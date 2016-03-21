@@ -1,41 +1,86 @@
 From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Mon, 21 Mar 2016 17:10:37 +0100
-Subject: [linux-sunxi][PATCH v2 0/5] ARM: sunxi: Add SPDIF playback support
-Message-ID: <1458576642-4078-1-git-send-email-codekipper@gmail.com>
+Date: Mon, 21 Mar 2016 17:10:39 +0100
+Subject: [linux-sunxi][PATCH v2 2/5] ARM: dts :sunxi: Add SPDIF pins to A10
+ and A20
+In-Reply-To: <1458576642-4078-1-git-send-email-codekipper@gmail.com>
+References: <1458576642-4078-1-git-send-email-codekipper@gmail.com>
+Message-ID: <1458576642-4078-3-git-send-email-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marcus Cooper <codekipper@gmail.com>
 
-Hi All,
+Add the SPDIF pins to the A10 and A20 dtsi.
 
-now that the sun4i-spdif driver has made it into linux-next then this patch
-series completes what is needed to have SPDIF working on both A10 and A20
-devices.
-
-Enjoy,
-CK
-
+Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 ---
-Changes since v1:
-- Added defines to the dma properties and changed reg length to cover the entire
-  spdif memory area.
+ arch/arm/boot/dts/sun4i-a10.dtsi | 21 +++++++++++++++++++++
+ arch/arm/boot/dts/sun7i-a20.dtsi | 21 +++++++++++++++++++++
+ 2 files changed, 42 insertions(+)
 
-Andrea Venturi (1):
-  clk: sunxi: mod1 clock should modify it's parent
-
-Marcus Cooper (4):
-  ARM: dts :sunxi: Add SPDIF pins to A10 and A20
-  ARM: dts: sunxi: Add the SPDIF to the A10 and A20
-  ARM: dts: sun4i: Add SPDIF to the Mele A1000
-  ARM: dts: sun7i: Add SPDIF to Itead Ibox
-
- arch/arm/boot/dts/sun4i-a10-a1000.dts      | 23 +++++++++++++++
- arch/arm/boot/dts/sun4i-a10.dtsi           | 45 ++++++++++++++++++++++++++++++
- arch/arm/boot/dts/sun7i-a20-itead-ibox.dts | 24 ++++++++++++++++
- arch/arm/boot/dts/sun7i-a20.dtsi           | 45 ++++++++++++++++++++++++++++++
- drivers/clk/sunxi/clk-a10-mod1.c           |  2 +-
- 5 files changed, 138 insertions(+), 1 deletion(-)
-
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index 2c8f5e6..0483640 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -1006,6 +1006,27 @@
+ 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+ 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 			};
++
++			spdif_tx_pins_a: spdif at 0 {
++				allwinner,pins = "PB13";
++				allwinner,function = "spdif";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++			};
++
++			spdif_rx_pins_a: spdif at 1 {
++				allwinner,pins = "PB12";
++				allwinner,function = "spdif";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
++			spdif_mclk_pins_a: spdif at 2 {
++				allwinner,pins = "PB3";
++				allwinner,function = "spdif";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
+ 		};
+ 
+ 		timer at 01c20c00 {
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 0940a78..7264d5e 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -1193,6 +1193,27 @@
+ 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+ 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 			};
++
++			spdif_tx_pins_a: spdif at 0 {
++				allwinner,pins = "PB13";
++				allwinner,function = "spdif";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++			};
++
++			spdif_rx_pins_a: spdif at 1 {
++				allwinner,pins = "PB12";
++				allwinner,function = "spdif";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
++			spdif_mclk_pins_a: spdif at 2 {
++				allwinner,pins = "PB3";
++				allwinner,function = "spdif";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
+ 		};
+ 
+ 		timer at 01c20c00 {
 -- 
 2.7.4
