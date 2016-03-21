@@ -1,74 +1,101 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Mon, 21 Mar 2016 16:35:53 +0530
-Subject: [PATCH 2/2] arm64: Fix watchpoint recursion when single-step is
- wrongly triggered in irq
-In-Reply-To: <56EFCF27.3090903@huawei.com>
-References: <1458549470-124791-1-git-send-email-hekuang@huawei.com>
- <1458549470-124791-2-git-send-email-hekuang@huawei.com>
- <20160321102423.GB15150@dhcppc6.redhat.com>
- <56EFCF27.3090903@huawei.com>
-Message-ID: <20160321110553.GC15150@dhcppc6.redhat.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 21 Mar 2016 19:08:38 +0800
+Subject: [PATCH v5 2/4] Documentation: Bindings: Add STM32 DWMAC glue
+In-Reply-To: <CAJgp7zxyQGrSSvNszawBQfS+omgKi1i35uW-eDyLdW-jP7oRjg@mail.gmail.com>
+References: <1458315428-10081-1-git-send-email-alexandre.torgue@gmail.com>
+ <1458315428-10081-3-git-send-email-alexandre.torgue@gmail.com>
+ <CAGb2v65SvVi0cJbaaD9cYrqC3pJ9eumwhTVk11_N7r_nTZhS9g@mail.gmail.com>
+ <CAJgp7zxyQGrSSvNszawBQfS+omgKi1i35uW-eDyLdW-jP7oRjg@mail.gmail.com>
+Message-ID: <CAGb2v64V_Km+i62L=L3nuzANX1eMhC2eBvKCZuVqEFdWqeTHLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/03/2016:06:38:31 PM, Wangnan (F) wrote:
-> 
-> 
-> On 2016/3/21 18:24, Pratyush Anand wrote:
-> >On 21/03/2016:08:37:50 AM, He Kuang wrote:
-> >>On arm64, watchpoint handler enables single-step to bypass the next
-> >>instruction for not recursive enter. If an irq is triggered right
-> >>after the watchpoint, a single-step will be wrongly triggered in irq
-> >>handler, which causes the watchpoint address not stepped over and
-> >>system hang.
-> >Does patch [1] resolves this issue as well? I hope it should. Patch[1] has still
-> >not been sent for review. Your test result will be helpful.
-> >
-> >~Pratyush
-> >
-> >[1] https://github.com/pratyushanand/linux/commit/7623c8099ac22eaa00e7e0f52430f7a4bd154652
-> 
-> Could you please provide a test program for your case so we can test
-> it on our devices? I guess setting breakpoint on a "copy_from_user()"
-> accessing an invalid address can trigger this problem?
+On Mon, Mar 21, 2016 at 6:45 PM, Alexandre Torgue
+<alexandre.torgue@gmail.com> wrote:
+> Hi,
+>
+> 2016-03-18 17:00 GMT+01:00 Chen-Yu Tsai <wens@csie.org>:
+>> Hi,
+>>
+>> On Fri, Mar 18, 2016 at 11:37 PM, Alexandre TORGUE
+>> <alexandre.torgue@gmail.com> wrote:
+>>> Signed-off-by: Alexandre TORGUE <alexandre.torgue@gmail.com>
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/net/stm32-dwmac.txt b/Documentation/devicetree/bindings/net/stm32-dwmac.txt
+>>> new file mode 100644
+>>> index 0000000..ada2aa4
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/net/stm32-dwmac.txt
+>>> @@ -0,0 +1,32 @@
+>>> +STMicroelectronics STM32 / MCU DWMAC glue layer controller
+>>> +
+>>> +This file documents platform glue layer for stmmac.
+>>> +Please see stmmac.txt for the other unchanged properties.
+>>> +
+>>> +The device node has following properties.
+>>> +
+>>> +Required properties:
+>>> +- compatible:  Should be "st,stm32-dwmac" to select glue, and
+>>> +              "snps,dwmac-3.50a" to select IP vesrion.
+>>
+>> If you need have sort of hardware glue, then it is not compatible.
+>>
+>
+> We could have the case where the glue is set by a bootloader.
+> In this case, we will select IP version in compatible and we will use
+> generic dwmac glue to probe stmmac driver.
 
-My test case was to test kprobing of copy_from_user. I used kprobe64-v11.
+It seems most platforms using DWMAC follow this design set by
+the original stmmac bindings. I'm arguing that the requirement
+of setting up the glue makes them incompatible.
 
-I reverted "patch v11 3/9" and used following script  for __copy_to_user(),
-which instruments kprobe at every instruction of a given function. I can easily
-see "Unexpected kernel single-step exception at EL1".
--------------------------------------------------------------
-#kprobe_at_function_all_inst.sh  
--------------------------------------------------------------
-#! /bin/sh
-#$1: function name
-echo 0 > /sys/kernel/debug/tracing/events/kprobes/enable
-echo >  /sys/kernel/debug/tracing/trace
-echo > /sys/kernel/debug/tracing/kprobe_events
-func=$(cat /proc/kallsyms | grep -A 1 -w $1 | cut -d ' ' -f 1)
-func_start=$((0x$(echo $func | cut -d ' ' -f 1)))
-func_end=$((0x$(echo $func | cut -d ' ' -f 2)))
-offset=0
-while [ $(($func_start + $offset)) -lt $func_end ]
-  do
-          printf -v cmd "p:probe_%x $1+0x%x" $offset $offset
-          echo $cmd >> /sys/kernel/debug/tracing/kprobe_events
-          offset=$((offset + 4))
-  done
-echo 1 > /sys/kernel/debug/tracing/events/kprobes/enable
--------------------------------------------------------------
+What happens when the bootloader didn't setup the glue? And one
+forgets to build the STM32 driver, only the generic one? The
+generic driver even matches to some, but not all, version
+strings.
 
-# ./kprobe_at_function_all_inst.sh __copy_to_user
+Maybe it would've been better if the versioned strings were
+only used to indicate functionality, and not used to bind
+the drivers. But the bindings were set some time ago.
 
-Now, if I apply the patch which I referred in [1], I can no longer see any
-"Unexpected kernel single-step exception at EL1" with above test script.
 
-If I understood correctly, then the problem you described in your patch is that
-an irq (el1_irq) is raised when watchpoint was being handled by kernel(specially
-before kernel could call reinstall_suspended_bps() to disable single stepping).
-Since, I disable single stepping for all the el1 exception mode, if
-kernel_enable_single_step() had been called but kernel_disable_single_step() had
-n't been called. So, your test case could be another good test for my
-patch.
+Regards
+ChenYu
 
-~Pratyush
+
+> Regards
+>
+> Alex.
+>
+>> ChenYu
+>>
+>>> +- clocks: Must contain a phandle for each entry in clock-names.
+>>> +- clock-names: Should be "stmmaceth" for the host clock.
+>>> +              Should be "tx-clk" for the MAC TX clock.
+>>> +              Should be "rx-clk" for the MAC RX clock.
+>>> +- st,syscon : Should be phandle/offset pair. The phandle to the syscon node which
+>>> +             encompases the glue register, and the offset of the control register.
+>>> +Example:
+>>> +
+>>> +               ethernet0: dwmac at 40028000 {
+>>> +                       compatible = "st,stm32-dwmac", "snps,dwmac-3.50a";
+>>> +                       status = "disabled";
+>>> +                       reg = <0x40028000 0x8000>;
+>>> +                       reg-names = "stmmaceth";
+>>> +                       interrupts = <0 61 0>, <0 62 0>;
+>>> +                       interrupt-names = "macirq", "eth_wake_irq";
+>>> +                       clock-names = "stmmaceth", "tx-clk", "rx-clk";
+>>> +                       clocks = <&rcc 0 25>, <&rcc 0 26>, <&rcc 0 27>;
+>>> +                       st,syscon = <&syscfg 0x4>;
+>>> +                       snps,pbl = <8>;
+>>> +                       snps,mixed-burst;
+>>> +                       dma-ranges;
+>>> +               };
+>>> --
+>>> 1.9.1
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
