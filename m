@@ -1,80 +1,34 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 21 Mar 2016 08:59:30 +0100
-Subject: [PATCH v7] ARM: dts: sun8i: Add leds and switches on Orangepi
- Plus boards
-In-Reply-To: <1458500102-11071-1-git-send-email-hdegoede@redhat.com>
-References: <1458500102-11071-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20160321075930.GA30977@lukather>
+Date: Mon, 21 Mar 2016 09:03:48 +0100
+Subject: [PATCH 0/8] ARM: dts: sun8i: Orangepi Plus dts improvements
+In-Reply-To: <1458489636-2825-1-git-send-email-hdegoede@redhat.com>
+References: <1458489636-2825-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20160321080348.GB30977@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Sun, Mar 20, 2016 at 07:55:02PM +0100, Hans de Goede wrote:
-> From: Krzysztof Adamski <k@japko.eu>
+On Sun, Mar 20, 2016 at 05:00:28PM +0100, Hans de Goede wrote:
+> Hi Maxime and Chen-Yu,
 > 
-> OrangePi Plus board has two leds - green ("pwr") and red ("status")
-> and two switches ("sw4" and "sw2"). This patch describes them in
-> devicetree.
+> Here is a series with various improvements for the Orangepi Plus dts.
+> Some (most) of these patches have been submitted before, esp. the USB
+> ones have multiple revisions before. But I lost count of their version,
+> so I'm posting this as a "new" set.
 > 
-> Signed-off-by: Krzysztof Adamski <k@japko.eu>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-
-An earlier version has already been sent for 4.6, please base your
-changes on top of this one.
-
-And there's a bunch of things I didn't catch at that time :/
-
-> ---
-> Changes in v6 (hdegoede):
-> -Merge leds and r_leds nodes into one
-> -Fix led labels to be in <board>:<colour>:<role> form
-> -Alphabetically sort the added nodes
-> -Add support for sw2 (this is the small reset-like button)
-> Changes in v7 (hdegoede):
-> -Use PL3 / PL4 in the pinctrl node, not PL03 / PL04
-> ---
->  arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts | 63 ++++++++++++++++++++++++++++
->  1 file changed, 63 insertions(+)
+> About the USB patches, these rely on the patches to add support for
+> multiple-reset controllers to ohci-platform / ehci-platform. These
+> patches are all acked up and will go upstream as soon as v4.6-rc1 is
+> released (they depend on changes which will go into v4.6-rc1).
 > 
-> diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-> index a680b1f..9d8c038 100644
-> --- a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-> +++ b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-> @@ -45,6 +45,7 @@
->  #include "sunxi-common-regulators.dtsi"
->  
->  #include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/input/input.h>
->  #include <dt-bindings/pinctrl/sun4i-a10.h>
->  
->  / {
-> @@ -59,6 +60,43 @@
->  		stdout-path = "serial0:115200n8";
->  	};
->  
-> +	gpio_keys {
-> +		compatible = "gpio-keys";
-> +		input-name = "sw4";
+> The old ohci-platform / ehci-platform will only look at the first reset
+> specified in the dt and as such will fail to load with the new dt nodes
+> (because they cannot talk to the controller).
+> 
+> I've also included a v6 of Krzysztof Adamski <k@japko.eu> leds / switches
+> patch, fixing the comments you had in your review of v5. I've done this
+> to avoid conflicts with my other patches.
 
-This is an undocumented (and apparently unused) property
-
-> +
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&sw_r_opc>;
-> +
-> +		sw2 at 0 {
-
-You shouldn't have a unit-address here
-
-> +			label = "sw2";
-> +			linux,code = <BTN_1>;
-> +			gpios = <&r_pio 0 4 GPIO_ACTIVE_LOW>;
-> +		};
-> +
-> +		sw4 at 0 {
-
-Ditto.
+Applied all but patch 6, which was in already.
 
 Thanks!
 Maxime
@@ -89,4 +43,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160321/90d11ec6/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160321/3b151be5/attachment.sig>
