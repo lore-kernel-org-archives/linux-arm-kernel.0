@@ -1,89 +1,52 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 21 Mar 2016 18:17:48 +0200
-Subject: [PATCH v2] dmaengine: vdma: Add 64 bit addressing support to the
- driver
-In-Reply-To: <3802E9A6666DF54886E2B9CBF743BA9801C08CA1@XAP-PVEXMBX01.xlnx.xilinx.com>
-References: <1440690558-39822-1-git-send-email-anuragku@xilinx.com>
- <20150921155712.GN2381@localhost>
- <3802E9A6666DF54886E2B9CBF743BA9801C08CA1@XAP-PVEXMBX01.xlnx.xilinx.com>
-Message-ID: <3681371.njDCZ2OU0Q@avalon>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Mon, 21 Mar 2016 17:32:15 +0100
+Subject: [PATCH v2 4/4] nmi_backtrace: generate one-line reports for idle
+ cpus
+In-Reply-To: <56F01E10.6030909@mellanox.com>
+References: <1458147733-29338-1-git-send-email-cmetcalf@mellanox.com>
+ <1458147733-29338-5-git-send-email-cmetcalf@mellanox.com>
+ <20160321154201.GA6344@twins.programming.kicks-ass.net>
+ <56F01E10.6030909@mellanox.com>
+Message-ID: <20160321163215.GC6344@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anurag,
+On Mon, Mar 21, 2016 at 12:15:12PM -0400, Chris Metcalf wrote:
+> On 03/21/2016 11:42 AM, Peter Zijlstra wrote:
 
-On Wednesday 23 Sep 2015 15:12:36 Anurag Kumar Vulisha wrote:
-> On Monday, September 21, 2015 9:27 PM Vinod Koul wrote:
-> > On Thu, Aug 27, 2015 at 09:19:18PM +0530, Anurag Kumar Vulisha wrote:
-> >> This VDMA  is a soft ip, which can be programmed to support
-> >> 32 bit addressing or greater than 32 bit addressing.
-> >> 
-> >> When the VDMA ip is configured for 32 bit address space the transfer
-> >> start address is specified by a single register.
-> > 
-> > would be good to specfiy which one
+> >The most common idle function for x86 is: mwait_idle_with_hints(),
+> >trouble is, its an inline, so I'm not sure adding __cpuidle to it does
+> >anything.
 > 
-> Will change  this in v3
+> No, you're right, it wouldn't help.  I didn't look at the drivers/cpuidle
+> subsystem at all in my patch, since I'm not that familiar with it,
+> but it seems like tagging acpi_processor_ffh_cstate_enter(), as the
+> only user of mwait_idle_with_hints(), will do the job.
 
-What happened to v3 ? :-)
+intel_idle() also uses it.
 
-> >> When the  VDMA core is configured for an address space greater than 32
-> >> then each start address is specified by a combination of two
-> >> registers. The first register specifies the LSB 32 bits of address,
-> >> while the next register specifies the MSB 32 bits of address.For
-> >> example,5Ch will specify the LSB 32 bits while 60h will specify the
-> >> MSB 32 bits of the first start address.So we need to program two
-> >> registers at a time.
-> > 
-> > can we have spaces after full stops and commas!
+> >I've yet to find the magic objdump incantation to check. Or rather
+> >objdump -h doesn't appear to list .cpuidle.text at all :/
+> >
+> >I'm probably doing something silly...
 > 
-> Will take care of this in v3 patch.
-> 
-> >> +/* Since vdma driver is trying to write to a register offset which is
-> >> +not a
-> >> + * multiple of 64 bits(ex : 0x5c), we are writing as two separate 32
-> >> +bits
-> >> + * instead of a single 64 bit register write.
-> >> + */
-> > 
-> > This is not kernel style for multi-lines, pls refer to
-> > Documentation/CodingStyle
-> 
-> Will address this in v3 patch
-> 
-> >> +
-> >> +static inline void vdma_desc_write_64(struct xilinx_vdma_chan *chan,
-> >> u32 reg,
-> >> +                            u32 value_lsb, u32 value_msb)
-> >> +{
-> >> +   /* Write the lsb 32 bits*/
-> >> +   writel(value_lsb, chan->xdev->regs + chan->desc_offset + reg);
-> >> +
-> >> +   /* Write the msb 32 bits */
-> >> +   writel(value_msb, chan->xdev->regs + chan->desc_offset + reg + 4);
-> > 
-> > why not writeq
-> 
-> We are trying to write at a register address(ex:0x5c) which is not aligned
-> on 8 bytes  boundary.So if I try to use 64 bit write on it,unalignment 
-> fault is getting  generated.To avoid that we are using two separate 32  bit
-> writes. We had this discussion in previous versions of this patch with
-> Laurent Pinchart .I have also added this exaplanation in the comments above
-> this function.
->
-> >> +   err = of_property_read_u32(node, "xlnx,addrwidth", &addr_width);
-> >> +
-> >> +   if (err < 0) {
-> >> +           /* Setting addr_width property to default 32 bits */
-> >> +           addr_width = 32;
-> >> +   }
-> > 
-> > braces for a single line statement! Also space is redandant before if
-> > condition
->
-> Will take care of this in v3 patch
+> The easiest way to check for a given function is just to look
+> at the "nm -n" output and see that all the functions you expect
+> to reflect idle behavior are in the cpuidle begin/end range.
 
--- 
-Regards,
+# nm -n ivb-ep-build/vmlinux | awk '/__cpuidle_text_start/ {p=1} {if (p) print $0} /__cpuidle_text_end/ {p=0}'
+ffffffff81b16ca8 T __cpuidle_text_start
+ffffffff81b16cb0 T default_idle
+ffffffff81b16e50 t mwait_idle
+ffffffff81b17080 t cpu_idle_poll
+ffffffff81b17280 T default_idle_call
+ffffffff81b172be T __cpuidle_text_end
 
-Laurent Pinchart
+So no intel_idle for me..
+
+> objdump -h certainly works to show .cpuidle.text if you look at
+> individual objects (e.g. arch/x86/kernel/process.o) but by the time
+> you're looking at the linked vmlinux image they have all been linked
+> into the giant .text section.
+
+Indeed.
