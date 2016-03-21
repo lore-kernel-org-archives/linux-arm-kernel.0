@@ -1,94 +1,46 @@
-From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
-Date: Mon, 21 Mar 2016 15:02:20 +0100
-Subject: [PATCH v5 2/4] Documentation: Bindings: Add STM32 DWMAC glue
-In-Reply-To: <CAJgp7zxyQGrSSvNszawBQfS+omgKi1i35uW-eDyLdW-jP7oRjg@mail.gmail.com>
-References: <1458315428-10081-1-git-send-email-alexandre.torgue@gmail.com>	<1458315428-10081-3-git-send-email-alexandre.torgue@gmail.com>	<CAGb2v65SvVi0cJbaaD9cYrqC3pJ9eumwhTVk11_N7r_nTZhS9g@mail.gmail.com>
- <CAJgp7zxyQGrSSvNszawBQfS+omgKi1i35uW-eDyLdW-jP7oRjg@mail.gmail.com>
-Message-ID: <56EFFEEC.1010407@st.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 21 Mar 2016 14:24:39 +0000
+Subject: [linux-sunxi] Re: [PATCH v8 2/2] ASoc: sun4i-codec: Add FM, Line
+ and Mic inputs
+In-Reply-To: <20160319171336.6e16eb5a@scratchpost.org>
+References: <20151221123148.1ab6480b@dayas> <20151221123416.51aa938e@dayas>
+ <20151227182157.GI30359@lukather> <20151228040649.475a742f@dayas>
+ <20160106220908.GE9631@lukather> <20160109164832.515d69b0@dayas>
+ <20160312085222.226d89bf@scratchpost.org>
+ <20160314104939.GL8418@lukather>
+ <20160315105802.GN2566@sirena.org.uk>
+ <20160319171336.6e16eb5a@scratchpost.org>
+Message-ID: <20160321142438.GU2566@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/21/2016 11:45 AM, Alexandre Torgue wrote:
-> Hi,
->
-> 2016-03-18 17:00 GMT+01:00 Chen-Yu Tsai <wens@csie.org>:
->> Hi,
->>
->> On Fri, Mar 18, 2016 at 11:37 PM, Alexandre TORGUE
->> <alexandre.torgue@gmail.com> wrote:
->>> Signed-off-by: Alexandre TORGUE <alexandre.torgue@gmail.com>
->>>
->>> diff --git a/Documentation/devicetree/bindings/net/stm32-dwmac.txt b/Documentation/devicetree/bindings/net/stm32-dwmac.txt
->>> new file mode 100644
->>> index 0000000..ada2aa4
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/net/stm32-dwmac.txt
->>> @@ -0,0 +1,32 @@
->>> +STMicroelectronics STM32 / MCU DWMAC glue layer controller
->>> +
->>> +This file documents platform glue layer for stmmac.
->>> +Please see stmmac.txt for the other unchanged properties.
->>> +
->>> +The device node has following properties.
->>> +
->>> +Required properties:
->>> +- compatible:  Should be "st,stm32-dwmac" to select glue, and
->>> +              "snps,dwmac-3.50a" to select IP vesrion.
+On Sat, Mar 19, 2016 at 05:13:36PM +0100, Danny Milosavljevic wrote:
+> Hi Mark,
 
-Almost all the synp gmac chips have the HW capability register that is
-used for setting all the parameters at probe time.
-This will override fields passed from DT. In theory, it is not
-necessary to pass: "snps,dwmac-3.50a" from device tree at least there
-is either no HW cap reg or the glue has some w/a for a specific chip
-revision.
-To be honest, I like to see the "snps,dwmac-3.50a" as compatibility
-to also have a better readability (that's my personal view ;-) ).
+> my question is whether it's possible to group together the left and right channel into one selem, and also if it's possible to reuse volumes then. For example:
 
-Peppe
+Please fix your mail client to word wrap within paragraphs at something
+substantially less than 80 columns.  Doing this makes your messages much
+easier to read and reply to.  This is particularly important for large
+walls of text like this.
 
->>
->> If you need have sort of hardware glue, then it is not compatible.
->>
->
-> We could have the case where the glue is set by a bootloader.
-> In this case, we will select IP version in compatible and we will use
-> generic dwmac glue to probe stmmac driver.
->
-> Regards
->
-> Alex.
->
->> ChenYu
->>
->>> +- clocks: Must contain a phandle for each entry in clock-names.
->>> +- clock-names: Should be "stmmaceth" for the host clock.
->>> +              Should be "tx-clk" for the MAC TX clock.
->>> +              Should be "rx-clk" for the MAC RX clock.
->>> +- st,syscon : Should be phandle/offset pair. The phandle to the syscon node which
->>> +             encompases the glue register, and the offset of the control register.
->>> +Example:
->>> +
->>> +               ethernet0: dwmac at 40028000 {
->>> +                       compatible = "st,stm32-dwmac", "snps,dwmac-3.50a";
->>> +                       status = "disabled";
->>> +                       reg = <0x40028000 0x8000>;
->>> +                       reg-names = "stmmaceth";
->>> +                       interrupts = <0 61 0>, <0 62 0>;
->>> +                       interrupt-names = "macirq", "eth_wake_irq";
->>> +                       clock-names = "stmmaceth", "tx-clk", "rx-clk";
->>> +                       clocks = <&rcc 0 25>, <&rcc 0 26>, <&rcc 0 27>;
->>> +                       st,syscon = <&syscfg 0x4>;
->>> +                       snps,pbl = <8>;
->>> +                       snps,mixed-burst;
->>> +                       dma-ranges;
->>> +               };
->>> --
->>> 1.9.1
->>>
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
->
+> Is it possible to group them together like this? How?
+
+This is something you'd need to change in alsamixer and the control
+naming standards.  None of this stuff is really supposed to be directly
+edited by normal users, they should mostly be using a UCM configuration,
+so at the minute this is essentially bikeshedding.
+
+> Is it possible to somehow distinguish those in alsamixer? Do we want to?
+
+I think you're looking for something that exports routing to userspace.
+Doing that would also help with reducing the faff with naming rules.
+Currently nobody is working on that but I think people would be very
+happy if someone were to work on it.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160321/f0f61045/attachment-0001.sig>
