@@ -1,77 +1,67 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 21 Mar 2016 13:04:41 -0600
-Subject: [RESEND PATCH V4 1/4] stm class: provision for statically
- assigned masterIDs
-In-Reply-To: <87wpow6znl.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1457418835-31417-1-git-send-email-zhang.chunyan@linaro.org>
- <1457418835-31417-2-git-send-email-zhang.chunyan@linaro.org>
- <87wpow6znl.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <CANLsYkxsaGmkpq6cNNw+CeMDKK7wwdDoegEuG2oNPNp185_9Mg@mail.gmail.com>
+From: sgurrappadi@nvidia.com (Sai Gurrappadi)
+Date: Mon, 21 Mar 2016 12:20:57 -0700
+Subject: [PATCH v4 2/8] Documentation: arm: define DT cpu capacity bindings
+In-Reply-To: <20160321105330.GB12319@e106622-lin>
+References: <1458311054-13524-1-git-send-email-juri.lelli@arm.com>
+ <1458311054-13524-3-git-send-email-juri.lelli@arm.com>
+ <56EC3F9E.4050209@nvidia.com> <20160321105330.GB12319@e106622-lin>
+Message-ID: <56F04999.6090902@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 March 2016 at 01:47, Alexander Shishkin
-<alexander.shishkin@linux.intel.com> wrote:
-> Chunyan Zhang <zhang.chunyan@linaro.org> writes:
->
->> From: Mathieu Poirier <mathieu.poirier@linaro.org>
+
+
+On 03/21/2016 03:53 AM, Juri Lelli wrote:
+> Hi Sai,
+> 
+> On 18/03/16 10:49, Sai Gurrappadi wrote:
+>> Hi Juri,
 >>
->> Some architecture like ARM assign masterIDs at the HW design
->> phase.  Those are therefore unreachable to users, making masterID
->> management in the generic STM core irrelevant.
+>> On 03/18/2016 07:24 AM, Juri Lelli wrote:
 >>
->> In this kind of configuration channels are shared between masters
->> rather than being allocated on a per master basis.
+>> <snip>
 >>
->> This patch adds a new 'mshared' flag to struct stm_data that tells the
->> core that this specific STM device doesn't need explicit masterID
->> management.
->
-> There are two kinds of 'masterIDs' that we're talking about here: the
-> ones that turn up in the STP stream and the ones that are accessible to
-> trace-side software (sw_start/sw_end). So in this case we want to
-> reflect the fact that there is no correlation between the two, because
-> hardware assigns STP channels dynamically based on the states of the
-> trace/execution environment. And although the trace side software can do
-> very little with this information, it does make sense to provide it.
->
-> The sw_start==sw_end situation, on the other hand, is a side effect of
-> the above and, as I said in one of the previous threads, may not even be
-> the case, or at least I don't see why it has to. And when it is the
-> case, I don't see the point in handling it differently from
-> sw_start<sw_end situation.
->
->> In the core sw_start/end of masterID are set to '1',
->> i.e there is only one masterID to deal with.
->
-> Why does this need to be done in the core and why '1'? IOW,
-> sw_{start,end} come straight from the driver, this new 'mshared' comes
-> straight from the driver, why do we need the core to modify the former
-> based on the latter?
+>>> +
+>>> +==========================================
+>>> +2 - CPU capacity definition
+>>> +==========================================
+>>> +
+>>> +CPU capacity is a number that provides the scheduler information about CPUs
+>>> +heterogeneity. Such heterogeneity can come from micro-architectural differences
+>>> +(e.g., ARM big.LITTLE systems) or maximum frequency at which CPUs can run
+>>> +(e.g., SMP systems with multiple frequency domains). Heterogeneity in this
+>>> +context is about differing performance characteristics; this binding tries to
+>>> +capture a first-order approximation of the relative performance of CPUs.
+>>
+>> Any reason why this capacity number is not dynamically generated based on the
+>> max frequency for each CPU? The DT property would then instead specify just
+>> the micro-architectural differences between the CPU types.
+>>
+> 
+> I'm not sure I clearly understand your question, so I'll try to
+> reiterate it.
+> 
+> Are you asking why we don't dynamically profile the system, at boot for
+> example, to get this number? Or do you ask why this number couldn't be
+> only describing micro-arch differences (so, if I get it right, we should
+> then multiply it by max freq to get the capacity of a CPU)?
+> 
+> We already played with the first option (please refer to v2 and v3), but
+> we ended up agreeing that dynamic profiling adds overhead to the boot
+> process (while a DT approach can provide information to speed up boot)
+> and it is in general not repeatable/reliable (as numbers can vary from
+> boot to boot for different reasons).
+> 
+> The second option I think can be feasible, but I'm not sure what we gain
+> in practice. We will still need to specify a per-platform number, right?
 
-The logic here was to account for drivers that only set the 'mshared'
-flag.  One could (wrongly) assume that if mshared is set in the
-driver, sw_{start,end} are don't need to be set.  That way errors are
-caught quicker.  I'm fine with removing that part.
+I meant the second bit. We only need some per-platform fudge factor for
+micro-architectural differences. Tying in the Fmax like this statically means
+that we need to manually synchronize DVFS tables and this number which seems
+unnecessary given that the kernel already has this info on boot.
 
-Other than the above, is there anything you'd like to see modified in
-this patch, i.e how the mshared flag is used to modify the output in
-sysFS/configFS?
-
-Thanks,
-Mathieu
-
->
->> Also this patch depends on [1], so that the number of masterID
->> is '1' too.
->
-> It's 7b3bb0e753 in Linus' tree, but I don't see the logical connection
-> in the statement above.
-
-That statement should have appeared in the cover letter rather than
-this patch's blurb - that way it applies cleanly.
-
->
-> Regards,
-> --
-> Alex
+> 
+> Best,
+> 
+> - Juri
+> 
