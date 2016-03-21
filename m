@@ -1,120 +1,116 @@
-From: dh.herrmann@gmail.com (David Herrmann)
-Date: Mon, 21 Mar 2016 14:54:10 +0100
-Subject: [PATCH v2 3/9] efi/x86: efifb: move DMI based quirks handling out
- of generic code
-In-Reply-To: <1458319661-19762-4-git-send-email-ard.biesheuvel@linaro.org>
-References: <1458319661-19762-1-git-send-email-ard.biesheuvel@linaro.org>
- <1458319661-19762-4-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CANq1E4SGfZeLdFPab-cA7zz=AHS59z9pfWt3defqhDqroY2WaQ@mail.gmail.com>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Mon, 21 Mar 2016 19:31:27 +0530
+Subject: [RESEND PATCH V7 4/6] i2c: qup: Add bam dma capabilities
+In-Reply-To: <20160224101949.GB1391@katana>
+References: <1456142895-32646-1-git-send-email-sricharan@codeaurora.org>
+ <20160224101949.GB1391@katana>
+Message-ID: <004901d1837a$2df9f620$89ede260$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hi wolfram,
 
-On Fri, Mar 18, 2016 at 5:47 PM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> The efifb quirks handling based on DMI identification of the platform is
-> specific to x86, so move it to x86 arch code.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> On Mon, Feb 22, 2016 at 05:38:15PM +0530, Sricharan R wrote:
+> > QUP cores can be attached to a BAM module, which acts as a dma engine
+> > for the QUP core. When DMA with BAM is enabled, the BAM consumer
+> pipe
+> > transmitted data is written to the output FIFO and the BAM producer
+> > pipe received data is read from the input FIFO.
+> >
+> > With BAM capabilities, qup-i2c core can transfer more than
+> > 256 bytes, without a 'stop' which is not possible otherwise.
+> >
+> > Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> > Reviewed-by: Andy Gross <andy.gross@linaro.org>
+> > Tested-by: Archit Taneja <architt@codeaurora.org>
+> > Tested-by: Telkar Nagender <ntelkar@codeaurora.org>
+> 
+> Applied to for-next, thanks!
 
-Fine with me:
+There is a bug with only this patch which comes out when CONFIG_DEBUG_SG
+option gets
+enabled.  I have patch like below to fix it, but wanted to ask you if it
+would correct to have this in the
+original patch or should I sent a separate fix ? Sorry for the mess on this.
+Not sure if the pull request is sent
+already.
 
-Acked-by: David Herrmann <dh.herrmann@gmail.com>
+diff --git a/drivers/i2c/busses/i2c-qup.c b/drivers/i2c/busses/i2c-qup.c
+index 23eaabb..a1fae0c 100644
+--- a/drivers/i2c/busses/i2c-qup.c
++++ b/drivers/i2c/busses/i2c-qup.c
+@@ -595,9 +595,6 @@ static int qup_sg_set_buf(struct scatterlist *sg, void
+*buf,
+ 	if (!ret)
+ 		return -EINVAL;
+ 
+-	if (!map)
+-		sg_dma_address(sg) = tg->addr + ((u8 *)buf - tg->start);
+-
+ 	return 0;
+ }
+ 
+@@ -1268,6 +1265,8 @@ static int qup_i2c_xfer_v2(struct i2c_adapter *adap,
+ 		}
+ 	}
+ 
++	idx = 0;
++
+ 	do {
+ 		if (msgs[idx].len == 0) {
+ 			ret = -EINVAL;
+@@ -1407,27 +1406,21 @@ static int qup_i2c_probe(struct platform_device
+*pdev)
+ 
+ 		/* 2 tag bytes for each block + 5 for start, stop tags */
+ 		size = blocks * 2 + 5;
+-		qup->dpool = dma_pool_create("qup_i2c-dma-pool", &pdev->dev,
+-					     size, 4, 0);
+ 
+-		qup->start_tag.start = dma_pool_alloc(qup->dpool,
+GFP_KERNEL,
+-						      &qup->start_tag.addr);
++		qup->start_tag.start = devm_kzalloc(&pdev->dev,
++						    size, GFP_KERNEL);
+ 		if (!qup->start_tag.start) {
+ 			ret = -ENOMEM;
+ 			goto fail_dma;
+ 		}
+ 
+-		qup->brx.tag.start = dma_pool_alloc(qup->dpool,
+-						    GFP_KERNEL,
+-						    &qup->brx.tag.addr);
++		qup->brx.tag.start = devm_kzalloc(&pdev->dev, size,
+GFP_KERNEL);
+ 		if (!qup->brx.tag.start) {
+ 			ret = -ENOMEM;
+ 			goto fail_dma;
+ 		}
+ 
+-		qup->btx.tag.start = dma_pool_alloc(qup->dpool,
+-						    GFP_KERNEL,
+-						    &qup->btx.tag.addr);
++		qup->btx.tag.start = devm_kzalloc(&pdev->dev, size,
+GFP_KERNEL);
+ 		if (!qup->btx.tag.start) {
+ 			ret = -ENOMEM;
+ 			goto fail_dma;
+@@ -1566,13 +1559,6 @@ static int qup_i2c_remove(struct platform_device
+*pdev)
+ 	struct qup_i2c_dev *qup = platform_get_drvdata(pdev);
+ 
+ 	if (qup->is_dma) {
+-		dma_pool_free(qup->dpool, qup->start_tag.start,
+-			      qup->start_tag.addr);
+-		dma_pool_free(qup->dpool, qup->brx.tag.start,
+-			      qup->brx.tag.addr);
+-		dma_pool_free(qup->dpool, qup->btx.tag.start,
+-			      qup->btx.tag.addr);
+-		dma_pool_destroy(qup->dpool);
+ 		dma_release_channel(qup->btx.dma);
+ 		dma_release_channel(qup->brx.dma);
+ 	}
+--
 
-Thanks
-David
-
-> ---
->  arch/x86/include/asm/efi.h  |  2 ++
->  arch/x86/kernel/sysfb_efi.c | 15 +++++++++++++++
->  drivers/video/fbdev/efifb.c | 15 ++++-----------
->  3 files changed, 21 insertions(+), 11 deletions(-)
->
-> diff --git a/arch/x86/include/asm/efi.h b/arch/x86/include/asm/efi.h
-> index 7d5187b66108..790adbc3a64a 100644
-> --- a/arch/x86/include/asm/efi.h
-> +++ b/arch/x86/include/asm/efi.h
-> @@ -154,6 +154,8 @@ static inline bool efi_runtime_supported(void)
->  extern struct console early_efi_console;
->  extern void parse_efi_setup(u64 phys_addr, u32 data_len);
->
-> +extern void efifb_setup_from_dmi(struct screen_info *si, const char *opt);
-> +
->  #ifdef CONFIG_EFI_MIXED
->  extern void efi_thunk_runtime_setup(void);
->  extern efi_status_t efi_thunk_set_virtual_address_map(
-> diff --git a/arch/x86/kernel/sysfb_efi.c b/arch/x86/kernel/sysfb_efi.c
-> index b285d4e8c68e..e21a8a7ddcff 100644
-> --- a/arch/x86/kernel/sysfb_efi.c
-> +++ b/arch/x86/kernel/sysfb_efi.c
-> @@ -68,6 +68,21 @@ struct efifb_dmi_info efifb_dmi_list[] = {
->         [M_UNKNOWN] = { NULL, 0, 0, 0, 0, OVERRIDE_NONE }
->  };
->
-> +void efifb_setup_from_dmi(struct screen_info *si, const char *opt)
-> +{
-> +       int i;
-> +
-> +       for (i = 0; i < M_UNKNOWN; i++) {
-> +               if (efifb_dmi_list[i].base != 0 &&
-> +                   !strcmp(opt, efifb_dmi_list[i].optname)) {
-> +                       si->lfb_base = efifb_dmi_list[i].base;
-> +                       si->lfb_linelength = efifb_dmi_list[i].stride;
-> +                       si->lfb_width = efifb_dmi_list[i].width;
-> +                       si->lfb_height = efifb_dmi_list[i].height;
-> +               }
-> +       }
-> +}
-> +
->  #define choose_value(dmivalue, fwvalue, field, flags) ({       \
->                 typeof(fwvalue) _ret_ = fwvalue;                \
->                 if ((flags) & (field))                          \
-> diff --git a/drivers/video/fbdev/efifb.c b/drivers/video/fbdev/efifb.c
-> index 95d293b7445a..dd594369b8a6 100644
-> --- a/drivers/video/fbdev/efifb.c
-> +++ b/drivers/video/fbdev/efifb.c
-> @@ -8,6 +8,7 @@
->
->  #include <linux/module.h>
->  #include <linux/kernel.h>
-> +#include <linux/efi.h>
->  #include <linux/errno.h>
->  #include <linux/fb.h>
->  #include <linux/platform_device.h>
-> @@ -15,7 +16,7 @@
->  #include <linux/dmi.h>
->  #include <linux/pci.h>
->  #include <video/vga.h>
-> -#include <asm/sysfb.h>
-> +#include <asm/efi.h>
->
->  static bool request_mem_succeeded = false;
->
-> @@ -85,21 +86,13 @@ static struct fb_ops efifb_ops = {
->  static int efifb_setup(char *options)
->  {
->         char *this_opt;
-> -       int i;
->
->         if (options && *options) {
->                 while ((this_opt = strsep(&options, ",")) != NULL) {
->                         if (!*this_opt) continue;
->
-> -                       for (i = 0; i < M_UNKNOWN; i++) {
-> -                               if (efifb_dmi_list[i].base != 0 &&
-> -                                   !strcmp(this_opt, efifb_dmi_list[i].optname)) {
-> -                                       screen_info.lfb_base = efifb_dmi_list[i].base;
-> -                                       screen_info.lfb_linelength = efifb_dmi_list[i].stride;
-> -                                       screen_info.lfb_width = efifb_dmi_list[i].width;
-> -                                       screen_info.lfb_height = efifb_dmi_list[i].height;
-> -                               }
-> -                       }
-> +                       efifb_setup_from_dmi(&screen_info, this_opt);
-> +
->                         if (!strncmp(this_opt, "base:", 5))
->                                 screen_info.lfb_base = simple_strtoul(this_opt+5, NULL, 0);
->                         else if (!strncmp(this_opt, "stride:", 7))
-> --
-> 2.5.0
->
+Regards,
+ Sricharan
