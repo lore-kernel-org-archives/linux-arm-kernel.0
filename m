@@ -1,43 +1,45 @@
 From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Mon, 21 Mar 2016 21:01:01 +0100
-Subject: [linux-sunxi][PATCH v3 3/8] ARM: dts: sun4i: Add the SPDIF clk to the
- A10
-In-Reply-To: <1458590466-12572-1-git-send-email-codekipper@gmail.com>
-References: <1458590466-12572-1-git-send-email-codekipper@gmail.com>
-Message-ID: <1458590466-12572-4-git-send-email-codekipper@gmail.com>
+Date: Mon, 21 Mar 2016 21:00:58 +0100
+Subject: [linux-sunxi][PATCH v3 0/8] ARM: sunxi: Add SPDIF playback support
+Message-ID: <1458590466-12572-1-git-send-email-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marcus Cooper <codekipper@gmail.com>
 
-Add the SPDIF clock to the A10 dtsi.
+Hi All,
 
-Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+now that the sun4i-spdif driver has made it into linux-next then this patch
+series completes what is needed to have SPDIF working on both A10 and A20
+devices.
+
+Enjoy,
+CK
+
 ---
- arch/arm/boot/dts/sun4i-a10.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+Changes since v2:
+- Split the patches up, added and removed some newlines, removed unused spdif
+  pins
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 62fcef9..5747522 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -477,6 +477,17 @@
- 			clock-output-names = "ir1";
- 		};
- 
-+		spdif_clk: clk at 01c200c0 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-a10-mod1-clk";
-+			reg = <0x01c200c0 0x4>;
-+			clocks = <&pll2 SUN4I_A10_PLL2_8X>,
-+				 <&pll2 SUN4I_A10_PLL2_4X>,
-+				 <&pll2 SUN4I_A10_PLL2_2X>,
-+				 <&pll2 SUN4I_A10_PLL2_1X>;
-+			clock-output-names = "spdif";
-+		};
-+
- 		usb_clk: clk at 01c200cc {
- 			#clock-cells = <1>;
- 			#reset-cells = <1>;
+Changes since v1:
+- Added defines to the dma properties and changed reg length to cover the entire
+  spdif memory area.
+
+Marcus Cooper (8):
+  ARM: dts :sunxi: Add SPDIF TX pin to the A10
+  ARM: dts :sun7i: Add SPDIF TX pin to the A20
+  ARM: dts: sun4i: Add the SPDIF clk to the A10
+  ARM: dts: sun7i: Add the SPDIF clk to the A20
+  ARM: dts: sun4i: Add the SPDIF block to the A10
+  ARM: dts: sun7i: Add the SPDIF block to the A20
+  ARM: dts: sun4i: Add SPDIF to the Mele A1000
+  ARM: dts: sun7i: Add SPDIF to the Itead Ibox
+
+ arch/arm/boot/dts/sun4i-a10-a1000.dts      | 24 +++++++++++++++++++++++
+ arch/arm/boot/dts/sun4i-a10.dtsi           | 31 ++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/sun7i-a20-itead-ibox.dts | 24 +++++++++++++++++++++++
+ arch/arm/boot/dts/sun7i-a20.dtsi           | 31 ++++++++++++++++++++++++++++++
+ 4 files changed, 110 insertions(+)
+
 -- 
 2.7.4
