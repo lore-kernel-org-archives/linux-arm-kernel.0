@@ -1,37 +1,22 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Mon, 21 Mar 2016 17:48:44 +0100
-Subject: [PATCH v2 4/4] nmi_backtrace: generate one-line reports for idle
- cpus
-In-Reply-To: <1458147733-29338-5-git-send-email-cmetcalf@mellanox.com>
-References: <1458147733-29338-1-git-send-email-cmetcalf@mellanox.com>
- <1458147733-29338-5-git-send-email-cmetcalf@mellanox.com>
-Message-ID: <20160321164843.GD6344@twins.programming.kicks-ass.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 21 Mar 2016 18:02:54 +0100
+Subject: [RFC5 PATCH v6 00/21] ILP32 for ARM64
+In-Reply-To: <mvmbn68drw9.fsf@hawking.suse.de>
+References: <1452792198-10718-1-git-send-email-ynorov@caviumnetworks.com>
+ <6653982.FK62mVSCZO@wuerfel> <mvmbn68drw9.fsf@hawking.suse.de>
+Message-ID: <9954557.6jHvOcOYGT@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Monday 21 March 2016 11:52:54 Andreas Schwab wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
+> 
+> > What exactly do you need to define F_GETLK64 for on LP64?
+> 
+> To override the generic definitions.
 
-The below annotates the two most used idle functions on x86
 
+Ok, got it. I misread that part as adding definitions for LP64, but it
+is correctly removing the definitions for ILP32.
 
---- a/arch/x86/kernel/acpi/cstate.c
-+++ b/arch/x86/kernel/acpi/cstate.c
-@@ -152,7 +152,7 @@ int acpi_processor_ffh_cstate_probe(unsi
- }
- EXPORT_SYMBOL_GPL(acpi_processor_ffh_cstate_probe);
- 
--void acpi_processor_ffh_cstate_enter(struct acpi_processor_cx *cx)
-+__cpuidle void acpi_processor_ffh_cstate_enter(struct acpi_processor_cx *cx)
- {
- 	unsigned int cpu = smp_processor_id();
- 	struct cstate_entry *percpu_entry;
---- a/drivers/idle/intel_idle.c
-+++ b/drivers/idle/intel_idle.c
-@@ -725,7 +725,7 @@ static struct cpuidle_state avn_cstates[
-  *
-  * Must be called under local_irq_disable().
-  */
--static int intel_idle(struct cpuidle_device *dev,
-+__cpuidle static int intel_idle(struct cpuidle_device *dev,
- 		struct cpuidle_driver *drv, int index)
- {
- 	unsigned long ecx = 1; /* break on interrupt flag */
+	Arnd
