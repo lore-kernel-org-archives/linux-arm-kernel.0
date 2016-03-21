@@ -1,70 +1,54 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Mon, 21 Mar 2016 08:50:03 +0100
-Subject: [PATCH 1/2] ARM: socfpga: Add support for HPS LEDs on SoCKit
-In-Reply-To: <1458431866-9269-1-git-send-email-marex@denx.de>
-References: <1458431866-9269-1-git-send-email-marex@denx.de>
-Message-ID: <73y49cl178.fsf@unicorn.hi.pengutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 21 Mar 2016 08:50:21 +0100
+Subject: [linux-sunxi] Re: [PATCH] ARM: dts: sun6i: Add serial0 alias and
+ stdout-path to a31s-primo81.dts
+In-Reply-To: <56ED184B.9000609@redhat.com>
+References: <1458137962-27714-1-git-send-email-hdegoede@redhat.com>
+ <CAGb2v67+V1JdaG2ypgj5sXyzxiwZhYC_z_1sye5HpnMvcE_QfA@mail.gmail.com>
+ <20160318174839.GQ30977@lukather> <56ED184B.9000609@redhat.com>
+Message-ID: <20160321075021.GY30977@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, Mar 19, 2016 at 10:13:47AM +0100, Hans de Goede wrote:
+> Hi,
+> 
+> On 18-03-16 18:48, Maxime Ripard wrote:
+> >On Thu, Mar 17, 2016 at 02:28:03PM +0800, Chen-Yu Tsai wrote:
+> >>On Wed, Mar 16, 2016 at 10:19 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> >>>u-boot uses the kernel as the canonical source for its sunxi dts files
+> >>>and u-boot needs these.
+> >>>
+> >>>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >>
+> >>Acked-by: Chen-Yu Tsai <wens@csie.org>
+> >
+> >Queued, thanks!
+> 
+> I just got an of-list mail from Karsten Merker that you nacked the addition
+> if this during the initial submission, because there are no accessible uart
+> test pads on this tablet.
+> 
+> In that case the proper fix would be to change the u-boot defconfig to have:
+> 
+> # CONFIG_REQUIRE_SERIAL_CONSOLE is not set
+> 
+> Which will stop u-boot from panicking (with nowhere to print the panic msg)
+> when it has no stdout-path.
+> 
+> Can you unqueue this one until we've figured out what the best fix is ?
 
-Hi!
-
-Marek Vasut writes:
-
-> Add support for the blue LEDs on the SoCFPGA SoCkit board.
->
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
-> ---
->  arch/arm/boot/dts/socfpga_cyclone5_sockit.dts | 32 +++++++++++++++++++++++++++
->  1 file changed, 32 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-> index b61f22f..1461690 100644
-> --- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-> +++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-> @@ -39,6 +39,34 @@
->  		ethernet0 = &gmac1;
->  	};
->  
-> +	leds {
-> +		compatible = "gpio-leds";
-> +
-> +		hps_led0 {
-> +			label = "hps:blue:led0";
-> +			gpios = <&portb 24 0>;	/* HPS_GPIO53 */
-> +			linux,default-trigger = "heartbeat";
-> +		};
-> +
-> +		hps_led1 {
-> +			label = "hps:blue:led1";
-> +			gpios = <&portb 25 0>;	/* HPS_GPIO54 */
-> +			linux,default-trigger = "heartbeat";
-> +		};
-> +
-> +		hps_led2 {
-> +			label = "hps:blue:led2";
-> +			gpios = <&portb 26 0>;	/* HPS_GPIO55 */
-> +			linux,default-trigger = "heartbeat";
-> +		};
-> +
-> +		hps_led3 {
-> +			label = "hps:blue:led3";
-> +			gpios = <&portb 27 0>;	/* HPS_GPIO56 */
-> +			linux,default-trigger = "heartbeat";
-> +		};
-> +	};
-> +
-
-I'd personally remove the default-triggers.
-Otherwise looks good to me.
-
-Regards,
-Steffen
+Done, thanks!
+Maxime
 
 -- 
-Pengutronix e.K.                           | Steffen Trumtrar            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160321/1933a8a8/attachment.sig>
