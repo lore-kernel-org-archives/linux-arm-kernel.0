@@ -1,22 +1,45 @@
-From: hch@infradead.org (Christoph Hellwig)
-Date: Mon, 21 Mar 2016 08:26:01 -0700
-Subject: [PATCH v5 3/9] dma-mapping: add dma_{map,unmap}_resource
-In-Reply-To: <3286525.zPAGiD4Xk2@avalon>
-References: <1457404974-1800-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <20160311125846.GF1111@bigcity.dyn.berto.se>
- <20160315082254.GE9136@infradead.org> <3286525.zPAGiD4Xk2@avalon>
-Message-ID: <20160321152601.GA11674@infradead.org>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Mon, 21 Mar 2016 16:36:42 +0100
+Subject: [PATCH v5 2/4] Documentation: Bindings: Add STM32 DWMAC glue
+In-Reply-To: <20160321124043.GA26873@rob-hp-laptop>
+References: <1458315428-10081-1-git-send-email-alexandre.torgue@gmail.com>
+ <1458315428-10081-3-git-send-email-alexandre.torgue@gmail.com>
+ <CAGb2v65SvVi0cJbaaD9cYrqC3pJ9eumwhTVk11_N7r_nTZhS9g@mail.gmail.com>
+ <20160321124043.GA26873@rob-hp-laptop>
+Message-ID: <CAGhQ9VwS=YwgfeUuK+LzGjy3f9btVGV7bN=TATGHwQs+JW+iGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 17, 2016 at 01:33:51PM +0200, Laurent Pinchart wrote:
-> The good news is that, given that no code uses this new API at the moment, 
-> there isn't much to audit. The patch series implements the resource mapping 
-> for arch/arm only, and makes use of it in the rcar-dmac driver only. Would you 
-> like anything audited else than the arch/arm dma mapping implementation, the 
-> rcar-dmac driver and the code that then deals with the dma addresses (I'm 
-> thinking about the IOMMU subsystem and the ipmmu-vmsa driver in particular) ?
+On 21 March 2016 at 13:40, Rob Herring <robh@kernel.org> wrote:
+> On Sat, Mar 19, 2016 at 12:00:22AM +0800, Chen-Yu Tsai wrote:
+>> Hi,
+>>
+>> On Fri, Mar 18, 2016 at 11:37 PM, Alexandre TORGUE
+>> <alexandre.torgue@gmail.com> wrote:
+>> > +- clocks: Must contain a phandle for each entry in clock-names.
+>> > +- clock-names: Should be "stmmaceth" for the host clock.
+>
+> This doesn't sound like the clock input signal name...
+>
+>> > +              Should be "tx-clk" for the MAC TX clock.
+>> > +              Should be "rx-clk" for the MAC RX clock.
+>
+> How can other DWMAC blocks not have these clocks? The glue can't really
+> add these clocks. It could combine them into one or a new version of
+> DWMAC could have a different number of clock inputs. So if there is
+> variation here, then some of the bindings are probably wrong. I guess
+> the only change I'm suggesting is possibly moving these into common
+> binding doc.
 
-Yes, it would be good to do an audit of all the ARM dma_ops as well
-as generic code like drivers/base/dma-*.c, lib/dma-debug.c and
-include/linux/dma-*.h
+The LPC18xx implementation probably have these clocks as well but the
+LPC1850 user manual only documents the main clock. Someone with access
+to the IP block doc from Synopsys should be able to check which clocks
+the MAC really needs.
+
+Rockchip bindings have two clocks named "mac_clk_rx" and "mac_clk_tx".
+These are probably the same as stm32 needs so maybe use these names
+and move them into the main doc and update the rockchip binding.
+
+
+regards,
+Joachim Eastwood
