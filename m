@@ -1,124 +1,198 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 21 Mar 2016 10:38:52 +0200
-Subject: [PATCH 0/3] ARM: OMAP3: Fix McBSP2/3 hwmod setup for sidetone
-In-Reply-To: <alpine.DEB.2.02.1603191908070.6629@utopia.booyaka.com>
-References: <1458296929-718-1-git-send-email-peter.ujfalusi@ti.com>
- <alpine.DEB.2.02.1603191908070.6629@utopia.booyaka.com>
-Message-ID: <56EFB31C.9090103@ti.com>
+From: hekuang@huawei.com (He Kuang)
+Date: Mon, 21 Mar 2016 08:37:50 +0000
+Subject: [PATCH 2/2] arm64: Fix watchpoint recursion when single-step is
+ wrongly triggered in irq
+In-Reply-To: <1458549470-124791-1-git-send-email-hekuang@huawei.com>
+References: <1458549470-124791-1-git-send-email-hekuang@huawei.com>
+Message-ID: <1458549470-124791-2-git-send-email-hekuang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul,
+On arm64, watchpoint handler enables single-step to bypass the next
+instruction for not recursive enter. If an irq is triggered right
+after the watchpoint, a single-step will be wrongly triggered in irq
+handler, which causes the watchpoint address not stepped over and
+system hang.
 
-On 03/19/16 21:31, Paul Walmsley wrote:
-> On Fri, 18 Mar 2016, Peter Ujfalusi wrote:
-> 
->> The series addresses a long standing issue with McBSP2/3 regarding to hwmod
->> setup. When booting with DT a warning is printed that mcbsp2/3 is using two
->> hwmod.
->> The root of the issue is the way how the hwmod data was constructed in the first
->> place for OMAP3 McBSP2/3.
->> After re-reading the TRM it is clear that the sidetone should not have it's
->> own hwmod data as it is not a separate IP, it is part of the McBSP module.
-> 
-> Odd.  I come to exactly the opposite conclusion from reading the TRM.
+Problem can be found at the following URL:
+"http://thread.gmane.org/gmane.linux.kernel/2167918"
 
-I was looking at the Figure 21-2 in chapter 21.1.2 SIDETONE core:
-McBSP2/3 module consist of McBSP core + SIDETONE core.
+This patch pushes watchpoint status and disables single step if it is
+triggered in irq handler and restores them back after irq is handled.
 
-In fact the SIDETONE blocks clearly should be hwmods, according to the
-> documentation.
-> 
-> Consider:
-> 
-> 1. The SIDETONE blocks have their own L4 ports - as documented in the 
-> OMAP36xx public TRM rev Z,  Table 2-5 "L4-Peripheral Memory Space".
+Signed-off-by: Wang Nan <wangnan0@huawei.com>
+Signed-off-by: He Kuang <hekuang@huawei.com>
+---
+ arch/arm64/include/asm/debug-monitors.h |  9 +++++++
+ arch/arm64/kernel/debug-monitors.c      | 13 ++++++++++
+ arch/arm64/kernel/entry.S               |  6 +++++
+ arch/arm64/kernel/hw_breakpoint.c       | 44 +++++++++++++++++++++++++++++++--
+ 4 files changed, 70 insertions(+), 2 deletions(-)
 
-The SIDETONE feature is an addition on top of 'standard' McBSP
-
-> 2. The SIDETONE blocks have different register access width restrictions 
-> from the McBSP.  Ibid., Table 2-7 "Register Access Restrictions".
-
-Yes, this is odd. McBSP is 32bits and the McBSP sidetone is 8/16/32bits
-
-> 3. The SIDETONE blocks have distinct L4-Per firewall region IDs from their 
-> corresponding McBSP IP blocks.  Ibid., Table 9-114 "Region Allocation for 
-> L4-Per Interconnect".
-
-This is also interesting:
-McBSP2 sidetone is in region 39 and 40 (module and L4 interconnect) which is
-unique in case of OMAP34xx and OMAP35xx, but it is overlapping with GPIO6 on
-OMAP36xx. Not sure what are the implications.
-
-> 4. The SIDETONE blocks have their own L4 target interconnect agents.  
-> Table 9-128 "L4-Per Instance Summary"
-
-As they are different in the memory map.
-
-> 5. The SIDETONE blocks have their own MPU IRQ lines, distinct from the 
-> McBSP block IRQ lines.  Table 12-4 "Interrupt Mapping to the MPU 
-> Subsystem"
-
-Well, all McBSP have 3 distinct MPU IRQ lines: combined, RX, TX (McBSP2:
-combined: 17, TX: 62, RX: 63 for example). This does not make the McBSP RX and
-TX different IP block.
-
-> 6. The SIDETONE IP block register target space is distinct from the 
-> corresponding McBSP address ranges.  Table 21-36 "McBSP Instance Summary"
-
-Yes, they are as it is an additional feature integrated into only McBSP2/3 module.
-
-> 7. The SIDETONE IP blocks have their own "TI OCP" integration registers.  
-> Table 21-134 "ST_REV_REG", Table 21-136 "ST_SYSCONFIG_REG".
-
-Which does not work in a way it is supposed to work.
-As per the TRM (SWPU177T - OMAP36xx) 21.3.2.2.6:
-McBSPi.ST_SYSCONFIG_REG[0] AUTOIDLE bit:
-- When this bit is asserted (set to 1), the McBSPi_ICLK clock auto-gating is
-enabled and this clock is disabled internally to the SIDETONE feature, thus
-reducing power consumption, but not to the McBSP module that contains this
-feature.
-After reset, the automatic clock gating is enabled; thus, this bit must be
-disabled by software for activated SIDETONE feature.
-- When this bit is set to 0, the McBSPi_ICLK clock auto-gating is disabled and
-this clock is enabled. The SIDETONE feature can be used normally.
-
-The important part being: "When this bit is asserted (set to 1), the
-McBSPi_ICLK clock auto-gating is enabled and this clock is disabled internally
-to the SIDETONE feature"
-
-In my reading the McBSPi.ST_SYSCONFIG_REG[0] AUTOIDLE is internal to McBSP
-module and it will not affect the PRCM level of gating the McBSP2/3_ICLK. Most
-likely the actual plan was that by setting this bit the McBSP core should
-prevent the ICLK auto gating, but it is - as you know - not working that way.
-
-> A better solution to the warnings you mention at the top of the message is 
-> to provide a separate low-level McBSP SIDETONE IP block device driver, 
-> distinct from the existing McBSP low-level IP block driver.
-
-If we treat the McBSP sidetone as a distinct module (which is not) of OMAP3:
-we will have two hwmods and two drivers poking with the same PRCM registers as
-we need this for the sidetone: if it is enabled we need to disable the
-autoidle for the McBSP_ICLK for the given McBSP module the sidetone is part of.
-The sidetone can be enabled/disabled any time when McBSP is active so if we
-have McBSP running and we enable the sidetone the McBSP_ICLK should not idle,
-when the sidetone is disabled and McBSP is still in use we can not disable the
-McBSP in PRCM level, but we can enable the ICLK autoidle.
-
->> It can not affect PRCM either since it's SYSCONFIG register's AUTOIDLE 
->> bit is only sets the autoidle from the internal McBSP_iclk clock to the 
->> sidetone block of the same McBSP.
-> 
-> Can't parse this - could you try again?  Are you referring to the erratum 
-> where someone forgot to hook up the SIDETONE idle signals to the PRCM, and 
-> the MCBSP_ICLK has to be manually kept active when the SIDETONE block is 
-> active?
-
-Probably there is an errata for this, but 21.3.2.2.6 tells that the
-McBSPi.ST_SYSCONFIG[0] AUTOIDLE is working internally to the SIDETONE feature.
-The intention must have been that in case the SIDETONE is in use, the McBSP
-module itself should prevent the autoidle, but it is not. We all know that
-this is not going to be fixed by new revision.
-
+diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
+index b5902e8..fe6939e 100644
+--- a/arch/arm64/include/asm/debug-monitors.h
++++ b/arch/arm64/include/asm/debug-monitors.h
+@@ -133,7 +133,10 @@ int kernel_active_single_step(void);
+ #ifdef CONFIG_HAVE_HW_BREAKPOINT
+ int reinstall_suspended_bps(struct pt_regs *regs);
+ u64 signal_single_step_enable_bps(void);
++u64 irq_single_step_enable_bps(void);
++
+ void signal_reinstall_single_step(u64 pstate);
++void irq_reinstall_single_step(struct pt_regs *regs);
+ #else
+ static inline int reinstall_suspended_bps(struct pt_regs *regs)
+ {
+@@ -145,7 +148,13 @@ static inline u64 signal_single_step_enable_bps(void)
+ 	return 0;
+ }
+ 
++static inline u64 irq_single_step_enable_bps(void)
++{
++	return 0;
++}
++
+ static inline void signal_reinstall_single_step(u64 pstate) { }
++static inline void irq_reinstall_single_step(struct pt_regs *regs) { }
+ #endif
+ 
+ int aarch32_break_handler(struct pt_regs *regs);
+diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
+index c536c9e..fab1faa 100644
+--- a/arch/arm64/kernel/debug-monitors.c
++++ b/arch/arm64/kernel/debug-monitors.c
+@@ -245,9 +245,22 @@ static void send_user_sigtrap(int si_code)
+ 	force_sig_info(SIGTRAP, &info, current);
+ }
+ 
++extern unsigned long el1_irq_ss_entry[];
++
+ static int single_step_handler(unsigned long addr, unsigned int esr,
+ 			       struct pt_regs *regs)
+ {
++	void *pc = (void *)instruction_pointer(regs);
++
++	if (pc == &el1_irq_ss_entry) {
++		struct pt_regs *irq_regs = (struct pt_regs *)(regs->sp);
++
++		irq_regs->pstate |= irq_single_step_enable_bps();
++		kernel_disable_single_step();
++
++		return 0;
++	}
++
+ 	/*
+ 	 * If we are stepping a pending breakpoint, call the hw_breakpoint
+ 	 * handler first.
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 1f7f5a2..836d98e 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -402,12 +402,18 @@ ENDPROC(el1_sync)
+ el1_irq:
+ 	kernel_entry 1
+ 	enable_dbg
++	.global el1_irq_ss_entry
++el1_irq_ss_entry:
+ #ifdef CONFIG_TRACE_IRQFLAGS
+ 	bl	trace_hardirqs_off
+ #endif
+ 
+ 	get_thread_info tsk
+ 	irq_handler
++#ifdef CONFIG_HAVE_HW_BREAKPOINT
++	mov	x0, sp
++	bl	irq_reinstall_single_step
++#endif
+ 
+ #ifdef CONFIG_PREEMPT
+ 	ldr	w24, [tsk, #TI_PREEMPT]		// get preempt count
+diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
+index 18fd3d3..0cf13ee 100644
+--- a/arch/arm64/kernel/hw_breakpoint.c
++++ b/arch/arm64/kernel/hw_breakpoint.c
+@@ -540,11 +540,12 @@ int arch_validate_hwbkpt_settings(struct perf_event *bp)
+  * exception level at the register level.
+  * This is used when single-stepping after a breakpoint exception.
+  */
+-static void toggle_bp_registers(int reg, enum dbg_active_el el, int enable)
++static bool toggle_bp_registers(int reg, enum dbg_active_el el, int enable)
+ {
+ 	int i, max_slots, privilege;
+ 	u32 ctrl;
+ 	struct perf_event **slots;
++	bool origin_state = false;
+ 
+ 	switch (reg) {
+ 	case AARCH64_DBG_REG_BCR:
+@@ -556,7 +557,7 @@ static void toggle_bp_registers(int reg, enum dbg_active_el el, int enable)
+ 		max_slots = core_num_wrps;
+ 		break;
+ 	default:
+-		return;
++		return false;
+ 	}
+ 
+ 	for (i = 0; i < max_slots; ++i) {
+@@ -568,12 +569,16 @@ static void toggle_bp_registers(int reg, enum dbg_active_el el, int enable)
+ 			continue;
+ 
+ 		ctrl = read_wb_reg(reg, i);
++		if (ctrl & 0x1)
++			origin_state = true;
+ 		if (enable)
+ 			ctrl |= 0x1;
+ 		else
+ 			ctrl &= ~0x1;
+ 		write_wb_reg(reg, i, ctrl);
+ 	}
++
++	return origin_state;
+ }
+ 
+ /*
+@@ -982,6 +987,41 @@ u64 signal_single_step_enable_bps(void)
+ 	return retval;
+ }
+ 
++u64 irq_single_step_enable_bps(void)
++{
++	u64 retval = 0;
++
++	if (!toggle_bp_registers(AARCH64_DBG_REG_WCR, DBG_ACTIVE_EL1, 1))
++		retval |= PSR_LINUX_HW_WP_SS;
++
++	if (!toggle_bp_registers(AARCH64_DBG_REG_BCR, DBG_ACTIVE_EL1, 1))
++		retval |= PSR_LINUX_HW_BP_SS;
++
++	return retval;
++}
++
++void irq_reinstall_single_step(struct pt_regs *regs)
++{
++	u64 pstate = regs->pstate;
++
++	if (likely(!(regs->pstate & PSR_LINUX_HW_SS)))
++		return;
++
++	if (!user_mode(regs)) {
++		if (pstate & PSR_LINUX_HW_BP_SS)
++			toggle_bp_registers(AARCH64_DBG_REG_BCR,
++					    DBG_ACTIVE_EL1, 0);
++		if (pstate & PSR_LINUX_HW_WP_SS)
++			toggle_bp_registers(AARCH64_DBG_REG_WCR,
++					    DBG_ACTIVE_EL1, 0);
++
++		if (!kernel_active_single_step()) {
++			asm volatile ("msr     daifset, #8\n");
++			kernel_enable_single_step(regs);
++		}
++	}
++}
++
+ void signal_reinstall_single_step(u64 pstate)
+ {
+ 	struct debug_info *debug_info = &current->thread.debug;
 -- 
-P?ter
+1.8.5.2
