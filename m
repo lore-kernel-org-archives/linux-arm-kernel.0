@@ -1,48 +1,83 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Mon, 21 Mar 2016 09:25:49 +0100
-Subject: [PATCH] clk: sunxi: Accept a greater rate when setting a parent
- clock
-In-Reply-To: <20160321072546.GT30977@lukather>
-References: <20160310081658.B749246B@mail.free-electrons.com>
- <20160321072546.GT30977@lukather>
-Message-ID: <20160321092549.4e6245e4f02839e29aeb86a9@free.fr>
+From: michael@amarulasolutions.com (Michael Trimarchi)
+Date: Mon, 21 Mar 2016 09:32:58 +0100
+Subject: [PATCH] ARM: dts: rockchip: Add mdio node to ethernet node
+In-Reply-To: <CAAObsKBXuTw37YJb+Fhq_NgZw2rjPQ14phF1yRG+N2mEu9uBmw@mail.gmail.com>
+References: <1458300056-6174-1-git-send-email-tomeu.vizoso@collabora.com>
+ <56EC744F.90308@suse.de>
+ <CAAObsKBXuTw37YJb+Fhq_NgZw2rjPQ14phF1yRG+N2mEu9uBmw@mail.gmail.com>
+Message-ID: <CAOf5uw=jUeh0YDQu2SFjMsRzVH-WaXeZoq5mAbAQwD_dwttjnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 21 Mar 2016 08:25:46 +0100
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+Hi
 
-> > -	/* find the parent that can help provide the fastest rate <= rate */
-> > +	/* find the parent that can help provide the fastest rate */
-> >  	num_parents = clk_hw_get_num_parents(hw);
-> >  	for (i = 0; i < num_parents; i++) {
-> >  		parent = clk_hw_get_parent_by_index(hw, i);
-> > @@ -100,7 +100,7 @@ static int clk_factors_determine_rate(struct clk_hw *hw,
-> >  		child_rate = clk_factors_round_rate(hw, req->rate,
-> >  						    &parent_rate);
-> >  
-> > -		if (child_rate <= req->rate && child_rate > best_child_rate) {
-> > +		if (child_rate > best_child_rate) {
-> 
-> I'm not sure this would work, since you'll end up picking the fastest
-> rate without considering whether it is the closest or not.
-> 
-> I guess what you want here is using the absolute difference between
-> the requested rate and the rate you're evaluating.
-> 
-> That being said, we had a similar discussion for SPI around a month
-> ago where we wanted a rate strictly lower than the requested one. I
-> guess it's time to add a flag to tell how you want to round.
+On Mon, Mar 21, 2016 at 9:23 AM, Tomeu Vizoso
+<tomeu.vizoso@collabora.com> wrote:
+> On 18 March 2016 at 22:34, Andreas F?rber <afaerber@suse.de> wrote:
+>> Am 18.03.2016 um 12:20 schrieb Tomeu Vizoso:
+>>> So the dwmac device manages to probe again.
+>>>
+>>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>>> Fixes: 88f8b1bb41c6 ("stmmac: Fix 'eth0: No PHY found' regression")
+>>> ---
+>>>  arch/arm/boot/dts/rk3288-rock2-som.dtsi | 8 ++++++++
+>>>  1 file changed, 8 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/rk3288-rock2-som.dtsi b/arch/arm/boot/dts/rk3288-rock2-som.dtsi
+>>> index 1ece66f3e162..4ba7ddecb478 100644
+>>> --- a/arch/arm/boot/dts/rk3288-rock2-som.dtsi
+>>> +++ b/arch/arm/boot/dts/rk3288-rock2-som.dtsi
+>>> @@ -101,6 +101,14 @@
+>>>       snps,reset-delays-us = <0 10000 30000>;
+>>>       rx_delay = <0x10>;
+>>>       tx_delay = <0x30>;
+>>> +     mdio0 {
+>>> +             #address-cells = <1>;
+>>> +             #size-cells = <0>;
+>>> +             compatible = "snps,dwmac-mdio";
+>>> +             ethphy1: ethernet-phy at 1 {
+>>> +                     reg = <1>;
+>>> +             };
+>>> +     };
+>>
+>> This is a) ugly for lack of white lines in between, b) unnecessary since
+>> this is being fixed in the stmmac driver where it will benefit more than
+>> just this one SoM.
+>
+> So is this redundant information, or just not necessary with the
+> present kernel driver because of some assumption in its current
+> implementation?
+>
 
-You are right, I just removed half of the constraint, but I still wonder
-why does this sequence introduced by the commit 862b728387aef3a37
-(clk: sunxi: factors: automatic reparenting support) do
-	"provide the fastest rate <= rate"
-instead of
-	"provide the closest rate" ?
+I have the same fix on my firefly tree. Look likes correct and describe the
+connection
 
-Emilio?
+Michael
+
+> Thanks,
+>
+> Tomeu
+>
+>> Regards,
+>> Andreas
+>>
+>>>  };
+>>>
+>>>  &i2c0 {
+>>
+>> --
+>> SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+>> GF: Felix Imend?rffer, Jane Smithard, Graham Norton; HRB 21284 (AG N?rnberg)
+>
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+
+
 
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+| Michael Nazzareno Trimarchi                     Amarula Solutions BV |
+| COO  -  Founder                                      Cruquiuskade 47 |
+| +31(0)851119172                                 Amsterdam 1018 AM NL |
+|                  [`as] http://www.amarulasolutions.com               |
