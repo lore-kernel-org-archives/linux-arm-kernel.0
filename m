@@ -1,51 +1,100 @@
-From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
-Date: Mon, 21 Mar 2016 11:01:41 -0500
-Subject: [PATCHv3 4/9] EDAC, altera: Abstract ECC Enable Mask in check_deps()
-In-Reply-To: <1458576106-24505-1-git-send-email-tthayer@opensource.altera.com>
-References: <1458576106-24505-1-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <1458576106-24505-5-git-send-email-tthayer@opensource.altera.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Mon, 21 Mar 2016 08:58:02 -0700
+Subject: Delete flush cache all in arm64 platform.
+In-Reply-To: <20160321100818.GA17326@leverpostej>
+References: <56EFABD3.7060700@hisilicon.com>
+ <20160321100818.GA17326@leverpostej>
+Message-ID: <56F01A0A.3030208@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thor Thayer <tthayer@opensource.altera.com>
+On 03/21/2016 03:08 AM, Mark Rutland wrote:
+> [adding LAKML]
+>
+> On Mon, Mar 21, 2016 at 04:07:47PM +0800, Chen Feng wrote:
+>> Hi Mark,
+>
+> Hi,
+>
+>> With 68234df4ea7939f98431aa81113fbdce10c4a84b
+>> arm64: kill flush_cache_all()
+>> The documented semantics of flush_cache_all are not possible to provide
+>> for arm64 (short of flushing the entire physical address space by VA),
+>> and there are currently no users; KVM uses VA maintenance exclusively,
+>> cpu_reset is never called, and the only two users outside of arch code
+>> cannot be built for arm64.
+>>
+>> While cpu_soft_reset and related functions (which call flush_cache_all)
+>> were thought to be useful for kexec, their current implementations only
+>> serve to mask bugs. For correctness kexec will need to perform
+>> maintenance by VA anyway to account for system caches, line migration,
+>> and other subtleties of the cache architecture. As the extent of this
+>> cache maintenance will be kexec-specific, it should probably live in the
+>> kexec code.
+>>
+>> This patch removes flush_cache_all, and related unused components,
+>> preventing further abuse.
+>>
+>>
+>> This patch delete the flush_cache_all interface.
+>
+> As the patch states, it does so because the documented semantics are
+> impossible to provide, as there is no portable mechanism to "flush" all
+> caches in the system.
+>
+> Set/Way operations cannot guarantee that data has been cleaned to the
+> PoC (i.e. memory), or invalidated from all levels of cache. Reasons
+> include:
+>
+> * They may race against background behaviour of the CPU (e.g.
+>    speculation), which may allocate/evict/migrate lines. Depending on the
+>    cache topology, this may "hide" lines from subsequent Set/Way
+>    operations.
+>
+> * They are not broadcast, and do not affect other CPUs. Depending on the
+>    implemented cache coherency protocols, other CPUs may be able to
+>    acquire dirty lines, or retain lines in shared states, and hence these
+>    may not be operated on.
+>
+> * They do not affect system caches (which respect cache maintenance by
+>    VA in ARMv8-A).
+>
+> The only portable mechanism to perform cache maintenance to all relevant
+> caches is by VA.
+>
+>> But if we use VA to flush cache to do cache-coherency with other
+>> master(eg:gpu)
+>>
+>> We must iterate over the sg-list to flush by va to pa.
+>>
+>> In this way, the iterate of sg-list may cost too much time(sg-table to
+>> sg-list) if the sglist is too long. Take a look at the
+>> ion_pages_sync_for_device in ion.
+>>
+>> The driver(eg: ION) need to use this interface(flush cache all) to
+>> *improve the efficiency*.
+>
+> As above, we cannot use Set/Way operations for this, and cannot provide
+> a flush_cache_all interface.
+>
+> I'm not sure what to suggest regarding improving efficiency.
+>
+> Is walking the sglist the expensive portion, or is the problem the cost
+> of multiple page-size operations (each with their own barriers)?
+>
 
-In preparation for the Arria10 peripheral ECCs, the
-ECC Enable mask is used in place of hard coded masks
-in the check dependency functions.
+Last time I looked at this, it was mostly the multiple page-size operations.
+Ion buffers can be big and easily bigger than the cache as well so flushing
+8MB of buffer for a 2MB cache is really a performance killer. The Set/Way
+operations are an improvement on systems where they can be used.
 
-Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
----
-v3: This change added.
----
- drivers/edac/altera_edac.c |    9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+The way Ion does cache maintenance is full of sadness and despair in general.
+Until everything gets a significant rework, the best option may be
+minimization of code paths where cache operations are called.
 
-diff --git a/drivers/edac/altera_edac.c b/drivers/edac/altera_edac.c
-index e20a045..0dbfa47 100644
---- a/drivers/edac/altera_edac.c
-+++ b/drivers/edac/altera_edac.c
-@@ -859,7 +859,9 @@ static void ocram_free_mem(void *p, size_t size, void *other)
- static int altr_ocram_check_deps(struct altr_edac_device_dev *device)
- {
- 	void __iomem  *base = device->base;
--	if (readl(base) & ALTR_OCR_ECC_EN)
-+	const struct edac_device_prv_data *prv = device->data;
-+
-+	if (readl(base) & prv->ecc_enable_mask)
- 		return 0;
- 
- 	edac_printk(KERN_ERR, EDAC_DEVICE,
-@@ -926,7 +928,10 @@ static void l2_free_mem(void *p, size_t size, void *other)
- static int altr_l2_check_deps(struct altr_edac_device_dev *device)
- {
- 	void __iomem *base = device->base;
--	if (readl(base) & ALTR_L2_ECC_EN)
-+	const struct edac_device_prv_data *prv = device->data;
-+
-+	if ((readl(base) & prv->ecc_enable_mask) ==
-+	     prv->ecc_enable_mask)
- 		return 0;
- 
- 	edac_printk(KERN_ERR, EDAC_DEVICE,
--- 
-1.7.9.5
+> Thanks,
+> Mark.
+>
+
+Thanks,
+Laura
