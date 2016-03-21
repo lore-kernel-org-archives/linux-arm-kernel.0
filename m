@@ -1,27 +1,29 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Mon, 21 Mar 2016 15:39:50 -0500
-Subject: [PATCH 2/2] serial: amba-pl011: complete support to ZTE uart
-In-Reply-To: <1457920282-14823-2-git-send-email-jun.nie@linaro.org>
-References: <1457920282-14823-1-git-send-email-jun.nie@linaro.org>
- <1457920282-14823-2-git-send-email-jun.nie@linaro.org>
-Message-ID: <56F05C16.1030805@codeaurora.org>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Mon, 21 Mar 2016 15:41:49 -0500
+Subject: [PATCH 2/2] ARM: socfpga: Add support for HPS KEYs/SWs on SoCKit
+In-Reply-To: <1458431866-9269-2-git-send-email-marex@denx.de>
+References: <1458431866-9269-1-git-send-email-marex@denx.de>
+ <1458431866-9269-2-git-send-email-marex@denx.de>
+Message-ID: <alpine.DEB.2.02.1603211541140.3523@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jun Nie wrote:
-> @@ -2570,9 +2608,17 @@ static int pl011_uart_plat_probe(struct platform_device *pdev)
->   	if (!uap)
->   		return -ENOMEM;
->
-> +	uap->clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(uap->clk))
-> +		return PTR_ERR(uap->clk);
-> +
+On Sat, 19 Mar 2016, Marek Vasut wrote:
 
-I don't this is supposed to be part of your patch, and it breaks my ACPI 
-platform anyway.  Where did it come from?
+> Add support for the keys and flip-switches on the SoCFPGA SoCkit board.
+> 
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
+> ---
+>  arch/arm/boot/dts/socfpga_cyclone5_sockit.dts | 62 ++++++++++++++++++++++++++-
+>  1 file changed, 61 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+> index 1461690..02e22f5 100644
+> --- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+> +++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
-Forum, a Linux Foundation collaborative project.
+Both patches applied!
+
+Thanks,
+Dinh
