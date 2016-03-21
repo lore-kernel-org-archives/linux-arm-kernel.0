@@ -1,92 +1,60 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Mon, 21 Mar 2016 16:45:44 +0800
-Subject: [PATCH v6 4/7] clk: mediatek: Add MT2701 clock support
-In-Reply-To: <1456381477.22545.24.camel@mtksdaap41>
-References: <1454665050-37776-1-git-send-email-jamesjj.liao@mediatek.com>
- <1454665050-37776-5-git-send-email-jamesjj.liao@mediatek.com>
- <20160210200853.26445.15165@quark.deferred.io>
- <1455527982.29688.8.camel@mtksdaap41>
- <20160224212533.2278.7597@quark.deferred.io>
- <1456381477.22545.24.camel@mtksdaap41>
-Message-ID: <1458549944.21625.6.camel@mtksdaap41>
+From: schwab@suse.de (Andreas Schwab)
+Date: Mon, 21 Mar 2016 10:07:49 +0100
+Subject: [RFC5 PATCH v6 00/21] ILP32 for ARM64
+In-Reply-To: <20160318154918.GA1595@yury-N73SV> (Yury Norov's message of "Fri,
+ 18 Mar 2016 18:49:18 +0300")
+References: <1452792198-10718-1-git-send-email-ynorov@caviumnetworks.com>
+ <56AB3805.1040308@huawei.com> <20160129170929.GA3543@yury-N73SV>
+ <56AC38F1.2030608@huawei.com> <20160218223506.GA7816@yury-N73SV>
+ <mvm8u29ukqw.fsf@hawking.suse.de> <20160225202855.GD16123@yury-N73SV>
+ <56EBD84D.2060009@huawei.com> <20160318154918.GA1595@yury-N73SV>
+Message-ID: <mvmoaa8dwre.fsf@hawking.suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+This patch may fix a few LTP tests.
 
-Sorry to use this old email to ask questions. Do you have any concern to
-apply this patch series into next version of kernel? Or do you really
-need a new patch series with less CLK_OF_DECLARE()?
+Andreas.
 
+diff --git a/sysdeps/unix/sysv/linux/aarch64/bits/fcntl.h b/sysdeps/unix/sysv/linux/aarch64/bits/fcntl.h
+index 3631903..d1010db 100644
+--- a/sysdeps/unix/sysv/linux/aarch64/bits/fcntl.h
++++ b/sysdeps/unix/sysv/linux/aarch64/bits/fcntl.h
+@@ -25,18 +25,29 @@
+ #define __O_NOFOLLOW	0100000
+ #define __O_DIRECT	0200000
+ 
+-#define __O_LARGEFILE	0
++#ifdef __ILP32__
++# define __O_LARGEFILE	0400000
++#else
++# define __O_LARGEFILE	0
++#endif
+ 
++#ifndef __ILP32__
+ # define F_GETLK64	5
+ # define F_SETLK64	6
+ # define F_SETLKW64	7
++#endif
+ 
+ struct flock
+   {
+     short int l_type;	/* Type of lock: F_RDLCK, F_WRLCK, or F_UNLCK.	*/
+     short int l_whence;	/* Where `l_start' is relative to (like `lseek').  */
++#ifndef __USE_FILE_OFFSET64
+     __off_t l_start;	/* Offset where the lock begins.  */
+     __off_t l_len;	/* Size of the locked area; zero means until EOF.  */
++#else
++    __off64_t l_start;	/* Offset where the lock begins.  */
++    __off64_t l_len;	/* Size of the locked area; zero means until EOF.  */
++#endif
+     __pid_t l_pid;	/* Process holding the lock.  */
+   };
+ 
+-- 
+2.7.3
 
-Best regards,
-
-James
-
-
-On Thu, 2016-02-25 at 14:24 +0800, James Liao wrote:
-> Hi Mike,
-> 
-> On Wed, 2016-02-24 at 13:25 -0800, Michael Turquette wrote:
-> > Hi James,
-> > 
-> > Quoting James Liao (2016-02-15 01:19:42)
-> > > Hi Mike,
-> > > 
-> > > On Wed, 2016-02-10 at 12:08 -0800, Michael Turquette wrote:
-> > > > Quoting James Liao (2016-02-05 01:37:27)
-> > > > > +CLK_OF_DECLARE(mtk_topckgen, "mediatek,mt2701-topckgen", mtk_topckgen_init);
-> > > > > +CLK_OF_DECLARE(mtk_infrasys, "mediatek,mt2701-infracfg", mtk_infrasys_init);
-> > > > > +CLK_OF_DECLARE(mtk_pericfg, "mediatek,mt2701-pericfg", mtk_pericfg_init);
-> > > > > +CLK_OF_DECLARE(mtk_mmsys, "mediatek,mt2701-mmsys", mtk_mmsys_init);
-> > > > > +CLK_OF_DECLARE(mtk_imgsys, "mediatek,mt2701-imgsys", mtk_imgsys_init);
-> > > > > +CLK_OF_DECLARE(mtk_vdecsys, "mediatek,mt2701-vdecsys", mtk_vdecsys_init);
-> > > > > +CLK_OF_DECLARE(mtk_hifsys, "mediatek,mt2701-hifsys", mtk_hifsys_init);
-> > > > > +CLK_OF_DECLARE(mtk_ethsys, "mediatek,mt2701-ethsys", mtk_ethsys_init);
-> > > > > +CLK_OF_DECLARE(mtk_bdpsys, "mediatek,mt2701-bdpsys", mtk_bdpsys_init);
-> > > > > +CLK_OF_DECLARE(mtk_apmixedsys, "mediatek,mt2701-apmixedsys",
-> > > > 
-> > > > :-/
-> > > > 
-> > > > This is way too much CLK_OF_DECLARE and not enough Linux Driver Model.
-> > > > 
-> > > > I understand that some platforms really must initialize some clocks very
-> > > > early, but can we please separate those into one table and call
-> > > > CLK_OF_DECLARE on only that set, and then register the rest through a
-> > > > platform_driver later on?
-> > > 
-> > > I know CLK_OF_DECLARE is much earlier than platform_driver, so it can
-> > > ensure all drivers lookup their clocks successfully during
-> > > platform_driver probe. Is there anything different to init these clock
-> > > providers in CLK_OF_DECLARE and platform_driver?
-> > 
-> > This a common pattern we're seeing right now. Joachim did a nice job of
-> > supporting early clocks with CLK_OF_DECLARE, and also using a proper
-> > driver in his lpc18xx implementation:
-> > 
-> > http://marc.info/?l=devicetree&m=145618160610001
-> 
-> Do you mean we should keep most clock init in platform_driver_probe and
-> use CLK_OF_DECLARE for some early clocks only?
-> 
-> Using CLK_OF_DECLARE() for all clock providers is convenient. The
-> convenience includes coding structure and driver init order. The coding
-> structure means we can use a consistency way to add clock providers, so
-> we can reduce errors and apply code generator on clock drivers.
-> 
-> The driver init order is another issue. In lpc18xx driver you mentioned
-> in [1], it uses ERR_PTR(-EPROBE_DEFER) to be the place holder for
-> non-early clocks in arch_init (CLK_OF_DECLARE), and then register early
-> and non-early clocks again in module_init. The EPROBE_DEFER place holder
-> is an interesting idea to resolve init order issue. But to register
-> clocks twice on the same clock provider seems not a good idea, although
-> it can still work in current CCF implementation.
-> 
-> Is it important to move clock init into platform_driver? If not, I
-> prefer to keep current implementation on MT2701, and look for a better
-> way to init clocks in platform_driver in new SoCs.
-> 
-> 
-> [1] http://marc.info/?l=devicetree&m=145618160610001
-> 
-> 
+-- 
+Andreas Schwab, SUSE Labs, schwab at suse.de
+GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
+"And now for something completely different."
