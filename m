@@ -1,101 +1,102 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 21 Mar 2016 17:14:03 +0000
-Subject: [PATCH] Revert "arm64: Increase the max granular size"
-In-Reply-To: <DA22064C-45A7-4F79-A433-84054AF182DF@caviumnetworks.com>
-References: <1458120743-12145-1-git-send-email-opensource.ganesh@gmail.com>
- <DA22064C-45A7-4F79-A433-84054AF182DF@caviumnetworks.com>
-Message-ID: <20160321171403.GE25466@e104818-lin.cambridge.arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 21 Mar 2016 17:14:06 +0000
+Subject: [PATCH] arm64: mm: Add trace_irqflags annotations to
+ do_debug_exception()
+Message-ID: <1458580446-32474-1-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 18, 2016 at 09:05:37PM +0000, Chalamarla, Tirumalesh wrote:
-> On 3/16/16, 2:32 AM, "linux-arm-kernel on behalf of Ganesh Mahendran" <linux-arm-kernel-bounces at lists.infradead.org on behalf of opensource.ganesh@gmail.com> wrote:
-> >Reverts commit 97303480753e ("arm64: Increase the max granular size").
-> >
-> >The commit 97303480753e ("arm64: Increase the max granular size") will
-> >degrade system performente in some cpus.
-> >
-> >We test wifi network throughput with iperf on Qualcomm msm8996 CPU:
-> >----------------
-> >run on host:
-> >  # iperf -s
-> >run on device:
-> >  # iperf -c <device-ip-addr> -t 100 -i 1
-> >----------------
-> >
-> >Test result:
-> >----------------
-> >with commit 97303480753e ("arm64: Increase the max granular size"):
-> >    172MBits/sec
-> >
-> >without commit 97303480753e ("arm64: Increase the max granular size"):
-> >    230MBits/sec
-> >----------------
-> >
-> >Some module like slab/net will use the L1_CACHE_SHIFT, so if we do not
-> >set the parameter correctly, it may affect the system performance.
-> >
-> >So revert the commit.
-> 
-> Is there any explanation why is this so? May be there is an
-> alternative to this, apart from reverting the commit.
+With CONFIG_PROVE_LOCKING, CONFIG_DEBUG_LOCKDEP and CONFIG_TRACE_IRQFLAGS
+enabled, lockdep will compare current->hardirqs_enabled with the flags from
+local_irq_save().
 
-I agree we need an explanation but in the meantime, this patch has
-caused a regression on certain systems.
+When a debug exception occurs, interrupts are disabled in entry.S, but
+lockdep isn't told, resulting in:
+DEBUG_LOCKS_WARN_ON(current->hardirqs_enabled)
+------------[ cut here ]------------
+WARNING: at ../kernel/locking/lockdep.c:3523
+Modules linked in:
+CPU: 3 PID: 1752 Comm: perf Not tainted 4.5.0-rc4+ #2204
+Hardware name: ARM Juno development board (r1) (DT)
+task: ffffffc974868000 ti: ffffffc975f40000 task.ti: ffffffc975f40000
+PC is at check_flags.part.35+0x17c/0x184
+LR is at check_flags.part.35+0x17c/0x184
+pc : [<ffffff80080fc93c>] lr : [<ffffff80080fc93c>] pstate: 600003c5
+[...]
+---[ end trace 74631f9305ef5020 ]---
+Call trace:
+[<ffffff80080fc93c>] check_flags.part.35+0x17c/0x184
+[<ffffff80080ffe30>] lock_acquire+0xa8/0xc4
+[<ffffff8008093038>] breakpoint_handler+0x118/0x288
+[<ffffff8008082434>] do_debug_exception+0x3c/0xa8
+[<ffffff80080854b4>] el1_dbg+0x18/0x6c
+[<ffffff80081e82f4>] do_filp_open+0x64/0xdc
+[<ffffff80081d6e60>] do_sys_open+0x140/0x204
+[<ffffff80081d6f58>] SyS_openat+0x10/0x18
+[<ffffff8008085d30>] el0_svc_naked+0x24/0x28
+possible reason: unannotated irqs-off.
+irq event stamp: 65857
+hardirqs last  enabled at (65857): [<ffffff80081fb1c0>] lookup_mnt+0xf4/0x1b4
+hardirqs last disabled at (65856): [<ffffff80081fb188>] lookup_mnt+0xbc/0x1b4
+softirqs last  enabled at (65790): [<ffffff80080bdca4>] __do_softirq+0x1f8/0x290
+softirqs last disabled at (65757): [<ffffff80080be038>] irq_exit+0x9c/0xd0
 
-> Until now it seems L1_CACHE_SHIFT is the max of supported chips. But
-> now we are making it 64byte, is there any reason why not 32. 
+This patch adds the annotations to do_debug_exception(), while trying not
+to call trace_hardirqs_off() if el1_dbg() interrupted a task that already
+had irqs disabled.
 
-We may have to revisit this logic and consider L1_CACHE_BYTES the
-_minimum_ of cache line sizes in arm64 systems supported by the kernel.
-Do you have any benchmarks on Cavium boards that would show significant
-degradation with 64-byte L1_CACHE_BYTES vs 128?
+Signed-off-by: James Morse <james.morse@arm.com>
+---
+ arch/arm64/mm/fault.c | 33 +++++++++++++++++++++++----------
+ 1 file changed, 23 insertions(+), 10 deletions(-)
 
-For non-coherent DMA, the simplest is to make ARCH_DMA_MINALIGN the
-_maximum_ of the supported systems:
-
-diff --git a/arch/arm64/include/asm/cache.h b/arch/arm64/include/asm/cache.h
-index 5082b30bc2c0..4b5d7b27edaf 100644
---- a/arch/arm64/include/asm/cache.h
-+++ b/arch/arm64/include/asm/cache.h
-@@ -18,17 +18,17 @@
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 44e56de23f79..d8b9c1da2630 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -548,20 +548,33 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
+ {
+ 	const struct fault_info *inf = debug_fault_info + DBG_ESR_EVT(esr);
+ 	struct siginfo info;
++	int rv;
  
- #include <asm/cachetype.h>
+-	if (!inf->fn(addr, esr, regs))
+-		return 1;
++	/*
++	 * If we came in from el0_dbg, we disabled irqs. From el1_dbg,
++	 * we need to test pstate.
++	 */
++	if (user_mode(regs) || !(regs->pstate & PSR_I_BIT))
++		trace_hardirqs_off();
  
--#define L1_CACHE_SHIFT		7
-+#define L1_CACHE_SHIFT		6
- #define L1_CACHE_BYTES		(1 << L1_CACHE_SHIFT)
+-	pr_alert("Unhandled debug exception: %s (0x%08x) at 0x%016lx\n",
+-		 inf->name, esr, addr);
++	if (!inf->fn(addr, esr, regs)) {
++		rv = 1;
++	} else {
++		pr_alert("Unhandled debug exception: %s (0x%08x) at 0x%016lx\n",
++			 inf->name, esr, addr);
++
++		info.si_signo = inf->sig;
++		info.si_errno = 0;
++		info.si_code  = inf->code;
++		info.si_addr  = (void __user *)addr;
++		arm64_notify_die("", regs, &info, 0);
++		rv = 0;
++	}
  
- /*
-  * Memory returned by kmalloc() may be used for DMA, so we must make
-- * sure that all such allocations are cache aligned. Otherwise,
-- * unrelated code may cause parts of the buffer to be read into the
-- * cache before the transfer is done, causing old data to be seen by
-- * the CPU.
-+ * sure that all such allocations are aligned to the maximum *known*
-+ * cache line size on ARMv8 systems. Otherwise, unrelated code may cause
-+ * parts of the buffer to be read into the cache before the transfer is
-+ * done, causing old data to be seen by the CPU.
-  */
--#define ARCH_DMA_MINALIGN	L1_CACHE_BYTES
-+#define ARCH_DMA_MINALIGN	(128)
+-	info.si_signo = inf->sig;
+-	info.si_errno = 0;
+-	info.si_code  = inf->code;
+-	info.si_addr  = (void __user *)addr;
+-	arm64_notify_die("", regs, &info, 0);
++	if (user_mode(regs) || !(regs->pstate & PSR_I_BIT))
++		trace_hardirqs_on();
  
- #ifndef __ASSEMBLY__
- 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 392c67eb9fa6..30bafca1aebf 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -976,9 +976,9 @@ void __init setup_cpu_features(void)
- 	if (!cwg)
- 		pr_warn("No Cache Writeback Granule information, assuming cache line size %d\n",
- 			cls);
--	if (L1_CACHE_BYTES < cls)
--		pr_warn("L1_CACHE_BYTES smaller than the Cache Writeback Granule (%d < %d)\n",
--			L1_CACHE_BYTES, cls);
-+	if (ARCH_DMA_MINALIGN < cls)
-+		pr_warn("ARCH_DMA_MINALIGN smaller than the Cache Writeback Granule (%d < %d)\n",
-+			ARCH_DMA_MINALIGN, cls);
+-	return 0;
++	return rv;
  }
  
- static bool __maybe_unused
+ #ifdef CONFIG_ARM64_PAN
+-- 
+2.7.0
