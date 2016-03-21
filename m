@@ -1,30 +1,84 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 21 Mar 2016 15:28:55 +0530
-Subject: [PATCH] cpufreq: rockchip: add driver
-In-Reply-To: <1505152.fhSnu3pvDr@diego>
-References: <1458303004-26445-1-git-send-email-xf@rock-chips.com>
- <1787319.AFAWVqkdk0@diego> <20160321095049.GD27778@vireshk-i7>
- <1505152.fhSnu3pvDr@diego>
-Message-ID: <20160321095855.GE27778@vireshk-i7>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 21 Mar 2016 10:08:18 +0000
+Subject: Delete flush cache all in arm64 platform.
+In-Reply-To: <56EFABD3.7060700@hisilicon.com>
+References: <56EFABD3.7060700@hisilicon.com>
+Message-ID: <20160321100818.GA17326@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21-03-16, 10:54, Heiko St?bner wrote:
-> I hadn't seen that yet ... nice that cpufreq-dt now also supports clusters :-)
+[adding LAKML]
+
+On Mon, Mar 21, 2016 at 04:07:47PM +0800, Chen Feng wrote:
+> Hi Mark,
+
+Hi,
+
+> With 68234df4ea7939f98431aa81113fbdce10c4a84b
+> arm64: kill flush_cache_all()
+> The documented semantics of flush_cache_all are not possible to provide
+> for arm64 (short of flushing the entire physical address space by VA),
+> and there are currently no users; KVM uses VA maintenance exclusively,
+> cpu_reset is never called, and the only two users outside of arch code
+> cannot be built for arm64.
 > 
-> The other part still stands though, as we probably should register the 
-> platform-device somewhere else and not in some new special module.
+> While cpu_soft_reset and related functions (which call flush_cache_all)
+> were thought to be useful for kexec, their current implementations only
+> serve to mask bugs. For correctness kexec will need to perform
+> maintenance by VA anyway to account for system caches, line migration,
+> and other subtleties of the cache architecture. As the extent of this
+> cache maintenance will be kexec-specific, it should probably live in the
+> kexec code.
 > 
-> When everything is using cpufreq-dt now, I guess we could just add it to the 
-> core rockchip clk-code. Or was there some agreement where this should be done 
-> (obviously not the devicetree itself)?
+> This patch removes flush_cache_all, and related unused components,
+> preventing further abuse.
+> 
+> 
+> This patch delete the flush_cache_all interface.
 
-Yeah, there was a discussion around creating a white or black list of platforms
-that want to create a platform device for cpufreq-dt. That can be done in
-cpufreq-dt.c or a new file, but I haven't worked out on that yet.
+As the patch states, it does so because the documented semantics are
+impossible to provide, as there is no portable mechanism to "flush" all
+caches in the system.
 
-You can do it from clk-code or from the driver that was added in this thread.
-Just that you need to match your platform's compatible string before doing that.
+Set/Way operations cannot guarantee that data has been cleaned to the
+PoC (i.e. memory), or invalidated from all levels of cache. Reasons
+include:
 
--- 
-viresh
+* They may race against background behaviour of the CPU (e.g.
+  speculation), which may allocate/evict/migrate lines. Depending on the
+  cache topology, this may "hide" lines from subsequent Set/Way
+  operations.
+
+* They are not broadcast, and do not affect other CPUs. Depending on the
+  implemented cache coherency protocols, other CPUs may be able to
+  acquire dirty lines, or retain lines in shared states, and hence these
+  may not be operated on.
+
+* They do not affect system caches (which respect cache maintenance by
+  VA in ARMv8-A).
+
+The only portable mechanism to perform cache maintenance to all relevant
+caches is by VA.
+
+> But if we use VA to flush cache to do cache-coherency with other
+> master(eg:gpu)
+> 
+> We must iterate over the sg-list to flush by va to pa.
+> 
+> In this way, the iterate of sg-list may cost too much time(sg-table to
+> sg-list) if the sglist is too long. Take a look at the
+> ion_pages_sync_for_device in ion.
+> 
+> The driver(eg: ION) need to use this interface(flush cache all) to
+> *improve the efficiency*.
+
+As above, we cannot use Set/Way operations for this, and cannot provide
+a flush_cache_all interface.
+
+I'm not sure what to suggest regarding improving efficiency.
+
+Is walking the sglist the expensive portion, or is the problem the cost
+of multiple page-size operations (each with their own barriers)?
+
+Thanks,
+Mark.
