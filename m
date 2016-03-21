@@ -1,63 +1,75 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Mon, 21 Mar 2016 12:09:33 +0100
-Subject: [PATCH v4 2/8] Documentation: arm: define DT cpu capacity bindings
-In-Reply-To: <20160321105330.GB12319@e106622-lin>
-References: <1458311054-13524-1-git-send-email-juri.lelli@arm.com>
- <1458311054-13524-3-git-send-email-juri.lelli@arm.com>
- <56EC3F9E.4050209@nvidia.com> <20160321105330.GB12319@e106622-lin>
-Message-ID: <CAKfTPtDP3zMR+zbvvqJCBvJ5r44do8NS03wC7pAejxPd0zHTMA@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 21 Mar 2016 11:14:31 +0100
+Subject: [PATCH 1/2] ARM: socfpga: Add support for HPS LEDs on SoCKit
+In-Reply-To: <73y49cl178.fsf@unicorn.hi.pengutronix.de>
+References: <1458431866-9269-1-git-send-email-marex@denx.de>
+ <73y49cl178.fsf@unicorn.hi.pengutronix.de>
+Message-ID: <56EFC987.2050502@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 March 2016 at 11:53, Juri Lelli <juri.lelli@arm.com> wrote:
-> Hi Sai,
->
-> On 18/03/16 10:49, Sai Gurrappadi wrote:
->> Hi Juri,
->>
->> On 03/18/2016 07:24 AM, Juri Lelli wrote:
->>
->> <snip>
->>
->> > +
->> > +==========================================
->> > +2 - CPU capacity definition
->> > +==========================================
->> > +
->> > +CPU capacity is a number that provides the scheduler information about CPUs
->> > +heterogeneity. Such heterogeneity can come from micro-architectural differences
->> > +(e.g., ARM big.LITTLE systems) or maximum frequency at which CPUs can run
->> > +(e.g., SMP systems with multiple frequency domains). Heterogeneity in this
->> > +context is about differing performance characteristics; this binding tries to
->> > +capture a first-order approximation of the relative performance of CPUs.
->>
->> Any reason why this capacity number is not dynamically generated based on the
->> max frequency for each CPU? The DT property would then instead specify just
->> the micro-architectural differences between the CPU types.
->>
->
-> I'm not sure I clearly understand your question, so I'll try to
-> reiterate it.
->
-> Are you asking why we don't dynamically profile the system, at boot for
-> example, to get this number? Or do you ask why this number couldn't be
-> only describing micro-arch differences (so, if I get it right, we should
-> then multiply it by max freq to get the capacity of a CPU)?
->
-> We already played with the first option (please refer to v2 and v3), but
-> we ended up agreeing that dynamic profiling adds overhead to the boot
-> process (while a DT approach can provide information to speed up boot)
-> and it is in general not repeatable/reliable (as numbers can vary from
-> boot to boot for different reasons).
->
-> The second option I think can be feasible, but I'm not sure what we gain
-> in practice. We will still need to specify a per-platform number, right?
+On 03/21/2016 08:50 AM, Steffen Trumtrar wrote:
+> 
+> Hi!
 
-So could we use dt binding like dhrystone = <xyz> (with a unit like
-DMIPS/Mhz)  which can then be combined with OPP table to gives a
-1st-order approximation of each CPU capacity ?
+Hi!
 
->
-> Best,
->
-> - Juri
+> Marek Vasut writes:
+> 
+>> Add support for the blue LEDs on the SoCFPGA SoCkit board.
+>>
+>> Signed-off-by: Marek Vasut <marex@denx.de>
+>> Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
+>> ---
+>>  arch/arm/boot/dts/socfpga_cyclone5_sockit.dts | 32 +++++++++++++++++++++++++++
+>>  1 file changed, 32 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+>> index b61f22f..1461690 100644
+>> --- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+>> +++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+>> @@ -39,6 +39,34 @@
+>>  		ethernet0 = &gmac1;
+>>  	};
+>>  
+>> +	leds {
+>> +		compatible = "gpio-leds";
+>> +
+>> +		hps_led0 {
+>> +			label = "hps:blue:led0";
+>> +			gpios = <&portb 24 0>;	/* HPS_GPIO53 */
+>> +			linux,default-trigger = "heartbeat";
+>> +		};
+>> +
+>> +		hps_led1 {
+>> +			label = "hps:blue:led1";
+>> +			gpios = <&portb 25 0>;	/* HPS_GPIO54 */
+>> +			linux,default-trigger = "heartbeat";
+>> +		};
+>> +
+>> +		hps_led2 {
+>> +			label = "hps:blue:led2";
+>> +			gpios = <&portb 26 0>;	/* HPS_GPIO55 */
+>> +			linux,default-trigger = "heartbeat";
+>> +		};
+>> +
+>> +		hps_led3 {
+>> +			label = "hps:blue:led3";
+>> +			gpios = <&portb 27 0>;	/* HPS_GPIO56 */
+>> +			linux,default-trigger = "heartbeat";
+>> +		};
+>> +	};
+>> +
+> 
+> I'd personally remove the default-triggers.
+
+At least the LEDs appear to do something and are not completely dead,
+but either way is fine with me. The heartbeat effect is also not amusing.
+
+> Otherwise looks good to me.
+
+Thanks for the review :)
+
+-- 
+Best regards,
+Marek Vasut
