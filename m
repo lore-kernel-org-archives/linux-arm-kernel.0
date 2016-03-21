@@ -1,46 +1,46 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 21 Mar 2016 14:24:39 +0000
-Subject: [linux-sunxi] Re: [PATCH v8 2/2] ASoc: sun4i-codec: Add FM, Line
- and Mic inputs
-In-Reply-To: <20160319171336.6e16eb5a@scratchpost.org>
-References: <20151221123148.1ab6480b@dayas> <20151221123416.51aa938e@dayas>
- <20151227182157.GI30359@lukather> <20151228040649.475a742f@dayas>
- <20160106220908.GE9631@lukather> <20160109164832.515d69b0@dayas>
- <20160312085222.226d89bf@scratchpost.org>
- <20160314104939.GL8418@lukather>
- <20160315105802.GN2566@sirena.org.uk>
- <20160319171336.6e16eb5a@scratchpost.org>
-Message-ID: <20160321142438.GU2566@sirena.org.uk>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Mon, 21 Mar 2016 15:40:24 +0100
+Subject: [PATCH v3 4/5] dmaengine: sun6i: Simplify some macros
+In-Reply-To: <20160321074843.GX30977@lukather>
+References: <cover.1458311540.git.moinejf@free.fr>
+ <a25c76bc3c63afc311069366af4970b909d356ef.1458311540.git.moinejf@free.fr>
+ <20160321074843.GX30977@lukather>
+Message-ID: <20160321154024.75584f8a6b4d1d22035327b8@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 19, 2016 at 05:13:36PM +0100, Danny Milosavljevic wrote:
-> Hi Mark,
+On Mon, 21 Mar 2016 08:48:43 +0100
+Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
-> my question is whether it's possible to group together the left and right channel into one selem, and also if it's possible to reuse volumes then. For example:
+> On Fri, Mar 18, 2016 at 03:21:11PM +0100, Jean-Francois Moine wrote:
+> > As the max burst and bus width values are now checked, there is
+> > no reason to check them again when setting the hardware registers.
+> > 
+> > Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> > ---
+> >  drivers/dma/sun6i-dma.c | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
+> > index 3f73123..643ba4c 100644
+> > --- a/drivers/dma/sun6i-dma.c
+> > +++ b/drivers/dma/sun6i-dma.c
+> > @@ -65,8 +65,8 @@
+> >  #define DMA_CHAN_CFG_SRC_DRQ(x)		((x) & 0x1f)
+> >  #define DMA_CHAN_CFG_SRC_IO_MODE	BIT(5)
+> >  #define DMA_CHAN_CFG_SRC_LINEAR_MODE	(0 << 5)
+> > -#define DMA_CHAN_CFG_SRC_BURST(x)	(((x) & 0x3) << 7)
+> > -#define DMA_CHAN_CFG_SRC_WIDTH(x)	(((x) & 0x3) << 9)
+> > +#define DMA_CHAN_CFG_SRC_BURST(x)	((x) << 7)
+> > +#define DMA_CHAN_CFG_SRC_WIDTH(x)	((x) << 9)
+> 
+> Well, you can easily end up with values higher than that. I still
+> believe that making sure you only always write what is expected is a
+> good thing.
 
-Please fix your mail client to word wrap within paragraphs at something
-substantially less than 80 columns.  Doing this makes your messages much
-easier to read and reply to.  This is particularly important for large
-walls of text like this.
+How the values could be higher? They are locally generated in
+convert_burst() and convert_buswidth() from checked client values.
 
-> Is it possible to group them together like this? How?
-
-This is something you'd need to change in alsamixer and the control
-naming standards.  None of this stuff is really supposed to be directly
-edited by normal users, they should mostly be using a UCM configuration,
-so at the minute this is essentially bikeshedding.
-
-> Is it possible to somehow distinguish those in alsamixer? Do we want to?
-
-I think you're looking for something that exports routing to userspace.
-Doing that would also help with reducing the faff with naming rules.
-Currently nobody is working on that but I think people would be very
-happy if someone were to work on it.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160321/f0f61045/attachment-0001.sig>
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
