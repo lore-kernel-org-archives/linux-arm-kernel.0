@@ -1,59 +1,30 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Mon, 21 Mar 2016 21:43:12 +0300
-Subject: [RFC5 PATCH v6 00/21] ILP32 for ARM64
-In-Reply-To: <56EFD9B0.6080004@huawei.com>
-References: <56AC38F1.2030608@huawei.com> <20160218223506.GA7816@yury-N73SV>
- <mvm8u29ukqw.fsf@hawking.suse.de>
- <20160225202855.GD16123@yury-N73SV> <56EBD84D.2060009@huawei.com>
- <20160318154918.GA1595@yury-N73SV> <56EC24EE.6020803@suse.de>
- <20160318164627.GA3201@yury-N73SV> <56EE5B6E.6030305@huawei.com>
- <56EFD9B0.6080004@huawei.com>
-Message-ID: <20160321184312.GB26563@yury-N73SV>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 21 Mar 2016 19:55:24 +0100
+Subject: [PATCH] arm64: KVM: Turn kvm_ksym_ref into a NOP on VHE
+In-Reply-To: <56EFFEEB.8020800@redhat.com>
+References: <1458321959-11728-1-git-send-email-marc.zyngier@arm.com>
+ <CAKv+Gu_at5LXa5jxpM7h=ntxdJNNqmbtVE-bWn3SicMMMuT6Dg@mail.gmail.com>
+ <56EFEABA.3010604@redhat.com> <20160321124216.GA16859@cbox>
+ <56EFFEEB.8020800@redhat.com>
+Message-ID: <20160321185524.GD16859@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 21, 2016 at 07:23:28PM +0800, Zhangjian (Bamvor) wrote:
-> >>So this most probably means that ilp32 code doesn't handle one of cloned
-> >>item properly. I have already discovered a bug where child processes
-> >>used parent TLS,
-> >It is a kernel bug or glibc bug? Could you please explain it or show the patch?
-> >The current ILP32 patches looks good to me. Recently, I backport these patches
-> >to our 4.1 kernel. And I saw crash frequently even if I only do a single print
-> >or infinite loop. There is some small changes about tls register after 4.1. I
-> >am not sure if it is a similar issue. It is great if you have some suggestions/
-> >ideas.
-> My issue is because I forget to change is_compat_task to
-> is_a32_compat_task in arch/arm64/kernel/process.c such piece of code
-> is delete after commit d00a3810c162 ("arm64: context-switch user tls
-> register tpidr_el0 for compat tasks). It is not exist in upstream
-> kernel, never mind.
+On Mon, Mar 21, 2016 at 03:02:19PM +0100, Paolo Bonzini wrote:
 > 
-> Meanwhile, I found that it seem that there is another is_compat_task
-> in tls_thread_flush. Is it relative the issue you mentioned?
 > 
-> ```
-> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-> index 432b094..9ab968c 100644
-> --- a/arch/arm64/kernel/process.c
-> +++ b/arch/arm64/kernel/process.c
-> @@ -209,7 +209,7 @@ static void tls_thread_flush(void)
->  {
->         asm ("msr tpidr_el0, xzr");
+> On 21/03/2016 13:42, Christoffer Dall wrote:
+> > Marc is on holiday this week, but I put this (with the fix) on top of
+> > Linus' master in the kvmarm/master branch:
+> > 
+> > git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git master
+> > 
+> > Do you want to just grab it from there?
 > 
-> -       if (is_compat_task()) {
-> +       if (is_a32_compat_task()) {
->                 current->thread.tp_value = 0;
+> Since you have two more patches, I guess you can just send a pull
+> request for all three.  I plan to send mine to Linus on Wednesday.
 > 
->                 /*
-> ```
-> 
-> Regards
-> 
-> Bamvor
+Sounds good, I'll send you one tomorrow (based on Linus' master branch
+of today - if that works?)
 
-Hi,
-
-This fix looks correct, though doesn't fix issue.
-Thank you.
-
-Yury.
+-Christoffer
