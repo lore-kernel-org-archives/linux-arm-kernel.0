@@ -1,76 +1,130 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 21 Mar 2016 11:34:40 +0000
-Subject: [PATCH] arm64: KVM: Turn kvm_ksym_ref into a NOP on VHE
-In-Reply-To: <20160320210704.GD24948@cbox>
-References: <1458321959-11728-1-git-send-email-marc.zyngier@arm.com>
- <20160318180708.GI4645@e104818-lin.cambridge.arm.com>
- <20160320210704.GD24948@cbox>
-Message-ID: <20160321113439.GA25466@e104818-lin.cambridge.arm.com>
+From: juri.lelli@arm.com (Juri Lelli)
+Date: Mon, 21 Mar 2016 11:39:38 +0000
+Subject: [PATCH v4 2/8] Documentation: arm: define DT cpu capacity bindings
+In-Reply-To: <20160320011517.GA17705@rob-hp-laptop>
+References: <1458311054-13524-1-git-send-email-juri.lelli@arm.com>
+ <1458311054-13524-3-git-send-email-juri.lelli@arm.com>
+ <20160320011517.GA17705@rob-hp-laptop>
+Message-ID: <20160321113938.GC12319@e106622-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 20, 2016 at 10:07:04PM +0100, Christoffer Dall wrote:
-> On Fri, Mar 18, 2016 at 06:07:09PM +0000, Catalin Marinas wrote:
-> > On Fri, Mar 18, 2016 at 05:25:59PM +0000, Marc Zyngier wrote:
-> > > When running with VHE, there is no need to translate kernel pointers
-> > > to the EL2 memory space, since we're already there (and we have a much
-> > > saner memory map to start with).
-> > > 
-> > > Unfortunately, kvm_ksym_ref is getting in the way, and the first
-> > > call into the "hypervisor" section is going to end up in fireworks,
-> > > since we're now branching into nowhereland. Meh.
-> > > 
-> > > A potential solution is to test if VHE is engaged or not, and only
-> > > perform the translation in the negative case. With this in place,
-> > > VHE is able to run again.
-> > > 
-> > > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > > ---
-> > >  arch/arm64/include/asm/kvm_asm.h | 8 +++++++-
-> > >  1 file changed, 7 insertions(+), 1 deletion(-)
-> > > 
-> > > diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-> > > index 226f49d..282f907 100644
-> > > --- a/arch/arm64/include/asm/kvm_asm.h
-> > > +++ b/arch/arm64/include/asm/kvm_asm.h
-> > > @@ -26,7 +26,13 @@
-> > >  #define KVM_ARM64_DEBUG_DIRTY_SHIFT	0
-> > >  #define KVM_ARM64_DEBUG_DIRTY		(1 << KVM_ARM64_DEBUG_DIRTY_SHIFT)
-> > >  
-> > > -#define kvm_ksym_ref(sym)		phys_to_virt((u64)&sym - kimage_voffset)
-> > > +#define kvm_ksym_ref(sym)						\
-> > > +	({								\
-> > > +		void *val = sym;					\
+On 19/03/16 20:15, Rob Herring wrote:
+> On Fri, Mar 18, 2016 at 02:24:08PM +0000, Juri Lelli wrote:
+> > ARM systems may be configured to have cpus with different power/performance
+> > characteristics within the same chip. In this case, additional information
+> > has to be made available to the kernel (the scheduler in particular) for it
+> > to be aware of such differences and take decisions accordingly.
 > > 
-> > Should we not use &sym, for consistency and just in case we ever pass
-> > something other than a function.
+> > Therefore, this patch aims at standardizing cpu capacities device tree
+> > bindings for ARM platforms. Bindings define cpu capacity parameter, to
+> > allow operating systems to retrieve such information from the device tree
+> > and initialize related kernel structures, paving the way for common code in
+> > the kernel to deal with heterogeneity.
+> > 
+> > Cc: Rob Herring <robh+dt@kernel.org>
+> > Cc: Pawel Moll <pawel.moll@arm.com>
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> > Cc: Kumar Gala <galak@codeaurora.org>
+> > Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > Cc: Olof Johansson <olof@lixom.net>
+> > Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> > Cc: Paul Walmsley <paul@pwsan.com>
+> > Cc: Linus Walleij <linus.walleij@linaro.org>
+> > Cc: Chen-Yu Tsai <wens@csie.org>
+> > Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > Cc: devicetree at vger.kernel.org
+> > Signed-off-by: Juri Lelli <juri.lelli@arm.com>
+> > ---
+> > 
+> > Changes from v1:
+> >  - removed section regarding capacity-scale
+> >  - added information regarding normalization
+> > ---
+> >  .../devicetree/bindings/arm/cpu-capacity.txt       | 222 +++++++++++++++++++++
+> >  Documentation/devicetree/bindings/arm/cpus.txt     |   9 +
+> >  2 files changed, 231 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/arm/cpu-capacity.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/cpu-capacity.txt b/Documentation/devicetree/bindings/arm/cpu-capacity.txt
+> > new file mode 100644
+> > index 0000000..fdfc453
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/arm/cpu-capacity.txt
+> > @@ -0,0 +1,222 @@
+> > +==========================================
+> > +ARM CPUs capacity bindings
+> > +==========================================
+> > +
+> > +==========================================
+> > +1 - Introduction
+> > +==========================================
+> > +
+> > +ARM systems may be configured to have cpus with different power/performance
+> > +characteristics within the same chip. In this case, additional information
+> > +has to be made available to the kernel (the scheduler in particular) for
+> > +it to be aware of such differences and take decisions accordingly.
+> > +
+> > +==========================================
+> > +2 - CPU capacity definition
+> > +==========================================
+> > +
+> > +CPU capacity is a number that provides the scheduler information about CPUs
+> > +heterogeneity. Such heterogeneity can come from micro-architectural differences
+> > +(e.g., ARM big.LITTLE systems) or maximum frequency at which CPUs can run
+> > +(e.g., SMP systems with multiple frequency domains). Heterogeneity in this
+> > +context is about differing performance characteristics; this binding tries to
+> > +capture a first-order approximation of the relative performance of CPUs.
+> > +
+> > +One simple way to estimate CPU capacities is to iteratively run a well-known
+> > +CPU user space benchmark (e.g, sysbench) on each CPU at maximum frequency and
+> > +then normalize values w.r.t.  the best performing CPU.  One can also do a
+> > +statistically significant study of a wide collection of benchmarks, but pros
+> > +of such an approach are not really evident at the time of writing.
 > 
-> we already do, we pass the symbox for an extern char _foo[] array, but
-> that should work just the same with sym and &sym.
-
-Just for consistency between "val = sym" and "phys_to_virt((u64)&sym..."
-
-> Given the effort put in to avoid these kinds of branches for the VHE
-> code, it may be worth optimizing this later on with the use of
-> instruction patching or static keys to avoid the branch on every vm
-> entry/exit?
-
-Marc tried with run-time patching first but the code was still reading
-kimage_voffset even with VHE. Anyway, it can be optimised later.
-
-> > > +		if (!is_kernel_in_hyp_mode())				\
-> > > +			val = phys_to_virt((u64)&sym - kimage_voffset);	\
-> > > +		val;							\
-> > > +	 })
-> > 
-> > Otherwise:
-> > 
-> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> I'll say again what I did previously. I don't have a problem this being 
+> in DT, but I want to see a defined method for determining the value. The 
+> above is a pretty vague statement. That can be run X to generate the 
+> value on the cpu. Or ARM providing the "golden" value for each core. As 
+> you said, it is only a 1st order approximation, so vendor to vendor 
+> implementation variations should not matter. 
 > 
-> Thanks, I can change to &sym and queue this patch (not assuming you plan
-> on taking it directly via the arm64 tree).
 
-Please feel free to merge this via the kvm tree.
+OK, sorry if I didn't get it. :-)
 
--- 
-Catalin
+What we usually do to come up with these numbers for a new platform is
+really something as simple as:
+
+ - set every CPUs to performance governor
+ - run the following on first CPU of each cluster
+   # taskset '<CPUmask>' sysbench --test=cpu --num-threads=1 --max-time=10 \
+     run | grep "events:" | awk '{print $5}'
+ - normalize numbers w.r.t. highest value obtained by running the former
+
+I'm not sure we can put something like this in the definition above, but
+I wont raise any objections if we actually can. :-)
+
+The "golden" value solution I don't think is feasible. Different
+implementations of the same CPU, and different configurations of caches
+etc., will end up giving different numbers. This values has to be a per
+platform thing, IMHO. Also, being it a per platform and relative number,
+it will be "confined" to a certain platform only (comparing capacities
+across different DTs has no meaning).
+
+> I also worry about what happens in more complex cases with lots of 
+> possible OPPs such as Qualcomm chips. This single value may not be 
+> sufficient.
+> 
+
+Having many OPPs are not a problem. This value only tells about
+micro-arch differences and it is used to obtain CPU scale invariance
+component.  We then have a frequency invariant component to handle clock
+frequency differences (there is also an on-going discussion about this
+[1]). The capacity values are to be obtained running at max freq.
+
+Thanks,
+
+- Juri
+
+[1] https://lkml.org/lkml/2016/3/14/64
