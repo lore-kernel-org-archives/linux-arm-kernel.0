@@ -1,54 +1,109 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 21 Mar 2016 14:52:43 +0000
-Subject: [PATCH v11 3/9] arm64: add copy_to/from_user to kprobes blacklist
-In-Reply-To: <20160318132902.GA29225@dhcppc6.redhat.com>
-References: <1457501543-24197-1-git-send-email-dave.long@linaro.org>
- <1457501543-24197-4-git-send-email-dave.long@linaro.org>
- <56E858D8.8030300@arm.com>
- <20160316054329.GC28915@dhcppc6.redhat.com>
- <56E9350A.7010909@arm.com>
- <20160317075726.GA16882@dhcppc6.redhat.com>
- <20160318132902.GA29225@dhcppc6.redhat.com>
-Message-ID: <20160321145242.GJ23397@arm.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Mon, 21 Mar 2016 15:55:26 +0100
+Subject: [PATCH] drm/rockchip: vop: Reset yrgb_mst when re-enabling
+In-Reply-To: <56ECA841.40803@rock-chips.com>
+References: <1458300147-6472-1-git-send-email-tomeu.vizoso@collabora.com>
+ <56ECA841.40803@rock-chips.com>
+Message-ID: <CAAObsKBt-+syM+btLdRj64OYBzZNV96a7zpmRyn5nSoTuwQsVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 18, 2016 at 06:59:02PM +0530, Pratyush Anand wrote:
-> On 17/03/2016:01:27:26 PM, Pratyush Anand wrote:
-> > @David: This patch was added in v9 and fixup_exception() had been dropped in v9.
-> > Since, dropping of fixup_exception() also caused to fail some systemtap test
-> > cases, so it was added back in v10. I wonder if we really need this patch.
-> > May be you can try to run related test case by dropping this patch. 
-> 
-> Had a closer look to the code, and noticed that fixup_exception() does not have
-> any role in handling of page fault of copy_to_user(). Then, why do we have the
-> problem.
-> Probably, I can see why does not it work. So, when we are single stepping an
-> instruction and page fault occurs, we will come to el1_da in entry.S. Here, we
-> do enable_dbg. As soon as we will do this, we will start receiving single step
-> exception after each instruction (not sure, probably for each alternate
-> instruction). Since, there will not be any matching single step handler for
-> these instructions, so we will see warning "Unexpected kernel single-step
-> exception at EL1". 
-> 
-> So, I think, we should 
-> 
-> (1) may be do not enable debug for el1_da, or
-> (2) enable_dbg only when single stepping is not enabled, or
-> (3) or disable single stepping during el1_da execution.
-> 
-> (1) will solve the issue for sure, but not sure if it could be the best choice.
-> 
-> Will, what do you suggest?
+On 19 March 2016 at 02:15, Mark yao <mark.yao@rock-chips.com> wrote:
+> On 2016?03?18? 19:22, Tomeu Vizoso wrote:
+>>
+>> When the VOP is re-enabled, it will start scanning right away the
+>> framebuffers that were configured from the last time, even if those have
+>> been destroyed already. To prevent the VOP from trying to access freed
+>> memory, reset the registers that hold pointers to framebuffers right
+>> after we can write to them, but before the VOP is awaken from standby.
+>>
+>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>> Link:
+>> http://lkml.kernel.org/g/CAAObsKAv+05ih5U+=4kic_NsjGMhfxYheHR8xXXmacZs+p5SHw at mail.gmail.com
+>> ---
+>>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 13 +++++++++++++
+>>   1 file changed, 13 insertions(+)
+>>
+>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> index 5e57f5b2e4b0..0df91c28740b 100644
+>> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> @@ -429,6 +429,7 @@ static void vop_dsp_hold_valid_irq_disable(struct vop
+>> *vop)
+>>   static void vop_enable(struct drm_crtc *crtc)
+>>   {
+>>         struct vop *vop = to_vop(crtc);
+>> +       int i;
+>>         int ret;
+>>         if (vop->is_enabled)
+>> @@ -476,6 +477,18 @@ static void vop_enable(struct drm_crtc *crtc)
+>>          */
+>>         vop->is_enabled = true;
+>>   +     /*
+>> +        * Before turning the VOP completely on, unset the registers
+>> +        * containing FB addresses to avoid the HW start scanning old FBs.
+>> +        */
+>> +       for (i = 0; i < vop->data->win_size; i++) {
+>> +               struct vop_win *vop_win = &vop->win[i];
+>> +               const struct vop_win_data *win = vop_win->data;
+>> +
+>> +               VOP_WIN_SET(vop, win, yrgb_mst, 0x0);
+>> +               VOP_WIN_SET(vop, win, uv_mst, 0x0);
+>> +       }
+>> +
+>
+> Hi Tomeu
+>
+> Thanks for your fix.
+>
+> Set yrgb_mst and uv_mst is not a good idea, because 0x0 also is a memory
+> buffer address, ddr will access the 0x0 buffer.
+> I think you may enable DRM_FBDEV_EMULATION, the 0x0 address is iommu mmaped
+> address for fbdev, so your test can works.
+> but if DRM_FBDEV_EMULATION is not define, may be 0x0 address is unmmaped,
+> would get the iommu crash.
 
-Leaving debug exceptions disabled isn't something I'm keen on at all,
-because it leads to blackspots in kernel debugging that I don't think
-should be enforced by the low-level debug machinery. My preference is
-for the higher-level debugger code (e.g. kprobes, kdgb) to ignore the
-events that it's not interested in.
+I have checked with DRM_FBDEV_EMULATION disabled and seems to work equally well.
 
-It's also very easy to lose track of the debug state if you run preemptible
-code at EL1 with debug exceptions disabled, because kernel debugging is
-per-cpu rather than per-task.
+> I think we can use atomic disable function like this:
+> for_each_plane_in_state(old_state, plane, old_plane_state, i) {
+>     const struct drm_plane_helper_funcs *funcs;
+>     funcs = plane->helper_private;
+>     funcs->atomic_disable(plane, old_plane_state);
+> }
+>
+> But I think we'd better find why we need do this hack here.
+>
+> Does the old FB address is ummaped when crtc disabling? why plane is not
+> disabled?
 
-Will
+Planes aren't being disabled because the CRTC is being disabled
+already, see http://lxr.free-electrons.com/source/drivers/gpu/drm/drm_atomic_helper.c#L1306
+
+Exynos is already disabling all planes when a crtc is disabled:
+
+http://lxr.free-electrons.com/source/drivers/gpu/drm/exynos/exynos_drm_fimd.c#L782
+
+I don't like it because there's state in the drm core and in the
+drivers that is left inconsistent.
+
+Regards,
+
+Tomeu
+
+> Thanks.
+>
+>>         spin_lock(&vop->reg_lock);
+>>         VOP_CTRL_SET(vop, standby, 0);
+>
+>
+>
+> --
+> ?ark Yao
+>
+>
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
