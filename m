@@ -1,29 +1,28 @@
 From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Mon, 21 Mar 2016 17:10:41 +0100
-Subject: [linux-sunxi][PATCH v2 4/5] ARM: dts: sun4i: Add SPDIF to the Mele
- A1000
+Date: Mon, 21 Mar 2016 17:10:42 +0100
+Subject: [linux-sunxi][PATCH v2 5/5] ARM: dts: sun7i: Add SPDIF to Itead Ibox
 In-Reply-To: <1458576642-4078-1-git-send-email-codekipper@gmail.com>
 References: <1458576642-4078-1-git-send-email-codekipper@gmail.com>
-Message-ID: <1458576642-4078-5-git-send-email-codekipper@gmail.com>
+Message-ID: <1458576642-4078-6-git-send-email-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marcus Cooper <codekipper@gmail.com>
 
-Enable the S/PDIF transmitter that is present on the A1000.
+Enable the S/PDIF transmitter that is present on the Itead Ibox.
 
 Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 ---
- arch/arm/boot/dts/sun4i-a10-a1000.dts | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+ arch/arm/boot/dts/sun7i-a20-itead-ibox.dts | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-a1000.dts b/arch/arm/boot/dts/sun4i-a10-a1000.dts
-index 97570cb..aaf5605 100644
---- a/arch/arm/boot/dts/sun4i-a10-a1000.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-a1000.dts
-@@ -87,6 +87,23 @@
- 		enable-active-high;
- 		gpio = <&pio 7 15 GPIO_ACTIVE_HIGH>;
+diff --git a/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts b/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
+index a512581..df76b74 100644
+--- a/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
++++ b/arch/arm/boot/dts/sun7i-a20-itead-ibox.dts
+@@ -65,6 +65,23 @@
+ 			default-state = "on";
+ 		};
  	};
 +
 +	sound {
@@ -45,18 +44,19 @@ index 97570cb..aaf5605 100644
  };
  
  &ahci {
-@@ -188,6 +205,12 @@
+@@ -131,6 +148,13 @@
  	status = "okay";
  };
  
++
 +&spdif {
 +	pinctrl-names = "default";
 +	pinctrl-0 = <&spdif_tx_pins_a>;
 +	status = "okay";
 +};
 +
- &uart0 {
+ &usbphy {
  	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
+ 	pinctrl-0 = <&usb0_id_detect_pin>;
 -- 
 2.7.4
