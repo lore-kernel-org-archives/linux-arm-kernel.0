@@ -1,89 +1,81 @@
 From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
-Date: Mon, 21 Mar 2016 11:01:42 -0500
-Subject: [PATCHv3 5/9] EDAC, altera: Add register offset for ECC Error Inject
+Date: Mon, 21 Mar 2016 11:01:43 -0500
+Subject: [PATCHv3 6/9] Documentation: dt: socfpga: Add Altera Arria10 L2 cache
+ binding
 In-Reply-To: <1458576106-24505-1-git-send-email-tthayer@opensource.altera.com>
 References: <1458576106-24505-1-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <1458576106-24505-6-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <1458576106-24505-7-git-send-email-tthayer@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thor Thayer <tthayer@opensource.altera.com>
 
-In preparation for the Arria10 peripheral ECCs, a register
-offset from the ECC base was added to the private data
-structure to index to the error injection register.
+Add the device tree bindings needed to support the Altera L2
+cache on the Arria10 chip. Since all the peripherals share
+IRQs, the IRQ fields are now in the ecc_manager.
 
 Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
 ---
-v2: Split large patch into smaller patches. Add an ECC
-    error inject offset to support the different register
-    layout of Arria10 peripheral ECCs.
-v3: Addition of offset defines (previously in ECC Enable
-    patch that was dropped).
+v2 Correct spelling of Arria10 in patch title.
+v3 Major restructuring change for ecc_manager to include IRQs
 ---
- drivers/edac/altera_edac.c |    7 +++++--
- drivers/edac/altera_edac.h |    3 +++
- 2 files changed, 8 insertions(+), 2 deletions(-)
+ .../bindings/arm/altera/socfpga-eccmgr.txt         |   40 ++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
-diff --git a/drivers/edac/altera_edac.c b/drivers/edac/altera_edac.c
-index 0dbfa47..502bf1f 100644
---- a/drivers/edac/altera_edac.c
-+++ b/drivers/edac/altera_edac.c
-@@ -622,8 +622,9 @@ static ssize_t altr_edac_device_trig(struct file *file,
- 		if (ACCESS_ONCE(ptemp[i]))
- 			result = -1;
- 		/* Toggle Error bit (it is latched), leave ECC enabled */
--		writel(error_mask, drvdata->base);
--		writel(priv->ecc_enable_mask, drvdata->base);
-+		writel(error_mask, (drvdata->base + priv->set_err_ofst));
-+		writel(priv->ecc_enable_mask, (drvdata->base +
-+					       priv->set_err_ofst));
- 		ptemp[i] = i;
- 	}
- 	/* Ensure it has been written out */
-@@ -879,6 +880,7 @@ const struct edac_device_prv_data ocramecc_data = {
- 	.ecc_enable_mask = ALTR_OCR_ECC_EN,
- 	.ce_set_mask = (ALTR_OCR_ECC_EN | ALTR_OCR_ECC_INJS),
- 	.ue_set_mask = (ALTR_OCR_ECC_EN | ALTR_OCR_ECC_INJD),
-+	.set_err_ofst = ALTR_OCR_ECC_REG_OFFSET,
- 	.trig_alloc_sz = ALTR_TRIG_OCRAM_BYTE_SIZE,
- };
+diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
+index 885f93d..37ff9bf 100644
+--- a/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
++++ b/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
+@@ -3,6 +3,7 @@ This driver uses the EDAC framework to implement the SOCFPGA ECC Manager.
+ The ECC Manager counts and corrects single bit errors and counts/handles
+ double bit errors which are uncorrectable.
  
-@@ -949,6 +951,7 @@ const struct edac_device_prv_data l2ecc_data = {
- 	.ecc_enable_mask = ALTR_L2_ECC_EN,
- 	.ce_set_mask = (ALTR_L2_ECC_EN | ALTR_L2_ECC_INJS),
- 	.ue_set_mask = (ALTR_L2_ECC_EN | ALTR_L2_ECC_INJD),
-+	.set_err_ofst = ALTR_L2_ECC_REG_OFFSET,
- 	.trig_alloc_sz = ALTR_TRIG_L2C_BYTE_SIZE,
- };
- 
-diff --git a/drivers/edac/altera_edac.h b/drivers/edac/altera_edac.h
-index 32c798a..d7ef94c 100644
---- a/drivers/edac/altera_edac.h
-+++ b/drivers/edac/altera_edac.h
-@@ -205,6 +205,7 @@ struct altr_sdram_mc_data {
- /******* Cyclone5 and Arria5 Defines *******/
- /* OCRAM ECC Management Group Defines */
- #define ALTR_MAN_GRP_OCRAM_ECC_OFFSET   0x04
-+#define ALTR_OCR_ECC_REG_OFFSET         0x00
- #define ALTR_OCR_ECC_EN                 BIT(0)
- #define ALTR_OCR_ECC_INJS               BIT(1)
- #define ALTR_OCR_ECC_INJD               BIT(2)
-@@ -213,6 +214,7 @@ struct altr_sdram_mc_data {
- 
- /* L2 ECC Management Group Defines */
- #define ALTR_MAN_GRP_L2_ECC_OFFSET      0x00
-+#define ALTR_L2_ECC_REG_OFFSET          0x00
- #define ALTR_L2_ECC_EN                  BIT(0)
- #define ALTR_L2_ECC_INJS                BIT(1)
- #define ALTR_L2_ECC_INJD                BIT(2)
-@@ -229,6 +231,7 @@ struct edac_device_prv_data {
- 	int ecc_enable_mask;
- 	int ce_set_mask;
- 	int ue_set_mask;
-+	int set_err_ofst;
- 	int trig_alloc_sz;
- };
- 
++Cyclone5 and Arria5 ECC Manager
+ Required Properties:
+ - compatible : Should be "altr,socfpga-ecc-manager"
+ - #address-cells: must be 1
+@@ -47,3 +48,42 @@ Example:
+ 			interrupts = <0 178 1>, <0 179 1>;
+ 		};
+ 	};
++
++Arria10 SoCFPGA ECC Manager
++The Arria10 SoC ECC Manager handles the IRQs for each peripheral
++in a shared register instead of individual IRQs like the Cyclone5
++and Arria5. Therefore the device tree is different as well.
++
++Required Properties:
++- compatible : Should be "altr,socfpga-a10-ecc-manager"
++- altr,sysgr-syscon : phandle to Arria10 System Manager Block
++	containing the ECC manager registers.
++- #address-cells: must be 1
++- #size-cells: must be 1
++- interrupts : Should be single bit error interrupt, then double bit error
++	interrupt. Note the rising edge type.
++- ranges : standard definition, should translate from local addresses
++
++Subcomponents:
++
++L2 Cache ECC
++Required Properties:
++- compatible : Should be "altr,socfpga-a10-l2-ecc"
++- reg : Address and size for ECC error interrupt clear registers.
++
++Example:
++
++	eccmgr: eccmgr at ffd06000 {
++		compatible = "altr,socfpga-a10-ecc-manager";
++		altr,sysmgr-syscon = <&sysmgr>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		interrupts = <0 2 IRQ_TYPE_LEVEL_HIGH>,
++			     <0 0 IRQ_TYPE_LEVEL_HIGH>;
++		ranges;
++
++		l2-ecc at ffd06010 {
++			compatible = "altr,socfpga-a10-l2-ecc";
++			reg = <0xffd06010 0x4>;
++		};
++	};
 -- 
 1.7.9.5
