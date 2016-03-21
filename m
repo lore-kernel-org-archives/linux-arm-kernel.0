@@ -1,52 +1,44 @@
-From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
-Date: Mon, 21 Mar 2016 11:01:46 -0500
-Subject: [PATCHv3 9/9] ARM: dts: Add Altera Arria10 L2 Cache EDAC devicetree
- entry
-In-Reply-To: <1458576106-24505-1-git-send-email-tthayer@opensource.altera.com>
-References: <1458576106-24505-1-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <1458576106-24505-10-git-send-email-tthayer@opensource.altera.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Mon, 21 Mar 2016 17:00:30 +0100
+Subject: [PATCH V1] perf: qcom: Add L3 cache PMU driver
+In-Reply-To: <a3abed24d82e0a90a5b782219fa24d84@codeaurora.org>
+References: <1458333422-8963-1-git-send-email-agustinv@codeaurora.org>
+ <20160321090400.GQ6344@twins.programming.kicks-ass.net>
+ <a3abed24d82e0a90a5b782219fa24d84@codeaurora.org>
+Message-ID: <20160321160030.GB6344@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thor Thayer <tthayer@opensource.altera.com>
+On Mon, Mar 21, 2016 at 11:56:59AM -0400, agustinv at codeaurora.org wrote:
+> On 2016-03-21 05:04, Peter Zijlstra wrote:
+> >On Fri, Mar 18, 2016 at 04:37:02PM -0400, Agustin Vega-Frias wrote:
+> >>This adds a new dynamic PMU to the Perf Events framework to program
+> >>and control the L3 cache PMUs in some Qualcomm Technologies SOCs.
+> >>
+> >>The driver supports a distributed cache architecture where the overall
+> >>cache is comprised of multiple slices each with its own PMU. The driver
+> >>aggregates counts across the whole system to provide a global picture
+> >>of the metrics selected by the user.
+> >
+> >So is there never a situation where you want to profile just a single
+> >slice?
+> 
+> No, access to each individual slice is determined by hashing based on the
+> target address.
+> 
+> >
+> >It userspace at all aware of these slices through other means?
+> 
+> Userspace is not aware of the actual topology.
+> 
+> >
+> >That is; typically we do not aggregate in-kernel like this but simply
+> >expose each slice as a separate PMU and let userspace sort things.
+> 
+> My decision of single vs. multiple PMUs was based on reducing the overhead
+> required of retrieving the system-wide counts, which would require multiple
+> system calls in the multiple-PMU case.
 
-Add the device tree entries needed to support the Altera L2
-cache EDAC on the Arria10 chip.
-
-Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
----
-v2 Match register value (l2-ecc at ffd06010)
-v3 Set ecc_manager to beginning of system_manager. Add sysman
-   phandle. Move IRQs into ecc_manager from children.
----
- arch/arm/boot/dts/socfpga_arria10.dtsi |   15 +++++++++++++++
- 1 file changed, 15 insertions(+)
-
-diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
-index cce9e50..345ea97 100644
---- a/arch/arm/boot/dts/socfpga_arria10.dtsi
-+++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
-@@ -599,6 +599,21 @@
- 			reg = <0xffe00000 0x40000>;
- 		};
- 
-+		eccmgr: eccmgr at ffd06000 {
-+			compatible = "altr,socfpga-a10-ecc-manager";
-+			altr,sysmgr-syscon = <&sysmgr>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			interrupts = <0 2 IRQ_TYPE_LEVEL_HIGH>,
-+				     <0 0 IRQ_TYPE_LEVEL_HIGH>;
-+			ranges;
-+
-+			l2-ecc at ffd06010 {
-+				compatible = "altr,socfpga-a10-l2-ecc";
-+				reg = <0xffd06010 0x4>;
-+			};
-+		};
-+
- 		rst: rstmgr at ffd05000 {
- 			#reset-cells = <1>;
- 			compatible = "altr,rst-mgr";
--- 
-1.7.9.5
+OK. A bit weird your hardware has a PMU per slice if its otherwise
+completely hidden. In any case, put a comment somewhere describing how
+access to a single slice never makes sense.
