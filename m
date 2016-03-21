@@ -1,52 +1,40 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Mon, 21 Mar 2016 17:32:15 +0100
-Subject: [PATCH v2 4/4] nmi_backtrace: generate one-line reports for idle
- cpus
-In-Reply-To: <56F01E10.6030909@mellanox.com>
-References: <1458147733-29338-1-git-send-email-cmetcalf@mellanox.com>
- <1458147733-29338-5-git-send-email-cmetcalf@mellanox.com>
- <20160321154201.GA6344@twins.programming.kicks-ass.net>
- <56F01E10.6030909@mellanox.com>
-Message-ID: <20160321163215.GC6344@twins.programming.kicks-ass.net>
+From: agustinv@codeaurora.org (agustinv at codeaurora.org)
+Date: Mon, 21 Mar 2016 12:37:45 -0400
+Subject: [PATCH V1] perf: qcom: Add L3 cache PMU driver
+In-Reply-To: <20160321120409.GT6344@twins.programming.kicks-ass.net>
+References: <1458333422-8963-1-git-send-email-agustinv@codeaurora.org>
+ <20160321103507.GB17326@leverpostej>
+ <20160321120409.GT6344@twins.programming.kicks-ass.net>
+Message-ID: <a872fdb890d5a2a09fe3915f67b24487@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 21, 2016 at 12:15:12PM -0400, Chris Metcalf wrote:
-> On 03/21/2016 11:42 AM, Peter Zijlstra wrote:
-
-> >The most common idle function for x86 is: mwait_idle_with_hints(),
-> >trouble is, its an inline, so I'm not sure adding __cpuidle to it does
-> >anything.
+On 2016-03-21 08:04, Peter Zijlstra wrote:
+> On Mon, Mar 21, 2016 at 10:35:08AM +0000, Mark Rutland wrote:
+>> > +static
+>> > +int qcom_l3_cache__event_add(struct perf_event *event, int flags)
+>> > +{
+>> > +	struct l3cache_pmu *system = to_l3cache_pmu(event->pmu);
+>> > +	struct hw_perf_event *hwc = &event->hw;
+>> > +	int idx;
+>> > +	int prev_cpu;
+>> > +	int err = 0;
+>> > +
+>> > +	/*
+>> > +	 * We need to disable the pmu while adding the event, otherwise
+>> > +	 * the perf tick might kick-in and re-add this event.
+>> > +	 */
+>> > +	perf_pmu_disable(event->pmu);
 > 
-> No, you're right, it wouldn't help.  I didn't look at the drivers/cpuidle
-> subsystem at all in my patch, since I'm not that familiar with it,
-> but it seems like tagging acpi_processor_ffh_cstate_enter(), as the
-> only user of mwait_idle_with_hints(), will do the job.
-
-intel_idle() also uses it.
-
-> >I've yet to find the magic objdump incantation to check. Or rather
-> >objdump -h doesn't appear to list .cpuidle.text at all :/
-> >
-> >I'm probably doing something silly...
+> Why did you write that? If you really need this you did something
+> seriously wrong elsewhere, because:
 > 
-> The easiest way to check for a given function is just to look
-> at the "nm -n" output and see that all the functions you expect
-> to reflect idle behavior are in the cpuidle begin/end range.
+> kernel/events/core.c:event_sched_in() is the only place calling
+> pmu::add() and that explicitly already does this.
 
-# nm -n ivb-ep-build/vmlinux | awk '/__cpuidle_text_start/ {p=1} {if (p) print $0} /__cpuidle_text_end/ {p=0}'
-ffffffff81b16ca8 T __cpuidle_text_start
-ffffffff81b16cb0 T default_idle
-ffffffff81b16e50 t mwait_idle
-ffffffff81b17080 t cpu_idle_poll
-ffffffff81b17280 T default_idle_call
-ffffffff81b172be T __cpuidle_text_end
+This might have been before I added the restriction that only one CPU 
+can open the events, but I will double-check and remove this as it is 
+unnecessary.
 
-So no intel_idle for me..
-
-> objdump -h certainly works to show .cpuidle.text if you look at
-> individual objects (e.g. arch/x86/kernel/process.o) but by the time
-> you're looking at the linked vmlinux image they have all been linked
-> into the giant .text section.
-
-Indeed.
+Thanks,
+Agustin
