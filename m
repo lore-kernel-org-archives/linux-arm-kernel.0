@@ -1,102 +1,68 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon, 21 Mar 2016 17:14:06 +0000
-Subject: [PATCH] arm64: mm: Add trace_irqflags annotations to
- do_debug_exception()
-Message-ID: <1458580446-32474-1-git-send-email-james.morse@arm.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Mon, 21 Mar 2016 18:17:38 +0100
+Subject: [PATCH v2 4/4] nmi_backtrace: generate one-line reports for idle
+ cpus
+In-Reply-To: <56F02B87.2000307@mellanox.com>
+References: <1458147733-29338-1-git-send-email-cmetcalf@mellanox.com>
+ <1458147733-29338-5-git-send-email-cmetcalf@mellanox.com>
+ <20160321154201.GA6344@twins.programming.kicks-ass.net>
+ <56F01E10.6030909@mellanox.com>
+ <20160321163215.GC6344@twins.programming.kicks-ass.net>
+ <56F02B87.2000307@mellanox.com>
+Message-ID: <20160321171738.GE6344@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With CONFIG_PROVE_LOCKING, CONFIG_DEBUG_LOCKDEP and CONFIG_TRACE_IRQFLAGS
-enabled, lockdep will compare current->hardirqs_enabled with the flags from
-local_irq_save().
+On Mon, Mar 21, 2016 at 01:12:39PM -0400, Chris Metcalf wrote:
+> I do see mwait used in the ACPI 4.0 Processor Aggregator Device driver, but
+> this seems sufficiently far removed from regular cpuidle that I don't
+> think it's appropriate to tag the power_saving_thread() function -
+> the initial commit talks about using the mechanism "to ride-out
+> transient electrical and thermal emergencies."
+> 
+> There's also the thermal "powerclamp" driver that enforces a particular
+> amount of idle time across the system.  For this one it's less clear to
+> me whether this is a valid "idle" state that we should ignore when doing
+> NMI backtracing.  This would be the clamp_thread() function in
+> drivers/thermal/intel_powerclamp.c.  For now I'm not including it,
+> but what do you think?
 
-When a debug exception occurs, interrupts are disabled in entry.S, but
-lockdep isn't told, resulting in:
-DEBUG_LOCKS_WARN_ON(current->hardirqs_enabled)
-------------[ cut here ]------------
-WARNING: at ../kernel/locking/lockdep.c:3523
-Modules linked in:
-CPU: 3 PID: 1752 Comm: perf Not tainted 4.5.0-rc4+ #2204
-Hardware name: ARM Juno development board (r1) (DT)
-task: ffffffc974868000 ti: ffffffc975f40000 task.ti: ffffffc975f40000
-PC is at check_flags.part.35+0x17c/0x184
-LR is at check_flags.part.35+0x17c/0x184
-pc : [<ffffff80080fc93c>] lr : [<ffffff80080fc93c>] pstate: 600003c5
-[...]
----[ end trace 74631f9305ef5020 ]---
-Call trace:
-[<ffffff80080fc93c>] check_flags.part.35+0x17c/0x184
-[<ffffff80080ffe30>] lock_acquire+0xa8/0xc4
-[<ffffff8008093038>] breakpoint_handler+0x118/0x288
-[<ffffff8008082434>] do_debug_exception+0x3c/0xa8
-[<ffffff80080854b4>] el1_dbg+0x18/0x6c
-[<ffffff80081e82f4>] do_filp_open+0x64/0xdc
-[<ffffff80081d6e60>] do_sys_open+0x140/0x204
-[<ffffff80081d6f58>] SyS_openat+0x10/0x18
-[<ffffff8008085d30>] el0_svc_naked+0x24/0x28
-possible reason: unannotated irqs-off.
-irq event stamp: 65857
-hardirqs last  enabled at (65857): [<ffffff80081fb1c0>] lookup_mnt+0xf4/0x1b4
-hardirqs last disabled at (65856): [<ffffff80081fb188>] lookup_mnt+0xbc/0x1b4
-softirqs last  enabled at (65790): [<ffffff80080bdca4>] __do_softirq+0x1f8/0x290
-softirqs last disabled at (65757): [<ffffff80080be038>] irq_exit+0x9c/0xd0
+Both the acpi power aggregator and the powerclamp driver are forced idle
+and have some serious issues, so are safe to ignore for now.
 
-This patch adds the annotations to do_debug_exception(), while trying not
-to call trace_hardirqs_off() if el1_dbg() interrupted a task that already
-had irqs disabled.
+Also, I would explicitly not include them, because forced idle might
+still be interesting.
 
-Signed-off-by: James Morse <james.morse@arm.com>
----
- arch/arm64/mm/fault.c | 33 +++++++++++++++++++++++----------
- 1 file changed, 23 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 44e56de23f79..d8b9c1da2630 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -548,20 +548,33 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
- {
- 	const struct fault_info *inf = debug_fault_info + DBG_ESR_EVT(esr);
- 	struct siginfo info;
-+	int rv;
- 
--	if (!inf->fn(addr, esr, regs))
--		return 1;
-+	/*
-+	 * If we came in from el0_dbg, we disabled irqs. From el1_dbg,
-+	 * we need to test pstate.
-+	 */
-+	if (user_mode(regs) || !(regs->pstate & PSR_I_BIT))
-+		trace_hardirqs_off();
- 
--	pr_alert("Unhandled debug exception: %s (0x%08x) at 0x%016lx\n",
--		 inf->name, esr, addr);
-+	if (!inf->fn(addr, esr, regs)) {
-+		rv = 1;
-+	} else {
-+		pr_alert("Unhandled debug exception: %s (0x%08x) at 0x%016lx\n",
-+			 inf->name, esr, addr);
-+
-+		info.si_signo = inf->sig;
-+		info.si_errno = 0;
-+		info.si_code  = inf->code;
-+		info.si_addr  = (void __user *)addr;
-+		arm64_notify_die("", regs, &info, 0);
-+		rv = 0;
-+	}
- 
--	info.si_signo = inf->sig;
--	info.si_errno = 0;
--	info.si_code  = inf->code;
--	info.si_addr  = (void __user *)addr;
--	arm64_notify_die("", regs, &info, 0);
-+	if (user_mode(regs) || !(regs->pstate & PSR_I_BIT))
-+		trace_hardirqs_on();
- 
--	return 0;
-+	return rv;
- }
- 
- #ifdef CONFIG_ARM64_PAN
--- 
-2.7.0
+> ># nm -n ivb-ep-build/vmlinux | awk '/__cpuidle_text_start/ {p=1} {if (p) print $0} /__cpuidle_text_end/ {p=0}'
+> >ffffffff81b16ca8 T __cpuidle_text_start
+> >ffffffff81b16cb0 T default_idle
+> >ffffffff81b16e50 t mwait_idle
+> >ffffffff81b17080 t cpu_idle_poll
+> >ffffffff81b17280 T default_idle_call
+> >ffffffff81b172be T __cpuidle_text_end
+> >
+> >So no intel_idle for me..
+> 
+> With the changes discussed so far in this email thread, we've gotten to:
+> 
+> ffffffff818df178 T __cpuidle_text_start
+> ffffffff818df180 T default_idle
+> ffffffff818df260 t mwait_idle
+> ffffffff818df3f0 T acpi_processor_ffh_cstate_enter
+> ffffffff818df4a0 T default_idle_call
+> ffffffff818df4e0 t cpu_idle_poll
+
+> ffffffff818df600 t intel_idle_freeze
+
+You can skip this one, that only happens when you suspend to idle.
+
+> ffffffff818df6a0 t intel_idle
+> ffffffff818df7b5 T __cpuidle_text_end
+> 
+> This is about 1,600 bytes (or about 450 instructions) that will cause
+> NMI to skip doing a backtrace if the PC is anywhere in the range.
+
+Yeah, the alternative is making mwait_idle_with_hints an actual
+function, but then we get to somehow exclude the other users like the
+forced idle stuff.
