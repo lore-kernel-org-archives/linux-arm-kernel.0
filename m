@@ -1,57 +1,24 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Mon, 21 Mar 2016 10:53:30 +0000
-Subject: [PATCH v4 2/8] Documentation: arm: define DT cpu capacity bindings
-In-Reply-To: <56EC3F9E.4050209@nvidia.com>
-References: <1458311054-13524-1-git-send-email-juri.lelli@arm.com>
- <1458311054-13524-3-git-send-email-juri.lelli@arm.com>
- <56EC3F9E.4050209@nvidia.com>
-Message-ID: <20160321105330.GB12319@e106622-lin>
+From: schwab@suse.de (Andreas Schwab)
+Date: Mon, 21 Mar 2016 11:52:54 +0100
+Subject: [RFC5 PATCH v6 00/21] ILP32 for ARM64
+In-Reply-To: <6653982.FK62mVSCZO@wuerfel> (Arnd Bergmann's message of "Mon, 21
+ Mar 2016 10:43:48 +0100")
+References: <1452792198-10718-1-git-send-email-ynorov@caviumnetworks.com>
+ <20160318154918.GA1595@yury-N73SV> <mvmoaa8dwre.fsf@hawking.suse.de>
+ <6653982.FK62mVSCZO@wuerfel>
+Message-ID: <mvmbn68drw9.fsf@hawking.suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sai,
+Arnd Bergmann <arnd@arndb.de> writes:
 
-On 18/03/16 10:49, Sai Gurrappadi wrote:
-> Hi Juri,
-> 
-> On 03/18/2016 07:24 AM, Juri Lelli wrote:
-> 
-> <snip>
-> 
-> > +
-> > +==========================================
-> > +2 - CPU capacity definition
-> > +==========================================
-> > +
-> > +CPU capacity is a number that provides the scheduler information about CPUs
-> > +heterogeneity. Such heterogeneity can come from micro-architectural differences
-> > +(e.g., ARM big.LITTLE systems) or maximum frequency at which CPUs can run
-> > +(e.g., SMP systems with multiple frequency domains). Heterogeneity in this
-> > +context is about differing performance characteristics; this binding tries to
-> > +capture a first-order approximation of the relative performance of CPUs.
-> 
-> Any reason why this capacity number is not dynamically generated based on the
-> max frequency for each CPU? The DT property would then instead specify just
-> the micro-architectural differences between the CPU types.
-> 
+> What exactly do you need to define F_GETLK64 for on LP64?
 
-I'm not sure I clearly understand your question, so I'll try to
-reiterate it.
+To override the generic definitions.
 
-Are you asking why we don't dynamically profile the system, at boot for
-example, to get this number? Or do you ask why this number couldn't be
-only describing micro-arch differences (so, if I get it right, we should
-then multiply it by max freq to get the capacity of a CPU)?
+Andreas.
 
-We already played with the first option (please refer to v2 and v3), but
-we ended up agreeing that dynamic profiling adds overhead to the boot
-process (while a DT approach can provide information to speed up boot)
-and it is in general not repeatable/reliable (as numbers can vary from
-boot to boot for different reasons).
-
-The second option I think can be feasible, but I'm not sure what we gain
-in practice. We will still need to specify a per-platform number, right?
-
-Best,
-
-- Juri
+-- 
+Andreas Schwab, SUSE Labs, schwab at suse.de
+GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
+"And now for something completely different."
