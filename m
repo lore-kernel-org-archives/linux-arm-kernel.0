@@ -1,55 +1,57 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 22 Mar 2016 23:31:11 +0100
-Subject: [PATCH v3 4/4] nmi_backtrace: generate one-line reports for idle
- cpus
-In-Reply-To: <1458667179-19630-5-git-send-email-cmetcalf@mellanox.com>
-References: <1458667179-19630-1-git-send-email-cmetcalf@mellanox.com>
- <1458667179-19630-5-git-send-email-cmetcalf@mellanox.com>
-Message-ID: <54039485.X1biSGXPBa@vostro.rjw.lan>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Wed, 23 Mar 2016 07:44:59 +0900
+Subject: Who is going to merge it [Was: Re: [PATCH v14 0/17] Add Analogix
+ Core Display Port Driver]
+In-Reply-To: <1919945.Y1tg0YzXlm@diego>
+References: <1455534485-1154-1-git-send-email-ykk@rock-chips.com>
+ <CAD=FV=XXESzA6n6MNEGH1Kbh7CeL8xWX8CifFLVf91+0JyFcJQ@mail.gmail.com>
+ <56F19AC9.5060507@osg.samsung.com> <1919945.Y1tg0YzXlm@diego>
+Message-ID: <56F1CAEB.3080701@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, March 22, 2016 01:19:39 PM Chris Metcalf wrote:
-> When doing an nmi backtrace of many cores, most of which are idle,
-> the output is a little overwhelming and very uninformative.  Suppress
-> messages for cpus that are idling when they are interrupted and just
-> emit one line, "NMI backtrace for N skipped: idling at pc 0xNNN".
++ Ajay kumar with Samsung email
+
+Hi,
+
+2016? 03? 23? 07:12? Heiko St?bner ?(?) ? ?:
+> Hi,
 > 
-> We do this by grouping all the cpuidle code together into a new
-> .cpuidle.text section, and then checking the address of the
-> interrupted PC to see if it lies within that section.
+> Am Dienstag, 22. M?rz 2016, 16:19:37 schrieb Javier Martinez Canillas:
+>> On 03/18/2016 07:53 PM, Doug Anderson wrote:
+>>> On Thu, Mar 17, 2016 at 11:41 PM, Caesar Wang <caesar.upstream@gmail.com> 
+> wrote:
+>> Same here, this is the second time I tested this series (first time was
+>> v6 on October 25 [2]) and I think that has been out there for too long.
+>>
+>>> Tested-by: Douglas Anderson <dianders@chromium.org>
+>> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
 > 
-> This commit suitably tags x86, arm64, and tile idle routines,
-> and only adds in the minimal framework for other architectures.
+> So we have 3 tests (Doug, Caesar and me) for the Rockchip side as well as 
+> Javier for the Exynos side based on the most recent drm state.
 > 
-> Acked-by: Peter Zijlstra (Intel) <peterz@infradead.org>
-> Tested-by: Peter Zijlstra (Intel) <peterz@infradead.org>
-> Signed-off-by: Chris Metcalf <cmetcalf@mellanox.com>
-> ---
+> As said by a lot of people it would be cool to get this merged soon - 
+> hopefully directly after -rc1. The only remaining question is through which 
+> tree it should go.
+> 
+> I guess there are two basic options:
+> - Inki takes the series - we could see the Rockchip-Ack being implied but 
+> maybe Mark can provide an explicit one
+> - Mark takes the series with an Ack from Inki for the shared parts
+> 
+> Inki, Mark do you have a preference?
 
-[cut]
+The problem would be that there is no drm bridge maintainer. I think the most suitable person as the maintainer would be Ajay Kumar who is an author of drm bridge framework.
+Of course, I could take them and have pull-request again. But it seems a little late. Dave had already pull-request.
 
-> diff --git a/drivers/idle/intel_idle.c b/drivers/idle/intel_idle.c
-> index cd4510a63375..924554f920fb 100644
-> --- a/drivers/idle/intel_idle.c
-> +++ b/drivers/idle/intel_idle.c
-> @@ -725,8 +725,8 @@ static struct cpuidle_state avn_cstates[] = {
->   *
->   * Must be called under local_irq_disable().
->   */
-> -static int intel_idle(struct cpuidle_device *dev,
-> -		struct cpuidle_driver *drv, int index)
-> +static __cpuidle int intel_idle(struct cpuidle_device *dev,
-> +				struct cpuidle_driver *drv, int index)
->  {
->  	unsigned long ecx = 1; /* break on interrupt flag */
->  	struct cpuidle_state *state = &drv->states[index];
-
-Well, what about intel_idle_freeze()?  Or do we not care?
-
-And analogous stuff in processor_idle.c for that matter?
-
-acpi_idle_enter()/acpi_idle_enter_freeze() plus stuff called by those?
+To Ajay,
+How about adding you as a drm bridge maintainer? DRM SoC driver maintainers would need a person who can manage the drm bridge relevant pathes.
 
 Thanks,
-Rafael
+Inki Dae
+ 
+> 
+> Thanks
+> Heiko
+> 
+> 
