@@ -1,249 +1,205 @@
 From: joro@8bytes.org (Joerg Roedel)
-Date: Tue, 22 Mar 2016 18:58:24 +0100
-Subject: [PATCH 1/6] of: Introduce struct of_phandle_iterator
+Date: Tue, 22 Mar 2016 18:58:25 +0100
+Subject: [PATCH 2/6] of: Move phandle walking to of_phandle_iterator_next()
 In-Reply-To: <1458669509-7178-1-git-send-email-joro@8bytes.org>
 References: <1458669509-7178-1-git-send-email-joro@8bytes.org>
-Message-ID: <1458669509-7178-2-git-send-email-joro@8bytes.org>
+Message-ID: <1458669509-7178-3-git-send-email-joro@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Joerg Roedel <jroedel@suse.de>
 
-This struct carrys all necessary information to iterate over
-a list of phandles and extract the arguments. Add an
-init-function for the iterator and make use of it in
-__of_parse_phandle_with_args().
+Move the code to walk over the phandles out of the loop in
+__of_parse_phandle_with_args() to a separate function that
+just works with the iterator handle: of_phandle_iterator_next().
 
 Signed-off-by: Joerg Roedel <jroedel@suse.de>
 ---
- drivers/of/base.c  | 99 +++++++++++++++++++++++++++++++++---------------------
- include/linux/of.h | 33 ++++++++++++++++++
- 2 files changed, 93 insertions(+), 39 deletions(-)
+ drivers/of/base.c  | 130 ++++++++++++++++++++++++++++++-----------------------
+ include/linux/of.h |   7 +++
+ 2 files changed, 81 insertions(+), 56 deletions(-)
 
 diff --git a/drivers/of/base.c b/drivers/of/base.c
-index 017dd94..bfdb09b 100644
+index bfdb09b..4036512 100644
 --- a/drivers/of/base.c
 +++ b/drivers/of/base.c
-@@ -1439,35 +1439,56 @@ void of_print_phandle_args(const char *msg, const struct of_phandle_args *args)
- 	printk("\n");
+@@ -1464,6 +1464,75 @@ int of_phandle_iterator_init(struct of_phandle_iterator *it,
+ 	return 0;
  }
  
-+int of_phandle_iterator_init(struct of_phandle_iterator *it,
-+		const struct device_node *np,
-+		const char *list_name,
-+		const char *cells_name,
-+		int cell_count)
++int of_phandle_iterator_next(struct of_phandle_iterator *it)
 +{
-+	const __be32 *list;
-+	int size;
++	uint32_t count = 0;
 +
-+	memset(it, 0, sizeof(*it));
++	if (it->node) {
++		of_node_put(it->node);
++		it->node = NULL;
++	}
 +
-+	list = of_get_property(np, list_name, &size);
-+	if (!list)
++	if (!it->cur || it->phandle_end >= it->list_end)
 +		return -ENOENT;
 +
-+	it->cells_name = cells_name;
-+	it->cell_count = cell_count;
-+	it->parent = np;
-+	it->list_end = list + size / sizeof(*list);
-+	it->phandle_end = list;
-+	it->cur = list;
++	it->cur = it->phandle_end;
++
++	/* If phandle is 0, then it is an empty entry with no arguments. */
++	it->phandle = be32_to_cpup(it->cur++);
++
++	if (it->phandle) {
++
++		/*
++		 * Find the provider node and parse the #*-cells property to
++		 * determine the argument length.
++		 */
++		it->node = of_find_node_by_phandle(it->phandle);
++
++		if (it->cells_name) {
++			if (!it->node) {
++				pr_err("%s: could not find phandle\n",
++				       it->parent->full_name);
++				goto err;
++			}
++
++			if (of_property_read_u32(it->node, it->cells_name,
++						 &count)) {
++				pr_err("%s: could not get %s for %s\n",
++				       it->parent->full_name,
++				       it->cells_name,
++				       it->node->full_name);
++				goto err;
++			}
++		} else {
++			count = it->cell_count;
++		}
++
++		/*
++		 * Make sure that the arguments actually fit in the remaining
++		 * property data length
++		 */
++		if (it->cur + count > it->list_end) {
++			pr_err("%s: arguments longer than property\n",
++			       it->parent->full_name);
++			goto err;
++		}
++	}
++
++	it->phandle_end = it->cur + count;
++	it->cur_count = count;
 +
 +	return 0;
++
++err:
++	if (it->node) {
++		of_node_put(it->node);
++		it->node = NULL;
++	}
++
++	return -EINVAL;
 +}
 +
  static int __of_parse_phandle_with_args(const struct device_node *np,
  					const char *list_name,
  					const char *cells_name,
- 					int cell_count, int index,
- 					struct of_phandle_args *out_args)
- {
--	const __be32 *list, *list_end;
--	int rc = 0, size, cur_index = 0;
--	uint32_t count = 0;
--	struct device_node *node = NULL;
--	phandle phandle;
-+	struct of_phandle_iterator it;
-+	int rc, cur_index = 0;
- 
--	/* Retrieve the phandle list property */
--	list = of_get_property(np, list_name, &size);
--	if (!list)
--		return -ENOENT;
--	list_end = list + size / sizeof(*list);
-+	rc = of_phandle_iterator_init(&it, np, list_name,
-+				      cells_name, cell_count);
-+	if (rc)
-+		return rc;
+@@ -1479,59 +1548,9 @@ static int __of_parse_phandle_with_args(const struct device_node *np,
+ 		return rc;
  
  	/* Loop over the phandles until all the requested entry is found */
--	while (list < list_end) {
-+	while (it.cur < it.list_end) {
- 		rc = -EINVAL;
--		count = 0;
-+		it.cur_count = 0;
- 
+-	while (it.cur < it.list_end) {
+-		rc = -EINVAL;
+-		it.cur_count = 0;
+-
+-		/*
+-		 * If phandle is 0, then it is an empty entry with no
+-		 * arguments.  Skip forward to the next entry.
+-		 */
+-		it.phandle = be32_to_cpup(it.cur++);
+-		if (it.phandle) {
+-			/*
+-			 * Find the provider node and parse the #*-cells
+-			 * property to determine the argument length.
+-			 *
+-			 * This is not needed if the cell count is hard-coded
+-			 * (i.e. cells_name not set, but cell_count is set),
+-			 * except when we're going to return the found node
+-			 * below.
+-			 */
+-			if (it.cells_name || cur_index == index) {
+-				it.node = of_find_node_by_phandle(it.phandle);
+-				if (!it.node) {
+-					pr_err("%s: could not find phandle\n",
+-						it.parent->full_name);
+-					goto err;
+-				}
+-			}
+-
+-			if (it.cells_name) {
+-				if (of_property_read_u32(it.node, it.cells_name,
+-							 &it.cur_count)) {
+-					pr_err("%s: could not get %s for %s\n",
+-						it.parent->full_name, it.cells_name,
+-						it.node->full_name);
+-					goto err;
+-				}
+-			} else {
+-				it.cur_count = it.cell_count;
+-			}
+-
+-			/*
+-			 * Make sure that the arguments actually fit in the
+-			 * remaining property data length
+-			 */
+-			if (it.cur + it.cur_count > it.list_end) {
+-				pr_err("%s: arguments longer than property\n",
+-					 it.parent->full_name);
+-				goto err;
+-			}
+-		}
+-
++	while ((rc = of_phandle_iterator_next(&it)) == 0) {
  		/*
- 		 * If phandle is 0, then it is an empty entry with no
- 		 * arguments.  Skip forward to the next entry.
- 		 */
--		phandle = be32_to_cpup(list++);
--		if (phandle) {
-+		it.phandle = be32_to_cpup(it.cur++);
-+		if (it.phandle) {
- 			/*
- 			 * Find the provider node and parse the #*-cells
- 			 * property to determine the argument length.
-@@ -1477,34 +1498,34 @@ static int __of_parse_phandle_with_args(const struct device_node *np,
- 			 * except when we're going to return the found node
- 			 * below.
- 			 */
--			if (cells_name || cur_index == index) {
--				node = of_find_node_by_phandle(phandle);
--				if (!node) {
-+			if (it.cells_name || cur_index == index) {
-+				it.node = of_find_node_by_phandle(it.phandle);
-+				if (!it.node) {
- 					pr_err("%s: could not find phandle\n",
--						np->full_name);
-+						it.parent->full_name);
- 					goto err;
- 				}
- 			}
- 
--			if (cells_name) {
--				if (of_property_read_u32(node, cells_name,
--							 &count)) {
-+			if (it.cells_name) {
-+				if (of_property_read_u32(it.node, it.cells_name,
-+							 &it.cur_count)) {
- 					pr_err("%s: could not get %s for %s\n",
--						np->full_name, cells_name,
--						node->full_name);
-+						it.parent->full_name, it.cells_name,
-+						it.node->full_name);
- 					goto err;
- 				}
- 			} else {
--				count = cell_count;
-+				it.cur_count = it.cell_count;
- 			}
- 
- 			/*
- 			 * Make sure that the arguments actually fit in the
- 			 * remaining property data length
- 			 */
--			if (list + count > list_end) {
-+			if (it.cur + it.cur_count > it.list_end) {
- 				pr_err("%s: arguments longer than property\n",
--					 np->full_name);
-+					 it.parent->full_name);
- 				goto err;
- 			}
- 		}
-@@ -1517,28 +1538,28 @@ static int __of_parse_phandle_with_args(const struct device_node *np,
- 		 */
- 		rc = -ENOENT;
- 		if (cur_index == index) {
--			if (!phandle)
-+			if (!it.phandle)
- 				goto err;
- 
- 			if (out_args) {
- 				int i;
--				if (WARN_ON(count > MAX_PHANDLE_ARGS))
--					count = MAX_PHANDLE_ARGS;
--				out_args->np = node;
--				out_args->args_count = count;
--				for (i = 0; i < count; i++)
--					out_args->args[i] = be32_to_cpup(list++);
-+				if (WARN_ON(it.cur_count > MAX_PHANDLE_ARGS))
-+					it.cur_count = MAX_PHANDLE_ARGS;
-+				out_args->np = it.node;
-+				out_args->args_count = it.cur_count;
-+				for (i = 0; i < it.cur_count; i++)
-+					out_args->args[i] = be32_to_cpup(it.cur++);
- 			} else {
--				of_node_put(node);
-+				of_node_put(it.node);
- 			}
- 
- 			/* Found it! return success */
+-		 * All of the error cases above bail out of the loop, so at
++		 * All of the error cases bail out of the loop, so at
+ 		 * this point, the parsing is successful. If the requested
+ 		 * index matches, then fill the out_args structure and return,
+ 		 * or return -ENOENT for an empty entry.
+@@ -1557,9 +1576,6 @@ static int __of_parse_phandle_with_args(const struct device_node *np,
  			return 0;
  		}
  
--		of_node_put(node);
--		node = NULL;
--		list += count;
-+		of_node_put(it.node);
-+		it.node = NULL;
-+		it.cur += it.cur_count;
+-		of_node_put(it.node);
+-		it.node = NULL;
+-		it.cur += it.cur_count;
  		cur_index++;
  	}
  
-@@ -1550,8 +1571,8 @@ static int __of_parse_phandle_with_args(const struct device_node *np,
+@@ -1569,7 +1585,9 @@ static int __of_parse_phandle_with_args(const struct device_node *np,
+ 	 * -EINVAL : parsing error on data
+ 	 * [1..n]  : Number of phandle (count mode; when index = -1)
  	 */
- 	rc = index < 0 ? cur_index : -ENOENT;
+-	rc = index < 0 ? cur_index : -ENOENT;
++	if (rc == -ENOENT && index < 0)
++		rc = cur_index;
++
   err:
--	if (node)
--		of_node_put(node);
-+	if (it.node)
-+		of_node_put(it.node);
- 	return rc;
- }
- 
+ 	if (it.node)
+ 		of_node_put(it.node);
 diff --git a/include/linux/of.h b/include/linux/of.h
-index dc6e396..70c2bdb 100644
+index 70c2bdb..d94388b0 100644
 --- a/include/linux/of.h
 +++ b/include/linux/of.h
-@@ -75,6 +75,23 @@ struct of_phandle_args {
- 	uint32_t args[MAX_PHANDLE_ARGS];
- };
+@@ -358,6 +358,8 @@ extern int of_phandle_iterator_init(struct of_phandle_iterator *it,
+ 				    const char *cells_name,
+ 				    int cell_count);
  
-+struct of_phandle_iterator {
-+	/* Common iterator information */
-+	const char *cells_name;
-+	int cell_count;
-+	const struct device_node *parent;
-+
-+	/* List size information */
-+	const __be32 *list_end;
-+	const __be32 *phandle_end;
-+
-+	/* Current position state */
-+	const __be32 *cur;
-+	uint32_t cur_count;
-+	phandle phandle;
-+	struct device_node *node;
-+};
-+
- struct of_reconfig_data {
- 	struct device_node	*dn;
- 	struct property		*prop;
-@@ -334,6 +351,13 @@ extern int of_parse_phandle_with_fixed_args(const struct device_node *np,
- extern int of_count_phandle_with_args(const struct device_node *np,
- 	const char *list_name, const char *cells_name);
- 
-+/* phandle iterator functions */
-+extern int of_phandle_iterator_init(struct of_phandle_iterator *it,
-+				    const struct device_node *np,
-+				    const char *list_name,
-+				    const char *cells_name,
-+				    int cell_count);
++extern int of_phandle_iterator_next(struct of_phandle_iterator *it);
 +
  extern void of_alias_scan(void * (*dt_alloc)(u64 size, u64 align));
  extern int of_alias_get_id(struct device_node *np, const char *stem);
  extern int of_alias_get_highest_id(const char *stem);
-@@ -608,6 +632,15 @@ static inline int of_count_phandle_with_args(struct device_node *np,
+@@ -641,6 +643,11 @@ static inline int of_phandle_iterator_init(struct of_phandle_iterator *it,
  	return -ENOSYS;
  }
  
-+static inline int of_phandle_iterator_init(struct of_phandle_iterator *it,
-+					   const struct device_node *np,
-+					   const char *list_name,
-+					   const char *cells_name,
-+					   int cell_count)
++static inline int of_phandle_iterator_next(struct of_phandle_iterator *it)
 +{
 +	return -ENOSYS;
 +}
