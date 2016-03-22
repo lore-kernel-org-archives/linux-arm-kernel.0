@@ -1,67 +1,163 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 22 Mar 2016 23:52:47 +0100
-Subject: Who is going to merge it [Was: Re: [PATCH v14 0/17] Add Analogix
- Core Display Port Driver]
-In-Reply-To: <56F1CAEB.3080701@samsung.com>
-References: <1455534485-1154-1-git-send-email-ykk@rock-chips.com>
- <1919945.Y1tg0YzXlm@diego> <56F1CAEB.3080701@samsung.com>
-Message-ID: <8949624.HmxDpZAlt2@diego>
+From: rogershimizu@gmail.com (Roger Shimizu)
+Date: Wed, 23 Mar 2016 07:54:35 +0900
+Subject: [PATCH] ARM: dts: orion5x: add device tree for kurobox-pro
+In-Reply-To: <20160322164200.GH5250@lunn.ch>
+References: <1458656898-16183-1-git-send-email-rogershimizu@gmail.com>
+ <20160322164200.GH5250@lunn.ch>
+Message-ID: <CAEQ9gEniE1CGaSb46uWDdg1AU0VWEU-Eq8uVF7X7Rxn1jM+KUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 23. M?rz 2016, 07:44:59 schrieb Inki Dae:
-> + Ajay kumar with Samsung email
-> 
-> Hi,
-> 
-> 2016? 03? 23? 07:12? Heiko St?bner ?(?) ? ?:
-> > Hi,
-> > 
-> > Am Dienstag, 22. M?rz 2016, 16:19:37 schrieb Javier Martinez Canillas:
-> >> On 03/18/2016 07:53 PM, Doug Anderson wrote:
-> >>> On Thu, Mar 17, 2016 at 11:41 PM, Caesar Wang
-> >>> <caesar.upstream@gmail.com>
-> > 
-> > wrote:
-> >> Same here, this is the second time I tested this series (first time was
-> >> v6 on October 25 [2]) and I think that has been out there for too long.
-> >> 
-> >>> Tested-by: Douglas Anderson <dianders@chromium.org>
-> >> 
-> >> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> > 
-> > So we have 3 tests (Doug, Caesar and me) for the Rockchip side as well as
-> > Javier for the Exynos side based on the most recent drm state.
-> > 
-> > As said by a lot of people it would be cool to get this merged soon -
-> > hopefully directly after -rc1. The only remaining question is through
-> > which
-> > tree it should go.
-> > 
-> > I guess there are two basic options:
-> > - Inki takes the series - we could see the Rockchip-Ack being implied but
-> > maybe Mark can provide an explicit one
-> > - Mark takes the series with an Ack from Inki for the shared parts
-> > 
-> > Inki, Mark do you have a preference?
-> 
-> The problem would be that there is no drm bridge maintainer. I think the
-> most suitable person as the maintainer would be Ajay Kumar who is an author
-> of drm bridge framework. Of course, I could take them and have pull-request
-> again. But it seems a little late. Dave had already pull-request.
+Dear Andrew,
 
-I really meant that for 4.7, not for the current merge window. I just want to 
-make sure it goes into a maintainer tree shortly after v4.6-rc1, before 
-something else changes the exynos-dp again :-) .
+Thanks for your review!
+
+On Wed, Mar 23, 2016 at 1:42 AM, Andrew Lunn <andrew@lunn.ch> wrote:
+> On Tue, Mar 22, 2016 at 11:28:18PM +0900, Roger Shimizu wrote:
+>> Add dts file to support Buffalo/Revogear Kurobox-Pro, which is marvell
+>> orion5x based 3.5" HDD NAS.
+>>
+>> It's a quite old product and already discontinued. So there's no
+>> official website for it. But it was an early product which used marvell
+>> orion5x 88F5182 chipset, it's popular in the community.
+>> Some unofficial site:
+>>   - http://buffalo.nas-central.org/wiki/Category:KuroboxPro
+>>   - http://nice.kaze.com/KUROPRO_ProductSpecifications.pdf
+>>
+>> This device tree is based on the board file:
+>>   arch/arm/mach-orion5x/kurobox_pro-setup.c
+>
+> Hi Roger
+>
+> This looks good, but lets try to figure out the NAND.
+>
+>> However, the NAND device, which is supported by board file, is not
+>> supported by device tree yet. So I still want to keep the board file
+>> for the time being.
+>
+>> +&devbus_cs0 {
+>> +     status = "disabled";
+>> +     devbus,keep-config;
+>> +
+>> +     /* According to board file: arch/arm/mach-orion5x/kurobox_pro-setup.c
+>> +      * There's a NAND flash on Device Bus CS0, but it fails on probing,
+>> +      * so it's disabled here.
+>> +      */
+>> +
+>> +     flash at 0 {
+>> +             compatible = "cfi-flash";
+>> +             reg = <0 0x1000000>;
+>> +             bank-width = <1>;
+>> +     };
+>> +};
+>
+> kurobox_pro-setup.c says:
+>
+> /*
+>  * 256K NOR flash Device bus boot chip select
+>  */
+>
+> #define KUROBOX_PRO_NOR_BOOT_BASE       0xf4000000
+> #define KUROBOX_PRO_NOR_BOOT_SIZE       SZ_256K
+>
+> /*
+>  * 256M NAND flash on Device bus chip select 1
+>  */
+>
+> #define KUROBOX_PRO_NAND_BASE           0xfc000000
+> #define KUROBOX_PRO_NAND_SIZE           SZ_2M
+>
+> So there is a NOR on CS0, not NAND.
+
+The NOR is on Device Bus Boot, which described in
+orion5x-linkstation.dtsi and is the probed OK:
+
+[    1.843221] Found: SST 39LF020
+[    1.846391] f4000000.flash: Found 1 x8 devices at 0x0 in 8-bit bank
+[    1.852715] number of JEDEC chips: 1
+[    1.872860] 3 ofpart partitions found on MTD device f4000000.flash
+[    1.879122] Creating 3 MTD partitions on "f4000000.flash":
+[    1.884697] 0x000000000000-0x000000030000 : "header"
+[    1.893209] 0x000000030000-0x00000003f000 : "uboot"
+[    1.901671] 0x00000003f000-0x000000040000 : "uboot_env"
 
 
-> To Ajay,
-> How about adding you as a drm bridge maintainer? DRM SoC driver maintainers
-> would need a person who can manage the drm bridge relevant pathes.
+The NAND, which is on Device Bus CS0, has probing issue. I only can
+have it probed by the board file:
 
-The previous example (dw_hdmi generalization between imx and rockchip) did 
-just go through the imx tree. So either the Samsung or Rockchip drm-trees 
-might be enough?
+[    8.698762] nand: device found, Manufacturer ID: 0x20, Chip ID: 0xda
+[    8.705194] nand: ST Micro NAND 256MiB 3,3V 8-bit
+[    8.709953] nand: 256 MiB, SLC, erase size: 128 KiB, page size:
+2048, OOB size: 64
+[    8.717619] Scanning device for bad blocks
+[    8.782220] Bad eraseblock 1530 at 0x00000bf40000
+[    8.794409] Bad eraseblock 1718 at 0x00000d6c0000
+[    8.806717] Bad eraseblock 1909 at 0x00000eea0000
+[    8.816968] Creating 3 MTD partitions on "orion_nand":
+[    8.822169] 0x000000000000-0x000000400000 : "uImage"
+[    8.830605] 0x000000400000-0x000004400000 : "rootfs"
+[    8.839497] 0x000004400000-0x000010000000 : "extra"
 
+> static struct platform_device kurobox_pro_nand_flash = {
+>         .name           = "orion_nand",
+>         .id             = -1,
+>         .dev            = {
+>                 .platform_data  = &kurobox_pro_nand_data,
+>         },
+>         .resource       = &kurobox_pro_nand_resource,
+>         .num_resources  = 1,
+> };
+>
+> The name "orion_nand" means this fits with the driver:
+>
+> drivers/mtd/nand/orion_nand.c:
+>
+> static struct platform_driver orion_nand_driver = {
+>         .remove         = orion_nand_remove,
+>         .driver         = {
+>                 .name   = "orion_nand",
+>                 .of_match_table = of_match_ptr(orion_nand_of_match_table),
+>         },
+> };
+>
+> And this uses compatible string         { .compatible = "marvell,orion-nand", },
+>
+> We need to add this to the dts file. The kirkwood.dtsi might be a good
+> example to copy.
 
-Heiko
+I already tried to use 'compatible = "marvell,orion-nand"' in flash
+block of devbus_cs0 part, but with no luck.
+
+So you mean I need to refer the nand block in mbus part in kirkwood.dtsi?
+
+        nand: nand at 012f {
+            #address-cells = <1>;
+            #size-cells = <1>;
+            cle = <0>;
+            ale = <1>;
+            bank-width = <1>;
+            compatible = "marvell,orion-nand";
+            reg = <MBUS_ID(0x01, 0x2f) 0 0x400>;
+            chip-delay = <25>;
+            /* set partition map and/or chip-delay in board dts */
+            clocks = <&gate_clk 7>;
+            pinctrl-0 = <&pmx_nand>;
+            pinctrl-names = "default";
+            status = "disabled";
+        };
+
+The difficulty for me is I have no idea on
+- which clock to use
+- which mpp pin to use
+- how to set these address
+
+And anohter question is, so the NAND is actually on mbus/nand, not
+Device Bus CS0?
+I say CS0 because it's described in board file, which may be wrong?
+
+Thank you!
+
+Cheers,
+-- 
+Roger Shimizu, GMT +9 Tokyo
+PGP/GPG: 17B3ACB1
