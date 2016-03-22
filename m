@@ -1,83 +1,31 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 22 Mar 2016 12:10:16 +0530
-Subject: [PATCH RESEND] Revert "PCI: dra7xx: Mark driver as broken"
-In-Reply-To: <56DFAE46.4090509@ti.com>
-References: <1457087359-16816-1-git-send-email-kishon@ti.com>
- <20160308180526.GC21278@localhost> <56DFAE46.4090509@ti.com>
-Message-ID: <56F0E8D0.3060009@ti.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Tue, 22 Mar 2016 12:07:37 +0530
+Subject: [PATCH 2/2] ARM: omap2plus_defconfig: Enable GPIO_TPIC2810
+In-Reply-To: <1458628657-30468-1-git-send-email-lokeshvutla@ti.com>
+References: <1458628657-30468-1-git-send-email-lokeshvutla@ti.com>
+Message-ID: <1458628657-30468-3-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+Enable the TI TPIC2810 8-Bit LED Driver with I2C Interface. This is used
+in AM335x ICEv2 Boards.
 
-On Wednesday 09 March 2016 10:31 AM, Kishon Vijay Abraham I wrote:
-> 
-> 
-> On Tuesday 08 March 2016 11:35 PM, Bjorn Helgaas wrote:
->> On Fri, Mar 04, 2016 at 03:59:19PM +0530, Kishon Vijay Abraham I wrote:
->>> From: Sekhar Nori <nsekhar@ti.com>
->>>
->>> This reverts commit <5c3b99d057525fe2befe6a7db9b1309035d93eee>
->>> ("PCI: dra7xx: Mark driver as broken").
->>>
->>> With support to de-assert PCIe reset present in kernel,
->>> DRA7x PCIe is not broken anymore.
->>>
->>> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
->>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->>> ---
->>> Bjorn,
->>>
->>> This patch should be merged only after [1] hits linus tree.
->>>
->>> Thanks
->>> Kishon
->>>
->>> [1] -> git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git
->>> 	for-v4.6/omap-hwmod-b
->>
->> OK.  Would you mind pinging me about this after [1] is merged to
->> Linus' tree?  I don't want to put this in my "next" branch yet,
->> because I don't know whether Pauls branch or mine will be merged first
->> in the merge window.  But after the merge window closes, I can
->> certainly include this in a "PCI fixes" pull request for inclusion in
->> v4.6.
-> 
-> yes sure. I can do that.
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+---
+ arch/arm/configs/omap2plus_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-The reset patch [2] has been merged to linus tree. This patch can be merged now.
-
-Thanks
-Kishon
-
-[2] ->
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/arch/arm/mach-omap2/omap_hwmod_7xx_data.c?id=1c96bee4df1998b9dec3e2ef8f77e8436e29342b
-> 
-> Thanks
-> Kishon
-> 
->>
->> Bjorn
->>
->>>  drivers/pci/host/Kconfig |    1 -
->>>  1 file changed, 1 deletion(-)
->>>
->>> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
->>> index 75a6054..6d181ba 100644
->>> --- a/drivers/pci/host/Kconfig
->>> +++ b/drivers/pci/host/Kconfig
->>> @@ -5,7 +5,6 @@ config PCI_DRA7XX
->>>  	bool "TI DRA7xx PCIe controller"
->>>  	select PCIE_DW
->>>  	depends on OF && HAS_IOMEM && TI_PIPE3
->>> -	depends on BROKEN
->>>  	help
->>>  	 Enables support for the PCIe controller in the DRA7xx SoC.  There
->>>  	 are two instances of PCIe controller in DRA7xx.  This controller can
->>> -- 
->>> 1.7.9.5
->>>
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index 156bc88..b4f17a4c 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -245,6 +245,7 @@ CONFIG_DEBUG_GPIO=y
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_GPIO_PCA953X=m
+ CONFIG_GPIO_PCF857X=y
++CONFIG_GPIO_TPIC2810=m
+ CONFIG_GPIO_TWL4030=y
+ CONFIG_GPIO_PALMAS=y
+ CONFIG_W1=m
+-- 
+2.1.4
