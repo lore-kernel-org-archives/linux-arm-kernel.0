@@ -1,29 +1,77 @@
-From: scott.wood@nxp.com (Scott Wood)
-Date: Tue, 22 Mar 2016 16:00:19 +0000
-Subject: [PATCH] gpio/ls1043a: Correct ls1043a gpio nodes compatible in
- dts file
-References: <1457600240-47141-1-git-send-email-Gang.Liu@nxp.com>
- <1457600240-47141-2-git-send-email-Gang.Liu@nxp.com>
- <DB5PR0401MB192833673541757889C889C1918A0@DB5PR0401MB1928.eurprd04.prod.outlook.com>
- <DB4PR04MB26636780AB3453AE0D3E218828B0@DB4PR04MB266.eurprd04.prod.outlook.com>
- <DB5PR0401MB19283736845DCFD5F4186729918C0@DB5PR0401MB1928.eurprd04.prod.outlook.com>
- <DB4PR04MB2660ED371AE3599B6EC8F8E82800@DB4PR04MB266.eurprd04.prod.outlook.com>
-Message-ID: <DB5PR0401MB19284B4AAA63BD31A605AC7691800@DB5PR0401MB1928.eurprd04.prod.outlook.com>
+From: clabbe.montjoie@gmail.com (LABBE Corentin)
+Date: Tue, 22 Mar 2016 17:04:54 +0100
+Subject: [PATCH] crypto: sun4i-ss: use spin_lock_irq{save|restore}
+Message-ID: <1458662694-25527-1-git-send-email-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/22/2016 09:03 AM, Gang Liu wrote:
-> Hi, Scott,
-> 
-> I think you mean that GPIO node needs two compatibles, one for general GPIO IP block ("fsl,qoriq-gpio")
-> and another for chip-specific ("fsl,ls1043a-gpio").
-> The driver can just include general GPIO IP block compatible, and if there is a errata for ls1043 GPIO, the
-> chip-specific compatible can be used to fix the errata, right?
+The current sun4i-ss driver is subject to data corruption when
+ciphering/deciphering.
+It occurs randomly on end of handled data.
+No root cause have been found and the only way to remove it is to replace
+all spin_lock_bh by they irq counterparts.
 
-Yes.
+Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
+Cc: stable <stable@vger.kernel.org>
+---
+ drivers/crypto/sunxi-ss/sun4i-ss-cipher.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-> If it's right, do you think the "fsl,ls1043a-gpio" and "fsl,qoriq-gpio" are ok for our Layerscape platforms?
-
-Yes.
-
--Scott
+diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c b/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c
+index a19ee12..e72fea73 100644
+--- a/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c
++++ b/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c
+@@ -35,6 +35,7 @@ static int sun4i_ss_opti_poll(struct ablkcipher_request *areq)
+ 	unsigned int todo;
+ 	struct sg_mapping_iter mi, mo;
+ 	unsigned int oi, oo; /* offset for in and out */
++	unsigned long flags;
+ 
+ 	if (areq->nbytes == 0)
+ 		return 0;
+@@ -49,7 +50,7 @@ static int sun4i_ss_opti_poll(struct ablkcipher_request *areq)
+ 		return -EINVAL;
+ 	}
+ 
+-	spin_lock_bh(&ss->slock);
++	spin_lock_irqsave(&ss->slock, flags);
+ 
+ 	for (i = 0; i < op->keylen; i += 4)
+ 		writel(*(op->key + i / 4), ss->base + SS_KEY0 + i);
+@@ -117,7 +118,7 @@ release_ss:
+ 	sg_miter_stop(&mi);
+ 	sg_miter_stop(&mo);
+ 	writel(0, ss->base + SS_CTL);
+-	spin_unlock_bh(&ss->slock);
++	spin_unlock_irqrestore(&ss->slock, flags);
+ 	return err;
+ }
+ 
+@@ -149,6 +150,7 @@ static int sun4i_ss_cipher_poll(struct ablkcipher_request *areq)
+ 	unsigned int ob = 0;	/* offset in buf */
+ 	unsigned int obo = 0;	/* offset in bufo*/
+ 	unsigned int obl = 0;	/* length of data in bufo */
++	unsigned long flags;
+ 
+ 	if (areq->nbytes == 0)
+ 		return 0;
+@@ -181,7 +183,7 @@ static int sun4i_ss_cipher_poll(struct ablkcipher_request *areq)
+ 	if (no_chunk == 1)
+ 		return sun4i_ss_opti_poll(areq);
+ 
+-	spin_lock_bh(&ss->slock);
++	spin_lock_irqsave(&ss->slock, flags);
+ 
+ 	for (i = 0; i < op->keylen; i += 4)
+ 		writel(*(op->key + i / 4), ss->base + SS_KEY0 + i);
+@@ -308,7 +310,7 @@ release_ss:
+ 	sg_miter_stop(&mi);
+ 	sg_miter_stop(&mo);
+ 	writel(0, ss->base + SS_CTL);
+-	spin_unlock_bh(&ss->slock);
++	spin_unlock_irqrestore(&ss->slock, flags);
+ 
+ 	return err;
+ }
+-- 
+2.7.3
