@@ -1,73 +1,38 @@
-From: graeme.gregory@linaro.org (G Gregory)
-Date: Tue, 22 Mar 2016 08:51:08 +0000
-Subject: [PATCH 2/2] serial: amba-pl011: complete support to ZTE uart
-In-Reply-To: <CABymUCMznFFgZhmVr7V-bwafzKoAiCCk03Uqg021JTzzUCntaw@mail.gmail.com>
-References: <1457920282-14823-1-git-send-email-jun.nie@linaro.org>
- <1457920282-14823-2-git-send-email-jun.nie@linaro.org>
- <56F05C16.1030805@codeaurora.org>
- <CABymUCNKOgdLBLr2fZ4KhwmG+R4Zm-LHnfDppV-yiwUjRH4Nyg@mail.gmail.com>
- <56F0A628.2080607@codeaurora.org>
- <CABymUCOX5zws9QfXp5Wud2JBAYJZH4rxPRVVgbk7tRvbUUHChA@mail.gmail.com>
- <56F0A88C.9050209@codeaurora.org>
- <CABymUCMDqfLsCr7dWxWpKZZwEqr+vO59GR+wUnyJqSGzXQYuDQ@mail.gmail.com>
- <CAGCh1+mFWPFqcjjngL=QOjVpboGGkyn6KezLLT5ZSV5xKR5YOw@mail.gmail.com>
- <CABymUCMznFFgZhmVr7V-bwafzKoAiCCk03Uqg021JTzzUCntaw@mail.gmail.com>
-Message-ID: <CAGCh1+k6YkceQf57MkM-VZoa8am0Y1a_4fjEECRL2hCN758toQ@mail.gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 22 Mar 2016 10:53:19 +0200
+Subject: [PATCH 0/3] ARM: OMAP3: Fix McBSP2/3 hwmod setup for sidetone
+In-Reply-To: <20160321202107.GO9329@atomide.com>
+References: <1458296929-718-1-git-send-email-peter.ujfalusi@ti.com>
+ <alpine.DEB.2.02.1603191908070.6629@utopia.booyaka.com>
+ <56EFB31C.9090103@ti.com> <20160321202107.GO9329@atomide.com>
+Message-ID: <56F107FF.8080006@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 March 2016 at 08:44, Jun Nie <jun.nie@linaro.org> wrote:
-> 2016-03-22 16:20 GMT+08:00 G Gregory <graeme.gregory@linaro.org>:
->> On 22 March 2016 at 02:17, Jun Nie <jun.nie@linaro.org> wrote:
->>> 2016-03-22 10:06 GMT+08:00 Timur Tabi <timur@codeaurora.org>:
->>>> Jun Nie wrote:
->>>>>
->>>>> That's a fair comment. I suppose all platform need to enable clock for
->>>>> the device. For device tree case, we need these code for clock
->>>>> enabling.
->>>>
->>>>
->>>> But why do you need to enable the clock?  The pl011 driver works fine for
->>>> every platform without your patch.  If the ZTE platform needs to call
->>>> clk_get() in order to work, than that is something different about your
->>>> platform.
->>>
->>> ARM/ST pl011 is amba device and use pl011_probe() for initialization,
->>> which call these clock enabling code for every device. You introduced
->>> platform device driver entry for pl011 and only sbsa use platform
->>> device probe method currently. I am trying to reuse this probe
->>> function, so need to add clock enabling code in this function.
->>>
->>> If you did not find any issue in sbsa device tree case, I guess the
->>> clock is always enabled. For mobile platform, clock is auto gated for
->>> power saving in most of cases.
->>>
->>>>
->>>>> For ACPI case, it may be handled automatically. If you agree
->>>>> my opinion, I will move these lines to patch 1. Please correct me if I
->>>>> am wrong.
->>>>
->>>>
->>>> I think you need to create a separate patch that adds that call, and make
->>>> sure it's tested by other platforms before it gets accepted.
->>>
->>> These code only impact sbsa device as only sbsa device is initialized
->>> via platform driver entry. So only your flavor is need for testing the
->>> code. Thanks! :-)
->>>
->> In SBSA mode the UART clock is always enabled by the firmware and
->> there are no baud rate registers so we don't need to know the value of
->> the clock. In ACPI there is no method to represent the clock. So if
->> you add lines to unconditionally require a clock you will break SBSA
->> mode in ACPI.
->>
->> Graeme
->
-> Right, Timur also already point out breakage of ACPI case. So I plan
-> to move clocking enabling code to device tree case handling. Do you
-> still have any other concern?
->
-No, I was just making sure ACPI case was clear because it didn't look
-so from earlier comments.
+Tony,
 
-Graeme
+On 03/21/16 22:21, Tony Lindgren wrote:
+> Hi,
+> 
+> * Peter Ujfalusi <peter.ujfalusi@ti.com> [160321 01:39]:
+>>
+>> This is also interesting:
+>> McBSP2 sidetone is in region 39 and 40 (module and L4 interconnect) which is
+>> unique in case of OMAP34xx and OMAP35xx, but it is overlapping with GPIO6 on
+>> OMAP36xx. Not sure what are the implications.
+> 
+> Hmm GPIO6 is in a different L4 segment though? Maybe
+> you did not account for the segments?
+> 
+> 0x49000000 + 0x20000 + 0x2000/0x4000/0x6000 for McBSP
+> 0x49000000 + 0x50000 + 0x8000 for GPIO6
+> 
+> Or maybe I don't understand at which physical address the
+> overlap is? :)
+
+The addresses are not overlapping, but the Region Numbers for GPIO6 and McBSP2
+sidetone in Table 9-114 "Region Allocation for
+L4-Per Interconnect". But only in case of OMAP36xx
+
+-- 
+P?ter
