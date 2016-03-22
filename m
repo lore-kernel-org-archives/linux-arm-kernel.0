@@ -1,52 +1,135 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Tue, 22 Mar 2016 11:48:13 +0100
-Subject: [PULL 0/3] KVM/ARM Fixes for v4.6-rc1
-In-Reply-To: <1458634776-18388-1-git-send-email-christoffer.dall@linaro.org>
-References: <1458634776-18388-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <56F122ED.3000105@redhat.com>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Tue, 22 Mar 2016 13:46:27 +0300
+Subject: [PATCH v5 0/6] ACPI: parse the SPCR table
+Message-ID: <1458643595-14719-1-git-send-email-aleksey.makarov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+'ARM Server Base Boot Requirements' [1] mentions SPCR (Serial Port
+Console Redirection Table) [2] as a mandatory ACPI table that
+specifies the configuration of serial console.
 
+Move earlycon early_param handling to serial to parse earlycon option once
 
-On 22/03/2016 09:19, Christoffer Dall wrote:
-> The following changes since commit 643ad15d47410d37d43daf3ef1c8ac52c281efa5:
-> 
->   Merge branch 'mm-pkeys-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip (2016-03-20 19:08:56 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-4.6-rc1
-> 
-> for you to fetch changes up to a6cdf1c08cbfe0818a3d8042844d75bf74fd82bd:
-> 
->   kvm: arm64: Disable compiler instrumentation for hypervisor code (2016-03-21 14:02:17 +0100)
-> 
-> ----------------------------------------------------------------
-> KVM/ARM Changes for v4.6-rc1
-> 
-> Second round of patches for v4.6-rc1, fixing a small handful of issue:
->  - disable preemption when calling smp_call_function_many
->  - Make kvm_ksym_ref work on VHE systems again after KASRL breakage
->  - Disable compiler instrumentation for hypervisor code that could make
->    KVM/arm64 blow up.
-> 
-> ----------------------------------------------------------------
-> Catalin Marinas (1):
->       kvm: arm64: Disable compiler instrumentation for hypervisor code
-> 
-> Eric Auger (1):
->       KVM: arm/arm64: disable preemption when calling smp_call_function_many
-> 
-> Marc Zyngier (1):
->       arm64: KVM: Turn kvm_ksym_ref into a NOP on VHE
-> 
->  arch/arm/kvm/arm.c               | 2 ++
->  arch/arm64/include/asm/kvm_asm.h | 8 +++++++-
->  arch/arm64/kvm/hyp/Makefile      | 4 ++++
->  3 files changed, 13 insertions(+), 1 deletion(-)
-> 
+Patch "ACPI: add definitions of DBG2 subtypes" required for the next patch.
+ACPI maintainers said that they had got it for the next release of ACPICA,
+but it has not appeared in linux-next yet.
 
-Pulled, thanks.
+Parse SPCR table, setup earlycon and add register specified console.
 
-Paolo
+Enable parsing this table on ARM64.  Earlycon should be set up
+as early as possible.  ACPI boot tables are mapped in
+arch/arm64/kernel/acpi.c:acpi_boot_table_init() called from setup_arch()
+and that's where we parse spcr.  So it has to be opted-in per-arch.
+
+Implement console_match() for pl011.
+
+Add EARLYCON_DECLARE to enable setting up earlycon for console specified in SPCR
+
+Based on the work by Leif Lindholm [3]
+Thanks to Peter Hurley for explaining how this should work.
+
+Should be applied to next-20160322.
+
+Tested on QEMU.  SPCR support is included in QEMU's ARM mach-virt
+since 2.4 release.
+
+v5:
+- drop patch "serial: pl011: use ACPI SPCR to setup 32-bit access" because
+  it is ugly. Also because Christopher Covington came with a better solution [4]
+- remove error message when the table is not provided by ACPI (Andy Shevchenko)
+- rewrite spcr.c following the suggestions by Peter Hurley
+- add console_match() for pl011 in a separate patch
+- add EARLYCON_DECLARE for pl011 in a separate patch
+- patch "of/serial: move earlycon early_param handling to serial" was added from
+  the GDB2 series
+
+v4:
+https://lkml.kernel.org/g/1456747355-15692-1-git-send-email-aleksey.makarov at linaro.org
+- drop patch "ACPI: change __init to __ref for early_acpi_os_unmap_memory()"
+  ACPI developers work on a new API and asked not to do that.
+  Instead, use acpi_get_table_with_size()/early_acpi_os_unmap_memory() once
+  and cache the result. (Lv Zheng)
+- fix some style issues (Yury Norov)
+
+v3:
+https://lkml.kernel.org/g/1455559532-8305-1-git-send-email-aleksey.makarov at linaro.org
+
+Greg Kroah-Hartman did not like v2 so I have rewritten this patchset:
+
+- drop acpi_match() member of struct console
+- drop implementations of this member for pl011 and 8250
+- drop the patch that renames some vars in printk.c as it is not needed anymore
+- drop patch that introduces system wide acpi_table_parse2().
+  Instead introduce a custom acpi_table_parse_spcr() in spcr.c
+
+Instead of introducing a new match_acpi() member of struct console,
+this patchset introduces a new function acpi_console_check().
+This function is called when a new uart is registered at serial_core.c
+the same way OF code checks for console.  If the registered uart is the
+console specified by SPCR table, this function calls add_preferred_console()
+
+The restrictions of this approach are:
+
+- only serial consoles can be set up
+- only consoles specified by the memory/io address can be set up
+  (SPCR can specify devices by PCI id/PCI address)
+
+v2:
+https://lkml.kernel.org/g/1455299022-11641-1-git-send-email-aleksey.makarov at linaro.org
+- don't use SPCR if user specified console in command line
+- fix initialization order of newcon->index = 0
+- rename some variables at printk.c (Joe Perches, Peter Hurley)
+- enable ACPI_SPCR_TABLE in a separate patch (Andy Shevchenko)
+- remove the retry loop for console registering (Peter Hurley).
+  Instead, obtain SPCR with acpi_get_table().  That works after
+  call to acpi_early_init() i. e. in any *_initcall()
+- describe design decision behind introducing acpi_match() (Peter Hurley)
+- fix compilation for x86 + ACPI (Graeme Gregory)
+- introduce DBG2 constants in a separate patch (Andy Shevchenko)
+- fix a typo in DBG2 constants (Andy Shevchenko)
+- add ACPI_DBG2_ARM_SBSA_32BIT constant (Christopher Covington)
+- add support for ACPI_DBG2_ARM_SBSA_* consoles (Christopher Covington)
+- add documentation for functions
+- add a patch that uses SPCR to find if SBSA serial driver should use 32-bit
+  accessor functions (Christopher Covington)
+- change __init to __ref for early_acpi_os_unmap_memory() in a separate patch
+- introduce acpi_table_parse2() in a separate patch
+- fix fetching the SPCR table early (Mark Salter)
+- add a patch from Mark Salter that introduces support for matching 8250-based
+  consoles
+
+v1:
+https://lkml.kernel.org/g/1453722324-22407-1-git-send-email-aleksey.makarov at linaro.org
+
+[1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0044a/index.html
+[2] https://msdn.microsoft.com/en-us/library/windows/hardware/dn639132(v=vs.85).aspx
+[3] https://lkml.kernel.org/g/1441716217-23786-1-git-send-email-leif.lindholm at linaro.org
+[4] https://lkml.kernel.org/g/1457415800-8799-1-git-send-email-cov at codeaurora.org
+
+Aleksey Makarov (5):
+  ACPI: add definitions of DBG2 subtypes
+  ACPI: parse SPCR and enable matching console
+  ACPI: enable ACPI_SPCR_TABLE on ARM64
+  serial: pl011: add console matching function
+  serial: pl011: add EARLYCON_DECLARE
+
+Leif Lindholm (1):
+  of/serial: move earlycon early_param handling to serial
+
+ arch/arm64/Kconfig              |   1 +
+ arch/arm64/kernel/acpi.c        |   2 +
+ drivers/acpi/Kconfig            |   3 ++
+ drivers/acpi/Makefile           |   1 +
+ drivers/acpi/spcr.c             | 102 ++++++++++++++++++++++++++++++++++++++++
+ drivers/of/fdt.c                |  11 +----
+ drivers/tty/serial/amba-pl011.c |  57 ++++++++++++++++++++++
+ drivers/tty/serial/earlycon.c   |  12 +++--
+ include/acpi/actbl2.h           |   5 ++
+ include/linux/acpi.h            |   8 ++++
+ include/linux/of_fdt.h          |   2 +
+ 11 files changed, 191 insertions(+), 13 deletions(-)
+ create mode 100644 drivers/acpi/spcr.c
+
+-- 
+2.7.4
