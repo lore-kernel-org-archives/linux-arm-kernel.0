@@ -1,187 +1,97 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Tue, 22 Mar 2016 09:07:30 -0700
-Subject: [PATCH v5 3/6] ACPI: parse SPCR and enable matching console
-In-Reply-To: <CAHp75VfsayWWSgkvpgrxcER6c2rZyykbvOtm7wBQROR6SFFfWw@mail.gmail.com>
-References: <1458643595-14719-1-git-send-email-aleksey.makarov@linaro.org>
- <1458643595-14719-4-git-send-email-aleksey.makarov@linaro.org>
- <CAHp75VfsayWWSgkvpgrxcER6c2rZyykbvOtm7wBQROR6SFFfWw@mail.gmail.com>
-Message-ID: <56F16DC2.7030901@hurleysoftware.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 22 Mar 2016 17:07:36 +0100
+Subject: [PATCH v1] cpufreq: rockchip: add driver
+In-Reply-To: <1458647848-48999-1-git-send-email-xf@rock-chips.com>
+References: <1458303004-26445-1-git-send-email-xf@rock-chips.com>
+ <1458647848-48999-1-git-send-email-xf@rock-chips.com>
+Message-ID: <1758347.rheI35MbRd@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/22/2016 04:09 AM, Andy Shevchenko wrote:
-> On Tue, Mar 22, 2016 at 12:46 PM, Aleksey Makarov
-> <aleksey.makarov@linaro.org> wrote:
->> 'ARM Server Base Boot Requiremets' [1] mentions SPCR (Serial Port
->> Console Redirection Table) [2] as a mandatory ACPI table that
->> specifies the configuration of serial console.
->>
->> Parse this table, setup earlycon and enable the specified console.
->>
->> Thanks to Peter Hurley for explaining how this should work.
->>
->> [1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0044a/index.html
->> [2] https://msdn.microsoft.com/en-us/library/windows/hardware/dn639132(v=vs.85).aspx
->>
+Hi,
+
+Am Dienstag, 22. M?rz 2016, 19:57:28 schrieb Feng Xiao:
+> This driver will directly use cpufreq-dt driver as backend.
 > 
->> +++ b/drivers/acpi/spcr.c
->> @@ -0,0 +1,102 @@
->> +/*
->> + * Copyright (c) 2012, Intel Corporation
->> + * Copyright (c) 2015, Red Hat, Inc.
->> + * Copyright (c) 2015, 2016 Linaro Ltd.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + */
->> +
->> +#define pr_fmt(fmt) "ACPI: SPCR: " fmt
->> +
->> +#include <linux/acpi.h>
->> +#include <linux/console.h>
->> +#include <linux/kernel.h>
->> +#include <linux/serial_core.h>
->> +
->> +static bool init_earlycon;
->> +
->> +void __init init_spcr_earlycon(void)
->> +{
->> +       init_earlycon = true;
->> +}
->> +
->> +int __init parse_spcr(void)
->> +{
->> +       static char opts[64];
->> +       struct acpi_table_spcr *table;
->> +       acpi_size table_size;
->> +       acpi_status status;
->> +       char *uart;
->> +       char *iotype;
->> +       int baud_rate;
->> +       int err = 0;
->> +
->> +       status = acpi_get_table_with_size(ACPI_SIG_SPCR, 0,
->> +                                         (struct acpi_table_header **)&table,
->> +                                         &table_size);
->> +
->> +       if (ACPI_FAILURE(status))
->> +               return -ENOENT;
->> +
->> +       if (table->header.revision < 2) {
->> +               err = -EINVAL;
->> +               pr_err("wrong table version\n");
->> +               goto done;
->> +       }
->> +
->> +       iotype = (table->serial_port.space_id == ACPI_ADR_SPACE_SYSTEM_MEMORY) ?
->> +                       "mmio" : "io";
->> +
->> +       switch (table->interface_type) {
->> +       case ACPI_DBG2_ARM_SBSA_32BIT:
->> +               iotype = "mmio32";
->> +               /* fall through */
->> +       case ACPI_DBG2_ARM_PL011:
->> +       case ACPI_DBG2_ARM_SBSA_GENERIC:
->> +       case ACPI_DBG2_BCM2835:
->> +               uart = "pl011";
->> +               break;
->> +       case ACPI_DBG2_16550_COMPATIBLE:
->> +       case ACPI_DBG2_16550_SUBSET:
->> +               uart = "uart";
->> +               break;
->> +       default:
->> +               err = -ENOENT;
->> +               goto done;
->> +       }
->> +
->> +       switch (table->baud_rate) {
->> +       case 3:
->> +               baud_rate = 9600;
->> +               break;
->> +       case 4:
->> +               baud_rate = 19200;
->> +               break;
->> +       case 6:
->> +               baud_rate = 57600;
->> +               break;
->> +       case 7:
->> +               baud_rate = 115200;
->> +               break;
->> +       default:
->> +               err = -ENOENT;
->> +               goto done;
->> +       }
->> +
->> +       sprintf(opts, "%s,%s,0x%llx,%d", uart, iotype,
->> +               table->serial_port.address, baud_rate);
+> As there is not a generic devicetree board file(rockchip.c)
+> on ARM64 architecture, so remove platform_device_register_simple
+> in rockchip.c and add a new cpufreq driver to support Rockchip
+> SoCs.
 > 
-> You may use snprintf(), though my question here what would happen on
-> 32-bit kernel when you supply 64-bit address as an option?
+> Signed-off-by: Feng Xiao <xf@rock-chips.com>
 
-Yeah this should probably use %pa for the printf specifier.
+some hints regarding the soc-selection below, otherwise this looks nice.
 
-But note this exposes underlying bug in the earlycon support, because
-that was originally written without 32/64-mixed bitness in mind; ie.,
-the address is parsed and handled as unsigned long in most places.
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 
+[includes an Ack for the mach-rockchip change ;-) ]
 
+[...]
 
+> diff --git a/drivers/cpufreq/rockchip-cpufreq.c
+> b/drivers/cpufreq/rockchip-cpufreq.c new file mode 100644
+> index 0000000..65c1de9
+> --- /dev/null
+> +++ b/drivers/cpufreq/rockchip-cpufreq.c
+> @@ -0,0 +1,55 @@
+> +/*
+> + * Rockchip Platforms CPUFreq Support
+> + *
+> + * Copyright (C) 2016 Fuzhou Rockchip Electronics Co., Ltd
+> + *
+> + * Feng Xiao <xf@rock-chips.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+> + * kind, whether express or implied; without even the implied warranty
+> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/err.h>
+> +#include <linux/init.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +
+> +static const char * const rockchip_compat[] = {
+> +	"rockchip,rk2928",
 
->> +
->> +       pr_info("console: %s", opts);
->> +
->> +       if (init_earlycon)
->> +               setup_earlycon(opts);
->> +
->> +       err = add_preferred_console(uart, 0, opts + strlen(uart) + 1);
->> +
->> +done:
->> +       early_acpi_os_unmap_memory((void __iomem *)table, table_size);
->> +       return err;
->> +}
->> diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
->> index d217366..ec030c9 100644
->> --- a/drivers/tty/serial/earlycon.c
->> +++ b/drivers/tty/serial/earlycon.c
->> @@ -22,6 +22,7 @@
->>  #include <linux/sizes.h>
->>  #include <linux/of.h>
->>  #include <linux/of_fdt.h>
->> +#include <linux/acpi.h>
->>
->>  #ifdef CONFIG_FIX_EARLYCON_MEM
->>  #include <asm/fixmap.h>
->> @@ -206,11 +207,15 @@ static int __init param_setup_earlycon(char *buf)
->>         int err;
->>
->>         /*
->> -        * Just 'earlycon' is a valid param for devicetree earlycons;
->> -        * don't generate a warning from parse_early_params() in that case
->> +        * Just 'earlycon' is a valid param for devicetree and ACPI SPCR
->> +        * earlycons; don't generate a warning from parse_early_params()
->> +        * in that case
->>          */
->> -       if (!buf || !buf[0])
->> -               return early_init_dt_scan_chosen_serial();
->> +       if (!buf || !buf[0]) {
->> +               init_spcr_earlycon();
-> 
->> +               early_init_dt_scan_chosen_serial();
->> +               return 0;
-> 
-> And you hide an error?
++	"rockchip,rk3036",
 
-Well, this is a little bit tricky because "earlycon" early parameter with
-missing /chosen/stdout-path node is no longer an error, since ACPI may be
-specifying the earlycon instead.
+> +	"rockchip,rk3066a",
+> +	"rockchip,rk3066b",
+> +	"rockchip,rk3188",
 
-Regards,
-Peter Hurley
++	"rockchip,rk3228",
 
->> +       }
->>
->>         err = setup_earlycon(buf);
->>         if (err == -ENOENT || err == -EALREADY)
-> 
+> +	"rockchip,rk3288",
+> +	"rockchip,rk3366",
+> +	"rockchip,rk3368",
+> +	"rockchip,rk3399",
+> +};
+> +
+> +static int __init rockchip_cpufreq_driver_init(void)
+> +{
+> +	struct platform_device *pdev;
+> +	int i;
+> +
+> +	for (i = 0; i < ARRAY_SIZE(rockchip_compat); i++) {
+> +		if (of_machine_is_compatible(rockchip_compat[i])) {
+> +			pdev = platform_device_register_simple("cpufreq-dt",
+> +							       -1, NULL, 0);
+> +			return PTR_ERR_OR_ZERO(pdev);
+> +		}
+> +	}
+> +
+> +	return -ENODEV;
+> +}
+> +module_init(rockchip_cpufreq_driver_init);
+> +
+> +MODULE_AUTHOR("Feng Xiao <xf@rock-chips.com>");
+> +MODULE_DESCRIPTION("Rockchip cpufreq driver");
+> +MODULE_LICENSE("GPL v2");
