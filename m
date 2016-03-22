@@ -1,64 +1,37 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 22 Mar 2016 01:42:50 +0100
-Subject: [RFC PATCH v1 0/4] Add Rockchip RGA support
-In-Reply-To: <56EFE66A.8020404@rock-chips.com>
-References: <1458552518-25527-1-git-send-email-ykk@rock-chips.com>
- <1511371.I0NIYzh3kP@diego> <56EFE66A.8020404@rock-chips.com>
-Message-ID: <1867694.1mDULrSexE@phil>
+From: jun.nie@linaro.org (Jun Nie)
+Date: Tue, 22 Mar 2016 09:16:13 +0800
+Subject: [PATCH 2/2] serial: amba-pl011: complete support to ZTE uart
+In-Reply-To: <56F05C16.1030805@codeaurora.org>
+References: <1457920282-14823-1-git-send-email-jun.nie@linaro.org>
+ <1457920282-14823-2-git-send-email-jun.nie@linaro.org>
+ <56F05C16.1030805@codeaurora.org>
+Message-ID: <CABymUCNKOgdLBLr2fZ4KhwmG+R4Zm-LHnfDppV-yiwUjRH4Nyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yakir,
+2016-03-22 4:39 GMT+08:00 Timur Tabi <timur@codeaurora.org>:
+> Jun Nie wrote:
+>>
+>> @@ -2570,9 +2608,17 @@ static int pl011_uart_plat_probe(struct
+>> platform_device *pdev)
+>>         if (!uap)
+>>                 return -ENOMEM;
+>>
+>> +       uap->clk = devm_clk_get(&pdev->dev, NULL);
+>> +       if (IS_ERR(uap->clk))
+>> +               return PTR_ERR(uap->clk);
+>> +
+>
+>
+> I don't this is supposed to be part of your patch, and it breaks my ACPI
+> platform anyway.  Where did it come from?
+>
+Is it OK to move to device tree part, I mean if (pdev->dev.of_node)
+clause? It is part of my patch, I am not aware ACPI requirement on
+this.
 
-Am Montag, 21. M?rz 2016, 20:17:46 schrieb Yakir Yang:
-> On 03/21/2016 07:29 PM, Heiko St?bner wrote:
-> > Am Montag, 21. M?rz 2016, 17:28:38 schrieb Yakir Yang:
-> >> This patch set would add the RGA direct rendering based 2d graphics
-> >> acceleration module.
-> > 
-> > very cool to see that.
-> 
-> ;)
-> 
-> >> This patch set is based on git repository below:
-> >> git://people.freedesktop.org/~airlied/linux drm-next
-> >> commit id: 568d7c764ae01f3706085ac8f0d8a8ac7e826bd7
-> >> 
-> >> And the RGA driver is based on Exynos G2D driver, it only manages the
-> >> command lists received from user, so user should make the command list
-> >> to data and registers needed by operation to use.
-> >> 
-> >> I have prepared an userspace demo application for testing:
-> >> 	https://github.com/yakir-Yang/libdrm-rockchip
-> >> 
-> >> That is a rockchip libdrm library, and I have write a simple test case
-> >> "rockchip_rga_test" that would test the below RGA features:
-> >> - solid
-> >> - copy
-> >> - rotation
-> >> - flip
-> >> - window clip
-> >> - dithering
-> > 
-> > Did you submit your libdrm changes as well?
-> > 
-> > Userspace-interfaces need to be stable so the other side must also get
-> > accepted - even before the kernel change if I remember correctly.
-> 
-> Got it, and I just saw exynos_fimg2d already landed at mainline libdrm.
-> But I don't find the way to submit patches to libdrm, would you like
-> share some helps here ;)
-
-Looking at the libdrm sources on cgit.freedesktop.org, I did not find any 
-specific manual on submitting patches.
-
-But looking at the dri-list archive, dri-devel at lists.freedesktop.org is the 
-right list and looking at the libdrm history it looks like Emil Velikov 
-<emil.l.velikov@gmail.com> seems to be doing maintenance-stuff in libdrm.
-And as a 3rd recipient, please also include the linux-rockchip list.
-
-@Emil, please shout if I read that wrong :-)
-
-
-Hope that helps
-Heiko
+Jun
+> --
+> Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
+> Forum, a Linux Foundation collaborative project.
