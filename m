@@ -1,117 +1,252 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 22 Mar 2016 15:56:46 +0100
-Subject: Suspicious error for CMA stress test
-In-Reply-To: <20160321044220.GA21578@js1304-P5Q-DELUXE>
-References: <56E2FB5C.1040602@suse.cz>
- <20160314064925.GA27587@js1304-P5Q-DELUXE> <56E662E8.700@suse.cz>
- <20160314071803.GA28094@js1304-P5Q-DELUXE> <56E92AFC.9050208@huawei.com>
- <20160317065426.GA10315@js1304-P5Q-DELUXE> <56EA77BC.2090702@huawei.com>
- <56EAD0B4.2060807@suse.cz>
- <CAAmzW4MNdFHSSTpCfWqy7oDtkR_Hfu2dZa_LW97W8J5vr5m4tg@mail.gmail.com>
- <1458307955.18134.31.camel@pengutronix.de>
- <20160321044220.GA21578@js1304-P5Q-DELUXE>
-Message-ID: <1458658606.2171.25.camel@pengutronix.de>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Tue, 22 Mar 2016 07:57:04 -0700
+Subject: [PATCH v5 3/6] ACPI: parse SPCR and enable matching console
+In-Reply-To: <20160322122650.GA10616@yury-N73SV>
+References: <1458643595-14719-1-git-send-email-aleksey.makarov@linaro.org>
+ <1458643595-14719-4-git-send-email-aleksey.makarov@linaro.org>
+ <20160322122650.GA10616@yury-N73SV>
+Message-ID: <56F15D40.9020401@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 21.03.2016, 13:42 +0900 schrieb Joonsoo Kim:
-> On Fri, Mar 18, 2016 at 02:32:35PM +0100, Lucas Stach wrote:
-> > Hi Vlastimil, Joonsoo,
-> > 
-> > Am Freitag, den 18.03.2016, 00:52 +0900 schrieb Joonsoo Kim:
-> > > 2016-03-18 0:43 GMT+09:00 Vlastimil Babka <vbabka@suse.cz>:
-> > > > On 03/17/2016 10:24 AM, Hanjun Guo wrote:
-> > > >>
-> > > >> On 2016/3/17 14:54, Joonsoo Kim wrote:
-> > > >>>
-> > > >>> On Wed, Mar 16, 2016 at 05:44:28PM +0800, Hanjun Guo wrote:
-> > > >>>>
-> > > >>>> On 2016/3/14 15:18, Joonsoo Kim wrote:
-> > > >>>>>
-> > > >>>>> On Mon, Mar 14, 2016 at 08:06:16AM +0100, Vlastimil Babka wrote:
-> > > >>>>>>
-> > > >>>>>> On 03/14/2016 07:49 AM, Joonsoo Kim wrote:
-> > > >>>>>>>
-> > > >>>>>>> On Fri, Mar 11, 2016 at 06:07:40PM +0100, Vlastimil Babka wrote:
-> > > >>>>>>>>
-> > > >>>>>>>> On 03/11/2016 04:00 PM, Joonsoo Kim wrote:
-> > > >>>>>>>>
-> > > >>>>>>>> How about something like this? Just and idea, probably buggy
-> > > >>>>>>>> (off-by-one etc.).
-> > > >>>>>>>> Should keep away cost from <pageblock_order iterations@the
-> > > >>>>>>>> expense of the
-> > > >>>>>>>> relatively fewer >pageblock_order iterations.
-> > > >>>>>>>
-> > > >>>>>>> Hmm... I tested this and found that it's code size is a little bit
-> > > >>>>>>> larger than mine. I'm not sure why this happens exactly but I guess
-> > > >>>>>>> it would be
-> > > >>>>>>> related to compiler optimization. In this case, I'm in favor of my
-> > > >>>>>>> implementation because it looks like well abstraction. It adds one
-> > > >>>>>>> unlikely branch to the merge loop but compiler would optimize it to
-> > > >>>>>>> check it once.
-> > > >>>>>>
-> > > >>>>>> I would be surprised if compiler optimized that to check it once, as
-> > > >>>>>> order increases with each loop iteration. But maybe it's smart
-> > > >>>>>> enough to do something like I did by hand? Guess I'll check the
-> > > >>>>>> disassembly.
-> > > >>>>>
-> > > >>>>> Okay. I used following slightly optimized version and I need to
-> > > >>>>> add 'max_order = min_t(unsigned int, MAX_ORDER, pageblock_order + 1)'
-> > > >>>>> to yours. Please consider it, too.
-> > > >>>>
-> > > >>>> Hmm, this one is not work, I still can see the bug is there after
-> > > >>>> applying
-> > > >>>> this patch, did I miss something?
-> > > >>>
-> > > >>> I may find that there is a bug which was introduced by me some time
-> > > >>> ago. Could you test following change in __free_one_page() on top of
-> > > >>> Vlastimil's patch?
-> > > >>>
-> > > >>> -page_idx = pfn & ((1 << max_order) - 1);
-> > > >>> +page_idx = pfn & ((1 << MAX_ORDER) - 1);
-> > > >>
-> > > >>
-> > > >> I tested Vlastimil's patch + your change with stress for more than half
-> > > >> hour, the bug
-> > > >> I reported is gone :)
-> > > >
-> > > >
-> > > > Oh, ok, will try to send proper patch, once I figure out what to write in
-> > > > the changelog :)
-> > > 
-> > > Thanks in advance!
-> > 
-> > After digging into the "PFN busy" race in CMA (see [1]), I believe we
-> > should just prevent any buddy merging in isolated ranges. This fixes the
-> > race I'm seeing without the need to hold the zone lock for extend
-> > periods of time.
+On 03/22/2016 05:26 AM, Yury Norov wrote:
+> On Tue, Mar 22, 2016 at 01:46:30PM +0300, Aleksey Makarov wrote:
+>> 'ARM Server Base Boot Requiremets' [1] mentions SPCR (Serial Port
+>> Console Redirection Table) [2] as a mandatory ACPI table that
+>> specifies the configuration of serial console.
+>>
+>> Parse this table, setup earlycon and enable the specified console.
+>>
+>> Thanks to Peter Hurley for explaining how this should work.
+>>
+>> [1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0044a/index.html
+>> [2] https://msdn.microsoft.com/en-us/library/windows/hardware/dn639132(v=vs.85).aspx
+>>
+>> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+>> ---
+>>  drivers/acpi/Kconfig          |   3 ++
+>>  drivers/acpi/Makefile         |   1 +
+>>  drivers/acpi/spcr.c           | 102 ++++++++++++++++++++++++++++++++++++++++++
+>>  drivers/tty/serial/earlycon.c |  13 ++++--
+>>  include/linux/acpi.h          |   8 ++++
+>>  5 files changed, 123 insertions(+), 4 deletions(-)
+>>  create mode 100644 drivers/acpi/spcr.c
+>>
+>> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+>> index 65fb483..5611eb6 100644
+>> --- a/drivers/acpi/Kconfig
+>> +++ b/drivers/acpi/Kconfig
+>> @@ -77,6 +77,9 @@ config ACPI_DEBUGGER_USER
+>>  
+>>  endif
+>>  
+>> +config ACPI_SPCR_TABLE
+>> +	bool
+>> +
+>>  config ACPI_SLEEP
+>>  	bool
+>>  	depends on SUSPEND || HIBERNATION
+>> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+>> index 7395928..f70ae14 100644
+>> --- a/drivers/acpi/Makefile
+>> +++ b/drivers/acpi/Makefile
+>> @@ -82,6 +82,7 @@ obj-$(CONFIG_ACPI_EC_DEBUGFS)	+= ec_sys.o
+>>  obj-$(CONFIG_ACPI_CUSTOM_METHOD)+= custom_method.o
+>>  obj-$(CONFIG_ACPI_BGRT)		+= bgrt.o
+>>  obj-$(CONFIG_ACPI_CPPC_LIB)	+= cppc_acpi.o
+>> +obj-$(CONFIG_ACPI_SPCR_TABLE)	+= spcr.o
+>>  obj-$(CONFIG_ACPI_DEBUGGER_USER) += acpi_dbg.o
+>>  
+>>  # processor has its own "processor." module_param namespace
+>> diff --git a/drivers/acpi/spcr.c b/drivers/acpi/spcr.c
+>> new file mode 100644
+>> index 0000000..1ec82f9
+>> --- /dev/null
+>> +++ b/drivers/acpi/spcr.c
+>> @@ -0,0 +1,102 @@
+>> +/*
+>> + * Copyright (c) 2012, Intel Corporation
+>> + * Copyright (c) 2015, Red Hat, Inc.
+>> + * Copyright (c) 2015, 2016 Linaro Ltd.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + */
+>> +
+>> +#define pr_fmt(fmt) "ACPI: SPCR: " fmt
+>> +
+>> +#include <linux/acpi.h>
+>> +#include <linux/console.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/serial_core.h>
+>> +
+>> +static bool init_earlycon;
+>> +
+>> +void __init init_spcr_earlycon(void)
+>> +{
+>> +	init_earlycon = true;
+>> +}
+>> +
 > 
-> "PFNs busy" can be caused by other type of race, too. I guess that
-> other cases happens more than buddy merging. Do you have any test case for
-> your problem?
+> 1. I see you keep in mind multiple access.
+
+Concurrent access is not a concern here: only the boot cpu is running
+and intrs are off.
+
+The "init_earlycon" flag is used because parsing the "earlycon" early param
+is earlier than parsing ACPI tables.
+
+
+ Then you'd worry about race
+> conditions as well. In this case, I'd consider atomic access to
+> variable.
+> 2. It seems you need is_init() helper too.
 > 
-I don't have any specific test case, but the etnaviv driver manages to
-hit this race quite often. That's because we allocate/free a large
-number of relatively small buffer from CMA, where allocation and free
-regularly happen on different CPUs.
+>> +int __init parse_spcr(void)
+>> +{
+>> +	static char opts[64];
+>> +	struct acpi_table_spcr *table;
+>> +	acpi_size table_size;
+>> +	acpi_status status;
+>> +	char *uart;
+>> +	char *iotype;
+>> +	int baud_rate;
+>> +	int err = 0;
+> 
+> You can do not initialize 'err'.
 
-So while we also have cases where the "PFN busy" is triggered by other
-factors, like pages locked for get_user_pages(), this race is the number
-one source of CMA retries in my workload.
+Why?
 
-> If it is indeed a problem, you can avoid it with simple retry
-> MAX_ORDER times on alloc_contig_range(). This is a rather dirty but
-> the reason I suggest it is that there are other type of race in
-> __alloc_contig_range() and retry could help them, too. For example,
-> if some of pages in the requested range isn't attached to the LRU yet
-> or detached from the LRU but not freed to buddy,
-> test_pages_isolated() can be failed.
 
-While a retry makes sense (if at all just to avoid a CMA allocation
-failure under CMA pressure), I would like to avoid the associated
-overhead for the common path where CMA is just racing with itself. The
-retry should only be needed in situations where we don't have any means
-to control the race, like a concurrent GUP.
+> 
+>> +
+>> +	status = acpi_get_table_with_size(ACPI_SIG_SPCR, 0,
+>> +					  (struct acpi_table_header **)&table,
+>> +					  &table_size);
+>> +
+>> +	if (ACPI_FAILURE(status))
+>> +		return -ENOENT;
+>> +
+>> +	if (table->header.revision < 2) {
+>> +		err = -EINVAL;
+>> +		pr_err("wrong table version\n");
+>> +		goto done;
+>> +	}
+>> +
+>> +	iotype = (table->serial_port.space_id == ACPI_ADR_SPACE_SYSTEM_MEMORY) ?
+>> +			"mmio" : "io";
+>> +
+>> +	switch (table->interface_type) {
+>> +	case ACPI_DBG2_ARM_SBSA_32BIT:
+>> +		iotype = "mmio32";
+>> +		/* fall through */
+>> +	case ACPI_DBG2_ARM_PL011:
+>> +	case ACPI_DBG2_ARM_SBSA_GENERIC:
+>> +	case ACPI_DBG2_BCM2835:
+>> +		uart = "pl011";
+>> +		break;
+>> +	case ACPI_DBG2_16550_COMPATIBLE:
+>> +	case ACPI_DBG2_16550_SUBSET:
+>> +		uart = "uart";
+>> +		break;
+>> +	default:
+>> +		err = -ENOENT;
+>> +		goto done;
+>> +	}
+>> +
+>> +	switch (table->baud_rate) {
+>> +	case 3:
+>> +		baud_rate = 9600;
+>> +		break;
+>> +	case 4:
+>> +		baud_rate = 19200;
+>> +		break;
+>> +	case 6:
+>> +		baud_rate = 57600;
+>> +		break;
+>> +	case 7:
+>> +		baud_rate = 115200;
+>> +		break;
+>> +	default:
+>> +		err = -ENOENT;
+>> +		goto done;
+>> +	}
+>> +
+>> +	sprintf(opts, "%s,%s,0x%llx,%d", uart, iotype,
+>> +		table->serial_port.address, baud_rate);
+> 
+> As 'opts' is static, don't you need to take some measures to prevent
+> concurrent access. The simpler measure for me is to declare it on
+> stack.
+
+Again, concurrent access is not a concern at this early time.
 
 Regards,
-Lucas
+Peter Hurley
+
+
+>> +
+>> +	pr_info("console: %s", opts);
+>> +
+>> +	if (init_earlycon)
+>> +		setup_earlycon(opts);
+>> +
+>> +	err = add_preferred_console(uart, 0, opts + strlen(uart) + 1);
+>> +
+>> +done:
+>> +	early_acpi_os_unmap_memory((void __iomem *)table, table_size);
+>> +	return err;
+>> +}
+>> diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
+>> index d217366..ec030c9 100644
+>> --- a/drivers/tty/serial/earlycon.c
+>> +++ b/drivers/tty/serial/earlycon.c
+>> @@ -22,6 +22,7 @@
+>>  #include <linux/sizes.h>
+>>  #include <linux/of.h>
+>>  #include <linux/of_fdt.h>
+>> +#include <linux/acpi.h>
+>>  
+>>  #ifdef CONFIG_FIX_EARLYCON_MEM
+>>  #include <asm/fixmap.h>
+>> @@ -206,11 +207,15 @@ static int __init param_setup_earlycon(char *buf)
+>>  	int err;
+>>  
+>>  	/*
+>> -	 * Just 'earlycon' is a valid param for devicetree earlycons;
+>> -	 * don't generate a warning from parse_early_params() in that case
+>> +	 * Just 'earlycon' is a valid param for devicetree and ACPI SPCR
+>> +	 * earlycons; don't generate a warning from parse_early_params()
+>> +	 * in that case
+>>  	 */
+>> -	if (!buf || !buf[0])
+>> -		return early_init_dt_scan_chosen_serial();
+>> +	if (!buf || !buf[0]) {
+>> +		init_spcr_earlycon();
+>> +		early_init_dt_scan_chosen_serial();
+>> +		return 0;
+>> +	}
+>>  
+>>  	err = setup_earlycon(buf);
+>>  	if (err == -ENOENT || err == -EALREADY)
+>> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+>> index 06ed7e5..ebbb212 100644
+>> --- a/include/linux/acpi.h
+>> +++ b/include/linux/acpi.h
+>> @@ -1004,4 +1004,12 @@ static inline struct fwnode_handle *acpi_get_next_subnode(struct device *dev,
+>>  #define acpi_probe_device_table(t)	({ int __r = 0; __r;})
+>>  #endif
+>>  
+>> +#ifdef CONFIG_ACPI_SPCR_TABLE
+>> +int parse_spcr(void);
+>> +void init_spcr_earlycon(void);
+>> +#else
+>> +static inline  int parse_spcr(void) { return 0; }
+>> +static inline void init_spcr_earlycon(void) {}
+>> +#endif
+>> +
+>>  #endif	/*_LINUX_ACPI_H*/
+>> -- 
+>> 2.7.4
