@@ -1,43 +1,60 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 22 Mar 2016 09:19:36 +0100
-Subject: [PULL 3/3] kvm: arm64: Disable compiler instrumentation for
- hypervisor code
-In-Reply-To: <1458634776-18388-1-git-send-email-christoffer.dall@linaro.org>
-References: <1458634776-18388-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1458634776-18388-4-git-send-email-christoffer.dall@linaro.org>
+From: graeme.gregory@linaro.org (G Gregory)
+Date: Tue, 22 Mar 2016 08:20:26 +0000
+Subject: [PATCH 2/2] serial: amba-pl011: complete support to ZTE uart
+In-Reply-To: <CABymUCMDqfLsCr7dWxWpKZZwEqr+vO59GR+wUnyJqSGzXQYuDQ@mail.gmail.com>
+References: <1457920282-14823-1-git-send-email-jun.nie@linaro.org>
+ <1457920282-14823-2-git-send-email-jun.nie@linaro.org>
+ <56F05C16.1030805@codeaurora.org>
+ <CABymUCNKOgdLBLr2fZ4KhwmG+R4Zm-LHnfDppV-yiwUjRH4Nyg@mail.gmail.com>
+ <56F0A628.2080607@codeaurora.org>
+ <CABymUCOX5zws9QfXp5Wud2JBAYJZH4rxPRVVgbk7tRvbUUHChA@mail.gmail.com>
+ <56F0A88C.9050209@codeaurora.org>
+ <CABymUCMDqfLsCr7dWxWpKZZwEqr+vO59GR+wUnyJqSGzXQYuDQ@mail.gmail.com>
+Message-ID: <CAGCh1+mFWPFqcjjngL=QOjVpboGGkyn6KezLLT5ZSV5xKR5YOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Catalin Marinas <catalin.marinas@arm.com>
+On 22 March 2016 at 02:17, Jun Nie <jun.nie@linaro.org> wrote:
+> 2016-03-22 10:06 GMT+08:00 Timur Tabi <timur@codeaurora.org>:
+>> Jun Nie wrote:
+>>>
+>>> That's a fair comment. I suppose all platform need to enable clock for
+>>> the device. For device tree case, we need these code for clock
+>>> enabling.
+>>
+>>
+>> But why do you need to enable the clock?  The pl011 driver works fine for
+>> every platform without your patch.  If the ZTE platform needs to call
+>> clk_get() in order to work, than that is something different about your
+>> platform.
+>
+> ARM/ST pl011 is amba device and use pl011_probe() for initialization,
+> which call these clock enabling code for every device. You introduced
+> platform device driver entry for pl011 and only sbsa use platform
+> device probe method currently. I am trying to reuse this probe
+> function, so need to add clock enabling code in this function.
+>
+> If you did not find any issue in sbsa device tree case, I guess the
+> clock is always enabled. For mobile platform, clock is auto gated for
+> power saving in most of cases.
+>
+>>
+>>> For ACPI case, it may be handled automatically. If you agree
+>>> my opinion, I will move these lines to patch 1. Please correct me if I
+>>> am wrong.
+>>
+>>
+>> I think you need to create a separate patch that adds that call, and make
+>> sure it's tested by other platforms before it gets accepted.
+>
+> These code only impact sbsa device as only sbsa device is initialized
+> via platform driver entry. So only your flavor is need for testing the
+> code. Thanks! :-)
+>
+In SBSA mode the UART clock is always enabled by the firmware and
+there are no baud rate registers so we don't need to know the value of
+the clock. In ACPI there is no method to represent the clock. So if
+you add lines to unconditionally require a clock you will break SBSA
+mode in ACPI.
 
-With the recent rewrite of the arm64 KVM hypervisor code in C, enabling
-certain options like KASAN would allow the compiler to generate memory
-accesses or function calls to addresses not mapped at EL2. This patch
-disables the compiler instrumentation on the arm64 hypervisor code for
-gcov-based profiling (GCOV_KERNEL), undefined behaviour sanity checker
-(UBSAN) and kernel address sanitizer (KASAN).
-
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Paolo Bonzini <pbonzini@redhat.com>
-Cc: <stable@vger.kernel.org> # 4.5+
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- arch/arm64/kvm/hyp/Makefile | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
-index b6a8fc5..778d0ef 100644
---- a/arch/arm64/kvm/hyp/Makefile
-+++ b/arch/arm64/kvm/hyp/Makefile
-@@ -16,3 +16,7 @@ obj-$(CONFIG_KVM_ARM_HOST) += fpsimd.o
- obj-$(CONFIG_KVM_ARM_HOST) += tlb.o
- obj-$(CONFIG_KVM_ARM_HOST) += hyp-entry.o
- obj-$(CONFIG_KVM_ARM_HOST) += s2-setup.o
-+
-+GCOV_PROFILE	:= n
-+KASAN_SANITIZE	:= n
-+UBSAN_SANITIZE	:= n
--- 
-2.1.2.330.g565301e.dirty
+Graeme
