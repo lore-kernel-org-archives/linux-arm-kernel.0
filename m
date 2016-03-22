@@ -1,46 +1,52 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Tue, 22 Mar 2016 10:03:49 +0000
-Subject: [RFC PATCH 04/12] kvm-arm: Rename kvm_pmd_huge to huge_pmd
-In-Reply-To: <20160322085532.GC21047@cbox>
-References: <1457974391-28456-1-git-send-email-suzuki.poulose@arm.com>
- <1457974391-28456-5-git-send-email-suzuki.poulose@arm.com>
- <20160322085532.GC21047@cbox>
-Message-ID: <56F11885.60900@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 22 Mar 2016 10:06:15 +0000
+Subject: [LINUX PATCH 1/2] mtd: Added dummy entry in the spi_transfer
+ structure.
+In-Reply-To: <4FF8F58FAA9D5D4193D4E554E4352C5902C6D34C@XAP-PVEXMBX02.xlnx.xilinx.com>
+References: <1458562809-36114-1-git-send-email-lakshmis@xilinx.com>
+ <20160321130734.GS2566@sirena.org.uk>
+ <4FF8F58FAA9D5D4193D4E554E4352C5902C6D34C@XAP-PVEXMBX02.xlnx.xilinx.com>
+Message-ID: <20160322100615.GA2566@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/03/16 08:55, Christoffer Dall wrote:
-> On Mon, Mar 14, 2016 at 04:53:03PM +0000, Suzuki K Poulose wrote:
->> kvm_pmd_huge doesn't have any dependency on the page table
->> where the pmd lives (i.e, hyp vs. stage2). So, rename it to
->> huge_pmd() to make it explicit.
->>
->> kvm_p.d_* wrappers will be used for helpers which differ
->> across hyp vs stage2.
->
-> I don't understand this commit message.  Do you associate the kvm_
-> prefix specifically with one of hyp or stage2?
+On Tue, Mar 22, 2016 at 06:39:51AM +0000, Lakshmi Sai Krishna Potthuri wrote:
 
-So the idea is kvm_ prefix will be used for handling either hyp or stage2
-depending on what we are dealing with (i.e, kvm parameter to the helpers).
+Please fix your mail client to word wrap within paragraphs at something
+substantially less than 80 columns.  Doing this makes your messages much
+easier to read and reply to.  Please also avoid reflowing other text
+into longer lengths, this makes things worse.
 
-So here, we just want to know if a given pmd represents a huge page, either
-via thp or via hugetlb and that doesn't have anything to do with hyp or stage2.
-Hence the change. As
+> >This isn't enough to add the feature - a client driver trying to make use of this
+> >needs to be able to tell if the cycles are actually going to be inserted.  I'd
+> >expect to see a capability flag that can be checked and some error checking so
+> >that if we try to do a transfer with dummy cycles and can't support it we don't
+> >silently ignore the dummy cycles, ideally also something that'll handle
+> >multiples of 8 bits with SPI controllers that don't otherwise support this
+> >feature.
 
->
-> I remember reviewers in the past specifically asked to name anything
-> relating to pgtable macros in the kvm code with a kvm_ prefix to
-> distinguish them from logic used elsewhere in the kernel.
+> Currently, all fast reads use 8 cycles or 1 byte of dummy. This generally works.
+> But it can be vary based on the flash and the type of read command.
+> Dummy bytes are taken care of in m25p80.c by adjusting the len field:
+> Length = size of (command + address + dummy byte)
 
-Correct. In this case it doesn't apply to kvm_pmd_huge().
+> There might be controllers (like ZynqMP GQSPI) that would be able to use
+> the information that dummy byte(s) were added and the precise number
+> of dummy cycles. This patch does not disturb the existing implementation
+> of adjusting length (as described above). It adds an additional optional feature.
+> So there is no harm to controllers that can't support it - they can ignore it and
+> still work with the existing "length adjustment" implementation.
+> If you think there value in adding a capability flag, please let me know.
 
->
-> I specifically do not like having huge_pmd() be significantly different
-> in logic from pmd_huge(), so defining pmd_thp_or_huge() for arm64 is a
-> much better option.
-
-Yes, I have switched to that in the next version.
-
-Thanks
-Suzuki
+This is really not what I'd expect to happen, I'd expect that these
+dummy cycles would be in addition to the actual data (see my request for
+better documentation...).  If they overlap with the data then what is
+the point in specifying this?  It's more work for the host, what benefit
+do we get from doing it over just handing it like a normal byte?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160322/a0ed364c/attachment.sig>
