@@ -1,44 +1,52 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 22 Mar 2016 17:46:57 +0100
-Subject: [GIT PULL] at91: fixes for 4.6 #1
-Message-ID: <1458665217-22369-1-git-send-email-nicolas.ferre@atmel.com>
+From: jan.glauber@caviumnetworks.com (Jan Glauber)
+Date: Tue, 22 Mar 2016 17:49:47 +0100
+Subject: [PATCH 3/5] arm64/perf: Add Broadcom Vulcan PMU support
+In-Reply-To: <CANK38rZQSOJPN76eP1LFcx8GduZRf8z-3w_kriAUg2=uON8Rcw@mail.gmail.com>
+References: <1458133309-17045-1-git-send-email-ashoks@broadcom.com>
+ <1458133309-17045-4-git-send-email-ashoks@broadcom.com>
+ <20160322100110.GC31126@arm.com>
+ <CANK38rZQSOJPN76eP1LFcx8GduZRf8z-3w_kriAUg2=uON8Rcw@mail.gmail.com>
+Message-ID: <20160322164947.GB23772@hardcore>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+Hi Ashok,
 
-Here is a "-fixes" tag that also can be considered as a "late DT" one for 4.6. I
-added the two patches by Ludovic on top of the previous DT material that you
-already pushed to Linus (at91-dt2 tag that was built on top of 4.5-rc3).
-It merges perfectly well with current Mainline and linux-next.
+On Tue, Mar 22, 2016 at 10:09:42PM +0530, Ashok Sekar wrote:
+> Hi Will,
+> 
+> On Tue, Mar 22, 2016 at 3:31 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > Hi Ashok,
+> >
+> > On Wed, Mar 16, 2016 at 06:01:47AM -0700, Ashok Kumar wrote:
 
-Thanks, best regards,
+[...]
 
-The following changes since commit ed0f4b3ffcdbd2b47a0b24035bb6f22464c9fef1:
+> >> +static struct attribute *vulcan_pmuv3_event_attrs[] = {
+> >> +     &armv8_event_attr_sw_incr.attr.attr,
+> >> +     &armv8_event_attr_l1i_cache_refill.attr.attr,
+> >> +     &armv8_event_attr_l1i_tlb_refill.attr.attr,
+> >> +     &armv8_event_attr_l1d_cache_refill.attr.attr,
+> >> +     &armv8_event_attr_l1d_cache_access.attr.attr,
+> >> +     &armv8_event_attr_l1d_tlb_refill.attr.attr,
+> >> +     &armv8_event_attr_ld_retired.attr.attr,
+> >> +     &armv8_event_attr_st_retired.attr.attr,
+> >> +     &armv8_event_attr_inst_retired.attr.attr,
+> >> +     &armv8_event_attr_exc_taken.attr.attr,
+> >> +     &armv8_event_attr_exc_return.attr.attr,
+> >
+> > ... but I'm not keen on having these tables in the kernel for each CPU
+> > PMU we support. Where I'd like to get to is:
+> >
+> >   * We expose the architected events (0x0-0x3f) in /sys using the existing
+> >     PMUv3 tables in conjunction with PMCEIDn_EL0 (Jan mentioned this before)
+> I will use armv8_pmuv3_event_attrs itself for the time being for Vulcan.
+> Once the events identification mechanism is done using PMCEIDn_EL0, it
+> should take care
+> of removing the unsupported events from the table for Vulcan too.
+> Jan is working on this currently? or else I could look into it.
 
-  ARM: dts: at91: sama5d2 Xplained: add leds node (2016-03-02 16:55:37 +0100)
+I did not find time yet to work on PMCEID support, so feel to start on
+it but please keep me in the loop.
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-fixes
-
-for you to fetch changes up to b02acd4e62602a6ab307da84388a16bf60106c48:
-
-  ARM: dts: at91: sama5d4 Xplained: don't disable hsmci regulator (2016-03-22 11:54:32 +0100)
-
-----------------------------------------------------------------
-First fixes batch for AT91 on 4.6 - DT only fixes:
-- prevent the boards from having glitches when inserting/removing SD card on
-  sama5d3/d4 Xplained. The regulators should be kept on.
-
-----------------------------------------------------------------
-Ludovic Desroches (2):
-      ARM: dts: at91: sama5d3 Xplained: don't disable hsmci regulator
-      ARM: dts: at91: sama5d4 Xplained: don't disable hsmci regulator
-
- arch/arm/boot/dts/at91-sama5d3_xplained.dts | 1 +
- arch/arm/boot/dts/at91-sama5d4_xplained.dts | 1 +
- 2 files changed, 2 insertions(+)
-
--- 
-Nicolas Ferre
+Jan
