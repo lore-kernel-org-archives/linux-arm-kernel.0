@@ -1,41 +1,51 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 22 Mar 2016 09:47:32 +0000
-Subject: [PATCH 1/5] arm64/perf: Changed events naming convention for
- uniformity
-In-Reply-To: <1458133309-17045-2-git-send-email-ashoks@broadcom.com>
-References: <1458133309-17045-1-git-send-email-ashoks@broadcom.com>
- <1458133309-17045-2-git-send-email-ashoks@broadcom.com>
-Message-ID: <20160322094732.GB31126@arm.com>
+From: juri.lelli@arm.com (Juri Lelli)
+Date: Tue, 22 Mar 2016 09:50:22 +0000
+Subject: [PATCH v4 2/8] Documentation: arm: define DT cpu capacity bindings
+In-Reply-To: <20160321175112.GY2566@sirena.org.uk>
+References: <1458311054-13524-1-git-send-email-juri.lelli@arm.com>
+ <1458311054-13524-3-git-send-email-juri.lelli@arm.com>
+ <56EC3F9E.4050209@nvidia.com> <20160321105330.GB12319@e106622-lin>
+ <CAKfTPtDP3zMR+zbvvqJCBvJ5r44do8NS03wC7pAejxPd0zHTMA@mail.gmail.com>
+ <20160321114956.GD12319@e106622-lin>
+ <20160321121210.GQ2566@sirena.org.uk>
+ <20160321172452.GE12319@e106622-lin>
+ <20160321175112.GY2566@sirena.org.uk>
+Message-ID: <20160322095022.GA23909@e106622-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ashok,
-
-On Wed, Mar 16, 2016 at 06:01:45AM -0700, Ashok Kumar wrote:
-> Changed events name to the format _L1/2/3I/D_CACHE/TLB_.
-> For e.g. moved ARMV8_PMUV3_PERFCTR_L1_DCACHE_REFILL to
-> ARMV8_PMUV3_PERFCTR_L1D_CACHE_REFILL in line with the already
-> existing definitions like ARMV8_PMUV3_PERFCTR_L3D_CACHE_WB.
+On 21/03/16 17:51, Mark Brown wrote:
+> On Mon, Mar 21, 2016 at 05:24:52PM +0000, Juri Lelli wrote:
 > 
-> Added _ACCESS keyword to some of the definitions
-> (ARMV8_PMUV3_PERFCTR_L1D_TLB, ARMV8_PMUV3_PERFCTR_L1I_TLB, etc)
-> in line with the already existing definitions like
-> ARMV8_PMUV3_PERFCTR_L1_DCACHE_ACCESS for clarity.
+> > I think this should work, but we have to understand how do we obtain the
+> > max frequency of each cluster while parsing DT. OPP bindings are
+> > helpful, but AFAIK there are platforms for which firmware is responsible
+> > for setting up and advertise available OPPs. I'm not sure if this
+> > happens later on during the boot process. We might still be able to use
+> > the clock-frequency property in this case, but that might need changing
+> > again if the top OPP gets removed/changed.
 > 
-> Corrected typo L21 to L2I in ARMV8_PMUV3_PERFCTR_L21_TLB_REFILL,
-> ARMV8_PMUV3_PERFCTR_L21_TLB
+> > OTH, we might simply want to say that capacity values are to be obtained
+> > once the platform is "stable" (no additional changes to configuration,
+> > OPPs, etc.). But this is maybe not acceptable?
+> 
+> How about we just punt and let the cpufreq driver tell us - it can parse
+> DT, use built in tables or whatever?  We could even remember the raw
+> values and recalculate if it ever decides to change for some reason.
+> Until cpufreq comes up we'll be stuck at whatever OPP that we're at on
+> startup which may not match whatever we define the numbers relative to
+> anyway.
+> 
 
-I don't mind renaming these events, but could we have them matching the
-names in the ARM ARM, please? For example:
+OK, I'll try and see how that can be done.
 
-> -#define ARMV8_PMUV3_PERFCTR_L1D_TLB				0x25
-> -#define ARMV8_PMUV3_PERFCTR_L1I_TLB				0x26
-> -#define ARMV8_PMUV3_PERFCTR_L2I_CACHE				0x27
-> +#define ARMV8_PMUV3_PERFCTR_L1D_TLB_ACCESS			0x25
-> +#define ARMV8_PMUV3_PERFCTR_L1I_TLB_ACCESS			0x26
-> +#define ARMV8_PMUV3_PERFCTR_L2I_CACHE_ACCESS			0x27
+Thanks,
 
-These really are called "L1D_TLB, L1I_TLB and L2I_CACHE" without the
-"_ACCESS" suffix.
+- Juri
 
-Will
+> > Also, I fear that for variants of a particular implementation we will
+> > still have to redo the profiling anyway (like we alreaady did for Juno
+> > and Juno-r2 for example).
+> 
+> This sometimes happens either through binning or through board design
+> decisions rather than through new silicon so we might be able to reuse.
