@@ -1,150 +1,138 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 22 Mar 2016 11:52:56 +0200
-Subject: [PATCH 1/2] ARM: dts: am335x: Add initial support for ICEv2 board
-In-Reply-To: <1458628657-30468-2-git-send-email-lokeshvutla@ti.com>
-References: <1458628657-30468-1-git-send-email-lokeshvutla@ti.com>
- <1458628657-30468-2-git-send-email-lokeshvutla@ti.com>
-Message-ID: <56F115F8.8040202@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 22 Mar 2016 10:01:11 +0000
+Subject: [PATCH 3/5] arm64/perf: Add Broadcom Vulcan PMU support
+In-Reply-To: <1458133309-17045-4-git-send-email-ashoks@broadcom.com>
+References: <1458133309-17045-1-git-send-email-ashoks@broadcom.com>
+ <1458133309-17045-4-git-send-email-ashoks@broadcom.com>
+Message-ID: <20160322100110.GC31126@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/22/2016 08:37 AM, Lokesh Vutla wrote:
-> TI's Industrial Communication Engine EVM is a low cost hardware mainly
-> developed for industrial communication type applications using serial
-> or Ethernet based interfaces. This platform features TI's AM3359 with
-> 800MHz single core Cortex-A8 processor, 256MB DDR3, 64MB SPI flash,
-> 8MB NOR Flash, mmc, usb, can, dual Ethernet ports.
+Hi Ashok,
+
+On Wed, Mar 16, 2016 at 06:01:47AM -0700, Ashok Kumar wrote:
+> Broadcom Vulcan uses ARMv8 PMUv3 and supports most of
+> the ARMv8 recommended implementation defined events.
 > 
-> For more information, look at HW user guide[1], Data manual[2].
+> Added Vulcan events mapping for perf and perf_cache.
 > 
-> Just add basic support for the moment.
+> Created separate event_attrs structure for vulcan as
+> it supports more events and doesn't support few events
+> (like PC_WRITE, MEM_ERROR) from the generic armv8
+> event_attrs structure.
 > 
-> [1] http://processors.wiki.ti.com/index.php/AM335x_Industrial_Communication_Engine_EVM_Rev2_1_HW_User_Guide
-> [2] http://www.ti.com/lit/ds/symlink/am3359.pdf
-> 
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> Signed-off-by: Ashok Kumar <ashoks@broadcom.com>
 > ---
->   .../devicetree/bindings/arm/omap/omap.txt          |   3 +
->   arch/arm/boot/dts/Makefile                         |   1 +
->   arch/arm/boot/dts/am335x-icev2.dts                 | 303 +++++++++++++++++++++
->   3 files changed, 307 insertions(+)
->   create mode 100644 arch/arm/boot/dts/am335x-icev2.dts
+>  arch/arm64/kernel/perf_event.c | 253 +++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 253 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
-> index 21e71a5..20f6d71 100644
-> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
-> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
-> @@ -133,6 +133,9 @@ Boards:
->   - AM335X Bone : Low cost community board
->     compatible = "ti,am335x-bone", "ti,am33xx", "ti,omap3"
->   
-> +- AM3359 ICEv2 : Low cost Industrial Communication Engine EVM.
-> +  compatible = "ti,am3359-icev2", "ti,am33xx", "ti,omap3"
+> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> index 3207b5f..1bb06d3 100644
+> --- a/arch/arm64/kernel/perf_event.c
+> +++ b/arch/arm64/kernel/perf_event.c
+> @@ -232,6 +232,20 @@ static const unsigned armv8_thunder_perf_map[PERF_COUNT_HW_MAX] = {
+>  	[PERF_COUNT_HW_STALLED_CYCLES_BACKEND]	= ARMV8_PMUV3_PERFCTR_STALL_BACKEND,
+>  };
+>  
+> +/* Broadcom Vulcan events mapping */
+> +static const unsigned armv8_vulcan_perf_map[PERF_COUNT_HW_MAX] = {
+> +	PERF_MAP_ALL_UNSUPPORTED,
+> +	[PERF_COUNT_HW_CPU_CYCLES]		= ARMV8_PMUV3_PERFCTR_CLOCK_CYCLES,
+> +	[PERF_COUNT_HW_INSTRUCTIONS]		= ARMV8_PMUV3_PERFCTR_INSTR_EXECUTED,
+> +	[PERF_COUNT_HW_CACHE_REFERENCES]	= ARMV8_PMUV3_PERFCTR_L1D_CACHE_ACCESS,
+> +	[PERF_COUNT_HW_CACHE_MISSES]		= ARMV8_PMUV3_PERFCTR_L1D_CACHE_REFILL,
+> +	[PERF_COUNT_HW_BRANCH_INSTRUCTIONS]	= ARMV8_PMUV3_PERFCTR_BR_RETIRED,
+> +	[PERF_COUNT_HW_BRANCH_MISSES]		= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
+> +	[PERF_COUNT_HW_BUS_CYCLES]		= ARMV8_PMUV3_PERFCTR_BUS_CYCLES,
+> +	[PERF_COUNT_HW_STALLED_CYCLES_FRONTEND]	= ARMV8_PMUV3_PERFCTR_STALL_FRONTEND,
+> +	[PERF_COUNT_HW_STALLED_CYCLES_BACKEND]	= ARMV8_PMUV3_PERFCTR_STALL_BACKEND,
+> +};
 > +
->   - AM335X OrionLXm : Substation Automation Platform
->     compatible = "novatech,am335x-lxm", "ti,am33xx"
->   
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 52b34a0..7dcf55e 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -486,6 +486,7 @@ dtb-$(CONFIG_SOC_AM33XX) += \
->   	am335x-cm-t335.dtb \
->   	am335x-evm.dtb \
->   	am335x-evmsk.dtb \
-> +	am335x-icev2.dtb \
->   	am335x-lxm.dtb \
->   	am335x-nano.dtb \
->   	am335x-pepper.dtb \
-> diff --git a/arch/arm/boot/dts/am335x-icev2.dts b/arch/arm/boot/dts/am335x-icev2.dts
-> new file mode 100644
-> index 0000000..59c91e8
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/am335x-icev2.dts
-> @@ -0,0 +1,303 @@
-> +/*
-> + * Copyright (C) 2016 Texas Instruments Incorporated - http://www.ti.com/
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
+>  static const unsigned armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+>  						[PERF_COUNT_HW_CACHE_OP_MAX]
+>  						[PERF_COUNT_HW_CACHE_RESULT_MAX] = {
+> @@ -324,6 +338,36 @@ static const unsigned armv8_thunder_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+>  	[C(BPU)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
+>  };
+>  
+> +static const unsigned armv8_vulcan_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+> +					      [PERF_COUNT_HW_CACHE_OP_MAX]
+> +					      [PERF_COUNT_HW_CACHE_RESULT_MAX] = {
+> +	PERF_CACHE_MAP_ALL_UNSUPPORTED,
 > +
-> +/*
-> + * AM335x ICE V2 board
-> + * http://www.ti.com/tool/tmdsice3359
-> + */
+> +	[C(L1D)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_IMPDEF_PERFCTR_L1D_CACHE_ACCESS_LD,
+> +	[C(L1D)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_IMPDEF_PERFCTR_L1D_CACHE_REFILL_LD,
+> +	[C(L1D)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV8_IMPDEF_PERFCTR_L1D_CACHE_ACCESS_ST,
+> +	[C(L1D)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_IMPDEF_PERFCTR_L1D_CACHE_REFILL_ST,
 > +
-> +/dts-v1/;
+> +	[C(L1I)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1I_CACHE_ACCESS,
+> +	[C(L1I)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1I_CACHE_REFILL,
 > +
-> +#include "am33xx.dtsi"
+> +	[C(ITLB)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1I_TLB_REFILL,
+> +	[C(ITLB)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1I_TLB_ACCESS,
 > +
-> +/ {
-> +	model = "TI AM3359 ICE-V2";
-> +	compatible = "ti,am3359-icev2", "ti,am33xx";
+> +	[C(DTLB)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_IMPDEF_PERFCTR_L1D_TLB_ACCESS_LD,
+> +	[C(DTLB)][C(OP_WRITE)][C(RESULT_ACCESS)] = ARMV8_IMPDEF_PERFCTR_L1D_TLB_ACCESS_ST,
+> +	[C(DTLB)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_IMPDEF_PERFCTR_L1D_TLB_REFILL_LD,
+> +	[C(DTLB)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_IMPDEF_PERFCTR_L1D_TLB_REFILL_ST,
 > +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x80000000 0x10000000>; /* 256 MB */
-> +	};
+> +	[C(BPU)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_PRED,
+> +	[C(BPU)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
+> +	[C(BPU)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_PRED,
+> +	[C(BPU)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
 > +
-> +	vbat: fixedregulator at 0 {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vbat";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		regulator-boot-on;
-> +	};
-> +
-> +	vtt_fixed: fixedregulator at 1 {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vtt";
-> +		regulator-min-microvolt = <1500000>;
-> +		regulator-max-microvolt = <1500000>;
-> +		gpio = <&gpio0 18 GPIO_ACTIVE_HIGH>;
-> +		regulator-always-on;
-> +		regulator-boot-on;
-> +		enable-active-high;
-> +	};
-> +
-> +	leds {
+> +	[C(NODE)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_IMPDEF_PERFCTR_BUS_ACCESS_LD,
+> +	[C(NODE)][C(OP_WRITE)][C(RESULT_ACCESS)] = ARMV8_IMPDEF_PERFCTR_BUS_ACCESS_ST,
+> +};
 
-Could you split this node on two leds at 0 and led at 1 and and move
-all tpic2810 leds under leds0 and  all gpio leds under leds at 1?
+I'm fine with this part of the patch...
 
-otherwise gpio leds will not work because tpic2810 is
-configured as module and so leds-gpio will be deferred until
-tpic2810 is loaded (but it can be never loaded ;)
-
-led at x numeration has to be started from 0 for each leds at Y.
-
-> +		compatible = "gpio-leds";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&user_leds>;
-> +
-> +		led at 0 {
-> +			label = "out0";
-> +			gpios = <&tpic2810 0 GPIO_ACTIVE_HIGH>;
-> +			default-state = "off";
-> +		};
-> +
+>  #define ARMV8_EVENT_ATTR_RESOLVE(m) #m
+>  #define ARMV8_EVENT_ATTR(name, config) \
+>  	PMU_EVENT_ATTR_STRING(name, armv8_event_attr_##name, \
+> @@ -379,6 +423,74 @@ ARMV8_EVENT_ATTR(l2i_tlb_refill, ARMV8_PMUV3_PERFCTR_L2I_TLB_REFILL);
+>  ARMV8_EVENT_ATTR(l2d_tlb_access, ARMV8_PMUV3_PERFCTR_L2D_TLB_ACCESS);
+>  ARMV8_EVENT_ATTR(l2i_tlb_access, ARMV8_PMUV3_PERFCTR_L2I_TLB_ACCESS);
+>  
+> +ARMV8_EVENT_ATTR(l1d_cache_access_ld, ARMV8_IMPDEF_PERFCTR_L1D_CACHE_ACCESS_LD);
+> +ARMV8_EVENT_ATTR(l1d_cache_refill_ld, ARMV8_IMPDEF_PERFCTR_L1D_CACHE_REFILL_LD);
+> +ARMV8_EVENT_ATTR(l1d_cache_access_st, ARMV8_IMPDEF_PERFCTR_L1D_CACHE_ACCESS_ST);
+> +ARMV8_EVENT_ATTR(l1d_cache_refill_st, ARMV8_IMPDEF_PERFCTR_L1D_CACHE_REFILL_ST);
+> +ARMV8_EVENT_ATTR(l1d_tlb_access_ld, ARMV8_IMPDEF_PERFCTR_L1D_TLB_ACCESS_LD);
+> +ARMV8_EVENT_ATTR(l1d_tlb_access_st, ARMV8_IMPDEF_PERFCTR_L1D_TLB_ACCESS_ST);
+> +ARMV8_EVENT_ATTR(l1d_tlb_refill_ld, ARMV8_IMPDEF_PERFCTR_L1D_TLB_REFILL_LD);
+> +ARMV8_EVENT_ATTR(l1d_tlb_refill_st, ARMV8_IMPDEF_PERFCTR_L1D_TLB_REFILL_ST);
 
 [...]
 
-> +		/* Tricolor status LEDs */
-> +		led at 8 {
-> +			label = "status0:red:cpu0";
-> +			gpios = <&gpio0 17 GPIO_ACTIVE_HIGH>;
-> +			default-state = "off";
-> +			linux,default-trigger = "cpu0";
-> +		};
-> +
+> +static struct attribute *vulcan_pmuv3_event_attrs[] = {
+> +	&armv8_event_attr_sw_incr.attr.attr,
+> +	&armv8_event_attr_l1i_cache_refill.attr.attr,
+> +	&armv8_event_attr_l1i_tlb_refill.attr.attr,
+> +	&armv8_event_attr_l1d_cache_refill.attr.attr,
+> +	&armv8_event_attr_l1d_cache_access.attr.attr,
+> +	&armv8_event_attr_l1d_tlb_refill.attr.attr,
+> +	&armv8_event_attr_ld_retired.attr.attr,
+> +	&armv8_event_attr_st_retired.attr.attr,
+> +	&armv8_event_attr_inst_retired.attr.attr,
+> +	&armv8_event_attr_exc_taken.attr.attr,
+> +	&armv8_event_attr_exc_return.attr.attr,
 
-[...]
+... but I'm not keen on having these tables in the kernel for each CPU
+PMU we support. Where I'd like to get to is:
 
-> 
+  * We expose the architected events (0x0-0x3f) in /sys using the existing
+    PMUv3 tables in conjunction with PMCEIDn_EL0 (Jan mentioned this before)
 
+  * Userspace knows about the micro-architecture-specific events for a
+    given PMU
 
--- 
-regards,
--grygorii
+If there really is a need to have this in the kernel, then I think we
+should construct the tables at runtime using a bitmap, much like I'd
+like to do with PMCEIDn_EL0. That would mean having a bitmap for each
+compatible string, as opposed to a table of pointers in the kernel image.
+
+I still need to be convinced that this doesn't belong in userspace,
+though.
+
+Will
