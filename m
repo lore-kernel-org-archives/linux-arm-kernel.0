@@ -1,136 +1,44 @@
-From: xf@rock-chips.com (Feng Xiao)
-Date: Tue, 22 Mar 2016 19:57:28 +0800
-Subject: [PATCH v1] cpufreq: rockchip: add driver
-In-Reply-To: <1458303004-26445-1-git-send-email-xf@rock-chips.com>
-References: <1458303004-26445-1-git-send-email-xf@rock-chips.com>
-Message-ID: <1458647848-48999-1-git-send-email-xf@rock-chips.com>
+From: julien.grall@arm.com (Julien Grall)
+Date: Tue, 22 Mar 2016 12:02:29 +0000
+Subject: [PATCH v3 6/9] irqchip/gic-v3: Parse and export virtual GIC
+ information
+In-Reply-To: <20160322112728.GA2486@xora-haswell.xora.org.uk>
+References: <1457436573-6180-1-git-send-email-julien.grall@arm.com>
+ <1457436573-6180-7-git-send-email-julien.grall@arm.com>
+ <20160322112728.GA2486@xora-haswell.xora.org.uk>
+Message-ID: <56F13455.2000703@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver will directly use cpufreq-dt driver as backend.
+Hi Graeme,
 
-As there is not a generic devicetree board file(rockchip.c)
-on ARM64 architecture, so remove platform_device_register_simple
-in rockchip.c and add a new cpufreq driver to support Rockchip
-SoCs.
+On 22/03/16 11:27, Graeme Gregory wrote:
+> On Tue, Mar 08, 2016 at 11:29:30AM +0000, Julien Grall wrote:
+>> @@ -1020,6 +1060,13 @@ gic_acpi_parse_madt_gicc(struct acpi_subtable_header *header,
+>>   		return -ENOMEM;
+>>
+>>   	gic_acpi_register_redist(gicc->gicr_base_address, redist_base);
+>> +
+>> +	acpi_data.maint_irq = gicc->vgic_interrupt;
+>> +	acpi_data.maint_irq_mode = (gicc->flags & ACPI_MADT_VGIC_IRQ_MODE) ?
+>> +				    ACPI_EDGE_SENSITIVE : ACPI_LEVEL_SENSITIVE;
+>> +	acpi_data.vctrl_base = gicc->gich_base_address;
+>> +	acpi_data.vcpu_base = gicc->gicv_base_address;
+>> +
+>>   	return 0;
+>>   }
+>
+> Placing this here means that it will not collect the info in the case
+> where there is a Generic Interrupt Redistributor structure in the MADT.
+>
+> I guess collecting this info should not be a side effect of happening to
+> pass GICC for redistributor base. Which unfortuneately probably means we
+> do need to parse the GICCs specifically for this information.
 
-Signed-off-by: Feng Xiao <xf@rock-chips.com>
----
-change in v1:
-- add compatible check
+I noticed it while testing on some platform. It's now fixed and will be 
+in the next version.
 
- arch/arm/mach-rockchip/rockchip.c  |  1 -
- drivers/cpufreq/Kconfig.arm        | 10 +++++++
- drivers/cpufreq/Makefile           |  1 +
- drivers/cpufreq/rockchip-cpufreq.c | 55 ++++++++++++++++++++++++++++++++++++++
- 4 files changed, 66 insertions(+), 1 deletion(-)
- create mode 100644 drivers/cpufreq/rockchip-cpufreq.c
+Regards,
 
-diff --git a/arch/arm/mach-rockchip/rockchip.c b/arch/arm/mach-rockchip/rockchip.c
-index 3f07cc5..beb71da 100644
---- a/arch/arm/mach-rockchip/rockchip.c
-+++ b/arch/arm/mach-rockchip/rockchip.c
-@@ -74,7 +74,6 @@ static void __init rockchip_dt_init(void)
- {
- 	rockchip_suspend_init();
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
--	platform_device_register_simple("cpufreq-dt", 0, NULL, 0);
- }
- 
- static const char * const rockchip_board_dt_compat[] = {
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index 14b1f93..1786315 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -97,6 +97,16 @@ config ARM_OMAP2PLUS_CPUFREQ
- 	depends on ARCH_OMAP2PLUS
- 	default ARCH_OMAP2PLUS
- 
-+config ARM_ROCKCHIP_CPUFREQ
-+	tristate "Rockchip CPUfreq driver"
-+	depends on ARCH_ROCKCHIP && CPUFREQ_DT
-+	select PM_OPP
-+	help
-+	  This adds the CPUFreq driver support for Rockchip SoCs.
-+	  The driver will directly use cpufreq-dt driver as backend.
-+
-+	  If in doubt, say N.
-+
- config ARM_S3C_CPUFREQ
- 	bool
- 	help
-diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-index 9e63fb1..91d8bb7 100644
---- a/drivers/cpufreq/Makefile
-+++ b/drivers/cpufreq/Makefile
-@@ -61,6 +61,7 @@ obj-$(CONFIG_ARM_MT8173_CPUFREQ)	+= mt8173-cpufreq.o
- obj-$(CONFIG_ARM_OMAP2PLUS_CPUFREQ)	+= omap-cpufreq.o
- obj-$(CONFIG_ARM_PXA2xx_CPUFREQ)	+= pxa2xx-cpufreq.o
- obj-$(CONFIG_PXA3xx)			+= pxa3xx-cpufreq.o
-+obj-$(CONFIG_ARM_ROCKCHIP_CPUFREQ)	+= rockchip-cpufreq.o
- obj-$(CONFIG_ARM_S3C24XX_CPUFREQ)	+= s3c24xx-cpufreq.o
- obj-$(CONFIG_ARM_S3C24XX_CPUFREQ_DEBUGFS) += s3c24xx-cpufreq-debugfs.o
- obj-$(CONFIG_ARM_S3C2410_CPUFREQ)	+= s3c2410-cpufreq.o
-diff --git a/drivers/cpufreq/rockchip-cpufreq.c b/drivers/cpufreq/rockchip-cpufreq.c
-new file mode 100644
-index 0000000..65c1de9
---- /dev/null
-+++ b/drivers/cpufreq/rockchip-cpufreq.c
-@@ -0,0 +1,55 @@
-+/*
-+ * Rockchip Platforms CPUFreq Support
-+ *
-+ * Copyright (C) 2016 Fuzhou Rockchip Electronics Co., Ltd
-+ *
-+ * Feng Xiao <xf@rock-chips.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/err.h>
-+#include <linux/init.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+
-+static const char * const rockchip_compat[] = {
-+	"rockchip,rk2928",
-+	"rockchip,rk3066a",
-+	"rockchip,rk3066b",
-+	"rockchip,rk3188",
-+	"rockchip,rk3288",
-+	"rockchip,rk3366",
-+	"rockchip,rk3368",
-+	"rockchip,rk3399",
-+};
-+
-+static int __init rockchip_cpufreq_driver_init(void)
-+{
-+	struct platform_device *pdev;
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(rockchip_compat); i++) {
-+		if (of_machine_is_compatible(rockchip_compat[i])) {
-+			pdev = platform_device_register_simple("cpufreq-dt",
-+							       -1, NULL, 0);
-+			return PTR_ERR_OR_ZERO(pdev);
-+		}
-+	}
-+
-+	return -ENODEV;
-+}
-+module_init(rockchip_cpufreq_driver_init);
-+
-+MODULE_AUTHOR("Feng Xiao <xf@rock-chips.com>");
-+MODULE_DESCRIPTION("Rockchip cpufreq driver");
-+MODULE_LICENSE("GPL v2");
 -- 
-1.9.1
+Julien Grall
