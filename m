@@ -1,165 +1,70 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Tue, 22 Mar 2016 17:08:46 +0100
-Subject: [PATCH 2/2] iio:adc:at91-sama5d2: add support for differential
- conversions
-In-Reply-To: <1458662926-8791-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1458662926-8791-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1458662926-8791-2-git-send-email-ludovic.desroches@atmel.com>
+From: alexandre.torgue@gmail.com (Alexandre Torgue)
+Date: Tue, 22 Mar 2016 17:11:33 +0100
+Subject: [PATCH v5 2/4] Documentation: Bindings: Add STM32 DWMAC glue
+In-Reply-To: <CAGhQ9VwS=YwgfeUuK+LzGjy3f9btVGV7bN=TATGHwQs+JW+iGA@mail.gmail.com>
+References: <1458315428-10081-1-git-send-email-alexandre.torgue@gmail.com>
+ <1458315428-10081-3-git-send-email-alexandre.torgue@gmail.com>
+ <CAGb2v65SvVi0cJbaaD9cYrqC3pJ9eumwhTVk11_N7r_nTZhS9g@mail.gmail.com>
+ <20160321124043.GA26873@rob-hp-laptop>
+ <CAGhQ9VwS=YwgfeUuK+LzGjy3f9btVGV7bN=TATGHwQs+JW+iGA@mail.gmail.com>
+Message-ID: <CAJgp7zxfFRhfNjcE23n+DKD0ffrvH4_sowPjK_-DZAS4ecH5dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add signed differential channels and update the voltage scale for
-differential conversions.
+Hi guys,
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
+I will fix typo issues (s/vesrion/version and ethernet @).
 
-This patch is based on:
-iio:adc:at91-sama5d2: fix identation
-iio:adc:at91-sama5d2: fix typo
+Concerning compatible string. For sure "snps,dwmac-3.50a" string is
+not used inside glue driver.
+I perfere to keep it for information but if you really want that I
+remove it I will not block ;)
 
- drivers/iio/adc/at91-sama5d2_adc.c | 71 ++++++++++++++++++++++++++++++--------
- 1 file changed, 56 insertions(+), 15 deletions(-)
+2016-03-21 16:36 GMT+01:00 Joachim  Eastwood <manabian@gmail.com>:
+> On 21 March 2016 at 13:40, Rob Herring <robh@kernel.org> wrote:
+>> On Sat, Mar 19, 2016 at 12:00:22AM +0800, Chen-Yu Tsai wrote:
+>>> Hi,
+>>>
+>>> On Fri, Mar 18, 2016 at 11:37 PM, Alexandre TORGUE
+>>> <alexandre.torgue@gmail.com> wrote:
+>>> > +- clocks: Must contain a phandle for each entry in clock-names.
+>>> > +- clock-names: Should be "stmmaceth" for the host clock.
+>>
+We can remove host clock (stmmac eth) entry here and refer to
+stmmac.txt binding for common entry
 
-diff --git a/drivers/iio/adc/at91-sama5d2_adc.c b/drivers/iio/adc/at91-sama5d2_adc.c
-index 01ba106..07adb10 100644
---- a/drivers/iio/adc/at91-sama5d2_adc.c
-+++ b/drivers/iio/adc/at91-sama5d2_adc.c
-@@ -113,8 +113,11 @@
- #define AT91_SAMA5D2_CWR	0x44
- /* Channel Gain Register */
- #define AT91_SAMA5D2_CGR	0x48
-+
- /* Channel Offset Register */
- #define AT91_SAMA5D2_COR	0x4c
-+#define AT91_SAMA5D2_COR_DIFF_OFFSET	16
-+
- /* Channel Data Register 0 */
- #define AT91_SAMA5D2_CDR0	0x50
- /* Analog Control Register */
-@@ -142,7 +145,7 @@
- /* Version Register */
- #define AT91_SAMA5D2_VERSION	0xfc
- 
--#define AT91_SAMA5D2_CHAN(num, addr)					\
-+#define AT91_SAMA5D2_CHAN_SINGLE(num, addr)				\
- 	{								\
- 		.type = IIO_VOLTAGE,					\
- 		.channel = num,						\
-@@ -158,6 +161,24 @@
- 		.indexed = 1,						\
- 	}
- 
-+#define AT91_SAMA5D2_CHAN_DIFF(num, num2, addr)				\
-+	{								\
-+		.type = IIO_VOLTAGE,					\
-+		.differential = 1,					\
-+		.channel = num,						\
-+		.channel2 = num2,					\
-+		.address = addr,					\
-+		.scan_type = {						\
-+			.sign = 's',					\
-+			.realbits = 12,					\
-+		},							\
-+		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),		\
-+		.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE),	\
-+		.info_mask_shared_by_all = BIT(IIO_CHAN_INFO_SAMP_FREQ),\
-+		.datasheet_name = "CH"#num"-CH"#num2,			\
-+		.indexed = 1,						\
-+	}
-+
- #define at91_adc_readl(st, reg)		readl_relaxed(st->base + reg)
- #define at91_adc_writel(st, reg, val)	writel_relaxed(val, st->base + reg)
- 
-@@ -187,18 +208,24 @@ struct at91_adc_state {
- };
- 
- static const struct iio_chan_spec at91_adc_channels[] = {
--	AT91_SAMA5D2_CHAN(0, 0x50),
--	AT91_SAMA5D2_CHAN(1, 0x54),
--	AT91_SAMA5D2_CHAN(2, 0x58),
--	AT91_SAMA5D2_CHAN(3, 0x5c),
--	AT91_SAMA5D2_CHAN(4, 0x60),
--	AT91_SAMA5D2_CHAN(5, 0x64),
--	AT91_SAMA5D2_CHAN(6, 0x68),
--	AT91_SAMA5D2_CHAN(7, 0x6c),
--	AT91_SAMA5D2_CHAN(8, 0x70),
--	AT91_SAMA5D2_CHAN(9, 0x74),
--	AT91_SAMA5D2_CHAN(10, 0x78),
--	AT91_SAMA5D2_CHAN(11, 0x7c),
-+	AT91_SAMA5D2_CHAN_SINGLE(0, 0x50),
-+	AT91_SAMA5D2_CHAN_SINGLE(1, 0x54),
-+	AT91_SAMA5D2_CHAN_SINGLE(2, 0x58),
-+	AT91_SAMA5D2_CHAN_SINGLE(3, 0x5c),
-+	AT91_SAMA5D2_CHAN_SINGLE(4, 0x60),
-+	AT91_SAMA5D2_CHAN_SINGLE(5, 0x64),
-+	AT91_SAMA5D2_CHAN_SINGLE(6, 0x68),
-+	AT91_SAMA5D2_CHAN_SINGLE(7, 0x6c),
-+	AT91_SAMA5D2_CHAN_SINGLE(8, 0x70),
-+	AT91_SAMA5D2_CHAN_SINGLE(9, 0x74),
-+	AT91_SAMA5D2_CHAN_SINGLE(10, 0x78),
-+	AT91_SAMA5D2_CHAN_SINGLE(11, 0x7c),
-+	AT91_SAMA5D2_CHAN_DIFF(0, 1, 0x50),
-+	AT91_SAMA5D2_CHAN_DIFF(2, 3, 0x58),
-+	AT91_SAMA5D2_CHAN_DIFF(4, 5, 0x60),
-+	AT91_SAMA5D2_CHAN_DIFF(6, 7, 0x68),
-+	AT91_SAMA5D2_CHAN_DIFF(8, 9, 0x70),
-+	AT91_SAMA5D2_CHAN_DIFF(10, 11, 0x78),
- };
- 
- static unsigned at91_adc_startup_time(unsigned startup_time_min,
-@@ -281,6 +308,7 @@ static int at91_adc_read_raw(struct iio_dev *indio_dev,
- 			     int *val, int *val2, long mask)
- {
- 	struct at91_adc_state *st = iio_priv(indio_dev);
-+	u32 cor = 0;
- 	int ret;
- 
- 	switch (mask) {
-@@ -289,6 +317,11 @@ static int at91_adc_read_raw(struct iio_dev *indio_dev,
- 
- 		st->chan = chan;
- 
-+		if (chan->differential)
-+			cor = (BIT(chan->channel) | BIT(chan->channel2)) <<
-+			      AT91_SAMA5D2_COR_DIFF_OFFSET;
-+
-+		at91_adc_writel(st, AT91_SAMA5D2_COR, cor);
- 		at91_adc_writel(st, AT91_SAMA5D2_CHER, BIT(chan->channel));
- 		at91_adc_writel(st, AT91_SAMA5D2_IER, BIT(chan->channel));
- 		at91_adc_writel(st, AT91_SAMA5D2_CR, AT91_SAMA5D2_CR_START);
-@@ -301,6 +334,8 @@ static int at91_adc_read_raw(struct iio_dev *indio_dev,
- 
- 		if (ret > 0) {
- 			*val = st->conversion_value;
-+			if (chan->scan_type.sign == 's')
-+				*val = sign_extend32(*val, 11);
- 			ret = IIO_VAL_INT;
- 			st->conversion_done = false;
- 		}
-@@ -313,6 +348,8 @@ static int at91_adc_read_raw(struct iio_dev *indio_dev,
- 
- 	case IIO_CHAN_INFO_SCALE:
- 		*val = st->vref_uv / 1000;
-+		if (chan->differential)
-+			*val *= 2;
- 		*val2 = chan->scan_type.realbits;
- 		return IIO_VAL_FRACTIONAL_LOG2;
- 
-@@ -447,8 +484,12 @@ static int at91_adc_probe(struct platform_device *pdev)
- 
- 	at91_adc_writel(st, AT91_SAMA5D2_CR, AT91_SAMA5D2_CR_SWRST);
- 	at91_adc_writel(st, AT91_SAMA5D2_IDR, 0xffffffff);
--	/* Transfer field must be set to 2 according to the datasheet. */
--	at91_adc_writel(st, AT91_SAMA5D2_MR, AT91_SAMA5D2_MR_TRANSFER(2));
-+	/*
-+	 * Transfer field must be set to 2 according to the datasheet and
-+	 * allows different analog settings for each channel.
-+	 */
-+	at91_adc_writel(st, AT91_SAMA5D2_MR,
-+			AT91_SAMA5D2_MR_TRANSFER(2) | AT91_SAMA5D2_MR_ANACH);
- 
- 	at91_adc_setup_samp_freq(st, st->soc_info.min_sample_rate);
- 
--- 
-2.5.0
+>> This doesn't sound like the clock input signal name...
+>>
+>>> > +              Should be "tx-clk" for the MAC TX clock.
+>>> > +              Should be "rx-clk" for the MAC RX clock.
+>>
+>> How can other DWMAC blocks not have these clocks? The glue can't really
+>> add these clocks. It could combine them into one or a new version of
+>> DWMAC could have a different number of clock inputs. So if there is
+>> variation here, then some of the bindings are probably wrong. I guess
+>> the only change I'm suggesting is possibly moving these into common
+>> binding doc.
+>
+> The LPC18xx implementation probably have these clocks as well but the
+> LPC1850 user manual only documents the main clock. Someone with access
+> to the IP block doc from Synopsys should be able to check which clocks
+> the MAC really needs.
+>
+> Rockchip bindings have two clocks named "mac_clk_rx" and "mac_clk_tx".
+> These are probably the same as stm32 needs so maybe use these names
+> and move them into the main doc and update the rockchip binding.
+>
+I think we can use same name. But I have a doubt on moving it in a
+common bindings (maybe I don't well understood). When you say "common
+binding file" is it "stmmac.txt" binding ? If yes does it mean that we
+have to control it inside stmmac driver (no more in glue) ? In this
+case those clocks will become "required" for stm32 and rockship but
+not for others chip. It could create confusion?
+
+Best regards
+
+Alex
+
+>
+> regards,
+> Joachim Eastwood
