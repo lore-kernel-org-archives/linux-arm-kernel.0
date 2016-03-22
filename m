@@ -1,21 +1,37 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Mon, 21 Mar 2016 20:56:27 -0500
-Subject: [PATCH 1/2] serial: amba-pl011: make platform driver generic
-In-Reply-To: <CABymUCPMV+L9sRyVPS4rrimr-PcugvGzgVWOCW63psAWY2hSPg@mail.gmail.com>
-References: <1457920282-14823-1-git-send-email-jun.nie@linaro.org>
- <56F04FC5.7040907@codeaurora.org>
- <CABymUCPMV+L9sRyVPS4rrimr-PcugvGzgVWOCW63psAWY2hSPg@mail.gmail.com>
-Message-ID: <56F0A64B.1060406@codeaurora.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 22 Mar 2016 11:00:02 +0900
+Subject: [PATCH 1/2] ARM: dts: exynos: Add Security SubSystem node to Exynos4
+Message-ID: <1458612003-30284-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jun Nie wrote:
-> Will address this suggestion in next version patch. How about "PL011
-> SBSA" "PL011 ZTE" "PL011 ARM rev1" "PL011 ST rev1"?
+Add Security SubSystem (SSS) node to Exynos4 which provides hardware
+acceleration of AES operations.
 
-That's fine.
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ arch/arm/boot/dts/exynos4.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
+diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+index c679b3cc3c48..39000f9c6b86 100644
+--- a/arch/arm/boot/dts/exynos4.dtsi
++++ b/arch/arm/boot/dts/exynos4.dtsi
+@@ -969,6 +969,15 @@
+ 		#iommu-cells = <0>;
+ 	};
+ 
++	sss: sss at 10830000 {
++		compatible = "samsung,exynos4210-secss";
++		reg = <0x10830000 0x300>;
++		interrupts = <0 112 0>;
++		clocks = <&clock CLK_SSS>;
++		clock-names = "secss";
++		status = "disabled";
++	};
++
+ 	prng: rng at 10830400 {
+ 		compatible = "samsung,exynos4-rng";
+ 		reg = <0x10830400 0x200>;
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, hosted by The Linux Foundation.
+2.5.0
