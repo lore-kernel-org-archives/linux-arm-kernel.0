@@ -1,60 +1,53 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 22 Mar 2016 10:11:28 +0000
-Subject: [PATCH] arm64: mm: allow preemption in copy_to_user_page
-Message-ID: <1458641488-21455-1-git-send-email-mark.rutland@arm.com>
+Date: Tue, 22 Mar 2016 10:11:45 +0000
+Subject: [PATCH] arm64: consistently use p?d_set_huge
+Message-ID: <1458641505-21499-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we disable preemption in copy_to_user_page; a behaviour that
-we inherited from the 32-bit arm code. This was necessary for older
-cores without broadcast data cache maintenance, and ensured that cache
-lines were dirtied and cleaned by the same CPU. On these systems dirty
-cache line migration was not possible, so this was sufficient to
-guarantee coherency.
+Commit 324420bf91f60582 ("arm64: add support for ioremap() block
+mappings") added new p?d_set_huge functions which do the hard work to
+generate and set a correct block entry.
 
-On contemporary systems, cache coherence protocols permit (dirty) cache
-lines to migrate between CPUs as a result of speculation, prefetching,
-and other behaviours. To account for this, in ARMv8 data cache
-maintenance operations are broadcast and affect all data caches in the
-domain associated with the VA (i.e. ISH for kernel and user mappings).
+These differ from open-coded huge page creation in the early page table
+code by explicitly setting the P?D_TYPE_SECT bits (which are implicitly
+retained by mv_sect_prot() for any valid prot), but are otherwise
+identical (and cannot fail on arm64).
 
-In __switch_to we ensure that tasks can be safely migrated in the middle
-of a maintenance sequence, using a dsb(ish) to ensure prior explicit
-memory accesses are observed and cache maintenance operations are
-completed before a task can be run on another CPU.
-
-Given the above, it is not necessary to disable preemption in
-copy_to_user_page. This patch removes the preempt_{disable,enable}
-calls, permitting preemption.
+For simplicity and consistency, make use of these in the initial page
+table creation code.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/mm/flush.c | 4 ----
- 1 file changed, 4 deletions(-)
+ arch/arm64/mm/mmu.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
-index 60585bd..dbd12ea 100644
---- a/arch/arm64/mm/flush.c
-+++ b/arch/arm64/mm/flush.c
-@@ -58,17 +58,13 @@ static void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
-  * Copy user data from/to a page which is mapped into a different processes
-  * address space.  Really, we want to allow our "user space" model to handle
-  * this.
-- *
-- * Note that this code needs to run on the current CPU.
-  */
- void copy_to_user_page(struct vm_area_struct *vma, struct page *page,
- 		       unsigned long uaddr, void *dst, const void *src,
- 		       unsigned long len)
- {
--	preempt_disable();
- 	memcpy(dst, src, len);
- 	flush_ptrace_access(vma, page, uaddr, dst, len);
--	preempt_enable();
- }
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index d2d8b8c..f3e5c74 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -211,8 +211,7 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
+ 		if (((addr | next | phys) & ~SECTION_MASK) == 0 &&
+ 		      block_mappings_allowed(pgtable_alloc)) {
+ 			pmd_t old_pmd =*pmd;
+-			set_pmd(pmd, __pmd(phys |
+-					   pgprot_val(mk_sect_prot(prot))));
++			pmd_set_huge(pmd, phys, prot);
+ 			/*
+ 			 * Check for previous table entries created during
+ 			 * boot (__create_page_tables) and flush them.
+@@ -272,8 +271,7 @@ static void alloc_init_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
+ 		if (use_1G_block(addr, next, phys) &&
+ 		    block_mappings_allowed(pgtable_alloc)) {
+ 			pud_t old_pud = *pud;
+-			set_pud(pud, __pud(phys |
+-					   pgprot_val(mk_sect_prot(prot))));
++			pud_set_huge(pud, phys, prot);
  
- void __sync_icache_dcache(pte_t pte, unsigned long addr)
+ 			/*
+ 			 * If we have an old value for a pud, it will
 -- 
 1.9.1
