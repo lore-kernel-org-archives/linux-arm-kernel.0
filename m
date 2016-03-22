@@ -1,10 +1,10 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 22 Mar 2016 10:40:38 +0900
-Subject: [PATCH 11/13] ARM: dts: koelsch: Remove unnecessary
- clock-output-names properties
+Date: Tue, 22 Mar 2016 10:40:40 +0900
+Subject: [PATCH 13/13] ARM: dts: lager: Remove unnecessary clock-output-names
+ properties
 In-Reply-To: <1458610840-15194-1-git-send-email-horms+renesas@verge.net.au>
 References: <1458610840-15194-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1458610840-15194-12-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1458610840-15194-14-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,14 +20,14 @@ clock-output-names properties and as necessary update the node names.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791-koelsch.dts | 3 +--
+ arch/arm/boot/dts/r8a7790-lager.dts | 3 +--
  1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index 0ad71b81d3a2..6eda659e0d98 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -242,11 +242,10 @@
+diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+index a5828721ab7c..823a119cb1b4 100644
+--- a/arch/arm/boot/dts/r8a7790-lager.dts
++++ b/arch/arm/boot/dts/r8a7790-lager.dts
+@@ -176,11 +176,10 @@
  			  1800000 0>;
  	};
  
