@@ -1,56 +1,63 @@
-From: jroedel@suse.de (Joerg Roedel)
-Date: Tue, 22 Mar 2016 18:55:49 +0100
-Subject: [PATCH 1/2] of: Implement iterator for phandles
-In-Reply-To: <CAL_JsqKjaB_YK3JY053BvcDpfr5pMg4-f53L4QYupuP=kQsLuw@mail.gmail.com>
-References: <1458146527-1133-1-git-send-email-joro@8bytes.org>
- <1458146527-1133-2-git-send-email-joro@8bytes.org>
- <CAL_JsqKjaB_YK3JY053BvcDpfr5pMg4-f53L4QYupuP=kQsLuw@mail.gmail.com>
-Message-ID: <20160322175549.GC3529@suse.de>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Tue, 22 Mar 2016 18:58:27 +0100
+Subject: [PATCH 4/6] of: Introduce of_for_each_phandle() helper macro
+In-Reply-To: <1458669509-7178-1-git-send-email-joro@8bytes.org>
+References: <1458669509-7178-1-git-send-email-joro@8bytes.org>
+Message-ID: <1458669509-7178-5-git-send-email-joro@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+From: Joerg Roedel <jroedel@suse.de>
 
-On Fri, Mar 18, 2016 at 10:54:57AM -0500, Rob Herring wrote:
-> This mostly looks fine to me, but it is kind of a lot of functions
-> just for this one thing. For example, I think the caller can track the
-> index themselves if they care about it. I'd also like to see a more
-> standard style for_each type iterator define rather than open coded
-> while loops.
+With this macro any user can easily iterate over a list of
+phandles. The patch also converts __of_parse_phandle_with_args()
+to make use of the macro.
 
-Thanks for your feedback. I think I worked everything into the patches
-and am about to send a new version.
+The of_count_phandle_with_args() function is not converted,
+because the macro hides the return value of of_phandle_iterator_init(),
+which is needed in there.
 
-> > +struct of_phandle_iterator {
-> > +       const struct device_node *np;
-> > +       const __be32 *list;
-> > +       const __be32 *list_end;
-> > +       const __be32 *phandle_end;
-> > +       phandle phandle;
-> > +       struct device_node *node;
-> 
-> np and node? If you need both, name them based on what they point to.
+Signed-off-by: Joerg Roedel <jroedel@suse.de>
+---
+ drivers/of/base.c  | 7 +------
+ include/linux/of.h | 6 ++++++
+ 2 files changed, 7 insertions(+), 6 deletions(-)
 
-Yes, 'np' is the parent node, while 'node' is the current node the
-iterator points to. The parent node is needed for the error messages
-later.
-
-> > +static inline struct device_node *of_phandle_iterator_node(struct of_phandle_iterator *it)
-> > +{
-> > +       if (!it->node)
-> > +               it->node = of_find_node_by_phandle(it->phandle);
-> > +
-> > +       if (it->node)
-> > +               of_node_get(it->node);
-> 
-> The above function may have already done the get. Not sure offhand.
-
-Yes, it does. But when the iterator moves on the node will be put again.
-So when it is returned here we get an extra reference.
-
-But it doesn't matter anymore as I changed the code to unconditionally
-get the node in of_phandle_iterator_next now.
-
-
-
-	Joerg
+diff --git a/drivers/of/base.c b/drivers/of/base.c
+index 15593cd..471d3d9 100644
+--- a/drivers/of/base.c
++++ b/drivers/of/base.c
+@@ -1542,13 +1542,8 @@ static int __of_parse_phandle_with_args(const struct device_node *np,
+ 	struct of_phandle_iterator it;
+ 	int rc, cur_index = 0;
+ 
+-	rc = of_phandle_iterator_init(&it, np, list_name,
+-				      cells_name, cell_count);
+-	if (rc)
+-		return rc;
+-
+ 	/* Loop over the phandles until all the requested entry is found */
+-	while ((rc = of_phandle_iterator_next(&it)) == 0) {
++	of_for_each_phandle(&it, rc, np, list_name, cells_name, cell_count) {
+ 		/*
+ 		 * All of the error cases bail out of the loop, so at
+ 		 * this point, the parsing is successful. If the requested
+diff --git a/include/linux/of.h b/include/linux/of.h
+index d94388b0..05e38ed 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -908,6 +908,12 @@ static inline int of_property_read_s32(const struct device_node *np,
+ 	return of_property_read_u32(np, propname, (u32*) out_value);
+ }
+ 
++#define of_for_each_phandle(it, err, np, ln, cn, cc)			\
++	for (of_phandle_iterator_init((it), (np), (ln), (cn), (cc)),	\
++	     err = of_phandle_iterator_next(it);			\
++	     err == 0;							\
++	     err = of_phandle_iterator_next(it))
++
+ #define of_property_for_each_u32(np, propname, prop, p, u)	\
+ 	for (prop = of_find_property(np, propname, NULL),	\
+ 		p = of_prop_next_u32(prop, NULL, &u);		\
+-- 
+1.9.1
