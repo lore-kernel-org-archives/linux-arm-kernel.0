@@ -1,129 +1,85 @@
-From: a0131933@ti.com (Lokesh Vutla)
-Date: Tue, 22 Mar 2016 16:59:36 +0530
-Subject: [PATCH 1/2] ARM: dts: am335x: Add initial support for ICEv2 board
-In-Reply-To: <56F115F8.8040202@ti.com>
-References: <1458628657-30468-1-git-send-email-lokeshvutla@ti.com>
- <1458628657-30468-2-git-send-email-lokeshvutla@ti.com>
- <56F115F8.8040202@ti.com>
-Message-ID: <56F12CA0.9010808@ti.com>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Tue, 22 Mar 2016 19:35:25 +0800
+Subject: [PATCH v6 0/4] add reboot mode driver
+Message-ID: <1458646525-491-1-git-send-email-andy.yan@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+This driver parse the reboot commands like "reboot loader"
+and "reboot recovery" to get a boot mode described in the
+device tree , then call the corresponding  write interfae
+to store the boot mode in some place like special register
+or ram , which can be read by the bootloader after system
+reboot.
 
-On Tuesday 22 March 2016 03:22 PM, Grygorii Strashko wrote:
-> On 03/22/2016 08:37 AM, Lokesh Vutla wrote:
->> TI's Industrial Communication Engine EVM is a low cost hardware mainly
->> developed for industrial communication type applications using serial
->> or Ethernet based interfaces. This platform features TI's AM3359 with
->> 800MHz single core Cortex-A8 processor, 256MB DDR3, 64MB SPI flash,
->> 8MB NOR Flash, mmc, usb, can, dual Ethernet ports.
->>
->> For more information, look at HW user guide[1], Data manual[2].
->>
->> Just add basic support for the moment.
->>
->> [1] http://processors.wiki.ti.com/index.php/AM335x_Industrial_Communication_Engine_EVM_Rev2_1_HW_User_Guide
->> [2] http://www.ti.com/lit/ds/symlink/am3359.pdf
->>
->> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
->> ---
->>   .../devicetree/bindings/arm/omap/omap.txt          |   3 +
->>   arch/arm/boot/dts/Makefile                         |   1 +
->>   arch/arm/boot/dts/am335x-icev2.dts                 | 303 +++++++++++++++++++++
->>   3 files changed, 307 insertions(+)
->>   create mode 100644 arch/arm/boot/dts/am335x-icev2.dts
->>
->> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
->> index 21e71a5..20f6d71 100644
->> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
->> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
->> @@ -133,6 +133,9 @@ Boards:
->>   - AM335X Bone : Low cost community board
->>     compatible = "ti,am335x-bone", "ti,am33xx", "ti,omap3"
->>   
->> +- AM3359 ICEv2 : Low cost Industrial Communication Engine EVM.
->> +  compatible = "ti,am3359-icev2", "ti,am33xx", "ti,omap3"
->> +
->>   - AM335X OrionLXm : Substation Automation Platform
->>     compatible = "novatech,am335x-lxm", "ti,am33xx"
->>   
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index 52b34a0..7dcf55e 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -486,6 +486,7 @@ dtb-$(CONFIG_SOC_AM33XX) += \
->>   	am335x-cm-t335.dtb \
->>   	am335x-evm.dtb \
->>   	am335x-evmsk.dtb \
->> +	am335x-icev2.dtb \
->>   	am335x-lxm.dtb \
->>   	am335x-nano.dtb \
->>   	am335x-pepper.dtb \
->> diff --git a/arch/arm/boot/dts/am335x-icev2.dts b/arch/arm/boot/dts/am335x-icev2.dts
->> new file mode 100644
->> index 0000000..59c91e8
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/am335x-icev2.dts
->> @@ -0,0 +1,303 @@
->> +/*
->> + * Copyright (C) 2016 Texas Instruments Incorporated - http://www.ti.com/
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +/*
->> + * AM335x ICE V2 board
->> + * http://www.ti.com/tool/tmdsice3359
->> + */
->> +
->> +/dts-v1/;
->> +
->> +#include "am33xx.dtsi"
->> +
->> +/ {
->> +	model = "TI AM3359 ICE-V2";
->> +	compatible = "ti,am3359-icev2", "ti,am33xx";
->> +
->> +	memory {
->> +		device_type = "memory";
->> +		reg = <0x80000000 0x10000000>; /* 256 MB */
->> +	};
->> +
->> +	vbat: fixedregulator at 0 {
->> +		compatible = "regulator-fixed";
->> +		regulator-name = "vbat";
->> +		regulator-min-microvolt = <5000000>;
->> +		regulator-max-microvolt = <5000000>;
->> +		regulator-boot-on;
->> +	};
->> +
->> +	vtt_fixed: fixedregulator at 1 {
->> +		compatible = "regulator-fixed";
->> +		regulator-name = "vtt";
->> +		regulator-min-microvolt = <1500000>;
->> +		regulator-max-microvolt = <1500000>;
->> +		gpio = <&gpio0 18 GPIO_ACTIVE_HIGH>;
->> +		regulator-always-on;
->> +		regulator-boot-on;
->> +		enable-active-high;
->> +	};
->> +
->> +	leds {
-> 
-> Could you split this node on two leds at 0 and led at 1 and and move
-> all tpic2810 leds under leds0 and  all gpio leds under leds at 1?
-> 
-> otherwise gpio leds will not work because tpic2810 is
-> configured as module and so leds-gpio will be deferred until
-> tpic2810 is loaded (but it can be never loaded ;)
-> 
-> led at x numeration has to be started from 0 for each leds at Y.
+This is commonly done on Android based devices, in order to
+reboot the device into fastboot or recovery mode.
 
-Hmm I get your point. I was always doing insmod of tpic2810 before doing
-insmod of leds-gpio. Will fix it and repost.
 
-Thanks and regards,
-Lokesh
+Changes in v6:
+- fix a typo with "property"
+- describe property "mask" more clear
+
+Changes in v5:
+- delete a unnecessary blank line in syscon-reboot-mode.txt
+- rename mode-fastoboot to mode-bootloader in syscon-reboot-mode.txt
+- rename macro BOOT_LOADER to BOOT_BL_DOWNLOAD, which gives a more clear mean
+- use two blank space under help in Kconfig
+- use unsigned int instead of int for member magic in struct mode_info
+
+Changes in v4:
+- remove mode-maskrom
+- rename mode-fastboot to mode-bootloader to keep compatible with the exiting Android device
+- make this driver depends on OF to avoid kbuild test error
+
+Changes in v3:
+- descirbe all reboot mode as properity instead of subnode
+- scan multi properities
+- add mask value for some platform which only use some bits of the register
+  to store boot mode magic value
+- descirbe all reboot mode as property instead of subnode
+- add rk3036 support
+- descirbe all reboot mode as properity instead of subnode
+
+Changes in v2:
+- move to dir drivers/power/reset/
+- make syscon-reboot-mode a generic driver
+- make this node as a subnode of PMU
+- make this node as a subnode of pmugrf
+
+Changes in v1:
+- fix the embarrassed compile warning
+- correct the maskrom magic number
+- check for the normal reboot
+- correct the maskrom magic number
+- use macro defined in rockchip_boot-mode.h for reboot-mode DT node
+
+Andy Yan (4):
+  dt-bindings: power: reset: add document for reboot-mode driver
+  power: reset: add reboot mode driver
+  ARM: dts: rockchip: add syscon-reboot-mode DT node
+  ARM64: dts: rockchip: add syscon-reboot-mode DT node
+
+ .../bindings/power/reset/reboot-mode.txt           |  24 +++++
+ .../bindings/power/reset/syscon-reboot-mode.txt    |  35 +++++++
+ arch/arm/boot/dts/rk3036.dtsi                      |  11 ++-
+ arch/arm/boot/dts/rk3288.dtsi                      |  10 ++
+ arch/arm/boot/dts/rk3xxx.dtsi                      |  12 ++-
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi           |  12 ++-
+ drivers/power/reset/Kconfig                        |  13 +++
+ drivers/power/reset/Makefile                       |   2 +
+ drivers/power/reset/reboot-mode.c                  | 106 +++++++++++++++++++++
+ drivers/power/reset/reboot-mode.h                  |   6 ++
+ drivers/power/reset/syscon-reboot-mode.c           |  65 +++++++++++++
+ include/dt-bindings/soc/rockchip_boot-mode.h       |  15 +++
+ 12 files changed, 308 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power/reset/reboot-mode.txt
+ create mode 100644 Documentation/devicetree/bindings/power/reset/syscon-reboot-mode.txt
+ create mode 100644 drivers/power/reset/reboot-mode.c
+ create mode 100644 drivers/power/reset/reboot-mode.h
+ create mode 100644 drivers/power/reset/syscon-reboot-mode.c
+ create mode 100644 include/dt-bindings/soc/rockchip_boot-mode.h
+
+-- 
+1.9.1
