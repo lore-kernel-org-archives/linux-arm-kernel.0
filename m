@@ -1,76 +1,100 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Tue, 22 Mar 2016 10:32:22 -0700
-Subject: [PATCH v5 3/6] ACPI: parse SPCR and enable matching console
-In-Reply-To: <20160322165122.GB10616@yury-N73SV>
-References: <1458643595-14719-1-git-send-email-aleksey.makarov@linaro.org>
- <1458643595-14719-4-git-send-email-aleksey.makarov@linaro.org>
- <20160322122650.GA10616@yury-N73SV> <56F15D40.9020401@hurleysoftware.com>
- <20160322165122.GB10616@yury-N73SV>
-Message-ID: <56F181A6.3070502@hurleysoftware.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 22 Mar 2016 10:37:14 -0700
+Subject: [PATCH] arm64/dma-mapping: Add DMA_ATTR_ALLOC_SINGLE_PAGES support
+In-Reply-To: <20160321180147.GR23397@arm.com>
+References: <1456944866-15990-1-git-send-email-yong.wu@mediatek.com>
+ <20160321180147.GR23397@arm.com>
+Message-ID: <CAD=FV=WL-OgE6D+8m3A8ZSJ8HgVZJw_+7uBce=qPh80LaxQKbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/22/2016 09:51 AM, Yury Norov wrote:
-> On Tue, Mar 22, 2016 at 07:57:04AM -0700, Peter Hurley wrote:
-> 
-> [...]
-> 
->>>> +static bool init_earlycon;
->>>> +
->>>> +void __init init_spcr_earlycon(void)
->>>> +{
->>>> +	init_earlycon = true;
->>>> +}
->>>> +
->>>
->>> 1. I see you keep in mind multiple access.
+Will,
+
+On Mon, Mar 21, 2016 at 11:01 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Thu, Mar 03, 2016 at 02:54:26AM +0800, Yong Wu wrote:
+>> Sometimes it is not worth for the iommu allocating big chunks.
+>> Here we enable DMA_ATTR_ALLOC_SINGLE_PAGES which could help avoid to
+>> allocate big chunks while iommu allocating buffer.
 >>
->> Concurrent access is not a concern here: only the boot cpu is running
->> and intrs are off.
+>> More information about this attribute, please check Doug's commit[1].
 >>
->> The "init_earlycon" flag is used because parsing the "earlycon" early param
->> is earlier than parsing ACPI tables.
+>> [1]: https://lkml.org/lkml/2016/1/11/720
 >>
-> 
-> OK got it. My concern is that it's generic code, and parse_spcr() is public
-> function. I think corresponding comment is needed at least. The other option is
-> to make it race-safe and forget. I prefer second one, moreover it's 2 simple
-> changes.
-
-Earlycon is generic only in the sense of platform independence, not in the
-sense of temporal independence. There is no serialization in earlycon, anywhere.
-Adding serialization will unnecessarily confuse casual observers into
-believing it is necessary.
-
-An argument could be made that earlycon needs some standalone documentation,
-but I don't think this patch needs to be that.
-
-
->>  Then you'd worry about race
->>> conditions as well. In this case, I'd consider atomic access to
->>> variable.
->>> 2. It seems you need is_init() helper too.
->>>
->>>> +int __init parse_spcr(void)
->>>> +{
->>>> +	static char opts[64];
->>>> +	struct acpi_table_spcr *table;
->>>> +	acpi_size table_size;
->>>> +	acpi_status status;
->>>> +	char *uart;
->>>> +	char *iotype;
->>>> +	int baud_rate;
->>>> +	int err = 0;
->>>
->>> You can do not initialize 'err'.
+>> Cc: Robin Murphy <robin.murphy@arm.com>
+>> Suggested-by: Douglas Anderson <dianders@chromium.org>
+>> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+>> ---
 >>
->> Why?
+>> Our video drivers may soon use this.
 >>
-> 
-> Because there's no path here that doesn't init err with some value.
-> So this initialization is useless waste of cycles.
+>>  arch/arm64/mm/dma-mapping.c |  4 ++--
+>>  drivers/iommu/dma-iommu.c   | 14 ++++++++++----
+>>  include/linux/dma-iommu.h   |  4 ++--
+>>  3 files changed, 14 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+>> index 331c4ca..3225e3ca 100644
+>> --- a/arch/arm64/mm/dma-mapping.c
+>> +++ b/arch/arm64/mm/dma-mapping.c
+>> @@ -562,8 +562,8 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
+>>               struct page **pages;
+>>               pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, coherent);
+>>
+>> -             pages = iommu_dma_alloc(dev, iosize, gfp, ioprot, handle,
+>> -                                     flush_page);
+>> +             pages = iommu_dma_alloc(dev, iosize, gfp, ioprot, attrs,
+>> +                                     handle, flush_page);
+>>               if (!pages)
+>>                       return NULL;
+>>
+>> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+>> index 72d6182..3569cb6 100644
+>> --- a/drivers/iommu/dma-iommu.c
+>> +++ b/drivers/iommu/dma-iommu.c
+>> @@ -190,7 +190,8 @@ static void __iommu_dma_free_pages(struct page **pages, int count)
+>>       kvfree(pages);
+>>  }
+>>
+>> -static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp)
+>> +static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp,
+>> +                                          struct dma_attrs *attrs)
+>>  {
+>>       struct page **pages;
+>>       unsigned int i = 0, array_size = count * sizeof(*pages);
+>> @@ -203,6 +204,10 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp)
+>>       if (!pages)
+>>               return NULL;
+>>
+>> +     /* Go straight to 4K chunks if caller says it's OK. */
+>> +     if (dma_get_attr(DMA_ATTR_ALLOC_SINGLE_PAGES, attrs))
+>> +             order = 0;
+>
+> I have a slight snag with this, in that you don't consult the IOMMU
+> pgsize_bitmap at any point, and assume that it can map pages at the
+> same granularity as the CPU. The documentation for
+> DMA_ATTR_ALLOC_SINGLE_PAGES seems to be weaker than that.
 
-Ok.
+Interesting.  Is that something that exists in the real world?  ...or
+something you think is coming soon?
 
-Regards,
-Peter Hurley
+I'd argue that such a case existed in the real world then probably
+we're already broken.  Unless I'm misreading, existing code will
+already fall all the way back to order 0 allocations.  ...so while
+existing code might could work if it was called on a totally
+unfragmented system, it would already break once some fragmentation
+was introduced.
+
+I'm not saying that we shouldn't fix the code to handle this, I'm just
+saying that Yong Wu's patch doesn't appear to break any code that
+wasn't already broken.  That might be reason to land his code first,
+then debate the finer points of whether IOMMUs with less granularity
+are likely to exist and whether we need to add complexity to the code
+to handle them (or just detect this case and return an error).
+
+>From looking at a WIP patch provided to me by Yong Wu, it looks as if
+he thinks several more functions need to change to handle this need
+for IOMMUs that can't handle small pages.  That seems to be further
+evidence that the work should be done in a separate patch.
+
+
+Doug
