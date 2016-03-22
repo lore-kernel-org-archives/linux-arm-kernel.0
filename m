@@ -1,49 +1,29 @@
-From: ashok.sekar@broadcom.com (Ashok Sekar)
-Date: Tue, 22 Mar 2016 21:01:55 +0530
-Subject: [PATCH 1/5] arm64/perf: Changed events naming convention for
- uniformity
-In-Reply-To: <20160322094732.GB31126@arm.com>
-References: <1458133309-17045-1-git-send-email-ashoks@broadcom.com>
- <1458133309-17045-2-git-send-email-ashoks@broadcom.com>
- <20160322094732.GB31126@arm.com>
-Message-ID: <CANK38rZypVwh7F=CD6KMs8GqNMy_geejYHVphjW26Jpd=YRe5A@mail.gmail.com>
+From: scott.wood@nxp.com (Scott Wood)
+Date: Tue, 22 Mar 2016 16:00:19 +0000
+Subject: [PATCH] gpio/ls1043a: Correct ls1043a gpio nodes compatible in
+ dts file
+References: <1457600240-47141-1-git-send-email-Gang.Liu@nxp.com>
+ <1457600240-47141-2-git-send-email-Gang.Liu@nxp.com>
+ <DB5PR0401MB192833673541757889C889C1918A0@DB5PR0401MB1928.eurprd04.prod.outlook.com>
+ <DB4PR04MB26636780AB3453AE0D3E218828B0@DB4PR04MB266.eurprd04.prod.outlook.com>
+ <DB5PR0401MB19283736845DCFD5F4186729918C0@DB5PR0401MB1928.eurprd04.prod.outlook.com>
+ <DB4PR04MB2660ED371AE3599B6EC8F8E82800@DB4PR04MB266.eurprd04.prod.outlook.com>
+Message-ID: <DB5PR0401MB19284B4AAA63BD31A605AC7691800@DB5PR0401MB1928.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On 03/22/2016 09:03 AM, Gang Liu wrote:
+> Hi, Scott,
+> 
+> I think you mean that GPIO node needs two compatibles, one for general GPIO IP block ("fsl,qoriq-gpio")
+> and another for chip-specific ("fsl,ls1043a-gpio").
+> The driver can just include general GPIO IP block compatible, and if there is a errata for ls1043 GPIO, the
+> chip-specific compatible can be used to fix the errata, right?
 
-On Tue, Mar 22, 2016 at 3:17 PM, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Ashok,
->
-> On Wed, Mar 16, 2016 at 06:01:45AM -0700, Ashok Kumar wrote:
->> Changed events name to the format _L1/2/3I/D_CACHE/TLB_.
->> For e.g. moved ARMV8_PMUV3_PERFCTR_L1_DCACHE_REFILL to
->> ARMV8_PMUV3_PERFCTR_L1D_CACHE_REFILL in line with the already
->> existing definitions like ARMV8_PMUV3_PERFCTR_L3D_CACHE_WB.
->>
->> Added _ACCESS keyword to some of the definitions
->> (ARMV8_PMUV3_PERFCTR_L1D_TLB, ARMV8_PMUV3_PERFCTR_L1I_TLB, etc)
->> in line with the already existing definitions like
->> ARMV8_PMUV3_PERFCTR_L1_DCACHE_ACCESS for clarity.
->>
->> Corrected typo L21 to L2I in ARMV8_PMUV3_PERFCTR_L21_TLB_REFILL,
->> ARMV8_PMUV3_PERFCTR_L21_TLB
->
-> I don't mind renaming these events, but could we have them matching the
-> names in the ARM ARM, please? For example:
->
->> -#define ARMV8_PMUV3_PERFCTR_L1D_TLB                          0x25
->> -#define ARMV8_PMUV3_PERFCTR_L1I_TLB                          0x26
->> -#define ARMV8_PMUV3_PERFCTR_L2I_CACHE                                0x27
->> +#define ARMV8_PMUV3_PERFCTR_L1D_TLB_ACCESS                   0x25
->> +#define ARMV8_PMUV3_PERFCTR_L1I_TLB_ACCESS                   0x26
->> +#define ARMV8_PMUV3_PERFCTR_L2I_CACHE_ACCESS                 0x27
->
-> These really are called "L1D_TLB, L1I_TLB and L2I_CACHE" without the
-> "_ACCESS" suffix.
-Sure, I will post a v2 as per ARM ARM. I just added it for verbosity.
+Yes.
 
-Thanks,
-Ashok
->
-> Will
+> If it's right, do you think the "fsl,ls1043a-gpio" and "fsl,qoriq-gpio" are ok for our Layerscape platforms?
+
+Yes.
+
+-Scott
