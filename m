@@ -1,51 +1,150 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Tue, 22 Mar 2016 09:50:22 +0000
-Subject: [PATCH v4 2/8] Documentation: arm: define DT cpu capacity bindings
-In-Reply-To: <20160321175112.GY2566@sirena.org.uk>
-References: <1458311054-13524-1-git-send-email-juri.lelli@arm.com>
- <1458311054-13524-3-git-send-email-juri.lelli@arm.com>
- <56EC3F9E.4050209@nvidia.com> <20160321105330.GB12319@e106622-lin>
- <CAKfTPtDP3zMR+zbvvqJCBvJ5r44do8NS03wC7pAejxPd0zHTMA@mail.gmail.com>
- <20160321114956.GD12319@e106622-lin>
- <20160321121210.GQ2566@sirena.org.uk>
- <20160321172452.GE12319@e106622-lin>
- <20160321175112.GY2566@sirena.org.uk>
-Message-ID: <20160322095022.GA23909@e106622-lin>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 22 Mar 2016 11:52:56 +0200
+Subject: [PATCH 1/2] ARM: dts: am335x: Add initial support for ICEv2 board
+In-Reply-To: <1458628657-30468-2-git-send-email-lokeshvutla@ti.com>
+References: <1458628657-30468-1-git-send-email-lokeshvutla@ti.com>
+ <1458628657-30468-2-git-send-email-lokeshvutla@ti.com>
+Message-ID: <56F115F8.8040202@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/03/16 17:51, Mark Brown wrote:
-> On Mon, Mar 21, 2016 at 05:24:52PM +0000, Juri Lelli wrote:
+On 03/22/2016 08:37 AM, Lokesh Vutla wrote:
+> TI's Industrial Communication Engine EVM is a low cost hardware mainly
+> developed for industrial communication type applications using serial
+> or Ethernet based interfaces. This platform features TI's AM3359 with
+> 800MHz single core Cortex-A8 processor, 256MB DDR3, 64MB SPI flash,
+> 8MB NOR Flash, mmc, usb, can, dual Ethernet ports.
 > 
-> > I think this should work, but we have to understand how do we obtain the
-> > max frequency of each cluster while parsing DT. OPP bindings are
-> > helpful, but AFAIK there are platforms for which firmware is responsible
-> > for setting up and advertise available OPPs. I'm not sure if this
-> > happens later on during the boot process. We might still be able to use
-> > the clock-frequency property in this case, but that might need changing
-> > again if the top OPP gets removed/changed.
+> For more information, look at HW user guide[1], Data manual[2].
 > 
-> > OTH, we might simply want to say that capacity values are to be obtained
-> > once the platform is "stable" (no additional changes to configuration,
-> > OPPs, etc.). But this is maybe not acceptable?
+> Just add basic support for the moment.
 > 
-> How about we just punt and let the cpufreq driver tell us - it can parse
-> DT, use built in tables or whatever?  We could even remember the raw
-> values and recalculate if it ever decides to change for some reason.
-> Until cpufreq comes up we'll be stuck at whatever OPP that we're at on
-> startup which may not match whatever we define the numbers relative to
-> anyway.
+> [1] http://processors.wiki.ti.com/index.php/AM335x_Industrial_Communication_Engine_EVM_Rev2_1_HW_User_Guide
+> [2] http://www.ti.com/lit/ds/symlink/am3359.pdf
+> 
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> ---
+>   .../devicetree/bindings/arm/omap/omap.txt          |   3 +
+>   arch/arm/boot/dts/Makefile                         |   1 +
+>   arch/arm/boot/dts/am335x-icev2.dts                 | 303 +++++++++++++++++++++
+>   3 files changed, 307 insertions(+)
+>   create mode 100644 arch/arm/boot/dts/am335x-icev2.dts
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
+> index 21e71a5..20f6d71 100644
+> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
+> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
+> @@ -133,6 +133,9 @@ Boards:
+>   - AM335X Bone : Low cost community board
+>     compatible = "ti,am335x-bone", "ti,am33xx", "ti,omap3"
+>   
+> +- AM3359 ICEv2 : Low cost Industrial Communication Engine EVM.
+> +  compatible = "ti,am3359-icev2", "ti,am33xx", "ti,omap3"
+> +
+>   - AM335X OrionLXm : Substation Automation Platform
+>     compatible = "novatech,am335x-lxm", "ti,am33xx"
+>   
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 52b34a0..7dcf55e 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -486,6 +486,7 @@ dtb-$(CONFIG_SOC_AM33XX) += \
+>   	am335x-cm-t335.dtb \
+>   	am335x-evm.dtb \
+>   	am335x-evmsk.dtb \
+> +	am335x-icev2.dtb \
+>   	am335x-lxm.dtb \
+>   	am335x-nano.dtb \
+>   	am335x-pepper.dtb \
+> diff --git a/arch/arm/boot/dts/am335x-icev2.dts b/arch/arm/boot/dts/am335x-icev2.dts
+> new file mode 100644
+> index 0000000..59c91e8
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/am335x-icev2.dts
+> @@ -0,0 +1,303 @@
+> +/*
+> + * Copyright (C) 2016 Texas Instruments Incorporated - http://www.ti.com/
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +/*
+> + * AM335x ICE V2 board
+> + * http://www.ti.com/tool/tmdsice3359
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "am33xx.dtsi"
+> +
+> +/ {
+> +	model = "TI AM3359 ICE-V2";
+> +	compatible = "ti,am3359-icev2", "ti,am33xx";
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x80000000 0x10000000>; /* 256 MB */
+> +	};
+> +
+> +	vbat: fixedregulator at 0 {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "vbat";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		regulator-boot-on;
+> +	};
+> +
+> +	vtt_fixed: fixedregulator at 1 {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "vtt";
+> +		regulator-min-microvolt = <1500000>;
+> +		regulator-max-microvolt = <1500000>;
+> +		gpio = <&gpio0 18 GPIO_ACTIVE_HIGH>;
+> +		regulator-always-on;
+> +		regulator-boot-on;
+> +		enable-active-high;
+> +	};
+> +
+> +	leds {
+
+Could you split this node on two leds at 0 and led at 1 and and move
+all tpic2810 leds under leds0 and  all gpio leds under leds at 1?
+
+otherwise gpio leds will not work because tpic2810 is
+configured as module and so leds-gpio will be deferred until
+tpic2810 is loaded (but it can be never loaded ;)
+
+led at x numeration has to be started from 0 for each leds at Y.
+
+> +		compatible = "gpio-leds";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&user_leds>;
+> +
+> +		led at 0 {
+> +			label = "out0";
+> +			gpios = <&tpic2810 0 GPIO_ACTIVE_HIGH>;
+> +			default-state = "off";
+> +		};
+> +
+
+[...]
+
+> +		/* Tricolor status LEDs */
+> +		led at 8 {
+> +			label = "status0:red:cpu0";
+> +			gpios = <&gpio0 17 GPIO_ACTIVE_HIGH>;
+> +			default-state = "off";
+> +			linux,default-trigger = "cpu0";
+> +		};
+> +
+
+[...]
+
 > 
 
-OK, I'll try and see how that can be done.
 
-Thanks,
-
-- Juri
-
-> > Also, I fear that for variants of a particular implementation we will
-> > still have to redo the profiling anyway (like we alreaady did for Juno
-> > and Juno-r2 for example).
-> 
-> This sometimes happens either through binning or through board design
-> decisions rather than through new silicon so we might be able to reuse.
+-- 
+regards,
+-grygorii
