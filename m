@@ -1,93 +1,88 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 22 Mar 2016 17:42:00 +0100
-Subject: [PATCH] ARM: dts: orion5x: add device tree for kurobox-pro
-In-Reply-To: <1458656898-16183-1-git-send-email-rogershimizu@gmail.com>
-References: <1458656898-16183-1-git-send-email-rogershimizu@gmail.com>
-Message-ID: <20160322164200.GH5250@lunn.ch>
+From: sr@denx.de (Stefan Roese)
+Date: Tue, 22 Mar 2016 17:44:52 +0100
+Subject: [PATCH v2] spi: orion.c: Add direct access mode
+In-Reply-To: <20160322173546.40d24cc2@free-electrons.com>
+References: <1458663893-13766-1-git-send-email-sr@denx.de>
+ <20160322173546.40d24cc2@free-electrons.com>
+Message-ID: <56F17684.2010307@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 22, 2016 at 11:28:18PM +0900, Roger Shimizu wrote:
-> Add dts file to support Buffalo/Revogear Kurobox-Pro, which is marvell
-> orion5x based 3.5" HDD NAS.
-> 
-> It's a quite old product and already discontinued. So there's no
-> official website for it. But it was an early product which used marvell
-> orion5x 88F5182 chipset, it's popular in the community.
-> Some unofficial site:
->   - http://buffalo.nas-central.org/wiki/Category:KuroboxPro
->   - http://nice.kaze.com/KUROPRO_ProductSpecifications.pdf
-> 
-> This device tree is based on the board file:
->   arch/arm/mach-orion5x/kurobox_pro-setup.c
+Hi Thomas,
 
-Hi Roger
+On 22.03.2016 17:35, Thomas Petazzoni wrote:
+> On Tue, 22 Mar 2016 17:24:53 +0100, Stefan Roese wrote:
+>> This patch adds support for the direct access mode to the Orion SPI
+>> driver which is used on the Marvell Armada based SoCs. In this direct
+>> mode, all data written to (or read from) a specifically mapped MBus
+>> window (linked to one SPI chip-select on one of the SPI controllers)
+>> will be transferred directly to the SPI bus. Without the need to control
+>> the SPI registers in between. This can improve the SPI transfer rate in
+>> such cases.
+>>
+>> Both, direct-read and -write mode are supported. But only the write
+>> mode has been tested. This mode especially benefits from the SPI direct
+>> mode, as the data bytes are written head-to-head to the SPI bus,
+>> without any additional addresses.
+>>
+>> One use-case for this direct write mode is, programming a FPGA bitstream
+>> image into the FPGA connected to the SPI bus at maximum speed.
+>>
+>> This mode is described in chapter "22.5.2 Direct Write to SPI" in the
+>> Marvell Armada XP Functional Spec Datasheet.
+>>
+>> Signed-off-by: Stefan Roese <sr@denx.de>
+>> Cc: Nadav Haklai <nadavh@marvell.com>
+>> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> Cc: Mark Brown <broonie@kernel.org>
+>> ---
+>> Mark, sorry for the huge delay for v2 of this direct-access patch.
+>> I was busy with other tasks in the meantime. And only found now
+>> the time to address (hopefully all) of your comments.
+>
+> Thanks for this new version! To be honest, I don't remember all the
+> discussions that took place on the v1, so maybe I'll just be re-asking
+> the same question.
 
-This looks good, but lets try to figure out the NAND.
+No problem. Thanks for looking into this.
 
-> However, the NAND device, which is supported by board file, is not
-> supported by device tree yet. So I still want to keep the board file
-> for the time being.
+> Has there been any discussion on whether dynamically adding the MBus
+> window is a good idea, as opposed to statically defining it in the
+> board .dts ?
 
-> +&devbus_cs0 {
-> +	status = "disabled";
-> +	devbus,keep-config;
-> +
-> +	/* According to board file: arch/arm/mach-orion5x/kurobox_pro-setup.c
-> +	 * There's a NAND flash on Device Bus CS0, but it fails on probing,
-> +	 * so it's disabled here.
-> +	 */
-> +
-> +	flash at 0 {
-> +		compatible = "cfi-flash";
-> +		reg = <0 0x1000000>;
-> +		bank-width = <1>;
-> +	};
-> +};
+Yes. My 1st patch version (still RFC) used fixed MBus windows instead:
 
-kurobox_pro-setup.c says:
+http://www.spinics.net/lists/linux-spi/msg06536.html
 
-/*
- * 256K NOR flash Device bus boot chip select
- */
+Mark suggested to use dynamic windows, so that one area could be
+used for all SPI devices by switching (re-configuring) the MBus
+window:
 
-#define KUROBOX_PRO_NOR_BOOT_BASE       0xf4000000
-#define KUROBOX_PRO_NOR_BOOT_SIZE       SZ_256K
+http://www.spinics.net/lists/linux-spi/msg06537.html
 
-/*
- * 256M NAND flash on Device bus chip select 1
- */
+> So far, the only driver that was using dynamically allocated MBus is
+> the PCIe controller driver, because there is no way in advanced to know
+> the number and memory window requirements of the PCIe devices that will
+> be connected to the system.
+>
+> For all other windows (BootROM, crypto SRAM and more recently network
+> related SRAM), we are using statically allocated windows.
+>
+> So I'm wondering if we should add this additional DT binding that
+> describes the necessary information to allow the driver to dynamically
+> allocate a window, or if we shouldn't rely on a statically allocated
+> window.
+>
+> This is really an open discussion, I don't have a very well-defined
+> opinion on the matter.
 
-#define KUROBOX_PRO_NAND_BASE           0xfc000000
-#define KUROBOX_PRO_NAND_SIZE           SZ_2M
+I also have no real preference here.
 
-So there is a NOR on CS0, not NAND.
+> Let's Cc: Arnd Bergmann on this question, he has followed the whole
+> MBus story and might have some interesting insights.
 
-static struct platform_device kurobox_pro_nand_flash = {
-        .name           = "orion_nand",
-        .id             = -1,
-        .dev            = {
-                .platform_data  = &kurobox_pro_nand_data,
-        },
-        .resource       = &kurobox_pro_nand_resource,
-        .num_resources  = 1,
-};
+Good idea.
 
-The name "orion_nand" means this fits with the driver:
-
-drivers/mtd/nand/orion_nand.c:
-
-static struct platform_driver orion_nand_driver = {
-        .remove         = orion_nand_remove,
-        .driver         = {
-                .name   = "orion_nand",
-                .of_match_table = of_match_ptr(orion_nand_of_match_table),
-        },
-};
-
-And this uses compatible string         { .compatible = "marvell,orion-nand", },
-
-We need to add this to the dts file. The kirkwood.dtsi might be a good
-example to copy.
-
-	Andrew
+Thanks,
+Stefan
