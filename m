@@ -1,235 +1,281 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 22 Mar 2016 14:23:17 -0600
-Subject: [PATCH 09/14] coresight: tmc: adding mode of operation for link/sinks
+Date: Tue, 22 Mar 2016 14:23:20 -0600
+Subject: [PATCH 12/14] coresight: tmc: implementing TMC-ETF AUX space API
 In-Reply-To: <1458678202-3447-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1458678202-3447-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1458678202-3447-10-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1458678202-3447-13-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Moving tmc_drvdata::enable to a local_t mode.  That way the
-sink interface is aware of it's orgin and the foundation for
-mutual exclusion between the sysFS and Perf interface can be
-laid out.
+This patch implement the AUX area interfaces required to
+use the TMC (configured as an ETF) from the Perf sub-system.
+
+The heuristic is heavily borrowed from the ETB10 implementation.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-tmc-etf.c | 29 ++++++++++++++++++++-----
- drivers/hwtracing/coresight/coresight-tmc-etr.c | 25 +++++++++++++++++----
- drivers/hwtracing/coresight/coresight-tmc.h     |  5 +++--
- 3 files changed, 47 insertions(+), 12 deletions(-)
+ drivers/hwtracing/coresight/coresight-tmc-etf.c | 198 ++++++++++++++++++++++++
+ drivers/hwtracing/coresight/coresight-tmc.h     |  21 +++
+ 2 files changed, 219 insertions(+)
 
 diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-index e5d67e01409c..a88c76d7f473 100644
+index 2cad1aa1949f..79762b2c6114 100644
 --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
 +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-@@ -108,6 +108,7 @@ static void tmc_etf_disable_hw(struct tmc_drvdata *drvdata)
+@@ -15,7 +15,9 @@
+  * this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
  
- static int tmc_enable_etf_sink(struct coresight_device *csdev, u32 mode)
- {
-+	u32 val;
- 	bool allocated = false;
- 	char *buf = NULL;
- 	unsigned long flags;
-@@ -125,6 +126,15 @@ static int tmc_enable_etf_sink(struct coresight_device *csdev, u32 mode)
- 		return -EBUSY;
- 	}
++#include <linux/circ_buf.h>
+ #include <linux/coresight.h>
++#include <linux/perf_event.h>
+ #include <linux/slab.h>
  
-+	val = local_cmpxchg(&drvdata->mode, CS_MODE_DISABLED, mode);
-+	/*
-+	 * In sysFS mode we can have multiple writers per sink.  Since this
-+	 * sink is already enabled no memory is needed and the HW need not be
-+	 * touched.
-+	 */
-+	if (val == CS_MODE_SYSFS)
-+		goto out;
-+
- 	/*
- 	 * If drvdata::buf isn't NULL, memory was allocated for a previous
- 	 * trace run but wasn't read.  If so simply zero-out the memory.
-@@ -141,9 +151,9 @@ static int tmc_enable_etf_sink(struct coresight_device *csdev, u32 mode)
- 	}
- 
- 	tmc_etb_enable_hw(drvdata);
--	drvdata->enable = true;
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
-+out:
- 	/* Free memory outside the spinlock if need be */
- 	if (!allocated)
- 		kfree(buf);
-@@ -154,6 +164,7 @@ static int tmc_enable_etf_sink(struct coresight_device *csdev, u32 mode)
- 
- static void tmc_disable_etf_sink(struct coresight_device *csdev)
- {
-+	u32 val;
- 	unsigned long flags;
- 	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
-@@ -163,9 +174,15 @@ static void tmc_disable_etf_sink(struct coresight_device *csdev)
- 		return;
- 	}
- 
-+	val = local_cmpxchg(&drvdata->mode, CS_MODE_SYSFS, CS_MODE_DISABLED);
-+	/* Nothing to do, the TMC was already disabled */
-+	if (val == CS_MODE_DISABLED)
-+		goto out;
-+
- 	tmc_etb_disable_hw(drvdata);
- 	tmc_etb_dump_hw(drvdata);
--	drvdata->enable = false;
-+
-+out:
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
- 	dev_info(drvdata->dev, "TMC-ETB/ETF disabled\n");
-@@ -184,7 +201,7 @@ static int tmc_enable_etf_link(struct coresight_device *csdev,
- 	}
- 
- 	tmc_etf_enable_hw(drvdata);
--	drvdata->enable = true;
-+	local_set(&drvdata->mode, CS_MODE_SYSFS);
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
- 	dev_info(drvdata->dev, "TMC-ETF enabled\n");
-@@ -204,7 +221,7 @@ static void tmc_disable_etf_link(struct coresight_device *csdev,
- 	}
- 
- 	tmc_etf_disable_hw(drvdata);
--	drvdata->enable = false;
-+	local_set(&drvdata->mode, CS_MODE_DISABLED);
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
+ #include "coresight-priv.h"
+@@ -281,9 +283,205 @@ static void tmc_disable_etf_link(struct coresight_device *csdev,
  	dev_info(drvdata->dev, "TMC disabled\n");
-@@ -237,7 +254,7 @@ int tmc_read_prepare_etf(struct tmc_drvdata *drvdata)
- 	spin_lock_irqsave(&drvdata->spinlock, flags);
+ }
  
- 	/* The TMC isn't enabled, so there is no need to disable it */
--	if (!drvdata->enable) {
-+	if (local_read(&drvdata->mode) == CS_MODE_DISABLED) {
- 		/*
- 		 * The ETB/ETF is disabled already.  If drvdata::buf is NULL
- 		 * trace data has been harvested.
-@@ -288,7 +305,7 @@ int tmc_read_unprepare_etf(struct tmc_drvdata *drvdata)
- 	}
- 
- 	/* The TMC isn't enabled, so there is no need to enable it */
--	if (!drvdata->enable) {
-+	if (local_read(&drvdata->mode) == CS_MODE_DISABLED) {
- 		/*
- 		 * The ETB/ETF is not tracing and the buffer was just read.
- 		 * As such prepare to free the trace buffer.
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-index c4962568276e..540d0b96a958 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-@@ -84,6 +84,7 @@ static void tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
- 
- static int tmc_enable_etr_sink(struct coresight_device *csdev, u32 mode)
- {
-+	u32 val;
- 	bool allocated = false;
- 	unsigned long flags;
- 	void __iomem *vaddr;
-@@ -107,6 +108,15 @@ static int tmc_enable_etr_sink(struct coresight_device *csdev, u32 mode)
- 		return -EBUSY;
- 	}
- 
-+	val = local_cmpxchg(&drvdata->mode, CS_MODE_DISABLED, mode);
++static void *tmc_alloc_etf_buffer(struct coresight_device *csdev, int cpu,
++				  void **pages, int nr_pages, bool overwrite)
++{
++	int node;
++	struct cs_tmc_buffers *buf;
++
++	if (cpu == -1)
++		cpu = smp_processor_id();
++	node = cpu_to_node(cpu);
++
++	/* Allocate memory structure for interaction with Perf */
++	buf = kzalloc_node(sizeof(struct cs_tmc_buffers), GFP_KERNEL, node);
++	if (!buf)
++		return NULL;
++
++	buf->snapshot = overwrite;
++	buf->nr_pages = nr_pages;
++	buf->data_pages = pages;
++
++	return buf;
++}
++
++static void tmc_free_etf_buffer(void *config)
++{
++	struct cs_tmc_buffers *buf = config;
++
++	kfree(buf);
++}
++
++static int tmc_set_etf_buffer(struct coresight_device *csdev,
++			      struct perf_output_handle *handle,
++			      void *sink_config)
++{
++	int ret = 0;
++	unsigned long head;
++	struct cs_tmc_buffers *buf = sink_config;
++
++	/* wrap head around to the amount of space we have */
++	head = handle->head & ((buf->nr_pages << PAGE_SHIFT) - 1);
++
++	/* find the page to write to */
++	buf->cur = head / PAGE_SIZE;
++
++	/* and offset within that page */
++	buf->offset = head % PAGE_SIZE;
++
++	local_set(&buf->data_size, 0);
++
++	return ret;
++}
++
++static unsigned long tmc_reset_etf_buffer(struct coresight_device *csdev,
++					  struct perf_output_handle *handle,
++					  void *sink_config, bool *lost)
++{
++	unsigned long size = 0;
++	struct cs_tmc_buffers *buf = sink_config;
++
++	if (buf) {
++		/*
++		 * In snapshot mode ->data_size holds the new address of the
++		 * ring buffer's head.  The size itself is the whole address
++		 * range since we want the latest information.
++		 */
++		if (buf->snapshot)
++			handle->head = local_xchg(&buf->data_size,
++						  buf->nr_pages << PAGE_SHIFT);
++		/*
++		 * Tell the tracer PMU how much we got in this run and if
++		 * something went wrong along the way.  Nobody else can use
++		 * this cs_tmc_buffers instance until we are done.  As such
++		 * resetting parameters here and squaring off with the ring
++		 * buffer API in the tracer PMU is fine.
++		 */
++		*lost = !!local_xchg(&buf->lost, 0);
++		size = local_xchg(&buf->data_size, 0);
++	}
++
++	return size;
++}
++
++static void tmc_update_etf_buffer(struct coresight_device *csdev,
++				  struct perf_output_handle *handle,
++				  void *sink_config)
++{
++	int i, cur;
++	u32 *buf_ptr;
++	u32 read_ptr, write_ptr;
++	u32 status, to_read;
++	unsigned long offset;
++	struct cs_tmc_buffers *buf = sink_config;
++	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
++
++	if (!buf)
++		return;
++
++	/* This shouldn't happen */
++	if (WARN_ON_ONCE(local_read(&drvdata->mode) != CS_MODE_PERF))
++		return;
++
++	CS_UNLOCK(drvdata->base);
++
++	tmc_flush_and_stop(drvdata);
++
++	read_ptr = readl_relaxed(drvdata->base + TMC_RRP);
++	write_ptr = readl_relaxed(drvdata->base + TMC_RWP);
++
 +	/*
-+	 * In sysFS mode we can have multiple writers per sink.  Since this
-+	 * sink is already enabled no memory is needed and the HW need not be
-+	 * touched.
++	 * Get a hold of the status register and see if a wrap around
++	 * has occurred.  If so adjust things accordingly.
 +	 */
-+	if (val == CS_MODE_SYSFS)
-+		goto out;
++	status = readl_relaxed(drvdata->base + TMC_STS);
++	if (status & TMC_STS_FULL) {
++		local_inc(&buf->lost);
++		to_read = drvdata->size;
++	} else {
++		to_read = CIRC_CNT(write_ptr, read_ptr, drvdata->size);
++	}
 +
- 	/*
- 	 * If drvdata::buf == NULL, use the memory allocated above.
- 	 * Otherwise a buffer still exists from a previous session, so
-@@ -122,9 +132,9 @@ static int tmc_enable_etr_sink(struct coresight_device *csdev, u32 mode)
- 	memset(drvdata->vaddr, 0, drvdata->size);
- 
- 	tmc_etr_enable_hw(drvdata);
--	drvdata->enable = true;
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
-+out:
- 	/* Free memory outside the spinlock if need be */
- 	if (!allocated)
- 		dma_free_coherent(drvdata->dev, drvdata->size, vaddr, paddr);
-@@ -135,6 +145,7 @@ static int tmc_enable_etr_sink(struct coresight_device *csdev, u32 mode)
- 
- static void tmc_disable_etr_sink(struct coresight_device *csdev)
- {
-+	u32 val;
- 	unsigned long flags;
- 	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
-@@ -144,9 +155,15 @@ static void tmc_disable_etr_sink(struct coresight_device *csdev)
- 		return;
- 	}
- 
-+	val = local_cmpxchg(&drvdata->mode, CS_MODE_SYSFS, CS_MODE_DISABLED);
-+	/* Nothing to do, the TMC was already disabled */
-+	if (val == CS_MODE_DISABLED)
-+		goto out;
++	/*
++	 * The TMC RAM buffer may be bigger than the space available in the
++	 * perf ring buffer (handle->size).  If so advance the RRP so that we
++	 * get the latest trace data.
++	 */
++	if (to_read > handle->size) {
++		u32 mask = 0;
 +
- 	tmc_etr_disable_hw(drvdata);
- 	tmc_etr_dump_hw(drvdata);
--	drvdata->enable = false;
++		/*
++		 * The value written to RRP must be byte-address aligned to
++		 * the width of the trace memory databus _and_ to a frame
++		 * boundary (16 byte), whichever is the biggest. For example,
++		 * for 32-bit, 64-bit and 128-bit wide trace memory, the four
++		 * LSBs must be 0s. For 256-bit wide trace memory, the five
++		 * LSBs must be 0s.
++		 */
++		switch (drvdata->memwidth) {
++		case TMC_MEM_INTF_WIDTH_32BITS:
++		case TMC_MEM_INTF_WIDTH_64BITS:
++		case TMC_MEM_INTF_WIDTH_128BITS:
++			mask = GENMASK(31, 5);
++			break;
++		case TMC_MEM_INTF_WIDTH_256BITS:
++			mask = GENMASK(31, 6);
++			break;
++		}
 +
-+out:
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
++		/*
++		 * Make sure the new size is aligned in accordance with the
++		 * requirement explained above.
++		 */
++		to_read -= handle->size & mask;
++		/* Move the RAM read pointer up */
++		read_ptr = (write_ptr + drvdata->size) - to_read;
++		/* Make sure we are still within our limits */
++		read_ptr &= ~(drvdata->size - 1);
++		/* Tell the HW */
++		writel_relaxed(read_ptr, drvdata->base + TMC_RRP);
++		local_inc(&buf->lost);
++	}
++
++	cur = buf->cur;
++	offset = buf->offset;
++
++	/* for every byte to read */
++	for (i = 0; i < to_read; i += 4) {
++		buf_ptr = buf->data_pages[cur] + offset;
++		*buf_ptr = readl_relaxed(drvdata->base + TMC_RRD);
++
++		offset += 4;
++		if (offset >= PAGE_SIZE) {
++			offset = 0;
++			cur++;
++			/* wrap around at the end of the buffer */
++			cur &= buf->nr_pages - 1;
++		}
++	}
++
++	/*
++	 * In snapshot mode all we have to do is communicate to
++	 * perf_aux_output_end() the address of the current head.  In full
++	 * trace mode the same function expects a size to move rb->aux_head
++	 * forward.
++	 */
++	if (buf->snapshot)
++		local_set(&buf->data_size, (cur * PAGE_SIZE) + offset);
++	else
++		local_add(to_read, &buf->data_size);
++
++	CS_LOCK(drvdata->base);
++}
++
+ static const struct coresight_ops_sink tmc_etf_sink_ops = {
+ 	.enable		= tmc_enable_etf_sink,
+ 	.disable	= tmc_disable_etf_sink,
++	.alloc_buffer	= tmc_alloc_etf_buffer,
++	.free_buffer	= tmc_free_etf_buffer,
++	.set_buffer	= tmc_set_etf_buffer,
++	.reset_buffer	= tmc_reset_etf_buffer,
++	.update_buffer	= tmc_update_etf_buffer,
+ };
  
- 	dev_info(drvdata->dev, "TMC-ETR disabled\n");
-@@ -168,7 +185,7 @@ int tmc_read_prepare_etr(struct tmc_drvdata *drvdata)
- 	spin_lock_irqsave(&drvdata->spinlock, flags);
- 
- 	/* The TMC isn't enabled, so there is no need to disable it */
--	if (!drvdata->enable) {
-+	if (local_read(&drvdata->mode) == CS_MODE_DISABLED) {
- 		/*
- 		 * The ETR is disabled already.  If drvdata::buf is NULL
- 		 * trace data has been harvested.
-@@ -210,7 +227,7 @@ int tmc_read_unprepare_etr(struct tmc_drvdata *drvdata)
- 	}
- 
- 	/* The TMC isn't enabled, so there is no need to enable it */
--	if (!drvdata->enable) {
-+	if (local_read(&drvdata->mode) == CS_MODE_DISABLED) {
- 		/*
- 		 * The ETR is not tracing and trace data was just read. As
- 		 * such prepare to free the trace buffer.
+ static const struct coresight_ops_link tmc_etf_link_ops = {
 diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
-index 6b11caf77ad1..6dbd70861b17 100644
+index a6fb7a9fec5a..3de442f15be7 100644
 --- a/drivers/hwtracing/coresight/coresight-tmc.h
 +++ b/drivers/hwtracing/coresight/coresight-tmc.h
-@@ -18,6 +18,7 @@
- #ifndef _CORESIGHT_TMC_H
- #define _CORESIGHT_TMC_H
- 
-+#include <linux/io.h>
- #include <linux/miscdevice.h>
- 
- #define TMC_RSZ			0x004
-@@ -100,7 +101,7 @@ enum tmc_mem_intf_width {
-  * @paddr:	DMA start location in RAM.
-  * @vaddr:	virtual representation of @paddr.
-  * @size:	@buf size.
-- * @enable:	this TMC is being used.
-+ * @mode:	how this TMC is being used.
-  * @config_type: TMC variant, must be of type @tmc_config_type.
-  * @trigger_cntr: amount of words to store after a trigger.
-  */
-@@ -116,7 +117,7 @@ struct tmc_drvdata {
- 	dma_addr_t		paddr;
- 	void __iomem		*vaddr;
- 	u32			size;
--	bool			enable;
-+	local_t			mode;
- 	enum tmc_config_type	config_type;
- 	u32			trigger_cntr;
+@@ -52,6 +52,7 @@
+ /* TMC_CTL - 0x020 */
+ #define TMC_CTL_CAPT_EN		BIT(0)
+ /* TMC_STS - 0x00C */
++#define TMC_STS_FULL		BIT(0)
+ #define TMC_STS_TRIGGERED	BIT(1)
+ /* TMC_AXICTL - 0x110 */
+ #define TMC_AXICTL_PROT_CTL_B0	BIT(0)
+@@ -90,6 +91,26 @@ enum tmc_mem_intf_width {
  };
+ 
+ /**
++ * struct cs_buffer - keep track of a recording session' specifics
++ * @cur:	index of the current buffer
++ * @nr_pages:	max number of pages granted to us
++ * @offset:	offset within the current buffer
++ * @data_size:	how much we collected in this run
++ * @lost:	other than zero if we had a HW buffer wrap around
++ * @snapshot:	is this run in snapshot mode
++ * @data_pages:	a handle the ring buffer
++ */
++struct cs_tmc_buffers {
++	unsigned int		cur;
++	unsigned int		nr_pages;
++	unsigned long		offset;
++	local_t			data_size;
++	local_t			lost;
++	bool			snapshot;
++	void			**data_pages;
++};
++
++/**
+  * struct tmc_drvdata - specifics associated to an TMC component
+  * @base:	memory mapped base address for this component.
+  * @dev:	the device entity associated to this component.
 -- 
 2.1.4
