@@ -1,58 +1,56 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Tue, 22 Mar 2016 11:24:06 +0100
-Subject: [RFC PATCH v1 0/4] Add Rockchip RGA support
-In-Reply-To: <56EFE66A.8020404@rock-chips.com>
-References: <1458552518-25527-1-git-send-email-ykk@rock-chips.com>
- <1511371.I0NIYzh3kP@diego> <56EFE66A.8020404@rock-chips.com>
-Message-ID: <56F11D46.8080208@suse.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 22 Mar 2016 10:24:29 +0000
+Subject: [PATCH v3 04/11] ARM: bcm2835: dt: add bindings for shared
+ interrupt properties
+In-Reply-To: <56F10F21.9020709@martin.sperl.org>
+References: <1457175142-28665-1-git-send-email-kernel@martin.sperl.org>
+ <1457175142-28665-5-git-send-email-kernel@martin.sperl.org>
+ <20160310085714.GA31313@svinekod>
+ <E60A6B56-0F3F-465C-8BF7-59EF35D41070@martin.sperl.org>
+ <56F10F21.9020709@martin.sperl.org>
+Message-ID: <20160322102429.GA21158@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yakir,
+On Tue, Mar 22, 2016 at 10:23:45AM +0100, Martin Sperl wrote:
+> Hi Mark!
 
-Am 21.03.2016 um 13:17 schrieb Yakir Yang:
-> On 03/21/2016 07:29 PM, Heiko St?bner wrote:
->> Am Montag, 21. M?rz 2016, 17:28:38 schrieb Yakir Yang:
->>> This patch set would add the RGA direct rendering based 2d graphics
->>> acceleration module.
->> very cool to see that.
-> ;)
->>> This patch set is based on git repository below:
->>> git://people.freedesktop.org/~airlied/linux drm-next
->>> commit id: 568d7c764ae01f3706085ac8f0d8a8ac7e826bd7
->>>
->>> And the RGA driver is based on Exynos G2D driver, it only manages the
->>> command lists received from user, so user should make the command list
->>> to data and registers needed by operation to use.
->>>
->>> I have prepared an userspace demo application for testing:
->>>     https://github.com/yakir-Yang/libdrm-rockchip
->>> That is a rockchip libdrm library, and I have write a simple test case
->>> "rockchip_rga_test" that would test the below RGA features:
->>> - solid
->>> - copy
->>> - rotation
->>> - flip
->>> - window clip
->>> - dithering
->> Did you submit your libdrm changes as well?
->>
->> Userspace-interfaces need to be stable so the other side must also get
->> accepted - even before the kernel change if I remember correctly.
+Hi Martin,
+
+Apologies for having gone silent on this.
+
+> On 11.03.2016 09:51, Martin Sperl wrote:
+> >>On 10.03.2016, at 09:57, Mark Rutland <mark.rutland@arm.com> wrote:
+> >>
+> >>Alternative options that have been considered:
+> >>* there is unfortunately no ?interrupt-names? property (like it exists for
+> >>   reg, dma), because then I would have preferred to used:
+> >>      interrupts = <...>, <...>, ?;
+> >>      interrupt-name = ?dma0?, ?dma1?, ..., ?dma10?, ?dmashared?, ?dmaall?;
+> >>   with something like this we could probably have avoided both properties
+> >>   and just added a legacy mapping
+> >>   This would require some changes to the irq framework (which I wanted
+> >>   to avoid)
 > 
-> Got it, and I just saw exynos_fimg2d already landed at mainline libdrm.
-> But I don't find the way to submit patches to libdrm, would you like
-> share some helps here ;)
+> I have posted a patch based on this approach (after having found out
+> that it is possible
+> with the current framework using platform_get_irq_byname).
+> 
+> Rob Herring has "Acked" the documentation patch:
+>   [PATCH 1/3] dt/bindings: bcm2835: add interrupt-names property
+> 
+> Is this approach acceptable for you as well, so that we can try to
+> get it merged?
 
-If you're using Exynos as an example, please keep in mind that the
-libdrm license is MIT/X11, not GPL as the kernel. For our Linux distro
-we had to disable some Exynos parts because they snuck some GPL code in
-there and redistributing libdrm under GPL would cause a big headache
-(review of all packages directly or indirectly linking against it).
+That approach looks good to me too.
+
+One minor nit: please explicitly describe the "dma-shared-all"
+interrupt-name in the description of interrupt-names.
+
+Otherwise, for the binding and the code (which I retains support for
+existing DTs):
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
 Thanks,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton; HRB 21284 (AG N?rnberg)
+Mark.
