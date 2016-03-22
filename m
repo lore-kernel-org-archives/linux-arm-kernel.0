@@ -1,63 +1,51 @@
-From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Tue, 22 Mar 2016 11:18:29 +0800
-Subject: [PATCH v3 1/1] arm64/dma-mapping: reduce an unnecessary conversion
- for coherent DMA
-In-Reply-To: <1458616709-21888-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1458616709-21888-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1458616709-21888-2-git-send-email-thunder.leizhen@huawei.com>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Tue, 22 Mar 2016 13:00:53 +0900
+Subject: [PATCH v2 3/5] dt-bindings: Add documentation for GM20B GPU
+In-Reply-To: <CAL_Jsq+SEOC1s_j8u3hMyDj5i9ROyAAN_-qmbsLrNvR3v2cXwA@mail.gmail.com>
+References: <1458010724-10945-1-git-send-email-acourbot@nvidia.com>
+ <1458010724-10945-4-git-send-email-acourbot@nvidia.com>
+ <20160318204748.GA20243@rob-hp-laptop>
+ <CAAVeFuKQvjb20aEh9_MBnrzEUjKoVc8yQu3a4Ego6Qaqe70M6A@mail.gmail.com>
+ <CAL_Jsq+SEOC1s_j8u3hMyDj5i9ROyAAN_-qmbsLrNvR3v2cXwA@mail.gmail.com>
+Message-ID: <56F0C375.1030907@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1.For coherent DMA
-  In swiotlb_alloc_coherent, it directly return vaddr on success, and
-pass vaddr to free_pages on failure. So, we can directly transparent pass
-vaddr from __dma_free to swiotlb_free_coherent.
-  According to my testing, it can save 8 clock cycles.
+On 03/22/2016 10:41 AM, Rob Herring wrote:
+> On Sun, Mar 20, 2016 at 1:55 AM, Alexandre Courbot <gnurou@gmail.com> wrote:
+>> On Sat, Mar 19, 2016 at 5:47 AM, Rob Herring <robh@kernel.org> wrote:
+>>> On Tue, Mar 15, 2016 at 11:58:42AM +0900, Alexandre Courbot wrote:
+>>>> GM20B's definition is mostly similar to GK20A's, but requires an
+>>>> additional clock.
+>
+> [...]
+>
+>>>>        gpu at 0,57000000 {
+>>>>                compatible = "nvidia,gk20a";
+>>>> @@ -45,3 +49,22 @@ Example:
+>>>>                iommus = <&mc TEGRA_SWGROUP_GPU>;
+>>>>                status = "disabled";
+>>>>        };
+>>>> +
+>>>> +Example for GM20B:
+>>>> +
+>>>> +     gpu at 0,57000000 {
+>>>
+>>> Drop the comma and leading zero.
+>>
+>> Even though this is how it appears in the actual DT?
+>
+> Yes, those will need to get fixed, too.
 
-2.For non-coherent DMA.
-  Keep no change for the original processing flow.
-  Because all DDR memory mapped as cacheable by default. But for
-non-coherent devices, both CPUs and devices should use NC(non-cacheable)
-attributes to access memory, to keep consistency. So we can not directly
-use vaddr retured by __dma_alloc_coherent, but should further remap the
-physical memory as NC and return it. So in __dma_free, we first use the
-NC-vaddr to unmap, then get vaddr base upon dma_handle and use it to free
-memory back to buddy.
+Sorry, I just want to confirm that I understand why this needs to be 
+fixed. The parent node has #address-cells = <2>, and the practice of 
+specifying two cells in the node name is consistent with what I see in 
+http://www.devicetree.org/Device_Tree_Usage.
 
-Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
----
- arch/arm64/mm/dma-mapping.c | 12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
+However in the device tree usage example one can interpret the two cells 
+as being two different components of the address, whereas in our case we 
+are using two cells because the address is 64-bit - hence we should 
+specify it in the name as a single entity. Is this correct?
 
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index a6e757c..ceb2018 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -187,16 +187,22 @@ static void __dma_free(struct device *dev, size_t size,
- 		       void *vaddr, dma_addr_t dma_handle,
- 		       struct dma_attrs *attrs)
- {
--	void *swiotlb_addr = phys_to_virt(dma_to_phys(dev, dma_handle));
--
- 	size = PAGE_ALIGN(size);
-
- 	if (!is_device_dma_coherent(dev)) {
- 		if (__free_from_pool(vaddr, size))
- 			return;
- 		vunmap(vaddr);
-+
-+		/*
-+		 * For non-coherent DMA, the vaddr is not part of the linear
-+		 * mapping as it has been remapped by __dma_alloc() via
-+		 * dma_common_contiguous_remap(), hence for swiotlb freeing we
-+		 * need the actual linear map address.
-+		 */
-+		vaddr = phys_to_virt(dma_to_phys(dev, dma_handle));
- 	}
--	__dma_free_coherent(dev, size, swiotlb_addr, dma_handle, attrs);
-+	__dma_free_coherent(dev, size, vaddr, dma_handle, attrs);
- }
-
- static dma_addr_t __swiotlb_map_page(struct device *dev, struct page *page,
---
-2.5.0
+Thanks,
+Alex.
