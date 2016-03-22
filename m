@@ -1,52 +1,79 @@
-From: jan.glauber@caviumnetworks.com (Jan Glauber)
-Date: Tue, 22 Mar 2016 17:49:47 +0100
-Subject: [PATCH 3/5] arm64/perf: Add Broadcom Vulcan PMU support
-In-Reply-To: <CANK38rZQSOJPN76eP1LFcx8GduZRf8z-3w_kriAUg2=uON8Rcw@mail.gmail.com>
-References: <1458133309-17045-1-git-send-email-ashoks@broadcom.com>
- <1458133309-17045-4-git-send-email-ashoks@broadcom.com>
- <20160322100110.GC31126@arm.com>
- <CANK38rZQSOJPN76eP1LFcx8GduZRf8z-3w_kriAUg2=uON8Rcw@mail.gmail.com>
-Message-ID: <20160322164947.GB23772@hardcore>
+From: panand@redhat.com (Pratyush Anand)
+Date: Tue, 22 Mar 2016 22:21:34 +0530
+Subject: [PATCH v11 3/9] arm64: add copy_to/from_user to kprobes blacklist
+In-Reply-To: <20160321145242.GJ23397@arm.com>
+References: <1457501543-24197-1-git-send-email-dave.long@linaro.org>
+ <1457501543-24197-4-git-send-email-dave.long@linaro.org>
+ <56E858D8.8030300@arm.com>
+ <20160316054329.GC28915@dhcppc6.redhat.com>
+ <56E9350A.7010909@arm.com>
+ <20160317075726.GA16882@dhcppc6.redhat.com>
+ <20160318132902.GA29225@dhcppc6.redhat.com>
+ <20160321145242.GJ23397@arm.com>
+Message-ID: <20160322165134.GF15150@dhcppc6.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ashok,
+Hi Will,
 
-On Tue, Mar 22, 2016 at 10:09:42PM +0530, Ashok Sekar wrote:
-> Hi Will,
+Thanks for the reply.
+
+On 21/03/2016:02:52:43 PM, Will Deacon wrote:
+> On Fri, Mar 18, 2016 at 06:59:02PM +0530, Pratyush Anand wrote:
+> > On 17/03/2016:01:27:26 PM, Pratyush Anand wrote:
+> > > @David: This patch was added in v9 and fixup_exception() had been dropped in v9.
+> > > Since, dropping of fixup_exception() also caused to fail some systemtap test
+> > > cases, so it was added back in v10. I wonder if we really need this patch.
+> > > May be you can try to run related test case by dropping this patch. 
+> > 
+> > Had a closer look to the code, and noticed that fixup_exception() does not have
+> > any role in handling of page fault of copy_to_user(). Then, why do we have the
+> > problem.
+> > Probably, I can see why does not it work. So, when we are single stepping an
+> > instruction and page fault occurs, we will come to el1_da in entry.S. Here, we
+> > do enable_dbg. As soon as we will do this, we will start receiving single step
+> > exception after each instruction (not sure, probably for each alternate
+> > instruction). Since, there will not be any matching single step handler for
+> > these instructions, so we will see warning "Unexpected kernel single-step
+> > exception at EL1". 
+> > 
+> > So, I think, we should 
+> > 
+> > (1) may be do not enable debug for el1_da, or
+> > (2) enable_dbg only when single stepping is not enabled, or
+> > (3) or disable single stepping during el1_da execution.
+> > 
+> > (1) will solve the issue for sure, but not sure if it could be the best choice.
+> > 
+> > Will, what do you suggest?
 > 
-> On Tue, Mar 22, 2016 at 3:31 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > Hi Ashok,
-> >
-> > On Wed, Mar 16, 2016 at 06:01:47AM -0700, Ashok Kumar wrote:
+> Leaving debug exceptions disabled isn't something I'm keen on at all,
+> because it leads to blackspots in kernel debugging that I don't think
+> should be enforced by the low-level debug machinery. My preference is
+> for the higher-level debugger code (e.g. kprobes, kdgb) to ignore the
+> events that it's not interested in.
 
-[...]
+I think this is what the current implementation is, so in the given situation
+higher-level debugger code ignore the single step exceptions events, which they
+are not expecting.
+Here, execution of single stepped instruction is causing to raise another new
+exception, say data abort. Now, as soon as we enable debug exceptions while
+handling this data abort we will start getting single step exceptions for all
+the executed instruction of data abort handler. None of the "higher-level
+debugger code" is interested in those events and so they ignore them. We keep on
+getting "Unexpected kernel single-step exception at EL1" until all the
+instructions for data abort handler are executed.
 
-> >> +static struct attribute *vulcan_pmuv3_event_attrs[] = {
-> >> +     &armv8_event_attr_sw_incr.attr.attr,
-> >> +     &armv8_event_attr_l1i_cache_refill.attr.attr,
-> >> +     &armv8_event_attr_l1i_tlb_refill.attr.attr,
-> >> +     &armv8_event_attr_l1d_cache_refill.attr.attr,
-> >> +     &armv8_event_attr_l1d_cache_access.attr.attr,
-> >> +     &armv8_event_attr_l1d_tlb_refill.attr.attr,
-> >> +     &armv8_event_attr_ld_retired.attr.attr,
-> >> +     &armv8_event_attr_st_retired.attr.attr,
-> >> +     &armv8_event_attr_inst_retired.attr.attr,
-> >> +     &armv8_event_attr_exc_taken.attr.attr,
-> >> +     &armv8_event_attr_exc_return.attr.attr,
-> >
-> > ... but I'm not keen on having these tables in the kernel for each CPU
-> > PMU we support. Where I'd like to get to is:
-> >
-> >   * We expose the architected events (0x0-0x3f) in /sys using the existing
-> >     PMUv3 tables in conjunction with PMCEIDn_EL0 (Jan mentioned this before)
-> I will use armv8_pmuv3_event_attrs itself for the time being for Vulcan.
-> Once the events identification mechanism is done using PMCEIDn_EL0, it
-> should take care
-> of removing the unsupported events from the table for Vulcan too.
-> Jan is working on this currently? or else I could look into it.
+> 
+> It's also very easy to lose track of the debug state if you run preemptible
+> code at EL1 with debug exceptions disabled, because kernel debugging is
+> per-cpu rather than per-task.
 
-I did not find time yet to work on PMCEID support, so feel to start on
-it but please keep me in the loop.
+OK.Thanks for this clarification. So, one of the way could be to set a per
+cpu variable by higher level debugger code, and then check them in kernel_entry
+and kernel_exit and accordingly disable/enable only single stepping. Do you
+think, it would be good idea to do that?
+If yes, then would adding a new u64 variable say "flags" in struct pt_regs be
+acceptable? 
 
-Jan
+~Pratyush
