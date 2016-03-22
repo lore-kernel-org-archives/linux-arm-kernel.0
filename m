@@ -1,52 +1,53 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue, 22 Mar 2016 16:04:33 +0100
-Subject: [PATCH] iommu/rockchip: Only log stall errors when attaching
-Message-ID: <1458659073-13553-1-git-send-email-tomeu.vizoso@collabora.com>
+Date: Tue, 22 Mar 2016 16:08:04 +0100
+Subject: [PATCH v2] drm/rockchip: vop: Disable planes when disabling CRTC
+Message-ID: <1458659284-14039-1-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the logging of timeouts when stalling the MMU to
-rk_iommu_attach_device, as it's expected that sometimes the MMU won't
-get stalled when detaching a device, and it's not a real problem that
-would need to be communicated to the user.
+When a VOP is re-enabled, it will start scanning right away the
+framebuffers that were configured from the last time, even if those have
+been destroyed already.
+
+To prevent the VOP from trying to access freed memory, disable all its
+windows when the CRTC is being disabled, then each window will get a
+valid framebuffer address before it's enabled again.
 
 Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+Link: http://lkml.kernel.org/g/CAAObsKAv+05ih5U+=4kic_NsjGMhfxYheHR8xXXmacZs+p5SHw at mail.gmail.com
 ---
- drivers/iommu/rockchip-iommu.c | 14 ++++++--------
- 1 file changed, 6 insertions(+), 8 deletions(-)
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-index 0253ab35c33b..65325b6742e6 100644
---- a/drivers/iommu/rockchip-iommu.c
-+++ b/drivers/iommu/rockchip-iommu.c
-@@ -346,13 +346,7 @@ static int rk_iommu_enable_stall(struct rk_iommu *iommu)
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index 5e57f5b2e4b0..e2118e62345b 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -499,10 +499,25 @@ err_disable_hclk:
+ static void vop_crtc_disable(struct drm_crtc *crtc)
+ {
+ 	struct vop *vop = to_vop(crtc);
++	int i;
  
- 	rk_iommu_command(iommu, RK_MMU_CMD_ENABLE_STALL);
+ 	if (!vop->is_enabled)
+ 		return;
  
--	ret = rk_wait_for(rk_iommu_is_stall_active(iommu), 1);
--	if (ret)
--		for (i = 0; i < iommu->num_mmu; i++)
--			dev_err(iommu->dev, "Enable stall request timed out, status: %#08x\n",
--				rk_iommu_read(iommu->bases[i], RK_MMU_STATUS));
--
--	return ret;
-+	return rk_wait_for(rk_iommu_is_stall_active(iommu), 1);
- }
- 
- static int rk_iommu_disable_stall(struct rk_iommu *iommu)
-@@ -798,8 +792,12 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
- 		return 0;
- 
- 	ret = rk_iommu_enable_stall(iommu);
--	if (ret)
-+	if (ret) {
-+		for (i = 0; i < iommu->num_mmu; i++)
-+			dev_err(iommu->dev, "Enable stall request timed out, status: %#08x\n",
-+				rk_iommu_read(iommu->bases[i], RK_MMU_STATUS));
- 		return ret;
++	/*
++	 * We need to make sure that all windows are disabled before we
++	 * disable that crtc. Otherwise we might try to scan from a destroyed
++	 * buffer later.
++	 */
++	for (i = 0; i < vop->data->win_size; i++) {
++		struct vop_win *vop_win = &vop->win[i];
++		const struct vop_win_data *win = vop_win->data;
++
++		spin_lock(&vop->reg_lock);
++		VOP_WIN_SET(vop, win, enable, 0);
++		spin_unlock(&vop->reg_lock);
 +	}
++
+ 	drm_crtc_vblank_off(crtc);
  
- 	ret = rk_iommu_force_reset(iommu);
- 	if (ret)
+ 	/*
 -- 
 2.5.0
