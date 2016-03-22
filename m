@@ -1,71 +1,75 @@
 From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Tue, 22 Mar 2016 20:04:11 +0300
+Date: Tue, 22 Mar 2016 20:08:03 +0300
 Subject: [PATCH v5 3/6] ACPI: parse SPCR and enable matching console
-In-Reply-To: <56F16DC2.7030901@hurleysoftware.com>
+In-Reply-To: <20160322165122.GB10616@yury-N73SV>
 References: <1458643595-14719-1-git-send-email-aleksey.makarov@linaro.org>
  <1458643595-14719-4-git-send-email-aleksey.makarov@linaro.org>
- <CAHp75VfsayWWSgkvpgrxcER6c2rZyykbvOtm7wBQROR6SFFfWw@mail.gmail.com>
- <56F16DC2.7030901@hurleysoftware.com>
-Message-ID: <56F17B0B.306@linaro.org>
+ <20160322122650.GA10616@yury-N73SV> <56F15D40.9020401@hurleysoftware.com>
+ <20160322165122.GB10616@yury-N73SV>
+Message-ID: <56F17BF3.7090608@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 03/22/2016 07:07 PM, Peter Hurley wrote:
-> On 03/22/2016 04:09 AM, Andy Shevchenko wrote:
->> On Tue, Mar 22, 2016 at 12:46 PM, Aleksey Makarov
->> <aleksey.makarov@linaro.org> wrote:
-
->>> +       sprintf(opts, "%s,%s,0x%llx,%d", uart, iotype,
->>> +               table->serial_port.address, baud_rate);
->>
->> You may use snprintf(), though my question here what would happen on
->> 32-bit kernel when you supply 64-bit address as an option?
+On 03/22/2016 07:51 PM, Yury Norov wrote:
+> On Tue, Mar 22, 2016 at 07:57:04AM -0700, Peter Hurley wrote:
 > 
-> Yeah this should probably use %pa for the printf specifier.
+> [...]
 > 
-> But note this exposes underlying bug in the earlycon support, because
-> that was originally written without 32/64-mixed bitness in mind; ie.,
-> the address is parsed and handled as unsigned long in most places.
-
-I don't quite follow this.  table->serial_port.address is explicitly u64,
-not pointer, so, according to printk-formats.txt %llx is ok here, %pa is wrong.
-Am I missing something?
-
->>>         /*
->>> -        * Just 'earlycon' is a valid param for devicetree earlycons;
->>> -        * don't generate a warning from parse_early_params() in that case
->>> +        * Just 'earlycon' is a valid param for devicetree and ACPI SPCR
->>> +        * earlycons; don't generate a warning from parse_early_params()
->>> +        * in that case
->>>          */
->>> -       if (!buf || !buf[0])
->>> -               return early_init_dt_scan_chosen_serial();
->>> +       if (!buf || !buf[0]) {
->>> +               init_spcr_earlycon();
+>>>> +static bool init_earlycon;
+>>>> +
+>>>> +void __init init_spcr_earlycon(void)
+>>>> +{
+>>>> +	init_earlycon = true;
+>>>> +}
+>>>> +
+>>>
+>>> 1. I see you keep in mind multiple access.
 >>
->>> +               early_init_dt_scan_chosen_serial();
->>> +               return 0;
+>> Concurrent access is not a concern here: only the boot cpu is running
+>> and intrs are off.
 >>
->> And you hide an error?
+>> The "init_earlycon" flag is used because parsing the "earlycon" early param
+>> is earlier than parsing ACPI tables.
+>>
 > 
-> Well, this is a little bit tricky because "earlycon" early parameter with
-> missing /chosen/stdout-path node is no longer an error, since ACPI may be
-> specifying the earlycon instead.
+> OK got it. My concern is that it's generic code, and parse_spcr() is public
+> function. I think corresponding comment is needed at least. The other option is
+> to make it race-safe and forget. I prefer second one, moreover it's 2 simple
+> changes.
 
-Agree, but note the email by Rob Herring.  The code should be like this:
+I would not call this function public.  It is made non-static only to allow 
+callin it from another compilation unit.  It should be called only once at initializatioin time.
+I will add a comment about this, thank you.
 
-if (!buf || !buf[0]) {
-	if (acpi_disabled) {
-		return early_init_dt_scan_chosen_serial();
-	} else {
-		init_spcr_earlycon();
-		return 0;
-	}
-}
+>>  Then you'd worry about race
+>>> conditions as well. In this case, I'd consider atomic access to
+>>> variable.
+>>> 2. It seems you need is_init() helper too.
+>>>
+>>>> +int __init parse_spcr(void)
+>>>> +{
+>>>> +	static char opts[64];
+>>>> +	struct acpi_table_spcr *table;
+>>>> +	acpi_size table_size;
+>>>> +	acpi_status status;
+>>>> +	char *uart;
+>>>> +	char *iotype;
+>>>> +	int baud_rate;
+>>>> +	int err = 0;
+>>>
+>>> You can do not initialize 'err'.
+>>
+>> Why?
+>>
+> 
+> Because there's no path here that doesn't init err with some value.
+> So this initialization is useless waste of cycles.
+> 
+> [...]
 
-But that requires to have made ACPI/DT decision at this point.
+I agree, will fix this.
 
 Thank you
 Aleksey
