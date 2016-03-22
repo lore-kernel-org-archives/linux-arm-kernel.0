@@ -1,53 +1,40 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 22 Mar 2016 22:31:45 +0800
-Subject: [PATCH] drivers: firmware: psci: make two helper functions static
-Message-ID: <1458657105-2348-1-git-send-email-jszhang@marvell.com>
+Date: Tue, 22 Mar 2016 22:35:29 +0800
+Subject: [PATCH] drivers: firmware: psci: add __init mark to
+ psci_dt_cpu_init_idle
+Message-ID: <1458657329-2484-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-psci_power_state_loses_context() and psci_power_state_is_valid are only
-used internally now, so make them static.
+psci_dt_cpu_init_idle() and psci_cpu_init_idle() are not needed after
+booting, so mark them as __init.
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
  drivers/firmware/psci.c | 4 ++--
- include/linux/psci.h    | 2 --
- 2 files changed, 2 insertions(+), 4 deletions(-)
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index 11bfee8..6d86881 100644
+index 7d52186..284413f 100644
 --- a/drivers/firmware/psci.c
 +++ b/drivers/firmware/psci.c
-@@ -91,7 +91,7 @@ static inline bool psci_has_ext_power_state(void)
- 				PSCI_1_0_FEATURES_CPU_SUSPEND_PF_MASK;
+@@ -250,7 +250,7 @@ static int __init psci_features(u32 psci_func_id)
+ #ifdef CONFIG_CPU_IDLE
+ static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
+ 
+-static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
++static int __init psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
+ {
+ 	int i, ret, count = 0;
+ 	u32 *psci_states;
+@@ -310,7 +310,7 @@ free_mem:
+ 	return ret;
  }
  
--bool psci_power_state_loses_context(u32 state)
-+static bool psci_power_state_loses_context(u32 state)
+-int psci_cpu_init_idle(unsigned int cpu)
++int __init psci_cpu_init_idle(unsigned int cpu)
  {
- 	const u32 mask = psci_has_ext_power_state() ?
- 					PSCI_1_0_EXT_POWER_STATE_TYPE_MASK :
-@@ -100,7 +100,7 @@ bool psci_power_state_loses_context(u32 state)
- 	return state & mask;
- }
- 
--bool psci_power_state_is_valid(u32 state)
-+static bool psci_power_state_is_valid(u32 state)
- {
- 	const u32 valid_mask = psci_has_ext_power_state() ?
- 			       PSCI_1_0_EXT_POWER_STATE_MASK :
-diff --git a/include/linux/psci.h b/include/linux/psci.h
-index 393efe2..bdea1cb 100644
---- a/include/linux/psci.h
-+++ b/include/linux/psci.h
-@@ -21,8 +21,6 @@
- #define PSCI_POWER_STATE_TYPE_POWER_DOWN	1
- 
- bool psci_tos_resident_on(int cpu);
--bool psci_power_state_loses_context(u32 state);
--bool psci_power_state_is_valid(u32 state);
- 
- int psci_cpu_init_idle(unsigned int cpu);
- int psci_cpu_suspend_enter(unsigned long index);
+ 	struct device_node *cpu_node;
+ 	int ret;
 -- 
 2.8.0.rc3
