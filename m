@@ -1,215 +1,33 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 22 Mar 2016 22:37:29 +0100
-Subject: [PATCH v2] ARM: dts: sun8i: Add Orange Pi PC support
-Message-ID: <1458682649-24104-1-git-send-email-hdegoede@redhat.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Tue, 22 Mar 2016 14:45:57 -0700
+Subject: [PATCH v15 0/6] arm64, numa: Add numa support for arm64 platforms
+In-Reply-To: <56F1936E.1090407@redhat.com>
+References: <1457481587-8976-1-git-send-email-ddaney.cavm@gmail.com>
+ <56F1936E.1090407@redhat.com>
+Message-ID: <56F1BD15.4000701@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chen-Yu Tsai <wens@csie.org>
+On 03/22/2016 11:48 AM, Jon Masters wrote:
+> On 03/08/2016 06:59 PM, David Daney wrote:
+>
+>> From: David Daney <david.daney@cavium.com>
+>>
+>> v15:
+>>
+>> 	- Make the distance-map node optional (again), if it is not in
+>>            the device tree, default values are used.
+>>
+>> 	- Minor cleanups to of_numa.c as suggested by Rob Harring.
+>
+> Hi David, all,
+>
+> Wondering what the status of this patch series is currently?
 
-The Orange Pi PC is an SBC based on the Allwinner H3 SoC with a uSD slot,
-3 USB ports directly from the SoC, a 10/100M ethernet port using the
-SoC's integrated PHY, USB OTG, HDMI, a TRRS headphone jack for stereo out
-and composite out, a microphone, an IR receiver, a CSI connector, 2 LEDs,
-a 3 pin UART header, and a 40-pin GPIO header.
+I haven't seen any feedback on v15.  My assumption was that the relevant 
+arm64 maintainers would take some sort of action after the merge window 
+quiets down.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
-Changes in v2 (hdegoede):
--Add leds
--Add gpio-keys
--Add ir
----
- arch/arm/boot/dts/Makefile                 |   1 +
- arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 167 +++++++++++++++++++++++++++++
- 2 files changed, 168 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+In any event, I am happy to make any improvements that may be suggested.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 04f8881..31d50a4 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -699,6 +699,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
- 	sun8i-a33-sinlinx-sina33.dtb \
- 	sun8i-a83t-allwinner-h8homlet-v2.dtb \
- 	sun8i-a83t-cubietruck-plus.dtb \
-+	sun8i-h3-orangepi-pc.dtb \
- 	sun8i-h3-orangepi-plus.dtb
- dtb-$(CONFIG_MACH_SUN9I) += \
- 	sun9i-a80-optimus.dtb \
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-new file mode 100644
-index 0000000..daf50b9a6
---- /dev/null
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-@@ -0,0 +1,167 @@
-+/*
-+ * Copyright (C) 2015 Chen-Yu Tsai <wens@csie.org>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun8i-h3.dtsi"
-+#include "sunxi-common-regulators.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
-+
-+/ {
-+	model = "Xunlong Orange Pi PC";
-+	compatible = "xunlong,orangepi-pc", "allwinner,sun8i-h3";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&leds_opc>, <&leds_r_opc>;
-+
-+		pwr_led {
-+			label = "orangepi:green:pwr";
-+			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>;
-+			default-state = "on";
-+		};
-+
-+		status_led {
-+			label = "orangepi:red:status";
-+			gpios = <&pio 0 15 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+
-+	r_gpio_keys {
-+		compatible = "gpio-keys";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&sw_r_opc>;
-+
-+		sw4 {
-+			label = "sw4";
-+			linux,code = <BTN_0>;
-+			gpios = <&r_pio 0 3 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+};
-+
-+&ehci1 {
-+	status = "okay";
-+};
-+
-+&ehci2 {
-+	status = "okay";
-+};
-+
-+&ehci3 {
-+	status = "okay";
-+};
-+
-+&ir {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ir_pins_a>;
-+	status = "okay";
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&ohci1 {
-+	status = "okay";
-+};
-+
-+&ohci2 {
-+	status = "okay";
-+};
-+
-+&ohci3 {
-+	status = "okay";
-+};
-+
-+&pio {
-+	leds_opc: led_pins at 0 {
-+		allwinner,pins = "PA15";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+};
-+
-+&r_pio {
-+	leds_r_opc: led_pins at 0 {
-+		allwinner,pins = "PL10";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
-+	sw_r_opc: key_pins at 0 {
-+		allwinner,pins = "PL3";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	/* USB VBUS is always on */
-+	status = "okay";
-+};
--- 
-2.7.3
+David Daney
