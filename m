@@ -1,86 +1,53 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Tue, 22 Mar 2016 10:21:51 -0700
-Subject: [PATCH v5 3/6] ACPI: parse SPCR and enable matching console
-In-Reply-To: <56F17B0B.306@linaro.org>
-References: <1458643595-14719-1-git-send-email-aleksey.makarov@linaro.org>
- <1458643595-14719-4-git-send-email-aleksey.makarov@linaro.org>
- <CAHp75VfsayWWSgkvpgrxcER6c2rZyykbvOtm7wBQROR6SFFfWw@mail.gmail.com>
- <56F16DC2.7030901@hurleysoftware.com> <56F17B0B.306@linaro.org>
-Message-ID: <56F17F2F.7050305@hurleysoftware.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Tue, 22 Mar 2016 18:30:05 +0100
+Subject: [PATCH v3 4/4] nmi_backtrace: generate one-line reports for idle
+ cpus
+In-Reply-To: <1458667179-19630-5-git-send-email-cmetcalf@mellanox.com>
+References: <1458667179-19630-1-git-send-email-cmetcalf@mellanox.com>
+ <1458667179-19630-5-git-send-email-cmetcalf@mellanox.com>
+Message-ID: <20160322173005.GT6344@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/22/2016 10:04 AM, Aleksey Makarov wrote:
+On Tue, Mar 22, 2016 at 01:19:39PM -0400, Chris Metcalf wrote:
+> When doing an nmi backtrace of many cores, most of which are idle,
+> the output is a little overwhelming and very uninformative.  Suppress
+> messages for cpus that are idling when they are interrupted and just
+> emit one line, "NMI backtrace for N skipped: idling at pc 0xNNN".
 > 
+> We do this by grouping all the cpuidle code together into a new
+> .cpuidle.text section, and then checking the address of the
+> interrupted PC to see if it lies within that section.
 > 
-> On 03/22/2016 07:07 PM, Peter Hurley wrote:
->> On 03/22/2016 04:09 AM, Andy Shevchenko wrote:
->>> On Tue, Mar 22, 2016 at 12:46 PM, Aleksey Makarov
->>> <aleksey.makarov@linaro.org> wrote:
+> This commit suitably tags x86, arm64, and tile idle routines,
+> and only adds in the minimal framework for other architectures.
 > 
->>>> +       sprintf(opts, "%s,%s,0x%llx,%d", uart, iotype,
->>>> +               table->serial_port.address, baud_rate);
->>>
->>> You may use snprintf(), though my question here what would happen on
->>> 32-bit kernel when you supply 64-bit address as an option?
->>
->> Yeah this should probably use %pa for the printf specifier.
->>
->> But note this exposes underlying bug in the earlycon support, because
->> that was originally written without 32/64-mixed bitness in mind; ie.,
->> the address is parsed and handled as unsigned long in most places.
-> 
-> I don't quite follow this.  table->serial_port.address is explicitly u64,
-> not pointer, so, according to printk-formats.txt %llx is ok here, %pa is wrong.
-> Am I missing something?
+> Acked-by: Peter Zijlstra (Intel) <peterz@infradead.org>
+> Tested-by: Peter Zijlstra (Intel) <peterz@infradead.org>
+> Signed-off-by: Chris Metcalf <cmetcalf@mellanox.com>
 
-No, you're right.
-There is still the underlying bug I noted; I'll fix that in this release cycle.
+For some reason I found a few CPUs using poll_idle().
+
+Rafael, when and why would that ever get selected as a useful idle
+state? When the predicted idle time is so short even C1 isn't worth it?
 
 
->>>>         /*
->>>> -        * Just 'earlycon' is a valid param for devicetree earlycons;
->>>> -        * don't generate a warning from parse_early_params() in that case
->>>> +        * Just 'earlycon' is a valid param for devicetree and ACPI SPCR
->>>> +        * earlycons; don't generate a warning from parse_early_params()
->>>> +        * in that case
->>>>          */
->>>> -       if (!buf || !buf[0])
->>>> -               return early_init_dt_scan_chosen_serial();
->>>> +       if (!buf || !buf[0]) {
->>>> +               init_spcr_earlycon();
->>>
->>>> +               early_init_dt_scan_chosen_serial();
->>>> +               return 0;
->>>
->>> And you hide an error?
->>
->> Well, this is a little bit tricky because "earlycon" early parameter with
->> missing /chosen/stdout-path node is no longer an error, since ACPI may be
->> specifying the earlycon instead.
-> 
-> Agree, but note the email by Rob Herring.  The code should be like this:
-> 
-> if (!buf || !buf[0]) {
-> 	if (acpi_disabled) {
-> 		return early_init_dt_scan_chosen_serial();
-> 	} else {
-> 		init_spcr_earlycon();
-> 		return 0;
-> 	}
-> }
-
-Ok.
-
-
-> But that requires to have made ACPI/DT decision at this point.
-
-It's an unfortunate command-line option dependency, but I think it's ok
-for the moment.  The same problem would exist if DT could be disabled
-via the command line.
-
-
-> 
-> Thank you
-> Aleksey
-> 
+--- a/drivers/cpuidle/driver.c
++++ b/drivers/cpuidle/driver.c
+@@ -14,6 +14,7 @@
+ #include <linux/cpuidle.h>
+ #include <linux/cpumask.h>
+ #include <linux/tick.h>
++#include <linux/cpu.h>
+ 
+ #include "cpuidle.h"
+ 
+@@ -178,7 +179,7 @@ static void __cpuidle_driver_init(struct
+ }
+ 
+ #ifdef CONFIG_ARCH_HAS_CPU_RELAX
+-static int poll_idle(struct cpuidle_device *dev,
++__cpuidle static int poll_idle(struct cpuidle_device *dev,
+ 		struct cpuidle_driver *drv, int index)
+ {
+ 	local_irq_enable();
