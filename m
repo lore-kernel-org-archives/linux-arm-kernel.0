@@ -1,38 +1,24 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 21 Mar 2016 20:41:33 -0500
-Subject: [PATCH v2 3/5] dt-bindings: Add documentation for GM20B GPU
-In-Reply-To: <CAAVeFuKQvjb20aEh9_MBnrzEUjKoVc8yQu3a4Ego6Qaqe70M6A@mail.gmail.com>
-References: <1458010724-10945-1-git-send-email-acourbot@nvidia.com>
- <1458010724-10945-4-git-send-email-acourbot@nvidia.com>
- <20160318204748.GA20243@rob-hp-laptop>
- <CAAVeFuKQvjb20aEh9_MBnrzEUjKoVc8yQu3a4Ego6Qaqe70M6A@mail.gmail.com>
-Message-ID: <CAL_Jsq+SEOC1s_j8u3hMyDj5i9ROyAAN_-qmbsLrNvR3v2cXwA@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 22 Mar 2016 10:44:38 +0900
+Subject: [PATCH 1/2] ARM: dts: r8a7794: add IIC clocks
+In-Reply-To: <CAMuHMdXuFu-mPKnmjaM7DQcni2FiMz99jkrQO4UrWhs14qXAyA@mail.gmail.com>
+References: <1458199991-19391-1-git-send-email-horms+renesas@verge.net.au>
+ <1458199991-19391-2-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdXuFu-mPKnmjaM7DQcni2FiMz99jkrQO4UrWhs14qXAyA@mail.gmail.com>
+Message-ID: <20160322014437.GB14367@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 20, 2016 at 1:55 AM, Alexandre Courbot <gnurou@gmail.com> wrote:
-> On Sat, Mar 19, 2016 at 5:47 AM, Rob Herring <robh@kernel.org> wrote:
->> On Tue, Mar 15, 2016 at 11:58:42AM +0900, Alexandre Courbot wrote:
->>> GM20B's definition is mostly similar to GK20A's, but requires an
->>> additional clock.
+On Thu, Mar 17, 2016 at 09:12:05AM +0100, Geert Uytterhoeven wrote:
+> On Thu, Mar 17, 2016 at 8:33 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > Add IIC clocks to r8a7794 device tree.
+> >
+> > Based on similar work for the r8a7790 by Wolfram Sang.
+> >
+> > CC: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-[...]
-
->>>       gpu at 0,57000000 {
->>>               compatible = "nvidia,gk20a";
->>> @@ -45,3 +49,22 @@ Example:
->>>               iommus = <&mc TEGRA_SWGROUP_GPU>;
->>>               status = "disabled";
->>>       };
->>> +
->>> +Example for GM20B:
->>> +
->>> +     gpu at 0,57000000 {
->>
->> Drop the comma and leading zero.
->
-> Even though this is how it appears in the actual DT?
-
-Yes, those will need to get fixed, too.
-
-Rob
+Thanks, I queued this up after fixing (my own) minor whitespace problem.
