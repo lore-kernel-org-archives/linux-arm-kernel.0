@@ -1,24 +1,56 @@
-From: joerg.krause@embedded.rocks (=?ISO-8859-1?Q?J=F6rg?= Krause)
-Date: Tue, 22 Mar 2016 13:52:49 +0100
-Subject: Power and regulator support for i.MX23/i.MX28
-Message-ID: <1458651169.25586.5.camel@embedded.rocks>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 22 Mar 2016 07:59:48 -0500
+Subject: [PATCH RESEND] Revert "PCI: dra7xx: Mark driver as broken"
+In-Reply-To: <1457087359-16816-1-git-send-email-kishon@ti.com>
+References: <1457087359-16816-1-git-send-email-kishon@ti.com>
+Message-ID: <20160322125948.GA19418@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Stefan Wahren,
+On Fri, Mar 04, 2016 at 03:59:19PM +0530, Kishon Vijay Abraham I wrote:
+> From: Sekhar Nori <nsekhar@ti.com>
+> 
+> This reverts commit <5c3b99d057525fe2befe6a7db9b1309035d93eee>
+> ("PCI: dra7xx: Mark driver as broken").
+> 
+> With support to de-assert PCIe reset present in kernel,
+> DRA7x PCIe is not broken anymore.
+> 
+> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 
-I've seen that you worked last year on porting the mxs power and
-regulator into Linux mainline [1]. You even maintained your own
-repository [2].
+Applied to for-linus for v4.6, thanks!
 
-I appreciate the support for the i.MX28 in the mainline kernel, but
-this feature is really missing. Is there any chance to work further on
-this? What's the current state of the repository? Any plans on updating
-this?
-
-[1]?http://comments.gmane.org/gmane.linux.power-management.general/5954
-8
-[2]?https://github.com/lategoodbye/linux-mxs-power
-
-Best regards
-J?rg Krause
+> ---
+> Bjorn,
+> 
+> This patch should be merged only after [1] hits linus tree.
+> 
+> Thanks
+> Kishon
+> 
+> [1] -> git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git
+> 	for-v4.6/omap-hwmod-b
+> 
+>  drivers/pci/host/Kconfig |    1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> index 75a6054..6d181ba 100644
+> --- a/drivers/pci/host/Kconfig
+> +++ b/drivers/pci/host/Kconfig
+> @@ -5,7 +5,6 @@ config PCI_DRA7XX
+>  	bool "TI DRA7xx PCIe controller"
+>  	select PCIE_DW
+>  	depends on OF && HAS_IOMEM && TI_PIPE3
+> -	depends on BROKEN
+>  	help
+>  	 Enables support for the PCIe controller in the DRA7xx SoC.  There
+>  	 are two instances of PCIe controller in DRA7xx.  This controller can
+> -- 
+> 1.7.9.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
