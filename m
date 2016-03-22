@@ -1,52 +1,39 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 22 Mar 2016 10:21:08 +0100
-Subject: [PATCH v2 02/18] dt-bindings: timer: sp804: add timer-width
- property
-In-Reply-To: <56EB03B3.3070106@arm.com>
-References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
- <1457519060-6038-1-git-send-email-narmstrong@baylibre.com>
- <1457519060-6038-3-git-send-email-narmstrong@baylibre.com>
- <20160317170926.GA28934@rob-hp-laptop> <56EAF212.7020700@arm.com>
- <CAL_JsqKRjFDNmGjkPfJ-BKXG8ekNzUgear3uLzsFYbZU7Zph7w@mail.gmail.com>
- <56EB03B3.3070106@arm.com>
-Message-ID: <56F10E84.1080607@baylibre.com>
+From: kernel@martin.sperl.org (Martin Sperl)
+Date: Tue, 22 Mar 2016 10:23:45 +0100
+Subject: [PATCH v3 04/11] ARM: bcm2835: dt: add bindings for shared
+ interrupt properties
+In-Reply-To: <E60A6B56-0F3F-465C-8BF7-59EF35D41070@martin.sperl.org>
+References: <1457175142-28665-1-git-send-email-kernel@martin.sperl.org>
+ <1457175142-28665-5-git-send-email-kernel@martin.sperl.org>
+ <20160310085714.GA31313@svinekod>
+ <E60A6B56-0F3F-465C-8BF7-59EF35D41070@martin.sperl.org>
+Message-ID: <56F10F21.9020709@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/17/2016 08:21 PM, Robin Murphy wrote:
-> On 17/03/16 19:00, Rob Herring wrote:
->> On Thu, Mar 17, 2016 at 1:06 PM, Robin Murphy <robin.murphy@arm.com> wrote:
->>> Hi Rob,
->>>
->>> On 17/03/16 17:09, Rob Herring wrote:
->>>> That would not be an SP804 nor would the vendor be ARM in that case. So
->>>> add a new compatible string for the vendor that decided to hack up ARM's
->>>> IP block.
->>>
->>>
->>> By all accounts this is some ancient reference design[1] which later evolved
->>> _into_ the SP804, so that vendor would probably still be ARM ;)
->>
->> Right.
->>
->>> A separate compatible string would indeed make more sense, though. Both
->>> semantically and in terms of letting the driver account for the differences
->>> automatically.
->>>
->>> Robin.
->>>
->>> [1]:http://infocenter.arm.com/help/topic/com.arm.doc.ddi0170a/I350250.html
->>
->> Humm, same as integrator timers perhaps?
-> 
-> Having had a quick look, what the Integrator/AP manual describes certainly smells like the same basic block as the "AMBA Timer" - 16 bit counters and the same control register layout - albeit in a mutant triple-timer version with a bigger offset between each register set. Integrator/CP, on the other hand, looks much more SP804-like.
-> 
-> Robin.
-> 
+Hi Mark!
 
-Hi,
+On 11.03.2016 09:51, Martin Sperl wrote:
+>> On 10.03.2016, at 09:57, Mark Rutland <mark.rutland@arm.com> wrote:
+>>
+>> Alternative options that have been considered:
+>> * there is unfortunately no ?interrupt-names? property (like it exists for
+>>    reg, dma), because then I would have preferred to used:
+>>       interrupts = <...>, <...>, ?;
+>>       interrupt-name = ?dma0?, ?dma1?, ..., ?dma10?, ?dmashared?, ?dmaall?;
+>>    with something like this we could probably have avoided both properties
+>>    and just added a legacy mapping
+>>    This would require some changes to the irq framework (which I wanted
+>>    to avoid)
 
-I will switch to oxsemi,ox810se-rps-timer since it need a specific register width that will be handled by the driver.
+I have posted a patch based on this approach (after having found out 
+that it is possible
+with the current framework using platform_get_irq_byname).
 
-Thanks,
-Neil
+Rob Herring has "Acked" the documentation patch:
+   [PATCH 1/3] dt/bindings: bcm2835: add interrupt-names property
+
+Is this approach acceptable for you as well, so that we can try to get 
+it merged?
+
+Thanks, Martin
