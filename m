@@ -1,115 +1,80 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 22 Mar 2016 18:53:48 +0000
-Subject: [PATCH 6/6] iommu/arm-smmu: Make use of phandle iterators in
- device-tree parsing
-In-Reply-To: <1458669509-7178-7-git-send-email-joro@8bytes.org>
-References: <1458669509-7178-1-git-send-email-joro@8bytes.org>
- <1458669509-7178-7-git-send-email-joro@8bytes.org>
-Message-ID: <56F194BC.3020709@arm.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 22 Mar 2016 16:19:37 -0300
+Subject: [PATCH v14 0/17] Add Analogix Core Display Port Driver
+In-Reply-To: <CAD=FV=XXESzA6n6MNEGH1Kbh7CeL8xWX8CifFLVf91+0JyFcJQ@mail.gmail.com>
+References: <1455534485-1154-1-git-send-email-ykk@rock-chips.com>
+ <56EBA305.8030202@gmail.com>
+ <CAD=FV=XXESzA6n6MNEGH1Kbh7CeL8xWX8CifFLVf91+0JyFcJQ@mail.gmail.com>
+Message-ID: <56F19AC9.5060507@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+Hello,
 
-On 22/03/16 17:58, Joerg Roedel wrote:
-> From: Joerg Roedel <jroedel@suse.de>
+On 03/18/2016 07:53 PM, Doug Anderson wrote:
+> Hi,
+> 
+> On Thu, Mar 17, 2016 at 11:41 PM, Caesar Wang <caesar.upstream@gmail.com> wrote:
+>> Hi all,
+>>
+>> I pick this series up and test on C101PA chromebook, after Heiko update the
+>> 3 patches.
+>>
+>> [v14.1,09/17] drm: rockchip: dp: add rockchip platform dp driver
+>> [v14.1,04/17] drm: bridge: analogix/dp: fix some obvious code style
+>> [v14.1,01/17] drm: bridge: analogix/dp: split exynos dp driver to bridge
+>> directory
+>>
+>> C101PA chromebook:
+>> http://www.amazon.co.uk/10-1-Inch-Chromebook-Rockchip-Integrated-Graphics/dp/B0107N7WT6/ref=lp_758129031_1_4?s=computers&ie=UTF8&qid=1458282912&sr=1-4
+>>
+>> So, verified for the rockchip eDp contrller on my github.
+>> https://github.com/Caesar-github/rockchip/tree/veyron/next-stable-chromeos
+> 
+> I did similar to Caesar but I tested on veyron-jerry instead of
+> veyron-mickey.  Like Caesar, I picked these together Heiko's v14.1
+> patches to resolve merge conflicts.  I also picked into a slightly
+> different tree (mine was a 4.4-based tree with backports, including
+> Heiko's latest eDP device tree patches).
 >
-> Remove the usage of of_parse_phandle_with_args() and replace
-> it by the phandle-iterator implementation so that we can
-> parse out all of the potentially present 128 stream-ids.
 
-In a stream-matching implementation, a device may quite legitimately own 
-anything up to _all_ of the stream IDs (32768, or 65536 if we ever 
-implement support for the SMMUv2 EXID extension), so this is only a 
-genuine limit for stream indexing (and if anyone ever actually made one 
-of those, I don't think they're running mainline on it).
+I also tested this series on an Exynos5800 Peach Pi Chromebook, using
+Heiko's branch [0] that is based on today's mainline (968f3e374fa).
 
-Alternatively, how straightforward is it to change the DT on your 
-machine? I'll be getting a v2 of [1] out in a couple of weeks (after 
-imminent holidays), which already gets rid of MAX_MASTER_STREAMIDS 
-altogether, and might also have grown proper SMR support by then.
+I've seen no regressions with these patches, DP is working fine and
+also comes up after a S2R and DPMS on/off using the exynos-drm sysfs.
 
-Robin.
+NOTE: I had to cherry-pick a SPI core fix [1] in order to make the Pi
+to boot. Not related to this series of course but I just mention it in
+case someone else wants to do the same test on this machine.
+ 
+> Tough I haven't reviewed the code and am not a graphics expert, I'd
+> very much love to see this landed, presumably right after the merge
+> window closes.  Yakir's first patch
+> <https://patchwork.kernel.org/patch/6959211/> is nearly 1 year old and
+> it really seems like if there were any major objections left they'd
+> have been stated by now.  v14 appears to be about 1 month old with no
+> major comments.
+>
 
-[1]:http://thread.gmane.org/gmane.linux.kernel.iommu/12454
+Same here, this is the second time I tested this series (first time was
+v6 on October 25 [2]) and I think that has been out there for too long.
+ 
+> Tested-by: Douglas Anderson <dianders@chromium.org>
+> 
 
-> Signed-off-by: Joerg Roedel <jroedel@suse.de>
-> ---
->   drivers/iommu/arm-smmu.c | 28 ++++++++++++++++++++++------
->   1 file changed, 22 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 59ee4b8..413bd64 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -48,7 +48,7 @@
->   #include "io-pgtable.h"
->
->   /* Maximum number of stream IDs assigned to a single device */
-> -#define MAX_MASTER_STREAMIDS		MAX_PHANDLE_ARGS
-> +#define MAX_MASTER_STREAMIDS		128
->
->   /* Maximum number of context banks per SMMU */
->   #define ARM_SMMU_MAX_CBS		128
-> @@ -349,6 +349,12 @@ struct arm_smmu_domain {
->   	struct iommu_domain		domain;
->   };
->
-> +struct arm_smmu_phandle_args {
-> +	struct device_node *np;
-> +	int args_count;
-> +	uint32_t args[MAX_MASTER_STREAMIDS];
-> +};
-> +
->   static struct iommu_ops arm_smmu_ops;
->
->   static DEFINE_SPINLOCK(arm_smmu_devices_lock);
-> @@ -458,7 +464,7 @@ static int insert_smmu_master(struct arm_smmu_device *smmu,
->
->   static int register_smmu_master(struct arm_smmu_device *smmu,
->   				struct device *dev,
-> -				struct of_phandle_args *masterspec)
-> +				struct arm_smmu_phandle_args *masterspec)
->   {
->   	int i;
->   	struct arm_smmu_master *master;
-> @@ -1716,7 +1722,8 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
->   	struct arm_smmu_device *smmu;
->   	struct device *dev = &pdev->dev;
->   	struct rb_node *node;
-> -	struct of_phandle_args masterspec;
-> +	struct of_phandle_iterator it;
-> +	struct arm_smmu_phandle_args masterspec;
->   	int num_irqs, i, err;
->
->   	smmu = devm_kzalloc(dev, sizeof(*smmu), GFP_KERNEL);
-> @@ -1777,9 +1784,14 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
->
->   	i = 0;
->   	smmu->masters = RB_ROOT;
-> -	while (!of_parse_phandle_with_args(dev->of_node, "mmu-masters",
-> -					   "#stream-id-cells", i,
-> -					   &masterspec)) {
-> +
-> +	of_for_each_phandle(&it, err, dev->of_node,
-> +			    "mmu-masters", "#stream-id-cells", 0) {
-> +		int count = of_phandle_iterator_args(&it, masterspec.args,
-> +						     MAX_MASTER_STREAMIDS);
-> +		masterspec.np		= of_node_get(it.node);
-> +		masterspec.args_count	= count;
-> +
->   		err = register_smmu_master(smmu, dev, &masterspec);
->   		if (err) {
->   			dev_err(dev, "failed to add master %s\n",
-> @@ -1789,6 +1801,10 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
->
->   		i++;
->   	}
-> +
-> +	if (i == 0)
-> +		goto out_put_masters;
-> +
->   	dev_notice(dev, "registered %d master devices\n", i);
->
->   	parse_driver_options(smmu);
->
+Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+> 
+> -Doug
+> 
+
+[0]: git://github.com/mmind/linux-rockchip.git tmp/analogix-dp-clean
+[1]: http://comments.gmane.org/gmane.linux.kernel.spi.devel/23563
+[2]: http://lists.infradead.org/pipermail/linux-rockchip/2015-October/004884.html
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
