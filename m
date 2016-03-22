@@ -1,53 +1,28 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 22 Mar 2016 22:42:41 +0800
-Subject: [PATCH 2/4] ARM: cpuidle: constify return value of
- arm_cpuidle_get_ops()
-In-Reply-To: <1458657763-2561-1-git-send-email-jszhang@marvell.com>
-References: <1458657763-2561-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1458657763-2561-3-git-send-email-jszhang@marvell.com>
+Date: Tue, 22 Mar 2016 22:42:39 +0800
+Subject: [PATCH 0/4] ARM: cpuidle: use const and __initconst for cpuidle_ops
+Message-ID: <1458657763-2561-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm_cpuidle_read_ops() just copies '*ops' to cpuidle_ops[cpu], so the
-structure '*ops' is not modified at all.
+These trivial patches are similar as Masahiro posted in[1]. The main
+purpose is let cpuidle_ops structure be constified and replace
+"__initdata" with "__initconst".
 
-The comment is also updated accordingly.
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-August/365826.html
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- arch/arm/kernel/cpuidle.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Jisheng Zhang (4):
+  ARM: cpuidle: add const qualifier to cpuidle_ops member in structures
+  ARM: cpuidle: constify return value of arm_cpuidle_get_ops()
+  soc: qcom: spm: use const and __initconst for qcom_cpuidle_ops
+  drivers: firmware: psci: use const and __initconst for
+    psci_cpuidle_ops
 
-diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
-index 703926e..a44b268e 100644
---- a/arch/arm/kernel/cpuidle.c
-+++ b/arch/arm/kernel/cpuidle.c
-@@ -70,7 +70,7 @@ int arm_cpuidle_suspend(int index)
-  *
-  * Returns a struct cpuidle_ops pointer, NULL if not found.
-  */
--static struct cpuidle_ops *__init arm_cpuidle_get_ops(const char *method)
-+static const struct cpuidle_ops *__init arm_cpuidle_get_ops(const char *method)
- {
- 	struct of_cpuidle_method *m = __cpuidle_method_of_table;
- 
-@@ -88,7 +88,7 @@ static struct cpuidle_ops *__init arm_cpuidle_get_ops(const char *method)
-  *
-  * Get the method name defined in the 'enable-method' property, retrieve the
-  * associated cpuidle_ops and do a struct copy. This copy is needed because all
-- * cpuidle_ops are tagged __initdata and will be unloaded after the init
-+ * cpuidle_ops are tagged __initconst and will be unloaded after the init
-  * process.
-  *
-  * Return 0 on sucess, -ENOENT if no 'enable-method' is defined, -EOPNOTSUPP if
-@@ -97,7 +97,7 @@ static struct cpuidle_ops *__init arm_cpuidle_get_ops(const char *method)
- static int __init arm_cpuidle_read_ops(struct device_node *dn, int cpu)
- {
- 	const char *enable_method;
--	struct cpuidle_ops *ops;
-+	const struct cpuidle_ops *ops;
- 
- 	enable_method = of_get_property(dn, "enable-method", NULL);
- 	if (!enable_method)
+ arch/arm/include/asm/cpuidle.h | 2 +-
+ arch/arm/kernel/cpuidle.c      | 6 +++---
+ drivers/firmware/psci.c        | 2 +-
+ drivers/soc/qcom/spm.c         | 2 +-
+ 4 files changed, 6 insertions(+), 6 deletions(-)
+
 -- 
 2.8.0.rc3
