@@ -1,81 +1,64 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 22 Mar 2016 14:23:19 -0600
-Subject: [PATCH 11/14] coresight: tmc: keep track of memory width
+Date: Tue, 22 Mar 2016 14:23:22 -0600
+Subject: [PATCH 14/14] coresight: configuring ETF in FIFO mode when acting as
+ link
 In-Reply-To: <1458678202-3447-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1458678202-3447-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1458678202-3447-12-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1458678202-3447-15-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Accessing the HW configuration register each time the memory
-width is needed simply doesn't make sense.  It is much more
-efficient to read the value once and keep a reference for
-later use.
+When part of a path but not identified as a sink, the EFT has to
+be configured as a link and placed in HW FIFO mode.  As such when
+enabling a path, call the right configuration function based on
+the role the ETF if playing in this trace run.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-tmc-etf.c | 8 +++-----
- drivers/hwtracing/coresight/coresight-tmc.c     | 1 +
- drivers/hwtracing/coresight/coresight-tmc.h     | 2 ++
- 3 files changed, 6 insertions(+), 5 deletions(-)
+ drivers/hwtracing/coresight/coresight.c | 17 +++++++++++++++--
+ 1 file changed, 15 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-index c533b4494969..2cad1aa1949f 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-@@ -42,18 +42,16 @@ void tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
- 
- static void tmc_etb_dump_hw(struct tmc_drvdata *drvdata)
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index 6ec2b66af9ee..fa7ecbd99901 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -287,15 +287,27 @@ int coresight_enable_path(struct list_head *path, u32 mode)
  {
--	enum tmc_mem_intf_width memwidth;
- 	u8 memwords;
- 	char *bufp;
- 	u32 read_data;
- 	int i;
  
--	memwidth = BMVAL(readl_relaxed(drvdata->base + CORESIGHT_DEVID), 8, 10);
--	if (memwidth == TMC_MEM_INTF_WIDTH_32BITS)
-+	if (drvdata->memwidth == TMC_MEM_INTF_WIDTH_32BITS)
- 		memwords = 1;
--	else if (memwidth == TMC_MEM_INTF_WIDTH_64BITS)
-+	else if (drvdata->memwidth == TMC_MEM_INTF_WIDTH_64BITS)
- 		memwords = 2;
--	else if (memwidth == TMC_MEM_INTF_WIDTH_128BITS)
-+	else if (drvdata->memwidth == TMC_MEM_INTF_WIDTH_128BITS)
- 		memwords = 4;
- 	else
- 		memwords = 8;
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index c614fe160f8a..beeac81ff2fe 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -304,6 +304,7 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
+ 	int ret = 0;
++	u32 type;
+ 	struct coresight_node *nd;
+ 	struct coresight_device *csdev, *parent, *child;
  
- 	devid = readl_relaxed(drvdata->base + CORESIGHT_DEVID);
- 	drvdata->config_type = BMVAL(devid, 6, 7);
-+	drvdata->memwidth = BMVAL(devid, 8, 10);
+ 	list_for_each_entry_reverse(nd, path, link) {
+ 		csdev = nd->csdev;
++		type = csdev->type;
  
- 	if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
- 		if (np)
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
-index 6dbd70861b17..a6fb7a9fec5a 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.h
-+++ b/drivers/hwtracing/coresight/coresight-tmc.h
-@@ -103,6 +103,7 @@ enum tmc_mem_intf_width {
-  * @size:	@buf size.
-  * @mode:	how this TMC is being used.
-  * @config_type: TMC variant, must be of type @tmc_config_type.
-+ * @memwidth:	width of the memory interface databus, powers of two.
-  * @trigger_cntr: amount of words to store after a trigger.
-  */
- struct tmc_drvdata {
-@@ -119,6 +120,7 @@ struct tmc_drvdata {
- 	u32			size;
- 	local_t			mode;
- 	enum tmc_config_type	config_type;
-+	enum tmc_mem_intf_width	memwidth;
- 	u32			trigger_cntr;
- };
- 
+-		switch (csdev->type) {
++		/*
++		 * ETF devices are tricky... They can be a link or a sink,
++		 * depending on how they are configured.  If an ETF has been
++		 * "activated" it will be configured as a sink, otherwise
++		 * go ahead with the link configuration.
++		 */
++		if (type == CORESIGHT_DEV_TYPE_LINKSINK)
++			type = (csdev == coresight_get_sink(path)) ?
++						CORESIGHT_DEV_TYPE_SINK :
++						CORESIGHT_DEV_TYPE_LINK;
++
++		switch (type) {
+ 		case CORESIGHT_DEV_TYPE_SINK:
+-		case CORESIGHT_DEV_TYPE_LINKSINK:
+ 			ret = coresight_enable_sink(csdev, mode);
+ 			if (ret)
+ 				goto err;
+@@ -304,6 +316,7 @@ int coresight_enable_path(struct list_head *path, u32 mode)
+ 			/* sources are enabled from either sysFS or Perf */
+ 			break;
+ 		case CORESIGHT_DEV_TYPE_LINK:
++		case CORESIGHT_DEV_TYPE_LINKSINK:
+ 			parent = list_prev_entry(nd, link)->csdev;
+ 			child = list_next_entry(nd, link)->csdev;
+ 			ret = coresight_enable_link(csdev, parent, child);
 -- 
 2.1.4
