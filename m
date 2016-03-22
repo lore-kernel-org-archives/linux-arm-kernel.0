@@ -1,51 +1,36 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 23 Mar 2016 06:23:50 +0800
-Subject: [PATCH next 1/2] PCI: keystone: add pci error irq handler
-In-Reply-To: <1458676378-24377-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <201603230621.h4pXMyFx%fengguang.wu@intel.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Tue, 22 Mar 2016 23:28:03 +0100
+Subject: [PATCH v3 4/4] nmi_backtrace: generate one-line reports for idle
+ cpus
+In-Reply-To: <20160322173005.GT6344@twins.programming.kicks-ass.net>
+References: <1458667179-19630-1-git-send-email-cmetcalf@mellanox.com>
+ <1458667179-19630-5-git-send-email-cmetcalf@mellanox.com>
+ <20160322173005.GT6344@twins.programming.kicks-ass.net>
+Message-ID: <1714182.jSNjvC6qiX@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Murali,
+On Tuesday, March 22, 2016 06:30:05 PM Peter Zijlstra wrote:
+> On Tue, Mar 22, 2016 at 01:19:39PM -0400, Chris Metcalf wrote:
+> > When doing an nmi backtrace of many cores, most of which are idle,
+> > the output is a little overwhelming and very uninformative.  Suppress
+> > messages for cpus that are idling when they are interrupted and just
+> > emit one line, "NMI backtrace for N skipped: idling at pc 0xNNN".
+> > 
+> > We do this by grouping all the cpuidle code together into a new
+> > .cpuidle.text section, and then checking the address of the
+> > interrupted PC to see if it lies within that section.
+> > 
+> > This commit suitably tags x86, arm64, and tile idle routines,
+> > and only adds in the minimal framework for other architectures.
+> > 
+> > Acked-by: Peter Zijlstra (Intel) <peterz@infradead.org>
+> > Tested-by: Peter Zijlstra (Intel) <peterz@infradead.org>
+> > Signed-off-by: Chris Metcalf <cmetcalf@mellanox.com>
+> 
+> For some reason I found a few CPUs using poll_idle().
+> 
+> Rafael, when and why would that ever get selected as a useful idle
+> state? When the predicted idle time is so short even C1 isn't worth it?
 
-[auto build test ERROR on next-20160322]
-
-url:    https://github.com/0day-ci/linux/commits/Murali-Karicheri/PCI-keystone-add-pci-error-irq-handler/20160323-035516
-config: arm-multi_v7_defconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
-
-All errors (new ones prefixed by >>):
-
-   drivers/pci/host/pci-keystone.c: In function 'ks_pcie_probe':
->> drivers/pci/host/pci-keystone.c:410:16: error: 'node' undeclared (first use in this function)
-     ks_pcie->np = node;
-                   ^
-   drivers/pci/host/pci-keystone.c:410:16: note: each undeclared identifier is reported only once for each function it appears in
-
-vim +/node +410 drivers/pci/host/pci-keystone.c
-
-   404			return PTR_ERR(reg_p);
-   405		ks_pcie->device_id = readl(reg_p) >> 16;
-   406		devm_iounmap(dev, reg_p);
-   407		devm_release_mem_region(dev, res->start, resource_size(res));
-   408	
-   409		pp->dev = dev;
- > 410		ks_pcie->np = node;
-   411		platform_set_drvdata(pdev, ks_pcie);
-   412		ks_pcie->clk = devm_clk_get(dev, "pcie");
-   413		if (IS_ERR(ks_pcie->clk)) {
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 37256 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160323/6eabdc96/attachment-0001.obj>
+Yes, that's the case.
