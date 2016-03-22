@@ -1,47 +1,60 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Tue, 22 Mar 2016 21:48:33 +0100
-Subject: [PATCH V1] perf: qcom: Add L3 cache PMU driver
-In-Reply-To: <1458333422-8963-1-git-send-email-agustinv@codeaurora.org>
-References: <1458333422-8963-1-git-send-email-agustinv@codeaurora.org>
-Message-ID: <20160322204833.GE6356@twins.programming.kicks-ass.net>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 22 Mar 2016 21:52:41 +0100
+Subject: [linux-sunxi] Re: [PATCH] musb: sunxi-glue: Fix sunxi-musb driver
+ not auto-loading
+In-Reply-To: <56F1A748.6070808@suse.de>
+References: <1458598418-16959-1-git-send-email-hdegoede@redhat.com>
+ <56F1A748.6070808@suse.de>
+Message-ID: <56F1B099.1000005@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 18, 2016 at 04:37:02PM -0400, Agustin Vega-Frias wrote:
-> +static int qcom_l3_cache_pmu_probe(struct platform_device *pdev)
-> +{
-> +	int result;
-> +
-> +	INIT_LIST_HEAD(&l3cache_pmu.pmus);
-> +
-> +	atomic_set(&l3cache_pmu.cpu, -1);
-> +	l3cache_pmu.pmu = (struct pmu) {
-> +		.task_ctx_nr	= perf_hw_context,
+Hi,
 
-This cannot be right. There should only be a single perf_hw_context
-driver in the system and that is typically the core pmu.
+On 22-03-16 21:12, Andreas F?rber wrote:
+> Hi Hans,
+>
+> Am 21.03.2016 um 23:13 schrieb Hans de Goede:
+>> Add a missing MODULE_DEVICE_TABLE() line which was causing the
+>> sunxi-musb glue to not auto-load when build as a module.
+>
+> "built"
 
-Also, since this is an L3 PMU, it seems very unlikely that these events
-are actually per logical CPU, which is required for per-task events.
+Thanks.
 
-If these events are indeed not per logical CPU but per L3 cluster, you
-should designate a single logical CPU per cluster to handle these
-events. See for example arch/x86/events/intel/rapl.c for a relatively
-simple PMU driver that has similar constraints.
+> Should this get a Fixes: header for backporting to stable?
 
-> +		.name		= "l3cache",
-> +		.pmu_enable	= qcom_l3_cache__pmu_enable,
-> +		.pmu_disable	= qcom_l3_cache__pmu_disable,
-> +		.event_init	= qcom_l3_cache__event_init,
-> +		.add		= qcom_l3_cache__event_add,
-> +		.del		= qcom_l3_cache__event_del,
-> +		.start		= qcom_l3_cache__event_start,
-> +		.stop		= qcom_l3_cache__event_stop,
-> +		.read		= qcom_l3_cache__event_read,
-> +
-> +		.event_idx	= dummy_event_idx,
+Actually while looking for the commit id, it looks like someone
+else has already beat me to it, and this is already fixes
+in Linus' tree, so self NACK for this one.
 
-perf_event_idx_default() wasn't good enough?
+Regards,
 
-> +		.attr_groups	= qcom_l3_cache_pmu_attr_grps,
-> +	};
+Hans
+
+
+>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>>   drivers/usb/musb/sunxi.c | 1 +
+>>   1 file changed, 1 insertion(+)
+>>
+>> diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
+>> index 4b472b8..9af9431 100644
+>> --- a/drivers/usb/musb/sunxi.c
+>> +++ b/drivers/usb/musb/sunxi.c
+>> @@ -756,6 +756,7 @@ static const struct of_device_id sunxi_musb_match[] = {
+>>   	{ .compatible = "allwinner,sun8i-a33-musb", },
+>>   	{}
+>>   };
+>> +MODULE_DEVICE_TABLE(of, sunxi_musb_match);
+>>
+>>   static struct platform_driver sunxi_musb_driver = {
+>>   	.probe = sunxi_musb_probe,
+>
+> Has anyone looked into my earlier report about the module filename not
+> having musb-? I did not see any response and haven't rechecked v4.5.0.
+>
+> Regards,
+> Andreas
+>
