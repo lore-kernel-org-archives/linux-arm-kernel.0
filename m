@@ -1,82 +1,83 @@
-From: lakshmi.sai.krishna.potthuri@xilinx.com (Lakshmi Sai Krishna Potthuri)
-Date: Tue, 22 Mar 2016 06:39:51 +0000
-Subject: [LINUX PATCH 1/2] mtd: Added dummy entry in the spi_transfer
- structure.
-In-Reply-To: <20160321130734.GS2566@sirena.org.uk>
-References: <1458562809-36114-1-git-send-email-lakshmis@xilinx.com>
- <20160321130734.GS2566@sirena.org.uk>
-Message-ID: <4FF8F58FAA9D5D4193D4E554E4352C5902C6D34C@XAP-PVEXMBX02.xlnx.xilinx.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 22 Mar 2016 12:10:16 +0530
+Subject: [PATCH RESEND] Revert "PCI: dra7xx: Mark driver as broken"
+In-Reply-To: <56DFAE46.4090509@ti.com>
+References: <1457087359-16816-1-git-send-email-kishon@ti.com>
+ <20160308180526.GC21278@localhost> <56DFAE46.4090509@ti.com>
+Message-ID: <56F0E8D0.3060009@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Bjorn,
 
-<snip>
->On Mon, Mar 21, 2016 at 05:50:08PM +0530, P L Sai Krishna wrote:
->> This patch does following things.
->> 1. Added dummy entry in the spi_transfer structure.
->> 2. Assigned dummy cycles to dummy member in the transfer structure
->> during read operation.
->
->Please try to follow the patch submission process covered in
->SubmittingPatches, in particular please use subject lines reflecting the style
->for the subsystem (which helps people identify relevant changes to
->review) and...
->
->>  drivers/mtd/devices/m25p80.c | 1 +
->>  include/linux/spi/spi.h      | 2 ++
->>  2 files changed, 3 insertions(+)
->
->...split things up into individual patches, for example here you're both adding a
->new feature and adding a user of that feature in a single patch.
-
-I will split the patch into two with appropriate commit messages.
-
->
->> + * @dummy: number of dummy cycles.
->
->This needs to be clearer about what a dummy cycle is and where it gets
->inserted.  We probably also want a better name, just "dummy" makes it look
->like a padding field in the structure.  How about dummy_cycles?
-
-dummy_cycles is a better idea.
-I will change it and add the usage of this in the description in a detailed manner.
-
->
->> @@ -752,6 +753,7 @@ struct spi_transfer {
->>      u8              bits_per_word;
->>      u16             delay_usecs;
->>      u32             speed_hz;
->> +    u32             dummy;
+On Wednesday 09 March 2016 10:31 AM, Kishon Vijay Abraham I wrote:
+> 
+> 
+> On Tuesday 08 March 2016 11:35 PM, Bjorn Helgaas wrote:
+>> On Fri, Mar 04, 2016 at 03:59:19PM +0530, Kishon Vijay Abraham I wrote:
+>>> From: Sekhar Nori <nsekhar@ti.com>
+>>>
+>>> This reverts commit <5c3b99d057525fe2befe6a7db9b1309035d93eee>
+>>> ("PCI: dra7xx: Mark driver as broken").
+>>>
+>>> With support to de-assert PCIe reset present in kernel,
+>>> DRA7x PCIe is not broken anymore.
+>>>
+>>> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>> ---
+>>> Bjorn,
+>>>
+>>> This patch should be merged only after [1] hits linus tree.
+>>>
+>>> Thanks
+>>> Kishon
+>>>
+>>> [1] -> git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git
+>>> 	for-v4.6/omap-hwmod-b
 >>
->>      struct list_head transfer_list;
->>  };
->
->This isn't enough to add the feature - a client driver trying to make use of this
->needs to be able to tell if the cycles are actually going to be inserted.  I'd
->expect to see a capability flag that can be checked and some error checking so
->that if we try to do a transfer with dummy cycles and can't support it we don't
->silently ignore the dummy cycles, ideally also something that'll handle
->multiples of 8 bits with SPI controllers that don't otherwise support this
->feature.
+>> OK.  Would you mind pinging me about this after [1] is merged to
+>> Linus' tree?  I don't want to put this in my "next" branch yet,
+>> because I don't know whether Pauls branch or mine will be merged first
+>> in the merge window.  But after the merge window closes, I can
+>> certainly include this in a "PCI fixes" pull request for inclusion in
+>> v4.6.
+> 
+> yes sure. I can do that.
 
-Currently, all fast reads use 8 cycles or 1 byte of dummy. This generally works.
-But it can be vary based on the flash and the type of read command.
-Dummy bytes are taken care of in m25p80.c by adjusting the len field:
-Length = size of (command + address + dummy byte)
+The reset patch [2] has been merged to linus tree. This patch can be merged now.
 
-There might be controllers (like ZynqMP GQSPI) that would be able to use
-the information that dummy byte(s) were added and the precise number
-of dummy cycles. This patch does not disturb the existing implementation
-of adjusting length (as described above). It adds an additional optional feature.
-So there is no harm to controllers that can't support it - they can ignore it and
-still work with the existing "length adjustment" implementation.
-If you think there value in adding a capability flag, please let me know.
+Thanks
+Kishon
 
-Thanks for your review.
-
-Regards,
-Sai Krishna
-
-
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+[2] ->
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/arch/arm/mach-omap2/omap_hwmod_7xx_data.c?id=1c96bee4df1998b9dec3e2ef8f77e8436e29342b
+> 
+> Thanks
+> Kishon
+> 
+>>
+>> Bjorn
+>>
+>>>  drivers/pci/host/Kconfig |    1 -
+>>>  1 file changed, 1 deletion(-)
+>>>
+>>> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+>>> index 75a6054..6d181ba 100644
+>>> --- a/drivers/pci/host/Kconfig
+>>> +++ b/drivers/pci/host/Kconfig
+>>> @@ -5,7 +5,6 @@ config PCI_DRA7XX
+>>>  	bool "TI DRA7xx PCIe controller"
+>>>  	select PCIE_DW
+>>>  	depends on OF && HAS_IOMEM && TI_PIPE3
+>>> -	depends on BROKEN
+>>>  	help
+>>>  	 Enables support for the PCIe controller in the DRA7xx SoC.  There
+>>>  	 are two instances of PCIe controller in DRA7xx.  This controller can
+>>> -- 
+>>> 1.7.9.5
+>>>
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
