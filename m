@@ -1,68 +1,58 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Tue, 22 Mar 2016 10:14:39 +0800
-Subject: [RFC PATCH v1 0/4] Add Rockchip RGA support
-In-Reply-To: <1867694.1mDULrSexE@phil>
-References: <1458552518-25527-1-git-send-email-ykk@rock-chips.com>
- <1511371.I0NIYzh3kP@diego> <56EFE66A.8020404@rock-chips.com>
- <1867694.1mDULrSexE@phil>
-Message-ID: <56F0AA8F.3050602@rock-chips.com>
+From: jun.nie@linaro.org (Jun Nie)
+Date: Tue, 22 Mar 2016 10:17:52 +0800
+Subject: [PATCH 2/2] serial: amba-pl011: complete support to ZTE uart
+In-Reply-To: <56F0A88C.9050209@codeaurora.org>
+References: <1457920282-14823-1-git-send-email-jun.nie@linaro.org>
+ <1457920282-14823-2-git-send-email-jun.nie@linaro.org>
+ <56F05C16.1030805@codeaurora.org>
+ <CABymUCNKOgdLBLr2fZ4KhwmG+R4Zm-LHnfDppV-yiwUjRH4Nyg@mail.gmail.com>
+ <56F0A628.2080607@codeaurora.org>
+ <CABymUCOX5zws9QfXp5Wud2JBAYJZH4rxPRVVgbk7tRvbUUHChA@mail.gmail.com>
+ <56F0A88C.9050209@codeaurora.org>
+Message-ID: <CABymUCMDqfLsCr7dWxWpKZZwEqr+vO59GR+wUnyJqSGzXQYuDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
-
-On 03/22/2016 08:42 AM, Heiko Stuebner wrote:
-> Hi Yakir,
->
-> Am Montag, 21. M?rz 2016, 20:17:46 schrieb Yakir Yang:
->> On 03/21/2016 07:29 PM, Heiko St?bner wrote:
->>> Am Montag, 21. M?rz 2016, 17:28:38 schrieb Yakir Yang:
->>>> This patch set would add the RGA direct rendering based 2d graphics
->>>> acceleration module.
->>> very cool to see that.
->> ;)
+2016-03-22 10:06 GMT+08:00 Timur Tabi <timur@codeaurora.org>:
+> Jun Nie wrote:
 >>
->>>> This patch set is based on git repository below:
->>>> git://people.freedesktop.org/~airlied/linux drm-next
->>>> commit id: 568d7c764ae01f3706085ac8f0d8a8ac7e826bd7
->>>>
->>>> And the RGA driver is based on Exynos G2D driver, it only manages the
->>>> command lists received from user, so user should make the command list
->>>> to data and registers needed by operation to use.
->>>>
->>>> I have prepared an userspace demo application for testing:
->>>> 	https://github.com/yakir-Yang/libdrm-rockchip
->>>>
->>>> That is a rockchip libdrm library, and I have write a simple test case
->>>> "rockchip_rga_test" that would test the below RGA features:
->>>> - solid
->>>> - copy
->>>> - rotation
->>>> - flip
->>>> - window clip
->>>> - dithering
->>> Did you submit your libdrm changes as well?
->>>
->>> Userspace-interfaces need to be stable so the other side must also get
->>> accepted - even before the kernel change if I remember correctly.
->> Got it, and I just saw exynos_fimg2d already landed at mainline libdrm.
->> But I don't find the way to submit patches to libdrm, would you like
->> share some helps here ;)
-> Looking at the libdrm sources on cgit.freedesktop.org, I did not find any
-> specific manual on submitting patches.
+>> That's a fair comment. I suppose all platform need to enable clock for
+>> the device. For device tree case, we need these code for clock
+>> enabling.
 >
-> But looking at the dri-list archive, dri-devel at lists.freedesktop.org is the
-> right list and looking at the libdrm history it looks like Emil Velikov
-> <emil.l.velikov@gmail.com> seems to be doing maintenance-stuff in libdrm.
-> And as a 3rd recipient, please also include the linux-rockchip list.
-Great, thanks, I would improve my libdrm changes, and submit them soon :)
+>
+> But why do you need to enable the clock?  The pl011 driver works fine for
+> every platform without your patch.  If the ZTE platform needs to call
+> clk_get() in order to work, than that is something different about your
+> platform.
 
-- Yakir
-> @Emil, please shout if I read that wrong :-)
+ARM/ST pl011 is amba device and use pl011_probe() for initialization,
+which call these clock enabling code for every device. You introduced
+platform device driver entry for pl011 and only sbsa use platform
+device probe method currently. I am trying to reuse this probe
+function, so need to add clock enabling code in this function.
+
+If you did not find any issue in sbsa device tree case, I guess the
+clock is always enabled. For mobile platform, clock is auto gated for
+power saving in most of cases.
+
+>
+>> For ACPI case, it may be handled automatically. If you agree
+>> my opinion, I will move these lines to patch 1. Please correct me if I
+>> am wrong.
 >
 >
-> Hope that helps
-> Heiko
+> I think you need to create a separate patch that adds that call, and make
+> sure it's tested by other platforms before it gets accepted.
+
+These code only impact sbsa device as only sbsa device is initialized
+via platform driver entry. So only your flavor is need for testing the
+code. Thanks! :-)
+
+Jun
 >
 >
->
+> --
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the
+> Code Aurora Forum, hosted by The Linux Foundation.
