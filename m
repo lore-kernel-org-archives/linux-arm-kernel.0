@@ -1,95 +1,41 @@
 From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Tue, 22 Mar 2016 13:46:28 +0300
-Subject: [PATCH v5 1/6] of/serial: move earlycon early_param handling to serial
+Date: Tue, 22 Mar 2016 13:46:29 +0300
+Subject: [PATCH v5 2/6] ACPI: add definitions of DBG2 subtypes
 In-Reply-To: <1458643595-14719-1-git-send-email-aleksey.makarov@linaro.org>
 References: <1458643595-14719-1-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <1458643595-14719-2-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <1458643595-14719-3-git-send-email-aleksey.makarov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Leif Lindholm <leif.lindholm@linaro.org>
+The recent version of Microsoft Debug Port Table 2 (DBG2) [1]
+specifies additional serial debug port subtypes.  These constants
+are also referred by Serial Port Console Redirection Table (SPCR) [2]
 
-We have multiple "earlycon" early_param handlers - merge the DT one into
-the main earlycon one.  It's a cleanup that also will be useful
-to decide if ACPI SPCR earlycon should be set up.
+Add these constants.
 
-Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+[1] https://msdn.microsoft.com/en-us/library/windows/hardware/dn639131(v=vs.85).aspx
+[2] https://msdn.microsoft.com/en-us/library/windows/hardware/dn639132(v=vs.85).aspx
+
 Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
 ---
- drivers/of/fdt.c              | 11 +----------
- drivers/tty/serial/earlycon.c |  3 ++-
- include/linux/of_fdt.h        |  2 ++
- 3 files changed, 5 insertions(+), 11 deletions(-)
+ include/acpi/actbl2.h | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-index 3349d2a..0547256 100644
---- a/drivers/of/fdt.c
-+++ b/drivers/of/fdt.c
-@@ -805,7 +805,7 @@ static inline void early_init_dt_check_for_initrd(unsigned long node)
+diff --git a/include/acpi/actbl2.h b/include/acpi/actbl2.h
+index a4ef625..652f747 100644
+--- a/include/acpi/actbl2.h
++++ b/include/acpi/actbl2.h
+@@ -371,6 +371,11 @@ struct acpi_dbg2_device {
  
- #ifdef CONFIG_SERIAL_EARLYCON
+ #define ACPI_DBG2_16550_COMPATIBLE  0x0000
+ #define ACPI_DBG2_16550_SUBSET      0x0001
++#define ACPI_DBG2_ARM_PL011         0x0003
++#define ACPI_DBG2_ARM_SBSA_32BIT    0x000D
++#define ACPI_DBG2_ARM_SBSA_GENERIC  0x000E
++#define ACPI_DBG2_ARM_DCC           0x000F
++#define ACPI_DBG2_BCM2835           0x0010
  
--static int __init early_init_dt_scan_chosen_serial(void)
-+int __init early_init_dt_scan_chosen_serial(void)
- {
- 	int offset;
- 	const char *p, *q, *options = NULL;
-@@ -849,15 +849,6 @@ static int __init early_init_dt_scan_chosen_serial(void)
- 	}
- 	return -ENODEV;
- }
--
--static int __init setup_of_earlycon(char *buf)
--{
--	if (buf)
--		return 0;
--
--	return early_init_dt_scan_chosen_serial();
--}
--early_param("earlycon", setup_of_earlycon);
- #endif
+ #define ACPI_DBG2_1394_STANDARD     0x0000
  
- /**
-diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
-index 067783f..d217366 100644
---- a/drivers/tty/serial/earlycon.c
-+++ b/drivers/tty/serial/earlycon.c
-@@ -17,6 +17,7 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/io.h>
-+#include <linux/of_fdt.h>
- #include <linux/serial_core.h>
- #include <linux/sizes.h>
- #include <linux/of.h>
-@@ -209,7 +210,7 @@ static int __init param_setup_earlycon(char *buf)
- 	 * don't generate a warning from parse_early_params() in that case
- 	 */
- 	if (!buf || !buf[0])
--		return 0;
-+		return early_init_dt_scan_chosen_serial();
- 
- 	err = setup_earlycon(buf);
- 	if (err == -ENOENT || err == -EALREADY)
-diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
-index 2fbe868..56b2a43 100644
---- a/include/linux/of_fdt.h
-+++ b/include/linux/of_fdt.h
-@@ -63,6 +63,7 @@ extern int early_init_dt_scan_chosen(unsigned long node, const char *uname,
- 				     int depth, void *data);
- extern int early_init_dt_scan_memory(unsigned long node, const char *uname,
- 				     int depth, void *data);
-+extern int early_init_dt_scan_chosen_serial(void);
- extern void early_init_fdt_scan_reserved_mem(void);
- extern void early_init_fdt_reserve_self(void);
- extern void early_init_dt_add_memory_arch(u64 base, u64 size);
-@@ -91,6 +92,7 @@ extern void early_get_first_memblock_info(void *, phys_addr_t *);
- extern u64 of_flat_dt_translate_address(unsigned long node);
- extern void of_fdt_limit_memory(int limit);
- #else /* CONFIG_OF_FLATTREE */
-+static inline int early_init_dt_scan_chosen_serial(void) { return -ENODEV; }
- static inline void early_init_fdt_scan_reserved_mem(void) {}
- static inline void early_init_fdt_reserve_self(void) {}
- static inline const char *of_flat_dt_get_machine_name(void) { return NULL; }
 -- 
 2.7.4
