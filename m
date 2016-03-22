@@ -1,56 +1,116 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 22 Mar 2016 10:24:29 +0000
-Subject: [PATCH v3 04/11] ARM: bcm2835: dt: add bindings for shared
- interrupt properties
-In-Reply-To: <56F10F21.9020709@martin.sperl.org>
-References: <1457175142-28665-1-git-send-email-kernel@martin.sperl.org>
- <1457175142-28665-5-git-send-email-kernel@martin.sperl.org>
- <20160310085714.GA31313@svinekod>
- <E60A6B56-0F3F-465C-8BF7-59EF35D41070@martin.sperl.org>
- <56F10F21.9020709@martin.sperl.org>
-Message-ID: <20160322102429.GA21158@leverpostej>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Tue, 22 Mar 2016 11:26:49 +0100
+Subject: [PATCH V5 13/15] pci, acpi: Match PCI config space accessors
+ against platfrom specific quirks.
+In-Reply-To: <1458316194.23434.104.camel@redhat.com>
+References: <1455630825-27253-1-git-send-email-tn@semihalf.com>
+ <1455630825-27253-14-git-send-email-tn@semihalf.com>
+ <1458316194.23434.104.camel@redhat.com>
+Message-ID: <56F11DE9.2030302@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 22, 2016 at 10:23:45AM +0100, Martin Sperl wrote:
-> Hi Mark!
+On 18.03.2016 16:49, Mark Salter wrote:
+> On Tue, 2016-02-16 at 14:53 +0100, Tomasz Nowicki wrote:
+>> Some platforms may not be fully compliant with generic set of PCI config
+>> accessors. For these cases we implement the way to overwrite accessors
+>> set prior to PCI buses enumeration. Algorithm traverses available quirk
+>> list, matches against <platform ID (DMI), domain, bus number> tuple and
+>> returns corresponding accessors. All quirks can be defined using:
+>> DECLARE_ACPI_MCFG_FIXUP() and kept self contained. Example,
+>>
+>> static const struct dmi_system_id foo_dmi[] = {
+>>          {
+>>                  .ident = "<Platform ident string>",
+>>                  .callback = <handler>,
+>>                  .matches = {
+>>                          DMI_MATCH(DMI_SYS_VENDOR, "<system vendor>"),
+>>                          DMI_MATCH(DMI_PRODUCT_NAME, "<product name>"),
+>>                          DMI_MATCH(DMI_PRODUCT_VERSION, "product version"),
+>>                  },
+>>          },
+>>          { }
+>> };
+>>
+>> static struct pci_ops foo_ecam_pci_ops = {
+>>          .map_bus = pci_mcfg_dev_base,
+>>          .read = foo_ecam_config_read,
+>>          .write = foo_ecam_config_write,
+>> };
+>> DECLARE_ACPI_MCFG_FIXUP(foo_dmi, NULL, &foo_ecam_pci_ops, <domain_nr>, <bus_nr>);
+>>
+>> More custom (non-DMI) matching can be done via an extra call.
+>> Note that there is possibility to assign quirk related private data to
+>> root->sysdata which will be available along read/wriate accessor, example:
+>>
+>> static int boo_match(struct pci_mcfg_fixup *fixup, struct acpi_pci_root *root)
+>> {
+>>          return [condition] ? 1 : 0;
+>> }
+>>
+>> int boo_ecam_config_read(struct pci_bus *bus, unsigned int devfn,
+>>                            int where, int size, u32 *val)
+>> {
+>>          struct acpi_pci_root *root = bus->sysdata;
+>>          struct boo_priv_data *boo_data = root->sysdata;
+>>
+>>          [..]
+>> }
+>>
+>> static struct pci_ops boo_ecam_pci_ops = {
+>> 	.map_bus = pci_mcfg_dev_base,
+>> 	.read = boo_ecam_config_read,
+>> 	.write = boo_ecam_config_write,
+>> };
+>> DECLARE_ACPI_MCFG_FIXUP(NULL, boo_match, &boo_ecam_pci_ops, <domain_nr>, <bus_nr>);
+>>
+>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>> Tested-by: Duc Dang <dhdang@apm.com>
+>> Tested-by: Dongdong Liu <liudongdong3@huawei.com>
+>> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
+>> Tested-by: Sinan Kaya <okaya@codeaurora.org>
+>> ---
+>>   drivers/acpi/pci_mcfg.c           | 32 ++++++++++++++++++++++++++++++--
+>>   include/acpi/acpi_bus.h           |  1 +
+>>   include/asm-generic/vmlinux.lds.h |  7 +++++++
+>>   include/linux/pci-acpi.h          | 18 ++++++++++++++++++
+>>   4 files changed, 56 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
+>> index 0062257..b343547 100644
+>> --- a/drivers/acpi/pci_mcfg.c
+>> +++ b/drivers/acpi/pci_mcfg.c
+>> @@ -41,6 +41,29 @@ int __weak raw_pci_write(unsigned int domain, unsigned int bus,
+>>   	return PCIBIOS_DEVICE_NOT_FOUND;
+>>   }
+>>
+>> +extern struct pci_mcfg_fixup __start_acpi_mcfg_fixups[];
+>> +extern struct pci_mcfg_fixup __end_acpi_mcfg_fixups[];
+>> +
+>> +static struct pci_ops *pci_mcfg_check_quirks(struct acpi_pci_root *root)
+>> +{
+>> +	struct pci_mcfg_fixup *f;
+>> +	int bus_num = root->secondary.start;
+>> +	int domain = root->segment;
+>> +
+>> +	/*
+>> +	 * First match against PCI topology <domain:bus> then use DMI or
+>> +	 * custom match handler.
+>> +	 */
+>> +	for (f = __start_acpi_mcfg_fixups; f < __end_acpi_mcfg_fixups; f++) {
+>> +		if ((f->domain == domain || f->domain == PCI_MCFG_DOMAIN_ANY) &&
+>> +		    (f->bus_num == bus_num || f->bus_num == PCI_MCFG_BUS_ANY) &&
+>> +		    (f->system ? dmi_check_system(f->system) : 1 &&
+>> +		     f->match ? f->match(f, root) : 1))
+>
+> The parens are not quite right here ^^^^
+> If dmi_check_system() returns true, f->match won't get called.
+>
+> This should be:
+> 		    (f->system ? dmi_check_system(f->system) : 1) &&
+> 		     f->match ? f->match(f, root) : 1)
 
-Hi Martin,
+Well spotted. Thanks!
 
-Apologies for having gone silent on this.
-
-> On 11.03.2016 09:51, Martin Sperl wrote:
-> >>On 10.03.2016, at 09:57, Mark Rutland <mark.rutland@arm.com> wrote:
-> >>
-> >>Alternative options that have been considered:
-> >>* there is unfortunately no ?interrupt-names? property (like it exists for
-> >>   reg, dma), because then I would have preferred to used:
-> >>      interrupts = <...>, <...>, ?;
-> >>      interrupt-name = ?dma0?, ?dma1?, ..., ?dma10?, ?dmashared?, ?dmaall?;
-> >>   with something like this we could probably have avoided both properties
-> >>   and just added a legacy mapping
-> >>   This would require some changes to the irq framework (which I wanted
-> >>   to avoid)
-> 
-> I have posted a patch based on this approach (after having found out
-> that it is possible
-> with the current framework using platform_get_irq_byname).
-> 
-> Rob Herring has "Acked" the documentation patch:
->   [PATCH 1/3] dt/bindings: bcm2835: add interrupt-names property
-> 
-> Is this approach acceptable for you as well, so that we can try to
-> get it merged?
-
-That approach looks good to me too.
-
-One minor nit: please explicitly describe the "dma-shared-all"
-interrupt-name in the description of interrupt-names.
-
-Otherwise, for the binding and the code (which I retains support for
-existing DTs):
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
+Tomasz
