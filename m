@@ -1,34 +1,47 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Tue, 22 Mar 2016 21:29:26 +0100
-Subject: [PATCH v2 0/6] ARM64: meson: GXBaby (S905) and Vega S95 enablement
-In-Reply-To: <CAOi56cXFEUZuu0bJknUYNhfR2jL=LYUTbpnX9diZw2B5JfTaEQ@mail.gmail.com>
-References: <1456886101-22967-1-git-send-email-afaerber@suse.de>
- <CAOi56cXFEUZuu0bJknUYNhfR2jL=LYUTbpnX9diZw2B5JfTaEQ@mail.gmail.com>
-Message-ID: <56F1AB26.8050200@suse.de>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Tue, 22 Mar 2016 21:48:33 +0100
+Subject: [PATCH V1] perf: qcom: Add L3 cache PMU driver
+In-Reply-To: <1458333422-8963-1-git-send-email-agustinv@codeaurora.org>
+References: <1458333422-8963-1-git-send-email-agustinv@codeaurora.org>
+Message-ID: <20160322204833.GE6356@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 21.03.2016 um 23:36 schrieb Kevin Hilman:
-> On Tue, Mar 1, 2016 at 6:34 PM, Andreas F?rber <afaerber@suse.de> wrote:
-> 
->> Note: On the Vega S95 I need to change TEXT_OFFSET as follows,
->> in order to avoid the vendor U-Boot overwriting itself (fwiu);
->> for the Mini Mx that's reportedly not necessary.
-> 
-> FYI, the Amlogic P200 dev board also needs this hack with the factory u-boot.
+On Fri, Mar 18, 2016 at 04:37:02PM -0400, Agustin Vega-Frias wrote:
+> +static int qcom_l3_cache_pmu_probe(struct platform_device *pdev)
+> +{
+> +	int result;
+> +
+> +	INIT_LIST_HEAD(&l3cache_pmu.pmus);
+> +
+> +	atomic_set(&l3cache_pmu.cpu, -1);
+> +	l3cache_pmu.pmu = (struct pmu) {
+> +		.task_ctx_nr	= perf_hw_context,
 
-I have meanwhile found that
+This cannot be right. There should only be a single perf_hw_context
+driver in the system and that is typically the core pmu.
 
-mkimage -A arm64 -O linux -T kernel -C none -a 0x1080000 -e 0x1080000 \
--n linux-next -d arch/arm64/boot/Image ../uImage
+Also, since this is an L3 PMU, it seems very unlikely that these events
+are actually per logical CPU, which is required for per-task events.
 
-and then using bootm instead of booti works even without the above hack
-on the Vega S95. Not a satisfactory solution yet, but better than
-patching the kernel in a distro-incompatible way.
+If these events are indeed not per logical CPU but per L3 cluster, you
+should designate a single logical CPU per cluster to handle these
+events. See for example arch/x86/events/intel/rapl.c for a relatively
+simple PMU driver that has similar constraints.
 
-Regards,
-Andreas
+> +		.name		= "l3cache",
+> +		.pmu_enable	= qcom_l3_cache__pmu_enable,
+> +		.pmu_disable	= qcom_l3_cache__pmu_disable,
+> +		.event_init	= qcom_l3_cache__event_init,
+> +		.add		= qcom_l3_cache__event_add,
+> +		.del		= qcom_l3_cache__event_del,
+> +		.start		= qcom_l3_cache__event_start,
+> +		.stop		= qcom_l3_cache__event_stop,
+> +		.read		= qcom_l3_cache__event_read,
+> +
+> +		.event_idx	= dummy_event_idx,
 
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton; HRB 21284 (AG N?rnberg)
+perf_event_idx_default() wasn't good enough?
+
+> +		.attr_groups	= qcom_l3_cache_pmu_attr_grps,
+> +	};
