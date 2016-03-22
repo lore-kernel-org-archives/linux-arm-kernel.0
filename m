@@ -1,32 +1,47 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Tue, 22 Mar 2016 13:46:33 +0300
-Subject: [PATCH v5 6/6] serial: pl011: add EARLYCON_DECLARE
-In-Reply-To: <1458643595-14719-1-git-send-email-aleksey.makarov@linaro.org>
-References: <1458643595-14719-1-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <1458643595-14719-7-git-send-email-aleksey.makarov@linaro.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 22 Mar 2016 11:55:19 +0100
+Subject: [PATCH] ARM: at91/dt: sama5d4 xplained: don't disable hsmci
+ regulator
+In-Reply-To: <1457692516-3151-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1457692516-3151-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <56F12497.8080602@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds definition of early console data for pl011.
-It allows setting up an early console with a string passed in
-command line or compiled by the ACPI SPCR table handler.
+Le 11/03/2016 11:35, Ludovic Desroches a ?crit :
+> If enabling the hsmci regulator on card detection, the board can reboot
+> on sd card insertion. Keeping the regulator always enabled fixes this
+> issue.
+> 
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> Fixes: 8d545f32bd77 ("ARM: at91/dt: sama5d4 xplained: add regulators for
+> v(q)mmc1 supplies")
+> Cc: stable at vger.kernel.org #4.3 and later
 
-Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
----
- drivers/tty/serial/amba-pl011.c | 1 +
- 1 file changed, 1 insertion(+)
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 59b743f..af6f87cf 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -2385,6 +2385,7 @@ static int __init pl011_early_console_setup(struct earlycon_device *device,
- 	return 0;
- }
- OF_EARLYCON_DECLARE(pl011, "arm,pl011", pl011_early_console_setup);
-+EARLYCON_DECLARE(pl011, pl011_early_console_setup);
- 
- #else
- #define AMBA_CONSOLE	NULL
+And changed the $subject prefix to the new convention:
+"ARM: dts: at91:"
+
+Thanks, bye.
+
+> ---
+>  arch/arm/boot/dts/at91-sama5d4_xplained.dts | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/boot/dts/at91-sama5d4_xplained.dts b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
+> index 569026e..da84e65 100644
+> --- a/arch/arm/boot/dts/at91-sama5d4_xplained.dts
+> +++ b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
+> @@ -268,5 +268,6 @@
+>  		regulator-min-microvolt = <3300000>;
+>  		regulator-max-microvolt = <3300000>;
+>  		vin-supply = <&vcc_3v3_reg>;
+> +		regulator-always-on;
+>  	};
+>  };
+> 
+
+
 -- 
-2.7.4
+Nicolas Ferre
