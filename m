@@ -1,16 +1,17 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 22 Mar 2016 11:17:48 +0100
-Subject: [PATCH 03/13] ARM: dts: sh73a0: Remove unnecessary
+Date: Tue, 22 Mar 2016 11:18:37 +0100
+Subject: [PATCH 00/13] ARM, arm64: dts: Remove unnecessary
  clock-output-names properties
-In-Reply-To: <1458610840-15194-4-git-send-email-horms+renesas@verge.net.au>
+In-Reply-To: <1458610840-15194-1-git-send-email-horms+renesas@verge.net.au>
 References: <1458610840-15194-1-git-send-email-horms+renesas@verge.net.au>
- <1458610840-15194-4-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdWPocvJj8_YfGNUyPnEajEK0uMLv_rj-NVUsWRdAZgWcQ@mail.gmail.com>
+Message-ID: <CAMuHMdV7F==8cMr-CQgiBGC9NhnojNN-6d2Ph+uaHjtbCFW4pQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Mar 22, 2016 at 2:40 AM, Simon Horman
 <horms+renesas@verge.net.au> wrote:
+> this series updates the device trees of Renesas ARM based SoCs.
+>
 > * Fixed rate and fixed factor clocks do not require an
 >   clock-output-names property.
 > * Since 07705583e920fef6 ("clk: shmobile: div6: Make clock-output-names
@@ -25,31 +26,27 @@ On Tue, Mar 22, 2016 at 2:40 AM, Simon Horman
 > as the MSTP clock driver (clk-mstp.c) explicitly looks for a clock
 > named zb_clk for the r8a73a4 and sh73a0 SoCs.
 >
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->  arch/arm/boot/dts/sh73a0.dtsi | 88 ++++++++++++++-----------------------------
->  1 file changed, 29 insertions(+), 59 deletions(-)
+> Based on renesas-devel-20160318-v4.5
 >
-> diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-> index bf825ca4f6f7..e697250886ef 100644
-> --- a/arch/arm/boot/dts/sh73a0.dtsi
-> +++ b/arch/arm/boot/dts/sh73a0.dtsi
+> Simon Horman (13):
+>   ARM: dts: r7s72100: Remove unnecessary clock-output-names properties
+>   ARM: dts: r8a73a4: Remove unnecessary clock-output-names properties
+>   ARM: dts: sh73a0: Remove unnecessary clock-output-names properties
+>   ARM: dts: r8a7740: Remove unnecessary clock-output-names properties
+>   ARM: dts: r8a7778: Remove unnecessary clock-output-names properties
+>   ARM: dts: r8a7779: Remove unnecessary clock-output-names properties
+>   ARM: dts: r8a7791: Remove unnecessary clock-output-names properties
+>   ARM: dts: r8a7793: Remove unnecessary clock-output-names properties
+>   ARM: dts: r8a7794: Remove unnecessary clock-output-names properties
+>   ARM: dts: gose: Remove unnecessary clock-output-names properties
+>   ARM: dts: koelsch: Remove unnecessary clock-output-names properties
+>   ARM: dts: porter: Remove unnecessary clock-output-names properties
+>   ARM: dts: lager: Remove unnecessary clock-output-names properties
 
-> @@ -686,170 +677,149 @@
->                         clocks = <&pll1_div2_clk>, <0>,
->                                  <&cpg_clocks SH73A0_CLK_PLL2>, <0>;
->                         #clock-cells = <0>;
-> -                       clock-output-names = "zb";
->                 };
+For 1, 4-13:
 
-Same comment here as for r8a73a4:
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-I'm wondering whether we should keep this one for now?
-Dropping it changes the clock name from "zb_clk" to "zb".
-
-
-
--- 
 Gr{oetje,eeting}s,
 
                         Geert
