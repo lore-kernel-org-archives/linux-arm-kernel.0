@@ -1,79 +1,64 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Tue, 22 Mar 2016 22:21:34 +0530
-Subject: [PATCH v11 3/9] arm64: add copy_to/from_user to kprobes blacklist
-In-Reply-To: <20160321145242.GJ23397@arm.com>
-References: <1457501543-24197-1-git-send-email-dave.long@linaro.org>
- <1457501543-24197-4-git-send-email-dave.long@linaro.org>
- <56E858D8.8030300@arm.com>
- <20160316054329.GC28915@dhcppc6.redhat.com>
- <56E9350A.7010909@arm.com>
- <20160317075726.GA16882@dhcppc6.redhat.com>
- <20160318132902.GA29225@dhcppc6.redhat.com>
- <20160321145242.GJ23397@arm.com>
-Message-ID: <20160322165134.GF15150@dhcppc6.redhat.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Tue, 22 Mar 2016 19:51:22 +0300
+Subject: [PATCH v5 3/6] ACPI: parse SPCR and enable matching console
+In-Reply-To: <56F15D40.9020401@hurleysoftware.com>
+References: <1458643595-14719-1-git-send-email-aleksey.makarov@linaro.org>
+ <1458643595-14719-4-git-send-email-aleksey.makarov@linaro.org>
+ <20160322122650.GA10616@yury-N73SV>
+ <56F15D40.9020401@hurleysoftware.com>
+Message-ID: <20160322165122.GB10616@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Tue, Mar 22, 2016 at 07:57:04AM -0700, Peter Hurley wrote:
 
-Thanks for the reply.
+[...]
 
-On 21/03/2016:02:52:43 PM, Will Deacon wrote:
-> On Fri, Mar 18, 2016 at 06:59:02PM +0530, Pratyush Anand wrote:
-> > On 17/03/2016:01:27:26 PM, Pratyush Anand wrote:
-> > > @David: This patch was added in v9 and fixup_exception() had been dropped in v9.
-> > > Since, dropping of fixup_exception() also caused to fail some systemtap test
-> > > cases, so it was added back in v10. I wonder if we really need this patch.
-> > > May be you can try to run related test case by dropping this patch. 
+> >> +static bool init_earlycon;
+> >> +
+> >> +void __init init_spcr_earlycon(void)
+> >> +{
+> >> +	init_earlycon = true;
+> >> +}
+> >> +
 > > 
-> > Had a closer look to the code, and noticed that fixup_exception() does not have
-> > any role in handling of page fault of copy_to_user(). Then, why do we have the
-> > problem.
-> > Probably, I can see why does not it work. So, when we are single stepping an
-> > instruction and page fault occurs, we will come to el1_da in entry.S. Here, we
-> > do enable_dbg. As soon as we will do this, we will start receiving single step
-> > exception after each instruction (not sure, probably for each alternate
-> > instruction). Since, there will not be any matching single step handler for
-> > these instructions, so we will see warning "Unexpected kernel single-step
-> > exception at EL1". 
-> > 
-> > So, I think, we should 
-> > 
-> > (1) may be do not enable debug for el1_da, or
-> > (2) enable_dbg only when single stepping is not enabled, or
-> > (3) or disable single stepping during el1_da execution.
-> > 
-> > (1) will solve the issue for sure, but not sure if it could be the best choice.
-> > 
-> > Will, what do you suggest?
+> > 1. I see you keep in mind multiple access.
 > 
-> Leaving debug exceptions disabled isn't something I'm keen on at all,
-> because it leads to blackspots in kernel debugging that I don't think
-> should be enforced by the low-level debug machinery. My preference is
-> for the higher-level debugger code (e.g. kprobes, kdgb) to ignore the
-> events that it's not interested in.
+> Concurrent access is not a concern here: only the boot cpu is running
+> and intrs are off.
+> 
+> The "init_earlycon" flag is used because parsing the "earlycon" early param
+> is earlier than parsing ACPI tables.
+> 
 
-I think this is what the current implementation is, so in the given situation
-higher-level debugger code ignore the single step exceptions events, which they
-are not expecting.
-Here, execution of single stepped instruction is causing to raise another new
-exception, say data abort. Now, as soon as we enable debug exceptions while
-handling this data abort we will start getting single step exceptions for all
-the executed instruction of data abort handler. None of the "higher-level
-debugger code" is interested in those events and so they ignore them. We keep on
-getting "Unexpected kernel single-step exception at EL1" until all the
-instructions for data abort handler are executed.
+OK got it. My concern is that it's generic code, and parse_spcr() is public
+function. I think corresponding comment is needed at least. The other option is
+to make it race-safe and forget. I prefer second one, moreover it's 2 simple
+changes.
 
 > 
-> It's also very easy to lose track of the debug state if you run preemptible
-> code at EL1 with debug exceptions disabled, because kernel debugging is
-> per-cpu rather than per-task.
+>  Then you'd worry about race
+> > conditions as well. In this case, I'd consider atomic access to
+> > variable.
+> > 2. It seems you need is_init() helper too.
+> > 
+> >> +int __init parse_spcr(void)
+> >> +{
+> >> +	static char opts[64];
+> >> +	struct acpi_table_spcr *table;
+> >> +	acpi_size table_size;
+> >> +	acpi_status status;
+> >> +	char *uart;
+> >> +	char *iotype;
+> >> +	int baud_rate;
+> >> +	int err = 0;
+> > 
+> > You can do not initialize 'err'.
+> 
+> Why?
+> 
 
-OK.Thanks for this clarification. So, one of the way could be to set a per
-cpu variable by higher level debugger code, and then check them in kernel_entry
-and kernel_exit and accordingly disable/enable only single stepping. Do you
-think, it would be good idea to do that?
-If yes, then would adding a new u64 variable say "flags" in struct pt_regs be
-acceptable? 
+Because there's no path here that doesn't init err with some value.
+So this initialization is useless waste of cycles.
 
-~Pratyush
+[...]
