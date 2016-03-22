@@ -1,116 +1,57 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue, 22 Mar 2016 11:26:49 +0100
-Subject: [PATCH V5 13/15] pci, acpi: Match PCI config space accessors
- against platfrom specific quirks.
-In-Reply-To: <1458316194.23434.104.camel@redhat.com>
-References: <1455630825-27253-1-git-send-email-tn@semihalf.com>
- <1455630825-27253-14-git-send-email-tn@semihalf.com>
- <1458316194.23434.104.camel@redhat.com>
-Message-ID: <56F11DE9.2030302@semihalf.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 22 Mar 2016 11:30:07 +0100
+Subject: [RFC PATCH 06/12] kvm-arm: Pass kvm parameter for pagetable
+ helpers
+In-Reply-To: <56F11B2F.2080007@arm.com>
+References: <1457974391-28456-1-git-send-email-suzuki.poulose@arm.com>
+ <1457974391-28456-7-git-send-email-suzuki.poulose@arm.com>
+ <20160322093037.GD21047@cbox> <56F11B2F.2080007@arm.com>
+Message-ID: <20160322103007.GA21613@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.03.2016 16:49, Mark Salter wrote:
-> On Tue, 2016-02-16 at 14:53 +0100, Tomasz Nowicki wrote:
->> Some platforms may not be fully compliant with generic set of PCI config
->> accessors. For these cases we implement the way to overwrite accessors
->> set prior to PCI buses enumeration. Algorithm traverses available quirk
->> list, matches against <platform ID (DMI), domain, bus number> tuple and
->> returns corresponding accessors. All quirks can be defined using:
->> DECLARE_ACPI_MCFG_FIXUP() and kept self contained. Example,
->>
->> static const struct dmi_system_id foo_dmi[] = {
->>          {
->>                  .ident = "<Platform ident string>",
->>                  .callback = <handler>,
->>                  .matches = {
->>                          DMI_MATCH(DMI_SYS_VENDOR, "<system vendor>"),
->>                          DMI_MATCH(DMI_PRODUCT_NAME, "<product name>"),
->>                          DMI_MATCH(DMI_PRODUCT_VERSION, "product version"),
->>                  },
->>          },
->>          { }
->> };
->>
->> static struct pci_ops foo_ecam_pci_ops = {
->>          .map_bus = pci_mcfg_dev_base,
->>          .read = foo_ecam_config_read,
->>          .write = foo_ecam_config_write,
->> };
->> DECLARE_ACPI_MCFG_FIXUP(foo_dmi, NULL, &foo_ecam_pci_ops, <domain_nr>, <bus_nr>);
->>
->> More custom (non-DMI) matching can be done via an extra call.
->> Note that there is possibility to assign quirk related private data to
->> root->sysdata which will be available along read/wriate accessor, example:
->>
->> static int boo_match(struct pci_mcfg_fixup *fixup, struct acpi_pci_root *root)
->> {
->>          return [condition] ? 1 : 0;
->> }
->>
->> int boo_ecam_config_read(struct pci_bus *bus, unsigned int devfn,
->>                            int where, int size, u32 *val)
->> {
->>          struct acpi_pci_root *root = bus->sysdata;
->>          struct boo_priv_data *boo_data = root->sysdata;
->>
->>          [..]
->> }
->>
->> static struct pci_ops boo_ecam_pci_ops = {
->> 	.map_bus = pci_mcfg_dev_base,
->> 	.read = boo_ecam_config_read,
->> 	.write = boo_ecam_config_write,
->> };
->> DECLARE_ACPI_MCFG_FIXUP(NULL, boo_match, &boo_ecam_pci_ops, <domain_nr>, <bus_nr>);
->>
->> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
->> Tested-by: Duc Dang <dhdang@apm.com>
->> Tested-by: Dongdong Liu <liudongdong3@huawei.com>
->> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
->> Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
->> Tested-by: Sinan Kaya <okaya@codeaurora.org>
->> ---
->>   drivers/acpi/pci_mcfg.c           | 32 ++++++++++++++++++++++++++++++--
->>   include/acpi/acpi_bus.h           |  1 +
->>   include/asm-generic/vmlinux.lds.h |  7 +++++++
->>   include/linux/pci-acpi.h          | 18 ++++++++++++++++++
->>   4 files changed, 56 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
->> index 0062257..b343547 100644
->> --- a/drivers/acpi/pci_mcfg.c
->> +++ b/drivers/acpi/pci_mcfg.c
->> @@ -41,6 +41,29 @@ int __weak raw_pci_write(unsigned int domain, unsigned int bus,
->>   	return PCIBIOS_DEVICE_NOT_FOUND;
->>   }
->>
->> +extern struct pci_mcfg_fixup __start_acpi_mcfg_fixups[];
->> +extern struct pci_mcfg_fixup __end_acpi_mcfg_fixups[];
->> +
->> +static struct pci_ops *pci_mcfg_check_quirks(struct acpi_pci_root *root)
->> +{
->> +	struct pci_mcfg_fixup *f;
->> +	int bus_num = root->secondary.start;
->> +	int domain = root->segment;
->> +
->> +	/*
->> +	 * First match against PCI topology <domain:bus> then use DMI or
->> +	 * custom match handler.
->> +	 */
->> +	for (f = __start_acpi_mcfg_fixups; f < __end_acpi_mcfg_fixups; f++) {
->> +		if ((f->domain == domain || f->domain == PCI_MCFG_DOMAIN_ANY) &&
->> +		    (f->bus_num == bus_num || f->bus_num == PCI_MCFG_BUS_ANY) &&
->> +		    (f->system ? dmi_check_system(f->system) : 1 &&
->> +		     f->match ? f->match(f, root) : 1))
->
-> The parens are not quite right here ^^^^
-> If dmi_check_system() returns true, f->match won't get called.
->
-> This should be:
-> 		    (f->system ? dmi_check_system(f->system) : 1) &&
-> 		     f->match ? f->match(f, root) : 1)
+On Tue, Mar 22, 2016 at 10:15:11AM +0000, Suzuki K. Poulose wrote:
+> On 22/03/16 09:30, Christoffer Dall wrote:
+> >On Mon, Mar 14, 2016 at 04:53:05PM +0000, Suzuki K Poulose wrote:
+> >>Pass 'kvm' to existing kvm_p.d_* page table wrappers to prepare
+> >>them to choose between hyp and stage2 page table. No functional
+> >>changes yet. Also while at it, convert them to static inline
+> >>functions.
+> >
+> >I have to say that I'm not really crazy about the idea of having common
+> >hyp and stage2 code and having the pgtable macros change behavior
+> >depending on the type.
+> >
+> >Is it not so that that host pgtable macros will always be valid for the
+> >hyp mappings, because we have the same VA space available etc.?  It's
+> >just a matter of different page table entry attributes.
+> 
+> Yes, host pgtable macros are still used for hyp mappings, when kvm == NULL.
+> and we do use explicit accessors (stage2_xxx wherever possible with this series).
+> 
+> >
+> >Looking at arch/arm/kvm/mmu.c, it looks to me like we would get the
+> >cleanest separation by separating stuff that touches hyp page tables
+> >from stuff that touches stage2 page tables.
+> 
+> OK. Here are the routines which deal with both types:
+> 
+> unmap_range, unmap_p{u,m}ds, unmap_ptes, clear_p{g,u,m}_entry
+> 
+> Duplicating them won't be that much of trouble.
+> 
+> >Then you can get rid of the whole kvm_ prefix and directly use stage2
+> >accessors (which you may want to consider renaming to s2_) directly.
+> 
+> Right.
+> 
+> >
+> >I think we've seen in the past that the confusion from functions
+> >potentially touching both hyp and stage2 page tables is a bad thing and
+> >we should seek to avoid it.
+> 
+> OK, I will respin the series with the proposed changes.
+> 
+Great, thanks a lot!!
 
-Well spotted. Thanks!
-
-Tomasz
+-Christoffer
