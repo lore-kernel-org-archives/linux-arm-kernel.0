@@ -1,119 +1,75 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 23 Mar 2016 00:27:04 +0800
-Subject: [PATCH v5 2/4] Documentation: Bindings: Add STM32 DWMAC glue
-In-Reply-To: <56EFFEEC.1010407@st.com>
-References: <1458315428-10081-1-git-send-email-alexandre.torgue@gmail.com>
- <1458315428-10081-3-git-send-email-alexandre.torgue@gmail.com>
- <CAGb2v65SvVi0cJbaaD9cYrqC3pJ9eumwhTVk11_N7r_nTZhS9g@mail.gmail.com>
- <CAJgp7zxyQGrSSvNszawBQfS+omgKi1i35uW-eDyLdW-jP7oRjg@mail.gmail.com>
- <56EFFEEC.1010407@st.com>
-Message-ID: <CAGb2v67aOXk2bfa5iQ_an2_6o3CJuXhTvqu22XK5hu3QvxMCmQ@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 22 Mar 2016 17:35:46 +0100
+Subject: [PATCH v2] spi: orion.c: Add direct access mode
+In-Reply-To: <1458663893-13766-1-git-send-email-sr@denx.de>
+References: <1458663893-13766-1-git-send-email-sr@denx.de>
+Message-ID: <20160322173546.40d24cc2@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 21, 2016 at 10:02 PM, Giuseppe CAVALLARO
-<peppe.cavallaro@st.com> wrote:
-> On 3/21/2016 11:45 AM, Alexandre Torgue wrote:
->>
->> Hi,
->>
->> 2016-03-18 17:00 GMT+01:00 Chen-Yu Tsai <wens@csie.org>:
->>>
->>> Hi,
->>>
->>> On Fri, Mar 18, 2016 at 11:37 PM, Alexandre TORGUE
->>> <alexandre.torgue@gmail.com> wrote:
->>>>
->>>> Signed-off-by: Alexandre TORGUE <alexandre.torgue@gmail.com>
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/net/stm32-dwmac.txt
->>>> b/Documentation/devicetree/bindings/net/stm32-dwmac.txt
->>>> new file mode 100644
->>>> index 0000000..ada2aa4
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/net/stm32-dwmac.txt
->>>> @@ -0,0 +1,32 @@
->>>> +STMicroelectronics STM32 / MCU DWMAC glue layer controller
->>>> +
->>>> +This file documents platform glue layer for stmmac.
->>>> +Please see stmmac.txt for the other unchanged properties.
->>>> +
->>>> +The device node has following properties.
->>>> +
->>>> +Required properties:
->>>> +- compatible:  Should be "st,stm32-dwmac" to select glue, and
->>>> +              "snps,dwmac-3.50a" to select IP vesrion.
->
->
-> Almost all the synp gmac chips have the HW capability register that is
-> used for setting all the parameters at probe time.
-> This will override fields passed from DT. In theory, it is not
-> necessary to pass: "snps,dwmac-3.50a" from device tree at least there
-> is either no HW cap reg or the glue has some w/a for a specific chip
-> revision.
-> To be honest, I like to see the "snps,dwmac-3.50a" as compatibility
-> to also have a better readability (that's my personal view ;-) ).
+Hello,
 
-I agree having the versioned strings is good for informational purposes,
-and to signal hardware capability. It is not so good for directly
-binding drivers in the implementation though.
+On Tue, 22 Mar 2016 17:24:53 +0100, Stefan Roese wrote:
+> This patch adds support for the direct access mode to the Orion SPI
+> driver which is used on the Marvell Armada based SoCs. In this direct
+> mode, all data written to (or read from) a specifically mapped MBus
+> window (linked to one SPI chip-select on one of the SPI controllers)
+> will be transferred directly to the SPI bus. Without the need to control
+> the SPI registers in between. This can improve the SPI transfer rate in
+> such cases.
+> 
+> Both, direct-read and -write mode are supported. But only the write
+> mode has been tested. This mode especially benefits from the SPI direct
+> mode, as the data bytes are written head-to-head to the SPI bus,
+> without any additional addresses.
+> 
+> One use-case for this direct write mode is, programming a FPGA bitstream
+> image into the FPGA connected to the SPI bus at maximum speed.
+> 
+> This mode is described in chapter "22.5.2 Direct Write to SPI" in the
+> Marvell Armada XP Functional Spec Datasheet.
+> 
+> Signed-off-by: Stefan Roese <sr@denx.de>
+> Cc: Nadav Haklai <nadavh@marvell.com>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Cc: Mark Brown <broonie@kernel.org>
+> ---
+> Mark, sorry for the huge delay for v2 of this direct-access patch.
+> I was busy with other tasks in the meantime. And only found now
+> the time to address (hopefully all) of your comments.
 
-Unfortunately, as Joachim pointed out, exynos5440 uses it so we cannot
-change it.
+Thanks for this new version! To be honest, I don't remember all the
+discussions that took place on the v1, so maybe I'll just be re-asking
+the same question.
 
-ChenYu
+Has there been any discussion on whether dynamically adding the MBus
+window is a good idea, as opposed to statically defining it in the
+board .dts ?
 
-> Peppe
->
->
->>>
->>> If you need have sort of hardware glue, then it is not compatible.
->>>
->>
->> We could have the case where the glue is set by a bootloader.
->> In this case, we will select IP version in compatible and we will use
->> generic dwmac glue to probe stmmac driver.
->>
->> Regards
->>
->> Alex.
->>
->>> ChenYu
->>>
->>>> +- clocks: Must contain a phandle for each entry in clock-names.
->>>> +- clock-names: Should be "stmmaceth" for the host clock.
->>>> +              Should be "tx-clk" for the MAC TX clock.
->>>> +              Should be "rx-clk" for the MAC RX clock.
->>>> +- st,syscon : Should be phandle/offset pair. The phandle to the syscon
->>>> node which
->>>> +             encompases the glue register, and the offset of the
->>>> control register.
->>>> +Example:
->>>> +
->>>> +               ethernet0: dwmac at 40028000 {
->>>> +                       compatible = "st,stm32-dwmac",
->>>> "snps,dwmac-3.50a";
->>>> +                       status = "disabled";
->>>> +                       reg = <0x40028000 0x8000>;
->>>> +                       reg-names = "stmmaceth";
->>>> +                       interrupts = <0 61 0>, <0 62 0>;
->>>> +                       interrupt-names = "macirq", "eth_wake_irq";
->>>> +                       clock-names = "stmmaceth", "tx-clk", "rx-clk";
->>>> +                       clocks = <&rcc 0 25>, <&rcc 0 26>, <&rcc 0 27>;
->>>> +                       st,syscon = <&syscfg 0x4>;
->>>> +                       snps,pbl = <8>;
->>>> +                       snps,mixed-burst;
->>>> +                       dma-ranges;
->>>> +               };
->>>> --
->>>> 1.9.1
->>>>
->>>>
->>>> _______________________________________________
->>>> linux-arm-kernel mailing list
->>>> linux-arm-kernel at lists.infradead.org
->>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->>
->>
->
+So far, the only driver that was using dynamically allocated MBus is
+the PCIe controller driver, because there is no way in advanced to know
+the number and memory window requirements of the PCIe devices that will
+be connected to the system.
+
+For all other windows (BootROM, crypto SRAM and more recently network
+related SRAM), we are using statically allocated windows.
+
+So I'm wondering if we should add this additional DT binding that
+describes the necessary information to allow the driver to dynamically
+allocate a window, or if we shouldn't rely on a statically allocated
+window.
+
+This is really an open discussion, I don't have a very well-defined
+opinion on the matter.
+
+Let's Cc: Arnd Bergmann on this question, he has followed the whole
+MBus story and might have some interesting insights.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
