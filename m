@@ -1,98 +1,74 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Tue, 22 Mar 2016 18:58:28 +0100
-Subject: [PATCH 5/6] of: Introduce of_phandle_iterator_args()
-In-Reply-To: <1458669509-7178-1-git-send-email-joro@8bytes.org>
-References: <1458669509-7178-1-git-send-email-joro@8bytes.org>
-Message-ID: <1458669509-7178-6-git-send-email-joro@8bytes.org>
+From: agustinv@codeaurora.org (agustinv at codeaurora.org)
+Date: Tue, 22 Mar 2016 14:33:58 -0400
+Subject: [PATCH V1] perf: qcom: Add L3 cache PMU driver
+In-Reply-To: <20160321103507.GB17326@leverpostej>
+References: <1458333422-8963-1-git-send-email-agustinv@codeaurora.org>
+ <20160321103507.GB17326@leverpostej>
+Message-ID: <09ca2b70ae43432623cfbac374da1784@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Joerg Roedel <jroedel@suse.de>
+On 2016-03-21 06:35, Mark Rutland wrote:
+> On Fri, Mar 18, 2016 at 04:37:02PM -0400, Agustin Vega-Frias wrote:
+>> +/*
+>> + * In some platforms interrupt resources might not come directly from 
+>> the GIC,
+>> + * but from separate IRQ circuitry that signals a summary IRQ to the 
+>> GIC and
+>> + * is handled by a secondary IRQ controller. This is problematic 
+>> under ACPI boot
+>> + * because the ACPI core does not use the Resource Source field on 
+>> the Extended
+>> + * Interrupt Descriptor, which in theory could be used to specify an 
+>> alternative
+>> + * IRQ controller.
+>> +
+>> + * For this reason in these platforms we implement the secondary IRQ 
+>> controller
+>> + * using the gpiolib and specify the IRQs as GpioInt resources, so 
+>> when getting
+>> + * an IRQ from the device we first try platform_get_irq and if it 
+>> fails we try
+>> + * devm_gpiod_get_index/gpiod_to_irq.
+>> + */
+>> +static
+>> +int qcom_l3_cache_pmu_get_slice_irq(struct platform_device *pdev,
+>> +				    struct platform_device *sdev)
+>> +{
+>> +	int virq = platform_get_irq(sdev, 0);
+>> +	struct gpio_desc *desc;
+>> +
+>> +	if (virq >= 0)
+>> +		return virq;
+>> +
+>> +	desc = devm_gpiod_get_index(&sdev->dev, NULL, 0, GPIOD_ASIS);
+>> +	if (IS_ERR(desc))
+>> +		return -ENOENT;
+>> +
+>> +	return gpiod_to_irq(desc);
+>> +}
+>> +
+> 
+> As Marc Zyngier pointed out in another thread, you should represent 
+> your
+> interrupt controller as an interrupt controller rather than pretending 
+> it is a
+> GPIO controller.
+> 
+> Drivers should be able to remain blissfully unaware what the other end 
+> of their
+> interrupt line is wired up to, and shouldn't have to jump through hoops 
+> like
+> the above.
+> 
+> Thanks,
+> Mark.
 
-This helper function can be used to copy the arguments of a
-phandle to an array.
+Given that this driver is ACPI-only we are leaning toward implementing 
+overflow signalling as ACPI events.
+This will hide these details from the driver and use standard ACPI APIs.
 
-Signed-off-by: Joerg Roedel <jroedel@suse.de>
----
- drivers/of/base.c  | 29 +++++++++++++++++++++++------
- include/linux/of.h | 10 ++++++++++
- 2 files changed, 33 insertions(+), 6 deletions(-)
+Thoughts?
 
-diff --git a/drivers/of/base.c b/drivers/of/base.c
-index 471d3d9..008988b 100644
---- a/drivers/of/base.c
-+++ b/drivers/of/base.c
-@@ -1533,6 +1533,23 @@ err:
- 	return -EINVAL;
- }
- 
-+int of_phandle_iterator_args(struct of_phandle_iterator *it,
-+			     uint32_t *args,
-+			     int size)
-+{
-+	int i, count;
-+
-+	count = it->cur_count;
-+
-+	if (WARN_ON(size < count))
-+		count = size;
-+
-+	for (i = 0; i < count; i++)
-+		args[i] = be32_to_cpup(it->cur++);
-+
-+	return count;
-+}
-+
- static int __of_parse_phandle_with_args(const struct device_node *np,
- 					const char *list_name,
- 					const char *cells_name,
-@@ -1556,13 +1573,13 @@ static int __of_parse_phandle_with_args(const struct device_node *np,
- 				goto err;
- 
- 			if (out_args) {
--				int i;
--				if (WARN_ON(it.cur_count > MAX_PHANDLE_ARGS))
--					it.cur_count = MAX_PHANDLE_ARGS;
-+				int c;
-+
-+				c = of_phandle_iterator_args(&it,
-+							     out_args->args,
-+							     MAX_PHANDLE_ARGS);
- 				out_args->np = it.node;
--				out_args->args_count = it.cur_count;
--				for (i = 0; i < it.cur_count; i++)
--					out_args->args[i] = be32_to_cpup(it.cur++);
-+				out_args->args_count = c;
- 			} else {
- 				of_node_put(it.node);
- 			}
-diff --git a/include/linux/of.h b/include/linux/of.h
-index 05e38ed..c91f8b1 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -359,6 +359,9 @@ extern int of_phandle_iterator_init(struct of_phandle_iterator *it,
- 				    int cell_count);
- 
- extern int of_phandle_iterator_next(struct of_phandle_iterator *it);
-+extern int of_phandle_iterator_args(struct of_phandle_iterator *it,
-+				    uint32_t *args,
-+				    int size);
- 
- extern void of_alias_scan(void * (*dt_alloc)(u64 size, u64 align));
- extern int of_alias_get_id(struct device_node *np, const char *stem);
-@@ -648,6 +651,13 @@ static inline int of_phandle_iterator_next(struct of_phandle_iterator *it)
- 	return -ENOSYS;
- }
- 
-+static inline int of_phandle_iterator_args(struct of_phandle_iterator *it,
-+					   uint32_t *args,
-+					   int size)
-+{
-+	return 0;
-+}
-+
- static inline int of_alias_get_id(struct device_node *np, const char *stem)
- {
- 	return -ENOSYS;
--- 
-1.9.1
+Thanks,
+Agustin
