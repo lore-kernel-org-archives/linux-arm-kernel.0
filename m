@@ -1,64 +1,49 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 22 Mar 2016 16:08:24 +0100
-Subject: [PATCH 2/2] arm*: efi: drop writable mapping of the UEFI System
- table
-In-Reply-To: <20160226150156.GC7475@codeblueprint.co.uk>
-References: <1456496435-12679-1-git-send-email-ard.biesheuvel@linaro.org>
- <1456496435-12679-2-git-send-email-ard.biesheuvel@linaro.org>
- <20160226150156.GC7475@codeblueprint.co.uk>
-Message-ID: <CAKv+Gu8+pYR_jxjcVeXgekVqD_BugtRLgNNhOkvhuaEpddbHRg@mail.gmail.com>
+From: ashok.sekar@broadcom.com (Ashok Sekar)
+Date: Tue, 22 Mar 2016 21:01:55 +0530
+Subject: [PATCH 1/5] arm64/perf: Changed events naming convention for
+ uniformity
+In-Reply-To: <20160322094732.GB31126@arm.com>
+References: <1458133309-17045-1-git-send-email-ashoks@broadcom.com>
+ <1458133309-17045-2-git-send-email-ashoks@broadcom.com>
+ <20160322094732.GB31126@arm.com>
+Message-ID: <CANK38rZypVwh7F=CD6KMs8GqNMy_geejYHVphjW26Jpd=YRe5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 February 2016 at 16:01, Matt Fleming <matt@codeblueprint.co.uk> wrote:
-> On Fri, 26 Feb, at 03:20:35PM, Ard Biesheuvel wrote:
->> Commit 2eec5dedf770 ("efi/arm-init: Use read-only early mappings")
->> updated the early ARM UEFI init code to create the temporary, early
->> mapping of the UEFI System table using read-only attributes, as a
->> hardening measure against inadvertent modification.
->>
->> However, this still leaves the permanent, writable mapping of the UEFI
->> System table, which is only ever referenced during invocations of UEFI
->> Runtime Services, at which time the UEFI virtual mapping is available,
->> which also covers the system table. (This is guaranteed by the fact that
->> SetVirtualAddressMap(), which is a runtime service itself, converts
->> various entries in the table to their virtual equivalents, which implies
->> that the table must be covered by a RuntimeServicesData region that has
->> the EFI_MEMORY_RUNTIME attribute.)
->>
->> So instead of creating this permanent mapping, record the virtual address
->> of the system table inside the UEFI virtual mapping, and dereference that
->> when accessing the table. This protects the contents of the system table
->> from inadvertent (or deliberate) modification when no UEFI Runtime
->> Services calls are in progress.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  drivers/firmware/efi/arm-init.c    |  2 ++
->>  drivers/firmware/efi/arm-runtime.c | 27 ++++++++++++++++-----------
->>  2 files changed, 18 insertions(+), 11 deletions(-)
+Hi Will,
+
+On Tue, Mar 22, 2016 at 3:17 PM, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Ashok,
 >
-> Looks like a nice cleanup. Applied.
-
-This patch causes a warning I hadn't spotted before sending it out.
-Could you fold this in please?
-
-diff --git a/drivers/firmware/efi/arm-runtime.c
-b/drivers/firmware/efi/arm-runtime.c
-index 6c97d4884fc7..fe749da9997e 100644
---- a/drivers/firmware/efi/arm-runtime.c
-+++ b/drivers/firmware/efi/arm-runtime.c
-@@ -72,8 +72,8 @@ static bool __init efi_virtmap_init(void)
-                 */
-                if (efi_system_table >= phys &&
-                    efi_system_table < phys + (md->num_pages * EFI_PAGE_SIZE)) {
--                       efi.systab = (void *)(efi_system_table - phys +
--                                             md->virt_addr);
-+                       efi.systab = (void *)(unsigned long)(efi_system_table -
-+                                                         phys + md->virt_addr);
-                        systab_found = true;
-                }
-        }
+> On Wed, Mar 16, 2016 at 06:01:45AM -0700, Ashok Kumar wrote:
+>> Changed events name to the format _L1/2/3I/D_CACHE/TLB_.
+>> For e.g. moved ARMV8_PMUV3_PERFCTR_L1_DCACHE_REFILL to
+>> ARMV8_PMUV3_PERFCTR_L1D_CACHE_REFILL in line with the already
+>> existing definitions like ARMV8_PMUV3_PERFCTR_L3D_CACHE_WB.
+>>
+>> Added _ACCESS keyword to some of the definitions
+>> (ARMV8_PMUV3_PERFCTR_L1D_TLB, ARMV8_PMUV3_PERFCTR_L1I_TLB, etc)
+>> in line with the already existing definitions like
+>> ARMV8_PMUV3_PERFCTR_L1_DCACHE_ACCESS for clarity.
+>>
+>> Corrected typo L21 to L2I in ARMV8_PMUV3_PERFCTR_L21_TLB_REFILL,
+>> ARMV8_PMUV3_PERFCTR_L21_TLB
+>
+> I don't mind renaming these events, but could we have them matching the
+> names in the ARM ARM, please? For example:
+>
+>> -#define ARMV8_PMUV3_PERFCTR_L1D_TLB                          0x25
+>> -#define ARMV8_PMUV3_PERFCTR_L1I_TLB                          0x26
+>> -#define ARMV8_PMUV3_PERFCTR_L2I_CACHE                                0x27
+>> +#define ARMV8_PMUV3_PERFCTR_L1D_TLB_ACCESS                   0x25
+>> +#define ARMV8_PMUV3_PERFCTR_L1I_TLB_ACCESS                   0x26
+>> +#define ARMV8_PMUV3_PERFCTR_L2I_CACHE_ACCESS                 0x27
+>
+> These really are called "L1D_TLB, L1I_TLB and L2I_CACHE" without the
+> "_ACCESS" suffix.
+Sure, I will post a v2 as per ARM ARM. I just added it for verbosity.
 
 Thanks,
-Ard.
+Ashok
+>
+> Will
