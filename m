@@ -1,40 +1,53 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 22 Mar 2016 22:35:29 +0800
-Subject: [PATCH] drivers: firmware: psci: add __init mark to
- psci_dt_cpu_init_idle
-Message-ID: <1458657329-2484-1-git-send-email-jszhang@marvell.com>
+Date: Tue, 22 Mar 2016 22:42:41 +0800
+Subject: [PATCH 2/4] ARM: cpuidle: constify return value of
+ arm_cpuidle_get_ops()
+In-Reply-To: <1458657763-2561-1-git-send-email-jszhang@marvell.com>
+References: <1458657763-2561-1-git-send-email-jszhang@marvell.com>
+Message-ID: <1458657763-2561-3-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-psci_dt_cpu_init_idle() and psci_cpu_init_idle() are not needed after
-booting, so mark them as __init.
+arm_cpuidle_read_ops() just copies '*ops' to cpuidle_ops[cpu], so the
+structure '*ops' is not modified at all.
+
+The comment is also updated accordingly.
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
- drivers/firmware/psci.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/kernel/cpuidle.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index 7d52186..284413f 100644
---- a/drivers/firmware/psci.c
-+++ b/drivers/firmware/psci.c
-@@ -250,7 +250,7 @@ static int __init psci_features(u32 psci_func_id)
- #ifdef CONFIG_CPU_IDLE
- static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
- 
--static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
-+static int __init psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
+diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
+index 703926e..a44b268e 100644
+--- a/arch/arm/kernel/cpuidle.c
++++ b/arch/arm/kernel/cpuidle.c
+@@ -70,7 +70,7 @@ int arm_cpuidle_suspend(int index)
+  *
+  * Returns a struct cpuidle_ops pointer, NULL if not found.
+  */
+-static struct cpuidle_ops *__init arm_cpuidle_get_ops(const char *method)
++static const struct cpuidle_ops *__init arm_cpuidle_get_ops(const char *method)
  {
- 	int i, ret, count = 0;
- 	u32 *psci_states;
-@@ -310,7 +310,7 @@ free_mem:
- 	return ret;
- }
+ 	struct of_cpuidle_method *m = __cpuidle_method_of_table;
  
--int psci_cpu_init_idle(unsigned int cpu)
-+int __init psci_cpu_init_idle(unsigned int cpu)
+@@ -88,7 +88,7 @@ static struct cpuidle_ops *__init arm_cpuidle_get_ops(const char *method)
+  *
+  * Get the method name defined in the 'enable-method' property, retrieve the
+  * associated cpuidle_ops and do a struct copy. This copy is needed because all
+- * cpuidle_ops are tagged __initdata and will be unloaded after the init
++ * cpuidle_ops are tagged __initconst and will be unloaded after the init
+  * process.
+  *
+  * Return 0 on sucess, -ENOENT if no 'enable-method' is defined, -EOPNOTSUPP if
+@@ -97,7 +97,7 @@ static struct cpuidle_ops *__init arm_cpuidle_get_ops(const char *method)
+ static int __init arm_cpuidle_read_ops(struct device_node *dn, int cpu)
  {
- 	struct device_node *cpu_node;
- 	int ret;
+ 	const char *enable_method;
+-	struct cpuidle_ops *ops;
++	const struct cpuidle_ops *ops;
+ 
+ 	enable_method = of_get_property(dn, "enable-method", NULL);
+ 	if (!enable_method)
 -- 
 2.8.0.rc3
