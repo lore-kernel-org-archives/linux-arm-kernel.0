@@ -1,99 +1,36 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 22 Mar 2016 08:22:14 +0100
-Subject: [linux-sunxi] Re: [PATCH 0/4] Add AXP209 GPIO driver
-In-Reply-To: <56E044C1.7080300@redhat.com>
-References: <1457520614-32239-1-git-send-email-maxime.ripard@free-electrons.com>
- <56E0146E.6050102@redhat.com> <20160309152822.GQ8418@lukather>
- <56E044C1.7080300@redhat.com>
-Message-ID: <20160322072214.GJ30977@lukather>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 22 Mar 2016 08:33:36 +0100
+Subject: [PATCH] arm64: KVM: Turn kvm_ksym_ref into a NOP on VHE
+In-Reply-To: <56F05FD7.9070706@redhat.com>
+References: <1458321959-11728-1-git-send-email-marc.zyngier@arm.com>
+ <CAKv+Gu_at5LXa5jxpM7h=ntxdJNNqmbtVE-bWn3SicMMMuT6Dg@mail.gmail.com>
+ <56EFEABA.3010604@redhat.com> <20160321124216.GA16859@cbox>
+ <56EFFEEB.8020800@redhat.com> <20160321185524.GD16859@cbox>
+ <56F05FD7.9070706@redhat.com>
+Message-ID: <20160322073336.GA21047@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Mar 09, 2016 at 04:44:01PM +0100, Hans de Goede wrote:
-> Hi,
+On Mon, Mar 21, 2016 at 09:55:51PM +0100, Paolo Bonzini wrote:
 > 
-> On 09-03-16 16:28, Maxime Ripard wrote:
-> >Hi,
-> >
-> >On Wed, Mar 09, 2016 at 01:17:50PM +0100, Hans de Goede wrote:
-> >>Hi,
-> >>
-> >>On 09-03-16 11:50, Maxime Ripard wrote:
-> >>>Hi,
-> >>>
-> >>>The axp209 PMIC used in combination to some Allwinner SoCs has a bunch
-> >>>of GPIOs accessible. Some boards use these to control their backlight
-> >>>or a few LEDs.
-> >>
-> >>Thanks for working on this, but IMHO this cannot go upstream like this,
-> >>the gpio pins on the axp pmics need a pinctrl driver, not a gpio
-> >>driver. I.E. on the axp209 gpio0 and gpio1 can also be used to output
-> >>an additional low-noise ldo (so as a regulator), or as an adc input.
-> >
-> >Eventually, yes, it needs both. But they don't even have to be the
-> >same driver, since they provide two different features. The only
-> >reason we have that construct in the pio case is because they share
-> >the same address space, but in the AXP case, the regmap and our mfd
-> >take care of that already.
 > 
-> Hmm, so your suggesting to have mfd instantiate 2 platform devices
-> for this, a gpio and a pinctrl device, each with their own
-> driver. Yes that would work, but I'm a bit worried about the 2
-> racing or some such since they both will end up touching
-> bit 0-2 of register 0x90 / 0x92, more-over since they are both
-> touching the exact same bits I've the feeling that this really
-> should be one driver.
-
-I don't think that's an issue. We basically have two cases here:
-either we have a driver using the pin or not.
-
-If we have a driver using it, then pinctrl will make sure we have an
-exclusive use of the pin, before the gpio is requested and we start
-changing that value. If not, then no one cares anyway.
-
+> On 21/03/2016 19:55, Christoffer Dall wrote:
+> > > Since you have two more patches, I guess you can just send a pull
+> > > request for all three.  I plan to send mine to Linus on Wednesday.
+> > 
+> > Sounds good, I'll send you one tomorrow (based on Linus' master branch
+> > of today - if that works?)
 > 
-> I guess that in a proper written dts we either use pinctrl to enable
-> a special function, or gpio, but still.
+> Anything that you can test with works.  Even basing it on your last pull
+> request is okay for me, and it's better for future bisection if there's
+> some known breakage in Linus's master branch.
 > 
-> >>I've been working on gsl1680 touchscreen support lately and on at least
-> >>a few a23 tablets, the low-noise ldo is used as AVCC for the touchscreen
-> >>controller.
-> >
-> >Yeah, the AXP209 also has an ADC connected to these pins.
-> >
-> >>Now these use an axp223 pmic, but nothing is stopping someone from
-> >>doing something similar with an axp209 and I think it would be best
-> >>to support this from day one, rather then hope we can retro-fit this
-> >>later without breaking dts.
-> >
-> >I considered that, but I don't see how it would break the DT later. If
-> >someone wants to enable say the ADC, he will of course have to add the
-> >pinctrl driver, and the pinctrl handles, but the old DT will only
-> >reference the gpio driver directly, which would still be something
-> >that would work.
-> 
-> I was assuming we would use one mfd-child(-platform)-device for this,
-> not two. I guess that with 2 devices you're right and there should
-> not be any problem, still as said it feels wrong-ish to have 2 drivers
-> poking bits 0-2 of reg 0x90 / reg 0x92.
+The changes to kvm_ksym_ref() didn't apply to anything in the kvmarm
+side of things but needed stuff from Catalin, so I just applied it on
+top of Linus' master.
 
-Note that the PIO is built on the same model and it works, while we
-have 3 drivers in one. The only reason why we have everything linked
-to the same device is because we have to share the address space, but
-regmap takes care of that here.
+I'll send you the pull request later and just holler if I need to change
+it somehow.
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160322/68957dcb/attachment.sig>
+Thanks,
+-Christoffer
