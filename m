@@ -1,34 +1,60 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 22 Mar 2016 11:00:03 +0900
-Subject: [PATCH 2/2] ARM: dts: exynos: Enable SSS on Trats2
-In-Reply-To: <1458612003-30284-1-git-send-email-k.kozlowski@samsung.com>
-References: <1458612003-30284-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1458612003-30284-2-git-send-email-k.kozlowski@samsung.com>
+From: jun.nie@linaro.org (Jun Nie)
+Date: Tue, 22 Mar 2016 10:01:49 +0800
+Subject: [PATCH 2/2] serial: amba-pl011: complete support to ZTE uart
+In-Reply-To: <56F0A628.2080607@codeaurora.org>
+References: <1457920282-14823-1-git-send-email-jun.nie@linaro.org>
+ <1457920282-14823-2-git-send-email-jun.nie@linaro.org>
+ <56F05C16.1030805@codeaurora.org>
+ <CABymUCNKOgdLBLr2fZ4KhwmG+R4Zm-LHnfDppV-yiwUjRH4Nyg@mail.gmail.com>
+ <56F0A628.2080607@codeaurora.org>
+Message-ID: <CABymUCOX5zws9QfXp5Wud2JBAYJZH4rxPRVVgbk7tRvbUUHChA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the Security SubSystem (SSS) on Trats2 (Exynos4412) board which
-allows usage of its hardware accelerated AES operations.
+2016-03-22 9:55 GMT+08:00 Timur Tabi <timur@codeaurora.org>:
+> Jun Nie wrote:
+>>
+>> 2016-03-22 4:39 GMT+08:00 Timur Tabi <timur@codeaurora.org>:
+>>>
+>>> Jun Nie wrote:
+>>>>
+>>>>
+>>>> @@ -2570,9 +2608,17 @@ static int pl011_uart_plat_probe(struct
+>>>> platform_device *pdev)
+>>>>          if (!uap)
+>>>>                  return -ENOMEM;
+>>>>
+>>>> +       uap->clk = devm_clk_get(&pdev->dev, NULL);
+>>>> +       if (IS_ERR(uap->clk))
+>>>> +               return PTR_ERR(uap->clk);
+>>>> +
+>>>
+>>>
+>>>
+>>> I don't this is supposed to be part of your patch, and it breaks my ACPI
+>>> platform anyway.  Where did it come from?
+>>>
+>> Is it OK to move to device tree part, I mean if (pdev->dev.of_node)
+>> clause? It is part of my patch, I am not aware ACPI requirement on
+>> this.
+>
+>
+> But this is not restricted to the ZTE platform.  Your patch says, "compete
+> support to ZTE uart" (maybe you should reword that to "add support for ZTE
+> UARTs").  However, this change affects ALL platforms. If you move it to the
+> device tree part, it will affect ALL device tree platforms.  That's not
+> "adding ZTE support".
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- arch/arm/boot/dts/exynos4412-trats2.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+That's a fair comment. I suppose all platform need to enable clock for
+the device. For device tree case, we need these code for clock
+enabling. For ACPI case, it may be handled automatically. If you agree
+my opinion, I will move these lines to patch 1. Please correct me if I
+am wrong.
 
-diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
-index ed017cc7b14f..2bf363c3bf62 100644
---- a/arch/arm/boot/dts/exynos4412-trats2.dts
-+++ b/arch/arm/boot/dts/exynos4412-trats2.dts
-@@ -1286,6 +1286,10 @@
- 	};
- };
- 
-+&sss {
-+	status = "okay";
-+};
-+
- &tmu {
- 	vtmu-supply = <&ldo10_reg>;
- 	status = "okay";
--- 
-2.5.0
+Jun
+
+>
+> --
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the
+> Code Aurora Forum, hosted by The Linux Foundation.
