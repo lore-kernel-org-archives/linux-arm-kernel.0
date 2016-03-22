@@ -1,100 +1,35 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 22 Mar 2016 10:37:14 -0700
-Subject: [PATCH] arm64/dma-mapping: Add DMA_ATTR_ALLOC_SINGLE_PAGES support
-In-Reply-To: <20160321180147.GR23397@arm.com>
-References: <1456944866-15990-1-git-send-email-yong.wu@mediatek.com>
- <20160321180147.GR23397@arm.com>
-Message-ID: <CAD=FV=WL-OgE6D+8m3A8ZSJ8HgVZJw_+7uBce=qPh80LaxQKbg@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 22 Mar 2016 17:39:52 +0000
+Subject: [PATCH v2] spi: orion.c: Add direct access mode
+In-Reply-To: <20160322173546.40d24cc2@free-electrons.com>
+References: <1458663893-13766-1-git-send-email-sr@denx.de>
+ <20160322173546.40d24cc2@free-electrons.com>
+Message-ID: <20160322173952.GF2566@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will,
+On Tue, Mar 22, 2016 at 05:35:46PM +0100, Thomas Petazzoni wrote:
 
-On Mon, Mar 21, 2016 at 11:01 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Thu, Mar 03, 2016 at 02:54:26AM +0800, Yong Wu wrote:
->> Sometimes it is not worth for the iommu allocating big chunks.
->> Here we enable DMA_ATTR_ALLOC_SINGLE_PAGES which could help avoid to
->> allocate big chunks while iommu allocating buffer.
->>
->> More information about this attribute, please check Doug's commit[1].
->>
->> [1]: https://lkml.org/lkml/2016/1/11/720
->>
->> Cc: Robin Murphy <robin.murphy@arm.com>
->> Suggested-by: Douglas Anderson <dianders@chromium.org>
->> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
->> ---
->>
->> Our video drivers may soon use this.
->>
->>  arch/arm64/mm/dma-mapping.c |  4 ++--
->>  drivers/iommu/dma-iommu.c   | 14 ++++++++++----
->>  include/linux/dma-iommu.h   |  4 ++--
->>  3 files changed, 14 insertions(+), 8 deletions(-)
->>
->> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
->> index 331c4ca..3225e3ca 100644
->> --- a/arch/arm64/mm/dma-mapping.c
->> +++ b/arch/arm64/mm/dma-mapping.c
->> @@ -562,8 +562,8 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
->>               struct page **pages;
->>               pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, coherent);
->>
->> -             pages = iommu_dma_alloc(dev, iosize, gfp, ioprot, handle,
->> -                                     flush_page);
->> +             pages = iommu_dma_alloc(dev, iosize, gfp, ioprot, attrs,
->> +                                     handle, flush_page);
->>               if (!pages)
->>                       return NULL;
->>
->> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
->> index 72d6182..3569cb6 100644
->> --- a/drivers/iommu/dma-iommu.c
->> +++ b/drivers/iommu/dma-iommu.c
->> @@ -190,7 +190,8 @@ static void __iommu_dma_free_pages(struct page **pages, int count)
->>       kvfree(pages);
->>  }
->>
->> -static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp)
->> +static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp,
->> +                                          struct dma_attrs *attrs)
->>  {
->>       struct page **pages;
->>       unsigned int i = 0, array_size = count * sizeof(*pages);
->> @@ -203,6 +204,10 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp)
->>       if (!pages)
->>               return NULL;
->>
->> +     /* Go straight to 4K chunks if caller says it's OK. */
->> +     if (dma_get_attr(DMA_ATTR_ALLOC_SINGLE_PAGES, attrs))
->> +             order = 0;
->
-> I have a slight snag with this, in that you don't consult the IOMMU
-> pgsize_bitmap at any point, and assume that it can map pages at the
-> same granularity as the CPU. The documentation for
-> DMA_ATTR_ALLOC_SINGLE_PAGES seems to be weaker than that.
+> Has there been any discussion on whether dynamically adding the MBus
+> window is a good idea, as opposed to statically defining it in the
+> board .dts ?
 
-Interesting.  Is that something that exists in the real world?  ...or
-something you think is coming soon?
+> So far, the only driver that was using dynamically allocated MBus is
+> the PCIe controller driver, because there is no way in advanced to know
+> the number and memory window requirements of the PCIe devices that will
+> be connected to the system.
 
-I'd argue that such a case existed in the real world then probably
-we're already broken.  Unless I'm misreading, existing code will
-already fall all the way back to order 0 allocations.  ...so while
-existing code might could work if it was called on a totally
-unfragmented system, it would already break once some fragmentation
-was introduced.
+> For all other windows (BootROM, crypto SRAM and more recently network
+> related SRAM), we are using statically allocated windows.
 
-I'm not saying that we shouldn't fix the code to handle this, I'm just
-saying that Yong Wu's patch doesn't appear to break any code that
-wasn't already broken.  That might be reason to land his code first,
-then debate the finer points of whether IOMMUs with less granularity
-are likely to exist and whether we need to add complexity to the code
-to handle them (or just detect this case and return an error).
-
->From looking at a WIP patch provided to me by Yong Wu, it looks as if
-he thinks several more functions need to change to handle this need
-for IOMMUs that can't handle small pages.  That seems to be further
-evidence that the work should be done in a separate patch.
-
-
-Doug
+Is this a case where we used to use static assignment because we didn't
+have a mechanism for dynamic assignment but now have a mechanism for
+dynamic assignment?  In other words is there any advantage to doing the
+assignments statically given that we can do them dynamically?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160322/340bc518/attachment-0001.sig>
