@@ -1,53 +1,163 @@
-From: gang.liu@nxp.com (Gang Liu)
-Date: Tue, 22 Mar 2016 14:03:22 +0000
-Subject: [PATCH] gpio/ls1043a: Correct ls1043a gpio nodes compatible in
- dts file
-In-Reply-To: <DB5PR0401MB19283736845DCFD5F4186729918C0@DB5PR0401MB1928.eurprd04.prod.outlook.com>
-References: <1457600240-47141-1-git-send-email-Gang.Liu@nxp.com>
- <1457600240-47141-2-git-send-email-Gang.Liu@nxp.com>
- <DB5PR0401MB192833673541757889C889C1918A0@DB5PR0401MB1928.eurprd04.prod.outlook.com>
- <DB4PR04MB26636780AB3453AE0D3E218828B0@DB4PR04MB266.eurprd04.prod.outlook.com>
- <DB5PR0401MB19283736845DCFD5F4186729918C0@DB5PR0401MB1928.eurprd04.prod.outlook.com>
-Message-ID: <DB4PR04MB2660ED371AE3599B6EC8F8E82800@DB4PR04MB266.eurprd04.prod.outlook.com>
+From: rogershimizu@gmail.com (Roger Shimizu)
+Date: Tue, 22 Mar 2016 23:28:18 +0900
+Subject: [PATCH] ARM: dts: orion5x: add device tree for kurobox-pro
+Message-ID: <1458656898-16183-1-git-send-email-rogershimizu@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Scott,
+Add dts file to support Buffalo/Revogear Kurobox-Pro, which is marvell
+orion5x based 3.5" HDD NAS.
 
-I think you mean that GPIO node needs two compatibles, one for general GPIO IP block ("fsl,qoriq-gpio")
-and another for chip-specific ("fsl,ls1043a-gpio").
-The driver can just include general GPIO IP block compatible, and if there is a errata for ls1043 GPIO, the
-chip-specific compatible can be used to fix the errata, right?
+It's a quite old product and already discontinued. So there's no
+official website for it. But it was an early product which used marvell
+orion5x 88F5182 chipset, it's popular in the community.
+Some unofficial site:
+  - http://buffalo.nas-central.org/wiki/Category:KuroboxPro
+  - http://nice.kaze.com/KUROPRO_ProductSpecifications.pdf
 
-If it's right, do you think the "fsl,ls1043a-gpio" and "fsl,qoriq-gpio" are ok for our Layerscape platforms?
-So maybe I need to create more patches for ls1021, ls2085 platform supported in opensource.
+This device tree is based on the board file:
+  arch/arm/mach-orion5x/kurobox_pro-setup.c
+However, the NAND device, which is supported by board file, is not
+supported by device tree yet. So I still want to keep the board file
+for the time being.
 
-Best Regards,
-Liu Gang
+Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
+---
+ arch/arm/boot/dts/Makefile               |   1 +
+ arch/arm/boot/dts/orion5x-kuroboxpro.dts | 113 +++++++++++++++++++++++++++++++
+ 2 files changed, 114 insertions(+)
+ create mode 100644 arch/arm/boot/dts/orion5x-kuroboxpro.dts
 
------Original Message-----
-From: Scott Wood 
-Sent: Saturday, March 19, 2016 2:49 AM
-To: Gang Liu <gang.liu@nxp.com>; linus.walleij at linaro.org; linux-gpio at vger.kernel.org; linux-arm-kernel at lists.infradead.org; khilman at linaro.org
-Cc: robh+dt at kernel.org; Leo Li <leo.li@nxp.com>; Mingkai Hu <mingkai.hu@nxp.com>
-Subject: Re: [PATCH] gpio/ls1043a: Correct ls1043a gpio nodes compatible in dts file
-
-> Hi, Scott,
-> Currently all QorIQ platform's GPIO IP blocks are same, they are all 
-> no version register, and have same registers, offset address and other 
-> features, so the code can cover all of them.
-
-So?  We have no idea what the hardware people will do in the future.
-
-> There is just one exceptional ls2080, it has the little-endian GPIO 
-> registers, and we added a "little-endian" property in the GPIO nodes.
-> 
-> Add in addition, we have deeply discussed about the GPIO compatible 
-> name before, you suggested using "fsl,qoriq-gpio" for all the QorIQ 
-> platforms. Please find some excerpt from former mail context.
-
-It's in established use so I won't suggest that we get rid of it.  But ideally the chip-specific compatible should be in the device tree (not the driver until/unless necessary) as well, so it seemed odd to get rid of it.
-
-If we were starting from scratch, then instead of "fsl,qoriq-gpio" it should have been a chip-based compatible for some arbitrary chip that contains this exact logic (in addition to the chip-specific compatible for the actual chip).  Neither case requires adding every chip name to the driver.
-
--Scott
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 52b34a0..de1d67a 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -521,6 +521,7 @@ dtb-$(CONFIG_SOC_DRA7XX) += \
+ 	dra7-evm.dtb \
+ 	dra72-evm.dtb
+ dtb-$(CONFIG_ARCH_ORION5X) += \
++	orion5x-kuroboxpro.dtb \
+ 	orion5x-lacie-d2-network.dtb \
+ 	orion5x-lacie-ethernet-disk-mini-v2.dtb \
+ 	orion5x-linkstation-lsgl.dtb \
+diff --git a/arch/arm/boot/dts/orion5x-kuroboxpro.dts b/arch/arm/boot/dts/orion5x-kuroboxpro.dts
+new file mode 100644
+index 0000000..c626ddd
+--- /dev/null
++++ b/arch/arm/boot/dts/orion5x-kuroboxpro.dts
+@@ -0,0 +1,113 @@
++/*
++ * Device Tree file for Buffalo/Revogear Kurobox Pro
++ *
++ * Copyright (C) 2016
++ * Roger Shimizu <rogershimizu@gmail.com>
++ *
++ * Based on the board file arch/arm/mach-orion5x/kurobox_pro-setup.c
++ * Copyright (C) Ronen Shitrit <rshitrit@marvell.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++#include "orion5x-linkstation.dtsi"
++#include <dt-bindings/gpio/gpio.h>
++
++/ {
++	model = "Buffalo/Revogear Kurobox Pro";
++	compatible = "buffalo,kurobox-pro", "marvell,orion5x-88f5182", "marvell,orion5x";
++
++	soc {
++		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000>,
++				 <MBUS_ID(0x09, 0x00) 0 0xf2200000 0x800>,
++				 <MBUS_ID(0x01, 0x0f) 0 0xf4000000 0x40000>,
++				 <MBUS_ID(0x01, 0x1e) 0 0xfc000000 0x1000000>;
++	};
++
++	memory { /* 128 MB */
++		device_type = "memory";
++		reg = <0x00000000 0x8000000>;
++	};
++};
++
++&pinctrl {
++	pmx_power_hdd: pmx-power-hdd {
++		marvell,pins = "mpp1";
++		marvell,function = "gpio";
++	};
++
++	pmx_power_usb: pmx-power-usb {
++		marvell,pins = "mpp9";
++		marvell,function = "gpio";
++	};
++};
++
++&devbus_cs0 {
++	status = "disabled";
++	devbus,keep-config;
++
++	/* According to board file: arch/arm/mach-orion5x/kurobox_pro-setup.c
++	 * There's a NAND flash on Device Bus CS0, but it fails on probing,
++	 * so it's disabled here.
++	 */
++
++	flash at 0 {
++		compatible = "cfi-flash";
++		reg = <0 0x1000000>;
++		bank-width = <1>;
++	};
++};
++
++&hdd_power {
++	gpios = <&gpio0 1 GPIO_ACTIVE_HIGH>;
++};
++
++&usb_power {
++	gpios = <&gpio0 9 GPIO_ACTIVE_HIGH>;
++};
++
++&sata {
++	nr-ports = <2>;
++};
++
++&ehci1 {
++	status = "okay";
++};
+-- 
+2.7.0
