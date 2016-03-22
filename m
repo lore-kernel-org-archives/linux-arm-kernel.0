@@ -1,70 +1,40 @@
-From: alexandre.torgue@gmail.com (Alexandre Torgue)
-Date: Tue, 22 Mar 2016 17:11:33 +0100
-Subject: [PATCH v5 2/4] Documentation: Bindings: Add STM32 DWMAC glue
-In-Reply-To: <CAGhQ9VwS=YwgfeUuK+LzGjy3f9btVGV7bN=TATGHwQs+JW+iGA@mail.gmail.com>
-References: <1458315428-10081-1-git-send-email-alexandre.torgue@gmail.com>
- <1458315428-10081-3-git-send-email-alexandre.torgue@gmail.com>
- <CAGb2v65SvVi0cJbaaD9cYrqC3pJ9eumwhTVk11_N7r_nTZhS9g@mail.gmail.com>
- <20160321124043.GA26873@rob-hp-laptop>
- <CAGhQ9VwS=YwgfeUuK+LzGjy3f9btVGV7bN=TATGHwQs+JW+iGA@mail.gmail.com>
-Message-ID: <CAJgp7zxfFRhfNjcE23n+DKD0ffrvH4_sowPjK_-DZAS4ecH5dg@mail.gmail.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Tue, 22 Mar 2016 09:15:15 -0700
+Subject: [PATCH v5 6/6] serial: pl011: add EARLYCON_DECLARE
+In-Reply-To: <1458643595-14719-7-git-send-email-aleksey.makarov@linaro.org>
+References: <1458643595-14719-1-git-send-email-aleksey.makarov@linaro.org>
+ <1458643595-14719-7-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <56F16F93.808@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
+On 03/22/2016 03:46 AM, Aleksey Makarov wrote:
+> This patch adds definition of early console data for pl011.
+> It allows setting up an early console with a string passed in
+> command line or compiled by the ACPI SPCR table handler.
 
-I will fix typo issues (s/vesrion/version and ethernet @).
+This shouldn't be necessary in 4.5+ since OF_EARLYCON_DECLARE()
+should be equivalent to EARLYCON_DECLARE() as well.
 
-Concerning compatible string. For sure "snps,dwmac-3.50a" string is
-not used inside glue driver.
-I perfere to keep it for information but if you really want that I
-remove it I will not block ;)
+Regards,
+Peter Hurley
 
-2016-03-21 16:36 GMT+01:00 Joachim  Eastwood <manabian@gmail.com>:
-> On 21 March 2016 at 13:40, Rob Herring <robh@kernel.org> wrote:
->> On Sat, Mar 19, 2016 at 12:00:22AM +0800, Chen-Yu Tsai wrote:
->>> Hi,
->>>
->>> On Fri, Mar 18, 2016 at 11:37 PM, Alexandre TORGUE
->>> <alexandre.torgue@gmail.com> wrote:
->>> > +- clocks: Must contain a phandle for each entry in clock-names.
->>> > +- clock-names: Should be "stmmaceth" for the host clock.
->>
-We can remove host clock (stmmac eth) entry here and refer to
-stmmac.txt binding for common entry
 
->> This doesn't sound like the clock input signal name...
->>
->>> > +              Should be "tx-clk" for the MAC TX clock.
->>> > +              Should be "rx-clk" for the MAC RX clock.
->>
->> How can other DWMAC blocks not have these clocks? The glue can't really
->> add these clocks. It could combine them into one or a new version of
->> DWMAC could have a different number of clock inputs. So if there is
->> variation here, then some of the bindings are probably wrong. I guess
->> the only change I'm suggesting is possibly moving these into common
->> binding doc.
->
-> The LPC18xx implementation probably have these clocks as well but the
-> LPC1850 user manual only documents the main clock. Someone with access
-> to the IP block doc from Synopsys should be able to check which clocks
-> the MAC really needs.
->
-> Rockchip bindings have two clocks named "mac_clk_rx" and "mac_clk_tx".
-> These are probably the same as stm32 needs so maybe use these names
-> and move them into the main doc and update the rockchip binding.
->
-I think we can use same name. But I have a doubt on moving it in a
-common bindings (maybe I don't well understood). When you say "common
-binding file" is it "stmmac.txt" binding ? If yes does it mean that we
-have to control it inside stmmac driver (no more in glue) ? In this
-case those clocks will become "required" for stm32 and rockship but
-not for others chip. It could create confusion?
-
-Best regards
-
-Alex
-
->
-> regards,
-> Joachim Eastwood
+> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+> ---
+>  drivers/tty/serial/amba-pl011.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> index 59b743f..af6f87cf 100644
+> --- a/drivers/tty/serial/amba-pl011.c
+> +++ b/drivers/tty/serial/amba-pl011.c
+> @@ -2385,6 +2385,7 @@ static int __init pl011_early_console_setup(struct earlycon_device *device,
+>  	return 0;
+>  }
+>  OF_EARLYCON_DECLARE(pl011, "arm,pl011", pl011_early_console_setup);
+> +EARLYCON_DECLARE(pl011, pl011_early_console_setup);
+>  
+>  #else
+>  #define AMBA_CONSOLE	NULL
+> 
