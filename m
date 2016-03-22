@@ -1,50 +1,58 @@
-From: psodagud@codeaurora.org (Sodagudi Prasad)
-Date: Tue, 22 Mar 2016 15:53:02 +0530
-Subject: [Query]  doubt on parameters passed to dma_map_single_attrs() API
-Message-ID: <eedb87e1131d74a77b49599648cc5aac@codeaurora.org>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Tue, 22 Mar 2016 11:24:06 +0100
+Subject: [RFC PATCH v1 0/4] Add Rockchip RGA support
+In-Reply-To: <56EFE66A.8020404@rock-chips.com>
+References: <1458552518-25527-1-git-send-email-ykk@rock-chips.com>
+ <1511371.I0NIYzh3kP@diego> <56EFE66A.8020404@rock-chips.com>
+Message-ID: <56F11D46.8080208@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Yakir,
 
-Hi All,
+Am 21.03.2016 um 13:17 schrieb Yakir Yang:
+> On 03/21/2016 07:29 PM, Heiko St?bner wrote:
+>> Am Montag, 21. M?rz 2016, 17:28:38 schrieb Yakir Yang:
+>>> This patch set would add the RGA direct rendering based 2d graphics
+>>> acceleration module.
+>> very cool to see that.
+> ;)
+>>> This patch set is based on git repository below:
+>>> git://people.freedesktop.org/~airlied/linux drm-next
+>>> commit id: 568d7c764ae01f3706085ac8f0d8a8ac7e826bd7
+>>>
+>>> And the RGA driver is based on Exynos G2D driver, it only manages the
+>>> command lists received from user, so user should make the command list
+>>> to data and registers needed by operation to use.
+>>>
+>>> I have prepared an userspace demo application for testing:
+>>>     https://github.com/yakir-Yang/libdrm-rockchip
+>>> That is a rockchip libdrm library, and I have write a simple test case
+>>> "rockchip_rga_test" that would test the below RGA features:
+>>> - solid
+>>> - copy
+>>> - rotation
+>>> - flip
+>>> - window clip
+>>> - dithering
+>> Did you submit your libdrm changes as well?
+>>
+>> Userspace-interfaces need to be stable so the other side must also get
+>> accepted - even before the kernel change if I remember correctly.
+> 
+> Got it, and I just saw exynos_fimg2d already landed at mainline libdrm.
+> But I don't find the way to submit patches to libdrm, would you like
+> share some helps here ;)
 
-Would like to check whether the dma_map_single_attrs() API, can accept 
-ptr variable from high memory or not?
-If we pass the memory pointer, which is pointing high memory does not 
-work with virt_to_page API.
+If you're using Exynos as an example, please keep in mind that the
+libdrm license is MIT/X11, not GPL as the kernel. For our Linux distro
+we had to disable some Exynos parts because they snuck some GPL code in
+there and redistributing libdrm under GPL would cause a big headache
+(review of all packages directly or indirectly linking against it).
 
-10 static inline dma_addr_t dma_map_single_attrs(struct device *dev, 
-void *ptr,
-  11                                               size_t size,
-  12                                               enum 
-dma_data_direction dir,
-  13                                               struct dma_attrs 
-*attrs)
-  14 {
-  15         const struct dma_map_ops *ops = get_dma_ops(dev);
-  16         dma_addr_t addr;
-  17
-  18         kmemcheck_mark_initialized(ptr, size);
-  19         BUG_ON(!valid_dma_direction(dir));
-  20         addr = ops->map_page(dev, virt_to_page(ptr),
-  21                              (unsigned long)ptr & ~PAGE_MASK, size,
-  22                              dir, attrs);
-<Prasad> using the virt_to_page for the high memory will end up with 
-wrong address.
-  23         debug_dma_map_page(dev, virt_to_page(ptr),
-  24                            (unsigned long)ptr & ~PAGE_MASK, size,
-  25                            dir, addr, true);
-  26         return addr;
-  27 }
-
-The only restriction which is observed that, ptr should point to 
-physically contiguous memory.
-
-So can we pass high memory mapped address to dma_map_single API or not?
-
--Thanks, Prasad
+Thanks,
+Andreas
 
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora 
-Forum,
-Linux Foundation Collaborative Project
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton; HRB 21284 (AG N?rnberg)
