@@ -1,49 +1,172 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 22 Mar 2016 11:56:41 +0100
-Subject: [PATCH] ARM: at91/dt: sama5d3 xplained: don't disable hsmci
- regulator
-In-Reply-To: <1457693033-3619-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1457693033-3619-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <56F124E9.8010304@atmel.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Tue, 22 Mar 2016 13:09:33 +0200
+Subject: [PATCH v5 3/6] ACPI: parse SPCR and enable matching console
+In-Reply-To: <1458643595-14719-4-git-send-email-aleksey.makarov@linaro.org>
+References: <1458643595-14719-1-git-send-email-aleksey.makarov@linaro.org>
+ <1458643595-14719-4-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <CAHp75VfsayWWSgkvpgrxcER6c2rZyykbvOtm7wBQROR6SFFfWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 11/03/2016 11:43, Ludovic Desroches a ?crit :
-> If enabling the hsmci regulator on card detection, the board can reboot
-> on sd card insertion. Keeping the regulator always enabled fixes this
-> issue.
-> 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> Fixes: 1b53e3416dd0 ("ARM: at91/dt: sama5d3 xplained: add fixed
-> regulator for vmmc0")
-> Cc: stable at vger.kernel.org #4.3 and later
+On Tue, Mar 22, 2016 at 12:46 PM, Aleksey Makarov
+<aleksey.makarov@linaro.org> wrote:
+> 'ARM Server Base Boot Requiremets' [1] mentions SPCR (Serial Port
+> Console Redirection Table) [2] as a mandatory ACPI table that
+> specifies the configuration of serial console.
+>
+> Parse this table, setup earlycon and enable the specified console.
+>
+> Thanks to Peter Hurley for explaining how this should work.
+>
+> [1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0044a/index.html
+> [2] https://msdn.microsoft.com/en-us/library/windows/hardware/dn639132(v=vs.85).aspx
+>
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> +++ b/drivers/acpi/spcr.c
+> @@ -0,0 +1,102 @@
+> +/*
+> + * Copyright (c) 2012, Intel Corporation
+> + * Copyright (c) 2015, Red Hat, Inc.
+> + * Copyright (c) 2015, 2016 Linaro Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + */
+> +
+> +#define pr_fmt(fmt) "ACPI: SPCR: " fmt
+> +
+> +#include <linux/acpi.h>
+> +#include <linux/console.h>
+> +#include <linux/kernel.h>
+> +#include <linux/serial_core.h>
+> +
+> +static bool init_earlycon;
+> +
+> +void __init init_spcr_earlycon(void)
+> +{
+> +       init_earlycon = true;
+> +}
+> +
+> +int __init parse_spcr(void)
+> +{
+> +       static char opts[64];
+> +       struct acpi_table_spcr *table;
+> +       acpi_size table_size;
+> +       acpi_status status;
+> +       char *uart;
+> +       char *iotype;
+> +       int baud_rate;
+> +       int err = 0;
+> +
+> +       status = acpi_get_table_with_size(ACPI_SIG_SPCR, 0,
+> +                                         (struct acpi_table_header **)&table,
+> +                                         &table_size);
+> +
+> +       if (ACPI_FAILURE(status))
+> +               return -ENOENT;
+> +
+> +       if (table->header.revision < 2) {
+> +               err = -EINVAL;
+> +               pr_err("wrong table version\n");
+> +               goto done;
+> +       }
+> +
+> +       iotype = (table->serial_port.space_id == ACPI_ADR_SPACE_SYSTEM_MEMORY) ?
+> +                       "mmio" : "io";
+> +
+> +       switch (table->interface_type) {
+> +       case ACPI_DBG2_ARM_SBSA_32BIT:
+> +               iotype = "mmio32";
+> +               /* fall through */
+> +       case ACPI_DBG2_ARM_PL011:
+> +       case ACPI_DBG2_ARM_SBSA_GENERIC:
+> +       case ACPI_DBG2_BCM2835:
+> +               uart = "pl011";
+> +               break;
+> +       case ACPI_DBG2_16550_COMPATIBLE:
+> +       case ACPI_DBG2_16550_SUBSET:
+> +               uart = "uart";
+> +               break;
+> +       default:
+> +               err = -ENOENT;
+> +               goto done;
+> +       }
+> +
+> +       switch (table->baud_rate) {
+> +       case 3:
+> +               baud_rate = 9600;
+> +               break;
+> +       case 4:
+> +               baud_rate = 19200;
+> +               break;
+> +       case 6:
+> +               baud_rate = 57600;
+> +               break;
+> +       case 7:
+> +               baud_rate = 115200;
+> +               break;
+> +       default:
+> +               err = -ENOENT;
+> +               goto done;
+> +       }
+> +
+> +       sprintf(opts, "%s,%s,0x%llx,%d", uart, iotype,
+> +               table->serial_port.address, baud_rate);
 
-Like the one about sama5d4 Xplained, I changed the $subject prefix and
-stacked both on top of at91-4.6-fixes branch that I plan to send to
-arm-soc soon.
+You may use snprintf(), though my question here what would happen on
+32-bit kernel when you supply 64-bit address as an option?
 
-Bye,
+> +
+> +       pr_info("console: %s", opts);
+> +
+> +       if (init_earlycon)
+> +               setup_earlycon(opts);
+> +
+> +       err = add_preferred_console(uart, 0, opts + strlen(uart) + 1);
+> +
+> +done:
+> +       early_acpi_os_unmap_memory((void __iomem *)table, table_size);
+> +       return err;
+> +}
+> diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
+> index d217366..ec030c9 100644
+> --- a/drivers/tty/serial/earlycon.c
+> +++ b/drivers/tty/serial/earlycon.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/sizes.h>
+>  #include <linux/of.h>
+>  #include <linux/of_fdt.h>
+> +#include <linux/acpi.h>
+>
+>  #ifdef CONFIG_FIX_EARLYCON_MEM
+>  #include <asm/fixmap.h>
+> @@ -206,11 +207,15 @@ static int __init param_setup_earlycon(char *buf)
+>         int err;
+>
+>         /*
+> -        * Just 'earlycon' is a valid param for devicetree earlycons;
+> -        * don't generate a warning from parse_early_params() in that case
+> +        * Just 'earlycon' is a valid param for devicetree and ACPI SPCR
+> +        * earlycons; don't generate a warning from parse_early_params()
+> +        * in that case
+>          */
+> -       if (!buf || !buf[0])
+> -               return early_init_dt_scan_chosen_serial();
+> +       if (!buf || !buf[0]) {
+> +               init_spcr_earlycon();
 
-> ---
->  arch/arm/boot/dts/at91-sama5d3_xplained.dts | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-> index d81474e..d4f5987 100644
-> --- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-> +++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
-> @@ -303,6 +303,7 @@
->  		regulator-name = "mmc0-card-supply";
->  		regulator-min-microvolt = <3300000>;
->  		regulator-max-microvolt = <3300000>;
-> +		regulator-always-on;
->  	};
->  
->  	gpio_keys {
-> 
+> +               early_init_dt_scan_chosen_serial();
+> +               return 0;
 
+And you hide an error?
+
+> +       }
+>
+>         err = setup_earlycon(buf);
+>         if (err == -ENOENT || err == -EALREADY)
 
 -- 
-Nicolas Ferre
+With Best Regards,
+Andy Shevchenko
