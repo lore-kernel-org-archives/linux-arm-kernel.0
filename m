@@ -1,10 +1,10 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 22 Mar 2016 10:40:39 +0900
-Subject: [PATCH 12/13] ARM: dts: porter: Remove unnecessary clock-output-names
- properties
+Date: Tue, 22 Mar 2016 10:40:38 +0900
+Subject: [PATCH 11/13] ARM: dts: koelsch: Remove unnecessary
+ clock-output-names properties
 In-Reply-To: <1458610840-15194-1-git-send-email-horms+renesas@verge.net.au>
 References: <1458610840-15194-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1458610840-15194-13-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1458610840-15194-12-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,25 +20,25 @@ clock-output-names properties and as necessary update the node names.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791-porter.dts | 3 +--
+ arch/arm/boot/dts/r8a7791-koelsch.dts | 3 +--
  1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791-porter.dts b/arch/arm/boot/dts/r8a7791-porter.dts
-index 6c08314427d6..a95eb934dc5c 100644
---- a/arch/arm/boot/dts/r8a7791-porter.dts
-+++ b/arch/arm/boot/dts/r8a7791-porter.dts
-@@ -113,11 +113,10 @@
- 		clock-frequency = <74250000>;
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+index 0ad71b81d3a2..6eda659e0d98 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -242,11 +242,10 @@
+ 			  1800000 0>;
  	};
  
--	x14_clk: x14-clock {
-+	x14_clk: audio_clock {
+-	audio_clock: clock {
++	audio_clock: audio_clock {
  		compatible = "fixed-clock";
  		#clock-cells = <0>;
  		clock-frequency = <11289600>;
 -		clock-output-names = "audio_clock";
  	};
  
- 	sound {
+ 	rsnd_ak4643: sound {
 -- 
 2.1.4
