@@ -1,33 +1,41 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Tue, 22 Mar 2016 14:45:57 -0700
-Subject: [PATCH v15 0/6] arm64, numa: Add numa support for arm64 platforms
-In-Reply-To: <56F1936E.1090407@redhat.com>
-References: <1457481587-8976-1-git-send-email-ddaney.cavm@gmail.com>
- <56F1936E.1090407@redhat.com>
-Message-ID: <56F1BD15.4000701@caviumnetworks.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 22 Mar 2016 23:12:51 +0100
+Subject: Who is going to merge it [Was: Re: [PATCH v14 0/17] Add Analogix Core
+ Display Port Driver]
+In-Reply-To: <56F19AC9.5060507@osg.samsung.com>
+References: <1455534485-1154-1-git-send-email-ykk@rock-chips.com>
+ <CAD=FV=XXESzA6n6MNEGH1Kbh7CeL8xWX8CifFLVf91+0JyFcJQ@mail.gmail.com>
+ <56F19AC9.5060507@osg.samsung.com>
+Message-ID: <1919945.Y1tg0YzXlm@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/22/2016 11:48 AM, Jon Masters wrote:
-> On 03/08/2016 06:59 PM, David Daney wrote:
->
->> From: David Daney <david.daney@cavium.com>
->>
->> v15:
->>
->> 	- Make the distance-map node optional (again), if it is not in
->>            the device tree, default values are used.
->>
->> 	- Minor cleanups to of_numa.c as suggested by Rob Harring.
->
-> Hi David, all,
->
-> Wondering what the status of this patch series is currently?
+Hi,
 
-I haven't seen any feedback on v15.  My assumption was that the relevant 
-arm64 maintainers would take some sort of action after the merge window 
-quiets down.
+Am Dienstag, 22. M?rz 2016, 16:19:37 schrieb Javier Martinez Canillas:
+> On 03/18/2016 07:53 PM, Doug Anderson wrote:
+> > On Thu, Mar 17, 2016 at 11:41 PM, Caesar Wang <caesar.upstream@gmail.com> 
+wrote:
+> Same here, this is the second time I tested this series (first time was
+> v6 on October 25 [2]) and I think that has been out there for too long.
+> 
+> > Tested-by: Douglas Anderson <dianders@chromium.org>
+> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-In any event, I am happy to make any improvements that may be suggested.
+So we have 3 tests (Doug, Caesar and me) for the Rockchip side as well as 
+Javier for the Exynos side based on the most recent drm state.
 
-David Daney
+As said by a lot of people it would be cool to get this merged soon - 
+hopefully directly after -rc1. The only remaining question is through which 
+tree it should go.
+
+I guess there are two basic options:
+- Inki takes the series - we could see the Rockchip-Ack being implied but 
+maybe Mark can provide an explicit one
+- Mark takes the series with an Ack from Inki for the shared parts
+
+Inki, Mark do you have a preference?
+
+
+Thanks
+Heiko
