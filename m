@@ -1,115 +1,85 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 23 Mar 2016 19:47:45 +0000
-Subject: [PATCH 07/12] ARM: dts: dragonboard-600c: add usb support
+Date: Wed, 23 Mar 2016 19:47:51 +0000
+Subject: [PATCH 08/12] ARM: dts: dragonboard-600c: add pcie support
 In-Reply-To: <1458762366-9233-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1458762366-9233-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1458762465-9630-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1458762471-9676-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds usb host and otg support on board with required
-regulators.
-
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+This patch adds pcie and regulators required to get on board ATL1C
+ethernet working.
 ---
- .../arm/boot/dts/qcom-apq8064-dragonboard-600c.dts | 64 ++++++++++++++++++++++
- 1 file changed, 64 insertions(+)
+ .../arm/boot/dts/qcom-apq8064-dragonboard-600c.dts | 36 ++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
 diff --git a/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts b/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
-index a977314..5374510 100644
+index 5374510..d3e6193 100644
 --- a/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
 +++ b/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
-@@ -60,6 +60,12 @@
+@@ -20,6 +20,16 @@
+ 			regulator-type = "voltage";
+ 			regulator-boot-on;
+ 		};
++
++		/* on board fixed 3.3v supply */
++		vcc3v3: vcc3v3 {
++			compatible = "regulator-fixed";
++			regulator-name = "VCC3V3";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-always-on;
++		};
++
+ 	};
+ 
+ 	soc {
+@@ -31,6 +41,18 @@
+ 					bias-disable;
+ 				};
+ 			};
++
++			pcie_pins: pcie_pinmux {
++				mux {
++					pins = "gpio27";
++					function = "gpio";
++				};
++				conf {
++					pins = "gpio27";
++					drive-strength = <12>;
++					bias-disable;
++				};
++			};
+ 		};
+ 
+ 		rpm at 108000 {
+@@ -109,6 +131,10 @@
+ 					regulator-max-microvolt = <1900000>;
  					bias-pull-down;
  				};
- 
-+				s3 {
-+					regulator-min-microvolt = <1000000>;
-+					regulator-max-microvolt = <1400000>;
-+					qcom,switch-mode-frequency = <4800000>;
-+				};
 +
- 				s4 {
- 					regulator-min-microvolt	= <1800000>;
- 					regulator-max-microvolt	= <1800000>;
-@@ -74,6 +80,18 @@
- 					qcom,switch-mode-frequency = <3200000>;
- 				 };
- 
-+				l3 {
-+					regulator-min-microvolt = <3050000>;
-+					regulator-max-microvolt = <3300000>;
-+					bias-pull-down;
-+				};
-+
-+				l4 {
-+					regulator-min-microvolt = <1000000>;
-+					regulator-max-microvolt = <1800000>;
-+					bias-pull-down;
-+				};
-+
- 				l5 {
- 					regulator-min-microvolt = <2750000>;
- 					regulator-max-microvolt = <3000000>;
-@@ -85,6 +103,12 @@
- 					regulator-max-microvolt = <2950000>;
- 					bias-pull-down;
- 				};
-+
-+				l23 {
-+					regulator-min-microvolt = <1700000>;
-+					regulator-max-microvolt = <1900000>;
++				lvs6 {
 +					bias-pull-down;
 +				};
  			};
  		};
  
-@@ -111,6 +135,46 @@
+@@ -135,6 +161,16 @@
  			};
  		};
  
-+		/* OTG */
-+		phy at 12500000 {
-+			status		= "okay";
-+			dr_mode		= "peripheral";
-+			vddcx-supply	= <&pm8921_s3>;
-+			v3p3-supply	= <&pm8921_l3>;
-+			v1p8-supply	= <&pm8921_l4>;
-+		};
-+
-+		phy at 12520000 {
-+			status		= "okay";
-+			vddcx-supply	= <&pm8921_s3>;
-+			v3p3-supply	= <&pm8921_l3>;
-+			v1p8-supply	= <&pm8921_l23>;
-+		};
-+
-+		phy at 12530000 {
-+			status		= "okay";
-+			vddcx-supply	= <&pm8921_s3>;
-+			v3p3-supply	= <&pm8921_l3>;
-+			v1p8-supply	= <&pm8921_l23>;
-+		};
-+
-+		gadget at 12500000 {
++		pci at 1b500000 {
 +			status = "okay";
++			vdda-supply = <&pm8921_s3>;
++			vdda_phy-supply = <&pm8921_lvs6>;
++			vdda_refclk-supply = <&vcc3v3>;
++			pinctrl-0 = <&pcie_pins>;
++			pinctrl-names = "default";
++			perst-gpio = <&tlmm_pinmux 27 GPIO_ACTIVE_LOW>;
 +		};
 +
-+		/* OTG */
-+		usb at 12500000 {
-+			status = "okay";
-+		};
-+
-+		usb at 12520000 {
-+			status = "okay";
-+		};
-+
-+		usb at 12530000 {
-+			status = "okay";
-+		};
-+
- 		amba {
- 			/* eMMC */
- 			sdcc at 12400000 {
+ 		/* OTG */
+ 		phy at 12500000 {
+ 			status		= "okay";
 -- 
 2.5.0
