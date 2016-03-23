@@ -1,55 +1,36 @@
-From: js@sig21.net (Johannes Stezenbach)
-Date: Wed, 23 Mar 2016 18:26:00 +0100
-Subject: dmaengine pl08x dt crash
-In-Reply-To: <20160323163517.GA9563@sig21.net>
-References: <20160323154049.GA2170@sig21.net>
- <CACRpkdZ3ecJPcUfv7TTPhTT+rMtAC+b1=HfE3cH0OR=swvNi6w@mail.gmail.com>
- <20160323162309.GA9472@sig21.net> <20160323163517.GA9563@sig21.net>
-Message-ID: <20160323172600.GA16903@sig21.net>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 23 Mar 2016 22:56:59 +0530
+Subject: [PATCH v2 00/11] da8xx USB clocks
+In-Reply-To: <56EAB38C.9070905@cogentembedded.com>
+References: <1458181615-27782-1-git-send-email-david@lechnology.com>
+ <56EAB38C.9070905@cogentembedded.com>
+Message-ID: <56F2D1E3.6060608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 23, 2016 at 05:35:17PM +0100, Johannes Stezenbach wrote:
-> On Wed, Mar 23, 2016 at 05:23:09PM +0100, Johannes Stezenbach wrote:
-> > On Wed, Mar 23, 2016 at 05:12:13PM +0100, Linus Walleij wrote:
-> > > https://git.kernel.org/cgit/linux/kernel/git/linusw/linux-nomadik.git/log/?h=pl08x-dma
-> > > 
-> > > dma: pl08x: support fixed signal assignment
+Hi David,
+
+On Thursday 17 March 2016 07:09 PM, Sergei Shtylyov wrote:
+> On 3/17/2016 5:26 AM, David Lechner wrote:
 > 
-> This method of using vendor_data for the fixed_signals flag
-> doesn't help me much, as my IP is a plain ARM pl081.
+>> OK, ready for round two.
 > 
-> I'm also not sure how it would help, since pl08x_of_probe()
-> is only called for !pl08x->pd (no platform_data) and thus
-> pl08x_dma_init_virtual_channels() sees 0 channels.
-> And with platform_data the driver worked fine with fixed channels.
+>    You're quick... :-)
 > 
-> > > dma: pl08x: allocate OF slave channel data at probe time
+>> I've added a new callback in the davinci clocks so that they can properly
+>> handle clock muxing. The clock functions are pretty much the same as
+>> in the
+>> previous patch set other than clk_set_parent() now works.
+>>
+>> The next new thing is a phy driver for the CFGCHIP2 register that
+>> controls the
+>> SoC USB PHY (both USB 1.1 and USB 2.0). The ohci and musb drivers have
+>> been
+>> updated to use this new phy driver.
 > 
-> This looks ore promising, I'm checking it.
+>    Fantastic! At least there's some breakthru on this front.
 
-Now I see the need for the first patch, but I wonder
-why not just amend the second one with this instead:
++1 Thanks a bunch for resurrecting this code.
 
-@@ -1916,6 +1916,7 @@ static int pl08x_dma_init_virtual_channels(struct pl08x_driver_data *pl08x,
-
-                if (slave) {
-                        chan->cd = &pl08x->pd->slave_channels[i];
-+                       chan->signal = i;
-                        pl08x_dma_slave_init(chan);
-                } else {
-                        chan->cd = &pl08x->pd->memcpy_channel;
-
-(The assignment of chan->name = chan->cd->bus_id is
-already done by pl08x_dma_slave_init().)
-
-If the platform is using a mux then pd->get_xfer_signal()
-would replace the signal, so this initialization wouldn't
-do any harm, right?
-
-Also, I wonder if "#define PL08X_DMA_SIGNALS 32" is an issue
-with pl081 which only has 16 signals?  But I guess not since
-nothing would request them.
-
-
-Johannes
+Regards,
+Sekhar
