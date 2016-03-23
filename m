@@ -1,35 +1,43 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Wed, 23 Mar 2016 14:30:11 +0100
-Subject: [PATCH v2 0/6] mm/hugetlb: Fix commandline parsing behavior for
- invalid hugepagesize
-In-Reply-To: <1458734844-14833-1-git-send-email-vaishali.thakkar@oracle.com>
-References: <1458734844-14833-1-git-send-email-vaishali.thakkar@oracle.com>
-Message-ID: <20160323133011.GG7059@dhcp22.suse.cz>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 23 Mar 2016 13:36:12 +0000
+Subject: [PATCH v2] spi: orion.c: Add direct access mode
+In-Reply-To: <20160323132637.GC19953@lunn.ch>
+References: <1458663893-13766-1-git-send-email-sr@denx.de>
+ <20160322173546.40d24cc2@free-electrons.com>
+ <56F17684.2010307@denx.de> <20160323113316.GH2566@sirena.org.uk>
+ <56F2852C.5010006@denx.de> <20160323125448.GM2566@sirena.org.uk>
+ <56F295E1.4030505@denx.de> <20160323132637.GC19953@lunn.ch>
+Message-ID: <20160323133612.GO2566@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 23-03-16 17:37:18, Vaishali Thakkar wrote:
-> Current code fails to ignore the 'hugepages=' parameters when unsupported
-> hugepagesize is specified. With this patchset, introduce new architecture
-> independent routine hugetlb_bad_size to handle such command line options.
-> And then call it in architecture specific code.
-> 
-> Changes since v1:
-> 	- Separated different architecture specific changes in different
-> 	  patches
-> 	- CC'ed all arch maintainers
+On Wed, Mar 23, 2016 at 02:26:37PM +0100, Andrew Lunn wrote:
 
-The hugetlb parameters parsing is a bit mess but this at least makes it
-behave more consistently. Feel free to add to all patches
-Acked-by: Michal Hocko <mhocko@suse.com>
+> The number of windows is limited. On i think the Armada XP, if you put
+> a PCIe device on every available PCIe bus, you can run out of
+> windows. This is why Thomas implemented dynamic allocation of the
+> Windows, so that only those that are needed are used.
 
-On a side note. I have received patches with broken threading - the
-follow up patches are not in the single thread under this cover email.
-I thought this was the default behavior of git send-email but maybe your
-(older) version doesn't do that. --thread option would enforce that
-(with --no-chain-reply-to) or you can set it up in the git config. IMHO
-it is always better to have the patchset in the single email thread.
+> So i would not statically and globally allocate as many windows as
+> possible SPI devices.
 
--- 
-Michal Hocko
-SUSE Labs
+> The fact that SPI can fall back to another mechanism if there are no
+> available windows, were as PCIe cannot, suggests that SPI should
+> dynamically allocate a window, and be prepared for it to fail.
+
+> Since only one SPI device can be active at once on a SPI bus, one
+> window per bus makes sense, and keeps the required number of windows
+> to a minimum.
+
+If we're under pressure for windows I'd go further and say that we
+should be dynamically allocating the windows only when they're actually
+in use (and modifying other drivers to do the same if that makes sense
+for them), unless it's somehow expensive to allocate windows that means
+that we should reduce the overall pressure.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160323/a891cc14/attachment.sig>
