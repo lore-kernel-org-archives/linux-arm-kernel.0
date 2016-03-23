@@ -1,78 +1,76 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 23 Mar 2016 19:47:16 +0000
-Subject: [PATCH 03/12] ARM: dts: apq8064: add gsbi7 i2c support
+Date: Wed, 23 Mar 2016 19:47:22 +0000
+Subject: [PATCH 04/12] ARM: dts: dragonboard-600c: add board support with
+ serial
 In-Reply-To: <1458762366-9233-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1458762366-9233-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1458762436-9446-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1458762442-9492-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support to gsbi7 i2c which is used in some of the new
-boards.
+This patch adds support to DragonBoard600 with basic serial ports.
+DragonBoard600 is based on APQ8064.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- arch/arm/boot/dts/qcom-apq8064-pins.dtsi | 25 +++++++++++++++++++++++++
- arch/arm/boot/dts/qcom-apq8064.dtsi      | 13 +++++++++++++
- 2 files changed, 38 insertions(+)
+ arch/arm/boot/dts/Makefile                         |  1 +
+ .../arm/boot/dts/qcom-apq8064-dragonboard-600c.dts | 36 ++++++++++++++++++++++
+ 2 files changed, 37 insertions(+)
+ create mode 100644 arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064-pins.dtsi b/arch/arm/boot/dts/qcom-apq8064-pins.dtsi
-index 8bb5e5f..4102a98 100644
---- a/arch/arm/boot/dts/qcom-apq8064-pins.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064-pins.dtsi
-@@ -219,4 +219,29 @@
- 			function = "gsbi7";
- 		};
- 	};
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 52b34a0..265941a4 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -532,6 +532,7 @@ dtb-$(CONFIG_ARCH_PRIMA2) += \
+ 	prima2-evb.dtb
+ dtb-$(CONFIG_ARCH_QCOM) += \
+ 	qcom-apq8064-cm-qs600.dtb \
++	qcom-apq8064-dragonboard-600c.dtb \
+ 	qcom-apq8064-ifc6410.dtb \
+ 	qcom-apq8064-sony-xperia-yuga.dtb \
+ 	qcom-apq8064-asus-nexus7-flo.dtb \
+diff --git a/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts b/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
+new file mode 100644
+index 0000000..e96aab6
+--- /dev/null
++++ b/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
+@@ -0,0 +1,36 @@
++#include "qcom-apq8064-v2.0.dtsi"
 +
-+	i2c7_pins: i2c7 {
-+		mux {
-+			pins = "gpio84", "gpio85";
-+			function = "gsbi7";
-+		};
++/ {
++	model = "Qualcomm Technologies, Inc. APQ8064 DragonBoard600c";
++	compatible = "qcom,apq8064-dragonboard600c", "qcom,apq8064";
 +
-+		pinconf {
-+			pins = "gpio84", "gpio85";
-+			drive-strength = <16>;
-+			bias-disable;
-+		};
++	aliases {
++		serial0 = &gsbi7_serial;
++		serial1 = &gsbi1_serial;
 +	};
 +
-+	i2c7_pins_sleep: i2c7_pins_sleep {
-+		mux {
-+			pins = "gpio84", "gpio85";
-+			function = "gpio";
-+		};
-+		pinconf {
-+			pins = "gpio84", "gpio85";
-+			drive-strength = <2>;
-+			bias-disable = <0>;
-+		};
-+	};
- };
-diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index 81b4290..f064f59 100644
---- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -417,6 +417,19 @@
- 				clock-names = "core", "iface";
- 				status = "disabled";
- 			};
-+
-+			gsbi7_i2c: i2c at 16680000 {
-+				compatible = "qcom,i2c-qup-v1.1.1";
-+				pinctrl-0 = <&i2c7_pins>;
-+				pinctrl-1 = <&i2c7_pins_sleep>;
-+				pinctrl-names = "default", "sleep";
-+				reg = <0x16680000 0x1000>;
-+				interrupts = <GIC_SPI 159 IRQ_TYPE_NONE>;
-+				clocks = <&gcc GSBI7_QUP_CLK>,
-+					 <&gcc GSBI7_H_CLK>;
-+				clock-names = "core", "iface";
-+				status = "disabled";
++	soc {
++		gsbi at 12440000 {
++			status = "okay";
++			qcom,mode = <GSBI_PROT_UART_W_FC>;
++			serial at 12450000 {
++				label = "LS-UART1";
++				status = "okay";
++				pinctrl-names = "default";
++				pinctrl-0 = <&gsbi1_uart_4pins>;
 +			};
- 		};
- 
- 		rng at 1a500000 {
++		};
++
++		/* DEBUG UART  */
++		gsbi at 16600000 {
++			status = "okay";
++			qcom,mode = <GSBI_PROT_I2C_UART>;
++			serial at 16640000 {
++				label = "LS-UART0";
++				status = "okay";
++				pinctrl-names = "default";
++				pinctrl-0 = <&gsbi7_uart_2pins>;
++			};
++		};
++	};
++};
 -- 
 2.5.0
