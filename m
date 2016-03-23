@@ -1,11 +1,11 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 23 Mar 2016 08:42:49 +0100
-Subject: [PATCH v2 1/2] ARM: dts: r8a73a4: Remove unnecessary
+Date: Wed, 23 Mar 2016 08:43:33 +0100
+Subject: [PATCH v2 2/2] ARM: dts: sh73a0: Remove unnecessary
  clock-output-names properties
-In-Reply-To: <1458695203-9950-2-git-send-email-horms+renesas@verge.net.au>
+In-Reply-To: <1458695203-9950-3-git-send-email-horms+renesas@verge.net.au>
 References: <1458695203-9950-1-git-send-email-horms+renesas@verge.net.au>
- <1458695203-9950-2-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdW-uq_6PkdaPhd++h1sYUEnwrQYRqops3utUu8nREaj8g@mail.gmail.com>
+ <1458695203-9950-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdU0S_xs0Q4ATHaUPwJx150iFnP5OxGmhYrg3ZDZ2YBkBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
