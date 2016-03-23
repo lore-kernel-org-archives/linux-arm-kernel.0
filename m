@@ -1,106 +1,29 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Wed, 23 Mar 2016 10:14:00 +0100
-Subject: [PATCH v3 2/2] documentation: Fix pinctrl documentation for Meson8 /
- Meson8b
-In-Reply-To: <1458724440-32228-1-git-send-email-carlo@caione.org>
-References: <1458724440-32228-1-git-send-email-carlo@caione.org>
-Message-ID: <1458724440-32228-3-git-send-email-carlo@caione.org>
+From: alexander.stein@systec-electronic.com (Alexander Stein)
+Date: Wed, 23 Mar 2016 10:18:11 +0100
+Subject: [PATCH 2/2 v5] irqchip/Layerscape: Add SCFG MSI controller support
+In-Reply-To: <1457321782-3245-2-git-send-email-Minghuan.Lian@nxp.com>
+References: <1457321782-3245-1-git-send-email-Minghuan.Lian@nxp.com>
+ <1457321782-3245-2-git-send-email-Minghuan.Lian@nxp.com>
+Message-ID: <7239962.9Fyo0vfqsc@ws-stein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Carlo Caione <carlo@endlessm.com>
+On Monday 07 March 2016 11:36:22, Minghuan Lian wrote:
+> Some kind of NXP Layerscape SoC provides a MSI
+> implementation which uses two SCFG registers MSIIR and
+> MSIR to support 32 MSI interrupts for each PCIe controller.
+> The patch is to support it.
+> 
+> Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
 
-Fix pin controller documentation introducing the new compatibles for
-the pinctrl drivers specific for aobus / cbus.
+Tested-by: Alexander Stein <alexander.stein@systec-electronic.com>
 
-This is needed because we have changed the pin controller driver: we
-have now a single specialized pinctrl driver / compatible for each bus
-the controller is attached to, instead of one single driver dealing with
-all the controllers we have on different buses.
+Using an intel e1000e card which uses 3 MSIs. But the IRQ numbers are a bit strange though:
+> grep eth3 /proc/interrupts
+> 
+>  63:         49          0       MSI 134742016 Edge      eth3-rx-0
+>  64:          3          0       MSI 134742017 Edge      eth3-tx-0
+>  65:          4          0       MSI 134742018 Edge      eth3
 
-Signed-off-by: Carlo Caione <carlo@endlessm.com>
----
- .../devicetree/bindings/pinctrl/meson,pinctrl.txt  | 38 ++++------------------
- 1 file changed, 7 insertions(+), 31 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt
-index 3f6a524..32f4a2d 100644
---- a/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt
-@@ -1,13 +1,16 @@
- == Amlogic Meson pinmux controller ==
- 
- Required properties for the root node:
-- - compatible: "amlogic,meson8-pinctrl" or "amlogic,meson8b-pinctrl"
-+ - compatible: one of "amlogic,meson8-cbus-pinctrl"
-+		      "amlogic,meson8b-cbus-pinctrl"
-+		      "amlogic,meson8-aobus-pinctrl"
-+		      "amlogic,meson8b-aobus-pinctrl"
-  - reg: address and size of registers controlling irq functionality
- 
- === GPIO sub-nodes ===
- 
--The 2 power domains of the controller (regular and always-on) are
--represented as sub-nodes and each of them acts as a GPIO controller.
-+The GPIO bank for the controller is represented as a sub-node and it acts as a
-+GPIO controller.
- 
- Required properties for sub-nodes are:
-  - reg: should contain address and size for mux, pull-enable, pull and
-@@ -18,10 +21,6 @@ Required properties for sub-nodes are:
-  - gpio-controller: identifies the node as a gpio controller
-  - #gpio-cells: must be 2
- 
--Valid sub-node names are:
-- - "banks" for the regular domain
-- - "ao-bank" for the always-on domain
--
- === Other sub-nodes ===
- 
- Child nodes without the "gpio-controller" represent some desired
-@@ -45,7 +44,7 @@ pinctrl-bindings.txt
- === Example ===
- 
- 	pinctrl: pinctrl at c1109880 {
--		compatible = "amlogic,meson8-pinctrl";
-+		compatible = "amlogic,meson8-cbus-pinctrl";
- 		reg = <0xc1109880 0x10>;
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-@@ -61,15 +60,6 @@ pinctrl-bindings.txt
- 			#gpio-cells = <2>;
-                };
- 
--		gpio_ao: ao-bank at c1108030 {
--			reg = <0xc8100014 0x4>,
--			      <0xc810002c 0x4>,
--			      <0xc8100024 0x8>;
--			reg-names = "mux", "pull", "gpio";
--			gpio-controller;
--			#gpio-cells = <2>;
--		};
--
- 		nand {
- 			mux {
- 				groups = "nand_io", "nand_io_ce0", "nand_io_ce1",
-@@ -79,18 +69,4 @@ pinctrl-bindings.txt
- 				function = "nand";
- 			};
- 		};
--
--		uart_ao_a {
--			mux {
--				groups = "uart_tx_ao_a", "uart_rx_ao_a",
--					 "uart_cts_ao_a", "uart_rts_ao_a";
--				function = "uart_ao";
--			};
--
--			conf {
--				pins = "GPIOAO_0", "GPIOAO_1",
--				       "GPIOAO_2", "GPIOAO_3";
--				bias-disable;
--			};
--		};
- 	};
--- 
-2.5.0
+Best regards,
+Alexander
