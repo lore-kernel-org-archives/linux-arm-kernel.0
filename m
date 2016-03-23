@@ -1,46 +1,29 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 23 Mar 2016 08:43:33 +0100
-Subject: [PATCH v2 2/2] ARM: dts: sh73a0: Remove unnecessary
- clock-output-names properties
-In-Reply-To: <1458695203-9950-3-git-send-email-horms+renesas@verge.net.au>
-References: <1458695203-9950-1-git-send-email-horms+renesas@verge.net.au>
- <1458695203-9950-3-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdU0S_xs0Q4ATHaUPwJx150iFnP5OxGmhYrg3ZDZ2YBkBg@mail.gmail.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Wed, 23 Mar 2016 08:53:59 +0100
+Subject: [PATCH v3 4/4] nmi_backtrace: generate one-line reports for idle
+ cpus
+In-Reply-To: <8028886.DUEJzF47F1@vostro.rjw.lan>
+References: <1458667179-19630-1-git-send-email-cmetcalf@mellanox.com>
+ <54039485.X1biSGXPBa@vostro.rjw.lan>
+ <20160322224557.GG6356@twins.programming.kicks-ass.net>
+ <8028886.DUEJzF47F1@vostro.rjw.lan>
+Message-ID: <20160323075359.GH6356@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Wed, Mar 23, 2016 at 01:50:00AM +0100, Rafael J. Wysocki wrote:
 
-On Wed, Mar 23, 2016 at 2:06 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> * Fixed rate and fixed factor clocks do not require an
->   clock-output-names property.
-> * Since 07705583e920fef6 ("clk: shmobile: div6: Make clock-output-names
->   optional") Renesas div6 clocks do not require a clock-output-names
->   property.
->
-> In the above cases there is only one clock output and its name is taken
-> from that of the clock node.  Accordingly, remove the unnecessary
-> clock-output-names properties and as necessary update the node names.
->
-> The clock-output-names property is left in place for the zb_clk which is
-> thus treated as a special case as the MSTP clock driver (clk-mstp.c)
-> explicitly looks for a clock named zb_clk for the r8a73a4 and sh73a0 SoCs.
+> > > Well, what about intel_idle_freeze()?  Or do we not care?
+> > 
+> > I argued against it; when you're suspended the NMI watchdog is stopped
+> > too.
+> 
+> Is it also stopped for suspend-to-idle?  I'm not sure about that.
+> 
+> Where do I need to look to find out?
 
-... a clock with node name zb_clk ...
+Hmm I have memories of writing a patch to that effect when we were
+starting with that suspend-to-idle stuff, because people didn't like
+being woken up all the time.
 
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
-With the above change:
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+But now that I look I cannot find it either..
