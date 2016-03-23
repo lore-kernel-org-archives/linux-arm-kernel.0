@@ -1,82 +1,50 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 23 Mar 2016 01:50 +0100
-Subject: [PATCH v3 4/4] nmi_backtrace: generate one-line reports for idle
- cpus
-In-Reply-To: <20160322224557.GG6356@twins.programming.kicks-ass.net>
-References: <1458667179-19630-1-git-send-email-cmetcalf@mellanox.com>
- <54039485.X1biSGXPBa@vostro.rjw.lan>
- <20160322224557.GG6356@twins.programming.kicks-ass.net>
-Message-ID: <8028886.DUEJzF47F1@vostro.rjw.lan>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 23 Mar 2016 09:48:03 +0900
+Subject: [PATCH 0/2] ARM: dts: shmobile: Correct interrupt type for ARM TWD
+In-Reply-To: <CAMuHMdXcew-NHGeb2x69CR4ZBeyf3hET3xtQYSkToSX9BD68uw@mail.gmail.com>
+References: <1458296361-4468-1-git-send-email-geert+renesas@glider.be>
+ <20160322012849.GA14367@verge.net.au>
+ <CAMuHMdXcew-NHGeb2x69CR4ZBeyf3hET3xtQYSkToSX9BD68uw@mail.gmail.com>
+Message-ID: <20160323004803.GB5950@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, March 22, 2016 11:45:57 PM Peter Zijlstra wrote:
-> On Tue, Mar 22, 2016 at 11:31:11PM +0100, Rafael J. Wysocki wrote:
+On Tue, Mar 22, 2016 at 09:43:40AM +0100, Geert Uytterhoeven wrote:
+> Hi Simon,
 > 
-> > > diff --git a/drivers/idle/intel_idle.c b/drivers/idle/intel_idle.c
-> > > index cd4510a63375..924554f920fb 100644
-> > > --- a/drivers/idle/intel_idle.c
-> > > +++ b/drivers/idle/intel_idle.c
-> > > @@ -725,8 +725,8 @@ static struct cpuidle_state avn_cstates[] = {
-> > >   *
-> > >   * Must be called under local_irq_disable().
-> > >   */
-> > > -static int intel_idle(struct cpuidle_device *dev,
-> > > -		struct cpuidle_driver *drv, int index)
-> > > +static __cpuidle int intel_idle(struct cpuidle_device *dev,
-> > > +				struct cpuidle_driver *drv, int index)
-> > >  {
-> > >  	unsigned long ecx = 1; /* break on interrupt flag */
-> > >  	struct cpuidle_state *state = &drv->states[index];
-> > 
-> > Well, what about intel_idle_freeze()?  Or do we not care?
+> On Tue, Mar 22, 2016 at 2:28 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Fri, Mar 18, 2016 at 11:19:19AM +0100, Geert Uytterhoeven wrote:
+> >> This patch series corrects the interrupt type for ARM TWD timers on
+> >> SH-Mobile AG5 and R-Car H1.
+> >>
+> >> The ARM TWD interrupt is a private peripheral interrupt (PPI), and per
+> >> the ARM GIC documentation, whether the type for PPIs can be set is
+> >> IMPLEMENTATION DEFINED.
+> >>
+> >> For SH-Mobile AG5 and R-Car H1 devices the PPI type cannot be set, and
+> >> so when we attempt to set the type for the ARM TWD interrupt it fails.
+> >> This has gone unnoticed because it fails silently, and because we cannot
+> >> re-configure the type it has had no impact. Nevertheless fix the type
+> >> for the TWD interrupt so that it matches the hardware configuration.
+> >>
+> >> This was exposed by Jon Hunter's "[PATCH 04/15] irqchip/gic: WARN if
+> >> setting the interrupt type fails" (https://lkml.org/lkml/2016/3/17/339),
+> >> which triggers:
+> >>
+> >>     WARNING: CPU: 0 PID: 0 at drivers/irqchip/irq-gic-common.c:61 gic_configure_irq+0x64/0x7c()
+> >>
+> >> Other Renesas SoCs using private peripheral interrupts (R-Mobile APE6,
+> >> R-Car Gen2, and R-Car Gen3) seem to be fine.
+> >>
+> >> Based on patches by Jon Hunter for Tegra20/30 and OMAP4.
+> >
+> > Thanks for this. Do you think it would be best to queue these up
+> > for v4.7 or as fixes for v4.6?
 > 
-> I argued against it; when you're suspended the NMI watchdog is stopped
-> too.
+> I don't know if/when Jon's patch will go in, but he's tracking the fixes for
+> various SoCs, as we don't know yet how many are affected.
+> 
+> So I think it's basically up to you.
 
-Is it also stopped for suspend-to-idle?  I'm not sure about that.
-
-Where do I need to look to find out?
-
-> Then again, you've more experience debugging that thing, so if
-> you think its useful its not much effort adding it.
-> 
-> > And analogous stuff in processor_idle.c for that matter?
-> > 
-> > acpi_idle_enter()/acpi_idle_enter_freeze() plus stuff called by those?
-> 
-> Ah, I only tagged acpi_processor_ffh_cstate_enter() because I went from
-> mwait_idle_with_hints(), I suppose acpi_safe_halt() and
-> acpi_idle_do_entry() itself for the INB method should cover it?
-
-Yes, these two should be sufficient.
-
-> (This being one of the reasons I asked Chris to Cc you; you know this
-> stuff far better than I do)
-> 
-> ---
->  drivers/acpi/processor_idle.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/acpi/processor_idle.c b/drivers/acpi/processor_idle.c
-> index 175c86bee3a9..d5b11fff9e88 100644
-> --- a/drivers/acpi/processor_idle.c
-> +++ b/drivers/acpi/processor_idle.c
-> @@ -111,7 +111,7 @@ static const struct dmi_system_id processor_power_dmi_table[] = {
->   * Callers should disable interrupts before the call and enable
->   * interrupts after return.
->   */
-> -static void acpi_safe_halt(void)
-> +__cpuidle static void acpi_safe_halt(void)
->  {
->  	if (!tif_need_resched()) {
->  		safe_halt();
-> @@ -680,7 +680,7 @@ static int acpi_idle_bm_check(void)
->   *
->   * Caller disables interrupt before call and enables interrupt after return.
->   */
-> -static void acpi_idle_do_entry(struct acpi_processor_cx *cx)
-> +__cpuidle static void acpi_idle_do_entry(struct acpi_processor_cx *cx)
->  {
->  	if (cx->entry_method == ACPI_CSTATE_FFH) {
->  		/* Call into architectural FFH based C-state */
+Thanks, got it.
+I will tentatively queue them up for v4.7.
