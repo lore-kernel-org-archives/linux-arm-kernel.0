@@ -1,49 +1,34 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 23 Mar 2016 14:43:41 +0000
-Subject: [PATCH v2 3/5] mailbox: mailbox-test: Use more consistent format for
- calling copy_from_user()
-In-Reply-To: <1458744223-12164-1-git-send-email-lee.jones@linaro.org>
-References: <1458744223-12164-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1458744223-12164-4-git-send-email-lee.jones@linaro.org>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 23 Mar 2016 10:03:39 -0500
+Subject: [PATCH 1/2] ARM: dts: am335x: Add initial support for ICEv2 board
+In-Reply-To: <1458628657-30468-2-git-send-email-lokeshvutla@ti.com>
+References: <1458628657-30468-1-git-send-email-lokeshvutla@ti.com>
+ <1458628657-30468-2-git-send-email-lokeshvutla@ti.com>
+Message-ID: <20160323150339.GA10417@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While we're at it, ensure copy-to location is NULL'ed in the error path.
+On Tue, Mar 22, 2016 at 12:07:36PM +0530, Lokesh Vutla wrote:
+> TI's Industrial Communication Engine EVM is a low cost hardware mainly
+> developed for industrial communication type applications using serial
+> or Ethernet based interfaces. This platform features TI's AM3359 with
+> 800MHz single core Cortex-A8 processor, 256MB DDR3, 64MB SPI flash,
+> 8MB NOR Flash, mmc, usb, can, dual Ethernet ports.
+> 
+> For more information, look at HW user guide[1], Data manual[2].
+> 
+> Just add basic support for the moment.
+> 
+> [1] http://processors.wiki.ti.com/index.php/AM335x_Industrial_Communication_Engine_EVM_Rev2_1_HW_User_Guide
+> [2] http://www.ti.com/lit/ds/symlink/am3359.pdf
+> 
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> ---
+>  .../devicetree/bindings/arm/omap/omap.txt          |   3 +
 
-Suggested-by: Dan Carpenter <dan.carpenter@oracle.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/mailbox/mailbox-test.c | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+Acked-by: Rob Herring <robh@kernel.org>
 
-diff --git a/drivers/mailbox/mailbox-test.c b/drivers/mailbox/mailbox-test.c
-index dc11bbf..5f4b439 100644
---- a/drivers/mailbox/mailbox-test.c
-+++ b/drivers/mailbox/mailbox-test.c
-@@ -46,7 +46,6 @@ static ssize_t mbox_test_signal_write(struct file *filp,
- 				       size_t count, loff_t *ppos)
- {
- 	struct mbox_test_device *tdev = filp->private_data;
--	int ret;
- 
- 	if (!tdev->tx_channel) {
- 		dev_err(tdev->dev, "Channel cannot do Tx\n");
-@@ -64,13 +63,13 @@ static ssize_t mbox_test_signal_write(struct file *filp,
- 	if (!tdev->signal)
- 		return -ENOMEM;
- 
--	ret = copy_from_user(tdev->signal, userbuf, count);
--	if (ret) {
-+	if (copy_from_user(tdev->signal, userbuf, count)) {
- 		kfree(tdev->signal);
-+		tdev->signal = NULL;
- 		return -EFAULT;
- 	}
- 
--	return ret < 0 ? ret : count;
-+	return count;
- }
- 
- static const struct file_operations mbox_test_signal_ops = {
--- 
-1.9.1
+>  arch/arm/boot/dts/Makefile                         |   1 +
+>  arch/arm/boot/dts/am335x-icev2.dts                 | 303 +++++++++++++++++++++
+>  3 files changed, 307 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/am335x-icev2.dts
