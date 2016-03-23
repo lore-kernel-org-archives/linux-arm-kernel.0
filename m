@@ -1,40 +1,131 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 23 Mar 2016 11:33:16 +0000
-Subject: [PATCH v2] spi: orion.c: Add direct access mode
-In-Reply-To: <56F17684.2010307@denx.de>
-References: <1458663893-13766-1-git-send-email-sr@denx.de>
- <20160322173546.40d24cc2@free-electrons.com>
- <56F17684.2010307@denx.de>
-Message-ID: <20160323113316.GH2566@sirena.org.uk>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Wed, 23 Mar 2016 12:47:07 +0100
+Subject: [PATCH v2] iommu/arm-smmu: Make use of phandle iterators in
+ device-tree device-tree parsing
+In-Reply-To: <CAL_JsqLncSjd7gyyN0FxfaBOWDbWz+qS_NKmVTsH4g0S_2ysww@mail.gmail.com>
+References: <1458669509-7178-1-git-send-email-joro@8bytes.org>
+ <1458669509-7178-7-git-send-email-joro@8bytes.org>
+ <CAL_JsqLncSjd7gyyN0FxfaBOWDbWz+qS_NKmVTsH4g0S_2ysww@mail.gmail.com>
+Message-ID: <20160323114707.GA17838@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 22, 2016 at 05:44:52PM +0100, Stefan Roese wrote:
-> On 22.03.2016 17:35, Thomas Petazzoni wrote:
+On Tue, Mar 22, 2016 at 01:38:06PM -0500, Rob Herring wrote:
+> > +       struct of_phandle_iterator it;
+> > +       struct arm_smmu_phandle_args masterspec;
+> 
+> Isn't this a bit big to put on the stack being ~512 bytes?
 
-> >Has there been any discussion on whether dynamically adding the MBus
-> >window is a good idea, as opposed to statically defining it in the
-> >board .dts ?
+Yeah, you might be right. I havn't seen any problems booting with this
+being allocated on the stack, but to be on the safe side I changed the
+patch to allocate the masterspec with kmalloc, patch below.
 
-> Yes. My 1st patch version (still RFC) used fixed MBus windows instead:
 
-> http://www.spinics.net/lists/linux-spi/msg06536.html
+	Joerg
 
-> Mark suggested to use dynamic windows, so that one area could be
-> used for all SPI devices by switching (re-configuring) the MBus
-> window:
+>From 85995d1edea7f61aae3c31e0fbd3258622d0b5ae Mon Sep 17 00:00:00 2001
+From: Joerg Roedel <jroedel@suse.de>
+Date: Wed, 16 Mar 2016 17:10:10 +0100
+Subject: [PATCH] iommu/arm-smmu: Make use of phandle iterators in device-tree
+ parsing
 
-> http://www.spinics.net/lists/linux-spi/msg06537.html
+Remove the usage of of_parse_phandle_with_args() and replace
+it by the phandle-iterator implementation so that we can
+parse out all of the potentially present 128 stream-ids.
 
-No, there's two separate things here.  The big problem with what you
-originally sent was that you were defining a window per SPI device but
-this is a part of the SPI controller so having to change windows per
-device is just going to make the code more complex.  There's also the
-separate issue of where any MBus windows we get come up with.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160323/52f9216e/attachment.sig>
+Signed-off-by: Joerg Roedel <jroedel@suse.de>
+---
+ drivers/iommu/arm-smmu.c | 41 +++++++++++++++++++++++++++++++++--------
+ 1 file changed, 33 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 59ee4b8..fa9b98c 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -48,7 +48,7 @@
+ #include "io-pgtable.h"
+ 
+ /* Maximum number of stream IDs assigned to a single device */
+-#define MAX_MASTER_STREAMIDS		MAX_PHANDLE_ARGS
++#define MAX_MASTER_STREAMIDS		128
+ 
+ /* Maximum number of context banks per SMMU */
+ #define ARM_SMMU_MAX_CBS		128
+@@ -349,6 +349,12 @@ struct arm_smmu_domain {
+ 	struct iommu_domain		domain;
+ };
+ 
++struct arm_smmu_phandle_args {
++	struct device_node *np;
++	int args_count;
++	uint32_t args[MAX_MASTER_STREAMIDS];
++};
++
+ static struct iommu_ops arm_smmu_ops;
+ 
+ static DEFINE_SPINLOCK(arm_smmu_devices_lock);
+@@ -458,7 +464,7 @@ static int insert_smmu_master(struct arm_smmu_device *smmu,
+ 
+ static int register_smmu_master(struct arm_smmu_device *smmu,
+ 				struct device *dev,
+-				struct of_phandle_args *masterspec)
++				struct arm_smmu_phandle_args *masterspec)
+ {
+ 	int i;
+ 	struct arm_smmu_master *master;
+@@ -1716,7 +1722,8 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 	struct arm_smmu_device *smmu;
+ 	struct device *dev = &pdev->dev;
+ 	struct rb_node *node;
+-	struct of_phandle_args masterspec;
++	struct of_phandle_iterator it;
++	struct arm_smmu_phandle_args *masterspec;
+ 	int num_irqs, i, err;
+ 
+ 	smmu = devm_kzalloc(dev, sizeof(*smmu), GFP_KERNEL);
+@@ -1777,20 +1784,38 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 
+ 	i = 0;
+ 	smmu->masters = RB_ROOT;
+-	while (!of_parse_phandle_with_args(dev->of_node, "mmu-masters",
+-					   "#stream-id-cells", i,
+-					   &masterspec)) {
+-		err = register_smmu_master(smmu, dev, &masterspec);
++
++	err = -ENOMEM;
++	/* No need to zero the memory for masterspec */
++	masterspec = kmalloc(sizeof(*masterspec), GFP_KERNEL);
++	if (!masterspec)
++		goto out_put_masters;
++
++	of_for_each_phandle(&it, err, dev->of_node,
++			    "mmu-masters", "#stream-id-cells", 0) {
++		int count = of_phandle_iterator_args(&it, masterspec->args,
++						     MAX_MASTER_STREAMIDS);
++		masterspec->np		= of_node_get(it.node);
++		masterspec->args_count	= count;
++
++		err = register_smmu_master(smmu, dev, masterspec);
+ 		if (err) {
+ 			dev_err(dev, "failed to add master %s\n",
+-				masterspec.np->name);
++				masterspec->np->name);
++			kfree(masterspec);
+ 			goto out_put_masters;
+ 		}
+ 
+ 		i++;
+ 	}
++
++	if (i == 0)
++		goto out_put_masters;
++
+ 	dev_notice(dev, "registered %d master devices\n", i);
+ 
++	kfree(masterspec);
++
+ 	parse_driver_options(smmu);
+ 
+ 	if (smmu->version > ARM_SMMU_V1 &&
+-- 
+2.4.3
