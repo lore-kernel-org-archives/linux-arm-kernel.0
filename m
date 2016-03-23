@@ -1,39 +1,59 @@
-From: alexander.stein@systec-electronic.com (Alexander Stein)
-Date: Wed, 23 Mar 2016 10:49:06 +0100
-Subject: [PATCH 1/1] ARM: dts: ls1021a: DSPI has 6 chip-selects
-Message-ID: <1458726546-29453-1-git-send-email-alexander.stein@systec-electronic.com>
+From: yh.huang@mediatek.com (YH Huang)
+Date: Wed, 23 Mar 2016 17:53:14 +0800
+Subject: [PATCH] sbs-battery: fix power status when battery is dry
+Message-ID: <1458726794-48298-1-git-send-email-yh.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both DSPI have signals SPIn_PCS[0:5] so in summary 6 chip-selects, not 5.
-Fix that.
+When the battery is dry and BATTERY_FULL_DISCHARGED is set,
+we should check BATTERY_DISCHARGING to decide the power status.
+If BATTERY_DISCHARGING is set, the power status is not charging.
+Or the power status should be charging.
 
-Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
+Signed-off-by: YH Huang <yh.huang@mediatek.com>
 ---
- arch/arm/boot/dts/ls1021a.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/power/sbs-battery.c |   22 ++++++++++++----------
+ 1 file changed, 12 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index bdc1dfd..e976d61 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -274,7 +274,7 @@
- 			interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
- 			clock-names = "dspi";
- 			clocks = <&platform_clk 1>;
--			spi-num-chipselects = <5>;
-+			spi-num-chipselects = <6>;
- 			big-endian;
- 			status = "disabled";
- 		};
-@@ -287,7 +287,7 @@
- 			interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
- 			clock-names = "dspi";
- 			clocks = <&platform_clk 1>;
--			spi-num-chipselects = <5>;
-+			spi-num-chipselects = <6>;
- 			big-endian;
- 			status = "disabled";
- 		};
+diff --git a/drivers/power/sbs-battery.c b/drivers/power/sbs-battery.c
+index d6226d6..d86db0e 100644
+--- a/drivers/power/sbs-battery.c
++++ b/drivers/power/sbs-battery.c
+@@ -382,11 +382,12 @@ static int sbs_get_battery_property(struct i2c_client *client,
+ 
+ 		if (ret & BATTERY_FULL_CHARGED)
+ 			val->intval = POWER_SUPPLY_STATUS_FULL;
+-		else if (ret & BATTERY_FULL_DISCHARGED)
+-			val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
+-		else if (ret & BATTERY_DISCHARGING)
+-			val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
+-		else
++		else if (ret & BATTERY_DISCHARGING) {
++			if (ret & BATTERY_FULL_DISCHARGED)
++				val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
++			else
++				val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
++		} else
+ 			val->intval = POWER_SUPPLY_STATUS_CHARGING;
+ 
+ 		if (chip->poll_time == 0)
+@@ -702,11 +703,12 @@ static void sbs_delayed_work(struct work_struct *work)
+ 
+ 	if (ret & BATTERY_FULL_CHARGED)
+ 		ret = POWER_SUPPLY_STATUS_FULL;
+-	else if (ret & BATTERY_FULL_DISCHARGED)
+-		ret = POWER_SUPPLY_STATUS_NOT_CHARGING;
+-	else if (ret & BATTERY_DISCHARGING)
+-		ret = POWER_SUPPLY_STATUS_DISCHARGING;
+-	else
++	else if (ret & BATTERY_DISCHARGING) {
++		if (ret & BATTERY_FULL_DISCHARGED)
++			ret = POWER_SUPPLY_STATUS_NOT_CHARGING;
++		else
++			ret = POWER_SUPPLY_STATUS_DISCHARGING;
++	} else
+ 		ret = POWER_SUPPLY_STATUS_CHARGING;
+ 
+ 	if (chip->last_state != ret) {
 -- 
-2.7.3
+1.7.9.5
