@@ -1,59 +1,47 @@
-From: carlo@endlessm.com (Carlo Caione)
-Date: Wed, 23 Mar 2016 17:04:19 +0100
-Subject: [PATCH v3 2/2] documentation: Fix pinctrl documentation for
- Meson8 / Meson8b
-In-Reply-To: <20160323152052.GA20906@rob-hp-laptop>
-References: <1458724440-32228-1-git-send-email-carlo@caione.org>
- <1458724440-32228-3-git-send-email-carlo@caione.org>
- <20160323152052.GA20906@rob-hp-laptop>
-Message-ID: <CAL9uMOGaf5556KX5RJWbaW0d1zcTZu4S6FvoqEXQCWXg1QUDpg@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 23 Mar 2016 17:12:13 +0100
+Subject: dmaengine pl08x dt crash
+In-Reply-To: <20160323154049.GA2170@sig21.net>
+References: <20160323154049.GA2170@sig21.net>
+Message-ID: <CACRpkdZ3ecJPcUfv7TTPhTT+rMtAC+b1=HfE3cH0OR=swvNi6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 23, 2016 at 4:20 PM, Rob Herring <robh@kernel.org> wrote:
-> On Wed, Mar 23, 2016 at 10:14:00AM +0100, Carlo Caione wrote:
->> From: Carlo Caione <carlo@endlessm.com>
->>
->> Fix pin controller documentation introducing the new compatibles for
->> the pinctrl drivers specific for aobus / cbus.
->>
->> This is needed because we have changed the pin controller driver: we
->> have now a single specialized pinctrl driver / compatible for each bus
->> the controller is attached to, instead of one single driver dealing with
->> all the controllers we have on different buses.
+On Wed, Mar 23, 2016 at 4:40 PM, Johannes Stezenbach <js@sig21.net> wrote:
+
+> I'm trying to use the new devicetree support for pl08x
+> added in commit aa4734da667442
+> (dmaengine: pl08x: support dt channel assignment).
 >
-> Aren't you breaking compatibility with old DTs here? If so, you need to
-> be clear that you are and why you think that is okay.
+> It causes crash in the pl011 serial driver when it calls
+> dma_chan_name() because the dma_chan->dev->device is NULL.
+> I think the reason is dma_async_device_register() is called
+> during pl08x_probe(), but at this time the number of slave
+> channels is still 0 as these get allocated later in
+> pl08x_of_xlate() when clients request the channels.
+>
+> [    0.420835] pl08xdmac dma8ch0: initialized 8 virtual memcpy channels
+> [    0.427380] pl08xdmac dma8ch0: initialized 0 virtual slave channels
+> [    0.436185] pl08xdmac dma8ch0: DMA: PL080s rev1 at 0xfec00000 irq 8
 
-Rob,
-It's a bit too late to worry about breaking compatibility since the
-driver changes are already landed in mainline and currently Meson8 and
-Meson8b platforms are broken because of this.
-You can read the whole discussion here [1] and here [2]. Driver and DT
-changes were supposed to go in together but a bit of general
-misunderstanding caused this issue.
+So you are trying to use it on the Samsung S3C?
 
-We decided to break compatibility with the old DTs since the the
-platform support is still in the really early stage so I really don't
-think this is going to cause any problem and we have a lot of good
-reasons to split the pinctrl driver. First of all it makes sense from
-the hardware prospective, since we actually have two different pin
-controllers on two different buses. Splitting the driver allows us to
-introduce in the DTS both CBUS and AOBUS as simple buses. We need a
-clear description of the two buses in the DTS since several devices
-have a different register mapping depending on which bus they are
-attached to. Also as you can read here [3] we want to map the whole
-CBUS as a syscon device to be able to access several registers
-scattered inside CBUS.
+I have it working on the Nomadik, but for platforms with fixed signal
+assignement I had to apply these patches:
+https://git.kernel.org/cgit/linux/kernel/git/linusw/linux-nomadik.git/log/?h=pl08x-dma
 
-As Andreas pointed out gxbb arch already models CBUS and AOBUS as
-simple-buses so we could reuse this driver also for that architecture.
+dma: pl08x: support fixed signal assignment
+dma: pl08x: allocate OF slave channel data at probe time
 
-Thanks,
+And the example:
+ARM: nomadik: add DMA engine and some channelspl08x-dma
 
-[1] http://www.spinics.net/lists/arm-kernel/msg489730.html
-[2] http://www.spinics.net/lists/devicetree/msg116771.html
-[3] http://www.spinics.net/lists/devicetree/msg115019.html
+I have meant to follow up on it but haven't gotten around to.
 
--- 
-Carlo Caione  |  +39.340.80.30.096  |  Endless
+If the Samsung also has fixed channels (no mux in front of the
+DMA lines) I think this might be what you need. They are not
+yet merged because Joachim reported a crash with the second
+patch and I haven't yet figured out why.
+
+Yours,
+Linus Walleij
