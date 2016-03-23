@@ -1,92 +1,38 @@
-From: jmfriedt@femto-st.fr (Jean-Michel Friedt)
-Date: Wed, 23 Mar 2016 17:28:48 +0100
-Subject: [PATCH 1/1] ARM: dts: sun5i-a13-olinuxino-micro: enable USB DRC
-Message-ID: <1458750528-13180-1-git-send-email-jmfriedt@femto-st.fr>
+From: js@sig21.net (Johannes Stezenbach)
+Date: Wed, 23 Mar 2016 17:35:17 +0100
+Subject: dmaengine pl08x dt crash
+In-Reply-To: <20160323162309.GA9472@sig21.net>
+References: <20160323154049.GA2170@sig21.net>
+ <CACRpkdZ3ecJPcUfv7TTPhTT+rMtAC+b1=HfE3cH0OR=swvNi6w@mail.gmail.com>
+ <20160323162309.GA9472@sig21.net>
+Message-ID: <20160323163517.GA9563@sig21.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: JM Friedt <jmfriedt@femto-st.fr>
+On Wed, Mar 23, 2016 at 05:23:09PM +0100, Johannes Stezenbach wrote:
+> On Wed, Mar 23, 2016 at 05:12:13PM +0100, Linus Walleij wrote:
+> > https://git.kernel.org/cgit/linux/kernel/git/linusw/linux-nomadik.git/log/?h=pl08x-dma
+> > 
+> > dma: pl08x: support fixed signal assignment
 
-Enable the OTG controller on the Olinuxino A13-micro. 
+This method of using vendor_data for the fixed_signals flag
+doesn't help me much, as my IP is a plain ARM pl081.
 
-Signed-off-by: JM Friedt <jmfriedt@femto-st.fr>
----
- arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts | 41 +++++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
+I'm also not sure how it would help, since pl08x_of_probe()
+is only called for !pl08x->pd (no platform_data) and thus
+pl08x_dma_init_virtual_channels() sees 0 channels.
+And with platform_data the driver worked fine with fixed channels.
 
-diff --git a/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts
-index ad84fe4..081329e 100644
---- a/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts
-+++ b/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts
-@@ -109,6 +109,10 @@
- 	status = "okay";
- };
- 
-+&otg_sram {
-+	status = "okay";
-+};
-+
- &pio {
- 	mmc0_cd_pin_olinuxinom: mmc0_cd_pin at 0 {
- 		allwinner,pins = "PG0";
-@@ -124,6 +128,27 @@
- 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 	};
- 
-+	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
-+		allwinner,pins = "PG2";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+	};
-+
-+	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
-+		allwinner,pins = "PG1";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_DOWN>;
-+	};
-+
-+	usb0_vbus_pin_olinuxinom: usb0_vbus_pin at 0 {
-+		allwinner,pins = "PG12";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
- 	usb1_vbus_pin_olinuxinom: usb1_vbus_pin at 0 {
- 		allwinner,pins = "PG11";
- 		allwinner,function = "gpio_out";
-@@ -132,6 +157,12 @@
- 	};
- };
- 
-+&reg_usb0_vbus {
-+	pinctrl-0 = <&usb0_vbus_pin_olinuxinom>;
-+	gpio = <&pio 6 12 GPIO_ACTIVE_HIGH>;
-+	status = "okay";
-+};
-+
- &reg_usb1_vbus {
- 	pinctrl-0 = <&usb1_vbus_pin_olinuxinom>;
- 	gpio = <&pio 6 11 GPIO_ACTIVE_HIGH>;
-@@ -144,7 +175,17 @@
- 	status = "okay";
- };
- 
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
- &usbphy {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&usb0_id_detect_pin>, <&usb0_vbus_detect_pin>;
-+	usb0_id_det-gpio = <&pio 6 2 GPIO_ACTIVE_HIGH>; /* PG2 */
-+	usb0_vbus_det-gpio = <&pio 6 1 GPIO_ACTIVE_HIGH>; /* PG1 */
-+	usb0_vbus-supply = <&reg_usb0_vbus>;
- 	usb1_vbus-supply = <&reg_usb1_vbus>;
- 	status = "okay";
- };
--- 
-2.6.4
+> > dma: pl08x: allocate OF slave channel data at probe time
+
+This looks ore promising, I'm checking it.
+
+> I'll give it a try.  My platform also has fixed channels,
+> previously it used platform data but I always thought it is
+> ugly, so I tried the new dt support.
+
+Of course I neglected to mention I'm using linux-4.5,
+in case you were wondering.
+
+
+Johannes
