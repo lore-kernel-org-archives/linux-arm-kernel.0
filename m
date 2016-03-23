@@ -1,217 +1,76 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 23 Mar 2016 11:33:33 -0700
-Subject: [PATCH 3/3] ARM64: dts: amlogic: Add P200/P201 boards
-In-Reply-To: <1458758013-11890-1-git-send-email-khilman@baylibre.com>
-References: <1458758013-11890-1-git-send-email-khilman@baylibre.com>
-Message-ID: <1458758013-11890-3-git-send-email-khilman@baylibre.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 23 Mar 2016 19:39:52 +0100
+Subject: [PATCH v2] spi: orion.c: Add direct access mode
+In-Reply-To: <56F2D19A.7020604@denx.de>
+References: <1458663893-13766-1-git-send-email-sr@denx.de>
+ <20160322173546.40d24cc2@free-electrons.com>
+ <56F17684.2010307@denx.de> <20160323113316.GH2566@sirena.org.uk>
+ <56F2852C.5010006@denx.de> <20160323125448.GM2566@sirena.org.uk>
+ <56F295E1.4030505@denx.de> <20160323132732.GN2566@sirena.org.uk>
+ <56F2D19A.7020604@denx.de>
+Message-ID: <20160323183952.GK5250@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add minimal DT files for the Amlogic P20x development boards, based on
-the Amlogic S905/GXBB SoC.
+> Please note that this direct access mode is really not suitable
+> for "normal" SPI devices like SPI NOR chips. As the direct read
+> mode (as described in chapter 22.5.1 of the Armada XP datasheet)
+> always generates:
+> 
+> a) a write command to the SPI bus (opcode configurable via register)
+> 
+> and
+> 
+> b) writes 1-4 address bytes to the SPI bus
+> 
+> before the data is read from the SPI bus.
+> 
+> So its definitely nothing that should be enabled per default for
+> all SPI devices.
 
-Cc: Andreas F?rber <afaerber@suse.de>
-Cc: Carlo Caione <carlo@endlessm.com>
-Signed-off-by: Kevin Hilman <khilman@baylibre.com>
----
- arch/arm64/boot/dts/amlogic/Makefile             |  2 +
- arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts  | 52 +++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts  | 52 +++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi | 57 ++++++++++++++++++++++++
- 4 files changed, 163 insertions(+)
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+Looking at the Kirkwood datasheet, it suggests it can be used with SPI
+flash:
 
-diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
-index a595752459e8..47ec703cb230 100644
---- a/arch/arm64/boot/dts/amlogic/Makefile
-+++ b/arch/arm64/boot/dts/amlogic/Makefile
-@@ -1,4 +1,6 @@
- dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-odroidc2.dtb
-+dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-p200.dtb
-+dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-p201.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-vega-s95-pro.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-vega-s95-meta.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-vega-s95-telos.dtb
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
-new file mode 100644
-index 000000000000..62979076e250
---- /dev/null
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
-@@ -0,0 +1,52 @@
-+/*
-+ * Copyright (c) 2016 Andreas F?rber
-+ * Copyright (c) 2016 BayLibre, Inc.
-+ * Author: Kevin Hilman <khilman@kernel.org>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "meson-gxbb-p20x.dtsi"
-+
-+/ {
-+	compatible = "amlogic,p200", "amlogic,meson-gxbb";
-+	model = "Amlogic Meson GXBB P200 Development Board";
-+};
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts
-new file mode 100644
-index 000000000000..39bb037a3e47
---- /dev/null
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts
-@@ -0,0 +1,52 @@
-+/*
-+ * Copyright (c) 2016 Andreas F?rber
-+ * Copyright (c) 2016 BayLibre, Inc.
-+ * Author: Kevin Hilman <khilman@kernel.org>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "meson-gxbb-p20x.dtsi"
-+
-+/ {
-+	compatible = "amlogic,p201", "amlogic,meson-gxbb";
-+	model = "Amlogic Meson GXBB P201 Development Board";
-+};
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-new file mode 100644
-index 000000000000..9790b314042a
---- /dev/null
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-@@ -0,0 +1,57 @@
-+/*
-+ * Copyright (c) 2016 Andreas F?rber
-+ * Copyright (c) 2016 BayLibre, Inc.
-+ * Author: Kevin Hilman <khilman@kernel.org>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#include "meson-gxbb.dtsi"
-+
-+/ {
-+	memory at 0 {
-+		device_type = "memory";
-+		reg = <0x0 0x0 0x0 0x40000000>;
-+	};
-+};
-+
-+/* This UART is brought out to the DB9 connector */
-+&uart_AO {
-+	status = "okay";
-+};
--- 
-2.7.4
+	If using SPI flash, set the <Attr> field in the CPU address
+	decoding windows to match the SPI interface (see Section 2,
+	Address Map, on page 34 for more details). Any CPU read to
+	this address space is converted by the SPI controller to a SPI
+	flash read transaction, composed of an address phase, followed
+	by a data phase.
+
+	The actual sequence that is driven on the SPI interface is:
+
+	1. Assert SPI_CSn. Write command to the SPI. The command is
+	either Read or Fast_Read, based on the configuration of the
+	<DirectRdCommand> field.
+
+	2. Write the address. The Address is driven in 1 to 4 phases
+	based on the configuration of the <DirectAddrLen>> field. The order of
+	the bytes is MSB to LSB.
+
+	3. In Fast_Read mode, add a one-byte dummy write.
+
+	4. Read the data, according to the length given by the request.
+
+	5. De-assert the SPI_CSn signal.
+
+There is also something interesting in the Direct Write to SPI
+section:
+
+	4. Address Phase.
+
+	This is a 1-4 byte field that is taken from the address of the
+	request.  The size of the address is configured via the
+	<DirectAddrLen> field in the Serial Memory Interface
+	Configuration Register (Table 629 p. 686).  The entire Address
+	phase is omitted when <Direct Wr Addr Enable> field in the
+	Serial Memory Direct Write Configuration Register (Table 634
+	p. 688) is cleared.
+
+Turning off the address phase may mean it is possible to do normal SPI
+writes using the direct mode.
+
+Quite a few Kirkwood boards have SPI flash, so if this brings better
+performance, it would be nice to be able to use it.
+
+	     Andrew
