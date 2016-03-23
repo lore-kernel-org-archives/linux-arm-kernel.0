@@ -1,41 +1,25 @@
 From: mark.yao@rock-chips.com (Mark yao)
-Date: Wed, 23 Mar 2016 09:08:05 +0800
-Subject: Who is going to merge it [Was: Re: [PATCH v14 0/17] Add Analogix
- Core Display Port Driver]
-In-Reply-To: <CAPM=9tz9_rbGJFuv-+YN=Sicfng++tHTDLrOX5Ohtwft+VnwtA@mail.gmail.com>
-References: <1455534485-1154-1-git-send-email-ykk@rock-chips.com>	<1919945.Y1tg0YzXlm@diego>	<56F1CAEB.3080701@samsung.com>	<8949624.HmxDpZAlt2@diego>	<56F1D0AD.8030905@samsung.com>	<20160322233906.GP19428@n2100.arm.linux.org.uk>	<56F1DB27.4040001@samsung.com>	<20160323000835.GQ19428@n2100.arm.linux.org.uk>
- <CAPM=9tz9_rbGJFuv-+YN=Sicfng++tHTDLrOX5Ohtwft+VnwtA@mail.gmail.com>
-Message-ID: <56F1EC75.5010903@rock-chips.com>
+Date: Wed, 23 Mar 2016 09:08:21 +0800
+Subject: [PATCH v14 09/17] drm: rockchip: dp: add rockchip platform dp
+ driver
+In-Reply-To: <1455534640-1877-1-git-send-email-ykk@rock-chips.com>
+References: <1455534485-1154-1-git-send-email-ykk@rock-chips.com>
+ <1455534640-1877-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <56F1EC85.8030403@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016?03?23? 08:41, Dave Airlie wrote:
->>> So although it's small framework or just subdirectory, we would need
->>> someone who can manage the framework to avoid further confusion if
->>> necessary.
->> So maybe it just doesn't need a maintainer, and maybe those the owner
->> of the bridge driver should be responsible for choosing the tree which
->> it's merged through along with updates.  That's how dw-hdmi has been
->> managed on the whole.
->>
->> It also means that the bridge driver maintainer is able to test changes
->> to the bridge driver, rather than having some over-arching bridge
->> subdirectory maintainer who doesn't have a clue whether the changes
->> work on the hardware.
->>
->> IMHO, having bridge driver authors/maintainers look after their own
->> code has many advantages.
-> The author just send me a pull request with acks from a git tree
-> that hopefully both people agreed and tested from. No need to
-> send this via another maintainer layer.
+On 2016?02?15? 19:10, Yakir Yang wrote:
+> Rockchip have three clocks for dp controller, we leave pclk_edp
+> to analogix_dp driver control, and keep the sclk_edp_24m and
+> sclk_edp in platform driver.
 >
-> Dave.
->
->
->
+> Signed-off-by: Yakir Yang<ykk@rock-chips.com>
+> Tested-by: Javier Martinez Canillas<javier@osg.samsung.com>
 
-Sure, these patches looks cool, I think it's ready to be merged, I'd 
-like to give a Acked-by on rockchip side.
+It looks good for me, I like it, So
+
+Acked-by: Mark Yao <mark.yao@rock-chips.com>
 
 -- 
 ?ark Yao
