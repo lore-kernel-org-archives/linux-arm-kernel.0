@@ -1,37 +1,51 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 23 Mar 2016 14:47:50 +0100
-Subject: [PATCH 1/3] ARM: at91: use chipid device for soc detection
-In-Reply-To: <56F27C89.9070004@atmel.com>
-References: <1458285681-25684-1-git-send-email-ludovic.desroches@atmel.com>
- <20160318103418.GA2531@piout.net> <56F27C89.9070004@atmel.com>
-Message-ID: <20160323134750.GC2570@piout.net>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 23 Mar 2016 14:56:06 +0100
+Subject: [PATCH v2] spi: orion.c: Add direct access mode
+In-Reply-To: <20160323133612.GO2566@sirena.org.uk>
+References: <1458663893-13766-1-git-send-email-sr@denx.de>
+ <20160322173546.40d24cc2@free-electrons.com>
+ <56F17684.2010307@denx.de> <20160323113316.GH2566@sirena.org.uk>
+ <56F2852C.5010006@denx.de> <20160323125448.GM2566@sirena.org.uk>
+ <56F295E1.4030505@denx.de> <20160323132637.GC19953@lunn.ch>
+ <20160323133612.GO2566@sirena.org.uk>
+Message-ID: <20160323135606.GE19953@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/03/2016 at 12:22:49 +0100, Nicolas Ferre wrote :
-> Le 18/03/2016 11:34, Alexandre Belloni a ?crit :
-> > On 18/03/2016 at 08:21:19 +0100, Ludovic Desroches wrote :
-> >> So far, the CIDR and EXID registers were in the DBGU interface. This device
-> >> has disappeared with the SAMA5D2 family. These registers are exposed
-> >> through a new device called chipid.
-> >>
-> >> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> >> [nicolas.ferre at atmel.com: remove useless warnings]
-> > Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > 
-> >> ---
-> >>  .../devicetree/bindings/arm/atmel-at91.txt         |  4 ++
-> >>  arch/arm/mach-at91/soc.c                           | 81 +++++++++++++++++-----
+On Wed, Mar 23, 2016 at 01:36:12PM +0000, Mark Brown wrote:
+> On Wed, Mar 23, 2016 at 02:26:37PM +0100, Andrew Lunn wrote:
 > 
-> We may need to split this patch in 2 for going through separate arm-soc
-> branches: what do you think Alexandre?
+> > The number of windows is limited. On i think the Armada XP, if you put
+> > a PCIe device on every available PCIe bus, you can run out of
+> > windows. This is why Thomas implemented dynamic allocation of the
+> > Windows, so that only those that are needed are used.
 > 
+> > So i would not statically and globally allocate as many windows as
+> > possible SPI devices.
+> 
+> > The fact that SPI can fall back to another mechanism if there are no
+> > available windows, were as PCIe cannot, suggests that SPI should
+> > dynamically allocate a window, and be prepared for it to fail.
+> 
+> > Since only one SPI device can be active at once on a SPI bus, one
+> > window per bus makes sense, and keeps the required number of windows
+> > to a minimum.
+> 
+> If we're under pressure for windows I'd go further and say that we
+> should be dynamically allocating the windows only when they're actually
+> in use (and modifying other drivers to do the same if that makes sense
+> for them), unless it's somehow expensive to allocate windows that means
+> that we should reduce the overall pressure.
 
-I think the patch can go in as it is now, the documentation being in
-line with the code.
+Hi Mark
 
+We are only under pressure in the extremes, i.e 10 PCIe busses in
+use. Only allocating PCIe Windows when needed means in practice, we
+have not had issues. We need to be mindful, and don't waste them, but
+we don't need to consider them a scarce resource.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+I don't see it being an issue for the SPI driver to allocate one on
+probe and keeping it until release. I probably would object to it
+allocating one per chip select line.
+
+   Andrew
