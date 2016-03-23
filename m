@@ -1,191 +1,87 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 23 Mar 2016 12:22:49 +0100
-Subject: [PATCH 1/3] ARM: at91: use chipid device for soc detection
-In-Reply-To: <20160318103418.GA2531@piout.net>
-References: <1458285681-25684-1-git-send-email-ludovic.desroches@atmel.com>
- <20160318103418.GA2531@piout.net>
-Message-ID: <56F27C89.9070004@atmel.com>
+Date: Wed, 23 Mar 2016 12:24:26 +0100
+Subject: [RESEND PATCH] ARM: at91/dt: sama5d2: add SFR node
+In-Reply-To: <1458230640-26049-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1458230640-26049-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <56F27CEA.7000509@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 18/03/2016 11:34, Alexandre Belloni a ?crit :
-> On 18/03/2016 at 08:21:19 +0100, Ludovic Desroches wrote :
->> So far, the CIDR and EXID registers were in the DBGU interface. This device
->> has disappeared with the SAMA5D2 family. These registers are exposed
->> through a new device called chipid.
->>
->> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
->> [nicolas.ferre at atmel.com: remove useless warnings]
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Le 17/03/2016 17:04, Ludovic Desroches a ?crit :
+> From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 > 
->> ---
->>  .../devicetree/bindings/arm/atmel-at91.txt         |  4 ++
->>  arch/arm/mach-at91/soc.c                           | 81 +++++++++++++++++-----
+> This SFR node is looked up by the I2S controller driver to tune the
+> SFR_I2SCLKSEL register.
+> 
+> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-We may need to split this patch in 2 for going through separate arm-soc
-branches: what do you think Alexandre?
-
-Anyway, I can do it myself: no need to re-send a version:
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-We'll queue it in our upcoming at91-4.7-dt and at91-4.7-soc branches.
+I'll queue it in our upcoming at91-4.7-dt branch. Thanks!
 
 Bye,
 
-
-
->>  2 files changed, 67 insertions(+), 18 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
->> index 7fd64ec..0b1fcbf 100644
->> --- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
->> +++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
->> @@ -41,6 +41,10 @@ compatible: must be one of:
->>         - "atmel,sama5d43"
->>         - "atmel,sama5d44"
->>  
->> +Chipid required properties:
->> +- compatible: Should be "atmel,sama5d2-chipid"
->> +- reg : Should contain registers location and length
->> +
->>  PIT Timer required properties:
->>  - compatible: Should be "atmel,at91sam9260-pit"
->>  - reg: Should contain registers location and length
->> diff --git a/arch/arm/mach-at91/soc.c b/arch/arm/mach-at91/soc.c
->> index 54343ff..034d563 100644
->> --- a/arch/arm/mach-at91/soc.c
->> +++ b/arch/arm/mach-at91/soc.c
->> @@ -22,48 +22,93 @@
->>  #include "soc.h"
->>  
->>  #define AT91_DBGU_CIDR			0x40
->> -#define AT91_DBGU_CIDR_VERSION(x)	((x) & 0x1f)
->> -#define AT91_DBGU_CIDR_EXT		BIT(31)
->> -#define AT91_DBGU_CIDR_MATCH_MASK	0x7fffffe0
->>  #define AT91_DBGU_EXID			0x44
->> +#define AT91_CHIPID_CIDR		0x00
->> +#define AT91_CHIPID_EXID		0x04
->> +#define AT91_CIDR_VERSION(x)		((x) & 0x1f)
->> +#define AT91_CIDR_EXT			BIT(31)
->> +#define AT91_CIDR_MATCH_MASK		0x7fffffe0
->>  
->> -struct soc_device * __init at91_soc_init(const struct at91_soc *socs)
->> +int __init at91_get_cidr_exid_from_dbgu(u32 *cidr, u32 *exid)
->>  {
->> -	struct soc_device_attribute *soc_dev_attr;
->> -	const struct at91_soc *soc;
->> -	struct soc_device *soc_dev;
->>  	struct device_node *np;
->>  	void __iomem *regs;
->> -	u32 cidr, exid;
->>  
->>  	np = of_find_compatible_node(NULL, NULL, "atmel,at91rm9200-dbgu");
->>  	if (!np)
->>  		np = of_find_compatible_node(NULL, NULL,
->>  					     "atmel,at91sam9260-dbgu");
->> +	if (!np)
->> +		return -ENODEV;
->>  
->> -	if (!np) {
->> -		pr_warn("Could not find DBGU node");
->> -		return NULL;
->> +	regs = of_iomap(np, 0);
->> +	of_node_put(np);
->> +
->> +	if (!regs) {
->> +		pr_warn("Could not map DBGU iomem range");
->> +		return -ENXIO;
->>  	}
->>  
->> +	*cidr = readl(regs + AT91_DBGU_CIDR);
->> +	*exid = readl(regs + AT91_DBGU_EXID);
->> +
->> +	iounmap(regs);
->> +
->> +	return 0;
->> +}
->> +
->> +int __init at91_get_cidr_exid_from_chipid(u32 *cidr, u32 *exid)
->> +{
->> +	struct device_node *np;
->> +	void __iomem *regs;
->> +
->> +	np = of_find_compatible_node(NULL, NULL, "atmel,sama5d2-chipid");
->> +	if (!np)
->> +		return -ENODEV;
->> +
->>  	regs = of_iomap(np, 0);
->>  	of_node_put(np);
->>  
->>  	if (!regs) {
->>  		pr_warn("Could not map DBGU iomem range");
->> -		return NULL;
->> +		return -ENXIO;
->>  	}
->>  
->> -	cidr = readl(regs + AT91_DBGU_CIDR);
->> -	exid = readl(regs + AT91_DBGU_EXID);
->> +	*cidr = readl(regs + AT91_CHIPID_CIDR);
->> +	*exid = readl(regs + AT91_CHIPID_EXID);
->>  
->>  	iounmap(regs);
->>  
->> +	return 0;
->> +}
->> +
->> +struct soc_device * __init at91_soc_init(const struct at91_soc *socs)
->> +{
->> +	struct soc_device_attribute *soc_dev_attr;
->> +	const struct at91_soc *soc;
->> +	struct soc_device *soc_dev;
->> +	u32 cidr, exid;
->> +	int ret;
->> +
->> +	/*
->> +	 * With SAMA5D2 and later SoCs, CIDR and EXID registers are no more
->> +	 * in the dbgu device but in the chipid device whose purpose is only
->> +	 * to expose these two registers.
->> +	 */
->> +	ret = at91_get_cidr_exid_from_dbgu(&cidr, &exid);
->> +	if (ret)
->> +		ret = at91_get_cidr_exid_from_chipid(&cidr, &exid);
->> +	if (ret) {
->> +		if (ret == -ENODEV)
->> +			pr_warn("Could not find identification node");
->> +		return NULL;
->> +	}
->> +
->>  	for (soc = socs; soc->name; soc++) {
->> -		if (soc->cidr_match != (cidr & AT91_DBGU_CIDR_MATCH_MASK))
->> +		if (soc->cidr_match != (cidr & AT91_CIDR_MATCH_MASK))
->>  			continue;
->>  
->> -		if (!(cidr & AT91_DBGU_CIDR_EXT) || soc->exid_match == exid)
->> +		if (!(cidr & AT91_CIDR_EXT) || soc->exid_match == exid)
->>  			break;
->>  	}
->>  
->> @@ -79,7 +124,7 @@ struct soc_device * __init at91_soc_init(const struct at91_soc *socs)
->>  	soc_dev_attr->family = soc->family;
->>  	soc_dev_attr->soc_id = soc->name;
->>  	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%X",
->> -					   AT91_DBGU_CIDR_VERSION(cidr));
->> +					   AT91_CIDR_VERSION(cidr));
->>  	soc_dev = soc_device_register(soc_dev_attr);
->>  	if (IS_ERR(soc_dev)) {
->>  		kfree(soc_dev_attr->revision);
->> @@ -91,7 +136,7 @@ struct soc_device * __init at91_soc_init(const struct at91_soc *socs)
->>  	if (soc->family)
->>  		pr_info("Detected SoC family: %s\n", soc->family);
->>  	pr_info("Detected SoC: %s, revision %X\n", soc->name,
->> -		AT91_DBGU_CIDR_VERSION(cidr));
->> +		AT91_CIDR_VERSION(cidr));
->>  
->>  	return soc_dev;
->>  }
->> -- 
->> 2.5.0
->>
+> ---
+>  Documentation/devicetree/bindings/arm/atmel-at91.txt |  2 +-
+>  arch/arm/boot/dts/sama5d2.dtsi                       |  5 +++++
+>  include/soc/at91/atmel-sfr.h                         | 18 ++++++++++++++++++
+>  3 files changed, 24 insertions(+), 1 deletion(-)
+>  create mode 100644 include/soc/at91/atmel-sfr.h
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+> index 7fd64ec..550fd66 100644
+> --- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
+> +++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+> @@ -155,7 +155,7 @@ elsewhere.
+>  
+>  required properties:
+>  - compatible: Should be "atmel,<chip>-sfr", "syscon".
+> -  <chip> can be "sama5d3" or "sama5d4".
+> +  <chip> can be "sama5d3", "sama5d4" or "sama5d2".
+>  - reg: Should contain registers location and length
+>  
+>  	sfr at f0038000 {
+> diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+> index 78996bd..36bb29c 100644
+> --- a/arch/arm/boot/dts/sama5d2.dtsi
+> +++ b/arch/arm/boot/dts/sama5d2.dtsi
+> @@ -973,6 +973,11 @@
+>  				status = "disabled";
+>  			};
+>  
+> +			sfr: sfr at f8030000 {
+> +				compatible = "atmel,sama5d2-sfr", "syscon";
+> +				reg = <0xf8030000 0x98>;
+> +			};
+> +
+>  			flx0: flexcom at f8034000 {
+>  				compatible = "atmel,sama5d2-flexcom";
+>  				reg = <0xf8034000 0x200>;
+> diff --git a/include/soc/at91/atmel-sfr.h b/include/soc/at91/atmel-sfr.h
+> new file mode 100644
+> index 0000000..2f9bb98
+> --- /dev/null
+> +++ b/include/soc/at91/atmel-sfr.h
+> @@ -0,0 +1,18 @@
+> +/*
+> + * Atmel SFR (Special Function Registers) register offsets and bit definitions.
+> + *
+> + * Copyright (C) 2016 Atmel
+> + *
+> + * Author: Ludovic Desroches <ludovic.desroches@atmel.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#ifndef _LINUX_MFD_SYSCON_ATMEL_SFR_H
+> +#define _LINUX_MFD_SYSCON_ATMEL_SFR_H
+> +
+> +#define AT91_SFR_I2SCLKSEL	0x90	/* I2SC Register */
+> +
+> +#endif /* _LINUX_MFD_SYSCON_ATMEL_SFR_H */
 > 
 
 
