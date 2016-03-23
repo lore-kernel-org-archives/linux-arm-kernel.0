@@ -1,33 +1,45 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 23 Mar 2016 15:10:17 +0900
-Subject: [PATCH] ARM: dts: exynos: Enable SSS on Odroid X/X2/U3 family
-Message-ID: <1458713417-32669-1-git-send-email-k.kozlowski@samsung.com>
+From: shhuiw@163.com (shhuiw)
+Date: Wed, 23 Mar 2016 14:31:41 +0800 (CST)
+Subject: cross build AArch64 kernel failed with ": fatal error: asm/types.h:
+ No such file or directory"
+Message-ID: <53a0aa9d.ecad.153a22bee78.Coremail.shhuiw@163.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the Security SubSystem (SSS) on Exynos4412-based Odroid boards
-to provide hardware acceleration for AES operations.
+Hello,
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Tested-by: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
----
- arch/arm/boot/dts/exynos4412-odroid-common.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-index 5e5d3fecb04c..470e592e9232 100644
---- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-+++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-@@ -492,6 +492,10 @@
- 	status = "okay";
- };
- 
-+&sss {
-+	status = "okay";
-+};
-+
- &tmu {
- 	vtmu-supply = <&ldo10_reg>;
- 	status = "okay";
--- 
-2.5.0
+I followed the steps below to build arm64 kernel image on Intel box:
+                make O=<output path> distclean
+                make O=<output path> mrproper
+                make O=<output path> ARCH=arm64 CROSS_COMPILE=aarch64-none-linux- defconfig
+                (optional) make O=<output path> ARCH=arm64 CROSS_COMPILE=aarch64-none-linux-   headers_install            
+                make O=<output path> ARCH=arm64 CROSS_COMPILE=aarch64-none-linux- 
+
+I used the upstream kernel
+
+But the last make step failed with:
+...
+  GEN     ./Makefile
+  CHK     include/generated/uapi/linux/version.h
+  CHK     include/generated/utsrelease.h
+  CC      kernel/bounds.s
+In file included from include/linux/types.h:5:0,
+                 from include/linux/page-flags.h:8,
+                 from kernel/bounds.c:9:
+include/uapi/linux/types.h:4:23: fatal error: asm/types.h: No such file or directory
+ #include <asm/types.h>
+                       ^
+compilation terminated.
+./Kbuild:44: recipe for target 'kernel/bounds.s' failed
+make[2]: *** [kernel/bounds.s] Error 1
+Makefile:993: recipe for target 'prepare0' failed
+make[1]: *** [prepare0] Error 2
+...
+
+
+Is this a bug? Is any solution available now? 
+
+
+Regards,
+sh
