@@ -1,29 +1,27 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 23 Mar 2016 10:20:52 -0500
-Subject: [PATCH v3 2/2] documentation: Fix pinctrl documentation for
- Meson8 / Meson8b
-In-Reply-To: <1458724440-32228-3-git-send-email-carlo@caione.org>
-References: <1458724440-32228-1-git-send-email-carlo@caione.org>
- <1458724440-32228-3-git-send-email-carlo@caione.org>
-Message-ID: <20160323152052.GA20906@rob-hp-laptop>
+Date: Wed, 23 Mar 2016 10:22:17 -0500
+Subject: [PATCH 1/2 v6] dt/bindings: Add bindings for Layerscape SCFG MSI
+In-Reply-To: <1458731300-13648-1-git-send-email-Minghuan.Lian@nxp.com>
+References: <1458731300-13648-1-git-send-email-Minghuan.Lian@nxp.com>
+Message-ID: <20160323152217.GA23919@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 23, 2016 at 10:14:00AM +0100, Carlo Caione wrote:
-> From: Carlo Caione <carlo@endlessm.com>
+On Wed, Mar 23, 2016 at 07:08:19PM +0800, Minghuan Lian wrote:
+> Some Layerscape SoCs use a simple MSI controller implementation.
+> It contains only two SCFG register to trigger and describe a
+> group 32 MSI interrupts. The patch adds bindings to describe
+> the controller.
 > 
-> Fix pin controller documentation introducing the new compatibles for
-> the pinctrl drivers specific for aobus / cbus.
-> 
-> This is needed because we have changed the pin controller driver: we
-> have now a single specialized pinctrl driver / compatible for each bus
-> the controller is attached to, instead of one single driver dealing with
-> all the controllers we have on different buses.
-
-Aren't you breaking compatibility with old DTs here? If so, you need to 
-be clear that you are and why you think that is okay.
- 
-> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+> Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
 > ---
->  .../devicetree/bindings/pinctrl/meson,pinctrl.txt  | 38 ++++------------------
->  1 file changed, 7 insertions(+), 31 deletions(-)
+> change log:
+> v6-v4: no change
+> v4: add interrupt-parent description
+> v3-v1: no change
+>  
+>  .../interrupt-controller/fsl,ls-scfg-msi.txt       | 30 ++++++++++++++++++++++
+>  1 file changed, 30 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt
+
+Acked-by: Rob Herring <robh@kernel.org>
