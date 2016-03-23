@@ -1,38 +1,82 @@
-From: airlied@gmail.com (Dave Airlie)
-Date: Wed, 23 Mar 2016 10:41:58 +1000
-Subject: Who is going to merge it [Was: Re: [PATCH v14 0/17] Add Analogix
- Core Display Port Driver]
-In-Reply-To: <20160323000835.GQ19428@n2100.arm.linux.org.uk>
-References: <1455534485-1154-1-git-send-email-ykk@rock-chips.com>
- <1919945.Y1tg0YzXlm@diego> <56F1CAEB.3080701@samsung.com>
- <8949624.HmxDpZAlt2@diego> <56F1D0AD.8030905@samsung.com>
- <20160322233906.GP19428@n2100.arm.linux.org.uk>
- <56F1DB27.4040001@samsung.com>
- <20160323000835.GQ19428@n2100.arm.linux.org.uk>
-Message-ID: <CAPM=9tz9_rbGJFuv-+YN=Sicfng++tHTDLrOX5Ohtwft+VnwtA@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 23 Mar 2016 01:50 +0100
+Subject: [PATCH v3 4/4] nmi_backtrace: generate one-line reports for idle
+ cpus
+In-Reply-To: <20160322224557.GG6356@twins.programming.kicks-ass.net>
+References: <1458667179-19630-1-git-send-email-cmetcalf@mellanox.com>
+ <54039485.X1biSGXPBa@vostro.rjw.lan>
+ <20160322224557.GG6356@twins.programming.kicks-ass.net>
+Message-ID: <8028886.DUEJzF47F1@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->
->> So although it's small framework or just subdirectory, we would need
->> someone who can manage the framework to avoid further confusion if
->> necessary.
->
-> So maybe it just doesn't need a maintainer, and maybe those the owner
-> of the bridge driver should be responsible for choosing the tree which
-> it's merged through along with updates.  That's how dw-hdmi has been
-> managed on the whole.
->
-> It also means that the bridge driver maintainer is able to test changes
-> to the bridge driver, rather than having some over-arching bridge
-> subdirectory maintainer who doesn't have a clue whether the changes
-> work on the hardware.
->
-> IMHO, having bridge driver authors/maintainers look after their own
-> code has many advantages.
+On Tuesday, March 22, 2016 11:45:57 PM Peter Zijlstra wrote:
+> On Tue, Mar 22, 2016 at 11:31:11PM +0100, Rafael J. Wysocki wrote:
+> 
+> > > diff --git a/drivers/idle/intel_idle.c b/drivers/idle/intel_idle.c
+> > > index cd4510a63375..924554f920fb 100644
+> > > --- a/drivers/idle/intel_idle.c
+> > > +++ b/drivers/idle/intel_idle.c
+> > > @@ -725,8 +725,8 @@ static struct cpuidle_state avn_cstates[] = {
+> > >   *
+> > >   * Must be called under local_irq_disable().
+> > >   */
+> > > -static int intel_idle(struct cpuidle_device *dev,
+> > > -		struct cpuidle_driver *drv, int index)
+> > > +static __cpuidle int intel_idle(struct cpuidle_device *dev,
+> > > +				struct cpuidle_driver *drv, int index)
+> > >  {
+> > >  	unsigned long ecx = 1; /* break on interrupt flag */
+> > >  	struct cpuidle_state *state = &drv->states[index];
+> > 
+> > Well, what about intel_idle_freeze()?  Or do we not care?
+> 
+> I argued against it; when you're suspended the NMI watchdog is stopped
+> too.
 
-The author just send me a pull request with acks from a git tree
-that hopefully both people agreed and tested from. No need to
-send this via another maintainer layer.
+Is it also stopped for suspend-to-idle?  I'm not sure about that.
 
-Dave.
+Where do I need to look to find out?
+
+> Then again, you've more experience debugging that thing, so if
+> you think its useful its not much effort adding it.
+> 
+> > And analogous stuff in processor_idle.c for that matter?
+> > 
+> > acpi_idle_enter()/acpi_idle_enter_freeze() plus stuff called by those?
+> 
+> Ah, I only tagged acpi_processor_ffh_cstate_enter() because I went from
+> mwait_idle_with_hints(), I suppose acpi_safe_halt() and
+> acpi_idle_do_entry() itself for the INB method should cover it?
+
+Yes, these two should be sufficient.
+
+> (This being one of the reasons I asked Chris to Cc you; you know this
+> stuff far better than I do)
+> 
+> ---
+>  drivers/acpi/processor_idle.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/acpi/processor_idle.c b/drivers/acpi/processor_idle.c
+> index 175c86bee3a9..d5b11fff9e88 100644
+> --- a/drivers/acpi/processor_idle.c
+> +++ b/drivers/acpi/processor_idle.c
+> @@ -111,7 +111,7 @@ static const struct dmi_system_id processor_power_dmi_table[] = {
+>   * Callers should disable interrupts before the call and enable
+>   * interrupts after return.
+>   */
+> -static void acpi_safe_halt(void)
+> +__cpuidle static void acpi_safe_halt(void)
+>  {
+>  	if (!tif_need_resched()) {
+>  		safe_halt();
+> @@ -680,7 +680,7 @@ static int acpi_idle_bm_check(void)
+>   *
+>   * Caller disables interrupt before call and enables interrupt after return.
+>   */
+> -static void acpi_idle_do_entry(struct acpi_processor_cx *cx)
+> +__cpuidle static void acpi_idle_do_entry(struct acpi_processor_cx *cx)
+>  {
+>  	if (cx->entry_method == ACPI_CSTATE_FFH) {
+>  		/* Call into architectural FFH based C-state */
