@@ -1,65 +1,59 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 23 Mar 2016 17:38:25 +0100
-Subject: [PATCH v3 02/19] clk: sunxi: Add display and TCON0 clocks driver
+Date: Wed, 23 Mar 2016 17:38:27 +0100
+Subject: [PATCH v3 04/19] clk: sunxi: Add TCON channel1 clock
 In-Reply-To: <1458751122-23976-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1458751122-23976-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1458751122-23976-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1458751122-23976-5-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A10 SoCs and its relatives has a special clock controller to drive the
-display engines (both frontend and backend), that have a lot in common with
-the clock to drive the first TCON channel.
+The TCON is a controller generating the timings to output videos signals,
+acting like both a CRTC and an encoder.
 
-Add a driver to support both.
+It has two channels depending on the output, each channel being driven by
+its own clock (and own clock controller).
+
+Add a driver for the channel 1 clock.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Acked-by: Rob Herring <robh@kernel.org>
 ---
- Documentation/devicetree/bindings/clock/sunxi.txt |   2 +
+ Documentation/devicetree/bindings/clock/sunxi.txt |   1 +
  drivers/clk/sunxi/Makefile                        |   1 +
- drivers/clk/sunxi/clk-sun4i-display.c             | 262 ++++++++++++++++++++++
- 3 files changed, 265 insertions(+)
- create mode 100644 drivers/clk/sunxi/clk-sun4i-display.c
+ drivers/clk/sunxi/clk-sun4i-tcon-ch1.c            | 300 ++++++++++++++++++++++
+ 3 files changed, 302 insertions(+)
+ create mode 100644 drivers/clk/sunxi/clk-sun4i-tcon-ch1.c
 
 diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-index 834436fbe83d..50e212bc8923 100644
+index 0e1e2c0eee61..54192c1a98dc 100644
 --- a/Documentation/devicetree/bindings/clock/sunxi.txt
 +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-@@ -64,6 +64,7 @@ Required properties:
- 	"allwinner,sun8i-h3-bus-gates-clk" - for the bus gates on H3
- 	"allwinner,sun9i-a80-apbs-gates-clk" - for the APBS gates on A80
- 	"allwinner,sun4i-a10-dram-gates-clk" - for the DRAM gates on A10
-+	"allwinner,sun4i-a10-display-clk" - for the display clocks on the A10
- 	"allwinner,sun5i-a13-mbus-clk" - for the MBUS clock on A13
- 	"allwinner,sun4i-a10-mmc-clk" - for the MMC clock
- 	"allwinner,sun9i-a80-mmc-clk" - for mmc module clocks on A80
-@@ -73,6 +74,7 @@ Required properties:
- 	"allwinner,sun8i-a23-mbus-clk" - for the MBUS clock on A23
+@@ -76,6 +76,7 @@ Required properties:
  	"allwinner,sun7i-a20-out-clk" - for the external output clocks
  	"allwinner,sun7i-a20-gmac-clk" - for the GMAC clock module on A20/A31
-+	"allwinner,sun4i-a10-tcon-ch0-clk" - for the TCON channel 0 clock on the A10
+ 	"allwinner,sun4i-a10-tcon-ch0-clk" - for the TCON channel 0 clock on the A10
++	"allwinner,sun4i-a10-tcon-ch1-clk" - for the TCON channel 1 clock on the A10
  	"allwinner,sun4i-a10-usb-clk" - for usb gates + resets on A10 / A20
  	"allwinner,sun5i-a13-usb-clk" - for usb gates + resets on A13
  	"allwinner,sun6i-a31-usb-clk" - for usb gates + resets on A31
 diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-index 3fd7901d48e4..37a6a642a037 100644
+index 244defcfa5db..39d2044a1f49 100644
 --- a/drivers/clk/sunxi/Makefile
 +++ b/drivers/clk/sunxi/Makefile
-@@ -11,6 +11,7 @@ obj-y += clk-a10-ve.o
- obj-y += clk-a20-gmac.o
- obj-y += clk-mod0.o
+@@ -13,6 +13,7 @@ obj-y += clk-mod0.o
  obj-y += clk-simple-gates.o
-+obj-y += clk-sun4i-display.o
+ obj-y += clk-sun4i-display.o
+ obj-y += clk-sun4i-pll3.o
++obj-y += clk-sun4i-tcon-ch1.o
  obj-y += clk-sun8i-bus-gates.o
  obj-y += clk-sun8i-mbus.o
  obj-y += clk-sun9i-core.o
-diff --git a/drivers/clk/sunxi/clk-sun4i-display.c b/drivers/clk/sunxi/clk-sun4i-display.c
+diff --git a/drivers/clk/sunxi/clk-sun4i-tcon-ch1.c b/drivers/clk/sunxi/clk-sun4i-tcon-ch1.c
 new file mode 100644
-index 000000000000..af7d1faebdec
+index 000000000000..98a4582de56a
 --- /dev/null
-+++ b/drivers/clk/sunxi/clk-sun4i-display.c
-@@ -0,0 +1,262 @@
++++ b/drivers/clk/sunxi/clk-sun4i-tcon-ch1.c
+@@ -0,0 +1,300 @@
 +/*
 + * Copyright 2015 Maxime Ripard
 + *
@@ -77,107 +71,233 @@ index 000000000000..af7d1faebdec
 + */
 +
 +#include <linux/clk-provider.h>
-+#include <linux/kernel.h>
++#include <linux/of.h>
 +#include <linux/of_address.h>
-+#include <linux/reset-controller.h>
 +#include <linux/slab.h>
 +#include <linux/spinlock.h>
 +
-+struct sun4i_a10_display_clk_data {
-+	bool	has_div;
-+	u8	has_rst;
-+	u8	parents;
++#define TCON_CH1_SCLK2_PARENTS		4
 +
-+	u8	offset_en;
-+	u8	offset_div;
-+	u8	offset_mux;
-+	u8	offset_rst;
++#define TCON_CH1_SCLK2_GATE_BIT		BIT(31)
++#define TCON_CH1_SCLK2_MUX_MASK		3
++#define TCON_CH1_SCLK2_MUX_SHIFT	24
++#define TCON_CH1_SCLK2_DIV_MASK		0xf
++#define TCON_CH1_SCLK2_DIV_SHIFT	0
 +
-+	u8	width_div;
-+	u8	width_mux;
++#define TCON_CH1_SCLK1_GATE_BIT		BIT(15)
++#define TCON_CH1_SCLK1_HALF_BIT		BIT(11)
++
++struct tcon_ch1_clk {
++	struct clk_hw	hw;
++	spinlock_t	lock;
++	void __iomem	*reg;
 +};
 +
-+struct reset_data {
-+	void __iomem			*reg;
-+	spinlock_t			*lock;
-+	struct reset_controller_dev	rcdev;
-+	u8				offset;
-+};
++#define hw_to_tclk(hw)	container_of(hw, struct tcon_ch1_clk, hw)
 +
-+static DEFINE_SPINLOCK(sun4i_a10_display_lock);
-+
-+static inline struct reset_data *rcdev_to_reset_data(struct reset_controller_dev *rcdev)
++static void tcon_ch1_disable(struct clk_hw *hw)
 +{
-+	return container_of(rcdev, struct reset_data, rcdev);
-+};
-+
-+static int sun4i_a10_display_assert(struct reset_controller_dev *rcdev,
-+				    unsigned long id)
-+{
-+	struct reset_data *data = rcdev_to_reset_data(rcdev);
++	struct tcon_ch1_clk *tclk = hw_to_tclk(hw);
 +	unsigned long flags;
 +	u32 reg;
 +
-+	spin_lock_irqsave(data->lock, flags);
-+
-+	reg = readl(data->reg);
-+	writel(reg & ~BIT(data->offset + id), data->reg);
-+
-+	spin_unlock_irqrestore(data->lock, flags);
-+
-+	return 0;
++	spin_lock_irqsave(&tclk->lock, flags);
++	reg = readl(tclk->reg);
++	reg &= ~(TCON_CH1_SCLK2_GATE_BIT | TCON_CH1_SCLK1_GATE_BIT);
++	writel(reg, tclk->reg);
++	spin_unlock_irqrestore(&tclk->lock, flags);
 +}
 +
-+static int sun4i_a10_display_deassert(struct reset_controller_dev *rcdev,
-+				      unsigned long id)
++static int tcon_ch1_enable(struct clk_hw *hw)
 +{
-+	struct reset_data *data = rcdev_to_reset_data(rcdev);
++	struct tcon_ch1_clk *tclk = hw_to_tclk(hw);
 +	unsigned long flags;
 +	u32 reg;
 +
-+	spin_lock_irqsave(data->lock, flags);
-+
-+	reg = readl(data->reg);
-+	writel(reg | BIT(data->offset + id), data->reg);
-+
-+	spin_unlock_irqrestore(data->lock, flags);
++	spin_lock_irqsave(&tclk->lock, flags);
++	reg = readl(tclk->reg);
++	reg |= TCON_CH1_SCLK2_GATE_BIT | TCON_CH1_SCLK1_GATE_BIT;
++	writel(reg, tclk->reg);
++	spin_unlock_irqrestore(&tclk->lock, flags);
 +
 +	return 0;
 +}
 +
-+static int sun4i_a10_display_status(struct reset_controller_dev *rcdev,
-+				    unsigned long id)
++static int tcon_ch1_is_enabled(struct clk_hw *hw)
 +{
-+	struct reset_data *data = rcdev_to_reset_data(rcdev);
++	struct tcon_ch1_clk *tclk = hw_to_tclk(hw);
++	u32 reg;
 +
-+	return !(readl(data->reg) & BIT(data->offset + id));
++	reg = readl(tclk->reg);
++	return reg & (TCON_CH1_SCLK2_GATE_BIT | TCON_CH1_SCLK1_GATE_BIT);
 +}
 +
-+static const struct reset_control_ops sun4i_a10_display_reset_ops = {
-+	.assert		= sun4i_a10_display_assert,
-+	.deassert	= sun4i_a10_display_deassert,
-+	.status		= sun4i_a10_display_status,
++static u8 tcon_ch1_get_parent(struct clk_hw *hw)
++{
++	struct tcon_ch1_clk *tclk = hw_to_tclk(hw);
++	int num_parents = clk_hw_get_num_parents(hw);
++	u32 reg;
++
++	reg = readl(tclk->reg) >> TCON_CH1_SCLK2_MUX_SHIFT;
++	reg &= reg >> TCON_CH1_SCLK2_MUX_MASK;
++
++	if (reg >= num_parents)
++		return -EINVAL;
++
++	return reg;
++}
++
++static int tcon_ch1_set_parent(struct clk_hw *hw, u8 index)
++{
++	struct tcon_ch1_clk *tclk = hw_to_tclk(hw);
++	unsigned long flags;
++	u32 reg;
++
++	spin_lock_irqsave(&tclk->lock, flags);
++	reg = readl(tclk->reg);
++	reg &= ~(TCON_CH1_SCLK2_MUX_MASK << TCON_CH1_SCLK2_MUX_SHIFT);
++	reg |= index << TCON_CH1_SCLK2_MUX_SHIFT;
++	writel(reg, tclk->reg);
++	spin_unlock_irqrestore(&tclk->lock, flags);
++
++	return 0;
 +};
 +
-+static int sun4i_a10_display_reset_xlate(struct reset_controller_dev *rcdev,
-+					 const struct of_phandle_args *spec)
++static unsigned long tcon_ch1_calc_divider(unsigned long rate,
++					   unsigned long parent_rate,
++					   u8 *div,
++					   bool *half)
 +{
-+	/* We only have a single reset signal */
++	unsigned long best_rate = 0;
++	u8 best_m = 0, m;
++	bool is_double;
++
++	for (m = 1; m < 16; m++) {
++		u8 d;
++
++		for (d = 1; d < 3; d++) {
++			unsigned long tmp_rate;
++
++			tmp_rate = parent_rate / m / d;
++
++			if (tmp_rate > rate)
++				continue;
++
++			if (!best_rate ||
++			    (rate - tmp_rate) < (rate - best_rate)) {
++				best_rate = tmp_rate;
++				best_m = m;
++				is_double = d;
++			}
++		}
++	}
++
++	if (div && half) {
++		*div = best_m;
++		*half = is_double;
++	}
++
++	return best_rate;
++}
++
++static int tcon_ch1_determine_rate(struct clk_hw *hw,
++				   struct clk_rate_request *req)
++{
++	long best_rate = -EINVAL;
++	int i;
++
++	for (i = 0; i < clk_hw_get_num_parents(hw); i++) {
++		unsigned long parent_rate;
++		unsigned long tmp_rate;
++		struct clk_hw *parent;
++
++		parent = clk_hw_get_parent_by_index(hw, i);
++		if (!parent)
++			continue;
++
++		parent_rate = clk_hw_get_rate(parent);
++
++		tmp_rate = tcon_ch1_calc_divider(req->rate, parent_rate,
++						 NULL, NULL);
++
++		if (best_rate < 0 ||
++		    (req->rate - tmp_rate) < (req->rate - best_rate)) {
++			best_rate = tmp_rate;
++			req->best_parent_rate = parent_rate;
++			req->best_parent_hw = parent;
++		}
++	}
++
++	if (best_rate < 0)
++		return best_rate;
++
++	req->rate = best_rate;
 +	return 0;
 +}
 +
-+static void __init sun4i_a10_display_init(struct device_node *node,
-+					  struct sun4i_a10_display_clk_data *data)
++static unsigned long tcon_ch1_recalc_rate(struct clk_hw *hw,
++					  unsigned long parent_rate)
 +{
-+	const char *parents[data->parents];
++	struct tcon_ch1_clk *tclk = hw_to_tclk(hw);
++	u32 reg;
++
++	reg = readl(tclk->reg);
++
++	parent_rate /= (reg & TCON_CH1_SCLK2_DIV_MASK) + 1;
++
++	if (reg & TCON_CH1_SCLK1_HALF_BIT)
++		parent_rate /= 2;
++
++	return parent_rate;
++}
++
++static int tcon_ch1_set_rate(struct clk_hw *hw, unsigned long rate,
++			     unsigned long parent_rate)
++{
++	struct tcon_ch1_clk *tclk = hw_to_tclk(hw);
++	unsigned long flags;
++	bool half;
++	u8 div_m;
++	u32 reg;
++
++	tcon_ch1_calc_divider(rate, parent_rate, &div_m, &half);
++
++	spin_lock_irqsave(&tclk->lock, flags);
++	reg = readl(tclk->reg);
++	reg &= ~(TCON_CH1_SCLK2_DIV_MASK | TCON_CH1_SCLK1_HALF_BIT);
++	reg |= (div_m - 1) & TCON_CH1_SCLK2_DIV_MASK;
++
++	if (half)
++		reg |= TCON_CH1_SCLK1_HALF_BIT;
++
++	writel(reg, tclk->reg);
++	spin_unlock_irqrestore(&tclk->lock, flags);
++
++	return 0;
++}
++
++static const struct clk_ops tcon_ch1_ops = {
++	.disable	= tcon_ch1_disable,
++	.enable		= tcon_ch1_enable,
++	.is_enabled	= tcon_ch1_is_enabled,
++
++	.get_parent	= tcon_ch1_get_parent,
++	.set_parent	= tcon_ch1_set_parent,
++
++	.determine_rate	= tcon_ch1_determine_rate,
++	.recalc_rate	= tcon_ch1_recalc_rate,
++	.set_rate	= tcon_ch1_set_rate,
++};
++
++static void __init tcon_ch1_setup(struct device_node *node)
++{
++	const char *parents[TCON_CH1_SCLK2_PARENTS];
 +	const char *clk_name = node->name;
-+	struct reset_data *reset_data;
-+	struct clk_divider *div = NULL;
-+	struct clk_gate *gate;
++	struct clk_init_data init;
++	struct tcon_ch1_clk *tclk;
 +	struct resource res;
-+	struct clk_mux *mux;
-+	void __iomem *reg;
 +	struct clk *clk;
++	void __iomem *reg;
 +	int ret;
 +
 +	of_property_read_string(node, "clock-output-names", &clk_name);
@@ -188,139 +308,51 @@ index 000000000000..af7d1faebdec
 +		return;
 +	}
 +
-+	ret = of_clk_parent_fill(node, parents, data->parents);
-+	if (ret != data->parents) {
++	ret = of_clk_parent_fill(node, parents, TCON_CH1_SCLK2_PARENTS);
++	if (ret != TCON_CH1_SCLK2_PARENTS) {
 +		pr_err("%s Could not retrieve the parents\n", clk_name);
-+		goto unmap;
++		goto err_unmap;
 +	}
 +
-+	mux = kzalloc(sizeof(*mux), GFP_KERNEL);
-+	if (!mux)
-+		goto unmap;
++	tclk = kzalloc(sizeof(*tclk), GFP_KERNEL);
++	if (!tclk)
++		goto err_unmap;
 +
-+	mux->reg = reg;
-+	mux->shift = data->offset_mux;
-+	mux->mask = (1 << data->width_mux) - 1;
-+	mux->lock = &sun4i_a10_display_lock;
++	init.name = clk_name;
++	init.ops = &tcon_ch1_ops;
++	init.parent_names = parents;
++	init.num_parents = TCON_CH1_SCLK2_PARENTS;
++	init.flags = CLK_SET_RATE_PARENT;
 +
-+	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
-+	if (!gate)
-+		goto free_mux;
++	tclk->reg = reg;
++	tclk->hw.init = &init;
++	spin_lock_init(&tclk->lock);
 +
-+	gate->reg = reg;
-+	gate->bit_idx = data->offset_en;
-+	gate->lock = &sun4i_a10_display_lock;
-+
-+	if (data->has_div) {
-+		div = kzalloc(sizeof(*div), GFP_KERNEL);
-+		if (!div)
-+			goto free_gate;
-+
-+		div->reg = reg;
-+		div->shift = data->offset_div;
-+		div->width = data->width_div;
-+		div->lock = &sun4i_a10_display_lock;
-+	}
-+
-+	clk = clk_register_composite(NULL, clk_name,
-+				     parents, data->parents,
-+				     &mux->hw, &clk_mux_ops,
-+				     data->has_div ? &div->hw : NULL,
-+				     data->has_div ? &clk_divider_ops : NULL,
-+				     &gate->hw, &clk_gate_ops,
-+				     0);
++	clk = clk_register(NULL, &tclk->hw);
 +	if (IS_ERR(clk)) {
 +		pr_err("%s: Couldn't register the clock\n", clk_name);
-+		goto free_div;
++		goto err_free_data;
 +	}
 +
 +	ret = of_clk_add_provider(node, of_clk_src_simple_get, clk);
 +	if (ret) {
-+		pr_err("%s: Couldn't register DT provider\n", clk_name);
-+		goto free_clk;
-+	}
-+
-+	if (!data->has_rst)
-+		return;
-+
-+	reset_data = kzalloc(sizeof(*reset_data), GFP_KERNEL);
-+	if (!reset_data)
-+		goto free_of_clk;
-+
-+	reset_data->reg = reg;
-+	reset_data->offset = data->offset_rst;
-+	reset_data->lock = &sun4i_a10_display_lock;
-+	reset_data->rcdev.nr_resets = data->has_rst;
-+	reset_data->rcdev.ops = &sun4i_a10_display_reset_ops;
-+	reset_data->rcdev.of_node = node;
-+
-+	if (data->has_rst == 1) {
-+		reset_data->rcdev.of_reset_n_cells = 0;
-+		reset_data->rcdev.of_xlate = &sun4i_a10_display_reset_xlate;
-+	} else {
-+		reset_data->rcdev.of_reset_n_cells = 1;
-+	}
-+
-+	if (reset_controller_register(&reset_data->rcdev)) {
-+		pr_err("%s: Couldn't register the reset controller\n",
-+		       clk_name);
-+		goto free_reset;
++		pr_err("%s: Couldn't register our clock provider\n", clk_name);
++		goto err_unregister_clk;
 +	}
 +
 +	return;
 +
-+free_reset:
-+	kfree(reset_data);
-+free_of_clk:
-+	of_clk_del_provider(node);
-+free_clk:
-+	clk_unregister_composite(clk);
-+free_div:
-+	if (data->has_div)
-+		kfree(div);
-+free_gate:
-+	kfree(gate);
-+free_mux:
-+	kfree(mux);
-+unmap:
++err_unregister_clk:
++	clk_unregister(clk);
++err_free_data:
++	kfree(tclk);
++err_unmap:
 +	iounmap(reg);
 +	of_address_to_resource(node, 0, &res);
 +	release_mem_region(res.start, resource_size(&res));
 +}
 +
-+static struct sun4i_a10_display_clk_data sun4i_a10_tcon_ch0_data = {
-+	.has_rst	= 2,
-+	.parents	= 4,
-+	.offset_en	= 31,
-+	.offset_rst	= 29,
-+	.offset_mux	= 24,
-+	.width_mux	= 2,
-+};
-+
-+static void __init sun4i_a10_tcon_ch0_setup(struct device_node *node)
-+{
-+	sun4i_a10_display_init(node, &sun4i_a10_tcon_ch0_data);
-+}
-+CLK_OF_DECLARE(sun4i_a10_tcon_ch0, "allwinner,sun4i-a10-tcon-ch0-clk",
-+	       sun4i_a10_tcon_ch0_setup);
-+
-+static struct sun4i_a10_display_clk_data sun4i_a10_display_data = {
-+	.has_div	= true,
-+	.has_rst	= 1,
-+	.parents	= 3,
-+	.offset_en	= 31,
-+	.offset_rst	= 30,
-+	.offset_mux	= 24,
-+	.offset_div	= 0,
-+	.width_mux	= 2,
-+	.width_div	= 4,
-+};
-+
-+static void __init sun4i_a10_display_setup(struct device_node *node)
-+{
-+	sun4i_a10_display_init(node, &sun4i_a10_display_data);
-+}
-+CLK_OF_DECLARE(sun4i_a10_display, "allwinner,sun4i-a10-display-clk",
-+	       sun4i_a10_display_setup);
++CLK_OF_DECLARE(tcon_ch1, "allwinner,sun4i-a10-tcon-ch1-clk",
++	       tcon_ch1_setup);
 -- 
 2.7.3
