@@ -1,51 +1,111 @@
-From: treding@nvidia.com (Thierry Reding)
-Date: Wed, 23 Mar 2016 16:49:00 +0100
-Subject: Who is going to merge it [Was: Re: [PATCH v14 0/17] Add Analogix
- Core Display Port Driver]
-In-Reply-To: <CAPM=9tz9_rbGJFuv-+YN=Sicfng++tHTDLrOX5Ohtwft+VnwtA@mail.gmail.com>
-References: <1455534485-1154-1-git-send-email-ykk@rock-chips.com>
- <1919945.Y1tg0YzXlm@diego> <56F1CAEB.3080701@samsung.com>
- <8949624.HmxDpZAlt2@diego> <56F1D0AD.8030905@samsung.com>
- <20160322233906.GP19428@n2100.arm.linux.org.uk>
- <56F1DB27.4040001@samsung.com>
- <20160323000835.GQ19428@n2100.arm.linux.org.uk>
- <CAPM=9tz9_rbGJFuv-+YN=Sicfng++tHTDLrOX5Ohtwft+VnwtA@mail.gmail.com>
-Message-ID: <20160323154859.GB9442@ulmo.nvidia.com>
+From: akshay.bhat@timesys.com (Akshay Bhat)
+Date: Wed, 23 Mar 2016 11:48:34 -0400
+Subject: [PATCH v4 3/3] ARM: imx6: Fix procedure to switch the parent of
+ LDB_DI_CLK
+In-Reply-To: <56D60C90.7080703@timesys.com>
+References: <1456476714-11351-1-git-send-email-p.zabel@pengutronix.de>
+ <1456476714-11351-4-git-send-email-p.zabel@pengutronix.de>
+ <56D60C90.7080703@timesys.com>
+Message-ID: <CACrMeVAtLMdx6FhhmvxOq=_q=HztU_2nqVwzbL3dYBHd-PWKUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 23, 2016 at 10:41:58AM +1000, Dave Airlie wrote:
-> >
-> >> So although it's small framework or just subdirectory, we would need
-> >> someone who can manage the framework to avoid further confusion if
-> >> necessary.
-> >
-> > So maybe it just doesn't need a maintainer, and maybe those the owner
-> > of the bridge driver should be responsible for choosing the tree which
-> > it's merged through along with updates.  That's how dw-hdmi has been
-> > managed on the whole.
-> >
-> > It also means that the bridge driver maintainer is able to test changes
-> > to the bridge driver, rather than having some over-arching bridge
-> > subdirectory maintainer who doesn't have a clue whether the changes
-> > work on the hardware.
-> >
-> > IMHO, having bridge driver authors/maintainers look after their own
-> > code has many advantages.
-> 
-> The author just send me a pull request with acks from a git tree
-> that hopefully both people agreed and tested from. No need to
-> send this via another maintainer layer.
+Hi Fabio,
 
-I have in the past "maintained" bridge drivers as part of the panel
-tree, but I have no objections at all for this to go in via one of the
-trees where it is used and can actually be tested.
+On Tue, Mar 1, 2016 at 4:41 PM, Akshay Bhat <akshay.bhat@timesys.com> wrote:
+> Hi Philipp,
+>
+> On 02/26/2016 03:51 AM, Philipp Zabel wrote:
+>>
+>> From: Fabio Estevam <fabio.estevam@freescale.com>
+>>
+>
+> <snip>
+>
+>
+>> +static void init_ldb_clks(struct device_node *np, void __iomem *ccm_base)
+>> +{
+>> +       unsigned int reg;
+>> +       unsigned int sel[2][4];
+>> +       int i;
+>> +
+>> +       reg = readl_relaxed(ccm_base + CCM_CS2CDR);
+>> +       sel[0][0] = (reg >> CS2CDR_LDB_DI0_CLK_SEL_SHIFT) & 7;
+>> +       sel[1][0] = (reg >> CS2CDR_LDB_DI1_CLK_SEL_SHIFT) & 7;
+>> +
+>> +       sel[0][3] = sel[0][2] = sel[0][1] = sel[0][0];
+>> +       sel[1][3] = sel[1][2] = sel[1][1] = sel[1][0];
+>> +
+>> +       of_assigned_ldb_sels(np, &sel[0][3], &sel[1][3]);
+>> +
+>> +       for (i = 0; i < 2; i++) {
+>> +               /* Warn if a glitch might have been introduced already */
+>> +               if (sel[i][0] != 3) {
+>> +                       pr_warn("ccm: ldb_di%d_sel already changed from
+>> reset value: %d\n",
+>> +                               i, sel[i][0]);
+>> +               }
+>> +
+>> +               if (sel[i][0] == sel[i][3])
+>> +                       continue;
+>> +
+>> +               /* Only switch to or from pll2_pfd2_396m if it is disabled
+>> */
+>> +               if ((sel[i][0] == 2 || sel[i][3] == 2) &&
+>> +                   (clk_get_parent(clk[IMX6QDL_CLK_PERIPH_PRE]) ==
+>> +                    clk[IMX6QDL_CLK_PLL2_PFD2_396M])) {
+>> +                       pr_err("ccm: ldb_di%d_sel: couldn't disable
+>> pll2_pfd2_396m\n",
+>> +                              i);
+>> +                       sel[i][3] = sel[i][2] = sel[i][1] = sel[i][0];
+>> +                       continue;
+>> +               }
+>> +
+>> +               /*
+>> +                * It is unclear whether the procedure works for switching
+>> from
+>> +                * pll3_usb_otg to any other parent than pll5_video_div
+>> +                */
+>> +               if (sel[i][0] > 3 && sel[i][0] != (sel[i][3] | 4)) {
+>> +                       pr_err("ccm: ldb_di%d_sel workaround only for top
+>> mux\n",
+>> +                              i);
+>> +                       sel[i][3] = sel[i][2] = sel[i][1] = sel[i][0];
+>> +                       continue;
+>> +               }
+>
+>
+> EB821 doesn't mention the above restriction. My understanding was as long as
+> the clock source you are switching from/to is disabled it should be ok to do
+> so. Maybe someone from Freescale can comment?
+>
+>> +
+>> +               /* First switch to the bottom mux */
+>> +               sel[i][1] = sel[i][0] | 4;
+>> +
+>
+>
+> Not sure if this really matters but as per EB821 Section 4.2, 6 b, the
+> recommended setting for sel[i][1] is 7
+>
+>
+>> +               /* Then configure the top mux before switching back to it
+>> */
+>> +               sel[i][2] = sel[i][3] | 4;
+>> +
+>
+>
+> Same goes here, as per EB821, Section 4.2, 6 c, the recommended setting for
+> sel[i][2] is 4
+>
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160323/2b09a436/attachment.sig>
+Any comment from NXP regarding the same? I have tested this patch as
+it is and it resolves intermittent blank LVDS display issues we are
+seeing on our boards. The questions is if the patch needs to be
+updated to match EB821 document for the above sections?
+
+It would be nice to get the patch accepted since it solves actual LVDS
+display issues on clock switch.
+
+Thanks,
+Akshay
