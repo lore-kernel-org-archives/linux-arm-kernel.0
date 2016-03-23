@@ -1,48 +1,124 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 23 Mar 2016 09:37:58 +0100
-Subject: [PATCH v2 16/18] dt-bindings: Add OXNAS bindings
-In-Reply-To: <20160317172738.GA7293@rob-hp-laptop>
-References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
- <1457519060-6038-1-git-send-email-narmstrong@baylibre.com>
- <1457519060-6038-17-git-send-email-narmstrong@baylibre.com>
- <20160317172738.GA7293@rob-hp-laptop>
-Message-ID: <56F255E6.2030905@baylibre.com>
+From: puck.chen@hisilicon.com (Chen Feng)
+Date: Wed, 23 Mar 2016 16:53:19 +0800
+Subject: Delete flush cache all in arm64 platform.
+In-Reply-To: <56F01A0A.3030208@redhat.com>
+References: <56EFABD3.7060700@hisilicon.com>
+ <20160321100818.GA17326@leverpostej> <56F01A0A.3030208@redhat.com>
+Message-ID: <56F2597F.4050708@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/17/2016 06:27 PM, Rob Herring wrote:
-> On Wed, Mar 09, 2016 at 11:24:18AM +0100, Neil Armstrong wrote:
->> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->> ---
->>  Documentation/devicetree/bindings/arm/oxnas.txt | 9 +++++++++
->>  1 file changed, 9 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/arm/oxnas.txt
+Hi Mark & Laura
+
+On 2016/3/21 23:58, Laura Abbott wrote:
+> On 03/21/2016 03:08 AM, Mark Rutland wrote:
+>> [adding LAKML]
 >>
->> diff --git a/Documentation/devicetree/bindings/arm/oxnas.txt b/Documentation/devicetree/bindings/arm/oxnas.txt
->> new file mode 100644
->> index 0000000..f6032d2
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/oxnas.txt
->> @@ -0,0 +1,9 @@
->> +PLX Technology OXNAS SoCs Family device tree bindings
->> +-------------------------------------------
->> +
->> +Boards with the OX810SE Soc SoC shall have the following properties:
+>> On Mon, Mar 21, 2016 at 04:07:47PM +0800, Chen Feng wrote:
+>>> Hi Mark,
+>>
+>> Hi,
+>>
+>>> With 68234df4ea7939f98431aa81113fbdce10c4a84b
+>>> arm64: kill flush_cache_all()
+>>> The documented semantics of flush_cache_all are not possible to provide
+>>> for arm64 (short of flushing the entire physical address space by VA),
+>>> and there are currently no users; KVM uses VA maintenance exclusively,
+>>> cpu_reset is never called, and the only two users outside of arch code
+>>> cannot be built for arm64.
+>>>
+>>> While cpu_soft_reset and related functions (which call flush_cache_all)
+>>> were thought to be useful for kexec, their current implementations only
+>>> serve to mask bugs. For correctness kexec will need to perform
+>>> maintenance by VA anyway to account for system caches, line migration,
+>>> and other subtleties of the cache architecture. As the extent of this
+>>> cache maintenance will be kexec-specific, it should probably live in the
+>>> kexec code.
+>>>
+>>> This patch removes flush_cache_all, and related unused components,
+>>> preventing further abuse.
+>>>
+>>>
+>>> This patch delete the flush_cache_all interface.
+>>
+>> As the patch states, it does so because the documented semantics are
+>> impossible to provide, as there is no portable mechanism to "flush" all
+>> caches in the system.
+>>
+>> Set/Way operations cannot guarantee that data has been cleaned to the
+>> PoC (i.e. memory), or invalidated from all levels of cache. Reasons
+>> include:
+>>
+>> * They may race against background behaviour of the CPU (e.g.
+>>    speculation), which may allocate/evict/migrate lines. Depending on the
+>>    cache topology, this may "hide" lines from subsequent Set/Way
+>>    operations.
+>>
+>> * They are not broadcast, and do not affect other CPUs. Depending on the
+>>    implemented cache coherency protocols, other CPUs may be able to
+>>    acquire dirty lines, or retain lines in shared states, and hence these
+>>    may not be operated on.
+>>
+>> * They do not affect system caches (which respect cache maintenance by
+>>    VA in ARMv8-A).
+>>
+>> The only portable mechanism to perform cache maintenance to all relevant
+>> caches is by VA.
+>>
+>>> But if we use VA to flush cache to do cache-coherency with other
+>>> master(eg:gpu)
+>>>
+>>> We must iterate over the sg-list to flush by va to pa.
+>>>
+>>> In this way, the iterate of sg-list may cost too much time(sg-table to
+>>> sg-list) if the sglist is too long. Take a look at the
+>>> ion_pages_sync_for_device in ion.
+>>>
+>>> The driver(eg: ION) need to use this interface(flush cache all) to
+>>> *improve the efficiency*.
+>>
+>> As above, we cannot use Set/Way operations for this, and cannot provide
+>> a flush_cache_all interface.
+>>
+>> I'm not sure what to suggest regarding improving efficiency.
+>>
+>> Is walking the sglist the expensive portion, or is the problem the cost
+>> of multiple page-size operations (each with their own barriers)?
+>>
 > 
-> s/Soc SoC/SoC/
-
-OK
+> Last time I looked at this, it was mostly the multiple page-size operations.
+> Ion buffers can be big and easily bigger than the cache as well so flushing
+> 8MB of buffer for a 2MB cache is really a performance killer. The Set/Way
+> operations are an improvement on systems where they can be used.
 > 
->> +  Required root node property:
->> +    compatible: "oxsemi,ox810se"
->> +
->> +Board compatible values:
->> +  - "wd,mbwe" (OX810SE)
+> The way Ion does cache maintenance is full of sadness and despair in general.
+> Until everything gets a significant rework, the best option may be
+> minimization of code paths where cache operations are called.
 > 
-> Seems kind of generic. Only one version?
+Thanks for your share.
 
-There is a My Book World Edition II, which seems to be the same (they share the same firmware) but with two SATA ports, the original kernel does not make any differences between the two models.
+Think about the low-mem scene, there are only 4k pages in system.
+If the ION buffer is 8MB or bigger, the sglist is very long.
+for_each_sg(sgl, sg, ret, i) be took too much time.
 
-I'm not aware of different versions and the firmware does not contain any specific code for different board revisions.
 
-Neil
+Laura,
+>the best option may be
+> minimization of code paths where cache operations are called.
+
+I am confused with the above comments. The buffer size is used by camera,
+the frame size may be just so bigger. Do you have any method for improve this?
+
+Thanks very much.
+
+
+
+>> Thanks,
+>> Mark.
+>>
+> 
+> Thanks,
+> Laura
+> 
+> .
+> 
