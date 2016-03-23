@@ -1,142 +1,120 @@
-From: agustinv@codeaurora.org (agustinv at codeaurora.org)
-Date: Wed, 23 Mar 2016 08:36:14 -0400
-Subject: [PATCH V1] perf: qcom: Add L3 cache PMU driver
-In-Reply-To: <56F26FF1.90002@arm.com>
-References: <1458333422-8963-1-git-send-email-agustinv@codeaurora.org>
- <20160321103507.GB17326@leverpostej>
- <09ca2b70ae43432623cfbac374da1784@codeaurora.org> <56F26FF1.90002@arm.com>
-Message-ID: <f33a9ea23bf426c138a9323e53703259@codeaurora.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 23 Mar 2016 13:38:01 +0100
+Subject: N900 sleep mode (in 4.5-rc0, if that matters)
+In-Reply-To: <20160209172403.GK19432@atomide.com>
+References: <20160126140010.GA29723@amd> <20160126172527.GY3500@atomide.com>
+ <20160130200244.GA30429@amd> <20160130201452.GC30429@amd>
+ <20160130221509.GA28644@amd> <20160201181316.GM19432@atomide.com>
+ <20160201211736.GA11283@amd> <20160201221111.GP19432@atomide.com>
+ <20160207212316.GA6147@amd> <20160209172403.GK19432@atomide.com>
+Message-ID: <20160323123801.GC32031@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-03-23 06:29, Marc Zyngier wrote:
-> On 22/03/16 18:33, agustinv at codeaurora.org wrote:
->> On 2016-03-21 06:35, Mark Rutland wrote:
->>> On Fri, Mar 18, 2016 at 04:37:02PM -0400, Agustin Vega-Frias wrote:
->>>> +/*
->>>> + * In some platforms interrupt resources might not come directly 
->>>> from
->>>> the GIC,
->>>> + * but from separate IRQ circuitry that signals a summary IRQ to 
->>>> the
->>>> GIC and
->>>> + * is handled by a secondary IRQ controller. This is problematic
->>>> under ACPI boot
->>>> + * because the ACPI core does not use the Resource Source field on
->>>> the Extended
->>>> + * Interrupt Descriptor, which in theory could be used to specify 
->>>> an
->>>> alternative
->>>> + * IRQ controller.
->>>> +
->>>> + * For this reason in these platforms we implement the secondary 
->>>> IRQ
->>>> controller
->>>> + * using the gpiolib and specify the IRQs as GpioInt resources, so
->>>> when getting
->>>> + * an IRQ from the device we first try platform_get_irq and if it
->>>> fails we try
->>>> + * devm_gpiod_get_index/gpiod_to_irq.
->>>> + */
->>>> +static
->>>> +int qcom_l3_cache_pmu_get_slice_irq(struct platform_device *pdev,
->>>> +				    struct platform_device *sdev)
->>>> +{
->>>> +	int virq = platform_get_irq(sdev, 0);
->>>> +	struct gpio_desc *desc;
->>>> +
->>>> +	if (virq >= 0)
->>>> +		return virq;
->>>> +
->>>> +	desc = devm_gpiod_get_index(&sdev->dev, NULL, 0, GPIOD_ASIS);
->>>> +	if (IS_ERR(desc))
->>>> +		return -ENOENT;
->>>> +
->>>> +	return gpiod_to_irq(desc);
->>>> +}
->>>> +
->>> 
->>> As Marc Zyngier pointed out in another thread, you should represent
->>> your
->>> interrupt controller as an interrupt controller rather than 
->>> pretending
->>> it is a
->>> GPIO controller.
->>> 
->>> Drivers should be able to remain blissfully unaware what the other 
->>> end
->>> of their
->>> interrupt line is wired up to, and shouldn't have to jump through 
->>> hoops
->>> like
->>> the above.
->>> 
->>> Thanks,
->>> Mark.
->> 
->> Given that this driver is ACPI-only we are leaning toward implementing
->> overflow signalling as ACPI events.
->> This will hide these details from the driver and use standard ACPI 
->> APIs.
->> 
->> Thoughts?
+Hi!
+
+> > > 055555fc459 ("usb: musb: core: Fix handling of the phy notifications")
+> > > 03e43528ab68 ("usb: musb: Fix unbalanced pm_runtime_enable")
+> > 
+> > Ok, with that, I can insmod and rmmod. But I still get:
+> > 
+> > 00001fff 48005020 (fa005020) cm_idlest_per blocking bits: 0007e000
 > 
-> Please don't do that. The HW (whatever that is, and whatever the
-> firmware is) provides you with an interrupt line, not an ACPI event.
-> "Hiding the details" is always the wrong thing to do. How do we cope
-> with CPU affinity, for example? How do we selectively disable this
-> interrupt at the controller level?
+> I think the cm_idlest_per is fine.
 > 
-> Also, ACPI events will be signalled by (guess what?) an interrupt. So
-> what are we actually gaining here?
+> > ffdffebd 48004a20 (fa004a20) cm_idlest1_core blocking bits: 00200042
+> > 0000000d 48004a28 (fa004a28) cm_idlest3_core
 > 
-> I'd *really* advise you to stick to existing abstractions, as they:
-> - accurately describe the way the HW works
-> - are already supported in the kernel
+> Bit 21 in cm_idlest1_core is for MCSPI4 so WLAN. Does that go
+> down if do sleep 5; cat /sys/kernel/debug/pm_debug/count ?
 > 
-> The existing shortcomings of the ACPI layer should be addressed pretty
-> easily (if the feature is not supported on x86, let's find out why - we
-> can make it an arm64 feature if we really have to).
+> If not, the're PM runtime missing or broken somewhere.
 > 
-> Thanks,
-> 
-> 	M.
-> --
-> Jazz is not dead. It just smells funny...
+> FYI, below is my omap3 usb test script that I use to start and
+> stop USB, it also works on n900. And after stopping it n900
+> continues hitting deeper idle states just fine.
 
-ACPI events *are* existing abstractions within ACPI-based systems and 
-the mechanism works across OSes.
+You rmmod musb_hdrc, so I checked, and found:
 
-If there was a one to one relationship between IRQs and events this 
-would be hiding for the sake of hiding.
-In this case I am proposing to demultiplex the IRQ in the ACPI layer 
-just as a secondary IRQ driver/domain does in DT.
+550a7375f (Felipe Balbi              2008-07-24 12:27:36 +0300 1093)
+static void musb_shutdown(struct platform_de
+vice *pdev)
+550a7375f (Felipe Balbi              2008-07-24 12:27:36 +0300 1094) {
+550a7375f (Felipe Balbi              2008-07-24 12:27:36 +0300 1095)
+struct musb     *musb = dev_to_musb(&pdev
+->dev);
+550a7375f (Felipe Balbi              2008-07-24 12:27:36 +0300 1096)
+unsigned long   flags;
+550a7375f (Felipe Balbi              2008-07-24 12:27:36 +0300 1097)
+4f9edd2d7 (Hema HK                   2011-03-22 16:02:12 +0530 1098)
+pm_runtime_get_sync(musb->controller);
+24307caef (Grazvydas Ignotas         2012-01-12 15:22:45 +0200 1099)
+2cc65feab (Daniel Mack               2013-04-10 21:55:47 +0200 1100)
+musb_host_cleanup(musb);
+24307caef (Grazvydas Ignotas         2012-01-12 15:22:45 +0200 1101)
+musb_gadget_cleanup(musb);
+24307caef (Grazvydas Ignotas         2012-01-12 15:22:45 +0200 1102)
+550a7375f (Felipe Balbi              2008-07-24 12:27:36 +0300 1103)
+spin_lock_irqsave(&musb->lock, flags);
+550a7375f (Felipe Balbi              2008-07-24 12:27:36 +0300 1104)
+musb_platform_disable(musb);
+550a7375f (Felipe Balbi              2008-07-24 12:27:36 +0300 1105)
+musb_generic_disable(musb);
+550a7375f (Felipe Balbi              2008-07-24 12:27:36 +0300 1106)
+spin_unlock_irqrestore(&musb->lock, flags
+);
+550a7375f (Felipe Balbi              2008-07-24 12:27:36 +0300 1107)
+120d074c5 (Grazvydas Ignotas         2010-10-10 13:52:22 -0500 1108)
+musb_writeb(musb->mregs, MUSB_DEVCTL, 0);
+120d074c5 (Grazvydas Ignotas         2010-10-10 13:52:22 -0500 1109)
+musb_platform_exit(musb);
+120d074c5 (Grazvydas Ignotas         2010-10-10 13:52:22 -0500 1110)
+4f9edd2d7 (Hema HK                   2011-03-22 16:02:12 +0530 1111)
+pm_runtime_put(musb->controller);
+550a7375f (Felipe Balbi              2008-07-24 12:27:36 +0300 1112)
+/* FIXME power down */
+550a7375f (Felipe Balbi              2008-07-24 12:27:36 +0300 1113) }
 
-I have reached out to Rafael and Jeremy Pieralisi w.r.t. support of 
-multiple IRQ domains via the Resource Source field.
+I thought i was responsible for the FIXME, but apparently not... If
+you happen to have some changes there, that would be useful to
+know....
 
-On the other hand we had implemented the IRQ combiner driver as a GPIO 
-chip because the hardware is not an interrupt controller, it is an 
-"interrupt
-combiner", which is very similar to a GPIO controller.
+Ok, another attempt at shutting USB down:
 
-Consider how a GPIO controller works: it sends a summary interrupt when 
-a GPIO is toggled, software reads a status register to determine
-which pin was toggled.  These combiners do the *exact* same thing except 
-it's based on internal chip wires instead of external pins: it
-sends a summary interrupt when any wire is toggled and software checks a 
-status register to determine which wire was toggled. That's pretty
-similar if you ask me.
+00001fff 48005020 (fa005020) cm_idlest_per blocking bits: 0007e000
+f7dffe9d 48004a20 (fa004a20) cm_idlest1_core blocking bits: 00200062
+0000000d 48004a28 (fa004a28) cm_idlest3_core
 
-Given that we need to support other operating systems representing it as 
-a GPIO controller was the most OS agnostic way to
-implement something like this on ACPI based systems.
+Tried again today:
 
-Thanks,
-Agustin.
+00001fff 48005020 (fa005020) cm_idlest_per blocking bits: 0007e000
+f7dffe9d 48004a20 (fa004a20) cm_idlest1_core blocking bits: 00200062
+0000000d 48004a28 (fa004a28) cm_idlest3_core
+pavel at n900:/my/tui/ofone$ sleep test
 
+00001fff 48005020 (fa005020) cm_idlest_per blocking bits: 0007e000
+ffde7e9d 48004a20 (fa004a20) cm_idlest1_core blocking bits: 00218062
+0000000d 48004a28 (fa004a28) cm_idlest3_core
+
+00001fff 48005020 (fa005020) cm_idlest_per blocking bits: 0007e000
+fedffe9d 48004a20 (fa004a20) cm_idlest1_core blocking bits: 01200062
+0000000d 48004a28 (fa004a28) cm_idlest3_core
+
+00001fff 48005020 (fa005020) cm_idlest_per blocking bits: 0007e000
+ffde7e9d 48004a20 (fa004a20) cm_idlest1_core blocking bits: 00218062
+0000000d 48004a28 (fa004a28) cm_idlest3_core
+
+Is there documentation for the cm_idlest1_ bits?
+
+How idle system do I need to have? Screen is blanked and machine
+should be mostly idle, but there's X running on another vt with Mate
+desktop, and some python scripts... GSM modem should be online.
+
+Are you booting over USB from NOLO?
+
+Thanks and best regards,
+
+								Pavel
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora 
-Forum,
-a Linux Foundation Collaborative Project.
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
