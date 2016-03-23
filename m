@@ -1,47 +1,51 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 23 Mar 2016 22:36:30 +0530
-Subject: [PATCH v2 05/11] dt-bindings: Add bindings for phy-da8xx-usb
-In-Reply-To: <1458181615-27782-6-git-send-email-david@lechnology.com>
+From: david@lechnology.com (David Lechner)
+Date: Wed, 23 Mar 2016 12:20:28 -0500
+Subject: [PATCH v2 03/11] ARM: davinci: da850: use clk->set_parent for
+ async3
+In-Reply-To: <56F2BCAB.3040404@ti.com>
 References: <1458181615-27782-1-git-send-email-david@lechnology.com>
- <1458181615-27782-6-git-send-email-david@lechnology.com>
-Message-ID: <56F2CD16.9060106@ti.com>
+ <1458181615-27782-4-git-send-email-david@lechnology.com>
+ <56F2BCAB.3040404@ti.com>
+Message-ID: <56F2D05C.8030909@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 17 March 2016 07:56 AM, David Lechner wrote:
-> Device tree binding for new phy-da8xx-usb driver.
-> 
-> Signed-off-by: David Lechner <david@lechnology.com>
-> ---
-> 
-> v2 changes: This is new patch in v2.
-> 
-> 
->  .../devicetree/bindings/phy/phy-da8xx-usb.txt      | 34 ++++++++++++++++++++++
->  1 file changed, 34 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/phy/phy-da8xx-usb.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/phy/phy-da8xx-usb.txt b/Documentation/devicetree/bindings/phy/phy-da8xx-usb.txt
-> new file mode 100644
-> index 0000000..ed6b710
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/phy/phy-da8xx-usb.txt
-> @@ -0,0 +1,34 @@
-> +TI DaVinci DA8XX USB PHY
-> +
-> +Required properties:
-> + - compatible: must be "ti,da830-usbphy".
-> + - #phy-cells: must be 1.
-> + - reg : Address and length of the CFGCHIP2 register.
+On 03/23/2016 10:56 AM, Sekhar Nori wrote:
+> On Thursday 17 March 2016 07:56 AM, David Lechner wrote:
+>> The da850 family of processors has an async3 clock domain that can be
+>> muxed to either pll0_sysclk2 or pll1_sysclk2. Now that the davinci clocks
+>> have a set_parent callback, we can use this to control the async3 mux
+>> instead of a stand-alone function.
+>>
+>> This adds a new async3_clk and sets the appropriate child clocks. The
+>> default is use to pll1_sysclk2 since it is not affected by processor
+>> frequency scaling.
+>>
+>> Signed-off-by: David Lechner <david@lechnology.com>
+>> ---
+>
+>> +static int da850_async3_set_parent(struct clk *clk, struct clk *parent)
+>> +{
+>> +	u32 __iomem *cfgchip3;
+>> +	u32 val;
+>> +
+>> +	/*
+>> +	 * Can't use DA8XX_SYSCFG0_VIRT() here since this can be called before
+>> +	 * da8xx_syscfg0_base is initialized.
+>> +	 */
+>> +	cfgchip3 = ioremap(DA8XX_SYSCFG0_BASE + DA8XX_CFGCHIP3_REG, 4);
+>
+> Is this just a theoretical possibility or have you seen this happen? I
+> would like to see if there are ways of avoiding this rather than throw
+> away usage of DA8XX_SYSCFG0_VIRT()
 
-I am not sure passing CFGCHIP2 register as reg property to the phy is
-future proof. At some point, we do want to move to common clock
-framework and at that point USB clocks controlled by CFGCHIP2 will be a
-separate driver needing access to the same register.
+Yes, it will not boot without this. The problem comes from the fact that 
+clocks are setup in davinci_common_init() which is called before 
+da8xx_syscfg0_base = ioremap(DA8XX_SYSCFG0_BASE, SZ_4K) in da850_init() 
+(and da830_init()). I also tried moving the ioremap() before 
+davinci_common_init(), but davinci_common_init() sets up the iomem, so 
+that doesn't work either.
 
-So I think the CFGCHIP2 access in USB phy driver should happen through a
-syscon phandle. This needs to happen now, not later since we cannot
-break DT backward-compatibility.
-
-Thanks,
-Sekhar
+So, if you want to use DA8XX_SYSCFG0_VIRT() here, the clock init would 
+have to be split out from davinci_common_init() which would affect all 
+davinci devices.
