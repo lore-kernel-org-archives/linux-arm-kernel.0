@@ -1,27 +1,54 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 23 Mar 2016 12:12:43 -0700
-Subject: [PATCH v3 0/2] Split pinctrl device for Meson8 / Meson8b and
- update docs
-In-Reply-To: <1458724440-32228-1-git-send-email-carlo@caione.org> (Carlo
- Caione's message of "Wed, 23 Mar 2016 10:13:58 +0100")
-References: <1458724440-32228-1-git-send-email-carlo@caione.org>
-Message-ID: <7hio0dqa8k.fsf@baylibre.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Wed, 23 Mar 2016 19:46:06 +0000
+Subject: [PATCH 00/12] ARM: dts: Add dragonboard-600c support.
+Message-ID: <1458762366-9233-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Carlo Caione <carlo@caione.org> writes:
+Hi Andy,
 
-> From: Carlo Caione <carlo@endlessm.com>
->
-> With http://www.spinics.net/lists/devicetree/msg116771.html we split / refactor
-> the pinctrl driver to have two different pinctrl devices for each bus.
->
-> Unfortunately these two patches still haven't found their way to mainline.
-> Reposting them as standalone patchset. Hopefully they can be ACKed as soon as
-> possible.
+This patchset adds support to Dragonboard 600c which is based on APQ8064.
 
-Tested-by: Kevin Hilman <khilman@baylibre.com>
+With this patchset, except spi I was able to test all the below features
+on this board on top of linus master branch.
+1> i2c
+2> spi
+3> sd/mmc with card detect
+4> eMMC
+5> USB
+6> SATA
+7> on board Ethernet based on PCIE.
+8> user and activity leds.
 
-I confirm that this gets meson8b-odroidc1 booting again in mainline.
+AHCI SATA is broken on APQ8064 on mainline, due to changes in libahci, fix is
+being discussed which should not effect this dt patches anyway.
+This patchset also has a fix to i2c/spi pinctrls which was not set correctly
+in my previous apq8064 patches, I have verified this patchset with eeprom and
+sensors on the board, you might want to take that patch in next rc.
 
-Kevin
+Thanks,
+srini
+
+Srinivas Kandagatla (12):
+  ARM: dts: apq8064: fix the pinctrls for i2c and spi
+  ARM: dts: apq8064: add support to gsbi1 uart
+  ARM: dts: apq8064: add gsbi7 i2c support
+  ARM: dts: dragonboard-600c: add board support with serial
+  ARM: dts: dragonboard-600c: add pmic regulator supplies
+  ARM: dts: dragonboard-600c: Add eMMC and SD card support
+  ARM: dts: dragonboard-600c: add usb support
+  ARM: dts: dragonboard-600c: add pcie support
+  ARM: dts: dragonboard-600c: add on board sata support.
+  ARM: dts: dragonboard-600c: Add on board leds support
+  ARM: dts: dragonboard-600c: add i2c support
+  ARM: dts: dragonboard-600c: add spi support
+
+ arch/arm/boot/dts/Makefile                         |   1 +
+ .../arm/boot/dts/qcom-apq8064-dragonboard-600c.dts | 377 +++++++++++++++++++++
+ arch/arm/boot/dts/qcom-apq8064-pins.dtsi           |  39 +++
+ arch/arm/boot/dts/qcom-apq8064.dtsi                |  41 ++-
+ 4 files changed, 452 insertions(+), 6 deletions(-)
+ create mode 100644 arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
+
+-- 
+2.5.0
