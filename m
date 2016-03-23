@@ -1,36 +1,61 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 23 Mar 2016 22:56:59 +0530
-Subject: [PATCH v2 00/11] da8xx USB clocks
-In-Reply-To: <56EAB38C.9070905@cogentembedded.com>
+Date: Wed, 23 Mar 2016 22:59:35 +0530
+Subject: [PATCH v2 03/11] ARM: davinci: da850: use clk->set_parent for
+ async3
+In-Reply-To: <56F2D05C.8030909@lechnology.com>
 References: <1458181615-27782-1-git-send-email-david@lechnology.com>
- <56EAB38C.9070905@cogentembedded.com>
-Message-ID: <56F2D1E3.6060608@ti.com>
+ <1458181615-27782-4-git-send-email-david@lechnology.com>
+ <56F2BCAB.3040404@ti.com> <56F2D05C.8030909@lechnology.com>
+Message-ID: <56F2D27F.6040001@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
-
-On Thursday 17 March 2016 07:09 PM, Sergei Shtylyov wrote:
-> On 3/17/2016 5:26 AM, David Lechner wrote:
-> 
->> OK, ready for round two.
-> 
->    You're quick... :-)
-> 
->> I've added a new callback in the davinci clocks so that they can properly
->> handle clock muxing. The clock functions are pretty much the same as
->> in the
->> previous patch set other than clk_set_parent() now works.
+On Wednesday 23 March 2016 10:50 PM, David Lechner wrote:
+> On 03/23/2016 10:56 AM, Sekhar Nori wrote:
+>> On Thursday 17 March 2016 07:56 AM, David Lechner wrote:
+>>> The da850 family of processors has an async3 clock domain that can be
+>>> muxed to either pll0_sysclk2 or pll1_sysclk2. Now that the davinci
+>>> clocks
+>>> have a set_parent callback, we can use this to control the async3 mux
+>>> instead of a stand-alone function.
+>>>
+>>> This adds a new async3_clk and sets the appropriate child clocks. The
+>>> default is use to pll1_sysclk2 since it is not affected by processor
+>>> frequency scaling.
+>>>
+>>> Signed-off-by: David Lechner <david@lechnology.com>
+>>> ---
 >>
->> The next new thing is a phy driver for the CFGCHIP2 register that
->> controls the
->> SoC USB PHY (both USB 1.1 and USB 2.0). The ohci and musb drivers have
->> been
->> updated to use this new phy driver.
+>>> +static int da850_async3_set_parent(struct clk *clk, struct clk *parent)
+>>> +{
+>>> +    u32 __iomem *cfgchip3;
+>>> +    u32 val;
+>>> +
+>>> +    /*
+>>> +     * Can't use DA8XX_SYSCFG0_VIRT() here since this can be called
+>>> before
+>>> +     * da8xx_syscfg0_base is initialized.
+>>> +     */
+>>> +    cfgchip3 = ioremap(DA8XX_SYSCFG0_BASE + DA8XX_CFGCHIP3_REG, 4);
+>>
+>> Is this just a theoretical possibility or have you seen this happen? I
+>> would like to see if there are ways of avoiding this rather than throw
+>> away usage of DA8XX_SYSCFG0_VIRT()
 > 
->    Fantastic! At least there's some breakthru on this front.
+> Yes, it will not boot without this. The problem comes from the fact that
+> clocks are setup in davinci_common_init() which is called before
+> da8xx_syscfg0_base = ioremap(DA8XX_SYSCFG0_BASE, SZ_4K) in da850_init()
+> (and da830_init()). I also tried moving the ioremap() before
+> davinci_common_init(), but davinci_common_init() sets up the iomem, so
+> that doesn't work either.
+> 
+> So, if you want to use DA8XX_SYSCFG0_VIRT() here, the clock init would
+> have to be split out from davinci_common_init() which would affect all
+> davinci devices.
 
-+1 Thanks a bunch for resurrecting this code.
+Alright, I guess 'can be called' in the comment should have used
+stronger language :) How about late registration of USB clocks as I
+suggested. It should also help consolidate code across da830 and da850.
 
-Regards,
+Thanks,
 Sekhar
