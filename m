@@ -1,57 +1,33 @@
 From: majun258@huawei.com (MaJun)
-Date: Wed, 23 Mar 2016 17:06:33 +0800
-Subject: [PATCH 2/2] irqchip/mbigen:Change the config option of mbigen driver
- to non-configurable
+Date: Wed, 23 Mar 2016 17:06:32 +0800
+Subject: [PATCH 1/2]ARM64: Enable mbigen interrupt controller on Hisilicon
+ platform
 In-Reply-To: <1458723993-21044-1-git-send-email-majun258@huawei.com>
 References: <1458723993-21044-1-git-send-email-majun258@huawei.com>
-Message-ID: <1458723993-21044-3-git-send-email-majun258@huawei.com>
+Message-ID: <1458723993-21044-2-git-send-email-majun258@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ma Jun <majun258@huawei.com>
 
-This config is selected by CONFIG_ARCH_HISI, So we change
-this config to non-configurable.
-
-I also adjust the mbigen config position try to sort the configs
-in alphabetical order.
-
+As a interrupt controller used on some of hisilicon SOCs(660,1610 etc.),
+mbigen driver should be enabled when CONFIG_ARCH_HISI is enabled.
 Signed-off-by: Ma Jun <majun258@huawei.com>
 ---
- drivers/irqchip/Kconfig |   14 ++++++--------
- 1 files changed, 6 insertions(+), 8 deletions(-)
+ arch/arm64/Kconfig.platforms |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-index 7e8c441..3e12479 100644
---- a/drivers/irqchip/Kconfig
-+++ b/drivers/irqchip/Kconfig
-@@ -32,14 +32,6 @@ config ARM_GIC_V3_ITS
- 	bool
- 	select PCI_MSI_IRQ_DOMAIN
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 21074f6..fdfd526 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -37,6 +37,7 @@ config ARCH_LAYERSCAPE
  
--config HISILICON_IRQ_MBIGEN
--	bool "Support mbigen interrupt controller"
--	default n
--	depends on ARM_GIC_V3 && ARM_GIC_V3_ITS && GENERIC_MSI_IRQ_DOMAIN
--	help
--	 Enable the mbigen interrupt controller used on
--	 Hisilicon platform.
--
- config ARM_NVIC
- 	bool
- 	select IRQ_DOMAIN
-@@ -114,6 +106,12 @@ config DW_APB_ICTL
- 	select GENERIC_IRQ_CHIP
- 	select IRQ_DOMAIN
+ config ARCH_HISI
+ 	bool "Hisilicon SoC Family"
++	select HISILICON_IRQ_MBIGEN
+ 	help
+ 	  This enables support for Hisilicon ARMv8 SoC family
  
-+config HISILICON_IRQ_MBIGEN
-+	bool
-+	select ARM_GIC_V3
-+	select ARM_GIC_V3_ITS
-+	select GENERIC_MSI_IRQ_DOMAIN
-+
- config IMGPDC_IRQ
- 	bool
- 	select GENERIC_IRQ_CHIP
 -- 
 1.7.1
