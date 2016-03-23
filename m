@@ -1,85 +1,51 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Wed, 23 Mar 2016 10:22:45 +0000
-Subject: [RFC PATCH 0/4] ACPI based PCI host driver with generic ECAM
-In-Reply-To: <CAKc_7PWfP0eQJ8dRN=CLu37=GKxin32Uf5rjiZGZgQCbiab2iA@mail.gmail.com>
-References: <CAKc_7PVK3VtaR-LDHNXPr5cSjbCcH--hsepFx=jVATNi=+a9Hw@mail.gmail.com>
- <1458245913-17211-1-git-send-email-jchandra@broadcom.com>
- <CAKc_7PWfP0eQJ8dRN=CLu37=GKxin32Uf5rjiZGZgQCbiab2iA@mail.gmail.com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1ED2A787@lhreml503-mbs>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 23 Mar 2016 18:28:09 +0800
+Subject: [linux-sunxi][PATCH v3 2/8] ARM: dts :sun7i: Add SPDIF TX pin to
+ the A20
+In-Reply-To: <1458590466-12572-3-git-send-email-codekipper@gmail.com>
+References: <1458590466-12572-1-git-send-email-codekipper@gmail.com>
+ <1458590466-12572-3-git-send-email-codekipper@gmail.com>
+Message-ID: <CAGb2v64VRrM-_AAt5Xbgxc4y+-3-=mPWvuQubrHjmufUAKUA+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jayachandran
+On Tue, Mar 22, 2016 at 4:01 AM,  <codekipper@gmail.com> wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
 
-> -----Original Message-----
-> From: linux-kernel-owner at vger.kernel.org [mailto:linux-kernel-
-> owner at vger.kernel.org] On Behalf Of Jayachandran C
-> Sent: 18 March 2016 17:48
-> To: Bjorn Helgaas; Tomasz Nowicki; rafael at kernel.org
-> Cc: Jayachandran C; Arnd Bergmann; Will Deacon; Catalin Marinas; Hanjun
-> Guo; Lorenzo Pieralisi; okaya at codeaurora.org;
-> jiang.liu at linux.intel.com; Stefano Stabellini;
-> robert.richter at caviumnetworks.com; Marcin Wojtas; Liviu.Dudau at arm.com;
-> David Daney; Wangyijing; Suravee.Suthikulpanit at amd.com;
-> msalter at redhat.com; linux-pci at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; linux-acpi at vger.kernel.org; linux-
-> kernel at vger.kernel.org; linaro-acpi at lists.linaro.org; Jon Masters
-> Subject: Re: [RFC PATCH 0/4] ACPI based PCI host driver with generic
-> ECAM
-> 
-> On Fri, Mar 18, 2016 at 1:48 AM, Jayachandran C <jchandra@broadcom.com>
-> wrote:
-> > Hi Bjorn,
-> >
-> > Here is a new patchset for the ACPI PCI controller driver based on
-> the
-> > earlier discussion[1].
-> >
-> > The first two patches in the patchset implements pci/ecam.c for
-> generic
-> > config space access and uses it in pci-host-generic.c and related
-> files.
-> >
-> > The third patch implements the ACPI PCI host driver using the same
-> ecam
-> > access functions. The fourth patch adds the implementation of raw
-> > operations.
-> >
-> > I have not used the pci_mmcfg_list or the region definitions from
-> x86,
-> > but have used a much simpler approach here.
-> >
-> > This should apply cleanly on top of the current pci next tree, and
-> > can be reviewed as a patchset.  To use it on ARM64, we need to pull
-> > in about 7 patches more from Tomasz patchset that fixes various
-> > issues (like stub code in arm64 pci.c, ACPI companion setup,
-> > domain number assignment, IO resources fixup etc.).
-> >
-> > If you are okay with this approach, I will work with Tomasz and
-> > post the full patchset.
-> >
-> > This has been tested on qemu with OVMF for the ACPI part and with
-> > device tree for pci-host-generic code.
-> 
-> The full patchset is available at https://github.com/jchandra-
-> brcm/linux.git on
-> branch arm64-acpi-pci, if anyone wants to try it.
+nit: space should be after colon, not after dts, in subject.
+Same for the RX pin patch.
 
-I had a look at your patchset and also in your git repo at the other
-patches that you ported over from Tomasz; it seems that now we miss
-a quirk mechanism to enable controller that are not fully ECAM.
+ChenYu
 
-This was provided before by Tomasz in:
-https://lkml.org/lkml/2016/2/16/410
-
-I think we should put something like that back in...
-
-Thanks
-
-Gab
-
-> 
-> Comments, suggestions and testing would be welcome.
-> 
-> Thanks,
-> JC.
+> Add the SPDIF TX pin to the A20 dtsi.
+>
+> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+> ---
+>  arch/arm/boot/dts/sun7i-a20.dtsi | 7 +++++++
+>  1 file changed, 7 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+> index 0940a78..0c207d0 100644
+> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+> @@ -1193,6 +1193,13 @@
+>                                 allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+>                                 allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>                         };
+> +
+> +                       spdif_tx_pins_a: spdif at 0 {
+> +                               allwinner,pins = "PB13";
+> +                               allwinner,function = "spdif";
+> +                               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +                               allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+> +                       };
+>                 };
+>
+>                 timer at 01c20c00 {
+> --
+> 2.7.4
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
