@@ -1,45 +1,39 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Wed, 23 Mar 2016 22:11:44 +0100
-Subject: [PATCH v5 0/2] power: reset: support for Atmel alternative
- Shutdown Controller
-In-Reply-To: <56F27B96.5010406@atmel.com>
-References: <1458134390-23847-1-git-send-email-nicolas.ferre@atmel.com>
- <56F27B96.5010406@atmel.com>
-Message-ID: <20160323211144.GA31473@earth>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 23 Mar 2016 22:24:44 +0100
+Subject: [PATCH] PM / AVS: rockchip-io: add io selectors and supplies for
+ rk3399
+In-Reply-To: <7h8u19q6dw.fsf@baylibre.com>
+References: <1458067526-11319-1-git-send-email-david.wu@rock-chips.com>
+ <4748955.K1DVHdsoLd@diego> <7h8u19q6dw.fsf@baylibre.com>
+Message-ID: <3859377.YHUlbhqqCy@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
-
-On Wed, Mar 23, 2016 at 12:18:46PM +0100, Nicolas Ferre wrote:
-> Le 16/03/2016 14:19, Nicolas Ferre a ?crit :
-> > This is a series to add driver for a new Atmel Shutdown Controller. This new IP
-> > is extensible and some features will be added later (see the TODO section).
-> > Its extensible nature led to write a new binding so that wake-up sources can be
-> > described easily.
+On Wednesday, March 23, 2016 01:35:55 PM Kevin Hilman wrote:
+> Heiko St?bner <heiko@sntech.de> writes:
 > 
-> I have the feeling that this series is ready. What do you think?
+> > Hi David,
+> >
+> > Am Mittwoch, 16. M?rz 2016, 02:45:26 schrieb David Wu:
+> >> This adds the necessary data for handling io voltage domains on the rk3399.
+> >> As interesting tidbit, the rk3399 contains two separate iodomain areas.
+> >> One in the regular General Register Files (GRF) and one in PMUGRF in the
+> >> pmu power domain.
+> >> 
+> >> Signed-off-by: David Wu <david.wu@rock-chips.com>
+> >
+> > looks good, so
+> > Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> 
+> Acked-by: Kevin Hilman <khilman@baylibre.com>
+> 
+> Rafael, can you queue this directly?  I don't currently have any other
+> AVS patches in the queue.
 
-I have see obvious problems with this series and plan to queue this
-after the merge window has closed. I give patches one more review
-while applying them, so at that point something might turn up.
+OK, applied.
 
-> So, do you want me to collect everybody's tags and send another version
-> or you can do it yourself?
+That said it's the last minute for this to get into 4.6, so I'd appreciate
+getting ACKs earlier during merge windows.
 
-I can collect the tags myself.
-
-> BTW, I will certainly send the device tree updates for the sama5d2 SoC,
-> but it will go through the AT91 then arm-soc git trees. No need for
-> further synchronization here.
-
-I will ignore the *.dts patches.
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160323/f01651fe/attachment.sig>
+Thanks,
+Rafael
