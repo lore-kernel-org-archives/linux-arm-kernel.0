@@ -1,33 +1,28 @@
-From: majun258@huawei.com (MaJun)
-Date: Wed, 23 Mar 2016 17:06:32 +0800
-Subject: [PATCH 1/2]ARM64: Enable mbigen interrupt controller on Hisilicon
- platform
-In-Reply-To: <1458723993-21044-1-git-send-email-majun258@huawei.com>
-References: <1458723993-21044-1-git-send-email-majun258@huawei.com>
-Message-ID: <1458723993-21044-2-git-send-email-majun258@huawei.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Wed, 23 Mar 2016 10:13:58 +0100
+Subject: [PATCH v3 0/2] Split pinctrl device for Meson8 / Meson8b and update
+ docs
+Message-ID: <1458724440-32228-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ma Jun <majun258@huawei.com>
+From: Carlo Caione <carlo@endlessm.com>
 
-As a interrupt controller used on some of hisilicon SOCs(660,1610 etc.),
-mbigen driver should be enabled when CONFIG_ARCH_HISI is enabled.
-Signed-off-by: Ma Jun <majun258@huawei.com>
----
- arch/arm64/Kconfig.platforms |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+With http://www.spinics.net/lists/devicetree/msg116771.html we split / refactor
+the pinctrl driver to have two different pinctrl devices for each bus.
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index 21074f6..fdfd526 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -37,6 +37,7 @@ config ARCH_LAYERSCAPE
- 
- config ARCH_HISI
- 	bool "Hisilicon SoC Family"
-+	select HISILICON_IRQ_MBIGEN
- 	help
- 	  This enables support for Hisilicon ARMv8 SoC family
- 
+Unfortunately these two patches still haven't found their way to mainline.
+Reposting them as standalone patchset. Hopefully they can be ACKed as soon as
+possible.
+
+Carlo Caione (2):
+  ARM: dts: amlogic: Split pinctrl device for Meson8 / Meson8b
+  documentation: Fix pinctrl documentation for Meson8 / Meson8b
+
+ .../devicetree/bindings/pinctrl/meson,pinctrl.txt  | 38 +++------------
+ arch/arm/boot/dts/meson8.dtsi                      | 57 ++++++++++++----------
+ arch/arm/boot/dts/meson8b.dtsi                     | 12 ++++-
+ 3 files changed, 49 insertions(+), 58 deletions(-)
+
 -- 
-1.7.1
+2.5.0
