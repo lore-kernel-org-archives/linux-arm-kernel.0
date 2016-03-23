@@ -1,46 +1,44 @@
-From: vaishali.thakkar@oracle.com (Vaishali Thakkar)
-Date: Wed, 23 Mar 2016 17:55:59 +0530
-Subject: [PATCH v2 2/6] arm64: mm: Use hugetlb_bad_size
-Message-ID: <1458735959-15677-1-git-send-email-vaishali.thakkar@oracle.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 23 Mar 2016 12:54:48 +0000
+Subject: [PATCH v2] spi: orion.c: Add direct access mode
+In-Reply-To: <56F2852C.5010006@denx.de>
+References: <1458663893-13766-1-git-send-email-sr@denx.de>
+ <20160322173546.40d24cc2@free-electrons.com>
+ <56F17684.2010307@denx.de> <20160323113316.GH2566@sirena.org.uk>
+ <56F2852C.5010006@denx.de>
+Message-ID: <20160323125448.GM2566@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the setup_hugepagesz function to call the routine
-hugetlb_bad_size when unsupported hugepage size is found.
+On Wed, Mar 23, 2016 at 12:59:40PM +0100, Stefan Roese wrote:
+> On 23.03.2016 12:33, Mark Brown wrote:
 
-Signed-off-by: Vaishali Thakkar <vaishali.thakkar@oracle.com>
-Reviewed-by: Mike Kravetz <mike.kravetz@oracle.com>
-Reviewed-by: Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>
-Cc: Hillf Danton <hillf.zj@alibaba-inc.com>
-Cc: Michal Hocko <mhocko@suse.com>
-Cc: Yaowei Bai <baiyaowei@cmss.chinamobile.com>
-Cc: Dominik Dingel <dingel@linux.vnet.ibm.com>
-Cc: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
-Cc: Paul Gortmaker <paul.gortmaker@windriver.com>
-Cc: Dave Hansen <dave.hansen@linux.intel.com>
----
-Please note that the patch is tested for x86 only. But as this
-is one line change I just changed them all. So, it would be good
-if the patch can be tested for other architectures before adding
-this in to mainline.
-Changes since v1:
-	- Separate different arch specific changes in different
-	  patches instead of one
----
- arch/arm64/mm/hugetlbpage.c | 1 +
- 1 file changed, 1 insertion(+)
+> > No, there's two separate things here.  The big problem with what you
+> > originally sent was that you were defining a window per SPI device but
+> > this is a part of the SPI controller so having to change windows per
+> > device is just going to make the code more complex.
 
-diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index 589fd28..aa8aee7 100644
---- a/arch/arm64/mm/hugetlbpage.c
-+++ b/arch/arm64/mm/hugetlbpage.c
-@@ -307,6 +307,7 @@ static __init int setup_hugepagesz(char *opt)
- 	} else if (ps == PUD_SIZE) {
- 		hugetlb_add_hstate(PUD_SHIFT - PAGE_SHIFT);
- 	} else {
-+		hugetlb_bad_size();
- 		pr_err("hugepagesz: Unsupported page size %lu K\n", ps >> 10);
- 		return 0;
- 	}
--- 
-2.1.4
+> I'm sorry, but this sentence is not totally clear to me: Do you mean
+> that the "more complex" code in v2 with the MBus window reconfiguration
+> is not good? Or do you mean that in the RFC version, the switching
+> between the SPI devices was too complex?
+
+I haven't looked at your new code at all.  What I'm saying is that
+specifying a per-device MBus window seems like pointless complexity.
+
+> >  There's also the
+> > separate issue of where any MBus windows we get come up with.
+
+> Could you also please explain this in more detail? What do you mean
+> with that? Do you mean the physical address, that is defined in the
+> DT for this MBus window?
+
+I had thought that this was what this subthread was about but you
+appeared to be confused.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160323/dba85ad1/attachment.sig>
