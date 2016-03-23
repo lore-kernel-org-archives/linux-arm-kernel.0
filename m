@@ -1,33 +1,29 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 23 Mar 2016 13:35:55 -0700
-Subject: [PATCH] PM / AVS: rockchip-io: add io selectors and supplies for
- rk3399
-In-Reply-To: <4748955.K1DVHdsoLd@diego> ("Heiko =?utf-8?Q?St=C3=BCbner=22'?=
- =?utf-8?Q?s?= message of "Wed, 16 Mar 2016 12:11:41 +0100")
-References: <1458067526-11319-1-git-send-email-david.wu@rock-chips.com>
- <4748955.K1DVHdsoLd@diego>
-Message-ID: <7h8u19q6dw.fsf@baylibre.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Wed, 23 Mar 2016 15:37:44 -0500
+Subject: [PATCH 0/6] of: Implement iterator for phandles
+In-Reply-To: <20160323115457.GC17838@8bytes.org>
+References: <1458669509-7178-1-git-send-email-joro@8bytes.org>
+ <CAL_JsqJ8f0+qQk4QQxyKmwtqnejCDxdjmrZf8480j54YXUTkVg@mail.gmail.com>
+ <20160323115457.GC17838@8bytes.org>
+Message-ID: <CAL_Jsq+85i+WD3wxnYoDg18v_KptVTQYTmkU_YVF00fvevwq_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko St?bner <heiko@sntech.de> writes:
-
-> Hi David,
+On Wed, Mar 23, 2016 at 6:54 AM, Joerg Roedel <joro@8bytes.org> wrote:
+> Hi Rob,
 >
-> Am Mittwoch, 16. M?rz 2016, 02:45:26 schrieb David Wu:
->> This adds the necessary data for handling io voltage domains on the rk3399.
->> As interesting tidbit, the rk3399 contains two separate iodomain areas.
->> One in the regular General Register Files (GRF) and one in PMUGRF in the
->> pmu power domain.
->> 
->> Signed-off-by: David Wu <david.wu@rock-chips.com>
+> On Tue, Mar 22, 2016 at 01:45:41PM -0500, Rob Herring wrote:
+>> On Tue, Mar 22, 2016 at 12:58 PM, Joerg Roedel <joro@8bytes.org> wrote:
+>> > Please review. Patches are based on v4.5.
+>>
+>> Other than my one comment, this looks good to me. For the series:
+>>
+>> Acked-by: Rob Herring <robh@kernel.org>
 >
-> looks good, so
-> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> Thanks a lot for your fast reply! I guess these patches will go through
+> the DT tree, or should I carry them in the IOMMU tree? The DT tree
+> probably makes more sense.
 
-Acked-by: Kevin Hilman <khilman@baylibre.com>
+Sure, I can take them.
 
-Rafael, can you queue this directly?  I don't currently have any other
-AVS patches in the queue.
-
-Kevin
+Rob
