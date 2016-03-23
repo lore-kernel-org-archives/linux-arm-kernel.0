@@ -1,48 +1,48 @@
-From: js1304@gmail.com (Joonsoo Kim)
-Date: Wed, 23 Mar 2016 17:32:43 +0900
-Subject: Suspicious error for CMA stress test
-In-Reply-To: <56F25343.8010100@suse.cz>
-References: <56E2FB5C.1040602@suse.cz>
- <20160314064925.GA27587@js1304-P5Q-DELUXE> <56E662E8.700@suse.cz>
- <20160314071803.GA28094@js1304-P5Q-DELUXE>
- <56E92AFC.9050208@huawei.com>
- <20160317065426.GA10315@js1304-P5Q-DELUXE>
- <56EA77BC.2090702@huawei.com> <56EAD0B4.2060807@suse.cz>
- <CAAmzW4MNdFHSSTpCfWqy7oDtkR_Hfu2dZa_LW97W8J5vr5m4tg@mail.gmail.com>
- <56EC0C41.70503@suse.cz> <20160323044407.GB4624@js1304-P5Q-DELUXE>
- <56F25343.8010100@suse.cz>
-Message-ID: <CAAmzW4Mipu0O6ooqc4Px1oxkpNPh_9RmWkBCj9QrWb+H7+q+xA@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Wed, 23 Mar 2016 09:37:58 +0100
+Subject: [PATCH v2 16/18] dt-bindings: Add OXNAS bindings
+In-Reply-To: <20160317172738.GA7293@rob-hp-laptop>
+References: <1457005210-18485-1-git-send-email-narmstrong@baylibre.com>
+ <1457519060-6038-1-git-send-email-narmstrong@baylibre.com>
+ <1457519060-6038-17-git-send-email-narmstrong@baylibre.com>
+ <20160317172738.GA7293@rob-hp-laptop>
+Message-ID: <56F255E6.2030905@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-03-23 17:26 GMT+09:00 Vlastimil Babka <vbabka@suse.cz>:
-> On 03/23/2016 05:44 AM, Joonsoo Kim wrote:
->>>
->>>
->>> Fixes: 3c605096d315 ("mm/page_alloc: restrict max order of merging on
->>> isolated pageblock")
->>> Link: https://lkml.org/lkml/2016/3/2/280
->>> Reported-by: Hanjun Guo <guohanjun@huawei.com>
->>> Debugged-by: Laura Abbott <labbott@redhat.com>
->>> Debugged-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
->>> Signed-off-by: Vlastimil Babka <vbabka@suse.cz>
->>> Cc: <stable@vger.kernel.org> # 3.18+
->>> ---
->>>   mm/page_alloc.c | 46 +++++++++++++++++++++++++++++++++-------------
->>>   1 file changed, 33 insertions(+), 13 deletions(-)
+On 03/17/2016 06:27 PM, Rob Herring wrote:
+> On Wed, Mar 09, 2016 at 11:24:18AM +0100, Neil Armstrong wrote:
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>> ---
+>>  Documentation/devicetree/bindings/arm/oxnas.txt | 9 +++++++++
+>>  1 file changed, 9 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/oxnas.txt
 >>
->>
->> Acked-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
->>
->> Thanks for taking care of this issue!.
->
->
-> Thanks for the review. But I'm now not sure whether we push this to
-> mainline+stable now, and later replace with Lucas' approach, or whether that
-> approach would be also suitable and non-disruptive enough for stable?
+>> diff --git a/Documentation/devicetree/bindings/arm/oxnas.txt b/Documentation/devicetree/bindings/arm/oxnas.txt
+>> new file mode 100644
+>> index 0000000..f6032d2
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/oxnas.txt
+>> @@ -0,0 +1,9 @@
+>> +PLX Technology OXNAS SoCs Family device tree bindings
+>> +-------------------------------------------
+>> +
+>> +Boards with the OX810SE Soc SoC shall have the following properties:
+> 
+> s/Soc SoC/SoC/
 
-Lucas' approach is for improvement and would be complex rather than
-this. I don't think it would be appropriate for stable. IMO, it's better to push
-this to mainline + stable now.
+OK
+> 
+>> +  Required root node property:
+>> +    compatible: "oxsemi,ox810se"
+>> +
+>> +Board compatible values:
+>> +  - "wd,mbwe" (OX810SE)
+> 
+> Seems kind of generic. Only one version?
 
-Thanks.
+There is a My Book World Edition II, which seems to be the same (they share the same firmware) but with two SATA ports, the original kernel does not make any differences between the two models.
+
+I'm not aware of different versions and the firmware does not contain any specific code for different board revisions.
+
+Neil
