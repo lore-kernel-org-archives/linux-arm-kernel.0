@@ -1,22 +1,43 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Wed, 23 Mar 2016 15:46:11 +0100
-Subject: [PATCH V1] perf: qcom: Add L3 cache PMU driver
-In-Reply-To: <f33a9ea23bf426c138a9323e53703259@codeaurora.org>
-References: <1458333422-8963-1-git-send-email-agustinv@codeaurora.org>
- <20160321103507.GB17326@leverpostej>
- <09ca2b70ae43432623cfbac374da1784@codeaurora.org>
- <56F26FF1.90002@arm.com>
- <f33a9ea23bf426c138a9323e53703259@codeaurora.org>
-Message-ID: <20160323144611.GB6344@twins.programming.kicks-ass.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 23 Mar 2016 14:43:43 +0000
+Subject: [PATCH v2 5/5] mailbox: Stop using ENOSYS for anything other than
+ unimplemented syscalls
+In-Reply-To: <1458744223-12164-1-git-send-email-lee.jones@linaro.org>
+References: <1458744223-12164-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1458744223-12164-6-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 23, 2016 at 08:36:14AM -0400, agustinv at codeaurora.org wrote:
+In accordance with e15f431fe2d5 ("errno.h: Improve ENOSYS's comment") and
+91c9afaf97ee ("checkpatch.pl: new instances of ENOSYS are errors") we're
+converting from the old meaning of: ENOSYS "Function not implemented" to
+a more standard EINVAL.
 
-> ACPI events *are* existing abstractions within ACPI-based systems and the
-> mechanism works across OSes.
+Reported-by: Seraphin Bonnaffe <seraphin.bonnaffe@st.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/mailbox/mailbox.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Correction; it never works anywhere. Its a nice idea on paper, but when
-you're stuck with a firmware that hands you random values pulled from a
-crack monkey's behind you have to then hack around, you wish you had
-done the sane thing and stuffed it in code you can actually fix.
+diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
+index 6a4811f..4a36632 100644
+--- a/drivers/mailbox/mailbox.c
++++ b/drivers/mailbox/mailbox.c
+@@ -375,13 +375,13 @@ struct mbox_chan *mbox_request_channel_byname(struct mbox_client *cl,
+ 
+ 	if (!np) {
+ 		dev_err(cl->dev, "%s() currently only supports DT\n", __func__);
+-		return ERR_PTR(-ENOSYS);
++		return ERR_PTR(-EINVAL);
+ 	}
+ 
+ 	if (!of_get_property(np, "mbox-names", NULL)) {
+ 		dev_err(cl->dev,
+ 			"%s() requires an \"mbox-names\" property\n", __func__);
+-		return ERR_PTR(-ENOSYS);
++		return ERR_PTR(-EINVAL);
+ 	}
+ 
+ 	of_property_for_each_string(np, "mbox-names", prop, mbox_name) {
+-- 
+1.9.1
