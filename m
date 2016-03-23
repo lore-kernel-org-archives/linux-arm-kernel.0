@@ -1,30 +1,78 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 23 Mar 2016 10:10:27 -0500
-Subject: [PATCH next 1/2] PCI: keystone: add pci error irq handler
-In-Reply-To: <1458676378-24377-1-git-send-email-m-karicheri2@ti.com>
-References: <1458676378-24377-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <20160323151027.GA17771@rob-hp-laptop>
+From: clabbe.montjoie@gmail.com (LABBE Corentin)
+Date: Wed, 23 Mar 2016 16:11:24 +0100
+Subject: [PATCH RESEND] crypto: sun4i-ss: Replace spinlock_bh by
+ spin_lock_irq{save|restore}
+Message-ID: <1458745884-27798-1-git-send-email-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 22, 2016 at 03:52:57PM -0400, Murali Karicheri wrote:
-> Keystone PCI hardware generates error interrupts at RC using platform
-> irq instead of standard msi/legacy irq. Add a simple error handler that
-> logs the fatal interrupt status to the console.
-> 
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: Kumar Gala <galak@codeaurora.org>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> ---
->  .../devicetree/bindings/pci/pci-keystone.txt       |  1 +
+The current sun4i-ss driver could generate data corruption when ciphering/deciphering.
+It occurs randomly on end of handled data.
+No root cause have been found and the only way to remove it is to replace
+all spin_lock_bh by their irq counterparts.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Fixes: 6298e948215f ("crypto: sunxi-ss - Add Allwinner Security System crypto accelerator")
+Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
+Cc: stable <stable@vger.kernel.org>
+---
+ drivers/crypto/sunxi-ss/sun4i-ss-cipher.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
->  drivers/pci/host/pci-keystone-dw.c                 | 46 ++++++++++++++++++++++
->  drivers/pci/host/pci-keystone.c                    | 32 +++++++++++++++
->  drivers/pci/host/pci-keystone.h                    |  6 +++
->  4 files changed, 85 insertions(+)
+diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c b/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c
+index 7be3fbc..3830d7c 100644
+--- a/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c
++++ b/drivers/crypto/sunxi-ss/sun4i-ss-cipher.c
+@@ -35,6 +35,7 @@ static int sun4i_ss_opti_poll(struct ablkcipher_request *areq)
+ 	unsigned int todo;
+ 	struct sg_mapping_iter mi, mo;
+ 	unsigned int oi, oo; /* offset for in and out */
++	unsigned long flags;
+ 
+ 	if (areq->nbytes == 0)
+ 		return 0;
+@@ -49,7 +50,7 @@ static int sun4i_ss_opti_poll(struct ablkcipher_request *areq)
+ 		return -EINVAL;
+ 	}
+ 
+-	spin_lock_bh(&ss->slock);
++	spin_lock_irqsave(&ss->slock, flags);
+ 
+ 	for (i = 0; i < op->keylen; i += 4)
+ 		writel(*(op->key + i / 4), ss->base + SS_KEY0 + i);
+@@ -117,7 +118,7 @@ release_ss:
+ 	sg_miter_stop(&mi);
+ 	sg_miter_stop(&mo);
+ 	writel(0, ss->base + SS_CTL);
+-	spin_unlock_bh(&ss->slock);
++	spin_unlock_irqrestore(&ss->slock, flags);
+ 	return err;
+ }
+ 
+@@ -149,6 +150,7 @@ static int sun4i_ss_cipher_poll(struct ablkcipher_request *areq)
+ 	unsigned int ob = 0;	/* offset in buf */
+ 	unsigned int obo = 0;	/* offset in bufo*/
+ 	unsigned int obl = 0;	/* length of data in bufo */
++	unsigned long flags;
+ 
+ 	if (areq->nbytes == 0)
+ 		return 0;
+@@ -181,7 +183,7 @@ static int sun4i_ss_cipher_poll(struct ablkcipher_request *areq)
+ 	if (no_chunk == 1)
+ 		return sun4i_ss_opti_poll(areq);
+ 
+-	spin_lock_bh(&ss->slock);
++	spin_lock_irqsave(&ss->slock, flags);
+ 
+ 	for (i = 0; i < op->keylen; i += 4)
+ 		writel(*(op->key + i / 4), ss->base + SS_KEY0 + i);
+@@ -307,7 +309,7 @@ release_ss:
+ 	sg_miter_stop(&mi);
+ 	sg_miter_stop(&mo);
+ 	writel(0, ss->base + SS_CTL);
+-	spin_unlock_bh(&ss->slock);
++	spin_unlock_irqrestore(&ss->slock, flags);
+ 
+ 	return err;
+ }
+-- 
+2.7.3
