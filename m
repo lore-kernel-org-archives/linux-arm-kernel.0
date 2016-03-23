@@ -1,35 +1,46 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Wed, 23 Mar 2016 09:06:23 +0100
-Subject: [PATCH v2 0/6] ARM64: meson: GXBaby (S905) and Vega S95 enablement
-In-Reply-To: <56F1AB26.8050200@suse.de>
-References: <1456886101-22967-1-git-send-email-afaerber@suse.de>
- <CAOi56cXFEUZuu0bJknUYNhfR2jL=LYUTbpnX9diZw2B5JfTaEQ@mail.gmail.com>
- <56F1AB26.8050200@suse.de>
-Message-ID: <CAOQ7t2aB6X5gS+0RfyB1PjTpJnUFnF95ejXwhYXgxEmXSq0KFQ@mail.gmail.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Wed, 23 Mar 2016 13:46:45 +0530
+Subject: [GIT PULL 2nd] Mailbox changes for v4.6
+Message-ID: <CABb+yY3Y_P0+NJzvkUMEzGUSG9MiOe-K0nSSOSgAXs4oQmA94w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 22, 2016 at 9:29 PM, Andreas F?rber <afaerber@suse.de> wrote:
-> Am 21.03.2016 um 23:36 schrieb Kevin Hilman:
->> On Tue, Mar 1, 2016 at 6:34 PM, Andreas F?rber <afaerber@suse.de> wrote:
->>
->>> Note: On the Vega S95 I need to change TEXT_OFFSET as follows,
->>> in order to avoid the vendor U-Boot overwriting itself (fwiu);
->>> for the Mini Mx that's reportedly not necessary.
->>
->> FYI, the Amlogic P200 dev board also needs this hack with the factory u-boot.
->
-> I have meanwhile found that
->
-> mkimage -A arm64 -O linux -T kernel -C none -a 0x1080000 -e 0x1080000 \
-> -n linux-next -d arch/arm64/boot/Image ../uImage
->
-> and then using bootm instead of booti works even without the above hack
-> on the Vega S95. Not a satisfactory solution yet, but better than
-> patching the kernel in a distro-incompatible way.
+Hi Linus,
 
-I wonder if we can add this kind of information in Documentation/arm/meson/.
-Probably it could be handy until we have a proper u-boot porting.
+ Due to some last minute cosmetic changes, the driver was not included
+in the first pull request, otherwise the driver has been reviewed
+twice. Could you please consider pulling it, so it doesn't get delayed
+for another cycle?
 
--- 
-Carlo Caione
+The following changes since commit c5a9d1f30c066b7922a5f66b8c03a263d2f06a8c:
+
+  mailbox: rockchip: avoid 64-bit division (2016-03-16 09:18:15 +0530)
+
+are available in the git repository at:
+
+  git://git.linaro.org/landing-teams/working/fujitsu/integration.git
+mailbox-for-next
+
+for you to fetch changes up to aace66b170ce7feda2d1860a81eefff37fa9d1d2:
+
+  mailbox: Introduce TI message manager driver (2016-03-21 20:33:15 +0530)
+
+----------------------------------------------------------------
+
+- Device tree bindings and driver for TI's Message-Manager controller
+
+----------------------------------------------------------------
+Nishanth Menon (2):
+      Documentation: dt: mailbox: Add TI Message Manager
+      mailbox: Introduce TI message manager driver
+
+ .../bindings/mailbox/ti,message-manager.txt        |  50 ++
+ drivers/mailbox/Kconfig                            |  11 +
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/ti-msgmgr.c                        | 639 +++++++++++++++++++++
+ include/linux/soc/ti/ti-msgmgr.h                   |  35 ++
+ 5 files changed, 737 insertions(+)
+ create mode 100644
+Documentation/devicetree/bindings/mailbox/ti,message-manager.txt
+ create mode 100644 drivers/mailbox/ti-msgmgr.c
+ create mode 100644 include/linux/soc/ti/ti-msgmgr.h
