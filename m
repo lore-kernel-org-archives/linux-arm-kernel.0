@@ -1,61 +1,42 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 23 Mar 2016 21:26:27 +0530
-Subject: [PATCH v2 03/11] ARM: davinci: da850: use clk->set_parent for
- async3
-In-Reply-To: <1458181615-27782-4-git-send-email-david@lechnology.com>
-References: <1458181615-27782-1-git-send-email-david@lechnology.com>
- <1458181615-27782-4-git-send-email-david@lechnology.com>
-Message-ID: <56F2BCAB.3040404@ti.com>
+From: vaishali.thakkar@oracle.com (Vaishali Thakkar)
+Date: Wed, 23 Mar 2016 21:31:39 +0530
+Subject: [PATCH v2 0/6] mm/hugetlb: Fix commandline parsing behavior for
+ invalid hugepagesize
+In-Reply-To: <20160323133011.GG7059@dhcp22.suse.cz>
+References: <1458734844-14833-1-git-send-email-vaishali.thakkar@oracle.com>
+ <20160323133011.GG7059@dhcp22.suse.cz>
+Message-ID: <56F2BDE3.40309@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 17 March 2016 07:56 AM, David Lechner wrote:
-> The da850 family of processors has an async3 clock domain that can be
-> muxed to either pll0_sysclk2 or pll1_sysclk2. Now that the davinci clocks
-> have a set_parent callback, we can use this to control the async3 mux
-> instead of a stand-alone function.
-> 
-> This adds a new async3_clk and sets the appropriate child clocks. The
-> default is use to pll1_sysclk2 since it is not affected by processor
-> frequency scaling.
-> 
-> Signed-off-by: David Lechner <david@lechnology.com>
-> ---
 
-> +static int da850_async3_set_parent(struct clk *clk, struct clk *parent)
-> +{
-> +	u32 __iomem *cfgchip3;
-> +	u32 val;
-> +
-> +	/*
-> +	 * Can't use DA8XX_SYSCFG0_VIRT() here since this can be called before
-> +	 * da8xx_syscfg0_base is initialized.
-> +	 */
-> +	cfgchip3 = ioremap(DA8XX_SYSCFG0_BASE + DA8XX_CFGCHIP3_REG, 4);
 
-Is this just a theoretical possibility or have you seen this happen? I
-would like to see if there are ways of avoiding this rather than throw
-away usage of DA8XX_SYSCFG0_VIRT()
+On Wednesday 23 March 2016 07:00 PM, Michal Hocko wrote:
+> On Wed 23-03-16 17:37:18, Vaishali Thakkar wrote:
+>> Current code fails to ignore the 'hugepages=' parameters when unsupported
+>> hugepagesize is specified. With this patchset, introduce new architecture
+>> independent routine hugetlb_bad_size to handle such command line options.
+>> And then call it in architecture specific code.
+>>
+>> Changes since v1:
+>> 	- Separated different architecture specific changes in different
+>> 	  patches
+>> 	- CC'ed all arch maintainers
+> The hugetlb parameters parsing is a bit mess but this at least makes it
+> behave more consistently. Feel free to add to all patches
+> Acked-by: Michal Hocko <mhocko@suse.com>
+>
+> On a side note. I have received patches with broken threading - the
+> follow up patches are not in the single thread under this cover email.
+> I thought this was the default behavior of git send-email but maybe your
+> (older) version doesn't do that. --thread option would enforce that
+> (with --no-chain-reply-to) or you can set it up in the git config. IMHO
+> it is always better to have the patchset in the single email thread.
+>
+Yes, now I have set up my git config for that. Hopefully, things will
+work properly - patchset in a single thread from the next time.
 
-> +	val = readl(cfgchip3);
-> +
-> +	/* Set the USB 1.1 PHY clock mux based on the parent clock. */
+Thanks.
 
-Comment is wrong (copy-paste error?)
-
-> +	if (parent == &pll0_sysclk2)
-> +		val &= ~CFGCHIP3_ASYNC3_CLKSRC;
-> +	else if (parent == &pll1_sysclk2)
-> +		val |= CFGCHIP3_ASYNC3_CLKSRC;
-> +	else {
-> +		pr_err("Bad parent on async3 clock mux.\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	writel(val, cfgchip3);
-> +
-> +	return 0;
-> +}
-
-Thanks,
-Sekhar
+-- 
+Vaishali
