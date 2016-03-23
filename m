@@ -1,42 +1,205 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 23 Mar 2016 23:11:53 +0100
-Subject: [PATCH 2/2] arm*: efi: drop writable mapping of the UEFI System
- table
-In-Reply-To: <20160323161624.GG11676@codeblueprint.co.uk>
-References: <1456496435-12679-1-git-send-email-ard.biesheuvel@linaro.org>
- <1456496435-12679-2-git-send-email-ard.biesheuvel@linaro.org>
- <20160226150156.GC7475@codeblueprint.co.uk>
- <CAKv+Gu8+pYR_jxjcVeXgekVqD_BugtRLgNNhOkvhuaEpddbHRg@mail.gmail.com>
- <20160323161624.GG11676@codeblueprint.co.uk>
-Message-ID: <CAKv+Gu_p=nWMbyciC9QXqnLEgqouxiERn6kcLv1V+2tDc74tbA@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 23 Mar 2016 23:14:16 +0100
+Subject: [PATCH] ARM: dts: sun8i: Base Orange Pi Plus dts on the Orange Pi 2
+ dts
+Message-ID: <1458771256-4069-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 March 2016 at 17:16, Matt Fleming <matt@codeblueprint.co.uk> wrote:
-> On Tue, 22 Mar, at 04:08:24PM, Ard Biesheuvel wrote:
->>
->> This patch causes a warning I hadn't spotted before sending it out.
->> Could you fold this in please?
->>
->> diff --git a/drivers/firmware/efi/arm-runtime.c
->> b/drivers/firmware/efi/arm-runtime.c
->> index 6c97d4884fc7..fe749da9997e 100644
->> --- a/drivers/firmware/efi/arm-runtime.c
->> +++ b/drivers/firmware/efi/arm-runtime.c
->> @@ -72,8 +72,8 @@ static bool __init efi_virtmap_init(void)
->>                  */
->>                 if (efi_system_table >= phys &&
->>                     efi_system_table < phys + (md->num_pages * EFI_PAGE_SIZE)) {
->> -                       efi.systab = (void *)(efi_system_table - phys +
->> -                                             md->virt_addr);
->> +                       efi.systab = (void *)(unsigned long)(efi_system_table -
->> +                                                         phys + md->virt_addr);
->>                         systab_found = true;
->>                 }
->>         }
->
-> Done, please check,
->
->   https://git.kernel.org/cgit/linux/kernel/git/mfleming/efi.git/commit/?h=next&id=4fd5c619dcf4f3d2c86d4a686ce66fc01e877a08
+The Orange Pi Plus really is an Orange Pi 2 extended with:
+1) A sata <-> usb bridge connected to ehci3
+2) An eMMC on mmc2
+3) An external gigabit ethernet phy instead of the integrated 100Mbit phy
 
-Looks good to me, thanks.
+This commit changes the dts to reflect this by making it include
+the Orange Pi 2 dts and then adding the extra bits.
+
+Note that the difference in ethernet phy is not taken into account
+because we do not have an ethernet driver for the H3 yet.
+
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts | 136 +--------------------------
+ 1 file changed, 2 insertions(+), 134 deletions(-)
+
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
+index 94f8b0b..b0cb417 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
+@@ -40,61 +40,13 @@
+  *     OTHER DEALINGS IN THE SOFTWARE.
+  */
+ 
+-/dts-v1/;
+-#include "sun8i-h3.dtsi"
+-#include "sunxi-common-regulators.dtsi"
+-
+-#include <dt-bindings/gpio/gpio.h>
+-#include <dt-bindings/input/input.h>
+-#include <dt-bindings/pinctrl/sun4i-a10.h>
++/* The Orange Pi Plus is an extended version of the Orange Pi 2 */
++#include "sun8i-h3-orangepi-2.dts"
+ 
+ / {
+ 	model = "Xunlong Orange Pi Plus";
+ 	compatible = "xunlong,orangepi-plus", "allwinner,sun8i-h3";
+ 
+-	aliases {
+-		serial0 = &uart0;
+-	};
+-
+-	chosen {
+-		stdout-path = "serial0:115200n8";
+-	};
+-
+-	leds {
+-		compatible = "gpio-leds";
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&leds_opc>, <&leds_r_opc>;
+-
+-		status_led {
+-			label = "orangepi-plus:red:status";
+-			gpios = <&pio 0 15 GPIO_ACTIVE_HIGH>;
+-		};
+-
+-		pwr_led {
+-			label = "orangepi-plus:green:pwr";
+-			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>;
+-			default-state = "on";
+-		};
+-	};
+-
+-	r_gpio_keys {
+-		compatible = "gpio-keys";
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&sw_r_opc>;
+-
+-		sw2 {
+-			label = "sw2";
+-			linux,code = <BTN_1>;
+-			gpios = <&r_pio 0 4 GPIO_ACTIVE_LOW>;
+-		};
+-
+-		sw4 {
+-			label = "sw4";
+-			linux,code = <BTN_0>;
+-			gpios = <&r_pio 0 3 GPIO_ACTIVE_LOW>;
+-		};
+-	};
+-
+ 	reg_usb3_vbus: usb3-vbus {
+ 		compatible = "regulator-fixed";
+ 		pinctrl-names = "default";
+@@ -106,49 +58,12 @@
+ 		enable-active-high;
+ 		gpio = <&pio 6 11 GPIO_ACTIVE_HIGH>;
+ 	};
+-
+-	wifi_pwrseq: wifi_pwrseq {
+-		compatible = "mmc-pwrseq-simple";
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&wifi_pwrseq_pin_orangepi>;
+-		reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>; /* PL7 WIFI_EN */
+-	};
+-};
+-
+-&ehci1 {
+-	status = "okay";
+ };
+ 
+ &ehci3 {
+ 	status = "okay";
+ };
+ 
+-&ir {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&ir_pins_a>;
+-	status = "okay";
+-};
+-
+-&mmc0 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
+-	vmmc-supply = <&reg_vcc3v3>;
+-	bus-width = <4>;
+-	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
+-	cd-inverted;
+-	status = "okay";
+-};
+-
+-&mmc1 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&mmc1_pins_a>;
+-	vmmc-supply = <&reg_vcc3v3>;
+-	mmc-pwrseq = <&wifi_pwrseq>;
+-	bus-width = <4>;
+-	non-removable;
+-	status = "okay";
+-};
+-
+ &mmc2 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc2_8bit_pins>;
+@@ -167,13 +82,6 @@
+ };
+ 
+ &pio {
+-	leds_opc: led_pins at 0 {
+-		allwinner,pins = "PA15";
+-		allwinner,function = "gpio_out";
+-		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+-		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+-	};
+-
+ 	usb3_vbus_pin_a: usb3_vbus_pin at 0 {
+ 		allwinner,pins = "PG11";
+ 		allwinner,function = "gpio_out";
+@@ -182,46 +90,6 @@
+ 	};
+ };
+ 
+-&r_pio {
+-	leds_r_opc: led_pins at 0 {
+-		allwinner,pins = "PL10";
+-		allwinner,function = "gpio_out";
+-		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+-		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+-	};
+-
+-	sw_r_opc: key_pins at 0 {
+-		allwinner,pins = "PL3", "PL4";
+-		allwinner,function = "gpio_in";
+-		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+-		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+-	};
+-
+-	wifi_pwrseq_pin_orangepi: wifi_pwrseq_pin at 0 {
+-		allwinner,pins = "PL7";
+-		allwinner,function = "gpio_out";
+-		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+-		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+-	};
+-};
+-
+-&reg_usb1_vbus {
+-	gpio = <&pio 6 13 GPIO_ACTIVE_HIGH>;
+-	status = "okay";
+-};
+-
+-&uart0 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&uart0_pins_a>;
+-	status = "okay";
+-};
+-
+-&usb1_vbus_pin_a {
+-	allwinner,pins = "PG13";
+-};
+-
+ &usbphy {
+-	usb1_vbus-supply = <&reg_usb1_vbus>;
+ 	usb3_vbus-supply = <&reg_usb3_vbus>;
+-	status = "okay";
+ };
+-- 
+2.7.3
