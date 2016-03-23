@@ -1,73 +1,38 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Wed, 23 Mar 2016 08:58:40 +0100
-Subject: [PATCH] ARM64: dts: amlogic: Clean up Vega S95 /memory nodes
-In-Reply-To: <1458169854-26127-1-git-send-email-afaerber@suse.de>
-References: <1458169854-26127-1-git-send-email-afaerber@suse.de>
-Message-ID: <CAOQ7t2acXkF5WAS+w=MbdA_BWokBJqT=D5sH0BDNsPQ5JfRH5A@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 23 Mar 2016 16:00:46 +0800
+Subject: [PATCH] ARM: dts: exynos: Enable SSS on Odroid X/X2/U3 family
+In-Reply-To: <1458713417-32669-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <201603231551.uTnlB1aO%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 17, 2016 at 12:10 AM, Andreas F?rber <afaerber@suse.de> wrote:
-> Resolve the following warnings from new dtc by adding the unit address:
->
->     DTC     arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-pro.dtb
->   Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
->     DTC     arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-meta.dtb
->   Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
->     DTC     arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-telos.dtb
->   Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
->
-> Fixes: cc733bc90636 ("ARM64: dts: amlogic: Add Tronsmart Vega S95 configs")
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
->  arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts  | 2 +-
->  arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts   | 2 +-
->  arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts | 2 +-
->  3 files changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts
-> index 399aff9e7975..62fb4968d680 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts
-> @@ -48,7 +48,7 @@
->         compatible = "tronsmart,vega-s95-meta", "tronsmart,vega-s95", "amlogic,meson-gxbb";
->         model = "Tronsmart Vega S95 Meta";
->
-> -       memory {
-> +       memory at 0 {
->                 device_type = "memory";
->                 reg = <0x0 0x0 0x0 0x80000000>;
->         };
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts
-> index ac5a241b5ec2..9a9663abdf5c 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts
-> @@ -48,7 +48,7 @@
->         compatible = "tronsmart,vega-s95-pro", "tronsmart,vega-s95", "amlogic,meson-gxbb";
->         model = "Tronsmart Vega S95 Pro";
->
-> -       memory {
-> +       memory at 0 {
->                 device_type = "memory";
->                 reg = <0x0 0x0 0x0 0x40000000>;
->         };
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts
-> index fff7bfa2aa39..2fe167b2609d 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts
-> @@ -48,7 +48,7 @@
->         compatible = "tronsmart,vega-s95-telos", "tronsmart,vega-s95", "amlogic,meson-gxbb";
->         model = "Tronsmart Vega S95 Telos";
->
-> -       memory {
-> +       memory at 0 {
->                 device_type = "memory";
->                 reg = <0x0 0x0 0x0 0x80000000>;
->         };
+Hi Krzysztof,
 
-Acked-by: Carlo Caione <carlo@endlessm.com>
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.5 next-20160323]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-Thanks,
+url:    https://github.com/0day-ci/linux/commits/Krzysztof-Kozlowski/ARM-dts-exynos-Enable-SSS-on-Odroid-X-X2-U3-family/20160323-141323
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
+config: arm-exynos_defconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
--- 
-Carlo Caione
+All errors (new ones prefixed by >>):
+
+>> Error: arch/arm/boot/dts/exynos4412-odroid-common.dtsi:495.1-5 Label or path sss not found
+   FATAL ERROR: Syntax error parsing input tree
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 23859 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160323/ca643025/attachment-0001.obj>
