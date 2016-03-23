@@ -1,38 +1,35 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 23 Mar 2016 13:27:32 +0000
-Subject: [PATCH v2] spi: orion.c: Add direct access mode
-In-Reply-To: <56F295E1.4030505@denx.de>
-References: <1458663893-13766-1-git-send-email-sr@denx.de>
- <20160322173546.40d24cc2@free-electrons.com>
- <56F17684.2010307@denx.de> <20160323113316.GH2566@sirena.org.uk>
- <56F2852C.5010006@denx.de> <20160323125448.GM2566@sirena.org.uk>
- <56F295E1.4030505@denx.de>
-Message-ID: <20160323132732.GN2566@sirena.org.uk>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Wed, 23 Mar 2016 14:30:11 +0100
+Subject: [PATCH v2 0/6] mm/hugetlb: Fix commandline parsing behavior for
+ invalid hugepagesize
+In-Reply-To: <1458734844-14833-1-git-send-email-vaishali.thakkar@oracle.com>
+References: <1458734844-14833-1-git-send-email-vaishali.thakkar@oracle.com>
+Message-ID: <20160323133011.GG7059@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 23, 2016 at 02:10:57PM +0100, Stefan Roese wrote:
-> On 23.03.2016 13:54, Mark Brown wrote:
+On Wed 23-03-16 17:37:18, Vaishali Thakkar wrote:
+> Current code fails to ignore the 'hugepages=' parameters when unsupported
+> hugepagesize is specified. With this patchset, introduce new architecture
+> independent routine hugetlb_bad_size to handle such command line options.
+> And then call it in architecture specific code.
+> 
+> Changes since v1:
+> 	- Separated different architecture specific changes in different
+> 	  patches
+> 	- CC'ed all arch maintainers
 
-> > I haven't looked at your new code at all.  What I'm saying is that
-> > specifying a per-device MBus window seems like pointless complexity.
+The hugetlb parameters parsing is a bit mess but this at least makes it
+behave more consistently. Feel free to add to all patches
+Acked-by: Michal Hocko <mhocko@suse.com>
 
-> I don't necessarily share this opinions. Code-wise, its less complex
-> that re-configuring (removing the old and creating the new) the MBus
-> window. But I have no strong feeling here. Whatever is decided that
-> should be used, I can go with.
+On a side note. I have received patches with broken threading - the
+follow up patches are not in the single thread under this cover email.
+I thought this was the default behavior of git send-email but maybe your
+(older) version doesn't do that. --thread option would enforce that
+(with --no-chain-reply-to) or you can set it up in the git config. IMHO
+it is always better to have the patchset in the single email thread.
 
-No, really - it's just unhelpful.  Putting this in the ABI means that
-every single system integrator who cares about performance is going to
-need to go and manually figure out how to configure this in DT and
-manually select values.  That's not doing a good job for users, it's
-making their lives harder for no gain.  If there are no physical
-constraints then how we allocate space in the MBus should be a runtime
-thing, it shouldn't be part of the ABI.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160323/806cfe06/attachment.sig>
+-- 
+Michal Hocko
+SUSE Labs
