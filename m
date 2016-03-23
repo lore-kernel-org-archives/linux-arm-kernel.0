@@ -1,222 +1,60 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Wed, 23 Mar 2016 01:50:15 +0100
-Subject: [PATCH] ARM64: dts: amlogic: add basic support for P200 and
- odroid-C2
-In-Reply-To: <1458692498-9210-1-git-send-email-khilman@baylibre.com>
-References: <1458692498-9210-1-git-send-email-khilman@baylibre.com>
-Message-ID: <56F1E847.3060004@suse.de>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 23 Mar 2016 09:52:57 +0900
+Subject: [PATCH 02/13] ARM: dts: r8a73a4: Remove unnecessary
+ clock-output-names properties
+In-Reply-To: <CAMuHMdW1D7QSitKPKDLettRmik-NvvfQNLLY-tjXp+ZPHFfdRA@mail.gmail.com>
+References: <1458610840-15194-1-git-send-email-horms+renesas@verge.net.au>
+ <1458610840-15194-3-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdW1D7QSitKPKDLettRmik-NvvfQNLLY-tjXp+ZPHFfdRA@mail.gmail.com>
+Message-ID: <20160323005256.GC5950@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
-
-Am 23.03.2016 um 01:21 schrieb Kevin Hilman:
-> Add basic, minimal DT files for the Amlogic GXBB-based P200
-> development board and Hardkernel ODROID-C2 boards.
+On Tue, Mar 22, 2016 at 11:17:09AM +0100, Geert Uytterhoeven wrote:
+> On Tue, Mar 22, 2016 at 2:40 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > * Fixed rate and fixed factor clocks do not require an
+> >   clock-output-names property.
+> > * Since 07705583e920fef6 ("clk: shmobile: div6: Make clock-output-names
+> >   optional") Renesas div6 clocks do not require a clock-output-names
+> >   property.
+> >
+> > In the above cases there is only one clock output and its name is taken
+> > from that of the clock node.
+> >
+> > Accordingly, remove the unnecessary clock-output-names properties and as
+> > necessary update the node names. The zb_clk is excluded from this rename
+> > as the MSTP clock driver (clk-mstp.c) explicitly looks for a clock
+> > named zb_clk for the r8a73a4 and sh73a0 SoCs.
 > 
-> Used the other gxbb boards from Andreas F?rber as a starting point.
+> Yeah, that was a bit hacky, but I didn't see a better solution with the MSTP
+> driver. CPG/MSSR would solve that differently.
+
+It made my eyes bleed but I'm over it now :)
+
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > ---
+> >  arch/arm/boot/dts/r8a73a4.dtsi | 76 ++++++++++++++----------------------------
+> >  1 file changed, 25 insertions(+), 51 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
+> > index 6583a1dfca1f..6eb23221cf2d 100644
+> > --- a/arch/arm/boot/dts/r8a73a4.dtsi
+> > +++ b/arch/arm/boot/dts/r8a73a4.dtsi
 > 
-> Cc: Andreas F?rber <afaerber@suse.de>
-> Cc: Carlo Caione <carlo@endlessm.com>
-> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
-> ---
-> Boot tested on top of next-20160321 on both boards.
+> > @@ -538,173 +533,152 @@
+> >                         clocks = <&pll1_div2_clk>, <0>,
+> >                                  <&cpg_clocks R8A73A4_CLK_PLL2S>, <0>;
+> >                         #clock-cells = <0>;
+> > -                       clock-output-names = "zb";
 > 
->  arch/arm64/boot/dts/amlogic/Makefile               |  2 +
->  .../arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 65 +++++++++++++++++++++
->  arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts    | 66 ++++++++++++++++++++++
->  3 files changed, 133 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
->  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
+> I'm wondering whether we should keep this one for now?
+> Dropping it changes the clock name from "zb_clk" to "zb".
 > 
-> diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
-> index eb672f38f89e..2cbaea3587ae 100644
-> --- a/arch/arm64/boot/dts/amlogic/Makefile
-> +++ b/arch/arm64/boot/dts/amlogic/Makefile
-> @@ -1,6 +1,8 @@
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-vega-s95-pro.dtb
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-vega-s95-meta.dtb
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-vega-s95-telos.dtb
-> +dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-p200.dtb
+> Nothing should rely on that, though, but keeping "zb" would allow us to e.g.
+> change the MSTP driver to match on clock name instead of node name, and drop
+> clock-output-names and rename the clock node later.
 
-Please keep the list sorted alphabetically. (vega-s95 only deviates in
-keeping Pro and Meta sorted in logically ascending order.)
-
-> +dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-odroidc2.dtb
-
-Hm, intuitively I would've named it meson-gxbb-odroid-c2.dtb. But I see
-that all other *odroid*.dts are named this way, so best to stick to the
-scheme I guess.
-
->  
->  always		:= $(dtb-y)
->  subdir-y	:= $(dts-dirs)
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-> new file mode 100644
-> index 000000000000..1a9e0332729c
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-> @@ -0,0 +1,65 @@
-> +/*
-> + * Copyright (c) 2016 Andreas F?rber
-> + * Copyright (c) 2016 BayLibre, Inc.
-> + * Author: Kevin Hilman <khilman@kernel.org>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This library is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This library is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "meson-gxbb.dtsi"
-> +
-> +/ {
-> +	compatible = "amlogic,meson-gxbb-odroidc2", "amlogic,meson-gxbb";
-
-This should be "hardkernel,odroid-c2", "amlogic,meson-gxbb".
-
-And the compatible string needs to be documented in
-Documentation/devicetree/bindings/arm/amlogic.txt. Officially that's
-requested to be a separate patch, so maybe split P200 and C2 while at it
-to encourage people providing a Tested-by for this more common one?
-
-> +	model = "Hardkernel ODROID-C2";
-> +	
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +
-> +	memory at 0 {
-> +		device_type = "memory";
-> +		reg = <0x0 0x0 0x0 0x80000000>;
-> +	};
-> +};
-> +
-> +&uart_AO {
-> +	status = "okay";
-> +};
-
-Otherwise looks good and I tested a similar dtb (telos) okay on the
-ODROID-C2.
-
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
-> new file mode 100644
-> index 000000000000..231abf2d719d
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
-> @@ -0,0 +1,66 @@
-> +/*
-> + * Copyright (c) 2016 Andreas F?rber
-> + * Copyright (c) 2016 BayLibre, Inc.
-> + * Author: Kevin Hilman <khilman@kernel.org>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This library is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This library is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "meson-gxbb.dtsi"
-> +
-> +/ {
-> +	compatible = "amlogic,meson-gxbb-p200", "amlogic,meson-gxbb";
-
-How unique is P200? I wonder whether we could simplify this to
-"amlogic,p200", "amlogic,meson-gxbb". I.e., is there or might there be a
-P200 board for a different SoC?
-
-> +	model = "Amlogic Meson GXBB P200 Development Board";
-> +	
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +
-> +	memory at 0 {
-> +		device_type = "memory";
-> +		reg = <0x0 0x0 0x0 0x40000000>;
-> +	};
-> +};
-> +
-> +/* This UART is brought out to the DB9 connector */
-> +&uart_AO {
-> +	status = "okay";
-> +};
-
-Otherwise looks fine.
-
-Thanks,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton; HRB 21284 (AG N?rnberg)
+Good idea, there seems little point in painting ourselves into a corner.
+I'll drop the zb change from this and the sh73a0 patch.
+We can clean things up later once/if we have a good plan.
