@@ -1,53 +1,24 @@
-From: blogic@openwrt.org (John Crispin)
-Date: Wed, 23 Mar 2016 10:07:28 +0100
-Subject: [PATCH] net: mediatek: fix checking for NULL instead of IS_ERR()
- in .probe
-In-Reply-To: <56F25B42.5030005@gmail.com>
-References: <1458687964-9690-1-git-send-email-vz@mleia.com>
- <56F25B42.5030005@gmail.com>
-Message-ID: <56F25CD0.5070806@openwrt.org>
+From: majun258@huawei.com (MaJun)
+Date: Wed, 23 Mar 2016 17:06:31 +0800
+Subject: [PATCH 0/2] Change the the config option of mbigen driver.
+Message-ID: <1458723993-21044-1-git-send-email-majun258@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Ma Jun <majun258@huawei.com>
 
+In current driver, the config of mbigen driver is a configurable option and
+have nothing to do with CONFIG_ARCH_HISI.
 
-On 23/03/2016 10:00, Matthias Brugger wrote:
-> 
-> 
-> On 23/03/16 00:06, Vladimir Zapolskiy wrote:
->> devm_ioremap_resource() returns ERR_PTR() value on error, it never
->> returns NULL, fix it and propagate the returned error upwards.
->>
->> Fixes: 656e705243fd ("net-next: mediatek: add support for MT7623
->> ethernet")
->> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
->> ---
-> 
-> Reviewed-by: Matthias Brugger <mbrugger@suse.com>
-> 
+As a module of Hisilicon SOC, the config of mbigen driver should be selected
+by CONFIG_ARCH_HISI on Hisilicon platform, but not a configurable option.
 
-Acked-by: John Crispin <blogic@openwrt.org>
+This patch set is applied to fix this problem.
 
-Thanks for the fix !
+Ma Jun (2):
+  ARM64: Enable mbigen interrupt controller on Hisilicon platform
+  irqchip/mbigen:Change the config option of mbigen driver to non-configurable
 
-
->>   drivers/net/ethernet/mediatek/mtk_eth_soc.c | 4 ++--
->>   1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
->> b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
->> index 7f2126b..e0b68af 100644
->> --- a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
->> +++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
->> @@ -1690,8 +1690,8 @@ static int mtk_probe(struct platform_device *pdev)
->>           return -ENOMEM;
->>
->>       eth->base = devm_ioremap_resource(&pdev->dev, res);
->> -    if (!eth->base)
->> -        return -EADDRNOTAVAIL;
->> +    if (IS_ERR(eth->base))
->> +        return PTR_ERR(eth->base);
->>
->>       spin_lock_init(&eth->page_lock);
->>
->>
+ arch/arm64/Kconfig.platforms |    1 +
+ drivers/irqchip/Kconfig      |   14 ++++++--------
+ 2 files changed, 7 insertions(+), 8 deletions(-)
