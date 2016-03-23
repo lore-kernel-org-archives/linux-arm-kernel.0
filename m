@@ -1,45 +1,39 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 23 Mar 2016 11:46:20 +0200
-Subject: [PATCH v2 1/2] ARM: dts: am335x: Add initial support for ICEv2
- board
-In-Reply-To: <1458704054-18152-2-git-send-email-lokeshvutla@ti.com>
-References: <1458704054-18152-1-git-send-email-lokeshvutla@ti.com>
- <1458704054-18152-2-git-send-email-lokeshvutla@ti.com>
-Message-ID: <56F265EC.5050208@ti.com>
+From: alexander.stein@systec-electronic.com (Alexander Stein)
+Date: Wed, 23 Mar 2016 10:49:06 +0100
+Subject: [PATCH 1/1] ARM: dts: ls1021a: DSPI has 6 chip-selects
+Message-ID: <1458726546-29453-1-git-send-email-alexander.stein@systec-electronic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/23/2016 05:34 AM, Lokesh Vutla wrote:
-> TI's Industrial Communication Engine EVM is a low cost hardware mainly
-> developed for industrial communication type applications using serial
-> or Ethernet based interfaces. This platform features TI's AM3359 with
-> 800MHz single core Cortex-A8 processor, 256MB DDR3, 64MB SPI flash,
-> 8MB NOR Flash, mmc, usb, can, dual Ethernet ports.
->
-> For more information, look at HW user guide[1], Data manual[2].
->
-> Just add basic support for the moment.
->
-> [1] http://processors.wiki.ti.com/index.php/AM335x_Industrial_Communication_Engine_EVM_Rev2_1_HW_User_Guide
-> [2] http://www.ti.com/lit/ds/symlink/am3359.pdf
->
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+Both DSPI have signals SPIn_PCS[0:5] so in summary 6 chip-selects, not 5.
+Fix that.
 
-Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
+Signed-off-by: Alexander Stein <alexander.stein@systec-electronic.com>
+---
+ arch/arm/boot/dts/ls1021a.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-> ---
-> Changes since v1:
-> - Add separate nodes for gpio leds and tpic2810 leds.
->
->   .../devicetree/bindings/arm/omap/omap.txt          |   3 +
->   arch/arm/boot/dts/Makefile                         |   1 +
->   arch/arm/boot/dts/am335x-icev2.dts                 | 306 +++++++++++++++++++++
->   3 files changed, 310 insertions(+)
->   create mode 100644 arch/arm/boot/dts/am335x-icev2.dts
->
-
-[...]
-
+diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+index bdc1dfd..e976d61 100644
+--- a/arch/arm/boot/dts/ls1021a.dtsi
++++ b/arch/arm/boot/dts/ls1021a.dtsi
+@@ -274,7 +274,7 @@
+ 			interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
+ 			clock-names = "dspi";
+ 			clocks = <&platform_clk 1>;
+-			spi-num-chipselects = <5>;
++			spi-num-chipselects = <6>;
+ 			big-endian;
+ 			status = "disabled";
+ 		};
+@@ -287,7 +287,7 @@
+ 			interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
+ 			clock-names = "dspi";
+ 			clocks = <&platform_clk 1>;
+-			spi-num-chipselects = <5>;
++			spi-num-chipselects = <6>;
+ 			big-endian;
+ 			status = "disabled";
+ 		};
 -- 
-regards,
--grygorii
+2.7.3
