@@ -1,32 +1,37 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 23 Mar 2016 09:39:19 -0400
-Subject: [PATCH v4] tty: serial: meson: Implement earlycon support
-In-Reply-To: <56F27268.4060902@suse.de>
-References: <1457263284-8819-1-git-send-email-afaerber@suse.de>
- <56F27268.4060902@suse.de>
-Message-ID: <20160323133919.GA4235@kroah.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 23 Mar 2016 14:47:50 +0100
+Subject: [PATCH 1/3] ARM: at91: use chipid device for soc detection
+In-Reply-To: <56F27C89.9070004@atmel.com>
+References: <1458285681-25684-1-git-send-email-ludovic.desroches@atmel.com>
+ <20160318103418.GA2531@piout.net> <56F27C89.9070004@atmel.com>
+Message-ID: <20160323134750.GC2570@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 23, 2016 at 11:39:36AM +0100, Andreas F?rber wrote:
-> Am 06.03.2016 um 12:21 schrieb Andreas F?rber:
-> > Split off the bulk of the existing meson_serial_console_write()
-> > implementation into meson_serial_port_write() for implementing
-> > meson_serial_early_console_write().
+On 23/03/2016 at 12:22:49 +0100, Nicolas Ferre wrote :
+> Le 18/03/2016 11:34, Alexandre Belloni a ?crit :
+> > On 18/03/2016 at 08:21:19 +0100, Ludovic Desroches wrote :
+> >> So far, the CIDR and EXID registers were in the DBGU interface. This device
+> >> has disappeared with the SAMA5D2 family. These registers are exposed
+> >> through a new device called chipid.
+> >>
+> >> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> >> [nicolas.ferre at atmel.com: remove useless warnings]
+> > Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 > > 
-> > Use "meson" as the earlycon driver name, courtesy of Nicolas.
-> > 
-> > Signed-off-by: Nicolas Saenz Julienne <nicolassaenzj@gmail.com>
-> > Acked-by: Carlo Caione <carlo@endlessm.com>
-> > Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> > ---
-> >  v3 -> v4:
-> >  * Select SERIAL_EARLYCON (Arnd)
+> >> ---
+> >>  .../devicetree/bindings/arm/atmel-at91.txt         |  4 ++
+> >>  arch/arm/mach-at91/soc.c                           | 81 +++++++++++++++++-----
 > 
-> Ping?
+> We may need to split this patch in 2 for going through separate arm-soc
+> branches: what do you think Alexandre?
+> 
 
-It's the middle of the merge window, there's nothing I can do at the
-moment, please wait for after 4.6-rc1 is out before I can start catching
-up...
+I think the patch can go in as it is now, the documentation being in
+line with the code.
 
-greg k-h
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
