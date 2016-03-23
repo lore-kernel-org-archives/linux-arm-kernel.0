@@ -1,40 +1,33 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 23 Mar 2016 20:30:08 +0000
-Subject: [PATCH 04/12] ARM: dts: dragonboard-600c: add board support with
- serial
-In-Reply-To: <56F2F78E.8050002@codeaurora.org>
-References: <1458762366-9233-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1458762442-9492-1-git-send-email-srinivas.kandagatla@linaro.org>
- <56F2F78E.8050002@codeaurora.org>
-Message-ID: <56F2FCD0.1000708@linaro.org>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 23 Mar 2016 13:35:55 -0700
+Subject: [PATCH] PM / AVS: rockchip-io: add io selectors and supplies for
+ rk3399
+In-Reply-To: <4748955.K1DVHdsoLd@diego> ("Heiko =?utf-8?Q?St=C3=BCbner=22'?=
+ =?utf-8?Q?s?= message of "Wed, 16 Mar 2016 12:11:41 +0100")
+References: <1458067526-11319-1-git-send-email-david.wu@rock-chips.com>
+ <4748955.K1DVHdsoLd@diego>
+Message-ID: <7h8u19q6dw.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Heiko St?bner <heiko@sntech.de> writes:
 
-
-On 23/03/16 20:07, Stephen Boyd wrote:
-> On 03/23/2016 12:47 PM, Srinivas Kandagatla wrote:
->> diff --git a/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts b/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
->> new file mode 100644
->> index 0000000..e96aab6
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
->> @@ -0,0 +1,36 @@
->> +#include "qcom-apq8064-v2.0.dtsi"
->> +
->> +/ {
->> +	model = "Qualcomm Technologies, Inc. APQ8064 DragonBoard600c";
->> +	compatible = "qcom,apq8064-dragonboard600c", "qcom,apq8064";
+> Hi David,
 >
-> Does the bootloader look at this string at all or is it using appended
-> DTB design? I'm mostly worried about having that
-Not at least on APQ8064 bootloaders, as they are still missing DT 
-support. Currently we append dtb to the kernel.
-> qcom,apq8064-dragonboard600c part. It should probably be
-> qcom,apq8064-sbc or something like that instead.
-Will do that in next version.
-
-thanks,
-srini
-
+> Am Mittwoch, 16. M?rz 2016, 02:45:26 schrieb David Wu:
+>> This adds the necessary data for handling io voltage domains on the rk3399.
+>> As interesting tidbit, the rk3399 contains two separate iodomain areas.
+>> One in the regular General Register Files (GRF) and one in PMUGRF in the
+>> pmu power domain.
+>> 
+>> Signed-off-by: David Wu <david.wu@rock-chips.com>
 >
+> looks good, so
+> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+
+Acked-by: Kevin Hilman <khilman@baylibre.com>
+
+Rafael, can you queue this directly?  I don't currently have any other
+AVS patches in the queue.
+
+Kevin
