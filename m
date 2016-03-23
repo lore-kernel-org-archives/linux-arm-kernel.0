@@ -1,103 +1,44 @@
 From: mmcclint@codeaurora.org (Matthew McClintock)
-Date: Wed, 23 Mar 2016 17:05:07 -0500
-Subject: [PATCH 12/17] qcom: ipq4019: add spi node to ipq4019 SoC and DK01
+Date: Wed, 23 Mar 2016 17:05:08 -0500
+Subject: [PATCH 13/17] qcom: ipq4019: add i2c node to ipq4019 SoC and DK01
  device tree
 In-Reply-To: <1458770712-10880-1-git-send-email-mmcclint@codeaurora.org>
 References: <1458770712-10880-1-git-send-email-mmcclint@codeaurora.org>
-Message-ID: <1458770712-10880-13-git-send-email-mmcclint@codeaurora.org>
+Message-ID: <1458770712-10880-14-git-send-email-mmcclint@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This will allow boards to enable the SPI bus
+This will allow boards to enable the I2C bus
 
+CC: Sricharan R <srichara@qti.qualcomm.com>
 Signed-off-by: Matthew McClintock <mmcclint@codeaurora.org>
 ---
- arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi | 37 +++++++++++++++++++++++++++
- arch/arm/boot/dts/qcom-ipq4019.dtsi           | 18 +++++++++++++
- 2 files changed, 55 insertions(+)
+ arch/arm/boot/dts/qcom-ipq4019.dtsi | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi b/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
-index 223da1a..21032a8 100644
---- a/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
-+++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
-@@ -48,6 +48,43 @@
- 					bias-disable;
- 				};
- 			};
-+
-+			spi_0_pins: spi_0_pinmux {
-+				pinmux {
-+					function = "blsp_spi0";
-+					pins = "gpio55", "gpio56", "gpio57";
-+				};
-+				pinmux_cs {
-+					function = "gpio";
-+					pins = "gpio54";
-+				};
-+				pinconf {
-+					pins = "gpio55", "gpio56", "gpio57";
-+					drive-strength = <12>;
-+					bias-disable;
-+				};
-+				pinconf_cs {
-+					pins = "gpio54";
-+					drive-strength = <2>;
-+					bias-disable;
-+					output-high;
-+				};
-+			};
-+		};
-+
-+		spi_0: spi at 78b5000 {
-+			pinctrl-0 = <&spi_0_pins>;
-+			pinctrl-names = "default";
-+			status = "ok";
-+			cs-gpios = <&tlmm 54 0>;
-+
-+			mx25l25635e at 0 {
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				reg = <0>;
-+				compatible = "mx25l25635e";
-+				spi-max-frequency = <24000000>;
-+			};
- 		};
- 
- 		serial at 78af000 {
 diff --git a/arch/arm/boot/dts/qcom-ipq4019.dtsi b/arch/arm/boot/dts/qcom-ipq4019.dtsi
-index acb851d..99e64f4 100644
+index 99e64f4..1937edf 100644
 --- a/arch/arm/boot/dts/qcom-ipq4019.dtsi
 +++ b/arch/arm/boot/dts/qcom-ipq4019.dtsi
-@@ -15,12 +15,18 @@
+@@ -25,6 +25,7 @@
  
- #include "skeleton.dtsi"
- #include <dt-bindings/clock/qcom,gcc-ipq4019.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
+ 	aliases {
+ 		spi0 = &spi_0;
++		i2c0 = &i2c_0;
+ 	};
  
- / {
- 	model = "Qualcomm Technologies, Inc. IPQ4019";
- 	compatible = "qcom,ipq4019";
- 	interrupt-parent = <&intc>;
- 
-+	aliases {
-+		spi0 = &spi_0;
-+	};
-+
  	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -108,6 +114,18 @@
- 			interrupts = <0 208 0>;
+@@ -126,6 +127,18 @@
+ 			status = "disabled";
  		};
  
-+		spi_0: spi at 78b5000 {
-+			compatible = "qcom,spi-qup-v2.2.1";
-+			reg = <0x78b5000 0x600>;
-+			interrupts = <GIC_SPI 95 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&gcc GCC_BLSP1_QUP1_SPI_APPS_CLK>,
-+				 <&gcc GCC_BLSP1_AHB_CLK>;
-+			clock-names = "core", "iface";
++		i2c_0: i2c at 78b7000 {
++			compatible = "qcom,i2c-qup-v2.2.1";
++			reg = <0x78b7000 0x6000>;
++			interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&gcc GCC_BLSP1_AHB_CLK>,
++				 <&gcc GCC_BLSP1_QUP2_I2C_APPS_CLK>;
++			clock-names = "iface", "core";
 +			#address-cells = <1>;
 +			#size-cells = <0>;
 +			status = "disabled";
