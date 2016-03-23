@@ -1,61 +1,69 @@
 From: Gang.Liu@nxp.com (Liu Gang)
-Date: Wed, 23 Mar 2016 17:47:19 +0800
-Subject: [PATCH] dt-bindings: Add new platforms GPIO node description
-Message-ID: <1458726442-1851-1-git-send-email-Gang.Liu@nxp.com>
+Date: Wed, 23 Mar 2016 17:47:21 +0800
+Subject: [PATCH v2] gpio/ls1043a: Add compatible "fsl,
+ qoriq-gpio" for ls1043a gpio nodes
+In-Reply-To: <1458726442-1851-1-git-send-email-Gang.Liu@nxp.com>
+References: <1458726442-1851-1-git-send-email-Gang.Liu@nxp.com>
+Message-ID: <1458726442-1851-3-git-send-email-Gang.Liu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the NXP GPIO node dt-binding file for QorIQ and
-Layerscape platforms, and add one more example with
-ls2080a GPIO node.
+The compatible "fsl,qoriq-gpio" is used by gpio driver:
+drivers/gpio/gpio-mpc8xxx.c to implement general gpio
+functionalities.
+
+The chip-specific compatible "fsl,ls1043a-gpio" may be
+used to fix potential gpio IP block errata or other
+chip-specific gpio issues.
 
 Signed-off-by: Liu Gang <Gang.Liu@nxp.com>
 ---
- .../devicetree/bindings/gpio/gpio-mpc8xxx.txt        | 20 +++++++++++++++++---
- 1 file changed, 17 insertions(+), 3 deletions(-)
+v2 changes:
+	Add chip-specific compatible based on Scott's
+	comment.
 
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-mpc8xxx.txt b/Documentation/devicetree/bindings/gpio/gpio-mpc8xxx.txt
-index 120bc49..4b6cc63 100644
---- a/Documentation/devicetree/bindings/gpio/gpio-mpc8xxx.txt
-+++ b/Documentation/devicetree/bindings/gpio/gpio-mpc8xxx.txt
-@@ -1,9 +1,10 @@
--* Freescale MPC512x/MPC8xxx/Layerscape GPIO controller
-+* Freescale MPC512x/MPC8xxx/QorIQ/Layerscape GPIO controller
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+index be72bf5..bf70b27 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+@@ -284,7 +284,7 @@
+ 		};
  
- Required properties:
- - compatible : Should be "fsl,<soc>-gpio"
-   The following <soc>s are known to be supported:
--    mpc5121, mpc5125, mpc8349, mpc8572, mpc8610, pq3, qoriq.
-+	mpc5121, mpc5125, mpc8349, mpc8572, mpc8610, pq3, qoriq,
-+	ls1021a, ls1043a, ls2080a.
- - reg : Address and length of the register set for the device
- - interrupts : Should be the port interrupt shared by all 32 pins.
- - #gpio-cells : Should be two.  The first cell is the pin number and
-@@ -15,7 +16,7 @@ Optional properties:
- - little-endian : GPIO registers are used as little endian. If not
-                   present registers are used as big endian by default.
+ 		gpio1: gpio at 2300000 {
+-			compatible = "fsl,ls1043a-gpio";
++			compatible = "fsl,ls1043a-gpio", "fsl,qoriq-gpio";
+ 			reg = <0x0 0x2300000 0x0 0x10000>;
+ 			interrupts = <0 66 0x4>;
+ 			gpio-controller;
+@@ -294,7 +294,7 @@
+ 		};
  
--Example:
-+Example of gpio-controller node for a mpc5125 SoC:
+ 		gpio2: gpio at 2310000 {
+-			compatible = "fsl,ls1043a-gpio";
++			compatible = "fsl,ls1043a-gpio", "fsl,qoriq-gpio";
+ 			reg = <0x0 0x2310000 0x0 0x10000>;
+ 			interrupts = <0 67 0x4>;
+ 			gpio-controller;
+@@ -304,7 +304,7 @@
+ 		};
  
- gpio0: gpio at 1100 {
- 	compatible = "fsl,mpc5125-gpio";
-@@ -24,3 +25,16 @@ gpio0: gpio at 1100 {
- 	interrupts = <78 0x8>;
- 	status = "okay";
- };
-+
-+Example of gpio-controller node for a ls2080a SoC:
-+
-+gpio0: gpio at 2300000 {
-+	compatible = "fsl,ls2080a-gpio", "fsl,qoriq-gpio";
-+	reg = <0x0 0x2300000 0x0 0x10000>;
-+	interrupts = <0 36 0x4>; /* Level high type */
-+	gpio-controller;
-+	little-endian;
-+	#gpio-cells = <2>;
-+	interrupt-controller;
-+	#interrupt-cells = <2>;
-+};
+ 		gpio3: gpio at 2320000 {
+-			compatible = "fsl,ls1043a-gpio";
++			compatible = "fsl,ls1043a-gpio", "fsl,qoriq-gpio";
+ 			reg = <0x0 0x2320000 0x0 0x10000>;
+ 			interrupts = <0 68 0x4>;
+ 			gpio-controller;
+@@ -314,7 +314,7 @@
+ 		};
+ 
+ 		gpio4: gpio at 2330000 {
+-			compatible = "fsl,ls1043a-gpio";
++			compatible = "fsl,ls1043a-gpio", "fsl,qoriq-gpio";
+ 			reg = <0x0 0x2330000 0x0 0x10000>;
+ 			interrupts = <0 134 0x4>;
+ 			gpio-controller;
 -- 
 2.1.0.27.g96db324
