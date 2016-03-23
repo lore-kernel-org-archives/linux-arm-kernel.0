@@ -1,33 +1,61 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Wed, 23 Mar 2016 09:04:14 +0530
-Subject: [PATCH v2 2/2] ARM: omap2plus_defconfig: Enable GPIO_TPIC2810
-In-Reply-To: <1458704054-18152-1-git-send-email-lokeshvutla@ti.com>
-References: <1458704054-18152-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <1458704054-18152-3-git-send-email-lokeshvutla@ti.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 23 Mar 2016 10:10:33 +0530
+Subject: [PATCH v2] cpufreq: rockchip: add driver
+In-Reply-To: <1458699487-58470-1-git-send-email-xf@rock-chips.com>
+References: <1458647848-48999-1-git-send-email-xf@rock-chips.com>
+ <1458699487-58470-1-git-send-email-xf@rock-chips.com>
+Message-ID: <20160323044033.GQ5272@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the TI TPIC2810 8-Bit LED Driver with I2C Interface. This is used
-in AM335x ICEv2 Boards.
+On 23-03-16, 10:18, Feng Xiao wrote:
+> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+> index 14b1f93..1786315 100644
+> --- a/drivers/cpufreq/Kconfig.arm
+> +++ b/drivers/cpufreq/Kconfig.arm
+> @@ -97,6 +97,16 @@ config ARM_OMAP2PLUS_CPUFREQ
+>  	depends on ARCH_OMAP2PLUS
+>  	default ARCH_OMAP2PLUS
+>  
+> +config ARM_ROCKCHIP_CPUFREQ
+> +	tristate "Rockchip CPUfreq driver"
 
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
----
-Changes since v1:
-- none.
- arch/arm/configs/omap2plus_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Since you are allowing it to be built as a module ...
 
-diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index 156bc88..b4f17a4c 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -245,6 +245,7 @@ CONFIG_DEBUG_GPIO=y
- CONFIG_GPIO_SYSFS=y
- CONFIG_GPIO_PCA953X=m
- CONFIG_GPIO_PCF857X=y
-+CONFIG_GPIO_TPIC2810=m
- CONFIG_GPIO_TWL4030=y
- CONFIG_GPIO_PALMAS=y
- CONFIG_W1=m
+> +	depends on ARCH_ROCKCHIP && CPUFREQ_DT
+> +	select PM_OPP
+> +	help
+> +	  This adds the CPUFreq driver support for Rockchip SoCs.
+> +	  The driver will directly use cpufreq-dt driver as backend.
+> +
+> +	  If in doubt, say N.
+
+> +++ b/drivers/cpufreq/rockchip-cpufreq.c
+> +static int __init rockchip_cpufreq_driver_init(void)
+> +{
+> +	struct platform_device *pdev;
+> +	int i;
+> +
+> +	for (i = 0; i < ARRAY_SIZE(rockchip_compat); i++) {
+> +		if (of_machine_is_compatible(rockchip_compat[i])) {
+> +			pdev = platform_device_register_simple("cpufreq-dt",
+> +							       -1, NULL, 0);
+> +			return PTR_ERR_OR_ZERO(pdev);
+> +		}
+> +	}
+> +
+> +	return -ENODEV;
+> +}
+> +module_init(rockchip_cpufreq_driver_init);
+
+You need a module exit as well to remove the device. Otherwise following
+sequence will give you errors:
+
+insmod rockchip-cpufreq.ko
+rmmod rockchip-cpufreq.ko
+insmod rockchip-cpufreq.ko //Errors on this..
+
+So, either don't allow it to be built as a module or fix the module-exit path.
+
 -- 
-2.1.4
+viresh
