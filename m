@@ -1,26 +1,38 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 23 Mar 2016 09:27:45 +0900
-Subject: [PATCH 2/2] ARM: dts: exynos: Enable SSS on Trats2
-In-Reply-To: <56F19C19.50207@math.uni-bielefeld.de>
-References: <1458612003-30284-1-git-send-email-k.kozlowski@samsung.com>
- <1458612003-30284-2-git-send-email-k.kozlowski@samsung.com>
- <56F19C19.50207@math.uni-bielefeld.de>
-Message-ID: <56F1E301.4050205@samsung.com>
+From: airlied@gmail.com (Dave Airlie)
+Date: Wed, 23 Mar 2016 10:41:58 +1000
+Subject: Who is going to merge it [Was: Re: [PATCH v14 0/17] Add Analogix
+ Core Display Port Driver]
+In-Reply-To: <20160323000835.GQ19428@n2100.arm.linux.org.uk>
+References: <1455534485-1154-1-git-send-email-ykk@rock-chips.com>
+ <1919945.Y1tg0YzXlm@diego> <56F1CAEB.3080701@samsung.com>
+ <8949624.HmxDpZAlt2@diego> <56F1D0AD.8030905@samsung.com>
+ <20160322233906.GP19428@n2100.arm.linux.org.uk>
+ <56F1DB27.4040001@samsung.com>
+ <20160323000835.GQ19428@n2100.arm.linux.org.uk>
+Message-ID: <CAPM=9tz9_rbGJFuv-+YN=Sicfng++tHTDLrOX5Ohtwft+VnwtA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.03.2016 04:25, Tobias Jakobi wrote:
-> Hello Krzysztof,
-> 
-> you can also add the node to the exynos4412-odroid-common dtsi. I have
-> checked that it works properly on an X2.
-> 
-> Thanks for patches and fixing that alignment issue!
+>
+>> So although it's small framework or just subdirectory, we would need
+>> someone who can manage the framework to avoid further confusion if
+>> necessary.
+>
+> So maybe it just doesn't need a maintainer, and maybe those the owner
+> of the bridge driver should be responsible for choosing the tree which
+> it's merged through along with updates.  That's how dw-hdmi has been
+> managed on the whole.
+>
+> It also means that the bridge driver maintainer is able to test changes
+> to the bridge driver, rather than having some over-arching bridge
+> subdirectory maintainer who doesn't have a clue whether the changes
+> work on the hardware.
+>
+> IMHO, having bridge driver authors/maintainers look after their own
+> code has many advantages.
 
-Thanks for testing it. I'll send a follow up with you as Tested-by.
+The author just send me a pull request with acks from a git tree
+that hopefully both people agreed and tested from. No need to
+send this via another maintainer layer.
 
-I didn't add it because my Odroid U3 is in unusable state... I need to
-fix it.
-
-Best regards,
-Krzysztof
+Dave.
