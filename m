@@ -1,57 +1,92 @@
-From: js@sig21.net (Johannes Stezenbach)
-Date: Wed, 23 Mar 2016 17:23:09 +0100
-Subject: dmaengine pl08x dt crash
-In-Reply-To: <CACRpkdZ3ecJPcUfv7TTPhTT+rMtAC+b1=HfE3cH0OR=swvNi6w@mail.gmail.com>
-References: <20160323154049.GA2170@sig21.net>
- <CACRpkdZ3ecJPcUfv7TTPhTT+rMtAC+b1=HfE3cH0OR=swvNi6w@mail.gmail.com>
-Message-ID: <20160323162309.GA9472@sig21.net>
+From: jmfriedt@femto-st.fr (Jean-Michel Friedt)
+Date: Wed, 23 Mar 2016 17:28:48 +0100
+Subject: [PATCH 1/1] ARM: dts: sun5i-a13-olinuxino-micro: enable USB DRC
+Message-ID: <1458750528-13180-1-git-send-email-jmfriedt@femto-st.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 23, 2016 at 05:12:13PM +0100, Linus Walleij wrote:
-> On Wed, Mar 23, 2016 at 4:40 PM, Johannes Stezenbach <js@sig21.net> wrote:
-> 
-> > I'm trying to use the new devicetree support for pl08x
-> > added in commit aa4734da667442
-> > (dmaengine: pl08x: support dt channel assignment).
-> >
-> > It causes crash in the pl011 serial driver when it calls
-> > dma_chan_name() because the dma_chan->dev->device is NULL.
-> > I think the reason is dma_async_device_register() is called
-> > during pl08x_probe(), but at this time the number of slave
-> > channels is still 0 as these get allocated later in
-> > pl08x_of_xlate() when clients request the channels.
-> >
-> > [    0.420835] pl08xdmac dma8ch0: initialized 8 virtual memcpy channels
-> > [    0.427380] pl08xdmac dma8ch0: initialized 0 virtual slave channels
-> > [    0.436185] pl08xdmac dma8ch0: DMA: PL080s rev1 at 0xfec00000 irq 8
-> 
-> So you are trying to use it on the Samsung S3C?
+From: JM Friedt <jmfriedt@femto-st.fr>
 
-The platform is an internal development board with ARM11 based SoC.
+Enable the OTG controller on the Olinuxino A13-micro. 
 
-> I have it working on the Nomadik, but for platforms with fixed signal
-> assignement I had to apply these patches:
-> https://git.kernel.org/cgit/linux/kernel/git/linusw/linux-nomadik.git/log/?h=pl08x-dma
-> 
-> dma: pl08x: support fixed signal assignment
-> dma: pl08x: allocate OF slave channel data at probe time
-> 
-> And the example:
-> ARM: nomadik: add DMA engine and some channelspl08x-dma
-> 
-> I have meant to follow up on it but haven't gotten around to.
-> 
-> If the Samsung also has fixed channels (no mux in front of the
-> DMA lines) I think this might be what you need. They are not
-> yet merged because Joachim reported a crash with the second
-> patch and I haven't yet figured out why.
+Signed-off-by: JM Friedt <jmfriedt@femto-st.fr>
+---
+ arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts | 41 +++++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
 
-I'll give it a try.  My platform also has fixed channels,
-previously it used platform data but I always thought it is
-ugly, so I tried the new dt support.
-
-Thanks for quick reply.
-
-
-Johannes
+diff --git a/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts
+index ad84fe4..081329e 100644
+--- a/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts
++++ b/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts
+@@ -109,6 +109,10 @@
+ 	status = "okay";
+ };
+ 
++&otg_sram {
++	status = "okay";
++};
++
+ &pio {
+ 	mmc0_cd_pin_olinuxinom: mmc0_cd_pin at 0 {
+ 		allwinner,pins = "PG0";
+@@ -124,6 +128,27 @@
+ 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 	};
+ 
++	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
++		allwinner,pins = "PG2";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++	};
++
++	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
++		allwinner,pins = "PG1";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_PULL_DOWN>;
++	};
++
++	usb0_vbus_pin_olinuxinom: usb0_vbus_pin at 0 {
++		allwinner,pins = "PG12";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
+ 	usb1_vbus_pin_olinuxinom: usb1_vbus_pin at 0 {
+ 		allwinner,pins = "PG11";
+ 		allwinner,function = "gpio_out";
+@@ -132,6 +157,12 @@
+ 	};
+ };
+ 
++&reg_usb0_vbus {
++	pinctrl-0 = <&usb0_vbus_pin_olinuxinom>;
++	gpio = <&pio 6 12 GPIO_ACTIVE_HIGH>;
++	status = "okay";
++};
++
+ &reg_usb1_vbus {
+ 	pinctrl-0 = <&usb1_vbus_pin_olinuxinom>;
+ 	gpio = <&pio 6 11 GPIO_ACTIVE_HIGH>;
+@@ -144,7 +175,17 @@
+ 	status = "okay";
+ };
+ 
++&usb_otg {
++	dr_mode = "otg";
++	status = "okay";
++};
++
+ &usbphy {
++	pinctrl-names = "default";
++	pinctrl-0 = <&usb0_id_detect_pin>, <&usb0_vbus_detect_pin>;
++	usb0_id_det-gpio = <&pio 6 2 GPIO_ACTIVE_HIGH>; /* PG2 */
++	usb0_vbus_det-gpio = <&pio 6 1 GPIO_ACTIVE_HIGH>; /* PG1 */
++	usb0_vbus-supply = <&reg_usb0_vbus>;
+ 	usb1_vbus-supply = <&reg_usb1_vbus>;
+ 	status = "okay";
+ };
+-- 
+2.6.4
