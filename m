@@ -1,29 +1,27 @@
-From: tranmanphong@gmail.com (Phong Tran)
-Date: Wed, 23 Mar 2016 21:09:24 +0700
-Subject: [PATCH] arm64: defconfig: Fix warning override MMC_BLOCK_MINORS
-Message-ID: <1458742164-9883-1-git-send-email-tranmanphong@gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 23 Mar 2016 09:24:00 -0500
+Subject: [PATCHv3 6/9] Documentation: dt: socfpga: Add Altera Arria10 L2
+ cache binding
+In-Reply-To: <1458576106-24505-7-git-send-email-tthayer@opensource.altera.com>
+References: <1458576106-24505-1-git-send-email-tthayer@opensource.altera.com>
+ <1458576106-24505-7-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <20160323142400.GA23997@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the duplicate of defination of CONFIG_MMC_BLOCK_MINORS.
-Fixes 22b0898 ("arm64: add defconfig options for Allwinner SoCs")
+On Mon, Mar 21, 2016 at 11:01:43AM -0500, tthayer at opensource.altera.com wrote:
+> From: Thor Thayer <tthayer@opensource.altera.com>
+> 
+> Add the device tree bindings needed to support the Altera L2
+> cache on the Arria10 chip. Since all the peripherals share
+> IRQs, the IRQ fields are now in the ecc_manager.
+> 
+> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+> ---
+> v2 Correct spelling of Arria10 in patch title.
+> v3 Major restructuring change for ecc_manager to include IRQs
+> ---
+>  .../bindings/arm/altera/socfpga-eccmgr.txt         |   40 ++++++++++++++++++++
+>  1 file changed, 40 insertions(+)
 
-Signed-off-by: Phong Tran <tranmanphong@gmail.com>
----
- arch/arm64/configs/defconfig | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index f705051..3ad26ff 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -215,7 +215,6 @@ CONFIG_MMC_SPI=y
- CONFIG_MMC_SUNXI=y
- CONFIG_MMC_DW=y
- CONFIG_MMC_DW_EXYNOS=y
--CONFIG_MMC_BLOCK_MINORS=16
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_SYSCON=y
--- 
-1.9.1
+Acked-by: Rob Herring <robh@kernel.org>
