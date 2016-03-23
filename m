@@ -1,41 +1,63 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 23 Mar 2016 14:43:42 +0000
-Subject: [PATCH v2 4/5] mailbox: mailbox-test: Prevent memory leak
+Date: Wed, 23 Mar 2016 14:43:39 +0000
+Subject: [PATCH v2 1/5] ARM: STi: stih407-family: Add nodes for Mailbox
 In-Reply-To: <1458744223-12164-1-git-send-email-lee.jones@linaro.org>
 References: <1458744223-12164-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1458744223-12164-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <1458744223-12164-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we set the Signal twice or more, without using it as part of a message,
-memory will be re-allocated and the pointer over-written.  Prevent this
-potential leak by only allocating memory when there isn't any already.
+This patch supplies the Mailbox Controller nodes.  In order to
+request channels, these nodes will be referenced by Mailbox
+Client nodes.
 
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mailbox/mailbox-test.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/stih407-family.dtsi | 33 +++++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
 
-diff --git a/drivers/mailbox/mailbox-test.c b/drivers/mailbox/mailbox-test.c
-index 5f4b439..58d0472 100644
---- a/drivers/mailbox/mailbox-test.c
-+++ b/drivers/mailbox/mailbox-test.c
-@@ -59,9 +59,12 @@ static ssize_t mbox_test_signal_write(struct file *filp,
- 		return -EINVAL;
- 	}
- 
--	tdev->signal = kzalloc(MBOX_MAX_SIG_LEN, GFP_KERNEL);
--	if (!tdev->signal)
--		return -ENOMEM;
-+	/* Only allocate memory if we need to */
-+	if (!tdev->signal) {
-+		tdev->signal = kzalloc(MBOX_MAX_SIG_LEN, GFP_KERNEL);
-+		if (!tdev->signal)
-+			return -ENOMEM;
-+	}
- 
- 	if (copy_from_user(tdev->signal, userbuf, count)) {
- 		kfree(tdev->signal);
+diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+index 81f8121..e6e34b4 100644
+--- a/arch/arm/boot/dts/stih407-family.dtsi
++++ b/arch/arm/boot/dts/stih407-family.dtsi
+@@ -694,5 +694,38 @@
+ 			clocks          = <&clk_sysin>;
+ 			status		= "okay";
+ 		};
++
++		mailbox0: mailbox at 0  {
++			compatible	= "st,stih407-mailbox";
++			reg		= <0x8f00000 0x1000>;
++			interrupts	= <GIC_SPI 1 IRQ_TYPE_NONE>;
++			#mbox-cells	= <2>;
++			mbox-name	= "a9";
++			status		= "okay";
++		};
++
++		mailbox1: mailbox at 1 {
++			compatible	= "st,stih407-mailbox";
++			reg		= <0x8f01000 0x1000>;
++			#mbox-cells	= <2>;
++			mbox-name	= "st231_gp_1";
++			status		= "okay";
++		};
++
++		mailbox2: mailbox at 2 {
++			compatible	= "st,stih407-mailbox";
++			reg		= <0x8f02000 0x1000>;
++			#mbox-cells	= <2>;
++			mbox-name	= "st231_gp_0";
++			status		= "okay";
++		};
++
++		mailbox3: mailbox at 3 {
++			compatible	= "st,stih407-mailbox";
++			reg		= <0x8f03000 0x1000>;
++			#mbox-cells	= <2>;
++			mbox-name	= "st231_audio_video";
++			status		= "okay";
++		};
+ 	};
+ };
 -- 
 1.9.1
