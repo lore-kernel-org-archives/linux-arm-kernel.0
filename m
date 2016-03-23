@@ -1,42 +1,80 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 23 Mar 2016 11:39:31 +0100
-Subject: [PATCH] ARM: floppy: avoid gcc-6 warning
-Message-ID: <1458729581-3195712-1-git-send-email-arnd@arndb.de>
+From: minghuan.lian@nxp.com (Minghuan Lian)
+Date: Wed, 23 Mar 2016 10:50:02 +0000
+Subject: [PATCH 2/2 v5] irqchip/Layerscape: Add SCFG MSI controller support
+In-Reply-To: <7239962.9Fyo0vfqsc@ws-stein>
+References: <1457321782-3245-1-git-send-email-Minghuan.Lian@nxp.com>
+ <1457321782-3245-2-git-send-email-Minghuan.Lian@nxp.com>
+ <7239962.9Fyo0vfqsc@ws-stein>
+Message-ID: <VI1PR04MB1615DEFA517CEDD7867DE667E8810@VI1PR04MB1615.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gcc-6.0 warns about comparisons between two identical expressions,
-which is what we get in the floppy driver when writing to the FD_DOR
-register:
+Hi Alexander,
 
-drivers/block/floppy.c: In function 'set_dor':
-drivers/block/floppy.c:810:44: error: self-comparison always evaluates to true [-Werror=tautological-compare]
-   fd_outb(newdor, FD_DOR);
+Thanks for your test.
 
-It would be nice to use a static inline function instead of the
-macro, to avoid the warning, but we cannot do that because the
-FD_DOR definition is incomplete at this point.
+Number 134742016 is calculated by the following code
 
-Adding a cast to (u32) is a harmless way to shut up the warning,
-just not very nice.
+/**
+ * pci_msi_domain_calc_hwirq - Generate a unique ID for an MSI source
+ * @dev:	Pointer to the PCI device
+ * @desc:	Pointer to the msi descriptor
+ *
+ * The ID number is only used within the irqdomain.
+ */
+irq_hw_number_t pci_msi_domain_calc_hwirq(struct pci_dev *dev,
+					  struct msi_desc *desc)
+{
+	return (irq_hw_number_t)desc->msi_attrib.entry_nr |
+		PCI_DEVID(dev->bus->number, dev->devfn) << 11 |
+		(pci_domain_nr(dev->bus) & 0xFFFFFFFF) << 27;
+}
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/include/asm/floppy.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+And this value is assigned to the hwirq in the function:
+static void pci_msi_domain_set_desc(msi_alloc_info_t *arg,
+				    struct msi_desc *desc)
+{
+	arg->desc = desc;
+	arg->hwirq = pci_msi_domain_calc_hwirq(msi_desc_to_pci_dev(desc),
+					       desc);
+}
 
-diff --git a/arch/arm/include/asm/floppy.h b/arch/arm/include/asm/floppy.h
-index f4882553fbb0..85a34cc8316a 100644
---- a/arch/arm/include/asm/floppy.h
-+++ b/arch/arm/include/asm/floppy.h
-@@ -17,7 +17,7 @@
- 
- #define fd_outb(val,port)			\
- 	do {					\
--		if ((port) == FD_DOR)		\
-+		if ((port) == (u32)FD_DOR)	\
- 			fd_setdor((val));	\
- 		else				\
- 			outb((val),(port));	\
--- 
-2.7.0
+
+Thanks,
+Minghuan
+
+> -----Original Message-----
+> From: Alexander Stein [mailto:alexander.stein at systec-electronic.com]
+> Sent: Wednesday, March 23, 2016 5:18 PM
+> To: linux-kernel at vger.kernel.org
+> Cc: Minghuan Lian <minghuan.lian@nxp.com>;
+> linux-arm-kernel at lists.infradead.org; Marc Zyngier <marc.zyngier@arm.com>;
+> Thomas Gleixner <tglx@linutronix.de>; Jason Cooper
+> <jason@lakedaemon.net>; Roy Zang <roy.zang@nxp.com>; Mingkai Hu
+> <mingkai.hu@nxp.com>; Stuart Yoder <stuart.yoder@nxp.com>; Yang-Leo Li
+> <leoyang.li@nxp.com>
+> Subject: Re: [PATCH 2/2 v5] irqchip/Layerscape: Add SCFG MSI controller
+> support
+> 
+> On Monday 07 March 2016 11:36:22, Minghuan Lian wrote:
+> > Some kind of NXP Layerscape SoC provides a MSI
+> > implementation which uses two SCFG registers MSIIR and
+> > MSIR to support 32 MSI interrupts for each PCIe controller.
+> > The patch is to support it.
+> >
+> > Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
+> 
+> Tested-by: Alexander Stein <alexander.stein@systec-electronic.com>
+> 
+> Using an intel e1000e card which uses 3 MSIs. But the IRQ numbers are a bit
+> strange though:
+> > grep eth3 /proc/interrupts
+> >
+> >  63:         49          0       MSI 134742016 Edge
+> eth3-rx-0
+> >  64:          3          0       MSI 134742017 Edge
+> eth3-tx-0
+> >  65:          4          0       MSI 134742018 Edge      eth3
+> 
+> Best regards,
+> Alexander
