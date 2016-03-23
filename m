@@ -1,97 +1,142 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 23 Mar 2016 03:12:53 +0100
-Subject: [PATCH] ARM: dts: orion5x: add device tree for kurobox-pro
-In-Reply-To: <CAEQ9gEniE1CGaSb46uWDdg1AU0VWEU-Eq8uVF7X7Rxn1jM+KUw@mail.gmail.com>
-References: <1458656898-16183-1-git-send-email-rogershimizu@gmail.com>
- <20160322164200.GH5250@lunn.ch>
- <CAEQ9gEniE1CGaSb46uWDdg1AU0VWEU-Eq8uVF7X7Rxn1jM+KUw@mail.gmail.com>
-Message-ID: <20160323021253.GB19953@lunn.ch>
+From: xf@rock-chips.com (Feng Xiao)
+Date: Wed, 23 Mar 2016 10:18:07 +0800
+Subject: [PATCH v2] cpufreq: rockchip: add driver
+In-Reply-To: <1458647848-48999-1-git-send-email-xf@rock-chips.com>
+References: <1458647848-48999-1-git-send-email-xf@rock-chips.com>
+Message-ID: <1458699487-58470-1-git-send-email-xf@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > kurobox_pro-setup.c says:
-> >
-> > /*
-> >  * 256K NOR flash Device bus boot chip select
-> >  */
-> >
-> > #define KUROBOX_PRO_NOR_BOOT_BASE       0xf4000000
-> > #define KUROBOX_PRO_NOR_BOOT_SIZE       SZ_256K
-> >
-> > /*
-> >  * 256M NAND flash on Device bus chip select 1
-> >  */
-> >
-> > #define KUROBOX_PRO_NAND_BASE           0xfc000000
-> > #define KUROBOX_PRO_NAND_SIZE           SZ_2M
-> >
-> > So there is a NOR on CS0, not NAND.
-> 
-> The NOR is on Device Bus Boot, which described in
-> orion5x-linkstation.dtsi and is the probed OK:
-> 
-> [    1.843221] Found: SST 39LF020
-> [    1.846391] f4000000.flash: Found 1 x8 devices at 0x0 in 8-bit bank
-> [    1.852715] number of JEDEC chips: 1
-> [    1.872860] 3 ofpart partitions found on MTD device f4000000.flash
-> [    1.879122] Creating 3 MTD partitions on "f4000000.flash":
-> [    1.884697] 0x000000000000-0x000000030000 : "header"
-> [    1.893209] 0x000000030000-0x00000003f000 : "uboot"
-> [    1.901671] 0x00000003f000-0x000000040000 : "uboot_env"
-> 
-> 
-> The NAND, which is on Device Bus CS0, has probing issue. I only can
-> have it probed by the board file:
+This driver will directly use cpufreq-dt driver as backend.
 
-The comment on the board file says chip select 1, not 0.
+As there is not a generic devicetree board file(rockchip.c)
+on ARM64 architecture, so remove platform_device_register_simple
+in rockchip.c and add a new cpufreq driver to support Rockchip
+SoCs.
 
-> So you mean I need to refer the nand block in mbus part in
-> kirkwood.dtsi?
+Signed-off-by: Feng Xiao <xf@rock-chips.com>
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+---
+change in v2:
+- add rockchip,rk3036 and rockchip,rk3228 to compatibility list
+
+change in v1:
+- add compatible check
+
+ arch/arm/mach-rockchip/rockchip.c  |  1 -
+ drivers/cpufreq/Kconfig.arm        | 10 +++++++
+ drivers/cpufreq/Makefile           |  1 +
+ drivers/cpufreq/rockchip-cpufreq.c | 57 ++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 68 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/cpufreq/rockchip-cpufreq.c
+
+diff --git a/arch/arm/mach-rockchip/rockchip.c b/arch/arm/mach-rockchip/rockchip.c
+index 3f07cc5..beb71da 100644
+--- a/arch/arm/mach-rockchip/rockchip.c
++++ b/arch/arm/mach-rockchip/rockchip.c
+@@ -74,7 +74,6 @@ static void __init rockchip_dt_init(void)
+ {
+ 	rockchip_suspend_init();
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+-	platform_device_register_simple("cpufreq-dt", 0, NULL, 0);
+ }
  
->         nand: nand at 012f {
->             #address-cells = <1>;
->             #size-cells = <1>;
->             cle = <0>;
->             ale = <1>;
->             bank-width = <1>;
->             compatible = "marvell,orion-nand";
->             reg = <MBUS_ID(0x01, 0x2f) 0 0x400>;
->             chip-delay = <25>;
->             /* set partition map and/or chip-delay in board dts */
->             clocks = <&gate_clk 7>;
->             pinctrl-0 = <&pmx_nand>;
->             pinctrl-names = "default";
->             status = "disabled";
->         };
-> 
-> The difficulty for me is I have no idea on
-> - which clock to use
-
-Orion5x does not have a specific clocks for peripherals. In this case,
-the clock is not needed.
-
-> - which mpp pin to use
-
-You need to define a pinmux configuration. Looking at the board file,
-we have:
-
-        MPP6_NAND,              /* NAND Flash REn */
-        MPP7_NAND,              /* NAND Flash WEn */
-
-So you can add a node to orion5x-mv88f5182.dtsi containing these two
-pins.
-
-> - how to set these address
-
-Not so sure here. The data sheet says CS1 uses Target Interface ID 1,
-Target Interface Attribute 0x1d.
-
-In the soc ranges you want
-
-reg = <MBUS_ID(0x01, 0x1d) 0 0xfc000000 0x1000000>
-
-and in the nand node
-
-reg = <MBUS_ID(0x01, 0x2f) 0 0x200000>;
-
-    Andrew
+ static const char * const rockchip_board_dt_compat[] = {
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+index 14b1f93..1786315 100644
+--- a/drivers/cpufreq/Kconfig.arm
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -97,6 +97,16 @@ config ARM_OMAP2PLUS_CPUFREQ
+ 	depends on ARCH_OMAP2PLUS
+ 	default ARCH_OMAP2PLUS
+ 
++config ARM_ROCKCHIP_CPUFREQ
++	tristate "Rockchip CPUfreq driver"
++	depends on ARCH_ROCKCHIP && CPUFREQ_DT
++	select PM_OPP
++	help
++	  This adds the CPUFreq driver support for Rockchip SoCs.
++	  The driver will directly use cpufreq-dt driver as backend.
++
++	  If in doubt, say N.
++
+ config ARM_S3C_CPUFREQ
+ 	bool
+ 	help
+diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+index 9e63fb1..91d8bb7 100644
+--- a/drivers/cpufreq/Makefile
++++ b/drivers/cpufreq/Makefile
+@@ -61,6 +61,7 @@ obj-$(CONFIG_ARM_MT8173_CPUFREQ)	+= mt8173-cpufreq.o
+ obj-$(CONFIG_ARM_OMAP2PLUS_CPUFREQ)	+= omap-cpufreq.o
+ obj-$(CONFIG_ARM_PXA2xx_CPUFREQ)	+= pxa2xx-cpufreq.o
+ obj-$(CONFIG_PXA3xx)			+= pxa3xx-cpufreq.o
++obj-$(CONFIG_ARM_ROCKCHIP_CPUFREQ)	+= rockchip-cpufreq.o
+ obj-$(CONFIG_ARM_S3C24XX_CPUFREQ)	+= s3c24xx-cpufreq.o
+ obj-$(CONFIG_ARM_S3C24XX_CPUFREQ_DEBUGFS) += s3c24xx-cpufreq-debugfs.o
+ obj-$(CONFIG_ARM_S3C2410_CPUFREQ)	+= s3c2410-cpufreq.o
+diff --git a/drivers/cpufreq/rockchip-cpufreq.c b/drivers/cpufreq/rockchip-cpufreq.c
+new file mode 100644
+index 0000000..9266614
+--- /dev/null
++++ b/drivers/cpufreq/rockchip-cpufreq.c
+@@ -0,0 +1,57 @@
++/*
++ * Rockchip Platforms CPUFreq Support
++ *
++ * Copyright (C) 2016 Fuzhou Rockchip Electronics Co., Ltd
++ *
++ * Feng Xiao <xf@rock-chips.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/err.h>
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++
++static const char * const rockchip_compat[] = {
++	"rockchip,rk2928",
++	"rockchip,rk3036",
++	"rockchip,rk3066a",
++	"rockchip,rk3066b",
++	"rockchip,rk3188",
++	"rockchip,rk3228",
++	"rockchip,rk3288",
++	"rockchip,rk3366",
++	"rockchip,rk3368",
++	"rockchip,rk3399",
++};
++
++static int __init rockchip_cpufreq_driver_init(void)
++{
++	struct platform_device *pdev;
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(rockchip_compat); i++) {
++		if (of_machine_is_compatible(rockchip_compat[i])) {
++			pdev = platform_device_register_simple("cpufreq-dt",
++							       -1, NULL, 0);
++			return PTR_ERR_OR_ZERO(pdev);
++		}
++	}
++
++	return -ENODEV;
++}
++module_init(rockchip_cpufreq_driver_init);
++
++MODULE_AUTHOR("Feng Xiao <xf@rock-chips.com>");
++MODULE_DESCRIPTION("Rockchip cpufreq driver");
++MODULE_LICENSE("GPL v2");
+-- 
+1.9.1
