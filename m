@@ -1,661 +1,327 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 23 Mar 2016 17:38:38 +0100
-Subject: [PATCH v3 15/19] drm: sun4i: Add composite output
-In-Reply-To: <1458751122-23976-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1458751122-23976-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1458751122-23976-16-git-send-email-maxime.ripard@free-electrons.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 23 Mar 2016 22:26:24 +0530
+Subject: [PATCH v2 04/11] ARM: davinci: da8xx: add usb phy clocks
+In-Reply-To: <1458181615-27782-5-git-send-email-david@lechnology.com>
+References: <1458181615-27782-1-git-send-email-david@lechnology.com>
+ <1458181615-27782-5-git-send-email-david@lechnology.com>
+Message-ID: <56F2CAB8.3090705@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some Allwinner SoCs have an IP called the TV encoder that is used to output
-composite and VGA signals. In such a case, we need to use the second TCON
-channel.
+On Thursday 17 March 2016 07:56 AM, David Lechner wrote:
+> Up to this point, the USB phy clock configuration was handled manually in
+> the board files and in the usb drivers. This adds proper clocks so that
+> the usb drivers can use clk_get and clk_enable and not have to worry about
+> the details. Also, the related code is removed from the board files.
+> 
+> Signed-off-by: David Lechner <david@lechnology.com>
+> ---
+> 
+> v2 changes: Move clock mux code to set_parent callback. Also fixed some other
+> issues from feedback on the previous patch.
+> 
+> 
+>  arch/arm/mach-davinci/board-da830-evm.c     |  12 ---
+>  arch/arm/mach-davinci/board-omapl138-hawk.c |   7 --
+>  arch/arm/mach-davinci/da830.c               | 143 ++++++++++++++++++++++++++++
+>  arch/arm/mach-davinci/da850.c               | 143 ++++++++++++++++++++++++++++
+>  4 files changed, 286 insertions(+), 19 deletions(-)
+> 
+> diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
+> index 3d8cf8c..f3a8cc9 100644
+> --- a/arch/arm/mach-davinci/board-da830-evm.c
+> +++ b/arch/arm/mach-davinci/board-da830-evm.c
+> @@ -115,18 +115,6 @@ static __init void da830_evm_usb_init(void)
+>  	 */
+>  	cfgchip2 = __raw_readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
+>  
+> -	/* USB2.0 PHY reference clock is 24 MHz */
+> -	cfgchip2 &= ~CFGCHIP2_REFFREQ;
+> -	cfgchip2 |=  CFGCHIP2_REFFREQ_24MHZ;
+> -
+> -	/*
+> -	 * Select internal reference clock for USB 2.0 PHY
+> -	 * and use it as a clock source for USB 1.1 PHY
+> -	 * (this is the default setting anyway).
+> -	 */
+> -	cfgchip2 &= ~CFGCHIP2_USB1PHYCLKMUX;
+> -	cfgchip2 |=  CFGCHIP2_USB2PHYCLKMUX;
+> -
+>  	/*
+>  	 * We have to override VBUS/ID signals when MUSB is configured into the
+>  	 * host-only mode -- ID pin will float if no cable is connected, so the
+> diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
+> index ee62486..d27e753 100644
+> --- a/arch/arm/mach-davinci/board-omapl138-hawk.c
+> +++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
+> @@ -251,13 +251,6 @@ static __init void omapl138_hawk_usb_init(void)
+>  		return;
+>  	}
+>  
+> -	/* Setup the Ref. clock frequency for the HAWK at 24 MHz. */
+> -
+> -	cfgchip2 = __raw_readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
+> -	cfgchip2 &= ~CFGCHIP2_REFFREQ;
+> -	cfgchip2 |=  CFGCHIP2_REFFREQ_24MHZ;
+> -	__raw_writel(cfgchip2, DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
+> -
+>  	ret = gpio_request_one(DA850_USB1_VBUS_PIN,
+>  			GPIOF_DIR_OUT, "USB1 VBUS");
+>  	if (ret < 0) {
+> diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
+> index 7187e7f..ee942b0 100644
+> --- a/arch/arm/mach-davinci/da830.c
+> +++ b/arch/arm/mach-davinci/da830.c
+> @@ -12,6 +12,7 @@
+>  #include <linux/init.h>
+>  #include <linux/clk.h>
+>  #include <linux/platform_data/gpio-davinci.h>
+> +#include <linux/platform_data/usb-davinci.h>
+>  
+>  #include <asm/mach/map.h>
+>  
+> @@ -346,6 +347,12 @@ static struct clk i2c1_clk = {
+>  	.gpsc		= 1,
+>  };
+>  
+> +static struct clk usb_ref_clk = {
+> +	.name		= "usb_ref_clk",
+> +	.rate		= 48000000,
+> +	.set_rate	= davinci_simple_set_rate,
+> +};
 
-Add support for that TV encoder.
+can we call this usb_refclkin so it matches the TRM name? Also, should
+this node be not be coming through individual board files as the rate
+depends on what is connected to the usb_refclkin pin? Or is the
+expectation that boards will call clk_set_rate() on this clock to the
+correct value? If yes, I think it is misleading to populate the .rate here.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/gpu/drm/sun4i/Makefile   |   2 +
- drivers/gpu/drm/sun4i/sun4i_tv.c | 621 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 623 insertions(+)
- create mode 100644 drivers/gpu/drm/sun4i/sun4i_tv.c
+> +
+>  static struct clk usb11_clk = {
+>  	.name		= "usb11",
+>  	.parent		= &pll0_sysclk4,
+> @@ -353,6 +360,139 @@ static struct clk usb11_clk = {
+>  	.gpsc		= 1,
+>  };
+>  
+> +static void usb20_phy_clk_enable(struct clk *clk)
+> +{
+> +	u32 val;
+> +
+> +	val = readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
+> +
+> +	/*
+> +	 * Turn on the USB 2.0 PHY, but just the PLL, and not OTG. The USB 1.1
+> +	 * host may use the PLL clock without USB 2.0 OTG being used.
+> +	 */
+> +	val &= ~(CFGCHIP2_RESET | CFGCHIP2_PHYPWRDN);
+> +	val |= CFGCHIP2_PHY_PLLON;
+> +
+> +	writel(val, DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
+> +
+> +	pr_info("Waiting for USB 2.0 PHY clock good...\n");
+> +	while (!(readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG))
+> +						& CFGCHIP2_PHYCLKGD))
+> +		cpu_relax();
 
-diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
-index 830abb9b2b74..c93498f6a795 100644
---- a/drivers/gpu/drm/sun4i/Makefile
-+++ b/drivers/gpu/drm/sun4i/Makefile
-@@ -9,3 +9,5 @@ sun4i-tcon-y += sun4i_dotclock.o
- 
- obj-$(CONFIG_DRM_SUN4I)		+= sun4i-drm.o sun4i-tcon.o
- obj-$(CONFIG_DRM_SUN4I)		+= sun4i_backend.o
-+
-+obj-$(CONFIG_DRM_SUN4I)		+= sun4i_tv.o
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tv.c b/drivers/gpu/drm/sun4i/sun4i_tv.c
-new file mode 100644
-index 000000000000..78634dfc0f77
---- /dev/null
-+++ b/drivers/gpu/drm/sun4i/sun4i_tv.c
-@@ -0,0 +1,621 @@
-+/*
-+ * Copyright (C) 2015 Free Electrons
-+ * Copyright (C) 2015 NextThing Co
-+ *
-+ * Maxime Ripard <maxime.ripard@free-electrons.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation; either version 2 of
-+ * the License, or (at your option) any later version.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/component.h>
-+#include <linux/of_address.h>
-+#include <linux/regmap.h>
-+#include <linux/reset.h>
-+
-+#include <drm/drmP.h>
-+#include <drm/drm_atomic_helper.h>
-+#include <drm/drm_crtc_helper.h>
-+#include <drm/drm_panel.h>
-+
-+#include "sun4i_backend.h"
-+#include "sun4i_drv.h"
-+#include "sun4i_tcon.h"
-+
-+#define SUN4I_TVE_EN_REG		0x000
-+#define SUN4I_TVE_EN_DAC_MAP_MASK		GENMASK(19, 4)
-+#define SUN4I_TVE_EN_DAC_MAP(dac, out)		(((out) & 0xf) << (dac + 1) * 4)
-+#define SUN4I_TVE_EN_ENABLE			BIT(0)
-+
-+#define SUN4I_TVE_CFG0_REG		0x004
-+#define SUN4I_TVE_CFG0_DAC_CONTROL_54M		BIT(26)
-+#define SUN4I_TVE_CFG0_CORE_DATAPATH_54M	BIT(25)
-+#define SUN4I_TVE_CFG0_CORE_CONTROL_54M		BIT(24)
-+#define SUN4I_TVE_CFG0_YC_EN			BIT(17)
-+#define SUN4I_TVE_CFG0_COMP_EN			BIT(16)
-+#define SUN4I_TVE_CFG0_RES(x)			((x) & 0xf)
-+#define SUN4I_TVE_CFG0_RES_480i			SUN4I_TVE_CFG0_RES(0)
-+#define SUN4I_TVE_CFG0_RES_576i			SUN4I_TVE_CFG0_RES(1)
-+
-+#define SUN4I_TVE_DAC0_REG		0x008
-+#define SUN4I_TVE_DAC0_CLOCK_INVERT		BIT(24)
-+#define SUN4I_TVE_DAC0_LUMA(x)			(((x) & 3) << 20)
-+#define SUN4I_TVE_DAC0_LUMA_0_4			SUN4I_TVE_DAC0_LUMA(3)
-+#define SUN4I_TVE_DAC0_CHROMA(x)		(((x) & 3) << 18)
-+#define SUN4I_TVE_DAC0_CHROMA_0_75		SUN4I_TVE_DAC0_CHROMA(3)
-+#define SUN4I_TVE_DAC0_INTERNAL_DAC(x)		(((x) & 3) << 16)
-+#define SUN4I_TVE_DAC0_INTERNAL_DAC_37_5_OHMS	SUN4I_TVE_DAC0_INTERNAL_DAC(3)
-+#define SUN4I_TVE_DAC0_DAC_EN(dac)		BIT(dac)
-+
-+#define SUN4I_TVE_NOTCH_REG		0x00c
-+#define SUN4I_TVE_NOTCH_DAC0_TO_DAC_DLY(dac, x)	((4 - (x)) << (dac * 3))
-+
-+#define SUN4I_TVE_CHROMA_FREQ_REG	0x010
-+
-+#define SUN4I_TVE_PORCH_REG		0x014
-+#define SUN4I_TVE_PORCH_BACK(x)			((x) << 16)
-+#define SUN4I_TVE_PORCH_FRONT(x)		(x)
-+
-+#define SUN4I_TVE_LINE_REG		0x01c
-+#define SUN4I_TVE_LINE_FIRST(x)			((x) << 16)
-+#define SUN4I_TVE_LINE_NUMBER(x)		(x)
-+
-+#define SUN4I_TVE_LEVEL_REG		0x020
-+#define SUN4I_TVE_LEVEL_BLANK(x)		((x) << 16)
-+#define SUN4I_TVE_LEVEL_BLACK(x)		(x)
-+
-+#define SUN4I_TVE_DAC1_REG		0x024
-+#define SUN4I_TVE_DAC1_AMPLITUDE(dac, x)	((x) << (dac * 8))
-+
-+#define SUN4I_TVE_DETECT_STA_REG	0x038
-+#define SUN4I_TVE_DETECT_STA_DAC(dac)		BIT((dac * 8))
-+#define SUN4I_TVE_DETECT_STA_UNCONNECTED		0
-+#define SUN4I_TVE_DETECT_STA_CONNECTED			1
-+#define SUN4I_TVE_DETECT_STA_GROUND			2
-+
-+#define SUN4I_TVE_CB_CR_LVL_REG		0x10c
-+#define SUN4I_TVE_CB_CR_LVL_CR_BURST(x)		((x) << 8)
-+#define SUN4I_TVE_CB_CR_LVL_CB_BURST(x)		(x)
-+
-+#define SUN4I_TVE_TINT_BURST_PHASE_REG	0x110
-+#define SUN4I_TVE_TINT_BURST_PHASE_CHROMA(x)	(x)
-+
-+#define SUN4I_TVE_BURST_WIDTH_REG	0x114
-+#define SUN4I_TVE_BURST_WIDTH_BREEZEWAY(x)	((x) << 16)
-+#define SUN4I_TVE_BURST_WIDTH_BURST_WIDTH(x)	((x) << 8)
-+#define SUN4I_TVE_BURST_WIDTH_HSYNC_WIDTH(x)	(x)
-+
-+#define SUN4I_TVE_CB_CR_GAIN_REG	0x118
-+#define SUN4I_TVE_CB_CR_GAIN_CR(x)		((x) << 8)
-+#define SUN4I_TVE_CB_CR_GAIN_CB(x)		(x)
-+
-+#define SUN4I_TVE_SYNC_VBI_REG		0x11c
-+#define SUN4I_TVE_SYNC_VBI_SYNC(x)		((x) << 16)
-+#define SUN4I_TVE_SYNC_VBI_VBLANK(x)		(x)
-+
-+#define SUN4I_TVE_ACTIVE_LINE_REG	0x124
-+#define SUN4I_TVE_ACTIVE_LINE(x)		(x)
-+
-+#define SUN4I_TVE_CHROMA_REG		0x128
-+#define SUN4I_TVE_CHROMA_COMP_GAIN(x)		((x) & 3)
-+#define SUN4I_TVE_CHROMA_COMP_GAIN_50		SUN4I_TVE_CHROMA_COMP_GAIN(2)
-+
-+#define SUN4I_TVE_12C_REG		0x12c
-+#define SUN4I_TVE_12C_NOTCH_WIDTH_WIDE		BIT(8)
-+#define SUN4I_TVE_12C_COMP_YUV_EN		BIT(0)
-+
-+#define SUN4I_TVE_RESYNC_REG		0x130
-+#define SUN4I_TVE_RESYNC_FIELD			BIT(31)
-+#define SUN4I_TVE_RESYNC_LINE(x)		((x) << 16)
-+#define SUN4I_TVE_RESYNC_PIXEL(x)		(x)
-+
-+#define SUN4I_TVE_SLAVE_REG		0x134
-+
-+#define SUN4I_TVE_WSS_DATA2_REG		0x244
-+
-+struct color_gains {
-+	u16	cb;
-+	u16	cr;
-+};
-+
-+struct burst_levels {
-+	u16	cb;
-+	u16	cr;
-+};
-+
-+struct video_levels {
-+	u16	black;
-+	u16	blank;
-+};
-+
-+struct resync_parameters {
-+	bool	field;
-+	u16	line;
-+	u16	pixel;
-+};
-+
-+struct tv_mode {
-+	char		*name;
-+
-+	u32		mode;
-+	u32		chroma_freq;
-+	u16		back_porch;
-+	u16		front_porch;
-+	u16		line_number;
-+	u16		vblank_level;
-+
-+	u32		hdisplay;
-+	u16		hfront_porch;
-+	u16		hsync_len;
-+	u16		hback_porch;
-+
-+	u32		vdisplay;
-+	u16		vfront_porch;
-+	u16		vsync_len;
-+	u16		vback_porch;
-+
-+	bool		yc_en;
-+	bool		dac3_en;
-+	bool		dac_bit25_en;
-+
-+	struct color_gains		*color_gains;
-+	struct burst_levels		*burst_levels;
-+	struct video_levels		*video_levels;
-+	struct resync_parameters	*resync_params;
-+};
-+
-+struct sun4i_tv {
-+	struct drm_connector	connector;
-+	struct drm_encoder	encoder;
-+
-+	struct clk		*clk;
-+	struct regmap		*regs;
-+	struct reset_control	*reset;
-+
-+	struct sun4i_drv	*drv;
-+};
-+
-+struct tv_mode tv_modes[] = {
-+};
-+
-+static inline struct sun4i_tv *
-+drm_encoder_to_sun4i_tv(struct drm_encoder *encoder)
-+{
-+	return container_of(encoder, struct sun4i_tv,
-+			    encoder);
-+}
-+
-+static inline struct sun4i_tv *
-+drm_connector_to_sun4i_tv(struct drm_connector *connector)
-+{
-+	return container_of(connector, struct sun4i_tv,
-+			    connector);
-+}
-+
-+/*
-+ * FIXME: If only the drm_display_mode private field was usable, this
-+ * could go away...
-+ *
-+ * So far, it doesn't seem to be preserved when the mode is passed by
-+ * to mode_set for some reason.
-+ */
-+static struct tv_mode *sun4i_tv_find_tv_by_mode(struct drm_display_mode *mode)
-+{
-+	int i;
-+
-+	/* First try to identify the mode by name */
-+	for (i = 0; i < ARRAY_SIZE(tv_modes); i++) {
-+		struct tv_mode *tv_mode = &tv_modes[i];
-+
-+		DRM_DEBUG_DRIVER("Comparing mode %s vs %s",
-+				 mode->name, tv_mode->name);
-+
-+		if (!strcmp(mode->name, tv_mode->name))
-+			return tv_mode;
-+	}
-+
-+	/* Then by number of lines */
-+	for (i = 0; i < ARRAY_SIZE(tv_modes); i++) {
-+		struct tv_mode *tv_mode = &tv_modes[i];
-+
-+		DRM_DEBUG_DRIVER("Comparing mode %s vs %s (X: %d vs %d)",
-+				 mode->name, tv_mode->name,
-+				 mode->vdisplay, tv_mode->vdisplay);
-+
-+		if (mode->vdisplay == tv_mode->vdisplay)
-+			return tv_mode;
-+	}
-+
-+	return NULL;
-+}
-+
-+static void sun4i_tv_mode_to_drm_mode(struct tv_mode *tv_mode,
-+				      struct drm_display_mode *mode)
-+{
-+	DRM_DEBUG_DRIVER("Creating mode %s\n", mode->name);
-+
-+	mode->type = DRM_MODE_TYPE_DRIVER;
-+	mode->clock = 13500;
-+	mode->flags = DRM_MODE_FLAG_INTERLACE;
-+
-+	mode->hdisplay = tv_mode->hdisplay;
-+	mode->hsync_start = mode->hdisplay + tv_mode->hfront_porch;
-+	mode->hsync_end = mode->hsync_start + tv_mode->hsync_len;
-+	mode->htotal = mode->hsync_end  + tv_mode->hback_porch;
-+
-+	mode->vdisplay = tv_mode->vdisplay;
-+	mode->vsync_start = mode->vdisplay + tv_mode->vfront_porch;
-+	mode->vsync_end = mode->vsync_start + tv_mode->vsync_len;
-+	mode->vtotal = mode->vsync_end  + tv_mode->vback_porch;
-+}
-+
-+static int sun4i_tv_atomic_check(struct drm_encoder *encoder,
-+				 struct drm_crtc_state *crtc_state,
-+				 struct drm_connector_state *conn_state)
-+{
-+	return 0;
-+}
-+
-+static void sun4i_tv_disable(struct drm_encoder *encoder)
-+{
-+	struct sun4i_tv *tv = drm_encoder_to_sun4i_tv(encoder);
-+	struct sun4i_drv *drv = tv->drv;
-+	struct sun4i_tcon *tcon = drv->tcon;
-+
-+	DRM_DEBUG_DRIVER("Disabling the TV Output\n");
-+
-+	sun4i_tcon_channel_disable(tcon, 1);
-+
-+	regmap_update_bits(tv->regs, SUN4I_TVE_EN_REG,
-+			   SUN4I_TVE_EN_ENABLE,
-+			   0);
-+	sun4i_backend_disable_color_correction(drv->backend);
-+}
-+
-+static void sun4i_tv_enable(struct drm_encoder *encoder)
-+{
-+	struct sun4i_tv *tv = drm_encoder_to_sun4i_tv(encoder);
-+	struct sun4i_drv *drv = tv->drv;
-+	struct sun4i_tcon *tcon = drv->tcon;
-+
-+	DRM_DEBUG_DRIVER("Enabling the TV Output\n");
-+
-+	sun4i_backend_apply_color_correction(drv->backend);
-+
-+	regmap_update_bits(tv->regs, SUN4I_TVE_EN_REG,
-+			   SUN4I_TVE_EN_ENABLE,
-+			   SUN4I_TVE_EN_ENABLE);
-+
-+	sun4i_tcon_channel_enable(tcon, 1);
-+}
-+
-+static void sun4i_tv_mode_set(struct drm_encoder *encoder,
-+			      struct drm_display_mode *mode,
-+			      struct drm_display_mode *adjusted_mode)
-+{
-+	struct sun4i_tv *tv = drm_encoder_to_sun4i_tv(encoder);
-+	struct sun4i_drv *drv = tv->drv;
-+	struct sun4i_tcon *tcon = drv->tcon;
-+	struct tv_mode *tv_mode = sun4i_tv_find_tv_by_mode(mode);
-+
-+	sun4i_tcon1_mode_set(tcon, mode);
-+
-+	/* Enable and map the DAC to the output */
-+	regmap_update_bits(tv->regs, SUN4I_TVE_EN_REG,
-+			   SUN4I_TVE_EN_DAC_MAP_MASK,
-+			   SUN4I_TVE_EN_DAC_MAP(0, 1) |
-+			   SUN4I_TVE_EN_DAC_MAP(1, 2) |
-+			   SUN4I_TVE_EN_DAC_MAP(2, 3) |
-+			   SUN4I_TVE_EN_DAC_MAP(3, 4));
-+
-+	/* Set PAL settings */
-+	regmap_write(tv->regs, SUN4I_TVE_CFG0_REG,
-+		     tv_mode->mode |
-+		     (tv_mode->yc_en ? SUN4I_TVE_CFG0_YC_EN : 0) |
-+		     SUN4I_TVE_CFG0_COMP_EN |
-+		     SUN4I_TVE_CFG0_DAC_CONTROL_54M |
-+		     SUN4I_TVE_CFG0_CORE_DATAPATH_54M |
-+		     SUN4I_TVE_CFG0_CORE_CONTROL_54M);
-+
-+	/* Configure the DAC for a composite output */
-+	regmap_write(tv->regs, SUN4I_TVE_DAC0_REG,
-+		     SUN4I_TVE_DAC0_DAC_EN(0) |
-+		     (tv_mode->dac3_en ? SUN4I_TVE_DAC0_DAC_EN(3) : 0) |
-+		     SUN4I_TVE_DAC0_INTERNAL_DAC_37_5_OHMS |
-+		     SUN4I_TVE_DAC0_CHROMA_0_75 |
-+		     SUN4I_TVE_DAC0_LUMA_0_4 |
-+		     SUN4I_TVE_DAC0_CLOCK_INVERT |
-+		     (tv_mode->dac_bit25_en ? BIT(25) : 0) |
-+		     BIT(30));
-+
-+	/* Configure the sample delay between DAC0 and the other DAC */
-+	regmap_write(tv->regs, SUN4I_TVE_NOTCH_REG,
-+		     SUN4I_TVE_NOTCH_DAC0_TO_DAC_DLY(1, 0) |
-+		     SUN4I_TVE_NOTCH_DAC0_TO_DAC_DLY(2, 0));
-+
-+	regmap_write(tv->regs, SUN4I_TVE_CHROMA_FREQ_REG,
-+		     tv_mode->chroma_freq);
-+
-+	/* Set the front and back porch */
-+	regmap_write(tv->regs, SUN4I_TVE_PORCH_REG,
-+		     SUN4I_TVE_PORCH_BACK(tv_mode->back_porch) |
-+		     SUN4I_TVE_PORCH_FRONT(tv_mode->front_porch));
-+
-+	/* Set the lines setup */
-+	regmap_write(tv->regs, SUN4I_TVE_LINE_REG,
-+		     SUN4I_TVE_LINE_FIRST(22) |
-+		     SUN4I_TVE_LINE_NUMBER(tv_mode->line_number));
-+
-+	regmap_write(tv->regs, SUN4I_TVE_LEVEL_REG,
-+		     SUN4I_TVE_LEVEL_BLANK(tv_mode->video_levels->blank) |
-+		     SUN4I_TVE_LEVEL_BLACK(tv_mode->video_levels->black));
-+
-+	regmap_write(tv->regs, SUN4I_TVE_DAC1_REG,
-+		     SUN4I_TVE_DAC1_AMPLITUDE(0, 0x18) |
-+		     SUN4I_TVE_DAC1_AMPLITUDE(1, 0x18) |
-+		     SUN4I_TVE_DAC1_AMPLITUDE(2, 0x18) |
-+		     SUN4I_TVE_DAC1_AMPLITUDE(3, 0x18));
-+
-+	regmap_write(tv->regs, SUN4I_TVE_CB_CR_LVL_REG,
-+		     SUN4I_TVE_CB_CR_LVL_CB_BURST(tv_mode->burst_levels->cb) |
-+		     SUN4I_TVE_CB_CR_LVL_CR_BURST(tv_mode->burst_levels->cr));
-+
-+	/* Set burst width for a composite output */
-+	regmap_write(tv->regs, SUN4I_TVE_BURST_WIDTH_REG,
-+		     SUN4I_TVE_BURST_WIDTH_HSYNC_WIDTH(126) |
-+		     SUN4I_TVE_BURST_WIDTH_BURST_WIDTH(68) |
-+		     SUN4I_TVE_BURST_WIDTH_BREEZEWAY(22));
-+
-+	regmap_write(tv->regs, SUN4I_TVE_CB_CR_GAIN_REG,
-+		     SUN4I_TVE_CB_CR_GAIN_CB(tv_mode->color_gains->cb) |
-+		     SUN4I_TVE_CB_CR_GAIN_CR(tv_mode->color_gains->cr));
-+
-+	regmap_write(tv->regs, SUN4I_TVE_SYNC_VBI_REG,
-+		     SUN4I_TVE_SYNC_VBI_SYNC(0x10) |
-+		     SUN4I_TVE_SYNC_VBI_VBLANK(tv_mode->vblank_level));
-+
-+	regmap_write(tv->regs, SUN4I_TVE_ACTIVE_LINE_REG,
-+		     SUN4I_TVE_ACTIVE_LINE(1440));
-+
-+	/* Set composite chroma gain to 50 % */
-+	regmap_write(tv->regs, SUN4I_TVE_CHROMA_REG,
-+		     SUN4I_TVE_CHROMA_COMP_GAIN_50);
-+
-+	regmap_write(tv->regs, SUN4I_TVE_12C_REG,
-+		     SUN4I_TVE_12C_COMP_YUV_EN |
-+		     SUN4I_TVE_12C_NOTCH_WIDTH_WIDE);
-+
-+	regmap_write(tv->regs, SUN4I_TVE_RESYNC_REG,
-+		     SUN4I_TVE_RESYNC_PIXEL(tv_mode->resync_params->pixel) |
-+		     SUN4I_TVE_RESYNC_LINE(tv_mode->resync_params->line) |
-+		     (tv_mode->resync_params->field ?
-+		      SUN4I_TVE_RESYNC_FIELD : 0));
-+
-+	regmap_write(tv->regs, SUN4I_TVE_SLAVE_REG, 0);
-+
-+	clk_set_rate(tcon->sclk1, mode->crtc_clock * 1000);
-+}
-+
-+static struct drm_encoder_helper_funcs sun4i_tv_helper_funcs = {
-+	.atomic_check	= sun4i_tv_atomic_check,
-+	.disable	= sun4i_tv_disable,
-+	.enable		= sun4i_tv_enable,
-+	.mode_set	= sun4i_tv_mode_set,
-+};
-+
-+static void sun4i_tv_destroy(struct drm_encoder *encoder)
-+{
-+	drm_encoder_cleanup(encoder);
-+}
-+
-+static struct drm_encoder_funcs sun4i_tv_funcs = {
-+	.destroy	= sun4i_tv_destroy,
-+};
-+
-+static int sun4i_tv_comp_get_modes(struct drm_connector *connector)
-+{
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(tv_modes); i++) {
-+		struct drm_display_mode *mode = drm_mode_create(connector->dev);
-+		struct tv_mode *tv_mode = &tv_modes[i];
-+
-+		strcpy(mode->name, tv_mode->name);
-+
-+		sun4i_tv_mode_to_drm_mode(tv_mode, mode);
-+		drm_mode_probed_add(connector, mode);
-+	}
-+
-+	return i;
-+}
-+
-+static int sun4i_tv_comp_mode_valid(struct drm_connector *connector,
-+				    struct drm_display_mode *mode)
-+{
-+	/* TODO */
-+	return MODE_OK;
-+}
-+
-+static struct drm_encoder *
-+sun4i_tv_comp_best_encoder(struct drm_connector *connector)
-+{
-+	struct sun4i_tv *tv = drm_connector_to_sun4i_tv(connector);
-+
-+	return &tv->encoder;
-+}
-+
-+static struct drm_connector_helper_funcs sun4i_tv_comp_connector_helper_funcs = {
-+	.get_modes	= sun4i_tv_comp_get_modes,
-+	.mode_valid	= sun4i_tv_comp_mode_valid,
-+	.best_encoder	= sun4i_tv_comp_best_encoder,
-+};
-+
-+static enum drm_connector_status
-+sun4i_tv_comp_connector_detect(struct drm_connector *connector, bool force)
-+{
-+	return connector_status_connected;
-+}
-+
-+static void
-+sun4i_tv_comp_connector_destroy(struct drm_connector *connector)
-+{
-+	drm_connector_cleanup(connector);
-+}
-+
-+static struct drm_connector_funcs sun4i_tv_comp_connector_funcs = {
-+	.dpms			= drm_atomic_helper_connector_dpms,
-+	.detect			= sun4i_tv_comp_connector_detect,
-+	.fill_modes		= drm_helper_probe_single_connector_modes,
-+	.destroy		= sun4i_tv_comp_connector_destroy,
-+	.reset			= drm_atomic_helper_connector_reset,
-+	.atomic_duplicate_state	= drm_atomic_helper_connector_duplicate_state,
-+	.atomic_destroy_state	= drm_atomic_helper_connector_destroy_state,
-+};
-+
-+static struct regmap_config sun4i_tv_regmap_config = {
-+	.reg_bits	= 32,
-+	.val_bits	= 32,
-+	.reg_stride	= 4,
-+	.max_register	= SUN4I_TVE_WSS_DATA2_REG,
-+	.name		= "tv-encoder",
-+};
-+
-+static int sun4i_tv_bind(struct device *dev, struct device *master,
-+			 void *data)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct drm_device *drm = data;
-+	struct sun4i_drv *drv = drm->dev_private;
-+	struct sun4i_tv *tv;
-+	struct resource *res;
-+	void __iomem *regs;
-+	int ret;
-+
-+	tv = devm_kzalloc(dev, sizeof(*tv), GFP_KERNEL);
-+	if (!tv)
-+		return -ENOMEM;
-+	tv->drv = drv;
-+	dev_set_drvdata(dev, tv);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	regs = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(regs)) {
-+		dev_err(dev, "Couldn't map the TV encoder registers\n");
-+		return PTR_ERR(regs);
-+	}
-+
-+	tv->regs = devm_regmap_init_mmio(dev, regs,
-+					 &sun4i_tv_regmap_config);
-+	if (IS_ERR(tv->regs)) {
-+		dev_err(dev, "Couldn't create the TV encoder regmap\n");
-+		return PTR_ERR(tv->regs);
-+	}
-+
-+	tv->reset = devm_reset_control_get(dev, NULL);
-+	if (IS_ERR(tv->reset)) {
-+		dev_err(dev, "Couldn't get our reset line\n");
-+		return PTR_ERR(tv->reset);
-+	}
-+
-+	ret = reset_control_deassert(tv->reset);
-+	if (ret) {
-+		dev_err(dev, "Couldn't deassert our reset line\n");
-+		return ret;
-+	}
-+
-+	tv->clk = devm_clk_get(dev, NULL);
-+	if (IS_ERR(tv->clk)) {
-+		dev_err(dev, "Couldn't get the TV encoder clock\n");
-+		ret = PTR_ERR(tv->clk);
-+		goto err_assert_reset;
-+	}
-+	clk_prepare_enable(tv->clk);
-+
-+	drm_encoder_helper_add(&tv->encoder,
-+			       &sun4i_tv_helper_funcs);
-+	ret = drm_encoder_init(drm,
-+			       &tv->encoder,
-+			       &sun4i_tv_funcs,
-+			       DRM_MODE_ENCODER_TVDAC,
-+			       NULL);
-+	if (ret) {
-+		dev_err(dev, "Couldn't initialise the TV encoder\n");
-+		goto err_disable_clk;
-+	}
-+
-+	tv->encoder.possible_crtcs = BIT(0);
-+
-+	drm_connector_helper_add(&tv->connector,
-+				 &sun4i_tv_comp_connector_helper_funcs);
-+	ret = drm_connector_init(drm, &tv->connector,
-+				 &sun4i_tv_comp_connector_funcs,
-+				 DRM_MODE_CONNECTOR_Composite);
-+	if (ret) {
-+		dev_err(dev,
-+			"Couldn't initialise the Composite connector\n");
-+		goto err_cleanup_connector;
-+	}
-+	tv->connector.interlace_allowed = true;
-+
-+	drm_mode_connector_attach_encoder(&tv->connector, &tv->encoder);
-+
-+	return 0;
-+
-+err_cleanup_connector:
-+	drm_encoder_cleanup(&tv->encoder);
-+err_disable_clk:
-+	clk_disable_unprepare(tv->clk);
-+err_assert_reset:
-+	reset_control_assert(tv->reset);
-+	return ret;
-+}
-+
-+static void sun4i_tv_unbind(struct device *dev, struct device *master,
-+			    void *data)
-+{
-+	struct sun4i_tv *tv = dev_get_drvdata(dev);
-+
-+	drm_connector_cleanup(&tv->connector);
-+	drm_encoder_cleanup(&tv->encoder);
-+	clk_disable_unprepare(tv->clk);
-+}
-+
-+static struct component_ops sun4i_tv_ops = {
-+	.bind	= sun4i_tv_bind,
-+	.unbind	= sun4i_tv_unbind,
-+};
-+
-+static int sun4i_tv_probe(struct platform_device *pdev)
-+{
-+	return component_add(&pdev->dev, &sun4i_tv_ops);
-+}
-+
-+static int sun4i_tv_remove(struct platform_device *pdev)
-+{
-+	component_del(&pdev->dev, &sun4i_tv_ops);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id sun4i_tv_of_table[] = {
-+	{ .compatible = "allwinner,sun4i-a10-tv-encoder" },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, sun4i_tv_of_table);
-+
-+static struct platform_driver sun4i_tv_platform_driver = {
-+	.probe		= sun4i_tv_probe,
-+	.remove		= sun4i_tv_remove,
-+	.driver		= {
-+		.name		= "sun4i-tve",
-+		.of_match_table	= sun4i_tv_of_table,
-+	},
-+};
-+module_platform_driver(sun4i_tv_platform_driver);
-+
-+MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com>");
-+MODULE_DESCRIPTION("Allwinner A10 TV Encoder Driver");
-+MODULE_LICENSE("GPL");
--- 
-2.7.3
+I guess this is copying some earlier code, but still, it will be nice to
+see a timeout mechanism here, rather than loop endlessly.
+
+> +}
+> +
+> +static void usb20_phy_clk_disable(struct clk *clk)
+> +{
+> +	u32 val;
+> +
+> +	val = readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
+> +	val |= CFGCHIP2_PHYPWRDN;
+> +	writel(val, DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
+> +}
+> +
+> +static int usb20_phy_clk_set_parent(struct clk *clk, struct clk *parent)
+> +{
+> +	u32 __iomem *cfgchip2;
+> +	u32 val;
+> +
+> +	/*
+> +	 * Can't use DA8XX_SYSCFG0_VIRT() here since this can be called before
+> +	 * da8xx_syscfg0_base is initialized.
+> +	 */
+> +	cfgchip2 = ioremap(DA8XX_SYSCFG0_BASE + DA8XX_CFGCHIP2_REG, 4);
+
+Again, not sure if this is juts a theoretical possibility. If yes, I
+would rather see you bail out if syscfg0_base is not initialized by the
+time you get here than do an ioremap() again.
+
+> +	val = readl(cfgchip2);
+> +
+> +	/* Set the mux depending on the parent clock. */
+> +	if (parent == &pll0_aux_clk)
+> +		val |= CFGCHIP2_USB2PHYCLKMUX;
+> +	else if (parent == &usb_ref_clk)
+> +		val &= ~CFGCHIP2_USB2PHYCLKMUX;
+> +	else {
+> +		pr_err("Bad parent on USB 2.0 PHY clock.\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	/* reference frequency also comes from parent clock */
+> +	val &= ~CFGCHIP2_REFFREQ;
+> +	switch (clk_get_rate(parent)) {
+> +	case 12000000:
+> +		val |= CFGCHIP2_REFFREQ_12MHZ;
+> +		break;
+> +	case 13000000:
+> +		val |= CFGCHIP2_REFFREQ_13MHZ;
+> +		break;
+> +	case 19200000:
+> +		val |= CFGCHIP2_REFFREQ_19_2MHZ;
+> +		break;
+> +	case 20000000:
+> +		val |= CFGCHIP2_REFFREQ_20MHZ;
+> +		break;
+> +	case 24000000:
+> +		val |= CFGCHIP2_REFFREQ_24MHZ;
+> +		break;
+> +	case 26000000:
+> +		val |= CFGCHIP2_REFFREQ_26MHZ;
+> +		break;
+> +	case 38400000:
+> +		val |= CFGCHIP2_REFFREQ_38_4MHZ;
+> +		break;
+> +	case 40000000:
+> +		val |= CFGCHIP2_REFFREQ_40MHZ;
+> +		break;
+> +	case 48000000:
+> +		val |= CFGCHIP2_REFFREQ_48MHZ;
+> +		break;
+> +	default:
+> +		pr_err("Bad parent clock rate on USB 2.0 PHY clock.\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	writel(val, cfgchip2);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct clk usb20_phy_clk = {
+> +	.name		= "usb20_phy",
+> +	.parent		= &pll0_aux_clk,
+> +	.clk_enable	= usb20_phy_clk_enable,
+> +	.clk_disable	= usb20_phy_clk_disable,
+> +	.set_parent	= usb20_phy_clk_set_parent,
+> +};
+
+I hope you have checked that all boards in mainline use the AUXCLK as
+the reference USB 2.0 frequency?
+
+> +
+> +static int usb11_phy_clk_set_parent(struct clk *clk, struct clk *parent)
+> +{
+> +	u32 __iomem *cfgchip2;
+> +	u32 val;
+> +
+> +	/*
+> +	 * Can't use DA8XX_SYSCFG0_VIRT() here since this can be called before
+> +	 * da8xx_syscfg0_base is initialized.
+> +	 */
+> +	cfgchip2 = ioremap(DA8XX_SYSCFG0_BASE + DA8XX_CFGCHIP2_REG, 4);
+> +	val = readl(cfgchip2);
+> +
+> +	/* Set the USB 1.1 PHY clock mux based on the parent clock. */
+> +	if (parent == &usb20_phy_clk)
+> +		val &= ~CFGCHIP2_USB1PHYCLKMUX;
+> +	else if (parent == &usb_ref_clk)
+> +		val |= CFGCHIP2_USB1PHYCLKMUX;
+> +	else {
+> +		pr_err("Bad parent on USB 1.1 PHY clock.\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	writel(val, cfgchip2);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct clk usb11_phy_clk = {
+> +	.name		= "usb11_phy",
+> +	.parent		= &usb20_phy_clk,
+> +	.set_parent	= usb11_phy_clk_set_parent,
+> +};
+
+Same thing here. I hope all current boards use USB2.0 clk as reference
+for USB 1.1 phy
+
+> +
+>  static struct clk emif3_clk = {
+>  	.name		= "emif3",
+>  	.parent		= &pll0_sysclk5,
+> @@ -420,7 +560,10 @@ static struct clk_lookup da830_clks[] = {
+>  	CLK("davinci_mdio.0",   "fck",          &emac_clk),
+>  	CLK(NULL,		"gpio",		&gpio_clk),
+>  	CLK("i2c_davinci.2",	NULL,		&i2c1_clk),
+> +	CLK(NULL,		"usb_ref_clk",	&usb_ref_clk),
+>  	CLK(NULL,		"usb11",	&usb11_clk),
+> +	CLK(NULL,		"usb20_phy",	&usb20_phy_clk),
+> +	CLK(NULL,		"usb11_phy",	&usb11_phy_clk),
+>  	CLK(NULL,		"emif3",	&emif3_clk),
+>  	CLK(NULL,		"arm",		&arm_clk),
+>  	CLK(NULL,		"rmii",		&rmii_clk),
+> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+> index 8c8f31e..8089a82 100644
+> --- a/arch/arm/mach-davinci/da850.c
+> +++ b/arch/arm/mach-davinci/da850.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/cpufreq.h>
+>  #include <linux/regulator/consumer.h>
+>  #include <linux/platform_data/gpio-davinci.h>
+> +#include <linux/platform_data/usb-davinci.h>
+>  
+>  #include <asm/mach/map.h>
+>  
+> @@ -360,6 +361,12 @@ static struct clk aemif_clk = {
+>  	.flags		= ALWAYS_ENABLED,
+>  };
+>  
+> +static struct clk usb_ref_clk = {
+> +	.name		= "usb_ref_clk",
+> +	.rate		= 48000000,
+> +	.set_rate	= davinci_simple_set_rate,
+> +};
+> +
+>  static struct clk usb11_clk = {
+>  	.name		= "usb11",
+>  	.parent		= &pll0_sysclk4,
+> @@ -374,6 +381,139 @@ static struct clk usb20_clk = {
+>  	.gpsc		= 1,
+>  };
+>  
+> +static void usb20_phy_clk_enable(struct clk *clk)
+> +{
+> +	u32 val;
+> +
+> +	val = readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
+> +
+> +	/*
+> +	 * Turn on the USB 2.0 PHY, but just the PLL, and not OTG. The USB 1.1
+> +	 * host may use the PLL clock without USB 2.0 OTG being used.
+> +	 */
+> +	val &= ~(CFGCHIP2_RESET | CFGCHIP2_PHYPWRDN);
+> +	val |= CFGCHIP2_PHY_PLLON;
+> +
+> +	writel(val, DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG));
+> +
+> +	pr_info("Waiting for USB 2.0 PHY clock good...\n");
+> +	while (!(readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG))
+> +						& CFGCHIP2_PHYCLKGD))
+> +		cpu_relax();
+> +}
+
+Looks like this is pretty much going to be the same code repeated for
+DA850 and DA830. So can we move these to a common file like da8xx-usb.c?
+You can even register these USB clocks from that file by using
+clkdev_add() and clk_register(). This way they can remain to be file local.
+
+Thanks,
+Sekhar
