@@ -1,60 +1,142 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 23 Mar 2016 13:26:09 +0100
-Subject: Question about PCI I/O space in ARM64
-In-Reply-To: <20160323101840.GA21390@e104818-lin.cambridge.arm.com>
-References: <56F209A9.4040304@huawei.com>
- <20160323101840.GA21390@e104818-lin.cambridge.arm.com>
-Message-ID: <8793380.nuVa09lFue@wuerfel>
+From: agustinv@codeaurora.org (agustinv at codeaurora.org)
+Date: Wed, 23 Mar 2016 08:36:14 -0400
+Subject: [PATCH V1] perf: qcom: Add L3 cache PMU driver
+In-Reply-To: <56F26FF1.90002@arm.com>
+References: <1458333422-8963-1-git-send-email-agustinv@codeaurora.org>
+ <20160321103507.GB17326@leverpostej>
+ <09ca2b70ae43432623cfbac374da1784@codeaurora.org> <56F26FF1.90002@arm.com>
+Message-ID: <f33a9ea23bf426c138a9323e53703259@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 23 March 2016 10:18:40 Catalin Marinas wrote:
-> On Wed, Mar 23, 2016 at 11:12:41AM +0800, Kefeng Wang wrote:
-> > If no pci, the PCI I/O space(16M) is mapped into an irrelevant mem space(right ?),
+On 2016-03-23 06:29, Marc Zyngier wrote:
+> On 22/03/16 18:33, agustinv at codeaurora.org wrote:
+>> On 2016-03-21 06:35, Mark Rutland wrote:
+>>> On Fri, Mar 18, 2016 at 04:37:02PM -0400, Agustin Vega-Frias wrote:
+>>>> +/*
+>>>> + * In some platforms interrupt resources might not come directly 
+>>>> from
+>>>> the GIC,
+>>>> + * but from separate IRQ circuitry that signals a summary IRQ to 
+>>>> the
+>>>> GIC and
+>>>> + * is handled by a secondary IRQ controller. This is problematic
+>>>> under ACPI boot
+>>>> + * because the ACPI core does not use the Resource Source field on
+>>>> the Extended
+>>>> + * Interrupt Descriptor, which in theory could be used to specify 
+>>>> an
+>>>> alternative
+>>>> + * IRQ controller.
+>>>> +
+>>>> + * For this reason in these platforms we implement the secondary 
+>>>> IRQ
+>>>> controller
+>>>> + * using the gpiolib and specify the IRQs as GpioInt resources, so
+>>>> when getting
+>>>> + * an IRQ from the device we first try platform_get_irq and if it
+>>>> fails we try
+>>>> + * devm_gpiod_get_index/gpiod_to_irq.
+>>>> + */
+>>>> +static
+>>>> +int qcom_l3_cache_pmu_get_slice_irq(struct platform_device *pdev,
+>>>> +				    struct platform_device *sdev)
+>>>> +{
+>>>> +	int virq = platform_get_irq(sdev, 0);
+>>>> +	struct gpio_desc *desc;
+>>>> +
+>>>> +	if (virq >= 0)
+>>>> +		return virq;
+>>>> +
+>>>> +	desc = devm_gpiod_get_index(&sdev->dev, NULL, 0, GPIOD_ASIS);
+>>>> +	if (IS_ERR(desc))
+>>>> +		return -ENOENT;
+>>>> +
+>>>> +	return gpiod_to_irq(desc);
+>>>> +}
+>>>> +
+>>> 
+>>> As Marc Zyngier pointed out in another thread, you should represent
+>>> your
+>>> interrupt controller as an interrupt controller rather than 
+>>> pretending
+>>> it is a
+>>> GPIO controller.
+>>> 
+>>> Drivers should be able to remain blissfully unaware what the other 
+>>> end
+>>> of their
+>>> interrupt line is wired up to, and shouldn't have to jump through 
+>>> hoops
+>>> like
+>>> the above.
+>>> 
+>>> Thanks,
+>>> Mark.
+>> 
+>> Given that this driver is ACPI-only we are leaning toward implementing
+>> overflow signalling as ACPI events.
+>> This will hide these details from the driver and use standard ACPI 
+>> APIs.
+>> 
+>> Thoughts?
 > 
-> No. It is not mapped at all.
+> Please don't do that. The HW (whatever that is, and whatever the
+> firmware is) provides you with an interrupt line, not an ACPI event.
+> "Hiding the details" is always the wrong thing to do. How do we cope
+> with CPU affinity, for example? How do we selectively disable this
+> interrupt at the controller level?
 > 
-> > not a right IO space,
-> > that is, no one call pci_remap_iospace() to remap the memory mapped I/O space, once driver
-> > like f71805f loaded, write value to IO space(see f71805f_init->f71805f_find->superio_enter->outb),
-> > we met following oops,
-> > ------------------------
-> > Unable to handle kernel paging request at virtual address ffffffbffee0002e
-> > pgd = ffffffc1d68d4000
-> > [ffffffbffee0002e] *pgd=0000000000000000, *pud=0000000000000000
-> > Internal error: Oops: 94000046 [#1] PREEMPT SMP
-> > Modules linked in: f71805f(+) hwmon
-> > CPU: 3 PID: 1659 Comm: insmod Not tainted 4.5.0+ #88
-> > Hardware name: linux,dummy-virt (DT)
-> > task: ffffffc1f6665400 ti: ffffffc1d6418000 task.ti: ffffffc1d6418000
-> > PC is at f71805f_find+0x6c/0x358 [f71805f]
-> > ------------------------
+> Also, ACPI events will be signalled by (guess what?) an interrupt. So
+> what are we actually gaining here?
 > 
-> That's caused by not having a mapped PCI I/O space.
+> I'd *really* advise you to stick to existing abstractions, as they:
+> - accurately describe the way the HW works
+> - are already supported in the kernel
 > 
-> > I am not clear about PCI I/O, but if this is indeed a bug, how to solve this issue,
-> > any advice will be appreciated.
+> The existing shortcomings of the ACPI layer should be addressed pretty
+> easily (if the feature is not supported on x86, let's find out why - we
+> can make it an arm64 feature if we really have to).
 > 
-> You need a PCI host controller driver (e.g.
-> drivers/pci/host/pci-host-generic.c) and corresponding bindings in DT or
-> ACPI.
+> Thanks,
+> 
+> 	M.
+> --
+> Jazz is not dead. It just smells funny...
 
-I think getting an Oops is not the best behavior though, it would be
-nice if that could be improved in some way.
+ACPI events *are* existing abstractions within ACPI-based systems and 
+the mechanism works across OSes.
 
-Ideally, each driver that accesses PCI I/O space would call request_region()
-before doing so, and it would be good if that call could be made to
-return an error when asked about an address that has not been mapped.
+If there was a one to one relationship between IRQs and events this 
+would be hiding for the sake of hiding.
+In this case I am proposing to demultiplex the IRQ in the ACPI layer 
+just as a secondary IRQ driver/domain does in DT.
 
-I see that ioport_resource gets initialized to the {0, IO_SPACE_LIMIT}
-range. If we could change it so that pci_remap_iospace() hooks up
-to ioport_resource and extends it whenever something gets mapped
-there up to IO_SPACE_LIMIT, we can change the default range to
-{0,0}, which would fail for any request_region call before the
-first pci_remap_iospace.
+I have reached out to Rafael and Jeremy Pieralisi w.r.t. support of 
+multiple IRQ domains via the Resource Source field.
 
-This won't help for the specific f71805f driver example, because that
-does not call request_region(), but we can treat that as a driver bug
-and fix it.
+On the other hand we had implemented the IRQ combiner driver as a GPIO 
+chip because the hardware is not an interrupt controller, it is an 
+"interrupt
+combiner", which is very similar to a GPIO controller.
 
-	Arnd
+Consider how a GPIO controller works: it sends a summary interrupt when 
+a GPIO is toggled, software reads a status register to determine
+which pin was toggled.  These combiners do the *exact* same thing except 
+it's based on internal chip wires instead of external pins: it
+sends a summary interrupt when any wire is toggled and software checks a 
+status register to determine which wire was toggled. That's pretty
+similar if you ask me.
+
+Given that we need to support other operating systems representing it as 
+a GPIO controller was the most OS agnostic way to
+implement something like this on ACPI based systems.
+
+Thanks,
+Agustin.
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora 
+Forum,
+a Linux Foundation Collaborative Project.
