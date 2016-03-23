@@ -1,112 +1,90 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 23 Mar 2016 19:48:04 +0000
-Subject: [PATCH 10/12] ARM: dts: dragonboard-600c: Add on board leds support
+Date: Wed, 23 Mar 2016 19:48:10 +0000
+Subject: [PATCH 11/12] ARM: dts: dragonboard-600c: add i2c support
 In-Reply-To: <1458762366-9233-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1458762366-9233-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1458762484-9768-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1458762490-9814-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support to 4 user leds, wlan and bt led on board.
+This patch adds nodes required to enable 4 i2c buses on the board which
+are connected to various sensors and eeprom.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- .../arm/boot/dts/qcom-apq8064-dragonboard-600c.dts | 76 ++++++++++++++++++++++
- 1 file changed, 76 insertions(+)
+ .../arm/boot/dts/qcom-apq8064-dragonboard-600c.dts | 46 ++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
 
 diff --git a/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts b/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
-index 52f742c..4fecd94 100644
+index 4fecd94..942de04 100644
 --- a/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
 +++ b/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
-@@ -53,6 +53,33 @@
- 					bias-disable;
- 				};
+@@ -8,6 +8,10 @@
+ 	aliases {
+ 		serial0 = &gsbi7_serial;
+ 		serial1 = &gsbi1_serial;
++		i2c0 = &gsbi2_i2c;
++		i2c1 = &gsbi3_i2c;
++		i2c2 = &gsbi4_i2c;
++		i2c3 = &gsbi7_i2c;
+ 	};
+ 
+ 	regulators {
+@@ -180,6 +184,42 @@
  			};
+ 		};
+ 
++		gsbi at 12480000 {
++			status = "okay";
++			qcom,mode = <GSBI_PROT_I2C>;
++			i2c at 124a0000 {
++				/* On Low speed expansion and Sensors */
++				label = "LS-I2C0";
++				status = "okay";
++			};
++		};
 +
-+			user_leds: user_leds {
-+				mux {
-+					pins = "gpio3", "gpio7", "gpio10", "gpio11";
-+					function = "gpio";
-+				};
-+
-+				conf {
-+					pins = "gpio3", "gpio7", "gpio10", "gpio11";
-+					function = "gpio";
-+					output-low;
++		gsbi at 16200000 {
++			status = "okay";
++			qcom,mode = <GSBI_PROT_I2C>;
++			i2c at 16280000 {
++			/* On Low speed expansion */
++				status = "okay";
++				label = "LS-I2C1";
++				clock-frequency = <200000>;
++				eeprom at 52 {
++					compatible = "atmel,24c128";
++					reg = <0x52>;
++					pagesize = <64>;
 +				};
 +			};
 +		};
 +
-+		qcom,ssbi at 500000 {
-+			pmic at 0 {
-+				mpps at 50 {
-+					mpp_leds: mpp_leds {
-+						pinconf {
-+							pins = "mpp7", "mpp8";
-+							function = "digital";
-+							output-low;
-+						};
-+					};
-+				};
-+			};
- 		};
- 
- 		rpm at 108000 {
-@@ -165,6 +192,55 @@
- 			};
- 		};
- 
-+		leds {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&user_leds>, <&mpp_leds>;
-+
-+			compatible = "gpio-leds";
-+
-+			led at 1 {
-+				label = "dragonboard-600c:green:user1";
-+				gpios = <&tlmm_pinmux 3 GPIO_ACTIVE_HIGH>;
-+				linux,default-trigger = "heartbeat";
-+				default-state = "off";
-+			};
-+
-+			led at 2 {
-+				label = "dragonboard-600c:green:user2";
-+				gpios = <&tlmm_pinmux 7 GPIO_ACTIVE_HIGH>;
-+				linux,default-trigger = "mmc0";
-+				default-state = "off";
-+			};
-+
-+			led at 3 {
-+				label = "dragonboard-600c:green:user3";
-+				gpios = <&tlmm_pinmux 10 GPIO_ACTIVE_HIGH>;
-+				linux,default-trigger = "mmc1";
-+				default-state = "off";
-+			};
-+
-+			led at 4 {
-+				label = "apq8016-sbc:green:user4";
-+				gpios = <&tlmm_pinmux 11 GPIO_ACTIVE_HIGH>;
-+				linux,default-trigger = "none";
-+				default-state = "off";
-+			};
-+
-+			led at 5 {
-+				label = "dragonboard-600c:yellow:wlan";
-+				gpios = <&pm8921_mpps 7 GPIO_ACTIVE_HIGH>;
-+				linux,default-trigger = "wlan";
-+				default-state = "off";
-+			};
-+
-+			led at 6 {
-+				label = "dragonboard-600c:blue:bt";
-+				gpios = <&pm8921_mpps 8 GPIO_ACTIVE_HIGH>;
-+				linux,default-trigger = "bt";
-+				default-state = "off";
++		gsbi at 16300000 {
++			status = "okay";
++			qcom,mode = <GSBI_PROT_I2C>;
++			i2c at 16380000 {
++				/* On High speed expansion */
++				label = "HS-CAM-I2C3";
++				status = "okay";
 +			};
 +		};
 +
- 		pci at 1b500000 {
+ 		/* DEBUG UART  */
+ 		gsbi at 16600000 {
  			status = "okay";
- 			vdda-supply = <&pm8921_s3>;
+@@ -190,6 +230,12 @@
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&gsbi7_uart_2pins>;
+ 			};
++
++			i2c at 16680000 {
++				/* On High speed expansion */
++				status = "okay";
++				label = "HS-CAM-I2C2";
++			};
+ 		};
+ 
+ 		leds {
 -- 
 2.5.0
