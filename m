@@ -1,47 +1,38 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 23 Mar 2016 17:12:13 +0100
-Subject: dmaengine pl08x dt crash
-In-Reply-To: <20160323154049.GA2170@sig21.net>
-References: <20160323154049.GA2170@sig21.net>
-Message-ID: <CACRpkdZ3ecJPcUfv7TTPhTT+rMtAC+b1=HfE3cH0OR=swvNi6w@mail.gmail.com>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Wed, 23 Mar 2016 16:16:24 +0000
+Subject: [PATCH 2/2] arm*: efi: drop writable mapping of the UEFI System
+ table
+In-Reply-To: <CAKv+Gu8+pYR_jxjcVeXgekVqD_BugtRLgNNhOkvhuaEpddbHRg@mail.gmail.com>
+References: <1456496435-12679-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1456496435-12679-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20160226150156.GC7475@codeblueprint.co.uk>
+ <CAKv+Gu8+pYR_jxjcVeXgekVqD_BugtRLgNNhOkvhuaEpddbHRg@mail.gmail.com>
+Message-ID: <20160323161624.GG11676@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 23, 2016 at 4:40 PM, Johannes Stezenbach <js@sig21.net> wrote:
+On Tue, 22 Mar, at 04:08:24PM, Ard Biesheuvel wrote:
+> 
+> This patch causes a warning I hadn't spotted before sending it out.
+> Could you fold this in please?
+> 
+> diff --git a/drivers/firmware/efi/arm-runtime.c
+> b/drivers/firmware/efi/arm-runtime.c
+> index 6c97d4884fc7..fe749da9997e 100644
+> --- a/drivers/firmware/efi/arm-runtime.c
+> +++ b/drivers/firmware/efi/arm-runtime.c
+> @@ -72,8 +72,8 @@ static bool __init efi_virtmap_init(void)
+>                  */
+>                 if (efi_system_table >= phys &&
+>                     efi_system_table < phys + (md->num_pages * EFI_PAGE_SIZE)) {
+> -                       efi.systab = (void *)(efi_system_table - phys +
+> -                                             md->virt_addr);
+> +                       efi.systab = (void *)(unsigned long)(efi_system_table -
+> +                                                         phys + md->virt_addr);
+>                         systab_found = true;
+>                 }
+>         }
 
-> I'm trying to use the new devicetree support for pl08x
-> added in commit aa4734da667442
-> (dmaengine: pl08x: support dt channel assignment).
->
-> It causes crash in the pl011 serial driver when it calls
-> dma_chan_name() because the dma_chan->dev->device is NULL.
-> I think the reason is dma_async_device_register() is called
-> during pl08x_probe(), but at this time the number of slave
-> channels is still 0 as these get allocated later in
-> pl08x_of_xlate() when clients request the channels.
->
-> [    0.420835] pl08xdmac dma8ch0: initialized 8 virtual memcpy channels
-> [    0.427380] pl08xdmac dma8ch0: initialized 0 virtual slave channels
-> [    0.436185] pl08xdmac dma8ch0: DMA: PL080s rev1 at 0xfec00000 irq 8
+Done, please check,
 
-So you are trying to use it on the Samsung S3C?
-
-I have it working on the Nomadik, but for platforms with fixed signal
-assignement I had to apply these patches:
-https://git.kernel.org/cgit/linux/kernel/git/linusw/linux-nomadik.git/log/?h=pl08x-dma
-
-dma: pl08x: support fixed signal assignment
-dma: pl08x: allocate OF slave channel data at probe time
-
-And the example:
-ARM: nomadik: add DMA engine and some channelspl08x-dma
-
-I have meant to follow up on it but haven't gotten around to.
-
-If the Samsung also has fixed channels (no mux in front of the
-DMA lines) I think this might be what you need. They are not
-yet merged because Joachim reported a crash with the second
-patch and I haven't yet figured out why.
-
-Yours,
-Linus Walleij
+  https://git.kernel.org/cgit/linux/kernel/git/mfleming/efi.git/commit/?h=next&id=4fd5c619dcf4f3d2c86d4a686ce66fc01e877a08
