@@ -1,72 +1,34 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 23 Mar 2016 15:37:11 +0100
-Subject: N900 sleep mode (in 4.5-rc0, if that matters)
-In-Reply-To: <20160211010818.GQ19432@atomide.com>
-References: <20160126172527.GY3500@atomide.com> <20160130200244.GA30429@amd>
- <20160130201452.GC30429@amd> <20160130221509.GA28644@amd>
- <20160201181316.GM19432@atomide.com> <20160201211736.GA11283@amd>
- <20160201221111.GP19432@atomide.com> <20160207212316.GA6147@amd>
- <20160209172403.GK19432@atomide.com>
- <20160211010818.GQ19432@atomide.com>
-Message-ID: <20160323143711.GA5459@amd>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 23 Mar 2016 14:43:38 +0000
+Subject: [PATCH v2 0/5] mailbox: A few fixes due for the v4.6 -rcs
+Message-ID: <1458744223-12164-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2016-02-10 17:08:18, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [160209 09:26]:
-> > * Pavel Machek <pavel@ucw.cz> [160207 13:24]:
-> > 
-> > > ffdffebd 48004a20 (fa004a20) cm_idlest1_core blocking bits: 00200042
-> > > 0000000d 48004a28 (fa004a28) cm_idlest3_core
-> > 
-> > Bit 21 in cm_idlest1_core is for MCSPI4 so WLAN. Does that go
-> > down if do sleep 5; cat /sys/kernel/debug/pm_debug/count ?
-> > 
-> > If not, the're PM runtime missing or broken somewhere.
-> 
-> Just tested n900 wlan here and it's working for me with Emil's
-> patch from the "" thread and the PM runtime regression fix for
-> hsmmc I posted earlier today. Looks like n900 is hitting off
-> mode just fine with wlan0 configured.
+Hi Jassi,
 
-Emil's patch, would that be:
+Resending these with patches 1 and 2 merged, as requested.
 
-commit fb724ed5c6175a2407b256d506c9e703c6bb62d4
-Author: Emil Goode <emil.fsw@goode.io>
-Date:   Wed Feb 10 02:22:16 2016 +0100
+Kind regards,
+Lee
 
-    wlcore: Fix regression in wlcore_set_partition()
+v1 => v2:
+  - Patch 2 merged into patch 
+  - No functional changes
 
-    The commit 3719c17e1816 ("wlcore/wl18xx: fw logger over sdio")
-    introduced a
-        regression causing the wlcore to time out and go into
-    recovery. Reverting the
-        changes regarding write of the last partition size brings the
-    module back to
-        it's functional state.
+Lee Jones (5):
+  ARM: STi: stih407-family: Add nodes for Mailbox
+  ARM: STi: DT: STiH407: Enable Mailbox testing facility
+  mailbox: mailbox-test: Use more consistent format for calling
+    copy_from_user()
+  mailbox: mailbox-test: Prevent memory leak
+  mailbox: Stop using ENOSYS for anything other than unimplemented
+    syscalls
 
-    Fixes: 3719c17e1816 ("wlcore/wl18xx: fw logger over sdio")
+ arch/arm/boot/dts/stih407-family.dtsi | 39 +++++++++++++++++++++++++++++++++++
+ drivers/mailbox/mailbox-test.c        | 16 +++++++-------
+ drivers/mailbox/mailbox.c             |  4 ++--
+ 3 files changed, 50 insertions(+), 9 deletions(-)
 
-?
-
-Hsmmc regression, that's
-
-Date: Wed, 10 Feb 2016 15:02:44 -0800
-From: Tony Lindgren <tony@atomide.com>
-To: linux-omap at vger.kernel.org
-Subject: [PATCH 1/7] mmc: omap_hsmmc: Fix PM regression with deferred probe for pm_runtime_reinit
-
-? Aha, but the patch this regression fixes does not seem to be in 4.4,
-so I should be fine unless I go to 4.5.
-
-> It does not wake up to pings from outside from off mode though
-> until the system wakes up.
-
-Ok, I guess I'm trying to get it to sleep, first, then we can talk
-about wakeup ;-).
-
-Best regards,
-									Pavel
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.9.1
