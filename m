@@ -1,36 +1,73 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 23 Mar 2016 17:38:28 +0100
-Subject: [PATCH v3 05/19] dt-bindings: clk: sun5i: add DRAM gates compatible
+Date: Wed, 23 Mar 2016 17:38:39 +0100
+Subject: [PATCH v3 16/19] drm: sun4i: tv: Add PAL output standard
 In-Reply-To: <1458751122-23976-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1458751122-23976-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1458751122-23976-6-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1458751122-23976-17-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner SoCs have a gate controller to gate the access to the DRAM
-clock to the some devices that need to access the DRAM directly (mostly
-display / image related IPs).
-
-Use a simple gates driver to support the one found in the A13 / R8 SoCs.
+Now that we have support for the composite output, we can start adding new
+supported standards. Start with PAL, and we will add other eventually.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- Documentation/devicetree/bindings/clock/sunxi.txt | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/gpu/drm/sun4i/sun4i_tv.c | 42 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-index 54192c1a98dc..e194cda2f469 100644
---- a/Documentation/devicetree/bindings/clock/sunxi.txt
-+++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-@@ -66,6 +66,7 @@ Required properties:
- 	"allwinner,sun9i-a80-apbs-gates-clk" - for the APBS gates on A80
- 	"allwinner,sun4i-a10-dram-gates-clk" - for the DRAM gates on A10
- 	"allwinner,sun4i-a10-display-clk" - for the display clocks on the A10
-+	"allwinner,sun5i-a13-dram-gates-clk" - for the DRAM gates on A13
- 	"allwinner,sun5i-a13-mbus-clk" - for the MBUS clock on A13
- 	"allwinner,sun4i-a10-mmc-clk" - for the MMC clock
- 	"allwinner,sun9i-a80-mmc-clk" - for mmc module clocks on A80
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tv.c b/drivers/gpu/drm/sun4i/sun4i_tv.c
+index 78634dfc0f77..ccf275a90132 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tv.c
+@@ -178,7 +178,49 @@ struct sun4i_tv {
+ 	struct sun4i_drv	*drv;
+ };
+ 
++struct video_levels pal_video_levels = {
++	.black = 252,	.blank = 252,
++};
++
++struct burst_levels pal_burst_levels = {
++	.cb = 40,	.cr = 40,
++};
++
++struct color_gains pal_color_gains = {
++	.cb = 224,	.cr = 224,
++};
++
++struct resync_parameters pal_resync_parameters = {
++	.field = true,	.line = 13,	.pixel = 12,
++};
++
+ struct tv_mode tv_modes[] = {
++	{
++		.name		= "PAL",
++		.mode		= SUN4I_TVE_CFG0_RES_576i,
++		.chroma_freq	= 0x2a098acb,
++
++		.back_porch	= 138,
++		.front_porch	= 24,
++		.line_number	= 625,
++
++		.hdisplay	= 720,
++		.hfront_porch	= 3,
++		.hsync_len	= 2,
++		.hback_porch	= 139,
++
++		.vdisplay	= 576,
++		.vfront_porch	= 28,
++		.vsync_len	= 2,
++		.vback_porch	= 19,
++
++		.vblank_level	= 252,
++
++		.color_gains	= &pal_color_gains,
++		.burst_levels	= &pal_burst_levels,
++		.video_levels	= &pal_video_levels,
++		.resync_params	= &pal_resync_parameters,
++	},
+ };
+ 
+ static inline struct sun4i_tv *
 -- 
 2.7.3
