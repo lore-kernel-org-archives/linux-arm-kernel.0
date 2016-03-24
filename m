@@ -1,94 +1,90 @@
 From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Thu, 24 Mar 2016 15:52:03 +0300
-Subject: [PATCH v6 5/5] serial: pl011: add console matching function
+Date: Thu, 24 Mar 2016 15:51:59 +0300
+Subject: [PATCH v6 1/5] of/serial: move earlycon early_param handling to serial
 In-Reply-To: <1458823925-19560-1-git-send-email-aleksey.makarov@linaro.org>
 References: <1458823925-19560-1-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <1458823925-19560-6-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <1458823925-19560-2-git-send-email-aleksey.makarov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds function pl011_console_match() that implements
-method match of struct console.  It allows to match consoles against
-data specified in a string, for example taken from command line or
-compiled by ACPI SPCR table handler.
+From: Leif Lindholm <leif.lindholm@linaro.org>
 
+We have multiple "earlycon" early_param handlers - merge the DT one into
+the main earlycon one.  It's a cleanup that also will be useful
+to defer setting up DT console until ACPI/DT decision is made.
+
+Rename the exported function to avoid clashing with the function from
+arch/microblaze/kernel/prom.c
+
+Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
 Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
 ---
- drivers/tty/serial/amba-pl011.c | 56 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 56 insertions(+)
+ drivers/of/fdt.c              | 11 +----------
+ drivers/tty/serial/earlycon.c |  2 +-
+ include/linux/of_fdt.h        |  2 ++
+ 3 files changed, 4 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 7c198e0..4139b64 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -2287,12 +2287,68 @@ static int __init pl011_console_setup(struct console *co, char *options)
- 	return uart_set_options(&uap->port, co, baud, parity, bits, flow);
- }
+diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+index 3349d2a..b50f775 100644
+--- a/drivers/of/fdt.c
++++ b/drivers/of/fdt.c
+@@ -805,7 +805,7 @@ static inline void early_init_dt_check_for_initrd(unsigned long node)
  
-+/**
-+ *	pl011_console_match - non-standard console matching
-+ *	@co:	  registering console
-+ *	@name:	  name from console command line
-+ *	@idx:	  index from console command line
-+ *	@options: ptr to option string from console command line
-+ *
-+ *	Only attempts to match console command lines of the form:
-+ *	    console=pl011,mmio|mmio32,<addr>[,<options>]
-+ *	    console=pl011,0x<addr>[,<options>]
-+ *	This form is used to register an initial earlycon boot console and
-+ *	replace it with the amba_console at pl011 driver init.
-+ *
-+ *	Performs console setup for a match (as required by interface)
-+ *	If no <options> are specified, then assume the h/w is already setup.
-+ *
-+ *	Returns 0 if console matches; otherwise non-zero to use default matching
-+ */
-+static int __init pl011_console_match(struct console *co, char *name, int idx,
-+				      char *options)
-+{
-+	char match[] = "pl011";	/* pl011-specific earlycon name */
-+	unsigned char iotype;
-+	unsigned long addr;
-+	int i;
-+
-+	if (strncmp(name, match, 5) != 0)
-+		return -ENODEV;
-+
-+	if (uart_parse_earlycon(options, &iotype, &addr, &options))
-+		return -ENODEV;
-+
-+	/* try to match the port specified on the command line */
-+	for (i = 0; i < ARRAY_SIZE(amba_ports); i++) {
-+		struct uart_port *port;
-+
-+		if (!amba_ports[i])
-+			continue;
-+
-+		port = &amba_ports[i]->port;
-+
-+		if (port->iotype != iotype)
-+			continue;
-+		if ((iotype == UPIO_MEM || iotype == UPIO_MEM32) &&
-+		    (port->mapbase != addr))
-+			continue;
-+
-+		co->index = i;
-+		port->cons = co;
-+		return pl011_console_setup(co, options);
-+	}
-+
-+	return -ENODEV;
-+}
-+
- static struct uart_driver amba_reg;
- static struct console amba_console = {
- 	.name		= "ttyAMA",
- 	.write		= pl011_console_write,
- 	.device		= uart_console_device,
- 	.setup		= pl011_console_setup,
-+	.match		= pl011_console_match,
- 	.flags		= CON_PRINTBUFFER,
- 	.index		= -1,
- 	.data		= &amba_reg,
+ #ifdef CONFIG_SERIAL_EARLYCON
+ 
+-static int __init early_init_dt_scan_chosen_serial(void)
++int __init early_init_dt_scan_chosen_stdout(void)
+ {
+ 	int offset;
+ 	const char *p, *q, *options = NULL;
+@@ -849,15 +849,6 @@ static int __init early_init_dt_scan_chosen_serial(void)
+ 	}
+ 	return -ENODEV;
+ }
+-
+-static int __init setup_of_earlycon(char *buf)
+-{
+-	if (buf)
+-		return 0;
+-
+-	return early_init_dt_scan_chosen_serial();
+-}
+-early_param("earlycon", setup_of_earlycon);
+ #endif
+ 
+ /**
+diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
+index 067783f..7aae655 100644
+--- a/drivers/tty/serial/earlycon.c
++++ b/drivers/tty/serial/earlycon.c
+@@ -209,7 +209,7 @@ static int __init param_setup_earlycon(char *buf)
+ 	 * don't generate a warning from parse_early_params() in that case
+ 	 */
+ 	if (!buf || !buf[0])
+-		return 0;
++		return early_init_dt_scan_chosen_stdout();
+ 
+ 	err = setup_earlycon(buf);
+ 	if (err == -ENOENT || err == -EALREADY)
+diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
+index 2fbe868..5cfe322 100644
+--- a/include/linux/of_fdt.h
++++ b/include/linux/of_fdt.h
+@@ -63,6 +63,7 @@ extern int early_init_dt_scan_chosen(unsigned long node, const char *uname,
+ 				     int depth, void *data);
+ extern int early_init_dt_scan_memory(unsigned long node, const char *uname,
+ 				     int depth, void *data);
++extern int early_init_dt_scan_chosen_stdout(void);
+ extern void early_init_fdt_scan_reserved_mem(void);
+ extern void early_init_fdt_reserve_self(void);
+ extern void early_init_dt_add_memory_arch(u64 base, u64 size);
+@@ -91,6 +92,7 @@ extern void early_get_first_memblock_info(void *, phys_addr_t *);
+ extern u64 of_flat_dt_translate_address(unsigned long node);
+ extern void of_fdt_limit_memory(int limit);
+ #else /* CONFIG_OF_FLATTREE */
++static inline int early_init_dt_scan_chosen_stdout(void) { return -ENODEV; }
+ static inline void early_init_fdt_scan_reserved_mem(void) {}
+ static inline void early_init_fdt_reserve_self(void) {}
+ static inline const char *of_flat_dt_get_machine_name(void) { return NULL; }
 -- 
 2.7.4
