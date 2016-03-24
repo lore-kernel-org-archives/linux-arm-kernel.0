@@ -1,175 +1,77 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 24 Mar 2016 11:23:52 +0000
-Subject: [PATCH 3/3] [media] c8sectpfe: Rework firmware loading mechanism
-In-Reply-To: <1458818632-25552-1-git-send-email-peter.griffin@linaro.org>
-References: <1458818632-25552-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1458818632-25552-4-git-send-email-peter.griffin@linaro.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 24 Mar 2016 12:24:52 +0100
+Subject: [PATCH v5 3/5] ARM: at91: pm: configure PMC fast startup signals
+In-Reply-To: <B256D81BAE5131468A838E5D7A243641D643C03F@penmbx01>
+References: <1458111489-23774-1-git-send-email-wenyou.yang@atmel.com>
+ <1458111489-23774-4-git-send-email-wenyou.yang@atmel.com>
+ <20160317171433.GD2831@piout.net>
+ <B256D81BAE5131468A838E5D7A243641D643C03F@penmbx01>
+Message-ID: <20160324112452.GJ2570@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-c8sectpfe driver relied on CONFIG_FW_LOADER_USER_HELPER_FALLBACK option
-for loading its xp70 firmware. A previous commit removed this Kconfig
-option, as it is apparently harmful, but did not update the driver
-code which relied on it.
+On 21/03/2016 at 02:24:32 +0000, Yang, Wenyou wrote :
+> Hi Alexandre,
+> 
+> > -----Original Message-----
+> > From: Alexandre Belloni [mailto:alexandre.belloni at free-electrons.com]
+> > Sent: 2016?3?18? 1:15
+> > To: Yang, Wenyou <Wenyou.Yang@atmel.com>
+> > Cc: Ferre, Nicolas <Nicolas.FERRE@atmel.com>; Jean-Christophe Plagniol-
+> > Villard <plagnioj@jcrosoft.com>; Russell King <linux@arm.linux.org.uk>; linux-
+> > kernel at vger.kernel.org; devicetree at vger.kernel.org; linux-arm-
+> > kernel at lists.infradead.org; linux-clk at vger.kernel.org; Rob Herring
+> > <robh+dt@kernel.org>; Pawel Moll <pawel.moll@arm.com>; Mark Brown
+> > <broonie@kernel.org>; Ian Campbell <ijc+devicetree@hellion.org.uk>; Kumar
+> > Gala <galak@codeaurora.org>
+> > Subject: Re: [PATCH v5 3/5] ARM: at91: pm: configure PMC fast startup signals
+> > 
+> > On 16/03/2016 at 14:58:07 +0800, Wenyou Yang wrote :
+> > > The fast startup signal is used as wake up sources for ULP1 mode.
+> > > As soon as a fast startup signal is asserted, the embedded 12 MHz RC
+> > > oscillator restarts automatically.
+> > >
+> > > This patch is to configure the fast startup signals, which signal is
+> > > enabled to trigger the PMC to wake up the system from ULP1 mode should
+> > > be configured via the DT.
+> > >
+> > > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> > 
+> > I would actually avoid doing that from the PMC driver and do that configuration
+> > from the aic5 driver. It has all the information you need, it knows what kind of level
+> > or edge is needed to wake up and what are the wakeup interrupts to enable. This
+> > will allow you to stop introducing a new binding. Also, this will avoid discrepancies
+> > between what is configured in the DT and what the user really wants (for exemple
+> > differences between the edge direction configured for the PIOBu in userspace
+> > versus what is in the device tree or wakeonlan activation/deactivation).
+> 
+> Thank you for your feedback.
+> 
+> But some wake-ups such as WKUP pin, ACC_CE, RXLP_MCE, don't have the corresponding
 
-This patch reworks the firmware loading into the start_feed callback.
-At this point we can be sure the rootfs is present, thereby removing
-the depedency on CONFIG_FW_LOADER_USER_HELPER_FALLBACK.
+The WKUP pin can be configured from the shdwc driver, ACC_CE from the
+ACC driver, RXLP_MCE, from the RXLP driver because you will need
+drivers for those at some point anyway.
 
-Fixes: 79f5b6ae960d ('[media] c8sectpfe: Remove select on CONFIG_FW_LOADER_USER_HELPER_FALLBACK')
+> interrupt number. Moreover, I think, the ULP1 is very different form the ULP0, it is not woken
+> up by the interrupt. It is fallen sleep and woken up by the some mechanism in the PMC. 
+> 
 
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
----
- .../media/platform/sti/c8sectpfe/c8sectpfe-core.c  | 65 ++++++++--------------
- 1 file changed, 22 insertions(+), 43 deletions(-)
+Well, we don't really care about the mechanism. We only care about how
+the user is able to configure the wakeup sources.
 
-diff --git a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
-index acd0767..7dddf77 100644
---- a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
-+++ b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
-@@ -49,7 +49,7 @@ MODULE_FIRMWARE(FIRMWARE_MEMDMA);
- #define PID_TABLE_SIZE 1024
- #define POLL_MSECS 50
- 
--static int load_c8sectpfe_fw_step1(struct c8sectpfei *fei);
-+static int load_c8sectpfe_fw(struct c8sectpfei *fei);
- 
- #define TS_PKT_SIZE 188
- #define HEADER_SIZE (4)
-@@ -141,6 +141,7 @@ static int c8sectpfe_start_feed(struct dvb_demux_feed *dvbdmxfeed)
- 	struct channel_info *channel;
- 	u32 tmp;
- 	unsigned long *bitmap;
-+	int ret;
- 
- 	switch (dvbdmxfeed->type) {
- 	case DMX_TYPE_TS:
-@@ -169,8 +170,9 @@ static int c8sectpfe_start_feed(struct dvb_demux_feed *dvbdmxfeed)
- 	}
- 
- 	if (!atomic_read(&fei->fw_loaded)) {
--		dev_err(fei->dev, "%s: c8sectpfe fw not loaded\n", __func__);
--		return -EINVAL;
-+		ret = load_c8sectpfe_fw(fei);
-+		if (ret)
-+			return ret;
- 	}
- 
- 	mutex_lock(&fei->lock);
-@@ -265,8 +267,9 @@ static int c8sectpfe_stop_feed(struct dvb_demux_feed *dvbdmxfeed)
- 	unsigned long *bitmap;
- 
- 	if (!atomic_read(&fei->fw_loaded)) {
--		dev_err(fei->dev, "%s: c8sectpfe fw not loaded\n", __func__);
--		return -EINVAL;
-+		ret = load_c8sectpfe_fw(fei);
-+		if (ret)
-+			return ret;
- 	}
- 
- 	mutex_lock(&fei->lock);
-@@ -880,13 +883,6 @@ static int c8sectpfe_probe(struct platform_device *pdev)
- 		goto err_clk_disable;
- 	}
- 
--	/* ensure all other init has been done before requesting firmware */
--	ret = load_c8sectpfe_fw_step1(fei);
--	if (ret) {
--		dev_err(dev, "Couldn't load slim core firmware\n");
--		goto err_clk_disable;
--	}
--
- 	c8sectpfe_debugfs_init(fei);
- 
- 	return 0;
-@@ -1091,15 +1087,14 @@ static void load_dmem_segment(struct c8sectpfei *fei, Elf32_Phdr *phdr,
- 		phdr->p_memsz - phdr->p_filesz);
- }
- 
--static int load_slim_core_fw(const struct firmware *fw, void *context)
-+static int load_slim_core_fw(const struct firmware *fw, struct c8sectpfei *fei)
- {
--	struct c8sectpfei *fei = context;
- 	Elf32_Ehdr *ehdr;
- 	Elf32_Phdr *phdr;
- 	u8 __iomem *dst;
- 	int err = 0, i;
- 
--	if (!fw || !context)
-+	if (!fw || !fei)
- 		return -EINVAL;
- 
- 	ehdr = (Elf32_Ehdr *)fw->data;
-@@ -1151,29 +1146,35 @@ static int load_slim_core_fw(const struct firmware *fw, void *context)
- 	return err;
- }
- 
--static void load_c8sectpfe_fw_cb(const struct firmware *fw, void *context)
-+static int load_c8sectpfe_fw(struct c8sectpfei *fei)
- {
--	struct c8sectpfei *fei = context;
-+	const struct firmware *fw;
- 	int err;
- 
-+	dev_info(fei->dev, "Loading firmware: %s\n", FIRMWARE_MEMDMA);
-+
-+	err = request_firmware(&fw, FIRMWARE_MEMDMA, fei->dev);
-+	if (err)
-+		return err;
-+
- 	err = c8sectpfe_elf_sanity_check(fei, fw);
- 	if (err) {
- 		dev_err(fei->dev, "c8sectpfe_elf_sanity_check failed err=(%d)\n"
- 			, err);
--		goto err;
-+		return err;
- 	}
- 
--	err = load_slim_core_fw(fw, context);
-+	err = load_slim_core_fw(fw, fei);
- 	if (err) {
- 		dev_err(fei->dev, "load_slim_core_fw failed err=(%d)\n", err);
--		goto err;
-+		return err;
- 	}
- 
- 	/* now the firmware is loaded configure the input blocks */
- 	err = configure_channels(fei);
- 	if (err) {
- 		dev_err(fei->dev, "configure_channels failed err=(%d)\n", err);
--		goto err;
-+		return err;
- 	}
- 
- 	/*
-@@ -1186,28 +1187,6 @@ static void load_c8sectpfe_fw_cb(const struct firmware *fw, void *context)
- 	writel(0x1,  fei->io + DMA_CPU_RUN);
- 
- 	atomic_set(&fei->fw_loaded, 1);
--err:
--	complete_all(&fei->fw_ack);
--}
--
--static int load_c8sectpfe_fw_step1(struct c8sectpfei *fei)
--{
--	int err;
--
--	dev_info(fei->dev, "Loading firmware: %s\n", FIRMWARE_MEMDMA);
--
--	init_completion(&fei->fw_ack);
--	atomic_set(&fei->fw_loaded, 0);
--
--	err = request_firmware_nowait(THIS_MODULE, FW_ACTION_HOTPLUG,
--				FIRMWARE_MEMDMA, fei->dev, GFP_KERNEL, fei,
--				load_c8sectpfe_fw_cb);
--
--	if (err) {
--		dev_err(fei->dev, "request_firmware_nowait err: %d.\n", err);
--		complete_all(&fei->fw_ack);
--		return err;
--	}
- 
- 	return 0;
- }
+With your patch set, what happens when no ULP1 sources are defined but
+there are ULP0 sources? What happens when there are both ULP1 and ULP0
+sources?
+
+What would be good is to use ULP1 when only ULP1 sources are set up and
+ULP0 in the other cases. This will greatly help the user. Also, what I'm
+suggesting actually allows to change the ULP1 sources at runtime from
+devices that are actually used which is quite better than setting them
+up statically from DT.
+
+
 -- 
-1.9.1
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
