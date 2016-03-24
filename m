@@ -1,70 +1,41 @@
-From: finley.xiao@rock-chips.com (Finley Xiao)
-Date: Thu, 24 Mar 2016 23:09:28 +0800
-Subject: [PATCH v2] cpufreq: rockchip: add driver
-In-Reply-To: <20160324064324.GG22062@vireshk-i7>
-References: <1458647848-48999-1-git-send-email-xf@rock-chips.com>
- <1458699487-58470-1-git-send-email-xf@rock-chips.com>
- <20160323044033.GQ5272@vireshk-i7> <56F35894.3020106@rock-chips.com>
- <20160324064324.GG22062@vireshk-i7>
-Message-ID: <56F40328.5090001@rock-chips.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 24 Mar 2016 15:16:47 +0000
+Subject: dmaengine: ARM pl080 misidentified as Samsung pl080s
+In-Reply-To: <20160324105651.GA20489@sig21.net>
+References: <20160324105651.GA20489@sig21.net>
+Message-ID: <20160324151647.GS19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
+On Thu, Mar 24, 2016 at 11:56:51AM +0100, Johannes Stezenbach wrote:
+> Hi,
+> 
+> commit da1b6c05b8b5bd ("dmaengine: PL08x: Add support for PL080S variant")
+> added this hunk:
+> 
+>  static struct amba_id pl08x_ids[] = {
+> +       /* Samsung PL080S variant */
+> +       {
+> +               .id     = 0x0a141080,
+> +               .mask   = 0xffffffff,
+> +               .data   = &vendor_pl080s,
+> +       },
+>         /* PL080 */
+> 
+> However, 0x0a141080 happens to be the ID of the
+> ARM PL080, too:
+> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0196g/I54627.html
+> 
+> Since the PL080S has the configuration register at a different
+> address the driver doesn't work for ARM PL080 anymore.
 
-can we add a of_match_table with a common compatible name as follows ?
-
---- a/drivers/cpufreq/cpufreq-dt.c
-+++ b/drivers/cpufreq/cpufreq-dt.c
-@@ -470,10 +470,16 @@ static int dt_cpufreq_remove(struct 
-platform_device *pdev)
-         cpufreq_unregister_driver(&dt_cpufreq_driver);
-         return 0;
-  }
-+static const struct of_device_id dt_cpufreq_of_match[] = {
-+       { .compatible = "***,***", },
-+       { }
-+};
-+MODULE_DEVICE_TABLE(of, dt_cpufreq_of_match);
-  static struct platform_driver dt_cpufreq_platdrv = {
-         .driver = {
-                 .name   = "cpufreq-dt",
-+               .of_match_table = dt_cpufreq_of_match,
-         },
-
---- a/arch/arm64/boot/dts/rockchip/rk3366.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3366.dtsi
-+       cpufreq {
-+               compatible = "***,***";
-+       }
-
-Does it create a DT node for a dummy device too ?
-
-
-? 2016/3/24 14:43, Viresh Kumar ??:
-> On 24-03-16, 11:01, Feng Xiao wrote:
->> hi all,
->>       I found that it could match the cpufreq-dt driver succesfully only with
->> the following changes.
->> --- a/arch/arm64/boot/dts/rockchip/rk3366.dtsi
->> +++ b/arch/arm64/boot/dts/rockchip/rk3366.dtsi
->> @@ -139,6 +139,10 @@
->>                  };
->>          };
->>
->> +       cpufreq-dt {   //the node name must be cpufreq-dt
->> +               compatible = "rockchip,cpufreq";  //  the compatible name is
->> insignificant
->> +       };
->> +
-> Its not allowed to create a DT node for a dummy device and so we never
-> followed this way.
->
-> I have just sent a patchset and cc'd you:
-> "[PATCH 0/3] cpufreq: dt: Create platform device from generic code"
->
-> and so this patch shall get replaced now.
->
+Vendors have got into serious trouble in the past over IDs claiming that
+some other legal entity being the vendor.  A certain buggy ARM926 clone
+comes to mind, and they were forced to respin their silicon as a result.
+It sounds like Samsung have made the same idiotic mistake.  I suggest
+reverting the offending commit.  This behaviour really isn't on.
 
 -- 
-Finley
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
