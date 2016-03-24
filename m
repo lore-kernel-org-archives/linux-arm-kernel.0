@@ -1,23 +1,20 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 24 Mar 2016 19:45:28 +0100
-Subject: [PATCH 0/2] ARM: sunxi: dt: Add missing DRAM gate clock for
- simplefb TV output
-In-Reply-To: <1458842920-30854-1-git-send-email-Priit.Laes@icefire.ee>
-References: <1458842920-30854-1-git-send-email-Priit.Laes@icefire.ee>
-Message-ID: <20160324184528.GZ30977@lukather>
+Date: Thu, 24 Mar 2016 19:46:22 +0100
+Subject: [PATCH v2 1/1] ARM: dts: sun5i-a13-olinuxino-micro: enable USB DRC
+In-Reply-To: <1458825533-13968-1-git-send-email-jmfriedt@femto-st.fr>
+References: <1458825533-13968-1-git-send-email-jmfriedt@femto-st.fr>
+Message-ID: <20160324184622.GA30977@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Mar 24, 2016 at 08:08:38PM +0200, Priit Laes wrote:
-> From: Priit Laes <plaes@plaes.org>
+On Thu, Mar 24, 2016 at 02:18:53PM +0100, Jean-Michel Friedt wrote:
+> From: JM Friedt <jmfriedt@femto-st.fr>
 > 
-> DRAM gating driver commit for sun[47]i seems to be missing DRAM gate bit 5 for
-> simplefb TV output node. Add it.
+> Enable the OTG controller on the Olinuxino A13-micro. 
+> 
+> Signed-off-by: Jean-Michel Friedt <jmfriedt@femto-st.fr>
 
-Thanks, could you please add the Fixes tag and Cc stable ?
-
+Applied, thanks!
 Maxime
 
 -- 
@@ -30,4 +27,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160324/3aad03d9/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160324/4ab34eff/attachment.sig>
