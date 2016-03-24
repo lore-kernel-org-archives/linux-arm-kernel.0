@@ -1,35 +1,38 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 24 Mar 2016 09:14:13 +0100
-Subject: [PATCH 0/4] serial: imx: some irq and handshaking fixes
-In-Reply-To: <1457605569-7828-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1457605569-7828-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20160324081413.GR6191@pengutronix.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 24 Mar 2016 09:17:26 +0100
+Subject: [PATCH 4/4] arm64: dts: marvell: Rename armada-ap806 XOR nodes
+In-Reply-To: <1458771861-12392-5-git-send-email-afaerber@suse.de>
+References: <1458771861-12392-1-git-send-email-afaerber@suse.de>
+ <1458771861-12392-5-git-send-email-afaerber@suse.de>
+Message-ID: <20160324091726.6eaf83ec@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Greg,
+Hello,
 
-On Thu, Mar 10, 2016 at 11:26:05AM +0100, Uwe Kleine-K?nig wrote:
-> this series doesn't solve all my problems but at least some. Now for my
-> remaining problem my machine at least doesn't reset (by watchdog) but
-> disables the serial irq instead which at least allows to debug further.
-> (Still I'm a bit out of ideas.)
+On Wed, 23 Mar 2016 23:24:21 +0100, Andreas F?rber wrote:
+> Node names should not contain an instance number, the unit address
+> serves to distinguish nodes of the same name. So rename the XOR nodes
+> to just xor at address, using xorX as label instead.
 > 
-> The last patch doesn't fix a real problem I have, just noticed that
-> while working on the handshaking stuff.
-> 
-> It would be great if these patched made it into v4.6-rc1.
+> Fixes: ec7e5a569bce ("arm64: dts: marvell: add Device Tree files for Armada 7K/8K")
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
 
-I have to rework this series. There is an unclear situation that results
-in a stuck irq on i.MX25 because I'm unable to clear the DCD irq. Also I
-missed a hunk in "let irq handler return IRQ_NONE if no event was
-handled".
+Removing the instance number from the node name is obviously good.
+However, I don't think it's really needed to add labels. The XOR
+engines are purely "internal" devices, so they are always enabled at
+the SoC level.
 
-I will post a safer series later today. Please don't apply this one.
+>  "marvell,mv-xor-v2" is not yet referenced from any driver in next-20160323.
 
-Best regards
-Uwe
+Yes. The driver has been submitted, but has received some comments that
+I need to address.
 
+Thanks!
+
+Thomas
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
