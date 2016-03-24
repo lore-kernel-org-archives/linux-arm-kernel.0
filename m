@@ -1,25 +1,33 @@
-From: Tirumalesh.Chalamarla@caviumnetworks.com (Chalamarla, Tirumalesh)
-Date: Thu, 24 Mar 2016 18:29:01 +0000
-Subject: [PATCH V4] iommu/arm-smmu-v2: Workaround for ThunderX errata#27704
-In-Reply-To: <20160324175127.GA29365@arm.com>
-References: <1457128569-13878-1-git-send-email-tchalamarla@caviumnetworks.com>
- <44D97D2C-5114-4FCD-AE3E-9404391FD449@caviumnetworks.com>
- <20160324175127.GA29365@arm.com>
-Message-ID: <4F6594C9-35E6-415B-B022-D78827C659C0@caviumnetworks.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 24 Mar 2016 19:45:28 +0100
+Subject: [PATCH 0/2] ARM: sunxi: dt: Add missing DRAM gate clock for
+ simplefb TV output
+In-Reply-To: <1458842920-30854-1-git-send-email-Priit.Laes@icefire.ee>
+References: <1458842920-30854-1-git-send-email-Priit.Laes@icefire.ee>
+Message-ID: <20160324184528.GZ30977@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks. 
+Hi,
 
+On Thu, Mar 24, 2016 at 08:08:38PM +0200, Priit Laes wrote:
+> From: Priit Laes <plaes@plaes.org>
+> 
+> DRAM gating driver commit for sun[47]i seems to be missing DRAM gate bit 5 for
+> simplefb TV output node. Add it.
 
+Thanks, could you please add the Fixes tag and Cc stable ?
 
+Maxime
 
-On 3/24/16, 10:51 AM, "Will Deacon" <will.deacon@arm.com> wrote:
-
->On Thu, Mar 24, 2016 at 05:36:39PM +0000, Chalamarla, Tirumalesh wrote:
->> Do you want me to resend it with path version number change?
->
->Shouldn't be any need. I've queued this locally, and will push out when
->I update my repo after the merge window.
->
->Will
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160324/3aad03d9/attachment.sig>
