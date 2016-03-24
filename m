@@ -1,63 +1,93 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 24 Mar 2016 17:48:23 +0100
-Subject: [PATCH v2] spi: orion.c: Add direct access mode
-In-Reply-To: <56F412B5.2080200@denx.de>
-References: <1458663893-13766-1-git-send-email-sr@denx.de>
- <3250653.vvT0RgK8yg@wuerfel> <56F412B5.2080200@denx.de>
-Message-ID: <30176583.aSTyzO0qS3@wuerfel>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu, 24 Mar 2016 17:49:57 +0100
+Subject: [PATCH v3 00/18] Add Initial support for PLX Technology OX810SE
+Message-ID: <1458838215-23314-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 24 March 2016 17:15:49 Stefan Roese wrote:
-> >
-> >       soc@ {
-> >               spi0 {
-> >                         compatible = "marvell,armada-370-spi",
-> >                                      "marvell,orion-spi";
-> >                       reg = <MBUS_ID(0xf0, 0x01) 0x10600 0x28>,
-> >                             <MBUS_ID(0x01, 0x5e) 0 0x100000>;
-> >                         #address-cells = <1>;
-> >                         #size-cells = <0>;
-> >                         pinctrl-0 = <&spi0_pins1>;
-> >                         pinctrl-names = "default";
-> >                         cell-index = <0>;
-> >                         interrupts = <30>;
-> >                         clocks = <&coreclk 0>;
-> >                         status = "disabled";
-> >               };
-> >       };
-> 
-> Do I understand this correctly, that you suggest to list all MBus
-> windows here, that the SoC supports (e.g. 8 for the Armada XP).
-> And let the SPI driver then extract and dynamically enable (map)
-> the one that is currently used?
+This serie adds initial support (IRQ, Timer, GPIO, Reset, Serial, Clocks) for
+the PLX Technology OX810SE used in the well-known Western Digital My Book
+World Edition Network Attached Storage device.
 
-Actually the syntax above doesn't imply any mapping at all, it
-just describes how the hardware is wired up, so that really
-needs to list all windows, and then the ranges property in the
-soc node can statically map the ones that are used on the
-particular machine.
+Extended support for SATA, DMA and Ethernet will come in further patches.
 
-> We also need a per-SPI-device DT property to enable this direct
-> access mode for this specific SPI device. As not all SPI devices
-> support this mode - at least not yet. How about this one:
-> 
->                 flash0: flash at 0 {
->                         compatible = "m25p128";
->                         reg = <0>;
->                         direct-access-enable;
->                         ...
->                 };
-> 
-> ?
+Upstream support for following devices like the OX820SE is welcome !
 
-Maybe the spi driver can just check whether the window is mapped
-or not, and then have no ranges entry for the devices that don't
-support it?
+v3 changes :
+ - use SoC specific compatible for interrupt controller
+ - use SoC specific compatible for dual timers, cleanup up width management
+ - full rewrite of pinctrl and gpio based on the pic32 code
+ - empty arm/arm/mach-oxnas/Makefile removal
+ - dtsi update with timer&irq compatible and pinctrl rewrite
 
-Alternatively, we might encode this in the 'reg' property in
-some way?
+v2 changes : http://lkml.kernel.org/r/1457519060-6038-1-git-send-email-narmstrong at baylibre.com
+- switch all compatible string to oxsemi,ox820se
+- add oxsemi to prefixes
+- switch to versatile-fpga interrupt controller with new compatible
+- switch to sp804 timer with new timer width property
+- cleanup of mach-oxnas (removal of generic oxnas.c)
+- cleanup of standard clock to a platform driver
 
-How do we know whether a device supports the mode or not?
+v1 : http://lkml.kernel.org/r/1457005210-18485-1-git-send-email-narmstrong at baylibre.com
 
-	Arnd
+Neil Armstrong (18):
+  clocksource: sp804: Add support for OX810SE 24bit timer width
+  dt-bindings: timer: sp804: add new compatible for OX810SE SoC
+  irqchip: versatile-fpga: add new compatible for OX810SE SoC
+  dt-bindings: irq: arm,versatile-fpga: add compatible string for
+    OX810SE SoC
+  dt-bindings: vendor-prefixes: Add PLX Technology
+  dt-bindings: Add Oxford Semiconductors to vendor prefixes
+  reset: Add PLX Technology Reset Controller driver
+  dt-bindings: Add PLX Technology Reset Controller bindings
+  clk: Add PLX Technology OXNAS Standard Clocks
+  dt-bindings: Add PLX Technology OXNAS Standard Clocks bindings
+  pinctrl: Add PLX Technology OXNAS pinctrl and gpio driver
+  dt-bindings: Add PLX Technology OXNAS pinctrl and gpio bindings
+  arm: Add new mach-oxnas
+  arm: Add build support for mach-oxnas
+  arm: boot: dts: Add PLX Technology OX810SE dtsi
+  dt-bindings: Add OXNAS bindings
+  dt-bindings: Add Western Digital to vendor prefixes
+  arm: boot: dts: Add Western Digital My Book World Edition device tree
+
+ Documentation/devicetree/bindings/arm/oxnas.txt    |   9 +
+ .../devicetree/bindings/clock/plxtech,stdclk.txt   |  35 +
+ .../devicetree/bindings/gpio/gpio_oxnas.txt        |  47 ++
+ .../arm,versatile-fpga-irq.txt                     |   2 +-
+ .../bindings/pinctrl/plxtech,pinctrl.txt           |  57 ++
+ .../devicetree/bindings/reset/plxtech,reset.txt    |  58 ++
+ .../devicetree/bindings/timer/arm,sp804.txt        |   2 +-
+ .../devicetree/bindings/vendor-prefixes.txt        |   5 +-
+ arch/arm/Kconfig                                   |   2 +
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/ox810se.dtsi                     | 336 +++++++++
+ arch/arm/boot/dts/wd-mbwe.dts                      | 112 +++
+ arch/arm/mach-oxnas/Kconfig                        |  25 +
+ drivers/clk/Kconfig                                |   6 +
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/clk-oxnas.c                            | 202 +++++
+ drivers/clocksource/timer-sp804.c                  |  40 +-
+ drivers/irqchip/irq-versatile-fpga.c               |   1 +
+ drivers/pinctrl/Kconfig                            |  11 +
+ drivers/pinctrl/Makefile                           |   1 +
+ drivers/pinctrl/pinctrl-oxnas.c                    | 837 +++++++++++++++++++++
+ drivers/reset/Kconfig                              |   3 +
+ drivers/reset/Makefile                             |   1 +
+ drivers/reset/reset-oxnas.c                        | 136 ++++
+ include/clocksource/timer-sp804.h                  |  11 +-
+ 25 files changed, 1921 insertions(+), 21 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/oxnas.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/plxtech,stdclk.txt
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio_oxnas.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/plxtech,pinctrl.txt
+ create mode 100644 Documentation/devicetree/bindings/reset/plxtech,reset.txt
+ create mode 100644 arch/arm/boot/dts/ox810se.dtsi
+ create mode 100644 arch/arm/boot/dts/wd-mbwe.dts
+ create mode 100644 arch/arm/mach-oxnas/Kconfig
+ create mode 100644 drivers/clk/clk-oxnas.c
+ create mode 100644 drivers/pinctrl/pinctrl-oxnas.c
+ create mode 100644 drivers/reset/reset-oxnas.c
+
+-- 
+1.9.1
