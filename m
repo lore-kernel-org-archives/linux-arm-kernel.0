@@ -1,31 +1,50 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 24 Mar 2016 09:18:32 +0100
-Subject: [PATCH 3/4] arm64: dts: marvell: Clean up armada-7040-db
-In-Reply-To: <1458771861-12392-4-git-send-email-afaerber@suse.de>
-References: <1458771861-12392-1-git-send-email-afaerber@suse.de>
- <1458771861-12392-4-git-send-email-afaerber@suse.de>
-Message-ID: <20160324091832.0060c907@free-electrons.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 24 Mar 2016 09:53:38 +0100
+Subject: [PATCH v5 0/2] power: reset: support for Atmel alternative
+ Shutdown Controller
+In-Reply-To: <20160323211144.GA31473@earth>
+References: <1458134390-23847-1-git-send-email-nicolas.ferre@atmel.com>
+ <56F27B96.5010406@atmel.com> <20160323211144.GA31473@earth>
+Message-ID: <56F3AB12.20701@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Wed, 23 Mar 2016 23:24:20 +0100, Andreas F?rber wrote:
-> Instead of duplicating the node hierarchy, reference the nodes by label,
-> adding labels where necessary.
+Le 23/03/2016 22:11, Sebastian Reichel a ?crit :
+> Hi Nicolas,
 > 
-> Drop some trailing or inconsistent white lines while at it.
+> On Wed, Mar 23, 2016 at 12:18:46PM +0100, Nicolas Ferre wrote:
+>> Le 16/03/2016 14:19, Nicolas Ferre a ?crit :
+>>> This is a series to add driver for a new Atmel Shutdown Controller. This new IP
+>>> is extensible and some features will be added later (see the TODO section).
+>>> Its extensible nature led to write a new binding so that wake-up sources can be
+>>> described easily.
+>>
+>> I have the feeling that this series is ready. What do you think?
 > 
-> Fixes: ec7e5a569bce ("arm64: dts: marvell: add Device Tree files for Armada 7K/8K")
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> I have see obvious problems with this series and plan to queue this
 
-We haven't used this solution on Marvell Armada 32-bits SoCs, so there
-needs to be a discussion on whether we want to go in this direction for
-the 64 bits SoCs.
+I would be reassured if a "not" was actually missing in the sentence
+above... ;-)
 
-Thomas
+Bye,
+
+> after the merge window has closed. I give patches one more review
+> while applying them, so at that point something might turn up.
+> 
+>> So, do you want me to collect everybody's tags and send another version
+>> or you can do it yourself?
+> 
+> I can collect the tags myself.
+> 
+>> BTW, I will certainly send the device tree updates for the sama5d2 SoC,
+>> but it will go through the AT91 then arm-soc git trees. No need for
+>> further synchronization here.
+> 
+> I will ignore the *.dts patches.
+> 
+> -- Sebastian
+> 
+
+
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Nicolas Ferre
