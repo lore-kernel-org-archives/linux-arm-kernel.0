@@ -1,38 +1,60 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 24 Mar 2016 12:13:24 +0530
-Subject: [PATCH v2] cpufreq: rockchip: add driver
-In-Reply-To: <56F35894.3020106@rock-chips.com>
-References: <1458647848-48999-1-git-send-email-xf@rock-chips.com>
- <1458699487-58470-1-git-send-email-xf@rock-chips.com>
- <20160323044033.GQ5272@vireshk-i7>
- <56F35894.3020106@rock-chips.com>
-Message-ID: <20160324064324.GG22062@vireshk-i7>
+From: yh.huang@mediatek.com (YH Huang)
+Date: Thu, 24 Mar 2016 14:43:52 +0800
+Subject: [PATCH] sbs-battery: fix power status when battery is dry
+In-Reply-To: <CAGS+omDTmJDkJYsf=gDJMrmAos+30enoAa2xfTPyirXUd37=9g@mail.gmail.com>
+References: <1458726794-48298-1-git-send-email-yh.huang@mediatek.com>
+ <CAGS+omDTmJDkJYsf=gDJMrmAos+30enoAa2xfTPyirXUd37=9g@mail.gmail.com>
+Message-ID: <1458801832.16645.7.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24-03-16, 11:01, Feng Xiao wrote:
-> hi all,
->      I found that it could match the cpufreq-dt driver succesfully only with
-> the following changes.
-> --- a/arch/arm64/boot/dts/rockchip/rk3366.dtsi
-> +++ b/arch/arm64/boot/dts/rockchip/rk3366.dtsi
-> @@ -139,6 +139,10 @@
->                 };
->         };
+Hi Daniel,
+
+On Thu, 2016-03-24 at 12:01 +0800, Daniel Kurtz wrote:
+> Hi YH,
 > 
-> +       cpufreq-dt {   //the node name must be cpufreq-dt
-> +               compatible = "rockchip,cpufreq";  //  the compatible name is
-> insignificant
-> +       };
-> +
+> On Wed, Mar 23, 2016 at 5:53 PM, YH Huang <yh.huang@mediatek.com> wrote:
+> > When the battery is dry and BATTERY_FULL_DISCHARGED is set,
+> > we should check BATTERY_DISCHARGING to decide the power status.
+> > If BATTERY_DISCHARGING is set, the power status is not charging.
+> > Or the power status should be charging.
+> >
+> > Signed-off-by: YH Huang <yh.huang@mediatek.com>
+> > ---
+> >  drivers/power/sbs-battery.c |   22 ++++++++++++----------
+> >  1 file changed, 12 insertions(+), 10 deletions(-)
+> >
+> > diff --git a/drivers/power/sbs-battery.c b/drivers/power/sbs-battery.c
+> > index d6226d6..d86db0e 100644
+> > --- a/drivers/power/sbs-battery.c
+> > +++ b/drivers/power/sbs-battery.c
+> > @@ -382,11 +382,12 @@ static int sbs_get_battery_property(struct i2c_client *client,
+> >
+> >                 if (ret & BATTERY_FULL_CHARGED)
+> >                         val->intval = POWER_SUPPLY_STATUS_FULL;
+> > -               else if (ret & BATTERY_FULL_DISCHARGED)
+> > -                       val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
+> > -               else if (ret & BATTERY_DISCHARGING)
+> > -                       val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
+> > -               else
+> > +               else if (ret & BATTERY_DISCHARGING) {
+> > +                       if (ret & BATTERY_FULL_DISCHARGED)
+> > +                               val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
+> > +                       else
+> > +                               val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
+> > +               } else
+> 
+> 
+> I think (BATTERY_DISCHARGING && BATTERY_FULL_DISCHARGED) is still
+> POWER_SUPPLY_STATUS_DISCHARGING.
+> So, let's just report what the battery says and do:
+> 
+>                else if (ret & BATTERY_DISCHARGING)
+>                                val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
+> 
+So we just ignore the special situation (BATTERY_DISCHARGING &&
+BATTERY_FULL_DISCHARGED).
+Isn't POWER_SUPPLY_STATUS_NOT_CHARGING a useful information?
 
-Its not allowed to create a DT node for a dummy device and so we never
-followed this way.
-
-I have just sent a patchset and cc'd you:
-"[PATCH 0/3] cpufreq: dt: Create platform device from generic code"
-
-and so this patch shall get replaced now.
-
--- 
-viresh
+Regards,
+YH Huang
