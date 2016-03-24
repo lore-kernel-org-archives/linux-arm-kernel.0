@@ -1,50 +1,52 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 24 Mar 2016 09:53:38 +0100
-Subject: [PATCH v5 0/2] power: reset: support for Atmel alternative
- Shutdown Controller
-In-Reply-To: <20160323211144.GA31473@earth>
-References: <1458134390-23847-1-git-send-email-nicolas.ferre@atmel.com>
- <56F27B96.5010406@atmel.com> <20160323211144.GA31473@earth>
-Message-ID: <56F3AB12.20701@atmel.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Thu, 24 Mar 2016 18:33:20 +0900
+Subject: [PATCH] ARM: dts: exynos: Fix invalid maximum voltage for buck9
+ supplying SD card
+In-Reply-To: <1458807125-13580-1-git-send-email-k.kozlowski@samsung.com>
+References: <1458807125-13580-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <56F3B460.9040306@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 23/03/2016 22:11, Sebastian Reichel a ?crit :
-> Hi Nicolas,
+On 03/24/2016 05:12 PM, Krzysztof Kozlowski wrote:
+> The buck9 regulator of S2MPS11 PMIC had incorrect maximum voltage -
+> lower by 5 mV than specified by datasheet. This buck9 provides power to
+> other regulators, including LDO13 and LDO19 which supply the MMC2 (SD
+> card).
 > 
-> On Wed, Mar 23, 2016 at 12:18:46PM +0100, Nicolas Ferre wrote:
->> Le 16/03/2016 14:19, Nicolas Ferre a ?crit :
->>> This is a series to add driver for a new Atmel Shutdown Controller. This new IP
->>> is extensible and some features will be added later (see the TODO section).
->>> Its extensible nature led to write a new binding so that wake-up sources can be
->>> described easily.
->>
->> I have the feeling that this series is ready. What do you think?
+> When constraints were applied, the depending regulators were not
+> providing enough power, leading to SD card detection errors:
+> 	mmc1: card never left busy state
+> 	mmc1: error -110 whilst initialising SD card
 > 
-> I have see obvious problems with this series and plan to queue this
+> Fixes: 86a2d2ac5e5d ("ARM: dts: Add dts file for Odroid XU3 board")
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-I would be reassured if a "not" was actually missing in the sentence
-above... ;-)
+Tested-by: Jaehoon Chung <jh80.chung@samsung.com>
 
-Bye,
+Best Regards,
+Jaehoon Chung
 
-> after the merge window has closed. I give patches one more review
-> while applying them, so at that point something might turn up.
 > 
->> So, do you want me to collect everybody's tags and send another version
->> or you can do it yourself?
+> ---
 > 
-> I can collect the tags myself.
+> The issue can be reproduced on next-20160324 with
+> bae4fdc88d7f7dda1 (regulator: core: Ensure we are at least in bounds for our constraints).
+> ---
+>  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
->> BTW, I will certainly send the device tree updates for the sama5d2 SoC,
->> but it will go through the AT91 then arm-soc git trees. No need for
->> further synchronization here.
+> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+> index 1bd507bfa750..82b2ba632cf6 100644
+> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+> @@ -299,7 +299,7 @@
+>  			buck9_reg: BUCK9 {
+>  				regulator-name = "vdd_2.8v_ldo";
+>  				regulator-min-microvolt = <3000000>;
+> -				regulator-max-microvolt = <3750000>;
+> +				regulator-max-microvolt = <3755000>;
+>  				regulator-always-on;
+>  				regulator-boot-on;
+>  			};
 > 
-> I will ignore the *.dts patches.
-> 
-> -- Sebastian
-> 
-
-
--- 
-Nicolas Ferre
