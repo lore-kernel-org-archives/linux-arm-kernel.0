@@ -1,387 +1,146 @@
-From: ashoks@broadcom.com (Ashok Kumar)
-Date: Thu, 24 Mar 2016 05:52:37 -0700
-Subject: [PATCH v2 3/6] arm64/perf: Filter common events based on PMCEIDn_EL0
-In-Reply-To: <1458823960-32760-1-git-send-email-ashoks@broadcom.com>
-References: <1458823960-32760-1-git-send-email-ashoks@broadcom.com>
-Message-ID: <1458823960-32760-4-git-send-email-ashoks@broadcom.com>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Thu, 24 Mar 2016 15:51:58 +0300
+Subject: [PATCH v6 0/5] ACPI: parse the SPCR table
+Message-ID: <1458823925-19560-1-git-send-email-aleksey.makarov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The complete common architectural and micro-architectural
-event number structure is filtered based on PMCEIDn_EL0 and
-copied to a new structure which is exposed to /sys
+'ARM Server Base Boot Requirements' [1] mentions SPCR (Serial Port
+Console Redirection Table) [2] as a mandatory ACPI table that
+specifies the configuration of serial console.
 
-The function which derives event bitmap from PMCEIDn_EL0 is
-executed in the cpus, which has the pmu being initialized,
-for heterogeneous pmu support.
+Move "earlycon" early_param handling to earlycon.c to parse this option once
 
-Enforced armv8_pmuv3_event_attrs array for event number
-ordering as this is indexed with event number now.
+Patch "ACPI: add definitions of DBG2 subtypes" is required for the next patch.
+ACPI maintainers said that they had got it for the next release of ACPICA,
+but it has not appeared in linux-next yet.
 
-Signed-off-by: Ashok Kumar <ashoks@broadcom.com>
----
- arch/arm64/kernel/perf_event.c | 281 ++++++++++++++++++++++++++++-------------
- 1 file changed, 195 insertions(+), 86 deletions(-)
+Parse SPCR table, setup earlycon and add register specified console.
 
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index 5358587..a025ec2 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -378,62 +378,106 @@ ARMV8_EVENT_ATTR(l2i_tlb_refill, ARMV8_PMUV3_PERFCTR_L2I_TLB_REFILL);
- ARMV8_EVENT_ATTR(l2d_tlb, ARMV8_PMUV3_PERFCTR_L2D_TLB);
- ARMV8_EVENT_ATTR(l2i_tlb, ARMV8_PMUV3_PERFCTR_L2I_TLB);
- 
--static struct attribute *armv8_pmuv3_event_attrs[] = {
--	&armv8_event_attr_sw_incr.attr.attr,
--	&armv8_event_attr_l1i_cache_refill.attr.attr,
--	&armv8_event_attr_l1i_tlb_refill.attr.attr,
--	&armv8_event_attr_l1d_cache_refill.attr.attr,
--	&armv8_event_attr_l1d_cache.attr.attr,
--	&armv8_event_attr_l1d_tlb_refill.attr.attr,
--	&armv8_event_attr_ld_retired.attr.attr,
--	&armv8_event_attr_st_retired.attr.attr,
--	&armv8_event_attr_inst_retired.attr.attr,
--	&armv8_event_attr_exc_taken.attr.attr,
--	&armv8_event_attr_exc_return.attr.attr,
--	&armv8_event_attr_cid_write_retired.attr.attr,
--	&armv8_event_attr_pc_write_retired.attr.attr,
--	&armv8_event_attr_br_immed_retired.attr.attr,
--	&armv8_event_attr_br_return_retired.attr.attr,
--	&armv8_event_attr_unaligned_ldst_retired.attr.attr,
--	&armv8_event_attr_br_mis_pred.attr.attr,
--	&armv8_event_attr_cpu_cycles.attr.attr,
--	&armv8_event_attr_br_pred.attr.attr,
--	&armv8_event_attr_mem_access.attr.attr,
--	&armv8_event_attr_l1i_cache.attr.attr,
--	&armv8_event_attr_l1d_cache_wb.attr.attr,
--	&armv8_event_attr_l2d_cache.attr.attr,
--	&armv8_event_attr_l2d_cache_refill.attr.attr,
--	&armv8_event_attr_l2d_cache_wb.attr.attr,
--	&armv8_event_attr_bus_access.attr.attr,
--	&armv8_event_attr_memory_error.attr.attr,
--	&armv8_event_attr_inst_spec.attr.attr,
--	&armv8_event_attr_ttbr_write_retired.attr.attr,
--	&armv8_event_attr_bus_cycles.attr.attr,
--	&armv8_event_attr_chain.attr.attr,
--	&armv8_event_attr_l1d_cache_allocate.attr.attr,
--	&armv8_event_attr_l2d_cache_allocate.attr.attr,
--	&armv8_event_attr_br_retired.attr.attr,
--	&armv8_event_attr_br_mis_pred_retired.attr.attr,
--	&armv8_event_attr_stall_frontend.attr.attr,
--	&armv8_event_attr_stall_backend.attr.attr,
--	&armv8_event_attr_l1d_tlb.attr.attr,
--	&armv8_event_attr_l1i_tlb.attr.attr,
--	&armv8_event_attr_l2i_cache.attr.attr,
--	&armv8_event_attr_l2i_cache_refill.attr.attr,
--	&armv8_event_attr_l3d_cache_allocate.attr.attr,
--	&armv8_event_attr_l3d_cache_refill.attr.attr,
--	&armv8_event_attr_l3d_cache.attr.attr,
--	&armv8_event_attr_l3d_cache_wb.attr.attr,
--	&armv8_event_attr_l2d_tlb_refill.attr.attr,
--	&armv8_event_attr_l2i_tlb_refill.attr.attr,
--	&armv8_event_attr_l2d_tlb.attr.attr,
--	&armv8_event_attr_l2i_tlb.attr.attr,
--	NULL,
--};
--
--static struct attribute_group armv8_pmuv3_events_attr_group = {
--	.name = "events",
--	.attrs = armv8_pmuv3_event_attrs,
-+#define ARMV8_PMUV3_MAX_COMMON_EVENTS 0x40
-+static struct attribute *armv8_pmuv3_event_attrs[ARMV8_PMUV3_MAX_COMMON_EVENTS] = {
-+	[ARMV8_PMUV3_PERFCTR_SW_INCR] =
-+		&armv8_event_attr_sw_incr.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_L1I_CACHE_REFILL] =
-+		&armv8_event_attr_l1i_cache_refill.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_L1I_TLB_REFILL] =
-+		&armv8_event_attr_l1i_tlb_refill.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_L1D_CACHE_REFILL] =
-+		&armv8_event_attr_l1d_cache_refill.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_L1D_CACHE] =
-+		&armv8_event_attr_l1d_cache.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_L1D_TLB_REFILL] =
-+		&armv8_event_attr_l1d_tlb_refill.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_LD_RETIRED] =
-+		&armv8_event_attr_ld_retired.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_ST_RETIRED] =
-+		&armv8_event_attr_st_retired.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_INST_RETIRED] =
-+		&armv8_event_attr_inst_retired.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_EXC_TAKEN] =
-+		&armv8_event_attr_exc_taken.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_EXC_RETURN] =
-+		&armv8_event_attr_exc_return.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_CID_WRITE_RETIRED] =
-+		&armv8_event_attr_cid_write_retired.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_PC_WRITE_RETIRED] =
-+		&armv8_event_attr_pc_write_retired.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_BR_IMMED_RETIRED] =
-+		&armv8_event_attr_br_immed_retired.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_BR_RETURN_RETIRED] =
-+		&armv8_event_attr_br_return_retired.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_UNALIGNED_LDST_RETIRED] =
-+		&armv8_event_attr_unaligned_ldst_retired.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_BR_MIS_PRED] =
-+		&armv8_event_attr_br_mis_pred.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_CPU_CYCLES] =
-+		&armv8_event_attr_cpu_cycles.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_BR_PRED] =
-+		&armv8_event_attr_br_pred.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_MEM_ACCESS] =
-+		&armv8_event_attr_mem_access.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_L1I_CACHE] =
-+		&armv8_event_attr_l1i_cache.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_L1D_CACHE_WB] =
-+		&armv8_event_attr_l1d_cache_wb.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_L2D_CACHE] =
-+		&armv8_event_attr_l2d_cache.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_L2D_CACHE_REFILL] =
-+		&armv8_event_attr_l2d_cache_refill.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_L2D_CACHE_WB] =
-+		&armv8_event_attr_l2d_cache_wb.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_BUS_ACCESS] =
-+		&armv8_event_attr_bus_access.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_MEMORY_ERROR] =
-+		&armv8_event_attr_memory_error.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_INST_SPEC] =
-+		&armv8_event_attr_inst_spec.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_TTBR_WRITE_RETIRED] =
-+		&armv8_event_attr_ttbr_write_retired.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_BUS_CYCLES] =
-+		&armv8_event_attr_bus_cycles.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_CHAIN] =
-+		&armv8_event_attr_chain.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_L1D_CACHE_ALLOCATE] =
-+		&armv8_event_attr_l1d_cache_allocate.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_L2D_CACHE_ALLOCATE] =
-+		&armv8_event_attr_l2d_cache_allocate.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_BR_RETIRED] =
-+		&armv8_event_attr_br_retired.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_BR_MIS_PRED_RETIRED] =
-+		&armv8_event_attr_br_mis_pred_retired.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_STALL_FRONTEND] =
-+		&armv8_event_attr_stall_frontend.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_STALL_BACKEND] =
-+		&armv8_event_attr_stall_backend.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_L1D_TLB] =
-+		&armv8_event_attr_l1d_tlb.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_L1I_TLB] =
-+		&armv8_event_attr_l1i_tlb.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_L2I_CACHE] =
-+		&armv8_event_attr_l2i_cache.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_L2I_CACHE_REFILL] =
-+		&armv8_event_attr_l2i_cache_refill.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_L3D_CACHE_ALLOCATE] =
-+		&armv8_event_attr_l3d_cache_allocate.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_L3D_CACHE_REFILL] =
-+		&armv8_event_attr_l3d_cache_refill.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_L3D_CACHE] =
-+		&armv8_event_attr_l3d_cache.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_L3D_CACHE_WB] =
-+		&armv8_event_attr_l3d_cache_wb.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_L2D_TLB_REFILL] =
-+		&armv8_event_attr_l2d_tlb_refill.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_L2I_TLB_REFILL] =
-+		&armv8_event_attr_l2i_tlb_refill.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_L2D_TLB] =
-+		&armv8_event_attr_l2d_tlb.attr.attr,
-+	[ARMV8_PMUV3_PERFCTR_L2I_TLB] =
-+		&armv8_event_attr_l2i_tlb.attr.attr,
- };
- 
- PMU_FORMAT_ATTR(event, "config:0-9");
-@@ -448,12 +492,6 @@ static struct attribute_group armv8_pmuv3_format_attr_group = {
- 	.attrs = armv8_pmuv3_format_attrs,
- };
- 
--static const struct attribute_group *armv8_pmuv3_attr_groups[] = {
--	&armv8_pmuv3_events_attr_group,
--	&armv8_pmuv3_format_attr_group,
--	NULL,
--};
--
- /*
-  * Perf Events' indices
-  */
-@@ -522,6 +560,18 @@ static inline void armv8pmu_pmcr_write(u32 val)
- 	asm volatile("msr pmcr_el0, %0" :: "r" (val));
- }
- 
-+static inline u32 armv8pmu_pmceidn_read(int reg)
-+{
-+	u32 val = 0;
-+
-+	if (reg == 0)
-+		asm volatile("mrs %0, pmceid0_el0" : "=r" (val));
-+	else if (reg == 1)
-+		asm volatile("mrs %0, pmceid1_el0" : "=r" (val));
-+
-+	return val;
-+}
-+
- static inline int armv8pmu_has_overflowed(u32 pmovsr)
- {
- 	return pmovsr & ARMV8_OVERFLOWED_MASK;
-@@ -890,26 +940,53 @@ static int armv8_thunder_map_event(struct perf_event *event)
- 				ARMV8_EVTYPE_EVENT);
- }
- 
--static void armv8pmu_read_num_pmnc_events(void *info)
-+static unsigned int armv8pmu_read_num_pmnc_events(void)
- {
--	int *nb_cnt = info;
--
-+	unsigned int nb_cnt;
- 	/* Read the nb of CNTx counters supported from PMNC */
--	*nb_cnt = (armv8pmu_pmcr_read() >> ARMV8_PMCR_N_SHIFT) & ARMV8_PMCR_N_MASK;
-+	nb_cnt = (armv8pmu_pmcr_read() >> ARMV8_PMCR_N_SHIFT) & ARMV8_PMCR_N_MASK;
- 
- 	/* Add the CPU cycles counter */
--	*nb_cnt += 1;
-+	nb_cnt += 1;
-+
-+	return nb_cnt;
-+}
-+
-+static void armv8pmu_read_common_events_bitmap(unsigned long *bmp)
-+{
-+	u32 reg[2];
-+
-+	reg[0] = armv8pmu_pmceidn_read(0);
-+	reg[1] = armv8pmu_pmceidn_read(1);
-+
-+	bitmap_from_u32array(bmp, ARMV8_PMUV3_MAX_COMMON_EVENTS,
-+			     reg, ARRAY_SIZE(reg));
-+	return;
- }
- 
--static int armv8pmu_probe_num_events(struct arm_pmu *arm_pmu)
-+struct armv8pmu_probe_pmu_data {
-+	int num_evt_cntrs;
-+	DECLARE_BITMAP(events_bitmap, ARMV8_PMUV3_MAX_COMMON_EVENTS);
-+};
-+
-+static void armv8pmu_probe_pmu(void *info)
- {
--	return smp_call_function_any(&arm_pmu->supported_cpus,
--				    armv8pmu_read_num_pmnc_events,
--				    &arm_pmu->num_events, 1);
-+	struct armv8pmu_probe_pmu_data *data = info;
-+
-+	data->num_evt_cntrs = armv8pmu_read_num_pmnc_events();
-+	armv8pmu_read_common_events_bitmap(data->events_bitmap);
- }
- 
--static void armv8_pmu_init(struct arm_pmu *cpu_pmu)
-+static int armv8_pmu_init(struct arm_pmu *cpu_pmu)
- {
-+	u32 evt, idx = 0;
-+	struct attribute **event_attrs;
-+	struct attribute_group *events_attr_group;
-+	const struct attribute_group **attr_groups;
-+	struct device *dev = &cpu_pmu->plat_device->dev;
-+	struct armv8pmu_probe_pmu_data pmu_data;
-+	int error;
-+
- 	cpu_pmu->handle_irq		= armv8pmu_handle_irq,
- 	cpu_pmu->enable			= armv8pmu_enable_event,
- 	cpu_pmu->disable		= armv8pmu_disable_event,
-@@ -921,50 +998,82 @@ static void armv8_pmu_init(struct arm_pmu *cpu_pmu)
- 	cpu_pmu->reset			= armv8pmu_reset,
- 	cpu_pmu->max_period		= (1LLU << 32) - 1,
- 	cpu_pmu->set_event_filter	= armv8pmu_set_event_filter;
-+
-+	error = smp_call_function_any(&cpu_pmu->supported_cpus,
-+			      armv8pmu_probe_pmu,
-+			      &pmu_data, 1);
-+	if (error)
-+		goto out;
-+
-+	cpu_pmu->num_events = pmu_data.num_evt_cntrs;
-+
-+	event_attrs = devm_kcalloc(dev, bitmap_weight(pmu_data.events_bitmap,
-+				   ARMV8_PMUV3_MAX_COMMON_EVENTS) + 1,
-+				   sizeof(*event_attrs), GFP_KERNEL);
-+	if (!event_attrs)
-+		goto mem_out;
-+
-+	events_attr_group = devm_kzalloc(dev, sizeof(*events_attr_group),
-+					 GFP_KERNEL);
-+	if (!events_attr_group)
-+		goto mem_out;
-+
-+	attr_groups = devm_kcalloc(dev, 3, sizeof(*attr_groups), GFP_KERNEL);
-+	if (!attr_groups)
-+		goto mem_out;
-+
-+	for_each_set_bit(evt, pmu_data.events_bitmap,
-+			 ARMV8_PMUV3_MAX_COMMON_EVENTS)
-+		event_attrs[idx++] = armv8_pmuv3_event_attrs[evt];
-+
-+	events_attr_group->name = "events";
-+	events_attr_group->attrs = event_attrs;
-+
-+	attr_groups[0] = events_attr_group;
-+	attr_groups[1] = &armv8_pmuv3_format_attr_group;
-+
-+	cpu_pmu->pmu.attr_groups = attr_groups;
-+
-+	return 0;
-+mem_out:
-+	error = -ENOMEM;
-+out:
-+	return error;
- }
- 
- static int armv8_pmuv3_init(struct arm_pmu *cpu_pmu)
- {
--	armv8_pmu_init(cpu_pmu);
- 	cpu_pmu->name			= "armv8_pmuv3";
- 	cpu_pmu->map_event		= armv8_pmuv3_map_event;
--	return armv8pmu_probe_num_events(cpu_pmu);
-+	return armv8_pmu_init(cpu_pmu);
- }
- 
- static int armv8_a53_pmu_init(struct arm_pmu *cpu_pmu)
- {
--	armv8_pmu_init(cpu_pmu);
- 	cpu_pmu->name			= "armv8_cortex_a53";
- 	cpu_pmu->map_event		= armv8_a53_map_event;
--	cpu_pmu->pmu.attr_groups	= armv8_pmuv3_attr_groups;
--	return armv8pmu_probe_num_events(cpu_pmu);
-+	return armv8_pmu_init(cpu_pmu);
- }
- 
- static int armv8_a57_pmu_init(struct arm_pmu *cpu_pmu)
- {
--	armv8_pmu_init(cpu_pmu);
- 	cpu_pmu->name			= "armv8_cortex_a57";
- 	cpu_pmu->map_event		= armv8_a57_map_event;
--	cpu_pmu->pmu.attr_groups	= armv8_pmuv3_attr_groups;
--	return armv8pmu_probe_num_events(cpu_pmu);
-+	return armv8_pmu_init(cpu_pmu);
- }
- 
- static int armv8_a72_pmu_init(struct arm_pmu *cpu_pmu)
- {
--	armv8_pmu_init(cpu_pmu);
- 	cpu_pmu->name			= "armv8_cortex_a72";
- 	cpu_pmu->map_event		= armv8_a57_map_event;
--	cpu_pmu->pmu.attr_groups	= armv8_pmuv3_attr_groups;
--	return armv8pmu_probe_num_events(cpu_pmu);
-+	return armv8_pmu_init(cpu_pmu);
- }
- 
- static int armv8_thunder_pmu_init(struct arm_pmu *cpu_pmu)
- {
--	armv8_pmu_init(cpu_pmu);
- 	cpu_pmu->name			= "armv8_cavium_thunder";
- 	cpu_pmu->map_event		= armv8_thunder_map_event;
--	cpu_pmu->pmu.attr_groups	= armv8_pmuv3_attr_groups;
--	return armv8pmu_probe_num_events(cpu_pmu);
-+	return armv8_pmu_init(cpu_pmu);
- }
- 
- static const struct of_device_id armv8_pmu_of_device_ids[] = {
+Enable parsing this table on ARM64.  Earlycon should be set up
+as early as possible.  ACPI boot tables are mapped in
+arch/arm64/kernel/acpi.c:acpi_boot_table_init() called from setup_arch()
+and that's where we parse spcr.  So it has to be opted-in per-arch.
+
+Implement console_match() for pl011.
+
+Based on the work by Leif Lindholm [3]
+Thanks to Peter Hurley for explaining how this should work.
+
+Should be applied to next-20160324.
+
+Tested on QEMU.  SPCR support is included in QEMU's ARM mach-virt
+since 2.4 release.
+
+v6:
+- add documentation for parse_spcr() functioin (Yury Norov)
+- don't initialize err variable (Yury Norov)
+- add __initdata for the earlycon_init_is_deferred flag variable
+- rename the function exported in "of/serial: move earlycon early_param handling
+  to serial" to avoid clash with the function from arch/microblaze/kernel/prom.c
+- defer initialization of DT earlycon until DT/ACPI decision is made
+  (Rob Herring, Peter Hurley)
+- use snprintf instead of sprintf (Andy Shevchenko)
+- drop patch that adds EARLYCON_DECLARE for pl011 as EARLYCON_DECLARE is
+  equivalent to OF_EARLYCON_DECLARE for 4.6+ (Peter Hurley).  This means that
+  SPCR earlycon will not work on the kernels before 4.6
+
+v5:
+https://lkml.kernel.org/g/1458643595-14719-1-git-send-email-aleksey.makarov at linaro.org
+- drop patch "serial: pl011: use ACPI SPCR to setup 32-bit access" because
+  it is ugly. Also because Christopher Covington came with a better solution [4]
+- remove error message when the table is not provided by ACPI (Andy Shevchenko)
+- rewrite spcr.c following the suggestions by Peter Hurley
+- add console_match() for pl011 in a separate patch
+- add EARLYCON_DECLARE for pl011 in a separate patch
+- add patch "of/serial: move earlycon early_param handling to serial" from
+  the GDB2 series
+
+v4:
+https://lkml.kernel.org/g/1456747355-15692-1-git-send-email-aleksey.makarov at linaro.org
+- drop patch "ACPI: change __init to __ref for early_acpi_os_unmap_memory()"
+  ACPI developers work on a new API and asked not to do that.
+  Instead, use acpi_get_table_with_size()/early_acpi_os_unmap_memory() once
+  and cache the result. (Lv Zheng)
+- fix some style issues (Yury Norov)
+
+v3:
+https://lkml.kernel.org/g/1455559532-8305-1-git-send-email-aleksey.makarov at linaro.org
+
+Greg Kroah-Hartman did not like v2 so I have rewritten this patchset:
+
+- drop acpi_match() member of struct console
+- drop implementations of this member for pl011 and 8250
+- drop the patch that renames some vars in printk.c as it is not needed anymore
+- drop patch that introduces system wide acpi_table_parse2().
+  Instead introduce a custom acpi_table_parse_spcr() in spcr.c
+
+Instead of introducing a new match_acpi() member of struct console,
+this patchset introduces a new function acpi_console_check().
+This function is called when a new uart is registered at serial_core.c
+the same way OF code checks for console.  If the registered uart is the
+console specified by SPCR table, this function calls add_preferred_console()
+
+The restrictions of this approach are:
+
+- only serial consoles can be set up
+- only consoles specified by the memory/io address can be set up
+  (SPCR can specify devices by PCI id/PCI address)
+
+v2:
+https://lkml.kernel.org/g/1455299022-11641-1-git-send-email-aleksey.makarov at linaro.org
+- don't use SPCR if user specified console in command line
+- fix initialization order of newcon->index = 0
+- rename some variables at printk.c (Joe Perches, Peter Hurley)
+- enable ACPI_SPCR_TABLE in a separate patch (Andy Shevchenko)
+- remove the retry loop for console registering (Peter Hurley).
+  Instead, obtain SPCR with acpi_get_table().  That works after
+  call to acpi_early_init() i. e. in any *_initcall()
+- describe design decision behind introducing acpi_match() (Peter Hurley)
+- fix compilation for x86 + ACPI (Graeme Gregory)
+- introduce DBG2 constants in a separate patch (Andy Shevchenko)
+- fix a typo in DBG2 constants (Andy Shevchenko)
+- add ACPI_DBG2_ARM_SBSA_32BIT constant (Christopher Covington)
+- add support for ACPI_DBG2_ARM_SBSA_* consoles (Christopher Covington)
+- add documentation for functions
+- add a patch that uses SPCR to find if SBSA serial driver should use 32-bit
+  accessor functions (Christopher Covington)
+- change __init to __ref for early_acpi_os_unmap_memory() in a separate patch
+- introduce acpi_table_parse2() in a separate patch
+- fix fetching the SPCR table early (Mark Salter)
+- add a patch from Mark Salter that introduces support for matching 8250-based
+  consoles
+
+v1:
+https://lkml.kernel.org/g/1453722324-22407-1-git-send-email-aleksey.makarov at linaro.org
+
+[1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0044a/index.html
+[2] https://msdn.microsoft.com/en-us/library/windows/hardware/dn639132(v=vs.85).aspx
+[3] https://lkml.kernel.org/g/1441716217-23786-1-git-send-email-leif.lindholm at linaro.org
+[4] https://lkml.kernel.org/g/1457415800-8799-1-git-send-email-cov at codeaurora.org
+
+Aleksey Makarov (4):
+  ACPI: add definitions of DBG2 subtypes
+  ACPI: parse SPCR and enable matching console
+  ACPI: enable ACPI_SPCR_TABLE on ARM64
+  serial: pl011: add console matching function
+
+Leif Lindholm (1):
+  of/serial: move earlycon early_param handling to serial
+
+ arch/arm64/Kconfig              |   1 +
+ arch/arm64/kernel/acpi.c        |   5 +-
+ drivers/acpi/Kconfig            |   3 +
+ drivers/acpi/Makefile           |   1 +
+ drivers/acpi/spcr.c             | 125 ++++++++++++++++++++++++++++++++++++++++
+ drivers/of/fdt.c                |  11 +---
+ drivers/tty/serial/amba-pl011.c |  56 ++++++++++++++++++
+ drivers/tty/serial/earlycon.c   |  11 +++-
+ include/acpi/actbl2.h           |   5 ++
+ include/linux/acpi.h            |   8 +++
+ include/linux/of_fdt.h          |   2 +
+ 11 files changed, 215 insertions(+), 13 deletions(-)
+ create mode 100644 drivers/acpi/spcr.c
+
 -- 
-2.1.0
+2.7.4
