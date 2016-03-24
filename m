@@ -1,77 +1,60 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 24 Mar 2016 12:24:52 +0100
-Subject: [PATCH v5 3/5] ARM: at91: pm: configure PMC fast startup signals
-In-Reply-To: <B256D81BAE5131468A838E5D7A243641D643C03F@penmbx01>
-References: <1458111489-23774-1-git-send-email-wenyou.yang@atmel.com>
- <1458111489-23774-4-git-send-email-wenyou.yang@atmel.com>
- <20160317171433.GD2831@piout.net>
- <B256D81BAE5131468A838E5D7A243641D643C03F@penmbx01>
-Message-ID: <20160324112452.GJ2570@piout.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 24 Mar 2016 12:26:25 +0100
+Subject: [linux-sunxi] Re: [PATCH] ARM: dts: sun8i: Base Orange Pi Plus
+ dts on the Orange Pi 2 dts
+In-Reply-To: <56F3CC68.4010705@redhat.com>
+References: <1458771256-4069-1-git-send-email-hdegoede@redhat.com>
+ <20160324075904.GU30977@lukather> <56F3CC68.4010705@redhat.com>
+Message-ID: <20160324112625.GX30977@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/03/2016 at 02:24:32 +0000, Yang, Wenyou wrote :
-> Hi Alexandre,
+Hi,
+
+On Thu, Mar 24, 2016 at 12:15:52PM +0100, Hans de Goede wrote:
+> Hi Maxime,
 > 
-> > -----Original Message-----
-> > From: Alexandre Belloni [mailto:alexandre.belloni at free-electrons.com]
-> > Sent: 2016?3?18? 1:15
-> > To: Yang, Wenyou <Wenyou.Yang@atmel.com>
-> > Cc: Ferre, Nicolas <Nicolas.FERRE@atmel.com>; Jean-Christophe Plagniol-
-> > Villard <plagnioj@jcrosoft.com>; Russell King <linux@arm.linux.org.uk>; linux-
-> > kernel at vger.kernel.org; devicetree at vger.kernel.org; linux-arm-
-> > kernel at lists.infradead.org; linux-clk at vger.kernel.org; Rob Herring
-> > <robh+dt@kernel.org>; Pawel Moll <pawel.moll@arm.com>; Mark Brown
-> > <broonie@kernel.org>; Ian Campbell <ijc+devicetree@hellion.org.uk>; Kumar
-> > Gala <galak@codeaurora.org>
-> > Subject: Re: [PATCH v5 3/5] ARM: at91: pm: configure PMC fast startup signals
-> > 
-> > On 16/03/2016 at 14:58:07 +0800, Wenyou Yang wrote :
-> > > The fast startup signal is used as wake up sources for ULP1 mode.
-> > > As soon as a fast startup signal is asserted, the embedded 12 MHz RC
-> > > oscillator restarts automatically.
-> > >
-> > > This patch is to configure the fast startup signals, which signal is
-> > > enabled to trigger the PMC to wake up the system from ULP1 mode should
-> > > be configured via the DT.
-> > >
-> > > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> > 
-> > I would actually avoid doing that from the PMC driver and do that configuration
-> > from the aic5 driver. It has all the information you need, it knows what kind of level
-> > or edge is needed to wake up and what are the wakeup interrupts to enable. This
-> > will allow you to stop introducing a new binding. Also, this will avoid discrepancies
-> > between what is configured in the DT and what the user really wants (for exemple
-> > differences between the edge direction configured for the PIOBu in userspace
-> > versus what is in the device tree or wakeonlan activation/deactivation).
+> On 24-03-16 08:59, Maxime Ripard wrote:
+> >Hi,
+> >
+> >On Wed, Mar 23, 2016 at 11:14:16PM +0100, Hans de Goede wrote:
+> >>The Orange Pi Plus really is an Orange Pi 2 extended with:
+> >>1) A sata <-> usb bridge connected to ehci3
+> >>2) An eMMC on mmc2
+> >>3) An external gigabit ethernet phy instead of the integrated 100Mbit phy
+> >>
+> >>This commit changes the dts to reflect this by making it include
+> >>the Orange Pi 2 dts and then adding the extra bits.
+> >>
+> >>Note that the difference in ethernet phy is not taken into account
+> >>because we do not have an ethernet driver for the H3 yet.
+> >>
+> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >
+> >Unfortunately, the patch doesn't apply anymore, and the merge doesn't
+> >seem trivial.
+> >
+> >I pushed my branch on my kernel.org repo, can you rebase your patch on
+> >top and resend it?
 > 
-> Thank you for your feedback.
+> The problem is that you forgot to apply:
+> "ARM: dts: sun8i: Orangepi plus gpio keys fixes and improvements"
 > 
-> But some wake-ups such as WKUP pin, ACC_CE, RXLP_MCE, don't have the corresponding
+> With that applied this one should apply unchanged too.
 
-The WKUP pin can be configured from the shdwc driver, ACC_CE from the
-ACC driver, RXLP_MCE, from the RXLP driver because you will need
-drivers for those at some point anyway.
+Damn, you're right... Sorry for the noise. I applied both.
 
-> interrupt number. Moreover, I think, the ULP1 is very different form the ULP0, it is not woken
-> up by the interrupt. It is fallen sleep and woken up by the some mechanism in the PMC. 
-> 
-
-Well, we don't really care about the mechanism. We only care about how
-the user is able to configure the wakeup sources.
-
-With your patch set, what happens when no ULP1 sources are defined but
-there are ULP0 sources? What happens when there are both ULP1 and ULP0
-sources?
-
-What would be good is to use ULP1 when only ULP1 sources are set up and
-ULP0 in the other cases. This will greatly help the user. Also, what I'm
-suggesting actually allows to change the ULP1 sources at runtime from
-devices that are actually used which is quite better than setting them
-up statically from DT.
-
+Thanks!
+Maxime
 
 -- 
-Alexandre Belloni, Free Electrons
+Maxime Ripard, Free Electrons
 Embedded Linux, Kernel and Android engineering
 http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160324/39e5a90e/attachment.sig>
