@@ -1,69 +1,49 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Thu, 24 Mar 2016 18:26:18 +0100
-Subject: [PATCH 2/3] ARM64: dts: amlogic: add Hardkernel ODROID-C2
-In-Reply-To: <CAOi56cVoLrHjeT_BhSZAvj5yZvf8Qkg8y=_zh+kikM+96+LGVg@mail.gmail.com>
-References: <1458758013-11890-1-git-send-email-khilman@baylibre.com>
- <1458758013-11890-2-git-send-email-khilman@baylibre.com>
- <8055578.HDz4P7ZJ9W@wuerfel> <56F41C76.8090805@suse.de>
- <CAOi56cVoLrHjeT_BhSZAvj5yZvf8Qkg8y=_zh+kikM+96+LGVg@mail.gmail.com>
-Message-ID: <56F4233A.5020904@suse.de>
+From: sr@denx.de (Stefan Roese)
+Date: Thu, 24 Mar 2016 18:30:22 +0100
+Subject: [PATCH v2] spi: orion.c: Add direct access mode
+In-Reply-To: <3107533.ZIfFo6QAv3@wuerfel>
+References: <1458663893-13766-1-git-send-email-sr@denx.de>
+ <3250653.vvT0RgK8yg@wuerfel> <56F412B5.2080200@denx.de>
+ <3107533.ZIfFo6QAv3@wuerfel>
+Message-ID: <56F4242E.70501@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 24.03.2016 um 18:16 schrieb Kevin Hilman:
-> On Thu, Mar 24, 2016 at 9:57 AM, Andreas F?rber <afaerber@suse.de> wrote:
->> Am 24.03.2016 um 13:58 schrieb Arnd Bergmann:
->>> On Wednesday 23 March 2016 11:33:32 Kevin Hilman wrote:
->>>> +/ {
->>>> +       compatible = "hardkernel,odroid-c2", "amlogic,meson-gxbb";
->>>> +       model = "Hardkernel ODROID-C2";
->>>> +
->>>> +       chosen {
->>>> +               stdout-path = "serial0:115200n8";
->>>> +       };
->>>> +
->>>> +       memory at 0 {
->>>> +               device_type = "memory";
->>>> +               reg = <0x0 0x0 0x0 0x80000000>;
->>>> +       };
->>>> +};
->>>> +
->>>> +&uart_AO {
->>>> +       status = "okay";
->>>> +};
->>>>
+On 24.03.2016 17:42, Arnd Bergmann wrote:
+> On Thursday 24 March 2016 17:15:49 Stefan Roese wrote:
+>>> but then we have a
+>>> problem with how it uses both internal-regs and and its own mbus
+>>> based reg, so we probably have to move the spi node outside of
+>>> the internal-regs node to achieve that, similar to how we handle
+>>> the devbus devices:
 >>>
->>> Shouldn't this also add the serial0 alias?
 >>>
->>> It seems that the .dtsi file accidentally sets an alias to a disabled
->>> device, which isn't really valid. Can you fix that when adding the
->>> .dts?
+>>>        soc@ {
+>>>                spi0 {
+>>>                          compatible = "marvell,armada-370-spi",
+>>>                                       "marvell,orion-spi";
+>>>                        reg = <MBUS_ID(0xf0, 0x01) 0x10600 0x28>,
+>>>                              <MBUS_ID(0x01, 0x5e) 0 0x100000>;
+>>>                          #address-cells = <1>;
+>>>                          #size-cells = <0>;
+>>>                          pinctrl-0 = <&spi0_pins1>;
+>>>                          pinctrl-names = "default";
+>>>                          cell-index = <0>;
+>>>                          interrupts = <30>;
+>>>                          clocks = <&coreclk 0>;
+>>>                          status = "disabled";
+>>>                };
+>>>        };
 >>
->> Hm, would it be any better to not disable either of the serials and
->> leave the aliases in the .dtsi?
-> 
-> I'm going to respin, moving the aliases that are actually into the
-> .dts that use them, and dropping the unused/disabled serial1.
+>> Do I understand this correctly, that you suggest to list all MBus
+>> windows here, that the SoC supports (e.g. 8 for the Armada XP).
+>> And let the SPI driver then extract and dynamically enable (map)
+>> the one that is currently used?
+>
+> I had not realize that there is more than one per controller.
+> Is it one per chip-select, or how do you pick the right ones?
 
-Carlo and me both agreed to that approach.
+Yes, its one per chip-select (SPI device).
 
-However @Arnd, I still don't understand how an alias to a disabled
-device hurts? It was not accidental on my part. And I'm pretty sure on
-my PowerMac's OpenFirmware I had aliases to disk devices not connected.
-
-Using an alias to a disabled device should be no different from using
-the full path to a disabled device. We don't prevent the latter, so why
-the former?
-
-If the serial node is disabled, the meson_uart driver won't probe and
-won't look up its alias. Who else uses it apart from stdout-path?
-
-The order was intentionally always AO (always-on) bus first, and there
-are just two UARTs I'm aware of.
-
-Regards,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton; HRB 21284 (AG N?rnberg)
+Thanks,
+Stefan
