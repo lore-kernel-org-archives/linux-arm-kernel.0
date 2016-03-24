@@ -1,34 +1,58 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Thu, 24 Mar 2016 19:15:28 +0100
-Subject: [PATCH v2 3/4] ARM64: dts: amlogic: add Hardkernel ODROID-C2
-In-Reply-To: <1458842715-27066-4-git-send-email-khilman@baylibre.com>
-References: <1458842715-27066-1-git-send-email-khilman@baylibre.com>
- <1458842715-27066-4-git-send-email-khilman@baylibre.com>
-Message-ID: <56F42EC0.1090307@suse.de>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 24 Mar 2016 21:19:45 +0300
+Subject: [PATCH 1/1] net: macb: remove BUG_ON() and reset the queue to
+ handle RX errors
+In-Reply-To: <1458830232-6159-1-git-send-email-cyrille.pitchen@atmel.com>
+References: <1458830232-6159-1-git-send-email-cyrille.pitchen@atmel.com>
+Message-ID: <56F42FC1.6000008@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 24.03.2016 um 19:05 schrieb Kevin Hilman:
-> Add minimal DT files for the Hardkernel ODROID-C2 board based on the
-> Amlogic S905/GXBB SoC.
-> 
-> Used the other gxbb boards from Andreas F?rber as a starting point.
-> 
-> Cc: Andreas F?rber <afaerber@suse.de>
-> Cc: Carlo Caione <carlo@endlessm.com>
-> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+Hello.
+
+On 03/24/2016 05:37 PM, Cyrille Pitchen wrote:
+
+> This patch removes two BUG_ON() used to notify about RX queue corruptions
+> on macb (not gem) hardware without actually handling the error.
+>
+> The new code skips corrupted frames but still processes faultless frames.
+> Then it resets the RX queue before restarting the reception from a clean
+> state.
+>
+> This patch is a rework of an older patch proposed by Neil Armstrong:
+> http://patchwork.ozlabs.org/patch/371525/
+>
+> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 > ---
->  arch/arm64/boot/dts/amlogic/Makefile               |  1 +
->  .../arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 69 ++++++++++++++++++++++
->  2 files changed, 70 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+>   drivers/net/ethernet/cadence/macb.c | 59 ++++++++++++++++++++++++++++++-------
+>   1 file changed, 49 insertions(+), 10 deletions(-)
+>
+> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+> index 6619178ed77b..39447a337149 100644
+> --- a/drivers/net/ethernet/cadence/macb.c
+> +++ b/drivers/net/ethernet/cadence/macb.c
+[...]
+> @@ -945,11 +948,26 @@ static int macb_rx_frame(struct macb *bp, unsigned int first_frag,
+>   	return 0;
+>   }
+>
+> +static inline void macb_init_rx_ring(struct macb *bp)
+> +{
+> +	int i;
+> +	dma_addr_t addr;
 
-Reviewed-by: Andreas F?rber <afaerber@suse.de>
+    DaveM prefers that longer declarations precede the shorter.
 
-Will re-test at a later point.
+[...]
+>   static int macb_rx(struct macb *bp, int budget)
+>   {
+>   	int received = 0;
+>   	unsigned int tail;
+>   	int first_frag = -1;
+> +	int reset_rx_queue = 0;
 
-Andreas
+    *bool*, please.
 
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton; HRB 21284 (AG N?rnberg)
+[...]
+
+MBR, Sergei
