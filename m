@@ -1,110 +1,123 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 24 Mar 2016 13:25:12 +0900
-Subject: [PATCH v5 03/21] PM / devfreq: Add devfreq_get_devfreq_by_phandle()
+Date: Thu, 24 Mar 2016 13:25:11 +0900
+Subject: [PATCH v5 02/21] PM / devfreq: exynos: Add documentation for generic
+ exynos bus frequency driver
 In-Reply-To: <1458793530-31897-1-git-send-email-cw00.choi@samsung.com>
 References: <1458793530-31897-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1458793530-31897-4-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1458793530-31897-3-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the new devfreq_get_devfreq_by_phandle() OF helper function
-which can find the instance of devfreq device by using phandle ("devfreq").
+This patch adds the documentation for generic exynos bus frequency
+driver.
 
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- drivers/devfreq/devfreq.c | 44 ++++++++++++++++++++++++++++++++++++++++++++
- include/linux/devfreq.h   |  9 +++++++++
- 2 files changed, 53 insertions(+)
+ .../devicetree/bindings/devfreq/exynos-bus.txt     | 95 ++++++++++++++++++++++
+ 1 file changed, 95 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/devfreq/exynos-bus.txt
 
-diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
-index 984c5e9e7bdd..20a9422c2552 100644
---- a/drivers/devfreq/devfreq.c
-+++ b/drivers/devfreq/devfreq.c
-@@ -25,6 +25,7 @@
- #include <linux/list.h>
- #include <linux/printk.h>
- #include <linux/hrtimer.h>
-+#include <linux/of.h>
- #include "governor.h"
- 
- static struct class *devfreq_class;
-@@ -639,6 +640,49 @@ struct devfreq *devm_devfreq_add_device(struct device *dev,
- }
- EXPORT_SYMBOL(devm_devfreq_add_device);
- 
-+#ifdef CONFIG_OF
-+/*
-+ * devfreq_get_devfreq_by_phandle - Get the devfreq device from devicetree
-+ * @dev - instance to the given device
-+ * @index - index into list of devfreq
-+ *
-+ * return the instance of devfreq device
-+ */
-+struct devfreq *devfreq_get_devfreq_by_phandle(struct device *dev, int index)
-+{
-+	struct device_node *node;
-+	struct devfreq *devfreq;
+diff --git a/Documentation/devicetree/bindings/devfreq/exynos-bus.txt b/Documentation/devicetree/bindings/devfreq/exynos-bus.txt
+new file mode 100644
+index 000000000000..78171b918e3f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/devfreq/exynos-bus.txt
+@@ -0,0 +1,95 @@
++* Generic Exynos Bus frequency device
 +
-+	if (!dev)
-+		return ERR_PTR(-EINVAL);
++The Samsung Exynos SoC has many buses for data transfer between DRAM
++and sub-blocks in SoC. Most Exynos SoCs share the common architecture
++for buses. Generally, each bus of Exynos SoC includes a source clock
++and a power line, which are able to change the clock frequency
++of the bus in runtime. To monitor the usage of each bus in runtime,
++the driver uses the PPMU (Platform Performance Monitoring Unit), which
++is able to measure the current load of sub-blocks.
 +
-+	if (!dev->of_node)
-+		return ERR_PTR(-EINVAL);
++There are a little different composition among Exynos SoC because each Exynos
++SoC has different sub-blocks. Therefore, shch difference should be specified
++in devicetree file instead of each device driver. In result, this driver
++is able to support the bus frequency for all Exynos SoCs.
 +
-+	node = of_parse_phandle(dev->of_node, "devfreq", index);
-+	if (!node)
-+		return ERR_PTR(-ENODEV);
++Required properties for bus device:
++- compatible: Should be "samsung,exynos-bus".
++- clock-names : the name of clock used by the bus, "bus".
++- clocks : phandles for clock specified in "clock-names" property.
++- operating-points-v2: the OPP table including frequency/voltage information
++  to support DVFS (Dynamic Voltage/Frequency Scaling) feature.
++- vdd-supply: the regulator to provide the buses with the voltage.
++- devfreq-events: the devfreq-event device to monitor the current utilization
++  of buses.
 +
-+	mutex_lock(&devfreq_list_lock);
-+	list_for_each_entry(devfreq, &devfreq_list, node) {
-+		if (devfreq->dev.parent
-+			&& devfreq->dev.parent->of_node == node) {
-+			mutex_unlock(&devfreq_list_lock);
-+			return devfreq;
-+		}
-+	}
-+	mutex_unlock(&devfreq_list_lock);
++Optional properties for bus device:
++- exynos,saturation-ratio: the percentage value which is used to calibrate
++			the performance count against total cycle count.
++- exynos,voltage-tolerance: the percentage value for bus voltage tolerance
++			which is used to calculate the max voltage.
 +
-+	return ERR_PTR(-EPROBE_DEFER);
-+}
-+#else
-+struct devfreq *devfreq_get_devfreq_by_phandle(struct device *dev, int index)
-+{
-+	return ERR_PTR(-ENODEV);
-+}
-+#endif /* CONFIG_OF */
-+EXPORT_SYMBOL_GPL(devfreq_get_devfreq_by_phandle);
++Example1:
++	Show the AXI buses of Exynos3250 SoC. Exynos3250 divides the buses to
++	power line (regulator). The MIF (Memory Interface) AXI bus is used to
++	transfer data between DRAM and CPU and uses the VDD_MIF regualtor.
 +
- /**
-  * devm_devfreq_remove_device() - Resource-managed devfreq_remove_device()
-  * @dev:	the device to add devfreq feature.
-diff --git a/include/linux/devfreq.h b/include/linux/devfreq.h
-index 6fa02a20eb63..aa0b8424ebc3 100644
---- a/include/linux/devfreq.h
-+++ b/include/linux/devfreq.h
-@@ -208,6 +208,9 @@ extern int devm_devfreq_register_opp_notifier(struct device *dev,
- extern void devm_devfreq_unregister_opp_notifier(struct device *dev,
- 						struct devfreq *devfreq);
- 
-+extern struct devfreq *devfreq_get_devfreq_by_phandle(struct device *dev,
-+						int index);
++	- power line(VDD_MIF) --> bus for DMC (Dynamic Memory Controller) block
 +
- /**
-  * devfreq_update_stats() - update the last_status pointer in struct devfreq
-  * @df:		the devfreq instance whose status needs updating
-@@ -307,6 +310,12 @@ static inline void devm_devfreq_unregister_opp_notifier(struct device *dev,
- {
- }
- 
-+static inline struct devfreq *devfreq_get_devfreq_by_phandle(struct device *dev,
-+							int index)
-+{
-+	return ERR_PTR(-ENODEV);
-+}
++	- MIF bus's frequency/voltage table
++	-----------------------
++	|Lv| Freq   | Voltage |
++	-----------------------
++	|L1| 50000  |800000   |
++	|L2| 100000 |800000   |
++	|L3| 134000 |800000   |
++	|L4| 200000 |825000   |
++	|L5| 400000 |875000   |
++	-----------------------
 +
- static inline int devfreq_update_stats(struct devfreq *df)
- {
- 	return -EINVAL;
++Example2 :
++	The bus of DMC (Dynamic Memory Controller) block in exynos3250.dtsi
++	is listed below:
++
++	bus_dmc: bus_dmc {
++		compatible = "samsung,exynos-bus";
++		clocks = <&cmu_dmc CLK_DIV_DMC>;
++		clock-names = "bus";
++		operating-points-v2 = <&bus_dmc_opp_table>;
++		status = "disabled";
++	};
++
++	bus_dmc_opp_table: opp_table1 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp at 50000000 {
++			opp-hz = /bits/ 64 <50000000>;
++			opp-microvolt = <800000>;
++		};
++		opp at 100000000 {
++			opp-hz = /bits/ 64 <100000000>;
++			opp-microvolt = <800000>;
++		};
++		opp at 134000000 {
++			opp-hz = /bits/ 64 <134000000>;
++			opp-microvolt = <800000>;
++		};
++		opp at 200000000 {
++			opp-hz = /bits/ 64 <200000000>;
++			opp-microvolt = <825000>;
++		};
++		opp at 400000000 {
++			opp-hz = /bits/ 64 <400000000>;
++			opp-microvolt = <875000>;
++		};
++	};
++
++	Usage case to handle the frequency and voltage of bus on runtime
++	in exynos3250-rinato.dts is listed below:
++
++	&bus_dmc {
++		devfreq-events = <&ppmu_dmc0_3>, <&ppmu_dmc1_3>;
++		vdd-supply = <&buck1_reg>;	/* VDD_MIF */
++		status = "okay";
++	};
 -- 
 1.9.1
