@@ -1,39 +1,51 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 24 Mar 2016 19:25:35 +0900
-Subject: [PATCH] ARM: dts: exynos: Fix invalid maximum voltage for buck9
- supplying SD card
-In-Reply-To: <20160324095332.GS2566@sirena.org.uk>
-References: <1458807125-13580-1-git-send-email-k.kozlowski@samsung.com>
- <20160324095332.GS2566@sirena.org.uk>
-Message-ID: <CAJKOXPc03ksVFKAHo_Znw41wdzRmzJpFYfAEw2q3EfrQxevghg@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 24 Mar 2016 11:27:27 +0100
+Subject: [PATCH 3/4] arm64: dts: marvell: Clean up armada-7040-db
+In-Reply-To: <20160324091832.0060c907@free-electrons.com> (Thomas Petazzoni's
+ message of "Thu, 24 Mar 2016 09:18:32 +0100")
+References: <1458771861-12392-1-git-send-email-afaerber@suse.de>
+ <1458771861-12392-4-git-send-email-afaerber@suse.de>
+ <20160324091832.0060c907@free-electrons.com>
+Message-ID: <87oaa4npbk.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 24, 2016 at 6:53 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Thu, Mar 24, 2016 at 05:12:05PM +0900, Krzysztof Kozlowski wrote:
+Hi Thomas,
+ 
+ On jeu., mars 24 2016, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+
+> Hello,
 >
->>                       buck9_reg: BUCK9 {
->>                               regulator-name = "vdd_2.8v_ldo";
->>                               regulator-min-microvolt = <3000000>;
->> -                             regulator-max-microvolt = <3750000>;
->> +                             regulator-max-microvolt = <3755000>;
->>                               regulator-always-on;
->>                               regulator-boot-on;
->>                       };
+> On Wed, 23 Mar 2016 23:24:20 +0100, Andreas F?rber wrote:
+>> Instead of duplicating the node hierarchy, reference the nodes by label,
+>> adding labels where necessary.
+>> 
+>> Drop some trailing or inconsistent white lines while at it.
+>> 
+>> Fixes: ec7e5a569bce ("arm64: dts: marvell: add Device Tree files for Armada 7K/8K")
+>> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
 >
-> Why does this regulator even have voltage constraints configured?  Is
-> there any intention that it should ever be varied at runtime?
+> We haven't used this solution on Marvell Armada 32-bits SoCs, so there
+> needs to be a discussion on whether we want to go in this direction for
+> the 64 bits SoCs.
 
-Good question. I was also wondering that, if tetting it by 5 mV lower
-causes failure, then the constraints are actually fixed at 3.755 V. I
-do not know the answer. Boards schematics do not specify the
-requirement here, datasheet for PMIC says default value of 3.4V. Heh,
-maybe the regulator driver is missing proper starting value for 'vsel'
-(datasheet says values in register start from 0x40 -> 3 V). Something
-looks wrong here...
+At first view using the label helps to have simpler dts files.
 
-I'll look at it after weekend. For now I applied my patch to the
-for-next, so the next should be fixed.
+Is there any cons by using it?
 
-Best regards,
-Krzysztof
+I agree that converting the Marvell Armada 32-bits SoCs would produce a
+lot of churn. But if some binding are common there is no file at all are
+in common, so we could use this solution for the 64 bits SoCs only.
+
+Jason, Andrew, Sebastian, do you see any problem with it?
+
+Thanks,
+
+Gregory
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
