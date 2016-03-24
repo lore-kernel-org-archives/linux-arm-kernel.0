@@ -1,99 +1,80 @@
-From: xf@rock-chips.com (Feng Xiao)
-Date: Thu, 24 Mar 2016 11:01:40 +0800
-Subject: [PATCH v2] cpufreq: rockchip: add driver
-In-Reply-To: <20160323044033.GQ5272@vireshk-i7>
-References: <1458647848-48999-1-git-send-email-xf@rock-chips.com>
- <1458699487-58470-1-git-send-email-xf@rock-chips.com>
- <20160323044033.GQ5272@vireshk-i7>
-Message-ID: <56F35894.3020106@rock-chips.com>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Thu, 24 Mar 2016 11:14:50 +0800
+Subject: Question about PCI I/O space in ARM64
+In-Reply-To: <8793380.nuVa09lFue@wuerfel>
+References: <56F209A9.4040304@huawei.com>
+ <20160323101840.GA21390@e104818-lin.cambridge.arm.com>
+ <8793380.nuVa09lFue@wuerfel>
+Message-ID: <56F35BAA.50800@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi all,
-      I found that it could match the cpufreq-dt driver succesfully only 
-with the following changes.
---- a/arch/arm64/boot/dts/rockchip/rk3366.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3366.dtsi
-@@ -139,6 +139,10 @@
-                 };
-         };
+On 2016/3/23 20:26, Arnd Bergmann wrote:
+> On Wednesday 23 March 2016 10:18:40 Catalin Marinas wrote:
+>> On Wed, Mar 23, 2016 at 11:12:41AM +0800, Kefeng Wang wrote:
+>>> If no pci, the PCI I/O space(16M) is mapped into an irrelevant mem space(right ?),
+>>
+>> No. It is not mapped at all.
+>>
+>>> not a right IO space,
+>>> that is, no one call pci_remap_iospace() to remap the memory mapped I/O space, once driver
+>>> like f71805f loaded, write value to IO space(see f71805f_init->f71805f_find->superio_enter->outb),
+>>> we met following oops,
+>>> ------------------------
+>>> Unable to handle kernel paging request at virtual address ffffffbffee0002e
+>>> pgd = ffffffc1d68d4000
+>>> [ffffffbffee0002e] *pgd=0000000000000000, *pud=0000000000000000
+>>> Internal error: Oops: 94000046 [#1] PREEMPT SMP
+>>> Modules linked in: f71805f(+) hwmon
+>>> CPU: 3 PID: 1659 Comm: insmod Not tainted 4.5.0+ #88
+>>> Hardware name: linux,dummy-virt (DT)
+>>> task: ffffffc1f6665400 ti: ffffffc1d6418000 task.ti: ffffffc1d6418000
+>>> PC is at f71805f_find+0x6c/0x358 [f71805f]
+>>> ------------------------
+>>
+>> That's caused by not having a mapped PCI I/O space.
 
-+       cpufreq-dt {   //the node name must be cpufreq-dt
-+               compatible = "rockchip,cpufreq";  //  the compatible 
-name is insignificant
-+       };
-+
+Clear.
 
-This was supported by the commit 07e461cd7e73a84f0e3757932b93cc80976fd749
+>>
+>>> I am not clear about PCI I/O, but if this is indeed a bug, how to solve this issue,
+>>> any advice will be appreciated.
+>>
+>> You need a PCI host controller driver (e.g.
+>> drivers/pci/host/pci-host-generic.c) and corresponding bindings in DT or
+>> ACPI.
 
-commit 07e461cd7e73a84f0e3757932b93cc80976fd749
-Author: Grant Likely <grant.likely@linaro.org>
-Date:   Wed May 21 15:40:31 2014 +0900
+In our inner test, there are some board without pcie host driver(even without
+pci host controller).
 
-     of: Ensure unique names without sacrificing determinism
+> 
+> I think getting an Oops is not the best behavior though, it would be
+> nice if that could be improved in some way.
+> 
+> Ideally, each driver that accesses PCI I/O space would call request_region()
+> before doing so, and it would be good if that call could be made to
+> return an error when asked about an address that has not been mapped.
+> 
+> I see that ioport_resource gets initialized to the {0, IO_SPACE_LIMIT}
+> range. If we could change it so that pci_remap_iospace() hooks up
+> to ioport_resource and extends it whenever something gets mapped
+> there up to IO_SPACE_LIMIT, we can change the default range to
+> {0,0}, which would fail for any request_region call before the
+> first pci_remap_iospace.
+> 
+> This won't help for the specific f71805f driver example, because that
+> does not call request_region(), but we can treat that as a driver bug
+> and fix it.
 
-     The way the driver core is implemented, every device using the same bus
-     type is required to have a unique name because a symlink to each device
-     is created in the appropriate /sys/bus/*/devices directory, and two
-     identical names causes a collision.
+Yes, we met same error with several modules(at least 8+), so it's better to find
+a good way to avoid it, change modules one by one maybe not a good choice.
 
-     The current code handles the requirement by using an globally
-     incremented counter that is appended to the device name. It works, but
-     it means any change to device registration will change the assigned
-     numbers. Instead, if we build up the name by using information from the
-     parent nodes, then it can be guaranteed to be unique without adding a
-     random number to the end of it.
+Define some arch in/out func instead of generic ops? when in/out vals, check
+whether or not the pci_iobase is mapped.
 
-     Signed-off-by: Grant Likely <grant.likely@linaro.org>
-     Cc: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
-     Cc: Rob Herring <robh@kernel.org>
-
-If so, do I need to continue to add the new cpufreq driver ?
-
-? 2016/3/23 12:40, Viresh Kumar ??:
-> On 23-03-16, 10:18, Feng Xiao wrote:
->> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
->> index 14b1f93..1786315 100644
->> --- a/drivers/cpufreq/Kconfig.arm
->> +++ b/drivers/cpufreq/Kconfig.arm
->> @@ -97,6 +97,16 @@ config ARM_OMAP2PLUS_CPUFREQ
->>   	depends on ARCH_OMAP2PLUS
->>   	default ARCH_OMAP2PLUS
->>   
->> +config ARM_ROCKCHIP_CPUFREQ
->> +	tristate "Rockchip CPUfreq driver"
-> Since you are allowing it to be built as a module ...
->
->> +	depends on ARCH_ROCKCHIP && CPUFREQ_DT
->> +	select PM_OPP
->> +	help
->> +	  This adds the CPUFreq driver support for Rockchip SoCs.
->> +	  The driver will directly use cpufreq-dt driver as backend.
->> +
->> +	  If in doubt, say N.
->> +++ b/drivers/cpufreq/rockchip-cpufreq.c
->> +static int __init rockchip_cpufreq_driver_init(void)
->> +{
->> +	struct platform_device *pdev;
->> +	int i;
->> +
->> +	for (i = 0; i < ARRAY_SIZE(rockchip_compat); i++) {
->> +		if (of_machine_is_compatible(rockchip_compat[i])) {
->> +			pdev = platform_device_register_simple("cpufreq-dt",
->> +							       -1, NULL, 0);
->> +			return PTR_ERR_OR_ZERO(pdev);
->> +		}
->> +	}
->> +
->> +	return -ENODEV;
->> +}
->> +module_init(rockchip_cpufreq_driver_init);
-> You need a module exit as well to remove the device. Otherwise following
-> sequence will give you errors:
->
-> insmod rockchip-cpufreq.ko
-> rmmod rockchip-cpufreq.ko
-> insmod rockchip-cpufreq.ko //Errors on this..
->
-> So, either don't allow it to be built as a module or fix the module-exit path.
->
+Thanks catalin and arnd for your reply.
+> 
+> 	Arnd
+> 
+> .
+> 
