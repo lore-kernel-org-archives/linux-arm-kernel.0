@@ -1,31 +1,63 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Thu, 24 Mar 2016 17:46:02 +0100
-Subject: [PATCH 1/4] arm64: dts: marvell: Clean up armada-3720-db
-In-Reply-To: <87zitnn9ds.fsf@free-electrons.com>
-References: <1458771861-12392-1-git-send-email-afaerber@suse.de>
- <1458771861-12392-2-git-send-email-afaerber@suse.de>
- <87zitnn9ds.fsf@free-electrons.com>
-Message-ID: <56F419CA.9010400@suse.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 24 Mar 2016 17:48:23 +0100
+Subject: [PATCH v2] spi: orion.c: Add direct access mode
+In-Reply-To: <56F412B5.2080200@denx.de>
+References: <1458663893-13766-1-git-send-email-sr@denx.de>
+ <3250653.vvT0RgK8yg@wuerfel> <56F412B5.2080200@denx.de>
+Message-ID: <30176583.aSTyzO0qS3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
-
-Am 24.03.2016 um 17:11 schrieb Gregory CLEMENT:
->> +/*
->> + * Exported on the micro USB connector CON32
->> + * through an FTDI
->> + */
+On Thursday 24 March 2016 17:15:49 Stefan Roese wrote:
+> >
+> >       soc@ {
+> >               spi0 {
+> >                         compatible = "marvell,armada-370-spi",
+> >                                      "marvell,orion-spi";
+> >                       reg = <MBUS_ID(0xf0, 0x01) 0x10600 0x28>,
+> >                             <MBUS_ID(0x01, 0x5e) 0 0x100000>;
+> >                         #address-cells = <1>;
+> >                         #size-cells = <0>;
+> >                         pinctrl-0 = <&spi0_pins1>;
+> >                         pinctrl-names = "default";
+> >                         cell-index = <0>;
+> >                         interrupts = <30>;
+> >                         clocks = <&coreclk 0>;
+> >                         status = "disabled";
+> >               };
+> >       };
 > 
-> As the comment didn't start anymore from the middle of the line, we
-> could have it an a single line. We don't have to split in 2 lines.
+> Do I understand this correctly, that you suggest to list all MBus
+> windows here, that the SoC supports (e.g. 8 for the Armada XP).
+> And let the SPI driver then extract and dynamically enable (map)
+> the one that is currently used?
 
-Sure. Should I change that along with 4/4 in a v2? It'll be after the
-Easter holidays.
+Actually the syntax above doesn't imply any mapping at all, it
+just describes how the hardware is wired up, so that really
+needs to list all windows, and then the ranges property in the
+soc node can statically map the ones that are used on the
+particular machine.
 
-Regards,
-Andreas
+> We also need a per-SPI-device DT property to enable this direct
+> access mode for this specific SPI device. As not all SPI devices
+> support this mode - at least not yet. How about this one:
+> 
+>                 flash0: flash at 0 {
+>                         compatible = "m25p128";
+>                         reg = <0>;
+>                         direct-access-enable;
+>                         ...
+>                 };
+> 
+> ?
 
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton; HRB 21284 (AG N?rnberg)
+Maybe the spi driver can just check whether the window is mapped
+or not, and then have no ranges entry for the devices that don't
+support it?
+
+Alternatively, we might encode this in the 'reg' property in
+some way?
+
+How do we know whether a device supports the mode or not?
+
+	Arnd
