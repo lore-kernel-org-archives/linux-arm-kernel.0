@@ -1,34 +1,60 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 24 Mar 2016 17:50:01 +0100
-Subject: [PATCH v3 04/18] dt-bindings: irq: arm,
- versatile-fpga: add compatible string for OX810SE SoC
+Date: Thu, 24 Mar 2016 17:50:07 +0100
+Subject: [PATCH v3 10/18] dt-bindings: Add PLX Technology OXNAS Standard
+ Clocks bindings
 In-Reply-To: <1458838215-23314-1-git-send-email-narmstrong@baylibre.com>
 References: <1458838215-23314-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1458838215-23314-5-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1458838215-23314-11-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Under the OX810SE, this same controller is used as "Reference Peripheral
-Specification" Interrupt Controller, so add new compatible string to support
-the PLX Technology OX810SE SoC Interrupt Controller.
-
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- .../devicetree/bindings/interrupt-controller/arm,versatile-fpga-irq.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ .../devicetree/bindings/clock/plxtech,stdclk.txt   | 35 ++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/plxtech,stdclk.txt
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/arm,versatile-fpga-irq.txt b/Documentation/devicetree/bindings/interrupt-controller/arm,versatile-fpga-irq.txt
-index c9cf605..2a1d16b 100644
---- a/Documentation/devicetree/bindings/interrupt-controller/arm,versatile-fpga-irq.txt
-+++ b/Documentation/devicetree/bindings/interrupt-controller/arm,versatile-fpga-irq.txt
-@@ -6,7 +6,7 @@ controllers are OR:ed together and fed to the CPU tile's IRQ input. Each
- instance can handle up to 32 interrupts.
- 
- Required properties:
--- compatible: "arm,versatile-fpga-irq"
-+- compatible: "arm,versatile-fpga-irq" or "oxsemi,ox810se-rps-irq"
- - interrupt-controller: Identifies the node as an interrupt controller
- - #interrupt-cells: The number of cells to define the interrupts.  Must be 1
-   as the FPGA IRQ controller has no configuration options for interrupt
+diff --git a/Documentation/devicetree/bindings/clock/plxtech,stdclk.txt b/Documentation/devicetree/bindings/clock/plxtech,stdclk.txt
+new file mode 100644
+index 0000000..c60b459
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/plxtech,stdclk.txt
+@@ -0,0 +1,35 @@
++PLX Technology OXNAS SoC Family Standard Clocks
++================================================
++
++Please also refer to clock-bindings.txt in this directory for common clock
++bindings usage.
++
++Required properties:
++- compatible: Should be "oxsemi,ox810se-stdclk"
++- #clock-cells: 1, see below
++
++Parent node should have the following properties :
++- compatible: Should be "oxsemi,ox810se-sys-ctrl", "syscon", "simple-mfd"
++
++For OX810SE, the clock indices are :
++ - 0: LEON
++ - 1: DMA_SGDMA
++ - 2: CIPHER
++ - 3: SATA
++ - 4: AUDIO
++ - 5: USBMPH
++ - 6: ETHA
++ - 7: PCIA
++ - 8: NAND
++
++example:
++
++sys: sys-ctrl at 000000 {
++	compatible = "oxsemi,ox810se-sys-ctrl", "syscon", "simple-mfd";
++	reg = <0x000000 0x100000>;
++
++	stdclk: stdclk {
++		compatible = "oxsemi,ox810se-stdclk";
++		#clock-cells = <1>;
++	};
++};
 -- 
 1.9.1
