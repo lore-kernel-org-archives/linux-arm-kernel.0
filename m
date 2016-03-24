@@ -1,50 +1,95 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Thu, 24 Mar 2016 14:16:16 +0100
-Subject: [PATCH v6 0/5] ACPI: parse the SPCR table
-In-Reply-To: <1458823925-19560-1-git-send-email-aleksey.makarov@linaro.org>
-References: <1458823925-19560-1-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <CAJZ5v0gzjtFzig7nEumr83+J2dGb+OA8GNR2i45ZqznfV_hA-A@mail.gmail.com>
+From: jmfriedt@femto-st.fr (Jean-Michel Friedt)
+Date: Thu, 24 Mar 2016 14:18:53 +0100
+Subject: [PATCH v2 1/1] ARM: dts: sun5i-a13-olinuxino-micro: enable USB DRC
+Message-ID: <1458825533-13968-1-git-send-email-jmfriedt@femto-st.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 24, 2016 at 1:51 PM, Aleksey Makarov
-<aleksey.makarov@linaro.org> wrote:
-> 'ARM Server Base Boot Requirements' [1] mentions SPCR (Serial Port
-> Console Redirection Table) [2] as a mandatory ACPI table that
-> specifies the configuration of serial console.
->
-> Move "earlycon" early_param handling to earlycon.c to parse this option once
->
-> Patch "ACPI: add definitions of DBG2 subtypes" is required for the next patch.
-> ACPI maintainers said that they had got it for the next release of ACPICA,
-> but it has not appeared in linux-next yet.
+From: JM Friedt <jmfriedt@femto-st.fr>
 
-It will.  Patches containing it have just been posted.
+Enable the OTG controller on the Olinuxino A13-micro. 
 
-> Parse SPCR table, setup earlycon and add register specified console.
->
-> Enable parsing this table on ARM64.  Earlycon should be set up
-> as early as possible.  ACPI boot tables are mapped in
-> arch/arm64/kernel/acpi.c:acpi_boot_table_init() called from setup_arch()
-> and that's where we parse spcr.  So it has to be opted-in per-arch.
->
-> Implement console_match() for pl011.
->
-> Based on the work by Leif Lindholm [3]
-> Thanks to Peter Hurley for explaining how this should work.
->
-> Should be applied to next-20160324.
->
-> Tested on QEMU.  SPCR support is included in QEMU's ARM mach-virt
-> since 2.4 release.
+Signed-off-by: Jean-Michel Friedt <jmfriedt@femto-st.fr>
+---
+Changes v1 -> v2: 
+	* Full first name in SoB.
+---
+ arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts | 41 +++++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
 
-Honestly, I'm not sure why I'm regarded as the right maintainer to send this to.
-
-The only patch here touching generic ACPI code is [3/5] (the [2/5] is
-going in through ACPICA) and the rest is all about ARM64 AFAICS.  Why
-don't you send it to the ARM64 maintainers instead?
-
-I'll have some comments on [3/5], I'll send them later today or tomorrow.
-
-Thanks,
-Rafael
+diff --git a/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts
+index ad84fe4..081329e 100644
+--- a/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts
++++ b/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts
+@@ -109,6 +109,10 @@
+ 	status = "okay";
+ };
+ 
++&otg_sram {
++	status = "okay";
++};
++
+ &pio {
+ 	mmc0_cd_pin_olinuxinom: mmc0_cd_pin at 0 {
+ 		allwinner,pins = "PG0";
+@@ -124,6 +128,27 @@
+ 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 	};
+ 
++	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
++		allwinner,pins = "PG2";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++	};
++
++	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
++		allwinner,pins = "PG1";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_PULL_DOWN>;
++	};
++
++	usb0_vbus_pin_olinuxinom: usb0_vbus_pin at 0 {
++		allwinner,pins = "PG12";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
+ 	usb1_vbus_pin_olinuxinom: usb1_vbus_pin at 0 {
+ 		allwinner,pins = "PG11";
+ 		allwinner,function = "gpio_out";
+@@ -132,6 +157,12 @@
+ 	};
+ };
+ 
++&reg_usb0_vbus {
++	pinctrl-0 = <&usb0_vbus_pin_olinuxinom>;
++	gpio = <&pio 6 12 GPIO_ACTIVE_HIGH>;
++	status = "okay";
++};
++
+ &reg_usb1_vbus {
+ 	pinctrl-0 = <&usb1_vbus_pin_olinuxinom>;
+ 	gpio = <&pio 6 11 GPIO_ACTIVE_HIGH>;
+@@ -144,7 +175,17 @@
+ 	status = "okay";
+ };
+ 
++&usb_otg {
++	dr_mode = "otg";
++	status = "okay";
++};
++
+ &usbphy {
++	pinctrl-names = "default";
++	pinctrl-0 = <&usb0_id_detect_pin>, <&usb0_vbus_detect_pin>;
++	usb0_id_det-gpio = <&pio 6 2 GPIO_ACTIVE_HIGH>; /* PG2 */
++	usb0_vbus_det-gpio = <&pio 6 1 GPIO_ACTIVE_HIGH>; /* PG1 */
++	usb0_vbus-supply = <&reg_usb0_vbus>;
+ 	usb1_vbus-supply = <&reg_usb1_vbus>;
+ 	status = "okay";
+ };
+-- 
+2.6.4
