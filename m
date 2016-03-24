@@ -1,43 +1,35 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 24 Mar 2016 16:47:52 +0900
-Subject: [PATCH v6 1/4] dt-bindings: power: reset: add document for
- reboot-mode driver
-In-Reply-To: <56F396FB.8030402@rock-chips.com>
-References: <1458646525-491-1-git-send-email-andy.yan@rock-chips.com>
- <1458646592-540-1-git-send-email-andy.yan@rock-chips.com>
- <CAJKOXPdUW5f6_sz14NMU8LP+QoKStB9omXticMkQX4D866okWw@mail.gmail.com>
- <56F396FB.8030402@rock-chips.com>
-Message-ID: <56F39BA8.30104@samsung.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 24 Mar 2016 08:51:09 +0100
+Subject: [linux-sunxi][PATCH v3 2/8] ARM: dts :sun7i: Add SPDIF TX pin to
+ the A20
+In-Reply-To: <CAGb2v64VRrM-_AAt5Xbgxc4y+-3-=mPWvuQubrHjmufUAKUA+w@mail.gmail.com>
+References: <1458590466-12572-1-git-send-email-codekipper@gmail.com>
+ <1458590466-12572-3-git-send-email-codekipper@gmail.com>
+ <CAGb2v64VRrM-_AAt5Xbgxc4y+-3-=mPWvuQubrHjmufUAKUA+w@mail.gmail.com>
+Message-ID: <20160324075109.GO30977@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24.03.2016 16:27, Andy Yan wrote:
->>> +- mode-normal: Normal reboot mode, system reboot with command "reboot".
->>> +- mode-recovery: Android Recovery mode, it is a mode to format the
->>> device or update a new image.
->>> +- mode-bootloader: Android fastboot mode, it's a mode to re-flash
->>> partitions on the Android based device.
->>> +- mode-loader: A bootloader mode, it's a mode used to download image
->>> on Rockchip platform,
->>> +              usually used in development.
->> The "bootloader" and "loader" examples are very confusing. Maybe just
->> name the first one as "mode-fastboot" and second as
->> "rockchip-download"? The term "loader" does not look for me as
->> anything related to uploading/downloading new firmware.
+On Wed, Mar 23, 2016 at 06:28:09PM +0800, Chen-Yu Tsai wrote:
+> On Tue, Mar 22, 2016 at 4:01 AM,  <codekipper@gmail.com> wrote:
+> > From: Marcus Cooper <codekipper@gmail.com>
 > 
->     About these two modes, we have a long discussion with Rob and John [0]
->     We keep them as what you see now to keep compatibility with exiting
-> devices.
-> 
->  [0] https://lkml.org/lkml/2016/2/2/128
+> nit: space should be after colon, not after dts, in subject.
+> Same for the RX pin patch.
 
-To me these names are non-obvious and I would rather expect choosing
-meaningful names when putting something into the mainline. The user
-(Android) will use this mainline kernel release in a year or more (3
-years for vendors?), so it will have plenty of time to adopt. :)
+I just fixed it.
 
-But this was already discussed and you got ack from Rob, so let's move
-on. I don't mind.
+Thanks!
+Maxime
 
-Best regards,
-Krzysztof
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160324/0daa211b/attachment-0001.sig>
