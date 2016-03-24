@@ -1,44 +1,30 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 24 Mar 2016 11:40:37 +0100
-Subject: [PATCH 3/4] arm64: dts: marvell: Clean up armada-7040-db
-In-Reply-To: <87oaa4npbk.fsf@free-electrons.com>
-References: <1458771861-12392-1-git-send-email-afaerber@suse.de>
- <1458771861-12392-4-git-send-email-afaerber@suse.de>
- <20160324091832.0060c907@free-electrons.com>
- <87oaa4npbk.fsf@free-electrons.com>
-Message-ID: <20160324114037.1204b46e@free-electrons.com>
+From: js@sig21.net (Johannes Stezenbach)
+Date: Thu, 24 Mar 2016 11:56:51 +0100
+Subject: dmaengine: ARM pl080 misidentified as Samsung pl080s
+Message-ID: <20160324105651.GA20489@sig21.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi,
 
-On Thu, 24 Mar 2016 11:27:27 +0100, Gregory CLEMENT wrote:
+commit da1b6c05b8b5bd ("dmaengine: PL08x: Add support for PL080S variant")
+added this hunk:
 
-> > We haven't used this solution on Marvell Armada 32-bits SoCs, so there
-> > needs to be a discussion on whether we want to go in this direction for
-> > the 64 bits SoCs.
-> 
-> At first view using the label helps to have simpler dts files.
-> 
-> Is there any cons by using it?
+ static struct amba_id pl08x_ids[] = {
++       /* Samsung PL080S variant */
++       {
++               .id     = 0x0a141080,
++               .mask   = 0xffffffff,
++               .data   = &vendor_pl080s,
++       },
+        /* PL080 */
 
-The only minor drawback from my point of view is that you don't see
-where in the hierarchy the device you're enabling is. But it's really a
-minor drawback and not everybody agrees that it is actually a drawback.
+However, 0x0a141080 happens to be the ID of the
+ARM PL080, too:
+http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0196g/I54627.html
 
-So I'm fine.
+Since the PL080S has the configuration register at a different
+address the driver doesn't work for ARM PL080 anymore.
 
-> I agree that converting the Marvell Armada 32-bits SoCs would produce a
-> lot of churn. But if some binding are common there is no file at all are
-> in common, so we could use this solution for the 64 bits SoCs only.
 
-Yes, we could. I'm fine with it. I was merely pointing out that it is
-moving away from our 32 bits way of doing things.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Johannes
