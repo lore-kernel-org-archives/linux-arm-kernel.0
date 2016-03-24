@@ -1,58 +1,35 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 24 Mar 2016 21:19:45 +0300
-Subject: [PATCH 1/1] net: macb: remove BUG_ON() and reset the queue to
- handle RX errors
-In-Reply-To: <1458830232-6159-1-git-send-email-cyrille.pitchen@atmel.com>
-References: <1458830232-6159-1-git-send-email-cyrille.pitchen@atmel.com>
-Message-ID: <56F42FC1.6000008@cogentembedded.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Thu, 24 Mar 2016 19:19:53 +0100
+Subject: [PATCH v2 4/4] ARM64: dts: amlogic: Add P200/P201 boards
+In-Reply-To: <1458842715-27066-5-git-send-email-khilman@baylibre.com>
+References: <1458842715-27066-1-git-send-email-khilman@baylibre.com>
+ <1458842715-27066-5-git-send-email-khilman@baylibre.com>
+Message-ID: <56F42FC9.1000905@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On 03/24/2016 05:37 PM, Cyrille Pitchen wrote:
-
-> This patch removes two BUG_ON() used to notify about RX queue corruptions
-> on macb (not gem) hardware without actually handling the error.
->
-> The new code skips corrupted frames but still processes faultless frames.
-> Then it resets the RX queue before restarting the reception from a clean
-> state.
->
-> This patch is a rework of an older patch proposed by Neil Armstrong:
-> http://patchwork.ozlabs.org/patch/371525/
->
-> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+Am 24.03.2016 um 19:05 schrieb Kevin Hilman:
+> Add minimal DT files for the Amlogic P20x development boards, based on
+> the Amlogic S905/GXBB SoC.
+> 
+> Cc: Andreas F?rber <afaerber@suse.de>
+> Cc: Carlo Caione <carlo@endlessm.com>
+> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
 > ---
->   drivers/net/ethernet/cadence/macb.c | 59 ++++++++++++++++++++++++++++++-------
->   1 file changed, 49 insertions(+), 10 deletions(-)
->
-> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-> index 6619178ed77b..39447a337149 100644
-> --- a/drivers/net/ethernet/cadence/macb.c
-> +++ b/drivers/net/ethernet/cadence/macb.c
-[...]
-> @@ -945,11 +948,26 @@ static int macb_rx_frame(struct macb *bp, unsigned int first_frag,
->   	return 0;
->   }
->
-> +static inline void macb_init_rx_ring(struct macb *bp)
-> +{
-> +	int i;
-> +	dma_addr_t addr;
+>  arch/arm64/boot/dts/amlogic/Makefile             |  2 +
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts  | 52 +++++++++++++++++++
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts  | 52 +++++++++++++++++++
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi | 65 ++++++++++++++++++++++++
+>  4 files changed, 171 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
+>  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts
+>  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
 
-    DaveM prefers that longer declarations precede the shorter.
+Reviewed-by: Andreas F?rber <afaerber@suse.de>
 
-[...]
->   static int macb_rx(struct macb *bp, int budget)
->   {
->   	int received = 0;
->   	unsigned int tail;
->   	int first_frag = -1;
-> +	int reset_rx_queue = 0;
+Thanks,
+Andreas
 
-    *bool*, please.
-
-[...]
-
-MBR, Sergei
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton; HRB 21284 (AG N?rnberg)
