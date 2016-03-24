@@ -1,60 +1,39 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 24 Mar 2016 12:26:25 +0100
-Subject: [linux-sunxi] Re: [PATCH] ARM: dts: sun8i: Base Orange Pi Plus
- dts on the Orange Pi 2 dts
-In-Reply-To: <56F3CC68.4010705@redhat.com>
-References: <1458771256-4069-1-git-send-email-hdegoede@redhat.com>
- <20160324075904.GU30977@lukather> <56F3CC68.4010705@redhat.com>
-Message-ID: <20160324112625.GX30977@lukather>
+From: sr@denx.de (Stefan Roese)
+Date: Thu, 24 Mar 2016 13:05:29 +0100
+Subject: [PATCH v2] spi: orion.c: Add direct access mode
+In-Reply-To: <20160324112308.GY2566@sirena.org.uk>
+References: <20160322173546.40d24cc2@free-electrons.com>
+ <56F17684.2010307@denx.de> <20160323113316.GH2566@sirena.org.uk>
+ <56F2852C.5010006@denx.de> <20160323125448.GM2566@sirena.org.uk>
+ <56F295E1.4030505@denx.de> <20160323132732.GN2566@sirena.org.uk>
+ <56F2D19A.7020604@denx.de> <20160323183952.GK5250@lunn.ch>
+ <56F37EFF.2090605@denx.de> <20160324112308.GY2566@sirena.org.uk>
+Message-ID: <56F3D809.5060803@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Mar 24, 2016 at 12:15:52PM +0100, Hans de Goede wrote:
-> Hi Maxime,
+On 24.03.2016 12:23, Mark Brown wrote:
+> On Thu, Mar 24, 2016 at 06:45:35AM +0100, Stefan Roese wrote:
 > 
-> On 24-03-16 08:59, Maxime Ripard wrote:
-> >Hi,
-> >
-> >On Wed, Mar 23, 2016 at 11:14:16PM +0100, Hans de Goede wrote:
-> >>The Orange Pi Plus really is an Orange Pi 2 extended with:
-> >>1) A sata <-> usb bridge connected to ehci3
-> >>2) An eMMC on mmc2
-> >>3) An external gigabit ethernet phy instead of the integrated 100Mbit phy
-> >>
-> >>This commit changes the dts to reflect this by making it include
-> >>the Orange Pi 2 dts and then adding the extra bits.
-> >>
-> >>Note that the difference in ethernet phy is not taken into account
-> >>because we do not have an ethernet driver for the H3 yet.
-> >>
-> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> >
-> >Unfortunately, the patch doesn't apply anymore, and the merge doesn't
-> >seem trivial.
-> >
-> >I pushed my branch on my kernel.org repo, can you rebase your patch on
-> >top and resend it?
+>> Right. It is of course possible to use this direct mode to access
+>> SPI flash. Its just not the way how the SPI MTD driver uses the
+>> SPI controller. All information that is written to the SPI flash
+>> (e.g. commands, addresses) are passed as plain tx-data in the SPI
+>> message to the SPI controller. And it would be not easy to detect
+>> commands / addresses vs. "real data" in this orion SPI driver
+>> to put these values into the specific registers.
 > 
-> The problem is that you forgot to apply:
-> "ARM: dts: sun8i: Orangepi plus gpio keys fixes and improvements"
-> 
-> With that applied this one should apply unchanged too.
+> We now have extensions for passing commands through directly (see
+> spi_flash_read()).
 
-Damn, you're right... Sorry for the noise. I applied both.
+Interesting. So this direct access mode can be used to interface
+with SPI flash using these extensions. Great.
 
-Thanks!
-Maxime
+But I hope that its not a requirement that I add this SPI flash
+support (via direct access mode) to the orion SPI driver to get
+this patch accepted. As it really was not the scope of my project.
+I can try to get this added later, but I can't make any promises
+here. Perhaps someone else finds the time to implement this?
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160324/39e5a90e/attachment.sig>
+Thanks,
+Stefan
