@@ -1,12 +1,12 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Wed, 23 Mar 2016 18:49:56 -0700
+Date: Wed, 23 Mar 2016 18:52:33 -0700
 Subject: RPi3 arm64 port status
-Message-ID: <87oaa4k5kr.fsf@eliezer.anholt.net>
+Message-ID: <87lh58k5ge.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I spent most of today working on getting aarch64 working on the
-Raspberry Pi 3.  Here's what I've got so far:
+I spent today working on getting aarch64 working on the Raspberry Pi 3.
+Here's what I've got so far:
 
 U-Boot branch mostly based on srwarren's work:
 https://github.com/anholt/u-boot/tree/rpi_dev
@@ -62,12 +62,12 @@ getting weird IPIs immediately after:
 [    6.269406] SMP: Total of 1 processors activated.
 [    6.361572] CPU: All CPU(s) started at EL2
 
-so something's still broken, but the boot continues.
+so something's still broken.
 
 With MMC drivers disabled, I get to the point of trying NFS root
 mounting, except that DWC2 hasn't found the network adapter (there's a
-probe of a root hub, then nothing else).  Not clear if this is a 64-bit
-specific problem or what.
+probe of a root hub, then nothing else).  It's not clear if this is a
+64-bit specific problem or what.
 
 Just thought people might like to know how things are going for aarch64
 on the Pi.
@@ -77,4 +77,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 818 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160323/75cfe501/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160323/182665fe/attachment.sig>
