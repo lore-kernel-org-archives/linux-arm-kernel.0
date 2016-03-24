@@ -1,78 +1,60 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 24 Mar 2016 14:24:25 +0100
-Subject: [PATCH v2 6/6] serial: imx: implement DSR irq handling for DTE mode
+Date: Thu, 24 Mar 2016 14:24:22 +0100
+Subject: [PATCH v2 3/6] serial: imx: make sure unhandled irqs are disabled
 In-Reply-To: <1458825865-7434-1-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <1458825865-7434-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1458825865-7434-7-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1458825865-7434-4-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable reporting of DSR events (which is named DTR in the registers
-because Freescale uses the names as seem from a DCE).
+Make sure that events that are not handled in the irq function don't
+trigger an interrupt.
+
+When the serial port is operated in DTE mode, the events for DCD and RI
+events are enabled after a system reset by default.
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- drivers/tty/serial/imx.c | 20 +++++++++++++++++---
- 1 file changed, 17 insertions(+), 3 deletions(-)
+ drivers/tty/serial/imx.c | 23 ++++++++++++++++++++++-
+ 1 file changed, 22 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index c07e652f8f58..621e488cbb12 100644
+index 5ced61e1de6a..fcd48fd78bf5 100644
 --- a/drivers/tty/serial/imx.c
 +++ b/drivers/tty/serial/imx.c
-@@ -114,6 +114,7 @@
- #define UCR3_RXDSEN	(1<<6)	/* Receive status interrupt enable */
- #define UCR3_AIRINTEN	(1<<5)	/* Async IR wake interrupt enable */
- #define UCR3_AWAKEN	(1<<4)	/* Async wake interrupt enable */
-+#define UCR3_DTRDEN	(1<<3)	/* Data Terminal Ready Delta Enable. */
- #define IMX21_UCR3_RXDMUXSEL	(1<<2)	/* RXD Muxed Input Select */
- #define UCR3_INVT	(1<<1)	/* Inverted Infrared transmission */
- #define UCR3_BPEN	(1<<0)	/* Preset registers enable */
-@@ -142,7 +143,7 @@
- #define USR1_FRAMERR	(1<<10) /* Frame error interrupt flag */
- #define USR1_RRDY	(1<<9)	 /* Receiver ready interrupt/dma flag */
- #define USR1_AGTIM	(1<<8)	 /* Ageing timer interrupt flag */
--#define USR1_TIMEOUT	(1<<7)	 /* Receive timeout interrupt status */
-+#define USR1_DTRD	(1<<7)	 /* DTR Delta */
- #define USR1_RXDS	 (1<<6)	 /* Receiver idle interrupt flag */
- #define USR1_AIRINT	 (1<<5)	 /* Async IR wake interrupt flag */
- #define USR1_AWAKE	 (1<<4)	 /* Aysnc wake interrupt flag */
-@@ -804,6 +805,19 @@ static irqreturn_t imx_int(int irq, void *dev_id)
- 		ret = IRQ_HANDLED;
+@@ -1221,11 +1221,32 @@ static int imx_startup(struct uart_port *port)
+ 	temp |= (UCR2_RXEN | UCR2_TXEN);
+ 	if (!sport->have_rtscts)
+ 		temp |= UCR2_IRTS;
++	/*
++	 * make sure the edge sensitive RTS-irq is disabled,
++	 * we're using RTSD instead.
++	 */
++	if (!is_imx1_uart(sport))
++		temp &= ~UCR2_RTSEN;
+ 	writel(temp, sport->port.membase + UCR2);
+ 
+ 	if (!is_imx1_uart(sport)) {
+ 		temp = readl(sport->port.membase + UCR3);
+-		temp |= IMX21_UCR3_RXDMUXSEL | UCR3_ADNIMP;
++
++		/*
++		 * The effect of RI and DCD differs depending on the UFCR_DCEDTE
++		 * bit. In DCE mode they control the outputs, in DTE mode they
++		 * enable the respective irqs. At least the DCD irq cannot be
++		 * cleared on i.MX25 at least, so it's not usable and must be
++		 * disabled. I don't have test hardware to check if RI has the
++		 * same problem but I consider this likely so it's disabled for
++		 * now, too.
++		 */
++		temp |= IMX21_UCR3_RXDMUXSEL | UCR3_ADNIMP |
++			UCR3_RI | UCR3_DCD;
++
++		if (sport->dte_mode)
++			temp &= ~(UCR3_RI | UCR3_DCD);
++
+ 		writel(temp, sport->port.membase + UCR3);
  	}
  
-+	if (sts & USR1_DTRD) {
-+		unsigned long flags;
-+
-+		if (sts & USR1_DTRD)
-+			writel(USR1_DTRD, sport->port.membase + USR1);
-+
-+		spin_lock_irqsave(&sport->port.lock, flags);
-+		imx_mctrl_check(sport);
-+		spin_unlock_irqrestore(&sport->port.lock, flags);
-+
-+		ret = IRQ_HANDLED;
-+	}
-+
- 	if (sts & USR1_RTSD) {
- 		imx_rtsint(irq, dev_id);
- 		ret = IRQ_HANDLED;
-@@ -1202,7 +1216,7 @@ static int imx_startup(struct uart_port *port)
- 	/*
- 	 * Finally, clear and enable interrupts
- 	 */
--	writel(USR1_RTSD, sport->port.membase + USR1);
-+	writel(USR1_RTSD | USR1_DTRD, sport->port.membase + USR1);
- 	writel(USR2_ORE, sport->port.membase + USR2);
- 
- 	if (sport->dma_is_inited && !sport->dma_is_enabled)
-@@ -1242,7 +1256,7 @@ static int imx_startup(struct uart_port *port)
- 		 * now, too.
- 		 */
- 		temp |= IMX21_UCR3_RXDMUXSEL | UCR3_ADNIMP |
--			UCR3_RI | UCR3_DCD;
-+			UCR3_DTRDEN | UCR3_RI | UCR3_DCD;
- 
- 		if (sport->dte_mode)
- 			temp &= ~(UCR3_RI | UCR3_DCD);
 -- 
 2.7.0
