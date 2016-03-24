@@ -1,37 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 24 Mar 2016 13:58:21 +0100
-Subject: [PATCH 2/3] ARM64: dts: amlogic: add Hardkernel ODROID-C2
-In-Reply-To: <1458758013-11890-2-git-send-email-khilman@baylibre.com>
-References: <1458758013-11890-1-git-send-email-khilman@baylibre.com>
- <1458758013-11890-2-git-send-email-khilman@baylibre.com>
-Message-ID: <8055578.HDz4P7ZJ9W@wuerfel>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Thu, 24 Mar 2016 14:01:02 +0100
+Subject: [PATCH] cpuidle: arm: make enter idle operation a bit more
+ efficient
+In-Reply-To: <1458796038-6062-1-git-send-email-jszhang@marvell.com>
+References: <1458796038-6062-1-git-send-email-jszhang@marvell.com>
+Message-ID: <CAJZ5v0jJ=0eMcJVvBE3ewzj5_jWmkwqbwVu5CFRAA+BFysiCdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 23 March 2016 11:33:32 Kevin Hilman wrote:
-> +/ {
-> +       compatible = "hardkernel,odroid-c2", "amlogic,meson-gxbb";
-> +       model = "Hardkernel ODROID-C2";
-> +       
-> +       chosen {
-> +               stdout-path = "serial0:115200n8";
-> +       };
+On Thu, Mar 24, 2016 at 6:07 AM, Jisheng Zhang <jszhang@marvell.com> wrote:
+> Currently, entering idle need to check the idx every time to choose the
+> real entering idle routine. But this check could be avoided by pointing
+> the idle enter function pointer of each idle states to the routines
+> suitable for each states directly.
+>
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+
+This looks reasonable to me, but I need an ACK from the maintainer of this code.
+
+> ---
+>  drivers/cpuidle/cpuidle-arm.c | 14 ++++++++------
+>  1 file changed, 8 insertions(+), 6 deletions(-)
+>
+> diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
+> index 545069d..48a620f 100644
+> --- a/drivers/cpuidle/cpuidle-arm.c
+> +++ b/drivers/cpuidle/cpuidle-arm.c
+> @@ -23,6 +23,13 @@
+>
+>  #include "dt_idle_states.h"
+>
+> +static int arm_enter_wfi_state(struct cpuidle_device *dev,
+> +                              struct cpuidle_driver *drv, int idx)
+> +{
+> +       cpu_do_idle();
+> +       return 0;
+> +}
 > +
-> +       memory at 0 {
-> +               device_type = "memory";
-> +               reg = <0x0 0x0 0x0 0x80000000>;
-> +       };
-> +};
-> +
-> +&uart_AO {
-> +       status = "okay";
-> +};
-> 
-
-Shouldn't this also add the serial0 alias?
-
-It seems that the .dtsi file accidentally sets an alias to a disabled
-device, which isn't really valid. Can you fix that when adding the
-.dts?
-
-	Arnd
+>  /*
+>   * arm_enter_idle_state - Programs CPU to enter the specified state
+>   *
+> @@ -38,11 +45,6 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
+>  {
+>         int ret;
+>
+> -       if (!idx) {
+> -               cpu_do_idle();
+> -               return idx;
+> -       }
+> -
+>         ret = cpu_pm_enter();
+>         if (!ret) {
+>                 /*
+> @@ -69,7 +71,7 @@ static struct cpuidle_driver arm_idle_driver = {
+>          * handler for idle state index 0.
+>          */
+>         .states[0] = {
+> -               .enter                  = arm_enter_idle_state,
+> +               .enter                  = arm_enter_wfi_state,
+>                 .exit_latency           = 1,
+>                 .target_residency       = 1,
+>                 .power_usage            = UINT_MAX,
+> --
