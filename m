@@ -1,43 +1,39 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Thu, 24 Mar 2016 17:52:55 +0100
-Subject: [PATCH v5 0/2] power: reset: support for Atmel alternative
- Shutdown Controller
-In-Reply-To: <56F3AB12.20701@atmel.com>
-References: <1458134390-23847-1-git-send-email-nicolas.ferre@atmel.com>
- <56F27B96.5010406@atmel.com> <20160323211144.GA31473@earth>
- <56F3AB12.20701@atmel.com>
-Message-ID: <20160324165254.GA31831@earth>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Thu, 24 Mar 2016 17:55:34 +0100
+Subject: [PATCH 1/3] Documentation: devicetree: amlogic: Document P20x and
+ ODROID-C2 boards
+In-Reply-To: <1458758013-11890-1-git-send-email-khilman@baylibre.com>
+References: <1458758013-11890-1-git-send-email-khilman@baylibre.com>
+Message-ID: <56F41C06.40207@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Mar 24, 2016 at 09:53:38AM +0100, Nicolas Ferre wrote:
-> Le 23/03/2016 22:11, Sebastian Reichel a ?crit :
-> > Hi Nicolas,
-> > 
-> > On Wed, Mar 23, 2016 at 12:18:46PM +0100, Nicolas Ferre wrote:
-> >> Le 16/03/2016 14:19, Nicolas Ferre a ?crit :
-> >>> This is a series to add driver for a new Atmel Shutdown Controller. This new IP
-> >>> is extensible and some features will be added later (see the TODO section).
-> >>> Its extensible nature led to write a new binding so that wake-up sources can be
-> >>> described easily.
-> >>
-> >> I have the feeling that this series is ready. What do you think?
-> > 
-> > I have see obvious problems with this series and plan to queue this
+Am 23.03.2016 um 19:33 schrieb Kevin Hilman:
+> Add compatible strings for Amlogic S905/GXBB based boards: Hardkernel
+> ODROID-C2, Amlogic P200 and Amlogic P201.
 > 
-> I would be reassured if a "not" was actually missing in the sentence
-> above... ;-)
+> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+> ---
+>  Documentation/devicetree/bindings/arm/amlogic.txt | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
+> index 8a5122ab19b0..fcc6f6c10803 100644
+> --- a/Documentation/devicetree/bindings/arm/amlogic.txt
+> +++ b/Documentation/devicetree/bindings/arm/amlogic.txt
+> @@ -25,3 +25,6 @@ Board compatible values:
+>    - "tronsmart,vega-s95-pro", "tronsmart,vega-s95" (Meson gxbb)
+>    - "tronsmart,vega-s95-meta", "tronsmart,vega-s95" (Meson gxbb)
+>    - "tronsmart,vega-s95-telos", "tronsmart,vega-s95" (Meson gxbb)
+> +  - "hardkernel,odroid-c2" (Meson gxbb)
+> +  - "amlogic,p200" (Meson gxbb)
+> +  - "amlogic,p201" (Meson gxbb)
 
-Sorry, it's missing of course (I do not intent to queue stuff with
-obvious problems ;)).
+Reviewed-by: Andreas F?rber <afaerber@suse.de>
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160324/570a8ff3/attachment.sig>
+Thanks,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton; HRB 21284 (AG N?rnberg)
