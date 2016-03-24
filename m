@@ -1,229 +1,283 @@
 From: david@lechnology.com (David Lechner)
-Date: Thu, 24 Mar 2016 18:51:39 -0500
-Subject: [PATCH v3 14/16] usb: ohci-da8xx: Remove code that references mach
+Date: Thu, 24 Mar 2016 18:51:41 -0500
+Subject: [PATCH v3 16/16] usb: musb: da8xx: Remove mach code
 In-Reply-To: <1458863503-31121-1-git-send-email-david@lechnology.com>
 References: <1458863503-31121-1-git-send-email-david@lechnology.com>
-Message-ID: <1458863503-31121-15-git-send-email-david@lechnology.com>
+Message-ID: <1458863503-31121-17-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Including mach/* is frowned upon in device drivers, so get rid of it.
-
-This replaces usb20_clk and code that pokes CFGCHIP2 with a proper phy
-driver.
+Use the new phy-da8xx-usb driver to take the place of the mach code that
+pokes CFGCHIP2 in the da8xx musb glue driver. This unbreaks the driver.
 
 Signed-off-by: David Lechner <david@lechnology.com>
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
 ---
 
 v3 changes:
 
-* add phy_init and phy_exit calls for completness (they are nops for this
-  particular phy driver).
-* add select PHY_DA8XX_USB to Kconfig
+* removed depends on BROKEN and added select PHY_DA8XX_USB to Kconfig
+* Added calls to phy_init and phy_exit
 
 
- drivers/usb/host/Kconfig      |   1 +
- drivers/usb/host/ohci-da8xx.c | 102 +++++++++++++++++++++++-------------------
- 2 files changed, 56 insertions(+), 47 deletions(-)
+ drivers/usb/musb/Kconfig |   2 +-
+ drivers/usb/musb/da8xx.c | 141 ++++++++++++++++-------------------------------
+ 2 files changed, 47 insertions(+), 96 deletions(-)
 
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 3050b18..e4432c6 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -472,6 +472,7 @@ config USB_OHCI_HCD_DAVINCI
- 	bool "OHCI support for TI DaVinci DA8xx"
+diff --git a/drivers/usb/musb/Kconfig b/drivers/usb/musb/Kconfig
+index 886526b..c73221a 100644
+--- a/drivers/usb/musb/Kconfig
++++ b/drivers/usb/musb/Kconfig
+@@ -82,7 +82,7 @@ config USB_MUSB_DA8XX
+ 	tristate "DA8xx/OMAP-L1x"
  	depends on ARCH_DAVINCI_DA8XX
- 	depends on USB_OHCI_HCD=y
+ 	depends on NOP_USB_XCEIV
+-	depends on BROKEN
 +	select PHY_DA8XX_USB
- 	default y
- 	help
- 	  Enables support for the DaVinci DA8xx integrated OHCI
-diff --git a/drivers/usb/host/ohci-da8xx.c b/drivers/usb/host/ohci-da8xx.c
-index e5c33bc..9d093ac 100644
---- a/drivers/usb/host/ohci-da8xx.c
-+++ b/drivers/usb/host/ohci-da8xx.c
-@@ -15,58 +15,50 @@
- #include <linux/jiffies.h>
- #include <linux/platform_device.h>
+ 
+ config USB_MUSB_TUSB6010
+ 	tristate "TUSB6010"
+diff --git a/drivers/usb/musb/da8xx.c b/drivers/usb/musb/da8xx.c
+index 0c1997c..de210cb 100644
+--- a/drivers/usb/musb/da8xx.c
++++ b/drivers/usb/musb/da8xx.c
+@@ -30,13 +30,12 @@
  #include <linux/clk.h>
--
--#include <mach/da8xx.h>
+ #include <linux/err.h>
+ #include <linux/io.h>
 +#include <linux/phy/phy.h>
- #include <linux/platform_data/usb-davinci.h>
++#include <linux/phy/phy-da8xx-usb.h>
+ #include <linux/platform_device.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/usb/usb_phy_generic.h>
  
- #ifndef CONFIG_ARCH_DAVINCI_DA8XX
- #error "This file is DA8xx bus glue.  Define CONFIG_ARCH_DAVINCI_DA8XX."
- #endif
- 
--#define CFGCHIP2	DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP2_REG)
+-#include <mach/da8xx.h>
+-#include <linux/platform_data/usb-davinci.h>
 -
- static struct clk *usb11_clk;
--static struct clk *usb20_clk;
-+static struct phy *usb11_phy;
- 
- /* Over-current indicator change bitmask */
- static volatile u16 ocic_mask;
- 
--static void ohci_da8xx_clock(int on)
-+static int ohci_da8xx_enable(void)
- {
--	u32 cfgchip2;
--
--	cfgchip2 = __raw_readl(CFGCHIP2);
--	if (on) {
--		clk_enable(usb11_clk);
--
--		/*
--		 * If USB 1.1 reference clock is sourced from USB 2.0 PHY, we
--		 * need to enable the USB 2.0 module clocking, start its PHY,
--		 * and not allow it to stop the clock during USB 2.0 suspend.
--		 */
--		if (!(cfgchip2 & CFGCHIP2_USB1PHYCLKMUX)) {
--			clk_enable(usb20_clk);
--
--			cfgchip2 &= ~(CFGCHIP2_RESET | CFGCHIP2_PHYPWRDN);
--			cfgchip2 |= CFGCHIP2_PHY_PLLON;
--			__raw_writel(cfgchip2, CFGCHIP2);
--
--			pr_info("Waiting for USB PHY clock good...\n");
--			while (!(__raw_readl(CFGCHIP2) & CFGCHIP2_PHYCLKGD))
--				cpu_relax();
--		}
-+	int ret;
- 
--		/* Enable USB 1.1 PHY */
--		cfgchip2 |= CFGCHIP2_USB1SUSPENDM;
--	} else {
--		clk_disable(usb11_clk);
--		if (!(cfgchip2 & CFGCHIP2_USB1PHYCLKMUX))
--			clk_disable(usb20_clk);
-+	ret = clk_prepare_enable(usb11_clk);
-+	if (ret)
-+		return ret;
- 
--		/* Disable USB 1.1 PHY */
--		cfgchip2 &= ~CFGCHIP2_USB1SUSPENDM;
--	}
--	__raw_writel(cfgchip2, CFGCHIP2);
-+	ret = phy_init(usb11_phy);
-+	if (ret)
-+		goto err_phy_init;
-+
-+	ret = phy_power_on(usb11_phy);
-+	if (ret)
-+		goto err_phy_power_on;
-+
-+	return 0;
-+
-+err_phy_power_on:
-+	phy_exit(usb11_phy);
-+err_phy_init:
-+	clk_disable_unprepare(usb11_clk);
-+
-+	return ret;
-+}
-+
-+static void ohci_da8xx_disable(void)
-+{
-+	phy_power_off(usb11_phy);
-+	phy_exit(usb11_phy);
-+	clk_disable_unprepare(usb11_clk);
- }
+ #include "musb_core.h"
  
  /*
-@@ -92,7 +84,9 @@ static int ohci_da8xx_init(struct usb_hcd *hcd)
+@@ -80,61 +79,15 @@
  
- 	dev_dbg(dev, "starting USB controller\n");
+ #define DA8XX_MENTOR_CORE_OFFSET 0x400
  
--	ohci_da8xx_clock(1);
-+	result = ohci_da8xx_enable();
-+	if (result < 0)
-+		return result;
+-#define CFGCHIP2	IO_ADDRESS(DA8XX_SYSCFG0_BASE + DA8XX_CFGCHIP2_REG)
+-
+ struct da8xx_glue {
+ 	struct device		*dev;
+ 	struct platform_device	*musb;
+-	struct platform_device	*phy;
++	struct platform_device	*usb_phy;
+ 	struct clk		*clk;
++	struct phy		*phy;
+ };
  
- 	/*
- 	 * DA8xx only have 1 port connected to the pins but the HC root hub
-@@ -101,8 +95,10 @@ static int ohci_da8xx_init(struct usb_hcd *hcd)
- 	ohci->num_ports = 1;
+ /*
+- * REVISIT (PM): we should be able to keep the PHY in low power mode most
+- * of the time (24 MHz oscillator and PLL off, etc.) by setting POWER.D0
+- * and, when in host mode, autosuspending idle root ports... PHY_PLLON
+- * (overriding SUSPENDM?) then likely needs to stay off.
+- */
+-
+-static inline void phy_on(void)
+-{
+-	u32 cfgchip2 = __raw_readl(CFGCHIP2);
+-
+-	/*
+-	 * Start the on-chip PHY and its PLL.
+-	 */
+-	cfgchip2 &= ~(CFGCHIP2_RESET | CFGCHIP2_PHYPWRDN | CFGCHIP2_OTGPWRDN);
+-	cfgchip2 |= CFGCHIP2_PHY_PLLON;
+-	__raw_writel(cfgchip2, CFGCHIP2);
+-
+-	pr_info("Waiting for USB PHY clock good...\n");
+-	while (!(__raw_readl(CFGCHIP2) & CFGCHIP2_PHYCLKGD))
+-		cpu_relax();
+-}
+-
+-static inline void phy_off(void)
+-{
+-	u32 cfgchip2 = __raw_readl(CFGCHIP2);
+-
+-	/*
+-	 * Ensure that USB 1.1 reference clock is not being sourced from
+-	 * USB 2.0 PHY.  Otherwise do not power down the PHY.
+-	 */
+-	if (!(cfgchip2 & CFGCHIP2_USB1PHYCLKMUX) &&
+-	     (cfgchip2 & CFGCHIP2_USB1SUSPENDM)) {
+-		pr_warning("USB 1.1 clocked from USB 2.0 PHY -- "
+-			   "can't power it down\n");
+-		return;
+-	}
+-
+-	/*
+-	 * Power down the on-chip PHY.
+-	 */
+-	cfgchip2 |= CFGCHIP2_PHYPWRDN | CFGCHIP2_OTGPWRDN;
+-	__raw_writel(cfgchip2, CFGCHIP2);
+-}
+-
+-/*
+  * Because we don't set CTRL.UINT, it's "important" to:
+  *	- not read/write INTRUSB/INTRUSBE (except during
+  *	  initial setup, as a workaround);
+@@ -385,29 +338,14 @@ static irqreturn_t da8xx_musb_interrupt(int irq, void *hci)
  
- 	result = ohci_init(ohci);
--	if (result < 0)
-+	if (result < 0) {
-+		ohci_da8xx_disable();
- 		return result;
-+	}
- 
- 	/*
- 	 * Since we're providing a board-specific root hub port power control
-@@ -129,7 +125,7 @@ static int ohci_da8xx_init(struct usb_hcd *hcd)
- static void ohci_da8xx_stop(struct usb_hcd *hcd)
+ static int da8xx_musb_set_mode(struct musb *musb, u8 musb_mode)
  {
- 	ohci_stop(hcd);
--	ohci_da8xx_clock(0);
-+	ohci_da8xx_disable();
+-	u32 cfgchip2 = __raw_readl(CFGCHIP2);
++	struct da8xx_glue *glue = dev_get_drvdata(musb->controller->parent);
+ 
+-	cfgchip2 &= ~CFGCHIP2_OTGMODE;
+-	switch (musb_mode) {
+-	case MUSB_HOST:		/* Force VBUS valid, ID = 0 */
+-		cfgchip2 |= CFGCHIP2_FORCE_HOST;
+-		break;
+-	case MUSB_PERIPHERAL:	/* Force VBUS valid, ID = 1 */
+-		cfgchip2 |= CFGCHIP2_FORCE_DEVICE;
+-		break;
+-	case MUSB_OTG:		/* Don't override the VBUS/ID comparators */
+-		cfgchip2 |= CFGCHIP2_NO_OVERRIDE;
+-		break;
+-	default:
+-		dev_dbg(musb->controller, "Trying to set unsupported mode %u\n", musb_mode);
+-	}
+-
+-	__raw_writel(cfgchip2, CFGCHIP2);
+-	return 0;
++	return da8xx_usb20_phy_set_mode(glue->phy, musb_mode);
  }
  
- static int ohci_da8xx_start(struct usb_hcd *hcd)
-@@ -301,12 +297,18 @@ static int usb_hcd_da8xx_probe(const struct hc_driver *driver,
- 		return -ENODEV;
- 
- 	usb11_clk = devm_clk_get(&pdev->dev, "usb11");
--	if (IS_ERR(usb11_clk))
-+	if (IS_ERR(usb11_clk)) {
-+		if (PTR_ERR(usb11_clk) != -EPROBE_DEFER)
-+			dev_err(&pdev->dev, "Failed to get clock.\n");
- 		return PTR_ERR(usb11_clk);
-+	}
- 
--	usb20_clk = devm_clk_get(&pdev->dev, "usb20");
--	if (IS_ERR(usb20_clk))
--		return PTR_ERR(usb20_clk);
-+	usb11_phy = devm_phy_get(&pdev->dev, "usbphy");
-+	if (IS_ERR(usb11_phy)) {
-+		if (PTR_ERR(usb11_phy) != -EPROBE_DEFER)
-+			dev_err(&pdev->dev, "Failed to get phy.\n");
-+		return PTR_ERR(usb11_phy);
-+	}
- 
- 	hcd = usb_create_hcd(driver, &pdev->dev, dev_name(&pdev->dev));
- 	if (!hcd)
-@@ -316,6 +318,7 @@ static int usb_hcd_da8xx_probe(const struct hc_driver *driver,
- 	hcd->regs = devm_ioremap_resource(&pdev->dev, mem);
- 	if (IS_ERR(hcd->regs)) {
- 		error = PTR_ERR(hcd->regs);
-+		dev_err(&pdev->dev, "failed to map ohci.\n");
- 		goto err;
- 	}
- 	hcd->rsrc_start = mem->start;
-@@ -397,7 +400,7 @@ static int ohci_da8xx_suspend(struct platform_device *pdev,
- 	if (ret)
- 		return ret;
- 
--	ohci_da8xx_clock(0);
-+	ohci_da8xx_disable();
- 	hcd->state = HC_STATE_SUSPENDED;
- 
- 	return ret;
-@@ -407,14 +410,19 @@ static int ohci_da8xx_resume(struct platform_device *dev)
+ static int da8xx_musb_init(struct musb *musb)
  {
- 	struct usb_hcd	*hcd	= platform_get_drvdata(dev);
- 	struct ohci_hcd	*ohci	= hcd_to_ohci(hcd);
-+	int ret;
++	struct da8xx_glue *glue = dev_get_drvdata(musb->controller->parent);
+ 	void __iomem *reg_base = musb->ctrl_base;
+ 	u32 rev;
+ 	int ret = -ENODEV;
+@@ -425,32 +363,56 @@ static int da8xx_musb_init(struct musb *musb)
+ 		goto fail;
+ 	}
  
- 	if (time_before(jiffies, ohci->next_statechange))
- 		msleep(5);
- 	ohci->next_statechange = jiffies;
++	ret = clk_prepare_enable(glue->clk);
++	if (ret) {
++		dev_err(glue->dev, "failed to enable clock\n");
++		goto fail;
++	}
++
+ 	setup_timer(&otg_workaround, otg_timer, (unsigned long)musb);
  
--	ohci_da8xx_clock(1);
-+	ret = ohci_da8xx_enable();
-+	if (ret)
-+		return ret;
+ 	/* Reset the controller */
+ 	musb_writel(reg_base, DA8XX_USB_CTRL_REG, DA8XX_SOFT_RESET_MASK);
+ 
+ 	/* Start the on-chip PHY and its PLL. */
+-	phy_on();
++	ret = phy_init(glue->phy);
++	if (ret) {
++		dev_err(glue->dev, "Failed to init phy.\n");
++		goto err_phy_init;
++	}
 +
- 	dev->dev.power.power_state = PMSG_ON;
- 	usb_hcd_resume_root_hub(hcd);
++	ret = phy_power_on(glue->phy);
++	if (ret) {
++		dev_err(glue->dev, "Failed to power on phy.\n");
++		goto err_phy_power_on;
++	}
+ 
+ 	msleep(5);
+ 
+ 	/* NOTE: IRQs are in mixed mode, not bypass to pure MUSB */
+-	pr_debug("DA8xx OTG revision %08x, PHY %03x, control %02x\n",
+-		 rev, __raw_readl(CFGCHIP2),
++	pr_debug("DA8xx OTG revision %08x, control %02x\n", rev,
+ 		 musb_readb(reg_base, DA8XX_USB_CTRL_REG));
+ 
+ 	musb->isr = da8xx_musb_interrupt;
+ 	return 0;
 +
++err_phy_power_on:
++	phy_exit(glue->phy);
++err_phy_init:
++	clk_disable_unprepare(glue->clk);
+ fail:
+ 	return ret;
+ }
+ 
+ static int da8xx_musb_exit(struct musb *musb)
+ {
++	struct da8xx_glue *glue = dev_get_drvdata(musb->controller->parent);
++
+ 	del_timer_sync(&otg_workaround);
+ 
+-	phy_off();
++	phy_power_off(glue->phy);
++	phy_exit(glue->phy);
++	clk_disable_unprepare(glue->clk);
+ 
+ 	usb_put_phy(musb->xceiv);
+ 
+@@ -504,10 +466,10 @@ static int da8xx_probe(struct platform_device *pdev)
+ 		return PTR_ERR(clk);
+ 	}
+ 
+-	ret = clk_enable(clk);
+-	if (ret) {
+-		dev_err(&pdev->dev, "failed to enable clock\n");
+-		goto err4;
++	glue->phy = devm_phy_get(&pdev->dev, "usbphy");
++	if (IS_ERR(glue->phy)) {
++		dev_err(&pdev->dev, "failed to get phy\n");
++		return PTR_ERR(glue->phy);
+ 	}
+ 
+ 	glue->dev			= &pdev->dev;
+@@ -515,10 +477,10 @@ static int da8xx_probe(struct platform_device *pdev)
+ 
+ 	pdata->platform_ops		= &da8xx_ops;
+ 
+-	glue->phy = usb_phy_generic_register();
+-	if (IS_ERR(glue->phy)) {
+-		ret = PTR_ERR(glue->phy);
+-		goto err5;
++	glue->usb_phy = usb_phy_generic_register();
++	if (IS_ERR(glue->usb_phy)) {
++		dev_err(&pdev->dev, "failed to register usb_phy\n");
++		return PTR_ERR(glue->usb_phy);
+ 	}
+ 	platform_set_drvdata(pdev, glue);
+ 
+@@ -544,22 +506,12 @@ static int da8xx_probe(struct platform_device *pdev)
+ 
+ 	glue->musb = musb = platform_device_register_full(&pinfo);
+ 	if (IS_ERR(musb)) {
+-		ret = PTR_ERR(musb);
+ 		dev_err(&pdev->dev, "failed to register musb device: %d\n", ret);
+-		goto err6;
++		usb_phy_generic_unregister(glue->usb_phy);
++		return PTR_ERR(musb);
+ 	}
+ 
+ 	return 0;
+-
+-err6:
+-	usb_phy_generic_unregister(glue->phy);
+-
+-err5:
+-	clk_disable(clk);
+-
+-err4:
+-
+-	return ret;
+ }
+ 
+ static int da8xx_remove(struct platform_device *pdev)
+@@ -567,8 +519,7 @@ static int da8xx_remove(struct platform_device *pdev)
+ 	struct da8xx_glue		*glue = platform_get_drvdata(pdev);
+ 
+ 	platform_device_unregister(glue->musb);
+-	usb_phy_generic_unregister(glue->phy);
+-	clk_disable(glue->clk);
++	usb_phy_generic_unregister(glue->usb_phy);
+ 
  	return 0;
  }
- #endif
 -- 
 1.9.1
