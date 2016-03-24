@@ -1,39 +1,38 @@
-From: plaes@plaes.org (Priit Laes)
-Date: Thu, 24 Mar 2016 21:52:17 +0200
-Subject: [PATCH v2 2/2] ARM: sun7i: dt: Enable dram gate 5 (tve0 clock) for
- simplefb TV output
-In-Reply-To: <1458849137-3883-1-git-send-email-plaes@plaes.org>
-References: <1458849137-3883-1-git-send-email-plaes@plaes.org>
-Message-ID: <1458849137-3883-3-git-send-email-plaes@plaes.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 24 Mar 2016 20:53:23 +0100
+Subject: [PATCH 2/3] ARM64: dts: amlogic: add Hardkernel ODROID-C2
+In-Reply-To: <56F4233A.5020904@suse.de>
+References: <1458758013-11890-1-git-send-email-khilman@baylibre.com>
+ <CAOi56cVoLrHjeT_BhSZAvj5yZvf8Qkg8y=_zh+kikM+96+LGVg@mail.gmail.com>
+ <56F4233A.5020904@suse.de>
+Message-ID: <4122350.NJToUYgt7m@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Seems like dram_gate 5 was forgotten when DRAM gating driver was added.
+On Thursday 24 March 2016 18:26:18 Andreas F?rber wrote:
+> 
+> However @Arnd, I still don't understand how an alias to a disabled
+> device hurts? It was not accidental on my part. And I'm pretty sure on
+> my PowerMac's OpenFirmware I had aliases to disk devices not connected.
+> 
+> Using an alias to a disabled device should be no different from using
+> the full path to a disabled device. We don't prevent the latter, so why
+> the former?
+> 
+> If the serial node is disabled, the meson_uart driver won't probe and
+> won't look up its alias. Who else uses it apart from stdout-path?
+> 
+> The order was intentionally always AO (always-on) bus first, and there
+> are just two UARTs I'm aware of.
 
-Add it.
+The aliases are supposed to reflect the numbering that is used on
+the board, and in most cases the SoC supports more UARTS than
+the board does, and not every board uses the same ones, so it's
+easier to always define the serial aliases in the .dts file and
+only list the ones that are actually wired up on the board.
 
-Cc: stable at vger.kernel.org
-Fixes: 0b4bf5a5200b (ARM: dts: sun7i: Add DRAM gates)
-Signed-off-by: Priit Laes <plaes@plaes.org>
----
- arch/arm/boot/dts/sun7i-a20.dtsi | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+With the disks in your example, the aliases would reflect the
+number of the connector, whether there is something on it or not,
+so that makes a lot of sense too.
 
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 0940a78..ee4e8e7 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -85,8 +85,9 @@
- 			compatible = "allwinner,simple-framebuffer",
- 				     "simple-framebuffer";
- 			allwinner,pipeline = "de_be0-lcd0-tve0";
--			clocks = <&pll5 1>, <&ahb_gates 34>, <&ahb_gates 36>,
--				 <&ahb_gates 44>, <&dram_gates 26>;
-+			clocks = <&pll5 1>,
-+				 <&ahb_gates 34>, <&ahb_gates 36>, <&ahb_gates 44>,
-+				 <&dram_gates 5>, <&dram_gates 26>;
- 			status = "disabled";
- 		};
- 	};
--- 
-2.5.0
+	Arnd
