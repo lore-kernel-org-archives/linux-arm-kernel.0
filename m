@@ -1,53 +1,72 @@
 From: shannon.zhao@linaro.org (Shannon Zhao)
-Date: Thu, 24 Mar 2016 22:44:31 +0800
-Subject: [PATCH v7 12/17] ARM64: ACPI: Check if it runs on Xen to enable or
- disable ACPI
+Date: Thu, 24 Mar 2016 22:44:32 +0800
+Subject: [PATCH v7 13/17] ARM: Xen: Document UEFI support on Xen ARM virtual
+ platforms
 In-Reply-To: <1458830676-27075-1-git-send-email-shannon.zhao@linaro.org>
 References: <1458830676-27075-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1458830676-27075-13-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1458830676-27075-14-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When it's a Xen domain0 booting with ACPI, it will supply a /chosen and
-a /hypervisor node in DT. So check if it needs to enable ACPI.
+Add a "uefi" node under /hypervisor node in FDT, then Linux kernel could
+scan this to get the UEFI information.
 
+CC: Rob Herring <robh@kernel.org>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
 Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- arch/arm64/kernel/acpi.c | 12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
+ Documentation/devicetree/bindings/arm/xen.txt | 33 +++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
 
-diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-index d1ce8e2..4e92be0 100644
---- a/arch/arm64/kernel/acpi.c
-+++ b/arch/arm64/kernel/acpi.c
-@@ -67,10 +67,13 @@ static int __init dt_scan_depth1_nodes(unsigned long node,
- {
- 	/*
- 	 * Return 1 as soon as we encounter a node at depth 1 that is
--	 * not the /chosen node.
-+	 * not the /chosen node, or /hypervisor node when running on Xen.
- 	 */
--	if (depth == 1 && (strcmp(uname, "chosen") != 0))
--		return 1;
-+	if (depth == 1 && (strcmp(uname, "chosen") != 0)) {
-+		if (!xen_initial_domain() || (strcmp(uname, "hypervisor") != 0))
-+			return 1;
-+	}
-+
- 	return 0;
- }
+diff --git a/Documentation/devicetree/bindings/arm/xen.txt b/Documentation/devicetree/bindings/arm/xen.txt
+index 0f7b9c2..6f83f76 100644
+--- a/Documentation/devicetree/bindings/arm/xen.txt
++++ b/Documentation/devicetree/bindings/arm/xen.txt
+@@ -15,6 +15,26 @@ the following properties:
+ - interrupts: the interrupt used by Xen to inject event notifications.
+   A GIC node is also required.
  
-@@ -184,7 +187,8 @@ void __init acpi_boot_table_init(void)
- 	/*
- 	 * Enable ACPI instead of device tree unless
- 	 * - ACPI has been disabled explicitly (acpi=off), or
--	 * - the device tree is not empty (it has more than just a /chosen node)
-+	 * - the device tree is not empty (it has more than just a /chosen node,
-+	 *   and a /hypervisor node when running on Xen)
- 	 *   and ACPI has not been force enabled (acpi=force)
- 	 */
- 	if (param_acpi_off ||
++To support UEFI on Xen ARM virtual platforms, Xen populates the FDT "uefi" node
++under /hypervisor with following parameters:
++
++________________________________________________________________________________
++Name                      | Size   | Description
++================================================================================
++xen,uefi-system-table     | 64-bit | Guest physical address of the UEFI System
++			  |	   | Table.
++--------------------------------------------------------------------------------
++xen,uefi-mmap-start       | 64-bit | Guest physical address of the UEFI memory
++			  |	   | map.
++--------------------------------------------------------------------------------
++xen,uefi-mmap-size        | 32-bit | Size in bytes of the UEFI memory map
++                          |        | pointed to in previous entry.
++--------------------------------------------------------------------------------
++xen,uefi-mmap-desc-size   | 32-bit | Size in bytes of each entry in the UEFI
++                          |        | memory map.
++--------------------------------------------------------------------------------
++xen,uefi-mmap-desc-ver    | 32-bit | Version of the mmap descriptor format.
++--------------------------------------------------------------------------------
+ 
+ Example (assuming #address-cells = <2> and #size-cells = <2>):
+ 
+@@ -22,4 +42,17 @@ hypervisor {
+ 	compatible = "xen,xen-4.3", "xen,xen";
+ 	reg = <0 0xb0000000 0 0x20000>;
+ 	interrupts = <1 15 0xf08>;
++	uefi {
++		xen,uefi-system-table = <0xXXXXXXXX>;
++		xen,uefi-mmap-start = <0xXXXXXXXX>;
++		xen,uefi-mmap-size = <0xXXXXXXXX>;
++		xen,uefi-mmap-desc-size = <0xXXXXXXXX>;
++		xen,uefi-mmap-desc-ver = <0xXXXXXXXX>;
++        };
+ };
++
++The format and meaning of the "xen,uefi-*" parameters are similar to those in
++Documentation/arm/uefi.txt, which are provided by the regular UEFI stub. However
++they differ because they are provided by the Xen hypervisor, together with a set
++of UEFI runtime services implemented via hypercalls, see
++http://xenbits.xen.org/docs/unstable/hypercall/x86_64/include,public,platform.h.html.
 -- 
 2.1.4
