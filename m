@@ -1,75 +1,87 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 24 Mar 2016 16:06:00 +0000
-Subject: [PATCH] cpuidle: arm: make enter idle operation a bit more
- efficient
-In-Reply-To: <1458796038-6062-1-git-send-email-jszhang@marvell.com>
-References: <1458796038-6062-1-git-send-email-jszhang@marvell.com>
-Message-ID: <20160324160600.GA21749@red-moon>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 24 Mar 2016 17:11:43 +0100
+Subject: [PATCH 1/4] arm64: dts: marvell: Clean up armada-3720-db
+In-Reply-To: <1458771861-12392-2-git-send-email-afaerber@suse.de> ("Andreas
+ =?utf-8?Q?F=C3=A4rber=22's?= message of "Wed, 23 Mar 2016 23:24:18 +0100")
+References: <1458771861-12392-1-git-send-email-afaerber@suse.de>
+ <1458771861-12392-2-git-send-email-afaerber@suse.de>
+Message-ID: <87zitnn9ds.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 24, 2016 at 01:07:18PM +0800, Jisheng Zhang wrote:
-> Currently, entering idle need to check the idx every time to choose the
-> real entering idle routine. But this check could be avoided by pointing
-> the idle enter function pointer of each idle states to the routines
-> suitable for each states directly.
-> 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Hi Andreas,
+ 
+ On mer., mars 23 2016, Andreas F?rber <afaerber@suse.de> wrote:
+
+> Instead of duplicating the SoC's node hierarchy, including a bus node
+> named "internal-regs", reference the actually desired nodes by label,
+> like Berlin already does. Add labels where necessary.
+
+We talked about this for the 3rd patch, but the conclusion will apply
+here too. So we are going to use this solution for the mvebu 64bits. I
+have just a minor remark.
+
+>
+> Drop an inconsistent white line while at it.
+>
+> Fixes: adbc3695d9e4 ("arm64: dts: add the Marvell Armada 3700 family and a development board")
+> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
 > ---
->  drivers/cpuidle/cpuidle-arm.c | 14 ++++++++------
->  1 file changed, 8 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
-> index 545069d..48a620f 100644
-> --- a/drivers/cpuidle/cpuidle-arm.c
-> +++ b/drivers/cpuidle/cpuidle-arm.c
-> @@ -23,6 +23,13 @@
+>  arch/arm64/boot/dts/marvell/armada-3720-db.dts | 35 +++++++++++---------------
+>  arch/arm64/boot/dts/marvell/armada-372x.dtsi   |  1 -
+>  arch/arm64/boot/dts/marvell/armada-37xx.dtsi   |  4 +--
+>  3 files changed, 17 insertions(+), 23 deletions(-)
+>
+> diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+> index 359050154511..48f97d14b057 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+> +++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+> @@ -60,27 +60,22 @@
+>  		device_type = "memory";
+>  		reg = <0x00000000 0x00000000 0x00000000 0x20000000>;
+>  	};
+> +};
 >  
->  #include "dt_idle_states.h"
+> -	soc {
+> -		internal-regs {
+> -			/*
+> -			* Exported on the micro USB connector CON32
+> -			* through an FTDI
+> -			*/
+> -			uart0: serial at 12000 {
+> -				status = "okay";
+> -			};
+> -
+> -			/* CON31 */
+> -			usb3 at 58000 {
+> -				status = "okay";
+> -			};
+> +/* CON3 */
+> +&sata {
+> +	status = "okay";
+> +};
 >  
-> +static int arm_enter_wfi_state(struct cpuidle_device *dev,
-> +			       struct cpuidle_driver *drv, int idx)
-> +{
-> +	cpu_do_idle();
-> +	return 0;
-> +}
-> +
->  /*
->   * arm_enter_idle_state - Programs CPU to enter the specified state
->   *
-> @@ -38,11 +45,6 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
->  {
->  	int ret;
->  
-> -	if (!idx) {
-> -		cpu_do_idle();
-> -		return idx;
-> -	}
+> -			/* CON3 */
+> -			sata at e0000 {
+> -			       status = "okay";
+> -			};
+> -		};
+> -	};
+> +/*
+> + * Exported on the micro USB connector CON32
+> + * through an FTDI
+> + */
 
-Mmm...if I wanted to paint your bikeshed I would say idx is in a
-register and you are removing a simple comparison to exchange it
-with a function that adds to code footprint and may even make
-performance worse instead of improving anything.
-
-I am not sure this patch makes anything more efficient, happy to be
-proven wrong, with significant data.
+As the comment didn't start anymore from the middle of the line, we
+could have it an a single line. We don't have to split in 2 lines.
 
 Thanks,
-Lorenzo
 
-> -
->  	ret = cpu_pm_enter();
->  	if (!ret) {
->  		/*
-> @@ -69,7 +71,7 @@ static struct cpuidle_driver arm_idle_driver = {
->  	 * handler for idle state index 0.
->  	 */
->  	.states[0] = {
-> -		.enter                  = arm_enter_idle_state,
-> +		.enter                  = arm_enter_wfi_state,
->  		.exit_latency           = 1,
->  		.target_residency       = 1,
->  		.power_usage		= UINT_MAX,
-> -- 
-> 2.8.0.rc3
-> 
+Gregory
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
