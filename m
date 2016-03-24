@@ -1,33 +1,34 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 24 Mar 2016 17:49:59 +0100
-Subject: [PATCH v3 02/18] dt-bindings: timer: sp804: add new compatible for
- OX810SE SoC
+Date: Thu, 24 Mar 2016 17:50:01 +0100
+Subject: [PATCH v3 04/18] dt-bindings: irq: arm,
+ versatile-fpga: add compatible string for OX810SE SoC
 In-Reply-To: <1458838215-23314-1-git-send-email-narmstrong@baylibre.com>
 References: <1458838215-23314-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1458838215-23314-3-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1458838215-23314-5-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add new oxsemi,ox810se-rps-timer compatible string to support the
-PLX Technology OX810SE SoC Dual Timers variant.
+Under the OX810SE, this same controller is used as "Reference Peripheral
+Specification" Interrupt Controller, so add new compatible string to support
+the PLX Technology OX810SE SoC Interrupt Controller.
 
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- Documentation/devicetree/bindings/timer/arm,sp804.txt | 2 +-
+ .../devicetree/bindings/interrupt-controller/arm,versatile-fpga-irq.txt | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/timer/arm,sp804.txt b/Documentation/devicetree/bindings/timer/arm,sp804.txt
-index 5cd8eee7..ebe8753 100644
---- a/Documentation/devicetree/bindings/timer/arm,sp804.txt
-+++ b/Documentation/devicetree/bindings/timer/arm,sp804.txt
-@@ -2,7 +2,7 @@ ARM sp804 Dual Timers
- ---------------------------------------
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/arm,versatile-fpga-irq.txt b/Documentation/devicetree/bindings/interrupt-controller/arm,versatile-fpga-irq.txt
+index c9cf605..2a1d16b 100644
+--- a/Documentation/devicetree/bindings/interrupt-controller/arm,versatile-fpga-irq.txt
++++ b/Documentation/devicetree/bindings/interrupt-controller/arm,versatile-fpga-irq.txt
+@@ -6,7 +6,7 @@ controllers are OR:ed together and fed to the CPU tile's IRQ input. Each
+ instance can handle up to 32 interrupts.
  
  Required properties:
--- compatible: Should be "arm,sp804" & "arm,primecell"
-+- compatible: Should be "arm,sp804" & "arm,primecell", or "oxsemi,ox810se-rps-timer"
- - interrupts: Should contain the list of Dual Timer interrupts. This is the
- 	interrupt for timer 1 and timer 2. In the case of a single entry, it is
- 	the combined interrupt or if "arm,sp804-has-irq" is present that
+-- compatible: "arm,versatile-fpga-irq"
++- compatible: "arm,versatile-fpga-irq" or "oxsemi,ox810se-rps-irq"
+ - interrupt-controller: Identifies the node as an interrupt controller
+ - #interrupt-cells: The number of cells to define the interrupts.  Must be 1
+   as the FPGA IRQ controller has no configuration options for interrupt
 -- 
 1.9.1
