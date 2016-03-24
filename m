@@ -1,41 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 24 Mar 2016 15:16:47 +0000
-Subject: dmaengine: ARM pl080 misidentified as Samsung pl080s
-In-Reply-To: <20160324105651.GA20489@sig21.net>
-References: <20160324105651.GA20489@sig21.net>
-Message-ID: <20160324151647.GS19428@n2100.arm.linux.org.uk>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Thu, 24 Mar 2016 15:28:25 +0000
+Subject: [PATCH v2 3/6] arm64/perf: Filter common events based on
+ PMCEIDn_EL0
+In-Reply-To: <1458823960-32760-4-git-send-email-ashoks@broadcom.com>
+References: <1458823960-32760-1-git-send-email-ashoks@broadcom.com>
+ <1458823960-32760-4-git-send-email-ashoks@broadcom.com>
+Message-ID: <56F40799.1030409@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 24, 2016 at 11:56:51AM +0100, Johannes Stezenbach wrote:
-> Hi,
-> 
-> commit da1b6c05b8b5bd ("dmaengine: PL08x: Add support for PL080S variant")
-> added this hunk:
-> 
->  static struct amba_id pl08x_ids[] = {
-> +       /* Samsung PL080S variant */
-> +       {
-> +               .id     = 0x0a141080,
-> +               .mask   = 0xffffffff,
-> +               .data   = &vendor_pl080s,
-> +       },
->         /* PL080 */
-> 
-> However, 0x0a141080 happens to be the ID of the
-> ARM PL080, too:
-> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0196g/I54627.html
-> 
-> Since the PL080S has the configuration register at a different
-> address the driver doesn't work for ARM PL080 anymore.
+On 24/03/16 12:52, Ashok Kumar wrote:
+> The complete common architectural and micro-architectural
+> event number structure is filtered based on PMCEIDn_EL0 and
+> copied to a new structure which is exposed to /sys
+>
+> The function which derives event bitmap from PMCEIDn_EL0 is
+> executed in the cpus, which has the pmu being initialized,
+> for heterogeneous pmu support.
+>
+> Enforced armv8_pmuv3_event_attrs array for event number
+> ordering as this is indexed with event number now.
+>
+> Signed-off-by: Ashok Kumar <ashoks@broadcom.com>
+> ---
+>   arch/arm64/kernel/perf_event.c | 281 ++++++++++++++++++++++++++++-------------
+>   1 file changed, 195 insertions(+), 86 deletions(-)
+>
 
-Vendors have got into serious trouble in the past over IDs claiming that
-some other legal entity being the vendor.  A certain buggy ARM926 clone
-comes to mind, and they were forced to respin their silicon as a result.
-It sounds like Samsung have made the same idiotic mistake.  I suggest
-reverting the offending commit.  This behaviour really isn't on.
+> +static inline u32 armv8pmu_pmceidn_read(int reg)
+> +{
+> +	u32 val = 0;
+> +
+> +	if (reg == 0)
+> +		asm volatile("mrs %0, pmceid0_el0" : "=r" (val));
+> +	else if (reg == 1)
+> +		asm volatile("mrs %0, pmceid1_el0" : "=r" (val));
+> +
+> +	return val;
+> +}
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> +	reg[0] = armv8pmu_pmceidn_read(0);
+> +	reg[1] = armv8pmu_pmceidn_read(1);
+
+Could we not add definitions for SYS_PMCEID0_EL0 and SYS_PMCEID1_EL0
+in asm/sysreg.h and simply do
+
+reg[0] = read_cpuid(SYS_PMCEID0_EL0);
+reg[1] = read_cpuid(SYS_PMCEID1_EL0);
+
+?
+
+Thanks
+Suzuki
