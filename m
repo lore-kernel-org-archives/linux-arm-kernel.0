@@ -1,37 +1,45 @@
 From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Thu, 24 Mar 2016 17:55:34 +0100
-Subject: [PATCH 1/3] Documentation: devicetree: amlogic: Document P20x and
- ODROID-C2 boards
-In-Reply-To: <1458758013-11890-1-git-send-email-khilman@baylibre.com>
+Date: Thu, 24 Mar 2016 17:57:26 +0100
+Subject: [PATCH 2/3] ARM64: dts: amlogic: add Hardkernel ODROID-C2
+In-Reply-To: <8055578.HDz4P7ZJ9W@wuerfel>
 References: <1458758013-11890-1-git-send-email-khilman@baylibre.com>
-Message-ID: <56F41C06.40207@suse.de>
+ <1458758013-11890-2-git-send-email-khilman@baylibre.com>
+ <8055578.HDz4P7ZJ9W@wuerfel>
+Message-ID: <56F41C76.8090805@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 23.03.2016 um 19:33 schrieb Kevin Hilman:
-> Add compatible strings for Amlogic S905/GXBB based boards: Hardkernel
-> ODROID-C2, Amlogic P200 and Amlogic P201.
+Am 24.03.2016 um 13:58 schrieb Arnd Bergmann:
+> On Wednesday 23 March 2016 11:33:32 Kevin Hilman wrote:
+>> +/ {
+>> +       compatible = "hardkernel,odroid-c2", "amlogic,meson-gxbb";
+>> +       model = "Hardkernel ODROID-C2";
+>> +       
+>> +       chosen {
+>> +               stdout-path = "serial0:115200n8";
+>> +       };
+>> +
+>> +       memory at 0 {
+>> +               device_type = "memory";
+>> +               reg = <0x0 0x0 0x0 0x80000000>;
+>> +       };
+>> +};
+>> +
+>> +&uart_AO {
+>> +       status = "okay";
+>> +};
+>>
 > 
-> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
-> ---
->  Documentation/devicetree/bindings/arm/amlogic.txt | 3 +++
->  1 file changed, 3 insertions(+)
+> Shouldn't this also add the serial0 alias?
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
-> index 8a5122ab19b0..fcc6f6c10803 100644
-> --- a/Documentation/devicetree/bindings/arm/amlogic.txt
-> +++ b/Documentation/devicetree/bindings/arm/amlogic.txt
-> @@ -25,3 +25,6 @@ Board compatible values:
->    - "tronsmart,vega-s95-pro", "tronsmart,vega-s95" (Meson gxbb)
->    - "tronsmart,vega-s95-meta", "tronsmart,vega-s95" (Meson gxbb)
->    - "tronsmart,vega-s95-telos", "tronsmart,vega-s95" (Meson gxbb)
-> +  - "hardkernel,odroid-c2" (Meson gxbb)
-> +  - "amlogic,p200" (Meson gxbb)
-> +  - "amlogic,p201" (Meson gxbb)
+> It seems that the .dtsi file accidentally sets an alias to a disabled
+> device, which isn't really valid. Can you fix that when adding the
+> .dts?
 
-Reviewed-by: Andreas F?rber <afaerber@suse.de>
+Hm, would it be any better to not disable either of the serials and
+leave the aliases in the .dtsi?
 
-Thanks,
+Regards,
 Andreas
 
 -- 
