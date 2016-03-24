@@ -1,26 +1,40 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 24 Mar 2016 11:02:40 +0000
-Subject: [PATCH] ARM: dts: exynos: Fix invalid maximum voltage for buck9
- supplying SD card
-In-Reply-To: <CAJKOXPc03ksVFKAHo_Znw41wdzRmzJpFYfAEw2q3EfrQxevghg@mail.gmail.com>
-References: <1458807125-13580-1-git-send-email-k.kozlowski@samsung.com>
- <20160324095332.GS2566@sirena.org.uk>
- <CAJKOXPc03ksVFKAHo_Znw41wdzRmzJpFYfAEw2q3EfrQxevghg@mail.gmail.com>
-Message-ID: <20160324110240.GU2566@sirena.org.uk>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 24 Mar 2016 12:08:03 +0100
+Subject: [PATCH 0/3] ARM,
+ arm64: dts: Use USB3.0 fallback compatibility strings
+In-Reply-To: <1458784869-17829-1-git-send-email-horms+renesas@verge.net.au>
+References: <1458784869-17829-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdVfRH=U+sANGo_=2TazKQ3ePvZbYR8WAAWuewXCRRXzkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 24, 2016 at 07:25:35PM +0900, Krzysztof Kozlowski wrote:
+On Thu, Mar 24, 2016 at 3:01 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Use recently added fallback compatibility strings in r8a779[015] device
+> trees.
+>
+> Based on renesas-devel-20160323-v4.5
+>
+> Simon Horman (3):
+>   ARM: dts: r8a7790: Use USB3.0 fallback compatibility string
+>   ARM: dts: r8a7791: Use USB3.0 fallback compatibility string
+>   arm64: dts: r8a7795: Use USB3.0 fallback compatibility string
+>
+>  arch/arm/boot/dts/r8a7790.dtsi           | 2 +-
+>  arch/arm/boot/dts/r8a7791.dtsi           | 2 +-
+>  arch/arm64/boot/dts/renesas/r8a7795.dtsi | 4 ++--
+>  3 files changed, 4 insertions(+), 4 deletions(-)
 
-> I'll look at it after weekend. For now I applied my patch to the
-> for-next, so the next should be fixed.
+For the whole series:
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Oh, and please send this to Linus - the regulator change is fixing a
-problem some other boards noticed.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160324/557c1498/attachment.sig>
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
