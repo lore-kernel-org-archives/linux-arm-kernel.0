@@ -1,346 +1,241 @@
 From: david@lechnology.com (David Lechner)
-Date: Thu, 24 Mar 2016 18:51:26 -0500
-Subject: [PATCH v3 01/16] dt: davinci: use proper address after @
+Date: Thu, 24 Mar 2016 18:51:27 -0500
+Subject: [PATCH v3 02/16] mfd: da8xx-cfgchip: New header file for CFGCHIP
+ registers.
 In-Reply-To: <1458863503-31121-1-git-send-email-david@lechnology.com>
 References: <1458863503-31121-1-git-send-email-david@lechnology.com>
-Message-ID: <1458863503-31121-2-git-send-email-david@lechnology.com>
+Message-ID: <1458863503-31121-3-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TI has been using the physical address in DT after the @ in device nodes.
-The device tree convention is to use the same address that is used for
-the reg property. This updates all davinci DT files to use the proper
-convention.
+We will be using a generic syscon device for the TI DA8XX SoC CFGCHIPx
+retisters. This will be used by a number of planned drivers including a
+new USB PHY driver and common clock framework drivers.
+
+The same defines are removed from the platform_data header file since they
+are now redundant and they didn't really belong there anyway.
 
 Signed-off-by: David Lechner <david@lechnology.com>
 ---
 
-v3 changes: This is a new patch.
+v3 changes: This is a new patch. It replaces the previous patch that just added
+some missing CFGCHIP2 registers to the platform_data/usb-davinci.h file.
+I took David Laight's advice and included all of the possible registers.
+
+Many of these registers will be used for clocks - hopefully in the near future. 
 
 
- arch/arm/boot/dts/da850-enbw-cmc.dts |  8 +++---
- arch/arm/boot/dts/da850-evm.dts      | 26 +++++++++---------
- arch/arm/boot/dts/da850.dtsi         | 52 ++++++++++++++++++------------------
- 3 files changed, 43 insertions(+), 43 deletions(-)
+include/linux/mfd/da8xx-cfgchip.h         | 160 ++++++++++++++++++++++++++++++
+ include/linux/platform_data/usb-davinci.h |  23 -----
+ 2 files changed, 160 insertions(+), 23 deletions(-)
+ create mode 100644 include/linux/mfd/da8xx-cfgchip.h
 
-diff --git a/arch/arm/boot/dts/da850-enbw-cmc.dts b/arch/arm/boot/dts/da850-enbw-cmc.dts
-index 645549e..101d1a1 100644
---- a/arch/arm/boot/dts/da850-enbw-cmc.dts
-+++ b/arch/arm/boot/dts/da850-enbw-cmc.dts
-@@ -16,14 +16,14 @@
- 	compatible = "enbw,cmc", "ti,da850";
- 	model = "EnBW CMC";
+diff --git a/include/linux/mfd/da8xx-cfgchip.h b/include/linux/mfd/da8xx-cfgchip.h
+new file mode 100644
+index 0000000..6940cf9
+--- /dev/null
++++ b/include/linux/mfd/da8xx-cfgchip.h
+@@ -0,0 +1,160 @@
++/*
++ * TI DaVinci DA8xx CHIPCFGx registers for syscon consumers.
++ *
++ * Copyright (C) 2016 David Lechner <david@lechnology.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __LINUX_MFD_DA8XX_CFGCHIP_H
++#define __LINUX_MFD_DA8XX_CFGCHIP_H
++
++#include <linux/bitops.h>
++
++/* register offsets */
++#define CFGCHIP_REG(n)				(n * 4)
++#define CFGCHIP0_REG				CFGCHIP_REG(0)
++#define CFGCHIP1_REG				CFGCHIP_REG(1)
++#define CFGCHIP2_REG				CFGCHIP_REG(2)
++#define CFGCHIP3_REG				CFGCHIP_REG(3)
++#define CFGCHIP4_REG				CFGCHIP_REG(4)
++
++/* CFGCHIP0 (PLL0/EDMA3_0) register bits */
++#define CFGCHIP0_PLL_MASTER_LOCK		BIT(4)
++#define CFGCHIP0_EDMA30TC1DBS(n)		(n << 2)
++#define CFGCHIP0_EDMA30TC1DBS_MASK		CFGCHIP0_EDMA30TC1DBS(0x3)
++#define CFGCHIP0_EDMA30TC1DBS_16		CFGCHIP0_EDMA30TC1DBS(0x0)
++#define CFGCHIP0_EDMA30TC1DBS_32		CFGCHIP0_EDMA30TC1DBS(0x1)
++#define CFGCHIP0_EDMA30TC1DBS_64		CFGCHIP0_EDMA30TC1DBS(0x2)
++#define CFGCHIP0_EDMA30TC0DBS(n)		(n << 0)
++#define CFGCHIP0_EDMA30TC0DBS_MASK		CFGCHIP0_EDMA30TC0DBS(0x3)
++#define CFGCHIP0_EDMA30TC0DBS_16		CFGCHIP0_EDMA30TC0DBS(0x0)
++#define CFGCHIP0_EDMA30TC0DBS_32		CFGCHIP0_EDMA30TC0DBS(0x1)
++#define CFGCHIP0_EDMA30TC0DBS_64		CFGCHIP0_EDMA30TC0DBS(0x2)
++
++/* CFGCHIP1 (eCAP/HPI/EDMA3_1/eHRPWM TBCLK/McASP0 AMUTEIN) register bits */
++#define CFGCHIP1_CAP2SRC(n)			(n << 27)
++#define CFGCHIP1_CAP2SRC_MASK			CFGCHIP1_CAP2SRC(0x1f)
++#define CFGCHIP1_CAP2SRC_ECAP_PIN		CFGCHIP1_CAP2SRC(0x0)
++#define CFGCHIP1_CAP2SRC_MCASP0_TX		CFGCHIP1_CAP2SRC(0x1)
++#define CFGCHIP1_CAP2SRC_MCASP0_RX		CFGCHIP1_CAP2SRC(0x2)
++#define CFGCHIP1_CAP2SRC_EMAC_C0_RX_THRESHOLD	CFGCHIP1_CAP2SRC(0x7)
++#define CFGCHIP1_CAP2SRC_EMAC_C0_RX		CFGCHIP1_CAP2SRC(0x8)
++#define CFGCHIP1_CAP2SRC_EMAC_C0_TX		CFGCHIP1_CAP2SRC(0x9)
++#define CFGCHIP1_CAP2SRC_EMAC_C0_MISC		CFGCHIP1_CAP2SRC(0xa)
++#define CFGCHIP1_CAP2SRC_EMAC_C1_RX_THRESHOLD	CFGCHIP1_CAP2SRC(0xb)
++#define CFGCHIP1_CAP2SRC_EMAC_C1_RX		CFGCHIP1_CAP2SRC(0xc)
++#define CFGCHIP1_CAP2SRC_EMAC_C1_TX		CFGCHIP1_CAP2SRC(0xd)
++#define CFGCHIP1_CAP2SRC_EMAC_C1_MISC		CFGCHIP1_CAP2SRC(0xe)
++#define CFGCHIP1_CAP2SRC_EMAC_C2_RX_THRESHOLD	CFGCHIP1_CAP2SRC(0xf)
++#define CFGCHIP1_CAP2SRC_EMAC_C2_RX		CFGCHIP1_CAP2SRC(0x10)
++#define CFGCHIP1_CAP2SRC_EMAC_C2_TX		CFGCHIP1_CAP2SRC(0x11)
++#define CFGCHIP1_CAP2SRC_EMAC_C2_MISC		CFGCHIP1_CAP2SRC(0x12)
++#define CFGCHIP1_CAP1SRC(n)			(n << 22)
++#define CFGCHIP1_CAP1SRC_MASK			CFGCHIP1_CAP1SRC(0x1f)
++#define CFGCHIP1_CAP1SRC_ECAP_PIN		CFGCHIP1_CAP1SRC(0x0)
++#define CFGCHIP1_CAP1SRC_MCASP0_TX		CFGCHIP1_CAP1SRC(0x1)
++#define CFGCHIP1_CAP1SRC_MCASP0_RX		CFGCHIP1_CAP1SRC(0x2)
++#define CFGCHIP1_CAP1SRC_EMAC_C0_RX_THRESHOLD	CFGCHIP1_CAP1SRC(0x7)
++#define CFGCHIP1_CAP1SRC_EMAC_C0_RX		CFGCHIP1_CAP1SRC(0x8)
++#define CFGCHIP1_CAP1SRC_EMAC_C0_TX		CFGCHIP1_CAP1SRC(0x9)
++#define CFGCHIP1_CAP1SRC_EMAC_C0_MISC		CFGCHIP1_CAP1SRC(0xa)
++#define CFGCHIP1_CAP1SRC_EMAC_C1_RX_THRESHOLD	CFGCHIP1_CAP1SRC(0xb)
++#define CFGCHIP1_CAP1SRC_EMAC_C1_RX		CFGCHIP1_CAP1SRC(0xc)
++#define CFGCHIP1_CAP1SRC_EMAC_C1_TX		CFGCHIP1_CAP1SRC(0xd)
++#define CFGCHIP1_CAP1SRC_EMAC_C1_MISC		CFGCHIP1_CAP1SRC(0xe)
++#define CFGCHIP1_CAP1SRC_EMAC_C2_RX_THRESHOLD	CFGCHIP1_CAP1SRC(0xf)
++#define CFGCHIP1_CAP1SRC_EMAC_C2_RX		CFGCHIP1_CAP1SRC(0x10)
++#define CFGCHIP1_CAP1SRC_EMAC_C2_TX		CFGCHIP1_CAP1SRC(0x11)
++#define CFGCHIP1_CAP1SRC_EMAC_C2_MISC		CFGCHIP1_CAP1SRC(0x12)
++#define CFGCHIP1_CAP0SRC(n)			(n << 17)
++#define CFGCHIP1_CAP0SRC_MASK			CFGCHIP1_CAP0SRC(0x1f)
++#define CFGCHIP1_CAP0SRC_ECAP_PIN		CFGCHIP1_CAP0SRC(0x0)
++#define CFGCHIP1_CAP0SRC_MCASP0_TX		CFGCHIP1_CAP0SRC(0x1)
++#define CFGCHIP1_CAP0SRC_MCASP0_RX		CFGCHIP1_CAP0SRC(0x2)
++#define CFGCHIP1_CAP0SRC_EMAC_C0_RX_THRESHOLD	CFGCHIP1_CAP0SRC(0x7)
++#define CFGCHIP1_CAP0SRC_EMAC_C0_RX		CFGCHIP1_CAP0SRC(0x8)
++#define CFGCHIP1_CAP0SRC_EMAC_C0_TX		CFGCHIP1_CAP0SRC(0x9)
++#define CFGCHIP1_CAP0SRC_EMAC_C0_MISC		CFGCHIP1_CAP0SRC(0xa)
++#define CFGCHIP1_CAP0SRC_EMAC_C1_RX_THRESHOLD	CFGCHIP1_CAP0SRC(0xb)
++#define CFGCHIP1_CAP0SRC_EMAC_C1_RX		CFGCHIP1_CAP0SRC(0xc)
++#define CFGCHIP1_CAP0SRC_EMAC_C1_TX		CFGCHIP1_CAP0SRC(0xd)
++#define CFGCHIP1_CAP0SRC_EMAC_C1_MISC		CFGCHIP1_CAP0SRC(0xe)
++#define CFGCHIP1_CAP0SRC_EMAC_C2_RX_THRESHOLD	CFGCHIP1_CAP0SRC(0xf)
++#define CFGCHIP1_CAP0SRC_EMAC_C2_RX		CFGCHIP1_CAP0SRC(0x10)
++#define CFGCHIP1_CAP0SRC_EMAC_C2_TX		CFGCHIP1_CAP0SRC(0x11)
++#define CFGCHIP1_CAP0SRC_EMAC_C2_MISC		CFGCHIP1_CAP0SRC(0x12)
++#define CFGCHIP1_HPIBYTEAD			BIT(16)
++#define CFGCHIP1_HPIENA				BIT(15)
++#define CFGCHIP0_EDMA31TC0DBS(n)		(n << 13)
++#define CFGCHIP0_EDMA31TC0DBS_MASK		CFGCHIP0_EDMA31TC0DBS(0x3)
++#define CFGCHIP0_EDMA31TC0DBS_16		CFGCHIP0_EDMA31TC0DBS(0x0)
++#define CFGCHIP0_EDMA31TC0DBS_32		CFGCHIP0_EDMA31TC0DBS(0x1)
++#define CFGCHIP0_EDMA31TC0DBS_64		CFGCHIP0_EDMA31TC0DBS(0x2)
++#define CFGCHIP1_TBCLKSYNC			BIT(12)
++#define CFGCHIP1_AMUTESEL0(n)			(n << 0)
++#define CFGCHIP1_AMUTESEL0_MASK			CFGCHIP1_AMUTESEL0(0xf)
++#define CFGCHIP1_AMUTESEL0_LOW			CFGCHIP1_AMUTESEL0(0x0)
++#define CFGCHIP1_AMUTESEL0_BANK_0		CFGCHIP1_AMUTESEL0(0x1)
++#define CFGCHIP1_AMUTESEL0_BANK_1		CFGCHIP1_AMUTESEL0(0x2)
++#define CFGCHIP1_AMUTESEL0_BANK_2		CFGCHIP1_AMUTESEL0(0x3)
++#define CFGCHIP1_AMUTESEL0_BANK_3		CFGCHIP1_AMUTESEL0(0x4)
++#define CFGCHIP1_AMUTESEL0_BANK_4		CFGCHIP1_AMUTESEL0(0x5)
++#define CFGCHIP1_AMUTESEL0_BANK_5		CFGCHIP1_AMUTESEL0(0x6)
++#define CFGCHIP1_AMUTESEL0_BANK_6		CFGCHIP1_AMUTESEL0(0x7)
++#define CFGCHIP1_AMUTESEL0_BANK_7		CFGCHIP1_AMUTESEL0(0x8)
++
++/* CFGCHIP2 (USB PHY) register bits */
++#define CFGCHIP2_PHYCLKGD			BIT(17)
++#define CFGCHIP2_VBUSSENSE			BIT(16)
++#define CFGCHIP2_RESET				BIT(15)
++#define CFGCHIP2_OTGMODE(n)			(n << 13)
++#define CFGCHIP2_OTGMODE_MASK			CFGCHIP2_OTGMODE(0x3)
++#define CFGCHIP2_OTGMODE_NO_OVERRIDE		CFGCHIP2_OTGMODE(0x0)
++#define CFGCHIP2_OTGMODE_FORCE_HOST		CFGCHIP2_OTGMODE(0x1)
++#define CFGCHIP2_OTGMODE_FORCE_DEVICE		CFGCHIP2_OTGMODE(0x2)
++#define CFGCHIP2_OTGMODE_FORCE_HOST_VBUS_LOW	CFGCHIP2_OTGMODE(0x3)
++#define CFGCHIP2_USB1PHYCLKMUX			BIT(12)
++#define CFGCHIP2_USB2PHYCLKMUX			BIT(11)
++#define CFGCHIP2_PHYPWRDN			BIT(10)
++#define CFGCHIP2_OTGPWRDN			BIT(9)
++#define CFGCHIP2_DATPOL				BIT(8)
++#define CFGCHIP2_USB1SUSPENDM			BIT(7)
++#define CFGCHIP2_PHY_PLLON			BIT(6)
++#define CFGCHIP2_SESENDEN			BIT(5)
++#define CFGCHIP2_VBDTCTEN			BIT(4)
++#define CFGCHIP2_REFFREQ(n)			(n << 0)
++#define CFGCHIP2_REFFREQ_MASK			CFGCHIP2_REFFREQ(0xf)
++#define CFGCHIP2_REFFREQ_12MHZ			CFGCHIP2_REFFREQ(0x1)
++#define CFGCHIP2_REFFREQ_24MHZ			CFGCHIP2_REFFREQ(0x2)
++#define CFGCHIP2_REFFREQ_48MHZ			CFGCHIP2_REFFREQ(0x3)
++#define CFGCHIP2_REFFREQ_19_2MHZ		CFGCHIP2_REFFREQ(0x4)
++#define CFGCHIP2_REFFREQ_38_4MHZ		CFGCHIP2_REFFREQ(0x5)
++#define CFGCHIP2_REFFREQ_13MHZ			CFGCHIP2_REFFREQ(0x6)
++#define CFGCHIP2_REFFREQ_26MHZ			CFGCHIP2_REFFREQ(0x7)
++#define CFGCHIP2_REFFREQ_20MHZ			CFGCHIP2_REFFREQ(0x8)
++#define CFGCHIP2_REFFREQ_40MHZ			CFGCHIP2_REFFREQ(0x9)
++
++/* CFGCHIP3 (EMAC/uPP/PLL1/ASYNC3/PRU/DIV4.5/EMIFA) register bits */
++
++#define CFGCHIP3_RMII_SEL			BIT(8)
++#define CFGCHIP3_UPP_TX_CLKSRC			BIT(6)
++#define CFGCHIP3_PLL1_MASTER_LOCK		BIT(5)
++#define CFGCHIP3_ASYNC3_CLKSRC			BIT(4)
++#define CFGCHIP3_PRUEVTSEL			BIT(3)
++#define CFGCHIP3_DIV45PENA			BIT(2)
++#define CFGCHIP3_EMA_CLKSRC			BIT(1)
++
++/* CFGCHIP4 (McASP0 AMUNTEIN) register bits */
++
++#define CFGCHIP4_AMUTECLR0			BIT(0)
++
++#endif /* __LINUX_MFD_DA8XX_CFGCHIP_H */
+diff --git a/include/linux/platform_data/usb-davinci.h b/include/linux/platform_data/usb-davinci.h
+index e0bc4ab..7c6ce24 100644
+--- a/include/linux/platform_data/usb-davinci.h
++++ b/include/linux/platform_data/usb-davinci.h
+@@ -11,28 +11,6 @@
+ #ifndef __ASM_ARCH_USB_H
+ #define __ASM_ARCH_USB_H
  
--	soc {
--		serial0: serial at 1c42000 {
-+	soc at 1c00000 {
-+		serial0: serial at 42000 {
- 			status = "okay";
- 		};
--		serial1: serial at 1d0c000 {
-+		serial1: serial at 10c000 {
- 			status = "okay";
- 		};
--		serial2: serial at 1d0d000 {
-+		serial2: serial at 10d000 {
- 			status = "okay";
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index ef061e9..1a15db8 100644
---- a/arch/arm/boot/dts/da850-evm.dts
-+++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -14,8 +14,8 @@
- 	compatible = "ti,da850-evm", "ti,da850";
- 	model = "DA850/AM1808/OMAP-L138 EVM";
+-/* DA8xx CFGCHIP2 (USB 2.0 PHY Control) register bits */
+-#define CFGCHIP2_PHYCLKGD	(1 << 17)
+-#define CFGCHIP2_VBUSSENSE	(1 << 16)
+-#define CFGCHIP2_RESET		(1 << 15)
+-#define CFGCHIP2_OTGMODE	(3 << 13)
+-#define CFGCHIP2_NO_OVERRIDE	(0 << 13)
+-#define CFGCHIP2_FORCE_HOST	(1 << 13)
+-#define CFGCHIP2_FORCE_DEVICE 	(2 << 13)
+-#define CFGCHIP2_FORCE_HOST_VBUS_LOW (3 << 13)
+-#define CFGCHIP2_USB1PHYCLKMUX	(1 << 12)
+-#define CFGCHIP2_USB2PHYCLKMUX	(1 << 11)
+-#define CFGCHIP2_PHYPWRDN	(1 << 10)
+-#define CFGCHIP2_OTGPWRDN	(1 << 9)
+-#define CFGCHIP2_DATPOL 	(1 << 8)
+-#define CFGCHIP2_USB1SUSPENDM	(1 << 7)
+-#define CFGCHIP2_PHY_PLLON	(1 << 6)	/* override PLL suspend */
+-#define CFGCHIP2_SESENDEN	(1 << 5)	/* Vsess_end comparator */
+-#define CFGCHIP2_VBDTCTEN	(1 << 4)	/* Vbus comparator */
+-#define CFGCHIP2_REFFREQ	(0xf << 0)
+-#define CFGCHIP2_REFFREQ_12MHZ	(1 << 0)
+-#define CFGCHIP2_REFFREQ_24MHZ	(2 << 0)
+-#define CFGCHIP2_REFFREQ_48MHZ	(3 << 0)
  
--	soc {
--		pmx_core: pinmux at 1c14120 {
-+	soc at 1c00000 {
-+		pmx_core: pinmux at 14120 {
- 			status = "okay";
+ struct	da8xx_ohci_root_hub;
  
- 			mcasp0_pins: pinmux_mcasp0_pins {
-@@ -30,19 +30,19 @@
- 				>;
- 			};
- 		};
--		serial0: serial at 1c42000 {
-+		serial0: serial at 42000 {
- 			status = "okay";
- 		};
--		serial1: serial at 1d0c000 {
-+		serial1: serial at 10c000 {
- 			status = "okay";
- 		};
--		serial2: serial at 1d0d000 {
-+		serial2: serial at 10d000 {
- 			status = "okay";
- 		};
--		rtc0: rtc at 1c23000 {
-+		rtc0: rtc at 23000 {
- 			status = "okay";
- 		};
--		i2c0: i2c at 1c22000 {
-+		i2c0: i2c at 22000 {
- 			status = "okay";
- 			clock-frequency = <100000>;
- 			pinctrl-names = "default";
-@@ -66,17 +66,17 @@
- 			};
+@@ -53,7 +31,6 @@ struct	da8xx_ohci_root_hub {
+ 	/* Time from power on to power good (in 2 ms units) */
+ 	u8	potpgt;
+ };
+-
+ void davinci_setup_usb(unsigned mA, unsigned potpgt_ms);
  
- 		};
--		wdt: wdt at 1c21000 {
-+		wdt: wdt at 21000 {
- 			status = "okay";
- 		};
--		mmc0: mmc at 1c40000 {
-+		mmc0: mmc at 40000 {
- 			max-frequency = <50000000>;
- 			bus-width = <4>;
- 			status = "okay";
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&mmc0_pins>;
- 		};
--		spi1: spi at 1f0e000 {
-+		spi1: spi at 30e000 {
- 			status = "okay";
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&spi1_pins &spi1_cs0_pin>;
-@@ -116,18 +116,18 @@
- 				};
- 			};
- 		};
--		mdio: mdio at 1e24000 {
-+		mdio: mdio at 224000 {
- 			status = "okay";
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&mdio_pins>;
- 			bus_freq = <2200000>;
- 		};
--		eth0: ethernet at 1e20000 {
-+		eth0: ethernet at 220000 {
- 			status = "okay";
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&mii_pins>;
- 		};
--		gpio: gpio at 1e26000 {
-+		gpio: gpio at 226000 {
- 			status = "okay";
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 226cda7..4294849 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -15,7 +15,7 @@
- 		#address-cells = <1>;
- 		#size-cells = <1>;
- 		ranges;
--		intc: interrupt-controller {
-+		intc: interrupt-controller at fffee000 {
- 			compatible = "ti,cp-intc";
- 			interrupt-controller;
- 			#interrupt-cells = <1>;
-@@ -23,7 +23,7 @@
- 			reg = <0xfffee000 0x2000>;
- 		};
- 	};
--	soc {
-+	soc at 1c00000 {
- 		compatible = "simple-bus";
- 		model = "da850";
- 		#address-cells = <1>;
-@@ -31,7 +31,7 @@
- 		ranges = <0x0 0x01c00000 0x400000>;
- 		interrupt-parent = <&intc>;
- 
--		pmx_core: pinmux at 1c14120 {
-+		pmx_core: pinmux at 14120 {
- 			compatible = "pinctrl-single";
- 			reg = <0x14120 0x50>;
- 			#address-cells = <1>;
-@@ -150,7 +150,7 @@
- 			};
- 
- 		};
--		edma0: edma at 01c00000 {
-+		edma0: edma at 0 {
- 			compatible = "ti,edma3-tpcc";
- 			/* eDMA3 CC0: 0x01c0 0000 - 0x01c0 7fff */
- 			reg =	<0x0 0x8000>;
-@@ -161,19 +161,19 @@
- 
- 			ti,tptcs = <&edma0_tptc0 7>, <&edma0_tptc1 0>;
- 		};
--		edma0_tptc0: tptc at 01c08000 {
-+		edma0_tptc0: tptc at 8000 {
- 			compatible = "ti,edma3-tptc";
- 			reg =	<0x8000 0x400>;
- 			interrupts = <13>;
- 			interrupt-names = "edm3_tcerrint";
- 		};
--		edma0_tptc1: tptc at 01c08400 {
-+		edma0_tptc1: tptc at 8400 {
- 			compatible = "ti,edma3-tptc";
- 			reg =	<0x8400 0x400>;
- 			interrupts = <32>;
- 			interrupt-names = "edm3_tcerrint";
- 		};
--		edma1: edma at 01e30000 {
-+		edma1: edma at 230000 {
- 			compatible = "ti,edma3-tpcc";
- 			/* eDMA3 CC1: 0x01e3 0000 - 0x01e3 7fff */
- 			reg =	<0x230000 0x8000>;
-@@ -184,41 +184,41 @@
- 
- 			ti,tptcs = <&edma1_tptc0 7>;
- 		};
--		edma1_tptc0: tptc at 01e38000 {
-+		edma1_tptc0: tptc at 238000 {
- 			compatible = "ti,edma3-tptc";
- 			reg =	<0x238000 0x400>;
- 			interrupts = <95>;
- 			interrupt-names = "edm3_tcerrint";
- 		};
--		serial0: serial at 1c42000 {
-+		serial0: serial at 42000 {
- 			compatible = "ns16550a";
- 			reg = <0x42000 0x100>;
- 			reg-shift = <2>;
- 			interrupts = <25>;
- 			status = "disabled";
- 		};
--		serial1: serial at 1d0c000 {
-+		serial1: serial at 10c000 {
- 			compatible = "ns16550a";
- 			reg = <0x10c000 0x100>;
- 			reg-shift = <2>;
- 			interrupts = <53>;
- 			status = "disabled";
- 		};
--		serial2: serial at 1d0d000 {
-+		serial2: serial at 10d000 {
- 			compatible = "ns16550a";
- 			reg = <0x10d000 0x100>;
- 			reg-shift = <2>;
- 			interrupts = <61>;
- 			status = "disabled";
- 		};
--		rtc0: rtc at 1c23000 {
-+		rtc0: rtc at 23000 {
- 			compatible = "ti,da830-rtc";
- 			reg = <0x23000 0x1000>;
- 			interrupts = <19
- 				      19>;
- 			status = "disabled";
- 		};
--		i2c0: i2c at 1c22000 {
-+		i2c0: i2c at 22000 {
- 			compatible = "ti,davinci-i2c";
- 			reg = <0x22000 0x1000>;
- 			interrupts = <15>;
-@@ -226,12 +226,12 @@
- 			#size-cells = <0>;
- 			status = "disabled";
- 		};
--		wdt: wdt at 1c21000 {
-+		wdt: wdt at 21000 {
- 			compatible = "ti,davinci-wdt";
- 			reg = <0x21000 0x1000>;
- 			status = "disabled";
- 		};
--		mmc0: mmc at 1c40000 {
-+		mmc0: mmc at 40000 {
- 			compatible = "ti,da830-mmc";
- 			reg = <0x40000 0x1000>;
- 			interrupts = <16>;
-@@ -239,7 +239,7 @@
- 			dma-names = "rx", "tx";
- 			status = "disabled";
- 		};
--		mmc1: mmc at 1e1b000 {
-+		mmc1: mmc at 21b000 {
- 			compatible = "ti,da830-mmc";
- 			reg = <0x21b000 0x1000>;
- 			interrupts = <72>;
-@@ -247,37 +247,37 @@
- 			dma-names = "rx", "tx";
- 			status = "disabled";
- 		};
--		ehrpwm0: ehrpwm at 01f00000 {
-+		ehrpwm0: ehrpwm at 300000 {
- 			compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
- 			#pwm-cells = <3>;
- 			reg = <0x300000 0x2000>;
- 			status = "disabled";
- 		};
--		ehrpwm1: ehrpwm at 01f02000 {
-+		ehrpwm1: ehrpwm at 302000 {
- 			compatible = "ti,da850-ehrpwm", "ti,am33xx-ehrpwm";
- 			#pwm-cells = <3>;
- 			reg = <0x302000 0x2000>;
- 			status = "disabled";
- 		};
--		ecap0: ecap at 01f06000 {
-+		ecap0: ecap at 306000 {
- 			compatible = "ti,da850-ecap", "ti,am33xx-ecap";
- 			#pwm-cells = <3>;
- 			reg = <0x306000 0x80>;
- 			status = "disabled";
- 		};
--		ecap1: ecap at 01f07000 {
-+		ecap1: ecap at 307000 {
- 			compatible = "ti,da850-ecap", "ti,am33xx-ecap";
- 			#pwm-cells = <3>;
- 			reg = <0x307000 0x80>;
- 			status = "disabled";
- 		};
--		ecap2: ecap at 01f08000 {
-+		ecap2: ecap at 308000 {
- 			compatible = "ti,da850-ecap", "ti,am33xx-ecap";
- 			#pwm-cells = <3>;
- 			reg = <0x308000 0x80>;
- 			status = "disabled";
- 		};
--		spi1: spi at 1f0e000 {
-+		spi1: spi at 30e000 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			compatible = "ti,da830-spi";
-@@ -289,13 +289,13 @@
- 			dma-names = "rx", "tx";
- 			status = "disabled";
- 		};
--		mdio: mdio at 1e24000 {
-+		mdio: mdio at 224000 {
- 			compatible = "ti,davinci_mdio";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			reg = <0x224000 0x1000>;
- 		};
--		eth0: ethernet at 1e20000 {
-+		eth0: ethernet at 220000 {
- 			compatible = "ti,davinci-dm6467-emac";
- 			reg = <0x220000 0x4000>;
- 			ti,davinci-ctrl-reg-offset = <0x3000>;
-@@ -309,7 +309,7 @@
- 					36
- 					>;
- 		};
--		gpio: gpio at 1e26000 {
-+		gpio: gpio at 226000 {
- 			compatible = "ti,dm6441-gpio";
- 			gpio-controller;
- 			reg = <0x226000 0x1000>;
-@@ -323,7 +323,7 @@
- 			status = "disabled";
- 		};
- 
--		mcasp0: mcasp at 01d00000 {
-+		mcasp0: mcasp at 100000 {
- 			compatible = "ti,da830-mcasp-audio";
- 			reg = <0x100000 0x2000>,
- 			      <0x102000 0x400000>;
+ #endif	/* ifndef __ASM_ARCH_USB_H */
 -- 
 1.9.1
