@@ -1,60 +1,108 @@
-From: yh.huang@mediatek.com (YH Huang)
-Date: Thu, 24 Mar 2016 14:43:52 +0800
-Subject: [PATCH] sbs-battery: fix power status when battery is dry
-In-Reply-To: <CAGS+omDTmJDkJYsf=gDJMrmAos+30enoAa2xfTPyirXUd37=9g@mail.gmail.com>
-References: <1458726794-48298-1-git-send-email-yh.huang@mediatek.com>
- <CAGS+omDTmJDkJYsf=gDJMrmAos+30enoAa2xfTPyirXUd37=9g@mail.gmail.com>
-Message-ID: <1458801832.16645.7.camel@mtksdaap41>
+From: sr@denx.de (Stefan Roese)
+Date: Thu, 24 Mar 2016 08:22:36 +0100
+Subject: [PATCH v2] spi: orion.c: Add direct access mode
+In-Reply-To: <12458203.7DzKuGjIvi@wuerfel>
+References: <1458663893-13766-1-git-send-email-sr@denx.de>
+ <20160323133612.GO2566@sirena.org.uk> <20160323135606.GE19953@lunn.ch>
+ <12458203.7DzKuGjIvi@wuerfel>
+Message-ID: <56F395BC.6070108@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On 23.03.2016 20:51, Arnd Bergmann wrote:
+> On Wednesday 23 March 2016 14:56:06 Andrew Lunn wrote:
+>> On Wed, Mar 23, 2016 at 01:36:12PM +0000, Mark Brown wrote:
+>>> On Wed, Mar 23, 2016 at 02:26:37PM +0100, Andrew Lunn wrote:
+>>>
+>>>> The number of windows is limited. On i think the Armada XP, if you put
+>>>> a PCIe device on every available PCIe bus, you can run out of
+>>>> windows. This is why Thomas implemented dynamic allocation of the
+>>>> Windows, so that only those that are needed are used.
+>>>
+>>>> So i would not statically and globally allocate as many windows as
+>>>> possible SPI devices.
+>>>
+>>>> The fact that SPI can fall back to another mechanism if there are no
+>>>> available windows, were as PCIe cannot, suggests that SPI should
+>>>> dynamically allocate a window, and be prepared for it to fail.
+>>>
+>>>> Since only one SPI device can be active at once on a SPI bus, one
+>>>> window per bus makes sense, and keeps the required number of windows
+>>>> to a minimum.
+>>>
+>>> If we're under pressure for windows I'd go further and say that we
+>>> should be dynamically allocating the windows only when they're actually
+>>> in use (and modifying other drivers to do the same if that makes sense
+>>> for them), unless it's somehow expensive to allocate windows that means
+>>> that we should reduce the overall pressure.
+>>
+>> Hi Mark
+>>
+>> We are only under pressure in the extremes, i.e 10 PCIe busses in
+>> use. Only allocating PCIe Windows when needed means in practice, we
+>> have not had issues. We need to be mindful, and don't waste them, but
+>> we don't need to consider them a scarce resource.
+>>
+>> I don't see it being an issue for the SPI driver to allocate one on
+>> probe and keeping it until release. I probably would object to it
+>> allocating one per chip select line.
+> 
+> I agree. We had a very long debate about this when we first added
+> the support for MBus, and not much has changed. As far as I'm concerned,
+> this is where we're at:
+> 
+> The binding defines a reasonable set of default settings for each
+> device that uses MBus, and the OS can use them, or define its own.
+> Coming up with an algorithm to do this right however is very hard
+> and not really worth it, as defining the defaults works well enough.
+> 
+> Ideally we'd let the boot loader set up the windows statically and
+> have the DT describe what they are, but unfortunately that is not
+> what boot loaders in the field do.
+> 
+> The method that was picked for MBus is similar to how we typically
+> handle PCI host bridges that have the same problem: you can set up
+> translation windows between CPU addresses and the various PCI
+> address spaces (I/O, mem, prefetchable, config, ...) in all sorts
+> of ways, with various tradeoffs, but instead we just pick a
+> reasonable default and describe it in the DT, because the kernel
+> has no good generic way of picking a particular setting over another.
 
-On Thu, 2016-03-24 at 12:01 +0800, Daniel Kurtz wrote:
-> Hi YH,
-> 
-> On Wed, Mar 23, 2016 at 5:53 PM, YH Huang <yh.huang@mediatek.com> wrote:
-> > When the battery is dry and BATTERY_FULL_DISCHARGED is set,
-> > we should check BATTERY_DISCHARGING to decide the power status.
-> > If BATTERY_DISCHARGING is set, the power status is not charging.
-> > Or the power status should be charging.
-> >
-> > Signed-off-by: YH Huang <yh.huang@mediatek.com>
-> > ---
-> >  drivers/power/sbs-battery.c |   22 ++++++++++++----------
-> >  1 file changed, 12 insertions(+), 10 deletions(-)
-> >
-> > diff --git a/drivers/power/sbs-battery.c b/drivers/power/sbs-battery.c
-> > index d6226d6..d86db0e 100644
-> > --- a/drivers/power/sbs-battery.c
-> > +++ b/drivers/power/sbs-battery.c
-> > @@ -382,11 +382,12 @@ static int sbs_get_battery_property(struct i2c_client *client,
-> >
-> >                 if (ret & BATTERY_FULL_CHARGED)
-> >                         val->intval = POWER_SUPPLY_STATUS_FULL;
-> > -               else if (ret & BATTERY_FULL_DISCHARGED)
-> > -                       val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
-> > -               else if (ret & BATTERY_DISCHARGING)
-> > -                       val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
-> > -               else
-> > +               else if (ret & BATTERY_DISCHARGING) {
-> > +                       if (ret & BATTERY_FULL_DISCHARGED)
-> > +                               val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
-> > +                       else
-> > +                               val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
-> > +               } else
-> 
-> 
-> I think (BATTERY_DISCHARGING && BATTERY_FULL_DISCHARGED) is still
-> POWER_SUPPLY_STATUS_DISCHARGING.
-> So, let's just report what the battery says and do:
-> 
->                else if (ret & BATTERY_DISCHARGING)
->                                val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
-> 
-So we just ignore the special situation (BATTERY_DISCHARGING &&
-BATTERY_FULL_DISCHARGED).
-Isn't POWER_SUPPLY_STATUS_NOT_CHARGING a useful information?
+Arnd, thanks for your comments.
 
-Regards,
-YH Huang
+So we seem to agree, that one MBus window per SPI controller is the
+way to go. Only how should this be described in the DT? I've come up
+with these new DT properties in v2:
+
++- da-reg : The physical memory area that will be used for the direct
++           access mode, if enabled in one of the SPI devices.
++
++Per SPI device:
++- da-target-attribute : The target and attribute value for a specific
++                        SPI-controller / SPI-device combination.
++			E.g. <0x01 0x5e>: SPI0-CS1 target and attribute
+
+...
+
++Example with direct access mode:
++	spi at 10600 {
++		compatible = "marvell,orion-spi";
++		status = "okay";
++		da-reg = <0xf2000000 0x100000>;
++
++		spi-fpga at 1 {
++			compatible = "altera,stratix-v";
++			reg = <1>;
++			/* 0x01 0x5e: SPI0-CS1 target and attribute */
++			da-target-attribute = <0x01 0x5e>;
++		};
++	};
+
+I've added the "da-*" (Direct Access) properties to enable the
+SPI driver to dynamically allocate the MBus windows. Do you find
+these new bindings reasonable? Or do you have better suggestions for
+this per-SPI-device dynamic MBus allocation, perhaps by using
+MBUS_ID somehow?
+
+Thanks,
+Stefan
