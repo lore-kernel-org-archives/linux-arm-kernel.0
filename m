@@ -1,91 +1,78 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 24 Mar 2016 10:38:18 -0600
-Subject: [PATCH 03/14] coresight: tmc: re-implementing
- tmc_read_prepare/unprepare() functions
-In-Reply-To: <56F271FE.8060904@arm.com>
-References: <1458678202-3447-1-git-send-email-mathieu.poirier@linaro.org>
- <1458678202-3447-4-git-send-email-mathieu.poirier@linaro.org>
- <56F271FE.8060904@arm.com>
-Message-ID: <CANLsYkwzpX42TWbf+3gGwqcFBGtE8d1D=U0eV5AjYvJdTMWZaA@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 24 Mar 2016 16:44:19 +0000
+Subject: [PATCH 0/2] arm64: cpuidle: make arm_cpuidle_suspend() more
+ efficient
+In-Reply-To: <20160324211853.1ffebd49@xhacker>
+References: <1458796130-6109-1-git-send-email-jszhang@marvell.com>
+ <20160324111507.GB9323@arm.com> <20160324211853.1ffebd49@xhacker>
+Message-ID: <20160324164419.GB21749@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 March 2016 at 04:37, Suzuki K. Poulose <Suzuki.Poulose@arm.com> wrote:
-> On 22/03/16 20:23, Mathieu Poirier wrote:
->>
->> In their current implementation the tmc_read_prepare/unprepare()
->> are a lump of if/else that is difficult to read.  This patch is
->> alleviating that by using a switch statement.  The latter also
->> allows for a better control on the error path.
->>
->> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->> ---
->>   drivers/hwtracing/coresight/coresight-tmc.c | 56
->> ++++++++++++++++++-----------
->>   1 file changed, 36 insertions(+), 20 deletions(-)
->>
->> diff --git a/drivers/hwtracing/coresight/coresight-tmc.c
->> b/drivers/hwtracing/coresight/coresight-tmc.c
->> index f4ba837a0810..208d47dd3083 100644
->> --- a/drivers/hwtracing/coresight/coresight-tmc.c
->> +++ b/drivers/hwtracing/coresight/coresight-tmc.c
->> @@ -430,7 +430,7 @@ static const struct coresight_ops tmc_etf_cs_ops = {
->>
->
->> -       if (drvdata->config_type == TMC_CONFIG_TYPE_ETB) {
->> +       switch (drvdata->config_type) {
->> +       case TMC_CONFIG_TYPE_ETB:
->>                 tmc_etb_disable_hw(drvdata);
->> -       } else if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
->> -               tmc_etr_disable_hw(drvdata);
->> -       } else {
->> +               break;
->> +       case TMC_CONFIG_TYPE_ETF:
->> +               /* There is no point in reading a TMC in HW FIFO mode */
->>                 mode = readl_relaxed(drvdata->base + TMC_MODE);
->> -               if (mode == TMC_MODE_CIRCULAR_BUFFER) {
->> -                       tmc_etb_disable_hw(drvdata);
->> -               } else {
->> -                       ret = -ENODEV;
->> +               if (mode != TMC_MODE_CIRCULAR_BUFFER) {
->> +                       ret = -EINVAL;
->>                         goto err;
->>                 }
->> +
->> +               tmc_etb_disable_hw(drvdata);
->> +               break;
->> +       case TMC_CONFIG_TYPE_ETR:
->> +               tmc_etr_disable_hw(drvdata);
->> +               break;
->> +       default:
->> +               ret = -EINVAL;
->> +               goto err;
->>         }
->
->
-> We seem to be doing this switch at different places in the code just for
-> enable_hw/disable_hw.
-> e.g, tmc_enable, tmc_disable
->
-> Could we make this a bit more cleaner by introducing something like this ?
->
-> struct tmc_hw_ops {
->         int (*enable_hw)(struct tmc_drvdata *drvdata, enum tmc_mode mode);
->         int (*disable_hw)(struct tmc_drvdata *drvdata, enum tmc_mode mode);
-> };
->
-> struct tmc_hw_ops tmc_etf_ops = {
->         tmc_etf_enable_hw,
->         tmc_etf_disable_hw,
-> };
->
-> similiarly for etb and etr and then add struct tmc_hw_ops *hw_ops to
-> tmc_drvdata, initialised
-> at probe time (while reading the config_type).
+On Thu, Mar 24, 2016 at 09:18:53PM +0800, Jisheng Zhang wrote:
+> Hi Will,
+> 
+> On Thu, 24 Mar 2016 11:15:07 +0000 Will Deacon wrote:
+> 
+> > On Thu, Mar 24, 2016 at 01:08:48PM +0800, Jisheng Zhang wrote:
+> > > This series is to improve the arm_cpuidle_suspend() a bit by removing/moving
+> > > out checks from this hot path.
+> > > 
+> > > Jisheng Zhang (2):
+> > >   arm64: cpuidle: remove cpu_ops check from arm_cpuidle_suspend()
+> > >   arm64: cpuidle: make arm_cpuidle_suspend() a bit more efficient
+> > > 
+> > >  arch/arm64/kernel/cpuidle.c | 9 ++-------
+> > >  1 file changed, 2 insertions(+), 7 deletions(-)  
+> > 
+> > These look fine to me, but do you have any rough numbers showing what
+> > sort of improvement we get from this change?
+> 
+> Good question. Here it is:
+> 
+> I measured the 4096 * time from arm_cpuidle_suspend entry point to the
+> cpu_psci_cpu_suspend entry point. HW platform is Marvell BG4CT STB board.
+> 
+> 1. only one shell, no other process, hot-unplug secondary cpus, execute the
+> following cmd
+> 
+> while true
+> do
+> 	sleep 0.2
+> done
+> 
+> before the patch: 1581220ns
+> 
+> after the patch: 1579630ns
+> 
+> reduced by 0.1%
+> 
+> 2. only one shell, no other process, hot-unplug secondary cpus, execute the
+> following cmd
+> 
+> while true
+> do
+> 	md5sum /tmp/testfile
+> 	sleep 0.2
+> done
+> 
+> NOTE the testfile size should be larger than L1+L2 cache size
+> 
+> before the patch: 1961960ns
+> after the patch: 1912500ns
+> 
+> reduced by 2.5%
+> 
+> So the more complex the system load, the bigger the improvement.
 
-That is a good idea - let me experiment with it a little...
+So between arm_cpuidle_suspend() and psci_cpu_suspend_enter() the
+checks that you are removing are almost the *only* code that is
+currently executed and this patch saves us best case 12ns per idle state
+entry (which is noise compared to CPU PM notifiers/FW execution time)
+if I am not mistaken, I can't wait to use that energy for something more
+useful :)
 
->
->
-> Suzuki
->
+Anyway, as a clean-up your patches are fine it is sloppy to check those
+pointers on every idle state entry (do you really need two patches ?), so:
+
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
