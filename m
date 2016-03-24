@@ -1,64 +1,43 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Thu, 24 Mar 2016 14:01:02 +0100
-Subject: [PATCH] cpuidle: arm: make enter idle operation a bit more
- efficient
-In-Reply-To: <1458796038-6062-1-git-send-email-jszhang@marvell.com>
-References: <1458796038-6062-1-git-send-email-jszhang@marvell.com>
-Message-ID: <CAJZ5v0jJ=0eMcJVvBE3ewzj5_jWmkwqbwVu5CFRAA+BFysiCdQ@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 24 Mar 2016 14:01:33 +0100
+Subject: [PATCH v14 0/17] Add Analogix Core Display Port Driver
+In-Reply-To: <1455534485-1154-1-git-send-email-ykk@rock-chips.com>
+References: <1455534485-1154-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <14744174.gBEQWZv0K7@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 24, 2016 at 6:07 AM, Jisheng Zhang <jszhang@marvell.com> wrote:
-> Currently, entering idle need to check the idx every time to choose the
-> real entering idle routine. But this check could be avoided by pointing
-> the idle enter function pointer of each idle states to the routines
-> suitable for each states directly.
->
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Am Montag, 15. Februar 2016, 19:08:05 schrieb Yakir Yang:
+> Hi all,
+> 
+>   The Samsung Exynos eDP controller and Rockchip RK3288 eDP controller
+> share the same IP, so a lot of parts can be re-used. I split the common
+> code into bridge directory, then rk3288 and exynos only need to keep
+> some platform code. Cause I can't find the exact IP name of exynos dp
+> controller, so I decide to name dp core driver with "analogix" which I
+> find in rk3288 eDP TRM
+> 
+> But there are still three light registers setting different between
+> exynos and rk3288.
+> 1. RK3288 have five special pll registers which not indicate in exynos
+>    dp controller.
+> 2. The address of DP_PHY_PD(dp phy power manager register) are different
+>    between rk3288 and exynos.
+> 3. Rk3288 and exynos have different setting with AUX_HW_RETRY_CTL(dp debug
+>    register).
+> 
+> Due to Mark Yao have introduced the ATOMIC support to Rockchip drm, so it's
+> okay to use the ATOMIC helpers functions in connector_funcs. No need to
+> splict the connector init to platform driver anymore, and this is the
+> biggest change since version 11.
+> 
+> This v14 didn't have lots of new changes which seems not the correct time to
+> upgrade the version number, but I have changed ordering of patches (adding
+> 2 more, and removing 2 out). Especially to prevent confusing people, so I
+> updated the whole series.
 
-This looks reasonable to me, but I need an ACK from the maintainer of this code.
+I guess I never said that explicitly, but of course I have tested this 
+numerous times, so
 
-> ---
->  drivers/cpuidle/cpuidle-arm.c | 14 ++++++++------
->  1 file changed, 8 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
-> index 545069d..48a620f 100644
-> --- a/drivers/cpuidle/cpuidle-arm.c
-> +++ b/drivers/cpuidle/cpuidle-arm.c
-> @@ -23,6 +23,13 @@
->
->  #include "dt_idle_states.h"
->
-> +static int arm_enter_wfi_state(struct cpuidle_device *dev,
-> +                              struct cpuidle_driver *drv, int idx)
-> +{
-> +       cpu_do_idle();
-> +       return 0;
-> +}
-> +
->  /*
->   * arm_enter_idle_state - Programs CPU to enter the specified state
->   *
-> @@ -38,11 +45,6 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
->  {
->         int ret;
->
-> -       if (!idx) {
-> -               cpu_do_idle();
-> -               return idx;
-> -       }
-> -
->         ret = cpu_pm_enter();
->         if (!ret) {
->                 /*
-> @@ -69,7 +71,7 @@ static struct cpuidle_driver arm_idle_driver = {
->          * handler for idle state index 0.
->          */
->         .states[0] = {
-> -               .enter                  = arm_enter_idle_state,
-> +               .enter                  = arm_enter_wfi_state,
->                 .exit_latency           = 1,
->                 .target_residency       = 1,
->                 .power_usage            = UINT_MAX,
-> --
+This series
+Tested-by: Heiko Stuebner <heiko@sntech.de>
