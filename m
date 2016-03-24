@@ -1,86 +1,58 @@
-From: sr@denx.de (Stefan Roese)
-Date: Thu, 24 Mar 2016 18:51:53 +0100
-Subject: [PATCH v2] spi: orion.c: Add direct access mode
-In-Reply-To: <30176583.aSTyzO0qS3@wuerfel>
-References: <1458663893-13766-1-git-send-email-sr@denx.de>
- <3250653.vvT0RgK8yg@wuerfel> <56F412B5.2080200@denx.de>
- <30176583.aSTyzO0qS3@wuerfel>
-Message-ID: <56F42939.4020803@denx.de>
+From: julien.grall@arm.com (Julien Grall)
+Date: Thu, 24 Mar 2016 17:53:34 +0000
+Subject: [PATCH v4 0/9] arm64: Add support for KVM with ACPI
+Message-ID: <1458842023-31853-1-git-send-email-julien.grall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24.03.2016 17:48, Arnd Bergmann wrote:
-> On Thursday 24 March 2016 17:15:49 Stefan Roese wrote:
->>>
->>>        soc@ {
->>>                spi0 {
->>>                          compatible = "marvell,armada-370-spi",
->>>                                       "marvell,orion-spi";
->>>                        reg = <MBUS_ID(0xf0, 0x01) 0x10600 0x28>,
->>>                              <MBUS_ID(0x01, 0x5e) 0 0x100000>;
->>>                          #address-cells = <1>;
->>>                          #size-cells = <0>;
->>>                          pinctrl-0 = <&spi0_pins1>;
->>>                          pinctrl-names = "default";
->>>                          cell-index = <0>;
->>>                          interrupts = <30>;
->>>                          clocks = <&coreclk 0>;
->>>                          status = "disabled";
->>>                };
->>>        };
->>
->> Do I understand this correctly, that you suggest to list all MBus
->> windows here, that the SoC supports (e.g. 8 for the Armada XP).
->> And let the SPI driver then extract and dynamically enable (map)
->> the one that is currently used?
->
-> Actually the syntax above doesn't imply any mapping at all, it
-> just describes how the hardware is wired up, so that really
-> needs to list all windows, and then the ranges property in the
-> soc node can statically map the ones that are used on the
-> particular machine.
+Hello,
 
-I see. But with this we are back to statically mapping the MBus
-windows that are used. Resulting in potentially multiple windows
-per SPI controller, which is not necessary (Andrew and Mark
-objected against that).
+This patch series allows KVM to work with ACPI on ARM64.
 
->> We also need a per-SPI-device DT property to enable this direct
->> access mode for this specific SPI device. As not all SPI devices
->> support this mode - at least not yet. How about this one:
->>
->>                  flash0: flash at 0 {
->>                          compatible = "m25p128";
->>                          reg = <0>;
->>                          direct-access-enable;
->>                          ...
->>                  };
->>
->> ?
->
-> Maybe the spi driver can just check whether the window is mapped
-> or not, and then have no ranges entry for the devices that don't
-> support it?
+Currently, the firmware tables are parsed by the virtual timer and virtual GIC
+code in order to configure them correctly.
 
-Sure, if its statically mapped (via 'ranges' in the soc node),
-then this is easy to implement in the driver. Its similar to what
-the RFC version of the patch did.
+However, the parsing of those tables is already done in the GIC and arch
+timer drivers. This patch series introduces new helpers to retrieve the
+information from the different drivers in order to avoid duplication of the
+parsing code.
 
-> Alternatively, we might encode this in the 'reg' property in
-> some way?
->
-> How do we know whether a device supports the mode or not?
+To make the merge easier via the different trees, each patch modifies
+a single subsystem.
 
-Currently, only a very limited number of SPI devices will support
-it. As its really only useful right now for full-speed tx-transfer.
-In my case its downloading a bitstream into a FPGA (only SPI
-writes). In the future, SPI NOR flash devices can be supported.
-But this needs additional work. So SPI devices should not use
-this direct access mode as default for now. It needs to get
-opted-in via some DT property.
+For all the changes see the different patches.
 
-Thanks,
-Stefan
+Yours sincerely,
 
-PS: I'm off into Easter vacation in a few hours. So I will follow-up
-on this earliest in week 14.
+Julien Grall (9):
+  clocksource: arm_arch_timer: Gather KVM specific information in a
+    structure
+  clocksource: arm_arch_timer: Extend arch_timer_kvm_info to get the
+    virtual IRQ
+  irqchip/gic-v2: Gather ACPI specific data in a single structure
+  irqchip/gic-v2: Parse and export virtual GIC information
+  irqchip/gic-v3: Gather all ACPI specific data in a single structure
+  irqchip/gic-v3: Parse and export virtual GIC information
+  KVM: arm/arm64: arch_timer: Rely on the arch timer to parse the
+    firmware tables
+  KVM: arm/arm64: vgic: Rely on the GIC driver to parse the firmware
+    tables
+  clocksource: arm_arch_timer: Remove arch_timer_get_timecounter
+
+ drivers/clocksource/arm_arch_timer.c   |  11 +-
+ drivers/irqchip/irq-gic-common.c       |  13 +++
+ drivers/irqchip/irq-gic-common.h       |   3 +
+ drivers/irqchip/irq-gic-v3.c           | 183 ++++++++++++++++++++++++++++-----
+ drivers/irqchip/irq-gic.c              |  87 +++++++++++++++-
+ include/clocksource/arm_arch_timer.h   |  12 +--
+ include/kvm/arm_vgic.h                 |   7 +-
+ include/linux/irqchip/arm-gic-common.h |  34 ++++++
+ virt/kvm/arm/arch_timer.c              |  40 ++-----
+ virt/kvm/arm/vgic-v2.c                 |  61 +++++------
+ virt/kvm/arm/vgic-v3.c                 |  47 +++------
+ virt/kvm/arm/vgic.c                    |  50 ++++-----
+ 12 files changed, 384 insertions(+), 164 deletions(-)
+ create mode 100644 include/linux/irqchip/arm-gic-common.h
+
+-- 
+1.9.1
