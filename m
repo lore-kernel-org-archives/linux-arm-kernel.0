@@ -1,60 +1,28 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Thu, 24 Mar 2016 14:24:22 +0100
-Subject: [PATCH v2 3/6] serial: imx: make sure unhandled irqs are disabled
-In-Reply-To: <1458825865-7434-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1458825865-7434-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <1458825865-7434-4-git-send-email-u.kleine-koenig@pengutronix.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 24 Mar 2016 14:37:23 +0100
+Subject: [PATCH 3/4] arm64: dts: marvell: Clean up armada-7040-db
+In-Reply-To: <20160324114037.1204b46e@free-electrons.com>
+References: <1458771861-12392-1-git-send-email-afaerber@suse.de>
+ <1458771861-12392-4-git-send-email-afaerber@suse.de>
+ <20160324091832.0060c907@free-electrons.com>
+ <87oaa4npbk.fsf@free-electrons.com>
+ <20160324114037.1204b46e@free-electrons.com>
+Message-ID: <20160324133723.GB15624@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make sure that events that are not handled in the irq function don't
-trigger an interrupt.
+> > I agree that converting the Marvell Armada 32-bits SoCs would produce a
+> > lot of churn. But if some binding are common there is no file at all are
+> > in common, so we could use this solution for the 64 bits SoCs only.
+> 
+> Yes, we could. I'm fine with it. I was merely pointing out that it is
+> moving away from our 32 bits way of doing things.
 
-When the serial port is operated in DTE mode, the events for DCD and RI
-events are enabled after a system reset by default.
+Sebastian spent a while converting dove and kirkwood to this
+scheme. Most boards have i2c, nand, eth, and mdio properties
+represented link this.
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- drivers/tty/serial/imx.c | 23 ++++++++++++++++++++++-
- 1 file changed, 22 insertions(+), 1 deletion(-)
+There are no many 64 bit boards, so now is the time to make the
+change...
 
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index 5ced61e1de6a..fcd48fd78bf5 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -1221,11 +1221,32 @@ static int imx_startup(struct uart_port *port)
- 	temp |= (UCR2_RXEN | UCR2_TXEN);
- 	if (!sport->have_rtscts)
- 		temp |= UCR2_IRTS;
-+	/*
-+	 * make sure the edge sensitive RTS-irq is disabled,
-+	 * we're using RTSD instead.
-+	 */
-+	if (!is_imx1_uart(sport))
-+		temp &= ~UCR2_RTSEN;
- 	writel(temp, sport->port.membase + UCR2);
- 
- 	if (!is_imx1_uart(sport)) {
- 		temp = readl(sport->port.membase + UCR3);
--		temp |= IMX21_UCR3_RXDMUXSEL | UCR3_ADNIMP;
-+
-+		/*
-+		 * The effect of RI and DCD differs depending on the UFCR_DCEDTE
-+		 * bit. In DCE mode they control the outputs, in DTE mode they
-+		 * enable the respective irqs. At least the DCD irq cannot be
-+		 * cleared on i.MX25 at least, so it's not usable and must be
-+		 * disabled. I don't have test hardware to check if RI has the
-+		 * same problem but I consider this likely so it's disabled for
-+		 * now, too.
-+		 */
-+		temp |= IMX21_UCR3_RXDMUXSEL | UCR3_ADNIMP |
-+			UCR3_RI | UCR3_DCD;
-+
-+		if (sport->dte_mode)
-+			temp &= ~(UCR3_RI | UCR3_DCD);
-+
- 		writel(temp, sport->port.membase + UCR3);
- 	}
- 
--- 
-2.7.0
+	Andrew
