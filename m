@@ -1,10 +1,10 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 25 Mar 2016 08:39:31 +0900
-Subject: [PATCH v3 2/8] clk: samsung: exynos3250: Add UART2 clock
-In-Reply-To: <1458027490-13787-3-git-send-email-cw00.choi@samsung.com>
+Date: Fri, 25 Mar 2016 08:39:40 +0900
+Subject: [PATCH v3 3/8] clk: samsung: exynos3250: Add MMC2 clock
+In-Reply-To: <1458027490-13787-4-git-send-email-cw00.choi@samsung.com>
 References: <1458027490-13787-1-git-send-email-cw00.choi@samsung.com>
- <1458027490-13787-3-git-send-email-cw00.choi@samsung.com>
-Message-ID: <56F47AB3.2070007@samsung.com>
+ <1458027490-13787-4-git-send-email-cw00.choi@samsung.com>
+Message-ID: <56F47ABC.7060006@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,98 +18,99 @@ Regards,
 Chanwoo Choi
 
 On 2016? 03? 15? 16:38, Chanwoo Choi wrote:
-> From: Pankaj Dubey <pankaj.dubey@samsung.com>
-> 
-> This patch add the UART2 clocks (mux, divider, gate) of Exynos3250 SoC.
+> This patch add the MMC2 clocks (mux, divider, gate) of Exynos3250 SoC.
 > 
 > Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
 > Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 > Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 > Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 > ---
->  drivers/clk/samsung/clk-exynos3250.c   | 6 ++++++
->  include/dt-bindings/clock/exynos3250.h | 6 +++++-
->  2 files changed, 11 insertions(+), 1 deletion(-)
+>  drivers/clk/samsung/clk-exynos3250.c   | 9 +++++++++
+>  include/dt-bindings/clock/exynos3250.h | 7 ++++++-
+>  2 files changed, 15 insertions(+), 1 deletion(-)
 > 
 > diff --git a/drivers/clk/samsung/clk-exynos3250.c b/drivers/clk/samsung/clk-exynos3250.c
-> index fdd41b17a24f..bc60e399d1bc 100644
+> index bc60e399d1bc..16575ee874cb 100644
 > --- a/drivers/clk/samsung/clk-exynos3250.c
 > +++ b/drivers/clk/samsung/clk-exynos3250.c
-> @@ -306,6 +306,7 @@ static struct samsung_mux_clock mux_clks[] __initdata = {
+> @@ -302,6 +302,7 @@ static struct samsung_mux_clock mux_clks[] __initdata = {
+>  
+>  	/* SRC_FSYS */
+>  	MUX(CLK_MOUT_TSADC, "mout_tsadc", group_sclk_p, SRC_FSYS, 28, 4),
+> +	MUX(CLK_MOUT_MMC2, "mout_mmc2", group_sclk_p, SRC_FSYS, 8, 4),
+>  	MUX(CLK_MOUT_MMC1, "mout_mmc1", group_sclk_p, SRC_FSYS, 4, 4),
 >  	MUX(CLK_MOUT_MMC0, "mout_mmc0", group_sclk_p, SRC_FSYS, 0, 4),
 >  
->  	/* SRC_PERIL0 */
-> +	MUX(CLK_MOUT_UART2, "mout_uart2", group_sclk_p, SRC_PERIL0, 8, 4),
->  	MUX(CLK_MOUT_UART1, "mout_uart1", group_sclk_p, SRC_PERIL0, 4, 4),
->  	MUX(CLK_MOUT_UART0, "mout_uart0", group_sclk_p, SRC_PERIL0, 0, 4),
->  
-> @@ -390,6 +391,7 @@ static struct samsung_div_clock div_clks[] __initdata = {
+> @@ -390,6 +391,11 @@ static struct samsung_div_clock div_clks[] __initdata = {
+>  		CLK_SET_RATE_PARENT, 0),
 >  	DIV(CLK_DIV_MMC0, "div_mmc0", "mout_mmc0", DIV_FSYS1, 0, 4),
 >  
->  	/* DIV_PERIL0 */
-> +	DIV(CLK_DIV_UART2, "div_uart2", "mout_uart2", DIV_PERIL0, 8, 4),
->  	DIV(CLK_DIV_UART1, "div_uart1", "mout_uart1", DIV_PERIL0, 4, 4),
->  	DIV(CLK_DIV_UART0, "div_uart0", "mout_uart0", DIV_PERIL0, 0, 4),
->  
-> @@ -552,6 +554,9 @@ static struct samsung_gate_clock gate_clks[] __initdata = {
->  		GATE_SCLK_PERIL, 7, CLK_SET_RATE_PARENT, 0),
->  	GATE(CLK_SCLK_SPI0, "sclk_spi0", "div_spi0_pre",
->  		GATE_SCLK_PERIL, 6, CLK_SET_RATE_PARENT, 0),
+> +	/* DIV_FSYS2 */
+> +	DIV_F(CLK_DIV_MMC2_PRE, "div_mmc2_pre", "div_mmc2", DIV_FSYS2, 8, 8,
+> +		CLK_SET_RATE_PARENT, 0),
+> +	DIV(CLK_DIV_MMC2, "div_mmc2", "mout_mmc2", DIV_FSYS2, 0, 4),
 > +
-> +	GATE(CLK_SCLK_UART2, "sclk_uart2", "div_uart2",
-> +		GATE_SCLK_PERIL, 2, CLK_SET_RATE_PARENT, 0),
->  	GATE(CLK_SCLK_UART1, "sclk_uart1", "div_uart1",
->  		GATE_SCLK_PERIL, 1, CLK_SET_RATE_PARENT, 0),
->  	GATE(CLK_SCLK_UART0, "sclk_uart0", "div_uart0",
-> @@ -649,6 +654,7 @@ static struct samsung_gate_clock gate_clks[] __initdata = {
->  	GATE(CLK_I2C2, "i2c2", "div_aclk_100", GATE_IP_PERIL, 8, 0, 0),
->  	GATE(CLK_I2C1, "i2c1", "div_aclk_100", GATE_IP_PERIL, 7, 0, 0),
->  	GATE(CLK_I2C0, "i2c0", "div_aclk_100", GATE_IP_PERIL, 6, 0, 0),
-> +	GATE(CLK_UART2, "uart2", "div_aclk_100", GATE_IP_PERIL, 2, 0, 0),
->  	GATE(CLK_UART1, "uart1", "div_aclk_100", GATE_IP_PERIL, 1, 0, 0),
->  	GATE(CLK_UART0, "uart0", "div_aclk_100", GATE_IP_PERIL, 0, 0, 0),
->  };
+>  	/* DIV_PERIL0 */
+>  	DIV(CLK_DIV_UART2, "div_uart2", "mout_uart2", DIV_PERIL0, 8, 4),
+>  	DIV(CLK_DIV_UART1, "div_uart1", "mout_uart1", DIV_PERIL0, 4, 4),
+> @@ -540,6 +546,8 @@ static struct samsung_gate_clock gate_clks[] __initdata = {
+>  		GATE_SCLK_FSYS, 9, CLK_SET_RATE_PARENT, 0),
+>  	GATE(CLK_SCLK_EBI, "sclk_ebi", "div_ebi",
+>  		GATE_SCLK_FSYS, 6, CLK_SET_RATE_PARENT, 0),
+> +	GATE(CLK_SCLK_MMC2, "sclk_mmc2", "div_mmc2_pre",
+> +		GATE_SCLK_FSYS, 2, CLK_SET_RATE_PARENT, 0),
+>  	GATE(CLK_SCLK_MMC1, "sclk_mmc1", "div_mmc1_pre",
+>  		GATE_SCLK_FSYS, 1, CLK_SET_RATE_PARENT, 0),
+>  	GATE(CLK_SCLK_MMC0, "sclk_mmc0", "div_mmc0_pre",
+> @@ -635,6 +643,7 @@ static struct samsung_gate_clock gate_clks[] __initdata = {
+>  	GATE(CLK_USBOTG, "usbotg", "div_aclk_200", GATE_IP_FSYS, 13, 0, 0),
+>  	GATE(CLK_USBHOST, "usbhost", "div_aclk_200", GATE_IP_FSYS, 12, 0, 0),
+>  	GATE(CLK_SROMC, "sromc", "div_aclk_200", GATE_IP_FSYS, 11, 0, 0),
+> +	GATE(CLK_SDMMC2, "sdmmc2", "div_aclk_200", GATE_IP_FSYS, 7, 0, 0),
+>  	GATE(CLK_SDMMC1, "sdmmc1", "div_aclk_200", GATE_IP_FSYS, 6, 0, 0),
+>  	GATE(CLK_SDMMC0, "sdmmc0", "div_aclk_200", GATE_IP_FSYS, 5, 0, 0),
+>  	GATE(CLK_PDMA1, "pdma1", "div_aclk_200", GATE_IP_FSYS, 1, 0, 0),
 > diff --git a/include/dt-bindings/clock/exynos3250.h b/include/dt-bindings/clock/exynos3250.h
-> index 63d01c15d2b3..ddb874130d86 100644
+> index ddb874130d86..c796ff02ceeb 100644
 > --- a/include/dt-bindings/clock/exynos3250.h
 > +++ b/include/dt-bindings/clock/exynos3250.h
-> @@ -79,6 +79,7 @@
->  #define CLK_MOUT_CORE			58
+> @@ -80,6 +80,7 @@
 >  #define CLK_MOUT_APLL			59
 >  #define CLK_MOUT_ACLK_266_SUB		60
-> +#define CLK_MOUT_UART2			61
+>  #define CLK_MOUT_UART2			61
+> +#define CLK_MOUT_MMC2			62
 >  
 >  /* Dividers */
 >  #define CLK_DIV_GPL			64
-> @@ -127,6 +128,7 @@
->  #define CLK_DIV_CORE			107
+> @@ -129,6 +130,8 @@
 >  #define CLK_DIV_HPM			108
 >  #define CLK_DIV_COPY			109
-> +#define CLK_DIV_UART2			110
+>  #define CLK_DIV_UART2			110
+> +#define CLK_DIV_MMC2_PRE		111
+> +#define CLK_DIV_MMC2			112
 >  
 >  /* Gates */
 >  #define CLK_ASYNC_G3D			128
-> @@ -223,6 +225,7 @@
->  #define CLK_BLOCK_MFC			219
+> @@ -226,6 +229,7 @@
 >  #define CLK_BLOCK_CAM			220
 >  #define CLK_SMIES			221
-> +#define CLK_UART2			222
+>  #define CLK_UART2			222
+> +#define CLK_SDMMC2			223
 >  
 >  /* Special clocks */
 >  #define CLK_SCLK_JPEG			224
-> @@ -249,12 +252,13 @@
->  #define CLK_SCLK_SPI0			245
+> @@ -253,12 +257,13 @@
 >  #define CLK_SCLK_UART1			246
 >  #define CLK_SCLK_UART0			247
-> +#define CLK_SCLK_UART2			248
+>  #define CLK_SCLK_UART2			248
+> +#define CLK_SCLK_MMC2			249
 >  
 >  /*
 >   * Total number of clocks of main CMU.
 >   * NOTE: Must be equal to last clock ID increased by one.
 >   */
-> -#define CLK_NR_CLKS			248
-> +#define CLK_NR_CLKS			249
+> -#define CLK_NR_CLKS			249
+> +#define CLK_NR_CLKS			250
 >  
 >  /*
 >   * CMU DMC
