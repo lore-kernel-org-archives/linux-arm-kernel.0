@@ -1,23 +1,40 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 23 Mar 2016 15:33:32 -0700
-Subject: [PATCH 15/17] qcom: ipq4019: add cpu operating points for cpufreq
- support
-In-Reply-To: <1458770712-10880-16-git-send-email-mmcclint@codeaurora.org>
-References: <1458770712-10880-1-git-send-email-mmcclint@codeaurora.org>
- <1458770712-10880-16-git-send-email-mmcclint@codeaurora.org>
-Message-ID: <56F319BC.5050405@codeaurora.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 24 Mar 2016 09:19:58 +0900
+Subject: [PATCH v2 1/2] ARM: dts: r8a73a4: Remove unnecessary
+ clock-output-names properties
+In-Reply-To: <CAMuHMdW-uq_6PkdaPhd++h1sYUEnwrQYRqops3utUu8nREaj8g@mail.gmail.com>
+References: <1458695203-9950-1-git-send-email-horms+renesas@verge.net.au>
+ <1458695203-9950-2-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdW-uq_6PkdaPhd++h1sYUEnwrQYRqops3utUu8nREaj8g@mail.gmail.com>
+Message-ID: <20160324001957.GA26615@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/23/2016 03:05 PM, Matthew McClintock wrote:
-> This adds some operating points for cpu frequeny scaling
->
-> Signed-off-by: Matthew McClintock <mmcclint@codeaurora.org>
-> ---
+On Wed, Mar 23, 2016 at 08:42:49AM +0100, Geert Uytterhoeven wrote:
+> Hi Simon,
+> 
+> On Wed, Mar 23, 2016 at 2:06 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > * Fixed rate and fixed factor clocks do not require an
+> >   clock-output-names property.
+> > * Since 07705583e920fef6 ("clk: shmobile: div6: Make clock-output-names
+> >   optional") Renesas div6 clocks do not require a clock-output-names
+> >   property.
+> >
+> > In the above cases there is only one clock output and its name is taken
+> > from that of the clock node.  Accordingly, remove the unnecessary
+> > clock-output-names properties and as necessary update the node names.
+> >
+> > The clock-output-names property is left in place for the zb_clk which is
+> > thus treated as a special case as the MSTP clock driver (clk-mstp.c)
+> > explicitly looks for a clock named zb_clk for the r8a73a4 and sh73a0 SoCs.
+> 
+> ... a clock with node name zb_clk ...
+> 
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> With the above change:
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Can you use the v2 OPP bindings instead? I imagine uV could be left out
-then because there isn't any regulator control?
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Thanks, I have queued this up with the change you suggest.
+Likewise for patch 2/2.
