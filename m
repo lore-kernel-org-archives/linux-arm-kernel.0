@@ -1,30 +1,33 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 24 Mar 2016 19:46:22 +0100
-Subject: [PATCH v2 1/1] ARM: dts: sun5i-a13-olinuxino-micro: enable USB DRC
-In-Reply-To: <1458825533-13968-1-git-send-email-jmfriedt@femto-st.fr>
-References: <1458825533-13968-1-git-send-email-jmfriedt@femto-st.fr>
-Message-ID: <20160324184622.GA30977@lukather>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 24 Mar 2016 14:50:48 -0400 (EDT)
+Subject: [PATCH 1/1] net: macb: replace macb_writel() call by
+ queue_writel() to update queue ISR
+In-Reply-To: <1458830404-6213-1-git-send-email-cyrille.pitchen@atmel.com>
+References: <1458830404-6213-1-git-send-email-cyrille.pitchen@atmel.com>
+Message-ID: <20160324.145048.1317096517497751465.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 24, 2016 at 02:18:53PM +0100, Jean-Michel Friedt wrote:
-> From: JM Friedt <jmfriedt@femto-st.fr>
-> 
-> Enable the OTG controller on the Olinuxino A13-micro. 
-> 
-> Signed-off-by: Jean-Michel Friedt <jmfriedt@femto-st.fr>
+From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+Date: Thu, 24 Mar 2016 15:40:04 +0100
 
-Applied, thanks!
-Maxime
+> macb_interrupt() should not use macb_writel(bp, ISR, <value>) but only
+> queue_writel(queue, ISR, <value>).
+> 
+> There is one IRQ and one set of {ISR, IER, IDR, IMR} [1] registers per
+> queue on gem hardware, though only queue0 is actually used for now to
+> receive frames: other queues can already be used to transmit frames.
+> 
+> The queue_readl() and queue_writel() helper macros are designed to access
+> the relevant IRQ registers.
+> 
+> [1]
+> ISR: Interrupt Status Register
+> IER: Interrupt Enable Register
+> IDR: Interrupt Disable Register
+> IMR: Interrupt Mask Register
+> 
+> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> Fixes: bfbb92c44670 ("net: macb: Handle the RXUBR interrupt on all devices")
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160324/4ab34eff/attachment.sig>
+Applied, thanks.
