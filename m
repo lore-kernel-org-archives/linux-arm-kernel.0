@@ -1,43 +1,142 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 23 Mar 2016 20:13:00 -0600
-Subject: RPi3 arm64 port status
-In-Reply-To: <87lh58k5ge.fsf@eliezer.anholt.net>
-References: <87lh58k5ge.fsf@eliezer.anholt.net>
-Message-ID: <56F34D2C.9070609@wwwdotorg.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 24 Mar 2016 11:27:34 +0900
+Subject: [PATCH v6 1/4] dt-bindings: power: reset: add document for
+ reboot-mode driver
+In-Reply-To: <1458646592-540-1-git-send-email-andy.yan@rock-chips.com>
+References: <1458646525-491-1-git-send-email-andy.yan@rock-chips.com>
+ <1458646592-540-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <CAJKOXPdUW5f6_sz14NMU8LP+QoKStB9omXticMkQX4D866okWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/23/2016 07:52 PM, Eric Anholt wrote:
-> I spent today working on getting aarch64 working on the Raspberry Pi 3.
-> Here's what I've got so far:
->
-> U-Boot branch mostly based on srwarren's work:
-> https://github.com/anholt/u-boot/tree/rpi_dev
->
-> (Check the commit messages there for necessary config.txt contents)
->
-> My linux tree:
-> https://github.com/anholt/linux/tree/bcm2837-64
->
-> Linux is booting to the point of initializing MMC.  As of recently, I'm
-> seeing MMC hangs at boot, and I haven't tracked down what's changed.
->
-> I haven't implemented SMP yet.  Just like the 2836, the firmware has the
-> secondaries spinlooping in a little bit of firmware memory, watching a
-> channel of the the inter-processor mailboxes.  When the secondary sees
-> the channel get a value, it jumps to it.  This is the same on the new
-> 64-bit chips, even though the register we're communicating through is
-> only 32 bits.
+Interesting idea. While looking at the code I stumped over few things below:
 
-Are you sure about that? I was under the impression that on the RPi 2, 
-the secondary CPU spin loop was implemented in a short stub that the VC 
-firmware placed into RAM at address 0 (the default ARM CPU reset 
-vector), but that that for the RPi 3 in AArch64 mode, there was no such 
-stub available yet.
+On Tue, Mar 22, 2016 at 8:36 PM, Andy Yan <andy.yan@rock-chips.com> wrote:
+> add device tree bindings document for reboot-mode driver
 
-As such I made U-Boot link to address 0, relied on setting kernel_old=1 
-in config.txt (which causes U-Boot to be loaded at address 0) and 
-enabled a similar secondary CPU spin loop in U-Boot by enabling 
-CONFIG_ARMV8_MULTIENTRY=y. The U-Boot code waits for a write to a memory 
-location (currently hard-coded to a somewhat randomly chosen 0x0FFFFFF0) 
-rather than for a message to appear in the HW mailbox.
+s/add/Add/
+Plus a full-stop at the end of sentence.
+
+>
+> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+>
+> binding
+
+What is that?
+
+>
+> ---
+>
+> Changes in v6:
+> - fix a typo with "property"
+> - describe property "mask" more clear
+>
+> Changes in v5:
+> - delete a unnecessary blank line in syscon-reboot-mode.txt
+> - rename mode-fastoboot to mode-bootloader in syscon-reboot-mode.txt
+> - rename macro BOOT_LOADER to BOOT_BL_DOWNLOAD, which gives a more clear mean
+>
+> Changes in v4:
+> - remove mode-maskrom
+> - rename mode-fastboot to mode-bootloader to keep compatible with the exiting Android device
+>
+> Changes in v3:
+> - descirbe all reboot mode as properity instead of subnode
+>
+> Changes in v2: None
+> Changes in v1: None
+>
+>  .../bindings/power/reset/reboot-mode.txt           | 24 +++++++++++++++
+>  .../bindings/power/reset/syscon-reboot-mode.txt    | 35 ++++++++++++++++++++++
+>  2 files changed, 59 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/power/reset/reboot-mode.txt
+>  create mode 100644 Documentation/devicetree/bindings/power/reset/syscon-reboot-mode.txt
+>
+> diff --git a/Documentation/devicetree/bindings/power/reset/reboot-mode.txt b/Documentation/devicetree/bindings/power/reset/reboot-mode.txt
+> new file mode 100644
+> index 0000000..3457949
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/power/reset/reboot-mode.txt
+> @@ -0,0 +1,24 @@
+> +Generic reboot mode core map driver
+> +
+> +This driver get reboot mode arguments and call the write
+> +interface to stores the magic value in special register
+s/stores/store/
+> +or ram . Then the bootloader can read it and take different
+
+s/ram ./ram./
+
+> +action according the argument stored.
+
+according to
+
+> +
+> +All mode properties are vendor specific, it is a indication to tell
+> +the bootloder what to do when the system reboot, and should be named
+
+s/bootloder/bootloader/
+s/reboot/reboots/
+
+> +as mode-xxx = <magic> (xxx is mode name).
+> +
+
+These are examples? If yes then add a note, like:
+
++For example modes common on Android platform:
+
+> +- mode-normal: Normal reboot mode, system reboot with command "reboot".
+> +- mode-recovery: Android Recovery mode, it is a mode to format the device or update a new image.
+> +- mode-bootloader: Android fastboot mode, it's a mode to re-flash partitions on the Android based device.
+> +- mode-loader: A bootloader mode, it's a mode used to download image on Rockchip platform,
+> +              usually used in development.
+
+The "bootloader" and "loader" examples are very confusing. Maybe just
+name the first one as "mode-fastboot" and second as
+"rockchip-download"? The term "loader" does not look for me as
+anything related to uploading/downloading new firmware.
+
+> +
+> +Example:
+> +       reboot-mode {
+> +               mode-normal = <BOOT_NORMAL>;
+> +               mode-recovery = <BOOT_RECOVERY>;
+> +               mode-bootloader = <BOOT_FASTBOOT>;
+> +               mode-loader = <BOOT_BL_DOWNLOAD>;
+> +       }
+> diff --git a/Documentation/devicetree/bindings/power/reset/syscon-reboot-mode.txt b/Documentation/devicetree/bindings/power/reset/syscon-reboot-mode.txt
+> new file mode 100644
+> index 0000000..eb28469
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/power/reset/syscon-reboot-mode.txt
+> @@ -0,0 +1,35 @@
+> +SYSCON reboot mode driver
+> +
+> +This driver get reboot mode magic value form reboot-mode driver
+
+s/get/gets/
+
+> +and stores it in a SYSCON mapped register. Then the bootloader
+> +can read it and take different action according to the magic
+> +value stored.
+> +
+> +This DT node should be represented as a sub-node of a "syscon", "simple-mfd"
+> +node.
+> +
+> +Required properties:
+> +- compatible: should be "syscon-reboot-mode"
+> +- offset: offset in the register map for the storage register (in bytes)
+> +
+> +Optional property:
+> +- mask: bits mask of the bits in the register to store the reboot mode magic value,
+> +  default set to 0xffffffff if missing.
+> +
+> +The rest of the properties should follow the generic reboot-mode discription
+
+s/discription/description/
+
+Please, run the spell check...
+
+Best regards,
+Krzysztof
