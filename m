@@ -1,83 +1,139 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 24 Mar 2016 17:50:05 +0100
-Subject: [PATCH v3 08/18] dt-bindings: Add PLX Technology Reset Controller
- bindings
+Date: Thu, 24 Mar 2016 17:50:09 +0100
+Subject: [PATCH v3 12/18] dt-bindings: Add PLX Technology OXNAS pinctrl and
+ gpio bindings
 In-Reply-To: <1458838215-23314-1-git-send-email-narmstrong@baylibre.com>
 References: <1458838215-23314-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1458838215-23314-9-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1458838215-23314-13-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Rob Herring <robh@kernel.org>
+Add pinctrl and gpio DT bindings for PLX Technology OXNAS SoC Family.
+This version supports the ARM926EJ-S based OX810SE SoC with 34 IO pins.
+
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- .../devicetree/bindings/reset/plxtech,reset.txt    | 58 ++++++++++++++++++++++
- 1 file changed, 58 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/reset/plxtech,reset.txt
+ .../devicetree/bindings/gpio/gpio_oxnas.txt        | 47 ++++++++++++++++++
+ .../bindings/pinctrl/plxtech,pinctrl.txt           | 57 ++++++++++++++++++++++
+ 2 files changed, 104 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio_oxnas.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/plxtech,pinctrl.txt
 
-diff --git a/Documentation/devicetree/bindings/reset/plxtech,reset.txt b/Documentation/devicetree/bindings/reset/plxtech,reset.txt
+diff --git a/Documentation/devicetree/bindings/gpio/gpio_oxnas.txt b/Documentation/devicetree/bindings/gpio/gpio_oxnas.txt
 new file mode 100644
-index 0000000..581c974
+index 0000000..4530fa9
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/reset/plxtech,reset.txt
-@@ -0,0 +1,58 @@
-+PLX Technology OXNAS SoC Family RESET Controller
-+================================================
-+
-+Please also refer to reset.txt in this directory for common reset
-+controller binding usage.
++++ b/Documentation/devicetree/bindings/gpio/gpio_oxnas.txt
+@@ -0,0 +1,47 @@
++* PLX Technology OXNAS SoC GPIO Controller
 +
 +Required properties:
-+- compatible: Should be "oxsemi,ox810se-reset"
-+- #reset-cells: 1, see below
++ - compatible: "oxsemi,ox810se-gpio"
++ - reg: Base address and length for the device.
++ - interrupts: The port interrupt shared by all pins.
++ - gpio-controller: Marks the port as GPIO controller.
++ - #gpio-cells: Two. The first cell is the pin number and
++   the second cell is used to specify the gpio polarity as defined in
++   defined in <dt-bindings/gpio/gpio.h>:
++      0 = GPIO_ACTIVE_HIGH
++      1 = GPIO_ACTIVE_LOW
++ - interrupt-controller: Marks the device node as an interrupt controller.
++ - #interrupt-cells: Two. The first cell is the GPIO number and second cell
++   is used to specify the trigger type as defined in
++   <dt-bindings/interrupt-controller/irq.h>:
++      IRQ_TYPE_EDGE_RISING
++      IRQ_TYPE_EDGE_FALLING
++      IRQ_TYPE_EDGE_BOTH
++ - plxtech,gpio-bank: Specifies which bank a controller owns.
++ - gpio-ranges: Interaction with the PINCTRL subsystem.
++ - ngpios: Specifies the gpio lines count in this specific bank.
 +
-+Parent node should have the following properties :
-+- compatible: Should be "oxsemi,ox810se-sys-ctrl", "syscon", "simple-mfd"
++Example:
 +
-+For OX810SE, the indices are :
-+ - 0 : ARM
-+ - 1 : COPRO
-+ - 2 : Reserved
-+ - 3 : Reserved
-+ - 4 : USBHS
-+ - 5 : USBHSPHY
-+ - 6 : MAC
-+ - 7 : PCI
-+ - 8 : DMA
-+ - 9 : DPE
-+ - 10 : DDR
-+ - 11 : SATA
-+ - 12 : SATA_LINK
-+ - 13 : SATA_PHY
-+ - 14 : Reserved
-+ - 15 : NAND
-+ - 16 : GPIO
-+ - 17 : UART1
-+ - 18 : UART2
-+ - 19 : MISC
-+ - 20 : I2S
-+ - 21 : AHB_MON
-+ - 22 : UART3
-+ - 23 : UART4
-+ - 24 : SGDMA
-+ - 25 : Reserved
-+ - 26 : Reserved
-+ - 27 : Reserved
-+ - 28 : Reserved
-+ - 29 : Reserved
-+ - 30 : Reserved
-+ - 31 : BUS
-+
-+example:
-+
-+sys: sys-ctrl at 000000 {
-+	compatible = "oxsemi,ox810se-sys-ctrl", "syscon", "simple-mfd";
++gpio0: gpio at 0 {
++	compatible = "oxsemi,ox810se-gpio";
 +	reg = <0x000000 0x100000>;
++	interrupts = <21>;
++	#gpio-cells = <2>;
++	gpio-controller;
++	interrupt-controller;
++	#interrupt-cells = <2>;
++	plxtech,gpio-bank = <0>;
++	gpio-ranges = <&pinctrl 0 0 32>;
++	ngpios = <32>;
++};
 +
-+	reset: reset-controller {
-+		compatible = "oxsemi,ox810se-reset";
-+		#reset-cells = <1>;
++keys {
++	...
++
++	button at sw1 {
++		label = "ESC";
++		linux,code = <1>;
++		gpios = <&gpio0 12 0>;
 +	};
++};
+diff --git a/Documentation/devicetree/bindings/pinctrl/plxtech,pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/plxtech,pinctrl.txt
+new file mode 100644
+index 0000000..dc4907b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pinctrl/plxtech,pinctrl.txt
+@@ -0,0 +1,57 @@
++* PLX Technology OXNAS SoC Family Pin Controller
++
++Please refer to pinctrl-bindings.txt, ../gpio/gpio.txt, and
++../interrupt-controller/interrupts.txt for generic information regarding
++pin controller, GPIO, and interrupt bindings.
++
++OXNAS 'pin configuration node' is a node of a group of pins which can be
++used for a specific device or function. This node represents configurations of
++pins, optional function, and optional mux related configuration.
++
++Required properties for pin controller node:
++ - compatible: "oxsemi,ox810se-pinctrl"
++ - plxtech,sys-ctrl: a phandle to the system controller syscon node
++
++Required properties for pin configuration sub-nodes:
++ - pins: List of pins to which the configuration applies.
++
++Optional properties for pin configuration sub-nodes:
++----------------------------------------------------
++ - function: Mux function for the specified pins.
++ - bias-pull-up: Enable weak pull-up.
++
++Example:
++
++pinctrl: pinctrl {
++	compatible = "oxsemi,ox810se-pinctrl";
++
++	/* Regmap for sys registers */
++	plxtech,sys-ctrl = <&sys>;
++
++	pinctrl_uart2: pinctrl_uart2 {
++		uart2a {
++			pins = "gpio31";
++			function = "fct3";
++		};
++		uart2b {
++			pins = "gpio32";
++			function = "fct3";
++		};
++	};
++};
++
++uart2: serial at 900000 {
++	compatible = "ns16550a";
++	reg = <0x900000 0x100000>;
++	clocks = <&sysclk>;
++	interrupts = <29>;
++	reg-shift = <0>;
++	fifo-size = <16>;
++	reg-io-width = <1>;
++	current-speed = <115200>;
++	no-loopback-test;
++	status = "disabled";
++	resets = <&reset 22>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart2>;
 +};
 -- 
 1.9.1
