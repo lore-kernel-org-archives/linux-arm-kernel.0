@@ -1,40 +1,47 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 24 Mar 2016 17:11:44 +0000
-Subject: [PATCH v3 03/18] irqchip: versatile-fpga: add new compatible for
- OX810SE SoC
-In-Reply-To: <1458838215-23314-4-git-send-email-narmstrong@baylibre.com>
-References: <1458838215-23314-1-git-send-email-narmstrong@baylibre.com>
- <1458838215-23314-4-git-send-email-narmstrong@baylibre.com>
-Message-ID: <56F41FD0.2040504@arm.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 24 Mar 2016 10:16:08 -0700
+Subject: [PATCH 2/3] ARM64: dts: amlogic: add Hardkernel ODROID-C2
+In-Reply-To: <56F41C76.8090805@suse.de>
+References: <1458758013-11890-1-git-send-email-khilman@baylibre.com>
+ <1458758013-11890-2-git-send-email-khilman@baylibre.com>
+ <8055578.HDz4P7ZJ9W@wuerfel> <56F41C76.8090805@suse.de>
+Message-ID: <CAOi56cVoLrHjeT_BhSZAvj5yZvf8Qkg8y=_zh+kikM+96+LGVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/03/16 16:50, Neil Armstrong wrote:
-> Under the OX810SE, this exact same interface is used as "Reference Peripheral
-> Specification" Interrupt Controller, so add a new compatible string in order
-> to support the PLX Technology OX810SE SoC interrupt controller.
-> 
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
->  drivers/irqchip/irq-versatile-fpga.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/irqchip/irq-versatile-fpga.c b/drivers/irqchip/irq-versatile-fpga.c
-> index 598ab3f..37dd464 100644
-> --- a/drivers/irqchip/irq-versatile-fpga.c
-> +++ b/drivers/irqchip/irq-versatile-fpga.c
-> @@ -227,4 +227,5 @@ int __init fpga_irq_of_init(struct device_node *node,
->  }
->  IRQCHIP_DECLARE(arm_fpga, "arm,versatile-fpga-irq", fpga_irq_of_init);
->  IRQCHIP_DECLARE(arm_fpga_sic, "arm,versatile-sic", fpga_irq_of_init);
-> +IRQCHIP_DECLARE(ox810se_rps, "oxsemi,ox810se-rps-irq", fpga_irq_of_init);
->  #endif
-> 
+On Thu, Mar 24, 2016 at 9:57 AM, Andreas F?rber <afaerber@suse.de> wrote:
+>
+> Am 24.03.2016 um 13:58 schrieb Arnd Bergmann:
+> > On Wednesday 23 March 2016 11:33:32 Kevin Hilman wrote:
+> >> +/ {
+> >> +       compatible = "hardkernel,odroid-c2", "amlogic,meson-gxbb";
+> >> +       model = "Hardkernel ODROID-C2";
+> >> +
+> >> +       chosen {
+> >> +               stdout-path = "serial0:115200n8";
+> >> +       };
+> >> +
+> >> +       memory at 0 {
+> >> +               device_type = "memory";
+> >> +               reg = <0x0 0x0 0x0 0x80000000>;
+> >> +       };
+> >> +};
+> >> +
+> >> +&uart_AO {
+> >> +       status = "okay";
+> >> +};
+> >>
+> >
+> > Shouldn't this also add the serial0 alias?
+> >
+> > It seems that the .dtsi file accidentally sets an alias to a disabled
+> > device, which isn't really valid. Can you fix that when adding the
+> > .dts?
+>
+> Hm, would it be any better to not disable either of the serials and
+> leave the aliases in the .dtsi?
 
-For patches 3 and 4:
+I'm going to respin, moving the aliases that are actually into the
+.dts that use them, and dropping the unused/disabled serial1.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Kevin
