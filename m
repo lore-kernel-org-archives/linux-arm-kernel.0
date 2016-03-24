@@ -1,72 +1,64 @@
 From: shannon.zhao@linaro.org (Shannon Zhao)
-Date: Thu, 24 Mar 2016 22:44:32 +0800
-Subject: [PATCH v7 13/17] ARM: Xen: Document UEFI support on Xen ARM virtual
- platforms
+Date: Thu, 24 Mar 2016 22:44:27 +0800
+Subject: [PATCH v7 08/17] Xen: public/hvm: sync changes of
+ HVM_PARAM_CALLBACK_VIA ABI from Xen
 In-Reply-To: <1458830676-27075-1-git-send-email-shannon.zhao@linaro.org>
 References: <1458830676-27075-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1458830676-27075-14-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1458830676-27075-9-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a "uefi" node under /hypervisor node in FDT, then Linux kernel could
-scan this to get the UEFI information.
+Sync the changes of HVM_PARAM_CALLBACK_VIA ABI introduced by
+Xen commit <ca5c54b6ff05> (public/hvm: export the HVM_PARAM_CALLBACK_VIA
+ABI in the API).
 
-CC: Rob Herring <robh@kernel.org>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-Acked-by: Rob Herring <robh@kernel.org>
-Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- Documentation/devicetree/bindings/arm/xen.txt | 33 +++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+ include/xen/interface/hvm/params.h | 27 +++++++++++++++++++++------
+ 1 file changed, 21 insertions(+), 6 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/xen.txt b/Documentation/devicetree/bindings/arm/xen.txt
-index 0f7b9c2..6f83f76 100644
---- a/Documentation/devicetree/bindings/arm/xen.txt
-+++ b/Documentation/devicetree/bindings/arm/xen.txt
-@@ -15,6 +15,26 @@ the following properties:
- - interrupts: the interrupt used by Xen to inject event notifications.
-   A GIC node is also required.
+diff --git a/include/xen/interface/hvm/params.h b/include/xen/interface/hvm/params.h
+index a6c7991..70ad208 100644
+--- a/include/xen/interface/hvm/params.h
++++ b/include/xen/interface/hvm/params.h
+@@ -27,16 +27,31 @@
+  * Parameter space for HVMOP_{set,get}_param.
+  */
  
-+To support UEFI on Xen ARM virtual platforms, Xen populates the FDT "uefi" node
-+under /hypervisor with following parameters:
++#define HVM_PARAM_CALLBACK_IRQ 0
+ /*
+  * How should CPU0 event-channel notifications be delivered?
+- * val[63:56] == 0: val[55:0] is a delivery GSI (Global System Interrupt).
+- * val[63:56] == 1: val[55:0] is a delivery PCI INTx line, as follows:
+- *                  Domain = val[47:32], Bus  = val[31:16],
+- *                  DevFn  = val[15: 8], IntX = val[ 1: 0]
+- * val[63:56] == 2: val[7:0] is a vector number.
++ *
+  * If val == 0 then CPU0 event-channel notifications are not delivered.
++ * If val != 0, val[63:56] encodes the type, as follows:
++ */
 +
-+________________________________________________________________________________
-+Name                      | Size   | Description
-+================================================================================
-+xen,uefi-system-table     | 64-bit | Guest physical address of the UEFI System
-+			  |	   | Table.
-+--------------------------------------------------------------------------------
-+xen,uefi-mmap-start       | 64-bit | Guest physical address of the UEFI memory
-+			  |	   | map.
-+--------------------------------------------------------------------------------
-+xen,uefi-mmap-size        | 32-bit | Size in bytes of the UEFI memory map
-+                          |        | pointed to in previous entry.
-+--------------------------------------------------------------------------------
-+xen,uefi-mmap-desc-size   | 32-bit | Size in bytes of each entry in the UEFI
-+                          |        | memory map.
-+--------------------------------------------------------------------------------
-+xen,uefi-mmap-desc-ver    | 32-bit | Version of the mmap descriptor format.
-+--------------------------------------------------------------------------------
- 
- Example (assuming #address-cells = <2> and #size-cells = <2>):
- 
-@@ -22,4 +42,17 @@ hypervisor {
- 	compatible = "xen,xen-4.3", "xen,xen";
- 	reg = <0 0xb0000000 0 0x20000>;
- 	interrupts = <1 15 0xf08>;
-+	uefi {
-+		xen,uefi-system-table = <0xXXXXXXXX>;
-+		xen,uefi-mmap-start = <0xXXXXXXXX>;
-+		xen,uefi-mmap-size = <0xXXXXXXXX>;
-+		xen,uefi-mmap-desc-size = <0xXXXXXXXX>;
-+		xen,uefi-mmap-desc-ver = <0xXXXXXXXX>;
-+        };
- };
++#define HVM_PARAM_CALLBACK_TYPE_GSI      0
++/*
++ * val[55:0] is a delivery GSI.  GSI 0 cannot be used, as it aliases val == 0,
++ * and disables all notifications.
++ */
 +
-+The format and meaning of the "xen,uefi-*" parameters are similar to those in
-+Documentation/arm/uefi.txt, which are provided by the regular UEFI stub. However
-+they differ because they are provided by the Xen hypervisor, together with a set
-+of UEFI runtime services implemented via hypercalls, see
-+http://xenbits.xen.org/docs/unstable/hypercall/x86_64/include,public,platform.h.html.
++#define HVM_PARAM_CALLBACK_TYPE_PCI_INTX 1
++/*
++ * val[55:0] is a delivery PCI INTx line:
++ * Domain = val[47:32], Bus = val[31:16] DevFn = val[15:8], IntX = val[1:0]
++ */
++
++#define HVM_PARAM_CALLBACK_TYPE_VECTOR   2
++/*
++ * val[7:0] is a vector number.  Check for XENFEAT_hvm_callback_vector to know
++ * if this delivery method is available.
+  */
+-#define HVM_PARAM_CALLBACK_IRQ 0
+ 
+ #define HVM_PARAM_STORE_PFN    1
+ #define HVM_PARAM_STORE_EVTCHN 2
 -- 
 2.1.4
