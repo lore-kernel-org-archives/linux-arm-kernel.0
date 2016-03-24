@@ -1,57 +1,153 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 24 Mar 2016 16:54:34 +0000
-Subject: [PATCH] arm64: opcodes.h: Add arm big-endian config options before
- including arm header
-Message-ID: <1458838474-8625-1-git-send-email-james.morse@arm.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu, 24 Mar 2016 17:50:15 +0100
+Subject: [PATCH v3 18/18] arm: boot: dts: Add Western Digital My Book World
+ Edition device tree
+In-Reply-To: <1458838215-23314-1-git-send-email-narmstrong@baylibre.com>
+References: <1458838215-23314-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1458838215-23314-19-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm and arm64 use different config options to specify big endian. This
-needs taking into account when including code/headers between the two
-architectures.
+Add Western Digital My Book World Edition device tree based on
+PLX Technology OX810SE SoC.
 
-A case in point is PAN, which uses the __instr_arm() macro to output
-instructions. The macro comes from opcodes.h, which lives under arch/arm.
-On a big-endian build the mismatched config options mean the instruction
-isn't byte swapped correctly, resulting in undefined instruction exceptions
-during boot:
-> alternatives: patching kernel code
-> kdevtmpfs[87]: undefined instruction: pc=ffffffc0004505b4
-> kdevtmpfs[87]: undefined instruction: pc=ffffffc00076231c
-> kdevtmpfs[87]: undefined instruction: pc=ffffffc00076231c
-> kdevtmpfs[87]: undefined instruction: pc=ffffffc00076231c
-> kdevtmpfs[87]: undefined instruction: pc=ffffffc00076231c
-> kdevtmpfs[87]: undefined instruction: pc=ffffffc00076231c
-> kdevtmpfs[87]: undefined instruction: pc=ffffffc00076231c
-> kdevtmpfs[87]: undefined instruction: pc=ffffffc00076231c
-> kdevtmpfs[87]: undefined instruction: pc=ffffffc00076231c
-> kdevtmpfs[87]: undefined instruction: pc=ffffffc00076231c
-> Internal error: Oops - undefined instruction: 0 [#1] SMP
-> Modules linked in:
-> CPU: 0 PID: 87 Comm: kdevtmpfs Not tainted 4.1.16+ #5
-> Hardware name: Hisilicon PhosphorHi1382 EVB (DT)
-> task: ffffffc336591700 ti: ffffffc3365a4000 task.ti: ffffffc3365a4000
-> PC is at dump_instr+0x68/0x100
-> LR is at do_undefinstr+0x1d4/0x2a4
-> pc : [<ffffffc00076231c>] lr : [<ffffffc0000811d4>] pstate: 604001c5
-> sp : ffffffc3365a6450
-
-Reported-by: Hanjun Guo <guohanjun@huawei.com>
-Signed-off-by: James Morse <james.morse@arm.com>
-Cc: <stable@vger.kernel.org> #4.3.x-
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- arch/arm64/include/asm/opcodes.h | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/boot/dts/Makefile    |   2 +
+ arch/arm/boot/dts/wd-mbwe.dts | 112 ++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 114 insertions(+)
+ create mode 100644 arch/arm/boot/dts/wd-mbwe.dts
 
-diff --git a/arch/arm64/include/asm/opcodes.h b/arch/arm64/include/asm/opcodes.h
-index 4e603ea36ad3..123f45d92cd1 100644
---- a/arch/arm64/include/asm/opcodes.h
-+++ b/arch/arm64/include/asm/opcodes.h
-@@ -1 +1,5 @@
-+#ifdef CONFIG_CPU_BIG_ENDIAN
-+#define CONFIG_CPU_ENDIAN_BE8 CONFIG_CPU_BIG_ENDIAN
-+#endif
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 52b34a0..3290d4e 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -530,6 +530,8 @@ dtb-$(CONFIG_ARCH_ORION5X) += \
+ 	orion5x-rd88f5182-nas.dtb
+ dtb-$(CONFIG_ARCH_PRIMA2) += \
+ 	prima2-evb.dtb
++dtb-$(CONFIG_ARCH_OXNAS) += \
++	wd-mbwe.dtb
+ dtb-$(CONFIG_ARCH_QCOM) += \
+ 	qcom-apq8064-cm-qs600.dtb \
+ 	qcom-apq8064-ifc6410.dtb \
+diff --git a/arch/arm/boot/dts/wd-mbwe.dts b/arch/arm/boot/dts/wd-mbwe.dts
+new file mode 100644
+index 0000000..ac3250a
+--- /dev/null
++++ b/arch/arm/boot/dts/wd-mbwe.dts
+@@ -0,0 +1,112 @@
++/*
++ * wd-mbwe.dtsi - Device tree file for Western Digital My Book World Edition
++ *
++ * Copyright (C) 2016 Neil Armstrong <narmstrong@baylibre.com>
++ *
++ * Licensed under GPLv2 or later
++ */
 +
- #include <../../arm/include/asm/opcodes.h>
++/dts-v1/;
++#include "ox810se.dtsi"
++
++/ {
++	model = "Western Digital My Book World Edition";
++
++	compatible = "wd,mbwe", "oxsemi,ox810se";
++
++	chosen {
++		bootargs = "console=ttyS1,115200n8 earlyprintk=serial";
++	};
++
++	memory {
++		/* 128Mbytes DDR */
++		reg = <0x48000000 0x8000000>;
++	};
++
++	aliases {
++		serial1 = &uart1;
++		gpio0 = &gpio0;
++		gpio1 = &gpio1;
++	};
++
++	gpio-keys-polled {
++		compatible = "gpio-keys-polled";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		poll-interval = <100>;
++
++		power {
++			label = "power";
++			gpios = <&gpio0 0 1>;
++			linux,code = <0x198>;
++		};
++
++		recovery {
++			label = "recovery";
++			gpios = <&gpio0 4 1>;
++			linux,code = <0xab>;
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		a0 {
++			label = "activity0";
++			gpios = <&gpio0 25 0>;
++			default-state = "keep";
++		};
++
++		a1 {
++			label = "activity1";
++			gpios = <&gpio0 26 0>;
++			default-state = "keep";
++		};
++
++		a2 {
++			label = "activity2";
++			gpios = <&gpio0 5 0>;
++			default-state = "keep";
++		};
++
++		a3 {
++			label = "activity3";
++			gpios = <&gpio0 6 0>;
++			default-state = "keep";
++		};
++
++		a4 {
++			label = "activity4";
++			gpios = <&gpio0 7 0>;
++			default-state = "keep";
++		};
++
++		a5 {
++			label = "activity5";
++			gpios = <&gpio1 2 0>;
++			default-state = "keep";
++		};
++	};
++
++	i2c-gpio {
++		compatible = "i2c-gpio";
++		gpios = <&gpio0 3 0 /* sda */
++			 &gpio0 2 0 /* scl */
++			 >;
++		i2c-gpio,delay-us = <2>;        /* ~100 kHz */
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		rtc0: rtc at 48 {
++			compatible = "st,m41t00";
++			reg = <0x68>;
++		};
++	};
++};
++
++&uart1 {
++	status = "okay";
++
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1>;
++};
 -- 
-2.8.0.rc3
+1.9.1
