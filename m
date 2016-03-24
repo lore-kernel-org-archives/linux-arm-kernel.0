@@ -1,95 +1,68 @@
-From: jmfriedt@femto-st.fr (Jean-Michel Friedt)
-Date: Thu, 24 Mar 2016 14:18:53 +0100
-Subject: [PATCH v2 1/1] ARM: dts: sun5i-a13-olinuxino-micro: enable USB DRC
-Message-ID: <1458825533-13968-1-git-send-email-jmfriedt@femto-st.fr>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 24 Mar 2016 21:18:53 +0800
+Subject: [PATCH 0/2] arm64: cpuidle: make arm_cpuidle_suspend() more
+ efficient
+In-Reply-To: <20160324111507.GB9323@arm.com>
+References: <1458796130-6109-1-git-send-email-jszhang@marvell.com>
+ <20160324111507.GB9323@arm.com>
+Message-ID: <20160324211853.1ffebd49@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: JM Friedt <jmfriedt@femto-st.fr>
+Hi Will,
 
-Enable the OTG controller on the Olinuxino A13-micro. 
+On Thu, 24 Mar 2016 11:15:07 +0000 Will Deacon wrote:
 
-Signed-off-by: Jean-Michel Friedt <jmfriedt@femto-st.fr>
----
-Changes v1 -> v2: 
-	* Full first name in SoB.
----
- arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts | 41 +++++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
+> On Thu, Mar 24, 2016 at 01:08:48PM +0800, Jisheng Zhang wrote:
+> > This series is to improve the arm_cpuidle_suspend() a bit by removing/moving
+> > out checks from this hot path.
+> > 
+> > Jisheng Zhang (2):
+> >   arm64: cpuidle: remove cpu_ops check from arm_cpuidle_suspend()
+> >   arm64: cpuidle: make arm_cpuidle_suspend() a bit more efficient
+> > 
+> >  arch/arm64/kernel/cpuidle.c | 9 ++-------
+> >  1 file changed, 2 insertions(+), 7 deletions(-)  
+> 
+> These look fine to me, but do you have any rough numbers showing what
+> sort of improvement we get from this change?
 
-diff --git a/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts
-index ad84fe4..081329e 100644
---- a/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts
-+++ b/arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts
-@@ -109,6 +109,10 @@
- 	status = "okay";
- };
- 
-+&otg_sram {
-+	status = "okay";
-+};
-+
- &pio {
- 	mmc0_cd_pin_olinuxinom: mmc0_cd_pin at 0 {
- 		allwinner,pins = "PG0";
-@@ -124,6 +128,27 @@
- 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 	};
- 
-+	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
-+		allwinner,pins = "PG2";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+	};
-+
-+	usb0_vbus_detect_pin: usb0_vbus_detect_pin at 0 {
-+		allwinner,pins = "PG1";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_DOWN>;
-+	};
-+
-+	usb0_vbus_pin_olinuxinom: usb0_vbus_pin at 0 {
-+		allwinner,pins = "PG12";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
- 	usb1_vbus_pin_olinuxinom: usb1_vbus_pin at 0 {
- 		allwinner,pins = "PG11";
- 		allwinner,function = "gpio_out";
-@@ -132,6 +157,12 @@
- 	};
- };
- 
-+&reg_usb0_vbus {
-+	pinctrl-0 = <&usb0_vbus_pin_olinuxinom>;
-+	gpio = <&pio 6 12 GPIO_ACTIVE_HIGH>;
-+	status = "okay";
-+};
-+
- &reg_usb1_vbus {
- 	pinctrl-0 = <&usb1_vbus_pin_olinuxinom>;
- 	gpio = <&pio 6 11 GPIO_ACTIVE_HIGH>;
-@@ -144,7 +175,17 @@
- 	status = "okay";
- };
- 
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
- &usbphy {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&usb0_id_detect_pin>, <&usb0_vbus_detect_pin>;
-+	usb0_id_det-gpio = <&pio 6 2 GPIO_ACTIVE_HIGH>; /* PG2 */
-+	usb0_vbus_det-gpio = <&pio 6 1 GPIO_ACTIVE_HIGH>; /* PG1 */
-+	usb0_vbus-supply = <&reg_usb0_vbus>;
- 	usb1_vbus-supply = <&reg_usb1_vbus>;
- 	status = "okay";
- };
--- 
-2.6.4
+Good question. Here it is:
+
+I measured the 4096 * time from arm_cpuidle_suspend entry point to the
+cpu_psci_cpu_suspend entry point. HW platform is Marvell BG4CT STB board.
+
+1. only one shell, no other process, hot-unplug secondary cpus, execute the
+following cmd
+
+while true
+do
+	sleep 0.2
+done
+
+before the patch: 1581220ns
+
+after the patch: 1579630ns
+
+reduced by 0.1%
+
+2. only one shell, no other process, hot-unplug secondary cpus, execute the
+following cmd
+
+while true
+do
+	md5sum /tmp/testfile
+	sleep 0.2
+done
+
+NOTE the testfile size should be larger than L1+L2 cache size
+
+before the patch: 1961960ns
+after the patch: 1912500ns
+
+reduced by 2.5%
+
+So the more complex the system load, the bigger the improvement.
+
+Thanks,
+Jisheng
