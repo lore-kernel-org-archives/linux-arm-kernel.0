@@ -1,141 +1,40 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 24 Mar 2016 13:25:30 +0900
-Subject: [PATCH v5 21/21] ARM: dts: Add support of bus frequency for
- exynos4412-trats/odroidu3
+Date: Thu, 24 Mar 2016 13:25:20 +0900
+Subject: [PATCH v5 11/21] MAINTAINERS: Add samsung bus frequency driver entry
 In-Reply-To: <1458793530-31897-1-git-send-email-cw00.choi@samsung.com>
 References: <1458793530-31897-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1458793530-31897-22-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1458793530-31897-12-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-THis patch adds the bus device tree nodes for both MIF (Memory) and INT
-(Internal) block to enable the bus frequency.
-
-The DMC bus is parent device in MIF block using VDD_MIF and the LEFTBUS
-bus is parent device in INT block using VDD_INT.
+This patch adds the 'BUS FREQUENCY DRIVER FOR SAMSUNG EXYNOS' entry to review the
+patches as maintainer. Patches will be picked up by DEVFREQ maintainer
+on devfreq git repository.
 
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- arch/arm/boot/dts/exynos4412-odroid-common.dtsi | 47 +++++++++++++++++++++++++
- arch/arm/boot/dts/exynos4412-trats2.dts         | 47 +++++++++++++++++++++++++
- 2 files changed, 94 insertions(+)
+ MAINTAINERS | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-index b4983cbc4f8c..2015f10071f9 100644
---- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-+++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-@@ -109,6 +109,53 @@
- 	};
- };
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 32bafda47c2f..9040f6a89ffe 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -3539,6 +3539,15 @@ F:	drivers/devfreq/devfreq-event.c
+ F:	include/linux/devfreq-event.h
+ F:	Documentation/devicetree/bindings/devfreq/event/
  
-+&bus_dmc {
-+	devfreq-events = <&ppmu_dmc0_3>, <&ppmu_dmc1_3>;
-+	vdd-supply = <&buck1_reg>;
-+	status = "okay";
-+};
++BUS FREQUENCY DRIVER FOR SAMSUNG EXYNOS
++M:	Chanwoo Choi <cw00.choi@samsung.com>
++L:	linux-pm at vger.kernel.org
++L:	linux-samsung-soc at vger.kernel.org
++T:	git git://git.kernel.org/pub/scm/linux/kernel/git/mzx/devfreq.git
++S:	Maintained
++F:	drivers/devfreq/exynos-bus.c
++F:	Documentation/devicetree/bindings/devfreq/exynos-bus.txt
 +
-+&bus_acp {
-+	devfreq = <&bus_dmc>;
-+	status = "okay";
-+};
-+
-+&bus_c2c {
-+	devfreq = <&bus_dmc>;
-+	status = "okay";
-+};
-+
-+&bus_leftbus {
-+	devfreq-events = <&ppmu_leftbus_3>, <&ppmu_rightbus_3>;
-+	vdd-supply = <&buck3_reg>;
-+	status = "okay";
-+};
-+
-+&bus_rightbus {
-+	devfreq = <&bus_leftbus>;
-+	status = "okay";
-+};
-+
-+&bus_display {
-+	devfreq = <&bus_leftbus>;
-+	status = "okay";
-+};
-+
-+&bus_fsys {
-+	devfreq = <&bus_leftbus>;
-+	status = "okay";
-+};
-+
-+&bus_peri {
-+	devfreq = <&bus_leftbus>;
-+	status = "okay";
-+};
-+
-+&bus_mfc {
-+	devfreq = <&bus_leftbus>;
-+	status = "okay";
-+};
-+
- &cpu0 {
- 	cpu0-supply = <&buck2_reg>;
- };
-diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
-index dce3cebe0606..9f3fb9a7f5f4 100644
---- a/arch/arm/boot/dts/exynos4412-trats2.dts
-+++ b/arch/arm/boot/dts/exynos4412-trats2.dts
-@@ -289,6 +289,53 @@
- 	status = "okay";
- };
- 
-+&bus_dmc {
-+	devfreq-events = <&ppmu_dmc0_3>, <&ppmu_dmc1_3>;
-+	vdd-supply = <&buck1_reg>;
-+	status = "okay";
-+};
-+
-+&bus_acp {
-+	devfreq = <&bus_dmc>;
-+	status = "okay";
-+};
-+
-+&bus_c2c {
-+	devfreq = <&bus_dmc>;
-+	status = "okay";
-+};
-+
-+&bus_leftbus {
-+	devfreq-events = <&ppmu_leftbus_3>, <&ppmu_rightbus_3>;
-+	vdd-supply = <&buck3_reg>;
-+	status = "okay";
-+};
-+
-+&bus_rightbus {
-+	devfreq = <&bus_leftbus>;
-+	status = "okay";
-+};
-+
-+&bus_display {
-+	devfreq = <&bus_leftbus>;
-+	status = "okay";
-+};
-+
-+&bus_fsys {
-+	devfreq = <&bus_leftbus>;
-+	status = "okay";
-+};
-+
-+&bus_peri {
-+	devfreq = <&bus_leftbus>;
-+	status = "okay";
-+};
-+
-+&bus_mfc {
-+	devfreq = <&bus_leftbus>;
-+	status = "okay";
-+};
-+
- &cpu0 {
- 	cpu0-supply = <&buck2_reg>;
- };
+ DEVICE NUMBER REGISTRY
+ M:	Torben Mathiasen <device@lanana.org>
+ W:	http://lanana.org/docs/device-list/index.html
 -- 
 1.9.1
