@@ -1,31 +1,179 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 24 Mar 2016 17:50:00 +0100
-Subject: [PATCH v3 03/18] irqchip: versatile-fpga: add new compatible for
- OX810SE SoC
+Date: Thu, 24 Mar 2016 17:49:58 +0100
+Subject: [PATCH v3 01/18] clocksource: sp804: Add support for OX810SE 24bit
+ timer width
 In-Reply-To: <1458838215-23314-1-git-send-email-narmstrong@baylibre.com>
 References: <1458838215-23314-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1458838215-23314-4-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1458838215-23314-2-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Under the OX810SE, this exact same interface is used as "Reference Peripheral
-Specification" Interrupt Controller, so add a new compatible string in order
-to support the PLX Technology OX810SE SoC interrupt controller.
+In order to support the Dual-Timer on the PLX Technology OX810SE SoC,
+implement variable counter width, keeping 32bit as default width.
+Add new compatible string oxsemi,ox810se-rps-timer in order to select
+the 24bit counter width.
 
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- drivers/irqchip/irq-versatile-fpga.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/clocksource/timer-sp804.c | 40 ++++++++++++++++++++++++++-------------
+ include/clocksource/timer-sp804.h | 11 ++++++-----
+ 2 files changed, 33 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/irqchip/irq-versatile-fpga.c b/drivers/irqchip/irq-versatile-fpga.c
-index 598ab3f..37dd464 100644
---- a/drivers/irqchip/irq-versatile-fpga.c
-+++ b/drivers/irqchip/irq-versatile-fpga.c
-@@ -227,4 +227,5 @@ int __init fpga_irq_of_init(struct device_node *node,
+diff --git a/drivers/clocksource/timer-sp804.c b/drivers/clocksource/timer-sp804.c
+index 5f45b9a..bdf3e14 100644
+--- a/drivers/clocksource/timer-sp804.c
++++ b/drivers/clocksource/timer-sp804.c
+@@ -80,9 +80,11 @@ void __init sp804_timer_disable(void __iomem *base)
+ void __init __sp804_clocksource_and_sched_clock_init(void __iomem *base,
+ 						     const char *name,
+ 						     struct clk *clk,
+-						     int use_sched_clock)
++						     int use_sched_clock,
++						     unsigned int width)
+ {
+ 	long rate;
++	u32 config = TIMER_CTRL_ENABLE | TIMER_CTRL_PERIODIC;
+ 
+ 	if (!clk) {
+ 		clk = clk_get_sys("sp804", name);
+@@ -98,19 +100,21 @@ void __init __sp804_clocksource_and_sched_clock_init(void __iomem *base,
+ 	if (rate < 0)
+ 		return;
+ 
++	if (width == 32)
++		config |= TIMER_CTRL_32BIT;
++
+ 	/* setup timer 0 as free-running clocksource */
+ 	writel(0, base + TIMER_CTRL);
+ 	writel(0xffffffff, base + TIMER_LOAD);
+ 	writel(0xffffffff, base + TIMER_VALUE);
+-	writel(TIMER_CTRL_32BIT | TIMER_CTRL_ENABLE | TIMER_CTRL_PERIODIC,
+-		base + TIMER_CTRL);
++	writel(config, base + TIMER_CTRL);
+ 
+ 	clocksource_mmio_init(base + TIMER_VALUE, name,
+-		rate, 200, 32, clocksource_mmio_readl_down);
++		rate, 200, width, clocksource_mmio_readl_down);
+ 
+ 	if (use_sched_clock) {
+ 		sched_clock_base = base;
+-		sched_clock_register(sp804_read, 32, rate);
++		sched_clock_register(sp804_read, width, rate);
+ 	}
  }
- IRQCHIP_DECLARE(arm_fpga, "arm,versatile-fpga-irq", fpga_irq_of_init);
- IRQCHIP_DECLARE(arm_fpga_sic, "arm,versatile-sic", fpga_irq_of_init);
-+IRQCHIP_DECLARE(ox810se_rps, "oxsemi,ox810se-rps-irq", fpga_irq_of_init);
+ 
+@@ -186,7 +190,9 @@ static struct irqaction sp804_timer_irq = {
+ 	.dev_id		= &sp804_clockevent,
+ };
+ 
+-void __init __sp804_clockevents_init(void __iomem *base, unsigned int irq, struct clk *clk, const char *name)
++void __init __sp804_clockevents_init(void __iomem *base, unsigned int irq,
++				     struct clk *clk, const char *name,
++				     unsigned int width)
+ {
+ 	struct clock_event_device *evt = &sp804_clockevent;
+ 	long rate;
+@@ -212,7 +218,7 @@ void __init __sp804_clockevents_init(void __iomem *base, unsigned int irq, struc
+ 	writel(0, base + TIMER_CTRL);
+ 
+ 	setup_irq(irq, &sp804_timer_irq);
+-	clockevents_config_and_register(evt, rate, 0xf, 0xffffffff);
++	clockevents_config_and_register(evt, rate, 0xf, GENMASK(width-1, 0));
+ }
+ 
+ static void __init sp804_of_init(struct device_node *np)
+@@ -223,6 +229,7 @@ static void __init sp804_of_init(struct device_node *np)
+ 	u32 irq_num = 0;
+ 	struct clk *clk1, *clk2;
+ 	const char *name = of_get_property(np, "compatible", NULL);
++	u32 width = 32;
+ 
+ 	base = of_iomap(np, 0);
+ 	if (WARN_ON(!base))
+@@ -254,14 +261,19 @@ static void __init sp804_of_init(struct device_node *np)
+ 	if (irq <= 0)
+ 		goto err;
+ 
++	if (of_device_is_compatible(np, "oxsemi,ox810se-rps-timer"))
++		width = 24;
++
+ 	of_property_read_u32(np, "arm,sp804-has-irq", &irq_num);
+ 	if (irq_num == 2) {
+-		__sp804_clockevents_init(base + TIMER_2_BASE, irq, clk2, name);
+-		__sp804_clocksource_and_sched_clock_init(base, name, clk1, 1);
++		__sp804_clockevents_init(base + TIMER_2_BASE, irq,
++					 clk2, name, width);
++		__sp804_clocksource_and_sched_clock_init(base, name,
++							 clk1, 1, width);
+ 	} else {
+-		__sp804_clockevents_init(base, irq, clk1 , name);
++		__sp804_clockevents_init(base, irq, clk1, name, width);
+ 		__sp804_clocksource_and_sched_clock_init(base + TIMER_2_BASE,
+-							 name, clk2, 1);
++							 name, clk2, 1, width);
+ 	}
+ 	initialized = true;
+ 
+@@ -270,6 +282,7 @@ err:
+ 	iounmap(base);
+ }
+ CLOCKSOURCE_OF_DECLARE(sp804, "arm,sp804", sp804_of_init);
++CLOCKSOURCE_OF_DECLARE(ox810se, "oxsemi,ox810se-rps-timer", sp804_of_init);
+ 
+ static void __init integrator_cp_of_init(struct device_node *np)
+ {
+@@ -293,13 +306,14 @@ static void __init integrator_cp_of_init(struct device_node *np)
+ 		goto err;
+ 
+ 	if (!init_count)
+-		__sp804_clocksource_and_sched_clock_init(base, name, clk, 0);
++		__sp804_clocksource_and_sched_clock_init(base, name,
++							 clk, 0, 32);
+ 	else {
+ 		irq = irq_of_parse_and_map(np, 0);
+ 		if (irq <= 0)
+ 			goto err;
+ 
+-		__sp804_clockevents_init(base, irq, clk, name);
++		__sp804_clockevents_init(base, irq, clk, name, 32);
+ 	}
+ 
+ 	init_count++;
+diff --git a/include/clocksource/timer-sp804.h b/include/clocksource/timer-sp804.h
+index 1f8a1ca..893d730 100644
+--- a/include/clocksource/timer-sp804.h
++++ b/include/clocksource/timer-sp804.h
+@@ -4,25 +4,26 @@
+ struct clk;
+ 
+ void __sp804_clocksource_and_sched_clock_init(void __iomem *,
+-					      const char *, struct clk *, int);
++					      const char *, struct clk *,
++					      int, unsigned int);
+ void __sp804_clockevents_init(void __iomem *, unsigned int,
+-			      struct clk *, const char *);
++			      struct clk *, const char *, unsigned int);
+ void sp804_timer_disable(void __iomem *);
+ 
+ static inline void sp804_clocksource_init(void __iomem *base, const char *name)
+ {
+-	__sp804_clocksource_and_sched_clock_init(base, name, NULL, 0);
++	__sp804_clocksource_and_sched_clock_init(base, name, NULL, 0, 32);
+ }
+ 
+ static inline void sp804_clocksource_and_sched_clock_init(void __iomem *base,
+ 							  const char *name)
+ {
+-	__sp804_clocksource_and_sched_clock_init(base, name, NULL, 1);
++	__sp804_clocksource_and_sched_clock_init(base, name, NULL, 1, 32);
+ }
+ 
+ static inline void sp804_clockevents_init(void __iomem *base, unsigned int irq, const char *name)
+ {
+-	__sp804_clockevents_init(base, irq, NULL, name);
++	__sp804_clockevents_init(base, irq, NULL, name, 32);
+ 
+ }
  #endif
 -- 
 1.9.1
