@@ -1,33 +1,225 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 24 Mar 2016 11:05:13 -0700
-Subject: [PATCH v2 2/4] Documentation: devicetree: amlogic: Document P20x and
- ODROID-C2 boards
+Date: Thu, 24 Mar 2016 11:05:15 -0700
+Subject: [PATCH v2 4/4] ARM64: dts: amlogic: Add P200/P201 boards
 In-Reply-To: <1458842715-27066-1-git-send-email-khilman@baylibre.com>
 References: <1458842715-27066-1-git-send-email-khilman@baylibre.com>
-Message-ID: <1458842715-27066-3-git-send-email-khilman@baylibre.com>
+Message-ID: <1458842715-27066-5-git-send-email-khilman@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add compatible strings for Amlogic S905/GXBB based boards: Hardkernel
-ODROID-C2, Amlogic P200 and Amlogic P201.
+Add minimal DT files for the Amlogic P20x development boards, based on
+the Amlogic S905/GXBB SoC.
 
-Cc: devicetree at vger.kernel.org
-Reviewed-by: Andreas F?rber <afaerber@suse.de>
+Cc: Andreas F?rber <afaerber@suse.de>
+Cc: Carlo Caione <carlo@endlessm.com>
 Signed-off-by: Kevin Hilman <khilman@baylibre.com>
 ---
- Documentation/devicetree/bindings/arm/amlogic.txt | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm64/boot/dts/amlogic/Makefile             |  2 +
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts  | 52 +++++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts  | 52 +++++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi | 65 ++++++++++++++++++++++++
+ 4 files changed, 171 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
 
-diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
-index 8a5122ab19b0..fcc6f6c10803 100644
---- a/Documentation/devicetree/bindings/arm/amlogic.txt
-+++ b/Documentation/devicetree/bindings/arm/amlogic.txt
-@@ -25,3 +25,6 @@ Board compatible values:
-   - "tronsmart,vega-s95-pro", "tronsmart,vega-s95" (Meson gxbb)
-   - "tronsmart,vega-s95-meta", "tronsmart,vega-s95" (Meson gxbb)
-   - "tronsmart,vega-s95-telos", "tronsmart,vega-s95" (Meson gxbb)
-+  - "hardkernel,odroid-c2" (Meson gxbb)
-+  - "amlogic,p200" (Meson gxbb)
-+  - "amlogic,p201" (Meson gxbb)
+diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
+index a595752459e8..47ec703cb230 100644
+--- a/arch/arm64/boot/dts/amlogic/Makefile
++++ b/arch/arm64/boot/dts/amlogic/Makefile
+@@ -1,4 +1,6 @@
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-odroidc2.dtb
++dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-p200.dtb
++dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-p201.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-vega-s95-pro.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-vega-s95-meta.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-vega-s95-telos.dtb
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
+new file mode 100644
+index 000000000000..62979076e250
+--- /dev/null
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
+@@ -0,0 +1,52 @@
++/*
++ * Copyright (c) 2016 Andreas F?rber
++ * Copyright (c) 2016 BayLibre, Inc.
++ * Author: Kevin Hilman <khilman@kernel.org>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++#include "meson-gxbb-p20x.dtsi"
++
++/ {
++	compatible = "amlogic,p200", "amlogic,meson-gxbb";
++	model = "Amlogic Meson GXBB P200 Development Board";
++};
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts
+new file mode 100644
+index 000000000000..39bb037a3e47
+--- /dev/null
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts
+@@ -0,0 +1,52 @@
++/*
++ * Copyright (c) 2016 Andreas F?rber
++ * Copyright (c) 2016 BayLibre, Inc.
++ * Author: Kevin Hilman <khilman@kernel.org>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++#include "meson-gxbb-p20x.dtsi"
++
++/ {
++	compatible = "amlogic,p201", "amlogic,meson-gxbb";
++	model = "Amlogic Meson GXBB P201 Development Board";
++};
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+new file mode 100644
+index 000000000000..bf7ff1d41851
+--- /dev/null
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+@@ -0,0 +1,65 @@
++/*
++ * Copyright (c) 2016 Andreas F?rber
++ * Copyright (c) 2016 BayLibre, Inc.
++ * Author: Kevin Hilman <khilman@kernel.org>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include "meson-gxbb.dtsi"
++
++/ {
++	aliases {
++		serial0 = &uart_AO;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	memory at 0 {
++		device_type = "memory";
++		reg = <0x0 0x0 0x0 0x40000000>;
++	};
++};
++
++/* This UART is brought out to the DB9 connector */
++&uart_AO {
++	status = "okay";
++};
 -- 
 2.7.4
