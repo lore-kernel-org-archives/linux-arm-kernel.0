@@ -1,43 +1,50 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 24 Mar 2016 14:01:33 +0100
-Subject: [PATCH v14 0/17] Add Analogix Core Display Port Driver
-In-Reply-To: <1455534485-1154-1-git-send-email-ykk@rock-chips.com>
-References: <1455534485-1154-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <14744174.gBEQWZv0K7@diego>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Thu, 24 Mar 2016 14:16:16 +0100
+Subject: [PATCH v6 0/5] ACPI: parse the SPCR table
+In-Reply-To: <1458823925-19560-1-git-send-email-aleksey.makarov@linaro.org>
+References: <1458823925-19560-1-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <CAJZ5v0gzjtFzig7nEumr83+J2dGb+OA8GNR2i45ZqznfV_hA-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 15. Februar 2016, 19:08:05 schrieb Yakir Yang:
-> Hi all,
-> 
->   The Samsung Exynos eDP controller and Rockchip RK3288 eDP controller
-> share the same IP, so a lot of parts can be re-used. I split the common
-> code into bridge directory, then rk3288 and exynos only need to keep
-> some platform code. Cause I can't find the exact IP name of exynos dp
-> controller, so I decide to name dp core driver with "analogix" which I
-> find in rk3288 eDP TRM
-> 
-> But there are still three light registers setting different between
-> exynos and rk3288.
-> 1. RK3288 have five special pll registers which not indicate in exynos
->    dp controller.
-> 2. The address of DP_PHY_PD(dp phy power manager register) are different
->    between rk3288 and exynos.
-> 3. Rk3288 and exynos have different setting with AUX_HW_RETRY_CTL(dp debug
->    register).
-> 
-> Due to Mark Yao have introduced the ATOMIC support to Rockchip drm, so it's
-> okay to use the ATOMIC helpers functions in connector_funcs. No need to
-> splict the connector init to platform driver anymore, and this is the
-> biggest change since version 11.
-> 
-> This v14 didn't have lots of new changes which seems not the correct time to
-> upgrade the version number, but I have changed ordering of patches (adding
-> 2 more, and removing 2 out). Especially to prevent confusing people, so I
-> updated the whole series.
+On Thu, Mar 24, 2016 at 1:51 PM, Aleksey Makarov
+<aleksey.makarov@linaro.org> wrote:
+> 'ARM Server Base Boot Requirements' [1] mentions SPCR (Serial Port
+> Console Redirection Table) [2] as a mandatory ACPI table that
+> specifies the configuration of serial console.
+>
+> Move "earlycon" early_param handling to earlycon.c to parse this option once
+>
+> Patch "ACPI: add definitions of DBG2 subtypes" is required for the next patch.
+> ACPI maintainers said that they had got it for the next release of ACPICA,
+> but it has not appeared in linux-next yet.
 
-I guess I never said that explicitly, but of course I have tested this 
-numerous times, so
+It will.  Patches containing it have just been posted.
 
-This series
-Tested-by: Heiko Stuebner <heiko@sntech.de>
+> Parse SPCR table, setup earlycon and add register specified console.
+>
+> Enable parsing this table on ARM64.  Earlycon should be set up
+> as early as possible.  ACPI boot tables are mapped in
+> arch/arm64/kernel/acpi.c:acpi_boot_table_init() called from setup_arch()
+> and that's where we parse spcr.  So it has to be opted-in per-arch.
+>
+> Implement console_match() for pl011.
+>
+> Based on the work by Leif Lindholm [3]
+> Thanks to Peter Hurley for explaining how this should work.
+>
+> Should be applied to next-20160324.
+>
+> Tested on QEMU.  SPCR support is included in QEMU's ARM mach-virt
+> since 2.4 release.
+
+Honestly, I'm not sure why I'm regarded as the right maintainer to send this to.
+
+The only patch here touching generic ACPI code is [3/5] (the [2/5] is
+going in through ACPICA) and the rest is all about ARM64 AFAICS.  Why
+don't you send it to the ARM64 maintainers instead?
+
+I'll have some comments on [3/5], I'll send them later today or tomorrow.
+
+Thanks,
+Rafael
