@@ -1,68 +1,37 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 24 Mar 2016 21:18:53 +0800
-Subject: [PATCH 0/2] arm64: cpuidle: make arm_cpuidle_suspend() more
- efficient
-In-Reply-To: <20160324111507.GB9323@arm.com>
-References: <1458796130-6109-1-git-send-email-jszhang@marvell.com>
- <20160324111507.GB9323@arm.com>
-Message-ID: <20160324211853.1ffebd49@xhacker>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Thu, 24 Mar 2016 14:24:20 +0100
+Subject: [PATCH v2 1/6] serial: imx: fix polarity of RI
+In-Reply-To: <1458825865-7434-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1458825865-7434-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1458825865-7434-2-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+When in DTE mode, the bit USR2_RIIN is active low. So invert the logic
+accordingly.
 
-On Thu, 24 Mar 2016 11:15:07 +0000 Will Deacon wrote:
+Fixes: 90ebc4838666 ("serial: imx: repair and complete handshaking")
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ drivers/tty/serial/imx.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-> On Thu, Mar 24, 2016 at 01:08:48PM +0800, Jisheng Zhang wrote:
-> > This series is to improve the arm_cpuidle_suspend() a bit by removing/moving
-> > out checks from this hot path.
-> > 
-> > Jisheng Zhang (2):
-> >   arm64: cpuidle: remove cpu_ops check from arm_cpuidle_suspend()
-> >   arm64: cpuidle: make arm_cpuidle_suspend() a bit more efficient
-> > 
-> >  arch/arm64/kernel/cpuidle.c | 9 ++-------
-> >  1 file changed, 2 insertions(+), 7 deletions(-)  
-> 
-> These look fine to me, but do you have any rough numbers showing what
-> sort of improvement we get from this change?
-
-Good question. Here it is:
-
-I measured the 4096 * time from arm_cpuidle_suspend entry point to the
-cpu_psci_cpu_suspend entry point. HW platform is Marvell BG4CT STB board.
-
-1. only one shell, no other process, hot-unplug secondary cpus, execute the
-following cmd
-
-while true
-do
-	sleep 0.2
-done
-
-before the patch: 1581220ns
-
-after the patch: 1579630ns
-
-reduced by 0.1%
-
-2. only one shell, no other process, hot-unplug secondary cpus, execute the
-following cmd
-
-while true
-do
-	md5sum /tmp/testfile
-	sleep 0.2
-done
-
-NOTE the testfile size should be larger than L1+L2 cache size
-
-before the patch: 1961960ns
-after the patch: 1912500ns
-
-reduced by 2.5%
-
-So the more complex the system load, the bigger the improvement.
-
-Thanks,
-Jisheng
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index 231e7d5caf6c..bfc4555c63d1 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -797,9 +797,9 @@ static unsigned int imx_get_hwmctrl(struct imx_port *sport)
+ 	if (!(usr1 & USR2_DCDIN))
+ 		tmp |= TIOCM_CAR;
+ 
+-	/* in DCE mode RIIN is always 0 */
+-	if (readl(sport->port.membase + USR2) & USR2_RIIN)
+-		tmp |= TIOCM_RI;
++	if (sport->dte_mode)
++		if (!(readl(sport->port.membase + USR2) & USR2_RIIN))
++			tmp |= TIOCM_RI;
+ 
+ 	return tmp;
+ }
+-- 
+2.7.0
