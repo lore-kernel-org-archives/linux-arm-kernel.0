@@ -1,108 +1,149 @@
-From: sr@denx.de (Stefan Roese)
-Date: Thu, 24 Mar 2016 08:22:36 +0100
-Subject: [PATCH v2] spi: orion.c: Add direct access mode
-In-Reply-To: <12458203.7DzKuGjIvi@wuerfel>
-References: <1458663893-13766-1-git-send-email-sr@denx.de>
- <20160323133612.GO2566@sirena.org.uk> <20160323135606.GE19953@lunn.ch>
- <12458203.7DzKuGjIvi@wuerfel>
-Message-ID: <56F395BC.6070108@denx.de>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Thu, 24 Mar 2016 15:27:55 +0800
+Subject: [PATCH v6 1/4] dt-bindings: power: reset: add document for
+ reboot-mode driver
+In-Reply-To: <CAJKOXPdUW5f6_sz14NMU8LP+QoKStB9omXticMkQX4D866okWw@mail.gmail.com>
+References: <1458646525-491-1-git-send-email-andy.yan@rock-chips.com>
+ <1458646592-540-1-git-send-email-andy.yan@rock-chips.com>
+ <CAJKOXPdUW5f6_sz14NMU8LP+QoKStB9omXticMkQX4D866okWw@mail.gmail.com>
+Message-ID: <56F396FB.8030402@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.03.2016 20:51, Arnd Bergmann wrote:
-> On Wednesday 23 March 2016 14:56:06 Andrew Lunn wrote:
->> On Wed, Mar 23, 2016 at 01:36:12PM +0000, Mark Brown wrote:
->>> On Wed, Mar 23, 2016 at 02:26:37PM +0100, Andrew Lunn wrote:
->>>
->>>> The number of windows is limited. On i think the Armada XP, if you put
->>>> a PCIe device on every available PCIe bus, you can run out of
->>>> windows. This is why Thomas implemented dynamic allocation of the
->>>> Windows, so that only those that are needed are used.
->>>
->>>> So i would not statically and globally allocate as many windows as
->>>> possible SPI devices.
->>>
->>>> The fact that SPI can fall back to another mechanism if there are no
->>>> available windows, were as PCIe cannot, suggests that SPI should
->>>> dynamically allocate a window, and be prepared for it to fail.
->>>
->>>> Since only one SPI device can be active at once on a SPI bus, one
->>>> window per bus makes sense, and keeps the required number of windows
->>>> to a minimum.
->>>
->>> If we're under pressure for windows I'd go further and say that we
->>> should be dynamically allocating the windows only when they're actually
->>> in use (and modifying other drivers to do the same if that makes sense
->>> for them), unless it's somehow expensive to allocate windows that means
->>> that we should reduce the overall pressure.
+Hi Krzysztof:
+
+On 2016?03?24? 10:27, Krzysztof Kozlowski wrote:
+> Interesting idea. While looking at the code I stumped over few things below:
+>
+> On Tue, Mar 22, 2016 at 8:36 PM, Andy Yan <andy.yan@rock-chips.com> wrote:
+>> add device tree bindings document for reboot-mode driver
+> s/add/Add/
+> Plus a full-stop at the end of sentence.
+     okay, I will do it in next version.
+>> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+>> Acked-by: Rob Herring <robh@kernel.org>
 >>
->> Hi Mark
+>> binding
+> What is that?
+
+     This will be removed
+>
+>> ---
 >>
->> We are only under pressure in the extremes, i.e 10 PCIe busses in
->> use. Only allocating PCIe Windows when needed means in practice, we
->> have not had issues. We need to be mindful, and don't waste them, but
->> we don't need to consider them a scarce resource.
+>> Changes in v6:
+>> - fix a typo with "property"
+>> - describe property "mask" more clear
 >>
->> I don't see it being an issue for the SPI driver to allocate one on
->> probe and keeping it until release. I probably would object to it
->> allocating one per chip select line.
-> 
-> I agree. We had a very long debate about this when we first added
-> the support for MBus, and not much has changed. As far as I'm concerned,
-> this is where we're at:
-> 
-> The binding defines a reasonable set of default settings for each
-> device that uses MBus, and the OS can use them, or define its own.
-> Coming up with an algorithm to do this right however is very hard
-> and not really worth it, as defining the defaults works well enough.
-> 
-> Ideally we'd let the boot loader set up the windows statically and
-> have the DT describe what they are, but unfortunately that is not
-> what boot loaders in the field do.
-> 
-> The method that was picked for MBus is similar to how we typically
-> handle PCI host bridges that have the same problem: you can set up
-> translation windows between CPU addresses and the various PCI
-> address spaces (I/O, mem, prefetchable, config, ...) in all sorts
-> of ways, with various tradeoffs, but instead we just pick a
-> reasonable default and describe it in the DT, because the kernel
-> has no good generic way of picking a particular setting over another.
+>> Changes in v5:
+>> - delete a unnecessary blank line in syscon-reboot-mode.txt
+>> - rename mode-fastoboot to mode-bootloader in syscon-reboot-mode.txt
+>> - rename macro BOOT_LOADER to BOOT_BL_DOWNLOAD, which gives a more clear mean
+>>
+>> Changes in v4:
+>> - remove mode-maskrom
+>> - rename mode-fastboot to mode-bootloader to keep compatible with the exiting Android device
+>>
+>> Changes in v3:
+>> - descirbe all reboot mode as properity instead of subnode
+>>
+>> Changes in v2: None
+>> Changes in v1: None
+>>
+>>   .../bindings/power/reset/reboot-mode.txt           | 24 +++++++++++++++
+>>   .../bindings/power/reset/syscon-reboot-mode.txt    | 35 ++++++++++++++++++++++
+>>   2 files changed, 59 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/power/reset/reboot-mode.txt
+>>   create mode 100644 Documentation/devicetree/bindings/power/reset/syscon-reboot-mode.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/power/reset/reboot-mode.txt b/Documentation/devicetree/bindings/power/reset/reboot-mode.txt
+>> new file mode 100644
+>> index 0000000..3457949
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/power/reset/reboot-mode.txt
+>> @@ -0,0 +1,24 @@
+>> +Generic reboot mode core map driver
+>> +
+>> +This driver get reboot mode arguments and call the write
+>> +interface to stores the magic value in special register
+> s/stores/store/
+>> +or ram . Then the bootloader can read it and take different
+> s/ram ./ram./
+>
+>> +action according the argument stored.
+> according to
+>
+>> +
+>> +All mode properties are vendor specific, it is a indication to tell
+>> +the bootloder what to do when the system reboot, and should be named
+> s/bootloder/bootloader/
+> s/reboot/reboots/
+>
+>> +as mode-xxx = <magic> (xxx is mode name).
+>> +
+> These are examples? If yes then add a note, like:
+>
+> +For example modes common on Android platform:
 
-Arnd, thanks for your comments.
+     Thanks for your carefully review, all these will be fixed in next 
+version.
+>> +- mode-normal: Normal reboot mode, system reboot with command "reboot".
+>> +- mode-recovery: Android Recovery mode, it is a mode to format the device or update a new image.
+>> +- mode-bootloader: Android fastboot mode, it's a mode to re-flash partitions on the Android based device.
+>> +- mode-loader: A bootloader mode, it's a mode used to download image on Rockchip platform,
+>> +              usually used in development.
+> The "bootloader" and "loader" examples are very confusing. Maybe just
+> name the first one as "mode-fastboot" and second as
+> "rockchip-download"? The term "loader" does not look for me as
+> anything related to uploading/downloading new firmware.
 
-So we seem to agree, that one MBus window per SPI controller is the
-way to go. Only how should this be described in the DT? I've come up
-with these new DT properties in v2:
+     About these two modes, we have a long discussion with Rob and John [0]
+     We keep them as what you see now to keep compatibility with exiting 
+devices.
 
-+- da-reg : The physical memory area that will be used for the direct
-+           access mode, if enabled in one of the SPI devices.
-+
-+Per SPI device:
-+- da-target-attribute : The target and attribute value for a specific
-+                        SPI-controller / SPI-device combination.
-+			E.g. <0x01 0x5e>: SPI0-CS1 target and attribute
-
-...
-
-+Example with direct access mode:
-+	spi at 10600 {
-+		compatible = "marvell,orion-spi";
-+		status = "okay";
-+		da-reg = <0xf2000000 0x100000>;
-+
-+		spi-fpga at 1 {
-+			compatible = "altera,stratix-v";
-+			reg = <1>;
-+			/* 0x01 0x5e: SPI0-CS1 target and attribute */
-+			da-target-attribute = <0x01 0x5e>;
-+		};
-+	};
-
-I've added the "da-*" (Direct Access) properties to enable the
-SPI driver to dynamically allocate the MBus windows. Do you find
-these new bindings reasonable? Or do you have better suggestions for
-this per-SPI-device dynamic MBus allocation, perhaps by using
-MBUS_ID somehow?
-
-Thanks,
-Stefan
+  [0] https://lkml.org/lkml/2016/2/2/128
+>
+>> +
+>> +Example:
+>> +       reboot-mode {
+>> +               mode-normal = <BOOT_NORMAL>;
+>> +               mode-recovery = <BOOT_RECOVERY>;
+>> +               mode-bootloader = <BOOT_FASTBOOT>;
+>> +               mode-loader = <BOOT_BL_DOWNLOAD>;
+>> +       }
+>> diff --git a/Documentation/devicetree/bindings/power/reset/syscon-reboot-mode.txt b/Documentation/devicetree/bindings/power/reset/syscon-reboot-mode.txt
+>> new file mode 100644
+>> index 0000000..eb28469
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/power/reset/syscon-reboot-mode.txt
+>> @@ -0,0 +1,35 @@
+>> +SYSCON reboot mode driver
+>> +
+>> +This driver get reboot mode magic value form reboot-mode driver
+> s/get/gets/
+>
+>> +and stores it in a SYSCON mapped register. Then the bootloader
+>> +can read it and take different action according to the magic
+>> +value stored.
+>> +
+>> +This DT node should be represented as a sub-node of a "syscon", "simple-mfd"
+>> +node.
+>> +
+>> +Required properties:
+>> +- compatible: should be "syscon-reboot-mode"
+>> +- offset: offset in the register map for the storage register (in bytes)
+>> +
+>> +Optional property:
+>> +- mask: bits mask of the bits in the register to store the reboot mode magic value,
+>> +  default set to 0xffffffff if missing.
+>> +
+>> +The rest of the properties should follow the generic reboot-mode discription
+> s/discription/description/
+>
+> Please, run the spell check...
+>
+> Best regards,
+> Krzysztof
+>
+>
+>
+>
