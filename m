@@ -1,35 +1,25 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Thu, 24 Mar 2016 19:19:53 +0100
-Subject: [PATCH v2 4/4] ARM64: dts: amlogic: Add P200/P201 boards
-In-Reply-To: <1458842715-27066-5-git-send-email-khilman@baylibre.com>
-References: <1458842715-27066-1-git-send-email-khilman@baylibre.com>
- <1458842715-27066-5-git-send-email-khilman@baylibre.com>
-Message-ID: <56F42FC9.1000905@suse.de>
+From: Tirumalesh.Chalamarla@caviumnetworks.com (Chalamarla, Tirumalesh)
+Date: Thu, 24 Mar 2016 18:29:01 +0000
+Subject: [PATCH V4] iommu/arm-smmu-v2: Workaround for ThunderX errata#27704
+In-Reply-To: <20160324175127.GA29365@arm.com>
+References: <1457128569-13878-1-git-send-email-tchalamarla@caviumnetworks.com>
+ <44D97D2C-5114-4FCD-AE3E-9404391FD449@caviumnetworks.com>
+ <20160324175127.GA29365@arm.com>
+Message-ID: <4F6594C9-35E6-415B-B022-D78827C659C0@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 24.03.2016 um 19:05 schrieb Kevin Hilman:
-> Add minimal DT files for the Amlogic P20x development boards, based on
-> the Amlogic S905/GXBB SoC.
-> 
-> Cc: Andreas F?rber <afaerber@suse.de>
-> Cc: Carlo Caione <carlo@endlessm.com>
-> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
-> ---
->  arch/arm64/boot/dts/amlogic/Makefile             |  2 +
->  arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts  | 52 +++++++++++++++++++
->  arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts  | 52 +++++++++++++++++++
->  arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi | 65 ++++++++++++++++++++++++
->  4 files changed, 171 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
->  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts
->  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+Thanks. 
 
-Reviewed-by: Andreas F?rber <afaerber@suse.de>
 
-Thanks,
-Andreas
 
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton; HRB 21284 (AG N?rnberg)
+
+On 3/24/16, 10:51 AM, "Will Deacon" <will.deacon@arm.com> wrote:
+
+>On Thu, Mar 24, 2016 at 05:36:39PM +0000, Chalamarla, Tirumalesh wrote:
+>> Do you want me to resend it with path version number change?
+>
+>Shouldn't be any need. I've queued this locally, and will push out when
+>I update my repo after the merge window.
+>
+>Will
