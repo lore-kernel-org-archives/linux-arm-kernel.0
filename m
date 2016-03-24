@@ -1,84 +1,82 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 24 Mar 2016 13:25:28 +0900
-Subject: [PATCH v5 19/21] ARM: dts: Add support of bus frequency using VDD_INT
- for exynos3250-rinato
+Date: Thu, 24 Mar 2016 13:25:18 +0900
+Subject: [PATCH v5 09/21] PM / devfreq: exynos: Add the detailed correlation
+ between sub-blocks and power line
 In-Reply-To: <1458793530-31897-1-git-send-email-cw00.choi@samsung.com>
 References: <1458793530-31897-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1458793530-31897-20-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1458793530-31897-10-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the bus device-tree nodes of INT (internal) block
-to enable the bus frequency scaling. The following sub-blocks share
-the VDD_INT power source:
-- LEFTBUS (parent device)
-- RIGHTBUS
-- PERIL
-- LCD0
-- FSYS
-- MCUISP / ISP
-- MFC
-
-The LEFTBUS is parent device with devfreq ondemand governor
-and the rest of devices depend on the LEFTBUS device.
+This patch adds the detailed corrleation between sub-blocks and power line
+for Exynos3250, Exynos4210 and Exynos4x12.
 
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- arch/arm/boot/dts/exynos3250-rinato.dts | 41 +++++++++++++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
+ .../devicetree/bindings/devfreq/exynos-bus.txt     | 51 ++++++++++++++++++++++
+ 1 file changed, 51 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
-index 9710e79e10a0..09444897b416 100644
---- a/arch/arm/boot/dts/exynos3250-rinato.dts
-+++ b/arch/arm/boot/dts/exynos3250-rinato.dts
-@@ -154,6 +154,47 @@
- 	status = "okay";
- };
+diff --git a/Documentation/devicetree/bindings/devfreq/exynos-bus.txt b/Documentation/devicetree/bindings/devfreq/exynos-bus.txt
+index 03f13d38f1a1..b098fa2ba5d4 100644
+--- a/Documentation/devicetree/bindings/devfreq/exynos-bus.txt
++++ b/Documentation/devicetree/bindings/devfreq/exynos-bus.txt
+@@ -53,6 +53,57 @@ Optional properties only for parent bus device:
+ - exynos,voltage-tolerance: the percentage value for bus voltage tolerance
+ 			which is used to calculate the max voltage.
  
-+&bus_leftbus {
-+	devfreq-events = <&ppmu_leftbus_3>, <&ppmu_rightbus_3>;
-+	vdd-supply = <&buck3_reg>;
-+	status = "okay";
-+};
++Detailed correlation between sub-blocks and power line according to Exynos SoC:
++- In case of Exynos3250, there are two power line as following:
++	VDD_MIF |--- DMC
 +
-+&bus_rightbus {
-+	devfreq = <&bus_leftbus>;
-+	status = "okay";
-+};
++	VDD_INT |--- LEFTBUS (parent device)
++		|--- PERIL
++		|--- MFC
++		|--- G3D
++		|--- RIGHTBUS
++		|--- PERIR
++		|--- FSYS
++		|--- LCD0
++		|--- PERIR
++		|--- ISP
++		|--- CAM
 +
-+&bus_lcd0 {
-+	devfreq = <&bus_leftbus>;
-+	status = "okay";
-+};
++- In case of Exynos4210, there is one power line as following:
++	VDD_INT |--- DMC (parent device)
++		|--- LEFTBUS
++		|--- PERIL
++		|--- MFC(L)
++		|--- G3D
++		|--- TV
++		|--- LCD0
++		|--- RIGHTBUS
++		|--- PERIR
++		|--- MFC(R)
++		|--- CAM
++		|--- FSYS
++		|--- GPS
++		|--- LCD0
++		|--- LCD1
 +
-+&bus_fsys {
-+	devfreq = <&bus_leftbus>;
-+	status = "okay";
-+};
++- In case of Exynos4x12, there are two power line as following:
++	VDD_MIF |--- DMC
 +
-+&bus_mcuisp {
-+	devfreq = <&bus_leftbus>;
-+	status = "okay";
-+};
++	VDD_INT |--- LEFTBUS (parent device)
++		|--- PERIL
++		|--- MFC(L)
++		|--- G3D
++		|--- TV
++		|--- IMAGE
++		|--- RIGHTBUS
++		|--- PERIR
++		|--- MFC(R)
++		|--- CAM
++		|--- FSYS
++		|--- GPS
++		|--- LCD0
++		|--- ISP
 +
-+&bus_isp {
-+	devfreq = <&bus_leftbus>;
-+	status = "okay";
-+};
-+
-+&bus_peril {
-+	devfreq = <&bus_leftbus>;
-+	status = "okay";
-+};
-+
-+&bus_mfc {
-+	devfreq = <&bus_leftbus>;
-+	status = "okay";
-+};
-+
- &cpu0 {
- 	cpu0-supply = <&buck2_reg>;
- };
+ Example1:
+ 	Show the AXI buses of Exynos3250 SoC. Exynos3250 divides the buses to
+ 	power line (regulator). The MIF (Memory Interface) AXI bus is used to
 -- 
 1.9.1
