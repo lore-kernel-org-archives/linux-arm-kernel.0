@@ -1,34 +1,109 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 24 Mar 2016 11:05:11 -0700
-Subject: [PATCH v2 0/4] ARM64: dts: amlogi: add a few more boards
-Message-ID: <1458842715-27066-1-git-send-email-khilman@baylibre.com>
+Date: Thu, 24 Mar 2016 11:05:14 -0700
+Subject: [PATCH v2 3/4] ARM64: dts: amlogic: add Hardkernel ODROID-C2
+In-Reply-To: <1458842715-27066-1-git-send-email-khilman@baylibre.com>
+References: <1458842715-27066-1-git-send-email-khilman@baylibre.com>
+Message-ID: <1458842715-27066-4-git-send-email-khilman@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for a few more Amlogic S905/GXBB based boards: Hardkernel
-ODROID-C2 and Amlogic P200/P201 boards.
+Add minimal DT files for the Hardkernel ODROID-C2 board based on the
+Amlogic S905/GXBB SoC.
 
-Series was boot tested on P200 and odroid-c2, on top of next-20160321.
+Used the other gxbb boards from Andreas F?rber as a starting point.
 
-Kevin Hilman (4):
-  ARM64: dts: amlogic: update serial aliases
-  Documentation: devicetree: amlogic: Document P20x and ODROID-C2 boards
-  ARM64: dts: amlogic: add Hardkernel ODROID-C2
-  ARM64: dts: amlogic: Add P200/P201 boards
-
- Documentation/devicetree/bindings/arm/amlogic.txt  |  3 +
- arch/arm64/boot/dts/amlogic/Makefile               |  3 +
+Cc: Andreas F?rber <afaerber@suse.de>
+Cc: Carlo Caione <carlo@endlessm.com>
+Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+---
+ arch/arm64/boot/dts/amlogic/Makefile               |  1 +
  .../arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 69 ++++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts    | 52 ++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts    | 52 ++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi   | 65 ++++++++++++++++++++
- .../boot/dts/amlogic/meson-gxbb-vega-s95.dtsi      |  4 ++
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |  5 --
- 8 files changed, 248 insertions(+), 5 deletions(-)
+ 2 files changed, 70 insertions(+)
  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
 
+diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
+index eb672f38f89e..a595752459e8 100644
+--- a/arch/arm64/boot/dts/amlogic/Makefile
++++ b/arch/arm64/boot/dts/amlogic/Makefile
+@@ -1,3 +1,4 @@
++dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-odroidc2.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-vega-s95-pro.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-vega-s95-meta.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-vega-s95-telos.dtb
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+new file mode 100644
+index 000000000000..7f2c6747a71e
+--- /dev/null
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+@@ -0,0 +1,69 @@
++/*
++ * Copyright (c) 2016 Andreas F?rber
++ * Copyright (c) 2016 BayLibre, Inc.
++ * Author: Kevin Hilman <khilman@kernel.org>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++#include "meson-gxbb.dtsi"
++
++/ {
++	compatible = "hardkernel,odroid-c2", "amlogic,meson-gxbb";
++	model = "Hardkernel ODROID-C2";
++	
++	aliases {
++		serial0 = &uart_AO;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	memory at 0 {
++		device_type = "memory";
++		reg = <0x0 0x0 0x0 0x80000000>;
++	};
++};
++
++&uart_AO {
++	status = "okay";
++};
 -- 
 2.7.4
