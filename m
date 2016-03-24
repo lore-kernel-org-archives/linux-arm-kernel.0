@@ -1,23 +1,27 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 24 Mar 2016 08:54:05 +0100
-Subject: [PATCH] ARM: dts: sun8i: Add dts for Orange Pi 2 SBC
-In-Reply-To: <1458728225-6922-1-git-send-email-hdegoede@redhat.com>
-References: <1458728225-6922-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20160324075405.GS30977@lukather>
+Date: Thu, 24 Mar 2016 08:55:26 +0100
+Subject: [PATCH 1/1] ARM: dts: sun5i-a13-olinuxino-micro: enable USB DRC
+In-Reply-To: <1458750528-13180-1-git-send-email-jmfriedt@femto-st.fr>
+References: <1458750528-13180-1-git-send-email-jmfriedt@femto-st.fr>
+Message-ID: <20160324075526.GT30977@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 23, 2016 at 11:17:05AM +0100, Hans de Goede wrote:
-> The Orange Pi 2 is a SBC based on the Allwinner H3 SoC with a uSD slot,
-> 4 USB ports connected via a USB-2 hub, a 10/100M ethernet port using the
-> SoC's integrated PHY, Wifi via a RTL8189ETV sdio wifi chip, USB OTG, HDMI,
-> a TRRS headphone jack for stereo out and composite out, a microphone,
-> an IR receiver, a CSI connector, 2 LEDs, a 3 pin UART header
-> and a 40-pin GPIO header.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Hi,
 
-Applied, thanks!
+On Wed, Mar 23, 2016 at 05:28:48PM +0100, Jean-Michel Friedt wrote:
+> From: JM Friedt <jmfriedt@femto-st.fr>
+> 
+> Enable the OTG controller on the Olinuxino A13-micro. 
+> 
+> Signed-off-by: JM Friedt <jmfriedt@femto-st.fr>
+
+Thanks a lot for your patch.
+
+It looks fine, but you need to have your whole first name here in the
+SoB.
+
+Thanks!
 Maxime
 
 -- 
@@ -30,4 +34,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160324/e9241c59/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160324/f323288c/attachment.sig>
