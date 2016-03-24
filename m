@@ -1,26 +1,35 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 24 Mar 2016 16:07:20 -0500
-Subject: [PATCH v6 1/5] of/serial: move earlycon early_param handling to
- serial
-In-Reply-To: <1458823925-19560-2-git-send-email-aleksey.makarov@linaro.org>
-References: <1458823925-19560-1-git-send-email-aleksey.makarov@linaro.org>
- <1458823925-19560-2-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <CAL_JsqJje4=U4+i3jfFDkRv2Px3cw5QzGHfq41OjRDNL6c_Q8Q@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 24 Mar 2016 22:12:31 +0100
+Subject: [PATCH] ARM: dts: veyron: enable the tsadc on pinky board
+In-Reply-To: <1450607434-6733-1-git-send-email-wxt@rock-chips.com>
+References: <1450607434-6733-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <2324215.uYLQVgh5FL@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 24, 2016 at 7:51 AM, Aleksey Makarov
-<aleksey.makarov@linaro.org> wrote:
-> From: Leif Lindholm <leif.lindholm@linaro.org>
->
-> We have multiple "earlycon" early_param handlers - merge the DT one into
-> the main earlycon one.  It's a cleanup that also will be useful
-> to defer setting up DT console until ACPI/DT decision is made.
->
-> Rename the exported function to avoid clashing with the function from
-> arch/microblaze/kernel/prom.c
->
-> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+Hi Caesar,
 
-Acked-by: Rob Herring <robh@kernel.org>
+Am Sonntag, 20. Dezember 2015, 18:30:34 schrieb Caesar Wang:
+> I think the tsadc is fakly hand on pinky board,
+> maybe that's fixed in newest kernel.
+> As the following patch is a example:
+> https://patchwork.kernel.org/patch/7472051/
+> 
+> I don't have meet this issue on pinky board.
+> Let me know if that's still hanging on pinky board.
+> 
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+
+I just gave that a try again on my pinky-rev2. And while the tsadc did produce 
+some results and didn't hang the system in my tries, the temperature values 
+seemed to be frozen (only changing once on every reboot).
+
+Running the same kernel on a Jerry produced the expected results of the 
+temperature changing over time and differing cpu frequencies.
+
+Pinky also is a sort of dinosaur and only you and me seem to still like them 
+:-) . And something is definitly strange here, and I'd tend to keep the tsadc 
+disabled for the time being. 
+
+
+Heiko
