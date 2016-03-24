@@ -1,39 +1,44 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Thu, 24 Mar 2016 11:10:11 -0000
-Subject: Who is going to merge it [Was: Re: [PATCH v14 0/17] Add Analogix
- Core Display Port Driver]
-In-Reply-To: <CAPM=9tz9_rbGJFuv-+YN=Sicfng++tHTDLrOX5Ohtwft+VnwtA@mail.gmail.com>
-References: <1455534485-1154-1-git-send-email-ykk@rock-chips.com>	<1919945.Y1tg0YzXlm@diego>	<56F1CAEB.3080701@samsung.com>	<8949624.HmxDpZAlt2@diego>	<56F1D0AD.8030905@samsung.com>	<20160322233906.GP19428@n2100.arm.linux.org.uk>	<56F1DB27.4040001@samsung.com>	<20160323000835.GQ19428@n2100.arm.linux.org.uk>
- <CAPM=9tz9_rbGJFuv-+YN=Sicfng++tHTDLrOX5Ohtwft+VnwtA@mail.gmail.com>
-Message-ID: <5A08F152.40705@rock-chips.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 24 Mar 2016 12:15:52 +0100
+Subject: [linux-sunxi] Re: [PATCH] ARM: dts: sun8i: Base Orange Pi Plus
+ dts on the Orange Pi 2 dts
+In-Reply-To: <20160324075904.GU30977@lukather>
+References: <1458771256-4069-1-git-send-email-hdegoede@redhat.com>
+ <20160324075904.GU30977@lukather>
+Message-ID: <56F3CC68.4010705@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Maxime,
 
-On 03/22/2016 08:41 PM, Dave Airlie wrote:
->>> So although it's small framework or just subdirectory, we would need
->>> someone who can manage the framework to avoid further confusion if
->>> necessary.
->> So maybe it just doesn't need a maintainer, and maybe those the owner
->> of the bridge driver should be responsible for choosing the tree which
->> it's merged through along with updates.  That's how dw-hdmi has been
->> managed on the whole.
->>
->> It also means that the bridge driver maintainer is able to test changes
->> to the bridge driver, rather than having some over-arching bridge
->> subdirectory maintainer who doesn't have a clue whether the changes
->> work on the hardware.
->>
->> IMHO, having bridge driver authors/maintainers look after their own
->> code has many advantages.
-> The author just send me a pull request with acks from a git tree
-> that hopefully both people agreed and tested from. No need to
-> send this via another maintainer layer.
+On 24-03-16 08:59, Maxime Ripard wrote:
+> Hi,
 >
-> Dave.
+> On Wed, Mar 23, 2016 at 11:14:16PM +0100, Hans de Goede wrote:
+>> The Orange Pi Plus really is an Orange Pi 2 extended with:
+>> 1) A sata <-> usb bridge connected to ehci3
+>> 2) An eMMC on mmc2
+>> 3) An external gigabit ethernet phy instead of the integrated 100Mbit phy
+>>
+>> This commit changes the dts to reflect this by making it include
+>> the Orange Pi 2 dts and then adding the extra bits.
+>>
+>> Note that the difference in ethernet phy is not taken into account
+>> because we do not have an ethernet driver for the H3 yet.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 >
+> Unfortunately, the patch doesn't apply anymore, and the merge doesn't
+> seem trivial.
+>
+> I pushed my branch on my kernel.org repo, can you rebase your patch on
+> top and resend it?
 
-Wow, thanks all ! such cool news  :-D  I'll prepare my pull request soon
+The problem is that you forgot to apply:
+"ARM: dts: sun8i: Orangepi plus gpio keys fixes and improvements"
 
+With that applied this one should apply unchanged too.
 
-- Yakir
+Regards,
+
+Hans
