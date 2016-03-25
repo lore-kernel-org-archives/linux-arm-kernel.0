@@ -1,58 +1,78 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 25 Mar 2016 21:58:40 +0100
-Subject: [PATCH v2] spi: orion.c: Add direct access mode
-In-Reply-To: <20160325155032.GH2566@sirena.org.uk>
-References: <1458663893-13766-1-git-send-email-sr@denx.de>
- <4319407.5A4b1VspuB@wuerfel> <20160325155032.GH2566@sirena.org.uk>
-Message-ID: <10747635.WkGeFaKqdy@wuerfel>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 25 Mar 2016 22:09:44 +0100
+Subject: usb: gadget breakage on N900: bind UDC by name passed via
+ usb_gadget_driver structure
+In-Reply-To: <CAB=otbQdpEtsXg2etX+3YYjrTfPYGtdKJo_V_rtfNb+VNV7g-w@mail.gmail.com>
+References: <20160317212603.GA16651@amd>
+ <CAB=otbSfj24nSUe1DyfVBDKD=trCp2-X-S-AcA1D+PTHZuP1Bg@mail.gmail.com>
+ <20160318202041.GA20196@amd> <56EFE057.7070106@samsung.com>
+ <20160323122143.GB32031@amd>
+ <CAB=otbT2VsZ8Rhc-jbKwtRAssn01ecVFyTyAp+5hS=d40AsGKA@mail.gmail.com>
+ <CAB=otbQdpEtsXg2etX+3YYjrTfPYGtdKJo_V_rtfNb+VNV7g-w@mail.gmail.com>
+Message-ID: <20160325210944.GA26394@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 25 March 2016 15:50:32 Mark Brown wrote:
-> On Fri, Mar 25, 2016 at 04:11:05PM +0100, Arnd Bergmann wrote:
-> 
-> > There is nothing magic in the binding if we just do the same thing
-> > the flash driver does, and describe the memory range that is associated
-> > with a chipselect.
-> 
-> Why are we even doing that though?  Like I say it just seems pointlessly
-> unhelpful for users.  Are we really saying that every single system has
-> to go through and manually modify their DT so that they can use this
-> entirely in SoC feature?  That doesn't seem like winning...
+Hi!
 
-I don't remember the exact details, but I think we had come up with
-a generic constraint solving algorithm to pick appropriate windows for
-each device with a (close to) minimal use of physical address space,
-and we defined the DT binding for MBus in a way that would let us
-implement that algorithm at a later point if we ever found we needed
-it, but then decided against implementing it because it puts a lot
-of complexity at the very early boot: it needs to do a deep walk
-of all enabled child device nodes to find the size and alignment of
-every reg property that translates into an mbus address, and figure out
-a set of mbus translations that convert those into CPU phys addresses
-without using too many mbus windows or too much address space.
-
-> > > > Ok, so with the static mapping it could be done very easily, or
-> > > > we need a more complex solution for the dynamic mapping.
+> OK, so at last I finished charging of my N900; found 1.8V USB
+> to UART adapter and soldered it to the phone.
 > 
-> > > Part of what I personally don't understand is why this is complicated?
+> I managed to boot N900 with working USB gadget (builtin g_ether)
+> in boardfile mode, can ping it from PC and transfer data. I don't
+> see any issue (except of musb name issue in twl phy driver, I've
+> already sent a fix for that: https://lkml.org/lkml/2016/3/24/670 )
 > 
-> > I think we'd need to add another special case in the bus driver
-> > for it, which otherwise should be able to handle this in a generic
-> > way: if we just use the existing binding, the spi host driver can
-> > simply call devm_ioremap_resource() to see if there is a map
-> > for a given chipselect and otherwise fall back to the current
-> > mode.
-> 
-> Why does the binding have to be in the client device to do that?
+> Pavel, I still don't see how you've got your issue, please share
+> more detials
 
-I don't understand the question. The client device here is the SPI
-controller, right? That doesn't need to have a special binding, it
-just needs to list the registers relative to the mbus address space
-like any other device, and that is independent of how we implement
-it.
+Ok, let me try. I undid all the changes in drivers/phy drivers/usb and
+include/linux/usb . I have all the gadget stuff built-in, so that I
+could use nfsroot, but this is boot from mmcblk.
 
-It looks like Stefan's patch tricks here by creating an incompatible
-binding for mbus that bypasses the address mapping.
+gzipped config is attached.
 
-	Arnd
+PC is unable to work with the gadget:
+
+[256526.716099] usb 2-1: new full-speed USB device number 52 using
+uhci_hcd
+[256526.832091] usb 2-1: device descriptor read/64, error -32
+[256527.052095] usb 2-1: device descriptor read/64, error -32
+[256527.268160] usb 2-1: new full-speed USB device number 53 using
+uhci_hcd
+[256527.388121] usb 2-1: device descriptor read/64, error -32
+[256527.608116] usb 2-1: device descriptor read/64, error -32
+[256527.824170] usb 2-1: new full-speed USB device number 54 using
+uhci_hcd
+[256527.851175] usb 2-1: device descriptor read/8, error -32
+[256527.975175] usb 2-1: device descriptor read/8, error -32
+[256528.188133] usb 2-1: new full-speed USB device number 55 using
+uhci_hcd
+[256528.218184] usb 2-1: device descriptor read/8, error -32
+[256528.343183] usb 2-1: device descriptor read/8, error -32
+[256528.444314] usb usb2-port1: unable to enumerate USB device
+
+Dmesg from the n900 is attached as /tmp/delme.gz. I did _not_ apply
+the patch from https://lkml.org/lkml/2016/3/24/670 , yet, as I'm using
+devicetree boot.
+
+Best regards,
+
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: config.gz
+Type: application/gzip
+Size: 24252 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160325/4926a928/attachment-0002.gz>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: delme.gz
+Type: application/gzip
+Size: 9443 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160325/4926a928/attachment-0003.gz>
