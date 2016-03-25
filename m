@@ -1,43 +1,85 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri, 25 Mar 2016 14:46:28 +0000
-Subject: [PATCH] usb: host: xhci-plat: Make enum xhci_plat_type start at a non
- zero value
-Message-ID: <1458917188-28452-1-git-send-email-peter.griffin@linaro.org>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 25 Mar 2016 09:48:34 -0500
+Subject: [PATCH v3 12/18] dt-bindings: Add PLX Technology OXNAS pinctrl
+ and gpio bindings
+In-Reply-To: <1458838215-23314-13-git-send-email-narmstrong@baylibre.com>
+References: <1458838215-23314-1-git-send-email-narmstrong@baylibre.com>
+ <1458838215-23314-13-git-send-email-narmstrong@baylibre.com>
+Message-ID: <20160325144834.GA27177@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Otherwise generic-xhci and xhci-platform which have no data get wrongly
-detected as XHCI_PLAT_TYPE_MARVELL_ARMADA by xhci_plat_type_is().
+On Thu, Mar 24, 2016 at 05:50:09PM +0100, Neil Armstrong wrote:
+> Add pinctrl and gpio DT bindings for PLX Technology OXNAS SoC Family.
+> This version supports the ARM926EJ-S based OX810SE SoC with 34 IO pins.
+> 
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>  .../devicetree/bindings/gpio/gpio_oxnas.txt        | 47 ++++++++++++++++++
+>  .../bindings/pinctrl/plxtech,pinctrl.txt           | 57 ++++++++++++++++++++++
+>  2 files changed, 104 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/gpio/gpio_oxnas.txt
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/plxtech,pinctrl.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio_oxnas.txt b/Documentation/devicetree/bindings/gpio/gpio_oxnas.txt
+> new file mode 100644
+> index 0000000..4530fa9
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/gpio/gpio_oxnas.txt
+> @@ -0,0 +1,47 @@
+> +* PLX Technology OXNAS SoC GPIO Controller
+> +
+> +Required properties:
+> + - compatible: "oxsemi,ox810se-gpio"
+> + - reg: Base address and length for the device.
+> + - interrupts: The port interrupt shared by all pins.
+> + - gpio-controller: Marks the port as GPIO controller.
+> + - #gpio-cells: Two. The first cell is the pin number and
+> +   the second cell is used to specify the gpio polarity as defined in
+> +   defined in <dt-bindings/gpio/gpio.h>:
+> +      0 = GPIO_ACTIVE_HIGH
+> +      1 = GPIO_ACTIVE_LOW
+> + - interrupt-controller: Marks the device node as an interrupt controller.
+> + - #interrupt-cells: Two. The first cell is the GPIO number and second cell
+> +   is used to specify the trigger type as defined in
+> +   <dt-bindings/interrupt-controller/irq.h>:
+> +      IRQ_TYPE_EDGE_RISING
+> +      IRQ_TYPE_EDGE_FALLING
+> +      IRQ_TYPE_EDGE_BOTH
+> + - plxtech,gpio-bank: Specifies which bank a controller owns.
 
-This fixes a regression in v4.5 for STiH407 family SoC's which use the
-synopsis dwc3 IP, whereby the disable_clk error path gets taken due to
-wrongly being detected as XHCI_PLAT_TYPE_MARVELL_ARMADA and the hcd never
-gets added.
+How is this used?
 
-I suspect this will also fix other dwc3 DT platforms such as Exynos,
-although I've only tested on STih410 SoC.
+> + - gpio-ranges: Interaction with the PINCTRL subsystem.
+> + - ngpios: Specifies the gpio lines count in this specific bank.
+> +
+> +Example:
+> +
+> +gpio0: gpio at 0 {
+> +	compatible = "oxsemi,ox810se-gpio";
+> +	reg = <0x000000 0x100000>;
+> +	interrupts = <21>;
+> +	#gpio-cells = <2>;
+> +	gpio-controller;
+> +	interrupt-controller;
+> +	#interrupt-cells = <2>;
+> +	plxtech,gpio-bank = <0>;
+> +	gpio-ranges = <&pinctrl 0 0 32>;
+> +	ngpios = <32>;
 
-Fixes: 4efb2f694114 ("usb: host: xhci-plat: add struct xhci_plat_priv")
-Cc: stable at vger.kernel.org
-Cc: gregory.clement at free-electrons.com
-Cc: yoshihiro.shimoda.uh at renesas.com
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
----
- drivers/usb/host/xhci-plat.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Is 32 the max? It should not be needed then.
 
-diff --git a/drivers/usb/host/xhci-plat.h b/drivers/usb/host/xhci-plat.h
-index 5a2e2e3..529c3c4 100644
---- a/drivers/usb/host/xhci-plat.h
-+++ b/drivers/usb/host/xhci-plat.h
-@@ -14,7 +14,7 @@
- #include "xhci.h"	/* for hcd_to_xhci() */
- 
- enum xhci_plat_type {
--	XHCI_PLAT_TYPE_MARVELL_ARMADA,
-+	XHCI_PLAT_TYPE_MARVELL_ARMADA = 1,
- 	XHCI_PLAT_TYPE_RENESAS_RCAR_GEN2,
- 	XHCI_PLAT_TYPE_RENESAS_RCAR_GEN3,
- };
--- 
-1.9.1
+> +};
+> +
+> +keys {
+> +	...
+> +
+> +	button at sw1 {
+
+sw1 is not a unit-address. Just do "sw1-button".
+
+> +		label = "ESC";
+> +		linux,code = <1>;
+> +		gpios = <&gpio0 12 0>;
+> +	};
+> +};
