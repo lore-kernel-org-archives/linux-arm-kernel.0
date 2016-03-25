@@ -1,91 +1,41 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Thu, 24 Mar 2016 17:23:48 -0700
-Subject: [PATCH 2/5] panel-simple: Add the 7" DPI panel from Adafruit.
+Date: Thu, 24 Mar 2016 17:23:51 -0700
+Subject: [PATCH 5/5] ARM: bcm2835: Add the DPI hardware to the device tree.
 In-Reply-To: <1458865431-30048-1-git-send-email-eric@anholt.net>
 References: <1458865431-30048-1-git-send-email-eric@anholt.net>
-Message-ID: <1458865431-30048-3-git-send-email-eric@anholt.net>
+Message-ID: <1458865431-30048-6-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a basic TFT panel with a 40-pin FPC connector on it.  The
-specification doesn't define timings, but the Adafruit instructions
-were setting up 800x480 CVT.
-
-v2: Add .bus_format and vsync/hsync flags.
+It's currently marked disabled, as it's not useful without a panel
+associated with it and the GPIO pins routed to ALT2.
 
 Signed-off-by: Eric Anholt <eric@anholt.net>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- .../bindings/display/panel/ontat,yx700wv03.txt     |  7 +++++
- drivers/gpu/drm/panel/panel-simple.c               | 35 ++++++++++++++++++++++
- 2 files changed, 42 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/panel/ontat,yx700wv03.txt
+ arch/arm/boot/dts/bcm283x.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/panel/ontat,yx700wv03.txt b/Documentation/devicetree/bindings/display/panel/ontat,yx700wv03.txt
-new file mode 100644
-index 0000000..3d8a5e0
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/panel/ontat,yx700wv03.txt
-@@ -0,0 +1,7 @@
-+On Tat Industrial Company 7" DPI TFT panel.
-+
-+Required properties:
-+- compatible: should be "ontat,yx700wv03"
-+
-+This binding is compatible with the simple-panel binding, which is specified
-+in simple-panel.txt in this directory.
-diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
-index f88a631..642c5ca 100644
---- a/drivers/gpu/drm/panel/panel-simple.c
-+++ b/drivers/gpu/drm/panel/panel-simple.c
-@@ -1176,6 +1176,38 @@ static const struct panel_desc shelly_sca07010_bfn_lnn = {
- 	.bus_format = MEDIA_BUS_FMT_RGB666_1X18,
- };
+diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
+index bbe4eab..d1e6340 100644
+--- a/arch/arm/boot/dts/bcm283x.dtsi
++++ b/arch/arm/boot/dts/bcm283x.dtsi
+@@ -166,6 +166,17 @@
+ 			interrupts = <2 14>; /* pwa1 */
+ 		};
  
-+/* 800x480 CVT.  The panel appears to be quite accepting, at least as
-+ * far as pixel clocks, but this is the timing that was being used in
-+ * the Adafruit installation instructions.
-+ */
-+static const struct drm_display_mode ontat_yx700wv03_mode = {
-+	.clock = 29500,
-+	.hdisplay = 800,
-+	.hsync_start = 824,
-+	.hsync_end = 896,
-+	.htotal = 992,
-+	.vdisplay = 480,
-+	.vsync_start = 483,
-+	.vsync_end = 493,
-+	.vtotal = 500,
-+	.vrefresh = 60,
-+	.flags = DRM_MODE_FLAG_NVSYNC | DRM_MODE_FLAG_NHSYNC,
-+};
++		dpi: dpi at 7e208000 {
++			compatible = "brcm,bcm2835-dpi";
++			reg = <0x7e208000 0x8c>;
++			clocks = <&clocks BCM2835_CLOCK_VPU>,
++				 <&clocks BCM2835_CLOCK_DPI>;
++			clock-names = "core", "pixel";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
 +
-+/* Specification at
-+ * https://www.adafruit.com/images/product-files/2406/c3163.pdf
-+ */
-+static const struct panel_desc ontat_yx700wv03 = {
-+	.modes = &ontat_yx700wv03_mode,
-+	.num_modes = 1,
-+	.bpc = 8,
-+	.size = {
-+		.width = 154,
-+		.height = 83,
-+	},
-+	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
-+};
-+
- static const struct of_device_id platform_of_match[] = {
- 	{
- 		.compatible = "ampire,am800480r3tmqwa1h",
-@@ -1265,6 +1297,9 @@ static const struct of_device_id platform_of_match[] = {
- 		.compatible = "okaya,rs800480t-7x0gp",
- 		.data = &okaya_rs800480t_7x0gp,
- 	}, {
-+		.compatible = "ontat,yx700wv03",
-+		.data = &ontat_yx700wv03,
-+	}, {
- 		.compatible = "ortustech,com43h4m85ulc",
- 		.data = &ortustech_com43h4m85ulc,
- 	}, {
+ 		aux: aux at 0x7e215000 {
+ 			compatible = "brcm,bcm2835-aux";
+ 			#clock-cells = <1>;
 -- 
 2.7.0
