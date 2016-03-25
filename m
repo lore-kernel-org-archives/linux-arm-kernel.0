@@ -1,180 +1,131 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 25 Mar 2016 02:04:59 +0000
-Subject: [RFC PATCH 36/45] KVM: arm/arm64: vgic-new: Add GICH_VMCR accessors
+Date: Fri, 25 Mar 2016 02:05:02 +0000
+Subject: [RFC PATCH 39/45] KVM: arm/arm64: vgic-new: vgic_init: implement
+ vgic_create
 In-Reply-To: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
 References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1458871508-17279-37-git-send-email-andre.przywara@arm.com>
+Message-ID: <1458871508-17279-40-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Eric Auger <eric.auger@linaro.org>
+
+This patch implements the vgic_creation function which is
+called on CREATE_IRQCHIP VM IOCTL (v2 only) or KVM_CREATE_DEVICE
+
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- include/kvm/vgic/vgic.h     |  7 +++++++
- virt/kvm/arm/vgic/vgic-v2.c | 29 +++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic-v3.c | 22 ++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic.c    | 16 ++++++++++++++++
- virt/kvm/arm/vgic/vgic.h    | 18 ++++++++++++++++++
- 5 files changed, 92 insertions(+)
+ include/kvm/vgic/vgic.h       |  1 +
+ virt/kvm/arm/vgic/vgic_init.c | 84 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 85 insertions(+)
 
 diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-index 43b4537..c4102a0 100644
+index 1bc7b66..536582b 100644
 --- a/include/kvm/vgic/vgic.h
 +++ b/include/kvm/vgic/vgic.h
-@@ -167,6 +167,13 @@ struct vgic_v3_cpu_if {
- #endif
+@@ -195,6 +195,7 @@ struct vgic_cpu {
  };
  
-+struct vgic_vmcr {
-+	u32	ctlr;
-+	u32	abpr;
-+	u32	bpr;
-+	u32	pmr;
-+};
-+
- struct vgic_cpu {
- 	/* CPU vif control registers for world switch */
- 	union {
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index 1cec423..fe6da47 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -180,6 +180,35 @@ out:
- 	vcpu->arch.vgic_cpu.vgic_v2.vgic_lr[lr] = val;
- }
+ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
++int kvm_vgic_create(struct kvm *kvm, u32 type);
+ int kvm_vgic_hyp_init(void);
  
-+void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
-+{
-+	u32 vmcr;
-+
-+	vmcr  = (vmcrp->ctlr << GICH_VMCR_CTRL_SHIFT) & GICH_VMCR_CTRL_MASK;
-+	vmcr |= (vmcrp->abpr << GICH_VMCR_ALIAS_BINPOINT_SHIFT) &
-+		GICH_VMCR_ALIAS_BINPOINT_MASK;
-+	vmcr |= (vmcrp->bpr << GICH_VMCR_BINPOINT_SHIFT) &
-+		GICH_VMCR_BINPOINT_MASK;
-+	vmcr |= (vmcrp->pmr << GICH_VMCR_PRIMASK_SHIFT) &
-+		GICH_VMCR_PRIMASK_MASK;
-+
-+	vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr = vmcr;
-+}
-+
-+void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
-+{
-+	u32 vmcr = vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr;
-+
-+	vmcrp->ctlr = (vmcr & GICH_VMCR_CTRL_MASK) >>
-+			GICH_VMCR_CTRL_SHIFT;
-+	vmcrp->abpr = (vmcr & GICH_VMCR_ALIAS_BINPOINT_MASK) >>
-+			GICH_VMCR_ALIAS_BINPOINT_SHIFT;
-+	vmcrp->bpr  = (vmcr & GICH_VMCR_BINPOINT_MASK) >>
-+			GICH_VMCR_BINPOINT_SHIFT;
-+	vmcrp->pmr  = (vmcr & GICH_VMCR_PRIMASK_MASK) >>
-+			GICH_VMCR_PRIMASK_SHIFT;
-+}
-+
- void vgic_v2_irq_change_affinity(struct kvm *kvm, u32 intid, u8 new_targets)
- {
- 	struct vgic_dist *dist = &kvm->arch.vgic;
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 71b4bad..04ef7f9 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -189,3 +189,25 @@ void vgic_v3_irq_change_affinity(struct kvm *kvm, u32 intid, u64 mpidr)
- 	irq->target_vcpu = vcpu;
- 	spin_unlock(&irq->irq_lock);
- }
-+
-+void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
-+{
-+	u32 vmcr;
-+
-+	vmcr  = (vmcrp->ctlr << ICH_VMCR_CTLR_SHIFT) & ICH_VMCR_CTLR_MASK;
-+	vmcr |= (vmcrp->abpr << ICH_VMCR_BPR1_SHIFT) & ICH_VMCR_BPR1_MASK;
-+	vmcr |= (vmcrp->bpr << ICH_VMCR_BPR0_SHIFT) & ICH_VMCR_BPR0_MASK;
-+	vmcr |= (vmcrp->pmr << ICH_VMCR_PMR_SHIFT) & ICH_VMCR_PMR_MASK;
-+
-+	vcpu->arch.vgic_cpu.vgic_v3.vgic_vmcr = vmcr;
-+}
-+
-+void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
-+{
-+	u32 vmcr = vcpu->arch.vgic_cpu.vgic_v3.vgic_vmcr;
-+
-+	vmcrp->ctlr = (vmcr & ICH_VMCR_CTLR_MASK) >> ICH_VMCR_CTLR_SHIFT;
-+	vmcrp->abpr = (vmcr & ICH_VMCR_BPR1_MASK) >> ICH_VMCR_BPR1_SHIFT;
-+	vmcrp->bpr  = (vmcr & ICH_VMCR_BPR0_MASK) >> ICH_VMCR_BPR0_SHIFT;
-+	vmcrp->pmr  = (vmcr & ICH_VMCR_PMR_MASK) >> ICH_VMCR_PMR_SHIFT;
-+}
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index d6c8c92..8c19379 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -401,6 +401,22 @@ static inline void vgic_set_underflow(struct kvm_vcpu *vcpu)
- 		vgic_v3_set_underflow(vcpu);
- }
+ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+diff --git a/virt/kvm/arm/vgic/vgic_init.c b/virt/kvm/arm/vgic/vgic_init.c
+index d7c50bb..80bf283 100644
+--- a/virt/kvm/arm/vgic/vgic_init.c
++++ b/virt/kvm/arm/vgic/vgic_init.c
+@@ -24,6 +24,90 @@
+ #include <asm/kvm_mmu.h>
+ #include "vgic.h"
  
-+void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
++/* CREATION */
++
++/**
++ * kvm_vgic_create: triggered by the instantiation of the VGIC device by
++ * user space, either through the legacy ARM specific VM IOCTL (CREATE_IRQCHIP)
++ * or through the generic VM IOCTL, KVM_CREATE_DEVICE API.
++ * Completion can be tested by irqchip_in_kernel
++ */
++int kvm_vgic_create(struct kvm *kvm, u32 type)
 +{
-+	if (kvm_vgic_global_state.type == VGIC_V2)
-+		vgic_v2_set_vmcr(vcpu, vmcr);
++	int i, vcpu_lock_idx = -1, ret;
++	struct kvm_vcpu *vcpu;
++
++	mutex_lock(&kvm->lock);
++
++	if (irqchip_in_kernel(kvm)) {
++		ret = -EEXIST;
++		goto out;
++	}
++
++	/*
++	 * This function is also called by the KVM_CREATE_IRQCHIP handler,
++	 * which had no chance yet to check the availability of the GICv2
++	 * emulation. So check this here again. KVM_CREATE_DEVICE does
++	 * the proper checks already.
++	 */
++	if (type == KVM_DEV_TYPE_ARM_VGIC_V2 &&
++		!kvm_vgic_global_state.can_emulate_gicv2) {
++		ret = -ENODEV;
++		goto out;
++	}
++
++	/*
++	 * Any time a vcpu is run, vcpu_load is called which tries to grab the
++	 * vcpu->mutex.  By grabbing the vcpu->mutex of all VCPUs we ensure
++	 * that no other VCPUs are run while we create the vgic.
++	 */
++	ret = -EBUSY;
++	kvm_for_each_vcpu(i, vcpu, kvm) {
++		if (!mutex_trylock(&vcpu->mutex))
++			goto out_unlock;
++		vcpu_lock_idx = i;
++	}
++
++	kvm_for_each_vcpu(i, vcpu, kvm) {
++		if (vcpu->arch.has_run_once)
++			goto out_unlock;
++	}
++	ret = 0;
++
++	if (type == KVM_DEV_TYPE_ARM_VGIC_V2)
++		kvm->arch.max_vcpus = VGIC_V2_MAX_CPUS;
 +	else
-+		vgic_v3_set_vmcr(vcpu, vmcr);
++		kvm->arch.max_vcpus = VGIC_V3_MAX_CPUS;
++
++	if (atomic_read(&kvm->online_vcpus) > kvm->arch.max_vcpus) {
++		ret = -E2BIG;
++		goto out_unlock;
++	}
++
++	kvm->arch.vgic.in_kernel = true;
++	kvm->arch.vgic.vgic_model = type;
++
++	/*
++	 * kvm_vgic_global_state.vctrl_base is set on vgic probe (kvm_arch_init)
++	 * it is stored in distributor struct for asm save/restore purpose
++	 */
++	kvm->arch.vgic.vctrl_base = kvm_vgic_global_state.vctrl_base;
++
++	kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
++	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
++	kvm->arch.vgic.vgic_redist_base = VGIC_ADDR_UNDEF;
++
++out_unlock:
++	for (; vcpu_lock_idx >= 0; vcpu_lock_idx--) {
++		vcpu = kvm_get_vcpu(kvm, vcpu_lock_idx);
++		mutex_unlock(&vcpu->mutex);
++	}
++
++out:
++	mutex_unlock(&kvm->lock);
++	return ret;
 +}
 +
-+void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
-+{
-+	if (kvm_vgic_global_state.type == VGIC_V2)
-+		vgic_v2_get_vmcr(vcpu, vmcr);
-+	else
-+		vgic_v3_get_vmcr(vcpu, vmcr);
-+}
-+
- static int compute_ap_list_depth(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index c8fd30c..c6d3ff6 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -36,6 +36,8 @@ void vgic_v2_set_underflow(struct kvm_vcpu *vcpu);
- int vgic_v2_dist_access(struct kvm_vcpu *vcpu, bool is_write,
- 			int offset, int len, void *val);
- int vgic_v2_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr);
-+void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
-+void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+ /* GENERIC PROBE */
  
- #ifdef CONFIG_KVM_ARM_VGIC_V3
- void vgic_v3_irq_change_affinity(struct kvm *kvm, u32 intid, u64 mpidr);
-@@ -47,6 +49,8 @@ int vgic_v3_dist_access(struct kvm_vcpu *vcpu, bool is_write,
- 			int offset, int len, void *val);
- int vgic_v3_redist_access(struct kvm_vcpu *vcpu, bool is_write,
- 			  int offset, int len, void *val);
-+void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
-+void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
- #else
- static inline void vgic_v3_irq_change_affinity(struct kvm *kvm, u32 intid,
- 					       u64 mpidr)
-@@ -81,8 +85,22 @@ static inline int vgic_v3_redist_access(struct kvm_vcpu *vcpu, bool is_write,
- {
- 	return -ENXIO;
- }
-+
-+static inline
-+void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
-+{
-+}
-+
-+static inline
-+void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
-+{
-+}
-+
- #endif
- 
-+void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
-+void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
-+
- void kvm_register_vgic_device(unsigned long type);
- 
- #endif
+ static void vgic_init_maintenance_interrupt(void *info)
 -- 
 2.7.3
