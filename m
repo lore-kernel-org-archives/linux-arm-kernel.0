@@ -1,153 +1,71 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 25 Mar 2016 12:15:47 -0500
-Subject: [PATCH v8 01/17] Xen: ACPI: Hide UART used by Xen
-In-Reply-To: <1458893149-17388-1-git-send-email-zhaoshenglong@huawei.com>
-References: <1458830676-27075-2-git-send-email-shannon.zhao@linaro.org>
- <1458893149-17388-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <20160325171547.GB29822@localhost>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 25 Mar 2016 20:22:59 +0300
+Subject: [PATCH v3 02/16] mfd: da8xx-cfgchip: New header file for CFGCHIP
+ registers.
+In-Reply-To: <1458863503-31121-3-git-send-email-david@lechnology.com>
+References: <1458863503-31121-1-git-send-email-david@lechnology.com>
+ <1458863503-31121-3-git-send-email-david@lechnology.com>
+Message-ID: <56F573F3.90500@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 25, 2016 at 04:05:49PM +0800, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> ACPI 6.0 introduces a new table STAO to list the devices which are used
-> by Xen and can't be used by Dom0. On Xen virtual platforms, the physical
-> UART is used by Xen. So here it hides UART from Dom0.
-> 
-> CC: "Rafael J. Wysocki" <rjw@rjwysocki.net> (supporter:ACPI)
-> CC: Len Brown <lenb@kernel.org> (supporter:ACPI)
-> CC: linux-acpi at vger.kernel.org (open list:ACPI)
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+On 03/25/2016 02:51 AM, David Lechner wrote:
+
+> We will be using a generic syscon device for the TI DA8XX SoC CFGCHIPx
+> retisters. This will be used by a number of planned drivers including a
+> new USB PHY driver and common clock framework drivers.
+>
+> The same defines are removed from the platform_data header file since they
+> are now redundant and they didn't really belong there anyway.
+>
+> Signed-off-by: David Lechner <david@lechnology.com>
 > ---
->  drivers/acpi/scan.c | 68 +++++++++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 68 insertions(+)
-> 
-> diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
-> index 5f28cf7..5420cc5 100644
-> --- a/drivers/acpi/scan.c
-> +++ b/drivers/acpi/scan.c
-> @@ -45,6 +45,7 @@ static LIST_HEAD(acpi_scan_handlers_list);
->  DEFINE_MUTEX(acpi_device_lock);
->  LIST_HEAD(acpi_wakeup_device_list);
->  static DEFINE_MUTEX(acpi_hp_context_lock);
-> +static u64 spcr_uart_addr;
->  
->  struct acpi_dep_data {
->  	struct list_head node;
-> @@ -1453,6 +1454,41 @@ static int acpi_add_single_object(struct acpi_device **child,
->  	return 0;
->  }
->  
-> +static acpi_status acpi_get_resource_memory(struct acpi_resource *ares,
-> +					    void *context)
-> +{
-> +	struct resource *res = context;
-> +
-> +	if (acpi_dev_resource_memory(ares, res))
-> +		return AE_CTRL_TERMINATE;
-> +
-> +	return AE_OK;
-> +}
-> +
-> +static bool acpi_device_should_be_hidden(acpi_handle handle)
-> +{
-> +	acpi_status status;
-> +	struct resource res;
-> +
-> +	/* Check if it should ignore the UART device */
-> +	if (spcr_uart_addr != 0) {
-> +		if (!acpi_has_method(handle, METHOD_NAME__CRS))
-> +			return false;
-> +
-> +		status = acpi_walk_resources(handle, METHOD_NAME__CRS,
-> +					     acpi_get_resource_memory, &res);
-> +		if (ACPI_FAILURE(status))
-> +			return false;
-> +
-> +		if (res.start == spcr_uart_addr) {
-> +			printk(KERN_INFO PREFIX "The UART device in SPCR table will be hidden\n");
+>
+> v3 changes: This is a new patch. It replaces the previous patch that just added
+> some missing CFGCHIP2 registers to the platform_data/usb-davinci.h file.
+> I took David Laight's advice and included all of the possible registers.
+>
+> Many of these registers will be used for clocks - hopefully in the near future.
+>
+>
+> include/linux/mfd/da8xx-cfgchip.h         | 160 ++++++++++++++++++++++++++++++
+>   include/linux/platform_data/usb-davinci.h |  23 -----
+>   2 files changed, 160 insertions(+), 23 deletions(-)
+>   create mode 100644 include/linux/mfd/da8xx-cfgchip.h
+>
+> diff --git a/include/linux/mfd/da8xx-cfgchip.h b/include/linux/mfd/da8xx-cfgchip.h
+> new file mode 100644
+> index 0000000..6940cf9
+> --- /dev/null
+> +++ b/include/linux/mfd/da8xx-cfgchip.h
+> @@ -0,0 +1,160 @@
+[...]
+> +/* register offsets */
+> +#define CFGCHIP_REG(n)				(n * 4)
+> +#define CFGCHIP0_REG				CFGCHIP_REG(0)
+> +#define CFGCHIP1_REG				CFGCHIP_REG(1)
+> +#define CFGCHIP2_REG				CFGCHIP_REG(2)
+> +#define CFGCHIP3_REG				CFGCHIP_REG(3)
+> +#define CFGCHIP4_REG				CFGCHIP_REG(4)
 
-Can we at least print out the ACPI device path and address here for
-debugging purposes?  IMHO, kernel messages that contain only static
-text are always dubious.  There's almost always a useful address, IRQ,
-return value, etc., that could be included.
+    Why not just use CFGCHIP_REG(n) directly?
 
-> +			return true;
-> +		}
-> +	}
-> +
-> +	return false;
-> +}
-> +
->  static int acpi_bus_type_and_status(acpi_handle handle, int *type,
->  				    unsigned long long *sta)
->  {
-> @@ -1466,6 +1502,9 @@ static int acpi_bus_type_and_status(acpi_handle handle, int *type,
->  	switch (acpi_type) {
->  	case ACPI_TYPE_ANY:		/* for ACPI_ROOT_OBJECT */
->  	case ACPI_TYPE_DEVICE:
-> +		if (acpi_device_should_be_hidden(handle))
-> +			return -ENODEV;
-> +
->  		*type = ACPI_BUS_TYPE_DEVICE;
->  		status = acpi_bus_get_status_handle(handle, sta);
->  		if (ACPI_FAILURE(status))
-> @@ -1916,9 +1955,24 @@ static int acpi_bus_scan_fixed(void)
->  	return result < 0 ? result : 0;
->  }
->  
-> +static void __init acpi_get_spcr_uart_addr(void)
-> +{
-> +	acpi_status status;
-> +	struct acpi_table_spcr *spcr_ptr;
-> +
-> +	status = acpi_get_table(ACPI_SIG_SPCR, 0,
-> +				(struct acpi_table_header **)&spcr_ptr);
-> +	if (ACPI_SUCCESS(status))
-> +		spcr_uart_addr = spcr_ptr->serial_port.address;
-> +	else
-> +		printk(KERN_WARNING PREFIX "STAO table present, but SPCR is missing\n");
-> +}
-> +
->  int __init acpi_scan_init(void)
->  {
->  	int result;
-> +	acpi_status status;
-> +	struct acpi_table_stao *stao_ptr;
->  
->  	acpi_pci_root_init();
->  	acpi_pci_link_init();
-> @@ -1934,6 +1988,20 @@ int __init acpi_scan_init(void)
->  
->  	acpi_scan_add_handler(&generic_device_handler);
->  
-> +	/*
-> +	 * If there is STAO table, check whether it needs to ignore the UART
-> +	 * device in SPCR table.
-> +	 */
-> +	status = acpi_get_table(ACPI_SIG_STAO, 0,
-> +				(struct acpi_table_header **)&stao_ptr);
-> +	if (ACPI_SUCCESS(status)) {
-> +		if (stao_ptr->header.length > sizeof(struct acpi_table_stao))
-> +			printk(KERN_INFO PREFIX "STAO Name List not yet supported.");
-> +
-> +		if (stao_ptr->ignore_uart)
-> +			acpi_get_spcr_uart_addr();
-> +	}
+[...]
+> diff --git a/include/linux/platform_data/usb-davinci.h b/include/linux/platform_data/usb-davinci.h
+> index e0bc4ab..7c6ce24 100644
+> --- a/include/linux/platform_data/usb-davinci.h
+> +++ b/include/linux/platform_data/usb-davinci.h
+[...]
+> @@ -53,7 +31,6 @@ struct	da8xx_ohci_root_hub {
+>   	/* Time from power on to power good (in 2 ms units) */
+>   	u8	potpgt;
+>   };
+> -
 
-This all seems sort of ad hoc.  Are UARTs the only things that can be
-listed in STAO?  If STAO can contain things other than UARTs, are we
-going to see more patches adding special-case code like this?
+    Why?
 
->  	mutex_lock(&acpi_scan_lock);
->  	/*
->  	 * Enumerate devices in the ACPI namespace.
-> -- 
-> 2.0.4
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>   void davinci_setup_usb(unsigned mA, unsigned potpgt_ms);
+>
+>   #endif	/* ifndef __ASM_ARCH_USB_H */
+
+MBR, Sergei
