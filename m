@@ -1,31 +1,78 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 25 Mar 2016 11:14:02 +0900
-Subject: [PATCH] ARM: uniphier: drop weird sizeof()
-Message-ID: <1458872042-30465-1-git-send-email-yamada.masahiro@socionext.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 25 Mar 2016 02:04:54 +0000
+Subject: [RFC PATCH 31/45] KVM: arm/arm64: vgic-new: vgic_kvm_device:
+ KVM_DEV_ARM_VGIC_GRP_CTRL
+In-Reply-To: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
+References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <1458871508-17279-32-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-My intention was to ioremap a 4-byte register.  Coincidentally enough,
-sizeof(SZ_4) equals to SZ_4, but this code is weird anyway.
+From: Eric Auger <eric.auger@linaro.org>
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+This patch implements the KVM_DEV_ARM_VGIC_GRP_CTRL group API
+featuring KVM_DEV_ARM_VGIC_CTRL_INIT attribute. The vgic_init
+function is not yet implemented though.
+
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
+ virt/kvm/arm/vgic/vgic_kvm_device.c | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
- arch/arm/mach-uniphier/platsmp.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-uniphier/platsmp.c b/arch/arm/mach-uniphier/platsmp.c
-index 6914135..db04142 100644
---- a/arch/arm/mach-uniphier/platsmp.c
-+++ b/arch/arm/mach-uniphier/platsmp.c
-@@ -120,7 +120,7 @@ static int __init uniphier_smp_prepare_trampoline(unsigned int max_cpus)
- 	if (ret)
- 		return ret;
+diff --git a/virt/kvm/arm/vgic/vgic_kvm_device.c b/virt/kvm/arm/vgic/vgic_kvm_device.c
+index c96549b..18cccac 100644
+--- a/virt/kvm/arm/vgic/vgic_kvm_device.c
++++ b/virt/kvm/arm/vgic/vgic_kvm_device.c
+@@ -23,6 +23,8 @@
+ static int vgic_set_common_attr(struct kvm_device *dev,
+ 				struct kvm_device_attr *attr)
+ {
++	int r;
++
+ 	switch (attr->group) {
+ 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
+ 		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
+@@ -55,6 +57,16 @@ static int vgic_set_common_attr(struct kvm_device *dev,
  
--	uniphier_smp_rom_boot_rsv2 = ioremap(rom_rsv2_phys, sizeof(SZ_4));
-+	uniphier_smp_rom_boot_rsv2 = ioremap(rom_rsv2_phys, SZ_4);
- 	if (!uniphier_smp_rom_boot_rsv2) {
- 		pr_err("failed to map ROM_BOOT_RSV2 register\n");
- 		return -ENOMEM;
+ 		return ret;
+ 	}
++	case KVM_DEV_ARM_VGIC_GRP_CTRL: {
++		switch (attr->attr) {
++		case KVM_DEV_ARM_VGIC_CTRL_INIT:
++			mutex_lock(&dev->kvm->lock);
++			r = vgic_init(dev->kvm);
++			mutex_unlock(&dev->kvm->lock);
++			return r;
++		}
++		break;
++	}
+ 	}
+ 
+ 	return -ENXIO;
+@@ -131,6 +143,11 @@ static int vgic_v2_has_attr(struct kvm_device *dev,
+ 	switch (attr->group) {
+ 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
+ 		return 0;
++	case KVM_DEV_ARM_VGIC_GRP_CTRL:
++		switch (attr->attr) {
++		case KVM_DEV_ARM_VGIC_CTRL_INIT:
++			return 0;
++		}
+ 	}
+ 	return -ENXIO;
+ }
+@@ -166,6 +183,11 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
+ 	switch (attr->group) {
+ 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
+ 		return 0;
++	case KVM_DEV_ARM_VGIC_GRP_CTRL:
++		switch (attr->attr) {
++		case KVM_DEV_ARM_VGIC_CTRL_INIT:
++			return 0;
++		}
+ 	}
+ 	return -ENXIO;
+ }
 -- 
-1.9.1
+2.7.3
