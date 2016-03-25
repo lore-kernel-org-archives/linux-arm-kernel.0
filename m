@@ -1,22 +1,43 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 25 Mar 2016 09:41:20 -0500
-Subject: [PATCH v3 04/18] dt-bindings: irq: arm,versatile-fpga: add
- compatible string for OX810SE SoC
-In-Reply-To: <1458838215-23314-5-git-send-email-narmstrong@baylibre.com>
-References: <1458838215-23314-1-git-send-email-narmstrong@baylibre.com>
- <1458838215-23314-5-git-send-email-narmstrong@baylibre.com>
-Message-ID: <20160325144120.GA26839@rob-hp-laptop>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Fri, 25 Mar 2016 14:46:28 +0000
+Subject: [PATCH] usb: host: xhci-plat: Make enum xhci_plat_type start at a non
+ zero value
+Message-ID: <1458917188-28452-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 24, 2016 at 05:50:01PM +0100, Neil Armstrong wrote:
-> Under the OX810SE, this same controller is used as "Reference Peripheral
-> Specification" Interrupt Controller, so add new compatible string to support
-> the PLX Technology OX810SE SoC Interrupt Controller.
-> 
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
->  .../devicetree/bindings/interrupt-controller/arm,versatile-fpga-irq.txt | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+Otherwise generic-xhci and xhci-platform which have no data get wrongly
+detected as XHCI_PLAT_TYPE_MARVELL_ARMADA by xhci_plat_type_is().
 
-Acked-by: Rob Herring <robh@kernel.org>
+This fixes a regression in v4.5 for STiH407 family SoC's which use the
+synopsis dwc3 IP, whereby the disable_clk error path gets taken due to
+wrongly being detected as XHCI_PLAT_TYPE_MARVELL_ARMADA and the hcd never
+gets added.
+
+I suspect this will also fix other dwc3 DT platforms such as Exynos,
+although I've only tested on STih410 SoC.
+
+Fixes: 4efb2f694114 ("usb: host: xhci-plat: add struct xhci_plat_priv")
+Cc: stable at vger.kernel.org
+Cc: gregory.clement at free-electrons.com
+Cc: yoshihiro.shimoda.uh at renesas.com
+Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+---
+ drivers/usb/host/xhci-plat.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/usb/host/xhci-plat.h b/drivers/usb/host/xhci-plat.h
+index 5a2e2e3..529c3c4 100644
+--- a/drivers/usb/host/xhci-plat.h
++++ b/drivers/usb/host/xhci-plat.h
+@@ -14,7 +14,7 @@
+ #include "xhci.h"	/* for hcd_to_xhci() */
+ 
+ enum xhci_plat_type {
+-	XHCI_PLAT_TYPE_MARVELL_ARMADA,
++	XHCI_PLAT_TYPE_MARVELL_ARMADA = 1,
+ 	XHCI_PLAT_TYPE_RENESAS_RCAR_GEN2,
+ 	XHCI_PLAT_TYPE_RENESAS_RCAR_GEN3,
+ };
+-- 
+1.9.1
