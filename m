@@ -1,163 +1,90 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 25 Mar 2016 02:05:06 +0000
-Subject: [RFC PATCH 43/45] KVM: arm/arm64: vgic-new: implement mapped IRQ
- handling
+Date: Fri, 25 Mar 2016 02:04:47 +0000
+Subject: [RFC PATCH 24/45] KVM: arm/arm64: vgic-new: Add GICv3 CTLR, IIDR,
+ TYPER handlers
 In-Reply-To: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
 References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1458871508-17279-44-git-send-email-andre.przywara@arm.com>
+Message-ID: <1458871508-17279-25-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We now store the mapped hardware IRQ number in our struct, so we
-don't need the irq_phys_map any longer for the new VGIC.
-Implement the hardware IRQ mapping on top of the reworked arch
-timer interface.
+As in the GICv2 emulation we handle those three registers in one
+function.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- include/kvm/vgic/vgic.h  | 15 ++++++++
- virt/kvm/arm/vgic/vgic.c | 92 ++++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 107 insertions(+)
+ virt/kvm/arm/vgic/vgic.h      |  2 ++
+ virt/kvm/arm/vgic/vgic_mmio.c | 38 ++++++++++++++++++++++++++++++++++++--
+ 2 files changed, 38 insertions(+), 2 deletions(-)
 
-diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-index e418de9..7c1d145 100644
---- a/include/kvm/vgic/vgic.h
-+++ b/include/kvm/vgic/vgic.h
-@@ -206,6 +206,21 @@ int kvm_vgic_hyp_init(void);
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index 4b8952a..0db1abe 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -19,6 +19,8 @@
+ #define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
+ #define IMPLEMENTER_ARM		0x43b
  
- int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
- 			bool level);
-+int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid, unsigned int intid,
-+			       bool level);
++#define INTERRUPT_ID_BITS_SPIS	10
 +
-+/*
-+ * This is not really needed, but we need this type to keep the arch
-+ * timer compatible with the old VGIC implementation.
-+ * This should be removed upon retiring the old VGIC.
-+ */
-+struct irq_phys_map {};
+ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
+ 			      u32 intid);
+ bool vgic_queue_irq(struct kvm *kvm, struct vgic_irq *irq);
+diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
+index 2d10c06..13e101f 100644
+--- a/virt/kvm/arm/vgic/vgic_mmio.c
++++ b/virt/kvm/arm/vgic/vgic_mmio.c
+@@ -606,7 +606,29 @@ static int vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
+ 				  struct kvm_io_device *this,
+ 				  gpa_t addr, int len, void *val)
+ {
+-	/* TODO: implement */
++	struct vgic_io_device *iodev = container_of(this,
++						    struct vgic_io_device, dev);
++	u32 value = 0;
 +
-+struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
-+					   u32 virt_irq, u32 irq);
-+int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, struct irq_phys_map *map,
-+			    u32 intid);
-+bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, u32 intid);
- 
- int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
- 
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index 4ade7c0..65395af 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -17,6 +17,9 @@
- #include <linux/kvm.h>
- #include <linux/kvm_host.h>
- #include <linux/list_sort.h>
-+#include <linux/irq.h>
-+#include <linux/interrupt.h>
-+#include <linux/irqdesc.h>
- 
- #include "vgic.h"
- 
-@@ -276,6 +279,83 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
- 
- 	vcpu = kvm_get_vcpu(kvm, cpuid);
- 	vgic_update_irq_pending(kvm, vcpu, intid, level);
-+
-+	return 0;
-+}
-+
-+/**
-+ * kvm_vgic_inject_mapped_irq - Inject a hardware mapped IRQ to the vgic
-+ * @kvm:     The VM structure pointer
-+ * @cpuid:   The CPU for PPIs
-+ * @irq_num: The INTID to inject a new state to.
-+ * @level:   Edge-triggered:  true:  to trigger the interrupt
-+ *			      false: to ignore the call
-+ *	     Level-sensitive  true:  raise the input signal
-+ *			      false: lower the input signal
-+ *
-+ * The GIC is not concerned with devices being active-LOW or active-HIGH for
-+ * level-sensitive interrupts.  You can think of the level parameter as 1
-+ * being HIGH and 0 being LOW and all devices being active-HIGH.
-+ */
-+int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid, unsigned int intid,
-+			       bool level)
-+{
-+	struct kvm_vcpu *vcpu;
-+	int ret;
-+
-+	ret = vgic_lazy_init(kvm);
-+	if (ret)
-+		return ret;
-+
-+	vcpu = kvm_get_vcpu(kvm, cpuid);
-+	vgic_update_irq_pending(kvm, vcpu, intid, level);
-+
-+	return 0;
-+}
-+
-+struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
-+					   u32 virt_irq, u32 intid)
-+{
-+	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
-+	struct irq_desc *desc;
-+	struct irq_data *data;
-+
-+	BUG_ON(!irq);
-+
-+	desc = irq_to_desc(intid);
-+	if (!desc) {
-+		kvm_err("%s: no interrupt descriptor\n", __func__);
-+		return NULL;
++	switch ((addr - iodev->base_addr) & ~3) {
++	case GICD_CTLR:
++		if (vcpu->kvm->arch.vgic.enabled)
++		       value |=	GICD_CTLR_ENABLE_SS_G1;
++		value |= GICD_CTLR_ARE_NS | GICD_CTLR_DS;
++		break;
++	case GICD_TYPER:
++		value = vcpu->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
++		value = (value >> 5) - 1;
++		value |= (INTERRUPT_ID_BITS_SPIS - 1) << 19;
++		break;
++	case GICD_IIDR:
++		value = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
++		break;
++	default:
++		return 0;
 +	}
 +
-+	data = irq_desc_get_irq_data(desc);
-+	while (data->parent_data)
-+		data = data->parent_data;
++	write_mask32(value, addr & 3, len, val);
+ 	return 0;
+ }
+ 
+@@ -614,7 +636,19 @@ static int vgic_mmio_write_v3_misc(struct kvm_vcpu *vcpu,
+ 				   struct kvm_io_device *this,
+ 				   gpa_t addr, int len, const void *val)
+ {
+-	/* TODO: implement */
++	struct vgic_io_device *iodev = container_of(this,
++						    struct vgic_io_device, dev);
++	bool enabled;
 +
-+	spin_lock(&irq->irq_lock);
++	/* These are not the bits you are looking for ... */
++	if (addr - iodev->base_addr > 0)
++		return 0;
 +
-+	irq->hw = true;
-+	irq->hwintid = data->hwirq;
++	/* We only care about the enable bit, all other bits are WI. */
++	enabled = *(u8*)val & GICD_CTLR_ENABLE_SS_G1;
 +
-+	spin_unlock(&irq->irq_lock);
-+
-+	return NULL;
-+}
-+
-+int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, struct irq_phys_map *map,
-+			    u32 intid)
-+{
-+	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid);
-+
-+	BUG_ON(!irq);
-+
-+	spin_lock(&irq->irq_lock);
-+
-+	irq->hw = false;
-+	irq->hwintid = 0;
-+
-+	spin_unlock(&irq->irq_lock);
++	vcpu->kvm->arch.vgic.enabled = enabled;
 +
  	return 0;
  }
  
-@@ -520,3 +600,15 @@ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
- 
- 	return pending;
- }
-+
-+bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, u32 intid)
-+{
-+	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid);
-+	bool map_is_active;
-+
-+	spin_lock(&irq->irq_lock);
-+	map_is_active = irq->hw && irq->active;
-+	spin_unlock(&irq->irq_lock);
-+
-+	return map_is_active;
-+}
 -- 
 2.7.3
