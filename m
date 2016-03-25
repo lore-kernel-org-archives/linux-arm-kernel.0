@@ -1,93 +1,242 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 25 Mar 2016 11:08:55 +0800
-Subject: [PATCH v2] arm64: cpuidle: make arm_cpuidle_suspend() a bit more
- efficient
-Message-ID: <1458875335-1843-1-git-send-email-jszhang@marvell.com>
+From: ruslan.bilovol@gmail.com (Ruslan Bilovol)
+Date: Fri, 25 Mar 2016 05:21:56 +0200
+Subject: usb: gadget breakage on N900: bind UDC by name passed via
+ usb_gadget_driver structure
+In-Reply-To: <CAB=otbT2VsZ8Rhc-jbKwtRAssn01ecVFyTyAp+5hS=d40AsGKA@mail.gmail.com>
+References: <20160317212603.GA16651@amd>
+ <CAB=otbSfj24nSUe1DyfVBDKD=trCp2-X-S-AcA1D+PTHZuP1Bg@mail.gmail.com>
+ <20160318202041.GA20196@amd> <56EFE057.7070106@samsung.com>
+ <20160323122143.GB32031@amd>
+ <CAB=otbT2VsZ8Rhc-jbKwtRAssn01ecVFyTyAp+5hS=d40AsGKA@mail.gmail.com>
+Message-ID: <CAB=otbQdpEtsXg2etX+3YYjrTfPYGtdKJo_V_rtfNb+VNV7g-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, we check two pointers: cpu_ops and cpu_suspend on every idle
-state entry. These pointers check can be avoided:
+OK, so at last I finished charging of my N900; found 1.8V USB
+to UART adapter and soldered it to the phone.
 
-If cpu_ops has not been registered, arm_cpuidle_init() will return
--EOPNOTSUPP, so arm_cpuidle_suspend() will never have chance to
-run. In other word, the cpu_ops check can be avoid.
+I managed to boot N900 with working USB gadget (builtin g_ether)
+in boardfile mode, can ping it from PC and transfer data. I don't
+see any issue (except of musb name issue in twl phy driver, I've
+already sent a fix for that: https://lkml.org/lkml/2016/3/24/670 )
 
-Similarly, the cpu_suspend check could be avoided in this hot path by
-moving it into arm_cpuidle_init().
+Pavel, I still don't see how you've got your issue, please share
+more detials
 
-I measured the 4096 * time from arm_cpuidle_suspend entry point to the
-cpu_psci_cpu_suspend entry point. HW platform is Marvell BG4CT STB
-board.
+Regards,
+Ruslan
 
-1. only one shell, no other process, hot-unplug secondary cpus, execute
-the following cmd
-
-while true
-do
-	sleep 0.2
-done
-
-before the patch: 1581220ns
-
-after the patch: 1579630ns
-
-reduced by 0.1%
-
-2. only one shell, no other process, hot-unplug secondary cpus, execute
-the following cmd
-
-while true
-do
-	md5sum /tmp/testfile
-	sleep 0.2
-done
-
-NOTE: the testfile size should be larger than L1+L2 cache size
-
-before the patch: 1961960ns
-after the patch: 1912500ns
-
-reduced by 2.5%
-
-So the more complex the system load, the bigger the improvement.
-
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
----
-Since v1:
- - add performance numbers
- - combine two small patches into one
- - add Lorenzo's ack
-
- arch/arm64/kernel/cpuidle.c | 9 ++-------
- 1 file changed, 2 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm64/kernel/cpuidle.c b/arch/arm64/kernel/cpuidle.c
-index 9047cab6..e11857f 100644
---- a/arch/arm64/kernel/cpuidle.c
-+++ b/arch/arm64/kernel/cpuidle.c
-@@ -19,7 +19,8 @@ int __init arm_cpuidle_init(unsigned int cpu)
- {
- 	int ret = -EOPNOTSUPP;
- 
--	if (cpu_ops[cpu] && cpu_ops[cpu]->cpu_init_idle)
-+	if (cpu_ops[cpu] && cpu_ops[cpu]->cpu_suspend &&
-+			cpu_ops[cpu]->cpu_init_idle)
- 		ret = cpu_ops[cpu]->cpu_init_idle(cpu);
- 
- 	return ret;
-@@ -36,11 +37,5 @@ int arm_cpuidle_suspend(int index)
- {
- 	int cpu = smp_processor_id();
- 
--	/*
--	 * If cpu_ops have not been registered or suspend
--	 * has not been initialized, cpu_suspend call fails early.
--	 */
--	if (!cpu_ops[cpu] || !cpu_ops[cpu]->cpu_suspend)
--		return -EOPNOTSUPP;
- 	return cpu_ops[cpu]->cpu_suspend(index);
- }
--- 
-2.8.0.rc3
+On Thu, Mar 24, 2016 at 2:45 AM, Ruslan Bilovol
+<ruslan.bilovol@gmail.com> wrote:
+> Hi Pavel,
+>
+> I didn't use my N900 for years, it is deeply discharged and can't
+> boot, so I left it connected overnight to the wall adapter to let it
+> get some juice.
+>
+> Meanwhile I looked into sources and still can't understand how
+> it happens.
+> Could you please attach your full .config and also dmesg
+> without hacks?
+>
+> Regards,
+> Ruslan
+>
+> On Wed, Mar 23, 2016 at 2:21 PM, Pavel Machek <pavel@ucw.cz> wrote:
+>> On Mon 2016-03-21 12:51:51, Marek Szyprowski wrote:
+>>> Hi
+>>>
+>>> On 2016-03-18 21:20, Pavel Machek wrote:
+>>> >Hi!
+>>> >
+>>> >>>USB gadget stops working for me on n900, if I merge
+>>> >>Could you please give us more details?
+>>> >>Which gadget driver do you use (g_nokia?)
+>>> >Ok, so I could get it to work with v4.5, and this patch. I'm including
+>>> >my config, too. No, I don't think I'm using g_nokia.
+>>>
+>>> This shows that there are some serious problems, probably with your udc
+>>> driver, which doesn't handle deferred probe properly. Your patch workaround
+>>> it by waiting some predefined time before registering gadget driver, however
+>>> this is not the proper way. Please try to isolate what exactly is needed to
+>>> get the gadget driver registered properly in your system or at least please
+>>> provide some logs from the failed case.
+>>
+>> Well, Ruslan said he has n900 available, so I provided requested
+>> information.
+>>
+>> This is the dmesg with the hack:
+>>
+>> [    0.623138] of_get_named_gpiod_flags: parsed 'ti,power-gpio'
+>> property of node '/ocp/spi at 480ba00
+>> 0/wl1251 at 0[0]' - status (0)
+>> [    0.623565] wl1251: ERROR vio regulator missing: -517
+>> [    0.624359] musb probe HACK cf9a9e00
+>> [    0.624420] musb probe HACK/2 cf9a9e00
+>> [    0.624511] musb probe HACK/3 cf9a9e00
+>> [    0.624755] HS USB OTG: no transceiver configured
+>> [    0.624847] musb-hdrc musb-hdrc.0.auto: musb_init_controller failed
+>> with status -517
+>> [    0.626525] mousedev: PS/2 mouse device common for all mice
+>> ...
+>> [    2.877441] ieee80211 phy1: Selected rate control algorithm
+>> 'minstrel'
+>> [    2.879882] wl1251: loaded
+>> [    2.889617] wl1251: initialized
+>> [    2.897521] Two musb controllers?  HACK
+>> [    2.904968] musb probe HACK cf9a9e00
+>> [    2.912048] musb probe HACK/2 cf9a9e00
+>> [    2.918823] musb probe HACK/3 cf9a9e00
+>> [    2.928985] musb-hdrc: ConfigData=0xde (UTMI-8, dyn FIFOs, bulk
+>> combine, bulk split, HB-ISO Rx, HB-ISO Tx, SoftConn)
+>> [    2.929016] musb-hdrc: MHDRC RTL version 1.400
+>> [    2.929046] musb-hdrc: setup fifo_mode 4
+>> [    2.929077] musb-hdrc: 28/31 max ep, 16384/16384 memory
+>> [    2.930511] tsc2005 spi1.0: GPIO lookup for consumer reset
+>> [    2.930541] tsc2005 spi1.0: using device tree for GPIO lookup
+>>
+>> In the kernel without the hack, there'll be only the first part of the
+>> dmesg, AFAICT.
+>>
+>> If there's an interest, I can repeat the test without the hack.
+>>
+>> Thanks,
+>>                                                                         Pavel
+>>
+>>
+>>> >diff --git a/drivers/usb/gadget/udc/udc-core.c b/drivers/usb/gadget/udc/udc-core.c
+>>> >index b86a6f0..bee109f 100644
+>>> >--- a/drivers/usb/gadget/udc/udc-core.c
+>>> >+++ b/drivers/usb/gadget/udc/udc-core.c
+>>> >@@ -542,14 +542,37 @@ err1:
+>>> >     return ret;
+>>> >  }
+>>> >-int usb_gadget_probe_driver(struct usb_gadget_driver *driver)
+>>> >+int usb_udc_attach_driver(const char *name, struct usb_gadget_driver *driver)
+>>> >+{
+>>> >+    struct usb_udc *udc = NULL;
+>>> >+    int ret = -ENODEV;
+>>> >+
+>>> >+    mutex_lock(&udc_lock);
+>>> >+    list_for_each_entry(udc, &udc_list, list) {
+>>> >+            ret = strcmp(name, dev_name(&udc->dev));
+>>> >+            if (!ret)
+>>> >+                    break;
+>>> >+    }
+>>> >+    if (ret) {
+>>> >+            ret = -ENODEV;
+>>> >+            goto out;
+>>> >+    }
+>>> >+    if (udc->driver) {
+>>> >+            ret = -EBUSY;
+>>> >+            goto out;
+>>> >+    }
+>>> >+    ret = udc_bind_to_driver(udc, driver);
+>>> >+out:
+>>> >+    mutex_unlock(&udc_lock);
+>>> >+    return ret;
+>>> >+}
+>>> >+EXPORT_SYMBOL_GPL(usb_udc_attach_driver);
+>>> >+
+>>> >+int __usb_gadget_probe_driver(struct usb_gadget_driver *driver)
+>>> >  {
+>>> >     struct usb_udc          *udc = NULL;
+>>> >     int                     ret = -ENODEV;
+>>> >-    if (!driver || !driver->bind || !driver->setup)
+>>> >-            return -EINVAL;
+>>> >-
+>>> >     mutex_lock(&udc_lock);
+>>> >     if (driver->udc_name) {
+>>> >             list_for_each_entry(udc, &udc_list, list) {
+>>> >@@ -567,16 +590,47 @@ int usb_gadget_probe_driver(struct usb_gadget_driver *driver)
+>>> >             }
+>>> >     }
+>>> >-    list_add_tail(&driver->pending, &gadget_driver_pending_list);
+>>> >+//  list_add_tail(&driver->pending, &gadget_driver_pending_list); FIXME
+>>> >     pr_info("udc-core: couldn't find an available UDC - added [%s] to list of pending drivers\n",
+>>> >             driver->function);
+>>> >+
+>>> >     mutex_unlock(&udc_lock);
+>>> >-    return 0;
+>>> >+    return ret;
+>>> >  found:
+>>> >     ret = udc_bind_to_driver(udc, driver);
+>>> >     mutex_unlock(&udc_lock);
+>>> >     return ret;
+>>> >  }
+>>> >+
+>>> >+#define USB_GADGET_BIND_RETRIES             5
+>>> >+#define USB_GADGET_BIND_TIMEOUT             (3 * HZ)
+>>> >+static void usb_gadget_work(struct work_struct *work)
+>>> >+{
+>>> >+    struct usb_gadget_driver *driver = container_of(work,
+>>> >+                                            struct usb_gadget_driver,
+>>> >+                                            work.work);
+>>> >+    int res;
+>>> >+
+>>> >+    if (driver->retries++ > USB_GADGET_BIND_RETRIES) {
+>>> >+            pr_err("couldn't find an available UDC\n");
+>>> >+            return;
+>>> >+    }
+>>> >+
+>>> >+    res = __usb_gadget_probe_driver(driver);
+>>> >+    if (res == -ENODEV)
+>>> >+            schedule_delayed_work(&driver->work, USB_GADGET_BIND_TIMEOUT);
+>>> >+}
+>>> >+
+>>> >+int usb_gadget_probe_driver(struct usb_gadget_driver *driver)
+>>> >+{
+>>> >+    if (!driver || !driver->bind || !driver->setup)
+>>> >+            return -EINVAL;
+>>> >+
+>>> >+    INIT_DELAYED_WORK(&driver->work, usb_gadget_work);
+>>> >+    schedule_delayed_work(&driver->work, 0);
+>>> >+
+>>> >+    return 0;
+>>> >+}
+>>> >  EXPORT_SYMBOL_GPL(usb_gadget_probe_driver);
+>>> >  int usb_gadget_unregister_driver(struct usb_gadget_driver *driver)
+>>> >@@ -587,6 +641,8 @@ int usb_gadget_unregister_driver(struct usb_gadget_driver *driver)
+>>> >     if (!driver || !driver->unbind)
+>>> >             return -EINVAL;
+>>> >+    cancel_delayed_work(&driver->work);
+>>> >+
+>>> >     mutex_lock(&udc_lock);
+>>> >     list_for_each_entry(udc, &udc_list, list)
+>>> >             if (udc->driver == driver) {
+>>> >@@ -747,7 +803,7 @@ static int __init usb_udc_init(void)
+>>> >     udc_class->dev_uevent = usb_udc_uevent;
+>>> >     return 0;
+>>> >  }
+>>> >-subsys_initcall(usb_udc_init);
+>>> >+late_initcall_sync(usb_udc_init);
+>>> >  static void __exit usb_udc_exit(void)
+>>> >  {
+>>> >diff --git a/include/linux/usb/gadget.h b/include/linux/usb/gadget.h
+>>> >index d82d006..adb1e68 100644
+>>> >--- a/include/linux/usb/gadget.h
+>>> >+++ b/include/linux/usb/gadget.h
+>>> >@@ -1014,6 +1014,8 @@ static inline int usb_gadget_activate(struct usb_gadget *gadget)
+>>> >   * @resume: Invoked on USB resume.  May be called in_interrupt.
+>>> >   * @reset: Invoked on USB bus reset. It is mandatory for all gadget drivers
+>>> >   * and should be called in_interrupt.
+>>> >+ * @work: Gadget work used to bind to the USB controller.
+>>> >+ * @retries: Gadget retries to bind to the USB controller.
+>>> >   * @driver: Driver model state for this driver.
+>>> >   * @udc_name: A name of UDC this driver should be bound to. If udc_name is NULL,
+>>> >   * this driver will be bound to any available UDC.
+>>> >@@ -1075,6 +1077,8 @@ struct usb_gadget_driver {
+>>> >     void                    (*suspend)(struct usb_gadget *);
+>>> >     void                    (*resume)(struct usb_gadget *);
+>>> >     void                    (*reset)(struct usb_gadget *);
+>>> >+    struct delayed_work     work;
+>>> >+    int                     retries;
+>>> >     /* FIXME support safe rmmod */
+>>> >     struct device_driver    driver;
+>>> >
+>>>
+>>> Best regards
+>>
+>> --
+>> (english) http://www.livejournal.com/~pavelmachek
+>> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
