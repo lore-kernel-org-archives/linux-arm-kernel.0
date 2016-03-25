@@ -1,30 +1,29 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Fri, 25 Mar 2016 10:14:25 -0500
-Subject: [PATCH v3 01/16] dt: davinci: use proper address after @
-In-Reply-To: <1458863503-31121-2-git-send-email-david@lechnology.com>
-References: <1458863503-31121-1-git-send-email-david@lechnology.com>
- <1458863503-31121-2-git-send-email-david@lechnology.com>
-Message-ID: <CAL_Jsq+CrrNnbx9rGhDmjoOkBVo6wjPTVeUcOWSHdLOwWeiC6Q@mail.gmail.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Fri, 25 Mar 2016 15:36:24 +0000
+Subject: [PATCH 0/4] STi DT updates
+Message-ID: <1458920188-29612-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 24, 2016 at 6:51 PM, David Lechner <david@lechnology.com> wrote:
-> TI has been using the physical address in DT after the @ in device nodes.
-> The device tree convention is to use the same address that is used for
-> the reg property. This updates all davinci DT files to use the proper
-> convention.
->
-> Signed-off-by: David Lechner <david@lechnology.com>
-> ---
->
-> v3 changes: This is a new patch.
->
->
->  arch/arm/boot/dts/da850-enbw-cmc.dts |  8 +++---
->  arch/arm/boot/dts/da850-evm.dts      | 26 +++++++++---------
->  arch/arm/boot/dts/da850.dtsi         | 52 ++++++++++++++++++------------------
->  3 files changed, 43 insertions(+), 43 deletions(-)
+Hi Maxime,
 
-Thanks for fixing.
+This series adds some more alternate pin configurations which were missing
+upstream, the DT config for SSC12, and also a DT node for the 24c256 eeprom.
 
-Acked-by: Rob Herring <robh@kernel.org>
+regards,
+
+Peter.
+
+Peter Griffin (4):
+  ARM: DT: STiH407: Add UART RTS/CTS pin configuration
+  ARM: DT: STiH407: Add i2c12 pin definition
+  ARM: DT: STiH407: Add node for i2c12 controller
+  ARM: STi: DT: STiH407: Add DT node for eeprom
+
+ arch/arm/boot/dts/stih407-family.dtsi  | 13 ++++++
+ arch/arm/boot/dts/stih407-pinctrl.dtsi | 82 ++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/stihxxx-b2120.dtsi   |  9 ++++
+ 3 files changed, 104 insertions(+)
+
+-- 
+1.9.1
