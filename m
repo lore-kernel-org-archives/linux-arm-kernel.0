@@ -1,205 +1,86 @@
-From: balbi@kernel.org (Felipe Balbi)
-Date: Fri, 25 Mar 2016 19:44:22 +0200
-Subject: [PATCH] usb: host: xhci-plat: Make enum xhci_plat_type start at a
- non zero value
-In-Reply-To: <87mvpmlc5e.fsf@free-electrons.com>
-References: <1458917188-28452-1-git-send-email-peter.griffin@linaro.org>
- <87mvpm8pfl.fsf@ti.com> <87mvpmlc5e.fsf@free-electrons.com>
-Message-ID: <87io0a8nbd.fsf@ti.com>
+From: haas@computerlinguist.org (Michael Haas)
+Date: Fri, 25 Mar 2016 20:04:05 +0100
+Subject: [PATCH 1/3] sunxi: A20-OLinuXino-LIME2: Fix ldo3/ldo4 in DTS
+Message-ID: <1458932647-24268-1-git-send-email-haas@computerlinguist.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+LDO3 and LDO4 are set to regulator-always-on which causes
+crashes on my A20-OLinuXino-LIME2 once axp20x-i2c.ko is loaded.
 
-Hi,
+This crash is observed in combination with recent versions
+of Das U-Boot starting from their commit
+02cc27c74f9b884b538bcd1b93342a4c05b5d608.
 
-Gregory CLEMENT <gregory.clement@free-electrons.com> writes:
->> Peter Griffin <peter.griffin@linaro.org> writes:
->>> Otherwise generic-xhci and xhci-platform which have no data get wrongly
->>> detected as XHCI_PLAT_TYPE_MARVELL_ARMADA by xhci_plat_type_is().
->>>
->>> This fixes a regression in v4.5 for STiH407 family SoC's which use the
->>> synopsis dwc3 IP, whereby the disable_clk error path gets taken due to
->>> wrongly being detected as XHCI_PLAT_TYPE_MARVELL_ARMADA and the hcd never
->>> gets added.
->>>
->>> I suspect this will also fix other dwc3 DT platforms such as Exynos,
->>> although I've only tested on STih410 SoC.
->>>
->>> Fixes: 4efb2f694114 ("usb: host: xhci-plat: add struct xhci_plat_priv")
->>> Cc: stable at vger.kernel.org
->>> Cc: gregory.clement at free-electrons.com
->>> Cc: yoshihiro.shimoda.uh at renesas.com
->>> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
->>> ---
->>>  drivers/usb/host/xhci-plat.h | 2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/usb/host/xhci-plat.h b/drivers/usb/host/xhci-plat.h
->>> index 5a2e2e3..529c3c4 100644
->>> --- a/drivers/usb/host/xhci-plat.h
->>> +++ b/drivers/usb/host/xhci-plat.h
->>> @@ -14,7 +14,7 @@
->>>  #include "xhci.h"	/* for hcd_to_xhci() */
->>>  
->>>  enum xhci_plat_type {
->>> -	XHCI_PLAT_TYPE_MARVELL_ARMADA,
->>> +	XHCI_PLAT_TYPE_MARVELL_ARMADA = 1,
->>>  	XHCI_PLAT_TYPE_RENESAS_RCAR_GEN2,
->>>  	XHCI_PLAT_TYPE_RENESAS_RCAR_GEN3,
->>
->> aren't these platforms using device tree ? Why aren't these just
->> different compatible strings ?
+>commit 02cc27c74f9b884b538bcd1b93342a4c05b5d608
+>Author: Hans de Goede <hdegoede@redhat.com>
+>Date:   Sat Oct 3 15:29:24 2015 +0200
 >
-> According to 4efb2f69411456d35051e9047c15157c9a5ba217 "usb: host:
-> xhci-plat: add struct xhci_plat_priv" :
+>    sunxi: power: Change axp209 LDO3 and LDO4 default to disabled
 >
-> This patch adds struct xhci_plat_priv to simplify the code to match
-> platform specific variables. For now, this patch adds a member "type" in
-> the structure
+>    LDO3 and LDO4 are normally either unused, or used to power csi
+>    attached camera sensors, and as such do not need to be enabled at
+>    boot time.
+>
+>    Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>    Acked-by: Ian Campbell <ijc@hellion.org.uk>
 
-that's fine but the answer doesn't exactly match my question ;-)
+Hans de Goede suggests fixing the Linux DTS file via the u-boot list:
 
-My point is that this enum shouldn't be necessary at all. We have
-compatible flags to make these checks instead. How about below ?
-(untested, uncompiled, yada yada yada). Note that we DON'T need this
-xhci_plat_type trickery, just need to be a little bit smarter about how
-we use driver_data:
+>The regulator-always-on will cause both regulators to get turned on,
+>but the min / max constraints match the datasheet constrains / the
+>absolute min / max values these ldo-s can deliver, not the constraints
+>which the board design puts on these.
+>
+>So now these ldo-s end up getting turned on at whatever voltage
+>is the default (which according to the datasheet is unknown),
+>where as the schematic says that if these get turned on (which
+>is not necessary) they should be run at 2.8V.
+>
+>This dts file is the only axp209 using dts file which:
+>
+>1) Does not have proper constraints for LDO3 / LDO4
+>2) Uses regulator-always-on; for these
+>
+>I would suggest fixing both, first you can try making min = max =
+>2800000. And if that fixes things, which I expect it will, I would
+>also drop the regulator-always-on from the dts, since we really
+>only need to turn these on when using the csi interface in which
+>case it would be up to the csi driver to explicitly turn them on.
 
-diff --git a/drivers/usb/host/xhci-mvebu.c b/drivers/usb/host/xhci-mvebu.c
-index 1eefc988192d..1ea6c18b74f3 100644
---- a/drivers/usb/host/xhci-mvebu.c
-+++ b/drivers/usb/host/xhci-mvebu.c
-@@ -41,8 +41,9 @@ static void xhci_mvebu_mbus_config(void __iomem *base,
- 	}
- }
- 
--int xhci_mvebu_mbus_init_quirk(struct platform_device *pdev)
-+int xhci_mvebu_mbus_init_quirk(struct usb_hcd *hcd)
- {
-+	struct platform_device *pdev = to_platform_device(hcd->self.controller);
- 	struct resource	*res;
- 	void __iomem *base;
- 	const struct mbus_dram_target_info *dram;
-diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-index 5c15e9bc5f7a..adb77c60a9ae 100644
---- a/drivers/usb/host/xhci-plat.c
-+++ b/drivers/usb/host/xhci-plat.c
-@@ -47,43 +47,56 @@ static void xhci_plat_quirks(struct device *dev, struct xhci_hcd *xhci)
- 	xhci->quirks |= XHCI_PLAT;
- }
- 
-+static void xhci_priv_plat_start(struct usb_hcd *hcd)
-+{
-+	struct xhci_plat_priv *priv = hcd_to_xhci_priv(hcd);
-+
-+	if (priv->plat_start)
-+		priv->plat_start(hcd);
-+}
-+
-+static int xhci_priv_init_quirk(struct usb_hcd *hcd)
-+{
-+	struct xhci_plat_priv *priv = hcd_to_xhci_priv(hcd);
-+
-+	if (!priv->init_quirk)
-+		return 0;
-+
-+	return priv->init_quirk(hcd);
-+}
-+
- /* called during probe() after chip reset completes */
- static int xhci_plat_setup(struct usb_hcd *hcd)
- {
- 	int ret;
- 
--	if (xhci_plat_type_is(hcd, XHCI_PLAT_TYPE_RENESAS_RCAR_GEN2) ||
--	    xhci_plat_type_is(hcd, XHCI_PLAT_TYPE_RENESAS_RCAR_GEN3)) {
--		ret = xhci_rcar_init_quirk(hcd);
--		if (ret)
--			return ret;
--	}
-+	ret = xhci_priv_init_quirk(hcd);
-+	if (ret)
-+		return ret;
- 
- 	return xhci_gen_setup(hcd, xhci_plat_quirks);
- }
- 
- static int xhci_plat_start(struct usb_hcd *hcd)
- {
--	if (xhci_plat_type_is(hcd, XHCI_PLAT_TYPE_RENESAS_RCAR_GEN2) ||
--	    xhci_plat_type_is(hcd, XHCI_PLAT_TYPE_RENESAS_RCAR_GEN3))
--		xhci_rcar_start(hcd);
--
-+	xhci_priv_plat_start(hcd);
- 	return xhci_run(hcd);
- }
- 
- #ifdef CONFIG_OF
- static const struct xhci_plat_priv xhci_plat_marvell_armada = {
--	.type = XHCI_PLAT_TYPE_MARVELL_ARMADA,
-+	.init_quirk = xhci_mvebu_mbus_init_quirk,
- };
- 
- static const struct xhci_plat_priv xhci_plat_renesas_rcar_gen2 = {
--	.type = XHCI_PLAT_TYPE_RENESAS_RCAR_GEN2,
- 	.firmware_name = XHCI_RCAR_FIRMWARE_NAME_V1,
-+	.init_quirk = xhci_rcar_init_quirk,
- };
- 
- static const struct xhci_plat_priv xhci_plat_renesas_rcar_gen3 = {
--	.type = XHCI_PLAT_TYPE_RENESAS_RCAR_GEN3,
- 	.firmware_name = XHCI_RCAR_FIRMWARE_NAME_V2,
-+	.init_quirk = xhci_rcar_init_quirk,
-+	.plat_start = xhci_rcar_start,
- };
- 
- static const struct of_device_id usb_xhci_of_match[] = {
-diff --git a/drivers/usb/host/xhci-plat.h b/drivers/usb/host/xhci-plat.h
-index 5a2e2e3936c4..c4d565980832 100644
---- a/drivers/usb/host/xhci-plat.h
-+++ b/drivers/usb/host/xhci-plat.h
-@@ -13,27 +13,13 @@
- 
- #include "xhci.h"	/* for hcd_to_xhci() */
- 
--enum xhci_plat_type {
--	XHCI_PLAT_TYPE_MARVELL_ARMADA,
--	XHCI_PLAT_TYPE_RENESAS_RCAR_GEN2,
--	XHCI_PLAT_TYPE_RENESAS_RCAR_GEN3,
--};
--
- struct xhci_plat_priv {
- 	enum xhci_plat_type type;
- 	const char *firmware_name;
-+	void (*plat_start)(struct usb_hcd *);
-+	int (*init_quirk)(struct usb_hcd *);
- };
- 
- #define hcd_to_xhci_priv(h) ((struct xhci_plat_priv *)hcd_to_xhci(h)->priv)
- 
--static inline bool xhci_plat_type_is(struct usb_hcd *hcd,
--				     enum xhci_plat_type type)
--{
--	struct xhci_plat_priv *priv = hcd_to_xhci_priv(hcd);
--
--	if (priv && priv->type == type)
--		return true;
--	else
--		return false;
--}
- #endif	/* _XHCI_PLAT_H */
+This patch implements the suggested changes. It is not enough
+to set the voltage to 2800000 to avoid the crash. Hence, I have
+also removed regulator-always-on.
 
-ps: there might be bugs there, but it's a holiday and I really shouldn't
-be spending time on this right now ;-)
+Signed-off-by: Michael Haas <haas@computerlinguist.org>
+CC: Hans de Goede <hdegoede@redhat.com>
+---
+ arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
-Anyway, have fun testing. Let me know if it doesn't work.
-
+diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+index d5c796c..d5ff2e9 100644
+--- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
++++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
+@@ -140,15 +140,13 @@
+ 			};
+ 
+ 			vcc_csi0: ldo3 {
+-				regulator-min-microvolt = <700000>;
+-				regulator-max-microvolt = <3500000>;
+-				regulator-always-on;
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
+ 			};
+ 
+ 			vcc_csi1: ldo4 {
+-				regulator-min-microvolt = <1250000>;
+-				regulator-max-microvolt = <3300000>;
+-				regulator-always-on;
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
+ 			};
+ 
+ 			vdd_cpu: dcdc2 {
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160325/08411d5c/attachment.sig>
+2.7.2
