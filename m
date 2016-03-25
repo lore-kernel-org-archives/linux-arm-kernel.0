@@ -1,239 +1,163 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 25 Mar 2016 02:05:04 +0000
-Subject: [RFC PATCH 41/45] KVM: arm/arm64: vgic-new: vgic_init: implement
- map_resources
+Date: Fri, 25 Mar 2016 02:05:06 +0000
+Subject: [RFC PATCH 43/45] KVM: arm/arm64: vgic-new: implement mapped IRQ
+ handling
 In-Reply-To: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
 References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1458871508-17279-42-git-send-email-andre.przywara@arm.com>
+Message-ID: <1458871508-17279-44-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Auger <eric.auger@linaro.org>
+We now store the mapped hardware IRQ number in our struct, so we
+don't need the irq_phys_map any longer for the new VGIC.
+Implement the hardware IRQ mapping on top of the reworked arch
+timer interface.
 
-map_resources is the last initialization step. It is executed on
-1st VCPU run. At that stage the code checks the userspace has provided
-the base addresses for the relevant VGIC regions, which depend on
-the type of VGIC that is exposed to the guest.
-
-The function also forces the vgic_init if it has not been executed yet
-(only allowed for VGIC v2).
-
-for GICv2, The VGIC CPU interface is mapped onto the GIC virtual CPU
-interface.
-
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- include/kvm/vgic/vgic.h       |  1 +
- virt/kvm/arm/vgic/vgic-v2.c   | 47 +++++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic-v3.c   | 44 ++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic.h      | 16 +++++++++++++++
- virt/kvm/arm/vgic/vgic_init.c | 27 +++++++++++++++++++++++++
- 5 files changed, 135 insertions(+)
+ include/kvm/vgic/vgic.h  | 15 ++++++++
+ virt/kvm/arm/vgic/vgic.c | 92 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 107 insertions(+)
 
 diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-index 4a51582..e418de9 100644
+index e418de9..7c1d145 100644
 --- a/include/kvm/vgic/vgic.h
 +++ b/include/kvm/vgic/vgic.h
-@@ -201,6 +201,7 @@ int kvm_vgic_create(struct kvm *kvm, u32 type);
- void kvm_vgic_destroy(struct kvm *kvm);
- void kvm_vgic_vcpu_early_init(struct kvm_vcpu *vcpu);
- void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu);
-+int kvm_vgic_map_resources(struct kvm *kvm);
- int kvm_vgic_hyp_init(void);
+@@ -206,6 +206,21 @@ int kvm_vgic_hyp_init(void);
  
  int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index c48dbd4..8d0898c 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -239,6 +239,53 @@ void vgic_v2_enable(struct kvm_vcpu *vcpu)
- {
- }
+ 			bool level);
++int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid, unsigned int intid,
++			       bool level);
++
++/*
++ * This is not really needed, but we need this type to keep the arch
++ * timer compatible with the old VGIC implementation.
++ * This should be removed upon retiring the old VGIC.
++ */
++struct irq_phys_map {};
++
++struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
++					   u32 virt_irq, u32 irq);
++int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, struct irq_phys_map *map,
++			    u32 intid);
++bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, u32 intid);
  
-+int vgic_v2_map_resources(struct kvm *kvm)
-+{
-+	struct vgic_dist *dist = &kvm->arch.vgic;
-+	int ret = 0;
+ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
+ 
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index 4ade7c0..65395af 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -17,6 +17,9 @@
+ #include <linux/kvm.h>
+ #include <linux/kvm_host.h>
+ #include <linux/list_sort.h>
++#include <linux/irq.h>
++#include <linux/interrupt.h>
++#include <linux/irqdesc.h>
+ 
+ #include "vgic.h"
+ 
+@@ -276,6 +279,83 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+ 
+ 	vcpu = kvm_get_vcpu(kvm, cpuid);
+ 	vgic_update_irq_pending(kvm, vcpu, intid, level);
 +
-+	if (vgic_ready(kvm))
-+		goto out;
-+
-+	if (IS_VGIC_ADDR_UNDEF(dist->vgic_dist_base) ||
-+	    IS_VGIC_ADDR_UNDEF(dist->vgic_cpu_base)) {
-+		kvm_err("Need to set vgic cpu and dist addresses first\n");
-+		ret = -ENXIO;
-+		goto out;
-+	}
-+
-+	/*
-+	 * Initialize the vgic if this hasn't already been done on demand by
-+	 * accessing the vgic state from userspace.
-+	 */
-+	ret = vgic_init(kvm);
-+	if (ret) {
-+		kvm_err("Unable to initialize VGIC dynamic data structures\n");
-+		goto out;
-+	}
-+
-+	ret = vgic_register_dist_regions(kvm, dist->vgic_dist_base, VGIC_V2);
-+	if (ret) {
-+		kvm_err("Unable to register VGIC MMIO regions\n");
-+		goto out;
-+	}
-+
-+	ret = kvm_phys_addr_ioremap(kvm, dist->vgic_cpu_base,
-+				    kvm_vgic_global_state.vcpu_base,
-+				    KVM_VGIC_V2_CPU_SIZE, true);
-+	if (ret) {
-+		kvm_err("Unable to remap VGIC CPU to VCPU\n");
-+		goto out;
-+	}
-+
-+	dist->ready = true;
-+
-+out:
-+	if (ret)
-+		kvm_vgic_destroy(kvm);
-+	return ret;
++	return 0;
 +}
-+
- /**
-  * vgic_v2_probe - probe for a GICv2 compatible interrupt controller in DT
-  * @node:	pointer to the DT node
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 3155680..705a269 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -225,6 +225,50 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu)
- {
- }
- 
-+int vgic_v3_map_resources(struct kvm *kvm)
-+{
-+	int ret = 0;
-+	struct vgic_dist *dist = &kvm->arch.vgic;
-+
-+	if (vgic_ready(kvm))
-+		goto out;
-+
-+	if (IS_VGIC_ADDR_UNDEF(dist->vgic_dist_base) ||
-+	    IS_VGIC_ADDR_UNDEF(dist->vgic_redist_base)) {
-+		kvm_err("Need to set vgic distributor addresses first\n");
-+		ret = -ENXIO;
-+		goto out;
-+	}
-+
-+	/*
-+	 * For a VGICv3 we require the userland to explicitly initialize
-+	 * the VGIC before we need to use it.
-+	 */
-+	if (!vgic_initialized(kvm)) {
-+		ret = -EBUSY;
-+		goto out;
-+	}
-+
-+	ret = vgic_register_dist_regions(kvm, dist->vgic_dist_base, VGIC_V3);
-+	if (ret) {
-+		kvm_err("Unable to register VGICv3 dist MMIO regions\n");
-+		goto out;
-+	}
-+
-+	ret = vgic_register_redist_regions(kvm, dist->vgic_redist_base);
-+	if (ret) {
-+		kvm_err("Unable to register VGICv3 redist MMIO regions\n");
-+		goto out;
-+	}
-+
-+	dist->ready = true;
-+
-+out:
-+	if (ret)
-+		kvm_vgic_destroy(kvm);
-+	return ret;
-+}
-+
- /**
-  * vgic_v3_probe - probe for a GICv3 compatible interrupt controller in DT
-  * @node:	pointer to the DT node
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 4b2e1b0..db9dfd7 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -40,6 +40,9 @@ void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
- void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
- void vgic_v2_enable(struct kvm_vcpu *vcpu);
- int vgic_v2_probe(struct device_node *vgic_node);
-+int vgic_v2_map_resources(struct kvm *kvm);
-+int vgic_register_dist_regions(struct kvm *kvm, gpa_t dist_base_address,
-+			       enum vgic_type);
- 
- #ifdef CONFIG_KVM_ARM_VGIC_V3
- void vgic_v3_irq_change_affinity(struct kvm *kvm, u32 intid, u64 mpidr);
-@@ -55,6 +58,8 @@ void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
- void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
- void vgic_v3_enable(struct kvm_vcpu *vcpu);
- int vgic_v3_probe(struct device_node *vgic_node);
-+int vgic_v3_map_resources(struct kvm *kvm);
-+int vgic_register_redist_regions(struct kvm *kvm, gpa_t dist_base_address);
- #else
- static inline void vgic_v3_irq_change_affinity(struct kvm *kvm, u32 intid,
- 					       u64 mpidr)
-@@ -108,6 +113,17 @@ static inline int vgic_v3_probe(struct device_node *vgic_node)
- {
- 	return -ENODEV;
- }
-+
-+static inline int vgic_v3_map_resources(struct kvm *kvm)
-+{
-+	return -ENODEV;
-+}
-+
-+static inline int vgic_register_redist_regions(struct kvm *kvm,
-+					       gpa_t dist_base_address)
-+{
-+	return -ENODEV;
-+}
- #endif
- 
- void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
-diff --git a/virt/kvm/arm/vgic/vgic_init.c b/virt/kvm/arm/vgic/vgic_init.c
-index f7a6a11..ac655b5 100644
---- a/virt/kvm/arm/vgic/vgic_init.c
-+++ b/virt/kvm/arm/vgic/vgic_init.c
-@@ -322,6 +322,33 @@ int vgic_lazy_init(struct kvm *kvm)
- 	return ret;
- }
- 
-+/* RESOURCE MAPPING */
 +
 +/**
-+ * Map the MMIO regions depending on the VGIC model exposed to the guest
-+ * called on the first VCPU run.
-+ * Also map the virtual CPU interface into the VM.
-+ * v2/v3 derivatives call vgic_init if not already done.
-+ * Completion can be tested by vgic_ready
++ * kvm_vgic_inject_mapped_irq - Inject a hardware mapped IRQ to the vgic
++ * @kvm:     The VM structure pointer
++ * @cpuid:   The CPU for PPIs
++ * @irq_num: The INTID to inject a new state to.
++ * @level:   Edge-triggered:  true:  to trigger the interrupt
++ *			      false: to ignore the call
++ *	     Level-sensitive  true:  raise the input signal
++ *			      false: lower the input signal
++ *
++ * The GIC is not concerned with devices being active-LOW or active-HIGH for
++ * level-sensitive interrupts.  You can think of the level parameter as 1
++ * being HIGH and 0 being LOW and all devices being active-HIGH.
 + */
-+int kvm_vgic_map_resources(struct kvm *kvm)
++int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid, unsigned int intid,
++			       bool level)
 +{
-+	struct vgic_dist *dist = &kvm->arch.vgic;
-+	int ret = 0;
++	struct kvm_vcpu *vcpu;
++	int ret;
 +
-+	mutex_lock(&kvm->lock);
-+	if (!irqchip_in_kernel(kvm))
-+		goto out;
++	ret = vgic_lazy_init(kvm);
++	if (ret)
++		return ret;
 +
-+	if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V2)
-+		ret = vgic_v2_map_resources(kvm);
-+	else
-+		ret = vgic_v3_map_resources(kvm);
-+out:
-+	mutex_unlock(&kvm->lock);
-+	return ret;
++	vcpu = kvm_get_vcpu(kvm, cpuid);
++	vgic_update_irq_pending(kvm, vcpu, intid, level);
++
++	return 0;
 +}
 +
- /* GENERIC PROBE */
++struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
++					   u32 virt_irq, u32 intid)
++{
++	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
++	struct irq_desc *desc;
++	struct irq_data *data;
++
++	BUG_ON(!irq);
++
++	desc = irq_to_desc(intid);
++	if (!desc) {
++		kvm_err("%s: no interrupt descriptor\n", __func__);
++		return NULL;
++	}
++
++	data = irq_desc_get_irq_data(desc);
++	while (data->parent_data)
++		data = data->parent_data;
++
++	spin_lock(&irq->irq_lock);
++
++	irq->hw = true;
++	irq->hwintid = data->hwirq;
++
++	spin_unlock(&irq->irq_lock);
++
++	return NULL;
++}
++
++int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, struct irq_phys_map *map,
++			    u32 intid)
++{
++	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid);
++
++	BUG_ON(!irq);
++
++	spin_lock(&irq->irq_lock);
++
++	irq->hw = false;
++	irq->hwintid = 0;
++
++	spin_unlock(&irq->irq_lock);
++
+ 	return 0;
+ }
  
- static void vgic_init_maintenance_interrupt(void *info)
+@@ -520,3 +600,15 @@ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
+ 
+ 	return pending;
+ }
++
++bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, u32 intid)
++{
++	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid);
++	bool map_is_active;
++
++	spin_lock(&irq->irq_lock);
++	map_is_active = irq->hw && irq->active;
++	spin_unlock(&irq->irq_lock);
++
++	return map_is_active;
++}
 -- 
 2.7.3
