@@ -1,48 +1,70 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 25 Mar 2016 11:04:15 +0800
-Subject: [PATCH 2/2] ARM: sun7i: dt: Enable dram gate 5 (tve0 clock) for
- simplefb TV output
-In-Reply-To: <1458842920-30854-3-git-send-email-Priit.Laes@icefire.ee>
-References: <1458842920-30854-1-git-send-email-Priit.Laes@icefire.ee>
- <1458842920-30854-3-git-send-email-Priit.Laes@icefire.ee>
-Message-ID: <CAGb2v67Gw9BJHmsSeLWE8PTh4Y2Kxa4Dj=N=T6T_-j0i8xLaog@mail.gmail.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Fri, 25 Mar 2016 11:06:30 +0800
+Subject: [PATCH] sbs-battery: fix power status when battery is dry
+In-Reply-To: <1458801832.16645.7.camel@mtksdaap41>
+References: <1458726794-48298-1-git-send-email-yh.huang@mediatek.com>
+ <CAGS+omDTmJDkJYsf=gDJMrmAos+30enoAa2xfTPyirXUd37=9g@mail.gmail.com>
+ <1458801832.16645.7.camel@mtksdaap41>
+Message-ID: <CAGS+omDhFP+_shCqEWasLDsHf-ab0-OWJJ-gZZkgihAgrZwBHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 25, 2016 at 2:08 AM, Priit Laes <Priit.Laes@icefire.ee> wrote:
-> From: Priit Laes <plaes@plaes.org>
+On Thu, Mar 24, 2016 at 2:43 PM, YH Huang <yh.huang@mediatek.com> wrote:
 >
-> Seems like dram_gate 5 was forgotten when DRAM gating driver was added.
+> Hi Daniel,
 >
-> Enable it.
+> On Thu, 2016-03-24 at 12:01 +0800, Daniel Kurtz wrote:
+> > Hi YH,
+> >
+> > On Wed, Mar 23, 2016 at 5:53 PM, YH Huang <yh.huang@mediatek.com> wrote:
+> > > When the battery is dry and BATTERY_FULL_DISCHARGED is set,
+> > > we should check BATTERY_DISCHARGING to decide the power status.
+> > > If BATTERY_DISCHARGING is set, the power status is not charging.
+> > > Or the power status should be charging.
+> > >
+> > > Signed-off-by: YH Huang <yh.huang@mediatek.com>
+> > > ---
+> > >  drivers/power/sbs-battery.c |   22 ++++++++++++----------
+> > >  1 file changed, 12 insertions(+), 10 deletions(-)
+> > >
+> > > diff --git a/drivers/power/sbs-battery.c b/drivers/power/sbs-battery.c
+> > > index d6226d6..d86db0e 100644
+> > > --- a/drivers/power/sbs-battery.c
+> > > +++ b/drivers/power/sbs-battery.c
+> > > @@ -382,11 +382,12 @@ static int sbs_get_battery_property(struct i2c_client *client,
+> > >
+> > >                 if (ret & BATTERY_FULL_CHARGED)
+> > >                         val->intval = POWER_SUPPLY_STATUS_FULL;
+> > > -               else if (ret & BATTERY_FULL_DISCHARGED)
+> > > -                       val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
+> > > -               else if (ret & BATTERY_DISCHARGING)
+> > > -                       val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
+> > > -               else
+> > > +               else if (ret & BATTERY_DISCHARGING) {
+> > > +                       if (ret & BATTERY_FULL_DISCHARGED)
+> > > +                               val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
+> > > +                       else
+> > > +                               val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
+> > > +               } else
+> >
+> >
+> > I think (BATTERY_DISCHARGING && BATTERY_FULL_DISCHARGED) is still
+> > POWER_SUPPLY_STATUS_DISCHARGING.
+> > So, let's just report what the battery says and do:
+> >
+> >                else if (ret & BATTERY_DISCHARGING)
+> >                                val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
+> >
+> So we just ignore the special situation (BATTERY_DISCHARGING &&
+> BATTERY_FULL_DISCHARGED).
+> Isn't POWER_SUPPLY_STATUS_NOT_CHARGING a useful information?
+
+The battery is discharging.  The fact that it is also reporting that
+it is already "discharged" just seems premature.   I would expect to
+only see NOT_CHARGING if completely discharged *and* not discharging.
+
 >
-> Signed-off-by: Priit Laes <plaes@plaes.org>
-
-
-Fixes: 0b4bf5a5200b ("ARM: dts: sun7i: Add DRAM gates")
-
-Thanks!
-
-> ---
->  arch/arm/boot/dts/sun7i-a20.dtsi | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
 >
-> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-> index 0940a78..ee4e8e7 100644
-> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
-> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-> @@ -85,8 +85,9 @@
->                         compatible = "allwinner,simple-framebuffer",
->                                      "simple-framebuffer";
->                         allwinner,pipeline = "de_be0-lcd0-tve0";
-> -                       clocks = <&pll5 1>, <&ahb_gates 34>, <&ahb_gates 36>,
-> -                                <&ahb_gates 44>, <&dram_gates 26>;
-> +                       clocks = <&pll5 1>,
-> +                                <&ahb_gates 34>, <&ahb_gates 36>, <&ahb_gates 44>,
-> +                                <&dram_gates 5>, <&dram_gates 26>;
->                         status = "disabled";
->                 };
->         };
-> --
-> 2.5.0
+> Regards,
+> YH Huang
 >
