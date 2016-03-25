@@ -1,93 +1,91 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Thu, 24 Mar 2016 17:02:34 -0700
-Subject: [PATCH 4/5] drm/vc4: Add DPI driver
-In-Reply-To: <20160321125745.GA16407@rob-hp-laptop>
-References: <1458355366-7073-1-git-send-email-eric@anholt.net>
- <1458355366-7073-5-git-send-email-eric@anholt.net>
- <20160321125745.GA16407@rob-hp-laptop>
-Message-ID: <871t6za0h1.fsf@eliezer.anholt.net>
+Date: Thu, 24 Mar 2016 17:23:48 -0700
+Subject: [PATCH 2/5] panel-simple: Add the 7" DPI panel from Adafruit.
+In-Reply-To: <1458865431-30048-1-git-send-email-eric@anholt.net>
+References: <1458865431-30048-1-git-send-email-eric@anholt.net>
+Message-ID: <1458865431-30048-3-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob Herring <robh@kernel.org> writes:
+This is a basic TFT panel with a 40-pin FPC connector on it.  The
+specification doesn't define timings, but the Adafruit instructions
+were setting up 800x480 CVT.
 
-> On Fri, Mar 18, 2016 at 07:42:45PM -0700, Eric Anholt wrote:
->> The DPI interface involves taking a ton of our GPIOs to be used as
->> outputs, and routing display signals over them in parallel.
->> 
->> Signed-off-by: Eric Anholt <eric@anholt.net>
->> ---
->>  .../devicetree/bindings/display/brcm,bcm-vc4.txt   |  67 +++
->>  drivers/gpu/drm/vc4/Kconfig                        |   1 +
->>  drivers/gpu/drm/vc4/Makefile                       |   1 +
->>  drivers/gpu/drm/vc4/vc4_debugfs.c                  |   1 +
->>  drivers/gpu/drm/vc4/vc4_dpi.c                      | 518 +++++++++++++++++++++
->>  drivers/gpu/drm/vc4/vc4_drv.c                      |   1 +
->>  drivers/gpu/drm/vc4/vc4_drv.h                      |   5 +
->>  7 files changed, 594 insertions(+)
->>  create mode 100644 drivers/gpu/drm/vc4/vc4_dpi.c
->> 
->> diff --git a/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt b/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
->> index 56a961a..1782c3f 100644
->> --- a/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
->> +++ b/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
->> @@ -35,6 +35,44 @@ Optional properties for HDMI:
->>  		  as an interrupt/status bit in the HDMI controller
->>  		  itself).  See bindings/pinctrl/brcm,bcm2835-gpio.txt
->>  
->> +Required properties for DPI:
->> +- compatible:		Should be "brcm,bcm2835-dpi"
->> +- reg:			Physical base address and length of the registers
->> +- clocks:		a) core: The core clock the unit runs on
->> +			b) pixel: The pixel clock that feeds the pixelvalve
->> +- port:			Port node with a single endpoint connecting to the
->> +			  panel device, as defined in [1]
->> +- brcm,output-format:	Output data format, must be one of:
->> +			0) disabled
->> +			1) 00000000rrrrrggggggbbbbb
->> +			2) 000rrrrr00gggggg000bbbbb
->> +			3) 00rrrrr000gggggg00bbbbb0
->> +			4) 000000rrrrrrggggggbbbbbb
->> +			5) 00rrrrrr00gggggg00bbbbbb
->> +			6) rrrrrrrrggggggggbbbbbbbb
->> +
->> +Optional properties for DPI:
->> +- brcm,rgb-order:		RGB reordering, must be one of:
->> +				0) RGB
->> +				1) BGR
->> +				2) GRB
->> +				3) BRG
->
->> +- brcm,hsync-disable:		Disables the hsync signal
->> +- brcm,vsync-disable:		Disables the vsync signal
->> +- brcm,output-enable-disable:	Disables the output enable signal
->> +- brcm,hsync-falling:		Outputs the hsync signal on the falling clk edge
->> +- brcm,vsync-falling:		Outputs the vsync signal on the falling clk edge
->> +- brcm,output-enable-falling:	Outputs the output enable signal on the
->> +				  falling clk edge
->> +- brcm,output-enable-invert:	Inverts the polarity of the output enable
->> +				  signal
->> +- brcm,pixel-clk-invert:	Inverts the polarity of the pixel clk signal
->> +- brcm,output-enable-mode:	Sets output enable when (vsync | hsync)
->> +				  instead of (hactive & vactive)
->
-> These are all really properties of what the panel requires and we 
-> already have video timings binding that would cover some of these.
->
-> Also, do you have actual users? Some of these seem like they would be 
-> rare or never. I've not seen panels caring about which clock edge the 
-> sync signals are on.
+v2: Add .bus_format and vsync/hsync flags.
 
-I was using output-format, rgb_order, output-enable-mode to get my panel
-to work.  I'm suspicious that the !output_enable_mode is not useful,
-though (Note: I had documented it backwards: false is hsync|vsync, true
-is hactive&vactive).  That just left me with output-format.  I think
-.bus_format in the panel_desc can cover that, so I've now dropped all of
-these brcm properties.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160324/c0f99da7/attachment.sig>
+Signed-off-by: Eric Anholt <eric@anholt.net>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ .../bindings/display/panel/ontat,yx700wv03.txt     |  7 +++++
+ drivers/gpu/drm/panel/panel-simple.c               | 35 ++++++++++++++++++++++
+ 2 files changed, 42 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/panel/ontat,yx700wv03.txt
+
+diff --git a/Documentation/devicetree/bindings/display/panel/ontat,yx700wv03.txt b/Documentation/devicetree/bindings/display/panel/ontat,yx700wv03.txt
+new file mode 100644
+index 0000000..3d8a5e0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/panel/ontat,yx700wv03.txt
+@@ -0,0 +1,7 @@
++On Tat Industrial Company 7" DPI TFT panel.
++
++Required properties:
++- compatible: should be "ontat,yx700wv03"
++
++This binding is compatible with the simple-panel binding, which is specified
++in simple-panel.txt in this directory.
+diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
+index f88a631..642c5ca 100644
+--- a/drivers/gpu/drm/panel/panel-simple.c
++++ b/drivers/gpu/drm/panel/panel-simple.c
+@@ -1176,6 +1176,38 @@ static const struct panel_desc shelly_sca07010_bfn_lnn = {
+ 	.bus_format = MEDIA_BUS_FMT_RGB666_1X18,
+ };
+ 
++/* 800x480 CVT.  The panel appears to be quite accepting, at least as
++ * far as pixel clocks, but this is the timing that was being used in
++ * the Adafruit installation instructions.
++ */
++static const struct drm_display_mode ontat_yx700wv03_mode = {
++	.clock = 29500,
++	.hdisplay = 800,
++	.hsync_start = 824,
++	.hsync_end = 896,
++	.htotal = 992,
++	.vdisplay = 480,
++	.vsync_start = 483,
++	.vsync_end = 493,
++	.vtotal = 500,
++	.vrefresh = 60,
++	.flags = DRM_MODE_FLAG_NVSYNC | DRM_MODE_FLAG_NHSYNC,
++};
++
++/* Specification at
++ * https://www.adafruit.com/images/product-files/2406/c3163.pdf
++ */
++static const struct panel_desc ontat_yx700wv03 = {
++	.modes = &ontat_yx700wv03_mode,
++	.num_modes = 1,
++	.bpc = 8,
++	.size = {
++		.width = 154,
++		.height = 83,
++	},
++	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
++};
++
+ static const struct of_device_id platform_of_match[] = {
+ 	{
+ 		.compatible = "ampire,am800480r3tmqwa1h",
+@@ -1265,6 +1297,9 @@ static const struct of_device_id platform_of_match[] = {
+ 		.compatible = "okaya,rs800480t-7x0gp",
+ 		.data = &okaya_rs800480t_7x0gp,
+ 	}, {
++		.compatible = "ontat,yx700wv03",
++		.data = &ontat_yx700wv03,
++	}, {
+ 		.compatible = "ortustech,com43h4m85ulc",
+ 		.data = &ortustech_com43h4m85ulc,
+ 	}, {
+-- 
+2.7.0
