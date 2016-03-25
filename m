@@ -1,283 +1,93 @@
-From: david@lechnology.com (David Lechner)
-Date: Thu, 24 Mar 2016 18:51:41 -0500
-Subject: [PATCH v3 16/16] usb: musb: da8xx: Remove mach code
-In-Reply-To: <1458863503-31121-1-git-send-email-david@lechnology.com>
-References: <1458863503-31121-1-git-send-email-david@lechnology.com>
-Message-ID: <1458863503-31121-17-git-send-email-david@lechnology.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 24 Mar 2016 17:02:34 -0700
+Subject: [PATCH 4/5] drm/vc4: Add DPI driver
+In-Reply-To: <20160321125745.GA16407@rob-hp-laptop>
+References: <1458355366-7073-1-git-send-email-eric@anholt.net>
+ <1458355366-7073-5-git-send-email-eric@anholt.net>
+ <20160321125745.GA16407@rob-hp-laptop>
+Message-ID: <871t6za0h1.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the new phy-da8xx-usb driver to take the place of the mach code that
-pokes CFGCHIP2 in the da8xx musb glue driver. This unbreaks the driver.
+Rob Herring <robh@kernel.org> writes:
 
-Signed-off-by: David Lechner <david@lechnology.com>
----
+> On Fri, Mar 18, 2016 at 07:42:45PM -0700, Eric Anholt wrote:
+>> The DPI interface involves taking a ton of our GPIOs to be used as
+>> outputs, and routing display signals over them in parallel.
+>> 
+>> Signed-off-by: Eric Anholt <eric@anholt.net>
+>> ---
+>>  .../devicetree/bindings/display/brcm,bcm-vc4.txt   |  67 +++
+>>  drivers/gpu/drm/vc4/Kconfig                        |   1 +
+>>  drivers/gpu/drm/vc4/Makefile                       |   1 +
+>>  drivers/gpu/drm/vc4/vc4_debugfs.c                  |   1 +
+>>  drivers/gpu/drm/vc4/vc4_dpi.c                      | 518 +++++++++++++++++++++
+>>  drivers/gpu/drm/vc4/vc4_drv.c                      |   1 +
+>>  drivers/gpu/drm/vc4/vc4_drv.h                      |   5 +
+>>  7 files changed, 594 insertions(+)
+>>  create mode 100644 drivers/gpu/drm/vc4/vc4_dpi.c
+>> 
+>> diff --git a/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt b/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
+>> index 56a961a..1782c3f 100644
+>> --- a/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
+>> +++ b/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
+>> @@ -35,6 +35,44 @@ Optional properties for HDMI:
+>>  		  as an interrupt/status bit in the HDMI controller
+>>  		  itself).  See bindings/pinctrl/brcm,bcm2835-gpio.txt
+>>  
+>> +Required properties for DPI:
+>> +- compatible:		Should be "brcm,bcm2835-dpi"
+>> +- reg:			Physical base address and length of the registers
+>> +- clocks:		a) core: The core clock the unit runs on
+>> +			b) pixel: The pixel clock that feeds the pixelvalve
+>> +- port:			Port node with a single endpoint connecting to the
+>> +			  panel device, as defined in [1]
+>> +- brcm,output-format:	Output data format, must be one of:
+>> +			0) disabled
+>> +			1) 00000000rrrrrggggggbbbbb
+>> +			2) 000rrrrr00gggggg000bbbbb
+>> +			3) 00rrrrr000gggggg00bbbbb0
+>> +			4) 000000rrrrrrggggggbbbbbb
+>> +			5) 00rrrrrr00gggggg00bbbbbb
+>> +			6) rrrrrrrrggggggggbbbbbbbb
+>> +
+>> +Optional properties for DPI:
+>> +- brcm,rgb-order:		RGB reordering, must be one of:
+>> +				0) RGB
+>> +				1) BGR
+>> +				2) GRB
+>> +				3) BRG
+>
+>> +- brcm,hsync-disable:		Disables the hsync signal
+>> +- brcm,vsync-disable:		Disables the vsync signal
+>> +- brcm,output-enable-disable:	Disables the output enable signal
+>> +- brcm,hsync-falling:		Outputs the hsync signal on the falling clk edge
+>> +- brcm,vsync-falling:		Outputs the vsync signal on the falling clk edge
+>> +- brcm,output-enable-falling:	Outputs the output enable signal on the
+>> +				  falling clk edge
+>> +- brcm,output-enable-invert:	Inverts the polarity of the output enable
+>> +				  signal
+>> +- brcm,pixel-clk-invert:	Inverts the polarity of the pixel clk signal
+>> +- brcm,output-enable-mode:	Sets output enable when (vsync | hsync)
+>> +				  instead of (hactive & vactive)
+>
+> These are all really properties of what the panel requires and we 
+> already have video timings binding that would cover some of these.
+>
+> Also, do you have actual users? Some of these seem like they would be 
+> rare or never. I've not seen panels caring about which clock edge the 
+> sync signals are on.
 
-v3 changes:
-
-* removed depends on BROKEN and added select PHY_DA8XX_USB to Kconfig
-* Added calls to phy_init and phy_exit
-
-
- drivers/usb/musb/Kconfig |   2 +-
- drivers/usb/musb/da8xx.c | 141 ++++++++++++++++-------------------------------
- 2 files changed, 47 insertions(+), 96 deletions(-)
-
-diff --git a/drivers/usb/musb/Kconfig b/drivers/usb/musb/Kconfig
-index 886526b..c73221a 100644
---- a/drivers/usb/musb/Kconfig
-+++ b/drivers/usb/musb/Kconfig
-@@ -82,7 +82,7 @@ config USB_MUSB_DA8XX
- 	tristate "DA8xx/OMAP-L1x"
- 	depends on ARCH_DAVINCI_DA8XX
- 	depends on NOP_USB_XCEIV
--	depends on BROKEN
-+	select PHY_DA8XX_USB
- 
- config USB_MUSB_TUSB6010
- 	tristate "TUSB6010"
-diff --git a/drivers/usb/musb/da8xx.c b/drivers/usb/musb/da8xx.c
-index 0c1997c..de210cb 100644
---- a/drivers/usb/musb/da8xx.c
-+++ b/drivers/usb/musb/da8xx.c
-@@ -30,13 +30,12 @@
- #include <linux/clk.h>
- #include <linux/err.h>
- #include <linux/io.h>
-+#include <linux/phy/phy.h>
-+#include <linux/phy/phy-da8xx-usb.h>
- #include <linux/platform_device.h>
- #include <linux/dma-mapping.h>
- #include <linux/usb/usb_phy_generic.h>
- 
--#include <mach/da8xx.h>
--#include <linux/platform_data/usb-davinci.h>
--
- #include "musb_core.h"
- 
- /*
-@@ -80,61 +79,15 @@
- 
- #define DA8XX_MENTOR_CORE_OFFSET 0x400
- 
--#define CFGCHIP2	IO_ADDRESS(DA8XX_SYSCFG0_BASE + DA8XX_CFGCHIP2_REG)
--
- struct da8xx_glue {
- 	struct device		*dev;
- 	struct platform_device	*musb;
--	struct platform_device	*phy;
-+	struct platform_device	*usb_phy;
- 	struct clk		*clk;
-+	struct phy		*phy;
- };
- 
- /*
-- * REVISIT (PM): we should be able to keep the PHY in low power mode most
-- * of the time (24 MHz oscillator and PLL off, etc.) by setting POWER.D0
-- * and, when in host mode, autosuspending idle root ports... PHY_PLLON
-- * (overriding SUSPENDM?) then likely needs to stay off.
-- */
--
--static inline void phy_on(void)
--{
--	u32 cfgchip2 = __raw_readl(CFGCHIP2);
--
--	/*
--	 * Start the on-chip PHY and its PLL.
--	 */
--	cfgchip2 &= ~(CFGCHIP2_RESET | CFGCHIP2_PHYPWRDN | CFGCHIP2_OTGPWRDN);
--	cfgchip2 |= CFGCHIP2_PHY_PLLON;
--	__raw_writel(cfgchip2, CFGCHIP2);
--
--	pr_info("Waiting for USB PHY clock good...\n");
--	while (!(__raw_readl(CFGCHIP2) & CFGCHIP2_PHYCLKGD))
--		cpu_relax();
--}
--
--static inline void phy_off(void)
--{
--	u32 cfgchip2 = __raw_readl(CFGCHIP2);
--
--	/*
--	 * Ensure that USB 1.1 reference clock is not being sourced from
--	 * USB 2.0 PHY.  Otherwise do not power down the PHY.
--	 */
--	if (!(cfgchip2 & CFGCHIP2_USB1PHYCLKMUX) &&
--	     (cfgchip2 & CFGCHIP2_USB1SUSPENDM)) {
--		pr_warning("USB 1.1 clocked from USB 2.0 PHY -- "
--			   "can't power it down\n");
--		return;
--	}
--
--	/*
--	 * Power down the on-chip PHY.
--	 */
--	cfgchip2 |= CFGCHIP2_PHYPWRDN | CFGCHIP2_OTGPWRDN;
--	__raw_writel(cfgchip2, CFGCHIP2);
--}
--
--/*
-  * Because we don't set CTRL.UINT, it's "important" to:
-  *	- not read/write INTRUSB/INTRUSBE (except during
-  *	  initial setup, as a workaround);
-@@ -385,29 +338,14 @@ static irqreturn_t da8xx_musb_interrupt(int irq, void *hci)
- 
- static int da8xx_musb_set_mode(struct musb *musb, u8 musb_mode)
- {
--	u32 cfgchip2 = __raw_readl(CFGCHIP2);
-+	struct da8xx_glue *glue = dev_get_drvdata(musb->controller->parent);
- 
--	cfgchip2 &= ~CFGCHIP2_OTGMODE;
--	switch (musb_mode) {
--	case MUSB_HOST:		/* Force VBUS valid, ID = 0 */
--		cfgchip2 |= CFGCHIP2_FORCE_HOST;
--		break;
--	case MUSB_PERIPHERAL:	/* Force VBUS valid, ID = 1 */
--		cfgchip2 |= CFGCHIP2_FORCE_DEVICE;
--		break;
--	case MUSB_OTG:		/* Don't override the VBUS/ID comparators */
--		cfgchip2 |= CFGCHIP2_NO_OVERRIDE;
--		break;
--	default:
--		dev_dbg(musb->controller, "Trying to set unsupported mode %u\n", musb_mode);
--	}
--
--	__raw_writel(cfgchip2, CFGCHIP2);
--	return 0;
-+	return da8xx_usb20_phy_set_mode(glue->phy, musb_mode);
- }
- 
- static int da8xx_musb_init(struct musb *musb)
- {
-+	struct da8xx_glue *glue = dev_get_drvdata(musb->controller->parent);
- 	void __iomem *reg_base = musb->ctrl_base;
- 	u32 rev;
- 	int ret = -ENODEV;
-@@ -425,32 +363,56 @@ static int da8xx_musb_init(struct musb *musb)
- 		goto fail;
- 	}
- 
-+	ret = clk_prepare_enable(glue->clk);
-+	if (ret) {
-+		dev_err(glue->dev, "failed to enable clock\n");
-+		goto fail;
-+	}
-+
- 	setup_timer(&otg_workaround, otg_timer, (unsigned long)musb);
- 
- 	/* Reset the controller */
- 	musb_writel(reg_base, DA8XX_USB_CTRL_REG, DA8XX_SOFT_RESET_MASK);
- 
- 	/* Start the on-chip PHY and its PLL. */
--	phy_on();
-+	ret = phy_init(glue->phy);
-+	if (ret) {
-+		dev_err(glue->dev, "Failed to init phy.\n");
-+		goto err_phy_init;
-+	}
-+
-+	ret = phy_power_on(glue->phy);
-+	if (ret) {
-+		dev_err(glue->dev, "Failed to power on phy.\n");
-+		goto err_phy_power_on;
-+	}
- 
- 	msleep(5);
- 
- 	/* NOTE: IRQs are in mixed mode, not bypass to pure MUSB */
--	pr_debug("DA8xx OTG revision %08x, PHY %03x, control %02x\n",
--		 rev, __raw_readl(CFGCHIP2),
-+	pr_debug("DA8xx OTG revision %08x, control %02x\n", rev,
- 		 musb_readb(reg_base, DA8XX_USB_CTRL_REG));
- 
- 	musb->isr = da8xx_musb_interrupt;
- 	return 0;
-+
-+err_phy_power_on:
-+	phy_exit(glue->phy);
-+err_phy_init:
-+	clk_disable_unprepare(glue->clk);
- fail:
- 	return ret;
- }
- 
- static int da8xx_musb_exit(struct musb *musb)
- {
-+	struct da8xx_glue *glue = dev_get_drvdata(musb->controller->parent);
-+
- 	del_timer_sync(&otg_workaround);
- 
--	phy_off();
-+	phy_power_off(glue->phy);
-+	phy_exit(glue->phy);
-+	clk_disable_unprepare(glue->clk);
- 
- 	usb_put_phy(musb->xceiv);
- 
-@@ -504,10 +466,10 @@ static int da8xx_probe(struct platform_device *pdev)
- 		return PTR_ERR(clk);
- 	}
- 
--	ret = clk_enable(clk);
--	if (ret) {
--		dev_err(&pdev->dev, "failed to enable clock\n");
--		goto err4;
-+	glue->phy = devm_phy_get(&pdev->dev, "usbphy");
-+	if (IS_ERR(glue->phy)) {
-+		dev_err(&pdev->dev, "failed to get phy\n");
-+		return PTR_ERR(glue->phy);
- 	}
- 
- 	glue->dev			= &pdev->dev;
-@@ -515,10 +477,10 @@ static int da8xx_probe(struct platform_device *pdev)
- 
- 	pdata->platform_ops		= &da8xx_ops;
- 
--	glue->phy = usb_phy_generic_register();
--	if (IS_ERR(glue->phy)) {
--		ret = PTR_ERR(glue->phy);
--		goto err5;
-+	glue->usb_phy = usb_phy_generic_register();
-+	if (IS_ERR(glue->usb_phy)) {
-+		dev_err(&pdev->dev, "failed to register usb_phy\n");
-+		return PTR_ERR(glue->usb_phy);
- 	}
- 	platform_set_drvdata(pdev, glue);
- 
-@@ -544,22 +506,12 @@ static int da8xx_probe(struct platform_device *pdev)
- 
- 	glue->musb = musb = platform_device_register_full(&pinfo);
- 	if (IS_ERR(musb)) {
--		ret = PTR_ERR(musb);
- 		dev_err(&pdev->dev, "failed to register musb device: %d\n", ret);
--		goto err6;
-+		usb_phy_generic_unregister(glue->usb_phy);
-+		return PTR_ERR(musb);
- 	}
- 
- 	return 0;
--
--err6:
--	usb_phy_generic_unregister(glue->phy);
--
--err5:
--	clk_disable(clk);
--
--err4:
--
--	return ret;
- }
- 
- static int da8xx_remove(struct platform_device *pdev)
-@@ -567,8 +519,7 @@ static int da8xx_remove(struct platform_device *pdev)
- 	struct da8xx_glue		*glue = platform_get_drvdata(pdev);
- 
- 	platform_device_unregister(glue->musb);
--	usb_phy_generic_unregister(glue->phy);
--	clk_disable(glue->clk);
-+	usb_phy_generic_unregister(glue->usb_phy);
- 
- 	return 0;
- }
--- 
-1.9.1
+I was using output-format, rgb_order, output-enable-mode to get my panel
+to work.  I'm suspicious that the !output_enable_mode is not useful,
+though (Note: I had documented it backwards: false is hsync|vsync, true
+is hactive&vactive).  That just left me with output-format.  I think
+.bus_format in the panel_desc can cover that, so I've now dropped all of
+these brcm properties.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160324/c0f99da7/attachment.sig>
