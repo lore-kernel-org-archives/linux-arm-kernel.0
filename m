@@ -1,83 +1,63 @@
-From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
-Date: Fri, 25 Mar 2016 14:32:35 +0100
-Subject: [PATCH] i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity
-Message-ID: <m3h9fuk7ik.fsf@t19.piap.pl>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 25 Mar 2016 08:40:20 -0500
+Subject: [PATCH v3 2/2] documentation: Fix pinctrl documentation for
+ Meson8 / Meson8b
+In-Reply-To: <CAL9uMOGaf5556KX5RJWbaW0d1zcTZu4S6FvoqEXQCWXg1QUDpg@mail.gmail.com>
+References: <1458724440-32228-1-git-send-email-carlo@caione.org>
+ <1458724440-32228-3-git-send-email-carlo@caione.org>
+ <20160323152052.GA20906@rob-hp-laptop>
+ <CAL9uMOGaf5556KX5RJWbaW0d1zcTZu4S6FvoqEXQCWXg1QUDpg@mail.gmail.com>
+Message-ID: <20160325134020.GA15177@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A recent commit 5c5fb40de8f14391a1238db05cef88754faf9229 stated:
-Follows: linus/v4.4-rc2
-Precedes: linus/v4.5-rc1
+On Wed, Mar 23, 2016 at 05:04:19PM +0100, Carlo Caione wrote:
+> On Wed, Mar 23, 2016 at 4:20 PM, Rob Herring <robh@kernel.org> wrote:
+> > On Wed, Mar 23, 2016 at 10:14:00AM +0100, Carlo Caione wrote:
+> >> From: Carlo Caione <carlo@endlessm.com>
+> >>
+> >> Fix pin controller documentation introducing the new compatibles for
+> >> the pinctrl drivers specific for aobus / cbus.
+> >>
+> >> This is needed because we have changed the pin controller driver: we
+> >> have now a single specialized pinctrl driver / compatible for each bus
+> >> the controller is attached to, instead of one single driver dealing with
+> >> all the controllers we have on different buses.
+> >
+> > Aren't you breaking compatibility with old DTs here? If so, you need to
+> > be clear that you are and why you think that is okay.
+> 
+> Rob,
+> It's a bit too late to worry about breaking compatibility since the
+> driver changes are already landed in mainline and currently Meson8 and
+> Meson8b platforms are broken because of this.
+> You can read the whole discussion here [1] and here [2]. Driver and DT
+> changes were supposed to go in together but a bit of general
+> misunderstanding caused this issue.
 
-    PCI: imx6: Add support for active-low reset GPIO
-
-    We previously used of_get_named_gpio(), which ignores the OF flags cell, so
-    the reset GPIO defaulted to "active high." This doesn't work on the Toradex
-    Apalis SoM with Ixora base board, which has an active-low reset GPIO.
-
-    Use devm_gpiod_get_optional() instead so we pay attention to the active
-    high/low flag.  This also adds support for GPIOs described via ACPI.
-
-The (now replaced) code doesn't support the above:
-@@ -287,10 +287,10 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
-     usleep_range(200, 500);
+My comment was the commit message needs to be clear that you are 
+breaking compatibility. That was true before part of this went in. 
  
-     /* Some boards don't have PCIe reset GPIO. */
--    if (gpio_is_valid(imx6_pcie->reset_gpio)) {
--        gpio_set_value_cansleep(imx6_pcie->reset_gpio, 0);
-+    if (imx6_pcie->reset_gpio) {
-+        gpiod_set_value_cansleep(imx6_pcie->reset_gpio, 0);
-         msleep(100);
--        gpio_set_value_cansleep(imx6_pcie->reset_gpio, 1);
-+        gpiod_set_value_cansleep(imx6_pcie->reset_gpio, 1);
-     }
-     return 0;
+> We decided to break compatibility with the old DTs since the the
+> platform support is still in the really early stage so I really don't
+> think this is going to cause any problem and we have a lot of good
+> reasons to split the pinctrl driver. First of all it makes sense from
+> the hardware prospective, since we actually have two different pin
+> controllers on two different buses. Splitting the driver allows us to
+> introduce in the DTS both CBUS and AOBUS as simple buses. We need a
+> clear description of the two buses in the DTS since several devices
+> have a different register mapping depending on which bus they are
+> attached to. Also as you can read here [3] we want to map the whole
+> CBUS as a syscon device to be able to access several registers
+> scattered inside CBUS.
 
-If the reset_gpio setup code had ignored the flags (haven't checked
-that), then clearly the resets were active-low (most reset lines are,
-because they can be then driven with open-drain/collector output).
-The gpiod_set_value*(0) activates reset, gpiod_set_value(1) -
-deactivates.
+>From a quick glance, you mainly needed to keep the old compatible string 
+in the driver and just ignore ao-bank. Then only what depended on 
+ao-bank would break. Maybe that's less broken than completely breaking 
+the pinctrl driver...
 
-Now we're told the setup code is now level-aware, but the above sequence
-thus _deactivates_ reset for 100 ms, then _activates_ it again. It has
-no chance to work, unless a board has a broken DTS file. A quick grep
-shows that about half the IMX6 boards specify an active-low PCIe reset,
-4 ask for active-high, and another 4 don't bother.
+Anyway, merge the fix:
 
+Acked-by: Rob Herring <robh@kernel.org>
 
-I wonder if all boards (except maybe that Toradex set) use an active-low
-PCIe reset and are now broken. Perhaps Toradex uses active-high and thus
-works.
-
-I'm not fixing individual DTS files because I don't really know, though
-perhaps we should change them all to "active-low", since it would work
-the same as before the 5c5fb40de8f14391a1238db05cef88754faf9229 change.
-
-Confirmed to fix Gateworks Laguna GW54xx.
-Without the patch, the following happens (as expected):
-
-PCI host bridge /soc/pcie at 0x01000000 ranges:
-  No bus range found for /soc/pcie at 0x01000000, using [bus 00-ff]
-   IO 0x01f80000..0x01f8ffff -> 0x00000000
-  MEM 0x01000000..0x01efffff -> 0x01000000
-imx6q-pcie 1ffc000.pcie: phy link never came up
-
-Signed-off-by: Krzysztof Ha?asa <khalasa@piap.pl>
-
-diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-index fe60096..f17fb02 100644
---- a/drivers/pci/host/pci-imx6.c
-+++ b/drivers/pci/host/pci-imx6.c
-@@ -288,9 +288,9 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
- 
- 	/* Some boards don't have PCIe reset GPIO. */
- 	if (imx6_pcie->reset_gpio) {
--		gpiod_set_value_cansleep(imx6_pcie->reset_gpio, 0);
--		msleep(100);
- 		gpiod_set_value_cansleep(imx6_pcie->reset_gpio, 1);
-+		msleep(100);
-+		gpiod_set_value_cansleep(imx6_pcie->reset_gpio, 0);
- 	}
- 	return 0;
- 
+Rob
