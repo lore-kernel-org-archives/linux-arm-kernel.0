@@ -1,51 +1,41 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 26 Mar 2016 00:34:39 +0100
-Subject: dmaengine pl08x dt crash
-In-Reply-To: <20160323154049.GA2170@sig21.net>
-References: <20160323154049.GA2170@sig21.net>
-Message-ID: <CACRpkdZKpm3MVO+ABpCmOdkHdmpnUeqK75c=oGbqDyGeFA92xQ@mail.gmail.com>
+From: js@sig21.net (Johannes Stezenbach)
+Date: Sat, 26 Mar 2016 00:50:24 +0100
+Subject: dmaengine: ARM pl080 misidentified as Samsung pl080s
+In-Reply-To: <CA+Ln22Ea-cVS1Cgq1TFKktMCiQ3OGqJ=Bjx3q1qxeGr3LSMXGQ@mail.gmail.com>
+References: <20160324105651.GA20489@sig21.net>
+ <CA+Ln22Ea-cVS1Cgq1TFKktMCiQ3OGqJ=Bjx3q1qxeGr3LSMXGQ@mail.gmail.com>
+Message-ID: <20160325235024.GA13621@sig21.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 23, 2016 at 4:40 PM, Johannes Stezenbach <js@sig21.net> wrote:
+On Sat, Mar 26, 2016 at 12:08:00AM +0100, Tomasz Figa wrote:
+> 2016-03-24 11:56 GMT+01:00 Johannes Stezenbach <js@sig21.net>:
+> >
+> > commit da1b6c05b8b5bd ("dmaengine: PL08x: Add support for PL080S variant")
+> > added this hunk:
+> >
+> >  static struct amba_id pl08x_ids[] = {
+> > +       /* Samsung PL080S variant */
+> > +       {
+> > +               .id     = 0x0a141080,
+> > +               .mask   = 0xffffffff,
+> > +               .data   = &vendor_pl080s,
+> > +       },
+> >         /* PL080 */
+> >
+> > However, 0x0a141080 happens to be the ID of the
+> > ARM PL080, too:
+> > http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0196g/I54627.html
+> 
+> It can be, assuming that 0xa1 is an existing revision of original
+> PL080. AFAIK when we were figuring out what to do with this broken
+> Samsung's controller, we found out that there was no platform with
+> such revision. Is your concern related to any actual hardware already
+> supported by upstream?
 
-> I'm trying to use the new devicetree support for pl08x
-> added in commit aa4734da667442
-> (dmaengine: pl08x: support dt channel assignment).
->
-> It causes crash in the pl011 serial driver when it calls
-> dma_chan_name() because the dma_chan->dev->device is NULL.
-> I think the reason is dma_async_device_register() is called
-> during pl08x_probe(), but at this time the number of slave
-> channels is still 0 as these get allocated later in
-> pl08x_of_xlate() when clients request the channels.
+It isn't upstream and likely won't.  I reported it because
+this is ARM IP probably used by others, for me it was
+easy enough to fix locally but I wasted two hours until
+I figured out what went wrong.
 
-The more I look at this the more broken it looks.
-
-The channels NEED to be present when
-dma_async_device_register() is called or their
-sysfs devices will never get initialized, this is used by
-the core code and thus we get this NULL dereference
-from dma_chan_name().
-
-I think the only system currently using this is the LPCs,
-and it works because they are using a mux
-(drivers/dma/lpc18xx-dmamux.c) in front of the DMA
-engine. Thus the dma_chan_name() will go to the
-mux intermediary channel, not to the actual channel.
-
-I sort of feel like the mux code should just call
-dma_chan_name() on the channels it handles to
-make a point...
-
-I think the patch I made entitled
-"dma: pl08x: allocate OF slave channel data at probe time"
-must be applied, and a harsher version at that: one
-that DELETE the dynamic channel allocation in pl08x_of_xlate(),
-obviously the dmaengine core is not supposed to be used
-like that. If we want to create slave channels on-the-fly, the code
-inside dma_async_device_register() that create sysfs entries
-etc need to be factored out and made use of from the xlate().
-
-Yours,
-Linus Walleij
+Johannes
