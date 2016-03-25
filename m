@@ -1,70 +1,93 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Fri, 25 Mar 2016 11:06:30 +0800
-Subject: [PATCH] sbs-battery: fix power status when battery is dry
-In-Reply-To: <1458801832.16645.7.camel@mtksdaap41>
-References: <1458726794-48298-1-git-send-email-yh.huang@mediatek.com>
- <CAGS+omDTmJDkJYsf=gDJMrmAos+30enoAa2xfTPyirXUd37=9g@mail.gmail.com>
- <1458801832.16645.7.camel@mtksdaap41>
-Message-ID: <CAGS+omDhFP+_shCqEWasLDsHf-ab0-OWJJ-gZZkgihAgrZwBHA@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 25 Mar 2016 11:08:55 +0800
+Subject: [PATCH v2] arm64: cpuidle: make arm_cpuidle_suspend() a bit more
+ efficient
+Message-ID: <1458875335-1843-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 24, 2016 at 2:43 PM, YH Huang <yh.huang@mediatek.com> wrote:
->
-> Hi Daniel,
->
-> On Thu, 2016-03-24 at 12:01 +0800, Daniel Kurtz wrote:
-> > Hi YH,
-> >
-> > On Wed, Mar 23, 2016 at 5:53 PM, YH Huang <yh.huang@mediatek.com> wrote:
-> > > When the battery is dry and BATTERY_FULL_DISCHARGED is set,
-> > > we should check BATTERY_DISCHARGING to decide the power status.
-> > > If BATTERY_DISCHARGING is set, the power status is not charging.
-> > > Or the power status should be charging.
-> > >
-> > > Signed-off-by: YH Huang <yh.huang@mediatek.com>
-> > > ---
-> > >  drivers/power/sbs-battery.c |   22 ++++++++++++----------
-> > >  1 file changed, 12 insertions(+), 10 deletions(-)
-> > >
-> > > diff --git a/drivers/power/sbs-battery.c b/drivers/power/sbs-battery.c
-> > > index d6226d6..d86db0e 100644
-> > > --- a/drivers/power/sbs-battery.c
-> > > +++ b/drivers/power/sbs-battery.c
-> > > @@ -382,11 +382,12 @@ static int sbs_get_battery_property(struct i2c_client *client,
-> > >
-> > >                 if (ret & BATTERY_FULL_CHARGED)
-> > >                         val->intval = POWER_SUPPLY_STATUS_FULL;
-> > > -               else if (ret & BATTERY_FULL_DISCHARGED)
-> > > -                       val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
-> > > -               else if (ret & BATTERY_DISCHARGING)
-> > > -                       val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
-> > > -               else
-> > > +               else if (ret & BATTERY_DISCHARGING) {
-> > > +                       if (ret & BATTERY_FULL_DISCHARGED)
-> > > +                               val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
-> > > +                       else
-> > > +                               val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
-> > > +               } else
-> >
-> >
-> > I think (BATTERY_DISCHARGING && BATTERY_FULL_DISCHARGED) is still
-> > POWER_SUPPLY_STATUS_DISCHARGING.
-> > So, let's just report what the battery says and do:
-> >
-> >                else if (ret & BATTERY_DISCHARGING)
-> >                                val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
-> >
-> So we just ignore the special situation (BATTERY_DISCHARGING &&
-> BATTERY_FULL_DISCHARGED).
-> Isn't POWER_SUPPLY_STATUS_NOT_CHARGING a useful information?
+Currently, we check two pointers: cpu_ops and cpu_suspend on every idle
+state entry. These pointers check can be avoided:
 
-The battery is discharging.  The fact that it is also reporting that
-it is already "discharged" just seems premature.   I would expect to
-only see NOT_CHARGING if completely discharged *and* not discharging.
+If cpu_ops has not been registered, arm_cpuidle_init() will return
+-EOPNOTSUPP, so arm_cpuidle_suspend() will never have chance to
+run. In other word, the cpu_ops check can be avoid.
 
->
->
-> Regards,
-> YH Huang
->
+Similarly, the cpu_suspend check could be avoided in this hot path by
+moving it into arm_cpuidle_init().
+
+I measured the 4096 * time from arm_cpuidle_suspend entry point to the
+cpu_psci_cpu_suspend entry point. HW platform is Marvell BG4CT STB
+board.
+
+1. only one shell, no other process, hot-unplug secondary cpus, execute
+the following cmd
+
+while true
+do
+	sleep 0.2
+done
+
+before the patch: 1581220ns
+
+after the patch: 1579630ns
+
+reduced by 0.1%
+
+2. only one shell, no other process, hot-unplug secondary cpus, execute
+the following cmd
+
+while true
+do
+	md5sum /tmp/testfile
+	sleep 0.2
+done
+
+NOTE: the testfile size should be larger than L1+L2 cache size
+
+before the patch: 1961960ns
+after the patch: 1912500ns
+
+reduced by 2.5%
+
+So the more complex the system load, the bigger the improvement.
+
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+Since v1:
+ - add performance numbers
+ - combine two small patches into one
+ - add Lorenzo's ack
+
+ arch/arm64/kernel/cpuidle.c | 9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm64/kernel/cpuidle.c b/arch/arm64/kernel/cpuidle.c
+index 9047cab6..e11857f 100644
+--- a/arch/arm64/kernel/cpuidle.c
++++ b/arch/arm64/kernel/cpuidle.c
+@@ -19,7 +19,8 @@ int __init arm_cpuidle_init(unsigned int cpu)
+ {
+ 	int ret = -EOPNOTSUPP;
+ 
+-	if (cpu_ops[cpu] && cpu_ops[cpu]->cpu_init_idle)
++	if (cpu_ops[cpu] && cpu_ops[cpu]->cpu_suspend &&
++			cpu_ops[cpu]->cpu_init_idle)
+ 		ret = cpu_ops[cpu]->cpu_init_idle(cpu);
+ 
+ 	return ret;
+@@ -36,11 +37,5 @@ int arm_cpuidle_suspend(int index)
+ {
+ 	int cpu = smp_processor_id();
+ 
+-	/*
+-	 * If cpu_ops have not been registered or suspend
+-	 * has not been initialized, cpu_suspend call fails early.
+-	 */
+-	if (!cpu_ops[cpu] || !cpu_ops[cpu]->cpu_suspend)
+-		return -EOPNOTSUPP;
+ 	return cpu_ops[cpu]->cpu_suspend(index);
+ }
+-- 
+2.8.0.rc3
