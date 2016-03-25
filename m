@@ -1,35 +1,35 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 25 Mar 2016 02:04:30 +0000
-Subject: [RFC PATCH 07/45] KVM: arm/arm64: vgic-new: Add vgic GICv2
- change_affinity
+Date: Fri, 25 Mar 2016 02:04:28 +0000
+Subject: [RFC PATCH 05/45] KVM: arm/arm64: vgic-new: Add acccessor to new
+ struct vgic_irq instance
 In-Reply-To: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
 References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1458871508-17279-8-git-send-email-andre.przywara@arm.com>
+Message-ID: <1458871508-17279-6-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <christoffer.dall@linaro.org>
 
-Introduce vgic-v2.c to contain GICv2 specific functions.
-Add vgic_v2_irq_change_affinity() to change the target VCPU of a
-particular interrupt.
+The new VGIC implementation centers around a struct vgic_irq instance
+per virtual IRQ.
+Provide a function to retrieve the right instance for a given IRQ
+number and (in case of private interrupts) the right VCPU.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Andre Przywara <marc.zyngier@arm.com>
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-v2.c | 40 ++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic.h    |  2 ++
- 2 files changed, 42 insertions(+)
- create mode 100644 virt/kvm/arm/vgic/vgic-v2.c
+ virt/kvm/arm/vgic/vgic.c | 41 +++++++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic.h | 22 ++++++++++++++++++++++
+ 2 files changed, 63 insertions(+)
+ create mode 100644 virt/kvm/arm/vgic/vgic.c
+ create mode 100644 virt/kvm/arm/vgic/vgic.h
 
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
 new file mode 100644
-index 0000000..0bf6f27
+index 0000000..8e34916
 --- /dev/null
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -0,0 +1,40 @@
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -0,0 +1,41 @@
 +/*
 + * Copyright (C) 2015, 2016 ARM Ltd.
 + *
@@ -51,35 +51,53 @@ index 0000000..0bf6f27
 +
 +#include "vgic.h"
 +
-+void vgic_v2_irq_change_affinity(struct kvm *kvm, u32 intid, u8 new_targets)
++struct vgic_global kvm_vgic_global_state;
++
++struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
++			      u32 intid)
 +{
-+	struct vgic_dist *dist = &kvm->arch.vgic;
-+	struct vgic_irq *irq;
-+	int target;
++	/* SGIs and PPIs */
++	if (intid <= VGIC_MAX_PRIVATE)
++		return &vcpu->arch.vgic_cpu.private_irqs[intid];
 +
-+	BUG_ON(intid <= VGIC_MAX_PRIVATE);
-+	BUG_ON(dist->vgic_model != KVM_DEV_TYPE_ARM_VGIC_V2);
++	/* SPIs */
++	if (intid <= VGIC_MAX_SPI)
++		return &kvm->arch.vgic.spis[intid - VGIC_NR_PRIVATE_IRQS];
 +
-+	irq = vgic_get_irq(kvm, NULL, intid);
++	/* LPIs are not yet covered */
++	if (intid >= VGIC_MIN_LPI)
++		return NULL;
 +
-+	spin_lock(&irq->irq_lock);
-+	irq->targets = new_targets;
-+
-+	target = ffs(irq->targets);
-+	target = target ? (target - 1) : 0;
-+	irq->target_vcpu = kvm_get_vcpu(kvm, target);
-+	spin_unlock(&irq->irq_lock);
++	WARN(1, "Looking up struct vgic_irq for reserved INTID");
++	return NULL;
 +}
 diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index e9f4aa6..b2faf00 100644
---- a/virt/kvm/arm/vgic/vgic.h
+new file mode 100644
+index 0000000..61b8d22
+--- /dev/null
 +++ b/virt/kvm/arm/vgic/vgic.h
-@@ -20,4 +20,6 @@ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
- 			      u32 intid);
- bool vgic_queue_irq(struct kvm *kvm, struct vgic_irq *irq);
- 
-+void vgic_v2_irq_change_affinity(struct kvm *kvm, u32 intid, u8 target);
+@@ -0,0 +1,22 @@
++/*
++ * Copyright (C) 2015, 2016 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __KVM_ARM_VGIC_NEW_H__
++#define __KVM_ARM_VGIC_NEW_H__
 +
- #endif
++struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
++			      u32 intid);
++
++#endif
 -- 
 2.7.3
