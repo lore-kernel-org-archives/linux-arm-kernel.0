@@ -1,36 +1,52 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 25 Mar 2016 10:50:30 +0100
-Subject: [PATCH v3 3/8] clk: samsung: exynos3250: Add MMC2 clock
-In-Reply-To: <56F47ABC.7060006@samsung.com>
-References: <1458027490-13787-1-git-send-email-cw00.choi@samsung.com>
- <1458027490-13787-4-git-send-email-cw00.choi@samsung.com>
- <56F47ABC.7060006@samsung.com>
-Message-ID: <56F509E6.7080807@samsung.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 25 Mar 2016 10:32:53 +0000
+Subject: [PATCH v2] spi: orion.c: Add direct access mode
+In-Reply-To: <12540712.SXPhdxqg9f@wuerfel>
+References: <1458663893-13766-1-git-send-email-sr@denx.de>
+ <30176583.aSTyzO0qS3@wuerfel> <56F42939.4020803@denx.de>
+ <12540712.SXPhdxqg9f@wuerfel>
+Message-ID: <20160325103253.GA2566@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo,
+On Thu, Mar 24, 2016 at 09:07:32PM +0100, Arnd Bergmann wrote:
+> On Thursday 24 March 2016 18:51:53 Stefan Roese wrote:
 
-On 03/25/2016 12:39 AM, Chanwoo Choi wrote:
-> diff --git a/include/dt-bindings/clock/exynos3250.h 
-> b/include/dt-bindings/clock/exynos3250.h
->> index ddb874130d86..c796ff02ceeb 100644
->> --- a/include/dt-bindings/clock/exynos3250.h
->> +++ b/include/dt-bindings/clock/exynos3250.h
-...
->> -#define CLK_NR_CLKS			249
->> +#define CLK_NR_CLKS			250
+> > I see. But with this we are back to statically mapping the MBus
+> > windows that are used. Resulting in potentially multiple windows
+> > per SPI controller, which is not necessary (Andrew and Mark
+> > objected against that).
 
-What do you think about putting all the changes to include/dt-bindings/
-clock/exynos3250.h into a separate patch? Now in patch 3/8 there
-is being changed again what was added in patch 2/8. However, my main
-point is to have a minimum required in a common topic branch for the clk
-and the arm-soc trees, so there is no need for arm-soc to pull all
-the drives/clk changes.
-It might not be that sensible in case of just those 2 patches in your
-series, nevertheless it would be good to keep that in mind for future
-submissions.
+> I'm not following here. Do you mean we should set up and tear
+> down the windows in the runtime PM callbacks so they are only
+> present when we actually access a device instead?
 
---
-Thanks,
-Sylwester
+What we're trying to avoid is allocating a window to every single client
+device attached to SPI, the controller can only talk to one device at
+once anyway so having one per device is wasteful when this is a limited
+resource.  Looking at this from the point of view of a SPI driver it
+just seems obviously bad, in order to get the best performance with this
+controller we need to do a special per-device magic binding.  That's not
+good for usability, it's not ideal having to do it per controller but at
+least then it's done for the SoC.
+
+We also already apparently have some dynamic code for PCIe. 
+
+> Among the dts files we ship with the kernel, how many would
+> actually use more than one mapping in practice if we decide to
+> do the static ranges property? I had a quick look and could not
+> even find one that has more than one chip-select connected.
+
+Do any of these boards have things like expansion connectors?
+
+> Ok, so with the static mapping it could be done very easily, or
+> we need a more complex solution for the dynamic mapping.
+
+Part of what I personally don't understand is why this is complicated?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160325/e3db35e2/attachment.sig>
