@@ -1,242 +1,133 @@
-From: ruslan.bilovol@gmail.com (Ruslan Bilovol)
-Date: Fri, 25 Mar 2016 05:21:56 +0200
-Subject: usb: gadget breakage on N900: bind UDC by name passed via
- usb_gadget_driver structure
-In-Reply-To: <CAB=otbT2VsZ8Rhc-jbKwtRAssn01ecVFyTyAp+5hS=d40AsGKA@mail.gmail.com>
-References: <20160317212603.GA16651@amd>
- <CAB=otbSfj24nSUe1DyfVBDKD=trCp2-X-S-AcA1D+PTHZuP1Bg@mail.gmail.com>
- <20160318202041.GA20196@amd> <56EFE057.7070106@samsung.com>
- <20160323122143.GB32031@amd>
- <CAB=otbT2VsZ8Rhc-jbKwtRAssn01ecVFyTyAp+5hS=d40AsGKA@mail.gmail.com>
-Message-ID: <CAB=otbQdpEtsXg2etX+3YYjrTfPYGtdKJo_V_rtfNb+VNV7g-w@mail.gmail.com>
+From: pc.liao@mediatek.com (PC Liao)
+Date: Fri, 25 Mar 2016 11:42:05 +0800
+Subject: [PATCH] ASoC: mediatek: Add second I2S on mt8173-rt5650 machine driver
+Message-ID: <1458877325-33980-1-git-send-email-pc.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OK, so at last I finished charging of my N900; found 1.8V USB
-to UART adapter and soldered it to the phone.
+This patch adds second I2S for rt5650 codec on mt8173-rt5650 machine driver.
 
-I managed to boot N900 with working USB gadget (builtin g_ether)
-in boardfile mode, can ping it from PC and transfer data. I don't
-see any issue (except of musb name issue in twl phy driver, I've
-already sent a fix for that: https://lkml.org/lkml/2016/3/24/670 )
+Signed-off-by: PC Liao <pc.liao@mediatek.com>
+---
+ .../devicetree/bindings/sound/mt8173-rt5650.txt    |    6 +++
+ sound/soc/mediatek/mt8173-rt5650.c                 |   55 ++++++++++++++++++--
+ 2 files changed, 56 insertions(+), 5 deletions(-)
 
-Pavel, I still don't see how you've got your issue, please share
-more detials
-
-Regards,
-Ruslan
-
-On Thu, Mar 24, 2016 at 2:45 AM, Ruslan Bilovol
-<ruslan.bilovol@gmail.com> wrote:
-> Hi Pavel,
->
-> I didn't use my N900 for years, it is deeply discharged and can't
-> boot, so I left it connected overnight to the wall adapter to let it
-> get some juice.
->
-> Meanwhile I looked into sources and still can't understand how
-> it happens.
-> Could you please attach your full .config and also dmesg
-> without hacks?
->
-> Regards,
-> Ruslan
->
-> On Wed, Mar 23, 2016 at 2:21 PM, Pavel Machek <pavel@ucw.cz> wrote:
->> On Mon 2016-03-21 12:51:51, Marek Szyprowski wrote:
->>> Hi
->>>
->>> On 2016-03-18 21:20, Pavel Machek wrote:
->>> >Hi!
->>> >
->>> >>>USB gadget stops working for me on n900, if I merge
->>> >>Could you please give us more details?
->>> >>Which gadget driver do you use (g_nokia?)
->>> >Ok, so I could get it to work with v4.5, and this patch. I'm including
->>> >my config, too. No, I don't think I'm using g_nokia.
->>>
->>> This shows that there are some serious problems, probably with your udc
->>> driver, which doesn't handle deferred probe properly. Your patch workaround
->>> it by waiting some predefined time before registering gadget driver, however
->>> this is not the proper way. Please try to isolate what exactly is needed to
->>> get the gadget driver registered properly in your system or at least please
->>> provide some logs from the failed case.
->>
->> Well, Ruslan said he has n900 available, so I provided requested
->> information.
->>
->> This is the dmesg with the hack:
->>
->> [    0.623138] of_get_named_gpiod_flags: parsed 'ti,power-gpio'
->> property of node '/ocp/spi at 480ba00
->> 0/wl1251 at 0[0]' - status (0)
->> [    0.623565] wl1251: ERROR vio regulator missing: -517
->> [    0.624359] musb probe HACK cf9a9e00
->> [    0.624420] musb probe HACK/2 cf9a9e00
->> [    0.624511] musb probe HACK/3 cf9a9e00
->> [    0.624755] HS USB OTG: no transceiver configured
->> [    0.624847] musb-hdrc musb-hdrc.0.auto: musb_init_controller failed
->> with status -517
->> [    0.626525] mousedev: PS/2 mouse device common for all mice
->> ...
->> [    2.877441] ieee80211 phy1: Selected rate control algorithm
->> 'minstrel'
->> [    2.879882] wl1251: loaded
->> [    2.889617] wl1251: initialized
->> [    2.897521] Two musb controllers?  HACK
->> [    2.904968] musb probe HACK cf9a9e00
->> [    2.912048] musb probe HACK/2 cf9a9e00
->> [    2.918823] musb probe HACK/3 cf9a9e00
->> [    2.928985] musb-hdrc: ConfigData=0xde (UTMI-8, dyn FIFOs, bulk
->> combine, bulk split, HB-ISO Rx, HB-ISO Tx, SoftConn)
->> [    2.929016] musb-hdrc: MHDRC RTL version 1.400
->> [    2.929046] musb-hdrc: setup fifo_mode 4
->> [    2.929077] musb-hdrc: 28/31 max ep, 16384/16384 memory
->> [    2.930511] tsc2005 spi1.0: GPIO lookup for consumer reset
->> [    2.930541] tsc2005 spi1.0: using device tree for GPIO lookup
->>
->> In the kernel without the hack, there'll be only the first part of the
->> dmesg, AFAICT.
->>
->> If there's an interest, I can repeat the test without the hack.
->>
->> Thanks,
->>                                                                         Pavel
->>
->>
->>> >diff --git a/drivers/usb/gadget/udc/udc-core.c b/drivers/usb/gadget/udc/udc-core.c
->>> >index b86a6f0..bee109f 100644
->>> >--- a/drivers/usb/gadget/udc/udc-core.c
->>> >+++ b/drivers/usb/gadget/udc/udc-core.c
->>> >@@ -542,14 +542,37 @@ err1:
->>> >     return ret;
->>> >  }
->>> >-int usb_gadget_probe_driver(struct usb_gadget_driver *driver)
->>> >+int usb_udc_attach_driver(const char *name, struct usb_gadget_driver *driver)
->>> >+{
->>> >+    struct usb_udc *udc = NULL;
->>> >+    int ret = -ENODEV;
->>> >+
->>> >+    mutex_lock(&udc_lock);
->>> >+    list_for_each_entry(udc, &udc_list, list) {
->>> >+            ret = strcmp(name, dev_name(&udc->dev));
->>> >+            if (!ret)
->>> >+                    break;
->>> >+    }
->>> >+    if (ret) {
->>> >+            ret = -ENODEV;
->>> >+            goto out;
->>> >+    }
->>> >+    if (udc->driver) {
->>> >+            ret = -EBUSY;
->>> >+            goto out;
->>> >+    }
->>> >+    ret = udc_bind_to_driver(udc, driver);
->>> >+out:
->>> >+    mutex_unlock(&udc_lock);
->>> >+    return ret;
->>> >+}
->>> >+EXPORT_SYMBOL_GPL(usb_udc_attach_driver);
->>> >+
->>> >+int __usb_gadget_probe_driver(struct usb_gadget_driver *driver)
->>> >  {
->>> >     struct usb_udc          *udc = NULL;
->>> >     int                     ret = -ENODEV;
->>> >-    if (!driver || !driver->bind || !driver->setup)
->>> >-            return -EINVAL;
->>> >-
->>> >     mutex_lock(&udc_lock);
->>> >     if (driver->udc_name) {
->>> >             list_for_each_entry(udc, &udc_list, list) {
->>> >@@ -567,16 +590,47 @@ int usb_gadget_probe_driver(struct usb_gadget_driver *driver)
->>> >             }
->>> >     }
->>> >-    list_add_tail(&driver->pending, &gadget_driver_pending_list);
->>> >+//  list_add_tail(&driver->pending, &gadget_driver_pending_list); FIXME
->>> >     pr_info("udc-core: couldn't find an available UDC - added [%s] to list of pending drivers\n",
->>> >             driver->function);
->>> >+
->>> >     mutex_unlock(&udc_lock);
->>> >-    return 0;
->>> >+    return ret;
->>> >  found:
->>> >     ret = udc_bind_to_driver(udc, driver);
->>> >     mutex_unlock(&udc_lock);
->>> >     return ret;
->>> >  }
->>> >+
->>> >+#define USB_GADGET_BIND_RETRIES             5
->>> >+#define USB_GADGET_BIND_TIMEOUT             (3 * HZ)
->>> >+static void usb_gadget_work(struct work_struct *work)
->>> >+{
->>> >+    struct usb_gadget_driver *driver = container_of(work,
->>> >+                                            struct usb_gadget_driver,
->>> >+                                            work.work);
->>> >+    int res;
->>> >+
->>> >+    if (driver->retries++ > USB_GADGET_BIND_RETRIES) {
->>> >+            pr_err("couldn't find an available UDC\n");
->>> >+            return;
->>> >+    }
->>> >+
->>> >+    res = __usb_gadget_probe_driver(driver);
->>> >+    if (res == -ENODEV)
->>> >+            schedule_delayed_work(&driver->work, USB_GADGET_BIND_TIMEOUT);
->>> >+}
->>> >+
->>> >+int usb_gadget_probe_driver(struct usb_gadget_driver *driver)
->>> >+{
->>> >+    if (!driver || !driver->bind || !driver->setup)
->>> >+            return -EINVAL;
->>> >+
->>> >+    INIT_DELAYED_WORK(&driver->work, usb_gadget_work);
->>> >+    schedule_delayed_work(&driver->work, 0);
->>> >+
->>> >+    return 0;
->>> >+}
->>> >  EXPORT_SYMBOL_GPL(usb_gadget_probe_driver);
->>> >  int usb_gadget_unregister_driver(struct usb_gadget_driver *driver)
->>> >@@ -587,6 +641,8 @@ int usb_gadget_unregister_driver(struct usb_gadget_driver *driver)
->>> >     if (!driver || !driver->unbind)
->>> >             return -EINVAL;
->>> >+    cancel_delayed_work(&driver->work);
->>> >+
->>> >     mutex_lock(&udc_lock);
->>> >     list_for_each_entry(udc, &udc_list, list)
->>> >             if (udc->driver == driver) {
->>> >@@ -747,7 +803,7 @@ static int __init usb_udc_init(void)
->>> >     udc_class->dev_uevent = usb_udc_uevent;
->>> >     return 0;
->>> >  }
->>> >-subsys_initcall(usb_udc_init);
->>> >+late_initcall_sync(usb_udc_init);
->>> >  static void __exit usb_udc_exit(void)
->>> >  {
->>> >diff --git a/include/linux/usb/gadget.h b/include/linux/usb/gadget.h
->>> >index d82d006..adb1e68 100644
->>> >--- a/include/linux/usb/gadget.h
->>> >+++ b/include/linux/usb/gadget.h
->>> >@@ -1014,6 +1014,8 @@ static inline int usb_gadget_activate(struct usb_gadget *gadget)
->>> >   * @resume: Invoked on USB resume.  May be called in_interrupt.
->>> >   * @reset: Invoked on USB bus reset. It is mandatory for all gadget drivers
->>> >   * and should be called in_interrupt.
->>> >+ * @work: Gadget work used to bind to the USB controller.
->>> >+ * @retries: Gadget retries to bind to the USB controller.
->>> >   * @driver: Driver model state for this driver.
->>> >   * @udc_name: A name of UDC this driver should be bound to. If udc_name is NULL,
->>> >   * this driver will be bound to any available UDC.
->>> >@@ -1075,6 +1077,8 @@ struct usb_gadget_driver {
->>> >     void                    (*suspend)(struct usb_gadget *);
->>> >     void                    (*resume)(struct usb_gadget *);
->>> >     void                    (*reset)(struct usb_gadget *);
->>> >+    struct delayed_work     work;
->>> >+    int                     retries;
->>> >     /* FIXME support safe rmmod */
->>> >     struct device_driver    driver;
->>> >
->>>
->>> Best regards
->>
->> --
->> (english) http://www.livejournal.com/~pavelmachek
->> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+diff --git a/Documentation/devicetree/bindings/sound/mt8173-rt5650.txt b/Documentation/devicetree/bindings/sound/mt8173-rt5650.txt
+index fe5a5ef..0046926 100644
+--- a/Documentation/devicetree/bindings/sound/mt8173-rt5650.txt
++++ b/Documentation/devicetree/bindings/sound/mt8173-rt5650.txt
+@@ -5,11 +5,17 @@ Required properties:
+ - mediatek,audio-codec: the phandles of rt5650 codecs
+ - mediatek,platform: the phandle of MT8173 ASoC platform
+ 
++Optional properties:
++- mediatek,rt5650_i2s: I2S mode of rt5650
++  0: using I2S1 on rt5650 for record
++  1: using I2S2 on rt5650 for record
++
+ Example:
+ 
+ 	sound {
+ 		compatible = "mediatek,mt8173-rt5650";
+ 		mediatek,audio-codec = <&rt5650>;
+ 		mediatek,platform = <&afe>;
++		mediatek,rt5650_i2s = <0>;
+ 	};
+ 
+diff --git a/sound/soc/mediatek/mt8173-rt5650.c b/sound/soc/mediatek/mt8173-rt5650.c
+index bb09bb1..ab4c806 100644
+--- a/sound/soc/mediatek/mt8173-rt5650.c
++++ b/sound/soc/mediatek/mt8173-rt5650.c
+@@ -23,6 +23,20 @@
+ 
+ #define MCLK_FOR_CODECS		12288000
+ 
++struct mt8173_rt5650_platform_data {
++	unsigned int rt5650_i2s;
++	/* 0 = I2S1; 1 = I2S2 */
++};
++
++static struct mt8173_rt5650_platform_data mt8173_rt5650_priv = {
++	.rt5650_i2s = 0,
++};
++
++enum mt8173_rt5650_i2s {
++	MT8173_RT5650_I2S1 = 0,
++	MT8173_RT5650_I2S2,
++};
++
+ static const struct snd_soc_dapm_widget mt8173_rt5650_widgets[] = {
+ 	SND_SOC_DAPM_SPK("Speaker", NULL),
+ 	SND_SOC_DAPM_MIC("Int Mic", NULL),
+@@ -87,10 +101,25 @@ static int mt8173_rt5650_init(struct snd_soc_pcm_runtime *runtime)
+ 	struct snd_soc_codec *codec = runtime->codec_dais[0]->codec;
+ 	int ret;
+ 
+-	rt5645_sel_asrc_clk_src(codec,
+-				RT5645_DA_STEREO_FILTER |
+-				RT5645_AD_STEREO_FILTER,
+-				RT5645_CLK_SEL_I2S1_ASRC);
++	switch (mt8173_rt5650_priv.rt5650_i2s) {
++	case MT8173_RT5650_I2S1:
++		rt5645_sel_asrc_clk_src(codec,
++					RT5645_DA_STEREO_FILTER |
++					RT5645_AD_STEREO_FILTER,
++					RT5645_CLK_SEL_I2S1_ASRC);
++		break;
++	case MT8173_RT5650_I2S2:
++		rt5645_sel_asrc_clk_src(codec,
++					RT5645_DA_STEREO_FILTER,
++					RT5645_CLK_SEL_I2S1_ASRC);
++		rt5645_sel_asrc_clk_src(codec,
++					RT5645_AD_STEREO_FILTER,
++					RT5645_CLK_SEL_I2S2_ASRC);
++		break;
++	default:
++		break;
++	}
++
+ 	/* enable jack detection */
+ 	ret = snd_soc_card_jack_new(card, "Headset Jack",
+ 				    SND_JACK_HEADPHONE | SND_JACK_MICROPHONE |
+@@ -112,6 +141,9 @@ static struct snd_soc_dai_link_component mt8173_rt5650_codecs[] = {
+ 	{
+ 		.dai_name = "rt5645-aif1",
+ 	},
++	{
++		.dai_name = "rt5645-aif2",
++	},
+ };
+ 
+ enum {
+@@ -149,7 +181,7 @@ static struct snd_soc_dai_link mt8173_rt5650_dais[] = {
+ 		.cpu_dai_name = "I2S",
+ 		.no_pcm = 1,
+ 		.codecs = mt8173_rt5650_codecs,
+-		.num_codecs = 1,
++		.num_codecs = 2,
+ 		.init = mt8173_rt5650_init,
+ 		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
+ 			   SND_SOC_DAIFMT_CBS_CFS,
+@@ -199,6 +231,19 @@ static int mt8173_rt5650_dev_probe(struct platform_device *pdev)
+ 			"Property 'audio-codec' missing or invalid\n");
+ 		return -EINVAL;
+ 	}
++	mt8173_rt5650_codecs[1].of_node = mt8173_rt5650_codecs[0].of_node;
++
++	if (device_property_present(&pdev->dev, "mediatek,rt5650_i2s")) {
++		ret = device_property_read_u32(&pdev->dev,
++					       "mediatek,rt5650_i2s",
++					       &mt8173_rt5650_priv.rt5650_i2s);
++		if (ret) {
++			dev_err(&pdev->dev,
++				"%s snd_soc_register_card fail %d\n",
++				__func__, ret);
++		}
++	}
++
+ 	card->dev = &pdev->dev;
+ 	platform_set_drvdata(pdev, card);
+ 
+-- 
+1.7.9.5
