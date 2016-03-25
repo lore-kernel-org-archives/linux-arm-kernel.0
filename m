@@ -1,11 +1,11 @@
-From: reichl@t-online.de (Markus Reichl)
-Date: Fri, 25 Mar 2016 08:07:40 +0100
+From: m.reichl@fivetechno.de (Markus Reichl)
+Date: Fri, 25 Mar 2016 08:14:15 +0100
 Subject: [PATCH] ARM: dts: exynos: Fix invalid maximum voltage for buck9
  supplying SD card
 In-Reply-To: <56F4D070.4020403@osg.samsung.com>
 References: <1458807125-13580-1-git-send-email-k.kozlowski@samsung.com>
  <56F4D070.4020403@osg.samsung.com>
-Message-ID: <3355646.rVxAcJbDaQ@dell2.five-lan.de>
+Message-ID: <1809671.FobX8lDEN5@dell2.five-lan.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
