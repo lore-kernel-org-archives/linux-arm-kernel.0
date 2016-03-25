@@ -1,131 +1,139 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Fri, 25 Mar 2016 17:30:09 +0800
-Subject: [RFC PATCH 3/3] arm64: Expose cpu vender id and model name through
- cpuinfo
-In-Reply-To: <1458898209-7486-1-git-send-email-wangkefeng.wang@huawei.com>
-References: <1458898209-7486-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1458898209-7486-4-git-send-email-wangkefeng.wang@huawei.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Fri, 25 Mar 2016 10:37:34 +0100
+Subject: [PATCH v2 1/1] net: macb: remove BUG_ON() and reset the queue to
+ handle RX errors
+Message-ID: <1458898654-25864-1-git-send-email-cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is helpful to show the name of chip vendor and CPU model
-to customers in cpuinfo, identify them by using CPU implementer
-and CPU part is not intuitive(compared with x86).
+This patch removes two BUG_ON() used to notify about RX queue corruptions
+on macb (not gem) hardware without actually handling the error.
 
-We are complained for this several times, so expose them.
+The new code skips corrupted frames but still processes faultless frames.
+Then it resets the RX queue before restarting the reception from a clean
+state.
 
-Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+This patch is a rework of an older patch proposed by Neil Armstrong:
+http://patchwork.ozlabs.org/patch/371525/
+
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm64/include/asm/cpu.h |  2 ++
- arch/arm64/kernel/cpuinfo.c  | 62 ++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 64 insertions(+)
 
-diff --git a/arch/arm64/include/asm/cpu.h b/arch/arm64/include/asm/cpu.h
-index 13a6103..b8c3d79 100644
---- a/arch/arm64/include/asm/cpu.h
-+++ b/arch/arm64/include/asm/cpu.h
-@@ -25,6 +25,8 @@
-  */
- struct cpuinfo_arm64 {
- 	struct cpu	cpu;
-+	char		vendor[16];
-+	char		model_name[16];
- 	u32		reg_ctr;
- 	u32		reg_cntfrq;
- 	u32		reg_dczid;
-diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-index 488d49a..da5f7df 100644
---- a/arch/arm64/kernel/cpuinfo.c
-+++ b/arch/arm64/kernel/cpuinfo.c
-@@ -19,6 +19,7 @@
- #include <asm/cpu.h>
- #include <asm/cputype.h>
- #include <asm/cpufeature.h>
-+#include <asm/elf.h>
+ChangeLog
+
+v1 -> v2
+- add Acked-by Neil Armstrong and Nicolas Ferre
+- use bool type instead of int for the 'reset_rx_queue' variable
+- move longer declarations before shorter declarations
+
+ drivers/net/ethernet/cadence/macb.c | 59 ++++++++++++++++++++++++++++++-------
+ 1 file changed, 49 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+index f715352a9b85..6c3dc27cb100 100644
+--- a/drivers/net/ethernet/cadence/macb.c
++++ b/drivers/net/ethernet/cadence/macb.c
+@@ -917,7 +917,10 @@ static int macb_rx_frame(struct macb *bp, unsigned int first_frag,
+ 		unsigned int frag_len = bp->rx_buffer_size;
  
- #include <linux/bitops.h>
- #include <linux/bug.h>
-@@ -100,6 +101,62 @@ static const char *const compat_hwcap2_str[] = {
- };
- #endif /* CONFIG_COMPAT */
+ 		if (offset + frag_len > len) {
+-			BUG_ON(frag != last_frag);
++			if (unlikely(frag != last_frag)) {
++				dev_kfree_skb_any(skb);
++				return -1;
++			}
+ 			frag_len = len - offset;
+ 		}
+ 		skb_copy_to_linear_data_offset(skb, offset,
+@@ -945,8 +948,23 @@ static int macb_rx_frame(struct macb *bp, unsigned int first_frag,
+ 	return 0;
+ }
  
-+static void cpuinfo_get_vendor_model(struct cpuinfo_arm64 *info)
++static inline void macb_init_rx_ring(struct macb *bp)
 +{
-+	char *vendor = info->vendor;
-+	char *name = info->model_name;
-+	u32 midr = info->reg_midr;
-+	u32 impl = MIDR_IMPLEMENTOR(midr);
-+	u32 part = MIDR_PARTNUM(midr);
++	dma_addr_t addr;
++	int i;
 +
-+	switch (impl) {
-+	case ARM_CPU_IMP_ARM:
-+		strcpy(vendor, "ARM");
-+		switch (part) {
-+		case ARM_CPU_PART_AEM_V8:
-+			strcpy(name, "AEM-V8");
-+			break;
-+		case ARM_CPU_PART_FOUNDATION:
-+			strcpy(name, "Foundation");
-+			break;
-+		case ARM_CPU_PART_CORTEX_A53:
-+			strcpy(name, "Cortex-A53");
-+			break;
-+		case ARM_CPU_PART_CORTEX_A57:
-+			strcpy(name, "Cortex-A57");
-+			break;
-+		};
-+		break;
-+	case ARM_CPU_IMP_APM:
-+		strcpy(vendor, "APM");
-+		switch (part) {
-+		case APM_CPU_PART_POTENZA:
-+			strcpy(name, "Potenza");
-+			break;
-+		};
-+		break;
-+	case ARM_CPU_IMP_CAVIUM:
-+		strcpy(vendor, "CAVIUM");
-+		switch (part) {
-+		case CAVIUM_CPU_PART_THUNDERX:
-+			strcpy(name, "Thunderx");
-+			break;
-+		};
-+		break;
-+	case ARM_CPU_IMP_BRCM:
-+		strcpy(vendor, "BROADCOM");
-+		switch (part) {
-+		case BRCM_CPU_PART_VULCAN:
-+			strcpy(name, "Vulcan");
-+			break;
-+		};
-+		break;
-+	default:
-+		strcpy(vendor, "Unknown");
-+		strcpy(name, "Unknown");
++	addr = bp->rx_buffers_dma;
++	for (i = 0; i < RX_RING_SIZE; i++) {
++		bp->rx_ring[i].addr = addr;
++		bp->rx_ring[i].ctrl = 0;
++		addr += bp->rx_buffer_size;
 +	}
++	bp->rx_ring[RX_RING_SIZE - 1].addr |= MACB_BIT(RX_WRAP);
 +}
 +
- static int c_show(struct seq_file *m, void *v)
+ static int macb_rx(struct macb *bp, int budget)
  {
- 	int i, j;
-@@ -116,6 +173,9 @@ static int c_show(struct seq_file *m, void *v)
- 		 * "processor".  Give glibc what it expects.
- 		 */
- 		seq_printf(m, "processor\t: %d\n", i);
-+		seq_printf(m, "vendor_id\t: %s\n", cpuinfo->vendor);
-+		seq_printf(m, "model name\t: %s rev %d (%s)\n", cpuinfo->model_name,
-+			   MIDR_REVISION(midr), ELF_PLATFORM);
++	bool reset_rx_queue = false;
+ 	int received = 0;
+ 	unsigned int tail;
+ 	int first_frag = -1;
+@@ -972,10 +990,18 @@ static int macb_rx(struct macb *bp, int budget)
  
- 		seq_printf(m, "BogoMIPS\t: %lu.%02lu\n",
- 			   loops_per_jiffy / (500000UL/HZ),
-@@ -238,6 +298,8 @@ static void __cpuinfo_store_cpu(struct cpuinfo_arm64 *info)
- 	info->reg_mvfr1 = read_cpuid(MVFR1_EL1);
- 	info->reg_mvfr2 = read_cpuid(MVFR2_EL1);
- 
-+	cpuinfo_get_vendor_model(info);
+ 		if (ctrl & MACB_BIT(RX_EOF)) {
+ 			int dropped;
+-			BUG_ON(first_frag == -1);
 +
- 	cpuinfo_detect_icache_policy(info);
++			if (unlikely(first_frag == -1)) {
++				reset_rx_queue = true;
++				continue;
++			}
  
- 	check_local_cpu_errata();
+ 			dropped = macb_rx_frame(bp, first_frag, tail);
+ 			first_frag = -1;
++			if (unlikely(dropped < 0)) {
++				reset_rx_queue = true;
++				continue;
++			}
+ 			if (!dropped) {
+ 				received++;
+ 				budget--;
+@@ -983,6 +1009,26 @@ static int macb_rx(struct macb *bp, int budget)
+ 		}
+ 	}
+ 
++	if (unlikely(reset_rx_queue)) {
++		unsigned long flags;
++		u32 ctrl;
++
++		netdev_err(bp->dev, "RX queue corruption: reset it\n");
++
++		spin_lock_irqsave(&bp->lock, flags);
++
++		ctrl = macb_readl(bp, NCR);
++		macb_writel(bp, NCR, ctrl & ~MACB_BIT(RE));
++
++		macb_init_rx_ring(bp);
++		macb_writel(bp, RBQP, bp->rx_ring_dma);
++
++		macb_writel(bp, NCR, ctrl | MACB_BIT(RE));
++
++		spin_unlock_irqrestore(&bp->lock, flags);
++		return received;
++	}
++
+ 	if (first_frag != -1)
+ 		bp->rx_tail = first_frag;
+ 	else
+@@ -1523,15 +1569,8 @@ static void gem_init_rings(struct macb *bp)
+ static void macb_init_rings(struct macb *bp)
+ {
+ 	int i;
+-	dma_addr_t addr;
+ 
+-	addr = bp->rx_buffers_dma;
+-	for (i = 0; i < RX_RING_SIZE; i++) {
+-		bp->rx_ring[i].addr = addr;
+-		bp->rx_ring[i].ctrl = 0;
+-		addr += bp->rx_buffer_size;
+-	}
+-	bp->rx_ring[RX_RING_SIZE - 1].addr |= MACB_BIT(RX_WRAP);
++	macb_init_rx_ring(bp);
+ 
+ 	for (i = 0; i < TX_RING_SIZE; i++) {
+ 		bp->queues[0].tx_ring[i].addr = 0;
 -- 
-1.7.12.4
+1.8.2.2
