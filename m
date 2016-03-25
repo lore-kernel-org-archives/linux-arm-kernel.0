@@ -1,77 +1,96 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 25 Mar 2016 02:04:48 +0000
-Subject: [RFC PATCH 25/45] KVM: arm/arm64: vgic-new: Add GICv3 redistributor
- TYPER handler
+Date: Fri, 25 Mar 2016 02:04:55 +0000
+Subject: [RFC PATCH 32/45] KVM: arm/arm64: vgic-new: vgic_kvm_device:
+ KVM_DEV_ARM_VGIC_GRP_ADDR
 In-Reply-To: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
 References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1458871508-17279-26-git-send-email-andre.przywara@arm.com>
+Message-ID: <1458871508-17279-33-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The redistributor TYPER tells the OS about the associated MPIDR,
-also the LAST bit is crucial.
+From: Eric Auger <eric.auger@linaro.org>
 
+This patch implements the KVM_DEV_ARM_VGIC_GRP_ADDR group which
+enables to set the base address of GIC regions as seen by the guest.
+
+The kvm_vgic_addr function whci eventually assigns the chosen address
+to the internal structure still is stubbed.
+
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- virt/kvm/arm/vgic/vgic_mmio.c | 32 +++++++++++++++++++++++++++++++-
- 1 file changed, 31 insertions(+), 1 deletion(-)
+ virt/kvm/arm/vgic/vgic_kvm_device.c | 38 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
-diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
-index 13e101f..6d74b00 100644
---- a/virt/kvm/arm/vgic/vgic_mmio.c
-+++ b/virt/kvm/arm/vgic/vgic_mmio.c
-@@ -652,6 +652,22 @@ static int vgic_mmio_write_v3_misc(struct kvm_vcpu *vcpu,
- 	return 0;
- }
+diff --git a/virt/kvm/arm/vgic/vgic_kvm_device.c b/virt/kvm/arm/vgic/vgic_kvm_device.c
+index 18cccac..d6fb2d6 100644
+--- a/virt/kvm/arm/vgic/vgic_kvm_device.c
++++ b/virt/kvm/arm/vgic/vgic_kvm_device.c
+@@ -26,6 +26,17 @@ static int vgic_set_common_attr(struct kvm_device *dev,
+ 	int r;
  
-+/*
-+ * We use a compressed version of the MPIDR (all 32 bits in one 32-bit word)
-+ * when we store the target MPIDR written by the guest.
-+ */
-+static u32 compress_mpidr(unsigned long mpidr)
-+{
-+	u32 ret;
+ 	switch (attr->group) {
++	case KVM_DEV_ARM_VGIC_GRP_ADDR: {
++		u64 __user *uaddr = (u64 __user *)(long)attr->addr;
++		u64 addr;
++		unsigned long type = (unsigned long)attr->attr;
 +
-+	ret = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-+	ret |= MPIDR_AFFINITY_LEVEL(mpidr, 1) << 8;
-+	ret |= MPIDR_AFFINITY_LEVEL(mpidr, 2) << 16;
-+	ret |= MPIDR_AFFINITY_LEVEL(mpidr, 3) << 24;
++		if (copy_from_user(&addr, uaddr, sizeof(addr)))
++			return -EFAULT;
 +
-+	return ret;
-+}
++		r = kvm_vgic_addr(dev->kvm, type, &addr, true);
++		return (r == -ENODEV) ? -ENXIO : r;
++	}
+ 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
+ 		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
+ 		u32 val;
+@@ -78,6 +89,19 @@ static int vgic_get_common_attr(struct kvm_device *dev,
+ 	int r = -ENXIO;
+ 
+ 	switch (attr->group) {
++	case KVM_DEV_ARM_VGIC_GRP_ADDR: {
++		u64 __user *uaddr = (u64 __user *)(long)attr->addr;
++		u64 addr;
++		unsigned long type = (unsigned long)attr->attr;
 +
- static int vgic_mmio_read_v3r_misc(struct kvm_vcpu *vcpu,
- 				   struct kvm_io_device *this,
- 				   gpa_t addr, int len, void *val)
-@@ -672,6 +688,9 @@ static int vgic_mmio_read_v3r_iidr(struct kvm_vcpu *vcpu,
- 				   struct kvm_io_device *this,
- 				   gpa_t addr, int len, void *val)
++		r = kvm_vgic_addr(dev->kvm, type, &addr, false);
++		if (r)
++			return (r == -ENODEV) ? -ENXIO : r;
++
++		if (copy_to_user(uaddr, &addr, sizeof(addr)))
++			return -EFAULT;
++		break;
++	}
+ 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
+ 		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
+ 
+@@ -141,6 +165,13 @@ static int vgic_v2_has_attr(struct kvm_device *dev,
+ 			    struct kvm_device_attr *attr)
  {
-+	write_mask32((PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0),
-+		     addr & 3, len, val);
-+
- 	return 0;
- }
- 
-@@ -679,7 +698,18 @@ static int vgic_mmio_read_v3r_typer(struct kvm_vcpu *vcpu,
- 				    struct kvm_io_device *this,
- 				    gpa_t addr, int len, void *val)
+ 	switch (attr->group) {
++	case KVM_DEV_ARM_VGIC_GRP_ADDR:
++		switch (attr->attr) {
++		case KVM_VGIC_V2_ADDR_TYPE_DIST:
++		case KVM_VGIC_V2_ADDR_TYPE_CPU:
++			return 0;
++		}
++		break;
+ 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
+ 		return 0;
+ 	case KVM_DEV_ARM_VGIC_GRP_CTRL:
+@@ -181,6 +212,13 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
+ 			    struct kvm_device_attr *attr)
  {
--	/* TODO: implement */
-+	struct vgic_io_device *iodev = container_of(this,
-+						    struct vgic_io_device, dev);
-+	unsigned long mpidr = kvm_vcpu_get_mpidr_aff(iodev->redist_vcpu);
-+	int target_vcpu_id = iodev->redist_vcpu->vcpu_id;
-+	u64 value;
-+
-+	value = (u64)compress_mpidr(mpidr) << 32;
-+	value |= ((target_vcpu_id & 0xffff) << 8);
-+	if (target_vcpu_id == atomic_read(&vcpu->kvm->online_vcpus) - 1)
-+		value |= GICR_TYPER_LAST;
-+
-+	write_mask64(value, addr & 7, len, val);
- 	return 0;
- }
- 
+ 	switch (attr->group) {
++	case KVM_DEV_ARM_VGIC_GRP_ADDR:
++		switch (attr->attr) {
++		case KVM_VGIC_V3_ADDR_TYPE_DIST:
++		case KVM_VGIC_V3_ADDR_TYPE_REDIST:
++			return 0;
++		}
++		break;
+ 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
+ 		return 0;
+ 	case KVM_DEV_ARM_VGIC_GRP_CTRL:
 -- 
 2.7.3
