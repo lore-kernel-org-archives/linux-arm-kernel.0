@@ -1,60 +1,61 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Fri, 25 Mar 2016 14:49:36 +0800
-Subject: Question about PCI I/O space in ARM64
-In-Reply-To: <20160324175728.GC21749@red-moon>
-References: <56F209A9.4040304@huawei.com>
- <20160323101840.GA21390@e104818-lin.cambridge.arm.com>
- <8793380.nuVa09lFue@wuerfel> <56F35BAA.50800@huawei.com>
- <20160324175728.GC21749@red-moon>
-Message-ID: <56F4DF80.5070707@huawei.com>
+From: yao.yuan@nxp.com (Yao Yuan)
+Date: Fri, 25 Mar 2016 06:54:24 +0000
+Subject: [PATCH v6 1/2] Documentation: fsl: dspi: Add fsl,ls2080a-dspi
+ compatible string
+In-Reply-To: <1457518926-18518-2-git-send-email-yao.yuan@freescale.com>
+References: <1457518926-18518-1-git-send-email-yao.yuan@freescale.com>
+ <1457518926-18518-2-git-send-email-yao.yuan@freescale.com>
+Message-ID: <AM2PR04MB07226D97B1E14BF526A1168389830@AM2PR04MB0722.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi All,
 
+Could you please help to review and merge this patch?
 
-On 2016/3/25 1:57, Lorenzo Pieralisi wrote:
-> [+ Jean]
-> 
-> On Thu, Mar 24, 2016 at 11:14:50AM +0800, Kefeng Wang wrote:
-> 
-> [...]
-> 
->>>> You need a PCI host controller driver (e.g.
->>>> drivers/pci/host/pci-host-generic.c) and corresponding bindings in DT or
->>>> ACPI.
->>
->> In our inner test, there are some board without pcie host driver(even
->> without pci host controller).
-> 
-> So I guess those drivers are for devices that are attached to an LPC
-> controller that is not part of a PCI host controller, right ?
-> 
-> BTW, what happened to this (not that I particularly like this patchset) ?
+Thanks.
 
-They are working on it, and will upstream again.
-
+On 03/09/2016 08:59 PM, Yao Yuan wrote:
 > 
-> https://lkml.org/lkml/2015/12/29/154
+> new compatible string: "fsl,ls2080a-dspi".
 > 
-[...]
+> Signed-off-by: Yuan Yao <yao.yuan@nxp.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> ---
+> Changed in v6:
+> No changes.
 > 
-> I agree with Arnd on this and we need to patch the eg f71805f driver too
-> (or we just do not build on ARM) to make it request the IO port region it
-> needs to actually probe the device, it is not correct to assume IO space
-> is available and mapped, I think that's a driver bug rather than anything
-> else, Jean can certainly shed some light here.
-
-Ok, so Jean, would you take a look this? Thanks.
-
-Kefeng
+> Changed in v5:
+> Fix the subject and commit message.
 > 
->> Define some arch in/out func instead of generic ops? when in/out vals, check
->> whether or not the pci_iobase is mapped.
+> Changed in v4:
+> No changes.
 > 
-> I do not think the problem should be solved in the IO accessors
-> implementation, see above.
+> Changed in v3:
+> Add the modifier for new compatible string like:
+> "fsl,ls2080a-dspi" followed by "fsl,ls2085a-dspi"
 > 
-> Lorenzo
+> Changed in v2:
+> Update my email to <yao.yuan@nxp.com>
+> ---
+>  Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
 > 
-> .
+> diff --git a/Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt
+> b/Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt
+> index fa77f87..1ad0fe3 100644
+> --- a/Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt
+> +++ b/Documentation/devicetree/bindings/spi/spi-fsl-dspi.txt
+> @@ -1,7 +1,10 @@
+>  ARM Freescale DSPI controller
 > 
+>  Required properties:
+> -- compatible : "fsl,vf610-dspi", "fsl,ls1021a-v1.0-dspi", "fsl,ls2085a-dspi"
+> +- compatible : "fsl,vf610-dspi", "fsl,ls1021a-v1.0-dspi",
+> +		"fsl,ls2085a-dspi"
+> +		or
+> +		"fsl,ls2080a-dspi" followed by "fsl,ls2085a-dspi"
+>  - reg : Offset and length of the register set for the device
+>  - interrupts : Should contain SPI controller interrupt
+>  - clocks: from common clock binding: handle to dspi clock.
+> --
