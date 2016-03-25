@@ -1,117 +1,94 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 25 Mar 2016 02:04:41 +0000
-Subject: [RFC PATCH 18/45] KVM: arm/arm64: vgic-new: Add ACTIVE registers
- handlers
+Date: Fri, 25 Mar 2016 02:04:37 +0000
+Subject: [RFC PATCH 14/45] KVM: arm/arm64: vgic-new: Add CTLR,
+ TYPER and IIDR handlers
 In-Reply-To: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
 References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1458871508-17279-19-git-send-email-andre.przywara@arm.com>
+Message-ID: <1458871508-17279-15-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- virt/kvm/arm/vgic/vgic_mmio.c | 81 +++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 79 insertions(+), 2 deletions(-)
+ virt/kvm/arm/vgic/vgic.h      |  3 +++
+ virt/kvm/arm/vgic/vgic_mmio.c | 49 ++++++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 51 insertions(+), 1 deletion(-)
 
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index a462e2b..57aea8f 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -16,6 +16,9 @@
+ #ifndef __KVM_ARM_VGIC_NEW_H__
+ #define __KVM_ARM_VGIC_NEW_H__
+ 
++#define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
++#define IMPLEMENTER_ARM		0x43b
++
+ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
+ 			      u32 intid);
+ bool vgic_queue_irq(struct kvm *kvm, struct vgic_irq *irq);
 diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
-index 788e186..bfc530c 100644
+index e1fd17f..e62366e 100644
 --- a/virt/kvm/arm/vgic/vgic_mmio.c
 +++ b/virt/kvm/arm/vgic/vgic_mmio.c
-@@ -289,6 +289,83 @@ static int vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
+@@ -82,9 +82,56 @@ static int vgic_mmio_write_nyi(struct kvm_vcpu *vcpu,
  	return 0;
  }
  
-+static int vgic_mmio_read_active(struct kvm_vcpu *vcpu,
-+				 struct kvm_io_device *this,
-+				 gpa_t addr, int len, void *val)
++static int vgic_mmio_read_v2_misc(struct kvm_vcpu *vcpu,
++				  struct kvm_io_device *this,
++				  gpa_t addr, int len, void *val)
 +{
 +	struct vgic_io_device *iodev = container_of(this,
 +						    struct vgic_io_device, dev);
-+	u32 intid = (addr - iodev->base_addr) * 8;
-+	u32 value = 0;
-+	int i;
++	u32 value;
 +
-+	if (iodev->redist_vcpu)
-+		vcpu = iodev->redist_vcpu;
-+
-+	/* Loop over all IRQs affected by this read */
-+	for (i = 0; i < len * 8; i++) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-+
-+		spin_lock(&irq->irq_lock);
-+		if (irq->active)
-+			value |= (1U << i);
-+		spin_unlock(&irq->irq_lock);
++	switch ((addr - iodev->base_addr) & ~3) {
++	case 0x0:
++		value = vcpu->kvm->arch.vgic.enabled ? GICD_ENABLE : 0;
++		break;
++	case 0x4:
++		value = vcpu->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
++		value = (value >> 5) - 1;
++		value |= (atomic_read(&vcpu->kvm->online_vcpus) - 1) << 5;
++		break;
++	case 0x8:
++		value = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
++		break;
++	default:
++		return 0;
 +	}
 +
 +	write_mask32(value, addr & 3, len, val);
 +	return 0;
 +}
 +
-+static int vgic_mmio_write_cactive(struct kvm_vcpu *vcpu,
++static int vgic_mmio_write_v2_misc(struct kvm_vcpu *vcpu,
 +				   struct kvm_io_device *this,
 +				   gpa_t addr, int len, const void *val)
 +{
 +	struct vgic_io_device *iodev = container_of(this,
 +						    struct vgic_io_device, dev);
-+	u32 intid = (addr - iodev->base_addr) * 8;
-+	int i;
++	/*
++	 * GICD_TYPER and GICD_IIDR are read-only, the upper three bytes of
++	 * GICD_CTLR are reserved.
++	 */
++	if (addr - iodev->base_addr >= 1)
++		return 0;
 +
-+	if (iodev->redist_vcpu)
-+		vcpu = iodev->redist_vcpu;
++	vcpu->kvm->arch.vgic.enabled = (*(u32 *)val) ? true : false;
++	/* TODO: is there anything to trigger at this point? */
 +
-+	for_each_set_bit(i, val, len * 8) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-+
-+		spin_lock(&irq->irq_lock);
-+
-+		irq->active = false;
-+		/* TODO: Anything more to do? Does flush/sync cover this? */
-+
-+		spin_unlock(&irq->irq_lock);
-+	}
 +	return 0;
 +}
 +
-+static int vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
-+				   struct kvm_io_device *this,
-+				   gpa_t addr, int len, const void *val)
-+{
-+	struct vgic_io_device *iodev = container_of(this,
-+						    struct vgic_io_device, dev);
-+	u32 intid = (addr - iodev->base_addr) * 8;
-+	int i;
-+
-+	if (iodev->redist_vcpu)
-+		vcpu = iodev->redist_vcpu;
-+
-+	for_each_set_bit(i, val, len * 8) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-+
-+		spin_lock(&irq->irq_lock);
-+
-+		irq->active = true;
-+		/* TODO: Anything more to do? Does flush/sync cover this? */
-+
-+		spin_unlock(&irq->irq_lock);
-+	}
-+	return 0;
-+}
-+
- static int vgic_mmio_read_priority(struct kvm_vcpu *vcpu,
- 				   struct kvm_io_device *this,
- 				   gpa_t addr, int len, void *val)
-@@ -347,9 +424,9 @@ struct vgic_register_region vgic_v2_dist_registers[] = {
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_CLEAR,
- 		vgic_mmio_read_pending, vgic_mmio_write_cpending, 1),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_SET,
--		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 1),
-+		vgic_mmio_read_active, vgic_mmio_write_sactive, 1),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_CLEAR,
--		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 1),
-+		vgic_mmio_read_active, vgic_mmio_write_cactive, 1),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PRI,
- 		vgic_mmio_read_priority, vgic_mmio_write_priority, 8),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_TARGET,
+ struct vgic_register_region vgic_v2_dist_registers[] = {
+ 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
+-		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 12),
++		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_IGROUP,
+ 		vgic_mmio_read_raz, vgic_mmio_write_wi, 1),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_SET,
 -- 
 2.7.3
