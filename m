@@ -1,133 +1,155 @@
-From: pc.liao@mediatek.com (PC Liao)
-Date: Fri, 25 Mar 2016 11:42:05 +0800
-Subject: [PATCH] ASoC: mediatek: Add second I2S on mt8173-rt5650 machine driver
-Message-ID: <1458877325-33980-1-git-send-email-pc.liao@mediatek.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Fri, 25 Mar 2016 12:02:34 +0800
+Subject: [PATCH] usb: chipidea: Configure DMA properties and ops from DT
+In-Reply-To: <CAOCOHw7wgzyp5JmhBF9i1mAsjOHHJhwvn4sw=aMdQjOQPDGqWA@mail.gmail.com>
+References: <1456119133-16114-1-git-send-email-bjorn.andersson@linaro.org>
+ <56CADCE9.9090305@linaro.org> <20160222220750.GI21240@tuxbot>
+ <CADRPPNRH28W6u8adSb9Ja0JSJvFgcKF+2jYa3GSKBcGVsZcdLQ@mail.gmail.com>
+ <CADRPPNS0q3Q9j4AYvqRfcSaQ6BzLiL6zM5tn7MwJ613iNA1iPQ@mail.gmail.com>
+ <CAOCOHw7wgzyp5JmhBF9i1mAsjOHHJhwvn4sw=aMdQjOQPDGqWA@mail.gmail.com>
+Message-ID: <20160325040234.GA6185@peterchendt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds second I2S for rt5650 codec on mt8173-rt5650 machine driver.
+On Tue, Mar 08, 2016 at 07:40:08PM -0800, Bjorn Andersson wrote:
+> On Tue, Mar 8, 2016 at 11:52 AM, Li Yang <leoli@freescale.com> wrote:
+> > On Wed, Mar 2, 2016 at 4:59 PM, Li Yang <leoli@freescale.com> wrote:
+> >> On Mon, Feb 22, 2016 at 4:07 PM, Bjorn Andersson
+> >> <bjorn.andersson@linaro.org> wrote:
+> >>> On Mon 22 Feb 02:03 PST 2016, Srinivas Kandagatla wrote:
+> >>>
+> >>>>
+> >>>>
+> >>>> On 22/02/16 05:32, Bjorn Andersson wrote:
+> >>>> >On certain platforms (e.g. ARM64) the dma_ops needs to be explicitly set
+> >>>> >to be able to do DMA allocations, so use the of_dma_configure() helper
+> >>>> >to populate the dma properties and assign an appropriate dma_ops.
+> [..]
+> >>>> None of the drivers call of_dma_configure() explicitly, which makes me feel
+> >>>> that we are doing something wrong. TBH, this should be handled in more
+> >>>> generic way rather than driver like this having an explicit call to
+> >>>> of_dma_configure().
+> >>>>
+> >>>
+> 
+> I had the chance to go through this with Arnd and the verdict is that
+> devices not described in DT should not do DMA (or allocate buffers for
+> doing DMA).
+> 
+> So I believe the solution is to fall back on Peter's description; the
+> chipidea driver is the core driver and the Qualcomm code should just
+> be a platform layer.
+> 
+> My suggestion is that we turn the chipidea core into a set of APIs
+> that can called by the platform specific pieces. That way we will have
+> the chipidea core be the device described in the DT.
+> 
 
-Signed-off-by: PC Liao <pc.liao@mediatek.com>
+Hi Bjorn,
+
+After reading the DMA documentation Russell supplied and several related
+DMA APIs, would you please try below patch on your ARM64 platform?
+Since the core device has no device node at all, I don't know why
+your patch can work, or am I missing something?
+
+>From bcf7eaf694d29fb7557a9406fb6c89213216069c Mon Sep 17 00:00:00 2001
+From: Peter Chen <peter.chen@freescale.com>
+Date: Fri, 25 Mar 2016 11:54:21 +0800
+Subject: [PATCH 1/1] usb: chipidea: add DMA mask configuration API
+
+Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- .../devicetree/bindings/sound/mt8173-rt5650.txt    |    6 +++
- sound/soc/mediatek/mt8173-rt5650.c                 |   55 ++++++++++++++++++--
- 2 files changed, 56 insertions(+), 5 deletions(-)
+ drivers/usb/chipidea/ci_hdrc_msm.c |    6 ++++++
+ drivers/usb/chipidea/core.c        |   25 +++++++++++++++++++++++++
+ include/linux/usb/chipidea.h       |    2 ++
+ 3 files changed, 33 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/sound/mt8173-rt5650.txt b/Documentation/devicetree/bindings/sound/mt8173-rt5650.txt
-index fe5a5ef..0046926 100644
---- a/Documentation/devicetree/bindings/sound/mt8173-rt5650.txt
-+++ b/Documentation/devicetree/bindings/sound/mt8173-rt5650.txt
-@@ -5,11 +5,17 @@ Required properties:
- - mediatek,audio-codec: the phandles of rt5650 codecs
- - mediatek,platform: the phandle of MT8173 ASoC platform
+diff --git a/drivers/usb/chipidea/ci_hdrc_msm.c b/drivers/usb/chipidea/ci_hdrc_msm.c
+index 3889809..43ceb38 100644
+--- a/drivers/usb/chipidea/ci_hdrc_msm.c
++++ b/drivers/usb/chipidea/ci_hdrc_msm.c
+@@ -5,6 +5,7 @@
+  * only version 2 as published by the Free Software Foundation.
+  */
  
-+Optional properties:
-+- mediatek,rt5650_i2s: I2S mode of rt5650
-+  0: using I2S1 on rt5650 for record
-+  1: using I2S2 on rt5650 for record
++#include <linux/dma-mapping.h>
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
+@@ -56,6 +57,7 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
+ {
+ 	struct platform_device *plat_ci;
+ 	struct usb_phy *phy;
++	int ret;
+ 
+ 	dev_dbg(&pdev->dev, "ci_hdrc_msm_probe\n");
+ 
+@@ -70,6 +72,10 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
+ 
+ 	ci_hdrc_msm_platdata.usb_phy = phy;
+ 
++	ret = ci_hdrc_set_dma_mask(&pdev->dev, DMA_BIT_MASK(64));
++	if (ret)
++		return ret;
 +
- Example:
+ 	plat_ci = ci_hdrc_add_device(&pdev->dev,
+ 				pdev->resource, pdev->num_resources,
+ 				&ci_hdrc_msm_platdata);
+diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+index 69426e6..b8ca5e3 100644
+--- a/drivers/usb/chipidea/core.c
++++ b/drivers/usb/chipidea/core.c
+@@ -62,6 +62,7 @@
+ #include <linux/usb/chipidea.h>
+ #include <linux/usb/of.h>
+ #include <linux/of.h>
++#include <linux/of_device.h>
+ #include <linux/phy.h>
+ #include <linux/regulator/consumer.h>
+ #include <linux/usb/ehci_def.h>
+@@ -811,6 +812,30 @@ static void ci_extcon_unregister(struct ci_hdrc *ci)
  
- 	sound {
- 		compatible = "mediatek,mt8173-rt5650";
- 		mediatek,audio-codec = <&rt5650>;
- 		mediatek,platform = <&afe>;
-+		mediatek,rt5650_i2s = <0>;
- 	};
+ static DEFINE_IDA(ci_ida);
  
-diff --git a/sound/soc/mediatek/mt8173-rt5650.c b/sound/soc/mediatek/mt8173-rt5650.c
-index bb09bb1..ab4c806 100644
---- a/sound/soc/mediatek/mt8173-rt5650.c
-+++ b/sound/soc/mediatek/mt8173-rt5650.c
-@@ -23,6 +23,20 @@
- 
- #define MCLK_FOR_CODECS		12288000
- 
-+struct mt8173_rt5650_platform_data {
-+	unsigned int rt5650_i2s;
-+	/* 0 = I2S1; 1 = I2S2 */
-+};
-+
-+static struct mt8173_rt5650_platform_data mt8173_rt5650_priv = {
-+	.rt5650_i2s = 0,
-+};
-+
-+enum mt8173_rt5650_i2s {
-+	MT8173_RT5650_I2S1 = 0,
-+	MT8173_RT5650_I2S2,
-+};
-+
- static const struct snd_soc_dapm_widget mt8173_rt5650_widgets[] = {
- 	SND_SOC_DAPM_SPK("Speaker", NULL),
- 	SND_SOC_DAPM_MIC("Int Mic", NULL),
-@@ -87,10 +101,25 @@ static int mt8173_rt5650_init(struct snd_soc_pcm_runtime *runtime)
- 	struct snd_soc_codec *codec = runtime->codec_dais[0]->codec;
- 	int ret;
- 
--	rt5645_sel_asrc_clk_src(codec,
--				RT5645_DA_STEREO_FILTER |
--				RT5645_AD_STEREO_FILTER,
--				RT5645_CLK_SEL_I2S1_ASRC);
-+	switch (mt8173_rt5650_priv.rt5650_i2s) {
-+	case MT8173_RT5650_I2S1:
-+		rt5645_sel_asrc_clk_src(codec,
-+					RT5645_DA_STEREO_FILTER |
-+					RT5645_AD_STEREO_FILTER,
-+					RT5645_CLK_SEL_I2S1_ASRC);
-+		break;
-+	case MT8173_RT5650_I2S2:
-+		rt5645_sel_asrc_clk_src(codec,
-+					RT5645_DA_STEREO_FILTER,
-+					RT5645_CLK_SEL_I2S1_ASRC);
-+		rt5645_sel_asrc_clk_src(codec,
-+					RT5645_AD_STEREO_FILTER,
-+					RT5645_CLK_SEL_I2S2_ASRC);
-+		break;
-+	default:
-+		break;
++/**
++ * ci_hdrc_set_dma_mask
++ *
++ * Set dma mask and coherent dma mask for glue layer device, and the core
++ * device will inherit these values. If the 'dma-ranges' is specified at
++ * DT, it will use this value for both dma mask and coherent dma mask.
++ *
++ * @dev: a pointer to the device struct of glue layer device
++ * @ci_coherent_dma_mask: the mask for both dma_mask and cohrent_dma_mask
++ */
++int ci_hdrc_set_dma_mask(struct device *dev, u64 ci_coherent_dma_mask)
++{
++	int ret = dma_set_mask_and_coherent(dev, ci_coherent_dma_mask);
++	if (ret) {
++		dev_err(dev, "dma_set_mask_and_coherent fails\n");
++		return ret;
 +	}
 +
- 	/* enable jack detection */
- 	ret = snd_soc_card_jack_new(card, "Headset Jack",
- 				    SND_JACK_HEADPHONE | SND_JACK_MICROPHONE |
-@@ -112,6 +141,9 @@ static struct snd_soc_dai_link_component mt8173_rt5650_codecs[] = {
- 	{
- 		.dai_name = "rt5645-aif1",
- 	},
-+	{
-+		.dai_name = "rt5645-aif2",
-+	},
- };
- 
- enum {
-@@ -149,7 +181,7 @@ static struct snd_soc_dai_link mt8173_rt5650_dais[] = {
- 		.cpu_dai_name = "I2S",
- 		.no_pcm = 1,
- 		.codecs = mt8173_rt5650_codecs,
--		.num_codecs = 1,
-+		.num_codecs = 2,
- 		.init = mt8173_rt5650_init,
- 		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
- 			   SND_SOC_DAIFMT_CBS_CFS,
-@@ -199,6 +231,19 @@ static int mt8173_rt5650_dev_probe(struct platform_device *pdev)
- 			"Property 'audio-codec' missing or invalid\n");
- 		return -EINVAL;
- 	}
-+	mt8173_rt5650_codecs[1].of_node = mt8173_rt5650_codecs[0].of_node;
++	if (dev_of_node(dev))
++		of_dma_configure(dev, dev->of_node);
 +
-+	if (device_property_present(&pdev->dev, "mediatek,rt5650_i2s")) {
-+		ret = device_property_read_u32(&pdev->dev,
-+					       "mediatek,rt5650_i2s",
-+					       &mt8173_rt5650_priv.rt5650_i2s);
-+		if (ret) {
-+			dev_err(&pdev->dev,
-+				"%s snd_soc_register_card fail %d\n",
-+				__func__, ret);
-+		}
-+	}
++	return ret;
++}
 +
- 	card->dev = &pdev->dev;
- 	platform_set_drvdata(pdev, card);
+ struct platform_device *ci_hdrc_add_device(struct device *dev,
+ 			struct resource *res, int nres,
+ 			struct ci_hdrc_platform_data *platdata)
+diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
+index 5dd75fa..8649930 100644
+--- a/include/linux/usb/chipidea.h
++++ b/include/linux/usb/chipidea.h
+@@ -84,4 +84,6 @@ struct platform_device *ci_hdrc_add_device(struct device *dev,
+ /* Remove ci hdrc device */
+ void ci_hdrc_remove_device(struct platform_device *pdev);
  
++int ci_hdrc_set_dma_mask(struct device *dev, u64 ci_coherent_dma_mask);
++
+ #endif
+
 -- 
-1.7.9.5
+Best Regards,
+Peter Chen
