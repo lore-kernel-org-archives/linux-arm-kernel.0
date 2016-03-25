@@ -1,63 +1,81 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 25 Mar 2016 08:40:20 -0500
-Subject: [PATCH v3 2/2] documentation: Fix pinctrl documentation for
- Meson8 / Meson8b
-In-Reply-To: <CAL9uMOGaf5556KX5RJWbaW0d1zcTZu4S6FvoqEXQCWXg1QUDpg@mail.gmail.com>
-References: <1458724440-32228-1-git-send-email-carlo@caione.org>
- <1458724440-32228-3-git-send-email-carlo@caione.org>
- <20160323152052.GA20906@rob-hp-laptop>
- <CAL9uMOGaf5556KX5RJWbaW0d1zcTZu4S6FvoqEXQCWXg1QUDpg@mail.gmail.com>
-Message-ID: <20160325134020.GA15177@rob-hp-laptop>
+From: lakshmi.sai.krishna.potthuri@xilinx.com (Lakshmi Sai Krishna Potthuri)
+Date: Fri, 25 Mar 2016 13:41:16 +0000
+Subject: [LINUX PATCH 1/2] mtd: Added dummy entry in the spi_transfer
+ structure.
+In-Reply-To: <20160322100615.GA2566@sirena.org.uk>
+References: <1458562809-36114-1-git-send-email-lakshmis@xilinx.com>
+ <20160321130734.GS2566@sirena.org.uk>
+ <4FF8F58FAA9D5D4193D4E554E4352C5902C6D34C@XAP-PVEXMBX02.xlnx.xilinx.com>
+ <20160322100615.GA2566@sirena.org.uk>
+Message-ID: <4FF8F58FAA9D5D4193D4E554E4352C5902C6DB59@XAP-PVEXMBX02.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 23, 2016 at 05:04:19PM +0100, Carlo Caione wrote:
-> On Wed, Mar 23, 2016 at 4:20 PM, Rob Herring <robh@kernel.org> wrote:
-> > On Wed, Mar 23, 2016 at 10:14:00AM +0100, Carlo Caione wrote:
-> >> From: Carlo Caione <carlo@endlessm.com>
-> >>
-> >> Fix pin controller documentation introducing the new compatibles for
-> >> the pinctrl drivers specific for aobus / cbus.
-> >>
-> >> This is needed because we have changed the pin controller driver: we
-> >> have now a single specialized pinctrl driver / compatible for each bus
-> >> the controller is attached to, instead of one single driver dealing with
-> >> all the controllers we have on different buses.
-> >
-> > Aren't you breaking compatibility with old DTs here? If so, you need to
-> > be clear that you are and why you think that is okay.
-> 
-> Rob,
-> It's a bit too late to worry about breaking compatibility since the
-> driver changes are already landed in mainline and currently Meson8 and
-> Meson8b platforms are broken because of this.
-> You can read the whole discussion here [1] and here [2]. Driver and DT
-> changes were supposed to go in together but a bit of general
-> misunderstanding caused this issue.
+Hi Mark,
 
-My comment was the commit message needs to be clear that you are 
-breaking compatibility. That was true before part of this went in. 
- 
-> We decided to break compatibility with the old DTs since the the
-> platform support is still in the really early stage so I really don't
-> think this is going to cause any problem and we have a lot of good
-> reasons to split the pinctrl driver. First of all it makes sense from
-> the hardware prospective, since we actually have two different pin
-> controllers on two different buses. Splitting the driver allows us to
-> introduce in the DTS both CBUS and AOBUS as simple buses. We need a
-> clear description of the two buses in the DTS since several devices
-> have a different register mapping depending on which bus they are
-> attached to. Also as you can read here [3] we want to map the whole
-> CBUS as a syscon device to be able to access several registers
-> scattered inside CBUS.
+>-----Original Message-----
+>From: Mark Brown [mailto:broonie at kernel.org]
+>Sent: Tuesday, March 22, 2016 3:36 PM
+>To: Lakshmi Sai Krishna Potthuri
+>Cc: Michal Simek; Soren Brinkmann; David Woodhouse; Brian Norris; Javier
+>Martinez Canillas; Boris Brezillon; Stephen Warren; Geert Uytterhoeven;
+>Andrew F. Davis; Marek Vasut; Jagan Teki; Rafa? Mi?ecki; linux-
+>mtd at lists.infradead.org; linux-kernel at vger.kernel.org; linux-
+>spi at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Harini Katakam;
+>Punnaiah Choudary Kalluri; Anirudha Sarangi
+>Subject: Re: [LINUX PATCH 1/2] mtd: Added dummy entry in the spi_transfer
+>structure.
+>
+>On Tue, Mar 22, 2016 at 06:39:51AM +0000, Lakshmi Sai Krishna Potthuri
+>wrote:
+>
+>Please fix your mail client to word wrap within paragraphs at something
+>substantially less than 80 columns.  Doing this makes your messages much
+>easier to read and reply to.  Please also avoid reflowing other text into longer
+>lengths, this makes things worse.
+>
+>> >This isn't enough to add the feature - a client driver trying to make
+>> >use of this needs to be able to tell if the cycles are actually going
+>> >to be inserted.  I'd expect to see a capability flag that can be
+>> >checked and some error checking so that if we try to do a transfer
+>> >with dummy cycles and can't support it we don't silently ignore the
+>> >dummy cycles, ideally also something that'll handle multiples of 8
+>> >bits with SPI controllers that don't otherwise support this feature.
+>
+>> Currently, all fast reads use 8 cycles or 1 byte of dummy. This generally
+>works.
+>> But it can be vary based on the flash and the type of read command.
+>> Dummy bytes are taken care of in m25p80.c by adjusting the len field:
+>> Length = size of (command + address + dummy byte)
+>
+>> There might be controllers (like ZynqMP GQSPI) that would be able to
+>> use the information that dummy byte(s) were added and the precise
+>> number of dummy cycles. This patch does not disturb the existing
+>> implementation of adjusting length (as described above). It adds an
+>additional optional feature.
+>> So there is no harm to controllers that can't support it - they can
+>> ignore it and still work with the existing "length adjustment"
+>implementation.
+>> If you think there value in adding a capability flag, please let me know.
+>
+>This is really not what I'd expect to happen, I'd expect that these dummy
+>cycles would be in addition to the actual data (see my request for better
+>documentation...).  If they overlap with the data then what is the point in
+>specifying this?  It's more work for the host, what benefit do we get from
+>doing it over just handing it like a normal byte?
 
->From a quick glance, you mainly needed to keep the old compatible string 
-in the driver and just ignore ao-bank. Then only what depended on 
-ao-bank would break. Maybe that's less broken than completely breaking 
-the pinctrl driver...
+len field in the transfer structure contains dummy bytes along with actual data
+bytes, controllers which requires dummy bytes use len field and simply Ignore
+the dummy field (contains only no of cycles)added in this patch. Controllers
+(like ZynqMP GQSPI) expects dummy in cycles won't work directly by using
+len field because host driver doesn't know that len field of a particular transfer
+includes dummy bytes or not (and also number of dummy bytes included in len
+field). In such cases driver use this dummy field to identify the number of dummy
+cycles and based on that it will send the required number of dummy cycles (which
+i did in the second patch).
 
-Anyway, merge the fix:
+Regards
+Sai Krishna
 
-Acked-by: Rob Herring <robh@kernel.org>
 
-Rob
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
