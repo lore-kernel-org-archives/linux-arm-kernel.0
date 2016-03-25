@@ -1,49 +1,76 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Fri, 25 Mar 2016 15:06:35 +0800
-Subject: [PATCH] arm64: opcodes.h: Add arm big-endian config options
- before including arm header
-In-Reply-To: <1458838474-8625-1-git-send-email-james.morse@arm.com>
-References: <1458838474-8625-1-git-send-email-james.morse@arm.com>
-Message-ID: <56F4E37B.5090302@huawei.com>
+From: reichl@t-online.de (Markus Reichl)
+Date: Fri, 25 Mar 2016 08:07:40 +0100
+Subject: [PATCH] ARM: dts: exynos: Fix invalid maximum voltage for buck9
+ supplying SD card
+In-Reply-To: <56F4D070.4020403@osg.samsung.com>
+References: <1458807125-13580-1-git-send-email-k.kozlowski@samsung.com>
+ <56F4D070.4020403@osg.samsung.com>
+Message-ID: <3355646.rVxAcJbDaQ@dell2.five-lan.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/3/25 0:54, James Morse wrote:
-> arm and arm64 use different config options to specify big endian. This
-> needs taking into account when including code/headers between the two
-> architectures.
->
-> A case in point is PAN, which uses the __instr_arm() macro to output
-> instructions. The macro comes from opcodes.h, which lives under arch/arm.
-> On a big-endian build the mismatched config options mean the instruction
-> isn't byte swapped correctly, resulting in undefined instruction exceptions
-> during boot:
->> alternatives: patching kernel code
->> kdevtmpfs[87]: undefined instruction: pc=ffffffc0004505b4
->> kdevtmpfs[87]: undefined instruction: pc=ffffffc00076231c
->> kdevtmpfs[87]: undefined instruction: pc=ffffffc00076231c
->> kdevtmpfs[87]: undefined instruction: pc=ffffffc00076231c
->> kdevtmpfs[87]: undefined instruction: pc=ffffffc00076231c
->> kdevtmpfs[87]: undefined instruction: pc=ffffffc00076231c
->> kdevtmpfs[87]: undefined instruction: pc=ffffffc00076231c
->> kdevtmpfs[87]: undefined instruction: pc=ffffffc00076231c
->> kdevtmpfs[87]: undefined instruction: pc=ffffffc00076231c
->> kdevtmpfs[87]: undefined instruction: pc=ffffffc00076231c
->> Internal error: Oops - undefined instruction: 0 [#1] SMP
->> Modules linked in:
->> CPU: 0 PID: 87 Comm: kdevtmpfs Not tainted 4.1.16+ #5
->> Hardware name: Hisilicon PhosphorHi1382 EVB (DT)
->> task: ffffffc336591700 ti: ffffffc3365a4000 task.ti: ffffffc3365a4000
->> PC is at dump_instr+0x68/0x100
->> LR is at do_undefinstr+0x1d4/0x2a4
->> pc : [<ffffffc00076231c>] lr : [<ffffffc0000811d4>] pstate: 604001c5
->> sp : ffffffc3365a6450
-> Reported-by: Hanjun Guo <guohanjun@huawei.com>
+Hi Javier,
 
-My colleague Xuefeng helped to test this patch, and the bug
-reported is gone,
+Am Freitag, 25. M?rz 2016, 02:45:20 schrieb Javier Martinez Canillas:
+> Hello Krzysztof,
+> 
+> On 03/24/2016 05:12 AM, Krzysztof Kozlowski wrote:
+> > The buck9 regulator of S2MPS11 PMIC had incorrect maximum voltage -
+> > lower by 5 mV than specified by datasheet. This buck9 provides power to
+> > other regulators, including LDO13 and LDO19 which supply the MMC2 (SD
+> > card).
+> > 
+> > When constraints were applied, the depending regulators were not
+> > providing enough power, leading to SD card detection errors:
+> > 	mmc1: card never left busy state
+> > 	mmc1: error -110 whilst initialising SD card
+> > 
+> > Fixes: 86a2d2ac5e5d ("ARM: dts: Add dts file for Odroid XU3 board")
+> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > 
+> > ---
+> > 
+> > The issue can be reproduced on next-20160324 with
+> > bae4fdc88d7f7dda1 (regulator: core: Ensure we are at least in bounds for our constraints).
+> > ---
+> >  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+> > index 1bd507bfa750..82b2ba632cf6 100644
+> > --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+> > +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+> > @@ -299,7 +299,7 @@
+> >  			buck9_reg: BUCK9 {
+> >  				regulator-name = "vdd_2.8v_ldo";
+> >  				regulator-min-microvolt = <3000000>;
+> > -				regulator-max-microvolt = <3750000>;
+> > +				regulator-max-microvolt = <3755000>;
+> >  				regulator-always-on;
+> >  				regulator-boot-on;
+> >  			};
+> > 
+> 
+> I tested next-20160324 + $SUBJECT on an Odroid XU4 (with exynos_defconfig)
+> and while it's true that the patch makes the SD card error to go away, I see
+> that the s2mps11 regulator driver fails to probe due an -EINVAL being return
+> by machine_constraints_voltage() -> _regulator_do_set_voltage():
+> 
+> [    1.710300] vdd_2.8v_ldo: failed to apply 3755000-3755000uV constraint(-22)
+> [    1.716387] s2mps11-pmic s2mps11-regulator: regulator init failed for 46
+> [    1.734878] s2mps11-pmic: probe of s2mps11-regulator failed with error -22
+> 
+> I wonder how neither Markus nor you saw this issue when testing so maybe I'm
+> doing something wrong? Since AFAICT it's only working because the driver fails
+> to probe so the same effect can be achieved disabling CONFIG_REGULATOR_S2MPS11.
+> 
+> Best regards,
+> 
+My first test yesterday was with next-20160324 + $SUBJECT, too, and I encountered the same
+error of the regulator system as you.
+As with next-20160324 I could not get the ethernet chip running (with or without $SUBJECT) I switched back to
+next-20160323 + $SUBJECT and posted the result above.
 
-Tested-by: Xuefeng Wang <wxf.wang@hisilicon.com>
-
-Thanks
-Hanjun
+Regards,
+--
+Markus 
