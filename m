@@ -1,78 +1,116 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 25 Mar 2016 02:04:58 +0000
-Subject: [RFC PATCH 35/45] KVM: arm/arm64: vgic-new: Add userland access to
- VGIC dist registers
+Date: Fri, 25 Mar 2016 02:05:00 +0000
+Subject: [RFC PATCH 37/45] KVM: arm/arm64: vgic-new: Add userland GIC CPU
+ interface access
 In-Reply-To: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
 References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1458871508-17279-36-git-send-email-andre.przywara@arm.com>
+Message-ID: <1458871508-17279-38-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- virt/kvm/arm/vgic/vgic_kvm_device.c | 50 ++++++++++++++++++++++++++++++++++++-
- 1 file changed, 49 insertions(+), 1 deletion(-)
+ virt/kvm/arm/vgic/vgic_kvm_device.c | 72 ++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 71 insertions(+), 1 deletion(-)
 
 diff --git a/virt/kvm/arm/vgic/vgic_kvm_device.c b/virt/kvm/arm/vgic/vgic_kvm_device.c
-index d9f2383..2e2f8b6 100644
+index 2e2f8b6..7f78a16 100644
 --- a/virt/kvm/arm/vgic/vgic_kvm_device.c
 +++ b/virt/kvm/arm/vgic/vgic_kvm_device.c
-@@ -264,7 +264,55 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
- 				 struct kvm_device_attr *attr,
- 				 u32 *reg, bool is_write)
- {
--	return -ENXIO;
-+	gpa_t addr;
-+	int cpuid, ret, c;
-+	struct kvm_vcpu *vcpu, *tmp_vcpu;
+@@ -17,8 +17,11 @@
+ #include <kvm/vgic/vgic.h>
+ #include <linux/uaccess.h>
+ #include <asm/kvm_mmu.h>
++#include <linux/irqchip/arm-gic.h>
+ #include "vgic.h"
+ 
++#define GICC_ARCH_VERSION_V2		0x2
 +
-+	cpuid = (attr->attr & KVM_DEV_ARM_VGIC_CPUID_MASK) >>
-+		 KVM_DEV_ARM_VGIC_CPUID_SHIFT;
-+	vcpu = kvm_get_vcpu(dev->kvm, cpuid);
-+	addr = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
-+
-+	mutex_lock(&dev->kvm->lock);
-+
-+	ret = vgic_init(dev->kvm);
-+	if (ret)
-+		goto out;
-+
-+	if (cpuid >= atomic_read(&dev->kvm->online_vcpus)) {
-+		ret = -EINVAL;
-+		goto out;
-+	}
-+
-+	/*
-+	 * Ensure that no other VCPU is running by checking the vcpu->cpu
-+	 * field.  If no other VPCUs are running we can safely access the VGIC
-+	 * state, because even if another VPU is run after this point, that
-+	 * VCPU will not touch the vgic state, because it will block on
-+	 * getting the vgic->lock in kvm_vgic_sync_hwstate().
-+	 */
-+	kvm_for_each_vcpu(c, tmp_vcpu, dev->kvm) {
-+		if (unlikely(tmp_vcpu->cpu != -1)) {
-+			ret = -EBUSY;
-+			goto out;
-+		}
-+	}
-+
-+	switch (attr->group) {
-+	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS:
-+		ret = -EINVAL;
-+		break;
-+	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
-+		ret = vgic_v2_dist_access(vcpu, is_write, addr, 4, reg);
-+		break;
-+	default:
-+		ret = -EINVAL;
-+		break;
-+	}
-+
-+out:
-+	mutex_unlock(&dev->kvm->lock);
-+	return ret;
+ /* common helpers */
+ 
+ static int vgic_ioaddr_overlap(struct kvm *kvm)
+@@ -252,6 +255,69 @@ void kvm_register_vgic_device(unsigned long type)
+ 	}
  }
  
- /* V2 ops */
++static u32 vgic_read_vcpuif(struct kvm_vcpu *vcpu, int offset)
++{
++	struct vgic_vmcr vmcr;
++	u32 *field;
++
++	switch (offset) {
++	case GIC_CPU_CTRL:
++		field = &vmcr.ctlr;
++		break;
++	case GIC_CPU_PRIMASK:
++		field = &vmcr.pmr;
++		break;
++	case GIC_CPU_BINPOINT:
++		field = &vmcr.bpr;
++		break;
++	case GIC_CPU_ALIAS_BINPOINT:
++		field = &vmcr.abpr;
++		break;
++	case GIC_CPU_IDENT:
++		return (PRODUCT_ID_KVM << 20) |
++		       (GICC_ARCH_VERSION_V2 << 16) |
++		       (IMPLEMENTER_ARM << 0);
++	default:
++		return 0;
++	}
++
++	vgic_get_vmcr(vcpu, &vmcr);
++
++	return *field;
++}
++
++static bool vgic_write_vcpuif(struct kvm_vcpu *vcpu, int offset, u32 value)
++{
++	struct vgic_vmcr vmcr;
++	u32 *field;
++
++	switch (offset) {
++	case GIC_CPU_CTRL:
++		field = &vmcr.ctlr;
++		break;
++	case GIC_CPU_PRIMASK:
++		field = &vmcr.pmr;
++		break;
++	case GIC_CPU_BINPOINT:
++		field = &vmcr.bpr;
++		break;
++	case GIC_CPU_ALIAS_BINPOINT:
++		field = &vmcr.abpr;
++		break;
++	default:
++		return false;
++	}
++
++	vgic_get_vmcr(vcpu, &vmcr);
++	if (*field == value)
++		return false;
++
++	*field = value;
++	vgic_set_vmcr(vcpu, &vmcr);
++
++	return true;
++}
++
+ /** vgic_attr_regs_access: allows user space to read/write VGIC registers
+  *
+  * @dev: kvm device handle
+@@ -300,7 +366,11 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
+ 
+ 	switch (attr->group) {
+ 	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS:
+-		ret = -EINVAL;
++		ret = 0;
++		if (is_write)
++			vgic_write_vcpuif(vcpu, addr, *reg);
++		else
++			*reg = vgic_read_vcpuif(vcpu, addr);
+ 		break;
+ 	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
+ 		ret = vgic_v2_dist_access(vcpu, is_write, addr, 4, reg);
 -- 
 2.7.3
