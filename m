@@ -1,36 +1,60 @@
-From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Fri, 25 Mar 2016 06:44:33 +0000
-Subject: [v6, 2/5] soc: fsl: add GUTS driver for QorIQ platforms
-In-Reply-To: <DB5PR0401MB1928302BB0DDE8D9B47E4361918C0@DB5PR0401MB1928.eurprd04.prod.outlook.com>
-References: <1457518131-11339-1-git-send-email-yangbo.lu@nxp.com>
- <1457518131-11339-3-git-send-email-yangbo.lu@nxp.com>
- <DB5PR0401MB1928302BB0DDE8D9B47E4361918C0@DB5PR0401MB1928.eurprd04.prod.outlook.com>
-Message-ID: <HE1PR04MB0889420582187F850129D3D0F8830@HE1PR04MB0889.eurprd04.prod.outlook.com>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Fri, 25 Mar 2016 14:49:36 +0800
+Subject: Question about PCI I/O space in ARM64
+In-Reply-To: <20160324175728.GC21749@red-moon>
+References: <56F209A9.4040304@huawei.com>
+ <20160323101840.GA21390@e104818-lin.cambridge.arm.com>
+ <8793380.nuVa09lFue@wuerfel> <56F35BAA.50800@huawei.com>
+ <20160324175728.GC21749@red-moon>
+Message-ID: <56F4DF80.5070707@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Scott Wood
-> Sent: Saturday, March 19, 2016 6:55 AM
-> To: Yangbo Lu; devicetree at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; linuxppc-
-> dev at lists.ozlabs.org; linux-clk at vger.kernel.org; linux-
-> i2c at vger.kernel.org; iommu at lists.linux-foundation.org;
-> netdev at vger.kernel.org; linux-mmc at vger.kernel.org
-> Cc: Rob Herring; Russell King; Jochen Friedrich; Joerg Roedel; Claudiu
-> Manoil; ulf.hansson at linaro.org; Bhupesh Sharma; Zhao Qiang; Kumar Gala;
-> Santosh Shilimkar; Yang-Leo Li; Xiaobo Xie
-> Subject: Re: [v6, 2/5] soc: fsl: add GUTS driver for QorIQ platforms
-> 
-> On 03/09/2016 04:18 AM, Yangbo Lu wrote:
-> > +#ifdef CONFIG_FSL_GUTS
-> > +u32 fsl_guts_get_svr(void);
-> > +int fsl_guts_init(void);
-> > +#endif
-> 
-> Don't ifdef prototypes (when not providing a stub alternative).
-> 
-> -Scott
 
-[Lu Yangbo-B47093] Ok, will remove the ifdef.
-Thank you very much.
+
+On 2016/3/25 1:57, Lorenzo Pieralisi wrote:
+> [+ Jean]
+> 
+> On Thu, Mar 24, 2016 at 11:14:50AM +0800, Kefeng Wang wrote:
+> 
+> [...]
+> 
+>>>> You need a PCI host controller driver (e.g.
+>>>> drivers/pci/host/pci-host-generic.c) and corresponding bindings in DT or
+>>>> ACPI.
+>>
+>> In our inner test, there are some board without pcie host driver(even
+>> without pci host controller).
+> 
+> So I guess those drivers are for devices that are attached to an LPC
+> controller that is not part of a PCI host controller, right ?
+> 
+> BTW, what happened to this (not that I particularly like this patchset) ?
+
+They are working on it, and will upstream again.
+
+> 
+> https://lkml.org/lkml/2015/12/29/154
+> 
+[...]
+> 
+> I agree with Arnd on this and we need to patch the eg f71805f driver too
+> (or we just do not build on ARM) to make it request the IO port region it
+> needs to actually probe the device, it is not correct to assume IO space
+> is available and mapped, I think that's a driver bug rather than anything
+> else, Jean can certainly shed some light here.
+
+Ok, so Jean, would you take a look this? Thanks.
+
+Kefeng
+> 
+>> Define some arch in/out func instead of generic ops? when in/out vals, check
+>> whether or not the pci_iobase is mapped.
+> 
+> I do not think the problem should be solved in the IO accessors
+> implementation, see above.
+> 
+> Lorenzo
+> 
+> .
+> 
