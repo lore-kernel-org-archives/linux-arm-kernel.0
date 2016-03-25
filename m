@@ -1,80 +1,77 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 25 Mar 2016 02:04:44 +0000
-Subject: [RFC PATCH 21/45] KVM: arm/arm64: vgic-new: Add SGIR register handler
+Date: Fri, 25 Mar 2016 02:04:48 +0000
+Subject: [RFC PATCH 25/45] KVM: arm/arm64: vgic-new: Add GICv3 redistributor
+ TYPER handler
 In-Reply-To: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
 References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1458871508-17279-22-git-send-email-andre.przywara@arm.com>
+Message-ID: <1458871508-17279-26-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The redistributor TYPER tells the OS about the associated MPIDR,
+also the LAST bit is crucial.
+
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- virt/kvm/arm/vgic/vgic_mmio.c | 46 ++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 45 insertions(+), 1 deletion(-)
+ virt/kvm/arm/vgic/vgic_mmio.c | 32 +++++++++++++++++++++++++++++++-
+ 1 file changed, 31 insertions(+), 1 deletion(-)
 
 diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
-index cde153f..a49726f 100644
+index 13e101f..6d74b00 100644
 --- a/virt/kvm/arm/vgic/vgic_mmio.c
 +++ b/virt/kvm/arm/vgic/vgic_mmio.c
-@@ -512,6 +512,50 @@ static int vgic_mmio_write_target(struct kvm_vcpu *vcpu,
+@@ -652,6 +652,22 @@ static int vgic_mmio_write_v3_misc(struct kvm_vcpu *vcpu,
  	return 0;
  }
  
-+static int vgic_mmio_write_sgir(struct kvm_vcpu *source_vcpu,
-+				struct kvm_io_device *this,
-+				gpa_t addr, int len, const void *val)
++/*
++ * We use a compressed version of the MPIDR (all 32 bits in one 32-bit word)
++ * when we store the target MPIDR written by the guest.
++ */
++static u32 compress_mpidr(unsigned long mpidr)
 +{
-+	int nr_vcpus = atomic_read(&source_vcpu->kvm->online_vcpus);
-+	u32 value = *(u32 *)val;
-+	int intid = value & 0xf;
-+	int targets = (value >> 16) & 0xff;
-+	int mode = (value >> 24) & 0x03;
-+	int c;
-+	struct kvm_vcpu *vcpu;
++	u32 ret;
 +
-+	switch (mode) {
-+	case 0x0:		/* as specified by targets */
-+		break;
-+	case 0x1:
-+		targets = (1U << nr_vcpus) - 1;			/* all, ... */
-+		targets &= ~(1U << source_vcpu->vcpu_id);	/* but self */
-+		break;
-+	case 0x2:		/* this very vCPU only */
-+		targets = (1U << source_vcpu->vcpu_id);
-+		break;
-+	case 0x3:		/* reserved */
-+		break;
-+	}
++	ret = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++	ret |= MPIDR_AFFINITY_LEVEL(mpidr, 1) << 8;
++	ret |= MPIDR_AFFINITY_LEVEL(mpidr, 2) << 16;
++	ret |= MPIDR_AFFINITY_LEVEL(mpidr, 3) << 24;
 +
-+	kvm_for_each_vcpu(c, vcpu, source_vcpu->kvm) {
-+		struct vgic_irq *irq;
-+
-+		if (!(targets & (1U << c)))
-+			continue;
-+
-+		irq = vgic_get_irq(source_vcpu->kvm, vcpu, intid);
-+
-+		spin_lock(&irq->irq_lock);
-+		irq->pending = true;
-+		irq->source |= 1U << source_vcpu->vcpu_id;
-+
-+		vgic_queue_irq(source_vcpu->kvm, irq);
-+	}
-+
-+	return 0;
++	return ret;
 +}
 +
- struct vgic_register_region vgic_v2_dist_registers[] = {
- 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
- 		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12),
-@@ -536,7 +580,7 @@ struct vgic_register_region vgic_v2_dist_registers[] = {
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_CONFIG,
- 		vgic_mmio_read_config, vgic_mmio_write_config, 2),
- 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SOFTINT,
--		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 4),
-+		vgic_mmio_read_raz, vgic_mmio_write_sgir, 4),
- 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SGI_PENDING_CLEAR,
- 		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 16),
- 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SGI_PENDING_SET,
+ static int vgic_mmio_read_v3r_misc(struct kvm_vcpu *vcpu,
+ 				   struct kvm_io_device *this,
+ 				   gpa_t addr, int len, void *val)
+@@ -672,6 +688,9 @@ static int vgic_mmio_read_v3r_iidr(struct kvm_vcpu *vcpu,
+ 				   struct kvm_io_device *this,
+ 				   gpa_t addr, int len, void *val)
+ {
++	write_mask32((PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0),
++		     addr & 3, len, val);
++
+ 	return 0;
+ }
+ 
+@@ -679,7 +698,18 @@ static int vgic_mmio_read_v3r_typer(struct kvm_vcpu *vcpu,
+ 				    struct kvm_io_device *this,
+ 				    gpa_t addr, int len, void *val)
+ {
+-	/* TODO: implement */
++	struct vgic_io_device *iodev = container_of(this,
++						    struct vgic_io_device, dev);
++	unsigned long mpidr = kvm_vcpu_get_mpidr_aff(iodev->redist_vcpu);
++	int target_vcpu_id = iodev->redist_vcpu->vcpu_id;
++	u64 value;
++
++	value = (u64)compress_mpidr(mpidr) << 32;
++	value |= ((target_vcpu_id & 0xffff) << 8);
++	if (target_vcpu_id == atomic_read(&vcpu->kvm->online_vcpus) - 1)
++		value |= GICR_TYPER_LAST;
++
++	write_mask64(value, addr & 7, len, val);
+ 	return 0;
+ }
+ 
 -- 
 2.7.3
