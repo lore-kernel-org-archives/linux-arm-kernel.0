@@ -1,78 +1,34 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 24 Mar 2016 21:25:07 -0700
-Subject: [PATCH] arm64/dma-mapping: Add DMA_ATTR_ALLOC_SINGLE_PAGES support
-In-Reply-To: <20160324115008.GE9323@arm.com>
-References: <1456944866-15990-1-git-send-email-yong.wu@mediatek.com>
- <20160321180147.GR23397@arm.com>
- <CAD=FV=WL-OgE6D+8m3A8ZSJ8HgVZJw_+7uBce=qPh80LaxQKbg@mail.gmail.com>
- <20160324115008.GE9323@arm.com>
-Message-ID: <CAD=FV=VBvdLqabE0h=+hRChY4G0=1dzH1z8eE7ukMC+wbnQT9w@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 25 Mar 2016 12:39:12 +0800
+Subject: [PATCH 1/1] usb: chipidea: add DMA mask configuration API
+In-Reply-To: <20160325040234.GA6185@peterchendt>
+Message-ID: <201603251224.amlQiwhC%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Peter,
 
-On Thu, Mar 24, 2016 at 4:50 AM, Will Deacon <will.deacon@arm.com> wrote:
->> > I have a slight snag with this, in that you don't consult the IOMMU
->> > pgsize_bitmap at any point, and assume that it can map pages at the
->> > same granularity as the CPU. The documentation for
->> > DMA_ATTR_ALLOC_SINGLE_PAGES seems to be weaker than that.
->>
->> Interesting.  Is that something that exists in the real world?  ...or
->> something you think is coming soon?
->
-> All it would take is for an IOMMU driver to choose a granule size that
-> differs from the CPU. For example, if the SMMU driver chose 64k pages
-> and the CPU was using 4k pages, then you'd have this problem.
->
->> I'd argue that such a case existed in the real world then probably
->> we're already broken.  Unless I'm misreading, existing code will
->> already fall all the way back to order 0 allocations.  ...so while
->> existing code might could work if it was called on a totally
->> unfragmented system, it would already break once some fragmentation
->> was introduced.
->
-> I disagree. For example, in the case I described previously, they may
-> well settle on a common supported granule (e.g. 2M), assuming that
-> contiguous pages were implemented in the page table code.
+[auto build test ERROR on v4.5-rc7]
+[also build test ERROR on next-20160324]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-I'm still a little confused how existing code could have worked if
-IOMMU has 64K pages and CPU has 4K pages if memory is fragmented.
-Presumably existing code in __iommu_dma_alloc_pages() would keep
-failing the "alloc_pages(gfp | __GFP_NORETRY, order);" call until
-order got down to 0.  Then we'd allocate order 0 (4K) pages and we'd
-hit a bug.
+url:    https://github.com/0day-ci/linux/commits/Peter-Chen/usb-chipidea-add-DMA-mask-configuration-API/20160325-120535
+config: i386-randconfig-s1-201612 (attached as .config)
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
+All errors (new ones prefixed by >>):
 
->> I'm not saying that we shouldn't fix the code to handle this, I'm just
->> saying that Yong Wu's patch doesn't appear to break any code that
->> wasn't already broken.  That might be reason to land his code first,
->> then debate the finer points of whether IOMMUs with less granularity
->> are likely to exist and whether we need to add complexity to the code
->> to handle them (or just detect this case and return an error).
->>
->> From looking at a WIP patch provided to me by Yong Wu, it looks as if
->> he thinks several more functions need to change to handle this need
->> for IOMMUs that can't handle small pages.  That seems to be further
->> evidence that the work should be done in a separate patch.
->
-> Sure, my observations weren't intended to hold up this patch, but we
-> should double-check that we're no regressing any of the existing IOMMU
-> drivers/platforms by going straight to order 0 allocations.
+>> ERROR: "ci_hdrc_set_dma_mask" [drivers/usb/chipidea/ci_hdrc_msm.ko] undefined!
 
-Argh.  I see why I was confused and thought it got complicated.  When
-I looked at diffs I thought Yong Wu's patch was more complicated
-because he rebased it and my diff showed some other unrelated patches.
-Dumb.
-
-OK, you're right that this is pretty simple.
-
-In any case, you're right that we should fix this.  ...though assuming
-my argument above isn't wrong, then existing code is already broken or
-has a latent bug if you've got an IOMMU that can't map at least as
-granular as the CPU.  To me that means adding that new feature (or
-fixing that latent bug) should be done in a separate patch.  It could
-come in sequence either before or after this one.  Of course, if
-everyone else thinks it should be one patch I won't block that...
-
--Doug
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 23634 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160325/301371ff/attachment-0001.obj>
