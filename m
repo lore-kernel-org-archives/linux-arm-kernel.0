@@ -1,93 +1,255 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 25 Mar 2016 02:04:31 +0000
-Subject: [RFC PATCH 08/45] KVM: arm/arm64: vgic-new: Add IRQ sorting
+Date: Fri, 25 Mar 2016 02:04:29 +0000
+Subject: [RFC PATCH 06/45] KVM: arm/arm64: vgic-new: Implement virtual IRQ
+ injection
 In-Reply-To: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
 References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1458871508-17279-9-git-send-email-andre.przywara@arm.com>
+Message-ID: <1458871508-17279-7-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <christoffer.dall@linaro.org>
 
-Adds the sorting function to cover the case where you have more IRQs
-to consider than you have LRs. We now consider priorities.
+Provide a vgic_queue_irq() function which decides whether a given
+IRQ needs to be queued to a VCPU's ap_list.
+This should be called whenever an IRQ became pending or got enabled,
+either as a result of userspace injection, from in-kernel emulated
+devices like the architected timer or from MMIO accesses to the
+distributor emulation.
+Also provides the necessary functions to allow userland to inject an
+IRQ to a guest.
+[Andre: refactor out vgic_queue_irq()]
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- virt/kvm/arm/vgic/vgic.c | 53 ++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 53 insertions(+)
+ include/kvm/vgic/vgic.h  |   3 +
+ virt/kvm/arm/vgic/vgic.c | 181 +++++++++++++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic.h |   1 +
+ 3 files changed, 185 insertions(+)
 
+diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+index 659f8b1..f32b284 100644
+--- a/include/kvm/vgic/vgic.h
++++ b/include/kvm/vgic/vgic.h
+@@ -178,6 +178,9 @@ struct vgic_cpu {
+ 	struct list_head ap_list_head;
+ };
+ 
++int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
++			bool level);
++
+ #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
+ #define vgic_initialized(k)	(false)
+ #define vgic_ready(k)		((k)->arch.vgic.ready)
 diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index a95aabc..29c753e 100644
+index 8e34916..a95aabc 100644
 --- a/virt/kvm/arm/vgic/vgic.c
 +++ b/virt/kvm/arm/vgic/vgic.c
-@@ -16,6 +16,7 @@
- 
- #include <linux/kvm.h>
- #include <linux/kvm_host.h>
-+#include <linux/list_sort.h>
+@@ -19,8 +19,25 @@
  
  #include "vgic.h"
  
-@@ -81,6 +82,58 @@ static struct kvm_vcpu *vgic_target_oracle(struct vgic_irq *irq)
- }
++#define CREATE_TRACE_POINTS
++#include "../trace.h"
++
+ struct vgic_global kvm_vgic_global_state;
  
- /*
-+ * The order of items in the ap_lists defines how we'll pack things in LRs as
-+ * well, the first items in the list being the first things populated in the
-+ * LRs.
++/*
++ * Locking order is always:
++ *   vgic_cpu->ap_list_lock
++ *     vgic_irq->irq_lock
 + *
-+ * A hard rule is that active interrupts can never be pushed out of the LRs
-+ * (and therefore take priority) since we cannot reliably trap on deactivation
-+ * of IRQs and therefore they have to be present in the LRs.
++ * (that is, always take the ap_list_lock before the struct vgic_irq lock).
 + *
-+ * Otherwise things should be sorted by the priority field and the GIC
-+ * hardware support will take care of preemption of priority groups etc.
-+ *
-+ * Return negative if "a" sorts before "b", 0 to preserve order, and positive
-+ * to sort "b" before "a".
++ * When taking more than one ap_list_lock at the same time, always take the
++ * lowest numbered VCPU's ap_list_lock first, so:
++ *   vcpuX->vcpu_id < vcpuY->vcpu_id:
++ *     spin_lock(vcpuX->arch.vgic_cpu.ap_list_lock);
++ *     spin_lock(vcpuY->arch.vgic_cpu.ap_list_lock);
 + */
-+static int vgic_irq_cmp(void *priv, struct list_head *a, struct list_head *b)
++
+ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
+ 			      u32 intid)
+ {
+@@ -39,3 +56,167 @@ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
+ 	WARN(1, "Looking up struct vgic_irq for reserved INTID");
+ 	return NULL;
+ }
++
++/**
++ * kvm_vgic_target_oracle - compute the target vcpu for an irq
++ *
++ * @irq:	The irq to route. Must be already locked.
++ *
++ * Based on the current state of the interrupt (enabled, pending,
++ * active, vcpu and target_vcpu), compute the next vcpu this should be
++ * given to. Return NULL if this shouldn't be injected at all.
++ */
++static struct kvm_vcpu *vgic_target_oracle(struct vgic_irq *irq)
 +{
-+	struct vgic_irq *irqa = container_of(a, struct vgic_irq, ap_list);
-+	struct vgic_irq *irqb = container_of(b, struct vgic_irq, ap_list);
-+	bool penda, pendb;
-+	int ret;
++	/* If the interrupt is active, it must stay on the current vcpu */
++	if (irq->active)
++		return irq->vcpu;
 +
-+	spin_lock(&irqa->irq_lock);
-+	spin_lock(&irqb->irq_lock);
++	/* If enabled and pending, it can migrate to a new one */
++	if (irq->enabled && irq->pending)
++		return irq->target_vcpu;
 +
-+	if (irqa->active || irqb->active) {
-+		ret = (int)irqb->active - (int)irqa->active;
-+		goto out;
-+	}
-+
-+	penda = irqa->enabled && irqa->pending;
-+	pendb = irqb->enabled && irqb->pending;
-+
-+	if (!penda || !pendb) {
-+		ret = (int)pendb - (int)penda;
-+		goto out;
-+	}
-+
-+	/* Both pending and enabled, sort by priority */
-+	ret = irqa->priority - irqb->priority;
-+out:
-+	spin_unlock(&irqb->irq_lock);
-+	spin_unlock(&irqa->irq_lock);
-+	return ret;
-+}
-+
-+/* Must be called with the ap_list_lock held */
-+static void vgic_sort_ap_list(struct kvm_vcpu *vcpu)
-+{
-+	list_sort(NULL, &vcpu->arch.vgic_cpu.ap_list_head, vgic_irq_cmp);
++	/* Otherwise, it is considered idle */
++	return NULL;
 +}
 +
 +/*
-  * Only valid injection if changing level for level-triggered IRQs or for a
-  * rising edge.
-  */
++ * Only valid injection if changing level for level-triggered IRQs or for a
++ * rising edge.
++ */
++static bool vgic_validate_injection(struct vgic_irq *irq, bool level)
++{
++	switch (irq->config) {
++	case VGIC_CONFIG_LEVEL:
++		return irq->line_level != level;
++	case VGIC_CONFIG_EDGE:
++		return level;
++	default:
++		BUG();
++	}
++}
++
++/*
++ * Check whether an IRQ needs to (and can) be queued to a VCPU's ap list.
++ * Do the queuing if necessary, taking the right locks in the right order.
++ * Returns true when the IRQ was queued, false otherwise.
++ *
++ * Needs to be entered with the IRQ lock already held, but will return
++ * with all locks dropped.
++ */
++bool vgic_queue_irq(struct kvm *kvm, struct vgic_irq *irq)
++{
++	struct kvm_vcpu *vcpu = vgic_target_oracle(irq);
++
++	if (irq->vcpu || !(irq->pending && irq->enabled) || !vcpu) {
++		/*
++		 * If this IRQ is already on a VCPU's ap_list, then it
++		 * cannot be moved or modified and there is no more work for
++		 * us to do.
++		 *
++		 * Otherwise, if the irq is not pending and enabled, it does
++		 * not need to be inserted into an ap_list and there is also
++		 * no more work for us to do.
++		 */
++		spin_unlock(&irq->irq_lock);
++		return false;
++	}
++
++	/*
++	 * We must unlock the irq lock to take the ap_list_lock where
++	 * we are going to insert this new pending interrupt.
++	 */
++	spin_unlock(&irq->irq_lock);
++
++	/* someone can do stuff here, which we re-check below */
++retry:
++	spin_lock(&vcpu->arch.vgic_cpu.ap_list_lock);
++	spin_lock(&irq->irq_lock);
++
++	/*
++	 * Did something change behind our backs?
++	 *
++	 * There are two cases:
++	 * 1) The irq became pending or active behind our backs and/or
++	 *    the irq->vcpu field was set correspondingly when putting
++	 *    the irq on an ap_list. Then drop the locks and return.
++	 * 2) Someone changed the affinity on this irq behind our
++	 *    backs and we are now holding the wrong ap_list_lock.
++	 *    Then drop the locks and try the new VCPU.
++	 */
++	if (irq->vcpu || !(irq->pending && irq->enabled)) {
++		spin_unlock(&irq->irq_lock);
++		spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
++		return false;
++	}
++
++	if (irq->target_vcpu != vcpu) {
++		spin_unlock(&irq->irq_lock);
++		spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
++
++		vcpu = irq->target_vcpu;
++		goto retry;
++	}
++
++	list_add_tail(&irq->ap_list, &vcpu->arch.vgic_cpu.ap_list_head);
++	irq->vcpu = vcpu;
++
++	spin_unlock(&irq->irq_lock);
++	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
++
++	kvm_vcpu_kick(vcpu);
++
++	return true;
++}
++
++static void vgic_update_irq_pending(struct kvm *kvm, struct kvm_vcpu *vcpu,
++				    u32 intid, bool level)
++{
++	struct vgic_irq *irq = vgic_get_irq(kvm, vcpu, intid);
++
++	trace_vgic_update_irq_pending(vcpu->vcpu_id, intid, level);
++
++	BUG_ON(in_interrupt());
++
++	spin_lock(&irq->irq_lock);
++
++	if (!vgic_validate_injection(irq, level)) {
++		/* Nothing to see here, move along... */
++		spin_unlock(&irq->irq_lock);
++		return;
++	}
++
++	if (irq->config == VGIC_CONFIG_LEVEL) {
++		irq->line_level = level;
++		irq->pending = level || irq->soft_pending;
++	} else {
++		irq->pending = true;
++	}
++
++	vgic_queue_irq(kvm, irq);
++}
++
++/**
++ * kvm_vgic_inject_irq - Inject an IRQ from a device to the vgic
++ * @kvm:     The VM structure pointer
++ * @cpuid:   The CPU for PPIs
++ * @intid:   The INTID to inject a new state to.
++ *           must not be mapped to a HW interrupt.
++ * @level:   Edge-triggered:  true:  to trigger the interrupt
++ *			      false: to ignore the call
++ *	     Level-sensitive  true:  raise the input signal
++ *			      false: lower the input signal
++ *
++ * The GIC is not concerned with devices being active-LOW or active-HIGH for
++ * level-sensitive interrupts.  You can think of the level parameter as 1
++ * being HIGH and 0 being LOW and all devices being active-HIGH.
++ */
++int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
++			bool level)
++{
++	struct kvm_vcpu *vcpu;
++
++	vcpu = kvm_get_vcpu(kvm, cpuid);
++	vgic_update_irq_pending(kvm, vcpu, intid, level);
++	return 0;
++}
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index 61b8d22..e9f4aa6 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -18,5 +18,6 @@
+ 
+ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
+ 			      u32 intid);
++bool vgic_queue_irq(struct kvm *kvm, struct vgic_irq *irq);
+ 
+ #endif
 -- 
 2.7.3
