@@ -1,36 +1,28 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri, 25 Mar 2016 15:36:28 +0000
-Subject: [PATCH 4/4] ARM: STi: DT: STiH407: Add DT node for eeprom
-In-Reply-To: <1458920188-29612-1-git-send-email-peter.griffin@linaro.org>
-References: <1458920188-29612-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1458920188-29612-5-git-send-email-peter.griffin@linaro.org>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 25 Mar 2016 11:44:23 -0400 (EDT)
+Subject: [PATCH v2 1/1] net: macb: remove BUG_ON() and reset the queue
+ to handle RX errors
+In-Reply-To: <1458898654-25864-1-git-send-email-cyrille.pitchen@atmel.com>
+References: <1458898654-25864-1-git-send-email-cyrille.pitchen@atmel.com>
+Message-ID: <20160325.114423.859412154606595295.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
----
- arch/arm/boot/dts/stihxxx-b2120.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+Date: Fri, 25 Mar 2016 10:37:34 +0100
 
-diff --git a/arch/arm/boot/dts/stihxxx-b2120.dtsi b/arch/arm/boot/dts/stihxxx-b2120.dtsi
-index 133375b..0d7c6dd 100644
---- a/arch/arm/boot/dts/stihxxx-b2120.dtsi
-+++ b/arch/arm/boot/dts/stihxxx-b2120.dtsi
-@@ -58,6 +58,15 @@
- 
- 		i2c at 9845000 {
- 			status = "okay";
-+
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			eeprom at 50 {
-+				compatible = "at,24c256";
-+				pagesize = <64>;
-+				reg = <0x50>;
-+			};
- 		};
- 
- 		i2c at 9540000 {
--- 
-1.9.1
+> This patch removes two BUG_ON() used to notify about RX queue corruptions
+> on macb (not gem) hardware without actually handling the error.
+> 
+> The new code skips corrupted frames but still processes faultless frames.
+> Then it resets the RX queue before restarting the reception from a clean
+> state.
+> 
+> This patch is a rework of an older patch proposed by Neil Armstrong:
+> http://patchwork.ozlabs.org/patch/371525/
+> 
+> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Applied, thank you.
