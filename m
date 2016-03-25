@@ -1,65 +1,95 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 25 Mar 2016 14:25:13 +0800
-Subject: [PATCH] cpuidle: arm: make enter idle operation a bit more
- efficient
-In-Reply-To: <20160324160600.GA21749@red-moon>
-References: <1458796038-6062-1-git-send-email-jszhang@marvell.com>
- <20160324160600.GA21749@red-moon>
-Message-ID: <20160325142513.6814ee41@xhacker>
+From: yangbo.lu@nxp.com (Yangbo Lu)
+Date: Fri, 25 Mar 2016 06:38:16 +0000
+Subject: [v6, 3/5] dt: move guts devicetree doc out of powerpc directory
+In-Reply-To: <HE1PR0401MB1931444381E249E41C45C748918C0@HE1PR0401MB1931.eurprd04.prod.outlook.com>
+References: <1457518131-11339-1-git-send-email-yangbo.lu@nxp.com>
+ <1457518131-11339-4-git-send-email-yangbo.lu@nxp.com>
+ <20160317170640.GB21009@rob-hp-laptop>
+ <HE1PR0401MB1931444381E249E41C45C748918C0@HE1PR0401MB1931.eurprd04.prod.outlook.com>
+Message-ID: <HE1PR04MB08895D48A45AD3F6B32FB088F8830@HE1PR04MB0889.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
-
-On Thu, 24 Mar 2016 16:06:00 +0000 Lorenzo Pieralisi wrote:
-
-> On Thu, Mar 24, 2016 at 01:07:18PM +0800, Jisheng Zhang wrote:
-> > Currently, entering idle need to check the idx every time to choose the
-> > real entering idle routine. But this check could be avoided by pointing
-> > the idle enter function pointer of each idle states to the routines
-> > suitable for each states directly.
-> > 
-> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> > ---
-> >  drivers/cpuidle/cpuidle-arm.c | 14 ++++++++------
-> >  1 file changed, 8 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
-> > index 545069d..48a620f 100644
-> > --- a/drivers/cpuidle/cpuidle-arm.c
-> > +++ b/drivers/cpuidle/cpuidle-arm.c
-> > @@ -23,6 +23,13 @@
-> >  
-> >  #include "dt_idle_states.h"
-> >  
-> > +static int arm_enter_wfi_state(struct cpuidle_device *dev,
-> > +			       struct cpuidle_driver *drv, int idx)
-> > +{
-> > +	cpu_do_idle();
-> > +	return 0;
-> > +}
-> > +
-> >  /*
-> >   * arm_enter_idle_state - Programs CPU to enter the specified state
-> >   *
-> > @@ -38,11 +45,6 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
-> >  {
-> >  	int ret;
-> >  
-> > -	if (!idx) {
-> > -		cpu_do_idle();
-> > -		return idx;
-> > -	}  
+> -----Original Message-----
+> From: Scott Wood
+> Sent: Saturday, March 19, 2016 2:16 AM
+> To: Rob Herring; Yangbo Lu
+> Cc: devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> linux-kernel at vger.kernel.org; linuxppc-dev at lists.ozlabs.org; linux-
+> clk at vger.kernel.org; linux-i2c at vger.kernel.org; iommu at lists.linux-
+> foundation.org; netdev at vger.kernel.org; linux-mmc at vger.kernel.org;
+> Russell King; Jochen Friedrich; Joerg Roedel; Claudiu Manoil;
+> ulf.hansson at linaro.org; Bhupesh Sharma; Zhao Qiang; Kumar Gala; Santosh
+> Shilimkar; Yang-Leo Li; Xiaobo Xie
+> Subject: Re: [v6, 3/5] dt: move guts devicetree doc out of powerpc
+> directory
 > 
-> Mmm...if I wanted to paint your bikeshed I would say idx is in a
-> register and you are removing a simple comparison to exchange it
-> with a function that adds to code footprint and may even make
-> performance worse instead of improving anything.
+> On 03/17/2016 12:06 PM, Rob Herring wrote:
+> > On Wed, Mar 09, 2016 at 06:08:49PM +0800, Yangbo Lu wrote:
+> >> Move guts devicetree doc to
+> >> Documentation/devicetree/bindings/soc/fsl/
+> >> since it's used by not only PowerPC but also ARM. And add a
+> >> specification for 'little-endian' property.
+> >>
+> >> Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
+> >> ---
+> >> Changes for v2:
+> >> 	- None
+> >> Changes for v3:
+> >> 	- None
+> >> Changes for v4:
+> >> 	- Added this patch
+> >> Changes for v5:
+> >> 	- Modified the description for little-endian property Changes for
+> >> v6:
+> >> 	- None
+> >> ---
+> >>  Documentation/devicetree/bindings/{powerpc => soc}/fsl/guts.txt | 3
+> >> +++
+> >>  1 file changed, 3 insertions(+)
+> >>  rename Documentation/devicetree/bindings/{powerpc =>
+> >> soc}/fsl/guts.txt (91%)
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/powerpc/fsl/guts.txt
+> >> b/Documentation/devicetree/bindings/soc/fsl/guts.txt
+> >> similarity index 91%
+> >> rename from Documentation/devicetree/bindings/powerpc/fsl/guts.txt
+> >> rename to Documentation/devicetree/bindings/soc/fsl/guts.txt
+> >> index b71b203..07adca9 100644
+> >> --- a/Documentation/devicetree/bindings/powerpc/fsl/guts.txt
+> >> +++ b/Documentation/devicetree/bindings/soc/fsl/guts.txt
+> >> @@ -25,6 +25,9 @@ Recommended properties:
+> >>   - fsl,liodn-bits : Indicates the number of defined bits in the LIODN
+> >>     registers, for those SOCs that have a PAMU device.
+> >>
+> >> + - little-endian : Indicates that the global utilities block is
+> little
+> >> +   endian. The default is big endian.
+> >
+> > The default is "the native endianness of the system". So absence on an
+> > ARM system would be LE.
 > 
-> I am not sure this patch makes anything more efficient, happy to be
-> proven wrong, with significant data.
+> No.  For this binding, the default is big-endian, because that's what
+> existed for this device before an endian property was added.
+> 
+> "endianness of the system" is not a well-defined concept.
+> 
+> > This property is valid for any simple-bus device,
+> 
+> Since when does simple-bus mean anything more than that the nodes
+> underneath it can be used without bus-specific knowledge?
+> 
+> > so it isn't really required to document per device. You can, but your
+> > description had better match the documented behaviour.
+> 
+> Documented where?
+> 
+> In fact, Documentation/devicetree/bindings/common-properties.txt
+> explicitly says of the endian properties, "If a binding supports these
+> properties, then the binding should also specify the default behavior if
+> none of these properties are present."
+> 
+> -Scott
 
-Thanks for pointing this out. I'll do some measurement and get back to you
-
-Thanks,
-Jisheng
+[Lu Yangbo-B47093] So, Rob, could you accept this patch after so much discussion?
+:)
