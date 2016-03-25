@@ -1,123 +1,31 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 25 Mar 2016 02:04:45 +0000
-Subject: [RFC PATCH 22/45] KVM: arm/arm64: vgic-new: Add SGIPENDR register
- handlers
-In-Reply-To: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
-References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1458871508-17279-23-git-send-email-andre.przywara@arm.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 25 Mar 2016 11:14:02 +0900
+Subject: [PATCH] ARM: uniphier: drop weird sizeof()
+Message-ID: <1458872042-30465-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+My intention was to ioremap a 4-byte register.  Coincidentally enough,
+sizeof(SZ_4) equals to SZ_4, but this code is weird anyway.
 
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
- virt/kvm/arm/vgic/vgic_mmio.c | 79 ++++++++++++++++++++++++++++++++-----------
- 1 file changed, 59 insertions(+), 20 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
-index a49726f..2ab8961 100644
---- a/virt/kvm/arm/vgic/vgic_mmio.c
-+++ b/virt/kvm/arm/vgic/vgic_mmio.c
-@@ -64,24 +64,6 @@ int vgic_mmio_write_wi(struct kvm_vcpu *vcpu, struct kvm_io_device *this,
- 	return 0;
- }
+ arch/arm/mach-uniphier/platsmp.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-uniphier/platsmp.c b/arch/arm/mach-uniphier/platsmp.c
+index 6914135..db04142 100644
+--- a/arch/arm/mach-uniphier/platsmp.c
++++ b/arch/arm/mach-uniphier/platsmp.c
+@@ -120,7 +120,7 @@ static int __init uniphier_smp_prepare_trampoline(unsigned int max_cpus)
+ 	if (ret)
+ 		return ret;
  
--static int vgic_mmio_read_nyi(struct kvm_vcpu *vcpu,
--			      struct kvm_io_device *this,
--			      gpa_t addr, int len, void *val)
--{
--	pr_warn("KVM: handling unimplemented VGIC MMIO read: VCPU %d, address: 0x%llx\n",
--		vcpu->vcpu_id, (unsigned long long)addr);
--	return 0;
--}
--
--static int vgic_mmio_write_nyi(struct kvm_vcpu *vcpu,
--			       struct kvm_io_device *this,
--			       gpa_t addr, int len, const void *val)
--{
--	pr_warn("KVM: handling unimplemented VGIC MMIO write: VCPU %d, address: 0x%llx\n",
--		vcpu->vcpu_id, (unsigned long long)addr);
--	return 0;
--}
--
- static int vgic_mmio_read_v2_misc(struct kvm_vcpu *vcpu,
- 				  struct kvm_io_device *this,
- 				  gpa_t addr, int len, void *val)
-@@ -556,6 +538,63 @@ static int vgic_mmio_write_sgir(struct kvm_vcpu *source_vcpu,
- 	return 0;
- }
- 
-+static int vgic_mmio_read_sgipend(struct kvm_vcpu *vcpu,
-+				  struct kvm_io_device *this,
-+				  gpa_t addr, int len, void *val)
-+{
-+	struct vgic_io_device *iodev = container_of(this,
-+						    struct vgic_io_device, dev);
-+	u32 intid = (addr - iodev->base_addr);
-+	int i;
-+
-+	for (i = 0; i < len; i++) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-+
-+		spin_lock(&irq->irq_lock);
-+		((u8 *)val)[i] = irq->source;
-+		spin_unlock(&irq->irq_lock);
-+	}
-+	return 0;
-+}
-+
-+static int vgic_mmio_write_sgipendc(struct kvm_vcpu *vcpu,
-+				    struct kvm_io_device *this,
-+				    gpa_t addr, int len, const void *val)
-+{
-+	struct vgic_io_device *iodev = container_of(this,
-+						    struct vgic_io_device, dev);
-+	u32 intid = (addr - iodev->base_addr);
-+	int i;
-+
-+	for (i = 0; i < len; i++) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-+
-+		spin_lock(&irq->irq_lock);
-+		irq->source &= ~((u8 *)val)[i];
-+		spin_unlock(&irq->irq_lock);
-+	}
-+	return 0;
-+}
-+
-+static int vgic_mmio_write_sgipends(struct kvm_vcpu *vcpu,
-+				    struct kvm_io_device *this,
-+				    gpa_t addr, int len, const void *val)
-+{
-+	struct vgic_io_device *iodev = container_of(this,
-+						    struct vgic_io_device, dev);
-+	u32 intid = (addr - iodev->base_addr);
-+	int i;
-+
-+	for (i = 0; i < len; i++) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-+
-+		spin_lock(&irq->irq_lock);
-+		irq->source |= ((u8 *)val)[i];
-+		spin_unlock(&irq->irq_lock);
-+	}
-+	return 0;
-+}
-+
- struct vgic_register_region vgic_v2_dist_registers[] = {
- 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
- 		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12),
-@@ -582,9 +621,9 @@ struct vgic_register_region vgic_v2_dist_registers[] = {
- 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SOFTINT,
- 		vgic_mmio_read_raz, vgic_mmio_write_sgir, 4),
- 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SGI_PENDING_CLEAR,
--		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 16),
-+		vgic_mmio_read_sgipend, vgic_mmio_write_sgipendc, 16),
- 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SGI_PENDING_SET,
--		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 16),
-+		vgic_mmio_read_sgipend, vgic_mmio_write_sgipends, 16),
- };
- 
- /*
+-	uniphier_smp_rom_boot_rsv2 = ioremap(rom_rsv2_phys, sizeof(SZ_4));
++	uniphier_smp_rom_boot_rsv2 = ioremap(rom_rsv2_phys, SZ_4);
+ 	if (!uniphier_smp_rom_boot_rsv2) {
+ 		pr_err("failed to map ROM_BOOT_RSV2 register\n");
+ 		return -ENOMEM;
 -- 
-2.7.3
+1.9.1
