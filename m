@@ -1,37 +1,44 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 25 Mar 2016 12:26:27 +0100
-Subject: [PATCH 0/4] ARM: cpuidle: use const and __initconst for
- cpuidle_ops
-In-Reply-To: <1458657763-2561-1-git-send-email-jszhang@marvell.com>
-References: <1458657763-2561-1-git-send-email-jszhang@marvell.com>
-Message-ID: <56F52063.6020002@linaro.org>
+Date: Fri, 25 Mar 2016 12:46:10 +0100
+Subject: [PATCH 1/2] ARM: cpuidle: fix !cpuidle_ops[cpu].init case during
+ init
+In-Reply-To: <1458796269-6158-2-git-send-email-jszhang@marvell.com>
+References: <1458796269-6158-1-git-send-email-jszhang@marvell.com>
+ <1458796269-6158-2-git-send-email-jszhang@marvell.com>
+Message-ID: <56F52502.3060308@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/22/2016 03:42 PM, Jisheng Zhang wrote:
-> These trivial patches are similar as Masahiro posted in[1]. The main
-> purpose is let cpuidle_ops structure be constified and replace
-> "__initdata" with "__initconst".
+On 03/24/2016 06:11 AM, Jisheng Zhang wrote:
+> Let's assume cpuidle_ops exists but it doesn't implement the according
+> init member, current arm_cpuidle_init() will return success to its
+> caller, but in fact it should return -EOPNOTSUPP.
 >
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-August/365826.html
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> ---
+>   arch/arm/kernel/cpuidle.c | 8 ++++++--
+>   1 file changed, 6 insertions(+), 2 deletions(-)
 >
-> Jisheng Zhang (4):
->    ARM: cpuidle: add const qualifier to cpuidle_ops member in structures
->    ARM: cpuidle: constify return value of arm_cpuidle_get_ops()
->    soc: qcom: spm: use const and __initconst for qcom_cpuidle_ops
->    drivers: firmware: psci: use const and __initconst for
->      psci_cpuidle_ops
+> diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
+> index 703926e..f108d8f 100644
+> --- a/arch/arm/kernel/cpuidle.c
+> +++ b/arch/arm/kernel/cpuidle.c
+> @@ -143,8 +143,12 @@ int __init arm_cpuidle_init(int cpu)
+>   		return -ENODEV;
 >
->   arch/arm/include/asm/cpuidle.h | 2 +-
->   arch/arm/kernel/cpuidle.c      | 6 +++---
->   drivers/firmware/psci.c        | 2 +-
->   drivers/soc/qcom/spm.c         | 2 +-
->   4 files changed, 6 insertions(+), 6 deletions(-)
+>   	ret = arm_cpuidle_read_ops(cpu_node, cpu);
+> -	if (!ret && cpuidle_ops[cpu].init)
+> -		ret = cpuidle_ops[cpu].init(cpu_node, cpu);
+> +	if (!ret) {
+> +		if (cpuidle_ops[cpu].init)
+> +			ret = cpuidle_ops[cpu].init(cpu_node, cpu);
+> +		else
+> +			ret = -EOPNOTSUPP;
+> +	}
 
-Sounds reasonable.
+Hi Jisheng,
 
-   -- Daniel
-
+this should be handled in the arm_cpuidle_read_ops function.
 
 -- 
   <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
