@@ -1,29 +1,31 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 25 Mar 2016 10:04:31 -0500
-Subject: [PATCH v3 08/16] dt-bindings: Add bindings for phy-da8xx-usb
-In-Reply-To: <1458863503-31121-9-git-send-email-david@lechnology.com>
-References: <1458863503-31121-1-git-send-email-david@lechnology.com>
- <1458863503-31121-9-git-send-email-david@lechnology.com>
-Message-ID: <20160325150431.GA7194@rob-hp-laptop>
+Date: Fri, 25 Mar 2016 10:06:04 -0500
+Subject: [PATCH 4/5] drm/vc4: Add DPI driver
+In-Reply-To: <1458865431-30048-5-git-send-email-eric@anholt.net>
+References: <1458865431-30048-1-git-send-email-eric@anholt.net>
+ <1458865431-30048-5-git-send-email-eric@anholt.net>
+Message-ID: <20160325150604.GA7620@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 24, 2016 at 06:51:33PM -0500, David Lechner wrote:
-> Device tree binding for new phy-da8xx-usb driver.
+On Thu, Mar 24, 2016 at 05:23:50PM -0700, Eric Anholt wrote:
+> The DPI interface involves taking a ton of our GPIOs to be used as
+> outputs, and routing display signals over them in parallel.
 > 
-> Signed-off-by: David Lechner <david@lechnology.com>
+> v2: Use display_info.bus_formats[] to replace our custom DT
+>     properties.
+> 
+> Signed-off-by: Eric Anholt <eric@anholt.net>
 > ---
-> 
-> v3 changes:
-> 
-> * added cfgchip info and example
-> * correct usage of "DA8xx"
-> * correct address after @
-> * dropped 11 before @ in usb@
-> 
-> 
->  .../devicetree/bindings/phy/phy-da8xx-usb.txt      | 40 ++++++++++++++++++++++
->  1 file changed, 40 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/phy/phy-da8xx-usb.txt
+>  .../devicetree/bindings/display/brcm,bcm-vc4.txt   |  36 ++
 
 Acked-by: Rob Herring <robh@kernel.org>
+
+>  drivers/gpu/drm/vc4/Kconfig                        |   1 +
+>  drivers/gpu/drm/vc4/Makefile                       |   1 +
+>  drivers/gpu/drm/vc4/vc4_debugfs.c                  |   1 +
+>  drivers/gpu/drm/vc4/vc4_dpi.c                      | 520 +++++++++++++++++++++
+>  drivers/gpu/drm/vc4/vc4_drv.c                      |   1 +
+>  drivers/gpu/drm/vc4/vc4_drv.h                      |   5 +
+>  7 files changed, 565 insertions(+)
+>  create mode 100644 drivers/gpu/drm/vc4/vc4_dpi.c
