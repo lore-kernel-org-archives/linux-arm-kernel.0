@@ -1,155 +1,78 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Fri, 25 Mar 2016 12:02:34 +0800
-Subject: [PATCH] usb: chipidea: Configure DMA properties and ops from DT
-In-Reply-To: <CAOCOHw7wgzyp5JmhBF9i1mAsjOHHJhwvn4sw=aMdQjOQPDGqWA@mail.gmail.com>
-References: <1456119133-16114-1-git-send-email-bjorn.andersson@linaro.org>
- <56CADCE9.9090305@linaro.org> <20160222220750.GI21240@tuxbot>
- <CADRPPNRH28W6u8adSb9Ja0JSJvFgcKF+2jYa3GSKBcGVsZcdLQ@mail.gmail.com>
- <CADRPPNS0q3Q9j4AYvqRfcSaQ6BzLiL6zM5tn7MwJ613iNA1iPQ@mail.gmail.com>
- <CAOCOHw7wgzyp5JmhBF9i1mAsjOHHJhwvn4sw=aMdQjOQPDGqWA@mail.gmail.com>
-Message-ID: <20160325040234.GA6185@peterchendt>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 24 Mar 2016 21:25:07 -0700
+Subject: [PATCH] arm64/dma-mapping: Add DMA_ATTR_ALLOC_SINGLE_PAGES support
+In-Reply-To: <20160324115008.GE9323@arm.com>
+References: <1456944866-15990-1-git-send-email-yong.wu@mediatek.com>
+ <20160321180147.GR23397@arm.com>
+ <CAD=FV=WL-OgE6D+8m3A8ZSJ8HgVZJw_+7uBce=qPh80LaxQKbg@mail.gmail.com>
+ <20160324115008.GE9323@arm.com>
+Message-ID: <CAD=FV=VBvdLqabE0h=+hRChY4G0=1dzH1z8eE7ukMC+wbnQT9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 08, 2016 at 07:40:08PM -0800, Bjorn Andersson wrote:
-> On Tue, Mar 8, 2016 at 11:52 AM, Li Yang <leoli@freescale.com> wrote:
-> > On Wed, Mar 2, 2016 at 4:59 PM, Li Yang <leoli@freescale.com> wrote:
-> >> On Mon, Feb 22, 2016 at 4:07 PM, Bjorn Andersson
-> >> <bjorn.andersson@linaro.org> wrote:
-> >>> On Mon 22 Feb 02:03 PST 2016, Srinivas Kandagatla wrote:
-> >>>
-> >>>>
-> >>>>
-> >>>> On 22/02/16 05:32, Bjorn Andersson wrote:
-> >>>> >On certain platforms (e.g. ARM64) the dma_ops needs to be explicitly set
-> >>>> >to be able to do DMA allocations, so use the of_dma_configure() helper
-> >>>> >to populate the dma properties and assign an appropriate dma_ops.
-> [..]
-> >>>> None of the drivers call of_dma_configure() explicitly, which makes me feel
-> >>>> that we are doing something wrong. TBH, this should be handled in more
-> >>>> generic way rather than driver like this having an explicit call to
-> >>>> of_dma_configure().
-> >>>>
-> >>>
-> 
-> I had the chance to go through this with Arnd and the verdict is that
-> devices not described in DT should not do DMA (or allocate buffers for
-> doing DMA).
-> 
-> So I believe the solution is to fall back on Peter's description; the
-> chipidea driver is the core driver and the Qualcomm code should just
-> be a platform layer.
-> 
-> My suggestion is that we turn the chipidea core into a set of APIs
-> that can called by the platform specific pieces. That way we will have
-> the chipidea core be the device described in the DT.
-> 
+Hi,
 
-Hi Bjorn,
+On Thu, Mar 24, 2016 at 4:50 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> > I have a slight snag with this, in that you don't consult the IOMMU
+>> > pgsize_bitmap at any point, and assume that it can map pages at the
+>> > same granularity as the CPU. The documentation for
+>> > DMA_ATTR_ALLOC_SINGLE_PAGES seems to be weaker than that.
+>>
+>> Interesting.  Is that something that exists in the real world?  ...or
+>> something you think is coming soon?
+>
+> All it would take is for an IOMMU driver to choose a granule size that
+> differs from the CPU. For example, if the SMMU driver chose 64k pages
+> and the CPU was using 4k pages, then you'd have this problem.
+>
+>> I'd argue that such a case existed in the real world then probably
+>> we're already broken.  Unless I'm misreading, existing code will
+>> already fall all the way back to order 0 allocations.  ...so while
+>> existing code might could work if it was called on a totally
+>> unfragmented system, it would already break once some fragmentation
+>> was introduced.
+>
+> I disagree. For example, in the case I described previously, they may
+> well settle on a common supported granule (e.g. 2M), assuming that
+> contiguous pages were implemented in the page table code.
 
-After reading the DMA documentation Russell supplied and several related
-DMA APIs, would you please try below patch on your ARM64 platform?
-Since the core device has no device node at all, I don't know why
-your patch can work, or am I missing something?
+I'm still a little confused how existing code could have worked if
+IOMMU has 64K pages and CPU has 4K pages if memory is fragmented.
+Presumably existing code in __iommu_dma_alloc_pages() would keep
+failing the "alloc_pages(gfp | __GFP_NORETRY, order);" call until
+order got down to 0.  Then we'd allocate order 0 (4K) pages and we'd
+hit a bug.
 
->From bcf7eaf694d29fb7557a9406fb6c89213216069c Mon Sep 17 00:00:00 2001
-From: Peter Chen <peter.chen@freescale.com>
-Date: Fri, 25 Mar 2016 11:54:21 +0800
-Subject: [PATCH 1/1] usb: chipidea: add DMA mask configuration API
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
----
- drivers/usb/chipidea/ci_hdrc_msm.c |    6 ++++++
- drivers/usb/chipidea/core.c        |   25 +++++++++++++++++++++++++
- include/linux/usb/chipidea.h       |    2 ++
- 3 files changed, 33 insertions(+)
+>> I'm not saying that we shouldn't fix the code to handle this, I'm just
+>> saying that Yong Wu's patch doesn't appear to break any code that
+>> wasn't already broken.  That might be reason to land his code first,
+>> then debate the finer points of whether IOMMUs with less granularity
+>> are likely to exist and whether we need to add complexity to the code
+>> to handle them (or just detect this case and return an error).
+>>
+>> From looking at a WIP patch provided to me by Yong Wu, it looks as if
+>> he thinks several more functions need to change to handle this need
+>> for IOMMUs that can't handle small pages.  That seems to be further
+>> evidence that the work should be done in a separate patch.
+>
+> Sure, my observations weren't intended to hold up this patch, but we
+> should double-check that we're no regressing any of the existing IOMMU
+> drivers/platforms by going straight to order 0 allocations.
 
-diff --git a/drivers/usb/chipidea/ci_hdrc_msm.c b/drivers/usb/chipidea/ci_hdrc_msm.c
-index 3889809..43ceb38 100644
---- a/drivers/usb/chipidea/ci_hdrc_msm.c
-+++ b/drivers/usb/chipidea/ci_hdrc_msm.c
-@@ -5,6 +5,7 @@
-  * only version 2 as published by the Free Software Foundation.
-  */
- 
-+#include <linux/dma-mapping.h>
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <linux/pm_runtime.h>
-@@ -56,6 +57,7 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
- {
- 	struct platform_device *plat_ci;
- 	struct usb_phy *phy;
-+	int ret;
- 
- 	dev_dbg(&pdev->dev, "ci_hdrc_msm_probe\n");
- 
-@@ -70,6 +72,10 @@ static int ci_hdrc_msm_probe(struct platform_device *pdev)
- 
- 	ci_hdrc_msm_platdata.usb_phy = phy;
- 
-+	ret = ci_hdrc_set_dma_mask(&pdev->dev, DMA_BIT_MASK(64));
-+	if (ret)
-+		return ret;
-+
- 	plat_ci = ci_hdrc_add_device(&pdev->dev,
- 				pdev->resource, pdev->num_resources,
- 				&ci_hdrc_msm_platdata);
-diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index 69426e6..b8ca5e3 100644
---- a/drivers/usb/chipidea/core.c
-+++ b/drivers/usb/chipidea/core.c
-@@ -62,6 +62,7 @@
- #include <linux/usb/chipidea.h>
- #include <linux/usb/of.h>
- #include <linux/of.h>
-+#include <linux/of_device.h>
- #include <linux/phy.h>
- #include <linux/regulator/consumer.h>
- #include <linux/usb/ehci_def.h>
-@@ -811,6 +812,30 @@ static void ci_extcon_unregister(struct ci_hdrc *ci)
- 
- static DEFINE_IDA(ci_ida);
- 
-+/**
-+ * ci_hdrc_set_dma_mask
-+ *
-+ * Set dma mask and coherent dma mask for glue layer device, and the core
-+ * device will inherit these values. If the 'dma-ranges' is specified at
-+ * DT, it will use this value for both dma mask and coherent dma mask.
-+ *
-+ * @dev: a pointer to the device struct of glue layer device
-+ * @ci_coherent_dma_mask: the mask for both dma_mask and cohrent_dma_mask
-+ */
-+int ci_hdrc_set_dma_mask(struct device *dev, u64 ci_coherent_dma_mask)
-+{
-+	int ret = dma_set_mask_and_coherent(dev, ci_coherent_dma_mask);
-+	if (ret) {
-+		dev_err(dev, "dma_set_mask_and_coherent fails\n");
-+		return ret;
-+	}
-+
-+	if (dev_of_node(dev))
-+		of_dma_configure(dev, dev->of_node);
-+
-+	return ret;
-+}
-+
- struct platform_device *ci_hdrc_add_device(struct device *dev,
- 			struct resource *res, int nres,
- 			struct ci_hdrc_platform_data *platdata)
-diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
-index 5dd75fa..8649930 100644
---- a/include/linux/usb/chipidea.h
-+++ b/include/linux/usb/chipidea.h
-@@ -84,4 +84,6 @@ struct platform_device *ci_hdrc_add_device(struct device *dev,
- /* Remove ci hdrc device */
- void ci_hdrc_remove_device(struct platform_device *pdev);
- 
-+int ci_hdrc_set_dma_mask(struct device *dev, u64 ci_coherent_dma_mask);
-+
- #endif
+Argh.  I see why I was confused and thought it got complicated.  When
+I looked at diffs I thought Yong Wu's patch was more complicated
+because he rebased it and my diff showed some other unrelated patches.
+Dumb.
 
--- 
-Best Regards,
-Peter Chen
+OK, you're right that this is pretty simple.
+
+In any case, you're right that we should fix this.  ...though assuming
+my argument above isn't wrong, then existing code is already broken or
+has a latent bug if you've got an IOMMU that can't map at least as
+granular as the CPU.  To me that means adding that new feature (or
+fixing that latent bug) should be done in a separate patch.  It could
+come in sequence either before or after this one.  Of course, if
+everyone else thinks it should be one patch I won't block that...
+
+-Doug
