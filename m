@@ -1,72 +1,32 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Thu, 24 Mar 2016 17:23:49 -0700
-Subject: [PATCH 3/5] drm: Add an encoder and connector type enum for DPI.
+Date: Thu, 24 Mar 2016 17:23:47 -0700
+Subject: [PATCH 1/5] of: Add vendor prefix for On Tat Industrial Company.
 In-Reply-To: <1458865431-30048-1-git-send-email-eric@anholt.net>
 References: <1458865431-30048-1-git-send-email-eric@anholt.net>
-Message-ID: <1458865431-30048-4-git-send-email-eric@anholt.net>
+Message-ID: <1458865431-30048-2-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Right now exynos is exposing DPI as a TMDS encoder and VGA connector,
-which seems rather misleading.  This isn't just an internal detail,
-since xrandr actually exposes "VGA" as the output name.  Define some
-new enums so that vc4's DPI can have a more informative name.
-
-I considered other names for the connector as well.  For VC4, the
-Adafruit DPI kippah takes the 28 GPIO pins and routes them to a
-standard-ish 40-pin FPC connector, but "40-pin FPC" doesn't uniquely
-identify an ordering of pins (apparently some other orderings exist),
-doesn't explain things as well for the user (who, if anything, knows
-their product is a DPI kippah/panel combo), and actually doesn't have
-to exist (one could connect the 28 GPIOs directly to something else).
-Simply "DPI" seems like a good compromise name to distinguish from the
-HDMI, DSI, and TV connectors .
+This is the vendor for a 7" DPI panel sold by Adafruit which I'd like
+to describe in DT.
 
 Signed-off-by: Eric Anholt <eric@anholt.net>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- drivers/gpu/drm/drm_crtc.c  | 2 ++
- include/uapi/drm/drm_mode.h | 2 ++
- 2 files changed, 4 insertions(+)
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/gpu/drm/drm_crtc.c b/drivers/gpu/drm/drm_crtc.c
-index f619121..64bd954 100644
---- a/drivers/gpu/drm/drm_crtc.c
-+++ b/drivers/gpu/drm/drm_crtc.c
-@@ -168,6 +168,7 @@ static struct drm_conn_prop_enum_list drm_connector_enum_list[] = {
- 	{ DRM_MODE_CONNECTOR_eDP, "eDP" },
- 	{ DRM_MODE_CONNECTOR_VIRTUAL, "Virtual" },
- 	{ DRM_MODE_CONNECTOR_DSI, "DSI" },
-+	{ DRM_MODE_CONNECTOR_DPI, "DPI" },
- };
- 
- static const struct drm_prop_enum_list drm_encoder_enum_list[] = {
-@@ -179,6 +180,7 @@ static const struct drm_prop_enum_list drm_encoder_enum_list[] = {
- 	{ DRM_MODE_ENCODER_VIRTUAL, "Virtual" },
- 	{ DRM_MODE_ENCODER_DSI, "DSI" },
- 	{ DRM_MODE_ENCODER_DPMST, "DP MST" },
-+	{ DRM_MODE_ENCODER_DPI, "DPI" },
- };
- 
- static const struct drm_prop_enum_list drm_subpixel_enum_list[] = {
-diff --git a/include/uapi/drm/drm_mode.h b/include/uapi/drm/drm_mode.h
-index 50adb46..1eb85f7 100644
---- a/include/uapi/drm/drm_mode.h
-+++ b/include/uapi/drm/drm_mode.h
-@@ -202,6 +202,7 @@ struct drm_mode_get_plane_res {
- #define DRM_MODE_ENCODER_VIRTUAL 5
- #define DRM_MODE_ENCODER_DSI	6
- #define DRM_MODE_ENCODER_DPMST	7
-+#define DRM_MODE_ENCODER_DPI	8
- 
- struct drm_mode_get_encoder {
- 	__u32 encoder_id;
-@@ -241,6 +242,7 @@ struct drm_mode_get_encoder {
- #define DRM_MODE_CONNECTOR_eDP		14
- #define DRM_MODE_CONNECTOR_VIRTUAL      15
- #define DRM_MODE_CONNECTOR_DSI		16
-+#define DRM_MODE_CONNECTOR_DPI		17
- 
- struct drm_mode_get_connector {
- 
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 72e2c5a..b35b5f8 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -166,6 +166,7 @@ nxp	NXP Semiconductors
+ okaya	Okaya Electric America, Inc.
+ olimex	OLIMEX Ltd.
+ onnn	ON Semiconductor Corp.
++ontat	On Tat Industrial Company
+ opencores	OpenCores.org
+ option	Option NV
+ ortustech	Ortus Technology Co., Ltd.
 -- 
 2.7.0
