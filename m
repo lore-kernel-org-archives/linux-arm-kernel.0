@@ -1,95 +1,78 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 25 Mar 2016 02:04:36 +0000
-Subject: [RFC PATCH 13/45] KVM: arm/arm64: vgic-new: Export register access
- interface
+Date: Fri, 25 Mar 2016 02:04:43 +0000
+Subject: [RFC PATCH 20/45] KVM: arm/arm64: vgic-new: Add TARGET registers
+ handlers
 In-Reply-To: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
 References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1458871508-17279-14-git-send-email-andre.przywara@arm.com>
+Message-ID: <1458871508-17279-21-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Userland can access the emulated GIC to save and restore its state
-for initialization or migration purposes.
-The kvm_io_bus API requires an absolute gpa, which does not fit the
-KVM_DEV_ARM_VGIC_GRP_DIST_REGS user API, that only provides relative
-offsets. So we explicitly iterate our register list to connect
-userland to the VGIC.
-
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Eric Auger <eric.auger@linaro.org>
 ---
- virt/kvm/arm/vgic/vgic.h      |  2 ++
- virt/kvm/arm/vgic/vgic_mmio.c | 45 +++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 47 insertions(+)
+ virt/kvm/arm/vgic/vgic_mmio.c | 43 ++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 42 insertions(+), 1 deletion(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 53730ba..a462e2b 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -25,6 +25,8 @@ void vgic_v2_process_maintenance(struct kvm_vcpu *vcpu);
- void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu);
- void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr);
- void vgic_v2_set_underflow(struct kvm_vcpu *vcpu);
-+int vgic_v2_dist_access(struct kvm_vcpu *vcpu, bool is_write,
-+			int offset, int len, void *val);
- 
- #ifdef CONFIG_KVM_ARM_VGIC_V3
- void vgic_v3_irq_change_affinity(struct kvm *kvm, u32 intid, u64 mpidr);
 diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
-index 26c46e7..e1fd17f 100644
+index 76657ce..cde153f 100644
 --- a/virt/kvm/arm/vgic/vgic_mmio.c
 +++ b/virt/kvm/arm/vgic/vgic_mmio.c
-@@ -113,6 +113,51 @@ struct vgic_register_region vgic_v2_dist_registers[] = {
- 		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 16),
- };
+@@ -471,6 +471,47 @@ static int vgic_mmio_write_config(struct kvm_vcpu *vcpu,
+ 	return 0;
+ }
  
-+/*
-+ * Using kvm_io_bus_* to access GIC registers directly from userspace does
-+ * not work, since we would need the absolute IPA address of the register
-+ * in question, but the userland interface only provides relative offsets.
-+ * So we provide our own dispatcher function for that purpose here.
-+ */
-+static int vgic_mmio_access(struct kvm_vcpu *vcpu,
-+			    struct vgic_register_region *region, int nr_regions,
-+			    bool is_write, int offset, int len, void *val)
++static int vgic_mmio_read_target(struct kvm_vcpu *vcpu,
++				 struct kvm_io_device *this,
++				 gpa_t addr, int len, void *val)
 +{
++	struct vgic_io_device *iodev = container_of(this,
++						    struct vgic_io_device, dev);
++	u32 intid = (addr - iodev->base_addr);
 +	int i;
-+	struct vgic_io_device dev;
 +
-+	for (i = 0; i < nr_regions; i++) {
-+		int reg_size = region[i].len;
++	if (iodev->redist_vcpu)
++		vcpu = iodev->redist_vcpu;
 +
-+		if (!reg_size)
-+			reg_size = (region[i].bits_per_irq * 1024) / 8;
++	for (i = 0; i < len; i++) {
++		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
 +
-+		if ((offset < region[i].reg_offset) ||
-+		    (offset + len > region[i].reg_offset + reg_size))
-+			continue;
-+
-+		dev.base_addr	= region[i].reg_offset;
-+		dev.redist_vcpu	= vcpu;
-+
-+		if (is_write)
-+			return region[i].ops.write(vcpu, &dev.dev,
-+						   offset, len, val);
-+		else
-+			return region[i].ops.read(vcpu, &dev.dev,
-+						  offset, len, val);
++		((u8 *)val)[i] = irq->targets;
 +	}
 +
-+	return -ENODEV;
++	return 0;
 +}
 +
-+int vgic_v2_dist_access(struct kvm_vcpu *vcpu, bool is_write,
-+			int offset, int len, void *val)
++static int vgic_mmio_write_target(struct kvm_vcpu *vcpu,
++				  struct kvm_io_device *this,
++				  gpa_t addr, int len, const void *val)
 +{
-+	return vgic_mmio_access(vcpu, vgic_v2_dist_registers,
-+				ARRAY_SIZE(vgic_v2_dist_registers),
-+				is_write, offset, len, val);
++	struct vgic_io_device *iodev = container_of(this,
++						    struct vgic_io_device, dev);
++	u32 intid = (addr - iodev->base_addr);
++	int i;
++
++	/* GICD_ITARGETSR[0-7] are read-only */
++	if (intid < VGIC_NR_PRIVATE_IRQS)
++		return 0;
++
++	for (i = 0; i < len; i++)
++		vgic_v2_irq_change_affinity(vcpu->kvm, intid + i,
++					    ((u8 *)val)[i]);
++
++	return 0;
 +}
 +
- int kvm_vgic_register_mmio_region(struct kvm *kvm, struct kvm_vcpu *vcpu,
- 				  struct vgic_register_region *reg_desc,
- 				  struct vgic_io_device *region,
+ struct vgic_register_region vgic_v2_dist_registers[] = {
+ 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
+ 		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12),
+@@ -491,7 +532,7 @@ struct vgic_register_region vgic_v2_dist_registers[] = {
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PRI,
+ 		vgic_mmio_read_priority, vgic_mmio_write_priority, 8),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_TARGET,
+-		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 8),
++		vgic_mmio_read_target, vgic_mmio_write_target, 8),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_CONFIG,
+ 		vgic_mmio_read_config, vgic_mmio_write_config, 2),
+ 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SOFTINT,
 -- 
 2.7.3
