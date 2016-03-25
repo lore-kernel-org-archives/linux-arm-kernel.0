@@ -1,90 +1,98 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 25 Mar 2016 02:04:47 +0000
-Subject: [RFC PATCH 24/45] KVM: arm/arm64: vgic-new: Add GICv3 CTLR, IIDR,
- TYPER handlers
+Date: Fri, 25 Mar 2016 02:04:42 +0000
+Subject: [RFC PATCH 19/45] KVM: arm/arm64: vgic-new: Add CONFIG registers
+ handlers
 In-Reply-To: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
 References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1458871508-17279-25-git-send-email-andre.przywara@arm.com>
+Message-ID: <1458871508-17279-20-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As in the GICv2 emulation we handle those three registers in one
-function.
-
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- virt/kvm/arm/vgic/vgic.h      |  2 ++
- virt/kvm/arm/vgic/vgic_mmio.c | 38 ++++++++++++++++++++++++++++++++++++--
- 2 files changed, 38 insertions(+), 2 deletions(-)
+ virt/kvm/arm/vgic/vgic_mmio.c | 63 ++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 62 insertions(+), 1 deletion(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 4b8952a..0db1abe 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -19,6 +19,8 @@
- #define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
- #define IMPLEMENTER_ARM		0x43b
- 
-+#define INTERRUPT_ID_BITS_SPIS	10
-+
- struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
- 			      u32 intid);
- bool vgic_queue_irq(struct kvm *kvm, struct vgic_irq *irq);
 diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
-index 2d10c06..13e101f 100644
+index bfc530c..76657ce 100644
 --- a/virt/kvm/arm/vgic/vgic_mmio.c
 +++ b/virt/kvm/arm/vgic/vgic_mmio.c
-@@ -606,7 +606,29 @@ static int vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
- 				  struct kvm_io_device *this,
- 				  gpa_t addr, int len, void *val)
- {
--	/* TODO: implement */
+@@ -410,6 +410,67 @@ static int vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
+ 	return 0;
+ }
+ 
++static int vgic_mmio_read_config(struct kvm_vcpu *vcpu,
++				 struct kvm_io_device *this,
++				 gpa_t addr, int len, void *val)
++{
 +	struct vgic_io_device *iodev = container_of(this,
 +						    struct vgic_io_device, dev);
++	u32 intid = (addr - iodev->base_addr) * 4;
 +	u32 value = 0;
++	int i;
 +
-+	switch ((addr - iodev->base_addr) & ~3) {
-+	case GICD_CTLR:
-+		if (vcpu->kvm->arch.vgic.enabled)
-+		       value |=	GICD_CTLR_ENABLE_SS_G1;
-+		value |= GICD_CTLR_ARE_NS | GICD_CTLR_DS;
-+		break;
-+	case GICD_TYPER:
-+		value = vcpu->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
-+		value = (value >> 5) - 1;
-+		value |= (INTERRUPT_ID_BITS_SPIS - 1) << 19;
-+		break;
-+	case GICD_IIDR:
-+		value = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
-+		break;
-+	default:
-+		return 0;
++	if (iodev->redist_vcpu)
++		vcpu = iodev->redist_vcpu;
++
++	for (i = 0; i < len * 4; i++) {
++		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
++
++		if (irq->config == VGIC_CONFIG_EDGE)
++			value |= (2U << (i * 2));
 +	}
 +
 +	write_mask32(value, addr & 3, len, val);
- 	return 0;
- }
- 
-@@ -614,7 +636,19 @@ static int vgic_mmio_write_v3_misc(struct kvm_vcpu *vcpu,
- 				   struct kvm_io_device *this,
- 				   gpa_t addr, int len, const void *val)
- {
--	/* TODO: implement */
++	return 0;
++}
++
++static int vgic_mmio_write_config(struct kvm_vcpu *vcpu,
++				  struct kvm_io_device *this,
++				  gpa_t addr, int len, const void *val)
++{
 +	struct vgic_io_device *iodev = container_of(this,
 +						    struct vgic_io_device, dev);
-+	bool enabled;
++	u32 intid = (addr - iodev->base_addr) * 4;
++	int i;
 +
-+	/* These are not the bits you are looking for ... */
-+	if (addr - iodev->base_addr > 0)
-+		return 0;
++	if (iodev->redist_vcpu)
++		vcpu = iodev->redist_vcpu;
 +
-+	/* We only care about the enable bit, all other bits are WI. */
-+	enabled = *(u8*)val & GICD_CTLR_ENABLE_SS_G1;
++	for (i = 0; i < len * 4; i++) {
++		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
 +
-+	vcpu->kvm->arch.vgic.enabled = enabled;
++		if (intid + i < 16)
++			continue;
 +
- 	return 0;
- }
- 
++		/*
++		 * The spec says that interrupts must be disabled before
++		 * changing the configuration to avoid UNDEFINED behaviour.
++		 * Is this sufficient in our case? Do we quickly enough remove
++		 * the IRQ from the ap_list to safely do the config change?
++		 * Will even a disabled interrupt in an ap_list cause us
++		 * headaches if we change the configuration?
++		 */
++		spin_lock(&irq->irq_lock);
++		if (test_bit(i * 2 + 1, val))
++			irq->config = VGIC_CONFIG_EDGE;
++		else
++			irq->config = VGIC_CONFIG_LEVEL;
++		spin_unlock(&irq->irq_lock);
++	}
++
++	return 0;
++}
++
+ struct vgic_register_region vgic_v2_dist_registers[] = {
+ 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
+ 		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12),
+@@ -432,7 +493,7 @@ struct vgic_register_region vgic_v2_dist_registers[] = {
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_TARGET,
+ 		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 8),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_CONFIG,
+-		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 8),
++		vgic_mmio_read_config, vgic_mmio_write_config, 2),
+ 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SOFTINT,
+ 		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 4),
+ 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SGI_PENDING_CLEAR,
 -- 
 2.7.3
