@@ -1,60 +1,43 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 25 Mar 2016 22:39:22 +0000
-Subject: [PATCH v2] spi: orion.c: Add direct access mode
-In-Reply-To: <10747635.WkGeFaKqdy@wuerfel>
-References: <1458663893-13766-1-git-send-email-sr@denx.de>
- <4319407.5A4b1VspuB@wuerfel> <20160325155032.GH2566@sirena.org.uk>
- <10747635.WkGeFaKqdy@wuerfel>
-Message-ID: <20160325223922.GG5028@sirena.org.uk>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 26 Mar 2016 00:08:00 +0100
+Subject: dmaengine: ARM pl080 misidentified as Samsung pl080s
+In-Reply-To: <20160324105651.GA20489@sig21.net>
+References: <20160324105651.GA20489@sig21.net>
+Message-ID: <CA+Ln22Ea-cVS1Cgq1TFKktMCiQ3OGqJ=Bjx3q1qxeGr3LSMXGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 25, 2016 at 09:58:40PM +0100, Arnd Bergmann wrote:
-> On Friday 25 March 2016 15:50:32 Mark Brown wrote:
+2016-03-24 11:56 GMT+01:00 Johannes Stezenbach <js@sig21.net>:
+> Hi,
+>
+> commit da1b6c05b8b5bd ("dmaengine: PL08x: Add support for PL080S variant")
+> added this hunk:
+>
+>  static struct amba_id pl08x_ids[] = {
+> +       /* Samsung PL080S variant */
+> +       {
+> +               .id     = 0x0a141080,
+> +               .mask   = 0xffffffff,
+> +               .data   = &vendor_pl080s,
+> +       },
+>         /* PL080 */
+>
+> However, 0x0a141080 happens to be the ID of the
+> ARM PL080, too:
+> http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0196g/I54627.html
 
-> > Why are we even doing that though?  Like I say it just seems pointlessly
-> > unhelpful for users.  Are we really saying that every single system has
-> > to go through and manually modify their DT so that they can use this
-> > entirely in SoC feature?  That doesn't seem like winning...
+It can be, assuming that 0xa1 is an existing revision of original
+PL080. AFAIK when we were figuring out what to do with this broken
+Samsung's controller, we found out that there was no platform with
+such revision. Is your concern related to any actual hardware already
+supported by upstream?
 
-> I don't remember the exact details, but I think we had come up with
-> a generic constraint solving algorithm to pick appropriate windows for
-> each device with a (close to) minimal use of physical address space,
+Best regards,
+Tomasz
 
-So there are some complicated constraints that make it hard to allocate
-from the bus space?
-
-> > > way: if we just use the existing binding, the spi host driver can
-> > > simply call devm_ioremap_resource() to see if there is a map
-> > > for a given chipselect and otherwise fall back to the current
-> > > mode.
-
-> > Why does the binding have to be in the client device to do that?
-
-> I don't understand the question. The client device here is the SPI
-> controller, right? That doesn't need to have a special binding, it
-> just needs to list the registers relative to the mbus address space
-> like any other device, and that is independent of how we implement
-> it.
-
-If you're saying we're doing a binding per chip select presumably that
-binding appears in the SPI device even if it's the controller driver
-that parses it.  This was what the original patch did, I pushed back
-since it's a fairly common pattern for poor quality bindings where
-people for some reason want to add per device properties for whatever
-new feature they want to support instead of doing it at the controller
-level (and ideally just doing it without requring any configuration).
-
-> It looks like Stefan's patch tricks here by creating an incompatible
-> binding for mbus that bypasses the address mapping.
-
-I've not looked at the patch and honestly nobody has been talking about
-any generic binding, all I've seen is the per device property in the
-original patch.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160325/7b887cd7/attachment.sig>
+>
+> Since the PL080S has the configuration register at a different
+> address the driver doesn't work for ARM PL080 anymore.
+>
+>
+> Johannes
