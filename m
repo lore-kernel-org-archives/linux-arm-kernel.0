@@ -1,45 +1,125 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 25 Mar 2016 15:01:09 +0000
-Subject: [LINUX PATCH 1/2] mtd: Added dummy entry in the spi_transfer
- structure.
-In-Reply-To: <4FF8F58FAA9D5D4193D4E554E4352C5902C6DB59@XAP-PVEXMBX02.xlnx.xilinx.com>
-References: <1458562809-36114-1-git-send-email-lakshmis@xilinx.com>
- <20160321130734.GS2566@sirena.org.uk>
- <4FF8F58FAA9D5D4193D4E554E4352C5902C6D34C@XAP-PVEXMBX02.xlnx.xilinx.com>
- <20160322100615.GA2566@sirena.org.uk>
- <4FF8F58FAA9D5D4193D4E554E4352C5902C6DB59@XAP-PVEXMBX02.xlnx.xilinx.com>
-Message-ID: <20160325150109.GF2566@sirena.org.uk>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 25 Mar 2016 10:03:44 -0500
+Subject: [PATCH] ARM: dts: AM572x-IDK Initial Support
+In-Reply-To: <1458858644-13800-1-git-send-email-nm@ti.com>
+References: <1458858644-13800-1-git-send-email-nm@ti.com>
+Message-ID: <20160325150344.GA1268@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 25, 2016 at 01:41:16PM +0000, Lakshmi Sai Krishna Potthuri wrote:
+On Thu, Mar 24, 2016 at 05:30:44PM -0500, Nishanth Menon wrote:
+> From: Schuyler Patton <spatton@ti.com>
+> 
+> The AM572x-IDK board is a board based on TI's AM5728 SOC
+> which has a dual core 1.5GHz A15 processor. This board is a
+> development platform for the Industrial market with:
+> - 2GB of DDR3L
+> - Dual 1Gbps Ethernet
+> - HDMI,
+> - PRU-ICSS
+> - uSD
+> - 16GB eMMC
+> - CAN
+> - RS-485
+> - PCIe
+> - USB3.0
+> - Video Input Port
+> - Industrial IO port and expansion connector
+> 
+> The link to the data sheet and TRM can be found here:
+> 
+> http://www.ti.com/product/AM5728
+> 
+> This patch creates a common dtsi file that will provide a common board
+> dtsi file to define the nodes that are common to AM57xx (including the
+> upcoming AM5718) IDK boards.
+> 
+> Initial support is only for basic peripherals
+> 
+> Signed-off-by: Schuyler Patton <spatton@ti.com>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+> Based on 6f30d29c603c Add linux-next specific files for 20160324
+> 
+> Test log: http://pastebin.ubuntu.com/15490907/
+> 
+>  .../devicetree/bindings/arm/omap/omap.txt          |   3 +
+>  arch/arm/boot/dts/Makefile                         |   1 +
+>  arch/arm/boot/dts/am572x-idk.dts                   |  85 ++++++
+>  arch/arm/boot/dts/am57xx-idk-common.dtsi           | 308 +++++++++++++++++++++
+>  4 files changed, 397 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/am572x-idk.dts
+>  create mode 100644 arch/arm/boot/dts/am57xx-idk-common.dtsi
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
+> index 21e71a5e866e..38659aa35ce3 100644
+> --- a/Documentation/devicetree/bindings/arm/omap/omap.txt
+> +++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
+> @@ -169,6 +169,9 @@ Boards:
+>  - AM57XX SBC-AM57x
+>    compatible = "compulab,sbc-am57x", "compulab,cl-som-am57x", "ti,am5728", "ti,dra742", "ti,dra74", "ti,dra7"
+>  
+> +- AM5728 IDK
+> +  compatible = "ti,am5728-idk", "ti,am5728", "ti,dra742", "ti,dra74", "ti,dra7"
 
-As I'm fairly sure I've said before please fix your mail client to word
-wrap within paragraphs at something substantially less than 80 columns.
-Doing this makes your messages much easier to read and reply to.
+Okay, but I think the TI folks have gone a bit crazy with all these 
+compatible strings...
 
-> >This is really not what I'd expect to happen, I'd expect that these dummy
-> >cycles would be in addition to the actual data (see my request for better
-> >documentation...).  If they overlap with the data then what is the point in
-> >specifying this?  It's more work for the host, what benefit do we get from
-> >doing it over just handing it like a normal byte?
+> +
+>  - DRA742 EVM:  Software Development Board for DRA742
+>    compatible = "ti,dra7-evm", "ti,dra742", "ti,dra74", "ti,dra7"
+>  
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index b25621ae2ff7..fec03c814a95 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -526,6 +526,7 @@ dtb-$(CONFIG_SOC_DRA7XX) += \
+>  	am57xx-beagle-x15.dtb \
+>  	am57xx-cl-som-am57x.dtb \
+>  	am57xx-sbc-am57x.dtb \
+> +	am572x-idk.dtb \
+>  	dra7-evm.dtb \
+>  	dra72-evm.dtb
+>  dtb-$(CONFIG_ARCH_ORION5X) += \
+> diff --git a/arch/arm/boot/dts/am572x-idk.dts b/arch/arm/boot/dts/am572x-idk.dts
+> new file mode 100644
+> index 000000000000..bb51f6de7b45
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/am572x-idk.dts
+> @@ -0,0 +1,85 @@
+> +/*
+> + * Copyright (C) 2015-2016 Texas Instruments Incorporated - http://www.ti.com/
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "dra74x.dtsi"
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/interrupt-controller/irq.h>
+> +#include "am57xx-idk-common.dtsi"
+> +
+> +/ {
+> +	model = "TI AM5728 IDK";
+> +	compatible = "ti,am5728-idk", "ti,am5728", "ti,dra742", "ti,dra74",
+> +		     "ti,dra7";
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x0 0x80000000 0x0 0x80000000>;
+> +	};
+> +
+> +	extcon_usb2: extcon_usb2 {
+> +		compatible = "linux,extcon-usb-gpio";
+> +		id-gpio = <&gpio3 16 GPIO_ACTIVE_HIGH>;
+> +	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +		led at 0 {
 
-> len field in the transfer structure contains dummy bytes along with actual data
-> bytes, controllers which requires dummy bytes use len field and simply Ignore
-> the dummy field (contains only no of cycles)added in this patch. Controllers
-> (like ZynqMP GQSPI) expects dummy in cycles won't work directly by using
-> len field because host driver doesn't know that len field of a particular transfer
-> includes dummy bytes or not (and also number of dummy bytes included in len
-> field). In such cases driver use this dummy field to identify the number of dummy
-> cycles and based on that it will send the required number of dummy cycles (which
-> i did in the second patch).
-
-This doesn't make any sense at all to me.  Why does the controller care
-what the bytes being sent to and from the device mean?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160325/71b76a17/attachment.sig>
+Unit-address without reg is going to start warning in dtc. Use something 
+like "cpu0-led" instead.
