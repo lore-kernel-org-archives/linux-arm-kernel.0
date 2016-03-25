@@ -1,67 +1,65 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 25 Mar 2016 02:45:20 -0300
-Subject: [PATCH] ARM: dts: exynos: Fix invalid maximum voltage for buck9
- supplying SD card
-In-Reply-To: <1458807125-13580-1-git-send-email-k.kozlowski@samsung.com>
-References: <1458807125-13580-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <56F4D070.4020403@osg.samsung.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 25 Mar 2016 14:25:13 +0800
+Subject: [PATCH] cpuidle: arm: make enter idle operation a bit more
+ efficient
+In-Reply-To: <20160324160600.GA21749@red-moon>
+References: <1458796038-6062-1-git-send-email-jszhang@marvell.com>
+ <20160324160600.GA21749@red-moon>
+Message-ID: <20160325142513.6814ee41@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+Hi Lorenzo,
 
-On 03/24/2016 05:12 AM, Krzysztof Kozlowski wrote:
-> The buck9 regulator of S2MPS11 PMIC had incorrect maximum voltage -
-> lower by 5 mV than specified by datasheet. This buck9 provides power to
-> other regulators, including LDO13 and LDO19 which supply the MMC2 (SD
-> card).
-> 
-> When constraints were applied, the depending regulators were not
-> providing enough power, leading to SD card detection errors:
-> 	mmc1: card never left busy state
-> 	mmc1: error -110 whilst initialising SD card
-> 
-> Fixes: 86a2d2ac5e5d ("ARM: dts: Add dts file for Odroid XU3 board")
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> 
-> ---
-> 
-> The issue can be reproduced on next-20160324 with
-> bae4fdc88d7f7dda1 (regulator: core: Ensure we are at least in bounds for our constraints).
-> ---
->  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-> index 1bd507bfa750..82b2ba632cf6 100644
-> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-> @@ -299,7 +299,7 @@
->  			buck9_reg: BUCK9 {
->  				regulator-name = "vdd_2.8v_ldo";
->  				regulator-min-microvolt = <3000000>;
-> -				regulator-max-microvolt = <3750000>;
-> +				regulator-max-microvolt = <3755000>;
->  				regulator-always-on;
->  				regulator-boot-on;
->  			};
-> 
+On Thu, 24 Mar 2016 16:06:00 +0000 Lorenzo Pieralisi wrote:
 
-I tested next-20160324 + $SUBJECT on an Odroid XU4 (with exynos_defconfig)
-and while it's true that the patch makes the SD card error to go away, I see
-that the s2mps11 regulator driver fails to probe due an -EINVAL being return
-by machine_constraints_voltage() -> _regulator_do_set_voltage():
+> On Thu, Mar 24, 2016 at 01:07:18PM +0800, Jisheng Zhang wrote:
+> > Currently, entering idle need to check the idx every time to choose the
+> > real entering idle routine. But this check could be avoided by pointing
+> > the idle enter function pointer of each idle states to the routines
+> > suitable for each states directly.
+> > 
+> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> > ---
+> >  drivers/cpuidle/cpuidle-arm.c | 14 ++++++++------
+> >  1 file changed, 8 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
+> > index 545069d..48a620f 100644
+> > --- a/drivers/cpuidle/cpuidle-arm.c
+> > +++ b/drivers/cpuidle/cpuidle-arm.c
+> > @@ -23,6 +23,13 @@
+> >  
+> >  #include "dt_idle_states.h"
+> >  
+> > +static int arm_enter_wfi_state(struct cpuidle_device *dev,
+> > +			       struct cpuidle_driver *drv, int idx)
+> > +{
+> > +	cpu_do_idle();
+> > +	return 0;
+> > +}
+> > +
+> >  /*
+> >   * arm_enter_idle_state - Programs CPU to enter the specified state
+> >   *
+> > @@ -38,11 +45,6 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
+> >  {
+> >  	int ret;
+> >  
+> > -	if (!idx) {
+> > -		cpu_do_idle();
+> > -		return idx;
+> > -	}  
+> 
+> Mmm...if I wanted to paint your bikeshed I would say idx is in a
+> register and you are removing a simple comparison to exchange it
+> with a function that adds to code footprint and may even make
+> performance worse instead of improving anything.
+> 
+> I am not sure this patch makes anything more efficient, happy to be
+> proven wrong, with significant data.
 
-[    1.710300] vdd_2.8v_ldo: failed to apply 3755000-3755000uV constraint(-22)
-[    1.716387] s2mps11-pmic s2mps11-regulator: regulator init failed for 46
-[    1.734878] s2mps11-pmic: probe of s2mps11-regulator failed with error -22
+Thanks for pointing this out. I'll do some measurement and get back to you
 
-I wonder how neither Markus nor you saw this issue when testing so maybe I'm
-doing something wrong? Since AFAICT it's only working because the driver fails
-to probe so the same effect can be achieved disabling CONFIG_REGULATOR_S2MPS11.
-
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Thanks,
+Jisheng
