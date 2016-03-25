@@ -1,112 +1,53 @@
-From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Fri, 25 Mar 2016 09:17:03 +0000
-Subject: [PATCH v2] dmaengine: vdma: Add 64 bit addressing support to
- the driver
-In-Reply-To: <3681371.njDCZ2OU0Q@avalon>
-References: <1440690558-39822-1-git-send-email-anuragku@xilinx.com>
- <20150921155712.GN2381@localhost>
- <3802E9A6666DF54886E2B9CBF743BA9801C08CA1@XAP-PVEXMBX01.xlnx.xilinx.com>
- <3681371.njDCZ2OU0Q@avalon>
-Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A56FFB3@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Fri, 25 Mar 2016 17:30:07 +0800
+Subject: [RFC PATCH 1/3] arm64: Append more field of id_aa64mmfr2 for
+ cpufeature
+In-Reply-To: <1458898209-7486-1-git-send-email-wangkefeng.wang@huawei.com>
+References: <1458898209-7486-1-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <1458898209-7486-2-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent Pinchart,
+There are some new cpu features which can be identified by id_aa64mmfr2,
+this patch appends all fields of it.
 
-> -----Original Message-----
-> From: Laurent Pinchart [mailto:laurent.pinchart at ideasonboard.com]
-> Sent: Monday, March 21, 2016 9:48 PM
-> To: Anurag Kumar Vulisha
-> Cc: Vinod Koul; Rob Herring; Pawel Moll; Mark Rutland; Ian Campbell; Kumar
-> Gala; Michal Simek; Soren Brinkmann; Dan Williams; afaerber at suse.de; Maxime
-> Ripard; Appana Durga Kedareswara Rao; Anirudha Sarangi; Srikanth Vemula;
-> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org; dmaengine at vger.kernel.org
-> Subject: Re: [PATCH v2] dmaengine: vdma: Add 64 bit addressing support to the
-> driver
-> 
-> Hi Anurag,
-> 
-> On Wednesday 23 Sep 2015 15:12:36 Anurag Kumar Vulisha wrote:
-> > On Monday, September 21, 2015 9:27 PM Vinod Koul wrote:
-> > > On Thu, Aug 27, 2015 at 09:19:18PM +0530, Anurag Kumar Vulisha wrote:
-> > >> This VDMA  is a soft ip, which can be programmed to support
-> > >> 32 bit addressing or greater than 32 bit addressing.
-> > >>
-> > >> When the VDMA ip is configured for 32 bit address space the
-> > >> transfer start address is specified by a single register.
-> > >
-> > > would be good to specfiy which one
-> >
-> > Will change  this in v3
-> 
-> What happened to v3 ? :-)
+Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+---
+ arch/arm64/include/asm/sysreg.h | 4 ++++
+ arch/arm64/kernel/cpufeature.c  | 4 ++++
+ 2 files changed, 8 insertions(+)
 
-I have sent it today.
-
-Thanks,
-Kedar.
-
-> 
-> > >> When the  VDMA core is configured for an address space greater than
-> > >> 32 then each start address is specified by a combination of two
-> > >> registers. The first register specifies the LSB 32 bits of address,
-> > >> while the next register specifies the MSB 32 bits of address.For
-> > >> example,5Ch will specify the LSB 32 bits while 60h will specify the
-> > >> MSB 32 bits of the first start address.So we need to program two
-> > >> registers at a time.
-> > >
-> > > can we have spaces after full stops and commas!
-> >
-> > Will take care of this in v3 patch.
-> >
-> > >> +/* Since vdma driver is trying to write to a register offset which
-> > >> +is not a
-> > >> + * multiple of 64 bits(ex : 0x5c), we are writing as two separate
-> > >> +32 bits
-> > >> + * instead of a single 64 bit register write.
-> > >> + */
-> > >
-> > > This is not kernel style for multi-lines, pls refer to
-> > > Documentation/CodingStyle
-> >
-> > Will address this in v3 patch
-> >
-> > >> +
-> > >> +static inline void vdma_desc_write_64(struct xilinx_vdma_chan
-> > >> +*chan,
-> > >> u32 reg,
-> > >> +                            u32 value_lsb, u32 value_msb) {
-> > >> +   /* Write the lsb 32 bits*/
-> > >> +   writel(value_lsb, chan->xdev->regs + chan->desc_offset + reg);
-> > >> +
-> > >> +   /* Write the msb 32 bits */
-> > >> +   writel(value_msb, chan->xdev->regs + chan->desc_offset + reg +
-> > >> + 4);
-> > >
-> > > why not writeq
-> >
-> > We are trying to write at a register address(ex:0x5c) which is not
-> > aligned on 8 bytes  boundary.So if I try to use 64 bit write on
-> > it,unalignment fault is getting  generated.To avoid that we are using
-> > two separate 32  bit writes. We had this discussion in previous
-> > versions of this patch with Laurent Pinchart .I have also added this
-> > exaplanation in the comments above this function.
-> >
-> > >> +   err = of_property_read_u32(node, "xlnx,addrwidth",
-> > >> + &addr_width);
-> > >> +
-> > >> +   if (err < 0) {
-> > >> +           /* Setting addr_width property to default 32 bits */
-> > >> +           addr_width = 32;
-> > >> +   }
-> > >
-> > > braces for a single line statement! Also space is redandant before
-> > > if condition
-> >
-> > Will take care of this in v3 patch
-> 
-> --
-> Regards,
-> 
-> Laurent Pinchart
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index 1a78d6e..c141243 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -142,7 +142,11 @@
+ #define ID_AA64MMFR1_HADBS_SHIFT	0
+ 
+ /* id_aa64mmfr2 */
++#define ID_AA64MMFR2_LVA_SHIFT		16
++#define ID_AA64MMFR2_IESB_SHIFT		12
++#define ID_AA64MMFR2_LSM_SHIFT		8
+ #define ID_AA64MMFR2_UAO_SHIFT		4
++#define ID_AA64MMFR2_CNP_SHIFT		0
+ 
+ /* id_aa64dfr0 */
+ #define ID_AA64DFR0_CTX_CMPS_SHIFT	28
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 943f514..677f17c 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -130,7 +130,11 @@ static struct arm64_ftr_bits ftr_id_aa64mmfr1[] = {
+ };
+ 
+ static struct arm64_ftr_bits ftr_id_aa64mmfr2[] = {
++	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR2_LVA_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR2_IESB_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR2_LSM_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR2_UAO_SHIFT, 4, 0),
++	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR2_CNP_SHIFT, 4, 0),
+ 	ARM64_FTR_END,
+ };
+ 
+-- 
+1.7.12.4
