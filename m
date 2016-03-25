@@ -1,71 +1,205 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 25 Mar 2016 20:22:59 +0300
-Subject: [PATCH v3 02/16] mfd: da8xx-cfgchip: New header file for CFGCHIP
- registers.
-In-Reply-To: <1458863503-31121-3-git-send-email-david@lechnology.com>
-References: <1458863503-31121-1-git-send-email-david@lechnology.com>
- <1458863503-31121-3-git-send-email-david@lechnology.com>
-Message-ID: <56F573F3.90500@cogentembedded.com>
+From: balbi@kernel.org (Felipe Balbi)
+Date: Fri, 25 Mar 2016 19:44:22 +0200
+Subject: [PATCH] usb: host: xhci-plat: Make enum xhci_plat_type start at a
+ non zero value
+In-Reply-To: <87mvpmlc5e.fsf@free-electrons.com>
+References: <1458917188-28452-1-git-send-email-peter.griffin@linaro.org>
+ <87mvpm8pfl.fsf@ti.com> <87mvpmlc5e.fsf@free-electrons.com>
+Message-ID: <87io0a8nbd.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/25/2016 02:51 AM, David Lechner wrote:
 
-> We will be using a generic syscon device for the TI DA8XX SoC CFGCHIPx
-> retisters. This will be used by a number of planned drivers including a
-> new USB PHY driver and common clock framework drivers.
->
-> The same defines are removed from the platform_data header file since they
-> are now redundant and they didn't really belong there anyway.
->
-> Signed-off-by: David Lechner <david@lechnology.com>
-> ---
->
-> v3 changes: This is a new patch. It replaces the previous patch that just added
-> some missing CFGCHIP2 registers to the platform_data/usb-davinci.h file.
-> I took David Laight's advice and included all of the possible registers.
->
-> Many of these registers will be used for clocks - hopefully in the near future.
->
->
-> include/linux/mfd/da8xx-cfgchip.h         | 160 ++++++++++++++++++++++++++++++
->   include/linux/platform_data/usb-davinci.h |  23 -----
->   2 files changed, 160 insertions(+), 23 deletions(-)
->   create mode 100644 include/linux/mfd/da8xx-cfgchip.h
->
-> diff --git a/include/linux/mfd/da8xx-cfgchip.h b/include/linux/mfd/da8xx-cfgchip.h
-> new file mode 100644
-> index 0000000..6940cf9
-> --- /dev/null
-> +++ b/include/linux/mfd/da8xx-cfgchip.h
-> @@ -0,0 +1,160 @@
-[...]
-> +/* register offsets */
-> +#define CFGCHIP_REG(n)				(n * 4)
-> +#define CFGCHIP0_REG				CFGCHIP_REG(0)
-> +#define CFGCHIP1_REG				CFGCHIP_REG(1)
-> +#define CFGCHIP2_REG				CFGCHIP_REG(2)
-> +#define CFGCHIP3_REG				CFGCHIP_REG(3)
-> +#define CFGCHIP4_REG				CFGCHIP_REG(4)
+Hi,
 
-    Why not just use CFGCHIP_REG(n) directly?
-
-[...]
-> diff --git a/include/linux/platform_data/usb-davinci.h b/include/linux/platform_data/usb-davinci.h
-> index e0bc4ab..7c6ce24 100644
-> --- a/include/linux/platform_data/usb-davinci.h
-> +++ b/include/linux/platform_data/usb-davinci.h
-[...]
-> @@ -53,7 +31,6 @@ struct	da8xx_ohci_root_hub {
->   	/* Time from power on to power good (in 2 ms units) */
->   	u8	potpgt;
->   };
-> -
-
-    Why?
-
->   void davinci_setup_usb(unsigned mA, unsigned potpgt_ms);
+Gregory CLEMENT <gregory.clement@free-electrons.com> writes:
+>> Peter Griffin <peter.griffin@linaro.org> writes:
+>>> Otherwise generic-xhci and xhci-platform which have no data get wrongly
+>>> detected as XHCI_PLAT_TYPE_MARVELL_ARMADA by xhci_plat_type_is().
+>>>
+>>> This fixes a regression in v4.5 for STiH407 family SoC's which use the
+>>> synopsis dwc3 IP, whereby the disable_clk error path gets taken due to
+>>> wrongly being detected as XHCI_PLAT_TYPE_MARVELL_ARMADA and the hcd never
+>>> gets added.
+>>>
+>>> I suspect this will also fix other dwc3 DT platforms such as Exynos,
+>>> although I've only tested on STih410 SoC.
+>>>
+>>> Fixes: 4efb2f694114 ("usb: host: xhci-plat: add struct xhci_plat_priv")
+>>> Cc: stable at vger.kernel.org
+>>> Cc: gregory.clement at free-electrons.com
+>>> Cc: yoshihiro.shimoda.uh at renesas.com
+>>> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+>>> ---
+>>>  drivers/usb/host/xhci-plat.h | 2 +-
+>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/usb/host/xhci-plat.h b/drivers/usb/host/xhci-plat.h
+>>> index 5a2e2e3..529c3c4 100644
+>>> --- a/drivers/usb/host/xhci-plat.h
+>>> +++ b/drivers/usb/host/xhci-plat.h
+>>> @@ -14,7 +14,7 @@
+>>>  #include "xhci.h"	/* for hcd_to_xhci() */
+>>>  
+>>>  enum xhci_plat_type {
+>>> -	XHCI_PLAT_TYPE_MARVELL_ARMADA,
+>>> +	XHCI_PLAT_TYPE_MARVELL_ARMADA = 1,
+>>>  	XHCI_PLAT_TYPE_RENESAS_RCAR_GEN2,
+>>>  	XHCI_PLAT_TYPE_RENESAS_RCAR_GEN3,
+>>
+>> aren't these platforms using device tree ? Why aren't these just
+>> different compatible strings ?
 >
->   #endif	/* ifndef __ASM_ARCH_USB_H */
+> According to 4efb2f69411456d35051e9047c15157c9a5ba217 "usb: host:
+> xhci-plat: add struct xhci_plat_priv" :
+>
+> This patch adds struct xhci_plat_priv to simplify the code to match
+> platform specific variables. For now, this patch adds a member "type" in
+> the structure
 
-MBR, Sergei
+that's fine but the answer doesn't exactly match my question ;-)
+
+My point is that this enum shouldn't be necessary at all. We have
+compatible flags to make these checks instead. How about below ?
+(untested, uncompiled, yada yada yada). Note that we DON'T need this
+xhci_plat_type trickery, just need to be a little bit smarter about how
+we use driver_data:
+
+diff --git a/drivers/usb/host/xhci-mvebu.c b/drivers/usb/host/xhci-mvebu.c
+index 1eefc988192d..1ea6c18b74f3 100644
+--- a/drivers/usb/host/xhci-mvebu.c
++++ b/drivers/usb/host/xhci-mvebu.c
+@@ -41,8 +41,9 @@ static void xhci_mvebu_mbus_config(void __iomem *base,
+ 	}
+ }
+ 
+-int xhci_mvebu_mbus_init_quirk(struct platform_device *pdev)
++int xhci_mvebu_mbus_init_quirk(struct usb_hcd *hcd)
+ {
++	struct platform_device *pdev = to_platform_device(hcd->self.controller);
+ 	struct resource	*res;
+ 	void __iomem *base;
+ 	const struct mbus_dram_target_info *dram;
+diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+index 5c15e9bc5f7a..adb77c60a9ae 100644
+--- a/drivers/usb/host/xhci-plat.c
++++ b/drivers/usb/host/xhci-plat.c
+@@ -47,43 +47,56 @@ static void xhci_plat_quirks(struct device *dev, struct xhci_hcd *xhci)
+ 	xhci->quirks |= XHCI_PLAT;
+ }
+ 
++static void xhci_priv_plat_start(struct usb_hcd *hcd)
++{
++	struct xhci_plat_priv *priv = hcd_to_xhci_priv(hcd);
++
++	if (priv->plat_start)
++		priv->plat_start(hcd);
++}
++
++static int xhci_priv_init_quirk(struct usb_hcd *hcd)
++{
++	struct xhci_plat_priv *priv = hcd_to_xhci_priv(hcd);
++
++	if (!priv->init_quirk)
++		return 0;
++
++	return priv->init_quirk(hcd);
++}
++
+ /* called during probe() after chip reset completes */
+ static int xhci_plat_setup(struct usb_hcd *hcd)
+ {
+ 	int ret;
+ 
+-	if (xhci_plat_type_is(hcd, XHCI_PLAT_TYPE_RENESAS_RCAR_GEN2) ||
+-	    xhci_plat_type_is(hcd, XHCI_PLAT_TYPE_RENESAS_RCAR_GEN3)) {
+-		ret = xhci_rcar_init_quirk(hcd);
+-		if (ret)
+-			return ret;
+-	}
++	ret = xhci_priv_init_quirk(hcd);
++	if (ret)
++		return ret;
+ 
+ 	return xhci_gen_setup(hcd, xhci_plat_quirks);
+ }
+ 
+ static int xhci_plat_start(struct usb_hcd *hcd)
+ {
+-	if (xhci_plat_type_is(hcd, XHCI_PLAT_TYPE_RENESAS_RCAR_GEN2) ||
+-	    xhci_plat_type_is(hcd, XHCI_PLAT_TYPE_RENESAS_RCAR_GEN3))
+-		xhci_rcar_start(hcd);
+-
++	xhci_priv_plat_start(hcd);
+ 	return xhci_run(hcd);
+ }
+ 
+ #ifdef CONFIG_OF
+ static const struct xhci_plat_priv xhci_plat_marvell_armada = {
+-	.type = XHCI_PLAT_TYPE_MARVELL_ARMADA,
++	.init_quirk = xhci_mvebu_mbus_init_quirk,
+ };
+ 
+ static const struct xhci_plat_priv xhci_plat_renesas_rcar_gen2 = {
+-	.type = XHCI_PLAT_TYPE_RENESAS_RCAR_GEN2,
+ 	.firmware_name = XHCI_RCAR_FIRMWARE_NAME_V1,
++	.init_quirk = xhci_rcar_init_quirk,
+ };
+ 
+ static const struct xhci_plat_priv xhci_plat_renesas_rcar_gen3 = {
+-	.type = XHCI_PLAT_TYPE_RENESAS_RCAR_GEN3,
+ 	.firmware_name = XHCI_RCAR_FIRMWARE_NAME_V2,
++	.init_quirk = xhci_rcar_init_quirk,
++	.plat_start = xhci_rcar_start,
+ };
+ 
+ static const struct of_device_id usb_xhci_of_match[] = {
+diff --git a/drivers/usb/host/xhci-plat.h b/drivers/usb/host/xhci-plat.h
+index 5a2e2e3936c4..c4d565980832 100644
+--- a/drivers/usb/host/xhci-plat.h
++++ b/drivers/usb/host/xhci-plat.h
+@@ -13,27 +13,13 @@
+ 
+ #include "xhci.h"	/* for hcd_to_xhci() */
+ 
+-enum xhci_plat_type {
+-	XHCI_PLAT_TYPE_MARVELL_ARMADA,
+-	XHCI_PLAT_TYPE_RENESAS_RCAR_GEN2,
+-	XHCI_PLAT_TYPE_RENESAS_RCAR_GEN3,
+-};
+-
+ struct xhci_plat_priv {
+ 	enum xhci_plat_type type;
+ 	const char *firmware_name;
++	void (*plat_start)(struct usb_hcd *);
++	int (*init_quirk)(struct usb_hcd *);
+ };
+ 
+ #define hcd_to_xhci_priv(h) ((struct xhci_plat_priv *)hcd_to_xhci(h)->priv)
+ 
+-static inline bool xhci_plat_type_is(struct usb_hcd *hcd,
+-				     enum xhci_plat_type type)
+-{
+-	struct xhci_plat_priv *priv = hcd_to_xhci_priv(hcd);
+-
+-	if (priv && priv->type == type)
+-		return true;
+-	else
+-		return false;
+-}
+ #endif	/* _XHCI_PLAT_H */
+
+ps: there might be bugs there, but it's a holiday and I really shouldn't
+be spending time on this right now ;-)
+
+Anyway, have fun testing. Let me know if it doesn't work.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160325/08411d5c/attachment.sig>
