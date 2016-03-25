@@ -1,100 +1,79 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 25 Mar 2016 06:51:48 -0600
-Subject: [RESEND PATCH V4 0/4] Introduce CoreSight STM support
-In-Reply-To: <1457418835-31417-1-git-send-email-zhang.chunyan@linaro.org>
-References: <1457418835-31417-1-git-send-email-zhang.chunyan@linaro.org>
-Message-ID: <CANLsYkyZODA6dHpKZfx2DPaZ0qe==6T1FGgR5ajZASGmcuJXhw@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 25 Mar 2016 21:20:23 +0800
+Subject: [PATCH] cpuidle: arm: make enter idle operation a bit more
+ efficient
+In-Reply-To: <20160325142513.6814ee41@xhacker>
+References: <1458796038-6062-1-git-send-email-jszhang@marvell.com>
+ <20160324160600.GA21749@red-moon>	<20160325142513.6814ee41@xhacker>
+Message-ID: <20160325212023.4d7440b8@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 March 2016 at 23:33, Chunyan Zhang <zhang.chunyan@linaro.org> wrote:
-> This patchset adds support for the CoreSight STM IP block.
->
-> In the fourth version, comments from various people have been
-> addressed.  Representing configurations where channels are shared
-> between multiple masterIDs has been kept unchanged from the previous
-> version because a viable alternative hasn't been suggested.
->
-> This RESEND PATCH 1/4 depends on the patch [3] which has been
-> merged into linux-next.
+Hi Lorenzo,
 
-We are not going anywhere with 1/4.  Since the functionality conveyed
-by that patch isn't strictly needed simply drop it (along with 2/4).
-Please take into consideration the comments I made on 4/4 and respin
-on 4.6-rc1 when it comes out.
+On Fri, 25 Mar 2016 14:25:13 +0800 Jisheng Zhang wrote:
 
-Thanks,
-Mathieu
+> Hi Lorenzo,
+> 
+> On Thu, 24 Mar 2016 16:06:00 +0000 Lorenzo Pieralisi wrote:
+> 
+> > On Thu, Mar 24, 2016 at 01:07:18PM +0800, Jisheng Zhang wrote:  
+> > > Currently, entering idle need to check the idx every time to choose the
+> > > real entering idle routine. But this check could be avoided by pointing
+> > > the idle enter function pointer of each idle states to the routines
+> > > suitable for each states directly.
+> > > 
+> > > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> > > ---
+> > >  drivers/cpuidle/cpuidle-arm.c | 14 ++++++++------
+> > >  1 file changed, 8 insertions(+), 6 deletions(-)
+> > > 
+> > > diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
+> > > index 545069d..48a620f 100644
+> > > --- a/drivers/cpuidle/cpuidle-arm.c
+> > > +++ b/drivers/cpuidle/cpuidle-arm.c
+> > > @@ -23,6 +23,13 @@
+> > >  
+> > >  #include "dt_idle_states.h"
+> > >  
+> > > +static int arm_enter_wfi_state(struct cpuidle_device *dev,
+> > > +			       struct cpuidle_driver *drv, int idx)
+> > > +{
+> > > +	cpu_do_idle();
+> > > +	return 0;
+> > > +}
+> > > +
+> > >  /*
+> > >   * arm_enter_idle_state - Programs CPU to enter the specified state
+> > >   *
+> > > @@ -38,11 +45,6 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
+> > >  {
+> > >  	int ret;
+> > >  
+> > > -	if (!idx) {
+> > > -		cpu_do_idle();
+> > > -		return idx;
+> > > -	}    
+> > 
+> > Mmm...if I wanted to paint your bikeshed I would say idx is in a
+> > register and you are removing a simple comparison to exchange it
+> > with a function that adds to code footprint and may even make
+> > performance worse instead of improving anything.
+> > 
+> > I am not sure this patch makes anything more efficient, happy to be
+> > proven wrong, with significant data.  
+> 
+> Thanks for pointing this out. I'll do some measurement and get back to you
+> 
 
->
-> Changes from V3:
->  - Removed ioctl get_options interface from the generic STM code and CoreSight STM driver.
->  - Removed 'write_max' from the structure 'stm_drvdata', and changed 'write_64bit' to 'write_bytes'.
->  - Revised stm_fundamental_data_size() to return the fundamental data size instead of 0/1.
->  - Removed stm_remove() from the driver.
->  - Revised the return value of ::packet() callback function according to [2].
->  - Modified stm_send() to send one STP packet at a time.
->  - Added comments to invariant/guaranteed CoreSight STM transaction mode.
->
-> Changes from V2:
->  - Changed to return -EFAULT if failed on the command STP_GET_OPTIONS.
->  - Used Alex's patch [1] instead of the last 2/6.
->  - Removed the while loop from stm_send(), since the packet size passed
->    to it isn't larger than 4 bytes on 32-bit system and 8 bytes on
->    64-bit system.
->  - Removed stm_send_64bit(), since the process of packets on 64-bit
->    CS-STM should be basically the same with on 32-bit system, except the
->    maximum length of writing STM at a time.
->  - Removed the support of writing 64-bit to CoreSight STM buffer at a time
->    on 32-bit ARM architecture according to an ARM engineer suggestion.  As
->    he said that the STM might receive a 64-bit write, or might receive a
->    pair of 32-bit writes to the two addressed words in either order.
->    So 64-bit write isn't guaranteed to work on the ARM 32-bit architecture.
->
-> Changes from v1:
->  - Added a definition of coresight_simple_func() in CS-STM driver to
->    avoid the kbuild test robot error for the time being.  This
->    modification will be removed when merging the code in which the
->    coresight_simple_func() has been moved to the header file.
->  - Calculate the channel number according to the channel memory space size.
->
->
-> Thanks,
-> Chunyan
->
-> [1] https://lkml.org/lkml/2016/2/4/652
-> [2] https://lkml.org/lkml/2016/2/12/397
-> [3] https://lkml.org/lkml/2015/12/22/348
->
-> Chunyan Zhang (1):
->   Documentations: Add explanations of the case for non-configurable
->     masters
->
-> Mathieu Poirier (2):
->   stm class: provision for statically assigned masterIDs
->   coresight-stm: Bindings for System Trace Macrocell
->
-> Pratik Patel (1):
->   coresight-stm: adding driver for CoreSight STM component
->
->  .../ABI/testing/sysfs-bus-coresight-devices-stm    |  53 ++
->  .../devicetree/bindings/arm/coresight.txt          |  28 +
->  Documentation/trace/coresight.txt                  |  37 +-
->  Documentation/trace/stm.txt                        |   6 +
->  drivers/hwtracing/coresight/Kconfig                |  11 +
->  drivers/hwtracing/coresight/Makefile               |   1 +
->  drivers/hwtracing/coresight/coresight-stm.c        | 890 +++++++++++++++++++++
->  drivers/hwtracing/stm/core.c                       |  17 +-
->  drivers/hwtracing/stm/policy.c                     |  18 +-
->  include/linux/coresight-stm.h                      |   6 +
->  include/linux/stm.h                                |   8 +
->  include/uapi/linux/coresight-stm.h                 |  21 +
->  12 files changed, 1090 insertions(+), 6 deletions(-)
->  create mode 100644 Documentation/ABI/testing/sysfs-bus-coresight-devices-stm
->  create mode 100644 drivers/hwtracing/coresight/coresight-stm.c
->  create mode 100644 include/linux/coresight-stm.h
->  create mode 100644 include/uapi/linux/coresight-stm.h
->
-> --
-> 1.9.1
->
+I have done the measurement, the fact shows you are correct!
+
+If there's nothing running in the system, the change improve performance by
+about 2.8%
+
+while if there's something running, I saw performance regression.
+
+so let's drop this patch.
+
+Thanks for your reviewing,
+Jisheng
