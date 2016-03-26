@@ -1,101 +1,157 @@
-From: bamvor.zhangjian@huawei.com (Zhangjian (Bamvor))
-Date: Sat, 26 Mar 2016 21:08:41 +0800
-Subject: [RFC5 PATCH v6 00/21] ILP32 for ARM64
-In-Reply-To: <20160321184012.GA26563@yury-N73SV>
-References: <1452792198-10718-1-git-send-email-ynorov@caviumnetworks.com>
- <56AB3805.1040308@huawei.com> <20160129170929.GA3543@yury-N73SV>
- <56AC38F1.2030608@huawei.com> <20160218223506.GA7816@yury-N73SV>
- <mvm8u29ukqw.fsf@hawking.suse.de> <20160225202855.GD16123@yury-N73SV>
- <56EBD84D.2060009@huawei.com> <20160318154918.GA1595@yury-N73SV>
- <mvmoaa8dwre.fsf@hawking.suse.de> <20160321184012.GA26563@yury-N73SV>
-Message-ID: <56F689D9.2090800@huawei.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Sat, 26 Mar 2016 13:14:20 +0000
+Subject: [PATCH v8 01/17] Xen: ACPI: Hide UART used by Xen
+In-Reply-To: <7418231.W9aSFKr1zs@vostro.rjw.lan>
+References: <1458830676-27075-2-git-send-email-shannon.zhao@linaro.org>
+ <1458893149-17388-1-git-send-email-zhaoshenglong@huawei.com>
+ <7418231.W9aSFKr1zs@vostro.rjw.lan>
+Message-ID: <alpine.DEB.2.02.1603261311450.18380@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Yury
+On Fri, 25 Mar 2016, Rafael J. Wysocki wrote:
+> On Friday, March 25, 2016 04:05:49 PM Shannon Zhao wrote:
+> > From: Shannon Zhao <shannon.zhao@linaro.org>
+> > 
+> > ACPI 6.0 introduces a new table STAO to list the devices which are used
+> > by Xen and can't be used by Dom0. On Xen virtual platforms, the physical
+> > UART is used by Xen. So here it hides UART from Dom0.
+> > 
+> > CC: "Rafael J. Wysocki" <rjw@rjwysocki.net> (supporter:ACPI)
+> > CC: Len Brown <lenb@kernel.org> (supporter:ACPI)
+> > CC: linux-acpi at vger.kernel.org (open list:ACPI)
+> > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> So I said it looked good, but now that I think about it, I have a question. ->
+> 
+> > ---
+> >  drivers/acpi/scan.c | 68 +++++++++++++++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 68 insertions(+)
+> > 
+> > diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+> > index 5f28cf7..5420cc5 100644
+> > --- a/drivers/acpi/scan.c
+> > +++ b/drivers/acpi/scan.c
+> > @@ -45,6 +45,7 @@ static LIST_HEAD(acpi_scan_handlers_list);
+> >  DEFINE_MUTEX(acpi_device_lock);
+> >  LIST_HEAD(acpi_wakeup_device_list);
+> >  static DEFINE_MUTEX(acpi_hp_context_lock);
+> > +static u64 spcr_uart_addr;
+> >  
+> >  struct acpi_dep_data {
+> >  	struct list_head node;
+> > @@ -1453,6 +1454,41 @@ static int acpi_add_single_object(struct acpi_device **child,
+> >  	return 0;
+> >  }
+> >  
+> > +static acpi_status acpi_get_resource_memory(struct acpi_resource *ares,
+> > +					    void *context)
+> > +{
+> > +	struct resource *res = context;
+> > +
+> > +	if (acpi_dev_resource_memory(ares, res))
+> > +		return AE_CTRL_TERMINATE;
+> 
+> -> It looks like this will terminate on the first memory resource found,
+> but what if there are more of them?
+> 
+> Or is it guaranteed that there will be only one for the device objects in
+> question?
 
-On 2016/3/22 2:40, Yury Norov wrote:
-> On Mon, Mar 21, 2016 at 10:07:49AM +0100, Andreas Schwab wrote:
-[...]
+Given that spcr_uart_addr is actually the only Base Address specified by
+the SPCR table, I think it is assumed that this kind of devices only
+have one memory region.
+
+
+> If not, then it would better to check res.start == spcr_uart_addr here too
+> and only terminate if there's a match.
 >
-> Hi Andreas,
->
-> Thank you for your patch. It seems like it fixed a couple of tests.
-> I applied it to the library branch. Current list of fails is like this:
-> float_bessel                   FAIL       137
-> float_exp_log                  FAIL       137
-> float_iperb                    FAIL       137
-> float_power                    FAIL       137
-> float_trigo                    FAIL       137
-> pipeio_3                       FAIL       5
-> abort01                        FAIL       2
-> clone02                        FAIL       4
-> kill10                         FAIL       2
-> kill11                         FAIL       2
-> mmap16                         FAIL       6
-> nftw01                         FAIL       1
-> nftw6401                       FAIL       1
-> open12                         FAIL       2
-> pathconf01                     FAIL       1
-> profil01                       FAIL       1
-> rename11                       FAIL       2
-> rmdir02                        FAIL       2
-> umount2_01                     FAIL       2
-> umount2_02                     FAIL       2
-> umount2_03                     FAIL       2
-> utime06                        FAIL       2
-> mtest06                        FAIL       11
-This is a patch for glibc.
-I found 64bit register is used in sysdep.h. It could fix some failure
-in bigendian. I do not test it on little endian yet. Hope It helps.
-
-Regards
-
-Bamvor
- From a4af2b7a8903ac5e033ba838ec3328bdeb1113ba Mon Sep 17 00:00:00 2001
-From: Yang Yingliang <yangyingliang@huawei.com>
-Date: Thu, 13 Nov 2014 16:05:58 +0800
-Subject: [PATCH] ARM64: ILP32: change register x1 to PTR_REG
-
-It should use 32-bit register instead of 64-bit register in ILP32.
-
-Suggested-by: Andrew Pinski <apinski@cavium.com>
-Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
-Signed-off-by: Bamvor Jian Zhang <bamvor.zhangjian@huawei.com>
----
-  sysdeps/aarch64/sysdep.h                 | 2 +-
-  sysdeps/unix/sysv/linux/aarch64/sysdep.h | 2 +-
-  2 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/sysdeps/aarch64/sysdep.h b/sysdeps/aarch64/sysdep.h
-index 6673242..742d23c 100644
---- a/sysdeps/aarch64/sysdep.h
-+++ b/sysdeps/aarch64/sysdep.h
-@@ -104,7 +104,7 @@
-  #define LDST_GLOBAL(OP, R, T,  EXPR)			\
-  	adrp	x##T, :got:EXPR;			\
-  	ldr	PTR_REG (T), [x##T, #:got_lo12:EXPR];	\
--	OP	x##R, [x##T];
-+	OP	PTR_REG (R), [x##T];
-
-  /* Since C identifiers are not normally prefixed with an underscore
-     on this system, the asm identifier `syscall_error' intrudes on the
-diff --git a/sysdeps/unix/sysv/linux/aarch64/sysdep.h b/sysdeps/unix/sysv/linux/aarch64/sysdep.h
-index 2bfec77..8fb8a6b 100644
---- a/sysdeps/unix/sysv/linux/aarch64/sysdep.h
-+++ b/sysdeps/unix/sysv/linux/aarch64/sysdep.h
-@@ -108,7 +108,7 @@
-  .Lsyscall_error:						\
-  	adrp	x1, :gottprel:errno;				\
-  	neg	w2, w0;						\
--	ldr	x1, [x1, :gottprel_lo12:errno];			\
-+	ldr	PTR_REG(1), [x1, :gottprel_lo12:errno];		\
-  	mrs	x3, tpidr_el0;					\
-  	mov	x0, -1;						\
-  	str	w2, [x1, x3];					\
--- 
-1.8.4.5
-
-
-> Yury.
->
+> > +
+> > +	return AE_OK;
+> > +}
+> > +
+> > +static bool acpi_device_should_be_hidden(acpi_handle handle)
+> > +{
+> > +	acpi_status status;
+> > +	struct resource res;
+> > +
+> > +	/* Check if it should ignore the UART device */
+> > +	if (spcr_uart_addr != 0) {
+> > +		if (!acpi_has_method(handle, METHOD_NAME__CRS))
+> > +			return false;
+> > +
+> > +		status = acpi_walk_resources(handle, METHOD_NAME__CRS,
+> > +					     acpi_get_resource_memory, &res);
+> > +		if (ACPI_FAILURE(status))
+> > +			return false;
+> > +
+> > +		if (res.start == spcr_uart_addr) {
+> > +			printk(KERN_INFO PREFIX "The UART device in SPCR table will be hidden\n");
+> > +			return true;
+> > +		}
+> > +	}
+> > +
+> > +	return false;
+> > +}
+> > +
+> >  static int acpi_bus_type_and_status(acpi_handle handle, int *type,
+> >  				    unsigned long long *sta)
+> >  {
+> > @@ -1466,6 +1502,9 @@ static int acpi_bus_type_and_status(acpi_handle handle, int *type,
+> >  	switch (acpi_type) {
+> >  	case ACPI_TYPE_ANY:		/* for ACPI_ROOT_OBJECT */
+> >  	case ACPI_TYPE_DEVICE:
+> > +		if (acpi_device_should_be_hidden(handle))
+> > +			return -ENODEV;
+> > +
+> >  		*type = ACPI_BUS_TYPE_DEVICE;
+> >  		status = acpi_bus_get_status_handle(handle, sta);
+> >  		if (ACPI_FAILURE(status))
+> > @@ -1916,9 +1955,24 @@ static int acpi_bus_scan_fixed(void)
+> >  	return result < 0 ? result : 0;
+> >  }
+> >  
+> > +static void __init acpi_get_spcr_uart_addr(void)
+> > +{
+> > +	acpi_status status;
+> > +	struct acpi_table_spcr *spcr_ptr;
+> > +
+> > +	status = acpi_get_table(ACPI_SIG_SPCR, 0,
+> > +				(struct acpi_table_header **)&spcr_ptr);
+> > +	if (ACPI_SUCCESS(status))
+> > +		spcr_uart_addr = spcr_ptr->serial_port.address;
+> > +	else
+> > +		printk(KERN_WARNING PREFIX "STAO table present, but SPCR is missing\n");
+> > +}
+> > +
+> >  int __init acpi_scan_init(void)
+> >  {
+> >  	int result;
+> > +	acpi_status status;
+> > +	struct acpi_table_stao *stao_ptr;
+> >  
+> >  	acpi_pci_root_init();
+> >  	acpi_pci_link_init();
+> > @@ -1934,6 +1988,20 @@ int __init acpi_scan_init(void)
+> >  
+> >  	acpi_scan_add_handler(&generic_device_handler);
+> >  
+> > +	/*
+> > +	 * If there is STAO table, check whether it needs to ignore the UART
+> > +	 * device in SPCR table.
+> > +	 */
+> > +	status = acpi_get_table(ACPI_SIG_STAO, 0,
+> > +				(struct acpi_table_header **)&stao_ptr);
+> > +	if (ACPI_SUCCESS(status)) {
+> > +		if (stao_ptr->header.length > sizeof(struct acpi_table_stao))
+> > +			printk(KERN_INFO PREFIX "STAO Name List not yet supported.");
+> > +
+> > +		if (stao_ptr->ignore_uart)
+> > +			acpi_get_spcr_uart_addr();
+> > +	}
+> > +
+> >  	mutex_lock(&acpi_scan_lock);
+> >  	/*
+> >  	 * Enumerate devices in the ACPI namespace.
+> > 
+> 
