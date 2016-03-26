@@ -1,33 +1,54 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Fri, 25 Mar 2016 21:26:12 -0500
-Subject: [PATCH V7 5/6] dts: msm8974: Add blsp2_bam dma node
-In-Reply-To: <CAJAp7Oi33=kraAiU337JdFJZbuKZEVoCtY4FfAv_RgiWVmz+sw@mail.gmail.com>
-References: <1453197766-18976-1-git-send-email-sricharan@codeaurora.org>
- <1453197766-18976-6-git-send-email-sricharan@codeaurora.org>
- <CAJAp7Oi33=kraAiU337JdFJZbuKZEVoCtY4FfAv_RgiWVmz+sw@mail.gmail.com>
-Message-ID: <20160326022612.GA3764@hector.attlocal.net>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Sat, 26 Mar 2016 14:37:52 +0800
+Subject: [PATCH v5 0/4] Add more clock compatible features and support the
+ RK3399 clock
+Message-ID: <1458974276-10325-1-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 25, 2016 at 04:17:30PM -0700, Bjorn Andersson wrote:
-> On Tue, Jan 19, 2016 at 2:02 AM, Sricharan R <sricharan@codeaurora.org> wrote:
-> > Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-> > Reviewed-by: Andy Gross <andy.gross@linaro.org>
 
-<snip>
+Hi,
+  The patch series add support more mux parameters and multiple
+clock providers for the rockchip features of the clock framework,
+and support the clock controller for the RK3399.
 
-> > +               blsp2_dma: dma-controller at f9944000 {
-> > +                       compatible = "qcom,bam-v1.4.0";
-> > +                       reg = <0xf9944000 0x19000>;
-> > +                       interrupts = <GIC_SPI 239 IRQ_TYPE_LEVEL_HIGH>;
-> > +                       clocks = <&gcc GCC_BLSP2_AHB_CLK>;
-> > +                       clock-names = "bam_clk";
-> > +                       #dma-cells = <1>;
-> > +                       qcom,ee = <0>;
-> 
-> Without "qcom,bam_ctrl_remote;" and
-> https://patchwork.kernel.org/patch/8639181/ the Xperia Honami board
-> fails to boot with this patch included.
 
-Ouch.  At least one set of pipes must be used by some other processor and TZ has
-locked down that BLSP.
+Changes in v5:
+- add some necessary clock IDs
+- keep PPLL independent into the part of the PMUCRU
+- fix PMUCRU IDs are out of range
+- add clock IDs to drivers reference
+- fix some important bugs
+- fix configuration for cpu tables
+
+Changes in v3:
+- rename pclkin_cif to pclkin_cifmux, add diagram and comment for
+  pclkin_cifmux
+- add the clk_test node
+- modify the cif_testout path
+- include two new patches that dt-bindings and header file from
+  Jianqun's patch series
+
+Changes in v2:
+- rename the aplll/apllb to lpll/bpll
+- add drv/sample clock nodes for sdmmc/sdio
+
+Xing Zheng (4):
+  clk: rockchip: fix big.LITTLE cores alternate reparent failed
+  dt-bindings: add bindings for rk3399 clock controller
+  clk: rockchip: add dt-binding header for rk3399
+  clk: rockchip: add clock controller for the RK3399
+
+ .../bindings/clock/rockchip,rk3399-cru.txt         |   83 ++
+ drivers/clk/rockchip/Makefile                      |    1 +
+ drivers/clk/rockchip/clk-cpu.c                     |   15 +-
+ drivers/clk/rockchip/clk-rk3399.c                  | 1550 ++++++++++++++++++++
+ drivers/clk/rockchip/clk.h                         |   24 +-
+ include/dt-bindings/clock/rk3399-cru.h             |  752 ++++++++++
+ 6 files changed, 2417 insertions(+), 8 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/rockchip,rk3399-cru.txt
+ create mode 100644 drivers/clk/rockchip/clk-rk3399.c
+ create mode 100644 include/dt-bindings/clock/rk3399-cru.h
+
+-- 
+1.7.9.5
