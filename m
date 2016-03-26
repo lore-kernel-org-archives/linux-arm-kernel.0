@@ -1,234 +1,89 @@
-From: balbi@kernel.org (Felipe Balbi)
-Date: Sat, 26 Mar 2016 12:10:39 +0200
-Subject: [PATCH] usb: host: xhci-plat: Make enum xhci_plat_type start at a
- non zero value
-In-Reply-To: <20160326091050.GA7793@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <1458917188-28452-1-git-send-email-peter.griffin@linaro.org>
- <87mvpm8pfl.fsf@ti.com> <87mvpmlc5e.fsf@free-electrons.com>
- <87io0a8nbd.fsf@ti.com>
- <20160326091050.GA7793@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <87fuvd8s80.fsf@ti.com>
+From: jlu@pengutronix.de (Jan Luebbe)
+Date: Sat, 26 Mar 2016 12:28:25 +0100
+Subject: [PATCH 1/2] ARM: multi_v5_defconfig: Enable support for MX21/MX27
+Message-ID: <1458991706-30109-1-git-send-email-jlu@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Although the SoC support was already enabled, the drivers and machines
+were missing.
 
-Hi,
+Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
+---
+ arch/arm/configs/multi_v5_defconfig | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
 
-Peter Griffin <peter.griffin@linaro.org> writes:
-> Hi Felipe,
->
-> On Fri, 25 Mar 2016, Felipe Balbi wrote:
->
->> 
->> Hi,
->> 
->> Gregory CLEMENT <gregory.clement@free-electrons.com> writes:
->> >> Peter Griffin <peter.griffin@linaro.org> writes:
->> >>> Otherwise generic-xhci and xhci-platform which have no data get wrongly
->> >>> detected as XHCI_PLAT_TYPE_MARVELL_ARMADA by xhci_plat_type_is().
->> >>>
->> >>> This fixes a regression in v4.5 for STiH407 family SoC's which use the
->> >>> synopsis dwc3 IP, whereby the disable_clk error path gets taken due to
->> >>> wrongly being detected as XHCI_PLAT_TYPE_MARVELL_ARMADA and the hcd never
->> >>> gets added.
->> >>>
->> >>> I suspect this will also fix other dwc3 DT platforms such as Exynos,
->> >>> although I've only tested on STih410 SoC.
->> >>>
->> >>> Fixes: 4efb2f694114 ("usb: host: xhci-plat: add struct xhci_plat_priv")
->> >>> Cc: stable at vger.kernel.org
->> >>> Cc: gregory.clement at free-electrons.com
->> >>> Cc: yoshihiro.shimoda.uh at renesas.com
->> >>> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
->> >>> ---
->> >>>  drivers/usb/host/xhci-plat.h | 2 +-
->> >>>  1 file changed, 1 insertion(+), 1 deletion(-)
->> >>>
->> >>> diff --git a/drivers/usb/host/xhci-plat.h b/drivers/usb/host/xhci-plat.h
->> >>> index 5a2e2e3..529c3c4 100644
->> >>> --- a/drivers/usb/host/xhci-plat.h
->> >>> +++ b/drivers/usb/host/xhci-plat.h
->> >>> @@ -14,7 +14,7 @@
->> >>>  #include "xhci.h"	/* for hcd_to_xhci() */
->> >>>  
->> >>>  enum xhci_plat_type {
->> >>> -	XHCI_PLAT_TYPE_MARVELL_ARMADA,
->> >>> +	XHCI_PLAT_TYPE_MARVELL_ARMADA = 1,
->> >>>  	XHCI_PLAT_TYPE_RENESAS_RCAR_GEN2,
->> >>>  	XHCI_PLAT_TYPE_RENESAS_RCAR_GEN3,
->> >>
->> >> aren't these platforms using device tree ? Why aren't these just
->> >> different compatible strings ?
->> >
->> > According to 4efb2f69411456d35051e9047c15157c9a5ba217 "usb: host:
->> > xhci-plat: add struct xhci_plat_priv" :
->> >
->> > This patch adds struct xhci_plat_priv to simplify the code to match
->> > platform specific variables. For now, this patch adds a member "type" in
->> > the structure
->> 
->> that's fine but the answer doesn't exactly match my question ;-)
->> 
->> My point is that this enum shouldn't be necessary at all. We have
->> compatible flags to make these checks instead. How about below ?
->> (untested, uncompiled, yada yada yada). Note that we DON'T need this
->> xhci_plat_type trickery, just need to be a little bit smarter about how
->> we use driver_data:
->
-> Your solution certainly looks more elegant.
-
-cool thanks. Now that I think about this more carefully, we might wanna
-take $subject anyway for the -rc and get my version applied for v4.7
-merge window. What do you think ?
-
->> diff --git a/drivers/usb/host/xhci-mvebu.c b/drivers/usb/host/xhci-mvebu.c
->> index 1eefc988192d..1ea6c18b74f3 100644
->> --- a/drivers/usb/host/xhci-mvebu.c
->> +++ b/drivers/usb/host/xhci-mvebu.c
->> @@ -41,8 +41,9 @@ static void xhci_mvebu_mbus_config(void __iomem *base,
->>  	}
->>  }
->>  
->> -int xhci_mvebu_mbus_init_quirk(struct platform_device *pdev)
->> +int xhci_mvebu_mbus_init_quirk(struct usb_hcd *hcd)
->>  {
->> +	struct platform_device *pdev = to_platform_device(hcd->self.controller);
->>  	struct resource	*res;
->>  	void __iomem *base;
->>  	const struct mbus_dram_target_info *dram;
->> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
->> index 5c15e9bc5f7a..adb77c60a9ae 100644
->> --- a/drivers/usb/host/xhci-plat.c
->> +++ b/drivers/usb/host/xhci-plat.c
->> @@ -47,43 +47,56 @@ static void xhci_plat_quirks(struct device *dev, struct xhci_hcd *xhci)
->>  	xhci->quirks |= XHCI_PLAT;
->>  }
->>  
->> +static void xhci_priv_plat_start(struct usb_hcd *hcd)
->> +{
->> +	struct xhci_plat_priv *priv = hcd_to_xhci_priv(hcd);
->> +
->> +	if (priv->plat_start)
->> +		priv->plat_start(hcd);
->> +}
->> +
->> +static int xhci_priv_init_quirk(struct usb_hcd *hcd)
->> +{
->> +	struct xhci_plat_priv *priv = hcd_to_xhci_priv(hcd);
->> +
->> +	if (!priv->init_quirk)
->> +		return 0;
->> +
->> +	return priv->init_quirk(hcd);
->> +}
->> +
->>  /* called during probe() after chip reset completes */
->>  static int xhci_plat_setup(struct usb_hcd *hcd)
->>  {
->>  	int ret;
->>  
->> -	if (xhci_plat_type_is(hcd, XHCI_PLAT_TYPE_RENESAS_RCAR_GEN2) ||
->> -	    xhci_plat_type_is(hcd, XHCI_PLAT_TYPE_RENESAS_RCAR_GEN3)) {
->> -		ret = xhci_rcar_init_quirk(hcd);
->> -		if (ret)
->> -			return ret;
->> -	}
->> +	ret = xhci_priv_init_quirk(hcd);
->> +	if (ret)
->> +		return ret;
->>  
->>  	return xhci_gen_setup(hcd, xhci_plat_quirks);
->>  }
->>  
->>  static int xhci_plat_start(struct usb_hcd *hcd)
->>  {
->> -	if (xhci_plat_type_is(hcd, XHCI_PLAT_TYPE_RENESAS_RCAR_GEN2) ||
->> -	    xhci_plat_type_is(hcd, XHCI_PLAT_TYPE_RENESAS_RCAR_GEN3))
->> -		xhci_rcar_start(hcd);
->> -
->> +	xhci_priv_plat_start(hcd);
->>  	return xhci_run(hcd);
->>  }
->>  
->>  #ifdef CONFIG_OF
->>  static const struct xhci_plat_priv xhci_plat_marvell_armada = {
->> -	.type = XHCI_PLAT_TYPE_MARVELL_ARMADA,
->> +	.init_quirk = xhci_mvebu_mbus_init_quirk,
->>  };
->>  
->>  static const struct xhci_plat_priv xhci_plat_renesas_rcar_gen2 = {
->> -	.type = XHCI_PLAT_TYPE_RENESAS_RCAR_GEN2,
->>  	.firmware_name = XHCI_RCAR_FIRMWARE_NAME_V1,
->> +	.init_quirk = xhci_rcar_init_quirk,
->>  };
->>  
->>  static const struct xhci_plat_priv xhci_plat_renesas_rcar_gen3 = {
->> -	.type = XHCI_PLAT_TYPE_RENESAS_RCAR_GEN3,
->>  	.firmware_name = XHCI_RCAR_FIRMWARE_NAME_V2,
->> +	.init_quirk = xhci_rcar_init_quirk,
->> +	.plat_start = xhci_rcar_start,
->>  };
->>  
->>  static const struct of_device_id usb_xhci_of_match[] = {
->> diff --git a/drivers/usb/host/xhci-plat.h b/drivers/usb/host/xhci-plat.h
->> index 5a2e2e3936c4..c4d565980832 100644
->> --- a/drivers/usb/host/xhci-plat.h
->> +++ b/drivers/usb/host/xhci-plat.h
->> @@ -13,27 +13,13 @@
->>  
->>  #include "xhci.h"	/* for hcd_to_xhci() */
->>  
->> -enum xhci_plat_type {
->> -	XHCI_PLAT_TYPE_MARVELL_ARMADA,
->> -	XHCI_PLAT_TYPE_RENESAS_RCAR_GEN2,
->> -	XHCI_PLAT_TYPE_RENESAS_RCAR_GEN3,
->> -};
->> -
->>  struct xhci_plat_priv {
->>  	enum xhci_plat_type type;
->>  	const char *firmware_name;
->> +	void (*plat_start)(struct usb_hcd *);
->> +	int (*init_quirk)(struct usb_hcd *);
->>  };
->>  
->>  #define hcd_to_xhci_priv(h) ((struct xhci_plat_priv *)hcd_to_xhci(h)->priv)
->>  
->> -static inline bool xhci_plat_type_is(struct usb_hcd *hcd,
->> -				     enum xhci_plat_type type)
->> -{
->> -	struct xhci_plat_priv *priv = hcd_to_xhci_priv(hcd);
->> -
->> -	if (priv && priv->type == type)
->> -		return true;
->> -	else
->> -		return false;
->> -}
->>  #endif	/* _XHCI_PLAT_H */
->> 
->> ps: there might be bugs there, but it's a holiday and I really shouldn't
->> be spending time on this right now ;-)
->
-> I'm also off on holiday now until Sunday 10th April... yay :-)
-
-heh, cool :-)
-
->> Anyway, have fun testing. Let me know if it doesn't work.
->
-> I only have access to STi platforms which were broken by this change.
-> Not any of the platforms which rely on the functionality which
-> was introduced (although I can't see any reason why your patch wouldn't work).
->
-> Maybe Yoshihiro (on CC) could test this on the Renesas platforms and
-> confirm?
-
-sure, that would be great; then we avoid further regressions ;-)
-
+diff --git a/arch/arm/configs/multi_v5_defconfig b/arch/arm/configs/multi_v5_defconfig
+index e11d99d..bb8d609 100644
+--- a/arch/arm/configs/multi_v5_defconfig
++++ b/arch/arm/configs/multi_v5_defconfig
+@@ -13,6 +13,11 @@ CONFIG_MODULE_UNLOAD=y
+ CONFIG_ARCH_MVEBU=y
+ CONFIG_MACH_KIRKWOOD=y
+ CONFIG_ARCH_MXC=y
++CONFIG_MACH_MX21ADS=y
++CONFIG_MACH_MX27ADS=y
++CONFIG_MACH_MX27_3DS=y
++CONFIG_MACH_IMX27_VISSTRIM_M10=y
++CONFIG_MACH_PCA100=y
+ CONFIG_MACH_IMX27_DT=y
+ CONFIG_SOC_IMX25=y
+ CONFIG_ARCH_ORION5X=y
+@@ -67,6 +72,7 @@ CONFIG_NET_PKTGEN=m
+ CONFIG_CFG80211=y
+ CONFIG_MAC80211=y
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_IMX_WEIM=y
+ CONFIG_MTD=y
+ CONFIG_MTD_CMDLINE_PARTS=y
+ CONFIG_MTD_BLOCK=y
+@@ -110,13 +116,17 @@ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_SERIAL_8250_RUNTIME_UARTS=2
+ CONFIG_SERIAL_OF_PLATFORM=y
++CONFIG_SERIAL_IMX=y
++CONFIG_SERIAL_IMX_CONSOLE=y
+ # CONFIG_HW_RANDOM is not set
+ CONFIG_I2C=y
+ # CONFIG_I2C_COMPAT is not set
+ CONFIG_I2C_CHARDEV=y
++CONFIG_I2C_IMX=y
+ CONFIG_I2C_MV64XXX=y
+ CONFIG_I2C_NOMADIK=y
+ CONFIG_SPI=y
++CONFIG_SPI_IMX=y
+ CONFIG_SPI_ORION=y
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_POWER_RESET=y
+@@ -131,10 +141,12 @@ CONFIG_THERMAL=y
+ CONFIG_KIRKWOOD_THERMAL=y
+ CONFIG_WATCHDOG=y
+ CONFIG_ORION_WATCHDOG=y
++CONFIG_IMX2_WDT=y
+ # CONFIG_ABX500_CORE is not set
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_FB=y
++CONFIG_FB_IMX=y
+ CONFIG_SOUND=y
+ CONFIG_SND=y
+ CONFIG_SND_SOC=y
+@@ -158,7 +170,6 @@ CONFIG_HID_ZEROPLUS=y
+ CONFIG_USB=y
+ CONFIG_USB_XHCI_HCD=y
+ CONFIG_USB_EHCI_HCD=y
+-CONFIG_USB_EHCI_ROOT_HUB_TT=y
+ CONFIG_USB_PRINTER=m
+ CONFIG_USB_STORAGE=y
+ CONFIG_USB_STORAGE_DATAFAB=y
+@@ -166,6 +177,8 @@ CONFIG_USB_STORAGE_FREECOM=y
+ CONFIG_USB_STORAGE_SDDR09=y
+ CONFIG_USB_STORAGE_SDDR55=y
+ CONFIG_USB_STORAGE_JUMPSHOT=y
++CONFIG_USB_CHIPIDEA=y
++CONFIG_USB_CHIPIDEA_HOST=y
+ CONFIG_MMC=y
+ CONFIG_SDIO_UART=y
+ CONFIG_MMC_MVSDIO=y
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160326/5f3fc385/attachment-0001.sig>
+2.1.4
