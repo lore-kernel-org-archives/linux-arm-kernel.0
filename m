@@ -1,83 +1,140 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Sat, 26 Mar 2016 02:13:59 +0000
-Subject: [PATCH v4 01/12] KVM: extend struct kvm_msi to hold a 32-bit device ID
+Date: Sat, 26 Mar 2016 02:14:01 +0000
+Subject: [PATCH v4 03/12] KVM: arm64: Introduce new MMIO region for the ITS
+ base address
 In-Reply-To: <1458958450-19662-1-git-send-email-andre.przywara@arm.com>
 References: <1458958450-19662-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1458958450-19662-2-git-send-email-andre.przywara@arm.com>
+Message-ID: <1458958450-19662-4-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM GICv3 ITS MSI controller requires a device ID to be able to
-assign the proper interrupt vector. On real hardware, this ID is
-sampled from the bus. To be able to emulate an ITS controller, extend
-the KVM MSI interface to let userspace provide such a device ID. For
-PCI devices, the device ID is simply the 16-bit bus-device-function
-triplet, which should be easily available to the userland tool.
-
-Also there is a new KVM capability which advertises whether the
-current VM requires a device ID to be set along with the MSI data.
-This flag is still reported as not available everywhere, later we will
-enable it when ITS emulation is used.
+The ARM GICv3 ITS controller requires a separate register frame to
+cover ITS specific registers. Add a new VGIC address type and store
+the address in a field in the vgic_dist structure.
+Provide a function to check whether userland has provided the address,
+so ITS functionality can be guarded by that check.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Eric Auger <eric.auger@linaro.org>
 ---
- Documentation/virtual/kvm/api.txt | 12 ++++++++++--
- include/uapi/linux/kvm.h          |  5 ++++-
- 2 files changed, 14 insertions(+), 3 deletions(-)
+ Documentation/virtual/kvm/devices/arm-vgic.txt |  9 +++++++++
+ arch/arm64/include/uapi/asm/kvm.h              |  2 ++
+ include/kvm/vgic/vgic.h                        |  5 +++++
+ virt/kvm/arm/vgic/vgic.c                       | 10 ++++++++++
+ virt/kvm/arm/vgic/vgic_init.c                  |  1 +
+ virt/kvm/arm/vgic/vgic_kvm_device.c            |  7 +++++++
+ 6 files changed, 34 insertions(+)
 
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index cb2ef0b..8f7351d 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -2163,10 +2163,18 @@ struct kvm_msi {
- 	__u32 address_hi;
- 	__u32 data;
- 	__u32 flags;
--	__u8  pad[16];
-+	__u32 devid;
-+	__u8  pad[12];
- };
+diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
+index 59541d4..087e2d9 100644
+--- a/Documentation/virtual/kvm/devices/arm-vgic.txt
++++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
+@@ -39,6 +39,15 @@ Groups:
+       Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
+       This address needs to be 64K aligned.
  
--No flags are defined so far. The corresponding field must be 0.
-+flags: KVM_MSI_VALID_DEVID: devid contains a valid value
-+devid: If KVM_MSI_VALID_DEVID is set, contains a unique device identifier
-+       for the device that wrote the MSI message.
-+       For PCI, this is usually a BFD identifier in the lower 16 bits.
++    KVM_VGIC_V3_ADDR_TYPE_ITS (rw, 64-bit)
++      Base address in the guest physical address space of the GICv3 ITS
++      control register frame. The ITS allows MSI(-X) interrupts to be
++      injected into guests. This extension is optional, if the kernel
++      does not support the ITS, the call returns -ENODEV.
++      This memory is solely for the guest to access the ITS control
++      registers and does not cover the ITS translation register.
++      Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
++      This address needs to be 64K aligned and the region covers 64 KByte.
+ 
+   KVM_DEV_ARM_VGIC_GRP_DIST_REGS
+   Attributes:
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index f209ea1..c2b257d 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -87,9 +87,11 @@ struct kvm_regs {
+ /* Supported VGICv3 address types  */
+ #define KVM_VGIC_V3_ADDR_TYPE_DIST	2
+ #define KVM_VGIC_V3_ADDR_TYPE_REDIST	3
++#define KVM_VGIC_V3_ADDR_TYPE_ITS	4
+ 
+ #define KVM_VGIC_V3_DIST_SIZE		SZ_64K
+ #define KVM_VGIC_V3_REDIST_SIZE		(2 * SZ_64K)
++#define KVM_VGIC_V3_ITS_SIZE		SZ_64K
+ 
+ #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
+ #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
+diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+index 7c1d145..11344e6 100644
+--- a/include/kvm/vgic/vgic.h
++++ b/include/kvm/vgic/vgic.h
+@@ -135,6 +135,9 @@ struct vgic_dist {
+ 		gpa_t			vgic_redist_base;
+ 	};
+ 
++	/* The base address of the ITS control register frame */
++	gpa_t			vgic_its_base;
 +
-+The per-VM KVM_CAP_MSI_DEVID capability advertises the need to provide
-+the device ID. If this capability is not set, userland cannot rely on
-+the kernel to allow the KVM_MSI_VALID_DEVID flag being set.
+ 	/* distributor enabled */
+ 	u32			enabled;
  
+@@ -253,4 +256,6 @@ static inline int kvm_vgic_get_max_vcpus(void)
+ 	return kvm_vgic_global_state.max_gic_vcpus;
+ }
  
- 4.71 KVM_CREATE_PIT2
-diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-index 50f44a2..6a02871 100644
---- a/include/uapi/linux/kvm.h
-+++ b/include/uapi/linux/kvm.h
-@@ -852,6 +852,7 @@ struct kvm_ppc_smmu_info {
- #define KVM_CAP_S390_RI 124
- #define KVM_CAP_ARM_PMU_V3 125
- #define KVM_CAP_VCPU_ATTRIBUTES 126
-+#define KVM_CAP_MSI_DEVID 127
++bool vgic_has_its(struct kvm *kvm);
++
+ #endif /* __ASM_ARM_KVM_VGIC_VGIC_H */
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index 65395af..1de2478 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -612,3 +612,13 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, u32 intid)
  
- #ifdef KVM_CAP_IRQ_ROUTING
+ 	return map_is_active;
+ }
++
++bool vgic_has_its(struct kvm *kvm)
++{
++	struct vgic_dist *dist = &kvm->arch.vgic;
++
++	if (dist->vgic_model != KVM_DEV_TYPE_ARM_VGIC_V3)
++		return false;
++
++	return !IS_VGIC_ADDR_UNDEF(dist->vgic_its_base);
++}
+diff --git a/virt/kvm/arm/vgic/vgic_init.c b/virt/kvm/arm/vgic/vgic_init.c
+index ac655b5..2301e03 100644
+--- a/virt/kvm/arm/vgic/vgic_init.c
++++ b/virt/kvm/arm/vgic/vgic_init.c
+@@ -132,6 +132,7 @@ int kvm_vgic_create(struct kvm *kvm, u32 type)
+ 	kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
+ 	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
+ 	kvm->arch.vgic.vgic_redist_base = VGIC_ADDR_UNDEF;
++	kvm->arch.vgic.vgic_its_base = VGIC_ADDR_UNDEF;
  
-@@ -1010,12 +1011,14 @@ struct kvm_one_reg {
- 	__u64 addr;
- };
- 
-+#define KVM_MSI_VALID_DEVID	(1U << 0)
- struct kvm_msi {
- 	__u32 address_lo;
- 	__u32 address_hi;
- 	__u32 data;
- 	__u32 flags;
--	__u8  pad[16];
-+	__u32 devid;
-+	__u8  pad[12];
- };
- 
- struct kvm_arm_device_addr {
+ out_unlock:
+ 	for (; vcpu_lock_idx >= 0; vcpu_lock_idx--) {
+diff --git a/virt/kvm/arm/vgic/vgic_kvm_device.c b/virt/kvm/arm/vgic/vgic_kvm_device.c
+index 7f78a16..3ec2ac3 100644
+--- a/virt/kvm/arm/vgic/vgic_kvm_device.c
++++ b/virt/kvm/arm/vgic/vgic_kvm_device.c
+@@ -109,6 +109,12 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
+ 		block_size = KVM_VGIC_V3_REDIST_SIZE;
+ 		alignment = SZ_64K;
+ 		break;
++	case KVM_VGIC_V3_ADDR_TYPE_ITS:
++		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
++		addr_ptr = &vgic->vgic_its_base;
++		block_size = KVM_VGIC_V3_ITS_SIZE;
++		alignment = SZ_64K;
++		break;
+ #endif
+ 	default:
+ 		r = -ENODEV;
+@@ -495,6 +501,7 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
+ 		switch (attr->attr) {
+ 		case KVM_VGIC_V3_ADDR_TYPE_DIST:
+ 		case KVM_VGIC_V3_ADDR_TYPE_REDIST:
++		case KVM_VGIC_V3_ADDR_TYPE_ITS:
+ 			return 0;
+ 		}
+ 		break;
 -- 
 2.7.3
