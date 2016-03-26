@@ -1,89 +1,58 @@
 From: jlu@pengutronix.de (Jan Luebbe)
-Date: Sat, 26 Mar 2016 12:28:25 +0100
-Subject: [PATCH 1/2] ARM: multi_v5_defconfig: Enable support for MX21/MX27
-Message-ID: <1458991706-30109-1-git-send-email-jlu@pengutronix.de>
+Date: Sat, 26 Mar 2016 12:28:26 +0100
+Subject: [PATCH 2/2] ARM: multi_v5_defconfig: Enable recommended options for
+ systemd
+In-Reply-To: <1458991706-30109-1-git-send-email-jlu@pengutronix.de>
+References: <1458991706-30109-1-git-send-email-jlu@pengutronix.de>
+Message-ID: <1458991706-30109-2-git-send-email-jlu@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Although the SoC support was already enabled, the drivers and machines
-were missing.
+Enable FHANDLE, CGROUPS, BLK_DEV_BSG and DEVTMPFS as recommended by
+systemd (which also matches the multi_v7 defconfig). Also enable IPV6,
+which defaults to 'y' by now.
 
 Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
 ---
- arch/arm/configs/multi_v5_defconfig | 15 ++++++++++++++-
- 1 file changed, 14 insertions(+), 1 deletion(-)
+ arch/arm/configs/multi_v5_defconfig | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/configs/multi_v5_defconfig b/arch/arm/configs/multi_v5_defconfig
-index e11d99d..bb8d609 100644
+index bb8d609..a822dd3 100644
 --- a/arch/arm/configs/multi_v5_defconfig
 +++ b/arch/arm/configs/multi_v5_defconfig
-@@ -13,6 +13,11 @@ CONFIG_MODULE_UNLOAD=y
+@@ -1,14 +1,15 @@
+ CONFIG_SYSVIPC=y
++CONFIG_FHANDLE=y
+ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_LOG_BUF_SHIFT=19
++CONFIG_CGROUPS=y
+ CONFIG_BLK_DEV_INITRD=y
+ CONFIG_PROFILING=y
+ CONFIG_OPROFILE=y
+ CONFIG_KPROBES=y
+ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+-# CONFIG_BLK_DEV_BSG is not set
+ # CONFIG_ARCH_MULTI_V7 is not set
  CONFIG_ARCH_MVEBU=y
  CONFIG_MACH_KIRKWOOD=y
- CONFIG_ARCH_MXC=y
-+CONFIG_MACH_MX21ADS=y
-+CONFIG_MACH_MX27ADS=y
-+CONFIG_MACH_MX27_3DS=y
-+CONFIG_MACH_IMX27_VISSTRIM_M10=y
-+CONFIG_MACH_PCA100=y
- CONFIG_MACH_IMX27_DT=y
- CONFIG_SOC_IMX25=y
- CONFIG_ARCH_ORION5X=y
-@@ -67,6 +72,7 @@ CONFIG_NET_PKTGEN=m
+@@ -65,13 +66,14 @@ CONFIG_IP_MULTICAST=y
+ CONFIG_IP_PNP=y
+ CONFIG_IP_PNP_DHCP=y
+ CONFIG_IP_PNP_BOOTP=y
+-# CONFIG_IPV6 is not set
+ CONFIG_NET_DSA=y
+ CONFIG_NET_SWITCHDEV=y
+ CONFIG_NET_PKTGEN=m
  CONFIG_CFG80211=y
  CONFIG_MAC80211=y
  CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_IMX_WEIM=y
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
+ CONFIG_IMX_WEIM=y
  CONFIG_MTD=y
  CONFIG_MTD_CMDLINE_PARTS=y
- CONFIG_MTD_BLOCK=y
-@@ -110,13 +116,17 @@ CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
- CONFIG_SERIAL_8250_RUNTIME_UARTS=2
- CONFIG_SERIAL_OF_PLATFORM=y
-+CONFIG_SERIAL_IMX=y
-+CONFIG_SERIAL_IMX_CONSOLE=y
- # CONFIG_HW_RANDOM is not set
- CONFIG_I2C=y
- # CONFIG_I2C_COMPAT is not set
- CONFIG_I2C_CHARDEV=y
-+CONFIG_I2C_IMX=y
- CONFIG_I2C_MV64XXX=y
- CONFIG_I2C_NOMADIK=y
- CONFIG_SPI=y
-+CONFIG_SPI_IMX=y
- CONFIG_SPI_ORION=y
- CONFIG_GPIO_SYSFS=y
- CONFIG_POWER_RESET=y
-@@ -131,10 +141,12 @@ CONFIG_THERMAL=y
- CONFIG_KIRKWOOD_THERMAL=y
- CONFIG_WATCHDOG=y
- CONFIG_ORION_WATCHDOG=y
-+CONFIG_IMX2_WDT=y
- # CONFIG_ABX500_CORE is not set
- CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_FB=y
-+CONFIG_FB_IMX=y
- CONFIG_SOUND=y
- CONFIG_SND=y
- CONFIG_SND_SOC=y
-@@ -158,7 +170,6 @@ CONFIG_HID_ZEROPLUS=y
- CONFIG_USB=y
- CONFIG_USB_XHCI_HCD=y
- CONFIG_USB_EHCI_HCD=y
--CONFIG_USB_EHCI_ROOT_HUB_TT=y
- CONFIG_USB_PRINTER=m
- CONFIG_USB_STORAGE=y
- CONFIG_USB_STORAGE_DATAFAB=y
-@@ -166,6 +177,8 @@ CONFIG_USB_STORAGE_FREECOM=y
- CONFIG_USB_STORAGE_SDDR09=y
- CONFIG_USB_STORAGE_SDDR55=y
- CONFIG_USB_STORAGE_JUMPSHOT=y
-+CONFIG_USB_CHIPIDEA=y
-+CONFIG_USB_CHIPIDEA_HOST=y
- CONFIG_MMC=y
- CONFIG_SDIO_UART=y
- CONFIG_MMC_MVSDIO=y
 -- 
 2.1.4
