@@ -1,101 +1,162 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Sat, 26 Mar 2016 02:14:02 +0000
-Subject: [PATCH v4 04/12] KVM: arm64: handle ITS related GICv3 redistributor
- registers
+Date: Sat, 26 Mar 2016 02:14:05 +0000
+Subject: [PATCH v4 07/12] KVM: arm64: add data structures to model ITS
+ interrupt translation
 In-Reply-To: <1458958450-19662-1-git-send-email-andre.przywara@arm.com>
 References: <1458958450-19662-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1458958450-19662-5-git-send-email-andre.przywara@arm.com>
+Message-ID: <1458958450-19662-8-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the GICv3 redistributor there are the PENDBASER and PROPBASER
-registers which we did not emulate so far, as they only make sense
-when having an ITS. In preparation for that emulate those MMIO
-accesses by storing the 64-bit data written into it into a variable
-which we later read in the ITS emulation.
+The GICv3 Interrupt Translation Service (ITS) uses tables in memory
+to allow a sophisticated interrupt routing. It features device tables,
+an interrupt table per device and a table connecting "collections" to
+actual CPUs (aka. redistributors in the GICv3 lingo).
+Since the interrupt numbers for the LPIs are allocated quite sparsely
+and the range can be quite huge (8192 LPIs being the minimum), using
+bitmaps or arrays for storing information is a waste of memory.
+We use linked lists instead, which we iterate linearily. This works
+very well with the actual number of LPIs/MSIs in the guest being
+quite low. Should the number of LPIs exceed the number where iterating
+through lists seems acceptable, we can later revisit this and use more
+efficient data structures.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- include/kvm/vgic/vgic.h       |  8 ++++++++
- virt/kvm/arm/vgic/vgic_mmio.c | 26 ++++++++++++++++++++++----
- 2 files changed, 30 insertions(+), 4 deletions(-)
+ include/kvm/vgic/vgic.h      |  3 ++
+ virt/kvm/arm/vgic/its-emul.c | 66 ++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 69 insertions(+)
 
 diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-index 11344e6..8ea5dd7 100644
+index bafea11..ecf3260 100644
 --- a/include/kvm/vgic/vgic.h
 +++ b/include/kvm/vgic/vgic.h
-@@ -145,6 +145,14 @@ struct vgic_dist {
+@@ -22,6 +22,7 @@
+ #include <linux/spinlock.h>
+ #include <linux/types.h>
+ #include <kvm/iodev.h>
++#include <linux/list.h>
  
- 	struct vgic_io_device	*dist_iodevs;
- 	struct vgic_io_device	*redist_iodevs;
-+
-+	/* Address of LPI configuration table shared by all redistributors */
-+	u64			propbaser;
-+
-+	/* Addresses of LPI pending tables per redistributor */
-+	u64			*pendbaser;
-+
-+	bool			lpis_enabled;
+ #define VGIC_V3_MAX_CPUS	255
+ #define VGIC_V2_MAX_CPUS	8
+@@ -118,6 +119,8 @@ struct vgic_its {
+ 	u64			cbaser;
+ 	int			creadr;
+ 	int			cwriter;
++	struct list_head	device_list;
++	struct list_head	collection_list;
  };
  
- struct vgic_v2_cpu_if {
-diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
-index 7d5d630..252b9aff 100644
---- a/virt/kvm/arm/vgic/vgic_mmio.c
-+++ b/virt/kvm/arm/vgic/vgic_mmio.c
-@@ -771,7 +771,9 @@ static int vgic_mmio_read_v3r_propbase(struct kvm_vcpu *vcpu,
- 				       struct kvm_io_device *this,
- 				       gpa_t addr, int len, void *val)
- {
--	/* TODO: implement */
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+ struct vgic_dist {
+diff --git a/virt/kvm/arm/vgic/its-emul.c b/virt/kvm/arm/vgic/its-emul.c
+index de8d360..c0334ff 100644
+--- a/virt/kvm/arm/vgic/its-emul.c
++++ b/virt/kvm/arm/vgic/its-emul.c
+@@ -21,6 +21,7 @@
+ #include <linux/kvm.h>
+ #include <linux/kvm_host.h>
+ #include <linux/interrupt.h>
++#include <linux/list.h>
+ 
+ #include <linux/irqchip/arm-gic-v3.h>
+ 
+@@ -31,6 +32,34 @@
+ #include "vgic.h"
+ #include "vgic_mmio.h"
+ 
++struct its_device {
++	struct list_head dev_list;
 +
-+	write_mask64(dist->propbaser, addr & 7, len, val);
++	/* the head for the list of ITTEs */
++	struct list_head itt;
++	u32 device_id;
++};
++
++#define COLLECTION_NOT_MAPPED ((u32)-1)
++
++struct its_collection {
++	struct list_head coll_list;
++
++	u32 collection_id;
++	u32 target_addr;
++};
++
++#define its_is_collection_mapped(coll) ((coll) && \
++				((coll)->target_addr != COLLECTION_NOT_MAPPED))
++
++struct its_itte {
++	struct list_head itte_list;
++
++	struct its_collection *collection;
++	u32 lpi;
++	u32 event_id;
++};
++
+ #define BASER_BASE_ADDRESS(x) ((x) & 0xfffffffff000ULL)
+ 
+ static int vgic_mmio_read_its_ctlr(struct kvm_vcpu *vcpu,
+@@ -137,6 +166,12 @@ static int vgic_mmio_read_its_idregs(struct kvm_vcpu *vcpu,
  	return 0;
  }
  
-@@ -779,7 +781,11 @@ static int vgic_mmio_write_v3r_propbase(struct kvm_vcpu *vcpu,
- 				        struct kvm_io_device *this,
- 				        gpa_t addr, int len, const void *val)
- {
--	/* TODO: implement */
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
++static void its_free_itte(struct its_itte *itte)
++{
++	list_del(&itte->itte_list);
++	kfree(itte);
++}
 +
-+	/* Storing a value with LPIs already enabled is undefined */
-+	if (!dist->lpis_enabled)
-+		dist->propbaser = mask64(dist->propbaser, addr & 7, len, val);
- 	return 0;
- }
+ /*
+  * This function is called with both the ITS and the distributor lock dropped,
+  * so the actual command handlers must take the respective locks when needed.
+@@ -309,6 +344,9 @@ int vits_init(struct kvm *kvm)
  
-@@ -787,7 +793,12 @@ static int vgic_mmio_read_v3r_pendbase(struct kvm_vcpu *vcpu,
- 				       struct kvm_io_device *this,
- 				       gpa_t addr, int len, void *val)
- {
--	/* TODO: implement */
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+	struct vgic_io_device *iodev = container_of(this,
-+						    struct vgic_io_device, dev);
-+	u64 pendbaser = dist->pendbaser[iodev->redist_vcpu->vcpu_id];
+ 	spin_lock_init(&its->lock);
+ 
++	INIT_LIST_HEAD(&its->device_list);
++	INIT_LIST_HEAD(&its->collection_list);
 +
-+	write_mask64(pendbaser, addr & 7, len, val);
- 	return 0;
- }
+ 	regions = kmalloc_array(ARRAY_SIZE(its_registers),
+ 				sizeof(struct vgic_io_device), GFP_KERNEL);
  
-@@ -795,7 +806,14 @@ static int vgic_mmio_write_v3r_pendbase(struct kvm_vcpu *vcpu,
- 				        struct kvm_io_device *this,
- 				        gpa_t addr, int len, const void *val)
+@@ -332,11 +370,39 @@ void vits_destroy(struct kvm *kvm)
  {
--	/* TODO: implement */
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+	struct vgic_io_device *iodev = container_of(this,
-+						    struct vgic_io_device, dev);
-+	u64 *pendbaser = &dist->pendbaser[iodev->redist_vcpu->vcpu_id];
-+
-+	/* Storing a value with LPIs already enabled is undefined */
-+	if (!dist->lpis_enabled)
-+		*pendbaser = mask64(*pendbaser, addr & 7, len, val);
- 	return 0;
- }
+ 	struct vgic_dist *dist = &kvm->arch.vgic;
+ 	struct vgic_its *its = &dist->its;
++	struct its_device *dev;
++	struct its_itte *itte;
++	struct list_head *dev_cur, *dev_temp;
++	struct list_head *cur, *temp;
  
+ 	if (!vgic_has_its(kvm))
+ 		return;
+ 
++	/*
++	 * We may end up here without the lists ever having been initialized.
++	 * Check this and bail out early to avoid dereferencing a NULL pointer.
++	 */
++	if (!its->device_list.next)
++		return;
++
++	spin_lock(&its->lock);
++	list_for_each_safe(dev_cur, dev_temp, &its->device_list) {
++		dev = container_of(dev_cur, struct its_device, dev_list);
++		list_for_each_safe(cur, temp, &dev->itt) {
++			itte = (container_of(cur, struct its_itte, itte_list));
++			its_free_itte(itte);
++		}
++		list_del(dev_cur);
++		kfree(dev);
++	}
++
++	list_for_each_safe(cur, temp, &its->collection_list) {
++		list_del(cur);
++		kfree(container_of(cur, struct its_collection, coll_list));
++	}
++
+ 	kfree(dist->pendbaser);
+ 
+ 	its->enabled = false;
++	spin_unlock(&its->lock);
+ }
 -- 
 2.7.3
