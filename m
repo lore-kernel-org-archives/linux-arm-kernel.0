@@ -1,57 +1,81 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 26 Mar 2016 17:10:35 +0300
-Subject: [PATCH] phy: da8xx-usb: new driver for DA8xx SoC USB PHY
-In-Reply-To: <1458871024-21478-1-git-send-email-david@lechnology.com>
-References: <1458863503-31121-10-git-send-email-david@lechnology.com>
- <1458871024-21478-1-git-send-email-david@lechnology.com>
-Message-ID: <56F6985B.2020902@cogentembedded.com>
+From: ruslan.bilovol@gmail.com (Ruslan Bilovol)
+Date: Sat, 26 Mar 2016 23:32:46 +0200
+Subject: usb: gadget breakage on N900: bind UDC by name passed via
+ usb_gadget_driver structure
+In-Reply-To: <20160325210944.GA26394@amd>
+References: <20160317212603.GA16651@amd>
+ <CAB=otbSfj24nSUe1DyfVBDKD=trCp2-X-S-AcA1D+PTHZuP1Bg@mail.gmail.com>
+ <20160318202041.GA20196@amd> <56EFE057.7070106@samsung.com>
+ <20160323122143.GB32031@amd>
+ <CAB=otbT2VsZ8Rhc-jbKwtRAssn01ecVFyTyAp+5hS=d40AsGKA@mail.gmail.com>
+ <CAB=otbQdpEtsXg2etX+3YYjrTfPYGtdKJo_V_rtfNb+VNV7g-w@mail.gmail.com>
+ <20160325210944.GA26394@amd>
+Message-ID: <CAB=otbQ1J7FZm9vWLwor93+uD3Fv38ykduWMXG3qByNh4mV9=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi
 
-On 3/25/2016 4:57 AM, David Lechner wrote:
-
-> This is a new phy driver for the SoC USB controllers on the TI DA8xx
-> family of microcontrollers. The USB 1.1 PHY is just a simple on/off.
-> The USB 2.0 PHY also allows overriding the VBUS and ID pins.
+On Fri, Mar 25, 2016 at 11:09 PM, Pavel Machek <pavel@ucw.cz> wrote:
+> Hi!
 >
-> Signed-off-by: David Lechner <david@lechnology.com>
-[...]
+>> OK, so at last I finished charging of my N900; found 1.8V USB
+>> to UART adapter and soldered it to the phone.
+>>
+>> I managed to boot N900 with working USB gadget (builtin g_ether)
+>> in boardfile mode, can ping it from PC and transfer data. I don't
+>> see any issue (except of musb name issue in twl phy driver, I've
+>> already sent a fix for that: https://lkml.org/lkml/2016/3/24/670 )
+>>
+>> Pavel, I still don't see how you've got your issue, please share
+>> more detials
+>
+> Ok, let me try. I undid all the changes in drivers/phy drivers/usb and
+> include/linux/usb . I have all the gadget stuff built-in, so that I
+> could use nfsroot, but this is boot from mmcblk.
 
-    Just some nit-picking.
+So do you mean you use original rootfs that was shipeed with N900?
 
-> diff --git a/drivers/phy/phy-da8xx-usb.c b/drivers/phy/phy-da8xx-usb.c
-> new file mode 100644
-> index 0000000..ecfd607
-> --- /dev/null
-> +++ b/drivers/phy/phy-da8xx-usb.c
-> @@ -0,0 +1,249 @@
-[...]
-> +static int da8xx_usbphy_probe(struct platform_device *pdev)
-[...]
-> +	if (node) {
-> +		d_phy->phy_provider = devm_of_phy_provider_register(dev,
-> +							da8xx_usbphy_of_xlate);
-> +		if (IS_ERR(d_phy->phy_provider)) {
-> +			dev_err(dev, "Failed to create phy provider.\n");
-> +			return PTR_ERR(d_phy->phy_provider);
-> +		}
-> +	} else {
-> +		int ret;
-> +
-> +		ret = phy_create_lookup(d_phy->usb11_phy, "usbphy", "ohci.0");
-> +		if (ret)
-> +			dev_warn(dev, "Failed to create usb11 phy lookup .\n");
+>
+> gzipped config is attached.
 
-    Space before period? I'd omit the periods altogether...
+Thanks, I'll try that
 
-> +		ret = phy_create_lookup(d_phy->usb20_phy, "usbphy", "musb-da8xx");
-> +		if (ret)
-> +			dev_warn(dev, "Failed to create usb20 phy lookup .\n");
+>
+> PC is unable to work with the gadget:
+>
+> [256526.716099] usb 2-1: new full-speed USB device number 52 using
+> uhci_hcd
+> [256526.832091] usb 2-1: device descriptor read/64, error -32
+> [256527.052095] usb 2-1: device descriptor read/64, error -32
+> [256527.268160] usb 2-1: new full-speed USB device number 53 using
+> uhci_hcd
+> [256527.388121] usb 2-1: device descriptor read/64, error -32
+> [256527.608116] usb 2-1: device descriptor read/64, error -32
+> [256527.824170] usb 2-1: new full-speed USB device number 54 using
+> uhci_hcd
+> [256527.851175] usb 2-1: device descriptor read/8, error -32
+> [256527.975175] usb 2-1: device descriptor read/8, error -32
+> [256528.188133] usb 2-1: new full-speed USB device number 55 using
+> uhci_hcd
+> [256528.218184] usb 2-1: device descriptor read/8, error -32
+> [256528.343183] usb 2-1: device descriptor read/8, error -32
+> [256528.444314] usb usb2-port1: unable to enumerate USB device
+>
+> Dmesg from the n900 is attached as /tmp/delme.gz. I did _not_ apply
+> the patch from https://lkml.org/lkml/2016/3/24/670 , yet, as I'm using
+> devicetree boot.
 
-     Likewise.
+Hmm.. don't see anything strange in the boot log related to USB,
+I'll try your config
 
-[...]
+Best regards
+Ruslan
 
-MBR, Sergei
+>
+> Best regards,
+>
+>                                                                         Pavel
+> --
+> (english) http://www.livejournal.com/~pavelmachek
+> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
