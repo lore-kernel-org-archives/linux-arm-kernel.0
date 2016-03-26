@@ -1,189 +1,111 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Sat, 26 Mar 2016 02:14:10 +0000
-Subject: [PATCH v4 12/12] KVM: arm64: enable ITS emulation as a virtual MSI
- controller
+Date: Sat, 26 Mar 2016 02:14:06 +0000
+Subject: [PATCH v4 08/12] KVM: arm64: connect LPIs to the VGIC emulation
 In-Reply-To: <1458958450-19662-1-git-send-email-andre.przywara@arm.com>
 References: <1458958450-19662-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1458958450-19662-13-git-send-email-andre.przywara@arm.com>
+Message-ID: <1458958450-19662-9-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If userspace has provided a base address for the ITS register frame,
-we enable the bits that advertise LPIs in the GICv3.
-When the guest has enabled LPIs and the ITS, we enable the emulation
-part by initializing the ITS data structures and trapping on ITS
-register frame accesses by the guest.
-Also we enable the KVM_SIGNAL_MSI feature to allow userland to inject
-MSIs into the guest. Not having enabled the ITS emulation will lead
-to a -ENODEV when trying to inject a MSI.
+LPIs are dynamically created (mapped) at guest runtime and their
+actual numbers can be quite high, but is mostly assigned using a very
+sparse allocation scheme. So arrays are not an ideal data structure
+to hold the information. We use our equivalent of the "Interrupt
+Translation Table Entry" (ITTE) to hold the vgic_irq struct for a
+virtual LPI embedded in in the ITTE.
+Connect the VGIC core code via an accessor function to help it get the
+struct vgic_irq for a certain LPI.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- Documentation/virtual/kvm/api.txt |  2 +-
- arch/arm64/kvm/Kconfig            |  1 +
- arch/arm64/kvm/reset.c            | 10 ++++++++++
- include/kvm/vgic/vgic.h           |  6 ++++++
- virt/kvm/arm/vgic.c               |  5 +++++
- virt/kvm/arm/vgic/its-emul.c      |  3 ++-
- virt/kvm/arm/vgic/vgic.c          |  8 ++++++++
- virt/kvm/arm/vgic/vgic_mmio.c     | 12 ++++++++++--
- 8 files changed, 43 insertions(+), 4 deletions(-)
+ virt/kvm/arm/vgic/its-emul.c | 29 +++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic.h     |  8 +++++++-
+ 2 files changed, 36 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index 8f7351d..536f19b 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -2150,7 +2150,7 @@ after pausing the vcpu, but before it is resumed.
- 4.71 KVM_SIGNAL_MSI
+diff --git a/virt/kvm/arm/vgic/its-emul.c b/virt/kvm/arm/vgic/its-emul.c
+index c0334ff..1188e9a 100644
+--- a/virt/kvm/arm/vgic/its-emul.c
++++ b/virt/kvm/arm/vgic/its-emul.c
+@@ -55,11 +55,29 @@ struct its_collection {
+ struct its_itte {
+ 	struct list_head itte_list;
  
- Capability: KVM_CAP_SIGNAL_MSI
--Architectures: x86
-+Architectures: x86 arm64
- Type: vm ioctl
- Parameters: struct kvm_msi (in)
- Returns: >0 on delivery, 0 if guest blocked the MSI, and -1 on error
-diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-index 3f0e1ce..71c9ebc 100644
---- a/arch/arm64/kvm/Kconfig
-+++ b/arch/arm64/kvm/Kconfig
-@@ -37,6 +37,7 @@ config KVM
- 	select HAVE_KVM_IRQFD
- 	select KVM_ARM_VGIC_V3
- 	select KVM_ARM_PMU if HW_PERF_EVENTS
-+	select HAVE_KVM_MSI
- 	---help---
- 	  Support hosting virtualized guest machines.
- 	  We don't support KVM with 16K page tables yet, due to the multiple
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index 2ba7c8d..43c3836 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -84,6 +84,16 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
- 	case KVM_CAP_VCPU_ATTRIBUTES:
- 		r = 1;
- 		break;
-+	case KVM_CAP_MSI_DEVID:
-+#ifdef CONFIG_KVM_NEW_VGIC
-+		if (!kvm)
-+			r = -EINVAL;
-+		else
-+			r = kvm->arch.vgic.msis_require_devid;
-+#else
-+		r = -EINVAL;
-+#endif
-+		break;
- 	default:
- 		r = 0;
- 	}
-diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-index ea98133..c50890f 100644
---- a/include/kvm/vgic/vgic.h
-+++ b/include/kvm/vgic/vgic.h
-@@ -115,6 +115,7 @@ struct vgic_io_device {
++	struct vgic_irq irq;
+ 	struct its_collection *collection;
+ 	u32 lpi;
+ 	u32 event_id;
+ };
  
- struct vgic_its {
- 	bool			enabled;
-+	struct vgic_io_device	iodev;
- 	spinlock_t		lock;
- 	u64			cbaser;
- 	int			creadr;
-@@ -133,6 +134,9 @@ struct vgic_dist {
- 	/* vGIC model the kernel emulates for the guest (GICv2 or GICv3) */
- 	u32			vgic_model;
- 
-+	/* Do injected MSIs require an additional device ID? */
-+	bool			msis_require_devid;
++/* To be used as an iterator this macro misses the enclosing parentheses */
++#define for_each_lpi(dev, itte, kvm) \
++	list_for_each_entry(dev, &(kvm)->arch.vgic.its.device_list, dev_list) \
++		list_for_each_entry(itte, &(dev)->itt, itte_list)
 +
- 	int			nr_spis;
- 
- 	/* TODO: Consider moving to global state */
-@@ -280,4 +284,6 @@ static inline int kvm_vgic_get_max_vcpus(void)
- 
- bool vgic_has_its(struct kvm *kvm);
- 
-+int kvm_send_userspace_msi(struct kvm *kvm, struct kvm_msi *msi);
++static struct its_itte *find_itte_by_lpi(struct kvm *kvm, int lpi)
++{
++	struct its_device *device;
++	struct its_itte *itte;
 +
- #endif /* __ASM_ARM_KVM_VGIC_VGIC_H */
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 079b0a7..3f01f7b 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -2470,3 +2470,8 @@ int kvm_set_msi(struct kvm_kernel_irq_routing_entry *e,
++	for_each_lpi(device, itte, kvm) {
++		if (itte->lpi == lpi)
++			return itte;
++	}
++	return NULL;
++}
++
+ #define BASER_BASE_ADDRESS(x) ((x) & 0xfffffffff000ULL)
+ 
+ static int vgic_mmio_read_its_ctlr(struct kvm_vcpu *vcpu,
+@@ -166,6 +184,17 @@ static int vgic_mmio_read_its_idregs(struct kvm_vcpu *vcpu,
+ 	return 0;
+ }
+ 
++struct vgic_irq *vgic_its_get_lpi(struct kvm *kvm, u32 intid)
++{
++	struct its_itte *itte;
++
++	itte = find_itte_by_lpi(kvm, intid);
++	if (!itte)
++		return NULL;
++
++	return &itte->irq;
++}
++
+ static void its_free_itte(struct its_itte *itte)
+ {
+ 	list_del(&itte->itte_list);
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index 08f97d1..160c511 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -63,6 +63,7 @@ int vgic_register_redist_regions(struct kvm *kvm, gpa_t dist_base_address);
+ 
+ int vits_init(struct kvm *kvm);
+ void vgic_enable_lpis(struct kvm_vcpu *vcpu);
++struct vgic_irq *vgic_its_get_lpi(struct kvm *kvm, u32 intid);
+ void vits_destroy(struct kvm *kvm);
+ #else
+ static inline void vgic_v3_irq_change_affinity(struct kvm *kvm, u32 intid,
+@@ -129,7 +130,7 @@ static inline int vgic_register_redist_regions(struct kvm *kvm,
+ 	return -ENODEV;
+ }
+ 
+-int vits_init(struct kvm *kvm)
++static inline int vits_init(struct kvm *kvm)
  {
  	return 0;
  }
-+
-+int kvm_send_userspace_msi(struct kvm *kvm, struct kvm_msi *msi)
-+{
-+	return -ENODEV;
-+}
-diff --git a/virt/kvm/arm/vgic/its-emul.c b/virt/kvm/arm/vgic/its-emul.c
-index 166551d..f9d289a 100644
---- a/virt/kvm/arm/vgic/its-emul.c
-+++ b/virt/kvm/arm/vgic/its-emul.c
-@@ -1098,8 +1098,9 @@ int vits_init(struct kvm *kvm)
- 		return ret;
- 
- 	its->enabled = false;
-+	dist->msis_require_devid = true;
- 
--	return -ENXIO;
-+	return 0;
+@@ -139,6 +140,11 @@ static inline void vgic_enable_lpis(struct kvm_vcpu *vcpu)
+ 	return;
  }
  
- void vits_destroy(struct kvm *kvm)
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index 1de2478..82bfb33 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -622,3 +622,11 @@ bool vgic_has_its(struct kvm *kvm)
- 
- 	return !IS_VGIC_ADDR_UNDEF(dist->vgic_its_base);
- }
-+
-+int kvm_send_userspace_msi(struct kvm *kvm, struct kvm_msi *msi)
++static inline struct vgic_irq *vgic_its_get_lpi(struct kvm *kvm, u32 intid)
 +{
-+	if (vgic_has_its(kvm))
-+		return vits_inject_msi(kvm, msi);
-+	else
-+		return -ENODEV;
++	return NULL;
 +}
-diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
-index 086555e..065934f 100644
---- a/virt/kvm/arm/vgic/vgic_mmio.c
-+++ b/virt/kvm/arm/vgic/vgic_mmio.c
-@@ -619,7 +619,12 @@ static int vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
- 	case GICD_TYPER:
- 		value = vcpu->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
- 		value = (value >> 5) - 1;
--		value |= (INTERRUPT_ID_BITS_SPIS - 1) << 19;
-+		if (vgic_has_its(vcpu->kvm)) {
-+			value |= (INTERRUPT_ID_BITS_ITS - 1) << 19;
-+			value |= GICD_TYPER_LPIS;
-+		} else {
-+			value |= (INTERRUPT_ID_BITS_SPIS - 1) << 19;
-+		}
- 		break;
- 	case GICD_IIDR:
- 		value = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
-@@ -742,7 +747,8 @@ static int vgic_mmio_write_v3r_misc(struct kvm_vcpu *vcpu,
- 
- 	if (vgic_has_its(vcpu->kvm) && !dist->lpis_enabled &&
- 	    (reg & GICR_CTLR_ENABLE_LPIS)) {
--		/* Eventually do something */
-+		vgic_enable_lpis(vcpu);
-+		dist->lpis_enabled = true;
- 	}
- 
- 	return 0;
-@@ -772,6 +778,8 @@ static int vgic_mmio_read_v3r_typer(struct kvm_vcpu *vcpu,
- 	value |= ((target_vcpu_id & 0xffff) << 8);
- 	if (target_vcpu_id == atomic_read(&vcpu->kvm->online_vcpus) - 1)
- 		value |= GICR_TYPER_LAST;
-+	if (vgic_has_its(vcpu->kvm))
-+		value |= GICR_TYPER_PLPIS;
- 
- 	write_mask64(value, addr & 7, len, val);
- 	return 0;
++
+ static inline void vits_destroy(struct kvm *kvm)
+ {
+ 	return;
 -- 
 2.7.3
