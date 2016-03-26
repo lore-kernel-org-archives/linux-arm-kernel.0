@@ -1,130 +1,147 @@
-From: ipaton0@gmail.com (Iain Paton)
-Date: Sat, 26 Mar 2016 00:58:33 +0000
-Subject: [linux-sunxi] [PATCH 1/3] sunxi: A20-OLinuXino-LIME2: Fix
- ldo3/ldo4 in DTS
-In-Reply-To: <1458932647-24268-1-git-send-email-haas@computerlinguist.org>
-References: <1458932647-24268-1-git-send-email-haas@computerlinguist.org>
-Message-ID: <56F5DEB9.7070207@gmail.com>
+From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
+Date: Sat, 26 Mar 2016 02:11:26 +0000
+Subject: [RFC PATCH 00/45] KVM: arm/arm64: Rework virtual GIC emulation
+In-Reply-To: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
+References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <56F5EFCE.1040307@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/03/16 19:04, Michael Haas wrote:
+On 25/03/16 02:04, Andre Przywara wrote:
+> This series is a joint effort to re-implement KVM's GIC emulation.
 
-> This patch implements the suggested changes. It is not enough
-> to set the voltage to 2800000 to avoid the crash. Hence, I have
-> also removed regulator-always-on.
+Forgot to mention:
+This series is based on an older version of kvmarm.git/next, which is
+roughly the pull request that got merged into 4.6-rc0. It applies to the
+current master, so I suggest people use 4.6-rc1 as a base once this is
+released.
 
-NAK.
+A git tree containing this series and the prerequisites can be found on
+linux-arm.org:
 
-If setting both min and max to 2800000 isn't working then I'd suggest you're 
-just papering over the issue and not actually solving it.
+git://linux-arm.org/linux-ap.git
+http://www.linux-arm.org/git?p=linux-ap.git;a=log;h=refs/heads/vgic-new/rfc
 
-It should be fairly clear that whenever those regulators are turned on by 
-some driver you're going to see the same issue, you've just delayed the 
-problem by removing the regulator-always-on item.
+Cheers,
+Andre.
 
-The real problem here is people monkeying with the regulators without 
-understanding what they're doing, bothering to test the results, or caring 
-about the consequences.
-
-Anyway, Hans was correct in that the datasheet we have access to says that 
-the defaults for these regulators are undefined. 
-I suspect that's not the whole story though, if these regulators had random 
-values at powerup we'd have seen problems before now. 
-Most likely the values we think we know are simply incorrect plus there's 
-probably some element of sequencing involved - perhaps LDO4 needs turned on 
-first. 
-However I don't see sufficient detail in the datasheets to confirm any of 
-that, so we shouldn't assume anything.
-Electrically on the lime2 LDO3 goes to VCC-PE and LDO4 to VCC-PG. Neither 
-groups E or G appear to be connected to anything other than gpio headers, 
-so this has little to do with board design, it's something internal to 
-the SoC that the datasheet is lacking on detail about.
-
-One of the reasons for the regulator-always-on being in the dts was so that 
-the regulator didn't get touched and so didn't break anything.
-
-All said and done, it only takes a minute with a multimeter to determine 
-actual defaults. Helpful to have multiple boards to gain some confidence 
-that they behave the same, but still basing values like this on tiny 
-sample sizes is probably unwise.
-
-Looking at other A20 based boards, Cubieboards for example, shows LDO3/4 
-being unused and the VCC-PE/PG pins they power on the lime2 being tied 
-directly to 3.3v. No issues there simply because there's no way to mess 
-with the power to those blocks.
-
-The patch you really want is something like the one below which works 
-on my boards regardless of the presence of regulator-always-on.
-Verified on four boards with u-boot 2016.03 and kernel 4.5.0.
-
-Whether you decide to remove regulator-always-on or not is a different 
-question, but please use 2.3v, or some other proven working value, for 
-ldo3. At least that way you have a fighting chance of the board 
-remaining functional when something wants to turn the regulator on.
-
-It's a good bet that the same u-boot change will have implications 
-for other boards, if not now then at some future point.
-
-Hans, take note, the schematic is wrong. You shouldn't assume either 
-the schematic or you are correct. Ill considered changes to regulators 
-can cause real damage to peoples boards.
-I know we've discussed regulators before and that my opinion falls on 
-deaf ears, but worth one last try..
-
-
-
-Author: Iain Paton <ipaton0@gmail.com>
-Date:   Fri Mar 25 22:07:55 2016 +0000
-
-sunxi: A20-OLinuXino-LIME2: Update ldo3/ldo4 in DTS
-
-A recent ill-considered u-boot change:
-
->commit 02cc27c74f9b884b538bcd1b93342a4c05b5d608
->Author: Hans de Goede <hdegoede@redhat.com>
->Date:   Sat Oct 3 15:29:24 2015 +0200
->
->    sunxi: power: Change axp209 LDO3 and LDO4 default to disabled
-
-causes the lime2 to lockup/crash when LDO3/4 are re-enabled by the
-kernel.
-
-The AXP209 datasheet shows the powerup values for these regulators 
-to be undefined and the 2.8v suggested by the lime2 schematic also 
-causes a lockup when the regulators are re-enabled so is obviously 
-also incorrect.
-
-Empirical measurement suggests LDO3 @ 2.3v and LDO4 @ 2.8v are the 
-actual defaults, but is based on a small sample size. 
-
-Verified to work with u-boot 2016.03, kernel 4.5.0 on four lime2 
-boards.
-
-Signed-off-by: Iain Paton <ipaton0@gmail.com>
----
-
-diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-index d5c796c..e665d22 100644
---- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-@@ -140,14 +140,14 @@
-                        };
- 
-                        vcc_csi0: ldo3 {
--                               regulator-min-microvolt = <700000>;
--                               regulator-max-microvolt = <3500000>;
-+                               regulator-min-microvolt = <2300000>;
-+                               regulator-max-microvolt = <2300000>;
-                                regulator-always-on;
-                        };
- 
-                        vcc_csi1: ldo4 {
--                               regulator-min-microvolt = <1250000>;
--                               regulator-max-microvolt = <3300000>;
-+                               regulator-min-microvolt = <2800000>;
-+                               regulator-max-microvolt = <2800000>;
-                                regulator-always-on;
-                        };
- 
--- 
+> 
+> While the current implementation is centered around providing
+> efficient MMIO emulation, the hot path for most guests is actually
+> the guest entry and exit, which currently is rather costly.
+> Also the existing emulation has a global distributor lock, which
+> quickly becomes a bottleneck once the number of VCPUs increases.
+> Additionally the emulation was originally designed for GICv2, adding
+> GICv3 ITS emulation support to this proved to be rather painful.
+> Last, but not least the existing code became less and less
+> maintainable, with many special cases handled explicitly.
+> 
+> The new implementation is build around a struct vgic_irq data data
+> structure, which holds all information about a virtual interrupt.
+> Interruts which should be injected are hold in a per-VCPU list, this
+> make the entry/exit path much more efficient. Also the new structure
+> allows to have more fine grained locking - per IRQ and per VCPU -
+> getting rid of the global distributor lock.
+> As a result of the new design ITS emulation fits in more nicely, the
+> respective code will be provided as a follow-up series.
+> 
+> This series implements the same feature set as the existing emulation,
+> as a goodie we now implement priorities correctly.
+> To allow an easy transition with good test coverage, but still maintain
+> stability, both implementations live side by side, selectable via a
+> Kconfig option. The default is the new implementation.
+> If this code proves to be reliable, we will later remove the current
+> implementation with an extra patch set.
+> 
+> Please have a look at the series, review it and give the code some
+> serious testing (and possibly debugging). All feedback is appreciated.
+> 
+> Cheers,
+> Andre.
+> 
+> Andre Przywara (26):
+>   KVM: arm/arm64: add missing MMIO data write-back
+>   KVM: arm/arm64: pmu: abstract access to number of SPIs
+>   KVM: arm/arm64: arch_timer: rework VGIC <-> timer interface
+>   KVM: arm/arm64: vgic-new: Add MMIO handling framework
+>   KVM: arm/arm64: vgic-new: Export register access interface
+>   KVM: arm/arm64: vgic-new: Add CTLR, TYPER and IIDR handlers
+>   KVM: arm/arm64: vgic-new: Add ENABLE registers handlers
+>   KVM: arm/arm64: vgic-new: Add PENDING registers handlers
+>   KVM: arm/arm64: vgic-new: Add PRIORITY registers handlers
+>   KVM: arm/arm64: vgic-new: Add ACTIVE registers handlers
+>   KVM: arm/arm64: vgic-new: Add CONFIG registers handlers
+>   KVM: arm/arm64: vgic-new: Add TARGET registers handlers
+>   KVM: arm/arm64: vgic-new: Add SGIR register handler
+>   KVM: arm/arm64: vgic-new: Add SGIPENDR register handlers
+>   KVM: arm/arm64: vgic-new: Add GICv3 emulation framework
+>   KVM: arm/arm64: vgic-new: Add GICv3 CTLR, IIDR, TYPER handlers
+>   KVM: arm/arm64: vgic-new: Add GICv3 redistributor TYPER handler
+>   KVM: arm/arm64: vgic-new: Add GICv3 IDREGS register handler
+>   KVM: arm/arm64: vgic-new: Add GICv3 IROUTER register handlers
+>   KVM: arm/arm64: vgic-new: Add GICv3 SGI system register trap handler
+>   KVM: arm/arm64: vgic-new: Add userland access to VGIC dist registers
+>   KVM: arm/arm64: vgic-new: Add GICH_VMCR accessors
+>   KVM: arm/arm64: vgic-new: Add userland GIC CPU interface access
+>   KVM: arm/arm64: vgic-new: implement mapped IRQ handling
+>   KVM: arm/arm64: vgic-new: Add dummy MSI implementation
+>   KVM: arm/arm64: vgic-new: enable build
+> 
+> Christoffer Dall (5):
+>   KVM: arm/arm64: vgic-new: Add data structure definitions
+>   KVM: arm/arm64: vgic-new: Add acccessor to new struct vgic_irq
+>     instance
+>   KVM: arm/arm64: vgic-new: Implement virtual IRQ injection
+>   KVM: arm/arm64: vgic-new: Add vgic GICv2 change_affinity
+>   KVM: arm/arm64: vgic-new: Add IRQ sorting
+> 
+> Eric Auger (12):
+>   KVM: arm/arm64: vgic-new: Implement kvm_vgic_vcpu_pending_irq
+>   KVM: arm/arm64: vgic-new: vgic_kvm_device: KVM device ops registration
+>   KVM: arm/arm64: vgic-new: vgic_kvm_device:
+>     KVM_DEV_ARM_VGIC_GRP_NR_IRQS
+>   KVM: arm/arm64: vgic-new: vgic_kvm_device: KVM_DEV_ARM_VGIC_GRP_CTRL
+>   KVM: arm/arm64: vgic-new: vgic_kvm_device: KVM_DEV_ARM_VGIC_GRP_ADDR
+>   KVM: arm/arm64: vgic-new: vgic_kvm_device: access to VGIC registers
+>   KVM: arm/arm64: vgic-new: vgic_kvm_device: implement kvm_vgic_addr
+>   KVM: arm/arm64: vgic-new: vgic_init: implement kvm_vgic_hyp_init
+>   KVM: arm/arm64: vgic-new: vgic_init: implement vgic_create
+>   KVM: arm/arm64: vgic-new: vgic_init: implement vgic_init
+>   KVM: arm/arm64: vgic-new: vgic_init: implement map_resources
+>   KVM: arm/arm64: vgic-new: Add vgic_v2/v3_enable
+> 
+> Marc Zyngier (2):
+>   KVM: arm/arm64: vgic-new: Add GICv2 IRQ sync/flush
+>   KVM: arm/arm64: vgic-new: Add GICv3 world switch backend
+> 
+>  arch/arm/kvm/Kconfig                |    7 +
+>  arch/arm/kvm/Makefile               |   10 +
+>  arch/arm/kvm/mmio.c                 |    2 +-
+>  arch/arm64/kvm/Kconfig              |    7 +
+>  arch/arm64/kvm/Makefile             |   10 +
+>  include/kvm/arm_vgic.h              |   14 +-
+>  include/kvm/vgic/vgic.h             |  256 +++++++
+>  virt/kvm/arm/arch_timer.c           |   11 +-
+>  virt/kvm/arm/pmu.c                  |    2 +-
+>  virt/kvm/arm/vgic.c                 |   18 +-
+>  virt/kvm/arm/vgic/vgic-v2.c         |  381 +++++++++++
+>  virt/kvm/arm/vgic/vgic-v3.c         |  357 ++++++++++
+>  virt/kvm/arm/vgic/vgic.c            |  614 +++++++++++++++++
+>  virt/kvm/arm/vgic/vgic.h            |  136 ++++
+>  virt/kvm/arm/vgic/vgic_init.c       |  447 ++++++++++++
+>  virt/kvm/arm/vgic/vgic_irqfd.c      |   51 ++
+>  virt/kvm/arm/vgic/vgic_kvm_device.c |  522 ++++++++++++++
+>  virt/kvm/arm/vgic/vgic_mmio.c       | 1277 +++++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic_mmio.h       |   47 ++
+>  19 files changed, 4149 insertions(+), 20 deletions(-)
+>  create mode 100644 include/kvm/vgic/vgic.h
+>  create mode 100644 virt/kvm/arm/vgic/vgic-v2.c
+>  create mode 100644 virt/kvm/arm/vgic/vgic-v3.c
+>  create mode 100644 virt/kvm/arm/vgic/vgic.c
+>  create mode 100644 virt/kvm/arm/vgic/vgic.h
+>  create mode 100644 virt/kvm/arm/vgic/vgic_init.c
+>  create mode 100644 virt/kvm/arm/vgic/vgic_irqfd.c
+>  create mode 100644 virt/kvm/arm/vgic/vgic_kvm_device.c
+>  create mode 100644 virt/kvm/arm/vgic/vgic_mmio.c
+>  create mode 100644 virt/kvm/arm/vgic/vgic_mmio.h
+> 
