@@ -1,147 +1,141 @@
-From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
-Date: Sat, 26 Mar 2016 02:11:26 +0000
-Subject: [RFC PATCH 00/45] KVM: arm/arm64: Rework virtual GIC emulation
-In-Reply-To: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
-References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <56F5EFCE.1040307@arm.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Sat, 26 Mar 2016 02:13:58 +0000
+Subject: [PATCH v4 00/12] KVM: arm64: GICv3 ITS emulation
+Message-ID: <1458958450-19662-1-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/03/16 02:04, Andre Przywara wrote:
-> This series is a joint effort to re-implement KVM's GIC emulation.
+Hi,
 
-Forgot to mention:
-This series is based on an older version of kvmarm.git/next, which is
-roughly the pull request that got merged into 4.6-rc0. It applies to the
-current master, so I suggest people use 4.6-rc1 as a base once this is
-released.
+this is a rebased and reworked version of the ITS emulation support.
+It allows KVM guests which use an emulated GICv3 to use LPIs as well,
+though in the moment this is limited to emulated PCI devices.
+It is now based on and requires the new VGIC implementation [1].
 
-A git tree containing this series and the prerequisites can be found on
-linux-arm.org:
-
-git://linux-arm.org/linux-ap.git
-http://www.linux-arm.org/git?p=linux-ap.git;a=log;h=refs/heads/vgic-new/rfc
+You can find all of this code (and the prerequisites) in the
+its-emul/v4 branch of my repository [2].
 
 Cheers,
 Andre.
 
-> 
-> While the current implementation is centered around providing
-> efficient MMIO emulation, the hot path for most guests is actually
-> the guest entry and exit, which currently is rather costly.
-> Also the existing emulation has a global distributor lock, which
-> quickly becomes a bottleneck once the number of VCPUs increases.
-> Additionally the emulation was originally designed for GICv2, adding
-> GICv3 ITS emulation support to this proved to be rather painful.
-> Last, but not least the existing code became less and less
-> maintainable, with many special cases handled explicitly.
-> 
-> The new implementation is build around a struct vgic_irq data data
-> structure, which holds all information about a virtual interrupt.
-> Interruts which should be injected are hold in a per-VCPU list, this
-> make the entry/exit path much more efficient. Also the new structure
-> allows to have more fine grained locking - per IRQ and per VCPU -
-> getting rid of the global distributor lock.
-> As a result of the new design ITS emulation fits in more nicely, the
-> respective code will be provided as a follow-up series.
-> 
-> This series implements the same feature set as the existing emulation,
-> as a goodie we now implement priorities correctly.
-> To allow an easy transition with good test coverage, but still maintain
-> stability, both implementations live side by side, selectable via a
-> Kconfig option. The default is the new implementation.
-> If this code proves to be reliable, we will later remove the current
-> implementation with an extra patch set.
-> 
-> Please have a look at the series, review it and give the code some
-> serious testing (and possibly debugging). All feedback is appreciated.
-> 
-> Cheers,
-> Andre.
-> 
-> Andre Przywara (26):
->   KVM: arm/arm64: add missing MMIO data write-back
->   KVM: arm/arm64: pmu: abstract access to number of SPIs
->   KVM: arm/arm64: arch_timer: rework VGIC <-> timer interface
->   KVM: arm/arm64: vgic-new: Add MMIO handling framework
->   KVM: arm/arm64: vgic-new: Export register access interface
->   KVM: arm/arm64: vgic-new: Add CTLR, TYPER and IIDR handlers
->   KVM: arm/arm64: vgic-new: Add ENABLE registers handlers
->   KVM: arm/arm64: vgic-new: Add PENDING registers handlers
->   KVM: arm/arm64: vgic-new: Add PRIORITY registers handlers
->   KVM: arm/arm64: vgic-new: Add ACTIVE registers handlers
->   KVM: arm/arm64: vgic-new: Add CONFIG registers handlers
->   KVM: arm/arm64: vgic-new: Add TARGET registers handlers
->   KVM: arm/arm64: vgic-new: Add SGIR register handler
->   KVM: arm/arm64: vgic-new: Add SGIPENDR register handlers
->   KVM: arm/arm64: vgic-new: Add GICv3 emulation framework
->   KVM: arm/arm64: vgic-new: Add GICv3 CTLR, IIDR, TYPER handlers
->   KVM: arm/arm64: vgic-new: Add GICv3 redistributor TYPER handler
->   KVM: arm/arm64: vgic-new: Add GICv3 IDREGS register handler
->   KVM: arm/arm64: vgic-new: Add GICv3 IROUTER register handlers
->   KVM: arm/arm64: vgic-new: Add GICv3 SGI system register trap handler
->   KVM: arm/arm64: vgic-new: Add userland access to VGIC dist registers
->   KVM: arm/arm64: vgic-new: Add GICH_VMCR accessors
->   KVM: arm/arm64: vgic-new: Add userland GIC CPU interface access
->   KVM: arm/arm64: vgic-new: implement mapped IRQ handling
->   KVM: arm/arm64: vgic-new: Add dummy MSI implementation
->   KVM: arm/arm64: vgic-new: enable build
-> 
-> Christoffer Dall (5):
->   KVM: arm/arm64: vgic-new: Add data structure definitions
->   KVM: arm/arm64: vgic-new: Add acccessor to new struct vgic_irq
->     instance
->   KVM: arm/arm64: vgic-new: Implement virtual IRQ injection
->   KVM: arm/arm64: vgic-new: Add vgic GICv2 change_affinity
->   KVM: arm/arm64: vgic-new: Add IRQ sorting
-> 
-> Eric Auger (12):
->   KVM: arm/arm64: vgic-new: Implement kvm_vgic_vcpu_pending_irq
->   KVM: arm/arm64: vgic-new: vgic_kvm_device: KVM device ops registration
->   KVM: arm/arm64: vgic-new: vgic_kvm_device:
->     KVM_DEV_ARM_VGIC_GRP_NR_IRQS
->   KVM: arm/arm64: vgic-new: vgic_kvm_device: KVM_DEV_ARM_VGIC_GRP_CTRL
->   KVM: arm/arm64: vgic-new: vgic_kvm_device: KVM_DEV_ARM_VGIC_GRP_ADDR
->   KVM: arm/arm64: vgic-new: vgic_kvm_device: access to VGIC registers
->   KVM: arm/arm64: vgic-new: vgic_kvm_device: implement kvm_vgic_addr
->   KVM: arm/arm64: vgic-new: vgic_init: implement kvm_vgic_hyp_init
->   KVM: arm/arm64: vgic-new: vgic_init: implement vgic_create
->   KVM: arm/arm64: vgic-new: vgic_init: implement vgic_init
->   KVM: arm/arm64: vgic-new: vgic_init: implement map_resources
->   KVM: arm/arm64: vgic-new: Add vgic_v2/v3_enable
-> 
-> Marc Zyngier (2):
->   KVM: arm/arm64: vgic-new: Add GICv2 IRQ sync/flush
->   KVM: arm/arm64: vgic-new: Add GICv3 world switch backend
-> 
->  arch/arm/kvm/Kconfig                |    7 +
->  arch/arm/kvm/Makefile               |   10 +
->  arch/arm/kvm/mmio.c                 |    2 +-
->  arch/arm64/kvm/Kconfig              |    7 +
->  arch/arm64/kvm/Makefile             |   10 +
->  include/kvm/arm_vgic.h              |   14 +-
->  include/kvm/vgic/vgic.h             |  256 +++++++
->  virt/kvm/arm/arch_timer.c           |   11 +-
->  virt/kvm/arm/pmu.c                  |    2 +-
->  virt/kvm/arm/vgic.c                 |   18 +-
->  virt/kvm/arm/vgic/vgic-v2.c         |  381 +++++++++++
->  virt/kvm/arm/vgic/vgic-v3.c         |  357 ++++++++++
->  virt/kvm/arm/vgic/vgic.c            |  614 +++++++++++++++++
->  virt/kvm/arm/vgic/vgic.h            |  136 ++++
->  virt/kvm/arm/vgic/vgic_init.c       |  447 ++++++++++++
->  virt/kvm/arm/vgic/vgic_irqfd.c      |   51 ++
->  virt/kvm/arm/vgic/vgic_kvm_device.c |  522 ++++++++++++++
->  virt/kvm/arm/vgic/vgic_mmio.c       | 1277 +++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic_mmio.h       |   47 ++
->  19 files changed, 4149 insertions(+), 20 deletions(-)
->  create mode 100644 include/kvm/vgic/vgic.h
->  create mode 100644 virt/kvm/arm/vgic/vgic-v2.c
->  create mode 100644 virt/kvm/arm/vgic/vgic-v3.c
->  create mode 100644 virt/kvm/arm/vgic/vgic.c
->  create mode 100644 virt/kvm/arm/vgic/vgic.h
->  create mode 100644 virt/kvm/arm/vgic/vgic_init.c
->  create mode 100644 virt/kvm/arm/vgic/vgic_irqfd.c
->  create mode 100644 virt/kvm/arm/vgic/vgic_kvm_device.c
->  create mode 100644 virt/kvm/arm/vgic/vgic_mmio.c
->  create mode 100644 virt/kvm/arm/vgic/vgic_mmio.h
-> 
+Changelog v3..v4:
+- adapting to new VGIC (changes in IRQ injection mechanism)
+
+Changelog v2..v3:
+- adapt to 4.3-rc and Christoffer's timer rework
+- adapt spin locks on handling PROPBASER/PENDBASER registers
+- rework locking in ITS command handling (dropping dist where needed)
+- only clear LPI pending bit if LPI could actually be queued
+- simplify GICR_CTLR handling
+- properly free ITTEs (including our pending bitmap)
+- fix corner cases with unmapped collections
+- keep retire_lr() around
+- rename vgic_handle_base_register to vgic_reg64_access()
+- use kcalloc instead of kmalloc
+- minor fixes, renames and added comments
+
+Changelog v1..v2
+- fix issues when using non-ITS GICv3 emulation
+- streamline frame address initialization (new patch 05/15)
+- preallocate buffer memory for reading from guest's memory
+- move locking into the actual command handlers
+-   preallocate memory for new structures if needed
+- use non-atomic __set_bit() and __clear_bit() when under the lock
+- add INT command handler to allow LPI injection from the guest
+- rewrite CWRITER handler to align with new locking scheme
+- remove unneeded CONFIG_HAVE_KVM_MSI #ifdefs
+- check memory table size against our LPI limit (65536 interrupts)
+- observe initial gap of 1024 interrupts in pending table
+- use term "configuration table" to be in line with the spec
+- clarify and extend documentation on API extensions
+- introduce new KVM_CAP_MSI_DEVID capability to advertise device ID requirement
+- update, fix and add many comments
+- minor style changes as requested by reviewers
+
+---------------
+
+The GICv3 ITS (Interrupt Translation Service) is a part of the
+ARM GICv3 interrupt controller [4] used for implementing MSIs.
+It specifies a new kind of interrupts (LPIs), which are mapped to
+establish a connection between a device, its MSI payload value and
+the target processor the IRQ is eventually delivered to.
+In order to allow using MSIs in an ARM64 KVM guest, we emulate this
+ITS widget in the kernel.
+The ITS works by reading commands written by software (from the guest
+in our case) into a (guest allocated) memory region and establishing
+the mapping between a device, the MSI payload and the target CPU.
+We parse these commands and update our internal data structures to
+reflect those changes. On an MSI injection we iterate those
+structures to learn the LPI number we have to inject.
+For the time being we use simple lists to hold the data, this is
+good enough for the small number of entries each of the components
+currently have. Should this become a performance bottleneck in the
+future, those can be extended to arrays or trees if needed.
+
+Most of the code lives in a separate source file (its-emul.c), though
+there are some changes necessary in the existing VGIC files.
+
+For the time being this series gives us the ability to use emulated
+PCI devices that can use MSIs in the guest. Those have to be
+triggered by letting the userland device emulation simulate the MSI
+write with the KVM_SIGNAL_MSI ioctl. This will be translated into
+the proper LPI by the ITS emulation and injected into the guest in
+the usual way (just with a higher IRQ number).
+
+This series is based on 4.5 plus the KVM queue for 4.6 and the new VGIC
+emulation code and can be found at the its-emul/v4 branch of this
+repository [2].
+For this to be used you need a GICv3 host machine (a fast model would
+do), though it does not rely on any host ITS bits (neither in hardware
+or software).
+
+To test this you can use the kvmtool patches available in the "its"
+branch here [3].
+Start a guest with: "$ lkvm run --irqchip=gicv3-its --force-pci"
+and see the ITS being used for instance by the virtio devices.
+
+[1]: https://lists.cs.columbia.edu/pipermail/kvmarm/2016-March/019191.html
+[2]: git://linux-arm.org/linux-ap.git
+     http://www.linux-arm.org/git?p=linux-ap.git;a=log;h=refs/heads/its-emul/v4
+[3]: git://linux-arm.org/kvmtool.git
+     http://www.linux-arm.org/git?p=kvmtool.git;a=log;h=refs/heads/its
+[4]: http://arminfo.emea.arm.com/help/topic/com.arm.doc.ihi0069a/IHI0069A_gic_architecture_specification.pdf
+
+Andre Przywara (12):
+  KVM: extend struct kvm_msi to hold a 32-bit device ID
+  KVM: arm/arm64: extend arch CAP checks to allow per-VM capabilities
+  KVM: arm64: Introduce new MMIO region for the ITS base address
+  KVM: arm64: handle ITS related GICv3 redistributor registers
+  KVM: arm64: introduce ITS emulation file with stub functions
+  KVM: arm64: implement basic ITS register handlers
+  KVM: arm64: add data structures to model ITS interrupt translation
+  KVM: arm64: connect LPIs to the VGIC emulation
+  KVM: arm64: sync LPI configuration and pending tables
+  KVM: arm64: implement ITS command queue command handlers
+  KVM: arm64: implement MSI injection in ITS emulation
+  KVM: arm64: enable ITS emulation as a virtual MSI controller
+
+ Documentation/virtual/kvm/api.txt              |   14 +-
+ Documentation/virtual/kvm/devices/arm-vgic.txt |    9 +
+ arch/arm/include/asm/kvm_host.h                |    2 +-
+ arch/arm/kvm/arm.c                             |    2 +-
+ arch/arm64/include/asm/kvm_host.h              |    2 +-
+ arch/arm64/include/uapi/asm/kvm.h              |    2 +
+ arch/arm64/kvm/Kconfig                         |    1 +
+ arch/arm64/kvm/Makefile                        |    1 +
+ arch/arm64/kvm/reset.c                         |   12 +-
+ include/kvm/vgic/vgic.h                        |   33 +
+ include/linux/irqchip/arm-gic-v3.h             |   28 +-
+ include/uapi/linux/kvm.h                       |    5 +-
+ virt/kvm/arm/vgic.c                            |    5 +
+ virt/kvm/arm/vgic/its-emul.c                   | 1146 ++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic.c                       |   18 +
+ virt/kvm/arm/vgic/vgic.h                       |   33 +
+ virt/kvm/arm/vgic/vgic_init.c                  |    9 +
+ virt/kvm/arm/vgic/vgic_kvm_device.c            |    7 +
+ virt/kvm/arm/vgic/vgic_mmio.c                  |   54 +-
+ 19 files changed, 1365 insertions(+), 18 deletions(-)
+ create mode 100644 virt/kvm/arm/vgic/its-emul.c
+
+-- 
+2.7.3
