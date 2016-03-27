@@ -1,61 +1,62 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sun, 27 Mar 2016 23:30:21 +0200
-Subject: [PATCH] ARM: dts: veyron: enable the tsadc on pinky board
-In-Reply-To: <56F48D19.1050702@gmail.com>
-References: <1450607434-6733-1-git-send-email-wxt@rock-chips.com>
- <2324215.uYLQVgh5FL@diego> <56F48D19.1050702@gmail.com>
-Message-ID: <2666341.7YP6MciD7F@diego>
+From: ruslan.bilovol@gmail.com (Ruslan Bilovol)
+Date: Mon, 28 Mar 2016 00:44:27 +0300
+Subject: usb: gadget breakage on N900: bind UDC by name passed via
+ usb_gadget_driver structure
+In-Reply-To: <20160327202657.GA31059@amd>
+References: <CAB=otbRd+hZaO6ihL3c88Ys_q-R4grmup4cfP70PT+N2JEQ3WQ@mail.gmail.com>
+ <CAB=otbQ=jJNk=CtB4hu51HXxOLxhWEDaeWf3V0Uc7Uh3veXsfg@mail.gmail.com>
+ <CAB=otbQ1J7FZm9vWLwor93+uD3Fv38ykduWMXG3qByNh4mV9=g@mail.gmail.com>
+ <20160327202657.GA31059@amd>
+Message-ID: <CAB=otbTsAwBohbYmwBERpdG-ZdAUk_vJwoZoO8dUf_H-W4jREg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Caesar,
+Hi,
 
-Am Freitag, 25. M?rz 2016, 08:58:01 schrieb Caesar Wang:
-> ? 2016?03?25? 05:12, Heiko St?bner ??:
-> > Am Sonntag, 20. Dezember 2015, 18:30:34 schrieb Caesar Wang:
-> >> I think the tsadc is fakly hand on pinky board,
-> >> maybe that's fixed in newest kernel.
-> >> As the following patch is a example:
-> >> https://patchwork.kernel.org/patch/7472051/
-> >> 
-> >> I don't have meet this issue on pinky board.
-> >> Let me know if that's still hanging on pinky board.
-> >> 
-> >> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> > 
-> > I just gave that a try again on my pinky-rev2. And while the tsadc did
-> > produce some results and didn't hang the system in my tries, the
-> > temperature values seemed to be frozen (only changing once on every
-> > reboot).
-> > 
-> > Running the same kernel on a Jerry produced the expected results of the
-> > temperature changing over time and differing cpu frequencies.
-> > 
-> > Pinky also is a sort of dinosaur and only you and me seem to still like
-> > them> 
-> > :-) . And something is definitly strange here, and I'd tend to keep the
-> > :tsadc> 
-> > disabled for the time being.
-> 
-> I remember the same issue on
-> https://code.google.com/p/chrome-os-partner/issues/detail?id=35060 in
-> the past
-> 
-> "thermal can 't work if  the hardware C1106 isn't removed in the
-> attachment."
-> 
-> So I think you can change this early board.
+On Sun, Mar 27, 2016 at 11:26 PM, Pavel Machek <pavel@ucw.cz> wrote:
+> Hi!
+>
+>> >> I managed to boot N900 with working USB gadget (builtin g_ether)
+>> >> in boardfile mode, can ping it from PC and transfer data. I don't
+>> >> see any issue (except of musb name issue in twl phy driver, I've
+>> >> already sent a fix for that: https://lkml.org/lkml/2016/3/24/670 )
+>> >>
+>> >> Pavel, I still don't see how you've got your issue, please share
+>> >> more detials
+>> >
+>> > Ok, let me try. I undid all the changes in drivers/phy drivers/usb and
+>> > include/linux/usb . I have all the gadget stuff built-in, so that I
+>> > could use nfsroot, but this is boot from mmcblk.
+>>
+>> So do you mean you use original rootfs that was shipeed with N900?
+>
+> No. I'm using Debian ARM root. It includes useful X and even phone
+> functions. https://gitlab.com/tui/tui .
+>
+>> > gzipped config is attached.
+>>
+>> Thanks, I'll try that
+>
+> Thanks.
+>
+>> > Dmesg from the n900 is attached as /tmp/delme.gz. I did _not_ apply
+>> > the patch from https://lkml.org/lkml/2016/3/24/670 , yet, as I'm using
+>> > devicetree boot.
+>>
+>> Hmm.. don't see anything strange in the boot log related to USB,
+>> I'll try your config
+>
+> Let me know how it went.
 
-As I'm a total noob when it comes to soldering (especially on such a tiny 
-scale), I don't think that is an option ;-) .
+I tried your config (with slight modifications) with vanilla kernel v4.5
+(modifications: cmdline changed to default; used INITRAMFS_SOURCE
+for prebuilt cpio archive with rootfs) and Device Tree booting.
+Works fine for me except I need to unplug-plug usb cable or issue
+# echo connect > /sys/devices/platform/68000000.ocp/480ab000
+.usb_otg_hs/musb-hdrc.0.auto/udc/musb-hdrc.0.auto/soft_connect
+to make connection.
+The gadget driver successfully binds to the gadget, but I don't know
+why the musb core doesn't issue pullup on USB lines during boot.
 
-Reading that bug report again, brought back memories, that exactly this was 
-the issue why suspend didn't work correctly for me then.
-
-So I still think I'll keep the tsadc on pinky as it is now - as I said before, 
-it looks like you and me are the only people still caring for pinky and 
-everybody else most likely put theirs into the trash already, so nothing 
-terrible important is affected by this :-)
-
-
-Heiko
+Best regards,
+Ruslan
