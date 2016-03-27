@@ -1,144 +1,555 @@
-From: mail@maciej.szmigiero.name (Maciej S. Szmigiero)
-Date: Sun, 27 Mar 2016 17:51:13 +0200
-Subject: [PATCH] ARM: dts: imx6qdl-udoo: add 7 inch LCD touchscreen panel
- support
-Message-ID: <56F80171.40708@maciej.szmigiero.name>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 27 Mar 2016 19:45:33 +0200
+Subject: [PATCH v4] ARM: dts: vf610-zii-dev: Add ZII development board.
+Message-ID: <1459100733-21552-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The official UDOO board kit has 7 and 15.6 inch touchscreen LCD panels
-as options.
+From: Cory Tusar <cory.tusar@pid1solutions.com>
 
-This patch adds support for 7 inch panel only, but the 15.6 inch one
-should be easy to add using the same regulator, backlight device and
-LVDS channel.
+This commit adds support for Rev. B of a Zodiac Inflight Innovations
+development board, mainly intended for DSA and ARINC 429 development
+work.
 
-Since this panel is an option for UDOO board it is disabled by default
-and can be enabled (for example) by the following U-Boot commands:
-fdt set backlight status okay
-fdt set panelchan status okay
-fdt set panel7 status okay
-fdt set touchscreenp7 status okay
-
-The LVDS channel is also disabled by default to avoid warning from its
-driver.
-
-Signed-off-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
+Signed-off-by: Cory Tusar <cory.tusar@pid1solutions.com>
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+Acked-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/boot/dts/imx6qdl-udoo.dtsi | 96 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 96 insertions(+)
+v4
+ Rebase onto 4.6-rc1.
 
-diff --git a/arch/arm/boot/dts/imx6qdl-udoo.dtsi b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-index d3e54e40a017..6a0a7ddb59ae 100644
---- a/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-@@ -10,6 +10,13 @@
-  */
- 
- / {
-+	aliases {
-+		backlight = &backlight;
-+		panelchan = &panelchan;
-+		panel7 = &panel7;
-+		touchscreenp7 = &touchscreenp7;
+v3
+ Remove unused labels
+ Replace _ with - in labels.
+ Added Acked-by
+
+v2
+ Add ZII Copyright
+ Dual license
+ Remove bootargs and extend stdout-path
+ Remove address format from regulator nodes
+ Remove extraneous space i2c_3 node
+ Move iomuxc to end
+ Remove L2 node
+ Add missing gpio-controller to gpio6
+ Removed unused fixed clocks
+ Add an spi node
+ Fix memory range
+ Fix naming of GPIO i2c expanders
+ Disable DMA on serial port, which appears to cause corrupt.
+
+Documentation/devicetree/bindings/net/mdio-mux.txt says:
+
+Required properties for child nodes:
+- #address-cells = <1>;
+- #size-cells = <0>;
+- reg : The sub-bus number.
+
+So i ignored the request to remove these properties.
+---
+ arch/arm/boot/dts/Makefile                |   3 +-
+ arch/arm/boot/dts/vf610-zii-dev-rev-b.dts | 735 ++++++++++++++++++++++++++++++
+ 2 files changed, 737 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 95c1923ce6fa..92074ff300f4 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -388,7 +388,8 @@ dtb-$(CONFIG_SOC_VF610) += \
+ 	vf610m4-colibri.dtb \
+ 	vf610-cosmic.dtb \
+ 	vf610m4-cosmic.dtb \
+-	vf610-twr.dtb
++	vf610-twr.dtb \
++	vf610-zii-dev-rev-b.dtb
+ dtb-$(CONFIG_ARCH_MXS) += \
+ 	imx23-evk.dtb \
+ 	imx23-olinuxino.dtb \
+diff --git a/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
+new file mode 100644
+index 000000000000..322086e64b42
+--- /dev/null
++++ b/arch/arm/boot/dts/vf610-zii-dev-rev-b.dts
+@@ -0,0 +1,735 @@
++/*
++ * Copyright (C) 2015, 2016 Zodiac Inflight Innovations
++ *
++ * Based on an original 'vf610-twr.dts' which is Copyright 2015,
++ * Freescale Semiconductor, Inc.
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License
++ *     version 2 as published by the Free Software Foundation.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "vf610.dtsi"
++
++/ {
++	model = "ZII VF610 Development Board, Rev B";
++	compatible = "zii,vf610dev-b", "zii,vf610dev", "fsl,vf610";
++
++	chosen {
++		stdout-path = "serial0:115200n8";
 +	};
 +
- 	chosen {
- 		stdout-path = &uart2;
- 	};
-@@ -33,6 +40,14 @@
- 			startup-delay-us = <2>; /* USB2415 requires a POR of 1 us minimum */
- 			gpio = <&gpio7 12 0>;
- 		};
-+
-+		reg_panel: regulator at 1 {
-+			compatible = "regulator-fixed";
-+			reg = <1>;
-+			regulator-name = "lcd_panel";
-+			enable-active-high;
-+			gpio = <&gpio1 2 0>;
-+		};
- 	};
- 
- 	sound {
-@@ -46,6 +61,34 @@
- 		mux-int-port = <1>;
- 		mux-ext-port = <6>;
- 	};
-+
-+	backlight: backlight {
-+		compatible = "gpio-backlight";
-+		gpios = <&gpio1 4 0>;
-+		default-on;
-+		status = "disabled";
++	memory {
++		reg = <0x80000000 0x20000000>;
 +	};
 +
-+	panel7: panel7 {
-+		/*
-+		 * in reality it is a -20t (parallel) model,
-+		 * but with LVDS bridge chip attached,
-+		 * so it is equivalent to -19t model in drive
-+		 * characteristics
-+		 */
++	gpio-leds {
++		compatible = "gpio-leds";
++		pinctrl-0 = <&pinctrl_leds_debug>;
 +		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_panel>;
-+		compatible = "urt,umsh-8596md-19t";
-+		power-supply = <&reg_panel>;
-+		backlight = <&backlight>;
-+		status = "disabled";
 +
-+		port {
-+			panel_in: endpoint {
-+				remote-endpoint = <&lvds0_out>;
++		debug {
++			label = "zii:green:debug1";
++			gpios = <&gpio2 10 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "heartbeat";
++		};
++	};
++
++	mdio-mux {
++		compatible = "mdio-mux-gpio";
++		pinctrl-0 = <&pinctrl_mdio_mux>;
++		pinctrl-names = "default";
++		gpios = <&gpio0 8  GPIO_ACTIVE_HIGH
++			 &gpio0 9  GPIO_ACTIVE_HIGH
++			 &gpio0 24 GPIO_ACTIVE_HIGH
++			 &gpio0 25 GPIO_ACTIVE_HIGH>;
++		mdio-parent-bus = <&mdio1>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		mdio_mux_1: mdio at 1 {
++			reg = <1>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		mdio_mux_2: mdio at 2 {
++			reg = <2>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		mdio_mux_4: mdio at 4 {
++			reg = <4>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		mdio_mux_8: mdio at 8 {
++			reg = <8>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++	};
++
++	dsa at 0 {
++		compatible = "marvell,dsa";
++		#address-cells = <2>;
++		#size-cells = <0>;
++
++		dsa,ethernet = <&fec1>;
++		dsa,mii-bus = <&mdio_mux_1>;
++
++		/* 6352 - Primary - 7 ports */
++		switch0: switch at 2 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x00 0>;
++			eeprom-length = <512>;
++
++			port at 0 {
++				reg = <0>;
++				label = "lan0";
++			};
++
++			port at 1 {
++				reg = <1>;
++				label = "lan1";
++			};
++
++			port at 2 {
++				reg = <2>;
++				label = "lan2";
++			};
++
++			switch0port5: port at 5 {
++				reg = <5>;
++				label = "dsa";
++				phy-mode = "rgmii-txid";
++				link = <&switch1port6
++					&switch2port9>;
++				fixed-link {
++					speed = <1000>;
++					full-duplex;
++				};
++			};
++
++			port at 6 {
++				reg = <6>;
++				label = "cpu";
++				fixed-link {
++					speed = <100>;
++					full-duplex;
++				};
++			};
++
++		};
++
++		/* 6352 - Secondary - 7 ports */
++		switch1: switch at 0 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x00 1>;
++			eeprom-length = <512>;
++			mii-bus = <&mdio_mux_2>;
++
++			port at 0 {
++				reg = <0>;
++				label = "lan3";
++			};
++
++			port at 1 {
++				reg = <1>;
++				label = "lan4";
++			};
++
++			port at 2 {
++				reg = <2>;
++				label = "lan5";
++			};
++
++			switch1port5: port at 5 {
++				reg = <5>;
++				label = "dsa";
++				link = <&switch2port9>;
++				phy-mode = "rgmii-txid";
++				fixed-link {
++					speed = <1000>;
++					full-duplex;
++				};
++			};
++
++			switch1port6: port at 6 {
++				reg = <6>;
++				label = "dsa";
++				phy-mode = "rgmii-txid";
++				link = <&switch0port5>;
++				fixed-link {
++					speed = <1000>;
++					full-duplex;
++				};
++			};
++		};
++
++		/* 6185 - 10 ports */
++		switch2: switch at 6 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x00 2>;
++			mii-bus = <&mdio_mux_4>;
++
++			port at 0 {
++				reg = <0>;
++				label = "lan6";
++			};
++
++			port at 1 {
++				reg = <1>;
++				label = "lan7";
++			};
++
++			port at 2 {
++				reg = <2>;
++				label = "lan8";
++			};
++
++			port at 3 {
++				reg = <3>;
++				label = "optical3";
++				fixed-link {
++					speed = <1000>;
++					full-duplex;
++					link-gpios = <&gpio6 2
++						      GPIO_ACTIVE_HIGH>;
++				};
++			};
++
++			port at 4 {
++				reg = <4>;
++				label = "optical4";
++				fixed-link {
++					speed = <1000>;
++					full-duplex;
++					link-gpios = <&gpio6 3
++						      GPIO_ACTIVE_HIGH>;
++				};
++			};
++
++			switch2port9: port at 9 {
++				reg = <9>;
++				label = "dsa";
++				phy-mode = "rgmii-txid";
++				link = <&switch1port5
++					&switch0port5>;
++				fixed-link {
++					speed = <1000>;
++					full-duplex;
++				};
 +			};
 +		};
 +	};
- };
- 
- &fec {
-@@ -151,6 +194,27 @@
- 				MX6QDL_PAD_EIM_EB2__GPIO2_IO30		0x1b0b0
- 			>;
- 		};
 +
-+		pinctrl_panel: panelgrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_GPIO_2__GPIO1_IO02		0x70
-+				MX6QDL_PAD_GPIO_4__GPIO1_IO04		0x70
-+			>;
++	reg_vcc_3v3_mcu: reg-vcc-3v3-mcu {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc_3v3_mcu";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++
++	usb0_vbus: usb0-vbus {
++		compatible = "regulator-fixed";
++		pinctrl-0 = <&pinctrl_usb_vbus>;
++		regulator-name = "usb_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		enable-active-high;
++		regulator-always-on;
++		regulator-boot-on;
++		gpio = <&gpio0 6 0>;
++	};
++
++	spi0 {
++		compatible = "spi-gpio";
++		pinctrl-0 = <&pinctrl_gpio_spi0>;
++		pinctrl-names = "default";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		gpio-sck  = <&gpio1 12 GPIO_ACTIVE_HIGH>;
++		gpio-mosi = <&gpio1 11 GPIO_ACTIVE_HIGH>;
++		gpio-miso = <&gpio1 10 GPIO_ACTIVE_HIGH>;
++		cs-gpios  = <&gpio1  9 GPIO_ACTIVE_HIGH
++			     &gpio1  8 GPIO_ACTIVE_HIGH>;
++		num-chipselects = <2>;
++
++		m25p128 at 0 {
++			compatible = "m25p128", "jedec,spi-nor";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0>;
++			spi-max-frequency = <1000000>;
 +		};
 +
-+		pinctrl_i2c3: i2c3grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_GPIO_5__I2C3_SCL		0x4001f8b1
-+				MX6QDL_PAD_GPIO_6__I2C3_SDA		0x4001f8b1
-+			>;
++		at93c46d at 1 {
++			compatible = "atmel,at93c46d";
++			pinctrl-0 = <&pinctrl_gpio_e6185_eeprom_sel>;
++			pinctrl-names = "default";
++			#address-cells = <0>;
++			#size-cells = <0>;
++			reg = <1>;
++			spi-max-frequency = <500000>;
++			spi-cs-high;
++			data-size = <16>;
++			select-gpios = <&gpio4 4 GPIO_ACTIVE_HIGH>;
 +		};
++	};
++};
 +
-+		pinctrl_touchscreenp7: touchscreenp7grp {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD2_DAT0__GPIO1_IO15		0x70
-+				MX6QDL_PAD_SD2_DAT2__GPIO1_IO13		0x1b0b0
-+			>;
-+		};
- 	};
- };
- 
-@@ -189,3 +253,35 @@
- 	ac97-gpios = <&gpio4 19 0 &gpio4 18 0 &gpio2 30 0>;
- 	status = "okay";
- };
++&fec0 {
++	phy-mode = "rmii";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_fec0>;
++	status = "okay";
++};
 +
-+&ldb {
++&fec1 {
++	phy-mode = "rmii";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_fec1>;
 +	status = "okay";
 +
-+	panelchan: lvds-channel at 0 {
-+		port at 4 {
-+			reg = <4>;
++	fixed-link {
++		   speed = <100>;
++		   full-duplex;
++	};
 +
-+			lvds0_out: endpoint {
-+				remote-endpoint = <&panel_in>;
++	mdio1: mdio {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "okay";
++	};
++};
++
++&adc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_adc0_ad5>;
++	vref-supply = <&reg_vcc_3v3_mcu>;
++	status = "okay";
++};
++
++&edma0 {
++	status = "okay";
++};
++
++&esdhc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_esdhc1>;
++	bus-width = <4>;
++	status = "okay";
++};
++
++&i2c0 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c0>;
++	status = "okay";
++
++	gpio5: pca9554 at 20 {
++		compatible = "nxp,pca9554";
++		reg = <0x20>;
++		gpio-controller;
++		#gpio-cells = <2>;
++
++	};
++
++	gpio6: pca9554 at 22 {
++		compatible = "nxp,pca9554";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_pca9554_22>;
++		reg = <0x22>;
++		gpio-controller;
++		#gpio-cells = <2>;
++		interrupt-parent = <&gpio2>;
++		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
++	};
++
++	lm75 at 48 {
++		compatible = "national,lm75";
++		reg = <0x48>;
++	};
++
++	at24c04 at 50 {
++		compatible = "atmel,24c04";
++		reg = <0x50>;
++	};
++
++	at24c04 at 52 {
++		compatible = "atmel,24c04";
++		reg = <0x52>;
++	};
++
++	ds1682 at 6b {
++		compatible = "dallas,ds1682";
++		reg = <0x6b>;
++	};
++};
++
++&i2c1 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1>;
++	status = "okay";
++};
++
++&i2c2 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2>;
++	status = "okay";
++
++	tca9548 at 70 {
++		compatible = "nxp,pca9548";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0x70>;
++		reset-gpios = <&gpio3 23 GPIO_ACTIVE_LOW>;
++
++		i2c at 0 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0>;
++
++			sfp1: at24c04 at 50 {
++				compatible = "atmel,24c02";
++				reg = <0x50>;
 +			};
++		};
++
++		i2c at 1 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <1>;
++
++			sfp2: at24c04 at 50 {
++				compatible = "atmel,24c02";
++				reg = <0x50>;
++			};
++		};
++
++		i2c at 2 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <2>;
++
++			sfp3: at24c04 at 50 {
++				compatible = "atmel,24c02";
++				reg = <0x50>;
++			};
++		};
++
++		i2c at 3 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <3>;
++
++			sfp4: at24c04 at 50 {
++				compatible = "atmel,24c02";
++				reg = <0x50>;
++			};
++
++		};
++
++		i2c at 4 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <4>;
 +		};
 +	};
 +};
@@ -148,15 +559,253 @@ index d3e54e40a017..6a0a7ddb59ae 100644
 +	pinctrl-names = "default";
 +	pinctrl-0 = <&pinctrl_i2c3>;
 +	status = "okay";
++};
 +
-+	touchscreenp7: touchscreenp7 at 55 {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_touchscreenp7>;
-+		compatible = "sitronix,st1232";
-+		reg = <0x55>;
-+		interrupt-parent = <&gpio1>;
-+		interrupts = <13 8>;
-+		gpios = <&gpio1 15 0>;
-+		status = "disabled";
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart0>;
++	status = "okay";
++	dmas = <>;
++	dma-names = "";
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1>;
++	status = "okay";
++};
++
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart2>;
++	status = "okay";
++};
++
++&usbdev0 {
++	disable-over-current;
++	status = "okay";
++	vbus-supply = <&usb0_vbus>;
++	dr_mode = "host";
++};
++
++&usbh1 {
++	disable-over-current;
++	status = "okay";
++};
++
++&usbmisc0 {
++	status = "okay";
++};
++
++&usbmisc1 {
++	status = "okay";
++};
++
++&usbphy0 {
++	status = "okay";
++};
++
++&usbphy1 {
++	status = "okay";
++};
++
++&iomuxc {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c_mux_reset>;
++
++	vf610-zii {
++		pinctrl_usb_vbus: pinctrl-usb-vbus {
++			fsl,pins = <
++				VF610_PAD_PTA16__GPIO_6	0x31c2
++			>;
++		};
++
++		pinctrl_i2c_mux_reset: pinctrl-i2c-mux-reset {
++			fsl,pins = <
++				 VF610_PAD_PTE14__GPIO_119	0x31c2
++				 >;
++		};
++
++		pinctrl_adc0_ad5: adc0ad5grp {
++			fsl,pins = <
++				VF610_PAD_PTC30__ADC0_SE5	0x00a1
++			>;
++		};
++
++		pinctrl_dspi0: dspi0grp {
++			fsl,pins = <
++				VF610_PAD_PTB18__DSPI0_CS1	0x1182
++				VF610_PAD_PTB19__DSPI0_CS0	0x1182
++				VF610_PAD_PTB20__DSPI0_SIN	0x1181
++				VF610_PAD_PTB21__DSPI0_SOUT	0x1182
++				VF610_PAD_PTB22__DSPI0_SCK	0x1182
++			>;
++		};
++
++		pinctrl_dspi2: dspi2grp {
++			fsl,pins = <
++				VF610_PAD_PTD31__DSPI2_CS1	0x1182
++				VF610_PAD_PTD30__DSPI2_CS0	0x1182
++				VF610_PAD_PTD29__DSPI2_SIN	0x1181
++				VF610_PAD_PTD28__DSPI2_SOUT	0x1182
++				VF610_PAD_PTD27__DSPI2_SCK	0x1182
++			>;
++		};
++
++		pinctrl_esdhc1: esdhc1grp {
++			fsl,pins = <
++				VF610_PAD_PTA24__ESDHC1_CLK	0x31ef
++				VF610_PAD_PTA25__ESDHC1_CMD	0x31ef
++				VF610_PAD_PTA26__ESDHC1_DAT0	0x31ef
++				VF610_PAD_PTA27__ESDHC1_DAT1	0x31ef
++				VF610_PAD_PTA28__ESDHC1_DATA2	0x31ef
++				VF610_PAD_PTA29__ESDHC1_DAT3	0x31ef
++				VF610_PAD_PTA7__GPIO_134	0x219d
++			>;
++		};
++
++		pinctrl_fec1: fec1grp {
++			fsl,pins = <
++				VF610_PAD_PTA6__RMII_CLKIN		0x30d1
++				VF610_PAD_PTC9__ENET_RMII1_MDC		0x30d2
++				VF610_PAD_PTC10__ENET_RMII1_MDIO	0x30d3
++				VF610_PAD_PTC11__ENET_RMII1_CRS		0x30d1
++				VF610_PAD_PTC12__ENET_RMII1_RXD1	0x30d1
++				VF610_PAD_PTC13__ENET_RMII1_RXD0	0x30d1
++				VF610_PAD_PTC14__ENET_RMII1_RXER	0x30d1
++				VF610_PAD_PTC15__ENET_RMII1_TXD1	0x30d2
++				VF610_PAD_PTC16__ENET_RMII1_TXD0	0x30d2
++				VF610_PAD_PTC17__ENET_RMII1_TXEN	0x30d2
++			>;
++		};
++
++		pinctrl_i2c0: i2c0grp {
++			fsl,pins = <
++				VF610_PAD_PTB14__I2C0_SCL	0x37ff
++				VF610_PAD_PTB15__I2C0_SDA	0x37ff
++			>;
++		};
++
++		pinctrl_i2c1: i2c1grp {
++			fsl,pins = <
++				VF610_PAD_PTB16__I2C1_SCL	0x37ff
++				VF610_PAD_PTB17__I2C1_SDA	0x37ff
++			>;
++		};
++
++		pinctrl_i2c2: i2c2grp {
++			fsl,pins = <
++				VF610_PAD_PTA22__I2C2_SCL	0x37ff
++				VF610_PAD_PTA23__I2C2_SDA	0x37ff
++			>;
++		};
++
++		pinctrl_i2c3: i2c3grp {
++			fsl,pins = <
++				VF610_PAD_PTA30__I2C3_SCL	0x37ff
++				VF610_PAD_PTA31__I2C3_SDA	0x37ff
++			>;
++		};
++
++		pinctrl_pwm0: pwm0grp {
++			fsl,pins = <
++				VF610_PAD_PTB0__FTM0_CH0	0x1582
++				VF610_PAD_PTB1__FTM0_CH1	0x1582
++				VF610_PAD_PTB2__FTM0_CH2	0x1582
++				VF610_PAD_PTB3__FTM0_CH3	0x1582
++			>;
++		};
++
++		pinctrl_uart0: uart0grp {
++			fsl,pins = <
++				VF610_PAD_PTB10__UART0_TX	0x21a2
++				VF610_PAD_PTB11__UART0_RX	0x21a1
++			>;
++		};
++
++		pinctrl_uart1: uart1grp {
++			fsl,pins = <
++				VF610_PAD_PTB23__UART1_TX	0x21a2
++				VF610_PAD_PTB24__UART1_RX	0x21a1
++			>;
++		};
++
++		pinctrl_uart2: uart2grp {
++			fsl,pins = <
++				VF610_PAD_PTD0__UART2_TX	0x21a2
++				VF610_PAD_PTD1__UART2_RX	0x21a1
++			>;
++		};
++
++		pinctrl_qspi0: qspi0grp {
++			fsl,pins = <
++				VF610_PAD_PTD7__QSPI0_B_QSCK	0x31c3
++				VF610_PAD_PTD8__QSPI0_B_CS0	0x31ff
++				VF610_PAD_PTD9__QSPI0_B_DATA3	0x31c3
++				VF610_PAD_PTD10__QSPI0_B_DATA2	0x31c3
++				VF610_PAD_PTD11__QSPI0_B_DATA1	0x31c3
++				VF610_PAD_PTD12__QSPI0_B_DATA0	0x31c3
++			>;
++		};
++
++		pinctrl_usb0_host: usb0-host-grp {
++			fsl,pins = <
++				VF610_PAD_PTD6__GPIO_85		0x0062
++			>;
++		};
++
++		pinctrl_mdio_mux: pinctrl-mdio-mux {
++			fsl,pins = <
++				VF610_PAD_PTA18__GPIO_8		0x31c2
++				VF610_PAD_PTA19__GPIO_9		0x31c2
++				VF610_PAD_PTB2__GPIO_24		0x31c2
++				VF610_PAD_PTB3__GPIO_25		0x31c2
++			>;
++		};
++
++		pinctrl_gpio_e6185_eeprom_sel: pinctrl-gpio-e6185-eeprom-spi0 {
++			fsl,pins = <
++				VF610_PAD_PTE27__GPIO_132	0x33e2
++			>;
++		};
++
++		pinctrl_gpio_spi0: pinctrl-gpio-spi0 {
++			fsl,pins = <
++				VF610_PAD_PTB22__GPIO_44	0x33e2
++				VF610_PAD_PTB21__GPIO_43	0x33e2
++				VF610_PAD_PTB20__GPIO_42	0x33e1
++				VF610_PAD_PTB19__GPIO_41	0x33e2
++				VF610_PAD_PTB18__GPIO_40	0x33e2
++			>;
++		};
++
++		pinctrl_fec0: fec0grp {
++			fsl,pins = <
++				VF610_PAD_PTC0__ENET_RMII0_MDC	0x30d2
++				VF610_PAD_PTC1__ENET_RMII0_MDIO	0x30d3
++				VF610_PAD_PTC2__ENET_RMII0_CRS	0x30d1
++				VF610_PAD_PTC3__ENET_RMII0_RXD1	0x30d1
++				VF610_PAD_PTC4__ENET_RMII0_RXD0	0x30d1
++				VF610_PAD_PTC5__ENET_RMII0_RXER	0x30d1
++				VF610_PAD_PTC6__ENET_RMII0_TXD1	0x30d2
++				VF610_PAD_PTC7__ENET_RMII0_TXD0	0x30d2
++				VF610_PAD_PTC8__ENET_RMII0_TXEN	0x30d2
++			>;
++		};
++
++		pinctrl_leds_debug: pinctrl-leds-debug {
++			fsl,pins = <
++				 VF610_PAD_PTD20__GPIO_74	0x31c2
++				 >;
++		};
++
++		pinctrl_pca9554_22: pinctrl-pca95540-22 {
++			fsl,pins = <
++				VF610_PAD_PTB28__GPIO_98	0x219d
++			>;
++		};
 +	};
 +};
++
+-- 
+2.7.0
