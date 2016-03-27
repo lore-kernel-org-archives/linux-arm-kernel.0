@@ -1,39 +1,57 @@
-From: cwchoi00@gmail.com (Chanwoo Choi)
-Date: Sun, 27 Mar 2016 22:57:23 +0900
-Subject: [PATCH v5 00/21] PM / devferq: Add generic exynos bus frequency
- driver and new passive governor
-In-Reply-To: <CANAwSgTihXTNasXaSE-L2oZcwCcovUiat_yv=Opweo3zvMjZDg@mail.gmail.com>
-References: <1458793530-31897-1-git-send-email-cw00.choi@samsung.com>
- <56F36D65.6030504@samsung.com>
- <CANAwSgTihXTNasXaSE-L2oZcwCcovUiat_yv=Opweo3zvMjZDg@mail.gmail.com>
-Message-ID: <CAGTfZH3UYY1o6z=i5ADe0jNih6y6rkYT09Q==V2Yv+hA4Yx+ew@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 27 Mar 2016 16:03:48 +0200
+Subject: [PATCH 2/2] pci: host: new driver for Marvell Armada 7K/8K PCIe
+ controller
+In-Reply-To: <1459071058-18328-3-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1459071058-18328-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1459071058-18328-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20160327140348.GA19498@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anand,
+> +static irqreturn_t armada8k_pcie_irq_handler(int irq, void *arg)
+> +{
+> +	struct pcie_port *pp = arg;
+> +	struct armada8k_pcie *pcie = to_armada8k_pcie(pp);
+> +	void __iomem *base = pcie->base;
+> +	u32 val;
+> +
+> +	val = readl(base + PCIE_GLOBAL_INT_CAUSE1_REG);
+> +	writel(val, base + PCIE_GLOBAL_INT_CAUSE1_REG);
+> +
+> +	return IRQ_HANDLED;
 
-On Sun, Mar 27, 2016 at 9:28 PM, Anand Moon <linux.amoon@gmail.com> wrote:
-> Hi Chanwoo Choi,
->
-> On 24 March 2016 at 10:00, Chanwoo Choi <cw00.choi@samsung.com> wrote:
->> Dear Anand and Tobias,
->>
->> To Anand,
->> First of all, thanks to your test on previous patchset.
->> I removed the your tested-by tag from this version
->> because I modified the devfreq core using DEVFREQ_TRANSITION_NOTIFIER notifier.
->> I think that this patch-set need to test with this patchset.
->> If you possible, could you please test this patch-set? Thanks in advance.
->>
-> I have being following this series, I have tested this series on Odroid U3.
->
-> Please feel free to add my Tested tag if needed
->
-> Tested-by: Anand Moon <linux.amoon@gmail.com>
+Hi Thomas
 
-Thanks for your test again.
+Maybe a comment as to why you are just throwing them away.
 
-Best Regards,
-Chanwoo Choi
+> +}
+> +
+> +static struct pcie_host_ops armada8k_pcie_host_ops = {
+> +	.link_up = armada8k_pcie_link_up,
+> +	.host_init = armada8k_pcie_host_init,
+> +};
+> +
+> +static int armada8k_pcie_probe(struct platform_device *pdev)
+> +{
+> +	struct armada8k_pcie *pcie;
+> +	struct pcie_port *pp;
+> +	struct device *dev = &pdev->dev;
+> +	struct resource *base;
+> +	int ret;
+> +
+> +	pcie = devm_kzalloc(dev, sizeof(*pcie), GFP_KERNEL);
+> +	if (!pcie)
+> +		return -ENOMEM;
+> +
+> +	pcie->main_clk = devm_clk_get(dev, "main");
+> +	if (!IS_ERR(pcie->main_clk))
+> +		clk_prepare_enable(pcie->main_clk);
+> +
+> +	pcie->lane_clk = devm_clk_get(dev, "port");
+> +	if (!IS_ERR(pcie->lane_clk))
+> +		clk_prepare_enable(pcie->lane_clk);
 
-[snip]
+Any need to handle -EPRODE_DEFERED here?
+
+    Andrew
