@@ -1,27 +1,30 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sun, 27 Mar 2016 13:55:21 -0400
-Subject: [PATCH V2 2/3] vfio, platform: make reset driver a requirement
-In-Reply-To: <56F7FA8E.9000707@linaro.org>
-References: <1457715275-11925-1-git-send-email-okaya@codeaurora.org>
- <1457715275-11925-3-git-send-email-okaya@codeaurora.org>
- <56E5A271.6000408@codeaurora.org> <56E8E2CD.3020604@linaro.org>
- <56E96D4C.3080008@codeaurora.org> <56F7FA8E.9000707@linaro.org>
-Message-ID: <56F81E89.1080807@codeaurora.org>
+From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
+Date: Sun, 27 Mar 2016 23:35:04 +0530
+Subject: [PATCH v2 0/6] dmaengine: vdma: AXI DMA's enhancments
+Message-ID: <1459101907-9756-1-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/27/2016 11:21 AM, Eric Auger wrote:
->> How about I add a module parameter which is not set by default? When set,
->> > I don't perform the reset requirement check.
-> Yes that's what I meant
-> 
-> Best Regards
-> 
-> Eric
+This patch series does some enhancments to the VDMA driver
+which includes
+--> Adding support for AXI DMA IP.
+--> Adding support for AXI CDMA IP.
+--> Fixing checkpatch warnings.
 
-Got it. I'll post something soon.
+Kedareswara rao Appana (6):
+  dmaengine: vdma: Fix checkpatch.pl warnings
+  dmaengine: vdma: Rename xilinx_vdma_ prefix to xilinx_dma
+  Documentation: DT: vdma: update binding doc for AXI DMA
+  dmaengine: vdma: Add Support for Xilinx AXI Direct Memory Access
+    Engine
+  Documentation: DT: vdma: update binding doc for AXI CDMA
+  dmaengine: vdma: Add Support for Xilinx AXI Central Direct Memory
+    Access Engine
+
+ .../devicetree/bindings/dma/xilinx/xilinx_vdma.txt |   38 +-
+ drivers/dma/xilinx/xilinx_vdma.c                   | 1335 ++++++++++++++------
+ include/linux/dma/xilinx_dma.h                     |   14 +
+ 3 files changed, 1028 insertions(+), 359 deletions(-)
 
 -- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+2.1.2
