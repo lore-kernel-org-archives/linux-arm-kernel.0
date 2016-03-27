@@ -1,84 +1,189 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 28 Mar 2016 08:38:08 +0900
-Subject: [PATCH v6 19/21] ARM: dts: Add support of bus frequency using VDD_INT
- for exynos3250-rinato
+Date: Mon, 28 Mar 2016 08:38:03 +0900
+Subject: [PATCH v6 14/21] ARM: dts: Add bus nodes using VDD_INT for Exynos3250
 In-Reply-To: <1459121890-4601-1-git-send-email-cw00.choi@samsung.com>
 References: <1459121890-4601-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1459121890-4601-20-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1459121890-4601-15-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the bus device-tree nodes of INT (internal) block
-to enable the bus frequency scaling. The following sub-blocks share
-the VDD_INT power source:
-- LEFTBUS (parent device)
-- RIGHTBUS
-- PERIL
-- LCD0
-- FSYS
-- MCUISP / ISP
-- MFC
+This patch adds the bus nodes using VDD_INT for Exynos3250 SoC.
+Exynos3250 has following AXI buses to translate data between
+DRAM and sub-blocks.
 
-The LEFTBUS is parent device with devfreq ondemand governor
-and the rest of devices depend on the LEFTBUS device.
+Following list specifies the detailed relation between DRAM and sub-blocks:
+- ACLK400 clock for MCUISP
+- ACLK266 clock for ISP
+- ACLK200 clock for FSYS
+- ACLK160 clock for LCD0
+- ACLK100 clock for PERIL
+- GDL clock for LEFTBUS
+- GDR clock for RIGHTBUS
+- SCLK_MFC clock for MFC
 
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- arch/arm/boot/dts/exynos3250-rinato.dts | 41 +++++++++++++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
+ arch/arm/boot/dts/exynos3250.dtsi | 147 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 147 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
-index 9710e79e10a0..09444897b416 100644
---- a/arch/arm/boot/dts/exynos3250-rinato.dts
-+++ b/arch/arm/boot/dts/exynos3250-rinato.dts
-@@ -154,6 +154,47 @@
- 	status = "okay";
+diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
+index 1ae72c4fa55e..b5157492a422 100644
+--- a/arch/arm/boot/dts/exynos3250.dtsi
++++ b/arch/arm/boot/dts/exynos3250.dtsi
+@@ -722,6 +722,153 @@
+ 				opp-microvolt = <875000>;
+ 			};
+ 		};
++
++		bus_leftbus: bus_leftbus {
++			compatible = "samsung,exynos-bus";
++			clocks = <&cmu CLK_DIV_GDL>;
++			clock-names = "bus";
++			operating-points-v2 = <&bus_leftbus_opp_table>;
++			status = "disabled";
++		};
++
++		bus_rightbus: bus_rightbus {
++			compatible = "samsung,exynos-bus";
++			clocks = <&cmu CLK_DIV_GDR>;
++			clock-names = "bus";
++			operating-points-v2 = <&bus_leftbus_opp_table>;
++			status = "disabled";
++		};
++
++		bus_lcd0: bus_lcd0 {
++			compatible = "samsung,exynos-bus";
++			clocks = <&cmu CLK_DIV_ACLK_160>;
++			clock-names = "bus";
++			operating-points-v2 = <&bus_leftbus_opp_table>;
++			status = "disabled";
++		};
++
++		bus_fsys: bus_fsys {
++			compatible = "samsung,exynos-bus";
++			clocks = <&cmu CLK_DIV_ACLK_200>;
++			clock-names = "bus";
++			operating-points-v2 = <&bus_leftbus_opp_table>;
++			status = "disabled";
++		};
++
++		bus_mcuisp: bus_mcuisp {
++			compatible = "samsung,exynos-bus";
++			clocks = <&cmu CLK_DIV_ACLK_400_MCUISP>;
++			clock-names = "bus";
++			operating-points-v2 = <&bus_mcuisp_opp_table>;
++			status = "disabled";
++		};
++
++		bus_isp: bus_isp {
++			compatible = "samsung,exynos-bus";
++			clocks = <&cmu CLK_DIV_ACLK_266>;
++			clock-names = "bus";
++			operating-points-v2 = <&bus_isp_opp_table>;
++			status = "disabled";
++		};
++
++		bus_peril: bus_peril {
++			compatible = "samsung,exynos-bus";
++			clocks = <&cmu CLK_DIV_ACLK_100>;
++			clock-names = "bus";
++			operating-points-v2 = <&bus_peril_opp_table>;
++			status = "disabled";
++		};
++
++		bus_mfc: bus_mfc {
++			compatible = "samsung,exynos-bus";
++			clocks = <&cmu CLK_SCLK_MFC>;
++			clock-names = "bus";
++			operating-points-v2 = <&bus_leftbus_opp_table>;
++			status = "disabled";
++		};
++
++		bus_leftbus_opp_table: opp_table2 {
++			compatible = "operating-points-v2";
++			opp-shared;
++
++			opp at 50000000 {
++				opp-hz = /bits/ 64 <50000000>;
++				opp-microvolt = <900000>;
++			};
++			opp at 80000000 {
++				opp-hz = /bits/ 64 <80000000>;
++				opp-microvolt = <900000>;
++			};
++			opp at 100000000 {
++				opp-hz = /bits/ 64 <100000000>;
++				opp-microvolt = <1000000>;
++			};
++			opp at 134000000 {
++				opp-hz = /bits/ 64 <134000000>;
++				opp-microvolt = <1000000>;
++			};
++			opp at 200000000 {
++				opp-hz = /bits/ 64 <200000000>;
++				opp-microvolt = <1000000>;
++			};
++		};
++
++		bus_mcuisp_opp_table: opp_table3 {
++			compatible = "operating-points-v2";
++			opp-shared;
++
++			opp at 50000000 {
++				opp-hz = /bits/ 64 <50000000>;
++			};
++			opp at 80000000 {
++				opp-hz = /bits/ 64 <80000000>;
++			};
++			opp at 100000000 {
++				opp-hz = /bits/ 64 <100000000>;
++			};
++			opp at 200000000 {
++				opp-hz = /bits/ 64 <200000000>;
++			};
++			opp at 400000000 {
++				opp-hz = /bits/ 64 <400000000>;
++			};
++		};
++
++		bus_isp_opp_table: opp_table4 {
++			compatible = "operating-points-v2";
++			opp-shared;
++
++			opp at 50000000 {
++				opp-hz = /bits/ 64 <50000000>;
++			};
++			opp at 80000000 {
++				opp-hz = /bits/ 64 <80000000>;
++			};
++			opp at 100000000 {
++				opp-hz = /bits/ 64 <100000000>;
++			};
++			opp at 200000000 {
++				opp-hz = /bits/ 64 <200000000>;
++			};
++			opp at 300000000 {
++				opp-hz = /bits/ 64 <300000000>;
++			};
++		};
++
++		bus_peril_opp_table: opp_table5 {
++			compatible = "operating-points-v2";
++			opp-shared;
++
++			opp at 50000000 {
++				opp-hz = /bits/ 64 <50000000>;
++			};
++			opp at 80000000 {
++				opp-hz = /bits/ 64 <80000000>;
++			};
++			opp at 100000000 {
++				opp-hz = /bits/ 64 <100000000>;
++			};
++		};
+ 	};
  };
  
-+&bus_leftbus {
-+	devfreq-events = <&ppmu_leftbus_3>, <&ppmu_rightbus_3>;
-+	vdd-supply = <&buck3_reg>;
-+	status = "okay";
-+};
-+
-+&bus_rightbus {
-+	devfreq = <&bus_leftbus>;
-+	status = "okay";
-+};
-+
-+&bus_lcd0 {
-+	devfreq = <&bus_leftbus>;
-+	status = "okay";
-+};
-+
-+&bus_fsys {
-+	devfreq = <&bus_leftbus>;
-+	status = "okay";
-+};
-+
-+&bus_mcuisp {
-+	devfreq = <&bus_leftbus>;
-+	status = "okay";
-+};
-+
-+&bus_isp {
-+	devfreq = <&bus_leftbus>;
-+	status = "okay";
-+};
-+
-+&bus_peril {
-+	devfreq = <&bus_leftbus>;
-+	status = "okay";
-+};
-+
-+&bus_mfc {
-+	devfreq = <&bus_leftbus>;
-+	status = "okay";
-+};
-+
- &cpu0 {
- 	cpu0-supply = <&buck2_reg>;
- };
 -- 
 1.9.1
