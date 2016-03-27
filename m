@@ -1,64 +1,80 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Sun, 27 Mar 2016 12:27:42 -0700
-Subject: [PATCH v2 5/6] Documentation: DT: vdma: update binding doc for
- AXI CDMA
-In-Reply-To: <1459101966-9932-2-git-send-email-appanad@xilinx.com>
-References: <1459101966-9932-1-git-send-email-appanad@xilinx.com>
- <1459101966-9932-2-git-send-email-appanad@xilinx.com>
-Message-ID: <20160327192742.GJ19212@xsjsorenbubuntu>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 27 Mar 2016 22:26:57 +0200
+Subject: usb: gadget breakage on N900: bind UDC by name passed via
+ usb_gadget_driver structure
+In-Reply-To: <CAB=otbRd+hZaO6ihL3c88Ys_q-R4grmup4cfP70PT+N2JEQ3WQ@mail.gmail.com>
+ <CAB=otbQ=jJNk=CtB4hu51HXxOLxhWEDaeWf3V0Uc7Uh3veXsfg@mail.gmail.com>
+ <CAB=otbQ1J7FZm9vWLwor93+uD3Fv38ykduWMXG3qByNh4mV9=g@mail.gmail.com>
+Message-ID: <20160327202657.GA31059@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2016-03-27 at 23:36:06 +0530, Kedareswara rao Appana wrote:
-> This patch updates the device-tree binding doc for
-> adding support for AXI CDMA.
-> 
-> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
-> ---
-> ---> Modified commit message as suggested by Vinod.
-> ---> Moved the patch to forward in the series as suggested by vinod.
-> 
->  .../devicetree/bindings/dma/xilinx/xilinx_vdma.txt     | 18 +++++++++++++++++-
->  1 file changed, 17 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-> index 5841421..2b0c12b 100644
-> --- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-> +++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-> @@ -8,8 +8,12 @@ target devices. It can be configured to have one channel or two channels.
->  If configured as two channels, one is to transmit to the device and another
->  is to receive from the device.
->  
-> +Xilinx AXI CDMA engine, it does transfers between memory-mapped source
-> +address and a memory-mapped destination address.
-> +
->  Required properties:
-> -- compatible: Should be "xlnx,axi-vdma-1.00.a" or "xlnx,axi-dma-1.00.a"
-> +- compatible: Should be "xlnx,axi-vdma-1.00.a" or "xlnx,axi-dma-1.00.a" or
-> +	      "xlnx,axi-cdma-1.00.a""
->  - #dma-cells: Should be <1>, see "dmas" property below
->  - reg: Should contain VDMA registers location and length.
->  - xlnx,num-fstores: Should be the number of framebuffers as configured in h/w.
-> @@ -80,6 +84,18 @@ axi_dma_0: axidma at 40400000 {
->  	} ;
->  } ;
->  
-> +axi_cdma_0: axicdma at 7e200000 {
-> +       compatible = "xlnx,axi-cdma-1.00.a";
-> +       #dma-cells = <1>;
-> +       reg = < 0x7e200000 0x10000 >;
-> +       xlnx,addrwidth = <0x20>;
-> +       dma-channel at 7e200000 {
-> +               compatible = "xlnx,axi-dma-mm2s-channel";
-> +               interrupts = < 0 55 4 >;
-> +               xlnx,datawidth = <0x40>;
-> +       } ;
-> +} ;
+Hi!
 
-As in the other patch, the node name should be 'dma-controller at ...' and
-the inconsistend spacing could be fixed.
+> >> I managed to boot N900 with working USB gadget (builtin g_ether)
+> >> in boardfile mode, can ping it from PC and transfer data. I don't
+> >> see any issue (except of musb name issue in twl phy driver, I've
+> >> already sent a fix for that: https://lkml.org/lkml/2016/3/24/670 )
+> >>
+> >> Pavel, I still don't see how you've got your issue, please share
+> >> more detials
+> >
+> > Ok, let me try. I undid all the changes in drivers/phy drivers/usb and
+> > include/linux/usb . I have all the gadget stuff built-in, so that I
+> > could use nfsroot, but this is boot from mmcblk.
+> 
+> So do you mean you use original rootfs that was shipeed with N900?
 
-Also, it seems this adds pretty much identical examples that just differ
-in the compat string. Is that really needed?
+No. I'm using Debian ARM root. It includes useful X and even phone
+functions. https://gitlab.com/tui/tui .
 
-	S?ren
+> > gzipped config is attached.
+> 
+> Thanks, I'll try that
+
+Thanks.
+
+> > Dmesg from the n900 is attached as /tmp/delme.gz. I did _not_ apply
+> > the patch from https://lkml.org/lkml/2016/3/24/670 , yet, as I'm using
+> > devicetree boot.
+> 
+> Hmm.. don't see anything strange in the boot log related to USB,
+> I'll try your config
+
+Let me know how it went.
+
+> >> Dmesg from the n900 is attached as /tmp/delme.gz. I did _not_ apply
+> >> the patch from https://lkml.org/lkml/2016/3/24/670 , yet, as I'm using
+> >> devicetree boot.
+> >
+> > Hmm.. don't see anything strange in the boot log related to USB,
+> > I'll try your config
+> 
+> After looking into your config and boot log again, I see you use kernel
+> 4.4, whereas the patch you've told about ("usb: gadget: bind UDC by name
+> passed via usb_gadget_driver structure") was merged only into 4.5 kernel.
+> Could you please try vanilla v4.5 with your config and see if it
+> helps?
+
+...ok, I could do that, but:
+
+> >> I managed to boot N900 with working USB gadget (builtin g_ether)
+> >> in boardfile mode, can ping it from PC and transfer data. I don't
+> >> see any issue (except of musb name issue in twl phy driver, I've
+> >> already sent a fix for that: https://lkml.org/lkml/2016/3/24/670 )
+> >
+> > I tried to add that one, too, and no change. Can I get your .config?
+> 
+> Since you use DT boot, this patch will not have any effect.
+> See my config attached.
+
+...it looks like it is not expected to have any effect.
+
+Ok, let me examine the config.
+
+Best regards,
+
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
