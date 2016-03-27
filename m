@@ -1,82 +1,144 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 28 Mar 2016 08:37:58 +0900
-Subject: [PATCH v6 09/21] PM / devfreq: exynos: Add the detailed correlation
- between sub-blocks and power line
+Date: Mon, 28 Mar 2016 08:38:10 +0900
+Subject: [PATCH v6 21/21] ARM: dts: Add support of bus frequency for
+ exynos4412-trats/odroidu3
 In-Reply-To: <1459121890-4601-1-git-send-email-cw00.choi@samsung.com>
 References: <1459121890-4601-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1459121890-4601-10-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1459121890-4601-22-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the detailed corrleation between sub-blocks and power line
-for Exynos3250, Exynos4210 and Exynos4x12.
+THis patch adds the bus device tree nodes for both MIF (Memory) and INT
+(Internal) block to enable the bus frequency.
+
+The DMC bus is parent device in MIF block using VDD_MIF and the LEFTBUS
+bus is parent device in INT block using VDD_INT.
 
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+[m.reichl and linux.amoon: Tested it on exynos4412-odroidu3 board]
+Tested-by: Markus Reichl <m.reichl@fivetechno.de>
+Tested-by: Anand Moon <linux.amoon@gmail.com>
 ---
- .../devicetree/bindings/devfreq/exynos-bus.txt     | 51 ++++++++++++++++++++++
- 1 file changed, 51 insertions(+)
+ arch/arm/boot/dts/exynos4412-odroid-common.dtsi | 47 +++++++++++++++++++++++++
+ arch/arm/boot/dts/exynos4412-trats2.dts         | 47 +++++++++++++++++++++++++
+ 2 files changed, 94 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/devfreq/exynos-bus.txt b/Documentation/devicetree/bindings/devfreq/exynos-bus.txt
-index 03f13d38f1a1..b098fa2ba5d4 100644
---- a/Documentation/devicetree/bindings/devfreq/exynos-bus.txt
-+++ b/Documentation/devicetree/bindings/devfreq/exynos-bus.txt
-@@ -53,6 +53,57 @@ Optional properties only for parent bus device:
- - exynos,voltage-tolerance: the percentage value for bus voltage tolerance
- 			which is used to calculate the max voltage.
+diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+index b4983cbc4f8c..2015f10071f9 100644
+--- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
++++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+@@ -109,6 +109,53 @@
+ 	};
+ };
  
-+Detailed correlation between sub-blocks and power line according to Exynos SoC:
-+- In case of Exynos3250, there are two power line as following:
-+	VDD_MIF |--- DMC
++&bus_dmc {
++	devfreq-events = <&ppmu_dmc0_3>, <&ppmu_dmc1_3>;
++	vdd-supply = <&buck1_reg>;
++	status = "okay";
++};
 +
-+	VDD_INT |--- LEFTBUS (parent device)
-+		|--- PERIL
-+		|--- MFC
-+		|--- G3D
-+		|--- RIGHTBUS
-+		|--- PERIR
-+		|--- FSYS
-+		|--- LCD0
-+		|--- PERIR
-+		|--- ISP
-+		|--- CAM
++&bus_acp {
++	devfreq = <&bus_dmc>;
++	status = "okay";
++};
 +
-+- In case of Exynos4210, there is one power line as following:
-+	VDD_INT |--- DMC (parent device)
-+		|--- LEFTBUS
-+		|--- PERIL
-+		|--- MFC(L)
-+		|--- G3D
-+		|--- TV
-+		|--- LCD0
-+		|--- RIGHTBUS
-+		|--- PERIR
-+		|--- MFC(R)
-+		|--- CAM
-+		|--- FSYS
-+		|--- GPS
-+		|--- LCD0
-+		|--- LCD1
++&bus_c2c {
++	devfreq = <&bus_dmc>;
++	status = "okay";
++};
 +
-+- In case of Exynos4x12, there are two power line as following:
-+	VDD_MIF |--- DMC
++&bus_leftbus {
++	devfreq-events = <&ppmu_leftbus_3>, <&ppmu_rightbus_3>;
++	vdd-supply = <&buck3_reg>;
++	status = "okay";
++};
 +
-+	VDD_INT |--- LEFTBUS (parent device)
-+		|--- PERIL
-+		|--- MFC(L)
-+		|--- G3D
-+		|--- TV
-+		|--- IMAGE
-+		|--- RIGHTBUS
-+		|--- PERIR
-+		|--- MFC(R)
-+		|--- CAM
-+		|--- FSYS
-+		|--- GPS
-+		|--- LCD0
-+		|--- ISP
++&bus_rightbus {
++	devfreq = <&bus_leftbus>;
++	status = "okay";
++};
 +
- Example1:
- 	Show the AXI buses of Exynos3250 SoC. Exynos3250 divides the buses to
- 	power line (regulator). The MIF (Memory Interface) AXI bus is used to
++&bus_display {
++	devfreq = <&bus_leftbus>;
++	status = "okay";
++};
++
++&bus_fsys {
++	devfreq = <&bus_leftbus>;
++	status = "okay";
++};
++
++&bus_peri {
++	devfreq = <&bus_leftbus>;
++	status = "okay";
++};
++
++&bus_mfc {
++	devfreq = <&bus_leftbus>;
++	status = "okay";
++};
++
+ &cpu0 {
+ 	cpu0-supply = <&buck2_reg>;
+ };
+diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+index dce3cebe0606..9f3fb9a7f5f4 100644
+--- a/arch/arm/boot/dts/exynos4412-trats2.dts
++++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+@@ -289,6 +289,53 @@
+ 	status = "okay";
+ };
+ 
++&bus_dmc {
++	devfreq-events = <&ppmu_dmc0_3>, <&ppmu_dmc1_3>;
++	vdd-supply = <&buck1_reg>;
++	status = "okay";
++};
++
++&bus_acp {
++	devfreq = <&bus_dmc>;
++	status = "okay";
++};
++
++&bus_c2c {
++	devfreq = <&bus_dmc>;
++	status = "okay";
++};
++
++&bus_leftbus {
++	devfreq-events = <&ppmu_leftbus_3>, <&ppmu_rightbus_3>;
++	vdd-supply = <&buck3_reg>;
++	status = "okay";
++};
++
++&bus_rightbus {
++	devfreq = <&bus_leftbus>;
++	status = "okay";
++};
++
++&bus_display {
++	devfreq = <&bus_leftbus>;
++	status = "okay";
++};
++
++&bus_fsys {
++	devfreq = <&bus_leftbus>;
++	status = "okay";
++};
++
++&bus_peri {
++	devfreq = <&bus_leftbus>;
++	status = "okay";
++};
++
++&bus_mfc {
++	devfreq = <&bus_leftbus>;
++	status = "okay";
++};
++
+ &cpu0 {
+ 	cpu0-supply = <&buck2_reg>;
+ };
 -- 
 1.9.1
