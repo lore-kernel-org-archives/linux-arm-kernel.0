@@ -1,60 +1,326 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Sun, 27 Mar 2016 15:48:21 -0700
-Subject: [PATCH v4] ARM: dts: vf610-zii-dev: Add ZII development board.
-In-Reply-To: <20160327223603.GA21605@lunn.ch>
-References: <1459100733-21552-1-git-send-email-andrew@lunn.ch>
- <56F84FAB.6010005@gmail.com> <20160327223603.GA21605@lunn.ch>
-Message-ID: <dad27c3a958ae97869c606e9e02e2d7b@agner.ch>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 28 Mar 2016 08:37:53 +0900
+Subject: [PATCH v6 04/21] PM / devfreq: Add new DEVFREQ_TRANSITION_NOTIFIER
+ notifier
+In-Reply-To: <1459121890-4601-1-git-send-email-cw00.choi@samsung.com>
+References: <1459121890-4601-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1459121890-4601-5-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-03-27 15:36, Andrew Lunn wrote:
-> Hi Marek
-> 
->> > +&i2c2 {
->> > +	clock-frequency = <100000>;
->> > +	pinctrl-names = "default";
->> > +	pinctrl-0 = <&pinctrl_i2c2>;
->> > +	status = "okay";
->> > +
->> > +	tca9548 at 70 {
->>
->> This should be pca9... , not tca9... :-)
-> 
-> The schematics for the board show that the device is a tca9548, so i
-> assume it is the T.I. part, not the NXP. But it is compatible at the
-> register level with the pca9548, hence the compatible string. So i
-> would say the label is correct, it matches the hardware.
-> 
->>
->> > +		compatible = "nxp,pca9548";
->> > +		#address-cells = <1>;
->> > +		#size-cells = <0>;
->> > +		reg = <0x70>;
->> > +		reset-gpios = <&gpio3 23 GPIO_ACTIVE_LOW>;
->> > +
->>
->> [...]
->>
->> > +&uart0 {
->> > +	pinctrl-names = "default";
->> > +	pinctrl-0 = <&pinctrl_uart0>;
->> > +	status = "okay";
->> > +	dmas = <>;
->> > +	dma-names = "";
->>
->> Why is this dma stuff here ?
-> 
-> We have seen corruption of the serial transmit stream, when the DMA is
-> being used. As a workaround, we disable DMA.
-> 
+This patch adds the new DEVFREQ_TRANSITION_NOTIFIER notifier to send
+the notification when the frequency of device is changed.
+This notifier has two state as following:
+- DEVFREQ_PRECHANGE  : Notify it before chaning the frequency of device
+- DEVFREQ_POSTCHANGE : Notify it after changed the frequency of device
 
-For the Colibri VF50/VF61 we used this method too to disable the DMA
-(clearing dma-names). I guess using the device tree deleting
-capabilities would be the more elegant way to do this.
+And this patch adds the resourced-managed function to release the resource
+automatically when error happen.
 
-We have seen such issues too, the DMA implementation of the LPUART
-driver seems to be racy... We are working on fixing that.
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+[m.reichl and linux.amoon: Tested it on exynos4412-odroidu3 board]
+Tested-by: Markus Reichl <m.reichl@fivetechno.de>
+Tested-by: Anand Moon <linux.amoon@gmail.com>
+---
+ drivers/devfreq/devfreq.c | 163 +++++++++++++++++++++++++++++++++++++++++++++-
+ include/linux/devfreq.h   |  58 ++++++++++++++++-
+ 2 files changed, 219 insertions(+), 2 deletions(-)
 
---
-Stefan
+diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
+index 20a9422c2552..1d6c803804d5 100644
+--- a/drivers/devfreq/devfreq.c
++++ b/drivers/devfreq/devfreq.c
+@@ -189,6 +189,29 @@ static struct devfreq_governor *find_devfreq_governor(const char *name)
+ 	return ERR_PTR(-ENODEV);
+ }
+ 
++static int devfreq_notify_transition(struct devfreq *devfreq,
++		struct devfreq_freqs *freqs, unsigned int state)
++{
++	if (!devfreq)
++		return -EINVAL;
++
++	switch (state) {
++	case DEVFREQ_PRECHANGE:
++		srcu_notifier_call_chain(&devfreq->transition_notifier_list,
++				DEVFREQ_PRECHANGE, freqs);
++		break;
++
++	case DEVFREQ_POSTCHANGE:
++		srcu_notifier_call_chain(&devfreq->transition_notifier_list,
++				DEVFREQ_POSTCHANGE, freqs);
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
+ /* Load monitoring helper functions for governors use */
+ 
+ /**
+@@ -200,7 +223,8 @@ static struct devfreq_governor *find_devfreq_governor(const char *name)
+  */
+ int update_devfreq(struct devfreq *devfreq)
+ {
+-	unsigned long freq;
++	struct devfreq_freqs freqs;
++	unsigned long freq, cur_freq;
+ 	int err = 0;
+ 	u32 flags = 0;
+ 
+@@ -234,10 +258,22 @@ int update_devfreq(struct devfreq *devfreq)
+ 		flags |= DEVFREQ_FLAG_LEAST_UPPER_BOUND; /* Use LUB */
+ 	}
+ 
++	if (devfreq->profile->get_cur_freq)
++		devfreq->profile->get_cur_freq(devfreq->dev.parent, &cur_freq);
++	else
++		cur_freq = devfreq->previous_freq;
++
++	freqs.old = cur_freq;
++	freqs.new = freq;
++	devfreq_notify_transition(devfreq, &freqs, DEVFREQ_PRECHANGE);
++
+ 	err = devfreq->profile->target(devfreq->dev.parent, &freq, flags);
+ 	if (err)
+ 		return err;
+ 
++	freqs.new = freq;
++	devfreq_notify_transition(devfreq, &freqs, DEVFREQ_POSTCHANGE);
++
+ 	if (devfreq->profile->freq_table)
+ 		if (devfreq_update_status(devfreq, freq))
+ 			dev_err(&devfreq->dev,
+@@ -542,6 +578,8 @@ struct devfreq *devfreq_add_device(struct device *dev,
+ 		goto err_out;
+ 	}
+ 
++	srcu_init_notifier_head(&devfreq->transition_notifier_list);
++
+ 	mutex_unlock(&devfreq->lock);
+ 
+ 	mutex_lock(&devfreq_list_lock);
+@@ -1310,6 +1348,129 @@ void devm_devfreq_unregister_opp_notifier(struct device *dev,
+ }
+ EXPORT_SYMBOL(devm_devfreq_unregister_opp_notifier);
+ 
++/**
++ * devfreq_register_notifier() - Register a driver with devfreq
++ * @devfreq:	The devfreq object.
++ * @nb:		The notifier block to register.
++ * @list:	DEVFREQ_TRANSITION_NOTIFIER.
++ */
++int devfreq_register_notifier(struct devfreq *devfreq,
++				struct notifier_block *nb,
++				unsigned int list)
++{
++	int ret = 0;
++
++	if (!devfreq)
++		return -EINVAL;
++
++	switch (list) {
++	case DEVFREQ_TRANSITION_NOTIFIER:
++		ret = srcu_notifier_chain_register(
++				&devfreq->transition_notifier_list, nb);
++		break;
++	default:
++		ret = -EINVAL;
++	}
++
++	return ret;
++}
++EXPORT_SYMBOL(devfreq_register_notifier);
++
++/*
++ * devfreq_unregister_notifier() - Unregister a driver with devfreq
++ * @devfreq:	The devfreq object.
++ * @nb:		The notifier block to be unregistered.
++ * @list:	DEVFREQ_TRANSITION_NOTIFIER.
++ */
++int devfreq_unregister_notifier(struct devfreq *devfreq,
++				struct notifier_block *nb,
++				unsigned int list)
++{
++	int ret = 0;
++
++	if (!devfreq)
++		return -EINVAL;
++
++	switch (list) {
++	case DEVFREQ_TRANSITION_NOTIFIER:
++		ret = srcu_notifier_chain_unregister(
++				&devfreq->transition_notifier_list, nb);
++		break;
++	default:
++		ret = -EINVAL;
++	}
++
++	return ret;
++}
++EXPORT_SYMBOL(devfreq_unregister_notifier);
++
++struct devfreq_notifier_devres {
++	struct devfreq *devfreq;
++	struct notifier_block *nb;
++	unsigned int list;
++};
++
++static void devm_devfreq_notifier_release(struct device *dev, void *res)
++{
++	struct devfreq_notifier_devres *this = res;
++
++	devfreq_unregister_notifier(this->devfreq, this->nb, this->list);
++}
++
++/**
++ * devm_devfreq_register_notifier()
++	- Resource-managed devfreq_register_notifier()
++ * @dev:	The devfreq user device. (parent of devfreq)
++ * @devfreq:	The devfreq object.
++ * @nb:		The notifier block to be unregistered.
++ * @list:	DEVFREQ_TRANSITION_NOTIFIER.
++ */
++int devm_devfreq_register_notifier(struct device *dev,
++				struct devfreq *devfreq,
++				struct notifier_block *nb,
++				unsigned int list)
++{
++	struct devfreq_notifier_devres *ptr;
++	int ret;
++
++	ptr = devres_alloc(devm_devfreq_notifier_release, sizeof(*ptr),
++				GFP_KERNEL);
++	if (!ptr)
++		return -ENOMEM;
++
++	ret = devfreq_register_notifier(devfreq, nb, list);
++	if (ret) {
++		devres_free(ptr);
++		return ret;
++	}
++
++	ptr->devfreq = devfreq;
++	ptr->nb = nb;
++	ptr->list = list;
++	devres_add(dev, ptr);
++
++	return 0;
++}
++EXPORT_SYMBOL(devm_devfreq_register_notifier);
++
++/**
++ * devm_devfreq_unregister_notifier()
++	- Resource-managed devfreq_unregister_notifier()
++ * @dev:	The devfreq user device. (parent of devfreq)
++ * @devfreq:	The devfreq object.
++ * @nb:		The notifier block to be unregistered.
++ * @list:	DEVFREQ_TRANSITION_NOTIFIER.
++ */
++void devm_devfreq_unregister_notifier(struct device *dev,
++				struct devfreq *devfreq,
++				struct notifier_block *nb,
++				unsigned int list)
++{
++	WARN_ON(devres_release(dev, devm_devfreq_notifier_release,
++			       devm_devfreq_dev_match, devfreq));
++}
++EXPORT_SYMBOL(devm_devfreq_unregister_notifier);
++
+ MODULE_AUTHOR("MyungJoo Ham <myungjoo.ham@samsung.com>");
+ MODULE_DESCRIPTION("devfreq class support");
+ MODULE_LICENSE("GPL");
+diff --git a/include/linux/devfreq.h b/include/linux/devfreq.h
+index aa0b8424ebc3..152ea342529c 100644
+--- a/include/linux/devfreq.h
++++ b/include/linux/devfreq.h
+@@ -19,6 +19,13 @@
+ 
+ #define DEVFREQ_NAME_LEN 16
+ 
++/* DEVFREQ notifier interface */
++#define DEVFREQ_TRANSITION_NOTIFIER	(0)
++
++/* Transition notifiers of DEVFREQ_TRANSITION_NOTIFIER */
++#define	DEVFREQ_PRECHANGE		(0)
++#define DEVFREQ_POSTCHANGE		(1)
++
+ struct devfreq;
+ 
+ /**
+@@ -177,6 +184,13 @@ struct devfreq {
+ 	unsigned int *trans_table;
+ 	unsigned long *time_in_state;
+ 	unsigned long last_stat_updated;
++
++	struct srcu_notifier_head transition_notifier_list;
++};
++
++struct devfreq_freqs {
++	unsigned long old;
++	unsigned long new;
+ };
+ 
+ #if defined(CONFIG_PM_DEVFREQ)
+@@ -207,7 +221,20 @@ extern int devm_devfreq_register_opp_notifier(struct device *dev,
+ 					      struct devfreq *devfreq);
+ extern void devm_devfreq_unregister_opp_notifier(struct device *dev,
+ 						struct devfreq *devfreq);
+-
++extern int devfreq_register_notifier(struct devfreq *devfreq,
++					struct notifier_block *nb,
++					unsigned int list);
++extern int devfreq_unregister_notifier(struct devfreq *devfreq,
++					struct notifier_block *nb,
++					unsigned int list);
++extern int devm_devfreq_register_notifier(struct device *dev,
++				struct devfreq *devfreq,
++				struct notifier_block *nb,
++				unsigned int list);
++extern void devm_devfreq_unregister_notifier(struct device *dev,
++				struct devfreq *devfreq,
++				struct notifier_block *nb,
++				unsigned int list);
+ extern struct devfreq *devfreq_get_devfreq_by_phandle(struct device *dev,
+ 						int index);
+ 
+@@ -310,6 +337,35 @@ static inline void devm_devfreq_unregister_opp_notifier(struct device *dev,
+ {
+ }
+ 
++static inline int devfreq_register_notifier(struct devfreq *devfreq,
++					struct notifier_block *nb,
++					unsigned int list)
++{
++	return 0;
++}
++
++static inline int devfreq_unregister_notifier(struct devfreq *devfreq,
++					struct notifier_block *nb,
++					unsigned int list)
++{
++	return 0;
++}
++
++static inline int devm_devfreq_register_notifier(struct device *dev,
++				struct devfreq *devfreq,
++				struct notifier_block *nb,
++				unsigned int list)
++{
++	return 0;
++}
++
++static inline void devm_devfreq_unregister_notifier(struct device *dev,
++				struct devfreq *devfreq,
++				struct notifier_block *nb,
++				unsigned int list)
++{
++}
++
+ static inline struct devfreq *devfreq_get_devfreq_by_phandle(struct device *dev,
+ 							int index)
+ {
+-- 
+1.9.1
