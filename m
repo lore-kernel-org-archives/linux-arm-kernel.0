@@ -1,80 +1,52 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 27 Mar 2016 22:26:57 +0200
-Subject: usb: gadget breakage on N900: bind UDC by name passed via
- usb_gadget_driver structure
-In-Reply-To: <CAB=otbRd+hZaO6ihL3c88Ys_q-R4grmup4cfP70PT+N2JEQ3WQ@mail.gmail.com>
- <CAB=otbQ=jJNk=CtB4hu51HXxOLxhWEDaeWf3V0Uc7Uh3veXsfg@mail.gmail.com>
- <CAB=otbQ1J7FZm9vWLwor93+uD3Fv38ykduWMXG3qByNh4mV9=g@mail.gmail.com>
-Message-ID: <20160327202657.GA31059@amd>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Sun, 27 Mar 2016 17:10:55 -0400
+Subject: [PATCH 1/4] drivers/bus: make brcmstb_gisb.c driver explicitly
+ non-modular
+In-Reply-To: <1459113058-14340-1-git-send-email-paul.gortmaker@windriver.com>
+References: <1459113058-14340-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <1459113058-14340-2-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+The Kconfig for this driver is currently:
 
-> >> I managed to boot N900 with working USB gadget (builtin g_ether)
-> >> in boardfile mode, can ping it from PC and transfer data. I don't
-> >> see any issue (except of musb name issue in twl phy driver, I've
-> >> already sent a fix for that: https://lkml.org/lkml/2016/3/24/670 )
-> >>
-> >> Pavel, I still don't see how you've got your issue, please share
-> >> more detials
-> >
-> > Ok, let me try. I undid all the changes in drivers/phy drivers/usb and
-> > include/linux/usb . I have all the gadget stuff built-in, so that I
-> > could use nfsroot, but this is boot from mmcblk.
-> 
-> So do you mean you use original rootfs that was shipeed with N900?
+config BRCMSTB_GISB_ARB
+        bool "Broadcom STB GISB bus arbiter"
 
-No. I'm using Debian ARM root. It includes useful X and even phone
-functions. https://gitlab.com/tui/tui .
+...meaning that it currently is not being built as a module by anyone.
+Lets remove all modular references, so that when reading the driver
+there is no doubt it is builtin-only.
 
-> > gzipped config is attached.
-> 
-> Thanks, I'll try that
+Since module_init translates to device_initcall in the non-modular
+case, the init ordering remains unchanged with this commit.
 
-Thanks.
+Cc: Brian Norris <computersforpeace@gmail.com>
+Cc: Gregory Fong <gregory.0xf0@gmail.com>
+Cc: Florian Fainelli <f.fainelli@gmail.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+---
+ drivers/bus/brcmstb_gisb.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-> > Dmesg from the n900 is attached as /tmp/delme.gz. I did _not_ apply
-> > the patch from https://lkml.org/lkml/2016/3/24/670 , yet, as I'm using
-> > devicetree boot.
-> 
-> Hmm.. don't see anything strange in the boot log related to USB,
-> I'll try your config
-
-Let me know how it went.
-
-> >> Dmesg from the n900 is attached as /tmp/delme.gz. I did _not_ apply
-> >> the patch from https://lkml.org/lkml/2016/3/24/670 , yet, as I'm using
-> >> devicetree boot.
-> >
-> > Hmm.. don't see anything strange in the boot log related to USB,
-> > I'll try your config
-> 
-> After looking into your config and boot log again, I see you use kernel
-> 4.4, whereas the patch you've told about ("usb: gadget: bind UDC by name
-> passed via usb_gadget_driver structure") was merged only into 4.5 kernel.
-> Could you please try vanilla v4.5 with your config and see if it
-> helps?
-
-...ok, I could do that, but:
-
-> >> I managed to boot N900 with working USB gadget (builtin g_ether)
-> >> in boardfile mode, can ping it from PC and transfer data. I don't
-> >> see any issue (except of musb name issue in twl phy driver, I've
-> >> already sent a fix for that: https://lkml.org/lkml/2016/3/24/670 )
-> >
-> > I tried to add that one, too, and no change. Can I get your .config?
-> 
-> Since you use DT boot, this patch will not have any effect.
-> See my config attached.
-
-...it looks like it is not expected to have any effect.
-
-Ok, let me examine the config.
-
-Best regards,
-
-									Pavel
+diff --git a/drivers/bus/brcmstb_gisb.c b/drivers/bus/brcmstb_gisb.c
+index f364fa4d24eb..319104b22ca4 100644
+--- a/drivers/bus/brcmstb_gisb.c
++++ b/drivers/bus/brcmstb_gisb.c
+@@ -13,7 +13,6 @@
+ 
+ #include <linux/init.h>
+ #include <linux/types.h>
+-#include <linux/module.h>
+ #include <linux/platform_device.h>
+ #include <linux/interrupt.h>
+ #include <linux/sysfs.h>
+@@ -408,5 +407,4 @@ static int __init brcm_gisb_driver_init(void)
+ 	return platform_driver_probe(&brcmstb_gisb_arb_driver,
+ 				     brcmstb_gisb_arb_probe);
+ }
+-
+-module_init(brcm_gisb_driver_init);
++device_initcall(brcm_gisb_driver_init);
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+2.6.1
