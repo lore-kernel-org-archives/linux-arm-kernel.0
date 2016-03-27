@@ -1,62 +1,26 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sun, 27 Mar 2016 23:24:59 +0200
-Subject: [PATCH v4] ARM: dts: vf610-zii-dev: Add ZII development board.
-In-Reply-To: <1459100733-21552-1-git-send-email-andrew@lunn.ch>
-References: <1459100733-21552-1-git-send-email-andrew@lunn.ch>
-Message-ID: <56F84FAB.6010005@gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Sun, 27 Mar 2016 23:26:52 +0200
+Subject: [PATCH v5 1/4] clk: rockchip: fix big.LITTLE cores alternate
+ reparent failed
+In-Reply-To: <1458974276-10325-2-git-send-email-zhengxing@rock-chips.com>
+References: <1458974276-10325-1-git-send-email-zhengxing@rock-chips.com>
+ <1458974276-10325-2-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <1608479.lxyeMomFsd@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/27/2016 07:45 PM, Andrew Lunn wrote:
-> From: Cory Tusar <cory.tusar@pid1solutions.com>
+Am Samstag, 26. M?rz 2016, 14:37:53 schrieb Xing Zheng:
+> On the RK3399, the order of the core's parents are LPLL/BPLL/DPLL/GPLL,
+> there is incorrect to select bit_0 and bit_1 as the main and alternate
+> parents for LPLL/BPLL. They should be configurable.
 > 
-> This commit adds support for Rev. B of a Zodiac Inflight Innovations
-> development board, mainly intended for DSA and ARINC 429 development
-> work.
-> 
-> Signed-off-by: Cory Tusar <cory.tusar@pid1solutions.com>
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> Acked-by: Stefan Agner <stefan@agner.ch>
+> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
 
-Hi!
+I've folded this fix into the original patch [0]
 
-just minor nit below.
 
-[..]
+Thanks
+Heiko
 
-> +&i2c2 {
-> +	clock-frequency = <100000>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c2>;
-> +	status = "okay";
-> +
-> +	tca9548 at 70 {
 
-This should be pca9... , not tca9... :-)
-
-> +		compatible = "nxp,pca9548";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		reg = <0x70>;
-> +		reset-gpios = <&gpio3 23 GPIO_ACTIVE_LOW>;
-> +
-
-[...]
-
-> +&uart0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart0>;
-> +	status = "okay";
-> +	dmas = <>;
-> +	dma-names = "";
-
-Why is this dma stuff here ?
-
-> +};
-> +
-
-[...]
-
--- 
-Best regards,
-Marek Vasut
+[0] https://git.kernel.org/cgit/linux/kernel/git/mmind/linux-rockchip.git/commit/?h=v4.7-clk/next&id=268aebaa2410152bf91ea1ede6b284ff8138822d
