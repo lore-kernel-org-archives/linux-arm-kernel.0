@@ -1,71 +1,72 @@
 From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Sun, 27 Mar 2016 17:10:56 -0400
-Subject: [PATCH 2/4] drivers/bus: make imx-weim.c explicitly non-modular
-In-Reply-To: <1459113058-14340-1-git-send-email-paul.gortmaker@windriver.com>
-References: <1459113058-14340-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <1459113058-14340-3-git-send-email-paul.gortmaker@windriver.com>
+Date: Sun, 27 Mar 2016 17:10:54 -0400
+Subject: [PATCH 0/4] drivers/bus: remove unused modular code from non-modular
+ drivers
+Message-ID: <1459113058-14340-1-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Kconfig currently controlling compilation of this code is:
+The drivers/bus doesn't have a strict maintainer entry, but since
+all the changes here are for ARM platforms, I'm Cc'ing arm-kernel
+and hoping it makes sense to vector these few changes through the
+arm-soc. [Olof, Will, Arnd? Seems you guys handle most of it...]
 
-drivers/bus/Kconfig:config IMX_WEIM
-drivers/bus/Kconfig:    bool "Freescale EIM DRIVER
+My ongoing audit looking for non-modular code that needlessly uses
+modular macros (vs. built-in equivalents) and/or has dead code
+relating to module unloading that can never be executed led to the
+creation of these four commits.
 
-...meaning that it currently is not being built as a module by anyone.
+Two are of the trivial kind, where we substitute in the non-modular
+versions that CPP would have put in place anyway, resulting in no
+actual changes, even at the binary output level.
 
-Lets remove the modular code that is essentially orphaned, so that
-when reading the driver there is no doubt it is builtin-only.
+The other two are of the kind where there was a ".remove" function
+registered into the driver struct.  Being non-modular, these
+functions will never be called via a normal module_exit path.
 
-Since module_platform_driver() uses the same init level priority as
-builtin_platform_driver() the init ordering remains unchanged with
-this commit.
+However, since it was possible (but largely pointless, and without
+a real use case) to unbind these drivers via sysfs, we explicitly
+disallow the unbind as part of the removal of the ".remove" itself.
 
-Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
+For anyone new to the underlying goal of this cleanup, we are trying to
+not use module support for code that can never be built as a module since:
 
-We also delete the MODULE_LICENSE tag etc. since all that information
-is already contained at the top of the file in the comments.
+ (1) it is easy to accidentally write unused module_exit and remove code
+ (2) it can be misleading when reading the source, thinking it can be
+     modular when the Makefile and/or Kconfig prohibit it
+ (3) it requires the include of the module.h header file which in turn
+     includes nearly everything else, thus adding to CPP overhead.
+ (4) it gets copied/replicated into other code and spreads like weeds.
 
-Cc: Shawn Guo <shawn.guo@linaro.org>
+Build tested for arm and arm64 on v4.6-rc1 to ensure no silly typos
+that would break compilation crept in.
+
+---
+
 Cc: Alison Chaiken <alison_chaiken@mentor.com>
+Cc: Brian Norris <computersforpeace@gmail.com>
+Cc: Florian Fainelli <f.fainelli@gmail.com>
+Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+Cc: Gregory Fong <gregory.0xf0@gmail.com>
+Cc: Kevin Hilman <khilman@linaro.org>
+Cc: Pawel Moll <pawel.moll@arm.com>
 Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Simon Horman <horms+renesas@verge.net.au>
 Cc: Wolfram Sang <wsa@the-dreams.de>
 Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
----
- drivers/bus/imx-weim.c | 9 ++-------
- 1 file changed, 2 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/bus/imx-weim.c b/drivers/bus/imx-weim.c
-index 1827fc4d15c1..d8592d9d2bc3 100644
---- a/drivers/bus/imx-weim.c
-+++ b/drivers/bus/imx-weim.c
-@@ -7,7 +7,7 @@
-  * License version 2. This program is licensed "as is" without any
-  * warranty of any kind, whether express or implied.
-  */
--#include <linux/module.h>
-+#include <linux/init.h>
- #include <linux/clk.h>
- #include <linux/io.h>
- #include <linux/of_device.h>
-@@ -57,7 +57,6 @@ static const struct of_device_id weim_id_table[] = {
- 	{ .compatible = "fsl,imx51-weim", .data = &imx51_weim_devtype, },
- 	{ }
- };
--MODULE_DEVICE_TABLE(of, weim_id_table);
- 
- static int __init imx_weim_gpr_setup(struct platform_device *pdev)
- {
-@@ -210,8 +209,4 @@ static struct platform_driver weim_driver = {
- 		.of_match_table	= weim_id_table,
- 	},
- };
--module_platform_driver_probe(weim_driver, weim_probe);
--
--MODULE_AUTHOR("Freescale Semiconductor Inc.");
--MODULE_DESCRIPTION("i.MX EIM Controller Driver");
--MODULE_LICENSE("GPL");
-+builtin_platform_driver_probe(weim_driver, weim_probe);
+Paul Gortmaker (4):
+  drivers/bus: make brcmstb_gisb.c driver explicitly non-modular
+  drivers/bus: make imx-weim.c explicitly non-modular
+  drivers/bus: make simple-pm-bus.c explicitly non-modular
+  drivers/bus: make arm-ccn.c driver explicitly non-modular
+
+ drivers/bus/arm-ccn.c       | 41 +++++------------------------------------
+ drivers/bus/brcmstb_gisb.c  |  4 +---
+ drivers/bus/imx-weim.c      |  9 ++-------
+ drivers/bus/simple-pm-bus.c | 22 +++++-----------------
+ 4 files changed, 13 insertions(+), 63 deletions(-)
+
 -- 
 2.6.1
