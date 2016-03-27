@@ -1,64 +1,64 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 27 Mar 2016 11:26:15 +0200
-Subject: [PATCH v4 3/5] clk: mvebu: new driver for Armada AP806 system
+Date: Sun, 27 Mar 2016 11:26:17 +0200
+Subject: [PATCH v4 5/5] clk: mvebu: new driver for Armada CP110 system
  controller
 In-Reply-To: <1459070777-18049-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1459070777-18049-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1459070777-18049-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1459070777-18049-6-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada AP806 system controller, amongst other things, provides a
-number of clocks for the platform: the CPU cluster clocks, whose
-frequencies are found by reading the Sample At Reset register, one
-fixed clock, and another clock derived from the fixed clock, which is
-the one used by most peripherals in AP806.
+The Armada CP110 system controller provides, amongst other things, a
+number of clocks for the platform: a small number of core clocks, and
+then a number of gatable clocks, derived from some of the core
+clocks. Those clocks are configured via registers of the CP110 System
+Controller.
 
-The AP806 is one of the two core HW blocks used in the Marvell 7K/8K
-SoCs.
+The CP110 is the other core HW block (next to the AP806) used in the
+Marvel Armada 7K and 8K SoCs.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
  drivers/clk/mvebu/Kconfig                   |   3 +
  drivers/clk/mvebu/Makefile                  |   1 +
- drivers/clk/mvebu/ap806-system-controller.c | 106 ++++++++++++++++++++++++++++
- 3 files changed, 110 insertions(+)
- create mode 100644 drivers/clk/mvebu/ap806-system-controller.c
+ drivers/clk/mvebu/cp110-system-controller.c | 265 ++++++++++++++++++++++++++++
+ 3 files changed, 269 insertions(+)
+ create mode 100644 drivers/clk/mvebu/cp110-system-controller.c
 
 diff --git a/drivers/clk/mvebu/Kconfig b/drivers/clk/mvebu/Kconfig
-index eaee8f0..bf7ae00 100644
+index bf7ae00..3165da7 100644
 --- a/drivers/clk/mvebu/Kconfig
 +++ b/drivers/clk/mvebu/Kconfig
-@@ -29,6 +29,9 @@ config ARMADA_XP_CLK
- 	select MVEBU_CLK_COMMON
- 	select MVEBU_CLK_CPU
+@@ -32,6 +32,9 @@ config ARMADA_XP_CLK
+ config ARMADA_AP806_SYSCON
+ 	bool
  
-+config ARMADA_AP806_SYSCON
++config ARMADA_CP110_SYSCON
 +	bool
 +
  config DOVE_CLK
  	bool
  	select MVEBU_CLK_COMMON
 diff --git a/drivers/clk/mvebu/Makefile b/drivers/clk/mvebu/Makefile
-index 8866115..f4aa481 100644
+index f4aa481..7172ef6 100644
 --- a/drivers/clk/mvebu/Makefile
 +++ b/drivers/clk/mvebu/Makefile
-@@ -7,6 +7,7 @@ obj-$(CONFIG_ARMADA_375_CLK)	+= armada-375.o
- obj-$(CONFIG_ARMADA_38X_CLK)	+= armada-38x.o
+@@ -8,6 +8,7 @@ obj-$(CONFIG_ARMADA_38X_CLK)	+= armada-38x.o
  obj-$(CONFIG_ARMADA_39X_CLK)	+= armada-39x.o
  obj-$(CONFIG_ARMADA_XP_CLK)	+= armada-xp.o
-+obj-$(CONFIG_ARMADA_AP806_SYSCON) += ap806-system-controller.o
+ obj-$(CONFIG_ARMADA_AP806_SYSCON) += ap806-system-controller.o
++obj-$(CONFIG_ARMADA_CP110_SYSCON) += cp110-system-controller.o
  obj-$(CONFIG_DOVE_CLK)		+= dove.o dove-divider.o
  obj-$(CONFIG_KIRKWOOD_CLK)	+= kirkwood.o
  obj-$(CONFIG_ORION_CLK)		+= orion.o
-diff --git a/drivers/clk/mvebu/ap806-system-controller.c b/drivers/clk/mvebu/ap806-system-controller.c
+diff --git a/drivers/clk/mvebu/cp110-system-controller.c b/drivers/clk/mvebu/cp110-system-controller.c
 new file mode 100644
-index 0000000..c33c209
+index 0000000..7b22503
 --- /dev/null
-+++ b/drivers/clk/mvebu/ap806-system-controller.c
-@@ -0,0 +1,106 @@
++++ b/drivers/clk/mvebu/cp110-system-controller.c
+@@ -0,0 +1,265 @@
 +/*
-+ * Marvell Armada AP806 System Controller
++ * Marvell Armada CP110 System Controller
 + *
 + * Copyright (C) 2016 Marvell
 + *
@@ -69,7 +69,27 @@ index 0000000..c33c209
 + * warranty of any kind, whether express or implied.
 + */
 +
-+#define pr_fmt(fmt) "ap806-system-controller: " fmt
++/*
++ * CP110 has 5 core clocks:
++ *
++ *  - APLL		(1 Ghz)
++ *    - PPv2 core	(1/3 APLL)
++ *    - EIP		(1/2 APLL)
++ *      - Core		(1/2 EIP)
++ *
++ *  - NAND clock, which is either:
++ *    - Equal to the core clock
++ *    - 2/5 APLL
++ *
++ * CP110 has 32 gatable clocks, for the various peripherals in the IP:
++ *
++ *  - Most have the "Core" clocks as their parents
++ *  - The NAND gatable clock has NAND-core as its parent
++ *  - The PPv2 gatable clock has PPv2-core as its parent
++ *  - The EIP* gatable clocks have EIP as their parent
++ */
++
++#define pr_fmt(fmt) "cp110-system-controller: " fmt
 +
 +#include <linux/kernel.h>
 +#include <linux/clk.h>
@@ -79,25 +99,131 @@ index 0000000..c33c209
 +#include <linux/of.h>
 +#include <linux/of_address.h>
 +#include <linux/regmap.h>
++#include <linux/slab.h>
 +
-+#define AP806_SAR_REG			0x400
-+#define AP806_SAR_CLKFREQ_MODE_MASK	0x1f
++#define CP110_PM_CLOCK_GATING_REG	0x220
++#define CP110_NAND_FLASH_CLK_CTRL_REG	0x700
++#define    NF_CLOCK_SEL_400_MASK	BIT(0)
 +
-+#define AP806_CLK_NUM 			4
-+
-+static struct clk *ap806_clks[AP806_CLK_NUM];
-+
-+static struct clk_onecell_data ap806_clk_data = {
-+	.clks = ap806_clks,
-+	.clk_num = AP806_CLK_NUM,
++enum {
++	CP110_CLK_TYPE_CORE,
++	CP110_CLK_TYPE_GATABLE,
 +};
 +
-+static void __init ap806_syscon_clk_init(struct device_node *np)
-+{
-+	unsigned int freq_mode, cpuclk_freq;
-+	const char *name, *fixedclk_name;
++#define CP110_MAX_CORE_CLOCKS		5
++#define CP110_MAX_GATABLE_CLOCKS	32
++
++#define CP110_CLK_NUM \
++	(CP110_MAX_CORE_CLOCKS + CP110_MAX_GATABLE_CLOCKS)
++
++/* A few gatable clocks need special handling */
++#define CP110_GATE_NAND			2
++#define CP110_GATE_PPV2			3
++#define CP110_GATE_EIP150		25
++#define CP110_GATE_EIP197		26
++
++static struct clk *cp110_clks[CP110_CLK_NUM];
++
++static struct clk_onecell_data cp110_clk_data = {
++	.clks = cp110_clks,
++	.clk_num = CP110_CLK_NUM,
++};
++
++struct cp110_gate_clk {
++	struct clk_hw hw;
 +	struct regmap *regmap;
-+	u32 reg;
++	u8 bit_idx;
++};
++
++static int cp110_gate_enable(struct clk_hw *hw)
++{
++	struct cp110_gate_clk *gate =
++		container_of(hw, struct cp110_gate_clk, hw);
++
++	regmap_update_bits(gate->regmap, CP110_PM_CLOCK_GATING_REG,
++			   BIT(gate->bit_idx), BIT(gate->bit_idx));
++
++	return 0;
++}
++
++static void cp110_gate_disable(struct clk_hw *hw)
++{
++	struct cp110_gate_clk *gate =
++		container_of(hw, struct cp110_gate_clk, hw);
++	regmap_update_bits(gate->regmap, CP110_PM_CLOCK_GATING_REG,
++			   BIT(gate->bit_idx), 0);
++}
++
++static int cp110_gate_is_enabled(struct clk_hw *hw)
++{
++	struct cp110_gate_clk *gate =
++		container_of(hw, struct cp110_gate_clk, hw);
++	u32 val;
++
++	regmap_read(gate->regmap, CP110_PM_CLOCK_GATING_REG, &val);
++
++	return val & BIT(gate->bit_idx);
++}
++
++static const struct clk_ops cp110_gate_ops = {
++	.enable = cp110_gate_enable,
++	.disable = cp110_gate_disable,
++	.is_enabled = cp110_gate_is_enabled,
++};
++
++static struct clk *cp110_register_gate(const char *name, const char *parent_name,
++				       struct regmap *regmap, u8 bit_idx)
++{
++	struct cp110_gate_clk *gate;
++	struct clk *clk;
++	struct clk_init_data init;
++
++	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
++	if (!gate)
++		return ERR_PTR(-ENOMEM);
++
++	init.name = name;
++	init.ops = &cp110_gate_ops;
++	init.flags = CLK_IS_BASIC;
++	init.parent_names = &parent_name;
++	init.num_parents = 1;
++
++	gate->regmap = regmap;
++	gate->bit_idx = bit_idx;
++	gate->hw.init = &init;
++
++	clk = clk_register(NULL, &gate->hw);
++	if (IS_ERR(clk))
++		kfree(gate);
++
++	return clk;
++}
++
++static struct clk *cp110_of_clk_get(struct of_phandle_args *clkspec, void *data)
++{
++	struct clk_onecell_data *clk_data = data;
++	unsigned int type = clkspec->args[0];
++	unsigned int idx = clkspec->args[1];
++
++	if (type == CP110_CLK_TYPE_CORE) {
++		if (idx > CP110_MAX_CORE_CLOCKS)
++			return ERR_PTR(-EINVAL);
++		return clk_data->clks[idx];
++	} else if (type == CP110_CLK_TYPE_GATABLE) {
++		if (idx > CP110_MAX_GATABLE_CLOCKS)
++			return ERR_PTR(-EINVAL);
++		return clk_data->clks[CP110_MAX_CORE_CLOCKS + idx];
++	}
++
++	return ERR_PTR(-EINVAL);
++}
++
++static void __init cp110_syscon_clk_init(struct device_node *np)
++{
++	struct regmap *regmap;
++	const char *name, *apll_name, *core_name, *eip_name, *nand_name;
++	u32 nand_clk_ctrl;
++	int clkidx = 0, i;
 +
 +	regmap = syscon_node_to_regmap(np);
 +	if (IS_ERR(regmap)) {
@@ -105,63 +231,96 @@ index 0000000..c33c209
 +		return;
 +	}
 +
-+	if (regmap_read(regmap, AP806_SAR_REG, &reg)) {
++	if (regmap_read(regmap, CP110_NAND_FLASH_CLK_CTRL_REG, &nand_clk_ctrl)) {
 +		pr_err("cannot read from regmap\n");
 +		return;
 +	}
 +
-+	freq_mode = reg & AP806_SAR_CLKFREQ_MODE_MASK;
-+	switch(freq_mode) {
-+	case 0x0 ... 0x5:
-+		cpuclk_freq = 2000;
-+		break;
-+	case 0x6 ... 0xB:
-+		cpuclk_freq = 1800;
-+		break;
-+	case 0xC ... 0x11:
-+		cpuclk_freq = 1600;
-+		break;
-+	case 0x12 ... 0x16:
-+		cpuclk_freq = 1400;
-+		break;
-+	case 0x17 ... 0x19:
-+		cpuclk_freq = 1300;
-+		break;
-+	default:
-+		pr_err("invalid SAR value\n");
-+		return;
++	/*
++	 * Register core clocks
++	 */
++
++        /* Register the APLL which is the root of the clk tree */
++	of_property_read_string_index(np, "core-clock-output-names",
++                                      0, &apll_name);
++        cp110_clks[0] =
++		clk_register_fixed_rate(NULL, apll_name, NULL, 0,
++					1000 * 1000 * 1000);
++
++        /* PPv2 is APLL/3 */
++	of_property_read_string_index(np, "core-clock-output-names",
++				      1, &name);
++        cp110_clks[1] =
++		clk_register_fixed_factor(NULL, name, apll_name,
++					  0, 1, 3);
++	clkidx++;
++
++        /* EIP clock is APLL/2 */
++	of_property_read_string_index(np, "core-clock-output-names",
++				      2, &eip_name);
++        cp110_clks[2] =
++		clk_register_fixed_factor(NULL, eip_name, apll_name, 0, 1, 2);
++	clkidx++;
++
++        /* Core clock is EIP/2 */
++	of_property_read_string_index(np, "core-clock-output-names",
++				      3, &core_name);
++        cp110_clks[3] =
++		clk_register_fixed_factor(NULL, core_name, eip_name, 0, 1, 2);
++	clkidx++;
++
++        /* NAND can be either APLL/2.5 or core clock */
++	of_property_read_string_index(np, "core-clock-output-names",
++				      4, &nand_name);
++        if (nand_clk_ctrl & NF_CLOCK_SEL_400_MASK)
++                cp110_clks[4] =
++			clk_register_fixed_factor(NULL, nand_name,
++						  apll_name, 0, 2, 5);
++        else
++                cp110_clks[4] =
++			clk_register_fixed_factor(NULL, nand_name,
++						  core_name, 0, 1, 1);
++
++	/*
++	 * Register gatable clocks
++	 */
++	for (i = 0; i < CP110_MAX_GATABLE_CLOCKS; i++) {
++		const char *parent;
++		int clkidx, ret;
++
++		ret = of_property_read_string_index(np, "gate-clock-output-names",
++						    i, &name);
++		/* Reached the end of the list? */
++		if (ret < 0)
++			break;
++
++		of_property_read_u32_index(np, "gate-clock-indices", i, &clkidx);
++
++		switch(clkidx) {
++		case CP110_GATE_NAND:
++			parent = nand_name;
++			break;
++		case CP110_GATE_PPV2:
++			parent = "ppv2-core";
++			break;
++		case CP110_GATE_EIP150:
++		case CP110_GATE_EIP197:
++			parent = "eip";
++			break;
++		default:
++			parent = "core";
++			break;
++		}
++
++		cp110_clks[CP110_MAX_CORE_CLOCKS + clkidx] =
++			cp110_register_gate(name, parent,
++					    regmap, clkidx);
 +	}
 +
-+	/* Convert to hertz */
-+	cpuclk_freq *= 1000 * 1000;
-+
-+	/* CPU clocks depend on the Sample At Reset configuration */
-+	of_property_read_string_index(np, "clock-output-names",
-+				      0, &name);
-+	ap806_clks[0] = clk_register_fixed_rate(NULL, name, NULL,
-+						0, cpuclk_freq);
-+
-+	of_property_read_string_index(np, "clock-output-names",
-+				      1, &name);
-+	ap806_clks[1] = clk_register_fixed_rate(NULL, name, NULL, 0,
-+						cpuclk_freq);
-+
-+	/* Fixed clock is always 1200 Mhz */
-+	of_property_read_string_index(np, "clock-output-names",
-+				      2, &fixedclk_name);
-+	ap806_clks[2] = clk_register_fixed_rate(NULL, fixedclk_name, NULL, 0,
-+						1200 * 1000 * 1000);
-+
-+	/* MSS Clock is fixed clock divided by 6 */
-+	of_property_read_string_index(np, "clock-output-names",
-+				      3, &name);
-+	ap806_clks[3] = clk_register_fixed_factor(NULL, name, fixedclk_name,
-+						  0, 1, 6);
-+
-+	of_clk_add_provider(np, of_clk_src_onecell_get, &ap806_clk_data);
++	of_clk_add_provider(np, cp110_of_clk_get, &cp110_clk_data);
 +}
 +
-+CLK_OF_DECLARE(ap806_syscon_clk, "marvell,ap806-system-controller",
-+	       ap806_syscon_clk_init);
++CLK_OF_DECLARE(cp110_syscon_clk, "marvell,cp110-system-controller0",
++	       cp110_syscon_clk_init);
 -- 
 2.6.4
