@@ -1,116 +1,167 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 27 Mar 2016 11:26:16 +0200
-Subject: [PATCH v4 4/5] dt-bindings: arm: add DT binding for Marvell CP110
- system controller
+Date: Sun, 27 Mar 2016 11:26:15 +0200
+Subject: [PATCH v4 3/5] clk: mvebu: new driver for Armada AP806 system
+ controller
 In-Reply-To: <1459070777-18049-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1459070777-18049-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1459070777-18049-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1459070777-18049-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds the DT binding documentation for the Marvell CP110
-system controller, which is part of the CP110 HW block, itself used in
-the Marvell Armada 7K and 8K SoCs.
+The Armada AP806 system controller, amongst other things, provides a
+number of clocks for the platform: the CPU cluster clocks, whose
+frequencies are found by reading the Sample At Reset register, one
+fixed clock, and another clock derived from the fixed clock, which is
+the one used by most peripherals in AP806.
+
+The AP806 is one of the two core HW blocks used in the Marvell 7K/8K
+SoCs.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- .../arm/marvell/cp110-system-controller0.txt       | 88 ++++++++++++++++++++++
- 1 file changed, 88 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
+ drivers/clk/mvebu/Kconfig                   |   3 +
+ drivers/clk/mvebu/Makefile                  |   1 +
+ drivers/clk/mvebu/ap806-system-controller.c | 106 ++++++++++++++++++++++++++++
+ 3 files changed, 110 insertions(+)
+ create mode 100644 drivers/clk/mvebu/ap806-system-controller.c
 
-diff --git a/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt b/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
+diff --git a/drivers/clk/mvebu/Kconfig b/drivers/clk/mvebu/Kconfig
+index eaee8f0..bf7ae00 100644
+--- a/drivers/clk/mvebu/Kconfig
++++ b/drivers/clk/mvebu/Kconfig
+@@ -29,6 +29,9 @@ config ARMADA_XP_CLK
+ 	select MVEBU_CLK_COMMON
+ 	select MVEBU_CLK_CPU
+ 
++config ARMADA_AP806_SYSCON
++	bool
++
+ config DOVE_CLK
+ 	bool
+ 	select MVEBU_CLK_COMMON
+diff --git a/drivers/clk/mvebu/Makefile b/drivers/clk/mvebu/Makefile
+index 8866115..f4aa481 100644
+--- a/drivers/clk/mvebu/Makefile
++++ b/drivers/clk/mvebu/Makefile
+@@ -7,6 +7,7 @@ obj-$(CONFIG_ARMADA_375_CLK)	+= armada-375.o
+ obj-$(CONFIG_ARMADA_38X_CLK)	+= armada-38x.o
+ obj-$(CONFIG_ARMADA_39X_CLK)	+= armada-39x.o
+ obj-$(CONFIG_ARMADA_XP_CLK)	+= armada-xp.o
++obj-$(CONFIG_ARMADA_AP806_SYSCON) += ap806-system-controller.o
+ obj-$(CONFIG_DOVE_CLK)		+= dove.o dove-divider.o
+ obj-$(CONFIG_KIRKWOOD_CLK)	+= kirkwood.o
+ obj-$(CONFIG_ORION_CLK)		+= orion.o
+diff --git a/drivers/clk/mvebu/ap806-system-controller.c b/drivers/clk/mvebu/ap806-system-controller.c
 new file mode 100644
-index 0000000..e8883da
+index 0000000..c33c209
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
-@@ -0,0 +1,88 @@
-+Marvell Armada CP110 System Controller 0
-+========================================
++++ b/drivers/clk/mvebu/ap806-system-controller.c
+@@ -0,0 +1,106 @@
++/*
++ * Marvell Armada AP806 System Controller
++ *
++ * Copyright (C) 2016 Marvell
++ *
++ * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
 +
-+The CP110 is one of the two core HW blocks of the Marvell Armada 7K/8K
-+SoCs. It contains two sets of system control registers, System
-+Controller 0 and System Controller 1. This Device Tree binding allows
-+to describe the first system controller, which provides registers to
-+configure various aspects of the SoC.
++#define pr_fmt(fmt) "ap806-system-controller: " fmt
 +
-+The Device Tree node representing this System Controller 0 provides a
-+number of clocks:
++#include <linux/kernel.h>
++#include <linux/clk.h>
++#include <linux/clk-provider.h>
++#include <linux/io.h>
++#include <linux/mfd/syscon.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/regmap.h>
 +
-+ - a set of core clocks
-+ - a set of gatable clocks
++#define AP806_SAR_REG			0x400
++#define AP806_SAR_CLKFREQ_MODE_MASK	0x1f
 +
-+Those clocks can be referenced by other Device Tree nodes using two
-+cells:
-+ - The first cell must be 0 or 1. 0 for the core clocks and 1 for the
-+   gatable clocks.
-+ - The second cell identifies the particular core clock or gatable
-+   clocks.
++#define AP806_CLK_NUM 			4
 +
-+The following clocks are available:
-+ - Core clocks
-+   - 0 0	APLL
-+   - 0 1	PPv2 core
-+   - 0 2	EIP
-+   - 0 3	Core
-+   - 0 4	NAND core
-+ - Gatable clocks
-+   - 1 0	Audio
-+   - 1 1	Comm Unit
-+   - 1 2	NAND
-+   - 1 3	PPv2
-+   - 1 4	SDIO
-+   - 1 5	MG Domain
-+   - 1 6	MG Core
-+   - 1 7	XOR1
-+   - 1 8	XOR0
-+   - 1 9	GOP DP
-+   - 1 11	PCIe x1 0
-+   - 1 12	PCIe x1 1
-+   - 1 13	PCIe x4
-+   - 1 14	PCIe / XOR
-+   - 1 15	SATA
-+   - 1 16	SATA USB
-+   - 1 18	GOP Macro
-+   - 1 22	USB3H0
-+   - 1 23	USB3H1
-+   - 1 24	USB3 Device
-+   - 1 25	EIP150
-+   - 1 26	EIP197
++static struct clk *ap806_clks[AP806_CLK_NUM];
 +
-+Required properties:
++static struct clk_onecell_data ap806_clk_data = {
++	.clks = ap806_clks,
++	.clk_num = AP806_CLK_NUM,
++};
 +
-+ - compatible: must be:
-+     "marvell,cp110-system-controller0", "syscon";
-+ - reg: register area of the CP110 system controller 0
-+ - #clock-cells: must be set to 2
-+ - core-clock-output-names must be set to:
-+    "cpm-apll", "cpm-ppv2-core", "cpm-eip", "cpm-core", "cpm-nand-core"
-+ - gatable-clock-indices must be set to:
-+	<0>, <1>, <2>, <3>, <4>, <5>, <6>, <7>, <8>,
-+	<9>, <11>, <12>, <13>, <14>, <15>, <16>, <18>,
-+	<22>, <23>, <24>, <25>, <26>
-+ - gatable-clock-output-names must be set to:
-+	"cpm-audio", "cpm-communit", "cpm-nand", "cpm-ppv2", "cpm-sdio",
-+	"cpm-mg-domain", "cpm-mg-core", "cpm-xor1", "cpm-xor0", "cpm-gop-dp", "cpm-pcie_x10",
-+	"cpm-pcie_x11", "cpm-pcie_x4", "cpm-pcie-xor", "cpm-sata", "cpm-sata-usb",
-+	"cpm-gop-macro", "cpm-usb3h0", "cpm-usb3h1", "cpm-usb3dev", "cpm-eip150",
-+	"cpm-eip197"
++static void __init ap806_syscon_clk_init(struct device_node *np)
++{
++	unsigned int freq_mode, cpuclk_freq;
++	const char *name, *fixedclk_name;
++	struct regmap *regmap;
++	u32 reg;
 +
-+Example:
++	regmap = syscon_node_to_regmap(np);
++	if (IS_ERR(regmap)) {
++		pr_err("cannot get regmap\n");
++		return;
++	}
 +
-+	cpm_syscon0: system-controller at 440000 {
-+		compatible = "marvell,cp110-system-controller0", "syscon";
-+		reg = <0x440000 0x1000>;
-+		#clock-cells = <2>;
-+		core-clock-output-names = "cpm-apll", "cpm-ppv2-core", "cpm-eip", "cpm-core", "cpm-nand-core";
-+		gate-clock-indices = <0>, <1>, <2>, <3>, <4>, <5>, <6>, <7>, <8>,
-+			<9>, <11>, <12>, <13>, <14>, <15>, <16>, <18>,
-+			<22>, <23>, <24>, <25>, <26>;
-+		gate-clock-output-names = "cpm-audio", "cpm-communit", "cpm-nand", "cpm-ppv2", "cpm-sdio",
-+			"cpm-mg-domain", "cpm-mg-core", "cpm-xor1", "cpm-xor0", "cpm-gop-dp", "cpm-pcie_x10",
-+			"cpm-pcie_x11", "cpm-pcie_x4", "cpm-pcie-xor", "cpm-sata", "cpm-sata-usb",
-+			"cpm-gop-macro", "cpm-usb3h0", "cpm-usb3h1", "cpm-usb3dev", "cpm-eip150",
-+			"cpm-eip197";
-+	};
++	if (regmap_read(regmap, AP806_SAR_REG, &reg)) {
++		pr_err("cannot read from regmap\n");
++		return;
++	}
++
++	freq_mode = reg & AP806_SAR_CLKFREQ_MODE_MASK;
++	switch(freq_mode) {
++	case 0x0 ... 0x5:
++		cpuclk_freq = 2000;
++		break;
++	case 0x6 ... 0xB:
++		cpuclk_freq = 1800;
++		break;
++	case 0xC ... 0x11:
++		cpuclk_freq = 1600;
++		break;
++	case 0x12 ... 0x16:
++		cpuclk_freq = 1400;
++		break;
++	case 0x17 ... 0x19:
++		cpuclk_freq = 1300;
++		break;
++	default:
++		pr_err("invalid SAR value\n");
++		return;
++	}
++
++	/* Convert to hertz */
++	cpuclk_freq *= 1000 * 1000;
++
++	/* CPU clocks depend on the Sample At Reset configuration */
++	of_property_read_string_index(np, "clock-output-names",
++				      0, &name);
++	ap806_clks[0] = clk_register_fixed_rate(NULL, name, NULL,
++						0, cpuclk_freq);
++
++	of_property_read_string_index(np, "clock-output-names",
++				      1, &name);
++	ap806_clks[1] = clk_register_fixed_rate(NULL, name, NULL, 0,
++						cpuclk_freq);
++
++	/* Fixed clock is always 1200 Mhz */
++	of_property_read_string_index(np, "clock-output-names",
++				      2, &fixedclk_name);
++	ap806_clks[2] = clk_register_fixed_rate(NULL, fixedclk_name, NULL, 0,
++						1200 * 1000 * 1000);
++
++	/* MSS Clock is fixed clock divided by 6 */
++	of_property_read_string_index(np, "clock-output-names",
++				      3, &name);
++	ap806_clks[3] = clk_register_fixed_factor(NULL, name, fixedclk_name,
++						  0, 1, 6);
++
++	of_clk_add_provider(np, of_clk_src_onecell_get, &ap806_clk_data);
++}
++
++CLK_OF_DECLARE(ap806_syscon_clk, "marvell,ap806-system-controller",
++	       ap806_syscon_clk_init);
 -- 
 2.6.4
