@@ -1,72 +1,98 @@
 From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Sun, 27 Mar 2016 17:10:54 -0400
-Subject: [PATCH 0/4] drivers/bus: remove unused modular code from non-modular
- drivers
-Message-ID: <1459113058-14340-1-git-send-email-paul.gortmaker@windriver.com>
+Date: Sun, 27 Mar 2016 17:10:57 -0400
+Subject: [PATCH 3/4] drivers/bus: make simple-pm-bus.c explicitly non-modular
+In-Reply-To: <1459113058-14340-1-git-send-email-paul.gortmaker@windriver.com>
+References: <1459113058-14340-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <1459113058-14340-4-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The drivers/bus doesn't have a strict maintainer entry, but since
-all the changes here are for ARM platforms, I'm Cc'ing arm-kernel
-and hoping it makes sense to vector these few changes through the
-arm-soc. [Olof, Will, Arnd? Seems you guys handle most of it...]
+The Kconfig currently controlling compilation of this code is:
 
-My ongoing audit looking for non-modular code that needlessly uses
-modular macros (vs. built-in equivalents) and/or has dead code
-relating to module unloading that can never be executed led to the
-creation of these four commits.
+config SIMPLE_PM_BUS
+        bool "Simple Power-Managed Bus Driver"
 
-Two are of the trivial kind, where we substitute in the non-modular
-versions that CPP would have put in place anyway, resulting in no
-actual changes, even at the binary output level.
+...meaning that it currently is not being built as a module by anyone.
 
-The other two are of the kind where there was a ".remove" function
-registered into the driver struct.  Being non-modular, these
-functions will never be called via a normal module_exit path.
+Lets remove the modular code that is essentially orphaned, so that
+when reading the driver there is no doubt it is builtin-only.
 
-However, since it was possible (but largely pointless, and without
-a real use case) to unbind these drivers via sysfs, we explicitly
-disallow the unbind as part of the removal of the ".remove" itself.
+We explicitly disallow a driver unbind, since that doesn't have a
+sensible use case anyway, and it allows us to drop the ".remove"
+code for non-modular drivers.
 
-For anyone new to the underlying goal of this cleanup, we are trying to
-not use module support for code that can never be built as a module since:
+Since module_init translates to device_initcall in the non-modular
+case, the init ordering remains unchanged with this commit.
 
- (1) it is easy to accidentally write unused module_exit and remove code
- (2) it can be misleading when reading the source, thinking it can be
-     modular when the Makefile and/or Kconfig prohibit it
- (3) it requires the include of the module.h header file which in turn
-     includes nearly everything else, thus adding to CPP overhead.
- (4) it gets copied/replicated into other code and spreads like weeds.
+Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
 
-Build tested for arm and arm64 on v4.6-rc1 to ensure no silly typos
-that would break compilation crept in.
+We also delete the MODULE_LICENSE tag etc. since all that information
+was (or is now) contained at the top of the file in the comments.
 
----
-
-Cc: Alison Chaiken <alison_chaiken@mentor.com>
-Cc: Brian Norris <computersforpeace@gmail.com>
-Cc: Florian Fainelli <f.fainelli@gmail.com>
 Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-Cc: Gregory Fong <gregory.0xf0@gmail.com>
 Cc: Kevin Hilman <khilman@linaro.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Shawn Guo <shawn.guo@linaro.org>
 Cc: Simon Horman <horms+renesas@verge.net.au>
-Cc: Wolfram Sang <wsa@the-dreams.de>
 Cc: linux-arm-kernel at lists.infradead.org
-
-Paul Gortmaker (4):
-  drivers/bus: make brcmstb_gisb.c driver explicitly non-modular
-  drivers/bus: make imx-weim.c explicitly non-modular
-  drivers/bus: make simple-pm-bus.c explicitly non-modular
-  drivers/bus: make arm-ccn.c driver explicitly non-modular
-
- drivers/bus/arm-ccn.c       | 41 +++++------------------------------------
- drivers/bus/brcmstb_gisb.c  |  4 +---
- drivers/bus/imx-weim.c      |  9 ++-------
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+---
  drivers/bus/simple-pm-bus.c | 22 +++++-----------------
- 4 files changed, 13 insertions(+), 63 deletions(-)
+ 1 file changed, 5 insertions(+), 17 deletions(-)
 
+diff --git a/drivers/bus/simple-pm-bus.c b/drivers/bus/simple-pm-bus.c
+index c5eb46cbf388..e194ef4a7583 100644
+--- a/drivers/bus/simple-pm-bus.c
++++ b/drivers/bus/simple-pm-bus.c
+@@ -1,6 +1,8 @@
+ /*
+  * Simple Power-Managed Bus Driver
+  *
++ * Author: Geert Uytterhoeven <geert+renesas@glider.be>
++ *
+  * Copyright (C) 2014-2015 Glider bvba
+  *
+  * This file is subject to the terms and conditions of the GNU General Public
+@@ -8,7 +10,7 @@
+  * for more details.
+  */
+ 
+-#include <linux/module.h>
++#include <linux/init.h>
+ #include <linux/of_platform.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
+@@ -28,31 +30,17 @@ static int simple_pm_bus_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static int simple_pm_bus_remove(struct platform_device *pdev)
+-{
+-	dev_dbg(&pdev->dev, "%s\n", __func__);
+-
+-	pm_runtime_disable(&pdev->dev);
+-	return 0;
+-}
+-
+ static const struct of_device_id simple_pm_bus_of_match[] = {
+ 	{ .compatible = "simple-pm-bus", },
+ 	{ /* sentinel */ }
+ };
+-MODULE_DEVICE_TABLE(of, simple_pm_bus_of_match);
+ 
+ static struct platform_driver simple_pm_bus_driver = {
+ 	.probe = simple_pm_bus_probe,
+-	.remove = simple_pm_bus_remove,
+ 	.driver = {
+ 		.name = "simple-pm-bus",
+ 		.of_match_table = simple_pm_bus_of_match,
++		.suppress_bind_attrs = true,
+ 	},
+ };
+-
+-module_platform_driver(simple_pm_bus_driver);
+-
+-MODULE_DESCRIPTION("Simple Power-Managed Bus Driver");
+-MODULE_AUTHOR("Geert Uytterhoeven <geert+renesas@glider.be>");
+-MODULE_LICENSE("GPL v2");
++builtin_platform_driver(simple_pm_bus_driver);
 -- 
 2.6.1
