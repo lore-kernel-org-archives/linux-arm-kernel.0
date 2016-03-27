@@ -1,320 +1,109 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 28 Mar 2016 08:37:57 +0900
-Subject: [PATCH v6 08/21] PM / devfreq: exynos: Update documentation for bus
- devices using passive governor
+Date: Mon, 28 Mar 2016 08:37:54 +0900
+Subject: [PATCH v6 05/21] PM / devfreq: Add governer type with unique number
 In-Reply-To: <1459121890-4601-1-git-send-email-cw00.choi@samsung.com>
 References: <1459121890-4601-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1459121890-4601-9-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1459121890-4601-6-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the documentation for passive bus devices and adds the
-detailed example of Exynos3250.
+This patch just adds the governor type to identify them
+by using the defined constant.
 
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 ---
- .../devicetree/bindings/devfreq/exynos-bus.txt     | 250 ++++++++++++++++++++-
- 1 file changed, 247 insertions(+), 3 deletions(-)
+ drivers/devfreq/governor.h                | 6 ++++++
+ drivers/devfreq/governor_performance.c    | 1 +
+ drivers/devfreq/governor_powersave.c      | 1 +
+ drivers/devfreq/governor_simpleondemand.c | 1 +
+ drivers/devfreq/governor_userspace.c      | 1 +
+ include/linux/devfreq.h                   | 2 ++
+ 6 files changed, 12 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/devfreq/exynos-bus.txt b/Documentation/devicetree/bindings/devfreq/exynos-bus.txt
-index 78171b918e3f..03f13d38f1a1 100644
---- a/Documentation/devicetree/bindings/devfreq/exynos-bus.txt
-+++ b/Documentation/devicetree/bindings/devfreq/exynos-bus.txt
-@@ -8,22 +8,46 @@ of the bus in runtime. To monitor the usage of each bus in runtime,
- the driver uses the PPMU (Platform Performance Monitoring Unit), which
- is able to measure the current load of sub-blocks.
+diff --git a/drivers/devfreq/governor.h b/drivers/devfreq/governor.h
+index fad7d6321978..cf19b923c362 100644
+--- a/drivers/devfreq/governor.h
++++ b/drivers/devfreq/governor.h
+@@ -18,6 +18,12 @@
  
-+The Exynos SoC includes the various sub-blocks which have the each AXI bus.
-+The each AXI bus has the owned source clock but, has not the only owned
-+power line. The power line might be shared among one more sub-blocks.
-+So, we can divide into two type of device as the role of each sub-block.
-+There are two type of bus devices as following:
-+- parent bus device
-+- passive bus device
-+
-+Basically, parent and passive bus device share the same power line.
-+The parent bus device can only change the voltage of shared power line
-+and the rest bus devices (passive bus device) depend on the decision of
-+the parent bus device. If there are three blocks which share the VDD_xxx
-+power line, Only one block should be parent device and then the rest blocks
-+should depend on the parent device as passive device.
-+
-+	VDD_xxx |--- A block (parent)
-+		|--- B block (passive)
-+		|--- C block (passive)
-+
- There are a little different composition among Exynos SoC because each Exynos
- SoC has different sub-blocks. Therefore, shch difference should be specified
- in devicetree file instead of each device driver. In result, this driver
- is able to support the bus frequency for all Exynos SoCs.
+ #define to_devfreq(DEV)	container_of((DEV), struct devfreq, dev)
  
--Required properties for bus device:
-+Required properties for all bus devices:
- - compatible: Should be "samsung,exynos-bus".
- - clock-names : the name of clock used by the bus, "bus".
- - clocks : phandles for clock specified in "clock-names" property.
- - operating-points-v2: the OPP table including frequency/voltage information
-   to support DVFS (Dynamic Voltage/Frequency Scaling) feature.
++/* Devfreq governor type */
++#define DEVFREQ_GOV_ONDEMAND			0x1
++#define DEVFREQ_GOV_PERFORMANCE			0x2
++#define DEVFREQ_GOV_POWERSAVE			0x3
++#define DEVFREQ_GOV_USERSPACE			0x4
 +
-+Required properties only for parent bus device:
- - vdd-supply: the regulator to provide the buses with the voltage.
- - devfreq-events: the devfreq-event device to monitor the current utilization
-   of buses.
+ /* Devfreq events */
+ #define DEVFREQ_GOV_START			0x1
+ #define DEVFREQ_GOV_STOP			0x2
+diff --git a/drivers/devfreq/governor_performance.c b/drivers/devfreq/governor_performance.c
+index c72f942f30a8..594d8ecb13fb 100644
+--- a/drivers/devfreq/governor_performance.c
++++ b/drivers/devfreq/governor_performance.c
+@@ -43,6 +43,7 @@ static int devfreq_performance_handler(struct devfreq *devfreq,
  
--Optional properties for bus device:
-+Required properties only for passive bus device:
-+- devfreq: the parent bus device.
-+
-+Optional properties only for parent bus device:
- - exynos,saturation-ratio: the percentage value which is used to calibrate
- 			the performance count against total cycle count.
- - exynos,voltage-tolerance: the percentage value for bus voltage tolerance
-@@ -34,7 +58,20 @@ Example1:
- 	power line (regulator). The MIF (Memory Interface) AXI bus is used to
- 	transfer data between DRAM and CPU and uses the VDD_MIF regualtor.
+ static struct devfreq_governor devfreq_performance = {
+ 	.name = "performance",
++	.type = DEVFREQ_GOV_PERFORMANCE,
+ 	.get_target_freq = devfreq_performance_func,
+ 	.event_handler = devfreq_performance_handler,
+ };
+diff --git a/drivers/devfreq/governor_powersave.c b/drivers/devfreq/governor_powersave.c
+index 0c6bed567e6d..e2817e1f2a31 100644
+--- a/drivers/devfreq/governor_powersave.c
++++ b/drivers/devfreq/governor_powersave.c
+@@ -40,6 +40,7 @@ static int devfreq_powersave_handler(struct devfreq *devfreq,
  
--	- power line(VDD_MIF) --> bus for DMC (Dynamic Memory Controller) block
-+	- MIF (Memory Interface) block
-+	: VDD_MIF |--- DMC (Dynamic Memory Controller)
-+
-+	- INT (Internal) block
-+	: VDD_INT |--- LEFTBUS (parent device)
-+		  |--- PERIL
-+		  |--- MFC
-+		  |--- G3D
-+		  |--- RIGHTBUS
-+		  |--- FSYS
-+		  |--- LCD0
-+		  |--- PERIR
-+		  |--- ISP
-+		  |--- CAM
+ static struct devfreq_governor devfreq_powersave = {
+ 	.name = "powersave",
++	.type = DEVFREQ_GOV_POWERSAVE,
+ 	.get_target_freq = devfreq_powersave_func,
+ 	.event_handler = devfreq_powersave_handler,
+ };
+diff --git a/drivers/devfreq/governor_simpleondemand.c b/drivers/devfreq/governor_simpleondemand.c
+index ae72ba5e78df..b905a535d486 100644
+--- a/drivers/devfreq/governor_simpleondemand.c
++++ b/drivers/devfreq/governor_simpleondemand.c
+@@ -126,6 +126,7 @@ static int devfreq_simple_ondemand_handler(struct devfreq *devfreq,
  
- 	- MIF bus's frequency/voltage table
- 	-----------------------
-@@ -47,6 +84,24 @@ Example1:
- 	|L5| 400000 |875000   |
- 	-----------------------
+ static struct devfreq_governor devfreq_simple_ondemand = {
+ 	.name = "simple_ondemand",
++	.type = DEVFREQ_GOV_ONDEMAND,
+ 	.get_target_freq = devfreq_simple_ondemand_func,
+ 	.event_handler = devfreq_simple_ondemand_handler,
+ };
+diff --git a/drivers/devfreq/governor_userspace.c b/drivers/devfreq/governor_userspace.c
+index 35de6e83c1fe..c78ab78a5220 100644
+--- a/drivers/devfreq/governor_userspace.c
++++ b/drivers/devfreq/governor_userspace.c
+@@ -138,6 +138,7 @@ static int devfreq_userspace_handler(struct devfreq *devfreq,
  
-+	- INT bus's frequency/voltage table
-+	----------------------------------------------------------
-+	|Block|LEFTBUS|RIGHTBUS|MCUISP |ISP    |PERIL  ||VDD_INT |
-+	| name|       |LCD0    |       |       |       ||        |
-+	|     |       |FSYS    |       |       |       ||        |
-+	|     |       |MFC     |       |       |       ||        |
-+	----------------------------------------------------------
-+	|Mode |*parent|passive |passive|passive|passive||        |
-+	----------------------------------------------------------
-+	|Lv   |Frequency                               ||Voltage |
-+	----------------------------------------------------------
-+	|L1   |50000  |50000   |50000  |50000  |50000  ||900000  |
-+	|L2   |80000  |80000   |80000  |80000  |80000  ||900000  |
-+	|L3   |100000 |100000  |100000 |100000 |100000 ||1000000 |
-+	|L4   |134000 |134000  |200000 |200000 |       ||1000000 |
-+	|L5   |200000 |200000  |400000 |300000 |       ||1000000 |
-+	----------------------------------------------------------
-+
- Example2 :
- 	The bus of DMC (Dynamic Memory Controller) block in exynos3250.dtsi
- 	is listed below:
-@@ -85,6 +140,154 @@ Example2 :
- 		};
- 	};
+ static struct devfreq_governor devfreq_userspace = {
+ 	.name = "userspace",
++	.type = DEVFREQ_GOV_USERSPACE,
+ 	.get_target_freq = devfreq_userspace_func,
+ 	.event_handler = devfreq_userspace_handler,
+ };
+diff --git a/include/linux/devfreq.h b/include/linux/devfreq.h
+index 152ea342529c..9baf45f661ad 100644
+--- a/include/linux/devfreq.h
++++ b/include/linux/devfreq.h
+@@ -104,6 +104,7 @@ struct devfreq_dev_profile {
+  * struct devfreq_governor - Devfreq policy governor
+  * @node:		list node - contains registered devfreq governors
+  * @name:		Governor's name
++ * @type:		Governor's type
+  * @get_target_freq:	Returns desired operating frequency for the device.
+  *			Basically, get_target_freq will run
+  *			devfreq_dev_profile.get_dev_status() to get the
+@@ -121,6 +122,7 @@ struct devfreq_governor {
+ 	struct list_head node;
  
-+	bus_leftbus: bus_leftbus {
-+		compatible = "samsung,exynos-bus";
-+		clocks = <&cmu CLK_DIV_GDL>;
-+		clock-names = "bus";
-+		operating-points-v2 = <&bus_leftbus_opp_table>;
-+		status = "disabled";
-+	};
-+
-+	bus_rightbus: bus_rightbus {
-+		compatible = "samsung,exynos-bus";
-+		clocks = <&cmu CLK_DIV_GDR>;
-+		clock-names = "bus";
-+		operating-points-v2 = <&bus_leftbus_opp_table>;
-+		status = "disabled";
-+	};
-+
-+	bus_lcd0: bus_lcd0 {
-+		compatible = "samsung,exynos-bus";
-+		clocks = <&cmu CLK_DIV_ACLK_160>;
-+		clock-names = "bus";
-+		operating-points-v2 = <&bus_leftbus_opp_table>;
-+		status = "disabled";
-+	};
-+
-+	bus_fsys: bus_fsys {
-+		compatible = "samsung,exynos-bus";
-+		clocks = <&cmu CLK_DIV_ACLK_200>;
-+		clock-names = "bus";
-+		operating-points-v2 = <&bus_leftbus_opp_table>;
-+		status = "disabled";
-+	};
-+
-+	bus_mcuisp: bus_mcuisp {
-+		compatible = "samsung,exynos-bus";
-+		clocks = <&cmu CLK_DIV_ACLK_400_MCUISP>;
-+		clock-names = "bus";
-+		operating-points-v2 = <&bus_mcuisp_opp_table>;
-+		status = "disabled";
-+	};
-+
-+	bus_isp: bus_isp {
-+		compatible = "samsung,exynos-bus";
-+		clocks = <&cmu CLK_DIV_ACLK_266>;
-+		clock-names = "bus";
-+		operating-points-v2 = <&bus_isp_opp_table>;
-+		status = "disabled";
-+	};
-+
-+	bus_peril: bus_peril {
-+		compatible = "samsung,exynos-bus";
-+		clocks = <&cmu CLK_DIV_ACLK_100>;
-+		clock-names = "bus";
-+		operating-points-v2 = <&bus_peril_opp_table>;
-+		status = "disabled";
-+	};
-+
-+	bus_mfc: bus_mfc {
-+		compatible = "samsung,exynos-bus";
-+		clocks = <&cmu CLK_SCLK_MFC>;
-+		clock-names = "bus";
-+		operating-points-v2 = <&bus_leftbus_opp_table>;
-+		status = "disabled";
-+	};
-+
-+	bus_leftbus_opp_table: opp_table1 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp at 50000000 {
-+			opp-hz = /bits/ 64 <50000000>;
-+			opp-microvolt = <900000>;
-+		};
-+		opp at 80000000 {
-+			opp-hz = /bits/ 64 <80000000>;
-+			opp-microvolt = <900000>;
-+		};
-+		opp at 100000000 {
-+			opp-hz = /bits/ 64 <100000000>;
-+			opp-microvolt = <1000000>;
-+		};
-+		opp at 134000000 {
-+			opp-hz = /bits/ 64 <134000000>;
-+			opp-microvolt = <1000000>;
-+		};
-+		opp at 200000000 {
-+			opp-hz = /bits/ 64 <200000000>;
-+			opp-microvolt = <1000000>;
-+		};
-+	};
-+
-+	bus_mcuisp_opp_table: opp_table2 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp at 50000000 {
-+			opp-hz = /bits/ 64 <50000000>;
-+		};
-+		opp at 80000000 {
-+			opp-hz = /bits/ 64 <80000000>;
-+		};
-+		opp at 100000000 {
-+			opp-hz = /bits/ 64 <100000000>;
-+		};
-+		opp at 200000000 {
-+			opp-hz = /bits/ 64 <200000000>;
-+		};
-+		opp at 400000000 {
-+			opp-hz = /bits/ 64 <400000000>;
-+		};
-+	};
-+
-+	bus_isp_opp_table: opp_table3 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp at 50000000 {
-+			opp-hz = /bits/ 64 <50000000>;
-+		};
-+		opp at 80000000 {
-+			opp-hz = /bits/ 64 <80000000>;
-+		};
-+		opp at 100000000 {
-+			opp-hz = /bits/ 64 <100000000>;
-+		};
-+		opp at 200000000 {
-+			opp-hz = /bits/ 64 <200000000>;
-+		};
-+		opp at 300000000 {
-+			opp-hz = /bits/ 64 <300000000>;
-+		};
-+	};
-+
-+	bus_peril_opp_table: opp_table4 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp at 50000000 {
-+			opp-hz = /bits/ 64 <50000000>;
-+		};
-+		opp at 80000000 {
-+			opp-hz = /bits/ 64 <80000000>;
-+		};
-+		opp at 100000000 {
-+			opp-hz = /bits/ 64 <100000000>;
-+		};
-+	};
-+
-+
- 	Usage case to handle the frequency and voltage of bus on runtime
- 	in exynos3250-rinato.dts is listed below:
- 
-@@ -93,3 +296,44 @@ Example2 :
- 		vdd-supply = <&buck1_reg>;	/* VDD_MIF */
- 		status = "okay";
- 	};
-+
-+	&bus_leftbus {
-+		devfreq-events = <&ppmu_leftbus_3>, <&ppmu_rightbus_3>;
-+		vdd-supply = <&buck3_reg>;
-+		status = "okay";
-+	};
-+
-+	&bus_rightbus {
-+		devfreq = <&bus_leftbus>;
-+		status = "okay";
-+	};
-+
-+	&bus_lcd0 {
-+		devfreq = <&bus_leftbus>;
-+		status = "okay";
-+	};
-+
-+	&bus_fsys {
-+		devfreq = <&bus_leftbus>;
-+		status = "okay";
-+	};
-+
-+	&bus_mcuisp {
-+		devfreq = <&bus_leftbus>;
-+		status = "okay";
-+	};
-+
-+	&bus_isp {
-+		devfreq = <&bus_leftbus>;
-+		status = "okay";
-+	};
-+
-+	&bus_peril {
-+		devfreq = <&bus_leftbus>;
-+		status = "okay";
-+	};
-+
-+	&bus_mfc {
-+		devfreq = <&bus_leftbus>;
-+		status = "okay";
-+	};
+ 	const char name[DEVFREQ_NAME_LEN];
++	const int type;
+ 	int (*get_target_freq)(struct devfreq *this, unsigned long *freq);
+ 	int (*event_handler)(struct devfreq *devfreq,
+ 				unsigned int event, void *data);
 -- 
 1.9.1
