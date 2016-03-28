@@ -1,216 +1,243 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 28 Mar 2016 15:54:23 +0900
-Subject: [PATCH v6 06/21] PM / devfreq: Add new passive governor
-In-Reply-To: <1314094711.28841459134703593.JavaMail.weblogic@epmlwas02a>
-References: <1314094711.28841459134703593.JavaMail.weblogic@epmlwas02a>
-Message-ID: <56F8D51F.1030306@samsung.com>
+From: yoshihiro.shimoda.uh@renesas.com (Yoshihiro Shimoda)
+Date: Mon, 28 Mar 2016 06:55:03 +0000
+Subject: [PATCH] usb: host: xhci-plat: Make enum xhci_plat_type start at a
+ non zero value
+In-Reply-To: <20160326091050.GA7793@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <1458917188-28452-1-git-send-email-peter.griffin@linaro.org>
+ <87mvpm8pfl.fsf@ti.com> <87mvpmlc5e.fsf@free-electrons.com>
+ <87io0a8nbd.fsf@ti.com>
+ <20160326091050.GA7793@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <SG2PR06MB09190267848198365A7783A3D8860@SG2PR06MB0919.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016? 03? 28? 12:11, MyungJoo Ham wrote:
-> []
->> Suggested-by: Myungjoo Ham <myungjoo.ham@samsung.com>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> [tjakobi: Reported RCU locking issue and cw00.choi fix it.]
->> Reported-by: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
->> [m.reichl and linux.amoon: Tested it on exynos4412-odroidu3 board]
->> Tested-by: Markus Reichl <m.reichl@fivetechno.de>
->> Tested-by: Anand Moon <linux.amoon@gmail.com>
->> ---
->>  drivers/devfreq/Kconfig            |   7 ++
->>  drivers/devfreq/Makefile           |   1 +
->>  drivers/devfreq/devfreq.c          |  17 ++++
->>  drivers/devfreq/governor.h         |  15 +++
->>  drivers/devfreq/governor_passive.c | 192 +++++++++++++++++++++++++++++++++++++
->>  include/linux/devfreq.h            |   3 +
->>  6 files changed, 235 insertions(+)
->>  create mode 100644 drivers/devfreq/governor_passive.c
->>
->> diff --git a/drivers/devfreq/Kconfig b/drivers/devfreq/Kconfig
+Hi,
+
+> Sent: Saturday, March 26, 2016 6:11 PM
+< snip >
+> > ps: there might be bugs there, but it's a holiday and I really shouldn't
+> > be spending time on this right now ;-)
 > 
-> []
+> I'm also off on holiday now until Sunday 10th April... yay :-)
+> >
+> > Anyway, have fun testing. Let me know if it doesn't work.
 > 
->> diff --git a/drivers/devfreq/Makefile b/drivers/devfreq/Makefile
->> index 8af8aaf922a8..2633087d5c63 100644
->> --- a/drivers/devfreq/Makefile
->> +++ b/drivers/devfreq/Makefile
->> @@ -4,6 +4,7 @@ obj-$(CONFIG_DEVFREQ_GOV_SIMPLE_ONDEMAND)	+= governor_simpleondemand.o
->>  obj-$(CONFIG_DEVFREQ_GOV_PERFORMANCE)	+= governor_performance.o
->>  obj-$(CONFIG_DEVFREQ_GOV_POWERSAVE)	+= governor_powersave.o
->>  obj-$(CONFIG_DEVFREQ_GOV_USERSPACE)	+= governor_userspace.o
->> +obj-$(CONFIG_DEVFREQ_GOV_PASSIVE)	+= governor_passive.o
->>  
->>  # DEVFREQ Drivers
->>  obj-$(CONFIG_ARM_EXYNOS_BUS_DEVFREQ)	+= exynos-bus.o
->> diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
->> index 1d6c803804d5..9f84bbc2994c 100644
->> --- a/drivers/devfreq/devfreq.c
->> +++ b/drivers/devfreq/devfreq.c
->> @@ -478,7 +478,13 @@ static void _remove_devfreq(struct devfreq *devfreq)
->>  		dev_warn(&devfreq->dev, "releasing devfreq which doesn't exist\n");
->>  		return;
->>  	}
->> +
->> +	if (devfreq->governor->type == DEVFREQ_GOV_PASSIVE)
->> +		devfreq_passive_unregister_notifier(devfreq);
->> +
->>  	list_del(&devfreq->node);
->> +	list_del_init(&devfreq->passive_node);
->> +
+> I only have access to STi platforms which were broken by this change.
+> Not any of the platforms which rely on the functionality which
+> was introduced (although I can't see any reason why your patch wouldn't work).
 > 
-> Let's do this inside governor_passive.c, you already have
-> the DEVFREQ_GOV_STOP signal. This may be called more frequently
-> because the START-STOP pair has wider usage than add-remove pair.
-> However, still, it's ok to be detached during the "STOP"ed but not
-> removed state.
+> Maybe Yoshihiro (on CC) could test this on the Renesas platforms and confirm?
 
-I agree the code about passive governor to drivers/devfreq/governor_passive.c.
-It makes the code clear.
+Thank you for sending the email to me on CC.
+I tested Felipe's patch on Renesas platfroms (R-Car Gen2 and Gen3) and I fixed the patch like the following.
+However, my fixes patch might need to clean the code up more.
 
-> 
->>  	mutex_unlock(&devfreq_list_lock);
->>  
->>  	if (devfreq->governor)
->> @@ -598,6 +604,17 @@ struct devfreq *devfreq_add_device(struct device *dev,
->>  		goto err_init;
->>  	}
->>  
->> +	if (devfreq->governor->type == DEVFREQ_GOV_PASSIVE) {
->> +		struct devfreq *parent_devfreq = (struct devfreq *)data;
->> +		list_add(&devfreq->passive_node, &parent_devfreq->passive_node);
->> +
->> +		err = devfreq_passive_register_notifier(devfreq);
->> +		if (err <0)
->> +			goto err_init;
->> +	} else {
->> +		INIT_LIST_HEAD(&devfreq->passive_node);
->> +	}
->> +
-> 
-> Same as above. We can reuse DEVFREQ_GOV_START for this.
-> With DEVFREQ_GOV_START/STOP, we can entirely remove any modifications
-> in the devfreq.c, governor.h, devfreq.h.
+Changes from Felipe's patch:
+- Change function names of xhci_rcar_init_quirk() to xhci_rcar_setup_quirk()
+- Add setup_quirk() member and use it for rcar's function.
+- Some minor fixes.
 
-I agree. I'll modify it.
-
-> 
-> Besides, such an approach removed the need for the patch 05/21.
-> We no longer (or yet) need "governor type".
-> 
->>  	return devfreq;
->>  
->>  err_init:
->> diff --git a/drivers/devfreq/governor.h b/drivers/devfreq/governor.h
->> index cf19b923c362..64d1dffcdb43 100644
->> --- a/drivers/devfreq/governor.h
->> +++ b/drivers/devfreq/governor.h
-> 
-> as mentioned above, we don't need to modify this file.
-
-OK.
-
-> 
->> diff --git a/drivers/devfreq/governor_passive.c b/drivers/devfreq/governor_passive.c
->> new file mode 100644
->> index 000000000000..521e93b68c11
->> --- /dev/null
->> +++ b/drivers/devfreq/governor_passive.c
->> @@ -0,0 +1,192 @@
->> +/*
->> + * linux/drivers/devfreq/governor_passive.c
->> + *
->> + * Copyright (C) 2016 Samsung Electronics
->> + * Author: Chanwoo Choi <cw00.choi@samsung.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +#include <linux/devfreq.h>
->> +#include <linux/module.h>
->> +#include <linux/device.h>
->> +#include <linux/devfreq.h>
-> 
-> Doubly included
-
-I'll fix it.
-
-> 
->> +#include "governor.h"
->> +
-> 
-> []
-> 
->> +static int devfreq_passive_event_handler(struct devfreq *devfreq,
->> +				unsigned int event, void *data)
->> +{
->> +	return 0;
-> 
-> Let's handle DEVFREQ_GOV_START/STOP event here.
-
-OK. I'll register/unregister the DEVFREQ_TRANSITION_NOTIFIER by using
-DEVFREQ_GOV_START/STOP event.
-
-> 
->> +}
->> +
->> +static struct devfreq_governor devfreq_passive = {
->> +	.name = "passive",
->> +	.type = DEVFREQ_GOV_PASSIVE,
-> 
-> Let's not use .type enum, yet. We don't this this. At least for now.
-
-OK. I'll remove it.
-
-> 
->> +	.get_target_freq = devfreq_passive_get_target_freq,
->> +	.event_handler = devfreq_passive_event_handler,
->> +};
->> +
-> 
-> []
-> 
->> diff --git a/include/linux/devfreq.h b/include/linux/devfreq.h
-
-
-When the devfreq device using passive governor registers the notifier
-to DEVFREQ_TRANSITION_NOTIFIER, the devfreq device need the one notifier block field
-as following:
-
-struct devfreq {
-	...
-	...
-	struct notifier_block passive_nb;
-}
-
-static int devfreq_passive_event_handler(struct devfreq *devfreq,
-                               unsigned int event, void *data)
-{
-       struct device *dev = devfreq->dev.parent;
-       struct devfreq *parent = (struct devfreq *)devfreq->data;
-       struct notifier_block *nb = &devfreq->passive_nb;
-       int ret = 0;
-
-       if (!parent)
-               return -EPROBE_DEFER;
-
-       switch (event) {
-       case DEVFREQ_GOV_START:
-               nb->notifier_call = devfreq_passive_notifier_call;
-               ret = devm_devfreq_register_notifier(dev, parent, nb,
-                                       DEVFREQ_TRANSITION_NOTIFIER);
-               break;
-       case DEVFREQ_GOV_STOP:
-               devm_devfreq_unregister_notifier(dev, parent, nb,
-                                       DEVFREQ_TRANSITION_NOTIFIER);
-               break;
-       default:
-               break;
-       }
-
-       return ret;
-}
-
-Best Regards,
-Chanwoo Choi
+---
+diff --git a/drivers/usb/host/xhci-mvebu.c b/drivers/usb/host/xhci-mvebu.c
+index 1eefc98..1ea6c18 100644
+--- a/drivers/usb/host/xhci-mvebu.c
++++ b/drivers/usb/host/xhci-mvebu.c
+@@ -41,8 +41,9 @@ static void xhci_mvebu_mbus_config(void __iomem *base,
+ 	}
+ }
+ 
+-int xhci_mvebu_mbus_init_quirk(struct platform_device *pdev)
++int xhci_mvebu_mbus_init_quirk(struct usb_hcd *hcd)
+ {
++	struct platform_device *pdev = to_platform_device(hcd->self.controller);
+ 	struct resource	*res;
+ 	void __iomem *base;
+ 	const struct mbus_dram_target_info *dram;
+diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+index d39d6bf..d28513a 100644
+--- a/drivers/usb/host/xhci-plat.c
++++ b/drivers/usb/host/xhci-plat.c
+@@ -47,43 +47,57 @@ static void xhci_plat_quirks(struct device *dev, struct xhci_hcd *xhci)
+ 	xhci->quirks |= XHCI_PLAT;
+ }
+ 
++static void xhci_priv_plat_start(struct usb_hcd *hcd)
++{
++	struct xhci_plat_priv *priv = hcd_to_xhci_priv(hcd);
++
++	if (priv->plat_start)
++		priv->plat_start(hcd);
++}
++
++static int xhci_priv_setup_quirk(struct usb_hcd *hcd)
++{
++	struct xhci_plat_priv *priv = hcd_to_xhci_priv(hcd);
++
++	if (!priv->setup_quirk)
++		return 0;
++
++	return priv->setup_quirk(hcd);
++}
++
+ /* called during probe() after chip reset completes */
+ static int xhci_plat_setup(struct usb_hcd *hcd)
+ {
+ 	int ret;
+ 
+-	if (xhci_plat_type_is(hcd, XHCI_PLAT_TYPE_RENESAS_RCAR_GEN2) ||
+-	    xhci_plat_type_is(hcd, XHCI_PLAT_TYPE_RENESAS_RCAR_GEN3)) {
+-		ret = xhci_rcar_init_quirk(hcd);
+-		if (ret)
+-			return ret;
+-	}
++	ret = xhci_priv_setup_quirk(hcd);
++	if (ret)
++		return ret;
+ 
+ 	return xhci_gen_setup(hcd, xhci_plat_quirks);
+ }
+ 
+ static int xhci_plat_start(struct usb_hcd *hcd)
+ {
+-	if (xhci_plat_type_is(hcd, XHCI_PLAT_TYPE_RENESAS_RCAR_GEN2) ||
+-	    xhci_plat_type_is(hcd, XHCI_PLAT_TYPE_RENESAS_RCAR_GEN3))
+-		xhci_rcar_start(hcd);
+-
++	xhci_priv_plat_start(hcd);
+ 	return xhci_run(hcd);
+ }
+ 
+ #ifdef CONFIG_OF
+ static const struct xhci_plat_priv xhci_plat_marvell_armada = {
+-	.type = XHCI_PLAT_TYPE_MARVELL_ARMADA,
++	.init_quirk = xhci_mvebu_mbus_init_quirk,
+ };
+ 
+ static const struct xhci_plat_priv xhci_plat_renesas_rcar_gen2 = {
+-	.type = XHCI_PLAT_TYPE_RENESAS_RCAR_GEN2,
+ 	.firmware_name = XHCI_RCAR_FIRMWARE_NAME_V1,
++	.setup_quirk = xhci_rcar_setup_quirk,
++	.plat_start = xhci_rcar_start,
+ };
+ 
+ static const struct xhci_plat_priv xhci_plat_renesas_rcar_gen3 = {
+-	.type = XHCI_PLAT_TYPE_RENESAS_RCAR_GEN3,
+ 	.firmware_name = XHCI_RCAR_FIRMWARE_NAME_V2,
++	.setup_quirk = xhci_rcar_setup_quirk,
++	.plat_start = xhci_rcar_start,
+ };
+ 
+ static const struct of_device_id usb_xhci_of_match[] = {
+@@ -119,6 +133,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
+ {
+ 	struct device_node	*node = pdev->dev.of_node;
+ 	struct usb_xhci_pdata	*pdata = dev_get_platdata(&pdev->dev);
++	struct xhci_plat_priv	*priv;
+ 	const struct of_device_id *match;
+ 	const struct hc_driver	*driver;
+ 	struct xhci_hcd		*xhci;
+@@ -178,18 +193,18 @@ static int xhci_plat_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	xhci = hcd_to_xhci(hcd);
++	priv = hcd_to_xhci_priv(hcd);
+ 	match = of_match_node(usb_xhci_of_match, node);
+ 	if (match) {
+ 		const struct xhci_plat_priv *priv_match = match->data;
+-		struct xhci_plat_priv *priv = hcd_to_xhci_priv(hcd);
+ 
+ 		/* Just copy data for now */
+ 		if (priv_match)
+ 			*priv = *priv_match;
+ 	}
+ 
+-	if (xhci_plat_type_is(hcd, XHCI_PLAT_TYPE_MARVELL_ARMADA)) {
+-		ret = xhci_mvebu_mbus_init_quirk(pdev);
++	if (priv->init_quirk) {
++		ret = priv->init_quirk(pdev);
+ 		if (ret)
+ 			goto disable_clk;
+ 	}
+diff --git a/drivers/usb/host/xhci-plat.h b/drivers/usb/host/xhci-plat.h
+index 5a2e2e3..1d86d6d 100644
+--- a/drivers/usb/host/xhci-plat.h
++++ b/drivers/usb/host/xhci-plat.h
+@@ -13,27 +13,13 @@
+ 
+ #include "xhci.h"	/* for hcd_to_xhci() */
+ 
+-enum xhci_plat_type {
+-	XHCI_PLAT_TYPE_MARVELL_ARMADA,
+-	XHCI_PLAT_TYPE_RENESAS_RCAR_GEN2,
+-	XHCI_PLAT_TYPE_RENESAS_RCAR_GEN3,
+-};
+-
+ struct xhci_plat_priv {
+-	enum xhci_plat_type type;
+ 	const char *firmware_name;
++	void (*plat_start)(struct usb_hcd *);
++	int (*init_quirk)(struct platform_device *pdev);
++	int (*setup_quirk)(struct usb_hcd *);
+ };
+ 
+ #define hcd_to_xhci_priv(h) ((struct xhci_plat_priv *)hcd_to_xhci(h)->priv)
+ 
+-static inline bool xhci_plat_type_is(struct usb_hcd *hcd,
+-				     enum xhci_plat_type type)
+-{
+-	struct xhci_plat_priv *priv = hcd_to_xhci_priv(hcd);
+-
+-	if (priv && priv->type == type)
+-		return true;
+-	else
+-		return false;
+-}
+ #endif	/* _XHCI_PLAT_H */
+diff --git a/drivers/usb/host/xhci-rcar.c b/drivers/usb/host/xhci-rcar.c
+index 623100e..7b2800c 100644
+--- a/drivers/usb/host/xhci-rcar.c
++++ b/drivers/usb/host/xhci-rcar.c
+@@ -81,11 +81,13 @@ void xhci_rcar_start(struct usb_hcd *hcd)
+ 	u32 temp;
+ 
+ 	if (hcd->regs != NULL) {
++		struct xhci_plat_priv *priv = hcd_to_xhci_priv(hcd);
++
+ 		/* Interrupt Enable */
+ 		temp = readl(hcd->regs + RCAR_USB3_INT_ENA);
+ 		temp |= RCAR_USB3_INT_ENA_VAL;
+ 		writel(temp, hcd->regs + RCAR_USB3_INT_ENA);
+-		if (xhci_plat_type_is(hcd, XHCI_PLAT_TYPE_RENESAS_RCAR_GEN2))
++		if (!strcmp(priv->firmware_name, XHCI_RCAR_FIRMWARE_NAME_V1))
+ 			xhci_rcar_start_gen2(hcd);
+ 	}
+ }
+@@ -154,7 +156,7 @@ static int xhci_rcar_download_firmware(struct usb_hcd *hcd)
+ }
+ 
+ /* This function needs to initialize a "phy" of usb before */
+-int xhci_rcar_init_quirk(struct usb_hcd *hcd)
++int xhci_rcar_setup_quirk(struct usb_hcd *hcd)
+ {
+ 	/* If hcd->regs is NULL, we don't just call the following function */
+ 	if (!hcd->regs)
+diff --git a/drivers/usb/host/xhci-rcar.h b/drivers/usb/host/xhci-rcar.h
+index 2941a25..05cd539 100644
+--- a/drivers/usb/host/xhci-rcar.h
++++ b/drivers/usb/host/xhci-rcar.h
+@@ -16,13 +16,13 @@
+ 
+ #if IS_ENABLED(CONFIG_USB_XHCI_RCAR)
+ void xhci_rcar_start(struct usb_hcd *hcd);
+-int xhci_rcar_init_quirk(struct usb_hcd *hcd);
++int xhci_rcar_setup_quirk(struct usb_hcd *hcd);
+ #else
+ static inline void xhci_rcar_start(struct usb_hcd *hcd)
+ {
+ }
+ 
+-static inline int xhci_rcar_init_quirk(struct usb_hcd *hcd)
++static inline int xhci_rcar_setup_quirk(struct usb_hcd *hcd)
+ {
+ 	return 0;
+ }
