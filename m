@@ -1,65 +1,54 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 28 Mar 2016 10:28:08 +0200
-Subject: [PATCH 3/4] drivers/bus: make simple-pm-bus.c explicitly
- non-modular
-In-Reply-To: <1459113058-14340-4-git-send-email-paul.gortmaker@windriver.com>
-References: <1459113058-14340-1-git-send-email-paul.gortmaker@windriver.com>
- <1459113058-14340-4-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <CAMuHMdVjbQZWFqk23=GX1NF-aTKz9SU+c2DUs-BV-zcTqhoqwQ@mail.gmail.com>
+From: balbi@kernel.org (Felipe Balbi)
+Date: Mon, 28 Mar 2016 11:30:11 +0300
+Subject: [PATCH] usb: host: xhci-plat: Make enum xhci_plat_type start at a
+ non zero value
+In-Reply-To: <SG2PR06MB09190267848198365A7783A3D8860@SG2PR06MB0919.apcprd06.prod.outlook.com>
+References: <1458917188-28452-1-git-send-email-peter.griffin@linaro.org>
+ <87mvpm8pfl.fsf@ti.com> <87mvpmlc5e.fsf@free-electrons.com>
+ <87io0a8nbd.fsf@ti.com>
+ <20160326091050.GA7793@griffinp-ThinkPad-X1-Carbon-2nd>
+ <SG2PR06MB09190267848198365A7783A3D8860@SG2PR06MB0919.apcprd06.prod.outlook.com>
+Message-ID: <87d1qf80oc.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
 
-On Sun, Mar 27, 2016 at 11:10 PM, Paul Gortmaker
-<paul.gortmaker@windriver.com> wrote:
-> The Kconfig currently controlling compilation of this code is:
+Hi,
+
+Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com> writes:
+>> > ps: there might be bugs there, but it's a holiday and I really shouldn't
+>> > be spending time on this right now ;-)
+>> 
+>> I'm also off on holiday now until Sunday 10th April... yay :-)
+>> >
+>> > Anyway, have fun testing. Let me know if it doesn't work.
+>> 
+>> I only have access to STi platforms which were broken by this change.
+>> Not any of the platforms which rely on the functionality which
+>> was introduced (although I can't see any reason why your patch wouldn't work).
+>> 
+>> Maybe Yoshihiro (on CC) could test this on the Renesas platforms and confirm?
 >
-> config SIMPLE_PM_BUS
->         bool "Simple Power-Managed Bus Driver"
+> Thank you for sending the email to me on CC.
 >
-> ...meaning that it currently is not being built as a module by anyone.
+> I tested Felipe's patch on Renesas platfroms (R-Car Gen2 and Gen3) and
+> I fixed the patch like the following.
 >
-> Lets remove the modular code that is essentially orphaned, so that
-> when reading the driver there is no doubt it is builtin-only.
+> However, my fixes patch might need to clean the code up more.
 >
-> We explicitly disallow a driver unbind, since that doesn't have a
-> sensible use case anyway, and it allows us to drop the ".remove"
-> code for non-modular drivers.
+> Changes from Felipe's patch:
+> - Change function names of xhci_rcar_init_quirk() to xhci_rcar_setup_quirk()
 
-Be prepared for the fallout. There are test farms running bind/unbind cycles
-on random drivers.
+I'm not sure renaming that function fits on the same patch ;-) Sounds
+like it should be a separate patch altogether. I'll work on this
+tomorrow if it's okay for you guys to test on your respective platforms :-)
 
-> Since module_init translates to device_initcall in the non-modular
-> case, the init ordering remains unchanged with this commit.
->
-> Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
->
-> We also delete the MODULE_LICENSE tag etc. since all that information
-> was (or is now) contained at the top of the file in the comments.
->
-> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-> Cc: Kevin Hilman <khilman@linaro.org>
-> Cc: Simon Horman <horms+renesas@verge.net.au>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-
-NAK.
-
-IIRC, I did test unbind.
-
-The real and productive fix is to change "bool" to "tristate" in Kconfig.
-
-All of these "make ... explicitly non-modular" may have to be reverted again
-when our kernels become too big to boot.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160328/a0b9b24b/attachment.sig>
