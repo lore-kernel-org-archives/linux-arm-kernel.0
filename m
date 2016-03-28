@@ -1,69 +1,59 @@
-From: blogic@openwrt.org (John Crispin)
-Date: Mon, 28 Mar 2016 11:47:32 +0200
-Subject: [PATCH] arm: dts: mt2701: Add clock controller device nodes
-In-Reply-To: <201603281638.VIBfNFp6%fengguang.wu@intel.com>
-References: <201603281638.VIBfNFp6%fengguang.wu@intel.com>
-Message-ID: <56F8FDB4.8070105@openwrt.org>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Mon, 28 Mar 2016 17:51:34 +0800
+Subject: [PATCH v6 0/3] Add more clock compatible features and support the
+ RK3399 clock
+Message-ID: <1459158697-8218-1-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-
-On 28/03/2016 10:13, kbuild test robot wrote:
-> Hi James,
-> 
-> [auto build test ERROR on robh/for-next]
-> [also build test ERROR on v4.6-rc1 next-20160327]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
-> 
-> url:    https://github.com/0day-ci/linux/commits/James-Liao/arm-dts-mt2701-Add-clock-controller-device-nodes/20160328-133113
-> base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
-> config: arm-multi_v7_defconfig (attached as .config)
-> reproduce:
->         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         # save the attached .config to linux build tree
->         make.cross ARCH=arm 
-> 
-> All errors (new ones prefixed by >>):
-> 
->    In file included from arch/arm/boot/dts/mt2701-evb.dts:16:0:
->>> arch/arm/boot/dts/mt2701.dtsi:15:42: fatal error: dt-bindings/clock/mt2701-clk.h: No such file or directory
->     #include <dt-bindings/clock/mt2701-clk.h>
-
-Hi James,
-
-looks like the mt2701 clock patches did not make it into v4.6-rc1. i had
-a few minor fixes i wanted to send this week for MT7623 support and
-noticed this last week already :(
-
-	John
+Hi,
+  The patch series add support more mux parameters and multiple
+clock providers for the rockchip features of the clock framework,
+and support the clock controller for the RK3399.
 
 
->                                              ^
->    compilation terminated.
-> 
-> vim +15 arch/arm/boot/dts/mt2701.dtsi
-> 
->      9	 * This program is distributed in the hope that it will be useful,
->     10	 * but WITHOUT ANY WARRANTY; without even the implied warranty of
->     11	 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->     12	 * GNU General Public License for more details.
->     13	 */
->     14	
->   > 15	#include <dt-bindings/clock/mt2701-clk.h>
->     16	#include <dt-bindings/interrupt-controller/irq.h>
->     17	#include <dt-bindings/interrupt-controller/arm-gic.h>
->     18	#include "skeleton64.dtsi"
-> 
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
-> 
-> 
-> 
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
-> 
+Changes in v6:
+- update some clock contents
+- fix the source of the pclkin_isp1_wrapper should be pclkin_cif
+- remove unused the GRF reference in the clock driver
+- use the frac mux type for spdif and i2s
+- remove useless defines RK3399_PMU_RSTNHOLD_CON and RK3399_PMU_GATEDIS_CON
+
+Changes in v5:
+- add some necessary clock IDs
+- keep PPLL independent into the part of the PMUCRU
+- fix PMUCRU IDs are out of range
+- add clock IDs to drivers reference
+- fix some important bugs
+- fix configuration for cpu tables
+
+Changes in v3:
+- rename pclkin_cif to pclkin_cifmux, add diagram and comment for
+  pclkin_cifmux
+- add the clk_test node
+- modify the cif_testout path
+- include two new patches that dt-bindings and header file from
+  Jianqun's patch series
+
+Changes in v2:
+- rename the aplll/apllb to lpll/bpll
+- add drv/sample clock nodes for sdmmc/sdio
+
+Xing Zheng (3):
+  dt-bindings: add bindings for rk3399 clock controller
+  clk: rockchip: add dt-binding header for rk3399
+  clk: rockchip: add clock controller for the RK3399
+
+ .../bindings/clock/rockchip,rk3399-cru.txt         |   68 +
+ drivers/clk/rockchip/Makefile                      |    1 +
+ drivers/clk/rockchip/clk-rk3399.c                  | 1540 ++++++++++++++++++++
+ drivers/clk/rockchip/clk.h                         |   22 +-
+ include/dt-bindings/clock/rk3399-cru.h             |  752 ++++++++++
+ 5 files changed, 2382 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/rockchip,rk3399-cru.txt
+ create mode 100644 drivers/clk/rockchip/clk-rk3399.c
+ create mode 100644 include/dt-bindings/clock/rk3399-cru.h
+
+-- 
+1.7.9.5
