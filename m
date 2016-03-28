@@ -1,172 +1,73 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 28 Mar 2016 02:07:30 +0200
-Subject: [PATCH v5 2/4] dt-bindings: add bindings for rk3399 clock
- controller
-In-Reply-To: <1507551.YPleCY5ZQt@phil>
-References: <1458974276-10325-1-git-send-email-zhengxing@rock-chips.com>
- <1458974276-10325-3-git-send-email-zhengxing@rock-chips.com>
- <1507551.YPleCY5ZQt@phil>
-Message-ID: <3689505.b0IKY6iWOt@phil>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 28 Mar 2016 09:08:48 +0900
+Subject: [PATCH] ARM: dts: exynos: Fix invalid maximum voltage for buck9
+ supplying SD card
+In-Reply-To: <56F4D070.4020403@osg.samsung.com>
+References: <1458807125-13580-1-git-send-email-k.kozlowski@samsung.com>
+ <56F4D070.4020403@osg.samsung.com>
+Message-ID: <56F87610.2040304@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Xing,
+On 25.03.2016 14:45, Javier Martinez Canillas wrote:
+> Hello Krzysztof,
+> 
+> On 03/24/2016 05:12 AM, Krzysztof Kozlowski wrote:
+>> The buck9 regulator of S2MPS11 PMIC had incorrect maximum voltage -
+>> lower by 5 mV than specified by datasheet. This buck9 provides power to
+>> other regulators, including LDO13 and LDO19 which supply the MMC2 (SD
+>> card).
+>>
+>> When constraints were applied, the depending regulators were not
+>> providing enough power, leading to SD card detection errors:
+>> 	mmc1: card never left busy state
+>> 	mmc1: error -110 whilst initialising SD card
+>>
+>> Fixes: 86a2d2ac5e5d ("ARM: dts: Add dts file for Odroid XU3 board")
+>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>
+>> ---
+>>
+>> The issue can be reproduced on next-20160324 with
+>> bae4fdc88d7f7dda1 (regulator: core: Ensure we are at least in bounds for our constraints).
+>> ---
+>>  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+>> index 1bd507bfa750..82b2ba632cf6 100644
+>> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+>> @@ -299,7 +299,7 @@
+>>  			buck9_reg: BUCK9 {
+>>  				regulator-name = "vdd_2.8v_ldo";
+>>  				regulator-min-microvolt = <3000000>;
+>> -				regulator-max-microvolt = <3750000>;
+>> +				regulator-max-microvolt = <3755000>;
+>>  				regulator-always-on;
+>>  				regulator-boot-on;
+>>  			};
+>>
+> 
+> I tested next-20160324 + $SUBJECT on an Odroid XU4 (with exynos_defconfig)
+> and while it's true that the patch makes the SD card error to go away, I see
+> that the s2mps11 regulator driver fails to probe due an -EINVAL being return
+> by machine_constraints_voltage() -> _regulator_do_set_voltage():
+> 
+> [    1.710300] vdd_2.8v_ldo: failed to apply 3755000-3755000uV constraint(-22)
+> [    1.716387] s2mps11-pmic s2mps11-regulator: regulator init failed for 46
+> [    1.734878] s2mps11-pmic: probe of s2mps11-regulator failed with error -22
 
-Am Montag, 28. M?rz 2016, 01:52:12 schrieb Heiko St?bner:
-> Am Samstag, 26. M?rz 2016, 14:37:54 schrieb Xing Zheng:
-> > Add devicetree bindings for Rockchip cru which found on
-> > Rockchip SoCs.
-> > 
-> > Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
-> > Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
-> > Acked-by: Rob Herring <robh@kernel.org>
-> > ---
-> > 
-> > Changes in v5: None
-> > Changes in v3: None
-> > Changes in v2: None
-> > 
-> >  .../bindings/clock/rockchip,rk3399-cru.txt         |   83
-> > 
-> > ++++++++++++++++++++ 1 file changed, 83 insertions(+)
-> > 
-> >  create mode 100644
-> > 
-> > Documentation/devicetree/bindings/clock/rockchip,rk3399-cru.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/clock/rockchip,rk3399-
-> 
-> cru.txt
-> 
-> > b/Documentation/devicetree/bindings/clock/rockchip,rk3399-cru.txt new
-> > file mode 100644
-> > index 0000000..9427caa
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/clock/rockchip,rk3399-cru.txt
-> > @@ -0,0 +1,83 @@
-> > +* Rockchip RK3399 Clock and Reset Unit
-> > +
-> > +The RK3399 clock controller generates and supplies clock to various
-> > +controllers within the SoC and also implements a reset controller for
-> > SoC +peripherals.
-> > +
-> > +Required Properties:
-> > +
-> > +- compatible: PMU for CRU should be "rockchip,rk3399-pmucru"
-> > +- compatible: CRU should be "rockchip,rk3399-cru"
-> > +- reg: physical base address of the controller and length of memory
-> 
-> mapped
-> 
-> > +  region.
-> > +- #clock-cells: should be 1.
-> > +- #reset-cells: should be 1.
-> > +
-> > +Optional Properties:
-> > +
-> > +- rockchip,grf: phandle to the syscon managing the "general register
-> 
-> files"
-> 
-> > +  If missing, pll rates are not changeable, due to the missing pll lock
-> > status. +
-> 
-> the rk3399 doesn't need the GRF, so we should drop this block for now
+Oh, damn, so the fix was only because driver failed to probe (which I
+missed). This explains Friday's next failures. I'll drop it from next
+because it makes more harm than good...
 
-actually, I just saw that the GRF is needed for the static settings during 
-init. So the rockchip,grf should stay but also move up to required 
-properties?
+BR,
+Krzysztof
 
-Same for the grf-comment in the examples-section.
-
-
-Heiko
-
-
+> I wonder how neither Markus nor you saw this issue when testing so maybe I'm
+> doing something wrong? Since AFAICT it's only working because the driver fails
+> to probe so the same effect can be achieved disabling CONFIG_REGULATOR_S2MPS11.
 > 
-> > +Each clock is assigned an identifier and client nodes can use this
-> > identifier +to specify the clock which they consume. All available
-> > clocks
-> > are defined as +preprocessor macros in the
-> > dt-bindings/clock/rk3399-cru.h
-> > headers and can be +used in device tree sources. Similar macros exist
-> > for
-> > the reset sources in +these files.
-> > +
-> > +External clocks:
-> > +
-> > +There are several clocks that are generated outside the SoC. It is
+> Best regards,
 > 
-> expected
-> 
-> > +that they are defined using standard clock bindings with following
-> > +clock-output-names:
-> > + - "xin24m" - crystal input - required,
-> > + - "xin32k" - rtc clock - optional,
-> > + - "ext_i2s" - external I2S clock - optional,
-> > + - "ext_gmac" - external GMAC clock - optional
-> > + - "ext_hsadc" - external HSADC clock - optional,
-> > + - "ext_isp" - external ISP clock - optional,
-> > + - "ext_jtag" - external JTAG clock - optional
-> > + - "ext_vip" - external VIP clock - optional,
-> > + - "usbotg_out" - output clock of the pll in the otg phy
-> 
-> external clock listing needs adjusting, something like
-> 
-> - clkin_i2s
-> - clkin_gmac
-> --> remove ext_hsadc
-> - clkin_cif
-> --> remove ext_jtag
-> --> remove ext_vip
-> - clk_usbphy0_480m
-> - clk_usbphy0_480m
-> 
-> maybe?
-> 
-> > +
-> > +Example: General Register Files
-> > +
-> > +	pmugrf: syscon at ff320000 {
-> > +		compatible = "rockchip,rk3399-pmugrf", "syscon";
-> > +		reg = <0x0 0xff320000 0x0 0x1000>;
-> > +	};
-> > +
-> > +	grf: syscon at ff770000 {
-> > +		compatible = "rockchip,rk3399-grf", "syscon";
-> > +		reg = <0x0 0xff770000 0x0 0x10000>;
-> > +	};
-> > +
-> > +Example: Clock controller node:
-> > +
-> > +	pmucru: pmu-clock-controller at ff750000 {
-> > +		compatible = "rockchip,rk3399-pmucru";
-> > +		reg = <0x0 0xff750000 0x0 0x1000>;
-> > +		rockchip,grf = <&pmugrf>;
-> > +		#clock-cells = <1>;
-> > +		#reset-cells = <1>;
-> > +	};
-> > +
-> > +	cru: clock-controller at ff760000 {
-> > +		compatible = "rockchip,rk3399-cru";
-> > +		reg = <0x0 0xff760000 0x0 0x1000>;
-> > +		rockchip,grf = <&grf>;
-> > +		#clock-cells = <1>;
-> > +		#reset-cells = <1>;
-> > +	};
-> 
-> also here drop grf nodes and rockchip,grf properties?
-> 
-> > +
-> > +Example: UART controller node that consumes the clock generated by the
-> > clock +  controller:
-> > +
-> > +	uart0: serial at ff1a0000 {
-> > +		compatible = "rockchip,rk3399-uart", "snps,dw-apb-uart";
-> > +		reg = <0x0 0xff180000 0x0 0x100>;
-> > +		clocks = <&cru SCLK_UART0>, <&cru PCLK_UART0>;
-> > +		clock-names = "baudclk", "apb_pclk";
-> > +		interrupts = <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>;
-> > +		reg-shift = <2>;
-> > +		reg-io-width = <4>;
-> > +	};
