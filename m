@@ -1,96 +1,84 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 28 Mar 2016 23:32:24 +0200
-Subject: [PATCH] dmaengine: pxa: handle bus errors
-Message-ID: <1459200744-13245-1-git-send-email-robert.jarzmik@free.fr>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 28 Mar 2016 23:33:35 +0200
+Subject: usb: gadget breakage on N900: bind UDC by name passed via
+ usb_gadget_driver structure
+In-Reply-To: <CAB=otbTsAwBohbYmwBERpdG-ZdAUk_vJwoZoO8dUf_H-W4jREg@mail.gmail.com>
+References: <CAB=otbRd+hZaO6ihL3c88Ys_q-R4grmup4cfP70PT+N2JEQ3WQ@mail.gmail.com>
+ <CAB=otbQ=jJNk=CtB4hu51HXxOLxhWEDaeWf3V0Uc7Uh3veXsfg@mail.gmail.com>
+ <CAB=otbQ1J7FZm9vWLwor93+uD3Fv38ykduWMXG3qByNh4mV9=g@mail.gmail.com>
+ <20160327202657.GA31059@amd>
+ <CAB=otbTsAwBohbYmwBERpdG-ZdAUk_vJwoZoO8dUf_H-W4jREg@mail.gmail.com>
+Message-ID: <20160328213334.GA10849@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the current state, upon bus error the driver will spin endlessly,
-relaunching the last tx, which will fail again and again :
- - a bus error happens
- - pxad_chan_handler() is called
- - as PXA_DCSR_STOPSTATE is true, the last non-terminated transaction is
-   lauched, which is the one triggering the bus error, as it didn't
-   terminate
- - moreover, the STOP interrupt fires a new, as the STOPIRQEN is still
-   active
+Hi!
 
-Break this logic by stopping the automatic relaunch of a dma channel
-upon a bus error, even if there are still pending issued requests on it.
+> >> >> I managed to boot N900 with working USB gadget (builtin g_ether)
+> >> >> in boardfile mode, can ping it from PC and transfer data. I don't
+> >> >> see any issue (except of musb name issue in twl phy driver, I've
+> >> >> already sent a fix for that: https://lkml.org/lkml/2016/3/24/670 )
+> >> >>
+> >> >> Pavel, I still don't see how you've got your issue, please share
+> >> >> more detials
+> >> >
+> >> > Ok, let me try. I undid all the changes in drivers/phy drivers/usb and
+> >> > include/linux/usb . I have all the gadget stuff built-in, so that I
+> >> > could use nfsroot, but this is boot from mmcblk.
+> >>
+> >> So do you mean you use original rootfs that was shipeed with N900?
+> >
+> > No. I'm using Debian ARM root. It includes useful X and even phone
+> > functions. https://gitlab.com/tui/tui .
+> >
+> >> > gzipped config is attached.
+> >>
+> >> Thanks, I'll try that
+> >
+> > Thanks.
+> >
+> >> > Dmesg from the n900 is attached as /tmp/delme.gz. I did _not_ apply
+> >> > the patch from https://lkml.org/lkml/2016/3/24/670 , yet, as I'm using
+> >> > devicetree boot.
+> >>
+> >> Hmm.. don't see anything strange in the boot log related to USB,
+> >> I'll try your config
+> >
+> > Let me know how it went.
+> 
+> I tried your config (with slight modifications) with vanilla kernel v4.5
+> (modifications: cmdline changed to default; used INITRAMFS_SOURCE
+> for prebuilt cpio archive with rootfs) and Device Tree booting.
+> Works fine for me except I need to unplug-plug usb cable or issue
+> # echo connect > /sys/devices/platform/68000000.ocp/480ab000
+> .usb_otg_hs/musb-hdrc.0.auto/udc/musb-hdrc.0.auto/soft_connect
+> to make connection.
+> The gadget driver successfully binds to the gadget, but I don't know
+> why the musb core doesn't issue pullup on USB lines during boot.
 
-As dma_cookie_status() seems unable to return DMA_ERROR in its current
-form, ie. there seems no way to mark a DMA_ERROR on a per-async-tx
-basis, it is chosen in this patch to remember on the channel which
-transaction failed, and report it in pxad_tx_status().
+I did a quick test here, and unplug/replug does not help, I still get
+error message on my PC.
 
-It's a bit misleading because if T1, T2, T3 and T4 were queued, and T1
-was completed while T2 causes a bus error, the status of T3 and T4 will
-be reported as DMA_IN_PROGRESS, while the channel is actually stopped.
+[53907.784294] usb usb4-port1: unable to enumerate USB device
+[53990.480064] usb 1-5: new high-speed USB device number 27 using
+ehci-pci
+[53990.592036] usb 1-5: device descriptor read/64, error -32
+[53990.808092] usb 1-5: device descriptor read/64, error -32
+[53991.024042] usb 1-5: new high-speed USB device number 28 using
+ehci-pci
+[53991.136043] usb 1-5: device descriptor read/64, error -32
+[53991.352041] usb 1-5: device descriptor read/64, error -32
+[53991.568076] usb 1-5: new high-speed USB device number 29 using
+ehci-pci
+[53991.589955] usb 1-5: device descriptor read/8, error -32
+[53991.709703] usb 1-5: device descriptor read/8, error -32
+[53991.924577] usb 1-5: new high-speed USB device number 30 using
+ehci-pci
+[53991.944944] usb 1-5: device descriptor read/8, error -32
+[53992.065822] usb 1-5: device descriptor read/8, error -32
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
- drivers/dma/pxa_dma.c | 14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/dma/pxa_dma.c b/drivers/dma/pxa_dma.c
-index debca824bed6..0dc5a528c463 100644
---- a/drivers/dma/pxa_dma.c
-+++ b/drivers/dma/pxa_dma.c
-@@ -117,6 +117,7 @@ struct pxad_chan {
- 	/* protected by vc->lock */
- 	struct pxad_phy		*phy;
- 	struct dma_pool		*desc_pool;	/* Descriptors pool */
-+	dma_cookie_t		bus_error;
- };
- 
- struct pxad_device {
-@@ -560,6 +561,7 @@ static void pxad_launch_chan(struct pxad_chan *chan,
- 			return;
- 		}
- 	}
-+	chan->bus_error = 0;
- 
- 	/*
- 	 * Program the descriptor's address into the DMA controller,
-@@ -663,6 +665,7 @@ static irqreturn_t pxad_chan_handler(int irq, void *dev_id)
- 	struct virt_dma_desc *vd, *tmp;
- 	unsigned int dcsr;
- 	unsigned long flags;
-+	dma_cookie_t last_started = 0;
- 
- 	BUG_ON(!chan);
- 
-@@ -675,6 +678,7 @@ static irqreturn_t pxad_chan_handler(int irq, void *dev_id)
- 		dev_dbg(&chan->vc.chan.dev->device,
- 			"%s(): checking txd %p[%x]: completed=%d\n",
- 			__func__, vd, vd->tx.cookie, is_desc_completed(vd));
-+		last_started = vd->tx.cookie;
- 		if (to_pxad_sw_desc(vd)->cyclic) {
- 			vchan_cyclic_callback(vd);
- 			break;
-@@ -687,7 +691,12 @@ static irqreturn_t pxad_chan_handler(int irq, void *dev_id)
- 		}
- 	}
- 
--	if (dcsr & PXA_DCSR_STOPSTATE) {
-+	if (dcsr & PXA_DCSR_BUSERR) {
-+		chan->bus_error = last_started;
-+		phy_disable(phy);
-+	}
-+
-+	if (!chan->bus_error && dcsr & PXA_DCSR_STOPSTATE) {
- 		dev_dbg(&chan->vc.chan.dev->device,
- 		"%s(): channel stopped, submitted_empty=%d issued_empty=%d",
- 			__func__,
-@@ -1245,6 +1254,9 @@ static enum dma_status pxad_tx_status(struct dma_chan *dchan,
- 	struct pxad_chan *chan = to_pxad_chan(dchan);
- 	enum dma_status ret;
- 
-+	if (cookie == chan->bus_error)
-+		return DMA_ERROR;
-+
- 	ret = dma_cookie_status(dchan, cookie, txstate);
- 	if (likely(txstate && (ret != DMA_ERROR)))
- 		dma_set_residue(txstate, pxad_residue(chan, cookie));
+Best regards,
+									Pavel
 -- 
-2.1.4
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
