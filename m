@@ -1,139 +1,85 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Mon, 28 Mar 2016 13:29:15 +0800
-Subject: [PATCH] arm: dts: mt2701: Add clock controller device nodes
-Message-ID: <1459142955-33209-1-git-send-email-jamesjj.liao@mediatek.com>
+From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
+Date: Mon, 28 Mar 2016 11:05:16 +0530
+Subject: [PATCH v1 0/4] Implement SoC bus driver for Vybrid
+In-Reply-To: <cover.1457684688.git.maitysanchayan@gmail.com>
+References: <cover.1457684688.git.maitysanchayan@gmail.com>
+Message-ID: <20160328053516.GA1443@Sanchayan-Arch.toradex.int>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add clock controller nodes for MT2701, include topckgen, infracfg,
-pericfg, apmixedsys, mmsys, imgsys, vdecsys, hifsys, ethsys and
-bdpsys. This patch also add two oscillators that provide clocks for
-MT2701.
+Hello,
 
-Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
----
-This patch is based on v4.6-rc1 and MT2701 clock patches [1]. This
-patch adds all clock provider nodes which are supported in [1].
+Ping.
 
-[1] http://lists.infradead.org/pipermail/linux-mediatek/2016-February/004030.html
+- Sanchayan.
 
- arch/arm/boot/dts/mt2701.dtsi | 78 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 78 insertions(+)
-
-diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-index 8343768..c8fee33 100644
---- a/arch/arm/boot/dts/mt2701.dtsi
-+++ b/arch/arm/boot/dts/mt2701.dtsi
-@@ -12,6 +12,7 @@
-  * GNU General Public License for more details.
-  */
- 
-+#include <dt-bindings/clock/mt2701-clk.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include "skeleton64.dtsi"
-@@ -76,6 +77,20 @@
- 		#clock-cells = <0>;
- 	};
- 
-+	clk26m: oscillator at 0 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <26000000>;
-+		clock-output-names = "clk26m";
-+	};
-+
-+	rtc32k: oscillator at 1 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <32000>;
-+		clock-output-names = "rtc32k";
-+	};
-+
- 	timer {
- 		compatible = "arm,armv7-timer";
- 		interrupt-parent = <&gic>;
-@@ -85,6 +100,26 @@
- 			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
- 	};
- 
-+	topckgen: syscon at 10000000 {
-+		compatible = "mediatek,mt2701-topckgen", "syscon";
-+		reg = <0 0x10000000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
-+	infracfg: syscon at 10001000 {
-+		compatible = "mediatek,mt2701-infracfg", "syscon";
-+		reg = <0 0x10001000 0 0x1000>;
-+		#clock-cells = <1>;
-+		#reset-cells = <1>;
-+	};
-+
-+	pericfg: syscon at 10003000 {
-+		compatible = "mediatek,mt2701-pericfg", "syscon";
-+		reg = <0 0x10003000 0 0x1000>;
-+		#clock-cells = <1>;
-+		#reset-cells = <1>;
-+	};
-+
- 	watchdog: watchdog at 10007000 {
- 		compatible = "mediatek,mt2701-wdt",
- 			     "mediatek,mt6589-wdt";
-@@ -109,6 +144,13 @@
- 		reg = <0 0x10200100 0 0x1c>;
- 	};
- 
-+	apmixedsys: syscon at 10209000 {
-+		compatible = "mediatek,mt2701-apmixedsys", "syscon";
-+		reg = <0 0x10209000 0 0x1000>;
-+		mediatek,hdmi-ibias = <0xa>;
-+		#clock-cells = <1>;
-+	};
-+
- 	gic: interrupt-controller at 10211000 {
- 		compatible = "arm,cortex-a7-gic";
- 		interrupt-controller;
-@@ -155,4 +197,40 @@
- 		clocks = <&uart_clk>;
- 		status = "disabled";
- 	};
-+
-+	mmsys: syscon at 14000000 {
-+		compatible = "mediatek,mt2701-mmsys", "syscon";
-+		reg = <0 0x14000000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
-+	imgsys: syscon at 15000000 {
-+		compatible = "mediatek,mt2701-imgsys", "syscon";
-+		reg = <0 0x15000000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
-+	vdecsys: syscon at 16000000 {
-+		compatible = "mediatek,mt2701-vdecsys", "syscon";
-+		reg = <0 0x16000000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
-+	hifsys: syscon at 1a000000 {
-+		compatible = "mediatek,mt2701-hifsys", "syscon";
-+		reg = <0 0x1a000000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
-+	ethsys: syscon at 1b000000 {
-+		compatible = "mediatek,mt2701-ethsys", "syscon";
-+		reg = <0 0x1b000000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
-+	bdpsys: syscon at 1c000000 {
-+		compatible = "mediatek,mt2701-bdpsys", "syscon";
-+		reg = <0 0x1c000000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
- };
--- 
-1.9.1
+On 16-03-11 14:29:27, Sanchayan Maity wrote:
+> Hello,
+> 
+> This patchset implements SoC bus support for Freescale Vybrid platform,
+> implementing the following
+> https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-devices-soc
+> 
+> This a reworked version of an older patchset series posted in June 2015
+> which was at v5 then [1]. Since the NVMEM framework was then getting
+> introduced, we decided that first a NVMEM driver for OCOTP peripheral
+> being in place would be better.
+> 
+> Compared to the older revisions, this driver now relies on NVMEM
+> consumer API using the NVMEM based vf610_ocotp driver which has
+> already been in mainline for a while now. Also now a new syscon
+> abstraction "syscon_regmap_read_from_offset" is implemented and
+> exported from syscon allowing accessing a register from a syscon
+> reference like this
+> 
+> ocotp-cfg1 = <&ocotp 0x20>;
+> 
+> avoiding code repetition in the driver.
+> 
+> One point on which we were not sure here is whether we really should
+> introduce a new Kconfig symbol as being introduced here. While we
+> could just enable it when SOC_VF610 is selected, this however would
+> introduce circular dependencies.
+> 
+> This patch series is based on top of shawn's for-next branch and
+> tested on Colibri Vybrid VF50 and VF61 modules.
+> 
+> Feedback is most welcome.
+> 
+> [1] Older v5:
+> http://lkml.iu.edu/hypermail/linux/kernel/1506.0/03787.html
+> Even earlier versions:
+> Version 4 of the patchset can be found here
+> https://lkml.org/lkml/2015/5/26/199
+> Version 3 of the patchset can be found here
+> http://www.spinics.net/lists/arm-kernel/msg420847.html
+> Version 2 of the patchset can be found here
+> http://www.spinics.net/lists/devicetree/msg80654.html
+> Version 1 of the patchset can be found here
+> http://www.spinics.net/lists/devicetree/msg80257.html
+> The RFC version can be found here
+> https://lkml.org/lkml/2015/5/11/13
+> 
+> Regards,
+> Sanchayan.
+> 
+> Sanchayan Maity (4):
+>   mfd: syscon: Introduce syscon_regmap_read_from_offset
+>   ARM: dts: vfxxx: Add device tree node for OCOTP
+>   ARM: dts: vfxxx: Add OCROM and phandle entries for Vybrid SoC bus driver
+>   soc: Add SoC bus driver for Freescale Vybrid Platform
+> 
+>  arch/arm/boot/dts/vfxxx.dtsi |  28 +++++++-
+>  drivers/mfd/syscon.c         |  30 ++++++++
+>  drivers/soc/Kconfig          |   1 +
+>  drivers/soc/fsl/Kconfig      |  10 +++
+>  drivers/soc/fsl/Makefile     |   1 +
+>  drivers/soc/fsl/soc-vf610.c  | 160 +++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/mfd/syscon.h   |  10 +++
+>  7 files changed, 239 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/soc/fsl/Kconfig
+>  create mode 100644 drivers/soc/fsl/soc-vf610.c
+> 
+> -- 
+> 2.7.2
+> 
