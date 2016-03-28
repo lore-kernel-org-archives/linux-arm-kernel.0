@@ -1,40 +1,23 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 28 Mar 2016 02:13:34 +0200
-Subject: [PATCH v5 4/4] clk: rockchip: add clock controller for the RK3399
-In-Reply-To: <1458974276-10325-5-git-send-email-zhengxing@rock-chips.com>
-References: <1458974276-10325-1-git-send-email-zhengxing@rock-chips.com>
- <1458974276-10325-5-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <9181730.v9nyazlRXy@phil>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 27 Mar 2016 21:26:35 -0300
+Subject: [PATCH] i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity
+In-Reply-To: <CAOMZO5DcZCxoLPeGRWSGkstm7F3eN-Q-yJyf6ktMTda2zLviag@mail.gmail.com>
+References: <m3h9fuk7ik.fsf@t19.piap.pl>
+ <CAOMZO5DcZCxoLPeGRWSGkstm7F3eN-Q-yJyf6ktMTda2zLviag@mail.gmail.com>
+Message-ID: <CAOMZO5B8Lzn-E4YOeYxVtN5PN11aOvZHn4eU0ixkdV8CO8+xYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Xing,
+On Sun, Mar 27, 2016 at 11:44 AM, Fabio Estevam <festevam@gmail.com> wrote:
 
-Am Samstag, 26. M?rz 2016, 14:37:56 schrieb Xing Zheng:
-> Add the clock tree definition for the new RK3399 SoC.
-> 
-> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
-> ---
+> Good catch!
+>
+> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+>
+> I will fix imx6q-sabresd.dtsi when this patch gets applied.
 
-[...]
+After thinking more about it, I think the correct fix is to revert
+5c5fb40de8f143 ("PCI: imx6: Add support for active-low reset GPIO") so
+that we do not break old dtb's.
 
-> +	/*
-> +	 * We use pclkin_cifinv by default GRF_SOC_CON20[9] (GSC20_9) setting in
-> system, +	 * so we ignore the mux and make clocks nodes as following,
-> +	 *
-> +	 * pclkin_cifinv --|-------\
-> +	 *                 |GSC20_9|-- pclkin_cifmux
-> +	 * pclkin_cif    --|-------/
-> +	 */
-> +	GATE(PCLK_ISP1_WRAPPER, "pclkin_isp1_wrapper", "pclkin_cifmux",
-
-please name that source clock pclkin_cif as in the TRM.
-pclkin_cif is the actual input clock - if I'm reading the TRM correctly and 
-the inverter is part of the soc or so?
-
-That we currently hide / hardcode the phase-handling should not be part of 
-our outside connection - which should be stable even if we implement this 
-later.
-
-
-Heiko
+Then a new dt property can be added if someone needs gpio active high PCI reset.
