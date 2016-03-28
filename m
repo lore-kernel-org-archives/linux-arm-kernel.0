@@ -1,58 +1,106 @@
-From: mohun106@gmail.com (Radha Mohan)
-Date: Mon, 28 Mar 2016 12:25:00 -0700
-Subject: [PATCH V4] iommu/arm-smmu-v2: Workaround for ThunderX errata#27704
-In-Reply-To: <CAC8NTUUXoW4mV7aFD90mbSpVaai=o6fxM+PLSUzu82qOjEJn2Q@mail.gmail.com>
-References: <1457128569-13878-1-git-send-email-tchalamarla@caviumnetworks.com>
- <44D97D2C-5114-4FCD-AE3E-9404391FD449@caviumnetworks.com>
- <20160324175127.GA29365@arm.com>
- <4F6594C9-35E6-415B-B022-D78827C659C0@caviumnetworks.com>
- <CAC8NTUUXoW4mV7aFD90mbSpVaai=o6fxM+PLSUzu82qOjEJn2Q@mail.gmail.com>
-Message-ID: <CAC8NTUXju1SMt_kUWNyOino8Y70DcAKW1buC+-s4qYoZi5NMtA@mail.gmail.com>
+From: akshay.bhat@timesys.com (Akshay Bhat)
+Date: Mon, 28 Mar 2016 15:26:19 -0400
+Subject: [PATCH v4 3/3] ARM: imx6: Fix procedure to switch the parent of
+ LDB_DI_CLK
+In-Reply-To: <CAOMZO5DJ=2xo3ciDDoC1KVwHpxagEjNHq5hEkS7StBzaXrk-pQ@mail.gmail.com>
+References: <1456476714-11351-1-git-send-email-p.zabel@pengutronix.de>
+ <1456476714-11351-4-git-send-email-p.zabel@pengutronix.de>
+ <56D60C90.7080703@timesys.com>
+ <CACrMeVAtLMdx6FhhmvxOq=_q=HztU_2nqVwzbL3dYBHd-PWKUg@mail.gmail.com>
+ <CAOMZO5DJ=2xo3ciDDoC1KVwHpxagEjNHq5hEkS7StBzaXrk-pQ@mail.gmail.com>
+Message-ID: <56F9855B.9060009@timesys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 28, 2016 at 11:57 AM, Radha Mohan <mohun106@gmail.com> wrote:
-> On Thu, Mar 24, 2016 at 11:29 AM, Chalamarla, Tirumalesh
-> <Tirumalesh.Chalamarla@caviumnetworks.com> wrote:
->> Thanks.
->>
->>
->>
->>
->> On 3/24/16, 10:51 AM, "Will Deacon" <will.deacon@arm.com> wrote:
->>
->>>On Thu, Mar 24, 2016 at 05:36:39PM +0000, Chalamarla, Tirumalesh wrote:
->>>> Do you want me to resend it with path version number change?
->>>
->>>Shouldn't be any need. I've queued this locally, and will push out when
->>>I update my repo after the merge window.
->>>
+Hi Fabio,
+
+On 03/28/2016 02:53 PM, Fabio Estevam wrote:
+> Hi Akshay,
 >
-> Minor change that affects the kernel compilation.
-> I think it makes sense to resubmit the patch.
+> On Wed, Mar 23, 2016 at 12:48 PM, Akshay Bhat <akshay.bhat@timesys.com> wrote:
 >
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 6ed7c3e..4aca5c1 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -1834,8 +1834,8 @@ static int arm_smmu_device_dt_probe(struct
-> platform_device *pdev)
->          * asid/vmid space.
->          */
->         if (of_device_is_compatible(dev->of_node, "cavium,smmu-v2")) {
-> -               smmu->cavium_id_base = atomic_read(cavium_smmu_context_count);
-> -               atomic_add(smmu->num_context_banks, cavium_smmu_context_count);
-> +               smmu->cavium_id_base = atomic_read(&cavium_smmu_context_count);
-> +               atomic_add(smmu->num_context_banks, &cavium_smmu_context_count);
->         }
+>> Any comment from NXP regarding the same? I have tested this patch as
+>> it is and it resolves intermittent blank LVDS display issues we are
+>> seeing on our boards. The questions is if the patch needs to be
+>> updated to match EB821 document for the above sections?
 >
->         list_add(&smmu->list, &arm_smmu_devices);
+> I am not aware of such document.
+>
+> Do you see any discrepancy with regards to the sequence from NXP 3.10 kernel?
+> http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/commit/?h=imx_3.10.17_1.0.1_ga&id=eecbe9a52587cf9eec30132fb9b8a6761f3a1e6d
 >
 
-Ok, please ignore this, I missed the changes in between the thread :)
+The 2 discrepancies I see with this patch with regards to the sequence 
+from NXP 3.10 kernel are:
 
->>>Will
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+1. NXP 3.10 kernel switches clock source as follows:
+current_parent -> 7 -> 4 -> new_parent
+
+Ref:
++	/*
++	 * Set the ldb_di0_clk and ldb_di1_clk to 111b.
++	 */
++	reg = readl_relaxed(ccm_base + 0x2c);
++	reg |= ((7 << 9) | (7 << 12));
++	writel_relaxed(reg, ccm_base + 0x2c);
++
++	/*
++	 * Set the ldb_di0_clk and ldb_di1_clk to 100b.
++	 */
++	reg = readl_relaxed(ccm_base + 0x2c);
++	reg &= ~((7 << 9) | (7 << 12));
++	reg |= ((4 << 9) | (4 << 12));
++	writel_relaxed(reg, ccm_base + 0x2c);
++
++	/*
++	 * Perform the LDB parent clock switch.
++	 */
++	clk_set_parent(clk[ldb_di0_sel], clk[new_parent]);
++	clk_set_parent(clk[ldb_di1_sel], clk[new_parent]);
+
+
+If I am reading this patch correctly, then this patch does:
+current_parent -> (current_parent | 4) -> (new_parent | 4) -> new_parent
+
+Ref:
++	/* First switch to the bottom mux */
++	sel[i][1] = sel[i][0] | 4;
++
++	/* Then configure the top mux before switching back to it */
++	sel[i][2] = sel[i][3] | 4;
++
++	pr_debug("ccm: switching ldb_di%d_sel: %d->%d->%d->%d\n", i,
++			 sel[i][0], sel[i][1], sel[i][2], sel[i][3]);
+
+
+2. The NXP 3.10 kernel does not have any restriction on what the new 
+parent is.
+
+Ref:
++ /*
++ * Perform the LDB parent clock switch.
++ */
++ clk_set_parent(clk[ldb_di0_sel], clk[new_parent]);
++ clk_set_parent(clk[ldb_di1_sel], clk[new_parent]);
+
+
+This patch has a restriction on the new_parent if the current_parent is 
+already pll3_usb_otg
+
+Ref:
++               /*
++                * It is unclear whether the procedure works for 
+switching from
++                * pll3_usb_otg to any other parent than pll5_video_div
++                */
++               if (sel[i][0] > 3 && sel[i][0] != (sel[i][3] | 4)) {
++                       pr_err("ccm: ldb_di%d_sel workaround only for 
+top mux\n",
++                              i);
++                       sel[i][3] = sel[i][2] = sel[i][1] = sel[i][0];
++                       continue;
++               }
++
+
+Thanks,
+Akshay
