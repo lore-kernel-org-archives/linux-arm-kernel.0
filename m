@@ -1,48 +1,76 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 28 Mar 2016 09:44:51 +0900
-Subject: [PATCH v3 3/8] clk: samsung: exynos3250: Add MMC2 clock
-In-Reply-To: <56F509E6.7080807@samsung.com>
-References: <1458027490-13787-1-git-send-email-cw00.choi@samsung.com>
- <1458027490-13787-4-git-send-email-cw00.choi@samsung.com>
- <56F47ABC.7060006@samsung.com> <56F509E6.7080807@samsung.com>
-Message-ID: <56F87E83.7060100@samsung.com>
+From: yh.huang@mediatek.com (YH Huang)
+Date: Mon, 28 Mar 2016 10:32:10 +0800
+Subject: [PATCH] sbs-battery: fix power status when battery is dry
+In-Reply-To: <CAGS+omDhFP+_shCqEWasLDsHf-ab0-OWJJ-gZZkgihAgrZwBHA@mail.gmail.com>
+References: <1458726794-48298-1-git-send-email-yh.huang@mediatek.com>
+ <CAGS+omDTmJDkJYsf=gDJMrmAos+30enoAa2xfTPyirXUd37=9g@mail.gmail.com>
+ <1458801832.16645.7.camel@mtksdaap41>
+ <CAGS+omDhFP+_shCqEWasLDsHf-ab0-OWJJ-gZZkgihAgrZwBHA@mail.gmail.com>
+Message-ID: <1459132330.16645.14.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
-
-On 2016? 03? 25? 18:50, Sylwester Nawrocki wrote:
-> Hi Chanwoo,
+On Fri, 2016-03-25 at 11:06 +0800, Daniel Kurtz wrote:
+> On Thu, Mar 24, 2016 at 2:43 PM, YH Huang <yh.huang@mediatek.com> wrote:
+> >
+> > Hi Daniel,
+> >
+> > On Thu, 2016-03-24 at 12:01 +0800, Daniel Kurtz wrote:
+> > > Hi YH,
+> > >
+> > > On Wed, Mar 23, 2016 at 5:53 PM, YH Huang <yh.huang@mediatek.com> wrote:
+> > > > When the battery is dry and BATTERY_FULL_DISCHARGED is set,
+> > > > we should check BATTERY_DISCHARGING to decide the power status.
+> > > > If BATTERY_DISCHARGING is set, the power status is not charging.
+> > > > Or the power status should be charging.
+> > > >
+> > > > Signed-off-by: YH Huang <yh.huang@mediatek.com>
+> > > > ---
+> > > >  drivers/power/sbs-battery.c |   22 ++++++++++++----------
+> > > >  1 file changed, 12 insertions(+), 10 deletions(-)
+> > > >
+> > > > diff --git a/drivers/power/sbs-battery.c b/drivers/power/sbs-battery.c
+> > > > index d6226d6..d86db0e 100644
+> > > > --- a/drivers/power/sbs-battery.c
+> > > > +++ b/drivers/power/sbs-battery.c
+> > > > @@ -382,11 +382,12 @@ static int sbs_get_battery_property(struct i2c_client *client,
+> > > >
+> > > >                 if (ret & BATTERY_FULL_CHARGED)
+> > > >                         val->intval = POWER_SUPPLY_STATUS_FULL;
+> > > > -               else if (ret & BATTERY_FULL_DISCHARGED)
+> > > > -                       val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
+> > > > -               else if (ret & BATTERY_DISCHARGING)
+> > > > -                       val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
+> > > > -               else
+> > > > +               else if (ret & BATTERY_DISCHARGING) {
+> > > > +                       if (ret & BATTERY_FULL_DISCHARGED)
+> > > > +                               val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
+> > > > +                       else
+> > > > +                               val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
+> > > > +               } else
+> > >
+> > >
+> > > I think (BATTERY_DISCHARGING && BATTERY_FULL_DISCHARGED) is still
+> > > POWER_SUPPLY_STATUS_DISCHARGING.
+> > > So, let's just report what the battery says and do:
+> > >
+> > >                else if (ret & BATTERY_DISCHARGING)
+> > >                                val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
+> > >
+> > So we just ignore the special situation (BATTERY_DISCHARGING &&
+> > BATTERY_FULL_DISCHARGED).
+> > Isn't POWER_SUPPLY_STATUS_NOT_CHARGING a useful information?
 > 
-> On 03/25/2016 12:39 AM, Chanwoo Choi wrote:
->> diff --git a/include/dt-bindings/clock/exynos3250.h 
->> b/include/dt-bindings/clock/exynos3250.h
->>> index ddb874130d86..c796ff02ceeb 100644
->>> --- a/include/dt-bindings/clock/exynos3250.h
->>> +++ b/include/dt-bindings/clock/exynos3250.h
-> ...
->>> -#define CLK_NR_CLKS			249
->>> +#define CLK_NR_CLKS			250
-> 
-> What do you think about putting all the changes to include/dt-bindings/
-> clock/exynos3250.h into a separate patch? Now in patch 3/8 there
-> is being changed again what was added in patch 2/8. However, my main
-> point is to have a minimum required in a common topic branch for the clk
-> and the arm-soc trees, so there is no need for arm-soc to pull all
-> the drives/clk changes.
-> It might not be that sensible in case of just those 2 patches in your
-> series, nevertheless it would be good to keep that in mind for future
-> submissions.
+> The battery is discharging.  The fact that it is also reporting that
+> it is already "discharged" just seems premature.   I would expect to
+> only see NOT_CHARGING if completely discharged *and* not discharging.
 
-You mean that separate patch1 include only the new clock id about both UART2 and MMC2
-and the patch2/patch3 just use the new clock id as following:
-
-patch1 dt-bindings: Add the clock id of UART2 and MMC2 for Exynos3250
-patch2 clk: samsung: exynos3250: Add UART2 clock
-patch3 clk: samsung: exynos3250: Add MMC2 clock
-
-As far as I understand it is that right?
-If it is ok, I'll modify it on v4 patchset as you comment.
-
-Best Regards,
-Chanwoo Choi
+I check the "Smart Battery Data Specification Revision 1.1".
+And there are some words about FULLY_DISCHARGED.
+"Discharge should be stopped soon."
+"This status bit may be set prior to the
+?TERMINATE_DISCHARGE_ALARM? as an early or first level warning of end of
+battery charge."
+It looks like the FULLY_DISCHARGED status is used to announce the
+warning of battery charge and it is still discharging if there is no one
+takes care of it.
