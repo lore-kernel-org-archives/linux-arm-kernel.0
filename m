@@ -1,46 +1,89 @@
-From: zhang.chunyan@linaro.org (Chunyan Zhang)
-Date: Mon, 28 Mar 2016 11:06:25 +0800
-Subject: [RESEND PATCH V4 4/4] coresight-stm: adding driver for CoreSight
- STM component
-In-Reply-To: <HE1PR08MB1130236EF28E34442F362F828A880@HE1PR08MB1130.eurprd08.prod.outlook.com>
-References: <1457418835-31417-1-git-send-email-zhang.chunyan@linaro.org>
- <1457418835-31417-5-git-send-email-zhang.chunyan@linaro.org>
- <HE1PR08MB1130236EF28E34442F362F828A880@HE1PR08MB1130.eurprd08.prod.outlook.com>
-Message-ID: <CAG2=9p-o5XRxeFxYSezjj7OGjikhE--_aPc1rJz4bD1ks0X5VQ@mail.gmail.com>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Mon, 28 Mar 2016 11:24:47 +0800
+Subject: [PATCH v5 2/4] dt-bindings: add bindings for rk3399 clock
+ controller
+In-Reply-To: <3689505.b0IKY6iWOt@phil>
+References: <1458974276-10325-1-git-send-email-zhengxing@rock-chips.com>
+ <1458974276-10325-3-git-send-email-zhengxing@rock-chips.com>
+ <1507551.YPleCY5ZQt@phil> <3689505.b0IKY6iWOt@phil>
+Message-ID: <56F8A3FF.6090800@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michael,
+Hi Heiko,
 
-On Mon, Mar 14, 2016 at 5:53 PM, Michael Williams
-<Michael.Williams@arm.com> wrote:
-> Reviewed-by: Michael Williams <michael.williams@arm.com>
-
-I will add your Reviewed-by in the next version of patch.
-
+On 2016?03?28? 08:07, Heiko Stuebner wrote:
+> Hi Xing,
 >
-> This resend addresses my earlier concerns.
-
-Thanks for your review and feedback,
-Chunyan
-
->
->> -----Original Message-----
->> From: Chunyan Zhang [mailto:zhang.chunyan at linaro.org]
->> Sent: 08 March 2016 06:34
->> To: mathieu.poirier at linaro.org; alexander.shishkin at linux.intel.com
->> Cc: Mike Leach; Michael Williams; Al Grant; tor at ti.com; nicolas.guion at st.com;
->> pratikp at codeaurora.org; zhang.lyra at gmail.com; linux-kernel at vger.kernel.org; linux-arm-
->> kernel at lists.infradead.org; linux-api at vger.kernel.org; linux-doc at vger.kernel.org
->> Subject: [RESEND PATCH V4 4/4] coresight-stm: adding driver for CoreSight STM component
+> Am Montag, 28. M?rz 2016, 01:52:12 schrieb Heiko St?bner:
+>> Am Samstag, 26. M?rz 2016, 14:37:54 schrieb Xing Zheng:
+>>> Add devicetree bindings for Rockchip cru which found on
+>>> Rockchip SoCs.
+>>>
+>>> Signed-off-by: Xing Zheng<zhengxing@rock-chips.com>
+>>> Signed-off-by: Jianqun Xu<jay.xu@rock-chips.com>
+>>> Acked-by: Rob Herring<robh@kernel.org>
+>>> ---
+>>>
+>>> Changes in v5: None
+>>> Changes in v3: None
+>>> Changes in v2: None
+>>>
+>>>   .../bindings/clock/rockchip,rk3399-cru.txt         |   83
+>>>
+>>> ++++++++++++++++++++ 1 file changed, 83 insertions(+)
+>>>
+>>>   create mode 100644
+>>>
+>>> Documentation/devicetree/bindings/clock/rockchip,rk3399-cru.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/clock/rockchip,rk3399-
+>> cru.txt
 >>
->> From: Pratik Patel <pratikp@codeaurora.org>
+>>> b/Documentation/devicetree/bindings/clock/rockchip,rk3399-cru.txt new
+>>> file mode 100644
+>>> index 0000000..9427caa
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/clock/rockchip,rk3399-cru.txt
+>>> @@ -0,0 +1,83 @@
+>>> +* Rockchip RK3399 Clock and Reset Unit
+>>> +
+>>> +The RK3399 clock controller generates and supplies clock to various
+>>> +controllers within the SoC and also implements a reset controller for
+>>> SoC +peripherals.
+>>> +
+>>> +Required Properties:
+>>> +
+>>> +- compatible: PMU for CRU should be "rockchip,rk3399-pmucru"
+>>> +- compatible: CRU should be "rockchip,rk3399-cru"
+>>> +- reg: physical base address of the controller and length of memory
+>> mapped
+>>
+>>> +  region.
+>>> +- #clock-cells: should be 1.
+>>> +- #reset-cells: should be 1.
+>>> +
+>>> +Optional Properties:
+>>> +
+>>> +- rockchip,grf: phandle to the syscon managing the "general register
+>> files"
+>>
+>>> +  If missing, pll rates are not changeable, due to the missing pll lock
+>>> status. +
+>> the rk3399 doesn't need the GRF, so we should drop this block for now
+> actually, I just saw that the GRF is needed for the static settings during
+> init. So the rockchip,grf should stay but also move up to required
+> properties?
 >
-> [snip]
+> Same for the grf-comment in the examples-section.
 >
-> Mike.
-> --
-> Michael Williams  Principal Engineer   ARM Limited
-> www.arm.com The Architecture For The Digital World
-> IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
 >
+I check the setting of the pclk_alive and pclk_pmu_src are not gating 
+default on the PMUGRF_SOC_CON0,
+so I think that we don't need to do the static settings to re-enable 
+them in the clock driver any more.
+
+Thanks.
+
+-- 
+- Xing Zheng
