@@ -1,37 +1,32 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 28 Mar 2016 12:09:43 +0200
-Subject: [PATCH v6 2/6] power-domain: allow domains only handling idle
- requests
-In-Reply-To: <1457558578-22049-3-git-send-email-zhangqing@rock-chips.com>
-References: <1457558578-22049-1-git-send-email-zhangqing@rock-chips.com>
- <1457558578-22049-3-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <2362699.UXTOZsAcz0@diego>
+From: Yisen.Zhuang@huawei.com (Yisen Zhuang)
+Date: Mon, 28 Mar 2016 18:40:55 +0800
+Subject: [PATCH net-next 0/2] net: hns: add setting coalescing parameters for
+ HNS v2
+Message-ID: <1459161657-151406-1-git-send-email-Yisen.Zhuang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 10. M?rz 2016, 05:22:54 schrieb Elaine Zhang:
-> On some Rockchip SoC there exist child-domains only handling their
-> idle state with the actual power-state handled by a parent-domain.
-> 
-> So allow such types of domains. For them, we can determine their
-> state (on/of) by checking the inverse idle-state instead.
-> 
-> There exist one special case if both idle as well power handling
-> were set as not present, but as the domain-data is defined in the
-> code itself, we can expect the reasonable developer to define them
-> 
-> So allow such types of domains. For them, we can determine their
-> state (on/of) by checking the inverse idle-state instead.
-> 
-> There exist one special case if both idle as well power handling
-> were set as not present, but as the domain-data is defined in the
-> code itself, we can expect the reasonable developer to define them
-> in a correct, without adding more checks.
-> 
-> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+There are some different REGs about coalescing setting between HNS V2 and
+HNS V1. The current HNS driver is only considering the situation for HNS
+V1. It needs to support both of them. And Ethtool needs to know if it is
+successful to set the parameters as well.
 
-applied to my armsoc/drivers branch for 4.7
+The patchset as below:
 
+>from Lisheng, one fix about setting overtime regs, and the other is about
+the return value from HW when setting the parameters.
 
-Thanks
-Heiko
+Lisheng (2):
+  net: hns: fixed the setting and getting overtime bug
+  net: hns: set-coalesce-usecs returns errno by dsaf.ko
+
+ drivers/net/ethernet/hisilicon/hns/hnae.h         |   2 +-
+ drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c |  64 +++----
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.c | 196 ++++++++++------------
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_rcb.h |  23 +--
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h |   1 +
+ drivers/net/ethernet/hisilicon/hns/hns_ethtool.c  |   6 +-
+ 6 files changed, 133 insertions(+), 159 deletions(-)
+
+-- 
+1.9.1
