@@ -1,62 +1,47 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Tue, 29 Mar 2016 01:16:58 +0800
-Subject: [PATCH v14 3/4] ARM64: add SBSA Generic Watchdog device node in
- amd-seattle-soc.dtsi
-In-Reply-To: <20160328141136.GA13855@dhcppc0.redhat.com>
-References: <1456735610-22012-1-git-send-email-fu.wei@linaro.org>
- <1456735610-22012-4-git-send-email-fu.wei@linaro.org>
- <CADyBb7shY-A-DTKEvNQS71SUtNmE6tkURfWDEb-_9eB-4htGWA@mail.gmail.com>
- <56F935AC.3020009@roeck-us.net>
- <20160328141136.GA13855@dhcppc0.redhat.com>
-Message-ID: <CADyBb7v68k9kPxLT403nD=b3EVWb+_571HPGpfa9q5a21+VfDA@mail.gmail.com>
+From: jchandra@broadcom.com (Jayachandran C)
+Date: Mon, 28 Mar 2016 23:31:37 +0530
+Subject: [RFC PATCH 0/4] ACPI based PCI host driver with generic ECAM
+In-Reply-To: <56F934B1.4080908@codeaurora.org>
+References: <CAKc_7PVK3VtaR-LDHNXPr5cSjbCcH--hsepFx=jVATNi=+a9Hw@mail.gmail.com>
+ <1458245913-17211-1-git-send-email-jchandra@broadcom.com>
+ <CAKc_7PWfP0eQJ8dRN=CLu37=GKxin32Uf5rjiZGZgQCbiab2iA@mail.gmail.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ED2A787@lhreml503-mbs>
+ <56F934B1.4080908@codeaurora.org>
+Message-ID: <CAKc_7PXs6+FpsrN5GyUZ0po79si0iN9+L3G1ec_OCGm512-3tA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pratyush, Guenter,
-
-On 28 March 2016 at 22:11, Pratyush Anand <panand@redhat.com> wrote:
-> On 28/03/2016:06:46:20 AM, Guenter Roeck wrote:
->> On 03/28/2016 06:12 AM, Fu Wei wrote:
->> >Hi Wim, Guenter:
->> >
->> >Great thanks for reviewing and applying this patchset :-)
->> >Now I can see almost all the patches of this patchset have been merged
->> >into the master branch of mainline kernel.
->> >But only this one is still out of any branch or repo. It seems that
->> >it's applied on linux-watchdog for a while, then disappeared.
->> >
->> >
->> >So any thing I can do for this patch? Do I need to resubmit it?
->> >Maybe I miss it in some repo? Could you help me ?
->> >Great thanks ! :-)
->> >
+On Mon, Mar 28, 2016 at 7:12 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+> Hi,
+>
+> On 3/23/2016 6:22 AM, Gabriele Paoloni wrote:
+>> I had a look at your patchset and also in your git repo at the other
+>> patches that you ported over from Tomasz; it seems that now we miss
+>> a quirk mechanism to enable controller that are not fully ECAM.
 >>
->> If I recall correctly, it was supposed to go in through some other tree (arm-soc ?)
+>> This was provided before by Tomasz in:
+>> https://lkml.org/lkml/2016/2/16/410
+>>
+>> I think we should put something like that back in...
+
+Like Tomasz mentioned in his mail, his approach does not work
+for raw operations. I have added raw operations in may patchset,
+so we have to come up with a new approach or decide that raw
+operations can be dropped.
+
+I am waiting for the overall acceptance of the patch set before
+going further along this path
+
+>>
+>> Thanks
+>>
+>> Gab
 >
-> Yes, it should have gone through arm-soc tree. But, it seems it got missed.  The
-> other dt patch for foundation-v8 is there in v4.6 pull request
-> [https://lkml.org/lkml/2016/3/20/244].
+> I was requested to test your patchset. I'll need this mechanism before
+> I can start.
 
-Yes, I thought it should be in arm-soc, but I have checked several
-branches in arm-soc repo, I can't find this patch.
-So can someone help to apply it.  I have applied it on the master
-branch of latest mainline kernel locally, I don't see any conflict.
+Please see above, we will need to look at the quirks again.
 
-Great thanks :-)
+> Sinan
 
->
-> ~Pratyush
-
-
-
--- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat Software (Beijing) Co.,Ltd.Shanghai Branch
-Ph: +86 21 61221326(direct)
-Ph: +86 186 2020 4684 (mobile)
-Room 1512, Regus One Corporate Avenue,Level 15,
-One Corporate Avenue,222 Hubin Road,Huangpu District,
-Shanghai,China 200021
+JC.
