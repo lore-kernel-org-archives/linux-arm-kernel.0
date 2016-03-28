@@ -1,23 +1,31 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 28 Mar 2016 12:36:19 -0700
-Subject: [PATCH] ARM: bcm2835: add CPU node for ARM core
-In-Reply-To: <1459182081-30819-1-git-send-email-stefan.wahren@i2se.com>
-References: <1459182081-30819-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <878u122y4s.fsf@eliezer.anholt.net>
+From: xypron.glpk@gmx.de (Heinrich Schuchardt)
+Date: Mon, 28 Mar 2016 10:38:31 +0200
+Subject: [PATCH 1/1] ARM: dts: kirkwood: add kirkwood-nsa320.dtb to Makefile
+Message-ID: <1459154311-4770-1-git-send-email-xypron.glpk@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren <stefan.wahren@i2se.com> writes:
+Commit be3d7d023b87 ("ARM: kirkwood: Add DTS file for NSA320")
+created the new file kirkwood-nsa320.dts but did not
+add it to the Makefile.
 
-> This patch adds the CPU node of the BCM2835 into the DT.
->
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+Fixes: be3d7d023b87 ("ARM: kirkwood: Add DTS file for NSA320")
+Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
+---
+ arch/arm/boot/dts/Makefile | 1 +
+ 1 file changed, 1 insertion(+)
 
-This looks good to me, but I'll give others a chance to speak up.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160328/608af1f0/attachment.sig>
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index f8308db..e75a340 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -215,6 +215,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += \
+ 	kirkwood-ns2mini.dtb \
+ 	kirkwood-nsa310.dtb \
+ 	kirkwood-nsa310a.dtb \
++	kirkwood-nsa320.dtb \
+ 	kirkwood-nsa325.dtb \
+ 	kirkwood-openblocks_a6.dtb \
+ 	kirkwood-openblocks_a7.dtb \
+-- 
+2.1.4
