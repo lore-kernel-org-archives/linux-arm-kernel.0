@@ -1,46 +1,38 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 28 Mar 2016 11:37:03 -0500
-Subject: [PATCH] ARM: dts: AM572x-IDK Initial Support
-In-Reply-To: <20160325150344.GA1268@rob-hp-laptop>
-References: <1458858644-13800-1-git-send-email-nm@ti.com>
- <20160325150344.GA1268@rob-hp-laptop>
-Message-ID: <56F95DAF.1080901@ti.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 28 Mar 2016 19:42:14 +0300
+Subject: [PATCH v3 02/16] mfd: da8xx-cfgchip: New header file for CFGCHIP
+ registers.
+In-Reply-To: <56F94772.7070009@lechnology.com>
+References: <1458863503-31121-1-git-send-email-david@lechnology.com>
+ <1458863503-31121-3-git-send-email-david@lechnology.com>
+ <56F573F3.90500@cogentembedded.com> <56F94772.7070009@lechnology.com>
+Message-ID: <56F95EE6.1010403@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/25/2016 10:03 AM, Rob Herring wrote:
-> On Thu, Mar 24, 2016 at 05:30:44PM -0500, Nishanth Menon wrote:
->> From: Schuyler Patton <spatton@ti.com>
-[...]
+Hello.
 
->> +- AM5728 IDK
->> +  compatible = "ti,am5728-idk", "ti,am5728", "ti,dra742", "ti,dra74", "ti,dra7"
-> 
-> Okay, but I think the TI folks have gone a bit crazy with all these 
-> compatible strings...
-> 
+On 03/28/2016 06:02 PM, David Lechner wrote:
 
-Sadly yes :( too many paper spins and trying to maintain requirements
-of exact match than wild cards is starting to look crazier over time :(
+>>> +/* register offsets */
+>>> +#define CFGCHIP_REG(n)                (n * 4)
+>>> +#define CFGCHIP0_REG                CFGCHIP_REG(0)
+>>> +#define CFGCHIP1_REG                CFGCHIP_REG(1)
+>>> +#define CFGCHIP2_REG                CFGCHIP_REG(2)
+>>> +#define CFGCHIP3_REG                CFGCHIP_REG(3)
+>>> +#define CFGCHIP4_REG                CFGCHIP_REG(4)
+>>
+>>     Why not just use CFGCHIP_REG(n) directly?
+>
+> I considered that, but I went this way because A) the TRM uses, for example,
+> "CFGCHIP2", so I wanted to keep "CFGCHIP" and "2" together
 
->> diff --git a/arch/arm/boot/dts/am572x-idk.dts b/arch/arm/boot/dts/am572x-idk.dts
->> new file mode 100644
->> index 000000000000..bb51f6de7b45
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/am572x-idk.dts
->> @@ -0,0 +1,85 @@
-[...]
+    I'd just drop the _REG suffix.
 
->> +	leds {
->> +		compatible = "gpio-leds";
->> +		led at 0 {
-> 
-> Unit-address without reg is going to start warning in dtc. Use something 
-> like "cpu0-led" instead.
-> 
-Fixed. Thanks. Updated version posted
-https://patchwork.kernel.org/patch/8679861/
+> and B) this tells
+> you how many CFGCHIP registers there are, i.e. there is no CFGCHIP5_REG.
 
--- 
-Regards,
-Nishanth Menon
+    You can tell that in a comment. Having a parametrized macro and using it 
+to just #define more macros doesn't appeal to me at all...
+
+MBR, Sergei
