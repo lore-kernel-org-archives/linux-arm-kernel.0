@@ -1,29 +1,38 @@
-From: akshay.bhat@timesys.com (Akshay Bhat)
-Date: Mon, 28 Mar 2016 15:42:43 -0400
-Subject: [PATCH] arm: dts: imx6q-ba16: Remove unused vqmmc-supply
-Message-ID: <1459194163-8540-1-git-send-email-akshay.bhat@timesys.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Mon, 28 Mar 2016 16:21:20 +0000
+Subject: [PATCH] ARM: bcm2835: add CPU node for ARM core
+Message-ID: <1459182081-30819-1-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The vqmmc supply is not connected to bio supply on the BA16 module.
-Remove the same.
+This patch adds the CPU node of the BCM2835 into the DT.
 
-Signed-off-by: Akshay Bhat <akshay.bhat@timesys.com>
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 ---
- arch/arm/boot/dts/imx6q-ba16.dtsi | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/boot/dts/bcm2835.dtsi |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6q-ba16.dtsi b/arch/arm/boot/dts/imx6q-ba16.dtsi
-index 8f6e603..96701a3 100644
---- a/arch/arm/boot/dts/imx6q-ba16.dtsi
-+++ b/arch/arm/boot/dts/imx6q-ba16.dtsi
-@@ -390,7 +390,6 @@
- 	pinctrl-0 = <&pinctrl_usdhc3 &pinctrl_usdhc3_reset>;
- 	bus-width = <8>;
- 	vmmc-supply = <&vdd_bperi>;
--	vqmmc-supply = <&vdd_bio>;
- 	non-removable;
- 	keep-power-in-suspend;
- 	status = "okay";
+diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+index b83b326..e87aba1 100644
+--- a/arch/arm/boot/dts/bcm2835.dtsi
++++ b/arch/arm/boot/dts/bcm2835.dtsi
+@@ -3,6 +3,17 @@
+ / {
+ 	compatible = "brcm,bcm2835";
+ 
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,arm1176jzf-s", "arm,arm1176";
++			reg = <0x0>;
++		};
++	};
++
+ 	soc {
+ 		ranges = <0x7e000000 0x20000000 0x02000000>;
+ 		dma-ranges = <0x40000000 0x00000000 0x20000000>;
 -- 
-2.7.4
+1.7.9.5
