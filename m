@@ -1,43 +1,24 @@
-From: akshay.bhat@timesys.com (Akshay Bhat)
-Date: Mon, 28 Mar 2016 16:19:15 -0400
-Subject: [PATCH v4 1/2] watchdog: imx2_wdt: add external reset support via
- 'ext-reset-output' dt prop
-In-Reply-To: <CAOMZO5DrTY3ho0Z_jXxeYMqbd6GmUKRwD1LB61vM1ZTGQAYOrg@mail.gmail.com>
-References: <1446758362-11702-1-git-send-email-akshay.bhat@timesys.com>
- <1446758362-11702-2-git-send-email-akshay.bhat@timesys.com>
- <20151105222325.GA26159@roeck-us.net>
- <CAJ+vNU2fSxRJ7YvxOfNzoEoiKgzv-dHj=+eksKxH48ekHiUw2Q@mail.gmail.com>
- <20151106220249.GA19791@roeck-us.net> <565F4244.7090502@timesys.com>
- <CAJ+vNU00Bf97HUqkkW9KqOUzHXh482R9O1gasz6ju3Pn-_5chA@mail.gmail.com>
- <CAJ+vNU2qHQPSJ1KWp_3f3vAdeuOcF0ooZHmHsdafabZLXJv=Bw@mail.gmail.com>
- <20151228162923.GA31680@spo001.leaseweb.nl> <56AA79DA.2010305@timesys.com>
- <CAOMZO5DrTY3ho0Z_jXxeYMqbd6GmUKRwD1LB61vM1ZTGQAYOrg@mail.gmail.com>
-Message-ID: <56F991C3.8030201@timesys.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 28 Mar 2016 22:24:12 +0200
+Subject: [PATCH v4 5/8] arm64: dts: rockchip: Clean up gpio-keys nodes
+In-Reply-To: <1458136727-32075-6-git-send-email-afaerber@suse.de>
+References: <1458136727-32075-1-git-send-email-afaerber@suse.de>
+ <1458136727-32075-6-git-send-email-afaerber@suse.de>
+Message-ID: <5487279.12FUefa44Q@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Am Mittwoch, 16. M?rz 2016, 14:58:43 schrieb Andreas F?rber:
+> Drop superfluous #address-cells and #size-cells.
+> Use KEY_POWER define for 116.
+> Rename sub-nodes to avoid new dtc warnings.
+> 
+> Reported-by: Julien Chauveau <chauveau.julien@gmail.com>
+> Cc: Julien Chauveau <chauveau.julien@gmail.com>
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
 
-On 02/28/2016 08:56 AM, Fabio Estevam wrote:
-> Rob,
->
-> On Thu, Jan 28, 2016 at 6:28 PM, Akshay Bhat <akshay.bhat@timesys.com> wrote:
->
->>> I have no objections against the idea and the code itself.
->>> But as Guenter pointed out: it would be handy to get feedback from the
->>> devicetree maintainers on the above discussion.
->>>
->>> Kind regards,
->>> Wim.
->>>
->>
->> Any suggestions on whether a vendor specific prefix is necessary?
->
-> Any comments?
->
+applied to my dts64 branch for 4.6
 
-Is this something you can help with, since you are the iMX 
-architecture/devicetree maintainer? Appreciate any feedback.
 
-Thanks,
-Akshay
+Thanks
+Heiko
