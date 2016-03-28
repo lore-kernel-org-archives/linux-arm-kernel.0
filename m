@@ -1,76 +1,164 @@
-From: yh.huang@mediatek.com (YH Huang)
-Date: Mon, 28 Mar 2016 10:32:10 +0800
-Subject: [PATCH] sbs-battery: fix power status when battery is dry
-In-Reply-To: <CAGS+omDhFP+_shCqEWasLDsHf-ab0-OWJJ-gZZkgihAgrZwBHA@mail.gmail.com>
-References: <1458726794-48298-1-git-send-email-yh.huang@mediatek.com>
- <CAGS+omDTmJDkJYsf=gDJMrmAos+30enoAa2xfTPyirXUd37=9g@mail.gmail.com>
- <1458801832.16645.7.camel@mtksdaap41>
- <CAGS+omDhFP+_shCqEWasLDsHf-ab0-OWJJ-gZZkgihAgrZwBHA@mail.gmail.com>
-Message-ID: <1459132330.16645.14.camel@mtksdaap41>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Mon, 28 Mar 2016 10:51:36 +0800
+Subject: [PATCH v5 2/4] dt-bindings: add bindings for rk3399 clock
+ controller
+In-Reply-To: <1507551.YPleCY5ZQt@phil>
+References: <1458974276-10325-1-git-send-email-zhengxing@rock-chips.com>
+ <1458974276-10325-3-git-send-email-zhengxing@rock-chips.com>
+ <1507551.YPleCY5ZQt@phil>
+Message-ID: <56F89C38.5000107@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-03-25 at 11:06 +0800, Daniel Kurtz wrote:
-> On Thu, Mar 24, 2016 at 2:43 PM, YH Huang <yh.huang@mediatek.com> wrote:
-> >
-> > Hi Daniel,
-> >
-> > On Thu, 2016-03-24 at 12:01 +0800, Daniel Kurtz wrote:
-> > > Hi YH,
-> > >
-> > > On Wed, Mar 23, 2016 at 5:53 PM, YH Huang <yh.huang@mediatek.com> wrote:
-> > > > When the battery is dry and BATTERY_FULL_DISCHARGED is set,
-> > > > we should check BATTERY_DISCHARGING to decide the power status.
-> > > > If BATTERY_DISCHARGING is set, the power status is not charging.
-> > > > Or the power status should be charging.
-> > > >
-> > > > Signed-off-by: YH Huang <yh.huang@mediatek.com>
-> > > > ---
-> > > >  drivers/power/sbs-battery.c |   22 ++++++++++++----------
-> > > >  1 file changed, 12 insertions(+), 10 deletions(-)
-> > > >
-> > > > diff --git a/drivers/power/sbs-battery.c b/drivers/power/sbs-battery.c
-> > > > index d6226d6..d86db0e 100644
-> > > > --- a/drivers/power/sbs-battery.c
-> > > > +++ b/drivers/power/sbs-battery.c
-> > > > @@ -382,11 +382,12 @@ static int sbs_get_battery_property(struct i2c_client *client,
-> > > >
-> > > >                 if (ret & BATTERY_FULL_CHARGED)
-> > > >                         val->intval = POWER_SUPPLY_STATUS_FULL;
-> > > > -               else if (ret & BATTERY_FULL_DISCHARGED)
-> > > > -                       val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
-> > > > -               else if (ret & BATTERY_DISCHARGING)
-> > > > -                       val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
-> > > > -               else
-> > > > +               else if (ret & BATTERY_DISCHARGING) {
-> > > > +                       if (ret & BATTERY_FULL_DISCHARGED)
-> > > > +                               val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
-> > > > +                       else
-> > > > +                               val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
-> > > > +               } else
-> > >
-> > >
-> > > I think (BATTERY_DISCHARGING && BATTERY_FULL_DISCHARGED) is still
-> > > POWER_SUPPLY_STATUS_DISCHARGING.
-> > > So, let's just report what the battery says and do:
-> > >
-> > >                else if (ret & BATTERY_DISCHARGING)
-> > >                                val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
-> > >
-> > So we just ignore the special situation (BATTERY_DISCHARGING &&
-> > BATTERY_FULL_DISCHARGED).
-> > Isn't POWER_SUPPLY_STATUS_NOT_CHARGING a useful information?
-> 
-> The battery is discharging.  The fact that it is also reporting that
-> it is already "discharged" just seems premature.   I would expect to
-> only see NOT_CHARGING if completely discharged *and* not discharging.
+Hi Heiko,
 
-I check the "Smart Battery Data Specification Revision 1.1".
-And there are some words about FULLY_DISCHARGED.
-"Discharge should be stopped soon."
-"This status bit may be set prior to the
-?TERMINATE_DISCHARGE_ALARM? as an early or first level warning of end of
-battery charge."
-It looks like the FULLY_DISCHARGED status is used to announce the
-warning of battery charge and it is still discharging if there is no one
-takes care of it.
+On 2016?03?28? 07:52, Heiko St?bner wrote:
+> Hi Xing,
+>
+> Am Samstag, 26. M?rz 2016, 14:37:54 schrieb Xing Zheng:
+>> Add devicetree bindings for Rockchip cru which found on
+>> Rockchip SoCs.
+>>
+>> Signed-off-by: Xing Zheng<zhengxing@rock-chips.com>
+>> Signed-off-by: Jianqun Xu<jay.xu@rock-chips.com>
+>> Acked-by: Rob Herring<robh@kernel.org>
+>> ---
+>>
+>> Changes in v5: None
+>> Changes in v3: None
+>> Changes in v2: None
+>>
+>>   .../bindings/clock/rockchip,rk3399-cru.txt         |   83
+>> ++++++++++++++++++++ 1 file changed, 83 insertions(+)
+>>   create mode 100644
+>> Documentation/devicetree/bindings/clock/rockchip,rk3399-cru.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/clock/rockchip,rk3399-
+> cru.txt
+>> b/Documentation/devicetree/bindings/clock/rockchip,rk3399-cru.txt new file
+>> mode 100644
+>> index 0000000..9427caa
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/clock/rockchip,rk3399-cru.txt
+>> @@ -0,0 +1,83 @@
+>> +* Rockchip RK3399 Clock and Reset Unit
+>> +
+>> +The RK3399 clock controller generates and supplies clock to various
+>> +controllers within the SoC and also implements a reset controller for SoC
+>> +peripherals.
+>> +
+>> +Required Properties:
+>> +
+>> +- compatible: PMU for CRU should be "rockchip,rk3399-pmucru"
+>> +- compatible: CRU should be "rockchip,rk3399-cru"
+>> +- reg: physical base address of the controller and length of memory
+> mapped
+>> +  region.
+>> +- #clock-cells: should be 1.
+>> +- #reset-cells: should be 1.
+>> +
+>> +Optional Properties:
+>> +
+>> +- rockchip,grf: phandle to the syscon managing the "general register
+> files"
+>> +  If missing, pll rates are not changeable, due to the missing pll lock
+>> status. +
+> the rk3399 doesn't need the GRF, so we should drop this block for now
+>
+>> +Each clock is assigned an identifier and client nodes can use this
+>> identifier +to specify the clock which they consume. All available clocks
+>> are defined as +preprocessor macros in the dt-bindings/clock/rk3399-cru.h
+>> headers and can be +used in device tree sources. Similar macros exist for
+>> the reset sources in +these files.
+>> +
+>> +External clocks:
+>> +
+>> +There are several clocks that are generated outside the SoC. It is
+> expected
+>> +that they are defined using standard clock bindings with following
+>> +clock-output-names:
+>> + - "xin24m" - crystal input - required,
+>> + - "xin32k" - rtc clock - optional,
+>> + - "ext_i2s" - external I2S clock - optional,
+>> + - "ext_gmac" - external GMAC clock - optional
+>> + - "ext_hsadc" - external HSADC clock - optional,
+>> + - "ext_isp" - external ISP clock - optional,
+>> + - "ext_jtag" - external JTAG clock - optional
+>> + - "ext_vip" - external VIP clock - optional,
+>> + - "usbotg_out" - output clock of the pll in the otg phy
+> external clock listing needs adjusting, something like
+>
+> - clkin_i2s
+> - clkin_gmac
+> -->  remove ext_hsadc
+> - clkin_cif
+> -->  remove ext_jtag
+> -->  remove ext_vip
+> - clk_usbphy0_480m
+> - clk_usbphy0_480m
+>
+> maybe?
+Thanks, now they like this:
+clock-output-names:
+- "xin24m" - crystal input - required,
+- "xin32k" - rtc clock - optional,
+- "clkin_gmac" - external GMAC clock - optional,
+- "gmac_phy_rx_clk" - external GMAC RX clock - optional,
+- "clkin_i2s" - external I2S clock - optional,
+- "pclkin_cif" - external ISP clock - optional,
+- "clk_usbphy0_480m" - output clock of the pll in the usbphy0
+- "clk_usbphy1_480m" - output clock of the pll in the usbphy1
+>
+>> +
+>> +Example: General Register Files
+>> +
+>> +	pmugrf: syscon at ff320000 {
+>> +		compatible = "rockchip,rk3399-pmugrf", "syscon";
+>> +		reg =<0x0 0xff320000 0x0 0x1000>;
+>> +	};
+>> +
+>> +	grf: syscon at ff770000 {
+>> +		compatible = "rockchip,rk3399-grf", "syscon";
+>> +		reg =<0x0 0xff770000 0x0 0x10000>;
+>> +	};
+>> +
+>> +Example: Clock controller node:
+>> +
+>> +	pmucru: pmu-clock-controller at ff750000 {
+>> +		compatible = "rockchip,rk3399-pmucru";
+>> +		reg =<0x0 0xff750000 0x0 0x1000>;
+>> +		rockchip,grf =<&pmugrf>;
+>> +		#clock-cells =<1>;
+>> +		#reset-cells =<1>;
+>> +	};
+>> +
+>> +	cru: clock-controller at ff760000 {
+>> +		compatible = "rockchip,rk3399-cru";
+>> +		reg =<0x0 0xff760000 0x0 0x1000>;
+>> +		rockchip,grf =<&grf>;
+>> +		#clock-cells =<1>;
+>> +		#reset-cells =<1>;
+>> +	};
+> also here drop grf nodes and rockchip,grf properties?
+Done.
+>
+>
+>> +
+>> +Example: UART controller node that consumes the clock generated by the
+>> clock +  controller:
+>> +
+>> +	uart0: serial at ff1a0000 {
+>> +		compatible = "rockchip,rk3399-uart", "snps,dw-apb-uart";
+>> +		reg =<0x0 0xff180000 0x0 0x100>;
+>> +		clocks =<&cru SCLK_UART0>,<&cru PCLK_UART0>;
+>> +		clock-names = "baudclk", "apb_pclk";
+>> +		interrupts =<GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>;
+>> +		reg-shift =<2>;
+>> +		reg-io-width =<4>;
+>> +	};
+>
+>
+Thanks.
+
+-- 
+- Xing Zheng
