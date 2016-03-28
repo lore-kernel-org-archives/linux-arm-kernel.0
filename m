@@ -1,23 +1,48 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 27 Mar 2016 21:26:35 -0300
-Subject: [PATCH] i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity
-In-Reply-To: <CAOMZO5DcZCxoLPeGRWSGkstm7F3eN-Q-yJyf6ktMTda2zLviag@mail.gmail.com>
-References: <m3h9fuk7ik.fsf@t19.piap.pl>
- <CAOMZO5DcZCxoLPeGRWSGkstm7F3eN-Q-yJyf6ktMTda2zLviag@mail.gmail.com>
-Message-ID: <CAOMZO5B8Lzn-E4YOeYxVtN5PN11aOvZHn4eU0ixkdV8CO8+xYw@mail.gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 28 Mar 2016 09:44:51 +0900
+Subject: [PATCH v3 3/8] clk: samsung: exynos3250: Add MMC2 clock
+In-Reply-To: <56F509E6.7080807@samsung.com>
+References: <1458027490-13787-1-git-send-email-cw00.choi@samsung.com>
+ <1458027490-13787-4-git-send-email-cw00.choi@samsung.com>
+ <56F47ABC.7060006@samsung.com> <56F509E6.7080807@samsung.com>
+Message-ID: <56F87E83.7060100@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 27, 2016 at 11:44 AM, Fabio Estevam <festevam@gmail.com> wrote:
+Hi Sylwester,
 
-> Good catch!
->
-> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
->
-> I will fix imx6q-sabresd.dtsi when this patch gets applied.
+On 2016? 03? 25? 18:50, Sylwester Nawrocki wrote:
+> Hi Chanwoo,
+> 
+> On 03/25/2016 12:39 AM, Chanwoo Choi wrote:
+>> diff --git a/include/dt-bindings/clock/exynos3250.h 
+>> b/include/dt-bindings/clock/exynos3250.h
+>>> index ddb874130d86..c796ff02ceeb 100644
+>>> --- a/include/dt-bindings/clock/exynos3250.h
+>>> +++ b/include/dt-bindings/clock/exynos3250.h
+> ...
+>>> -#define CLK_NR_CLKS			249
+>>> +#define CLK_NR_CLKS			250
+> 
+> What do you think about putting all the changes to include/dt-bindings/
+> clock/exynos3250.h into a separate patch? Now in patch 3/8 there
+> is being changed again what was added in patch 2/8. However, my main
+> point is to have a minimum required in a common topic branch for the clk
+> and the arm-soc trees, so there is no need for arm-soc to pull all
+> the drives/clk changes.
+> It might not be that sensible in case of just those 2 patches in your
+> series, nevertheless it would be good to keep that in mind for future
+> submissions.
 
-After thinking more about it, I think the correct fix is to revert
-5c5fb40de8f143 ("PCI: imx6: Add support for active-low reset GPIO") so
-that we do not break old dtb's.
+You mean that separate patch1 include only the new clock id about both UART2 and MMC2
+and the patch2/patch3 just use the new clock id as following:
 
-Then a new dt property can be added if someone needs gpio active high PCI reset.
+patch1 dt-bindings: Add the clock id of UART2 and MMC2 for Exynos3250
+patch2 clk: samsung: exynos3250: Add UART2 clock
+patch3 clk: samsung: exynos3250: Add MMC2 clock
+
+As far as I understand it is that right?
+If it is ok, I'll modify it on v4 patchset as you comment.
+
+Best Regards,
+Chanwoo Choi
