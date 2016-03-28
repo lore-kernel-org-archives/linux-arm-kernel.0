@@ -1,26 +1,48 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 28 Mar 2016 17:13:42 -0300
-Subject: [PATCH] i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity
-In-Reply-To: <CAJ+vNU2Sg1ZKBsGcQswrJZyTJ1WBEZor3ZqpoYUT7i9FKjEAog@mail.gmail.com>
-References: <m3h9fuk7ik.fsf@t19.piap.pl>
- <CAOMZO5DcZCxoLPeGRWSGkstm7F3eN-Q-yJyf6ktMTda2zLviag@mail.gmail.com>
- <CAOMZO5B8Lzn-E4YOeYxVtN5PN11aOvZHn4eU0ixkdV8CO8+xYw@mail.gmail.com>
- <CAJ+vNU2Sg1ZKBsGcQswrJZyTJ1WBEZor3ZqpoYUT7i9FKjEAog@mail.gmail.com>
-Message-ID: <CAOMZO5DO9G18=_YSri3a+UiYbLwN6AMG4asUXbT03mpbU3hHrw@mail.gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Mon, 28 Mar 2016 14:58:24 +0000
+Subject: [PATCH] pinctrl: bcm2835: Implement get_direction callback
+Message-ID: <1459177104-24353-1-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tim,
+Implement gpio_chip's get_direction() callback, that lets other
+drivers get particular GPIOs direction using gpiod_get_direction().
 
-On Mon, Mar 28, 2016 at 4:59 PM, Tim Harvey <tharvey@gateworks.com> wrote:
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+---
+ drivers/pinctrl/bcm/pinctrl-bcm2835.c |   13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-> Fabio,
->
-> I would agree with you on this - 5c5fb40de8f143 ("PCI: imx6: Add
-> support for active-low reset GPIO")  should be reverted.
->
-> I just finished bisecting an issue to this specific patch only to find
-> out Krzysztof found it a few days ago ;) Thanks Krzysztof.
-
-I sent the revert patch yesterday:
-http://marc.info/?l=linux-pci&m=145912622805757&w=2
+diff --git a/drivers/pinctrl/bcm/pinctrl-bcm2835.c b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
+index 08b1d93..dd8b174 100644
+--- a/drivers/pinctrl/bcm/pinctrl-bcm2835.c
++++ b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
+@@ -342,6 +342,18 @@ static int bcm2835_gpio_get(struct gpio_chip *chip, unsigned offset)
+ 	return bcm2835_gpio_get_bit(pc, GPLEV0, offset);
+ }
+ 
++static int bcm2835_gpio_get_direction(struct gpio_chip *chip, unsigned int offset)
++{
++	struct bcm2835_pinctrl *pc = gpiochip_get_data(chip);
++	enum bcm2835_fsel fsel = bcm2835_pinctrl_fsel_get(pc, offset);
++
++	/* Alternative function doesn't clearly provide a direction */
++	if (fsel > BCM2835_FSEL_GPIO_OUT)
++		return -EINVAL;
++
++	return (fsel == BCM2835_FSEL_GPIO_IN);
++}
++
+ static void bcm2835_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+ {
+ 	struct bcm2835_pinctrl *pc = gpiochip_get_data(chip);
+@@ -370,6 +382,7 @@ static struct gpio_chip bcm2835_gpio_chip = {
+ 	.free = gpiochip_generic_free,
+ 	.direction_input = bcm2835_gpio_direction_input,
+ 	.direction_output = bcm2835_gpio_direction_output,
++	.get_direction = bcm2835_gpio_get_direction,
+ 	.get = bcm2835_gpio_get,
+ 	.set = bcm2835_gpio_set,
+ 	.to_irq = bcm2835_gpio_to_irq,
+-- 
+1.7.9.5
