@@ -1,100 +1,60 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 28 Mar 2016 15:55:42 -0500
-Subject: [PATCH v2 5/6] Documentation: DT: vdma: update binding doc for
- AXI CDMA
-In-Reply-To: <C246CAC1457055469EF09E3A7AC4E11A4A570609@XAP-PVEXMBX01.xlnx.xilinx.com>
-References: <1459101966-9932-1-git-send-email-appanad@xilinx.com>
- <1459101966-9932-2-git-send-email-appanad@xilinx.com>
- <20160327192742.GJ19212@xsjsorenbubuntu>
- <C246CAC1457055469EF09E3A7AC4E11A4A570609@XAP-PVEXMBX01.xlnx.xilinx.com>
-Message-ID: <20160328205542.GA17273@rob-hp-laptop>
+Date: Mon, 28 Mar 2016 16:10:15 -0500
+Subject: [PATCH V2] ARM: dts: AM572x-IDK Initial Support
+In-Reply-To: <1459182909-23502-1-git-send-email-nm@ti.com>
+References: <1459182909-23502-1-git-send-email-nm@ti.com>
+Message-ID: <20160328211015.GA28249@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 28, 2016 at 05:27:01AM +0000, Appana Durga Kedareswara Rao wrote:
-> Hi Soren,
+On Mon, Mar 28, 2016 at 11:35:09AM -0500, Nishanth Menon wrote:
+> From: Schuyler Patton <spatton@ti.com>
 > 
-> > -----Original Message-----
-> > From: S?ren Brinkmann [mailto:soren.brinkmann at xilinx.com]
-> > Sent: Monday, March 28, 2016 12:58 AM
-> > To: Appana Durga Kedareswara Rao
-> > Cc: robh+dt at kernel.org; pawel.moll at arm.com; mark.rutland at arm.com;
-> > ijc+devicetree at hellion.org.uk; galak at codeaurora.org; Michal Simek;
-> > vinod.koul at intel.com; dan.j.williams at intel.com; Anurag Kumar Vulisha; Appana
-> > Durga Kedareswara Rao; moritz.fischer at ettus.com;
-> > laurent.pinchart at ideasonboard.com; luis at debethencourt.com; Srikanth
-> > Vemula; Anirudha Sarangi; devicetree at vger.kernel.org; linux-arm-
-> > kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
-> > dmaengine at vger.kernel.org
-> > Subject: Re: [PATCH v2 5/6] Documentation: DT: vdma: update binding doc for
-> > AXI CDMA
-> > 
-> > On Sun, 2016-03-27 at 23:36:06 +0530, Kedareswara rao Appana wrote:
-> > > This patch updates the device-tree binding doc for adding support for
-> > > AXI CDMA.
-> > >
-> > > Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
-> > > ---
-> > > ---> Modified commit message as suggested by Vinod.
-> > > ---> Moved the patch to forward in the series as suggested by vinod.
-> > >
-> > >  .../devicetree/bindings/dma/xilinx/xilinx_vdma.txt     | 18
-> > +++++++++++++++++-
-> > >  1 file changed, 17 insertions(+), 1 deletion(-)
-> > >
-> > > diff --git
-> > > a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-> > > b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-> > > index 5841421..2b0c12b 100644
-> > > --- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-> > > +++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-> > > @@ -8,8 +8,12 @@ target devices. It can be configured to have one channel
-> > or two channels.
-> > >  If configured as two channels, one is to transmit to the device and
-> > > another  is to receive from the device.
-> > >
-> > > +Xilinx AXI CDMA engine, it does transfers between memory-mapped
-> > > +source address and a memory-mapped destination address.
-> > > +
-> > >  Required properties:
-> > > -- compatible: Should be "xlnx,axi-vdma-1.00.a" or "xlnx,axi-dma-1.00.a"
-> > > +- compatible: Should be "xlnx,axi-vdma-1.00.a" or "xlnx,axi-dma-1.00.a" or
-> > > +	      "xlnx,axi-cdma-1.00.a""
-> > >  - #dma-cells: Should be <1>, see "dmas" property below
-> > >  - reg: Should contain VDMA registers location and length.
-> > >  - xlnx,num-fstores: Should be the number of framebuffers as configured in
-> > h/w.
-> > > @@ -80,6 +84,18 @@ axi_dma_0: axidma at 40400000 {
-> > >  	} ;
-> > >  } ;
-> > >
-> > > +axi_cdma_0: axicdma at 7e200000 {
-> > > +       compatible = "xlnx,axi-cdma-1.00.a";
-> > > +       #dma-cells = <1>;
-> > > +       reg = < 0x7e200000 0x10000 >;
-> > > +       xlnx,addrwidth = <0x20>;
-> > > +       dma-channel at 7e200000 {
-> > > +               compatible = "xlnx,axi-dma-mm2s-channel";
-> > > +               interrupts = < 0 55 4 >;
-> > > +               xlnx,datawidth = <0x40>;
-> > > +       } ;
-> > > +} ;
-> > 
-> > As in the other patch, the node name should be 'dma-controller at ...' and the
-> > inconsistend spacing could be fixed.
+> The AM572x-IDK board is a board based on TI's AM5728 SOC
+> which has a dual core 1.5GHz A15 processor. This board is a
+> development platform for the Industrial market with:
+> - 2GB of DDR3L
+> - Dual 1Gbps Ethernet
+> - HDMI,
+> - PRU-ICSS
+> - uSD
+> - 16GB eMMC
+> - CAN
+> - RS-485
+> - PCIe
+> - USB3.0
+> - Video Input Port
+> - Industrial IO port and expansion connector
 > 
-> Ok will fix...
+> The link to the data sheet and TRM can be found here:
 > 
-> > 
-> > Also, it seems this adds pretty much identical examples that just differ in the
-> > compat string. Is that really needed?
+> http://www.ti.com/product/AM5728
 > 
-> Most of the properties are same across the three DMA's
-> For AXI VDMA there are few required properties that are not required for AXI DMA/CDMA.
-> That's why added example for the other IP's as well I mean for AXI DMA and CDMA.
+> This patch creates a common dtsi file that will provide a common board
+> dtsi file to define the nodes that are common to AM57xx (including the
+> upcoming AM5718) IDK boards.
+> 
+> Initial support is only for basic peripherals
+> 
+> Signed-off-by: Schuyler Patton <spatton@ti.com>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+> based on v4.6-rc1
+> 
+> Changes since V1:
+> 	- Renamed the led nodes
+> 	- Dropped unused src_clk_x1 node (will introduce when needed).
+> 
+> Test: http://pastebin.ubuntu.com/15540747/
+> 
+> V1: https://patchwork.kernel.org/patch/8665181/
+> 
+>  .../devicetree/bindings/arm/omap/omap.txt          |   3 +
+>  arch/arm/boot/dts/Makefile                         |   1 +
+>  arch/arm/boot/dts/am572x-idk.dts                   |  85 ++++++
+>  arch/arm/boot/dts/am57xx-idk-common.dtsi           | 302 +++++++++++++++++++++
+>  4 files changed, 391 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/am572x-idk.dts
+>  create mode 100644 arch/arm/boot/dts/am57xx-idk-common.dtsi
 
-It needs to be clear what properties are required/valid for each 
-compatible string rather than relying on examples. I should be able to 
-write or validate the examples based on the rest of the text.
-
-Rob
+Acked-by: Rob Herring <robh@kernel.org>
