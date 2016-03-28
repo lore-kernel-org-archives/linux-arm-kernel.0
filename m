@@ -1,38 +1,32 @@
-From: david@lechnology.com (David Lechner)
-Date: Mon, 28 Mar 2016 10:02:10 -0500
-Subject: [PATCH v3 02/16] mfd: da8xx-cfgchip: New header file for CFGCHIP
- registers.
-In-Reply-To: <56F573F3.90500@cogentembedded.com>
-References: <1458863503-31121-1-git-send-email-david@lechnology.com>
- <1458863503-31121-3-git-send-email-david@lechnology.com>
- <56F573F3.90500@cogentembedded.com>
-Message-ID: <56F94772.7070009@lechnology.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Mon, 28 Mar 2016 23:28:48 +0800
+Subject: [PATCH] arm64: defconfig: remove redundant CONFIG_MMC_BLOCK_MINORS
+Message-ID: <1459178928-26973-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/25/2016 12:22 PM, Sergei Shtylyov wrote:
-> On 03/25/2016 02:51 AM, David Lechner wrote:
->> +/* register offsets */
->> +#define CFGCHIP_REG(n)                (n * 4)
->> +#define CFGCHIP0_REG                CFGCHIP_REG(0)
->> +#define CFGCHIP1_REG                CFGCHIP_REG(1)
->> +#define CFGCHIP2_REG                CFGCHIP_REG(2)
->> +#define CFGCHIP3_REG                CFGCHIP_REG(3)
->> +#define CFGCHIP4_REG                CFGCHIP_REG(4)
->
->     Why not just use CFGCHIP_REG(n) directly?
+There have two patches to add CONFIG_MMC_BLOCK_MINORS twice:
+22b0898e8 ("arm64: add defconfig options for Allwinner SoCs"),
+2f85bb09d ("arm64: defconfig: Increase MMC_BLOCK_MINORS to 16");
 
-I considered that, but I went this way because A) the TRM uses, for 
-example, "CFGCHIP2", so I wanted to keep "CFGCHIP" and "2" together and 
-B) this tells you how many CFGCHIP registers there are, i.e. there is no 
-CFGCHIP5_REG.
+So remove redundant CONFIG_MMC_BLOCK_MINORS to only enable once.
 
->> @@ -53,7 +31,6 @@ struct    da8xx_ohci_root_hub {
->>       /* Time from power on to power good (in 2 ms units) */
->>       u8    potpgt;
->>   };
->> -
->
->     Why?
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ arch/arm64/configs/defconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
-Unintentional. Must have sneaked in through rebasing or something.
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index f705051..3ad26ff 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -215,7 +215,6 @@ CONFIG_MMC_SPI=y
+ CONFIG_MMC_SUNXI=y
+ CONFIG_MMC_DW=y
+ CONFIG_MMC_DW_EXYNOS=y
+-CONFIG_MMC_BLOCK_MINORS=16
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_SYSCON=y
+-- 
+1.9.1
