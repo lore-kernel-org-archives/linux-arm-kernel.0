@@ -1,65 +1,41 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 28 Mar 2016 12:35:21 +0900
-Subject: [PATCH v6 04/21] PM / devfreq: Add new DEVFREQ_TRANSITION_NOTIFIER
- notifier
-In-Reply-To: <190611333.27621459133690582.JavaMail.weblogic@epmlwas02a>
-References: <190611333.27621459133690582.JavaMail.weblogic@epmlwas02a>
-Message-ID: <56F8A679.5010009@samsung.com>
+From: chengang.beijing@gmail.com (Chen Gang)
+Date: Mon, 28 Mar 2016 12:19:03 +0800
+Subject: [PATCH 1/1] ARM : missing corrupted reg in __do_div_asm
+Message-ID: <1459138743-10477-1-git-send-email-chengang.beijing@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016? 03? 28? 11:54, MyungJoo Ham wrote:
->>   
->>  This patch adds the new DEVFREQ_TRANSITION_NOTIFIER notifier to send
->> the notification when the frequency of device is changed.
->> This notifier has two state as following:
->> - DEVFREQ_PRECHANGE  : Notify it before chaning the frequency of device
->> - DEVFREQ_POSTCHANGE : Notify it after changed the frequency of device
->>
->> And this patch adds the resourced-managed function to release the resource
->> automatically when error happen.
->>
->> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->> [m.reichl and linux.amoon: Tested it on exynos4412-odroidu3 board]
->> Tested-by: Markus Reichl <m.reichl@fivetechno.de>
->> Tested-by: Anand Moon <linux.amoon@gmail.com>
->> ---
->>  drivers/devfreq/devfreq.c | 163 +++++++++++++++++++++++++++++++++++++++++++++-
->>  include/linux/devfreq.h   |  58 ++++++++++++++++-
->>  2 files changed, 219 insertions(+), 2 deletions(-)
-> 
-> []
-> 
->> diff --git a/include/linux/devfreq.h b/include/linux/devfreq.h
->> index aa0b8424ebc3..152ea342529c 100644
->> --- a/include/linux/devfreq.h
->> +++ b/include/linux/devfreq.h
->> @@ -19,6 +19,13 @@
->>  
->>  #define DEVFREQ_NAME_LEN 16
->>  
->> +/* DEVFREQ notifier interface */
->> +#define DEVFREQ_TRANSITION_NOTIFIER	(0)
->> +
->> +/* Transition notifiers of DEVFREQ_TRANSITION_NOTIFIER */
->> +#define	DEVFREQ_PRECHANGE		(0)
->> +#define DEVFREQ_POSTCHANGE		(1)
->> +
->>  struct devfreq;
->>  
->>  /**
->> @@ -177,6 +184,13 @@ struct devfreq {
->>  	unsigned int *trans_table;
->>  	unsigned long *time_in_state;
->>  	unsigned long last_stat_updated;
->> +
->> +	struct srcu_notifier_head transition_notifier_list;
->> +};
-> 
-> Like other properties of struct devfreq, please add
-> descriptions above. Other than that, it looks good.
+__xl(R0 in little endian system, or R1 in big endian system) is corrupted
+after calling __do_div64 and compiler is not informed about this in
+macro __do_div_asm. If n is used again afterwards, __xl won't be
+reloaded and n will contain incorrect value.
 
-OK. I was missing the description. I'll add it.
+Signed-off-by: Chen Gang <gangchen@rdamicro.com>
+Signed-off-by: Chen Gang <chengang.beijing@gmail.com>
+---
+ arch/arm/include/asm/div64.h | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-Best Regards,
-Chanwoo Choi
+diff --git a/arch/arm/include/asm/div64.h b/arch/arm/include/asm/div64.h
+index e1f0776..1a6e91a 100644
+--- a/arch/arm/include/asm/div64.h
++++ b/arch/arm/include/asm/div64.h
+@@ -35,12 +35,14 @@ static inline uint32_t __div64_32(uint64_t *n, uint32_t base)
+ 	register unsigned long long __n   asm("r0") = *n;
+ 	register unsigned long long __res asm("r2");
+ 	register unsigned int __rem       asm(__xh);
++	register unsigned int __clobber   asm(__xl);
+ 	asm(	__asmeq("%0", __xh)
+ 		__asmeq("%1", "r2")
++		__asmeq("%3", "r0")
++		__asmeq("%4", "r4")
+ 		__asmeq("%2", "r0")
+-		__asmeq("%3", "r4")
+ 		"bl	__do_div64"
+-		: "=r" (__rem), "=r" (__res)
++		: "=r" (__rem), "=r" (__res), "=r" (__clobber)
+ 		: "r" (__n), "r" (__base)
+ 		: "ip", "lr", "cc");
+ 	*n = __res;
+-- 
+2.4.3
