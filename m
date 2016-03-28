@@ -1,51 +1,42 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 28 Mar 2016 13:38:49 +0100
-Subject: [RFC PATCH 0/8] PM / Domains: Add support for removing PM domains
-In-Reply-To: <CAPDyKFq3hNARzjSOoP+-NmcgfSWzG6GDmh7qVX6yx6QPgN9Arw@mail.gmail.com>
-References: <1457090634-14785-1-git-send-email-jonathanh@nvidia.com>
- <CAPDyKFq3hNARzjSOoP+-NmcgfSWzG6GDmh7qVX6yx6QPgN9Arw@mail.gmail.com>
-Message-ID: <56F925D9.3080703@nvidia.com>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Mon, 28 Mar 2016 18:29:32 +0530
+Subject: [PATCH V7 5/6] dts: msm8974: Add blsp2_bam dma node
+In-Reply-To: <20160326022612.GA3764@hector.attlocal.net>
+References: <1453197766-18976-1-git-send-email-sricharan@codeaurora.org>
+ <1453197766-18976-6-git-send-email-sricharan@codeaurora.org>
+ <CAJAp7Oi33=kraAiU337JdFJZbuKZEVoCtY4FfAv_RgiWVmz+sw@mail.gmail.com>
+ <20160326022612.GA3764@hector.attlocal.net>
+Message-ID: <000d01d188f1$b150e660$13f2b320$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uffe,
-
-On 04/03/16 12:33, Ulf Hansson wrote:
-> On 4 March 2016 at 12:23, Jon Hunter <jonathanh@nvidia.com> wrote:
->> In order to safely remove PM domains there are a few changes that need to be
->> made to ensure that no one is holding an external reference to a PM domain
->> after it has been removed. One solution, implemented here, solves this by
->> eliminating external references to PM domain. Another alternative would be
->> to employ some reference counting for the PM domains, however, I did not see
->> a good reason for allowing external references in the first place (as always
->> there could be something that I have over-looked!).
->>
->> Jon Hunter (8):
->>   PM / Domains: Add new helper functions for device-tree
->>   ARM: EXYNOS: Remove calls to of_genpd_get_from_provider()
->>   staging: board: Remove calls to of_genpd_get_from_provider()
->>   PM / Domains: Don't expose generic_pm_domain structure
->>   PM / Domains: Verify the PM domain is present when adding a provider
->>   PM / Domains: Remove a provider by referencing the data pointer
->>   PM / Domains: Prepare for adding support to remove PM domains
->>   PM / Domains: Add support for removing PM domains
->>
->>  arch/arm/mach-exynos/pm_domains.c |  23 +--
->>  drivers/base/power/domain.c       | 324 +++++++++++++++++++++++++++++++++++---
->>  drivers/staging/board/board.c     |   9 +-
->>  include/linux/pm_domain.h         |  55 ++++---
->>  4 files changed, 348 insertions(+), 63 deletions(-)
->>
->> --
->> 2.1.4
->>
+> On Fri, Mar 25, 2016 at 04:17:30PM -0700, Bjorn Andersson wrote:
+> > On Tue, Jan 19, 2016 at 2:02 AM, Sricharan R <sricharan@codeaurora.org>
+> wrote:
+> > > Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> > > Reviewed-by: Andy Gross <andy.gross@linaro.org>
 > 
-> Jon, thanks for posting this!
-> My initial impressions is the I like the ideas for where you moves this.
+> <snip>
 > 
-> I will review it in more details as soon as I can (travelling next week).
+> > > +               blsp2_dma: dma-controller at f9944000 {
+> > > +                       compatible = "qcom,bam-v1.4.0";
+> > > +                       reg = <0xf9944000 0x19000>;
+> > > +                       interrupts = <GIC_SPI 239
+IRQ_TYPE_LEVEL_HIGH>;
+> > > +                       clocks = <&gcc GCC_BLSP2_AHB_CLK>;
+> > > +                       clock-names = "bam_clk";
+> > > +                       #dma-cells = <1>;
+> > > +                       qcom,ee = <0>;
+> >
+> > Without "qcom,bam_ctrl_remote;" and
+> > https://patchwork.kernel.org/patch/8639181/ the Xperia Honami board
+> > fails to boot with this patch included.
+> 
+> Ouch.  At least one set of pipes must be used by some other processor and
+> TZ has locked down that BLSP.
 
-Just wanted to see if you have had chance to look at this yet? Not urgent.
+ Hmm, this was not the case atleast on the apq8074DB board that I tested
+this on.
 
-Cheers
-Jon
+Regards,
+ Sricharan
