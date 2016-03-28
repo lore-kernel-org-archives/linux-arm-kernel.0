@@ -1,31 +1,39 @@
-From: xypron.glpk@gmx.de (Heinrich Schuchardt)
-Date: Mon, 28 Mar 2016 10:03:48 +0200
-Subject: [PATCH 1/1] ARM: dts: kirkwood: add kirkwood-ds112.dtb to Makefile
-Message-ID: <1459152228-4345-1-git-send-email-xypron.glpk@gmx.de>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Mon, 28 Mar 2016 12:59:45 -0700
+Subject: [PATCH] i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity
+In-Reply-To: <CAOMZO5B8Lzn-E4YOeYxVtN5PN11aOvZHn4eU0ixkdV8CO8+xYw@mail.gmail.com>
+References: <m3h9fuk7ik.fsf@t19.piap.pl>
+ <CAOMZO5DcZCxoLPeGRWSGkstm7F3eN-Q-yJyf6ktMTda2zLviag@mail.gmail.com>
+ <CAOMZO5B8Lzn-E4YOeYxVtN5PN11aOvZHn4eU0ixkdV8CO8+xYw@mail.gmail.com>
+Message-ID: <CAJ+vNU2Sg1ZKBsGcQswrJZyTJ1WBEZor3ZqpoYUT7i9FKjEAog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 2d0a7addbd10 ("ARM: Kirkwood: Add support for many Synology
-NAS devices") created the new file kirkwood-ds112.dts but did not
-add it to the Makefile.
+On Sun, Mar 27, 2016 at 5:26 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> On Sun, Mar 27, 2016 at 11:44 AM, Fabio Estevam <festevam@gmail.com> wrote:
+>
+>> Good catch!
+>>
+>> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+>>
+>> I will fix imx6q-sabresd.dtsi when this patch gets applied.
+>
+> After thinking more about it, I think the correct fix is to revert
+> 5c5fb40de8f143 ("PCI: imx6: Add support for active-low reset GPIO") so
+> that we do not break old dtb's.
+>
+> Then a new dt property can be added if someone needs gpio active high PCI reset.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Fixes: 2d0a7addbd10 ("ARM: Kirkwood: Add support for many Synology NAS devices")
-Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
----
- arch/arm/boot/dts/Makefile | 1 +
- 1 file changed, 1 insertion(+)
+Fabio,
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b25621a..f8308db 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -177,6 +177,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += \
- 	kirkwood-ds109.dtb \
- 	kirkwood-ds110jv10.dtb \
- 	kirkwood-ds111.dtb \
-+	kirkwood-ds112.dtb \
- 	kirkwood-ds209.dtb \
- 	kirkwood-ds210.dtb \
- 	kirkwood-ds212.dtb \
--- 
-2.1.4
+I would agree with you on this - 5c5fb40de8f143 ("PCI: imx6: Add
+support for active-low reset GPIO")  should be reverted.
+
+I just finished bisecting an issue to this specific patch only to find
+out Krzysztof found it a few days ago ;) Thanks Krzysztof.
+
+Tim
