@@ -1,40 +1,96 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 28 Mar 2016 18:30:16 -0300
-Subject: [PATCH] i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity
-In-Reply-To: <CAJ+vNU1_YqvWQkmuDB7r8z77iZJS6pP4Mr+j9yW4sFLAeJXQDw@mail.gmail.com>
-References: <m3h9fuk7ik.fsf@t19.piap.pl>
- <CAOMZO5DcZCxoLPeGRWSGkstm7F3eN-Q-yJyf6ktMTda2zLviag@mail.gmail.com>
- <CAOMZO5B8Lzn-E4YOeYxVtN5PN11aOvZHn4eU0ixkdV8CO8+xYw@mail.gmail.com>
- <CAJ+vNU2Sg1ZKBsGcQswrJZyTJ1WBEZor3ZqpoYUT7i9FKjEAog@mail.gmail.com>
- <CAOMZO5DO9G18=_YSri3a+UiYbLwN6AMG4asUXbT03mpbU3hHrw@mail.gmail.com>
- <CAJ+vNU1_YqvWQkmuDB7r8z77iZJS6pP4Mr+j9yW4sFLAeJXQDw@mail.gmail.com>
-Message-ID: <CAOMZO5A2osG3=mTaCayYfMokUj-vT+Udq9ckq45b1yaUP9Tn3g@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 28 Mar 2016 23:32:24 +0200
+Subject: [PATCH] dmaengine: pxa: handle bus errors
+Message-ID: <1459200744-13245-1-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 28, 2016 at 5:42 PM, Tim Harvey <tharvey@gateworks.com> wrote:
+In the current state, upon bus error the driver will spin endlessly,
+relaunching the last tx, which will fail again and again :
+ - a bus error happens
+ - pxad_chan_handler() is called
+ - as PXA_DCSR_STOPSTATE is true, the last non-terminated transaction is
+   lauched, which is the one triggering the bus error, as it didn't
+   terminate
+ - moreover, the STOP interrupt fires a new, as the STOPIRQEN is still
+   active
 
-> Fabio,
->
-> ok - I'll respond there as I agree with the patch but not the wording
-> of the commit (It's Gateworks 'Ventana' using IMX6 not Laguna and we
-> do define the polarity properly as active-low in Ventana dt's). It is
-> the fact that the gpio polarity has the wrong logic level that breaks
-> Ventana.
+Break this logic by stopping the automatic relaunch of a dma channel
+upon a bus error, even if there are still pending issued requests on it.
 
-Ok, I will change the wording in v2.
+As dma_cookie_status() seems unable to return DMA_ERROR in its current
+form, ie. there seems no way to mark a DMA_ERROR on a per-async-tx
+basis, it is chosen in this patch to remember on the channel which
+transaction failed, and report it in pxad_tx_status().
 
->
-> However, there seems to be another regression in 4.5 that's keeping
-> PCI working for me and I'm still bisecting that (using 802.11n access
-> points to test). Can you confirm that PCI works in v4.5 on IMX6 boards
-> with only 5c5fb40de8f14391a1238db05cef88754faf9229 reverted?
+It's a bit misleading because if T1, T2, T3 and T4 were queued, and T1
+was completed while T2 causes a bus error, the status of T3 and T4 will
+be reported as DMA_IN_PROGRESS, while the channel is actually stopped.
 
-On imx6qdl-sabresd.dtsi the PCI reset gpio polarity is set to high,
-which is not correct, so the Wifi card could be detected even with
-5c5fb40de8f. So two errors in sequence and PCI still works on this
-board :-)
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ drivers/dma/pxa_dma.c | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
 
-I don't have access to the board at the moment, but the only test I
-did was to see that the Wifi card got detected. I haven't really tried
-to communicate via Wifi.
+diff --git a/drivers/dma/pxa_dma.c b/drivers/dma/pxa_dma.c
+index debca824bed6..0dc5a528c463 100644
+--- a/drivers/dma/pxa_dma.c
++++ b/drivers/dma/pxa_dma.c
+@@ -117,6 +117,7 @@ struct pxad_chan {
+ 	/* protected by vc->lock */
+ 	struct pxad_phy		*phy;
+ 	struct dma_pool		*desc_pool;	/* Descriptors pool */
++	dma_cookie_t		bus_error;
+ };
+ 
+ struct pxad_device {
+@@ -560,6 +561,7 @@ static void pxad_launch_chan(struct pxad_chan *chan,
+ 			return;
+ 		}
+ 	}
++	chan->bus_error = 0;
+ 
+ 	/*
+ 	 * Program the descriptor's address into the DMA controller,
+@@ -663,6 +665,7 @@ static irqreturn_t pxad_chan_handler(int irq, void *dev_id)
+ 	struct virt_dma_desc *vd, *tmp;
+ 	unsigned int dcsr;
+ 	unsigned long flags;
++	dma_cookie_t last_started = 0;
+ 
+ 	BUG_ON(!chan);
+ 
+@@ -675,6 +678,7 @@ static irqreturn_t pxad_chan_handler(int irq, void *dev_id)
+ 		dev_dbg(&chan->vc.chan.dev->device,
+ 			"%s(): checking txd %p[%x]: completed=%d\n",
+ 			__func__, vd, vd->tx.cookie, is_desc_completed(vd));
++		last_started = vd->tx.cookie;
+ 		if (to_pxad_sw_desc(vd)->cyclic) {
+ 			vchan_cyclic_callback(vd);
+ 			break;
+@@ -687,7 +691,12 @@ static irqreturn_t pxad_chan_handler(int irq, void *dev_id)
+ 		}
+ 	}
+ 
+-	if (dcsr & PXA_DCSR_STOPSTATE) {
++	if (dcsr & PXA_DCSR_BUSERR) {
++		chan->bus_error = last_started;
++		phy_disable(phy);
++	}
++
++	if (!chan->bus_error && dcsr & PXA_DCSR_STOPSTATE) {
+ 		dev_dbg(&chan->vc.chan.dev->device,
+ 		"%s(): channel stopped, submitted_empty=%d issued_empty=%d",
+ 			__func__,
+@@ -1245,6 +1254,9 @@ static enum dma_status pxad_tx_status(struct dma_chan *dchan,
+ 	struct pxad_chan *chan = to_pxad_chan(dchan);
+ 	enum dma_status ret;
+ 
++	if (cookie == chan->bus_error)
++		return DMA_ERROR;
++
+ 	ret = dma_cookie_status(dchan, cookie, txstate);
+ 	if (likely(txstate && (ret != DMA_ERROR)))
+ 		dma_set_residue(txstate, pxad_residue(chan, cookie));
+-- 
+2.1.4
