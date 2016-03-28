@@ -1,37 +1,34 @@
 From: mark.yao@rock-chips.com (Mark yao)
-Date: Mon, 28 Mar 2016 14:40:05 +0800
-Subject: [PATCH] drm/rockchip: vop: Don't reject empty modesets
-In-Reply-To: <1458300123-6397-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1458300123-6397-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <56F8D1C5.6060504@rock-chips.com>
+Date: Mon, 28 Mar 2016 14:45:02 +0800
+Subject: [PATCH v2 1/5] drm/rockchip: dw_hdmi: Call drm_encoder_cleanup()
+ in error path
+In-Reply-To: <1457388054-23077-1-git-send-email-dianders@chromium.org>
+References: <1457388054-23077-1-git-send-email-dianders@chromium.org>
+Message-ID: <56F8D2EE.4080004@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016?03?18? 19:22, Tomeu Vizoso wrote:
-> So that when DRM_IOCTL_MODE_SETCRTC is called without a FB nor mode, the
-> CRTC gets disabled.
+On 2016?03?08? 06:00, Douglas Anderson wrote:
+> The drm_encoder_cleanup() was missing both from the error path of
+> dw_hdmi_rockchip_bind().  This caused a crash when slub_debug was
+> enabled and we ended up deferring probe of HDMI at boot.
 >
-> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> Link: http://lkml.kernel.org/g/CAAObsKAv+05ih5U+=4kic_NsjGMhfxYheHR8xXXmacZs+p5SHw at mail.gmail.com
-> ---
->   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 3 ---
->   1 file changed, 3 deletions(-)
+> This call isn't needed from unbind() because if dw_hdmi_bind() returns
+> no error then it takes over the job of freeing the encoder (in
+> dw_hdmi_unbind).
 >
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> index fd370548d7d7..5e57f5b2e4b0 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> @@ -885,9 +885,6 @@ static bool vop_crtc_mode_fixup(struct drm_crtc *crtc,
->   {
->   	struct vop *vop = to_vop(crtc);
->   
-> -	if (adjusted_mode->htotal == 0 || adjusted_mode->vtotal == 0)
-> -		return false;
-> -
->   	adjusted_mode->clock =
->   		clk_round_rate(vop->dclk, mode->clock * 1000) / 1000;
->   
-Applied to my drm-fixes, Thanks.
+> Signed-off-by: Douglas Anderson <dianders@chromium.org>
 
--- 
-?ark Yao
+Hi Douglas
+
+it seems has no doubt on these patch, and it works on my board, So I'd 
+like to apply following three patches.
+
+[PATCH v2 1/5] drm/rockchip: dw_hdmi: Call drm_encoder_cleanup() in 
+error path
+[PATCH v2 3/5] drm/rockchip: vop: Fix vop crtc cleanup
+[PATCH v2 4/5] drm/rockchip: dw_hdmi: Don't call platform_set_drvdata()
+
+Thanks for your fixes.
+
+-- ?ark Yao
