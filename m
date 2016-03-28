@@ -1,34 +1,33 @@
 From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Mon, 28 Mar 2016 18:23:03 +0900
-Subject: [PATCH v3 4/5] arm64: tegra210: Add reference clock to GM20B
+Date: Mon, 28 Mar 2016 18:23:04 +0900
+Subject: [PATCH v3 5/5] arm64: tegra210: Add IOMMU node to GM20B
 In-Reply-To: <1459156984-32644-1-git-send-email-acourbot@nvidia.com>
 References: <1459156984-32644-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <1459156984-32644-5-git-send-email-acourbot@nvidia.com>
+Message-ID: <1459156984-32644-6-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This clock is required for the GPU to operate.
+Nouveau can take advantage of this declaration to remove the need for
+contiguous memory.
 
 Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
 ---
- arch/arm64/boot/dts/nvidia/tegra210.dtsi | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ arch/arm64/boot/dts/nvidia/tegra210.dtsi | 3 +++
+ 1 file changed, 3 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/nvidia/tegra210.dtsi b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
-index 362c269946ff..04898cb25f0c 100644
+index 04898cb25f0c..478543f74863 100644
 --- a/arch/arm64/boot/dts/nvidia/tegra210.dtsi
 +++ b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
-@@ -309,8 +309,9 @@
- 			     <GIC_SPI 158 IRQ_TYPE_LEVEL_HIGH>;
- 		interrupt-names = "stall", "nonstall";
- 		clocks = <&tegra_car TEGRA210_CLK_GPU>,
--			 <&tegra_car TEGRA210_CLK_PLL_P_OUT5>;
--		clock-names = "gpu", "pwr";
-+			 <&tegra_car TEGRA210_CLK_PLL_P_OUT5>,
-+			 <&tegra_car TEGRA210_CLK_PLL_G_REF>;
-+		clock-names = "gpu", "pwr", "ref";
+@@ -314,6 +314,9 @@
+ 		clock-names = "gpu", "pwr", "ref";
  		resets = <&tegra_car 184>;
  		reset-names = "gpu";
++
++		iommus = <&mc TEGRA_SWGROUP_GPU>;
++
  		status = "disabled";
+ 	};
+ 
 -- 
 2.7.3
