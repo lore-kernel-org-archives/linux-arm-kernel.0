@@ -1,31 +1,29 @@
-From: xypron.glpk@gmx.de (Heinrich Schuchardt)
-Date: Mon, 28 Mar 2016 10:38:31 +0200
-Subject: [PATCH 1/1] ARM: dts: kirkwood: add kirkwood-nsa320.dtb to Makefile
-Message-ID: <1459154311-4770-1-git-send-email-xypron.glpk@gmx.de>
+From: akshay.bhat@timesys.com (Akshay Bhat)
+Date: Mon, 28 Mar 2016 15:42:43 -0400
+Subject: [PATCH] arm: dts: imx6q-ba16: Remove unused vqmmc-supply
+Message-ID: <1459194163-8540-1-git-send-email-akshay.bhat@timesys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit be3d7d023b87 ("ARM: kirkwood: Add DTS file for NSA320")
-created the new file kirkwood-nsa320.dts but did not
-add it to the Makefile.
+The vqmmc supply is not connected to bio supply on the BA16 module.
+Remove the same.
 
-Fixes: be3d7d023b87 ("ARM: kirkwood: Add DTS file for NSA320")
-Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
+Signed-off-by: Akshay Bhat <akshay.bhat@timesys.com>
 ---
- arch/arm/boot/dts/Makefile | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/imx6q-ba16.dtsi | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index f8308db..e75a340 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -215,6 +215,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += \
- 	kirkwood-ns2mini.dtb \
- 	kirkwood-nsa310.dtb \
- 	kirkwood-nsa310a.dtb \
-+	kirkwood-nsa320.dtb \
- 	kirkwood-nsa325.dtb \
- 	kirkwood-openblocks_a6.dtb \
- 	kirkwood-openblocks_a7.dtb \
+diff --git a/arch/arm/boot/dts/imx6q-ba16.dtsi b/arch/arm/boot/dts/imx6q-ba16.dtsi
+index 8f6e603..96701a3 100644
+--- a/arch/arm/boot/dts/imx6q-ba16.dtsi
++++ b/arch/arm/boot/dts/imx6q-ba16.dtsi
+@@ -390,7 +390,6 @@
+ 	pinctrl-0 = <&pinctrl_usdhc3 &pinctrl_usdhc3_reset>;
+ 	bus-width = <8>;
+ 	vmmc-supply = <&vdd_bperi>;
+-	vqmmc-supply = <&vdd_bio>;
+ 	non-removable;
+ 	keep-power-in-suspend;
+ 	status = "okay";
 -- 
-2.1.4
+2.7.4
