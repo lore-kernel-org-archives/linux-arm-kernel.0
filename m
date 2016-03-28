@@ -1,81 +1,69 @@
-From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Mon, 28 Mar 2016 18:23:02 +0900
-Subject: [PATCH v3 3/5] dt-bindings: Add documentation for GM20B GPU
-In-Reply-To: <1459156984-32644-1-git-send-email-acourbot@nvidia.com>
-References: <1459156984-32644-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <1459156984-32644-4-git-send-email-acourbot@nvidia.com>
+From: blogic@openwrt.org (John Crispin)
+Date: Mon, 28 Mar 2016 11:47:32 +0200
+Subject: [PATCH] arm: dts: mt2701: Add clock controller device nodes
+In-Reply-To: <201603281638.VIBfNFp6%fengguang.wu@intel.com>
+References: <201603281638.VIBfNFp6%fengguang.wu@intel.com>
+Message-ID: <56F8FDB4.8070105@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GM20B's definition is mostly similar to GK20A's, but requires an
-additional clock.
 
-Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
- .../devicetree/bindings/gpu/nvidia,gk20a.txt       | 29 +++++++++++++++++++---
- 1 file changed, 26 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/gpu/nvidia,gk20a.txt b/Documentation/devicetree/bindings/gpu/nvidia,gk20a.txt
-index 1e3748337319..ff3db65e50de 100644
---- a/Documentation/devicetree/bindings/gpu/nvidia,gk20a.txt
-+++ b/Documentation/devicetree/bindings/gpu/nvidia,gk20a.txt
-@@ -1,9 +1,10 @@
--NVIDIA GK20A Graphics Processing Unit
-+NVIDIA Tegra Graphics Processing Units
- 
- Required properties:
- - compatible: "nvidia,<gpu>"
-   Currently recognized values:
-   - nvidia,gk20a
-+  - nvidia,gm20b
- - reg: Physical base address and length of the controller's registers.
-   Must contain two entries:
-   - first entry for bar0
-@@ -19,6 +20,9 @@ Required properties:
- - clock-names: Must include the following entries:
-   - gpu
-   - pwr
-+If the compatible string is "nvidia,gm20b", then the following clock
-+is also required:
-+  - ref
- - resets: Must contain an entry for each entry in reset-names.
-   See ../reset/reset.txt for details.
- - reset-names: Must include the following entries:
-@@ -27,9 +31,9 @@ Required properties:
- Optional properties:
- - iommus: A reference to the IOMMU. See ../iommu/iommu.txt for details.
- 
--Example:
-+Example for GK20A:
- 
--	gpu at 0,57000000 {
-+	gpu at 57000000 {
- 		compatible = "nvidia,gk20a";
- 		reg = <0x0 0x57000000 0x0 0x01000000>,
- 		      <0x0 0x58000000 0x0 0x01000000>;
-@@ -45,3 +49,22 @@ Example:
- 		iommus = <&mc TEGRA_SWGROUP_GPU>;
- 		status = "disabled";
- 	};
-+
-+Example for GM20B:
-+
-+	gpu at 57000000 {
-+		compatible = "nvidia,gm20b";
-+		reg = <0x0 0x57000000 0x0 0x01000000>,
-+		      <0x0 0x58000000 0x0 0x01000000>;
-+		interrupts = <GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 158 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-names = "stall", "nonstall";
-+		clocks = <&tegra_car TEGRA210_CLK_GPU>,
-+			 <&tegra_car TEGRA210_CLK_PLL_P_OUT5>,
-+			 <&tegra_car TEGRA210_CLK_PLL_G_REF>;
-+		clock-names = "gpu", "pwr", "ref";
-+		resets = <&tegra_car 184>;
-+		reset-names = "gpu";
-+		iommus = <&mc TEGRA_SWGROUP_GPU>;
-+		status = "disabled";
-+	};
--- 
-2.7.3
+On 28/03/2016 10:13, kbuild test robot wrote:
+> Hi James,
+> 
+> [auto build test ERROR on robh/for-next]
+> [also build test ERROR on v4.6-rc1 next-20160327]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+> 
+> url:    https://github.com/0day-ci/linux/commits/James-Liao/arm-dts-mt2701-Add-clock-controller-device-nodes/20160328-133113
+> base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
+> config: arm-multi_v7_defconfig (attached as .config)
+> reproduce:
+>         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=arm 
+> 
+> All errors (new ones prefixed by >>):
+> 
+>    In file included from arch/arm/boot/dts/mt2701-evb.dts:16:0:
+>>> arch/arm/boot/dts/mt2701.dtsi:15:42: fatal error: dt-bindings/clock/mt2701-clk.h: No such file or directory
+>     #include <dt-bindings/clock/mt2701-clk.h>
+
+Hi James,
+
+looks like the mt2701 clock patches did not make it into v4.6-rc1. i had
+a few minor fixes i wanted to send this week for MT7623 support and
+noticed this last week already :(
+
+	John
+
+
+>                                              ^
+>    compilation terminated.
+> 
+> vim +15 arch/arm/boot/dts/mt2701.dtsi
+> 
+>      9	 * This program is distributed in the hope that it will be useful,
+>     10	 * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>     11	 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>     12	 * GNU General Public License for more details.
+>     13	 */
+>     14	
+>   > 15	#include <dt-bindings/clock/mt2701-clk.h>
+>     16	#include <dt-bindings/interrupt-controller/irq.h>
+>     17	#include <dt-bindings/interrupt-controller/arm-gic.h>
+>     18	#include "skeleton64.dtsi"
+> 
+> ---
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+> 
+> 
+> 
+> _______________________________________________
+> Linux-mediatek mailing list
+> Linux-mediatek at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+> 
