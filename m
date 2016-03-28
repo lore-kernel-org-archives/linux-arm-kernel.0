@@ -1,35 +1,33 @@
 From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Mon, 28 Mar 2016 18:23:00 +0900
-Subject: [PATCH v3 1/5] dt-bindings: gk20a: Fix typo in compatible name
-In-Reply-To: <1459156984-32644-1-git-send-email-acourbot@nvidia.com>
-References: <1459156984-32644-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <1459156984-32644-2-git-send-email-acourbot@nvidia.com>
+Date: Mon, 28 Mar 2016 18:22:59 +0900
+Subject: [PATCH v3 0/5] arm64: tegra: fix DT definitions for GM20B GPU
+Message-ID: <1459156984-32644-1-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The correct compatible name is "nvidia,gk20a".
+Small series that fixes/completes DT bindings for Tegra GPUs and add two
+missing entries required for the Tegra210 GPU to operate properly.
 
-Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
- Documentation/devicetree/bindings/gpu/nvidia,gk20a.txt | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Without these fixes, GM20B will crash during probe on 4.6 because a
+required clock is not activated.
 
-diff --git a/Documentation/devicetree/bindings/gpu/nvidia,gk20a.txt b/Documentation/devicetree/bindings/gpu/nvidia,gk20a.txt
-index 23bfe8e1f7cc..914f0ff4020e 100644
---- a/Documentation/devicetree/bindings/gpu/nvidia,gk20a.txt
-+++ b/Documentation/devicetree/bindings/gpu/nvidia,gk20a.txt
-@@ -1,9 +1,9 @@
- NVIDIA GK20A Graphics Processing Unit
- 
- Required properties:
--- compatible: "nvidia,<chip>-<gpu>"
-+- compatible: "nvidia,<gpu>"
-   Currently recognized values:
--  - nvidia,tegra124-gk20a
-+  - nvidia,gk20a
- - reg: Physical base address and length of the controller's registers.
-   Must contain two entries:
-   - first entry for bar0
+Changes since v2:
+- Fixed device address in DT examples
+- Carried Acked-bys
+
+Changes since v1:
+- Renamed "pllg_ref" clock to "ref" in DT bindings
+
+Alexandre Courbot (5):
+  dt-bindings: gk20a: Fix typo in compatible name
+  dt-bindings: gk20a: Document iommus property
+  dt-bindings: Add documentation for GM20B GPU
+  arm64: tegra210: Add reference clock to GM20B
+  arm64: tegra210: Add IOMMU node to GM20B
+
+ .../devicetree/bindings/gpu/nvidia,gk20a.txt       | 37 +++++++++++++++++++---
+ arch/arm64/boot/dts/nvidia/tegra210.dtsi           |  8 +++--
+ 2 files changed, 38 insertions(+), 7 deletions(-)
+
 -- 
 2.7.3
