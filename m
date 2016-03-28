@@ -1,47 +1,87 @@
-From: jchandra@broadcom.com (Jayachandran C)
-Date: Mon, 28 Mar 2016 23:31:37 +0530
-Subject: [RFC PATCH 0/4] ACPI based PCI host driver with generic ECAM
-In-Reply-To: <56F934B1.4080908@codeaurora.org>
-References: <CAKc_7PVK3VtaR-LDHNXPr5cSjbCcH--hsepFx=jVATNi=+a9Hw@mail.gmail.com>
- <1458245913-17211-1-git-send-email-jchandra@broadcom.com>
- <CAKc_7PWfP0eQJ8dRN=CLu37=GKxin32Uf5rjiZGZgQCbiab2iA@mail.gmail.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ED2A787@lhreml503-mbs>
- <56F934B1.4080908@codeaurora.org>
-Message-ID: <CAKc_7PXs6+FpsrN5GyUZ0po79si0iN9+L3G1ec_OCGm512-3tA@mail.gmail.com>
+From: konrad@kernel.org (Konrad Rzeszutek Wilk)
+Date: Mon, 28 Mar 2016 14:29:29 -0400
+Subject: [PATCH 2/3] swiotlb: prefix dma_to_phys and phys_to_dma functions
+In-Reply-To: <56EC1805.5060207@codeaurora.org>
+References: <1458252137-24497-1-git-send-email-okaya@codeaurora.org>
+ <1458252137-24497-2-git-send-email-okaya@codeaurora.org>
+ <56EBF09A.1060503@arm.com> <56EC1805.5060207@codeaurora.org>
+Message-ID: <CACJDEmrzKOExg-Rchjy2hfVzkzbCZ=WNn4Bu3EVgim748VvRig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 28, 2016 at 7:12 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
-> Hi,
+On Fri, Mar 18, 2016 at 11:00 AM, Sinan Kaya <okaya@codeaurora.org> wrote:
+> On 3/18/2016 8:12 AM, Robin Murphy wrote:
+>> Since we know for sure that swiotlb_to_phys is a no-op on arm64, it might be cleaner to simply not reference it at all. I suppose we could have some private local wrappers, e.g.:
+>>
+>> #define swiotlb_to_virt(addr) phys_to_virt((phys_addr_t)(addr))
+>>
+>> to keep the intent of the code clear (and just in case anyone ever builds a system mad enough to warrant switching out that definition, but I'd hope that never happens).
+>>
+>> Otherwise, looks good - thanks for doing this!
 >
-> On 3/23/2016 6:22 AM, Gabriele Paoloni wrote:
->> I had a look at your patchset and also in your git repo at the other
->> patches that you ported over from Tomasz; it seems that now we miss
->> a quirk mechanism to enable controller that are not fully ECAM.
->>
->> This was provided before by Tomasz in:
->> https://lkml.org/lkml/2016/2/16/410
->>
->> I think we should put something like that back in...
-
-Like Tomasz mentioned in his mail, his approach does not work
-for raw operations. I have added raw operations in may patchset,
-so we have to come up with a new approach or decide that raw
-operations can be dropped.
-
-I am waiting for the overall acceptance of the patch set before
-going further along this path
-
->>
->> Thanks
->>
->> Gab
+> OK. I added this. Reviewed-by?
 >
-> I was requested to test your patchset. I'll need this mechanism before
-> I can start.
+> I'm not happy to submit such a big patch for all different ARCHs. I couldn't
+> find a cleaner solution. I'm willing to split this patch into multiple if there
+> is a better way.
+>
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index ada00c3..8c0f66b 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -29,6 +29,14 @@
+>
+>  #include <asm/cacheflush.h>
+>
+> +/*
+> + * If you are building a system without IOMMU, then you are using SWIOTLB
+> + * library. The ARM64 adaptation of this library does not support address
+> + * translation and it assumes that physical address = dma address for such
+> + * a use case. Please don't build a platform that violates this.
+> + */
 
-Please see above, we will need to look at the quirks again.
+Why not just expand the ARM64 part to support address translation?
 
-> Sinan
+> +#define swiotlb_to_virt(addr) phys_to_virt((phys_addr_t)(addr))
+> +
 
-JC.
+Adding Stefano here.
+
+>  static pgprot_t __get_dma_pgprot(struct dma_attrs *attrs, pgprot_t prot,
+>                                  bool coherent)
+>  {
+> @@ -188,7 +196,7 @@ static void __dma_free(struct device *dev, size_t size,
+>                        void *vaddr, dma_addr_t dma_handle,
+>                        struct dma_attrs *attrs)
+>  {
+> -       void *swiotlb_addr = phys_to_virt(swiotlb_dma_to_phys(dev, dma_handle));
+> +       void *swiotlb_addr = swiotlb_to_virt(dma_handle);
+>
+>         size = PAGE_ALIGN(size);
+>
+> @@ -209,8 +217,7 @@ static dma_addr_t __swiotlb_map_page(struct device *dev, struct page *page,
+>
+>         dev_addr = swiotlb_map_page(dev, page, offset, size, dir, attrs);
+>         if (!is_device_dma_coherent(dev))
+> -               __dma_map_area(phys_to_virt(swiotlb_dma_to_phys(dev, dev_addr)),
+> -                              size, dir);
+> +               __dma_map_area(swiotlb_to_virt(dev_addr), size, dir);
+>
+>         return dev_addr;
+>  }
+> @@ -283,8 +290,7 @@ static void __swiotlb_sync_single_for_device(struct device *dev,
+>  {
+>         swiotlb_sync_single_for_device(dev, dev_addr, size, dir);
+>         if (!is_device_dma_coherent(dev))
+> -               __dma_map_area(phys_to_virt(swiotlb_dma_to_phys(dev, dev_addr)),
+> -                              size, dir);
+> +               __dma_map_area(swiotlb_to_virt(dev_addr), size, dir);
+>  }
+>
+>
+>
+>
+> --
+> Sinan Kaya
+> Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
