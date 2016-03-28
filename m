@@ -1,164 +1,111 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Mon, 28 Mar 2016 10:51:36 +0800
-Subject: [PATCH v5 2/4] dt-bindings: add bindings for rk3399 clock
- controller
-In-Reply-To: <1507551.YPleCY5ZQt@phil>
-References: <1458974276-10325-1-git-send-email-zhengxing@rock-chips.com>
- <1458974276-10325-3-git-send-email-zhengxing@rock-chips.com>
- <1507551.YPleCY5ZQt@phil>
-Message-ID: <56F89C38.5000107@rock-chips.com>
+From: zhang.chunyan@linaro.org (Chunyan Zhang)
+Date: Mon, 28 Mar 2016 10:58:29 +0800
+Subject: [RESEND PATCH V4 0/4] Introduce CoreSight STM support
+In-Reply-To: <CANLsYkyZODA6dHpKZfx2DPaZ0qe==6T1FGgR5ajZASGmcuJXhw@mail.gmail.com>
+References: <1457418835-31417-1-git-send-email-zhang.chunyan@linaro.org>
+ <CANLsYkyZODA6dHpKZfx2DPaZ0qe==6T1FGgR5ajZASGmcuJXhw@mail.gmail.com>
+Message-ID: <CAG2=9p94GH9qRTffV8OrGvqktT_iyfGR4zBLN3NABJaesj8t2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+On Fri, Mar 25, 2016 at 8:51 PM, Mathieu Poirier
+<mathieu.poirier@linaro.org> wrote:
+> On 7 March 2016 at 23:33, Chunyan Zhang <zhang.chunyan@linaro.org> wrote:
+>> This patchset adds support for the CoreSight STM IP block.
+>>
+>> In the fourth version, comments from various people have been
+>> addressed.  Representing configurations where channels are shared
+>> between multiple masterIDs has been kept unchanged from the previous
+>> version because a viable alternative hasn't been suggested.
+>>
+>> This RESEND PATCH 1/4 depends on the patch [3] which has been
+>> merged into linux-next.
+>
+> We are not going anywhere with 1/4.  Since the functionality conveyed
+> by that patch isn't strictly needed simply drop it (along with 2/4).
+> Please take into consideration the comments I made on 4/4 and respin
+> on 4.6-rc1 when it comes out.
 
-On 2016?03?28? 07:52, Heiko St?bner wrote:
-> Hi Xing,
->
-> Am Samstag, 26. M?rz 2016, 14:37:54 schrieb Xing Zheng:
->> Add devicetree bindings for Rockchip cru which found on
->> Rockchip SoCs.
->>
->> Signed-off-by: Xing Zheng<zhengxing@rock-chips.com>
->> Signed-off-by: Jianqun Xu<jay.xu@rock-chips.com>
->> Acked-by: Rob Herring<robh@kernel.org>
->> ---
->>
->> Changes in v5: None
->> Changes in v3: None
->> Changes in v2: None
->>
->>   .../bindings/clock/rockchip,rk3399-cru.txt         |   83
->> ++++++++++++++++++++ 1 file changed, 83 insertions(+)
->>   create mode 100644
->> Documentation/devicetree/bindings/clock/rockchip,rk3399-cru.txt
->>
->> diff --git a/Documentation/devicetree/bindings/clock/rockchip,rk3399-
-> cru.txt
->> b/Documentation/devicetree/bindings/clock/rockchip,rk3399-cru.txt new file
->> mode 100644
->> index 0000000..9427caa
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/clock/rockchip,rk3399-cru.txt
->> @@ -0,0 +1,83 @@
->> +* Rockchip RK3399 Clock and Reset Unit
->> +
->> +The RK3399 clock controller generates and supplies clock to various
->> +controllers within the SoC and also implements a reset controller for SoC
->> +peripherals.
->> +
->> +Required Properties:
->> +
->> +- compatible: PMU for CRU should be "rockchip,rk3399-pmucru"
->> +- compatible: CRU should be "rockchip,rk3399-cru"
->> +- reg: physical base address of the controller and length of memory
-> mapped
->> +  region.
->> +- #clock-cells: should be 1.
->> +- #reset-cells: should be 1.
->> +
->> +Optional Properties:
->> +
->> +- rockchip,grf: phandle to the syscon managing the "general register
-> files"
->> +  If missing, pll rates are not changeable, due to the missing pll lock
->> status. +
-> the rk3399 doesn't need the GRF, so we should drop this block for now
->
->> +Each clock is assigned an identifier and client nodes can use this
->> identifier +to specify the clock which they consume. All available clocks
->> are defined as +preprocessor macros in the dt-bindings/clock/rk3399-cru.h
->> headers and can be +used in device tree sources. Similar macros exist for
->> the reset sources in +these files.
->> +
->> +External clocks:
->> +
->> +There are several clocks that are generated outside the SoC. It is
-> expected
->> +that they are defined using standard clock bindings with following
->> +clock-output-names:
->> + - "xin24m" - crystal input - required,
->> + - "xin32k" - rtc clock - optional,
->> + - "ext_i2s" - external I2S clock - optional,
->> + - "ext_gmac" - external GMAC clock - optional
->> + - "ext_hsadc" - external HSADC clock - optional,
->> + - "ext_isp" - external ISP clock - optional,
->> + - "ext_jtag" - external JTAG clock - optional
->> + - "ext_vip" - external VIP clock - optional,
->> + - "usbotg_out" - output clock of the pll in the otg phy
-> external clock listing needs adjusting, something like
->
-> - clkin_i2s
-> - clkin_gmac
-> -->  remove ext_hsadc
-> - clkin_cif
-> -->  remove ext_jtag
-> -->  remove ext_vip
-> - clk_usbphy0_480m
-> - clk_usbphy0_480m
->
-> maybe?
-Thanks, now they like this:
-clock-output-names:
-- "xin24m" - crystal input - required,
-- "xin32k" - rtc clock - optional,
-- "clkin_gmac" - external GMAC clock - optional,
-- "gmac_phy_rx_clk" - external GMAC RX clock - optional,
-- "clkin_i2s" - external I2S clock - optional,
-- "pclkin_cif" - external ISP clock - optional,
-- "clk_usbphy0_480m" - output clock of the pll in the usbphy0
-- "clk_usbphy1_480m" - output clock of the pll in the usbphy1
->
->> +
->> +Example: General Register Files
->> +
->> +	pmugrf: syscon at ff320000 {
->> +		compatible = "rockchip,rk3399-pmugrf", "syscon";
->> +		reg =<0x0 0xff320000 0x0 0x1000>;
->> +	};
->> +
->> +	grf: syscon at ff770000 {
->> +		compatible = "rockchip,rk3399-grf", "syscon";
->> +		reg =<0x0 0xff770000 0x0 0x10000>;
->> +	};
->> +
->> +Example: Clock controller node:
->> +
->> +	pmucru: pmu-clock-controller at ff750000 {
->> +		compatible = "rockchip,rk3399-pmucru";
->> +		reg =<0x0 0xff750000 0x0 0x1000>;
->> +		rockchip,grf =<&pmugrf>;
->> +		#clock-cells =<1>;
->> +		#reset-cells =<1>;
->> +	};
->> +
->> +	cru: clock-controller at ff760000 {
->> +		compatible = "rockchip,rk3399-cru";
->> +		reg =<0x0 0xff760000 0x0 0x1000>;
->> +		rockchip,grf =<&grf>;
->> +		#clock-cells =<1>;
->> +		#reset-cells =<1>;
->> +	};
-> also here drop grf nodes and rockchip,grf properties?
-Done.
->
->
->> +
->> +Example: UART controller node that consumes the clock generated by the
->> clock +  controller:
->> +
->> +	uart0: serial at ff1a0000 {
->> +		compatible = "rockchip,rk3399-uart", "snps,dw-apb-uart";
->> +		reg =<0x0 0xff180000 0x0 0x100>;
->> +		clocks =<&cru SCLK_UART0>,<&cru PCLK_UART0>;
->> +		clock-names = "baudclk", "apb_pclk";
->> +		interrupts =<GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>;
->> +		reg-shift =<2>;
->> +		reg-io-width =<4>;
->> +	};
->
->
-Thanks.
+Got it. Noticed 4.6-rc1 has been came out, I will send out a new
+patchset today, include 3/4 and 4/4 with addressing your comments on
+4/4.
 
--- 
-- Xing Zheng
+Thanks for your review,
+Chunyan
+
+>
+> Thanks,
+> Mathieu
+>
+>>
+>> Changes from V3:
+>>  - Removed ioctl get_options interface from the generic STM code and CoreSight STM driver.
+>>  - Removed 'write_max' from the structure 'stm_drvdata', and changed 'write_64bit' to 'write_bytes'.
+>>  - Revised stm_fundamental_data_size() to return the fundamental data size instead of 0/1.
+>>  - Removed stm_remove() from the driver.
+>>  - Revised the return value of ::packet() callback function according to [2].
+>>  - Modified stm_send() to send one STP packet at a time.
+>>  - Added comments to invariant/guaranteed CoreSight STM transaction mode.
+>>
+>> Changes from V2:
+>>  - Changed to return -EFAULT if failed on the command STP_GET_OPTIONS.
+>>  - Used Alex's patch [1] instead of the last 2/6.
+>>  - Removed the while loop from stm_send(), since the packet size passed
+>>    to it isn't larger than 4 bytes on 32-bit system and 8 bytes on
+>>    64-bit system.
+>>  - Removed stm_send_64bit(), since the process of packets on 64-bit
+>>    CS-STM should be basically the same with on 32-bit system, except the
+>>    maximum length of writing STM at a time.
+>>  - Removed the support of writing 64-bit to CoreSight STM buffer at a time
+>>    on 32-bit ARM architecture according to an ARM engineer suggestion.  As
+>>    he said that the STM might receive a 64-bit write, or might receive a
+>>    pair of 32-bit writes to the two addressed words in either order.
+>>    So 64-bit write isn't guaranteed to work on the ARM 32-bit architecture.
+>>
+>> Changes from v1:
+>>  - Added a definition of coresight_simple_func() in CS-STM driver to
+>>    avoid the kbuild test robot error for the time being.  This
+>>    modification will be removed when merging the code in which the
+>>    coresight_simple_func() has been moved to the header file.
+>>  - Calculate the channel number according to the channel memory space size.
+>>
+>>
+>> Thanks,
+>> Chunyan
+>>
+>> [1] https://lkml.org/lkml/2016/2/4/652
+>> [2] https://lkml.org/lkml/2016/2/12/397
+>> [3] https://lkml.org/lkml/2015/12/22/348
+>>
+>> Chunyan Zhang (1):
+>>   Documentations: Add explanations of the case for non-configurable
+>>     masters
+>>
+>> Mathieu Poirier (2):
+>>   stm class: provision for statically assigned masterIDs
+>>   coresight-stm: Bindings for System Trace Macrocell
+>>
+>> Pratik Patel (1):
+>>   coresight-stm: adding driver for CoreSight STM component
+>>
+>>  .../ABI/testing/sysfs-bus-coresight-devices-stm    |  53 ++
+>>  .../devicetree/bindings/arm/coresight.txt          |  28 +
+>>  Documentation/trace/coresight.txt                  |  37 +-
+>>  Documentation/trace/stm.txt                        |   6 +
+>>  drivers/hwtracing/coresight/Kconfig                |  11 +
+>>  drivers/hwtracing/coresight/Makefile               |   1 +
+>>  drivers/hwtracing/coresight/coresight-stm.c        | 890 +++++++++++++++++++++
+>>  drivers/hwtracing/stm/core.c                       |  17 +-
+>>  drivers/hwtracing/stm/policy.c                     |  18 +-
+>>  include/linux/coresight-stm.h                      |   6 +
+>>  include/linux/stm.h                                |   8 +
+>>  include/uapi/linux/coresight-stm.h                 |  21 +
+>>  12 files changed, 1090 insertions(+), 6 deletions(-)
+>>  create mode 100644 Documentation/ABI/testing/sysfs-bus-coresight-devices-stm
+>>  create mode 100644 drivers/hwtracing/coresight/coresight-stm.c
+>>  create mode 100644 include/linux/coresight-stm.h
+>>  create mode 100644 include/uapi/linux/coresight-stm.h
+>>
+>> --
+>> 1.9.1
+>>
