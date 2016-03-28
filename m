@@ -1,63 +1,51 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 28 Mar 2016 14:36:31 +0200
-Subject: [linux-sunxi] Re: [PATCH] ARM: dts: sun8i: Add dts for Orange Pi
- 2 SBC
-In-Reply-To: <20160325125342.2b4b6c9ec2e4922b51687ad3@free.fr>
-References: <1458728225-6922-1-git-send-email-hdegoede@redhat.com>
- <20160325125342.2b4b6c9ec2e4922b51687ad3@free.fr>
-Message-ID: <56F9254F.9040306@redhat.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 28 Mar 2016 13:38:49 +0100
+Subject: [RFC PATCH 0/8] PM / Domains: Add support for removing PM domains
+In-Reply-To: <CAPDyKFq3hNARzjSOoP+-NmcgfSWzG6GDmh7qVX6yx6QPgN9Arw@mail.gmail.com>
+References: <1457090634-14785-1-git-send-email-jonathanh@nvidia.com>
+ <CAPDyKFq3hNARzjSOoP+-NmcgfSWzG6GDmh7qVX6yx6QPgN9Arw@mail.gmail.com>
+Message-ID: <56F925D9.3080703@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Uffe,
 
-On 25-03-16 12:53, Jean-Francois Moine wrote:
-> On Wed, 23 Mar 2016 11:17:05 +0100
-> Hans de Goede <hdegoede@redhat.com> wrote:
->
->> The Orange Pi 2 is a SBC based on the Allwinner H3 SoC with a uSD slot,
->> 4 USB ports connected via a USB-2 hub, a 10/100M ethernet port using the
->> SoC's integrated PHY, Wifi via a RTL8189ETV sdio wifi chip, USB OTG, HDMI,
->> a TRRS headphone jack for stereo out and composite out, a microphone,
->> an IR receiver, a CSI connector, 2 LEDs, a 3 pin UART header
->> and a 40-pin GPIO header.
+On 04/03/16 12:33, Ulf Hansson wrote:
+> On 4 March 2016 at 12:23, Jon Hunter <jonathanh@nvidia.com> wrote:
+>> In order to safely remove PM domains there are a few changes that need to be
+>> made to ensure that no one is holding an external reference to a PM domain
+>> after it has been removed. One solution, implemented here, solves this by
+>> eliminating external references to PM domain. Another alternative would be
+>> to employ some reference counting for the PM domains, however, I did not see
+>> a good reason for allowing external references in the first place (as always
+>> there could be something that I have over-looked!).
 >>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>   arch/arm/boot/dts/Makefile                |   1 +
->>   arch/arm/boot/dts/sun8i-h3-orangepi-2.dts | 186 ++++++++++++++++++++++++++++++
->>   2 files changed, 187 insertions(+)
->>   create mode 100644 arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
-> 	[snip]
->> diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
->> new file mode 100644
->> index 0000000..f93f5d1
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
-> 	[snip]
->> +&mmc0 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
->> +	vmmc-supply = <&reg_vcc3v3>;
->> +	bus-width = <4>;
->> +	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
->> +	cd-inverted;
->> +	status = "okay";
->> +};
->> +
->> +&mmc1 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&mmc1_pins_a>;
->> +	vmmc-supply = <&reg_vcc3v3>;
->
-> While still 3.3V, the power of the mmc1 if supplied by an other
-> regulator.
+>> Jon Hunter (8):
+>>   PM / Domains: Add new helper functions for device-tree
+>>   ARM: EXYNOS: Remove calls to of_genpd_get_from_provider()
+>>   staging: board: Remove calls to of_genpd_get_from_provider()
+>>   PM / Domains: Don't expose generic_pm_domain structure
+>>   PM / Domains: Verify the PM domain is present when adding a provider
+>>   PM / Domains: Remove a provider by referencing the data pointer
+>>   PM / Domains: Prepare for adding support to remove PM domains
+>>   PM / Domains: Add support for removing PM domains
+>>
+>>  arch/arm/mach-exynos/pm_domains.c |  23 +--
+>>  drivers/base/power/domain.c       | 324 +++++++++++++++++++++++++++++++++++---
+>>  drivers/staging/board/board.c     |   9 +-
+>>  include/linux/pm_domain.h         |  55 ++++---
+>>  4 files changed, 348 insertions(+), 63 deletions(-)
+>>
+>> --
+>> 2.1.4
+>>
+> 
+> Jon, thanks for posting this!
+> My initial impressions is the I like the ideas for where you moves this.
+> 
+> I will review it in more details as soon as I can (travelling next week).
 
-I do not have schematics for the OPi 2, on the OPi plus schematic the
-2 share a regulator. But even if it is another fixed 3.3V regulator,
-there is little use in modelling it as a separate regulator when we
-cannot control it.
+Just wanted to see if you have had chance to look at this yet? Not urgent.
 
-Regards,
-
-Hans
+Cheers
+Jon
