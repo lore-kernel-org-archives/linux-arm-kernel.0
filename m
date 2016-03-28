@@ -1,81 +1,54 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 28 Mar 2016 17:05:24 +0900
-Subject: [PATCH v6 2/4] power: reset: add reboot mode driver
-In-Reply-To: <56F8DFED.50905@rock-chips.com>
-References: <1458646525-491-1-git-send-email-andy.yan@rock-chips.com>
- <1458646642-591-1-git-send-email-andy.yan@rock-chips.com>
- <CAJKOXPcKzGTAicbsXK-cC9WQT0vBhpSG_q2GCn37+72x2hdhsQ@mail.gmail.com>
- <56F39F36.5050702@rock-chips.com> <56F8D078.6040503@samsung.com>
- <56F8DFED.50905@rock-chips.com>
-Message-ID: <56F8E5C4.5010000@samsung.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 28 Mar 2016 16:13:48 +0800
+Subject: [PATCH] arm: dts: mt2701: Add clock controller device nodes
+In-Reply-To: <1459142955-33209-1-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <201603281638.VIBfNFp6%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28.03.2016 16:40, Andy Yan wrote:
-> Hi Krzysztof :
-> 
-> On 2016?03?28? 14:34, Krzysztof Kozlowski wrote:
->> On 24.03.2016 17:03, Andy Yan wrote:
->>> Hi Krzystof:
->> (...)
->>
->>>>> +static int get_reboot_mode_magic(struct reboot_mode_driver *reboot,
->>>>> +                                const char *cmd)
->>>>> +{
->>>>> +       const char *normal = "normal";
->>>>> +       int magic = 0;
->>>>> +       struct mode_info *info;
->>>>> +
->>>>> +       if (!cmd)
->>>>> +               cmd = normal;
->>>>> +
->>>>> +       list_for_each_entry(info, &reboot->head, list) {
->>>>> +               if (!strcmp(info->mode, cmd)) {
->>>>> +                       magic = info->magic;
->>>>> +                       break;
->>>>> +               }
->>>>> +       }
->>>>> +
->>>>> +       return magic;
->>>> In absence of 'normal' mode (it is not described as required property)
->>>> the magic will be '0'. It would be nice to document that in bindings.
->>>> Imagine someone forgets about this and will wonder why 0x0 is written
->>>> to his precious register on normal reboot...
->>>      If the magic value is '0', we won't touch the register, please see
->>> reboot_mode_notify bellow.
->> Ah, indeed... so we cannot use value of '0' for magic (e.g. to clear any
->> existing value for normal reboot)?
-> 
->     It seems that the value '0' cannot be used.
+Hi James,
 
-How about mentioning it in bindings documentation?
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.6-rc1 next-20160327]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-(...)
+url:    https://github.com/0day-ci/linux/commits/James-Liao/arm-dts-mt2701-Add-clock-controller-device-nodes/20160328-133113
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
+config: arm-multi_v7_defconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
->>>>> +               strcpy(info->mode, prop->name + len);
->>>> Ehm, and how do you protect that name of mode is shorter than 32
->>>> characters?
->>>      How about info->mode = prop->name + len ?
->> I don't get your answer.
->> As fair as I read the code, the prop->name can be very long and you are
->> copying it from 5 character. If the name of the mode has bazillion
->> characters then again my question: how do you protect that it will fit
->> in 32 bytes of 'mode'?
-> 
->     What I mean is set info->mode as a pointer point to prop->name + len
-> 
->    struct mode_info {
->             char *mode;
->             ..........
->             .........
->    }
-> 
->    info->mode = prop->name + len
+All errors (new ones prefixed by >>):
 
-Ahh, I get it. Then I guess you should also do of_node_get() and
-of_node_put()... and use kstrdup_const(). Looks good but I am not
-familiar with overlays and life-cycle of OF nodes (documentation for the
-life-cycle is a todo list item: Documentation/devicetree/todo.txt).
+   In file included from arch/arm/boot/dts/mt2701-evb.dts:16:0:
+>> arch/arm/boot/dts/mt2701.dtsi:15:42: fatal error: dt-bindings/clock/mt2701-clk.h: No such file or directory
+    #include <dt-bindings/clock/mt2701-clk.h>
+                                             ^
+   compilation terminated.
 
-Best regards,
-Krzysztof
+vim +15 arch/arm/boot/dts/mt2701.dtsi
+
+     9	 * This program is distributed in the hope that it will be useful,
+    10	 * but WITHOUT ANY WARRANTY; without even the implied warranty of
+    11	 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    12	 * GNU General Public License for more details.
+    13	 */
+    14	
+  > 15	#include <dt-bindings/clock/mt2701-clk.h>
+    16	#include <dt-bindings/interrupt-controller/irq.h>
+    17	#include <dt-bindings/interrupt-controller/arm-gic.h>
+    18	#include "skeleton64.dtsi"
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 36561 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160328/3c6b7a0e/attachment-0001.obj>
