@@ -1,53 +1,24 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 28 Mar 2016 08:28:09 -0700
-Subject: [RFC PATCH 0/4] Implement USB device/host switch for Vybrid
-In-Reply-To: <20160325074051.GB22398@peterchendt>
-References: <cover.1458030082.git.maitysanchayan@gmail.com>
- <20160325074051.GB22398@peterchendt>
-Message-ID: <3c2e72efc8cae93ff31be1b44f9a02b3@agner.ch>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 28 Mar 2016 11:39:43 -0400 (EDT)
+Subject: [PATCH net-next 2/2] net: hns: set-coalesce-usecs returns
+ errno by dsaf.ko
+In-Reply-To: <1459161657-151406-3-git-send-email-Yisen.Zhuang@huawei.com>
+References: <1459161657-151406-1-git-send-email-Yisen.Zhuang@huawei.com>
+ <1459161657-151406-3-git-send-email-Yisen.Zhuang@huawei.com>
+Message-ID: <20160328.113943.1432536731823075776.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-03-25 00:40, Peter Chen wrote:
-> On Tue, Mar 15, 2016 at 02:08:26PM +0530, Sanchayan Maity wrote:
->> Hello Peter,
->>
->> The existing usage of extcon in Chipidea driver relies on OTG
->> registers. In case of SoC with dual role device but not a true
->> OTG controller, this does not work. Such SoC's should specify
->> the existing CI_HDRC_DUAL_ROLE_NOT_OTG flag and do the role
->> switch without checking any of the OTG registers in my opinion.
->> This is the case for Vybrid which uses a Chipidea IP but does
->> not have a true 5 pin OTG implemented.
+From: Yisen Zhuang <Yisen.Zhuang@huawei.com>
+Date: Mon, 28 Mar 2016 18:40:57 +0800
+
+> From: Lisheng <lisheng011@huawei.com>
 > 
-> Sorry to reply you late due to my new born baby.
+> It may fail to set coalesce usecs to HW, and Ethtool needs to know if it
+> is successful to cfg the parameter or not. So it needs return the errno by
+> dsaf.ko.
 > 
-> Are you sure Vybrid is NOT OTG core? Afaik, it is uses the same
-> IP base with other Freescale SoCs, just the IP core is 2.40a.
-> When working at device mode, can you read vbus status through
-> OTGSC? And if there is an ID pin (input pin) for Vybrid? I mean
-> SoC, not the board.
+> Signed-off-by: Lisheng <lisheng011@huawei.com>
+> Signed-off-by: Yisen Zhuang <Yisen.Zhuang@huawei.com>
 
-I think the IP is actually OTG capable, the registers are there, but the
-signals seem not to be available on the SoC package. That is also what
-the RM says...
-
-Quotes from the RM:
-
-"OTG controller should be treated as
-Dual role controller that allows the
-controller to act as either a Host or a
-device with no support for HNP/SRP."
-
-And later, in Chapter 11.1:
-
-"The USB is not a true OTG. It can be configured by software to function
-either as
-peripheral or as host. The ID pin, which is unique for OTG operation, is
-not present in
-this implementation. There are no five pin interface. The user will get
-four pin host/
-device interface."
-
---
-Stefan
+Applied.
