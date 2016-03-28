@@ -1,74 +1,39 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Mon, 28 Mar 2016 21:12:08 +0800
-Subject: [PATCH v14 3/4] ARM64: add SBSA Generic Watchdog device node in
- amd-seattle-soc.dtsi
-In-Reply-To: <1456735610-22012-4-git-send-email-fu.wei@linaro.org>
-References: <1456735610-22012-1-git-send-email-fu.wei@linaro.org>
- <1456735610-22012-4-git-send-email-fu.wei@linaro.org>
-Message-ID: <CADyBb7shY-A-DTKEvNQS71SUtNmE6tkURfWDEb-_9eB-4htGWA@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 28 Mar 2016 09:35:21 -0400
+Subject: [PATCH V3 0/3] vfio, platform: add HIDMA and ACPI support
+Message-ID: <1459172124-6730-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wim, Guenter:
+The patchset makes three different changes.
+1. Add support for probing ACPI platform reset drivers.
+2. Make reset driver a requirement by default with an optional kernel
+command line override
+3. Add support for HIDMA reset driver.
 
-Great thanks for reviewing and applying this patchset :-)
-Now I can see almost all the patches of this patchset have been merged
-into the master branch of mainline kernel.
-But only this one is still out of any branch or repo. It seems that
-it's applied on linux-watchdog for a while, then disappeared.
+Specific changes:
 
+vfio, platform: make reset driver a requirement
+Changes from V2: (https://lkml.org/lkml/2016/3/11/463)
+* add reset_required kernel command line option to override the
+  requirement.
 
-So any thing I can do for this patch? Do I need to resubmit it?
-Maybe I miss it in some repo? Could you help me ?
-Great thanks ! :-)
+Sinan Kaya (3):
+  vfio, platform: add support for ACPI while detecting the reset driver
+  vfio, platform: make reset driver a requirement by default
+  vfio, platform: add QTI HIDMA reset driver
 
-On 29 February 2016 at 16:46,  <fu.wei@linaro.org> wrote:
-> From: Fu Wei <fu.wei@linaro.org>
->
-> This can be a example of adding SBSA Generic Watchdog device node
-> into some dts files for the Soc which contains SBSA Generic Watchdog.
->
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> Signed-off-by: Fu Wei <fu.wei@linaro.org>
-> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
-> ---
->  arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi | 8 ++++++++
->  1 file changed, 8 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi b/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
-> index 2874d92..0a8ca1d 100644
-> --- a/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
-> +++ b/arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi
-> @@ -84,6 +84,14 @@
->                         clock-names = "uartclk", "apb_pclk";
->                 };
->
-> +               watchdog0: watchdog at e0bb0000 {
-> +                       compatible = "arm,sbsa-gwdt";
-> +                       reg = <0x0 0xe0bc0000 0 0x1000>,
-> +                               <0x0 0xe0bb0000 0 0x1000>;
-> +                       interrupts = <0 337 4>;
-> +                       timeout-sec = <15>;
-> +               };
-> +
->                 spi0: ssp at e1020000 {
->                         status = "disabled";
->                         compatible = "arm,pl022", "arm,primecell";
-> --
-> 2.5.0
->
-
-
+ drivers/vfio/platform/reset/Kconfig                |   9 ++
+ drivers/vfio/platform/reset/Makefile               |   2 +
+ .../vfio/platform/reset/vfio_platform_amdxgbe.c    |   4 +-
+ .../platform/reset/vfio_platform_calxedaxgmac.c    |   4 +-
+ .../vfio/platform/reset/vfio_platform_qcomhidma.c  | 101 ++++++++++++++++++
+ drivers/vfio/platform/vfio_amba.c                  |   5 +
+ drivers/vfio/platform/vfio_platform.c              |   5 +
+ drivers/vfio/platform/vfio_platform_common.c       | 115 +++++++++++++++++----
+ drivers/vfio/platform/vfio_platform_private.h      |  44 ++++----
+ 9 files changed, 250 insertions(+), 39 deletions(-)
+ create mode 100644 drivers/vfio/platform/reset/vfio_platform_qcomhidma.c
 
 -- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat Software (Beijing) Co.,Ltd.Shanghai Branch
-Ph: +86 21 61221326(direct)
-Ph: +86 186 2020 4684 (mobile)
-Room 1512, Regus One Corporate Avenue,Level 15,
-One Corporate Avenue,222 Hubin Road,Huangpu District,
-Shanghai,China 200021
+1.8.2.1
