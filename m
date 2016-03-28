@@ -1,71 +1,151 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Mon, 28 Mar 2016 15:06:53 -0700
-Subject: [PATCH] i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity
-In-Reply-To: <CAOMZO5A2osG3=mTaCayYfMokUj-vT+Udq9ckq45b1yaUP9Tn3g@mail.gmail.com>
-References: <m3h9fuk7ik.fsf@t19.piap.pl>
- <CAOMZO5DcZCxoLPeGRWSGkstm7F3eN-Q-yJyf6ktMTda2zLviag@mail.gmail.com>
- <CAOMZO5B8Lzn-E4YOeYxVtN5PN11aOvZHn4eU0ixkdV8CO8+xYw@mail.gmail.com>
- <CAJ+vNU2Sg1ZKBsGcQswrJZyTJ1WBEZor3ZqpoYUT7i9FKjEAog@mail.gmail.com>
- <CAOMZO5DO9G18=_YSri3a+UiYbLwN6AMG4asUXbT03mpbU3hHrw@mail.gmail.com>
- <CAJ+vNU1_YqvWQkmuDB7r8z77iZJS6pP4Mr+j9yW4sFLAeJXQDw@mail.gmail.com>
- <CAOMZO5A2osG3=mTaCayYfMokUj-vT+Udq9ckq45b1yaUP9Tn3g@mail.gmail.com>
-Message-ID: <CAJ+vNU2ST=XG5H04-OCwpHgcvkoXOQw8F3MjXhJmWhBUbxWE-g@mail.gmail.com>
+From: emil.l.velikov@gmail.com (Emil Velikov)
+Date: Mon, 28 Mar 2016 23:07:59 +0100
+Subject: [RFC PATCH v1 0/4] Add Rockchip RGA support
+In-Reply-To: <1571169.Hy8an0n7lM@diego>
+References: <1458552518-25527-1-git-send-email-ykk@rock-chips.com>
+ <13797722.SiyveTZ1bB@diego>
+ <CACvgo52vL5_HQfgfnxRMzSJXYw-sWT3QozZaWswQXHr9-bwBSA@mail.gmail.com>
+ <1571169.Hy8an0n7lM@diego>
+Message-ID: <CACvgo516ewfwGCpV=noX+re1x8t3Sp1t39Sha+A2-tQ5YsoihA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 28, 2016 at 2:30 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> On Mon, Mar 28, 2016 at 5:42 PM, Tim Harvey <tharvey@gateworks.com> wrote:
->
->> Fabio,
+On 28 March 2016 at 22:46, Heiko St?bner <heiko@sntech.de> wrote:
+> Am Montag, 28. M?rz 2016, 22:35:36 schrieb Emil Velikov:
+>> On 28 March 2016 at 19:44, Heiko St?bner <heiko@sntech.de> wrote:
+>> > Am Montag, 28. M?rz 2016, 13:21:02 schrieb Emil Velikov:
+>> >> On 22 March 2016 at 00:42, Heiko Stuebner <heiko@sntech.de> wrote:
+>> >> > Hi Yakir,
+>> >> >
+>> >> > Am Montag, 21. M?rz 2016, 20:17:46 schrieb Yakir Yang:
+>> >> >> On 03/21/2016 07:29 PM, Heiko St?bner wrote:
+>> >> >> > Am Montag, 21. M?rz 2016, 17:28:38 schrieb Yakir Yang:
+>> >> >> >> This patch set would add the RGA direct rendering based 2d graphics
+>> >> >> >> acceleration module.
+>> >> >> >
+>> >> >> > very cool to see that.
+>> >> >>
+>> >> >> ;)
+>> >> >>
+>> >> >> >> This patch set is based on git repository below:
+>> >> >> >> git://people.freedesktop.org/~airlied/linux drm-next
+>> >> >> >> commit id: 568d7c764ae01f3706085ac8f0d8a8ac7e826bd7
+>> >> >> >>
+>> >> >> >> And the RGA driver is based on Exynos G2D driver, it only manages
+>> >> >> >> the
+>> >> >> >> command lists received from user, so user should make the command
+>> >> >> >> list
+>> >> >> >> to data and registers needed by operation to use.
+>> >> >> >>
+>> >> >> >> I have prepared an userspace demo application for testing:
+>> >> >> >>    https://github.com/yakir-Yang/libdrm-rockchip
+>> >> >> >>
+>> >> >> >> That is a rockchip libdrm library, and I have write a simple test
+>> >> >> >> case
+>> >> >> >> "rockchip_rga_test" that would test the below RGA features:
+>> >> >> >> - solid
+>> >> >> >> - copy
+>> >> >> >> - rotation
+>> >> >> >> - flip
+>> >> >> >> - window clip
+>> >> >> >> - dithering
+>> >> >> >
+>> >> >> > Did you submit your libdrm changes as well?
+>> >> >> >
+>> >> >> > Userspace-interfaces need to be stable so the other side must also
+>> >> >> > get
+>> >> >> > accepted - even before the kernel change if I remember correctly.
+>> >> >>
+>> >> >> Got it, and I just saw exynos_fimg2d already landed at mainline
+>> >> >> libdrm.
+>> >> >> But I don't find the way to submit patches to libdrm, would you like
+>> >> >> share some helps here ;)
+>> >> >
+>> >> > Looking at the libdrm sources on cgit.freedesktop.org, I did not find
+>> >> > any
+>> >> > specific manual on submitting patches.
+>> >> >
+>> >> > But looking at the dri-list archive, dri-devel at lists.freedesktop.org is
+>> >> > the
+>> >> > right list and looking at the libdrm history it looks like Emil Velikov
+>> >> > <emil.l.velikov@gmail.com> seems to be doing maintenance-stuff in
+>> >> > libdrm.
+>> >> > And as a 3rd recipient, please also include the linux-rockchip list.
+>> >> >
+>> >> > @Emil, please shout if I read that wrong :-)
+>> >>
+>> >> You got it spot on Heiko. There are a few notes though...
+>> >>
+>> >> As one reuses the existing hardware/IP block, it would be better to
+>> >> avoid copy/pasting code around.
+>> >>
+>> >> Namely:
+>> >>  - (if possible) factor out the exynos g2d kernel functionality to a
+>> >>
+>> >> separate kernel module and wire up the rockhip (via dt ?) to use it
+>> >>
+>> >>  - factor out the g2d specifics out of exynos_drm.h (into
+>> >>
+>> >> exynos_g2d_drm.h perhaps ?) and make sure exynos_drm.h includes the
+>> >> new header
+>> >
+>> > I think the IP blocks themself are quite different between Rockchip's RGA
+>> > and Samsung's g2d and I guess the similarities are more along the lines
+>> > on how that gets integrated into the respective drm driver and userspace.
+>> In this case, the exynos_g2d_drm.h seems like a good idea. As I'm
+>> obviously biased, it's better to check how others feel on the topic.
 >>
->> ok - I'll respond there as I agree with the patch but not the wording
->> of the commit (It's Gateworks 'Ventana' using IMX6 not Laguna and we
->> do define the polarity properly as active-low in Ventana dt's). It is
->> the fact that the gpio polarity has the wrong logic level that breaks
->> Ventana.
->
-> Ok, I will change the wording in v2.
->
+>> >>  - if neither of these are possible, then please ensure that the new
+>> >>
+>> >> header uses correct types (see the docs [1]), use MIT/X11 license (if
+>> >> possible) and link where upstream userspace is happy with the
+>> >> interface (ideally more than a simple test app like libdrm)
+>> >> These might sound like an overkill, although getting UAPI right and
+>> >> maintaining it forever forces us to do so.
+>> >
+>> > As for a real-world usecase, maybe the armsoc xserver might be somewhat
+>> > easy to use. While the core changes I did are in the core project
+>> > already, I'm still keeping the actual Rockchip support separate [0] due
+>> > to the not-yet- resolved create_gem ioctl.
+>> >
+>> > Anyway, the armsoc xserver has some exa implementation hooks were I guess
+>> > it might be relatively easy to hook up soc-specific things.
 >>
->> However, there seems to be another regression in 4.5 that's keeping
->> PCI working for me and I'm still bisecting that (using 802.11n access
->> points to test). Can you confirm that PCI works in v4.5 on IMX6 boards
->> with only 5c5fb40de8f14391a1238db05cef88754faf9229 reverted?
+>> Ouch the armsoc ddx... Last time I've checked it felt like a place
+>> where everyone is doing his own thing, with no actual reviews and/or
+>> maintainer.
 >
-> On imx6qdl-sabresd.dtsi the PCI reset gpio polarity is set to high,
-> which is not correct, so the Wifi card could be detected even with
-> 5c5fb40de8f. So two errors in sequence and PCI still works on this
-> board :-)
-
-ouch - two wrongs did make a right!
-
-It's not too easy to tell how many IMX6 boards incorrectly specify
-their reset-gpio polarity. I don't know what the best way to determine
-what boards use the IMX6 pcie host controller. Is there a dtc usage
-that will display the compiled dtb's then we grep out 'compatible =
-"fsl,imx6q-pcie"' to at least get the list of boards to inspect? I'm
-curious if its just one or two boards that incorrectly specify the
-polarity of their PCI reset.
-
+> The development rate is pretty low and maintainership is unclear but the per-
+> soc voodoo is quite limited to the GEM-creation and everything else seems
+> somewhat nice when compared for example to the older versions of the ddx.
 >
-> I don't have access to the board at the moment, but the only test I
-> did was to see that the Wifi card got detected. I haven't really tried
-> to communicate via Wifi.
+>
+>> Iirc most/all of it's functionality was achievable with
+>> modesetting ddx (with or without glamor) ? I take it that things have
+>> changed and/or I misunderstood something ?
+>
+> I don't really understand that whole stack or how xservers work on a whole ;-)
+> I was merely able to make the _binary_ mali-driver work with this one and
+> remembered that there were hooks for future per-soc exa functions.
+>
+> I guess for that glamor thing you'd need an actual gpu driver and not that
+> libGL-override voodoo those crazy binary drivers do.
+>
+> At least the modesetting ddx didn't like mali-binary-driver.
+>
+A quick rundown of the whole thing (simplified and maybe slightly off)
+- the modesetting DDX (merged in xserver for a few releases now),
+relies on GBM for buffer management and GL{,ES} for acceleration. On
+the KMS side it's as generic as any other driver should be.
 
-I figured out it was the change to enable CONFIG_PCI_MSI in v4.5 that
-is causing interrupts to fail for me.
+I'm not sure how well modesetting works without gbm, but it should be
+able to build at least. About getting it (or others) to work with
+binary blobs... I guess you know what my and others' view is. Place
+the fact that one tries to upstream a kernel interface which,
+indirectly, interacts with such a module makes things even more ...
+lovely.
 
-Lucas, the case that is failing for me is when I have 4 miniPCI radios
-behind a PCIe->PCI bridge. In this case the radios get legacy
-INTA/B/C/D mapped to them correctly from what I can tell (GIC
-123/122/121/120 swizzled appropriately), but those interrupts never
-fire. I don't think this case is necessarily a regression, I'm not
-clear that it has ever worked. In fact I can't seem to come up with a
-scenario where the MSI irq is firing either: IMX6->ath9k radio (no
-bridge) with MSI doesn't fire the PCI-MSI interrupt or the GPC 123
-interrupt that gets mapped to it via the driver. Any ideas what can be
-going on here?
+Sorry to be the bearer of bad news. If you have other ideas or others
+feels like I'm overly dramatic let me know, please.
 
-Regards,
-
-Tim
+-Emil
