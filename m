@@ -1,48 +1,43 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 28 Mar 2016 14:58:24 +0000
-Subject: [PATCH] pinctrl: bcm2835: Implement get_direction callback
-Message-ID: <1459177104-24353-1-git-send-email-stefan.wahren@i2se.com>
+From: akshay.bhat@timesys.com (Akshay Bhat)
+Date: Mon, 28 Mar 2016 16:19:15 -0400
+Subject: [PATCH v4 1/2] watchdog: imx2_wdt: add external reset support via
+ 'ext-reset-output' dt prop
+In-Reply-To: <CAOMZO5DrTY3ho0Z_jXxeYMqbd6GmUKRwD1LB61vM1ZTGQAYOrg@mail.gmail.com>
+References: <1446758362-11702-1-git-send-email-akshay.bhat@timesys.com>
+ <1446758362-11702-2-git-send-email-akshay.bhat@timesys.com>
+ <20151105222325.GA26159@roeck-us.net>
+ <CAJ+vNU2fSxRJ7YvxOfNzoEoiKgzv-dHj=+eksKxH48ekHiUw2Q@mail.gmail.com>
+ <20151106220249.GA19791@roeck-us.net> <565F4244.7090502@timesys.com>
+ <CAJ+vNU00Bf97HUqkkW9KqOUzHXh482R9O1gasz6ju3Pn-_5chA@mail.gmail.com>
+ <CAJ+vNU2qHQPSJ1KWp_3f3vAdeuOcF0ooZHmHsdafabZLXJv=Bw@mail.gmail.com>
+ <20151228162923.GA31680@spo001.leaseweb.nl> <56AA79DA.2010305@timesys.com>
+ <CAOMZO5DrTY3ho0Z_jXxeYMqbd6GmUKRwD1LB61vM1ZTGQAYOrg@mail.gmail.com>
+Message-ID: <56F991C3.8030201@timesys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement gpio_chip's get_direction() callback, that lets other
-drivers get particular GPIOs direction using gpiod_get_direction().
+Hi Shawn,
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- drivers/pinctrl/bcm/pinctrl-bcm2835.c |   13 +++++++++++++
- 1 file changed, 13 insertions(+)
+On 02/28/2016 08:56 AM, Fabio Estevam wrote:
+> Rob,
+>
+> On Thu, Jan 28, 2016 at 6:28 PM, Akshay Bhat <akshay.bhat@timesys.com> wrote:
+>
+>>> I have no objections against the idea and the code itself.
+>>> But as Guenter pointed out: it would be handy to get feedback from the
+>>> devicetree maintainers on the above discussion.
+>>>
+>>> Kind regards,
+>>> Wim.
+>>>
+>>
+>> Any suggestions on whether a vendor specific prefix is necessary?
+>
+> Any comments?
+>
 
-diff --git a/drivers/pinctrl/bcm/pinctrl-bcm2835.c b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
-index 08b1d93..dd8b174 100644
---- a/drivers/pinctrl/bcm/pinctrl-bcm2835.c
-+++ b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
-@@ -342,6 +342,18 @@ static int bcm2835_gpio_get(struct gpio_chip *chip, unsigned offset)
- 	return bcm2835_gpio_get_bit(pc, GPLEV0, offset);
- }
- 
-+static int bcm2835_gpio_get_direction(struct gpio_chip *chip, unsigned int offset)
-+{
-+	struct bcm2835_pinctrl *pc = gpiochip_get_data(chip);
-+	enum bcm2835_fsel fsel = bcm2835_pinctrl_fsel_get(pc, offset);
-+
-+	/* Alternative function doesn't clearly provide a direction */
-+	if (fsel > BCM2835_FSEL_GPIO_OUT)
-+		return -EINVAL;
-+
-+	return (fsel == BCM2835_FSEL_GPIO_IN);
-+}
-+
- static void bcm2835_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
- {
- 	struct bcm2835_pinctrl *pc = gpiochip_get_data(chip);
-@@ -370,6 +382,7 @@ static struct gpio_chip bcm2835_gpio_chip = {
- 	.free = gpiochip_generic_free,
- 	.direction_input = bcm2835_gpio_direction_input,
- 	.direction_output = bcm2835_gpio_direction_output,
-+	.get_direction = bcm2835_gpio_get_direction,
- 	.get = bcm2835_gpio_get,
- 	.set = bcm2835_gpio_set,
- 	.to_irq = bcm2835_gpio_to_irq,
--- 
-1.7.9.5
+Is this something you can help with, since you are the iMX 
+architecture/devicetree maintainer? Appreciate any feedback.
+
+Thanks,
+Akshay
