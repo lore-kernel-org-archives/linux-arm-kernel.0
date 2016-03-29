@@ -1,132 +1,77 @@
-From: rklein@nvidia.com (Rhyland Klein)
-Date: Tue, 29 Mar 2016 11:05:52 -0400
-Subject: [PATCH] sbs-battery: fix power status when battery is dry
-In-Reply-To: <1459216353.16645.20.camel@mtksdaap41>
-References: <1458726794-48298-1-git-send-email-yh.huang@mediatek.com>
- <CAGS+omDTmJDkJYsf=gDJMrmAos+30enoAa2xfTPyirXUd37=9g@mail.gmail.com>
- <1458801832.16645.7.camel@mtksdaap41>
- <CAGS+omDhFP+_shCqEWasLDsHf-ab0-OWJJ-gZZkgihAgrZwBHA@mail.gmail.com>
- <1459132330.16645.14.camel@mtksdaap41>
- <CAGS+omBVStB3mfXtDHdbsOK+y2UesGYtZBtYm=ctcpBfm88VEg@mail.gmail.com>
- <56F95451.5040607@nvidia.com> <1459216353.16645.20.camel@mtksdaap41>
-Message-ID: <56FA99D0.1010004@nvidia.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 29 Mar 2016 16:06:50 +0100
+Subject: [PATCH] arm64: mm: Add trace_irqflags annotations to
+ do_debug_exception()
+In-Reply-To: <1458580446-32474-1-git-send-email-james.morse@arm.com>
+References: <1458580446-32474-1-git-send-email-james.morse@arm.com>
+Message-ID: <20160329150650.GE6745@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/28/2016 9:52 PM, YH Huang wrote:
-> On Mon, 2016-03-28 at 11:57 -0400, Rhyland Klein wrote:
->> On 3/28/2016 6:05 AM, Daniel Kurtz wrote:
->>> +Rhyland Klein who original wrote this code...
->>>
->>> On Mon, Mar 28, 2016 at 10:32 AM, YH Huang <yh.huang@mediatek.com> wrote:
->>>>
->>>> On Fri, 2016-03-25 at 11:06 +0800, Daniel Kurtz wrote:
->>>>> On Thu, Mar 24, 2016 at 2:43 PM, YH Huang <yh.huang@mediatek.com> wrote:
->>>>>>
->>>>>> Hi Daniel,
->>>>>>
->>>>>> On Thu, 2016-03-24 at 12:01 +0800, Daniel Kurtz wrote:
->>>>>>> Hi YH,
->>>>>>>
->>>>>>> On Wed, Mar 23, 2016 at 5:53 PM, YH Huang <yh.huang@mediatek.com> wrote:
->>>>>>>> When the battery is dry and BATTERY_FULL_DISCHARGED is set,
->>>>>>>> we should check BATTERY_DISCHARGING to decide the power status.
->>>>>>>> If BATTERY_DISCHARGING is set, the power status is not charging.
->>>>>>>> Or the power status should be charging.
->>>>>>>>
->>>>>>>> Signed-off-by: YH Huang <yh.huang@mediatek.com>
->>>>>>>> ---
->>>>>>>>  drivers/power/sbs-battery.c |   22 ++++++++++++----------
->>>>>>>>  1 file changed, 12 insertions(+), 10 deletions(-)
->>>>>>>>
->>>>>>>> diff --git a/drivers/power/sbs-battery.c b/drivers/power/sbs-battery.c
->>>>>>>> index d6226d6..d86db0e 100644
->>>>>>>> --- a/drivers/power/sbs-battery.c
->>>>>>>> +++ b/drivers/power/sbs-battery.c
->>>>>>>> @@ -382,11 +382,12 @@ static int sbs_get_battery_property(struct i2c_client *client,
->>>>>>>>
->>>>>>>>                 if (ret & BATTERY_FULL_CHARGED)
->>>>>>>>                         val->intval = POWER_SUPPLY_STATUS_FULL;
->>>>>>>> -               else if (ret & BATTERY_FULL_DISCHARGED)
->>>>>>>> -                       val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
->>>>>>>> -               else if (ret & BATTERY_DISCHARGING)
->>>>>>>> -                       val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
->>>>>>>> -               else
->>>>>>>> +               else if (ret & BATTERY_DISCHARGING) {
->>>>>>>> +                       if (ret & BATTERY_FULL_DISCHARGED)
->>>>>>>> +                               val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
->>>>>>>> +                       else
->>>>>>>> +                               val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
->>>>>>>> +               } else
->>>>>>>
->>>>>>>
->>>>>>> I think (BATTERY_DISCHARGING && BATTERY_FULL_DISCHARGED) is still
->>>>>>> POWER_SUPPLY_STATUS_DISCHARGING.
->>>>>>> So, let's just report what the battery says and do:
->>>>>>>
->>>>>>>                else if (ret & BATTERY_DISCHARGING)
->>>>>>>                                val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
->>>>>>>
->>>>>> So we just ignore the special situation (BATTERY_DISCHARGING &&
->>>>>> BATTERY_FULL_DISCHARGED).
->>>>>> Isn't POWER_SUPPLY_STATUS_NOT_CHARGING a useful information?
->>>>>
->>>>> The battery is discharging.  The fact that it is also reporting that
->>>>> it is already "discharged" just seems premature.   I would expect to
->>>>> only see NOT_CHARGING if completely discharged *and* not discharging.
->>>>
->>>> I check the "Smart Battery Data Specification Revision 1.1".
->>>> And there are some words about FULLY_DISCHARGED.
->>>> "Discharge should be stopped soon."
->>>> "This status bit may be set prior to the
->>>> ?TERMINATE_DISCHARGE_ALARM? as an early or first level warning of end of
->>>> battery charge."
->>>> It looks like the FULLY_DISCHARGED status is used to announce the
->>>> warning of battery charge and it is still discharging if there is no one
->>>> takes care of it.
->>
->>
->> The only difference I see in the patch above is that in the case where
->> DISCHARGING isn't set, it won't check FULL_DISCHARGE. Nothing seems to
->> be changed in the case where FULL_DISCHARGE & DISCHARGING are set.
+On Mon, Mar 21, 2016 at 05:14:06PM +0000, James Morse wrote:
+> With CONFIG_PROVE_LOCKING, CONFIG_DEBUG_LOCKDEP and CONFIG_TRACE_IRQFLAGS
+> enabled, lockdep will compare current->hardirqs_enabled with the flags from
+> local_irq_save().
 > 
-> If battery is dry(FULLY_DISCHARGED) and is charging(No
-> BATTERY_DISCHARGING) by AC at the same time,
-> I think it is better to mark as POWER_SUPPLY_STATUS_CHARGING.
-> Is this right?
->
+> When a debug exception occurs, interrupts are disabled in entry.S, but
+> lockdep isn't told, resulting in:
+> DEBUG_LOCKS_WARN_ON(current->hardirqs_enabled)
+> ------------[ cut here ]------------
+> WARNING: at ../kernel/locking/lockdep.c:3523
+> Modules linked in:
+> CPU: 3 PID: 1752 Comm: perf Not tainted 4.5.0-rc4+ #2204
+> Hardware name: ARM Juno development board (r1) (DT)
+> task: ffffffc974868000 ti: ffffffc975f40000 task.ti: ffffffc975f40000
+> PC is at check_flags.part.35+0x17c/0x184
+> LR is at check_flags.part.35+0x17c/0x184
+> pc : [<ffffff80080fc93c>] lr : [<ffffff80080fc93c>] pstate: 600003c5
+> [...]
+> ---[ end trace 74631f9305ef5020 ]---
+> Call trace:
+> [<ffffff80080fc93c>] check_flags.part.35+0x17c/0x184
+> [<ffffff80080ffe30>] lock_acquire+0xa8/0xc4
+> [<ffffff8008093038>] breakpoint_handler+0x118/0x288
+> [<ffffff8008082434>] do_debug_exception+0x3c/0xa8
+> [<ffffff80080854b4>] el1_dbg+0x18/0x6c
+> [<ffffff80081e82f4>] do_filp_open+0x64/0xdc
+> [<ffffff80081d6e60>] do_sys_open+0x140/0x204
+> [<ffffff80081d6f58>] SyS_openat+0x10/0x18
+> [<ffffff8008085d30>] el0_svc_naked+0x24/0x28
+> possible reason: unannotated irqs-off.
+> irq event stamp: 65857
+> hardirqs last  enabled at (65857): [<ffffff80081fb1c0>] lookup_mnt+0xf4/0x1b4
+> hardirqs last disabled at (65856): [<ffffff80081fb188>] lookup_mnt+0xbc/0x1b4
+> softirqs last  enabled at (65790): [<ffffff80080bdca4>] __do_softirq+0x1f8/0x290
+> softirqs last disabled at (65757): [<ffffff80080be038>] irq_exit+0x9c/0xd0
+> 
+> This patch adds the annotations to do_debug_exception(), while trying not
+> to call trace_hardirqs_off() if el1_dbg() interrupted a task that already
+> had irqs disabled.
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
+> ---
+>  arch/arm64/mm/fault.c | 33 +++++++++++++++++++++++----------
+>  1 file changed, 23 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> index 44e56de23f79..d8b9c1da2630 100644
+> --- a/arch/arm64/mm/fault.c
+> +++ b/arch/arm64/mm/fault.c
+> @@ -548,20 +548,33 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
+>  {
+>  	const struct fault_info *inf = debug_fault_info + DBG_ESR_EVT(esr);
+>  	struct siginfo info;
+> +	int rv;
+>  
+> -	if (!inf->fn(addr, esr, regs))
+> -		return 1;
+> +	/*
+> +	 * If we came in from el0_dbg, we disabled irqs. From el1_dbg,
+> +	 * we need to test pstate.
+> +	 */
+> +	if (user_mode(regs) || !(regs->pstate & PSR_I_BIT))
+> +		trace_hardirqs_off();
 
-Hmm. I can see where you patch would address that situation. From the
-spec, it looks like its expected that the flags should look something
-like this:
+Can you use interrupts_enabled(regs) for this?
 
-capacity (in the course of running from fully_charged to dry to
-recharging...)
-
-full: FULLY_CHARGED
-<unplug>
-high->low: DISCHARGING
-~0%: (DISCHARGING & FULLY_DISCHARGED)
-<plug in>
-->~20%: FULLY_DISCHARGED
->~20%: <nothing> = charging
-
->From this understanding, it seems like we can't expect FULLY_DISCHARGED
-to ever be the only flag, nor can we expect it to go away when the
-system is initially plugged in. In light of this, I can see why your
-patch is preferable to the existing code, as the existing code could
-imply that the system is either still near 0% when it is in fact
-charging. Of course, ideally the status returned would be "LOW BUT
-CHARGING" but I can see how CHARGING seems like a better option.
-
-I think this patch would be fine if we wanted to cover that case, though
-if we do merge this, we should probably flush out the patch description
-better to clarify why we have to treat FULLY_DISCHARGED as only
-applicable while DISCHARGING. This, IMHO, isn't because the
-FULLY_DISCHARGED flag comes on early, but rather because it doesn't turn
-off until ~20%.
-
--rhyland
-
--- 
-nvpublic
+Will
