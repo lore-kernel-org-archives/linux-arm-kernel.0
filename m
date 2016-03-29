@@ -1,112 +1,53 @@
-From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Tue, 29 Mar 2016 05:48:54 +0000
-Subject: [PATCH v2 3/6] Documentation: DT: vdma: update binding doc for
- AXI DMA
-In-Reply-To: <20160328205255.GA12237@rob-hp-laptop>
-References: <1459101966-9932-1-git-send-email-appanad@xilinx.com>
- <20160328205255.GA12237@rob-hp-laptop>
-Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A570B5F@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 29 Mar 2016 14:03:37 +0800
+Subject: [PATCH v2 5/9] ARM: dts: qcom: msm8974: Introduce the wcnss
+ remoteproc node
+In-Reply-To: <1459222625-11440-6-git-send-email-bjorn.andersson@linaro.org>
+Message-ID: <201603291305.IgQ6FAlE%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Bjorn,
 
-> -----Original Message-----
-> From: Rob Herring [mailto:robh at kernel.org]
-> Sent: Tuesday, March 29, 2016 2:23 AM
-> To: Appana Durga Kedareswara Rao
-> Cc: pawel.moll at arm.com; mark.rutland at arm.com;
-> ijc+devicetree at hellion.org.uk; galak at codeaurora.org; Michal Simek; Soren
-> Brinkmann; vinod.koul at intel.com; dan.j.williams at intel.com; Anurag Kumar
-> Vulisha; Appana Durga Kedareswara Rao; moritz.fischer at ettus.com;
-> laurent.pinchart at ideasonboard.com; luis at debethencourt.com; Srikanth
-> Vemula; Anirudha Sarangi; dmaengine at vger.kernel.org;
-> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH v2 3/6] Documentation: DT: vdma: update binding doc for
-> AXI DMA
-> 
-> On Sun, Mar 27, 2016 at 11:36:05PM +0530, Kedareswara rao Appana wrote:
-> > This patch updates the device-tree binding doc for adding support for
-> > AXI DMA.
-> >
-> > Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
-> > ---
-> > Changes for v2:
-> > ---> Modified commit message as suggested by Vinod.
-> > ---> Moved the patch to forward in the series as suggested by vinod.
-> >
-> >  .../devicetree/bindings/dma/xilinx/xilinx_vdma.txt | 22
-> > +++++++++++++++++++++-
-> >  1 file changed, 21 insertions(+), 1 deletion(-)
-> >
-> > diff --git
-> > a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-> > b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-> > index a86737c..5841421 100644
-> > --- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-> > +++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-> > @@ -3,8 +3,13 @@ It can be configured to have one channel or two
-> > channels. If configured  as two channels, one is to transmit to the
-> > video device and another is  to receive from the video device.
-> >
-> > +Xilinx AXI DMA engine, it does transfers between memory and AXI4
-> > +stream target devices. It can be configured to have one channel or two
-> channels.
-> > +If configured as two channels, one is to transmit to the device and
-> > +another is to receive from the device.
-> > +
-> >  Required properties:
-> > -- compatible: Should be "xlnx,axi-vdma-1.00.a"
-> > +- compatible: Should be "xlnx,axi-vdma-1.00.a" or "xlnx,axi-dma-1.00.a"
-> 
-> Why the new compatible string? This is 2 different IP blocks? If so, is there really
-> much shared?
+[auto build test ERROR on v4.6-rc1]
+[also build test ERROR on next-20160329]
+[cannot apply to robh/for-next]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-The support for the AXI DMA IP also added to the existing VDMA Linux driver
-In this series of patches.
+url:    https://github.com/0day-ci/linux/commits/Bjorn-Andersson/Qualcomm-WCNSS-remoteproc/20160329-114231
+config: arm-multi_v7_defconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-> 
-> >  - #dma-cells: Should be <1>, see "dmas" property below
-> >  - reg: Should contain VDMA registers location and length.
-> >  - xlnx,num-fstores: Should be the number of framebuffers as configured in
-> h/w.
-> > @@ -59,6 +64,21 @@ axi_vdma_0: axivdma at 40030000 {
-> >  	} ;
-> >  } ;
-> >
-> > +axi_dma_0: axidma at 40400000 {
-> 
-> dma at 40400000
+All errors (new ones prefixed by >>):
 
-Ok will fix in the next version 
+   In file included from arch/arm/boot/dts/qcom-apq8074-dragonboard.dts:1:0:
+>> arch/arm/boot/dts/qcom-msm8974.dtsi:5:42: fatal error: dt-bindings/clock/qcom,rpmcc.h: No such file or directory
+    #include <dt-bindings/clock/qcom,rpmcc.h>
+                                             ^
+   compilation terminated.
 
-Thanks,
-Kedar.
+vim +5 arch/arm/boot/dts/qcom-msm8974.dtsi
 
-> 
-> > +	compatible = "xlnx,axi-dma-1.00.a";
-> > +	#dma-cells = <1>;
-> > +	reg = < 0x40400000 0x10000 >;
-> > +	dma-channel at 40400000 {
-> > +		compatible = "xlnx,axi-dma-mm2s-channel";
-> > +		interrupts = < 0 59 4 >;
-> > +		xlnx,datawidth = <0x40>;
-> > +	} ;
-> > +	dma-channel at 40400030 {
-> > +		compatible = "xlnx,axi-dma-s2mm-channel";
-> > +		interrupts = < 0 58 4 >;
-> > +		xlnx,datawidth = <0x40>;
-> > +	} ;
-> > +} ;
-> >
-> >  * DMA client
-> >
-> > --
-> > 2.1.2
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+     1	/dts-v1/;
+     2	
+     3	#include <dt-bindings/interrupt-controller/arm-gic.h>
+     4	#include <dt-bindings/clock/qcom,gcc-msm8974.h>
+   > 5	#include <dt-bindings/clock/qcom,rpmcc.h>
+     6	#include "skeleton.dtsi"
+     7	
+     8	/ {
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 37221 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160329/d4b63b23/attachment-0001.obj>
