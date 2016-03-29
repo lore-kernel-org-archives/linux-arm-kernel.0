@@ -1,40 +1,98 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 30 Mar 2016 00:12:30 +0200
-Subject: arm64: kernel v4.6-rc1 hangs on QEMU
-In-Reply-To: <20160329220502.GA14443@yury-N73SV>
-References: <20160329220502.GA14443@yury-N73SV>
-Message-ID: <3753214.GGjb33ZPlQ@wuerfel>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 29 Mar 2016 15:16:34 -0700
+Subject: [PATCH resend v5 2/3] ASoC: cygnus: Add Cygnus audio DAI driver
+In-Reply-To: <1459277192-10942-3-git-send-email-simran.rai@broadcom.com>
+References: <1459277192-10942-1-git-send-email-simran.rai@broadcom.com>
+ <1459277192-10942-3-git-send-email-simran.rai@broadcom.com>
+Message-ID: <20160329221634.GQ2350@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 30 March 2016 01:05:02 Yury Norov wrote:
-> Checked  for both v4.6-rc1 and current master (1993b17).
-> Config: arm64 defconfig
-> QEMU: QEMU emulator version 2.3.0 (Debian 1:2.3+dfsg-5ubuntu9.2)
-> 
-> Stacktrace:
-> #0  arch_counter_get_cntvct () at
-> ./arch/arm64/include/asm/arch_timer.h:121
-> #1  __delay (cycles=1024) at arch/arm64/lib/delay.c:31
-> #2  0xffffff8008340970 in __const_udelay (xloops=<optimized out>) at
-> arch/arm64/lib/delay.c:41
-> #3  0xffffff800815420c in panic (fmt=<optimized out>) at
-> kernel/panic.c:257
-> #4  0xffffff80080be588 in do_exit (code=11) at kernel/exit.c:666
-> #5  0xffffff8008089d08 in die (str=<optimized out>, regs=0xffffff8008aebe20 <init_thread_union+15904>, err=143867376) at arch/arm64/kernel/traps.c:298
-> #6  0xffffff8008089dec in arm64_notify_die (str=<optimized out>, regs=<optimized out>, info=<optimized out>, err=<optimized out>) at arch/arm64/kernel/traps.c:309
-> #7  0xffffff800808212c in do_undefinstr (regs=0xffffff8008aebe20 <init_thread_union+15904>) at arch/arm64/kernel/traps.c:399
-> #8  0xffffff8008a1fe08 in cpuinfo_store_boot_cpu () at arch/arm64/kernel/cpuinfo.c:252
-> #9  0xffffff8008a1fe08 in cpuinfo_store_boot_cpu () at arch/arm64/kernel/cpuinfo.c:252
-> #10 0xffffff8008a20388 in smp_prepare_boot_cpu () at arch/arm64/kernel/smp.c:403
-> #11 0xffffff8008a1d6ec in start_kernel () at init/main.c:511
-> #12 0xffffff80080811d8 in __mmap_switched () at arch/arm64/kernel/head.S:437
-> Backtrace stopped: previous frame identical to this frame (corrupt stack?)
-> 
+On Tue, Mar 29, 2016 at 11:46:31AM -0700, Simran Rai wrote:
 
-Undefined instruction in cpuinfo_store_boot_cpu() could be related
-to the SYS_ID_AA64MMFR2_EL1 access that was recently added.
+A few issues here, a lot of them are stylistic though there's what look
+like a couple of small bugs here too.
 
-What does the architecture say about reading unknown cpuid registers?
+> +static int cygnus_ssp_set_clocks(struct cygnus_aio_port *aio,
+> +			struct cygnus_audio *cygaud)
+> +{
+> +	u32 value, i = 0;
+> +	u32 mask = 0xf;
+> +	u32 sclk;
+> +	bool found = false;
+> +	const struct _ssp_clk_coeff *p_entry = NULL;
+> +
+> +	if ((!aio->lrclk) || (!aio->bit_per_frame)) {
+> +		dev_err(aio->cygaud->dev, "First set up port through hw_params()\n");
+> +		return -EINVAL;
+> +	}
 
-	Arnd
+This function is only ever called from one site in hw_prams().  What is
+this defending against?  A check like this seems very worrying, if it
+ever goes off that seems to indicate either something is seriously wrong
+or we should be recording something then coming back and trying again
+later.
+
+> +	for (i = 0; i < ARRAY_SIZE(ssp_clk_coeff); i++) {
+> +		p_entry = &ssp_clk_coeff[i];
+> +		if ((p_entry->rate == aio->lrclk) &&
+> +				(p_entry->sclk_rate == aio->bit_per_frame) &&
+> +				(p_entry->mclk == aio->mclk)) {
+
+Why the strange indentation here?
+
+> +	/* Set sclk rate */
+> +	if (aio->port_type == PORT_TDM) {
+
+switch statment here for extensibility.
+
+> +		/* Configure channels as mono or stereo */
+> +		if (params_channels(params) == 1) {
+> +			value = readl(aio->cygaud->audio +
+> +				aio->regs.bf_sourcech_cfg);
+> +			value |= BIT(BF_SRC_CFGX_SAMPLE_CH_MODE);
+> +			value &= ~BIT(BF_SRC_CFGX_BUFFER_PAIR_ENABLE);
+> +			writel(value, aio->cygaud->audio +
+> +				aio->regs.bf_sourcech_cfg);
+> +		} else {
+> +			value = readl(aio->cygaud->audio +
+> +				aio->regs.bf_sourcech_cfg);
+> +			value &= ~BIT(BF_SRC_CFGX_SAMPLE_CH_MODE);
+> +			writel(value, aio->cygaud->audio +
+> +				aio->regs.bf_sourcech_cfg);
+> +		}
+
+Either this should be a switch statement or the comment should say we
+support more than stereo.  It's also not clear to me how
+BUFFER_PAIR_ENABLE gets set again if we go from mono to stereo.
+
+> +	if (!aio->is_slave) {
+> +		if (aio->clk_trace.cap_clk_en)
+> +			clk_prepare_enable(aio->cygaud->
+> +					audio_clk[aio->pll_clk_num]);
+
+Should check the return value of clk_prepare_enable().
+
+> +	.playback = {
+> +		.channels_min = 2,
+> +		.channels_max = 2,
+> +		.rates = CYGNUS_TDM_RATE | SNDRV_PCM_RATE_88200 |
+> +			SNDRV_PCM_RATE_96000 | SNDRV_PCM_RATE_176400 |
+> +			SNDRV_PCM_RATE_192000,
+> +		.formats = SNDRV_PCM_FMTBIT_S16_LE |
+> +			SNDRV_PCM_FMTBIT_S32_LE,
+
+According to hw_params() the driver also supports S8 and S24.
+
+> +	if (port_type == PORT_TDM) {
+
+> +	} else { /* SPDIF case */
+
+switch statement...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160329/12540dc2/attachment.sig>
