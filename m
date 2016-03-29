@@ -1,122 +1,117 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue, 29 Mar 2016 10:59:15 -0400
-Subject: [PATCH 0/3] drm/exynos: Kconfig dependency fixes
-In-Reply-To: <56FA03A3.1090205@samsung.com>
-References: <1459214937-18686-1-git-send-email-javier@osg.samsung.com>
- <56F9DE63.6050808@samsung.com> <56F9EB3E.5080000@osg.samsung.com>
- <56FA03A3.1090205@samsung.com>
-Message-ID: <56FA9843.70806@osg.samsung.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Tue, 29 Mar 2016 16:02:08 +0100
+Subject: [PATCH 01/12] ARM: dts: apq8064: fix the pinctrls for i2c and spi
+In-Reply-To: <20160329142807.GF8929@tuxbot>
+References: <1458762366-9233-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1458762421-9339-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <20160329142807.GF8929@tuxbot>
+Message-ID: <56FA98F0.2000300@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Seung-Woo,
 
-On 03/29/2016 12:25 AM, Seung-Woo Kim wrote:
-> Hello Javier,
-> 
-> On 2016? 03? 29? 11:41, Javier Martinez Canillas wrote:
->> Hello Seung-Woo,
->>
->> Thanks a lot for your feedback.
->>
->> On 03/28/2016 09:46 PM, Seung-Woo Kim wrote:
->>> Hi Javier,
->>>
->>> On 2016? 03? 29? 10:28, Javier Martinez Canillas wrote:
->>>> Hello Inki,
->>>>
->>>> This patch series contains some fixes for the Kconfig symbol dependencies
->>>> of the Exynos DRM driver. They make sure that the Exynos DRM components
->>>> and the media platform drivers that makes use of the same HW IP block are
->>>> not enabled at the same time.
->>>>
->>>> Best regards,
->>>> Javier
->>>>
->>>>
->>>> Javier Martinez Canillas (3):
->>>>   drm/exynos: Use VIDEO_SAMSUNG_S5P_G2D=n as G2D Kconfig dependency
->>>>   drm/exynos: Use VIDEO_SAMSUNG_EXYNOS_GSC=n as GSC Kconfig dependency
->>>>   drm/exynos: Make DRM_EXYNOS_FIMC depend on VIDEO_S5P_FIMC=n
->>>
->>> In G2D case, there is only one instance, but for the other cases, there
->>> are several instances and in my environment, I enable both drivers on
->>> v4l2 and drm FIMC/GSC.
->>>
->>> So, IMHO, the not-enabled v4l2 dependency is not really required for drm
->>> fimc and drm gsc.
->>>
->>
->> I'm confused, it was you who added the depends on !VIDEO_SAMSUNG_EXYNOS_GSC
->> for DRM_EXYNOS_GSC in commit aeefb36832e5 ("drm/exynos: gsc: add device tree
->> support and remove usage of static mappings").
-> 
-> Yes, you are right. Originally, my goal on the GSC was bringing optional
-> flag for setting isp mode or wb mode like FIMC in tizen.org git tree.
-> 
-> https://review.tizen.org/git/?p=platform/kernel/linux-exynos.git;a=blobdiff;f=Documentation/devicetree/bindings/media/exynos5-gsc.txt;h=d526777a3abd04d244c46fdd729e3df93bb86917;hp=0604d42f38d1941526d47ad11a958a2a83797f97;hb=751cd6d88d9620c83042641b52fdd244408a3947;hpb=7c7ab44f86d64ba6a6733da8f201a26a6c0e807f
-> 
-> But only devicetree part of GSC was upstreamed and simultaneous enabling
-> both v4l2 gsc and drm gsc driver is removed. The only reason I set both
-> driver simultaneously was enabling video codec, exynos-mfc with gsc to
-> convert RGB plane.
-> 
-> I know Marek already has plan to integrate yuv plane feature of GSC to
-> DRM KMS. Also, for GSC, simultaneous setup is alredy remove, so your
-> patch seems better.
+
+On 29/03/16 15:28, Bjorn Andersson wrote:
+> On Wed 23 Mar 12:47 PDT 2016, Srinivas Kandagatla wrote:
 >
+>> This patch fixes pinctrls for spi and i2c nodes whose default and sleep
+>> states are together, which is incorrect.
+>>
+>> Without this patch i2c/spi would not be functional.
+>>
+>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>
+> The change in itself is sound, but I don't understand why i2c/spi fails
+> to function if we don't bring them to a sleep state. Can you please
+> update the commit message with an explanation?
 
-Ok, thanks for the confirmation. So at least patch 1/3 and 3/3 are needed then.
- 
->>
->> >From the commit message "The driver cannot be used simultaneously with V4L2
->> Mem2Mem GScaller driver thought". Did that assumption changed and the depend
->> should be removed then? or maybe I misunderstood what you meant.
->>
->> Now, I'm not really sure about FIMC either, it was feedback I got from this
->> patch [0]. Could you please take a look to that and let me know if enabling
->> these drivers simultaneously makes sense then?
-> 
-> About FIMC, there is still simultaneous setup for both v4l2 and drm
-> driver with devicetree binding flags, samsung,isp-wb and samsung,lcd-wb.
-> 
-> If on the FIMC instance of dt node, samsung,lcd-wb is set, then drm
-> driver is probed, otherwise v4l2 driver is probed.
-> 
+Yes, with the existing code the device would endup configuring the 
+default pinstate to sleep pinconf. So the i2c bus would not be functional.
 
-Interesting, I didn't know about these DT properties. I see that some FIMC nodes
-are using both though like in arch/arm/boot/dts/exynos4x12.dtsi. Is that a bug?
+If you try mainline on any 8064 based boards you would easily reproduce 
+the bug. For example read the eeprom on IFC6410.
+>
+>
+> PS. Whenever there's multiple states for a thing I do prefer prefixing
+> them _a and _s to highlight that difference (not only suffixing the
+> sleep state). And use abbreviations :)
 
-So if both the DRM and V4L2 drivers can be enabled at the same time for FIMC,
-then patch 3/3 should be dropped and instead the exynos_defconfig patch that
-enables CONFIG_VIDEO_S5P_FIMC should be picked IMHO.
+If I search for _sleep in dts folder these are widely used, am not sure 
+which is the prefered way to do this, as long as its readable by user am 
+ok to do it either way.
 
-> Simultaneous FIMC driver is also only for RGB converting of video codec
-> planes like GSC at least to me.
-> 
-> Marek, do you have any idea about the simultaneous setup for fimc and gsc?
-> 
-> Best Regards,
-> - Seung-Woo Kim
-> 
+>
+> Regards,
+> Bjorn
+>
+>> ---
+>>   arch/arm/boot/dts/qcom-apq8064.dtsi | 18 ++++++++++++------
+>>   1 file changed, 12 insertions(+), 6 deletions(-)
 >>
->>> Best Regards,
->>> - Seung-Woo Kim
->>>
->>>>
->>>>  drivers/gpu/drm/exynos/Kconfig | 6 +++---
->>>>  1 file changed, 3 insertions(+), 3 deletions(-)
->>>>
->>>
+>> diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+>> index 65d0e8d..c6ff8fc 100644
+>> --- a/arch/arm/boot/dts/qcom-apq8064.dtsi
+>> +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+>> @@ -227,7 +227,8 @@
 >>
->> [0]: https://lkml.org/lkml/2016/3/23/292
+>>   			gsbi1_i2c: i2c at 12460000 {
+>>   				compatible = "qcom,i2c-qup-v1.1.1";
+>> -				pinctrl-0 = <&i2c1_pins &i2c1_pins_sleep>;
+>> +				pinctrl-0 = <&i2c1_pins>;
+>> +				pinctrl-1 = <&i2c1_pins_sleep>;
+>>   				pinctrl-names = "default", "sleep";
+>>   				reg = <0x12460000 0x1000>;
+>>   				interrupts = <0 194 IRQ_TYPE_NONE>;
+>> @@ -255,7 +256,8 @@
+>>   			gsbi2_i2c: i2c at 124a0000 {
+>>   				compatible = "qcom,i2c-qup-v1.1.1";
+>>   				reg = <0x124a0000 0x1000>;
+>> -				pinctrl-0 = <&i2c2_pins &i2c2_pins_sleep>;
+>> +				pinctrl-0 = <&i2c2_pins>;
+>> +				pinctrl-1 = <&i2c2_pins_sleep>;
+>>   				pinctrl-names = "default", "sleep";
+>>   				interrupts = <0 196 IRQ_TYPE_NONE>;
+>>   				clocks = <&gcc GSBI2_QUP_CLK>, <&gcc GSBI2_H_CLK>;
+>> @@ -277,7 +279,8 @@
+>>   			ranges;
+>>   			gsbi3_i2c: i2c at 16280000 {
+>>   				compatible = "qcom,i2c-qup-v1.1.1";
+>> -				pinctrl-0 = <&i2c3_pins &i2c3_pins_sleep>;
+>> +				pinctrl-0 = <&i2c3_pins>;
+>> +				pinctrl-1 = <&i2c3_pins_sleep>;
+>>   				pinctrl-names = "default", "sleep";
+>>   				reg = <0x16280000 0x1000>;
+>>   				interrupts = <GIC_SPI 151 IRQ_TYPE_NONE>;
+>> @@ -302,7 +305,8 @@
 >>
->> Best regards,
+>>   			gsbi4_i2c: i2c at 16380000 {
+>>   				compatible = "qcom,i2c-qup-v1.1.1";
+>> -				pinctrl-0 = <&i2c4_pins &i2c4_pins_sleep>;
+>> +				pinctrl-0 = <&i2c4_pins>;
+>> +				pinctrl-1 = <&i2c4_pins_sleep>;
+>>   				pinctrl-names = "default", "sleep";
+>>   				reg = <0x16380000 0x1000>;
+>>   				interrupts = <GIC_SPI 153 IRQ_TYPE_NONE>;
+>> @@ -337,7 +341,8 @@
+>>   				compatible = "qcom,spi-qup-v1.1.1";
+>>   				reg = <0x1a280000 0x1000>;
+>>   				interrupts = <0 155 0>;
+>> -				pinctrl-0 = <&spi5_default &spi5_sleep>;
+>> +				pinctrl-0 = <&spi5_default>;
+>> +				pinctrl-1 = <&spi5_sleep>;
+>>   				pinctrl-names = "default", "sleep";
+>>   				clocks = <&gcc GSBI5_QUP_CLK>, <&gcc GSBI5_H_CLK>;
+>>   				clock-names = "core", "iface";
+>> @@ -370,7 +375,8 @@
 >>
-> 
-
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+>>   			gsbi6_i2c: i2c at 16580000 {
+>>   				compatible = "qcom,i2c-qup-v1.1.1";
+>> -				pinctrl-0 = <&i2c6_pins &i2c6_pins_sleep>;
+>> +				pinctrl-0 = <&i2c6_pins>;
+>> +				pinctrl-1 = <&i2c6_pins_sleep>;
+>>   				pinctrl-names = "default", "sleep";
+>>   				reg = <0x16580000 0x1000>;
+>>   				interrupts = <GIC_SPI 157 IRQ_TYPE_NONE>;
+>> --
+>> 2.5.0
+>>
