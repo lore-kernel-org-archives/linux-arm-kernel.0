@@ -1,48 +1,47 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 29 Mar 2016 17:18:38 +0100
-Subject: [PATCH v7 12/17] ARM64: ACPI: Check if it runs on Xen to enable
- or disable ACPI
-In-Reply-To: <1458830676-27075-13-git-send-email-shannon.zhao@linaro.org>
-References: <1458830676-27075-1-git-send-email-shannon.zhao@linaro.org>
- <1458830676-27075-13-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <20160329161837.GH6745@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 29 Mar 2016 18:19:56 +0200
+Subject: [PATCH] MAINTAINERS: attach arch/arm/configs/mvebu_*_defconfig to
+ relevant maintainers
+In-Reply-To: <20160318102203.GJ1184@io.lakedaemon.net> (Jason Cooper's message
+ of "Fri, 18 Mar 2016 10:22:03 +0000")
+References: <1458289626-26153-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160318102203.GJ1184@io.lakedaemon.net>
+Message-ID: <87d1qdw91v.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 24, 2016 at 10:44:31PM +0800, Shannon Zhao wrote:
-> When it's a Xen domain0 booting with ACPI, it will supply a /chosen and
-> a /hypervisor node in DT. So check if it needs to enable ACPI.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  arch/arm64/kernel/acpi.c | 12 ++++++++----
->  1 file changed, 8 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> index d1ce8e2..4e92be0 100644
-> --- a/arch/arm64/kernel/acpi.c
-> +++ b/arch/arm64/kernel/acpi.c
-> @@ -67,10 +67,13 @@ static int __init dt_scan_depth1_nodes(unsigned long node,
->  {
->  	/*
->  	 * Return 1 as soon as we encounter a node at depth 1 that is
-> -	 * not the /chosen node.
-> +	 * not the /chosen node, or /hypervisor node when running on Xen.
->  	 */
-> -	if (depth == 1 && (strcmp(uname, "chosen") != 0))
-> -		return 1;
-> +	if (depth == 1 && (strcmp(uname, "chosen") != 0)) {
-> +		if (!xen_initial_domain() || (strcmp(uname, "hypervisor") != 0))
-> +			return 1;
-> +	}
+Hi Thomas,
+ 
+ On ven., mars 18 2016, Jason Cooper <jason@lakedaemon.net> wrote:
 
-Hmm, but xen_initial_domain() is false when xen isn't being used at all,
-so it feels to me like this is a bit too far-reaching and is basically
-claiming the "/hypervisor" namespace for Xen. Couldn't it be renamed to
-"xen,hypervisor" or something?
+> On Fri, Mar 18, 2016 at 09:27:06AM +0100, Thomas Petazzoni wrote:
+>> The arch/arm/configs/mvebu_*_defconfig currently don't belong to any
+>> maintainer, so get_maintainer returns only information based on
+>> commits, which is not completely accurate.
+>> 
+>> Therefore, this commit replaces a useless empty newline in MAINTAINERS
+>> by a line attaching those defconfigs to the appropriate Marvell EBU
+>> maintainers.
+>> 
+>> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>
+> Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-Mark, got any thoughts on this?
+Applied on mvebu/defconfig (I just have to adapt it to fit with
+v4.6-rc1)
 
-Will
+Thanks,
+
+Gregory
+
+
+>
+> thx,
+>
+> Jason.
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
