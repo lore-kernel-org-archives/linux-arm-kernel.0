@@ -1,40 +1,128 @@
-From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
-Date: Tue, 29 Mar 2016 07:43:24 +0200
-Subject: [PATCH] i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity
-In-Reply-To: <m31t6tkfjw.fsf@t19.piap.pl> ("Krzysztof
- \=\?utf-8\?Q\?Ha\=C5\=82as\?\=
- \=\?utf-8\?Q\?a\=22's\?\= message of
- "Tue, 29 Mar 2016 07:40:19 +0200")
-References: <m3h9fuk7ik.fsf@t19.piap.pl>
- <CAOMZO5DcZCxoLPeGRWSGkstm7F3eN-Q-yJyf6ktMTda2zLviag@mail.gmail.com>
- <CAOMZO5B8Lzn-E4YOeYxVtN5PN11aOvZHn4eU0ixkdV8CO8+xYw@mail.gmail.com>
- <CAJ+vNU2Sg1ZKBsGcQswrJZyTJ1WBEZor3ZqpoYUT7i9FKjEAog@mail.gmail.com>
- <CAOMZO5DO9G18=_YSri3a+UiYbLwN6AMG4asUXbT03mpbU3hHrw@mail.gmail.com>
- <CAJ+vNU1_YqvWQkmuDB7r8z77iZJS6pP4Mr+j9yW4sFLAeJXQDw@mail.gmail.com>
- <CAOMZO5A2osG3=mTaCayYfMokUj-vT+Udq9ckq45b1yaUP9Tn3g@mail.gmail.com>
- <CAJ+vNU2ST=XG5H04-OCwpHgcvkoXOQw8F3MjXhJmWhBUbxWE-g@mail.gmail.com>
- <CAOMZO5DwuBcpL85GYjTV9yy_ZZB33PDY3TfzwkS1WK03hfkhqg@mail.gmail.com>
- <m31t6tkfjw.fsf@t19.piap.pl>
-Message-ID: <m3wpolj0ub.fsf@t19.piap.pl>
+From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
+Date: Tue, 29 Mar 2016 05:48:50 +0000
+Subject: [PATCH v2 5/6] Documentation: DT: vdma: update binding doc for
+ AXI CDMA
+In-Reply-To: <20160328205542.GA17273@rob-hp-laptop>
+References: <1459101966-9932-1-git-send-email-appanad@xilinx.com>
+ <1459101966-9932-2-git-send-email-appanad@xilinx.com>
+ <20160327192742.GJ19212@xsjsorenbubuntu>
+ <C246CAC1457055469EF09E3A7AC4E11A4A570609@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <20160328205542.GA17273@rob-hp-laptop>
+Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A570B51@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> OTOH, we should fix it some day, making sure the DTS files are fixed
-> first:
->
-> imx6qdl-apf6dev.dtsi:       reset-gpio = <&gpio6 2 GPIO_ACTIVE_HIGH>;
-> imx6qdl-aristainetos2.dtsi: reset-gpio = <&gpio2 16 GPIO_ACTIVE_HIGH>;
-> imx6qdl-hummingboard.dtsi:  reset-gpio = <&gpio3 4 0>; (I think RMK already handles this)
-> imx6qdl-phytec-pfla02.dtsi: reset-gpio = <&gpio4 17 0>;
-> imx6qdl-sabresd.dtsi:       reset-gpio = <&gpio7 12 0>;
-> imx6q-dmo-edmqmx6.dts:      reset-gpio = <&gpio4 8 0>;
-> imx6q-novena.dts:           reset-gpio = <&gpio3 29 GPIO_ACTIVE_HIGH>;
-> imx6q-tbs2910.dts:          reset-gpio = <&gpio7 12 GPIO_ACTIVE_HIGH>;
+Hi Rob,
 
-Or maybe we should simply change these to *_LOW, add that short patch
-from me, and forget about it.
--- 
-Krzysztof Halasa
+> -----Original Message-----
+> From: Rob Herring [mailto:robh at kernel.org]
+> Sent: Tuesday, March 29, 2016 2:26 AM
+> To: Appana Durga Kedareswara Rao
+> Cc: Soren Brinkmann; pawel.moll at arm.com; mark.rutland at arm.com;
+> ijc+devicetree at hellion.org.uk; galak at codeaurora.org; Michal Simek;
+> vinod.koul at intel.com; dan.j.williams at intel.com; Anurag Kumar Vulisha;
+> moritz.fischer at ettus.com; laurent.pinchart at ideasonboard.com;
+> luis at debethencourt.com; Srikanth Vemula; Anirudha Sarangi;
+> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org; dmaengine at vger.kernel.org
+> Subject: Re: [PATCH v2 5/6] Documentation: DT: vdma: update binding doc for
+> AXI CDMA
+> 
+> On Mon, Mar 28, 2016 at 05:27:01AM +0000, Appana Durga Kedareswara Rao
+> wrote:
+> > Hi Soren,
+> >
+> > > -----Original Message-----
+> > > From: S?ren Brinkmann [mailto:soren.brinkmann at xilinx.com]
+> > > Sent: Monday, March 28, 2016 12:58 AM
+> > > To: Appana Durga Kedareswara Rao
+> > > Cc: robh+dt at kernel.org; pawel.moll at arm.com; mark.rutland at arm.com;
+> > > ijc+devicetree at hellion.org.uk; galak at codeaurora.org; Michal Simek;
+> > > vinod.koul at intel.com; dan.j.williams at intel.com; Anurag Kumar
+> > > Vulisha; Appana Durga Kedareswara Rao; moritz.fischer at ettus.com;
+> > > laurent.pinchart at ideasonboard.com; luis at debethencourt.com; Srikanth
+> > > Vemula; Anirudha Sarangi; devicetree at vger.kernel.org; linux-arm-
+> > > kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> > > dmaengine at vger.kernel.org
+> > > Subject: Re: [PATCH v2 5/6] Documentation: DT: vdma: update binding
+> > > doc for AXI CDMA
+> > >
+> > > On Sun, 2016-03-27 at 23:36:06 +0530, Kedareswara rao Appana wrote:
+> > > > This patch updates the device-tree binding doc for adding support
+> > > > for AXI CDMA.
+> > > >
+> > > > Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> > > > ---
+> > > > ---> Modified commit message as suggested by Vinod.
+> > > > ---> Moved the patch to forward in the series as suggested by vinod.
+> > > >
+> > > >  .../devicetree/bindings/dma/xilinx/xilinx_vdma.txt     | 18
+> > > +++++++++++++++++-
+> > > >  1 file changed, 17 insertions(+), 1 deletion(-)
+> > > >
+> > > > diff --git
+> > > > a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+> > > > b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+> > > > index 5841421..2b0c12b 100644
+> > > > --- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+> > > > +++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+> > > > @@ -8,8 +8,12 @@ target devices. It can be configured to have one
+> > > > channel
+> > > or two channels.
+> > > >  If configured as two channels, one is to transmit to the device
+> > > > and another  is to receive from the device.
+> > > >
+> > > > +Xilinx AXI CDMA engine, it does transfers between memory-mapped
+> > > > +source address and a memory-mapped destination address.
+> > > > +
+> > > >  Required properties:
+> > > > -- compatible: Should be "xlnx,axi-vdma-1.00.a" or "xlnx,axi-dma-1.00.a"
+> > > > +- compatible: Should be "xlnx,axi-vdma-1.00.a" or "xlnx,axi-dma-1.00.a"
+> or
+> > > > +	      "xlnx,axi-cdma-1.00.a""
+> > > >  - #dma-cells: Should be <1>, see "dmas" property below
+> > > >  - reg: Should contain VDMA registers location and length.
+> > > >  - xlnx,num-fstores: Should be the number of framebuffers as
+> > > > configured in
+> > > h/w.
+> > > > @@ -80,6 +84,18 @@ axi_dma_0: axidma at 40400000 {
+> > > >  	} ;
+> > > >  } ;
+> > > >
+> > > > +axi_cdma_0: axicdma at 7e200000 {
+> > > > +       compatible = "xlnx,axi-cdma-1.00.a";
+> > > > +       #dma-cells = <1>;
+> > > > +       reg = < 0x7e200000 0x10000 >;
+> > > > +       xlnx,addrwidth = <0x20>;
+> > > > +       dma-channel at 7e200000 {
+> > > > +               compatible = "xlnx,axi-dma-mm2s-channel";
+> > > > +               interrupts = < 0 55 4 >;
+> > > > +               xlnx,datawidth = <0x40>;
+> > > > +       } ;
+> > > > +} ;
+> > >
+> > > As in the other patch, the node name should be 'dma-controller at ...'
+> > > and the inconsistend spacing could be fixed.
+> >
+> > Ok will fix...
+> >
+> > >
+> > > Also, it seems this adds pretty much identical examples that just
+> > > differ in the compat string. Is that really needed?
+> >
+> > Most of the properties are same across the three DMA's For AXI VDMA
+> > there are few required properties that are not required for AXI DMA/CDMA.
+> > That's why added example for the other IP's as well I mean for AXI DMA and
+> CDMA.
+> 
+> It needs to be clear what properties are required/valid for each compatible
+> string rather than relying on examples. I should be able to write or validate the
+> examples based on the rest of the text.
 
-Industrial Research Institute for Automation and Measurements PIAP
-Al. Jerozolimskie 202, 02-486 Warsaw, Poland
+Ok will fix it in the next version of the patch.
+
+Regards,
+Kedar.
+
+> 
+> Rob
