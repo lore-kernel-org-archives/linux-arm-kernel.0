@@ -1,41 +1,70 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Mar 2016 17:24:31 +0200
-Subject: [PATCH] i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity
-In-Reply-To: <CAJ+vNU3kBk+J-hU1OWPOS6kbFq+J0zM9QpfVy4x1VXL3hgrMTg@mail.gmail.com>
-References: <m3h9fuk7ik.fsf@t19.piap.pl> <5741237.2X2Q0sCFQj@wuerfel>
- <CAJ+vNU3kBk+J-hU1OWPOS6kbFq+J0zM9QpfVy4x1VXL3hgrMTg@mail.gmail.com>
-Message-ID: <3827347.i8fIQs6jUv@wuerfel>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 29 Mar 2016 17:45:20 +0200
+Subject: [PATCH v4 3/3] ARM: mvebu: Add the hardware monitor to the NSA320
+ device tree
+In-Reply-To: <1457192097-32538-4-git-send-email-linux@baker-net.org.uk> (Adam
+ Baker's message of "Sat, 5 Mar 2016 15:34:57 +0000")
+References: <1457192097-32538-1-git-send-email-linux@baker-net.org.uk>
+ <1457192097-32538-4-git-send-email-linux@baker-net.org.uk>
+Message-ID: <87poudwanj.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 March 2016 08:10:08 Tim Harvey wrote:
-> Arnd,
-> 
-> Right, on the IMX the MSI interrupt is GIC-120 which is also the
-> legacy INTD and I do see that if I happen to put a radio in a slot
-> where due to swizzling its pin1 becomes INTD (GIC-120) the interrupt
-> does fire and the device works. Any other slot using GIC-123 (INTA),
-> GIC-122 (INTB), or GIC-121 (INTC) never fires so its very possible
-> that something in the designware core is masking out the legacy irqs.
+Hi Adam,
+ 
+ On sam., mars 05 2016, Adam Baker <linux@baker-net.org.uk> wrote:
 
-Interesting. I was actually expecting the opposite here, having the
-IRQs only work if they are not IntD. 
+> Add an entry for the hardware monitoring MCU
+>
+> Signed-off-by: Adam Baker <linux@baker-net.org.uk>
 
+Applied on mvebu/dt, I only changed the tropic to "ARM: dts: kirkwood:
+Add the hardware monitor to the NSA320 device tree" as know requested
+by the arm-soc maintainer.
 
-> I typically advise our users to 'not' enable MSI because
-> architecturally you can spread 4 distinct legacy irq's across CPU's
-> better than a single shared irq.
+Thanks,
 
-That is a very good point, I never understood why we want to enable
-MSI support on any PCI host bridge that just forwards all MSIs
-to a single IRQ line. Originally MSI was meant as a performance
-feature, but there is nothing in this setup that makes things go
-faster, and several things that make it go slower.
+Gregory
 
-I would still hope that with disabling MSI support in just the i.MX
-driver (as in the trivial patch I suggested trying, or by
-reverting Lucas' d1dc9749a5b8 patch) will make things just work.
-If not, we may need to change the pcie-designware driver as well,
-so it doesn't try to enable MSI on its own.
+> ---
+> This patch is unchanged from the version Gregory CLEMENT said
+> he would apply once the hwmon maintainers accept 2/3
+> ---
+>  arch/arm/boot/dts/kirkwood-nsa320.dts | 13 +++++++++++--
+>  1 file changed, 11 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/kirkwood-nsa320.dts b/arch/arm/boot/dts/kirkwood-nsa320.dts
+> index 24f686d..2a935e9 100644
+> --- a/arch/arm/boot/dts/kirkwood-nsa320.dts
+> +++ b/arch/arm/boot/dts/kirkwood-nsa320.dts
+> @@ -193,10 +193,19 @@
+>  		};
+>  	};
+>  
+> +	hwmon {
+> +		compatible = "zyxel,nsa320-mcu";
+> +		pinctrl-0 = <&pmx_mcu_data &pmx_mcu_clk &pmx_mcu_act>;
+> +		pinctrl-names = "default";
+> +
+> +		data-gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>;
+> +		clk-gpios = <&gpio0 16 GPIO_ACTIVE_HIGH>;
+> +		act-gpios = <&gpio0 17 GPIO_ACTIVE_LOW>;
+> +	};
+> +
+>  	/* The following pins are currently not assigned to a driver,
+>  	   some of them should be configured as inputs.
+> -	pinctrl-0 = <&pmx_mcu_data &pmx_mcu_clk &pmx_mcu_act
+> -		     &pmx_htp &pmx_vid_b1
+> +	pinctrl-0 = <&pmx_htp &pmx_vid_b1
+>  		     &pmx_power_resume_data &pmx_power_resume_clk>; */
+>  };
+>  
+> -- 
+> 2.1.4
+>
 
-	Arnd
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
