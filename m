@@ -1,33 +1,40 @@
 From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
-Date: Tue, 29 Mar 2016 07:21:04 +0200
+Date: Tue, 29 Mar 2016 07:29:33 +0200
 Subject: [PATCH] i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity
-In-Reply-To: <CAJ+vNU1_YqvWQkmuDB7r8z77iZJS6pP4Mr+j9yW4sFLAeJXQDw@mail.gmail.com>
- (Tim Harvey's message of "Mon, 28 Mar 2016 13:42:33 -0700")
+In-Reply-To: <CAJ+vNU2ST=XG5H04-OCwpHgcvkoXOQw8F3MjXhJmWhBUbxWE-g@mail.gmail.com>
+ (Tim Harvey's message of "Mon, 28 Mar 2016 15:06:53 -0700")
 References: <m3h9fuk7ik.fsf@t19.piap.pl>
  <CAOMZO5DcZCxoLPeGRWSGkstm7F3eN-Q-yJyf6ktMTda2zLviag@mail.gmail.com>
  <CAOMZO5B8Lzn-E4YOeYxVtN5PN11aOvZHn4eU0ixkdV8CO8+xYw@mail.gmail.com>
  <CAJ+vNU2Sg1ZKBsGcQswrJZyTJ1WBEZor3ZqpoYUT7i9FKjEAog@mail.gmail.com>
  <CAOMZO5DO9G18=_YSri3a+UiYbLwN6AMG4asUXbT03mpbU3hHrw@mail.gmail.com>
  <CAJ+vNU1_YqvWQkmuDB7r8z77iZJS6pP4Mr+j9yW4sFLAeJXQDw@mail.gmail.com>
-Message-ID: <m3a8lhkgfz.fsf@t19.piap.pl>
+ <CAOMZO5A2osG3=mTaCayYfMokUj-vT+Udq9ckq45b1yaUP9Tn3g@mail.gmail.com>
+ <CAJ+vNU2ST=XG5H04-OCwpHgcvkoXOQw8F3MjXhJmWhBUbxWE-g@mail.gmail.com>
+Message-ID: <m360w5kg1u.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Tim Harvey <tharvey@gateworks.com> writes:
 
-> ok - I'll respond there as I agree with the patch but not the wording
-> of the commit (It's Gateworks 'Ventana' using IMX6 not Laguna and we
-> do define the polarity properly as active-low in Ventana dt's).
+> It's not too easy to tell how many IMX6 boards incorrectly specify
+> their reset-gpio polarity. I don't know what the best way to determine
+> what boards use the IMX6 pcie host controller. Is there a dtc usage
+> that will display the compiled dtb's then we grep out 'compatible =
+> "fsl,imx6q-pcie"' to at least get the list of boards to inspect? I'm
+> curious if its just one or two boards that incorrectly specify the
+> polarity of their PCI reset.
 
-Right, it's Ventana of course (I had been working with Laguna boards
-recently).
+I guess, maybe 8 of them. Not counting those with out-of-tree DTS/DTB
+files.
 
-> However, there seems to be another regression in 4.5 that's keeping
-> PCI working for me and I'm still bisecting that (using 802.11n access
-> points to test). Can you confirm that PCI works in v4.5 on IMX6 boards
-> with only 5c5fb40de8f14391a1238db05cef88754faf9229 reverted?
+Something like:
+$ grep reset-gpio arch/arm/boot/dts/imx6* | grep -v phy-reset
 
-I will check with my frame buffer and wifi cards.
+> I figured out it was the change to enable CONFIG_PCI_MSI in v4.5 that
+> is causing interrupts to fail for me.
+
+Right, a long standing issue. MSI never worked for me on i.MX6.
 -- 
 Krzysztof Halasa
 
