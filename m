@@ -1,52 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Mar 2016 23:08:55 +0200
-Subject: [PATCH v2] spi: orion.c: Add direct access mode
-In-Reply-To: <20160329210018.GL2350@sirena.org.uk>
-References: <1458663893-13766-1-git-send-email-sr@denx.de>
- <7339827.UeYZLZET5g@wuerfel> <20160329210018.GL2350@sirena.org.uk>
-Message-ID: <3108005.nUMWsj4kjp@wuerfel>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Tue, 29 Mar 2016 14:10:55 -0700
+Subject: [PATCH 10/12] ARM: dts: dragonboard-600c: Add on board leds
+ support
+In-Reply-To: <CAP71WjwPQn8OuCy+8iuQpDrUW2baQ0qzaviLEDixVzTmUP_BTw@mail.gmail.com>
+References: <1458762366-9233-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1458762484-9768-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <20160327055012.GD8929@tuxbot> <56FA8F47.7070200@linaro.org>
+ <20160329145115.GO8929@tuxbot>
+ <CAP71WjwPQn8OuCy+8iuQpDrUW2baQ0qzaviLEDixVzTmUP_BTw@mail.gmail.com>
+Message-ID: <20160329211055.GU8929@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 March 2016 14:00:18 Mark Brown wrote:
-> On Tue, Mar 29, 2016 at 10:04:59PM +0200, Arnd Bergmann wrote:
-> > On Tuesday 29 March 2016 12:52:30 Mark Brown wrote:
-> 
-> > > Well, we currently don't have any XIP or whatever support at all, it's
-> > > still only in the SPI operations so it's academic - that'd be a future
-> > > issue if we did start doing things that accessed the memory map outside
-> > > of the SPI flow.
-> 
-> > Isn't this just about implementing .point()/.unpoint() in the spi-nor
-> > driver?
-> 
-> Implementing that would require the SPI core to export something
-> providing access to the memory regions.  We don't currently do that,
-> it'd require us to deal with the interaction with access as a SPI device
-> (this hardware often seems to only accelerate reads so we still need to
-> use regular SPI access for writes).
+On Tue 29 Mar 11:32 PDT 2016, Nicolas Dechesne wrote:
 
-The manual lists both read and write accesses as handled through
-direct mode.
-
-> > > For me the simplest thing seems like just using one window for all the
-> > > devices, it seems more likely to deliver useful results without the
-> > > system integrator having to think about how to configure this for
-> > > optimisation.
+> On Tue, Mar 29, 2016 at 4:51 PM, Bjorn Andersson
+> <bjorn.andersson@linaro.org> wrote:
+> >> Am ok, to change, did you get activity leds works with any of these strings
+> >> with WLAN or BT?
+> >>
+> >
+> > I did test them; rx, assoc and radio seems to work. Tx does not tickle
+> > the led, but should probably.
+> >
+> > I didn't find the spec for the baord, so I'm not sure what the LEDs
+> > should indicate. But it feels like radio or assoc makes most sense, and
+> > follows what we can do with the BT led.
 > 
-> > Do you mean single-window mode? I don't see the difference to the other
-> > modes, but that's certainly fine with me if it helps.
+> this is in the 96boards 'specs' at [1], which states
 > 
-> I don't like having to assign windows per device, like I say it seems
-> like more work.
+> -
+> The User LEDs shall be directly programmable from the SoC.
+> 1. WiFi activity LED
+> 2. Bluetooth activity LED
+> -
+> 
+> [1] http://www.96boards.org/ce-specification
 
-Ok, but that's something else that can be implemented independently
-as I explained earlier: We currently rely on the windows to be assigned
-in the DT, but it's also possible to extend the mbus driver in a way
-that lets it pick its own windows in one way or another. It should
-not impact the binding for the SPI host controller in any way, the
-binding just describes how the internal addressing is wired up to
-the mbus in hardware, and the mbus driver takes care of mapping those
-into CPU addresses.
+Thanks Nico. I presume "activity" here means it should be off and blink
+upon data being transmitted in either direction?
 
-	Arnd
+Sounds like we need to plan some work to extend the existing triggers
+with a phyXactivity and hciX-activity.
+
+
+For now I think we should go with phy0assoc and hci-power though, so we
+have something related to WiFi and BT.
+
+Regards,
+Bjorn
