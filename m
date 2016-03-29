@@ -1,38 +1,26 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 29 Mar 2016 11:41:54 +0800
-Subject: [PATCH 1/4] ARM: dts: qcom: msm8974: Add USB gadget nodes
-In-Reply-To: <1459215159-2576-1-git-send-email-bjorn.andersson@linaro.org>
-Message-ID: <201603291144.YJ71a5us%fengguang.wu@intel.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 29 Mar 2016 13:10:33 +0900
+Subject: [PATCH 3/3] cpufreq: exynos: Use generic platdev driver
+In-Reply-To: <6cb29053bce7026dd9429326236a67c45e901c7b.1458801338.git.viresh.kumar@linaro.org>
+References: <cover.1458801338.git.viresh.kumar@linaro.org>
+ <6cb29053bce7026dd9429326236a67c45e901c7b.1458801338.git.viresh.kumar@linaro.org>
+Message-ID: <56FA0039.6030007@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+On 24.03.2016 15:40, Viresh Kumar wrote:
+> The cpufreq-dt-platdev driver supports creation of cpufreq-dt platform
+> device now, reuse that and remove similar code from platform code.
+> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+>  arch/arm/mach-exynos/exynos.c        | 25 -------------------------
+>  drivers/cpufreq/cpufreq-dt-platdev.c |  5 +++++
+>  2 files changed, 5 insertions(+), 25 deletions(-)
 
-[auto build test ERROR on v4.6-rc1]
-[also build test ERROR on next-20160329]
-[cannot apply to robh/for-next]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+Looks fine to me... except that it is a little bit outdated. Please
+rebase on v4.6-rc1 because Bartlomiej added support for cpufreq @Exynos542x.
 
-url:    https://github.com/0day-ci/linux/commits/Bjorn-Andersson/ARM-dts-qcom-msm8974-Add-USB-gadget-nodes/20160329-093758
-config: arm-multi_v7_defconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+Best regards,
 
-All errors (new ones prefixed by >>):
-
->> Error: arch/arm/boot/dts/qcom-msm8974.dtsi:510.19-20 syntax error
-   FATAL ERROR: Unable to parse input tree
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 37213 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160329/9864eb77/attachment-0001.obj>
+Krzysztof
