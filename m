@@ -1,61 +1,41 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 29 Mar 2016 12:04:34 +0200
-Subject: [PATCH] ARM: bcm2835: add CPU node for ARM core
-In-Reply-To: <20160329094158.GB26574@leverpostej>
-References: <1459182081-30819-1-git-send-email-stefan.wahren@i2se.com>
- <20160329094158.GB26574@leverpostej>
-Message-ID: <56FA5332.4050707@i2se.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 29 Mar 2016 12:07:56 +0200
+Subject: [linux-sunxi] [PATCH v3 08/19] ARM: sun5i: Add DRAM gates
+In-Reply-To: <CAGb2v66AV8FT7VLs-WV=QD-w-zYrOqgE--Gubq=+hnEUaqUH6g@mail.gmail.com>
+References: <1458751122-23976-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1458751122-23976-9-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v66AV8FT7VLs-WV=QD-w-zYrOqgE--Gubq=+hnEUaqUH6g@mail.gmail.com>
+Message-ID: <20160329100755.GK30977@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 29.03.2016 um 11:41 schrieb Mark Rutland:
-> On Mon, Mar 28, 2016 at 04:21:20PM +0000, Stefan Wahren wrote:
->> This patch adds the CPU node of the BCM2835 into the DT.
->>
->> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
->> ---
->>  arch/arm/boot/dts/bcm2835.dtsi |   11 +++++++++++
->>  1 file changed, 11 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
->> index b83b326..e87aba1 100644
->> --- a/arch/arm/boot/dts/bcm2835.dtsi
->> +++ b/arch/arm/boot/dts/bcm2835.dtsi
->> @@ -3,6 +3,17 @@
->>  / {
->>  	compatible = "brcm,bcm2835";
->>  
->> +	cpus {
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +
->> +		cpu at 0 {
->> +			device_type = "cpu";
->> +			compatible = "arm,arm1176jzf-s", "arm,arm1176";
->> +			reg = <0x0>;
->> +		};
->> +	};
-> Minor nit: the "arm,arm1176" fallback isn't documented, nor used
-> elsewhere, so it can/should be dropped.
+On Thu, Mar 24, 2016 at 12:31:13PM +0800, Chen-Yu Tsai wrote:
+> On Thu, Mar 24, 2016 at 12:38 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > The DRAM gates control whether the image / display devices on the SoC have
+> > access to the DRAM clock or not.
+> >
+> > Enable it.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> 
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
+> 
+> I assume you'll add another version for A10s, or move the whole thing
+> to sun5i.dtsi later?
 
-This fallback came from arch/arm/boot/dts/s3c64xx.dtsi
+Indeed.
 
-I will send a V2 without the fallback.
+Maxime
 
-Stefan
-
->
-> Otherwise, this looks fine per [1]. With the above change, feel free to
-> add my ack.
->
-> Mark.
->
-> [1] Documentation/devicetree/bindings/arm/cpus.txt
->
->> +
->>  	soc {
->>  		ranges = <0x7e000000 0x20000000 0x02000000>;
->>  		dma-ranges = <0x40000000 0x00000000 0x20000000>;
->> -- 
->> 1.7.9.5
->>
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160329/af9a1542/attachment.sig>
