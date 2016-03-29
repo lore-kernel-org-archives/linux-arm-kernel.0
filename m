@@ -1,47 +1,30 @@
-From: sw0312.kim@samsung.com (Seung-Woo Kim)
-Date: Tue, 29 Mar 2016 10:46:11 +0900
-Subject: [PATCH 0/3] drm/exynos: Kconfig dependency fixes
-In-Reply-To: <1459214937-18686-1-git-send-email-javier@osg.samsung.com>
-References: <1459214937-18686-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <56F9DE63.6050808@samsung.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 29 Mar 2016 10:48:22 +0900
+Subject: [PATCH v3 3/8] clk: samsung: exynos3250: Add MMC2 clock
+In-Reply-To: <56F87E83.7060100@samsung.com>
+References: <1458027490-13787-1-git-send-email-cw00.choi@samsung.com>
+ <1458027490-13787-4-git-send-email-cw00.choi@samsung.com>
+ <56F47ABC.7060006@samsung.com> <56F509E6.7080807@samsung.com>
+ <56F87E83.7060100@samsung.com>
+Message-ID: <56F9DEE6.8020203@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
-
-On 2016? 03? 29? 10:28, Javier Martinez Canillas wrote:
-> Hello Inki,
+On 28.03.2016 09:44, Chanwoo Choi wrote:
+> You mean that separate patch1 include only the new clock id about both UART2 and MMC2
+> and the patch2/patch3 just use the new clock id as following:
 > 
-> This patch series contains some fixes for the Kconfig symbol dependencies
-> of the Exynos DRM driver. They make sure that the Exynos DRM components
-> and the media platform drivers that makes use of the same HW IP block are
-> not enabled at the same time.
+> patch1 dt-bindings: Add the clock id of UART2 and MMC2 for Exynos3250
+> patch2 clk: samsung: exynos3250: Add UART2 clock
+> patch3 clk: samsung: exynos3250: Add MMC2 clock
 > 
-> Best regards,
-> Javier
-> 
-> 
-> Javier Martinez Canillas (3):
->   drm/exynos: Use VIDEO_SAMSUNG_S5P_G2D=n as G2D Kconfig dependency
->   drm/exynos: Use VIDEO_SAMSUNG_EXYNOS_GSC=n as GSC Kconfig dependency
->   drm/exynos: Make DRM_EXYNOS_FIMC depend on VIDEO_S5P_FIMC=n
+> As far as I understand it is that right?
+> If it is ok, I'll modify it on v4 patchset as you comment.
 
-In G2D case, there is only one instance, but for the other cases, there
-are several instances and in my environment, I enable both drivers on
-v4l2 and drm FIMC/GSC.
+Hi Sylwester and Tomasz,
 
-So, IMHO, the not-enabled v4l2 dependency is not really required for drm
-fimc and drm gsc.
+Can you provide me a tag with these exynos3250 clock patches (after
+posting v4)? Of course you can also ack/review them and then I'll handle it.
 
-Best Regards,
-- Seung-Woo Kim
-
-> 
->  drivers/gpu/drm/exynos/Kconfig | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-
--- 
-Seung-Woo Kim
-Samsung Software R&D Center
---
+BR,
+Krzysztof
