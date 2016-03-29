@@ -1,127 +1,32 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Tue, 29 Mar 2016 08:10:08 -0700
-Subject: [PATCH] i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity
-In-Reply-To: <5741237.2X2Q0sCFQj@wuerfel>
-References: <m3h9fuk7ik.fsf@t19.piap.pl> <23031613.R8qN30TbTq@wuerfel>
- <CAJ+vNU2BKLDREOWP8EWXZR43to10yw+qvKwv1MzS4a_L9n5ozg@mail.gmail.com>
- <5741237.2X2Q0sCFQj@wuerfel>
-Message-ID: <CAJ+vNU3kBk+J-hU1OWPOS6kbFq+J0zM9QpfVy4x1VXL3hgrMTg@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 29 Mar 2016 20:52:46 +0530
+Subject: [PATCH V2 3/3] cpufreq: exynos: Use generic platdev driver
+In-Reply-To: <3810049.oQlCXiQ5bk@wuerfel>
+References: <cover.1459233524.git.viresh.kumar@linaro.org>
+ <81a8da75a0e7783e2b47f9e04297f167e8134afe.1459233524.git.viresh.kumar@linaro.org>
+ <3810049.oQlCXiQ5bk@wuerfel>
+Message-ID: <CAKohpomQ9=YK79o0fqHqZ7xexHv5EMJSPx+4KrT0RxeMh+hwWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 29, 2016 at 7:50 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 29 March 2016 07:29:34 Tim Harvey wrote:
->> On Tue, Mar 29, 2016 at 6:52 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Tuesday 29 March 2016 06:32:29 Tim Harvey wrote:
+On 29 March 2016 at 20:34, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 29 March 2016 12:09:49 Viresh Kumar wrote:
+>> -static void __init exynos_cpufreq_init(void)
+>> -{
+>> -       struct device_node *root = of_find_node_by_path("/");
+>> -       const struct of_device_id *match;
+>> -
+>> -       match = of_match_node(exynos_cpufreq_matches, root);
+>> -       if (!match) {
+>> -               platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
+>> -               return;
+>> -       }
+>> -
+>> -       platform_device_register_simple(match->data, -1, NULL, 0);
+>> -}
 >
->> >> I think 31e98e0d24cd2537a63e06e235e050a06b175df7 "ARM:
->> >> imx_v6_v7_defconfig: enable PCI_MSI" should be reverted as well until
->> >> we figure this out.
->> >
->> > That doesn't sound like a helpful solution, multi_v7_defconfig for
->> > instance will still be broken because it enables PCI_MSI, and so
->> > will be all major distros.
->>
->> Arnd,
->>
->> True, but keep in mind that as far as I can tell this behavior has
->> been around since MSI was added to the IMX6 (breakage of devices that
->> use legacy irq's if MSI is enabled) which was in 3.16.
->
-> I see. This part wasn't clear to me.
->
->> > What happens if we patch the pci-imx6 driver to not make use of
->> > its MSI support even when that is enabled in the kernel? Does that
->> > get both devices in your GW5xxx to work with legacy interrupts or
->> > is one or both of them still broken?
->> >
->> >         Arnd
->> >
->> > diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
->> > index eb5a2755a164..d7607b2695c6 100644
->> > --- a/drivers/pci/host/pci-imx6.c
->> > +++ b/drivers/pci/host/pci-imx6.c
->> > @@ -470,7 +470,7 @@ static void imx6_pcie_host_init(struct pcie_port *pp)
->> >
->> >         imx6_pcie_establish_link(pp);
->> >
->> > -       if (IS_ENABLED(CONFIG_PCI_MSI))
->> > +       if (0 && IS_ENABLED(CONFIG_PCI_MSI))
->> >                 dw_pcie_msi_init(pp);
->> >  }
->> >
->> > @@ -490,7 +490,7 @@ static int __init imx6_add_pcie_port(struct pcie_port *pp,
->> >  {
->> >         int ret;
->> >
->> > -       if (IS_ENABLED(CONFIG_PCI_MSI)) {
->> > +       if (0 && IS_ENABLED(CONFIG_PCI_MSI)) {
->> >                 pp->msi_irq = platform_get_irq_byname(pdev, "msi");
->> >                 if (pp->msi_irq <= 0) {
->> >                         dev_err(&pdev->dev, "failed to get MSI irq\n");
->> >
->>
->> That is not enough - we would also need to disable a couple more in
->> the designware core that imx6 uses, which is also used by several
->> other SoC's. We should probably get some feedback from people with
->> those SoC's regarding MSI breaking legacy irqs.
->
-> Good point. I really just meant this as an experiment, trying to
-> figure out what causes it to break. I'd be surprised if the
-> MSI support in the generic pcie-designware driver caused the same
-> problem on the other SoCs.
->
->> PCI_MSI was enabled in imx_v6_v7_defconfig in 4.5 and enabled in
->> multi_v7_defconfig back in 3.16. PCI MSI was first introduced for the
->> IMX6 host controller in 3.16 as well. I verified that the same issue
->> exists all the way back to 3.16.
->
-> Thanks for doing that research.
->
->> I don't know if its worse to disable PCI MSI for IMX6/designware all
->> the way back to 3.16 or to disable it just back to 4.5 where imx_v6_v7
->> enabled it, or perhaps just figure out the actual issue and get that
->> backported?
->
-> I'd like to see the problem understood better before we talk about
-> backports.
->
-> One thing I just noticed is that the same GPC interrupt line (GIC_SPI
-> 120) is used for MSI and for IntD. Maybe there is something going on with
-> sharing an interrupt line between a nested irqchip and a device?
->
-> Could this be a bug in the generic IRQ handling code? Can you check
-> which interrupt the broken device(s) on your machine are using? Is
-> it always the 120 (IntD) line, or are the other three lines broken
-> as well? I don't actually know how to look it up, but the 'lspci -t'
-> output should let us reconstruct the swizzling manually.
->
->         Arnd
+> How is the "exynos-cpufreq" case handled now? Is that no longer used now?
+> I assume the patch is correct based on Krzysztof's review, but it might be
+> good to explain this better.
 
-Arnd,
-
-Right, on the IMX the MSI interrupt is GIC-120 which is also the
-legacy INTD and I do see that if I happen to put a radio in a slot
-where due to swizzling its pin1 becomes INTD (GIC-120) the interrupt
-does fire and the device works. Any other slot using GIC-123 (INTA),
-GIC-122 (INTB), or GIC-121 (INTC) never fires so its very possible
-that something in the designware core is masking out the legacy irqs.
-I would also think this was something IMX specific, but I really don't
-see any codepaths in pci-imx6.c that would cause that: a driver
-requesting a legacy PCI would get a GIC interrupt which is handled by
-the IMX6 gpc interrupt controller.
-
-Any dra7xxx, exynos, spear13xx, keystone, layerscape, hisi, qcom SoC
-users of designware PCIe core out there that can verify PCI MSI and
-legacy are both working at the same time?
-
-Lucas is the expert here and I believe he has the documentation for
-the designware core that Freescale doens't provide with the IMX6
-documentation so hopefully he can provide some insight. He's the one
-that has authored all the MSI support and has been using it.
-
-I typically advise our users to 'not' enable MSI because
-architecturally you can spread 4 distinct legacy irq's across CPU's
-better than a single shared irq.
-
-Tim
+That's stale code, the driver got removed some time back.
