@@ -1,139 +1,101 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 29 Mar 2016 15:43:06 +0100
-Subject: [RFC PATCH 2/3] ata: ahci-platform: Add ports-implemented dt
- bindings.
-In-Reply-To: <CAL_JsqLhSz1qWj01mAAg4X89hb4LnYB-CjJ2d1JW=jJw66Oq=g@mail.gmail.com>
-References: <1459257075-21393-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1459257075-21393-3-git-send-email-srinivas.kandagatla@linaro.org>
- <CAL_JsqLhSz1qWj01mAAg4X89hb4LnYB-CjJ2d1JW=jJw66Oq=g@mail.gmail.com>
-Message-ID: <56FA947A.5080806@linaro.org>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Tue, 29 Mar 2016 07:44:37 -0700
+Subject: [PATCH 11/12] ARM: dts: dragonboard-600c: add i2c support
+In-Reply-To: <1458762490-9814-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1458762366-9233-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1458762490-9814-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20160329144437.GN8929@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed 23 Mar 12:48 PDT 2016, Srinivas Kandagatla wrote:
 
+> This patch adds nodes required to enable 4 i2c buses on the board which
+> are connected to various sensors and eeprom.
+> 
 
-On 29/03/16 15:11, Rob Herring wrote:
-> On Tue, Mar 29, 2016 at 8:11 AM, Srinivas Kandagatla
-> <srinivas.kandagatla@linaro.org> wrote:
->> On some SOCs PORTS_IMPL register value is never programmed by the BIOS
->
-> s/BIOS/firmware/
-BIOS is the word used in the AHCI SPECS so want to stick to this.
->
-> You do plan to fix this in your firmware/bootloader, too, right?
+I would like for the pinconf for these blocks to be in this patch (and
+file) to make it clear how they are configured and where to change them.
 
-No. This feature was working just before v4.5, we have no plans to fix 
-this in firmware as of today.
->
->> and left at zero value. Which means that no sata ports are avaiable for
->> software. AHCI driver used to cope up with this by fabricating the
->> port_map if the PORTS_IMPL register is read zero, but recent patch
->> broke this workaround as zero value was valid for nvme disks.
->
-> s/nvme/NVMe/
+Regards,
+Bjorn
 
-Yep, will fix it.
->
->>
->> This patch adds ports-implemented dt bindings as workaround for this issue
->
-> s/dt/DT/
-Ok, will fix it.
-
->
->> in a way that DT can dictate the port_map incase where the SOCs does not
->> program it already.
->
-> port_map is a Linux term.
-Yes, I can rephrase it to ports implemented.
->
-> ...can override the PORTS_IMPL register in cases where the firmware
-> did not program it already.
->
->>
->> Fixes: 566d1827df2e ("libata: disable forced PORTS_IMPL for >= AHCI 1.3)
->> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->> ---
->>   Documentation/devicetree/bindings/ata/ahci-platform.txt | 11 +++++++++++
->>   drivers/ata/ahci_platform.c                             |  4 ++++
->>   2 files changed, 15 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
->> index 30df832..8165db3 100644
->> --- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
->> +++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
->> @@ -32,6 +32,10 @@ Optional properties:
->>   - target-supply     : regulator for SATA target power
->>   - phys              : reference to the SATA PHY node
->>   - phy-names         : must be "sata-phy"
->> +- ports-implemented : Mask that indicates which ports that the HBA supports
->> +                     are available for software to use. Useful if PORTS_IMPL
->> +                     is not programmed by the BIOS, which is true with
->> +                     some embedded SOC's.
->>
->>   Required properties when using sub-nodes:
->>   - #address-cells    : number of cells to encode an address
->> @@ -59,6 +63,13 @@ Examples:
->>                  target-supply = <&reg_ahci_5v>;
->>          };
->>
->> +       sata0: sata at 29000000 { /* Qualcomm APQ8064 */
->
-> Do you really need another example just for this?
->
->> +               compatible = "generic-ahci";
->
-> Where's your chip specific compatible string? You would not require a
-> DT update to fix this if you had that.
-
-Possibly, But we really are not doing anything specific in the ahci 
-driver which is not generic, that might be the reason why we skipped 
-this in the first place.
-
-I agree we could solve this issue in more than one way, The only 
-advantage of this new bindings would be to other platforms benefiting 
-from this workaround would not have to keep adding a new compatible 
-string into the ahci-platform driver.
-
-Like Annapurna Alpine platform seems to have the same issue.
-
-Am ok to do it either way.
-
-
-thanks,
-srini
-
->
->> +               reg = <0x29000000 0x180>;
->> +               interrupts = <GIC_SPI 209 IRQ_TYPE_NONE>;
->> +               ports-implemented = <0x1>;
->> +       };
->> +
->>   With sub-nodes:
->>          sata at f7e90000 {
->>                  compatible = "marvell,berlin2q-achi", "generic-ahci";
->> diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
->> index 4044233..ec8db80 100644
->> --- a/drivers/ata/ahci_platform.c
->> +++ b/drivers/ata/ahci_platform.c
->> @@ -42,6 +42,7 @@ static int ahci_probe(struct platform_device *pdev)
->>          struct device *dev = &pdev->dev;
->>          struct ahci_host_priv *hpriv;
->>          int rc;
->> +       u32 ports_impl;
->>
->>          hpriv = ahci_platform_get_resources(pdev);
->>          if (IS_ERR(hpriv))
->> @@ -51,6 +52,9 @@ static int ahci_probe(struct platform_device *pdev)
->>          if (rc)
->>                  return rc;
->>
->> +       of_property_read_u32(dev->of_node,
->> +                            "ports-implemented", &hpriv->force_port_map);
->> +
->>          if (of_device_is_compatible(dev->of_node, "hisilicon,hisi-ahci"))
->>                  hpriv->flags |= AHCI_HFLAG_NO_FBS | AHCI_HFLAG_NO_NCQ;
->>
->> --
->> 2.5.0
->>
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> ---
+>  .../arm/boot/dts/qcom-apq8064-dragonboard-600c.dts | 46 ++++++++++++++++++++++
+>  1 file changed, 46 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts b/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
+> index 4fecd94..942de04 100644
+> --- a/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
+> +++ b/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
+> @@ -8,6 +8,10 @@
+>  	aliases {
+>  		serial0 = &gsbi7_serial;
+>  		serial1 = &gsbi1_serial;
+> +		i2c0 = &gsbi2_i2c;
+> +		i2c1 = &gsbi3_i2c;
+> +		i2c2 = &gsbi4_i2c;
+> +		i2c3 = &gsbi7_i2c;
+>  	};
+>  
+>  	regulators {
+> @@ -180,6 +184,42 @@
+>  			};
+>  		};
+>  
+> +		gsbi at 12480000 {
+> +			status = "okay";
+> +			qcom,mode = <GSBI_PROT_I2C>;
+> +			i2c at 124a0000 {
+> +				/* On Low speed expansion and Sensors */
+> +				label = "LS-I2C0";
+> +				status = "okay";
+> +			};
+> +		};
+> +
+> +		gsbi at 16200000 {
+> +			status = "okay";
+> +			qcom,mode = <GSBI_PROT_I2C>;
+> +			i2c at 16280000 {
+> +			/* On Low speed expansion */
+> +				status = "okay";
+> +				label = "LS-I2C1";
+> +				clock-frequency = <200000>;
+> +				eeprom at 52 {
+> +					compatible = "atmel,24c128";
+> +					reg = <0x52>;
+> +					pagesize = <64>;
+> +				};
+> +			};
+> +		};
+> +
+> +		gsbi at 16300000 {
+> +			status = "okay";
+> +			qcom,mode = <GSBI_PROT_I2C>;
+> +			i2c at 16380000 {
+> +				/* On High speed expansion */
+> +				label = "HS-CAM-I2C3";
+> +				status = "okay";
+> +			};
+> +		};
+> +
+>  		/* DEBUG UART  */
+>  		gsbi at 16600000 {
+>  			status = "okay";
+> @@ -190,6 +230,12 @@
+>  				pinctrl-names = "default";
+>  				pinctrl-0 = <&gsbi7_uart_2pins>;
+>  			};
+> +
+> +			i2c at 16680000 {
+> +				/* On High speed expansion */
+> +				status = "okay";
+> +				label = "HS-CAM-I2C2";
+> +			};
+>  		};
+>  
+>  		leds {
+> -- 
+> 2.5.0
+> 
