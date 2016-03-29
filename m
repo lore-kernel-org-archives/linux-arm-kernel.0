@@ -1,57 +1,82 @@
-From: jonas.rabenstein@studium.uni-erlangen.de (Jonas Rabenstein)
-Date: Tue, 29 Mar 2016 09:37:51 +0200
-Subject: [PATCH] arm: remove tautologic #ifdefs in proc-v7-3level.S
-Message-ID: <1459237071-13842-1-git-send-email-jonas.rabenstein@studium.uni-erlangen.de>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue, 29 Mar 2016 00:39:03 -0700
+Subject: [PATCH v2 6/8] drm/fsl-dcu: add TCON driver
+In-Reply-To: <3752084.bcROvR6fvG@ws-stein>
+References: <1459216802-32094-1-git-send-email-stefan@agner.ch>
+ <2234894.ri36D5MRrN@ws-stein> <57c86de8eca0aa16a5cdfc488977ca4e@agner.ch>
+ <3752084.bcROvR6fvG@ws-stein>
+Message-ID: <154ce63f6767c2fc6f15e2486c0753c1@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The file arch/arm/mm/proc-v7-3level.S is only used by the #include
-directive in arch/arm/mm/proc-v7.S:23. This #include is conditional and
-depends on  CONFIG_ARM_LPAE (otherwise proc-v7-2level.S is used).
-CONFIG_ARM_LPAE has a dependency on CONFIG_MMU defined in Kconfig.
-Consequently, checks for CONFIG_MMU in proc-v7-3level.S are superfluous.
+On 2016-03-29 00:26, Alexander Stein wrote:
+> On Tuesday 29 March 2016 00:11:13, Stefan Agner wrote:
+>> >> --- a/Documentation/devicetree/bindings/display/fsl,dcu.txt
+>> >> +++ b/Documentation/devicetree/bindings/display/fsl,dcu.txt
+>> >>
+>> >> @@ -14,6 +14,7 @@ Required properties:
+>> >>  Optional properties:
+>> >>  - clocks:		Second handle for pixel clock.
+>> >>  - clock-names:		Second name "pix" for pixel clock.
+>> >>
+>> >> +- fsl,tcon:		The phandle to the timing controller node.
+>> >
+>> > Maybe a comment this is (currently) only for Vybrid, but not LS1021A.
+>>
+>> IMHO, such references to SoCs in a peripheral binding is somewhat
+>> misplaced. If we would start doing this, we would end up in lots of SoC
+>> references, and nobody knows whether they are actually accurate and up
+>> to date... And I think we should add tcon to LS1021a, more on that
+>> below...
+> 
+> Well, I don't mind after all.
+> 
+>> >> --- /dev/null
+>> >> +++ b/drivers/gpu/drm/fsl-dcu/fsl_tcon.c
+>> >> [...]
+>> >> +struct fsl_tcon *fsl_tcon_init(struct device *dev)
+>> >> +{
+>> >> +	struct fsl_tcon *tcon;
+>> >> +	struct device_node *np;
+>> >> +	int ret;
+>> >> +
+>> >> +	tcon = devm_kzalloc(dev, sizeof(*tcon), GFP_KERNEL);
+>> >> +	if (!tcon)
+>> >> +		return NULL;
+>> >> +
+>> >> +	np = of_parse_phandle(dev->of_node, "fsl,tcon", 0);
+>> >> +	if (!np) {
+>> >> +		dev_warn(dev, "Couldn't find the tcon node\n");
+>> >> +		return NULL;
+>> >> +	}
+>> >
+>> > Maybe check for device tree node before allocating struct fsl_tcon? Also
+>> > this should not be a warning, as on LS1021A this is to be expected.
+>>
+>> Agreed, definitely the smarter sequence.
+>>
+>> Afact LS1021a has also a TCON. At least in Jianwei Wangs initial patches
+>> it was part of the driver, see:
+>> https://lkml.org/lkml/2015/7/13/242
+>>
+>> Not sure how that driver can work without TCON support on LS1021a, maybe
+>> the bootloader sets the TCON to bypass?
+>>
+>> Since I do not have a LS1021a, I hesitated to just add it to the LS1021s
+>> dt's, but it should be fairly straight forward.
+> 
+> Interesting, but in Patch 3
+> (https://lists.freedesktop.org/archives/dri-devel/2015-July/086381.html)
+> no TCON node is added and using is still
+> optional. Yet, I don't find any TCON hardware in the LS1021A reference manual, 
+> e.g. in the memory map. I hard guess is that it doesn't require/use one. 
+> Without memory address it would be pretty hard to add one.
 
-Signed-off-by: Jonas Rabenstein <jonas.rabenstein@studium.uni-erlangen.de>
----
- I detected the issue with chimaera, a tool I currently develop for my bachelor
- thesis extending the undertaker tool suite (https://undertaker.cs.fau.de).
+Ok, maybe I am completely wrong on that. I thought I have seen it...
 
- arch/arm/mm/proc-v7-3level.S | 4 ----
- 1 file changed, 4 deletions(-)
+It could be that Jianwei added TCON support for Vybrid only, in this
+case I agree there shouldn't be a warning if TCON is missing. Maybe even
+the other way around, write a info message in case TCON has been found.
 
-diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
-index 5e5720e..6903f34 100644
---- a/arch/arm/mm/proc-v7-3level.S
-+++ b/arch/arm/mm/proc-v7-3level.S
-@@ -55,13 +55,11 @@
-  * the new TTB).
-  */
- ENTRY(cpu_v7_switch_mm)
--#ifdef CONFIG_MMU
- 	mmid	r2, r2
- 	asid	r2, r2
- 	orr	rpgdh, rpgdh, r2, lsl #(48 - 32)	@ upper 32-bits of pgd
- 	mcrr	p15, 0, rpgdl, rpgdh, c2		@ set TTB 0
- 	isb
--#endif
- 	ret	lr
- ENDPROC(cpu_v7_switch_mm)
- 
-@@ -81,7 +79,6 @@ ENDPROC(cpu_v7_switch_mm)
-  * - pte - PTE value to store (64-bit in r2 and r3)
-  */
- ENTRY(cpu_v7_set_pte_ext)
--#ifdef CONFIG_MMU
- 	tst	rl, #L_PTE_VALID
- 	beq	1f
- 	tst	rh, #1 << (57 - 32)		@ L_PTE_NONE
-@@ -97,7 +94,6 @@ ENTRY(cpu_v7_set_pte_ext)
- 1:	strd	r2, r3, [r0]
- 	ALT_SMP(W(nop))
- 	ALT_UP (mcr	p15, 0, r0, c7, c10, 1)		@ flush_pte
--#endif
- 	ret	lr
- ENDPROC(cpu_v7_set_pte_ext)
- 
--- 
-2.7.3
+--
+Stefan
