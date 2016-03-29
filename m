@@ -1,61 +1,64 @@
-From: pc.liao@mediatek.com (PC Liao)
-Date: Tue, 29 Mar 2016 21:28:23 +0800
-Subject: [PATCH] ASoC: mediatek: Add second I2S on mt8173-rt5650 machine
- driver
-In-Reply-To: <20160328191115.GE2350@sirena.org.uk>
-References: <1458877325-33980-1-git-send-email-pc.liao@mediatek.com>
- <20160328191115.GE2350@sirena.org.uk>
-Message-ID: <1459258103.3747.7.camel@mtksdaap41>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Tue, 29 Mar 2016 14:30:03 +0100
+Subject: [PATCH 10/12] ARM: dts: dragonboard-600c: Add on board leds
+ support
+In-Reply-To: <CAP71WjzdDRqtS4oJu_m_Y9kuZ4QprYnqMHop=5a6Vc6yypakhA@mail.gmail.com>
+References: <1458762366-9233-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1458762484-9768-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <CAP71WjzdDRqtS4oJu_m_Y9kuZ4QprYnqMHop=5a6Vc6yypakhA@mail.gmail.com>
+Message-ID: <56FA835B.3080909@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Thanks Nico,
 
-On Tue, 2016-03-29 at 03:11 +0800, Mark Brown wrote:
-> On Fri, Mar 25, 2016 at 11:42:05AM +0800, PC Liao wrote:
-> 
-> > +Optional properties:
-> > +- mediatek,rt5650_i2s: I2S mode of rt5650
-> > +  0: using I2S1 on rt5650 for record
-> > +  1: using I2S2 on rt5650 for record
-> > +
-> 
-> I would expect the machine driver to have a reference to the DAI that is
-> in use rather than a property like this.  This is the way pretty much
-> all DT based machine drivers work...
+On 24/03/16 16:51, Nicolas Dechesne wrote:
+> On Wed, Mar 23, 2016 at 8:48 PM, Srinivas Kandagatla
+> <srinivas.kandagatla@linaro.org> wrote:
+>> +                       led at 1 {
+>> +                               label = "dragonboard-600c:green:user1";
+>> +                               gpios = <&tlmm_pinmux 3 GPIO_ACTIVE_HIGH>;
+>> +                               linux,default-trigger = "heartbeat";
+>> +                               default-state = "off";
+>> +                       };
+>> +
+>> +                       led at 2 {
+>> +                               label = "dragonboard-600c:green:user2";
+>> +                               gpios = <&tlmm_pinmux 7 GPIO_ACTIVE_HIGH>;
+>> +                               linux,default-trigger = "mmc0";
+>> +                               default-state = "off";
+>> +                       };
+>> +
+>> +                       led at 3 {
+>> +                               label = "dragonboard-600c:green:user3";
+>> +                               gpios = <&tlmm_pinmux 10 GPIO_ACTIVE_HIGH>;
+>> +                               linux,default-trigger = "mmc1";
+>> +                               default-state = "off";
+>> +                       };
+>> +
+>> +                       led at 4 {
+>> +                               label = "apq8016-sbc:green:user4";
+>
+> typo ^^
+>
+Yep, Will fix this.
+>> +                               gpios = <&tlmm_pinmux 11 GPIO_ACTIVE_HIGH>;
+>> +                               linux,default-trigger = "none";
+>> +                               default-state = "off";
+>> +                       };
+>
+> also, if i read the 96boards specs correctly, the LED are labeled
+> 3-2-1-0 , if you look at the board with the LEDs on the bottom. With
+> this DT config, you end up with 0-1-2-3 instead.
+>
+> also, they should be labeled 0 to 3, not 1 to 4.
 
-Thanks for comment.
-I think I need to comment more clearly.
-This setting is different connection from MT8173 to rt5650 on hardware.
+I agree Will fix it. The structure was copied from the 8016.
 
-- mediatek,rt5650_i2s: I2S mode of rt5650
-0: Default setting. Playback and record path use same set of I2S.
-Playback/Record path using same I2S clock connect from MT8173 I2S1 to
-rt5650 I2S1.
-1: Playback and record path use different set of I2S. Playback path
-connects from MT8173 I2S1 to rt5650 I2S1 and record path connects from
-MT8173 I2S2 to rt5650 I2S2.
+Its strange that DB410c LEDS labels on the board are from 1 to 4 rather 
+than 0 to 3, on the other hand DB600c does not have any labels as such.
 
-Because we use codec ASRC function and need to initialize on different
-setting about this parts:
-+	switch (mt8173_rt5650_priv.rt5650_i2s) {
-+	case MT8173_RT5650_I2S1:
-+		rt5645_sel_asrc_clk_src(codec,
-+					RT5645_DA_STEREO_FILTER |
-+					RT5645_AD_STEREO_FILTER,
-+					RT5645_CLK_SEL_I2S1_ASRC);
-+		break;
-+	case MT8173_RT5650_I2S2:
-+		rt5645_sel_asrc_clk_src(codec,
-+					RT5645_DA_STEREO_FILTER,
-+					RT5645_CLK_SEL_I2S1_ASRC);
-+		rt5645_sel_asrc_clk_src(codec,
-+					RT5645_AD_STEREO_FILTER,
-+					RT5645_CLK_SEL_I2S2_ASRC);
-+		break;
-+	default:
-+		break;
-+	}
-, we use device tree to determine which connection we choose.
-Does this explain can be accepted?
-Thanks!
+For Now I can change DB600c to start with 0 rather than 1.
+
+
+>
