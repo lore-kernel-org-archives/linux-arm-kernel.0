@@ -1,8 +1,8 @@
 From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
-Date: Tue, 29 Mar 2016 07:29:33 +0200
+Date: Tue, 29 Mar 2016 07:40:19 +0200
 Subject: [PATCH] i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity
-In-Reply-To: <CAJ+vNU2ST=XG5H04-OCwpHgcvkoXOQw8F3MjXhJmWhBUbxWE-g@mail.gmail.com>
- (Tim Harvey's message of "Mon, 28 Mar 2016 15:06:53 -0700")
+In-Reply-To: <CAOMZO5DwuBcpL85GYjTV9yy_ZZB33PDY3TfzwkS1WK03hfkhqg@mail.gmail.com>
+ (Fabio Estevam's message of "Mon, 28 Mar 2016 19:13:18 -0300")
 References: <m3h9fuk7ik.fsf@t19.piap.pl>
  <CAOMZO5DcZCxoLPeGRWSGkstm7F3eN-Q-yJyf6ktMTda2zLviag@mail.gmail.com>
  <CAOMZO5B8Lzn-E4YOeYxVtN5PN11aOvZHn4eU0ixkdV8CO8+xYw@mail.gmail.com>
@@ -11,30 +11,31 @@ References: <m3h9fuk7ik.fsf@t19.piap.pl>
  <CAJ+vNU1_YqvWQkmuDB7r8z77iZJS6pP4Mr+j9yW4sFLAeJXQDw@mail.gmail.com>
  <CAOMZO5A2osG3=mTaCayYfMokUj-vT+Udq9ckq45b1yaUP9Tn3g@mail.gmail.com>
  <CAJ+vNU2ST=XG5H04-OCwpHgcvkoXOQw8F3MjXhJmWhBUbxWE-g@mail.gmail.com>
-Message-ID: <m360w5kg1u.fsf@t19.piap.pl>
+ <CAOMZO5DwuBcpL85GYjTV9yy_ZZB33PDY3TfzwkS1WK03hfkhqg@mail.gmail.com>
+Message-ID: <m31t6tkfjw.fsf@t19.piap.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tim Harvey <tharvey@gateworks.com> writes:
+Fabio Estevam <festevam@gmail.com> writes:
 
-> It's not too easy to tell how many IMX6 boards incorrectly specify
-> their reset-gpio polarity. I don't know what the best way to determine
-> what boards use the IMX6 pcie host controller. Is there a dtc usage
-> that will display the compiled dtb's then we grep out 'compatible =
-> "fsl,imx6q-pcie"' to at least get the list of boards to inspect? I'm
-> curious if its just one or two boards that incorrectly specify the
-> polarity of their PCI reset.
+> In order to keep old dtb's working we should simply ignore the GPIO
+> flags passed in the 'reset-gpio' property.
+>
+> That's why we need a revert. Just sent a v2, BTW.
 
-I guess, maybe 8 of them. Not counting those with out-of-tree DTS/DTB
-files.
+OTOH, we should fix it some day, making sure the DTS files are fixed
+first:
 
-Something like:
-$ grep reset-gpio arch/arm/boot/dts/imx6* | grep -v phy-reset
+imx6qdl-apf6dev.dtsi:       reset-gpio = <&gpio6 2 GPIO_ACTIVE_HIGH>;
+imx6qdl-aristainetos2.dtsi: reset-gpio = <&gpio2 16 GPIO_ACTIVE_HIGH>;
+imx6qdl-hummingboard.dtsi:  reset-gpio = <&gpio3 4 0>; (I think RMK already handles this)
+imx6qdl-phytec-pfla02.dtsi: reset-gpio = <&gpio4 17 0>;
+imx6qdl-sabresd.dtsi:       reset-gpio = <&gpio7 12 0>;
+imx6q-dmo-edmqmx6.dts:      reset-gpio = <&gpio4 8 0>;
+imx6q-novena.dts:           reset-gpio = <&gpio3 29 GPIO_ACTIVE_HIGH>;
+imx6q-tbs2910.dts:          reset-gpio = <&gpio7 12 GPIO_ACTIVE_HIGH>;
 
-> I figured out it was the change to enable CONFIG_PCI_MSI in v4.5 that
-> is causing interrupts to fail for me.
-
-Right, a long standing issue. MSI never worked for me on i.MX6.
+The original patch was a bad implementation of a good idea.
 -- 
 Krzysztof Halasa
 
