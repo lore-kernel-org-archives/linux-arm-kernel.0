@@ -1,30 +1,133 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 29 Mar 2016 16:39:13 +0200
-Subject: [PATCH v4 9/9] clocksource: arm_arch_timer: Remove
- arch_timer_get_timecounter
-In-Reply-To: <1458842023-31853-10-git-send-email-julien.grall@arm.com>
-References: <1458842023-31853-1-git-send-email-julien.grall@arm.com>
- <1458842023-31853-10-git-send-email-julien.grall@arm.com>
-Message-ID: <56FA9391.1040007@linaro.org>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Tue, 29 Mar 2016 07:39:17 -0700
+Subject: [PATCH 07/12] ARM: dts: dragonboard-600c: add usb support
+In-Reply-To: <1458762465-9630-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1458762366-9233-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1458762465-9630-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20160329143917.GK8929@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/24/2016 06:53 PM, Julien Grall wrote:
-> The only call of arch_timer_get_timecounter (in KVM) has been removed.
->
-> Signed-off-by: Julien Grall <julien.grall@arm.com>
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+On Wed 23 Mar 12:47 PDT 2016, Srinivas Kandagatla wrote:
 
-Hi Julien,
+> This patch adds usb host and otg support on board with required
+> regulators.
+> 
 
-do you want me to take this patch through my tree ?
+Please fold the regulators into the regulator patch instead.
 
-   -- Daniel
+For the rest:
 
+Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+Regards,
+Bjorn
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> ---
+>  .../arm/boot/dts/qcom-apq8064-dragonboard-600c.dts | 64 ++++++++++++++++++++++
+>  1 file changed, 64 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts b/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
+> index a977314..5374510 100644
+> --- a/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
+> +++ b/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
+> @@ -60,6 +60,12 @@
+>  					bias-pull-down;
+>  				};
+>  
+> +				s3 {
+> +					regulator-min-microvolt = <1000000>;
+> +					regulator-max-microvolt = <1400000>;
+> +					qcom,switch-mode-frequency = <4800000>;
+> +				};
+> +
+>  				s4 {
+>  					regulator-min-microvolt	= <1800000>;
+>  					regulator-max-microvolt	= <1800000>;
+> @@ -74,6 +80,18 @@
+>  					qcom,switch-mode-frequency = <3200000>;
+>  				 };
+>  
+> +				l3 {
+> +					regulator-min-microvolt = <3050000>;
+> +					regulator-max-microvolt = <3300000>;
+> +					bias-pull-down;
+> +				};
+> +
+> +				l4 {
+> +					regulator-min-microvolt = <1000000>;
+> +					regulator-max-microvolt = <1800000>;
+> +					bias-pull-down;
+> +				};
+> +
+>  				l5 {
+>  					regulator-min-microvolt = <2750000>;
+>  					regulator-max-microvolt = <3000000>;
+> @@ -85,6 +103,12 @@
+>  					regulator-max-microvolt = <2950000>;
+>  					bias-pull-down;
+>  				};
+> +
+> +				l23 {
+> +					regulator-min-microvolt = <1700000>;
+> +					regulator-max-microvolt = <1900000>;
+> +					bias-pull-down;
+> +				};
+>  			};
+>  		};
+>  
+> @@ -111,6 +135,46 @@
+>  			};
+>  		};
+>  
+> +		/* OTG */
+> +		phy at 12500000 {
+> +			status		= "okay";
+> +			dr_mode		= "peripheral";
+> +			vddcx-supply	= <&pm8921_s3>;
+> +			v3p3-supply	= <&pm8921_l3>;
+> +			v1p8-supply	= <&pm8921_l4>;
+> +		};
+> +
+> +		phy at 12520000 {
+> +			status		= "okay";
+> +			vddcx-supply	= <&pm8921_s3>;
+> +			v3p3-supply	= <&pm8921_l3>;
+> +			v1p8-supply	= <&pm8921_l23>;
+> +		};
+> +
+> +		phy at 12530000 {
+> +			status		= "okay";
+> +			vddcx-supply	= <&pm8921_s3>;
+> +			v3p3-supply	= <&pm8921_l3>;
+> +			v1p8-supply	= <&pm8921_l23>;
+> +		};
+> +
+> +		gadget at 12500000 {
+> +			status = "okay";
+> +		};
+> +
+> +		/* OTG */
+> +		usb at 12500000 {
+> +			status = "okay";
+> +		};
+> +
+> +		usb at 12520000 {
+> +			status = "okay";
+> +		};
+> +
+> +		usb at 12530000 {
+> +			status = "okay";
+> +		};
+> +
+>  		amba {
+>  			/* eMMC */
+>  			sdcc at 12400000 {
+> -- 
+> 2.5.0
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
