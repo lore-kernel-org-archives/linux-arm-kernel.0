@@ -1,65 +1,94 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 29 Mar 2016 11:38:27 +0200
-Subject: [PATCH] clk: sunxi: Accept a greater rate when setting a parent
- clock
-In-Reply-To: <20160321092549.4e6245e4f02839e29aeb86a9@free.fr>
-References: <20160310081658.B749246B@mail.free-electrons.com>
- <20160321072546.GT30977@lukather>
- <20160321092549.4e6245e4f02839e29aeb86a9@free.fr>
-Message-ID: <20160329093827.GH30977@lukather>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Tue, 29 Mar 2016 17:38:49 +0800
+Subject: [RESEND PATCH v4 1/5] clocksource: move some enums and marcos to
+ header file for arm_arch_timer
+In-Reply-To: <alpine.DEB.2.11.1603181016560.3978@nanos>
+References: <1458288053-29031-1-git-send-email-fu.wei@linaro.org>
+ <1458288053-29031-2-git-send-email-fu.wei@linaro.org>
+ <alpine.DEB.2.11.1603181016560.3978@nanos>
+Message-ID: <CADyBb7tZ5UDGoZw1C1Db5r4UTSXCTrdeJEAaXVWSMY7qbD9TFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Thomas,
 
-On Mon, Mar 21, 2016 at 09:25:49AM +0100, Jean-Francois Moine wrote:
-> On Mon, 21 Mar 2016 08:25:46 +0100
-> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> 
-> > > -	/* find the parent that can help provide the fastest rate <= rate */
-> > > +	/* find the parent that can help provide the fastest rate */
-> > >  	num_parents = clk_hw_get_num_parents(hw);
-> > >  	for (i = 0; i < num_parents; i++) {
-> > >  		parent = clk_hw_get_parent_by_index(hw, i);
-> > > @@ -100,7 +100,7 @@ static int clk_factors_determine_rate(struct clk_hw *hw,
-> > >  		child_rate = clk_factors_round_rate(hw, req->rate,
-> > >  						    &parent_rate);
-> > >  
-> > > -		if (child_rate <= req->rate && child_rate > best_child_rate) {
-> > > +		if (child_rate > best_child_rate) {
-> > 
-> > I'm not sure this would work, since you'll end up picking the fastest
-> > rate without considering whether it is the closest or not.
-> > 
-> > I guess what you want here is using the absolute difference between
-> > the requested rate and the rate you're evaluating.
-> > 
-> > That being said, we had a similar discussion for SPI around a month
-> > ago where we wanted a rate strictly lower than the requested one. I
-> > guess it's time to add a flag to tell how you want to round.
-> 
-> You are right, I just removed half of the constraint, but I still wonder
-> why does this sequence introduced by the commit 862b728387aef3a37
-> (clk: sunxi: factors: automatic reparenting support) do
-> 	"provide the fastest rate <= rate"
-> instead of
-> 	"provide the closest rate" ?
+On 18 March 2016 at 17:27, Thomas Gleixner <tglx@linutronix.de> wrote:
+> On Fri, 18 Mar 2016, fu.wei at linaro.org wrote:
+>
+> Subject: clocksource: move some enums and marcos to header file for arm_arch_timer
+>
+> That sucks.
+>
+> 1) The prefix is crap. It suggests this is about the generic clocksource code
+>
+>    clocksource/drivers/arm_arch_timer:
+>
+>    Is the proper prefix
+>
+> 2) Sentences start with upper case letters
+>
+> 3) What exactly are 'marcos' ?
+>
+> So a useful subject line would be;
+>
+> clocksource/drivers/arm_arch_timer: Move enums and defines to header file
+>
+>> From: Fu Wei <fu.wei@linaro.org>
+>>
+>> The patch sorts out the code for arm_arch_timer:
+>
+> What does it sort out? Nothing, AFAICT.
+>
+> You miss to explain WHY you are doing this. The list below is completely
+> useless because one can see that from the patch.
+>
+> So this wants to be something like this:
+>
+> To support the arm_arch_timer via ACPI we need to share defines and enums
+> between the driver and the ACPI parser code.
+>
+> Split out the relevant defines and enums into arm_arch_timer.h. No functional
+> change.
+>
+>>     (1)move enum ppi_nr to the header file
+>>     (2)move "ARCH_*_TIMER" marcos to the header file
+>>     (3)add enum spi_nr in the header file, and use it in the driver
+>>     (4)add ARCH_WD_TIMER and ARCH_TIMER_MEM_MAX_FRAME marcos
+>
+> So this does 3 things at once.
+>
+>    1) Move existing defines and enums
+>
+>    2) Add a new enum and convert the driver to use it
+>
+>    3) Add new defines without using them
+>
+> So this needs to be seperate
+>
+>    #1) This patch
+>
+>    #2) Seperate patch which adds the new enum and converts the places in the
+>        driver
+>
+>    #3) This needs to go into the patch which actually uses the defines.
 
-I guess it's a confusing wording, in this case where you try to have
-the closest rate but below the requested rate, what you want is
-actually the fastest rate that doesn't trip above the requested rate,
-hence the comment I guess.
+Great thanks , will fix these following your suggestion :-)
 
-Maxime
+>
+> Thanks,
+>
+>         tglx
+
+
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160329/6c5ef873/attachment.sig>
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat Software (Beijing) Co.,Ltd.Shanghai Branch
+Ph: +86 21 61221326(direct)
+Ph: +86 186 2020 4684 (mobile)
+Room 1512, Regus One Corporate Avenue,Level 15,
+One Corporate Avenue,222 Hubin Road,Huangpu District,
+Shanghai,China 200021
