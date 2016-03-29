@@ -1,59 +1,34 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Tue, 29 Mar 2016 12:11:21 -0700
-Subject: [PATCH] arm64: dts: apm: Fix compatible string for X-Gene 2 SATA
- controller DTS node
-In-Reply-To: <1459245294-22678-1-git-send-email-rsahu@apm.com>
-References: <1459245294-22678-1-git-send-email-rsahu@apm.com>
-Message-ID: <CADaLNDnU7UJOOFs9euPP035iJX5b1-p7jLoKB5f0Sn==Ec3sYA@mail.gmail.com>
+From: wpdster@gmail.com (Patrick Doyle)
+Date: Tue, 29 Mar 2016 15:18:08 -0400
+Subject: Bad mode in undefined instruction handler detected
+In-Reply-To: <20160329182922.GC19428@n2100.arm.linux.org.uk>
+References: <CAF_dkJBa3Y1EZGduZyjWqV3p5s7zf+Y4ppdeKW8anhd5nkjOPg@mail.gmail.com>
+ <20160329165940.GA19428@n2100.arm.linux.org.uk>
+ <CAF_dkJA=4iqD=siV5RM7KTDfEQGtKc3G17E+C+K+-_hmneK4aA@mail.gmail.com>
+ <20160329182922.GC19428@n2100.arm.linux.org.uk>
+Message-ID: <CAF_dkJBR+n-ijE2YBmt3KR=B3VOkh4mu-d5YiXNDDCVihkgH6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 29, 2016 at 2:54 AM, Rameshwar Prasad Sahu <rsahu@apm.com> wrote:
-> Fix X-Gene SATA controller compatible string for Merlin board.
+On Tue, Mar 29, 2016 at 2:29 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> THUMB2_KERNEL is an option, which I believe you already have disabled.
+> So, the offending option is probably ARM_UNWIND.  You are provided with
+> the ARM_UNWIND option, and you need to say no to that.  Don't try to
+> build a kenrel with frame pointers and unwinding together - it'll
+> probably fail, or if you succeed in building it, it probably won't
+> work correctly since that's a combination we don't support.
 >
-> Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
-> Acked-by: Suman Tripathi <stripathi@apm.com>
+Right, I can confirm that building with both produces a kernel that
+doesn't boot (for me anyway).  Unfortunately, enabling FRAME_POINTER
+instead of ARM_UNWIND produced a kernel which, when it crashed only
+told me:
 
-I will queue this patch into xgene-next tree.
+Unable to handle kernel paging request at virtual address e5912144
+pgd = c0004000
+[e5912144] *pgd=00000000
+Internal error: Oops: 5 [#1] ARM
 
-> ---
->  arch/arm64/boot/dts/apm/apm-shadowcat.dtsi |    6 +++---
->  1 files changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi b/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
-> index 5d87a3d..74d971e 100644
-> --- a/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
-> +++ b/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
-> @@ -524,7 +524,7 @@
->                 };
->
->                 sata1: sata at 1a000000 {
-> -                       compatible = "apm,xgene-ahci";
-> +                       compatible = "apm,xgene-ahci-v2";
->                         reg = <0x0 0x1a000000 0x0 0x1000>,
->                               <0x0 0x1f200000 0x0 0x1000>,
->                               <0x0 0x1f20d000 0x0 0x1000>,
-> @@ -534,7 +534,7 @@
->                 };
->
->                 sata2: sata at 1a200000 {
-> -                       compatible = "apm,xgene-ahci";
-> +                       compatible = "apm,xgene-ahci-v2";
->                         reg = <0x0 0x1a200000 0x0 0x1000>,
->                               <0x0 0x1f210000 0x0 0x1000>,
->                               <0x0 0x1f21d000 0x0 0x1000>,
-> @@ -544,7 +544,7 @@
->                 };
->
->                 sata3: sata at 1a400000 {
-> -                       compatible = "apm,xgene-ahci";
-> +                       compatible = "apm,xgene-ahci-v2";
->                         reg = <0x0 0x1a400000 0x0 0x1000>,
->                               <0x0 0x1f220000 0x0 0x1000>,
->                               <0x0 0x1f22d000 0x0 0x1000>,
-> --
-> 1.7.1
->
+Is there something else I need to enable to get a more verbose dump?
 
-Regards,
-Duc Dang.
+--wpd
