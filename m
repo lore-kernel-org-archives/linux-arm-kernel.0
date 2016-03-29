@@ -1,32 +1,63 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 29 Mar 2016 19:06:48 +0200
-Subject: [PATCH 1/2] ARM: mvebu: correct the usb node name from usb@ to
- ehci@
-In-Reply-To: <CAJweMdbywGZF1qJF2Nv3RTJb_dULOS_JAQpsPJjYgG+5Y7HU3w@mail.gmail.com>
-References: <1459259813-5278-1-git-send-email-patrick@puiterwijk.org>
- <1459259813-5278-2-git-send-email-patrick@puiterwijk.org>
- <4079235.sABSXKnJCE@wuerfel> <87zithutnn.fsf@free-electrons.com>
- <CAJweMdbywGZF1qJF2Nv3RTJb_dULOS_JAQpsPJjYgG+5Y7HU3w@mail.gmail.com>
-Message-ID: <20160329190648.1f37cbc3@free-electrons.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Tue, 29 Mar 2016 12:07:30 -0500
+Subject: [RFC PATCH 2/3] ata: ahci-platform: Add ports-implemented dt
+ bindings.
+In-Reply-To: <56FA947A.5080806@linaro.org>
+References: <1459257075-21393-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1459257075-21393-3-git-send-email-srinivas.kandagatla@linaro.org>
+ <CAL_JsqLhSz1qWj01mAAg4X89hb4LnYB-CjJ2d1JW=jJw66Oq=g@mail.gmail.com>
+ <56FA947A.5080806@linaro.org>
+Message-ID: <CAL_JsqLR2GFuveVJj9u9RPAyHvgrF=TUPQXFVBH_BO3BXNx_vw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Mar 29, 2016 at 9:43 AM, Srinivas Kandagatla
+<srinivas.kandagatla@linaro.org> wrote:
+>
+>
+> On 29/03/16 15:11, Rob Herring wrote:
+>>
+>> On Tue, Mar 29, 2016 at 8:11 AM, Srinivas Kandagatla
+>> <srinivas.kandagatla@linaro.org> wrote:
+>>>
+>>> On some SOCs PORTS_IMPL register value is never programmed by the BIOS
+>>
+>>
+>> s/BIOS/firmware/
+>
+> BIOS is the word used in the AHCI SPECS so want to stick to this.
 
-On Tue, 29 Mar 2016 16:49:43 +0000, Patrick Uiterwijk wrote:
+The spec being Intel's also says it is a PCI device... BIOS is a type
+of firmware.
 
-> Thank you for this pointer, setting fdt_skip_update no did fix this
-> issue indeed.
+[...]
 
-Hum, what should fix the problem is to set fdt_skip_update to "yes". If
-you set it to "no", then the Marvell U-Boot will do its funky DTB
-tweaks which are not necessarily compatible with the mainline kernel
-DT bindings.
+>>> +       sata0: sata at 29000000 { /* Qualcomm APQ8064 */
+>>
+>>
+>> Do you really need another example just for this?
+>>
+>>> +               compatible = "generic-ahci";
+>>
+>>
+>> Where's your chip specific compatible string? You would not require a
+>> DT update to fix this if you had that.
+>
+>
+> Possibly, But we really are not doing anything specific in the ahci driver
+> which is not generic, that might be the reason why we skipped this in the
+> first place.
+>
+> I agree we could solve this issue in more than one way, The only advantage
+> of this new bindings would be to other platforms benefiting from this
+> workaround would not have to keep adding a new compatible string into the
+> ahci-platform driver.
+>
+> Like Annapurna Alpine platform seems to have the same issue.
+>
+> Am ok to do it either way.
 
-Best regards,
+I'm saying do both. Adding ports-implemented is fine, but add an SoC
+compatible string (in the dts, not the driver).
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Rob
