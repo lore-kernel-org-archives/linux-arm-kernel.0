@@ -1,38 +1,119 @@
-From: joseph@codesourcery.com (Joseph Myers)
-Date: Tue, 29 Mar 2016 20:15:10 +0000
-Subject: [RFC5 PATCH v6 00/21] ILP32 for ARM64
-In-Reply-To: <3467083.D7LuvS9l35@wuerfel>
-References: <1452792198-10718-1-git-send-email-ynorov@caviumnetworks.com>
- <3298847.t7vI4YM3gJ@wuerfel>
- <alpine.DEB.2.10.1603291551420.20115@digraph.polyomino.org.uk>
- <3467083.D7LuvS9l35@wuerfel>
-Message-ID: <alpine.DEB.2.10.1603292010080.15654@digraph.polyomino.org.uk>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 29 Mar 2016 22:18:59 +0200
+Subject: [PATCH v4 8/8] arm64: dts: rockchip: Add Landingship config
+In-Reply-To: <1458136727-32075-9-git-send-email-afaerber@suse.de>
+References: <1458136727-32075-1-git-send-email-afaerber@suse.de>
+ <1458136727-32075-9-git-send-email-afaerber@suse.de>
+Message-ID: <3754303.PKl0CGdnnX@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 Mar 2016, Arnd Bergmann wrote:
+Am Mittwoch, 16. M?rz 2016, 14:58:46 schrieb Andreas F?rber:
 
-> How do we do it then? Should we just define __USE_FILE_OFFSET64
-> unconditionally for all new 32-bit architectures and leave the
-> code dealing with 32-bit off_t/ino_t in place but unreachable, to
-> minimize the differences?
+This needs a commit message explaining the i2c1/i2c2 voodoo below - especially 
+as this is the only difference to the core geekbox board.
 
-Defining __USE_FILE_OFFSET64 unconditionally would prevent glibc from 
-building (see: how the patches a while back prototyping changing the 
-default had to disable the change when glibc itself is built).  A change 
-in the default, though desired (someone needs to pick up those patches 
-together with the analysis done of possible impact on distributions), 
-should not be tied to a new port, and would need to be discussed 
-thoroughly on libc-alpha.
+And I'm still not fully convinced about having the landing ship separate.
+I guess I'll just go to the talk about "Portable Device Tree Connector: 
+Painless Expansion Board Support" [0] on monday to help make up my mind ;-) .
 
-> Or should all the obsolete types be defined the same way as their
-> replacements so we have 64-bit __OFF_T_TYPE/__INO_T_TYPE
-> and use the same binary implementation regardless of FILE_OFFSET_BITS?
 
-I think so (along with using wordsize-64 sysdeps directories as far as 
-possible, like x32 does).  But design questions for a glibc port really 
-belong on libc-alpha to get any sort of community consensus.
+Heiko
 
--- 
-Joseph S. Myers
-joseph at codesourcery.com
+
+[0] http://openiotelc2016.sched.org/event/6DA4/portable-device-tree-connector-painless-expansion-board-support-pantelis-antoniou-konsulko-group
+
+
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
+>  v3 -> v4: Unchanged
+> 
+>  v2 -> v3:
+>  * Changed compatible string to include geekbox- (Heiko)
+>  * Rebroke compatible strings line
+>  * Disabled i2c1 to avoid hang (next-20160304)
+> 
+>  v2: New - showcases inclusion of GeekBox module config
+> 
+>  arch/arm64/boot/dts/rockchip/Makefile              |  1 +
+>  .../dts/rockchip/rk3368-geekbox-landingship.dts    | 57
+> ++++++++++++++++++++++ 2 files changed, 58 insertions(+)
+>  create mode 100644
+> arch/arm64/boot/dts/rockchip/rk3368-geekbox-landingship.dts
+> 
+> diff --git a/arch/arm64/boot/dts/rockchip/Makefile
+> b/arch/arm64/boot/dts/rockchip/Makefile index df37865e8ced..201bcd9863ce
+> 100644
+> --- a/arch/arm64/boot/dts/rockchip/Makefile
+> +++ b/arch/arm64/boot/dts/rockchip/Makefile
+> @@ -1,5 +1,6 @@
+>  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-evb-act8846.dtb
+>  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-geekbox.dtb
+> +dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-geekbox-landingship.dtb
+>  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-r88.dtb
+> 
+>  always		:= $(dtb-y)
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3368-geekbox-landingship.dts
+> b/arch/arm64/boot/dts/rockchip/rk3368-geekbox-landingship.dts new file mode
+> 100644
+> index 000000000000..a28ace9512bb
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/rockchip/rk3368-geekbox-landingship.dts
+> @@ -0,0 +1,57 @@
+> +/*
+> + * Copyright (c) 2016 Andreas F?rber
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +#include "rk3368-geekbox.dts"
+> +
+> +/ {
+> +	model = "GeekBox on Landingship";
+> +	compatible = "geekbuying,geekbox-landingship",
+> +		     "geekbuying,geekbox", "rockchip,rk3368";
+> +};
+> +
+> +&i2c1 {
+> +	status = "disabled";
+> +};
+> +
+> +&i2c2 {
+> +	status = "okay";
+> +};
