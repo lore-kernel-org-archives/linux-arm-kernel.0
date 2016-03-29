@@ -1,36 +1,37 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 28 Mar 2016 18:24:28 -0700
-Subject: [PATCH v2 1/5] phy: Rename phy-brcmstb-sata driver to
- phy-brcm-sata driver
-In-Reply-To: <1459140510-5317-2-git-send-email-anup.patel@broadcom.com>
+Date: Mon, 28 Mar 2016 18:27:42 -0700
+Subject: [PATCH v2 3/5] dt-bindings: phy: bindings document for common
+ Broadcom SATA3 PHY driver
+In-Reply-To: <1459140510-5317-4-git-send-email-anup.patel@broadcom.com>
 References: <1459140510-5317-1-git-send-email-anup.patel@broadcom.com>
- <1459140510-5317-2-git-send-email-anup.patel@broadcom.com>
-Message-ID: <56F9D94C.5060905@gmail.com>
+ <1459140510-5317-4-git-send-email-anup.patel@broadcom.com>
+Message-ID: <56F9DA0E.5040608@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Le 27/03/2016 21:48, Anup Patel a ?crit :
-> Currently, we have a common SATA3 PHY driver for all Broadcom
-> STB SoCs. This driver can be extended and re-used for Broadcom
-> iProc SoCs having same SATA3 PHY.
-> 
-> This patch renames existing Broadcom STB SATA3 PHY driver to
-> common Broadcom SATA3 PHY driver to share this PHY driver across
-> Broadcom SoCs.
-> 
-> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-> ---
-[snip]
-> +config PHY_BRCM_SATA
-> +	tristate "Broadcom SATA PHY driver"
-> +	depends on ARCH_BRCMSTB || ARCH_BCM_IPROC || BMIPS_GENERIC || COMPILE_TEST
-> +	depends on OF
-> +	select GENERIC_PHY
-> +	default ARCH_BCM_IPROC
+>  Required properties:
+>  - compatible: should be one or more of
+>       "brcm,bcm7425-sata-phy"
+>       "brcm,bcm7445-sata-phy"
+> +     "brcm,iproc-ns2-sata-phy"
+>       "brcm,phy-sata3"
+>  - address-cells: should be 1
+>  - size-cells: should be 0
+> -- reg: register range for the PHY PCB interface
+> -- reg-names: should be "phy"
+> +- reg: register ranges for the PHY PCB interface
+> +- reg-names: should be "phy" and "phy-ctrl"
+> +     The "phy-ctrl" registers are only required for
+> +     "brcm,iproc-ns2-sata-phy".
 
-This could be a separate patch of its own, but I do not think it matters
-that much.
+I objected to adding another register during the internal review, which,
+in the case of the STB chips is dealt with at the AHCI controller level
+as was requested when Brian got the driver sent, but if that is the only
+point here, then let's get your patches merged as-is.
+
+The rest of the changes look fine so:
 
 Acked-by: Florian Fainelli <f.fainelli@gmail.com>
--- 
+--
 Florian
