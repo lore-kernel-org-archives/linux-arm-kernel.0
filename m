@@ -1,44 +1,46 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 29 Mar 2016 18:19:56 +0200
-Subject: [PATCH] MAINTAINERS: attach arch/arm/configs/mvebu_*_defconfig to
- relevant maintainers
-In-Reply-To: <20160318102203.GJ1184@io.lakedaemon.net> (Jason Cooper's message
- of "Fri, 18 Mar 2016 10:22:03 +0000")
-References: <1458289626-26153-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160318102203.GJ1184@io.lakedaemon.net>
-Message-ID: <87d1qdw91v.fsf@free-electrons.com>
+Date: Tue, 29 Mar 2016 18:21:36 +0200
+Subject: [PATCH] ARM: configs: Enabling the new Marvell's cryptographic
+ engine driver for multi_v7_defconfig
+In-Reply-To: <20160318084454.GA8836@archy.home> (Romain Perier's message of
+ "Fri, 18 Mar 2016 09:44:54 +0100")
+References: <20160318084454.GA8836@archy.home>
+Message-ID: <878u11w8z3.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hi Romain,
  
- On ven., mars 18 2016, Jason Cooper <jason@lakedaemon.net> wrote:
+ On ven., mars 18 2016, Romain Perier <romain.perier@free-electrons.com> wrote:
 
-> On Fri, Mar 18, 2016 at 09:27:06AM +0100, Thomas Petazzoni wrote:
->> The arch/arm/configs/mvebu_*_defconfig currently don't belong to any
->> maintainer, so get_maintainer returns only information based on
->> commits, which is not completely accurate.
->> 
->> Therefore, this commit replaces a useless empty newline in MAINTAINERS
->> by a line attaching those defconfigs to the appropriate Marvell EBU
->> maintainers.
->> 
->> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> This enables the new driver for Marvell CESA crypto engines on all ARMv7.
 >
-> Acked-by: Jason Cooper <jason@lakedaemon.net>
+> Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
 
-Applied on mvebu/defconfig (I just have to adapt it to fit with
-v4.6-rc1)
+Applied on mvebu/defconfig
 
 Thanks,
 
 Gregory
-
-
+> ---
+>  arch/arm/configs/multi_v7_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
 >
-> thx,
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index 2823490..392e970 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -829,6 +829,7 @@ CONFIG_LOCKUP_DETECTOR=y
+>  CONFIG_CRYPTO_DEV_TEGRA_AES=y
+>  CONFIG_CPUFREQ_DT=y
+>  CONFIG_KEYSTONE_IRQ=y
+> +CONFIG_CRYPTO_DEV_MARVELL_CESA=m
+>  CONFIG_CRYPTO_DEV_SUN4I_SS=m
+>  CONFIG_CRYPTO_DEV_ROCKCHIP=m
+>  CONFIG_ARM_CRYPTO=y
+> -- 
+> 2.7.3
 >
-> Jason.
 
 -- 
 Gregory Clement, Free Electrons
