@@ -1,33 +1,41 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 29 Mar 2016 16:39:23 -0700
-Subject: [GIT PULL] bcm2835 clk changes for 4.6 maybe
-In-Reply-To: <1458265130-30734-1-git-send-email-eric@anholt.net>
-References: <1458265130-30734-1-git-send-email-eric@anholt.net>
-Message-ID: <20160329233923.GR18567@codeaurora.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 30 Mar 2016 08:46:36 +0900
+Subject: [PATCH V2 3/3] cpufreq: exynos: Use generic platdev driver
+In-Reply-To: <CAKohpomQ9=YK79o0fqHqZ7xexHv5EMJSPx+4KrT0RxeMh+hwWg@mail.gmail.com>
+References: <cover.1459233524.git.viresh.kumar@linaro.org>
+ <81a8da75a0e7783e2b47f9e04297f167e8134afe.1459233524.git.viresh.kumar@linaro.org>
+ <3810049.oQlCXiQ5bk@wuerfel>
+ <CAKohpomQ9=YK79o0fqHqZ7xexHv5EMJSPx+4KrT0RxeMh+hwWg@mail.gmail.com>
+Message-ID: <56FB13DC.2090902@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/17, Eric Anholt wrote:
-> This is late, so feel free to drop it, but I figured I'd send it to
-> you in case you were still open to merges.  I've pounded on it a bit
-> today (modesets to all sorts of resolutions on HDMI, used it for
-> testing the DPI panel support that I'm hoping to have for 4.7, and did
-> a whole lot of browsing of clk_summary as I debugged DPI), and kbuild
-> test robot came back clean, so I'm pretty happy with it.
+On 30.03.2016 00:22, Viresh Kumar wrote:
+> On 29 March 2016 at 20:34, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Tuesday 29 March 2016 12:09:49 Viresh Kumar wrote:
+>>> -static void __init exynos_cpufreq_init(void)
+>>> -{
+>>> -       struct device_node *root = of_find_node_by_path("/");
+>>> -       const struct of_device_id *match;
+>>> -
+>>> -       match = of_match_node(exynos_cpufreq_matches, root);
+>>> -       if (!match) {
+>>> -               platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
+>>> -               return;
+>>> -       }
+>>> -
+>>> -       platform_device_register_simple(match->data, -1, NULL, 0);
+>>> -}
+>>
+>> How is the "exynos-cpufreq" case handled now? Is that no longer used now?
+>> I assume the patch is correct based on Krzysztof's review, but it might be
+>> good to explain this better.
 > 
-> The following changes since commit 4d3ac6662452060721599a3392bc2f524af984cb:
-> 
->   clk: bcm2835: fix check of error code returned by devm_ioremap_resource() (2016-03-15 18:14:11 -0700)
-> 
-> are available in the git repository at:
-> 
->   git at github.com:anholt/linux.git tags/bcm2835-clk-next-2016-03-17
+> That's stale code, the driver got removed some time back.
 
-Please make sure to use a proper URL here. I don't have access to
-git at github.com, but I can fetch this from
-git://github.com/anholt/linux.git. The tag and the contents match
-so I'm fairly confident all is well.
+Yeah, that's old driver, no longer existing. It makes sense to split the
+patch - first remove the stale exynos-cpufreq and then move cpufreq-dt.
+This would help avoid confusion when grepping through the history.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Best regards,
+Krzysztof
