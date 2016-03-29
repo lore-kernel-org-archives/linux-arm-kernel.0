@@ -1,139 +1,175 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Mar 2016 16:05:21 +0200
-Subject: [PATCH 1/2] ARM: mvebu: correct the usb node name from usb@ to
- ehci@
-In-Reply-To: <1459259813-5278-2-git-send-email-patrick@puiterwijk.org>
-References: <1459259813-5278-1-git-send-email-patrick@puiterwijk.org>
- <1459259813-5278-2-git-send-email-patrick@puiterwijk.org>
-Message-ID: <4079235.sABSXKnJCE@wuerfel>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 29 Mar 2016 16:10:38 +0200
+Subject: [PATCH v2 1/3] ARM: at91: use chipid device for soc detection
+In-Reply-To: <55618572.U3p4crGV1Y@wuerfel>
+References: <55618572.U3p4crGV1Y@wuerfel>
+Message-ID: <1459260638-3899-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 March 2016 13:56:52 Patrick Uiterwijk wrote:
-> According to Documentation/devicetree/bindings/usb/ehci-orion.txt,
-> the Orion Marvell variant of EHCI controllers should have names
-> ehci at 50000 for example.
-> 
-> Signed-off-by: Patrick Uiterwijk <patrick@puiterwijk.org>
-> 
+From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-I think it's better to follow the generic USB binding that suggests
-the name of 'usb', unless we understand what the specific bug is
-you run into. Do you think it is the boot loader that messes
-up the hardware, or something in the kernel that goes wrong? Did
-it work on earlier kernels?
+So far, the CIDR and EXID registers were in the DBGU interface. This device
+has disappeared with the SAMA5D2 family. These registers are exposed
+through a new device called chipid.
 
-We had a regression based on the USB device probing, but that
-should be fixed now with the patch below. Do you have that?
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+[nicolas.ferre at atmel.com: remove useless warnings]
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+[arnd at arndb.de: suggest to use static functions to reduce scope]
+---
+ .../devicetree/bindings/arm/atmel-at91.txt         |  4 ++
+ arch/arm/mach-at91/soc.c                           | 81 +++++++++++++++++-----
+ 2 files changed, 67 insertions(+), 18 deletions(-)
 
-	Arnd
-
-
-commit 7222c832254a75dcd67d683df75753d4a4e125bb
-Author: Nicolai Stange <nicstange@gmail.com>
-Date:   Thu Mar 17 23:53:02 2016 +0100
-
-    usb/core: usb_alloc_dev(): fix setting of ->portnum
-    
-    With commit 69bec7259853 ("USB: core: let USB device know device node"),
-    the port1 argument of usb_alloc_dev() gets overwritten as follows:
-    
-      ... usb_alloc_dev(..., unsigned port1)
-      {
-        ...
-        if (!parent->parent) {
-          port1 = usb_hcd_find_raw_port_number(..., port1);
-        }
-        ...
-      }
-    
-    Later on, this now overwritten port1 gets assigned to ->portnum:
-    
-      dev->portnum = port1;
-    
-    However, since xhci_find_raw_port_number() isn't idempotent, the
-    aforementioned commit causes a number of KASAN splats like the following:
-    
-      BUG: KASAN: slab-out-of-bounds in xhci_find_raw_port_number+0x98/0x170
-                                           at addr ffff8801d9311670
-      Read of size 8 by task kworker/2:1/87
-      [...]
-      Workqueue: usb_hub_wq hub_event
-       0000000000000188 000000005814b877 ffff8800cba17588 ffffffff8191447e
-       0000000041b58ab3 ffffffff82a03209 ffffffff819143a2 ffffffff82a252f4
-       ffff8801d93115e0 0000000000000188 ffff8801d9311628 ffff8800cba17588
-      Call Trace:
-       [<ffffffff8191447e>] dump_stack+0xdc/0x15e
-       [<ffffffff819143a2>] ? _atomic_dec_and_lock+0xa2/0xa2
-       [<ffffffff814e2cd1>] ? print_section+0x61/0xb0
-       [<ffffffff814e4939>] print_trailer+0x179/0x2c0
-       [<ffffffff814f0d84>] object_err+0x34/0x40
-       [<ffffffff814f4388>] kasan_report_error+0x2f8/0x8b0
-       [<ffffffff814eb91e>] ? __slab_alloc+0x5e/0x90
-       [<ffffffff812178c0>] ? __lock_is_held+0x90/0x130
-       [<ffffffff814f5091>] kasan_report+0x71/0xa0
-       [<ffffffff814ec082>] ? kmem_cache_alloc_trace+0x212/0x560
-       [<ffffffff81d99468>] ? xhci_find_raw_port_number+0x98/0x170
-       [<ffffffff814f33d4>] __asan_load8+0x64/0x70
-       [<ffffffff81d99468>] xhci_find_raw_port_number+0x98/0x170
-       [<ffffffff81db0105>] xhci_setup_addressable_virt_dev+0x235/0xa10
-       [<ffffffff81d9ea51>] xhci_setup_device+0x3c1/0x1430
-       [<ffffffff8121cddd>] ? trace_hardirqs_on+0xd/0x10
-       [<ffffffff81d9fac0>] ? xhci_setup_device+0x1430/0x1430
-       [<ffffffff81d9fad3>] xhci_address_device+0x13/0x20
-       [<ffffffff81d2081a>] hub_port_init+0x55a/0x1550
-       [<ffffffff81d28705>] hub_event+0xef5/0x24d0
-       [<ffffffff81d27810>] ? hub_port_debounce+0x2f0/0x2f0
-       [<ffffffff8195e1ee>] ? debug_object_deactivate+0x1be/0x270
-       [<ffffffff81210203>] ? print_rt_rq+0x53/0x2d0
-       [<ffffffff8121657d>] ? trace_hardirqs_off+0xd/0x10
-       [<ffffffff8226acfb>] ? _raw_spin_unlock_irqrestore+0x5b/0x60
-       [<ffffffff81250000>] ? irq_domain_set_hwirq_and_chip+0x30/0xb0
-       [<ffffffff81256339>] ? debug_lockdep_rcu_enabled+0x39/0x40
-       [<ffffffff812178c0>] ? __lock_is_held+0x90/0x130
-       [<ffffffff81196877>] process_one_work+0x567/0xec0
-      [...]
-    
-    Afterwards, xhci reports some functional errors:
-    
-      xhci_hcd 0000:00:14.0: ERROR: unexpected setup address command completion
-                                    code 0x11.
-      xhci_hcd 0000:00:14.0: ERROR: unexpected setup address command completion
-                                    code 0x11.
-      usb 4-3: device not accepting address 2, error -22
-    
-    Fix this by not overwriting the port1 argument in usb_alloc_dev(), but
-    storing the raw port number as required by OF in an additional variable,
-    raw_port.
-    
-    Fixes: 69bec7259853 ("USB: core: let USB device know device node")
-    Signed-off-by: Nicolai Stange <nicstange@gmail.com>
-    Acked-by: Alan Stern <stern@rowland.harvard.edu>
-    Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
-diff --git a/drivers/usb/core/usb.c b/drivers/usb/core/usb.c
-index ffa5cf13ffe1..dcb85e3cd5a7 100644
---- a/drivers/usb/core/usb.c
-+++ b/drivers/usb/core/usb.c
-@@ -424,6 +424,7 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent,
- 	struct usb_device *dev;
- 	struct usb_hcd *usb_hcd = bus_to_hcd(bus);
- 	unsigned root_hub = 0;
-+	unsigned raw_port = port1;
+diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+index 7fd64ec9ee1d..0b1fcbfe2299 100644
+--- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
++++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+@@ -41,6 +41,10 @@ compatible: must be one of:
+        - "atmel,sama5d43"
+        - "atmel,sama5d44"
  
- 	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
- 	if (!dev)
-@@ -498,11 +499,11 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent,
++Chipid required properties:
++- compatible: Should be "atmel,sama5d2-chipid"
++- reg : Should contain registers location and length
++
+ PIT Timer required properties:
+ - compatible: Should be "atmel,at91sam9260-pit"
+ - reg: Should contain registers location and length
+diff --git a/arch/arm/mach-at91/soc.c b/arch/arm/mach-at91/soc.c
+index 54343ffa3e53..c6fda75ddb89 100644
+--- a/arch/arm/mach-at91/soc.c
++++ b/arch/arm/mach-at91/soc.c
+@@ -22,48 +22,93 @@
+ #include "soc.h"
  
- 		if (!parent->parent) {
- 			/* device under root hub's port */
--			port1 = usb_hcd_find_raw_port_number(usb_hcd,
-+			raw_port = usb_hcd_find_raw_port_number(usb_hcd,
- 				port1);
- 		}
- 		dev->dev.of_node = usb_of_get_child_node(parent->dev.of_node,
--				port1);
-+				raw_port);
+ #define AT91_DBGU_CIDR			0x40
+-#define AT91_DBGU_CIDR_VERSION(x)	((x) & 0x1f)
+-#define AT91_DBGU_CIDR_EXT		BIT(31)
+-#define AT91_DBGU_CIDR_MATCH_MASK	0x7fffffe0
+ #define AT91_DBGU_EXID			0x44
++#define AT91_CHIPID_CIDR		0x00
++#define AT91_CHIPID_EXID		0x04
++#define AT91_CIDR_VERSION(x)		((x) & 0x1f)
++#define AT91_CIDR_EXT			BIT(31)
++#define AT91_CIDR_MATCH_MASK		0x7fffffe0
  
- 		/* hub driver sets up TT records */
+-struct soc_device * __init at91_soc_init(const struct at91_soc *socs)
++static int __init at91_get_cidr_exid_from_dbgu(u32 *cidr, u32 *exid)
+ {
+-	struct soc_device_attribute *soc_dev_attr;
+-	const struct at91_soc *soc;
+-	struct soc_device *soc_dev;
+ 	struct device_node *np;
+ 	void __iomem *regs;
+-	u32 cidr, exid;
+ 
+ 	np = of_find_compatible_node(NULL, NULL, "atmel,at91rm9200-dbgu");
+ 	if (!np)
+ 		np = of_find_compatible_node(NULL, NULL,
+ 					     "atmel,at91sam9260-dbgu");
++	if (!np)
++		return -ENODEV;
+ 
+-	if (!np) {
+-		pr_warn("Could not find DBGU node");
+-		return NULL;
++	regs = of_iomap(np, 0);
++	of_node_put(np);
++
++	if (!regs) {
++		pr_warn("Could not map DBGU iomem range");
++		return -ENXIO;
  	}
+ 
++	*cidr = readl(regs + AT91_DBGU_CIDR);
++	*exid = readl(regs + AT91_DBGU_EXID);
++
++	iounmap(regs);
++
++	return 0;
++}
++
++static int __init at91_get_cidr_exid_from_chipid(u32 *cidr, u32 *exid)
++{
++	struct device_node *np;
++	void __iomem *regs;
++
++	np = of_find_compatible_node(NULL, NULL, "atmel,sama5d2-chipid");
++	if (!np)
++		return -ENODEV;
++
+ 	regs = of_iomap(np, 0);
+ 	of_node_put(np);
+ 
+ 	if (!regs) {
+ 		pr_warn("Could not map DBGU iomem range");
+-		return NULL;
++		return -ENXIO;
+ 	}
+ 
+-	cidr = readl(regs + AT91_DBGU_CIDR);
+-	exid = readl(regs + AT91_DBGU_EXID);
++	*cidr = readl(regs + AT91_CHIPID_CIDR);
++	*exid = readl(regs + AT91_CHIPID_EXID);
+ 
+ 	iounmap(regs);
+ 
++	return 0;
++}
++
++struct soc_device * __init at91_soc_init(const struct at91_soc *socs)
++{
++	struct soc_device_attribute *soc_dev_attr;
++	const struct at91_soc *soc;
++	struct soc_device *soc_dev;
++	u32 cidr, exid;
++	int ret;
++
++	/*
++	 * With SAMA5D2 and later SoCs, CIDR and EXID registers are no more
++	 * in the dbgu device but in the chipid device whose purpose is only
++	 * to expose these two registers.
++	 */
++	ret = at91_get_cidr_exid_from_dbgu(&cidr, &exid);
++	if (ret)
++		ret = at91_get_cidr_exid_from_chipid(&cidr, &exid);
++	if (ret) {
++		if (ret == -ENODEV)
++			pr_warn("Could not find identification node");
++		return NULL;
++	}
++
+ 	for (soc = socs; soc->name; soc++) {
+-		if (soc->cidr_match != (cidr & AT91_DBGU_CIDR_MATCH_MASK))
++		if (soc->cidr_match != (cidr & AT91_CIDR_MATCH_MASK))
+ 			continue;
+ 
+-		if (!(cidr & AT91_DBGU_CIDR_EXT) || soc->exid_match == exid)
++		if (!(cidr & AT91_CIDR_EXT) || soc->exid_match == exid)
+ 			break;
+ 	}
+ 
+@@ -79,7 +124,7 @@ struct soc_device * __init at91_soc_init(const struct at91_soc *socs)
+ 	soc_dev_attr->family = soc->family;
+ 	soc_dev_attr->soc_id = soc->name;
+ 	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%X",
+-					   AT91_DBGU_CIDR_VERSION(cidr));
++					   AT91_CIDR_VERSION(cidr));
+ 	soc_dev = soc_device_register(soc_dev_attr);
+ 	if (IS_ERR(soc_dev)) {
+ 		kfree(soc_dev_attr->revision);
+@@ -91,7 +136,7 @@ struct soc_device * __init at91_soc_init(const struct at91_soc *socs)
+ 	if (soc->family)
+ 		pr_info("Detected SoC family: %s\n", soc->family);
+ 	pr_info("Detected SoC: %s, revision %X\n", soc->name,
+-		AT91_DBGU_CIDR_VERSION(cidr));
++		AT91_CIDR_VERSION(cidr));
+ 
+ 	return soc_dev;
+ }
+-- 
+2.1.3
