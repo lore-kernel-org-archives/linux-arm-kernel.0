@@ -1,47 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Mar 2016 15:27:03 +0200
-Subject: [RFC5 PATCH v6 00/21] ILP32 for ARM64
-In-Reply-To: <56FA816D.60101@huawei.com>
-References: <1452792198-10718-1-git-send-email-ynorov@caviumnetworks.com>
- <20160329120147.GA3551@yury-N73SV> <56FA816D.60101@huawei.com>
-Message-ID: <3298847.t7vI4YM3gJ@wuerfel>
+From: pc.liao@mediatek.com (PC Liao)
+Date: Tue, 29 Mar 2016 21:28:23 +0800
+Subject: [PATCH] ASoC: mediatek: Add second I2S on mt8173-rt5650 machine
+ driver
+In-Reply-To: <20160328191115.GE2350@sirena.org.uk>
+References: <1458877325-33980-1-git-send-email-pc.liao@mediatek.com>
+ <20160328191115.GE2350@sirena.org.uk>
+Message-ID: <1459258103.3747.7.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 March 2016 21:21:49 Zhangjian wrote:
-> >>>
-> >>> Then we could remove the __USE_FILE_OFFSET64 in stat.h and fcnt.h in
-> >>> aarch64. And truncate and ftruncate is same as truncate64 and
-> >>> ftruncate64.
-> >>
-> >> I don't know what the glibc developers prefer, but I think the
-> >> result needs to be something like that: either __OFF_T_TYPE is
-> >> defined as you write above as a 64-bit type, or the user-visible
-> >> off_t typedef unconditionally uses __OFF64_T_TYPE rather than
-> >> __OFF_T_TYPE.
-> >>
-> >
-> > I'm not the glibc developer as well, but I think it's OK.
-> IIUC, it is usually what glibc does.
-> If we want to define off_t to 64bit in ilp32, the follow syscall may
-> need to define as non-compat too:
-> sys_fadvise64
-> sys_sendfile
-> sys_sendfile64
-> sys_lseek
-> sys_splice
-> sys_sync_file_range2
-> sys_truncate
-> sys_ftruncate
+Hi Mark,
 
-I'm not following here. Do you mean in the kernel or in glibc?
+On Tue, 2016-03-29 at 03:11 +0800, Mark Brown wrote:
+> On Fri, Mar 25, 2016 at 11:42:05AM +0800, PC Liao wrote:
+> 
+> > +Optional properties:
+> > +- mediatek,rt5650_i2s: I2S mode of rt5650
+> > +  0: using I2S1 on rt5650 for record
+> > +  1: using I2S2 on rt5650 for record
+> > +
+> 
+> I would expect the machine driver to have a reference to the DAI that is
+> in use rather than a property like this.  This is the way pretty much
+> all DT based machine drivers work...
 
-In the kernel, the list of syscalls is fine, because we already only
-provide syscalls passing loff_t as I said, and that is 64-bit.
+Thanks for comment.
+I think I need to comment more clearly.
+This setting is different connection from MT8173 to rt5650 on hardware.
 
-In glibc, I think we need to define fewer entry points, not more.
-Instead of having both lseek and lseek64, only one of them should
-be provided, and that should always take a 64-bit offset, calling
-into the kernel with the _llseek syscall entry.
+- mediatek,rt5650_i2s: I2S mode of rt5650
+0: Default setting. Playback and record path use same set of I2S.
+Playback/Record path using same I2S clock connect from MT8173 I2S1 to
+rt5650 I2S1.
+1: Playback and record path use different set of I2S. Playback path
+connects from MT8173 I2S1 to rt5650 I2S1 and record path connects from
+MT8173 I2S2 to rt5650 I2S2.
 
-	Arnd
+Because we use codec ASRC function and need to initialize on different
+setting about this parts:
++	switch (mt8173_rt5650_priv.rt5650_i2s) {
++	case MT8173_RT5650_I2S1:
++		rt5645_sel_asrc_clk_src(codec,
++					RT5645_DA_STEREO_FILTER |
++					RT5645_AD_STEREO_FILTER,
++					RT5645_CLK_SEL_I2S1_ASRC);
++		break;
++	case MT8173_RT5650_I2S2:
++		rt5645_sel_asrc_clk_src(codec,
++					RT5645_DA_STEREO_FILTER,
++					RT5645_CLK_SEL_I2S1_ASRC);
++		rt5645_sel_asrc_clk_src(codec,
++					RT5645_AD_STEREO_FILTER,
++					RT5645_CLK_SEL_I2S2_ASRC);
++		break;
++	default:
++		break;
++	}
+, we use device tree to determine which connection we choose.
+Does this explain can be accepted?
+Thanks!
