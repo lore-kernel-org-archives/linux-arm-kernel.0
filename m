@@ -1,84 +1,71 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 29 Mar 2016 09:18:04 +0200
-Subject: [PULL 4/4] ARM: memremap: implement arch_memremap_wb()
-In-Reply-To: <1459235884-24318-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1459235884-24318-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1459235884-24318-5-git-send-email-ard.biesheuvel@linaro.org>
+From: alexander.stein@systec-electronic.com (Alexander Stein)
+Date: Tue, 29 Mar 2016 09:26:53 +0200
+Subject: [PATCH v2 6/8] drm/fsl-dcu: add TCON driver
+In-Reply-To: <57c86de8eca0aa16a5cdfc488977ca4e@agner.ch>
+References: <1459216802-32094-1-git-send-email-stefan@agner.ch>
+ <2234894.ri36D5MRrN@ws-stein> <57c86de8eca0aa16a5cdfc488977ca4e@agner.ch>
+Message-ID: <3752084.bcROvR6fvG@ws-stein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The generic memremap() falls back to using ioremap_cache() to create
-MEMREMAP_WB mappings if the requested region is not already covered
-by the linear mapping, unless the architecture provides an implementation
-of arch_memremap_wb().
+On Tuesday 29 March 2016 00:11:13, Stefan Agner wrote:
+> >> --- a/Documentation/devicetree/bindings/display/fsl,dcu.txt
+> >> +++ b/Documentation/devicetree/bindings/display/fsl,dcu.txt
+> >> 
+> >> @@ -14,6 +14,7 @@ Required properties:
+> >>  Optional properties:
+> >>  - clocks:		Second handle for pixel clock.
+> >>  - clock-names:		Second name "pix" for pixel clock.
+> >> 
+> >> +- fsl,tcon:		The phandle to the timing controller node.
+> > 
+> > Maybe a comment this is (currently) only for Vybrid, but not LS1021A.
+> 
+> IMHO, such references to SoCs in a peripheral binding is somewhat
+> misplaced. If we would start doing this, we would end up in lots of SoC
+> references, and nobody knows whether they are actually accurate and up
+> to date... And I think we should add tcon to LS1021a, more on that
+> below...
 
-Since ioremap_cache() is not appropriate on ARM to map memory with the
-same attributes used for the linear mapping, implement arch_memremap_wb()
-which does exactly that. Also, relax the WARN() check to allow MT_MEMORY_RW
-mappings of pfn_valid() pages.
+Well, I don't mind after all.
 
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Acked-by: Dan Williams <dan.j.williams@intel.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/include/asm/io.h |  6 ++++++
- arch/arm/mm/ioremap.c     | 12 ++++++++++--
- 2 files changed, 16 insertions(+), 2 deletions(-)
+> >> --- /dev/null
+> >> +++ b/drivers/gpu/drm/fsl-dcu/fsl_tcon.c
+> >> [...]
+> >> +struct fsl_tcon *fsl_tcon_init(struct device *dev)
+> >> +{
+> >> +	struct fsl_tcon *tcon;
+> >> +	struct device_node *np;
+> >> +	int ret;
+> >> +
+> >> +	tcon = devm_kzalloc(dev, sizeof(*tcon), GFP_KERNEL);
+> >> +	if (!tcon)
+> >> +		return NULL;
+> >> +
+> >> +	np = of_parse_phandle(dev->of_node, "fsl,tcon", 0);
+> >> +	if (!np) {
+> >> +		dev_warn(dev, "Couldn't find the tcon node\n");
+> >> +		return NULL;
+> >> +	}
+> > 
+> > Maybe check for device tree node before allocating struct fsl_tcon? Also
+> > this should not be a warning, as on LS1021A this is to be expected.
+> 
+> Agreed, definitely the smarter sequence.
+> 
+> Afact LS1021a has also a TCON. At least in Jianwei Wangs initial patches
+> it was part of the driver, see:
+> https://lkml.org/lkml/2015/7/13/242
+> 
+> Not sure how that driver can work without TCON support on LS1021a, maybe
+> the bootloader sets the TCON to bypass?
+> 
+> Since I do not have a LS1021a, I hesitated to just add it to the LS1021s
+> dt's, but it should be fairly straight forward.
 
-diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-index fb94de290edd..781ef5fe235d 100644
---- a/arch/arm/include/asm/io.h
-+++ b/arch/arm/include/asm/io.h
-@@ -392,6 +392,9 @@ void __iomem *ioremap(resource_size_t res_cookie, size_t size);
- #define ioremap ioremap
- #define ioremap_nocache ioremap
- 
-+/*
-+ * Do not use ioremap_cache for mapping memory. Use memremap instead.
-+ */
- void __iomem *ioremap_cache(resource_size_t res_cookie, size_t size);
- #define ioremap_cache ioremap_cache
- 
-@@ -408,6 +411,9 @@ void __iomem *ioremap_wc(resource_size_t res_cookie, size_t size);
- void iounmap(volatile void __iomem *iomem_cookie);
- #define iounmap iounmap
- 
-+void *arch_memremap_wb(phys_addr_t phys_addr, size_t size);
-+#define arch_memremap_wb arch_memremap_wb
-+
- /*
-  * io{read,write}{16,32}be() macros
-  */
-diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-index d5350f6af089..ff0eed23ddf1 100644
---- a/arch/arm/mm/ioremap.c
-+++ b/arch/arm/mm/ioremap.c
-@@ -297,9 +297,10 @@ static void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
- 	}
- 
- 	/*
--	 * Don't allow RAM to be mapped - this causes problems with ARMv6+
-+	 * Don't allow RAM to be mapped with mismatched attributes - this
-+	 * causes problems with ARMv6+
- 	 */
--	if (WARN_ON(pfn_valid(pfn)))
-+	if (WARN_ON(pfn_valid(pfn) && mtype != MT_MEMORY_RW))
- 		return NULL;
- 
- 	area = get_vm_area_caller(size, VM_IOREMAP, caller);
-@@ -418,6 +419,13 @@ __arm_ioremap_exec(phys_addr_t phys_addr, size_t size, bool cached)
- 			__builtin_return_address(0));
- }
- 
-+void *arch_memremap_wb(phys_addr_t phys_addr, size_t size)
-+{
-+	return (__force void *)arch_ioremap_caller(phys_addr, size,
-+						   MT_MEMORY_RW,
-+						   __builtin_return_address(0));
-+}
-+
- void __iounmap(volatile void __iomem *io_addr)
- {
- 	void *addr = (void *)(PAGE_MASK & (unsigned long)io_addr);
--- 
-2.5.0
+Interesting, but in Patch 3 (https://lists.freedesktop.org/archives/dri-devel/2015-July/086381.html) no TCON node is added and using is still 
+optional. Yet, I don't find any TCON hardware in the LS1021A reference manual, 
+e.g. in the memory map. I hard guess is that it doesn't require/use one. 
+Without memory address it would be pretty hard to add one.
+
+Alexander
