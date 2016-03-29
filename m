@@ -1,101 +1,97 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 29 Mar 2016 07:44:37 -0700
-Subject: [PATCH 11/12] ARM: dts: dragonboard-600c: add i2c support
-In-Reply-To: <1458762490-9814-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1458762366-9233-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1458762490-9814-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <20160329144437.GN8929@tuxbot>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 Mar 2016 16:50:40 +0200
+Subject: [PATCH] i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity
+In-Reply-To: <CAJ+vNU2BKLDREOWP8EWXZR43to10yw+qvKwv1MzS4a_L9n5ozg@mail.gmail.com>
+References: <m3h9fuk7ik.fsf@t19.piap.pl> <23031613.R8qN30TbTq@wuerfel>
+ <CAJ+vNU2BKLDREOWP8EWXZR43to10yw+qvKwv1MzS4a_L9n5ozg@mail.gmail.com>
+Message-ID: <5741237.2X2Q0sCFQj@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 23 Mar 12:48 PDT 2016, Srinivas Kandagatla wrote:
+On Tuesday 29 March 2016 07:29:34 Tim Harvey wrote:
+> On Tue, Mar 29, 2016 at 6:52 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Tuesday 29 March 2016 06:32:29 Tim Harvey wrote:
 
-> This patch adds nodes required to enable 4 i2c buses on the board which
-> are connected to various sensors and eeprom.
+> >> I think 31e98e0d24cd2537a63e06e235e050a06b175df7 "ARM:
+> >> imx_v6_v7_defconfig: enable PCI_MSI" should be reverted as well until
+> >> we figure this out.
+> >
+> > That doesn't sound like a helpful solution, multi_v7_defconfig for
+> > instance will still be broken because it enables PCI_MSI, and so
+> > will be all major distros.
 > 
-
-I would like for the pinconf for these blocks to be in this patch (and
-file) to make it clear how they are configured and where to change them.
-
-Regards,
-Bjorn
-
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
->  .../arm/boot/dts/qcom-apq8064-dragonboard-600c.dts | 46 ++++++++++++++++++++++
->  1 file changed, 46 insertions(+)
+> Arnd,
 > 
-> diff --git a/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts b/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
-> index 4fecd94..942de04 100644
-> --- a/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
-> +++ b/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
-> @@ -8,6 +8,10 @@
->  	aliases {
->  		serial0 = &gsbi7_serial;
->  		serial1 = &gsbi1_serial;
-> +		i2c0 = &gsbi2_i2c;
-> +		i2c1 = &gsbi3_i2c;
-> +		i2c2 = &gsbi4_i2c;
-> +		i2c3 = &gsbi7_i2c;
->  	};
->  
->  	regulators {
-> @@ -180,6 +184,42 @@
->  			};
->  		};
->  
-> +		gsbi at 12480000 {
-> +			status = "okay";
-> +			qcom,mode = <GSBI_PROT_I2C>;
-> +			i2c at 124a0000 {
-> +				/* On Low speed expansion and Sensors */
-> +				label = "LS-I2C0";
-> +				status = "okay";
-> +			};
-> +		};
-> +
-> +		gsbi at 16200000 {
-> +			status = "okay";
-> +			qcom,mode = <GSBI_PROT_I2C>;
-> +			i2c at 16280000 {
-> +			/* On Low speed expansion */
-> +				status = "okay";
-> +				label = "LS-I2C1";
-> +				clock-frequency = <200000>;
-> +				eeprom at 52 {
-> +					compatible = "atmel,24c128";
-> +					reg = <0x52>;
-> +					pagesize = <64>;
-> +				};
-> +			};
-> +		};
-> +
-> +		gsbi at 16300000 {
-> +			status = "okay";
-> +			qcom,mode = <GSBI_PROT_I2C>;
-> +			i2c at 16380000 {
-> +				/* On High speed expansion */
-> +				label = "HS-CAM-I2C3";
-> +				status = "okay";
-> +			};
-> +		};
-> +
->  		/* DEBUG UART  */
->  		gsbi at 16600000 {
->  			status = "okay";
-> @@ -190,6 +230,12 @@
->  				pinctrl-names = "default";
->  				pinctrl-0 = <&gsbi7_uart_2pins>;
->  			};
-> +
-> +			i2c at 16680000 {
-> +				/* On High speed expansion */
-> +				status = "okay";
-> +				label = "HS-CAM-I2C2";
-> +			};
->  		};
->  
->  		leds {
-> -- 
-> 2.5.0
+> True, but keep in mind that as far as I can tell this behavior has
+> been around since MSI was added to the IMX6 (breakage of devices that
+> use legacy irq's if MSI is enabled) which was in 3.16.
+
+I see. This part wasn't clear to me.
+
+> > What happens if we patch the pci-imx6 driver to not make use of
+> > its MSI support even when that is enabled in the kernel? Does that
+> > get both devices in your GW5xxx to work with legacy interrupts or
+> > is one or both of them still broken?
+> >
+> >         Arnd
+> >
+> > diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+> > index eb5a2755a164..d7607b2695c6 100644
+> > --- a/drivers/pci/host/pci-imx6.c
+> > +++ b/drivers/pci/host/pci-imx6.c
+> > @@ -470,7 +470,7 @@ static void imx6_pcie_host_init(struct pcie_port *pp)
+> >
+> >         imx6_pcie_establish_link(pp);
+> >
+> > -       if (IS_ENABLED(CONFIG_PCI_MSI))
+> > +       if (0 && IS_ENABLED(CONFIG_PCI_MSI))
+> >                 dw_pcie_msi_init(pp);
+> >  }
+> >
+> > @@ -490,7 +490,7 @@ static int __init imx6_add_pcie_port(struct pcie_port *pp,
+> >  {
+> >         int ret;
+> >
+> > -       if (IS_ENABLED(CONFIG_PCI_MSI)) {
+> > +       if (0 && IS_ENABLED(CONFIG_PCI_MSI)) {
+> >                 pp->msi_irq = platform_get_irq_byname(pdev, "msi");
+> >                 if (pp->msi_irq <= 0) {
+> >                         dev_err(&pdev->dev, "failed to get MSI irq\n");
+> >
 > 
+> That is not enough - we would also need to disable a couple more in
+> the designware core that imx6 uses, which is also used by several
+> other SoC's. We should probably get some feedback from people with
+> those SoC's regarding MSI breaking legacy irqs.
+
+Good point. I really just meant this as an experiment, trying to
+figure out what causes it to break. I'd be surprised if the
+MSI support in the generic pcie-designware driver caused the same
+problem on the other SoCs.
+
+> PCI_MSI was enabled in imx_v6_v7_defconfig in 4.5 and enabled in
+> multi_v7_defconfig back in 3.16. PCI MSI was first introduced for the
+> IMX6 host controller in 3.16 as well. I verified that the same issue
+> exists all the way back to 3.16.
+
+Thanks for doing that research.
+
+> I don't know if its worse to disable PCI MSI for IMX6/designware all
+> the way back to 3.16 or to disable it just back to 4.5 where imx_v6_v7
+> enabled it, or perhaps just figure out the actual issue and get that
+> backported?
+
+I'd like to see the problem understood better before we talk about
+backports.
+
+One thing I just noticed is that the same GPC interrupt line (GIC_SPI
+120) is used for MSI and for IntD. Maybe there is something going on with
+sharing an interrupt line between a nested irqchip and a device?
+
+Could this be a bug in the generic IRQ handling code? Can you check
+which interrupt the broken device(s) on your machine are using? Is
+it always the 120 (IntD) line, or are the other three lines broken
+as well? I don't actually know how to look it up, but the 'lspci -t'
+output should let us reconstruct the swizzling manually.
+
+	Arnd
