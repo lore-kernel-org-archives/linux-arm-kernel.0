@@ -1,94 +1,108 @@
 From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 29 Mar 2016 07:34:15 -0700
-Subject: [PATCH 03/12] ARM: dts: apq8064: add gsbi7 i2c support
-In-Reply-To: <1458762436-9446-1-git-send-email-srinivas.kandagatla@linaro.org>
+Date: Tue, 29 Mar 2016 07:37:11 -0700
+Subject: [PATCH 05/12] ARM: dts: dragonboard-600c: add pmic regulator
+ supplies
+In-Reply-To: <1458762450-9538-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1458762366-9233-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1458762436-9446-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <20160329143415.GH8929@tuxbot>
+ <1458762450-9538-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20160329143711.GI8929@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed 23 Mar 12:47 PDT 2016, Srinivas Kandagatla wrote:
 
-> This patch adds support to gsbi7 i2c which is used in some of the new
-> boards.
+> This patch adds pmic regulator supplies connected on the board.
+> Rest of the invidual regulators would be added as and when required by
+> the devices.
 > 
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
->  arch/arm/boot/dts/qcom-apq8064-pins.dtsi | 25 +++++++++++++++++++++++++
->  arch/arm/boot/dts/qcom-apq8064.dtsi      | 13 +++++++++++++
->  2 files changed, 38 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/qcom-apq8064-pins.dtsi b/arch/arm/boot/dts/qcom-apq8064-pins.dtsi
-> index 8bb5e5f..4102a98 100644
-> --- a/arch/arm/boot/dts/qcom-apq8064-pins.dtsi
-> +++ b/arch/arm/boot/dts/qcom-apq8064-pins.dtsi
-> @@ -219,4 +219,29 @@
->  			function = "gsbi7";
->  		};
->  	};
-> +
-> +	i2c7_pins: i2c7 {
-> +		mux {
-> +			pins = "gpio84", "gpio85";
-> +			function = "gsbi7";
-> +		};
-> +
-> +		pinconf {
-> +			pins = "gpio84", "gpio85";
-> +			drive-strength = <16>;
-> +			bias-disable;
-> +		};
-> +	};
-> +
-> +	i2c7_pins_sleep: i2c7_pins_sleep {
-> +		mux {
-> +			pins = "gpio84", "gpio85";
-> +			function = "gpio";
-> +		};
-> +		pinconf {
-> +			pins = "gpio84", "gpio85";
-> +			drive-strength = <2>;
-> +			bias-disable = <0>;
-> +		};
-> +	};
 
-I've been going back and forth about having default pinconfig settings
-in the platform dtsi and having devices to override these later.
+I do think we should try to fill them all out, before they are needed.
+Especially so that people don't take the easy path of just copying
+pieces from some other 8064 dts to get going...
 
-I do find it cleaner to push this down to the board, as they should
-always be verified and tweaked by a hw guy for the specific board.
+But we can do that in a follow up if you prefer.
 
-
-For some cases this isn't really the case, based on hard design
-requirements, but for i2c it is.
-
->  };
-> diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-> index 81b4290..f064f59 100644
-> --- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-> +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-> @@ -417,6 +417,19 @@
->  				clock-names = "core", "iface";
->  				status = "disabled";
->  			};
-> +
-> +			gsbi7_i2c: i2c at 16680000 {
-
-We normally don't need to reference the i2c adaptors, so please drop
-this label.
-
-> +				compatible = "qcom,i2c-qup-v1.1.1";
-> +				pinctrl-0 = <&i2c7_pins>;
-> +				pinctrl-1 = <&i2c7_pins_sleep>;
-> +				pinctrl-names = "default", "sleep";
-> +				reg = <0x16680000 0x1000>;
-> +				interrupts = <GIC_SPI 159 IRQ_TYPE_NONE>;
-> +				clocks = <&gcc GSBI7_QUP_CLK>,
-> +					 <&gcc GSBI7_H_CLK>;
-> +				clock-names = "core", "iface";
-> +				status = "disabled";
-> +			};
+Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 
 Regards,
 Bjorn
+
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> ---
+>  .../arm/boot/dts/qcom-apq8064-dragonboard-600c.dts | 55 ++++++++++++++++++++++
+>  1 file changed, 55 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts b/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
+> index e96aab6..0a0bcfe 100644
+> --- a/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
+> +++ b/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
+> @@ -9,7 +9,62 @@
+>  		serial1 = &gsbi1_serial;
+>  	};
+>  
+> +	regulators {
+> +		compatible = "simple-bus";
+> +		vph: regulator-fixed at 1 {
+> +			compatible = "regulator-fixed";
+> +			regulator-min-microvolt = <4500000>;
+> +			regulator-max-microvolt = <4500000>;
+> +			regulator-name = "VPH";
+> +			regulator-type = "voltage";
+> +			regulator-boot-on;
+> +		};
+> +	};
+> +
+>  	soc {
+> +		rpm at 108000 {
+> +			regulators {
+> +				vdd_l1_l2_l12_l18-supply = <&pm8921_s4>;
+> +				vdd_l3_15_17-supply = <&vph>;
+> +				vdd_l4_14-supply = <&vph>;
+> +				vdd_l5_8_16-supply = <&vph>;
+> +				vdd_l6_7-supply = <&vph>;
+> +				vdd_l9_11-supply = <&vph>;
+> +				vdd_l10_22-supply = <&vph>;
+> +				vdd_l21_23_29-supply = <&vph>;
+> +				vdd_l24-supply = <&pm8921_s1>;
+> +				vdd_l25-supply = <&pm8921_s1>;
+> +				vdd_l26-supply = <&pm8921_s7>;
+> +				vdd_l27-supply = <&pm8921_s7>;
+> +				vdd_l28-supply = <&pm8921_s7>;
+> +				vin_lvs1_3_6-supply = <&pm8921_s4>;
+> +				vin_lvs2-supply = <&pm8921_s1>;
+> +				vin_lvs4_5_7-supply = <&pm8921_s4>;
+> +
+> +				s1 {
+> +					regulator-always-on;
+> +					regulator-min-microvolt = <1225000>;
+> +					regulator-max-microvolt = <1225000>;
+> +					qcom,switch-mode-frequency = <3200000>;
+> +					bias-pull-down;
+> +				};
+> +
+> +				s4 {
+> +					regulator-min-microvolt	= <1800000>;
+> +					regulator-max-microvolt	= <1800000>;
+> +					qcom,switch-mode-frequency = <3200000>;
+> +					bias-pull-down;
+> +					regulator-always-on;
+> +				};
+> +
+> +				s7 {
+> +					regulator-min-microvolt = <1300000>;
+> +					regulator-max-microvolt = <1300000>;
+> +					qcom,switch-mode-frequency = <3200000>;
+> +				 };
+> +			};
+> +		};
+> +
+>  		gsbi at 12440000 {
+>  			status = "okay";
+>  			qcom,mode = <GSBI_PROT_UART_W_FC>;
+> -- 
+> 2.5.0
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
