@@ -1,47 +1,62 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 29 Mar 2016 18:56:41 +0100
-Subject: [PATCH] i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity
-In-Reply-To: <3827347.i8fIQs6jUv@wuerfel>
-References: <m3h9fuk7ik.fsf@t19.piap.pl> <5741237.2X2Q0sCFQj@wuerfel>
- <CAJ+vNU3kBk+J-hU1OWPOS6kbFq+J0zM9QpfVy4x1VXL3hgrMTg@mail.gmail.com>
- <3827347.i8fIQs6jUv@wuerfel>
-Message-ID: <56FAC1D9.40404@arm.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 29 Mar 2016 11:15:49 -0700
+Subject: [PATCH] ARM: sa1100: Initialize gpio after gpio subsystem has been
+ initialized
+Message-ID: <1459275349-11356-1-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/03/16 16:24, Arnd Bergmann wrote:
-> On Tuesday 29 March 2016 08:10:08 Tim Harvey wrote:
->> Arnd,
->>
->> Right, on the IMX the MSI interrupt is GIC-120 which is also the
->> legacy INTD and I do see that if I happen to put a radio in a slot
->> where due to swizzling its pin1 becomes INTD (GIC-120) the interrupt
->> does fire and the device works. Any other slot using GIC-123 (INTA),
->> GIC-122 (INTB), or GIC-121 (INTC) never fires so its very possible
->> that something in the designware core is masking out the legacy irqs.
-> 
-> Interesting. I was actually expecting the opposite here, having the
-> IRQs only work if they are not IntD. 
-> 
-> 
->> I typically advise our users to 'not' enable MSI because
->> architecturally you can spread 4 distinct legacy irq's across CPU's
->> better than a single shared irq.
-> 
-> That is a very good point, I never understood why we want to enable
-> MSI support on any PCI host bridge that just forwards all MSIs
-> to a single IRQ line. Originally MSI was meant as a performance
-> feature, but there is nothing in this setup that makes things go
-> faster, and several things that make it go slower.
+The sa1100 gpio driver was initialized from interrupt initialization code,
+which is earlier than the gpio subsystem is initialized. Since commit
+ff2b13592299 ("gpio: make the gpiochip a real device"), this is fatal
+and causes the system to crash.
 
-Feature-ticking exercise.
+The sa1100 gpio driver must be initialized prior to arch_initcall, since
+its gpio pins are used in arch_initcall code, but after the gpio subsystem
+is initialized (core_initcall). Initialize it with postcore_initcall.
 
-"We support MSI", never mind if that negating the benefits of the
-mechanism and ending up with disastrous impacts on interrupt affinity,
-and a set of open questions regarding the effect of the MSI as a DMA fence.
+Fixes: ff2b13592299 ("gpio: make the gpiochip a real device")
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+---
 
-/me stops ranting for the day...
+Tested by building collie_defconfig and:
 
-	M.
+qemu-system-arm -M collie -kernel arch/arm/boot/zImage \
+	-no-reboot -initrd busybox-armv4.cpio \
+	--append "rdinit=/sbin/init console=ttySA1" -monitor null -nographic
+
+ arch/arm/mach-sa1100/generic.c | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-sa1100/generic.c b/arch/arm/mach-sa1100/generic.c
+index 345e63f4eb71..850aa7f8f649 100644
+--- a/arch/arm/mach-sa1100/generic.c
++++ b/arch/arm/mach-sa1100/generic.c
+@@ -321,6 +321,15 @@ static int __init sa1100_init(void)
+ 
+ arch_initcall(sa1100_init);
+ 
++static int __init sa1100_gpio_init(void)
++{
++	sa1100_init_gpio();
++
++	return 0;
++}
++
++postcore_initcall(sa1100_gpio_init);
++
+ void __init sa11x0_init_late(void)
+ {
+ 	sa11x0_pm_init();
+@@ -386,8 +395,6 @@ void __init sa1100_init_irq(void)
+ 	request_resource(&iomem_resource, &irq_resource);
+ 
+ 	sa11x0_init_irq_nodt(IRQ_GPIO0_SC, irq_resource.start);
+-
+-	sa1100_init_gpio();
+ }
+ 
+ /*
 -- 
-Jazz is not dead. It just smells funny...
+2.5.0
