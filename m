@@ -1,22 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 30 Mar 2016 00:26:38 +0200
-Subject: [PATCH] ARM: u8500_defconfig: turn on the Synaptics RMI4 driver
-In-Reply-To: <1458550237-11607-1-git-send-email-linus.walleij@linaro.org>
-References: <1458550237-11607-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <4997479.iKb4xpQBLQ@wuerfel>
+Date: Wed, 30 Mar 2016 00:28:29 +0200
+Subject: [PATCH 1/2] ARM: multi_v5_defconfig: Enable support for MX21/MX27
+In-Reply-To: <1458991706-30109-1-git-send-email-jlu@pengutronix.de>
+References: <1458991706-30109-1-git-send-email-jlu@pengutronix.de>
+Message-ID: <3101569.yyK0A7ozKe@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 21 March 2016 09:50:37 Linus Walleij wrote:
-> The Ux500 boards may have an RMI4 unit, and the DT fragments for
-> them have been merged upstream. Add it to the defconfig.
+On Saturday 26 March 2016 12:28:25 Jan Luebbe wrote:
+> Although the SoC support was already enabled, the drivers and machines
+> were missing.
 > 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ARM SoC folks: please apply this directly for v4.6 so our defconfig
-> is in sync with available upstream drivers.
+> Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
 > 
 
-Applied to fixes, thanks
+I thought about applying this to the bug fix branch for 4.6, but
+it doesn't seem urgent enough for that. Unless there is something
+I'm missing about why we need it now, please have these merged
+by the i.MX maintainers and sent to our next/defconfig branch for 4.7.
 
 	Arnd
