@@ -1,53 +1,122 @@
-From: wpdster@gmail.com (Patrick Doyle)
-Date: Tue, 29 Mar 2016 10:55:07 -0400
-Subject: Bad mode in undefined instruction handler detected
-Message-ID: <CAF_dkJBa3Y1EZGduZyjWqV3p5s7zf+Y4ppdeKW8anhd5nkjOPg@mail.gmail.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 29 Mar 2016 10:59:15 -0400
+Subject: [PATCH 0/3] drm/exynos: Kconfig dependency fixes
+In-Reply-To: <56FA03A3.1090205@samsung.com>
+References: <1459214937-18686-1-git-send-email-javier@osg.samsung.com>
+ <56F9DE63.6050808@samsung.com> <56F9EB3E.5080000@osg.samsung.com>
+ <56FA03A3.1090205@samsung.com>
+Message-ID: <56FA9843.70806@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello folks...
-I am looking for a clue as to how I might debug the following kernel oops:
+Hello Seung-Woo,
 
-Bad mode in undefined instruction handler detected
-Internal error: Oops - bad mode: 0 [#1] ARM
-Modules linked in: usb_f_eem g_ether u_ether libcomposite atmel_usba_udc
-CPU: 0 PID: 0 Comm: swapper Not tainted 4.1.0-linux4sam_5.1 #4
-Hardware name: Atmel SAMA5
-task: c11440b8 ti: c1140000 task.ti: c1140000
-PC is at _einittext+0x3f9456e8/0xfffdb400
-LR is at 0xc0c565c8
-pc : [<ffff0024>]    lr : [<c0c565c8>]    psr: 600e0192
-sp : c1141f30  ip : 00000019  fp : c11420d0
-r10: c1147548  r9 : 00000132  r8 : b0a5c253
-r7 : 00000132  r6 : b0a5bacb  r5 : 00000000  r4 : c1162d10
-r3 : 00000132  r2 : b0a5c253  r1 : fffffff9  r0 : c1141f78
-Flags: nZCv  IRQs off  FIQs on  Mode IRQ_32  ISA ARM  Segment kernel
-Control: 10c53c7d  Table: 24804059  DAC: 00000015
-Process swapper (pid: 0, stack limit = 0xc1140208)
-Stack: (0xc1141f30 to 0xc1142000)
-1f20:                                     c1141f78 fffffff9 b0a5c253 00000132
-1f40: c1162d10 00000000 b0a5bacb 00000132 b0a5c253 00000132 c1147548 c11420d0
-1f60: 00000019 c1141f30 c0c565c8 ffff0024 600e0192 ffffffff b0a5c253 00000132
-1f80: 00000001 c1140000 c11420c8 c1162d10 c11631c4 00000001 c1162d08 c1147548
-1fa0: c11420d0 c003c9f0 00000000 c116d57b 00000000 c1142000 00000000 c0686c34
-1fc0: ffffffff ffffffff c0686680 00000000 00000000 c06ad280 c116db14 c1142078
-1fe0: c06ad27c c114518c 20004059 410fc051 00000000 20008078 00000000 00000000
-Code: ea000481 ea000400 ea000487 e7fddef1 (e7fddef1)
----[ end trace bf564fba2bcf8264 ]---
-Kernel panic - not syncing: Attempted to kill the idle task!
----[ end Kernel panic - not syncing: Attempted to kill the idle task!
+On 03/29/2016 12:25 AM, Seung-Woo Kim wrote:
+> Hello Javier,
+> 
+> On 2016? 03? 29? 11:41, Javier Martinez Canillas wrote:
+>> Hello Seung-Woo,
+>>
+>> Thanks a lot for your feedback.
+>>
+>> On 03/28/2016 09:46 PM, Seung-Woo Kim wrote:
+>>> Hi Javier,
+>>>
+>>> On 2016? 03? 29? 10:28, Javier Martinez Canillas wrote:
+>>>> Hello Inki,
+>>>>
+>>>> This patch series contains some fixes for the Kconfig symbol dependencies
+>>>> of the Exynos DRM driver. They make sure that the Exynos DRM components
+>>>> and the media platform drivers that makes use of the same HW IP block are
+>>>> not enabled at the same time.
+>>>>
+>>>> Best regards,
+>>>> Javier
+>>>>
+>>>>
+>>>> Javier Martinez Canillas (3):
+>>>>   drm/exynos: Use VIDEO_SAMSUNG_S5P_G2D=n as G2D Kconfig dependency
+>>>>   drm/exynos: Use VIDEO_SAMSUNG_EXYNOS_GSC=n as GSC Kconfig dependency
+>>>>   drm/exynos: Make DRM_EXYNOS_FIMC depend on VIDEO_S5P_FIMC=n
+>>>
+>>> In G2D case, there is only one instance, but for the other cases, there
+>>> are several instances and in my environment, I enable both drivers on
+>>> v4l2 and drm FIMC/GSC.
+>>>
+>>> So, IMHO, the not-enabled v4l2 dependency is not really required for drm
+>>> fimc and drm gsc.
+>>>
+>>
+>> I'm confused, it was you who added the depends on !VIDEO_SAMSUNG_EXYNOS_GSC
+>> for DRM_EXYNOS_GSC in commit aeefb36832e5 ("drm/exynos: gsc: add device tree
+>> support and remove usage of static mappings").
+> 
+> Yes, you are right. Originally, my goal on the GSC was bringing optional
+> flag for setting isp mode or wb mode like FIMC in tizen.org git tree.
+> 
+> https://review.tizen.org/git/?p=platform/kernel/linux-exynos.git;a=blobdiff;f=Documentation/devicetree/bindings/media/exynos5-gsc.txt;h=d526777a3abd04d244c46fdd729e3df93bb86917;hp=0604d42f38d1941526d47ad11a958a2a83797f97;hb=751cd6d88d9620c83042641b52fdd244408a3947;hpb=7c7ab44f86d64ba6a6733da8f201a26a6c0e807f
+> 
+> But only devicetree part of GSC was upstreamed and simultaneous enabling
+> both v4l2 gsc and drm gsc driver is removed. The only reason I set both
+> driver simultaneously was enabling video codec, exynos-mfc with gsc to
+> convert RGB plane.
+> 
+> I know Marek already has plan to integrate yuv plane feature of GSC to
+> DRM KMS. Also, for GSC, simultaneous setup is alredy remove, so your
+> patch seems better.
+>
 
-This reproduces quite regularly on my (custom SAMA5) development board
-when transferring data from a camera (wired to the ISI port) to an
-external host via USB.  So the problem could be related to the camera
-driver, the USB driver, or something completely different (such as a
-memory error that happens to occur with the same symptoms every time I
-run my code for 5 to 10 minutes, despite the fact that I am unable to
-induce a memory error by running stress, stress-ng, or memtester).
+Ok, thanks for the confirmation. So at least patch 1/3 and 3/3 are needed then.
+ 
+>>
+>> >From the commit message "The driver cannot be used simultaneously with V4L2
+>> Mem2Mem GScaller driver thought". Did that assumption changed and the depend
+>> should be removed then? or maybe I misunderstood what you meant.
+>>
+>> Now, I'm not really sure about FIMC either, it was feedback I got from this
+>> patch [0]. Could you please take a look to that and let me know if enabling
+>> these drivers simultaneously makes sense then?
+> 
+> About FIMC, there is still simultaneous setup for both v4l2 and drm
+> driver with devicetree binding flags, samsung,isp-wb and samsung,lcd-wb.
+> 
+> If on the FIMC instance of dt node, samsung,lcd-wb is set, then drm
+> driver is probed, otherwise v4l2 driver is probed.
+> 
 
-Any clues as to how I might parse this oops and ultimately track down
-the root cause of this would be greatly appreciated.
+Interesting, I didn't know about these DT properties. I see that some FIMC nodes
+are using both though like in arch/arm/boot/dts/exynos4x12.dtsi. Is that a bug?
 
-Thanks.
+So if both the DRM and V4L2 drivers can be enabled at the same time for FIMC,
+then patch 3/3 should be dropped and instead the exynos_defconfig patch that
+enables CONFIG_VIDEO_S5P_FIMC should be picked IMHO.
 
---wpd
+> Simultaneous FIMC driver is also only for RGB converting of video codec
+> planes like GSC at least to me.
+> 
+> Marek, do you have any idea about the simultaneous setup for fimc and gsc?
+> 
+> Best Regards,
+> - Seung-Woo Kim
+> 
+>>
+>>> Best Regards,
+>>> - Seung-Woo Kim
+>>>
+>>>>
+>>>>  drivers/gpu/drm/exynos/Kconfig | 6 +++---
+>>>>  1 file changed, 3 insertions(+), 3 deletions(-)
+>>>>
+>>>
+>>
+>> [0]: https://lkml.org/lkml/2016/3/23/292
+>>
+>> Best regards,
+>>
+> 
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
