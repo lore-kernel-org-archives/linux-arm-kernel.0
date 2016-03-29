@@ -1,41 +1,53 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Mar 2016 21:32:07 +0200
-Subject: [PATCH 2/3] swiotlb: prefix dma_to_phys and phys_to_dma functions
-In-Reply-To: <CACJDEmrzKOExg-Rchjy2hfVzkzbCZ=WNn4Bu3EVgim748VvRig@mail.gmail.com>
-References: <1458252137-24497-1-git-send-email-okaya@codeaurora.org>
- <56EC1805.5060207@codeaurora.org>
- <CACJDEmrzKOExg-Rchjy2hfVzkzbCZ=WNn4Bu3EVgim748VvRig@mail.gmail.com>
-Message-ID: <6420021.rzhE3kJKJP@wuerfel>
+Date: Tue, 29 Mar 2016 21:39:20 +0200
+Subject: [PATCH] i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity
+In-Reply-To: <CAJ+vNU01JFRXSzF-0OhvyLds03mbbeBbw0by0dwuCotdxpDuog@mail.gmail.com>
+References: <m3h9fuk7ik.fsf@t19.piap.pl> <3827347.i8fIQs6jUv@wuerfel>
+ <CAJ+vNU01JFRXSzF-0OhvyLds03mbbeBbw0by0dwuCotdxpDuog@mail.gmail.com>
+Message-ID: <3601512.SumN6MaWDe@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 28 March 2016 14:29:29 Konrad Rzeszutek Wilk wrote:
-> > diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-> > index ada00c3..8c0f66b 100644
-> > --- a/arch/arm64/mm/dma-mapping.c
-> > +++ b/arch/arm64/mm/dma-mapping.c
-> > @@ -29,6 +29,14 @@
+On Tuesday 29 March 2016 10:38:16 Tim Harvey wrote:
+> On Tue, Mar 29, 2016 at 8:24 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Tuesday 29 March 2016 08:10:08 Tim Harvey wrote:
+> >> Arnd,
+> >>
+> >> Right, on the IMX the MSI interrupt is GIC-120 which is also the
+> >> legacy INTD and I do see that if I happen to put a radio in a slot
+> >> where due to swizzling its pin1 becomes INTD (GIC-120) the interrupt
+> >> does fire and the device works. Any other slot using GIC-123 (INTA),
+> >> GIC-122 (INTB), or GIC-121 (INTC) never fires so its very possible
+> >> that something in the designware core is masking out the legacy irqs.
 > >
-> >  #include <asm/cacheflush.h>
+> > Interesting. I was actually expecting the opposite here, having the
+> > IRQs only work if they are not IntD.
 > >
-> > +/*
-> > + * If you are building a system without IOMMU, then you are using SWIOTLB
-> > + * library. The ARM64 adaptation of this library does not support address
-> > + * translation and it assumes that physical address = dma address for such
-> > + * a use case. Please don't build a platform that violates this.
-> > + */
+> >
+> >> I typically advise our users to 'not' enable MSI because
+> >> architecturally you can spread 4 distinct legacy irq's across CPU's
+> >> better than a single shared irq.
+> >
+> > That is a very good point, I never understood why we want to enable
+> > MSI support on any PCI host bridge that just forwards all MSIs
+> > to a single IRQ line. Originally MSI was meant as a performance
+> > feature, but there is nothing in this setup that makes things go
+> > faster, and several things that make it go slower.
 > 
-> Why not just expand the ARM64 part to support address translation?
+> I had a conversation once with Lucas about implementing the shared MSI
+> interrupt in such a way that its smp affinity could be set to other
+> CPU's to gain a performance benefit in certain multi-device cases.
+> 
+> While this is technically possible it would involve creating a softirq
+> glue between the different handlers but that would add overhead of a
+> softirq plus potentially waking up another CPU to every IRQ which
+> would end up adding some overhead to even the simple single-device
+> case.
+> 
+> Without any hard data it wasn't clear if this was worth it or if there
+> was a clean way to provide this as build-time or run-time option.
 
-Because so far all hardware we have is relatively sane. We only
-need to implement this if someone accidentally puts their DMA
-space at the wrong address.
-
-There is at least one platform that could in theory use this because
-their RAM starts at an address that is outside of the reach of 32-bit
-devices, and a static IOMMU mapping (created by firmware) could be
-used to map the start of RAM into DMA address zero, to avoid having
-to use an IOMMU all the time, but it was considered not worth the
-effort to implement that.
+I think it's pretty clear that this would take things from 'somewhat silly'
+to 'completely bonkers' ;-)
 
 	Arnd
