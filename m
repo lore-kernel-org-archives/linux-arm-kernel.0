@@ -1,36 +1,45 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Tue, 29 Mar 2016 22:45:18 +0200
-Subject: [PATCH v4 3/8] Documentation: devicetree: rockchip: Document
- GeekBox
-In-Reply-To: <31070685.TnxqGeNupO@diego>
-References: <1458136727-32075-1-git-send-email-afaerber@suse.de>
- <1458136727-32075-4-git-send-email-afaerber@suse.de>
- <31070685.TnxqGeNupO@diego>
-Message-ID: <56FAE95E.6060900@suse.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 29 Mar 2016 14:00:18 -0700
+Subject: [PATCH v2] spi: orion.c: Add direct access mode
+In-Reply-To: <7339827.UeYZLZET5g@wuerfel>
+References: <1458663893-13766-1-git-send-email-sr@denx.de>
+ <21028994.N5ajfyoUoV@wuerfel> <20160329195230.GK2350@sirena.org.uk>
+ <7339827.UeYZLZET5g@wuerfel>
+Message-ID: <20160329210018.GL2350@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 29.03.2016 um 22:13 schrieb Heiko St?bner:
-> Am Mittwoch, 16. M?rz 2016, 14:58:41 schrieb Andreas F?rber:
->> Use "geekbuying,geekbox" compatible string.
->>
->> Acked-by: Rob Herring <robh@kernel.org>
->> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> 
-> I've folded this patch into the geekbox dts patch, carrying Rob's Ack for the 
-> binding over.
+On Tue, Mar 29, 2016 at 10:04:59PM +0200, Arnd Bergmann wrote:
+> On Tuesday 29 March 2016 12:52:30 Mark Brown wrote:
 
-Either you just made a mistake in my name or
-https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/Documentation/devicetree/bindings/submitting-patches.txt
-needs an update. It clearly says:
+> > Well, we currently don't have any XIP or whatever support at all, it's
+> > still only in the SPI operations so it's academic - that'd be a future
+> > issue if we did start doing things that accessed the memory map outside
+> > of the SPI flow.
 
-"1) The Documentation/ portion of the patch should be a separate patch."
+> Isn't this just about implementing .point()/.unpoint() in the spi-nor
+> driver?
 
-That's why I always do it this way.
+Implementing that would require the SPI core to export something
+providing access to the memory regions.  We don't currently do that,
+it'd require us to deal with the interaction with access as a SPI device
+(this hardware often seems to only accelerate reads so we still need to
+use regular SPI access for writes).
 
-Regards,
-Andreas
+> > For me the simplest thing seems like just using one window for all the
+> > devices, it seems more likely to deliver useful results without the
+> > system integrator having to think about how to configure this for
+> > optimisation.
 
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton; HRB 21284 (AG N?rnberg)
+> Do you mean single-window mode? I don't see the difference to the other
+> modes, but that's certainly fine with me if it helps.
+
+I don't like having to assign windows per device, like I say it seems
+like more work.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160329/a5f0c702/attachment-0001.sig>
