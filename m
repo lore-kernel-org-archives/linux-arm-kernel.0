@@ -1,32 +1,32 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 29 Mar 2016 20:52:46 +0530
-Subject: [PATCH V2 3/3] cpufreq: exynos: Use generic platdev driver
-In-Reply-To: <3810049.oQlCXiQ5bk@wuerfel>
-References: <cover.1459233524.git.viresh.kumar@linaro.org>
- <81a8da75a0e7783e2b47f9e04297f167e8134afe.1459233524.git.viresh.kumar@linaro.org>
- <3810049.oQlCXiQ5bk@wuerfel>
-Message-ID: <CAKohpomQ9=YK79o0fqHqZ7xexHv5EMJSPx+4KrT0RxeMh+hwWg@mail.gmail.com>
+From: yendapally.reddy@broadcom.com (Yendapally Reddy Dhananjaya Reddy)
+Date: Tue, 29 Mar 2016 11:22:10 -0400
+Subject: [PATCH RESEND 0/2] pinmux support for Broadcom NS2 SoC
+Message-ID: <1459264932-27884-1-git-send-email-yendapally.reddy@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 March 2016 at 20:34, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 29 March 2016 12:09:49 Viresh Kumar wrote:
->> -static void __init exynos_cpufreq_init(void)
->> -{
->> -       struct device_node *root = of_find_node_by_path("/");
->> -       const struct of_device_id *match;
->> -
->> -       match = of_match_node(exynos_cpufreq_matches, root);
->> -       if (!match) {
->> -               platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
->> -               return;
->> -       }
->> -
->> -       platform_device_register_simple(match->data, -1, NULL, 0);
->> -}
->
-> How is the "exynos-cpufreq" case handled now? Is that no longer used now?
-> I assume the patch is correct based on Krzysztof's review, but it might be
-> good to explain this better.
+This patchset contains the pinmux support for the Broadcom's
+Northstar 2 (NS2) SoC.
 
-That's stale code, the driver got removed some time back.
+The first patch provides the driver details and the second patch contains
+the enable method. The documentation details patch is already merged.
+
+This patch set has been tested on NS2 bcm958712K board.
+This patch set is based on v4.6.0-rc1 and is available from github
+repo: https://github.com/Broadcom/arm64-linux.git
+branch: ns2-pinmux-v1
+
+Yendapally Reddy Dhananjaya Reddy (2):
+  pinctrl: ns2: add pinmux driver support for Broadcom NS2 SoC
+  ARM: dts: enable pinctrl for Broadcom NS2 SoC
+
+ arch/arm64/boot/dts/broadcom/ns2-svk.dts |    9 +
+ arch/arm64/boot/dts/broadcom/ns2.dtsi    |    7 +
+ drivers/pinctrl/bcm/Kconfig              |   13 +
+ drivers/pinctrl/bcm/Makefile             |    1 +
+ drivers/pinctrl/bcm/pinctrl-ns2-mux.c    | 1122 ++++++++++++++++++++++++++++++
+ 5 files changed, 1152 insertions(+)
+ create mode 100644 drivers/pinctrl/bcm/pinctrl-ns2-mux.c
+
+-- 
+2.1.0
