@@ -1,65 +1,65 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Mar 2016 14:42:08 +0200
-Subject: [RFC5 PATCH v6 00/21] ILP32 for ARM64
-In-Reply-To: <20160329120147.GA3551@yury-N73SV>
-References: <1452792198-10718-1-git-send-email-ynorov@caviumnetworks.com>
- <4405408.txAtlZbTDH@wuerfel> <20160329120147.GA3551@yury-N73SV>
-Message-ID: <4942019.FGzfTdnOaZ@wuerfel>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 29 Mar 2016 13:44:01 +0100
+Subject: [RFC PATCH 1/3] arm64: Append more field of id_aa64mmfr2 for
+ cpufeature
+In-Reply-To: <1458898209-7486-2-git-send-email-wangkefeng.wang@huawei.com>
+References: <1458898209-7486-1-git-send-email-wangkefeng.wang@huawei.com>
+ <1458898209-7486-2-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <20160329124401.GE26574@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 March 2016 15:01:47 Yury Norov wrote:
-> On Tue, Mar 29, 2016 at 12:58:25PM +0200, Arnd Bergmann wrote:
-> > On Saturday 26 March 2016 20:36:43 Zhangjian wrote:
-> > > 
-> > > I am a little bit confuse about off_t. In "[PATCH 08/33] 32-bit
-> > > ABI: introduce ARCH_32BIT_OFF_T config option", it mentioned that all
-> > > the new 32bit architecture should use 64bit off_t.
-> > 
-> > Ah, so it is part of the series. I had not checked that here.
-> > 
+On Fri, Mar 25, 2016 at 05:30:07PM +0800, Kefeng Wang wrote:
+> There are some new cpu features which can be identified by id_aa64mmfr2,
+> this patch appends all fields of it.
+
+FWIW, this looks like a good thing regardless of the cpuinfo patches.
+
+The shifts look right to me. I'm not all that familiar with each of the
+features, so I don't know whether or not we need strict exact matching
+(though it's a safer to assume that we do for now).
+
+Mark.
+
 > 
-> I'm preparing new submission now. I can join off_t, s390 and ilp32
-> patchsets. It seems, they will not be grabbed separately anyway, so
-> this may decrease confusions like this.
+> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+> ---
+>  arch/arm64/include/asm/sysreg.h | 4 ++++
+>  arch/arm64/kernel/cpufeature.c  | 4 ++++
+>  2 files changed, 8 insertions(+)
 > 
-> Arnd?
-
-Yes, that sounds good.
-
-> > > Should we define off_t in aarch64(for both ilp32 and lp64) in
-> > > typesize.h as following?
-> > > 
-> > > diff --git a/sysdeps/unix/sysv/linux/aarch64/bits/typesizes.h b/sysdeps/unix/sysv/linux/aarch64/bits/typesizes.h
-> > > index 7073493..13b77c5 100644
-> > > --- a/sysdeps/unix/sysv/linux/aarch64/bits/typesizes.h
-> > > +++ b/sysdeps/unix/sysv/linux/aarch64/bits/typesizes.h
-> > > @@ -33,7 +33,7 @@
-> > >   #define __INO64_T_TYPE         __UQUAD_TYPE
-> > >   #define __MODE_T_TYPE          __U32_TYPE
-> > >   #define __NLINK_T_TYPE         __U32_TYPE
-> > > -#define __OFF_T_TYPE           __SLONGWORD_TYPE
-> > > +#define __OFF_T_TYPE           __SQUAD_TYPE
-> > >   #define __OFF64_T_TYPE         __SQUAD_TYPE
-> > >   #define __PID_T_TYPE           __S32_TYPE
-> > >   #define __RLIM_T_TYPE          __ULONGWORD_TYPE
-> > > 
-> > > Then we could remove the __USE_FILE_OFFSET64 in stat.h and fcnt.h in
-> > > aarch64. And truncate and ftruncate is same as truncate64 and
-> > > ftruncate64.
-> > 
-> > I don't know what the glibc developers prefer, but I think the
-> > result needs to be something like that: either __OFF_T_TYPE is
-> > defined as you write above as a 64-bit type, or the user-visible
-> > off_t typedef unconditionally uses __OFF64_T_TYPE rather than
-> > __OFF_T_TYPE.
-> > 
+> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+> index 1a78d6e..c141243 100644
+> --- a/arch/arm64/include/asm/sysreg.h
+> +++ b/arch/arm64/include/asm/sysreg.h
+> @@ -142,7 +142,11 @@
+>  #define ID_AA64MMFR1_HADBS_SHIFT	0
+>  
+>  /* id_aa64mmfr2 */
+> +#define ID_AA64MMFR2_LVA_SHIFT		16
+> +#define ID_AA64MMFR2_IESB_SHIFT		12
+> +#define ID_AA64MMFR2_LSM_SHIFT		8
+>  #define ID_AA64MMFR2_UAO_SHIFT		4
+> +#define ID_AA64MMFR2_CNP_SHIFT		0
+>  
+>  /* id_aa64dfr0 */
+>  #define ID_AA64DFR0_CTX_CMPS_SHIFT	28
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index 943f514..677f17c 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -130,7 +130,11 @@ static struct arm64_ftr_bits ftr_id_aa64mmfr1[] = {
+>  };
+>  
+>  static struct arm64_ftr_bits ftr_id_aa64mmfr2[] = {
+> +	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR2_LVA_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR2_IESB_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR2_LSM_SHIFT, 4, 0),
+>  	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR2_UAO_SHIFT, 4, 0),
+> +	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR2_CNP_SHIFT, 4, 0),
+>  	ARM64_FTR_END,
+>  };
+>  
+> -- 
+> 1.7.12.4
 > 
-> I'm not the glibc developer as well, but I think it's OK.
-
-Which of the two? I guess with the example that Bamvor gave
-regarding struct stat, the latter is what we want, forcing the
-use of __USE_FILE_OFFSET64 rather than changing the definition of
-__OFF_T_TYPE.
-
-	Arnd
