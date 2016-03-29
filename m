@@ -1,46 +1,49 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 29 Mar 2016 12:52:30 -0700
-Subject: [PATCH v2] spi: orion.c: Add direct access mode
-In-Reply-To: <21028994.N5ajfyoUoV@wuerfel>
-References: <1458663893-13766-1-git-send-email-sr@denx.de>
- <29105031.S6XB0bXn2i@wuerfel> <20160329164758.GQ2350@sirena.org.uk>
- <21028994.N5ajfyoUoV@wuerfel>
-Message-ID: <20160329195230.GK2350@sirena.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 29 Mar 2016 21:04:20 +0100
+Subject: Bad mode in undefined instruction handler detected
+In-Reply-To: <CAF_dkJBR+n-ijE2YBmt3KR=B3VOkh4mu-d5YiXNDDCVihkgH6Q@mail.gmail.com>
+References: <CAF_dkJBa3Y1EZGduZyjWqV3p5s7zf+Y4ppdeKW8anhd5nkjOPg@mail.gmail.com>
+ <20160329165940.GA19428@n2100.arm.linux.org.uk>
+ <CAF_dkJA=4iqD=siV5RM7KTDfEQGtKc3G17E+C+K+-_hmneK4aA@mail.gmail.com>
+ <20160329182922.GC19428@n2100.arm.linux.org.uk>
+ <CAF_dkJBR+n-ijE2YBmt3KR=B3VOkh4mu-d5YiXNDDCVihkgH6Q@mail.gmail.com>
+Message-ID: <20160329200420.GD19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 29, 2016 at 09:49:09PM +0200, Arnd Bergmann wrote:
-> On Tuesday 29 March 2016 09:47:58 Mark Brown wrote:
+On Tue, Mar 29, 2016 at 03:18:08PM -0400, Patrick Doyle wrote:
+> On Tue, Mar 29, 2016 at 2:29 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > THUMB2_KERNEL is an option, which I believe you already have disabled.
+> > So, the offending option is probably ARM_UNWIND.  You are provided with
+> > the ARM_UNWIND option, and you need to say no to that.  Don't try to
+> > build a kenrel with frame pointers and unwinding together - it'll
+> > probably fail, or if you succeed in building it, it probably won't
+> > work correctly since that's a combination we don't support.
+> >
+> Right, I can confirm that building with both produces a kernel that
+> doesn't boot (for me anyway).  Unfortunately, enabling FRAME_POINTER
+> instead of ARM_UNWIND produced a kernel which, when it crashed only
+> told me:
+> 
+> Unable to handle kernel paging request at virtual address e5912144
+> pgd = c0004000
+> [e5912144] *pgd=00000000
+> Internal error: Oops: 5 [#1] ARM
+> 
+> Is there something else I need to enable to get a more verbose dump?
 
-> > Well, in the cases where we have one device on the bus then it's not a
-> > big deal since we can check what the last thing we set was.  The direct
-> > access stuff is going to have trouble if we have multiple devices on the
-> > bus since we try to mix it with non-MMIO access we run the risk of
-> > conflicting simultaneous use unless we continue to route everything
-> > through the SPI subsystem (like we do with the current flash read
-> > support).
+Sounds like you're getting memory corruption, and this time it's
+(possibly) overwriting bits of the kernel responsible for dumping
+this data.
 
-> Maybe we can avoid that if we enforce at the driver level that we
-> use the same mode for all slaves? The way I read the manual, I think
-> that's how it is intended at least.
+If it only happens when using the camera, it sounds to me (at least)
+as though the camera driver is buggy, and that's outside of my
+expertise.  That's guess-work though.
 
-Well, we currently don't have any XIP or whatever support at all, it's
-still only in the SPI operations so it's academic - that'd be a future
-issue if we did start doing things that accessed the memory map outside
-of the SPI flow.
+I'm afraid that I don't think I can help in this case, sorry.
 
-> Also, as mentioned we don't have any machine with more than one SPI
-> slave so far, so we don't really need to overengineer it and can
-> go for the simplest implementation in the SPI master driver.
-
-For me the simplest thing seems like just using one window for all the
-devices, it seems more likely to deliver useful results without the
-system integrator having to think about how to configure this for
-optimisation.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160329/10feda5e/attachment.sig>
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
