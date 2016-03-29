@@ -1,110 +1,75 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 29 Mar 2016 16:02:32 +0100
-Subject: [PATCH 11/12] ARM: dts: dragonboard-600c: add i2c support
-In-Reply-To: <20160329144437.GN8929@tuxbot>
+Date: Tue, 29 Mar 2016 16:02:43 +0100
+Subject: [PATCH 00/12] ARM: dts: Add dragonboard-600c support.
+In-Reply-To: <20160329145448.GP8929@tuxbot>
 References: <1458762366-9233-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1458762490-9814-1-git-send-email-srinivas.kandagatla@linaro.org>
- <20160329144437.GN8929@tuxbot>
-Message-ID: <56FA9908.80205@linaro.org>
+ <20160329145448.GP8929@tuxbot>
+Message-ID: <56FA9913.7040308@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 29/03/16 15:44, Bjorn Andersson wrote:
-> On Wed 23 Mar 12:48 PDT 2016, Srinivas Kandagatla wrote:
+On 29/03/16 15:54, Bjorn Andersson wrote:
+> On Wed 23 Mar 12:46 PDT 2016, Srinivas Kandagatla wrote:
 >
->> This patch adds nodes required to enable 4 i2c buses on the board which
->> are connected to various sensors and eeprom.
+>> Hi Andy,
 >>
+>> This patchset adds support to Dragonboard 600c which is based on APQ8064.
+>>
+>> With this patchset, except spi I was able to test all the below features
+>> on this board on top of linus master branch.
+>> 1> i2c
+>> 2> spi
+>> 3> sd/mmc with card detect
+>> 4> eMMC
+>> 5> USB
+>> 6> SATA
+>> 7> on board Ethernet based on PCIE.
+>> 8> user and activity leds.
+>>
+>> AHCI SATA is broken on APQ8064 on mainline, due to changes in libahci, fix is
+>> being discussed which should not effect this dt patches anyway.
+>> This patchset also has a fix to i2c/spi pinctrls which was not set correctly
+>> in my previous apq8064 patches, I have verified this patchset with eeprom and
+>> sensors on the board, you might want to take that patch in next rc.
+>>
+>> Thanks,
+>> srini
+>>
+>> Srinivas Kandagatla (12):
+>>    ARM: dts: apq8064: fix the pinctrls for i2c and spi
+>>    ARM: dts: apq8064: add support to gsbi1 uart
+>>    ARM: dts: apq8064: add gsbi7 i2c support
+>>    ARM: dts: dragonboard-600c: add board support with serial
+>>    ARM: dts: dragonboard-600c: add pmic regulator supplies
+>>    ARM: dts: dragonboard-600c: Add eMMC and SD card support
+>>    ARM: dts: dragonboard-600c: add usb support
+>>    ARM: dts: dragonboard-600c: add pcie support
+>>    ARM: dts: dragonboard-600c: add on board sata support.
+>>    ARM: dts: dragonboard-600c: Add on board leds support
+>>    ARM: dts: dragonboard-600c: add i2c support
+>>    ARM: dts: dragonboard-600c: add spi support
 >
-> I would like for the pinconf for these blocks to be in this patch (and
-> file) to make it clear how they are configured and where to change them.
->
-When I started adding this I had same opinion, I will do that in next 
-release.
+> Please abbreviate db600c (and drop those upper case As).
 
-thanks,
+Yep. Will do.
+>
+>>
+>>   arch/arm/boot/dts/Makefile                         |   1 +
+>>   .../arm/boot/dts/qcom-apq8064-dragonboard-600c.dts | 377 +++++++++++++++++++++
+>
+> Please make this qcom-apq8064-arrow-db600c.dts
+Ok, makes sense.
+
+thanks
 srini
+>
+>>   arch/arm/boot/dts/qcom-apq8064-pins.dtsi           |  39 +++
+>>   arch/arm/boot/dts/qcom-apq8064.dtsi                |  41 ++-
+>>   4 files changed, 452 insertions(+), 6 deletions(-)
+>>   create mode 100644 arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
+>
 > Regards,
 > Bjorn
 >
->> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->> ---
->>   .../arm/boot/dts/qcom-apq8064-dragonboard-600c.dts | 46 ++++++++++++++++++++++
->>   1 file changed, 46 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts b/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
->> index 4fecd94..942de04 100644
->> --- a/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
->> +++ b/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
->> @@ -8,6 +8,10 @@
->>   	aliases {
->>   		serial0 = &gsbi7_serial;
->>   		serial1 = &gsbi1_serial;
->> +		i2c0 = &gsbi2_i2c;
->> +		i2c1 = &gsbi3_i2c;
->> +		i2c2 = &gsbi4_i2c;
->> +		i2c3 = &gsbi7_i2c;
->>   	};
->>
->>   	regulators {
->> @@ -180,6 +184,42 @@
->>   			};
->>   		};
->>
->> +		gsbi at 12480000 {
->> +			status = "okay";
->> +			qcom,mode = <GSBI_PROT_I2C>;
->> +			i2c at 124a0000 {
->> +				/* On Low speed expansion and Sensors */
->> +				label = "LS-I2C0";
->> +				status = "okay";
->> +			};
->> +		};
->> +
->> +		gsbi at 16200000 {
->> +			status = "okay";
->> +			qcom,mode = <GSBI_PROT_I2C>;
->> +			i2c at 16280000 {
->> +			/* On Low speed expansion */
->> +				status = "okay";
->> +				label = "LS-I2C1";
->> +				clock-frequency = <200000>;
->> +				eeprom at 52 {
->> +					compatible = "atmel,24c128";
->> +					reg = <0x52>;
->> +					pagesize = <64>;
->> +				};
->> +			};
->> +		};
->> +
->> +		gsbi at 16300000 {
->> +			status = "okay";
->> +			qcom,mode = <GSBI_PROT_I2C>;
->> +			i2c at 16380000 {
->> +				/* On High speed expansion */
->> +				label = "HS-CAM-I2C3";
->> +				status = "okay";
->> +			};
->> +		};
->> +
->>   		/* DEBUG UART  */
->>   		gsbi at 16600000 {
->>   			status = "okay";
->> @@ -190,6 +230,12 @@
->>   				pinctrl-names = "default";
->>   				pinctrl-0 = <&gsbi7_uart_2pins>;
->>   			};
->> +
->> +			i2c at 16680000 {
->> +				/* On High speed expansion */
->> +				status = "okay";
->> +				label = "HS-CAM-I2C2";
->> +			};
->>   		};
->>
->>   		leds {
->> --
->> 2.5.0
->>
