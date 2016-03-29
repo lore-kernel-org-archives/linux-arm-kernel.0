@@ -1,37 +1,100 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 29 Mar 2016 11:10:09 +0100
-Subject: [PATCH 2/4] mfd: axp20x: Add AXP209 GPIO driver to the mfd
-In-Reply-To: <20160329095838.GJ30977@lukather>
-References: <1457520614-32239-1-git-send-email-maxime.ripard@free-electrons.com>
- <1457520614-32239-3-git-send-email-maxime.ripard@free-electrons.com>
- <20160321115410.GC4140@x1> <20160329095838.GJ30977@lukather>
-Message-ID: <20160329101009.GE8659@x1>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Tue, 29 Mar 2016 11:10:03 +0100
+Subject: [PATCH] ARM: kexec: fix crashkernel= handling
+Message-ID: <E1akqb5-0002LZ-1f@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 Mar 2016, Maxime Ripard wrote:
+When the kernel crashkernel parameter is specified with just a size, we
+are supposed to allocate a region from RAM to store the crashkernel.
+However, ARM merely reserves physical address zero with no checking
+that there is even RAM there.
 
-> Hi Lee,
-> 
-> On Mon, Mar 21, 2016 at 11:54:10AM +0000, Lee Jones wrote:
-> > On Wed, 09 Mar 2016, Maxime Ripard wrote:
-> > 
-> > > Now that we have a GPIO driver for the AXP209, we can add it to our MFD.
-> > > 
-> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > > ---
-> > >  drivers/mfd/axp20x.c | 3 +++
-> > >  1 file changed, 3 insertions(+)
-> > 
-> > Applied, thanks.
-> 
-> There's still some discussions about the whole design of the driver,
-> can you drop that patch for now?
+Fix this by lifting similar code from x86, importing it to ARM with
+the ARM specific parameters added.
 
-Sure.  Done.
+Update the kdump documentation to reflect this change.
 
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ Documentation/kdump/kdump.txt | 13 +++----------
+ arch/arm/kernel/setup.c       | 26 ++++++++++++++++++++++++++
+ 2 files changed, 29 insertions(+), 10 deletions(-)
+
+diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
+index bc4bd5a44b88..88ff63d5fde3 100644
+--- a/Documentation/kdump/kdump.txt
++++ b/Documentation/kdump/kdump.txt
+@@ -263,12 +263,6 @@ been removed from the machine.
+     crashkernel=<range1>:<size1>[,<range2>:<size2>,...][@offset]
+     range=start-[end]
+ 
+-Please note, on arm, the offset is required.
+-    crashkernel=<range1>:<size1>[,<range2>:<size2>,...]@offset
+-    range=start-[end]
+-
+-    'start' is inclusive and 'end' is exclusive.
+-
+ For example:
+ 
+     crashkernel=512M-2G:64M,2G-:128M
+@@ -307,10 +301,9 @@ Boot into System Kernel
+    on the memory consumption of the kdump system. In general this is not
+    dependent on the memory size of the production system.
+ 
+-   On arm, use "crashkernel=Y at X". Note that the start address of the kernel
+-   will be aligned to 128MiB (0x08000000), so if the start address is not then
+-   any space below the alignment point may be overwritten by the dump-capture kernel,
+-   which means it is possible that the vmcore is not that precise as expected.
++   On arm, the use of "crashkernel=Y at X" is no longer necessary; the
++   kernel will automatically locate the crash kernel image within the
++   first 512MB of RAM if X is not given.
+ 
+ 
+ Load the Dump-capture Kernel
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 7d0cba6f1cc5..5d8511c425f0 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -938,6 +938,13 @@ static int __init init_machine_late(void)
+ late_initcall(init_machine_late);
+ 
+ #ifdef CONFIG_KEXEC
++/*
++ * The crash region must be aligned to 128MB to avoid
++ * zImage relocating below the reserved region.
++ */
++#define CRASH_ALIGN	(128 << 20)
++#define CRASH_ADDR_MAX	(PHYS_OFFSET + (512 << 20))
++
+ static inline unsigned long long get_total_mem(void)
+ {
+ 	unsigned long total;
+@@ -965,6 +972,25 @@ static void __init reserve_crashkernel(void)
+ 	if (ret)
+ 		return;
+ 
++	if (crash_base <= 0) {
++		crash_base = memblock_find_in_range(CRASH_ALIGN, CRASH_ADDR_MAX,
++						    crash_size, CRASH_ALIGN);
++		if (!crash_base) {
++			pr_err("crashkernel reservation failed - No suitable area found.\n");
++			return;
++		}
++	} else {
++		unsigned long long start;
++
++		start = memblock_find_in_range(crash_base,
++					       crash_base + crash_size,
++					       crash_size, SECTION_SIZE);
++		if (start != crash_base) {
++			pr_err("crashkernel reservation failed - memory is in use.\n");
++			return;
++		}
++	}
++
+ 	ret = memblock_reserve(crash_base, crash_size);
+ 	if (ret < 0) {
+ 		pr_warn("crashkernel reservation failed - memory is in use (0x%lx)\n",
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.1.0
