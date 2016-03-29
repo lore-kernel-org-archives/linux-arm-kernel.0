@@ -1,254 +1,196 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 29 Mar 2016 17:22:26 +0800
-Subject: [PATCH resend v2 3/9] mfd: axp20x: Add support for AXP809 PMIC
+Date: Tue, 29 Mar 2016 17:22:27 +0800
+Subject: [PATCH resend v2 4/9] regulator: axp20x: support AXP809 variant
 In-Reply-To: <1459243352-23344-1-git-send-email-wens@csie.org>
 References: <1459243352-23344-1-git-send-email-wens@csie.org>
-Message-ID: <1459243352-23344-4-git-send-email-wens@csie.org>
+Message-ID: <1459243352-23344-5-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The X-Powers AXP809 is a new PMIC that is paired with Allwinner's A80
-SoC, along with a slave AXP806 PMIC.
+The X-Powers AXP809 PMIC has a similar set of regulators as the AXP221,
+though a few LDOs were removed, and a new switch output added. Like the
+AXP221, AXP809 also has DC1SW and DC5LDO, which are internally chained
+to DCDC1 and DCDC5, respectively.
 
-This PMIC is quite similar to the earlier AXP223, though the interrupts
-and regulator have changed a bit.
-
-This patch adds support for the interrupts and power button of the PMIC.
+Add support for this new variant. Also remove the "axp22x_" prefix from
+DC1SW/DC5LDO supply handling code, as the AXP809 uses it as well.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/mfd/axp20x-rsb.c   |  1 +
- drivers/mfd/axp20x.c       | 79 ++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/mfd/axp20x.h | 59 ++++++++++++++++++++++++++++++++++
- 3 files changed, 139 insertions(+)
+ drivers/regulator/axp20x-regulator.c | 119 ++++++++++++++++++++++++++---------
+ 1 file changed, 90 insertions(+), 29 deletions(-)
 
-diff --git a/drivers/mfd/axp20x-rsb.c b/drivers/mfd/axp20x-rsb.c
-index 28c20247c112..a407527bcd09 100644
---- a/drivers/mfd/axp20x-rsb.c
-+++ b/drivers/mfd/axp20x-rsb.c
-@@ -61,6 +61,7 @@ static int axp20x_rsb_remove(struct sunxi_rsb_device *rdev)
- 
- static const struct of_device_id axp20x_rsb_of_match[] = {
- 	{ .compatible = "x-powers,axp223", .data = (void *)AXP223_ID },
-+	{ .compatible = "x-powers,axp809", .data = (void *)AXP809_ID },
- 	{ },
- };
- MODULE_DEVICE_TABLE(of, axp20x_rsb_of_match);
-diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-index a57d6e940610..1ce923277cc8 100644
---- a/drivers/mfd/axp20x.c
-+++ b/drivers/mfd/axp20x.c
-@@ -37,6 +37,7 @@ static const char * const axp20x_model_names[] = {
- 	"AXP221",
- 	"AXP223",
- 	"AXP288",
-+	"AXP809",
+diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
+index 40cd894e4df5..6a601f377019 100644
+--- a/drivers/regulator/axp20x-regulator.c
++++ b/drivers/regulator/axp20x-regulator.c
+@@ -224,6 +224,61 @@ static const struct regulator_desc axp22x_regulators[] = {
+ 	AXP_DESC_FIXED(AXP22X, RTC_LDO, "rtc_ldo", "ips", 3000),
  };
  
- static const struct regmap_range axp152_writeable_ranges[] = {
-@@ -85,6 +86,7 @@ static const struct regmap_access_table axp20x_volatile_table = {
- 	.n_yes_ranges	= ARRAY_SIZE(axp20x_volatile_ranges),
- };
- 
-+/* AXP22x ranges are shared with the AXP809, as they cover the same range */
- static const struct regmap_range axp22x_writeable_ranges[] = {
- 	regmap_reg_range(AXP20X_DATACACHE(0), AXP20X_IRQ5_STATE),
- 	regmap_reg_range(AXP20X_DCDC_MODE, AXP22X_BATLOW_THRES1),
-@@ -211,6 +213,20 @@ static struct resource axp288_fuel_gauge_resources[] = {
- 	},
- };
- 
-+static struct resource axp809_pek_resources[] = {
-+	{
-+		.name   = "PEK_DBR",
-+		.start  = AXP809_IRQ_PEK_RIS_EDGE,
-+		.end    = AXP809_IRQ_PEK_RIS_EDGE,
-+		.flags  = IORESOURCE_IRQ,
-+	}, {
-+		.name   = "PEK_DBF",
-+		.start  = AXP809_IRQ_PEK_FAL_EDGE,
-+		.end    = AXP809_IRQ_PEK_FAL_EDGE,
-+		.flags  = IORESOURCE_IRQ,
-+	},
++static const struct regulator_linear_range axp809_dcdc4_ranges[] = {
++	REGULATOR_LINEAR_RANGE(600000, 0x0, 0x2f, 20000),
++	REGULATOR_LINEAR_RANGE(1800000, 0x30, 0x38, 100000),
 +};
 +
- static const struct regmap_config axp152_regmap_config = {
- 	.reg_bits	= 8,
- 	.val_bits	= 8,
-@@ -378,6 +394,41 @@ static const struct regmap_irq axp288_regmap_irqs[] = {
- 	INIT_REGMAP_IRQ(AXP288, BC_USB_CHNG,            5, 1),
- };
- 
-+static const struct regmap_irq axp809_regmap_irqs[] = {
-+	INIT_REGMAP_IRQ(AXP809, ACIN_OVER_V,		0, 7),
-+	INIT_REGMAP_IRQ(AXP809, ACIN_PLUGIN,		0, 6),
-+	INIT_REGMAP_IRQ(AXP809, ACIN_REMOVAL,	        0, 5),
-+	INIT_REGMAP_IRQ(AXP809, VBUS_OVER_V,		0, 4),
-+	INIT_REGMAP_IRQ(AXP809, VBUS_PLUGIN,		0, 3),
-+	INIT_REGMAP_IRQ(AXP809, VBUS_REMOVAL,	        0, 2),
-+	INIT_REGMAP_IRQ(AXP809, VBUS_V_LOW,		0, 1),
-+	INIT_REGMAP_IRQ(AXP809, BATT_PLUGIN,		1, 7),
-+	INIT_REGMAP_IRQ(AXP809, BATT_REMOVAL,	        1, 6),
-+	INIT_REGMAP_IRQ(AXP809, BATT_ENT_ACT_MODE,	1, 5),
-+	INIT_REGMAP_IRQ(AXP809, BATT_EXIT_ACT_MODE,	1, 4),
-+	INIT_REGMAP_IRQ(AXP809, CHARG,		        1, 3),
-+	INIT_REGMAP_IRQ(AXP809, CHARG_DONE,		1, 2),
-+	INIT_REGMAP_IRQ(AXP809, BATT_CHG_TEMP_HIGH,	2, 7),
-+	INIT_REGMAP_IRQ(AXP809, BATT_CHG_TEMP_HIGH_END,	2, 6),
-+	INIT_REGMAP_IRQ(AXP809, BATT_CHG_TEMP_LOW,	2, 5),
-+	INIT_REGMAP_IRQ(AXP809, BATT_CHG_TEMP_LOW_END,	2, 4),
-+	INIT_REGMAP_IRQ(AXP809, BATT_ACT_TEMP_HIGH,	2, 3),
-+	INIT_REGMAP_IRQ(AXP809, BATT_ACT_TEMP_HIGH_END,	2, 2),
-+	INIT_REGMAP_IRQ(AXP809, BATT_ACT_TEMP_LOW,	2, 1),
-+	INIT_REGMAP_IRQ(AXP809, BATT_ACT_TEMP_LOW_END,	2, 0),
-+	INIT_REGMAP_IRQ(AXP809, DIE_TEMP_HIGH,	        3, 7),
-+	INIT_REGMAP_IRQ(AXP809, LOW_PWR_LVL1,	        3, 1),
-+	INIT_REGMAP_IRQ(AXP809, LOW_PWR_LVL2,	        3, 0),
-+	INIT_REGMAP_IRQ(AXP809, TIMER,		        4, 7),
-+	INIT_REGMAP_IRQ(AXP809, PEK_RIS_EDGE,	        4, 6),
-+	INIT_REGMAP_IRQ(AXP809, PEK_FAL_EDGE,	        4, 5),
-+	INIT_REGMAP_IRQ(AXP809, PEK_SHORT,		4, 4),
-+	INIT_REGMAP_IRQ(AXP809, PEK_LONG,		4, 3),
-+	INIT_REGMAP_IRQ(AXP809, PEK_OVER_OFF,		4, 2),
-+	INIT_REGMAP_IRQ(AXP809, GPIO1_INPUT,		4, 1),
-+	INIT_REGMAP_IRQ(AXP809, GPIO0_INPUT,		4, 0),
++static const struct regulator_linear_range axp809_dldo1_ranges[] = {
++	REGULATOR_LINEAR_RANGE(700000, 0x0, 0x1a, 100000),
++	REGULATOR_LINEAR_RANGE(3400000, 0x1b, 0x1f, 200000),
 +};
 +
- static const struct regmap_irq_chip axp152_regmap_irq_chip = {
- 	.name			= "axp152_irq_chip",
- 	.status_base		= AXP152_IRQ1_STATE,
-@@ -428,6 +479,18 @@ static const struct regmap_irq_chip axp288_regmap_irq_chip = {
- 
- };
- 
-+static const struct regmap_irq_chip axp809_regmap_irq_chip = {
-+	.name			= "axp809",
-+	.status_base		= AXP20X_IRQ1_STATE,
-+	.ack_base		= AXP20X_IRQ1_STATE,
-+	.mask_base		= AXP20X_IRQ1_EN,
-+	.mask_invert		= true,
-+	.init_ack_masked	= true,
-+	.irqs			= axp809_regmap_irqs,
-+	.num_irqs		= ARRAY_SIZE(axp809_regmap_irqs),
-+	.num_regs		= 5,
++static const struct regulator_desc axp809_regulators[] = {
++	AXP_DESC(AXP809, DCDC1, "dcdc1", "vin1", 1600, 3400, 100,
++		 AXP22X_DCDC1_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL1, BIT(1)),
++	AXP_DESC(AXP809, DCDC2, "dcdc2", "vin2", 600, 1540, 20,
++		 AXP22X_DCDC2_V_OUT, 0x3f, AXP22X_PWR_OUT_CTRL1, BIT(2)),
++	AXP_DESC(AXP809, DCDC3, "dcdc3", "vin3", 600, 1860, 20,
++		 AXP22X_DCDC3_V_OUT, 0x3f, AXP22X_PWR_OUT_CTRL1, BIT(3)),
++	AXP_DESC_RANGES(AXP809, DCDC4, "dcdc4", "vin4", axp809_dcdc4_ranges,
++			57, AXP22X_DCDC4_V_OUT, 0x3f, AXP22X_PWR_OUT_CTRL1,
++			BIT(4)),
++	AXP_DESC(AXP809, DCDC5, "dcdc5", "vin5", 1000, 2550, 50,
++		 AXP22X_DCDC5_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL1, BIT(5)),
++	/* secondary switchable output of DCDC1 */
++	AXP_DESC_SW(AXP809, DC1SW, "dc1sw", NULL, AXP22X_PWR_OUT_CTRL2,
++		    BIT(7)),
++	/* LDO regulator internally chained to DCDC5 */
++	AXP_DESC(AXP809, DC5LDO, "dc5ldo", NULL, 700, 1400, 100,
++		 AXP22X_DC5LDO_V_OUT, 0x7, AXP22X_PWR_OUT_CTRL1, BIT(0)),
++	AXP_DESC(AXP809, ALDO1, "aldo1", "aldoin", 700, 3300, 100,
++		 AXP22X_ALDO1_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL1, BIT(6)),
++	AXP_DESC(AXP809, ALDO2, "aldo2", "aldoin", 700, 3300, 100,
++		 AXP22X_ALDO2_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL1, BIT(7)),
++	AXP_DESC(AXP809, ALDO3, "aldo3", "aldoin", 700, 3300, 100,
++		 AXP22X_ALDO3_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(5)),
++	AXP_DESC_RANGES(AXP809, DLDO1, "dldo1", "dldoin", axp809_dldo1_ranges,
++			32, AXP22X_DLDO1_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2,
++			BIT(3)),
++	AXP_DESC(AXP809, DLDO2, "dldo2", "dldoin", 700, 3300, 100,
++		 AXP22X_DLDO2_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(4)),
++	AXP_DESC(AXP809, ELDO1, "eldo1", "eldoin", 700, 3300, 100,
++		 AXP22X_ELDO1_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(0)),
++	AXP_DESC(AXP809, ELDO2, "eldo2", "eldoin", 700, 3300, 100,
++		 AXP22X_ELDO2_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(1)),
++	AXP_DESC(AXP809, ELDO3, "eldo3", "eldoin", 700, 3300, 100,
++		 AXP22X_ELDO3_V_OUT, 0x1f, AXP22X_PWR_OUT_CTRL2, BIT(2)),
++	AXP_DESC_IO(AXP809, LDO_IO0, "ldo_io0", "ips", 700, 3300, 100,
++		    AXP22X_LDO_IO0_V_OUT, 0x1f, AXP20X_GPIO0_CTRL, 0x07,
++		    AXP22X_IO_ENABLED, AXP22X_IO_DISABLED),
++	AXP_DESC_IO(AXP809, LDO_IO1, "ldo_io1", "ips", 700, 3300, 100,
++		    AXP22X_LDO_IO1_V_OUT, 0x1f, AXP20X_GPIO1_CTRL, 0x07,
++		    AXP22X_IO_ENABLED, AXP22X_IO_DISABLED),
++	AXP_DESC_FIXED(AXP809, RTC_LDO, "rtc_ldo", "ips", 1800),
++	AXP_DESC_SW(AXP809, SW, "sw", "swin", AXP22X_PWR_OUT_CTRL2, BIT(6)),
 +};
 +
- static struct mfd_cell axp20x_cells[] = {
- 	{
- 		.name		= "axp20x-pek",
-@@ -572,6 +635,16 @@ static struct mfd_cell axp288_cells[] = {
- 	},
- };
- 
-+static struct mfd_cell axp809_cells[] = {
-+	{
-+		.name			= "axp20x-pek",
-+		.num_resources		= ARRAY_SIZE(axp809_pek_resources),
-+		.resources		= axp809_pek_resources,
-+	}, {
-+		.name			= "axp20x-regulator",
-+	},
-+};
-+
- static struct axp20x_dev *axp20x_pm_power_off;
- static void axp20x_power_off(void)
+ static int axp20x_set_dcdc_freq(struct platform_device *pdev, u32 dcdcfreq)
  {
-@@ -631,6 +704,12 @@ int axp20x_match_device(struct axp20x_dev *axp20x)
- 		axp20x->regmap_cfg = &axp288_regmap_config;
- 		axp20x->regmap_irq_chip = &axp288_regmap_irq_chip;
+ 	struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
+@@ -239,6 +294,7 @@ static int axp20x_set_dcdc_freq(struct platform_device *pdev, u32 dcdcfreq)
+ 		break;
+ 	case AXP221_ID:
+ 	case AXP223_ID:
++	case AXP809_ID:
+ 		min = 1800;
+ 		max = 4050;
+ 		def = 3000;
+@@ -318,6 +374,7 @@ static int axp20x_set_dcdc_workmode(struct regulator_dev *rdev, int id, u32 work
+ 
+ 	case AXP221_ID:
+ 	case AXP223_ID:
++	case AXP809_ID:
+ 		if (id < AXP22X_DCDC1 || id > AXP22X_DCDC5)
+ 			return -EINVAL;
+ 
+@@ -346,8 +403,8 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
+ 	};
+ 	int ret, i, nregulators;
+ 	u32 workmode;
+-	const char *axp22x_dc1_name = axp22x_regulators[AXP22X_DCDC1].name;
+-	const char *axp22x_dc5_name = axp22x_regulators[AXP22X_DCDC5].name;
++	const char *dcdc1_name = axp22x_regulators[AXP22X_DCDC1].name;
++	const char *dcdc5_name = axp22x_regulators[AXP22X_DCDC5].name;
+ 
+ 	switch (axp20x->variant) {
+ 	case AXP202_ID:
+@@ -360,6 +417,10 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
+ 		regulators = axp22x_regulators;
+ 		nregulators = AXP22X_REG_ID_MAX;
  		break;
 +	case AXP809_ID:
-+		axp20x->nr_cells = ARRAY_SIZE(axp809_cells);
-+		axp20x->cells = axp809_cells;
-+		axp20x->regmap_cfg = &axp22x_regmap_config;
-+		axp20x->regmap_irq_chip = &axp809_regmap_irq_chip;
++		regulators = axp809_regulators;
++		nregulators = AXP809_REG_ID_MAX;
 +		break;
  	default:
- 		dev_err(dev, "unsupported AXP20X ID %lu\n", axp20x->variant);
- 		return -EINVAL;
-diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
-index d82e7d51372b..0be4982f08fe 100644
---- a/include/linux/mfd/axp20x.h
-+++ b/include/linux/mfd/axp20x.h
-@@ -20,6 +20,7 @@ enum {
- 	AXP221_ID,
- 	AXP223_ID,
- 	AXP288_ID,
-+	AXP809_ID,
- 	NR_AXP20X_VARIANTS,
- };
- 
-@@ -264,6 +265,29 @@ enum {
- 	AXP22X_REG_ID_MAX,
- };
- 
-+enum {
-+	AXP809_DCDC1 = 0,
-+	AXP809_DCDC2,
-+	AXP809_DCDC3,
-+	AXP809_DCDC4,
-+	AXP809_DCDC5,
-+	AXP809_DC1SW,
-+	AXP809_DC5LDO,
-+	AXP809_ALDO1,
-+	AXP809_ALDO2,
-+	AXP809_ALDO3,
-+	AXP809_ELDO1,
-+	AXP809_ELDO2,
-+	AXP809_ELDO3,
-+	AXP809_DLDO1,
-+	AXP809_DLDO2,
-+	AXP809_RTC_LDO,
-+	AXP809_LDO_IO0,
-+	AXP809_LDO_IO1,
-+	AXP809_SW,
-+	AXP809_REG_ID_MAX,
-+};
+ 		dev_err(&pdev->dev, "Unsupported AXP variant: %ld\n",
+ 			axp20x->variant);
+@@ -382,22 +443,22 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
+ 		 * part of this loop to see where we save the DT defined
+ 		 * name.
+ 		 */
+-		if (regulators == axp22x_regulators) {
+-			if (i == AXP22X_DC1SW) {
+-				new_desc = devm_kzalloc(&pdev->dev,
+-							sizeof(*desc),
+-							GFP_KERNEL);
+-				*new_desc = regulators[i];
+-				new_desc->supply_name = axp22x_dc1_name;
+-				desc = new_desc;
+-			} else if (i == AXP22X_DC5LDO) {
+-				new_desc = devm_kzalloc(&pdev->dev,
+-							sizeof(*desc),
+-							GFP_KERNEL);
+-				*new_desc = regulators[i];
+-				new_desc->supply_name = axp22x_dc5_name;
+-				desc = new_desc;
+-			}
++		if ((regulators == axp22x_regulators && i == AXP22X_DC1SW) ||
++		    (regulators == axp809_regulators && i == AXP809_DC1SW)) {
++			new_desc = devm_kzalloc(&pdev->dev, sizeof(*desc),
++						GFP_KERNEL);
++			*new_desc = regulators[i];
++			new_desc->supply_name = dcdc1_name;
++			desc = new_desc;
++		}
 +
- /* IRQs */
- enum {
- 	AXP152_IRQ_LDO0IN_CONNECT = 1,
-@@ -390,6 +414,41 @@ enum axp288_irqs {
- 	AXP288_IRQ_BC_USB_CHNG,
- };
++		if ((regulators == axp22x_regulators && i == AXP22X_DC5LDO) ||
++		    (regulators == axp809_regulators && i == AXP809_DC5LDO)) {
++			new_desc = devm_kzalloc(&pdev->dev, sizeof(*desc),
++						GFP_KERNEL);
++			*new_desc = regulators[i];
++			new_desc->supply_name = dcdc5_name;
++			desc = new_desc;
+ 		}
  
-+enum axp809_irqs {
-+	AXP809_IRQ_ACIN_OVER_V = 1,
-+	AXP809_IRQ_ACIN_PLUGIN,
-+	AXP809_IRQ_ACIN_REMOVAL,
-+	AXP809_IRQ_VBUS_OVER_V,
-+	AXP809_IRQ_VBUS_PLUGIN,
-+	AXP809_IRQ_VBUS_REMOVAL,
-+	AXP809_IRQ_VBUS_V_LOW,
-+	AXP809_IRQ_BATT_PLUGIN,
-+	AXP809_IRQ_BATT_REMOVAL,
-+	AXP809_IRQ_BATT_ENT_ACT_MODE,
-+	AXP809_IRQ_BATT_EXIT_ACT_MODE,
-+	AXP809_IRQ_CHARG,
-+	AXP809_IRQ_CHARG_DONE,
-+	AXP809_IRQ_BATT_CHG_TEMP_HIGH,
-+	AXP809_IRQ_BATT_CHG_TEMP_HIGH_END,
-+	AXP809_IRQ_BATT_CHG_TEMP_LOW,
-+	AXP809_IRQ_BATT_CHG_TEMP_LOW_END,
-+	AXP809_IRQ_BATT_ACT_TEMP_HIGH,
-+	AXP809_IRQ_BATT_ACT_TEMP_HIGH_END,
-+	AXP809_IRQ_BATT_ACT_TEMP_LOW,
-+	AXP809_IRQ_BATT_ACT_TEMP_LOW_END,
-+	AXP809_IRQ_DIE_TEMP_HIGH,
-+	AXP809_IRQ_LOW_PWR_LVL1,
-+	AXP809_IRQ_LOW_PWR_LVL2,
-+	AXP809_IRQ_TIMER,
-+	AXP809_IRQ_PEK_RIS_EDGE,
-+	AXP809_IRQ_PEK_FAL_EDGE,
-+	AXP809_IRQ_PEK_SHORT,
-+	AXP809_IRQ_PEK_LONG,
-+	AXP809_IRQ_PEK_OVER_OFF,
-+	AXP809_IRQ_GPIO1_INPUT,
-+	AXP809_IRQ_GPIO0_INPUT,
-+};
+ 		rdev = devm_regulator_register(&pdev->dev, desc, &config);
+@@ -420,17 +481,17 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
+ 		/*
+ 		 * Save AXP22X DCDC1 / DCDC5 regulator names for later.
+ 		 */
+-		if (regulators == axp22x_regulators) {
+-			/* Can we use rdev->constraints->name instead? */
+-			if (i == AXP22X_DCDC1)
+-				of_property_read_string(rdev->dev.of_node,
+-							"regulator-name",
+-							&axp22x_dc1_name);
+-			else if (i == AXP22X_DCDC5)
+-				of_property_read_string(rdev->dev.of_node,
+-							"regulator-name",
+-							&axp22x_dc5_name);
+-		}
++		if ((regulators == axp22x_regulators && i == AXP22X_DCDC1) ||
++		    (regulators == axp809_regulators && i == AXP809_DCDC1))
++			of_property_read_string(rdev->dev.of_node,
++						"regulator-name",
++						&dcdc1_name);
 +
- #define AXP288_TS_ADC_H		0x58
- #define AXP288_TS_ADC_L		0x59
- #define AXP288_GP_ADC_H		0x5a
++		if ((regulators == axp22x_regulators && i == AXP22X_DCDC5) ||
++		    (regulators == axp809_regulators && i == AXP809_DCDC5))
++			of_property_read_string(rdev->dev.of_node,
++						"regulator-name",
++						&dcdc5_name);
+ 	}
+ 
+ 	return 0;
 -- 
 2.7.0
