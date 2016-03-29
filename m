@@ -1,260 +1,180 @@
-From: markus.mayer@broadcom.com (Markus Mayer)
-Date: Tue, 29 Mar 2016 11:47:10 -0700
-Subject: [PATCH 3/4] arm64: dts: Move NS2 clock DT nodes to separate DT
- file
-In-Reply-To: <1459236454-26285-4-git-send-email-anup.patel@broadcom.com>
-References: <1459236454-26285-1-git-send-email-anup.patel@broadcom.com>
- <1459236454-26285-4-git-send-email-anup.patel@broadcom.com>
-Message-ID: <CAGt4E5vadj_Z8tqapA02z6hHkztM5YgLU4Sv-EYeR-ohk2Jkgg@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 29 Mar 2016 13:50:35 -0500
+Subject: [PATCH v3 13/19] drm: sun4i: Add DT bindings documentation
+In-Reply-To: <20160329103314.GL30977@lukather>
+References: <1458751122-23976-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1458751122-23976-14-git-send-email-maxime.ripard@free-electrons.com>
+ <20160325141118.GA26927@rob-hp-laptop>
+ <20160329103314.GL30977@lukather>
+Message-ID: <20160329185035.GA8445@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 March 2016 at 00:27, Anup Patel <anup.patel@broadcom.com> wrote:
-> For more readabilty and consistency with other Broadcom SoCs, we move
-> all NS2 clock DT nodes from main SoC DT file to a separate DT file.
->
-> We also update the license header in ns2.dtsi as-per new Broadcom
-> convention.
->
-> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-> Reviewed-by: Ray Jui <rjui@broadcom.com>
-> Reviewed-by: Scott Branden <sbranden@broadcom.com>
-> ---
->  arch/arm64/boot/dts/broadcom/ns2-clock.dtsi | 105 ++++++++++++++++++++++++++++
->  arch/arm64/boot/dts/broadcom/ns2.dtsi       |  81 +--------------------
->  2 files changed, 108 insertions(+), 78 deletions(-)
->  create mode 100644 arch/arm64/boot/dts/broadcom/ns2-clock.dtsi
->
-> diff --git a/arch/arm64/boot/dts/broadcom/ns2-clock.dtsi b/arch/arm64/boot/dts/broadcom/ns2-clock.dtsi
-> new file mode 100644
-> index 0000000..99009fd
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/broadcom/ns2-clock.dtsi
-> @@ -0,0 +1,105 @@
-> +/*
-> + *  BSD LICENSE
-> + *
-> + *  Copyright (c) 2016 Broadcom.  All rights reserved.
-> + *
-> + *  Redistribution and use in source and binary forms, with or without
-> + *  modification, are permitted provided that the following conditions
-> + *  are met:
-> + *
-> + *    * Redistributions of source code must retain the above copyright
-> + *      notice, this list of conditions and the following disclaimer.
-> + *    * Redistributions in binary form must reproduce the above copyright
-> + *      notice, this list of conditions and the following disclaimer in
-> + *      the documentation and/or other materials provided with the
-> + *      distribution.
-> + *    * Neither the name of Broadcom Corporation nor the names of its
-> + *      contributors may be used to endorse or promote products derived
-> + *      from this software without specific prior written permission.
-> + *
-> + *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-> + *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-> + *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-> + *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-> + *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-> + *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-> + *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-> + *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-> + *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-> + *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-> + * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-> + */
-> +
-> +#include <dt-bindings/clock/bcm-ns2.h>
-> +
-> +       osc: oscillator {
-> +               #clock-cells = <0>;
-> +               compatible = "fixed-clock";
-> +               clock-frequency = <25000000>;
-> +       };
-> +
-> +       lcpll_ddr: lcpll_ddr at 6501d058 {
-> +               #clock-cells = <1>;
-> +               compatible = "brcm,ns2-lcpll-ddr";
-> +               reg = <0x6501d058 0x20>,
-> +                     <0x6501c020 0x4>,
-> +                     <0x6501d04c 0x4>;
-> +               clocks = <&osc>;
-> +               clock-output-names = "lcpll_ddr", "pcie_sata_usb",
-> +                                    "ddr", "ddr_ch2_unused",
-> +                                    "ddr_ch3_unused", "ddr_ch4_unused",
-> +                                    "ddr_ch5_unused";
-> +       };
-> +
-> +       lcpll_ports: lcpll_ports at 6501d078 {
-> +               #clock-cells = <1>;
-> +               compatible = "brcm,ns2-lcpll-ports";
-> +               reg = <0x6501d078 0x20>,
-> +                     <0x6501c020 0x4>,
-> +                     <0x6501d054 0x4>;
-> +               clocks = <&osc>;
-> +               clock-output-names = "lcpll_ports", "wan", "rgmii",
-> +                                    "ports_ch2_unused",
-> +                                    "ports_ch3_unused",
-> +                                    "ports_ch4_unused",
-> +                                    "ports_ch5_unused";
-> +       };
-> +
-> +       genpll_scr: genpll_scr at 6501d098 {
-> +               #clock-cells = <1>;
-> +               compatible = "brcm,ns2-genpll-scr";
-> +               reg = <0x6501d098 0x32>,
-> +                     <0x6501c020 0x4>,
-> +                     <0x6501d044 0x4>;
-> +               clocks = <&osc>;
-> +               clock-output-names = "genpll_scr", "scr", "fs",
-> +                                    "audio_ref", "scr_ch3_unused",
-> +                                    "scr_ch4_unused", "scr_ch5_unused";
-> +       };
-> +
-> +       iprocmed: iprocmed {
-> +               #clock-cells = <0>;
-> +               compatible = "fixed-factor-clock";
-> +               clocks = <&genpll_scr BCM_NS2_GENPLL_SCR_SCR_CLK>;
-> +               clock-div = <2>;
-> +               clock-mult = <1>;
-> +       };
-> +
-> +       iprocslow: iprocslow {
-> +               #clock-cells = <0>;
-> +               compatible = "fixed-factor-clock";
-> +               clocks = <&genpll_scr BCM_NS2_GENPLL_SCR_SCR_CLK>;
-> +               clock-div = <4>;
-> +               clock-mult = <1>;
-> +       };
-> +
-> +       genpll_sw: genpll_sw at 6501d0c4 {
-> +               #clock-cells = <1>;
-> +               compatible = "brcm,ns2-genpll-sw";
-> +               reg = <0x6501d0c4 0x32>,
-> +                     <0x6501c020 0x4>,
-> +                     <0x6501d044 0x4>;
-> +               clocks = <&osc>;
-> +               clock-output-names = "genpll_sw", "rpe", "250", "nic",
-> +                                    "chimp", "port", "sdio";
-> +       };
-> diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-> index 940ed52..0a92a68 100644
-> --- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
-> +++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-> @@ -1,7 +1,7 @@
->  /*
->   *  BSD LICENSE
->   *
-> - *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
-> + *  Copyright (c) 2015 Broadcom.  All rights reserved.
+On Tue, Mar 29, 2016 at 12:33:14PM +0200, Maxime Ripard wrote:
+> Hi Rob,
+> 
+> On Fri, Mar 25, 2016 at 09:11:18AM -0500, Rob Herring wrote:
+> > On Wed, Mar 23, 2016 at 05:38:36PM +0100, Maxime Ripard wrote:
+> > > The display pipeline of the Allwinner A10 is involving several loosely
+> > > coupled components.
+> > > 
+> > > Add a documentation for the bindings.
+> > > 
+> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > > ---
+> > >  .../bindings/display/sunxi/sun4i-drm.txt           | 254 +++++++++++++++++++++
+> > >  1 file changed, 254 insertions(+)
+> > >  create mode 100644 Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> > > new file mode 100644
+> > > index 000000000000..378edb919eae
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> > > @@ -0,0 +1,254 @@
+> > > +Allwinner A10 Display Pipeline
+> > > +==============================
+> > > +
+> > > +The Allwinner A10 Display pipeline is composed of several components
+> > > +that are going to be documented below:
+> > > +
+> > > +TV Encoder
+> > > +----------
+> > > +
+> > > +The TV Encoder supports the composite and VGA output. It is one end of
+> > > +the pipeline.
+> > > +
+> > > +Required properties:
+> > > + - compatible: value should be "allwinner,sun4i-a10-tv-encoder".
+> > > + - reg: base address and size of memory-mapped region
+> > > + - clocks: the clocks driving the TV encoder
+> > > + - resets: phandle to the reset controller driving the encoder
+> > > +
+> > > +- ports: A ports node with endpoint definitions as defined in
+> > > +  Documentation/devicetree/bindings/media/video-interfaces.txt. The
+> > > +  first port should be the input endpoint.
+> > > +
+> > > +TCON
+> > > +----
+> > > +
+> > > +The TCON acts as a timing controller for RGB, LVDS and TV interfaces.
+> > > +
+> > > +Required properties:
+> > > + - compatible: value should be "allwinner,sun5i-a13-tcon".
+> > > + - reg: base address and size of memory-mapped region
+> > > + - interrupts: interrupt associated to this IP
+> > > + - clocks: phandles to the clocks feeding the TCON. Three are needed:
+> > > +   - 'ahb': the interface clocks
+> > > +   - 'tcon-ch0': The clock driving the TCON channel 0
+> > > +   - 'tcon-ch1': The clock driving the TCON channel 1
+> > > + - resets: phandles to the reset controllers driving the encoder
+> > > +   - "lcd": the reset line for the TCON channel 0
+> > > +
+> > > + - clock-names: the clock names mentioned above
+> > > + - reset-names: the reset names mentioned above
+> > > + - clock-output-names: Name of the pixel clock created
+> > > +
+> > > +- ports: A ports node with endpoint definitions as defined in
+> > > +  Documentation/devicetree/bindings/media/video-interfaces.txt. The
+> > > +  first port should be the input endpoint, the second one the output
+> > 
+> > The example shows 2 output endpoints. Your diagram shows up to 4 
+> > outputs. The number should be how ever many could coexist in a given h/w 
+> > design. In other words, I'm assuming all 4 can't be used simultaneously, 
+> > but can all 4 be wired up in a h/w design and switched in s/w? 
+> > 
+> > Just be clear on the numbering.
+> 
+> Yes, each TCON has two channels, the first one being usable for
+> RGB/LVDS, the second one for TV/VGA. HDMI is basically implemented
+> using an in-SoC RGB-to-HDMI bridge, so it would use the first channel
+> as well.
 
-I am thinking the 2015 copyright notice should remain as is and a new
-2016 notice should be added underneath.
+So I think you should have 2 ports (1 per channel) and then 2 endpoints 
+for 1st (RGB/LVDS/ExtBridge and HDMI) and 1 endpoint (TV/VGA) for 2nd 
+port.
 
-Copyright (c) 2016 Broadcom.  All rights reserved.
+> I don't see how a particular design could use several devices on the
+> first channel, because they would share the same timings, and I don't
+> really see how it would work out.
+> 
+> > > +
+> > > +Endpoints optional property:
+> > > +  - allwinner,panel: boolean to indicate that the endpoint is a panel
+> > 
+> > This can be determined by the endpoint not being TV Encoder (or HDMI).
+> 
+> It wouldn't really scale if you start to consider the bridges
+> too. Then, you would have to duplicate and maintain a list of all the
+> bridges supported in Linux and a list of all the panels supported in
+> Linux, and try to match that to see if it's a panel, a bridge or an
+> element of our pipeline.
 
->   *
->   *  Redistribution and use in source and binary forms, with or without
->   *  modification, are permitted provided that the following conditions
-> @@ -110,33 +110,6 @@
->                                      <&A57_3>;
->         };
->
-> -       clocks {
-> -               #address-cells = <1>;
-> -               #size-cells = <1>;
-> -
-> -               osc: oscillator {
-> -                       #clock-cells = <0>;
-> -                       compatible = "fixed-clock";
-> -                       clock-frequency = <25000000>;
-> -               };
-> -
-> -               iprocmed: iprocmed {
-> -                       #clock-cells = <0>;
-> -                       compatible = "fixed-factor-clock";
-> -                       clocks = <&genpll_scr BCM_NS2_GENPLL_SCR_SCR_CLK>;
-> -                       clock-div = <2>;
-> -                       clock-mult = <1>;
-> -               };
-> -
-> -               iprocslow: iprocslow {
-> -                       #clock-cells = <0>;
-> -                       compatible = "fixed-factor-clock";
-> -                       clocks = <&genpll_scr BCM_NS2_GENPLL_SCR_SCR_CLK>;
-> -                       clock-div = <4>;
-> -                       clock-mult = <1>;
-> -               };
-> -       };
-> -
->         pcie0: pcie at 20020000 {
->                 compatible = "brcm,iproc-pcie";
->                 reg = <0 0x20020000 0 0x1000>;
-> @@ -217,6 +190,8 @@
->                 #size-cells = <1>;
->                 ranges = <0 0 0 0xffffffff>;
->
-> +               #include "ns2-clock.dtsi"
-> +
->                 dma0: dma at 61360000 {
->                         compatible = "arm,pl330", "arm,primecell";
->                         reg = <0x61360000 0x1000>;
-> @@ -277,56 +252,6 @@
->                         mmu-masters;
->                 };
->
-> -               lcpll_ddr: lcpll_ddr at 6501d058 {
-> -                       #clock-cells = <1>;
-> -                       compatible = "brcm,ns2-lcpll-ddr";
-> -                       reg = <0x6501d058 0x20>,
-> -                             <0x6501c020 0x4>,
-> -                             <0x6501d04c 0x4>;
-> -                       clocks = <&osc>;
-> -                       clock-output-names = "lcpll_ddr", "pcie_sata_usb",
-> -                                            "ddr", "ddr_ch2_unused",
-> -                                            "ddr_ch3_unused", "ddr_ch4_unused",
-> -                                            "ddr_ch5_unused";
-> -               };
-> -
-> -               lcpll_ports: lcpll_ports at 6501d078 {
-> -                       #clock-cells = <1>;
-> -                       compatible = "brcm,ns2-lcpll-ports";
-> -                       reg = <0x6501d078 0x20>,
-> -                             <0x6501c020 0x4>,
-> -                             <0x6501d054 0x4>;
-> -                       clocks = <&osc>;
-> -                       clock-output-names = "lcpll_ports", "wan", "rgmii",
-> -                                            "ports_ch2_unused",
-> -                                            "ports_ch3_unused",
-> -                                            "ports_ch4_unused",
-> -                                            "ports_ch5_unused";
-> -               };
-> -
-> -               genpll_scr: genpll_scr at 6501d098 {
-> -                       #clock-cells = <1>;
-> -                       compatible = "brcm,ns2-genpll-scr";
-> -                       reg = <0x6501d098 0x32>,
-> -                             <0x6501c020 0x4>,
-> -                             <0x6501d044 0x4>;
-> -                       clocks = <&osc>;
-> -                       clock-output-names = "genpll_scr", "scr", "fs",
-> -                                            "audio_ref", "scr_ch3_unused",
-> -                                            "scr_ch4_unused", "scr_ch5_unused";
-> -               };
-> -
-> -               genpll_sw: genpll_sw at 6501d0c4 {
-> -                       #clock-cells = <1>;
-> -                       compatible = "brcm,ns2-genpll-sw";
-> -                       reg = <0x6501d0c4 0x32>,
-> -                             <0x6501c020 0x4>,
-> -                             <0x6501d044 0x4>;
-> -                       clocks = <&osc>;
-> -                       clock-output-names = "genpll_sw", "rpe", "250", "nic",
-> -                                            "chimp", "port", "sdio";
-> -               };
-> -
->                 crmu: crmu at 65024000 {
->                         compatible = "syscon";
->                         reg = <0x65024000 0x100>;
-> --
-> 1.9.1
->
+So my concern is that no one else has needed this, so why do you? Based 
+on the above, you know that a panel is always connected to port 0, 
+endpoint 0. If it is an external bridge instead, then that can be 
+determined when the bridge driver is bound.
+
+
+> > > +Display Engine Backend
+> > > +----------------------
+> > > +
+> > > +The display engine backend exposes layers and sprites to the
+> > > +system.
+> > > +
+> > > +Required properties:
+> > > +  - compatible: value must be one of:
+> > > +    * allwinner,sun5i-a13-display-backend
+> > > +  - reg: base address and size of the memory-mapped region.
+> > > +  - clocks: phandles to the clocks feeding the frontend and backend
+> > > +    * ahb: the backend interface clock
+> > > +    * mod: the backend module clock
+> > > +    * ram: the backend DRAM clock
+> > > +  - clock-names: the clock names mentioned above
+> > > +  - resets: phandles to the reset controllers driving the backend
+> > > +
+> > > +- ports: A ports node with endpoint definitions as defined in
+> > > +  Documentation/devicetree/bindings/media/video-interfaces.txt. The
+> > > +  first port should be the input endpoints, the second one the output
+> > > +
+> > > +Display Engine Frontend
+> > > +-----------------------
+> > > +
+> > > +The display engine frontend does formats conversion, scaling,
+> > > +deinterlacing and color space conversion.
+> > > +
+> > > +Required properties:
+> > > +  - compatible: value must be one of:
+> > > +    * allwinner,sun5i-a13-display-frontend
+> > > +  - reg: base address and size of the memory-mapped region.
+> > > +  - interrupts: interrupt associated to this IP
+> > > +  - clocks: phandles to the clocks feeding the frontend and backend
+> > > +    * ahb: the backend interface clock
+> > > +    * mod: the backend module clock
+> > > +    * ram: the backend DRAM clock
+> > > +  - clock-names: the clock names mentioned above
+> > > +  - resets: phandles to the reset controllers driving the backend
+> > > +
+> > > +Display Engine Pipeline
+> > > +-----------------------
+> > > +
+> > > +The display engine pipeline (and its entry point, since it can be
+> > > +either directly the backend or the frontend) is represented as an
+> > > +extra node.
+> > > +
+> > > +Required properties:
+> > > +  - compatible: value must be one of:
+> > > +    * allwinner,sun5i-a13-display-engine
+> > > +  - allwinner,pipelines: list of phandle to the entry points of the
+> > > +    pipelines (either to the frontend or backend)
+> > 
+> > Seems like using FE or BE would be a function of your framebuffers' 
+> > formats and shouldn't be defined in DT.
+> 
+> Well, they are different IP blocks, so it should be defined in DT,
+> shouldn't it?
+
+They should, but allwinner,sun5i-a13-display-engine is not really an IP 
+block. Again, what decides if you use the FE or not?
+
+Rob
