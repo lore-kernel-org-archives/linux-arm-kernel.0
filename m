@@ -1,49 +1,32 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 29 Mar 2016 17:50:18 +0200
-Subject: [PATCH v2] ARM: configs: Enabling the new Marvell's cryptographic
- engine driver for mvebu_v7_defconfig
-In-Reply-To: <20160320191916.GA9910@archy.lan> (Romain Perier's message of
- "Sun, 20 Mar 2016 20:19:16 +0100")
-References: <20160320191916.GA9910@archy.lan>
-Message-ID: <87lh51waf9.fsf@free-electrons.com>
+From: joseph@codesourcery.com (Joseph Myers)
+Date: Tue, 29 Mar 2016 15:54:52 +0000
+Subject: [RFC5 PATCH v6 00/21] ILP32 for ARM64
+In-Reply-To: <3298847.t7vI4YM3gJ@wuerfel>
+References: <1452792198-10718-1-git-send-email-ynorov@caviumnetworks.com>
+ <20160329120147.GA3551@yury-N73SV> <56FA816D.60101@huawei.com>
+ <3298847.t7vI4YM3gJ@wuerfel>
+Message-ID: <alpine.DEB.2.10.1603291551420.20115@digraph.polyomino.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Romain,
- 
- On dim., mars 20 2016, Romain Perier <romain.perier@free-electrons.com> wrote:
+On Tue, 29 Mar 2016, Arnd Bergmann wrote:
 
-> This enables the new driver for Marvell CESA crypto engines on all mvebu v7.
->
-> Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
+> In glibc, I think we need to define fewer entry points, not more.
+> Instead of having both lseek and lseek64, only one of them should
+> be provided, and that should always take a 64-bit offset, calling
+> into the kernel with the _llseek syscall entry.
 
-Applied on mvebu/defconfig
+lseek64 is part of the public API, on all platforms.  It should be aliased 
+to lseek where possible.
 
-Thanks,
-
-Gregory
-> ---
-> Changes in v2:
->   - Select the driver as built-in instead of module, as requested by the maintainer
->
->  arch/arm/configs/mvebu_v7_defconfig | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/configs/mvebu_v7_defconfig b/arch/arm/configs/mvebu_v7_defconfig
-> index dc5797a..bedfa95 100644
-> --- a/arch/arm/configs/mvebu_v7_defconfig
-> +++ b/arch/arm/configs/mvebu_v7_defconfig
-> @@ -155,3 +155,4 @@ CONFIG_MAGIC_SYSRQ=y
->  CONFIG_TIMER_STATS=y
->  # CONFIG_DEBUG_BUGVERBOSE is not set
->  CONFIG_DEBUG_USER=y
-> +CONFIG_CRYPTO_DEV_MARVELL_CESA=y
-> -- 
-> 2.7.4
->
+Strictly, it would be possible to provide it in the API without it being 
+part of the ABI, by arranging the headers so that calls to lseek64 result 
+in objects with a reference to lseek (because it uses the off64_t typedef, 
+it's not valid to declare it yourself rather than including a header that 
+declares it).  I don't think it would be a good idea for a new 
+sub-architecture port to try introducing such a difference from all other 
+ports, however.
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Joseph S. Myers
+joseph at codesourcery.com
