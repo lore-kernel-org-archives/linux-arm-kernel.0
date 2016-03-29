@@ -1,1201 +1,910 @@
 From: tiffany.lin@mediatek.com (Tiffany Lin)
-Date: Tue, 29 Mar 2016 19:32:04 +0800
-Subject: [PATCH v6 2/8] [media] VPU: mediatek: support Mediatek VPU
-In-Reply-To: <1459251130-53774-2-git-send-email-tiffany.lin@mediatek.com>
+Date: Tue, 29 Mar 2016 19:32:08 +0800
+Subject: [PATCH v6 6/8] [media] vcodec: mediatek: Add Mediatek VP8 Video
+ Encoder Driver
+In-Reply-To: <1459251130-53774-6-git-send-email-tiffany.lin@mediatek.com>
 References: <1459251130-53774-1-git-send-email-tiffany.lin@mediatek.com>
  <1459251130-53774-2-git-send-email-tiffany.lin@mediatek.com>
-Message-ID: <1459251130-53774-3-git-send-email-tiffany.lin@mediatek.com>
+ <1459251130-53774-3-git-send-email-tiffany.lin@mediatek.com>
+ <1459251130-53774-4-git-send-email-tiffany.lin@mediatek.com>
+ <1459251130-53774-5-git-send-email-tiffany.lin@mediatek.com>
+ <1459251130-53774-6-git-send-email-tiffany.lin@mediatek.com>
+Message-ID: <1459251130-53774-7-git-send-email-tiffany.lin@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
+From: PoChun Lin <pochun.lin@mediatek.com>
 
-The VPU driver for hw video codec embedded in Mediatek's MT8173 SOCs.
-It is able to handle video decoding/encoding of in a range of formats.
-The driver provides with VPU firmware download, memory management and
-the communication interface between CPU and VPU.
-For VPU initialization, it will create virtual memory for CPU access and
-IOMMU address for vcodec hw device access. When a decode/encode instance
-opens a device node, vpu driver will download vpu firmware to the device.
-A decode/encode instant will decode/encode a frame using VPU
-interface to interrupt vpu to handle decoding/encoding jobs.
+Add vp8 encoder driver for MT8173
 
-Signed-off-by: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
+Signed-off-by: pochun.lin <pochun.lin@mediatek.com>
 Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
 ---
- drivers/media/platform/Kconfig           |   12 +
- drivers/media/platform/Makefile          |    2 +
- drivers/media/platform/mtk-vpu/Makefile  |    1 +
- drivers/media/platform/mtk-vpu/mtk_vpu.c |  949 ++++++++++++++++++++++++++++++
- drivers/media/platform/mtk-vpu/mtk_vpu.h |  163 +++++
- 5 files changed, 1127 insertions(+)
- create mode 100644 drivers/media/platform/mtk-vpu/Makefile
- create mode 100644 drivers/media/platform/mtk-vpu/mtk_vpu.c
- create mode 100644 drivers/media/platform/mtk-vpu/mtk_vpu.h
+ drivers/media/platform/mtk-vcodec/Makefile         |   12 +-
+ drivers/media/platform/mtk-vcodec/venc_drv_if.c    |    6 +-
+ drivers/media/platform/mtk-vcodec/vp8_enc/Makefile |    6 +
+ .../platform/mtk-vcodec/vp8_enc/venc_vp8_if.c      |  368 ++++++++++++++++++++
+ .../platform/mtk-vcodec/vp8_enc/venc_vp8_if.h      |  150 ++++++++
+ .../platform/mtk-vcodec/vp8_enc/venc_vp8_vpu.c     |  237 +++++++++++++
+ .../platform/mtk-vcodec/vp8_enc/venc_vp8_vpu.h     |   29 ++
+ 7 files changed, 803 insertions(+), 5 deletions(-)
+ create mode 100644 drivers/media/platform/mtk-vcodec/vp8_enc/Makefile
+ create mode 100644 drivers/media/platform/mtk-vcodec/vp8_enc/venc_vp8_if.c
+ create mode 100644 drivers/media/platform/mtk-vcodec/vp8_enc/venc_vp8_if.h
+ create mode 100644 drivers/media/platform/mtk-vcodec/vp8_enc/venc_vp8_vpu.c
+ create mode 100644 drivers/media/platform/mtk-vcodec/vp8_enc/venc_vp8_vpu.h
 
-diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
-index ccbc974..6b59dbc 100644
---- a/drivers/media/platform/Kconfig
-+++ b/drivers/media/platform/Kconfig
-@@ -148,6 +148,18 @@ config VIDEO_CODA
- 	   Coda is a range of video codec IPs that supports
- 	   H.264, MPEG-4, and other video formats.
+diff --git a/drivers/media/platform/mtk-vcodec/Makefile b/drivers/media/platform/mtk-vcodec/Makefile
+index 1226ab7..30edfd7 100644
+--- a/drivers/media/platform/mtk-vcodec/Makefile
++++ b/drivers/media/platform/mtk-vcodec/Makefile
+@@ -1,8 +1,12 @@
+ obj-$(CONFIG_VIDEO_MEDIATEK_VCODEC) += mtk-vcodec-enc.o mtk-vcodec-common.o
+-mtk-vcodec-enc-y := mtk_vcodec_enc.o \
+-               mtk_vcodec_enc_drv.o \
+-               mtk_vcodec_enc_pm.o \
+-               venc_drv_if.o \
++mtk-vcodec-enc-y := h264_enc/venc_h264_if.o \
++		h264_enc/venc_h264_vpu.o \
++		vp8_enc/venc_vp8_if.o \
++		vp8_enc/venc_vp8_vpu.o \
++		mtk_vcodec_enc.o \
++		mtk_vcodec_enc_drv.o \
++		mtk_vcodec_enc_pm.o \
++		venc_drv_if.o \
  
-+config VIDEO_MEDIATEK_VPU
-+	tristate "Mediatek Video Processor Unit"
-+	depends on VIDEO_DEV && VIDEO_V4L2 && ARCH_MEDIATEK
-+	---help---
-+	    This driver provides downloading VPU firmware and
-+	    communicating with VPU. This driver for hw video
-+	    codec embedded in Mediatek's MT8173 SOCs. It is able
-+	    to handle video decoding/encoding in a range of formats.
-+
-+	    To compile this driver as a module, choose M here: the
-+	    module will be called mtk-vpu.
-+
- config VIDEO_MEM2MEM_DEINTERLACE
- 	tristate "Deinterlace support"
- 	depends on VIDEO_DEV && VIDEO_V4L2 && DMA_ENGINE
-diff --git a/drivers/media/platform/Makefile b/drivers/media/platform/Makefile
-index efa0295..e5b19c6 100644
---- a/drivers/media/platform/Makefile
-+++ b/drivers/media/platform/Makefile
-@@ -55,3 +55,5 @@ obj-$(CONFIG_VIDEO_AM437X_VPFE)		+= am437x/
- obj-$(CONFIG_VIDEO_XILINX)		+= xilinx/
+ mtk-vcodec-common-y := mtk_vcodec_intr.o \
+                mtk_vcodec_util.o\
+diff --git a/drivers/media/platform/mtk-vcodec/venc_drv_if.c b/drivers/media/platform/mtk-vcodec/venc_drv_if.c
+index 8d02941..89213ed 100644
+--- a/drivers/media/platform/mtk-vcodec/venc_drv_if.c
++++ b/drivers/media/platform/mtk-vcodec/venc_drv_if.c
+@@ -25,6 +25,8 @@
+ #include "mtk_vpu.h"
  
- ccflags-y += -I$(srctree)/drivers/media/i2c
+ #include "venc_drv_base.h"
++#include "vp8_enc/venc_vp8_if.h"
 +
-+obj-$(CONFIG_VIDEO_MEDIATEK_VPU)	+= mtk-vpu/
-diff --git a/drivers/media/platform/mtk-vpu/Makefile b/drivers/media/platform/mtk-vpu/Makefile
+ 
+ int venc_if_init(struct mtk_vcodec_ctx *ctx, unsigned int fourcc)
+ {
+@@ -32,6 +34,8 @@ int venc_if_init(struct mtk_vcodec_ctx *ctx, unsigned int fourcc)
+ 
+ 	switch (fourcc) {
+ 	case V4L2_PIX_FMT_VP8:
++		ctx->enc_if = get_vp8_enc_comm_if();
++		break;
+ 	case V4L2_PIX_FMT_H264:
+ 	default:
+ 		return -EINVAL;
+@@ -75,7 +79,7 @@ int venc_if_encode(struct mtk_vcodec_ctx *ctx,
+ 	mtk_venc_lock(ctx);
+ 	mtk_vcodec_enc_clock_on(&ctx->dev->pm);
+ 	ret = ctx->enc_if->encode(ctx->drv_handle, opt, frm_buf,
+-							  bs_buf, result);
++				  bs_buf, result);
+ 	mtk_vcodec_enc_clock_off(&ctx->dev->pm);
+ 	mtk_venc_unlock(ctx);
+ 	spin_lock_irqsave(&ctx->dev->irqlock, flags);
+diff --git a/drivers/media/platform/mtk-vcodec/vp8_enc/Makefile b/drivers/media/platform/mtk-vcodec/vp8_enc/Makefile
 new file mode 100644
-index 0000000..d890a66
+index 0000000..0f515c7
 --- /dev/null
-+++ b/drivers/media/platform/mtk-vpu/Makefile
-@@ -0,0 +1 @@
-+obj-y += mtk_vpu.o
-diff --git a/drivers/media/platform/mtk-vpu/mtk_vpu.c b/drivers/media/platform/mtk-vpu/mtk_vpu.c
++++ b/drivers/media/platform/mtk-vcodec/vp8_enc/Makefile
+@@ -0,0 +1,6 @@
++obj-$(CONFIG_VIDEO_MEDIATEK_VCODEC) += venc_vp8_if.o venc_vp8_vpu.o
++
++ccflags-y += \
++    -I$(srctree)/drivers/media/platform/mtk-vcodec/ \
++    -I$(srctree)/drivers/media/platform/mtk-vcodec/vp8_enc \
++    -I$(srctree)/drivers/media/platform/mtk-vpu
+diff --git a/drivers/media/platform/mtk-vcodec/vp8_enc/venc_vp8_if.c b/drivers/media/platform/mtk-vcodec/vp8_enc/venc_vp8_if.c
 new file mode 100644
-index 0000000..bb4867b
+index 0000000..813bfe5
 --- /dev/null
-+++ b/drivers/media/platform/mtk-vpu/mtk_vpu.c
-@@ -0,0 +1,949 @@
++++ b/drivers/media/platform/mtk-vcodec/vp8_enc/venc_vp8_if.c
+@@ -0,0 +1,368 @@
 +/*
-+* Copyright (c) 2016 MediaTek Inc.
-+* Author: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
-+*
-+* This program is free software; you can redistribute it and/or modify
-+* it under the terms of the GNU General Public License version 2 as
-+* published by the Free Software Foundation.
-+*
-+* This program is distributed in the hope that it will be useful,
-+* but WITHOUT ANY WARRANTY; without even the implied warranty of
-+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+* GNU General Public License for more details.
-+*/
-+#include <linux/bootmem.h>
-+#include <linux/clk.h>
-+#include <linux/debugfs.h>
-+#include <linux/firmware.h>
++ * Copyright (c) 2016 MediaTek Inc.
++ * Author: Daniel Hsiao <daniel.hsiao@mediatek.com>
++ *         PoChun Lin <pochun.lin@mediatek.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
 +#include <linux/interrupt.h>
-+#include <linux/iommu.h>
-+#include <linux/module.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_platform.h>
-+#include <linux/of_reserved_mem.h>
-+#include <linux/sched.h>
-+#include <linux/sizes.h>
++#include <linux/kernel.h>
++#include <linux/slab.h>
++
++#include "mtk_vcodec_drv.h"
++#include "mtk_vcodec_util.h"
++#include "mtk_vcodec_intr.h"
++#include "mtk_vcodec_enc.h"
++#include "mtk_vcodec_enc_pm.h"
++#include "mtk_vpu.h"
++
++#include "venc_vp8_if.h"
++#include "venc_vp8_vpu.h"
++
++#define VENC_BITSTREAM_FRAME_SIZE 0x0098
++#define VENC_BITSTREAM_HEADER_LEN 0x00e8
++
++/* This ac_tag is vp8 frame tag. */
++#define MAX_AC_TAG_SIZE 10
++
++static inline void vp8_enc_write_reg(struct venc_vp8_inst *inst, u32 addr,
++				     u32 val)
++{
++	writel(val, inst->hw_base + addr);
++}
++
++static inline u32 vp8_enc_read_reg(struct venc_vp8_inst *inst, u32 addr)
++{
++	return readl(inst->hw_base + addr);
++}
++
++static void vp8_enc_free_work_buf(struct venc_vp8_inst *inst)
++{
++	int i;
++
++	mtk_vcodec_debug_enter(inst);
++
++	/* Buffers need to be freed by AP. */
++	for (i = 0; i < VENC_VP8_VPU_WORK_BUF_MAX; i++) {
++		if ((inst->work_bufs[i].size == 0))
++			continue;
++		mtk_vcodec_mem_free(inst->ctx, &inst->work_bufs[i]);
++	}
++
++	mtk_vcodec_debug_leave(inst);
++}
++
++static int vp8_enc_alloc_work_buf(struct venc_vp8_inst *inst)
++{
++	int i;
++	int ret = 0;
++	struct venc_vp8_vpu_buf *wb = inst->vpu_inst.vsi->work_bufs;
++
++	mtk_vcodec_debug_enter(inst);
++
++	for (i = 0; i < VENC_VP8_VPU_WORK_BUF_MAX; i++) {
++		if ((wb[i].size == 0))
++			continue;
++		/*
++		 * This 'wb' structure is set by VPU side and shared to AP for
++		 * buffer allocation and IO virtual addr mapping. For most of
++		 * the buffers, AP will allocate the buffer according to 'size'
++		 * field and store the IO virtual addr in 'iova' field. For the
++		 * RC_CODEx buffers, they are pre-allocated in the VPU side
++		 * because they are inside VPU SRAM, and save the VPU addr in
++		 * the 'vpua' field. The AP will translate the VPU addr to the
++		 * corresponding IO virtual addr and store in 'iova' field.
++		 */
++		inst->work_bufs[i].size = wb[i].size;
++		ret = mtk_vcodec_mem_alloc(inst->ctx, &inst->work_bufs[i]);
++		if (ret) {
++			mtk_vcodec_err(inst,
++				       "cannot alloc work_bufs[%d]", i);
++			goto err_alloc;
++		}
++		/*
++		 * This RC_CODEx is pre-allocated by VPU and saved in VPU addr.
++		 * So we need use memcpy to copy RC_CODEx from VPU addr into IO
++		 * virtual addr in 'iova' field for reg setting in VPU side.
++		 */
++		if (i == VENC_VP8_VPU_WORK_BUF_RC_CODE ||
++		    i == VENC_VP8_VPU_WORK_BUF_RC_CODE2 ||
++		    i == VENC_VP8_VPU_WORK_BUF_RC_CODE3) {
++			void *tmp_va;
++
++			tmp_va = vpu_mapping_dm_addr(inst->dev, wb[i].vpua);
++			memcpy(inst->work_bufs[i].va, tmp_va, wb[i].size);
++		}
++		wb[i].iova = inst->work_bufs[i].dma_addr;
++
++		mtk_vcodec_debug(inst,
++				 "work_bufs[%d] va=0x%p,iova=0x%p,size=0x%lx",
++				 i, inst->work_bufs[i].va,
++				 (void *)inst->work_bufs[i].dma_addr,
++				 inst->work_bufs[i].size);
++	}
++
++	mtk_vcodec_debug_leave(inst);
++
++	return ret;
++
++err_alloc:
++	vp8_enc_free_work_buf(inst);
++
++	return ret;
++}
++
++static unsigned int vp8_enc_wait_venc_done(struct venc_vp8_inst *inst)
++{
++	unsigned int irq_status = 0;
++	struct mtk_vcodec_ctx *ctx = (struct mtk_vcodec_ctx *)inst->ctx;
++
++	if (!mtk_vcodec_wait_for_done_ctx(ctx, MTK_INST_IRQ_RECEIVED,
++					  WAIT_INTR_TIMEOUT_MS)) {
++		irq_status = ctx->irq_status;
++		mtk_vcodec_debug(inst, "isr return %x", irq_status);
++	}
++	return irq_status;
++}
++
++/*
++ * Compose ac_tag, bitstream header and bitstream payload into
++ * one bitstream buffer.
++ */
++static int vp8_enc_compose_one_frame(struct venc_vp8_inst *inst,
++				     struct mtk_vcodec_mem *bs_buf,
++				     unsigned int *bs_size)
++{
++	unsigned int not_key;
++	u32 bs_frm_size;
++	u32 bs_hdr_len;
++	unsigned int ac_tag_size;
++	u8 ac_tag[MAX_AC_TAG_SIZE];
++
++	bs_frm_size = vp8_enc_read_reg(inst, VENC_BITSTREAM_FRAME_SIZE);
++	bs_hdr_len = vp8_enc_read_reg(inst, VENC_BITSTREAM_HEADER_LEN);
++
++	/* if a frame is key frame, not_key is 0 */
++	not_key = !inst->is_key_frm;
++	*(u32 *)ac_tag = __cpu_to_le32((bs_hdr_len << 5) | 0x10 | not_key);
++	/* key frame */
++	if (not_key == 0) {
++		ac_tag_size = MAX_AC_TAG_SIZE;
++		ac_tag[3] = 0x9d;
++		ac_tag[4] = 0x01;
++		ac_tag[5] = 0x2a;
++		ac_tag[6] = inst->vpu_inst.vsi->config.pic_w;
++		ac_tag[7] = inst->vpu_inst.vsi->config.pic_w >> 8;
++		ac_tag[8] = inst->vpu_inst.vsi->config.pic_h;
++		ac_tag[9] = inst->vpu_inst.vsi->config.pic_h >> 8;
++	} else {
++		ac_tag_size = 3;
++	}
++
++	if (bs_buf->size < bs_hdr_len + bs_frm_size + ac_tag_size) {
++		mtk_vcodec_err(inst, "bitstream buf size is too small(%ld)",
++			       bs_buf->size);
++		return -EINVAL;
++	}
++
++	/*
++	* (1) The vp8 bitstream header and body are generated by the HW vp8
++	* encoder separately at the same time. We cannot know the bitstream
++	* header length in advance.
++	* (2) From the vp8 spec, there is no stuffing byte allowed between the
++	* ac tag, bitstream header and bitstream body.
++	*/
++	memmove(bs_buf->va + bs_hdr_len + ac_tag_size,
++		bs_buf->va, bs_frm_size);
++	memcpy(bs_buf->va + ac_tag_size,
++	       inst->work_bufs[VENC_VP8_VPU_WORK_BUF_BS_HEADER].va,
++	       bs_hdr_len);
++	memcpy(bs_buf->va, ac_tag, ac_tag_size);
++	*bs_size = bs_frm_size + bs_hdr_len + ac_tag_size;
++
++	return 0;
++}
++
++static int vp8_enc_encode_frame(struct venc_vp8_inst *inst,
++				struct venc_frm_buf *frm_buf,
++				struct mtk_vcodec_mem *bs_buf,
++				unsigned int *bs_size)
++{
++	int ret = 0;
++	unsigned int irq_status;
++
++	mtk_vcodec_debug(inst, "->frm_cnt=%d", inst->frm_cnt);
++
++	ret = vp8_enc_vpu_encode(inst, frm_buf, bs_buf);
++	if (ret)
++		return ret;
++
++	irq_status = vp8_enc_wait_venc_done(inst);
++	if (irq_status != MTK_VENC_IRQ_STATUS_FRM) {
++		mtk_vcodec_err(inst, "irq_status=%d failed", irq_status);
++		return -EIO;
++	}
++
++	if (vp8_enc_compose_one_frame(inst, bs_buf, bs_size)) {
++		mtk_vcodec_err(inst, "vp8_enc_compose_one_frame failed");
++		return -EINVAL;
++	}
++
++	inst->frm_cnt++;
++	mtk_vcodec_debug(inst, "<-size=%d key_frm=%d", *bs_size,
++			 inst->is_key_frm);
++
++	return ret;
++}
++
++static int vp8_enc_init(struct mtk_vcodec_ctx *ctx, unsigned long *handle)
++{
++	int ret = 0;
++	struct venc_vp8_inst *inst;
++
++	inst = kzalloc(sizeof(*inst), GFP_KERNEL);
++	if (!inst)
++		return -ENOMEM;
++
++	inst->ctx = ctx;
++	inst->dev = mtk_vcodec_get_plat_dev(ctx);
++	inst->hw_base = mtk_vcodec_get_reg_addr(inst->ctx, VENC_LT_SYS);
++
++	mtk_vcodec_debug_enter(inst);
++
++	ret = vp8_enc_vpu_init(inst);
++
++	mtk_vcodec_debug_leave(inst);
++
++	if (ret)
++		kfree(inst);
++	else
++		(*handle) = (unsigned long)inst;
++
++	return ret;
++}
++
++static int vp8_enc_encode(unsigned long handle,
++			  enum venc_start_opt opt,
++			  struct venc_frm_buf *frm_buf,
++			  struct mtk_vcodec_mem *bs_buf,
++			  struct venc_done_result *result)
++{
++	int ret = 0;
++	struct venc_vp8_inst *inst = (struct venc_vp8_inst *)handle;
++	struct mtk_vcodec_ctx *ctx = inst->ctx;
++
++	mtk_vcodec_debug_enter(inst);
++
++	enable_irq(ctx->dev->enc_lt_irq);
++
++	switch (opt) {
++	case VENC_START_OPT_ENCODE_FRAME:
++		ret = vp8_enc_encode_frame(inst, frm_buf, bs_buf,
++					   &result->bs_size);
++		if (ret)
++			goto encode_err;
++		result->is_key_frm = inst->is_key_frm;
++		break;
++
++	default:
++		mtk_vcodec_err(inst, "opt not support:%d", opt);
++		ret = -EINVAL;
++		break;
++	}
++
++encode_err:
++
++	disable_irq(ctx->dev->enc_lt_irq);
++	mtk_vcodec_debug_leave(inst);
++
++	return ret;
++}
++
++static int vp8_enc_set_param(unsigned long handle,
++			     enum venc_set_param_type type,
++			     struct venc_enc_prm *enc_prm)
++{
++	int i;
++	int ret = 0;
++	struct venc_vp8_inst *inst = (struct venc_vp8_inst *)handle;
++
++	mtk_vcodec_debug(inst, "->type=%d", type);
++
++	switch (type) {
++	case VENC_SET_PARAM_ENC:
++		ret = vp8_enc_vpu_set_param(inst, type, enc_prm);
++		if (ret)
++			break;
++		if (inst->work_buf_allocated) {
++			vp8_enc_free_work_buf(inst);
++			inst->work_buf_allocated = false;
++		}
++		ret = vp8_enc_alloc_work_buf(inst);
++		if (ret)
++			break;
++		inst->work_buf_allocated = true;
++		for (i = 0; i < MTK_VCODEC_MAX_PLANES; i++) {
++			enc_prm->sizeimage[i] =
++				inst->vpu_inst.vsi->sizeimage[i];
++			mtk_vcodec_debug(inst, "sizeimage[%d] size=0x%x", i,
++					 enc_prm->sizeimage[i]);
++		}
++		break;
++
++	/*
++	 * VENC_SET_PARAM_TS_MODE must be called before VENC_SET_PARAM_ENC
++	 */
++	case VENC_SET_PARAM_TS_MODE:
++		inst->ts_mode = 1;
++		mtk_vcodec_debug(inst, "set ts_mode");
++		break;
++
++	default:
++		ret = vp8_enc_vpu_set_param(inst, type, enc_prm);
++		break;
++	}
++
++	mtk_vcodec_debug_leave(inst);
++
++	return ret;
++}
++
++static int vp8_enc_deinit(unsigned long handle)
++{
++	int ret = 0;
++	struct venc_vp8_inst *inst = (struct venc_vp8_inst *)handle;
++
++	mtk_vcodec_debug_enter(inst);
++
++	ret = vp8_enc_vpu_deinit(inst);
++
++	if (inst->work_buf_allocated)
++		vp8_enc_free_work_buf(inst);
++
++	mtk_vcodec_debug_leave(inst);
++	kfree(inst);
++
++	return ret;
++}
++
++static struct venc_common_if venc_vp8_if = {
++	vp8_enc_init,
++	vp8_enc_encode,
++	vp8_enc_set_param,
++	vp8_enc_deinit,
++};
++
++struct venc_common_if *get_vp8_enc_comm_if(void)
++{
++	return &venc_vp8_if;
++}
+diff --git a/drivers/media/platform/mtk-vcodec/vp8_enc/venc_vp8_if.h b/drivers/media/platform/mtk-vcodec/vp8_enc/venc_vp8_if.h
+new file mode 100644
+index 0000000..9837219
+--- /dev/null
++++ b/drivers/media/platform/mtk-vcodec/vp8_enc/venc_vp8_if.h
+@@ -0,0 +1,150 @@
++/*
++ * Copyright (c) 2016 MediaTek Inc.
++ * Author: Daniel Hsiao <daniel.hsiao@mediatek.com>
++ *         PoChun Lin <pochun.lin@mediatek.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef _VENC_VP8_IF_H_
++#define _VENC_VP8_IF_H_
++
++#include "venc_drv_base.h"
++
++/**
++ * enum venc_vp8_vpu_work_buf - vp8 encoder buffer index
++ */
++enum venc_vp8_vpu_work_buf {
++	VENC_VP8_VPU_WORK_BUF_LUMA,
++	VENC_VP8_VPU_WORK_BUF_LUMA2,
++	VENC_VP8_VPU_WORK_BUF_LUMA3,
++	VENC_VP8_VPU_WORK_BUF_CHROMA,
++	VENC_VP8_VPU_WORK_BUF_CHROMA2,
++	VENC_VP8_VPU_WORK_BUF_CHROMA3,
++	VENC_VP8_VPU_WORK_BUF_MV_INFO,
++	VENC_VP8_VPU_WORK_BUF_BS_HEADER,
++	VENC_VP8_VPU_WORK_BUF_PROB_BUF,
++	VENC_VP8_VPU_WORK_BUF_RC_INFO,
++	VENC_VP8_VPU_WORK_BUF_RC_CODE,
++	VENC_VP8_VPU_WORK_BUF_RC_CODE2,
++	VENC_VP8_VPU_WORK_BUF_RC_CODE3,
++	VENC_VP8_VPU_WORK_BUF_MAX,
++};
++
++/*
++ * struct venc_vp8_vpu_config - Structure for vp8 encoder configuration
++ * @input_fourcc: input fourcc
++ * @bitrate: target bitrate (in bps)
++ * @pic_w: picture width. Picture size is visible stream resolution, in pixels,
++ *         to be used for display purposes; must be smaller or equal to buffer
++ *         size.
++ * @pic_h: picture height
++ * @buf_w: buffer width (with 16 alignment). Buffer size is stream resolution
++ *         in pixels aligned to hardware requirements.
++ * @buf_h: buffer height (with 16 alignment)
++ * @gop_size: group of picture size (key frame)
++ * @framerate: frame rate in fps
++ * @ts_mode: temporal scalability mode (0: disable, 1: enable)
++ *	     support three temporal layers - 0: 7.5fps 1: 7.5fps 2: 15fps.
++ */
++struct venc_vp8_vpu_config {
++	u32 input_fourcc;
++	u32 bitrate;
++	u32 pic_w;
++	u32 pic_h;
++	u32 buf_w;
++	u32 buf_h;
++	u32 gop_size;
++	u32 framerate;
++	u32 ts_mode;
++};
++
++/*
++ * struct venc_vp8_vpu_buf -Structure for buffer information
++ * @align: buffer alignment (in bytes)
++ * @iova: IO virtual address
++ * @vpua: VPU side memory addr which is used by RC_CODE
++ * @size: buffer size (in bytes)
++ */
++struct venc_vp8_vpu_buf {
++	u32 align;
++	u32 iova;
++	u32 vpua;
++	u32 size;
++};
++
++/*
++ * struct venc_vp8_vsi - Structure for VPU driver control and info share
++ * This structure is allocated in VPU side and shared to AP side.
++ * @config: vp8 encoder configuration
++ * @work_bufs: working buffer information in VPU side
++ * The work_bufs here is for storing the 'size' info shared to AP side.
++ * The similar item in struct venc_vp8_inst is for memory allocation
++ * in AP side. The AP driver will copy the 'size' from here to the one in
++ * struct mtk_vcodec_mem, then invoke mtk_vcodec_mem_alloc to allocate
++ * the buffer. After that, bypass the 'dma_addr' to the 'iova' field here for
++ * register setting in VPU side.
++ * @sizeimage: image size for each plane
++ */
++struct venc_vp8_vsi {
++	struct venc_vp8_vpu_config config;
++	struct venc_vp8_vpu_buf work_bufs[VENC_VP8_VPU_WORK_BUF_MAX];
++	unsigned int sizeimage[MTK_VCODEC_MAX_PLANES];
++};
++
++/*
++ * struct venc_vp8_vpu_inst - vp8 encoder VPU driver instance
++ * @wq_hd: wait queue used for vpu cmd trigger then wait vpu interrupt done
++ * @signaled: flag used for checking vpu interrupt done
++ * @failure: flag to show vpu cmd succeeds or not
++ * @state: enum venc_ipi_msg_enc_state
++ * @id: VPU instance id
++ * @vsi: driver structure allocated by VPU side and shared to AP side for
++ *	 control and info share
++ */
++struct venc_vp8_vpu_inst {
++	wait_queue_head_t wq_hd;
++	int signaled;
++	int failure;
++	int state;
++	unsigned int id;
++	struct venc_vp8_vsi *vsi;
++};
++
++/*
++ * struct venc_vp8_inst - vp8 encoder AP driver instance
++ * @hw_base: vp8 encoder hardware register base
++ * @work_bufs: working buffer
++ * @work_buf_allocated: working buffer allocated flag
++ * @frm_cnt: encoded frame count, it's used for I-frame judgement and
++ *	     reset when force intra cmd received.
++ * @ts_mode: temporal scalability mode (0: disable, 1: enable)
++ *	     support three temporal layers - 0: 7.5fps 1: 7.5fps 2: 15fps.
++ * @is_key_frm: key frame flag
++ * @vpu_inst: VPU instance to exchange information between AP and VPU
++ * @ctx: context for v4l2 layer integration
++ * @dev: device for v4l2 layer integration
++ */
++struct venc_vp8_inst {
++	void __iomem *hw_base;
++	struct mtk_vcodec_mem work_bufs[VENC_VP8_VPU_WORK_BUF_MAX];
++	bool work_buf_allocated;
++	unsigned int frm_cnt;
++	unsigned int ts_mode;
++	unsigned int is_key_frm;
++	struct venc_vp8_vpu_inst vpu_inst;
++	void *ctx;
++	struct platform_device *dev;
++};
++
++struct venc_common_if *get_vp8_enc_comm_if(void);
++
++#endif
+diff --git a/drivers/media/platform/mtk-vcodec/vp8_enc/venc_vp8_vpu.c b/drivers/media/platform/mtk-vcodec/vp8_enc/venc_vp8_vpu.c
+new file mode 100644
+index 0000000..76ccd60
+--- /dev/null
++++ b/drivers/media/platform/mtk-vcodec/vp8_enc/venc_vp8_vpu.c
+@@ -0,0 +1,237 @@
++/*
++ * Copyright (c) 2016 MediaTek Inc.
++ * Author: Daniel Hsiao <daniel.hsiao@mediatek.com>
++ *         PoChun Lin <pochun.lin@mediatek.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
 +#include "mtk_vpu.h"
 +
-+/**
-+ * VPU (video processor unit) is a tiny processor controlling video hardware
-+ * related to video codec, scaling and color format converting.
-+ * VPU interfaces with other blocks by share memory and interrupt.
-+ **/
++#include "venc_vp8_if.h"
++#include "venc_vp8_vpu.h"
++#include "venc_ipi_msg.h"
 +
-+#define INIT_TIMEOUT_MS		2000U
-+#define IPI_TIMEOUT_MS		2000U
-+#define VPU_FW_VER_LEN		16
-+
-+/* maximum program/data TCM (Tightly-Coupled Memory) size */
-+#define VPU_PTCM_SIZE		(96 * SZ_1K)
-+#define VPU_DTCM_SIZE		(32 * SZ_1K)
-+/* the offset to get data tcm address */
-+#define VPU_DTCM_OFFSET		0x18000UL
-+/* daynamic allocated maximum extended memory size */
-+#define VPU_EXT_P_SIZE		SZ_1M
-+#define VPU_EXT_D_SIZE		SZ_4M
-+/* maximum binary firmware size */
-+#define VPU_P_FW_SIZE		(VPU_PTCM_SIZE + VPU_EXT_P_SIZE)
-+#define VPU_D_FW_SIZE		(VPU_DTCM_SIZE + VPU_EXT_D_SIZE)
-+/* the size of share buffer between Host and  VPU */
-+#define SHARE_BUF_SIZE		48
-+
-+/* binary firmware name */
-+#define VPU_P_FW		"vpu_p.bin"
-+#define VPU_D_FW		"vpu_d.bin"
-+
-+#define VPU_RESET		0x0
-+#define VPU_TCM_CFG		0x0008
-+#define VPU_PMEM_EXT0_ADDR	0x000C
-+#define VPU_PMEM_EXT1_ADDR	0x0010
-+#define VPU_TO_HOST		0x001C
-+#define VPU_DMEM_EXT0_ADDR	0x0014
-+#define VPU_DMEM_EXT1_ADDR	0x0018
-+#define HOST_TO_VPU		0x0024
-+#define VPU_PC_REG		0x0060
-+#define VPU_WDT_REG		0x0084
-+
-+/* vpu inter-processor communication interrupt */
-+#define VPU_IPC_INT		BIT(8)
-+
-+/**
-+ * enum vpu_fw_type - VPU firmware type
-+ *
-+ * @P_FW: program firmware
-+ * @D_FW: data firmware
-+ *
-+ */
-+enum vpu_fw_type {
-+	P_FW,
-+	D_FW,
-+};
-+
-+/**
-+ * struct vpu_mem - VPU extended program/data memory information
-+ *
-+ * @va:		the kernel virtual memory address of VPU extended memory
-+ * @pa:		the physical memory address of VPU extended memory
-+ *
-+ */
-+struct vpu_mem {
-+	void *va;
-+	phys_addr_t pa;
-+};
-+
-+/**
-+ * struct vpu_regs - VPU TCM and configuration registers
-+ *
-+ * @tcm:	the register for VPU Tightly-Coupled Memory
-+ * @cfg:	the register for VPU configuration
-+ * @irq:	the irq number for VPU interrupt
-+ */
-+struct vpu_regs {
-+	void __iomem *tcm;
-+	void __iomem *cfg;
-+	int irq;
-+};
-+
-+/**
-+ * struct vpu_wdt_handler - VPU watchdog reset handler
-+ *
-+ * @reset_func:	reset handler
-+ * @priv:	private data
-+ */
-+struct vpu_wdt_handler {
-+	void (*reset_func)(void *);
-+	void *priv;
-+};
-+
-+/**
-+ * struct vpu_wdt - VPU watchdog workqueue
-+ *
-+ * @handler:	VPU watchdog reset handler
-+ * @ws:		workstruct for VPU watchdog
-+ * @wq:		workqueue for VPU watchdog
-+ */
-+struct vpu_wdt {
-+	struct vpu_wdt_handler handler[VPU_RST_MAX];
-+	struct work_struct ws;
-+	struct workqueue_struct *wq;
-+};
-+
-+/**
-+ * struct vpu_run - VPU initialization status
-+ *
-+ * @signaled:		the signal of vpu initialization completed
-+ * @fw_ver:		VPU firmware version
-+ * @enc_capability:	encoder capability which is not used for now and
-+ *			the value is reserved for future use
-+ * @wq:			wait queue for VPU initialization status
-+ */
-+struct vpu_run {
-+	u32 signaled;
-+	char fw_ver[VPU_FW_VER_LEN];
-+	unsigned int	enc_capability;
-+	wait_queue_head_t wq;
-+};
-+
-+/**
-+ * struct vpu_ipi_desc - VPU IPI descriptor
-+ *
-+ * @handler:	IPI handler
-+ * @name:	the name of IPI handler
-+ * @priv:	the private data of IPI handler
-+ */
-+struct vpu_ipi_desc {
-+	ipi_handler_t handler;
-+	const char *name;
-+	void *priv;
-+};
-+
-+/**
-+ * struct share_obj - DTCM (Data Tightly-Coupled Memory) buffer shared with
-+ *		      AP and VPU
-+ *
-+ * @id:		IPI id
-+ * @len:	share buffer length
-+ * @share_buf:	share buffer data
-+ */
-+struct share_obj {
-+	s32 id;
-+	u32 len;
-+	unsigned char share_buf[SHARE_BUF_SIZE];
-+};
-+
-+/**
-+ * struct mtk_vpu - vpu driver data
-+ * @extmem:		VPU extended memory information
-+ * @reg:		VPU TCM and configuration registers
-+ * @run:		VPU initialization status
-+ * @ipi_desc:		VPU IPI descriptor
-+ * @recv_buf:		VPU DTCM share buffer for receiving. The
-+ *			receive buffer is only accessed in interrupt context.
-+ * @send_buf:		VPU DTCM share buffer for sending
-+ * @dev:		VPU struct device
-+ * @clk:		VPU clock on/off
-+ * @enable_4GB:		VPU 4GB mode on/off
-+ * @vpu_mutex:		protect mtk_vpu (except recv_buf) and ensure only
-+ *			one client to use VPU service at a time. For example,
-+ *			suppose a client is using VPU to decode VP8.
-+ *			If the other client wants to encode VP8,
-+ *			it has to wait until VP8 decode completes.
-+ * @wdt_refcnt		WDT reference count to make sure the watchdog can be
-+ *			disabled if no other client is using VPU service
-+ * @ack_wq:		The wait queue for each codec and mdp. When sleeping
-+ *			processes wake up, they will check the condition
-+ *			"ipi_id_ack" to run the corresponding action or
-+ *			go back to sleep.
-+ * @ipi_id_ack:		The ACKs for registered IPI function sending
-+ *			interrupt to VPU
-+ *
-+ */
-+struct mtk_vpu {
-+	struct vpu_mem extmem[2];
-+	struct vpu_regs reg;
-+	struct vpu_run run;
-+	struct vpu_wdt wdt;
-+	struct vpu_ipi_desc ipi_desc[IPI_MAX];
-+	struct share_obj *recv_buf;
-+	struct share_obj *send_buf;
-+	struct device *dev;
-+	struct clk *clk;
-+	bool enable_4GB;
-+	struct mutex vpu_mutex; /* for protecting vpu data data structure */
-+	u32 wdt_refcnt;
-+	wait_queue_head_t ack_wq;
-+	bool ipi_id_ack[IPI_MAX];
-+};
-+
-+static inline void vpu_cfg_writel(struct mtk_vpu *vpu, u32 val, u32 offset)
++static void handle_vp8_enc_init_msg(struct venc_vp8_inst *inst, void *data)
 +{
-+	writel(val, vpu->reg.cfg + offset);
++	struct venc_vpu_ipi_msg_init *msg = data;
++
++	inst->vpu_inst.id = msg->vpu_inst_addr;
++	inst->vpu_inst.vsi = (struct venc_vp8_vsi *)
++		vpu_mapping_dm_addr(inst->dev, msg->vpu_inst_addr);
 +}
 +
-+static inline u32 vpu_cfg_readl(struct mtk_vpu *vpu, u32 offset)
++static void handle_vp8_enc_encode_msg(struct venc_vp8_inst *inst, void *data)
 +{
-+	return readl(vpu->reg.cfg + offset);
++	struct venc_vpu_ipi_msg_enc *msg = data;
++
++	inst->vpu_inst.state = msg->state;
++	inst->is_key_frm = msg->is_key_frm;
 +}
 +
-+static inline bool vpu_running(struct mtk_vpu *vpu)
++static void vp8_enc_vpu_ipi_handler(void *data, unsigned int len, void *priv)
 +{
-+	return vpu_cfg_readl(vpu, VPU_RESET) & BIT(0);
-+}
++	struct venc_vpu_ipi_msg_common *msg = data;
++	struct venc_vp8_inst *inst = (struct venc_vp8_inst *)msg->venc_inst;
 +
-+void vpu_clock_disable(struct mtk_vpu *vpu)
-+{
-+	/* Disable VPU watchdog */
-+	mutex_lock(&vpu->vpu_mutex);
-+	if (!--vpu->wdt_refcnt)
-+		vpu_cfg_writel(vpu,
-+			       vpu_cfg_readl(vpu, VPU_WDT_REG) & ~(1L << 31),
-+			       VPU_WDT_REG);
-+	mutex_unlock(&vpu->vpu_mutex);
++	mtk_vcodec_debug(inst, "->msg_id=%x inst=%p status=%d",
++			 msg->msg_id, inst, msg->status);
 +
-+	clk_disable(vpu->clk);
-+}
-+
-+int vpu_clock_enable(struct mtk_vpu *vpu)
-+{
-+	int ret;
-+
-+	ret = clk_enable(vpu->clk);
-+	if (ret)
-+		return ret;
-+	/* Enable VPU watchdog */
-+	mutex_lock(&vpu->vpu_mutex);
-+	if (!vpu->wdt_refcnt++)
-+		vpu_cfg_writel(vpu,
-+			       vpu_cfg_readl(vpu, VPU_WDT_REG) | (1L << 31),
-+			       VPU_WDT_REG);
-+	mutex_unlock(&vpu->vpu_mutex);
-+
-+	return ret;
-+}
-+
-+int vpu_ipi_register(struct platform_device *pdev,
-+		     enum ipi_id id, ipi_handler_t handler,
-+		     const char *name, void *priv)
-+{
-+	struct mtk_vpu *vpu = platform_get_drvdata(pdev);
-+	struct vpu_ipi_desc *ipi_desc;
-+
-+	if (!vpu) {
-+		dev_err(&pdev->dev, "vpu device in not ready\n");
-+		return -EPROBE_DEFER;
++	switch (msg->msg_id) {
++	case VPU_IPIMSG_ENC_INIT_DONE:
++		handle_vp8_enc_init_msg(inst, data);
++		break;
++	case VPU_IPIMSG_ENC_SET_PARAM_DONE:
++		break;
++	case VPU_IPIMSG_ENC_ENCODE_DONE:
++		handle_vp8_enc_encode_msg(inst, data);
++		break;
++	case VPU_IPIMSG_ENC_DEINIT_DONE:
++		break;
++	default:
++		mtk_vcodec_err(inst, "unknown msg id=%x", msg->msg_id);
++		break;
 +	}
 +
-+	if (id >= 0 && id < IPI_MAX && handler) {
-+		ipi_desc = vpu->ipi_desc;
-+		ipi_desc[id].name = name;
-+		ipi_desc[id].handler = handler;
-+		ipi_desc[id].priv = priv;
-+		return 0;
-+	}
++	inst->vpu_inst.signaled = 1;
++	inst->vpu_inst.failure = (msg->status != VENC_IPI_MSG_STATUS_OK);
 +
-+	dev_err(&pdev->dev, "register vpu ipi id %d with invalid arguments\n",
-+		id);
-+	return -EINVAL;
++	mtk_vcodec_debug_leave(inst);
 +}
 +
-+int vpu_ipi_send(struct platform_device *pdev,
-+		 enum ipi_id id, void *buf,
-+		 unsigned int len)
++static int vp8_enc_vpu_send_msg(struct venc_vp8_inst *inst, void *msg,
++				int len)
 +{
-+	struct mtk_vpu *vpu = platform_get_drvdata(pdev);
-+	struct share_obj *send_obj = vpu->send_buf;
-+	unsigned long timeout;
-+	int ret = 0;
++	int status;
 +
-+	if (id <= IPI_VPU_INIT || id >= IPI_MAX ||
-+	    len > sizeof(send_obj->share_buf) || !buf) {
-+		dev_err(vpu->dev, "failed to send ipi message\n");
++	mtk_vcodec_debug_enter(inst);
++
++	status = vpu_ipi_send(inst->dev, IPI_VENC_VP8, (void *)msg, len);
++	if (status) {
++		uint32_t msg_id = *(uint32_t *)msg;
++
++		mtk_vcodec_err(inst,
++			       "vpu_ipi_send msg_id=%x len=%d failed status=%d",
++			       msg_id, len, status);
++		return -EINVAL;
++	}
++	if (inst->vpu_inst.failure)
++		return -EINVAL;
++
++	mtk_vcodec_debug_leave(inst);
++
++	return 0;
++}
++
++int vp8_enc_vpu_init(struct venc_vp8_inst *inst)
++{
++	int status;
++	struct venc_ap_ipi_msg_init out;
++
++	mtk_vcodec_debug_enter(inst);
++
++	init_waitqueue_head(&inst->vpu_inst.wq_hd);
++	inst->vpu_inst.signaled = 0;
++	inst->vpu_inst.failure = 0;
++
++	status = vpu_ipi_register(inst->dev, IPI_VENC_VP8,
++				  vp8_enc_vpu_ipi_handler,
++				  "vp8_enc", NULL);
++	if (status) {
++		mtk_vcodec_err(inst,
++			       "vpu_ipi_register failed status=%d", status);
 +		return -EINVAL;
 +	}
 +
-+	ret = vpu_clock_enable(vpu);
-+	if (ret) {
-+		dev_err(vpu->dev, "failed to enable vpu clock\n");
-+		return ret;
-+	}
-+	if (!vpu_running(vpu)) {
-+		dev_err(vpu->dev, "vpu_ipi_send: VPU is not running\n");
-+		ret = -EINVAL;
-+		goto clock_disable;
-+	}
-+
-+	mutex_lock(&vpu->vpu_mutex);
-+
-+	 /* Wait until VPU receives the last command */
-+	timeout = jiffies + msecs_to_jiffies(IPI_TIMEOUT_MS);
-+	do {
-+		if (time_after(jiffies, timeout)) {
-+			dev_err(vpu->dev, "vpu_ipi_send: IPI timeout!\n");
-+			ret = -EIO;
-+			goto mut_unlock;
-+		}
-+	} while (vpu_cfg_readl(vpu, HOST_TO_VPU));
-+
-+	memcpy((void *)send_obj->share_buf, buf, len);
-+	send_obj->len = len;
-+	send_obj->id = id;
-+
-+	vpu->ipi_id_ack[id] = false;
-+	/* send the command to VPU */
-+	vpu_cfg_writel(vpu, 0x1, HOST_TO_VPU);
-+
-+	mutex_unlock(&vpu->vpu_mutex);
-+
-+	/* wait for VPU's ACK */
-+	timeout = msecs_to_jiffies(IPI_TIMEOUT_MS);
-+	ret = wait_event_interruptible_timeout(vpu->ack_wq,
-+					       vpu->ipi_id_ack[id], timeout);
-+	vpu->ipi_id_ack[id] = false;
-+	if (ret == 0) {
-+		dev_err(vpu->dev, "vpu ipi %d ack time out !", id);
-+		ret = -EIO;
-+		goto clock_disable;
-+	} else if (-ERESTARTSYS == ret) {
-+		dev_err(vpu->dev, "vpu ipi %d ack wait interrupted by a signal",
-+			id);
-+		ret = -ERESTARTSYS;
-+		goto clock_disable;
-+	}
-+	vpu_clock_disable(vpu);
-+
-+	return 0;
-+
-+mut_unlock:
-+	mutex_unlock(&vpu->vpu_mutex);
-+clock_disable:
-+	vpu_clock_disable(vpu);
-+
-+	return ret;
-+}
-+
-+static void vpu_wdt_reset_func(struct work_struct *ws)
-+{
-+	struct vpu_wdt *wdt = container_of(ws, struct vpu_wdt, ws);
-+	struct mtk_vpu *vpu = container_of(wdt, struct mtk_vpu, wdt);
-+	struct vpu_wdt_handler *handler = wdt->handler;
-+	int index, ret;
-+
-+	dev_info(vpu->dev, "vpu reset\n");
-+	ret = vpu_clock_enable(vpu);
-+	if (ret) {
-+		dev_err(vpu->dev, "[VPU] wdt enables clock failed %d\n", ret);
-+		return;
-+	}
-+	mutex_lock(&vpu->vpu_mutex);
-+	vpu_cfg_writel(vpu, 0x0, VPU_RESET);
-+	mutex_unlock(&vpu->vpu_mutex);
-+	vpu_clock_disable(vpu);
-+
-+	for (index = 0; index < VPU_RST_MAX; index++) {
-+		if (handler[index].reset_func) {
-+			handler[index].reset_func(handler[index].priv);
-+			dev_dbg(vpu->dev, "wdt handler func %d\n", index);
-+		}
-+	}
-+}
-+
-+int vpu_wdt_reg_handler(struct platform_device *pdev,
-+			void wdt_reset(void *),
-+			void *priv, enum rst_id id)
-+{
-+	struct mtk_vpu *vpu = platform_get_drvdata(pdev);
-+	struct vpu_wdt_handler *handler = vpu->wdt.handler;
-+
-+	if (!vpu) {
-+		dev_err(vpu->dev, "vpu device in not ready\n");
-+		return -EPROBE_DEFER;
-+	}
-+
-+	if (id > 0 && id < VPU_RST_MAX && wdt_reset) {
-+		dev_dbg(vpu->dev, "wdt register id %d\n", id);
-+		mutex_lock(&vpu->vpu_mutex);
-+		handler[id].reset_func = wdt_reset;
-+		handler[id].priv = priv;
-+		mutex_unlock(&vpu->vpu_mutex);
-+		return 0;
-+	}
-+
-+	dev_err(vpu->dev, "register vpu wdt handler failed\n");
-+	return -EINVAL;
-+}
-+
-+unsigned int vpu_get_venc_hw_capa(struct platform_device *pdev)
-+{
-+	struct mtk_vpu *vpu = platform_get_drvdata(pdev);
-+
-+	return vpu->run.enc_capability;
-+}
-+
-+void *vpu_mapping_dm_addr(struct platform_device *pdev,
-+			  u32 dtcm_dmem_addr)
-+{
-+	struct mtk_vpu *vpu = platform_get_drvdata(pdev);
-+
-+	if (!dtcm_dmem_addr ||
-+	    (dtcm_dmem_addr > (VPU_DTCM_SIZE + VPU_EXT_D_SIZE))) {
-+		dev_err(vpu->dev, "invalid virtual data memory address\n");
-+		return ERR_PTR(-EINVAL);
-+	}
-+
-+	if (dtcm_dmem_addr < VPU_DTCM_SIZE)
-+		return dtcm_dmem_addr + vpu->reg.tcm + VPU_DTCM_OFFSET;
-+
-+	return vpu->extmem[D_FW].va + (dtcm_dmem_addr - VPU_DTCM_SIZE);
-+}
-+
-+struct platform_device *vpu_get_plat_device(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct device_node *vpu_node;
-+	struct platform_device *vpu_pdev;
-+
-+	vpu_node = of_parse_phandle(dev->of_node, "mediatek,vpu", 0);
-+	if (!vpu_node) {
-+		dev_err(dev, "can't get vpu node\n");
-+		return NULL;
-+	}
-+
-+	vpu_pdev = of_find_device_by_node(vpu_node);
-+	if (WARN_ON(!vpu_pdev)) {
-+		dev_err(dev, "vpu pdev failed\n");
-+		of_node_put(vpu_node);
-+		return NULL;
-+	}
-+
-+	return vpu_pdev;
-+}
-+
-+/* load vpu program/data memory */
-+static int load_requested_vpu(struct mtk_vpu *vpu,
-+			      const struct firmware *vpu_fw,
-+			      u8 fw_type)
-+{
-+	size_t tcm_size = fw_type ? VPU_DTCM_SIZE : VPU_PTCM_SIZE;
-+	size_t fw_size = fw_type ? VPU_D_FW_SIZE : VPU_P_FW_SIZE;
-+	char *fw_name = fw_type ? VPU_D_FW : VPU_P_FW;
-+	size_t dl_size = 0;
-+	size_t extra_fw_size = 0;
-+	void *dest;
-+	int ret;
-+
-+	ret = request_firmware(&vpu_fw, fw_name, vpu->dev);
-+	if (ret < 0) {
-+		dev_err(vpu->dev, "Failed to load %s, %d\n", fw_name, ret);
-+		return ret;
-+	}
-+	dl_size = vpu_fw->size;
-+	if (dl_size > fw_size) {
-+		dev_err(vpu->dev, "fw %s size %zu is abnormal\n", fw_name,
-+			dl_size);
-+		release_firmware(vpu_fw);
-+		return  -EFBIG;
-+	}
-+	dev_dbg(vpu->dev, "Downloaded fw %s size: %zu.\n",
-+		fw_name,
-+		dl_size);
-+	/* reset VPU */
-+	vpu_cfg_writel(vpu, 0x0, VPU_RESET);
-+
-+	/* handle extended firmware size */
-+	if (dl_size > tcm_size) {
-+		dev_dbg(vpu->dev, "fw size %lx > limited fw size %lx\n",
-+			dl_size, tcm_size);
-+		extra_fw_size = dl_size - tcm_size;
-+		dev_dbg(vpu->dev, "extra_fw_size %lx\n", extra_fw_size);
-+		dl_size = tcm_size;
-+	}
-+	dest = vpu->reg.tcm;
-+	if (fw_type == D_FW)
-+		dest += VPU_DTCM_OFFSET;
-+	memcpy(dest, vpu_fw->data, dl_size);
-+	/* download to extended memory if need */
-+	if (extra_fw_size > 0) {
-+		dest = vpu->extmem[fw_type].va;
-+		dev_dbg(vpu->dev, "download extended memory type %x\n",
-+			fw_type);
-+		memcpy(dest, vpu_fw->data + tcm_size, extra_fw_size);
-+	}
-+
-+	release_firmware(vpu_fw);
-+
-+	return 0;
-+}
-+
-+int vpu_load_firmware(struct platform_device *pdev)
-+{
-+	struct mtk_vpu *vpu = platform_get_drvdata(pdev);
-+	struct device *dev = &pdev->dev;
-+	struct vpu_run *run = &vpu->run;
-+	const struct firmware *vpu_fw;
-+	int ret;
-+
-+	if (!pdev) {
-+		dev_err(dev, "VPU platform device is invalid\n");
++	out.msg_id = AP_IPIMSG_ENC_INIT;
++	out.venc_inst = (unsigned long)inst;
++	if (vp8_enc_vpu_send_msg(inst, &out, sizeof(out))) {
++		mtk_vcodec_err(inst, "AP_IPIMSG_ENC_INIT failed");
 +		return -EINVAL;
 +	}
 +
-+	ret = vpu_clock_enable(vpu);
-+	if (ret) {
-+		dev_err(dev, "enable clock failed %d\n", ret);
-+		return ret;
-+	}
-+
-+	mutex_lock(&vpu->vpu_mutex);
-+
-+	if (vpu_running(vpu)) {
-+		mutex_unlock(&vpu->vpu_mutex);
-+		vpu_clock_disable(vpu);
-+		dev_warn(dev, "vpu is running already\n");
-+		return 0;
-+	}
-+
-+	run->signaled = false;
-+	dev_dbg(vpu->dev, "firmware request\n");
-+	/* Downloading program firmware to device*/
-+	ret = load_requested_vpu(vpu, vpu_fw, P_FW);
-+	if (ret < 0) {
-+		dev_err(dev, "Failed to request %s, %d\n", VPU_P_FW, ret);
-+		goto OUT_LOAD_FW;
-+	}
-+
-+	/* Downloading data firmware to device */
-+	ret = load_requested_vpu(vpu, vpu_fw, D_FW);
-+	if (ret < 0) {
-+		dev_err(dev, "Failed to request %s, %d\n", VPU_D_FW, ret);
-+		goto OUT_LOAD_FW;
-+	}
-+
-+	/* boot up vpu */
-+	vpu_cfg_writel(vpu, 0x1, VPU_RESET);
-+
-+	ret = wait_event_interruptible_timeout(run->wq,
-+					       run->signaled,
-+					       msecs_to_jiffies(INIT_TIMEOUT_MS)
-+					       );
-+	if (ret == 0) {
-+		ret = -ETIME;
-+		dev_err(dev, "wait vpu initialization timout!\n");
-+		goto OUT_LOAD_FW;
-+	} else if (-ERESTARTSYS == ret) {
-+		dev_err(dev, "wait vpu interrupted by a signal!\n");
-+		goto OUT_LOAD_FW;
-+	}
-+
-+	ret = 0;
-+	dev_info(dev, "vpu is ready. Fw version %s\n", run->fw_ver);
-+
-+OUT_LOAD_FW:
-+	mutex_unlock(&vpu->vpu_mutex);
-+	vpu_clock_disable(vpu);
-+
-+	return ret;
-+}
-+
-+static void vpu_init_ipi_handler(void *data, unsigned int len, void *priv)
-+{
-+	struct mtk_vpu *vpu = (struct mtk_vpu *)priv;
-+	struct vpu_run *run = (struct vpu_run *)data;
-+
-+	vpu->run.signaled = run->signaled;
-+	strncpy(vpu->run.fw_ver, run->fw_ver, VPU_FW_VER_LEN);
-+	vpu->run.enc_capability = run->enc_capability;
-+	wake_up_interruptible(&vpu->run.wq);
-+}
-+
-+#ifdef CONFIG_DEBUG_FS
-+static int vpu_debug_open(struct inode *inode, struct file *file)
-+{
-+	file->private_data = inode->i_private;
-+	return 0;
-+}
-+
-+static ssize_t vpu_debug_read(struct file *file, char __user *user_buf,
-+			      size_t count, loff_t *ppos)
-+{
-+	char buf[256];
-+	unsigned int len;
-+	unsigned int running, pc, vpu_to_host, host_to_vpu, wdt;
-+	int ret;
-+	struct device *dev = file->private_data;
-+	struct mtk_vpu *vpu = dev_get_drvdata(dev);
-+
-+	ret = vpu_clock_enable(vpu);
-+	if (ret) {
-+		dev_err(vpu->dev, "[VPU] enable clock failed %d\n", ret);
-+		return 0;
-+	}
-+
-+	/* vpu register status */
-+	running = vpu_running(vpu);
-+	pc = vpu_cfg_readl(vpu, VPU_PC_REG);
-+	wdt = vpu_cfg_readl(vpu, VPU_WDT_REG);
-+	host_to_vpu = vpu_cfg_readl(vpu, HOST_TO_VPU);
-+	vpu_to_host = vpu_cfg_readl(vpu, VPU_TO_HOST);
-+	vpu_clock_disable(vpu);
-+
-+	if (running) {
-+		len = snprintf(buf, sizeof(buf), "VPU is running\n\n"
-+		"FW Version: %s\n"
-+		"PC: 0x%x\n"
-+		"WDT: 0x%x\n"
-+		"Host to VPU: 0x%x\n"
-+		"VPU to Host: 0x%x\n",
-+		vpu->run.fw_ver, pc, wdt,
-+		host_to_vpu, vpu_to_host);
-+	} else {
-+		len = snprintf(buf, sizeof(buf), "VPU not running\n");
-+	}
-+
-+	return simple_read_from_buffer(user_buf, count, ppos, buf, len);
-+}
-+
-+static const struct file_operations vpu_debug_fops = {
-+	.open = vpu_debug_open,
-+	.read = vpu_debug_read,
-+};
-+#endif /* CONFIG_DEBUG_FS */
-+
-+static void vpu_free_ext_mem(struct mtk_vpu *vpu, u8 fw_type)
-+{
-+	struct device *dev = vpu->dev;
-+	size_t fw_ext_size = fw_type ? VPU_EXT_D_SIZE : VPU_EXT_P_SIZE;
-+
-+	dma_free_coherent(dev, fw_ext_size, vpu->extmem[fw_type].va,
-+			  vpu->extmem[fw_type].pa);
-+}
-+
-+static int vpu_alloc_ext_mem(struct mtk_vpu *vpu, u32 fw_type)
-+{
-+	struct device *dev = vpu->dev;
-+	size_t fw_ext_size = fw_type ? VPU_EXT_D_SIZE : VPU_EXT_P_SIZE;
-+	u32 vpu_ext_mem0 = fw_type ? VPU_DMEM_EXT0_ADDR : VPU_PMEM_EXT0_ADDR;
-+	u32 vpu_ext_mem1 = fw_type ? VPU_DMEM_EXT1_ADDR : VPU_PMEM_EXT1_ADDR;
-+	u32 offset_4gb = vpu->enable_4GB ? 0x40000000 : 0;
-+
-+	vpu->extmem[fw_type].va = dma_alloc_coherent(dev,
-+					       fw_ext_size,
-+					       &vpu->extmem[fw_type].pa,
-+					       GFP_KERNEL);
-+	if (!vpu->extmem[fw_type].va) {
-+		dev_err(dev, "Failed to allocate the extended program memory\n");
-+		return PTR_ERR(vpu->extmem[fw_type].va);
-+	}
-+
-+	/* Disable extend0. Enable extend1 */
-+	vpu_cfg_writel(vpu, 0x1, vpu_ext_mem0);
-+	vpu_cfg_writel(vpu, (vpu->extmem[fw_type].pa & 0xFFFFF000) + offset_4gb,
-+		       vpu_ext_mem1);
-+
-+	dev_info(dev, "%s extend memory phy=0x%llx virt=0x%p\n",
-+		 fw_type ? "Data" : "Program",
-+		 (unsigned long long)vpu->extmem[fw_type].pa,
-+		 vpu->extmem[fw_type].va);
++	mtk_vcodec_debug_leave(inst);
 +
 +	return 0;
 +}
 +
-+static void vpu_ipi_handler(struct mtk_vpu *vpu)
++int vp8_enc_vpu_set_param(struct venc_vp8_inst *inst,
++			  enum venc_set_param_type id,
++			  struct venc_enc_prm *enc_param)
 +{
-+	struct share_obj *rcv_obj = vpu->recv_buf;
-+	struct vpu_ipi_desc *ipi_desc = vpu->ipi_desc;
++	struct venc_ap_ipi_msg_set_param out;
 +
-+	if (rcv_obj->id < IPI_MAX && ipi_desc[rcv_obj->id].handler) {
-+		ipi_desc[rcv_obj->id].handler(rcv_obj->share_buf,
-+					      rcv_obj->len,
-+					      ipi_desc[rcv_obj->id].priv);
-+		if (rcv_obj->id > IPI_VPU_INIT) {
-+			vpu->ipi_id_ack[rcv_obj->id] = true;
-+			wake_up_interruptible(&vpu->ack_wq);
-+		}
-+	} else {
-+		dev_err(vpu->dev, "No such ipi id = %d\n", rcv_obj->id);
++	mtk_vcodec_debug_enter(inst);
++
++	out.msg_id = AP_IPIMSG_ENC_SET_PARAM;
++	out.vpu_inst_addr = inst->vpu_inst.id;
++	out.param_id = id;
++	switch (id) {
++	case VENC_SET_PARAM_ENC: {
++		inst->vpu_inst.vsi->config.input_fourcc =
++			enc_param->input_fourcc;
++		inst->vpu_inst.vsi->config.bitrate = enc_param->bitrate;
++		inst->vpu_inst.vsi->config.pic_w = enc_param->width;
++		inst->vpu_inst.vsi->config.pic_h = enc_param->height;
++		inst->vpu_inst.vsi->config.buf_w = enc_param->buf_width;
++		inst->vpu_inst.vsi->config.buf_h = enc_param->buf_height;
++		inst->vpu_inst.vsi->config.gop_size = enc_param->gop_size;
++		inst->vpu_inst.vsi->config.framerate = enc_param->frm_rate;
++		inst->vpu_inst.vsi->config.ts_mode = inst->ts_mode;
++		out.data_item = 0;
++		break;
 +	}
-+}
-+
-+static int vpu_ipi_init(struct mtk_vpu *vpu)
-+{
-+	/* Disable VPU to host interrupt */
-+	vpu_cfg_writel(vpu, 0x0, VPU_TO_HOST);
-+
-+	/* shared buffer initialization */
-+	vpu->recv_buf = (struct share_obj *)(vpu->reg.tcm + VPU_DTCM_OFFSET);
-+	vpu->send_buf = vpu->recv_buf + 1;
-+	memset(vpu->recv_buf, 0, sizeof(struct share_obj));
-+	memset(vpu->send_buf, 0, sizeof(struct share_obj));
-+
-+	return 0;
-+}
-+
-+static irqreturn_t vpu_irq_handler(int irq, void *priv)
-+{
-+	struct mtk_vpu *vpu = priv;
-+	u32 vpu_to_host;
-+	int ret;
-+
-+	/*
-+	 * Clock should have been enabled already.
-+	 * Enable again in case vpu_ipi_send times out
-+	 * and has disabled the clock.
-+	 */
-+	ret = clk_enable(vpu->clk);
-+	if (ret) {
-+		dev_err(vpu->dev, "[VPU] enable clock failed %d\n", ret);
-+		return IRQ_NONE;
++	case VENC_SET_PARAM_FORCE_INTRA:
++		out.data_item = 0;
++		break;
++	case VENC_SET_PARAM_ADJUST_BITRATE:
++		out.data_item = 1;
++		out.data[0] = enc_param->bitrate;
++		break;
++	case VENC_SET_PARAM_ADJUST_FRAMERATE:
++		out.data_item = 1;
++		out.data[0] = enc_param->frm_rate;
++		break;
++	case VENC_SET_PARAM_GOP_SIZE:
++		out.data_item = 1;
++		out.data[0] = enc_param->gop_size;
++		break;
++	default:
++		mtk_vcodec_err(inst, "id not support:%d", id);
++		return -EINVAL;
 +	}
-+	vpu_to_host = vpu_cfg_readl(vpu, VPU_TO_HOST);
-+	if (vpu_to_host & VPU_IPC_INT) {
-+		vpu_ipi_handler(vpu);
-+	} else {
-+		dev_err(vpu->dev, "vpu watchdog timeout! 0x%x", vpu_to_host);
-+		queue_work(vpu->wdt.wq, &vpu->wdt.ws);
-+	}
-+
-+	/* VPU won't send another interrupt until we set VPU_TO_HOST to 0. */
-+	vpu_cfg_writel(vpu, 0x0, VPU_TO_HOST);
-+	clk_disable(vpu->clk);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+#ifdef CONFIG_DEBUG_FS
-+static struct dentry *vpu_debugfs;
-+#endif
-+static int mtk_vpu_probe(struct platform_device *pdev)
-+{
-+	struct mtk_vpu *vpu;
-+	struct device *dev;
-+	struct resource *res;
-+	int ret = 0;
-+
-+	dev_dbg(&pdev->dev, "initialization\n");
-+
-+	dev = &pdev->dev;
-+	vpu = devm_kzalloc(dev, sizeof(*vpu), GFP_KERNEL);
-+	if (!vpu)
-+		return -ENOMEM;
-+
-+	vpu->dev = &pdev->dev;
-+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "tcm");
-+	vpu->reg.tcm = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(vpu->reg.tcm)) {
-+		dev_err(dev, "devm_ioremap_resource vpu tcm failed.\n");
-+		return PTR_ERR(vpu->reg.tcm);
-+	}
-+
-+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "cfg_reg");
-+	vpu->reg.cfg = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(vpu->reg.cfg)) {
-+		dev_err(dev, "devm_ioremap_resource vpu cfg failed.\n");
-+		return PTR_ERR(vpu->reg.cfg);
-+	}
-+
-+	/* Get VPU clock */
-+	vpu->clk = devm_clk_get(dev, "main");
-+	if (!vpu->clk) {
-+		dev_err(dev, "get vpu clock failed\n");
++	if (vp8_enc_vpu_send_msg(inst, &out, sizeof(out))) {
++		mtk_vcodec_err(inst, "AP_IPIMSG_ENC_SET_PARAM failed");
 +		return -EINVAL;
 +	}
 +
-+	platform_set_drvdata(pdev, vpu);
-+
-+	ret = clk_prepare(vpu->clk);
-+	if (ret) {
-+		dev_err(dev, "prepare vpu clock failed\n");
-+		return ret;
-+	}
-+
-+	/* VPU watchdog */
-+	vpu->wdt.wq = create_singlethread_workqueue("vpu_wdt");
-+	if (!vpu->wdt.wq) {
-+		dev_err(dev, "initialize wdt workqueue failed\n");
-+		return -ENOMEM;
-+	}
-+	INIT_WORK(&vpu->wdt.ws, vpu_wdt_reset_func);
-+	mutex_init(&vpu->vpu_mutex);
-+
-+	ret = vpu_clock_enable(vpu);
-+	if (ret) {
-+		dev_err(dev, "enable vpu clock failed\n");
-+		goto workqueue_destroy;
-+	}
-+
-+	dev_dbg(dev, "vpu ipi init\n");
-+	ret = vpu_ipi_init(vpu);
-+	if (ret) {
-+		dev_err(dev, "Failed to init ipi\n");
-+		goto disable_vpu_clk;
-+	}
-+
-+	/* register vpu initialization IPI */
-+	ret = vpu_ipi_register(pdev, IPI_VPU_INIT, vpu_init_ipi_handler,
-+			       "vpu_init", vpu);
-+	if (ret) {
-+		dev_err(dev, "Failed to register IPI_VPU_INIT\n");
-+		goto vpu_mutex_destroy;
-+	}
-+
-+#ifdef CONFIG_DEBUG_FS
-+	vpu_debugfs = debugfs_create_file("mtk_vpu", S_IRUGO, NULL, (void *)dev,
-+					  &vpu_debug_fops);
-+	if (!vpu_debugfs) {
-+		ret = -ENOMEM;
-+		goto cleanup_ipi;
-+	}
-+#endif
-+
-+	/* Set PTCM to 96K and DTCM to 32K */
-+	vpu_cfg_writel(vpu, 0x2, VPU_TCM_CFG);
-+
-+	vpu->enable_4GB = !!(max_pfn > (0xffffffffUL >> PAGE_SHIFT));
-+	dev_dbg(dev, "4GB mode %u\n", vpu->enable_4GB);
-+
-+	if (vpu->enable_4GB) {
-+		ret = of_reserved_mem_device_init(dev);
-+		if (ret)
-+			dev_info(dev, "init reserved memory failed\n");
-+			/* continue to use dynamic allocation if failed */
-+	}
-+
-+	ret = vpu_alloc_ext_mem(vpu, D_FW);
-+	if (ret) {
-+		dev_err(dev, "Allocate DM failed\n");
-+		goto remove_debugfs;
-+	}
-+
-+	ret = vpu_alloc_ext_mem(vpu, P_FW);
-+	if (ret) {
-+		dev_err(dev, "Allocate PM failed\n");
-+		goto free_d_mem;
-+	}
-+
-+	init_waitqueue_head(&vpu->run.wq);
-+	init_waitqueue_head(&vpu->ack_wq);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-+	if (!res) {
-+		dev_err(dev, "get IRQ resource failed.\n");
-+		ret = -ENXIO;
-+		goto free_p_mem;
-+	}
-+	vpu->reg.irq = platform_get_irq(pdev, 0);
-+	ret = devm_request_irq(dev, vpu->reg.irq, vpu_irq_handler, 0,
-+			       pdev->name, vpu);
-+	if (ret) {
-+		dev_err(dev, "failed to request irq\n");
-+		goto free_p_mem;
-+	}
-+
-+	vpu_clock_disable(vpu);
-+	dev_dbg(dev, "initialization completed\n");
++	mtk_vcodec_debug_leave(inst);
 +
 +	return 0;
-+
-+free_p_mem:
-+	vpu_free_ext_mem(vpu, P_FW);
-+free_d_mem:
-+	vpu_free_ext_mem(vpu, D_FW);
-+remove_debugfs:
-+	of_reserved_mem_device_release(dev);
-+#ifdef CONFIG_DEBUG_FS
-+	debugfs_remove(vpu_debugfs);
-+cleanup_ipi:
-+#endif
-+	memset(vpu->ipi_desc, 0, sizeof(struct vpu_ipi_desc) * IPI_MAX);
-+vpu_mutex_destroy:
-+	mutex_destroy(&vpu->vpu_mutex);
-+disable_vpu_clk:
-+	vpu_clock_disable(vpu);
-+workqueue_destroy:
-+	destroy_workqueue(vpu->wdt.wq);
-+
-+	return ret;
 +}
 +
-+static const struct of_device_id mtk_vpu_match[] = {
-+	{
-+		.compatible = "mediatek,mt8173-vpu",
-+	},
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, mtk_vpu_match);
-+
-+static int mtk_vpu_remove(struct platform_device *pdev)
++int vp8_enc_vpu_encode(struct venc_vp8_inst *inst,
++		       struct venc_frm_buf *frm_buf,
++		       struct mtk_vcodec_mem *bs_buf)
 +{
-+	struct mtk_vpu *vpu = platform_get_drvdata(pdev);
++	struct venc_ap_ipi_msg_enc out;
 +
-+#ifdef CONFIG_DEBUG_FS
-+	debugfs_remove(vpu_debugfs);
-+#endif
-+	if (vpu->wdt.wq) {
-+		flush_workqueue(vpu->wdt.wq);
-+		destroy_workqueue(vpu->wdt.wq);
++	mtk_vcodec_debug_enter(inst);
++
++	memset(&out, 0, sizeof(out));
++	out.msg_id = AP_IPIMSG_ENC_ENCODE;
++	out.vpu_inst_addr = inst->vpu_inst.id;
++	if (frm_buf) {
++		if ((frm_buf->fb_addr[0].dma_addr % 16 == 0) &&
++		    (frm_buf->fb_addr[1].dma_addr % 16 == 0) &&
++		    (frm_buf->fb_addr[2].dma_addr % 16 == 0)) {
++			out.input_addr[0] = frm_buf->fb_addr[0].dma_addr;
++			out.input_addr[1] = frm_buf->fb_addr[1].dma_addr;
++			out.input_addr[2] = frm_buf->fb_addr[2].dma_addr;
++		} else {
++			mtk_vcodec_err(inst, "dma_addr not align to 16");
++			return -EINVAL;
++		}
 +	}
-+	vpu_free_ext_mem(vpu, P_FW);
-+	vpu_free_ext_mem(vpu, D_FW);
-+	mutex_destroy(&vpu->vpu_mutex);
-+	clk_unprepare(vpu->clk);
++	if (bs_buf) {
++		out.bs_addr = bs_buf->dma_addr;
++		out.bs_size = bs_buf->size;
++	}
++	if (vp8_enc_vpu_send_msg(inst, &out, sizeof(out))) {
++		mtk_vcodec_err(inst, "AP_IPIMSG_ENC_ENCODE failed");
++		return -EINVAL;
++	}
++
++	mtk_vcodec_debug(inst, "state=%d key_frm=%d",
++			 inst->vpu_inst.state, inst->is_key_frm);
++
++	mtk_vcodec_debug_leave(inst);
 +
 +	return 0;
 +}
 +
-+static struct platform_driver mtk_vpu_driver = {
-+	.probe	= mtk_vpu_probe,
-+	.remove	= mtk_vpu_remove,
-+	.driver	= {
-+		.name	= "mtk_vpu",
-+		.owner	= THIS_MODULE,
-+		.of_match_table = mtk_vpu_match,
-+	},
-+};
++int vp8_enc_vpu_deinit(struct venc_vp8_inst *inst)
++{
++	struct venc_ap_ipi_msg_deinit out;
 +
-+module_platform_driver(mtk_vpu_driver);
++	mtk_vcodec_debug_enter(inst);
 +
-+MODULE_LICENSE("GPL v2");
-+MODULE_DESCRIPTION("Mediatek Video Prosessor Unit driver");
-diff --git a/drivers/media/platform/mtk-vpu/mtk_vpu.h b/drivers/media/platform/mtk-vpu/mtk_vpu.h
++	out.msg_id = AP_IPIMSG_ENC_DEINIT;
++	out.vpu_inst_addr = inst->vpu_inst.id;
++	if (vp8_enc_vpu_send_msg(inst, &out, sizeof(out))) {
++		mtk_vcodec_err(inst, "AP_IPIMSG_ENC_DEINIT failed");
++		return -EINVAL;
++	}
++
++	mtk_vcodec_debug_leave(inst);
++
++	return 0;
++}
+diff --git a/drivers/media/platform/mtk-vcodec/vp8_enc/venc_vp8_vpu.h b/drivers/media/platform/mtk-vcodec/vp8_enc/venc_vp8_vpu.h
 new file mode 100644
-index 0000000..0ba90bf7
+index 0000000..c1d8f4a
 --- /dev/null
-+++ b/drivers/media/platform/mtk-vpu/mtk_vpu.h
-@@ -0,0 +1,163 @@
++++ b/drivers/media/platform/mtk-vcodec/vp8_enc/venc_vp8_vpu.h
+@@ -0,0 +1,29 @@
 +/*
-+* Copyright (c) 2016 MediaTek Inc.
-+* Author: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
-+*
-+* This program is free software; you can redistribute it and/or modify
-+* it under the terms of the GNU General Public License version 2 as
-+* published by the Free Software Foundation.
-+*
-+* This program is distributed in the hope that it will be useful,
-+* but WITHOUT ANY WARRANTY; without even the implied warranty of
-+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+* GNU General Public License for more details.
-+*/
-+
-+#ifndef _MTK_VPU_H
-+#define _MTK_VPU_H
-+
-+#include <linux/platform_device.h>
-+
-+/**
-+ * VPU (video processor unit) is a tiny processor controlling video hardware
-+ * related to video codec, scaling and color format converting.
-+ * VPU interfaces with other blocks by share memory and interrupt.
-+ **/
-+
-+typedef void (*ipi_handler_t) (void *data,
-+			       unsigned int len,
-+			       void *priv);
-+
-+/**
-+ * enum ipi_id - the id of inter-processor interrupt
++ * Copyright (c) 2016 MediaTek Inc.
++ * Author: Daniel Hsiao <daniel.hsiao@mediatek.com>
++ *         PoChun Lin <pochun.lin@mediatek.com>
 + *
-+ * @IPI_VPU_INIT:	 The interrupt from vpu is to notfiy kernel
-+			 VPU initialization completed.
-+			 IPI_VPU_INIT is sent from VPU when firmware is
-+			 loaded. AP doesn't need to send IPI_VPU_INIT
-+			 command to VPU.
-+			 For other IPI below, AP should send the request
-+			 to VPU to trigger the interrupt.
-+ * @IPI_VENC_H264:	 The interrupt from vpu is to notify kernel to
-+			 handle H264 video encoder job, and vice versa.
-+ * @IPI_VENC_VP8:	 The interrupt fro vpu is to notify kernel to
-+			 handle VP8 video encoder job,, and vice versa.
-+ * @IPI_MAX:		 The maximum IPI number
++ * This program is free software; you can redistribute it and/or
++ * modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + */
 +
-+enum ipi_id {
-+	IPI_VPU_INIT = 0,
-+	IPI_VENC_H264,
-+	IPI_VENC_VP8,
-+	IPI_MAX,
-+};
++#ifndef _VENC_VP8_VPU_H_
++#define _VENC_VP8_VPU_H_
 +
-+/**
-+ * enum rst_id - reset id to register reset function for VPU watchdog timeout
-+ *
-+ * @VPU_RST_ENC: encoder reset id
-+ * @VPU_RST_MAX: maximum reset id
-+ */
-+enum rst_id {
-+	VPU_RST_ENC,
-+	VPU_RST_MAX,
-+};
++int vp8_enc_vpu_init(struct venc_vp8_inst *inst);
++int vp8_enc_vpu_set_param(struct venc_vp8_inst *inst,
++			  enum venc_set_param_type id,
++			  struct venc_enc_prm *param);
++int vp8_enc_vpu_encode(struct venc_vp8_inst *inst,
++		       struct venc_frm_buf *frm_buf,
++		       struct mtk_vcodec_mem *bs_buf);
++int vp8_enc_vpu_deinit(struct venc_vp8_inst *inst);
 +
-+/**
-+ * vpu_ipi_register - register an ipi function
-+ *
-+ * @pdev:	VPU platform device
-+ * @id:		IPI ID
-+ * @handler:	IPI handler
-+ * @name:	IPI name
-+ * @priv:	private data for IPI handler
-+ *
-+ * Register an ipi function to receive ipi interrupt from VPU.
-+ *
-+ * Return: Return 0 if ipi registers successfully, otherwise it is failed.
-+ */
-+int vpu_ipi_register(struct platform_device *pdev, enum ipi_id id,
-+		     ipi_handler_t handler, const char *name, void *priv);
-+
-+/**
-+ * vpu_ipi_send - send data from AP to vpu.
-+ *
-+ * @pdev:	VPU platform device
-+ * @id:		IPI ID
-+ * @buf:	the data buffer
-+ * @len:	the data buffer length
-+ *
-+ * This function is thread-safe. When this function returns,
-+ * VPU has received the data and starts the processing.
-+ * When the processing completes, IPI handler registered
-+ * by vpu_ipi_register will be called in interrupt context.
-+ *
-+ * Return: Return 0 if sending data successfully, otherwise it is failed.
-+ **/
-+int vpu_ipi_send(struct platform_device *pdev,
-+		 enum ipi_id id, void *buf,
-+		 unsigned int len);
-+
-+/**
-+ * vpu_get_plat_device - get VPU's platform device
-+ *
-+ * @pdev:	the platform device of the module requesting VPU platform
-+ *		device for using VPU API.
-+ *
-+ * Return: Return NULL if it is failed.
-+ * otherwise it is VPU's platform device
-+ **/
-+struct platform_device *vpu_get_plat_device(struct platform_device *pdev);
-+
-+/**
-+ * vpu_wdt_reg_handler - register a VPU watchdog handler
-+ *
-+ * @pdev:               VPU platform device
-+ * @vpu_wdt_reset_func:	the callback reset function
-+ * @private_data:       the private data for reset function
-+ * @rst_id:		reset id
-+ *
-+ * Register a handler performing own tasks when vpu reset by watchdog
-+ *
-+ * Return: Return 0 if the handler is added successfully,
-+ * otherwise it is failed.
-+ *
-+ **/
-+int vpu_wdt_reg_handler(struct platform_device *pdev,
-+			void vpu_wdt_reset_func(void *),
-+			void *priv, enum rst_id id);
-+
-+/**
-+ * vpu_get_venc_hw_capa - get video encoder hardware capability
-+ *
-+ * @pdev:	VPU platform device
-+ *
-+ * Return: video encoder hardware capability
-+ **/
-+unsigned int vpu_get_venc_hw_capa(struct platform_device *pdev);
-+
-+/**
-+ * vpu_load_firmware - download VPU firmware and boot it
-+ *
-+ * @pdev:	VPU platform device
-+ *
-+ * Return: Return 0 if downloading firmware successfully,
-+ * otherwise it is failed
-+ **/
-+int vpu_load_firmware(struct platform_device *pdev);
-+
-+/**
-+ * vpu_mapping_dm_addr - Mapping DTCM/DMEM to kernel virtual address
-+ *
-+ * @pdev:	VPU platform device
-+ * @dmem_addr:	VPU's data memory address
-+ *
-+ * Mapping the VPU's DTCM (Data Tightly-Coupled Memory) /
-+ * DMEM (Data Extended Memory) memory address to
-+ * kernel virtual address.
-+ *
-+ * Return: Return ERR_PTR(-EINVAL) if mapping failed,
-+ * otherwise the mapped kernel virtual address
-+ **/
-+void *vpu_mapping_dm_addr(struct platform_device *pdev,
-+			  u32 dtcm_dmem_addr);
-+#endif /* _MTK_VPU_H */
++#endif
 -- 
 1.7.9.5
