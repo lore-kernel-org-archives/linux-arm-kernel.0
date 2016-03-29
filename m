@@ -1,56 +1,71 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 29 Mar 2016 09:18:00 +0200
-Subject: [PULL 0/4] ARM support for generic memremap()
-Message-ID: <1459235884-24318-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Tue, 29 Mar 2016 09:18:01 +0200
+Subject: [PULL 1/4] ARM: reintroduce ioremap_cached() for creating cached I/O
+ mappings
+In-Reply-To: <1459235884-24318-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1459235884-24318-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1459235884-24318-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+The original ARM-only ioremap flavor 'ioremap_cached' has been renamed
+to 'ioremap_cache' to align with other architectures, and subsequently
+abused in generic code to map things like firmware tables in memory.
+For that reason, there is currently an effort underway to deprecate
+ioremap_cache, whose semantics are poorly defined, and which is typed
+with an __iomem annotation that is inappropriate for mappings of ordinary
+memory.
 
-This is a straight rebase of version 3 of this patch series, which I posted
-here: http://thread.gmane.org/gmane.linux.ports.arm.kernel/484005. I have
-attached the individual patches to this cover letter for reference.
+However, original users of ioremap_cached() used it in a context where
+the I/O connotation is appropriate, and replacing those instances with
+memremap() does not make sense. So let's revive ioremap_cached(), so
+that we can change back those original users before we drop ioremap_cache
+entirely in favor of memremap.
 
-Please pull for v4.7. I expect some of my UEFI work regarding memory
-protection tables and the EFI framebuffer to land in the 4.7 timeframe as well,
-and thise rely on memremap() to do the right thing if firmware tables happen
-to reside in memory that is also covered by memblock/the linear mapping.
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Acked-by: Dan Williams <dan.j.williams@intel.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm/include/asm/io.h | 6 ++++++
+ arch/arm/mm/ioremap.c     | 4 ++++
+ 2 files changed, 10 insertions(+)
 
-Thanks,
-Ard.
-
--------------8<-----------------
-The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
-
-  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
-
-are available in the git repository at:
-
-  git://git.linaro.org/people/ard.biesheuvel/linux-arm.git \
-                                                  tags/arm-memremap-for-v4.7
-
-for you to fetch changes up to fc77542bdffe9dcb3890c631ad571e1e4b0cc8c3:
-
-  ARM: memremap: implement arch_memremap_wb() (2016-03-29 08:19:26 +0200)
-
-----------------------------------------------------------------
-This series wires up the generic memremap() function in a way that allows it
-to be used as intended, i.e., without regard for whether the region being
-mapped is covered by a struct page and/or the linear mapping (lowmem)
-
-----------------------------------------------------------------
-
-Ard Biesheuvel (4):
-  ARM: reintroduce ioremap_cached() for creating cached I/O mappings
-  mtd: pxa2xx-flash: switch back from memremap to ioremap_cached
-  memremap: add arch specific hook for MEMREMAP_WB mappings
-  ARM: memremap: implement arch_memremap_wb()
-
- arch/arm/include/asm/io.h       | 12 ++++++++++++
- arch/arm/mm/ioremap.c           | 16 ++++++++++++++--
- drivers/mtd/maps/pxa2xx-flash.c |  6 +++---
- kernel/memremap.c               | 11 ++++++++---
- 4 files changed, 37 insertions(+), 8 deletions(-)
-
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index 485982084fe9..fb94de290edd 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -395,6 +395,12 @@ void __iomem *ioremap(resource_size_t res_cookie, size_t size);
+ void __iomem *ioremap_cache(resource_size_t res_cookie, size_t size);
+ #define ioremap_cache ioremap_cache
+ 
++/*
++ * Do not use ioremap_cached in new code. Provided for the benefit of
++ * the pxa2xx-flash MTD driver only.
++ */
++void __iomem *ioremap_cached(resource_size_t res_cookie, size_t size);
++
+ void __iomem *ioremap_wc(resource_size_t res_cookie, size_t size);
+ #define ioremap_wc ioremap_wc
+ #define ioremap_wt ioremap_wc
+diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+index 66a978d05958..d5350f6af089 100644
+--- a/arch/arm/mm/ioremap.c
++++ b/arch/arm/mm/ioremap.c
+@@ -380,11 +380,15 @@ void __iomem *ioremap(resource_size_t res_cookie, size_t size)
+ EXPORT_SYMBOL(ioremap);
+ 
+ void __iomem *ioremap_cache(resource_size_t res_cookie, size_t size)
++	__alias(ioremap_cached);
++
++void __iomem *ioremap_cached(resource_size_t res_cookie, size_t size)
+ {
+ 	return arch_ioremap_caller(res_cookie, size, MT_DEVICE_CACHED,
+ 				   __builtin_return_address(0));
+ }
+ EXPORT_SYMBOL(ioremap_cache);
++EXPORT_SYMBOL(ioremap_cached);
+ 
+ void __iomem *ioremap_wc(resource_size_t res_cookie, size_t size)
+ {
 -- 
 2.5.0
