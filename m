@@ -1,53 +1,88 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 29 Mar 2016 14:03:37 +0800
-Subject: [PATCH v2 5/9] ARM: dts: qcom: msm8974: Introduce the wcnss
- remoteproc node
-In-Reply-To: <1459222625-11440-6-git-send-email-bjorn.andersson@linaro.org>
-Message-ID: <201603291305.IgQ6FAlE%fengguang.wu@intel.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 29 Mar 2016 12:09:49 +0530
+Subject: [PATCH V2 3/3] cpufreq: exynos: Use generic platdev driver
+In-Reply-To: <cover.1459233524.git.viresh.kumar@linaro.org>
+References: <cover.1459233524.git.viresh.kumar@linaro.org>
+Message-ID: <81a8da75a0e7783e2b47f9e04297f167e8134afe.1459233524.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+The cpufreq-dt-platdev driver supports creation of cpufreq-dt platform
+device now, reuse that and remove similar code from platform code.
 
-[auto build test ERROR on v4.6-rc1]
-[also build test ERROR on next-20160329]
-[cannot apply to robh/for-next]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
-
-url:    https://github.com/0day-ci/linux/commits/Bjorn-Andersson/Qualcomm-WCNSS-remoteproc/20160329-114231
-config: arm-multi_v7_defconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
-
-All errors (new ones prefixed by >>):
-
-   In file included from arch/arm/boot/dts/qcom-apq8074-dragonboard.dts:1:0:
->> arch/arm/boot/dts/qcom-msm8974.dtsi:5:42: fatal error: dt-bindings/clock/qcom,rpmcc.h: No such file or directory
-    #include <dt-bindings/clock/qcom,rpmcc.h>
-                                             ^
-   compilation terminated.
-
-vim +5 arch/arm/boot/dts/qcom-msm8974.dtsi
-
-     1	/dts-v1/;
-     2	
-     3	#include <dt-bindings/interrupt-controller/arm-gic.h>
-     4	#include <dt-bindings/clock/qcom,gcc-msm8974.h>
-   > 5	#include <dt-bindings/clock/qcom,rpmcc.h>
-     6	#include "skeleton.dtsi"
-     7	
-     8	/ {
-
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 37221 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160329/d4b63b23/attachment-0001.obj>
+ arch/arm/mach-exynos/exynos.c        | 29 -----------------------------
+ drivers/cpufreq/cpufreq-dt-platdev.c |  9 +++++++++
+ 2 files changed, 9 insertions(+), 29 deletions(-)
+
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index bbf51a46f772..4d3b056fd786 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -213,33 +213,6 @@ static void __init exynos_init_irq(void)
+ 	exynos_map_pmu();
+ }
+ 
+-static const struct of_device_id exynos_cpufreq_matches[] = {
+-	{ .compatible = "samsung,exynos3250", .data = "cpufreq-dt" },
+-	{ .compatible = "samsung,exynos4210", .data = "cpufreq-dt" },
+-	{ .compatible = "samsung,exynos4212", .data = "cpufreq-dt" },
+-	{ .compatible = "samsung,exynos4412", .data = "cpufreq-dt" },
+-	{ .compatible = "samsung,exynos5250", .data = "cpufreq-dt" },
+-#ifndef CONFIG_BL_SWITCHER
+-	{ .compatible = "samsung,exynos5420", .data = "cpufreq-dt" },
+-	{ .compatible = "samsung,exynos5800", .data = "cpufreq-dt" },
+-#endif
+-	{ /* sentinel */ }
+-};
+-
+-static void __init exynos_cpufreq_init(void)
+-{
+-	struct device_node *root = of_find_node_by_path("/");
+-	const struct of_device_id *match;
+-
+-	match = of_match_node(exynos_cpufreq_matches, root);
+-	if (!match) {
+-		platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
+-		return;
+-	}
+-
+-	platform_device_register_simple(match->data, -1, NULL, 0);
+-}
+-
+ static void __init exynos_dt_machine_init(void)
+ {
+ 	/*
+@@ -262,8 +235,6 @@ static void __init exynos_dt_machine_init(void)
+ 	    of_machine_is_compatible("samsung,exynos5250"))
+ 		platform_device_register(&exynos_cpuidle);
+ 
+-	exynos_cpufreq_init();
+-
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
+index 18b81724ca0b..c5a70b683c7c 100644
+--- a/drivers/cpufreq/cpufreq-dt-platdev.c
++++ b/drivers/cpufreq/cpufreq-dt-platdev.c
+@@ -20,6 +20,15 @@ struct cpufreq_dt_compat {
+ };
+ 
+ static struct cpufreq_dt_compat compat[] = {
++	{ "samsung,exynos3250",		NULL,		0 },
++	{ "samsung,exynos4210",		NULL,		0 },
++	{ "samsung,exynos4212",		NULL,		0 },
++	{ "samsung,exynos4412",		NULL,		0 },
++	{ "samsung,exynos5250",		NULL,		0 },
++#ifndef CONFIG_BL_SWITCHER
++	{ "samsung,exynos5420",		NULL,		0 },
++	{ "samsung,exynos5800",		NULL,		0 },
++#endif
+ };
+ 
+ static int __init cpufreq_dt_platdev_init(void)
+-- 
+2.7.1.410.g6faf27b
