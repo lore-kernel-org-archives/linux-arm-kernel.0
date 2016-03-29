@@ -1,81 +1,56 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 29 Mar 2016 00:11:13 -0700
-Subject: [PATCH v2 6/8] drm/fsl-dcu: add TCON driver
-In-Reply-To: <2234894.ri36D5MRrN@ws-stein>
-References: <1459216802-32094-1-git-send-email-stefan@agner.ch>
- <1459216802-32094-7-git-send-email-stefan@agner.ch>
- <2234894.ri36D5MRrN@ws-stein>
-Message-ID: <57c86de8eca0aa16a5cdfc488977ca4e@agner.ch>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 29 Mar 2016 09:18:00 +0200
+Subject: [PULL 0/4] ARM support for generic memremap()
+Message-ID: <1459235884-24318-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-03-28 23:45, Alexander Stein wrote:
-> Hi,
-> 
-> some comments below.
-> 
-> On Monday 28 March 2016 19:00:00, Stefan Agner wrote:
->> Add driver for the TCON (timing controller) module. The TCON module
->> is a separate module attached after the DCU (display controller
->> unit). Each DCU instance has its own, directly connected TCON
->> instance. The DCU's RGB and timing signals are passing through
->> the TCON module. TCON can provide timing signals for raw TFT panels
->> or operate in a bypass mode which leaves all signals unaltered.
->>
->> The driver currently only supports the bypass mode.
->>
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> 
->> --- a/Documentation/devicetree/bindings/display/fsl,dcu.txt
->> +++ b/Documentation/devicetree/bindings/display/fsl,dcu.txt
->> @@ -14,6 +14,7 @@ Required properties:
->>  Optional properties:
->>  - clocks:		Second handle for pixel clock.
->>  - clock-names:		Second name "pix" for pixel clock.
->> +- fsl,tcon:		The phandle to the timing controller node.
-> 
-> Maybe a comment this is (currently) only for Vybrid, but not LS1021A.
-> 
+Hello Russell,
 
-IMHO, such references to SoCs in a peripheral binding is somewhat
-misplaced. If we would start doing this, we would end up in lots of SoC
-references, and nobody knows whether they are actually accurate and up
-to date... And I think we should add tcon to LS1021a, more on that
-below...
+This is a straight rebase of version 3 of this patch series, which I posted
+here: http://thread.gmane.org/gmane.linux.ports.arm.kernel/484005. I have
+attached the individual patches to this cover letter for reference.
 
->> --- /dev/null
->> +++ b/drivers/gpu/drm/fsl-dcu/fsl_tcon.c
->> [...]
->> +struct fsl_tcon *fsl_tcon_init(struct device *dev)
->> +{
->> +	struct fsl_tcon *tcon;
->> +	struct device_node *np;
->> +	int ret;
->> +
->> +	tcon = devm_kzalloc(dev, sizeof(*tcon), GFP_KERNEL);
->> +	if (!tcon)
->> +		return NULL;
->> +
->> +	np = of_parse_phandle(dev->of_node, "fsl,tcon", 0);
->> +	if (!np) {
->> +		dev_warn(dev, "Couldn't find the tcon node\n");
->> +		return NULL;
->> +	}
-> 
-> Maybe check for device tree node before allocating struct fsl_tcon? Also this 
-> should not be a warning, as on LS1021A this is to be expected.
+Please pull for v4.7. I expect some of my UEFI work regarding memory
+protection tables and the EFI framebuffer to land in the 4.7 timeframe as well,
+and thise rely on memremap() to do the right thing if firmware tables happen
+to reside in memory that is also covered by memblock/the linear mapping.
 
-Agreed, definitely the smarter sequence.
+Thanks,
+Ard.
 
-Afact LS1021a has also a TCON. At least in Jianwei Wangs initial patches
-it was part of the driver, see:
-https://lkml.org/lkml/2015/7/13/242
+-------------8<-----------------
+The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 
-Not sure how that driver can work without TCON support on LS1021a, maybe
-the bootloader sets the TCON to bypass?
+  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
 
-Since I do not have a LS1021a, I hesitated to just add it to the LS1021s
-dt's, but it should be fairly straight forward.
+are available in the git repository at:
 
---
-Stefan
+  git://git.linaro.org/people/ard.biesheuvel/linux-arm.git \
+                                                  tags/arm-memremap-for-v4.7
+
+for you to fetch changes up to fc77542bdffe9dcb3890c631ad571e1e4b0cc8c3:
+
+  ARM: memremap: implement arch_memremap_wb() (2016-03-29 08:19:26 +0200)
+
+----------------------------------------------------------------
+This series wires up the generic memremap() function in a way that allows it
+to be used as intended, i.e., without regard for whether the region being
+mapped is covered by a struct page and/or the linear mapping (lowmem)
+
+----------------------------------------------------------------
+
+Ard Biesheuvel (4):
+  ARM: reintroduce ioremap_cached() for creating cached I/O mappings
+  mtd: pxa2xx-flash: switch back from memremap to ioremap_cached
+  memremap: add arch specific hook for MEMREMAP_WB mappings
+  ARM: memremap: implement arch_memremap_wb()
+
+ arch/arm/include/asm/io.h       | 12 ++++++++++++
+ arch/arm/mm/ioremap.c           | 16 ++++++++++++++--
+ drivers/mtd/maps/pxa2xx-flash.c |  6 +++---
+ kernel/memremap.c               | 11 ++++++++---
+ 4 files changed, 37 insertions(+), 8 deletions(-)
+
+-- 
+2.5.0
