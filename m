@@ -1,45 +1,47 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Tue, 29 Mar 2016 23:50:40 +0200
-Subject: [PATCH 1/7] ARM: dts: lpc18xx: add creg-clk node
+Date: Tue, 29 Mar 2016 23:50:42 +0200
+Subject: [PATCH 3/7] ARM: dts: lpc18xx: add adc nodes
 In-Reply-To: <1459288246-1670-1-git-send-email-manabian@gmail.com>
 References: <1459288246-1670-1-git-send-email-manabian@gmail.com>
-Message-ID: <1459288246-1670-2-git-send-email-manabian@gmail.com>
+Message-ID: <1459288246-1670-4-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add node for the creg clock controller and change the input
-clock on cgu to use it.
+Add nodes for the two 10-bit ADCs found on all lpc18xx SoCs.
 
 Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 ---
- arch/arm/boot/dts/lpc18xx.dtsi | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/lpc18xx.dtsi | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
 diff --git a/arch/arm/boot/dts/lpc18xx.dtsi b/arch/arm/boot/dts/lpc18xx.dtsi
-index 053a1f5..0b59eae1 100644
+index e270294..88d27ae 100644
 --- a/arch/arm/boot/dts/lpc18xx.dtsi
 +++ b/arch/arm/boot/dts/lpc18xx.dtsi
-@@ -195,6 +195,12 @@
- 			clocks = <&ccu1 CLK_CPU_CREG>;
- 			resets = <&rgu 5>;
- 
-+			creg_clk: clock-controller {
-+				compatible = "nxp,lpc1850-creg-clk";
-+				clocks = <&xtal32>;
-+				#clock-cells = <1>;
-+			};
-+
- 			usb0_otg_phy: phy at 004 {
- 				compatible = "nxp,lpc1850-usb-otg-phy";
- 				clocks = <&ccu1 CLK_USB0>;
-@@ -213,7 +219,7 @@
- 			compatible = "nxp,lpc1850-cgu";
- 			reg = <0x40050000 0x1000>;
- 			#clock-cells = <1>;
--			clocks = <&xtal>, <&xtal32>, <&enet_rx_clk>, <&enet_tx_clk>, <&gp_clkin>;
-+			clocks = <&xtal>, <&creg_clk 1>, <&enet_rx_clk>, <&enet_tx_clk>, <&gp_clkin>;
+@@ -453,6 +453,24 @@
+ 			status = "disabled";
  		};
  
- 		ccu1: clock-controller at 40051000 {
++		adc0: adc at 400e3000 {
++			compatible = "nxp,lpc1850-adc";
++			reg = <0x400e3000 0x1000>;
++			interrupts = <17>;
++			clocks = <&ccu1 CLK_APB3_ADC0>;
++			resets = <&rgu 40>;
++			status = "disabled";
++		};
++
++		adc1: adc at 400e4000 {
++			compatible = "nxp,lpc1850-adc";
++			reg = <0x400e4000 0x1000>;
++			interrupts = <21>;
++			clocks = <&ccu1 CLK_APB3_ADC1>;
++			resets = <&rgu 41>;
++			status = "disabled";
++		};
++
+ 		gpio: gpio at 400f4000 {
+ 			compatible = "nxp,lpc1850-gpio";
+ 			reg = <0x400f4000 0x4000>;
 -- 
 2.7.4
