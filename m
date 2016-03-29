@@ -1,163 +1,57 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 29 Mar 2016 18:37:48 +0200
-Subject: [PATCH 1/2] ARM: mvebu: correct the usb node name from usb@ to
- ehci@
-In-Reply-To: <4079235.sABSXKnJCE@wuerfel> (Arnd Bergmann's message of "Tue, 29
- Mar 2016 16:05:21 +0200")
-References: <1459259813-5278-1-git-send-email-patrick@puiterwijk.org>
- <1459259813-5278-2-git-send-email-patrick@puiterwijk.org>
- <4079235.sABSXKnJCE@wuerfel>
-Message-ID: <87zithutnn.fsf@free-electrons.com>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Tue, 29 Mar 2016 09:40:06 -0700
+Subject: [PATCH] i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity
+In-Reply-To: <56FAA9C1.5060107@tekno-soft.it>
+References: <m3h9fuk7ik.fsf@t19.piap.pl> <23031613.R8qN30TbTq@wuerfel>
+ <CAJ+vNU2BKLDREOWP8EWXZR43to10yw+qvKwv1MzS4a_L9n5ozg@mail.gmail.com>
+ <5741237.2X2Q0sCFQj@wuerfel>
+ <CAJ+vNU3kBk+J-hU1OWPOS6kbFq+J0zM9QpfVy4x1VXL3hgrMTg@mail.gmail.com>
+ <56FAA9C1.5060107@tekno-soft.it>
+Message-ID: <CAJ+vNU0bQVd0qyLg+09CUHx4WsrEqwZ4hLVuuvazR8DWpiHE_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
- 
- On mar., mars 29 2016, Arnd Bergmann <arnd@arndb.de> wrote:
-
-> On Tuesday 29 March 2016 13:56:52 Patrick Uiterwijk wrote:
->> According to Documentation/devicetree/bindings/usb/ehci-orion.txt,
->> the Orion Marvell variant of EHCI controllers should have names
->> ehci at 50000 for example.
->> 
->> Signed-off-by: Patrick Uiterwijk <patrick@puiterwijk.org>
->> 
+On Tue, Mar 29, 2016 at 9:13 AM, Roberto Fichera <kernel@tekno-soft.it> wrote:
+> On 03/29/2016 05:10 PM, Tim Harvey wrote:
+>> Arnd,
+>>
+>> Right, on the IMX the MSI interrupt is GIC-120 which is also the
+>> legacy INTD and I do see that if I happen to put a radio in a slot
+>> where due to swizzling its pin1 becomes INTD (GIC-120) the interrupt
+>> does fire and the device works. Any other slot using GIC-123 (INTA),
+>> GIC-122 (INTB), or GIC-121 (INTC) never fires so its very possible
+>> that something in the designware core is masking out the legacy irqs.
+>> I would also think this was something IMX specific, but I really don't
+>> see any codepaths in pci-imx6.c that would cause that: a driver
+>> requesting a legacy PCI would get a GIC interrupt which is handled by
+>> the IMX6 gpc interrupt controller.
+>>
+>> Any dra7xxx, exynos, spear13xx, keystone, layerscape, hisi, qcom SoC
+>> users of designware PCIe core out there that can verify PCI MSI and
+>> legacy are both working at the same time?
+>>
+>> Lucas is the expert here and I believe he has the documentation for
+>> the designware core that Freescale doens't provide with the IMX6
+>> documentation so hopefully he can provide some insight. He's the one
+>> that has authored all the MSI support and has been using it.
+>>
+>> I typically advise our users to 'not' enable MSI because
+>> architecturally you can spread 4 distinct legacy irq's across CPU's
+>> better than a single shared irq.
 >
-> I think it's better to follow the generic USB binding that suggests
-> the name of 'usb', unless we understand what the specific bug is
-> you run into. Do you think it is the boot loader that messes
-> up the hardware, or something in the kernel that goes wrong? Did
-> it work on earlier kernels?
->
-
-I am pretty sure that this issue is caused by the Marvell U-Boot which
-tries to modify the dts on the fly. But the device tree reference of
-this U-boot is not the one we use in mainline, so at end it mess up the
-dtb!
-
-There is an option to ask Marvell bootloader to not modify the dts, I
-think it is something like ftd_skip.
-
-Gregory
-
-> We had a regression based on the USB device probing, but that
-> should be fixed now with the patch below. Do you have that?
->
-> 	Arnd
->
->
-> commit 7222c832254a75dcd67d683df75753d4a4e125bb
-> Author: Nicolai Stange <nicstange@gmail.com>
-> Date:   Thu Mar 17 23:53:02 2016 +0100
->
->     usb/core: usb_alloc_dev(): fix setting of ->portnum
->     
->     With commit 69bec7259853 ("USB: core: let USB device know device node"),
->     the port1 argument of usb_alloc_dev() gets overwritten as follows:
->     
->       ... usb_alloc_dev(..., unsigned port1)
->       {
->         ...
->         if (!parent->parent) {
->           port1 = usb_hcd_find_raw_port_number(..., port1);
->         }
->         ...
->       }
->     
->     Later on, this now overwritten port1 gets assigned to ->portnum:
->     
->       dev->portnum = port1;
->     
->     However, since xhci_find_raw_port_number() isn't idempotent, the
->     aforementioned commit causes a number of KASAN splats like the following:
->     
->       BUG: KASAN: slab-out-of-bounds in xhci_find_raw_port_number+0x98/0x170
->                                            at addr ffff8801d9311670
->       Read of size 8 by task kworker/2:1/87
->       [...]
->       Workqueue: usb_hub_wq hub_event
->        0000000000000188 000000005814b877 ffff8800cba17588 ffffffff8191447e
->        0000000041b58ab3 ffffffff82a03209 ffffffff819143a2 ffffffff82a252f4
->        ffff8801d93115e0 0000000000000188 ffff8801d9311628 ffff8800cba17588
->       Call Trace:
->        [<ffffffff8191447e>] dump_stack+0xdc/0x15e
->        [<ffffffff819143a2>] ? _atomic_dec_and_lock+0xa2/0xa2
->        [<ffffffff814e2cd1>] ? print_section+0x61/0xb0
->        [<ffffffff814e4939>] print_trailer+0x179/0x2c0
->        [<ffffffff814f0d84>] object_err+0x34/0x40
->        [<ffffffff814f4388>] kasan_report_error+0x2f8/0x8b0
->        [<ffffffff814eb91e>] ? __slab_alloc+0x5e/0x90
->        [<ffffffff812178c0>] ? __lock_is_held+0x90/0x130
->        [<ffffffff814f5091>] kasan_report+0x71/0xa0
->        [<ffffffff814ec082>] ? kmem_cache_alloc_trace+0x212/0x560
->        [<ffffffff81d99468>] ? xhci_find_raw_port_number+0x98/0x170
->        [<ffffffff814f33d4>] __asan_load8+0x64/0x70
->        [<ffffffff81d99468>] xhci_find_raw_port_number+0x98/0x170
->        [<ffffffff81db0105>] xhci_setup_addressable_virt_dev+0x235/0xa10
->        [<ffffffff81d9ea51>] xhci_setup_device+0x3c1/0x1430
->        [<ffffffff8121cddd>] ? trace_hardirqs_on+0xd/0x10
->        [<ffffffff81d9fac0>] ? xhci_setup_device+0x1430/0x1430
->        [<ffffffff81d9fad3>] xhci_address_device+0x13/0x20
->        [<ffffffff81d2081a>] hub_port_init+0x55a/0x1550
->        [<ffffffff81d28705>] hub_event+0xef5/0x24d0
->        [<ffffffff81d27810>] ? hub_port_debounce+0x2f0/0x2f0
->        [<ffffffff8195e1ee>] ? debug_object_deactivate+0x1be/0x270
->        [<ffffffff81210203>] ? print_rt_rq+0x53/0x2d0
->        [<ffffffff8121657d>] ? trace_hardirqs_off+0xd/0x10
->        [<ffffffff8226acfb>] ? _raw_spin_unlock_irqrestore+0x5b/0x60
->        [<ffffffff81250000>] ? irq_domain_set_hwirq_and_chip+0x30/0xb0
->        [<ffffffff81256339>] ? debug_lockdep_rcu_enabled+0x39/0x40
->        [<ffffffff812178c0>] ? __lock_is_held+0x90/0x130
->        [<ffffffff81196877>] process_one_work+0x567/0xec0
->       [...]
->     
->     Afterwards, xhci reports some functional errors:
->     
->       xhci_hcd 0000:00:14.0: ERROR: unexpected setup address command completion
->                                     code 0x11.
->       xhci_hcd 0000:00:14.0: ERROR: unexpected setup address command completion
->                                     code 0x11.
->       usb 4-3: device not accepting address 2, error -22
->     
->     Fix this by not overwriting the port1 argument in usb_alloc_dev(), but
->     storing the raw port number as required by OF in an additional variable,
->     raw_port.
->     
->     Fixes: 69bec7259853 ("USB: core: let USB device know device node")
->     Signed-off-by: Nicolai Stange <nicstange@gmail.com>
->     Acked-by: Alan Stern <stern@rowland.harvard.edu>
->     Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->
-> diff --git a/drivers/usb/core/usb.c b/drivers/usb/core/usb.c
-> index ffa5cf13ffe1..dcb85e3cd5a7 100644
-> --- a/drivers/usb/core/usb.c
-> +++ b/drivers/usb/core/usb.c
-> @@ -424,6 +424,7 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent,
->  	struct usb_device *dev;
->  	struct usb_hcd *usb_hcd = bus_to_hcd(bus);
->  	unsigned root_hub = 0;
-> +	unsigned raw_port = port1;
->  
->  	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
->  	if (!dev)
-> @@ -498,11 +499,11 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent,
->  
->  		if (!parent->parent) {
->  			/* device under root hub's port */
-> -			port1 = usb_hcd_find_raw_port_number(usb_hcd,
-> +			raw_port = usb_hcd_find_raw_port_number(usb_hcd,
->  				port1);
->  		}
->  		dev->dev.of_node = usb_of_get_child_node(parent->dev.of_node,
-> -				port1);
-> +				raw_port);
->  
->  		/* hub driver sets up TT records */
->  	}
+> Don't know if I'm facing similar problem, however devices connected in miniPCI slot behind
+> a PCIe-to-PCI bridge (MSI is disabled) using INTA all is working ok, including shared IRQ.
+> In case of INTB will not work, and the GIC irq quite often get stuck.
 >
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Roberto,
+
+What board/platform is this and what does /proc/interrupts look like?
+
+This sounds like what would happen if the downstream interrupts on the
+PCIe-to-PCI bridge are not mapped properly as was the case with a
+board I support (in which case I had to work out a bootloader fixup
+that placed a non-standard interrupt-map in the device-tree for the
+bridge). What bridge are you using?
+
+Tim
