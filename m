@@ -1,64 +1,53 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 29 Mar 2016 07:54:48 -0700
-Subject: [PATCH 00/12] ARM: dts: Add dragonboard-600c support.
-In-Reply-To: <1458762366-9233-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1458762366-9233-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <20160329145448.GP8929@tuxbot>
+From: wpdster@gmail.com (Patrick Doyle)
+Date: Tue, 29 Mar 2016 10:55:07 -0400
+Subject: Bad mode in undefined instruction handler detected
+Message-ID: <CAF_dkJBa3Y1EZGduZyjWqV3p5s7zf+Y4ppdeKW8anhd5nkjOPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 23 Mar 12:46 PDT 2016, Srinivas Kandagatla wrote:
+Hello folks...
+I am looking for a clue as to how I might debug the following kernel oops:
 
-> Hi Andy,
-> 
-> This patchset adds support to Dragonboard 600c which is based on APQ8064.
-> 
-> With this patchset, except spi I was able to test all the below features
-> on this board on top of linus master branch.
-> 1> i2c
-> 2> spi
-> 3> sd/mmc with card detect
-> 4> eMMC
-> 5> USB
-> 6> SATA
-> 7> on board Ethernet based on PCIE.
-> 8> user and activity leds.
-> 
-> AHCI SATA is broken on APQ8064 on mainline, due to changes in libahci, fix is
-> being discussed which should not effect this dt patches anyway.
-> This patchset also has a fix to i2c/spi pinctrls which was not set correctly
-> in my previous apq8064 patches, I have verified this patchset with eeprom and
-> sensors on the board, you might want to take that patch in next rc.
-> 
-> Thanks,
-> srini
-> 
-> Srinivas Kandagatla (12):
->   ARM: dts: apq8064: fix the pinctrls for i2c and spi
->   ARM: dts: apq8064: add support to gsbi1 uart
->   ARM: dts: apq8064: add gsbi7 i2c support
->   ARM: dts: dragonboard-600c: add board support with serial
->   ARM: dts: dragonboard-600c: add pmic regulator supplies
->   ARM: dts: dragonboard-600c: Add eMMC and SD card support
->   ARM: dts: dragonboard-600c: add usb support
->   ARM: dts: dragonboard-600c: add pcie support
->   ARM: dts: dragonboard-600c: add on board sata support.
->   ARM: dts: dragonboard-600c: Add on board leds support
->   ARM: dts: dragonboard-600c: add i2c support
->   ARM: dts: dragonboard-600c: add spi support
+Bad mode in undefined instruction handler detected
+Internal error: Oops - bad mode: 0 [#1] ARM
+Modules linked in: usb_f_eem g_ether u_ether libcomposite atmel_usba_udc
+CPU: 0 PID: 0 Comm: swapper Not tainted 4.1.0-linux4sam_5.1 #4
+Hardware name: Atmel SAMA5
+task: c11440b8 ti: c1140000 task.ti: c1140000
+PC is at _einittext+0x3f9456e8/0xfffdb400
+LR is at 0xc0c565c8
+pc : [<ffff0024>]    lr : [<c0c565c8>]    psr: 600e0192
+sp : c1141f30  ip : 00000019  fp : c11420d0
+r10: c1147548  r9 : 00000132  r8 : b0a5c253
+r7 : 00000132  r6 : b0a5bacb  r5 : 00000000  r4 : c1162d10
+r3 : 00000132  r2 : b0a5c253  r1 : fffffff9  r0 : c1141f78
+Flags: nZCv  IRQs off  FIQs on  Mode IRQ_32  ISA ARM  Segment kernel
+Control: 10c53c7d  Table: 24804059  DAC: 00000015
+Process swapper (pid: 0, stack limit = 0xc1140208)
+Stack: (0xc1141f30 to 0xc1142000)
+1f20:                                     c1141f78 fffffff9 b0a5c253 00000132
+1f40: c1162d10 00000000 b0a5bacb 00000132 b0a5c253 00000132 c1147548 c11420d0
+1f60: 00000019 c1141f30 c0c565c8 ffff0024 600e0192 ffffffff b0a5c253 00000132
+1f80: 00000001 c1140000 c11420c8 c1162d10 c11631c4 00000001 c1162d08 c1147548
+1fa0: c11420d0 c003c9f0 00000000 c116d57b 00000000 c1142000 00000000 c0686c34
+1fc0: ffffffff ffffffff c0686680 00000000 00000000 c06ad280 c116db14 c1142078
+1fe0: c06ad27c c114518c 20004059 410fc051 00000000 20008078 00000000 00000000
+Code: ea000481 ea000400 ea000487 e7fddef1 (e7fddef1)
+---[ end trace bf564fba2bcf8264 ]---
+Kernel panic - not syncing: Attempted to kill the idle task!
+---[ end Kernel panic - not syncing: Attempted to kill the idle task!
 
-Please abbreviate db600c (and drop those upper case As).
+This reproduces quite regularly on my (custom SAMA5) development board
+when transferring data from a camera (wired to the ISI port) to an
+external host via USB.  So the problem could be related to the camera
+driver, the USB driver, or something completely different (such as a
+memory error that happens to occur with the same symptoms every time I
+run my code for 5 to 10 minutes, despite the fact that I am unable to
+induce a memory error by running stress, stress-ng, or memtester).
 
-> 
->  arch/arm/boot/dts/Makefile                         |   1 +
->  .../arm/boot/dts/qcom-apq8064-dragonboard-600c.dts | 377 +++++++++++++++++++++
+Any clues as to how I might parse this oops and ultimately track down
+the root cause of this would be greatly appreciated.
 
-Please make this qcom-apq8064-arrow-db600c.dts
+Thanks.
 
->  arch/arm/boot/dts/qcom-apq8064-pins.dtsi           |  39 +++
->  arch/arm/boot/dts/qcom-apq8064.dtsi                |  41 ++-
->  4 files changed, 452 insertions(+), 6 deletions(-)
->  create mode 100644 arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
-
-Regards,
-Bjorn
+--wpd
