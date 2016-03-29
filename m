@@ -1,93 +1,89 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 29 Mar 2016 10:07:07 +0200
-Subject: [PATCH 3/5] drm: Add an encoder and connector type enum for DPI.
-In-Reply-To: <1458865431-30048-4-git-send-email-eric@anholt.net>
-References: <1458865431-30048-1-git-send-email-eric@anholt.net>
- <1458865431-30048-4-git-send-email-eric@anholt.net>
-Message-ID: <20160329080707.GJ2510@phenom.ffwll.local>
+From: rabin.vincent@axis.com (Rabin Vincent)
+Date: Tue, 29 Mar 2016 10:08:37 +0200
+Subject: [PATCH] clockevents/drivers/arm_global_timer: Fix erratum 740657
+ workaround
+Message-ID: <1459238917-2240-1-git-send-email-rabin.vincent@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 24, 2016 at 05:23:49PM -0700, Eric Anholt wrote:
-> Right now exynos is exposing DPI as a TMDS encoder and VGA connector,
-> which seems rather misleading.  This isn't just an internal detail,
-> since xrandr actually exposes "VGA" as the output name.  Define some
-> new enums so that vc4's DPI can have a more informative name.
-> 
-> I considered other names for the connector as well.  For VC4, the
-> Adafruit DPI kippah takes the 28 GPIO pins and routes them to a
-> standard-ish 40-pin FPC connector, but "40-pin FPC" doesn't uniquely
-> identify an ordering of pins (apparently some other orderings exist),
-> doesn't explain things as well for the user (who, if anything, knows
-> their product is a DPI kippah/panel combo), and actually doesn't have
-> to exist (one could connect the 28 GPIOs directly to something else).
-> Simply "DPI" seems like a good compromise name to distinguish from the
-> HDMI, DSI, and TV connectors .
-> 
-> Signed-off-by: Eric Anholt <eric@anholt.net>
+From: Rabin Vincent <rabinv@axis.com>
 
-Follow-up patch to fix up existing drivers? Either way
+According to the errata document for the Cortex A9 MPCore, the correct
+code sequence in the interrupt handler to workaround erratum 740657
+"Global Timer can send two interrupts for the same event" is:
 
-Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch> + ack for merging
-through a vc4 pull request (Dave has recently okayed that I can do such
-acks for non-i915 trees).
+ (1) Read the ICCIAR (Interrupt Acknowledge) register
+ (2) Modify the comparator value, to set it to a higher value
+ (3) Clear the Global Timer flag
+ (4) Clear the Pending Status information for Interrupt 27 (Global
+     Timer interrupt) in the Distributor of the Interrupt Controller.
+ (5) Write the ICCEOIR (End of Interrupt) register
 
-Cheers, Daniel
+(1) and (5) are done by the GIC driver and (2) and (3) are done by the
+Global Timer driver.  However, nobody does (4) and thus the workaround
+is inactive and the timer triggers many spurious interrupts:
 
-> ---
->  drivers/gpu/drm/drm_crtc.c  | 2 ++
->  include/uapi/drm/drm_mode.h | 2 ++
->  2 files changed, 4 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/drm_crtc.c b/drivers/gpu/drm/drm_crtc.c
-> index f619121..64bd954 100644
-> --- a/drivers/gpu/drm/drm_crtc.c
-> +++ b/drivers/gpu/drm/drm_crtc.c
-> @@ -168,6 +168,7 @@ static struct drm_conn_prop_enum_list drm_connector_enum_list[] = {
->  	{ DRM_MODE_CONNECTOR_eDP, "eDP" },
->  	{ DRM_MODE_CONNECTOR_VIRTUAL, "Virtual" },
->  	{ DRM_MODE_CONNECTOR_DSI, "DSI" },
-> +	{ DRM_MODE_CONNECTOR_DPI, "DPI" },
->  };
->  
->  static const struct drm_prop_enum_list drm_encoder_enum_list[] = {
-> @@ -179,6 +180,7 @@ static const struct drm_prop_enum_list drm_encoder_enum_list[] = {
->  	{ DRM_MODE_ENCODER_VIRTUAL, "Virtual" },
->  	{ DRM_MODE_ENCODER_DSI, "DSI" },
->  	{ DRM_MODE_ENCODER_DPMST, "DP MST" },
-> +	{ DRM_MODE_ENCODER_DPI, "DPI" },
->  };
->  
->  static const struct drm_prop_enum_list drm_subpixel_enum_list[] = {
-> diff --git a/include/uapi/drm/drm_mode.h b/include/uapi/drm/drm_mode.h
-> index 50adb46..1eb85f7 100644
-> --- a/include/uapi/drm/drm_mode.h
-> +++ b/include/uapi/drm/drm_mode.h
-> @@ -202,6 +202,7 @@ struct drm_mode_get_plane_res {
->  #define DRM_MODE_ENCODER_VIRTUAL 5
->  #define DRM_MODE_ENCODER_DSI	6
->  #define DRM_MODE_ENCODER_DPMST	7
-> +#define DRM_MODE_ENCODER_DPI	8
->  
->  struct drm_mode_get_encoder {
->  	__u32 encoder_id;
-> @@ -241,6 +242,7 @@ struct drm_mode_get_encoder {
->  #define DRM_MODE_CONNECTOR_eDP		14
->  #define DRM_MODE_CONNECTOR_VIRTUAL      15
->  #define DRM_MODE_CONNECTOR_DSI		16
-> +#define DRM_MODE_CONNECTOR_DPI		17
->  
->  struct drm_mode_get_connector {
->  
-> -- 
-> 2.7.0
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+ <idle>-0 [001] d.h2 99.850527: irq_handler_entry: irq=16 name=gt
+ <idle>-0 [001] d.h2 99.850538: irq_handler_exit: irq=16 ret=handled
+ <idle>-0 [001] d.H2 99.850540: irq_handler_entry: irq=16 name=gt
+ <idle>-0 [001] d.H2 99.850542: irq_handler_exit: irq=16 ret=unhandled
+ <idle>-0 [001] d.h2 99.987832: irq_handler_entry: irq=16 name=gt
+ <idle>-0 [001] dnh2 99.987845: irq_handler_exit: irq=16 ret=handled
+ <idle>-0 [001] dnh2 99.987848: irq_handler_entry: irq=16 name=gt
+ <idle>-0 [001] dnh2 99.987850: irq_handler_exit: irq=16 ret=unhandled
 
+Make the Global Timer driver perform step (4) via the GIC driver with
+the help of the irq_set_irqchip_state() function, to prevent the
+spurious interrupts.
+
+Signed-off-by: Rabin Vincent <rabinv@axis.com>
+---
+ drivers/clocksource/arm_global_timer.c | 21 +++++++++++++--------
+ 1 file changed, 13 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
+index 9df0d16..b9d0f86 100644
+--- a/drivers/clocksource/arm_global_timer.c
++++ b/drivers/clocksource/arm_global_timer.c
+@@ -140,26 +140,31 @@ static int gt_clockevent_set_next_event(unsigned long evt,
+ static irqreturn_t gt_clockevent_interrupt(int irq, void *dev_id)
+ {
+ 	struct clock_event_device *evt = dev_id;
++	bool workaround = clockevent_state_oneshot(evt);
+ 
+ 	if (!(readl_relaxed(gt_base + GT_INT_STATUS) &
+ 				GT_INT_STATUS_EVENT_FLAG))
+ 		return IRQ_NONE;
+ 
+ 	/**
+-	 * ERRATA 740657( Global Timer can send 2 interrupts for
++	 * ERRATA 740657 (Global Timer can send 2 interrupts for
+ 	 * the same event in single-shot mode)
+ 	 * Workaround:
+-	 *	Either disable single-shot mode.
+-	 *	Or
+-	 *	Modify the Interrupt Handler to avoid the
+-	 *	offending sequence. This is achieved by clearing
+-	 *	the Global Timer flag _after_ having incremented
+-	 *	the Comparator register	value to a higher value.
++	 * - Read the ICCIAR (Interrupt Acknowledge) register
++	 * - Modify the comparator value, to set it to a higher value
++	 * - Clear the Global Timer flag
++	 * - Clear the Pending Status information for Interrupt 27 (Global
++	 *   Timer interrupt) in the Distributor of the Interrupt Controller.
++	 * - Write the ICCEOIR (End of Interrupt) register
+ 	 */
+-	if (clockevent_state_oneshot(evt))
++	if (workaround)
+ 		gt_compare_set(ULONG_MAX, 0);
+ 
+ 	writel_relaxed(GT_INT_STATUS_EVENT_FLAG, gt_base + GT_INT_STATUS);
++
++	if (workaround)
++		irq_set_irqchip_state(irq, IRQCHIP_STATE_PENDING, false);
++
+ 	evt->event_handler(evt);
+ 
+ 	return IRQ_HANDLED;
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+2.7.0
