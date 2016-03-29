@@ -1,49 +1,107 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 28 Mar 2016 18:59:56 -0700
-Subject: [PATCH v2 2/8] ARM: imx: clk-vf610: add TCON ipg clock
+Date: Mon, 28 Mar 2016 18:59:57 -0700
+Subject: [PATCH v2 3/8] drm/fsl-dcu: disable clock on initialization failure
+ and remove
 In-Reply-To: <1459216802-32094-1-git-send-email-stefan@agner.ch>
 References: <1459216802-32094-1-git-send-email-stefan@agner.ch>
-Message-ID: <1459216802-32094-3-git-send-email-stefan@agner.ch>
+Message-ID: <1459216802-32094-4-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the ipg (bus) clock for the TCON modules (Timing Controller). This
-module is required by the new DCU DRM driver, since the display signals
-pass through TCON.
+Fix error handling during probe by reordering initialization and
+adding a error path which disables clock again. Also disable the
+clock on remove.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- drivers/clk/imx/clk-vf610.c             | 3 +++
- include/dt-bindings/clock/vf610-clock.h | 4 +++-
- 2 files changed, 6 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.c | 44 +++++++++++++++----------------
+ 1 file changed, 21 insertions(+), 23 deletions(-)
 
-diff --git a/drivers/clk/imx/clk-vf610.c b/drivers/clk/imx/clk-vf610.c
-index 426fde2..43be1cf 100644
---- a/drivers/clk/imx/clk-vf610.c
-+++ b/drivers/clk/imx/clk-vf610.c
-@@ -327,6 +327,9 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
- 	clk[VF610_CLK_DCU1_DIV] = imx_clk_divider("dcu1_div", "dcu1_en", CCM_CSCDR3, 20, 3);
- 	clk[VF610_CLK_DCU1] = imx_clk_gate2("dcu1", "ipg_bus", CCM_CCGR9, CCM_CCGRx_CGn(8));
+diff --git a/drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.c b/drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.c
+index e8d9337..f2a9c1b 100644
+--- a/drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.c
++++ b/drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.c
+@@ -290,6 +290,11 @@ static int fsl_dcu_drm_probe(struct platform_device *pdev)
+ 	if (!fsl_dev)
+ 		return -ENOMEM;
  
-+	clk[VF610_CLK_TCON0] = imx_clk_gate2("tcon0", "platform_bus", CCM_CCGR1, CCM_CCGRx_CGn(13));
-+	clk[VF610_CLK_TCON1] = imx_clk_gate2("tcon1", "platform_bus", CCM_CCGR7, CCM_CCGRx_CGn(13));
++	id = of_match_node(fsl_dcu_of_match, pdev->dev.of_node);
++	if (!id)
++		return -ENODEV;
++	fsl_dev->soc = id->data;
 +
- 	clk[VF610_CLK_ESAI_SEL] = imx_clk_mux("esai_sel", CCM_CSCMR1, 20, 2, esai_sels, 4);
- 	clk[VF610_CLK_ESAI_EN] = imx_clk_gate("esai_en", "esai_sel", CCM_CSCDR2, 30);
- 	clk[VF610_CLK_ESAI_DIV] = imx_clk_divider("esai_div", "esai_en", CCM_CSCDR2, 24, 4);
-diff --git a/include/dt-bindings/clock/vf610-clock.h b/include/dt-bindings/clock/vf610-clock.h
-index 56c16aa..fbe17cc 100644
---- a/include/dt-bindings/clock/vf610-clock.h
-+++ b/include/dt-bindings/clock/vf610-clock.h
-@@ -195,6 +195,8 @@
- #define VF610_CLK_SNVS			182
- #define VF610_CLK_DAP			183
- #define VF610_CLK_OCOTP         184
--#define VF610_CLK_END			185
-+#define VF610_CLK_TCON0			185
-+#define VF610_CLK_TCON1			186
-+#define VF610_CLK_END			187
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	if (!res) {
+ 		dev_err(dev, "could not get memory IO resource\n");
+@@ -308,39 +313,29 @@ static int fsl_dcu_drm_probe(struct platform_device *pdev)
+ 		return -ENXIO;
+ 	}
  
- #endif /* __DT_BINDINGS_CLOCK_VF610_H */
++	fsl_dev->regmap = devm_regmap_init_mmio(dev, base,
++			&fsl_dcu_regmap_config);
++	if (IS_ERR(fsl_dev->regmap)) {
++		dev_err(dev, "regmap init failed\n");
++		return PTR_ERR(fsl_dev->regmap);
++	}
++
+ 	fsl_dev->clk = devm_clk_get(dev, "dcu");
+ 	if (IS_ERR(fsl_dev->clk)) {
+-		ret = PTR_ERR(fsl_dev->clk);
+ 		dev_err(dev, "failed to get dcu clock\n");
+-		return ret;
+-	}
+-	ret = clk_prepare(fsl_dev->clk);
+-	if (ret < 0) {
+-		dev_err(dev, "failed to prepare dcu clk\n");
+-		return ret;
++		return PTR_ERR(fsl_dev->clk);
+ 	}
+-	ret = clk_enable(fsl_dev->clk);
++	ret = clk_prepare_enable(fsl_dev->clk);
+ 	if (ret < 0) {
+ 		dev_err(dev, "failed to enable dcu clk\n");
+-		clk_unprepare(fsl_dev->clk);
+ 		return ret;
+ 	}
+ 
+-	fsl_dev->regmap = devm_regmap_init_mmio(dev, base,
+-			&fsl_dcu_regmap_config);
+-	if (IS_ERR(fsl_dev->regmap)) {
+-		dev_err(dev, "regmap init failed\n");
+-		return PTR_ERR(fsl_dev->regmap);
+-	}
+-
+-	id = of_match_node(fsl_dcu_of_match, pdev->dev.of_node);
+-	if (!id)
+-		return -ENODEV;
+-	fsl_dev->soc = id->data;
+-
+ 	drm = drm_dev_alloc(driver, dev);
+-	if (!drm)
+-		return -ENOMEM;
++	if (!drm) {
++		ret = -ENOMEM;
++		goto disable_clk;
++	}
+ 
+ 	fsl_dev->dev = dev;
+ 	fsl_dev->drm = drm;
+@@ -360,6 +355,8 @@ static int fsl_dcu_drm_probe(struct platform_device *pdev)
+ 
+ unref:
+ 	drm_dev_unref(drm);
++disable_clk:
++	clk_disable_unprepare(fsl_dev->clk);
+ 	return ret;
+ }
+ 
+@@ -367,6 +364,7 @@ static int fsl_dcu_drm_remove(struct platform_device *pdev)
+ {
+ 	struct fsl_dcu_drm_device *fsl_dev = platform_get_drvdata(pdev);
+ 
++	clk_disable_unprepare(fsl_dev->clk);
+ 	drm_put_dev(fsl_dev->drm);
+ 
+ 	return 0;
 -- 
 2.7.4
