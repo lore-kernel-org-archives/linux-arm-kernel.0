@@ -1,85 +1,50 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 29 Mar 2016 10:55:39 +0200
-Subject: [PATCH] i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity
-In-Reply-To: <CAJ+vNU2ST=XG5H04-OCwpHgcvkoXOQw8F3MjXhJmWhBUbxWE-g@mail.gmail.com>
-References: <m3h9fuk7ik.fsf@t19.piap.pl>
- <CAOMZO5DcZCxoLPeGRWSGkstm7F3eN-Q-yJyf6ktMTda2zLviag@mail.gmail.com>
- <CAOMZO5B8Lzn-E4YOeYxVtN5PN11aOvZHn4eU0ixkdV8CO8+xYw@mail.gmail.com>
- <CAJ+vNU2Sg1ZKBsGcQswrJZyTJ1WBEZor3ZqpoYUT7i9FKjEAog@mail.gmail.com>
- <CAOMZO5DO9G18=_YSri3a+UiYbLwN6AMG4asUXbT03mpbU3hHrw@mail.gmail.com>
- <CAJ+vNU1_YqvWQkmuDB7r8z77iZJS6pP4Mr+j9yW4sFLAeJXQDw@mail.gmail.com>
- <CAOMZO5A2osG3=mTaCayYfMokUj-vT+Udq9ckq45b1yaUP9Tn3g@mail.gmail.com>
- <CAJ+vNU2ST=XG5H04-OCwpHgcvkoXOQw8F3MjXhJmWhBUbxWE-g@mail.gmail.com>
-Message-ID: <1459241739.2565.9.camel@pengutronix.de>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Tue, 29 Mar 2016 11:03:33 +0200
+Subject: [PATCH v3 2/5] dmaengine: sun6i: Add 4 as a possible burst
+ value for the H3
+In-Reply-To: <20160329064650.GG30977@lukather>
+References: <cover.1458311540.git.moinejf@free.fr>
+ <8485d9976f327cf23e051f64c3a3c5cbff4214a7.1458311540.git.moinejf@free.fr>
+ <20160321072918.GV30977@lukather>
+ <20160321093533.c91912e9ac263d9c003355e2@free.fr>
+ <20160329064650.GG30977@lukather>
+Message-ID: <20160329110333.98b6bfad38dd44950c35d6f2@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 28.03.2016, 15:06 -0700 schrieb Tim Harvey:
-> On Mon, Mar 28, 2016 at 2:30 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> > On Mon, Mar 28, 2016 at 5:42 PM, Tim Harvey <tharvey@gateworks.com> wrote:
-> >
-> >> Fabio,
-> >>
-> >> ok - I'll respond there as I agree with the patch but not the wording
-> >> of the commit (It's Gateworks 'Ventana' using IMX6 not Laguna and we
-> >> do define the polarity properly as active-low in Ventana dt's). It is
-> >> the fact that the gpio polarity has the wrong logic level that breaks
-> >> Ventana.
-> >
-> > Ok, I will change the wording in v2.
-> >
-> >>
-> >> However, there seems to be another regression in 4.5 that's keeping
-> >> PCI working for me and I'm still bisecting that (using 802.11n access
-> >> points to test). Can you confirm that PCI works in v4.5 on IMX6 boards
-> >> with only 5c5fb40de8f14391a1238db05cef88754faf9229 reverted?
-> >
-> > On imx6qdl-sabresd.dtsi the PCI reset gpio polarity is set to high,
-> > which is not correct, so the Wifi card could be detected even with
-> > 5c5fb40de8f. So two errors in sequence and PCI still works on this
-> > board :-)
-> 
-> ouch - two wrongs did make a right!
-> 
-> It's not too easy to tell how many IMX6 boards incorrectly specify
-> their reset-gpio polarity. I don't know what the best way to determine
-> what boards use the IMX6 pcie host controller. Is there a dtc usage
-> that will display the compiled dtb's then we grep out 'compatible =
-> "fsl,imx6q-pcie"' to at least get the list of boards to inspect? I'm
-> curious if its just one or two boards that incorrectly specify the
-> polarity of their PCI reset.
-> 
-I would suspect that most boards specify the reset polarity the wrong
-way around. Fixing this without breaking DT stability is hard. OTOH we
-could just argue that the system description in DT is wrong and needs to
-be fixed.
+On Tue, 29 Mar 2016 08:46:50 +0200
+Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
-> >
-> > I don't have access to the board at the moment, but the only test I
-> > did was to see that the Wifi card got detected. I haven't really tried
-> > to communicate via Wifi.
+> On Mon, Mar 21, 2016 at 09:35:33AM +0100, Jean-Francois Moine wrote:
+> > On Mon, 21 Mar 2016 08:29:18 +0100
+> > Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> > 
+> > > > @@ -470,6 +473,10 @@ static int set_config(struct sun6i_dma_dev *sdev,
+> > > >  {
+> > > >  	s8 src_width, dst_width, src_burst, dst_burst;
+> > > >  
+> > > > +	if (!sdev->cfg->burst_4 &&
+> > > > +	    (sconfig->src_maxburst == 4 || sconfig->dst_maxburst == 4))
+> > > > +		return -EINVAL;
+> > > > +
+> > > 
+> > > I still believe this should be dealt with at the framework level.
+> > 
+> > What do you mean? In the DMA clients?
 > 
-> I figured out it was the change to enable CONFIG_PCI_MSI in v4.5 that
-> is causing interrupts to fail for me.
+> No, in the dmaengine framework.
 > 
-Is this working with v4.4 and PCI_MSI enabled? I'm sure I've tested MSI
-IRQs before enabling them in the defconfig and they have been working
-for me for a long time before that. Tested with i210 on Gateworks
-Ventana.
+> A driver should register the burst size they support, and
+> dmaengine_slave_config would reject any invalid burst size based on
+> that.
 
-> Lucas, the case that is failing for me is when I have 4 miniPCI radios
-> behind a PCIe->PCI bridge. In this case the radios get legacy
-> INTA/B/C/D mapped to them correctly from what I can tell (GIC
-> 123/122/121/120 swizzled appropriately), but those interrupts never
-> fire. I don't think this case is necessarily a regression, I'm not
-> clear that it has ever worked. In fact I can't seem to come up with a
-> scenario where the MSI irq is firing either: IMX6->ath9k radio (no
-> bridge) with MSI doesn't fire the PCI-MSI interrupt or the GPC 123
-> interrupt that gets mapped to it via the driver. Any ideas what can be
-> going on here?
-> 
-Please test if MSI IRQs work with v4.4. I'll take a look at this later
-today.
+Maybe you are right, but this does not seem to be very easy: the max
+burst size is on a u32 value, and, as a bit map (256Mb) is forbidden,
+the DMA drivers should declare a list of (min, max) authorized values.
 
-Regards,
-Lucas
+Well, I will not start such a development for just testing if 4 is a
+good burst size when calling the sun6i DMA driver...
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
