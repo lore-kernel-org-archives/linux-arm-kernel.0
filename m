@@ -1,53 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Mar 2016 21:39:20 +0200
-Subject: [PATCH] i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity
-In-Reply-To: <CAJ+vNU01JFRXSzF-0OhvyLds03mbbeBbw0by0dwuCotdxpDuog@mail.gmail.com>
-References: <m3h9fuk7ik.fsf@t19.piap.pl> <3827347.i8fIQs6jUv@wuerfel>
- <CAJ+vNU01JFRXSzF-0OhvyLds03mbbeBbw0by0dwuCotdxpDuog@mail.gmail.com>
-Message-ID: <3601512.SumN6MaWDe@wuerfel>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 29 Mar 2016 12:46:29 -0700
+Subject: [PATCH resend v5 0/3] ASoC: cygnus: Add audio support for
+ Broadcom Cygnus SoC
+In-Reply-To: <56FAD579.3060703@broadcom.com>
+References: <1459277192-10942-1-git-send-email-simran.rai@broadcom.com>
+ <20160329190910.GF2350@sirena.org.uk>
+ <56FAD579.3060703@broadcom.com>
+Message-ID: <20160329194629.GH2350@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 March 2016 10:38:16 Tim Harvey wrote:
-> On Tue, Mar 29, 2016 at 8:24 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Tuesday 29 March 2016 08:10:08 Tim Harvey wrote:
-> >> Arnd,
-> >>
-> >> Right, on the IMX the MSI interrupt is GIC-120 which is also the
-> >> legacy INTD and I do see that if I happen to put a radio in a slot
-> >> where due to swizzling its pin1 becomes INTD (GIC-120) the interrupt
-> >> does fire and the device works. Any other slot using GIC-123 (INTA),
-> >> GIC-122 (INTB), or GIC-121 (INTC) never fires so its very possible
-> >> that something in the designware core is masking out the legacy irqs.
-> >
-> > Interesting. I was actually expecting the opposite here, having the
-> > IRQs only work if they are not IntD.
-> >
-> >
-> >> I typically advise our users to 'not' enable MSI because
-> >> architecturally you can spread 4 distinct legacy irq's across CPU's
-> >> better than a single shared irq.
-> >
-> > That is a very good point, I never understood why we want to enable
-> > MSI support on any PCI host bridge that just forwards all MSIs
-> > to a single IRQ line. Originally MSI was meant as a performance
-> > feature, but there is nothing in this setup that makes things go
-> > faster, and several things that make it go slower.
-> 
-> I had a conversation once with Lucas about implementing the shared MSI
-> interrupt in such a way that its smp affinity could be set to other
-> CPU's to gain a performance benefit in certain multi-device cases.
-> 
-> While this is technically possible it would involve creating a softirq
-> glue between the different handlers but that would add overhead of a
-> softirq plus potentially waking up another CPU to every IRQ which
-> would end up adding some overhead to even the simple single-device
-> case.
-> 
-> Without any hard data it wasn't clear if this was worth it or if there
-> was a clean way to provide this as build-time or run-time option.
+On Tue, Mar 29, 2016 at 12:20:25PM -0700, Florian Fainelli wrote:
 
-I think it's pretty clear that this would take things from 'somewhat silly'
-to 'completely bonkers' ;-)
+> Subject apart, and thanks for the education, is there something wrong
+> with this patch series?
 
-	Arnd
+I've not yet reviewed it, I was just doing first pass triage and was
+about to complain that my review comments had been ignored since it was
+flagged as a resend but there were issues with the last version.  It's
+fortunate that I actually went to look for that version to paste my
+comments back in...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160329/6c99b574/attachment.sig>
