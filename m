@@ -1,33 +1,24 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 29 Mar 2016 14:11:15 +0100
-Subject: [RFC PATCH 3/3] ARM: dts: apq8064: add ahci ports-implemented mask
-In-Reply-To: <1459257075-21393-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1459257075-21393-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1459257075-21393-4-git-send-email-srinivas.kandagatla@linaro.org>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 29 Mar 2016 14:12:09 +0100
+Subject: [RFC PATCH 00/45] KVM: arm/arm64: Rework virtual GIC emulation
+In-Reply-To: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
+References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <56FA7F29.4060005@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds new ports-implemented mask, which is required to get
-achi working on the mainline. Without this patch value read from
-PORTS_IMPL register which is zero would not enable any ports for
-software to use.
+Hi Andre,
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- arch/arm/boot/dts/qcom-apq8064.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+On 25/03/16 02:04, Andre Przywara wrote:
+> Please have a look at the series, review it and give the code some
+> serious testing (and possibly debugging). All feedback is appreciated.
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index f064f59..3ff1a43b 100644
---- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -717,6 +717,7 @@
- 
- 			phys			= <&sata_phy0>;
- 			phy-names		= "sata-phy";
-+			ports-implemented	= <0x1>;
- 		};
- 
- 		/* Temporary fixed regulator */
--- 
-2.5.0
+I see that with the new vgic implementation kvmtool starts throwing:
+
+kvm [1273]: Unable to register VGICv3 redist MMIO regions
+
+for --cpus 58 and above, where with the old vgic it is quite happy with
+up to 255 cpus.
+
+Cheers
+Vladimir
