@@ -1,40 +1,65 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Mar 2016 11:25:47 +0200
-Subject: [PATCH V3 1/3] vfio,
- platform: add support for ACPI while detecting the reset driver
-In-Reply-To: <1459172124-6730-2-git-send-email-okaya@codeaurora.org>
-References: <1459172124-6730-1-git-send-email-okaya@codeaurora.org>
- <1459172124-6730-2-git-send-email-okaya@codeaurora.org>
-Message-ID: <98854818.NJS35fvhsb@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 29 Mar 2016 11:38:27 +0200
+Subject: [PATCH] clk: sunxi: Accept a greater rate when setting a parent
+ clock
+In-Reply-To: <20160321092549.4e6245e4f02839e29aeb86a9@free.fr>
+References: <20160310081658.B749246B@mail.free-electrons.com>
+ <20160321072546.GT30977@lukather>
+ <20160321092549.4e6245e4f02839e29aeb86a9@free.fr>
+Message-ID: <20160329093827.GH30977@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 28 March 2016 09:35:22 Sinan Kaya wrote:
-> The code is using the compatible DT string to associate a reset driver with
-> the actual device itself. The compatible string does not exist on ACPI
-> based systems. HID is the unique identifier for a device driver instead.
-> The change allows a driver to register with DT compatible string or ACPI
-> HID and then match the object with one of these conditions.
+Hi,
+
+On Mon, Mar 21, 2016 at 09:25:49AM +0100, Jean-Francois Moine wrote:
+> On Mon, 21 Mar 2016 08:25:46 +0100
+> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 > 
-> Rules for loading the reset driver are as follow:
-> - ACPI HID needs match for ACPI systems
-> - DT compat needs to match for OF systems
+> > > -	/* find the parent that can help provide the fastest rate <= rate */
+> > > +	/* find the parent that can help provide the fastest rate */
+> > >  	num_parents = clk_hw_get_num_parents(hw);
+> > >  	for (i = 0; i < num_parents; i++) {
+> > >  		parent = clk_hw_get_parent_by_index(hw, i);
+> > > @@ -100,7 +100,7 @@ static int clk_factors_determine_rate(struct clk_hw *hw,
+> > >  		child_rate = clk_factors_round_rate(hw, req->rate,
+> > >  						    &parent_rate);
+> > >  
+> > > -		if (child_rate <= req->rate && child_rate > best_child_rate) {
+> > > +		if (child_rate > best_child_rate) {
+> > 
+> > I'm not sure this would work, since you'll end up picking the fastest
+> > rate without considering whether it is the closest or not.
+> > 
+> > I guess what you want here is using the absolute difference between
+> > the requested rate and the rate you're evaluating.
+> > 
+> > That being said, we had a similar discussion for SPI around a month
+> > ago where we wanted a rate strictly lower than the requested one. I
+> > guess it's time to add a flag to tell how you want to round.
 > 
-> Tested-by: Eric Auger <eric.auger@linaro.org> (device tree only)
-> Tested-by: Shanker Donthineni <shankerd@codeaurora.org> (ACPI only)
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> 
+> You are right, I just removed half of the constraint, but I still wonder
+> why does this sequence introduced by the commit 862b728387aef3a37
+> (clk: sunxi: factors: automatic reparenting support) do
+> 	"provide the fastest rate <= rate"
+> instead of
+> 	"provide the closest rate" ?
 
+I guess it's a confusing wording, in this case where you try to have
+the closest rate but below the requested rate, what you want is
+actually the fastest rate that doesn't trip above the requested rate,
+hence the comment I guess.
 
-This really feels wrong for two reasons:
+Maxime
 
-* device assignment of non-PCI devices is really special and doesn't
-  seem to make sense on general purpose servers that would be the target
-  for ACPI normally
-
-* If there is indeed a requirement for ACPI to handle something like this,
-  it should be part of the ACPI spec, with a well-defined method of handling
-  reset, rather than having to add a device specific hack for each
-  device separately.
-
-	Arnd
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160329/6c5ef873/attachment.sig>
