@@ -1,46 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 29 Mar 2016 19:29:22 +0100
-Subject: Bad mode in undefined instruction handler detected
-In-Reply-To: <CAF_dkJA=4iqD=siV5RM7KTDfEQGtKc3G17E+C+K+-_hmneK4aA@mail.gmail.com>
-References: <CAF_dkJBa3Y1EZGduZyjWqV3p5s7zf+Y4ppdeKW8anhd5nkjOPg@mail.gmail.com>
- <20160329165940.GA19428@n2100.arm.linux.org.uk>
- <CAF_dkJA=4iqD=siV5RM7KTDfEQGtKc3G17E+C+K+-_hmneK4aA@mail.gmail.com>
-Message-ID: <20160329182922.GC19428@n2100.arm.linux.org.uk>
+From: nicolas.dechesne@linaro.org (Nicolas Dechesne)
+Date: Tue, 29 Mar 2016 20:32:38 +0200
+Subject: [PATCH 10/12] ARM: dts: dragonboard-600c: Add on board leds
+ support
+In-Reply-To: <20160329145115.GO8929@tuxbot>
+References: <1458762366-9233-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1458762484-9768-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <20160327055012.GD8929@tuxbot> <56FA8F47.7070200@linaro.org>
+ <20160329145115.GO8929@tuxbot>
+Message-ID: <CAP71WjwPQn8OuCy+8iuQpDrUW2baQ0qzaviLEDixVzTmUP_BTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 29, 2016 at 02:22:29PM -0400, Patrick Doyle wrote:
-> Hmmm... inexplicably, compiling with frame pointers enabled doesn't
-> seem to be an option for me :-(
+On Tue, Mar 29, 2016 at 4:51 PM, Bjorn Andersson
+<bjorn.andersson@linaro.org> wrote:
+>> Am ok, to change, did you get activity leds works with any of these strings
+>> with WLAN or BT?
+>>
+>
+> I did test them; rx, assoc and radio seems to work. Tx does not tickle
+> the led, but should probably.
+>
+> I didn't find the spec for the baord, so I'm not sure what the LEDs
+> should indicate. But it feels like radio or assoc makes most sense, and
+> follows what we can do with the BT led.
 
-Right, because the Kconfig system is setup to use a frame pointer
-when the configuration options allow it, because not having it hurts
-the ability to get sensible debugging from kernel crashes.
+this is in the 96boards 'specs' at [1], which states
 
-> with no option to set CONFIG_FRAME_POINTER in between.  Could that be
-> because FRAME_POINTER looks like:
-> 
-> config FRAME_POINTER
->     bool
->     depends on !THUMB2_KERNEL
->     default y if !ARM_UNWIND || FUNCTION_GRAPH_TRACER
->     help
->       If you say N here, the resulting kernel will be slightly smaller and
->       faster. However, if neither FRAME_POINTER nor ARM_UNWIND are enabled,
->       when a problem occurs with the kernel, the information that is
->       reported is severely limited.
-> 
-> -- that is, not prompt for the "bool" option?  Is this an either/or
-> choice for ARM_UNWIND vs FRAME_POINTER?
+-
+The User LEDs shall be directly programmable from the SoC.
+1. WiFi activity LED
+2. Bluetooth activity LED
+-
 
-THUMB2_KERNEL is an option, which I believe you already have disabled.
-So, the offending option is probably ARM_UNWIND.  You are provided with
-the ARM_UNWIND option, and you need to say no to that.  Don't try to
-build a kenrel with frame pointers and unwinding together - it'll
-probably fail, or if you succeed in building it, it probably won't
-work correctly since that's a combination we don't support.
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+[1] http://www.96boards.org/ce-specification
