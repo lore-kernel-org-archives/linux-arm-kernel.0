@@ -1,35 +1,93 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Mar 2016 10:05:58 +0200
-Subject: [PATCH] arm: remove tautologic #ifdefs in proc-v7-3level.S
-In-Reply-To: <1459237071-13842-1-git-send-email-jonas.rabenstein@studium.uni-erlangen.de>
-References: <1459237071-13842-1-git-send-email-jonas.rabenstein@studium.uni-erlangen.de>
-Message-ID: <3570872.7QPkonuD2y@wuerfel>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Tue, 29 Mar 2016 10:07:07 +0200
+Subject: [PATCH 3/5] drm: Add an encoder and connector type enum for DPI.
+In-Reply-To: <1458865431-30048-4-git-send-email-eric@anholt.net>
+References: <1458865431-30048-1-git-send-email-eric@anholt.net>
+ <1458865431-30048-4-git-send-email-eric@anholt.net>
+Message-ID: <20160329080707.GJ2510@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 March 2016 09:37:51 Jonas Rabenstein wrote:
-> The file arch/arm/mm/proc-v7-3level.S is only used by the #include
-> directive in arch/arm/mm/proc-v7.S:23. This #include is conditional and
-> depends on  CONFIG_ARM_LPAE (otherwise proc-v7-2level.S is used).
-> CONFIG_ARM_LPAE has a dependency on CONFIG_MMU defined in Kconfig.
-> Consequently, checks for CONFIG_MMU in proc-v7-3level.S are superfluous.
+On Thu, Mar 24, 2016 at 05:23:49PM -0700, Eric Anholt wrote:
+> Right now exynos is exposing DPI as a TMDS encoder and VGA connector,
+> which seems rather misleading.  This isn't just an internal detail,
+> since xrandr actually exposes "VGA" as the output name.  Define some
+> new enums so that vc4's DPI can have a more informative name.
 > 
-> Signed-off-by: Jonas Rabenstein <jonas.rabenstein@studium.uni-erlangen.de>
+> I considered other names for the connector as well.  For VC4, the
+> Adafruit DPI kippah takes the 28 GPIO pins and routes them to a
+> standard-ish 40-pin FPC connector, but "40-pin FPC" doesn't uniquely
+> identify an ordering of pins (apparently some other orderings exist),
+> doesn't explain things as well for the user (who, if anything, knows
+> their product is a DPI kippah/panel combo), and actually doesn't have
+> to exist (one could connect the 28 GPIOs directly to something else).
+> Simply "DPI" seems like a good compromise name to distinguish from the
+> HDMI, DSI, and TV connectors .
+> 
+> Signed-off-by: Eric Anholt <eric@anholt.net>
+
+Follow-up patch to fix up existing drivers? Either way
+
+Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch> + ack for merging
+through a vc4 pull request (Dave has recently okayed that I can do such
+acks for non-i915 trees).
+
+Cheers, Daniel
+
 > ---
->  I detected the issue with chimaera, a tool I currently develop for my bachelor
->  thesis extending the undertaker tool suite (https://undertaker.cs.fau.de).
+>  drivers/gpu/drm/drm_crtc.c  | 2 ++
+>  include/uapi/drm/drm_mode.h | 2 ++
+>  2 files changed, 4 insertions(+)
+> 
+> diff --git a/drivers/gpu/drm/drm_crtc.c b/drivers/gpu/drm/drm_crtc.c
+> index f619121..64bd954 100644
+> --- a/drivers/gpu/drm/drm_crtc.c
+> +++ b/drivers/gpu/drm/drm_crtc.c
+> @@ -168,6 +168,7 @@ static struct drm_conn_prop_enum_list drm_connector_enum_list[] = {
+>  	{ DRM_MODE_CONNECTOR_eDP, "eDP" },
+>  	{ DRM_MODE_CONNECTOR_VIRTUAL, "Virtual" },
+>  	{ DRM_MODE_CONNECTOR_DSI, "DSI" },
+> +	{ DRM_MODE_CONNECTOR_DPI, "DPI" },
+>  };
+>  
+>  static const struct drm_prop_enum_list drm_encoder_enum_list[] = {
+> @@ -179,6 +180,7 @@ static const struct drm_prop_enum_list drm_encoder_enum_list[] = {
+>  	{ DRM_MODE_ENCODER_VIRTUAL, "Virtual" },
+>  	{ DRM_MODE_ENCODER_DSI, "DSI" },
+>  	{ DRM_MODE_ENCODER_DPMST, "DP MST" },
+> +	{ DRM_MODE_ENCODER_DPI, "DPI" },
+>  };
+>  
+>  static const struct drm_prop_enum_list drm_subpixel_enum_list[] = {
+> diff --git a/include/uapi/drm/drm_mode.h b/include/uapi/drm/drm_mode.h
+> index 50adb46..1eb85f7 100644
+> --- a/include/uapi/drm/drm_mode.h
+> +++ b/include/uapi/drm/drm_mode.h
+> @@ -202,6 +202,7 @@ struct drm_mode_get_plane_res {
+>  #define DRM_MODE_ENCODER_VIRTUAL 5
+>  #define DRM_MODE_ENCODER_DSI	6
+>  #define DRM_MODE_ENCODER_DPMST	7
+> +#define DRM_MODE_ENCODER_DPI	8
+>  
+>  struct drm_mode_get_encoder {
+>  	__u32 encoder_id;
+> @@ -241,6 +242,7 @@ struct drm_mode_get_encoder {
+>  #define DRM_MODE_CONNECTOR_eDP		14
+>  #define DRM_MODE_CONNECTOR_VIRTUAL      15
+>  #define DRM_MODE_CONNECTOR_DSI		16
+> +#define DRM_MODE_CONNECTOR_DPI		17
+>  
+>  struct drm_mode_get_connector {
+>  
+> -- 
+> 2.7.0
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
-Nice catch!
-
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-
-I guess you should submit the same thing for the other file as well,
-either in the same patch or as a series.
-
-You can also add
-
-Fixes: 8d2cd3a38fd6 ("ARM: LPAE: Factor out classic-MMU specific code into proc-v7-2level.S")
-
-to mark the commit that led to the situation.
-
-	Arnd
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
