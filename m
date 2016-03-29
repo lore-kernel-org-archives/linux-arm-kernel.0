@@ -1,135 +1,65 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Mar 2016 14:39:10 +0200
-Subject: [PATCH v2] spi: orion.c: Add direct access mode
-In-Reply-To: <20160325223922.GG5028@sirena.org.uk>
-References: <1458663893-13766-1-git-send-email-sr@denx.de>
- <10747635.WkGeFaKqdy@wuerfel> <20160325223922.GG5028@sirena.org.uk>
-Message-ID: <29105031.S6XB0bXn2i@wuerfel>
+Date: Tue, 29 Mar 2016 14:42:08 +0200
+Subject: [RFC5 PATCH v6 00/21] ILP32 for ARM64
+In-Reply-To: <20160329120147.GA3551@yury-N73SV>
+References: <1452792198-10718-1-git-send-email-ynorov@caviumnetworks.com>
+ <4405408.txAtlZbTDH@wuerfel> <20160329120147.GA3551@yury-N73SV>
+Message-ID: <4942019.FGzfTdnOaZ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 25 March 2016 22:39:22 Mark Brown wrote:
-> On Fri, Mar 25, 2016 at 09:58:40PM +0100, Arnd Bergmann wrote:
-> > On Friday 25 March 2016 15:50:32 Mark Brown wrote:
+On Tuesday 29 March 2016 15:01:47 Yury Norov wrote:
+> On Tue, Mar 29, 2016 at 12:58:25PM +0200, Arnd Bergmann wrote:
+> > On Saturday 26 March 2016 20:36:43 Zhangjian wrote:
+> > > 
+> > > I am a little bit confuse about off_t. In "[PATCH 08/33] 32-bit
+> > > ABI: introduce ARCH_32BIT_OFF_T config option", it mentioned that all
+> > > the new 32bit architecture should use 64bit off_t.
+> > 
+> > Ah, so it is part of the series. I had not checked that here.
+> > 
 > 
-> > > Why are we even doing that though?  Like I say it just seems pointlessly
-> > > unhelpful for users.  Are we really saying that every single system has
-> > > to go through and manually modify their DT so that they can use this
-> > > entirely in SoC feature?  That doesn't seem like winning...
+> I'm preparing new submission now. I can join off_t, s390 and ilp32
+> patchsets. It seems, they will not be grabbed separately anyway, so
+> this may decrease confusions like this.
 > 
-> > I don't remember the exact details, but I think we had come up with
-> > a generic constraint solving algorithm to pick appropriate windows for
-> > each device with a (close to) minimal use of physical address space,
+> Arnd?
+
+Yes, that sounds good.
+
+> > > Should we define off_t in aarch64(for both ilp32 and lp64) in
+> > > typesize.h as following?
+> > > 
+> > > diff --git a/sysdeps/unix/sysv/linux/aarch64/bits/typesizes.h b/sysdeps/unix/sysv/linux/aarch64/bits/typesizes.h
+> > > index 7073493..13b77c5 100644
+> > > --- a/sysdeps/unix/sysv/linux/aarch64/bits/typesizes.h
+> > > +++ b/sysdeps/unix/sysv/linux/aarch64/bits/typesizes.h
+> > > @@ -33,7 +33,7 @@
+> > >   #define __INO64_T_TYPE         __UQUAD_TYPE
+> > >   #define __MODE_T_TYPE          __U32_TYPE
+> > >   #define __NLINK_T_TYPE         __U32_TYPE
+> > > -#define __OFF_T_TYPE           __SLONGWORD_TYPE
+> > > +#define __OFF_T_TYPE           __SQUAD_TYPE
+> > >   #define __OFF64_T_TYPE         __SQUAD_TYPE
+> > >   #define __PID_T_TYPE           __S32_TYPE
+> > >   #define __RLIM_T_TYPE          __ULONGWORD_TYPE
+> > > 
+> > > Then we could remove the __USE_FILE_OFFSET64 in stat.h and fcnt.h in
+> > > aarch64. And truncate and ftruncate is same as truncate64 and
+> > > ftruncate64.
+> > 
+> > I don't know what the glibc developers prefer, but I think the
+> > result needs to be something like that: either __OFF_T_TYPE is
+> > defined as you write above as a 64-bit type, or the user-visible
+> > off_t typedef unconditionally uses __OFF64_T_TYPE rather than
+> > __OFF_T_TYPE.
+> > 
 > 
-> So there are some complicated constraints that make it hard to allocate
-> from the bus space?
+> I'm not the glibc developer as well, but I think it's OK.
 
-Yes, it's basically an optimization problem: the closer you can squeeze
-everything together, the more address space you have left for RAM and/or
-PCI.
-
->From the Armada XP data sheet, I can also see that it's possible to map
-multiple SPI slaves into the MMIO space using a single MBus window, which
-can be useful if  you have plenty of address space but a shortage of
-mbus window registers.
-
-> > > > way: if we just use the existing binding, the spi host driver can
-> > > > simply call devm_ioremap_resource() to see if there is a map
-> > > > for a given chipselect and otherwise fall back to the current
-> > > > mode.
-> 
-> > > Why does the binding have to be in the client device to do that?
-> 
-> > I don't understand the question. The client device here is the SPI
-> > controller, right? That doesn't need to have a special binding, it
-> > just needs to list the registers relative to the mbus address space
-> > like any other device, and that is independent of how we implement
-> > it.
-> 
-> If you're saying we're doing a binding per chip select presumably that
-> binding appears in the SPI device even if it's the controller driver
-> that parses it.  This was what the original patch did, I pushed back
-> since it's a fairly common pattern for poor quality bindings where
-> people for some reason want to add per device properties for whatever
-> new feature they want to support instead of doing it at the controller
-> level (and ideally just doing it without requring any configuration).
->
-> > It looks like Stefan's patch tricks here by creating an incompatible
-> > binding for mbus that bypasses the address mapping.
-> 
-> I've not looked at the patch and honestly nobody has been talking about
-> any generic binding, all I've seen is the per device property in the
-> original patch.
-
-I've looked up the original patch now, and I agree with your concern.
-It's not at all what I suggest here though. We should not need any
-properties in the spi slave node, and I think all added properties in
-the spi master node should be static, and not refer to the configuration
-at all.
-
-In the DT node for the spi master, we already have a register range
-for the SPI's control registers, and this is an address in the
-domain of the MBus controller, which we treat as a 64-bit flat address
-space in DT, specifically it is part of the 'internal-regs' bus that
-has a 20-bit section out of that 64-bit bus:
-
-        soc {
-                #address-cells = <2>;
-                #size-cells = <1>;
-                internal-regs {
-                        compatible = "simple-bus";
-                        #address-cells = <1>;
-                        #size-cells = <1>;
-                        ranges = <0 MBUS_ID(0xf0, 0x01) 0 0x100000>;
-
-                        spi0: spi at 10600 {
-				compatible = "marvell,armada-370-spi";
-                                reg = <0x10600 0x28>;
-                                #address-cells = <1>;
-                                #size-cells = <0>;
-                        };
-		};
-	};
-
-What we really have though is additional registers that belong to
-the SPI controller and that are not part of internal-regs, so
-we need to move it up one level out of the internal-regs node in order
-to add more registers:
-
-        soc {
-                #address-cells = <2>;
-                #size-cells = <1>;
-               spi0: spi at 10600 {
-			compatible = "marvell,armada-370-spi";
-                       reg = <MBUS_ID(0xf0, 0x01) 0x10600 0x28>, /* control */
-			       <MBUS_ID(0x01, 0x1e) 0 0x100000>; /* CS0 */
-			       <MBUS_ID(0x01, 0x5e) 0 0x100000>; /* CS1 */
-			       <MBUS_ID(0x01, 0x9e) 0 0x100000>; /* CS2 */
-			       <MBUS_ID(0x01, 0xee) 0 0x100000>; /* CS3 */
-			       <MBUS_ID(0x01, 0x1f) 0 0x100000>; /* CS4 */
-			       <MBUS_ID(0x01, 0x5f) 0 0x100000>; /* CS5 */
-			       <MBUS_ID(0x01, 0x9f) 0 0x100000>; /* CS6 */
-			       <MBUS_ID(0x01, 0xef) 0 0x100000>; /* CS7 */
-                       #address-cells = <1>;
-                       #size-cells = <0>;
-		};
-	};
-
-This lists all the addresses as seen from the MBus, but doesn't put them
-into the CPU address space, which is then done by adding an entry in the
-'ranges' property of the soc node:
-
-	soc {
-		ranges = <MBUS_ID(0x01, 0x1e) 0  0xe0000000  0x20000>; /* SPI 0 CS0 128kb */
-		...
-	};
-
-I think it makes a lot of sense to define a separate window for each CS
-at boot time, just so you don't have to reprogram the windows manually.
-After all, the entire point of the direct mode is to avoid having to
-do any of the setup work, and have the SPI master set the right CS
-itself based on the MBus ID that is used for accessing the slave mmio
-window. This is also required if we want to enable things like
-XIP (DaX) mappings for file systems on a SPI-NOR flash.
+Which of the two? I guess with the example that Bamvor gave
+regarding struct stat, the latter is what we want, forcing the
+use of __USE_FILE_OFFSET64 rather than changing the definition of
+__OFF_T_TYPE.
 
 	Arnd
