@@ -1,56 +1,106 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 28 Mar 2016 19:00:01 -0700
-Subject: [PATCH v2 7/8] ARM: dts: vf610: add display nodes
+Date: Mon, 28 Mar 2016 19:00:02 -0700
+Subject: [PATCH v2 8/8] ARM: dts: vf610-colibri: enable display controller
 In-Reply-To: <1459216802-32094-1-git-send-email-stefan@agner.ch>
 References: <1459216802-32094-1-git-send-email-stefan@agner.ch>
-Message-ID: <1459216802-32094-8-git-send-email-stefan@agner.ch>
+Message-ID: <1459216802-32094-9-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the dcu and tcon nodes to enable the Display Controller Unit
-and Timing Controller in Vybrid's SoC level device-tree file.
+Enable dcu node which is used by the DCU DRM driver. Assign the 5.7"
+EDT panel with VGA resolution which Toradex sells often with the
+evaluation board.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/boot/dts/vfxxx.dtsi | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ arch/arm/boot/dts/vf-colibri-eval-v3.dtsi | 16 +++++++++++++++
+ arch/arm/boot/dts/vf-colibri.dtsi         | 33 +++++++++++++++++++++++++++++++
+ 2 files changed, 49 insertions(+)
 
-diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
-index a9ceb5b..78e24c6 100644
---- a/arch/arm/boot/dts/vfxxx.dtsi
-+++ b/arch/arm/boot/dts/vfxxx.dtsi
-@@ -234,6 +234,14 @@
- 							<20000000>;
- 			};
+diff --git a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
+index ed65e0f..f5d4c78 100644
+--- a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
++++ b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
+@@ -18,6 +18,11 @@
+ 		clock-frequency = <16000000>;
+ 	};
  
-+			tcon0: timing-controller at 4003d000 {
-+				compatible = "fsl,vf610-tcon";
-+				reg = <0x4003d000 0x1000>;
-+				clocks = <&clks VF610_CLK_TCON0>;
-+				clock-names = "ipg";
-+				status = "disabled";
-+			};
++	panel: panel {
++		compatible = "edt,et057090dhu";
++		backlight = <&bl>;
++	};
 +
- 			wdoga5: wdog at 4003e000 {
- 				compatible = "fsl,vf610-wdt", "fsl,imx21-wdt";
- 				reg = <0x4003e000 0x1000>;
-@@ -339,6 +347,17 @@
- 				status = "disabled";
- 			};
+ 	regulators {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+@@ -53,6 +58,13 @@
+ 	status  = "okay";
+ };
  
-+			dcu0: dcu at 40058000 {
-+				compatible = "fsl,vf610-dcu";
-+				reg = <0x40058000 0x1200>;
-+				interrupts = <30 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks VF610_CLK_DCU0>,
-+					<&clks VF610_CLK_DCU0_DIV>;
-+				clock-names = "dcu", "pix";
-+				fsl,tcon = <&tcon0>;
-+				status = "disabled";
-+			};
++&dcu0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_dcu0_1>;
++	fsl,panel = <&panel>;
++	status = "okay";
++};
 +
- 			i2c0: i2c at 40066000 {
- 				#address-cells = <1>;
- 				#size-cells = <0>;
+ &dspi1 {
+ 	status = "okay";
+ 
+@@ -100,6 +112,10 @@
+ 	status = "okay";
+ };
+ 
++&tcon0 {
++	status = "okay";
++};
++
+ &uart0 {
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/vf-colibri.dtsi b/arch/arm/boot/dts/vf-colibri.dtsi
+index 6e556be..5f1847b 100644
+--- a/arch/arm/boot/dts/vf-colibri.dtsi
++++ b/arch/arm/boot/dts/vf-colibri.dtsi
+@@ -159,6 +159,39 @@
+ 			>;
+ 		};
+ 
++		pinctrl_dcu0_1: dcu0grp_1 {
++			fsl,pins = <
++				VF610_PAD_PTE0__DCU0_HSYNC	0x1902
++				VF610_PAD_PTE1__DCU0_VSYNC	0x1902
++				VF610_PAD_PTE2__DCU0_PCLK	0x1902
++				VF610_PAD_PTE4__DCU0_DE		0x1902
++				VF610_PAD_PTE5__DCU0_R0		0x1902
++				VF610_PAD_PTE6__DCU0_R1		0x1902
++				VF610_PAD_PTE7__DCU0_R2		0x1902
++				VF610_PAD_PTE8__DCU0_R3		0x1902
++				VF610_PAD_PTE9__DCU0_R4		0x1902
++				VF610_PAD_PTE10__DCU0_R5	0x1902
++				VF610_PAD_PTE11__DCU0_R6	0x1902
++				VF610_PAD_PTE12__DCU0_R7	0x1902
++				VF610_PAD_PTE13__DCU0_G0	0x1902
++				VF610_PAD_PTE14__DCU0_G1	0x1902
++				VF610_PAD_PTE15__DCU0_G2	0x1902
++				VF610_PAD_PTE16__DCU0_G3	0x1902
++				VF610_PAD_PTE17__DCU0_G4	0x1902
++				VF610_PAD_PTE18__DCU0_G5	0x1902
++				VF610_PAD_PTE19__DCU0_G6	0x1902
++				VF610_PAD_PTE20__DCU0_G7	0x1902
++				VF610_PAD_PTE21__DCU0_B0	0x1902
++				VF610_PAD_PTE22__DCU0_B1	0x1902
++				VF610_PAD_PTE23__DCU0_B2	0x1902
++				VF610_PAD_PTE24__DCU0_B3	0x1902
++				VF610_PAD_PTE25__DCU0_B4	0x1902
++				VF610_PAD_PTE26__DCU0_B5	0x1902
++				VF610_PAD_PTE27__DCU0_B6	0x1902
++				VF610_PAD_PTE28__DCU0_B7	0x1902
++			>;
++		};
++
+ 		pinctrl_dspi1: dspi1grp {
+ 			fsl,pins = <
+ 				VF610_PAD_PTD5__DSPI1_CS0		0x33e2
 -- 
 2.7.4
