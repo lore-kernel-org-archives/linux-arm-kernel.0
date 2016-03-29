@@ -1,142 +1,100 @@
-From: bamvor.zhangjian@huawei.com (Zhangjian (Bamvor))
-Date: Tue, 29 Mar 2016 21:21:49 +0800
-Subject: [RFC5 PATCH v6 00/21] ILP32 for ARM64
-In-Reply-To: <20160329120147.GA3551@yury-N73SV>
-References: <1452792198-10718-1-git-send-email-ynorov@caviumnetworks.com>
- <6653982.FK62mVSCZO@wuerfel> <56F6825B.7000906@huawei.com>
- <4405408.txAtlZbTDH@wuerfel> <20160329120147.GA3551@yury-N73SV>
-Message-ID: <56FA816D.60101@huawei.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Tue, 29 Mar 2016 15:26:47 +0200
+Subject: [PATCH] arm: at91: do not disable/enable clocks in a row
+Message-ID: <1459258007-24968-1-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Yury
+Currently the driver will disable the clock and enable it one line later
+if it is switching from periodic mode into one shot.
+This can be avoided and causes a needless warning on -RT.
 
-On 2016/3/29 20:01, Yury Norov wrote:
-> On Tue, Mar 29, 2016 at 12:58:25PM +0200, Arnd Bergmann wrote:
->> On Saturday 26 March 2016 20:36:43 Zhangjian wrote:
->>> Hi, Arnd
->>>
->>> On 2016/3/21 17:43, Arnd Bergmann wrote:
->>>> On Monday 21 March 2016 10:07:49 Andreas Schwab wrote:
->>>>> This patch may fix a few LTP tests.
->>>>>
->>>>
->>>> Thanks for analyzing.
->>>>
->>>>> diff --git a/sysdeps/unix/sysv/linux/aarch64/bits/fcntl.h b/sysdeps/unix/sysv/linux/aarch64/bits/fcntl.h
->>>>> index 3631903..d1010db 100644
->>>>> --- a/sysdeps/unix/sysv/linux/aarch64/bits/fcntl.h
->>>>> +++ b/sysdeps/unix/sysv/linux/aarch64/bits/fcntl.h
->>>>> @@ -25,18 +25,29 @@
->>>>>    #define __O_NOFOLLOW	0100000
->>>>>    #define __O_DIRECT	0200000
->>>>>
->>>>> -#define __O_LARGEFILE	0
->>>>> +#ifdef __ILP32__
->>>>> +# define __O_LARGEFILE	0400000
->>>>> +#else
->>>>> +# define __O_LARGEFILE	0
->>>>> +#endif
->>>>>
->>>>
->>>> I guess this means I screwed up when I said I'd merged the kernel patch
->>>> that Yury did to fix it, sorry about that.
->>>>
->>>> We need the patch to make all new architecture in the kernel default to
->>>> O_LARGEFILE, and not do this in user space. I'd suggest now to keep the
->>>> patches as part of the ILP32 series after all, to make sure they are
->>>> merged at the point when they are needed.
->>>
->>> I am a little bit confuse about off_t. In "[PATCH 08/33] 32-bit
->>> ABI: introduce ARCH_32BIT_OFF_T config option", it mentioned that all
->>> the new 32bit architecture should use 64bit off_t.
->>
->> Ah, so it is part of the series. I had not checked that here.
->>
->
-> I'm preparing new submission now.
-Cool:)
- > I can join off_t, s390 and ilp32
-> patchsets. It seems, they will not be grabbed separately anyway, so
-> this may decrease confusions like this.
->
-> Arnd?
-I am curious which one is more easily to get ack:p
->
->>> Should we define off_t in aarch64(for both ilp32 and lp64) in
->>> typesize.h as following?
->>>
->>> diff --git a/sysdeps/unix/sysv/linux/aarch64/bits/typesizes.h b/sysdeps/unix/sysv/linux/aarch64/bits/typesizes.h
->>> index 7073493..13b77c5 100644
->>> --- a/sysdeps/unix/sysv/linux/aarch64/bits/typesizes.h
->>> +++ b/sysdeps/unix/sysv/linux/aarch64/bits/typesizes.h
->>> @@ -33,7 +33,7 @@
->>>    #define __INO64_T_TYPE         __UQUAD_TYPE
->>>    #define __MODE_T_TYPE          __U32_TYPE
->>>    #define __NLINK_T_TYPE         __U32_TYPE
->>> -#define __OFF_T_TYPE           __SLONGWORD_TYPE
->>> +#define __OFF_T_TYPE           __SQUAD_TYPE
->>>    #define __OFF64_T_TYPE         __SQUAD_TYPE
->>>    #define __PID_T_TYPE           __S32_TYPE
->>>    #define __RLIM_T_TYPE          __ULONGWORD_TYPE
->>>
->>> Then we could remove the __USE_FILE_OFFSET64 in stat.h and fcnt.h in
->>> aarch64. And truncate and ftruncate is same as truncate64 and
->>> ftruncate64.
->>
->> I don't know what the glibc developers prefer, but I think the
->> result needs to be something like that: either __OFF_T_TYPE is
->> defined as you write above as a 64-bit type, or the user-visible
->> off_t typedef unconditionally uses __OFF64_T_TYPE rather than
->> __OFF_T_TYPE.
->>
->
-> I'm not the glibc developer as well, but I think it's OK.
-IIUC, it is usually what glibc does.
-If we want to define off_t to 64bit in ilp32, the follow syscall may
-need to define as non-compat too:
-sys_fadvise64
-sys_sendfile
-sys_sendfile64
-sys_lseek
-sys_splice
-sys_sync_file_range2
-sys_truncate
-sys_ftruncate
+Tested-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ drivers/clocksource/tcb_clksrc.c | 33 +++++++++++++++++++++++++++++----
+ 1 file changed, 29 insertions(+), 4 deletions(-)
 
-Regards
-
-Bamvor
-
->
->>> Otherwise we need to handle the pad like yury do it in
->>> stat.h, and we need to handle the bigendian as well:
->>
->> I see.
->>
->>> @@ -35,12 +35,21 @@ struct stat
->>>      {
->>>        __dev_t st_dev;			/* Device.  */
->>>    #ifdef __ILP32__
->>> +
->>> +#if !defined(__AARCH64EB__)
->>>        unsigned int __st_ino_pad;
->>> +#endif
->>> +
->>>    # ifndef __USE_FILE_OFFSET64
->>>        __ino_t st_ino;			/* File serial number.	*/
->>>    # else
->>>        __ino_t __st_ino;			/* 32bit file serial number.	*/
->>>    # endif
->>> +
->>> +#if defined(__AARCH64EB__)
->>> +    unsigned int __st_ino_pad;
->>> +#endif
->>> +
->>>    #else
->>
->> This would indeed be silly, we really don't want anyone
->> to access the old __st_ino field or the 32-bit version of
->> the offset here.
->>
->> 	Arnd
+diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
+index 4da2af9694a2..ed1ae4445e8d 100644
+--- a/drivers/clocksource/tcb_clksrc.c
++++ b/drivers/clocksource/tcb_clksrc.c
+@@ -74,6 +74,7 @@ static struct clocksource clksrc = {
+ struct tc_clkevt_device {
+ 	struct clock_event_device	clkevt;
+ 	struct clk			*clk;
++	bool				clk_enabled;
+ 	void __iomem			*regs;
+ };
+ 
+@@ -91,6 +92,24 @@ static struct tc_clkevt_device *to_tc_clkevt(struct clock_event_device *clkevt)
+  */
+ static u32 timer_clock;
+ 
++static void tc_clk_disable(struct clock_event_device *d)
++{
++	struct tc_clkevt_device *tcd = to_tc_clkevt(d);
++
++	clk_disable(tcd->clk);
++	tcd->clk_enabled = false;
++}
++
++static void tc_clk_enable(struct clock_event_device *d)
++{
++	struct tc_clkevt_device *tcd = to_tc_clkevt(d);
++
++	if (tcd->clk_enabled)
++		return;
++	clk_enable(tcd->clk);
++	tcd->clk_enabled = true;
++}
++
+ static int tc_shutdown(struct clock_event_device *d)
+ {
+ 	struct tc_clkevt_device *tcd = to_tc_clkevt(d);
+@@ -98,8 +117,14 @@ static int tc_shutdown(struct clock_event_device *d)
+ 
+ 	__raw_writel(0xff, regs + ATMEL_TC_REG(2, IDR));
+ 	__raw_writel(ATMEL_TC_CLKDIS, regs + ATMEL_TC_REG(2, CCR));
++	return 0;
++}
++
++static int tc_shutdown_clk_off(struct clock_event_device *d)
++{
++	tc_shutdown(d);
+ 	if (!clockevent_state_detached(d))
+-		clk_disable(tcd->clk);
++		tc_clk_disable(d);
+ 
+ 	return 0;
+ }
+@@ -112,7 +137,7 @@ static int tc_set_oneshot(struct clock_event_device *d)
+ 	if (clockevent_state_oneshot(d) || clockevent_state_periodic(d))
+ 		tc_shutdown(d);
+ 
+-	clk_enable(tcd->clk);
++	tc_clk_enable(d);
+ 
+ 	/* slow clock, count up to RC, then irq and stop */
+ 	__raw_writel(timer_clock | ATMEL_TC_CPCSTOP | ATMEL_TC_WAVE |
+@@ -134,7 +159,7 @@ static int tc_set_periodic(struct clock_event_device *d)
+ 	/* By not making the gentime core emulate periodic mode on top
+ 	 * of oneshot, we get lower overhead and improved accuracy.
+ 	 */
+-	clk_enable(tcd->clk);
++	tc_clk_enable(d);
+ 
+ 	/* slow clock, count up to RC, then irq and restart */
+ 	__raw_writel(timer_clock | ATMEL_TC_WAVE | ATMEL_TC_WAVESEL_UP_AUTO,
+@@ -168,7 +193,7 @@ static struct tc_clkevt_device clkevt = {
+ 		/* Should be lower than at91rm9200's system timer */
+ 		.rating			= 125,
+ 		.set_next_event		= tc_next_event,
+-		.set_state_shutdown	= tc_shutdown,
++		.set_state_shutdown	= tc_shutdown_clk_off,
+ 		.set_state_periodic	= tc_set_periodic,
+ 		.set_state_oneshot	= tc_set_oneshot,
+ 	},
+-- 
+2.8.0.rc3
