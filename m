@@ -1,63 +1,115 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Tue, 29 Mar 2016 12:07:30 -0500
-Subject: [RFC PATCH 2/3] ata: ahci-platform: Add ports-implemented dt
- bindings.
-In-Reply-To: <56FA947A.5080806@linaro.org>
-References: <1459257075-21393-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1459257075-21393-3-git-send-email-srinivas.kandagatla@linaro.org>
- <CAL_JsqLhSz1qWj01mAAg4X89hb4LnYB-CjJ2d1JW=jJw66Oq=g@mail.gmail.com>
- <56FA947A.5080806@linaro.org>
-Message-ID: <CAL_JsqLR2GFuveVJj9u9RPAyHvgrF=TUPQXFVBH_BO3BXNx_vw@mail.gmail.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Tue, 29 Mar 2016 19:07:34 +0200
+Subject: [RFC v5 06/17] dma-reserved-iommu: iommu_get/put_single_reserved
+In-Reply-To: <20160310115253.GA14609@e106794-lin.cambridge.arm.com>
+References: <1456856877-4817-1-git-send-email-eric.auger@linaro.org>
+ <1456856877-4817-7-git-send-email-eric.auger@linaro.org>
+ <20160310115253.GA14609@e106794-lin.cambridge.arm.com>
+Message-ID: <56FAB656.7030400@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 29, 2016 at 9:43 AM, Srinivas Kandagatla
-<srinivas.kandagatla@linaro.org> wrote:
->
->
-> On 29/03/16 15:11, Rob Herring wrote:
->>
->> On Tue, Mar 29, 2016 at 8:11 AM, Srinivas Kandagatla
->> <srinivas.kandagatla@linaro.org> wrote:
->>>
->>> On some SOCs PORTS_IMPL register value is never programmed by the BIOS
->>
->>
->> s/BIOS/firmware/
->
-> BIOS is the word used in the AHCI SPECS so want to stick to this.
+Hi Jean-Philippe,
+On 03/10/2016 12:52 PM, Jean-Philippe Brucker wrote:
+> Hi Eric,
+> 
+> On Tue, Mar 01, 2016 at 06:27:46PM +0000, Eric Auger wrote:
+>> [...]
+>> +
+>> +int iommu_get_single_reserved(struct iommu_domain *domain,
+>> +			      phys_addr_t addr, int prot,
+>> +			      dma_addr_t *iova)
+>> +{
+>> +	unsigned long order = __ffs(domain->ops->pgsize_bitmap);
+>> +	size_t page_size = 1 << order;
+>> +	phys_addr_t mask = page_size - 1;
+>> +	phys_addr_t aligned_addr = addr & ~mask;
+>> +	phys_addr_t offset  = addr - aligned_addr;
+>> +	struct iommu_reserved_binding *b;
+>> +	struct iova *p_iova;
+>> +	struct iova_domain *iovad =
+>> +		(struct iova_domain *)domain->reserved_iova_cookie;
+>> +	int ret;
+>> +
+>> +	if (!iovad)
+>> +		return -EINVAL;
+>> +
+>> +	mutex_lock(&domain->reserved_mutex);
+> 
+> I believe this function could get called from the chunk of __setup_irq
+> that is executed atomically:
+> 
+>     * request_threaded_irq
+>     * __setup_irq
+>     * irq_startup
+>     * irq_domain_activate_irq
+>     * msi_domain_activate
+>     * msi_compose
+>     * iommu_get_single_reserved
+> 
+> If this is the case, we should probably use a spinlock to protect the
+> iova_domain...
+Please apologize for the delay, I was in vacation.
+Thank you for spotting this flow. I will rework the locking.
+> 
+>> +
+>> +	b = find_reserved_binding(domain, aligned_addr, page_size);
+>> +	if (b) {
+>> +		*iova = b->iova + offset;
+>> +		kref_get(&b->kref);
+>> +		ret = 0;
+>> +		goto unlock;
+>> +	}
+>> +
+>> +	/* there is no existing reserved iova for this pa */
+>> +	p_iova = alloc_iova(iovad, 1, iovad->dma_32bit_pfn, true);
+>> +	if (!p_iova) {
+>> +		ret = -ENOMEM;
+>> +		goto unlock;
+>> +	}
+>> +	*iova = p_iova->pfn_lo << order;
+>> +
+>> +	b = kzalloc(sizeof(*b), GFP_KERNEL);
+> 
+> ... and GFP_ATOMIC here.
+OK
 
-The spec being Intel's also says it is a PCI device... BIOS is a type
-of firmware.
+Thank you for your time!
 
-[...]
+Best Regards
 
->>> +       sata0: sata at 29000000 { /* Qualcomm APQ8064 */
->>
->>
->> Do you really need another example just for this?
->>
->>> +               compatible = "generic-ahci";
->>
->>
->> Where's your chip specific compatible string? You would not require a
->> DT update to fix this if you had that.
->
->
-> Possibly, But we really are not doing anything specific in the ahci driver
-> which is not generic, that might be the reason why we skipped this in the
-> first place.
->
-> I agree we could solve this issue in more than one way, The only advantage
-> of this new bindings would be to other platforms benefiting from this
-> workaround would not have to keep adding a new compatible string into the
-> ahci-platform driver.
->
-> Like Annapurna Alpine platform seems to have the same issue.
->
-> Am ok to do it either way.
-
-I'm saying do both. Adding ports-implemented is fine, but add an SoC
-compatible string (in the dts, not the driver).
-
-Rob
+Eric
+> 
+> Thanks,
+> Jean-Philippe
+> 
+>> +	if (!b) {
+>> +		ret = -ENOMEM;
+>> +		goto free_iova_unlock;
+>> +	}
+>> +
+>> +	ret = iommu_map(domain, *iova, aligned_addr, page_size, prot);
+>> +	if (ret)
+>> +		goto free_binding_iova_unlock;
+>> +
+>> +	kref_init(&b->kref);
+>> +	kref_get(&b->kref);
+>> +	b->domain = domain;
+>> +	b->addr = aligned_addr;
+>> +	b->iova = *iova;
+>> +	b->size = page_size;
+>> +
+>> +	link_reserved_binding(domain, b);
+>> +
+>> +	*iova += offset;
+>> +	goto unlock;
+>> +
+>> +free_binding_iova_unlock:
+>> +	kfree(b);
+>> +free_iova_unlock:
+>> +	free_iova(iovad, *iova >> order);
+>> +unlock:
+>> +	mutex_unlock(&domain->reserved_mutex);
+>> +	return ret;
+>> +}
+>> +EXPORT_SYMBOL_GPL(iommu_get_single_reserved);
