@@ -1,117 +1,89 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Tue, 29 Mar 2016 10:31:41 -0700
-Subject: [PATCH] i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity
-In-Reply-To: <56FAB0DB.3070303@tekno-soft.it>
-References: <m3h9fuk7ik.fsf@t19.piap.pl> <23031613.R8qN30TbTq@wuerfel>
- <CAJ+vNU2BKLDREOWP8EWXZR43to10yw+qvKwv1MzS4a_L9n5ozg@mail.gmail.com>
- <5741237.2X2Q0sCFQj@wuerfel>
- <CAJ+vNU3kBk+J-hU1OWPOS6kbFq+J0zM9QpfVy4x1VXL3hgrMTg@mail.gmail.com>
- <56FAA9C1.5060107@tekno-soft.it>
- <CAJ+vNU0bQVd0qyLg+09CUHx4WsrEqwZ4hLVuuvazR8DWpiHE_g@mail.gmail.com>
- <56FAB0DB.3070303@tekno-soft.it>
-Message-ID: <CAJ+vNU3yh8ivb+axTwXawSbtCTa+kHUsJY=EGoziT8WSEW1CHQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 29 Mar 2016 18:32:15 +0100
+Subject: [PATCH v4 1/9] clocksource: arm_arch_timer: Gather KVM specific
+ information in a structure
+In-Reply-To: <56FAB7D2.1000508@linaro.org>
+References: <1458842023-31853-1-git-send-email-julien.grall@arm.com>
+ <1458842023-31853-2-git-send-email-julien.grall@arm.com>
+ <56FAB7D2.1000508@linaro.org>
+Message-ID: <56FABC1F.2040500@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 29, 2016 at 9:44 AM, Roberto Fichera <kernel@tekno-soft.it> wrote:
-> On 03/29/2016 06:40 PM, Tim Harvey wrote:
->> On Tue, Mar 29, 2016 at 9:13 AM, Roberto Fichera <kernel@tekno-soft.it> wrote:
->>> On 03/29/2016 05:10 PM, Tim Harvey wrote:
->>>> Arnd,
->>>>
->>>> Right, on the IMX the MSI interrupt is GIC-120 which is also the
->>>> legacy INTD and I do see that if I happen to put a radio in a slot
->>>> where due to swizzling its pin1 becomes INTD (GIC-120) the interrupt
->>>> does fire and the device works. Any other slot using GIC-123 (INTA),
->>>> GIC-122 (INTB), or GIC-121 (INTC) never fires so its very possible
->>>> that something in the designware core is masking out the legacy irqs.
->>>> I would also think this was something IMX specific, but I really don't
->>>> see any codepaths in pci-imx6.c that would cause that: a driver
->>>> requesting a legacy PCI would get a GIC interrupt which is handled by
->>>> the IMX6 gpc interrupt controller.
->>>>
->>>> Any dra7xxx, exynos, spear13xx, keystone, layerscape, hisi, qcom SoC
->>>> users of designware PCIe core out there that can verify PCI MSI and
->>>> legacy are both working at the same time?
->>>>
->>>> Lucas is the expert here and I believe he has the documentation for
->>>> the designware core that Freescale doens't provide with the IMX6
->>>> documentation so hopefully he can provide some insight. He's the one
->>>> that has authored all the MSI support and has been using it.
->>>>
->>>> I typically advise our users to 'not' enable MSI because
->>>> architecturally you can spread 4 distinct legacy irq's across CPU's
->>>> better than a single shared irq.
->>> Don't know if I'm facing similar problem, however devices connected in miniPCI slot behind
->>> a PCIe-to-PCI bridge (MSI is disabled) using INTA all is working ok, including shared IRQ.
->>> In case of INTB will not work, and the GIC irq quite often get stuck.
->>>
->> Roberto,
+Daniel,
+
+On 29/03/16 18:13, Daniel Lezcano wrote:
+> On 03/24/2016 06:53 PM, Julien Grall wrote:
+>> Introduce a structure which are filled up by the arch timer driver and
+>> used by the virtual timer in KVM.
 >>
->> What board/platform is this and what does /proc/interrupts look like?
->
-> It's a custom board
->
-> root at voneus-janas-imx6q:~# cat /proc/interrupts
->            CPU0       CPU1       CPU2       CPU3
->  16:        936        637       2057        938       GIC  29 Edge      twd
->  17:          0          0          0          0       GPC  55 Level     i.MX Timer Tick
->  22:        247          0          0          0       GPC  26 Level     2020000.serial
->  34:          0          0          0          0  gpio-mxc   6 Edge      Factory Reset Button
-> 267:          0          0          0          0       GPC  49 Level     imx_thermal
-> 272:          0          0          0          0       GPC  19 Level     rtc alarm
-> 278:          0          0          0          0       GPC   2 Level     sdma
-> 281:        361          0          0          0       GIC 150 Level     2188000.ethernet
-> 282:          0          0          0          0       GIC 151 Level     2188000.ethernet
-> 283:       2882          0          0          0       GPC  25 Level     mmc0
-> 284:         95          0          0          0       GPC  37 Level     21a4000.i2c
-> 290:      36546          0          0          0       GPC 123 Level     PCIe PME, b4xxp
-> 291:          2          0          0          0       GIC 137 Level     2101000.jr0
-> 292:          0          0          0          0       GIC 138 Level     2102000.jr1
-> IPI0:          0          0          0          0  CPU wakeup interrupts
-> IPI1:          0          0          0          0  Timer broadcast interrupts
-> IPI2:       1642       1038       1626       1781  Rescheduling interrupts
-> IPI3:         95         95        122        119  Function call interrupts
-> IPI4:          3          0          2          0  Single function call interrupts
-> IPI5:          0          0          0          0  CPU stop interrupts
-> IPI6:          0          0          0          0  IRQ work interrupts
-> IPI7:          0          0          0          0  completion interrupts
-> Err:          0
->
->
+>> The first member of this structure will be the timecounter. More members
+>> will be added later.
 >>
->> This sounds like what would happen if the downstream interrupts on the
->> PCIe-to-PCI bridge are not mapped properly as was the case with a
->> board I support (in which case I had to work out a bootloader fixup
->> that placed a non-standard interrupt-map in the device-tree for the
->> bridge). What bridge are you using?
->
-> PCIe-to-PCI bridge is a Ti XIO2001 where we are using INTA/B only wired 1:1
->
+>> A stub for the new helper isn't introduced because KVM requires the arch
+>> timer for both ARM64 and ARM32.
+>>
+>> The function arch_timer_get_timecounter is kept for the time being and
+>> will be dropped in a subsequent patch.
+>>
+>> Signed-off-by: Julien Grall <julien.grall@arm.com>
+> 
+>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>>
+>>      Changes in v3:
+>>          - Rename the patch
+>>          - Move the KVM changes and removal of arch_timer_get_timecounter
+>>          in separate patches.
+>> ---
+>>   drivers/clocksource/arm_arch_timer.c | 12 +++++++++---
+>>   include/clocksource/arm_arch_timer.h |  5 +++++
+>>   2 files changed, 14 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+>> index 5152b38..62bdfe7 100644
+>> --- a/drivers/clocksource/arm_arch_timer.c
+>> +++ b/drivers/clocksource/arm_arch_timer.c
+>> @@ -468,11 +468,16 @@ static struct cyclecounter cyclecounter = {
+>>   	.mask	= CLOCKSOURCE_MASK(56),
+>>   };
+>>
+>> -static struct timecounter timecounter;
+>> +static struct arch_timer_kvm_info arch_timer_kvm_info;
+> 
+> This structure is statically defined in this subsystem but not used in 
+> this file and a couple of a accessors is added to let another subsystem 
+> to access it.
+> 
+> That sounds there is something wrong here with the design of the current 
+> code, virt/phys are mixed.
+> 
+> It isn't possible to split the virt/phys timer code respectively in 
+> virt/kvm/arm/arch_timer.c and drivers/clocksource/arm_arch_timer.c ?
 
-Roberto,
+No, that'd be the wrong thing to do. The kernel uses *either* the virt
+or phys timer depending on how it has been booted, and both counters are
+in use.
 
-That's right, we've talked about your bridge on IMX community.
+What KVM (or any other hypervisor) needs from the timer subsystem is:
+- an interrupt (so that it can force a guest exit when the timer fires),
+- a way to convert the values programmed into the HW into a timer event
+(which is what the time counter structure is for).
 
-I don't see anything in your proc/interrupts other than GPC 123 - you
-probably only had one device populated when you did that. Put devices
-in all for slots then show me 'cat /proc/interrupts' as well as 'lspci
--vv' (so that I can see what interrupt was given to pin1 and what
-interrupt that maps to on the IMX6).
+That allows the hypervisor to *emulate* a timer for the guest, and
+that's what virt/kvm/arm/arch_timer.c is all about. We have a clear
+separation of what is driving the HW vs what is emulating it, and I'm
+quite eager to preserve that.
 
-Check your XIO2001 routing and insure the following for proper IRQ mapping:
-Slot12: IDSEL A28: socket INTA = XIO2001 INTA
-Slot13: IDSEL A29: socket INTA = XIO2001 INTB
-Slot14: IDSEL A30: socket INTA = XIO2001 INTC
-Slot15: IDSEL A31: socket INTA = XIO2001 INTD
+> At least, 'struct arch_timer_kvm_info' should belong to 
+> virt/kvm/arm/arch_timer.c.
 
-The relationship between slot number of IDSEL is based on the PCI
-specification. The XIO2001 int mapping to socket mapping is based on
-Table 2 in the XIO2001 implementation guide. In my case what the
-hardware designer flipped the IDSEL mappings above such that slot12's
-idsel was hooked to A31 (so it was really slot15) etc, which created a
-non-standard mapping that required what ended up being a very time
-consuming and difficult to figure out software fixup (to say the
-least).
+At the cost of mandating separate storage in the arm_arch_timer driver.
+I do not find that much nicer, but if you prefer that, fine by me.
 
-Tim
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
