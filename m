@@ -1,42 +1,41 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Mar 2016 21:30:29 +0200
-Subject: [RFC5 PATCH v6 00/21] ILP32 for ARM64
-In-Reply-To: <alpine.DEB.2.10.1603291551420.20115@digraph.polyomino.org.uk>
-References: <1452792198-10718-1-git-send-email-ynorov@caviumnetworks.com>
- <3298847.t7vI4YM3gJ@wuerfel>
- <alpine.DEB.2.10.1603291551420.20115@digraph.polyomino.org.uk>
-Message-ID: <3467083.D7LuvS9l35@wuerfel>
+Date: Tue, 29 Mar 2016 21:32:07 +0200
+Subject: [PATCH 2/3] swiotlb: prefix dma_to_phys and phys_to_dma functions
+In-Reply-To: <CACJDEmrzKOExg-Rchjy2hfVzkzbCZ=WNn4Bu3EVgim748VvRig@mail.gmail.com>
+References: <1458252137-24497-1-git-send-email-okaya@codeaurora.org>
+ <56EC1805.5060207@codeaurora.org>
+ <CACJDEmrzKOExg-Rchjy2hfVzkzbCZ=WNn4Bu3EVgim748VvRig@mail.gmail.com>
+Message-ID: <6420021.rzhE3kJKJP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 March 2016 15:54:52 Joseph Myers wrote:
-> On Tue, 29 Mar 2016, Arnd Bergmann wrote:
+On Monday 28 March 2016 14:29:29 Konrad Rzeszutek Wilk wrote:
+> > diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> > index ada00c3..8c0f66b 100644
+> > --- a/arch/arm64/mm/dma-mapping.c
+> > +++ b/arch/arm64/mm/dma-mapping.c
+> > @@ -29,6 +29,14 @@
+> >
+> >  #include <asm/cacheflush.h>
+> >
+> > +/*
+> > + * If you are building a system without IOMMU, then you are using SWIOTLB
+> > + * library. The ARM64 adaptation of this library does not support address
+> > + * translation and it assumes that physical address = dma address for such
+> > + * a use case. Please don't build a platform that violates this.
+> > + */
 > 
-> > In glibc, I think we need to define fewer entry points, not more.
-> > Instead of having both lseek and lseek64, only one of them should
-> > be provided, and that should always take a 64-bit offset, calling
-> > into the kernel with the _llseek syscall entry.
-> 
-> lseek64 is part of the public API, on all platforms.  It should be aliased 
-> to lseek where possible.
+> Why not just expand the ARM64 part to support address translation?
 
-Right, makes sense.
+Because so far all hardware we have is relatively sane. We only
+need to implement this if someone accidentally puts their DMA
+space at the wrong address.
 
-> Strictly, it would be possible to provide it in the API without it being 
-> part of the ABI, by arranging the headers so that calls to lseek64 result 
-> in objects with a reference to lseek (because it uses the off64_t typedef, 
-> it's not valid to declare it yourself rather than including a header that 
-> declares it).  I don't think it would be a good idea for a new 
-> sub-architecture port to try introducing such a difference from all other 
-> ports, however.
-
-How do we do it then? Should we just define __USE_FILE_OFFSET64
-unconditionally for all new 32-bit architectures and leave the
-code dealing with 32-bit off_t/ino_t in place but unreachable, to
-minimize the differences?
-
-Or should all the obsolete types be defined the same way as their
-replacements so we have 64-bit __OFF_T_TYPE/__INO_T_TYPE
-and use the same binary implementation regardless of FILE_OFFSET_BITS?
+There is at least one platform that could in theory use this because
+their RAM starts at an address that is outside of the reach of 32-bit
+devices, and a static IOMMU mapping (created by firmware) could be
+used to map the start of RAM into DMA address zero, to avoid having
+to use an IOMMU all the time, but it was considered not worth the
+effort to implement that.
 
 	Arnd
