@@ -1,29 +1,41 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 29 Mar 2016 12:46:29 -0700
-Subject: [PATCH resend v5 0/3] ASoC: cygnus: Add audio support for
- Broadcom Cygnus SoC
-In-Reply-To: <56FAD579.3060703@broadcom.com>
-References: <1459277192-10942-1-git-send-email-simran.rai@broadcom.com>
- <20160329190910.GF2350@sirena.org.uk>
- <56FAD579.3060703@broadcom.com>
-Message-ID: <20160329194629.GH2350@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 Mar 2016 21:49:09 +0200
+Subject: [PATCH v2] spi: orion.c: Add direct access mode
+In-Reply-To: <20160329164758.GQ2350@sirena.org.uk>
+References: <1458663893-13766-1-git-send-email-sr@denx.de>
+ <29105031.S6XB0bXn2i@wuerfel> <20160329164758.GQ2350@sirena.org.uk>
+Message-ID: <21028994.N5ajfyoUoV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 29, 2016 at 12:20:25PM -0700, Florian Fainelli wrote:
+On Tuesday 29 March 2016 09:47:58 Mark Brown wrote:
+> 
+> > I think it makes a lot of sense to define a separate window for each CS
+> > at boot time, just so you don't have to reprogram the windows manually.
+> > After all, the entire point of the direct mode is to avoid having to
+> > do any of the setup work, and have the SPI master set the right CS
+> > itself based on the MBus ID that is used for accessing the slave mmio
+> > window. This is also required if we want to enable things like
+> > XIP (DaX) mappings for file systems on a SPI-NOR flash.
+> 
+> Well, in the cases where we have one device on the bus then it's not a
+> big deal since we can check what the last thing we set was.  The direct
+> access stuff is going to have trouble if we have multiple devices on the
+> bus since we try to mix it with non-MMIO access we run the risk of
+> conflicting simultaneous use unless we continue to route everything
+> through the SPI subsystem (like we do with the current flash read
+> support).
+> 
+> It really only makes a difference if the reprogramming process happens a
+> lot and is expensive relative to the transfers and that doesn't seem
+> like something I'd expect.
 
-> Subject apart, and thanks for the education, is there something wrong
-> with this patch series?
+Maybe we can avoid that if we enforce at the driver level that we
+use the same mode for all slaves? The way I read the manual, I think
+that's how it is intended at least.
 
-I've not yet reviewed it, I was just doing first pass triage and was
-about to complain that my review comments had been ignored since it was
-flagged as a resend but there were issues with the last version.  It's
-fortunate that I actually went to look for that version to paste my
-comments back in...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160329/6c99b574/attachment.sig>
+Also, as mentioned we don't have any machine with more than one SPI
+slave so far, so we don't really need to overengineer it and can
+go for the simplest implementation in the SPI master driver.
+
+	Arnd
