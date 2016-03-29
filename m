@@ -1,75 +1,30 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 29 Mar 2016 16:02:43 +0100
-Subject: [PATCH 00/12] ARM: dts: Add dragonboard-600c support.
-In-Reply-To: <20160329145448.GP8929@tuxbot>
-References: <1458762366-9233-1-git-send-email-srinivas.kandagatla@linaro.org>
- <20160329145448.GP8929@tuxbot>
-Message-ID: <56FA9913.7040308@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 Mar 2016 17:04:26 +0200
+Subject: [PATCH V2 3/3] cpufreq: exynos: Use generic platdev driver
+In-Reply-To: <81a8da75a0e7783e2b47f9e04297f167e8134afe.1459233524.git.viresh.kumar@linaro.org>
+References: <cover.1459233524.git.viresh.kumar@linaro.org>
+ <81a8da75a0e7783e2b47f9e04297f167e8134afe.1459233524.git.viresh.kumar@linaro.org>
+Message-ID: <3810049.oQlCXiQ5bk@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tuesday 29 March 2016 12:09:49 Viresh Kumar wrote:
+> -static void __init exynos_cpufreq_init(void)
+> -{
+> -       struct device_node *root = of_find_node_by_path("/");
+> -       const struct of_device_id *match;
+> -
+> -       match = of_match_node(exynos_cpufreq_matches, root);
+> -       if (!match) {
+> -               platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
+> -               return;
+> -       }
+> -
+> -       platform_device_register_simple(match->data, -1, NULL, 0);
+> -}
 
+How is the "exynos-cpufreq" case handled now? Is that no longer used now?
+I assume the patch is correct based on Krzysztof's review, but it might be
+good to explain this better.
 
-On 29/03/16 15:54, Bjorn Andersson wrote:
-> On Wed 23 Mar 12:46 PDT 2016, Srinivas Kandagatla wrote:
->
->> Hi Andy,
->>
->> This patchset adds support to Dragonboard 600c which is based on APQ8064.
->>
->> With this patchset, except spi I was able to test all the below features
->> on this board on top of linus master branch.
->> 1> i2c
->> 2> spi
->> 3> sd/mmc with card detect
->> 4> eMMC
->> 5> USB
->> 6> SATA
->> 7> on board Ethernet based on PCIE.
->> 8> user and activity leds.
->>
->> AHCI SATA is broken on APQ8064 on mainline, due to changes in libahci, fix is
->> being discussed which should not effect this dt patches anyway.
->> This patchset also has a fix to i2c/spi pinctrls which was not set correctly
->> in my previous apq8064 patches, I have verified this patchset with eeprom and
->> sensors on the board, you might want to take that patch in next rc.
->>
->> Thanks,
->> srini
->>
->> Srinivas Kandagatla (12):
->>    ARM: dts: apq8064: fix the pinctrls for i2c and spi
->>    ARM: dts: apq8064: add support to gsbi1 uart
->>    ARM: dts: apq8064: add gsbi7 i2c support
->>    ARM: dts: dragonboard-600c: add board support with serial
->>    ARM: dts: dragonboard-600c: add pmic regulator supplies
->>    ARM: dts: dragonboard-600c: Add eMMC and SD card support
->>    ARM: dts: dragonboard-600c: add usb support
->>    ARM: dts: dragonboard-600c: add pcie support
->>    ARM: dts: dragonboard-600c: add on board sata support.
->>    ARM: dts: dragonboard-600c: Add on board leds support
->>    ARM: dts: dragonboard-600c: add i2c support
->>    ARM: dts: dragonboard-600c: add spi support
->
-> Please abbreviate db600c (and drop those upper case As).
-
-Yep. Will do.
->
->>
->>   arch/arm/boot/dts/Makefile                         |   1 +
->>   .../arm/boot/dts/qcom-apq8064-dragonboard-600c.dts | 377 +++++++++++++++++++++
->
-> Please make this qcom-apq8064-arrow-db600c.dts
-Ok, makes sense.
-
-thanks
-srini
->
->>   arch/arm/boot/dts/qcom-apq8064-pins.dtsi           |  39 +++
->>   arch/arm/boot/dts/qcom-apq8064.dtsi                |  41 ++-
->>   4 files changed, 452 insertions(+), 6 deletions(-)
->>   create mode 100644 arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
->
-> Regards,
-> Bjorn
->
+	Arnd
