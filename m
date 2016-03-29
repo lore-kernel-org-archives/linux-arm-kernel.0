@@ -1,46 +1,42 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Tue, 29 Mar 2016 21:28:26 +0200
-Subject: [PATCH 4/5] ARM: dts: omap4-kc1: LEDs support
-In-Reply-To: <1459279707-17611-1-git-send-email-contact@paulk.fr>
-References: <1459279707-17611-1-git-send-email-contact@paulk.fr>
-Message-ID: <1459279707-17611-6-git-send-email-contact@paulk.fr>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 Mar 2016 21:30:29 +0200
+Subject: [RFC5 PATCH v6 00/21] ILP32 for ARM64
+In-Reply-To: <alpine.DEB.2.10.1603291551420.20115@digraph.polyomino.org.uk>
+References: <1452792198-10718-1-git-send-email-ynorov@caviumnetworks.com>
+ <3298847.t7vI4YM3gJ@wuerfel>
+ <alpine.DEB.2.10.1603291551420.20115@digraph.polyomino.org.uk>
+Message-ID: <3467083.D7LuvS9l35@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for the Kindle Fire (first generation) power button LEDs, that
-are wired to the TWL6030 PWM outputs.
+On Tuesday 29 March 2016 15:54:52 Joseph Myers wrote:
+> On Tue, 29 Mar 2016, Arnd Bergmann wrote:
+> 
+> > In glibc, I think we need to define fewer entry points, not more.
+> > Instead of having both lseek and lseek64, only one of them should
+> > be provided, and that should always take a 64-bit offset, calling
+> > into the kernel with the _llseek syscall entry.
+> 
+> lseek64 is part of the public API, on all platforms.  It should be aliased 
+> to lseek where possible.
 
-Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
----
- arch/arm/boot/dts/omap4-kc1.dts | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+Right, makes sense.
 
-diff --git a/arch/arm/boot/dts/omap4-kc1.dts b/arch/arm/boot/dts/omap4-kc1.dts
-index 0d08f9f..3681414 100644
---- a/arch/arm/boot/dts/omap4-kc1.dts
-+++ b/arch/arm/boot/dts/omap4-kc1.dts
-@@ -17,6 +17,22 @@
- 		device_type = "memory";
- 		reg = <0x80000000 0x20000000>; /* 512 MB */
- 	};
-+
-+	pwmleds {
-+		compatible = "pwm-leds";
-+
-+		green {
-+			label = "green";
-+			pwms = <&twl_pwm 0 7812500>;
-+			max-brightness = <127>;
-+		};
-+
-+		orange {
-+			label = "orange";
-+			pwms = <&twl_pwm 1 7812500>;
-+			max-brightness = <127>;
-+		};
-+	};
- };
- 
- &omap4_pmx_core {
--- 
-2.7.4
+> Strictly, it would be possible to provide it in the API without it being 
+> part of the ABI, by arranging the headers so that calls to lseek64 result 
+> in objects with a reference to lseek (because it uses the off64_t typedef, 
+> it's not valid to declare it yourself rather than including a header that 
+> declares it).  I don't think it would be a good idea for a new 
+> sub-architecture port to try introducing such a difference from all other 
+> ports, however.
+
+How do we do it then? Should we just define __USE_FILE_OFFSET64
+unconditionally for all new 32-bit architectures and leave the
+code dealing with 32-bit off_t/ino_t in place but unreachable, to
+minimize the differences?
+
+Or should all the obsolete types be defined the same way as their
+replacements so we have 64-bit __OFF_T_TYPE/__INO_T_TYPE
+and use the same binary implementation regardless of FILE_OFFSET_BITS?
+
+	Arnd
