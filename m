@@ -1,32 +1,35 @@
-From: romain.perier@free-electrons.com (Romain Perier)
-Date: Tue, 29 Mar 2016 10:02:28 +0200
-Subject: [PATCH] ARM: configs: Switching to the new Marvell's cryptographic
- engine driver for mvebu_v5_defconfig
-Message-ID: <1459238548-28029-1-git-send-email-romain.perier@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 Mar 2016 10:05:58 +0200
+Subject: [PATCH] arm: remove tautologic #ifdefs in proc-v7-3level.S
+In-Reply-To: <1459237071-13842-1-git-send-email-jonas.rabenstein@studium.uni-erlangen.de>
+References: <1459237071-13842-1-git-send-email-jonas.rabenstein@studium.uni-erlangen.de>
+Message-ID: <3570872.7QPkonuD2y@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables the new driver for Marvell CESA crypto engines on all mvebu v5.
-The old driver is no longer used, but it is still in the tree for fallback.
+On Tuesday 29 March 2016 09:37:51 Jonas Rabenstein wrote:
+> The file arch/arm/mm/proc-v7-3level.S is only used by the #include
+> directive in arch/arm/mm/proc-v7.S:23. This #include is conditional and
+> depends on  CONFIG_ARM_LPAE (otherwise proc-v7-2level.S is used).
+> CONFIG_ARM_LPAE has a dependency on CONFIG_MMU defined in Kconfig.
+> Consequently, checks for CONFIG_MMU in proc-v7-3level.S are superfluous.
+> 
+> Signed-off-by: Jonas Rabenstein <jonas.rabenstein@studium.uni-erlangen.de>
+> ---
+>  I detected the issue with chimaera, a tool I currently develop for my bachelor
+>  thesis extending the undertaker tool suite (https://undertaker.cs.fau.de).
 
-Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
----
- arch/arm/configs/mvebu_v5_defconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Nice catch!
 
-diff --git a/arch/arm/configs/mvebu_v5_defconfig b/arch/arm/configs/mvebu_v5_defconfig
-index 4562006..6051c51 100644
---- a/arch/arm/configs/mvebu_v5_defconfig
-+++ b/arch/arm/configs/mvebu_v5_defconfig
-@@ -208,8 +208,8 @@ CONFIG_DEBUG_KERNEL=y
- # CONFIG_DEBUG_PREEMPT is not set
- # CONFIG_FTRACE is not set
- CONFIG_DEBUG_USER=y
-+CONFIG_CRYPTO_DEV_MARVELL_CESA=y
- CONFIG_CRYPTO_CBC=m
- CONFIG_CRYPTO_PCBC=m
--CONFIG_CRYPTO_DEV_MV_CESA=y
- CONFIG_CRC_CCITT=y
- CONFIG_LIBCRC32C=y
--- 
-2.7.4
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+
+I guess you should submit the same thing for the other file as well,
+either in the same patch or as a series.
+
+You can also add
+
+Fixes: 8d2cd3a38fd6 ("ARM: LPAE: Factor out classic-MMU specific code into proc-v7-2level.S")
+
+to mark the commit that led to the situation.
+
+	Arnd
