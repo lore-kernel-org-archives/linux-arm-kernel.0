@@ -1,40 +1,38 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Mon, 28 Mar 2016 18:32:37 -0700
-Subject: [PATCH 2/4] ARM: dts: msm8974: Split efs in rfsa and rmtfs
-In-Reply-To: <1459215159-2576-1-git-send-email-bjorn.andersson@linaro.org>
-References: <1459215159-2576-1-git-send-email-bjorn.andersson@linaro.org>
-Message-ID: <1459215159-2576-2-git-send-email-bjorn.andersson@linaro.org>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Tue, 29 Mar 2016 10:32:51 +0900
+Subject: [PATCH 0/3] drm/exynos: Kconfig dependency fixes
+In-Reply-To: <1459214937-18686-1-git-send-email-javier@osg.samsung.com>
+References: <1459214937-18686-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <56F9DB43.6090309@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One part of the efs memory region is used specifically for sharing file system
-buffers between the apps and modem cpus (aka rmtfs), so better reflect this
-split.
+Hi Javier,
 
-Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
----
- arch/arm/boot/dts/qcom-msm8974.dtsi | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+Thanks for your patch set.
 
-diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-index 927075137b76..1afee408a923 100644
---- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-@@ -49,8 +49,13 @@
- 			no-map;
- 		};
- 
--		efs at 0fd600000 {
--			reg = <0x0fd60000 0x1a0000>;
-+		rfsa at 0fd60000 {
-+			reg = <0x0fd60000 0x20000>;
-+			no-map;
-+		};
-+
-+		rmtfs at 0fd80000 {
-+			reg = <0x0fd80000 0x180000>;
- 			no-map;
- 		};
- 
--- 
-2.5.0
+Will merge them if there is no issue.
+
+Thanks,
+Inki Dae
+
+2016? 03? 29? 10:28? Javier Martinez Canillas ?(?) ? ?:
+> Hello Inki,
+> 
+> This patch series contains some fixes for the Kconfig symbol dependencies
+> of the Exynos DRM driver. They make sure that the Exynos DRM components
+> and the media platform drivers that makes use of the same HW IP block are
+> not enabled at the same time.
+> 
+> Best regards,
+> Javier
+> 
+> 
+> Javier Martinez Canillas (3):
+>   drm/exynos: Use VIDEO_SAMSUNG_S5P_G2D=n as G2D Kconfig dependency
+>   drm/exynos: Use VIDEO_SAMSUNG_EXYNOS_GSC=n as GSC Kconfig dependency
+>   drm/exynos: Make DRM_EXYNOS_FIMC depend on VIDEO_S5P_FIMC=n
+> 
+>  drivers/gpu/drm/exynos/Kconfig | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
