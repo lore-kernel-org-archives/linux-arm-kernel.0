@@ -1,112 +1,84 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 29 Mar 2016 15:32:40 +0200
-Subject: [PATCH] arm: at91: do not disable/enable clocks in a row
-In-Reply-To: <1459258007-24968-1-git-send-email-bigeasy@linutronix.de>
-References: <1459258007-24968-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <56FA83F8.5060808@atmel.com>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Tue, 29 Mar 2016 06:32:29 -0700
+Subject: [PATCH] i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity
+In-Reply-To: <1459248921.2565.15.camel@pengutronix.de>
+References: <m3h9fuk7ik.fsf@t19.piap.pl>
+ <CAOMZO5DcZCxoLPeGRWSGkstm7F3eN-Q-yJyf6ktMTda2zLviag@mail.gmail.com>
+ <CAOMZO5B8Lzn-E4YOeYxVtN5PN11aOvZHn4eU0ixkdV8CO8+xYw@mail.gmail.com>
+ <CAJ+vNU2Sg1ZKBsGcQswrJZyTJ1WBEZor3ZqpoYUT7i9FKjEAog@mail.gmail.com>
+ <CAOMZO5DO9G18=_YSri3a+UiYbLwN6AMG4asUXbT03mpbU3hHrw@mail.gmail.com>
+ <CAJ+vNU1_YqvWQkmuDB7r8z77iZJS6pP4Mr+j9yW4sFLAeJXQDw@mail.gmail.com>
+ <CAOMZO5A2osG3=mTaCayYfMokUj-vT+Udq9ckq45b1yaUP9Tn3g@mail.gmail.com>
+ <CAJ+vNU2ST=XG5H04-OCwpHgcvkoXOQw8F3MjXhJmWhBUbxWE-g@mail.gmail.com>
+ <1459241739.2565.9.camel@pengutronix.de>
+ <m3shz9in52.fsf@t19.piap.pl>
+ <1459248921.2565.15.camel@pengutronix.de>
+Message-ID: <CAJ+vNU3o98T2cev1Pj0VJR884kOxVxhrzmowDixGuV2Tb=Sh1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 29/03/2016 15:26, Sebastian Andrzej Siewior a ?crit :
-> Currently the driver will disable the clock and enable it one line later
-> if it is switching from periodic mode into one shot.
-> This can be avoided and causes a needless warning on -RT.
-> 
-> Tested-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+On Tue, Mar 29, 2016 at 3:55 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> Am Dienstag, den 29.03.2016, 12:39 +0200 schrieb Krzysztof Ha?asa:
+>> Lucas Stach <l.stach@pengutronix.de> writes:
+>>
+>> > Is this working with v4.4 and PCI_MSI enabled? I'm sure I've tested MSI
+>> > IRQs before enabling them in the defconfig and they have been working
+>> > for me for a long time before that. Tested with i210 on Gateworks
+>> > Ventana.
+>>
+>> MSI never worked for me on Ventana. I have been using 4.2 extensively,
+>> and now I'm switching to 4.5 (which doesn't work either).
+>>
+>> Could it be a DTS (bridge) problem(?)
 
-Absolutely makes sense:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Lucas,
 
-Thanks.
+It's not the bridge - its the fact that not all drivers support MSI interrupts.
 
-> ---
->  drivers/clocksource/tcb_clksrc.c | 33 +++++++++++++++++++++++++++++----
->  1 file changed, 29 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
-> index 4da2af9694a2..ed1ae4445e8d 100644
-> --- a/drivers/clocksource/tcb_clksrc.c
-> +++ b/drivers/clocksource/tcb_clksrc.c
-> @@ -74,6 +74,7 @@ static struct clocksource clksrc = {
->  struct tc_clkevt_device {
->  	struct clock_event_device	clkevt;
->  	struct clk			*clk;
-> +	bool				clk_enabled;
->  	void __iomem			*regs;
->  };
->  
-> @@ -91,6 +92,24 @@ static struct tc_clkevt_device *to_tc_clkevt(struct clock_event_device *clkevt)
->   */
->  static u32 timer_clock;
->  
-> +static void tc_clk_disable(struct clock_event_device *d)
-> +{
-> +	struct tc_clkevt_device *tcd = to_tc_clkevt(d);
-> +
-> +	clk_disable(tcd->clk);
-> +	tcd->clk_enabled = false;
-> +}
-> +
-> +static void tc_clk_enable(struct clock_event_device *d)
-> +{
-> +	struct tc_clkevt_device *tcd = to_tc_clkevt(d);
-> +
-> +	if (tcd->clk_enabled)
-> +		return;
-> +	clk_enable(tcd->clk);
-> +	tcd->clk_enabled = true;
-> +}
-> +
->  static int tc_shutdown(struct clock_event_device *d)
->  {
->  	struct tc_clkevt_device *tcd = to_tc_clkevt(d);
-> @@ -98,8 +117,14 @@ static int tc_shutdown(struct clock_event_device *d)
->  
->  	__raw_writel(0xff, regs + ATMEL_TC_REG(2, IDR));
->  	__raw_writel(ATMEL_TC_CLKDIS, regs + ATMEL_TC_REG(2, CCR));
-> +	return 0;
-> +}
-> +
-> +static int tc_shutdown_clk_off(struct clock_event_device *d)
-> +{
-> +	tc_shutdown(d);
->  	if (!clockevent_state_detached(d))
-> -		clk_disable(tcd->clk);
-> +		tc_clk_disable(d);
->  
->  	return 0;
->  }
-> @@ -112,7 +137,7 @@ static int tc_set_oneshot(struct clock_event_device *d)
->  	if (clockevent_state_oneshot(d) || clockevent_state_periodic(d))
->  		tc_shutdown(d);
->  
-> -	clk_enable(tcd->clk);
-> +	tc_clk_enable(d);
->  
->  	/* slow clock, count up to RC, then irq and stop */
->  	__raw_writel(timer_clock | ATMEL_TC_CPCSTOP | ATMEL_TC_WAVE |
-> @@ -134,7 +159,7 @@ static int tc_set_periodic(struct clock_event_device *d)
->  	/* By not making the gentime core emulate periodic mode on top
->  	 * of oneshot, we get lower overhead and improved accuracy.
->  	 */
-> -	clk_enable(tcd->clk);
-> +	tc_clk_enable(d);
->  
->  	/* slow clock, count up to RC, then irq and restart */
->  	__raw_writel(timer_clock | ATMEL_TC_WAVE | ATMEL_TC_WAVESEL_UP_AUTO,
-> @@ -168,7 +193,7 @@ static struct tc_clkevt_device clkevt = {
->  		/* Should be lower than at91rm9200's system timer */
->  		.rating			= 125,
->  		.set_next_event		= tc_next_event,
-> -		.set_state_shutdown	= tc_shutdown,
-> +		.set_state_shutdown	= tc_shutdown_clk_off,
->  		.set_state_periodic	= tc_set_periodic,
->  		.set_state_oneshot	= tc_set_oneshot,
->  	},
-> 
+One of the most common uses of PCI on Ventana is 802.11n radios and of
+them the ath9k driver is very commonly used and does not request an
+MSI interrupt (drivers/net/wireless/ath/ath9k/pci.c)
 
+>>
+>> On 4.5, trying to use it with TW6869 frame buffer and GW5410:
+>>
+>> TW6869: PCI 0000:04:00.0, IRQ 336, MMIO 0x1100000
+>> TW686x 0000:04:00.0: enabling device (0140 -> 0142)
+>>
+> I don't see whee the device even tries to use MSI IRQs. Even if the
+> infrastructure is enabled it opts to use legacy INTA.
 
--- 
-Nicolas Ferre
+yes, that's what many drivers do.
+
+>
+> There is no upstream driver for this chip, so I don't know where to look
+> to find out if the driver tries to enable MSI.
+>
+> Is what you are saying that if you enable MSI support in the kernel, it
+> breaks legacy IRQs?
+
+Yes - any driver that does not support MSI will use legacy IRQ's and
+they never fire.
+
+The Ventana GW53xx and GW54xx boards have a Marvell PCIe GigE
+supported by the sky2 driver as eth1 which does support MSI and I
+verified it gets an MSI interrupt and does work (along ath9k devices
+with legacy interrupts that fail to work).
+
+root at ventana:~# cat /proc/interrupts | grep MSI
+299:          0          0   PCI-MSI   0 Edge      PCIe PME, aerdrv
+308:       8726          0   PCI-MSI   9 Edge      eth1
+
+So it appears that MSI works for those drivers that use it, but does
+somehow cause legacy IRQ's to break.
+
+I sent you a GW5400 dev kit over a while back to use for through
+bridge testing on IMX6 that you should be able to repeat this with
+assuming you have a PCIe card with a driver that doesn't support MSI
+(or that you can tweak its driver to not support MSI).
+
+I think 31e98e0d24cd2537a63e06e235e050a06b175df7 "ARM:
+imx_v6_v7_defconfig: enable PCI_MSI" should be reverted as well until
+we figure this out.
+
+Tim
