@@ -1,33 +1,70 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 29 Mar 2016 08:08:56 +0530
-Subject: [PATCH 3/3] cpufreq: exynos: Use generic platdev driver
-In-Reply-To: <56F9E9FC.7080007@samsung.com>
-References: <cover.1458801338.git.viresh.kumar@linaro.org>
- <6cb29053bce7026dd9429326236a67c45e901c7b.1458801338.git.viresh.kumar@linaro.org>
- <56F9E9FC.7080007@samsung.com>
-Message-ID: <20160329023856.GW32495@vireshk-i7>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 28 Mar 2016 22:41:02 -0400
+Subject: [PATCH 0/3] drm/exynos: Kconfig dependency fixes
+In-Reply-To: <56F9DE63.6050808@samsung.com>
+References: <1459214937-18686-1-git-send-email-javier@osg.samsung.com>
+ <56F9DE63.6050808@samsung.com>
+Message-ID: <56F9EB3E.5080000@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29-03-16, 11:35, Krzysztof Kozlowski wrote:
-> On 24.03.2016 15:40, Viresh Kumar wrote:
-> > The cpufreq-dt-platdev driver supports creation of cpufreq-dt platform
-> > device now, reuse that and remove similar code from platform code.
-> > 
-> > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> > ---
-> >  arch/arm/mach-exynos/exynos.c        | 25 -------------------------
-> >  drivers/cpufreq/cpufreq-dt-platdev.c |  5 +++++
-> >  2 files changed, 5 insertions(+), 25 deletions(-)
-> 
-> Hi,
-> 
-> I got only 3rd patch (and no cover letter). I don't know what is the
-> background or what is your plan for this. I suppose you want to merge it
-> through cupfreq tree? Anyway could you cc-me on everything (or at least
-> cover letter)?
+Hello Seung-Woo,
 
-I bounced (mutt is great) all the other mails to you just now.
+Thanks a lot for your feedback.
 
+On 03/28/2016 09:46 PM, Seung-Woo Kim wrote:
+> Hi Javier,
+> 
+> On 2016? 03? 29? 10:28, Javier Martinez Canillas wrote:
+>> Hello Inki,
+>>
+>> This patch series contains some fixes for the Kconfig symbol dependencies
+>> of the Exynos DRM driver. They make sure that the Exynos DRM components
+>> and the media platform drivers that makes use of the same HW IP block are
+>> not enabled at the same time.
+>>
+>> Best regards,
+>> Javier
+>>
+>>
+>> Javier Martinez Canillas (3):
+>>   drm/exynos: Use VIDEO_SAMSUNG_S5P_G2D=n as G2D Kconfig dependency
+>>   drm/exynos: Use VIDEO_SAMSUNG_EXYNOS_GSC=n as GSC Kconfig dependency
+>>   drm/exynos: Make DRM_EXYNOS_FIMC depend on VIDEO_S5P_FIMC=n
+> 
+> In G2D case, there is only one instance, but for the other cases, there
+> are several instances and in my environment, I enable both drivers on
+> v4l2 and drm FIMC/GSC.
+> 
+> So, IMHO, the not-enabled v4l2 dependency is not really required for drm
+> fimc and drm gsc.
+>
+
+I'm confused, it was you who added the depends on !VIDEO_SAMSUNG_EXYNOS_GSC
+for DRM_EXYNOS_GSC in commit aeefb36832e5 ("drm/exynos: gsc: add device tree
+support and remove usage of static mappings").
+
+>From the commit message "The driver cannot be used simultaneously with V4L2
+Mem2Mem GScaller driver thought". Did that assumption changed and the depend
+should be removed then? or maybe I misunderstood what you meant.
+
+Now, I'm not really sure about FIMC either, it was feedback I got from this
+patch [0]. Could you please take a look to that and let me know if enabling
+these drivers simultaneously makes sense then?
+
+> Best Regards,
+> - Seung-Woo Kim
+> 
+>>
+>>  drivers/gpu/drm/exynos/Kconfig | 6 +++---
+>>  1 file changed, 3 insertions(+), 3 deletions(-)
+>>
+> 
+
+[0]: https://lkml.org/lkml/2016/3/23/292
+
+Best regards,
 -- 
-viresh
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
