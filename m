@@ -1,65 +1,108 @@
-From: gangchen@rdamicro.com (=?utf-8?B?6ZmI5YiaKEdhbmdjaGVuKQ==?=)
-Date: Tue, 29 Mar 2016 10:58:20 +0000
-Subject: [PATCH 1/1] ARM : missing corrupted reg in __do_div_asm
-In-Reply-To: <20160329103418.GX19428@n2100.arm.linux.org.uk>
-References: <1459138743-10477-1-git-send-email-chengang.beijing@gmail.com>
- <3792990.eCI4tPEEyD@wuerfel>
- <20160329102605.GC3701@e103592.cambridge.arm.com>
- <20160329103418.GX19428@n2100.arm.linux.org.uk>
-Message-ID: <56FA5FCB.2050609@rdamicro.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 Mar 2016 12:58:25 +0200
+Subject: [RFC5 PATCH v6 00/21] ILP32 for ARM64
+In-Reply-To: <56F6825B.7000906@huawei.com>
+References: <1452792198-10718-1-git-send-email-ynorov@caviumnetworks.com>
+ <6653982.FK62mVSCZO@wuerfel> <56F6825B.7000906@huawei.com>
+Message-ID: <4405408.txAtlZbTDH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/29/2016 06:34 PM, Russell King - ARM Linux wrote:
-> On Tue, Mar 29, 2016 at 11:26:05AM +0100, Dave Martin wrote:
->> On Tue, Mar 29, 2016 at 12:19:49PM +0200, Arnd Bergmann wrote:
->>> On Monday 28 March 2016 12:19:03 Chen Gang wrote:
->>>> __xl(R0 in little endian system, or R1 in big endian system) is corrupted
->>>> after calling __do_div64 and compiler is not informed about this in
->>>> macro __do_div_asm. If n is used again afterwards, __xl won't be
->>>> reloaded and n will contain incorrect value.
->>>>
->>>> Signed-off-by: Chen Gang <gangchen@rdamicro.com>
->>>> Signed-off-by: Chen Gang <chengang.beijing@gmail.com>
->>>> ---
->>> How did you find this? Did you run into this problem on a live system
->>> or see it through inspection?
->>>
-We (in RDAMicro) found  the problem when we added TLC nand support in 
-MTD driver.
-I submit this patch several time last year.
-And this patch also fix one problems of XFS:
-http://permalink.gmane.org/gmane.comp.file-systems.xfs.general/69224
->>>>   arch/arm/include/asm/div64.h | 6 ++++--
->>>>   1 file changed, 4 insertions(+), 2 deletions(-)
->>>>
->>>> diff --git a/arch/arm/include/asm/div64.h b/arch/arm/include/asm/div64.h
->>>> index e1f0776..1a6e91a 100644
->>>> --- a/arch/arm/include/asm/div64.h
->>>> +++ b/arch/arm/include/asm/div64.h
->>>> @@ -35,12 +35,14 @@ static inline uint32_t __div64_32(uint64_t *n, uint32_t base)
->>>>          register unsigned long long __n   asm("r0") = *n;
->>>>          register unsigned long long __res asm("r2");
->>>>          register unsigned int __rem       asm(__xh);
->>>> +       register unsigned int __clobber   asm(__xl);
->>>>          asm(    __asmeq("%0", __xh)
->>>>                  __asmeq("%1", "r2")
->>>> +               __asmeq("%3", "r0")
->>>> +               __asmeq("%4", "r4")
->>>>                  __asmeq("%2", "r0")
->>>> -               __asmeq("%3", "r4")
->>>>                  "bl     __do_div64"
->>>> -               : "=r" (__rem), "=r" (__res)
->>>> +               : "=r" (__rem), "=r" (__res), "=r" (__clobber)
->>>>                  : "r" (__n), "r" (__base)
->>>>                  : "ip", "lr", "cc");
->>>>          *n = __res;
->>> Doesn't the clobber normally go in the third line along with
->>> "ip" and "lr"?
->> Since __xl is not used for any real argument to the asm, I think
->> we can just add __xl to the clobber list directly, without needing
->> to introduce an extra register variable ... no?
-> No, you can't.  The clobber list is not allowed to specify registers
-> that may be used for input or output operands, and since __xl may be
-> r0, and __n _is_ r0, you can't specify r0 in the clobber list.
->
+On Saturday 26 March 2016 20:36:43 Zhangjian wrote:
+> Hi, Arnd
+> 
+> On 2016/3/21 17:43, Arnd Bergmann wrote:
+> > On Monday 21 March 2016 10:07:49 Andreas Schwab wrote:
+> >> This patch may fix a few LTP tests.
+> >>
+> >
+> > Thanks for analyzing.
+> >
+> >> diff --git a/sysdeps/unix/sysv/linux/aarch64/bits/fcntl.h b/sysdeps/unix/sysv/linux/aarch64/bits/fcntl.h
+> >> index 3631903..d1010db 100644
+> >> --- a/sysdeps/unix/sysv/linux/aarch64/bits/fcntl.h
+> >> +++ b/sysdeps/unix/sysv/linux/aarch64/bits/fcntl.h
+> >> @@ -25,18 +25,29 @@
+> >>   #define __O_NOFOLLOW	0100000
+> >>   #define __O_DIRECT	0200000
+> >>
+> >> -#define __O_LARGEFILE	0
+> >> +#ifdef __ILP32__
+> >> +# define __O_LARGEFILE	0400000
+> >> +#else
+> >> +# define __O_LARGEFILE	0
+> >> +#endif
+> >>
+> >
+> > I guess this means I screwed up when I said I'd merged the kernel patch
+> > that Yury did to fix it, sorry about that.
+> >
+> > We need the patch to make all new architecture in the kernel default to
+> > O_LARGEFILE, and not do this in user space. I'd suggest now to keep the
+> > patches as part of the ILP32 series after all, to make sure they are
+> > merged at the point when they are needed.
+> 
+> I am a little bit confuse about off_t. In "[PATCH 08/33] 32-bit
+> ABI: introduce ARCH_32BIT_OFF_T config option", it mentioned that all
+> the new 32bit architecture should use 64bit off_t.
+
+Ah, so it is part of the series. I had not checked that here.
+
+> Should we define off_t in aarch64(for both ilp32 and lp64) in
+> typesize.h as following?
+> 
+> diff --git a/sysdeps/unix/sysv/linux/aarch64/bits/typesizes.h b/sysdeps/unix/sysv/linux/aarch64/bits/typesizes.h
+> index 7073493..13b77c5 100644
+> --- a/sysdeps/unix/sysv/linux/aarch64/bits/typesizes.h
+> +++ b/sysdeps/unix/sysv/linux/aarch64/bits/typesizes.h
+> @@ -33,7 +33,7 @@
+>   #define __INO64_T_TYPE         __UQUAD_TYPE
+>   #define __MODE_T_TYPE          __U32_TYPE
+>   #define __NLINK_T_TYPE         __U32_TYPE
+> -#define __OFF_T_TYPE           __SLONGWORD_TYPE
+> +#define __OFF_T_TYPE           __SQUAD_TYPE
+>   #define __OFF64_T_TYPE         __SQUAD_TYPE
+>   #define __PID_T_TYPE           __S32_TYPE
+>   #define __RLIM_T_TYPE          __ULONGWORD_TYPE
+> 
+> Then we could remove the __USE_FILE_OFFSET64 in stat.h and fcnt.h in
+> aarch64. And truncate and ftruncate is same as truncate64 and
+> ftruncate64.
+
+I don't know what the glibc developers prefer, but I think the
+result needs to be something like that: either __OFF_T_TYPE is
+defined as you write above as a 64-bit type, or the user-visible
+off_t typedef unconditionally uses __OFF64_T_TYPE rather than
+__OFF_T_TYPE.
+
+> Otherwise we need to handle the pad like yury do it in
+> stat.h, and we need to handle the bigendian as well:
+
+I see.
+
+> @@ -35,12 +35,21 @@ struct stat
+>     {
+>       __dev_t st_dev;			/* Device.  */
+>   #ifdef __ILP32__
+> +
+> +#if !defined(__AARCH64EB__)
+>       unsigned int __st_ino_pad;
+> +#endif
+> +
+>   # ifndef __USE_FILE_OFFSET64
+>       __ino_t st_ino;			/* File serial number.	*/
+>   # else
+>       __ino_t __st_ino;			/* 32bit file serial number.	*/
+>   # endif
+> +
+> +#if defined(__AARCH64EB__)
+> +    unsigned int __st_ino_pad;
+> +#endif
+> +
+>   #else
+
+This would indeed be silly, we really don't want anyone
+to access the old __st_ino field or the 32-bit version of
+the offset here.
+
+	Arnd
