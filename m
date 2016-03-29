@@ -1,82 +1,178 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 29 Mar 2016 00:39:03 -0700
-Subject: [PATCH v2 6/8] drm/fsl-dcu: add TCON driver
-In-Reply-To: <3752084.bcROvR6fvG@ws-stein>
-References: <1459216802-32094-1-git-send-email-stefan@agner.ch>
- <2234894.ri36D5MRrN@ws-stein> <57c86de8eca0aa16a5cdfc488977ca4e@agner.ch>
- <3752084.bcROvR6fvG@ws-stein>
-Message-ID: <154ce63f6767c2fc6f15e2486c0753c1@agner.ch>
+From: fu.wei@linaro.org (fu.wei at linaro.org)
+Date: Tue, 29 Mar 2016 15:44:18 +0800
+Subject: [PATCH v8] acpi, apei, arm64: APEI initial support for aarch64.
+Message-ID: <1459237458-12352-1-git-send-email-fu.wei@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-03-29 00:26, Alexander Stein wrote:
-> On Tuesday 29 March 2016 00:11:13, Stefan Agner wrote:
->> >> --- a/Documentation/devicetree/bindings/display/fsl,dcu.txt
->> >> +++ b/Documentation/devicetree/bindings/display/fsl,dcu.txt
->> >>
->> >> @@ -14,6 +14,7 @@ Required properties:
->> >>  Optional properties:
->> >>  - clocks:		Second handle for pixel clock.
->> >>  - clock-names:		Second name "pix" for pixel clock.
->> >>
->> >> +- fsl,tcon:		The phandle to the timing controller node.
->> >
->> > Maybe a comment this is (currently) only for Vybrid, but not LS1021A.
->>
->> IMHO, such references to SoCs in a peripheral binding is somewhat
->> misplaced. If we would start doing this, we would end up in lots of SoC
->> references, and nobody knows whether they are actually accurate and up
->> to date... And I think we should add tcon to LS1021a, more on that
->> below...
-> 
-> Well, I don't mind after all.
-> 
->> >> --- /dev/null
->> >> +++ b/drivers/gpu/drm/fsl-dcu/fsl_tcon.c
->> >> [...]
->> >> +struct fsl_tcon *fsl_tcon_init(struct device *dev)
->> >> +{
->> >> +	struct fsl_tcon *tcon;
->> >> +	struct device_node *np;
->> >> +	int ret;
->> >> +
->> >> +	tcon = devm_kzalloc(dev, sizeof(*tcon), GFP_KERNEL);
->> >> +	if (!tcon)
->> >> +		return NULL;
->> >> +
->> >> +	np = of_parse_phandle(dev->of_node, "fsl,tcon", 0);
->> >> +	if (!np) {
->> >> +		dev_warn(dev, "Couldn't find the tcon node\n");
->> >> +		return NULL;
->> >> +	}
->> >
->> > Maybe check for device tree node before allocating struct fsl_tcon? Also
->> > this should not be a warning, as on LS1021A this is to be expected.
->>
->> Agreed, definitely the smarter sequence.
->>
->> Afact LS1021a has also a TCON. At least in Jianwei Wangs initial patches
->> it was part of the driver, see:
->> https://lkml.org/lkml/2015/7/13/242
->>
->> Not sure how that driver can work without TCON support on LS1021a, maybe
->> the bootloader sets the TCON to bypass?
->>
->> Since I do not have a LS1021a, I hesitated to just add it to the LS1021s
->> dt's, but it should be fairly straight forward.
-> 
-> Interesting, but in Patch 3
-> (https://lists.freedesktop.org/archives/dri-devel/2015-July/086381.html)
-> no TCON node is added and using is still
-> optional. Yet, I don't find any TCON hardware in the LS1021A reference manual, 
-> e.g. in the memory map. I hard guess is that it doesn't require/use one. 
-> Without memory address it would be pretty hard to add one.
+From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
 
-Ok, maybe I am completely wrong on that. I thought I have seen it...
+This commit provides APEI arch-specific bits for aarch64
 
-It could be that Jianwei added TCON support for Vybrid only, in this
-case I agree there shouldn't be a warning if TCON is missing. Maybe even
-the other way around, write a info message in case TCON has been found.
+Meanwhile,
+(1)add a new subfunction "hest_ia32_init" for
+"acpi_disable_cmcff" which is used by IA-32 Architecture
+Corrected Machine Check (CMC).
+(2)move HEST type (ACPI_HEST_TYPE_IA32_CORRECTED_CHECK) checking to
+a generic place.
+(3)select EFI when ACPI_APEI is set on ARM64,
+because arch_apei_get_mem_attribute is using efi_mem_attributes on ARM64.
 
---
-Stefan
+[Fu Wei: improve && upstream]
+
+Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+Tested-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+Signed-off-by: Fu Wei <fu.wei@linaro.org>
+Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
+Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
+---
+Changelog:
+v8: Fix a "undefined reference" bug by selecting EFI when ACPI_APEI is set
+    on ARM64.
+
+v7: https://lkml.org/lkml/2016/3/17/183
+    Add comment for arch_apei_flush_tlb_one in arch/arm64/include/asm/acpi.h
+
+v6: https://lists.linaro.org/pipermail/linaro-acpi/2016-March/006644.html
+    Move HEST type (ACPI_HEST_TYPE_IA32_CORRECTED_CHECK) checking to
+    a generic place.
+    Delete HAVE_ACPI_APEI_HEST_IA32.
+
+v5: https://lkml.org/lkml/2015/12/10/131
+    Add "HAVE_ACPI_APEI_HEST_IA32" instead of
+    "#if defined(__i386__) || defined(__x86_64__)".
+
+v4: https://lkml.org/lkml/2015/12/8/188
+    Rebase to latest kernel version(4.4-rc4).
+    Move arch_apei_flush_tlb_one into header file as a inline function
+    Add a new subfunction "hest_ia_init" for "acpi_disable_cmcff".
+
+v3: https://lkml.org/lkml/2015/12/3/521
+    Remove "acpi_disable_cmcff" from arm64 code,
+    and wrap it in hest.c by "#if defined(__i386__) || defined(__x86_64__)"
+
+v2: https://lkml.org/lkml/2015/12/2/432
+    Rebase to latest kernel version(4.4-rc3).
+    Move arch_apei_flush_tlb_one() to arch/arm64/kernel/acpi.c
+
+v1: https://lkml.org/lkml/2015/8/14/199
+    Move arch_apei_flush_tlb_one() to arch/arm64/include/asm/apci.h.
+    Delete arch/arm64/kernel/apei.c.
+    Add "#ifdef CONFIG_ACPI_APEI" for "acpi_disable_cmcff".
+
+ arch/arm64/Kconfig            |  1 +
+ arch/arm64/include/asm/acpi.h | 15 ++++++++++++++-
+ arch/x86/kernel/acpi/apei.c   |  3 ---
+ drivers/acpi/apei/Kconfig     |  1 +
+ drivers/acpi/apei/hest.c      | 18 +++++++++++++++---
+ 5 files changed, 31 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 4f43622..08952ec 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -3,6 +3,7 @@ config ARM64
+ 	select ACPI_CCA_REQUIRED if ACPI
+ 	select ACPI_GENERIC_GSI if ACPI
+ 	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
++	select HAVE_ACPI_APEI if ACPI
+ 	select ARCH_HAS_DEVMEM_IS_ALLOWED
+ 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+ 	select ARCH_HAS_ELF_RANDOMIZE
+diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+index aee323b..4a6c959 100644
+--- a/arch/arm64/include/asm/acpi.h
++++ b/arch/arm64/include/asm/acpi.h
+@@ -17,6 +17,7 @@
+ 
+ #include <asm/cputype.h>
+ #include <asm/smp_plat.h>
++#include <asm/tlbflush.h>
+ 
+ /* Macros for consistency checks of the GICC subtable of MADT */
+ #define ACPI_MADT_GICC_LENGTH	\
+@@ -110,7 +111,19 @@ static inline const char *acpi_get_enable_method(int cpu)
+ }
+ 
+ #ifdef	CONFIG_ACPI_APEI
++#define acpi_disable_cmcff 1
+ pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
+-#endif
+ 
++/*
++ * This inline function is used in IRQ context (by GHES driver now),
++ * see ghes_iounmap_irq and ghes_iounmap_nmi in drivers/acpi/apei/ghes.c.
++ * The page mapped is reserved for firmware in kernel. This invalidate TLB
++ * maintenance should be broadcasted safely to make sure that all the cores
++ * will do TLB invalidation, then get the right pages.
++ */
++static inline void arch_apei_flush_tlb_one(unsigned long addr)
++{
++	flush_tlb_kernel_range(addr, addr + PAGE_SIZE);
++}
++#endif /* CONFIG_ACPI_APEI */
+ #endif /*_ASM_ACPI_H*/
+diff --git a/arch/x86/kernel/acpi/apei.c b/arch/x86/kernel/acpi/apei.c
+index c280df6..ea3046e 100644
+--- a/arch/x86/kernel/acpi/apei.c
++++ b/arch/x86/kernel/acpi/apei.c
+@@ -24,9 +24,6 @@ int arch_apei_enable_cmcff(struct acpi_hest_header *hest_hdr, void *data)
+ 	struct acpi_hest_ia_corrected *cmc;
+ 	struct acpi_hest_ia_error_bank *mc_bank;
+ 
+-	if (hest_hdr->type != ACPI_HEST_TYPE_IA32_CORRECTED_CHECK)
+-		return 0;
+-
+ 	cmc = (struct acpi_hest_ia_corrected *)hest_hdr;
+ 	if (!cmc->enabled)
+ 		return 0;
+diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
+index b0140c8..b037c5c 100644
+--- a/drivers/acpi/apei/Kconfig
++++ b/drivers/acpi/apei/Kconfig
+@@ -8,6 +8,7 @@ config ACPI_APEI
+ 	bool "ACPI Platform Error Interface (APEI)"
+ 	select MISC_FILESYSTEMS
+ 	select PSTORE
++	select EFI if ARM64
+ 	select UEFI_CPER
+ 	depends on HAVE_ACPI_APEI
+ 	help
+diff --git a/drivers/acpi/apei/hest.c b/drivers/acpi/apei/hest.c
+index 20b3fcf..792a0d9 100644
+--- a/drivers/acpi/apei/hest.c
++++ b/drivers/acpi/apei/hest.c
+@@ -123,7 +123,18 @@ EXPORT_SYMBOL_GPL(apei_hest_parse);
+  */
+ static int __init hest_parse_cmc(struct acpi_hest_header *hest_hdr, void *data)
+ {
+-	return arch_apei_enable_cmcff(hest_hdr, data);
++	if (hest_hdr->type != ACPI_HEST_TYPE_IA32_CORRECTED_CHECK)
++		return 0;
++
++	if (!acpi_disable_cmcff)
++		return !arch_apei_enable_cmcff(hest_hdr, data);
++
++	return 0;
++}
++
++static inline int __init hest_ia32_init(void)
++{
++	return apei_hest_parse(hest_parse_cmc, NULL);
+ }
+ 
+ struct ghes_arr {
+@@ -232,8 +243,9 @@ void __init acpi_hest_init(void)
+ 		goto err;
+ 	}
+ 
+-	if (!acpi_disable_cmcff)
+-		apei_hest_parse(hest_parse_cmc, NULL);
++	rc = hest_ia32_init();
++	if (rc)
++		goto err;
+ 
+ 	if (!ghes_disable) {
+ 		rc = apei_hest_parse(hest_parse_ghes_count, &ghes_count);
+-- 
+2.5.0
