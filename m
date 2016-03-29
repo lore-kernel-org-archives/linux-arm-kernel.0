@@ -1,70 +1,44 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 29 Mar 2016 15:46:00 +0200
-Subject: [PATCH] ARM: at91/dt: sama5d2: add LCD controller
-In-Reply-To: <56E17731.6020600@atmel.com>
-References: <1457616316-12613-1-git-send-email-nicolas.ferre@atmel.com>
- <56E17731.6020600@atmel.com>
-Message-ID: <56FA8718.7090903@atmel.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 29 Mar 2016 15:52:04 +0200
+Subject: [PATCH] clockevents/drivers/timer-atmel-pit: fix double free_irq
+In-Reply-To: <20160329133206.GA13334@linutronix.de>
+References: <1458245383-9859-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <20160329133206.GA13334@linutronix.de>
+Message-ID: <20160329135204.GG2346@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 10/03/2016 14:31, Nicolas Ferre a ?crit :
-> Note to myself: change the $subject line to:
-> ARM: dts: at91: sama5d2: add LCD controller
+On 29/03/2016 at 15:32:06 +0200, Sebastian Andrzej Siewior wrote :
+> * Alexandre Belloni | 2016-03-17 21:09:43 [+0100]:
 > 
-> :-)
-
-With $subject changed, queued in at91-4.7-dt branch.
-
-> Le 10/03/2016 14:25, Nicolas Ferre a ?crit :
->> Add LCD controller node that binds to the atmel_hlcdc DRM driver.
->>
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> ---
->>  arch/arm/boot/dts/sama5d2.dtsi | 26 ++++++++++++++++++++++++++
->>  1 file changed, 26 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
->> index 78996bdbd3df..ce6df4d48bf9 100644
->> --- a/arch/arm/boot/dts/sama5d2.dtsi
->> +++ b/arch/arm/boot/dts/sama5d2.dtsi
->> @@ -319,6 +319,32 @@
->>  			#size-cells = <1>;
->>  			ranges;
->>  
->> +			hlcdc: hlcdc at f0000000 {
->> +				compatible = "atmel,sama5d2-hlcdc";
->> +				reg = <0xf0000000 0x2000>;
->> +				interrupts = <45 IRQ_TYPE_LEVEL_HIGH 0>;
->> +				clocks = <&lcdc_clk>, <&lcdck>, <&clk32k>;
->> +				clock-names = "periph_clk","sys_clk", "slow_clk";
->> +				status = "disabled";
->> +
->> +				hlcdc-display-controller {
->> +					compatible = "atmel,hlcdc-display-controller";
->> +					#address-cells = <1>;
->> +					#size-cells = <0>;
->> +
->> +					port at 0 {
->> +						#address-cells = <1>;
->> +						#size-cells = <0>;
->> +						reg = <0>;
->> +					};
->> +				};
->> +
->> +				hlcdc_pwm: hlcdc-pwm {
->> +					compatible = "atmel,hlcdc-pwm";
->> +					#pwm-cells = <3>;
->> +				};
->> +			};
->> +
->>  			ramc0: ramc at f000c000 {
->>  				compatible = "atmel,sama5d3-ddramc";
->>  				reg = <0xf000c000 0x200>;
->>
+> >Hi Sebastian,
+> Hi Alexandre,
 > 
+> >This patch fixes the last warning for preempt-rt on at91. It applies on
+> >v4.4.4-rt11. Note that the whome PIT/TCB mess will be fixed in another way in
+> >the mainline as we are reworking the tcb driver to avoid using the pit when
+> >booting.
+> 
+> oh, okay. I just sent the "arm: at91: do not disable/enable clocks in a
+> row" patch as you asked me a while ago. It applied cleanly against the
+> next tree of today.
+
+Yeah, actually, it was not needed anymore. I forgot about it at the time
+but f02b4b72d12c (clockevents/tcb_clksrc: Prevent disabling an already
+disabled clock) was sufficient to remove the warning. Your patch is
+still Ok but maybe it can get rid of the
+"if (!clockevent_state_detached(d))" in tc_shutdown_clk_off()
+
+I'll test and take care of that.
+
+> So I will apply this to get rid of the warning. And if you manage not to
+> use the PIT during boot then we won't have the free_irq() mess which is
+> good.
 > 
 
+Yeah, this will definitively happen (hopefully sooner than later ;) )
 
 -- 
-Nicolas Ferre
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
