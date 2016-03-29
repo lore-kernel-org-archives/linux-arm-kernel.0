@@ -1,25 +1,28 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 28 Mar 2016 18:28:51 -0700
-Subject: [PATCH v2 4/5] dt-bindings: ata: add compatible string for iProc
- AHCI controller
-In-Reply-To: <1459140510-5317-5-git-send-email-anup.patel@broadcom.com>
-References: <1459140510-5317-1-git-send-email-anup.patel@broadcom.com>
- <1459140510-5317-5-git-send-email-anup.patel@broadcom.com>
-Message-ID: <56F9DA53.1090005@gmail.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 28 Mar 2016 21:28:54 -0400
+Subject: [PATCH 0/3] drm/exynos: Kconfig dependency fixes
+Message-ID: <1459214937-18686-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 27/03/2016 21:48, Anup Patel a ?crit :
-> The Broadcom iProc SoCs have AHCI compliant SATA controller. This
-> patch adds common compatible string for AHCI SATA controller on
-> iProc SoCs.
-> 
-> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-> Acked-by: Rob Herring <robh@kernel.org>
+Hello Inki,
 
-Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+This patch series contains some fixes for the Kconfig symbol dependencies
+of the Exynos DRM driver. They make sure that the Exynos DRM components
+and the media platform drivers that makes use of the same HW IP block are
+not enabled at the same time.
 
-Tejun, should I queue this one through an arm-soc pull request or do you
-want to take it via libata? Thanks!
+Best regards,
+Javier
+
+
+Javier Martinez Canillas (3):
+  drm/exynos: Use VIDEO_SAMSUNG_S5P_G2D=n as G2D Kconfig dependency
+  drm/exynos: Use VIDEO_SAMSUNG_EXYNOS_GSC=n as GSC Kconfig dependency
+  drm/exynos: Make DRM_EXYNOS_FIMC depend on VIDEO_S5P_FIMC=n
+
+ drivers/gpu/drm/exynos/Kconfig | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
 -- 
-Florian
+2.5.0
