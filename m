@@ -1,51 +1,85 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Mar 2016 10:48:59 +0200
-Subject: [PATCH] arm: remove tautologic #ifdefs in proc-v7-3level.S
-In-Reply-To: <20160329082911.GG20211@studium.uni-erlangen.de>
-References: <1459237071-13842-1-git-send-email-jonas.rabenstein@studium.uni-erlangen.de>
- <3570872.7QPkonuD2y@wuerfel> <20160329082911.GG20211@studium.uni-erlangen.de>
-Message-ID: <7626858.QDVI2ASZbI@wuerfel>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 29 Mar 2016 10:55:39 +0200
+Subject: [PATCH] i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity
+In-Reply-To: <CAJ+vNU2ST=XG5H04-OCwpHgcvkoXOQw8F3MjXhJmWhBUbxWE-g@mail.gmail.com>
+References: <m3h9fuk7ik.fsf@t19.piap.pl>
+ <CAOMZO5DcZCxoLPeGRWSGkstm7F3eN-Q-yJyf6ktMTda2zLviag@mail.gmail.com>
+ <CAOMZO5B8Lzn-E4YOeYxVtN5PN11aOvZHn4eU0ixkdV8CO8+xYw@mail.gmail.com>
+ <CAJ+vNU2Sg1ZKBsGcQswrJZyTJ1WBEZor3ZqpoYUT7i9FKjEAog@mail.gmail.com>
+ <CAOMZO5DO9G18=_YSri3a+UiYbLwN6AMG4asUXbT03mpbU3hHrw@mail.gmail.com>
+ <CAJ+vNU1_YqvWQkmuDB7r8z77iZJS6pP4Mr+j9yW4sFLAeJXQDw@mail.gmail.com>
+ <CAOMZO5A2osG3=mTaCayYfMokUj-vT+Udq9ckq45b1yaUP9Tn3g@mail.gmail.com>
+ <CAJ+vNU2ST=XG5H04-OCwpHgcvkoXOQw8F3MjXhJmWhBUbxWE-g@mail.gmail.com>
+Message-ID: <1459241739.2565.9.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 March 2016 10:29:11 Jonas Rabenstein wrote:
-> On Tue, Mar 29, 2016 at 10:05:58AM +0200, Arnd Bergmann wrote:
-> > On Tuesday 29 March 2016 09:37:51 Jonas Rabenstein wrote:
-> > > The file arch/arm/mm/proc-v7-3level.S is only used by the #include
-> > > directive in arch/arm/mm/proc-v7.S:23. This #include is conditional and
-> > > depends on  CONFIG_ARM_LPAE (otherwise proc-v7-2level.S is used).
-> > > CONFIG_ARM_LPAE has a dependency on CONFIG_MMU defined in Kconfig.
-> > > Consequently, checks for CONFIG_MMU in proc-v7-3level.S are superfluous.
-> > > 
-> > > Signed-off-by: Jonas Rabenstein <jonas.rabenstein@studium.uni-erlangen.de>
-> > > ---
-> > >  I detected the issue with chimaera, a tool I currently develop for my bachelor
-> > >  thesis extending the undertaker tool suite (https://undertaker.cs.fau.de).
-> > 
-> > Nice catch!
-> > 
-> > Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-> > 
-> > I guess you should submit the same thing for the other file as well,
-> > either in the same patch or as a series.
-> I do not get, what you mean with 'the other file'? For the
-> proc-v7-2level.S this precondition does not hold, as proc-v7-2level.S is
-> included if !CONFIG_ARM_LPAE. Consequently, no evidence about the MMU
-> state is available in their.
+Am Montag, den 28.03.2016, 15:06 -0700 schrieb Tim Harvey:
+> On Mon, Mar 28, 2016 at 2:30 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> > On Mon, Mar 28, 2016 at 5:42 PM, Tim Harvey <tharvey@gateworks.com> wrote:
+> >
+> >> Fabio,
+> >>
+> >> ok - I'll respond there as I agree with the patch but not the wording
+> >> of the commit (It's Gateworks 'Ventana' using IMX6 not Laguna and we
+> >> do define the polarity properly as active-low in Ventana dt's). It is
+> >> the fact that the gpio polarity has the wrong logic level that breaks
+> >> Ventana.
+> >
+> > Ok, I will change the wording in v2.
+> >
+> >>
+> >> However, there seems to be another regression in 4.5 that's keeping
+> >> PCI working for me and I'm still bisecting that (using 802.11n access
+> >> points to test). Can you confirm that PCI works in v4.5 on IMX6 boards
+> >> with only 5c5fb40de8f14391a1238db05cef88754faf9229 reverted?
+> >
+> > On imx6qdl-sabresd.dtsi the PCI reset gpio polarity is set to high,
+> > which is not correct, so the Wifi card could be detected even with
+> > 5c5fb40de8f. So two errors in sequence and PCI still works on this
+> > board :-)
+> 
+> ouch - two wrongs did make a right!
+> 
+> It's not too easy to tell how many IMX6 boards incorrectly specify
+> their reset-gpio polarity. I don't know what the best way to determine
+> what boards use the IMX6 pcie host controller. Is there a dtc usage
+> that will display the compiled dtb's then we grep out 'compatible =
+> "fsl,imx6q-pcie"' to at least get the list of boards to inspect? I'm
+> curious if its just one or two boards that incorrectly specify the
+> polarity of their PCI reset.
+> 
+I would suspect that most boards specify the reset polarity the wrong
+way around. Fixing this without breaking DT stability is hard. OTOH we
+could just argue that the system description in DT is wrong and needs to
+be fixed.
 
-My mistake. I misread this as the both files being used only for
-MMU-enabled kernels, which would make sense because they deal with
-page tables that are not being used without MMU, but they are in fact
-being compiled anyway.
+> >
+> > I don't have access to the board at the moment, but the only test I
+> > did was to see that the Wifi card got detected. I haven't really tried
+> > to communicate via Wifi.
+> 
+> I figured out it was the change to enable CONFIG_PCI_MSI in v4.5 that
+> is causing interrupts to fail for me.
+> 
+Is this working with v4.4 and PCI_MSI enabled? I'm sure I've tested MSI
+IRQs before enabling them in the defconfig and they have been working
+for me for a long time before that. Tested with i210 on Gateworks
+Ventana.
 
-> > You can also add
-> > 
-> > Fixes: 8d2cd3a38fd6 ("ARM: LPAE: Factor out classic-MMU specific code into proc-v7-2level.S")
-> Shouldn't it be:
-> Fixes: 1b6ba46b7efa ("ARM: LPAE: MMU setup for the 3-level page table
-> format")?
+> Lucas, the case that is failing for me is when I have 4 miniPCI radios
+> behind a PCIe->PCI bridge. In this case the radios get legacy
+> INTA/B/C/D mapped to them correctly from what I can tell (GIC
+> 123/122/121/120 swizzled appropriately), but those interrupts never
+> fire. I don't think this case is necessarily a regression, I'm not
+> clear that it has ever worked. In fact I can't seem to come up with a
+> scenario where the MSI irq is firing either: IMX6->ath9k radio (no
+> bridge) with MSI doesn't fire the PCI-MSI interrupt or the GPC 123
+> interrupt that gets mapped to it via the driver. Any ideas what can be
+> going on here?
+> 
+Please test if MSI IRQs work with v4.4. I'll take a look at this later
+today.
 
-Nevermind then. My line was incorrect, and the other one is a bit
-redundant as it is the one that adds the file in the first place.
-
-	Arnd
+Regards,
+Lucas
