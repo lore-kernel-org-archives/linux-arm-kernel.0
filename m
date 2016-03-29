@@ -1,113 +1,104 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 29 Mar 2016 15:20:55 +0100
-Subject: [PATCH 10/12] ARM: dts: dragonboard-600c: Add on board leds
- support
-In-Reply-To: <20160327055012.GD8929@tuxbot>
-References: <1458762366-9233-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1458762484-9768-1-git-send-email-srinivas.kandagatla@linaro.org>
- <20160327055012.GD8929@tuxbot>
-Message-ID: <56FA8F47.7070200@linaro.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 29 Mar 2016 16:21:03 +0200
+Subject: [PATCH] clockevents/drivers/arm_global_timer: Fix erratum 740657
+ workaround
+In-Reply-To: <1459238917-2240-1-git-send-email-rabin.vincent@axis.com>
+References: <1459238917-2240-1-git-send-email-rabin.vincent@axis.com>
+Message-ID: <56FA8F4F.1000900@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Bjorn,
-
-On 27/03/16 06:50, Bjorn Andersson wrote:
-> On Wed 23 Mar 12:48 PDT 2016, Srinivas Kandagatla wrote:
+On 03/29/2016 10:08 AM, Rabin Vincent wrote:
+> From: Rabin Vincent <rabinv@axis.com>
 >
->> This patch adds support to 4 user leds, wlan and bt led on board.
->>
->> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> According to the errata document for the Cortex A9 MPCore, the correct
+> code sequence in the interrupt handler to workaround erratum 740657
+> "Global Timer can send two interrupts for the same event" is:
 >
-> I'm not fond of the overly complicated names; and I think it should at
-> least be shortened to "db600c:...".
-
-I agree, I will fix this in next version.
-
+>   (1) Read the ICCIAR (Interrupt Acknowledge) register
+>   (2) Modify the comparator value, to set it to a higher value
+>   (3) Clear the Global Timer flag
+>   (4) Clear the Pending Status information for Interrupt 27 (Global
+>       Timer interrupt) in the Distributor of the Interrupt Controller.
+>   (5) Write the ICCEOIR (End of Interrupt) register
 >
-> Tested this on my DB600c, seems to work, except the WiFi/BT triggers,
-> see comments below.
+> (1) and (5) are done by the GIC driver and (2) and (3) are done by the
+> Global Timer driver.  However, nobody does (4) and thus the workaround
+> is inactive and the timer triggers many spurious interrupts:
 >
->> +		leds {
->> +			pinctrl-names = "default";
->> +			pinctrl-0 = <&user_leds>, <&mpp_leds>;
->> +
->> +			compatible = "gpio-leds";
->> +
->> +			led at 1 {
->> +				label = "dragonboard-600c:green:user1";
->> +				gpios = <&tlmm_pinmux 3 GPIO_ACTIVE_HIGH>;
->> +				linux,default-trigger = "heartbeat";
->> +				default-state = "off";
->> +			};
->> +
->> +			led at 2 {
->> +				label = "dragonboard-600c:green:user2";
->> +				gpios = <&tlmm_pinmux 7 GPIO_ACTIVE_HIGH>;
->> +				linux,default-trigger = "mmc0";
->> +				default-state = "off";
->> +			};
->> +
->> +			led at 3 {
->> +				label = "dragonboard-600c:green:user3";
->> +				gpios = <&tlmm_pinmux 10 GPIO_ACTIVE_HIGH>;
->> +				linux,default-trigger = "mmc1";
->> +				default-state = "off";
->> +			};
->> +
->> +			led at 4 {
->> +				label = "apq8016-sbc:green:user4";
->> +				gpios = <&tlmm_pinmux 11 GPIO_ACTIVE_HIGH>;
->> +				linux,default-trigger = "none";
->> +				default-state = "off";
->> +			};
->> +
->> +			led at 5 {
->> +				label = "dragonboard-600c:yellow:wlan";
->> +				gpios = <&pm8921_mpps 7 GPIO_ACTIVE_HIGH>;
->> +				linux,default-trigger = "wlan";
+>   <idle>-0 [001] d.h2 99.850527: irq_handler_entry: irq=16 name=gt
+>   <idle>-0 [001] d.h2 99.850538: irq_handler_exit: irq=16 ret=handled
+>   <idle>-0 [001] d.H2 99.850540: irq_handler_entry: irq=16 name=gt
+>   <idle>-0 [001] d.H2 99.850542: irq_handler_exit: irq=16 ret=unhandled
+>   <idle>-0 [001] d.h2 99.987832: irq_handler_entry: irq=16 name=gt
+>   <idle>-0 [001] dnh2 99.987845: irq_handler_exit: irq=16 ret=handled
+>   <idle>-0 [001] dnh2 99.987848: irq_handler_entry: irq=16 name=gt
+>   <idle>-0 [001] dnh2 99.987850: irq_handler_exit: irq=16 ret=unhandled
+
+Hi Rabin,
+
+what platform are you using to test that ?
+
+
+> Make the Global Timer driver perform step (4) via the GIC driver with
+> the help of the irq_set_irqchip_state() function, to prevent the
+> spurious interrupts.
 >
-> This should either be "phy0rx", "phy0tx", "phy0assoc" or "phy0radio". TX
-> does not seem to work, so this should be debugged; "assoc" is probably
-> the one that makes most sense.
-
-
-Am ok, to change, did you get activity leds works with any of these 
-strings with WLAN or BT?
-
-phy0rx/tx seems to be bit more generic and atleast the name looks bit 
-non-specific to wlan.
-
-These names should be documented somewhere, Its very difficult to find 
-which names to use unless you read the code.
-
-It would be nice to just provide a phandle to the device which 
-led-trigger should use, which makes it clear and explicit.
-
-
-
+> Signed-off-by: Rabin Vincent <rabinv@axis.com>
+> ---
+>   drivers/clocksource/arm_global_timer.c | 21 +++++++++++++--------
+>   1 file changed, 13 insertions(+), 8 deletions(-)
 >
->> +				default-state = "off";
->> +			};
->> +
->> +			led at 6 {
->> +				label = "dragonboard-600c:blue:bt";
->> +				gpios = <&pm8921_mpps 8 GPIO_ACTIVE_HIGH>;
->> +				linux,default-trigger = "bt";
+> diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
+> index 9df0d16..b9d0f86 100644
+> --- a/drivers/clocksource/arm_global_timer.c
+> +++ b/drivers/clocksource/arm_global_timer.c
+> @@ -140,26 +140,31 @@ static int gt_clockevent_set_next_event(unsigned long evt,
+>   static irqreturn_t gt_clockevent_interrupt(int irq, void *dev_id)
+>   {
+>   	struct clock_event_device *evt = dev_id;
+> +	bool workaround = clockevent_state_oneshot(evt);
 >
-> This should be "hci0-power".
+>   	if (!(readl_relaxed(gt_base + GT_INT_STATUS) &
+>   				GT_INT_STATUS_EVENT_FLAG))
+>   		return IRQ_NONE;
+>
+>   	/**
+> -	 * ERRATA 740657( Global Timer can send 2 interrupts for
+> +	 * ERRATA 740657 (Global Timer can send 2 interrupts for
+>   	 * the same event in single-shot mode)
+>   	 * Workaround:
+> -	 *	Either disable single-shot mode.
+> -	 *	Or
+> -	 *	Modify the Interrupt Handler to avoid the
+> -	 *	offending sequence. This is achieved by clearing
+> -	 *	the Global Timer flag _after_ having incremented
+> -	 *	the Comparator register	value to a higher value.
+> +	 * - Read the ICCIAR (Interrupt Acknowledge) register
+> +	 * - Modify the comparator value, to set it to a higher value
+> +	 * - Clear the Global Timer flag
+> +	 * - Clear the Pending Status information for Interrupt 27 (Global
+> +	 *   Timer interrupt) in the Distributor of the Interrupt Controller.
+> +	 * - Write the ICCEOIR (End of Interrupt) register
+>   	 */
+> -	if (clockevent_state_oneshot(evt))
+> +	if (workaround)
+>   		gt_compare_set(ULONG_MAX, 0);
+>
+>   	writel_relaxed(GT_INT_STATUS_EVENT_FLAG, gt_base + GT_INT_STATUS);
+> +
+> +	if (workaround)
+> +		irq_set_irqchip_state(irq, IRQCHIP_STATE_PENDING, false);
+> +
+>   	evt->event_handler(evt);
+>
+>   	return IRQ_HANDLED;
+>
 
-Does this trigger work for you?
-Name is bit misleading though.
 
-Thanks,
-srini
->
->> +				default-state = "off";
->> +			};
->> +		};
->> +
->
-> Regards,
-> Bjorn
->
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
