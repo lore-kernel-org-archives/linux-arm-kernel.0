@@ -1,40 +1,36 @@
-From: emil.l.velikov@gmail.com (Emil Velikov)
-Date: Tue, 29 Mar 2016 14:13:26 +0100
-Subject: [RFC PATCH v1 0/4] Add Rockchip RGA support
-In-Reply-To: <17189219.y56YqHz6yR@diego>
-References: <1458552518-25527-1-git-send-email-ykk@rock-chips.com>
- <1571169.Hy8an0n7lM@diego>
- <CACvgo516ewfwGCpV=noX+re1x8t3Sp1t39Sha+A2-tQ5YsoihA@mail.gmail.com>
- <17189219.y56YqHz6yR@diego>
-Message-ID: <CACvgo50REvRxN2_qdw=2NeTTSgjpA+9c8OZgPE0q19meH6ArKA@mail.gmail.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Tue, 29 Mar 2016 09:14:35 -0400
+Subject: [PATCH 4/4] drivers/bus: make arm-ccn.c driver explicitly
+ non-modular
+In-Reply-To: <1459252386.5053.18.camel@arm.com>
+References: <1459113058-14340-1-git-send-email-paul.gortmaker@windriver.com>
+ <1459113058-14340-5-git-send-email-paul.gortmaker@windriver.com>
+ <20160329114525.GC6745@arm.com> <1459252386.5053.18.camel@arm.com>
+Message-ID: <20160329131435.GA20649@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 March 2016 at 23:13, Heiko St?bner <heiko@sntech.de> wrote:
+[Re: [PATCH 4/4] drivers/bus: make arm-ccn.c driver explicitly non-modular] On 29/03/2016 (Tue 12:53) Pawel Moll wrote:
 
-> I have the feeling we're going quite a bit off-topic right now :-) .
-> The binary-driver-crazyness, hasn't really anything to do with Yakir's support
-> for the RGA (which is about raster-graphics-acceleration, so 2d stuff).
->
-> And me mentioning the armsoc-ddx was merely a means to allow some sort of
-> different userspace user, as requested in your original mail ;-) .
->
-Seems like I forgot to state the obvious - for all the reasons
-mentioned, the armsoc ddx seems like a bad example.
+> Dnia 2016-03-29, Tue o godzinie 12:45 +0100, Will Deacon pisze:
+> > I'd much rather fix the driver to build as a module, if at all
+> > possible.
+> > Suzuki (CC'd) is taking a look at that, so please drop this patch for
+> > now.
+> 
+> There's no problem with building arm-ccn.c as a module - all it's
+> really doing today is providing a PMU driver. I don't even know why
+> have I made it bool-only in the first place...
 
-> Maybe you know a better use-case on where to demonstrate the viability of the
-> userspace API for it as originally requested.
-I'm afraid that my RockChip-foo is extremely limited. Perhaps the
-actual user of these should be mentioned ? xf86-video-rockhip (is
-there one ?) or any other effort/project that lacks some (all?) of the
-criticism listed.
+My guess is that like many other instances, it originally starts out as
+an innocent copy and paste during early driver development -- hence the
+desire to get the code and Kconfigs consistent tree wide.
 
-(Sort of) the bottom line - either reuse the existing interfaces or
-provide an approved, full blown userspace (libdrm demos/programs do
-not count) that uses the new interfaces.
+Anyway, thanks guys for tackling the conversion ; I'll shelf this patch
+and watch for the conversion to hit linux-next.
 
-I haven't made these rules, just a fool^Wguy that repeats them so that
-people don't abuse them much. If in doubt check with Dave and Daniel V
-- they had enough repeating these.
+Paul.
+--
 
--Emil
+> 
+> Pawel
