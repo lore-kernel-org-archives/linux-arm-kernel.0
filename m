@@ -1,73 +1,163 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Tue, 29 Mar 2016 17:35:57 +0100
-Subject: [PATCH v7 10/17] arm/xen: Get event-channel irq through HVM_PARAM
- when booting with ACPI
-In-Reply-To: <1458830676-27075-11-git-send-email-shannon.zhao@linaro.org>
-References: <1458830676-27075-1-git-send-email-shannon.zhao@linaro.org>
- <1458830676-27075-11-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <56FAAEED.7060108@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 29 Mar 2016 18:37:48 +0200
+Subject: [PATCH 1/2] ARM: mvebu: correct the usb node name from usb@ to
+ ehci@
+In-Reply-To: <4079235.sABSXKnJCE@wuerfel> (Arnd Bergmann's message of "Tue, 29
+ Mar 2016 16:05:21 +0200")
+References: <1459259813-5278-1-git-send-email-patrick@puiterwijk.org>
+ <1459259813-5278-2-git-send-email-patrick@puiterwijk.org>
+ <4079235.sABSXKnJCE@wuerfel>
+Message-ID: <87zithutnn.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shannon,
+Hi Arnd,
+ 
+ On mar., mars 29 2016, Arnd Bergmann <arnd@arndb.de> wrote:
 
-On 24/03/16 14:44, Shannon Zhao wrote:
-> When booting with ACPI, it could get the event-channel irq through
-
-The kernel will always get the event-channel IRQ through 
-HVM_PARAM_CALLBACK_IRQ.
-
-So I would say: ", the kernel will get the event-channel..."
-
-> HVM_PARAM_CALLBACK_IRQ.
+> On Tuesday 29 March 2016 13:56:52 Patrick Uiterwijk wrote:
+>> According to Documentation/devicetree/bindings/usb/ehci-orion.txt,
+>> the Orion Marvell variant of EHCI controllers should have names
+>> ehci at 50000 for example.
+>> 
+>> Signed-off-by: Patrick Uiterwijk <patrick@puiterwijk.org>
+>> 
 >
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> ---
->   arch/arm/xen/enlighten.c | 36 +++++++++++++++++++++++++++++++++++-
->   1 file changed, 35 insertions(+), 1 deletion(-)
+> I think it's better to follow the generic USB binding that suggests
+> the name of 'usb', unless we understand what the specific bug is
+> you run into. Do you think it is the boot loader that messes
+> up the hardware, or something in the kernel that goes wrong? Did
+> it work on earlier kernels?
 >
-> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> index d94f726..680aae0 100644
-> --- a/arch/arm/xen/enlighten.c
-> +++ b/arch/arm/xen/enlighten.c
-> @@ -30,6 +30,7 @@
->   #include <linux/time64.h>
->   #include <linux/timekeeping.h>
->   #include <linux/timekeeper_internal.h>
-> +#include <linux/acpi.h>
->
->   #include <linux/mm.h>
->
-> @@ -278,6 +279,35 @@ void __init xen_early_init(void)
->   		add_preferred_console("hvc", 0, NULL);
->   }
->
-> +static void __init xen_acpi_guest_init(void)
-> +{
-> +#ifdef CONFIG_ACPI
-> +	struct xen_hvm_param a;
-> +	int interrupt, trigger, polarity;
-> +
-> +	a.domid = DOMID_SELF;
-> +	a.index = HVM_PARAM_CALLBACK_IRQ;
-> +	xen_events_irq = 0;
-> +
-> +	if (!HYPERVISOR_hvm_op(HVMOP_get_param, &a)) {
-> +		if ((a.value >> 56) == HVM_PARAM_CALLBACK_TYPE_PPI) {
-> +			interrupt = a.value & 0xff;
-> +			trigger = ((a.value >> 8) & 0x1) ? ACPI_EDGE_SENSITIVE
-> +							 : ACPI_LEVEL_SENSITIVE;
-> +			polarity = ((a.value >> 8) & 0x2) ? ACPI_ACTIVE_LOW
-> +							  : ACPI_ACTIVE_HIGH;
-> +			xen_events_irq = acpi_register_gsi(NULL, interrupt,
-> +							   trigger, polarity);
-> +		}
-> +	}
 
-Can you invert the condition to remove one layer of indentation?
+I am pretty sure that this issue is caused by the Marvell U-Boot which
+tries to modify the dts on the fly. But the device tree reference of
+this U-boot is not the one we use in mainline, so at end it mess up the
+dtb!
 
-Regards,
+There is an option to ask Marvell bootloader to not modify the dts, I
+think it is something like ftd_skip.
+
+Gregory
+
+> We had a regression based on the USB device probing, but that
+> should be fixed now with the patch below. Do you have that?
+>
+> 	Arnd
+>
+>
+> commit 7222c832254a75dcd67d683df75753d4a4e125bb
+> Author: Nicolai Stange <nicstange@gmail.com>
+> Date:   Thu Mar 17 23:53:02 2016 +0100
+>
+>     usb/core: usb_alloc_dev(): fix setting of ->portnum
+>     
+>     With commit 69bec7259853 ("USB: core: let USB device know device node"),
+>     the port1 argument of usb_alloc_dev() gets overwritten as follows:
+>     
+>       ... usb_alloc_dev(..., unsigned port1)
+>       {
+>         ...
+>         if (!parent->parent) {
+>           port1 = usb_hcd_find_raw_port_number(..., port1);
+>         }
+>         ...
+>       }
+>     
+>     Later on, this now overwritten port1 gets assigned to ->portnum:
+>     
+>       dev->portnum = port1;
+>     
+>     However, since xhci_find_raw_port_number() isn't idempotent, the
+>     aforementioned commit causes a number of KASAN splats like the following:
+>     
+>       BUG: KASAN: slab-out-of-bounds in xhci_find_raw_port_number+0x98/0x170
+>                                            at addr ffff8801d9311670
+>       Read of size 8 by task kworker/2:1/87
+>       [...]
+>       Workqueue: usb_hub_wq hub_event
+>        0000000000000188 000000005814b877 ffff8800cba17588 ffffffff8191447e
+>        0000000041b58ab3 ffffffff82a03209 ffffffff819143a2 ffffffff82a252f4
+>        ffff8801d93115e0 0000000000000188 ffff8801d9311628 ffff8800cba17588
+>       Call Trace:
+>        [<ffffffff8191447e>] dump_stack+0xdc/0x15e
+>        [<ffffffff819143a2>] ? _atomic_dec_and_lock+0xa2/0xa2
+>        [<ffffffff814e2cd1>] ? print_section+0x61/0xb0
+>        [<ffffffff814e4939>] print_trailer+0x179/0x2c0
+>        [<ffffffff814f0d84>] object_err+0x34/0x40
+>        [<ffffffff814f4388>] kasan_report_error+0x2f8/0x8b0
+>        [<ffffffff814eb91e>] ? __slab_alloc+0x5e/0x90
+>        [<ffffffff812178c0>] ? __lock_is_held+0x90/0x130
+>        [<ffffffff814f5091>] kasan_report+0x71/0xa0
+>        [<ffffffff814ec082>] ? kmem_cache_alloc_trace+0x212/0x560
+>        [<ffffffff81d99468>] ? xhci_find_raw_port_number+0x98/0x170
+>        [<ffffffff814f33d4>] __asan_load8+0x64/0x70
+>        [<ffffffff81d99468>] xhci_find_raw_port_number+0x98/0x170
+>        [<ffffffff81db0105>] xhci_setup_addressable_virt_dev+0x235/0xa10
+>        [<ffffffff81d9ea51>] xhci_setup_device+0x3c1/0x1430
+>        [<ffffffff8121cddd>] ? trace_hardirqs_on+0xd/0x10
+>        [<ffffffff81d9fac0>] ? xhci_setup_device+0x1430/0x1430
+>        [<ffffffff81d9fad3>] xhci_address_device+0x13/0x20
+>        [<ffffffff81d2081a>] hub_port_init+0x55a/0x1550
+>        [<ffffffff81d28705>] hub_event+0xef5/0x24d0
+>        [<ffffffff81d27810>] ? hub_port_debounce+0x2f0/0x2f0
+>        [<ffffffff8195e1ee>] ? debug_object_deactivate+0x1be/0x270
+>        [<ffffffff81210203>] ? print_rt_rq+0x53/0x2d0
+>        [<ffffffff8121657d>] ? trace_hardirqs_off+0xd/0x10
+>        [<ffffffff8226acfb>] ? _raw_spin_unlock_irqrestore+0x5b/0x60
+>        [<ffffffff81250000>] ? irq_domain_set_hwirq_and_chip+0x30/0xb0
+>        [<ffffffff81256339>] ? debug_lockdep_rcu_enabled+0x39/0x40
+>        [<ffffffff812178c0>] ? __lock_is_held+0x90/0x130
+>        [<ffffffff81196877>] process_one_work+0x567/0xec0
+>       [...]
+>     
+>     Afterwards, xhci reports some functional errors:
+>     
+>       xhci_hcd 0000:00:14.0: ERROR: unexpected setup address command completion
+>                                     code 0x11.
+>       xhci_hcd 0000:00:14.0: ERROR: unexpected setup address command completion
+>                                     code 0x11.
+>       usb 4-3: device not accepting address 2, error -22
+>     
+>     Fix this by not overwriting the port1 argument in usb_alloc_dev(), but
+>     storing the raw port number as required by OF in an additional variable,
+>     raw_port.
+>     
+>     Fixes: 69bec7259853 ("USB: core: let USB device know device node")
+>     Signed-off-by: Nicolai Stange <nicstange@gmail.com>
+>     Acked-by: Alan Stern <stern@rowland.harvard.edu>
+>     Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>
+> diff --git a/drivers/usb/core/usb.c b/drivers/usb/core/usb.c
+> index ffa5cf13ffe1..dcb85e3cd5a7 100644
+> --- a/drivers/usb/core/usb.c
+> +++ b/drivers/usb/core/usb.c
+> @@ -424,6 +424,7 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent,
+>  	struct usb_device *dev;
+>  	struct usb_hcd *usb_hcd = bus_to_hcd(bus);
+>  	unsigned root_hub = 0;
+> +	unsigned raw_port = port1;
+>  
+>  	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+>  	if (!dev)
+> @@ -498,11 +499,11 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent,
+>  
+>  		if (!parent->parent) {
+>  			/* device under root hub's port */
+> -			port1 = usb_hcd_find_raw_port_number(usb_hcd,
+> +			raw_port = usb_hcd_find_raw_port_number(usb_hcd,
+>  				port1);
+>  		}
+>  		dev->dev.of_node = usb_of_get_child_node(parent->dev.of_node,
+> -				port1);
+> +				raw_port);
+>  
+>  		/* hub driver sets up TT records */
+>  	}
+>
 
 -- 
-Julien Grall
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
