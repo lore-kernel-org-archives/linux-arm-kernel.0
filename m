@@ -1,40 +1,44 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Tue, 29 Mar 2016 17:04:49 +0100
-Subject: [PATCH v4 9/9] clocksource: arm_arch_timer: Remove
- arch_timer_get_timecounter
-In-Reply-To: <56FA9391.1040007@linaro.org>
-References: <1458842023-31853-1-git-send-email-julien.grall@arm.com>
- <1458842023-31853-10-git-send-email-julien.grall@arm.com>
- <56FA9391.1040007@linaro.org>
-Message-ID: <56FAA7A1.2020507@arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 29 Mar 2016 18:05:58 +0200
+Subject: [GIT PULL] at91: soc for 4.7 #1
+Message-ID: <1459267558-16328-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/03/16 15:39, Daniel Lezcano wrote:
-> On 03/24/2016 06:53 PM, Julien Grall wrote:
->> The only call of arch_timer_get_timecounter (in KVM) has been removed.
->>
->> Signed-off-by: Julien Grall <julien.grall@arm.com>
->> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
->
-> Hi Julien,
+Arnd, Olof, Kevin,
 
-Hi Daniel,
+A little SoC update with this new chipid code. Pretty simple feature indeed.
+If you feel like waiting more material before taking this PR, not problem. I
+can also rebase it on another "-rc" if needed.
 
-> do you want me to take this patch through my tree ?
+Thanks, best regards,
 
-This patch depends on patch #7, so it's not possible to merge for now.
+The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 
-The plan suggested to merge the series is divided in 3 steps:
+  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
 
-   1) Patch #1-#2 are merged via your tree
-      Patch #2-#6 are merged via the irqchip-tree
-   2) Patch #7-#8 are merged via the KVM tree
-   3) Patch #9 (this patch) is merge via your tree
+are available in the git repository at:
 
-I can ping you when the steps 1 and 2 are completed.
+  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-soc
 
-Regards,
+for you to fetch changes up to c07f98a73978964065b57079cae9ab9d060769fe:
+
+  ARM: at91/soc: reference the whole sama5d2 family (2016-03-29 16:34:31 +0200)
+
+----------------------------------------------------------------
+First SoC batch for 4.7:
+- chipid registers reading for SoC detection
+
+----------------------------------------------------------------
+Ludovic Desroches (2):
+      ARM: at91: use chipid device for soc detection
+      ARM: at91/soc: reference the whole sama5d2 family
+
+ .../devicetree/bindings/arm/atmel-at91.txt         |  4 ++
+ arch/arm/mach-at91/sama5.c                         | 20 +++++-
+ arch/arm/mach-at91/soc.c                           | 81 +++++++++++++++++-----
+ arch/arm/mach-at91/soc.h                           | 12 +++-
+ 4 files changed, 97 insertions(+), 20 deletions(-)
 
 -- 
-Julien Grall
+Nicolas Ferre
