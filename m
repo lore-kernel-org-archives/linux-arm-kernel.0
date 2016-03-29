@@ -1,115 +1,34 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Tue, 29 Mar 2016 19:07:34 +0200
-Subject: [RFC v5 06/17] dma-reserved-iommu: iommu_get/put_single_reserved
-In-Reply-To: <20160310115253.GA14609@e106794-lin.cambridge.arm.com>
-References: <1456856877-4817-1-git-send-email-eric.auger@linaro.org>
- <1456856877-4817-7-git-send-email-eric.auger@linaro.org>
- <20160310115253.GA14609@e106794-lin.cambridge.arm.com>
-Message-ID: <56FAB656.7030400@linaro.org>
+From: patrick@puiterwijk.org (Patrick Uiterwijk)
+Date: Tue, 29 Mar 2016 17:09:11 +0000
+Subject: [PATCH 1/2] ARM: mvebu: correct the usb node name from usb@ to
+ ehci@
+In-Reply-To: <20160329190648.1f37cbc3@free-electrons.com>
+References: <1459259813-5278-1-git-send-email-patrick@puiterwijk.org>
+ <1459259813-5278-2-git-send-email-patrick@puiterwijk.org>
+ <4079235.sABSXKnJCE@wuerfel> <87zithutnn.fsf@free-electrons.com>
+ <CAJweMdbywGZF1qJF2Nv3RTJb_dULOS_JAQpsPJjYgG+5Y7HU3w@mail.gmail.com>
+ <20160329190648.1f37cbc3@free-electrons.com>
+Message-ID: <CAJweMdZXSjichcbMkg9o8=+Ecjmqg1pNU8UTOL1uY6TJXzZvxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Philippe,
-On 03/10/2016 12:52 PM, Jean-Philippe Brucker wrote:
-> Hi Eric,
-> 
-> On Tue, Mar 01, 2016 at 06:27:46PM +0000, Eric Auger wrote:
->> [...]
->> +
->> +int iommu_get_single_reserved(struct iommu_domain *domain,
->> +			      phys_addr_t addr, int prot,
->> +			      dma_addr_t *iova)
->> +{
->> +	unsigned long order = __ffs(domain->ops->pgsize_bitmap);
->> +	size_t page_size = 1 << order;
->> +	phys_addr_t mask = page_size - 1;
->> +	phys_addr_t aligned_addr = addr & ~mask;
->> +	phys_addr_t offset  = addr - aligned_addr;
->> +	struct iommu_reserved_binding *b;
->> +	struct iova *p_iova;
->> +	struct iova_domain *iovad =
->> +		(struct iova_domain *)domain->reserved_iova_cookie;
->> +	int ret;
->> +
->> +	if (!iovad)
->> +		return -EINVAL;
->> +
->> +	mutex_lock(&domain->reserved_mutex);
-> 
-> I believe this function could get called from the chunk of __setup_irq
-> that is executed atomically:
-> 
->     * request_threaded_irq
->     * __setup_irq
->     * irq_startup
->     * irq_domain_activate_irq
->     * msi_domain_activate
->     * msi_compose
->     * iommu_get_single_reserved
-> 
-> If this is the case, we should probably use a spinlock to protect the
-> iova_domain...
-Please apologize for the delay, I was in vacation.
-Thank you for spotting this flow. I will rework the locking.
-> 
->> +
->> +	b = find_reserved_binding(domain, aligned_addr, page_size);
->> +	if (b) {
->> +		*iova = b->iova + offset;
->> +		kref_get(&b->kref);
->> +		ret = 0;
->> +		goto unlock;
->> +	}
->> +
->> +	/* there is no existing reserved iova for this pa */
->> +	p_iova = alloc_iova(iovad, 1, iovad->dma_32bit_pfn, true);
->> +	if (!p_iova) {
->> +		ret = -ENOMEM;
->> +		goto unlock;
->> +	}
->> +	*iova = p_iova->pfn_lo << order;
->> +
->> +	b = kzalloc(sizeof(*b), GFP_KERNEL);
-> 
-> ... and GFP_ATOMIC here.
-OK
+Hi,
 
-Thank you for your time!
+On Tue, Mar 29, 2016 at 5:06 PM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+> Hello,
+>
+> On Tue, 29 Mar 2016 16:49:43 +0000, Patrick Uiterwijk wrote:
+>
+>> Thank you for this pointer, setting fdt_skip_update no did fix this
+>> issue indeed.
+>
+> Hum, what should fix the problem is to set fdt_skip_update to "yes". If
+> you set it to "no", then the Marvell U-Boot will do its funky DTB
+> tweaks which are not necessarily compatible with the mainline kernel
+> DT bindings.
 
-Best Regards
+Correct, I meant setting it to "yes" fixed the problem, sorry for the confusion.
 
-Eric
-> 
-> Thanks,
-> Jean-Philippe
-> 
->> +	if (!b) {
->> +		ret = -ENOMEM;
->> +		goto free_iova_unlock;
->> +	}
->> +
->> +	ret = iommu_map(domain, *iova, aligned_addr, page_size, prot);
->> +	if (ret)
->> +		goto free_binding_iova_unlock;
->> +
->> +	kref_init(&b->kref);
->> +	kref_get(&b->kref);
->> +	b->domain = domain;
->> +	b->addr = aligned_addr;
->> +	b->iova = *iova;
->> +	b->size = page_size;
->> +
->> +	link_reserved_binding(domain, b);
->> +
->> +	*iova += offset;
->> +	goto unlock;
->> +
->> +free_binding_iova_unlock:
->> +	kfree(b);
->> +free_iova_unlock:
->> +	free_iova(iovad, *iova >> order);
->> +unlock:
->> +	mutex_unlock(&domain->reserved_mutex);
->> +	return ret;
->> +}
->> +EXPORT_SYMBOL_GPL(iommu_get_single_reserved);
+
+Patrick
