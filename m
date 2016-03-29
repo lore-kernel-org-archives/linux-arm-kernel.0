@@ -1,88 +1,40 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Tue, 29 Mar 2016 17:35:49 -0300
-Subject: [PATCH 3/3] ARM: s3c24xx: Use the panic LED trigger for GTA02
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 Mar 2016 22:44:55 +0200
+Subject: [PATCH 0/3] Add a new LED trigger for kernel panics (and use it)
 In-Reply-To: <1459283749-22451-1-git-send-email-ezequiel@vanguardiasur.com.ar>
 References: <1459283749-22451-1-git-send-email-ezequiel@vanguardiasur.com.ar>
-Message-ID: <1459283749-22451-4-git-send-email-ezequiel@vanguardiasur.com.ar>
+Message-ID: <5392030.GWFj1RcGVs@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let's take advantage of the recently introduced panic LED trigger,
-and get rid of the open-coded panic_blink usage.
+On Tuesday 29 March 2016 17:35:46 Ezequiel Garcia wrote:
+> This patchset adds a very simple kernel panic LED trigger,
+> by hooking into panic_blink. I've tested this trigger on
+> ARM Armada XP OpenBlocks AX3-4 machine.
+> 
+> The trigger is then used to replace the open-coded panic_blink
+> usage in GTA02 board.
+> 
+> Note that I don't have a GTA02 board, so the last patch is only
+> built tested.
+> 
+> Ezequiel Garcia (3):
+>   leds: trigger: Introduce a kernel panic LED trigger
+>   ARM: configs: Enable panic LED trigger on s3c2410
+>   ARM: s3c24xx: Use the panic LED trigger for GTA02
+> 
+>  arch/arm/configs/s3c2410_defconfig   |  1 +
+>  arch/arm/mach-s3c24xx/mach-gta02.c   | 35 ++++++++++++++++-------------------
+>  drivers/leds/trigger/Kconfig         |  7 +++++++
+>  drivers/leds/trigger/Makefile        |  1 +
+>  drivers/leds/trigger/ledtrig-panic.c | 30 ++++++++++++++++++++++++++++++
+>  5 files changed, 55 insertions(+), 19 deletions(-)
+>  create mode 100644 drivers/leds/trigger/ledtrig-panic.c
 
-Built tested only.
+Now we just need to port this 13-year old patch:
 
-Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
----
- arch/arm/mach-s3c24xx/mach-gta02.c | 35 ++++++++++++++++-------------------
- 1 file changed, 16 insertions(+), 19 deletions(-)
+https://lwn.net/Articles/21857/
 
-diff --git a/arch/arm/mach-s3c24xx/mach-gta02.c b/arch/arm/mach-s3c24xx/mach-gta02.c
-index 27ae6877550f..e794d55abc9e 100644
---- a/arch/arm/mach-s3c24xx/mach-gta02.c
-+++ b/arch/arm/mach-s3c24xx/mach-gta02.c
-@@ -71,6 +71,7 @@
- #include <linux/platform_data/touchscreen-s3c2410.h>
- #include <linux/platform_data/usb-ohci-s3c2410.h>
- #include <linux/platform_data/usb-s3c2410_udc.h>
-+#include <linux/platform_data/leds-s3c24xx.h>
- 
- #include <mach/fb.h>
- #include <mach/hardware.h>
-@@ -89,22 +90,6 @@
- 
- static struct pcf50633 *gta02_pcf;
- 
--/*
-- * This gets called frequently when we paniced.
-- */
--
--static long gta02_panic_blink(int state)
--{
--	long delay = 0;
--	char led;
--
--	led = (state) ? 1 : 0;
--	gpio_direction_output(GTA02_GPIO_AUX_LED, led);
--
--	return delay;
--}
--
--
- static struct map_desc gta02_iodesc[] __initdata = {
- 	{
- 		.virtual	= 0xe0000000,
-@@ -500,6 +485,20 @@ static struct platform_device gta02_buttons_device = {
- 	},
- };
- 
-+static struct s3c24xx_led_platdata gta02_panic_led_pdata = {
-+	.name = "panic",
-+	.gpio = GTA02_GPIO_AUX_LED,
-+	.def_trigger = "panic",
-+};
-+
-+static struct platform_device gta02_panic_led_device = {
-+	.name = "s3c24xx_led",
-+	.id = -1,
-+	.dev = {
-+		.platform_data = &gta02_panic_led_pdata,
-+	},
-+};
-+
- static void __init gta02_map_io(void)
- {
- 	s3c24xx_init_io(gta02_iodesc, ARRAY_SIZE(gta02_iodesc));
-@@ -563,9 +562,7 @@ static void gta02_poweroff(void)
- 
- static void __init gta02_machine_init(void)
- {
--	/* Set the panic callback to turn AUX LED on or off. */
--	panic_blink = gta02_panic_blink;
--
-+	platform_device_register(&gta02_panic_led_device);
- 	s3c_pm_init();
- 
- #ifdef CONFIG_CHARGER_PCF50633
--- 
-2.7.0
+;-)
+
+	Arnd
