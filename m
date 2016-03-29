@@ -1,206 +1,99 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 29 Mar 2016 16:37:16 +0200
-Subject: [PATCH v3 01/18] clocksource: sp804: Add support for OX810SE
- 24bit timer width
-In-Reply-To: <1458838215-23314-2-git-send-email-narmstrong@baylibre.com>
-References: <1458838215-23314-1-git-send-email-narmstrong@baylibre.com>
- <1458838215-23314-2-git-send-email-narmstrong@baylibre.com>
-Message-ID: <56FA931C.5040900@linaro.org>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Tue, 29 Mar 2016 07:38:29 -0700
+Subject: [PATCH 06/12] ARM: dts: dragonboard-600c: Add eMMC and SD card
+ support
+In-Reply-To: <1458762458-9584-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1458762366-9233-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1458762458-9584-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20160329143829.GJ8929@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/24/2016 05:49 PM, Neil Armstrong wrote:
-> In order to support the Dual-Timer on the PLX Technology OX810SE SoC,
-> implement variable counter width, keeping 32bit as default width.
-> Add new compatible string oxsemi,ox810se-rps-timer in order to select
-> the 24bit counter width.
->
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+On Wed 23 Mar 12:47 PDT 2016, Srinivas Kandagatla wrote:
 
-Hi Neil,
-
-could you encapsulate the timer properties into a structure:
-
-struct timer_sp804 {
-	struct clock_event_device sp804_clockevent;
-	void __iomem *base;
-	unsigned int rate;
-	unsigned int width;
-}
-
-and pass this structure around instead of an ugly '32' constant ?
-
-Thanks !
-
-   -- Daniel
-
+> This patch adds eMMC and SD card support with card detect and adding
+> required regulators.
+> 
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 > ---
->   drivers/clocksource/timer-sp804.c | 40 ++++++++++++++++++++++++++-------------
->   include/clocksource/timer-sp804.h | 11 ++++++-----
->   2 files changed, 33 insertions(+), 18 deletions(-)
->
-> diff --git a/drivers/clocksource/timer-sp804.c b/drivers/clocksource/timer-sp804.c
-> index 5f45b9a..bdf3e14 100644
-> --- a/drivers/clocksource/timer-sp804.c
-> +++ b/drivers/clocksource/timer-sp804.c
-> @@ -80,9 +80,11 @@ void __init sp804_timer_disable(void __iomem *base)
->   void __init __sp804_clocksource_and_sched_clock_init(void __iomem *base,
->   						     const char *name,
->   						     struct clk *clk,
-> -						     int use_sched_clock)
-> +						     int use_sched_clock,
-> +						     unsigned int width)
->   {
->   	long rate;
-> +	u32 config = TIMER_CTRL_ENABLE | TIMER_CTRL_PERIODIC;
->
->   	if (!clk) {
->   		clk = clk_get_sys("sp804", name);
-> @@ -98,19 +100,21 @@ void __init __sp804_clocksource_and_sched_clock_init(void __iomem *base,
->   	if (rate < 0)
->   		return;
->
-> +	if (width == 32)
-> +		config |= TIMER_CTRL_32BIT;
+>  .../arm/boot/dts/qcom-apq8064-dragonboard-600c.dts | 41 ++++++++++++++++++++++
+>  1 file changed, 41 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts b/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
+> index 0a0bcfe..a977314 100644
+> --- a/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
+> +++ b/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
+> @@ -1,4 +1,5 @@
+>  #include "qcom-apq8064-v2.0.dtsi"
+> +#include <dt-bindings/gpio/gpio.h>
+>  
+>  / {
+>  	model = "Qualcomm Technologies, Inc. APQ8064 DragonBoard600c";
+> @@ -22,6 +23,16 @@
+>  	};
+>  
+>  	soc {
+> +		pinctrl at 800000 {
+> +			card_detect: card_detect {
+> +				mux {
+> +					pins = "gpio26";
+> +					function = "gpio";
+> +					bias-disable;
+> +				};
+> +			};
+> +		};
 > +
->   	/* setup timer 0 as free-running clocksource */
->   	writel(0, base + TIMER_CTRL);
->   	writel(0xffffffff, base + TIMER_LOAD);
->   	writel(0xffffffff, base + TIMER_VALUE);
-> -	writel(TIMER_CTRL_32BIT | TIMER_CTRL_ENABLE | TIMER_CTRL_PERIODIC,
-> -		base + TIMER_CTRL);
-> +	writel(config, base + TIMER_CTRL);
->
->   	clocksource_mmio_init(base + TIMER_VALUE, name,
-> -		rate, 200, 32, clocksource_mmio_readl_down);
-> +		rate, 200, width, clocksource_mmio_readl_down);
->
->   	if (use_sched_clock) {
->   		sched_clock_base = base;
-> -		sched_clock_register(sp804_read, 32, rate);
-> +		sched_clock_register(sp804_read, width, rate);
->   	}
->   }
->
-> @@ -186,7 +190,9 @@ static struct irqaction sp804_timer_irq = {
->   	.dev_id		= &sp804_clockevent,
->   };
->
-> -void __init __sp804_clockevents_init(void __iomem *base, unsigned int irq, struct clk *clk, const char *name)
-> +void __init __sp804_clockevents_init(void __iomem *base, unsigned int irq,
-> +				     struct clk *clk, const char *name,
-> +				     unsigned int width)
->   {
->   	struct clock_event_device *evt = &sp804_clockevent;
->   	long rate;
-> @@ -212,7 +218,7 @@ void __init __sp804_clockevents_init(void __iomem *base, unsigned int irq, struc
->   	writel(0, base + TIMER_CTRL);
->
->   	setup_irq(irq, &sp804_timer_irq);
-> -	clockevents_config_and_register(evt, rate, 0xf, 0xffffffff);
-> +	clockevents_config_and_register(evt, rate, 0xf, GENMASK(width-1, 0));
->   }
->
->   static void __init sp804_of_init(struct device_node *np)
-> @@ -223,6 +229,7 @@ static void __init sp804_of_init(struct device_node *np)
->   	u32 irq_num = 0;
->   	struct clk *clk1, *clk2;
->   	const char *name = of_get_property(np, "compatible", NULL);
-> +	u32 width = 32;
->
->   	base = of_iomap(np, 0);
->   	if (WARN_ON(!base))
-> @@ -254,14 +261,19 @@ static void __init sp804_of_init(struct device_node *np)
->   	if (irq <= 0)
->   		goto err;
->
-> +	if (of_device_is_compatible(np, "oxsemi,ox810se-rps-timer"))
-> +		width = 24;
+>  		rpm at 108000 {
+>  			regulators {
+>  				vdd_l1_l2_l12_l18-supply = <&pm8921_s4>;
+> @@ -62,6 +73,18 @@
+>  					regulator-max-microvolt = <1300000>;
+>  					qcom,switch-mode-frequency = <3200000>;
+>  				 };
 > +
->   	of_property_read_u32(np, "arm,sp804-has-irq", &irq_num);
->   	if (irq_num == 2) {
-> -		__sp804_clockevents_init(base + TIMER_2_BASE, irq, clk2, name);
-> -		__sp804_clocksource_and_sched_clock_init(base, name, clk1, 1);
-> +		__sp804_clockevents_init(base + TIMER_2_BASE, irq,
-> +					 clk2, name, width);
-> +		__sp804_clocksource_and_sched_clock_init(base, name,
-> +							 clk1, 1, width);
->   	} else {
-> -		__sp804_clockevents_init(base, irq, clk1 , name);
-> +		__sp804_clockevents_init(base, irq, clk1, name, width);
->   		__sp804_clocksource_and_sched_clock_init(base + TIMER_2_BASE,
-> -							 name, clk2, 1);
-> +							 name, clk2, 1, width);
->   	}
->   	initialized = true;
->
-> @@ -270,6 +282,7 @@ err:
->   	iounmap(base);
->   }
->   CLOCKSOURCE_OF_DECLARE(sp804, "arm,sp804", sp804_of_init);
-> +CLOCKSOURCE_OF_DECLARE(ox810se, "oxsemi,ox810se-rps-timer", sp804_of_init);
->
->   static void __init integrator_cp_of_init(struct device_node *np)
->   {
-> @@ -293,13 +306,14 @@ static void __init integrator_cp_of_init(struct device_node *np)
->   		goto err;
->
->   	if (!init_count)
-> -		__sp804_clocksource_and_sched_clock_init(base, name, clk, 0);
-> +		__sp804_clocksource_and_sched_clock_init(base, name,
-> +							 clk, 0, 32);
->   	else {
->   		irq = irq_of_parse_and_map(np, 0);
->   		if (irq <= 0)
->   			goto err;
->
-> -		__sp804_clockevents_init(base, irq, clk, name);
-> +		__sp804_clockevents_init(base, irq, clk, name, 32);
->   	}
->
->   	init_count++;
-> diff --git a/include/clocksource/timer-sp804.h b/include/clocksource/timer-sp804.h
-> index 1f8a1ca..893d730 100644
-> --- a/include/clocksource/timer-sp804.h
-> +++ b/include/clocksource/timer-sp804.h
-> @@ -4,25 +4,26 @@
->   struct clk;
->
->   void __sp804_clocksource_and_sched_clock_init(void __iomem *,
-> -					      const char *, struct clk *, int);
-> +					      const char *, struct clk *,
-> +					      int, unsigned int);
->   void __sp804_clockevents_init(void __iomem *, unsigned int,
-> -			      struct clk *, const char *);
-> +			      struct clk *, const char *, unsigned int);
->   void sp804_timer_disable(void __iomem *);
->
->   static inline void sp804_clocksource_init(void __iomem *base, const char *name)
->   {
-> -	__sp804_clocksource_and_sched_clock_init(base, name, NULL, 0);
-> +	__sp804_clocksource_and_sched_clock_init(base, name, NULL, 0, 32);
->   }
->
->   static inline void sp804_clocksource_and_sched_clock_init(void __iomem *base,
->   							  const char *name)
->   {
-> -	__sp804_clocksource_and_sched_clock_init(base, name, NULL, 1);
-> +	__sp804_clocksource_and_sched_clock_init(base, name, NULL, 1, 32);
->   }
->
->   static inline void sp804_clockevents_init(void __iomem *base, unsigned int irq, const char *name)
->   {
-> -	__sp804_clockevents_init(base, irq, NULL, name);
-> +	__sp804_clockevents_init(base, irq, NULL, name, 32);
->
->   }
->   #endif
->
+> +				l5 {
+> +					regulator-min-microvolt = <2750000>;
+> +					regulator-max-microvolt = <3000000>;
+> +					bias-pull-down;
+> +				};
+> +
+> +				l6 {
+> +					regulator-min-microvolt = <2950000>;
+> +					regulator-max-microvolt = <2950000>;
+> +					bias-pull-down;
+> +				};
 
+I would prefer if you folded these into the regulator patch.
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>  			};
+>  		};
+>  
+> @@ -87,5 +110,23 @@
+>  				pinctrl-0 = <&gsbi7_uart_2pins>;
+>  			};
+>  		};
+> +
+> +		amba {
+> +			/* eMMC */
+> +			sdcc at 12400000 {
+> +				status = "okay";
+> +				vmmc-supply = <&pm8921_l5>;
+> +				vqmmc-supply = <&pm8921_s4>;
+> +			};
+> +
+> +			/* External micro SD card */
+> +			sdcc at 12180000 {
+> +				status = "okay";
+> +				vmmc-supply = <&pm8921_l6>;
+> +				pinctrl-names	= "default";
+> +				pinctrl-0	= <&card_detect>;
+> +				cd-gpios	= <&tlmm_pinmux 26 GPIO_ACTIVE_HIGH>;
+> +			};
+> +		};
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Other than that,
+
+Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+
+Regards,
+Bjorn
