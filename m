@@ -1,49 +1,61 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 29 Mar 2016 11:03:06 +0100
-Subject: [PATCH] arm64/sunxi: 4.6-rc1: Add dependency on generic irq chip
-Message-ID: <1459245786-11905-1-git-send-email-suzuki.poulose@arm.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 29 Mar 2016 12:04:34 +0200
+Subject: [PATCH] ARM: bcm2835: add CPU node for ARM core
+In-Reply-To: <20160329094158.GB26574@leverpostej>
+References: <1459182081-30819-1-git-send-email-stefan.wahren@i2se.com>
+ <20160329094158.GB26574@leverpostej>
+Message-ID: <56FA5332.4050707@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit ce3dd55b99b1 ("arm64: Introduce Allwinner SoC config option"),
-added support for ARCH_SUNXI on arm64, but failed to select
-GENERIC_IRQ_CHIP, which is required for drivers/irqchip/irq-sunxi-nmi.c
-and causes build failures like :
+Am 29.03.2016 um 11:41 schrieb Mark Rutland:
+> On Mon, Mar 28, 2016 at 04:21:20PM +0000, Stefan Wahren wrote:
+>> This patch adds the CPU node of the BCM2835 into the DT.
+>>
+>> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+>> ---
+>>  arch/arm/boot/dts/bcm2835.dtsi |   11 +++++++++++
+>>  1 file changed, 11 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+>> index b83b326..e87aba1 100644
+>> --- a/arch/arm/boot/dts/bcm2835.dtsi
+>> +++ b/arch/arm/boot/dts/bcm2835.dtsi
+>> @@ -3,6 +3,17 @@
+>>  / {
+>>  	compatible = "brcm,bcm2835";
+>>  
+>> +	cpus {
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +
+>> +		cpu at 0 {
+>> +			device_type = "cpu";
+>> +			compatible = "arm,arm1176jzf-s", "arm,arm1176";
+>> +			reg = <0x0>;
+>> +		};
+>> +	};
+> Minor nit: the "arm,arm1176" fallback isn't documented, nor used
+> elsewhere, so it can/should be dropped.
 
-  UPD     include/generated/compile.h
-  CC      init/version.o
-  LD      init/built-in.o
-drivers/built-in.o: In function `sunxi_sc_nmi_set_type':
-drivers/irqchip/irq-sunxi-nmi.c:114: undefined reference to `irq_setup_alt_chip'
-drivers/built-in.o: In function `irq_domain_add_linear':
-include/linux/irqdomain.h:253: undefined reference to `irq_generic_chip_ops'
-include/linux/irqdomain.h:253: undefined reference to `irq_generic_chip_ops'
-drivers/built-in.o: In function `sunxi_sc_nmi_irq_init':
-drivers/irqchip/irq-sunxi-nmi.c:146: undefined reference to `irq_alloc_domain_generic_chips'
-drivers/irqchip/irq-sunxi-nmi.c:161: undefined reference to `irq_get_domain_generic_chip'
-drivers/irqchip/irq-sunxi-nmi.c:170: undefined reference to `irq_gc_mask_clr_bit'
-drivers/irqchip/irq-sunxi-nmi.c:171: undefined reference to `irq_gc_mask_set_bit'
-drivers/irqchip/irq-sunxi-nmi.c:172: undefined reference to `irq_gc_ack_set_bit'
-drivers/irqchip/irq-sunxi-nmi.c:170: undefined reference to `irq_gc_mask_clr_bit'
+This fallback came from arch/arm/boot/dts/s3c64xx.dtsi
 
-Fixes: commit ce3dd55b99b1 ("arm64: Introduce Allwinner SoC config option")
-Cc: Andre Przywara <andre.przywara@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- arch/arm64/Kconfig.platforms |    1 +
- 1 file changed, 1 insertion(+)
+I will send a V2 without the fallback.
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index efa77c1..521b1ec 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -2,6 +2,7 @@ menu "Platform selection"
- 
- config ARCH_SUNXI
- 	bool "Allwinner sunxi 64-bit SoC Family"
-+	select GENERIC_IRQ_CHIP
- 	help
- 	  This enables support for Allwinner sunxi based SoCs like the A64.
- 
--- 
-1.7.9.5
+Stefan
+
+>
+> Otherwise, this looks fine per [1]. With the above change, feel free to
+> add my ack.
+>
+> Mark.
+>
+> [1] Documentation/devicetree/bindings/arm/cpus.txt
+>
+>> +
+>>  	soc {
+>>  		ranges = <0x7e000000 0x20000000 0x02000000>;
+>>  		dma-ranges = <0x40000000 0x00000000 0x20000000>;
+>> -- 
+>> 1.7.9.5
+>>
