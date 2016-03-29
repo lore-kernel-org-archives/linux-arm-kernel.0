@@ -1,99 +1,30 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 29 Mar 2016 07:38:29 -0700
-Subject: [PATCH 06/12] ARM: dts: dragonboard-600c: Add eMMC and SD card
- support
-In-Reply-To: <1458762458-9584-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1458762366-9233-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1458762458-9584-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <20160329143829.GJ8929@tuxbot>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 29 Mar 2016 16:39:13 +0200
+Subject: [PATCH v4 9/9] clocksource: arm_arch_timer: Remove
+ arch_timer_get_timecounter
+In-Reply-To: <1458842023-31853-10-git-send-email-julien.grall@arm.com>
+References: <1458842023-31853-1-git-send-email-julien.grall@arm.com>
+ <1458842023-31853-10-git-send-email-julien.grall@arm.com>
+Message-ID: <56FA9391.1040007@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 23 Mar 12:47 PDT 2016, Srinivas Kandagatla wrote:
+On 03/24/2016 06:53 PM, Julien Grall wrote:
+> The only call of arch_timer_get_timecounter (in KVM) has been removed.
+>
+> Signed-off-by: Julien Grall <julien.grall@arm.com>
+> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-> This patch adds eMMC and SD card support with card detect and adding
-> required regulators.
-> 
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
->  .../arm/boot/dts/qcom-apq8064-dragonboard-600c.dts | 41 ++++++++++++++++++++++
->  1 file changed, 41 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts b/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
-> index 0a0bcfe..a977314 100644
-> --- a/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
-> +++ b/arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
-> @@ -1,4 +1,5 @@
->  #include "qcom-apq8064-v2.0.dtsi"
-> +#include <dt-bindings/gpio/gpio.h>
->  
->  / {
->  	model = "Qualcomm Technologies, Inc. APQ8064 DragonBoard600c";
-> @@ -22,6 +23,16 @@
->  	};
->  
->  	soc {
-> +		pinctrl at 800000 {
-> +			card_detect: card_detect {
-> +				mux {
-> +					pins = "gpio26";
-> +					function = "gpio";
-> +					bias-disable;
-> +				};
-> +			};
-> +		};
-> +
->  		rpm at 108000 {
->  			regulators {
->  				vdd_l1_l2_l12_l18-supply = <&pm8921_s4>;
-> @@ -62,6 +73,18 @@
->  					regulator-max-microvolt = <1300000>;
->  					qcom,switch-mode-frequency = <3200000>;
->  				 };
-> +
-> +				l5 {
-> +					regulator-min-microvolt = <2750000>;
-> +					regulator-max-microvolt = <3000000>;
-> +					bias-pull-down;
-> +				};
-> +
-> +				l6 {
-> +					regulator-min-microvolt = <2950000>;
-> +					regulator-max-microvolt = <2950000>;
-> +					bias-pull-down;
-> +				};
+Hi Julien,
 
-I would prefer if you folded these into the regulator patch.
+do you want me to take this patch through my tree ?
 
->  			};
->  		};
->  
-> @@ -87,5 +110,23 @@
->  				pinctrl-0 = <&gsbi7_uart_2pins>;
->  			};
->  		};
-> +
-> +		amba {
-> +			/* eMMC */
-> +			sdcc at 12400000 {
-> +				status = "okay";
-> +				vmmc-supply = <&pm8921_l5>;
-> +				vqmmc-supply = <&pm8921_s4>;
-> +			};
-> +
-> +			/* External micro SD card */
-> +			sdcc at 12180000 {
-> +				status = "okay";
-> +				vmmc-supply = <&pm8921_l6>;
-> +				pinctrl-names	= "default";
-> +				pinctrl-0	= <&card_detect>;
-> +				cd-gpios	= <&tlmm_pinmux 26 GPIO_ACTIVE_HIGH>;
-> +			};
-> +		};
+   -- Daniel
 
-Other than that,
 
-Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-Regards,
-Bjorn
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
