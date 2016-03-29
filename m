@@ -1,31 +1,36 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Tue, 29 Mar 2016 09:17:04 +0800
-Subject: [PATCH v6 0/3] Add more clock compatible features and support the
- RK3399 clock
-In-Reply-To: <4649399.g7v7zsVJik@diego>
-References: <1459158697-8218-1-git-send-email-zhengxing@rock-chips.com>
- <4649399.g7v7zsVJik@diego>
-Message-ID: <56F9D790.1080608@rock-chips.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 28 Mar 2016 18:24:28 -0700
+Subject: [PATCH v2 1/5] phy: Rename phy-brcmstb-sata driver to
+ phy-brcm-sata driver
+In-Reply-To: <1459140510-5317-2-git-send-email-anup.patel@broadcom.com>
+References: <1459140510-5317-1-git-send-email-anup.patel@broadcom.com>
+ <1459140510-5317-2-git-send-email-anup.patel@broadcom.com>
+Message-ID: <56F9D94C.5060905@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Le 27/03/2016 21:48, Anup Patel a ?crit :
+> Currently, we have a common SATA3 PHY driver for all Broadcom
+> STB SoCs. This driver can be extended and re-used for Broadcom
+> iProc SoCs having same SATA3 PHY.
+> 
+> This patch renames existing Broadcom STB SATA3 PHY driver to
+> common Broadcom SATA3 PHY driver to share this PHY driver across
+> Broadcom SoCs.
+> 
+> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+> ---
+[snip]
+> +config PHY_BRCM_SATA
+> +	tristate "Broadcom SATA PHY driver"
+> +	depends on ARCH_BRCMSTB || ARCH_BCM_IPROC || BMIPS_GENERIC || COMPILE_TEST
+> +	depends on OF
+> +	select GENERIC_PHY
+> +	default ARCH_BCM_IPROC
 
-On 2016?03?28? 20:59, Heiko St?bner wrote:
-> Am Montag, 28. M?rz 2016, 17:51:34 schrieb Xing Zheng:
->>    The patch series add support more mux parameters and multiple
->> clock providers for the rockchip features of the clock framework,
->> and support the clock controller for the RK3399.
-> applied all 3 for 4.7 with one change:
->
-> I've dropped the grf paragraph from the binding doc (as it is not used
-> anymore) and also dropped the gmac_phy_rx_clk input clock.
->
-> We can add these back once they are getting used in the future.
->
->
-> Heiko
->
-OK, thanks Heiko. :-)
+This could be a separate patch of its own, but I do not think it matters
+that much.
 
+Acked-by: Florian Fainelli <f.fainelli@gmail.com>
 -- 
-- Xing Zheng
+Florian
