@@ -1,62 +1,149 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Tue, 29 Mar 2016 19:45:16 +0800
-Subject: [RFC PATCH v1 0/4] Add Rockchip RGA support
-In-Reply-To: <56F11D46.8080208@suse.de>
-References: <1458552518-25527-1-git-send-email-ykk@rock-chips.com>
- <1511371.I0NIYzh3kP@diego> <56EFE66A.8020404@rock-chips.com>
- <56F11D46.8080208@suse.de>
-Message-ID: <56FA6ACC.5080202@rock-chips.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 29 Mar 2016 12:45:44 +0100
+Subject: [RFC PATCH 3/3] arm64: Expose cpu vender id and model name
+ through cpuinfo
+In-Reply-To: <1458898209-7486-4-git-send-email-wangkefeng.wang@huawei.com>
+References: <1458898209-7486-1-git-send-email-wangkefeng.wang@huawei.com>
+ <1458898209-7486-4-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <20160329114544.GF3701@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andreas,
+On Fri, Mar 25, 2016 at 05:30:09PM +0800, Kefeng Wang wrote:
+> It is helpful to show the name of chip vendor and CPU model
+> to customers in cpuinfo, identify them by using CPU implementer
+> and CPU part is not intuitive(compared with x86).
+> 
+> We are complained for this several times, so expose them.
 
-On 03/22/2016 06:24 PM, Andreas F?rber wrote:
-> Hi Yakir,
->
-> Am 21.03.2016 um 13:17 schrieb Yakir Yang:
->> On 03/21/2016 07:29 PM, Heiko St?bner wrote:
->>> Am Montag, 21. M?rz 2016, 17:28:38 schrieb Yakir Yang:
->>>> This patch set would add the RGA direct rendering based 2d graphics
->>>> acceleration module.
->>> very cool to see that.
->> ;)
->>>> This patch set is based on git repository below:
->>>> git://people.freedesktop.org/~airlied/linux drm-next
->>>> commit id: 568d7c764ae01f3706085ac8f0d8a8ac7e826bd7
->>>>
->>>> And the RGA driver is based on Exynos G2D driver, it only manages the
->>>> command lists received from user, so user should make the command list
->>>> to data and registers needed by operation to use.
->>>>
->>>> I have prepared an userspace demo application for testing:
->>>>      https://github.com/yakir-Yang/libdrm-rockchip
->>>> That is a rockchip libdrm library, and I have write a simple test case
->>>> "rockchip_rga_test" that would test the below RGA features:
->>>> - solid
->>>> - copy
->>>> - rotation
->>>> - flip
->>>> - window clip
->>>> - dithering
->>> Did you submit your libdrm changes as well?
->>>
->>> Userspace-interfaces need to be stable so the other side must also get
->>> accepted - even before the kernel change if I remember correctly.
->> Got it, and I just saw exynos_fimg2d already landed at mainline libdrm.
->> But I don't find the way to submit patches to libdrm, would you like
->> share some helps here ;)
-> If you're using Exynos as an example, please keep in mind that the
-> libdrm license is MIT/X11, not GPL as the kernel. For our Linux distro
-> we had to disable some Exynos parts because they snuck some GPL code in
-> there and redistributing libdrm under GPL would cause a big headache
-> (review of all packages directly or indirectly linking against it).
+Isn't the same information already provided in numeric form?
 
-Hmmm... I just saw exynos_drm.h still declared the GNU license,
-is it convince for you to share some specific example here ;)
+We don't want redundant forms of the same information in an ABI unless
+there's a clear reason why software needs it...
 
-Thanks,
-- Yakir
-> Thanks,
-> Andreas
->
+Cheers
+---Dave
+
+
+> 
+> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+> ---
+>  arch/arm64/include/asm/cpu.h |  2 ++
+>  arch/arm64/kernel/cpuinfo.c  | 62 ++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 64 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/cpu.h b/arch/arm64/include/asm/cpu.h
+> index 13a6103..b8c3d79 100644
+> --- a/arch/arm64/include/asm/cpu.h
+> +++ b/arch/arm64/include/asm/cpu.h
+> @@ -25,6 +25,8 @@
+>   */
+>  struct cpuinfo_arm64 {
+>  	struct cpu	cpu;
+> +	char		vendor[16];
+> +	char		model_name[16];
+>  	u32		reg_ctr;
+>  	u32		reg_cntfrq;
+>  	u32		reg_dczid;
+> diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+> index 488d49a..da5f7df 100644
+> --- a/arch/arm64/kernel/cpuinfo.c
+> +++ b/arch/arm64/kernel/cpuinfo.c
+> @@ -19,6 +19,7 @@
+>  #include <asm/cpu.h>
+>  #include <asm/cputype.h>
+>  #include <asm/cpufeature.h>
+> +#include <asm/elf.h>
+>  
+>  #include <linux/bitops.h>
+>  #include <linux/bug.h>
+> @@ -100,6 +101,62 @@ static const char *const compat_hwcap2_str[] = {
+>  };
+>  #endif /* CONFIG_COMPAT */
+>  
+> +static void cpuinfo_get_vendor_model(struct cpuinfo_arm64 *info)
+> +{
+> +	char *vendor = info->vendor;
+> +	char *name = info->model_name;
+> +	u32 midr = info->reg_midr;
+> +	u32 impl = MIDR_IMPLEMENTOR(midr);
+> +	u32 part = MIDR_PARTNUM(midr);
+> +
+> +	switch (impl) {
+> +	case ARM_CPU_IMP_ARM:
+> +		strcpy(vendor, "ARM");
+> +		switch (part) {
+> +		case ARM_CPU_PART_AEM_V8:
+> +			strcpy(name, "AEM-V8");
+> +			break;
+> +		case ARM_CPU_PART_FOUNDATION:
+> +			strcpy(name, "Foundation");
+> +			break;
+> +		case ARM_CPU_PART_CORTEX_A53:
+> +			strcpy(name, "Cortex-A53");
+> +			break;
+> +		case ARM_CPU_PART_CORTEX_A57:
+> +			strcpy(name, "Cortex-A57");
+> +			break;
+> +		};
+> +		break;
+> +	case ARM_CPU_IMP_APM:
+> +		strcpy(vendor, "APM");
+> +		switch (part) {
+> +		case APM_CPU_PART_POTENZA:
+> +			strcpy(name, "Potenza");
+> +			break;
+> +		};
+> +		break;
+> +	case ARM_CPU_IMP_CAVIUM:
+> +		strcpy(vendor, "CAVIUM");
+> +		switch (part) {
+> +		case CAVIUM_CPU_PART_THUNDERX:
+> +			strcpy(name, "Thunderx");
+> +			break;
+> +		};
+> +		break;
+> +	case ARM_CPU_IMP_BRCM:
+> +		strcpy(vendor, "BROADCOM");
+> +		switch (part) {
+> +		case BRCM_CPU_PART_VULCAN:
+> +			strcpy(name, "Vulcan");
+> +			break;
+> +		};
+> +		break;
+> +	default:
+> +		strcpy(vendor, "Unknown");
+> +		strcpy(name, "Unknown");
+> +	}
+> +}
+> +
+>  static int c_show(struct seq_file *m, void *v)
+>  {
+>  	int i, j;
+> @@ -116,6 +173,9 @@ static int c_show(struct seq_file *m, void *v)
+>  		 * "processor".  Give glibc what it expects.
+>  		 */
+>  		seq_printf(m, "processor\t: %d\n", i);
+> +		seq_printf(m, "vendor_id\t: %s\n", cpuinfo->vendor);
+> +		seq_printf(m, "model name\t: %s rev %d (%s)\n", cpuinfo->model_name,
+> +			   MIDR_REVISION(midr), ELF_PLATFORM);
+>  
+>  		seq_printf(m, "BogoMIPS\t: %lu.%02lu\n",
+>  			   loops_per_jiffy / (500000UL/HZ),
+> @@ -238,6 +298,8 @@ static void __cpuinfo_store_cpu(struct cpuinfo_arm64 *info)
+>  	info->reg_mvfr1 = read_cpuid(MVFR1_EL1);
+>  	info->reg_mvfr2 = read_cpuid(MVFR2_EL1);
+>  
+> +	cpuinfo_get_vendor_model(info);
+> +
+>  	cpuinfo_detect_icache_policy(info);
+>  
+>  	check_local_cpu_errata();
+> -- 
+> 1.7.12.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
