@@ -1,38 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 29 Mar 2016 16:46:15 +0100
-Subject: [PATCH] arm64: defconfig: remove redundant CONFIG_MMC_BLOCK_MINORS
-In-Reply-To: <1459178928-26973-1-git-send-email-leo.yan@linaro.org>
-References: <1459178928-26973-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <20160329154615.GF6745@arm.com>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Tue, 29 Mar 2016 08:45:59 -0700
+Subject: [PATCH v3 0/4] thermal: hisilicon: enable power allocator for
+ Hi6220
+In-Reply-To: <1459250835-25561-1-git-send-email-leo.yan@linaro.org>
+References: <1459250835-25561-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <20160329154548.GE1855@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 28, 2016 at 11:28:48PM +0800, Leo Yan wrote:
-> There have two patches to add CONFIG_MMC_BLOCK_MINORS twice:
-> 22b0898e8 ("arm64: add defconfig options for Allwinner SoCs"),
-> 2f85bb09d ("arm64: defconfig: Increase MMC_BLOCK_MINORS to 16");
+On Tue, Mar 29, 2016 at 07:27:11PM +0800, Leo Yan wrote:
+> Hi6220 has octa-core so it has quite high power consumption when run
+> benchmark and introduces high temperature for SoC. So need enable
+> thermal governor to control temperature and also cannot hurt much for
+> performance after impose cooling operations on CPU.
 > 
-> So remove redundant CONFIG_MMC_BLOCK_MINORS to only enable once.
+> This patch series is to enable power allocator for Hi6220. Patch 1 is to
+> change "hysteresis" as optional property for trip points, so when enable
+> power allocator governor we can ignore this property.
 > 
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> ---
->  arch/arm64/configs/defconfig | 1 -
->  1 file changed, 1 deletion(-)
+> During profiling also found two issues for thermal sensor's driver. The
+> power allocator just uses only one sensor, so patch 2 is to fix sensor
+> driver to let it can initialize driver successfully with only enabling
+> one sensor; patch 3 is to dismiss warning of IRQ imbalance enabling.
 > 
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index f705051..3ad26ff 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -215,7 +215,6 @@ CONFIG_MMC_SPI=y
->  CONFIG_MMC_SUNXI=y
->  CONFIG_MMC_DW=y
->  CONFIG_MMC_DW_EXYNOS=y
-> -CONFIG_MMC_BLOCK_MINORS=16
->  CONFIG_NEW_LEDS=y
->  CONFIG_LEDS_CLASS=y
->  CONFIG_LEDS_SYSCON=y
+> After profiling on Hikey, the power model has been simplized with only
+> dynamic coefficient, and now it's convienence to pass it from CPU node.
+> So patch 4 and 5 bind sensor and pass power model parameters.
+> 
+> This patch series have been tested on 96boards Hikey.
 
-Thanks, I'll pick this up with some other pending defconfig updates for
--rc2.
+Applied patches 1 and 2 in my fixes branch. Patches 3 and 4 need to go
+via the hisi platform tree. You may add my
 
-Will
+Acked-by: Eduardo Valentin <edubezval@gmail.com>
+
+on patches 3 and 4 if you want.
