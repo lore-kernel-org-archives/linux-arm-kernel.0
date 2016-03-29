@@ -1,52 +1,105 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Mar 2016 14:44:20 +0200
-Subject: [PATCH V3 1/3] vfio,
- platform: add support for ACPI while detecting the reset driver
-In-Reply-To: <8f766d081b33d91f196e7bd5e13b6f33@codeaurora.org>
-References: <1459172124-6730-1-git-send-email-okaya@codeaurora.org>
- <147496989.L43SVC7xRY@wuerfel>
- <8f766d081b33d91f196e7bd5e13b6f33@codeaurora.org>
-Message-ID: <4981390.J9tsJr16lM@wuerfel>
+From: sstabellini@kernel.org (Stefano Stabellini)
+Date: Tue, 29 Mar 2016 13:44:41 +0100 (BST)
+Subject: [PATCH 2/3] swiotlb: prefix dma_to_phys and phys_to_dma functions
+In-Reply-To: <CACJDEmrzKOExg-Rchjy2hfVzkzbCZ=WNn4Bu3EVgim748VvRig@mail.gmail.com>
+References: <1458252137-24497-1-git-send-email-okaya@codeaurora.org>
+ <1458252137-24497-2-git-send-email-okaya@codeaurora.org>
+ <56EBF09A.1060503@arm.com> <56EC1805.5060207@codeaurora.org>
+ <CACJDEmrzKOExg-Rchjy2hfVzkzbCZ=WNn4Bu3EVgim748VvRig@mail.gmail.com>
+Message-ID: <alpine.DEB.2.02.1603291329460.18380@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 March 2016 08:15:42 okaya at codeaurora.org wrote:
-> >> >
-> >> > * If there is indeed a requirement for ACPI to handle something like
-> >> > this,
-> >> >   it should be part of the ACPI spec, with a well-defined method of
-> >> > handling
-> >> >   reset, rather than having to add a device specific hack for each
-> >> >   device separately.
-> >> >
-> >> 
-> >> I see. Normally, this is done by calling _rst method. AFAIK, Linux
-> >> doesn?t support _rst. I can check its presence and call it if it is
-> >> there.
-> > 
-> > Yes, that sounds reasonable: In patch 2 where you check for the
-> > presence of the reset method, just keep the existing logic for
-> > DT based systems, and use _rst on ACPI based systems instead,
-> > then you can drop both patches 1 and 3.
-> > 
+On Mon, 28 Mar 2016, Konrad Rzeszutek Wilk wrote:
+> On Fri, Mar 18, 2016 at 11:00 AM, Sinan Kaya <okaya@codeaurora.org> wrote:
+> > On 3/18/2016 8:12 AM, Robin Murphy wrote:
+> >> Since we know for sure that swiotlb_to_phys is a no-op on arm64, it might be cleaner to simply not reference it at all. I suppose we could have some private local wrappers, e.g.:
+> >>
+> >> #define swiotlb_to_virt(addr) phys_to_virt((phys_addr_t)(addr))
+> >>
+> >> to keep the intent of the code clear (and just in case anyone ever builds a system mad enough to warrant switching out that definition, but I'd hope that never happens).
+> >>
+> >> Otherwise, looks good - thanks for doing this!
+> >
+> > OK. I added this. Reviewed-by?
+> >
+> > I'm not happy to submit such a big patch for all different ARCHs. I couldn't
+> > find a cleaner solution. I'm willing to split this patch into multiple if there
+> > is a better way.
+> >
+> > diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> > index ada00c3..8c0f66b 100644
+> > --- a/arch/arm64/mm/dma-mapping.c
+> > +++ b/arch/arm64/mm/dma-mapping.c
+> > @@ -29,6 +29,14 @@
+> >
+> >  #include <asm/cacheflush.h>
+> >
+> > +/*
+> > + * If you are building a system without IOMMU, then you are using SWIOTLB
+> > + * library. The ARM64 adaptation of this library does not support address
+> > + * translation and it assumes that physical address = dma address for such
+> > + * a use case. Please don't build a platform that violates this.
+> > + */
 > 
-> I can certainly drop patch #3 and push the reset responsibility to acpi.
+> Why not just expand the ARM64 part to support address translation?
+>
+> > +#define swiotlb_to_virt(addr) phys_to_virt((phys_addr_t)(addr))
+> > +
 > 
-> I never liked having a fragmented sw design across multiple drivers.
-> 
-> I need something for patch #1. Compatible is a DT property not ACPI.but 
-> then, I won't have a reset driver anymore.
-> 
-> If we think about how vfio pci works, we pass the pci vendor and device 
-> id to new_id file to find out which pci device needs to be pass thru.
-> 
-> I can go to a similar route. This time we pass the object id through 
-> new_id and I call reset method on this object.
-> 
-> Let me know what you think?
+> Adding Stefano here.
 
-It would certainly be nice to make it work more like PCI VFIO does
-here, where you can assign any device as long as it has an IOMMU
-(and a _rst method in this case).
+Could you please explain what is the problem that you are trying to
+solve? In other words, what is the issue with assuming that physical
+address = dma address (and the current dma_to_phys and phys_to_dma
+static inlines) if no arm64 platforms violate it? That's pretty much
+what is done on x86 too (without X86_DMA_REMAP).
 
-	Arnd
+If you want to make sure that the assumption is not violated, you can
+introduce a boot time check or a BUG_ON somewhere.
+
+If there is an arm64 platform with phys_addr != dma_addr, we need proper
+support for it. In fact even if there is an IOMMU on that platform, when
+running Xen on it, the IOMMU would be used by the hypervisor and Linux
+would still end up without it, using the swiotlb.
+
+ 
+> >  static pgprot_t __get_dma_pgprot(struct dma_attrs *attrs, pgprot_t prot,
+> >                                  bool coherent)
+> >  {
+> > @@ -188,7 +196,7 @@ static void __dma_free(struct device *dev, size_t size,
+> >                        void *vaddr, dma_addr_t dma_handle,
+> >                        struct dma_attrs *attrs)
+> >  {
+> > -       void *swiotlb_addr = phys_to_virt(swiotlb_dma_to_phys(dev, dma_handle));
+> > +       void *swiotlb_addr = swiotlb_to_virt(dma_handle);
+> >
+> >         size = PAGE_ALIGN(size);
+> >
+> > @@ -209,8 +217,7 @@ static dma_addr_t __swiotlb_map_page(struct device *dev, struct page *page,
+> >
+> >         dev_addr = swiotlb_map_page(dev, page, offset, size, dir, attrs);
+> >         if (!is_device_dma_coherent(dev))
+> > -               __dma_map_area(phys_to_virt(swiotlb_dma_to_phys(dev, dev_addr)),
+> > -                              size, dir);
+> > +               __dma_map_area(swiotlb_to_virt(dev_addr), size, dir);
+> >
+> >         return dev_addr;
+> >  }
+> > @@ -283,8 +290,7 @@ static void __swiotlb_sync_single_for_device(struct device *dev,
+> >  {
+> >         swiotlb_sync_single_for_device(dev, dev_addr, size, dir);
+> >         if (!is_device_dma_coherent(dev))
+> > -               __dma_map_area(phys_to_virt(swiotlb_dma_to_phys(dev, dev_addr)),
+> > -                              size, dir);
+> > +               __dma_map_area(swiotlb_to_virt(dev_addr), size, dir);
+> >  }
+> >
+> >
+> >
+> >
+> > --
+> > Sinan Kaya
+> > Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+> > Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+> 
