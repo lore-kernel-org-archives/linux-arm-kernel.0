@@ -1,32 +1,40 @@
-From: joseph@codesourcery.com (Joseph Myers)
-Date: Tue, 29 Mar 2016 15:54:52 +0000
-Subject: [RFC5 PATCH v6 00/21] ILP32 for ARM64
-In-Reply-To: <3298847.t7vI4YM3gJ@wuerfel>
-References: <1452792198-10718-1-git-send-email-ynorov@caviumnetworks.com>
- <20160329120147.GA3551@yury-N73SV> <56FA816D.60101@huawei.com>
- <3298847.t7vI4YM3gJ@wuerfel>
-Message-ID: <alpine.DEB.2.10.1603291551420.20115@digraph.polyomino.org.uk>
+From: julien.grall@arm.com (Julien Grall)
+Date: Tue, 29 Mar 2016 17:04:49 +0100
+Subject: [PATCH v4 9/9] clocksource: arm_arch_timer: Remove
+ arch_timer_get_timecounter
+In-Reply-To: <56FA9391.1040007@linaro.org>
+References: <1458842023-31853-1-git-send-email-julien.grall@arm.com>
+ <1458842023-31853-10-git-send-email-julien.grall@arm.com>
+ <56FA9391.1040007@linaro.org>
+Message-ID: <56FAA7A1.2020507@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 Mar 2016, Arnd Bergmann wrote:
+On 29/03/16 15:39, Daniel Lezcano wrote:
+> On 03/24/2016 06:53 PM, Julien Grall wrote:
+>> The only call of arch_timer_get_timecounter (in KVM) has been removed.
+>>
+>> Signed-off-by: Julien Grall <julien.grall@arm.com>
+>> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+>
+> Hi Julien,
 
-> In glibc, I think we need to define fewer entry points, not more.
-> Instead of having both lseek and lseek64, only one of them should
-> be provided, and that should always take a 64-bit offset, calling
-> into the kernel with the _llseek syscall entry.
+Hi Daniel,
 
-lseek64 is part of the public API, on all platforms.  It should be aliased 
-to lseek where possible.
+> do you want me to take this patch through my tree ?
 
-Strictly, it would be possible to provide it in the API without it being 
-part of the ABI, by arranging the headers so that calls to lseek64 result 
-in objects with a reference to lseek (because it uses the off64_t typedef, 
-it's not valid to declare it yourself rather than including a header that 
-declares it).  I don't think it would be a good idea for a new 
-sub-architecture port to try introducing such a difference from all other 
-ports, however.
+This patch depends on patch #7, so it's not possible to merge for now.
+
+The plan suggested to merge the series is divided in 3 steps:
+
+   1) Patch #1-#2 are merged via your tree
+      Patch #2-#6 are merged via the irqchip-tree
+   2) Patch #7-#8 are merged via the KVM tree
+   3) Patch #9 (this patch) is merge via your tree
+
+I can ping you when the steps 1 and 2 are completed.
+
+Regards,
 
 -- 
-Joseph S. Myers
-joseph at codesourcery.com
+Julien Grall
