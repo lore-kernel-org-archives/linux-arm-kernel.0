@@ -1,33 +1,34 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 29 Mar 2016 14:11:25 +0100
-Subject: [PATCH 4/4] drivers/bus: make arm-ccn.c driver explicitly
- non-modular
-In-Reply-To: <20160329123021.GD6745@arm.com>
-References: <1459113058-14340-1-git-send-email-paul.gortmaker@windriver.com>
- <1459113058-14340-5-git-send-email-paul.gortmaker@windriver.com>
- <20160329114525.GC6745@arm.com> <1459252386.5053.18.camel@arm.com>
- <20160329123021.GD6745@arm.com>
-Message-ID: <1459257085.2461.2.camel@arm.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Tue, 29 Mar 2016 14:11:13 +0100
+Subject: [RFC PATCH 1/3] libahci: save port map for forced port map
+In-Reply-To: <1459257075-21393-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1459257075-21393-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1459257075-21393-2-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-03-29 at 13:30 +0100, Will Deacon wrote:
-> On Tue, Mar 29, 2016 at 12:53:06PM +0100, Pawel Moll wrote:
-> > Dnia 2016-03-29, Tue o godzinie 12:45 +0100, Will Deacon pisze:
-> > > I'd much rather fix the driver to build as a module, if at all
-> > > possible.
-> > > Suzuki (CC'd) is taking a look at that, so please drop this patch
-> > > for
-> > > now.
-> > 
-> > There's no problem with building arm-ccn.c as a module - all it's
-> > really doing today is providing a PMU driver. I don't even know why
-> > have I made it bool-only in the first place...
-> 
-> Probably because it doesn't compile due to the irq_set_affinity call.
+In usecases where force_port_map is used saved_port_map is never set,
+resulting in not programming the PORTS_IMPL register as part of intial
+config. This patch fixes this by setting it to port_map even in case
+where force_port_map is used, making it more inline with other parts of
+the code.
 
-The original arm-ccn.c did not call it at all. My guess is that I
-copied ARM_CCI stanza without thinking. But I'm glad Suzuki will
-straighten it out :-)
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+ drivers/ata/libahci.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Pawe?
+diff --git a/drivers/ata/libahci.c b/drivers/ata/libahci.c
+index 3982054..a5d7c1c 100644
+--- a/drivers/ata/libahci.c
++++ b/drivers/ata/libahci.c
+@@ -507,6 +507,7 @@ void ahci_save_initial_config(struct device *dev, struct ahci_host_priv *hpriv)
+ 		dev_info(dev, "forcing port_map 0x%x -> 0x%x\n",
+ 			 port_map, hpriv->force_port_map);
+ 		port_map = hpriv->force_port_map;
++		hpriv->saved_port_map = port_map;
+ 	}
+ 
+ 	if (hpriv->mask_port_map) {
+-- 
+2.5.0
