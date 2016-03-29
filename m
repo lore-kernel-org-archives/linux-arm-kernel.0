@@ -1,71 +1,30 @@
-From: alexander.stein@systec-electronic.com (Alexander Stein)
-Date: Tue, 29 Mar 2016 09:26:53 +0200
-Subject: [PATCH v2 6/8] drm/fsl-dcu: add TCON driver
-In-Reply-To: <57c86de8eca0aa16a5cdfc488977ca4e@agner.ch>
-References: <1459216802-32094-1-git-send-email-stefan@agner.ch>
- <2234894.ri36D5MRrN@ws-stein> <57c86de8eca0aa16a5cdfc488977ca4e@agner.ch>
-Message-ID: <3752084.bcROvR6fvG@ws-stein>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Tue, 29 Mar 2016 12:57:30 +0530
+Subject: [PATCH 0/4] Few more updates for NS2 DT
+Message-ID: <1459236454-26285-1-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 March 2016 00:11:13, Stefan Agner wrote:
-> >> --- a/Documentation/devicetree/bindings/display/fsl,dcu.txt
-> >> +++ b/Documentation/devicetree/bindings/display/fsl,dcu.txt
-> >> 
-> >> @@ -14,6 +14,7 @@ Required properties:
-> >>  Optional properties:
-> >>  - clocks:		Second handle for pixel clock.
-> >>  - clock-names:		Second name "pix" for pixel clock.
-> >> 
-> >> +- fsl,tcon:		The phandle to the timing controller node.
-> > 
-> > Maybe a comment this is (currently) only for Vybrid, but not LS1021A.
-> 
-> IMHO, such references to SoCs in a peripheral binding is somewhat
-> misplaced. If we would start doing this, we would end up in lots of SoC
-> references, and nobody knows whether they are actually accurate and up
-> to date... And I think we should add tcon to LS1021a, more on that
-> below...
+This patchset primarily adds more PL330 and PL022 DT nodes for
+NS2 SVK. It also moves clock DT nodes to separate file to be
+consistent with other Broadcom SoCs DT files.
 
-Well, I don't mind after all.
+The patchset is based on v4.6-rc1 tag and is available in ns2_dt3_v1
+branch of https://github.com/Broadcom/arm64-linux.git
 
-> >> --- /dev/null
-> >> +++ b/drivers/gpu/drm/fsl-dcu/fsl_tcon.c
-> >> [...]
-> >> +struct fsl_tcon *fsl_tcon_init(struct device *dev)
-> >> +{
-> >> +	struct fsl_tcon *tcon;
-> >> +	struct device_node *np;
-> >> +	int ret;
-> >> +
-> >> +	tcon = devm_kzalloc(dev, sizeof(*tcon), GFP_KERNEL);
-> >> +	if (!tcon)
-> >> +		return NULL;
-> >> +
-> >> +	np = of_parse_phandle(dev->of_node, "fsl,tcon", 0);
-> >> +	if (!np) {
-> >> +		dev_warn(dev, "Couldn't find the tcon node\n");
-> >> +		return NULL;
-> >> +	}
-> > 
-> > Maybe check for device tree node before allocating struct fsl_tcon? Also
-> > this should not be a warning, as on LS1021A this is to be expected.
-> 
-> Agreed, definitely the smarter sequence.
-> 
-> Afact LS1021a has also a TCON. At least in Jianwei Wangs initial patches
-> it was part of the driver, see:
-> https://lkml.org/lkml/2015/7/13/242
-> 
-> Not sure how that driver can work without TCON support on LS1021a, maybe
-> the bootloader sets the TCON to bypass?
-> 
-> Since I do not have a LS1021a, I hesitated to just add it to the LS1021s
-> dt's, but it should be fairly straight forward.
+All patches have been tested on Broadcom NS2 SVK.
 
-Interesting, but in Patch 3 (https://lists.freedesktop.org/archives/dri-devel/2015-July/086381.html) no TCON node is added and using is still 
-optional. Yet, I don't find any TCON hardware in the LS1021A reference manual, 
-e.g. in the memory map. I hard guess is that it doesn't require/use one. 
-Without memory address it would be pretty hard to add one.
+Anup Patel (4):
+  arm64: dts: Add ARM PL330 DMA DT node for NS2
+  arm64: dts: Add maintenance interrupt for GIC in NS2 DT
+  arm64: dts: Move NS2 clock DT nodes to separate DT file
+  arm64: dts: Add ARM PL022 SPI DT nodes for NS2
 
-Alexander
+ arch/arm64/boot/dts/broadcom/ns2-clock.dtsi | 105 +++++++++++++++++++++++
+ arch/arm64/boot/dts/broadcom/ns2-svk.dts    |  45 ++++++++++
+ arch/arm64/boot/dts/broadcom/ns2.dtsi       | 124 +++++++++++-----------------
+ 3 files changed, 196 insertions(+), 78 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/broadcom/ns2-clock.dtsi
+
+-- 
+1.9.1
