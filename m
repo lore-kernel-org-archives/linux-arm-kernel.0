@@ -1,65 +1,52 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 29 Mar 2016 13:44:01 +0100
-Subject: [RFC PATCH 1/3] arm64: Append more field of id_aa64mmfr2 for
- cpufeature
-In-Reply-To: <1458898209-7486-2-git-send-email-wangkefeng.wang@huawei.com>
-References: <1458898209-7486-1-git-send-email-wangkefeng.wang@huawei.com>
- <1458898209-7486-2-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <20160329124401.GE26574@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 Mar 2016 14:44:20 +0200
+Subject: [PATCH V3 1/3] vfio,
+ platform: add support for ACPI while detecting the reset driver
+In-Reply-To: <8f766d081b33d91f196e7bd5e13b6f33@codeaurora.org>
+References: <1459172124-6730-1-git-send-email-okaya@codeaurora.org>
+ <147496989.L43SVC7xRY@wuerfel>
+ <8f766d081b33d91f196e7bd5e13b6f33@codeaurora.org>
+Message-ID: <4981390.J9tsJr16lM@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 25, 2016 at 05:30:07PM +0800, Kefeng Wang wrote:
-> There are some new cpu features which can be identified by id_aa64mmfr2,
-> this patch appends all fields of it.
-
-FWIW, this looks like a good thing regardless of the cpuinfo patches.
-
-The shifts look right to me. I'm not all that familiar with each of the
-features, so I don't know whether or not we need strict exact matching
-(though it's a safer to assume that we do for now).
-
-Mark.
-
+On Tuesday 29 March 2016 08:15:42 okaya at codeaurora.org wrote:
+> >> >
+> >> > * If there is indeed a requirement for ACPI to handle something like
+> >> > this,
+> >> >   it should be part of the ACPI spec, with a well-defined method of
+> >> > handling
+> >> >   reset, rather than having to add a device specific hack for each
+> >> >   device separately.
+> >> >
+> >> 
+> >> I see. Normally, this is done by calling _rst method. AFAIK, Linux
+> >> doesn?t support _rst. I can check its presence and call it if it is
+> >> there.
+> > 
+> > Yes, that sounds reasonable: In patch 2 where you check for the
+> > presence of the reset method, just keep the existing logic for
+> > DT based systems, and use _rst on ACPI based systems instead,
+> > then you can drop both patches 1 and 3.
+> > 
 > 
-> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
-> ---
->  arch/arm64/include/asm/sysreg.h | 4 ++++
->  arch/arm64/kernel/cpufeature.c  | 4 ++++
->  2 files changed, 8 insertions(+)
+> I can certainly drop patch #3 and push the reset responsibility to acpi.
 > 
-> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> index 1a78d6e..c141243 100644
-> --- a/arch/arm64/include/asm/sysreg.h
-> +++ b/arch/arm64/include/asm/sysreg.h
-> @@ -142,7 +142,11 @@
->  #define ID_AA64MMFR1_HADBS_SHIFT	0
->  
->  /* id_aa64mmfr2 */
-> +#define ID_AA64MMFR2_LVA_SHIFT		16
-> +#define ID_AA64MMFR2_IESB_SHIFT		12
-> +#define ID_AA64MMFR2_LSM_SHIFT		8
->  #define ID_AA64MMFR2_UAO_SHIFT		4
-> +#define ID_AA64MMFR2_CNP_SHIFT		0
->  
->  /* id_aa64dfr0 */
->  #define ID_AA64DFR0_CTX_CMPS_SHIFT	28
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 943f514..677f17c 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -130,7 +130,11 @@ static struct arm64_ftr_bits ftr_id_aa64mmfr1[] = {
->  };
->  
->  static struct arm64_ftr_bits ftr_id_aa64mmfr2[] = {
-> +	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR2_LVA_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR2_IESB_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR2_LSM_SHIFT, 4, 0),
->  	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR2_UAO_SHIFT, 4, 0),
-> +	ARM64_FTR_BITS(FTR_STRICT, FTR_EXACT, ID_AA64MMFR2_CNP_SHIFT, 4, 0),
->  	ARM64_FTR_END,
->  };
->  
-> -- 
-> 1.7.12.4
+> I never liked having a fragmented sw design across multiple drivers.
 > 
+> I need something for patch #1. Compatible is a DT property not ACPI.but 
+> then, I won't have a reset driver anymore.
+> 
+> If we think about how vfio pci works, we pass the pci vendor and device 
+> id to new_id file to find out which pci device needs to be pass thru.
+> 
+> I can go to a similar route. This time we pass the object id through 
+> new_id and I call reset method on this object.
+> 
+> Let me know what you think?
+
+It would certainly be nice to make it work more like PCI VFIO does
+here, where you can assign any device as long as it has an IOMMU
+(and a _rst method in this case).
+
+	Arnd
