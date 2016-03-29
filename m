@@ -1,75 +1,81 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 29 Mar 2016 17:22:23 +0800
-Subject: [PATCH resend v2 0/9] mfd: axp20x: Add support for AXP809 PMIC
-Message-ID: <1459243352-23344-1-git-send-email-wens@csie.org>
+Date: Tue, 29 Mar 2016 17:22:25 +0800
+Subject: [PATCH resend v2 2/9] mfd: axp20x: Add bindings for AXP809 PMIC
+In-Reply-To: <1459243352-23344-1-git-send-email-wens@csie.org>
+References: <1459243352-23344-1-git-send-email-wens@csie.org>
+Message-ID: <1459243352-23344-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+This patch adds the basic and regulator bindings for the X-Powers AXP809
+PMIC.
 
-This is a resend of v2 of the AXP809 PMIC support series. This adds
-support for X-Powers' AXP809 PMIC. This is the primary PMIC accompanying
-Allwinner's A80 SoC. For now, only the power button (PEK) and regulators
-are supported. These are supported using existing axp20x drivers.
+Also update the DC-DC converter operating frequency for AXP22X/AXP80X.
 
-Driver patches are based on v4.6-rc1, while DT patches are based on
-Maxime's sunxi/dt-for-4.7 branch.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/mfd/axp20x.txt | 31 ++++++++++++++++++++++--
+ 1 file changed, 29 insertions(+), 2 deletions(-)
 
-Some regulator patches were merged into v4.6-rc1. Those have been
-dropped from this series. Other than that there are no changes.
-
-Patch 1 adds a MAINTAINERS entry for the X-Powers AXP PMICs.
-I list myself as the maintainer.
-
-Patch 2 adds AXP809 to the axp20x bindings.
-
-Patch 3 adds AXP809 support to the axp20x mfd driver.
-
-Patch 4 adds AXP809 support to the axp20x regulator driver.
-This patch depends on patch 3.
-
-Patch 5 adds a dtsi file for AXP809.
-
-Patch 6 enables AXP809 support on the A80 Optimus board.
-
-Patch 7 enables AXP809 support on the Cubieboard 4.
-
-Patch 8 disables the dummy regulators from sunxi-common-regulators.dtsi
-on the A80 Optimus board. These aren't used in the board DTS anymore.
-
-Patch 9 disables the dummy regulators from sunxi-common-regulators.dtsi,
-on the Cubieboard4. These aren't used in the board DTS anymore.
-
-
-Regards
-ChenYu
-
-Chen-Yu Tsai (9):
-  MAINTAINERS: Add entry for X-Powers AXP family PMIC drivers
-  mfd: axp20x: Add bindings for AXP809 PMIC
-  mfd: axp20x: Add support for AXP809 PMIC
-  regulator: axp20x: support AXP809 variant
-  ARM: dts: sunxi: Add dtsi file for AXP809 PMIC
-  ARM: dts: sun9i: a80-optimus: Add AXP809 PMIC device node and
-    regulators
-  ARM: dts: sun9i: cubieboard4: Add AXP809 PMIC device node and
-    regulators
-  ARM: dts: sun9i: a80-optimus: Disable dummy regulators vcc3v0, vcc3v3,
-    vcc5v0
-  ARM: dts: sun9i: cubieboard4: Disable dummy regulators vcc3v0, vcc3v3,
-    vcc5v0
-
- Documentation/devicetree/bindings/mfd/axp20x.txt   |  31 ++++-
- MAINTAINERS                                        |   6 +
- .../dts/{sun9i-a80-cubieboard4.dts => axp809.dtsi} |  98 ++------------
- arch/arm/boot/dts/sun9i-a80-cubieboard4.dts        | 143 ++++++++++++++++++++-
- arch/arm/boot/dts/sun9i-a80-optimus.dts            | 143 ++++++++++++++++++++-
- drivers/mfd/axp20x-rsb.c                           |   1 +
- drivers/mfd/axp20x.c                               |  79 ++++++++++++
- drivers/regulator/axp20x-regulator.c               | 119 ++++++++++++-----
- include/linux/mfd/axp20x.h                         |  59 +++++++++
- 9 files changed, 554 insertions(+), 125 deletions(-)
- copy arch/arm/boot/dts/{sun9i-a80-cubieboard4.dts => axp809.dtsi} (52%)
-
+diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+index fd39fa54571b..d20b1034e967 100644
+--- a/Documentation/devicetree/bindings/mfd/axp20x.txt
++++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+@@ -6,10 +6,11 @@ axp202 (X-Powers)
+ axp209 (X-Powers)
+ axp221 (X-Powers)
+ axp223 (X-Powers)
++axp809 (X-Powers)
+ 
+ Required properties:
+ - compatible: "x-powers,axp152", "x-powers,axp202", "x-powers,axp209",
+-	      "x-powers,axp221", "x-powers,axp223"
++	      "x-powers,axp221", "x-powers,axp223", "x-powers,axp809"
+ - reg: The I2C slave address or RSB hardware address for the AXP chip
+ - interrupt-parent: The parent interrupt controller
+ - interrupts: SoC NMI / GPIO interrupt connected to the PMIC's IRQ pin
+@@ -18,7 +19,9 @@ Required properties:
+ 
+ Optional properties:
+ - x-powers,dcdc-freq: defines the work frequency of DC-DC in KHz
+-		      (range: 750-1875). Default: 1.5MHz
++		      AXP152/20X: range:  750-1875, Default: 1.5 MHz
++		      AXP22X/80X: range: 1800-4050, Default: 3   MHz
++
+ - <input>-supply: a phandle to the regulator supply node. May be omitted if
+ 		  inputs are unregulated, such as using the IPSOUT output
+ 		  from the PMIC.
+@@ -77,6 +80,30 @@ LDO_IO0		: LDO		: ips-supply		: GPIO 0
+ LDO_IO1		: LDO		: ips-supply		: GPIO 1
+ RTC_LDO		: LDO		: ips-supply		: always on
+ 
++AXP809 regulators, type, and corresponding input supply names:
++
++Regulator	  Type		  Supply Name		  Notes
++---------	  ----		  -----------		  -----
++DCDC1		: DC-DC buck	: vin1-supply
++DCDC2		: DC-DC buck	: vin2-supply
++DCDC3		: DC-DC	buck	: vin3-supply
++DCDC4		: DC-DC	buck	: vin4-supply
++DCDC5		: DC-DC	buck	: vin5-supply
++DC1SW		: On/Off Switch	:			: DCDC1 secondary output
++DC5LDO		: LDO		:			: input from DCDC5
++ALDO1		: LDO		: aldoin-supply		: shared supply
++ALDO2		: LDO		: aldoin-supply		: shared supply
++ALDO3		: LDO		: aldoin-supply		: shared supply
++DLDO1		: LDO		: dldoin-supply		: shared supply
++DLDO2		: LDO		: dldoin-supply		: shared supply
++ELDO1		: LDO		: eldoin-supply		: shared supply
++ELDO2		: LDO		: eldoin-supply		: shared supply
++ELDO3		: LDO		: eldoin-supply		: shared supply
++LDO_IO0		: LDO		: ips-supply		: GPIO 0
++LDO_IO1		: LDO		: ips-supply		: GPIO 1
++RTC_LDO		: LDO		: ips-supply		: always on
++SW		: On/Off Switch : swin-supply
++
+ Example:
+ 
+ axp209: pmic at 34 {
 -- 
 2.7.0
