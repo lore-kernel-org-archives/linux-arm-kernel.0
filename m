@@ -1,35 +1,61 @@
-From: nicolas.dechesne@linaro.org (Nicolas Dechesne)
-Date: Tue, 29 Mar 2016 20:32:38 +0200
-Subject: [PATCH 10/12] ARM: dts: dragonboard-600c: Add on board leds
- support
-In-Reply-To: <20160329145115.GO8929@tuxbot>
-References: <1458762366-9233-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1458762484-9768-1-git-send-email-srinivas.kandagatla@linaro.org>
- <20160327055012.GD8929@tuxbot> <56FA8F47.7070200@linaro.org>
- <20160329145115.GO8929@tuxbot>
-Message-ID: <CAP71WjwPQn8OuCy+8iuQpDrUW2baQ0qzaviLEDixVzTmUP_BTw@mail.gmail.com>
+From: simran.rai@broadcom.com (Simran Rai)
+Date: Tue, 29 Mar 2016 11:46:29 -0700
+Subject: [PATCH resend v5 0/3] ASoC: cygnus: Add audio support for Broadcom
+ Cygnus SoC
+Message-ID: <1459277192-10942-1-git-send-email-simran.rai@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 29, 2016 at 4:51 PM, Bjorn Andersson
-<bjorn.andersson@linaro.org> wrote:
->> Am ok, to change, did you get activity leds works with any of these strings
->> with WLAN or BT?
->>
->
-> I did test them; rx, assoc and radio seems to work. Tx does not tickle
-> the led, but should probably.
->
-> I didn't find the spec for the baord, so I'm not sure what the LEDs
-> should indicate. But it feels like radio or assoc makes most sense, and
-> follows what we can do with the BT led.
+Hi,
 
-this is in the 96boards 'specs' at [1], which states
+This patchset contains audio support for Broadcom's Cygnus SoC.
+It contains DT bindings and core audio driver. The audio driver supports
+both capture and playback of Audio PCM samples over I2S/TDM interface and
+provides playback support over SPDIF interface.
 
--
-The User LEDs shall be directly programmable from the SoC.
-1. WiFi activity LED
-2. Bluetooth activity LED
--
+This patchset is derived from a previously submitted patchset:
+http://lkml.iu.edu/hypermail/linux/kernel/1503.3/05434.html
 
-[1] http://www.96boards.org/ce-specification
+This patchset has been tested on Cygnus wireless audio bcm958305K board.
+It is rebased on top of v4.6-rc1 and is available from github:
+
+repo: https://github.com/Broadcom/cygnus-linux/tree/cygnus-sound-v5
+
+Changes from v4:
+- Fix power suspend function and add power resume function
+- Remove clock initialization code from audio driver to clock framework
+Changes from v3:
+- Fix the subject lines to match the style for the subsystem
+Changes from v2:
+- Split patchset 2/2 from v2 into patchsets 2/3 and 3/3.
+- Remove SND_SOC_CYGNUS_DIAG. Diagnostics can be performed using
+standard kernel trace infrastructure.
+- Fix interrupt handler. Acknowledge only those interrupts that are
+handledby ISR.
+- Modify configure_vco() and the pll_macro_entry() struct to make it
+better readable. The functionality did not change.
+- Remove casts on macros
+- Removed surround sound channel grouping from the driver.
+Changes from v1:
+- Address code review comments. Fixed print format of type size_t and
+pointer.
+
+Simran Rai (3):
+  ASoC: cygnus: Add DT bindings for Broadcom Cygnus audio
+  ASoC: cygnus: Add Cygnus audio DAI driver
+  ASoC: cygnus: Add Cygnus audio DMA driver
+
+ .../bindings/sound/brcm,cygnus-audio.txt           |   67 +
+ sound/soc/bcm/Kconfig                              |    9 +
+ sound/soc/bcm/Makefile                             |    5 +
+ sound/soc/bcm/cygnus-pcm.c                         |  861 +++++++++++
+ sound/soc/bcm/cygnus-ssp.c                         | 1513 ++++++++++++++++++++
+ sound/soc/bcm/cygnus-ssp.h                         |  139 ++
+ 6 files changed, 2594 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/brcm,cygnus-audio.txt
+ create mode 100644 sound/soc/bcm/cygnus-pcm.c
+ create mode 100644 sound/soc/bcm/cygnus-ssp.c
+ create mode 100644 sound/soc/bcm/cygnus-ssp.h
+
+-- 
+1.7.9.5
