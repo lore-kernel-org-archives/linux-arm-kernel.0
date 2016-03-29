@@ -1,38 +1,26 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Tue, 29 Mar 2016 10:32:51 +0900
-Subject: [PATCH 0/3] drm/exynos: Kconfig dependency fixes
-In-Reply-To: <1459214937-18686-1-git-send-email-javier@osg.samsung.com>
-References: <1459214937-18686-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <56F9DB43.6090309@samsung.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 29 Mar 2016 10:38:22 +0900
+Subject: [PATCH 0/2] ARM: uniphier: updates for Linux 4.7-rc1
+Message-ID: <1459215505-18035-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+Hi Arnd, Olof
 
-Thanks for your patch set.
+Two patches for UniPhier SMP updates.
 
-Will merge them if there is no issue.
+Please get them into ASOC.
 
-Thanks,
-Inki Dae
 
-2016? 03? 29? 10:28? Javier Martinez Canillas ?(?) ? ?:
-> Hello Inki,
-> 
-> This patch series contains some fixes for the Kconfig symbol dependencies
-> of the Exynos DRM driver. They make sure that the Exynos DRM components
-> and the media platform drivers that makes use of the same HW IP block are
-> not enabled at the same time.
-> 
-> Best regards,
-> Javier
-> 
-> 
-> Javier Martinez Canillas (3):
->   drm/exynos: Use VIDEO_SAMSUNG_S5P_G2D=n as G2D Kconfig dependency
->   drm/exynos: Use VIDEO_SAMSUNG_EXYNOS_GSC=n as GSC Kconfig dependency
->   drm/exynos: Make DRM_EXYNOS_FIMC depend on VIDEO_S5P_FIMC=n
-> 
->  drivers/gpu/drm/exynos/Kconfig | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
+
+Masahiro Yamada (2):
+  ARM: uniphier: fix up cache ops broadcast of ACTLR
+  ARM: uniphier: initialize outer cache for secondary CPUs
+
+ arch/arm/include/asm/hardware/cache-uniphier.h |  5 +++++
+ arch/arm/mach-uniphier/platsmp.c               | 21 +++++++++++++++++++++
+ arch/arm/mm/cache-uniphier.c                   | 19 ++++++++++++++++---
+ 3 files changed, 42 insertions(+), 3 deletions(-)
+
+-- 
+1.9.1
