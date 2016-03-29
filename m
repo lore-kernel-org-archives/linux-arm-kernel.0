@@ -1,44 +1,76 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 29 Mar 2016 15:52:04 +0200
-Subject: [PATCH] clockevents/drivers/timer-atmel-pit: fix double free_irq
-In-Reply-To: <20160329133206.GA13334@linutronix.de>
-References: <1458245383-9859-1-git-send-email-alexandre.belloni@free-electrons.com>
- <20160329133206.GA13334@linutronix.de>
-Message-ID: <20160329135204.GG2346@piout.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 Mar 2016 15:52:11 +0200
+Subject: [PATCH] i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity
+In-Reply-To: <CAJ+vNU3o98T2cev1Pj0VJR884kOxVxhrzmowDixGuV2Tb=Sh1Q@mail.gmail.com>
+References: <m3h9fuk7ik.fsf@t19.piap.pl>
+ <1459248921.2565.15.camel@pengutronix.de>
+ <CAJ+vNU3o98T2cev1Pj0VJR884kOxVxhrzmowDixGuV2Tb=Sh1Q@mail.gmail.com>
+Message-ID: <23031613.R8qN30TbTq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/03/2016 at 15:32:06 +0200, Sebastian Andrzej Siewior wrote :
-> * Alexandre Belloni | 2016-03-17 21:09:43 [+0100]:
+On Tuesday 29 March 2016 06:32:29 Tim Harvey wrote:
+> >
+> > There is no upstream driver for this chip, so I don't know where to look
+> > to find out if the driver tries to enable MSI.
+> >
+> > Is what you are saying that if you enable MSI support in the kernel, it
+> > breaks legacy IRQs?
 > 
-> >Hi Sebastian,
-> Hi Alexandre,
+> Yes - any driver that does not support MSI will use legacy IRQ's and
+> they never fire.
 > 
-> >This patch fixes the last warning for preempt-rt on at91. It applies on
-> >v4.4.4-rt11. Note that the whome PIT/TCB mess will be fixed in another way in
-> >the mainline as we are reworking the tcb driver to avoid using the pit when
-> >booting.
+> The Ventana GW53xx and GW54xx boards have a Marvell PCIe GigE
+> supported by the sky2 driver as eth1 which does support MSI and I
+> verified it gets an MSI interrupt and does work (along ath9k devices
+> with legacy interrupts that fail to work).
 > 
-> oh, okay. I just sent the "arm: at91: do not disable/enable clocks in a
-> row" patch as you asked me a while ago. It applied cleanly against the
-> next tree of today.
-
-Yeah, actually, it was not needed anymore. I forgot about it at the time
-but f02b4b72d12c (clockevents/tcb_clksrc: Prevent disabling an already
-disabled clock) was sufficient to remove the warning. Your patch is
-still Ok but maybe it can get rid of the
-"if (!clockevent_state_detached(d))" in tc_shutdown_clk_off()
-
-I'll test and take care of that.
-
-> So I will apply this to get rid of the warning. And if you manage not to
-> use the PIT during boot then we won't have the free_irq() mess which is
-> good.
+> root at ventana:~# cat /proc/interrupts | grep MSI
+> 299:          0          0   PCI-MSI   0 Edge      PCIe PME, aerdrv
+> 308:       8726          0   PCI-MSI   9 Edge      eth1
 > 
+> So it appears that MSI works for those drivers that use it, but does
+> somehow cause legacy IRQ's to break.
+> 
+> I sent you a GW5400 dev kit over a while back to use for through
+> bridge testing on IMX6 that you should be able to repeat this with
+> assuming you have a PCIe card with a driver that doesn't support MSI
+> (or that you can tweak its driver to not support MSI).
+> 
+> I think 31e98e0d24cd2537a63e06e235e050a06b175df7 "ARM:
+> imx_v6_v7_defconfig: enable PCI_MSI" should be reverted as well until
+> we figure this out.
 
-Yeah, this will definitively happen (hopefully sooner than later ;) )
+That doesn't sound like a helpful solution, multi_v7_defconfig for
+instance will still be broken because it enables PCI_MSI, and so
+will be all major distros.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+What happens if we patch the pci-imx6 driver to not make use of
+its MSI support even when that is enabled in the kernel? Does that
+get both devices in your GW5xxx to work with legacy interrupts or
+is one or both of them still broken?
+
+	Arnd
+
+diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+index eb5a2755a164..d7607b2695c6 100644
+--- a/drivers/pci/host/pci-imx6.c
++++ b/drivers/pci/host/pci-imx6.c
+@@ -470,7 +470,7 @@ static void imx6_pcie_host_init(struct pcie_port *pp)
+ 
+ 	imx6_pcie_establish_link(pp);
+ 
+-	if (IS_ENABLED(CONFIG_PCI_MSI))
++	if (0 && IS_ENABLED(CONFIG_PCI_MSI))
+ 		dw_pcie_msi_init(pp);
+ }
+ 
+@@ -490,7 +490,7 @@ static int __init imx6_add_pcie_port(struct pcie_port *pp,
+ {
+ 	int ret;
+ 
+-	if (IS_ENABLED(CONFIG_PCI_MSI)) {
++	if (0 && IS_ENABLED(CONFIG_PCI_MSI)) {
+ 		pp->msi_irq = platform_get_irq_byname(pdev, "msi");
+ 		if (pp->msi_irq <= 0) {
+ 			dev_err(&pdev->dev, "failed to get MSI irq\n");
