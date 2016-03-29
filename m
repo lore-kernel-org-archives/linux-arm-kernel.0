@@ -1,49 +1,59 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 29 Mar 2016 08:46:50 +0200
-Subject: [PATCH v3 2/5] dmaengine: sun6i: Add 4 as a possible burst value
- for the H3
-In-Reply-To: <20160321093533.c91912e9ac263d9c003355e2@free.fr>
-References: <cover.1458311540.git.moinejf@free.fr>
- <8485d9976f327cf23e051f64c3a3c5cbff4214a7.1458311540.git.moinejf@free.fr>
- <20160321072918.GV30977@lukather>
- <20160321093533.c91912e9ac263d9c003355e2@free.fr>
-Message-ID: <20160329064650.GG30977@lukather>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 29 Mar 2016 06:48:37 +0000 (UTC)
+Subject: [GIT PULL] ARM: OMAP2+: first hwmod fix for v4.6-rc
+Message-ID: <alpine.DEB.2.02.1603290647170.20409@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 21, 2016 at 09:35:33AM +0100, Jean-Francois Moine wrote:
-> On Mon, 21 Mar 2016 08:29:18 +0100
-> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> 
-> > > @@ -470,6 +473,10 @@ static int set_config(struct sun6i_dma_dev *sdev,
-> > >  {
-> > >  	s8 src_width, dst_width, src_burst, dst_burst;
-> > >  
-> > > +	if (!sdev->cfg->burst_4 &&
-> > > +	    (sconfig->src_maxburst == 4 || sconfig->dst_maxburst == 4))
-> > > +		return -EINVAL;
-> > > +
-> > 
-> > I still believe this should be dealt with at the framework level.
-> 
-> What do you mean? In the DMA clients?
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-No, in the dmaengine framework.
+Hi Tony
 
-A driver should register the burst size they support, and
-dmaengine_slave_config would reject any invalid burst size based on
-that.
+The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 
-Maxime
+  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160329/3d482454/attachment-0001.sig>
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v4.6-rc/omap-fixes-a
+
+for you to fetch changes up to 3ca4a238106dedc285193ee47f494a6584b6fd2f:
+
+  ARM: OMAP2+: hwmod: Fix updating of sysconfig register (2016-03-26 23:08:55 -0600)
+
+- ----------------------------------------------------------------
+ARM: OMAP2+: first hwmod fix for v4.6-rc
+
+Fix a longstanding bug in the hwmod code that could cause
+hardware SYSCONFIG register values to not match the kernel's
+idea of what they should be, and that could result in lower
+performance during IP block idle entry.
+
+Basic build, boot, and PM test logs are available here:
+
+http://www.pwsan.com/omap/testlogs/omap-hwmod-fixes-a-for-v4.6-rc/20160326231727/
+
+- ----------------------------------------------------------------
+Lokesh Vutla (1):
+      ARM: OMAP2+: hwmod: Fix updating of sysconfig register
+
+ arch/arm/mach-omap2/omap_hwmod.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1
+
+iQIcBAEBAgAGBQJW+GgPAAoJEMePsQ0LvSpLO0MP/2DtDpbR/5jn+D9TNNkmhZed
+RAkY7etiSX9uMz65R8MzH7+G6D0p22VF66DdKR/d4ewv4n4YK+4swMRn3VZ/AZKJ
+ZJNSdu1P9jLPQYvxmD7k/pdbQPZ8NuhCRR5j8CyLOEzPPZfRFDC4RIgddgKuPbaU
+tpAInuPZ/PJj9xBWUAShJa1ZgZABm3+ivkybw3SJSiQpwROf45W2pkQUXgEeRV+R
+kmWmsav9TBCMNnJyxKlI4bPkU/RXaHkksfFEOuXSG5sNhSfjgGy9RgCXSE6gTi5K
+Qw/I3wyqa8VxZSg7JxXG0rkq63jUpywH3BB1dXBhZ5cb+6DdI3Kpqe+j8gYbMH8W
+60WFHPiIqghfT2pvqQw8PXOp61SeaUu5N/AWUK7gfIDDW1iq0hHTFXnXflW6K709
+IhoRsn0bazuFhIAHLy3R5ZsZRE3RDr1JYum2n0Q1cJBiKP47kpcGVCqPpddGue+p
+ZEg+M67EdvLfKLC3KEzT0X2zJCCi8Z1IGOzHIOt4mG2TnyPDU5rZR+QSp7Oi6vdz
+Z82eKW9cCg+WAJjxw0KoMJIVqbzp9FQWGoJiY883BF+tP2tkY9c2/pUrPaTaDO3m
+ajy9NUsPTHBqQd+DiEj1BUucu2LFj5vfPEBlASGeUcfkASePN+jG1M/bcmqcMx5F
+JnZRdouLjoSLQNNOeujA
+=HOgc
+-----END PGP SIGNATURE-----
