@@ -1,77 +1,127 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 29 Mar 2016 16:06:50 +0100
-Subject: [PATCH] arm64: mm: Add trace_irqflags annotations to
- do_debug_exception()
-In-Reply-To: <1458580446-32474-1-git-send-email-james.morse@arm.com>
-References: <1458580446-32474-1-git-send-email-james.morse@arm.com>
-Message-ID: <20160329150650.GE6745@arm.com>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Tue, 29 Mar 2016 08:10:08 -0700
+Subject: [PATCH] i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity
+In-Reply-To: <5741237.2X2Q0sCFQj@wuerfel>
+References: <m3h9fuk7ik.fsf@t19.piap.pl> <23031613.R8qN30TbTq@wuerfel>
+ <CAJ+vNU2BKLDREOWP8EWXZR43to10yw+qvKwv1MzS4a_L9n5ozg@mail.gmail.com>
+ <5741237.2X2Q0sCFQj@wuerfel>
+Message-ID: <CAJ+vNU3kBk+J-hU1OWPOS6kbFq+J0zM9QpfVy4x1VXL3hgrMTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 21, 2016 at 05:14:06PM +0000, James Morse wrote:
-> With CONFIG_PROVE_LOCKING, CONFIG_DEBUG_LOCKDEP and CONFIG_TRACE_IRQFLAGS
-> enabled, lockdep will compare current->hardirqs_enabled with the flags from
-> local_irq_save().
-> 
-> When a debug exception occurs, interrupts are disabled in entry.S, but
-> lockdep isn't told, resulting in:
-> DEBUG_LOCKS_WARN_ON(current->hardirqs_enabled)
-> ------------[ cut here ]------------
-> WARNING: at ../kernel/locking/lockdep.c:3523
-> Modules linked in:
-> CPU: 3 PID: 1752 Comm: perf Not tainted 4.5.0-rc4+ #2204
-> Hardware name: ARM Juno development board (r1) (DT)
-> task: ffffffc974868000 ti: ffffffc975f40000 task.ti: ffffffc975f40000
-> PC is at check_flags.part.35+0x17c/0x184
-> LR is at check_flags.part.35+0x17c/0x184
-> pc : [<ffffff80080fc93c>] lr : [<ffffff80080fc93c>] pstate: 600003c5
-> [...]
-> ---[ end trace 74631f9305ef5020 ]---
-> Call trace:
-> [<ffffff80080fc93c>] check_flags.part.35+0x17c/0x184
-> [<ffffff80080ffe30>] lock_acquire+0xa8/0xc4
-> [<ffffff8008093038>] breakpoint_handler+0x118/0x288
-> [<ffffff8008082434>] do_debug_exception+0x3c/0xa8
-> [<ffffff80080854b4>] el1_dbg+0x18/0x6c
-> [<ffffff80081e82f4>] do_filp_open+0x64/0xdc
-> [<ffffff80081d6e60>] do_sys_open+0x140/0x204
-> [<ffffff80081d6f58>] SyS_openat+0x10/0x18
-> [<ffffff8008085d30>] el0_svc_naked+0x24/0x28
-> possible reason: unannotated irqs-off.
-> irq event stamp: 65857
-> hardirqs last  enabled at (65857): [<ffffff80081fb1c0>] lookup_mnt+0xf4/0x1b4
-> hardirqs last disabled at (65856): [<ffffff80081fb188>] lookup_mnt+0xbc/0x1b4
-> softirqs last  enabled at (65790): [<ffffff80080bdca4>] __do_softirq+0x1f8/0x290
-> softirqs last disabled at (65757): [<ffffff80080be038>] irq_exit+0x9c/0xd0
-> 
-> This patch adds the annotations to do_debug_exception(), while trying not
-> to call trace_hardirqs_off() if el1_dbg() interrupted a task that already
-> had irqs disabled.
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> ---
->  arch/arm64/mm/fault.c | 33 +++++++++++++++++++++++----------
->  1 file changed, 23 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-> index 44e56de23f79..d8b9c1da2630 100644
-> --- a/arch/arm64/mm/fault.c
-> +++ b/arch/arm64/mm/fault.c
-> @@ -548,20 +548,33 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
->  {
->  	const struct fault_info *inf = debug_fault_info + DBG_ESR_EVT(esr);
->  	struct siginfo info;
-> +	int rv;
->  
-> -	if (!inf->fn(addr, esr, regs))
-> -		return 1;
-> +	/*
-> +	 * If we came in from el0_dbg, we disabled irqs. From el1_dbg,
-> +	 * we need to test pstate.
-> +	 */
-> +	if (user_mode(regs) || !(regs->pstate & PSR_I_BIT))
-> +		trace_hardirqs_off();
+On Tue, Mar 29, 2016 at 7:50 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 29 March 2016 07:29:34 Tim Harvey wrote:
+>> On Tue, Mar 29, 2016 at 6:52 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Tuesday 29 March 2016 06:32:29 Tim Harvey wrote:
+>
+>> >> I think 31e98e0d24cd2537a63e06e235e050a06b175df7 "ARM:
+>> >> imx_v6_v7_defconfig: enable PCI_MSI" should be reverted as well until
+>> >> we figure this out.
+>> >
+>> > That doesn't sound like a helpful solution, multi_v7_defconfig for
+>> > instance will still be broken because it enables PCI_MSI, and so
+>> > will be all major distros.
+>>
+>> Arnd,
+>>
+>> True, but keep in mind that as far as I can tell this behavior has
+>> been around since MSI was added to the IMX6 (breakage of devices that
+>> use legacy irq's if MSI is enabled) which was in 3.16.
+>
+> I see. This part wasn't clear to me.
+>
+>> > What happens if we patch the pci-imx6 driver to not make use of
+>> > its MSI support even when that is enabled in the kernel? Does that
+>> > get both devices in your GW5xxx to work with legacy interrupts or
+>> > is one or both of them still broken?
+>> >
+>> >         Arnd
+>> >
+>> > diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+>> > index eb5a2755a164..d7607b2695c6 100644
+>> > --- a/drivers/pci/host/pci-imx6.c
+>> > +++ b/drivers/pci/host/pci-imx6.c
+>> > @@ -470,7 +470,7 @@ static void imx6_pcie_host_init(struct pcie_port *pp)
+>> >
+>> >         imx6_pcie_establish_link(pp);
+>> >
+>> > -       if (IS_ENABLED(CONFIG_PCI_MSI))
+>> > +       if (0 && IS_ENABLED(CONFIG_PCI_MSI))
+>> >                 dw_pcie_msi_init(pp);
+>> >  }
+>> >
+>> > @@ -490,7 +490,7 @@ static int __init imx6_add_pcie_port(struct pcie_port *pp,
+>> >  {
+>> >         int ret;
+>> >
+>> > -       if (IS_ENABLED(CONFIG_PCI_MSI)) {
+>> > +       if (0 && IS_ENABLED(CONFIG_PCI_MSI)) {
+>> >                 pp->msi_irq = platform_get_irq_byname(pdev, "msi");
+>> >                 if (pp->msi_irq <= 0) {
+>> >                         dev_err(&pdev->dev, "failed to get MSI irq\n");
+>> >
+>>
+>> That is not enough - we would also need to disable a couple more in
+>> the designware core that imx6 uses, which is also used by several
+>> other SoC's. We should probably get some feedback from people with
+>> those SoC's regarding MSI breaking legacy irqs.
+>
+> Good point. I really just meant this as an experiment, trying to
+> figure out what causes it to break. I'd be surprised if the
+> MSI support in the generic pcie-designware driver caused the same
+> problem on the other SoCs.
+>
+>> PCI_MSI was enabled in imx_v6_v7_defconfig in 4.5 and enabled in
+>> multi_v7_defconfig back in 3.16. PCI MSI was first introduced for the
+>> IMX6 host controller in 3.16 as well. I verified that the same issue
+>> exists all the way back to 3.16.
+>
+> Thanks for doing that research.
+>
+>> I don't know if its worse to disable PCI MSI for IMX6/designware all
+>> the way back to 3.16 or to disable it just back to 4.5 where imx_v6_v7
+>> enabled it, or perhaps just figure out the actual issue and get that
+>> backported?
+>
+> I'd like to see the problem understood better before we talk about
+> backports.
+>
+> One thing I just noticed is that the same GPC interrupt line (GIC_SPI
+> 120) is used for MSI and for IntD. Maybe there is something going on with
+> sharing an interrupt line between a nested irqchip and a device?
+>
+> Could this be a bug in the generic IRQ handling code? Can you check
+> which interrupt the broken device(s) on your machine are using? Is
+> it always the 120 (IntD) line, or are the other three lines broken
+> as well? I don't actually know how to look it up, but the 'lspci -t'
+> output should let us reconstruct the swizzling manually.
+>
+>         Arnd
 
-Can you use interrupts_enabled(regs) for this?
+Arnd,
 
-Will
+Right, on the IMX the MSI interrupt is GIC-120 which is also the
+legacy INTD and I do see that if I happen to put a radio in a slot
+where due to swizzling its pin1 becomes INTD (GIC-120) the interrupt
+does fire and the device works. Any other slot using GIC-123 (INTA),
+GIC-122 (INTB), or GIC-121 (INTC) never fires so its very possible
+that something in the designware core is masking out the legacy irqs.
+I would also think this was something IMX specific, but I really don't
+see any codepaths in pci-imx6.c that would cause that: a driver
+requesting a legacy PCI would get a GIC interrupt which is handled by
+the IMX6 gpc interrupt controller.
+
+Any dra7xxx, exynos, spear13xx, keystone, layerscape, hisi, qcom SoC
+users of designware PCIe core out there that can verify PCI MSI and
+legacy are both working at the same time?
+
+Lucas is the expert here and I believe he has the documentation for
+the designware core that Freescale doens't provide with the IMX6
+documentation so hopefully he can provide some insight. He's the one
+that has authored all the MSI support and has been using it.
+
+I typically advise our users to 'not' enable MSI because
+architecturally you can spread 4 distinct legacy irq's across CPU's
+better than a single shared irq.
+
+Tim
