@@ -1,49 +1,72 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 29 Mar 2016 18:21:36 +0200
-Subject: [PATCH] ARM: configs: Enabling the new Marvell's cryptographic
- engine driver for multi_v7_defconfig
-In-Reply-To: <20160318084454.GA8836@archy.home> (Romain Perier's message of
- "Fri, 18 Mar 2016 09:44:54 +0100")
-References: <20160318084454.GA8836@archy.home>
-Message-ID: <878u11w8z3.fsf@free-electrons.com>
+From: julien.grall@arm.com (Julien Grall)
+Date: Tue, 29 Mar 2016 17:28:56 +0100
+Subject: [PATCH v7 03/17] Xen: xlate: Use page_to_xen_pfn instead of
+ page_to_pfn
+In-Reply-To: <1458830676-27075-4-git-send-email-shannon.zhao@linaro.org>
+References: <1458830676-27075-1-git-send-email-shannon.zhao@linaro.org>
+ <1458830676-27075-4-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <56FAAD48.2010401@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Romain,
- 
- On ven., mars 18 2016, Romain Perier <romain.perier@free-electrons.com> wrote:
+Hi Shannon,
 
-> This enables the new driver for Marvell CESA crypto engines on all ARMv7.
+On 24/03/16 14:44, Shannon Zhao wrote:
+> Make xen_xlate_map_ballooned_pages work with 64K pages. In that case
+> Kernel pages are 64K in size but Xen pages remain 4K in size. Xen pfns
+> refer to 4K pages.
 >
-> Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
-
-Applied on mvebu/defconfig
-
-Thanks,
-
-Gregory
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 > ---
->  arch/arm/configs/multi_v7_defconfig | 1 +
->  1 file changed, 1 insertion(+)
+>   drivers/xen/xlate_mmu.c | 26 ++++++++++++++++----------
+>   1 file changed, 16 insertions(+), 10 deletions(-)
 >
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 2823490..392e970 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -829,6 +829,7 @@ CONFIG_LOCKUP_DETECTOR=y
->  CONFIG_CRYPTO_DEV_TEGRA_AES=y
->  CONFIG_CPUFREQ_DT=y
->  CONFIG_KEYSTONE_IRQ=y
-> +CONFIG_CRYPTO_DEV_MARVELL_CESA=m
->  CONFIG_CRYPTO_DEV_SUN4I_SS=m
->  CONFIG_CRYPTO_DEV_ROCKCHIP=m
->  CONFIG_ARM_CRYPTO=y
-> -- 
-> 2.7.3
+> diff --git a/drivers/xen/xlate_mmu.c b/drivers/xen/xlate_mmu.c
+> index 9692656..28f728b 100644
+> --- a/drivers/xen/xlate_mmu.c
+> +++ b/drivers/xen/xlate_mmu.c
+> @@ -207,9 +207,12 @@ int __init xen_xlate_map_ballooned_pages(xen_pfn_t **gfns, void **virt,
+>   	void *vaddr;
+>   	int rc;
+>   	unsigned int i;
+> +	unsigned long nr_pages;
+> +	xen_pfn_t xen_pfn = 0;
 >
+>   	BUG_ON(nr_grant_frames == 0);
+> -	pages = kcalloc(nr_grant_frames, sizeof(pages[0]), GFP_KERNEL);
+> +	nr_pages = DIV_ROUND_UP(nr_grant_frames, XEN_PFN_PER_PAGE);
+> +	pages = kcalloc(nr_pages, sizeof(pages[0]), GFP_KERNEL);
+>   	if (!pages)
+>   		return -ENOMEM;
+>
+> @@ -218,22 +221,25 @@ int __init xen_xlate_map_ballooned_pages(xen_pfn_t **gfns, void **virt,
+>   		kfree(pages);
+>   		return -ENOMEM;
+>   	}
+> -	rc = alloc_xenballooned_pages(nr_grant_frames, pages);
+> +	rc = alloc_xenballooned_pages(nr_pages, pages);
+>   	if (rc) {
+> -		pr_warn("%s Couldn't balloon alloc %ld pfns rc:%d\n", __func__,
+> -			nr_grant_frames, rc);
+> +		pr_warn("%s Couldn't balloon alloc %ld pages rc:%d\n", __func__,
+> +			nr_pages, rc);
+>   		kfree(pages);
+>   		kfree(pfns);
+>   		return rc;
+>   	}
+> -	for (i = 0; i < nr_grant_frames; i++)
+> -		pfns[i] = page_to_pfn(pages[i]);
+> +	for (i = 0; i < nr_grant_frames; i++) {
+> +		if ((i % XEN_PFN_PER_PAGE) == 0)
+> +			xen_pfn = page_to_xen_pfn(pages[i / XEN_PFN_PER_PAGE]);
+> +		pfns[i] = pfn_to_gfn(xen_pfn++);
+> +	}
+
+Would it be possible to re-use xen_for_each_gfn? This will avoid 
+open-coding the loop to break down the Linux page.
+
+Regards,
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Julien Grall
