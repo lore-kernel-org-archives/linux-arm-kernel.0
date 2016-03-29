@@ -1,42 +1,48 @@
-From: kernel@tekno-soft.it (Roberto Fichera)
-Date: Tue, 29 Mar 2016 18:13:53 +0200
-Subject: [PATCH] i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity
-In-Reply-To: <CAJ+vNU3kBk+J-hU1OWPOS6kbFq+J0zM9QpfVy4x1VXL3hgrMTg@mail.gmail.com>
-References: <m3h9fuk7ik.fsf@t19.piap.pl> <23031613.R8qN30TbTq@wuerfel>
- <CAJ+vNU2BKLDREOWP8EWXZR43to10yw+qvKwv1MzS4a_L9n5ozg@mail.gmail.com>
- <5741237.2X2Q0sCFQj@wuerfel>
- <CAJ+vNU3kBk+J-hU1OWPOS6kbFq+J0zM9QpfVy4x1VXL3hgrMTg@mail.gmail.com>
-Message-ID: <56FAA9C1.5060107@tekno-soft.it>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 29 Mar 2016 17:18:38 +0100
+Subject: [PATCH v7 12/17] ARM64: ACPI: Check if it runs on Xen to enable
+ or disable ACPI
+In-Reply-To: <1458830676-27075-13-git-send-email-shannon.zhao@linaro.org>
+References: <1458830676-27075-1-git-send-email-shannon.zhao@linaro.org>
+ <1458830676-27075-13-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <20160329161837.GH6745@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/29/2016 05:10 PM, Tim Harvey wrote:
-> Arnd,
->
-> Right, on the IMX the MSI interrupt is GIC-120 which is also the
-> legacy INTD and I do see that if I happen to put a radio in a slot
-> where due to swizzling its pin1 becomes INTD (GIC-120) the interrupt
-> does fire and the device works. Any other slot using GIC-123 (INTA),
-> GIC-122 (INTB), or GIC-121 (INTC) never fires so its very possible
-> that something in the designware core is masking out the legacy irqs.
-> I would also think this was something IMX specific, but I really don't
-> see any codepaths in pci-imx6.c that would cause that: a driver
-> requesting a legacy PCI would get a GIC interrupt which is handled by
-> the IMX6 gpc interrupt controller.
->
-> Any dra7xxx, exynos, spear13xx, keystone, layerscape, hisi, qcom SoC
-> users of designware PCIe core out there that can verify PCI MSI and
-> legacy are both working at the same time?
->
-> Lucas is the expert here and I believe he has the documentation for
-> the designware core that Freescale doens't provide with the IMX6
-> documentation so hopefully he can provide some insight. He's the one
-> that has authored all the MSI support and has been using it.
->
-> I typically advise our users to 'not' enable MSI because
-> architecturally you can spread 4 distinct legacy irq's across CPU's
-> better than a single shared irq.
+On Thu, Mar 24, 2016 at 10:44:31PM +0800, Shannon Zhao wrote:
+> When it's a Xen domain0 booting with ACPI, it will supply a /chosen and
+> a /hypervisor node in DT. So check if it needs to enable ACPI.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  arch/arm64/kernel/acpi.c | 12 ++++++++----
+>  1 file changed, 8 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> index d1ce8e2..4e92be0 100644
+> --- a/arch/arm64/kernel/acpi.c
+> +++ b/arch/arm64/kernel/acpi.c
+> @@ -67,10 +67,13 @@ static int __init dt_scan_depth1_nodes(unsigned long node,
+>  {
+>  	/*
+>  	 * Return 1 as soon as we encounter a node at depth 1 that is
+> -	 * not the /chosen node.
+> +	 * not the /chosen node, or /hypervisor node when running on Xen.
+>  	 */
+> -	if (depth == 1 && (strcmp(uname, "chosen") != 0))
+> -		return 1;
+> +	if (depth == 1 && (strcmp(uname, "chosen") != 0)) {
+> +		if (!xen_initial_domain() || (strcmp(uname, "hypervisor") != 0))
+> +			return 1;
+> +	}
 
-Don't know if I'm facing similar problem, however devices connected in miniPCI slot behind
-a PCIe-to-PCI bridge (MSI is disabled) using INTA all is working ok, including shared IRQ.
-In case of INTB will not work, and the GIC irq quite often get stuck.
+Hmm, but xen_initial_domain() is false when xen isn't being used at all,
+so it feels to me like this is a bit too far-reaching and is basically
+claiming the "/hypervisor" namespace for Xen. Couldn't it be renamed to
+"xen,hypervisor" or something?
+
+Mark, got any thoughts on this?
+
+Will
