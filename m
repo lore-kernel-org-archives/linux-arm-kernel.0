@@ -1,53 +1,36 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 29 Mar 2016 07:21:10 -0700
-Subject: [PATCH 04/12] ARM: dts: dragonboard-600c: add board support with
- serial
-In-Reply-To: <56F3477E.8090205@codeaurora.org>
-References: <1458762366-9233-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1458762442-9492-1-git-send-email-srinivas.kandagatla@linaro.org>
- <56F2F78E.8050002@codeaurora.org> <56F2FCD0.1000708@linaro.org>
- <CAOCOHw7TyzDf4jvAMChOFFEgsL4Z1+CcESLOuckT=Q7W9hQvCw@mail.gmail.com>
- <56F3477E.8090205@codeaurora.org>
-Message-ID: <20160329142110.GE8929@tuxbot>
+From: yendapally.reddy@broadcom.com (Yendapally Reddy Dhananjaya Reddy)
+Date: Tue, 29 Mar 2016 10:22:27 -0400
+Subject: [PATCH RESEND 0/3] pwm support for Broadcom iProc SoC's
+Message-ID: <1459261350-23851-1-git-send-email-yendapally.reddy@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 23 Mar 18:48 PDT 2016, Stephen Boyd wrote:
+This patchset contains the pwm support for the Broadcom's iProc SoC's.
 
-> On 03/23/2016 06:04 PM, Bjorn Andersson wrote:
-> > On Wed, Mar 23, 2016 at 1:30 PM, Srinivas Kandagatla
-> > <srinivas.kandagatla@linaro.org> wrote:
-> >>
-> >> On 23/03/16 20:07, Stephen Boyd wrote:
-[..]
-> >
-> > Also, if I make a product based of this board, with some minor
-> > changes, is that still the sbc?
-> >
-> > I think the compatible should be "qcom,apq8064-db600c",
-> > "qcom,apq8064-sbc", "qcom,apq8064"
-> >
-> >
-> 
-> I really hope that people don't keep using the qcom bootloader dtb
-> picking design if they make a new product based off qcom boards with a
-> slight variation. They should replace the vendor part of the compatible
-> anyway with their own vendor prefix, and then the bootloader would need
-> to be updated to look for that string or something else. I really don't
-> want to get in the business of updating dtbTool for all the non-qcom
-> designs that pop up because they keep using the qcom dtb identification
-> scheme. It almost doesn't scale right now and that's just qcom designs.
+The first patch provides the documentation details and the
+second patch contains the controller support details. The third patch
+contains the enable method for Northstar Plus SoC.
 
-At that other company the various dtb's that was to be picked for a
-given product was always to support the various SoC versions; so those
-devices always shipped with the mtp board-id and msm-id.
+This patch series has been tested on NSP bcm958625HR board with oscilloscope.
+The pwm is not enabled for this board as the pins are open and not used.
 
-As far as I've seen this is how Qualcomm's Android customers does it.
+This patch series is based on v4.6.0-rc1 and is available from github
+repo: https://github.com/Broadcom/cygnus-linux.git
+branch: iproc-pwm-v1
 
+This patch series was originally sent on 03/01/16.
+See https://lkml.org/lkml/2016/3/1/487
 
-But as things progress further I do see a need for being able to also
-pick the right product and at that point you're right that the vendor
-must change their boot loader.
+Yendapally Reddy Dhananjaya Reddy (3):
+  Documentation: dt: Add Broadcom iproc pwm controller binding
+  pwm: kona: Add support for Broadcom iproc pwm controller
+  ARM: dts: NSP: Add PWM Support to DT
 
-Regards,
-Bjorn
+ .../devicetree/bindings/pwm/brcm,kona-pwm.txt      |   2 +-
+ arch/arm/boot/dts/bcm-nsp.dtsi                     |   8 +
+ drivers/pwm/Kconfig                                |   6 +-
+ drivers/pwm/pwm-bcm-kona.c                         | 183 ++++++++++++++++++---
+ 4 files changed, 172 insertions(+), 27 deletions(-)
+
+-- 
+2.1.0
