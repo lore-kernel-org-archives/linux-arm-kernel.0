@@ -1,36 +1,47 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 29 Mar 2016 10:43:07 +0900
-Subject: [PATCH v2] arm64: dts: Add tmu node for exynos7
-In-Reply-To: <56DD4907.8030100@samsung.com>
-References: <1456477590-4530-1-git-send-email-alim.akhtar@samsung.com>
- <56DD0022.20800@samsung.com> <56DD4907.8030100@samsung.com>
-Message-ID: <56F9DDAB.5000807@samsung.com>
+From: sw0312.kim@samsung.com (Seung-Woo Kim)
+Date: Tue, 29 Mar 2016 10:46:11 +0900
+Subject: [PATCH 0/3] drm/exynos: Kconfig dependency fixes
+In-Reply-To: <1459214937-18686-1-git-send-email-javier@osg.samsung.com>
+References: <1459214937-18686-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <56F9DE63.6050808@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07.03.2016 18:25, Alim Akhtar wrote:
-> Hi Krzysztof,
+Hi Javier,
+
+On 2016? 03? 29? 10:28, Javier Martinez Canillas wrote:
+> Hello Inki,
 > 
-> On 03/07/2016 09:44 AM, Krzysztof Kozlowski wrote:
->> On 26.02.2016 18:06, Alim Akhtar wrote:
->>> This patch adds tmu node, related temprature sensor and triping
->>> point data for Atlas cpu core found on exynos7 SoC.
->>>
->>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
->>> ---
->>> Changes since v1:
->>> * Addressed krzysztof's review comments.
->>>
->>>   .../boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi   |   25 +++++++++
->>>   .../arm64/boot/dts/exynos/exynos7-trip-points.dtsi |   54
->>> ++++++++++++++++++++
->>>   arch/arm64/boot/dts/exynos/exynos7.dtsi            |   20 ++++++++
->>>   3 files changed, 99 insertions(+)
->>>   create mode 100644
->>> arch/arm64/boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi
->>>   create mode 100644 arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi
+> This patch series contains some fixes for the Kconfig symbol dependencies
+> of the Exynos DRM driver. They make sure that the Exynos DRM components
+> and the media platform drivers that makes use of the same HW IP block are
+> not enabled at the same time.
+> 
+> Best regards,
+> Javier
+> 
+> 
+> Javier Martinez Canillas (3):
+>   drm/exynos: Use VIDEO_SAMSUNG_S5P_G2D=n as G2D Kconfig dependency
+>   drm/exynos: Use VIDEO_SAMSUNG_EXYNOS_GSC=n as GSC Kconfig dependency
+>   drm/exynos: Make DRM_EXYNOS_FIMC depend on VIDEO_S5P_FIMC=n
 
-Queued for v4.7. Thanks.
+In G2D case, there is only one instance, but for the other cases, there
+are several instances and in my environment, I enable both drivers on
+v4l2 and drm FIMC/GSC.
 
-Best regards,
-Krzysztof
+So, IMHO, the not-enabled v4l2 dependency is not really required for drm
+fimc and drm gsc.
+
+Best Regards,
+- Seung-Woo Kim
+
+> 
+>  drivers/gpu/drm/exynos/Kconfig | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+
+-- 
+Seung-Woo Kim
+Samsung Software R&D Center
+--
