@@ -1,88 +1,60 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 29 Mar 2016 12:09:49 +0530
-Subject: [PATCH V2 3/3] cpufreq: exynos: Use generic platdev driver
-In-Reply-To: <cover.1459233524.git.viresh.kumar@linaro.org>
-References: <cover.1459233524.git.viresh.kumar@linaro.org>
-Message-ID: <81a8da75a0e7783e2b47f9e04297f167e8134afe.1459233524.git.viresh.kumar@linaro.org>
+From: alexander.stein@systec-electronic.com (Alexander Stein)
+Date: Tue, 29 Mar 2016 08:45:33 +0200
+Subject: [PATCH v2 6/8] drm/fsl-dcu: add TCON driver
+In-Reply-To: <1459216802-32094-7-git-send-email-stefan@agner.ch>
+References: <1459216802-32094-1-git-send-email-stefan@agner.ch>
+ <1459216802-32094-7-git-send-email-stefan@agner.ch>
+Message-ID: <2234894.ri36D5MRrN@ws-stein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cpufreq-dt-platdev driver supports creation of cpufreq-dt platform
-device now, reuse that and remove similar code from platform code.
+Hi,
 
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- arch/arm/mach-exynos/exynos.c        | 29 -----------------------------
- drivers/cpufreq/cpufreq-dt-platdev.c |  9 +++++++++
- 2 files changed, 9 insertions(+), 29 deletions(-)
+some comments below.
 
-diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index bbf51a46f772..4d3b056fd786 100644
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@ -213,33 +213,6 @@ static void __init exynos_init_irq(void)
- 	exynos_map_pmu();
- }
- 
--static const struct of_device_id exynos_cpufreq_matches[] = {
--	{ .compatible = "samsung,exynos3250", .data = "cpufreq-dt" },
--	{ .compatible = "samsung,exynos4210", .data = "cpufreq-dt" },
--	{ .compatible = "samsung,exynos4212", .data = "cpufreq-dt" },
--	{ .compatible = "samsung,exynos4412", .data = "cpufreq-dt" },
--	{ .compatible = "samsung,exynos5250", .data = "cpufreq-dt" },
--#ifndef CONFIG_BL_SWITCHER
--	{ .compatible = "samsung,exynos5420", .data = "cpufreq-dt" },
--	{ .compatible = "samsung,exynos5800", .data = "cpufreq-dt" },
--#endif
--	{ /* sentinel */ }
--};
--
--static void __init exynos_cpufreq_init(void)
--{
--	struct device_node *root = of_find_node_by_path("/");
--	const struct of_device_id *match;
--
--	match = of_match_node(exynos_cpufreq_matches, root);
--	if (!match) {
--		platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
--		return;
--	}
--
--	platform_device_register_simple(match->data, -1, NULL, 0);
--}
--
- static void __init exynos_dt_machine_init(void)
- {
- 	/*
-@@ -262,8 +235,6 @@ static void __init exynos_dt_machine_init(void)
- 	    of_machine_is_compatible("samsung,exynos5250"))
- 		platform_device_register(&exynos_cpuidle);
- 
--	exynos_cpufreq_init();
--
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
-diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
-index 18b81724ca0b..c5a70b683c7c 100644
---- a/drivers/cpufreq/cpufreq-dt-platdev.c
-+++ b/drivers/cpufreq/cpufreq-dt-platdev.c
-@@ -20,6 +20,15 @@ struct cpufreq_dt_compat {
- };
- 
- static struct cpufreq_dt_compat compat[] = {
-+	{ "samsung,exynos3250",		NULL,		0 },
-+	{ "samsung,exynos4210",		NULL,		0 },
-+	{ "samsung,exynos4212",		NULL,		0 },
-+	{ "samsung,exynos4412",		NULL,		0 },
-+	{ "samsung,exynos5250",		NULL,		0 },
-+#ifndef CONFIG_BL_SWITCHER
-+	{ "samsung,exynos5420",		NULL,		0 },
-+	{ "samsung,exynos5800",		NULL,		0 },
-+#endif
- };
- 
- static int __init cpufreq_dt_platdev_init(void)
--- 
-2.7.1.410.g6faf27b
+On Monday 28 March 2016 19:00:00, Stefan Agner wrote:
+> Add driver for the TCON (timing controller) module. The TCON module
+> is a separate module attached after the DCU (display controller
+> unit). Each DCU instance has its own, directly connected TCON
+> instance. The DCU's RGB and timing signals are passing through
+> the TCON module. TCON can provide timing signals for raw TFT panels
+> or operate in a bypass mode which leaves all signals unaltered.
+> 
+> The driver currently only supports the bypass mode.
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+
+> --- a/Documentation/devicetree/bindings/display/fsl,dcu.txt
+> +++ b/Documentation/devicetree/bindings/display/fsl,dcu.txt
+> @@ -14,6 +14,7 @@ Required properties:
+>  Optional properties:
+>  - clocks:		Second handle for pixel clock.
+>  - clock-names:		Second name "pix" for pixel clock.
+> +- fsl,tcon:		The phandle to the timing controller node.
+
+Maybe a comment this is (currently) only for Vybrid, but not LS1021A.
+
+> --- /dev/null
+> +++ b/drivers/gpu/drm/fsl-dcu/fsl_tcon.c
+> [...]
+> +struct fsl_tcon *fsl_tcon_init(struct device *dev)
+> +{
+> +	struct fsl_tcon *tcon;
+> +	struct device_node *np;
+> +	int ret;
+> +
+> +	tcon = devm_kzalloc(dev, sizeof(*tcon), GFP_KERNEL);
+> +	if (!tcon)
+> +		return NULL;
+> +
+> +	np = of_parse_phandle(dev->of_node, "fsl,tcon", 0);
+> +	if (!np) {
+> +		dev_warn(dev, "Couldn't find the tcon node\n");
+> +		return NULL;
+> +	}
+
+Maybe check for device tree node before allocating struct fsl_tcon? Also this 
+should not be a warning, as on LS1021A this is to be expected.
+
+Best regards,
+Alexander
