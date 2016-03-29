@@ -1,73 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 30 Mar 2016 00:04:55 +0200
-Subject: [PATCH v2] spi: orion.c: Add direct access mode
-In-Reply-To: <20160329212842.GN2350@sirena.org.uk>
-References: <1458663893-13766-1-git-send-email-sr@denx.de>
- <3108005.nUMWsj4kjp@wuerfel> <20160329212842.GN2350@sirena.org.uk>
-Message-ID: <13533301.gfdhE3AuMf@wuerfel>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Wed, 30 Mar 2016 01:05:02 +0300
+Subject: arm64: kernel v4.6-rc1 hangs on QEMU
+Message-ID: <20160329220502.GA14443@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 March 2016 14:28:42 Mark Brown wrote:
-> On Tue, Mar 29, 2016 at 11:08:55PM +0200, Arnd Bergmann wrote:
-> > On Tuesday 29 March 2016 14:00:18 Mark Brown wrote:
-> 
-> > > Implementing that would require the SPI core to export something
-> > > providing access to the memory regions.  We don't currently do that,
-> > > it'd require us to deal with the interaction with access as a SPI device
-> > > (this hardware often seems to only accelerate reads so we still need to
-> > > use regular SPI access for writes).
-> 
-> > The manual lists both read and write accesses as handled through
-> > direct mode.
-> 
-> That is not in general the case for this sort of hardware, and there's
-> also erase support to consider here.
+Hi,
 
-Sorry for being unclear, I was referring to spi writes here, not flash
-writes.
+Checked  for both v4.6-rc1 and current master (1993b17).
+Config: arm64 defconfig
+QEMU: QEMU emulator version 2.3.0 (Debian 1:2.3+dfsg-5ubuntu9.2)
 
-The MTD infrastructure handles _point internally, and I think it is
-only ever used on jffs2 these days. I had assumed that _point was
-used by mtd_block to implement direct_access for read-only block
-based file systems as well, but it's not.
+Stacktrace:
+#0  arch_counter_get_cntvct () at
+./arch/arm64/include/asm/arch_timer.h:121
+#1  __delay (cycles=1024) at arch/arm64/lib/delay.c:31
+#2  0xffffff8008340970 in __const_udelay (xloops=<optimized out>) at
+arch/arm64/lib/delay.c:41
+#3  0xffffff800815420c in panic (fmt=<optimized out>) at
+kernel/panic.c:257
+#4  0xffffff80080be588 in do_exit (code=11) at kernel/exit.c:666
+#5  0xffffff8008089d08 in die (str=<optimized out>, regs=0xffffff8008aebe20 <init_thread_union+15904>, err=143867376) at arch/arm64/kernel/traps.c:298
+#6  0xffffff8008089dec in arm64_notify_die (str=<optimized out>, regs=<optimized out>, info=<optimized out>, err=<optimized out>) at arch/arm64/kernel/traps.c:309
+#7  0xffffff800808212c in do_undefinstr (regs=0xffffff8008aebe20 <init_thread_union+15904>) at arch/arm64/kernel/traps.c:399
+#8  0xffffff8008a1fe08 in cpuinfo_store_boot_cpu () at arch/arm64/kernel/cpuinfo.c:252
+#9  0xffffff8008a1fe08 in cpuinfo_store_boot_cpu () at arch/arm64/kernel/cpuinfo.c:252
+#10 0xffffff8008a20388 in smp_prepare_boot_cpu () at arch/arm64/kernel/smp.c:403
+#11 0xffffff8008a1d6ec in start_kernel () at init/main.c:511
+#12 0xffffff80080811d8 in __mmap_switched () at arch/arm64/kernel/head.S:437
+Backtrace stopped: previous frame identical to this frame (corrupt stack?)
 
-I don't think there is any device that abstracts a SPI-NOR flash
-to look like RAM.
+Corefile can be found at:
+https://drive.google.com/file/d/0B93nHerV55yNdFp5em54TEVnU2c/view?usp=sharing
 
-> > > I don't like having to assign windows per device, like I say it seems
-> > > like more work.
-> 
-> > Ok, but that's something else that can be implemented independently
-> > as I explained earlier: We currently rely on the windows to be assigned
-> > in the DT, but it's also possible to extend the mbus driver in a way
-> > that lets it pick its own windows in one way or another. It should
-> 
-> That's what I've been asking for but people keep saying it's not
-> possible...
-
-It's not impossible, it's just that IIRC we decided that the effort
-to do this well was not reasonable compared to the benefit back
-when the mbus driver got added.
-
-I don't think anything has changed here.
-
-> > not impact the binding for the SPI host controller in any way, the
-> > binding just describes how the internal addressing is wired up to
-> > the mbus in hardware, and the mbus driver takes care of mapping those
-> > into CPU addresses.
-> 
-> If we're able to do it automatically without baking this into the DT and
-> there's enough space to cope with this and PCI together then that's more
-> reasonable.
-
-Ok, good. Then let's just do the SPI host driver like all the other
-mbus slaves using whatever mbus provides, and implement dynamic remapping
-of mbus windows whenever someone gets too annoyed with having to 
-come up with a mapping for their board.
-
-At least by doing SPI like all the other devices, we don't make it
-harder to come up with a generic algorithm for assigning the windows
-at boot time.
-
-	Arnd
+Yury.
