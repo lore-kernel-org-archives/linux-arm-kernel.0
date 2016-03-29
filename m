@@ -1,51 +1,51 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 29 Mar 2016 11:13:51 +0100
-Subject: [PATCH] ARM: bcm2835: add CPU node for ARM core
-In-Reply-To: <56FA5332.4050707@i2se.com>
-References: <1459182081-30819-1-git-send-email-stefan.wahren@i2se.com>
- <20160329094158.GB26574@leverpostej> <56FA5332.4050707@i2se.com>
-Message-ID: <20160329101351.GC26574@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 29 Mar 2016 12:19:49 +0200
+Subject: [PATCH 1/1] ARM : missing corrupted reg in __do_div_asm
+In-Reply-To: <1459138743-10477-1-git-send-email-chengang.beijing@gmail.com>
+References: <1459138743-10477-1-git-send-email-chengang.beijing@gmail.com>
+Message-ID: <3792990.eCI4tPEEyD@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 29, 2016 at 12:04:34PM +0200, Stefan Wahren wrote:
-> Am 29.03.2016 um 11:41 schrieb Mark Rutland:
-> > On Mon, Mar 28, 2016 at 04:21:20PM +0000, Stefan Wahren wrote:
-> >> This patch adds the CPU node of the BCM2835 into the DT.
-> >>
-> >> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> >> ---
-> >>  arch/arm/boot/dts/bcm2835.dtsi |   11 +++++++++++
-> >>  1 file changed, 11 insertions(+)
-> >>
-> >> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
-> >> index b83b326..e87aba1 100644
-> >> --- a/arch/arm/boot/dts/bcm2835.dtsi
-> >> +++ b/arch/arm/boot/dts/bcm2835.dtsi
-> >> @@ -3,6 +3,17 @@
-> >>  / {
-> >>  	compatible = "brcm,bcm2835";
-> >>  
-> >> +	cpus {
-> >> +		#address-cells = <1>;
-> >> +		#size-cells = <0>;
-> >> +
-> >> +		cpu at 0 {
-> >> +			device_type = "cpu";
-> >> +			compatible = "arm,arm1176jzf-s", "arm,arm1176";
-> >> +			reg = <0x0>;
-> >> +		};
-> >> +	};
-> > Minor nit: the "arm,arm1176" fallback isn't documented, nor used
-> > elsewhere, so it can/should be dropped.
+On Monday 28 March 2016 12:19:03 Chen Gang wrote:
+> __xl(R0 in little endian system, or R1 in big endian system) is corrupted
+> after calling __do_div64 and compiler is not informed about this in
+> macro __do_div_asm. If n is used again afterwards, __xl won't be
+> reloaded and n will contain incorrect value.
 > 
-> This fallback came from arch/arm/boot/dts/s3c64xx.dtsi
+> Signed-off-by: Chen Gang <gangchen@rdamicro.com>
+> Signed-off-by: Chen Gang <chengang.beijing@gmail.com>
+> ---
 
-Ah, indeed. I failed to spot that when grepping. For consistency, we
-should probably clean that up.
+How did you find this? Did you run into this problem on a live system
+or see it through inspection?
 
-> I will send a V2 without the fallback.
+>  arch/arm/include/asm/div64.h | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/div64.h b/arch/arm/include/asm/div64.h
+> index e1f0776..1a6e91a 100644
+> --- a/arch/arm/include/asm/div64.h
+> +++ b/arch/arm/include/asm/div64.h
+> @@ -35,12 +35,14 @@ static inline uint32_t __div64_32(uint64_t *n, uint32_t base)
+>         register unsigned long long __n   asm("r0") = *n;
+>         register unsigned long long __res asm("r2");
+>         register unsigned int __rem       asm(__xh);
+> +       register unsigned int __clobber   asm(__xl);
+>         asm(    __asmeq("%0", __xh)
+>                 __asmeq("%1", "r2")
+> +               __asmeq("%3", "r0")
+> +               __asmeq("%4", "r4")
+>                 __asmeq("%2", "r0")
+> -               __asmeq("%3", "r4")
+>                 "bl     __do_div64"
+> -               : "=r" (__rem), "=r" (__res)
+> +               : "=r" (__rem), "=r" (__res), "=r" (__clobber)
+>                 : "r" (__n), "r" (__base)
+>                 : "ip", "lr", "cc");
+>         *n = __res;
 
-Cheers!
+Doesn't the clobber normally go in the third line along with
+"ip" and "lr"?
 
-Mark.
+	Arnd
