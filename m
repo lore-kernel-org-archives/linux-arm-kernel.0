@@ -1,59 +1,81 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 29 Mar 2016 06:48:37 +0000 (UTC)
-Subject: [GIT PULL] ARM: OMAP2+: first hwmod fix for v4.6-rc
-Message-ID: <alpine.DEB.2.02.1603290647170.20409@utopia.booyaka.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue, 29 Mar 2016 00:11:13 -0700
+Subject: [PATCH v2 6/8] drm/fsl-dcu: add TCON driver
+In-Reply-To: <2234894.ri36D5MRrN@ws-stein>
+References: <1459216802-32094-1-git-send-email-stefan@agner.ch>
+ <1459216802-32094-7-git-send-email-stefan@agner.ch>
+ <2234894.ri36D5MRrN@ws-stein>
+Message-ID: <57c86de8eca0aa16a5cdfc488977ca4e@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
+On 2016-03-28 23:45, Alexander Stein wrote:
+> Hi,
+> 
+> some comments below.
+> 
+> On Monday 28 March 2016 19:00:00, Stefan Agner wrote:
+>> Add driver for the TCON (timing controller) module. The TCON module
+>> is a separate module attached after the DCU (display controller
+>> unit). Each DCU instance has its own, directly connected TCON
+>> instance. The DCU's RGB and timing signals are passing through
+>> the TCON module. TCON can provide timing signals for raw TFT panels
+>> or operate in a bypass mode which leaves all signals unaltered.
+>>
+>> The driver currently only supports the bypass mode.
+>>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> 
+>> --- a/Documentation/devicetree/bindings/display/fsl,dcu.txt
+>> +++ b/Documentation/devicetree/bindings/display/fsl,dcu.txt
+>> @@ -14,6 +14,7 @@ Required properties:
+>>  Optional properties:
+>>  - clocks:		Second handle for pixel clock.
+>>  - clock-names:		Second name "pix" for pixel clock.
+>> +- fsl,tcon:		The phandle to the timing controller node.
+> 
+> Maybe a comment this is (currently) only for Vybrid, but not LS1021A.
+> 
 
-Hi Tony
+IMHO, such references to SoCs in a peripheral binding is somewhat
+misplaced. If we would start doing this, we would end up in lots of SoC
+references, and nobody knows whether they are actually accurate and up
+to date... And I think we should add tcon to LS1021a, more on that
+below...
 
-The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+>> --- /dev/null
+>> +++ b/drivers/gpu/drm/fsl-dcu/fsl_tcon.c
+>> [...]
+>> +struct fsl_tcon *fsl_tcon_init(struct device *dev)
+>> +{
+>> +	struct fsl_tcon *tcon;
+>> +	struct device_node *np;
+>> +	int ret;
+>> +
+>> +	tcon = devm_kzalloc(dev, sizeof(*tcon), GFP_KERNEL);
+>> +	if (!tcon)
+>> +		return NULL;
+>> +
+>> +	np = of_parse_phandle(dev->of_node, "fsl,tcon", 0);
+>> +	if (!np) {
+>> +		dev_warn(dev, "Couldn't find the tcon node\n");
+>> +		return NULL;
+>> +	}
+> 
+> Maybe check for device tree node before allocating struct fsl_tcon? Also this 
+> should not be a warning, as on LS1021A this is to be expected.
 
-  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+Agreed, definitely the smarter sequence.
 
-are available in the git repository at:
+Afact LS1021a has also a TCON. At least in Jianwei Wangs initial patches
+it was part of the driver, see:
+https://lkml.org/lkml/2015/7/13/242
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v4.6-rc/omap-fixes-a
+Not sure how that driver can work without TCON support on LS1021a, maybe
+the bootloader sets the TCON to bypass?
 
-for you to fetch changes up to 3ca4a238106dedc285193ee47f494a6584b6fd2f:
+Since I do not have a LS1021a, I hesitated to just add it to the LS1021s
+dt's, but it should be fairly straight forward.
 
-  ARM: OMAP2+: hwmod: Fix updating of sysconfig register (2016-03-26 23:08:55 -0600)
-
-- ----------------------------------------------------------------
-ARM: OMAP2+: first hwmod fix for v4.6-rc
-
-Fix a longstanding bug in the hwmod code that could cause
-hardware SYSCONFIG register values to not match the kernel's
-idea of what they should be, and that could result in lower
-performance during IP block idle entry.
-
-Basic build, boot, and PM test logs are available here:
-
-http://www.pwsan.com/omap/testlogs/omap-hwmod-fixes-a-for-v4.6-rc/20160326231727/
-
-- ----------------------------------------------------------------
-Lokesh Vutla (1):
-      ARM: OMAP2+: hwmod: Fix updating of sysconfig register
-
- arch/arm/mach-omap2/omap_hwmod.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1
-
-iQIcBAEBAgAGBQJW+GgPAAoJEMePsQ0LvSpLO0MP/2DtDpbR/5jn+D9TNNkmhZed
-RAkY7etiSX9uMz65R8MzH7+G6D0p22VF66DdKR/d4ewv4n4YK+4swMRn3VZ/AZKJ
-ZJNSdu1P9jLPQYvxmD7k/pdbQPZ8NuhCRR5j8CyLOEzPPZfRFDC4RIgddgKuPbaU
-tpAInuPZ/PJj9xBWUAShJa1ZgZABm3+ivkybw3SJSiQpwROf45W2pkQUXgEeRV+R
-kmWmsav9TBCMNnJyxKlI4bPkU/RXaHkksfFEOuXSG5sNhSfjgGy9RgCXSE6gTi5K
-Qw/I3wyqa8VxZSg7JxXG0rkq63jUpywH3BB1dXBhZ5cb+6DdI3Kpqe+j8gYbMH8W
-60WFHPiIqghfT2pvqQw8PXOp61SeaUu5N/AWUK7gfIDDW1iq0hHTFXnXflW6K709
-IhoRsn0bazuFhIAHLy3R5ZsZRE3RDr1JYum2n0Q1cJBiKP47kpcGVCqPpddGue+p
-ZEg+M67EdvLfKLC3KEzT0X2zJCCi8Z1IGOzHIOt4mG2TnyPDU5rZR+QSp7Oi6vdz
-Z82eKW9cCg+WAJjxw0KoMJIVqbzp9FQWGoJiY883BF+tP2tkY9c2/pUrPaTaDO3m
-ajy9NUsPTHBqQd+DiEj1BUucu2LFj5vfPEBlASGeUcfkASePN+jG1M/bcmqcMx5F
-JnZRdouLjoSLQNNOeujA
-=HOgc
------END PGP SIGNATURE-----
+--
+Stefan
