@@ -1,49 +1,121 @@
 From: leo.yan@linaro.org (Leo Yan)
-Date: Tue, 29 Mar 2016 19:27:11 +0800
-Subject: [PATCH v3 0/4] thermal: hisilicon: enable power allocator for Hi6220
-Message-ID: <1459250835-25561-1-git-send-email-leo.yan@linaro.org>
+Date: Tue, 29 Mar 2016 19:27:12 +0800
+Subject: [PATCH v3 1/4] thermal: hisilicon: support to use any sensor
+In-Reply-To: <1459250835-25561-1-git-send-email-leo.yan@linaro.org>
+References: <1459250835-25561-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <1459250835-25561-2-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi6220 has octa-core so it has quite high power consumption when run
-benchmark and introduces high temperature for SoC. So need enable
-thermal governor to control temperature and also cannot hurt much for
-performance after impose cooling operations on CPU.
+In current code sensor driver registers all 4 sensors together and if
+any of them has not bound to thermal zone successfully then driver will
+return failure for driver's initialization. As a result, if DT binds
+thermal zone with only one sensor, then the thermal driver will not work
+well anymore.
 
-This patch series is to enable power allocator for Hi6220. Patch 1 is to
-change "hysteresis" as optional property for trip points, so when enable
-power allocator governor we can ignore this property.
+So this patch is to fix this issue. It allows the thermal sensor driver
+can register any number sensors at initialization phase, and fix up code
+for other related code to skip related sensor's accessing if the sensor
+has not been enabled in initialization phase.
 
-During profiling also found two issues for thermal sensor's driver. The
-power allocator just uses only one sensor, so patch 2 is to fix sensor
-driver to let it can initialize driver successfully with only enabling
-one sensor; patch 3 is to dismiss warning of IRQ imbalance enabling.
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ drivers/thermal/hisi_thermal.c | 33 ++++++++++++++++++++-------------
+ 1 file changed, 20 insertions(+), 13 deletions(-)
 
-After profiling on Hikey, the power model has been simplized with only
-dynamic coefficient, and now it's convienence to pass it from CPU node.
-So patch 4 and 5 bind sensor and pass power model parameters.
-
-This patch series have been tested on 96boards Hikey.
-
-Changes from v2:
-* Discarded patch for changing "hysteresis" as optional property
-* Added back "hysteresis" property
-
-Changes from v1:
-* According to Javi's review, removed unecessary properties for DT
-* Added patch 1 for change "hysteresis" as optional property
-* Added patch 3 to fix IRQ imbalance enabling issue
-
-
-Leo Yan (4):
-  thermal: hisilicon: support to use any sensor
-  thermal: hisilicon: fix IRQ imbalance enabling
-  arm64: dts: register Hi6220's thermal sensor
-  arm64: dts: register Hi6220's thermal zone for power allocator
-
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 44 +++++++++++++++++++++++++++++++
- drivers/thermal/hisi_thermal.c            | 40 +++++++++++++++++-----------
- 2 files changed, 68 insertions(+), 16 deletions(-)
-
+diff --git a/drivers/thermal/hisi_thermal.c b/drivers/thermal/hisi_thermal.c
+index 36d0729..0fed5cf 100644
+--- a/drivers/thermal/hisi_thermal.c
++++ b/drivers/thermal/hisi_thermal.c
+@@ -160,7 +160,7 @@ static int hisi_thermal_get_temp(void *_sensor, int *temp)
+ 	struct hisi_thermal_sensor *sensor = _sensor;
+ 	struct hisi_thermal_data *data = sensor->thermal;
+ 
+-	int sensor_id = 0, i;
++	int sensor_id = -1, i;
+ 	long max_temp = 0;
+ 
+ 	*temp = hisi_thermal_get_sensor_temp(data, sensor);
+@@ -168,12 +168,19 @@ static int hisi_thermal_get_temp(void *_sensor, int *temp)
+ 	sensor->sensor_temp = *temp;
+ 
+ 	for (i = 0; i < HISI_MAX_SENSORS; i++) {
++		if (!data->sensors[i].tzd)
++			continue;
++
+ 		if (data->sensors[i].sensor_temp >= max_temp) {
+ 			max_temp = data->sensors[i].sensor_temp;
+ 			sensor_id = i;
+ 		}
+ 	}
+ 
++	/* If no sensor has been enabled, then skip to enable irq */
++	if (sensor_id == -1)
++		return 0;
++
+ 	mutex_lock(&data->thermal_lock);
+ 	data->irq_bind_sensor = sensor_id;
+ 	mutex_unlock(&data->thermal_lock);
+@@ -226,8 +233,12 @@ static irqreturn_t hisi_thermal_alarm_irq_thread(int irq, void *dev)
+ 		 sensor->thres_temp / 1000);
+ 	mutex_unlock(&data->thermal_lock);
+ 
+-	for (i = 0; i < HISI_MAX_SENSORS; i++)
++	for (i = 0; i < HISI_MAX_SENSORS; i++) {
++		if (!data->sensors[i].tzd)
++			continue;
++
+ 		thermal_zone_device_update(data->sensors[i].tzd);
++	}
+ 
+ 	return IRQ_HANDLED;
+ }
+@@ -247,6 +258,7 @@ static int hisi_thermal_register_sensor(struct platform_device *pdev,
+ 				sensor, &hisi_of_thermal_ops);
+ 	if (IS_ERR(sensor->tzd)) {
+ 		ret = PTR_ERR(sensor->tzd);
++		sensor->tzd = NULL;
+ 		dev_err(&pdev->dev, "failed to register sensor id %d: %d\n",
+ 			sensor->id, ret);
+ 		return ret;
+@@ -334,25 +346,17 @@ static int hisi_thermal_probe(struct platform_device *pdev)
+ 	for (i = 0; i < HISI_MAX_SENSORS; ++i) {
+ 		ret = hisi_thermal_register_sensor(pdev, data,
+ 						   &data->sensors[i], i);
+-		if (ret) {
++		if (ret)
+ 			dev_err(&pdev->dev,
+ 				"failed to register thermal sensor: %d\n", ret);
+-			goto err_get_sensor_data;
+-		}
++		else
++			hisi_thermal_toggle_sensor(&data->sensors[i], true);
+ 	}
+ 
+ 	hisi_thermal_enable_bind_irq_sensor(data);
+ 	data->irq_enabled = true;
+ 
+-	for (i = 0; i < HISI_MAX_SENSORS; i++)
+-		hisi_thermal_toggle_sensor(&data->sensors[i], true);
+-
+ 	return 0;
+-
+-err_get_sensor_data:
+-	clk_disable_unprepare(data->clk);
+-
+-	return ret;
+ }
+ 
+ static int hisi_thermal_remove(struct platform_device *pdev)
+@@ -363,6 +367,9 @@ static int hisi_thermal_remove(struct platform_device *pdev)
+ 	for (i = 0; i < HISI_MAX_SENSORS; i++) {
+ 		struct hisi_thermal_sensor *sensor = &data->sensors[i];
+ 
++		if (!sensor->tzd)
++			continue;
++
+ 		hisi_thermal_toggle_sensor(sensor, false);
+ 		thermal_zone_of_sensor_unregister(&pdev->dev, sensor->tzd);
+ 	}
 -- 
 1.9.1
