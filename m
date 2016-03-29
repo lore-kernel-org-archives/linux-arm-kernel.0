@@ -1,127 +1,73 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 29 Mar 2016 17:35:00 +0100
-Subject: [PATCH v8] acpi, apei, arm64: APEI initial support for aarch64.
-In-Reply-To: <1459237458-12352-1-git-send-email-fu.wei@linaro.org>
-References: <1459237458-12352-1-git-send-email-fu.wei@linaro.org>
-Message-ID: <20160329163500.GI6745@arm.com>
+From: julien.grall@arm.com (Julien Grall)
+Date: Tue, 29 Mar 2016 17:35:57 +0100
+Subject: [PATCH v7 10/17] arm/xen: Get event-channel irq through HVM_PARAM
+ when booting with ACPI
+In-Reply-To: <1458830676-27075-11-git-send-email-shannon.zhao@linaro.org>
+References: <1458830676-27075-1-git-send-email-shannon.zhao@linaro.org>
+ <1458830676-27075-11-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <56FAAEED.7060108@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 29, 2016 at 03:44:18PM +0800, fu.wei at linaro.org wrote:
-> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> 
-> This commit provides APEI arch-specific bits for aarch64
-> 
-> Meanwhile,
-> (1)add a new subfunction "hest_ia32_init" for
-> "acpi_disable_cmcff" which is used by IA-32 Architecture
-> Corrected Machine Check (CMC).
-> (2)move HEST type (ACPI_HEST_TYPE_IA32_CORRECTED_CHECK) checking to
-> a generic place.
-> (3)select EFI when ACPI_APEI is set on ARM64,
-> because arch_apei_get_mem_attribute is using efi_mem_attributes on ARM64.
-> 
-> [Fu Wei: improve && upstream]
-> 
-> Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-> Tested-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-> Signed-off-by: Fu Wei <fu.wei@linaro.org>
-> Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
+Hi Shannon,
+
+On 24/03/16 14:44, Shannon Zhao wrote:
+> When booting with ACPI, it could get the event-channel irq through
+
+The kernel will always get the event-channel IRQ through 
+HVM_PARAM_CALLBACK_IRQ.
+
+So I would say: ", the kernel will get the event-channel..."
+
+> HVM_PARAM_CALLBACK_IRQ.
+>
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 > ---
-> Changelog:
-> v8: Fix a "undefined reference" bug by selecting EFI when ACPI_APEI is set
->     on ARM64.
-> 
-> v7: https://lkml.org/lkml/2016/3/17/183
->     Add comment for arch_apei_flush_tlb_one in arch/arm64/include/asm/acpi.h
-> 
-> v6: https://lists.linaro.org/pipermail/linaro-acpi/2016-March/006644.html
->     Move HEST type (ACPI_HEST_TYPE_IA32_CORRECTED_CHECK) checking to
->     a generic place.
->     Delete HAVE_ACPI_APEI_HEST_IA32.
-> 
-> v5: https://lkml.org/lkml/2015/12/10/131
->     Add "HAVE_ACPI_APEI_HEST_IA32" instead of
->     "#if defined(__i386__) || defined(__x86_64__)".
-> 
-> v4: https://lkml.org/lkml/2015/12/8/188
->     Rebase to latest kernel version(4.4-rc4).
->     Move arch_apei_flush_tlb_one into header file as a inline function
->     Add a new subfunction "hest_ia_init" for "acpi_disable_cmcff".
-> 
-> v3: https://lkml.org/lkml/2015/12/3/521
->     Remove "acpi_disable_cmcff" from arm64 code,
->     and wrap it in hest.c by "#if defined(__i386__) || defined(__x86_64__)"
-> 
-> v2: https://lkml.org/lkml/2015/12/2/432
->     Rebase to latest kernel version(4.4-rc3).
->     Move arch_apei_flush_tlb_one() to arch/arm64/kernel/acpi.c
-> 
-> v1: https://lkml.org/lkml/2015/8/14/199
->     Move arch_apei_flush_tlb_one() to arch/arm64/include/asm/apci.h.
->     Delete arch/arm64/kernel/apei.c.
->     Add "#ifdef CONFIG_ACPI_APEI" for "acpi_disable_cmcff".
-> 
->  arch/arm64/Kconfig            |  1 +
->  arch/arm64/include/asm/acpi.h | 15 ++++++++++++++-
->  arch/x86/kernel/acpi/apei.c   |  3 ---
->  drivers/acpi/apei/Kconfig     |  1 +
->  drivers/acpi/apei/hest.c      | 18 +++++++++++++++---
->  5 files changed, 31 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 4f43622..08952ec 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -3,6 +3,7 @@ config ARM64
->  	select ACPI_CCA_REQUIRED if ACPI
->  	select ACPI_GENERIC_GSI if ACPI
->  	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
-> +	select HAVE_ACPI_APEI if ACPI
->  	select ARCH_HAS_DEVMEM_IS_ALLOWED
->  	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
->  	select ARCH_HAS_ELF_RANDOMIZE
-> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-> index aee323b..4a6c959 100644
-> --- a/arch/arm64/include/asm/acpi.h
-> +++ b/arch/arm64/include/asm/acpi.h
-> @@ -17,6 +17,7 @@
->  
->  #include <asm/cputype.h>
->  #include <asm/smp_plat.h>
-> +#include <asm/tlbflush.h>
->  
->  /* Macros for consistency checks of the GICC subtable of MADT */
->  #define ACPI_MADT_GICC_LENGTH	\
-> @@ -110,7 +111,19 @@ static inline const char *acpi_get_enable_method(int cpu)
->  }
->  
->  #ifdef	CONFIG_ACPI_APEI
-> +#define acpi_disable_cmcff 1
->  pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
-> -#endif
->  
-> +/*
-> + * This inline function is used in IRQ context (by GHES driver now),
-> + * see ghes_iounmap_irq and ghes_iounmap_nmi in drivers/acpi/apei/ghes.c.
-> + * The page mapped is reserved for firmware in kernel. This invalidate TLB
-> + * maintenance should be broadcasted safely to make sure that all the cores
-> + * will do TLB invalidation, then get the right pages.
-> + */
+>   arch/arm/xen/enlighten.c | 36 +++++++++++++++++++++++++++++++++++-
+>   1 file changed, 35 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> index d94f726..680aae0 100644
+> --- a/arch/arm/xen/enlighten.c
+> +++ b/arch/arm/xen/enlighten.c
+> @@ -30,6 +30,7 @@
+>   #include <linux/time64.h>
+>   #include <linux/timekeeping.h>
+>   #include <linux/timekeeper_internal.h>
+> +#include <linux/acpi.h>
+>
+>   #include <linux/mm.h>
+>
+> @@ -278,6 +279,35 @@ void __init xen_early_init(void)
+>   		add_preferred_console("hvc", 0, NULL);
+>   }
+>
+> +static void __init xen_acpi_guest_init(void)
+> +{
+> +#ifdef CONFIG_ACPI
+> +	struct xen_hvm_param a;
+> +	int interrupt, trigger, polarity;
+> +
+> +	a.domid = DOMID_SELF;
+> +	a.index = HVM_PARAM_CALLBACK_IRQ;
+> +	xen_events_irq = 0;
+> +
+> +	if (!HYPERVISOR_hvm_op(HVMOP_get_param, &a)) {
+> +		if ((a.value >> 56) == HVM_PARAM_CALLBACK_TYPE_PPI) {
+> +			interrupt = a.value & 0xff;
+> +			trigger = ((a.value >> 8) & 0x1) ? ACPI_EDGE_SENSITIVE
+> +							 : ACPI_LEVEL_SENSITIVE;
+> +			polarity = ((a.value >> 8) & 0x2) ? ACPI_ACTIVE_LOW
+> +							  : ACPI_ACTIVE_HIGH;
+> +			xen_events_irq = acpi_register_gsi(NULL, interrupt,
+> +							   trigger, polarity);
+> +		}
+> +	}
 
-How about:
+Can you invert the condition to remove one layer of indentation?
 
- /*
-  * Despite its name, this function must still broadcast the TLB
-  * invalidation in order to ensure other CPUs don't up with with junk
-  * entries as a result of speculation. Unusually, its also called in
-  * IRQ context (ghes_iounmap_irq) so if we ever need to use IPIs for
-  * TLB broadcasting, then we're in trouble here.
-  */
+Regards,
 
-With that,
-
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-Will
+-- 
+Julien Grall
