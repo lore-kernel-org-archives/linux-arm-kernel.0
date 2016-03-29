@@ -1,35 +1,57 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Tue, 29 Mar 2016 12:57:32 +0530
-Subject: [PATCH 2/4] arm64: dts: Add maintenance interrupt for GIC in NS2 DT
-In-Reply-To: <1459236454-26285-1-git-send-email-anup.patel@broadcom.com>
-References: <1459236454-26285-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1459236454-26285-3-git-send-email-anup.patel@broadcom.com>
+From: jonas.rabenstein@studium.uni-erlangen.de (Jonas Rabenstein)
+Date: Tue, 29 Mar 2016 09:37:51 +0200
+Subject: [PATCH] arm: remove tautologic #ifdefs in proc-v7-3level.S
+Message-ID: <1459237071-13842-1-git-send-email-jonas.rabenstein@studium.uni-erlangen.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The KVM ARM64 requires GIC maintenance interrupt for VGIC emulation
-so this patch adds the missing "interrupts" attribute to GIC node in
-NS2 DT.
+The file arch/arm/mm/proc-v7-3level.S is only used by the #include
+directive in arch/arm/mm/proc-v7.S:23. This #include is conditional and
+depends on  CONFIG_ARM_LPAE (otherwise proc-v7-2level.S is used).
+CONFIG_ARM_LPAE has a dependency on CONFIG_MMU defined in Kconfig.
+Consequently, checks for CONFIG_MMU in proc-v7-3level.S are superfluous.
 
-Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-Reviewed-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Scott Branden <sbranden@broadcom.com>
+Signed-off-by: Jonas Rabenstein <jonas.rabenstein@studium.uni-erlangen.de>
 ---
- arch/arm64/boot/dts/broadcom/ns2.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+ I detected the issue with chimaera, a tool I currently develop for my bachelor
+ thesis extending the undertaker tool suite (https://undertaker.cs.fau.de).
 
-diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-index a9f4585..940ed52 100644
---- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-@@ -347,6 +347,8 @@
- 			      <0x65220000 0x1000>,
- 			      <0x65240000 0x2000>,
- 			      <0x65260000 0x1000>;
-+			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_RAW(0xf) |
-+				      IRQ_TYPE_LEVEL_HIGH)>;
- 		};
+ arch/arm/mm/proc-v7-3level.S | 4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+index 5e5720e..6903f34 100644
+--- a/arch/arm/mm/proc-v7-3level.S
++++ b/arch/arm/mm/proc-v7-3level.S
+@@ -55,13 +55,11 @@
+  * the new TTB).
+  */
+ ENTRY(cpu_v7_switch_mm)
+-#ifdef CONFIG_MMU
+ 	mmid	r2, r2
+ 	asid	r2, r2
+ 	orr	rpgdh, rpgdh, r2, lsl #(48 - 32)	@ upper 32-bits of pgd
+ 	mcrr	p15, 0, rpgdl, rpgdh, c2		@ set TTB 0
+ 	isb
+-#endif
+ 	ret	lr
+ ENDPROC(cpu_v7_switch_mm)
  
- 		timer0: timer at 66030000 {
+@@ -81,7 +79,6 @@ ENDPROC(cpu_v7_switch_mm)
+  * - pte - PTE value to store (64-bit in r2 and r3)
+  */
+ ENTRY(cpu_v7_set_pte_ext)
+-#ifdef CONFIG_MMU
+ 	tst	rl, #L_PTE_VALID
+ 	beq	1f
+ 	tst	rh, #1 << (57 - 32)		@ L_PTE_NONE
+@@ -97,7 +94,6 @@ ENTRY(cpu_v7_set_pte_ext)
+ 1:	strd	r2, r3, [r0]
+ 	ALT_SMP(W(nop))
+ 	ALT_UP (mcr	p15, 0, r0, c7, c10, 1)		@ flush_pte
+-#endif
+ 	ret	lr
+ ENDPROC(cpu_v7_set_pte_ext)
+ 
 -- 
-1.9.1
+2.7.3
