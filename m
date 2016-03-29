@@ -1,94 +1,53 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Tue, 29 Mar 2016 17:38:49 +0800
-Subject: [RESEND PATCH v4 1/5] clocksource: move some enums and marcos to
- header file for arm_arch_timer
-In-Reply-To: <alpine.DEB.2.11.1603181016560.3978@nanos>
-References: <1458288053-29031-1-git-send-email-fu.wei@linaro.org>
- <1458288053-29031-2-git-send-email-fu.wei@linaro.org>
- <alpine.DEB.2.11.1603181016560.3978@nanos>
-Message-ID: <CADyBb7tZ5UDGoZw1C1Db5r4UTSXCTrdeJEAaXVWSMY7qbD9TFg@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 29 Mar 2016 10:41:59 +0100
+Subject: [PATCH] ARM: bcm2835: add CPU node for ARM core
+In-Reply-To: <1459182081-30819-1-git-send-email-stefan.wahren@i2se.com>
+References: <1459182081-30819-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <20160329094158.GB26574@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Mon, Mar 28, 2016 at 04:21:20PM +0000, Stefan Wahren wrote:
+> This patch adds the CPU node of the BCM2835 into the DT.
+> 
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> ---
+>  arch/arm/boot/dts/bcm2835.dtsi |   11 +++++++++++
+>  1 file changed, 11 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+> index b83b326..e87aba1 100644
+> --- a/arch/arm/boot/dts/bcm2835.dtsi
+> +++ b/arch/arm/boot/dts/bcm2835.dtsi
+> @@ -3,6 +3,17 @@
+>  / {
+>  	compatible = "brcm,bcm2835";
+>  
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		cpu at 0 {
+> +			device_type = "cpu";
+> +			compatible = "arm,arm1176jzf-s", "arm,arm1176";
+> +			reg = <0x0>;
+> +		};
+> +	};
 
-On 18 March 2016 at 17:27, Thomas Gleixner <tglx@linutronix.de> wrote:
-> On Fri, 18 Mar 2016, fu.wei at linaro.org wrote:
->
-> Subject: clocksource: move some enums and marcos to header file for arm_arch_timer
->
-> That sucks.
->
-> 1) The prefix is crap. It suggests this is about the generic clocksource code
->
->    clocksource/drivers/arm_arch_timer:
->
->    Is the proper prefix
->
-> 2) Sentences start with upper case letters
->
-> 3) What exactly are 'marcos' ?
->
-> So a useful subject line would be;
->
-> clocksource/drivers/arm_arch_timer: Move enums and defines to header file
->
->> From: Fu Wei <fu.wei@linaro.org>
->>
->> The patch sorts out the code for arm_arch_timer:
->
-> What does it sort out? Nothing, AFAICT.
->
-> You miss to explain WHY you are doing this. The list below is completely
-> useless because one can see that from the patch.
->
-> So this wants to be something like this:
->
-> To support the arm_arch_timer via ACPI we need to share defines and enums
-> between the driver and the ACPI parser code.
->
-> Split out the relevant defines and enums into arm_arch_timer.h. No functional
-> change.
->
->>     (1)move enum ppi_nr to the header file
->>     (2)move "ARCH_*_TIMER" marcos to the header file
->>     (3)add enum spi_nr in the header file, and use it in the driver
->>     (4)add ARCH_WD_TIMER and ARCH_TIMER_MEM_MAX_FRAME marcos
->
-> So this does 3 things at once.
->
->    1) Move existing defines and enums
->
->    2) Add a new enum and convert the driver to use it
->
->    3) Add new defines without using them
->
-> So this needs to be seperate
->
->    #1) This patch
->
->    #2) Seperate patch which adds the new enum and converts the places in the
->        driver
->
->    #3) This needs to go into the patch which actually uses the defines.
+Minor nit: the "arm,arm1176" fallback isn't documented, nor used
+elsewhere, so it can/should be dropped.
 
-Great thanks , will fix these following your suggestion :-)
+Otherwise, this looks fine per [1]. With the above change, feel free to
+add my ack.
 
->
-> Thanks,
->
->         tglx
+Mark.
 
+[1] Documentation/devicetree/bindings/arm/cpus.txt
 
-
--- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat Software (Beijing) Co.,Ltd.Shanghai Branch
-Ph: +86 21 61221326(direct)
-Ph: +86 186 2020 4684 (mobile)
-Room 1512, Regus One Corporate Avenue,Level 15,
-One Corporate Avenue,222 Hubin Road,Huangpu District,
-Shanghai,China 200021
+> +
+>  	soc {
+>  		ranges = <0x7e000000 0x20000000 0x02000000>;
+>  		dma-ranges = <0x40000000 0x00000000 0x20000000>;
+> -- 
+> 1.7.9.5
+> 
