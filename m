@@ -1,108 +1,183 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 29 Mar 2016 17:13:05 +0100
-Subject: [PATCH] clockevents/drivers/arm_global_timer: Fix erratum 740657
- workaround
-In-Reply-To: <1459238917-2240-1-git-send-email-rabin.vincent@axis.com>
-References: <1459238917-2240-1-git-send-email-rabin.vincent@axis.com>
-Message-ID: <56FAA991.1080401@arm.com>
+From: rogershimizu@gmail.com (Roger Shimizu)
+Date: Wed, 30 Mar 2016 01:11:45 +0900
+Subject: [PATCH v2] ARM: dts: orion5x: add device tree for kurobox-pro
+In-Reply-To: <1458656898-16183-1-git-send-email-rogershimizu@gmail.com>
+References: <1458656898-16183-1-git-send-email-rogershimizu@gmail.com>
+Message-ID: <1459267905-15403-1-git-send-email-rogershimizu@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rabin,
+Add dts file to support Buffalo/Revogear Kurobox-Pro, which is marvell
+orion5x based 3.5" HDD NAS.
 
-On 29/03/16 09:08, Rabin Vincent wrote:
-> From: Rabin Vincent <rabinv@axis.com>
-> 
-> According to the errata document for the Cortex A9 MPCore, the correct
-> code sequence in the interrupt handler to workaround erratum 740657
-> "Global Timer can send two interrupts for the same event" is:
-> 
->  (1) Read the ICCIAR (Interrupt Acknowledge) register
->  (2) Modify the comparator value, to set it to a higher value
->  (3) Clear the Global Timer flag
->  (4) Clear the Pending Status information for Interrupt 27 (Global
->      Timer interrupt) in the Distributor of the Interrupt Controller.
->  (5) Write the ICCEOIR (End of Interrupt) register
-> 
-> (1) and (5) are done by the GIC driver and (2) and (3) are done by the
-> Global Timer driver.  However, nobody does (4) and thus the workaround
-> is inactive and the timer triggers many spurious interrupts:
-> 
->  <idle>-0 [001] d.h2 99.850527: irq_handler_entry: irq=16 name=gt
->  <idle>-0 [001] d.h2 99.850538: irq_handler_exit: irq=16 ret=handled
->  <idle>-0 [001] d.H2 99.850540: irq_handler_entry: irq=16 name=gt
->  <idle>-0 [001] d.H2 99.850542: irq_handler_exit: irq=16 ret=unhandled
->  <idle>-0 [001] d.h2 99.987832: irq_handler_entry: irq=16 name=gt
->  <idle>-0 [001] dnh2 99.987845: irq_handler_exit: irq=16 ret=handled
->  <idle>-0 [001] dnh2 99.987848: irq_handler_entry: irq=16 name=gt
->  <idle>-0 [001] dnh2 99.987850: irq_handler_exit: irq=16 ret=unhandled
-> 
-> Make the Global Timer driver perform step (4) via the GIC driver with
-> the help of the irq_set_irqchip_state() function, to prevent the
-> spurious interrupts.
-> 
-> Signed-off-by: Rabin Vincent <rabinv@axis.com>
-> ---
->  drivers/clocksource/arm_global_timer.c | 21 +++++++++++++--------
->  1 file changed, 13 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
-> index 9df0d16..b9d0f86 100644
-> --- a/drivers/clocksource/arm_global_timer.c
-> +++ b/drivers/clocksource/arm_global_timer.c
-> @@ -140,26 +140,31 @@ static int gt_clockevent_set_next_event(unsigned long evt,
->  static irqreturn_t gt_clockevent_interrupt(int irq, void *dev_id)
->  {
->  	struct clock_event_device *evt = dev_id;
-> +	bool workaround = clockevent_state_oneshot(evt);
->  
->  	if (!(readl_relaxed(gt_base + GT_INT_STATUS) &
->  				GT_INT_STATUS_EVENT_FLAG))
->  		return IRQ_NONE;
->  
->  	/**
-> -	 * ERRATA 740657( Global Timer can send 2 interrupts for
-> +	 * ERRATA 740657 (Global Timer can send 2 interrupts for
->  	 * the same event in single-shot mode)
->  	 * Workaround:
-> -	 *	Either disable single-shot mode.
-> -	 *	Or
-> -	 *	Modify the Interrupt Handler to avoid the
-> -	 *	offending sequence. This is achieved by clearing
-> -	 *	the Global Timer flag _after_ having incremented
-> -	 *	the Comparator register	value to a higher value.
-> +	 * - Read the ICCIAR (Interrupt Acknowledge) register
-> +	 * - Modify the comparator value, to set it to a higher value
-> +	 * - Clear the Global Timer flag
-> +	 * - Clear the Pending Status information for Interrupt 27 (Global
-> +	 *   Timer interrupt) in the Distributor of the Interrupt Controller.
-> +	 * - Write the ICCEOIR (End of Interrupt) register
->  	 */
-> -	if (clockevent_state_oneshot(evt))
-> +	if (workaround)
->  		gt_compare_set(ULONG_MAX, 0);
->  
->  	writel_relaxed(GT_INT_STATUS_EVENT_FLAG, gt_base + GT_INT_STATUS);
-> +
-> +	if (workaround)
-> +		irq_set_irqchip_state(irq, IRQCHIP_STATE_PENDING, false);
-> +
+It's a quite old product and already discontinued. So there's no
+official website for it. But it was an early product which used marvell
+orion5x 88F5182 chipset, it's popular in the community.
+Some unofficial site:
+  - http://buffalo.nas-central.org/wiki/Category:KuroboxPro
+  - http://nice.kaze.com/KUROPRO_ProductSpecifications.pdf
 
-This raises a few questions:
+This device tree is based on the board file:
+  arch/arm/mach-orion5x/kurobox_pro-setup.c
+However, the probing order of NAND and JEDEC-Flash are different from
+the original board file, this results in incompatible minor number
+for a few /dev/mtdX and /dev/mtdblockX devices.
+So I still want to keep the board file for the time being.
 
-- What if my timer is not connected to a controller that implements this
-API? Something that is not a GIC, for example?
+Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
+---
+Change in v2:
+  - The NAND device on devbus CS0 becomes able to probe
 
-- How does it work when the GIC (with EOImode==1) performs a priority
-drop (by writing to the EOI register) before calling into the timer
-handler, and finishing the handling with a write to DIR?
+ arch/arm/boot/dts/Makefile               |   1 +
+ arch/arm/boot/dts/orion5x-kuroboxpro.dts | 127 +++++++++++++++++++++++++++++++
+ 2 files changed, 128 insertions(+)
+ create mode 100644 arch/arm/boot/dts/orion5x-kuroboxpro.dts
 
-- What are the comparative costs of taking a spurious (but nonetheless
-harmless) interrupt vs poking the distributor (which is by no mean a
-cheap operation)?
-
-Thanks,
-
-	M.
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 52b34a0..de1d67a 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -521,6 +521,7 @@ dtb-$(CONFIG_SOC_DRA7XX) += \
+ 	dra7-evm.dtb \
+ 	dra72-evm.dtb
+ dtb-$(CONFIG_ARCH_ORION5X) += \
++	orion5x-kuroboxpro.dtb \
+ 	orion5x-lacie-d2-network.dtb \
+ 	orion5x-lacie-ethernet-disk-mini-v2.dtb \
+ 	orion5x-linkstation-lsgl.dtb \
+diff --git a/arch/arm/boot/dts/orion5x-kuroboxpro.dts b/arch/arm/boot/dts/orion5x-kuroboxpro.dts
+new file mode 100644
+index 0000000..1a672b0
+--- /dev/null
++++ b/arch/arm/boot/dts/orion5x-kuroboxpro.dts
+@@ -0,0 +1,127 @@
++/*
++ * Device Tree file for Buffalo/Revogear Kurobox Pro
++ *
++ * Copyright (C) 2016
++ * Roger Shimizu <rogershimizu@gmail.com>
++ *
++ * Based on the board file arch/arm/mach-orion5x/kurobox_pro-setup.c
++ * Copyright (C) Ronen Shitrit <rshitrit@marvell.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++#include "orion5x-linkstation.dtsi"
++#include <dt-bindings/gpio/gpio.h>
++
++/ {
++	model = "Buffalo/Revogear Kurobox Pro";
++	compatible = "buffalo,kurobox-pro", "marvell,orion5x-88f5182", "marvell,orion5x";
++
++	soc {
++		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000>,
++				 <MBUS_ID(0x09, 0x00) 0 0xf2200000 0x800>,
++				 <MBUS_ID(0x01, 0x0f) 0 0xf4000000 0x40000>,
++				 <MBUS_ID(0x01, 0x1e) 0 0xfc000000 0x1000000>;
++	};
++
++	memory { /* 128 MB */
++		device_type = "memory";
++		reg = <0x00000000 0x8000000>;
++	};
++};
++
++&pinctrl {
++	pmx_power_hdd: pmx-power-hdd {
++		marvell,pins = "mpp1";
++		marvell,function = "gpio";
++	};
++
++	pmx_power_usb: pmx-power-usb {
++		marvell,pins = "mpp9";
++		marvell,function = "gpio";
++	};
++};
++
++&devbus_cs0 {
++	status = "okay";
++	compatible = "marvell,orion-nand";
++	reg = <MBUS_ID(0x01, 0x1e) 0 0x400>;
++	cle = <0>;
++	ale = <1>;
++	bank-width = <1>;
++
++	partitions {
++		compatible = "fixed-partitions";
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		uImage at 0 { /* 4 MB */
++			reg = <0 0x400000>;
++			read-only;
++		};
++
++		rootfs at 400000 { /* 64 MB */
++			reg = <0x400000 0x4000000>;
++			read-only;
++		};
++
++		extra at 4400000 { /* 188 MB */
++			reg = <0x4400000 0xBC00000>;
++			read-only;
++		};
++	};
++};
++
++&hdd_power {
++	gpios = <&gpio0 1 GPIO_ACTIVE_HIGH>;
++};
++
++&usb_power {
++	gpios = <&gpio0 9 GPIO_ACTIVE_HIGH>;
++};
++
++&sata {
++	nr-ports = <2>;
++};
++
++&ehci1 {
++	status = "okay";
++};
 -- 
-Jazz is not dead. It just smells funny...
+2.8.0.rc3
