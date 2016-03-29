@@ -1,40 +1,52 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 29 Mar 2016 23:21:51 +0200
-Subject: [PATCH v4 3/8] Documentation: devicetree: rockchip: Document
- GeekBox
-In-Reply-To: <56FAE95E.6060900@suse.de>
-References: <1458136727-32075-1-git-send-email-afaerber@suse.de>
- <31070685.TnxqGeNupO@diego> <56FAE95E.6060900@suse.de>
-Message-ID: <1682289.HWd4yLL18I@diego>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 29 Mar 2016 14:28:42 -0700
+Subject: [PATCH v2] spi: orion.c: Add direct access mode
+In-Reply-To: <3108005.nUMWsj4kjp@wuerfel>
+References: <1458663893-13766-1-git-send-email-sr@denx.de>
+ <7339827.UeYZLZET5g@wuerfel> <20160329210018.GL2350@sirena.org.uk>
+ <3108005.nUMWsj4kjp@wuerfel>
+Message-ID: <20160329212842.GN2350@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 29. M?rz 2016, 22:45:18 schrieb Andreas F?rber:
-> Am 29.03.2016 um 22:13 schrieb Heiko St?bner:
-> > Am Mittwoch, 16. M?rz 2016, 14:58:41 schrieb Andreas F?rber:
-> >> Use "geekbuying,geekbox" compatible string.
-> >> 
-> >> Acked-by: Rob Herring <robh@kernel.org>
-> >> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> > 
-> > I've folded this patch into the geekbox dts patch, carrying Rob's Ack for
-> > the binding over.
-> 
-> Either you just made a mistake in my name or
-> https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/Docume
-> ntation/devicetree/bindings/submitting-patches.txt needs an update. It
-> clearly says:
-> 
-> "1) The Documentation/ portion of the patch should be a separate patch."
-> 
-> That's why I always do it this way.
+On Tue, Mar 29, 2016 at 11:08:55PM +0200, Arnd Bergmann wrote:
+> On Tuesday 29 March 2016 14:00:18 Mark Brown wrote:
 
-looking at the dt-bindings git log, it seems that is handled in a variety of 
-ways :-) . Personally I'm doing completely new bindings separately but the 
-125th addition of a board just inside the dts patch.
+> > Implementing that would require the SPI core to export something
+> > providing access to the memory regions.  We don't currently do that,
+> > it'd require us to deal with the interaction with access as a SPI device
+> > (this hardware often seems to only accelerate reads so we still need to
+> > use regular SPI access for writes).
 
-But I guess we can also move it out again into a separate patch if you prefer 
-that :-) .
+> The manual lists both read and write accesses as handled through
+> direct mode.
 
+That is not in general the case for this sort of hardware, and there's
+also erase support to consider here.
 
-Heiko
+> > I don't like having to assign windows per device, like I say it seems
+> > like more work.
+
+> Ok, but that's something else that can be implemented independently
+> as I explained earlier: We currently rely on the windows to be assigned
+> in the DT, but it's also possible to extend the mbus driver in a way
+> that lets it pick its own windows in one way or another. It should
+
+That's what I've been asking for but people keep saying it's not
+possible...
+
+> not impact the binding for the SPI host controller in any way, the
+> binding just describes how the internal addressing is wired up to
+> the mbus in hardware, and the mbus driver takes care of mapping those
+> into CPU addresses.
+
+If we're able to do it automatically without baking this into the DT and
+there's enough space to cope with this and PCI together then that's more
+reasonable.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160329/f38f0c00/attachment.sig>
