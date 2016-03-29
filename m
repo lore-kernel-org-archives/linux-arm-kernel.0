@@ -1,89 +1,136 @@
-From: rabin.vincent@axis.com (Rabin Vincent)
-Date: Tue, 29 Mar 2016 10:08:37 +0200
-Subject: [PATCH] clockevents/drivers/arm_global_timer: Fix erratum 740657
- workaround
-Message-ID: <1459238917-2240-1-git-send-email-rabin.vincent@axis.com>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Tue, 29 Mar 2016 16:05:29 +0800
+Subject: [PATCH v9 01/17] Xen: ACPI: Hide UART used by Xen
+Message-ID: <1459238729-11520-1-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rabin Vincent <rabinv@axis.com>
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-According to the errata document for the Cortex A9 MPCore, the correct
-code sequence in the interrupt handler to workaround erratum 740657
-"Global Timer can send two interrupts for the same event" is:
+ACPI 6.0 introduces a new table STAO to list the devices which are used
+by Xen and can't be used by Dom0. On Xen virtual platforms, the physical
+UART is used by Xen. So here it hides UART from Dom0.
 
- (1) Read the ICCIAR (Interrupt Acknowledge) register
- (2) Modify the comparator value, to set it to a higher value
- (3) Clear the Global Timer flag
- (4) Clear the Pending Status information for Interrupt 27 (Global
-     Timer interrupt) in the Distributor of the Interrupt Controller.
- (5) Write the ICCEOIR (End of Interrupt) register
-
-(1) and (5) are done by the GIC driver and (2) and (3) are done by the
-Global Timer driver.  However, nobody does (4) and thus the workaround
-is inactive and the timer triggers many spurious interrupts:
-
- <idle>-0 [001] d.h2 99.850527: irq_handler_entry: irq=16 name=gt
- <idle>-0 [001] d.h2 99.850538: irq_handler_exit: irq=16 ret=handled
- <idle>-0 [001] d.H2 99.850540: irq_handler_entry: irq=16 name=gt
- <idle>-0 [001] d.H2 99.850542: irq_handler_exit: irq=16 ret=unhandled
- <idle>-0 [001] d.h2 99.987832: irq_handler_entry: irq=16 name=gt
- <idle>-0 [001] dnh2 99.987845: irq_handler_exit: irq=16 ret=handled
- <idle>-0 [001] dnh2 99.987848: irq_handler_entry: irq=16 name=gt
- <idle>-0 [001] dnh2 99.987850: irq_handler_exit: irq=16 ret=unhandled
-
-Make the Global Timer driver perform step (4) via the GIC driver with
-the help of the irq_set_irqchip_state() function, to prevent the
-spurious interrupts.
-
-Signed-off-by: Rabin Vincent <rabinv@axis.com>
+CC: "Rafael J. Wysocki" <rjw@rjwysocki.net> (supporter:ACPI)
+CC: Len Brown <lenb@kernel.org> (supporter:ACPI)
+CC: linux-acpi at vger.kernel.org (open list:ACPI)
+Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- drivers/clocksource/arm_global_timer.c | 21 +++++++++++++--------
- 1 file changed, 13 insertions(+), 8 deletions(-)
+v9: add the UART device address in printed message
+---
+ drivers/acpi/scan.c | 69 +++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 69 insertions(+)
 
-diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
-index 9df0d16..b9d0f86 100644
---- a/drivers/clocksource/arm_global_timer.c
-+++ b/drivers/clocksource/arm_global_timer.c
-@@ -140,26 +140,31 @@ static int gt_clockevent_set_next_event(unsigned long evt,
- static irqreturn_t gt_clockevent_interrupt(int irq, void *dev_id)
+diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+index 5f28cf7..29f26fc 100644
+--- a/drivers/acpi/scan.c
++++ b/drivers/acpi/scan.c
+@@ -45,6 +45,7 @@ static LIST_HEAD(acpi_scan_handlers_list);
+ DEFINE_MUTEX(acpi_device_lock);
+ LIST_HEAD(acpi_wakeup_device_list);
+ static DEFINE_MUTEX(acpi_hp_context_lock);
++static u64 spcr_uart_addr;
+ 
+ struct acpi_dep_data {
+ 	struct list_head node;
+@@ -1453,6 +1454,42 @@ static int acpi_add_single_object(struct acpi_device **child,
+ 	return 0;
+ }
+ 
++static acpi_status acpi_get_resource_memory(struct acpi_resource *ares,
++					    void *context)
++{
++	struct resource *res = context;
++
++	if (acpi_dev_resource_memory(ares, res))
++		return AE_CTRL_TERMINATE;
++
++	return AE_OK;
++}
++
++static bool acpi_device_should_be_hidden(acpi_handle handle)
++{
++	acpi_status status;
++	struct resource res;
++
++	/* Check if it should ignore the UART device */
++	if (spcr_uart_addr != 0) {
++		if (!acpi_has_method(handle, METHOD_NAME__CRS))
++			return false;
++
++		status = acpi_walk_resources(handle, METHOD_NAME__CRS,
++					     acpi_get_resource_memory, &res);
++		if (ACPI_FAILURE(status))
++			return false;
++
++		if (res.start == spcr_uart_addr) {
++			printk(KERN_INFO PREFIX "The UART device @%pa in SPCR table will be hidden\n",
++			       &res.start);
++			return true;
++		}
++	}
++
++	return false;
++}
++
+ static int acpi_bus_type_and_status(acpi_handle handle, int *type,
+ 				    unsigned long long *sta)
  {
- 	struct clock_event_device *evt = dev_id;
-+	bool workaround = clockevent_state_oneshot(evt);
- 
- 	if (!(readl_relaxed(gt_base + GT_INT_STATUS) &
- 				GT_INT_STATUS_EVENT_FLAG))
- 		return IRQ_NONE;
- 
- 	/**
--	 * ERRATA 740657( Global Timer can send 2 interrupts for
-+	 * ERRATA 740657 (Global Timer can send 2 interrupts for
- 	 * the same event in single-shot mode)
- 	 * Workaround:
--	 *	Either disable single-shot mode.
--	 *	Or
--	 *	Modify the Interrupt Handler to avoid the
--	 *	offending sequence. This is achieved by clearing
--	 *	the Global Timer flag _after_ having incremented
--	 *	the Comparator register	value to a higher value.
-+	 * - Read the ICCIAR (Interrupt Acknowledge) register
-+	 * - Modify the comparator value, to set it to a higher value
-+	 * - Clear the Global Timer flag
-+	 * - Clear the Pending Status information for Interrupt 27 (Global
-+	 *   Timer interrupt) in the Distributor of the Interrupt Controller.
-+	 * - Write the ICCEOIR (End of Interrupt) register
- 	 */
--	if (clockevent_state_oneshot(evt))
-+	if (workaround)
- 		gt_compare_set(ULONG_MAX, 0);
- 
- 	writel_relaxed(GT_INT_STATUS_EVENT_FLAG, gt_base + GT_INT_STATUS);
+@@ -1466,6 +1503,9 @@ static int acpi_bus_type_and_status(acpi_handle handle, int *type,
+ 	switch (acpi_type) {
+ 	case ACPI_TYPE_ANY:		/* for ACPI_ROOT_OBJECT */
+ 	case ACPI_TYPE_DEVICE:
++		if (acpi_device_should_be_hidden(handle))
++			return -ENODEV;
 +
-+	if (workaround)
-+		irq_set_irqchip_state(irq, IRQCHIP_STATE_PENDING, false);
-+
- 	evt->event_handler(evt);
+ 		*type = ACPI_BUS_TYPE_DEVICE;
+ 		status = acpi_bus_get_status_handle(handle, sta);
+ 		if (ACPI_FAILURE(status))
+@@ -1916,9 +1956,24 @@ static int acpi_bus_scan_fixed(void)
+ 	return result < 0 ? result : 0;
+ }
  
- 	return IRQ_HANDLED;
++static void __init acpi_get_spcr_uart_addr(void)
++{
++	acpi_status status;
++	struct acpi_table_spcr *spcr_ptr;
++
++	status = acpi_get_table(ACPI_SIG_SPCR, 0,
++				(struct acpi_table_header **)&spcr_ptr);
++	if (ACPI_SUCCESS(status))
++		spcr_uart_addr = spcr_ptr->serial_port.address;
++	else
++		printk(KERN_WARNING PREFIX "STAO table present, but SPCR is missing\n");
++}
++
+ int __init acpi_scan_init(void)
+ {
+ 	int result;
++	acpi_status status;
++	struct acpi_table_stao *stao_ptr;
+ 
+ 	acpi_pci_root_init();
+ 	acpi_pci_link_init();
+@@ -1934,6 +1989,20 @@ int __init acpi_scan_init(void)
+ 
+ 	acpi_scan_add_handler(&generic_device_handler);
+ 
++	/*
++	 * If there is STAO table, check whether it needs to ignore the UART
++	 * device in SPCR table.
++	 */
++	status = acpi_get_table(ACPI_SIG_STAO, 0,
++				(struct acpi_table_header **)&stao_ptr);
++	if (ACPI_SUCCESS(status)) {
++		if (stao_ptr->header.length > sizeof(struct acpi_table_stao))
++			printk(KERN_INFO PREFIX "STAO Name List not yet supported.");
++
++		if (stao_ptr->ignore_uart)
++			acpi_get_spcr_uart_addr();
++	}
++
+ 	mutex_lock(&acpi_scan_lock);
+ 	/*
+ 	 * Enumerate devices in the ACPI namespace.
 -- 
-2.7.0
+2.0.4
