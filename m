@@ -1,175 +1,108 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 29 Mar 2016 16:10:38 +0200
-Subject: [PATCH v2 1/3] ARM: at91: use chipid device for soc detection
-In-Reply-To: <55618572.U3p4crGV1Y@wuerfel>
-References: <55618572.U3p4crGV1Y@wuerfel>
-Message-ID: <1459260638-3899-1-git-send-email-nicolas.ferre@atmel.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Tue, 29 Mar 2016 09:11:32 -0500
+Subject: [RFC PATCH 2/3] ata: ahci-platform: Add ports-implemented dt
+ bindings.
+In-Reply-To: <1459257075-21393-3-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1459257075-21393-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1459257075-21393-3-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <CAL_JsqLhSz1qWj01mAAg4X89hb4LnYB-CjJ2d1JW=jJw66Oq=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Desroches <ludovic.desroches@atmel.com>
+On Tue, Mar 29, 2016 at 8:11 AM, Srinivas Kandagatla
+<srinivas.kandagatla@linaro.org> wrote:
+> On some SOCs PORTS_IMPL register value is never programmed by the BIOS
 
-So far, the CIDR and EXID registers were in the DBGU interface. This device
-has disappeared with the SAMA5D2 family. These registers are exposed
-through a new device called chipid.
+s/BIOS/firmware/
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-[nicolas.ferre at atmel.com: remove useless warnings]
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-[arnd at arndb.de: suggest to use static functions to reduce scope]
----
- .../devicetree/bindings/arm/atmel-at91.txt         |  4 ++
- arch/arm/mach-at91/soc.c                           | 81 +++++++++++++++++-----
- 2 files changed, 67 insertions(+), 18 deletions(-)
+You do plan to fix this in your firmware/bootloader, too, right?
 
-diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-index 7fd64ec9ee1d..0b1fcbfe2299 100644
---- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
-+++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-@@ -41,6 +41,10 @@ compatible: must be one of:
-        - "atmel,sama5d43"
-        - "atmel,sama5d44"
- 
-+Chipid required properties:
-+- compatible: Should be "atmel,sama5d2-chipid"
-+- reg : Should contain registers location and length
-+
- PIT Timer required properties:
- - compatible: Should be "atmel,at91sam9260-pit"
- - reg: Should contain registers location and length
-diff --git a/arch/arm/mach-at91/soc.c b/arch/arm/mach-at91/soc.c
-index 54343ffa3e53..c6fda75ddb89 100644
---- a/arch/arm/mach-at91/soc.c
-+++ b/arch/arm/mach-at91/soc.c
-@@ -22,48 +22,93 @@
- #include "soc.h"
- 
- #define AT91_DBGU_CIDR			0x40
--#define AT91_DBGU_CIDR_VERSION(x)	((x) & 0x1f)
--#define AT91_DBGU_CIDR_EXT		BIT(31)
--#define AT91_DBGU_CIDR_MATCH_MASK	0x7fffffe0
- #define AT91_DBGU_EXID			0x44
-+#define AT91_CHIPID_CIDR		0x00
-+#define AT91_CHIPID_EXID		0x04
-+#define AT91_CIDR_VERSION(x)		((x) & 0x1f)
-+#define AT91_CIDR_EXT			BIT(31)
-+#define AT91_CIDR_MATCH_MASK		0x7fffffe0
- 
--struct soc_device * __init at91_soc_init(const struct at91_soc *socs)
-+static int __init at91_get_cidr_exid_from_dbgu(u32 *cidr, u32 *exid)
- {
--	struct soc_device_attribute *soc_dev_attr;
--	const struct at91_soc *soc;
--	struct soc_device *soc_dev;
- 	struct device_node *np;
- 	void __iomem *regs;
--	u32 cidr, exid;
- 
- 	np = of_find_compatible_node(NULL, NULL, "atmel,at91rm9200-dbgu");
- 	if (!np)
- 		np = of_find_compatible_node(NULL, NULL,
- 					     "atmel,at91sam9260-dbgu");
-+	if (!np)
-+		return -ENODEV;
- 
--	if (!np) {
--		pr_warn("Could not find DBGU node");
--		return NULL;
-+	regs = of_iomap(np, 0);
-+	of_node_put(np);
-+
-+	if (!regs) {
-+		pr_warn("Could not map DBGU iomem range");
-+		return -ENXIO;
- 	}
- 
-+	*cidr = readl(regs + AT91_DBGU_CIDR);
-+	*exid = readl(regs + AT91_DBGU_EXID);
-+
-+	iounmap(regs);
-+
-+	return 0;
-+}
-+
-+static int __init at91_get_cidr_exid_from_chipid(u32 *cidr, u32 *exid)
-+{
-+	struct device_node *np;
-+	void __iomem *regs;
-+
-+	np = of_find_compatible_node(NULL, NULL, "atmel,sama5d2-chipid");
-+	if (!np)
-+		return -ENODEV;
-+
- 	regs = of_iomap(np, 0);
- 	of_node_put(np);
- 
- 	if (!regs) {
- 		pr_warn("Could not map DBGU iomem range");
--		return NULL;
-+		return -ENXIO;
- 	}
- 
--	cidr = readl(regs + AT91_DBGU_CIDR);
--	exid = readl(regs + AT91_DBGU_EXID);
-+	*cidr = readl(regs + AT91_CHIPID_CIDR);
-+	*exid = readl(regs + AT91_CHIPID_EXID);
- 
- 	iounmap(regs);
- 
-+	return 0;
-+}
-+
-+struct soc_device * __init at91_soc_init(const struct at91_soc *socs)
-+{
-+	struct soc_device_attribute *soc_dev_attr;
-+	const struct at91_soc *soc;
-+	struct soc_device *soc_dev;
-+	u32 cidr, exid;
-+	int ret;
-+
-+	/*
-+	 * With SAMA5D2 and later SoCs, CIDR and EXID registers are no more
-+	 * in the dbgu device but in the chipid device whose purpose is only
-+	 * to expose these two registers.
-+	 */
-+	ret = at91_get_cidr_exid_from_dbgu(&cidr, &exid);
-+	if (ret)
-+		ret = at91_get_cidr_exid_from_chipid(&cidr, &exid);
-+	if (ret) {
-+		if (ret == -ENODEV)
-+			pr_warn("Could not find identification node");
-+		return NULL;
-+	}
-+
- 	for (soc = socs; soc->name; soc++) {
--		if (soc->cidr_match != (cidr & AT91_DBGU_CIDR_MATCH_MASK))
-+		if (soc->cidr_match != (cidr & AT91_CIDR_MATCH_MASK))
- 			continue;
- 
--		if (!(cidr & AT91_DBGU_CIDR_EXT) || soc->exid_match == exid)
-+		if (!(cidr & AT91_CIDR_EXT) || soc->exid_match == exid)
- 			break;
- 	}
- 
-@@ -79,7 +124,7 @@ struct soc_device * __init at91_soc_init(const struct at91_soc *socs)
- 	soc_dev_attr->family = soc->family;
- 	soc_dev_attr->soc_id = soc->name;
- 	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%X",
--					   AT91_DBGU_CIDR_VERSION(cidr));
-+					   AT91_CIDR_VERSION(cidr));
- 	soc_dev = soc_device_register(soc_dev_attr);
- 	if (IS_ERR(soc_dev)) {
- 		kfree(soc_dev_attr->revision);
-@@ -91,7 +136,7 @@ struct soc_device * __init at91_soc_init(const struct at91_soc *socs)
- 	if (soc->family)
- 		pr_info("Detected SoC family: %s\n", soc->family);
- 	pr_info("Detected SoC: %s, revision %X\n", soc->name,
--		AT91_DBGU_CIDR_VERSION(cidr));
-+		AT91_CIDR_VERSION(cidr));
- 
- 	return soc_dev;
- }
--- 
-2.1.3
+> and left at zero value. Which means that no sata ports are avaiable for
+> software. AHCI driver used to cope up with this by fabricating the
+> port_map if the PORTS_IMPL register is read zero, but recent patch
+> broke this workaround as zero value was valid for nvme disks.
+
+s/nvme/NVMe/
+
+>
+> This patch adds ports-implemented dt bindings as workaround for this issue
+
+s/dt/DT/
+
+> in a way that DT can dictate the port_map incase where the SOCs does not
+> program it already.
+
+port_map is a Linux term.
+
+...can override the PORTS_IMPL register in cases where the firmware
+did not program it already.
+
+>
+> Fixes: 566d1827df2e ("libata: disable forced PORTS_IMPL for >= AHCI 1.3)
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/ata/ahci-platform.txt | 11 +++++++++++
+>  drivers/ata/ahci_platform.c                             |  4 ++++
+>  2 files changed, 15 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+> index 30df832..8165db3 100644
+> --- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
+> +++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+> @@ -32,6 +32,10 @@ Optional properties:
+>  - target-supply     : regulator for SATA target power
+>  - phys              : reference to the SATA PHY node
+>  - phy-names         : must be "sata-phy"
+> +- ports-implemented : Mask that indicates which ports that the HBA supports
+> +                     are available for software to use. Useful if PORTS_IMPL
+> +                     is not programmed by the BIOS, which is true with
+> +                     some embedded SOC's.
+>
+>  Required properties when using sub-nodes:
+>  - #address-cells    : number of cells to encode an address
+> @@ -59,6 +63,13 @@ Examples:
+>                 target-supply = <&reg_ahci_5v>;
+>         };
+>
+> +       sata0: sata at 29000000 { /* Qualcomm APQ8064 */
+
+Do you really need another example just for this?
+
+> +               compatible = "generic-ahci";
+
+Where's your chip specific compatible string? You would not require a
+DT update to fix this if you had that.
+
+> +               reg = <0x29000000 0x180>;
+> +               interrupts = <GIC_SPI 209 IRQ_TYPE_NONE>;
+> +               ports-implemented = <0x1>;
+> +       };
+> +
+>  With sub-nodes:
+>         sata at f7e90000 {
+>                 compatible = "marvell,berlin2q-achi", "generic-ahci";
+> diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
+> index 4044233..ec8db80 100644
+> --- a/drivers/ata/ahci_platform.c
+> +++ b/drivers/ata/ahci_platform.c
+> @@ -42,6 +42,7 @@ static int ahci_probe(struct platform_device *pdev)
+>         struct device *dev = &pdev->dev;
+>         struct ahci_host_priv *hpriv;
+>         int rc;
+> +       u32 ports_impl;
+>
+>         hpriv = ahci_platform_get_resources(pdev);
+>         if (IS_ERR(hpriv))
+> @@ -51,6 +52,9 @@ static int ahci_probe(struct platform_device *pdev)
+>         if (rc)
+>                 return rc;
+>
+> +       of_property_read_u32(dev->of_node,
+> +                            "ports-implemented", &hpriv->force_port_map);
+> +
+>         if (of_device_is_compatible(dev->of_node, "hisilicon,hisi-ahci"))
+>                 hpriv->flags |= AHCI_HFLAG_NO_FBS | AHCI_HFLAG_NO_NCQ;
+>
+> --
+> 2.5.0
+>
