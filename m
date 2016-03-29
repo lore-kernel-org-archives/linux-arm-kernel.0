@@ -1,34 +1,79 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 29 Mar 2016 14:11:13 +0100
-Subject: [RFC PATCH 1/3] libahci: save port map for forced port map
+Date: Tue, 29 Mar 2016 14:11:14 +0100
+Subject: [RFC PATCH 2/3] ata: ahci-platform: Add ports-implemented dt bindings.
 In-Reply-To: <1459257075-21393-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1459257075-21393-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1459257075-21393-2-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1459257075-21393-3-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In usecases where force_port_map is used saved_port_map is never set,
-resulting in not programming the PORTS_IMPL register as part of intial
-config. This patch fixes this by setting it to port_map even in case
-where force_port_map is used, making it more inline with other parts of
-the code.
+On some SOCs PORTS_IMPL register value is never programmed by the BIOS
+and left at zero value. Which means that no sata ports are avaiable for
+software. AHCI driver used to cope up with this by fabricating the
+port_map if the PORTS_IMPL register is read zero, but recent patch
+broke this workaround as zero value was valid for nvme disks.
 
+This patch adds ports-implemented dt bindings as workaround for this issue
+in a way that DT can dictate the port_map incase where the SOCs does not
+program it already.
+
+Fixes: 566d1827df2e ("libata: disable forced PORTS_IMPL for >= AHCI 1.3)
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- drivers/ata/libahci.c | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/devicetree/bindings/ata/ahci-platform.txt | 11 +++++++++++
+ drivers/ata/ahci_platform.c                             |  4 ++++
+ 2 files changed, 15 insertions(+)
 
-diff --git a/drivers/ata/libahci.c b/drivers/ata/libahci.c
-index 3982054..a5d7c1c 100644
---- a/drivers/ata/libahci.c
-+++ b/drivers/ata/libahci.c
-@@ -507,6 +507,7 @@ void ahci_save_initial_config(struct device *dev, struct ahci_host_priv *hpriv)
- 		dev_info(dev, "forcing port_map 0x%x -> 0x%x\n",
- 			 port_map, hpriv->force_port_map);
- 		port_map = hpriv->force_port_map;
-+		hpriv->saved_port_map = port_map;
- 	}
+diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+index 30df832..8165db3 100644
+--- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
++++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+@@ -32,6 +32,10 @@ Optional properties:
+ - target-supply     : regulator for SATA target power
+ - phys              : reference to the SATA PHY node
+ - phy-names         : must be "sata-phy"
++- ports-implemented : Mask that indicates which ports that the HBA supports
++		      are available for software to use. Useful if PORTS_IMPL
++		      is not programmed by the BIOS, which is true with
++		      some embedded SOC's.
  
- 	if (hpriv->mask_port_map) {
+ Required properties when using sub-nodes:
+ - #address-cells    : number of cells to encode an address
+@@ -59,6 +63,13 @@ Examples:
+ 		target-supply = <&reg_ahci_5v>;
+ 	};
+ 
++	sata0: sata at 29000000 { /* Qualcomm APQ8064 */
++		compatible = "generic-ahci";
++		reg = <0x29000000 0x180>;
++		interrupts = <GIC_SPI 209 IRQ_TYPE_NONE>;
++		ports-implemented = <0x1>;
++	};
++
+ With sub-nodes:
+ 	sata at f7e90000 {
+ 		compatible = "marvell,berlin2q-achi", "generic-ahci";
+diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
+index 4044233..ec8db80 100644
+--- a/drivers/ata/ahci_platform.c
++++ b/drivers/ata/ahci_platform.c
+@@ -42,6 +42,7 @@ static int ahci_probe(struct platform_device *pdev)
+ 	struct device *dev = &pdev->dev;
+ 	struct ahci_host_priv *hpriv;
+ 	int rc;
++	u32 ports_impl;
+ 
+ 	hpriv = ahci_platform_get_resources(pdev);
+ 	if (IS_ERR(hpriv))
+@@ -51,6 +52,9 @@ static int ahci_probe(struct platform_device *pdev)
+ 	if (rc)
+ 		return rc;
+ 
++	of_property_read_u32(dev->of_node,
++			     "ports-implemented", &hpriv->force_port_map);
++
+ 	if (of_device_is_compatible(dev->of_node, "hisilicon,hisi-ahci"))
+ 		hpriv->flags |= AHCI_HFLAG_NO_FBS | AHCI_HFLAG_NO_NCQ;
+ 
 -- 
 2.5.0
