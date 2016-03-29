@@ -1,37 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 29 Mar 2016 15:12:41 +0200
-Subject: [PATCH] i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity
-In-Reply-To: <1459248921.2565.15.camel@pengutronix.de>
-References: <m3h9fuk7ik.fsf@t19.piap.pl> <m3shz9in52.fsf@t19.piap.pl>
- <1459248921.2565.15.camel@pengutronix.de>
-Message-ID: <11848373.8j4FtIpEd5@wuerfel>
+From: emil.l.velikov@gmail.com (Emil Velikov)
+Date: Tue, 29 Mar 2016 14:13:26 +0100
+Subject: [RFC PATCH v1 0/4] Add Rockchip RGA support
+In-Reply-To: <17189219.y56YqHz6yR@diego>
+References: <1458552518-25527-1-git-send-email-ykk@rock-chips.com>
+ <1571169.Hy8an0n7lM@diego>
+ <CACvgo516ewfwGCpV=noX+re1x8t3Sp1t39Sha+A2-tQ5YsoihA@mail.gmail.com>
+ <17189219.y56YqHz6yR@diego>
+Message-ID: <CACvgo50REvRxN2_qdw=2NeTTSgjpA+9c8OZgPE0q19meH6ArKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 29 March 2016 12:55:21 Lucas Stach wrote:
-> Am Dienstag, den 29.03.2016, 12:39 +0200 schrieb Krzysztof Ha?asa:
-> > Lucas Stach <l.stach@pengutronix.de> writes:
-> > 
-> > > Is this working with v4.4 and PCI_MSI enabled? I'm sure I've tested MSI
-> > > IRQs before enabling them in the defconfig and they have been working
-> > > for me for a long time before that. Tested with i210 on Gateworks
-> > > Ventana.
-> > 
-> > MSI never worked for me on Ventana. I have been using 4.2 extensively,
-> > and now I'm switching to 4.5 (which doesn't work either).
-> > 
-> > Could it be a DTS (bridge) problem(?)
-> > 
-> > On 4.5, trying to use it with TW6869 frame buffer and GW5410:
-> > 
-> > TW6869: PCI 0000:04:00.0, IRQ 336, MMIO 0x1100000
-> > TW686x 0000:04:00.0: enabling device (0140 -> 0142)
-> > 
-> I don't see whee the device even tries to use MSI IRQs. Even if the
-> infrastructure is enabled it opts to use legacy INTA.
+On 28 March 2016 at 23:13, Heiko St?bner <heiko@sntech.de> wrote:
 
-It just never calls pci_enable_msi(), right? MSI is purely opt-in
-for the driver, but it should just work if the device supports it
-and you add that call.
+> I have the feeling we're going quite a bit off-topic right now :-) .
+> The binary-driver-crazyness, hasn't really anything to do with Yakir's support
+> for the RGA (which is about raster-graphics-acceleration, so 2d stuff).
+>
+> And me mentioning the armsoc-ddx was merely a means to allow some sort of
+> different userspace user, as requested in your original mail ;-) .
+>
+Seems like I forgot to state the obvious - for all the reasons
+mentioned, the armsoc ddx seems like a bad example.
 
-	Arnd
+> Maybe you know a better use-case on where to demonstrate the viability of the
+> userspace API for it as originally requested.
+I'm afraid that my RockChip-foo is extremely limited. Perhaps the
+actual user of these should be mentioned ? xf86-video-rockhip (is
+there one ?) or any other effort/project that lacks some (all?) of the
+criticism listed.
+
+(Sort of) the bottom line - either reuse the existing interfaces or
+provide an approved, full blown userspace (libdrm demos/programs do
+not count) that uses the new interfaces.
+
+I haven't made these rules, just a fool^Wguy that repeats them so that
+people don't abuse them much. If in doubt check with Dave and Daniel V
+- they had enough repeating these.
+
+-Emil
