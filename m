@@ -1,41 +1,33 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 29 Mar 2016 14:11:12 +0100
-Subject: [RFC PATCH 0/3] ahci: add ports-implemented dt bindings.
-Message-ID: <1459257075-21393-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 29 Mar 2016 14:11:25 +0100
+Subject: [PATCH 4/4] drivers/bus: make arm-ccn.c driver explicitly
+ non-modular
+In-Reply-To: <20160329123021.GD6745@arm.com>
+References: <1459113058-14340-1-git-send-email-paul.gortmaker@windriver.com>
+ <1459113058-14340-5-git-send-email-paul.gortmaker@windriver.com>
+ <20160329114525.GC6745@arm.com> <1459252386.5053.18.camel@arm.com>
+ <20160329123021.GD6745@arm.com>
+Message-ID: <1459257085.2461.2.camel@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tejun,
+On Tue, 2016-03-29 at 13:30 +0100, Will Deacon wrote:
+> On Tue, Mar 29, 2016 at 12:53:06PM +0100, Pawel Moll wrote:
+> > Dnia 2016-03-29, Tue o godzinie 12:45 +0100, Will Deacon pisze:
+> > > I'd much rather fix the driver to build as a module, if at all
+> > > possible.
+> > > Suzuki (CC'd) is taking a look at that, so please drop this patch
+> > > for
+> > > now.
+> > 
+> > There's no problem with building arm-ccn.c as a module - all it's
+> > really doing today is providing a PMU driver. I don't even know why
+> > have I made it bool-only in the first place...
+> 
+> Probably because it doesn't compile due to the irq_set_affinity call.
 
-On some SOCs PORTS_IMPL register value is never programmed by the BIOS
-and left at zero value. Which means that no sata ports are available for
-software. AHCI driver used to cope up with this by fabricating the
-port_map if the PORTS_IMPL register is read zero, but recent patch [1]
-broke this workaround as zero value was valid for nvme disks.
+The original arm-ccn.c did not call it at all. My guess is that I
+copied ARM_CCI stanza without thinking. But I'm glad Suzuki will
+straighten it out :-)
 
-This patch adds ports-implemented dt bindings as workaround for this issue
-in a way that DT can dictate the port_map incase where the SOCs does not
-program it already.
-
-Am sure that there are more than one SOC that hits this issue.
-
-Without this patchset, ACHI on APQ8064 Qualcomm platform is broken in mainline.
-With the below patchset am able to get back the functionality.
-
-Thanks,
-srini
-[1] 566d18 "libata: disable forced PORTS_IMPL for >= AHCI 1.3"
-
-Srinivas Kandagatla (3):
-  libahci: save port map for forced port map
-  ata: ahci-platform: Add ports-implemented dt bindings.
-  ARM: dts: apq8064: add ahci ports-implemented mask
-
- Documentation/devicetree/bindings/ata/ahci-platform.txt | 11 +++++++++++
- arch/arm/boot/dts/qcom-apq8064.dtsi                     |  1 +
- drivers/ata/ahci_platform.c                             |  4 ++++
- drivers/ata/libahci.c                                   |  1 +
- 4 files changed, 17 insertions(+)
-
--- 
-2.5.0
+Pawe?
