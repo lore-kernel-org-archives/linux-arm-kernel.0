@@ -1,67 +1,49 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 28 Mar 2016 18:59:54 -0700
-Subject: [PATCH v2 0/8] add TCON and Vybrid support
-Message-ID: <1459216802-32094-1-git-send-email-stefan@agner.ch>
+Date: Mon, 28 Mar 2016 18:59:56 -0700
+Subject: [PATCH v2 2/8] ARM: imx: clk-vf610: add TCON ipg clock
+In-Reply-To: <1459216802-32094-1-git-send-email-stefan@agner.ch>
+References: <1459216802-32094-1-git-send-email-stefan@agner.ch>
+Message-ID: <1459216802-32094-3-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds the missing pieces to make the Freescale
-DCU DRM driver work on Freescale Vybrid.
+Add the ipg (bus) clock for the TCON modules (Timing Controller). This
+module is required by the new DCU DRM driver, since the display signals
+pass through TCON.
 
-Foremost, it adds support for the timing controller (TCON)
-module. The module is between the Display Controller and the
-actual output pins. It allows to alter the timings for RAW
-TFT displays, but can also operate in a bypass mode. This
-change has only support for the bypass mode.
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ drivers/clk/imx/clk-vf610.c             | 3 +++
+ include/dt-bindings/clock/vf610-clock.h | 4 +++-
+ 2 files changed, 6 insertions(+), 1 deletion(-)
 
-Earlier variants of the DCU DRM driver configured the TCON
-module in bypass mode, however this has been removed and
-postponed. The last variant with the TCON code was v9:
-https://lkml.org/lkml/2015/7/13/242
-
-The patchset also fixes the DCU related clocks in the Vybrid
-clock tree and makes use of the common clock framework for
-the pixelclock divider.
-
-Testing on LS1021a welcomeing!
-
-Changes since v1:
-- Properly disable clocks on errors
-- Create clear seperation of pixel clock and bus clock
-- Simplified TCON driver by removing suspend/resume
-  capabilities (encoder disable/enable makes sure that
-  TCON bypass gets disabled/reenabled on suspend)
-- Use common clock framework to create a divider clock
-  which represents the DCU internal pixel clock divider
-
-Stefan Agner (8):
-  ARM: imx: clk-vf610: fix DCU clock tree
-  ARM: imx: clk-vf610: add TCON ipg clock
-  drm/fsl-dcu: disable clock on initialization failure and remove
-  drm/fsl-dcu: add extra clock for pixel clock
-  drm/fsl-dcu: use common clock framework for pixel clock divider
-  drm/fsl-dcu: add TCON driver
-  ARM: dts: vf610: add display nodes
-  ARM: dts: vf610-colibri: enable display controller
-
- .../devicetree/bindings/display/fsl,dcu.txt        |   6 ++
- .../devicetree/bindings/display/fsl,tcon.txt       |  18 ++++
- arch/arm/boot/dts/vf-colibri-eval-v3.dtsi          |  16 +++
- arch/arm/boot/dts/vf-colibri.dtsi                  |  33 +++++++
- arch/arm/boot/dts/vfxxx.dtsi                       |  19 ++++
- drivers/clk/imx/clk-vf610.c                        |   7 +-
- drivers/gpu/drm/fsl-dcu/Makefile                   |   3 +-
- drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_crtc.c         |   7 +-
- drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.c          |  73 ++++++++++----
- drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.h          |   2 +
- drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_rgb.c          |  11 +++
- drivers/gpu/drm/fsl-dcu/fsl_tcon.c                 | 108 +++++++++++++++++++++
- drivers/gpu/drm/fsl-dcu/fsl_tcon.h                 |  33 +++++++
- include/dt-bindings/clock/vf610-clock.h            |   4 +-
- 14 files changed, 311 insertions(+), 29 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/display/fsl,tcon.txt
- create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_tcon.c
- create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_tcon.h
-
+diff --git a/drivers/clk/imx/clk-vf610.c b/drivers/clk/imx/clk-vf610.c
+index 426fde2..43be1cf 100644
+--- a/drivers/clk/imx/clk-vf610.c
++++ b/drivers/clk/imx/clk-vf610.c
+@@ -327,6 +327,9 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
+ 	clk[VF610_CLK_DCU1_DIV] = imx_clk_divider("dcu1_div", "dcu1_en", CCM_CSCDR3, 20, 3);
+ 	clk[VF610_CLK_DCU1] = imx_clk_gate2("dcu1", "ipg_bus", CCM_CCGR9, CCM_CCGRx_CGn(8));
+ 
++	clk[VF610_CLK_TCON0] = imx_clk_gate2("tcon0", "platform_bus", CCM_CCGR1, CCM_CCGRx_CGn(13));
++	clk[VF610_CLK_TCON1] = imx_clk_gate2("tcon1", "platform_bus", CCM_CCGR7, CCM_CCGRx_CGn(13));
++
+ 	clk[VF610_CLK_ESAI_SEL] = imx_clk_mux("esai_sel", CCM_CSCMR1, 20, 2, esai_sels, 4);
+ 	clk[VF610_CLK_ESAI_EN] = imx_clk_gate("esai_en", "esai_sel", CCM_CSCDR2, 30);
+ 	clk[VF610_CLK_ESAI_DIV] = imx_clk_divider("esai_div", "esai_en", CCM_CSCDR2, 24, 4);
+diff --git a/include/dt-bindings/clock/vf610-clock.h b/include/dt-bindings/clock/vf610-clock.h
+index 56c16aa..fbe17cc 100644
+--- a/include/dt-bindings/clock/vf610-clock.h
++++ b/include/dt-bindings/clock/vf610-clock.h
+@@ -195,6 +195,8 @@
+ #define VF610_CLK_SNVS			182
+ #define VF610_CLK_DAP			183
+ #define VF610_CLK_OCOTP         184
+-#define VF610_CLK_END			185
++#define VF610_CLK_TCON0			185
++#define VF610_CLK_TCON1			186
++#define VF610_CLK_END			187
+ 
+ #endif /* __DT_BINDINGS_CLOCK_VF610_H */
 -- 
 2.7.4
