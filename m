@@ -1,70 +1,38 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 29 Mar 2016 17:45:20 +0200
-Subject: [PATCH v4 3/3] ARM: mvebu: Add the hardware monitor to the NSA320
- device tree
-In-Reply-To: <1457192097-32538-4-git-send-email-linux@baker-net.org.uk> (Adam
- Baker's message of "Sat, 5 Mar 2016 15:34:57 +0000")
-References: <1457192097-32538-1-git-send-email-linux@baker-net.org.uk>
- <1457192097-32538-4-git-send-email-linux@baker-net.org.uk>
-Message-ID: <87poudwanj.fsf@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 29 Mar 2016 16:46:15 +0100
+Subject: [PATCH] arm64: defconfig: remove redundant CONFIG_MMC_BLOCK_MINORS
+In-Reply-To: <1459178928-26973-1-git-send-email-leo.yan@linaro.org>
+References: <1459178928-26973-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <20160329154615.GF6745@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Adam,
- 
- On sam., mars 05 2016, Adam Baker <linux@baker-net.org.uk> wrote:
-
-> Add an entry for the hardware monitoring MCU
->
-> Signed-off-by: Adam Baker <linux@baker-net.org.uk>
-
-Applied on mvebu/dt, I only changed the tropic to "ARM: dts: kirkwood:
-Add the hardware monitor to the NSA320 device tree" as know requested
-by the arm-soc maintainer.
-
-Thanks,
-
-Gregory
-
+On Mon, Mar 28, 2016 at 11:28:48PM +0800, Leo Yan wrote:
+> There have two patches to add CONFIG_MMC_BLOCK_MINORS twice:
+> 22b0898e8 ("arm64: add defconfig options for Allwinner SoCs"),
+> 2f85bb09d ("arm64: defconfig: Increase MMC_BLOCK_MINORS to 16");
+> 
+> So remove redundant CONFIG_MMC_BLOCK_MINORS to only enable once.
+> 
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
 > ---
-> This patch is unchanged from the version Gregory CLEMENT said
-> he would apply once the hwmon maintainers accept 2/3
-> ---
->  arch/arm/boot/dts/kirkwood-nsa320.dts | 13 +++++++++++--
->  1 file changed, 11 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/kirkwood-nsa320.dts b/arch/arm/boot/dts/kirkwood-nsa320.dts
-> index 24f686d..2a935e9 100644
-> --- a/arch/arm/boot/dts/kirkwood-nsa320.dts
-> +++ b/arch/arm/boot/dts/kirkwood-nsa320.dts
-> @@ -193,10 +193,19 @@
->  		};
->  	};
->  
-> +	hwmon {
-> +		compatible = "zyxel,nsa320-mcu";
-> +		pinctrl-0 = <&pmx_mcu_data &pmx_mcu_clk &pmx_mcu_act>;
-> +		pinctrl-names = "default";
-> +
-> +		data-gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>;
-> +		clk-gpios = <&gpio0 16 GPIO_ACTIVE_HIGH>;
-> +		act-gpios = <&gpio0 17 GPIO_ACTIVE_LOW>;
-> +	};
-> +
->  	/* The following pins are currently not assigned to a driver,
->  	   some of them should be configured as inputs.
-> -	pinctrl-0 = <&pmx_mcu_data &pmx_mcu_clk &pmx_mcu_act
-> -		     &pmx_htp &pmx_vid_b1
-> +	pinctrl-0 = <&pmx_htp &pmx_vid_b1
->  		     &pmx_power_resume_data &pmx_power_resume_clk>; */
->  };
->  
-> -- 
-> 2.1.4
->
+>  arch/arm64/configs/defconfig | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index f705051..3ad26ff 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -215,7 +215,6 @@ CONFIG_MMC_SPI=y
+>  CONFIG_MMC_SUNXI=y
+>  CONFIG_MMC_DW=y
+>  CONFIG_MMC_DW_EXYNOS=y
+> -CONFIG_MMC_BLOCK_MINORS=16
+>  CONFIG_NEW_LEDS=y
+>  CONFIG_LEDS_CLASS=y
+>  CONFIG_LEDS_SYSCON=y
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Thanks, I'll pick this up with some other pending defconfig updates for
+-rc2.
+
+Will
