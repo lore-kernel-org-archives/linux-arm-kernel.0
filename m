@@ -1,78 +1,64 @@
 From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 29 Mar 2016 07:51:15 -0700
-Subject: [PATCH 10/12] ARM: dts: dragonboard-600c: Add on board leds
- support
-In-Reply-To: <56FA8F47.7070200@linaro.org>
+Date: Tue, 29 Mar 2016 07:54:48 -0700
+Subject: [PATCH 00/12] ARM: dts: Add dragonboard-600c support.
+In-Reply-To: <1458762366-9233-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1458762366-9233-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1458762484-9768-1-git-send-email-srinivas.kandagatla@linaro.org>
- <20160327055012.GD8929@tuxbot> <56FA8F47.7070200@linaro.org>
-Message-ID: <20160329145115.GO8929@tuxbot>
+Message-ID: <20160329145448.GP8929@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 29 Mar 07:20 PDT 2016, Srinivas Kandagatla wrote:
+On Wed 23 Mar 12:46 PDT 2016, Srinivas Kandagatla wrote:
 
-> Thanks Bjorn,
+> Hi Andy,
 > 
-> On 27/03/16 06:50, Bjorn Andersson wrote:
-> >On Wed 23 Mar 12:48 PDT 2016, Srinivas Kandagatla wrote:
-[..]
-> >>+
-> >>+			led at 5 {
-> >>+				label = "dragonboard-600c:yellow:wlan";
-> >>+				gpios = <&pm8921_mpps 7 GPIO_ACTIVE_HIGH>;
-> >>+				linux,default-trigger = "wlan";
-> >
-> >This should either be "phy0rx", "phy0tx", "phy0assoc" or "phy0radio". TX
-> >does not seem to work, so this should be debugged; "assoc" is probably
-> >the one that makes most sense.
+> This patchset adds support to Dragonboard 600c which is based on APQ8064.
 > 
+> With this patchset, except spi I was able to test all the below features
+> on this board on top of linus master branch.
+> 1> i2c
+> 2> spi
+> 3> sd/mmc with card detect
+> 4> eMMC
+> 5> USB
+> 6> SATA
+> 7> on board Ethernet based on PCIE.
+> 8> user and activity leds.
 > 
-> Am ok, to change, did you get activity leds works with any of these strings
-> with WLAN or BT?
+> AHCI SATA is broken on APQ8064 on mainline, due to changes in libahci, fix is
+> being discussed which should not effect this dt patches anyway.
+> This patchset also has a fix to i2c/spi pinctrls which was not set correctly
+> in my previous apq8064 patches, I have verified this patchset with eeprom and
+> sensors on the board, you might want to take that patch in next rc.
 > 
+> Thanks,
+> srini
+> 
+> Srinivas Kandagatla (12):
+>   ARM: dts: apq8064: fix the pinctrls for i2c and spi
+>   ARM: dts: apq8064: add support to gsbi1 uart
+>   ARM: dts: apq8064: add gsbi7 i2c support
+>   ARM: dts: dragonboard-600c: add board support with serial
+>   ARM: dts: dragonboard-600c: add pmic regulator supplies
+>   ARM: dts: dragonboard-600c: Add eMMC and SD card support
+>   ARM: dts: dragonboard-600c: add usb support
+>   ARM: dts: dragonboard-600c: add pcie support
+>   ARM: dts: dragonboard-600c: add on board sata support.
+>   ARM: dts: dragonboard-600c: Add on board leds support
+>   ARM: dts: dragonboard-600c: add i2c support
+>   ARM: dts: dragonboard-600c: add spi support
 
-I did test them; rx, assoc and radio seems to work. Tx does not tickle
-the led, but should probably.
-
-I didn't find the spec for the baord, so I'm not sure what the LEDs
-should indicate. But it feels like radio or assoc makes most sense, and
-follows what we can do with the BT led.
-
-> phy0rx/tx seems to be bit more generic and atleast the name looks bit
-> non-specific to wlan.
-> 
-> These names should be documented somewhere, Its very difficult to find which
-> names to use unless you read the code.
-> 
-> It would be nice to just provide a phandle to the device which led-trigger
-> should use, which makes it clear and explicit.
-> 
-
-I agree, I was surprised by their naming. The phandle solution would
-have been nice, except that you have no way from sysfs to pick which
-node to follow.
+Please abbreviate db600c (and drop those upper case As).
 
 > 
-> 
-> >
-> >>+				default-state = "off";
-> >>+			};
-> >>+
-> >>+			led at 6 {
-> >>+				label = "dragonboard-600c:blue:bt";
-> >>+				gpios = <&pm8921_mpps 8 GPIO_ACTIVE_HIGH>;
-> >>+				linux,default-trigger = "bt";
-> >
-> >This should be "hci0-power".
-> 
-> Does this trigger work for you?
-> Name is bit misleading though.
-> 
+>  arch/arm/boot/dts/Makefile                         |   1 +
+>  .../arm/boot/dts/qcom-apq8064-dragonboard-600c.dts | 377 +++++++++++++++++++++
 
-I don't think I tested it, but it is the only bt led trigger exposed by
-the bluetooth framework. I don't think we have any other hci devices on
-this board, so it should be fine.
+Please make this qcom-apq8064-arrow-db600c.dts
+
+>  arch/arm/boot/dts/qcom-apq8064-pins.dtsi           |  39 +++
+>  arch/arm/boot/dts/qcom-apq8064.dtsi                |  41 ++-
+>  4 files changed, 452 insertions(+), 6 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/qcom-apq8064-dragonboard-600c.dts
 
 Regards,
 Bjorn
