@@ -1,108 +1,28 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Tue, 29 Mar 2016 09:11:32 -0500
-Subject: [RFC PATCH 2/3] ata: ahci-platform: Add ports-implemented dt
- bindings.
-In-Reply-To: <1459257075-21393-3-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1459257075-21393-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1459257075-21393-3-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <CAL_JsqLhSz1qWj01mAAg4X89hb4LnYB-CjJ2d1JW=jJw66Oq=g@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 29 Mar 2016 11:14:38 -0300
+Subject: [PATCH] i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity
+In-Reply-To: <1459241739.2565.9.camel@pengutronix.de>
+References: <m3h9fuk7ik.fsf@t19.piap.pl>
+ <CAOMZO5DcZCxoLPeGRWSGkstm7F3eN-Q-yJyf6ktMTda2zLviag@mail.gmail.com>
+ <CAOMZO5B8Lzn-E4YOeYxVtN5PN11aOvZHn4eU0ixkdV8CO8+xYw@mail.gmail.com>
+ <CAJ+vNU2Sg1ZKBsGcQswrJZyTJ1WBEZor3ZqpoYUT7i9FKjEAog@mail.gmail.com>
+ <CAOMZO5DO9G18=_YSri3a+UiYbLwN6AMG4asUXbT03mpbU3hHrw@mail.gmail.com>
+ <CAJ+vNU1_YqvWQkmuDB7r8z77iZJS6pP4Mr+j9yW4sFLAeJXQDw@mail.gmail.com>
+ <CAOMZO5A2osG3=mTaCayYfMokUj-vT+Udq9ckq45b1yaUP9Tn3g@mail.gmail.com>
+ <CAJ+vNU2ST=XG5H04-OCwpHgcvkoXOQw8F3MjXhJmWhBUbxWE-g@mail.gmail.com>
+ <1459241739.2565.9.camel@pengutronix.de>
+Message-ID: <CAOMZO5Cisx9xv9hCxzYK2U-MdVCdbVMYGY2y4PVoVReWjwE8=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 29, 2016 at 8:11 AM, Srinivas Kandagatla
-<srinivas.kandagatla@linaro.org> wrote:
-> On some SOCs PORTS_IMPL register value is never programmed by the BIOS
+On Tue, Mar 29, 2016 at 5:55 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
 
-s/BIOS/firmware/
+> I would suspect that most boards specify the reset polarity the wrong
+> way around. Fixing this without breaking DT stability is hard. OTOH we
 
-You do plan to fix this in your firmware/bootloader, too, right?
+It is not hard if we just revert the buggy commit.
 
-> and left at zero value. Which means that no sata ports are avaiable for
-> software. AHCI driver used to cope up with this by fabricating the
-> port_map if the PORTS_IMPL register is read zero, but recent patch
-> broke this workaround as zero value was valid for nvme disks.
+> could just argue that the system description in DT is wrong and needs to
+> be fixed.
 
-s/nvme/NVMe/
-
->
-> This patch adds ports-implemented dt bindings as workaround for this issue
-
-s/dt/DT/
-
-> in a way that DT can dictate the port_map incase where the SOCs does not
-> program it already.
-
-port_map is a Linux term.
-
-...can override the PORTS_IMPL register in cases where the firmware
-did not program it already.
-
->
-> Fixes: 566d1827df2e ("libata: disable forced PORTS_IMPL for >= AHCI 1.3)
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
->  Documentation/devicetree/bindings/ata/ahci-platform.txt | 11 +++++++++++
->  drivers/ata/ahci_platform.c                             |  4 ++++
->  2 files changed, 15 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-> index 30df832..8165db3 100644
-> --- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
-> +++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
-> @@ -32,6 +32,10 @@ Optional properties:
->  - target-supply     : regulator for SATA target power
->  - phys              : reference to the SATA PHY node
->  - phy-names         : must be "sata-phy"
-> +- ports-implemented : Mask that indicates which ports that the HBA supports
-> +                     are available for software to use. Useful if PORTS_IMPL
-> +                     is not programmed by the BIOS, which is true with
-> +                     some embedded SOC's.
->
->  Required properties when using sub-nodes:
->  - #address-cells    : number of cells to encode an address
-> @@ -59,6 +63,13 @@ Examples:
->                 target-supply = <&reg_ahci_5v>;
->         };
->
-> +       sata0: sata at 29000000 { /* Qualcomm APQ8064 */
-
-Do you really need another example just for this?
-
-> +               compatible = "generic-ahci";
-
-Where's your chip specific compatible string? You would not require a
-DT update to fix this if you had that.
-
-> +               reg = <0x29000000 0x180>;
-> +               interrupts = <GIC_SPI 209 IRQ_TYPE_NONE>;
-> +               ports-implemented = <0x1>;
-> +       };
-> +
->  With sub-nodes:
->         sata at f7e90000 {
->                 compatible = "marvell,berlin2q-achi", "generic-ahci";
-> diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
-> index 4044233..ec8db80 100644
-> --- a/drivers/ata/ahci_platform.c
-> +++ b/drivers/ata/ahci_platform.c
-> @@ -42,6 +42,7 @@ static int ahci_probe(struct platform_device *pdev)
->         struct device *dev = &pdev->dev;
->         struct ahci_host_priv *hpriv;
->         int rc;
-> +       u32 ports_impl;
->
->         hpriv = ahci_platform_get_resources(pdev);
->         if (IS_ERR(hpriv))
-> @@ -51,6 +52,9 @@ static int ahci_probe(struct platform_device *pdev)
->         if (rc)
->                 return rc;
->
-> +       of_property_read_u32(dev->of_node,
-> +                            "ports-implemented", &hpriv->force_port_map);
-> +
->         if (of_device_is_compatible(dev->of_node, "hisilicon,hisi-ahci"))
->                 hpriv->flags |= AHCI_HFLAG_NO_FBS | AHCI_HFLAG_NO_NCQ;
->
-> --
-> 2.5.0
->
+Sure, this would be a nice thing to do as well.
