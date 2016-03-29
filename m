@@ -1,36 +1,33 @@
 From: yendapally.reddy@broadcom.com (Yendapally Reddy Dhananjaya Reddy)
-Date: Tue, 29 Mar 2016 10:22:27 -0400
-Subject: [PATCH RESEND 0/3] pwm support for Broadcom iProc SoC's
-Message-ID: <1459261350-23851-1-git-send-email-yendapally.reddy@broadcom.com>
+Date: Tue, 29 Mar 2016 10:22:28 -0400
+Subject: [PATCH RESEND 1/3] Documentation: dt: Add Broadcom iproc pwm
+ controller binding
+In-Reply-To: <1459261350-23851-1-git-send-email-yendapally.reddy@broadcom.com>
+References: <1459261350-23851-1-git-send-email-yendapally.reddy@broadcom.com>
+Message-ID: <1459261350-23851-2-git-send-email-yendapally.reddy@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset contains the pwm support for the Broadcom's iProc SoC's.
+Add a binding for Broadcom iproc pwm controller
 
-The first patch provides the documentation details and the
-second patch contains the controller support details. The third patch
-contains the enable method for Northstar Plus SoC.
+Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/pwm/brcm,kona-pwm.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-This patch series has been tested on NSP bcm958625HR board with oscilloscope.
-The pwm is not enabled for this board as the pins are open and not used.
-
-This patch series is based on v4.6.0-rc1 and is available from github
-repo: https://github.com/Broadcom/cygnus-linux.git
-branch: iproc-pwm-v1
-
-This patch series was originally sent on 03/01/16.
-See https://lkml.org/lkml/2016/3/1/487
-
-Yendapally Reddy Dhananjaya Reddy (3):
-  Documentation: dt: Add Broadcom iproc pwm controller binding
-  pwm: kona: Add support for Broadcom iproc pwm controller
-  ARM: dts: NSP: Add PWM Support to DT
-
- .../devicetree/bindings/pwm/brcm,kona-pwm.txt      |   2 +-
- arch/arm/boot/dts/bcm-nsp.dtsi                     |   8 +
- drivers/pwm/Kconfig                                |   6 +-
- drivers/pwm/pwm-bcm-kona.c                         | 183 ++++++++++++++++++---
- 4 files changed, 172 insertions(+), 27 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/pwm/brcm,kona-pwm.txt b/Documentation/devicetree/bindings/pwm/brcm,kona-pwm.txt
+index 8eae9fe..5036f63 100644
+--- a/Documentation/devicetree/bindings/pwm/brcm,kona-pwm.txt
++++ b/Documentation/devicetree/bindings/pwm/brcm,kona-pwm.txt
+@@ -3,7 +3,7 @@ Broadcom Kona PWM controller device tree bindings
+ This controller has 6 channels.
+ 
+ Required Properties :
+-- compatible: should contain "brcm,kona-pwm"
++- compatible: should contain "brcm,kona-pwm" or "brcm,iproc-pwm"
+ - reg: physical base address and length of the controller's registers
+ - clocks: phandle + clock specifier pair for the external clock
+ - #pwm-cells: Should be 3. See pwm.txt in this directory for a
 -- 
 2.1.0
