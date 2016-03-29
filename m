@@ -1,70 +1,57 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 28 Mar 2016 22:41:02 -0400
-Subject: [PATCH 0/3] drm/exynos: Kconfig dependency fixes
-In-Reply-To: <56F9DE63.6050808@samsung.com>
-References: <1459214937-18686-1-git-send-email-javier@osg.samsung.com>
- <56F9DE63.6050808@samsung.com>
-Message-ID: <56F9EB3E.5080000@osg.samsung.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Mon, 28 Mar 2016 20:36:56 -0700
+Subject: [PATCH v2 0/9] Qualcomm WCNSS remoteproc
+Message-ID: <1459222625-11440-1-git-send-email-bjorn.andersson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Seung-Woo,
+This series introduces the remoteproc driver for controlling the Qualcomm
+Wireless Connectivity Subsystem (WCNSS). The WCNSS is a builtin ARM9 inside the
+Qualcomm SoC with an externally connected RF module (iris).
 
-Thanks a lot for your feedback.
+Supports booting and shutting down wcnss on 8064, 8974 and 8016. The driver
+will call the crash handler in remoteproc, but further work is needed in the
+framework for this not to bring down the kernel.
 
-On 03/28/2016 09:46 PM, Seung-Woo Kim wrote:
-> Hi Javier,
-> 
-> On 2016? 03? 29? 10:28, Javier Martinez Canillas wrote:
->> Hello Inki,
->>
->> This patch series contains some fixes for the Kconfig symbol dependencies
->> of the Exynos DRM driver. They make sure that the Exynos DRM components
->> and the media platform drivers that makes use of the same HW IP block are
->> not enabled at the same time.
->>
->> Best regards,
->> Javier
->>
->>
->> Javier Martinez Canillas (3):
->>   drm/exynos: Use VIDEO_SAMSUNG_S5P_G2D=n as G2D Kconfig dependency
->>   drm/exynos: Use VIDEO_SAMSUNG_EXYNOS_GSC=n as GSC Kconfig dependency
->>   drm/exynos: Make DRM_EXYNOS_FIMC depend on VIDEO_S5P_FIMC=n
-> 
-> In G2D case, there is only one instance, but for the other cases, there
-> are several instances and in my environment, I enable both drivers on
-> v4l2 and drm FIMC/GSC.
-> 
-> So, IMHO, the not-enabled v4l2 dependency is not really required for drm
-> fimc and drm gsc.
->
+Changes since v1:
+- Split iris definition into separate driver/dt-node
+- Move constants from DT to code
+- Make stop-state and some of interrupts optional to properly work on 8064
+- Cleaned up and made mdt loader support relocation, which is needed on 8016.
+- Add dts patches
 
-I'm confused, it was you who added the depends on !VIDEO_SAMSUNG_EXYNOS_GSC
-for DRM_EXYNOS_GSC in commit aeefb36832e5 ("drm/exynos: gsc: add device tree
-support and remove usage of static mappings").
+Bjorn Andersson (9):
+  dt-binding: remoteproc: Introduce Qualcomm WCNSS loader binding
+  remoteproc: core: Make the loaded resource table optional
+  remoteproc: Add additional crash reasons
+  remoteproc: Introduce Qualcomm WCNSS firmware loader
+  ARM: dts: qcom: msm8974: Introduce the wcnss remoteproc node
+  ARM: dts: qcom: apq8064: Add syscon for sic-non-secure
+  ARM: dts: qcom: apq8064: Add complete smsm node
+  ARM: dts: qcom: apq8064: Add smd node and all edges
+  ARM: dts: qcom: apq8064: Introduce wcnss remoteproc
 
->From the commit message "The driver cannot be used simultaneously with V4L2
-Mem2Mem GScaller driver thought". Did that assumption changed and the depend
-should be removed then? or maybe I misunderstood what you meant.
+ .../bindings/remoteproc/qcom,wcnss-pil.txt         | 117 +++++
+ .../arm/boot/dts/qcom-apq8064-sony-xperia-yuga.dts |   4 +
+ arch/arm/boot/dts/qcom-apq8064.dtsi                | 151 ++++++
+ .../boot/dts/qcom-msm8974-sony-xperia-honami.dts   |  32 ++
+ arch/arm/boot/dts/qcom-msm8974.dtsi                |  36 +-
+ drivers/remoteproc/Kconfig                         |  12 +
+ drivers/remoteproc/Makefile                        |   2 +
+ drivers/remoteproc/qcom_mdt_loader.c               | 172 ++++++
+ drivers/remoteproc/qcom_mdt_loader.h               |   7 +
+ drivers/remoteproc/qcom_wcnss.c                    | 579 +++++++++++++++++++++
+ drivers/remoteproc/qcom_wcnss.h                    |  22 +
+ drivers/remoteproc/qcom_wcnss_iris.c               | 185 +++++++
+ drivers/remoteproc/remoteproc_core.c               |  10 +-
+ include/linux/remoteproc.h                         |   4 +
+ 14 files changed, 1326 insertions(+), 7 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/remoteproc/qcom,wcnss-pil.txt
+ create mode 100644 drivers/remoteproc/qcom_mdt_loader.c
+ create mode 100644 drivers/remoteproc/qcom_mdt_loader.h
+ create mode 100644 drivers/remoteproc/qcom_wcnss.c
+ create mode 100644 drivers/remoteproc/qcom_wcnss.h
+ create mode 100644 drivers/remoteproc/qcom_wcnss_iris.c
 
-Now, I'm not really sure about FIMC either, it was feedback I got from this
-patch [0]. Could you please take a look to that and let me know if enabling
-these drivers simultaneously makes sense then?
-
-> Best Regards,
-> - Seung-Woo Kim
-> 
->>
->>  drivers/gpu/drm/exynos/Kconfig | 6 +++---
->>  1 file changed, 3 insertions(+), 3 deletions(-)
->>
-> 
-
-[0]: https://lkml.org/lkml/2016/3/23/292
-
-Best regards,
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+2.5.0
