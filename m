@@ -1,27 +1,112 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Tue, 29 Mar 2016 15:32:06 +0200
-Subject: [PATCH] clockevents/drivers/timer-atmel-pit: fix double free_irq
-In-Reply-To: <1458245383-9859-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1458245383-9859-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20160329133206.GA13334@linutronix.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 29 Mar 2016 15:32:40 +0200
+Subject: [PATCH] arm: at91: do not disable/enable clocks in a row
+In-Reply-To: <1459258007-24968-1-git-send-email-bigeasy@linutronix.de>
+References: <1459258007-24968-1-git-send-email-bigeasy@linutronix.de>
+Message-ID: <56FA83F8.5060808@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Alexandre Belloni | 2016-03-17 21:09:43 [+0100]:
+Le 29/03/2016 15:26, Sebastian Andrzej Siewior a ?crit :
+> Currently the driver will disable the clock and enable it one line later
+> if it is switching from periodic mode into one shot.
+> This can be avoided and causes a needless warning on -RT.
+> 
+> Tested-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 
->Hi Sebastian,
-Hi Alexandre,
+Absolutely makes sense:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
->This patch fixes the last warning for preempt-rt on at91. It applies on
->v4.4.4-rt11. Note that the whome PIT/TCB mess will be fixed in another way in
->the mainline as we are reworking the tcb driver to avoid using the pit when
->booting.
+Thanks.
 
-oh, okay. I just sent the "arm: at91: do not disable/enable clocks in a
-row" patch as you asked me a while ago. It applied cleanly against the
-next tree of today.
-So I will apply this to get rid of the warning. And if you manage not to
-use the PIT during boot then we won't have the free_irq() mess which is
-good.
+> ---
+>  drivers/clocksource/tcb_clksrc.c | 33 +++++++++++++++++++++++++++++----
+>  1 file changed, 29 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
+> index 4da2af9694a2..ed1ae4445e8d 100644
+> --- a/drivers/clocksource/tcb_clksrc.c
+> +++ b/drivers/clocksource/tcb_clksrc.c
+> @@ -74,6 +74,7 @@ static struct clocksource clksrc = {
+>  struct tc_clkevt_device {
+>  	struct clock_event_device	clkevt;
+>  	struct clk			*clk;
+> +	bool				clk_enabled;
+>  	void __iomem			*regs;
+>  };
+>  
+> @@ -91,6 +92,24 @@ static struct tc_clkevt_device *to_tc_clkevt(struct clock_event_device *clkevt)
+>   */
+>  static u32 timer_clock;
+>  
+> +static void tc_clk_disable(struct clock_event_device *d)
+> +{
+> +	struct tc_clkevt_device *tcd = to_tc_clkevt(d);
+> +
+> +	clk_disable(tcd->clk);
+> +	tcd->clk_enabled = false;
+> +}
+> +
+> +static void tc_clk_enable(struct clock_event_device *d)
+> +{
+> +	struct tc_clkevt_device *tcd = to_tc_clkevt(d);
+> +
+> +	if (tcd->clk_enabled)
+> +		return;
+> +	clk_enable(tcd->clk);
+> +	tcd->clk_enabled = true;
+> +}
+> +
+>  static int tc_shutdown(struct clock_event_device *d)
+>  {
+>  	struct tc_clkevt_device *tcd = to_tc_clkevt(d);
+> @@ -98,8 +117,14 @@ static int tc_shutdown(struct clock_event_device *d)
+>  
+>  	__raw_writel(0xff, regs + ATMEL_TC_REG(2, IDR));
+>  	__raw_writel(ATMEL_TC_CLKDIS, regs + ATMEL_TC_REG(2, CCR));
+> +	return 0;
+> +}
+> +
+> +static int tc_shutdown_clk_off(struct clock_event_device *d)
+> +{
+> +	tc_shutdown(d);
+>  	if (!clockevent_state_detached(d))
+> -		clk_disable(tcd->clk);
+> +		tc_clk_disable(d);
+>  
+>  	return 0;
+>  }
+> @@ -112,7 +137,7 @@ static int tc_set_oneshot(struct clock_event_device *d)
+>  	if (clockevent_state_oneshot(d) || clockevent_state_periodic(d))
+>  		tc_shutdown(d);
+>  
+> -	clk_enable(tcd->clk);
+> +	tc_clk_enable(d);
+>  
+>  	/* slow clock, count up to RC, then irq and stop */
+>  	__raw_writel(timer_clock | ATMEL_TC_CPCSTOP | ATMEL_TC_WAVE |
+> @@ -134,7 +159,7 @@ static int tc_set_periodic(struct clock_event_device *d)
+>  	/* By not making the gentime core emulate periodic mode on top
+>  	 * of oneshot, we get lower overhead and improved accuracy.
+>  	 */
+> -	clk_enable(tcd->clk);
+> +	tc_clk_enable(d);
+>  
+>  	/* slow clock, count up to RC, then irq and restart */
+>  	__raw_writel(timer_clock | ATMEL_TC_WAVE | ATMEL_TC_WAVESEL_UP_AUTO,
+> @@ -168,7 +193,7 @@ static struct tc_clkevt_device clkevt = {
+>  		/* Should be lower than at91rm9200's system timer */
+>  		.rating			= 125,
+>  		.set_next_event		= tc_next_event,
+> -		.set_state_shutdown	= tc_shutdown,
+> +		.set_state_shutdown	= tc_shutdown_clk_off,
+>  		.set_state_periodic	= tc_set_periodic,
+>  		.set_state_oneshot	= tc_set_oneshot,
+>  	},
+> 
 
-Sebastian
+
+-- 
+Nicolas Ferre
