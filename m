@@ -1,85 +1,53 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 29 Mar 2016 18:02:39 +0100
-Subject: [PATCH v2 1/2] dma/iommu: Add pgsize_bitmap confirmation in
- __iommu_dma_alloc_pages
-In-Reply-To: <1459146732-15620-1-git-send-email-yong.wu@mediatek.com>
-References: <1459146732-15620-1-git-send-email-yong.wu@mediatek.com>
-Message-ID: <20160329170238.GK6745@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 29 Mar 2016 18:05:59 +0100
+Subject: [RFC PATCH 2/3] arm64: Expose physical/virtual address bits
+ through cpuinfo
+In-Reply-To: <20160329112940.GE3701@e103592.cambridge.arm.com>
+References: <1458898209-7486-1-git-send-email-wangkefeng.wang@huawei.com>
+ <1458898209-7486-3-git-send-email-wangkefeng.wang@huawei.com>
+ <20160329112940.GE3701@e103592.cambridge.arm.com>
+Message-ID: <20160329170559.GB19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 28, 2016 at 02:32:11PM +0800, Yong Wu wrote:
-> Currently __iommu_dma_alloc_pages assumes that all the IOMMU support
-> the granule of PAGE_SIZE. It call alloc_page to try allocating memory
-> in the last time. Fortunately the mininum pagesize in all the
-> current IOMMU is SZ_4K, so this works well.
+On Tue, Mar 29, 2016 at 12:29:40PM +0100, Dave Martin wrote:
+> On Fri, Mar 25, 2016 at 05:30:08PM +0800, Kefeng Wang wrote:
+> > ARMv8 Physical Address range allows 0x0~0x6, the 0x6 is supported
+> > in ARMv8.2, permitted values in ID_AA64MMFR0_EL1 are:
+> > 0000  32 bits, 4GB.
+> > 0001  36 bits, 64GB.
+> > 0010  40 bits, 1TB.
+> > 0011  42 bits, 4TB.
+> > 0100  44 bits, 16TB.
+> > 0101  48 bits, 256TB.
+> > 0110  52 bits, 4096TB.
+> > All other values are reserved.
+> > 
+> > Meanwhile, ARMv8 can support 48bit or 52bit virtual addresses,
+> > larger virtual address(52bit) is introduced in ARMv8.2.
+> > 
+> > Exposing the physical and virtual address bits to userspace through
+> > procfs like x86, then it is easy to check the capacity of them that
+> > cpu supported from cpuinfo.
+>
+> Can you say why this information is useful for userspace?
 > 
-> But there may be a case in which the mininum granule of IOMMU may be
-> larger than PAGE_SIZE, then it will abort as the IOMMU cann't map the
-> discontinuous memory within a granule. For example, the pgsize_bitmap
-> of the IOMMU only has SZ_16K while the PAGE_SIZE is SZ_4K, then we
-> have to prepare SZ_16K continuous memory at least for each a granule
-> iommu mapping.
+> Once anything is added to cpuinfo it becomes ABI and must be supported
+> forever, so we want to avoid adding anything that is not absolutely
+> definitely needed...
 
-Did you find a driver/platform that actually needs this? I certainly
-think it's possible, but we don't necessarily need to fix it if it's
-not broken yet! Just adding a comment would be enough.
+It's also something that becomes different between ARM32 and ARM64, and
+I'm not adding it to ARM32 without a _very_ good justification why we
+need such information exported to userspace.
 
-Either way, a couple of review comments inline.
+Given that userspace is fully insulated on 32-bit ARM from any knowledge
+of LPAE, I see zero reason why userspace needs to have any knowledge of
+the LPAE physical address space.  Even my work on kexec on the most
+weird of ARMv7 LPAE platforms (where system memory is above 4GB phys)
+there's no reason for userspace to have any specific knowledge of LPAE.
+IOW, /dev/mem is just a file, just like any other file larger than 4GB.
 
-> 
-> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-> 
-> ---
-> v2:
->  -rebase on v4.6-rc1.
->  -add a new patch([1/2] add pgsize_bitmap) here.
-> 
->  drivers/iommu/dma-iommu.c | 22 +++++++++++++---------
->  1 file changed, 13 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-> index 72d6182..75ce71e 100644
-> --- a/drivers/iommu/dma-iommu.c
-> +++ b/drivers/iommu/dma-iommu.c
-> @@ -190,11 +190,13 @@ static void __iommu_dma_free_pages(struct page **pages, int count)
->  	kvfree(pages);
->  }
->  
-> -static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp)
-> +static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp,
-> +					     unsigned long pgsize_bitmap)
->  {
->  	struct page **pages;
->  	unsigned int i = 0, array_size = count * sizeof(*pages);
-> -	unsigned int order = MAX_ORDER;
-> +	int min_order = get_order(1 << __ffs(pgsize_bitmap));
-
-1UL
-
-> +	int order = MAX_ORDER;
->  
->  	if (array_size <= PAGE_SIZE)
->  		pages = kzalloc(array_size, GFP_KERNEL);
-> @@ -213,13 +215,16 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp)
->  		/*
->  		 * Higher-order allocations are a convenience rather
->  		 * than a necessity, hence using __GFP_NORETRY until
-> -		 * falling back to single-page allocations.
-> +		 * falling back to min size allocations.
->  		 */
-> -		for (order = min_t(unsigned int, order, __fls(count));
-> -		     order > 0; order--) {
-> -			page = alloc_pages(gfp | __GFP_NORETRY, order);
-> +		for (order = min_t(int, order, __fls(count));
-> +		     order >= min_order; order--) {
-> +			page = alloc_pages((order == min_order) ? gfp :
-> +					   gfp | __GFP_NORETRY, order);
->  			if (!page)
->  				continue;
-> +			if (!order)
-> +				break;
-
-Isn't this handled by the loop condition?
-
-Will
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
