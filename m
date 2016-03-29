@@ -1,35 +1,45 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Tue, 29 Mar 2016 23:50:39 +0200
-Subject: [PATCH 0/7] LPC18xx dts for 4.7
-Message-ID: <1459288246-1670-1-git-send-email-manabian@gmail.com>
+Date: Tue, 29 Mar 2016 23:50:40 +0200
+Subject: [PATCH 1/7] ARM: dts: lpc18xx: add creg-clk node
+In-Reply-To: <1459288246-1670-1-git-send-email-manabian@gmail.com>
+References: <1459288246-1670-1-git-send-email-manabian@gmail.com>
+Message-ID: <1459288246-1670-2-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These patches add support for the RTC and analog peripherals (ADC/DAC)
-found on LPC18xx SoCs. It also adds a CREG clock controller which is
-needed to enable the 1 kHz clock for the RTC. Note that the IIO drivers
-and dt doc hasn't yet hit next but they are queued in the IIO tree and
-should hit next anytime now.
+Add node for the creg clock controller and change the input
+clock on cgu to use it.
 
-There are also a few board updates to enable the analog peripherals
-on the two LPC435x development boards.
+Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+---
+ arch/arm/boot/dts/lpc18xx.dtsi | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-These patches represent the bulk of dts additions on lpc18xx platform
-for 4.7. There is also a bulk with warning fixes that is upcoming.
-
-Joachim Eastwood (7):
-  ARM: dts: lpc18xx: add creg-clk node
-  ARM: dts: lpc18xx: add rtc node
-  ARM: dts: lpc18xx: add adc nodes
-  ARM: dts: lpc18xx: add dac node
-  ARM: dts: lpc4357-ea4357: add adc0
-  ARM: dts: lpc4357-ea4357: add dac
-  ARM: dts: lpc4350-hitex-eval: add adc1
-
- arch/arm/boot/dts/lpc18xx.dtsi              | 43 ++++++++++++++++++++++++++++-
- arch/arm/boot/dts/lpc4350-hitex-eval.dts    | 23 +++++++++++++++
- arch/arm/boot/dts/lpc4357-ea4357-devkit.dts | 17 ++++++++++++
- 3 files changed, 82 insertions(+), 1 deletion(-)
-
+diff --git a/arch/arm/boot/dts/lpc18xx.dtsi b/arch/arm/boot/dts/lpc18xx.dtsi
+index 053a1f5..0b59eae1 100644
+--- a/arch/arm/boot/dts/lpc18xx.dtsi
++++ b/arch/arm/boot/dts/lpc18xx.dtsi
+@@ -195,6 +195,12 @@
+ 			clocks = <&ccu1 CLK_CPU_CREG>;
+ 			resets = <&rgu 5>;
+ 
++			creg_clk: clock-controller {
++				compatible = "nxp,lpc1850-creg-clk";
++				clocks = <&xtal32>;
++				#clock-cells = <1>;
++			};
++
+ 			usb0_otg_phy: phy at 004 {
+ 				compatible = "nxp,lpc1850-usb-otg-phy";
+ 				clocks = <&ccu1 CLK_USB0>;
+@@ -213,7 +219,7 @@
+ 			compatible = "nxp,lpc1850-cgu";
+ 			reg = <0x40050000 0x1000>;
+ 			#clock-cells = <1>;
+-			clocks = <&xtal>, <&xtal32>, <&enet_rx_clk>, <&enet_tx_clk>, <&gp_clkin>;
++			clocks = <&xtal>, <&creg_clk 1>, <&enet_rx_clk>, <&enet_tx_clk>, <&gp_clkin>;
+ 		};
+ 
+ 		ccu1: clock-controller at 40051000 {
 -- 
 2.7.4
