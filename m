@@ -1,77 +1,85 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 29 Mar 2016 17:59:40 +0100
-Subject: Bad mode in undefined instruction handler detected
-In-Reply-To: <CAF_dkJBa3Y1EZGduZyjWqV3p5s7zf+Y4ppdeKW8anhd5nkjOPg@mail.gmail.com>
-References: <CAF_dkJBa3Y1EZGduZyjWqV3p5s7zf+Y4ppdeKW8anhd5nkjOPg@mail.gmail.com>
-Message-ID: <20160329165940.GA19428@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 29 Mar 2016 18:02:39 +0100
+Subject: [PATCH v2 1/2] dma/iommu: Add pgsize_bitmap confirmation in
+ __iommu_dma_alloc_pages
+In-Reply-To: <1459146732-15620-1-git-send-email-yong.wu@mediatek.com>
+References: <1459146732-15620-1-git-send-email-yong.wu@mediatek.com>
+Message-ID: <20160329170238.GK6745@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 29, 2016 at 10:55:07AM -0400, Patrick Doyle wrote:
-> Hello folks...
-> I am looking for a clue as to how I might debug the following kernel oops:
+On Mon, Mar 28, 2016 at 02:32:11PM +0800, Yong Wu wrote:
+> Currently __iommu_dma_alloc_pages assumes that all the IOMMU support
+> the granule of PAGE_SIZE. It call alloc_page to try allocating memory
+> in the last time. Fortunately the mininum pagesize in all the
+> current IOMMU is SZ_4K, so this works well.
+> 
+> But there may be a case in which the mininum granule of IOMMU may be
+> larger than PAGE_SIZE, then it will abort as the IOMMU cann't map the
+> discontinuous memory within a granule. For example, the pgsize_bitmap
+> of the IOMMU only has SZ_16K while the PAGE_SIZE is SZ_4K, then we
+> have to prepare SZ_16K continuous memory at least for each a granule
+> iommu mapping.
 
-I'm not sure even I can help on this one, it looks extremely weird.
+Did you find a driver/platform that actually needs this? I certainly
+think it's possible, but we don't necessarily need to fix it if it's
+not broken yet! Just adding a comment would be enough.
 
-> Bad mode in undefined instruction handler detected
-> Internal error: Oops - bad mode: 0 [#1] ARM
-> Modules linked in: usb_f_eem g_ether u_ether libcomposite atmel_usba_udc
-> CPU: 0 PID: 0 Comm: swapper Not tainted 4.1.0-linux4sam_5.1 #4
-> Hardware name: Atmel SAMA5
-> task: c11440b8 ti: c1140000 task.ti: c1140000
-> PC is at _einittext+0x3f9456e8/0xfffdb400
-> LR is at 0xc0c565c8
-> pc : [<ffff0024>]    lr : [<c0c565c8>]    psr: 600e0192
-> sp : c1141f30  ip : 00000019  fp : c11420d0
-> r10: c1147548  r9 : 00000132  r8 : b0a5c253
-> r7 : 00000132  r6 : b0a5bacb  r5 : 00000000  r4 : c1162d10
-> r3 : 00000132  r2 : b0a5c253  r1 : fffffff9  r0 : c1141f78
-> Flags: nZCv  IRQs off  FIQs on  Mode IRQ_32  ISA ARM  Segment kernel
+Either way, a couple of review comments inline.
 
-So what this is saying is that we entered the undefined instruction
-handler due to the instruction at PC=0xffff0024 with PSR=0x600e0192,
-where the PSR value indicates that we were in 32-bit IRQ mode.
+> 
+> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+> 
+> ---
+> v2:
+>  -rebase on v4.6-rc1.
+>  -add a new patch([1/2] add pgsize_bitmap) here.
+> 
+>  drivers/iommu/dma-iommu.c | 22 +++++++++++++---------
+>  1 file changed, 13 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+> index 72d6182..75ce71e 100644
+> --- a/drivers/iommu/dma-iommu.c
+> +++ b/drivers/iommu/dma-iommu.c
+> @@ -190,11 +190,13 @@ static void __iommu_dma_free_pages(struct page **pages, int count)
+>  	kvfree(pages);
+>  }
+>  
+> -static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp)
+> +static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp,
+> +					     unsigned long pgsize_bitmap)
+>  {
+>  	struct page **pages;
+>  	unsigned int i = 0, array_size = count * sizeof(*pages);
+> -	unsigned int order = MAX_ORDER;
+> +	int min_order = get_order(1 << __ffs(pgsize_bitmap));
 
-Entering the undefined instruction handler from PC=0xffff0024 is
-intentional, since we fill the vectors page with a code which is
-guaranteed to cause an undefined instruction exception (0xe7fddef1).
+1UL
 
-The problem is two fold:
+> +	int order = MAX_ORDER;
+>  
+>  	if (array_size <= PAGE_SIZE)
+>  		pages = kzalloc(array_size, GFP_KERNEL);
+> @@ -213,13 +215,16 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp)
+>  		/*
+>  		 * Higher-order allocations are a convenience rather
+>  		 * than a necessity, hence using __GFP_NORETRY until
+> -		 * falling back to single-page allocations.
+> +		 * falling back to min size allocations.
+>  		 */
+> -		for (order = min_t(unsigned int, order, __fls(count));
+> -		     order > 0; order--) {
+> -			page = alloc_pages(gfp | __GFP_NORETRY, order);
+> +		for (order = min_t(int, order, __fls(count));
+> +		     order >= min_order; order--) {
+> +			page = alloc_pages((order == min_order) ? gfp :
+> +					   gfp | __GFP_NORETRY, order);
+>  			if (!page)
+>  				continue;
+> +			if (!order)
+> +				break;
 
-(a) how did we end up executing code at 0xffff0024?
-(b) how did we execute this code while in IRQ mode?
+Isn't this handled by the loop condition?
 
-> Control: 10c53c7d  Table: 24804059  DAC: 00000015
-> Process swapper (pid: 0, stack limit = 0xc1140208)
-> Stack: (0xc1141f30 to 0xc1142000)
-> 1f20:                                     c1141f78 fffffff9 b0a5c253 00000132
-> 1f40: c1162d10 00000000 b0a5bacb 00000132 b0a5c253 00000132 c1147548 c11420d0
-> 1f60: 00000019 c1141f30 c0c565c8 ffff0024 600e0192 ffffffff
-
-These stacked values are the register state printed out above, so we can
-ignore these (this gets printed because we're unable to properly save
-the SVC stack pointer, which is why these exceptions are fatal.)
-
-> 1f60:                                                       b0a5c253 00000132
-> 1f80: 00000001 c1140000 c11420c8 c1162d10 c11631c4 00000001 c1162d08 c1147548
-> 1fa0: c11420d0 c003c9f0 00000000 c116d57b 00000000 c1142000 00000000 c0686c34
-> 1fc0: ffffffff ffffffff c0686680 00000000 00000000 c06ad280 c116db14 c1142078
-> 1fe0: c06ad27c c114518c 20004059 410fc051 00000000 20008078 00000000 00000000
-
-This is the stack state for the parent context, and since we don't have
-a backtrace (due to no frame pointer) this becomes guess work - frankly
-I'm not going to waste my time guessing, and at this point ask you to
-reproduce on a kernel _with_ frame pointers enabled.
-
-You should then get proper stack frames which will take some of the guess
-work out of working out what in the above stack dump are addresses and
-what isn't.
-
-This is a nice example where _not_ having frame pointers makes things
-stupidly difficult to trace - IMHO GCC must _never_ remove support for
-frame pointers on ARM for this very reason.
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Will
