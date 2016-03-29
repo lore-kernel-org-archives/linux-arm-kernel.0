@@ -1,106 +1,73 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Tue, 29 Mar 2016 07:29:34 -0700
-Subject: [PATCH] i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity
-In-Reply-To: <23031613.R8qN30TbTq@wuerfel>
-References: <m3h9fuk7ik.fsf@t19.piap.pl>
- <1459248921.2565.15.camel@pengutronix.de>
- <CAJ+vNU3o98T2cev1Pj0VJR884kOxVxhrzmowDixGuV2Tb=Sh1Q@mail.gmail.com>
- <23031613.R8qN30TbTq@wuerfel>
-Message-ID: <CAJ+vNU2BKLDREOWP8EWXZR43to10yw+qvKwv1MzS4a_L9n5ozg@mail.gmail.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Tue, 29 Mar 2016 07:29:46 -0700
+Subject: [PATCH 02/12] ARM: dts: apq8064: add support to gsbi1 uart
+In-Reply-To: <1458762429-9397-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1458762366-9233-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1458762429-9397-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20160329142946.GG8929@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 29, 2016 at 6:52 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 29 March 2016 06:32:29 Tim Harvey wrote:
->> >
->> > There is no upstream driver for this chip, so I don't know where to look
->> > to find out if the driver tries to enable MSI.
->> >
->> > Is what you are saying that if you enable MSI support in the kernel, it
->> > breaks legacy IRQs?
->>
->> Yes - any driver that does not support MSI will use legacy IRQ's and
->> they never fire.
->>
->> The Ventana GW53xx and GW54xx boards have a Marvell PCIe GigE
->> supported by the sky2 driver as eth1 which does support MSI and I
->> verified it gets an MSI interrupt and does work (along ath9k devices
->> with legacy interrupts that fail to work).
->>
->> root at ventana:~# cat /proc/interrupts | grep MSI
->> 299:          0          0   PCI-MSI   0 Edge      PCIe PME, aerdrv
->> 308:       8726          0   PCI-MSI   9 Edge      eth1
->>
->> So it appears that MSI works for those drivers that use it, but does
->> somehow cause legacy IRQ's to break.
->>
->> I sent you a GW5400 dev kit over a while back to use for through
->> bridge testing on IMX6 that you should be able to repeat this with
->> assuming you have a PCIe card with a driver that doesn't support MSI
->> (or that you can tweak its driver to not support MSI).
->>
->> I think 31e98e0d24cd2537a63e06e235e050a06b175df7 "ARM:
->> imx_v6_v7_defconfig: enable PCI_MSI" should be reverted as well until
->> we figure this out.
->
-> That doesn't sound like a helpful solution, multi_v7_defconfig for
-> instance will still be broken because it enables PCI_MSI, and so
-> will be all major distros.
+On Wed 23 Mar 12:47 PDT 2016, Srinivas Kandagatla wrote:
 
-Arnd,
+> This patch adds support to gsbi1 uart and its pinctrls nodes.
+> 
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> ---
+>  arch/arm/boot/dts/qcom-apq8064-pins.dtsi | 14 ++++++++++++++
+>  arch/arm/boot/dts/qcom-apq8064.dtsi      | 10 ++++++++++
+>  2 files changed, 24 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/qcom-apq8064-pins.dtsi b/arch/arm/boot/dts/qcom-apq8064-pins.dtsi
+> index b57c59d..8bb5e5f 100644
+> --- a/arch/arm/boot/dts/qcom-apq8064-pins.dtsi
+> +++ b/arch/arm/boot/dts/qcom-apq8064-pins.dtsi
+> @@ -39,6 +39,20 @@
+>  		};
+>  	};
+>  
+> +	gsbi1_uart_2pins: gsbi1_uart_2pins {
+> +		mux {
+> +			pins = "gpio18", "gpio19";
+> +			function = "gsbi1";
+> +		};
+> +	};
+> +
+> +	gsbi1_uart_4pins: gsbi1_uart_4pins {
+> +		mux {
+> +			pins = "gpio18", "gpio19", "gpio20", "gpio21";
+> +			function = "gsbi1";
+> +		};
+> +	};
+> +
 
-True, but keep in mind that as far as I can tell this behavior has
-been around since MSI was added to the IMX6 (breakage of devices that
-use legacy irq's if MSI is enabled) which was in 3.16.
+No-one consumes this nodes.
 
->
-> What happens if we patch the pci-imx6 driver to not make use of
-> its MSI support even when that is enabled in the kernel? Does that
-> get both devices in your GW5xxx to work with legacy interrupts or
-> is one or both of them still broken?
->
->         Arnd
->
-> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-> index eb5a2755a164..d7607b2695c6 100644
-> --- a/drivers/pci/host/pci-imx6.c
-> +++ b/drivers/pci/host/pci-imx6.c
-> @@ -470,7 +470,7 @@ static void imx6_pcie_host_init(struct pcie_port *pp)
->
->         imx6_pcie_establish_link(pp);
->
-> -       if (IS_ENABLED(CONFIG_PCI_MSI))
-> +       if (0 && IS_ENABLED(CONFIG_PCI_MSI))
->                 dw_pcie_msi_init(pp);
->  }
->
-> @@ -490,7 +490,7 @@ static int __init imx6_add_pcie_port(struct pcie_port *pp,
->  {
->         int ret;
->
-> -       if (IS_ENABLED(CONFIG_PCI_MSI)) {
-> +       if (0 && IS_ENABLED(CONFIG_PCI_MSI)) {
->                 pp->msi_irq = platform_get_irq_byname(pdev, "msi");
->                 if (pp->msi_irq <= 0) {
->                         dev_err(&pdev->dev, "failed to get MSI irq\n");
->
+>  	i2c2_pins: i2c2 {
+>  		mux {
+>  			pins = "gpio24", "gpio25";
+> diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+> index c6ff8fc..81b4290 100644
+> --- a/arch/arm/boot/dts/qcom-apq8064.dtsi
+> +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+> @@ -225,6 +225,16 @@
+>  
+>  			syscon-tcsr = <&tcsr>;
+>  
+> +			gsbi1_serial: serial at 12450000 {
 
-That is not enough - we would also need to disable a couple more in
-the designware core that imx6 uses, which is also used by several
-other SoC's. We should probably get some feedback from people with
-those SoC's regarding MSI breaking legacy irqs.
+Are you going to reference this node? Otherwise it should not have a
+label.
 
-PCI_MSI was enabled in imx_v6_v7_defconfig in 4.5 and enabled in
-multi_v7_defconfig back in 3.16. PCI MSI was first introduced for the
-IMX6 host controller in 3.16 as well. I verified that the same issue
-exists all the way back to 3.16.
+> +				compatible = "qcom,msm-uartdm-v1.3", "qcom,msm-uartdm";
+> +				reg = <0x12450000 0x100>,
+> +				      <0x12400000 0x03>;
+> +				interrupts = <0 193 0x0>;
+> +				clocks = <&gcc GSBI1_UART_CLK>, <&gcc GSBI1_H_CLK>;
+> +				clock-names = "core", "iface";
+> +				status = "disabled";
+> +			};
+> +
 
-I don't know if its worse to disable PCI MSI for IMX6/designware all
-the way back to 3.16 or to disable it just back to 4.5 where imx_v6_v7
-enabled it, or perhaps just figure out the actual issue and get that
-backported?
-
-Lucas, have you had any thoughts or time yet to think about why
-enabling MSI breaks legacy IRQs?
-
-Tim
+Regards,
+Bjorn
