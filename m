@@ -1,40 +1,40 @@
-From: wpdster@gmail.com (Patrick Doyle)
-Date: Tue, 29 Mar 2016 17:19:57 -0400
-Subject: Bad mode in undefined instruction handler detected
-In-Reply-To: <20160329200420.GD19428@n2100.arm.linux.org.uk>
-References: <CAF_dkJBa3Y1EZGduZyjWqV3p5s7zf+Y4ppdeKW8anhd5nkjOPg@mail.gmail.com>
- <20160329165940.GA19428@n2100.arm.linux.org.uk>
- <CAF_dkJA=4iqD=siV5RM7KTDfEQGtKc3G17E+C+K+-_hmneK4aA@mail.gmail.com>
- <20160329182922.GC19428@n2100.arm.linux.org.uk>
- <CAF_dkJBR+n-ijE2YBmt3KR=B3VOkh4mu-d5YiXNDDCVihkgH6Q@mail.gmail.com>
- <20160329200420.GD19428@n2100.arm.linux.org.uk>
-Message-ID: <CAF_dkJCM=_4Vb2BD8AVJrnacMvWVy1TXSEG_Rp8KzrBg8Kr=9g@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 29 Mar 2016 23:21:51 +0200
+Subject: [PATCH v4 3/8] Documentation: devicetree: rockchip: Document
+ GeekBox
+In-Reply-To: <56FAE95E.6060900@suse.de>
+References: <1458136727-32075-1-git-send-email-afaerber@suse.de>
+ <31070685.TnxqGeNupO@diego> <56FAE95E.6060900@suse.de>
+Message-ID: <1682289.HWd4yLL18I@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 29, 2016 at 4:04 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Mar 29, 2016 at 03:18:08PM -0400, Patrick Doyle wrote:
->> Unable to handle kernel paging request at virtual address e5912144
->> pgd = c0004000
->> [e5912144] *pgd=00000000
->> Internal error: Oops: 5 [#1] ARM
->>
->> Is there something else I need to enable to get a more verbose dump?
->
-> Sounds like you're getting memory corruption, and this time it's
-> (possibly) overwriting bits of the kernel responsible for dumping
-> this data.
->
-> If it only happens when using the camera, it sounds to me (at least)
-> as though the camera driver is buggy, and that's outside of my
-> expertise.  That's guess-work though.
->
-> I'm afraid that I don't think I can help in this case, sorry.
-Thanks for your help and insight.  It does happen in other contexts
-besides the use of the camera.  I'll keep poking around and see what I
-can find.
+Am Dienstag, 29. M?rz 2016, 22:45:18 schrieb Andreas F?rber:
+> Am 29.03.2016 um 22:13 schrieb Heiko St?bner:
+> > Am Mittwoch, 16. M?rz 2016, 14:58:41 schrieb Andreas F?rber:
+> >> Use "geekbuying,geekbox" compatible string.
+> >> 
+> >> Acked-by: Rob Herring <robh@kernel.org>
+> >> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> > 
+> > I've folded this patch into the geekbox dts patch, carrying Rob's Ack for
+> > the binding over.
+> 
+> Either you just made a mistake in my name or
+> https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/Docume
+> ntation/devicetree/bindings/submitting-patches.txt needs an update. It
+> clearly says:
+> 
+> "1) The Documentation/ portion of the patch should be a separate patch."
+> 
+> That's why I always do it this way.
 
-Thanks again.
+looking at the dt-bindings git log, it seems that is handled in a variety of 
+ways :-) . Personally I'm doing completely new bindings separately but the 
+125th addition of a board just inside the dts patch.
 
---wpd
+But I guess we can also move it out again into a separate patch if you prefer 
+that :-) .
+
+
+Heiko
