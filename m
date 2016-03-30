@@ -1,168 +1,76 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 30 Mar 2016 22:03:38 +0200
-Subject: [PATCH v5 15/46] pwm: introduce the pwm_state concept
+Date: Wed, 30 Mar 2016 22:03:45 +0200
+Subject: [PATCH v5 22/46] pwm: rockchip: avoid glitches on already running PWMs
 In-Reply-To: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1459368249-13241-16-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1459368249-13241-23-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PWM state, represented by its period, duty_cycle and polarity,
-is currently directly stored in the PWM device.
-Declare a pwm_state structure embedding those field so that we can later
-use this struct to atomically update all the PWM parameters at once.
-
-All pwm_get_xxx() helpers are now implemented as wrappers around
-pwm_get_state().
+The current logic will disable the PWM clk even if the PWM was left
+enabled by the bootloader (because it's controlling a critical device
+like a regulator for example).
+Keep the PWM clk enabled if the PWM is enabled to avoid any glitches.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/pwm/core.c  |  8 ++++----
- include/linux/pwm.h | 54 +++++++++++++++++++++++++++++++++++++++++------------
- 2 files changed, 46 insertions(+), 16 deletions(-)
+ drivers/pwm/pwm-rockchip.c | 24 +++++++++++++++++++++++-
+ 1 file changed, 23 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-index 6433059..f3f91e7 100644
---- a/drivers/pwm/core.c
-+++ b/drivers/pwm/core.c
-@@ -268,7 +268,7 @@ int pwmchip_add_with_polarity(struct pwm_chip *chip,
- 		pwm->chip = chip;
- 		pwm->pwm = chip->base + i;
- 		pwm->hwpwm = i;
--		pwm->polarity = polarity;
-+		pwm->state.polarity = polarity;
+diff --git a/drivers/pwm/pwm-rockchip.c b/drivers/pwm/pwm-rockchip.c
+index 6a1087c..5c7e79c 100644
+--- a/drivers/pwm/pwm-rockchip.c
++++ b/drivers/pwm/pwm-rockchip.c
+@@ -302,6 +302,7 @@ static int rockchip_pwm_probe(struct platform_device *pdev)
+ {
+ 	const struct of_device_id *id;
+ 	struct rockchip_pwm_chip *pc;
++	struct pwm_state pstate;
+ 	struct resource *r;
+ 	int ret;
  
- 		radix_tree_insert(&pwm_tree, pwm->pwm, pwm);
+@@ -322,7 +323,7 @@ static int rockchip_pwm_probe(struct platform_device *pdev)
+ 	if (IS_ERR(pc->clk))
+ 		return PTR_ERR(pc->clk);
+ 
+-	ret = clk_prepare(pc->clk);
++	ret = clk_prepare_enable(pc->clk);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -345,12 +346,33 @@ static int rockchip_pwm_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev, "pwmchip_add() failed: %d\n", ret);
  	}
-@@ -446,8 +446,8 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
- 	if (err)
- 		return err;
  
--	pwm->duty_cycle = duty_ns;
--	pwm->period = period_ns;
-+	pwm->state.duty_cycle = duty_ns;
-+	pwm->state.period = period_ns;
- 
- 	return 0;
- }
-@@ -480,7 +480,7 @@ int pwm_set_polarity(struct pwm_device *pwm, enum pwm_polarity polarity)
- 	if (err)
- 		return err;
- 
--	pwm->polarity = polarity;
-+	pwm->state.polarity = polarity;
- 
- 	return 0;
- }
-diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-index ed65354..f0f0f37 100644
---- a/include/linux/pwm.h
-+++ b/include/linux/pwm.h
-@@ -97,6 +97,18 @@ enum {
- 	PWMF_EXPORTED = 1 << 2,
- };
- 
-+/*
-+ * struct pwm_state - state of a PWM channel
-+ * @period: PWM period (in nanoseconds)
-+ * @duty_cycle: PWM duty cycle (in nanoseconds)
-+ * @polarity: PWM polarity
-+ */
-+struct pwm_state {
-+	unsigned int period;
-+	unsigned int duty_cycle;
-+	enum pwm_polarity polarity;
-+};
++	/* Keep the PWM clk enabled if the PWM appears to be up and running. */
++	pwm_get_state(pc->chip.pwms, &pstate);
++	if (!pstate.enabled)
++		clk_disable(pc->clk);
 +
- /**
-  * struct pwm_device - PWM channel object
-  * @label: name of the PWM device
-@@ -105,10 +117,8 @@ enum {
-  * @pwm: global index of the PWM device
-  * @chip: PWM chip providing this PWM device
-  * @chip_data: chip-private data associated with the PWM device
-- * @period: period of the PWM signal (in nanoseconds)
-- * @duty_cycle: duty cycle of the PWM signal (in nanoseconds)
-- * @polarity: polarity of the PWM signal
-  * @args: PWM arguments
-+ * @state: curent PWM channel state
-  */
- struct pwm_device {
- 	const char *label;
-@@ -118,13 +128,21 @@ struct pwm_device {
- 	struct pwm_chip *chip;
- 	void *chip_data;
- 
--	unsigned int period;
--	unsigned int duty_cycle;
--	enum pwm_polarity polarity;
--
- 	struct pwm_args args;
-+	struct pwm_state state;
- };
- 
-+/**
-+ * pwm_get_state() - retrieve the current PWM state
-+ * @pwm: PWM device
-+ * @state: state to fill with the current PWM state
-+ */
-+static inline void pwm_get_state(const struct pwm_device *pwm,
-+				 struct pwm_state *state)
-+{
-+	*state = pwm->state;
-+}
-+
- static inline bool pwm_is_enabled(const struct pwm_device *pwm)
- {
- 	return test_bit(PWMF_ENABLED, &pwm->flags);
-@@ -133,23 +151,31 @@ static inline bool pwm_is_enabled(const struct pwm_device *pwm)
- static inline void pwm_set_period(struct pwm_device *pwm, unsigned int period)
- {
- 	if (pwm)
--		pwm->period = period;
-+		pwm->state.period = period;
+ 	return ret;
  }
  
- static inline unsigned int pwm_get_period(const struct pwm_device *pwm)
+ static int rockchip_pwm_remove(struct platform_device *pdev)
  {
--	return pwm ? pwm->period : 0;
+ 	struct rockchip_pwm_chip *pc = platform_get_drvdata(pdev);
 +	struct pwm_state pstate;
 +
-+	pwm_get_state(pwm, &pstate);
-+
-+	return pstate.period;
- }
++	/*
++	 * Disable the PWM clk before unpreparing it if the PWM device is still
++	 * running. This should only happen when the last PWM user left it
++	 * enabled, or when nobody requested a PWM that was previously enabled
++	 * by the bootloader.
++	 *
++	 * FIXME: Maybe the core should disable all PWM devices in
++	 * pwmchip_remove(). In this case we'd only have to call
++	 * clk_unprepare() after pwmchip_remove().
++	 *
++	 */
++	pwm_get_state(pc->chip.pwms, &pstate);
++	if (pstate.enabled)
++		clk_disable(pc->clk);
  
- static inline void pwm_set_duty_cycle(struct pwm_device *pwm, unsigned int duty)
- {
- 	if (pwm)
--		pwm->duty_cycle = duty;
-+		pwm->state.duty_cycle = duty;
- }
+ 	clk_unprepare(pc->clk);
  
- static inline unsigned int pwm_get_duty_cycle(const struct pwm_device *pwm)
- {
--	return pwm ? pwm->duty_cycle : 0;
-+	struct pwm_state pstate;
-+
-+	pwm_get_state(pwm, &pstate);
-+
-+	return pstate.duty_cycle;
- }
- 
- /*
-@@ -159,7 +185,11 @@ int pwm_set_polarity(struct pwm_device *pwm, enum pwm_polarity polarity);
- 
- static inline enum pwm_polarity pwm_get_polarity(const struct pwm_device *pwm)
- {
--	return pwm ? pwm->polarity : PWM_POLARITY_NORMAL;
-+	struct pwm_state pstate;
-+
-+	pwm_get_state(pwm, &pstate);
-+
-+	return pstate.polarity;
- }
- 
- static inline void pwm_get_args(const struct pwm_device *pwm,
 -- 
 2.5.0
