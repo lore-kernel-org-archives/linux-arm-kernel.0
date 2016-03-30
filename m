@@ -1,236 +1,251 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 30 Mar 2016 17:39:51 +0200
-Subject: [PATCH v2 4/7] scatterlist: add sg_alloc_table_from_buf() helper
+Date: Wed, 30 Mar 2016 17:39:48 +0200
+Subject: [PATCH v2 1/7] mtd: nand: sunxi: move some ECC related operations to
+ their own functions
 In-Reply-To: <1459352394-22810-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1459352394-22810-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1459352394-22810-5-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1459352394-22810-2-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sg_alloc_table_from_buf() provides an easy solution to create an sg_table
-from a virtual address pointer. This function takes care of dealing with
-vmallocated buffers, buffer alignment, or DMA engine limitations (maximum
-DMA transfer size).
+In order to support DMA operations in a clean way we need to extract some
+of the logic coded in sunxi_nfc_hw_ecc_read/write_page() into their own
+function.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- include/linux/scatterlist.h |  24 +++++++
- lib/scatterlist.c           | 161 ++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 185 insertions(+)
+ drivers/mtd/nand/sunxi_nand.c | 163 ++++++++++++++++++++++++++++--------------
+ 1 file changed, 108 insertions(+), 55 deletions(-)
 
-diff --git a/include/linux/scatterlist.h b/include/linux/scatterlist.h
-index 556ec1e..4a75362 100644
---- a/include/linux/scatterlist.h
-+++ b/include/linux/scatterlist.h
-@@ -41,6 +41,27 @@ struct sg_table {
- 	unsigned int orig_nents;	/* original size of list */
- };
- 
-+/**
-+ * struct sg_constraints - SG constraints structure
-+ *
-+ * @max_chunk_len: maximum chunk buffer length. Each SG entry has to be smaller
-+ *		   than this value. Zero means no constraint.
-+ * @required_alignment: minimum alignment. Is used for both size and pointer
-+ *			alignment. If this constraint is not met, the function
-+ *			should return -EINVAL.
-+ * @preferred_alignment: preferred alignment. Mainly used to optimize
-+ *			 throughput when the DMA engine performs better when
-+ *			 doing aligned accesses.
-+ *
-+ * This structure is here to help sg_alloc_table_from_buf() create the optimal
-+ * SG list based on DMA engine constraints.
-+ */
-+struct sg_constraints {
-+	size_t max_chunk_len;
-+	size_t required_alignment;
-+	size_t preferred_alignment;
-+};
-+
- /*
-  * Notes on SG table design.
-  *
-@@ -265,6 +286,9 @@ int sg_alloc_table_from_pages(struct sg_table *sgt,
- 	struct page **pages, unsigned int n_pages,
- 	unsigned long offset, unsigned long size,
- 	gfp_t gfp_mask);
-+int sg_alloc_table_from_buf(struct sg_table *sgt, const void *buf, size_t len,
-+			    const struct sg_constraints *constraints,
-+			    gfp_t gfp_mask);
- 
- size_t sg_copy_buffer(struct scatterlist *sgl, unsigned int nents, void *buf,
- 		      size_t buflen, off_t skip, bool to_buffer);
-diff --git a/lib/scatterlist.c b/lib/scatterlist.c
-index 004fc70..94776ff 100644
---- a/lib/scatterlist.c
-+++ b/lib/scatterlist.c
-@@ -433,6 +433,167 @@ int sg_alloc_table_from_pages(struct sg_table *sgt,
+diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
+index a71905c..f6ea0fb 100644
+--- a/drivers/mtd/nand/sunxi_nand.c
++++ b/drivers/mtd/nand/sunxi_nand.c
+@@ -776,6 +776,92 @@ static inline void sunxi_nfc_user_data_to_buf(u32 user_data, u8 *buf)
+ 	buf[3] = user_data >> 24;
  }
- EXPORT_SYMBOL(sg_alloc_table_from_pages);
  
-+static size_t sg_buf_chunk_len(const void *buf, size_t len,
-+			       const struct sg_constraints *cons)
++static inline u32 sunxi_nfc_buf_to_user_data(const u8 *buf)
 +{
-+	size_t chunk_len = len;
-+
-+	if (cons->max_chunk_len)
-+		chunk_len = min_t(size_t, chunk_len, cons->max_chunk_len);
-+
-+	if (is_vmalloc_addr(buf)) {
-+		unsigned long offset_in_page = offset_in_page(buf);
-+		size_t contig_len = PAGE_SIZE - offset_in_page;
-+		unsigned long phys = vmalloc_to_pfn(buf) - offset_in_page;
-+		const void *contig_ptr = buf + contig_len;
-+
-+		/*
-+		 * Vmalloced buffer might be composed of several physically
-+		 * contiguous pages. Avoid extra scattergather entries in
-+		 * this case.
-+		 */
-+		while (contig_len < chunk_len) {
-+			if (phys + PAGE_SIZE != vmalloc_to_pfn(contig_ptr))
-+				break;
-+
-+			contig_len += PAGE_SIZE;
-+			contig_ptr += PAGE_SIZE;
-+			phys += PAGE_SIZE;
-+		}
-+
-+		chunk_len = min_t(size_t, chunk_len, contig_len);
-+	}
-+
-+	if (!IS_ALIGNED((unsigned long)buf, cons->preferred_alignment)) {
-+		const void *aligned_buf = PTR_ALIGN(buf,
-+						    cons->preferred_alignment);
-+		size_t unaligned_len = (unsigned long)(aligned_buf - buf);
-+
-+		chunk_len = min_t(size_t, chunk_len, unaligned_len);
-+	} else if (chunk_len > cons->preferred_alignment) {
-+		chunk_len &= ~(cons->preferred_alignment - 1);
-+	}
-+
-+	return chunk_len;
++	return buf[0] | (buf[1] << 8) | (buf[2] << 16) | (buf[3] << 24);
 +}
 +
-+#define sg_for_each_chunk_in_buf(buf, len, chunk_len, constraints)	\
-+	for (chunk_len = sg_buf_chunk_len(buf, len, constraints);	\
-+	     len;							\
-+	     len -= chunk_len, buf += chunk_len,			\
-+	     chunk_len = sg_buf_chunk_len(buf, len, constraints))
-+
-+static int sg_check_constraints(struct sg_constraints *cons,
-+				const void *buf, size_t len)
++static void sunxi_nfc_hw_ecc_get_prot_oob_bytes(struct mtd_info *mtd, u8 *oob,
++						int step, bool bbm, int page)
 +{
-+	if (!cons->required_alignment)
-+		cons->required_alignment = 1;
++	struct nand_chip *nand = mtd_to_nand(mtd);
++	struct sunxi_nfc *nfc = to_sunxi_nfc(nand->controller);
 +
-+	if (!cons->preferred_alignment)
-+		cons->preferred_alignment = cons->required_alignment;
++	sunxi_nfc_user_data_to_buf(readl(nfc->regs + NFC_REG_USER_DATA(step)),
++				   oob);
 +
-+	/* Test if buf and len are properly aligned. */
-+	if (!IS_ALIGNED((unsigned long)buf, cons->required_alignment) ||
-+	    !IS_ALIGNED(len, cons->required_alignment))
-+		return -EINVAL;
-+
-+	/*
-+	 * if the buffer has been vmallocated and required_alignment is
-+	 * more than PAGE_SIZE we cannot guarantee it.
-+	 */
-+	if (is_vmalloc_addr(buf) && cons->required_alignment > PAGE_SIZE)
-+		return -EINVAL;
-+
-+	/*
-+	 * max_chunk_len has to be aligned to required_alignment to
-+	 * guarantee that all buffer chunks are aligned correctly.
-+	 */
-+	if (!IS_ALIGNED(cons->max_chunk_len, cons->required_alignment))
-+		return -EINVAL;
-+
-+	/*
-+	 * preferred_alignment has to be aligned to required_alignment
-+	 * to avoid misalignment of buffer chunks.
-+	 */
-+	if (!IS_ALIGNED(cons->preferred_alignment, cons->required_alignment))
-+		return -EINVAL;
-+
-+	return 0;
++	/* De-randomize the Bad Block Marker. */
++	if (bbm && (nand->options & NAND_NEED_SCRAMBLING))
++		sunxi_nfc_randomize_bbm(mtd, page, oob);
 +}
 +
-+/**
-+ * sg_alloc_table_from_buf - create an SG table from a buffer
-+ *
-+ * @sgt: SG table
-+ * @buf: buffer you want to create this SG table from
-+ * @len: length of buf
-+ * @constraints: optional constraints to take into account when creating
-+ *		 the SG table. Can be NULL if no specific constraints are
-+ *		 required.
-+ * @gfp_mask: type of allocation to use when creating the table
-+ *
-+ * This function creates an SG table from a buffer, its length and some
-+ * SG constraints.
-+ *
-+ * Note: This function supports vmallocated and physically contiguous buffers.
-+ */
-+int sg_alloc_table_from_buf(struct sg_table *sgt, const void *buf, size_t len,
-+			    const struct sg_constraints *constraints,
-+			    gfp_t gfp_mask)
++static void sunxi_nfc_hw_ecc_set_prot_oob_bytes(struct mtd_info *mtd,
++						const u8 *oob, int step,
++						bool bbm, int page)
 +{
-+	struct sg_constraints cons = { };
-+	size_t remaining, chunk_len;
-+	const void *sg_buf;
-+	int i, ret;
++	struct nand_chip *nand = mtd_to_nand(mtd);
++	struct sunxi_nfc *nfc = to_sunxi_nfc(nand->controller);
++	u8 user_data[4];
 +
-+	if (constraints)
-+		cons = *constraints;
++	/* Randomize the Bad Block Marker. */
++	if (bbm && (nand->options & NAND_NEED_SCRAMBLING)) {
++		memcpy(user_data, oob, sizeof(user_data));
++		sunxi_nfc_randomize_bbm(mtd, page, user_data);
++		oob = user_data;
++	}
 +
-+	ret = sg_check_constraints(&cons, buf, len);
-+	if (ret)
-+		return ret;
++	writel(sunxi_nfc_buf_to_user_data(oob),
++	       nfc->regs + NFC_REG_USER_DATA(step));
++}
 +
-+	sg_buf = buf;
-+	remaining = len;
-+	i = 0;
-+	sg_for_each_chunk_in_buf(sg_buf, remaining, chunk_len, &cons)
-+		i++;
++static void sunxi_nfc_hw_ecc_update_stats(struct mtd_info *mtd,
++					  unsigned int *max_bitflips, int ret)
++{
++	if (ret < 0) {
++		mtd->ecc_stats.failed++;
++	} else {
++		mtd->ecc_stats.corrected += ret;
++		*max_bitflips = max_t(unsigned int, *max_bitflips, ret);
++	}
++}
 +
-+	ret = sg_alloc_table(sgt, i, gfp_mask);
-+	if (ret)
-+		return ret;
++static int sunxi_nfc_hw_ecc_correct(struct mtd_info *mtd, u8 *data, u8 *oob,
++				    int step, u32 status, bool *erased)
++{
++	struct nand_chip *nand = mtd_to_nand(mtd);
++	struct sunxi_nfc *nfc = to_sunxi_nfc(nand->controller);
++	struct nand_ecc_ctrl *ecc = &nand->ecc;
++	u32 tmp;
 +
-+	sg_buf = buf;
-+	remaining = len;
-+	i = 0;
-+	sg_for_each_chunk_in_buf(sg_buf, remaining, chunk_len, &cons) {
-+		if (is_vmalloc_addr(sg_buf)) {
-+			struct page *vm_page;
++	*erased = false;
 +
-+			vm_page = vmalloc_to_page(sg_buf);
-+			if (!vm_page) {
-+				ret = -ENOMEM;
-+				goto err_free_table;
-+			}
++	if (status & NFC_ECC_ERR(step))
++		return -EBADMSG;
 +
-+			sg_set_page(&sgt->sgl[i], vm_page, chunk_len,
-+				    offset_in_page(sg_buf));
++	if (status & NFC_ECC_PAT_FOUND(step)) {
++		u8 pattern;
++
++		if (unlikely(!(readl(nfc->regs + NFC_REG_PAT_ID) & 0x1))) {
++			pattern = 0x0;
 +		} else {
-+			sg_set_buf(&sgt->sgl[i], sg_buf, chunk_len);
++			pattern = 0xff;
++			*erased = true;
 +		}
 +
-+		i++;
++		if (data)
++			memset(data, pattern, ecc->size);
++
++		if (oob)
++			memset(oob, pattern, ecc->bytes + 4);
++
++		return 0;
 +	}
 +
-+	return 0;
++	tmp = readl(nfc->regs + NFC_REG_ECC_ERR_CNT(step));
 +
-+err_free_table:
-+	sg_free_table(sgt);
-+
-+	return ret;
++	return NFC_ECC_ERR_CNT(step, tmp);
 +}
-+EXPORT_SYMBOL(sg_alloc_table_from_buf);
 +
- void __sg_page_iter_start(struct sg_page_iter *piter,
- 			  struct scatterlist *sglist, unsigned int nents,
- 			  unsigned long pgoffset)
+ static int sunxi_nfc_hw_ecc_read_chunk(struct mtd_info *mtd,
+ 				       u8 *data, int data_off,
+ 				       u8 *oob, int oob_off,
+@@ -787,7 +873,7 @@ static int sunxi_nfc_hw_ecc_read_chunk(struct mtd_info *mtd,
+ 	struct sunxi_nfc *nfc = to_sunxi_nfc(nand->controller);
+ 	struct nand_ecc_ctrl *ecc = &nand->ecc;
+ 	int raw_mode = 0;
+-	u32 status;
++	bool erased;
+ 	int ret;
+ 
+ 	if (*cur_off != data_off)
+@@ -813,27 +899,13 @@ static int sunxi_nfc_hw_ecc_read_chunk(struct mtd_info *mtd,
+ 
+ 	*cur_off = oob_off + ecc->bytes + 4;
+ 
+-	status = readl(nfc->regs + NFC_REG_ECC_ST);
+-	if (status & NFC_ECC_PAT_FOUND(0)) {
+-		u8 pattern = 0xff;
+-
+-		if (unlikely(!(readl(nfc->regs + NFC_REG_PAT_ID) & 0x1)))
+-			pattern = 0x0;
+-
+-		memset(data, pattern, ecc->size);
+-		memset(oob, pattern, ecc->bytes + 4);
+-
++	ret = sunxi_nfc_hw_ecc_correct(mtd, data, oob, 0,
++				       readl(nfc->regs + NFC_REG_ECC_ST),
++				       &erased);
++	if (erased)
+ 		return 1;
+-	}
+-
+-	ret = NFC_ECC_ERR_CNT(0, readl(nfc->regs + NFC_REG_ECC_ERR_CNT(0)));
+-
+-	memcpy_fromio(data, nfc->regs + NFC_RAM0_BASE, ecc->size);
+ 
+-	nand->cmdfunc(mtd, NAND_CMD_RNDOUT, oob_off, -1);
+-	sunxi_nfc_randomizer_read_buf(mtd, oob, ecc->bytes + 4, true, page);
+-
+-	if (status & NFC_ECC_ERR(0)) {
++	if (ret < 0) {
+ 		/*
+ 		 * Re-read the data with the randomizer disabled to identify
+ 		 * bitflips in erased pages.
+@@ -841,35 +913,32 @@ static int sunxi_nfc_hw_ecc_read_chunk(struct mtd_info *mtd,
+ 		if (nand->options & NAND_NEED_SCRAMBLING) {
+ 			nand->cmdfunc(mtd, NAND_CMD_RNDOUT, data_off, -1);
+ 			nand->read_buf(mtd, data, ecc->size);
+-			nand->cmdfunc(mtd, NAND_CMD_RNDOUT, oob_off, -1);
+-			nand->read_buf(mtd, oob, ecc->bytes + 4);
++		} else {
++			memcpy_fromio(data, nfc->regs + NFC_RAM0_BASE,
++				      ecc->size);
+ 		}
+ 
++		nand->cmdfunc(mtd, NAND_CMD_RNDOUT, oob_off, -1);
++		nand->read_buf(mtd, oob, ecc->bytes + 4);
++
+ 		ret = nand_check_erased_ecc_chunk(data,	ecc->size,
+ 						  oob, ecc->bytes + 4,
+ 						  NULL, 0, ecc->strength);
+ 		if (ret >= 0)
+ 			raw_mode = 1;
+ 	} else {
+-		/*
+-		 * The engine protects 4 bytes of OOB data per chunk.
+-		 * Retrieve the corrected OOB bytes.
+-		 */
+-		sunxi_nfc_user_data_to_buf(readl(nfc->regs + NFC_REG_USER_DATA(0)),
+-					   oob);
++		memcpy_fromio(data, nfc->regs + NFC_RAM0_BASE, ecc->size);
+ 
+-		/* De-randomize the Bad Block Marker. */
+-		if (bbm && nand->options & NAND_NEED_SCRAMBLING)
+-			sunxi_nfc_randomize_bbm(mtd, page, oob);
+-	}
++		nand->cmdfunc(mtd, NAND_CMD_RNDOUT, oob_off, -1);
++		sunxi_nfc_randomizer_read_buf(mtd, oob, ecc->bytes + 4,
++					      true, page);
+ 
+-	if (ret < 0) {
+-		mtd->ecc_stats.failed++;
+-	} else {
+-		mtd->ecc_stats.corrected += ret;
+-		*max_bitflips = max_t(unsigned int, *max_bitflips, ret);
++		sunxi_nfc_hw_ecc_get_prot_oob_bytes(mtd, oob, 0,
++						    bbm, page);
+ 	}
+ 
++	sunxi_nfc_hw_ecc_update_stats(mtd, max_bitflips, ret);
++
+ 	return raw_mode;
+ }
+ 
+@@ -898,11 +967,6 @@ static void sunxi_nfc_hw_ecc_read_extra_oob(struct mtd_info *mtd,
+ 	*cur_off = mtd->oobsize + mtd->writesize;
+ }
+ 
+-static inline u32 sunxi_nfc_buf_to_user_data(const u8 *buf)
+-{
+-	return buf[0] | (buf[1] << 8) | (buf[2] << 16) | (buf[3] << 24);
+-}
+-
+ static int sunxi_nfc_hw_ecc_write_chunk(struct mtd_info *mtd,
+ 					const u8 *data, int data_off,
+ 					const u8 *oob, int oob_off,
+@@ -919,19 +983,6 @@ static int sunxi_nfc_hw_ecc_write_chunk(struct mtd_info *mtd,
+ 
+ 	sunxi_nfc_randomizer_write_buf(mtd, data, ecc->size, false, page);
+ 
+-	/* Fill OOB data in */
+-	if ((nand->options & NAND_NEED_SCRAMBLING) && bbm) {
+-		u8 user_data[4];
+-
+-		memcpy(user_data, oob, 4);
+-		sunxi_nfc_randomize_bbm(mtd, page, user_data);
+-		writel(sunxi_nfc_buf_to_user_data(user_data),
+-		       nfc->regs + NFC_REG_USER_DATA(0));
+-	} else {
+-		writel(sunxi_nfc_buf_to_user_data(oob),
+-		       nfc->regs + NFC_REG_USER_DATA(0));
+-	}
+-
+ 	if (data_off + ecc->size != oob_off)
+ 		nand->cmdfunc(mtd, NAND_CMD_RNDIN, oob_off, -1);
+ 
+@@ -940,6 +991,8 @@ static int sunxi_nfc_hw_ecc_write_chunk(struct mtd_info *mtd,
+ 		return ret;
+ 
+ 	sunxi_nfc_randomizer_enable(mtd);
++	sunxi_nfc_hw_ecc_set_prot_oob_bytes(mtd, oob, 0, bbm, page);
++
+ 	writel(NFC_DATA_TRANS | NFC_DATA_SWAP_METHOD |
+ 	       NFC_ACCESS_DIR | NFC_ECC_OP,
+ 	       nfc->regs + NFC_REG_CMD);
 -- 
 2.5.0
