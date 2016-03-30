@@ -1,40 +1,149 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 30 Mar 2016 19:35:16 +0200
-Subject: [PATCH 1/5] dmaengine: mv_xor: make the code 64 bits compliant
+Date: Wed, 30 Mar 2016 19:35:17 +0200
+Subject: [PATCH 2/5] dmaengine: mv_xor: use SoC type instead of directly the
+ operation mode
 In-Reply-To: <1459359320-12638-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1459359320-12638-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1459359320-12638-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1459359320-12638-3-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix two warnings which appear when building for 64 bits target.
+Currently the main difference between legacy XOR engine and newer one, is
+the way the engine modes are setup (either in the descriptor or through
+the controller registers). In order to be able to take into account new
+generation of the XOR engine for the ARM64 SoC, we need to identify them
+by type, and then depending to the type the engine setup will be
+selected.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/dma/mv_xor.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/dma/mv_xor.c | 40 ++++++++++++++++++++++++++++------------
+ drivers/dma/mv_xor.h |  1 +
+ 2 files changed, 29 insertions(+), 12 deletions(-)
 
 diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-index 3922a5d56806..a6ec82776cbc 100644
+index a6ec82776cbc..6d012a56b97b 100644
 --- a/drivers/dma/mv_xor.c
 +++ b/drivers/dma/mv_xor.c
-@@ -477,7 +477,7 @@ mv_xor_prep_dma_xor(struct dma_chan *chan, dma_addr_t dest, dma_addr_t *src,
- 	BUG_ON(len > MV_XOR_MAX_BYTE_COUNT);
+@@ -31,6 +31,11 @@
+ #include "dmaengine.h"
+ #include "mv_xor.h"
  
- 	dev_dbg(mv_chan_to_devp(mv_chan),
--		"%s src_cnt: %d len: %u dest %pad flags: %ld\n",
-+		"%s src_cnt: %d len: %zu dest %pad flags: %ld\n",
- 		__func__, src_cnt, len, &dest, flags);
++enum mv_xor_type {
++	XOR_ORION,
++	XOR_ARMADA_38X,
++};
++
+ enum mv_xor_mode {
+ 	XOR_MODE_IN_REG,
+ 	XOR_MODE_IN_DESC,
+@@ -933,7 +938,7 @@ static int mv_xor_channel_remove(struct mv_xor_chan *mv_chan)
+ static struct mv_xor_chan *
+ mv_xor_channel_add(struct mv_xor_device *xordev,
+ 		   struct platform_device *pdev,
+-		   int idx, dma_cap_mask_t cap_mask, int irq, int op_in_desc)
++		   int idx, dma_cap_mask_t cap_mask, int irq)
+ {
+ 	int ret = 0;
+ 	struct mv_xor_chan *mv_chan;
+@@ -945,7 +950,10 @@ mv_xor_channel_add(struct mv_xor_device *xordev,
  
- 	sw_desc = mv_chan_alloc_slot(mv_chan);
-@@ -1220,7 +1220,7 @@ static int mv_xor_probe(struct platform_device *pdev)
+ 	mv_chan->idx = idx;
+ 	mv_chan->irq = irq;
+-	mv_chan->op_in_desc = op_in_desc;
++	if (xordev->xor_type == XOR_ORION)
++		mv_chan->op_in_desc = XOR_MODE_IN_REG;
++	else
++		mv_chan->op_in_desc = XOR_MODE_IN_DESC;
+ 
+ 	dma_dev = &mv_chan->dmadev;
+ 
+@@ -1137,8 +1145,8 @@ static int mv_xor_resume(struct platform_device *dev)
+ }
+ 
+ static const struct of_device_id mv_xor_dt_ids[] = {
+-	{ .compatible = "marvell,orion-xor", .data = (void *)XOR_MODE_IN_REG },
+-	{ .compatible = "marvell,armada-380-xor", .data = (void *)XOR_MODE_IN_DESC },
++	{ .compatible = "marvell,orion-xor", .data = (void *)XOR_ORION },
++	{ .compatible = "marvell,armada-380-xor", .data = (void *)XOR_ARMADA_38X },
+ 	{},
+ };
+ 
+@@ -1152,7 +1160,6 @@ static int mv_xor_probe(struct platform_device *pdev)
+ 	struct resource *res;
+ 	unsigned int max_engines, max_channels;
+ 	int i, ret;
+-	int op_in_desc;
+ 
+ 	dev_notice(&pdev->dev, "Marvell shared XOR driver\n");
+ 
+@@ -1180,6 +1187,20 @@ static int mv_xor_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, xordev);
+ 
++
++	/*
++	 * We need to know which type of XOR device we use before
++	 * setting up. In non-dt case it can only be the legacy one.
++	 */
++	xordev->xor_type = XOR_ORION;
++	if (pdev->dev.of_node) {
++		const struct of_device_id *of_id =
++			of_match_device(mv_xor_dt_ids,
++					&pdev->dev);
++
++		xordev->xor_type = (uintptr_t)of_id->data;
++	}
++
+ 	/*
+ 	 * (Re-)program MBUS remapping windows if we are asked to.
+ 	 */
+@@ -1212,15 +1233,11 @@ static int mv_xor_probe(struct platform_device *pdev)
+ 	if (pdev->dev.of_node) {
+ 		struct device_node *np;
+ 		int i = 0;
+-		const struct of_device_id *of_id =
+-			of_match_device(mv_xor_dt_ids,
+-					&pdev->dev);
+ 
+ 		for_each_child_of_node(pdev->dev.of_node, np) {
  			struct mv_xor_chan *chan;
  			dma_cap_mask_t cap_mask;
  			int irq;
--			op_in_desc = (int)of_id->data;
-+			op_in_desc = (uintptr_t)of_id->data;
+-			op_in_desc = (uintptr_t)of_id->data;
  
  			if (i >= max_channels)
  				continue;
+@@ -1237,7 +1254,7 @@ static int mv_xor_probe(struct platform_device *pdev)
+ 			}
+ 
+ 			chan = mv_xor_channel_add(xordev, pdev, i,
+-						  cap_mask, irq, op_in_desc);
++						  cap_mask, irq);
+ 			if (IS_ERR(chan)) {
+ 				ret = PTR_ERR(chan);
+ 				irq_dispose_mapping(irq);
+@@ -1266,8 +1283,7 @@ static int mv_xor_probe(struct platform_device *pdev)
+ 			}
+ 
+ 			chan = mv_xor_channel_add(xordev, pdev, i,
+-						  cd->cap_mask, irq,
+-						  XOR_MODE_IN_REG);
++						  cd->cap_mask, irq);
+ 			if (IS_ERR(chan)) {
+ 				ret = PTR_ERR(chan);
+ 				goto err_channel_add;
+diff --git a/drivers/dma/mv_xor.h b/drivers/dma/mv_xor.h
+index c19fe30e5ae9..bf56e082e7cd 100644
+--- a/drivers/dma/mv_xor.h
++++ b/drivers/dma/mv_xor.h
+@@ -85,6 +85,7 @@ struct mv_xor_device {
+ 	void __iomem	     *xor_high_base;
+ 	struct clk	     *clk;
+ 	struct mv_xor_chan   *channels[MV_XOR_MAX_CHANNELS];
++	int		     xor_type;
+ };
+ 
+ /**
 -- 
 2.5.0
