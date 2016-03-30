@@ -1,37 +1,39 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 30 Mar 2016 10:14:05 +0200
-Subject: [PATCH v2] ARM: cpuidle: make arm_cpuidle_suspend() a bit more
- efficient
-In-Reply-To: <20160330160504.50be1959@xhacker>
-References: <1459324077-7116-1-git-send-email-jszhang@marvell.com>
- <56FB87FA.50405@linaro.org> <20160330160504.50be1959@xhacker>
-Message-ID: <56FB8ACD.6050503@linaro.org>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 30 Mar 2016 13:45:27 +0530
+Subject: [PATCH V3 3/4] ARM: exynos: exynos-cpufreq platform device isn't
+ supported anymore
+In-Reply-To: <cover.1459325515.git.viresh.kumar@linaro.org>
+References: <cover.1459325515.git.viresh.kumar@linaro.org>
+Message-ID: <abff8b995fce34ea80c68c5d11ccb8a525fb81fa.1459325515.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/30/2016 10:05 AM, Jisheng Zhang wrote:
-> Dear Daniel,
->
-> On Wed, 30 Mar 2016 10:02:02 +0200 Daniel Lezcano wrote:
->
->> On 03/30/2016 09:47 AM, Jisheng Zhang wrote:
->>> Currently, we check cpuidle_ops.suspend every time when entering a
->>> low-power idle state. But this check could be avoided in this hot path
->>> by moving it into arm_cpuidle_read_ops() to reduce arm_cpuidle_suspend
->>> overhead a bit.
->>
->> This patch makes sense but the ARM64 part is missing.
->>
->
-> Here is the ARM64 part, you are also in the "To" list ;)
->
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/417713.html
+The driver is removed long back and we don't support this device
+anymore. Stop adding it.
 
-Ah, yes. That happens when we read the email sequentially :)
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ arch/arm/mach-exynos/exynos.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index bbf51a46f772..4dfce1069406 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -232,12 +232,8 @@ static void __init exynos_cpufreq_init(void)
+ 	const struct of_device_id *match;
+ 
+ 	match = of_match_node(exynos_cpufreq_matches, root);
+-	if (!match) {
+-		platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
+-		return;
+-	}
+-
+-	platform_device_register_simple(match->data, -1, NULL, 0);
++	if (match)
++		platform_device_register_simple(match->data, -1, NULL, 0);
+ }
+ 
+ static void __init exynos_dt_machine_init(void)
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+2.7.1.410.g6faf27b
