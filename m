@@ -1,9 +1,9 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 30 Mar 2016 22:04:06 +0200
-Subject: [PATCH v5 43/46] backlight: pwm_bl: switch to the atomic PWM API
+Date: Wed, 30 Mar 2016 22:04:07 +0200
+Subject: [PATCH v5 44/46] video: ssd1307fb: switch to the atomic PWM API
 In-Reply-To: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1459368249-13241-44-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1459368249-13241-45-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,97 +12,66 @@ by pwm_apply_state().
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/video/backlight/pwm_bl.c | 43 ++++++++++++++++++++++------------------
- 1 file changed, 24 insertions(+), 19 deletions(-)
+ drivers/video/fbdev/ssd1307fb.c | 24 +++++++++++++++++++-----
+ 1 file changed, 19 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
-index 2479c11..b069fb2 100644
---- a/drivers/video/backlight/pwm_bl.c
-+++ b/drivers/video/backlight/pwm_bl.c
-@@ -43,8 +43,22 @@ struct pwm_bl_data {
- 	void			(*exit)(struct device *);
- };
+diff --git a/drivers/video/fbdev/ssd1307fb.c b/drivers/video/fbdev/ssd1307fb.c
+index df9c63a..ed9a115 100644
+--- a/drivers/video/fbdev/ssd1307fb.c
++++ b/drivers/video/fbdev/ssd1307fb.c
+@@ -289,6 +289,8 @@ static int ssd1307fb_init(struct ssd1307fb_par *par)
+ 	struct pwm_args pargs = { };
  
-+static int compute_duty_cycle(struct pwm_bl_data *pb, int brightness)
-+{
-+	unsigned int lth = pb->lth_brightness;
-+	int duty_cycle;
+ 	if (par->device_info->need_pwm) {
++		struct pwm_state pstate;
 +
-+	if (pb->levels)
-+		duty_cycle = pb->levels[brightness];
-+	else
-+		duty_cycle = brightness;
+ 		par->pwm = pwm_get(&par->client->dev, NULL);
+ 		if (IS_ERR(par->pwm)) {
+ 			dev_err(&par->client->dev, "Could not get PWM from device tree!\n");
+@@ -296,10 +298,14 @@ static int ssd1307fb_init(struct ssd1307fb_par *par)
+ 		}
+ 
+ 		pwm_get_args(par->pwm, &pargs);
++		pwm_get_state(par->pwm, &pstate);
+ 		par->pwm_period = pargs.period;
 +
-+	return (duty_cycle * (pb->period - lth) / pb->scale) + lth;
-+}
+ 		/* Enable the PWM */
+-		pwm_config(par->pwm, par->pwm_period / 2, par->pwm_period);
+-		pwm_enable(par->pwm);
++		pstate.period = pargs.period;
++		pstate.duty_cycle = pstate.period / 2;
++		pstate.enabled = true;
++		pwm_apply_state(par->pwm, &pstate);
+ 
+ 		dev_dbg(&par->client->dev, "Using PWM%d with a %dns period.\n",
+ 			par->pwm->pwm, par->pwm_period);
+@@ -685,8 +691,12 @@ static int ssd1307fb_probe(struct i2c_client *client,
+ bl_init_error:
+ 	unregister_framebuffer(info);
+ panel_init_error:
+-	if (par->device_info->need_pwm) {
+-		pwm_disable(par->pwm);
++	if (par->device_info->need_pwm && par->pwm) {
++		struct pwm_state pstate;
 +
- static void pwm_backlight_power_on(struct pwm_bl_data *pb, int brightness)
- {
-+	struct pwm_state pstate;
- 	int err;
++		pwm_get_state(par->pwm, &pstate);
++		pstate.enabled = false;
++		pwm_apply_state(par->pwm, &pstate);
+ 		pwm_put(par->pwm);
+ 	};
+ reset_oled_error:
+@@ -707,7 +717,11 @@ static int ssd1307fb_remove(struct i2c_client *client)
  
- 	if (pb->enabled)
-@@ -57,17 +71,24 @@ static void pwm_backlight_power_on(struct pwm_bl_data *pb, int brightness)
- 	if (pb->enable_gpio)
- 		gpiod_set_value(pb->enable_gpio, 1);
- 
--	pwm_enable(pb->pwm);
-+	pwm_get_state(pb->pwm, &pstate);
-+	pstate.duty_cycle = compute_duty_cycle(pb, brightness);
-+	pstate.enabled = true;
-+	pwm_apply_state(pb->pwm, &pstate);
- 	pb->enabled = true;
- }
- 
- static void pwm_backlight_power_off(struct pwm_bl_data *pb)
- {
-+	struct pwm_state pstate;
+ 	unregister_framebuffer(info);
+ 	if (par->device_info->need_pwm) {
+-		pwm_disable(par->pwm);
++		struct pwm_state pstate;
 +
- 	if (!pb->enabled)
- 		return;
- 
--	pwm_config(pb->pwm, 0, pb->period);
--	pwm_disable(pb->pwm);
-+	pwm_get_state(pb->pwm, &pstate);
-+	pstate.duty_cycle = 0;
-+	pstate.enabled = false;
-+	pwm_apply_state(pb->pwm, &pstate);
- 
- 	if (pb->enable_gpio)
- 		gpiod_set_value(pb->enable_gpio, 0);
-@@ -76,24 +97,10 @@ static void pwm_backlight_power_off(struct pwm_bl_data *pb)
- 	pb->enabled = false;
- }
- 
--static int compute_duty_cycle(struct pwm_bl_data *pb, int brightness)
--{
--	unsigned int lth = pb->lth_brightness;
--	int duty_cycle;
--
--	if (pb->levels)
--		duty_cycle = pb->levels[brightness];
--	else
--		duty_cycle = brightness;
--
--	return (duty_cycle * (pb->period - lth) / pb->scale) + lth;
--}
--
- static int pwm_backlight_update_status(struct backlight_device *bl)
- {
- 	struct pwm_bl_data *pb = bl_get_data(bl);
- 	int brightness = bl->props.brightness;
--	int duty_cycle;
- 
- 	if (bl->props.power != FB_BLANK_UNBLANK ||
- 	    bl->props.fb_blank != FB_BLANK_UNBLANK ||
-@@ -104,8 +111,6 @@ static int pwm_backlight_update_status(struct backlight_device *bl)
- 		brightness = pb->notify(pb->dev, brightness);
- 
- 	if (brightness > 0) {
--		duty_cycle = compute_duty_cycle(pb, brightness);
--		pwm_config(pb->pwm, duty_cycle, pb->period);
- 		pwm_backlight_power_on(pb, brightness);
- 	} else
- 		pwm_backlight_power_off(pb);
++		pwm_get_state(par->pwm, &pstate);
++		pstate.enabled = false;
++		pwm_apply_state(par->pwm, &pstate);
+ 		pwm_put(par->pwm);
+ 	};
+ 	fb_deferred_io_cleanup(info);
 -- 
 2.5.0
