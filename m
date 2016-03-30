@@ -1,80 +1,278 @@
-From: gangchen@rdamicro.com (=?utf-8?B?6ZmI5YiaKEdhbmdjaGVuKQ==?=)
-Date: Wed, 30 Mar 2016 03:27:01 +0000
-Subject: [PATCH 1/1] ARM : missing corrupted reg in __do_div_asm
-In-Reply-To: <20160329105637.GD3701@e103592.cambridge.arm.com>
-References: <1459138743-10477-1-git-send-email-chengang.beijing@gmail.com>
- <3792990.eCI4tPEEyD@wuerfel>
- <20160329102605.GC3701@e103592.cambridge.arm.com>
- <20160329103418.GX19428@n2100.arm.linux.org.uk>
- <20160329105637.GD3701@e103592.cambridge.arm.com>
-Message-ID: <56FB4784.1060105@rdamicro.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 30 Mar 2016 12:36:19 +0900
+Subject: [PATCH v7 2/4] power: reset: add reboot mode driver
+In-Reply-To: <1459304443-9811-1-git-send-email-andy.yan@rock-chips.com>
+References: <1459304304-9713-1-git-send-email-andy.yan@rock-chips.com>
+ <1459304443-9811-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <56FB49B3.2040505@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/29/2016 06:56 PM, Dave Martin wrote:
-> On Tue, Mar 29, 2016 at 11:34:18AM +0100, Russell King - ARM Linux wrote:
->> On Tue, Mar 29, 2016 at 11:26:05AM +0100, Dave Martin wrote:
->>> On Tue, Mar 29, 2016 at 12:19:49PM +0200, Arnd Bergmann wrote:
->>>> On Monday 28 March 2016 12:19:03 Chen Gang wrote:
->>>>> __xl(R0 in little endian system, or R1 in big endian system) is corrupted
->>>>> after calling __do_div64 and compiler is not informed about this in
->>>>> macro __do_div_asm. If n is used again afterwards, __xl won't be
->>>>> reloaded and n will contain incorrect value.
->>>>>
->>>>> Signed-off-by: Chen Gang <gangchen@rdamicro.com>
->>>>> Signed-off-by: Chen Gang <chengang.beijing@gmail.com>
->>>>> ---
->>>> How did you find this? Did you run into this problem on a live system
->>>> or see it through inspection?
->>>>
->>>>>   arch/arm/include/asm/div64.h | 6 ++++--
->>>>>   1 file changed, 4 insertions(+), 2 deletions(-)
->>>>>
->>>>> diff --git a/arch/arm/include/asm/div64.h b/arch/arm/include/asm/div64.h
->>>>> index e1f0776..1a6e91a 100644
->>>>> --- a/arch/arm/include/asm/div64.h
->>>>> +++ b/arch/arm/include/asm/div64.h
->>>>> @@ -35,12 +35,14 @@ static inline uint32_t __div64_32(uint64_t *n, uint32_t base)
->>>>>          register unsigned long long __n   asm("r0") = *n;
->>>>>          register unsigned long long __res asm("r2");
->>>>>          register unsigned int __rem       asm(__xh);
->>>>> +       register unsigned int __clobber   asm(__xl);
->>>>>          asm(    __asmeq("%0", __xh)
->>>>>                  __asmeq("%1", "r2")
->>>>> +               __asmeq("%3", "r0")
->>>>> +               __asmeq("%4", "r4")
->>>>>                  __asmeq("%2", "r0")
->>>>> -               __asmeq("%3", "r4")
->>>>>                  "bl     __do_div64"
->>>>> -               : "=r" (__rem), "=r" (__res)
->>>>> +               : "=r" (__rem), "=r" (__res), "=r" (__clobber)
->>>>>                  : "r" (__n), "r" (__base)
->>>>>                  : "ip", "lr", "cc");
->>>>>          *n = __res;
->>>> Doesn't the clobber normally go in the third line along with
->>>> "ip" and "lr"?
->>> Since __xl is not used for any real argument to the asm, I think
->>> we can just add __xl to the clobber list directly, without needing
->>> to introduce an extra register variable ... no?
->> No, you can't.  The clobber list is not allowed to specify registers
->> that may be used for input or output operands, and since __xl may be
->> r0, and __n _is_ r0, you can't specify r0 in the clobber list.
-> Hmm, you're right -- in which case the change looks reasonable.
->
-> I wonder whether the following would be cleaner than having these
-> aliased arguments:
->
-> 	asm(	/* ... */
-> 		"bl	__do_div64"
-> 		: "+r" (__n), "=r" (__res)
-> 		: "r" (__base)
-> 		: "ip", "lr", "cc");
-> 	*n = __res;
-> 	return __n >> 32;
->
-> (providing that GCC doesn't make a mess of the "easy" shift).
-I tried your proposal. It didn't make any difference: this is inline 
-function and gcc just ignores your trick.
->
-> Cheers
-> ---Dave
+On 30.03.2016 11:20, Andy Yan wrote:
+> This driver parses the reboot commands like "reboot bootloader"
+> and "reboot recovery" to get a boot mode described in the
+> device tree , then call the write interfae to store the boot
+> mode in some place like special register or sram, which can
+> be read by the bootloader after system reboot, then the bootloader
+> can take different action according to the mode stored.
+> 
+> This is commonly used on Android based devices, in order to
+> reboot the device into fastboot or recovery mode.
+> 
+> Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+> Reviewed-by: Moritz Fischer <moritz.fischer@ettus.com>
+> Tested-by: John Stultz <john.stultz@linaro.org>
+> Acked-by: John Stultz <john.stultz@linaro.org>
+> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+> 
+> ---
+> 
+> Changes in v7:
+> - address some suggestions from Krzysztof, make syscon-reboot-mode driver data self-contained.
+> 
+
+Thanks for changes, few comments below.
+
+(...)
+
+> diff --git a/drivers/power/reset/reboot-mode.c b/drivers/power/reset/reboot-mode.c
+> new file mode 100644
+> index 0000000..ae6f931
+> --- /dev/null
+> +++ b/drivers/power/reset/reboot-mode.c
+> @@ -0,0 +1,115 @@
+> +/*
+> + * Copyright (c) 2016, Fuzhou Rockchip Electronics Co., Ltd
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
+> +
+> +#include <linux/device.h>
+> +#include <linux/init.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/reboot.h>
+> +#include "reboot-mode.h"
+> +
+> +#define PREFIX "mode-"
+> +
+> +struct mode_info {
+> +	const char *mode;
+> +	unsigned int magic;
+> +	struct list_head list;
+> +};
+> +
+> +struct reboot_mode_driver {
+> +	struct device *dev;
+> +	struct list_head head;
+> +	int (*write)(struct device *dev, int magic);
+> +	struct notifier_block reboot_notifier;
+> +};
+> +
+> +static int get_reboot_mode_magic(struct reboot_mode_driver *reboot,
+> +				 const char *cmd)
+> +{
+> +	const char *normal = "normal";
+> +	int magic = 0;
+> +	struct mode_info *info;
+> +
+> +	if (!cmd)
+> +		cmd = normal;
+> +
+> +	list_for_each_entry(info, &reboot->head, list) {
+> +		if (!strcmp(info->mode, cmd)) {
+> +			magic = info->magic;
+> +			break;
+> +		}
+> +	}
+> +
+> +	return magic;
+> +}
+> +
+> +static int reboot_mode_notify(struct notifier_block *this,
+> +			      unsigned long mode, void *cmd)
+> +{
+> +	struct reboot_mode_driver *reboot;
+> +	int magic;
+> +
+> +	reboot = container_of(this, struct reboot_mode_driver, reboot_notifier);
+> +	magic = get_reboot_mode_magic(reboot, cmd);
+> +	if (magic)
+> +		reboot->write(reboot->dev, magic);
+> +
+> +	return NOTIFY_DONE;
+> +}
+> +
+> +int reboot_mode_register(struct device *dev, int (*write)(struct device *, int))
+> +{
+> +	struct reboot_mode_driver *reboot;
+> +	struct mode_info *info;
+> +	struct property *prop;
+> +	struct device_node *np;
+> +	size_t len = strlen(PREFIX);
+> +	int ret;
+> +
+> +	reboot = devm_kzalloc(dev, sizeof(*reboot), GFP_KERNEL);
+> +	if (!reboot)
+> +		return -ENOMEM;
+> +
+> +	reboot->dev = dev;
+> +	reboot->write = write;
+> +	INIT_LIST_HEAD(&reboot->head);
+> +
+> +	np = of_node_get(dev->of_node);
+> +	for_each_property_of_node(np, prop) {
+> +		if (len > strlen(prop->name) || strncmp(prop->name, PREFIX, len))
+> +			continue;
+> +
+> +		info = devm_kzalloc(dev, sizeof(*info), GFP_KERNEL);
+> +		if (!info)
+
+Clean up needed: of_node_put() and kfree_const() for items stored on the
+list from previous iterations.
+
+> +			return -ENOMEM;
+> +
+> +		info->mode = kstrdup_const(prop->name + len, GFP_KERNEL);
+> +		if (of_property_read_u32(np, prop->name, &info->magic)) {
+> +			dev_err(dev, "reboot mode %s without magic number\n",
+> +				info->mode);
+> +			devm_kfree(dev, info);
+> +			continue;
+> +		}
+> +		list_add_tail(&info->list, &reboot->head);
+> +	}
+> +	of_node_put(np);
+
+If you of_node_put() here, there is no sense in getting it before. I
+mentioned of_node_get() only because I am not sure about life-cycle of
+nodes in case of DT overlays and you are storing the pointer to string
+from DT.
+
+The doubts I have are concerning only the case of freeing nodes from
+overlay.
+
+I don't know if of_node_get() is needed but of_node_get()+of_node_put()
+seems useless.
+
+> +
+> +	reboot->reboot_notifier.notifier_call = reboot_mode_notify;
+> +	ret = register_reboot_notifier(&reboot->reboot_notifier);
+> +	if (ret)
+> +		dev_err(dev, "can't register reboot notifier\n");
+> +
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(reboot_mode_register);
+> +
+> +MODULE_AUTHOR("Andy Yan <andy.yan@rock-chips.com");
+> +MODULE_DESCRIPTION("System reboot mode driver");
+> +MODULE_LICENSE("GPL v2");
+> diff --git a/drivers/power/reset/reboot-mode.h b/drivers/power/reset/reboot-mode.h
+> new file mode 100644
+> index 0000000..c861129
+> --- /dev/null
+> +++ b/drivers/power/reset/reboot-mode.h
+> @@ -0,0 +1,6 @@
+> +#ifndef __REBOOT_MODE_H__
+> +#define __REBOOT_MODE_H__
+> +
+> +int reboot_mode_register(struct device *dev, int (*write)(struct device *, int));
+> +
+> +#endif
+> diff --git a/drivers/power/reset/syscon-reboot-mode.c b/drivers/power/reset/syscon-reboot-mode.c
+> new file mode 100644
+> index 0000000..f1b8072
+> --- /dev/null
+> +++ b/drivers/power/reset/syscon-reboot-mode.c
+> @@ -0,0 +1,86 @@
+> +/*
+> + * Copyright (c) 2016, Fuzhou Rockchip Electronics Co., Ltd
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
+> +
+> +#include <linux/init.h>
+> +#include <linux/module.h>
+> +#include <linux/kernel.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/reboot.h>
+> +#include <linux/regmap.h>
+> +#include <linux/mfd/syscon.h>
+> +#include "reboot-mode.h"
+> +
+> +struct syscon_reboot_mode {
+> +	struct device *dev;
+
+'dev' looks unused (only set).
+
+> +	struct regmap *map;
+> +	u32 offset;
+> +	u32 mask;
+> +};
+> +
+> +static int syscon_reboot_mode_write(struct device *dev, int magic)
+> +{
+> +	struct syscon_reboot_mode *syscon_rbm = dev_get_drvdata(dev);
+> +	int ret;
+> +
+> +	ret = regmap_update_bits(syscon_rbm->map, syscon_rbm->offset,
+> +				 syscon_rbm->mask, magic);
+> +	if (ret < 0)
+> +		dev_err(dev, "update reboot mode bits failed\n");
+> +
+> +	return ret;
+> +}
+> +
+> +static int syscon_reboot_mode_probe(struct platform_device *pdev)
+> +{
+> +	int ret;
+> +	struct syscon_reboot_mode *syscon_rbm;
+> +
+> +	syscon_rbm = devm_kzalloc(&pdev->dev, sizeof(*syscon_rbm), GFP_KERNEL);
+> +	if (!syscon_rbm)
+> +		return -ENOMEM;
+> +
+> +	syscon_rbm->dev = &pdev->dev;
+> +	syscon_rbm->mask = 0xffffffff;
+> +
+> +	syscon_rbm->map = syscon_node_to_regmap(pdev->dev.parent->of_node);
+> +	if (IS_ERR(syscon_rbm->map))
+> +		return PTR_ERR(syscon_rbm->map);
+> +
+> +	if (of_property_read_u32(pdev->dev.of_node, "offset", &syscon_rbm->offset))
+> +		return -EINVAL;
+> +
+> +	of_property_read_u32(pdev->dev.of_node, "mask", &syscon_rbm->mask);
+> +
+> +	dev_set_drvdata(&pdev->dev, syscon_rbm);
+> +
+> +	ret = reboot_mode_register(&pdev->dev, syscon_reboot_mode_write);
+> +	if (ret)
+> +		dev_err(&pdev->dev, "can't register reboot mode\n");
+> +
+> +	return ret;
+> +}
+> +
+> +static const struct of_device_id syscon_reboot_mode_of_match[] = {
+> +	{ .compatible = "syscon-reboot-mode" },
+> +	{}
+> +};
+> +
+> +static struct platform_driver syscon_reboot_mode_driver = {
+> +	.probe = syscon_reboot_mode_probe,
+
+Cleanup needed. What will happen after device unbind? Memory will be
+released (devm-*()) but reboot notifier won't thus leading to OOPS on
+reboot.
+
+Best regards,
+Krzysztof
