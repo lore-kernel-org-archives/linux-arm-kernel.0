@@ -1,26 +1,26 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 30 Mar 2016 14:24:10 -0700
-Subject: [PATCH v5 30/46] regulator: pwm: retrieve correct voltage
-In-Reply-To: <1459368249-13241-31-git-send-email-boris.brezillon@free-electrons.com>
-References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
- <1459368249-13241-31-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20160330212410.GX2350@sirena.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 30 Mar 2016 14:32:25 -0700
+Subject: [PATCH v2] ARM: dts: dra7: Correct clock tree for sys_32k_ck
+In-Reply-To: <20160330211828.GE9329@atomide.com>
+References: <1457957001-720-1-git-send-email-j-keerthy@ti.com>
+ <20160330211828.GE9329@atomide.com>
+Message-ID: <20160330213224.GH9329@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 30, 2016 at 10:03:53PM +0200, Boris Brezillon wrote:
-> The continuous PWM voltage regulator is caching the voltage value in
-> the ->volt_uV field. While most of the time this value should reflect the
-> real voltage, sometime it can be sightly different if the PWM device
-> rounded the set_duty_cycle request.
-> Moreover, this value is not valid until someone has modified the regulator
-> output.
+* Tony Lindgren <tony@atomide.com> [160330 14:19]:
+> * Keerthy <j-keerthy@ti.com> [160314 05:04]:
+> > This is w.r.t J6/J6eco: 32clk is pseudo (erratum i856) - clock source.
+> > Errata i856 for the AM572x (DRA7xx) points out that the 32.768KHz external
+> > crystal is not enabled at power up. Instead the CPU falls back to using
+> > an emulation for the 32KHz clock which is SYSCLK1/610.  SYSCLK1 is usually
+> > 20MHz on boards so far (which gives an emulated frequency of 32.786KHz)
+> 
+> Thanks applying into omap-for-v4.6/fixes.
 
-Acked-by: Mark Brown <broonie@kernel.org>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160330/044e6353/attachment.sig>
+Actually let's wait a review from Tero on this one, not sure
+about the pseudo clock naming here. So dropping for now.
+
+Regards,
+
+Tony
