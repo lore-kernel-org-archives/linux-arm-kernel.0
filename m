@@ -1,102 +1,101 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 30 Mar 2016 15:18:43 +0200
-Subject: [PATCH 2/2] arm64: remove the now unneeded relocate_initrd()
-In-Reply-To: <1459343923-16283-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1459343923-16283-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1459343923-16283-3-git-send-email-ard.biesheuvel@linaro.org>
+From: vgoyal@redhat.com (Vivek Goyal)
+Date: Wed, 30 Mar 2016 09:27:08 -0400
+Subject: [PATCH] ARM: kexec: fix crashkernel= handling
+In-Reply-To: <20160330130530.GH19428@n2100.arm.linux.org.uk>
+References: <E1akqb5-0002LZ-1f@rmk-PC.arm.linux.org.uk>
+ <20160330014638.GA6993@dhcp-128-65.nay.redhat.com>
+ <20160330123922.GA11351@dhcppc0.redhat.com>
+ <20160330130530.GH19428@n2100.arm.linux.org.uk>
+Message-ID: <20160330132708.GC32738@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This removes the relocate_initrd() implementation and invocation, which are
-no longer needed now that the placement of the initrd is guaranteed to be
-covered by the linear mapping.
+On Wed, Mar 30, 2016 at 02:05:30PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Mar 30, 2016 at 06:09:22PM +0530, Pratyush Anand wrote:
+> > On 30/03/2016:09:46:38 AM, Dave Young wrote:
+> > > Hi, Russell
+> > > 
+> > > A long standing issue, but nobody tried to do it. Thank you for bringing up.
+> > > 
+> > > On 03/29/16 at 11:10am, Russell King wrote:
+> > > > When the kernel crashkernel parameter is specified with just a size, we
+> > > > are supposed to allocate a region from RAM to store the crashkernel.
+> > > > However, ARM merely reserves physical address zero with no checking
+> > > > that there is even RAM there.
+> > > > 
+> > > > Fix this by lifting similar code from x86, importing it to ARM with
+> > > > the ARM specific parameters added.
+> > > > 
+> > > > Update the kdump documentation to reflect this change.
+> > > > 
+> > > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > > > ---
+> > > >  Documentation/kdump/kdump.txt | 13 +++----------
+> > > >  arch/arm/kernel/setup.c       | 26 ++++++++++++++++++++++++++
+> > > >  2 files changed, 29 insertions(+), 10 deletions(-)
+> > > > 
+> > > > diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
+> > > > index bc4bd5a44b88..88ff63d5fde3 100644
+> > > > --- a/Documentation/kdump/kdump.txt
+> > > > +++ b/Documentation/kdump/kdump.txt
+> > > > @@ -263,12 +263,6 @@ been removed from the machine.
+> > > >      crashkernel=<range1>:<size1>[,<range2>:<size2>,...][@offset]
+> > > >      range=start-[end]
+> > > >  
+> > > > -Please note, on arm, the offset is required.
+> > > > -    crashkernel=<range1>:<size1>[,<range2>:<size2>,...]@offset
+> > > > -    range=start-[end]
+> > > > -
+> > > > -    'start' is inclusive and 'end' is exclusive.
+> > > > -
+> > > >  For example:
+> > > >  
+> > > >      crashkernel=512M-2G:64M,2G-:128M
+> > > > @@ -307,10 +301,9 @@ Boot into System Kernel
+> > > >     on the memory consumption of the kdump system. In general this is not
+> > > >     dependent on the memory size of the production system.
+> > > >  
+> > > > -   On arm, use "crashkernel=Y at X". Note that the start address of the kernel
+> > > > -   will be aligned to 128MiB (0x08000000), so if the start address is not then
+> > > > -   any space below the alignment point may be overwritten by the dump-capture kernel,
+> > > > -   which means it is possible that the vmcore is not that precise as expected.
+> > > > +   On arm, the use of "crashkernel=Y at X" is no longer necessary; the
+> > > > +   kernel will automatically locate the crash kernel image within the
+> > > > +   first 512MB of RAM if X is not given.
+> > > >  
+> > > >  
+> > > >  Load the Dump-capture Kernel
+> > > > diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> > > > index 7d0cba6f1cc5..5d8511c425f0 100644
+> > > > --- a/arch/arm/kernel/setup.c
+> > > > +++ b/arch/arm/kernel/setup.c
+> > > > @@ -938,6 +938,13 @@ static int __init init_machine_late(void)
+> > > >  late_initcall(init_machine_late);
+> > > >  
+> > > >  #ifdef CONFIG_KEXEC
+> > > > +/*
+> > > > + * The crash region must be aligned to 128MB to avoid
+> > > > + * zImage relocating below the reserved region.
+> > > > + */
+> > > > +#define CRASH_ALIGN	(128 << 20)
+> > > > +#define CRASH_ADDR_MAX	(PHYS_OFFSET + (512 << 20))
+> > > 
+> > > Any reason to limit crash mem within the first 512M only? What if one want to
+> > > reserve memory over 512M?
+> > 
+> > When crash base is not give, then may be it can be just checked if memblock
+> > region is memory and not reserved, then allow to reserve. That might help to
+> > remove 512M restriction.
+> 
+> ... and then I'll have to update the commit text.
+> 
+> You may notice that I say that this is mostly taken from the x86
+> implementation.  The x86 implementation also has this 512MB
+> allocation limit, to prevent it being placed too high in physical
+> memory.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/setup.c | 64 --------------------
- 1 file changed, 64 deletions(-)
+IIRC, x86 had this limitation as they could not support any higher. But
+if ARM can support higher, it would be good to allow that.
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 9dc67769b6a4..7b85b1d6a6fb 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -224,69 +224,6 @@ static void __init request_standard_resources(void)
- 	}
- }
- 
--#ifdef CONFIG_BLK_DEV_INITRD
--/*
-- * Relocate initrd if it is not completely within the linear mapping.
-- * This would be the case if mem= cuts out all or part of it.
-- */
--static void __init relocate_initrd(void)
--{
--	phys_addr_t orig_start = __virt_to_phys(initrd_start);
--	phys_addr_t orig_end = __virt_to_phys(initrd_end);
--	phys_addr_t ram_end = memblock_end_of_DRAM();
--	phys_addr_t new_start;
--	unsigned long size, to_free = 0;
--	void *dest;
--
--	if (orig_end <= ram_end)
--		return;
--
--	/*
--	 * Any of the original initrd which overlaps the linear map should
--	 * be freed after relocating.
--	 */
--	if (orig_start < ram_end)
--		to_free = ram_end - orig_start;
--
--	size = orig_end - orig_start;
--	if (!size)
--		return;
--
--	/* initrd needs to be relocated completely inside linear mapping */
--	new_start = memblock_find_in_range(0, PFN_PHYS(max_pfn),
--					   size, PAGE_SIZE);
--	if (!new_start)
--		panic("Cannot relocate initrd of size %ld\n", size);
--	memblock_reserve(new_start, size);
--
--	initrd_start = __phys_to_virt(new_start);
--	initrd_end   = initrd_start + size;
--
--	pr_info("Moving initrd from [%llx-%llx] to [%llx-%llx]\n",
--		orig_start, orig_start + size - 1,
--		new_start, new_start + size - 1);
--
--	dest = (void *)initrd_start;
--
--	if (to_free) {
--		memcpy(dest, (void *)__phys_to_virt(orig_start), to_free);
--		dest += to_free;
--	}
--
--	copy_from_early_mem(dest, orig_start + to_free, size - to_free);
--
--	if (to_free) {
--		pr_info("Freeing original RAMDISK from [%llx-%llx]\n",
--			orig_start, orig_start + to_free - 1);
--		memblock_free(orig_start, to_free);
--	}
--}
--#else
--static inline void __init relocate_initrd(void)
--{
--}
--#endif
--
- u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
- 
- void __init setup_arch(char **cmdline_p)
-@@ -327,7 +264,6 @@ void __init setup_arch(char **cmdline_p)
- 	acpi_boot_table_init();
- 
- 	paging_init();
--	relocate_initrd();
- 
- 	kasan_init();
- 
--- 
-2.5.0
+Thanks
+Vivek
