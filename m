@@ -1,74 +1,238 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 30 Mar 2016 15:56:51 +0200
-Subject: [RFC PATCH 00/45] KVM: arm/arm64: Rework virtual GIC emulation
-In-Reply-To: <56FBBDFB.7080308@arm.com>
-References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
- <56FA7F29.4060005@arm.com> <56FBBBC2.6010602@arm.com>
- <56FBBDFB.7080308@arm.com>
-Message-ID: <20160330135651.GJ4126@cbox>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 30 Mar 2016 22:06:17 +0800
+Subject: [PATCH v4 2/2] arm64: dts: add LS1043a-QDS board support
+In-Reply-To: <1457403939-12080-2-git-send-email-Zhiqiang.Hou@nxp.com>
+References: <1457403939-12080-1-git-send-email-Zhiqiang.Hou@nxp.com>
+ <1457403939-12080-2-git-send-email-Zhiqiang.Hou@nxp.com>
+Message-ID: <20160330140608.GL28207@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir,
-
-On Wed, Mar 30, 2016 at 12:52:27PM +0100, Vladimir Murzin wrote:
-> On 30/03/16 12:42, Vladimir Murzin wrote:
-> > On 29/03/16 14:12, Vladimir Murzin wrote:
-> >> Hi Andre,
-> >>
-> >> On 25/03/16 02:04, Andre Przywara wrote:
-> >>> Please have a look at the series, review it and give the code some
-> >>> serious testing (and possibly debugging). All feedback is appreciated.
-> >>
-> >> I see that with the new vgic implementation kvmtool starts throwing:
-> >>
-> >> kvm [1273]: Unable to register VGICv3 redist MMIO regions
-> >>
-> > 
-> > It comes from kvm_io_bus_register_dev()
-> > 
-> > if (bus->dev_count - bus->ioeventfd_count > NR_IOBUS_DEVS - 1)
-> > 	return -ENOSPC;
-> > 
-> > with bus->dev_count being 1000
-> > 
-> > [<ffffffc00009f93c>] kvm_io_bus_register_dev+0x130/0x148
-> > [<ffffffc0000ad274>] kvm_vgic_register_mmio_region+0xac/0xdc
-> > [<ffffffc0000ad4d4>] vgic_register_redist_regions+0xb8/0x158
-> > [<ffffffc0000abb90>] vgic_v3_map_resources+0x5c/0xf0
-> > [<ffffffc0000aae04>] kvm_vgic_map_resources+0x40/0x84
-> > [<ffffffc0000a23d0>] kvm_arch_vcpu_ioctl_run+0x3f0/0x400
-> > [<ffffffc00009d484>] kvm_vcpu_ioctl+0x2d4/0x6ec
-> > [<ffffffc0001c4eec>] do_vfs_ioctl+0xb4/0x760
-> > [<ffffffc0001c561c>] SyS_ioctl+0x84/0x98
-> > [<ffffffc000085d30>] el0_svc_naked+0x24/0x28
-> > 
+On Tue, Mar 08, 2016 at 10:25:39AM +0800, Zhiqiang Hou wrote:
+> From: Shaohui Xie <Shaohui.Xie@freescale.com>
 > 
-> and one more thing I've forgotten to mention... something odd happens on
-> destroy path
+> The LS1043a-QDS board is a high-performance computing, evaluation,
+> development, and test platform supporting the LS1043a SoC.
 > 
-> INFO: task kvm-vcpu-0:1123 blocked for more than 120 seconds.
->       Tainted: G        W       4.5.0-rc6+ #432
-> "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
-> kvm-vcpu-0      D ffffffc000086bcc     0  1123   1114 0x00000008
-> Call trace:
-> [<ffffffc000086bcc>] __switch_to+0x90/0xa4
-> [<ffffffc0006c4390>] __schedule+0x188/0x59c
-> [<ffffffc0006c47e0>] schedule+0x3c/0xa0
-> [<ffffffc0006c4bf4>] schedule_preempt_disabled+0x20/0x38
-> [<ffffffc0006c618c>] __mutex_lock_slowpath+0xc4/0x148
-> [<ffffffc0006c6254>] mutex_lock+0x44/0x5c
-> [<ffffffc0000aacb8>] kvm_vgic_destroy+0x20/0xb0
-> [<ffffffc0000abbdc>] vgic_v3_map_resources+0xa8/0xf0
-> [<ffffffc0000aae04>] kvm_vgic_map_resources+0x40/0x84
-> [<ffffffc0000a23d0>] kvm_arch_vcpu_ioctl_run+0x3f0/0x400
-> [<ffffffc00009d484>] kvm_vcpu_ioctl+0x2d4/0x6ec
-> [<ffffffc0001c4eec>] do_vfs_ioctl+0xb4/0x760
-> [<ffffffc0001c561c>] SyS_ioctl+0x84/0x98
-> [<ffffffc000085d30>] el0_svc_naked+0x24/0x28
+> Signed-off-by: Shaohui Xie <Shaohui.Xie@freescale.com>
+> Signed-off-by: Mingkai Hu <Mingkai.Hu@freescale.com>
+> Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+
+The series looks good to me.  There are a couple of small comments in
+this patch as below, but I decided to fix them myself and applied both
+patches.
+
+> ---
+> v4:
+>  - No change.
 > 
+> v3:
+>  - Resort the nodes alphabetically.
+>  - Correct the compatible of nodes adt7461a at24,24c512 and pca9547.
+>  - Change the name of adt7461a to temp-sensor.
+> 
+> v2:
+>  - Add root node compatible property.
+> 
+>  arch/arm64/boot/dts/freescale/Makefile            |   1 +
+>  arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts | 167 ++++++++++++++++++++++
+>  2 files changed, 168 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
+> 
+> diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
+> index f3c2516..1423fa4 100644
+> --- a/arch/arm64/boot/dts/freescale/Makefile
+> +++ b/arch/arm64/boot/dts/freescale/Makefile
+> @@ -2,6 +2,7 @@ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-qds.dtb
+>  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-rdb.dtb
+>  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-simu.dtb
+>  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1043a-rdb.dtb
+> +dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1043a-qds.dtb
 
-Is this also with many many VCPUs or in general?
+The list should maintained alphabetically.
 
-Thanks,
--Christoffer
+>   
+>  always		:= $(dtb-y)
+>  subdir-y	:= $(dts-dirs)
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
+> new file mode 100644
+> index 0000000..97e9906
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
+> @@ -0,0 +1,167 @@
+> +/*
+> + * Device Tree Include file for Freescale Layerscape-1043A family SoC.
+> + *
+> + * Copyright 2014-2015, Freescale Semiconductor
+> + *
+> + * Mingkai Hu <Mingkai.hu@freescale.com>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPLv2 or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This library is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This library is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +/include/ "fsl-ls1043a.dtsi"
+> +
+> +/ {
+> +	model = "LS1043A QDS Board";
+> +	compatible = "fsl,ls1043a-qds", "fsl,ls1043a";
+> +
+> +	aliases {
+> +		gpio0 = &gpio1;
+> +		gpio1 = &gpio2;
+> +		gpio2 = &gpio3;
+> +		gpio3 = &gpio4;
+> +		serial0 = &lpuart0;
+> +		serial1 = &lpuart1;
+> +		serial2 = &lpuart2;
+> +		serial3 = &lpuart3;
+> +		serial4 = &lpuart4;
+> +		serial5 = &lpuart5;
+> +	};
+> +};
+> +
+> +&duart0 {
+> +	status = "okay";
+> +};
+> +
+> +&duart1 {
+> +	status = "okay";
+> +};
+> +
+> +&ifc {
+> +	#address-cells = <2>;
+> +	#size-cells = <1>;
+> +	/* NOR, NAND Flashes and FPGA on board */
+> +	ranges = <0x0 0x0 0x0 0x60000000 0x08000000
+> +		  0x1 0x0 0x0 0x7e800000 0x00010000
+> +		  0x2 0x0 0x0 0x7fb00000 0x00000100>;
+> +	status = "okay";
+> +
+> +	nor at 0,0 {
+> +		compatible = "cfi-flash";
+> +		reg = <0x0 0x0 0x8000000>;
+> +		bank-width = <2>;
+> +		device-width = <1>;
+> +	};
+> +
+> +	nand at 1,0 {
+> +		compatible = "fsl,ifc-nand";
+> +		reg = <0x1 0x0 0x10000>;
+> +	};
+> +
+> +	fpga: board-control at 2,0 {
+> +		compatible = "fsl,ls1043aqds-fpga", "fsl,fpga-qixis";
+> +		reg = <0x2 0x0 0x0000100>;
+> +	};
+> +};
+> +
+> +&i2c0 {
+> +	status = "okay";
+
+We generally have a new line between properties and sub-node.
+
+Shawn
+
+> +	pca9547 at 77 {
+> +		compatible = "nxp,pca9547";
+> +		reg = <0x77>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		i2c at 0 {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			reg = <0x0>;
+> +
+> +			rtc at 68 {
+> +				compatible = "dallas,ds3232";
+> +				reg = <0x68>;
+> +				/* IRQ10_B */
+> +				interrupts = <0 150 0x4>;
+> +			};
+> +		};
+> +
+> +		i2c at 2 {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			reg = <0x2>;
+> +
+> +			ina220 at 40 {
+> +				compatible = "ti,ina220";
+> +				reg = <0x40>;
+> +				shunt-resistor = <1000>;
+> +			};
+> +
+> +			ina220 at 41 {
+> +				compatible = "ti,ina220";
+> +				reg = <0x41>;
+> +				shunt-resistor = <1000>;
+> +			};
+> +		};
+> +
+> +		i2c at 3 {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			reg = <0x3>;
+> +
+> +			eeprom at 56 {
+> +				compatible = "atmel,24c512";
+> +				reg = <0x56>;
+> +			};
+> +
+> +			eeprom at 57 {
+> +				compatible = "atmel,24c512";
+> +				reg = <0x57>;
+> +			};
+> +
+> +			temp-sensor at 4c {
+> +				compatible = "adi,adt7461a";
+> +				reg = <0x4c>;
+> +			};
+> +		};
+> +	};
+> +};
+> +
+> +&lpuart0 {
+> +	status = "okay";
+> +};
+> -- 
+> 2.1.0.27.g96db324
+> 
+> 
