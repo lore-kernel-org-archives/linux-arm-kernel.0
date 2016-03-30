@@ -1,88 +1,74 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 30 Mar 2016 12:52:27 +0100
-Subject: [RFC PATCH 00/45] KVM: arm/arm64: Rework virtual GIC emulation
-In-Reply-To: <56FBBBC2.6010602@arm.com>
-References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
- <56FA7F29.4060005@arm.com> <56FBBBC2.6010602@arm.com>
-Message-ID: <56FBBDFB.7080308@arm.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 30 Mar 2016 19:53:41 +0800
+Subject: [PATCH] net: mvpp2: replace MVPP2_CPU_D_CACHE_LINE_SIZE with
+ L1_CACHE_BYTES
+Message-ID: <1459338821-343-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/03/16 12:42, Vladimir Murzin wrote:
-> On 29/03/16 14:12, Vladimir Murzin wrote:
->> Hi Andre,
->>
->> On 25/03/16 02:04, Andre Przywara wrote:
->>> Please have a look at the series, review it and give the code some
->>> serious testing (and possibly debugging). All feedback is appreciated.
->>
->> I see that with the new vgic implementation kvmtool starts throwing:
->>
->> kvm [1273]: Unable to register VGICv3 redist MMIO regions
->>
-> 
-> It comes from kvm_io_bus_register_dev()
-> 
-> if (bus->dev_count - bus->ioeventfd_count > NR_IOBUS_DEVS - 1)
-> 	return -ENOSPC;
-> 
-> with bus->dev_count being 1000
-> 
-> [<ffffffc00009f93c>] kvm_io_bus_register_dev+0x130/0x148
-> [<ffffffc0000ad274>] kvm_vgic_register_mmio_region+0xac/0xdc
-> [<ffffffc0000ad4d4>] vgic_register_redist_regions+0xb8/0x158
-> [<ffffffc0000abb90>] vgic_v3_map_resources+0x5c/0xf0
-> [<ffffffc0000aae04>] kvm_vgic_map_resources+0x40/0x84
-> [<ffffffc0000a23d0>] kvm_arch_vcpu_ioctl_run+0x3f0/0x400
-> [<ffffffc00009d484>] kvm_vcpu_ioctl+0x2d4/0x6ec
-> [<ffffffc0001c4eec>] do_vfs_ioctl+0xb4/0x760
-> [<ffffffc0001c561c>] SyS_ioctl+0x84/0x98
-> [<ffffffc000085d30>] el0_svc_naked+0x24/0x28
-> 
+The mvpp2 ip maybe used in SoCs which may have have 64bytes cacheline
+size. Replace the MVPP2_CPU_D_CACHE_LINE_SIZE with L1_CACHE_BYTES.
 
-and one more thing I've forgotten to mention... something odd happens on
-destroy path
+And since dma_alloc_coherent() is always cacheline size aligned, so
+remove the align checks.
 
-INFO: task kvm-vcpu-0:1123 blocked for more than 120 seconds.
-      Tainted: G        W       4.5.0-rc6+ #432
-"echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
-kvm-vcpu-0      D ffffffc000086bcc     0  1123   1114 0x00000008
-Call trace:
-[<ffffffc000086bcc>] __switch_to+0x90/0xa4
-[<ffffffc0006c4390>] __schedule+0x188/0x59c
-[<ffffffc0006c47e0>] schedule+0x3c/0xa0
-[<ffffffc0006c4bf4>] schedule_preempt_disabled+0x20/0x38
-[<ffffffc0006c618c>] __mutex_lock_slowpath+0xc4/0x148
-[<ffffffc0006c6254>] mutex_lock+0x44/0x5c
-[<ffffffc0000aacb8>] kvm_vgic_destroy+0x20/0xb0
-[<ffffffc0000abbdc>] vgic_v3_map_resources+0xa8/0xf0
-[<ffffffc0000aae04>] kvm_vgic_map_resources+0x40/0x84
-[<ffffffc0000a23d0>] kvm_arch_vcpu_ioctl_run+0x3f0/0x400
-[<ffffffc00009d484>] kvm_vcpu_ioctl+0x2d4/0x6ec
-[<ffffffc0001c4eec>] do_vfs_ioctl+0xb4/0x760
-[<ffffffc0001c561c>] SyS_ioctl+0x84/0x98
-[<ffffffc000085d30>] el0_svc_naked+0x24/0x28
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ drivers/net/ethernet/marvell/mvpp2.c | 14 +-------------
+ 1 file changed, 1 insertion(+), 13 deletions(-)
 
-Vladimir
-
-> Hope this helps...
-> Vladimir
-> 
->> for --cpus 58 and above, where with the old vgic it is quite happy with
->> up to 255 cpus.
->>
->> Cheers
->> Vladimir
->> _______________________________________________
->> kvmarm mailing list
->> kvmarm at lists.cs.columbia.edu
->> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
->>
->>
-> 
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
-> 
-> 
+diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
+index c797971a..05f358b 100644
+--- a/drivers/net/ethernet/marvell/mvpp2.c
++++ b/drivers/net/ethernet/marvell/mvpp2.c
+@@ -321,7 +321,6 @@
+ /* Lbtd 802.3 type */
+ #define MVPP2_IP_LBDT_TYPE		0xfffa
+ 
+-#define MVPP2_CPU_D_CACHE_LINE_SIZE	32
+ #define MVPP2_TX_CSUM_MAX_SIZE		9800
+ 
+ /* Timeout constants */
+@@ -377,7 +376,7 @@
+ 
+ #define MVPP2_RX_PKT_SIZE(mtu) \
+ 	ALIGN((mtu) + MVPP2_MH_SIZE + MVPP2_VLAN_TAG_LEN + \
+-	      ETH_HLEN + ETH_FCS_LEN, MVPP2_CPU_D_CACHE_LINE_SIZE)
++	      ETH_HLEN + ETH_FCS_LEN, L1_CACHE_BYTES)
+ 
+ #define MVPP2_RX_BUF_SIZE(pkt_size)	((pkt_size) + NET_SKB_PAD)
+ #define MVPP2_RX_TOTAL_SIZE(buf_size)	((buf_size) + MVPP2_SKB_SHINFO_SIZE)
+@@ -4493,10 +4492,6 @@ static int mvpp2_aggr_txq_init(struct platform_device *pdev,
+ 	if (!aggr_txq->descs)
+ 		return -ENOMEM;
+ 
+-	/* Make sure descriptor address is cache line size aligned  */
+-	BUG_ON(aggr_txq->descs !=
+-	       PTR_ALIGN(aggr_txq->descs, MVPP2_CPU_D_CACHE_LINE_SIZE));
+-
+ 	aggr_txq->last_desc = aggr_txq->size - 1;
+ 
+ 	/* Aggr TXQ no reset WA */
+@@ -4526,9 +4521,6 @@ static int mvpp2_rxq_init(struct mvpp2_port *port,
+ 	if (!rxq->descs)
+ 		return -ENOMEM;
+ 
+-	BUG_ON(rxq->descs !=
+-	       PTR_ALIGN(rxq->descs, MVPP2_CPU_D_CACHE_LINE_SIZE));
+-
+ 	rxq->last_desc = rxq->size - 1;
+ 
+ 	/* Zero occupied and non-occupied counters - direct access */
+@@ -4616,10 +4608,6 @@ static int mvpp2_txq_init(struct mvpp2_port *port,
+ 	if (!txq->descs)
+ 		return -ENOMEM;
+ 
+-	/* Make sure descriptor address is cache line size aligned  */
+-	BUG_ON(txq->descs !=
+-	       PTR_ALIGN(txq->descs, MVPP2_CPU_D_CACHE_LINE_SIZE));
+-
+ 	txq->last_desc = txq->size - 1;
+ 
+ 	/* Set Tx descriptors queue starting address - indirect access */
+-- 
+2.8.0.rc3
