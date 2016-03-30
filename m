@@ -1,54 +1,81 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 30 Mar 2016 09:22:33 +0800
-Subject: [PATCH v4 1/2] watchdog: imx2_wdt: add external reset support
- via 'ext-reset-output' dt prop
-In-Reply-To: <56F991C3.8030201@timesys.com>
-References: <20151105222325.GA26159@roeck-us.net>
- <CAJ+vNU2fSxRJ7YvxOfNzoEoiKgzv-dHj=+eksKxH48ekHiUw2Q@mail.gmail.com>
- <20151106220249.GA19791@roeck-us.net>
- <565F4244.7090502@timesys.com>
- <CAJ+vNU00Bf97HUqkkW9KqOUzHXh482R9O1gasz6ju3Pn-_5chA@mail.gmail.com>
- <CAJ+vNU2qHQPSJ1KWp_3f3vAdeuOcF0ooZHmHsdafabZLXJv=Bw@mail.gmail.com>
- <20151228162923.GA31680@spo001.leaseweb.nl>
- <56AA79DA.2010305@timesys.com>
- <CAOMZO5DrTY3ho0Z_jXxeYMqbd6GmUKRwD1LB61vM1ZTGQAYOrg@mail.gmail.com>
- <56F991C3.8030201@timesys.com>
-Message-ID: <20160330012226.GD28207@tiger>
+From: dyoung@redhat.com (Dave Young)
+Date: Wed, 30 Mar 2016 09:46:38 +0800
+Subject: [PATCH] ARM: kexec: fix crashkernel= handling
+In-Reply-To: <E1akqb5-0002LZ-1f@rmk-PC.arm.linux.org.uk>
+References: <E1akqb5-0002LZ-1f@rmk-PC.arm.linux.org.uk>
+Message-ID: <20160330014638.GA6993@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 28, 2016 at 04:19:15PM -0400, Akshay Bhat wrote:
-> Hi Shawn,
+Hi, Russell
+
+A long standing issue, but nobody tried to do it. Thank you for bringing up.
+
+On 03/29/16 at 11:10am, Russell King wrote:
+> When the kernel crashkernel parameter is specified with just a size, we
+> are supposed to allocate a region from RAM to store the crashkernel.
+> However, ARM merely reserves physical address zero with no checking
+> that there is even RAM there.
 > 
-> On 02/28/2016 08:56 AM, Fabio Estevam wrote:
-> >Rob,
-> >
-> >On Thu, Jan 28, 2016 at 6:28 PM, Akshay Bhat <akshay.bhat@timesys.com> wrote:
-> >
-> >>>I have no objections against the idea and the code itself.
-> >>>But as Guenter pointed out: it would be handy to get feedback from the
-> >>>devicetree maintainers on the above discussion.
-> >>>
-> >>>Kind regards,
-> >>>Wim.
-> >>>
-> >>
-> >>Any suggestions on whether a vendor specific prefix is necessary?
-> >
-> >Any comments?
-> >
+> Fix this by lifting similar code from x86, importing it to ARM with
+> the ARM specific parameters added.
 > 
-> Is this something you can help with, since you are the iMX
-> architecture/devicetree maintainer? Appreciate any feedback.
+> Update the kdump documentation to reflect this change.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  Documentation/kdump/kdump.txt | 13 +++----------
+>  arch/arm/kernel/setup.c       | 26 ++++++++++++++++++++++++++
+>  2 files changed, 29 insertions(+), 10 deletions(-)
+> 
+> diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
+> index bc4bd5a44b88..88ff63d5fde3 100644
+> --- a/Documentation/kdump/kdump.txt
+> +++ b/Documentation/kdump/kdump.txt
+> @@ -263,12 +263,6 @@ been removed from the machine.
+>      crashkernel=<range1>:<size1>[,<range2>:<size2>,...][@offset]
+>      range=start-[end]
+>  
+> -Please note, on arm, the offset is required.
+> -    crashkernel=<range1>:<size1>[,<range2>:<size2>,...]@offset
+> -    range=start-[end]
+> -
+> -    'start' is inclusive and 'end' is exclusive.
+> -
+>  For example:
+>  
+>      crashkernel=512M-2G:64M,2G-:128M
+> @@ -307,10 +301,9 @@ Boot into System Kernel
+>     on the memory consumption of the kdump system. In general this is not
+>     dependent on the memory size of the production system.
+>  
+> -   On arm, use "crashkernel=Y at X". Note that the start address of the kernel
+> -   will be aligned to 128MiB (0x08000000), so if the start address is not then
+> -   any space below the alignment point may be overwritten by the dump-capture kernel,
+> -   which means it is possible that the vmcore is not that precise as expected.
+> +   On arm, the use of "crashkernel=Y at X" is no longer necessary; the
+> +   kernel will automatically locate the crash kernel image within the
+> +   first 512MB of RAM if X is not given.
+>  
+>  
+>  Load the Dump-capture Kernel
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 7d0cba6f1cc5..5d8511c425f0 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -938,6 +938,13 @@ static int __init init_machine_late(void)
+>  late_initcall(init_machine_late);
+>  
+>  #ifdef CONFIG_KEXEC
+> +/*
+> + * The crash region must be aligned to 128MB to avoid
+> + * zImage relocating below the reserved region.
+> + */
+> +#define CRASH_ALIGN	(128 << 20)
+> +#define CRASH_ADDR_MAX	(PHYS_OFFSET + (512 << 20))
 
-FWIW,
+Any reason to limit crash mem within the first 512M only? What if one want to
+reserve memory over 512M?
 
-Acked-by: Shawn Guo <shawnguo@kernel.org>
-
-Guenter,
-
-I think it's reasonable to pick up the patch, if we have it copied to DT
-maintainers and on the list for a long period of time, and do not see
-any objection from anyone.
-
-Shawn
+Thanks
+Dave
