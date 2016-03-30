@@ -1,89 +1,111 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 30 Mar 2016 22:03:50 +0200
-Subject: [PATCH v5 27/46] regulator: pwm: adjust PWM config at probe time
+Date: Wed, 30 Mar 2016 22:04:01 +0200
+Subject: [PATCH v5 38/46] input: misc: pwm-beeper: switch to the atomic PWM API
 In-Reply-To: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1459368249-13241-28-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1459368249-13241-39-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PWM attached to a PWM regulator device might have been previously
-configured by the bootloader.
-Make sure the bootloader and linux config are in sync, and adjust the PWM
-config if that's not the case.
+pwm_config/enable/disable() have been deprecated and should be replaced
+by pwm_apply_state().
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/regulator/pwm-regulator.c | 50 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 50 insertions(+)
+ drivers/input/misc/pwm-beeper.c | 46 +++++++++++++++++++++++++++--------------
+ 1 file changed, 31 insertions(+), 15 deletions(-)
 
-diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
-index 9154c47..9590fb0 100644
---- a/drivers/regulator/pwm-regulator.c
-+++ b/drivers/regulator/pwm-regulator.c
-@@ -240,6 +240,52 @@ static int pwm_regulator_init_continuous(struct platform_device *pdev,
- 	return 0;
- }
- 
-+static int pwm_regulator_adjust_pwm_config(struct pwm_regulator_data *drvdata)
-+{
-+	struct pwm_state pstate = { };
-+	struct pwm_args pargs = { };
-+
-+	pwm_get_args(drvdata->pwm, &pargs);
-+	pwm_get_state(drvdata->pwm, &pstate);
-+
-+	/*
-+	 * if the current period is zero this either means the PWM driver
-+	 * does not support initial state retrieval or the PWM was not
-+	 * configured.
-+	 * In any case, we setup the new period and poloarity, and assign a
-+	 * duty_cycle of 0.
-+	 */
-+	if (!pstate.period) {
-+		pstate.duty_cycle = 0;
-+		pstate.period = pargs.period;
-+		pstate.polarity = pargs.polarity;
-+
-+		return pwm_apply_state(drvdata->pwm, &pstate);
-+	}
-+
-+	/*
-+	 * Adjust the PWM dutycycle/period based on the period value provided
-+	 * in PWM args.
-+	 */
-+	if (pargs.period != pstate.period) {
-+		u64 dutycycle = (u64)pstate.duty_cycle * pargs.period;
-+
-+		do_div(dutycycle, pstate.period);
-+		pstate.duty_cycle = dutycycle;
-+		pstate.period = pargs.period;
-+	}
-+
-+	/*
-+	 * If the polarity changed, we should also change the dutycycle value.
-+	 */
-+	if (pargs.polarity != pstate.polarity) {
-+		pstate.polarity = pargs.polarity;
-+		pstate.duty_cycle = pstate.period - pstate.duty_cycle;
-+	}
-+
-+	return pwm_apply_state(drvdata->pwm, &pstate);
-+}
-+
- static int pwm_regulator_probe(struct platform_device *pdev)
+diff --git a/drivers/input/misc/pwm-beeper.c b/drivers/input/misc/pwm-beeper.c
+index f2261ab..36c9897 100644
+--- a/drivers/input/misc/pwm-beeper.c
++++ b/drivers/input/misc/pwm-beeper.c
+@@ -34,7 +34,7 @@ static int pwm_beeper_event(struct input_dev *input,
  {
- 	const struct regulator_init_data *init_data;
-@@ -283,6 +329,10 @@ static int pwm_regulator_probe(struct platform_device *pdev)
- 		return PTR_ERR(drvdata->pwm);
+ 	int ret = 0;
+ 	struct pwm_beeper *beeper = input_get_drvdata(input);
+-	unsigned long period;
++	struct pwm_state pstate;
+ 
+ 	if (type != EV_SND || value < 0)
+ 		return -EINVAL;
+@@ -49,19 +49,22 @@ static int pwm_beeper_event(struct input_dev *input,
+ 		return -EINVAL;
  	}
  
-+	ret = pwm_regulator_adjust_pwm_config(drvdata);
++	pwm_get_state(beeper->pwm, &pstate);
++
+ 	if (value == 0) {
+-		pwm_disable(beeper->pwm);
++		pstate.enabled = false;
+ 	} else {
+-		period = HZ_TO_NANOSECONDS(value);
+-		ret = pwm_config(beeper->pwm, period / 2, period);
+-		if (ret)
+-			return ret;
+-		ret = pwm_enable(beeper->pwm);
+-		if (ret)
+-			return ret;
+-		beeper->period = period;
++		pstate.enabled = false;
++		pstate.period = HZ_TO_NANOSECONDS(value);
++		pstate.duty_cycle = pstate.period / 2;
+ 	}
+ 
++	ret = pwm_apply_state(beeper->pwm, &pstate);
 +	if (ret)
 +		return ret;
 +
- 	regulator = devm_regulator_register(&pdev->dev,
- 					    &drvdata->desc, &config);
- 	if (IS_ERR(regulator)) {
++	beeper->period = value ? pstate.period : 0;
++
+ 	return 0;
+ }
+ 
+@@ -132,10 +135,13 @@ err_free:
+ static int pwm_beeper_remove(struct platform_device *pdev)
+ {
+ 	struct pwm_beeper *beeper = platform_get_drvdata(pdev);
++	struct pwm_state pstate;
+ 
+ 	input_unregister_device(beeper->input);
+ 
+-	pwm_disable(beeper->pwm);
++	pwm_get_state(beeper->pwm, &pstate);
++	pstate.enabled = false;
++	pwm_apply_state(beeper->pwm, &pstate);
+ 	pwm_free(beeper->pwm);
+ 
+ 	kfree(beeper);
+@@ -147,8 +153,13 @@ static int __maybe_unused pwm_beeper_suspend(struct device *dev)
+ {
+ 	struct pwm_beeper *beeper = dev_get_drvdata(dev);
+ 
+-	if (beeper->period)
+-		pwm_disable(beeper->pwm);
++	if (beeper->period) {
++		struct pwm_state pstate;
++
++		pwm_get_state(beeper->pwm, &pstate);
++		pstate.enabled = false;
++		pwm_apply_state(beeper->pwm, &pstate);
++	}
+ 
+ 	return 0;
+ }
+@@ -158,8 +169,13 @@ static int __maybe_unused pwm_beeper_resume(struct device *dev)
+ 	struct pwm_beeper *beeper = dev_get_drvdata(dev);
+ 
+ 	if (beeper->period) {
+-		pwm_config(beeper->pwm, beeper->period / 2, beeper->period);
+-		pwm_enable(beeper->pwm);
++		struct pwm_state pstate;
++
++		pwm_get_state(beeper->pwm, &pstate);
++		pstate.period = beeper->period;
++		pstate.duty_cycle = beeper->period / 2;
++		pstate.enabled = true;
++		pwm_apply_state(beeper->pwm, &pstate);
+ 	}
+ 
+ 	return 0;
 -- 
 2.5.0
