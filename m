@@ -1,63 +1,95 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 30 Mar 2016 22:04:09 +0200
-Subject: [PATCH v5 46/46] ARM: s3c24xx: rx1950: switch to the atomic PWM API
+Date: Wed, 30 Mar 2016 22:03:55 +0200
+Subject: [PATCH v5 32/46] pwm: deprecate pwm_config(),
+ pwm_enable() and pwm_disable()
 In-Reply-To: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1459368249-13241-47-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1459368249-13241-33-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace pwm_disable/enable/config() by pwm_apply_state().
+Prefix those function as deprecated to encourage all existing users to
+switch to pwm_apply_state().
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- arch/arm/mach-s3c24xx/mach-rx1950.c | 17 ++++++++++++++---
- 1 file changed, 14 insertions(+), 3 deletions(-)
+ include/linux/pwm.h | 24 ++++++++++++------------
+ 1 file changed, 12 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-s3c24xx/mach-rx1950.c b/arch/arm/mach-s3c24xx/mach-rx1950.c
-index 774c982..2dc9487 100644
---- a/arch/arm/mach-s3c24xx/mach-rx1950.c
-+++ b/arch/arm/mach-s3c24xx/mach-rx1950.c
-@@ -384,10 +384,15 @@ static struct pwm_device *lcd_pwm;
- 
- static void rx1950_lcd_power(int enable)
+diff --git a/include/linux/pwm.h b/include/linux/pwm.h
+index 4aad4eb..9bac10f 100644
+--- a/include/linux/pwm.h
++++ b/include/linux/pwm.h
+@@ -225,8 +225,8 @@ int pwm_apply_state(struct pwm_device *pwm, struct pwm_state *state);
+  *
+  * Returns: 0 on success or a negative error code on failure.
+  */
+-static inline int pwm_config(struct pwm_device *pwm, int duty_ns,
+-			     int period_ns)
++static inline int __deprecated pwm_config(struct pwm_device *pwm, int duty_ns,
++					  int period_ns)
  {
-+	struct pwm_state pstate;
- 	int i;
- 	static int enabled;
-+
- 	if (enabled == enable)
- 		return;
-+
-+	pwm_get_state(lcd_pwm, &pstate);
-+
- 	if (!enable) {
+ 	struct pwm_state pstate;
  
- 		/* GPC11-GPC15->OUTPUT */
-@@ -433,15 +438,21 @@ static void rx1950_lcd_power(int enable)
+@@ -252,8 +252,8 @@ static inline int pwm_config(struct pwm_device *pwm, int duty_ns,
+  *
+  * Returns: 0 on success or a negative error code on failure.
+  */
+-static inline int pwm_set_polarity(struct pwm_device *pwm,
+-				   enum pwm_polarity polarity)
++static inline int __deprecated pwm_set_polarity(struct pwm_device *pwm,
++						enum pwm_polarity polarity)
+ {
+ 	struct pwm_state pstate;
  
- 		/* GPB1->OUTPUT, GPB1->0 */
- 		gpio_direction_output(S3C2410_GPB(1), 0);
--		pwm_config(lcd_pwm, 0, LCD_PWM_PERIOD);
-+
-+		pstate.enabled = false;
-+		pstate.period = LCD_PWM_PERIOD;
-+		pstate.duty_cycle = 0;
-+		pwm_apply_state(lcd_pwm, &pstate);
- 		pwm_disable(lcd_pwm);
+@@ -284,7 +284,7 @@ static inline int pwm_set_polarity(struct pwm_device *pwm,
+  *
+  * Returns: 0 on success or a negative error code on failure.
+  */
+-static inline int pwm_enable(struct pwm_device *pwm)
++static inline int __deprecated pwm_enable(struct pwm_device *pwm)
+ {
+ 	struct pwm_state pstate;
  
- 		/* GPC0->0, GPC10->0 */
- 		gpio_direction_output(S3C2410_GPC(0), 0);
- 		gpio_direction_output(S3C2410_GPC(10), 0);
- 	} else {
--		pwm_config(lcd_pwm, LCD_PWM_DUTY, LCD_PWM_PERIOD);
--		pwm_enable(lcd_pwm);
-+		pstate.enabled = true;
-+		pstate.period = LCD_PWM_PERIOD;
-+		pstate.duty_cycle = LCD_PWM_DUTY;
-+		pwm_apply_state(lcd_pwm, &pstate);
+@@ -303,7 +303,7 @@ static inline int pwm_enable(struct pwm_device *pwm)
+  * pwm_disable() - stop a PWM output toggling
+  * @pwm: PWM device
+  */
+-static inline void pwm_disable(struct pwm_device *pwm)
++static inline void __deprecated pwm_disable(struct pwm_device *pwm)
+ {
+ 	struct pwm_state pstate;
  
- 		gpio_direction_output(S3C2410_GPC(0), 1);
- 		gpio_direction_output(S3C2410_GPC(5), 1);
+@@ -360,24 +360,24 @@ static inline int pwm_apply_state(struct pwm_device *pwm,
+ 	return -ENOTSUPP;
+ }
+ 
+-static inline int pwm_config(struct pwm_device *pwm, int duty_ns,
+-			     int period_ns)
++static inline int __deprecated pwm_config(struct pwm_device *pwm, int duty_ns,
++					  int period_ns)
+ {
+ 	return -EINVAL;
+ }
+ 
+-static inline int pwm_set_polarity(struct pwm_device *pwm,
+-				   enum pwm_polarity polarity)
++static inline int __deprecated pwm_set_polarity(struct pwm_device *pwm,
++						enum pwm_polarity polarity)
+ {
+ 	return -ENOTSUPP;
+ }
+ 
+-static inline int pwm_enable(struct pwm_device *pwm)
++static inline int __deprecated pwm_enable(struct pwm_device *pwm)
+ {
+ 	return -EINVAL;
+ }
+ 
+-static inline void pwm_disable(struct pwm_device *pwm)
++static inline void __deprecated pwm_disable(struct pwm_device *pwm)
+ {
+ }
+ 
 -- 
 2.5.0
