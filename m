@@ -1,31 +1,37 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Wed, 30 Mar 2016 16:59:36 +0800
-Subject: [stericsson:earlydebug 1/1] undefined reference to `printascii'
-Message-ID: <201603301634.NZINzh2u%fengguang.wu@intel.com>
+From: kaloz@openwrt.org (Imre Kaloz)
+Date: Wed, 30 Mar 2016 11:05:37 +0200
+Subject: [PATCH v2] ARM: mvebu: Correct unit address for linksys
+In-Reply-To: <1459270660-30411-1-git-send-email-patrick@puiterwijk.org>
+References: <1459270660-30411-1-git-send-email-patrick@puiterwijk.org>
+Message-ID: <op.ye4rjnln2s3iss@ecaz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git earlydebug
-head:   7a0e86123c84ec8853d7c6ae248e911a04a81bb4
-commit: 7a0e86123c84ec8853d7c6ae248e911a04a81bb4 [1/1] uglyhack printascii
-config: i386-randconfig-n0-201613 (attached as .config)
-reproduce:
-        git checkout 7a0e86123c84ec8853d7c6ae248e911a04a81bb4
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+Right, a165c3b63b6f24fdc47c270db5f8b1a48b69c1b6 was merged sooner then  
+this board setup file.
 
-All errors (new ones prefixed by >>):
+Acked-by: Imre Kaloz <kaloz@openwrt.org>
 
-   init/built-in.o: In function `start_kernel':
->> (.init.text+0x45a): undefined reference to `printascii'
+On Tue, 29 Mar 2016 18:57:40 +0200, Patrick Uiterwijk  
+<patrick@puiterwijk.org> wrote:
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 21634 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160330/4ce4d522/attachment-0001.obj>
+> The USB2 port for Armada 38x is defined to be at 58000, not at
+> 50000.
+>
+> Signed-off-by: Patrick Uiterwijk <patrick@puiterwijk.org>
+> ---
+>  arch/arm/boot/dts/armada-385-linksys.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/armada-385-linksys.dtsi  
+> b/arch/arm/boot/dts/armada-385-linksys.dtsi
+> index 3710755..85d2c37 100644
+> --- a/arch/arm/boot/dts/armada-385-linksys.dtsi
+> +++ b/arch/arm/boot/dts/armada-385-linksys.dtsi
+> @@ -117,7 +117,7 @@
+>  			};
+> 			/* USB part of the eSATA/USB 2.0 port */
+> -			usb at 50000 {
+> +			usb at 58000 {
+>  				status = "okay";
+>  			};
