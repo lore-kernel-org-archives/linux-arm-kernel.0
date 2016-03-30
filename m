@@ -1,58 +1,41 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 30 Mar 2016 18:02:26 +0200
+Date: Wed, 30 Mar 2016 18:12:15 +0200
 Subject: [PATCH v4 3/3] ARM: imx6: Fix procedure to switch the parent of
  LDB_DI_CLK
-In-Reply-To: <56D60C90.7080703@timesys.com>
+In-Reply-To: <CAOMZO5A6HoQ0i7rMm4Ov6AZP6DrE+Vh09NgLtVm0yfDHH62XKw@mail.gmail.com>
 References: <1456476714-11351-1-git-send-email-p.zabel@pengutronix.de>
  <1456476714-11351-4-git-send-email-p.zabel@pengutronix.de>
  <56D60C90.7080703@timesys.com>
-Message-ID: <1459353746.2505.86.camel@pengutronix.de>
+ <CAOMZO5A6HoQ0i7rMm4Ov6AZP6DrE+Vh09NgLtVm0yfDHH62XKw@mail.gmail.com>
+Message-ID: <1459354335.2505.92.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Akshay,
-
-Am Dienstag, den 01.03.2016, 16:41 -0500 schrieb Akshay Bhat:
-[...]
-> > +		/*
-> > +		 * It is unclear whether the procedure works for switching from
-> > +		 * pll3_usb_otg to any other parent than pll5_video_div
-> > +		 */
-> > +		if (sel[i][0] > 3 && sel[i][0] != (sel[i][3] | 4)) {
-> > +			pr_err("ccm: ldb_di%d_sel workaround only for top mux\n",
-> > +			       i);
-> > +			sel[i][3] = sel[i][2] = sel[i][1] = sel[i][0];
-> > +			continue;
-> > +		}
+Am Montag, den 28.03.2016, 15:48 -0300 schrieb Fabio Estevam:
+> Hi Akshay,
 > 
-> EB821 doesn't mention the above restriction. My understanding was as 
-> long as the clock source you are switching from/to is disabled it should 
-> be ok to do so. Maybe someone from Freescale can comment?
-
-Maybe. If the only issue was that all input clocks have to be disabled,
-I don't understand why the intermediate steps 3 -> 7 -> 4 -> 0 are
-necessary though. See below for an explanation why I felt I have no idea
-how to properly switch from 4 to 1, for example. Maybe this is indeed
-not a problem at all and this condition can just be dropped. Do you have
-a way to test this?
-
-> > +
-> > +		/* First switch to the bottom mux */
-> > +		sel[i][1] = sel[i][0] | 4;
-> > +
+> On Tue, Mar 1, 2016 at 6:41 PM, Akshay Bhat <akshay.bhat@timesys.com> wrote:
 > 
-> Not sure if this really matters but as per EB821 Section 4.2, 6 b, the 
-> recommended setting for sel[i][1] is 7
+> > EB821 doesn't mention the above restriction. My understanding was as long as
+> > the clock source you are switching from/to is disabled it should be ok to do
+> > so. Maybe someone from Freescale can comment?
+> 
+> I don't have access to this EB821 document.
+> 
+> The procedure we have tested is shown here:
+> http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/commit/?h=imx_3.10.17_1.0.1_ga&id=eecbe9a52587cf9eec30132fb9b8a6761f3a1e6d
 
-As I understand, the EB821 does not explain why it should be 7, or why
-the second step should be 4, and the section you quote is explicitly
-just an example that assumes that the initial setting is the reset
-default (3).
->From the original patch description it sounded like it is necessary to
-first switch from the top mux to the bottom mux without changing the
-4-port mux, which I interpreted as |4 (and describe in the last
-paragraph of the comment above init_ldb_clocks). That information could
-well be incorrect or incomplete. I'd love to see ERR009219.
+This patch still describes the switching from top to bottom mux and only
+then manipulating the top mux:
+
+	 * The code below switches the parent to the bottom mux first
+	 * and then manipulates the top mux. This ensures that no glitch
+	 * will enter the divider.
+
+Unfortunately it doesn't detail how this is achieved exactly. I assumed
+that it's just that bit 0x4 manipulates the two-port mux that selects
+between top and bottom mux and bits 0x3 manipulate the two 4-port muxes
+(top and bottom) at the same time, but that was just conjecture.
 
 regards
 Philipp
