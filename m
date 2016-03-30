@@ -1,90 +1,55 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Wed, 30 Mar 2016 18:57:16 +0200
-Subject: [PATCH 3/3] clk: sunxi: Add sun8i PLL audio support
-In-Reply-To: <cover.1459358017.git.moinejf@free.fr>
-References: <cover.1459358017.git.moinejf@free.fr>
-Message-ID: <8ba2e0d78c70ea4c54fb25969956fc31674df612.1459358017.git.moinejf@free.fr>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Thu, 31 Mar 2016 01:55:00 +0800
+Subject: [PATCH v8] acpi, apei, arm64: APEI initial support for aarch64.
+In-Reply-To: <201603301450.pihQHWST%fengguang.wu@intel.com>
+References: <1459237458-12352-1-git-send-email-fu.wei@linaro.org>
+ <201603301450.pihQHWST%fengguang.wu@intel.com>
+Message-ID: <CADyBb7spZBi-w5wFnVjioMVo4EEjWGcVdWgtbsF+wkCA0qi=gQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the PLL type which is used by the sun8i family for audio.
+Hi Tomasz
 
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
- Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
- drivers/clk/sunxi/clk-sunxi.c                     | 48 +++++++++++++++++++++++
- 2 files changed, 49 insertions(+)
+On 30 March 2016 at 14:50, kbuild test robot <lkp@intel.com> wrote:
+> Hi Tomasz,
+>
+> [auto build test WARNING on arm64/for-next/core]
+> [also build test WARNING on v4.6-rc1 next-20160330]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+>
+> url:    https://github.com/0day-ci/linux/commits/fu-wei-linaro-org/acpi-apei-arm64-APEI-initial-support-for-aarch64/20160329-154730
+> base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux for-next/core
+> config: arm64-allyesconfig (attached as .config)
+> reproduce:
+>         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=arm64
+>
+> All warnings (new ones prefixed by >>):
+>
+> warning: (ACPI_APEI) selects EFI which has unmet direct dependencies (OF && !CPU_BIG_ENDIAN)
 
-diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-index ff93aee..917d4aa 100644
---- a/Documentation/devicetree/bindings/clock/sunxi.txt
-+++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-@@ -10,6 +10,7 @@ Required properties:
- 	"allwinner,sun4i-a10-pll1-clk" - for the main PLL clock and PLL4
- 	"allwinner,sun6i-a31-pll1-clk" - for the main PLL clock on A31
- 	"allwinner,sun8i-a23-pll1-clk" - for the main PLL clock on A23
-+	"allwinner,sun8i-pll2-clk" - for the audio PLL clock
- 	"allwinner,sun6i-a31-pll3-clk" - for the video PLL clock
- 	"allwinner,sun9i-a80-pll4-clk" - for the peripheral PLLs on A80
- 	"allwinner,sun4i-a10-pll5-clk" - for the PLL5 clock
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index 270f2a9..7386141 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -1130,6 +1130,54 @@ CLK_OF_DECLARE(sun6i_pll6, "allwinner,sun6i-a31-pll6-clk",
- 	       sun6i_pll6_clk_setup);
- 
- /*
-+ * sun8i pll2
-+ *
-+ * rate = parent_rate / (m + 1) * (n + 1) / (p + 1);
-+ */
-+static void sun8i_pll2_factors(struct factors_request *req)
-+{
-+	unsigned long n, m;
-+
-+	/* set p = 4 so that pll2 = pll2x8 / 8 */
-+	req->p = 4 - 1;
-+	rational_best_approximation(req->rate,
-+				req->parent_rate / 4,
-+				1 << 7, 1 << 5, &n, &m);
-+	req->rate = req->parent_rate / m * n / 4;
-+	req->m = m - 1;
-+	req->n = n - 1;
-+}
-+
-+static void sun8i_pll2_recalc(struct factors_request *req)
-+{
-+	req->rate = req->parent_rate / (req->m + 1) * (req->n + 1) /
-+						(req->p + 1);
-+}
-+
-+static const struct clk_factors_config sun8i_pll2_config = {
-+	.mshift = 0,
-+	.mwidth = 5,
-+	.nshift = 8,
-+	.nwidth = 7,
-+	.pshift = 16,
-+	.pwidth = 4,
-+};
-+
-+static const struct factors_data sun8i_pll2_data __initconst = {
-+	.enable = 31,
-+	.table = &sun8i_pll2_config,
-+	.getter = sun8i_pll2_factors,
-+	.recalc = sun8i_pll2_recalc,
-+};
-+
-+static void __init sun8i_pll2_setup(struct device_node *node)
-+{
-+	sunxi_factors_clk_setup(node, &sun8i_pll2_data);
-+}
-+CLK_OF_DECLARE(sun8i_pll2, "allwinner,sun8i-pll2-clk",
-+	       sun8i_pll2_setup);
-+
-+/*
-  * sun6i pll3
-  *
-  * if (p == 0) rate = k ? 270MHz : 297MHz
+I think it's caused by  CPU_BIG_ENDIAN, because  ARM64 selects OF.
+
+Any suggestion ?
+
+
+>
+> ---
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+
+
+
 -- 
-2.8.0
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat Software (Beijing) Co.,Ltd.Shanghai Branch
+Ph: +86 21 61221326(direct)
+Ph: +86 186 2020 4684 (mobile)
+Room 1512, Regus One Corporate Avenue,Level 15,
+One Corporate Avenue,222 Hubin Road,Huangpu District,
+Shanghai,China 200021
