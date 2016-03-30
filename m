@@ -1,41 +1,117 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Wed, 30 Mar 2016 14:57:06 -0400
-Subject: [RFC PATCH 1/3] libahci: save port map for forced port map
-In-Reply-To: <1459257075-21393-2-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1459257075-21393-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1459257075-21393-2-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <20160330185706.GQ7822@mtj.duckdns.org>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Wed, 30 Mar 2016 16:11:09 -0300
+Subject: [PATCH 1/3] leds: trigger: Introduce a kernel panic LED trigger
+In-Reply-To: <56FB9C6A.2090402@samsung.com>
+References: <1459283749-22451-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+ <1459283749-22451-2-git-send-email-ezequiel@vanguardiasur.com.ar>
+ <56FB9C6A.2090402@samsung.com>
+Message-ID: <20160330191109.GA27372@laptop.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
++lkml
 
-On Tue, Mar 29, 2016 at 02:11:13PM +0100, Srinivas Kandagatla wrote:
-> In usecases where force_port_map is used saved_port_map is never set,
-> resulting in not programming the PORTS_IMPL register as part of intial
-> config. This patch fixes this by setting it to port_map even in case
-> where force_port_map is used, making it more inline with other parts of
-> the code.
+On 30 Mar 11:29 AM, Jacek Anaszewski wrote:
+> Hi Ezequiel,
 > 
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
->  drivers/ata/libahci.c | 1 +
->  1 file changed, 1 insertion(+)
+> Thanks for the patch. I've tested it on exynos4412-trats2 board
+> with leds-aat1290 driver, by executing:
 > 
-> diff --git a/drivers/ata/libahci.c b/drivers/ata/libahci.c
-> index 3982054..a5d7c1c 100644
-> --- a/drivers/ata/libahci.c
-> +++ b/drivers/ata/libahci.c
-> @@ -507,6 +507,7 @@ void ahci_save_initial_config(struct device *dev, struct ahci_host_priv *hpriv)
->  		dev_info(dev, "forcing port_map 0x%x -> 0x%x\n",
->  			 port_map, hpriv->force_port_map);
->  		port_map = hpriv->force_port_map;
-> +		hpriv->saved_port_map = port_map;
+> echo "c" > /proc/sysrq-trigger
+> 
+> I was able to notice the blinking then.
+> 
+> Applied to the for-next branch of linux-leds.git.
+> 
 
-So, the only change it'd cause is making the driver write the forced
-value to the PI register.  Does that make sense?
+Notice that we currently need LEDs to be dedicated
+to the panic trigger, which is pretty lame as LEDs
+are scarce and are most likely assigned to something else.
 
-Thanks.
+So, here's a toy patch to switch all the installed LEDs
+to the panic trigger on kernel panic. Patch is half-baked,
+but it shows the idea.
+
+(Interestingly, it also blinks the LEDs on a USB keyboard!)
+
+Is there any value in polishing this and find a way upstream?
+
+diff --git a/drivers/leds/led-class.c b/drivers/leds/led-class.c
+index aa84e5b37593..caaf6161a7ae 100644
+--- a/drivers/leds/led-class.c
++++ b/drivers/leds/led-class.c
+@@ -321,6 +321,20 @@ void devm_led_classdev_unregister(struct device *dev,
+ }
+ EXPORT_SYMBOL_GPL(devm_led_classdev_unregister);
+ 
++static int led_panic_notifier(struct notifier_block *nb,
++			      unsigned long code, void *unused)
++{
++	struct led_classdev *led_cdev;
++
++	list_for_each_entry(led_cdev, &leds_list, node)
++		led_trigger_set_at_panic(led_cdev, "panic");
++	return NOTIFY_DONE;
++}
++
++static struct notifier_block led_panic_nb = {
++	.notifier_call = led_panic_notifier,
++};
++
+ static int __init leds_init(void)
+ {
+ 	leds_class = class_create(THIS_MODULE, "leds");
+@@ -328,6 +342,8 @@ static int __init leds_init(void)
+ 		return PTR_ERR(leds_class);
+ 	leds_class->pm = &leds_class_dev_pm_ops;
+ 	leds_class->dev_groups = led_groups;
++	atomic_notifier_chain_register(&panic_notifier_list,
++				       &led_panic_nb);
+ 	return 0;
+ }
+ 
+diff --git a/drivers/leds/led-triggers.c b/drivers/leds/led-triggers.c
+index 2181581795d3..8c1d33acdfa8 100644
+--- a/drivers/leds/led-triggers.c
++++ b/drivers/leds/led-triggers.c
+@@ -148,6 +148,21 @@ void led_trigger_remove(struct led_classdev *led_cdev)
+ }
+ EXPORT_SYMBOL_GPL(led_trigger_remove);
+ 
++void led_trigger_set_at_panic(struct led_classdev *led_cdev, const char *name)
++{
++	struct led_trigger *trig;
++
++	list_for_each_entry(trig, &trigger_list, next_trig) {
++		if (strcmp(name, trig->name))
++			continue;
++		list_add_tail(&led_cdev->trig_list, &trig->led_cdevs);
++		led_cdev->trigger = trig;
++		if (trig->activate)
++			trig->activate(led_cdev);
++		break;
++	}
++}
++
+ void led_trigger_set_default(struct led_classdev *led_cdev)
+ {
+ 	struct led_trigger *trig;
+diff --git a/drivers/leds/leds.h b/drivers/leds/leds.h
+index db3f20da7221..8cfa10f626a6 100644
+--- a/drivers/leds/leds.h
++++ b/drivers/leds/leds.h
+@@ -21,6 +21,7 @@ static inline int led_get_brightness(struct led_classdev *led_cdev)
+ 	return led_cdev->brightness;
+ }
+ 
++void led_trigger_set_at_panic(struct led_classdev *led_cdev, const char *name);
+ void led_init_core(struct led_classdev *led_cdev);
+ void led_stop_software_blink(struct led_classdev *led_cdev);
+ void led_set_brightness_nopm(struct led_classdev *led_cdev,
+-- 
+2.7.0
+
 
 -- 
-tejun
+Ezequiel Garcia, VanguardiaSur
+www.vanguardiasur.com.ar
