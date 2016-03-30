@@ -1,62 +1,172 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 30 Mar 2016 16:46:02 +0200
-Subject: [PATCH v2 7/9] nios2: use correct void* return type for page_to_virt()
+Date: Wed, 30 Mar 2016 16:46:00 +0200
+Subject: [PATCH v2 5/9] arm64: mm: move vmemmap region right below the linear
+ region
 In-Reply-To: <1459349164-27175-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1459349164-27175-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1459349164-27175-8-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1459349164-27175-6-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To align with other architectures, the expression procuded by expanding
-the macro page_to_virt() should be of type void*, since it returns a
-virtual address. Fix that, and also fix up an instance where page_to_virt
-was expected to return 'unsigned long', and drop another instance that was
-entirely unused (page_to_bus)
+This moves the vmemmap region right below PAGE_OFFSET, aka the start
+of the linear region, and redefines its size to be a power of two.
+Due to the placement of PAGE_OFFSET in the middle of the address space,
+whose size is a power of two as well, this guarantees that virt to
+page conversions and vice versa can be implemented efficiently, by
+masking and shifting rather than ordinary arithmetic.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/nios2/include/asm/io.h      | 1 -
- arch/nios2/include/asm/page.h    | 2 +-
- arch/nios2/include/asm/pgtable.h | 2 +-
- 3 files changed, 2 insertions(+), 3 deletions(-)
+ arch/arm64/include/asm/memory.h  | 18 +++++++++++++++++-
+ arch/arm64/include/asm/pgtable.h | 11 +++--------
+ arch/arm64/mm/dump.c             | 16 ++++++++--------
+ arch/arm64/mm/init.c             | 14 ++++++++++----
+ 4 files changed, 38 insertions(+), 21 deletions(-)
 
-diff --git a/arch/nios2/include/asm/io.h b/arch/nios2/include/asm/io.h
-index c5a62da22cd2..ce072ba0f8dd 100644
---- a/arch/nios2/include/asm/io.h
-+++ b/arch/nios2/include/asm/io.h
-@@ -50,7 +50,6 @@ static inline void iounmap(void __iomem *addr)
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index 12f8a00fb3f1..8a2ab195ca77 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -40,6 +40,21 @@
+ #define PCI_IO_SIZE		SZ_16M
  
- /* Pages to physical address... */
- #define page_to_phys(page)	virt_to_phys(page_to_virt(page))
--#define page_to_bus(page)	page_to_virt(page)
+ /*
++ * Log2 of the upper bound of the size of a struct page. Used for sizing
++ * the vmemmap region only, does not affect actual memory footprint.
++ * We don't use sizeof(struct page) directly since taking its size here
++ * requires its definition to be available at this point in the inclusion
++ * chain, and it may not be a power of 2 in the first place.
++ */
++#define STRUCT_PAGE_MAX_SHIFT	6
++
++/*
++ * VMEMMAP_SIZE - allows the whole linear region to be covered by
++ *                a struct page array
++ */
++#define VMEMMAP_SIZE (UL(1) << (VA_BITS - PAGE_SHIFT - 1 + STRUCT_PAGE_MAX_SHIFT))
++
++/*
+  * PAGE_OFFSET - the virtual address of the start of the kernel image (top
+  *		 (VA_BITS - 1))
+  * VA_BITS - the maximum number of bits for virtual addresses.
+@@ -54,7 +69,8 @@
+ #define MODULES_END		(MODULES_VADDR + MODULES_VSIZE)
+ #define MODULES_VADDR		(VA_START + KASAN_SHADOW_SIZE)
+ #define MODULES_VSIZE		(SZ_128M)
+-#define PCI_IO_END		(PAGE_OFFSET - SZ_2M)
++#define VMEMMAP_START		(PAGE_OFFSET - VMEMMAP_SIZE)
++#define PCI_IO_END		(VMEMMAP_START - SZ_2M)
+ #define PCI_IO_START		(PCI_IO_END - PCI_IO_SIZE)
+ #define FIXADDR_TOP		(PCI_IO_START - SZ_2M)
+ #define TASK_SIZE_64		(UL(1) << VA_BITS)
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 377257a8d393..2abfa4d09e65 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -24,20 +24,15 @@
+ #include <asm/pgtable-prot.h>
  
- /* Macros used for converting between virtual and physical mappings. */
- #define phys_to_virt(vaddr)	\
-diff --git a/arch/nios2/include/asm/page.h b/arch/nios2/include/asm/page.h
-index 4b32d6fd9d98..c1683f51ad0f 100644
---- a/arch/nios2/include/asm/page.h
-+++ b/arch/nios2/include/asm/page.h
-@@ -84,7 +84,7 @@ extern struct page *mem_map;
- 	((void *)((unsigned long)(x) + PAGE_OFFSET - PHYS_OFFSET))
+ /*
+- * VMALLOC and SPARSEMEM_VMEMMAP ranges.
++ * VMALLOC range.
+  *
+- * VMEMAP_SIZE: allows the whole linear region to be covered by a struct page array
+- *	(rounded up to PUD_SIZE).
+  * VMALLOC_START: beginning of the kernel vmalloc space
+- * VMALLOC_END: extends to the available space below vmmemmap, PCI I/O space,
+- *	fixed mappings and modules
++ * VMALLOC_END: extends to the available space below vmmemmap, PCI I/O space
++ *	and fixed mappings
+  */
+-#define VMEMMAP_SIZE		ALIGN((1UL << (VA_BITS - PAGE_SHIFT - 1)) * sizeof(struct page), PUD_SIZE)
+-
+ #define VMALLOC_START		(MODULES_END)
+ #define VMALLOC_END		(PAGE_OFFSET - PUD_SIZE - VMEMMAP_SIZE - SZ_64K)
  
- #define page_to_virt(page)	\
--	((((page) - mem_map) << PAGE_SHIFT) + PAGE_OFFSET)
-+	((void *)(((page) - mem_map) << PAGE_SHIFT) + PAGE_OFFSET)
+-#define VMEMMAP_START		(VMALLOC_END + SZ_64K)
+ #define vmemmap			((struct page *)VMEMMAP_START - (memstart_addr >> PAGE_SHIFT))
  
- # define pfn_to_kaddr(pfn)	__va((pfn) << PAGE_SHIFT)
- # define pfn_valid(pfn)		((pfn) >= ARCH_PFN_OFFSET &&	\
-diff --git a/arch/nios2/include/asm/pgtable.h b/arch/nios2/include/asm/pgtable.h
-index a213e8c9aad0..298393c3cb42 100644
---- a/arch/nios2/include/asm/pgtable.h
-+++ b/arch/nios2/include/asm/pgtable.h
-@@ -209,7 +209,7 @@ static inline void set_pte(pte_t *ptep, pte_t pteval)
- static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
- 			      pte_t *ptep, pte_t pteval)
- {
--	unsigned long paddr = page_to_virt(pte_page(pteval));
-+	unsigned long paddr = (unsigned long)page_to_virt(pte_page(pteval));
+ #define FIRST_USER_ADDRESS	0UL
+diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
+index f9271cb2f5e3..a21f47421b0c 100644
+--- a/arch/arm64/mm/dump.c
++++ b/arch/arm64/mm/dump.c
+@@ -37,14 +37,14 @@ enum address_markers_idx {
+ 	MODULES_END_NR,
+ 	VMALLOC_START_NR,
+ 	VMALLOC_END_NR,
+-#ifdef CONFIG_SPARSEMEM_VMEMMAP
+-	VMEMMAP_START_NR,
+-	VMEMMAP_END_NR,
+-#endif
+ 	FIXADDR_START_NR,
+ 	FIXADDR_END_NR,
+ 	PCI_START_NR,
+ 	PCI_END_NR,
++#ifdef CONFIG_SPARSEMEM_VMEMMAP
++	VMEMMAP_START_NR,
++	VMEMMAP_END_NR,
++#endif
+ 	KERNEL_SPACE_NR,
+ };
  
- 	flush_dcache_range(paddr, paddr + PAGE_SIZE);
- 	set_pte(ptep, pteval);
+@@ -53,14 +53,14 @@ static struct addr_marker address_markers[] = {
+ 	{ MODULES_END,		"Modules end" },
+ 	{ VMALLOC_START,	"vmalloc() Area" },
+ 	{ VMALLOC_END,		"vmalloc() End" },
+-#ifdef CONFIG_SPARSEMEM_VMEMMAP
+-	{ 0,			"vmemmap start" },
+-	{ 0,			"vmemmap end" },
+-#endif
+ 	{ FIXADDR_START,	"Fixmap start" },
+ 	{ FIXADDR_TOP,		"Fixmap end" },
+ 	{ PCI_IO_START,		"PCI I/O start" },
+ 	{ PCI_IO_END,		"PCI I/O end" },
++#ifdef CONFIG_SPARSEMEM_VMEMMAP
++	{ 0,			"vmemmap start" },
++	{ 0,			"vmemmap end" },
++#endif
+ 	{ PAGE_OFFSET,		"Linear Mapping" },
+ 	{ -1,			NULL },
+ };
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 89376f3c65a3..d55d720dba79 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -412,6 +412,10 @@ void __init mem_init(void)
+ 		MLK_ROUNDUP(__start_rodata, _etext),
+ 		MLK_ROUNDUP(__init_begin, __init_end),
+ 		MLK_ROUNDUP(_sdata, _edata));
++	pr_cont("    fixed   : 0x%16lx - 0x%16lx   (%6ld KB)\n",
++		MLK(FIXADDR_START, FIXADDR_TOP));
++	pr_cont("    PCI I/O : 0x%16lx - 0x%16lx   (%6ld MB)\n",
++		MLM(PCI_IO_START, PCI_IO_END));
+ #ifdef CONFIG_SPARSEMEM_VMEMMAP
+ 	pr_cont("    vmemmap : 0x%16lx - 0x%16lx   (%6ld GB maximum)\n"
+ 		"              0x%16lx - 0x%16lx   (%6ld MB actual)\n",
+@@ -420,10 +424,6 @@ void __init mem_init(void)
+ 		MLM((unsigned long)phys_to_page(memblock_start_of_DRAM()),
+ 		    (unsigned long)virt_to_page(high_memory)));
+ #endif
+-	pr_cont("    fixed   : 0x%16lx - 0x%16lx   (%6ld KB)\n",
+-		MLK(FIXADDR_START, FIXADDR_TOP));
+-	pr_cont("    PCI I/O : 0x%16lx - 0x%16lx   (%6ld MB)\n",
+-		MLM(PCI_IO_START, PCI_IO_END));
+ 	pr_cont("    memory  : 0x%16lx - 0x%16lx   (%6ld MB)\n",
+ 		MLM(__phys_to_virt(memblock_start_of_DRAM()),
+ 		    (unsigned long)high_memory));
+@@ -440,6 +440,12 @@ void __init mem_init(void)
+ 	BUILD_BUG_ON(TASK_SIZE_32			> TASK_SIZE_64);
+ #endif
+ 
++	/*
++	 * Make sure we chose the upper bound of sizeof(struct page)
++	 * correctly.
++	 */
++	BUILD_BUG_ON(sizeof(struct page) > (1 << STRUCT_PAGE_MAX_SHIFT));
++
+ 	if (PAGE_SIZE >= 16384 && get_num_physpages() <= 128) {
+ 		extern int sysctl_overcommit_memory;
+ 		/*
 -- 
 2.5.0
