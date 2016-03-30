@@ -1,126 +1,78 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 30 Mar 2016 22:03:51 +0200
-Subject: [PATCH v5 28/46] regulator: pwm: swith to the atomic PWM API
+Date: Wed, 30 Mar 2016 22:03:53 +0200
+Subject: [PATCH v5 30/46] regulator: pwm: retrieve correct voltage
 In-Reply-To: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1459368249-13241-29-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1459368249-13241-31-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pwm_config/enable/disable() have been deprecated in favor of
-pwm_apply_state().
-Replace all those calls with the equivalent pwm_get/apply_state().
+The continuous PWM voltage regulator is caching the voltage value in
+the ->volt_uV field. While most of the time this value should reflect the
+real voltage, sometime it can be sightly different if the PWM device
+rounded the set_duty_cycle request.
+Moreover, this value is not valid until someone has modified the regulator
+output.
+
+Remove the ->volt_uV field and always rely on the PWM state to calculate
+the regulator output.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/regulator/pwm-regulator.c | 54 ++++++++++++++++++++++++---------------
- 1 file changed, 34 insertions(+), 20 deletions(-)
+ drivers/regulator/pwm-regulator.c | 23 +++++++++++++++++------
+ 1 file changed, 17 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
-index 9590fb0..42cc312 100644
+index 9374796..77f42d8 100644
 --- a/drivers/regulator/pwm-regulator.c
 +++ b/drivers/regulator/pwm-regulator.c
-@@ -59,16 +59,18 @@ static int pwm_regulator_set_voltage_sel(struct regulator_dev *rdev,
- 					 unsigned selector)
+@@ -35,9 +35,6 @@ struct pwm_regulator_data {
+ 	struct regulator_ops ops;
+ 
+ 	int state;
+-
+-	/* Continuous voltage */
+-	int volt_uV;
+ };
+ 
+ struct pwm_voltages {
+@@ -167,11 +164,27 @@ static int pwm_voltage_to_duty_cycle_percentage(struct regulator_dev *rdev, int
+ 	return ((req_uV * 100) - (min_uV * 100)) / diff;
+ }
+ 
++static int pwm_duty_cycle_percentage_to_voltage(struct regulator_dev *rdev,
++						int dutycycle)
++{
++	int min_uV = rdev->constraints->min_uV;
++	int max_uV = rdev->constraints->max_uV;
++	int diff = max_uV - min_uV;
++
++	return min_uV + ((diff * dutycycle) / 100);
++}
++
+ static int pwm_regulator_get_voltage(struct regulator_dev *rdev)
  {
  	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
--	struct pwm_args pargs = { };
--	int dutycycle;
-+	struct pwm_state pstate = { };
++	struct pwm_state pstate;
 +	u64 dutycycle;
- 	int ret;
  
--	pwm_get_args(drvdata->pwm, &pargs);
+-	return drvdata->volt_uV;
 +	pwm_get_state(drvdata->pwm, &pstate);
- 
--	dutycycle = (pargs.period *
--		    drvdata->duty_cycle_table[selector].dutycycle) / 100;
-+	dutycycle = drvdata->duty_cycle_table[selector].dutycycle;
-+	dutycycle *= pstate.period;
-+	do_div(dutycycle, 100);
-+	pstate.duty_cycle = dutycycle;
- 
--	ret = pwm_config(drvdata->pwm, dutycycle, pargs.period);
-+	ret = pwm_apply_state(drvdata->pwm, &pstate);
- 	if (ret) {
- 		dev_err(&rdev->dev, "Failed to configure PWM\n");
- 		return ret;
-@@ -93,24 +95,39 @@ static int pwm_regulator_list_voltage(struct regulator_dev *rdev,
- static int pwm_regulator_enable(struct regulator_dev *dev)
- {
- 	struct pwm_regulator_data *drvdata = rdev_get_drvdata(dev);
-+	struct pwm_state pstate = { };
++	dutycycle = pstate.duty_cycle * 100;
++	do_div(dutycycle, pstate.period);
 +
-+	pwm_get_state(drvdata->pwm, &pstate);
-+	if (pstate.enabled)
-+		return 0;
-+
-+	pstate.enabled = true;
- 
--	return pwm_enable(drvdata->pwm);
-+	return pwm_apply_state(drvdata->pwm, &pstate);
++	return pwm_duty_cycle_percentage_to_voltage(rdev, dutycycle);
  }
  
- static int pwm_regulator_disable(struct regulator_dev *dev)
- {
- 	struct pwm_regulator_data *drvdata = rdev_get_drvdata(dev);
-+	struct pwm_state pstate = { };
- 
--	pwm_disable(drvdata->pwm);
-+	pwm_get_state(drvdata->pwm, &pstate);
-+	if (!pstate.enabled)
-+		return 0;
- 
--	return 0;
-+	pstate.enabled = false;
-+
-+	return pwm_apply_state(drvdata->pwm, &pstate);
- }
- 
- static int pwm_regulator_is_enabled(struct regulator_dev *dev)
- {
- 	struct pwm_regulator_data *drvdata = rdev_get_drvdata(dev);
-+	struct pwm_state pstate = { };
- 
--	return pwm_is_enabled(drvdata->pwm);
-+	pwm_get_state(drvdata->pwm, &pstate);
-+
-+	return pstate.enabled;
- }
- 
- /**
-@@ -138,25 +155,22 @@ static int pwm_regulator_set_voltage(struct regulator_dev *rdev,
- {
- 	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
- 	unsigned int ramp_delay = rdev->constraints->ramp_delay;
--	struct pwm_args pargs = { };
--	int duty_cycle;
-+	struct pwm_state pstate = { };
-+	u64 duty_cycle;
- 	int ret;
- 
--	pwm_get_args(drvdata->pwm, &pargs);
-+	pwm_get_state(drvdata->pwm, &pstate);
- 	duty_cycle = pwm_voltage_to_duty_cycle_percentage(rdev, min_uV);
-+	duty_cycle *= pstate.period;
-+	do_div(duty_cycle, 100);
-+	pstate.duty_cycle = duty_cycle;
- 
--	ret = pwm_config(drvdata->pwm, (pargs.period / 100) * duty_cycle,
--			 pargs.period);
-+	ret = pwm_apply_state(drvdata->pwm, &pstate);
- 	if (ret) {
- 		dev_err(&rdev->dev, "Failed to configure PWM\n");
+ static int pwm_regulator_set_voltage(struct regulator_dev *rdev,
+@@ -196,8 +209,6 @@ static int pwm_regulator_set_voltage(struct regulator_dev *rdev,
  		return ret;
  	}
  
--	ret = pwm_enable(drvdata->pwm);
--	if (ret) {
--		dev_err(&rdev->dev, "Failed to enable PWM\n");
--		return ret;
--	}
- 	drvdata->volt_uV = min_uV;
- 
+-	drvdata->volt_uV = min_uV;
+-
  	/* Delay required by PWM regulator to settle to the new voltage */
+ 	usleep_range(ramp_delay, ramp_delay + 1000);
+ 
 -- 
 2.5.0
