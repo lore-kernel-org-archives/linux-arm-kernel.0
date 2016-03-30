@@ -1,33 +1,38 @@
-From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
-Date: Wed, 30 Mar 2016 14:23:03 +0200
-Subject: [PATCH BUGFIX] clk: imx6q: fix typo in CAN clock definition
-Message-ID: <1459340583-14743-1-git-send-email-LW@KARO-electronics.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 30 Mar 2016 14:25:45 +0200
+Subject: [PATCH v2 0/3] arm64: memstart_addr alignment and vmemmap offset fixes
+Message-ID: <1459340748-14975-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit ee36027427c7 ("clk: imx: Add clock support for imx6qp")
-introduced a regression due to a subtle typo in the 'can_root' clock
-definition. The effect is that trying to configure the bitrate of the
-can interfaces fails with -EDOM or produces a division by zero error
-due to the clock_freq of the can serial clock being reported as '0'.
+This series wraps up some loose ends regarding the v4.6 changes in arm64 to
+allow the kernel to reside at any [appropriately aligned] physical address.
 
-Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
----
- drivers/clk/imx/clk-imx6q.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Patch #1 fixes a bug where we fail to update memstart_addr after clipping
+memory from the bottom if so required by the size of the linear region and
+the placement of the kernel Image.
 
-diff --git a/drivers/clk/imx/clk-imx6q.c b/drivers/clk/imx/clk-imx6q.c
-index 02e1818..2beb396f 100644
---- a/drivers/clk/imx/clk-imx6q.c
-+++ b/drivers/clk/imx/clk-imx6q.c
-@@ -394,7 +394,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 		clk[IMX6QDL_CLK_LDB_DI1_DIV_3_5] = imx_clk_fixed_factor("ldb_di1_div_3_5", "ldb_di1", 2, 7);
- 	} else {
- 		clk[IMX6QDL_CLK_ECSPI_ROOT] = imx_clk_divider("ecspi_root", "pll3_60m", base + 0x38, 19, 6);
--		clk[IMX6QDL_CLK_CAN_ROOT] = imx_clk_divider("can_root", "pll3_60", base + 0x20, 2, 6);
-+		clk[IMX6QDL_CLK_CAN_ROOT] = imx_clk_divider("can_root", "pll3_60m", base + 0x20, 2, 6);
- 		clk[IMX6QDL_CLK_IPG_PER] = imx_clk_fixup_divider("ipg_per", "ipg", base + 0x1c, 0, 6, imx_cscmr1_fixup);
- 		clk[IMX6QDL_CLK_UART_SERIAL_PODF] = imx_clk_divider("uart_serial_podf", "pll3_80m",          base + 0x24, 0,  6);
- 		clk[IMX6QDL_CLK_LDB_DI0_DIV_3_5] = imx_clk_fixed_factor("ldb_di0_div_3_5", "ldb_di0_sel", 2, 7);
+Patch #2 updates the constant ARM64_MEMSTART_ALIGN, which defines the minimum
+alignment of memstart_addr, to account for the section alignment my sparsemem
+vmemmap if that is enabled. This is a prerequisite for patch #3
+
+Patch #3 reverts commit 36e5cd6b897e ("arm64: account for sparsemem section
+alignment  when choosing vmemmap offset"), which was included as a bugfix in
+v4.5-late, but is no longer required now that we can freely choose
+memstart_addr, allowing us to take this minimum alignment into account. This
+makes the rounding in the definition of vmemmap redundant.
+
+Ard Biesheuvel (3):
+  arm64/mm: ensure memstart_addr remains sufficiently aligned
+  arm64: choose memstart_addr based on minimum sparsemem section
+    alignment
+  Revert "arm64: account for sparsemem section alignment when choosing
+    vmemmap offset"
+
+ arch/arm64/include/asm/kernel-pgtable.h | 21 +++++++++++++++++---
+ arch/arm64/include/asm/pgtable.h        |  5 ++---
+ arch/arm64/mm/init.c                    |  8 ++++++--
+ 3 files changed, 26 insertions(+), 8 deletions(-)
+
 -- 
-2.1.4
+2.5.0
