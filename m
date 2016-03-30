@@ -1,9 +1,9 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 30 Mar 2016 18:14:55 +0200
-Subject: [PATCH v5 40/50] mtd: nand: pxa3xx: switch to mtd_ooblayout_ops
+Date: Wed, 30 Mar 2016 18:14:54 +0200
+Subject: [PATCH v5 39/50] mtd: nand: omap2: switch to mtd_ooblayout_ops
 In-Reply-To: <1459354505-32551-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1459354505-32551-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1459354505-32551-41-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1459354505-32551-40-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,167 +12,310 @@ ECC/OOB layout to MTD users.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/mtd/nand/pxa3xx_nand.c | 104 +++++++++++++++++++++++++----------------
- 1 file changed, 64 insertions(+), 40 deletions(-)
+ drivers/mtd/nand/omap2.c | 194 +++++++++++++++++++++++++++--------------------
+ 1 file changed, 113 insertions(+), 81 deletions(-)
 
-diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index d650885..ce2e2d9 100644
---- a/drivers/mtd/nand/pxa3xx_nand.c
-+++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -324,6 +324,62 @@ static struct pxa3xx_nand_flash builtin_flash_types[] = {
- 	{ 0xba20, 16, 16, &timing[3] },
- };
+diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
+index 4ebf16b..bca154a 100644
+--- a/drivers/mtd/nand/omap2.c
++++ b/drivers/mtd/nand/omap2.c
+@@ -169,8 +169,6 @@ struct omap_nand_info {
+ 	u_char				*buf;
+ 	int					buf_len;
+ 	struct gpmc_nand_regs		reg;
+-	/* generated at runtime depending on ECC algorithm and layout selected */
+-	struct nand_ecclayout		oobinfo;
+ 	/* fields specific for BCHx_HW ECC scheme */
+ 	struct device			*elm_dev;
+ 	struct device_node		*of_node;
+@@ -1639,19 +1637,108 @@ static bool omap2_nand_ecc_check(struct omap_nand_info *info,
+ 	return true;
+ }
  
-+static int pxa3xx_ooblayout_ecc(struct mtd_info *mtd, int section,
-+				struct mtd_oob_region *oobregion)
++static int omap_ooblayout_ecc(struct mtd_info *mtd, int section,
++			      struct mtd_oob_region *oobregion)
 +{
 +	struct nand_chip *chip = mtd_to_nand(mtd);
-+	struct pxa3xx_nand_host *host = nand_get_controller_data(chip);
-+	struct pxa3xx_nand_info *info = host->info_data;
-+	int nchunks = mtd->writesize / info->chunk_size;
++	int off = chip->options & NAND_BUSWIDTH_16 ?
++		  BADBLOCK_MARKER_LENGTH : 1;
 +
-+	if (section >= nchunks)
++	if (section)
 +		return -ERANGE;
 +
-+	oobregion->offset = ((info->ecc_size + info->spare_size) * section) +
-+			    info->spare_size;
-+	oobregion->length = info->ecc_size;
++	oobregion->offset = off;
++	oobregion->length = chip->ecc.total;
 +
 +	return 0;
 +}
 +
-+static int pxa3xx_ooblayout_free(struct mtd_info *mtd, int section,
++static int omap_ooblayout_free(struct mtd_info *mtd, int section,
++			       struct mtd_oob_region *oobregion)
++{
++	struct nand_chip *chip = mtd_to_nand(mtd);
++	int off = chip->options & NAND_BUSWIDTH_16 ?
++		  BADBLOCK_MARKER_LENGTH : 1;
++
++	if (section)
++		return -ERANGE;
++
++	off += chip->ecc.total;
++	if (off >= mtd->oobsize)
++		return -ERANGE;
++
++	oobregion->offset = off;
++	oobregion->length = mtd->oobsize - off;
++
++	return 0;
++}
++
++static const struct mtd_ooblayout_ops omap_ooblayout_ops = {
++	.ecc = omap_ooblayout_ecc,
++	.free = omap_ooblayout_free,
++};
++
++static int omap_sw_ooblayout_ecc(struct mtd_info *mtd, int section,
 +				 struct mtd_oob_region *oobregion)
 +{
 +	struct nand_chip *chip = mtd_to_nand(mtd);
-+	struct pxa3xx_nand_host *host = nand_get_controller_data(chip);
-+	struct pxa3xx_nand_info *info = host->info_data;
-+	int nchunks = mtd->writesize / info->chunk_size;
++	int off = chip->options & NAND_BUSWIDTH_16 ?
++		  BADBLOCK_MARKER_LENGTH : 1;
 +
-+	if (section >= nchunks)
++	if (section >= chip->ecc.steps)
 +		return -ERANGE;
 +
-+	if (!info->spare_size)
-+		return 0;
-+
-+	oobregion->offset = section * (info->ecc_size + info->spare_size);
-+	oobregion->length = info->spare_size;
-+	if (!section) {
-+		/*
-+		 * Bootrom looks in bytes 0 & 5 for bad blocks for the
-+		 * 4KB page / 4bit BCH combination.
-+		 */
-+		if (mtd->writesize == 4096 && info->chunk_size == 2048) {
-+			oobregion->offset += 6;
-+			oobregion->length -= 6;
-+		} else {
-+			oobregion->offset += 2;
-+			oobregion->length -= 2;
-+		}
-+	}
++	/*
++	 * When SW correction is employed, one OMAP specific marker byte is
++	 * reserved after each ECC step.
++	 */
++	oobregion->offset = off + (section * (chip->ecc.bytes + 1));
++	oobregion->length = chip->ecc.bytes;
 +
 +	return 0;
 +}
 +
-+static const struct mtd_ooblayout_ops pxa3xx_ooblayout_ops = {
-+	.ecc = pxa3xx_ooblayout_ecc,
-+	.free = pxa3xx_ooblayout_free,
++static int omap_sw_ooblayout_free(struct mtd_info *mtd, int section,
++				  struct mtd_oob_region *oobregion)
++{
++	struct nand_chip *chip = mtd_to_nand(mtd);
++	int off = chip->options & NAND_BUSWIDTH_16 ?
++		  BADBLOCK_MARKER_LENGTH : 1;
++
++	if (section)
++		return -ERANGE;
++
++	/*
++	 * When SW correction is employed, one OMAP specific marker byte is
++	 * reserved after each ECC step.
++	 */
++	off += ((chip->ecc.bytes + 1) * chip->ecc.steps);
++	if (off >= mtd->oobsize)
++		return -ERANGE;
++
++	oobregion->offset = off;
++	oobregion->length = mtd->oobsize - off;
++
++	return 0;
++}
++
++static const struct mtd_ooblayout_ops omap_sw_ooblayout_ops = {
++	.ecc = omap_sw_ooblayout_ecc,
++	.free = omap_sw_ooblayout_free,
 +};
 +
- static u8 bbt_pattern[] = {'M', 'V', 'B', 'b', 't', '0' };
- static u8 bbt_mirror_pattern[] = {'1', 't', 'b', 'B', 'V', 'M' };
- 
-@@ -347,41 +403,6 @@ static struct nand_bbt_descr bbt_mirror_descr = {
- 	.pattern = bbt_mirror_pattern
- };
- 
--static struct nand_ecclayout ecc_layout_2KB_bch4bit = {
--	.eccbytes = 32,
--	.eccpos = {
--		32, 33, 34, 35, 36, 37, 38, 39,
--		40, 41, 42, 43, 44, 45, 46, 47,
--		48, 49, 50, 51, 52, 53, 54, 55,
--		56, 57, 58, 59, 60, 61, 62, 63},
--	.oobfree = { {2, 30} }
--};
--
--static struct nand_ecclayout ecc_layout_4KB_bch4bit = {
--	.eccbytes = 64,
--	.eccpos = {
--		32,  33,  34,  35,  36,  37,  38,  39,
--		40,  41,  42,  43,  44,  45,  46,  47,
--		48,  49,  50,  51,  52,  53,  54,  55,
--		56,  57,  58,  59,  60,  61,  62,  63,
--		96,  97,  98,  99,  100, 101, 102, 103,
--		104, 105, 106, 107, 108, 109, 110, 111,
--		112, 113, 114, 115, 116, 117, 118, 119,
--		120, 121, 122, 123, 124, 125, 126, 127},
--	/* Bootrom looks in bytes 0 & 5 for bad blocks */
--	.oobfree = { {6, 26}, { 64, 32} }
--};
--
--static struct nand_ecclayout ecc_layout_4KB_bch8bit = {
--	.eccbytes = 128,
--	.eccpos = {
--		32,  33,  34,  35,  36,  37,  38,  39,
--		40,  41,  42,  43,  44,  45,  46,  47,
--		48,  49,  50,  51,  52,  53,  54,  55,
--		56,  57,  58,  59,  60,  61,  62,  63},
--	.oobfree = { }
--};
--
- #define NDTR0_tCH(c)	(min((c), 7) << 19)
- #define NDTR0_tCS(c)	(min((c), 7) << 16)
- #define NDTR0_tWH(c)	(min((c), 7) << 11)
-@@ -1546,9 +1567,12 @@ static void pxa3xx_nand_free_buff(struct pxa3xx_nand_info *info)
- }
- 
- static int pxa_ecc_init(struct pxa3xx_nand_info *info,
--			struct nand_ecc_ctrl *ecc,
-+			struct mtd_info *mtd,
- 			int strength, int ecc_stepsize, int page_size)
+ static int omap_nand_probe(struct platform_device *pdev)
  {
-+	struct nand_chip *chip = mtd_to_nand(mtd);
-+	struct nand_ecc_ctrl *ecc = &chip->ecc;
-+
- 	if (strength == 1 && ecc_stepsize == 512 && page_size == 2048) {
- 		info->nfullchunks = 1;
- 		info->ntotalchunks = 1;
-@@ -1582,7 +1606,7 @@ static int pxa_ecc_init(struct pxa3xx_nand_info *info,
- 		info->ecc_size = 32;
- 		ecc->mode = NAND_ECC_HW;
- 		ecc->size = info->chunk_size;
--		ecc->layout = &ecc_layout_2KB_bch4bit;
-+		mtd_set_ooblayout(mtd, &pxa3xx_ooblayout_ops);
- 		ecc->strength = 16;
+ 	struct omap_nand_info		*info;
+ 	struct omap_nand_platform_data	*pdata;
+ 	struct mtd_info			*mtd;
+ 	struct nand_chip		*nand_chip;
+-	struct nand_ecclayout		*ecclayout;
+ 	int				err;
+-	int				i;
+ 	dma_cap_mask_t			mask;
+ 	unsigned			sig;
+-	unsigned			oob_index;
+ 	struct resource			*res;
++	int				min_oobbytes;
++	int				oobbytes_per_step;
  
- 	} else if (strength == 4 && ecc_stepsize == 512 && page_size == 4096) {
-@@ -1594,7 +1618,7 @@ static int pxa_ecc_init(struct pxa3xx_nand_info *info,
- 		info->ecc_size = 32;
- 		ecc->mode = NAND_ECC_HW;
- 		ecc->size = info->chunk_size;
--		ecc->layout = &ecc_layout_4KB_bch4bit;
-+		mtd_set_ooblayout(mtd, &pxa3xx_ooblayout_ops);
- 		ecc->strength = 16;
+ 	pdata = dev_get_platdata(&pdev->dev);
+ 	if (pdata == NULL) {
+@@ -1810,7 +1897,7 @@ static int omap_nand_probe(struct platform_device *pdev)
  
  	/*
-@@ -1612,7 +1636,7 @@ static int pxa_ecc_init(struct pxa3xx_nand_info *info,
- 		info->ecc_size = 32;
- 		ecc->mode = NAND_ECC_HW;
- 		ecc->size = info->chunk_size;
--		ecc->layout = &ecc_layout_4KB_bch8bit;
-+		mtd_set_ooblayout(mtd, &pxa3xx_ooblayout_ops);
- 		ecc->strength = 16;
- 	} else {
- 		dev_err(&info->pdev->dev,
-@@ -1703,7 +1727,7 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
- 		ecc_step = 512;
+ 	 * Bail out earlier to let NAND_ECC_SOFT code create its own
+-	 * ecclayout instead of using ours.
++	 * ooblayout instead of using ours.
+ 	 */
+ 	if (info->ecc_opt == OMAP_ECC_HAM1_CODE_SW) {
+ 		nand_chip->ecc.mode = NAND_ECC_SOFT;
+@@ -1818,8 +1905,6 @@ static int omap_nand_probe(struct platform_device *pdev)
  	}
  
--	ret = pxa_ecc_init(info, &chip->ecc, ecc_strength,
-+	ret = pxa_ecc_init(info, mtd, ecc_strength,
- 			   ecc_step, mtd->writesize);
- 	if (ret)
- 		return ret;
+ 	/* populate MTD interface based on ECC scheme */
+-	ecclayout		= &info->oobinfo;
+-	nand_chip->ecc.layout	= ecclayout;
+ 	switch (info->ecc_opt) {
+ 	case OMAP_ECC_HAM1_CODE_HW:
+ 		pr_info("nand: using OMAP_ECC_HAM1_CODE_HW\n");
+@@ -1830,19 +1915,8 @@ static int omap_nand_probe(struct platform_device *pdev)
+ 		nand_chip->ecc.calculate        = omap_calculate_ecc;
+ 		nand_chip->ecc.hwctl            = omap_enable_hwecc;
+ 		nand_chip->ecc.correct          = omap_correct_data;
+-		/* define ECC layout */
+-		ecclayout->eccbytes		= nand_chip->ecc.bytes *
+-							(mtd->writesize /
+-							nand_chip->ecc.size);
+-		if (nand_chip->options & NAND_BUSWIDTH_16)
+-			oob_index		= BADBLOCK_MARKER_LENGTH;
+-		else
+-			oob_index		= 1;
+-		for (i = 0; i < ecclayout->eccbytes; i++, oob_index++)
+-			ecclayout->eccpos[i]	= oob_index;
+-		/* no reserved-marker in ecclayout for this ecc-scheme */
+-		ecclayout->oobfree->offset	=
+-				ecclayout->eccpos[ecclayout->eccbytes - 1] + 1;
++		mtd_set_ooblayout(mtd, &omap_ooblayout_ops);
++		oobbytes_per_step		= nand_chip->ecc.bytes;
+ 		break;
+ 
+ 	case OMAP_ECC_BCH4_CODE_HW_DETECTION_SW:
+@@ -1854,19 +1928,9 @@ static int omap_nand_probe(struct platform_device *pdev)
+ 		nand_chip->ecc.hwctl		= omap_enable_hwecc_bch;
+ 		nand_chip->ecc.correct		= nand_bch_correct_data;
+ 		nand_chip->ecc.calculate	= omap_calculate_ecc_bch;
+-		/* define ECC layout */
+-		ecclayout->eccbytes		= nand_chip->ecc.bytes *
+-							(mtd->writesize /
+-							nand_chip->ecc.size);
+-		oob_index			= BADBLOCK_MARKER_LENGTH;
+-		for (i = 0; i < ecclayout->eccbytes; i++, oob_index++) {
+-			ecclayout->eccpos[i] = oob_index;
+-			if (((i + 1) % nand_chip->ecc.bytes) == 0)
+-				oob_index++;
+-		}
+-		/* include reserved-marker in ecclayout->oobfree calculation */
+-		ecclayout->oobfree->offset	= 1 +
+-				ecclayout->eccpos[ecclayout->eccbytes - 1] + 1;
++		mtd_set_ooblayout(mtd, &omap_sw_ooblayout_ops);
++		/* Reserve one byte for the OMAP marker */
++		oobbytes_per_step		= nand_chip->ecc.bytes + 1;
+ 		/* software bch library is used for locating errors */
+ 		nand_chip->ecc.priv		= nand_bch_init(mtd);
+ 		if (!nand_chip->ecc.priv) {
+@@ -1888,16 +1952,8 @@ static int omap_nand_probe(struct platform_device *pdev)
+ 		nand_chip->ecc.calculate	= omap_calculate_ecc_bch;
+ 		nand_chip->ecc.read_page	= omap_read_page_bch;
+ 		nand_chip->ecc.write_page	= omap_write_page_bch;
+-		/* define ECC layout */
+-		ecclayout->eccbytes		= nand_chip->ecc.bytes *
+-							(mtd->writesize /
+-							nand_chip->ecc.size);
+-		oob_index			= BADBLOCK_MARKER_LENGTH;
+-		for (i = 0; i < ecclayout->eccbytes; i++, oob_index++)
+-			ecclayout->eccpos[i]	= oob_index;
+-		/* reserved marker already included in ecclayout->eccbytes */
+-		ecclayout->oobfree->offset	=
+-				ecclayout->eccpos[ecclayout->eccbytes - 1] + 1;
++		mtd_set_ooblayout(mtd, &omap_ooblayout_ops);
++		oobbytes_per_step		= nand_chip->ecc.bytes;
+ 
+ 		err = elm_config(info->elm_dev, BCH4_ECC,
+ 				 mtd->writesize / nand_chip->ecc.size,
+@@ -1915,19 +1971,9 @@ static int omap_nand_probe(struct platform_device *pdev)
+ 		nand_chip->ecc.hwctl		= omap_enable_hwecc_bch;
+ 		nand_chip->ecc.correct		= nand_bch_correct_data;
+ 		nand_chip->ecc.calculate	= omap_calculate_ecc_bch;
+-		/* define ECC layout */
+-		ecclayout->eccbytes		= nand_chip->ecc.bytes *
+-							(mtd->writesize /
+-							nand_chip->ecc.size);
+-		oob_index			= BADBLOCK_MARKER_LENGTH;
+-		for (i = 0; i < ecclayout->eccbytes; i++, oob_index++) {
+-			ecclayout->eccpos[i] = oob_index;
+-			if (((i + 1) % nand_chip->ecc.bytes) == 0)
+-				oob_index++;
+-		}
+-		/* include reserved-marker in ecclayout->oobfree calculation */
+-		ecclayout->oobfree->offset	= 1 +
+-				ecclayout->eccpos[ecclayout->eccbytes - 1] + 1;
++		mtd_set_ooblayout(mtd, &omap_sw_ooblayout_ops);
++		/* Reserve one byte for the OMAP marker */
++		oobbytes_per_step		= nand_chip->ecc.bytes + 1;
+ 		/* software bch library is used for locating errors */
+ 		nand_chip->ecc.priv		= nand_bch_init(mtd);
+ 		if (!nand_chip->ecc.priv) {
+@@ -1949,6 +1995,8 @@ static int omap_nand_probe(struct platform_device *pdev)
+ 		nand_chip->ecc.calculate	= omap_calculate_ecc_bch;
+ 		nand_chip->ecc.read_page	= omap_read_page_bch;
+ 		nand_chip->ecc.write_page	= omap_write_page_bch;
++		mtd_set_ooblayout(mtd, &omap_ooblayout_ops);
++		oobbytes_per_step		= nand_chip->ecc.bytes;
+ 
+ 		err = elm_config(info->elm_dev, BCH8_ECC,
+ 				 mtd->writesize / nand_chip->ecc.size,
+@@ -1956,16 +2004,6 @@ static int omap_nand_probe(struct platform_device *pdev)
+ 		if (err < 0)
+ 			goto return_error;
+ 
+-		/* define ECC layout */
+-		ecclayout->eccbytes		= nand_chip->ecc.bytes *
+-							(mtd->writesize /
+-							nand_chip->ecc.size);
+-		oob_index			= BADBLOCK_MARKER_LENGTH;
+-		for (i = 0; i < ecclayout->eccbytes; i++, oob_index++)
+-			ecclayout->eccpos[i]	= oob_index;
+-		/* reserved marker already included in ecclayout->eccbytes */
+-		ecclayout->oobfree->offset	=
+-				ecclayout->eccpos[ecclayout->eccbytes - 1] + 1;
+ 		break;
+ 
+ 	case OMAP_ECC_BCH16_CODE_HW:
+@@ -1979,6 +2017,8 @@ static int omap_nand_probe(struct platform_device *pdev)
+ 		nand_chip->ecc.calculate	= omap_calculate_ecc_bch;
+ 		nand_chip->ecc.read_page	= omap_read_page_bch;
+ 		nand_chip->ecc.write_page	= omap_write_page_bch;
++		mtd_set_ooblayout(mtd, &omap_ooblayout_ops);
++		oobbytes_per_step		= nand_chip->ecc.bytes;
+ 
+ 		err = elm_config(info->elm_dev, BCH16_ECC,
+ 				 mtd->writesize / nand_chip->ecc.size,
+@@ -1986,16 +2026,6 @@ static int omap_nand_probe(struct platform_device *pdev)
+ 		if (err < 0)
+ 			goto return_error;
+ 
+-		/* define ECC layout */
+-		ecclayout->eccbytes		= nand_chip->ecc.bytes *
+-							(mtd->writesize /
+-							nand_chip->ecc.size);
+-		oob_index			= BADBLOCK_MARKER_LENGTH;
+-		for (i = 0; i < ecclayout->eccbytes; i++, oob_index++)
+-			ecclayout->eccpos[i]	= oob_index;
+-		/* reserved marker already included in ecclayout->eccbytes */
+-		ecclayout->oobfree->offset	=
+-				ecclayout->eccpos[ecclayout->eccbytes - 1] + 1;
+ 		break;
+ 	default:
+ 		dev_err(&info->pdev->dev, "invalid or unsupported ECC scheme\n");
+@@ -2003,13 +2033,15 @@ static int omap_nand_probe(struct platform_device *pdev)
+ 		goto return_error;
+ 	}
+ 
+-	/* all OOB bytes from oobfree->offset till end off OOB are free */
+-	ecclayout->oobfree->length = mtd->oobsize - ecclayout->oobfree->offset;
+ 	/* check if NAND device's OOB is enough to store ECC signatures */
+-	if (mtd->oobsize < (ecclayout->eccbytes + BADBLOCK_MARKER_LENGTH)) {
++	min_oobbytes = (oobbytes_per_step *
++			(mtd->writesize / nand_chip->ecc.size)) +
++		       (nand_chip->options & NAND_BUSWIDTH_16 ?
++			BADBLOCK_MARKER_LENGTH : 1);
++	if (mtd->oobsize < min_oobbytes) {
+ 		dev_err(&info->pdev->dev,
+ 			"not enough OOB bytes required = %d, available=%d\n",
+-			ecclayout->eccbytes, mtd->oobsize);
++			min_oobbytes, mtd->oobsize);
+ 		err = -EINVAL;
+ 		goto return_error;
+ 	}
 -- 
 2.5.0
