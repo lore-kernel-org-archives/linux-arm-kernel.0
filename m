@@ -1,42 +1,37 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 30 Mar 2016 13:07:06 +0100
-Subject: [RFC PATCH 00/45] KVM: arm/arm64: Rework virtual GIC emulation
-In-Reply-To: <56FBBBC2.6010602@arm.com>
-References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
- <56FA7F29.4060005@arm.com> <56FBBBC2.6010602@arm.com>
-Message-ID: <56FBC16A.7040404@arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 30 Mar 2016 20:09:58 +0800
+Subject: [PATCH v4] ARM: dts: vf610-zii-dev: Add ZII development board.
+In-Reply-To: <dad27c3a958ae97869c606e9e02e2d7b@agner.ch>
+References: <1459100733-21552-1-git-send-email-andrew@lunn.ch>
+ <56F84FAB.6010005@gmail.com> <20160327223603.GA21605@lunn.ch>
+ <dad27c3a958ae97869c606e9e02e2d7b@agner.ch>
+Message-ID: <20160330120958.GG28207@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/03/16 12:42, Vladimir Murzin wrote:
-> On 29/03/16 14:12, Vladimir Murzin wrote:
->> Hi Andre,
->>
->> On 25/03/16 02:04, Andre Przywara wrote:
->>> Please have a look at the series, review it and give the code some
->>> serious testing (and possibly debugging). All feedback is appreciated.
->>
->> I see that with the new vgic implementation kvmtool starts throwing:
->>
->> kvm [1273]: Unable to register VGICv3 redist MMIO regions
->>
+On Sun, Mar 27, 2016 at 03:48:21PM -0700, Stefan Agner wrote:
+> >> > +&uart0 {
+> >> > +	pinctrl-names = "default";
+> >> > +	pinctrl-0 = <&pinctrl_uart0>;
+> >> > +	status = "okay";
+> >> > +	dmas = <>;
+> >> > +	dma-names = "";
+> >>
+> >> Why is this dma stuff here ?
+> > 
+> > We have seen corruption of the serial transmit stream, when the DMA is
+> > being used. As a workaround, we disable DMA.
+> > 
 > 
-> It comes from kvm_io_bus_register_dev()
+> For the Colibri VF50/VF61 we used this method too to disable the DMA
+> (clearing dma-names). I guess using the device tree deleting
+> capabilities would be the more elegant way to do this.
 > 
-> if (bus->dev_count - bus->ioeventfd_count > NR_IOBUS_DEVS - 1)
-> 	return -ENOSPC;
-> 
-> with bus->dev_count being 1000
+> We have seen such issues too, the DMA implementation of the LPUART
+> driver seems to be racy... We are working on fixing that.
 
-Ouch. That's a consequence of having one "device" per actual register
-set, I believe. So either we bump this limit up by a factor 10 (at
-least), or we switch back to the old way of handling access to the GIC
-regions (big "catch-all", and further demuxing).
+In this case, shouldn't the DMA support be disabled in driver before the
+issue gets fixed?  I'm saying that we shouldn't manipulate device tree
+(i.e.  hardware description) to work around Linux device driver issue.
 
-Thoughts?
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Shawn
