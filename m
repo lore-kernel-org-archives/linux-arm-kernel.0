@@ -1,47 +1,88 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 30 Mar 2016 19:47:59 +0800
-Subject: [PATCH 0/4] Add support for Engicam IMX6UL module
-In-Reply-To: <1455963652-24618-1-git-send-email-michael@amarulasolutions.com>
-References: <1455963652-24618-1-git-send-email-michael@amarulasolutions.com>
-Message-ID: <20160330114748.GF28207@tiger>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Wed, 30 Mar 2016 12:52:27 +0100
+Subject: [RFC PATCH 00/45] KVM: arm/arm64: Rework virtual GIC emulation
+In-Reply-To: <56FBBBC2.6010602@arm.com>
+References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
+ <56FA7F29.4060005@arm.com> <56FBBBC2.6010602@arm.com>
+Message-ID: <56FBBDFB.7080308@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 20, 2016 at 11:20:48AM +0100, Michael Trimarchi wrote:
-> Thi patch series add the support for Engicam IMXUL product
+On 30/03/16 12:42, Vladimir Murzin wrote:
+> On 29/03/16 14:12, Vladimir Murzin wrote:
+>> Hi Andre,
+>>
+>> On 25/03/16 02:04, Andre Przywara wrote:
+>>> Please have a look at the series, review it and give the code some
+>>> serious testing (and possibly debugging). All feedback is appreciated.
+>>
+>> I see that with the new vgic implementation kvmtool starts throwing:
+>>
+>> kvm [1273]: Unable to register VGICv3 redist MMIO regions
+>>
 > 
-> https://community.freescale.com/docs/DOC-328428
+> It comes from kvm_io_bus_register_dev()
 > 
-> Based on Freescale? i.MX 6UltraLite processor, a high performance,
-> ultra-efficient processor family featuring an advanced implementation
-> of a single ARM? Cortex?-A7 core, which operates at speeds up to 528 MHz.
+> if (bus->dev_count - bus->ioeventfd_count > NR_IOBUS_DEVS - 1)
+> 	return -ENOSPC;
 > 
-> The new ENGICAM GEA M6UL module is suitable for cost effective HMI
-> applications requiring high performance CPU.
+> with bus->dev_count being 1000
 > 
-> Michael Trimarchi (4):
->   ARM: dts: imx6ul: Add flexcan1 and flexcan2 support
->   ARM: dts: imx6ul: Add LCDIF support
->   ARM: dts: imx6ul: Add GPMI nand controller support
->   ARM: dts: imx6ul-geam: Add Engicam IMX6UL GEA M6UL initial support
+> [<ffffffc00009f93c>] kvm_io_bus_register_dev+0x130/0x148
+> [<ffffffc0000ad274>] kvm_vgic_register_mmio_region+0xac/0xdc
+> [<ffffffc0000ad4d4>] vgic_register_redist_regions+0xb8/0x158
+> [<ffffffc0000abb90>] vgic_v3_map_resources+0x5c/0xf0
+> [<ffffffc0000aae04>] kvm_vgic_map_resources+0x40/0x84
+> [<ffffffc0000a23d0>] kvm_arch_vcpu_ioctl_run+0x3f0/0x400
+> [<ffffffc00009d484>] kvm_vcpu_ioctl+0x2d4/0x6ec
+> [<ffffffc0001c4eec>] do_vfs_ioctl+0xb4/0x760
+> [<ffffffc0001c561c>] SyS_ioctl+0x84/0x98
+> [<ffffffc000085d30>] el0_svc_naked+0x24/0x28
+> 
 
-There are quite some changes around imx6ul.dtsi getting into 4.6-rc1.
-Can you please rebase onto 4.6-rc1 and resend?
+and one more thing I've forgotten to mention... something odd happens on
+destroy path
 
-Shawn
+INFO: task kvm-vcpu-0:1123 blocked for more than 120 seconds.
+      Tainted: G        W       4.5.0-rc6+ #432
+"echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
+kvm-vcpu-0      D ffffffc000086bcc     0  1123   1114 0x00000008
+Call trace:
+[<ffffffc000086bcc>] __switch_to+0x90/0xa4
+[<ffffffc0006c4390>] __schedule+0x188/0x59c
+[<ffffffc0006c47e0>] schedule+0x3c/0xa0
+[<ffffffc0006c4bf4>] schedule_preempt_disabled+0x20/0x38
+[<ffffffc0006c618c>] __mutex_lock_slowpath+0xc4/0x148
+[<ffffffc0006c6254>] mutex_lock+0x44/0x5c
+[<ffffffc0000aacb8>] kvm_vgic_destroy+0x20/0xb0
+[<ffffffc0000abbdc>] vgic_v3_map_resources+0xa8/0xf0
+[<ffffffc0000aae04>] kvm_vgic_map_resources+0x40/0x84
+[<ffffffc0000a23d0>] kvm_arch_vcpu_ioctl_run+0x3f0/0x400
+[<ffffffc00009d484>] kvm_vcpu_ioctl+0x2d4/0x6ec
+[<ffffffc0001c4eec>] do_vfs_ioctl+0xb4/0x760
+[<ffffffc0001c561c>] SyS_ioctl+0x84/0x98
+[<ffffffc000085d30>] el0_svc_naked+0x24/0x28
 
+Vladimir
+
+> Hope this helps...
+> Vladimir
 > 
->  arch/arm/boot/dts/Makefile             |   3 +-
->  arch/arm/boot/dts/imx6ul-geam-kit.dts  | 102 +++++++++
->  arch/arm/boot/dts/imx6ul-geam.dtsi     | 371 +++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/imx6ul.dtsi          |  68 ++++++
->  drivers/mtd/nand/gpmi-nand/gpmi-nand.c |  10 +
->  drivers/mtd/nand/gpmi-nand/gpmi-nand.h |   6 +-
->  6 files changed, 557 insertions(+), 3 deletions(-)
->  create mode 100644 arch/arm/boot/dts/imx6ul-geam-kit.dts
->  create mode 100644 arch/arm/boot/dts/imx6ul-geam.dtsi
+>> for --cpus 58 and above, where with the old vgic it is quite happy with
+>> up to 255 cpus.
+>>
+>> Cheers
+>> Vladimir
+>> _______________________________________________
+>> kvmarm mailing list
+>> kvmarm at lists.cs.columbia.edu
+>> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+>>
+>>
 > 
-> -- 
-> 2.7.0
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
 > 
 > 
