@@ -1,84 +1,86 @@
 From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
-Date: Wed, 30 Mar 2016 10:27:44 -0500
-Subject: [PATCH 3/7] EDAC, altera: Make OCRAM ECC dependency check generic
+Date: Wed, 30 Mar 2016 10:27:47 -0500
+Subject: [PATCH 6/7] ARM: socfpga: Enable Arria10 OCRAM ECC on startup
 In-Reply-To: <1459351668-14622-1-git-send-email-tthayer@opensource.altera.com>
 References: <1459351668-14622-1-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <1459351668-14622-4-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <1459351668-14622-7-git-send-email-tthayer@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thor Thayer <tthayer@opensource.altera.com>
 
-In preparation for the Arria10 peripheral ECCs, the OCRAM
-ECC dependency check was moved into the general ECC area
-since this same function can be used by other memories.
+Enable ECC for Arria10 On-Chip RAM on machine startup. The ECC has to be
+enabled before data is stored in memory otherwise the ECC will fail
+on reads.
 
 Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
 ---
- drivers/edac/altera_edac.c |   43 +++++++++++++++++++++----------------------
- 1 file changed, 21 insertions(+), 22 deletions(-)
+ arch/arm/mach-socfpga/core.h    |    1 +
+ arch/arm/mach-socfpga/ocram.c   |   22 ++++++++++++++++++++++
+ arch/arm/mach-socfpga/socfpga.c |    2 ++
+ 3 files changed, 25 insertions(+)
 
-diff --git a/drivers/edac/altera_edac.c b/drivers/edac/altera_edac.c
-index f0a6de7..f7ffc77 100644
---- a/drivers/edac/altera_edac.c
-+++ b/drivers/edac/altera_edac.c
-@@ -648,6 +648,26 @@ static ssize_t altr_edac_device_trig(struct file *file,
- 	return count;
- }
+diff --git a/arch/arm/mach-socfpga/core.h b/arch/arm/mach-socfpga/core.h
+index bfbc78d..65e1817 100644
+--- a/arch/arm/mach-socfpga/core.h
++++ b/arch/arm/mach-socfpga/core.h
+@@ -39,6 +39,7 @@ extern void socfpga_sysmgr_init(void);
+ void socfpga_init_l2_ecc(void);
+ void socfpga_init_ocram_ecc(void);
+ void socfpga_init_arria10_l2_ecc(void);
++void socfpga_init_arria10_ocram_ecc(void);
  
-+/*
-+ *  Test for memory's ECC dependencies upon entry because platform specific
-+ *  startup should have initialized the memory and enabled the ECC.
-+ *  Can't turn on ECC here because accessing un-initialized memory will
-+ *  cause CE/UE errors possibly causing an ABORT.
-+ */
-+static int altr_check_ecc_deps(struct altr_edac_device_dev *device)
+ extern void __iomem *sys_manager_base_addr;
+ extern void __iomem *rst_manager_base_addr;
+diff --git a/arch/arm/mach-socfpga/ocram.c b/arch/arm/mach-socfpga/ocram.c
+index 60ec643..e9d0982 100644
+--- a/arch/arm/mach-socfpga/ocram.c
++++ b/arch/arm/mach-socfpga/ocram.c
+@@ -19,6 +19,8 @@
+ #include <linux/of_address.h>
+ #include <linux/of_platform.h>
+ 
++#include "../drivers/edac/altera_edac.h"
++
+ #define ALTR_OCRAM_CLEAR_ECC          0x00000018
+ #define ALTR_OCRAM_ECC_EN             0x00000019
+ 
+@@ -47,3 +49,23 @@ void socfpga_init_ocram_ecc(void)
+ 
+ 	iounmap(mapped_ocr_edac_addr);
+ }
++
++void socfpga_init_arria10_ocram_ecc(void)
 +{
-+	void __iomem  *base = device->base;
-+	const struct edac_device_prv_data *prv = device->data;
++	struct device_node *np;
++	int ret;
 +
-+	if (readl(base + prv->ecc_en_ofst) & prv->ecc_enable_mask)
-+		return 0;
++	/* Find the OCRAM EDAC device tree node */
++	np = of_find_compatible_node(NULL, NULL, "altr,socfpga-a10-ocram-ecc");
++	if (!np) {
++		pr_err("Unable to find socfpga-a10-ocram-ecc\n");
++		return;
++	}
 +
-+	edac_printk(KERN_ERR, EDAC_DEVICE,
-+		    "%s: No ECC present or ECC disabled.\n",
-+		    device->edac_dev_name);
-+	return -ENODEV;
++	ret = altr_init_a10_ecc_block(np, A10_SYSMGR_ECC_INTSTAT_OCRAM,
++				      ALTR_A10_OCRAM_ECC_EN_CTL, 0);
++	if (ret)
++		pr_err("Unable to initialize OCRAM\n");
++
++	of_node_put(np);
 +}
-+
- static const struct file_operations altr_edac_device_inject_fops = {
- 	.open = simple_open,
- 	.write = altr_edac_device_trig,
-@@ -853,29 +873,8 @@ static void ocram_free_mem(void *p, size_t size, void *other)
- 	gen_pool_free((struct gen_pool *)other, (u32)p, size);
+diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
+index e9b5b60..dde14f7 100644
+--- a/arch/arm/mach-socfpga/socfpga.c
++++ b/arch/arm/mach-socfpga/socfpga.c
+@@ -72,6 +72,8 @@ static void __init socfpga_arria10_init_irq(void)
+ 	socfpga_sysmgr_init();
+ 	if (IS_ENABLED(CONFIG_EDAC_ALTERA_L2C))
+ 		socfpga_init_arria10_l2_ecc();
++	if (IS_ENABLED(CONFIG_EDAC_ALTERA_OCRAM))
++		socfpga_init_arria10_ocram_ecc();
  }
  
--/*
-- * altr_ocram_check_deps()
-- *	Test for OCRAM cache ECC dependencies upon entry because
-- *	platform specific startup should have initialized the
-- *	On-Chip RAM memory and enabled the ECC.
-- *	Can't turn on ECC here because accessing un-initialized
-- *	memory will cause CE/UE errors possibly causing an ABORT.
-- */
--static int altr_ocram_check_deps(struct altr_edac_device_dev *device)
--{
--	void __iomem  *base = device->base;
--	const struct edac_device_prv_data *prv = device->data;
--
--	if (readl(base + prv->ecc_en_ofst) & prv->ecc_enable_mask)
--		return 0;
--
--	edac_printk(KERN_ERR, EDAC_DEVICE,
--		    "OCRAM: No ECC present or ECC disabled.\n");
--	return -ENODEV;
--}
--
- const struct edac_device_prv_data ocramecc_data = {
--	.setup = altr_ocram_check_deps,
-+	.setup = altr_check_ecc_deps,
- 	.ce_clear_mask = (ALTR_OCR_ECC_EN | ALTR_OCR_ECC_SERR),
- 	.ue_clear_mask = (ALTR_OCR_ECC_EN | ALTR_OCR_ECC_DERR),
- 	.dbgfs_name = "altr_ocram_trigger",
+ static void socfpga_cyclone5_restart(enum reboot_mode mode, const char *cmd)
 -- 
 1.7.9.5
