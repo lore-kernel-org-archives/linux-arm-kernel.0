@@ -1,120 +1,322 @@
 From: andy.yan@rock-chips.com (Andy Yan)
-Date: Wed, 30 Mar 2016 10:19:50 +0800
-Subject: [PATCH v7 1/4] dt-bindings: power: reset: add document for
- reboot-mode driver
+Date: Wed, 30 Mar 2016 10:20:43 +0800
+Subject: [PATCH v7 2/4] power: reset: add reboot mode driver
 In-Reply-To: <1459304304-9713-1-git-send-email-andy.yan@rock-chips.com>
 References: <1459304304-9713-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <1459304390-9763-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <1459304443-9811-1-git-send-email-andy.yan@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree bindings document for reboot-mode driver.
+This driver parses the reboot commands like "reboot bootloader"
+and "reboot recovery" to get a boot mode described in the
+device tree , then call the write interfae to store the boot
+mode in some place like special register or sram, which can
+be read by the bootloader after system reboot, then the bootloader
+can take different action according to the mode stored.
 
+This is commonly used on Android based devices, in order to
+reboot the device into fastboot or recovery mode.
+
+Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+Reviewed-by: Moritz Fischer <moritz.fischer@ettus.com>
+Tested-by: John Stultz <john.stultz@linaro.org>
+Acked-by: John Stultz <john.stultz@linaro.org>
 Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
-Acked-by: Rob Herring <robh@kernel.org>
 
 ---
 
 Changes in v7:
-- fix some spelling mistakes
-- declare that the mode magic should be none-zero value
+- address some suggestions from Krzysztof, make syscon-reboot-mode driver data self-contained.
 
-Changes in v6:
-- fix a typo with "property"
-- describe property "mask" more clear
-
+Changes in v6: None
 Changes in v5:
-- delete a unnecessary blank line in syscon-reboot-mode.txt
-- rename mode-fastoboot to mode-bootloader in syscon-reboot-mode.txt
-- rename macro BOOT_LOADER to BOOT_BL_DOWNLOAD, which gives a more clear mean
+- use two blank space under help in Kconfig
+- use unsigned int instead of int for member magic in struct mode_info
 
 Changes in v4:
-- remove mode-maskrom
-- rename mode-fastboot to mode-bootloader to keep compatible with the exiting Android device
+- make this driver depends on OF to avoid kbuild test error
 
 Changes in v3:
-- descirbe all reboot mode as properity instead of subnode
+- scan multi properities
+- add mask value for some platform which only use some bits of the register
+  to store boot mode magic value
 
-Changes in v2: None
-Changes in v1: None
+Changes in v2:
+- move to dir drivers/power/reset/
+- make syscon-reboot-mode a generic driver
 
- .../bindings/power/reset/reboot-mode.txt           | 25 ++++++++++++++++
- .../bindings/power/reset/syscon-reboot-mode.txt    | 35 ++++++++++++++++++++++
- 2 files changed, 60 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/power/reset/reboot-mode.txt
- create mode 100644 Documentation/devicetree/bindings/power/reset/syscon-reboot-mode.txt
+Changes in v1:
+- fix the embarrassed compile warning
+- correct the maskrom magic number
+- check for the normal reboot
 
-diff --git a/Documentation/devicetree/bindings/power/reset/reboot-mode.txt b/Documentation/devicetree/bindings/power/reset/reboot-mode.txt
+ drivers/power/reset/Kconfig              |  13 ++++
+ drivers/power/reset/Makefile             |   2 +
+ drivers/power/reset/reboot-mode.c        | 115 +++++++++++++++++++++++++++++++
+ drivers/power/reset/reboot-mode.h        |   6 ++
+ drivers/power/reset/syscon-reboot-mode.c |  86 +++++++++++++++++++++++
+ 5 files changed, 222 insertions(+)
+ create mode 100644 drivers/power/reset/reboot-mode.c
+ create mode 100644 drivers/power/reset/reboot-mode.h
+ create mode 100644 drivers/power/reset/syscon-reboot-mode.c
+
+diff --git a/drivers/power/reset/Kconfig b/drivers/power/reset/Kconfig
+index 1131cf7..cf50630 100644
+--- a/drivers/power/reset/Kconfig
++++ b/drivers/power/reset/Kconfig
+@@ -173,5 +173,18 @@ config POWER_RESET_ZX
+ 	help
+ 	  Reboot support for ZTE SoCs.
+ 
++config REBOOT_MODE
++	tristate
++
++config SYSCON_REBOOT_MODE
++	bool "Generic SYSCON regmap reboot mode driver"
++	depends on OF
++	select REBOOT_MODE
++	help
++	  Say y here will enable reboot mode driver. This will
++	  get reboot mode arguments and store it in SYSCON mapped
++	  register, then the bootloader can read it to take different
++	  action according to the mode.
++
+ endif
+ 
+diff --git a/drivers/power/reset/Makefile b/drivers/power/reset/Makefile
+index 096fa67..a63865b 100644
+--- a/drivers/power/reset/Makefile
++++ b/drivers/power/reset/Makefile
+@@ -20,3 +20,5 @@ obj-$(CONFIG_POWER_RESET_SYSCON) += syscon-reboot.o
+ obj-$(CONFIG_POWER_RESET_SYSCON_POWEROFF) += syscon-poweroff.o
+ obj-$(CONFIG_POWER_RESET_RMOBILE) += rmobile-reset.o
+ obj-$(CONFIG_POWER_RESET_ZX) += zx-reboot.o
++obj-$(CONFIG_REBOOT_MODE) += reboot-mode.o
++obj-$(CONFIG_SYSCON_REBOOT_MODE) += syscon-reboot-mode.o
+diff --git a/drivers/power/reset/reboot-mode.c b/drivers/power/reset/reboot-mode.c
 new file mode 100644
-index 0000000..de34f27
+index 0000000..ae6f931
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/power/reset/reboot-mode.txt
-@@ -0,0 +1,25 @@
-+Generic reboot mode core map driver
++++ b/drivers/power/reset/reboot-mode.c
+@@ -0,0 +1,115 @@
++/*
++ * Copyright (c) 2016, Fuzhou Rockchip Electronics Co., Ltd
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
 +
-+This driver get reboot mode arguments and call the write
-+interface to store the magic value in special register
-+or ram. Then the bootloader can read it and take different
-+action according to the argument stored.
++#include <linux/device.h>
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/reboot.h>
++#include "reboot-mode.h"
 +
-+All mode properties are vendor specific, it is a indication to tell
-+the bootloader what to do when the system reboots, and should be named
-+as mode-xxx = <magic> (xxx is mode name, magic should be a none-zero value).
++#define PREFIX "mode-"
 +
-+For example modes common on Android platform:
-+- mode-normal: Normal reboot mode, system reboot with command "reboot".
-+- mode-recovery: Android Recovery mode, it is a mode to format the device or update a new image.
-+- mode-bootloader: Android fastboot mode, it's a mode to re-flash partitions on the Android based device.
-+- mode-loader: A bootloader mode, it's a mode used to download image on Rockchip platform,
-+	       usually used in development.
++struct mode_info {
++	const char *mode;
++	unsigned int magic;
++	struct list_head list;
++};
 +
-+Example:
-+	reboot-mode {
-+		mode-normal = <BOOT_NORMAL>;
-+		mode-recovery = <BOOT_RECOVERY>;
-+		mode-bootloader = <BOOT_FASTBOOT>;
-+		mode-loader = <BOOT_BL_DOWNLOAD>;
++struct reboot_mode_driver {
++	struct device *dev;
++	struct list_head head;
++	int (*write)(struct device *dev, int magic);
++	struct notifier_block reboot_notifier;
++};
++
++static int get_reboot_mode_magic(struct reboot_mode_driver *reboot,
++				 const char *cmd)
++{
++	const char *normal = "normal";
++	int magic = 0;
++	struct mode_info *info;
++
++	if (!cmd)
++		cmd = normal;
++
++	list_for_each_entry(info, &reboot->head, list) {
++		if (!strcmp(info->mode, cmd)) {
++			magic = info->magic;
++			break;
++		}
 +	}
-diff --git a/Documentation/devicetree/bindings/power/reset/syscon-reboot-mode.txt b/Documentation/devicetree/bindings/power/reset/syscon-reboot-mode.txt
++
++	return magic;
++}
++
++static int reboot_mode_notify(struct notifier_block *this,
++			      unsigned long mode, void *cmd)
++{
++	struct reboot_mode_driver *reboot;
++	int magic;
++
++	reboot = container_of(this, struct reboot_mode_driver, reboot_notifier);
++	magic = get_reboot_mode_magic(reboot, cmd);
++	if (magic)
++		reboot->write(reboot->dev, magic);
++
++	return NOTIFY_DONE;
++}
++
++int reboot_mode_register(struct device *dev, int (*write)(struct device *, int))
++{
++	struct reboot_mode_driver *reboot;
++	struct mode_info *info;
++	struct property *prop;
++	struct device_node *np;
++	size_t len = strlen(PREFIX);
++	int ret;
++
++	reboot = devm_kzalloc(dev, sizeof(*reboot), GFP_KERNEL);
++	if (!reboot)
++		return -ENOMEM;
++
++	reboot->dev = dev;
++	reboot->write = write;
++	INIT_LIST_HEAD(&reboot->head);
++
++	np = of_node_get(dev->of_node);
++	for_each_property_of_node(np, prop) {
++		if (len > strlen(prop->name) || strncmp(prop->name, PREFIX, len))
++			continue;
++
++		info = devm_kzalloc(dev, sizeof(*info), GFP_KERNEL);
++		if (!info)
++			return -ENOMEM;
++
++		info->mode = kstrdup_const(prop->name + len, GFP_KERNEL);
++		if (of_property_read_u32(np, prop->name, &info->magic)) {
++			dev_err(dev, "reboot mode %s without magic number\n",
++				info->mode);
++			devm_kfree(dev, info);
++			continue;
++		}
++		list_add_tail(&info->list, &reboot->head);
++	}
++	of_node_put(np);
++
++	reboot->reboot_notifier.notifier_call = reboot_mode_notify;
++	ret = register_reboot_notifier(&reboot->reboot_notifier);
++	if (ret)
++		dev_err(dev, "can't register reboot notifier\n");
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(reboot_mode_register);
++
++MODULE_AUTHOR("Andy Yan <andy.yan@rock-chips.com");
++MODULE_DESCRIPTION("System reboot mode driver");
++MODULE_LICENSE("GPL v2");
+diff --git a/drivers/power/reset/reboot-mode.h b/drivers/power/reset/reboot-mode.h
 new file mode 100644
-index 0000000..f7ce1d8
+index 0000000..c861129
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/power/reset/syscon-reboot-mode.txt
-@@ -0,0 +1,35 @@
-+SYSCON reboot mode driver
++++ b/drivers/power/reset/reboot-mode.h
+@@ -0,0 +1,6 @@
++#ifndef __REBOOT_MODE_H__
++#define __REBOOT_MODE_H__
 +
-+This driver gets reboot mode magic value form reboot-mode driver
-+and stores it in a SYSCON mapped register. Then the bootloader
-+can read it and take different action according to the magic
-+value stored.
++int reboot_mode_register(struct device *dev, int (*write)(struct device *, int));
 +
-+This DT node should be represented as a sub-node of a "syscon", "simple-mfd"
-+node.
++#endif
+diff --git a/drivers/power/reset/syscon-reboot-mode.c b/drivers/power/reset/syscon-reboot-mode.c
+new file mode 100644
+index 0000000..f1b8072
+--- /dev/null
++++ b/drivers/power/reset/syscon-reboot-mode.c
+@@ -0,0 +1,86 @@
++/*
++ * Copyright (c) 2016, Fuzhou Rockchip Electronics Co., Ltd
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
 +
-+Required properties:
-+- compatible: should be "syscon-reboot-mode"
-+- offset: offset in the register map for the storage register (in bytes)
++#include <linux/init.h>
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/reboot.h>
++#include <linux/regmap.h>
++#include <linux/mfd/syscon.h>
++#include "reboot-mode.h"
 +
-+Optional property:
-+- mask: bits mask of the bits in the register to store the reboot mode magic value,
-+  default set to 0xffffffff if missing.
++struct syscon_reboot_mode {
++	struct device *dev;
++	struct regmap *map;
++	u32 offset;
++	u32 mask;
++};
 +
-+The rest of the properties should follow the generic reboot-mode description
-+found in reboot-mode.txt
++static int syscon_reboot_mode_write(struct device *dev, int magic)
++{
++	struct syscon_reboot_mode *syscon_rbm = dev_get_drvdata(dev);
++	int ret;
 +
-+Example:
-+	pmu: pmu at 20004000 {
-+		compatible = "rockchip,rk3066-pmu", "syscon", "simple-mfd";
-+		reg = <0x20004000 0x100>;
++	ret = regmap_update_bits(syscon_rbm->map, syscon_rbm->offset,
++				 syscon_rbm->mask, magic);
++	if (ret < 0)
++		dev_err(dev, "update reboot mode bits failed\n");
 +
-+		reboot-mode {
-+			compatible = "syscon-reboot-mode";
-+			offset = <0x40>;
-+			mode-normal = <BOOT_NORMAL>;
-+			mode-recovery = <BOOT_RECOVERY>;
-+			mode-bootloader = <BOOT_FASTBOOT>;
-+			mode-loader = <BOOT_BL_DOWNLOAD>;
-+		};
-+	};
++	return ret;
++}
++
++static int syscon_reboot_mode_probe(struct platform_device *pdev)
++{
++	int ret;
++	struct syscon_reboot_mode *syscon_rbm;
++
++	syscon_rbm = devm_kzalloc(&pdev->dev, sizeof(*syscon_rbm), GFP_KERNEL);
++	if (!syscon_rbm)
++		return -ENOMEM;
++
++	syscon_rbm->dev = &pdev->dev;
++	syscon_rbm->mask = 0xffffffff;
++
++	syscon_rbm->map = syscon_node_to_regmap(pdev->dev.parent->of_node);
++	if (IS_ERR(syscon_rbm->map))
++		return PTR_ERR(syscon_rbm->map);
++
++	if (of_property_read_u32(pdev->dev.of_node, "offset", &syscon_rbm->offset))
++		return -EINVAL;
++
++	of_property_read_u32(pdev->dev.of_node, "mask", &syscon_rbm->mask);
++
++	dev_set_drvdata(&pdev->dev, syscon_rbm);
++
++	ret = reboot_mode_register(&pdev->dev, syscon_reboot_mode_write);
++	if (ret)
++		dev_err(&pdev->dev, "can't register reboot mode\n");
++
++	return ret;
++}
++
++static const struct of_device_id syscon_reboot_mode_of_match[] = {
++	{ .compatible = "syscon-reboot-mode" },
++	{}
++};
++
++static struct platform_driver syscon_reboot_mode_driver = {
++	.probe = syscon_reboot_mode_probe,
++	.driver = {
++		.name = "syscon-reboot-mode",
++		.of_match_table = syscon_reboot_mode_of_match,
++	},
++};
++module_platform_driver(syscon_reboot_mode_driver);
++
++MODULE_AUTHOR("Andy Yan <andy.yan@rock-chips.com");
++MODULE_DESCRIPTION("SYSCON reboot mode driver");
++MODULE_LICENSE("GPL v2");
 -- 
 1.9.1
