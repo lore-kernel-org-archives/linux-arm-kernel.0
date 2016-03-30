@@ -1,9 +1,9 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 30 Mar 2016 22:03:58 +0200
-Subject: [PATCH v5 35/46] hwmon: pwm-fan: switch to the atomic API
+Date: Wed, 30 Mar 2016 22:03:59 +0200
+Subject: [PATCH v5 36/46] input: misc: max77693: switch to the atomic API
 In-Reply-To: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1459368249-13241-36-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1459368249-13241-37-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,171 +12,76 @@ by pwm_apply_state().
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/hwmon/pwm-fan.c | 81 ++++++++++++++++++++++++++++---------------------
- 1 file changed, 46 insertions(+), 35 deletions(-)
+ drivers/input/misc/max77693-haptic.c | 23 +++++++++++++++++------
+ 1 file changed, 17 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/hwmon/pwm-fan.c b/drivers/hwmon/pwm-fan.c
-index 82c5656..da4e4ab 100644
---- a/drivers/hwmon/pwm-fan.c
-+++ b/drivers/hwmon/pwm-fan.c
-@@ -40,8 +40,8 @@ struct pwm_fan_ctx {
+diff --git a/drivers/input/misc/max77693-haptic.c b/drivers/input/misc/max77693-haptic.c
+index cf6aac0..aef7dc4 100644
+--- a/drivers/input/misc/max77693-haptic.c
++++ b/drivers/input/misc/max77693-haptic.c
+@@ -70,13 +70,16 @@ struct max77693_haptic {
  
- static int  __set_pwm(struct pwm_fan_ctx *ctx, unsigned long pwm)
+ static int max77693_haptic_set_duty_cycle(struct max77693_haptic *haptic)
  {
 +	struct pwm_state pstate;
  	struct pwm_args pargs = { };
--	unsigned long duty;
- 	int ret = 0;
+-	int delta;
+ 	int error;
  
- 	pwm_get_args(ctx->pwm, &pargs);
-@@ -50,19 +50,17 @@ static int  __set_pwm(struct pwm_fan_ctx *ctx, unsigned long pwm)
- 	if (ctx->pwm_value == pwm)
- 		goto exit_set_pwm_err;
- 
--	duty = DIV_ROUND_UP(pwm * (pargs.period - 1), MAX_PWM);
--	ret = pwm_config(ctx->pwm, duty, pargs.period);
--	if (ret)
--		goto exit_set_pwm_err;
--
-+	pwm_get_state(ctx->pwm, &pstate);
+ 	pwm_get_args(haptic->pwm_dev, &pargs);
+-	delta = (pargs.period + haptic->pwm_duty) / 2;
+-	error = pwm_config(haptic->pwm_dev, delta, pargs.period);
++	pwm_get_state(haptic->pwm_dev, &pstate);
++
 +	pstate.period = pargs.period;
-+	pstate.duty_cycle = DIV_ROUND_UP(pwm * (pargs.period - 1), MAX_PWM);
- 	if (pwm == 0)
--		pwm_disable(ctx->pwm);
-+		pstate.enabled = false;
-+	else
-+		pstate.enabled = true;
++	pstate.duty_cycle = (pargs.period + haptic->pwm_duty) / 2;
++	error = pwm_apply_state(haptic->pwm_dev, &pstate);
+ 	if (error) {
+ 		dev_err(haptic->dev, "failed to configure pwm: %d\n", error);
+ 		return error;
+@@ -161,12 +164,16 @@ static int max77693_haptic_lowsys(struct max77693_haptic *haptic, bool enable)
  
--	if (ctx->pwm_value == 0) {
--		ret = pwm_enable(ctx->pwm);
--		if (ret)
--			goto exit_set_pwm_err;
--	}
-+	ret = pwm_apply_state(ctx->pwm, &pstate);
-+	if (ret)
-+		goto exit_set_pwm_err;
- 
- 	ctx->pwm_value = pwm;
- exit_set_pwm_err:
-@@ -217,10 +215,10 @@ static int pwm_fan_of_get_cooling_data(struct device *dev,
- static int pwm_fan_probe(struct platform_device *pdev)
+ static void max77693_haptic_enable(struct max77693_haptic *haptic)
  {
- 	struct thermal_cooling_device *cdev;
 +	struct pwm_state pstate;
- 	struct pwm_args pargs = { };
- 	struct pwm_fan_ctx *ctx;
- 	struct device *hwmon;
--	int duty_cycle;
- 	int ret;
+ 	int error;
  
- 	ctx = devm_kzalloc(&pdev->dev, sizeof(*ctx), GFP_KERNEL);
-@@ -239,27 +237,25 @@ static int pwm_fan_probe(struct platform_device *pdev)
+ 	if (haptic->enabled)
+ 		return;
  
- 	/* Set duty cycle to maximum allowed */
- 	pwm_get_args(ctx->pwm, &pargs);
--	duty_cycle = pargs.period - 1;
-+	pwm_get_state(ctx->pwm, &pstate);
-+
-+	pstate.period = pargs.period;
-+	pstate.duty_cycle = pargs.period - 1;
-+	pstate.enabled = true;
- 	ctx->pwm_value = MAX_PWM;
- 
--	ret = pwm_config(ctx->pwm, duty_cycle, pargs.period);
-+	ret = pwm_apply_state(ctx->pwm, &pstate);
- 	if (ret) {
- 		dev_err(&pdev->dev, "Failed to configure PWM\n");
- 		return ret;
- 	}
- 
--	/* Enbale PWM output */
--	ret = pwm_enable(ctx->pwm);
--	if (ret) {
--		dev_err(&pdev->dev, "Failed to enable PWM\n");
--		return ret;
--	}
--
- 	hwmon = devm_hwmon_device_register_with_groups(&pdev->dev, "pwmfan",
- 						       ctx, pwm_fan_groups);
- 	if (IS_ERR(hwmon)) {
- 		dev_err(&pdev->dev, "Failed to register hwmon device\n");
--		pwm_disable(ctx->pwm);
-+		pstate.enabled = false;
-+		pwm_apply_state(ctx->pwm, &pstate);
- 		return PTR_ERR(hwmon);
- 	}
- 
-@@ -275,7 +271,8 @@ static int pwm_fan_probe(struct platform_device *pdev)
- 		if (IS_ERR(cdev)) {
- 			dev_err(&pdev->dev,
- 				"Failed to register pwm-fan as cooling device");
--			pwm_disable(ctx->pwm);
-+			pstate.enabled = false;
-+			pwm_apply_state(ctx->pwm, &pstate);
- 			return PTR_ERR(cdev);
- 		}
- 		ctx->cdev = cdev;
-@@ -290,8 +287,14 @@ static int pwm_fan_remove(struct platform_device *pdev)
- 	struct pwm_fan_ctx *ctx = platform_get_drvdata(pdev);
- 
- 	thermal_cooling_device_unregister(ctx->cdev);
--	if (ctx->pwm_value)
--		pwm_disable(ctx->pwm);
-+	if (ctx->pwm_value) {
-+		struct pwm_state pstate;
-+
-+		pwm_get_state(ctx->pwm, &pstate);
-+		pstate.enabled = false;
-+		pwm_apply_state(ctx->pwm, &pstate);
-+	}
-+
- 	return 0;
- }
- 
-@@ -300,27 +303,35 @@ static int pwm_fan_suspend(struct device *dev)
- {
- 	struct pwm_fan_ctx *ctx = dev_get_drvdata(dev);
- 
--	if (ctx->pwm_value)
--		pwm_disable(ctx->pwm);
-+	if (ctx->pwm_value) {
-+		struct pwm_state pstate;
-+
-+		pwm_get_state(ctx->pwm, &pstate);
-+		pstate.enabled = false;
-+		pwm_apply_state(ctx->pwm, &pstate);
-+	}
-+
- 	return 0;
- }
- 
- static int pwm_fan_resume(struct device *dev)
- {
- 	struct pwm_fan_ctx *ctx = dev_get_drvdata(dev);
-+	struct pwm_state pstate;
- 	struct pwm_args pargs = { };
--	unsigned long duty;
--	int ret;
- 
- 	if (ctx->pwm_value == 0)
- 		return 0;
- 
- 	pwm_get_args(ctx->pwm, &pargs);
--	duty = DIV_ROUND_UP(ctx->pwm_value * (pargs.period - 1), MAX_PWM);
--	ret = pwm_config(ctx->pwm, duty, pargs.period);
--	if (ret)
--		return ret;
--	return pwm_enable(ctx->pwm);
-+	pwm_get_state(ctx->pwm, &pstate);
-+
-+	pstate.period = pargs.period;
-+	pstate.duty_cycle = DIV_ROUND_UP(ctx->pwm_value * (pargs.period - 1),
-+					 MAX_PWM);
+-	error = pwm_enable(haptic->pwm_dev);
++	pwm_get_state(haptic->pwm_dev, &pstate);
 +	pstate.enabled = true;
 +
-+	return pwm_apply_state(ctx->pwm, &pstate);
++	error = pwm_apply_state(haptic->pwm_dev, &pstate);
+ 	if (error) {
+ 		dev_err(haptic->dev,
+ 			"failed to enable haptic pwm device: %d\n", error);
+@@ -188,11 +195,13 @@ static void max77693_haptic_enable(struct max77693_haptic *haptic)
+ err_enable_config:
+ 	max77693_haptic_lowsys(haptic, false);
+ err_enable_lowsys:
+-	pwm_disable(haptic->pwm_dev);
++	pstate.enabled = false;
++	pwm_apply_state(haptic->pwm_dev, &pstate);
  }
- #endif
  
+ static void max77693_haptic_disable(struct max77693_haptic *haptic)
+ {
++	struct pwm_state pstate;
+ 	int error;
+ 
+ 	if (!haptic->enabled)
+@@ -206,7 +215,9 @@ static void max77693_haptic_disable(struct max77693_haptic *haptic)
+ 	if (error)
+ 		goto err_disable_lowsys;
+ 
+-	pwm_disable(haptic->pwm_dev);
++	pwm_get_state(haptic->pwm_dev, &pstate);
++	pstate.enabled = false;
++	pwm_apply_state(haptic->pwm_dev, &pstate);
+ 	haptic->enabled = false;
+ 
+ 	return;
 -- 
 2.5.0
