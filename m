@@ -1,61 +1,39 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 30 Mar 2016 14:09:16 -0700
-Subject: [PATCH v4 1/2] watchdog: imx2_wdt: add external reset support
- via 'ext-reset-output' dt prop
-In-Reply-To: <20160330012226.GD28207@tiger>
-References: <CAJ+vNU2fSxRJ7YvxOfNzoEoiKgzv-dHj=+eksKxH48ekHiUw2Q@mail.gmail.com>
- <20151106220249.GA19791@roeck-us.net>
- <565F4244.7090502@timesys.com>
- <CAJ+vNU00Bf97HUqkkW9KqOUzHXh482R9O1gasz6ju3Pn-_5chA@mail.gmail.com>
- <CAJ+vNU2qHQPSJ1KWp_3f3vAdeuOcF0ooZHmHsdafabZLXJv=Bw@mail.gmail.com>
- <20151228162923.GA31680@spo001.leaseweb.nl>
- <56AA79DA.2010305@timesys.com>
- <CAOMZO5DrTY3ho0Z_jXxeYMqbd6GmUKRwD1LB61vM1ZTGQAYOrg@mail.gmail.com>
- <56F991C3.8030201@timesys.com> <20160330012226.GD28207@tiger>
-Message-ID: <20160330210916.GB21993@roeck-us.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 30 Mar 2016 14:11:15 -0700
+Subject: [PATCH] ARM: OMAP2: Fix up interconnect barrier initialization
+ for DRA7
+In-Reply-To: <4167118.MBvk7Vsb05@avalon>
+References: <1457712748-1408-1-git-send-email-nm@ti.com>
+ <4167118.MBvk7Vsb05@avalon>
+Message-ID: <20160330211114.GC9329@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 30, 2016 at 09:22:33AM +0800, Shawn Guo wrote:
-> On Mon, Mar 28, 2016 at 04:19:15PM -0400, Akshay Bhat wrote:
-> > Hi Shawn,
+* Laurent Pinchart <laurent.pinchart@ideasonboard.com> [160311 08:46]:
+> Hi Nishanth,
+> 
+> Thank you for the patch.
+> 
+> On Friday 11 March 2016 10:12:28 Nishanth Menon wrote:
+> > The following commits:
+> > commit 3fa609755c11 ("ARM: omap2: restore OMAP4 barrier behaviour")
+> > commit f746929ffdc8 ("Revert "ARM: OMAP4: remove dead kconfig option
+> > OMAP4_ERRATA_I688"") and
+> > commit ea827ad5ffbb ("ARM: DRA7: Provide proper IO map table")
+> > came in around the same time, unfortunately this seem to have missed
+> > initializing the barrier for DRA7 platforms - omap5_map_io was reused
+> > for dra7 till it was split out by the last patch. barrier_init
+> > needs to be hence carried forward as it is valid for DRA7 family of
+> > processors as they are for OMAP5.
 > > 
-> > On 02/28/2016 08:56 AM, Fabio Estevam wrote:
-> > >Rob,
-> > >
-> > >On Thu, Jan 28, 2016 at 6:28 PM, Akshay Bhat <akshay.bhat@timesys.com> wrote:
-> > >
-> > >>>I have no objections against the idea and the code itself.
-> > >>>But as Guenter pointed out: it would be handy to get feedback from the
-> > >>>devicetree maintainers on the above discussion.
-> > >>>
-> > >>>Kind regards,
-> > >>>Wim.
-> > >>>
-> > >>
-> > >>Any suggestions on whether a vendor specific prefix is necessary?
-> > >
-> > >Any comments?
-> > >
-> > 
-> > Is this something you can help with, since you are the iMX
-> > architecture/devicetree maintainer? Appreciate any feedback.
+> > Fixes: ea827ad5ffbb7 ("ARM: DRA7: Provide proper IO map table")
+> > Reported-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > Reported-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> > Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> > Signed-off-by: Nishanth Menon <nm@ti.com>
 > 
-> FWIW,
-> 
-> Acked-by: Shawn Guo <shawnguo@kernel.org>
-> 
-> Guenter,
-> 
-> I think it's reasonable to pick up the patch, if we have it copied to DT
-> maintainers and on the list for a long period of time, and do not see
-> any objection from anyone.
-> 
-The question was if the property name should be ext-reset-output or
-fsl,ext-reset-output. In my opinion, it should be fsl,ext-reset-output
-because it is not a generic property. Tim disagrees.
+> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-So we have two options: Change the property name to fsl,ext-reset-output,
-which I would accept, or wait for a devicetree maintainer to make a decision.
+Applying into omap-for-v4.6/fixes with Cc stable thanks.
 
-Guenter
+Tony
