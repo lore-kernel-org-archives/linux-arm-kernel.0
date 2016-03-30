@@ -1,92 +1,50 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 30 Mar 2016 18:14:40 +0200
-Subject: [PATCH v5 25/50] mtd: nand: cafe: switch to mtd_ooblayout_ops
+Date: Wed, 30 Mar 2016 18:14:21 +0200
+Subject: [PATCH v5 06/50] mtd: nand: gpmi: use mtd_ooblayout_xxx() helpers
+ where appropriate
 In-Reply-To: <1459354505-32551-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1459354505-32551-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1459354505-32551-26-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1459354505-32551-7-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implementing the mtd_ooblayout_ops interface is the new way of exposing
-ECC/OOB layout to MTD users.
+The mtd_ooblayout_xxx() helper functions have been added to avoid direct
+accesses to the ecclayout field, and thus ease for future reworks.
+Use these helpers in all places where the oobfree[] and eccpos[] arrays
+where directly accessed.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/mtd/nand/cafe_nand.c | 44 ++++++++++++++++++++++++++++++++------------
- 1 file changed, 32 insertions(+), 12 deletions(-)
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/mtd/nand/cafe_nand.c b/drivers/mtd/nand/cafe_nand.c
-index e553aff..0b0c937 100644
---- a/drivers/mtd/nand/cafe_nand.c
-+++ b/drivers/mtd/nand/cafe_nand.c
-@@ -459,10 +459,37 @@ static int cafe_nand_read_page(struct mtd_info *mtd, struct nand_chip *chip,
- 	return max_bitflips;
- }
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+index 8122c69..3a29b65 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+@@ -1327,18 +1327,19 @@ static int gpmi_ecc_read_oob(struct mtd_info *mtd, struct nand_chip *chip,
+ static int
+ gpmi_ecc_write_oob(struct mtd_info *mtd, struct nand_chip *chip, int page)
+ {
+-	struct nand_oobfree *of = mtd->ecclayout->oobfree;
++	struct mtd_oob_region of = { };
+ 	int status = 0;
  
--static struct nand_ecclayout cafe_oobinfo_2048 = {
--	.eccbytes = 14,
--	.eccpos = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13},
--	.oobfree = {{14, 50}}
-+static int cafe_ooblayout_ecc(struct mtd_info *mtd, int section,
-+			      struct mtd_oob_region *oobregion)
-+{
-+	struct nand_chip *chip = mtd_to_nand(mtd);
-+
-+	if (section)
-+		return -ERANGE;
-+
-+	oobregion->offset = 0;
-+	oobregion->length = chip->ecc.total;
-+
-+	return 0;
-+}
-+
-+static int cafe_ooblayout_free(struct mtd_info *mtd, int section,
-+			       struct mtd_oob_region *oobregion)
-+{
-+	struct nand_chip *chip = mtd_to_nand(mtd);
-+
-+	if (section)
-+		return -ERANGE;
-+
-+	oobregion->offset = chip->ecc.total;
-+	oobregion->length = mtd->oobsize - chip->ecc.total;
-+
-+	return 0;
-+}
-+
-+static const struct mtd_ooblayout_ops cafe_ooblayout_ops = {
-+	.ecc = cafe_ooblayout_ecc,
-+	.free = cafe_ooblayout_free,
- };
+ 	/* Do we have available oob area? */
+-	if (!of->length)
++	mtd_ooblayout_free(mtd, 0, &of);
++	if (!of.length)
+ 		return -EPERM;
  
- /* Ick. The BBT code really ought to be able to work this bit out
-@@ -494,12 +521,6 @@ static struct nand_bbt_descr cafe_bbt_mirror_descr_2048 = {
- 	.pattern = cafe_mirror_pattern_2048
- };
+ 	if (!nand_is_slc(chip))
+ 		return -EPERM;
  
--static struct nand_ecclayout cafe_oobinfo_512 = {
--	.eccbytes = 14,
--	.eccpos = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13},
--	.oobfree = {{14, 2}}
--};
--
- static struct nand_bbt_descr cafe_bbt_main_descr_512 = {
- 	.options = NAND_BBT_LASTBLOCK | NAND_BBT_CREATE | NAND_BBT_WRITE
- 		| NAND_BBT_2BIT | NAND_BBT_VERSION,
-@@ -743,12 +764,11 @@ static int cafe_nand_probe(struct pci_dev *pdev,
- 		cafe->ctl2 |= 1<<29; /* 2KiB page size */
+-	chip->cmdfunc(mtd, NAND_CMD_SEQIN, mtd->writesize + of->offset, page);
+-	chip->write_buf(mtd, chip->oob_poi + of->offset, of->length);
++	chip->cmdfunc(mtd, NAND_CMD_SEQIN, mtd->writesize + of.offset, page);
++	chip->write_buf(mtd, chip->oob_poi + of.offset, of.length);
+ 	chip->cmdfunc(mtd, NAND_CMD_PAGEPROG, -1, -1);
  
- 	/* Set up ECC according to the type of chip we found */
-+	mtd_set_ooblayout(mtd, &cafe_ooblayout_ops);
- 	if (mtd->writesize == 2048) {
--		cafe->nand.ecc.layout = &cafe_oobinfo_2048;
- 		cafe->nand.bbt_td = &cafe_bbt_main_descr_2048;
- 		cafe->nand.bbt_md = &cafe_bbt_mirror_descr_2048;
- 	} else if (mtd->writesize == 512) {
--		cafe->nand.ecc.layout = &cafe_oobinfo_512;
- 		cafe->nand.bbt_td = &cafe_bbt_main_descr_512;
- 		cafe->nand.bbt_md = &cafe_bbt_mirror_descr_512;
- 	} else {
+ 	status = chip->waitfunc(mtd, chip);
 -- 
 2.5.0
