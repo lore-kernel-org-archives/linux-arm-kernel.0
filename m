@@ -1,91 +1,28 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 30 Mar 2016 11:29:42 +0200
-Subject: [RFC PATCH 07/45] KVM: arm/arm64: vgic-new: Add vgic GICv2
- change_affinity
-In-Reply-To: <1458871508-17279-8-git-send-email-andre.przywara@arm.com>
-References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
- <1458871508-17279-8-git-send-email-andre.przywara@arm.com>
-Message-ID: <20160330092942.GH4126@cbox>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Wed, 30 Mar 2016 11:30:56 +0200
+Subject: [PATCH v3 3/8] clk: samsung: exynos3250: Add MMC2 clock
+In-Reply-To: <56F87E83.7060100@samsung.com>
+References: <1458027490-13787-1-git-send-email-cw00.choi@samsung.com>
+ <1458027490-13787-4-git-send-email-cw00.choi@samsung.com>
+ <56F47ABC.7060006@samsung.com> <56F509E6.7080807@samsung.com>
+ <56F87E83.7060100@samsung.com>
+Message-ID: <56FB9CD0.5040802@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 25, 2016 at 02:04:30AM +0000, Andre Przywara wrote:
-> From: Christoffer Dall <christoffer.dall@linaro.org>
+On 03/28/2016 02:44 AM, Chanwoo Choi wrote:
+> You mean that separate patch1 include only the new clock id about both UART2 and MMC2
+> and the patch2/patch3 just use the new clock id as following:
 > 
-> Introduce vgic-v2.c to contain GICv2 specific functions.
-> Add vgic_v2_irq_change_affinity() to change the target VCPU of a
-> particular interrupt.
+> patch1 dt-bindings: Add the clock id of UART2 and MMC2 for Exynos3250
+> patch2 clk: samsung: exynos3250: Add UART2 clock
+> patch3 clk: samsung: exynos3250: Add MMC2 clock
 > 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Andre Przywara <marc.zyngier@arm.com>
-> ---
->  virt/kvm/arm/vgic/vgic-v2.c | 40 ++++++++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic.h    |  2 ++
->  2 files changed, 42 insertions(+)
->  create mode 100644 virt/kvm/arm/vgic/vgic-v2.c
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-> new file mode 100644
-> index 0000000..0bf6f27
-> --- /dev/null
-> +++ b/virt/kvm/arm/vgic/vgic-v2.c
-> @@ -0,0 +1,40 @@
-> +/*
-> + * Copyright (C) 2015, 2016 ARM Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/kvm.h>
-> +#include <linux/kvm_host.h>
-> +
-> +#include "vgic.h"
-> +
-> +void vgic_v2_irq_change_affinity(struct kvm *kvm, u32 intid, u8 new_targets)
-> +{
-> +	struct vgic_dist *dist = &kvm->arch.vgic;
-> +	struct vgic_irq *irq;
-> +	int target;
-> +
-> +	BUG_ON(intid <= VGIC_MAX_PRIVATE);
-> +	BUG_ON(dist->vgic_model != KVM_DEV_TYPE_ARM_VGIC_V2);
+> As far as I understand it is that right?
+> If it is ok, I'll modify it on v4 patchset as you comment.
 
-we can probably get rid of the last BUG_ON here.
+Yeah, that's what I meant.
 
-> +
-> +	irq = vgic_get_irq(kvm, NULL, intid);
-> +
-> +	spin_lock(&irq->irq_lock);
-> +	irq->targets = new_targets;
-> +
-> +	target = ffs(irq->targets);
-> +	target = target ? (target - 1) : 0;
-> +	irq->target_vcpu = kvm_get_vcpu(kvm, target);
-> +	spin_unlock(&irq->irq_lock);
-> +}
-> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> index e9f4aa6..b2faf00 100644
-> --- a/virt/kvm/arm/vgic/vgic.h
-> +++ b/virt/kvm/arm/vgic/vgic.h
-> @@ -20,4 +20,6 @@ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
->  			      u32 intid);
->  bool vgic_queue_irq(struct kvm *kvm, struct vgic_irq *irq);
->  
-> +void vgic_v2_irq_change_affinity(struct kvm *kvm, u32 intid, u8 target);
-> +
->  #endif
-> -- 
-> 2.7.3
-> 
+-- 
+Thanks,
+Sylwester
