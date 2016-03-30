@@ -1,10 +1,10 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 30 Mar 2016 18:14:21 +0200
-Subject: [PATCH v5 06/50] mtd: nand: gpmi: use mtd_ooblayout_xxx() helpers
+Date: Wed, 30 Mar 2016 18:14:20 +0200
+Subject: [PATCH v5 05/50] mtd: nand: fsl_ifc: use mtd_ooblayout_xxx() helpers
  where appropriate
 In-Reply-To: <1459354505-32551-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1459354505-32551-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1459354505-32551-7-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1459354505-32551-6-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,36 +15,40 @@ where directly accessed.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+ drivers/mtd/nand/fsl_ifc_nand.c | 14 +++++++++-----
+ 1 file changed, 9 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-index 8122c69..3a29b65 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-@@ -1327,18 +1327,19 @@ static int gpmi_ecc_read_oob(struct mtd_info *mtd, struct nand_chip *chip,
- static int
- gpmi_ecc_write_oob(struct mtd_info *mtd, struct nand_chip *chip, int page)
- {
--	struct nand_oobfree *of = mtd->ecclayout->oobfree;
-+	struct mtd_oob_region of = { };
- 	int status = 0;
+diff --git a/drivers/mtd/nand/fsl_ifc_nand.c b/drivers/mtd/nand/fsl_ifc_nand.c
+index 43f5a3a..2e970ac 100644
+--- a/drivers/mtd/nand/fsl_ifc_nand.c
++++ b/drivers/mtd/nand/fsl_ifc_nand.c
+@@ -257,18 +257,22 @@ static int is_blank(struct mtd_info *mtd, unsigned int bufnum)
+ 	u8 __iomem *addr = priv->vbase + bufnum * (mtd->writesize * 2);
+ 	u32 __iomem *mainarea = (u32 __iomem *)addr;
+ 	u8 __iomem *oob = addr + mtd->writesize;
+-	int i;
++	struct mtd_oob_region oobregion = { };
++	int i, section = 0;
  
- 	/* Do we have available oob area? */
--	if (!of->length)
-+	mtd_ooblayout_free(mtd, 0, &of);
-+	if (!of.length)
- 		return -EPERM;
+ 	for (i = 0; i < mtd->writesize / 4; i++) {
+ 		if (__raw_readl(&mainarea[i]) != 0xffffffff)
+ 			return 0;
+ 	}
  
- 	if (!nand_is_slc(chip))
- 		return -EPERM;
+-	for (i = 0; i < chip->ecc.layout->eccbytes; i++) {
+-		int pos = chip->ecc.layout->eccpos[i];
++	mtd_ooblayout_ecc(mtd, section++, &oobregion);
++	while (oobregion.length) {
++		for (i = 0; i < oobregion.length; i++) {
++			if (__raw_readb(&oob[oobregion.offset + i]) != 0xff)
++				return 0;
++		}
  
--	chip->cmdfunc(mtd, NAND_CMD_SEQIN, mtd->writesize + of->offset, page);
--	chip->write_buf(mtd, chip->oob_poi + of->offset, of->length);
-+	chip->cmdfunc(mtd, NAND_CMD_SEQIN, mtd->writesize + of.offset, page);
-+	chip->write_buf(mtd, chip->oob_poi + of.offset, of.length);
- 	chip->cmdfunc(mtd, NAND_CMD_PAGEPROG, -1, -1);
+-		if (__raw_readb(&oob[pos]) != 0xff)
+-			return 0;
++		mtd_ooblayout_ecc(mtd, section++, &oobregion);
+ 	}
  
- 	status = chip->waitfunc(mtd, chip);
+ 	return 1;
 -- 
 2.5.0
