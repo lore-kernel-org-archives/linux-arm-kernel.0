@@ -1,107 +1,66 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 30 Mar 2016 16:56:10 +0100
-Subject: [PATCH] arm64: KVM: Register CPU notifiers when the kernel runs at HYP
-Message-ID: <1459353370-589-1-git-send-email-james.morse@arm.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Wed, 30 Mar 2016 17:57:08 +0200
+Subject: [PATCH 11/13] dtb: amd: Add PCIe SMMU device tree node
+In-Reply-To: <20160330154538.GA10224@arm.com>
+References: <1453929121-12171-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <20160128111453.GG17123@leverpostej> <56AA07AA.7050701@arm.com>
+ <6645680.g0j8d12m6d@wuerfel> <20160128142751.GA775@arm.com>
+ <56FBF2B7.8090601@linaro.org> <20160330154538.GA10224@arm.com>
+Message-ID: <56FBF754.7020804@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the kernel is running at EL2, it doesn't need init_hyp_mode() to
-configure page tables for HYP. This function also registers the CPU
-hotplug and lower power notifiers that cause HYP to be re-initialised
-after the CPU has been reset.
+Hi Will,
+On 03/30/2016 05:45 PM, Will Deacon wrote:
+> Hi Eric,
+> 
+> On Wed, Mar 30, 2016 at 05:37:27PM +0200, Eric Auger wrote:
+>> On 01/28/2016 03:27 PM, Will Deacon wrote:
+>>> On Thu, Jan 28, 2016 at 03:17:33PM +0100, Arnd Bergmann wrote:
+>>>> On Thursday 28 January 2016 12:20:58 Robin Murphy wrote:
+>>>>>>
+>>>>> Any IDs specified here would only apply to DMA by the "platform device" 
+>>>>> side of the host controller itself (as would an equivalent "iommus" 
+>>>>> property on pcie0 once I finish the SMMUv2 generic binding support I'm 
+>>>>> working on). In terms of PCI devices, the "mmu-masters" property is 
+>>>>> overloaded such that only its existence matters, to identify that there 
+>>>>> _is_ a relationship between the SMMU and the PCI bus(es) behind that 
+>>>>> host controller.
+>>>>
+>>>> I wasn't aware that this was actually still specified. I had hoped
+>>>> we were getting rid of mmu-masters before anyone actually started
+>>>> using it, but now I see it in ns2.dtsi and fsl-ls2080a.dtsi.
+>>>>
+>>>> Does anyone know what happened to the plan to use the iommu DT binding
+>>>> for the ARM SMMU instead? Do we now have to support both ways indefinitely?
+>>>
+>>> We always did -- Seattle used the mmu-masters binding before the generic
+>>> binding even existed. Robin has been working on patches to get of_xlate
+>>> up and running, but it got held up by Laurent's series which didn't end
+>>> up going anywhere.
+>>>
+>> Up to now I have used the PCI smmu description as described in Suravee's
+>> patch and this does not work anymore with 4.6-rc1 since the default
+>> domain was introduced. So now I see 2 SMRs matching a single streamid
+>> (in my case 256, one steming from the "platform device" side of the host
+>> controller and one steming from the PCI device) and this causes SMCF
+>> (stream match conflict fault). So PCIe PF does not work.
+> 
+> Sorry about that, it wasn't intentional. In fact, I wrote commit
+> cbf8277ef456 ("iommu/arm-smmu: Treat IOMMU_DOMAIN_DMA as bypass for now")
+> specifically to avoid this breakage, after seeing it myself with VFIO
+> and an S2CR-based configuration. It looks like the check just needs moving
+> higher up (i.e. before we initialise the SMRs).
+> 
+> Does that fix it for you?
+Yes this fixes the issue for me, thanks! I guess you will send that patch?
 
-To avoid losing the register state that controls stage2 translation, move
-the registering of these notifiers into init_subsystems(), and add an
-is_kernel_in_hyp_mode() path to each callback.
+So eventually what is the right way to describe the smmu-masters (~
+future of that patch)?
 
-Fixes: 1e947bad0b6 ("arm64: KVM: Skip HYP setup when already running in HYP")
-Signed-off-by: James Morse <james.morse@arm.com>
----
- arch/arm/kvm/arm.c | 51 +++++++++++++++++++++++++++++++++------------------
- 1 file changed, 33 insertions(+), 18 deletions(-)
+Best Regards
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 6accd66d26f0..cf0184edf4f5 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -1067,8 +1067,16 @@ static int hyp_init_cpu_notify(struct notifier_block *self,
- 	switch (action) {
- 	case CPU_STARTING:
- 	case CPU_STARTING_FROZEN:
--		if (__hyp_get_vectors() == hyp_default_vectors)
--			cpu_init_hyp_mode(NULL);
-+		if (is_kernel_in_hyp_mode()) {
-+			/*
-+			 * cpu_init_stage2() is safe to call even if the PM
-+			 * event was cancelled before the CPU was reset.
-+			 */
-+			cpu_init_stage2(NULL);
-+		} else {
-+			if (__hyp_get_vectors() == hyp_default_vectors)
-+				cpu_init_hyp_mode(NULL);
-+		}
- 		break;
- 	}
- 
-@@ -1084,9 +1092,13 @@ static int hyp_init_cpu_pm_notifier(struct notifier_block *self,
- 				    unsigned long cmd,
- 				    void *v)
- {
--	if (cmd == CPU_PM_EXIT &&
--	    __hyp_get_vectors() == hyp_default_vectors) {
--		cpu_init_hyp_mode(NULL);
-+	if (cmd == CPU_PM_EXIT) {
-+		if (is_kernel_in_hyp_mode()) {
-+			cpu_init_stage2(NULL);
-+		} else {
-+			if (__hyp_get_vectors() == hyp_default_vectors)
-+				cpu_init_hyp_mode(NULL);
-+		}
- 		return NOTIFY_OK;
- 	}
- 
-@@ -1128,6 +1140,22 @@ static int init_subsystems(void)
- 	int err;
- 
- 	/*
-+	 * Register CPU Hotplug notifier
-+	 */
-+	cpu_notifier_register_begin();
-+	err = __register_cpu_notifier(&hyp_init_cpu_nb);
-+	cpu_notifier_register_done();
-+	if (err) {
-+		kvm_err("Cannot register KVM init CPU notifier (%d)\n", err);
-+		return err;
-+	}
-+
-+	/*
-+	 * Register CPU lower-power notifier
-+	 */
-+	hyp_cpu_pm_init();
-+
-+	/*
- 	 * Init HYP view of VGIC
- 	 */
- 	err = kvm_vgic_hyp_init();
-@@ -1270,19 +1298,6 @@ static int init_hyp_mode(void)
- 	free_boot_hyp_pgd();
- #endif
- 
--	cpu_notifier_register_begin();
--
--	err = __register_cpu_notifier(&hyp_init_cpu_nb);
--
--	cpu_notifier_register_done();
--
--	if (err) {
--		kvm_err("Cannot register HYP init CPU notifier (%d)\n", err);
--		goto out_err;
--	}
--
--	hyp_cpu_pm_init();
--
- 	/* set size of VMID supported by CPU */
- 	kvm_vmid_bits = kvm_get_vmid_bits();
- 	kvm_info("%d-bit VMID\n", kvm_vmid_bits);
--- 
-2.8.0.rc3
+Eric
+> 
+> Will
+> 
