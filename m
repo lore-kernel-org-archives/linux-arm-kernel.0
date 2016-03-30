@@ -1,95 +1,102 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 30 Mar 2016 22:03:55 +0200
-Subject: [PATCH v5 32/46] pwm: deprecate pwm_config(),
- pwm_enable() and pwm_disable()
+Date: Wed, 30 Mar 2016 22:03:56 +0200
+Subject: [PATCH v5 33/46] pwm: replace pwm_disable() by pwm_apply_state()
 In-Reply-To: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1459368249-13241-33-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1459368249-13241-34-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prefix those function as deprecated to encourage all existing users to
-switch to pwm_apply_state().
+Some PWM drivers are calling the deprecated pwm_disable() function in
+their pwm->free() or pdev->remove() function. Replace those calls by
+the pwm_apply_state().
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- include/linux/pwm.h | 24 ++++++++++++------------
- 1 file changed, 12 insertions(+), 12 deletions(-)
+ drivers/pwm/pwm-lpc18xx-sct.c | 7 +++++--
+ drivers/pwm/pwm-lpc32xx.c     | 9 +++++++--
+ drivers/pwm/pwm-spear.c       | 9 +++++++--
+ drivers/pwm/pwm-sti.c         | 9 +++++++--
+ 4 files changed, 26 insertions(+), 8 deletions(-)
 
-diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-index 4aad4eb..9bac10f 100644
---- a/include/linux/pwm.h
-+++ b/include/linux/pwm.h
-@@ -225,8 +225,8 @@ int pwm_apply_state(struct pwm_device *pwm, struct pwm_state *state);
-  *
-  * Returns: 0 on success or a negative error code on failure.
-  */
--static inline int pwm_config(struct pwm_device *pwm, int duty_ns,
--			     int period_ns)
-+static inline int __deprecated pwm_config(struct pwm_device *pwm, int duty_ns,
-+					  int period_ns)
+diff --git a/drivers/pwm/pwm-lpc18xx-sct.c b/drivers/pwm/pwm-lpc18xx-sct.c
+index 19dc64c..c4d7cb1 100644
+--- a/drivers/pwm/pwm-lpc18xx-sct.c
++++ b/drivers/pwm/pwm-lpc18xx-sct.c
+@@ -305,9 +305,12 @@ static void lpc18xx_pwm_free(struct pwm_chip *chip, struct pwm_device *pwm)
  {
- 	struct pwm_state pstate;
+ 	struct lpc18xx_pwm_chip *lpc18xx_pwm = to_lpc18xx_pwm_chip(chip);
+ 	struct lpc18xx_pwm_data *lpc18xx_data = pwm_get_chip_data(pwm);
++	struct pwm_state pstate;
  
-@@ -252,8 +252,8 @@ static inline int pwm_config(struct pwm_device *pwm, int duty_ns,
-  *
-  * Returns: 0 on success or a negative error code on failure.
-  */
--static inline int pwm_set_polarity(struct pwm_device *pwm,
--				   enum pwm_polarity polarity)
-+static inline int __deprecated pwm_set_polarity(struct pwm_device *pwm,
-+						enum pwm_polarity polarity)
- {
- 	struct pwm_state pstate;
- 
-@@ -284,7 +284,7 @@ static inline int pwm_set_polarity(struct pwm_device *pwm,
-  *
-  * Returns: 0 on success or a negative error code on failure.
-  */
--static inline int pwm_enable(struct pwm_device *pwm)
-+static inline int __deprecated pwm_enable(struct pwm_device *pwm)
- {
- 	struct pwm_state pstate;
- 
-@@ -303,7 +303,7 @@ static inline int pwm_enable(struct pwm_device *pwm)
-  * pwm_disable() - stop a PWM output toggling
-  * @pwm: PWM device
-  */
--static inline void pwm_disable(struct pwm_device *pwm)
-+static inline void __deprecated pwm_disable(struct pwm_device *pwm)
- {
- 	struct pwm_state pstate;
- 
-@@ -360,24 +360,24 @@ static inline int pwm_apply_state(struct pwm_device *pwm,
- 	return -ENOTSUPP;
+-	pwm_disable(pwm);
+-	pwm_set_duty_cycle(pwm, 0);
++	pwm_get_state(pwm, &pstate);
++	pstate.duty_cycle = 0;
++	pstate.enabled = false;
++	pwm_apply_state(pwm, &pstate);
+ 	clear_bit(lpc18xx_data->duty_event, &lpc18xx_pwm->event_map);
  }
  
--static inline int pwm_config(struct pwm_device *pwm, int duty_ns,
--			     int period_ns)
-+static inline int __deprecated pwm_config(struct pwm_device *pwm, int duty_ns,
-+					  int period_ns)
- {
- 	return -EINVAL;
- }
+diff --git a/drivers/pwm/pwm-lpc32xx.c b/drivers/pwm/pwm-lpc32xx.c
+index 4d470c1..95870e0 100644
+--- a/drivers/pwm/pwm-lpc32xx.c
++++ b/drivers/pwm/pwm-lpc32xx.c
+@@ -138,8 +138,13 @@ static int lpc32xx_pwm_remove(struct platform_device *pdev)
+ 	struct lpc32xx_pwm_chip *lpc32xx = platform_get_drvdata(pdev);
+ 	unsigned int i;
  
--static inline int pwm_set_polarity(struct pwm_device *pwm,
--				   enum pwm_polarity polarity)
-+static inline int __deprecated pwm_set_polarity(struct pwm_device *pwm,
-+						enum pwm_polarity polarity)
- {
- 	return -ENOTSUPP;
- }
+-	for (i = 0; i < lpc32xx->chip.npwm; i++)
+-		pwm_disable(&lpc32xx->chip.pwms[i]);
++	for (i = 0; i < lpc32xx->chip.npwm; i++) {
++		struct pwm_state pstate;
++
++		pwm_get_state(&lpc32xx->chip.pwms[i], &pstate);
++		pstate.enabled = false;
++		pwm_apply_state(&lpc32xx->chip.pwms[i], &pstate);
++	}
  
--static inline int pwm_enable(struct pwm_device *pwm)
-+static inline int __deprecated pwm_enable(struct pwm_device *pwm)
- {
- 	return -EINVAL;
+ 	return pwmchip_remove(&lpc32xx->chip);
  }
+diff --git a/drivers/pwm/pwm-spear.c b/drivers/pwm/pwm-spear.c
+index 6c6b44f..2ee4cd5 100644
+--- a/drivers/pwm/pwm-spear.c
++++ b/drivers/pwm/pwm-spear.c
+@@ -233,8 +233,13 @@ static int spear_pwm_remove(struct platform_device *pdev)
+ 	struct spear_pwm_chip *pc = platform_get_drvdata(pdev);
+ 	int i;
  
--static inline void pwm_disable(struct pwm_device *pwm)
-+static inline void __deprecated pwm_disable(struct pwm_device *pwm)
- {
- }
+-	for (i = 0; i < NUM_PWM; i++)
+-		pwm_disable(&pc->chip.pwms[i]);
++	for (i = 0; i < NUM_PWM; i++) {
++		struct pwm_state pstate;
++
++		pwm_get_state(&pc->chip.pwms[i], &pstate);
++		pstate.enabled = false;
++		pwm_apply_state(&pc->chip.pwms[i], &pstate);
++	}
+ 
+ 	/* clk was prepared in probe, hence unprepare it here */
+ 	clk_unprepare(pc->clk);
+diff --git a/drivers/pwm/pwm-sti.c b/drivers/pwm/pwm-sti.c
+index bea1d17..0ec44a8 100644
+--- a/drivers/pwm/pwm-sti.c
++++ b/drivers/pwm/pwm-sti.c
+@@ -435,8 +435,13 @@ static int sti_pwm_remove(struct platform_device *pdev)
+ 	struct sti_pwm_chip *pc = platform_get_drvdata(pdev);
+ 	unsigned int i;
+ 
+-	for (i = 0; i < pc->cdata->num_chan; i++)
+-		pwm_disable(&pc->chip.pwms[i]);
++	for (i = 0; i < pc->cdata->num_chan; i++) {
++		struct pwm_state pstate;
++
++		pwm_get_state(&pc->chip.pwms[i], &pstate);
++		pstate.enabled = false;
++		pwm_apply_state(&pc->chip.pwms[i], &pstate);
++	}
+ 
+ 	clk_unprepare(pc->clk);
  
 -- 
 2.5.0
