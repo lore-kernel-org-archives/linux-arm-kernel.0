@@ -1,99 +1,232 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 30 Mar 2016 18:38:50 +0200
-Subject: [PATCH v2 2/5] arm64: efi: apply strict permissons for UEFI Runtime
- Services regions
-In-Reply-To: <1459355933-13529-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1459355933-13529-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1459355933-13529-3-git-send-email-ard.biesheuvel@linaro.org>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 30 Mar 2016 18:15:05 +0200
+Subject: [PATCH v5 50/50] mtd: kill the nand_ecclayout struct
+In-Reply-To: <1459354505-32551-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1459354505-32551-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1459354505-32551-51-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Recent UEFI versions expose permission attributes for runtime services
-memory regions, either in the UEFI memory map or in the separate memory
-attributes table. This allows the kernel to map these regions with
-stricter permissions, rather than the RWX permissions that are used by
-default. So wire this up in our mapping routine.
+Now that all MTD drivers have moved to the mtd_ooblayout_ops model we can
+safely remove the struct nand_ecclayout definition, and all the remaining
+places where it was still used.
 
-Note that in the absence of permission attributes, we still only map
-regions of type EFI_RUNTIME_SERVICE_CODE with the executable bit set.
-Also, we base the mapping attributes of EFI_MEMORY_MAPPED_IO on the
-type directly rather than on the absence of the EFI_MEMORY_WB attribute.
-This is more correct, but is also required for compatibility with the
-upcoming support for the Memory Attributes Table, which only carries
-permission attributes, not memory type attributes.
-
-Cc: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- arch/arm64/kernel/efi.c | 54 +++++++++++++++-----
- 1 file changed, 40 insertions(+), 14 deletions(-)
+ drivers/mtd/mtdchar.c      |  12 ++---
+ drivers/mtd/mtdcore.c      | 117 ---------------------------------------------
+ include/linux/mtd/mtd.h    |  20 --------
+ include/uapi/mtd/mtd-abi.h |   2 +-
+ 4 files changed, 7 insertions(+), 144 deletions(-)
 
-diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index b6abc852f2a1..33a6da160a50 100644
---- a/arch/arm64/kernel/efi.c
-+++ b/arch/arm64/kernel/efi.c
-@@ -17,22 +17,48 @@
+diff --git a/drivers/mtd/mtdchar.c b/drivers/mtd/mtdchar.c
+index 3fad2c7..2a47a3f 100644
+--- a/drivers/mtd/mtdchar.c
++++ b/drivers/mtd/mtdchar.c
+@@ -465,12 +465,12 @@ static int mtdchar_readoob(struct file *file, struct mtd_info *mtd,
+ }
  
- #include <asm/efi.h>
+ /*
+- * Copies (and truncates, if necessary) data from the larger struct,
+- * nand_ecclayout, to the smaller, deprecated layout struct,
+- * nand_ecclayout_user. This is necessary only to support the deprecated
+- * API ioctl ECCGETLAYOUT while allowing all new functionality to use
+- * nand_ecclayout flexibly (i.e. the struct may change size in new
+- * releases without requiring major rewrites).
++ * Copies (and truncates, if necessary) OOB layout information to the
++ * deprecated layout struct, nand_ecclayout_user. This is necessary only to
++ * support the deprecated API ioctl ECCGETLAYOUT while allowing all new
++ * functionality to use mtd_ooblayout_ops flexibly (i.e. mtd_ooblayout_ops
++ * can describe any kind of OOB layout with almost zero overhead from a
++ * memory usage point of view).
+  */
+ static int shrink_ecclayout(struct mtd_info *mtd,
+ 			    struct nand_ecclayout_user *to)
+diff --git a/drivers/mtd/mtdcore.c b/drivers/mtd/mtdcore.c
+index bebca51..cbfa5ad 100644
+--- a/drivers/mtd/mtdcore.c
++++ b/drivers/mtd/mtdcore.c
+@@ -1357,123 +1357,6 @@ int mtd_ooblayout_count_eccbytes(struct mtd_info *mtd)
+ }
+ EXPORT_SYMBOL_GPL(mtd_ooblayout_count_eccbytes);
  
--int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md)
-+/*
-+ * Only regions of type EFI_RUNTIME_SERVICES_CODE need to be
-+ * executable, everything else can be mapped with the XN bits
-+ * set. Also take the new (optional) RO/XP bits into account.
-+ */
-+static __init pteval_t create_mapping_protection(efi_memory_desc_t *md)
- {
--	pteval_t prot_val;
-+	u64 attr = md->attribute;
-+	u32 type = md->type;
- 
+-/**
+- * mtd_ecclayout_ecc - Default ooblayout_ecc iterator implementation
+- * @mtd: MTD device structure
+- * @section: ECC section. Depending on the layout you may have all the ECC
+- *	     bytes stored in a single contiguous section, or one section
+- *	     per ECC chunk (and sometime several sections for a single ECC
+- *	     ECC chunk)
+- * @oobecc: OOB region struct filled with the appropriate ECC position
+- *	    information
+- *
+- * This function is just a wrapper around the mtd->ecclayout field and is
+- * here to ease the transition to the mtd_ooblayout_ops approach.
+- * All it does is convert the layout->eccpos information into proper oob
+- * region definitions.
+- *
+- * Returns zero on success, a negative error code otherwise.
+- */
+-static int mtd_ecclayout_ecc(struct mtd_info *mtd, int section,
+-			     struct mtd_oob_region *oobecc)
+-{
+-	int eccbyte = 0, cursection = 0, length = 0, eccpos = 0;
+-
+-	if (!mtd->ecclayout)
+-		return -ENOTSUPP;
+-
 -	/*
--	 * Only regions of type EFI_RUNTIME_SERVICES_CODE need to be
--	 * executable, everything else can be mapped with the XN bits
--	 * set.
+-	 * This logic allows us to reuse the ->ecclayout information and
+-	 * expose them as ECC regions (as done for the OOB free regions).
+-	 *
+-	 * TODO: this should be dropped as soon as we get rid of the
+-	 * ->ecclayout field.
 -	 */
--	if ((md->attribute & EFI_MEMORY_WB) == 0)
--		prot_val = PROT_DEVICE_nGnRE;
--	else if (md->type == EFI_RUNTIME_SERVICES_CODE ||
--		 !PAGE_ALIGNED(md->phys_addr))
--		prot_val = pgprot_val(PAGE_KERNEL_EXEC);
--	else
--		prot_val = pgprot_val(PAGE_KERNEL);
-+	if (type == EFI_MEMORY_MAPPED_IO)
-+		return PROT_DEVICE_nGnRE;
-+
-+	if (WARN_ONCE(!PAGE_ALIGNED(md->phys_addr),
-+		      "UEFI Runtime regions are not aligned to 64 KB -- buggy firmware?"))
-+		/*
-+		 * If the region is not aligned to the page size of the OS, we
-+		 * can not use strict permissions, since that would also affect
-+		 * the mapping attributes of the adjacent regions.
-+		 */
-+		return pgprot_val(PAGE_KERNEL_EXEC);
-+
-+	/* R-- */
-+	if ((attr & (EFI_MEMORY_XP | EFI_MEMORY_RO)) ==
-+	    (EFI_MEMORY_XP | EFI_MEMORY_RO))
-+		return pgprot_val(PAGE_KERNEL_RO);
-+
-+	/* R-X */
-+	if (attr & EFI_MEMORY_RO)
-+		return pgprot_val(PAGE_KERNEL_ROX);
-+
-+	/* RW- */
-+	if (attr & EFI_MEMORY_XP || type != EFI_RUNTIME_SERVICES_CODE)
-+		return pgprot_val(PAGE_KERNEL);
-+
-+	/* RWX */
-+	return pgprot_val(PAGE_KERNEL_EXEC);
-+}
-+
-+int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md)
-+{
-+	pteval_t prot_val = create_mapping_protection(md);
+-	for (eccbyte = 0; eccbyte < mtd->ecclayout->eccbytes; eccbyte++) {
+-		eccpos = mtd->ecclayout->eccpos[eccbyte];
+-
+-		if (eccbyte < mtd->ecclayout->eccbytes - 1) {
+-			int neccpos = mtd->ecclayout->eccpos[eccbyte + 1];
+-
+-			if (eccpos + 1 == neccpos) {
+-				length++;
+-				continue;
+-			}
+-		}
+-
+-		if (section == cursection)
+-			break;
+-
+-		length = 0;
+-		cursection++;
+-	}
+-
+-	if (cursection != section || eccbyte >= mtd->ecclayout->eccbytes)
+-		return -ERANGE;
+-
+-	oobecc->length = length + 1;
+-	oobecc->offset = eccpos - length;
+-
+-	return 0;
+-}
+-
+-/**
+- * mtd_ecclayout_ecc - Default ooblayout_free iterator implementation
+- * @mtd: MTD device structure
+- * @section: Free section. Depending on the layout you may have all the free
+- *	     bytes stored in a single contiguous section, or one section
+- *	     per ECC chunk (and sometime several sections for a single ECC
+- *	     ECC chunk)
+- * @oobfree: OOB region struct filled with the appropriate free position
+- *	     information
+- *
+- * This function is just a wrapper around the mtd->ecclayout field and is
+- * here to ease the transition to the mtd_ooblayout_ops approach.
+- * All it does is convert the layout->oobfree information into proper oob
+- * region definitions.
+- *
+- * Returns zero on success, a negative error code otherwise.
+- */
+-static int mtd_ecclayout_free(struct mtd_info *mtd, int section,
+-			      struct mtd_oob_region *oobfree)
+-{
+-	struct nand_ecclayout *layout = mtd->ecclayout;
+-
+-	if (!layout)
+-		return -ENOTSUPP;
+-
+-	if (section >= MTD_MAX_OOBFREE_ENTRIES_LARGE ||
+-	    !layout->oobfree[section].length)
+-		return -ERANGE;
+-
+-	oobfree->offset = layout->oobfree[section].offset;
+-	oobfree->length = layout->oobfree[section].length;
+-
+-	return 0;
+-}
+-
+-static const struct mtd_ooblayout_ops mtd_ecclayout_wrapper_ops = {
+-	.ecc = mtd_ecclayout_ecc,
+-	.free = mtd_ecclayout_free,
+-};
+-
+-/**
+- * mtd_set_ecclayout - Attach an ecclayout to an MTD device
+- * @mtd: MTD device structure
+- * @ecclayout: The ecclayout to attach to the device
+- *
+- * Returns zero on success, a negative error code otherwise.
+- */
+-void mtd_set_ecclayout(struct mtd_info *mtd, struct nand_ecclayout *ecclayout)
+-{
+-	if (!mtd || !ecclayout)
+-		return;
+-
+-	mtd->ecclayout = ecclayout;
+-	mtd_set_ooblayout(mtd, &mtd_ecclayout_wrapper_ops);
+-}
+-EXPORT_SYMBOL_GPL(mtd_set_ecclayout);
+-
+ /*
+  * Method to access the protection register area, present in some flash
+  * devices. The user data is one time programmable but the factory data is read
+diff --git a/include/linux/mtd/mtd.h b/include/linux/mtd/mtd.h
+index a38fe9a..df8c116 100644
+--- a/include/linux/mtd/mtd.h
++++ b/include/linux/mtd/mtd.h
+@@ -96,21 +96,6 @@ struct mtd_oob_ops {
  
- 	create_pgd_mapping(mm, md->phys_addr, md->virt_addr,
- 			   md->num_pages << EFI_PAGE_SHIFT,
+ #define MTD_MAX_OOBFREE_ENTRIES_LARGE	32
+ #define MTD_MAX_ECCPOS_ENTRIES_LARGE	640
+-/*
+- * Internal ECC layout control structure. For historical reasons, there is a
+- * similar, smaller struct nand_ecclayout_user (in mtd-abi.h) that is retained
+- * for export to user-space via the ECCGETLAYOUT ioctl.
+- * nand_ecclayout should be expandable in the future simply by the above macros.
+- *
+- * This structure is now deprecated, you should use struct nand_ecclayout_ops
+- * to describe your OOB layout.
+- */
+-struct nand_ecclayout {
+-	__u32 eccbytes;
+-	__u32 eccpos[MTD_MAX_ECCPOS_ENTRIES_LARGE];
+-	struct nand_oobfree oobfree[MTD_MAX_OOBFREE_ENTRIES_LARGE];
+-};
+-
+ /**
+  * struct mtd_oob_region - oob region definition
+  * @offset: region offset
+@@ -200,9 +185,6 @@ struct mtd_info {
+ 	const char *name;
+ 	int index;
+ 
+-	/* [Deprecated] ECC layout structure pointer - read only! */
+-	struct nand_ecclayout *ecclayout;
+-
+ 	/* OOB layout description */
+ 	const struct mtd_ooblayout_ops *ooblayout;
+ 
+@@ -308,8 +290,6 @@ int mtd_ooblayout_set_databytes(struct mtd_info *mtd, const u8 *databuf,
+ int mtd_ooblayout_count_freebytes(struct mtd_info *mtd);
+ int mtd_ooblayout_count_eccbytes(struct mtd_info *mtd);
+ 
+-void mtd_set_ecclayout(struct mtd_info *mtd, struct nand_ecclayout *ecclayout);
+-
+ static inline void mtd_set_ooblayout(struct mtd_info *mtd,
+ 				     const struct mtd_ooblayout_ops *ooblayout)
+ {
+diff --git a/include/uapi/mtd/mtd-abi.h b/include/uapi/mtd/mtd-abi.h
+index 763bb69..0ec1da2 100644
+--- a/include/uapi/mtd/mtd-abi.h
++++ b/include/uapi/mtd/mtd-abi.h
+@@ -228,7 +228,7 @@ struct nand_oobfree {
+  * complete set of ECC information. The ioctl truncates the larger internal
+  * structure to retain binary compatibility with the static declaration of the
+  * ioctl. Note that the "MTD_MAX_..._ENTRIES" macros represent the max size of
+- * the user struct, not the MAX size of the internal struct nand_ecclayout.
++ * the user struct, not the MAX size of the internal OOB layout representation.
+  */
+ struct nand_ecclayout_user {
+ 	__u32 eccbytes;
 -- 
 2.5.0
