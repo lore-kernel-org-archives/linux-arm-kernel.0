@@ -1,33 +1,42 @@
-From: ynezz@true.cz (Petr =?iso-8859-2?Q?=A9tetiar?=)
-Date: Wed, 30 Mar 2016 14:06:44 +0200
-Subject: [PATCH] i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity
-In-Reply-To: <m3h9fuk7ik.fsf@t19.piap.pl>
-References: <m3h9fuk7ik.fsf@t19.piap.pl>
-Message-ID: <20160330120644.GM20367@ibawizard.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 30 Mar 2016 13:07:06 +0100
+Subject: [RFC PATCH 00/45] KVM: arm/arm64: Rework virtual GIC emulation
+In-Reply-To: <56FBBBC2.6010602@arm.com>
+References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
+ <56FA7F29.4060005@arm.com> <56FBBBC2.6010602@arm.com>
+Message-ID: <56FBC16A.7040404@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Krzysztof Ha?asa <khalasa@piap.pl> [2016-03-25 14:32:35]:
+On 30/03/16 12:42, Vladimir Murzin wrote:
+> On 29/03/16 14:12, Vladimir Murzin wrote:
+>> Hi Andre,
+>>
+>> On 25/03/16 02:04, Andre Przywara wrote:
+>>> Please have a look at the series, review it and give the code some
+>>> serious testing (and possibly debugging). All feedback is appreciated.
+>>
+>> I see that with the new vgic implementation kvmtool starts throwing:
+>>
+>> kvm [1273]: Unable to register VGICv3 redist MMIO regions
+>>
+> 
+> It comes from kvm_io_bus_register_dev()
+> 
+> if (bus->dev_count - bus->ioeventfd_count > NR_IOBUS_DEVS - 1)
+> 	return -ENOSPC;
+> 
+> with bus->dev_count being 1000
 
-Cze??,
+Ouch. That's a consequence of having one "device" per actual register
+set, I believe. So either we bump this limit up by a factor 10 (at
+least), or we switch back to the old way of handling access to the GIC
+regions (big "catch-all", and further demuxing).
 
-> I wonder if all boards (except maybe that Toradex set) use an active-low
-> PCIe reset and are now broken. Perhaps Toradex uses active-high and thus
-> works.
+Thoughts?
 
-I'm really puzzled by this :-) With your patch applied I get following on
-Toradex Apalis modules:
+Thanks,
 
- DTS:         reset-gpio = <&gpio1 28 GPIO_ACTIVE_LOW>;
- dmesg:       imx6q-pcie 1ffc000.pcie: phy link never came up
- gpio:        gpio-28  (                    |reset               ) out hi
- pin voltage: 0V
-
- DTS:         reset-gpio = <&gpio1 28 GPIO_ACTIVE_HIGH>;
- dmesg:       ath9k 0000:01:00.0: enabling device (0140 -> 0142)
- gpio:        gpio-28  (                    |reset               ) out lo
- pin voltage: 3V3
-
-So Toradex Apalis is actually active-high? Thanks.
-
--- ynezz
+	M.
+-- 
+Jazz is not dead. It just smells funny...
