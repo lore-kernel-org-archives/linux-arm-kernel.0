@@ -1,479 +1,161 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 30 Mar 2016 22:03:41 +0200
-Subject: [PATCH v5 18/46] pwm: add the core infrastructure to allow atomic
- update
+Date: Wed, 30 Mar 2016 22:03:46 +0200
+Subject: [PATCH v5 23/46] pwm: rockchip: add support for atomic update
 In-Reply-To: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1459368249-13241-19-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1459368249-13241-24-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an ->apply() method to the pwm_ops struct to allow PWM drivers to
-implement atomic update.
-This method will be preferred over the ->enable(), ->disable() and
-->config() methods if available.
-
-Add the pwm_apply_state() function to the PWM user API.
-
-Note that the pwm_apply_state() does not guarantee the atomicity of the
-update operation, it all depends on the availability and implementation
-of the ->apply() method.
-
-pwm_enable/disable/set_polarity/config() are now implemented as wrappers
-around the pwm_apply_state() function.
+Implement the ->apply() function to add support for atomic update.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Tested-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/pwm/core.c  | 155 ++++++++++++++++++---------------------
- include/linux/pwm.h | 207 +++++++++++++++++++++++++++++++++++++---------------
- 2 files changed, 220 insertions(+), 142 deletions(-)
+ drivers/pwm/pwm-rockchip.c | 63 ++++++++++++++++++++++++++++------------------
+ 1 file changed, 39 insertions(+), 24 deletions(-)
 
-diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-index a909c64..62e6b3c 100644
---- a/drivers/pwm/core.c
-+++ b/drivers/pwm/core.c
-@@ -226,6 +226,19 @@ void *pwm_get_chip_data(struct pwm_device *pwm)
- }
- EXPORT_SYMBOL_GPL(pwm_get_chip_data);
+diff --git a/drivers/pwm/pwm-rockchip.c b/drivers/pwm/pwm-rockchip.c
+index 5c7e79c..ed27740 100644
+--- a/drivers/pwm/pwm-rockchip.c
++++ b/drivers/pwm/pwm-rockchip.c
+@@ -50,7 +50,8 @@ struct rockchip_pwm_data {
+ 	const struct pwm_ops *ops;
  
-+static bool pwm_ops_check(const struct pwm_ops *ops)
-+{
-+	/* driver supports legacy, non-atomic operation */
-+	if (ops->config && ops->enable && ops->disable)
-+		return true;
-+
-+	/* driver supports atomic operation */
-+	if (ops->apply)
-+		return true;
-+
-+	return false;
-+}
-+
- /**
-  * pwmchip_add_with_polarity() - register a new PWM chip
-  * @chip: the PWM chip to add
-@@ -244,8 +257,10 @@ int pwmchip_add_with_polarity(struct pwm_chip *chip,
- 	unsigned int i;
- 	int ret;
- 
--	if (!chip || !chip->dev || !chip->ops || !chip->ops->config ||
--	    !chip->ops->enable || !chip->ops->disable || !chip->npwm)
-+	if (!chip || !chip->dev || !chip->ops || !chip->npwm)
-+		return -EINVAL;
-+
-+	if (!pwm_ops_check(chip->ops))
- 		return -EINVAL;
- 
- 	mutex_lock(&pwm_lock);
-@@ -431,102 +446,72 @@ void pwm_free(struct pwm_device *pwm)
- EXPORT_SYMBOL_GPL(pwm_free);
- 
- /**
-- * pwm_config() - change a PWM device configuration
-+ * pwm_apply_state() - atomically apply a new state to a PWM device
-  * @pwm: PWM device
-- * @duty_ns: "on" time (in nanoseconds)
-- * @period_ns: duration (in nanoseconds) of one cycle
-- *
-- * Returns: 0 on success or a negative error code on failure.
-+ * @state: new state to apply. This can be adjusted by the PWM driver
-+ *	   if the requested config is not achievable, for example,
-+ *	   ->duty_cycle and ->period might be approximated.
-  */
--int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
-+int pwm_apply_state(struct pwm_device *pwm, struct pwm_state *state)
- {
- 	int err;
- 
--	if (!pwm || duty_ns < 0 || period_ns <= 0 || duty_ns > period_ns)
--		return -EINVAL;
--
--	err = pwm->chip->ops->config(pwm->chip, pwm, duty_ns, period_ns);
--	if (err)
--		return err;
--
--	pwm->state.duty_cycle = duty_ns;
--	pwm->state.period = period_ns;
--
--	return 0;
--}
--EXPORT_SYMBOL_GPL(pwm_config);
--
--/**
-- * pwm_set_polarity() - configure the polarity of a PWM signal
-- * @pwm: PWM device
-- * @polarity: new polarity of the PWM signal
-- *
-- * Note that the polarity cannot be configured while the PWM device is
-- * enabled.
-- *
-- * Returns: 0 on success or a negative error code on failure.
-- */
--int pwm_set_polarity(struct pwm_device *pwm, enum pwm_polarity polarity)
--{
--	int err;
--
--	if (!pwm || !pwm->chip->ops)
--		return -EINVAL;
--
--	if (!pwm->chip->ops->set_polarity)
--		return -ENOSYS;
--
--	if (pwm_is_enabled(pwm))
--		return -EBUSY;
--
--	err = pwm->chip->ops->set_polarity(pwm->chip, pwm, polarity);
--	if (err)
--		return err;
--
--	pwm->state.polarity = polarity;
--
--	return 0;
--}
--EXPORT_SYMBOL_GPL(pwm_set_polarity);
--
--/**
-- * pwm_enable() - start a PWM output toggling
-- * @pwm: PWM device
-- *
-- * Returns: 0 on success or a negative error code on failure.
-- */
--int pwm_enable(struct pwm_device *pwm)
--{
--	int err = 0;
--
- 	if (!pwm)
- 		return -EINVAL;
- 
--	if (!pwm_is_enabled(pwm)) {
--		err = pwm->chip->ops->enable(pwm->chip, pwm);
--		if (!err)
--			pwm->state.enabled = true;
--	}
-+	if (!memcmp(state, &pwm->state, sizeof(*state)))
-+		return 0;
- 
--	return err;
--}
--EXPORT_SYMBOL_GPL(pwm_enable);
-+	if (pwm->chip->ops->apply) {
-+		err = pwm->chip->ops->apply(pwm->chip, pwm, state);
-+		if (err)
-+			return err;
-+	} else {
-+		/*
-+		 * FIXME: restore the initial state in case of error.
-+		 */
-+		if (state->polarity != pwm->state.polarity) {
-+			if (!pwm->chip->ops->set_polarity)
-+				return -ENOTSUPP;
-+
-+			/*
-+			 * Changing the polarity of a running PWM is
-+			 * only allowed when the PWM driver implements
-+			 * ->apply().
-+			 */
-+			if (pwm->state.enabled)
-+				return -EBUSY;
-+
-+			err = pwm->chip->ops->set_polarity(pwm->chip, pwm,
-+							   state->polarity);
-+			if (err)
-+				return err;
-+		}
- 
--/**
-- * pwm_disable() - stop a PWM output toggling
-- * @pwm: PWM device
-- */
--void pwm_disable(struct pwm_device *pwm)
--{
--	if (!pwm)
--		return;
-+		if (state->period != pwm->state.period ||
-+		    state->duty_cycle != pwm->state.duty_cycle) {
-+			err = pwm->chip->ops->config(pwm->chip, pwm,
-+						     state->period,
-+						     state->duty_cycle);
-+			if (err)
-+				return err;
-+		}
- 
--	if (pwm_is_enabled(pwm)) {
--		pwm->chip->ops->disable(pwm->chip, pwm);
--		pwm->state.enabled = false;
-+		if (state->enabled != pwm->state.enabled) {
-+			if (state->enabled) {
-+				err = pwm->chip->ops->enable(pwm->chip, pwm);
-+				if (err)
-+					return err;
-+			} else {
-+				pwm->chip->ops->disable(pwm->chip, pwm);
-+			}
-+		}
- 	}
-+
-+	pwm->state = *state;
-+	return 0;
- }
--EXPORT_SYMBOL_GPL(pwm_disable);
-+EXPORT_SYMBOL_GPL(pwm_apply_state);
- 
- static struct pwm_chip *of_node_to_pwmchip(struct device_node *np)
- {
-diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-index ceedcf8..4aad4eb 100644
---- a/include/linux/pwm.h
-+++ b/include/linux/pwm.h
-@@ -5,59 +5,7 @@
- #include <linux/mutex.h>
- #include <linux/of.h>
- 
--struct pwm_device;
- struct seq_file;
--
--#if IS_ENABLED(CONFIG_PWM)
--/*
-- * pwm_request - request a PWM device
-- */
--struct pwm_device *pwm_request(int pwm_id, const char *label);
--
--/*
-- * pwm_free - free a PWM device
-- */
--void pwm_free(struct pwm_device *pwm);
--
--/*
-- * pwm_config - change a PWM device configuration
-- */
--int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns);
--
--/*
-- * pwm_enable - start a PWM output toggling
-- */
--int pwm_enable(struct pwm_device *pwm);
--
--/*
-- * pwm_disable - stop a PWM output toggling
-- */
--void pwm_disable(struct pwm_device *pwm);
--#else
--static inline struct pwm_device *pwm_request(int pwm_id, const char *label)
--{
--	return ERR_PTR(-ENODEV);
--}
--
--static inline void pwm_free(struct pwm_device *pwm)
--{
--}
--
--static inline int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
--{
--	return -EINVAL;
--}
--
--static inline int pwm_enable(struct pwm_device *pwm)
--{
--	return -EINVAL;
--}
--
--static inline void pwm_disable(struct pwm_device *pwm)
--{
--}
--#endif
--
- struct pwm_chip;
- 
- /**
-@@ -183,11 +131,6 @@ static inline unsigned int pwm_get_duty_cycle(const struct pwm_device *pwm)
- 	return pstate.duty_cycle;
- }
- 
--/*
-- * pwm_set_polarity - configure the polarity of a PWM signal
-- */
--int pwm_set_polarity(struct pwm_device *pwm, enum pwm_polarity polarity);
--
- static inline enum pwm_polarity pwm_get_polarity(const struct pwm_device *pwm)
- {
- 	struct pwm_state pstate;
-@@ -211,6 +154,10 @@ static inline void pwm_get_args(const struct pwm_device *pwm,
-  * @set_polarity: configure the polarity of this PWM
-  * @enable: enable PWM output toggling
-  * @disable: disable PWM output toggling
-+ * @apply: atomically apply a new PWM config. The state argument
-+ *	   should be adjusted with the real hardware config (if the
-+ *	   approximate the period or duty_cycle value, state should
-+ *	   reflect it)
-  * @get_state: get the current PWM state. This function is only
-  *	       called once per PWM device when the PWM chip is
-  *	       registered.
-@@ -226,6 +173,8 @@ struct pwm_ops {
- 			    enum pwm_polarity polarity);
- 	int (*enable)(struct pwm_chip *chip, struct pwm_device *pwm);
- 	void (*disable)(struct pwm_chip *chip, struct pwm_device *pwm);
-+	int (*apply)(struct pwm_chip *chip, struct pwm_device *pwm,
-+		     struct pwm_state *state);
+ 	void (*set_enable)(struct pwm_chip *chip,
+-			   struct pwm_device *pwm, bool enable);
++			   struct pwm_device *pwm, bool enable,
++			   enum pwm_polarity polarity);
  	void (*get_state)(struct pwm_chip *chip, struct pwm_device *pwm,
  			  struct pwm_state *pstate);
- #ifdef CONFIG_DEBUG_FS
-@@ -263,6 +212,114 @@ struct pwm_chip {
+ };
+@@ -61,7 +62,8 @@ static inline struct rockchip_pwm_chip *to_rockchip_pwm_chip(struct pwm_chip *c)
+ }
+ 
+ static void rockchip_pwm_set_enable_v1(struct pwm_chip *chip,
+-				       struct pwm_device *pwm, bool enable)
++				       struct pwm_device *pwm, bool enable,
++				       enum pwm_polarity polarity)
+ {
+ 	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
+ 	u32 enable_conf = PWM_CTRL_OUTPUT_EN | PWM_CTRL_TIMER_EN;
+@@ -91,14 +93,15 @@ static void rockchip_pwm_get_state_v1(struct pwm_chip *chip,
+ }
+ 
+ static void rockchip_pwm_set_enable_v2(struct pwm_chip *chip,
+-				       struct pwm_device *pwm, bool enable)
++				       struct pwm_device *pwm, bool enable,
++				       enum pwm_polarity polarity)
+ {
+ 	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
+ 	u32 enable_conf = PWM_OUTPUT_LEFT | PWM_LP_DISABLE | PWM_ENABLE |
+ 			  PWM_CONTINUOUS;
+ 	u32 val;
+ 
+-	if (pwm_get_polarity(pwm) == PWM_POLARITY_INVERSED)
++	if (polarity == PWM_POLARITY_INVERSED)
+ 		enable_conf |= PWM_DUTY_NEGATIVE | PWM_INACTIVE_POSITIVE;
+ 	else
+ 		enable_conf |= PWM_DUTY_POSITIVE | PWM_INACTIVE_NEGATIVE;
+@@ -168,7 +171,6 @@ static int rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
+ 	unsigned long period, duty;
+ 	u64 clk_rate, div;
+-	int ret;
+ 
+ 	clk_rate = clk_get_rate(pc->clk);
+ 
+@@ -185,15 +187,8 @@ static int rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	do_div(div, pc->data->prescaler * NSEC_PER_SEC);
+ 	duty = div;
+ 
+-	ret = clk_enable(pc->clk);
+-	if (ret)
+-		return ret;
+-
+ 	writel(period, pc->base + pc->data->regs.period);
+ 	writel(duty, pc->base + pc->data->regs.duty);
+-	writel(0, pc->base + pc->data->regs.cntr);
+-
+-	clk_disable(pc->clk);
+ 
+ 	return 0;
+ }
+@@ -211,43 +206,63 @@ static int rockchip_pwm_set_polarity(struct pwm_chip *chip,
+ 	return 0;
+ }
+ 
+-static int rockchip_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
++static int rockchip_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
++			      struct pwm_state *state)
+ {
+ 	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
++	struct pwm_state curstate;
++	bool enabled;
+ 	int ret;
+ 
++	pwm_get_state(pwm, &curstate);
++	enabled = curstate.enabled;
++
+ 	ret = clk_enable(pc->clk);
+ 	if (ret)
+ 		return ret;
+ 
+-	pc->data->set_enable(chip, pwm, true);
++	if (state->polarity != curstate.polarity && enabled) {
++		pc->data->set_enable(chip, pwm, false, state->polarity);
++		enabled = false;
++	}
+ 
+-	return 0;
+-}
++	ret = rockchip_pwm_config(chip, pwm, state->duty_cycle, state->period);
++	if (ret) {
++		if (enabled != curstate.enabled)
++			pc->data->set_enable(chip, pwm, !enabled,
++					     state->polarity);
+ 
+-static void rockchip_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+-{
+-	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
++		goto out;
++	}
+ 
+-	pc->data->set_enable(chip, pwm, false);
++	if (state->enabled != enabled)
++		pc->data->set_enable(chip, pwm, state->enabled,
++				     state->polarity);
+ 
++	/*
++	 * Update the state with the real hardware, which can differ a bit
++	 * because of period/duty_cycle approximation.
++	 */
++	rockchip_pwm_get_state(chip, pwm, state);
++
++out:
+ 	clk_disable(pc->clk);
++
++	return ret;
+ }
+ 
+ static const struct pwm_ops rockchip_pwm_ops_v1 = {
+ 	.get_state = rockchip_pwm_get_state,
+ 	.config = rockchip_pwm_config,
+-	.enable = rockchip_pwm_enable,
+-	.disable = rockchip_pwm_disable,
++	.apply = rockchip_pwm_apply,
+ 	.owner = THIS_MODULE,
  };
  
- #if IS_ENABLED(CONFIG_PWM)
-+/* PWM user APIs */
-+struct pwm_device *pwm_request(int pwm_id, const char *label);
-+void pwm_free(struct pwm_device *pwm);
-+int pwm_apply_state(struct pwm_device *pwm, struct pwm_state *state);
-+
-+/**
-+ * pwm_config() - change a PWM device configuration
-+ * @pwm: PWM device
-+ * @duty_ns: "on" time (in nanoseconds)
-+ * @period_ns: duration (in nanoseconds) of one cycle
-+ *
-+ * Returns: 0 on success or a negative error code on failure.
-+ */
-+static inline int pwm_config(struct pwm_device *pwm, int duty_ns,
-+			     int period_ns)
-+{
-+	struct pwm_state pstate;
-+
-+	if (!pwm)
-+		return -EINVAL;
-+
-+	pwm_get_state(pwm, &pstate);
-+	if (pstate.duty_cycle == duty_ns && pstate.period == period_ns)
-+		return 0;
-+
-+	pstate.duty_cycle = duty_ns;
-+	pstate.period = period_ns;
-+	return pwm_apply_state(pwm, &pstate);
-+}
-+
-+/**
-+ * pwm_set_polarity() - configure the polarity of a PWM signal
-+ * @pwm: PWM device
-+ * @polarity: new polarity of the PWM signal
-+ *
-+ * Note that the polarity cannot be configured while the PWM device is
-+ * enabled.
-+ *
-+ * Returns: 0 on success or a negative error code on failure.
-+ */
-+static inline int pwm_set_polarity(struct pwm_device *pwm,
-+				   enum pwm_polarity polarity)
-+{
-+	struct pwm_state pstate;
-+
-+	if (!pwm)
-+		return -EINVAL;
-+
-+	pwm_get_state(pwm, &pstate);
-+	if (pstate.polarity == polarity)
-+		return 0;
-+
-+	/*
-+	 * Changing the polarity of a running PWM without adjusting the
-+	 * dutycycle/period value is a bit risky (can introduce glitches).
-+	 * Return -EBUSY in this case.
-+	 * Note that this is allowed when using pwm_apply_state() because
-+	 * the user specifies all the parameters.
-+	 */
-+	if (pstate.enabled)
-+		return -EBUSY;
-+
-+	pstate.polarity = polarity;
-+	return pwm_apply_state(pwm, &pstate);
-+}
-+
-+/**
-+ * pwm_enable() - start a PWM output toggling
-+ * @pwm: PWM device
-+ *
-+ * Returns: 0 on success or a negative error code on failure.
-+ */
-+static inline int pwm_enable(struct pwm_device *pwm)
-+{
-+	struct pwm_state pstate;
-+
-+	if (!pwm)
-+		return -EINVAL;
-+
-+	pwm_get_state(pwm, &pstate);
-+	if (pstate.enabled)
-+		return 0;
-+
-+	pstate.enabled = true;
-+	return pwm_apply_state(pwm, &pstate);
-+}
-+
-+/**
-+ * pwm_disable() - stop a PWM output toggling
-+ * @pwm: PWM device
-+ */
-+static inline void pwm_disable(struct pwm_device *pwm)
-+{
-+	struct pwm_state pstate;
-+
-+	if (!pwm)
-+		return;
-+
-+	pwm_get_state(pwm, &pstate);
-+	if (!pstate.enabled)
-+		return;
-+
-+	pstate.enabled = false;
-+	pwm_apply_state(pwm, &pstate);
-+}
-+
-+
-+/* PWM provider APIs */
- int pwm_set_chip_data(struct pwm_device *pwm, void *data);
- void *pwm_get_chip_data(struct pwm_device *pwm);
+ static const struct pwm_ops rockchip_pwm_ops_v2 = {
+ 	.get_state = rockchip_pwm_get_state,
+ 	.config = rockchip_pwm_config,
++	.apply = rockchip_pwm_apply,
+ 	.set_polarity = rockchip_pwm_set_polarity,
+-	.enable = rockchip_pwm_enable,
+-	.disable = rockchip_pwm_disable,
+ 	.owner = THIS_MODULE,
+ };
  
-@@ -288,6 +345,42 @@ void devm_pwm_put(struct device *dev, struct pwm_device *pwm);
- 
- bool pwm_can_sleep(struct pwm_device *pwm);
- #else
-+static inline struct pwm_device *pwm_request(int pwm_id, const char *label)
-+{
-+	return ERR_PTR(-ENODEV);
-+}
-+
-+static inline void pwm_free(struct pwm_device *pwm)
-+{
-+}
-+
-+static inline int pwm_apply_state(struct pwm_device *pwm,
-+				  const struct pwm_state *state)
-+{
-+	return -ENOTSUPP;
-+}
-+
-+static inline int pwm_config(struct pwm_device *pwm, int duty_ns,
-+			     int period_ns)
-+{
-+	return -EINVAL;
-+}
-+
-+static inline int pwm_set_polarity(struct pwm_device *pwm,
-+				   enum pwm_polarity polarity)
-+{
-+	return -ENOTSUPP;
-+}
-+
-+static inline int pwm_enable(struct pwm_device *pwm)
-+{
-+	return -EINVAL;
-+}
-+
-+static inline void pwm_disable(struct pwm_device *pwm)
-+{
-+}
-+
- static inline int pwm_set_chip_data(struct pwm_device *pwm, void *data)
- {
- 	return -EINVAL;
 -- 
 2.5.0
