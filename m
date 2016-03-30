@@ -1,55 +1,70 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 30 Mar 2016 15:16:29 +0800
-Subject: [PATCH 1/2] ARM: cpuidle: fix !cpuidle_ops[cpu].init case
- during init
-In-Reply-To: <56F52502.3060308@linaro.org>
-References: <1458796269-6158-1-git-send-email-jszhang@marvell.com>
- <1458796269-6158-2-git-send-email-jszhang@marvell.com>
- <56F52502.3060308@linaro.org>
-Message-ID: <20160330151629.0b338365@xhacker>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Wed, 30 Mar 2016 15:19:28 +0800
+Subject: [PATCH v7 12/17] ARM64: ACPI: Check if it runs on Xen to enable
+ or disable ACPI
+In-Reply-To: <20160329163147.GB27223@leverpostej>
+References: <1458830676-27075-1-git-send-email-shannon.zhao@linaro.org>
+ <1458830676-27075-13-git-send-email-shannon.zhao@linaro.org>
+ <20160329161837.GH6745@arm.com> <20160329163147.GB27223@leverpostej>
+Message-ID: <56FB7E00.7030400@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Hi Will, Mark,
 
-On Fri, 25 Mar 2016 12:46:10 +0100 Daniel Lezcano wrote:
-
-> On 03/24/2016 06:11 AM, Jisheng Zhang wrote:
-> > Let's assume cpuidle_ops exists but it doesn't implement the according
-> > init member, current arm_cpuidle_init() will return success to its
-> > caller, but in fact it should return -EOPNOTSUPP.
-> >
-> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> > ---
-> >   arch/arm/kernel/cpuidle.c | 8 ++++++--
-> >   1 file changed, 6 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
-> > index 703926e..f108d8f 100644
-> > --- a/arch/arm/kernel/cpuidle.c
-> > +++ b/arch/arm/kernel/cpuidle.c
-> > @@ -143,8 +143,12 @@ int __init arm_cpuidle_init(int cpu)
-> >   		return -ENODEV;
-> >
-> >   	ret = arm_cpuidle_read_ops(cpu_node, cpu);
-> > -	if (!ret && cpuidle_ops[cpu].init)
-> > -		ret = cpuidle_ops[cpu].init(cpu_node, cpu);
-> > +	if (!ret) {
-> > +		if (cpuidle_ops[cpu].init)
-> > +			ret = cpuidle_ops[cpu].init(cpu_node, cpu);
-> > +		else
-> > +			ret = -EOPNOTSUPP;
-> > +	}  
+On 2016/3/30 0:31, Mark Rutland wrote:
+> On Tue, Mar 29, 2016 at 05:18:38PM +0100, Will Deacon wrote:
+>> > On Thu, Mar 24, 2016 at 10:44:31PM +0800, Shannon Zhao wrote:
+>>> > > When it's a Xen domain0 booting with ACPI, it will supply a /chosen and
+>>> > > a /hypervisor node in DT. So check if it needs to enable ACPI.
+>>> > > 
+>>> > > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>>> > > Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+>>> > > Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
+>>> > > ---
+>>> > >  arch/arm64/kernel/acpi.c | 12 ++++++++----
+>>> > >  1 file changed, 8 insertions(+), 4 deletions(-)
+>>> > > 
+>>> > > diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+>>> > > index d1ce8e2..4e92be0 100644
+>>> > > --- a/arch/arm64/kernel/acpi.c
+>>> > > +++ b/arch/arm64/kernel/acpi.c
+>>> > > @@ -67,10 +67,13 @@ static int __init dt_scan_depth1_nodes(unsigned long node,
+>>> > >  {
+>>> > >  	/*
+>>> > >  	 * Return 1 as soon as we encounter a node at depth 1 that is
+>>> > > -	 * not the /chosen node.
+>>> > > +	 * not the /chosen node, or /hypervisor node when running on Xen.
+>>> > >  	 */
+>>> > > -	if (depth == 1 && (strcmp(uname, "chosen") != 0))
+>>> > > -		return 1;
+>>> > > +	if (depth == 1 && (strcmp(uname, "chosen") != 0)) {
+>>> > > +		if (!xen_initial_domain() || (strcmp(uname, "hypervisor") != 0))
+>>> > > +			return 1;
+>>> > > +	}
+>> > 
+>> > Hmm, but xen_initial_domain() is false when xen isn't being used at all,
+>> > so it feels to me like this is a bit too far-reaching and is basically
+>> > claiming the "/hypervisor" namespace for Xen. Couldn't it be renamed to
+>> > "xen,hypervisor" or something?
+>> > 
+>> > Mark, got any thoughts on this?
+> The node has a compatible string, "xen,xen" per [1], which would tell us
+> absolutely that xen is present. I'd be happy checking for that
+> explicitly.
 > 
-> Hi Jisheng,
-> 
-> this should be handled in the arm_cpuidle_read_ops function.
-> 
+I think actually the xen_initial_domain is the result of the
+fdt_find_hyper_node. If the compatible string "xen,xen" doesn't exist,
+the xen_initial_domain() will return false and whatever the current node
+is the above check will return 1 since the device tree is not empty.
 
-Thanks for reviewing. After some consideration, I think this patch isn't correct
-There may be platforms which doesn't need the init member at all, although
-currently I don't see such platforms in mainline, So I'll drop this patch
-and send out one v2 only does the optimization.
+> In patch 11 fdt_find_hyper_node checks the compatible string. We could
+> factor that out into a helper like is_xen_node(node) and use it here
+> too.
+> 
+I don't think so because we already check the compatible string before
+and we could get the result simply via xen_initial_domain().
 
-Thanks a lot,
-Jisheng
+Thanks,
+-- 
+Shannon
