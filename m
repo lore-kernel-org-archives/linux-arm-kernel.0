@@ -1,78 +1,64 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 30 Mar 2016 22:03:53 +0200
-Subject: [PATCH v5 30/46] regulator: pwm: retrieve correct voltage
+Date: Wed, 30 Mar 2016 22:03:54 +0200
+Subject: [PATCH v5 31/46] pwm: update documentation
 In-Reply-To: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1459368249-13241-31-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1459368249-13241-32-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The continuous PWM voltage regulator is caching the voltage value in
-the ->volt_uV field. While most of the time this value should reflect the
-real voltage, sometime it can be sightly different if the PWM device
-rounded the set_duty_cycle request.
-Moreover, this value is not valid until someone has modified the regulator
-output.
-
-Remove the ->volt_uV field and always rely on the PWM state to calculate
-the regulator output.
+Update the PWM subsystem documentation to reflect the atomic PWM changes.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/regulator/pwm-regulator.c | 23 +++++++++++++++++------
- 1 file changed, 17 insertions(+), 6 deletions(-)
+ Documentation/pwm.txt | 27 +++++++++++++++++++++++++--
+ 1 file changed, 25 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
-index 9374796..77f42d8 100644
---- a/drivers/regulator/pwm-regulator.c
-+++ b/drivers/regulator/pwm-regulator.c
-@@ -35,9 +35,6 @@ struct pwm_regulator_data {
- 	struct regulator_ops ops;
+diff --git a/Documentation/pwm.txt b/Documentation/pwm.txt
+index ca895fd..cb25fca 100644
+--- a/Documentation/pwm.txt
++++ b/Documentation/pwm.txt
+@@ -42,9 +42,23 @@ variants of these functions, devm_pwm_get() and devm_pwm_put(), also exist.
  
- 	int state;
--
--	/* Continuous voltage */
--	int volt_uV;
- };
+ After being requested, a PWM has to be configured using:
  
- struct pwm_voltages {
-@@ -167,11 +164,27 @@ static int pwm_voltage_to_duty_cycle_percentage(struct regulator_dev *rdev, int
- 	return ((req_uV * 100) - (min_uV * 100)) / diff;
- }
+-int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns);
++int pwm_apply_state(struct pwm_device *pwm, struct pwm_state *pstate);
  
-+static int pwm_duty_cycle_percentage_to_voltage(struct regulator_dev *rdev,
-+						int dutycycle)
-+{
-+	int min_uV = rdev->constraints->min_uV;
-+	int max_uV = rdev->constraints->max_uV;
-+	int diff = max_uV - min_uV;
+-To start/stop toggling the PWM output use pwm_enable()/pwm_disable().
++This API controls both the PWM period/duty_cycle config and the
++enable/disable state.
 +
-+	return min_uV + ((diff * dutycycle) / 100);
-+}
++The legacy pwm_config(), pwm_enable() and pwm_disable() are now deprecated,
++and should be replaced by pwm_apply_state() calls.
 +
- static int pwm_regulator_get_voltage(struct regulator_dev *rdev)
- {
- 	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
-+	struct pwm_state pstate;
-+	u64 dutycycle;
- 
--	return drvdata->volt_uV;
-+	pwm_get_state(drvdata->pwm, &pstate);
-+	dutycycle = pstate.duty_cycle * 100;
-+	do_div(dutycycle, pstate.period);
++The PWM user API also allows one to query the PWM state with pwm_get_state().
 +
-+	return pwm_duty_cycle_percentage_to_voltage(rdev, dutycycle);
- }
++In addition to the PWM state, the PWM API also exposes PWM arguments, which
++are the reference PWM config one should use on this PWM.
++PWM arguments are usually platform-specific and allows the PWM user to only
++care about dutycycle relatively to the full period (like, duty = 50% of the
++period). struct pwm_args contains 2 fields (period and polarity) and should
++be used to set the initial PWM config (usually done in the probe function
++of the PWM user). PWM arguments are retrieved with pwm_get_args().
  
- static int pwm_regulator_set_voltage(struct regulator_dev *rdev,
-@@ -196,8 +209,6 @@ static int pwm_regulator_set_voltage(struct regulator_dev *rdev,
- 		return ret;
- 	}
+ Using PWMs with the sysfs interface
+ -----------------------------------
+@@ -105,6 +119,15 @@ goes low for the remainder of the period. Conversely, a signal with inversed
+ polarity starts low for the duration of the duty cycle and goes high for the
+ remainder of the period.
  
--	drvdata->volt_uV = min_uV;
--
- 	/* Delay required by PWM regulator to settle to the new voltage */
- 	usleep_range(ramp_delay, ramp_delay + 1000);
++Drivers are encouraged to implement ->apply() instead of the legacy
++->enable(), ->disable() and ->config() methods. Doing that should provide
++atomicity in the PWM config workflow, which is required when the PWM controls
++a critical device (like a regulator).
++
++The implementation of ->get_state() (a method used to retrieve initial PWM
++state) is also encouraged for the same reason: letting the PWM user know
++about the current PWM state would allow him to avoid glitches.
++
+ Locking
+ -------
  
 -- 
 2.5.0
