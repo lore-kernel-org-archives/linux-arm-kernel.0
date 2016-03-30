@@ -1,44 +1,32 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 30 Mar 2016 21:55:55 +0200
-Subject: [RFC PATCH 00/45] KVM: arm/arm64: Rework virtual GIC emulation
-In-Reply-To: <56FBC16A.7040404@arm.com>
-References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
- <56FA7F29.4060005@arm.com> <56FBBBC2.6010602@arm.com>
- <56FBC16A.7040404@arm.com>
-Message-ID: <20160330195555.GL4126@cbox>
+From: carlo@caione.org (Carlo Caione)
+Date: Wed, 30 Mar 2016 21:56:35 +0200
+Subject: [GIT PULL] gxbb: ARM64 changes for 4.7
+Message-ID: <CAOQ7t2bEOM8A=6vRjXJGKof3xbtFxHj8zYCgSfOkoORy-fEGbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 30, 2016 at 01:07:06PM +0100, Marc Zyngier wrote:
-> On 30/03/16 12:42, Vladimir Murzin wrote:
-> > On 29/03/16 14:12, Vladimir Murzin wrote:
-> >> Hi Andre,
-> >>
-> >> On 25/03/16 02:04, Andre Przywara wrote:
-> >>> Please have a look at the series, review it and give the code some
-> >>> serious testing (and possibly debugging). All feedback is appreciated.
-> >>
-> >> I see that with the new vgic implementation kvmtool starts throwing:
-> >>
-> >> kvm [1273]: Unable to register VGICv3 redist MMIO regions
-> >>
-> > 
-> > It comes from kvm_io_bus_register_dev()
-> > 
-> > if (bus->dev_count - bus->ioeventfd_count > NR_IOBUS_DEVS - 1)
-> > 	return -ENOSPC;
-> > 
-> > with bus->dev_count being 1000
-> 
-> Ouch. That's a consequence of having one "device" per actual register
-> set, I believe. So either we bump this limit up by a factor 10 (at
-> least), or we switch back to the old way of handling access to the GIC
-> regions (big "catch-all", and further demuxing).
-> 
-> Thoughts?
-> 
-Since we have to have code to iterate through the individual register
-regions for the userland MMIO accesses anyway, I think we should just
-revert back to the old way.
+Hi,
+simple defconfig change to enable the ARM64 Amlogic boards.
 
--Christoffer
+The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+
+  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+
+are available in the git repository at:
+
+  https://github.com/carlocaione/linux-meson tags/gxbb-arm64
+
+for you to fetch changes up to 97d8eb16aa84eb48466f34c3ec0f492f34b85a04:
+
+  arm64: defconfig: enable basic boot for Amlogic meson (2016-03-30
+19:50:47 +0200)
+
+----------------------------------------------------------------
+Update defconfig to have basic boot for the Amlogic meson boards.
+
+----------------------------------------------------------------
+Kevin Hilman (1):
+      arm64: defconfig: enable basic boot for Amlogic meson
+
+ arch/arm64/configs/defconfig | 3 +++
+ 1 file changed, 3 insertions(+)
