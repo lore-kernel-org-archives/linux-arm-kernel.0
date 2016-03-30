@@ -1,9 +1,9 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 30 Mar 2016 18:14:51 +0200
-Subject: [PATCH v5 36/50] mtd: nand: jz4780: switch to mtd_ooblayout_ops
+Date: Wed, 30 Mar 2016 18:14:57 +0200
+Subject: [PATCH v5 42/50] mtd: nand: sh_flctl: switch to mtd_ooblayout_ops
 In-Reply-To: <1459354505-32551-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1459354505-32551-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1459354505-32551-37-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1459354505-32551-43-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,61 +11,118 @@ Implementing the mtd_ooblayout_ops interface is the new way of exposing
 ECC/OOB layout to MTD users.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Tested-by: Harvey Hunt <harvey.hunt@imgtec.com>
 ---
- drivers/mtd/nand/jz4780_nand.c | 19 +++++--------------
- 1 file changed, 5 insertions(+), 14 deletions(-)
+ drivers/mtd/nand/sh_flctl.c | 87 ++++++++++++++++++++++++++++++++++-----------
+ 1 file changed, 67 insertions(+), 20 deletions(-)
 
-diff --git a/drivers/mtd/nand/jz4780_nand.c b/drivers/mtd/nand/jz4780_nand.c
-index e1c016c..b86a579 100644
---- a/drivers/mtd/nand/jz4780_nand.c
-+++ b/drivers/mtd/nand/jz4780_nand.c
-@@ -56,8 +56,6 @@ struct jz4780_nand_chip {
- 	struct nand_chip chip;
- 	struct list_head chip_list;
+diff --git a/drivers/mtd/nand/sh_flctl.c b/drivers/mtd/nand/sh_flctl.c
+index 4814402..fa46610 100644
+--- a/drivers/mtd/nand/sh_flctl.c
++++ b/drivers/mtd/nand/sh_flctl.c
+@@ -43,26 +43,73 @@
+ #include <linux/mtd/partitions.h>
+ #include <linux/mtd/sh_flctl.h>
  
--	struct nand_ecclayout ecclayout;
--
- 	struct gpio_desc *busy_gpio;
- 	struct gpio_desc *wp_gpio;
- 	unsigned int reading: 1;
-@@ -165,8 +163,7 @@ static int jz4780_nand_init_ecc(struct jz4780_nand_chip *nand, struct device *de
- 	struct nand_chip *chip = &nand->chip;
- 	struct mtd_info *mtd = nand_to_mtd(chip);
- 	struct jz4780_nand_controller *nfc = to_jz4780_nand_controller(chip->controller);
--	struct nand_ecclayout *layout = &nand->ecclayout;
--	u32 start, i;
-+	int eccbytes;
+-static struct nand_ecclayout flctl_4secc_oob_16 = {
+-	.eccbytes = 10,
+-	.eccpos = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+-	.oobfree = {
+-		{.offset = 12,
+-		. length = 4} },
++static int flctl_4secc_ooblayout_sp_ecc(struct mtd_info *mtd, int section,
++					struct mtd_oob_region *oobregion)
++{
++	struct nand_chip *chip = mtd_to_nand(mtd);
++
++	if (section)
++		return -ERANGE;
++
++	oobregion->offset = 0;
++	oobregion->length = chip->ecc.bytes;
++
++	return 0;
++}
++
++static int flctl_4secc_ooblayout_sp_free(struct mtd_info *mtd, int section,
++					 struct mtd_oob_region *oobregion)
++{
++	if (section)
++		return -ERANGE;
++
++	oobregion->offset = 12;
++	oobregion->length = 4;
++
++	return 0;
++}
++
++static const struct mtd_ooblayout_ops flctl_4secc_oob_smallpage_ops = {
++	.ecc = flctl_4secc_ooblayout_sp_ecc,
++	.free = flctl_4secc_ooblayout_sp_free,
+ };
  
- 	chip->ecc.bytes = fls((1 + 8) * chip->ecc.size)	*
- 				(chip->ecc.strength / 8);
-@@ -201,23 +198,17 @@ static int jz4780_nand_init_ecc(struct jz4780_nand_chip *nand, struct device *de
- 		return 0;
+-static struct nand_ecclayout flctl_4secc_oob_64 = {
+-	.eccbytes = 4 * 10,
+-	.eccpos = {
+-		 6,  7,  8,  9, 10, 11, 12, 13, 14, 15,
+-		22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
+-		38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
+-		54, 55, 56, 57, 58, 59, 60, 61, 62, 63 },
+-	.oobfree = {
+-		{.offset =  2, .length = 4},
+-		{.offset = 16, .length = 6},
+-		{.offset = 32, .length = 6},
+-		{.offset = 48, .length = 6} },
++static int flctl_4secc_ooblayout_lp_ecc(struct mtd_info *mtd, int section,
++					struct mtd_oob_region *oobregion)
++{
++	struct nand_chip *chip = mtd_to_nand(mtd);
++
++	if (section >= chip->ecc.steps)
++		return -ERANGE;
++
++	oobregion->offset = (section * 16) + 6;
++	oobregion->length = chip->ecc.bytes;
++
++	return 0;
++}
++
++static int flctl_4secc_ooblayout_lp_free(struct mtd_info *mtd, int section,
++					 struct mtd_oob_region *oobregion)
++{
++	struct nand_chip *chip = mtd_to_nand(mtd);
++
++	if (section >= chip->ecc.steps)
++		return -ERANGE;
++
++	oobregion->offset = section * 16;
++	oobregion->length = 6;
++
++	if (!section) {
++		oobregion->offset += 2;
++		oobregion->length -= 2;
++	}
++
++	return 0;
++}
++
++static const struct mtd_ooblayout_ops flctl_4secc_oob_largepage_ops = {
++	.ecc = flctl_4secc_ooblayout_lp_ecc,
++	.free = flctl_4secc_ooblayout_lp_free,
+ };
  
- 	/* Generate ECC layout. ECC codes are right aligned in the OOB area. */
--	layout->eccbytes = mtd->writesize / chip->ecc.size * chip->ecc.bytes;
-+	eccbytes = mtd->writesize / chip->ecc.size * chip->ecc.bytes;
+ static uint8_t scan_ff_pattern[] = { 0xff, 0xff };
+@@ -987,10 +1034,10 @@ static int flctl_chip_init_tail(struct mtd_info *mtd)
  
--	if (layout->eccbytes > mtd->oobsize - 2) {
-+	if (eccbytes > mtd->oobsize - 2) {
- 		dev_err(dev,
- 			"invalid ECC config: required %d ECC bytes, but only %d are available",
--			layout->eccbytes, mtd->oobsize - 2);
-+			eccbytes, mtd->oobsize - 2);
- 		return -EINVAL;
- 	}
- 
--	start = mtd->oobsize - layout->eccbytes;
--	for (i = 0; i < layout->eccbytes; i++)
--		layout->eccpos[i] = start + i;
--
--	layout->oobfree[0].offset = 2;
--	layout->oobfree[0].length = mtd->oobsize - layout->eccbytes - 2;
-+	mtd->ooblayout = &nand_ooblayout_lp_ops;
- 
--	chip->ecc.layout = layout;
- 	return 0;
- }
+ 	if (flctl->hwecc) {
+ 		if (mtd->writesize == 512) {
+-			chip->ecc.layout = &flctl_4secc_oob_16;
++			mtd_set_ooblayout(mtd, &flctl_4secc_oob_smallpage_ops);
+ 			chip->badblock_pattern = &flctl_4secc_smallpage;
+ 		} else {
+-			chip->ecc.layout = &flctl_4secc_oob_64;
++			mtd_set_ooblayout(mtd, &flctl_4secc_oob_largepage_ops);
+ 			chip->badblock_pattern = &flctl_4secc_largepage;
+ 		}
  
 -- 
 2.5.0
