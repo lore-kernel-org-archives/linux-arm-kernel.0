@@ -1,154 +1,260 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 30 Mar 2016 18:14:52 +0200
-Subject: [PATCH v5 37/50] mtd: nand: lpc32xx: switch to mtd_ooblayout_ops
+Date: Wed, 30 Mar 2016 18:15:02 +0200
+Subject: [PATCH v5 47/50] mtd: onenand: switch to mtd_ooblayout_ops
 In-Reply-To: <1459354505-32551-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1459354505-32551-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1459354505-32551-38-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1459354505-32551-48-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Implementing the mtd_ooblayout_ops interface is the new way of exposing
-ECC/OOB layout to MTD users.
+ECC/OOB layout to MTD users. Modify the onenand drivers to switch to this
+approach.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/mtd/nand/lpc32xx_mlc.c | 50 ++++++++++++++++++++++++++++--------------
- drivers/mtd/nand/lpc32xx_slc.c | 41 +++++++++++++++++++++++++++-------
- 2 files changed, 66 insertions(+), 25 deletions(-)
+ drivers/mtd/onenand/onenand_base.c | 162 ++++++++++++++++++++++---------------
+ include/linux/mtd/onenand.h        |   2 -
+ 2 files changed, 97 insertions(+), 67 deletions(-)
 
-diff --git a/drivers/mtd/nand/lpc32xx_mlc.c b/drivers/mtd/nand/lpc32xx_mlc.c
-index d8c3e7a..f668282 100644
---- a/drivers/mtd/nand/lpc32xx_mlc.c
-+++ b/drivers/mtd/nand/lpc32xx_mlc.c
-@@ -139,22 +139,37 @@ struct lpc32xx_nand_cfg_mlc {
- 	unsigned num_parts;
- };
- 
--static struct nand_ecclayout lpc32xx_nand_oob = {
--	.eccbytes = 40,
--	.eccpos = { 6,  7,  8,  9, 10, 11, 12, 13, 14, 15,
--		   22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
--		   38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
--		   54, 55, 56, 57, 58, 59, 60, 61, 62, 63 },
--	.oobfree = {
--		{ .offset = 0,
--		  .length = 6, },
--		{ .offset = 16,
--		  .length = 6, },
--		{ .offset = 32,
--		  .length = 6, },
--		{ .offset = 48,
--		  .length = 6, },
--		},
-+static int lpc32xx_ooblayout_ecc(struct mtd_info *mtd, int section,
-+				 struct mtd_oob_region *oobregion)
-+{
-+	struct nand_chip *nand_chip = mtd_to_nand(mtd);
-+
-+	if (section >= nand_chip->ecc.steps)
-+		return -ERANGE;
-+
-+	oobregion->offset = ((section + 1) * 16) - nand_chip->ecc.bytes;
-+	oobregion->length = nand_chip->ecc.bytes;
-+
-+	return 0;
-+}
-+
-+static int lpc32xx_ooblayout_free(struct mtd_info *mtd, int section,
-+				  struct mtd_oob_region *oobregion)
-+{
-+	struct nand_chip *nand_chip = mtd_to_nand(mtd);
-+
-+	if (section >= nand_chip->ecc.steps)
-+		return -ERANGE;
-+
-+	oobregion->offset = 16 * section;
-+	oobregion->length = 16 - nand_chip->ecc.bytes;
-+
-+	return 0;
-+}
-+
-+static const struct mtd_ooblayout_ops lpc32xx_ooblayout_ops = {
-+	.ecc = lpc32xx_ooblayout_ecc,
-+	.free = lpc32xx_ooblayout_free,
- };
- 
- static struct nand_bbt_descr lpc32xx_nand_bbt = {
-@@ -713,6 +728,7 @@ static int lpc32xx_nand_probe(struct platform_device *pdev)
- 	nand_chip->ecc.write_oob = lpc32xx_write_oob;
- 	nand_chip->ecc.read_oob = lpc32xx_read_oob;
- 	nand_chip->ecc.strength = 4;
-+	nand_chip->ecc.bytes = 10;
- 	nand_chip->waitfunc = lpc32xx_waitfunc;
- 
- 	nand_chip->options = NAND_NO_SUBPAGE_WRITE;
-@@ -751,7 +767,7 @@ static int lpc32xx_nand_probe(struct platform_device *pdev)
- 
- 	nand_chip->ecc.mode = NAND_ECC_HW;
- 	nand_chip->ecc.size = 512;
--	nand_chip->ecc.layout = &lpc32xx_nand_oob;
-+	mtd_set_ooblayout(mtd, &lpc32xx_ooblayout_ops);
- 	host->mlcsubpages = mtd->writesize / 512;
- 
- 	/* initially clear interrupt status */
-diff --git a/drivers/mtd/nand/lpc32xx_slc.c b/drivers/mtd/nand/lpc32xx_slc.c
-index 10cf8e62..219dd67 100644
---- a/drivers/mtd/nand/lpc32xx_slc.c
-+++ b/drivers/mtd/nand/lpc32xx_slc.c
-@@ -146,13 +146,38 @@
-  * NAND ECC Layout for small page NAND devices
-  * Note: For large and huge page devices, the default layouts are used
+diff --git a/drivers/mtd/onenand/onenand_base.c b/drivers/mtd/onenand/onenand_base.c
+index d0fa505..a4b029a 100644
+--- a/drivers/mtd/onenand/onenand_base.c
++++ b/drivers/mtd/onenand/onenand_base.c
+@@ -68,21 +68,33 @@ MODULE_PARM_DESC(otp,	"Corresponding behaviour of OneNAND in OTP"
+  * flexonenand_oob_128 - oob info for Flex-Onenand with 4KB page
+  * For now, we expose only 64 out of 80 ecc bytes
   */
--static struct nand_ecclayout lpc32xx_nand_oob_16 = {
--	.eccbytes = 6,
--	.eccpos = {10, 11, 12, 13, 14, 15},
--	.oobfree = {
--		{ .offset = 0, .length = 4 },
--		{ .offset = 6, .length = 4 },
--	},
-+static int lpc32xx_ooblayout_ecc(struct mtd_info *mtd, int section,
-+				 struct mtd_oob_region *oobregion)
+-static struct nand_ecclayout flexonenand_oob_128 = {
+-	.eccbytes	= 64,
+-	.eccpos		= {
+-		6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+-		22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
+-		38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
+-		54, 55, 56, 57, 58, 59, 60, 61, 62, 63,
+-		70, 71, 72, 73, 74, 75, 76, 77, 78, 79,
+-		86, 87, 88, 89, 90, 91, 92, 93, 94, 95,
+-		102, 103, 104, 105
+-		},
+-	.oobfree	= {
+-		{2, 4}, {18, 4}, {34, 4}, {50, 4},
+-		{66, 4}, {82, 4}, {98, 4}, {114, 4}
+-	}
++static int flexonenand_ooblayout_ecc(struct mtd_info *mtd, int section,
++				     struct mtd_oob_region *oobregion)
 +{
-+	if (section)
++	if (section > 7)
 +		return -ERANGE;
 +
-+	oobregion->length = 6;
-+	oobregion->offset = 10;
++	oobregion->offset = (section * 16) + 6;
++	oobregion->length = 10;
 +
 +	return 0;
 +}
 +
-+static int lpc32xx_ooblayout_free(struct mtd_info *mtd, int section,
-+				  struct mtd_oob_region *oobregion)
++static int flexonenand_ooblayout_free(struct mtd_info *mtd, int section,
++				      struct mtd_oob_region *oobregion)
 +{
-+	if (section > 1)
++	if (section > 7)
 +		return -ERANGE;
 +
-+	if (!section) {
-+		oobregion->offset = 0;
-+		oobregion->length = 4;
-+	} else {
-+		oobregion->offset = 6;
-+		oobregion->length = 4;
-+	}
++	oobregion->offset = (section * 16) + 2;
++	oobregion->length = 4;
 +
 +	return 0;
 +}
 +
-+static const struct mtd_ooblayout_ops lpc32xx_ooblayout_ops = {
-+	.ecc = lpc32xx_ooblayout_ecc,
-+	.free = lpc32xx_ooblayout_free,
++static const struct mtd_ooblayout_ops flexonenand_ooblayout_ops = {
++	.ecc = flexonenand_ooblayout_ecc,
++	.free = flexonenand_ooblayout_free,
  };
  
- static u8 bbt_pattern[] = {'B', 'b', 't', '0' };
-@@ -886,7 +911,7 @@ static int lpc32xx_nand_probe(struct platform_device *pdev)
- 	 * custom BBT marker layout.
- 	 */
- 	if (mtd->writesize <= 512)
--		chip->ecc.layout = &lpc32xx_nand_oob_16;
-+		mtd_set_ooblayout(mtd, &lpc32xx_ooblayout_ops);
+ /*
+@@ -91,56 +103,77 @@ static struct nand_ecclayout flexonenand_oob_128 = {
+  * Based on specification:
+  * 4Gb M-die OneNAND Flash (KFM4G16Q4M, KFN8G16Q4M). Rev. 1.3, Apr. 2010
+  *
+- * For eccpos we expose only 64 bytes out of 72 (see struct nand_ecclayout)
+- *
+- * oobfree uses the spare area fields marked as
+- * "Managed by internal ECC logic for Logical Sector Number area"
+- */
+-static struct nand_ecclayout onenand_oob_128 = {
+-	.eccbytes	= 64,
+-	.eccpos		= {
+-		7, 8, 9, 10, 11, 12, 13, 14, 15,
+-		23, 24, 25, 26, 27, 28, 29, 30, 31,
+-		39, 40, 41, 42, 43, 44, 45, 46, 47,
+-		55, 56, 57, 58, 59, 60, 61, 62, 63,
+-		71, 72, 73, 74, 75, 76, 77, 78, 79,
+-		87, 88, 89, 90, 91, 92, 93, 94, 95,
+-		103, 104, 105, 106, 107, 108, 109, 110, 111,
+-		119
+-	},
+-	.oobfree	= {
+-		{2, 3}, {18, 3}, {34, 3}, {50, 3},
+-		{66, 3}, {82, 3}, {98, 3}, {114, 3}
+-	}
++ */
++static int onenand_ooblayout_128_ecc(struct mtd_info *mtd, int section,
++				     struct mtd_oob_region *oobregion)
++{
++	if (section > 7)
++		return -ERANGE;
++
++	oobregion->offset = (section * 16) + 7;
++	oobregion->length = 9;
++
++	return 0;
++}
++
++static int onenand_ooblayout_128_free(struct mtd_info *mtd, int section,
++				      struct mtd_oob_region *oobregion)
++{
++	if (section >= 8)
++		return -ERANGE;
++
++	/*
++	 * free bytes are using the spare area fields marked as
++	 * "Managed by internal ECC logic for Logical Sector Number area"
++	 */
++	oobregion->offset = (section * 16) + 2;
++	oobregion->length = 3;
++
++	return 0;
++}
++
++static const struct mtd_ooblayout_ops onenand_oob_128_ooblayout_ops = {
++	.ecc = onenand_ooblayout_128_ecc,
++	.free = onenand_ooblayout_128_free,
+ };
  
- 	/* These sizes remain the same regardless of page size */
- 	chip->ecc.size = 256;
+ /**
+- * onenand_oob_64 - oob info for large (2KB) page
++ * onenand_oob_32_64 - oob info for large (2KB) page
+  */
+-static struct nand_ecclayout onenand_oob_64 = {
+-	.eccbytes	= 20,
+-	.eccpos		= {
+-		8, 9, 10, 11, 12,
+-		24, 25, 26, 27, 28,
+-		40, 41, 42, 43, 44,
+-		56, 57, 58, 59, 60,
+-		},
+-	.oobfree	= {
+-		{2, 3}, {14, 2}, {18, 3}, {30, 2},
+-		{34, 3}, {46, 2}, {50, 3}, {62, 2}
++static int onenand_ooblayout_32_64_ecc(struct mtd_info *mtd, int section,
++				       struct mtd_oob_region *oobregion)
++{
++	if (section > 3)
++		return -ERANGE;
++
++	oobregion->offset = (section * 16) + 8;
++	oobregion->length = 5;
++
++	return 0;
++}
++
++static int onenand_ooblayout_32_64_free(struct mtd_info *mtd, int section,
++					struct mtd_oob_region *oobregion)
++{
++	int sections = (mtd->oobsize / 32) * 2;
++
++	if (section >= sections)
++		return -ERANGE;
++
++	if (section & 1) {
++		oobregion->offset = ((section - 1) * 16) + 14;
++		oobregion->length = 2;
++	} else  {
++		oobregion->offset = (section * 16) + 2;
++		oobregion->length = 3;
+ 	}
+-};
+ 
+-/**
+- * onenand_oob_32 - oob info for middle (1KB) page
+- */
+-static struct nand_ecclayout onenand_oob_32 = {
+-	.eccbytes	= 10,
+-	.eccpos		= {
+-		8, 9, 10, 11, 12,
+-		24, 25, 26, 27, 28,
+-		},
+-	.oobfree	= { {2, 3}, {14, 2}, {18, 3}, {30, 2} }
++	return 0;
++}
++
++static const struct mtd_ooblayout_ops onenand_oob_32_64_ooblayout_ops = {
++	.ecc = onenand_ooblayout_32_64_ecc,
++	.free = onenand_ooblayout_32_64_free,
+ };
+ 
+ static const unsigned char ffchars[] = {
+@@ -3957,22 +3990,22 @@ int onenand_scan(struct mtd_info *mtd, int maxchips)
+ 	switch (mtd->oobsize) {
+ 	case 128:
+ 		if (FLEXONENAND(this)) {
+-			this->ecclayout = &flexonenand_oob_128;
++			mtd_set_ooblayout(mtd, &flexonenand_ooblayout_ops);
+ 			mtd->subpage_sft = 0;
+ 		} else {
+-			this->ecclayout = &onenand_oob_128;
++			mtd_set_ooblayout(mtd, &onenand_oob_128_ooblayout_ops);
+ 			mtd->subpage_sft = 2;
+ 		}
+ 		if (ONENAND_IS_NOP_1(this))
+ 			mtd->subpage_sft = 0;
+ 		break;
+ 	case 64:
+-		this->ecclayout = &onenand_oob_64;
++		mtd_set_ooblayout(mtd, &onenand_oob_32_64_ooblayout_ops);
+ 		mtd->subpage_sft = 2;
+ 		break;
+ 
+ 	case 32:
+-		this->ecclayout = &onenand_oob_32;
++		mtd_set_ooblayout(mtd, &onenand_oob_32_64_ooblayout_ops);
+ 		mtd->subpage_sft = 1;
+ 		break;
+ 
+@@ -3981,7 +4014,7 @@ int onenand_scan(struct mtd_info *mtd, int maxchips)
+ 			__func__, mtd->oobsize);
+ 		mtd->subpage_sft = 0;
+ 		/* To prevent kernel oops */
+-		this->ecclayout = &onenand_oob_32;
++		mtd_set_ooblayout(mtd, &onenand_oob_32_64_ooblayout_ops);
+ 		break;
+ 	}
+ 
+@@ -3997,7 +4030,6 @@ int onenand_scan(struct mtd_info *mtd, int maxchips)
+ 
+ 	mtd->oobavail = ret;
+ 
+-	mtd_set_ecclayout(mtd, this->ecclayout);
+ 	mtd->ecc_strength = 1;
+ 
+ 	/* Fill in remaining MTD driver data */
+diff --git a/include/linux/mtd/onenand.h b/include/linux/mtd/onenand.h
+index 4596503..0aaa98b 100644
+--- a/include/linux/mtd/onenand.h
++++ b/include/linux/mtd/onenand.h
+@@ -80,7 +80,6 @@ struct onenand_bufferram {
+  * @page_buf:		[INTERN] page main data buffer
+  * @oob_buf:		[INTERN] page oob data buffer
+  * @subpagesize:	[INTERN] holds the subpagesize
+- * @ecclayout:		[REPLACEABLE] the default ecc placement scheme
+  * @bbm:		[REPLACEABLE] pointer to Bad Block Management
+  * @priv:		[OPTIONAL] pointer to private chip date
+  */
+@@ -134,7 +133,6 @@ struct onenand_chip {
+ #endif
+ 
+ 	int			subpagesize;
+-	struct nand_ecclayout	*ecclayout;
+ 
+ 	void			*bbm;
+ 
 -- 
 2.5.0
