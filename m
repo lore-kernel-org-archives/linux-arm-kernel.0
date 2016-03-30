@@ -1,61 +1,80 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 30 Mar 2016 22:04:05 +0200
-Subject: [PATCH v5 42/46] backlight: lp8788: switch to the atomic PWM API
-In-Reply-To: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1459368249-13241-43-git-send-email-boris.brezillon@free-electrons.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 30 Mar 2016 22:09:00 +0200
+Subject: [PATCH] arm64: kvm: 4.6-rc1: Fix VTCR_EL2 VS setting
+In-Reply-To: <1459344839-14397-1-git-send-email-suzuki.poulose@arm.com>
+References: <1459344839-14397-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20160330200900.GM4126@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pwm_config/enable/disable() have been deprecated and should be replaced
-by pwm_apply_state().
+On Wed, Mar 30, 2016 at 02:33:59PM +0100, Suzuki K Poulose wrote:
+> When we detect support for 16bit VMID in ID_AA64MMFR1, we set the
+> VTCR_EL2_VS field to 1 to make use of 16bit vmids. But, with
+> commit 3a3604bc5eb4 ("arm64: KVM: Switch to C-based stage2 init")
+> this is broken and we corrupt VTCR_EL2:T0SZ instead of updating the VS
+> field. VTCR_EL2_VS was actually defined to the field shift (19) and
+> not the real value for VS. This patch fixes the issue.
+> 
+> Fixes: commit 3a3604bc5eb4 ("arm64: KVM: Switch to C-based stage2 init")
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- drivers/video/backlight/lp8788_bl.c | 17 +++++++++--------
- 1 file changed, 9 insertions(+), 8 deletions(-)
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-diff --git a/drivers/video/backlight/lp8788_bl.c b/drivers/video/backlight/lp8788_bl.c
-index 5d583d7..521c730 100644
---- a/drivers/video/backlight/lp8788_bl.c
-+++ b/drivers/video/backlight/lp8788_bl.c
-@@ -124,16 +124,13 @@ static int lp8788_backlight_configure(struct lp8788_bl *bl)
- 
- static void lp8788_pwm_ctrl(struct lp8788_bl *bl, int br, int max_br)
- {
--	unsigned int period;
--	unsigned int duty;
- 	struct device *dev;
-+	struct pwm_state pstate;
- 	struct pwm_device *pwm;
- 
- 	if (!bl->pdata)
- 		return;
- 
--	period = bl->pdata->period_ns;
--	duty = br * period / max_br;
- 	dev = bl->lp->dev;
- 
- 	/* request PWM device with the consumer name */
-@@ -147,11 +144,15 @@ static void lp8788_pwm_ctrl(struct lp8788_bl *bl, int br, int max_br)
- 		bl->pwm = pwm;
- 	}
- 
--	pwm_config(bl->pwm, duty, period);
--	if (duty)
--		pwm_enable(bl->pwm);
-+	pwm_get_state(bl->pwm, &pstate);
-+	pstate.period = bl->pdata->period_ns;
-+	pstate.duty_cycle = br * pstate.period / max_br;
-+	if (pstate.duty_cycle)
-+		pstate.enabled = true;
- 	else
--		pwm_disable(bl->pwm);
-+		pstate.enabled = false;
-+
-+	pwm_apply_state(bl->pwm, &pstate);
- }
- 
- static int lp8788_bl_update_status(struct backlight_device *bl_dev)
--- 
-2.5.0
+> ---
+>  arch/arm64/include/asm/kvm_arm.h |    4 +++-
+>  arch/arm64/include/asm/sysreg.h  |    3 +++
+>  arch/arm64/kvm/hyp/s2-setup.c    |    6 ++++--
+>  3 files changed, 10 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+> index 0e391db..4150fd8 100644
+> --- a/arch/arm64/include/asm/kvm_arm.h
+> +++ b/arch/arm64/include/asm/kvm_arm.h
+> @@ -124,7 +124,9 @@
+>  #define VTCR_EL2_SL0_LVL1	(1 << 6)
+>  #define VTCR_EL2_T0SZ_MASK	0x3f
+>  #define VTCR_EL2_T0SZ_40B	24
+> -#define VTCR_EL2_VS		19
+> +#define VTCR_EL2_VS_SHIFT	19
+> +#define VTCR_EL2_VS_8BIT	(0 << VTCR_EL2_VS_SHIFT)
+> +#define VTCR_EL2_VS_16BIT	(1 << VTCR_EL2_VS_SHIFT)
+>  
+>  /*
+>   * We configure the Stage-2 page tables to always restrict the IPA space to be
+> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+> index 1a78d6e..1287416 100644
+> --- a/arch/arm64/include/asm/sysreg.h
+> +++ b/arch/arm64/include/asm/sysreg.h
+> @@ -141,6 +141,9 @@
+>  #define ID_AA64MMFR1_VMIDBITS_SHIFT	4
+>  #define ID_AA64MMFR1_HADBS_SHIFT	0
+>  
+> +#define ID_AA64MMFR1_VMIDBITS_8		0
+> +#define ID_AA64MMFR1_VMIDBITS_16	2
+> +
+>  /* id_aa64mmfr2 */
+>  #define ID_AA64MMFR2_UAO_SHIFT		4
+>  
+> diff --git a/arch/arm64/kvm/hyp/s2-setup.c b/arch/arm64/kvm/hyp/s2-setup.c
+> index bfc54fd..5a9f3bf 100644
+> --- a/arch/arm64/kvm/hyp/s2-setup.c
+> +++ b/arch/arm64/kvm/hyp/s2-setup.c
+> @@ -36,8 +36,10 @@ void __hyp_text __init_stage2_translation(void)
+>  	 * Read the VMIDBits bits from ID_AA64MMFR1_EL1 and set the VS
+>  	 * bit in VTCR_EL2.
+>  	 */
+> -	tmp = (read_sysreg(id_aa64mmfr1_el1) >> 4) & 0xf;
+> -	val |= (tmp == 2) ? VTCR_EL2_VS : 0;
+> +	tmp = (read_sysreg(id_aa64mmfr1_el1) >> ID_AA64MMFR1_VMIDBITS_SHIFT) & 0xf;
+> +	val |= (tmp == ID_AA64MMFR1_VMIDBITS_16) ?
+> +			VTCR_EL2_VS_16BIT :
+> +			VTCR_EL2_VS_8BIT;
+>  
+>  	write_sysreg(val, vtcr_el2);
+>  }
+> -- 
+> 1.7.9.5
+> 
