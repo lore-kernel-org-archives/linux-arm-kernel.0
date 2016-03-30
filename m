@@ -1,74 +1,60 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 30 Mar 2016 17:37:27 +0200
-Subject: [PATCH 11/13] dtb: amd: Add PCIe SMMU device tree node
-In-Reply-To: <20160128142751.GA775@arm.com>
-References: <1453929121-12171-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <20160128111453.GG17123@leverpostej> <56AA07AA.7050701@arm.com>
- <6645680.g0j8d12m6d@wuerfel> <20160128142751.GA775@arm.com>
-Message-ID: <56FBF2B7.8090601@linaro.org>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 30 Mar 2016 17:39:50 +0200
+Subject: [PATCH v2 3/7] mtd: nand: sunxi: make cur_off parameter optional in
+ extra oob helpers
+In-Reply-To: <1459352394-22810-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1459352394-22810-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1459352394-22810-4-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear all,
-On 01/28/2016 03:27 PM, Will Deacon wrote:
-> On Thu, Jan 28, 2016 at 03:17:33PM +0100, Arnd Bergmann wrote:
->> On Thursday 28 January 2016 12:20:58 Robin Murphy wrote:
->>>>
->>>> Will, Robin, thoughts?
->>>
->>> Any IDs specified here would only apply to DMA by the "platform device" 
->>> side of the host controller itself (as would an equivalent "iommus" 
->>> property on pcie0 once I finish the SMMUv2 generic binding support I'm 
->>> working on). In terms of PCI devices, the "mmu-masters" property is 
->>> overloaded such that only its existence matters, to identify that there 
->>> _is_ a relationship between the SMMU and the PCI bus(es) behind that 
->>> host controller.
->>
->> I wasn't aware that this was actually still specified. I had hoped
->> we were getting rid of mmu-masters before anyone actually started
->> using it, but now I see it in ns2.dtsi and fsl-ls2080a.dtsi.
->>
->> Does anyone know what happened to the plan to use the iommu DT binding
->> for the ARM SMMU instead? Do we now have to support both ways indefinitely?
-> 
-> We always did -- Seattle used the mmu-masters binding before the generic
-> binding even existed. Robin has been working on patches to get of_xlate
-> up and running, but it got held up by Laurent's series which didn't end
-> up going anywhere.
-> 
-> Will
-Up to now I have used the PCI smmu description as described in Suravee's
-patch and this does not work anymore with 4.6-rc1 since the default
-domain was introduced. So now I see 2 SMRs matching a single streamid
-(in my case 256, one steming from the "platform device" side of the host
-controller and one steming from the PCI device) and this causes SMCF
-(stream match conflict fault). So PCIe PF does not work.
+Allow for NULL cur_offs values when the caller does not know where the
+NAND page register pointer point to.
 
-I observe the fault only when I override the PCIe ACS property in my
-case which was pretty confusing (each PF/VF is put in a separate group).
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ drivers/mtd/nand/sunxi_nand.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-What is the correct syntax then: mmu-masters = <&pcie0>?
-
-instead of
-
-+			 mmu-masters = <&pcie0
-+				/* 1:00:[0,3] */ 256 257 258 259
-+				/* 2:00:[0,3] */ 512 513 514 515
-+				/* 3:00:[0,3] */ 768 769 770 771
-+				/* 4:00:[0,3] */ 1024 1025 1026 1027>
-
-Is there a plan to update/upstream the dt description for PCIe smmu.
-
-Thank you in advance
-
-Best Regards
-
-Eric
-
-
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
+index 3e7b919..6d6b166 100644
+--- a/drivers/mtd/nand/sunxi_nand.c
++++ b/drivers/mtd/nand/sunxi_nand.c
+@@ -956,7 +956,7 @@ static void sunxi_nfc_hw_ecc_read_extra_oob(struct mtd_info *mtd,
+ 	if (len <= 0)
+ 		return;
+ 
+-	if (*cur_off != offset)
++	if (!cur_off || *cur_off != offset)
+ 		nand->cmdfunc(mtd, NAND_CMD_RNDOUT,
+ 			      offset + mtd->writesize, -1);
+ 
+@@ -966,7 +966,8 @@ static void sunxi_nfc_hw_ecc_read_extra_oob(struct mtd_info *mtd,
+ 		sunxi_nfc_randomizer_read_buf(mtd, oob + offset, len,
+ 					      false, page);
+ 
+-	*cur_off = mtd->oobsize + mtd->writesize;
++	if (cur_off)
++		*cur_off = mtd->oobsize + mtd->writesize;
+ }
+ 
+ static int sunxi_nfc_hw_ecc_write_chunk(struct mtd_info *mtd,
+@@ -1021,13 +1022,14 @@ static void sunxi_nfc_hw_ecc_write_extra_oob(struct mtd_info *mtd,
+ 	if (len <= 0)
+ 		return;
+ 
+-	if (*cur_off != offset)
++	if (!cur_off || *cur_off != offset)
+ 		nand->cmdfunc(mtd, NAND_CMD_RNDIN,
+ 			      offset + mtd->writesize, -1);
+ 
+ 	sunxi_nfc_randomizer_write_buf(mtd, oob + offset, len, false, page);
+ 
+-	*cur_off = mtd->oobsize + mtd->writesize;
++	if (cur_off)
++		*cur_off = mtd->oobsize + mtd->writesize;
+ }
+ 
+ static int sunxi_nfc_hw_ecc_read_page(struct mtd_info *mtd,
+-- 
+2.5.0
