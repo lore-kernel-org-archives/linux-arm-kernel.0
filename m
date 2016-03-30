@@ -1,26 +1,117 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 30 Mar 2016 09:51:43 -0700
-Subject: [PATCH v2 4/7] scatterlist: add sg_alloc_table_from_buf() helper
-In-Reply-To: <1459352394-22810-5-git-send-email-boris.brezillon@free-electrons.com>
-References: <1459352394-22810-1-git-send-email-boris.brezillon@free-electrons.com>
- <1459352394-22810-5-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20160330165143.GI2350@sirena.org.uk>
+From: cmetcalf@mellanox.com (Chris Metcalf)
+Date: Wed, 30 Mar 2016 13:16:06 -0400
+Subject: [PATCH v4 0/4] improvements to the nmi_backtrace code
+In-Reply-To: <8028886.DUEJzF47F1@vostro.rjw.lan>
+Message-ID: <1459358170-27745-1-git-send-email-cmetcalf@mellanox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 30, 2016 at 05:39:51PM +0200, Boris Brezillon wrote:
-> sg_alloc_table_from_buf() provides an easy solution to create an sg_table
-> from a virtual address pointer. This function takes care of dealing with
-> vmallocated buffers, buffer alignment, or DMA engine limitations (maximum
-> DMA transfer size).
+>From the version 1 cover letter:
 
-This seems nice.  Should we also have a further helper on top of this
-which will get constraints from a dmaengine, it seems like it'd be a
-common need?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160330/6feb33d1/attachment-0001.sig>
+  This patch series modifies the trigger_xxx_backtrace() NMI-based
+  remote backtracing code to make it more flexible, and makes a few
+  small improvements along the way.
+
+  The motivation comes from the task isolation code, where there are
+  scenarios where we want to be able to diagnose a case where some cpu
+  is about to interrupt a task-isolated cpu.  It can be helpful to
+  see both where the interrupting cpu is, and also an approximation
+  of where the cpu that is being interrupted is.  The nmi_backtrace
+  framework allows us to discover the stack of the interrupted cpu.
+
+I've tested that the change works as desired on tile, and build-tested
+x86, arm64, and arm.  For x86 and arm64 I confirmed that the generic
+cpuidle stuff as well as the architecture-specific routines are in the
+new cpuidle section.  For arm I just build-tested it and made sure the
+generic cpuidle routines were in the new cpuidle section, but I didn't
+attempt to tease apart the tangle of platform-specific idle routines
+that arm has and tag them with __cpuidle.  That might be more usefully
+done by someone with arm platform experience in a follow-up patch.
+
+I have also pushed it up to kernel.org to pull if that's easier:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/cmetcalf/linux-tile.git nmi-backtrace
+
+The change conflicts with Petr Mladek's NMI printk cleanup patches:
+
+https://lkml.kernel.org/r/1459353210-20260-1-git-send-email-pmladek at suse.com
+
+He has kindly offered to resolve the conflicts.
+
+v4: Added some more __cpuidle functions (PeterZ, Rafael Wysocki)
+    Rebased to kernel v4.6-rc1
+
+v3: Various improvements to the set of __cpuidle functions;
+    Add back in a missing section accidentally removed in modpost.c (PeterZ)
+    https://lkml.kernel.org/r/1458667179-19630-1-git-send-email-cmetcalf at mellanox.com
+
+v2: Switch to using __cpuidle tagging, switch S-O-B to Mellanox
+    https://lkml.kernel.org/r/1458147733-29338-1-git-send-email-cmetcalf at mellanox.com
+
+Chris Metcalf (4):
+  nmi_backtrace: add more trigger_*_cpu_backtrace() methods
+  nmi_backtrace: do a local dump_stack() instead of a self-NMI
+  arch/tile: adopt the new nmi_backtrace framework
+  nmi_backtrace: generate one-line reports for idle cpus
+
+ arch/alpha/kernel/vmlinux.lds.S      |  1 +
+ arch/arc/kernel/vmlinux.lds.S        |  1 +
+ arch/arm/include/asm/irq.h           |  4 +-
+ arch/arm/kernel/smp.c                | 13 +------
+ arch/arm/kernel/vmlinux.lds.S        |  1 +
+ arch/arm64/kernel/vmlinux.lds.S      |  1 +
+ arch/arm64/mm/proc.S                 |  2 +
+ arch/avr32/kernel/vmlinux.lds.S      |  1 +
+ arch/blackfin/kernel/vmlinux.lds.S   |  1 +
+ arch/c6x/kernel/vmlinux.lds.S        |  1 +
+ arch/cris/kernel/vmlinux.lds.S       |  1 +
+ arch/frv/kernel/vmlinux.lds.S        |  1 +
+ arch/h8300/kernel/vmlinux.lds.S      |  1 +
+ arch/hexagon/kernel/vmlinux.lds.S    |  1 +
+ arch/ia64/kernel/vmlinux.lds.S       |  1 +
+ arch/m32r/kernel/vmlinux.lds.S       |  1 +
+ arch/m68k/kernel/vmlinux-nommu.lds   |  1 +
+ arch/m68k/kernel/vmlinux-std.lds     |  1 +
+ arch/m68k/kernel/vmlinux-sun3.lds    |  1 +
+ arch/metag/kernel/vmlinux.lds.S      |  1 +
+ arch/microblaze/kernel/vmlinux.lds.S |  1 +
+ arch/mips/kernel/vmlinux.lds.S       |  1 +
+ arch/mn10300/kernel/vmlinux.lds.S    |  1 +
+ arch/nios2/kernel/vmlinux.lds.S      |  1 +
+ arch/openrisc/kernel/vmlinux.lds.S   |  1 +
+ arch/parisc/kernel/vmlinux.lds.S     |  1 +
+ arch/powerpc/kernel/vmlinux.lds.S    |  1 +
+ arch/s390/kernel/vmlinux.lds.S       |  1 +
+ arch/score/kernel/vmlinux.lds.S      |  1 +
+ arch/sh/kernel/vmlinux.lds.S         |  1 +
+ arch/sparc/kernel/vmlinux.lds.S      |  1 +
+ arch/tile/include/asm/irq.h          |  4 +-
+ arch/tile/kernel/entry.S             |  2 +-
+ arch/tile/kernel/pmc.c               |  3 --
+ arch/tile/kernel/process.c           | 72 ++++++++----------------------------
+ arch/tile/kernel/traps.c             |  7 +++-
+ arch/tile/kernel/vmlinux.lds.S       |  1 +
+ arch/um/kernel/dyn.lds.S             |  1 +
+ arch/um/kernel/uml.lds.S             |  1 +
+ arch/unicore32/kernel/vmlinux.lds.S  |  1 +
+ arch/x86/include/asm/irq.h           |  4 +-
+ arch/x86/kernel/acpi/cstate.c        |  2 +-
+ arch/x86/kernel/apic/hw_nmi.c        |  6 +--
+ arch/x86/kernel/process.c            |  4 +-
+ arch/x86/kernel/vmlinux.lds.S        |  1 +
+ arch/xtensa/kernel/vmlinux.lds.S     |  3 ++
+ drivers/acpi/processor_idle.c        |  5 ++-
+ drivers/cpuidle/driver.c             |  5 ++-
+ drivers/idle/intel_idle.c            |  4 +-
+ include/asm-generic/vmlinux.lds.h    |  6 +++
+ include/linux/cpu.h                  |  5 +++
+ include/linux/nmi.h                  | 63 ++++++++++++++++++++++++-------
+ kernel/sched/idle.c                  | 13 ++++++-
+ lib/nmi_backtrace.c                  | 40 +++++++++++++-------
+ scripts/mod/modpost.c                |  2 +-
+ scripts/recordmcount.c               |  1 +
+ scripts/recordmcount.pl              |  1 +
+ 57 files changed, 183 insertions(+), 121 deletions(-)
+
+-- 
+2.7.2
