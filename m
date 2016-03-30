@@ -1,58 +1,35 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Wed, 30 Mar 2016 19:47:40 +0200
-Subject: [PATCH v2] clk: sunxi: Accept a greater rate when setting a parent
- clock
-Message-ID: <mailman.14.1459361730.1636.linux-arm-kernel@lists.infradead.org>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 30 Mar 2016 20:18:31 +0200
+Subject: [PATCH v2 4/7] scatterlist: add sg_alloc_table_from_buf() helper
+In-Reply-To: <20160330165143.GI2350@sirena.org.uk>
+References: <1459352394-22810-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1459352394-22810-5-git-send-email-boris.brezillon@free-electrons.com>
+ <20160330165143.GI2350@sirena.org.uk>
+Message-ID: <20160330201831.38e1d6bd@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The best rate of a clock may be a bit greater than the requested one.
-In such a case, the rate setting from a child clock was rejected.
+On Wed, 30 Mar 2016 09:51:43 -0700
+Mark Brown <broonie@kernel.org> wrote:
 
-This patch fixes the problem searching a 'best rate' instead of
-a 'fastest rate <= rate'.
+> On Wed, Mar 30, 2016 at 05:39:51PM +0200, Boris Brezillon wrote:
+> > sg_alloc_table_from_buf() provides an easy solution to create an sg_table
+> > from a virtual address pointer. This function takes care of dealing with
+> > vmallocated buffers, buffer alignment, or DMA engine limitations (maximum
+> > DMA transfer size).
+> 
+> This seems nice.  Should we also have a further helper on top of this
+> which will get constraints from a dmaengine, it seems like it'd be a
+> common need?
 
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
- drivers/clk/sunxi/clk-factors.c | 15 ++++++++++++---
- 1 file changed, 12 insertions(+), 3 deletions(-)
+Yep, we could create a wrapper extracting dma_slave caps info,
+converting it to sg_constraints and calling sg_alloc_table_from_buf().
+But let's try to get this function accepted first, and I'll send another
+patch providing this wrapper.
 
-diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
-index ddefe96..c8e2f29 100644
---- a/drivers/clk/sunxi/clk-factors.c
-+++ b/drivers/clk/sunxi/clk-factors.c
-@@ -95,9 +95,10 @@ static int clk_factors_determine_rate(struct clk_hw *hw,
- 	struct clk_factors *factors = to_clk_factors(hw);
- 	struct clk_hw *parent, *best_parent = NULL;
- 	int i, num_parents;
--	unsigned long parent_rate, best = 0, child_rate, best_child_rate = 0;
-+	unsigned long parent_rate, best = 0, child_rate, best_child_rate;
-+	unsigned long d_rate, best_d_rate = ~0ul;
- 
--	/* find the parent that can help provide the fastest rate <= rate */
-+	/* find the parent that can help provide the best rate */
- 	num_parents = clk_hw_get_num_parents(hw);
- 	for (i = 0; i < num_parents; i++) {
- 		struct factors_request factors_req = {
-@@ -116,10 +117,18 @@ static int clk_factors_determine_rate(struct clk_hw *hw,
- 		factors->get_factors(&factors_req);
- 		child_rate = factors_req.rate;
- 
--		if (child_rate <= req->rate && child_rate > best_child_rate) {
-+		if (child_rate >= req->rate)
-+			d_rate = child_rate - req->rate;
-+		else
-+			d_rate = req->rate - child_rate;
-+
-+		if (d_rate < best_d_rate) {
- 			best_parent = parent;
- 			best = parent_rate;
- 			best_child_rate = child_rate;
-+			if (d_rate == 0)
-+				break;
-+			best_d_rate = d_rate;
- 		}
- 	}
- 
+BTW, do you see other things that should be added in sg_constraints?
+
 -- 
-2.8.0
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
