@@ -1,41 +1,54 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 30 Mar 2016 08:46:36 +0900
-Subject: [PATCH V2 3/3] cpufreq: exynos: Use generic platdev driver
-In-Reply-To: <CAKohpomQ9=YK79o0fqHqZ7xexHv5EMJSPx+4KrT0RxeMh+hwWg@mail.gmail.com>
-References: <cover.1459233524.git.viresh.kumar@linaro.org>
- <81a8da75a0e7783e2b47f9e04297f167e8134afe.1459233524.git.viresh.kumar@linaro.org>
- <3810049.oQlCXiQ5bk@wuerfel>
- <CAKohpomQ9=YK79o0fqHqZ7xexHv5EMJSPx+4KrT0RxeMh+hwWg@mail.gmail.com>
-Message-ID: <56FB13DC.2090902@samsung.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 30 Mar 2016 09:22:33 +0800
+Subject: [PATCH v4 1/2] watchdog: imx2_wdt: add external reset support
+ via 'ext-reset-output' dt prop
+In-Reply-To: <56F991C3.8030201@timesys.com>
+References: <20151105222325.GA26159@roeck-us.net>
+ <CAJ+vNU2fSxRJ7YvxOfNzoEoiKgzv-dHj=+eksKxH48ekHiUw2Q@mail.gmail.com>
+ <20151106220249.GA19791@roeck-us.net>
+ <565F4244.7090502@timesys.com>
+ <CAJ+vNU00Bf97HUqkkW9KqOUzHXh482R9O1gasz6ju3Pn-_5chA@mail.gmail.com>
+ <CAJ+vNU2qHQPSJ1KWp_3f3vAdeuOcF0ooZHmHsdafabZLXJv=Bw@mail.gmail.com>
+ <20151228162923.GA31680@spo001.leaseweb.nl>
+ <56AA79DA.2010305@timesys.com>
+ <CAOMZO5DrTY3ho0Z_jXxeYMqbd6GmUKRwD1LB61vM1ZTGQAYOrg@mail.gmail.com>
+ <56F991C3.8030201@timesys.com>
+Message-ID: <20160330012226.GD28207@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30.03.2016 00:22, Viresh Kumar wrote:
-> On 29 March 2016 at 20:34, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Tuesday 29 March 2016 12:09:49 Viresh Kumar wrote:
->>> -static void __init exynos_cpufreq_init(void)
->>> -{
->>> -       struct device_node *root = of_find_node_by_path("/");
->>> -       const struct of_device_id *match;
->>> -
->>> -       match = of_match_node(exynos_cpufreq_matches, root);
->>> -       if (!match) {
->>> -               platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
->>> -               return;
->>> -       }
->>> -
->>> -       platform_device_register_simple(match->data, -1, NULL, 0);
->>> -}
->>
->> How is the "exynos-cpufreq" case handled now? Is that no longer used now?
->> I assume the patch is correct based on Krzysztof's review, but it might be
->> good to explain this better.
+On Mon, Mar 28, 2016 at 04:19:15PM -0400, Akshay Bhat wrote:
+> Hi Shawn,
 > 
-> That's stale code, the driver got removed some time back.
+> On 02/28/2016 08:56 AM, Fabio Estevam wrote:
+> >Rob,
+> >
+> >On Thu, Jan 28, 2016 at 6:28 PM, Akshay Bhat <akshay.bhat@timesys.com> wrote:
+> >
+> >>>I have no objections against the idea and the code itself.
+> >>>But as Guenter pointed out: it would be handy to get feedback from the
+> >>>devicetree maintainers on the above discussion.
+> >>>
+> >>>Kind regards,
+> >>>Wim.
+> >>>
+> >>
+> >>Any suggestions on whether a vendor specific prefix is necessary?
+> >
+> >Any comments?
+> >
+> 
+> Is this something you can help with, since you are the iMX
+> architecture/devicetree maintainer? Appreciate any feedback.
 
-Yeah, that's old driver, no longer existing. It makes sense to split the
-patch - first remove the stale exynos-cpufreq and then move cpufreq-dt.
-This would help avoid confusion when grepping through the history.
+FWIW,
 
-Best regards,
-Krzysztof
+Acked-by: Shawn Guo <shawnguo@kernel.org>
+
+Guenter,
+
+I think it's reasonable to pick up the patch, if we have it copied to DT
+maintainers and on the list for a long period of time, and do not see
+any objection from anyone.
+
+Shawn
