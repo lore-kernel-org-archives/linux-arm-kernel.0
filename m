@@ -1,147 +1,212 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 30 Mar 2016 22:03:44 +0200
-Subject: [PATCH v5 21/46] pwm: rockchip: add initial state retrieval
+Date: Wed, 30 Mar 2016 22:03:42 +0200
+Subject: [PATCH v5 19/46] pwm: switch to the atomic API
 In-Reply-To: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1459368249-13241-22-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1459368249-13241-20-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement the ->get_state() function to expose initial state.
+Replace legacy pwm_get/set_xxx() and pwm_config/enable/disable() calls
+by pwm_get/apply_state().
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/pwm/pwm-rockchip.c | 69 ++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 69 insertions(+)
+ drivers/pwm/core.c  |  5 ++++-
+ drivers/pwm/sysfs.c | 61 +++++++++++++++++++++++++++++++----------------------
+ 2 files changed, 40 insertions(+), 26 deletions(-)
 
-diff --git a/drivers/pwm/pwm-rockchip.c b/drivers/pwm/pwm-rockchip.c
-index 7d9cc90..6a1087c 100644
---- a/drivers/pwm/pwm-rockchip.c
-+++ b/drivers/pwm/pwm-rockchip.c
-@@ -51,6 +51,8 @@ struct rockchip_pwm_data {
+diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+index 62e6b3c..c2b1569 100644
+--- a/drivers/pwm/core.c
++++ b/drivers/pwm/core.c
+@@ -882,13 +882,16 @@ static void pwm_dbg_show(struct pwm_chip *chip, struct seq_file *s)
  
- 	void (*set_enable)(struct pwm_chip *chip,
- 			   struct pwm_device *pwm, bool enable);
-+	void (*get_state)(struct pwm_chip *chip, struct pwm_device *pwm,
-+			  struct pwm_state *pstate);
- };
- 
- static inline struct rockchip_pwm_chip *to_rockchip_pwm_chip(struct pwm_chip *c)
-@@ -75,6 +77,19 @@ static void rockchip_pwm_set_enable_v1(struct pwm_chip *chip,
- 	writel_relaxed(val, pc->base + pc->data->regs.ctrl);
- }
- 
-+static void rockchip_pwm_get_state_v1(struct pwm_chip *chip,
-+				      struct pwm_device *pwm,
-+				      struct pwm_state *pstate)
-+{
-+	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
-+	u32 enable_conf = PWM_CTRL_OUTPUT_EN | PWM_CTRL_TIMER_EN;
-+	u32 val;
+ 	for (i = 0; i < chip->npwm; i++) {
+ 		struct pwm_device *pwm = &chip->pwms[i];
++		struct pwm_state pstate;
 +
-+	val = readl(pc->base + pc->data->regs.ctrl);
-+	if ((val & enable_conf) == enable_conf)
-+		pstate->enabled = true;
-+}
-+
- static void rockchip_pwm_set_enable_v2(struct pwm_chip *chip,
- 				       struct pwm_device *pwm, bool enable)
++		pwm_get_state(pwm, &pstate);
+ 
+ 		seq_printf(s, " pwm-%-3d (%-20.20s):", i, pwm->label);
+ 
+ 		if (test_bit(PWMF_REQUESTED, &pwm->flags))
+ 			seq_puts(s, " requested");
+ 
+-		if (pwm_is_enabled(pwm))
++		if (pstate.enabled)
+ 			seq_puts(s, " enabled");
+ 
+ 		seq_puts(s, "\n");
+diff --git a/drivers/pwm/sysfs.c b/drivers/pwm/sysfs.c
+index ab28c89..7ec1747 100644
+--- a/drivers/pwm/sysfs.c
++++ b/drivers/pwm/sysfs.c
+@@ -47,13 +47,13 @@ static ssize_t period_show(struct device *child,
  {
-@@ -98,6 +113,55 @@ static void rockchip_pwm_set_enable_v2(struct pwm_chip *chip,
- 	writel_relaxed(val, pc->base + pc->data->regs.ctrl);
+ 	struct pwm_export *export = child_to_pwm_export(child);
+ 	const struct pwm_device *pwm = export->pwm;
+-	unsigned int period;
++	struct pwm_state pstate;
+ 
+ 	mutex_lock(&export->lock);
+-	period = pwm_get_period(pwm);
++	pwm_get_state(pwm, &pstate);
+ 	mutex_unlock(&export->lock);
+ 
+-	return sprintf(buf, "%u\n", period);
++	return sprintf(buf, "%u\n", pstate.period);
  }
  
-+static void rockchip_pwm_get_state_v2(struct pwm_chip *chip,
-+				      struct pwm_device *pwm,
-+				      struct pwm_state *pstate)
-+{
-+	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
-+	u32 enable_conf = PWM_OUTPUT_LEFT | PWM_LP_DISABLE | PWM_ENABLE |
-+			  PWM_CONTINUOUS;
-+	u32 val;
-+
-+	val = readl(pc->base + pc->data->regs.ctrl);
-+	if ((val & enable_conf) != enable_conf)
-+		return;
-+
-+	pstate->enabled = true;
-+
-+	if (!(val & PWM_DUTY_POSITIVE))
-+		pstate->polarity = PWM_POLARITY_INVERSED;
-+}
-+
-+static void rockchip_pwm_get_state(struct pwm_chip *chip,
-+				   struct pwm_device *pwm,
-+				   struct pwm_state *pstate)
-+{
-+	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
-+	unsigned long clk_rate;
-+	u64 tmp;
-+	int ret;
-+
-+	ret = clk_enable(pc->clk);
-+	if (ret)
-+		return;
-+
-+	clk_rate = clk_get_rate(pc->clk);
-+
-+	tmp = readl(pc->base + pc->data->regs.period);
-+	tmp *= pc->data->prescaler * NSEC_PER_SEC;
-+	do_div(tmp, clk_rate);
-+	pstate->period = tmp;
-+
-+	tmp = readl(pc->base + pc->data->regs.duty);
-+	tmp *= pc->data->prescaler * NSEC_PER_SEC;
-+	do_div(tmp, clk_rate);
-+	pstate->duty_cycle = tmp;
-+
-+	pc->data->get_state(chip, pwm, pstate);
-+
-+	clk_disable(pc->clk);
-+}
-+
- static int rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 			       int duty_ns, int period_ns)
+ static ssize_t period_store(struct device *child,
+@@ -62,6 +62,7 @@ static ssize_t period_store(struct device *child,
  {
-@@ -171,6 +235,7 @@ static void rockchip_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 	struct pwm_export *export = child_to_pwm_export(child);
+ 	struct pwm_device *pwm = export->pwm;
++	struct pwm_state pstate;
+ 	unsigned int val;
+ 	int ret;
+ 
+@@ -70,7 +71,9 @@ static ssize_t period_store(struct device *child,
+ 		return ret;
+ 
+ 	mutex_lock(&export->lock);
+-	ret = pwm_config(pwm, pwm_get_duty_cycle(pwm), val);
++	pwm_get_state(pwm, &pstate);
++	pstate.period = val;
++	ret = pwm_apply_state(pwm, &pstate);
+ 	mutex_unlock(&export->lock);
+ 
+ 	return ret ? : size;
+@@ -82,13 +85,13 @@ static ssize_t duty_cycle_show(struct device *child,
+ {
+ 	struct pwm_export *export = child_to_pwm_export(child);
+ 	const struct pwm_device *pwm = export->pwm;
+-	unsigned int duty;
++	struct pwm_state pstate;
+ 
+ 	mutex_lock(&export->lock);
+-	duty = pwm_get_duty_cycle(pwm);
++	pwm_get_state(pwm, &pstate);
+ 	mutex_unlock(&export->lock);
+ 
+-	return sprintf(buf, "%u\n", duty);
++	return sprintf(buf, "%u\n", pstate.duty_cycle);
  }
  
- static const struct pwm_ops rockchip_pwm_ops_v1 = {
-+	.get_state = rockchip_pwm_get_state,
- 	.config = rockchip_pwm_config,
- 	.enable = rockchip_pwm_enable,
- 	.disable = rockchip_pwm_disable,
-@@ -178,6 +243,7 @@ static const struct pwm_ops rockchip_pwm_ops_v1 = {
- };
+ static ssize_t duty_cycle_store(struct device *child,
+@@ -97,6 +100,7 @@ static ssize_t duty_cycle_store(struct device *child,
+ {
+ 	struct pwm_export *export = child_to_pwm_export(child);
+ 	struct pwm_device *pwm = export->pwm;
++	struct pwm_state pstate;
+ 	unsigned int val;
+ 	int ret;
  
- static const struct pwm_ops rockchip_pwm_ops_v2 = {
-+	.get_state = rockchip_pwm_get_state,
- 	.config = rockchip_pwm_config,
- 	.set_polarity = rockchip_pwm_set_polarity,
- 	.enable = rockchip_pwm_enable,
-@@ -195,6 +261,7 @@ static const struct rockchip_pwm_data pwm_data_v1 = {
- 	.prescaler = 2,
- 	.ops = &rockchip_pwm_ops_v1,
- 	.set_enable = rockchip_pwm_set_enable_v1,
-+	.get_state = rockchip_pwm_get_state_v1,
- };
+@@ -105,7 +109,9 @@ static ssize_t duty_cycle_store(struct device *child,
+ 		return ret;
  
- static const struct rockchip_pwm_data pwm_data_v2 = {
-@@ -207,6 +274,7 @@ static const struct rockchip_pwm_data pwm_data_v2 = {
- 	.prescaler = 1,
- 	.ops = &rockchip_pwm_ops_v2,
- 	.set_enable = rockchip_pwm_set_enable_v2,
-+	.get_state = rockchip_pwm_get_state_v2,
- };
+ 	mutex_lock(&export->lock);
+-	ret = pwm_config(pwm, val, pwm_get_period(pwm));
++	pwm_get_state(pwm, &pstate);
++	pstate.duty_cycle = val;
++	ret = pwm_apply_state(pwm, &pstate);
+ 	mutex_unlock(&export->lock);
  
- static const struct rockchip_pwm_data pwm_data_vop = {
-@@ -219,6 +287,7 @@ static const struct rockchip_pwm_data pwm_data_vop = {
- 	.prescaler = 1,
- 	.ops = &rockchip_pwm_ops_v2,
- 	.set_enable = rockchip_pwm_set_enable_v2,
-+	.get_state = rockchip_pwm_get_state_v2,
- };
+ 	return ret ? : size;
+@@ -117,13 +123,13 @@ static ssize_t enable_show(struct device *child,
+ {
+ 	struct pwm_export *export = child_to_pwm_export(child);
+ 	const struct pwm_device *pwm = export->pwm;
+-	bool enabled;
++	struct pwm_state pstate;
  
- static const struct of_device_id rockchip_pwm_dt_ids[] = {
+ 	mutex_lock(&export->lock);
+-	enabled = pwm_is_enabled(pwm);
++	pwm_get_state(pwm, &pstate);
+ 	mutex_unlock(&export->lock);
+ 
+-	return sprintf(buf, "%d\n", enabled);
++	return sprintf(buf, "%d\n", pstate.enabled);
+ }
+ 
+ static ssize_t enable_store(struct device *child,
+@@ -132,24 +138,20 @@ static ssize_t enable_store(struct device *child,
+ {
+ 	struct pwm_export *export = child_to_pwm_export(child);
+ 	struct pwm_device *pwm = export->pwm;
++	struct pwm_state pstate;
+ 	int val, ret;
+ 
+ 	ret = kstrtoint(buf, 0, &val);
+ 	if (ret)
+ 		return ret;
+ 
++	if (val != 0 && val != 1)
++		return -EINVAL;
++
+ 	mutex_lock(&export->lock);
+-	switch (val) {
+-	case 0:
+-		pwm_disable(pwm);
+-		break;
+-	case 1:
+-		ret = pwm_enable(pwm);
+-		break;
+-	default:
+-		ret = -EINVAL;
+-		break;
+-	}
++	pwm_get_state(pwm, &pstate);
++	pstate.enabled = val;
++	ret = pwm_apply_state(pwm, &pstate);
+ 	mutex_unlock(&export->lock);
+ 
+ 	return ret ? : size;
+@@ -162,9 +164,13 @@ static ssize_t polarity_show(struct device *child,
+ 	struct pwm_export *export = child_to_pwm_export(child);
+ 	const struct pwm_device *pwm = export->pwm;
+ 	const char *polarity = "unknown";
++	struct pwm_state pstate;
+ 
+ 	mutex_lock(&export->lock);
+-	switch (pwm_get_polarity(pwm)) {
++	pwm_get_state(pwm, &pstate);
++	mutex_unlock(&export->lock);
++
++	switch (pstate.polarity) {
+ 	case PWM_POLARITY_NORMAL:
+ 		polarity = "normal";
+ 		break;
+@@ -173,7 +179,6 @@ static ssize_t polarity_show(struct device *child,
+ 		polarity = "inversed";
+ 		break;
+ 	}
+-	mutex_unlock(&export->lock);
+ 
+ 	return sprintf(buf, "%s\n", polarity);
+ }
+@@ -185,6 +190,7 @@ static ssize_t polarity_store(struct device *child,
+ 	struct pwm_export *export = child_to_pwm_export(child);
+ 	struct pwm_device *pwm = export->pwm;
+ 	enum pwm_polarity polarity;
++	struct pwm_state pstate;
+ 	int ret;
+ 
+ 	if (sysfs_streq(buf, "normal"))
+@@ -195,7 +201,12 @@ static ssize_t polarity_store(struct device *child,
+ 		return -EINVAL;
+ 
+ 	mutex_lock(&export->lock);
+-	ret = pwm_set_polarity(pwm, polarity);
++	pwm_get_state(pwm, &pstate);
++	pstate.polarity = polarity;
++	if (pstate.enabled)
++		ret = -EBUSY;
++	else
++		ret = pwm_apply_state(pwm, &pstate);
+ 	mutex_unlock(&export->lock);
+ 
+ 	return ret ? : size;
 -- 
 2.5.0
