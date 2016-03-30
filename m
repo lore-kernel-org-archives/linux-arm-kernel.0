@@ -1,24 +1,67 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 30 Mar 2016 10:02:02 +0200
-Subject: [PATCH v2] ARM: cpuidle: make arm_cpuidle_suspend() a bit more
- efficient
-In-Reply-To: <1459324077-7116-1-git-send-email-jszhang@marvell.com>
-References: <1459324077-7116-1-git-send-email-jszhang@marvell.com>
-Message-ID: <56FB87FA.50405@linaro.org>
+From: peter.chen@nxp.com (Peter Chen)
+Date: Wed, 30 Mar 2016 08:07:13 +0000
+Subject: [RFC PATCH 0/4] Implement USB device/host switch for Vybrid
+In-Reply-To: <20160330063246.GA16028@Sanchayan-Arch.toradex.int>
+References: <cover.1458030082.git.maitysanchayan@gmail.com>
+ <20160325074051.GB22398@peterchendt>
+ <3c2e72efc8cae93ff31be1b44f9a02b3@agner.ch>
+ <HE1PR04MB1450691A838973845B7AD16F8B870@HE1PR04MB1450.eurprd04.prod.outlook.com>
+ <20160330063246.GA16028@Sanchayan-Arch.toradex.int>
+Message-ID: <HE1PR04MB1450A32BDE5CA5C06124561A8B980@HE1PR04MB1450.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/30/2016 09:47 AM, Jisheng Zhang wrote:
-> Currently, we check cpuidle_ops.suspend every time when entering a
-> low-power idle state. But this check could be avoided in this hot path
-> by moving it into arm_cpuidle_read_ops() to reduce arm_cpuidle_suspend
-> overhead a bit.
+ 
+> 
+> On 16-03-29 00:24:46, Peter Chen wrote:
+> >
+> > >
+> > > On 2016-03-25 00:40, Peter Chen wrote:
+> > > > On Tue, Mar 15, 2016 at 02:08:26PM +0530, Sanchayan Maity wrote:
+> > > >> Hello Peter,
+> > > >>
+> > > >> The existing usage of extcon in Chipidea driver relies on OTG
+> > > >> registers. In case of SoC with dual role device but not a true
+> > > >> OTG controller, this does not work. Such SoC's should specify the
+> > > >> existing CI_HDRC_DUAL_ROLE_NOT_OTG flag and do the role switch
+> > > >> without checking any of the OTG registers in my opinion.
+> > > >> This is the case for Vybrid which uses a Chipidea IP but does not
+> > > >> have a true 5 pin OTG implemented.
+> > > >
+> > > > Sorry to reply you late due to my new born baby.
+> > > >
+> > > > Are you sure Vybrid is NOT OTG core? Afaik, it is uses the same IP
+> > > > base with other Freescale SoCs, just the IP core is 2.40a.
+> > > > When working at device mode, can you read vbus status through OTGSC?
+> > > > And if there is an ID pin (input pin) for Vybrid? I mean SoC, not
+> > > > the board.
+> > >
+> > > I think the IP is actually OTG capable, the registers are there, but
+> > > the signals seem not to be available on the SoC package. That is also what
+> the RM says...
+> > >
+> > > Quotes from the RM:
+> > >
+> > > "OTG controller should be treated as Dual role controller that
+> > > allows the controller to act as either a Host or a device with no
+> > > support for HNP/SRP."
+> > >
+> > > And later, in Chapter 11.1:
+> > >
+> > > "The USB is not a true OTG. It can be configured by software to
+> > > function either as peripheral or as host. The ID pin, which is
+> > > unique for OTG operation, is not present in this implementation.
+> > > There are no five pin interface. The user will get four pin host/ device
+> interface."
+> > >
+> >
+> > Get it, thanks. I am doing a patch for covering this case and vbus always-on
+> case.
+> 
+> If I may ask at this point, how would your implementation be covering this case
+> for Vybrid?
+> 
 
-This patch makes sense but the ARM64 part is missing.
+Yes, if the vbus and id status are from the extcon, it will not read register OTGSC.
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Peter
