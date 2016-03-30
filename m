@@ -1,87 +1,89 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 30 Mar 2016 22:03:59 +0200
-Subject: [PATCH v5 36/46] input: misc: max77693: switch to the atomic API
+Date: Wed, 30 Mar 2016 22:03:50 +0200
+Subject: [PATCH v5 27/46] regulator: pwm: adjust PWM config at probe time
 In-Reply-To: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1459368249-13241-37-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1459368249-13241-28-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pwm_config/enable/disable() have been deprecated and should be replaced
-by pwm_apply_state().
+The PWM attached to a PWM regulator device might have been previously
+configured by the bootloader.
+Make sure the bootloader and linux config are in sync, and adjust the PWM
+config if that's not the case.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/input/misc/max77693-haptic.c | 23 +++++++++++++++++------
- 1 file changed, 17 insertions(+), 6 deletions(-)
+ drivers/regulator/pwm-regulator.c | 50 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 50 insertions(+)
 
-diff --git a/drivers/input/misc/max77693-haptic.c b/drivers/input/misc/max77693-haptic.c
-index cf6aac0..aef7dc4 100644
---- a/drivers/input/misc/max77693-haptic.c
-+++ b/drivers/input/misc/max77693-haptic.c
-@@ -70,13 +70,16 @@ struct max77693_haptic {
- 
- static int max77693_haptic_set_duty_cycle(struct max77693_haptic *haptic)
- {
-+	struct pwm_state pstate;
- 	struct pwm_args pargs = { };
--	int delta;
- 	int error;
- 
- 	pwm_get_args(haptic->pwm_dev, &pargs);
--	delta = (pargs.period + haptic->pwm_duty) / 2;
--	error = pwm_config(haptic->pwm_dev, delta, pargs.period);
-+	pwm_get_state(haptic->pwm_dev, &pstate);
-+
-+	pstate.period = pargs.period;
-+	pstate.duty_cycle = (pargs.period + haptic->pwm_duty) / 2;
-+	error = pwm_apply_state(haptic->pwm_dev, &pstate);
- 	if (error) {
- 		dev_err(haptic->dev, "failed to configure pwm: %d\n", error);
- 		return error;
-@@ -161,12 +164,16 @@ static int max77693_haptic_lowsys(struct max77693_haptic *haptic, bool enable)
- 
- static void max77693_haptic_enable(struct max77693_haptic *haptic)
- {
-+	struct pwm_state pstate;
- 	int error;
- 
- 	if (haptic->enabled)
- 		return;
- 
--	error = pwm_enable(haptic->pwm_dev);
-+	pwm_get_state(haptic->pwm_dev, &pstate);
-+	pstate.enabled = true;
-+
-+	error = pwm_apply_state(haptic->pwm_dev, &pstate);
- 	if (error) {
- 		dev_err(haptic->dev,
- 			"failed to enable haptic pwm device: %d\n", error);
-@@ -188,11 +195,13 @@ static void max77693_haptic_enable(struct max77693_haptic *haptic)
- err_enable_config:
- 	max77693_haptic_lowsys(haptic, false);
- err_enable_lowsys:
--	pwm_disable(haptic->pwm_dev);
-+	pstate.enabled = false;
-+	pwm_apply_state(haptic->pwm_dev, &pstate);
+diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
+index 9154c47..9590fb0 100644
+--- a/drivers/regulator/pwm-regulator.c
++++ b/drivers/regulator/pwm-regulator.c
+@@ -240,6 +240,52 @@ static int pwm_regulator_init_continuous(struct platform_device *pdev,
+ 	return 0;
  }
  
- static void max77693_haptic_disable(struct max77693_haptic *haptic)
++static int pwm_regulator_adjust_pwm_config(struct pwm_regulator_data *drvdata)
++{
++	struct pwm_state pstate = { };
++	struct pwm_args pargs = { };
++
++	pwm_get_args(drvdata->pwm, &pargs);
++	pwm_get_state(drvdata->pwm, &pstate);
++
++	/*
++	 * if the current period is zero this either means the PWM driver
++	 * does not support initial state retrieval or the PWM was not
++	 * configured.
++	 * In any case, we setup the new period and poloarity, and assign a
++	 * duty_cycle of 0.
++	 */
++	if (!pstate.period) {
++		pstate.duty_cycle = 0;
++		pstate.period = pargs.period;
++		pstate.polarity = pargs.polarity;
++
++		return pwm_apply_state(drvdata->pwm, &pstate);
++	}
++
++	/*
++	 * Adjust the PWM dutycycle/period based on the period value provided
++	 * in PWM args.
++	 */
++	if (pargs.period != pstate.period) {
++		u64 dutycycle = (u64)pstate.duty_cycle * pargs.period;
++
++		do_div(dutycycle, pstate.period);
++		pstate.duty_cycle = dutycycle;
++		pstate.period = pargs.period;
++	}
++
++	/*
++	 * If the polarity changed, we should also change the dutycycle value.
++	 */
++	if (pargs.polarity != pstate.polarity) {
++		pstate.polarity = pargs.polarity;
++		pstate.duty_cycle = pstate.period - pstate.duty_cycle;
++	}
++
++	return pwm_apply_state(drvdata->pwm, &pstate);
++}
++
+ static int pwm_regulator_probe(struct platform_device *pdev)
  {
-+	struct pwm_state pstate;
- 	int error;
+ 	const struct regulator_init_data *init_data;
+@@ -283,6 +329,10 @@ static int pwm_regulator_probe(struct platform_device *pdev)
+ 		return PTR_ERR(drvdata->pwm);
+ 	}
  
- 	if (!haptic->enabled)
-@@ -206,7 +215,9 @@ static void max77693_haptic_disable(struct max77693_haptic *haptic)
- 	if (error)
- 		goto err_disable_lowsys;
- 
--	pwm_disable(haptic->pwm_dev);
-+	pwm_get_state(haptic->pwm_dev, &pstate);
-+	pstate.enabled = false;
-+	pwm_apply_state(haptic->pwm_dev, &pstate);
- 	haptic->enabled = false;
- 
- 	return;
++	ret = pwm_regulator_adjust_pwm_config(drvdata);
++	if (ret)
++		return ret;
++
+ 	regulator = devm_regulator_register(&pdev->dev,
+ 					    &drvdata->desc, &config);
+ 	if (IS_ERR(regulator)) {
 -- 
 2.5.0
