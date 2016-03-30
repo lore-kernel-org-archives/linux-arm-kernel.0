@@ -1,95 +1,56 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Wed, 30 Mar 2016 22:45:06 +0200
-Subject: [PATCH 2/7] ARM: dts: skeleton: add unit name to memory node
-In-Reply-To: <20160330170645.GA13690@leverpostej>
-References: <1459290646-3592-1-git-send-email-manabian@gmail.com>
- <1459290646-3592-3-git-send-email-manabian@gmail.com>
- <20160330110611.GB25354@leverpostej> <56FBCF70.80006@mentor.com>
- <20160330134155.GC25354@leverpostej>
- <CAGhQ9VykiwMWaw3xcJdg2CahNFt+sp7tFC5O8VwA=-_=UoJ8kA@mail.gmail.com>
- <20160330170645.GA13690@leverpostej>
-Message-ID: <CAGhQ9Vykn=G+cmVuBCAA_ATTz4XNEPeUWYbZRb5NsrVBOjaS-A@mail.gmail.com>
+From: emilio@elopez.com.ar (=?UTF-8?Q?Emilio_L=c3=b3pez?=)
+Date: Wed, 30 Mar 2016 17:49:47 -0300
+Subject: [PATCH] clk: sunxi: Accept a greater rate when setting a parent
+ clock
+In-Reply-To: <20160321092549.4e6245e4f02839e29aeb86a9@free.fr>
+References: <20160310081658.B749246B@mail.free-electrons.com>
+ <20160321072546.GT30977@lukather>
+ <20160321092549.4e6245e4f02839e29aeb86a9@free.fr>
+Message-ID: <56FC3BEB.8030106@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 March 2016 at 19:06, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Wed, Mar 30, 2016 at 06:15:35PM +0200, Joachim Eastwood wrote:
->> Hi Mark,
+[Sorry for the delay, I meant to reply to this post a while back but I
+forgot]
+
+El 21/03/16 a las 05:25, Jean-Francois Moine escribi?:
+> On Mon, 21 Mar 2016 08:25:46 +0100
+> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> 
+>>> -	/* find the parent that can help provide the fastest rate <= rate */
+>>> +	/* find the parent that can help provide the fastest rate */
+>>>  	num_parents = clk_hw_get_num_parents(hw);
+>>>  	for (i = 0; i < num_parents; i++) {
+>>>  		parent = clk_hw_get_parent_by_index(hw, i);
+>>> @@ -100,7 +100,7 @@ static int clk_factors_determine_rate(struct clk_hw *hw,
+>>>  		child_rate = clk_factors_round_rate(hw, req->rate,
+>>>  						    &parent_rate);
+>>>  
+>>> -		if (child_rate <= req->rate && child_rate > best_child_rate) {
+>>> +		if (child_rate > best_child_rate) {
 >>
->> On 30 March 2016 at 15:41, Mark Rutland <mark.rutland@arm.com> wrote:
->> > On Wed, Mar 30, 2016 at 04:06:56PM +0300, Vladimir Zapolskiy wrote:
->> >> On 30.03.2016 14:06, Mark Rutland wrote:
->> >> > On Wed, Mar 30, 2016 at 12:30:41AM +0200, Joachim Eastwood wrote:
->> >> >> Add unit name to memory to remove the following warning:
->> >> >>  Warning (unit_address_vs_reg): Node /memory has a reg or ranges
->> >> >>                            property, but no unit name
->> >> >
->> >> > If anything, it would be better to get rid of the memory node from the
->> >> > skeleton DTs.
->> >> >
->> >> > For DTs which have a memory node there's no problem, and DTs which
->> >> > expect a bootlaoder to fill things in have a logical place to document
->> >> > that fact.
->> >
->> >> The only problem I see if DTB is updated on a board but a board bootloader
->> >> on fix-up is capable to fill a preexisting "/memory" device node in only,
->> >> otherwise it is not clear why the device node is present in skeleton.dtsi.
->> >
->> > Sure. To clarify the above, what I expect that for this case is that the
->> > empty memory node would exist in the dts for that particular board,
->> > along with a comment, e.g.
->> >
->> >         /* The firmware/bootloader for $BOARD fills this in */
->> >         memory {
->> >                 device_type = "memory";
->> >                 reg = <0 0 0 0>;
->> >         };
+>> I'm not sure this would work, since you'll end up picking the fastest
+>> rate without considering whether it is the closest or not.
 >>
->> To avoid the warning with the new dtc this would need to be memory at 0.
->
-> Hmm... That's a little sub-optimal in the case that a bootloader is
-> patching this. Presumably a bootloader that needs an existing node won't
-> patch the unit-address to match the reg (which might not start at 0).
->
-> I'd rather not have the unit-address than have an incorrect
-> unit-address, though I guess we don't have much of a choice here, unless
-> there's some override we can place in the dts.
->
->> > That way you can tell at a glance that the lack of memory information in
->> > the DT for a board is intentional, and the bootloader still gets the
->> > node it expects.
+>> I guess what you want here is using the absolute difference between
+>> the requested rate and the rate you're evaluating.
 >>
->> But this doesn't seem to be a "problem" with any of the DTs in
->> arch/arm/boot as they all defined a memory node.
->>
->> I used the following script to check for the memory node in all built dtb's.
->>   make ARCH=arm CONFIG_OF_ALL_DTBS=y dtbs
->>   for i in $(ls arch/arm/boot/dts/*.dtb); do
->>          m=$(scripts/dtc/dtc -I dtb -O dts $i | grep -m1 'memory.*{')
->>          if [ -z "$m" ]; then
->>                  echo "Missing memory node in $i"
->>           fi
->>   done
->>
->> So it should be pretty safe to just remove the memory node entry in
->> the skeleton files. Unless I have missed something with the script
->> above.
->
-> The above might match reserved-memory nodes; it might be better to check
-> for 'device_type\s*=\s*"memory"'.
+>> That being said, we had a similar discussion for SPI around a month
+>> ago where we wanted a rate strictly lower than the requested one. I
+>> guess it's time to add a flag to tell how you want to round.
+> 
+> You are right, I just removed half of the constraint, but I still wonder
+> why does this sequence introduced by the commit 862b728387aef3a37
+> (clk: sunxi: factors: automatic reparenting support) do
+> 	"provide the fastest rate <= rate"
+> instead of
+> 	"provide the closest rate" ?
+> 
+> Emilio?
 
-I did check the output of the grep and it looks good. But there are
-indeed DTs that are missing the 'device_type = "memory"' parameter.
-Actually; _a lot_ or 438 of 741 to be exact. ugh...
+Overclocking components is usually not a good default in my opinion. I
+don't recall at the moment if there was some other justification apart
+from playing it safe.
 
-I guess all those should be fixed up before we can remove the memory
-node from skeleton. :/
-
-
-> I assume that was run after deleting the memory node from the skeletons?
-
-Yes :)
-
-
-regards,
-Joachim Eastwood
+Cheers,
+Emilio
