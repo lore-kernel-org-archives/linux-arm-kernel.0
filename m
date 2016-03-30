@@ -1,103 +1,48 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Wed, 30 Mar 2016 12:22:49 +0100
-Subject: [PATCH v7 03/17] Xen: xlate: Use page_to_xen_pfn instead of
- page_to_pfn
-In-Reply-To: <56FB8258.7030303@huawei.com>
-References: <1458830676-27075-1-git-send-email-shannon.zhao@linaro.org>
- <1458830676-27075-4-git-send-email-shannon.zhao@linaro.org>
- <56FAAD48.2010401@arm.com> <56FB8258.7030303@huawei.com>
-Message-ID: <56FBB709.5050802@arm.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Wed, 30 Mar 2016 13:42:44 +0200
+Subject: [PATCH 1/5] arm/defconfigs: Remove CONFIG_IPV6_PRIVACY
+In-Reply-To: <1459338168-29334-1-git-send-email-bp@alien8.de>
+References: <1459338168-29334-1-git-send-email-bp@alien8.de>
+Message-ID: <1459338168-29334-2-git-send-email-bp@alien8.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shannon,
+From: Borislav Petkov <bp@suse.de>
 
-On 30/03/16 08:38, Shannon Zhao wrote:
->
->
-> On 2016/3/30 0:28, Julien Grall wrote:
->> On 24/03/16 14:44, Shannon Zhao wrote:
->>> Make xen_xlate_map_ballooned_pages work with 64K pages. In that case
->>> Kernel pages are 64K in size but Xen pages remain 4K in size. Xen pfns
->>> refer to 4K pages.
->>>
->>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->>> Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
->>> ---
->>>    drivers/xen/xlate_mmu.c | 26 ++++++++++++++++----------
->>>    1 file changed, 16 insertions(+), 10 deletions(-)
->>>
->>> diff --git a/drivers/xen/xlate_mmu.c b/drivers/xen/xlate_mmu.c
->>> index 9692656..28f728b 100644
->>> --- a/drivers/xen/xlate_mmu.c
->>> +++ b/drivers/xen/xlate_mmu.c
->>> @@ -207,9 +207,12 @@ int __init
->>> xen_xlate_map_ballooned_pages(xen_pfn_t **gfns, void **virt,
->>>        void *vaddr;
->>>        int rc;
->>>        unsigned int i;
->>> +    unsigned long nr_pages;
->>> +    xen_pfn_t xen_pfn = 0;
->>>
->>>        BUG_ON(nr_grant_frames == 0);
->>> -    pages = kcalloc(nr_grant_frames, sizeof(pages[0]), GFP_KERNEL);
->>> +    nr_pages = DIV_ROUND_UP(nr_grant_frames, XEN_PFN_PER_PAGE);
->>> +    pages = kcalloc(nr_pages, sizeof(pages[0]), GFP_KERNEL);
->>>        if (!pages)
->>>            return -ENOMEM;
->>>
->>> @@ -218,22 +221,25 @@ int __init
->>> xen_xlate_map_ballooned_pages(xen_pfn_t **gfns, void **virt,
->>>            kfree(pages);
->>>            return -ENOMEM;
->>>        }
->>> -    rc = alloc_xenballooned_pages(nr_grant_frames, pages);
->>> +    rc = alloc_xenballooned_pages(nr_pages, pages);
->>>        if (rc) {
->>> -        pr_warn("%s Couldn't balloon alloc %ld pfns rc:%d\n", __func__,
->>> -            nr_grant_frames, rc);
->>> +        pr_warn("%s Couldn't balloon alloc %ld pages rc:%d\n", __func__,
->>> +            nr_pages, rc);
->>>            kfree(pages);
->>>            kfree(pfns);
->>>            return rc;
->>>        }
->>> -    for (i = 0; i < nr_grant_frames; i++)
->>> -        pfns[i] = page_to_pfn(pages[i]);
->>> +    for (i = 0; i < nr_grant_frames; i++) {
->>> +        if ((i % XEN_PFN_PER_PAGE) == 0)
->>> +            xen_pfn = page_to_xen_pfn(pages[i / XEN_PFN_PER_PAGE]);
->>> +        pfns[i] = pfn_to_gfn(xen_pfn++);
->>> +    }
->>
->> Would it be possible to re-use xen_for_each_gfn? This will avoid
->> open-coding the loop to break down the Linux page.
-> I don't think so. Using xen_acpi_guest_init will require factoring
-> "pfns[i] = pfn_to_gfn(xen_pfn++)" to a function with parameter pfns[i].
-> How can we pass pfns[i]?
+Option is long gone, see
 
-By using the variable data. Something along those lines:
+  5d9efa7ee99e ("ipv6: Remove privacy config option.")
 
-struct map_balloon_pages
-{
-       xen_pfn_t *pfns;
-       unsigned int idx;
-};
+Signed-off-by: Borislav Petkov <bp@suse.de>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/configs/lpc32xx_defconfig | 1 -
+ arch/arm/configs/s3c2410_defconfig | 1 -
+ 2 files changed, 2 deletions(-)
 
-static void setup_balloon_gfn(unsigned long gfn, void *data)
-{
-       struct map_balloon_pages *info = data;
-
-
-       data->pfns[data->idx] = gfn;
-       data->idx++;
-}
-
-And then in xen_xlate_map_ballooned_pages
-
-xen_for_each_gfn(pages, nr_grant_frames, setup_balloon_gfn, &data);
-
-Regards,
-
+diff --git a/arch/arm/configs/lpc32xx_defconfig b/arch/arm/configs/lpc32xx_defconfig
+index 9f56ca3985ae..d1da7de9613c 100644
+--- a/arch/arm/configs/lpc32xx_defconfig
++++ b/arch/arm/configs/lpc32xx_defconfig
+@@ -45,7 +45,6 @@ CONFIG_IP_PNP_BOOTP=y
+ # CONFIG_INET_LRO is not set
+ # CONFIG_INET_DIAG is not set
+ CONFIG_IPV6=y
+-CONFIG_IPV6_PRIVACY=y
+ # CONFIG_WIRELESS is not set
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_DEVTMPFS=y
+diff --git a/arch/arm/configs/s3c2410_defconfig b/arch/arm/configs/s3c2410_defconfig
+index b3ade552a2a5..bc4bfe02e611 100644
+--- a/arch/arm/configs/s3c2410_defconfig
++++ b/arch/arm/configs/s3c2410_defconfig
+@@ -76,7 +76,6 @@ CONFIG_TCP_CONG_LP=m
+ CONFIG_TCP_CONG_VENO=m
+ CONFIG_TCP_CONG_YEAH=m
+ CONFIG_TCP_CONG_ILLINOIS=m
+-CONFIG_IPV6_PRIVACY=y
+ CONFIG_IPV6_ROUTER_PREF=y
+ CONFIG_INET6_AH=m
+ CONFIG_INET6_ESP=m
 -- 
-Julien Grall
+2.7.3
