@@ -1,48 +1,84 @@
 From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
-Date: Wed, 30 Mar 2016 10:27:45 -0500
-Subject: [PATCH 4/7] Documentation: dt: socfpga: Add Altera Arria10 OCRAM
- binding
+Date: Wed, 30 Mar 2016 10:27:44 -0500
+Subject: [PATCH 3/7] EDAC, altera: Make OCRAM ECC dependency check generic
 In-Reply-To: <1459351668-14622-1-git-send-email-tthayer@opensource.altera.com>
 References: <1459351668-14622-1-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <1459351668-14622-5-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <1459351668-14622-4-git-send-email-tthayer@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thor Thayer <tthayer@opensource.altera.com>
 
-Add the device tree bindings needed to support the Altera On-Chip
-RAM ECC on the Arria10 chip.
+In preparation for the Arria10 peripheral ECCs, the OCRAM
+ECC dependency check was moved into the general ECC area
+since this same function can be used by other memories.
 
 Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
 ---
- .../bindings/arm/altera/socfpga-eccmgr.txt         |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/edac/altera_edac.c |   43 +++++++++++++++++++++----------------------
+ 1 file changed, 21 insertions(+), 22 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
-index 37ff9bf..2f409d5 100644
---- a/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
-+++ b/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
-@@ -71,6 +71,11 @@ Required Properties:
- - compatible : Should be "altr,socfpga-a10-l2-ecc"
- - reg : Address and size for ECC error interrupt clear registers.
+diff --git a/drivers/edac/altera_edac.c b/drivers/edac/altera_edac.c
+index f0a6de7..f7ffc77 100644
+--- a/drivers/edac/altera_edac.c
++++ b/drivers/edac/altera_edac.c
+@@ -648,6 +648,26 @@ static ssize_t altr_edac_device_trig(struct file *file,
+ 	return count;
+ }
  
-+On-Chip RAM ECC
-+Required Properties:
-+- compatible : Should be "altr,socfpga-a10-ocram-ecc"
-+- reg : Address and size for ECC block registers.
++/*
++ *  Test for memory's ECC dependencies upon entry because platform specific
++ *  startup should have initialized the memory and enabled the ECC.
++ *  Can't turn on ECC here because accessing un-initialized memory will
++ *  cause CE/UE errors possibly causing an ABORT.
++ */
++static int altr_check_ecc_deps(struct altr_edac_device_dev *device)
++{
++	void __iomem  *base = device->base;
++	const struct edac_device_prv_data *prv = device->data;
 +
- Example:
++	if (readl(base + prv->ecc_en_ofst) & prv->ecc_enable_mask)
++		return 0;
++
++	edac_printk(KERN_ERR, EDAC_DEVICE,
++		    "%s: No ECC present or ECC disabled.\n",
++		    device->edac_dev_name);
++	return -ENODEV;
++}
++
+ static const struct file_operations altr_edac_device_inject_fops = {
+ 	.open = simple_open,
+ 	.write = altr_edac_device_trig,
+@@ -853,29 +873,8 @@ static void ocram_free_mem(void *p, size_t size, void *other)
+ 	gen_pool_free((struct gen_pool *)other, (u32)p, size);
+ }
  
- 	eccmgr: eccmgr at ffd06000 {
-@@ -86,4 +91,9 @@ Example:
- 			compatible = "altr,socfpga-a10-l2-ecc";
- 			reg = <0xffd06010 0x4>;
- 		};
-+
-+		ocram-ecc at ff8c3000 {
-+			compatible = "altr,socfpga-a10-ocram-ecc";
-+			reg = <0xff8c3000 0x90>;
-+		};
- 	};
+-/*
+- * altr_ocram_check_deps()
+- *	Test for OCRAM cache ECC dependencies upon entry because
+- *	platform specific startup should have initialized the
+- *	On-Chip RAM memory and enabled the ECC.
+- *	Can't turn on ECC here because accessing un-initialized
+- *	memory will cause CE/UE errors possibly causing an ABORT.
+- */
+-static int altr_ocram_check_deps(struct altr_edac_device_dev *device)
+-{
+-	void __iomem  *base = device->base;
+-	const struct edac_device_prv_data *prv = device->data;
+-
+-	if (readl(base + prv->ecc_en_ofst) & prv->ecc_enable_mask)
+-		return 0;
+-
+-	edac_printk(KERN_ERR, EDAC_DEVICE,
+-		    "OCRAM: No ECC present or ECC disabled.\n");
+-	return -ENODEV;
+-}
+-
+ const struct edac_device_prv_data ocramecc_data = {
+-	.setup = altr_ocram_check_deps,
++	.setup = altr_check_ecc_deps,
+ 	.ce_clear_mask = (ALTR_OCR_ECC_EN | ALTR_OCR_ECC_SERR),
+ 	.ue_clear_mask = (ALTR_OCR_ECC_EN | ALTR_OCR_ECC_DERR),
+ 	.dbgfs_name = "altr_ocram_trigger",
 -- 
 1.7.9.5
