@@ -1,48 +1,34 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 30 Mar 2016 16:46:01 +0200
-Subject: [PATCH v2 6/9] arm64: mm: restrict virt_to_page() to the linear
- mapping
+Date: Wed, 30 Mar 2016 16:46:03 +0200
+Subject: [PATCH v2 8/9] openrisc: drop wrongly typed definition of
+ page_to_virt()
 In-Reply-To: <1459349164-27175-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1459349164-27175-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1459349164-27175-7-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1459349164-27175-9-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the vmemmap region has been redefined to cover the linear region
-rather than the entire physical address space, we no longer need to
-perform a virtual-to-physical translation in the implementaion of
-virt_to_page(). This restricts virt_to_page() translations to the linear
-region, so redefine virt_addr_valid() as well.
+To align with generic code and other architectures that expect the macro
+page_to_virt to produce an expression whose type is 'void*', drop the
+arch specific definition, which is never referenced anyway.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/include/asm/memory.h | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+ arch/openrisc/include/asm/page.h | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index 8a2ab195ca77..f412f502ccdd 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -208,9 +208,19 @@ static inline void *phys_to_virt(phys_addr_t x)
-  */
- #define ARCH_PFN_OFFSET		((unsigned long)PHYS_PFN_OFFSET)
+diff --git a/arch/openrisc/include/asm/page.h b/arch/openrisc/include/asm/page.h
+index e613d3673034..35bcb7cd2cde 100644
+--- a/arch/openrisc/include/asm/page.h
++++ b/arch/openrisc/include/asm/page.h
+@@ -81,8 +81,6 @@ typedef struct page *pgtable_t;
  
-+#ifndef CONFIG_SPARSEMEM_VMEMMAP
- #define virt_to_page(kaddr)	pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
--#define	virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
-+#define virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
-+#else
-+#define __virt_to_pgoff(kaddr)	(((u64)(kaddr) & ~PAGE_OFFSET) / PAGE_SIZE * sizeof(struct page))
-+#define __page_to_voff(kaddr)	(((u64)(page) & ~VMEMMAP_START) * PAGE_SIZE / sizeof(struct page))
-+
-+#define page_to_virt(page)	((void *)((__page_to_voff(page)) | PAGE_OFFSET))
-+#define virt_to_page(vaddr)	((struct page *)((__virt_to_pgoff(vaddr)) | VMEMMAP_START))
+ #define virt_to_page(addr) \
+ 	(mem_map + (((unsigned long)(addr)-PAGE_OFFSET) >> PAGE_SHIFT))
+-#define page_to_virt(page) \
+-	((((page) - mem_map) << PAGE_SHIFT) + PAGE_OFFSET)
  
-+#define virt_addr_valid(kaddr)	pfn_valid((((u64)(kaddr) & ~PAGE_OFFSET) \
-+					   + PHYS_OFFSET) >> PAGE_SHIFT)
-+#endif
- #endif
+ #define page_to_phys(page)      ((dma_addr_t)page_to_pfn(page) << PAGE_SHIFT)
  
- #include <asm-generic/memory_model.h>
 -- 
 2.5.0
