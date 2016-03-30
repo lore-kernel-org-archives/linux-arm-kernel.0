@@ -1,70 +1,281 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 30 Mar 2016 22:03:34 +0200
-Subject: [PATCH v5 11/46] regulator: pwm: use pwm_get_args() where appropriate
+Date: Wed, 30 Mar 2016 22:03:27 +0200
+Subject: [PATCH v5 04/46] pwm: get rid of pwm->lock
 In-Reply-To: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1459368249-13241-12-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1459368249-13241-5-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PWM framework has clarified the concept of reference PWM config
-(the platform dependent config retrieved from the DT or the PWM
-lookup table) and real PWM state.
+PWM devices are not protected against concurrent accesses. The lock in
+pwm_device might let PWM users think it is, but it's actually only
+protecting the enabled state.
 
-Use pwm_get_args() when the PWM user wants to retrieve this reference
-config and not the current state.
-
-This is part of the rework allowing the PWM framework to support
-hardware readout and expose real PWM state even when the PWM has
-just been requested (before the user calls pwm_config/enable/disable()).
+Removing this lock should be fine as long as all PWM users are aware that
+accesses to the PWM device have to be serialized, which seems to be the
+case for all of them except the sysfs interface.
+Patch the sysfs code by adding a lock to the pwm_export struct and making
+sure it's taken for all accesses to the exported PWM device.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/regulator/pwm-regulator.c | 14 ++++++++------
- 1 file changed, 8 insertions(+), 6 deletions(-)
+ drivers/pwm/core.c  | 19 ++++--------------
+ drivers/pwm/sysfs.c | 57 ++++++++++++++++++++++++++++++++++++++++++-----------
+ include/linux/pwm.h |  2 --
+ 3 files changed, 50 insertions(+), 28 deletions(-)
 
-diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
-index 4689d62..9154c47 100644
---- a/drivers/regulator/pwm-regulator.c
-+++ b/drivers/regulator/pwm-regulator.c
-@@ -59,16 +59,16 @@ static int pwm_regulator_set_voltage_sel(struct regulator_dev *rdev,
- 					 unsigned selector)
+diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+index 7831bc6..7c330ff 100644
+--- a/drivers/pwm/core.c
++++ b/drivers/pwm/core.c
+@@ -269,7 +269,6 @@ int pwmchip_add_with_polarity(struct pwm_chip *chip,
+ 		pwm->pwm = chip->base + i;
+ 		pwm->hwpwm = i;
+ 		pwm->polarity = polarity;
+-		mutex_init(&pwm->lock);
+ 
+ 		radix_tree_insert(&pwm_tree, pwm->pwm, pwm);
+ 	}
+@@ -474,22 +473,16 @@ int pwm_set_polarity(struct pwm_device *pwm, enum pwm_polarity polarity)
+ 	if (!pwm->chip->ops->set_polarity)
+ 		return -ENOSYS;
+ 
+-	mutex_lock(&pwm->lock);
+-
+-	if (pwm_is_enabled(pwm)) {
+-		err = -EBUSY;
+-		goto unlock;
+-	}
++	if (pwm_is_enabled(pwm))
++		return -EBUSY;
+ 
+ 	err = pwm->chip->ops->set_polarity(pwm->chip, pwm, polarity);
+ 	if (err)
+-		goto unlock;
++		return err;
+ 
+ 	pwm->polarity = polarity;
+ 
+-unlock:
+-	mutex_unlock(&pwm->lock);
+-	return err;
++	return 0;
+ }
+ EXPORT_SYMBOL_GPL(pwm_set_polarity);
+ 
+@@ -506,16 +499,12 @@ int pwm_enable(struct pwm_device *pwm)
+ 	if (!pwm)
+ 		return -EINVAL;
+ 
+-	mutex_lock(&pwm->lock);
+-
+ 	if (!test_and_set_bit(PWMF_ENABLED, &pwm->flags)) {
+ 		err = pwm->chip->ops->enable(pwm->chip, pwm);
+ 		if (err)
+ 			clear_bit(PWMF_ENABLED, &pwm->flags);
+ 	}
+ 
+-	mutex_unlock(&pwm->lock);
+-
+ 	return err;
+ }
+ EXPORT_SYMBOL_GPL(pwm_enable);
+diff --git a/drivers/pwm/sysfs.c b/drivers/pwm/sysfs.c
+index 9c90886..ab28c89 100644
+--- a/drivers/pwm/sysfs.c
++++ b/drivers/pwm/sysfs.c
+@@ -26,6 +26,7 @@
+ struct pwm_export {
+ 	struct device child;
+ 	struct pwm_device *pwm;
++	struct mutex lock;
+ };
+ 
+ static struct pwm_export *child_to_pwm_export(struct device *child)
+@@ -44,16 +45,23 @@ static ssize_t period_show(struct device *child,
+ 			   struct device_attribute *attr,
+ 			   char *buf)
  {
- 	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
--	unsigned int pwm_reg_period;
-+	struct pwm_args pargs = { };
- 	int dutycycle;
+-	const struct pwm_device *pwm = child_to_pwm_device(child);
++	struct pwm_export *export = child_to_pwm_export(child);
++	const struct pwm_device *pwm = export->pwm;
++	unsigned int period;
++
++	mutex_lock(&export->lock);
++	period = pwm_get_period(pwm);
++	mutex_unlock(&export->lock);
+ 
+-	return sprintf(buf, "%u\n", pwm_get_period(pwm));
++	return sprintf(buf, "%u\n", period);
+ }
+ 
+ static ssize_t period_store(struct device *child,
+ 			    struct device_attribute *attr,
+ 			    const char *buf, size_t size)
+ {
+-	struct pwm_device *pwm = child_to_pwm_device(child);
++	struct pwm_export *export = child_to_pwm_export(child);
++	struct pwm_device *pwm = export->pwm;
+ 	unsigned int val;
  	int ret;
  
--	pwm_reg_period = pwm_get_period(drvdata->pwm);
-+	pwm_get_args(drvdata->pwm, &pargs);
- 
--	dutycycle = (pwm_reg_period *
-+	dutycycle = (pargs.period *
- 		    drvdata->duty_cycle_table[selector].dutycycle) / 100;
- 
--	ret = pwm_config(drvdata->pwm, dutycycle, pwm_reg_period);
-+	ret = pwm_config(drvdata->pwm, dutycycle, pargs.period);
- 	if (ret) {
- 		dev_err(&rdev->dev, "Failed to configure PWM\n");
+@@ -61,7 +69,9 @@ static ssize_t period_store(struct device *child,
+ 	if (ret)
  		return ret;
-@@ -138,13 +138,15 @@ static int pwm_regulator_set_voltage(struct regulator_dev *rdev,
+ 
++	mutex_lock(&export->lock);
+ 	ret = pwm_config(pwm, pwm_get_duty_cycle(pwm), val);
++	mutex_unlock(&export->lock);
+ 
+ 	return ret ? : size;
+ }
+@@ -70,16 +80,23 @@ static ssize_t duty_cycle_show(struct device *child,
+ 			       struct device_attribute *attr,
+ 			       char *buf)
  {
- 	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
- 	unsigned int ramp_delay = rdev->constraints->ramp_delay;
--	unsigned int period = pwm_get_period(drvdata->pwm);
-+	struct pwm_args pargs = { };
- 	int duty_cycle;
+-	const struct pwm_device *pwm = child_to_pwm_device(child);
++	struct pwm_export *export = child_to_pwm_export(child);
++	const struct pwm_device *pwm = export->pwm;
++	unsigned int duty;
++
++	mutex_lock(&export->lock);
++	duty = pwm_get_duty_cycle(pwm);
++	mutex_unlock(&export->lock);
+ 
+-	return sprintf(buf, "%u\n", pwm_get_duty_cycle(pwm));
++	return sprintf(buf, "%u\n", duty);
+ }
+ 
+ static ssize_t duty_cycle_store(struct device *child,
+ 				struct device_attribute *attr,
+ 				const char *buf, size_t size)
+ {
+-	struct pwm_device *pwm = child_to_pwm_device(child);
++	struct pwm_export *export = child_to_pwm_export(child);
++	struct pwm_device *pwm = export->pwm;
+ 	unsigned int val;
  	int ret;
  
-+	pwm_get_args(drvdata->pwm, &pargs);
- 	duty_cycle = pwm_voltage_to_duty_cycle_percentage(rdev, min_uV);
- 
--	ret = pwm_config(drvdata->pwm, (period / 100) * duty_cycle, period);
-+	ret = pwm_config(drvdata->pwm, (pargs.period / 100) * duty_cycle,
-+			 pargs.period);
- 	if (ret) {
- 		dev_err(&rdev->dev, "Failed to configure PWM\n");
+@@ -87,7 +104,9 @@ static ssize_t duty_cycle_store(struct device *child,
+ 	if (ret)
  		return ret;
+ 
++	mutex_lock(&export->lock);
+ 	ret = pwm_config(pwm, val, pwm_get_period(pwm));
++	mutex_unlock(&export->lock);
+ 
+ 	return ret ? : size;
+ }
+@@ -96,22 +115,30 @@ static ssize_t enable_show(struct device *child,
+ 			   struct device_attribute *attr,
+ 			   char *buf)
+ {
+-	const struct pwm_device *pwm = child_to_pwm_device(child);
++	struct pwm_export *export = child_to_pwm_export(child);
++	const struct pwm_device *pwm = export->pwm;
++	bool enabled;
++
++	mutex_lock(&export->lock);
++	enabled = pwm_is_enabled(pwm);
++	mutex_unlock(&export->lock);
+ 
+-	return sprintf(buf, "%d\n", pwm_is_enabled(pwm));
++	return sprintf(buf, "%d\n", enabled);
+ }
+ 
+ static ssize_t enable_store(struct device *child,
+ 			    struct device_attribute *attr,
+ 			    const char *buf, size_t size)
+ {
+-	struct pwm_device *pwm = child_to_pwm_device(child);
++	struct pwm_export *export = child_to_pwm_export(child);
++	struct pwm_device *pwm = export->pwm;
+ 	int val, ret;
+ 
+ 	ret = kstrtoint(buf, 0, &val);
+ 	if (ret)
+ 		return ret;
+ 
++	mutex_lock(&export->lock);
+ 	switch (val) {
+ 	case 0:
+ 		pwm_disable(pwm);
+@@ -123,6 +150,7 @@ static ssize_t enable_store(struct device *child,
+ 		ret = -EINVAL;
+ 		break;
+ 	}
++	mutex_unlock(&export->lock);
+ 
+ 	return ret ? : size;
+ }
+@@ -131,9 +159,11 @@ static ssize_t polarity_show(struct device *child,
+ 			     struct device_attribute *attr,
+ 			     char *buf)
+ {
+-	const struct pwm_device *pwm = child_to_pwm_device(child);
++	struct pwm_export *export = child_to_pwm_export(child);
++	const struct pwm_device *pwm = export->pwm;
+ 	const char *polarity = "unknown";
+ 
++	mutex_lock(&export->lock);
+ 	switch (pwm_get_polarity(pwm)) {
+ 	case PWM_POLARITY_NORMAL:
+ 		polarity = "normal";
+@@ -143,6 +173,7 @@ static ssize_t polarity_show(struct device *child,
+ 		polarity = "inversed";
+ 		break;
+ 	}
++	mutex_unlock(&export->lock);
+ 
+ 	return sprintf(buf, "%s\n", polarity);
+ }
+@@ -151,7 +182,8 @@ static ssize_t polarity_store(struct device *child,
+ 			      struct device_attribute *attr,
+ 			      const char *buf, size_t size)
+ {
+-	struct pwm_device *pwm = child_to_pwm_device(child);
++	struct pwm_export *export = child_to_pwm_export(child);
++	struct pwm_device *pwm = export->pwm;
+ 	enum pwm_polarity polarity;
+ 	int ret;
+ 
+@@ -162,7 +194,9 @@ static ssize_t polarity_store(struct device *child,
+ 	else
+ 		return -EINVAL;
+ 
++	mutex_lock(&export->lock);
+ 	ret = pwm_set_polarity(pwm, polarity);
++	mutex_unlock(&export->lock);
+ 
+ 	return ret ? : size;
+ }
+@@ -203,6 +237,7 @@ static int pwm_export_child(struct device *parent, struct pwm_device *pwm)
+ 	}
+ 
+ 	export->pwm = pwm;
++	mutex_init(&export->lock);
+ 
+ 	export->child.release = pwm_export_release;
+ 	export->child.parent = parent;
+diff --git a/include/linux/pwm.h b/include/linux/pwm.h
+index cfc3ed4..6555f01 100644
+--- a/include/linux/pwm.h
++++ b/include/linux/pwm.h
+@@ -88,7 +88,6 @@ enum {
+  * @pwm: global index of the PWM device
+  * @chip: PWM chip providing this PWM device
+  * @chip_data: chip-private data associated with the PWM device
+- * @lock: used to serialize accesses to the PWM device where necessary
+  * @period: period of the PWM signal (in nanoseconds)
+  * @duty_cycle: duty cycle of the PWM signal (in nanoseconds)
+  * @polarity: polarity of the PWM signal
+@@ -100,7 +99,6 @@ struct pwm_device {
+ 	unsigned int pwm;
+ 	struct pwm_chip *chip;
+ 	void *chip_data;
+-	struct mutex lock;
+ 
+ 	unsigned int period;
+ 	unsigned int duty_cycle;
 -- 
 2.5.0
