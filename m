@@ -1,25 +1,113 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 30 Mar 2016 08:51:40 -0700
-Subject: [PATCH resend v5 0/3] ASoC: cygnus: Add audio support for
- Broadcom Cygnus SoC
-In-Reply-To: <s5hpoucgerx.wl-tiwai@suse.de>
-References: <1459277192-10942-1-git-send-email-simran.rai@broadcom.com>
- <20160329190910.GF2350@sirena.org.uk>
- <56FAD579.3060703@broadcom.com>
- <20160329194629.GH2350@sirena.org.uk>
- <s5hpoucgerx.wl-tiwai@suse.de>
-Message-ID: <20160330155140.GA2350@sirena.org.uk>
+From: pmladek@suse.com (Petr Mladek)
+Date: Wed, 30 Mar 2016 17:53:25 +0200
+Subject: [PATCH v4 0/5] Cleaning printk stuff in NMI context
+Message-ID: <1459353210-20260-1-git-send-email-pmladek@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 30, 2016 at 05:35:14PM +0200, Takashi Iwai wrote:
-> 
+This patch set generalizes the already existing solution for
+printing NMI messages. The main idea comes from Peter Zijlstra.
 
-Empty mail?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160330/607c4e80/attachment.sig>
+v4 adds one more patch that flushes NNI buffers when the system
+is panicing. Otherwise, it is almost the same as the last version
+in the -mm tree, see changes below for more details
+
+There is a trivial conflict with Sergey's v8 of async printk,
+see http://thread.gmane.org/gmane.linux.kernel/2183611
+In short, we must handle console in vprintk_emit() neither in sched
+nor in nmi. Therefore we need the line
+
+	if (!in_sched && !deferred_console_in_nmi()) {
+
+
+There are move conflicts with the nmi_backtrace improvements
+from Chris Metcalf, see
+ http://marc.info/?l=linux-kernel&m=145866814901740&w=2
+Feel free to ask me to resolve them.
+
+
+Changes against v3:
+
+  + merged all small changes from -mm tree, including commit
+    descriptions
+
+  + disabled interrupts when taking the read_lock in __printk_nmi_flush();
+    printk_nmi_flush() might be called from any context; reported
+    by lockdep
+
+  + never introduce NEED_PRINTK_NMI; in -mm tree was introduced
+    in 1st patch and removed in the 4th one
+
+  + flush NMI buffers when the system goes down (new 5th patch);
+    addresses Daniel's concerns
+
+
+Changes against v2:
+
+  + fixed compilation problems reported by 0-day build robot
+
+  + MN10300 and Xtensa architectures will get handled separately
+
+  + dropped the patch that printed NMI messages directly when Oops
+    in progress; it made the solution less reliable
+
+  + made the size of the buffer configurable; use real numbers
+    instead of PAGE_SIZE
+
+
+Changes against v1:
+
+  + rebased on top of 4.4-rc2; there the old implementation was
+    moved to lib/nmi_backtrace.c and used also on arm; I hope that
+    I got the arm side correctly; I was not able to test on arm :-(
+
+  + defined HAVE_NMI on arm for !CPU_V7M instead of !CPU_V7;
+    handle_fiq_as_nmi() is called from entry-armv.S that
+    is compiled when !CPU_V7M
+
+  + defined HAVE_NMI also on mips; it calls nmi_enter() and
+    seems to have real NMIs (or am I wrong?)
+
+  + serialized backtraces when printing directly
+    (oops_in_progress)
+
+
+Petr Mladek (5):
+  printk/nmi: generic solution for safe printk in NMI
+  printk/nmi: use IRQ work only when ready
+  printk/nmi: warn when some message has been lost in NMI context
+  printk/nmi: increase the size of NMI buffer and make it configurable
+  printk/nmi: flush NMI messages on the system panic
+
+ arch/Kconfig                  |   4 +
+ arch/arm/Kconfig              |   1 +
+ arch/arm/kernel/smp.c         |   2 +
+ arch/avr32/Kconfig            |   1 +
+ arch/blackfin/Kconfig         |   1 +
+ arch/cris/Kconfig             |   1 +
+ arch/mips/Kconfig             |   1 +
+ arch/powerpc/Kconfig          |   1 +
+ arch/s390/Kconfig             |   1 +
+ arch/sh/Kconfig               |   1 +
+ arch/sparc/Kconfig            |   1 +
+ arch/tile/Kconfig             |   1 +
+ arch/x86/Kconfig              |   1 +
+ arch/x86/kernel/apic/hw_nmi.c |   1 -
+ include/linux/hardirq.h       |   2 +
+ include/linux/percpu.h        |   3 -
+ include/linux/printk.h        |  16 ++-
+ init/Kconfig                  |  27 +++++
+ init/main.c                   |   1 +
+ kernel/kexec_core.c           |   1 +
+ kernel/panic.c                |   6 +-
+ kernel/printk/Makefile        |   1 +
+ kernel/printk/internal.h      |  57 ++++++++++
+ kernel/printk/nmi.c           | 258 ++++++++++++++++++++++++++++++++++++++++++
+ kernel/printk/printk.c        |  43 +++----
+ lib/nmi_backtrace.c           |  89 +--------------
+ 26 files changed, 411 insertions(+), 111 deletions(-)
+ create mode 100644 kernel/printk/internal.h
+ create mode 100644 kernel/printk/nmi.c
+
+-- 
+1.8.5.6
