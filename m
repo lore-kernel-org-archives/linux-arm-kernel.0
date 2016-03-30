@@ -1,37 +1,26 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 30 Mar 2016 18:14:26 +0200
-Subject: [PATCH v5 11/50] mtd: add mtd_set_ecclayout() helper function
-In-Reply-To: <1459354505-32551-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1459354505-32551-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1459354505-32551-12-git-send-email-boris.brezillon@free-electrons.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 30 Mar 2016 09:51:43 -0700
+Subject: [PATCH v2 4/7] scatterlist: add sg_alloc_table_from_buf() helper
+In-Reply-To: <1459352394-22810-5-git-send-email-boris.brezillon@free-electrons.com>
+References: <1459352394-22810-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1459352394-22810-5-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20160330165143.GI2350@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an mtd_set_ecclayout() helper function to avoid direct accesses to the
-mtd->ecclayout field. This will ease future reworks of ECC layout
-definition.
+On Wed, Mar 30, 2016 at 05:39:51PM +0200, Boris Brezillon wrote:
+> sg_alloc_table_from_buf() provides an easy solution to create an sg_table
+> from a virtual address pointer. This function takes care of dealing with
+> vmallocated buffers, buffer alignment, or DMA engine limitations (maximum
+> DMA transfer size).
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- include/linux/mtd/mtd.h | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/include/linux/mtd/mtd.h b/include/linux/mtd/mtd.h
-index b141f26..6250dd8 100644
---- a/include/linux/mtd/mtd.h
-+++ b/include/linux/mtd/mtd.h
-@@ -286,6 +286,12 @@ int mtd_ooblayout_set_databytes(struct mtd_info *mtd, const u8 *databuf,
- int mtd_ooblayout_count_freebytes(struct mtd_info *mtd);
- int mtd_ooblayout_count_eccbytes(struct mtd_info *mtd);
- 
-+static inline void mtd_set_ecclayout(struct mtd_info *mtd,
-+				     struct nand_ecclayout *ecclayout)
-+{
-+	mtd->ecclayout = ecclayout;
-+}
-+
- static inline void mtd_set_of_node(struct mtd_info *mtd,
- 				   struct device_node *np)
- {
--- 
-2.5.0
+This seems nice.  Should we also have a further helper on top of this
+which will get constraints from a dmaengine, it seems like it'd be a
+common need?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160330/6feb33d1/attachment-0001.sig>
