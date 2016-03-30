@@ -1,9 +1,9 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 30 Mar 2016 22:04:07 +0200
-Subject: [PATCH v5 44/46] video: ssd1307fb: switch to the atomic PWM API
+Date: Wed, 30 Mar 2016 22:04:08 +0200
+Subject: [PATCH v5 45/46] drm: i915: switch to the atomic PWM API
 In-Reply-To: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1459368249-13241-45-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1459368249-13241-46-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,66 +12,106 @@ by pwm_apply_state().
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/video/fbdev/ssd1307fb.c | 24 +++++++++++++++++++-----
- 1 file changed, 19 insertions(+), 5 deletions(-)
+ drivers/gpu/drm/i915/intel_panel.c | 39 +++++++++++++++++++++++++-------------
+ 1 file changed, 26 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/video/fbdev/ssd1307fb.c b/drivers/video/fbdev/ssd1307fb.c
-index df9c63a..ed9a115 100644
---- a/drivers/video/fbdev/ssd1307fb.c
-+++ b/drivers/video/fbdev/ssd1307fb.c
-@@ -289,6 +289,8 @@ static int ssd1307fb_init(struct ssd1307fb_par *par)
- 	struct pwm_args pargs = { };
+diff --git a/drivers/gpu/drm/i915/intel_panel.c b/drivers/gpu/drm/i915/intel_panel.c
+index 21ee647..b86bd20 100644
+--- a/drivers/gpu/drm/i915/intel_panel.c
++++ b/drivers/gpu/drm/i915/intel_panel.c
+@@ -538,10 +538,10 @@ static u32 bxt_get_backlight(struct intel_connector *connector)
+ static u32 pwm_get_backlight(struct intel_connector *connector)
+ {
+ 	struct intel_panel *panel = &connector->panel;
+-	int duty_ns;
++	struct pwm_state pstate;
  
- 	if (par->device_info->need_pwm) {
-+		struct pwm_state pstate;
-+
- 		par->pwm = pwm_get(&par->client->dev, NULL);
- 		if (IS_ERR(par->pwm)) {
- 			dev_err(&par->client->dev, "Could not get PWM from device tree!\n");
-@@ -296,10 +298,14 @@ static int ssd1307fb_init(struct ssd1307fb_par *par)
- 		}
+-	duty_ns = pwm_get_duty_cycle(panel->backlight.pwm);
+-	return DIV_ROUND_UP(duty_ns * 100, CRC_PMIC_PWM_PERIOD_NS);
++	pwm_get_state(panel->backlight.pwm, &pstate);
++	return DIV_ROUND_UP(pstate.duty_cycle * 100, CRC_PMIC_PWM_PERIOD_NS);
+ }
  
- 		pwm_get_args(par->pwm, &pargs);
-+		pwm_get_state(par->pwm, &pstate);
- 		par->pwm_period = pargs.period;
-+
- 		/* Enable the PWM */
--		pwm_config(par->pwm, par->pwm_period / 2, par->pwm_period);
--		pwm_enable(par->pwm);
-+		pstate.period = pargs.period;
-+		pstate.duty_cycle = pstate.period / 2;
-+		pstate.enabled = true;
-+		pwm_apply_state(par->pwm, &pstate);
+ static u32 intel_panel_get_backlight(struct intel_connector *connector)
+@@ -630,9 +630,12 @@ static void bxt_set_backlight(struct intel_connector *connector, u32 level)
+ static void pwm_set_backlight(struct intel_connector *connector, u32 level)
+ {
+ 	struct intel_panel *panel = &connector->panel;
+-	int duty_ns = DIV_ROUND_UP(level * CRC_PMIC_PWM_PERIOD_NS, 100);
++	struct pwm_state pstate;
  
- 		dev_dbg(&par->client->dev, "Using PWM%d with a %dns period.\n",
- 			par->pwm->pwm, par->pwm_period);
-@@ -685,8 +691,12 @@ static int ssd1307fb_probe(struct i2c_client *client,
- bl_init_error:
- 	unregister_framebuffer(info);
- panel_init_error:
--	if (par->device_info->need_pwm) {
--		pwm_disable(par->pwm);
-+	if (par->device_info->need_pwm && par->pwm) {
-+		struct pwm_state pstate;
-+
-+		pwm_get_state(par->pwm, &pstate);
-+		pstate.enabled = false;
-+		pwm_apply_state(par->pwm, &pstate);
- 		pwm_put(par->pwm);
- 	};
- reset_oled_error:
-@@ -707,7 +717,11 @@ static int ssd1307fb_remove(struct i2c_client *client)
+-	pwm_config(panel->backlight.pwm, duty_ns, CRC_PMIC_PWM_PERIOD_NS);
++	pwm_get_state(panel->backlight.pwm, &pstate);
++	pstate.duty_cycle = DIV_ROUND_UP(level * CRC_PMIC_PWM_PERIOD_NS, 100);
++	pstate.period = CRC_PMIC_PWM_PERIOD_NS;
++	pwm_apply_state(panel->backlight.pwm, &pstate);
+ }
  
- 	unregister_framebuffer(info);
- 	if (par->device_info->need_pwm) {
--		pwm_disable(par->pwm);
-+		struct pwm_state pstate;
-+
-+		pwm_get_state(par->pwm, &pstate);
-+		pstate.enabled = false;
-+		pwm_apply_state(par->pwm, &pstate);
- 		pwm_put(par->pwm);
- 	};
- 	fb_deferred_io_cleanup(info);
+ static void
+@@ -801,11 +804,15 @@ static void bxt_disable_backlight(struct intel_connector *connector)
+ static void pwm_disable_backlight(struct intel_connector *connector)
+ {
+ 	struct intel_panel *panel = &connector->panel;
++	struct pwm_state pstate;
+ 
+ 	/* Disable the backlight */
+-	pwm_config(panel->backlight.pwm, 0, CRC_PMIC_PWM_PERIOD_NS);
++	pwm_get_state(panel->backlight.pwm, &pstate);
++	pstate.duty_cycle = 0;
++	pwm_apply_state(panel->backlight.pwm, &pstate);
+ 	usleep_range(2000, 3000);
+-	pwm_disable(panel->backlight.pwm);
++	pstate.enabled = false;
++	pwm_apply_state(panel->backlight.pwm, &pstate);
+ }
+ 
+ void intel_panel_disable_backlight(struct intel_connector *connector)
+@@ -1068,8 +1075,11 @@ static void bxt_enable_backlight(struct intel_connector *connector)
+ static void pwm_enable_backlight(struct intel_connector *connector)
+ {
+ 	struct intel_panel *panel = &connector->panel;
++	struct pwm_state pstate;
+ 
+-	pwm_enable(panel->backlight.pwm);
++	pwm_get_state(panel->backlight.pwm, &pstate);
++	pstate.enabled = true;
++	pwm_apply_state(panel->backlight.pwm, &pstate);
+ 	intel_panel_actually_set_backlight(connector, panel->backlight.level);
+ }
+ 
+@@ -1630,6 +1640,7 @@ static int pwm_setup_backlight(struct intel_connector *connector,
+ {
+ 	struct drm_device *dev = connector->base.dev;
+ 	struct intel_panel *panel = &connector->panel;
++	struct pwm_state pstate;
+ 	int retval;
+ 
+ 	/* Get the PWM chip for backlight control */
+@@ -1640,8 +1651,10 @@ static int pwm_setup_backlight(struct intel_connector *connector,
+ 		return -ENODEV;
+ 	}
+ 
+-	retval = pwm_config(panel->backlight.pwm, CRC_PMIC_PWM_PERIOD_NS,
+-			    CRC_PMIC_PWM_PERIOD_NS);
++	pwm_get_state(panel->backlight.pwm, &pstate);
++	pstate.period = CRC_PMIC_PWM_PERIOD_NS;
++	pstate.duty_cycle = CRC_PMIC_PWM_PERIOD_NS;
++	retval = pwm_apply_state(panel->backlight.pwm, &pstate);
+ 	if (retval < 0) {
+ 		DRM_ERROR("Failed to configure the pwm chip\n");
+ 		pwm_put(panel->backlight.pwm);
+@@ -1651,9 +1664,9 @@ static int pwm_setup_backlight(struct intel_connector *connector,
+ 
+ 	panel->backlight.min = 0; /* 0% */
+ 	panel->backlight.max = 100; /* 100% */
+-	panel->backlight.level = DIV_ROUND_UP(
+-				 pwm_get_duty_cycle(panel->backlight.pwm) * 100,
+-				 CRC_PMIC_PWM_PERIOD_NS);
++	pwm_get_state(panel->backlight.pwm, &pstate);
++	panel->backlight.level = DIV_ROUND_UP(pstate.duty_cycle * 100,
++					      pstate.period);
+ 	panel->backlight.enabled = panel->backlight.level != 0;
+ 
+ 	return 0;
 -- 
 2.5.0
