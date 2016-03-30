@@ -1,38 +1,49 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 30 Mar 2016 14:25:45 +0200
-Subject: [PATCH v2 0/3] arm64: memstart_addr alignment and vmemmap offset fixes
-Message-ID: <1459340748-14975-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Wed, 30 Mar 2016 14:25:46 +0200
+Subject: [PATCH v2 1/3] arm64/mm: ensure memstart_addr remains sufficiently
+ aligned
+In-Reply-To: <1459340748-14975-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1459340748-14975-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1459340748-14975-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series wraps up some loose ends regarding the v4.6 changes in arm64 to
-allow the kernel to reside at any [appropriately aligned] physical address.
+After choosing memstart_addr to be the highest multiple of
+ARM64_MEMSTART_ALIGN less than or equal to the first usable physical memory
+address, we clip the memblocks to the maximum size of the linear region.
+Since the kernel may be high up in memory, we take care not to clip the
+kernel itself, which means we have to clip some memory from the bottom if
+this occurs, to ensure that the distance between the first and the last
+usable physical memory address can be covered by the linear region.
 
-Patch #1 fixes a bug where we fail to update memstart_addr after clipping
-memory from the bottom if so required by the size of the linear region and
-the placement of the kernel Image.
+However, we fail to update memstart_addr if this clipping from the bottom
+occurs, which means that we may still end up with virtual addresses that
+wrap into the userland range. So increment memstart_addr as appropriate to
+prevent this from happening.
 
-Patch #2 updates the constant ARM64_MEMSTART_ALIGN, which defines the minimum
-alignment of memstart_addr, to account for the section alignment my sparsemem
-vmemmap if that is enabled. This is a prerequisite for patch #3
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/mm/init.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-Patch #3 reverts commit 36e5cd6b897e ("arm64: account for sparsemem section
-alignment  when choosing vmemmap offset"), which was included as a bugfix in
-v4.5-late, but is no longer required now that we can freely choose
-memstart_addr, allowing us to take this minimum alignment into account. This
-makes the rounding in the definition of vmemmap redundant.
-
-Ard Biesheuvel (3):
-  arm64/mm: ensure memstart_addr remains sufficiently aligned
-  arm64: choose memstart_addr based on minimum sparsemem section
-    alignment
-  Revert "arm64: account for sparsemem section alignment when choosing
-    vmemmap offset"
-
- arch/arm64/include/asm/kernel-pgtable.h | 21 +++++++++++++++++---
- arch/arm64/include/asm/pgtable.h        |  5 ++---
- arch/arm64/mm/init.c                    |  8 ++++++--
- 3 files changed, 26 insertions(+), 8 deletions(-)
-
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index ec4db8dfbe3a..82ced5fa1e66 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -190,8 +190,12 @@ void __init arm64_memblock_init(void)
+ 	 */
+ 	memblock_remove(max_t(u64, memstart_addr + linear_region_size, __pa(_end)),
+ 			ULLONG_MAX);
+-	if (memblock_end_of_DRAM() > linear_region_size)
+-		memblock_remove(0, memblock_end_of_DRAM() - linear_region_size);
++	if (memstart_addr + linear_region_size < memblock_end_of_DRAM()) {
++		/* ensure that memstart_addr remains sufficiently aligned */
++		memstart_addr = round_up(memblock_end_of_DRAM() - linear_region_size,
++					 ARM64_MEMSTART_ALIGN);
++		memblock_remove(0, memstart_addr);
++	}
+ 
+ 	/*
+ 	 * Apply the memory limit if it was set. Since the kernel may be loaded
 -- 
 2.5.0
