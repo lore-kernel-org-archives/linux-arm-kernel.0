@@ -1,108 +1,97 @@
-From: shannon.zhao@linaro.org (Shannon Zhao)
-Date: Wed, 30 Mar 2016 20:42:20 +0800
-Subject: [PATCH v7 03/17] Xen: xlate: Use page_to_xen_pfn instead of
- page_to_pfn
-In-Reply-To: <56FBB709.5050802@arm.com>
-References: <1458830676-27075-1-git-send-email-shannon.zhao@linaro.org>
- <1458830676-27075-4-git-send-email-shannon.zhao@linaro.org>
- <56FAAD48.2010401@arm.com> <56FB8258.7030303@huawei.com>
- <56FBB709.5050802@arm.com>
-Message-ID: <56FBC9AC.1070203@linaro.org>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 30 Mar 2016 14:43:28 +0200
+Subject: [PATCH v2 1/9] drm: atmel-hlcdc: add a ->cleanup_fb() operation
+In-Reply-To: <20160318175848.GK14170@phenom.ffwll.local>
+References: <1458136663-21396-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1458136663-21396-2-git-send-email-boris.brezillon@free-electrons.com>
+ <20160316151738.GQ14170@phenom.ffwll.local>
+ <20160317094942.48079e49@bbrezillon>
+ <20160318175848.GK14170@phenom.ffwll.local>
+Message-ID: <20160330144328.6fe3375e@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016?03?30? 19:22, Julien Grall wrote:
-> Hi Shannon,
-> 
-> On 30/03/16 08:38, Shannon Zhao wrote:
->>
->>
->> On 2016/3/30 0:28, Julien Grall wrote:
->>> On 24/03/16 14:44, Shannon Zhao wrote:
->>>> Make xen_xlate_map_ballooned_pages work with 64K pages. In that case
->>>> Kernel pages are 64K in size but Xen pages remain 4K in size. Xen pfns
->>>> refer to 4K pages.
->>>>
->>>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->>>> Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
->>>> ---
->>>>    drivers/xen/xlate_mmu.c | 26 ++++++++++++++++----------
->>>>    1 file changed, 16 insertions(+), 10 deletions(-)
->>>>
->>>> diff --git a/drivers/xen/xlate_mmu.c b/drivers/xen/xlate_mmu.c
->>>> index 9692656..28f728b 100644
->>>> --- a/drivers/xen/xlate_mmu.c
->>>> +++ b/drivers/xen/xlate_mmu.c
->>>> @@ -207,9 +207,12 @@ int __init
->>>> xen_xlate_map_ballooned_pages(xen_pfn_t **gfns, void **virt,
->>>>        void *vaddr;
->>>>        int rc;
->>>>        unsigned int i;
->>>> +    unsigned long nr_pages;
->>>> +    xen_pfn_t xen_pfn = 0;
->>>>
->>>>        BUG_ON(nr_grant_frames == 0);
->>>> -    pages = kcalloc(nr_grant_frames, sizeof(pages[0]), GFP_KERNEL);
->>>> +    nr_pages = DIV_ROUND_UP(nr_grant_frames, XEN_PFN_PER_PAGE);
->>>> +    pages = kcalloc(nr_pages, sizeof(pages[0]), GFP_KERNEL);
->>>>        if (!pages)
->>>>            return -ENOMEM;
->>>>
->>>> @@ -218,22 +221,25 @@ int __init
->>>> xen_xlate_map_ballooned_pages(xen_pfn_t **gfns, void **virt,
->>>>            kfree(pages);
->>>>            return -ENOMEM;
->>>>        }
->>>> -    rc = alloc_xenballooned_pages(nr_grant_frames, pages);
->>>> +    rc = alloc_xenballooned_pages(nr_pages, pages);
->>>>        if (rc) {
->>>> -        pr_warn("%s Couldn't balloon alloc %ld pfns rc:%d\n",
->>>> __func__,
->>>> -            nr_grant_frames, rc);
->>>> +        pr_warn("%s Couldn't balloon alloc %ld pages rc:%d\n",
->>>> __func__,
->>>> +            nr_pages, rc);
->>>>            kfree(pages);
->>>>            kfree(pfns);
->>>>            return rc;
->>>>        }
->>>> -    for (i = 0; i < nr_grant_frames; i++)
->>>> -        pfns[i] = page_to_pfn(pages[i]);
->>>> +    for (i = 0; i < nr_grant_frames; i++) {
->>>> +        if ((i % XEN_PFN_PER_PAGE) == 0)
->>>> +            xen_pfn = page_to_xen_pfn(pages[i / XEN_PFN_PER_PAGE]);
->>>> +        pfns[i] = pfn_to_gfn(xen_pfn++);
->>>> +    }
->>>
->>> Would it be possible to re-use xen_for_each_gfn? This will avoid
->>> open-coding the loop to break down the Linux page.
->> I don't think so. Using xen_acpi_guest_init will require factoring
->> "pfns[i] = pfn_to_gfn(xen_pfn++)" to a function with parameter pfns[i].
->> How can we pass pfns[i]?
-> 
-> By using the variable data. Something along those lines:
-> 
-> struct map_balloon_pages
-> {
->       xen_pfn_t *pfns;
->       unsigned int idx;
-> };
-> 
-> static void setup_balloon_gfn(unsigned long gfn, void *data)
-> {
->       struct map_balloon_pages *info = data;
-> 
-> 
->       data->pfns[data->idx] = gfn;
->       data->idx++;
-> }
-> 
-> And then in xen_xlate_map_ballooned_pages
-> 
-> xen_for_each_gfn(pages, nr_grant_frames, setup_balloon_gfn, &data);
-I think this looks like less direct. Anyway I will update this patch as
-you said.
+Hi Daniel,
 
-Thanks,
+On Fri, 18 Mar 2016 18:58:48 +0100
+Daniel Vetter <daniel@ffwll.ch> wrote:
+
+> On Thu, Mar 17, 2016 at 09:49:42AM +0100, Boris Brezillon wrote:
+> > Hi Daniel,
+> > 
+> > On Wed, 16 Mar 2016 16:17:38 +0100
+> > Daniel Vetter <daniel@ffwll.ch> wrote:
+> > 
+> > > On Wed, Mar 16, 2016 at 02:57:35PM +0100, Boris Brezillon wrote:
+> > > > Add a ->cleanup_fb() operation to avoid memory leaks when the atomic
+> > > > operation is interrupted after the ->prepare_fb() call.
+> > > > 
+> > > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > > > Fixes 2389fc1 ("drm: atmel-hlcdc: Atomic mode-setting conversion")
+> > > > Reviewed-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > > > Tested-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > > > ---
+> > > >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h    |  2 ++
+> > > >  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c | 22 +++++++++++++++++++---
+> > > >  2 files changed, 21 insertions(+), 3 deletions(-)
+> > > > 
+> > > > diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
+> > > > index fed517f..ec64140 100644
+> > > > --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
+> > > > +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h
+> > > > @@ -81,11 +81,13 @@ struct atmel_hlcdc_plane_properties {
+> > > >   * @layer: HLCDC layer structure
+> > > >   * @properties: pointer to the property definitions structure
+> > > >   * @rotation: current rotation status
+> > > > + * @prepared: flagging the plane has prepared for an atomic update
+> > > >   */
+> > > >  struct atmel_hlcdc_plane {
+> > > >  	struct drm_plane base;
+> > > >  	struct atmel_hlcdc_layer layer;
+> > > >  	struct atmel_hlcdc_plane_properties *properties;
+> > > > +	bool prepared;
+> > > >  };
+> > > >  
+> > > >  static inline struct atmel_hlcdc_plane *
+> > > > diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
+> > > > index 1ffe9c3..35027d0 100644
+> > > > --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
+> > > > +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
+> > > > @@ -715,11 +715,25 @@ static int atmel_hlcdc_plane_prepare_fb(struct drm_plane *p,
+> > > >  					const struct drm_plane_state *new_state)
+> > > >  {
+> > > >  	struct atmel_hlcdc_plane *plane = drm_plane_to_atmel_hlcdc_plane(p);
+> > > > +	int ret;
+> > > >  
+> > > > -	if (!new_state->fb)
+> > > > -		return 0;
+> > > > +	ret = atmel_hlcdc_layer_update_start(&plane->layer);
+> > > > +	if (!ret)
+> > > > +		plane->prepared = true;
+> > > 
+> > > Atomic helpers will keep track of this for you, and only call ->cleanup_fb
+> > > on a plane combo where it did (successfully) call ->prepare_fb.
+> > 
+> > Hm, it's not exactly encoding the same thing. What I want to do here is
+> > call atmel_hlcdc_layer_update_rollback() only if the atomic update has
+> > failed (see below, I set ->prepared back to false in the
+> > ->atomic_update() method). AFAICT, ->cleanup_fb() is also called
+> > when the whole operation succeed (and in this case I don't want to
+> > call atmel_hlcdc_layer_update_rollback()).
+> > 
+> > Let me know if you see a better approach to do that.
+> 
+> Ah makes sense. And yeah I guess this is the only approach really. Note
+> that you should put plane_prepared into plane_state though, in case we
+> start to pipeline updates.
+
+Still having a problem when putting the ->prepared field into my
+atmel_hlcdc_plane_state struct: ->prepare_fb() and ->cleanup_fb() are
+passing a pointer to a *const* struct drm_plane_state, and I'd like to
+avoid a const to non-const cast here.
+
+
 -- 
-Shannon
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
