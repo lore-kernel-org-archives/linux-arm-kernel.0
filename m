@@ -1,64 +1,48 @@
-From: andy.yan@rock-chips.com (Andy Yan)
-Date: Wed, 30 Mar 2016 10:22:25 +0800
-Subject: [PATCH v7 4/4] ARM64: dts: rockchip: add syscon-reboot-mode DT node
-In-Reply-To: <1459304304-9713-1-git-send-email-andy.yan@rock-chips.com>
-References: <1459304304-9713-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <1459304545-9909-1-git-send-email-andy.yan@rock-chips.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Wed, 30 Mar 2016 10:53:53 +0800
+Subject: [PATCH v3 0/4] thermal: hisilicon: enable power allocator for
+ Hi6220
+In-Reply-To: <20160329154548.GE1855@localhost.localdomain>
+References: <1459250835-25561-1-git-send-email-leo.yan@linaro.org>
+ <20160329154548.GE1855@localhost.localdomain>
+Message-ID: <20160330025353.GA28401@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add syscon-reboot-mode driver DT node for rk3368 platform
+On Tue, Mar 29, 2016 at 08:45:59AM -0700, Eduardo Valentin wrote:
+> On Tue, Mar 29, 2016 at 07:27:11PM +0800, Leo Yan wrote:
+> > Hi6220 has octa-core so it has quite high power consumption when run
+> > benchmark and introduces high temperature for SoC. So need enable
+> > thermal governor to control temperature and also cannot hurt much for
+> > performance after impose cooling operations on CPU.
+> > 
+> > This patch series is to enable power allocator for Hi6220. Patch 1 is to
+> > change "hysteresis" as optional property for trip points, so when enable
+> > power allocator governor we can ignore this property.
+> > 
+> > During profiling also found two issues for thermal sensor's driver. The
+> > power allocator just uses only one sensor, so patch 2 is to fix sensor
+> > driver to let it can initialize driver successfully with only enabling
+> > one sensor; patch 3 is to dismiss warning of IRQ imbalance enabling.
+> > 
+> > After profiling on Hikey, the power model has been simplized with only
+> > dynamic coefficient, and now it's convienence to pass it from CPU node.
+> > So patch 4 and 5 bind sensor and pass power model parameters.
+> > 
+> > This patch series have been tested on 96boards Hikey.
+> 
+> Applied patches 1 and 2 in my fixes branch. Patches 3 and 4 need to go
+> via the hisi platform tree. You may add my
+> 
+> Acked-by: Eduardo Valentin <edubezval@gmail.com>
+> 
+> on patches 3 and 4 if you want.
 
-Tested-by: Caesar Wang <caesar.upstream@gmail.com>
-Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+Thanks, Eduardo.
 
----
+Hi Wei,
 
-Changes in v7: None
-Changes in v6: None
-Changes in v5: None
-Changes in v4: None
-Changes in v3:
-- descirbe all reboot mode as property instead of subnode
+Could you help pick up patches 3/4 for enabling thermal in dts?
 
-Changes in v2:
-- make this node as a subnode of pmugrf
-
-Changes in v1: None
-
- arch/arm64/boot/dts/rockchip/rk3368.dtsi | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-index 122777b..df062ea 100644
---- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-@@ -45,6 +45,7 @@
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/pinctrl/rockchip.h>
-+#include <dt-bindings/soc/rockchip_boot-mode.h>
- #include <dt-bindings/thermal/thermal.h>
- 
- / {
-@@ -554,8 +555,17 @@
- 	};
- 
- 	pmugrf: syscon at ff738000 {
--		compatible = "rockchip,rk3368-pmugrf", "syscon";
-+		compatible = "rockchip,rk3368-pmugrf", "syscon", "simple-mfd";
- 		reg = <0x0 0xff738000 0x0 0x1000>;
-+
-+		reboot-mode {
-+			compatible = "syscon-reboot-mode";
-+			offset = <0x200>;
-+			mode-normal = <BOOT_NORMAL>;
-+			mode-recovery = <BOOT_RECOVERY>;
-+			mode-bootloader = <BOOT_FASTBOOT>;
-+			mode-loader = <BOOT_BL_DOWNLOAD>;
-+		};
- 	};
- 
- 	cru: clock-controller at ff760000 {
--- 
-1.9.1
+Thanks,
+Leo Yan
