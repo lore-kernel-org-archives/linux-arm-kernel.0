@@ -1,51 +1,62 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Wed, 30 Mar 2016 13:51:13 +0300
-Subject: [PATCH net-next] net: hns: add support of pause frame ctrl for
- HNS V2
-In-Reply-To: <1459235041-91766-1-git-send-email-Yisen.Zhuang@huawei.com>
-References: <1459235041-91766-1-git-send-email-Yisen.Zhuang@huawei.com>
-Message-ID: <1459335073.5907.34.camel@linux.intel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 30 Mar 2016 12:06:12 +0100
+Subject: [PATCH 2/7] ARM: dts: skeleton: add unit name to memory node
+In-Reply-To: <1459290646-3592-3-git-send-email-manabian@gmail.com>
+References: <1459290646-3592-1-git-send-email-manabian@gmail.com>
+ <1459290646-3592-3-git-send-email-manabian@gmail.com>
+Message-ID: <20160330110611.GB25354@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-03-29 at 15:04 +0800, Yisen Zhuang wrote:
-> From: Lisheng <lisheng011@huawei.com>
+On Wed, Mar 30, 2016 at 12:30:41AM +0200, Joachim Eastwood wrote:
+> Add unit name to memory to remove the following warning:
+>  Warning (unit_address_vs_reg): Node /memory has a reg or ranges
+> 				property, but no unit name
+
+If anything, it would be better to get rid of the memory node from the
+skeleton DTs.
+
+For DTs which have a memory node there's no problem, and DTs which
+expect a bootlaoder to fill things in have a logical place to document
+that fact.
+
+Thanks,
+Mark.
+
 > 
-> The patch adds support of pause ctrl for HNS V2, and this feature is
-> lost
-> by HNS V1:
-> ???????1) service ports can disable rx pause frame,
-> ???????2) debug ports can open tx/rx pause frame.
+> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+> ---
+>  arch/arm/boot/dts/skeleton.dtsi   | 2 +-
+>  arch/arm/boot/dts/skeleton64.dtsi | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
 > 
-> And this patch updates the REGs about the pause ctrl when updated
-> status function called by upper layer routine.
-
-> --- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
-> +++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
+> diff --git a/arch/arm/boot/dts/skeleton.dtsi b/arch/arm/boot/dts/skeleton.dtsi
+> index b41d241..a20da0a 100644
+> --- a/arch/arm/boot/dts/skeleton.dtsi
+> +++ b/arch/arm/boot/dts/skeleton.dtsi
+> @@ -9,5 +9,5 @@
+>  	#size-cells = <1>;
+>  	chosen { };
+>  	aliases { };
+> -	memory { device_type = "memory"; reg = <0 0>; };
+> +	memory at 0 { device_type = "memory"; reg = <0 0>; };
+>  };
+> diff --git a/arch/arm/boot/dts/skeleton64.dtsi b/arch/arm/boot/dts/skeleton64.dtsi
+> index b5d7f36..6dbe9f9 100644
+> --- a/arch/arm/boot/dts/skeleton64.dtsi
+> +++ b/arch/arm/boot/dts/skeleton64.dtsi
+> @@ -9,5 +9,5 @@
+>  	#size-cells = <2>;
+>  	chosen { };
+>  	aliases { };
+> -	memory { device_type = "memory"; reg = <0 0 0 0>; };
+> +	memory at 0 { device_type = "memory"; reg = <0 0 0 0>; };
+>  };
+> -- 
+> 2.7.4
 > 
-
-> +void hns_dsaf_get_rx_mac_pause_en(struct dsaf_device *dsaf_dev, int
-> mac_id,
-> +				??u32 *en)
-> +{
-> +	if (AE_IS_VER1(dsaf_dev->dsaf_ver))
-> +		*en = 1;
-> ?	else
-> ?		dsaf_write_dev(dsaf_dev, DSAF_PFC_EN_0_REG + mac_id
-> * 4, 0xff);
-> +		*en = dsaf_get_dev_bit(dsaf_dev,
-> +				???????DSAF_PAUSE_CFG_REG + mac_id *
-> 4,
-> +				???????DSAF_MAC_PAUSE_RX_EN_B);
-
-And what the point of if branch then? I think it's an obvious misfix,
-you must replace else to } else { and add }.
-
-How did you test this part?
-
-> ?}
-
-
--- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
