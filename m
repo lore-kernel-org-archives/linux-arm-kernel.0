@@ -1,9 +1,9 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 30 Mar 2016 18:15:00 +0200
-Subject: [PATCH v5 45/50] mtd: nand: vf610: switch to mtd_ooblayout_ops
+Date: Wed, 30 Mar 2016 18:14:52 +0200
+Subject: [PATCH v5 37/50] mtd: nand: lpc32xx: switch to mtd_ooblayout_ops
 In-Reply-To: <1459354505-32551-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1459354505-32551-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1459354505-32551-46-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1459354505-32551-38-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,66 +12,143 @@ ECC/OOB layout to MTD users.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/mtd/nand/vf610_nfc.c | 34 ++++------------------------------
- 1 file changed, 4 insertions(+), 30 deletions(-)
+ drivers/mtd/nand/lpc32xx_mlc.c | 50 ++++++++++++++++++++++++++++--------------
+ drivers/mtd/nand/lpc32xx_slc.c | 41 +++++++++++++++++++++++++++-------
+ 2 files changed, 66 insertions(+), 25 deletions(-)
 
-diff --git a/drivers/mtd/nand/vf610_nfc.c b/drivers/mtd/nand/vf610_nfc.c
-index 293feb1..da34de1 100644
---- a/drivers/mtd/nand/vf610_nfc.c
-+++ b/drivers/mtd/nand/vf610_nfc.c
-@@ -175,34 +175,6 @@ static inline struct vf610_nfc *mtd_to_nfc(struct mtd_info *mtd)
- 	return container_of(mtd_to_nand(mtd), struct vf610_nfc, chip);
- }
+diff --git a/drivers/mtd/nand/lpc32xx_mlc.c b/drivers/mtd/nand/lpc32xx_mlc.c
+index d8c3e7a..f668282 100644
+--- a/drivers/mtd/nand/lpc32xx_mlc.c
++++ b/drivers/mtd/nand/lpc32xx_mlc.c
+@@ -139,22 +139,37 @@ struct lpc32xx_nand_cfg_mlc {
+ 	unsigned num_parts;
+ };
  
--static struct nand_ecclayout vf610_nfc_ecc45 = {
--	.eccbytes = 45,
--	.eccpos = {19, 20, 21, 22, 23,
--		   24, 25, 26, 27, 28, 29, 30, 31,
--		   32, 33, 34, 35, 36, 37, 38, 39,
--		   40, 41, 42, 43, 44, 45, 46, 47,
--		   48, 49, 50, 51, 52, 53, 54, 55,
--		   56, 57, 58, 59, 60, 61, 62, 63},
+-static struct nand_ecclayout lpc32xx_nand_oob = {
+-	.eccbytes = 40,
+-	.eccpos = { 6,  7,  8,  9, 10, 11, 12, 13, 14, 15,
+-		   22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
+-		   38, 39, 40, 41, 42, 43, 44, 45, 46, 47,
+-		   54, 55, 56, 57, 58, 59, 60, 61, 62, 63 },
 -	.oobfree = {
--		{.offset = 2,
--		 .length = 17} }
--};
--
--static struct nand_ecclayout vf610_nfc_ecc60 = {
--	.eccbytes = 60,
--	.eccpos = { 4,  5,  6,  7,  8,  9, 10, 11,
--		   12, 13, 14, 15, 16, 17, 18, 19,
--		   20, 21, 22, 23, 24, 25, 26, 27,
--		   28, 29, 30, 31, 32, 33, 34, 35,
--		   36, 37, 38, 39, 40, 41, 42, 43,
--		   44, 45, 46, 47, 48, 49, 50, 51,
--		   52, 53, 54, 55, 56, 57, 58, 59,
--		   60, 61, 62, 63 },
--	.oobfree = {
--		{.offset = 2,
--		 .length = 2} }
--};
--
- static inline u32 vf610_nfc_read(struct vf610_nfc *nfc, uint reg)
- {
- 	return readl(nfc->regs + reg);
-@@ -781,14 +753,16 @@ static int vf610_nfc_probe(struct platform_device *pdev)
- 		if (mtd->oobsize > 64)
- 			mtd->oobsize = 64;
+-		{ .offset = 0,
+-		  .length = 6, },
+-		{ .offset = 16,
+-		  .length = 6, },
+-		{ .offset = 32,
+-		  .length = 6, },
+-		{ .offset = 48,
+-		  .length = 6, },
+-		},
++static int lpc32xx_ooblayout_ecc(struct mtd_info *mtd, int section,
++				 struct mtd_oob_region *oobregion)
++{
++	struct nand_chip *nand_chip = mtd_to_nand(mtd);
++
++	if (section >= nand_chip->ecc.steps)
++		return -ERANGE;
++
++	oobregion->offset = ((section + 1) * 16) - nand_chip->ecc.bytes;
++	oobregion->length = nand_chip->ecc.bytes;
++
++	return 0;
++}
++
++static int lpc32xx_ooblayout_free(struct mtd_info *mtd, int section,
++				  struct mtd_oob_region *oobregion)
++{
++	struct nand_chip *nand_chip = mtd_to_nand(mtd);
++
++	if (section >= nand_chip->ecc.steps)
++		return -ERANGE;
++
++	oobregion->offset = 16 * section;
++	oobregion->length = 16 - nand_chip->ecc.bytes;
++
++	return 0;
++}
++
++static const struct mtd_ooblayout_ops lpc32xx_ooblayout_ops = {
++	.ecc = lpc32xx_ooblayout_ecc,
++	.free = lpc32xx_ooblayout_free,
+ };
  
-+		/*
-+		 * mtd->ecclayout is not specified here because we're using the
-+		 * default large page ECC layout defined in NAND core.
-+		 */
- 		if (chip->ecc.strength == 32) {
- 			nfc->ecc_mode = ECC_60_BYTE;
- 			chip->ecc.bytes = 60;
--			chip->ecc.layout = &vf610_nfc_ecc60;
- 		} else if (chip->ecc.strength == 24) {
- 			nfc->ecc_mode = ECC_45_BYTE;
- 			chip->ecc.bytes = 45;
--			chip->ecc.layout = &vf610_nfc_ecc45;
- 		} else {
- 			dev_err(nfc->dev, "Unsupported ECC strength\n");
- 			err = -ENXIO;
+ static struct nand_bbt_descr lpc32xx_nand_bbt = {
+@@ -713,6 +728,7 @@ static int lpc32xx_nand_probe(struct platform_device *pdev)
+ 	nand_chip->ecc.write_oob = lpc32xx_write_oob;
+ 	nand_chip->ecc.read_oob = lpc32xx_read_oob;
+ 	nand_chip->ecc.strength = 4;
++	nand_chip->ecc.bytes = 10;
+ 	nand_chip->waitfunc = lpc32xx_waitfunc;
+ 
+ 	nand_chip->options = NAND_NO_SUBPAGE_WRITE;
+@@ -751,7 +767,7 @@ static int lpc32xx_nand_probe(struct platform_device *pdev)
+ 
+ 	nand_chip->ecc.mode = NAND_ECC_HW;
+ 	nand_chip->ecc.size = 512;
+-	nand_chip->ecc.layout = &lpc32xx_nand_oob;
++	mtd_set_ooblayout(mtd, &lpc32xx_ooblayout_ops);
+ 	host->mlcsubpages = mtd->writesize / 512;
+ 
+ 	/* initially clear interrupt status */
+diff --git a/drivers/mtd/nand/lpc32xx_slc.c b/drivers/mtd/nand/lpc32xx_slc.c
+index 10cf8e62..219dd67 100644
+--- a/drivers/mtd/nand/lpc32xx_slc.c
++++ b/drivers/mtd/nand/lpc32xx_slc.c
+@@ -146,13 +146,38 @@
+  * NAND ECC Layout for small page NAND devices
+  * Note: For large and huge page devices, the default layouts are used
+  */
+-static struct nand_ecclayout lpc32xx_nand_oob_16 = {
+-	.eccbytes = 6,
+-	.eccpos = {10, 11, 12, 13, 14, 15},
+-	.oobfree = {
+-		{ .offset = 0, .length = 4 },
+-		{ .offset = 6, .length = 4 },
+-	},
++static int lpc32xx_ooblayout_ecc(struct mtd_info *mtd, int section,
++				 struct mtd_oob_region *oobregion)
++{
++	if (section)
++		return -ERANGE;
++
++	oobregion->length = 6;
++	oobregion->offset = 10;
++
++	return 0;
++}
++
++static int lpc32xx_ooblayout_free(struct mtd_info *mtd, int section,
++				  struct mtd_oob_region *oobregion)
++{
++	if (section > 1)
++		return -ERANGE;
++
++	if (!section) {
++		oobregion->offset = 0;
++		oobregion->length = 4;
++	} else {
++		oobregion->offset = 6;
++		oobregion->length = 4;
++	}
++
++	return 0;
++}
++
++static const struct mtd_ooblayout_ops lpc32xx_ooblayout_ops = {
++	.ecc = lpc32xx_ooblayout_ecc,
++	.free = lpc32xx_ooblayout_free,
+ };
+ 
+ static u8 bbt_pattern[] = {'B', 'b', 't', '0' };
+@@ -886,7 +911,7 @@ static int lpc32xx_nand_probe(struct platform_device *pdev)
+ 	 * custom BBT marker layout.
+ 	 */
+ 	if (mtd->writesize <= 512)
+-		chip->ecc.layout = &lpc32xx_nand_oob_16;
++		mtd_set_ooblayout(mtd, &lpc32xx_ooblayout_ops);
+ 
+ 	/* These sizes remain the same regardless of page size */
+ 	chip->ecc.size = 256;
 -- 
 2.5.0
