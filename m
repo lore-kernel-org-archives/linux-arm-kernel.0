@@ -1,61 +1,42 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 30 Mar 2016 14:25:47 +0200
-Subject: [PATCH v2 2/3] arm64: choose memstart_addr based on minimum sparsemem
- section alignment
+Date: Wed, 30 Mar 2016 14:25:48 +0200
+Subject: [PATCH v2 3/3] Revert "arm64: account for sparsemem section alignment
+ when choosing vmemmap offset"
 In-Reply-To: <1459340748-14975-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1459340748-14975-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1459340748-14975-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1459340748-14975-4-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This redefines ARM64_MEMSTART_ALIGN in terms of the minimal alignment
-required by sparsemem vmemmap. This comes down to using 1 GB for all
-translation granules if CONFIG_SPARSEMEM_VMEMMAP is enabled.
+This reverts commit 36e5cd6b897e17d03008f81e075625d8e43e52d0, since the
+section alignment is now guaranteed by construction when choosing the
+value of memstart_addr.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/include/asm/kernel-pgtable.h | 21 +++++++++++++++++---
- 1 file changed, 18 insertions(+), 3 deletions(-)
+ arch/arm64/include/asm/pgtable.h | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kernel-pgtable.h b/arch/arm64/include/asm/kernel-pgtable.h
-index 5c6375d8528b..7e51d1b57c0c 100644
---- a/arch/arm64/include/asm/kernel-pgtable.h
-+++ b/arch/arm64/include/asm/kernel-pgtable.h
-@@ -19,6 +19,7 @@
- #ifndef __ASM_KERNEL_PGTABLE_H
- #define __ASM_KERNEL_PGTABLE_H
- 
-+#include <asm/sparsemem.h>
- 
- /*
-  * The linear mapping and the start of memory are both 2M aligned (per
-@@ -86,10 +87,24 @@
-  * (64k granule), or a multiple that can be mapped using contiguous bits
-  * in the page tables: 32 * PMD_SIZE (16k granule)
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 989fef16d461..aa6106ac050c 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -32,14 +32,13 @@
+  * VMALLOC_END: extends to the available space below vmmemmap, PCI I/O space,
+  *	fixed mappings and modules
   */
--#ifdef CONFIG_ARM64_64K_PAGES
--#define ARM64_MEMSTART_ALIGN	SZ_512M
-+#if defined(CONFIG_ARM64_4K_PAGES)
-+#define ARM64_MEMSTART_SHIFT		PUD_SHIFT
-+#elif defined(CONFIG_ARM64_16K_PAGES)
-+#define ARM64_MEMSTART_SHIFT		(PMD_SHIFT + 5)
- #else
--#define ARM64_MEMSTART_ALIGN	SZ_1G
-+#define ARM64_MEMSTART_SHIFT		PMD_SHIFT
-+#endif
-+
-+/*
-+ * sparsemem vmemmap imposes an additional requirement on the alignment of
-+ * memstart_addr, due to the fact that the base of the vmemmap region
-+ * has a direct correspondence, and needs to appear sufficiently aligned
-+ * in the virtual address space.
-+ */
-+#if defined(CONFIG_SPARSEMEM_VMEMMAP) && ARM64_MEMSTART_SHIFT < SECTION_SIZE_BITS
-+#define ARM64_MEMSTART_ALIGN	(1UL << SECTION_SIZE_BITS)
-+#else
-+#define ARM64_MEMSTART_ALIGN	(1UL << ARM64_MEMSTART_SHIFT)
- #endif
+-#define VMEMMAP_SIZE		ALIGN((1UL << (VA_BITS - PAGE_SHIFT)) * sizeof(struct page), PUD_SIZE)
++#define VMEMMAP_SIZE		ALIGN((1UL << (VA_BITS - PAGE_SHIFT - 1)) * sizeof(struct page), PUD_SIZE)
  
- #endif	/* __ASM_KERNEL_PGTABLE_H */
+ #define VMALLOC_START		(MODULES_END)
+ #define VMALLOC_END		(PAGE_OFFSET - PUD_SIZE - VMEMMAP_SIZE - SZ_64K)
+ 
+ #define VMEMMAP_START		(VMALLOC_END + SZ_64K)
+-#define vmemmap			((struct page *)VMEMMAP_START - \
+-				 SECTION_ALIGN_DOWN(memstart_addr >> PAGE_SHIFT))
++#define vmemmap			((struct page *)VMEMMAP_START - (memstart_addr >> PAGE_SHIFT))
+ 
+ #define FIRST_USER_ADDRESS	0UL
+ 
 -- 
 2.5.0
