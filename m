@@ -1,86 +1,80 @@
-From: henryc.chen@mediatek.com (Henry Chen)
-Date: Wed, 30 Mar 2016 15:25:08 +0800
-Subject: [PATCH] mfd: mt6397: irq domain should initialize before
- mfd_add_devices()
-Message-ID: <1459322708-21363-1-git-send-email-henryc.chen@mediatek.com>
+From: kaloz@openwrt.org (Imre Kaloz)
+Date: Wed, 30 Mar 2016 11:10:03 +0200
+Subject: [PATCH] ARM: mvebu: fix GPIO config on the Linksys boards
+In-Reply-To: <1438368120-23860-1-git-send-email-kaloz@openwrt.org>
+References: <1438368120-23860-1-git-send-email-kaloz@openwrt.org>
+Message-ID: <op.ye4rq1ae2s3iss@ecaz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some sub driver like RTC module need irq domain from parent to create
-irq mapping when driver initialize. so move mt6397_irq_init() before
-mfd_add_devices().
+Hi guys,
 
-Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
----
-This patch fixed the below warning based on "Linux kernel v4.6-rc1"
-WARNING: CPU: 1 PID: 132 at kernel/mediatek/kernel/irq/irqdomain.c:471
-irq_create_mapping+0xc4/0xd0
----
- drivers/mfd/mt6397-core.c | 37 ++++++++++++++++++++++---------------
- 1 file changed, 22 insertions(+), 15 deletions(-)
+Just noticed this never got neither merged or declined ;)
 
-diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
-index 8e8d932..a879223 100644
---- a/drivers/mfd/mt6397-core.c
-+++ b/drivers/mfd/mt6397-core.c
-@@ -270,22 +270,36 @@ static int mt6397_probe(struct platform_device *pdev)
- 		goto fail_irq;
- 	}
- 
-+	pmic->irq = platform_get_irq(pdev, 0);
-+
- 	switch (id & 0xff) {
- 	case MT6323_CID_CODE:
--		pmic->int_con[0] = MT6323_INT_CON0;
--		pmic->int_con[1] = MT6323_INT_CON1;
--		pmic->int_status[0] = MT6323_INT_STATUS0;
--		pmic->int_status[1] = MT6323_INT_STATUS1;
-+		if (pmic->irq > 0) {
-+			pmic->int_con[0] = MT6323_INT_CON0;
-+			pmic->int_con[1] = MT6323_INT_CON1;
-+			pmic->int_status[0] = MT6323_INT_STATUS0;
-+			pmic->int_status[1] = MT6323_INT_STATUS1;
-+			ret = mt6397_irq_init(pmic);
-+			if (ret)
-+				return ret;
-+		}
-+
- 		ret = mfd_add_devices(&pdev->dev, -1, mt6323_devs,
- 				ARRAY_SIZE(mt6323_devs), NULL, 0, NULL);
- 		break;
- 
- 	case MT6397_CID_CODE:
- 	case MT6391_CID_CODE:
--		pmic->int_con[0] = MT6397_INT_CON0;
--		pmic->int_con[1] = MT6397_INT_CON1;
--		pmic->int_status[0] = MT6397_INT_STATUS0;
--		pmic->int_status[1] = MT6397_INT_STATUS1;
-+		if (pmic->irq > 0) {
-+			pmic->int_con[0] = MT6397_INT_CON0;
-+			pmic->int_con[1] = MT6397_INT_CON1;
-+			pmic->int_status[0] = MT6397_INT_STATUS0;
-+			pmic->int_status[1] = MT6397_INT_STATUS1;
-+			ret = mt6397_irq_init(pmic);
-+			if (ret)
-+				return ret;
-+		}
-+
- 		ret = mfd_add_devices(&pdev->dev, -1, mt6397_devs,
- 				ARRAY_SIZE(mt6397_devs), NULL, 0, NULL);
- 		break;
-@@ -296,13 +310,6 @@ static int mt6397_probe(struct platform_device *pdev)
- 		break;
- 	}
- 
--	pmic->irq = platform_get_irq(pdev, 0);
--	if (pmic->irq > 0) {
--		ret = mt6397_irq_init(pmic);
--		if (ret)
--			return ret;
--	}
--
- fail_irq:
- 	if (ret) {
- 		irq_domain_remove(pmic->irq_domain);
--- 
-1.8.1.1.dirty
+It should still apply, but if needed, I can refresh it and send a v2.
+
+
+Best,
+
+Imre
+
+On Fri, 31 Jul 2015 20:42:00 +0200, Imre Kaloz <kaloz@openwrt.org> wrote:
+
+> Some of the GPIO configs were wrong in the submitted DTS files,
+> this patch fixes all affected boards.
+>
+> Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
+>
+> Cc: <stable@vger.kernel.org> # v4.1 +
+> ---
+>  arch/arm/boot/dts/armada-385-linksys.dtsi     | 6 +++---
+>  arch/arm/boot/dts/armada-xp-linksys-mamba.dts | 4 ++--
+>  2 files changed, 5 insertions(+), 5 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/armada-385-linksys.dtsi  
+> b/arch/arm/boot/dts/armada-385-linksys.dtsi
+> index 74a9c6b..1b0075f 100644
+> --- a/arch/arm/boot/dts/armada-385-linksys.dtsi
+> +++ b/arch/arm/boot/dts/armada-385-linksys.dtsi
+> @@ -243,7 +243,7 @@
+>  		button at 2 {
+>  			label = "Factory Reset Button";
+>  			linux,code = <KEY_RESTART>;
+> -			gpios = <&gpio1 15 GPIO_ACTIVE_LOW>;
+> +			gpios = <&gpio0 29 GPIO_ACTIVE_LOW>;
+>  		};
+>  	};
+> @@ -258,7 +258,7 @@
+>  		};
+> 		sata {
+> -			gpios = <&gpio1 22 GPIO_ACTIVE_HIGH>;
+> +			gpios = <&gpio1 22 GPIO_ACTIVE_LOW>;
+>  			default-state = "off";
+>  		};
+>  	};
+> @@ -311,7 +311,7 @@
+> &pinctrl {
+>  	keys_pin: keys-pin {
+> -		marvell,pins = "mpp24", "mpp47";
+> +		marvell,pins = "mpp24", "mpp29";
+>  		marvell,function = "gpio";
+>  	};
+> diff --git a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts  
+> b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
+> index fdd187c..e767735 100644
+> --- a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
+> +++ b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
+> @@ -302,13 +302,13 @@
+>  		button at 1 {
+>  			label = "WPS";
+>  			linux,code = <KEY_WPS_BUTTON>;
+> -			gpios = <&gpio1 0 GPIO_ACTIVE_HIGH>;
+> +			gpios = <&gpio1 0 GPIO_ACTIVE_LOW>;
+>  		};
+> 		button at 2 {
+>  			label = "Factory Reset Button";
+>  			linux,code = <KEY_RESTART>;
+> -			gpios = <&gpio1 1 GPIO_ACTIVE_HIGH>;
+> +			gpios = <&gpio1 1 GPIO_ACTIVE_LOW>;
+>  		};
+>  	};
