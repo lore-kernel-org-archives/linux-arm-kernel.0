@@ -1,54 +1,35 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 30 Mar 2016 11:54:22 +0200
-Subject: [PATCH] ARM: configs: Switching to the new Marvell's
- cryptographic engine driver for mvebu_v5_defconfig
-In-Reply-To: <1459238548-28029-1-git-send-email-romain.perier@free-electrons.com>
- (Romain Perier's message of "Tue, 29 Mar 2016 10:02:28 +0200")
-References: <1459238548-28029-1-git-send-email-romain.perier@free-electrons.com>
-Message-ID: <87egasuw8h.fsf@free-electrons.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Wed, 30 Mar 2016 17:58:43 +0800
+Subject: [stericsson:earlydebug 1/1] init/built-in.o:undefined reference to
+ `printascii'
+Message-ID: <201603301742.7njb0XAD%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Romain,
- 
- On mar., mars 29 2016, Romain Perier <romain.perier@free-electrons.com> wrote:
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git earlydebug
+head:   7a0e86123c84ec8853d7c6ae248e911a04a81bb4
+commit: 7a0e86123c84ec8853d7c6ae248e911a04a81bb4 [1/1] uglyhack printascii
+config: xtensa-common_defconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 7a0e86123c84ec8853d7c6ae248e911a04a81bb4
+        # save the attached .config to linux build tree
+        make.cross ARCH=xtensa 
 
-> This enables the new driver for Marvell CESA crypto engines on all mvebu v5.
-> The old driver is no longer used, but it is still in the tree for fallback.
->
-> Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
+All errors (new ones prefixed by >>):
 
-As we already spoke about it with Andrew and Jason I applied it on
-mvebu/defconfig.
+>> init/built-in.o:(.init.literal+0x168): undefined reference to `printascii'
+   init/built-in.o: In function `start_kernel':
+   (.init.text+0x409): undefined reference to `printascii'
 
-Thanks,
-
-Gregory
-
-> ---
->  arch/arm/configs/mvebu_v5_defconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/configs/mvebu_v5_defconfig b/arch/arm/configs/mvebu_v5_defconfig
-> index 4562006..6051c51 100644
-> --- a/arch/arm/configs/mvebu_v5_defconfig
-> +++ b/arch/arm/configs/mvebu_v5_defconfig
-> @@ -208,8 +208,8 @@ CONFIG_DEBUG_KERNEL=y
->  # CONFIG_DEBUG_PREEMPT is not set
->  # CONFIG_FTRACE is not set
->  CONFIG_DEBUG_USER=y
-> +CONFIG_CRYPTO_DEV_MARVELL_CESA=y
->  CONFIG_CRYPTO_CBC=m
->  CONFIG_CRYPTO_PCBC=m
-> -CONFIG_CRYPTO_DEV_MV_CESA=y
->  CONFIG_CRC_CCITT=y
->  CONFIG_LIBCRC32C=y
-> -- 
-> 2.7.4
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 9839 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160330/5e77c255/attachment-0001.obj>
