@@ -1,64 +1,33 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 30 Mar 2016 19:55:21 +0800
-Subject: [PATCH] net: mvneta: replace MVNETA_CPU_D_CACHE_LINE_SIZE with
- L1_CACHE_BYTES
-Message-ID: <1459338921-391-1-git-send-email-jszhang@marvell.com>
+From: ynezz@true.cz (Petr =?iso-8859-2?Q?=A9tetiar?=)
+Date: Wed, 30 Mar 2016 14:06:44 +0200
+Subject: [PATCH] i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity
+In-Reply-To: <m3h9fuk7ik.fsf@t19.piap.pl>
+References: <m3h9fuk7ik.fsf@t19.piap.pl>
+Message-ID: <20160330120644.GM20367@ibawizard.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mvneta is also used in some Marvell berlin family SoCs which may
-have 64bytes cacheline size. Replace the MVNETA_CPU_D_CACHE_LINE_SIZE
-usage with L1_CACHE_BYTES.
+Krzysztof Ha?asa <khalasa@piap.pl> [2016-03-25 14:32:35]:
 
-And since dma_alloc_coherent() is always cacheline size aligned, so
-remove the align checks.
+Cze??,
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- drivers/net/ethernet/marvell/mvneta.c | 10 +---------
- 1 file changed, 1 insertion(+), 9 deletions(-)
+> I wonder if all boards (except maybe that Toradex set) use an active-low
+> PCIe reset and are now broken. Perhaps Toradex uses active-high and thus
+> works.
 
-diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index 577f7ca..5880871 100644
---- a/drivers/net/ethernet/marvell/mvneta.c
-+++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -260,7 +260,6 @@
- 
- #define MVNETA_VLAN_TAG_LEN             4
- 
--#define MVNETA_CPU_D_CACHE_LINE_SIZE    32
- #define MVNETA_TX_CSUM_DEF_SIZE		1600
- #define MVNETA_TX_CSUM_MAX_SIZE		9800
- #define MVNETA_ACC_MODE_EXT1		1
-@@ -300,7 +299,7 @@
- #define MVNETA_RX_PKT_SIZE(mtu) \
- 	ALIGN((mtu) + MVNETA_MH_SIZE + MVNETA_VLAN_TAG_LEN + \
- 	      ETH_HLEN + ETH_FCS_LEN,			     \
--	      MVNETA_CPU_D_CACHE_LINE_SIZE)
-+	      L1_CACHE_BYTES)
- 
- #define IS_TSO_HEADER(txq, addr) \
- 	((addr >= txq->tso_hdrs_phys) && \
-@@ -2764,9 +2763,6 @@ static int mvneta_rxq_init(struct mvneta_port *pp,
- 	if (rxq->descs == NULL)
- 		return -ENOMEM;
- 
--	BUG_ON(rxq->descs !=
--	       PTR_ALIGN(rxq->descs, MVNETA_CPU_D_CACHE_LINE_SIZE));
--
- 	rxq->last_desc = rxq->size - 1;
- 
- 	/* Set Rx descriptors queue starting address */
-@@ -2837,10 +2833,6 @@ static int mvneta_txq_init(struct mvneta_port *pp,
- 	if (txq->descs == NULL)
- 		return -ENOMEM;
- 
--	/* Make sure descriptor address is cache line size aligned  */
--	BUG_ON(txq->descs !=
--	       PTR_ALIGN(txq->descs, MVNETA_CPU_D_CACHE_LINE_SIZE));
--
- 	txq->last_desc = txq->size - 1;
- 
- 	/* Set maximum bandwidth for enabled TXQs */
--- 
-2.8.0.rc3
+I'm really puzzled by this :-) With your patch applied I get following on
+Toradex Apalis modules:
+
+ DTS:         reset-gpio = <&gpio1 28 GPIO_ACTIVE_LOW>;
+ dmesg:       imx6q-pcie 1ffc000.pcie: phy link never came up
+ gpio:        gpio-28  (                    |reset               ) out hi
+ pin voltage: 0V
+
+ DTS:         reset-gpio = <&gpio1 28 GPIO_ACTIVE_HIGH>;
+ dmesg:       ath9k 0000:01:00.0: enabling device (0140 -> 0142)
+ gpio:        gpio-28  (                    |reset               ) out lo
+ pin voltage: 3V3
+
+So Toradex Apalis is actually active-high? Thanks.
+
+-- ynezz
