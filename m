@@ -1,56 +1,48 @@
 From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
-Date: Wed, 30 Mar 2016 10:27:43 -0500
-Subject: [PATCH 2/7] EDAC, altera: Add register offset for ECC Enable
+Date: Wed, 30 Mar 2016 10:27:45 -0500
+Subject: [PATCH 4/7] Documentation: dt: socfpga: Add Altera Arria10 OCRAM
+ binding
 In-Reply-To: <1459351668-14622-1-git-send-email-tthayer@opensource.altera.com>
 References: <1459351668-14622-1-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <1459351668-14622-3-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <1459351668-14622-5-git-send-email-tthayer@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thor Thayer <tthayer@opensource.altera.com>
 
-In preparation for the Arria10 peripheral ECCs, a register
-offset from the ECC base was added to the private data
-structure to index to the ECC enable register.
+Add the device tree bindings needed to support the Altera On-Chip
+RAM ECC on the Arria10 chip.
 
 Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
 ---
- drivers/edac/altera_edac.c |    3 ++-
- drivers/edac/altera_edac.h |    1 +
- 2 files changed, 3 insertions(+), 1 deletion(-)
+ .../bindings/arm/altera/socfpga-eccmgr.txt         |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/drivers/edac/altera_edac.c b/drivers/edac/altera_edac.c
-index fb6fe56..f0a6de7 100644
---- a/drivers/edac/altera_edac.c
-+++ b/drivers/edac/altera_edac.c
-@@ -866,7 +866,7 @@ static int altr_ocram_check_deps(struct altr_edac_device_dev *device)
- 	void __iomem  *base = device->base;
- 	const struct edac_device_prv_data *prv = device->data;
+diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
+index 37ff9bf..2f409d5 100644
+--- a/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
++++ b/Documentation/devicetree/bindings/arm/altera/socfpga-eccmgr.txt
+@@ -71,6 +71,11 @@ Required Properties:
+ - compatible : Should be "altr,socfpga-a10-l2-ecc"
+ - reg : Address and size for ECC error interrupt clear registers.
  
--	if (readl(base) & prv->ecc_enable_mask)
-+	if (readl(base + prv->ecc_en_ofst) & prv->ecc_enable_mask)
- 		return 0;
++On-Chip RAM ECC
++Required Properties:
++- compatible : Should be "altr,socfpga-a10-ocram-ecc"
++- reg : Address and size for ECC block registers.
++
+ Example:
  
- 	edac_printk(KERN_ERR, EDAC_DEVICE,
-@@ -882,6 +882,7 @@ const struct edac_device_prv_data ocramecc_data = {
- 	.alloc_mem = ocram_alloc_mem,
- 	.free_mem = ocram_free_mem,
- 	.ecc_enable_mask = ALTR_OCR_ECC_EN,
-+	.ecc_en_ofst = ALTR_OCR_ECC_REG_OFFSET,
- 	.ce_set_mask = (ALTR_OCR_ECC_EN | ALTR_OCR_ECC_INJS),
- 	.ue_set_mask = (ALTR_OCR_ECC_EN | ALTR_OCR_ECC_INJD),
- 	.set_err_ofst = ALTR_OCR_ECC_REG_OFFSET,
-diff --git a/drivers/edac/altera_edac.h b/drivers/edac/altera_edac.h
-index c995388..cb6b2b9 100644
---- a/drivers/edac/altera_edac.h
-+++ b/drivers/edac/altera_edac.h
-@@ -256,6 +256,7 @@ struct edac_device_prv_data {
- 	void * (*alloc_mem)(size_t size, void **other);
- 	void (*free_mem)(void *p, size_t size, void *other);
- 	int ecc_enable_mask;
-+	int ecc_en_ofst;
- 	int ce_set_mask;
- 	int ue_set_mask;
- 	int set_err_ofst;
+ 	eccmgr: eccmgr at ffd06000 {
+@@ -86,4 +91,9 @@ Example:
+ 			compatible = "altr,socfpga-a10-l2-ecc";
+ 			reg = <0xffd06010 0x4>;
+ 		};
++
++		ocram-ecc at ff8c3000 {
++			compatible = "altr,socfpga-a10-ocram-ecc";
++			reg = <0xff8c3000 0x90>;
++		};
+ 	};
 -- 
 1.7.9.5
