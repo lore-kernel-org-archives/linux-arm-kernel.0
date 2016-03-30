@@ -1,59 +1,76 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 30 Mar 2016 12:03:09 +0200
-Subject: [PATCH v2] ARM: mvebu: Correct unit address for linksys
-In-Reply-To: <op.ye4rjnln2s3iss@ecaz> (Imre Kaloz's message of "Wed, 30 Mar
- 2016 11:05:37 +0200")
-References: <1459270660-30411-1-git-send-email-patrick@puiterwijk.org>
- <op.ye4rjnln2s3iss@ecaz>
-Message-ID: <877fgkuvtu.fsf@free-electrons.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 30 Mar 2016 17:42:42 +0800
+Subject: [PATCH 1/2] ARM: cpuidle: fix !cpuidle_ops[cpu].init case
+ during init
+In-Reply-To: <56FB9CFB.8050305@linaro.org>
+References: <1458796269-6158-1-git-send-email-jszhang@marvell.com>
+ <1458796269-6158-2-git-send-email-jszhang@marvell.com>
+ <56F52502.3060308@linaro.org>	<20160330151629.0b338365@xhacker>
+ <56FB89A8.90209@linaro.org>	<20160330161745.7afd6e48@xhacker>
+ <56FB9125.10507@linaro.org>	<20160330164342.10cf1830@xhacker>
+ <56FB9CFB.8050305@linaro.org>
+Message-ID: <20160330174242.3f11526c@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Patrick,
- 
- On mer., mars 30 2016, "Imre Kaloz" <kaloz@openwrt.org> wrote:
+Hi Daniel,
 
-> Right, a165c3b63b6f24fdc47c270db5f8b1a48b69c1b6 was merged sooner then
-> this board setup file.
->
-> Acked-by: Imre Kaloz <kaloz@openwrt.org>
+On Wed, 30 Mar 2016 11:31:39 +0200 Daniel Lezcano wrote:
 
-Applied on mvebu/fixes. I also added the following flags to the commit:
-Cc: <stable@vger.kernel.org>
-Fixes: 2d0a7addbd10 ("ARM: Kirkwood: Add support for many Synology NAS devices")
+> On 03/30/2016 10:43 AM, Jisheng Zhang wrote:
+> > On Wed, 30 Mar 2016 10:41:09 +0200 Daniel Lezcano wrote:
+> >  
+> >> On 03/30/2016 10:17 AM, Jisheng Zhang wrote:  
+> >>> On Wed, 30 Mar 2016 10:09:12 +0200 Daniel Lezcano wrote:
+> >>>  
+> >>>> On 03/30/2016 09:16 AM, Jisheng Zhang wrote:  
+> >>>>> Hi Daniel,  
+> >>>>
+> >>>> [ ... ]
+> >>>>
+> >>>> Added Lorenzo and Catalin.
+> >>>>  
+> >>>>>> Hi Jisheng,
+> >>>>>>
+> >>>>>> this should be handled in the arm_cpuidle_read_ops function.
+> >>>>>>  
+> >>>>>
+> >>>>> Thanks for reviewing. After some consideration, I think this patch isn't correct
+> >>>>> There may be platforms which doesn't need the init member at all, although
+> >>>>> currently I don't see such platforms in mainline, So I'll drop this patch
+> >>>>> and send out one v2 only does the optimization.  
+> >>>>
+> >>>> There is an inconsistency between ARM and ARM64. The 'cpu_get_ops', the
+> >>>> arm_cpuidle_read_ops from the ARM64 side, returns -EOPNOTSUPP when the
+> >>>> init function is not there for cpuidle.  
+> >>>
+> >>> yes.
+> >>> arm64's arm_cpuidle_init() returns -EOPNOTSUPP if init callback isn't defined
+> >>>  
+> >>>>
+> >>>> I don't think it is a problem, but as ARM/ARM64 are sharing the same
+> >>>> cpuidle-arm.c driver it would make sense to unify the behavior between
+> >>>> both archs.  
+> >>>
+> >>> yes, agree with you. From "unify" point of view, could I move back the suspend
+> >>> callback check and init callback check into arm_cpuidle_init() for arm as V1 does?  
+> >>
+> >> Why ? To be consistent with ARM64 ?  
+> >
+> > Yes, that's my intention.  
+> 
+> Well, I don't have a strong opinion on that. ARM64 cpu_ops is slightly 
+> different from cpuidle_ops as the cpu boot / hotplug operations are 
+> placed in a different place and that explains why on ARM64 we can have 
+> an successful 'get_ops' because we use the partially filled structure. 
+> On ARM, it is cpuidle_ops only, so we can gracefully fail if the ops are 
+> not defined.
+> 
+> IMO, it still make sense to keep the checks in arm_cpuidle_read_ops for ARM.
+> 
 
-as well as the acked-by from Imre.
+Got your points. I'll send a v3 to add init check. These checks will be
+in arm_cpuidle_read_ops.
 
 Thanks,
-
-Gregory
->
-> On Tue, 29 Mar 2016 18:57:40 +0200, Patrick Uiterwijk
-> <patrick@puiterwijk.org> wrote:
->
->> The USB2 port for Armada 38x is defined to be at 58000, not at
->> 50000.
->>
->> Signed-off-by: Patrick Uiterwijk <patrick@puiterwijk.org>
->> ---
->>  arch/arm/boot/dts/armada-385-linksys.dtsi | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/armada-385-linksys.dtsi
->> b/arch/arm/boot/dts/armada-385-linksys.dtsi
->> index 3710755..85d2c37 100644
->> --- a/arch/arm/boot/dts/armada-385-linksys.dtsi
->> +++ b/arch/arm/boot/dts/armada-385-linksys.dtsi
->> @@ -117,7 +117,7 @@
->>  			};
->> 			/* USB part of the eSATA/USB 2.0 port */
->> -			usb at 50000 {
->> +			usb at 58000 {
->>  				status = "okay";
->>  			};
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Jisheng
