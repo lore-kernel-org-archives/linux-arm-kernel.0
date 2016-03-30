@@ -1,54 +1,32 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 30 Mar 2016 12:42:58 +0100
-Subject: [RFC PATCH 00/45] KVM: arm/arm64: Rework virtual GIC emulation
-In-Reply-To: <56FA7F29.4060005@arm.com>
-References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
- <56FA7F29.4060005@arm.com>
-Message-ID: <56FBBBC2.6010602@arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 30 Mar 2016 19:43:14 +0800
+Subject: ARM: dts: imx6ul: add more functionality to i.MX6UL
+In-Reply-To: <1457095043-14115-1-git-send-email-LW@KARO-electronics.de>
+References: <1452619291-13625-1-git-send-email-LW@KARO-electronics.de>
+ <1453284549-16363-1-git-send-email-LW@KARO-electronics.de>
+ <1457095043-14115-1-git-send-email-LW@KARO-electronics.de>
+Message-ID: <20160330114313.GE28207@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/03/16 14:12, Vladimir Murzin wrote:
-> Hi Andre,
+On Fri, Mar 04, 2016 at 01:37:21PM +0100, Lothar Wa?mann wrote:
+> [PATCHv3 1/2] ARM: dts: imx6ul: add support for Ka-Ro electronics TXUL modules
+> [PATCHv3 2/2] ARM: dts: imx6ul: add support for Ka-Ro electronics TXUL mainboard
+
+Applied both, thanks.
+
 > 
-> On 25/03/16 02:04, Andre Przywara wrote:
->> Please have a look at the series, review it and give the code some
->> serious testing (and possibly debugging). All feedback is appreciated.
+> This patchset adds more functionality to the i.MX6UL machines.
 > 
-> I see that with the new vgic implementation kvmtool starts throwing:
+> Changes vs. v1:
+> - added patch to implement KPP clock for i.MX6UL to prevent conflicts
+>   when this patch would go via a different tree.
+> - added board support for Ka-Ro electronics TX6UL module for the same
+>   reason
+> - added imx6ul specific compatibles as requested by Lucas Stach
 > 
-> kvm [1273]: Unable to register VGICv3 redist MMIO regions
-> 
-
-It comes from kvm_io_bus_register_dev()
-
-if (bus->dev_count - bus->ioeventfd_count > NR_IOBUS_DEVS - 1)
-	return -ENOSPC;
-
-with bus->dev_count being 1000
-
-[<ffffffc00009f93c>] kvm_io_bus_register_dev+0x130/0x148
-[<ffffffc0000ad274>] kvm_vgic_register_mmio_region+0xac/0xdc
-[<ffffffc0000ad4d4>] vgic_register_redist_regions+0xb8/0x158
-[<ffffffc0000abb90>] vgic_v3_map_resources+0x5c/0xf0
-[<ffffffc0000aae04>] kvm_vgic_map_resources+0x40/0x84
-[<ffffffc0000a23d0>] kvm_arch_vcpu_ioctl_run+0x3f0/0x400
-[<ffffffc00009d484>] kvm_vcpu_ioctl+0x2d4/0x6ec
-[<ffffffc0001c4eec>] do_vfs_ioctl+0xb4/0x760
-[<ffffffc0001c561c>] SyS_ioctl+0x84/0x98
-[<ffffffc000085d30>] el0_svc_naked+0x24/0x28
-
-Hope this helps...
-Vladimir
-
-> for --cpus 58 and above, where with the old vgic it is quite happy with
-> up to 255 cpus.
-> 
-> Cheers
-> Vladimir
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+> Changes vs. v2:
+> - dropped patches which have already been applied in the meantime
+> - addressed comments by Shawn Guo
 > 
 > 
