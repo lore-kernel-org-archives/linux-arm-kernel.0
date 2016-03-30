@@ -1,117 +1,63 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 30 Mar 2016 22:04:08 +0200
-Subject: [PATCH v5 45/46] drm: i915: switch to the atomic PWM API
+Date: Wed, 30 Mar 2016 22:04:09 +0200
+Subject: [PATCH v5 46/46] ARM: s3c24xx: rx1950: switch to the atomic PWM API
 In-Reply-To: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1459368249-13241-46-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1459368249-13241-47-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pwm_config/enable/disable() have been deprecated and should be replaced
-by pwm_apply_state().
+Replace pwm_disable/enable/config() by pwm_apply_state().
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/gpu/drm/i915/intel_panel.c | 39 +++++++++++++++++++++++++-------------
- 1 file changed, 26 insertions(+), 13 deletions(-)
+ arch/arm/mach-s3c24xx/mach-rx1950.c | 17 ++++++++++++++---
+ 1 file changed, 14 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/gpu/drm/i915/intel_panel.c b/drivers/gpu/drm/i915/intel_panel.c
-index 21ee647..b86bd20 100644
---- a/drivers/gpu/drm/i915/intel_panel.c
-+++ b/drivers/gpu/drm/i915/intel_panel.c
-@@ -538,10 +538,10 @@ static u32 bxt_get_backlight(struct intel_connector *connector)
- static u32 pwm_get_backlight(struct intel_connector *connector)
+diff --git a/arch/arm/mach-s3c24xx/mach-rx1950.c b/arch/arm/mach-s3c24xx/mach-rx1950.c
+index 774c982..2dc9487 100644
+--- a/arch/arm/mach-s3c24xx/mach-rx1950.c
++++ b/arch/arm/mach-s3c24xx/mach-rx1950.c
+@@ -384,10 +384,15 @@ static struct pwm_device *lcd_pwm;
+ 
+ static void rx1950_lcd_power(int enable)
  {
- 	struct intel_panel *panel = &connector->panel;
--	int duty_ns;
 +	struct pwm_state pstate;
+ 	int i;
+ 	static int enabled;
++
+ 	if (enabled == enable)
+ 		return;
++
++	pwm_get_state(lcd_pwm, &pstate);
++
+ 	if (!enable) {
  
--	duty_ns = pwm_get_duty_cycle(panel->backlight.pwm);
--	return DIV_ROUND_UP(duty_ns * 100, CRC_PMIC_PWM_PERIOD_NS);
-+	pwm_get_state(panel->backlight.pwm, &pstate);
-+	return DIV_ROUND_UP(pstate.duty_cycle * 100, CRC_PMIC_PWM_PERIOD_NS);
- }
+ 		/* GPC11-GPC15->OUTPUT */
+@@ -433,15 +438,21 @@ static void rx1950_lcd_power(int enable)
  
- static u32 intel_panel_get_backlight(struct intel_connector *connector)
-@@ -630,9 +630,12 @@ static void bxt_set_backlight(struct intel_connector *connector, u32 level)
- static void pwm_set_backlight(struct intel_connector *connector, u32 level)
- {
- 	struct intel_panel *panel = &connector->panel;
--	int duty_ns = DIV_ROUND_UP(level * CRC_PMIC_PWM_PERIOD_NS, 100);
-+	struct pwm_state pstate;
+ 		/* GPB1->OUTPUT, GPB1->0 */
+ 		gpio_direction_output(S3C2410_GPB(1), 0);
+-		pwm_config(lcd_pwm, 0, LCD_PWM_PERIOD);
++
++		pstate.enabled = false;
++		pstate.period = LCD_PWM_PERIOD;
++		pstate.duty_cycle = 0;
++		pwm_apply_state(lcd_pwm, &pstate);
+ 		pwm_disable(lcd_pwm);
  
--	pwm_config(panel->backlight.pwm, duty_ns, CRC_PMIC_PWM_PERIOD_NS);
-+	pwm_get_state(panel->backlight.pwm, &pstate);
-+	pstate.duty_cycle = DIV_ROUND_UP(level * CRC_PMIC_PWM_PERIOD_NS, 100);
-+	pstate.period = CRC_PMIC_PWM_PERIOD_NS;
-+	pwm_apply_state(panel->backlight.pwm, &pstate);
- }
+ 		/* GPC0->0, GPC10->0 */
+ 		gpio_direction_output(S3C2410_GPC(0), 0);
+ 		gpio_direction_output(S3C2410_GPC(10), 0);
+ 	} else {
+-		pwm_config(lcd_pwm, LCD_PWM_DUTY, LCD_PWM_PERIOD);
+-		pwm_enable(lcd_pwm);
++		pstate.enabled = true;
++		pstate.period = LCD_PWM_PERIOD;
++		pstate.duty_cycle = LCD_PWM_DUTY;
++		pwm_apply_state(lcd_pwm, &pstate);
  
- static void
-@@ -801,11 +804,15 @@ static void bxt_disable_backlight(struct intel_connector *connector)
- static void pwm_disable_backlight(struct intel_connector *connector)
- {
- 	struct intel_panel *panel = &connector->panel;
-+	struct pwm_state pstate;
- 
- 	/* Disable the backlight */
--	pwm_config(panel->backlight.pwm, 0, CRC_PMIC_PWM_PERIOD_NS);
-+	pwm_get_state(panel->backlight.pwm, &pstate);
-+	pstate.duty_cycle = 0;
-+	pwm_apply_state(panel->backlight.pwm, &pstate);
- 	usleep_range(2000, 3000);
--	pwm_disable(panel->backlight.pwm);
-+	pstate.enabled = false;
-+	pwm_apply_state(panel->backlight.pwm, &pstate);
- }
- 
- void intel_panel_disable_backlight(struct intel_connector *connector)
-@@ -1068,8 +1075,11 @@ static void bxt_enable_backlight(struct intel_connector *connector)
- static void pwm_enable_backlight(struct intel_connector *connector)
- {
- 	struct intel_panel *panel = &connector->panel;
-+	struct pwm_state pstate;
- 
--	pwm_enable(panel->backlight.pwm);
-+	pwm_get_state(panel->backlight.pwm, &pstate);
-+	pstate.enabled = true;
-+	pwm_apply_state(panel->backlight.pwm, &pstate);
- 	intel_panel_actually_set_backlight(connector, panel->backlight.level);
- }
- 
-@@ -1630,6 +1640,7 @@ static int pwm_setup_backlight(struct intel_connector *connector,
- {
- 	struct drm_device *dev = connector->base.dev;
- 	struct intel_panel *panel = &connector->panel;
-+	struct pwm_state pstate;
- 	int retval;
- 
- 	/* Get the PWM chip for backlight control */
-@@ -1640,8 +1651,10 @@ static int pwm_setup_backlight(struct intel_connector *connector,
- 		return -ENODEV;
- 	}
- 
--	retval = pwm_config(panel->backlight.pwm, CRC_PMIC_PWM_PERIOD_NS,
--			    CRC_PMIC_PWM_PERIOD_NS);
-+	pwm_get_state(panel->backlight.pwm, &pstate);
-+	pstate.period = CRC_PMIC_PWM_PERIOD_NS;
-+	pstate.duty_cycle = CRC_PMIC_PWM_PERIOD_NS;
-+	retval = pwm_apply_state(panel->backlight.pwm, &pstate);
- 	if (retval < 0) {
- 		DRM_ERROR("Failed to configure the pwm chip\n");
- 		pwm_put(panel->backlight.pwm);
-@@ -1651,9 +1664,9 @@ static int pwm_setup_backlight(struct intel_connector *connector,
- 
- 	panel->backlight.min = 0; /* 0% */
- 	panel->backlight.max = 100; /* 100% */
--	panel->backlight.level = DIV_ROUND_UP(
--				 pwm_get_duty_cycle(panel->backlight.pwm) * 100,
--				 CRC_PMIC_PWM_PERIOD_NS);
-+	pwm_get_state(panel->backlight.pwm, &pstate);
-+	panel->backlight.level = DIV_ROUND_UP(pstate.duty_cycle * 100,
-+					      pstate.period);
- 	panel->backlight.enabled = panel->backlight.level != 0;
- 
- 	return 0;
+ 		gpio_direction_output(S3C2410_GPC(0), 1);
+ 		gpio_direction_output(S3C2410_GPC(5), 1);
 -- 
 2.5.0
