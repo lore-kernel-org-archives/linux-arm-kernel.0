@@ -1,53 +1,37 @@
-From: emil.l.velikov@gmail.com (Emil Velikov)
-Date: Wed, 30 Mar 2016 21:03:57 +0100
-Subject: [RFC PATCH v1 0/4] Add Rockchip RGA support
-In-Reply-To: <CACvgo50REvRxN2_qdw=2NeTTSgjpA+9c8OZgPE0q19meH6ArKA@mail.gmail.com>
-References: <1458552518-25527-1-git-send-email-ykk@rock-chips.com>
- <1571169.Hy8an0n7lM@diego>
- <CACvgo516ewfwGCpV=noX+re1x8t3Sp1t39Sha+A2-tQ5YsoihA@mail.gmail.com>
- <17189219.y56YqHz6yR@diego>
- <CACvgo50REvRxN2_qdw=2NeTTSgjpA+9c8OZgPE0q19meH6ArKA@mail.gmail.com>
-Message-ID: <CACvgo53rYAW4H0SJnz8-7QtfRHmWWUh+7L7DiUbjBJ-hPBMHug@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 30 Mar 2016 22:03:25 +0200
+Subject: [PATCH v5 02/46] backlight: pwm_bl: remove useless call to
+ pwm_set_period()
+In-Reply-To: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1459368249-13241-3-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 March 2016 at 14:13, Emil Velikov <emil.l.velikov@gmail.com> wrote:
-> On 28 March 2016 at 23:13, Heiko St?bner <heiko@sntech.de> wrote:
->
->> I have the feeling we're going quite a bit off-topic right now :-) .
->> The binary-driver-crazyness, hasn't really anything to do with Yakir's support
->> for the RGA (which is about raster-graphics-acceleration, so 2d stuff).
->>
->> And me mentioning the armsoc-ddx was merely a means to allow some sort of
->> different userspace user, as requested in your original mail ;-) .
->>
-> Seems like I forgot to state the obvious - for all the reasons
-> mentioned, the armsoc ddx seems like a bad example.
->
->> Maybe you know a better use-case on where to demonstrate the viability of the
->> userspace API for it as originally requested.
-> I'm afraid that my RockChip-foo is extremely limited. Perhaps the
-> actual user of these should be mentioned ? xf86-video-rockhip (is
-> there one ?) or any other effort/project that lacks some (all?) of the
-> criticism listed.
->
-> (Sort of) the bottom line - either reuse the existing interfaces or
-> provide an approved, full blown userspace (libdrm demos/programs do
-> not count) that uses the new interfaces.
->
-> I haven't made these rules, just a fool^Wguy that repeats them so that
-> people don't abuse them much. If in doubt check with Dave and Daniel V
-> - they had enough repeating these.
->
-I can see how my earlier response may have been come
-across/interpreted as aggressive and/or demanding. Apologies anyone
-got upset/annoyed.
+The PWM period will be set when calling pwm_config. Remove this useless
+call to pwm_set_period(), which might mess up with the internal PWM state.
 
-Let me try in another light - if you guys are willing to have
-xf86-video-rockchip or keep track of/co-maintain armsoc, pretty much
-everyone will be over the moon. Personally I'd opt for the former,
-taking the modesetting (the one in the xserver tree) as a base - it
-has all the cool new bits ;-)
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Acked-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/video/backlight/pwm_bl.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-Regards,
-Emil
+diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
+index 64f9e1b..a33a290 100644
+--- a/drivers/video/backlight/pwm_bl.c
++++ b/drivers/video/backlight/pwm_bl.c
+@@ -313,10 +313,8 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+ 	 * via the PWM lookup table.
+ 	 */
+ 	pb->period = pwm_get_period(pb->pwm);
+-	if (!pb->period && (data->pwm_period_ns > 0)) {
++	if (!pb->period && (data->pwm_period_ns > 0))
+ 		pb->period = data->pwm_period_ns;
+-		pwm_set_period(pb->pwm, data->pwm_period_ns);
+-	}
+ 
+ 	pb->lth_brightness = data->lth_brightness * (pb->period / pb->scale);
+ 
+-- 
+2.5.0
