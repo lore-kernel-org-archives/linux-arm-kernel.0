@@ -1,10 +1,9 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 30 Mar 2016 22:03:32 +0200
-Subject: [PATCH v5 09/46] misc: max77693-haptic: use pwm_get_args() where
- appropriate
+Date: Wed, 30 Mar 2016 22:03:31 +0200
+Subject: [PATCH v5 08/46] hwmon: pwm-fan: use pwm_get_args() where appropriate
 In-Reply-To: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1459368249-13241-10-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1459368249-13241-9-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -21,46 +20,74 @@ just been requested (before the user calls pwm_config/enable/disable()).
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/input/misc/max77693-haptic.c | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+ drivers/hwmon/pwm-fan.c | 19 +++++++++++++------
+ 1 file changed, 13 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/input/misc/max77693-haptic.c b/drivers/input/misc/max77693-haptic.c
-index 6d96bff..cf6aac0 100644
---- a/drivers/input/misc/max77693-haptic.c
-+++ b/drivers/input/misc/max77693-haptic.c
-@@ -70,10 +70,13 @@ struct max77693_haptic {
+diff --git a/drivers/hwmon/pwm-fan.c b/drivers/hwmon/pwm-fan.c
+index 3e23003..82c5656 100644
+--- a/drivers/hwmon/pwm-fan.c
++++ b/drivers/hwmon/pwm-fan.c
+@@ -40,15 +40,18 @@ struct pwm_fan_ctx {
  
- static int max77693_haptic_set_duty_cycle(struct max77693_haptic *haptic)
+ static int  __set_pwm(struct pwm_fan_ctx *ctx, unsigned long pwm)
  {
--	int delta = (haptic->pwm_dev->period + haptic->pwm_duty) / 2;
 +	struct pwm_args pargs = { };
-+	int delta;
- 	int error;
+ 	unsigned long duty;
+ 	int ret = 0;
  
--	error = pwm_config(haptic->pwm_dev, delta, haptic->pwm_dev->period);
-+	pwm_get_args(haptic->pwm_dev, &pargs);
-+	delta = (pargs.period + haptic->pwm_duty) / 2;
-+	error = pwm_config(haptic->pwm_dev, delta, pargs.period);
- 	if (error) {
- 		dev_err(haptic->dev, "failed to configure pwm: %d\n", error);
- 		return error;
-@@ -234,6 +237,7 @@ static int max77693_haptic_play_effect(struct input_dev *dev, void *data,
- 				       struct ff_effect *effect)
++	pwm_get_args(ctx->pwm, &pargs);
++
+ 	mutex_lock(&ctx->lock);
+ 	if (ctx->pwm_value == pwm)
+ 		goto exit_set_pwm_err;
+ 
+-	duty = DIV_ROUND_UP(pwm * (ctx->pwm->period - 1), MAX_PWM);
+-	ret = pwm_config(ctx->pwm, duty, ctx->pwm->period);
++	duty = DIV_ROUND_UP(pwm * (pargs.period - 1), MAX_PWM);
++	ret = pwm_config(ctx->pwm, duty, pargs.period);
+ 	if (ret)
+ 		goto exit_set_pwm_err;
+ 
+@@ -214,6 +217,7 @@ static int pwm_fan_of_get_cooling_data(struct device *dev,
+ static int pwm_fan_probe(struct platform_device *pdev)
  {
- 	struct max77693_haptic *haptic = input_get_drvdata(dev);
+ 	struct thermal_cooling_device *cdev;
 +	struct pwm_args pargs = { };
- 	u64 period_mag_multi;
+ 	struct pwm_fan_ctx *ctx;
+ 	struct device *hwmon;
+ 	int duty_cycle;
+@@ -234,10 +238,11 @@ static int pwm_fan_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, ctx);
  
- 	haptic->magnitude = effect->u.rumble.strong_magnitude;
-@@ -245,7 +249,8 @@ static int max77693_haptic_play_effect(struct input_dev *dev, void *data,
- 	 * The formula to convert magnitude to pwm_duty as follows:
- 	 * - pwm_duty = (magnitude * pwm_period) / MAX_MAGNITUDE(0xFFFF)
- 	 */
--	period_mag_multi = (u64)haptic->pwm_dev->period * haptic->magnitude;
-+	pwm_get_args(haptic->pwm_dev, &pargs);
-+	period_mag_multi = (u64)pargs.period * haptic->magnitude;
- 	haptic->pwm_duty = (unsigned int)(period_mag_multi >>
- 						MAX_MAGNITUDE_SHIFT);
+ 	/* Set duty cycle to maximum allowed */
+-	duty_cycle = ctx->pwm->period - 1;
++	pwm_get_args(ctx->pwm, &pargs);
++	duty_cycle = pargs.period - 1;
+ 	ctx->pwm_value = MAX_PWM;
  
+-	ret = pwm_config(ctx->pwm, duty_cycle, ctx->pwm->period);
++	ret = pwm_config(ctx->pwm, duty_cycle, pargs.period);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Failed to configure PWM\n");
+ 		return ret;
+@@ -303,14 +308,16 @@ static int pwm_fan_suspend(struct device *dev)
+ static int pwm_fan_resume(struct device *dev)
+ {
+ 	struct pwm_fan_ctx *ctx = dev_get_drvdata(dev);
++	struct pwm_args pargs = { };
+ 	unsigned long duty;
+ 	int ret;
+ 
+ 	if (ctx->pwm_value == 0)
+ 		return 0;
+ 
+-	duty = DIV_ROUND_UP(ctx->pwm_value * (ctx->pwm->period - 1), MAX_PWM);
+-	ret = pwm_config(ctx->pwm, duty, ctx->pwm->period);
++	pwm_get_args(ctx->pwm, &pargs);
++	duty = DIV_ROUND_UP(ctx->pwm_value * (pargs.period - 1), MAX_PWM);
++	ret = pwm_config(ctx->pwm, duty, pargs.period);
+ 	if (ret)
+ 		return ret;
+ 	return pwm_enable(ctx->pwm);
 -- 
 2.5.0
