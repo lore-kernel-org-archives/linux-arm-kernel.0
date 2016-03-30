@@ -1,55 +1,42 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 30 Mar 2016 12:44:16 +0900
-Subject: [PATCH v7 1/4] dt-bindings: power: reset: add document for
- reboot-mode driver
-In-Reply-To: <1459304390-9763-1-git-send-email-andy.yan@rock-chips.com>
-References: <1459304304-9713-1-git-send-email-andy.yan@rock-chips.com>
- <1459304390-9763-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <56FB4B90.4000206@samsung.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 29 Mar 2016 22:12:46 -0700
+Subject: [GIT PULL] bcm2835 clk changes for 4.6 maybe
+In-Reply-To: <20160329233923.GR18567@codeaurora.org>
+References: <1458265130-30734-1-git-send-email-eric@anholt.net>
+ <20160329233923.GR18567@codeaurora.org>
+Message-ID: <877fgk5z1t.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30.03.2016 11:19, Andy Yan wrote:
-> Add device tree bindings document for reboot-mode driver.
-> 
-> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
-> Acked-by: Rob Herring <robh@kernel.org>
-> 
-> ---
-> 
-> Changes in v7:
-> - fix some spelling mistakes
-> - declare that the mode magic should be none-zero value
-> 
-> Changes in v6:
-> - fix a typo with "property"
-> - describe property "mask" more clear
-> 
-> Changes in v5:
-> - delete a unnecessary blank line in syscon-reboot-mode.txt
-> - rename mode-fastoboot to mode-bootloader in syscon-reboot-mode.txt
-> - rename macro BOOT_LOADER to BOOT_BL_DOWNLOAD, which gives a more clear mean
-> 
-> Changes in v4:
-> - remove mode-maskrom
-> - rename mode-fastboot to mode-bootloader to keep compatible with the exiting Android device
-> 
-> Changes in v3:
-> - descirbe all reboot mode as properity instead of subnode
-> 
-> Changes in v2: None
-> Changes in v1: None
-> 
->  .../bindings/power/reset/reboot-mode.txt           | 25 ++++++++++++++++
->  .../bindings/power/reset/syscon-reboot-mode.txt    | 35 ++++++++++++++++++++++
->  2 files changed, 60 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/power/reset/reboot-mode.txt
->  create mode 100644 Documentation/devicetree/bindings/power/reset/syscon-reboot-mode.txt
+Stephen Boyd <sboyd@codeaurora.org> writes:
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> On 03/17, Eric Anholt wrote:
+>> This is late, so feel free to drop it, but I figured I'd send it to
+>> you in case you were still open to merges.  I've pounded on it a bit
+>> today (modesets to all sorts of resolutions on HDMI, used it for
+>> testing the DPI panel support that I'm hoping to have for 4.7, and did
+>> a whole lot of browsing of clk_summary as I debugged DPI), and kbuild
+>> test robot came back clean, so I'm pretty happy with it.
+>> 
+>> The following changes since commit 4d3ac6662452060721599a3392bc2f524af984cb:
+>> 
+>>   clk: bcm2835: fix check of error code returned by devm_ioremap_resource() (2016-03-15 18:14:11 -0700)
+>> 
+>> are available in the git repository at:
+>> 
+>>   git at github.com:anholt/linux.git tags/bcm2835-clk-next-2016-03-17
+>
+> Please make sure to use a proper URL here. I don't have access to
+> git at github.com, but I can fetch this from
+> git://github.com/anholt/linux.git. The tag and the contents match
+> so I'm fairly confident all is well.
 
-
-
-Best regards,
-
-Krzysztof
+Yeah, it should have been https://github.com/anholt/linux -- sorry about
+that!
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160329/5a6204e7/attachment.sig>
