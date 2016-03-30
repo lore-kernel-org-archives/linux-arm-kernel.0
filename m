@@ -1,76 +1,155 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 30 Mar 2016 22:03:45 +0200
-Subject: [PATCH v5 22/46] pwm: rockchip: avoid glitches on already running PWMs
+Date: Wed, 30 Mar 2016 22:03:28 +0200
+Subject: [PATCH v5 05/46] pwm: introduce the pwm_args concept
 In-Reply-To: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1459368249-13241-23-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1459368249-13241-6-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current logic will disable the PWM clk even if the PWM was left
-enabled by the bootloader (because it's controlling a critical device
-like a regulator for example).
-Keep the PWM clk enabled if the PWM is enabled to avoid any glitches.
+Currently the PWM core mixes the current PWM state with the per-platform
+reference config (specified through the PWM lookup table, DT definition or
+directly hardcoded in PWM drivers).
+
+Create a pwm_args struct to store this reference config, so that PWM users
+can differentiate the current config from the reference one.
+
+Patch all places where pwm->args should be initialized. We keep the
+pwm_set_polarity/period() calls until all PWM users are patched to
+use pwm_args instead of pwm_get_period/polarity().
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/pwm/pwm-rockchip.c | 24 +++++++++++++++++++++++-
- 1 file changed, 23 insertions(+), 1 deletion(-)
+ drivers/pwm/core.c         | 13 +++++++++----
+ drivers/pwm/pwm-clps711x.c |  3 ++-
+ drivers/pwm/pwm-pxa.c      |  1 +
+ include/linux/pwm.h        | 26 ++++++++++++++++++++++++++
+ 4 files changed, 38 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/pwm/pwm-rockchip.c b/drivers/pwm/pwm-rockchip.c
-index 6a1087c..5c7e79c 100644
---- a/drivers/pwm/pwm-rockchip.c
-+++ b/drivers/pwm/pwm-rockchip.c
-@@ -302,6 +302,7 @@ static int rockchip_pwm_probe(struct platform_device *pdev)
- {
- 	const struct of_device_id *id;
- 	struct rockchip_pwm_chip *pc;
-+	struct pwm_state pstate;
- 	struct resource *r;
- 	int ret;
+diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+index 7c330ff..cd55d61 100644
+--- a/drivers/pwm/core.c
++++ b/drivers/pwm/core.c
+@@ -146,12 +146,14 @@ of_pwm_xlate_with_flags(struct pwm_chip *pc, const struct of_phandle_args *args)
+ 	if (IS_ERR(pwm))
+ 		return pwm;
  
-@@ -322,7 +323,7 @@ static int rockchip_pwm_probe(struct platform_device *pdev)
- 	if (IS_ERR(pc->clk))
- 		return PTR_ERR(pc->clk);
+-	pwm_set_period(pwm, args->args[1]);
++	pwm->args.period = args->args[1];
++	pwm_set_period(pwm, pwm->args.period);
  
--	ret = clk_prepare(pc->clk);
-+	ret = clk_prepare_enable(pc->clk);
- 	if (ret)
- 		return ret;
+ 	if (args->args[2] & PWM_POLARITY_INVERTED)
+-		pwm_set_polarity(pwm, PWM_POLARITY_INVERSED);
++		pwm->args.polarity = PWM_POLARITY_INVERSED;
+ 	else
+-		pwm_set_polarity(pwm, PWM_POLARITY_NORMAL);
++		pwm->args.polarity = PWM_POLARITY_NORMAL;
++	pwm_set_polarity(pwm, pwm->args.polarity);
  
-@@ -345,12 +346,33 @@ static int rockchip_pwm_probe(struct platform_device *pdev)
- 		dev_err(&pdev->dev, "pwmchip_add() failed: %d\n", ret);
- 	}
+ 	return pwm;
+ }
+@@ -172,7 +174,8 @@ of_pwm_simple_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
+ 	if (IS_ERR(pwm))
+ 		return pwm;
  
-+	/* Keep the PWM clk enabled if the PWM appears to be up and running. */
-+	pwm_get_state(pc->chip.pwms, &pstate);
-+	if (!pstate.enabled)
-+		clk_disable(pc->clk);
+-	pwm_set_period(pwm, args->args[1]);
++	pwm->args.period = args->args[1];
++	pwm_set_period(pwm, pwm->args.period);
+ 
+ 	return pwm;
+ }
+@@ -740,6 +743,8 @@ struct pwm_device *pwm_get(struct device *dev, const char *con_id)
+ 	if (IS_ERR(pwm))
+ 		goto out;
+ 
++	pwm->args.period = chosen->period;
++	pwm->args.polarity = chosen->polarity;
+ 	pwm_set_period(pwm, chosen->period);
+ 	pwm_set_polarity(pwm, chosen->polarity);
+ 
+diff --git a/drivers/pwm/pwm-clps711x.c b/drivers/pwm/pwm-clps711x.c
+index a80c108..807a48d 100644
+--- a/drivers/pwm/pwm-clps711x.c
++++ b/drivers/pwm/pwm-clps711x.c
+@@ -60,7 +60,8 @@ static int clps711x_pwm_request(struct pwm_chip *chip, struct pwm_device *pwm)
+ 		return -EINVAL;
+ 
+ 	/* Store constant period value */
+-	pwm_set_period(pwm, DIV_ROUND_CLOSEST(NSEC_PER_SEC, freq));
++	pwm->args.period = DIV_ROUND_CLOSEST(NSEC_PER_SEC, freq);
++	pwm_set_period(pwm, pwm->args.period);
+ 
+ 	return 0;
+ }
+diff --git a/drivers/pwm/pwm-pxa.c b/drivers/pwm/pwm-pxa.c
+index cb2f702..3fcc886 100644
+--- a/drivers/pwm/pwm-pxa.c
++++ b/drivers/pwm/pwm-pxa.c
+@@ -160,6 +160,7 @@ pxa_pwm_of_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
+ 	if (IS_ERR(pwm))
+ 		return pwm;
+ 
++	pwm->args.period = args->args[0];
+ 	pwm_set_period(pwm, args->args[0]);
+ 
+ 	return pwm;
+diff --git a/include/linux/pwm.h b/include/linux/pwm.h
+index 6555f01..ed65354 100644
+--- a/include/linux/pwm.h
++++ b/include/linux/pwm.h
+@@ -74,6 +74,23 @@ enum pwm_polarity {
+ 	PWM_POLARITY_INVERSED,
+ };
+ 
++/**
++ * struct pwm_args - PWM arguments
++ * @period: reference period
++ * @polarity: reference polarity
++ *
++ * This structure describe board-dependent arguments attached to a PWM
++ * device. Those arguments are usually retrieved from the PWM lookup table or
++ * DT definition.
++ * This should not be confused with the PWM state: PWM args not representing
++ * the current PWM state, but the configuration the PWM user plan to use
++ * on this PWM device.
++ */
++struct pwm_args {
++	unsigned int period;
++	enum pwm_polarity polarity;
++};
 +
- 	return ret;
+ enum {
+ 	PWMF_REQUESTED = 1 << 0,
+ 	PWMF_ENABLED = 1 << 1,
+@@ -91,6 +108,7 @@ enum {
+  * @period: period of the PWM signal (in nanoseconds)
+  * @duty_cycle: duty cycle of the PWM signal (in nanoseconds)
+  * @polarity: polarity of the PWM signal
++ * @args: PWM arguments
+  */
+ struct pwm_device {
+ 	const char *label;
+@@ -103,6 +121,8 @@ struct pwm_device {
+ 	unsigned int period;
+ 	unsigned int duty_cycle;
+ 	enum pwm_polarity polarity;
++
++	struct pwm_args args;
+ };
+ 
+ static inline bool pwm_is_enabled(const struct pwm_device *pwm)
+@@ -142,6 +162,12 @@ static inline enum pwm_polarity pwm_get_polarity(const struct pwm_device *pwm)
+ 	return pwm ? pwm->polarity : PWM_POLARITY_NORMAL;
  }
  
- static int rockchip_pwm_remove(struct platform_device *pdev)
- {
- 	struct rockchip_pwm_chip *pc = platform_get_drvdata(pdev);
-+	struct pwm_state pstate;
++static inline void pwm_get_args(const struct pwm_device *pwm,
++				struct pwm_args *args)
++{
++	*args = pwm->args;
++}
 +
-+	/*
-+	 * Disable the PWM clk before unpreparing it if the PWM device is still
-+	 * running. This should only happen when the last PWM user left it
-+	 * enabled, or when nobody requested a PWM that was previously enabled
-+	 * by the bootloader.
-+	 *
-+	 * FIXME: Maybe the core should disable all PWM devices in
-+	 * pwmchip_remove(). In this case we'd only have to call
-+	 * clk_unprepare() after pwmchip_remove().
-+	 *
-+	 */
-+	pwm_get_state(pc->chip.pwms, &pstate);
-+	if (pstate.enabled)
-+		clk_disable(pc->clk);
- 
- 	clk_unprepare(pc->clk);
- 
+ /**
+  * struct pwm_ops - PWM controller operations
+  * @request: optional hook for requesting a PWM
 -- 
 2.5.0
