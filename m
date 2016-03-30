@@ -1,53 +1,109 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 30 Mar 2016 17:43:06 +0200
-Subject: [PATCH v2 1/4] arm64: use 'segment' rather than 'chunk' to describe
- mapped kernel regions
+Date: Wed, 30 Mar 2016 17:43:09 +0200
+Subject: [PATCH v2 4/4] arm64: simplify kernel segment mapping granularity
 In-Reply-To: <1459352589-28721-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1459352589-28721-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1459352589-28721-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1459352589-28721-5-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the poorly defined term chunk with segment, which is a term that is
-already used by the ELF spec to describe contiguous mappings with the same
-permission attributes of statically allocated ranges of an executable.
+The mapping of the kernel consist of four segments, each of which is mapped
+with different permission attributes and/or lifetimes. To optimize the TLB
+and translation table footprint, we define various opaque constants in the
+linker script that resolve to different aligment values depending on the
+page size and whether CONFIG_DEBUG_ALIGN_RODATA is set.
+
+Considering that
+- a 4 KB granule kernel benefits from a 64 KB segment alignment (due to
+  the fact that it allows the use of the contiguous bit),
+- the minimum alignment of the .data segment is THREAD_SIZE already, not
+  PAGE_SIZE (i.e., we already have padding between _data and the start of
+  the .data payload in many cases),
+- 2 MB is a suitable alignment value on all granule sizes, either for
+  mapping directly (level 2 on 4 KB), or via the contiguous bit (level 3 on
+  16 KB and 64 KB),
+- anything beyond 2 MB exceeds the minimum alignment mandated by the boot
+  protocol, and can only be mapped efficiently if the physical alignment
+  happens to be the same,
+
+we can simplify this by standardizing on 64 KB (or 2 MB) explicitly, i.e.,
+regardless of granule size, all segments are aligned either to 64 KB, or to
+2 MB if CONFIG_DEBUG_ALIGN_RODATA=y. This also means we can drop the Kconfig
+dependency of CONFIG_DEBUG_ALIGN_RODATA on CONFIG_ARM64_4K_PAGES.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/mm/mmu.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ arch/arm64/Kconfig.debug        |  2 +-
+ arch/arm64/kernel/vmlinux.lds.S | 25 ++++++++++++--------
+ 2 files changed, 16 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index f3e5c74233f3..9be2065f8ddb 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -471,8 +471,8 @@ void fixup_init(void)
- 	unmap_kernel_range((u64)__init_begin, (u64)(__init_end - __init_begin));
- }
+diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+index 7e76845a0434..710fde4ad0f0 100644
+--- a/arch/arm64/Kconfig.debug
++++ b/arch/arm64/Kconfig.debug
+@@ -59,7 +59,7 @@ config DEBUG_RODATA
+ 	  If in doubt, say Y
  
--static void __init map_kernel_chunk(pgd_t *pgd, void *va_start, void *va_end,
--				    pgprot_t prot, struct vm_struct *vma)
-+static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
-+				      pgprot_t prot, struct vm_struct *vma)
- {
- 	phys_addr_t pa_start = __pa(va_start);
- 	unsigned long size = va_end - va_start;
-@@ -499,11 +499,11 @@ static void __init map_kernel(pgd_t *pgd)
- {
- 	static struct vm_struct vmlinux_text, vmlinux_rodata, vmlinux_init, vmlinux_data;
+ config DEBUG_ALIGN_RODATA
+-	depends on DEBUG_RODATA && ARM64_4K_PAGES
++	depends on DEBUG_RODATA
+ 	bool "Align linker sections up to SECTION_SIZE"
+ 	help
+ 	  If this option is enabled, sections that may potentially be marked as
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 61a1075b9c30..77d86c976abd 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -63,14 +63,19 @@ PECOFF_FILE_ALIGNMENT = 0x200;
+ #endif
  
--	map_kernel_chunk(pgd, _stext, __start_rodata, PAGE_KERNEL_EXEC, &vmlinux_text);
--	map_kernel_chunk(pgd, __start_rodata, _etext, PAGE_KERNEL, &vmlinux_rodata);
--	map_kernel_chunk(pgd, __init_begin, __init_end, PAGE_KERNEL_EXEC,
--			 &vmlinux_init);
--	map_kernel_chunk(pgd, _data, _end, PAGE_KERNEL, &vmlinux_data);
-+	map_kernel_segment(pgd, _stext, __start_rodata, PAGE_KERNEL_EXEC, &vmlinux_text);
-+	map_kernel_segment(pgd, __start_rodata, _etext, PAGE_KERNEL, &vmlinux_rodata);
-+	map_kernel_segment(pgd, __init_begin, __init_end, PAGE_KERNEL_EXEC,
-+			   &vmlinux_init);
-+	map_kernel_segment(pgd, _data, _end, PAGE_KERNEL, &vmlinux_data);
+ #if defined(CONFIG_DEBUG_ALIGN_RODATA)
+-#define ALIGN_DEBUG_RO			. = ALIGN(1<<SECTION_SHIFT);
+-#define ALIGN_DEBUG_RO_MIN(min)		ALIGN_DEBUG_RO
+-#elif defined(CONFIG_DEBUG_RODATA)
+-#define ALIGN_DEBUG_RO			. = ALIGN(1<<PAGE_SHIFT);
+-#define ALIGN_DEBUG_RO_MIN(min)		ALIGN_DEBUG_RO
++/*
++ *  4 KB granule:   1 level 2 entry
++ * 16 KB granule: 128 level 3 entries, with contiguous bit
++ * 64 KB granule:  32 level 3 entries, with contiguous bit
++ */
++#define SEGMENT_ALIGN			SZ_2M
+ #else
+-#define ALIGN_DEBUG_RO
+-#define ALIGN_DEBUG_RO_MIN(min)		. = ALIGN(min);
++/*
++ *  4 KB granule:  16 level 3 entries, with contiguous bit
++ * 16 KB granule:   4 level 3 entries, without contiguous bit
++ * 64 KB granule:   1 level 3 entry
++ */
++#define SEGMENT_ALIGN			SZ_64K
+ #endif
  
- 	if (!pgd_val(*pgd_offset_raw(pgd, FIXADDR_START))) {
- 		/*
+ SECTIONS
+@@ -114,12 +119,12 @@ SECTIONS
+ 		*(.got)			/* Global offset table		*/
+ 	}
+ 
+-	ALIGN_DEBUG_RO_MIN(PAGE_SIZE)
++	. = ALIGN(SEGMENT_ALIGN);
+ 	RO_DATA(PAGE_SIZE)		/* everything from this point to */
+ 	EXCEPTION_TABLE(8)		/* _etext will be marked RO NX   */
+ 	NOTES
+ 
+-	ALIGN_DEBUG_RO_MIN(PAGE_SIZE)
++	. = ALIGN(SEGMENT_ALIGN);
+ 	_etext = .;			/* End of text and rodata section */
+ 	__init_begin = .;
+ 
+@@ -168,7 +173,7 @@ SECTIONS
+ 		*(.hash)
+ 	}
+ 
+-	. = ALIGN(PAGE_SIZE);
++	. = ALIGN(SEGMENT_ALIGN);
+ 	__init_end = .;
+ 
+ 	_data = .;
 -- 
 2.5.0
