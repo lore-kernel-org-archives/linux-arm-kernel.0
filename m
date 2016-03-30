@@ -1,49 +1,61 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 30 Mar 2016 14:25:46 +0200
-Subject: [PATCH v2 1/3] arm64/mm: ensure memstart_addr remains sufficiently
- aligned
+Date: Wed, 30 Mar 2016 14:25:47 +0200
+Subject: [PATCH v2 2/3] arm64: choose memstart_addr based on minimum sparsemem
+ section alignment
 In-Reply-To: <1459340748-14975-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1459340748-14975-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1459340748-14975-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1459340748-14975-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After choosing memstart_addr to be the highest multiple of
-ARM64_MEMSTART_ALIGN less than or equal to the first usable physical memory
-address, we clip the memblocks to the maximum size of the linear region.
-Since the kernel may be high up in memory, we take care not to clip the
-kernel itself, which means we have to clip some memory from the bottom if
-this occurs, to ensure that the distance between the first and the last
-usable physical memory address can be covered by the linear region.
-
-However, we fail to update memstart_addr if this clipping from the bottom
-occurs, which means that we may still end up with virtual addresses that
-wrap into the userland range. So increment memstart_addr as appropriate to
-prevent this from happening.
+This redefines ARM64_MEMSTART_ALIGN in terms of the minimal alignment
+required by sparsemem vmemmap. This comes down to using 1 GB for all
+translation granules if CONFIG_SPARSEMEM_VMEMMAP is enabled.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/mm/init.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/kernel-pgtable.h | 21 +++++++++++++++++---
+ 1 file changed, 18 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index ec4db8dfbe3a..82ced5fa1e66 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -190,8 +190,12 @@ void __init arm64_memblock_init(void)
- 	 */
- 	memblock_remove(max_t(u64, memstart_addr + linear_region_size, __pa(_end)),
- 			ULLONG_MAX);
--	if (memblock_end_of_DRAM() > linear_region_size)
--		memblock_remove(0, memblock_end_of_DRAM() - linear_region_size);
-+	if (memstart_addr + linear_region_size < memblock_end_of_DRAM()) {
-+		/* ensure that memstart_addr remains sufficiently aligned */
-+		memstart_addr = round_up(memblock_end_of_DRAM() - linear_region_size,
-+					 ARM64_MEMSTART_ALIGN);
-+		memblock_remove(0, memstart_addr);
-+	}
+diff --git a/arch/arm64/include/asm/kernel-pgtable.h b/arch/arm64/include/asm/kernel-pgtable.h
+index 5c6375d8528b..7e51d1b57c0c 100644
+--- a/arch/arm64/include/asm/kernel-pgtable.h
++++ b/arch/arm64/include/asm/kernel-pgtable.h
+@@ -19,6 +19,7 @@
+ #ifndef __ASM_KERNEL_PGTABLE_H
+ #define __ASM_KERNEL_PGTABLE_H
  
- 	/*
- 	 * Apply the memory limit if it was set. Since the kernel may be loaded
++#include <asm/sparsemem.h>
+ 
+ /*
+  * The linear mapping and the start of memory are both 2M aligned (per
+@@ -86,10 +87,24 @@
+  * (64k granule), or a multiple that can be mapped using contiguous bits
+  * in the page tables: 32 * PMD_SIZE (16k granule)
+  */
+-#ifdef CONFIG_ARM64_64K_PAGES
+-#define ARM64_MEMSTART_ALIGN	SZ_512M
++#if defined(CONFIG_ARM64_4K_PAGES)
++#define ARM64_MEMSTART_SHIFT		PUD_SHIFT
++#elif defined(CONFIG_ARM64_16K_PAGES)
++#define ARM64_MEMSTART_SHIFT		(PMD_SHIFT + 5)
+ #else
+-#define ARM64_MEMSTART_ALIGN	SZ_1G
++#define ARM64_MEMSTART_SHIFT		PMD_SHIFT
++#endif
++
++/*
++ * sparsemem vmemmap imposes an additional requirement on the alignment of
++ * memstart_addr, due to the fact that the base of the vmemmap region
++ * has a direct correspondence, and needs to appear sufficiently aligned
++ * in the virtual address space.
++ */
++#if defined(CONFIG_SPARSEMEM_VMEMMAP) && ARM64_MEMSTART_SHIFT < SECTION_SIZE_BITS
++#define ARM64_MEMSTART_ALIGN	(1UL << SECTION_SIZE_BITS)
++#else
++#define ARM64_MEMSTART_ALIGN	(1UL << ARM64_MEMSTART_SHIFT)
+ #endif
+ 
+ #endif	/* __ASM_KERNEL_PGTABLE_H */
 -- 
 2.5.0
