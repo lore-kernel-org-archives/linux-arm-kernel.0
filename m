@@ -1,80 +1,99 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 30 Mar 2016 18:38:51 +0200
-Subject: [PATCH v2 3/5] efi: add support for the EFI_MEMORY_ATTRIBUTES_TABLE
- config table
+Date: Wed, 30 Mar 2016 18:38:50 +0200
+Subject: [PATCH v2 2/5] arm64: efi: apply strict permissons for UEFI Runtime
+ Services regions
 In-Reply-To: <1459355933-13529-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1459355933-13529-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1459355933-13529-4-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1459355933-13529-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This declares the GUID and struct typedef for the new memory attributes
-table which contains the permissions that can be used to apply stricter
-permissions to UEFI Runtime Services memory regions.
+Recent UEFI versions expose permission attributes for runtime services
+memory regions, either in the UEFI memory map or in the separate memory
+attributes table. This allows the kernel to map these regions with
+stricter permissions, rather than the RWX permissions that are used by
+default. So wire this up in our mapping routine.
 
+Note that in the absence of permission attributes, we still only map
+regions of type EFI_RUNTIME_SERVICE_CODE with the executable bit set.
+Also, we base the mapping attributes of EFI_MEMORY_MAPPED_IO on the
+type directly rather than on the absence of the EFI_MEMORY_WB attribute.
+This is more correct, but is also required for compatibility with the
+upcoming support for the Memory Attributes Table, which only carries
+permission attributes, not memory type attributes.
+
+Cc: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/firmware/efi/efi.c |  2 ++
- include/linux/efi.h        | 13 +++++++++++++
- 2 files changed, 15 insertions(+)
+ arch/arm64/kernel/efi.c | 54 +++++++++++++++-----
+ 1 file changed, 40 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
-index 3a69ed5ecfcb..5683865baa92 100644
---- a/drivers/firmware/efi/efi.c
-+++ b/drivers/firmware/efi/efi.c
-@@ -43,6 +43,7 @@ struct efi __read_mostly efi = {
- 	.config_table		= EFI_INVALID_TABLE_ADDR,
- 	.esrt			= EFI_INVALID_TABLE_ADDR,
- 	.properties_table	= EFI_INVALID_TABLE_ADDR,
-+	.mem_attr_table		= EFI_INVALID_TABLE_ADDR,
- };
- EXPORT_SYMBOL(efi);
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index b6abc852f2a1..33a6da160a50 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -17,22 +17,48 @@
  
-@@ -338,6 +339,7 @@ static __initdata efi_config_table_type_t common_tables[] = {
- 	{UGA_IO_PROTOCOL_GUID, "UGA", &efi.uga},
- 	{EFI_SYSTEM_RESOURCE_TABLE_GUID, "ESRT", &efi.esrt},
- 	{EFI_PROPERTIES_TABLE_GUID, "PROP", &efi.properties_table},
-+	{EFI_MEMORY_ATTRIBUTES_TABLE_GUID, "MEMATTR", &efi.mem_attr_table},
- 	{NULL_GUID, NULL, NULL},
- };
+ #include <asm/efi.h>
  
-diff --git a/include/linux/efi.h b/include/linux/efi.h
-index 1626474567ac..346d01ad7cca 100644
---- a/include/linux/efi.h
-+++ b/include/linux/efi.h
-@@ -623,6 +623,10 @@ void efi_native_runtime_setup(void);
- 	EFI_GUID(0x3152bca5, 0xeade, 0x433d, \
- 		 0x86, 0x2e, 0xc0, 0x1c, 0xdc, 0x29, 0x1f, 0x44)
+-int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md)
++/*
++ * Only regions of type EFI_RUNTIME_SERVICES_CODE need to be
++ * executable, everything else can be mapped with the XN bits
++ * set. Also take the new (optional) RO/XP bits into account.
++ */
++static __init pteval_t create_mapping_protection(efi_memory_desc_t *md)
+ {
+-	pteval_t prot_val;
++	u64 attr = md->attribute;
++	u32 type = md->type;
  
-+#define EFI_MEMORY_ATTRIBUTES_TABLE_GUID \
-+	EFI_GUID(0xdcfa911d, 0x26eb, 0x469f, \
-+		 0xa2, 0x20, 0x38, 0xb7, 0xdc, 0x46, 0x12, 0x20)
+-	/*
+-	 * Only regions of type EFI_RUNTIME_SERVICES_CODE need to be
+-	 * executable, everything else can be mapped with the XN bits
+-	 * set.
+-	 */
+-	if ((md->attribute & EFI_MEMORY_WB) == 0)
+-		prot_val = PROT_DEVICE_nGnRE;
+-	else if (md->type == EFI_RUNTIME_SERVICES_CODE ||
+-		 !PAGE_ALIGNED(md->phys_addr))
+-		prot_val = pgprot_val(PAGE_KERNEL_EXEC);
+-	else
+-		prot_val = pgprot_val(PAGE_KERNEL);
++	if (type == EFI_MEMORY_MAPPED_IO)
++		return PROT_DEVICE_nGnRE;
 +
- typedef struct {
- 	efi_guid_t guid;
- 	u64 table;
-@@ -847,6 +851,14 @@ typedef struct {
- 
- #define EFI_INVALID_TABLE_ADDR		(~0UL)
- 
-+typedef struct {
-+	u32 version;
-+	u32 num_entries;
-+	u32 desc_size;
-+	u32 reserved;
-+	efi_memory_desc_t entry[0];
-+} efi_memory_attributes_table_t;
++	if (WARN_ONCE(!PAGE_ALIGNED(md->phys_addr),
++		      "UEFI Runtime regions are not aligned to 64 KB -- buggy firmware?"))
++		/*
++		 * If the region is not aligned to the page size of the OS, we
++		 * can not use strict permissions, since that would also affect
++		 * the mapping attributes of the adjacent regions.
++		 */
++		return pgprot_val(PAGE_KERNEL_EXEC);
 +
- /*
-  * All runtime access to EFI goes through this structure:
-  */
-@@ -868,6 +880,7 @@ extern struct efi {
- 	unsigned long config_table;	/* config tables */
- 	unsigned long esrt;		/* ESRT table */
- 	unsigned long properties_table;	/* properties table */
-+	unsigned long mem_attr_table;	/* memory attributes table */
- 	efi_get_time_t *get_time;
- 	efi_set_time_t *set_time;
- 	efi_get_wakeup_time_t *get_wakeup_time;
++	/* R-- */
++	if ((attr & (EFI_MEMORY_XP | EFI_MEMORY_RO)) ==
++	    (EFI_MEMORY_XP | EFI_MEMORY_RO))
++		return pgprot_val(PAGE_KERNEL_RO);
++
++	/* R-X */
++	if (attr & EFI_MEMORY_RO)
++		return pgprot_val(PAGE_KERNEL_ROX);
++
++	/* RW- */
++	if (attr & EFI_MEMORY_XP || type != EFI_RUNTIME_SERVICES_CODE)
++		return pgprot_val(PAGE_KERNEL);
++
++	/* RWX */
++	return pgprot_val(PAGE_KERNEL_EXEC);
++}
++
++int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md)
++{
++	pteval_t prot_val = create_mapping_protection(md);
+ 
+ 	create_pgd_mapping(mm, md->phys_addr, md->virt_addr,
+ 			   md->num_pages << EFI_PAGE_SHIFT,
 -- 
 2.5.0
