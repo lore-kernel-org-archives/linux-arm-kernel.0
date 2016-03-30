@@ -1,63 +1,28 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 30 Mar 2016 12:12:09 -0700
-Subject: N900 sleep mode (in 4.5-rc0, if that matters)
-In-Reply-To: <20160323123801.GC32031@amd>
-References: <20160126172527.GY3500@atomide.com> <20160130200244.GA30429@amd>
- <20160130201452.GC30429@amd> <20160130221509.GA28644@amd>
- <20160201181316.GM19432@atomide.com> <20160201211736.GA11283@amd>
- <20160201221111.GP19432@atomide.com> <20160207212316.GA6147@amd>
- <20160209172403.GK19432@atomide.com> <20160323123801.GC32031@amd>
-Message-ID: <20160330191208.GW9329@atomide.com>
+Date: Wed, 30 Mar 2016 12:13:56 -0700
+Subject: [PATCH v4 1/5] ARM: dts: LG Optimus Black codename sniper basic
+ support
+In-Reply-To: <1458489518.29161.3.camel@paulk.fr>
+References: <1456663185-14170-1-git-send-email-contact@paulk.fr>
+ <1456663185-14170-2-git-send-email-contact@paulk.fr>
+ <20160229215136.GO13417@atomide.com>
+ <1458489518.29161.3.camel@paulk.fr>
+Message-ID: <20160330191356.GX9329@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pavel Machek <pavel@ucw.cz> [160323 05:38]:
+* Paul Kocialkowski <contact@paulk.fr> [160320 08:59]:
+> Le lundi 29 f?vrier 2016 ? 13:51 -0800, Tony Lindgren a ?crit?:
+> > Anyways, applying the dts changes into omap-for-v4.6/dt thanks.
 > 
-> Ok, another attempt at shutting USB down:
+> It seems that v3 of this patch was merged into your tree instead of v4, which
+> contains some improvements over v3.
 > 
-> 00001fff 48005020 (fa005020) cm_idlest_per blocking bits: 0007e000
-> f7dffe9d 48004a20 (fa004a20) cm_idlest1_core blocking bits: 00200062
-> 0000000d 48004a28 (fa004a28) cm_idlest3_core
-> 
-> Tried again today:
-> 
-> 00001fff 48005020 (fa005020) cm_idlest_per blocking bits: 0007e000
-> f7dffe9d 48004a20 (fa004a20) cm_idlest1_core blocking bits: 00200062
-> 0000000d 48004a28 (fa004a28) cm_idlest3_core
-> pavel at n900:/my/tui/ofone$ sleep test
-> 
-> 00001fff 48005020 (fa005020) cm_idlest_per blocking bits: 0007e000
-> ffde7e9d 48004a20 (fa004a20) cm_idlest1_core blocking bits: 00218062
-> 0000000d 48004a28 (fa004a28) cm_idlest3_core
-> 
-> 00001fff 48005020 (fa005020) cm_idlest_per blocking bits: 0007e000
-> fedffe9d 48004a20 (fa004a20) cm_idlest1_core blocking bits: 01200062
-> 0000000d 48004a28 (fa004a28) cm_idlest3_core
-> 
-> 00001fff 48005020 (fa005020) cm_idlest_per blocking bits: 0007e000
-> ffde7e9d 48004a20 (fa004a20) cm_idlest1_core blocking bits: 00218062
-> 0000000d 48004a28 (fa004a28) cm_idlest3_core
-> 
-> Is there documentation for the cm_idlest1_ bits?
+> Should I submit a cleanup patch with the diff or can you use v4 instead (if not
+> too late)?
 
-Yes, see the TRM.
+Oops sorry. Yes please send an incremental patch against v4.6-rc1.
 
-> How idle system do I need to have? Screen is blanked and machine
-> should be mostly idle, but there's X running on another vt with Mate
-> desktop, and some python scripts... GSM modem should be online.
-
-Well I think it's the USB only you have blocking deeper idle states.
-
-Are you sure you rmmod:ed all the USB related modules like in my
-test script?
-
-MUSB currently has an unresolved issue where it blocks idle states
-if loaded.
-
-> Are you booting over USB from NOLO?
-
-I'm booting over smc91x using u-boot.
-
-Regards,
+Thanks,
 
 Tony
