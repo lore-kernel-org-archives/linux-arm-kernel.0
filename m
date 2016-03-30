@@ -1,102 +1,101 @@
-From: blogic@openwrt.org (John Crispin)
-Date: Wed, 30 Mar 2016 11:18:19 +0200
-Subject: [PATCH] mfd: mt6397: irq domain should initialize before
- mfd_add_devices()
-In-Reply-To: <1459322708-21363-1-git-send-email-henryc.chen@mediatek.com>
-References: <1459322708-21363-1-git-send-email-henryc.chen@mediatek.com>
-Message-ID: <56FB99DB.6010901@openwrt.org>
+From: j.anaszewski@samsung.com (Jacek Anaszewski)
+Date: Wed, 30 Mar 2016 11:29:14 +0200
+Subject: [PATCH 1/3] leds: trigger: Introduce a kernel panic LED trigger
+In-Reply-To: <1459283749-22451-2-git-send-email-ezequiel@vanguardiasur.com.ar>
+References: <1459283749-22451-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+ <1459283749-22451-2-git-send-email-ezequiel@vanguardiasur.com.ar>
+Message-ID: <56FB9C6A.2090402@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Ezequiel,
 
-small nitpick inline
+Thanks for the patch. I've tested it on exynos4412-trats2 board
+with leds-aat1290 driver, by executing:
 
-On 30/03/2016 09:25, Henry Chen wrote:
-> Some sub driver like RTC module need irq domain from parent to create
-> irq mapping when driver initialize. so move mt6397_irq_init() before
-> mfd_add_devices().
-> 
-> Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
+echo "c" > /proc/sysrq-trigger
+
+I was able to notice the blinking then.
+
+Applied to the for-next branch of linux-leds.git.
+
+Thanks,
+Jacek Anaszewski
+
+On 03/29/2016 10:35 PM, Ezequiel Garcia wrote:
+> This commit introduces a new LED trigger which allows to configure
+> a LED to blink on a kernel panic (through panic_blink).
+>
+> Notice that currently the Openmoko FreeRunner (GTA02) mach code
+> sets panic_blink to blink a hard-coded LED. The new trigger is
+> meant to introduce a generic mechanism to achieve this.
+>
+> Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
 > ---
-> This patch fixed the below warning based on "Linux kernel v4.6-rc1"
-> WARNING: CPU: 1 PID: 132 at kernel/mediatek/kernel/irq/irqdomain.c:471
-> irq_create_mapping+0xc4/0xd0
-> ---
->  drivers/mfd/mt6397-core.c | 37 ++++++++++++++++++++++---------------
->  1 file changed, 22 insertions(+), 15 deletions(-)
-> 
-> diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
-> index 8e8d932..a879223 100644
-> --- a/drivers/mfd/mt6397-core.c
-> +++ b/drivers/mfd/mt6397-core.c
-> @@ -270,22 +270,36 @@ static int mt6397_probe(struct platform_device *pdev)
->  		goto fail_irq;
->  	}
->  
-> +	pmic->irq = platform_get_irq(pdev, 0);
+>   drivers/leds/trigger/Kconfig         |  7 +++++++
+>   drivers/leds/trigger/Makefile        |  1 +
+>   drivers/leds/trigger/ledtrig-panic.c | 30 ++++++++++++++++++++++++++++++
+>   3 files changed, 38 insertions(+)
+>   create mode 100644 drivers/leds/trigger/ledtrig-panic.c
+>
+> diff --git a/drivers/leds/trigger/Kconfig b/drivers/leds/trigger/Kconfig
+> index 5bda6a9b56bb..554f5bfbeced 100644
+> --- a/drivers/leds/trigger/Kconfig
+> +++ b/drivers/leds/trigger/Kconfig
+> @@ -108,4 +108,11 @@ config LEDS_TRIGGER_CAMERA
+>   	  This enables direct flash/torch on/off by the driver, kernel space.
+>   	  If unsure, say Y.
+>
+> +config LEDS_TRIGGER_PANIC
+> +	bool "LED Panic Trigger"
+> +	depends on LEDS_TRIGGERS
+> +	help
+> +	  This allows LEDs to be configured to blink on a kernel panic.
+> +	  If unsure, say Y.
 > +
->  	switch (id & 0xff) {
->  	case MT6323_CID_CODE:
-> -		pmic->int_con[0] = MT6323_INT_CON0;
-> -		pmic->int_con[1] = MT6323_INT_CON1;
-> -		pmic->int_status[0] = MT6323_INT_STATUS0;
-> -		pmic->int_status[1] = MT6323_INT_STATUS1;
-> +		if (pmic->irq > 0) {
-
-should this not be
-
-		if (pmic->irq >= 0) {
-
-i think the code before your patch was wrong as linux irqs start with 0.
-
-	John
-
-
-> +			pmic->int_con[0] = MT6323_INT_CON0;
-> +			pmic->int_con[1] = MT6323_INT_CON1;
-> +			pmic->int_status[0] = MT6323_INT_STATUS0;
-> +			pmic->int_status[1] = MT6323_INT_STATUS1;
-> +			ret = mt6397_irq_init(pmic);
-> +			if (ret)
-> +				return ret;
-> +		}
+>   endif # LEDS_TRIGGERS
+> diff --git a/drivers/leds/trigger/Makefile b/drivers/leds/trigger/Makefile
+> index 1abf48dacf7e..547bf5c80e52 100644
+> --- a/drivers/leds/trigger/Makefile
+> +++ b/drivers/leds/trigger/Makefile
+> @@ -8,3 +8,4 @@ obj-$(CONFIG_LEDS_TRIGGER_CPU)		+= ledtrig-cpu.o
+>   obj-$(CONFIG_LEDS_TRIGGER_DEFAULT_ON)	+= ledtrig-default-on.o
+>   obj-$(CONFIG_LEDS_TRIGGER_TRANSIENT)	+= ledtrig-transient.o
+>   obj-$(CONFIG_LEDS_TRIGGER_CAMERA)	+= ledtrig-camera.o
+> +obj-$(CONFIG_LEDS_TRIGGER_PANIC)	+= ledtrig-panic.o
+> diff --git a/drivers/leds/trigger/ledtrig-panic.c b/drivers/leds/trigger/ledtrig-panic.c
+> new file mode 100644
+> index 000000000000..627b350c5ec3
+> --- /dev/null
+> +++ b/drivers/leds/trigger/ledtrig-panic.c
+> @@ -0,0 +1,30 @@
+> +/*
+> + * Kernel Panic LED Trigger
+> + *
+> + * Copyright 2016 Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + */
 > +
->  		ret = mfd_add_devices(&pdev->dev, -1, mt6323_devs,
->  				ARRAY_SIZE(mt6323_devs), NULL, 0, NULL);
->  		break;
->  
->  	case MT6397_CID_CODE:
->  	case MT6391_CID_CODE:
-> -		pmic->int_con[0] = MT6397_INT_CON0;
-> -		pmic->int_con[1] = MT6397_INT_CON1;
-> -		pmic->int_status[0] = MT6397_INT_STATUS0;
-> -		pmic->int_status[1] = MT6397_INT_STATUS1;
-> +		if (pmic->irq > 0) {
-> +			pmic->int_con[0] = MT6397_INT_CON0;
-> +			pmic->int_con[1] = MT6397_INT_CON1;
-> +			pmic->int_status[0] = MT6397_INT_STATUS0;
-> +			pmic->int_status[1] = MT6397_INT_STATUS1;
-> +			ret = mt6397_irq_init(pmic);
-> +			if (ret)
-> +				return ret;
-> +		}
+> +#include <linux/kernel.h>
+> +#include <linux/init.h>
+> +#include <linux/leds.h>
 > +
->  		ret = mfd_add_devices(&pdev->dev, -1, mt6397_devs,
->  				ARRAY_SIZE(mt6397_devs), NULL, 0, NULL);
->  		break;
-> @@ -296,13 +310,6 @@ static int mt6397_probe(struct platform_device *pdev)
->  		break;
->  	}
->  
-> -	pmic->irq = platform_get_irq(pdev, 0);
-> -	if (pmic->irq > 0) {
-> -		ret = mt6397_irq_init(pmic);
-> -		if (ret)
-> -			return ret;
-> -	}
-> -
->  fail_irq:
->  	if (ret) {
->  		irq_domain_remove(pmic->irq_domain);
-> 
+> +static struct led_trigger *trigger;
+> +
+> +static long led_panic_blink(int state)
+> +{
+> +	led_trigger_event(trigger, state ? LED_FULL : LED_OFF);
+> +	return 0;
+> +}
+> +
+> +static int __init ledtrig_panic_init(void)
+> +{
+> +	led_trigger_register_simple("panic", &trigger);
+> +	panic_blink = led_panic_blink;
+> +	return 0;
+> +}
+> +device_initcall(ledtrig_panic_init);
