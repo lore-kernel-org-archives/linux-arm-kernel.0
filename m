@@ -1,64 +1,41 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 30 Mar 2016 22:03:48 +0200
-Subject: [PATCH v5 25/46] pwm: sti: avoid glitches on already running PWMs
+Date: Wed, 30 Mar 2016 22:03:26 +0200
+Subject: [PATCH v5 03/46] backlight: lm3630a_bl: stop messing with the
+ pwm->period field
 In-Reply-To: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1459368249-13241-26-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1459368249-13241-4-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current logic will disable the PWM clk even if a PWM was left
-enabled by the bootloader (because it's controlling a critical device
-like a regulator for example).
-Keep the PWM clk enabled if at least one PWM is enabled to avoid any
-glitches.
+pwm->period field is not supposed to be changed by PWM users. The only
+ones authorized to change it are the PWM core and PWM drivers.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/pwm/pwm-sti.c | 17 +++++++++++++++--
- 1 file changed, 15 insertions(+), 2 deletions(-)
+ drivers/video/backlight/lm3630a_bl.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/drivers/pwm/pwm-sti.c b/drivers/pwm/pwm-sti.c
-index 0fbca94..bea1d17 100644
---- a/drivers/pwm/pwm-sti.c
-+++ b/drivers/pwm/pwm-sti.c
-@@ -343,7 +343,7 @@ static int sti_pwm_probe(struct platform_device *pdev)
- 	struct sti_pwm_compat_data *cdata;
- 	struct sti_pwm_chip *pc;
- 	struct resource *res;
--	int ret;
-+	int i, ret;
+diff --git a/drivers/video/backlight/lm3630a_bl.c b/drivers/video/backlight/lm3630a_bl.c
+index 35fe482..3d16bd6 100644
+--- a/drivers/video/backlight/lm3630a_bl.c
++++ b/drivers/video/backlight/lm3630a_bl.c
+@@ -162,7 +162,7 @@ static int lm3630a_intr_config(struct lm3630a_chip *pchip)
  
- 	pc = devm_kzalloc(dev, sizeof(*pc), GFP_KERNEL);
- 	if (!pc)
-@@ -394,7 +394,7 @@ static int sti_pwm_probe(struct platform_device *pdev)
- 		return -EINVAL;
+ static void lm3630a_pwm_ctrl(struct lm3630a_chip *pchip, int br, int br_max)
+ {
+-	unsigned int period = pwm_get_period(pchip->pwmd);
++	unsigned int period = pchip->pdata->pwm_period;
+ 	unsigned int duty = br * period / br_max;
+ 
+ 	pwm_config(pchip->pwmd, duty, period);
+@@ -425,7 +425,6 @@ static int lm3630a_probe(struct i2c_client *client,
+ 			return PTR_ERR(pchip->pwmd);
+ 		}
  	}
+-	pchip->pwmd->period = pdata->pwm_period;
  
--	ret = clk_prepare(pc->clk);
-+	ret = clk_prepare_enable(pc->clk);
- 	if (ret) {
- 		dev_err(dev, "failed to prepare clock\n");
- 		return ret;
-@@ -412,6 +412,19 @@ static int sti_pwm_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
-+	/*
-+	 * Keep the PWM clk enabled if some PWMs appear to be up and
-+	 * running.
-+	 */
-+	for (i = 0; i < pc->chip.npwm; i++) {
-+		struct pwm_state pstate;
-+
-+		pwm_get_state(&pc->chip.pwms[i], &pstate);
-+		if (pstate.enabled)
-+			clk_enable(pc->clk);
-+	}
-+	clk_disable(pc->clk);
-+
- 	platform_set_drvdata(pdev, pc);
- 
- 	return 0;
+ 	/* interrupt enable  : irq 0 is not allowed */
+ 	pchip->irq = client->irq;
 -- 
 2.5.0
