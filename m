@@ -1,9 +1,9 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 30 Mar 2016 22:03:31 +0200
-Subject: [PATCH v5 08/46] hwmon: pwm-fan: use pwm_get_args() where appropriate
+Date: Wed, 30 Mar 2016 22:03:30 +0200
+Subject: [PATCH v5 07/46] clk: pwm: use pwm_get_args() where appropriate
 In-Reply-To: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1459368249-13241-9-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1459368249-13241-8-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,74 +20,49 @@ just been requested (before the user calls pwm_config/enable/disable()).
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/hwmon/pwm-fan.c | 19 +++++++++++++------
- 1 file changed, 13 insertions(+), 6 deletions(-)
+ drivers/clk/clk-pwm.c | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/hwmon/pwm-fan.c b/drivers/hwmon/pwm-fan.c
-index 3e23003..82c5656 100644
---- a/drivers/hwmon/pwm-fan.c
-+++ b/drivers/hwmon/pwm-fan.c
-@@ -40,15 +40,18 @@ struct pwm_fan_ctx {
- 
- static int  __set_pwm(struct pwm_fan_ctx *ctx, unsigned long pwm)
+diff --git a/drivers/clk/clk-pwm.c b/drivers/clk/clk-pwm.c
+index 8830458..ebcd738 100644
+--- a/drivers/clk/clk-pwm.c
++++ b/drivers/clk/clk-pwm.c
+@@ -56,6 +56,7 @@ static const struct clk_ops clk_pwm_ops = {
+ static int clk_pwm_probe(struct platform_device *pdev)
  {
+ 	struct device_node *node = pdev->dev.of_node;
 +	struct pwm_args pargs = { };
- 	unsigned long duty;
- 	int ret = 0;
+ 	struct clk_init_data init;
+ 	struct clk_pwm *clk_pwm;
+ 	struct pwm_device *pwm;
+@@ -71,22 +72,23 @@ static int clk_pwm_probe(struct platform_device *pdev)
+ 	if (IS_ERR(pwm))
+ 		return PTR_ERR(pwm);
  
-+	pwm_get_args(ctx->pwm, &pargs);
-+
- 	mutex_lock(&ctx->lock);
- 	if (ctx->pwm_value == pwm)
- 		goto exit_set_pwm_err;
+-	if (!pwm->period) {
++	pwm_get_args(pwm, &pargs);
++	if (!pargs.period) {
+ 		dev_err(&pdev->dev, "invalid PWM period\n");
+ 		return -EINVAL;
+ 	}
  
--	duty = DIV_ROUND_UP(pwm * (ctx->pwm->period - 1), MAX_PWM);
--	ret = pwm_config(ctx->pwm, duty, ctx->pwm->period);
-+	duty = DIV_ROUND_UP(pwm * (pargs.period - 1), MAX_PWM);
-+	ret = pwm_config(ctx->pwm, duty, pargs.period);
- 	if (ret)
- 		goto exit_set_pwm_err;
+ 	if (of_property_read_u32(node, "clock-frequency", &clk_pwm->fixed_rate))
+-		clk_pwm->fixed_rate = NSEC_PER_SEC / pwm->period;
++		clk_pwm->fixed_rate = NSEC_PER_SEC / pargs.period;
  
-@@ -214,6 +217,7 @@ static int pwm_fan_of_get_cooling_data(struct device *dev,
- static int pwm_fan_probe(struct platform_device *pdev)
- {
- 	struct thermal_cooling_device *cdev;
-+	struct pwm_args pargs = { };
- 	struct pwm_fan_ctx *ctx;
- 	struct device *hwmon;
- 	int duty_cycle;
-@@ -234,10 +238,11 @@ static int pwm_fan_probe(struct platform_device *pdev)
- 	platform_set_drvdata(pdev, ctx);
+-	if (pwm->period != NSEC_PER_SEC / clk_pwm->fixed_rate &&
+-	    pwm->period != DIV_ROUND_UP(NSEC_PER_SEC, clk_pwm->fixed_rate)) {
++	if (pargs.period != NSEC_PER_SEC / clk_pwm->fixed_rate &&
++	    pargs.period != DIV_ROUND_UP(NSEC_PER_SEC, clk_pwm->fixed_rate)) {
+ 		dev_err(&pdev->dev,
+ 			"clock-frequency does not match PWM period\n");
+ 		return -EINVAL;
+ 	}
  
- 	/* Set duty cycle to maximum allowed */
--	duty_cycle = ctx->pwm->period - 1;
-+	pwm_get_args(ctx->pwm, &pargs);
-+	duty_cycle = pargs.period - 1;
- 	ctx->pwm_value = MAX_PWM;
- 
--	ret = pwm_config(ctx->pwm, duty_cycle, ctx->pwm->period);
-+	ret = pwm_config(ctx->pwm, duty_cycle, pargs.period);
- 	if (ret) {
- 		dev_err(&pdev->dev, "Failed to configure PWM\n");
+-	ret = pwm_config(pwm, (pwm->period + 1) >> 1, pwm->period);
++	ret = pwm_config(pwm, (pargs.period + 1) >> 1, pargs.period);
+ 	if (ret < 0)
  		return ret;
-@@ -303,14 +308,16 @@ static int pwm_fan_suspend(struct device *dev)
- static int pwm_fan_resume(struct device *dev)
- {
- 	struct pwm_fan_ctx *ctx = dev_get_drvdata(dev);
-+	struct pwm_args pargs = { };
- 	unsigned long duty;
- 	int ret;
  
- 	if (ctx->pwm_value == 0)
- 		return 0;
- 
--	duty = DIV_ROUND_UP(ctx->pwm_value * (ctx->pwm->period - 1), MAX_PWM);
--	ret = pwm_config(ctx->pwm, duty, ctx->pwm->period);
-+	pwm_get_args(ctx->pwm, &pargs);
-+	duty = DIV_ROUND_UP(ctx->pwm_value * (pargs.period - 1), MAX_PWM);
-+	ret = pwm_config(ctx->pwm, duty, pargs.period);
- 	if (ret)
- 		return ret;
- 	return pwm_enable(ctx->pwm);
 -- 
 2.5.0
