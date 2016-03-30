@@ -1,37 +1,37 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 30 Mar 2016 22:03:25 +0200
-Subject: [PATCH v5 02/46] backlight: pwm_bl: remove useless call to
- pwm_set_period()
+Date: Wed, 30 Mar 2016 22:03:24 +0200
+Subject: [PATCH v5 01/46] pwm: rcar: make use of pwm_is_enabled()
 In-Reply-To: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1459368249-13241-3-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1459368249-13241-2-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PWM period will be set when calling pwm_config. Remove this useless
-call to pwm_set_period(), which might mess up with the internal PWM state.
+Commit 5c31252c4a86 ("pwm: Add the pwm_is_enabled() helper") introduced a
+new function to test whether a PWM device is enabled or not without
+manipulating PWM internal fields.
+Hiding this is necessary if we want to smoothly move to the atomic PWM
+config approach without impacting PWM drivers.
+Fix this driver to use pwm_is_enabled() instead of directly accessing the
+->flags field.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Acked-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/video/backlight/pwm_bl.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ drivers/pwm/pwm-rcar.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
-index 64f9e1b..a33a290 100644
---- a/drivers/video/backlight/pwm_bl.c
-+++ b/drivers/video/backlight/pwm_bl.c
-@@ -313,10 +313,8 @@ static int pwm_backlight_probe(struct platform_device *pdev)
- 	 * via the PWM lookup table.
- 	 */
- 	pb->period = pwm_get_period(pb->pwm);
--	if (!pb->period && (data->pwm_period_ns > 0)) {
-+	if (!pb->period && (data->pwm_period_ns > 0))
- 		pb->period = data->pwm_period_ns;
--		pwm_set_period(pb->pwm, data->pwm_period_ns);
--	}
+diff --git a/drivers/pwm/pwm-rcar.c b/drivers/pwm/pwm-rcar.c
+index 7b8ac06..1c85ecc 100644
+--- a/drivers/pwm/pwm-rcar.c
++++ b/drivers/pwm/pwm-rcar.c
+@@ -157,7 +157,7 @@ static int rcar_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+ 		return div;
  
- 	pb->lth_brightness = data->lth_brightness * (pb->period / pb->scale);
+ 	/* Let the core driver set pwm->period if disabled and duty_ns == 0 */
+-	if (!test_bit(PWMF_ENABLED, &pwm->flags) && !duty_ns)
++	if (!pwm_is_enabled(pwm) && !duty_ns)
+ 		return 0;
  
+ 	rcar_pwm_update(rp, RCAR_PWMCR_SYNC, RCAR_PWMCR_SYNC, RCAR_PWMCR);
 -- 
 2.5.0
