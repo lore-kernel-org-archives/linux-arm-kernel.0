@@ -1,19 +1,24 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 30 Mar 2016 14:18:28 -0700
-Subject: [PATCH v2] ARM: dts: dra7: Correct clock tree for sys_32k_ck
-In-Reply-To: <1457957001-720-1-git-send-email-j-keerthy@ti.com>
-References: <1457957001-720-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <20160330211828.GE9329@atomide.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 30 Mar 2016 14:22:24 -0700
+Subject: [PATCH v5 27/46] regulator: pwm: adjust PWM config at probe time
+In-Reply-To: <1459368249-13241-28-git-send-email-boris.brezillon@free-electrons.com>
+References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1459368249-13241-28-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20160330212224.GV2350@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Keerthy <j-keerthy@ti.com> [160314 05:04]:
-> This is w.r.t J6/J6eco: 32clk is pseudo (erratum i856) - clock source.
-> Errata i856 for the AM572x (DRA7xx) points out that the 32.768KHz external
-> crystal is not enabled at power up. Instead the CPU falls back to using
-> an emulation for the 32KHz clock which is SYSCLK1/610.  SYSCLK1 is usually
-> 20MHz on boards so far (which gives an emulated frequency of 32.786KHz)
+On Wed, Mar 30, 2016 at 10:03:50PM +0200, Boris Brezillon wrote:
+> The PWM attached to a PWM regulator device might have been previously
+> configured by the bootloader.
+> Make sure the bootloader and linux config are in sync, and adjust the PWM
+> config if that's not the case.
 
-Thanks applying into omap-for-v4.6/fixes.
-
-Tony
+Acked-by: Mark Brown <broonie@kernel.org>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160330/0dba77c2/attachment.sig>
