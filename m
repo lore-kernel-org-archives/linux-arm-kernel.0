@@ -1,41 +1,166 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 30 Mar 2016 18:12:15 +0200
-Subject: [PATCH v4 3/3] ARM: imx6: Fix procedure to switch the parent of
- LDB_DI_CLK
-In-Reply-To: <CAOMZO5A6HoQ0i7rMm4Ov6AZP6DrE+Vh09NgLtVm0yfDHH62XKw@mail.gmail.com>
-References: <1456476714-11351-1-git-send-email-p.zabel@pengutronix.de>
- <1456476714-11351-4-git-send-email-p.zabel@pengutronix.de>
- <56D60C90.7080703@timesys.com>
- <CAOMZO5A6HoQ0i7rMm4Ov6AZP6DrE+Vh09NgLtVm0yfDHH62XKw@mail.gmail.com>
-Message-ID: <1459354335.2505.92.camel@pengutronix.de>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 30 Mar 2016 18:14:17 +0200
+Subject: [PATCH v5 02/50] mtd: use mtd_ooblayout_xxx() helpers where
+ appropriate
+In-Reply-To: <1459354505-32551-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1459354505-32551-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1459354505-32551-3-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 28.03.2016, 15:48 -0300 schrieb Fabio Estevam:
-> Hi Akshay,
-> 
-> On Tue, Mar 1, 2016 at 6:41 PM, Akshay Bhat <akshay.bhat@timesys.com> wrote:
-> 
-> > EB821 doesn't mention the above restriction. My understanding was as long as
-> > the clock source you are switching from/to is disabled it should be ok to do
-> > so. Maybe someone from Freescale can comment?
-> 
-> I don't have access to this EB821 document.
-> 
-> The procedure we have tested is shown here:
-> http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/commit/?h=imx_3.10.17_1.0.1_ga&id=eecbe9a52587cf9eec30132fb9b8a6761f3a1e6d
+The mtd_ooblayout_xxx() helper functions have been added to avoid direct
+accesses to the ecclayout field, and thus ease for future reworks.
+Use these helpers in all places where the oobfree[] and eccpos[] arrays
+where directly accessed.
 
-This patch still describes the switching from top to bottom mux and only
-then manipulating the top mux:
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ drivers/mtd/mtdchar.c | 107 +++++++++++++++++++++++++++++++++++++++++---------
+ 1 file changed, 88 insertions(+), 19 deletions(-)
 
-	 * The code below switches the parent to the bottom mux first
-	 * and then manipulates the top mux. This ensures that no glitch
-	 * will enter the divider.
-
-Unfortunately it doesn't detail how this is achieved exactly. I assumed
-that it's just that bit 0x4 manipulates the two-port mux that selects
-between top and bottom mux and bits 0x3 manipulate the two 4-port muxes
-(top and bottom) at the same time, but that was just conjecture.
-
-regards
-Philipp
+diff --git a/drivers/mtd/mtdchar.c b/drivers/mtd/mtdchar.c
+index 6d19835..cd64ab7 100644
+--- a/drivers/mtd/mtdchar.c
++++ b/drivers/mtd/mtdchar.c
+@@ -472,28 +472,101 @@ static int mtdchar_readoob(struct file *file, struct mtd_info *mtd,
+  * nand_ecclayout flexibly (i.e. the struct may change size in new
+  * releases without requiring major rewrites).
+  */
+-static int shrink_ecclayout(const struct nand_ecclayout *from,
+-		struct nand_ecclayout_user *to)
++static int shrink_ecclayout(struct mtd_info *mtd,
++			    struct nand_ecclayout_user *to)
+ {
+-	int i;
++	struct mtd_oob_region oobregion;
++	int i, section = 0, ret;
+ 
+-	if (!from || !to)
++	if (!mtd || !to)
+ 		return -EINVAL;
+ 
+ 	memset(to, 0, sizeof(*to));
+ 
+-	to->eccbytes = min((int)from->eccbytes, MTD_MAX_ECCPOS_ENTRIES);
+-	for (i = 0; i < to->eccbytes; i++)
+-		to->eccpos[i] = from->eccpos[i];
++	to->eccbytes = 0;
++	for (i = 0; i < MTD_MAX_ECCPOS_ENTRIES;) {
++		u32 eccpos;
++
++		ret = mtd_ooblayout_ecc(mtd, section, &oobregion);
++		if (ret < 0) {
++			if (ret != -ERANGE)
++				return ret;
++
++			break;
++		}
++
++		eccpos = oobregion.offset;
++		for (; i < MTD_MAX_ECCPOS_ENTRIES &&
++		       eccpos < oobregion.offset + oobregion.length; i++) {
++			to->eccpos[i] = eccpos++;
++			to->eccbytes++;
++		}
++	}
+ 
+ 	for (i = 0; i < MTD_MAX_OOBFREE_ENTRIES; i++) {
+-		if (from->oobfree[i].length == 0 &&
+-				from->oobfree[i].offset == 0)
++		ret = mtd_ooblayout_free(mtd, i, &oobregion);
++		if (ret < 0) {
++			if (ret != -ERANGE)
++				return ret;
++
++			break;
++		}
++
++		to->oobfree[i].offset = oobregion.offset;
++		to->oobfree[i].length = oobregion.length;
++		to->oobavail += to->oobfree[i].length;
++	}
++
++	return 0;
++}
++
++static int get_oobinfo(struct mtd_info *mtd, struct nand_oobinfo *to)
++{
++	struct mtd_oob_region oobregion;
++	int i, section = 0, ret;
++
++	if (!mtd || !to)
++		return -EINVAL;
++
++	memset(to, 0, sizeof(*to));
++
++	to->eccbytes = 0;
++	for (i = 0; i < ARRAY_SIZE(to->eccpos);) {
++		u32 eccpos;
++
++		ret = mtd_ooblayout_ecc(mtd, section, &oobregion);
++		if (ret < 0) {
++			if (ret != -ERANGE)
++				return ret;
++
+ 			break;
+-		to->oobavail += from->oobfree[i].length;
+-		to->oobfree[i] = from->oobfree[i];
++		}
++
++		if (oobregion.length + i > ARRAY_SIZE(to->eccpos))
++			return -EINVAL;
++
++		eccpos = oobregion.offset;
++		for (; eccpos < oobregion.offset + oobregion.length; i++) {
++			to->eccpos[i] = eccpos++;
++			to->eccbytes++;
++		}
+ 	}
+ 
++	for (i = 0; i < 8; i++) {
++		ret = mtd_ooblayout_free(mtd, i, &oobregion);
++		if (ret < 0) {
++			if (ret != -ERANGE)
++				return ret;
++
++			break;
++		}
++
++		to->oobfree[i][0] = oobregion.offset;
++		to->oobfree[i][1] = oobregion.length;
++	}
++
++	to->useecc = MTD_NANDECC_AUTOPLACE;
++
+ 	return 0;
+ }
+ 
+@@ -817,14 +890,10 @@ static int mtdchar_ioctl(struct file *file, u_int cmd, u_long arg)
+ 
+ 		if (!mtd->ecclayout)
+ 			return -EOPNOTSUPP;
+-		if (mtd->ecclayout->eccbytes > ARRAY_SIZE(oi.eccpos))
+-			return -EINVAL;
+ 
+-		oi.useecc = MTD_NANDECC_AUTOPLACE;
+-		memcpy(&oi.eccpos, mtd->ecclayout->eccpos, sizeof(oi.eccpos));
+-		memcpy(&oi.oobfree, mtd->ecclayout->oobfree,
+-		       sizeof(oi.oobfree));
+-		oi.eccbytes = mtd->ecclayout->eccbytes;
++		ret = get_oobinfo(mtd, &oi);
++		if (ret)
++			return ret;
+ 
+ 		if (copy_to_user(argp, &oi, sizeof(struct nand_oobinfo)))
+ 			return -EFAULT;
+@@ -920,7 +989,7 @@ static int mtdchar_ioctl(struct file *file, u_int cmd, u_long arg)
+ 		if (!usrlay)
+ 			return -ENOMEM;
+ 
+-		shrink_ecclayout(mtd->ecclayout, usrlay);
++		shrink_ecclayout(mtd, usrlay);
+ 
+ 		if (copy_to_user(argp, usrlay, sizeof(*usrlay)))
+ 			ret = -EFAULT;
+-- 
+2.5.0
