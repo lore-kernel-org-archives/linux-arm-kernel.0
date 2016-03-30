@@ -1,48 +1,54 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Wed, 30 Mar 2016 13:42:44 +0200
-Subject: [PATCH 1/5] arm/defconfigs: Remove CONFIG_IPV6_PRIVACY
-In-Reply-To: <1459338168-29334-1-git-send-email-bp@alien8.de>
-References: <1459338168-29334-1-git-send-email-bp@alien8.de>
-Message-ID: <1459338168-29334-2-git-send-email-bp@alien8.de>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Wed, 30 Mar 2016 12:42:58 +0100
+Subject: [RFC PATCH 00/45] KVM: arm/arm64: Rework virtual GIC emulation
+In-Reply-To: <56FA7F29.4060005@arm.com>
+References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
+ <56FA7F29.4060005@arm.com>
+Message-ID: <56FBBBC2.6010602@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Borislav Petkov <bp@suse.de>
+On 29/03/16 14:12, Vladimir Murzin wrote:
+> Hi Andre,
+> 
+> On 25/03/16 02:04, Andre Przywara wrote:
+>> Please have a look at the series, review it and give the code some
+>> serious testing (and possibly debugging). All feedback is appreciated.
+> 
+> I see that with the new vgic implementation kvmtool starts throwing:
+> 
+> kvm [1273]: Unable to register VGICv3 redist MMIO regions
+> 
 
-Option is long gone, see
+It comes from kvm_io_bus_register_dev()
 
-  5d9efa7ee99e ("ipv6: Remove privacy config option.")
+if (bus->dev_count - bus->ioeventfd_count > NR_IOBUS_DEVS - 1)
+	return -ENOSPC;
 
-Signed-off-by: Borislav Petkov <bp@suse.de>
-Cc: linux-arm-kernel at lists.infradead.org
----
- arch/arm/configs/lpc32xx_defconfig | 1 -
- arch/arm/configs/s3c2410_defconfig | 1 -
- 2 files changed, 2 deletions(-)
+with bus->dev_count being 1000
 
-diff --git a/arch/arm/configs/lpc32xx_defconfig b/arch/arm/configs/lpc32xx_defconfig
-index 9f56ca3985ae..d1da7de9613c 100644
---- a/arch/arm/configs/lpc32xx_defconfig
-+++ b/arch/arm/configs/lpc32xx_defconfig
-@@ -45,7 +45,6 @@ CONFIG_IP_PNP_BOOTP=y
- # CONFIG_INET_LRO is not set
- # CONFIG_INET_DIAG is not set
- CONFIG_IPV6=y
--CONFIG_IPV6_PRIVACY=y
- # CONFIG_WIRELESS is not set
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_DEVTMPFS=y
-diff --git a/arch/arm/configs/s3c2410_defconfig b/arch/arm/configs/s3c2410_defconfig
-index b3ade552a2a5..bc4bfe02e611 100644
---- a/arch/arm/configs/s3c2410_defconfig
-+++ b/arch/arm/configs/s3c2410_defconfig
-@@ -76,7 +76,6 @@ CONFIG_TCP_CONG_LP=m
- CONFIG_TCP_CONG_VENO=m
- CONFIG_TCP_CONG_YEAH=m
- CONFIG_TCP_CONG_ILLINOIS=m
--CONFIG_IPV6_PRIVACY=y
- CONFIG_IPV6_ROUTER_PREF=y
- CONFIG_INET6_AH=m
- CONFIG_INET6_ESP=m
--- 
-2.7.3
+[<ffffffc00009f93c>] kvm_io_bus_register_dev+0x130/0x148
+[<ffffffc0000ad274>] kvm_vgic_register_mmio_region+0xac/0xdc
+[<ffffffc0000ad4d4>] vgic_register_redist_regions+0xb8/0x158
+[<ffffffc0000abb90>] vgic_v3_map_resources+0x5c/0xf0
+[<ffffffc0000aae04>] kvm_vgic_map_resources+0x40/0x84
+[<ffffffc0000a23d0>] kvm_arch_vcpu_ioctl_run+0x3f0/0x400
+[<ffffffc00009d484>] kvm_vcpu_ioctl+0x2d4/0x6ec
+[<ffffffc0001c4eec>] do_vfs_ioctl+0xb4/0x760
+[<ffffffc0001c561c>] SyS_ioctl+0x84/0x98
+[<ffffffc000085d30>] el0_svc_naked+0x24/0x28
+
+Hope this helps...
+Vladimir
+
+> for --cpus 58 and above, where with the old vgic it is quite happy with
+> up to 255 cpus.
+> 
+> Cheers
+> Vladimir
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
+> 
+> 
