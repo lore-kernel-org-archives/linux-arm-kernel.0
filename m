@@ -1,101 +1,91 @@
-From: j.anaszewski@samsung.com (Jacek Anaszewski)
-Date: Wed, 30 Mar 2016 11:29:14 +0200
-Subject: [PATCH 1/3] leds: trigger: Introduce a kernel panic LED trigger
-In-Reply-To: <1459283749-22451-2-git-send-email-ezequiel@vanguardiasur.com.ar>
-References: <1459283749-22451-1-git-send-email-ezequiel@vanguardiasur.com.ar>
- <1459283749-22451-2-git-send-email-ezequiel@vanguardiasur.com.ar>
-Message-ID: <56FB9C6A.2090402@samsung.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 30 Mar 2016 11:29:42 +0200
+Subject: [RFC PATCH 07/45] KVM: arm/arm64: vgic-new: Add vgic GICv2
+ change_affinity
+In-Reply-To: <1458871508-17279-8-git-send-email-andre.przywara@arm.com>
+References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
+ <1458871508-17279-8-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160330092942.GH4126@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ezequiel,
-
-Thanks for the patch. I've tested it on exynos4412-trats2 board
-with leds-aat1290 driver, by executing:
-
-echo "c" > /proc/sysrq-trigger
-
-I was able to notice the blinking then.
-
-Applied to the for-next branch of linux-leds.git.
-
-Thanks,
-Jacek Anaszewski
-
-On 03/29/2016 10:35 PM, Ezequiel Garcia wrote:
-> This commit introduces a new LED trigger which allows to configure
-> a LED to blink on a kernel panic (through panic_blink).
->
-> Notice that currently the Openmoko FreeRunner (GTA02) mach code
-> sets panic_blink to blink a hard-coded LED. The new trigger is
-> meant to introduce a generic mechanism to achieve this.
->
-> Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
+On Fri, Mar 25, 2016 at 02:04:30AM +0000, Andre Przywara wrote:
+> From: Christoffer Dall <christoffer.dall@linaro.org>
+> 
+> Introduce vgic-v2.c to contain GICv2 specific functions.
+> Add vgic_v2_irq_change_affinity() to change the target VCPU of a
+> particular interrupt.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Andre Przywara <marc.zyngier@arm.com>
 > ---
->   drivers/leds/trigger/Kconfig         |  7 +++++++
->   drivers/leds/trigger/Makefile        |  1 +
->   drivers/leds/trigger/ledtrig-panic.c | 30 ++++++++++++++++++++++++++++++
->   3 files changed, 38 insertions(+)
->   create mode 100644 drivers/leds/trigger/ledtrig-panic.c
->
-> diff --git a/drivers/leds/trigger/Kconfig b/drivers/leds/trigger/Kconfig
-> index 5bda6a9b56bb..554f5bfbeced 100644
-> --- a/drivers/leds/trigger/Kconfig
-> +++ b/drivers/leds/trigger/Kconfig
-> @@ -108,4 +108,11 @@ config LEDS_TRIGGER_CAMERA
->   	  This enables direct flash/torch on/off by the driver, kernel space.
->   	  If unsure, say Y.
->
-> +config LEDS_TRIGGER_PANIC
-> +	bool "LED Panic Trigger"
-> +	depends on LEDS_TRIGGERS
-> +	help
-> +	  This allows LEDs to be configured to blink on a kernel panic.
-> +	  If unsure, say Y.
-> +
->   endif # LEDS_TRIGGERS
-> diff --git a/drivers/leds/trigger/Makefile b/drivers/leds/trigger/Makefile
-> index 1abf48dacf7e..547bf5c80e52 100644
-> --- a/drivers/leds/trigger/Makefile
-> +++ b/drivers/leds/trigger/Makefile
-> @@ -8,3 +8,4 @@ obj-$(CONFIG_LEDS_TRIGGER_CPU)		+= ledtrig-cpu.o
->   obj-$(CONFIG_LEDS_TRIGGER_DEFAULT_ON)	+= ledtrig-default-on.o
->   obj-$(CONFIG_LEDS_TRIGGER_TRANSIENT)	+= ledtrig-transient.o
->   obj-$(CONFIG_LEDS_TRIGGER_CAMERA)	+= ledtrig-camera.o
-> +obj-$(CONFIG_LEDS_TRIGGER_PANIC)	+= ledtrig-panic.o
-> diff --git a/drivers/leds/trigger/ledtrig-panic.c b/drivers/leds/trigger/ledtrig-panic.c
+>  virt/kvm/arm/vgic/vgic-v2.c | 40 ++++++++++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic.h    |  2 ++
+>  2 files changed, 42 insertions(+)
+>  create mode 100644 virt/kvm/arm/vgic/vgic-v2.c
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
 > new file mode 100644
-> index 000000000000..627b350c5ec3
+> index 0000000..0bf6f27
 > --- /dev/null
-> +++ b/drivers/leds/trigger/ledtrig-panic.c
-> @@ -0,0 +1,30 @@
+> +++ b/virt/kvm/arm/vgic/vgic-v2.c
+> @@ -0,0 +1,40 @@
 > +/*
-> + * Kernel Panic LED Trigger
-> + *
-> + * Copyright 2016 Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
+> + * Copyright (C) 2015, 2016 ARM Ltd.
 > + *
 > + * This program is free software; you can redistribute it and/or modify
 > + * it under the terms of the GNU General Public License version 2 as
 > + * published by the Free Software Foundation.
 > + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 > + */
 > +
-> +#include <linux/kernel.h>
-> +#include <linux/init.h>
-> +#include <linux/leds.h>
+> +#include <linux/kvm.h>
+> +#include <linux/kvm_host.h>
 > +
-> +static struct led_trigger *trigger;
+> +#include "vgic.h"
 > +
-> +static long led_panic_blink(int state)
+> +void vgic_v2_irq_change_affinity(struct kvm *kvm, u32 intid, u8 new_targets)
 > +{
-> +	led_trigger_event(trigger, state ? LED_FULL : LED_OFF);
-> +	return 0;
-> +}
+> +	struct vgic_dist *dist = &kvm->arch.vgic;
+> +	struct vgic_irq *irq;
+> +	int target;
 > +
-> +static int __init ledtrig_panic_init(void)
-> +{
-> +	led_trigger_register_simple("panic", &trigger);
-> +	panic_blink = led_panic_blink;
-> +	return 0;
+> +	BUG_ON(intid <= VGIC_MAX_PRIVATE);
+> +	BUG_ON(dist->vgic_model != KVM_DEV_TYPE_ARM_VGIC_V2);
+
+we can probably get rid of the last BUG_ON here.
+
+> +
+> +	irq = vgic_get_irq(kvm, NULL, intid);
+> +
+> +	spin_lock(&irq->irq_lock);
+> +	irq->targets = new_targets;
+> +
+> +	target = ffs(irq->targets);
+> +	target = target ? (target - 1) : 0;
+> +	irq->target_vcpu = kvm_get_vcpu(kvm, target);
+> +	spin_unlock(&irq->irq_lock);
 > +}
-> +device_initcall(ledtrig_panic_init);
+> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+> index e9f4aa6..b2faf00 100644
+> --- a/virt/kvm/arm/vgic/vgic.h
+> +++ b/virt/kvm/arm/vgic/vgic.h
+> @@ -20,4 +20,6 @@ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
+>  			      u32 intid);
+>  bool vgic_queue_irq(struct kvm *kvm, struct vgic_irq *irq);
+>  
+> +void vgic_v2_irq_change_affinity(struct kvm *kvm, u32 intid, u8 target);
+> +
+>  #endif
+> -- 
+> 2.7.3
+> 
