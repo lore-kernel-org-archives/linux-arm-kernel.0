@@ -1,14 +1,13 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 30 Mar 2016 08:15:16 -0600
-Subject: [PATCH] pinctrl: bcm2835: Implement get_direction callback
-In-Reply-To: <1459177104-24353-1-git-send-email-stefan.wahren@i2se.com>
-References: <1459177104-24353-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <56FBDF74.3040400@wwwdotorg.org>
+Date: Wed, 30 Mar 2016 08:17:07 -0600
+Subject: [PATCH] ARM: bcm2835: add CPU node for ARM core
+In-Reply-To: <1459182081-30819-1-git-send-email-stefan.wahren@i2se.com>
+References: <1459182081-30819-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <56FBDFE3.4000709@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/28/2016 08:58 AM, Stefan Wahren wrote:
-> Implement gpio_chip's get_direction() callback, that lets other
-> drivers get particular GPIOs direction using gpiod_get_direction().
+On 03/28/2016 10:21 AM, Stefan Wahren wrote:
+> This patch adds the CPU node of the BCM2835 into the DT.
 
-Reviewed-by: Stephen Warren <swarren@wwwdotorg.org>
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
