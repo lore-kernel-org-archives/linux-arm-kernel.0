@@ -1,102 +1,77 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 30 Mar 2016 22:03:56 +0200
-Subject: [PATCH v5 33/46] pwm: replace pwm_disable() by pwm_apply_state()
+Date: Wed, 30 Mar 2016 22:03:47 +0200
+Subject: [PATCH v5 24/46] pwm: sti: add support for initial state retrieval
 In-Reply-To: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1459368249-13241-34-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1459368249-13241-25-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some PWM drivers are calling the deprecated pwm_disable() function in
-their pwm->free() or pdev->remove() function. Replace those calls by
-the pwm_apply_state().
+Implement ->get_state() to provide support for initial state retrieval.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/pwm/pwm-lpc18xx-sct.c | 7 +++++--
- drivers/pwm/pwm-lpc32xx.c     | 9 +++++++--
- drivers/pwm/pwm-spear.c       | 9 +++++++--
- drivers/pwm/pwm-sti.c         | 9 +++++++--
- 4 files changed, 26 insertions(+), 8 deletions(-)
+ drivers/pwm/pwm-sti.c | 41 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
 
-diff --git a/drivers/pwm/pwm-lpc18xx-sct.c b/drivers/pwm/pwm-lpc18xx-sct.c
-index 19dc64c..c4d7cb1 100644
---- a/drivers/pwm/pwm-lpc18xx-sct.c
-+++ b/drivers/pwm/pwm-lpc18xx-sct.c
-@@ -305,9 +305,12 @@ static void lpc18xx_pwm_free(struct pwm_chip *chip, struct pwm_device *pwm)
- {
- 	struct lpc18xx_pwm_chip *lpc18xx_pwm = to_lpc18xx_pwm_chip(chip);
- 	struct lpc18xx_pwm_data *lpc18xx_data = pwm_get_chip_data(pwm);
-+	struct pwm_state pstate;
- 
--	pwm_disable(pwm);
--	pwm_set_duty_cycle(pwm, 0);
-+	pwm_get_state(pwm, &pstate);
-+	pstate.duty_cycle = 0;
-+	pstate.enabled = false;
-+	pwm_apply_state(pwm, &pstate);
- 	clear_bit(lpc18xx_data->duty_event, &lpc18xx_pwm->event_map);
- }
- 
-diff --git a/drivers/pwm/pwm-lpc32xx.c b/drivers/pwm/pwm-lpc32xx.c
-index 4d470c1..95870e0 100644
---- a/drivers/pwm/pwm-lpc32xx.c
-+++ b/drivers/pwm/pwm-lpc32xx.c
-@@ -138,8 +138,13 @@ static int lpc32xx_pwm_remove(struct platform_device *pdev)
- 	struct lpc32xx_pwm_chip *lpc32xx = platform_get_drvdata(pdev);
- 	unsigned int i;
- 
--	for (i = 0; i < lpc32xx->chip.npwm; i++)
--		pwm_disable(&lpc32xx->chip.pwms[i]);
-+	for (i = 0; i < lpc32xx->chip.npwm; i++) {
-+		struct pwm_state pstate;
-+
-+		pwm_get_state(&lpc32xx->chip.pwms[i], &pstate);
-+		pstate.enabled = false;
-+		pwm_apply_state(&lpc32xx->chip.pwms[i], &pstate);
-+	}
- 
- 	return pwmchip_remove(&lpc32xx->chip);
- }
-diff --git a/drivers/pwm/pwm-spear.c b/drivers/pwm/pwm-spear.c
-index 6c6b44f..2ee4cd5 100644
---- a/drivers/pwm/pwm-spear.c
-+++ b/drivers/pwm/pwm-spear.c
-@@ -233,8 +233,13 @@ static int spear_pwm_remove(struct platform_device *pdev)
- 	struct spear_pwm_chip *pc = platform_get_drvdata(pdev);
- 	int i;
- 
--	for (i = 0; i < NUM_PWM; i++)
--		pwm_disable(&pc->chip.pwms[i]);
-+	for (i = 0; i < NUM_PWM; i++) {
-+		struct pwm_state pstate;
-+
-+		pwm_get_state(&pc->chip.pwms[i], &pstate);
-+		pstate.enabled = false;
-+		pwm_apply_state(&pc->chip.pwms[i], &pstate);
-+	}
- 
- 	/* clk was prepared in probe, hence unprepare it here */
- 	clk_unprepare(pc->clk);
 diff --git a/drivers/pwm/pwm-sti.c b/drivers/pwm/pwm-sti.c
-index bea1d17..0ec44a8 100644
+index 92abbd5..0fbca94 100644
 --- a/drivers/pwm/pwm-sti.c
 +++ b/drivers/pwm/pwm-sti.c
-@@ -435,8 +435,13 @@ static int sti_pwm_remove(struct platform_device *pdev)
- 	struct sti_pwm_chip *pc = platform_get_drvdata(pdev);
- 	unsigned int i;
+@@ -238,6 +238,46 @@ static void sti_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 	mutex_unlock(&pc->sti_pwm_lock);
+ }
  
--	for (i = 0; i < pc->cdata->num_chan; i++)
--		pwm_disable(&pc->chip.pwms[i]);
-+	for (i = 0; i < pc->cdata->num_chan; i++) {
-+		struct pwm_state pstate;
++static void sti_pwm_get_state(struct pwm_chip *chip,
++			      struct pwm_device *pwm,
++			      struct pwm_state *pstate)
++{
++	struct sti_pwm_chip *pc = to_sti_pwmchip(chip);
++	unsigned int regval, prescaler;
++	u64 timens;
++	int ret;
 +
-+		pwm_get_state(&pc->chip.pwms[i], &pstate);
-+		pstate.enabled = false;
-+		pwm_apply_state(&pc->chip.pwms[i], &pstate);
++	/* The clock has to be enabled to access PWM registers */
++	ret = clk_enable(pc->clk);
++	if (ret) {
++		dev_err(chip->dev, "Failed to enable PWM clk");
++		return;
 +	}
- 
- 	clk_unprepare(pc->clk);
- 
++
++	regmap_field_read(pc->prescale_high, &regval);
++	prescaler = regval << 4;
++	regmap_field_read(pc->prescale_low, &regval);
++	prescaler |= regval;
++
++	timens = (u64)(prescaler + 1) * NSEC_PER_SEC *
++		 (pc->cdata->max_pwm_cnt + 1);
++	do_div(timens, pc->clk_rate);
++
++	pstate->period = timens;
++
++	regmap_read(pc->regmap, STI_DS_REG(pwm->hwpwm), &regval);
++	timens = (u64)(regval + 1) * pstate->period;
++	do_div(timens, pc->cdata->max_pwm_cnt + 1);
++	pstate->duty_cycle = timens;
++
++	regmap_field_read(pc->pwm_en, &regval);
++	pstate->enabled = regval;
++
++	pstate->polarity = PWM_POLARITY_NORMAL;
++
++	clk_disable(pc->clk);
++}
++
+ static void sti_pwm_free(struct pwm_chip *chip, struct pwm_device *pwm)
+ {
+ 	struct sti_pwm_chip *pc = to_sti_pwmchip(chip);
+@@ -249,6 +289,7 @@ static const struct pwm_ops sti_pwm_ops = {
+ 	.config = sti_pwm_config,
+ 	.enable = sti_pwm_enable,
+ 	.disable = sti_pwm_disable,
++	.get_state = sti_pwm_get_state,
+ 	.free = sti_pwm_free,
+ 	.owner = THIS_MODULE,
+ };
 -- 
 2.5.0
