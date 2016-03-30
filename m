@@ -1,53 +1,53 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Wed, 30 Mar 2016 21:56:37 +0200
-Subject: [GIT PULL] gxbb: DT64 changes for 4.7
-Message-ID: <CAOQ7t2aOQ7svJZti+aLy4uyk37TGCYYCw3aHjBQvN6ysy6_vfw@mail.gmail.com>
+From: emil.l.velikov@gmail.com (Emil Velikov)
+Date: Wed, 30 Mar 2016 21:03:57 +0100
+Subject: [RFC PATCH v1 0/4] Add Rockchip RGA support
+In-Reply-To: <CACvgo50REvRxN2_qdw=2NeTTSgjpA+9c8OZgPE0q19meH6ArKA@mail.gmail.com>
+References: <1458552518-25527-1-git-send-email-ykk@rock-chips.com>
+ <1571169.Hy8an0n7lM@diego>
+ <CACvgo516ewfwGCpV=noX+re1x8t3Sp1t39Sha+A2-tQ5YsoihA@mail.gmail.com>
+ <17189219.y56YqHz6yR@diego>
+ <CACvgo50REvRxN2_qdw=2NeTTSgjpA+9c8OZgPE0q19meH6ArKA@mail.gmail.com>
+Message-ID: <CACvgo53rYAW4H0SJnz8-7QtfRHmWWUh+7L7DiUbjBJ-hPBMHug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-new boards coming for 4.7, Odroid-C2 and the reference boards P200/P201.
+On 29 March 2016 at 14:13, Emil Velikov <emil.l.velikov@gmail.com> wrote:
+> On 28 March 2016 at 23:13, Heiko St?bner <heiko@sntech.de> wrote:
+>
+>> I have the feeling we're going quite a bit off-topic right now :-) .
+>> The binary-driver-crazyness, hasn't really anything to do with Yakir's support
+>> for the RGA (which is about raster-graphics-acceleration, so 2d stuff).
+>>
+>> And me mentioning the armsoc-ddx was merely a means to allow some sort of
+>> different userspace user, as requested in your original mail ;-) .
+>>
+> Seems like I forgot to state the obvious - for all the reasons
+> mentioned, the armsoc ddx seems like a bad example.
+>
+>> Maybe you know a better use-case on where to demonstrate the viability of the
+>> userspace API for it as originally requested.
+> I'm afraid that my RockChip-foo is extremely limited. Perhaps the
+> actual user of these should be mentioned ? xf86-video-rockhip (is
+> there one ?) or any other effort/project that lacks some (all?) of the
+> criticism listed.
+>
+> (Sort of) the bottom line - either reuse the existing interfaces or
+> provide an approved, full blown userspace (libdrm demos/programs do
+> not count) that uses the new interfaces.
+>
+> I haven't made these rules, just a fool^Wguy that repeats them so that
+> people don't abuse them much. If in doubt check with Dave and Daniel V
+> - they had enough repeating these.
+>
+I can see how my earlier response may have been come
+across/interpreted as aggressive and/or demanding. Apologies anyone
+got upset/annoyed.
 
-The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+Let me try in another light - if you guys are willing to have
+xf86-video-rockchip or keep track of/co-maintain armsoc, pretty much
+everyone will be over the moon. Personally I'd opt for the former,
+taking the modesetting (the one in the xserver tree) as a base - it
+has all the cool new bits ;-)
 
-  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
-
-are available in the git repository at:
-
-  https://github.com/carlocaione/linux-meson tags/gxbb-dt64
-
-for you to fetch changes up to ac40004db3fbea89c50083c6f9015ac7061e77b4:
-
-  ARM64: dts: amlogic: Add P200/P201 boards (2016-03-30 19:52:34 +0200)
-
-----------------------------------------------------------------
-Add support for a few more Amlogic S905/GXBB based boards: Hardkernel ODROID-C2
-and Amlogic P200/P201 boards.
-We also fix the memory nodes on the Vega S95 DTS.
-
-----------------------------------------------------------------
-Andreas F?rber (1):
-      ARM64: dts: amlogic: Clean up Vega S95 /memory nodes
-
-Kevin Hilman (4):
-      ARM64: dts: amlogic: update serial aliases
-      Documentation: devicetree: amlogic: Document P20x and ODROID-C2 boards
-      ARM64: dts: amlogic: add Hardkernel ODROID-C2
-      ARM64: dts: amlogic: Add P200/P201 boards
-
- Documentation/devicetree/bindings/arm/amlogic.txt  |  3 +
- arch/arm64/boot/dts/amlogic/Makefile               |  3 +
- .../arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 69 ++++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts    | 52 ++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts    | 52 ++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi   | 65 ++++++++++++++++++++
- .../boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts  |  2 +-
- .../boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts   |  2 +-
- .../boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts |  2 +-
- .../boot/dts/amlogic/meson-gxbb-vega-s95.dtsi      |  4 ++
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |  5 --
- 11 files changed, 251 insertions(+), 8 deletions(-)
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+Regards,
+Emil
