@@ -1,73 +1,149 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 30 Mar 2016 14:33:59 +0100
-Subject: [PATCH] arm64: kvm: 4.6-rc1: Fix VTCR_EL2 VS setting
-Message-ID: <1459344839-14397-1-git-send-email-suzuki.poulose@arm.com>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Wed, 30 Mar 2016 06:38:02 -0700
+Subject: [PATCH] i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity
+In-Reply-To: <56FBCBA2.6050903@tekno-soft.it>
+References: <m3h9fuk7ik.fsf@t19.piap.pl>
+ <CAJ+vNU3yh8ivb+axTwXawSbtCTa+kHUsJY=EGoziT8WSEW1CHQ@mail.gmail.com>
+ <56FB87A1.4020505@tekno-soft.it> <5245625.0MITzPXo6V@wuerfel>
+ <56FBCBA2.6050903@tekno-soft.it>
+Message-ID: <CAJ+vNU3CcXgMBfTnazofZVt5Z4vi9bf7SkbJ9=DMQ-xksTQJJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we detect support for 16bit VMID in ID_AA64MMFR1, we set the
-VTCR_EL2_VS field to 1 to make use of 16bit vmids. But, with
-commit 3a3604bc5eb4 ("arm64: KVM: Switch to C-based stage2 init")
-this is broken and we corrupt VTCR_EL2:T0SZ instead of updating the VS
-field. VTCR_EL2_VS was actually defined to the field shift (19) and
-not the real value for VS. This patch fixes the issue.
+On Wed, Mar 30, 2016 at 5:50 AM, Roberto Fichera <kernel@tekno-soft.it> wrote:
+> On 03/30/2016 12:10 PM, Arnd Bergmann wrote:
+>> On Wednesday 30 March 2016 10:00:33 Roberto Fichera wrote:
+>>>> Check your XIO2001 routing and insure the following for proper IRQ mapping:
+>>>> Slot12: IDSEL A28: socket INTA = XIO2001 INTA
+>>>> Slot13: IDSEL A29: socket INTA = XIO2001 INTB
+>>>> Slot14: IDSEL A30: socket INTA = XIO2001 INTC
+>>>> Slot15: IDSEL A31: socket INTA = XIO2001 INTD
+>>> After crosschecking with our hardware designer the PCB IRQ mapping is the following:
+>>>
+>>> J2 : IDSEL  A16: => Device 0 : socket INTA = XIO2001 INTA
+>>> J3 : IDSEL  A18: => Device 2 : socket INTA = XIO2001 INTA* **(This should be INTC)*
+>>> J11: IDSEL A20: => Device 4 : socket INTA = XIO2001 INTA
+>>>
+>>> The interrupt routing for J3 is wrong. The XIO2001 driver may expect Device 2 to interrupt on INTC - but it will
+>>> interrupt on INTA.
+>> What does your interrupt-map property look like then?
+>
+> Unfortunately it seems that J3 slot doesn't work anymore. Inserting a card there, PCIe link will not come up anymore.
+> Likely I broke it. Looking at some spare logs I have, a card inserted in J3 will get another interrupt, was 291 however
+> unfortunately I don't have an usefull lspci -vv output, sorry! Will check in it against another PCB when I can.
+>
+>> Note that you have to override both map and map-mask in this case.
+>
+> Can you please give more details where should I have a look?
+>
+>>
+>>       Arnd
+>>
+>
 
-Fixes: commit 3a3604bc5eb4 ("arm64: KVM: Switch to C-based stage2 init")
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- arch/arm64/include/asm/kvm_arm.h |    4 +++-
- arch/arm64/include/asm/sysreg.h  |    3 +++
- arch/arm64/kvm/hyp/s2-setup.c    |    6 ++++--
- 3 files changed, 10 insertions(+), 3 deletions(-)
+Robert,
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 0e391db..4150fd8 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -124,7 +124,9 @@
- #define VTCR_EL2_SL0_LVL1	(1 << 6)
- #define VTCR_EL2_T0SZ_MASK	0x3f
- #define VTCR_EL2_T0SZ_40B	24
--#define VTCR_EL2_VS		19
-+#define VTCR_EL2_VS_SHIFT	19
-+#define VTCR_EL2_VS_8BIT	(0 << VTCR_EL2_VS_SHIFT)
-+#define VTCR_EL2_VS_16BIT	(1 << VTCR_EL2_VS_SHIFT)
- 
- /*
-  * We configure the Stage-2 page tables to always restrict the IPA space to be
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 1a78d6e..1287416 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -141,6 +141,9 @@
- #define ID_AA64MMFR1_VMIDBITS_SHIFT	4
- #define ID_AA64MMFR1_HADBS_SHIFT	0
- 
-+#define ID_AA64MMFR1_VMIDBITS_8		0
-+#define ID_AA64MMFR1_VMIDBITS_16	2
-+
- /* id_aa64mmfr2 */
- #define ID_AA64MMFR2_UAO_SHIFT		4
- 
-diff --git a/arch/arm64/kvm/hyp/s2-setup.c b/arch/arm64/kvm/hyp/s2-setup.c
-index bfc54fd..5a9f3bf 100644
---- a/arch/arm64/kvm/hyp/s2-setup.c
-+++ b/arch/arm64/kvm/hyp/s2-setup.c
-@@ -36,8 +36,10 @@ void __hyp_text __init_stage2_translation(void)
- 	 * Read the VMIDBits bits from ID_AA64MMFR1_EL1 and set the VS
- 	 * bit in VTCR_EL2.
- 	 */
--	tmp = (read_sysreg(id_aa64mmfr1_el1) >> 4) & 0xf;
--	val |= (tmp == 2) ? VTCR_EL2_VS : 0;
-+	tmp = (read_sysreg(id_aa64mmfr1_el1) >> ID_AA64MMFR1_VMIDBITS_SHIFT) & 0xf;
-+	val |= (tmp == ID_AA64MMFR1_VMIDBITS_16) ?
-+			VTCR_EL2_VS_16BIT :
-+			VTCR_EL2_VS_8BIT;
- 
- 	write_sysreg(val, vtcr_el2);
- }
--- 
-1.7.9.5
+The interrupt-map / interrupt-map-mask properties are the ones that
+dictate irq mapping. In most cases they are defined at the host
+controller only and the kernel will assume standard interrupt
+swizzling (aka barber pole'ing) through bridges and will rotate
+interrupts (swizzle) for each bridge you go through. It is only if the
+interrupts are 'not' mapped properly (as in your case, and as was mine
+on a specific add-in card) that you need to define interrupt-map /
+interrupt-map-mask for the actual bridge with the interrupt mapping
+issue. So in other words, you won't have an interrupt-map/mask for
+your TI XIO2001 'currently', but you need to add one to describe its
+non-standard mapping.
+
+If you look at imx6qdl.dtsi you'll see the interrupt-map/mask for
+standard mapping is:
+
+interrupt-map-mask = <0 0 0 0x7>;
+interrupt-map = <0 0 0 1 &gpc GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>,
+                          <0 0 0 2 &gpc GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
+                          <0 0 0 3 &gpc GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
+                          <0 0 0 4 &gpc GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
+
+This is because on the IMX6 INTA=GIC_123, INTB=GIC_122, INTC=GIC_121,
+INTD=GIC_120. The interrupt-map-mask is important because it decribes
+which bits of the 'unit interrupt specifier' each map pertains to. For
+the standard mapping above only the pin is important because this is
+the mapping for each slot so only the last three bits of the 'unit
+interrupt specifier' which has four cells is specified in the mask
+(0x7).
+
+In your case you will need to describe a map that depends not only on
+pin but on slot. The first 32bit cell in the 'unit interrupt
+specifier' defines the bus/domain/function (BDF) as: bus << 16 | dev
+<< 11 | func <<8. This is also the same format for the first cell in
+the 'reg' property that describes each PCI device.
+
+If you are saying that your hardware did not swizzle the interrupts
+for the various slots then that means the above mapping needs to be
+applied to each slot the same. I
+
+You need to nest PCI devices as they appear on the bus, specifying reg
+properly. So, in your case you have a XIO2001 bridge hanging off of
+the IMX6 root complex. The root complex is at BDF 0:00.0, the XIO2001
+is at BDF 1:00.0, and its sockets are@bus=2. So you will need to
+add the following to your device-tree (fixing pinctrl and reset-gpio
+per your board specifics):
+
+&pcie {
+        pinctrl-names = "default";
+        pinctrl-0 = <&pinctrl_pcie>;
+        reset-gpio = <&gpio1 29 GPIO_ACTIVE_LOW>;
+        status = "okay";
+
+       /* 0:00.0 root complex */
+       pcie at 0,0,0 {
+               reg = <0 0 0 0 0>; /* bus=0, dev=0, func=0 */
+
+               /* 1:00.0 TI bridge with reversed IRQ mapping */
+               pcie at 1,0,0 {
+                       device_type = "pci";
+                       #address-cells = <3>;
+                       #size-cells = <2>;
+                       reg = <0x010000 0 0 0 0>; /* bus=1, dev=0, func=0 */
+                       #interrupt-cells = <1>;
+                       interrupt-map-mask = <0xfff00 0 0 0x7>; /*
+match bus and device as well as pin */
+                       interrupt-map =
+                               /* MAP for INTA/B/C/D in slot 2:00.00 -
+standard mapping */
+                               <0x26000 0 0 1 &gpc GIC_SPI 123 IRQ_TYPE_LEVEL_H
+                               <0x26000 0 0 2 &gpc GIC_SPI 122 IRQ_TYPE_LEVEL_H
+                               <0x26000 0 0 3 &gpc GIC_SPI 121 IRQ_TYPE_LEVEL_H
+                               <0x26000 0 0 4 &gpc GIC_SPI 120 IRQ_TYPE_LEVEL_H
+                               /* MAP for INTA/B/C/D in slot 2:02.00 -
+wrong mapping */
+                               <0x26800 0 0 1 &gpc GIC_SPI 123 IRQ_TYPE_LEVEL_H
+                               <0x26800 0 0 2 &gpc GIC_SPI 122 IRQ_TYPE_LEVEL_H
+                               <0x26800 0 0 3 &gpc GIC_SPI 121 IRQ_TYPE_LEVEL_H
+                               <0x26800 0 0 4 &gpc GIC_SPI 120 IRQ_TYPE_LEVEL_H
+                               /* MAP for INTA/B/C/D in slot 2:04.00 -
+standard mapping */
+                               <0x27000 0 0 1 &gpc GIC_SPI 123 IRQ_TYPE_LEVEL_H
+                               <0x27000 0 0 2 &gpc GIC_SPI 122 IRQ_TYPE_LEVEL_H
+                               <0x27000 0 0 3 &gpc GIC_SPI 121 IRQ_TYPE_LEVEL_H
+                               <0x27000 0 0 4 &gpc GIC_SPI 120 IRQ_TYPE_LEVEL_H
+...
+               };
+       };
+};
+
+You will need to provide a full mapping which means you'll need to
+know how INTA/B/C/D are mapped to each slot. MiniPCIe only users
+INTA/B but afaik you have to specify all four. I 'think' what you are
+elluding to is that the hardware engineer didn't swizzle the slots at
+all so all slots are mapped with INTA->INTA, INTB->INTB, INTC->INTC,
+INTD->INTD. If this is the case then you just copy the above for all
+slots taking care to specify the first cell properly with b<<16 |
+d<<11.
+
+You may find http://devicetree.org/Device_Tree_Usage#Advanced_Interrupt_Mapping
+to be helpful as well.
+
+Regards,
+
+Tim
