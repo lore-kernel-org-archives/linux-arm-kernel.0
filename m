@@ -1,73 +1,58 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 30 Mar 2016 20:06:52 +0200
-Subject: [PATCH] arm: at91: do not disable/enable clocks in a row
-In-Reply-To: <1459258007-24968-1-git-send-email-bigeasy@linutronix.de>
-References: <1459258007-24968-1-git-send-email-bigeasy@linutronix.de>
-Message-ID: <56FC15BC.9010708@linaro.org>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Wed, 30 Mar 2016 19:47:40 +0200
+Subject: [PATCH v2] clk: sunxi: Accept a greater rate when setting a parent
+ clock
+Message-ID: <mailman.14.1459361730.1636.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/29/2016 03:26 PM, Sebastian Andrzej Siewior wrote:
-> Currently the driver will disable the clock and enable it one line later
-> if it is switching from periodic mode into one shot.
-> This can be avoided and causes a needless warning on -RT.
+The best rate of a clock may be a bit greater than the requested one.
+In such a case, the rate setting from a child clock was rejected.
 
-I don't see the connection between the description and the content of 
-the patch.
+This patch fixes the problem searching a 'best rate' instead of
+a 'fastest rate <= rate'.
 
-It can be avoided by not disabling the clock when going to periodic / 
-oneshot.
+Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+---
+ drivers/clk/sunxi/clk-factors.c | 15 ++++++++++++---
+ 1 file changed, 12 insertions(+), 3 deletions(-)
 
-The function below suggest clk_enable() is called twice, is that the 
-real issue ?
-
-> Tested-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-> ---
->   drivers/clocksource/tcb_clksrc.c | 33 +++++++++++++++++++++++++++++----
->   1 file changed, 29 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
-> index 4da2af9694a2..ed1ae4445e8d 100644
-> --- a/drivers/clocksource/tcb_clksrc.c
-> +++ b/drivers/clocksource/tcb_clksrc.c
-> @@ -74,6 +74,7 @@ static struct clocksource clksrc = {
->   struct tc_clkevt_device {
->   	struct clock_event_device	clkevt;
->   	struct clk			*clk;
-> +	bool				clk_enabled;
->   	void __iomem			*regs;
->   };
->
-> @@ -91,6 +92,24 @@ static struct tc_clkevt_device *to_tc_clkevt(struct clock_event_device *clkevt)
->    */
->   static u32 timer_clock;
->
-> +static void tc_clk_disable(struct clock_event_device *d)
-> +{
-> +	struct tc_clkevt_device *tcd = to_tc_clkevt(d);
-> +
-> +	clk_disable(tcd->clk);
-> +	tcd->clk_enabled = false;
-> +}
-> +
-> +static void tc_clk_enable(struct clock_event_device *d)
-> +{
-> +	struct tc_clkevt_device *tcd = to_tc_clkevt(d);
-> +
-> +	if (tcd->clk_enabled)
-> +		return;
-> +	clk_enable(tcd->clk);
-> +	tcd->clk_enabled = true;
-> +}
-
-This function.
-
-
+diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
+index ddefe96..c8e2f29 100644
+--- a/drivers/clk/sunxi/clk-factors.c
++++ b/drivers/clk/sunxi/clk-factors.c
+@@ -95,9 +95,10 @@ static int clk_factors_determine_rate(struct clk_hw *hw,
+ 	struct clk_factors *factors = to_clk_factors(hw);
+ 	struct clk_hw *parent, *best_parent = NULL;
+ 	int i, num_parents;
+-	unsigned long parent_rate, best = 0, child_rate, best_child_rate = 0;
++	unsigned long parent_rate, best = 0, child_rate, best_child_rate;
++	unsigned long d_rate, best_d_rate = ~0ul;
+ 
+-	/* find the parent that can help provide the fastest rate <= rate */
++	/* find the parent that can help provide the best rate */
+ 	num_parents = clk_hw_get_num_parents(hw);
+ 	for (i = 0; i < num_parents; i++) {
+ 		struct factors_request factors_req = {
+@@ -116,10 +117,18 @@ static int clk_factors_determine_rate(struct clk_hw *hw,
+ 		factors->get_factors(&factors_req);
+ 		child_rate = factors_req.rate;
+ 
+-		if (child_rate <= req->rate && child_rate > best_child_rate) {
++		if (child_rate >= req->rate)
++			d_rate = child_rate - req->rate;
++		else
++			d_rate = req->rate - child_rate;
++
++		if (d_rate < best_d_rate) {
+ 			best_parent = parent;
+ 			best = parent_rate;
+ 			best_child_rate = child_rate;
++			if (d_rate == 0)
++				break;
++			best_d_rate = d_rate;
+ 		}
+ 	}
+ 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+2.8.0
