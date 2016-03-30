@@ -1,87 +1,53 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 30 Mar 2016 17:43:08 +0200
-Subject: [PATCH v2 3/4] arm64: cover the .head.text section in the .text
- segment mapping
+Date: Wed, 30 Mar 2016 17:43:06 +0200
+Subject: [PATCH v2 1/4] arm64: use 'segment' rather than 'chunk' to describe
+ mapped kernel regions
 In-Reply-To: <1459352589-28721-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1459352589-28721-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1459352589-28721-4-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1459352589-28721-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Keeping .head.text out of the .text mapping buys us very little: its actual
-payload is only 4 KB, most of which is padding, but the page alignment may
-add up to 2 MB (in case of CONFIG_DEBUG_ALIGN_RODATA=y) of additional
-padding to the uncompressed kernel Image.
-
-Also, on 4 KB granule kernels, the 4 KB misalignment of .text forces us to
-map the adjacent 56 KB of code without the PTE_CONT attribute, and since
-this region contains things like the vector table and the GIC interrupt
-handling entry point, this region is likely to benefit from the reduced TLB
-pressure that results from PTE_CONT mappings.
-
-So remove the alignment between the .head.text and .text sections, and use
-the [_text, _etext) rather than the [_stext, _etext) interval for mapping
-the .text segment.
+Replace the poorly defined term chunk with segment, which is a term that is
+already used by the ELF spec to describe contiguous mappings with the same
+permission attributes of statically allocated ranges of an executable.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/kernel/vmlinux.lds.S |  1 -
- arch/arm64/mm/mmu.c             | 10 +++++-----
- 2 files changed, 5 insertions(+), 6 deletions(-)
+ arch/arm64/mm/mmu.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 5a1939a74ff3..61a1075b9c30 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -96,7 +96,6 @@ SECTIONS
- 		_text = .;
- 		HEAD_TEXT
- 	}
--	ALIGN_DEBUG_RO_MIN(PAGE_SIZE)
- 	.text : {			/* Real text segment		*/
- 		_stext = .;		/* Text and read-only data	*/
- 			__exception_text_start = .;
 diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 9be2065f8ddb..dbad533076d1 100644
+index f3e5c74233f3..9be2065f8ddb 100644
 --- a/arch/arm64/mm/mmu.c
 +++ b/arch/arm64/mm/mmu.c
-@@ -385,7 +385,7 @@ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
+@@ -471,8 +471,8 @@ void fixup_init(void)
+ 	unmap_kernel_range((u64)__init_begin, (u64)(__init_end - __init_begin));
+ }
  
- static void __init __map_memblock(pgd_t *pgd, phys_addr_t start, phys_addr_t end)
+-static void __init map_kernel_chunk(pgd_t *pgd, void *va_start, void *va_end,
+-				    pgprot_t prot, struct vm_struct *vma)
++static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
++				      pgprot_t prot, struct vm_struct *vma)
  {
--	unsigned long kernel_start = __pa(_stext);
-+	unsigned long kernel_start = __pa(_text);
- 	unsigned long kernel_end = __pa(_etext);
- 
- 	/*
-@@ -417,7 +417,7 @@ static void __init __map_memblock(pgd_t *pgd, phys_addr_t start, phys_addr_t end
- 				     early_pgtable_alloc);
- 
- 	/*
--	 * Map the linear alias of the [_stext, _etext) interval as
-+	 * Map the linear alias of the [_text, _etext) interval as
- 	 * read-only/non-executable. This makes the contents of the
- 	 * region accessible to subsystems such as hibernate, but
- 	 * protects it from inadvertent modification or execution.
-@@ -449,8 +449,8 @@ void mark_rodata_ro(void)
- {
- 	unsigned long section_size;
- 
--	section_size = (unsigned long)__start_rodata - (unsigned long)_stext;
--	create_mapping_late(__pa(_stext), (unsigned long)_stext,
-+	section_size = (unsigned long)__start_rodata - (unsigned long)_text;
-+	create_mapping_late(__pa(_text), (unsigned long)_text,
- 			    section_size, PAGE_KERNEL_ROX);
- 	/*
- 	 * mark .rodata as read only. Use _etext rather than __end_rodata to
-@@ -499,7 +499,7 @@ static void __init map_kernel(pgd_t *pgd)
+ 	phys_addr_t pa_start = __pa(va_start);
+ 	unsigned long size = va_end - va_start;
+@@ -499,11 +499,11 @@ static void __init map_kernel(pgd_t *pgd)
  {
  	static struct vm_struct vmlinux_text, vmlinux_rodata, vmlinux_init, vmlinux_data;
  
--	map_kernel_segment(pgd, _stext, __start_rodata, PAGE_KERNEL_EXEC, &vmlinux_text);
-+	map_kernel_segment(pgd, _text, __start_rodata, PAGE_KERNEL_EXEC, &vmlinux_text);
- 	map_kernel_segment(pgd, __start_rodata, _etext, PAGE_KERNEL, &vmlinux_rodata);
- 	map_kernel_segment(pgd, __init_begin, __init_end, PAGE_KERNEL_EXEC,
- 			   &vmlinux_init);
+-	map_kernel_chunk(pgd, _stext, __start_rodata, PAGE_KERNEL_EXEC, &vmlinux_text);
+-	map_kernel_chunk(pgd, __start_rodata, _etext, PAGE_KERNEL, &vmlinux_rodata);
+-	map_kernel_chunk(pgd, __init_begin, __init_end, PAGE_KERNEL_EXEC,
+-			 &vmlinux_init);
+-	map_kernel_chunk(pgd, _data, _end, PAGE_KERNEL, &vmlinux_data);
++	map_kernel_segment(pgd, _stext, __start_rodata, PAGE_KERNEL_EXEC, &vmlinux_text);
++	map_kernel_segment(pgd, __start_rodata, _etext, PAGE_KERNEL, &vmlinux_rodata);
++	map_kernel_segment(pgd, __init_begin, __init_end, PAGE_KERNEL_EXEC,
++			   &vmlinux_init);
++	map_kernel_segment(pgd, _data, _end, PAGE_KERNEL, &vmlinux_data);
+ 
+ 	if (!pgd_val(*pgd_offset_raw(pgd, FIXADDR_START))) {
+ 		/*
 -- 
 2.5.0
