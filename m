@@ -1,62 +1,103 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 30 Mar 2016 12:06:12 +0100
-Subject: [PATCH 2/7] ARM: dts: skeleton: add unit name to memory node
-In-Reply-To: <1459290646-3592-3-git-send-email-manabian@gmail.com>
-References: <1459290646-3592-1-git-send-email-manabian@gmail.com>
- <1459290646-3592-3-git-send-email-manabian@gmail.com>
-Message-ID: <20160330110611.GB25354@leverpostej>
+From: julien.grall@arm.com (Julien Grall)
+Date: Wed, 30 Mar 2016 12:22:49 +0100
+Subject: [PATCH v7 03/17] Xen: xlate: Use page_to_xen_pfn instead of
+ page_to_pfn
+In-Reply-To: <56FB8258.7030303@huawei.com>
+References: <1458830676-27075-1-git-send-email-shannon.zhao@linaro.org>
+ <1458830676-27075-4-git-send-email-shannon.zhao@linaro.org>
+ <56FAAD48.2010401@arm.com> <56FB8258.7030303@huawei.com>
+Message-ID: <56FBB709.5050802@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 30, 2016 at 12:30:41AM +0200, Joachim Eastwood wrote:
-> Add unit name to memory to remove the following warning:
->  Warning (unit_address_vs_reg): Node /memory has a reg or ranges
-> 				property, but no unit name
+Hi Shannon,
 
-If anything, it would be better to get rid of the memory node from the
-skeleton DTs.
+On 30/03/16 08:38, Shannon Zhao wrote:
+>
+>
+> On 2016/3/30 0:28, Julien Grall wrote:
+>> On 24/03/16 14:44, Shannon Zhao wrote:
+>>> Make xen_xlate_map_ballooned_pages work with 64K pages. In that case
+>>> Kernel pages are 64K in size but Xen pages remain 4K in size. Xen pfns
+>>> refer to 4K pages.
+>>>
+>>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>>> Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+>>> ---
+>>>    drivers/xen/xlate_mmu.c | 26 ++++++++++++++++----------
+>>>    1 file changed, 16 insertions(+), 10 deletions(-)
+>>>
+>>> diff --git a/drivers/xen/xlate_mmu.c b/drivers/xen/xlate_mmu.c
+>>> index 9692656..28f728b 100644
+>>> --- a/drivers/xen/xlate_mmu.c
+>>> +++ b/drivers/xen/xlate_mmu.c
+>>> @@ -207,9 +207,12 @@ int __init
+>>> xen_xlate_map_ballooned_pages(xen_pfn_t **gfns, void **virt,
+>>>        void *vaddr;
+>>>        int rc;
+>>>        unsigned int i;
+>>> +    unsigned long nr_pages;
+>>> +    xen_pfn_t xen_pfn = 0;
+>>>
+>>>        BUG_ON(nr_grant_frames == 0);
+>>> -    pages = kcalloc(nr_grant_frames, sizeof(pages[0]), GFP_KERNEL);
+>>> +    nr_pages = DIV_ROUND_UP(nr_grant_frames, XEN_PFN_PER_PAGE);
+>>> +    pages = kcalloc(nr_pages, sizeof(pages[0]), GFP_KERNEL);
+>>>        if (!pages)
+>>>            return -ENOMEM;
+>>>
+>>> @@ -218,22 +221,25 @@ int __init
+>>> xen_xlate_map_ballooned_pages(xen_pfn_t **gfns, void **virt,
+>>>            kfree(pages);
+>>>            return -ENOMEM;
+>>>        }
+>>> -    rc = alloc_xenballooned_pages(nr_grant_frames, pages);
+>>> +    rc = alloc_xenballooned_pages(nr_pages, pages);
+>>>        if (rc) {
+>>> -        pr_warn("%s Couldn't balloon alloc %ld pfns rc:%d\n", __func__,
+>>> -            nr_grant_frames, rc);
+>>> +        pr_warn("%s Couldn't balloon alloc %ld pages rc:%d\n", __func__,
+>>> +            nr_pages, rc);
+>>>            kfree(pages);
+>>>            kfree(pfns);
+>>>            return rc;
+>>>        }
+>>> -    for (i = 0; i < nr_grant_frames; i++)
+>>> -        pfns[i] = page_to_pfn(pages[i]);
+>>> +    for (i = 0; i < nr_grant_frames; i++) {
+>>> +        if ((i % XEN_PFN_PER_PAGE) == 0)
+>>> +            xen_pfn = page_to_xen_pfn(pages[i / XEN_PFN_PER_PAGE]);
+>>> +        pfns[i] = pfn_to_gfn(xen_pfn++);
+>>> +    }
+>>
+>> Would it be possible to re-use xen_for_each_gfn? This will avoid
+>> open-coding the loop to break down the Linux page.
+> I don't think so. Using xen_acpi_guest_init will require factoring
+> "pfns[i] = pfn_to_gfn(xen_pfn++)" to a function with parameter pfns[i].
+> How can we pass pfns[i]?
 
-For DTs which have a memory node there's no problem, and DTs which
-expect a bootlaoder to fill things in have a logical place to document
-that fact.
+By using the variable data. Something along those lines:
 
-Thanks,
-Mark.
+struct map_balloon_pages
+{
+       xen_pfn_t *pfns;
+       unsigned int idx;
+};
 
-> 
-> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
-> ---
->  arch/arm/boot/dts/skeleton.dtsi   | 2 +-
->  arch/arm/boot/dts/skeleton64.dtsi | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/skeleton.dtsi b/arch/arm/boot/dts/skeleton.dtsi
-> index b41d241..a20da0a 100644
-> --- a/arch/arm/boot/dts/skeleton.dtsi
-> +++ b/arch/arm/boot/dts/skeleton.dtsi
-> @@ -9,5 +9,5 @@
->  	#size-cells = <1>;
->  	chosen { };
->  	aliases { };
-> -	memory { device_type = "memory"; reg = <0 0>; };
-> +	memory at 0 { device_type = "memory"; reg = <0 0>; };
->  };
-> diff --git a/arch/arm/boot/dts/skeleton64.dtsi b/arch/arm/boot/dts/skeleton64.dtsi
-> index b5d7f36..6dbe9f9 100644
-> --- a/arch/arm/boot/dts/skeleton64.dtsi
-> +++ b/arch/arm/boot/dts/skeleton64.dtsi
-> @@ -9,5 +9,5 @@
->  	#size-cells = <2>;
->  	chosen { };
->  	aliases { };
-> -	memory { device_type = "memory"; reg = <0 0 0 0>; };
-> +	memory at 0 { device_type = "memory"; reg = <0 0 0 0>; };
->  };
-> -- 
-> 2.7.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+static void setup_balloon_gfn(unsigned long gfn, void *data)
+{
+       struct map_balloon_pages *info = data;
+
+
+       data->pfns[data->idx] = gfn;
+       data->idx++;
+}
+
+And then in xen_xlate_map_ballooned_pages
+
+xen_for_each_gfn(pages, nr_grant_frames, setup_balloon_gfn, &data);
+
+Regards,
+
+-- 
+Julien Grall
