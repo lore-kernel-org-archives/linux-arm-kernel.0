@@ -1,37 +1,33 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 30 Mar 2016 20:09:58 +0800
-Subject: [PATCH v4] ARM: dts: vf610-zii-dev: Add ZII development board.
-In-Reply-To: <dad27c3a958ae97869c606e9e02e2d7b@agner.ch>
-References: <1459100733-21552-1-git-send-email-andrew@lunn.ch>
- <56F84FAB.6010005@gmail.com> <20160327223603.GA21605@lunn.ch>
- <dad27c3a958ae97869c606e9e02e2d7b@agner.ch>
-Message-ID: <20160330120958.GG28207@tiger>
+From: LW@KARO-electronics.de (=?UTF-8?q?Lothar=20Wa=C3=9Fmann?=)
+Date: Wed, 30 Mar 2016 14:23:03 +0200
+Subject: [PATCH BUGFIX] clk: imx6q: fix typo in CAN clock definition
+Message-ID: <1459340583-14743-1-git-send-email-LW@KARO-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 27, 2016 at 03:48:21PM -0700, Stefan Agner wrote:
-> >> > +&uart0 {
-> >> > +	pinctrl-names = "default";
-> >> > +	pinctrl-0 = <&pinctrl_uart0>;
-> >> > +	status = "okay";
-> >> > +	dmas = <>;
-> >> > +	dma-names = "";
-> >>
-> >> Why is this dma stuff here ?
-> > 
-> > We have seen corruption of the serial transmit stream, when the DMA is
-> > being used. As a workaround, we disable DMA.
-> > 
-> 
-> For the Colibri VF50/VF61 we used this method too to disable the DMA
-> (clearing dma-names). I guess using the device tree deleting
-> capabilities would be the more elegant way to do this.
-> 
-> We have seen such issues too, the DMA implementation of the LPUART
-> driver seems to be racy... We are working on fixing that.
+commit ee36027427c7 ("clk: imx: Add clock support for imx6qp")
+introduced a regression due to a subtle typo in the 'can_root' clock
+definition. The effect is that trying to configure the bitrate of the
+can interfaces fails with -EDOM or produces a division by zero error
+due to the clock_freq of the can serial clock being reported as '0'.
 
-In this case, shouldn't the DMA support be disabled in driver before the
-issue gets fixed?  I'm saying that we shouldn't manipulate device tree
-(i.e.  hardware description) to work around Linux device driver issue.
+Signed-off-by: Lothar Wa?mann <LW@KARO-electronics.de>
+---
+ drivers/clk/imx/clk-imx6q.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Shawn
+diff --git a/drivers/clk/imx/clk-imx6q.c b/drivers/clk/imx/clk-imx6q.c
+index 02e1818..2beb396f 100644
+--- a/drivers/clk/imx/clk-imx6q.c
++++ b/drivers/clk/imx/clk-imx6q.c
+@@ -394,7 +394,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 		clk[IMX6QDL_CLK_LDB_DI1_DIV_3_5] = imx_clk_fixed_factor("ldb_di1_div_3_5", "ldb_di1", 2, 7);
+ 	} else {
+ 		clk[IMX6QDL_CLK_ECSPI_ROOT] = imx_clk_divider("ecspi_root", "pll3_60m", base + 0x38, 19, 6);
+-		clk[IMX6QDL_CLK_CAN_ROOT] = imx_clk_divider("can_root", "pll3_60", base + 0x20, 2, 6);
++		clk[IMX6QDL_CLK_CAN_ROOT] = imx_clk_divider("can_root", "pll3_60m", base + 0x20, 2, 6);
+ 		clk[IMX6QDL_CLK_IPG_PER] = imx_clk_fixup_divider("ipg_per", "ipg", base + 0x1c, 0, 6, imx_cscmr1_fixup);
+ 		clk[IMX6QDL_CLK_UART_SERIAL_PODF] = imx_clk_divider("uart_serial_podf", "pll3_80m",          base + 0x24, 0,  6);
+ 		clk[IMX6QDL_CLK_LDB_DI0_DIV_3_5] = imx_clk_fixed_factor("ldb_di0_div_3_5", "ldb_di0_sel", 2, 7);
+-- 
+2.1.4
