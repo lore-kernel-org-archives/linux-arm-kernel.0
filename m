@@ -1,222 +1,46 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 30 Mar 2016 18:14:33 +0200
-Subject: [PATCH v5 18/50] mtd: nand: implement the default mtd_ooblayout_ops
-In-Reply-To: <1459354505-32551-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1459354505-32551-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1459354505-32551-19-git-send-email-boris.brezillon@free-electrons.com>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 30 Mar 2016 17:46:41 +0100
+Subject: [PATCH] arm64: KVM: Register CPU notifiers when the kernel runs
+ at HYP
+In-Reply-To: <56FBFF12.60109@arm.com>
+References: <1459353370-589-1-git-send-email-james.morse@arm.com>
+ <56FBFF12.60109@arm.com>
+Message-ID: <56FC02F1.5060804@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the default nand_ecclayout definitions for large and small page
-devices with the equivalent mtd_ooblayout_ops.
+On 30/03/16 17:30, Marc Zyngier wrote:
+>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+>> index 6accd66d26f0..cf0184edf4f5 100644
+>> --- a/arch/arm/kvm/arm.c
+>> +++ b/arch/arm/kvm/arm.c
+>> @@ -1084,9 +1092,13 @@ static int hyp_init_cpu_pm_notifier(struct notifier_block *self,
+>>  				    unsigned long cmd,
+>>  				    void *v)
+>>  {
+>> -	if (cmd == CPU_PM_EXIT &&
+>> -	    __hyp_get_vectors() == hyp_default_vectors) {
+>> -		cpu_init_hyp_mode(NULL);
+>> +	if (cmd == CPU_PM_EXIT) {
+>> +		if (is_kernel_in_hyp_mode()) {
+>> +			cpu_init_stage2(NULL);
+>> +		} else {
+>> +			if (__hyp_get_vectors() == hyp_default_vectors)
+>> +				cpu_init_hyp_mode(NULL);
+>> +		}
+> 
+> Any reason why we can't isolate that snippet in a separate function and
+> use it in both locations?
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- drivers/mtd/nand/nand_base.c | 148 ++++++++++++++++++++++++++++---------------
- include/linux/mtd/nand.h     |   3 +
- 2 files changed, 99 insertions(+), 52 deletions(-)
+I thought I did that ... bother, wrong branch.
 
-diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
-index 295af79..3d6985e 100644
---- a/drivers/mtd/nand/nand_base.c
-+++ b/drivers/mtd/nand/nand_base.c
-@@ -48,50 +48,6 @@
- #include <linux/mtd/partitions.h>
- #include <linux/of_mtd.h>
- 
--/* Define default oob placement schemes for large and small page devices */
--static struct nand_ecclayout nand_oob_8 = {
--	.eccbytes = 3,
--	.eccpos = {0, 1, 2},
--	.oobfree = {
--		{.offset = 3,
--		 .length = 2},
--		{.offset = 6,
--		 .length = 2} }
--};
--
--static struct nand_ecclayout nand_oob_16 = {
--	.eccbytes = 6,
--	.eccpos = {0, 1, 2, 3, 6, 7},
--	.oobfree = {
--		{.offset = 8,
--		 . length = 8} }
--};
--
--static struct nand_ecclayout nand_oob_64 = {
--	.eccbytes = 24,
--	.eccpos = {
--		   40, 41, 42, 43, 44, 45, 46, 47,
--		   48, 49, 50, 51, 52, 53, 54, 55,
--		   56, 57, 58, 59, 60, 61, 62, 63},
--	.oobfree = {
--		{.offset = 2,
--		 .length = 38} }
--};
--
--static struct nand_ecclayout nand_oob_128 = {
--	.eccbytes = 48,
--	.eccpos = {
--		   80, 81, 82, 83, 84, 85, 86, 87,
--		   88, 89, 90, 91, 92, 93, 94, 95,
--		   96, 97, 98, 99, 100, 101, 102, 103,
--		   104, 105, 106, 107, 108, 109, 110, 111,
--		   112, 113, 114, 115, 116, 117, 118, 119,
--		   120, 121, 122, 123, 124, 125, 126, 127},
--	.oobfree = {
--		{.offset = 2,
--		 .length = 78} }
--};
--
- static int nand_get_device(struct mtd_info *mtd, int new_state);
- 
- static int nand_do_write_oob(struct mtd_info *mtd, loff_t to,
-@@ -103,6 +59,92 @@ static int nand_do_write_oob(struct mtd_info *mtd, loff_t to,
-  */
- DEFINE_LED_TRIGGER(nand_led_trigger);
- 
-+/* Define default oob placement schemes for large and small page devices */
-+static int nand_ooblayout_ecc_sp(struct mtd_info *mtd, int section,
-+				 struct mtd_oob_region *oobregion)
-+{
-+	struct nand_chip *chip = mtd_to_nand(mtd);
-+	struct nand_ecc_ctrl *ecc = &chip->ecc;
-+
-+	if (section > 1)
-+		return -ERANGE;
-+
-+	if (!section) {
-+		oobregion->offset = 0;
-+		oobregion->length = 4;
-+	} else {
-+		oobregion->offset = 6;
-+		oobregion->length = ecc->total - 4;
-+	}
-+
-+	return 0;
-+}
-+
-+static int nand_ooblayout_free_sp(struct mtd_info *mtd, int section,
-+				  struct mtd_oob_region *oobregion)
-+{
-+	if (section > 1)
-+		return -ERANGE;
-+
-+	if (mtd->oobsize == 16) {
-+		if (section)
-+			return -ERANGE;
-+
-+		oobregion->length = 8;
-+		oobregion->offset = 8;
-+	} else {
-+		oobregion->length = 2;
-+		if (!section)
-+			oobregion->offset = 3;
-+		else
-+			oobregion->offset = 6;
-+	}
-+
-+	return 0;
-+}
-+
-+const struct mtd_ooblayout_ops nand_ooblayout_sp_ops = {
-+	.ecc = nand_ooblayout_ecc_sp,
-+	.free = nand_ooblayout_free_sp,
-+};
-+EXPORT_SYMBOL_GPL(nand_ooblayout_sp_ops);
-+
-+static int nand_ooblayout_ecc_lp(struct mtd_info *mtd, int section,
-+				 struct mtd_oob_region *oobregion)
-+{
-+	struct nand_chip *chip = mtd_to_nand(mtd);
-+	struct nand_ecc_ctrl *ecc = &chip->ecc;
-+
-+	if (section)
-+		return -ERANGE;
-+
-+	oobregion->length = ecc->total;
-+	oobregion->offset = mtd->oobsize - oobregion->length;
-+
-+	return 0;
-+}
-+
-+static int nand_ooblayout_free_lp(struct mtd_info *mtd, int section,
-+				  struct mtd_oob_region *oobregion)
-+{
-+	struct nand_chip *chip = mtd_to_nand(mtd);
-+	struct nand_ecc_ctrl *ecc = &chip->ecc;
-+
-+	if (section)
-+		return -ERANGE;
-+
-+	oobregion->length = mtd->oobsize - ecc->total - 2;
-+	oobregion->offset = 2;
-+
-+	return 0;
-+}
-+
-+const struct mtd_ooblayout_ops nand_ooblayout_lp_ops = {
-+	.ecc = nand_ooblayout_ecc_lp,
-+	.free = nand_ooblayout_free_lp,
-+};
-+EXPORT_SYMBOL_GPL(nand_ooblayout_lp_ops);
-+
- static int check_offs_len(struct mtd_info *mtd,
- 					loff_t ofs, uint64_t len)
- {
-@@ -4120,21 +4162,24 @@ int nand_scan_tail(struct mtd_info *mtd)
- 	chip->oob_poi = chip->buffers->databuf + mtd->writesize;
- 
- 	/*
-+	 * Set the provided ECC layout. If ecc->layout is NULL, the MTD core
-+	 * will just leave mtd->ooblayout to NULL, if it's not NULL, it will
-+	 * set ->ooblayout to the default ecclayout wrapper.
-+	 */
-+	mtd_set_ecclayout(mtd, ecc->layout);
-+
-+	/*
- 	 * If no default placement scheme is given, select an appropriate one.
- 	 */
--	if (!ecc->layout && (ecc->mode != NAND_ECC_SOFT_BCH)) {
-+	if (!mtd->ooblayout && (ecc->mode != NAND_ECC_SOFT_BCH)) {
- 		switch (mtd->oobsize) {
- 		case 8:
--			ecc->layout = &nand_oob_8;
--			break;
- 		case 16:
--			ecc->layout = &nand_oob_16;
-+			mtd_set_ooblayout(mtd, &nand_ooblayout_sp_ops);
- 			break;
- 		case 64:
--			ecc->layout = &nand_oob_64;
--			break;
- 		case 128:
--			ecc->layout = &nand_oob_128;
-+			mtd_set_ooblayout(mtd, &nand_ooblayout_lp_ops);
- 			break;
- 		default:
- 			pr_warn("No oob scheme defined for oobsize %d\n",
-@@ -4288,7 +4333,6 @@ int nand_scan_tail(struct mtd_info *mtd)
- 		ecc->write_oob_raw = ecc->write_oob;
- 
- 	/* propagate ecc info to mtd_info */
--	mtd_set_ecclayout(mtd, ecc->layout);
- 	mtd->ecc_strength = ecc->strength;
- 	mtd->ecc_step_size = ecc->size;
- 
-diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
-index 1b673e1..a9796ba 100644
---- a/include/linux/mtd/nand.h
-+++ b/include/linux/mtd/nand.h
-@@ -748,6 +748,9 @@ struct nand_chip {
- 	void *priv;
- };
- 
-+extern const struct mtd_ooblayout_ops nand_ooblayout_sp_ops;
-+extern const struct mtd_ooblayout_ops nand_ooblayout_lp_ops;
-+
- static inline void nand_set_flash_node(struct nand_chip *chip,
- 				       struct device_node *np)
- {
--- 
-2.5.0
+We can argue about the name, I called it 'cpu_hyp_reinit()', which pairs up with
+'cpu_hyp_reset()' in a rebased version of the kexec/hibernate hyp-shutdown code.
+(cpu_ seems to be the prefix for per-cpu functions in this file)
+
+v2 shortly,
+
+
+Thanks/Sorry,
+
+James
