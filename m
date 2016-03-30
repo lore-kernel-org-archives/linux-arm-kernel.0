@@ -1,86 +1,85 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 30 Mar 2016 09:46:23 +0200
-Subject: [PATCH] efi/arm64: don't apply MEMBLOCK_NOMAP to UEFI memory map
- mapping
-Message-ID: <1459323983-9120-1-git-send-email-ard.biesheuvel@linaro.org>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 30 Mar 2016 15:47:57 +0800
+Subject: [PATCH v2] ARM: cpuidle: make arm_cpuidle_suspend() a bit more
+ efficient
+Message-ID: <1459324077-7116-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matt,
+Currently, we check cpuidle_ops.suspend every time when entering a
+low-power idle state. But this check could be avoided in this hot path
+by moving it into arm_cpuidle_read_ops() to reduce arm_cpuidle_suspend
+overhead a bit.
 
-Could we queue this as a fix for v4.6 with a cc:stable for v4.5, please?
-(assuming no objections from any of the cc'ees)
-
-Thanks,
-Ard.
-
-----------8<--------------
-Commit 4dffbfc48d65 ("arm64/efi: mark UEFI reserved regions as
-MEMBLOCK_NOMAP") updated the mapping logic of both the RuntimeServices
-regions as well as the kernel's copy of the UEFI memory map to set the
-MEMBLOCK_NOMAP flag, which causes these regions to be omitted from the
-kernel direct mapping, and from being covered by a struct page.
-For the RuntimeServices regions, this is an obvious win, since the contents
-of these regions have significance to the firmware executable code itself,
-and are mapped in the EFI page tables using attributes that are described in
-the UEFI memory map, and which may differ from the attributes we use for
-mapping system RAM. It also prevents the contents from being modified
-inadvertently, since the EFI page tables are only live during runtime
-service invocations.
-
-None of these concerns apply to the allocation that covers the UEFI memory
-map, since it is entirely owned by the kernel. Setting the MEMBLOCK_NOMAP on
-the region did allow us to use ioremap_cache() to map it both on arm64 and
-on ARM, since the latter does not allow ioremap_cache() to be used on
-regions that are covered by a struct page.
-
-The ioremap_cache() on ARM restriction will be lifted in the v4.7 timeframe,
-but in the mean time, it has been reported that commit 4dffbfc48d65 causes
-a regression on 64k granule kernels. This is due to the fact that, given
-the 64 KB page size, the region that we end up removing from the kernel
-direct mapping is rounded up to 64 KB, and this 64 KB page frame may be
-shared with the initrd when booting via GRUB (which does not align its
-EFI_LOADER_DATA allocations to 64 KB like the stub does). This will crash
-the kernel as soon as it tries to access the initrd.
-
-Since the issue is specific to arm64, revert back to memblock_reserve()'ing
-the UEFI memory map when running on arm64. This is a temporary fix for v4.5
-and v4.6, and will be superseded in the v4.7 timeframe when we will be able
-to move back to memblock_reserve() unconditionally.
-
-Fixes: 4dffbfc48d65 ("arm64/efi: mark UEFI reserved regions as MEMBLOCK_NOMAP")
-Reported-by: Mark Salter <msalter@redhat.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
- drivers/firmware/efi/arm-init.c | 18 +++++++++++++++---
- 1 file changed, 15 insertions(+), 3 deletions(-)
+Since v1:
+ - drop patch1, I.E "ARM: cpuidle: fix !cpuidle_ops[cpu].init case
+   during init", because there may be platforms which doesn't need the
+   init member at all.
+ - adopt Daniel's suggestion to move the cpuidle_ops.suspend check to
+   arm_cpuidle_read_ops().
 
-diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
-index aa1f743152a2..8714f8c271ba 100644
---- a/drivers/firmware/efi/arm-init.c
-+++ b/drivers/firmware/efi/arm-init.c
-@@ -203,7 +203,19 @@ void __init efi_init(void)
+ arch/arm/kernel/cpuidle.c | 21 ++++++++++++---------
+ 1 file changed, 12 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
+index 703926e..e63388e 100644
+--- a/arch/arm/kernel/cpuidle.c
++++ b/arch/arm/kernel/cpuidle.c
+@@ -47,18 +47,13 @@ int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
+  * This function calls the underlying arch specific low level PM code as
+  * registered at the init time.
+  *
+- * Returns -EOPNOTSUPP if no suspend callback is defined, the result of the
+- * callback otherwise.
++ * Returns the result of the suspend callback.
+  */
+ int arm_cpuidle_suspend(int index)
+ {
+-	int ret = -EOPNOTSUPP;
+ 	int cpu = smp_processor_id();
  
- 	reserve_regions();
- 	early_memunmap(memmap.map, params.mmap_size);
--	memblock_mark_nomap(params.mmap & PAGE_MASK,
--			    PAGE_ALIGN(params.mmap_size +
--				       (params.mmap & ~PAGE_MASK)));
-+
-+	if (IS_ENABLED(CONFIG_ARM)) {
-+		/*
-+		 * ARM currently does not allow ioremap_cache() to be called on
-+		 * memory regions that are covered by struct page. So remove the
-+		 * UEFI memory map from the linear mapping.
-+		 */
-+		memblock_mark_nomap(params.mmap & PAGE_MASK,
-+				    PAGE_ALIGN(params.mmap_size +
-+					       (params.mmap & ~PAGE_MASK)));
-+	} else {
-+		memblock_reserve(params.mmap & PAGE_MASK,
-+				 PAGE_ALIGN(params.mmap_size +
-+					    (params.mmap & ~PAGE_MASK)));
-+	}
+-	if (cpuidle_ops[cpu].suspend)
+-		ret = cpuidle_ops[cpu].suspend(index);
+-
+-	return ret;
++	return cpuidle_ops[cpu].suspend(index);
  }
+ 
+ /**
+@@ -92,7 +87,8 @@ static struct cpuidle_ops *__init arm_cpuidle_get_ops(const char *method)
+  * process.
+  *
+  * Return 0 on sucess, -ENOENT if no 'enable-method' is defined, -EOPNOTSUPP if
+- * no cpuidle_ops is registered for the 'enable-method'.
++ * no cpuidle_ops is registered for the 'enable-method', or if no suspend
++ * callback is defined.
+  */
+ static int __init arm_cpuidle_read_ops(struct device_node *dn, int cpu)
+ {
+@@ -110,6 +106,12 @@ static int __init arm_cpuidle_read_ops(struct device_node *dn, int cpu)
+ 		return -EOPNOTSUPP;
+ 	}
+ 
++	if (!ops->suspend) {
++		pr_warn("cpuidle_ops '%s': no suspend callback\n",
++			enable_method);
++		return -EOPNOTSUPP;
++	}
++
+ 	cpuidle_ops[cpu] = *ops; /* structure copy */
+ 
+ 	pr_notice("cpuidle: enable-method property '%s'"
+@@ -129,7 +131,8 @@ static int __init arm_cpuidle_read_ops(struct device_node *dn, int cpu)
+  * Returns:
+  *  0 on success,
+  *  -ENODEV if it fails to find the cpu node in the device tree,
+- *  -EOPNOTSUPP if it does not find a registered cpuidle_ops for this cpu,
++ *  -EOPNOTSUPP if it does not find a registered and valid cpuidle_ops for
++ *   this cpu,
+  *  -ENOENT if it fails to find an 'enable-method' property,
+  *  -ENXIO if the HW reports a failure or a misconfiguration,
+  *  -ENOMEM if the HW report an memory allocation failure 
 -- 
-2.5.0
+2.8.0.rc3
