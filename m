@@ -1,90 +1,51 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 30 Mar 2016 18:14:34 +0200
-Subject: [PATCH v5 19/50] mtd: nand: bch: switch to mtd_ooblayout_ops
-In-Reply-To: <1459354505-32551-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1459354505-32551-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1459354505-32551-20-git-send-email-boris.brezillon@free-electrons.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 31 Mar 2016 00:33:54 +0800
+Subject: [PATCH v4 5/5] printk/nmi: flush NMI messages on the system panic
+In-Reply-To: <1459353210-20260-6-git-send-email-pmladek@suse.com>
+Message-ID: <201603310000.dKufp7mg%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the nand_ecclayout definition by the equivalent mtd_ooblayout_ops
-definition.
+Hi Petr,
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+[auto build test ERROR on v4.6-rc1]
+[cannot apply to tip/x86/core next-20160330]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+
+url:    https://github.com/0day-ci/linux/commits/Petr-Mladek/Cleaning-printk-stuff-in-NMI-context/20160330-235818
+config: i386-randconfig-s1-201613 (attached as .config)
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
+
+All errors (new ones prefixed by >>):
+
+   kernel/printk/nmi.c: In function 'printk_nmi_flush_on_panic':
+>> kernel/printk/nmi.c:218:4: error: implicit declaration of function 'debug_locks_off' [-Werror=implicit-function-declaration]
+       debug_locks_off();
+       ^
+   cc1: some warnings being treated as errors
+
+vim +/debug_locks_off +218 kernel/printk/nmi.c
+
+   212			 * Do not risk a double release when more CPUs are up.
+   213			 */
+   214			if (raw_spin_is_locked(&logbuf_lock)) {
+   215				if (num_online_cpus() > 1)
+   216					return;
+   217	
+ > 218				debug_locks_off();
+   219				raw_spin_lock_init(&logbuf_lock);
+   220			}
+   221	
+
 ---
- drivers/mtd/nand/nand_bch.c | 33 +++++++++++----------------------
- 1 file changed, 11 insertions(+), 22 deletions(-)
-
-diff --git a/drivers/mtd/nand/nand_bch.c b/drivers/mtd/nand/nand_bch.c
-index b3039de..e29e75f 100644
---- a/drivers/mtd/nand/nand_bch.c
-+++ b/drivers/mtd/nand/nand_bch.c
-@@ -32,13 +32,11 @@
- /**
-  * struct nand_bch_control - private NAND BCH control structure
-  * @bch:       BCH control structure
-- * @ecclayout: private ecc layout for this BCH configuration
-  * @errloc:    error location array
-  * @eccmask:   XOR ecc mask, allows erased pages to be decoded as valid
-  */
- struct nand_bch_control {
- 	struct bch_control   *bch;
--	struct nand_ecclayout ecclayout;
- 	unsigned int         *errloc;
- 	unsigned char        *eccmask;
- };
-@@ -124,7 +122,6 @@ struct nand_bch_control *nand_bch_init(struct mtd_info *mtd)
- {
- 	struct nand_chip *nand = mtd_to_nand(mtd);
- 	unsigned int m, t, eccsteps, i;
--	struct nand_ecclayout *layout = nand->ecc.layout;
- 	struct nand_bch_control *nbc = NULL;
- 	unsigned char *erased_page;
- 	unsigned int eccsize = nand->ecc.size;
-@@ -161,8 +158,17 @@ struct nand_bch_control *nand_bch_init(struct mtd_info *mtd)
- 
- 	eccsteps = mtd->writesize/eccsize;
- 
-+	/*
-+	 * Rely on the default ecclayout to ooblayout wrapper provided by MTD
-+	 * core if ecc.layout is not NULL.
-+	 * FIXME: this should be removed when all callers have moved to the
-+	 * mtd_ooblayout_ops approach.
-+	 */
-+	if (nand->ecc.layout)
-+		mtd_set_ecclayout(mtd, nand->ecc.layout);
-+
- 	/* if no ecc placement scheme was provided, build one */
--	if (!layout) {
-+	if (!mtd->ooblayout) {
- 
- 		/* handle large page devices only */
- 		if (mtd->oobsize < 64) {
-@@ -171,24 +177,7 @@ struct nand_bch_control *nand_bch_init(struct mtd_info *mtd)
- 			goto fail;
- 		}
- 
--		layout = &nbc->ecclayout;
--		layout->eccbytes = eccsteps*eccbytes;
--
--		/* reserve 2 bytes for bad block marker */
--		if (layout->eccbytes+2 > mtd->oobsize) {
--			printk(KERN_WARNING "no suitable oob scheme available "
--			       "for oobsize %d eccbytes %u\n", mtd->oobsize,
--			       eccbytes);
--			goto fail;
--		}
--		/* put ecc bytes at oob tail */
--		for (i = 0; i < layout->eccbytes; i++)
--			layout->eccpos[i] = mtd->oobsize-layout->eccbytes+i;
--
--		layout->oobfree[0].offset = 2;
--		layout->oobfree[0].length = mtd->oobsize-2-layout->eccbytes;
--
--		nand->ecc.layout = layout;
-+		mtd_set_ooblayout(mtd, &nand_ooblayout_lp_ops);
- 	}
- 
- 	/* sanity checks */
--- 
-2.5.0
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 27512 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160331/9b73021e/attachment-0001.obj>
