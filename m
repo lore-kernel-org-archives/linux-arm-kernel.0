@@ -1,27 +1,57 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 30 Mar 2016 17:30:34 +0900
-Subject: [PATCH V3 3/4] ARM: exynos: exynos-cpufreq platform device isn't
- supported anymore
-In-Reply-To: <abff8b995fce34ea80c68c5d11ccb8a525fb81fa.1459325515.git.viresh.kumar@linaro.org>
-References: <cover.1459325515.git.viresh.kumar@linaro.org>
- <abff8b995fce34ea80c68c5d11ccb8a525fb81fa.1459325515.git.viresh.kumar@linaro.org>
-Message-ID: <56FB8EAA.3010203@samsung.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 30 Mar 2016 10:41:09 +0200
+Subject: [PATCH 1/2] ARM: cpuidle: fix !cpuidle_ops[cpu].init case during
+ init
+In-Reply-To: <20160330161745.7afd6e48@xhacker>
+References: <1458796269-6158-1-git-send-email-jszhang@marvell.com>
+ <1458796269-6158-2-git-send-email-jszhang@marvell.com>
+ <56F52502.3060308@linaro.org> <20160330151629.0b338365@xhacker>
+ <56FB89A8.90209@linaro.org> <20160330161745.7afd6e48@xhacker>
+Message-ID: <56FB9125.10507@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30.03.2016 17:15, Viresh Kumar wrote:
-> The driver is removed long back and we don't support this device
-> anymore. Stop adding it.
-> 
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
->  arch/arm/mach-exynos/exynos.c | 8 ++------
->  1 file changed, 2 insertions(+), 6 deletions(-)
+On 03/30/2016 10:17 AM, Jisheng Zhang wrote:
+> On Wed, 30 Mar 2016 10:09:12 +0200 Daniel Lezcano wrote:
+>
+>> On 03/30/2016 09:16 AM, Jisheng Zhang wrote:
+>>> Hi Daniel,
+>>
+>> [ ... ]
+>>
+>> Added Lorenzo and Catalin.
+>>
+>>>> Hi Jisheng,
+>>>>
+>>>> this should be handled in the arm_cpuidle_read_ops function.
+>>>>
+>>>
+>>> Thanks for reviewing. After some consideration, I think this patch isn't correct
+>>> There may be platforms which doesn't need the init member at all, although
+>>> currently I don't see such platforms in mainline, So I'll drop this patch
+>>> and send out one v2 only does the optimization.
+>>
+>> There is an inconsistency between ARM and ARM64. The 'cpu_get_ops', the
+>> arm_cpuidle_read_ops from the ARM64 side, returns -EOPNOTSUPP when the
+>> init function is not there for cpuidle.
+>
+> yes.
+> arm64's arm_cpuidle_init() returns -EOPNOTSUPP if init callback isn't defined
+>
+>>
+>> I don't think it is a problem, but as ARM/ARM64 are sharing the same
+>> cpuidle-arm.c driver it would make sense to unify the behavior between
+>> both archs.
+>
+> yes, agree with you. From "unify" point of view, could I move back the suspend
+> callback check and init callback check into arm_cpuidle_init() for arm as V1 does?
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Why ? To be consistent with ARM64 ?
 
 
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-Best regards,
-
-Krzysztof
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
