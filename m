@@ -1,46 +1,63 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 30 Mar 2016 17:46:41 +0100
-Subject: [PATCH] arm64: KVM: Register CPU notifiers when the kernel runs
- at HYP
-In-Reply-To: <56FBFF12.60109@arm.com>
-References: <1459353370-589-1-git-send-email-james.morse@arm.com>
- <56FBFF12.60109@arm.com>
-Message-ID: <56FC02F1.5060804@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 30 Mar 2016 18:38:53 +0200
+Subject: [PATCH v2 5/5] arm*: efi: take the Memory Attributes table into
+ account
+In-Reply-To: <1459355933-13529-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1459355933-13529-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1459355933-13529-6-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/03/16 17:30, Marc Zyngier wrote:
->> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->> index 6accd66d26f0..cf0184edf4f5 100644
->> --- a/arch/arm/kvm/arm.c
->> +++ b/arch/arm/kvm/arm.c
->> @@ -1084,9 +1092,13 @@ static int hyp_init_cpu_pm_notifier(struct notifier_block *self,
->>  				    unsigned long cmd,
->>  				    void *v)
->>  {
->> -	if (cmd == CPU_PM_EXIT &&
->> -	    __hyp_get_vectors() == hyp_default_vectors) {
->> -		cpu_init_hyp_mode(NULL);
->> +	if (cmd == CPU_PM_EXIT) {
->> +		if (is_kernel_in_hyp_mode()) {
->> +			cpu_init_stage2(NULL);
->> +		} else {
->> +			if (__hyp_get_vectors() == hyp_default_vectors)
->> +				cpu_init_hyp_mode(NULL);
->> +		}
-> 
-> Any reason why we can't isolate that snippet in a separate function and
-> use it in both locations?
+Call into the generic memory attributes table support code at the
+appropriate times during the init sequence so that the UEFI Runtime
+Services region are mapped according to the strict permissions it
+specifies.
 
-I thought I did that ... bother, wrong branch.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/include/asm/efi.h       | 2 ++
+ drivers/firmware/efi/arm-init.c    | 1 +
+ drivers/firmware/efi/arm-runtime.c | 3 +++
+ 3 files changed, 6 insertions(+)
 
-We can argue about the name, I called it 'cpu_hyp_reinit()', which pairs up with
-'cpu_hyp_reset()' in a rebased version of the kexec/hibernate hyp-shutdown code.
-(cpu_ seems to be the prefix for per-cpu functions in this file)
-
-v2 shortly,
-
-
-Thanks/Sorry,
-
-James
+diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
+index 8e88a696c9cb..4dafc89f373a 100644
+--- a/arch/arm64/include/asm/efi.h
++++ b/arch/arm64/include/asm/efi.h
+@@ -14,6 +14,8 @@ extern void efi_init(void);
+ 
+ int efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md);
+ 
++#define efi_set_mapping_permissions	efi_create_mapping
++
+ #define efi_call_virt(f, ...)						\
+ ({									\
+ 	efi_##f##_t *__f;						\
+diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
+index d5df9849544c..9941a4f2f66f 100644
+--- a/drivers/firmware/efi/arm-init.c
++++ b/drivers/firmware/efi/arm-init.c
+@@ -204,6 +204,7 @@ void __init efi_init(void)
+ 		return;
+ 
+ 	reserve_regions();
++	efi_memattr_init();
+ 	early_memunmap(memmap.map, params.mmap_size);
+ 	memblock_reserve(params.mmap & PAGE_MASK,
+ 			 PAGE_ALIGN(params.mmap_size +
+diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
+index b0cfe208c14c..bf1f6ffc9218 100644
+--- a/drivers/firmware/efi/arm-runtime.c
++++ b/drivers/firmware/efi/arm-runtime.c
+@@ -75,6 +75,9 @@ static bool __init efi_virtmap_init(void)
+ 			set_bit(EFI_SYSTEM_TABLES, &efi.flags);
+ 		}
+ 	}
++
++	if (efi_memattr_apply_permissions(&efi_mm, efi_set_mapping_permissions))
++		return false;
+ 	return true;
+ }
+ 
+-- 
+2.5.0
