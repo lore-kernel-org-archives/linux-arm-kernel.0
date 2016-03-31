@@ -1,58 +1,87 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Thu, 31 Mar 2016 19:23:32 +0800
-Subject: [PATCH v9 04/17] arm/xen: Use xen_xlate_map_ballooned_pages to setup
- grant table
-In-Reply-To: <1459423425-1220-1-git-send-email-zhaoshenglong@huawei.com>
-References: <1459423425-1220-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1459423425-1220-5-git-send-email-zhaoshenglong@huawei.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 31 Mar 2016 13:35:53 +0200
+Subject: [RFC PATCH 21/45] KVM: arm/arm64: vgic-new: Add SGIR register
+ handler
+In-Reply-To: <1458871508-17279-22-git-send-email-andre.przywara@arm.com>
+References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
+ <1458871508-17279-22-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160331113553.GA4126@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shannon Zhao <shannon.zhao@linaro.org>
+On Fri, Mar 25, 2016 at 02:04:44AM +0000, Andre Przywara wrote:
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  virt/kvm/arm/vgic/vgic_mmio.c | 46 ++++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 45 insertions(+), 1 deletion(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
+> index cde153f..a49726f 100644
+> --- a/virt/kvm/arm/vgic/vgic_mmio.c
+> +++ b/virt/kvm/arm/vgic/vgic_mmio.c
+> @@ -512,6 +512,50 @@ static int vgic_mmio_write_target(struct kvm_vcpu *vcpu,
+>  	return 0;
+>  }
+>  
+> +static int vgic_mmio_write_sgir(struct kvm_vcpu *source_vcpu,
+> +				struct kvm_io_device *this,
+> +				gpa_t addr, int len, const void *val)
+> +{
+> +	int nr_vcpus = atomic_read(&source_vcpu->kvm->online_vcpus);
+> +	u32 value = *(u32 *)val;
+> +	int intid = value & 0xf;
+> +	int targets = (value >> 16) & 0xff;
+> +	int mode = (value >> 24) & 0x03;
+> +	int c;
+> +	struct kvm_vcpu *vcpu;
+> +
+> +	switch (mode) {
+> +	case 0x0:		/* as specified by targets */
+> +		break;
+> +	case 0x1:
+> +		targets = (1U << nr_vcpus) - 1;			/* all, ... */
+> +		targets &= ~(1U << source_vcpu->vcpu_id);	/* but self */
+> +		break;
+> +	case 0x2:		/* this very vCPU only */
+> +		targets = (1U << source_vcpu->vcpu_id);
+> +		break;
+> +	case 0x3:		/* reserved */
 
-Use xen_xlate_map_ballooned_pages to setup grant table. Then it doesn't
-rely on DT or ACPI to pass the start address and size of grant table.
+should we not avoid generating any SGIs in this case?
 
-Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
----
- arch/arm/xen/enlighten.c | 13 ++++---------
- 1 file changed, 4 insertions(+), 9 deletions(-)
-
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 75cd734..d94f726 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -282,18 +282,10 @@ static int __init xen_guest_init(void)
- {
- 	struct xen_add_to_physmap xatp;
- 	struct shared_info *shared_info_page = NULL;
--	struct resource res;
--	phys_addr_t grant_frames;
- 
- 	if (!xen_domain())
- 		return 0;
- 
--	if (of_address_to_resource(xen_node, GRANT_TABLE_PHYSADDR, &res)) {
--		pr_err("Xen grant table base address not found\n");
--		return -ENODEV;
--	}
--	grant_frames = res.start;
--
- 	xen_events_irq = irq_of_parse_and_map(xen_node, 0);
- 	if (!xen_events_irq) {
- 		pr_err("Xen event channel interrupt not found\n");
-@@ -328,7 +320,10 @@ static int __init xen_guest_init(void)
- 	if (xen_vcpu_info == NULL)
- 		return -ENOMEM;
- 
--	if (gnttab_setup_auto_xlat_frames(grant_frames)) {
-+	xen_auto_xlat_grant_frames.count = gnttab_max_grant_frames();
-+	if (xen_xlate_map_ballooned_pages(&xen_auto_xlat_grant_frames.pfn,
-+					  &xen_auto_xlat_grant_frames.vaddr,
-+					  xen_auto_xlat_grant_frames.count)) {
- 		free_percpu(xen_vcpu_info);
- 		return -ENOMEM;
- 	}
--- 
-2.0.4
+> +		break;
+> +	}
+> +
+> +	kvm_for_each_vcpu(c, vcpu, source_vcpu->kvm) {
+> +		struct vgic_irq *irq;
+> +
+> +		if (!(targets & (1U << c)))
+> +			continue;
+> +
+> +		irq = vgic_get_irq(source_vcpu->kvm, vcpu, intid);
+> +
+> +		spin_lock(&irq->irq_lock);
+> +		irq->pending = true;
+> +		irq->source |= 1U << source_vcpu->vcpu_id;
+> +
+> +		vgic_queue_irq(source_vcpu->kvm, irq);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>  struct vgic_register_region vgic_v2_dist_registers[] = {
+>  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
+>  		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12),
+> @@ -536,7 +580,7 @@ struct vgic_register_region vgic_v2_dist_registers[] = {
+>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_CONFIG,
+>  		vgic_mmio_read_config, vgic_mmio_write_config, 2),
+>  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SOFTINT,
+> -		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 4),
+> +		vgic_mmio_read_raz, vgic_mmio_write_sgir, 4),
+>  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SGI_PENDING_CLEAR,
+>  		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 16),
+>  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SGI_PENDING_SET,
+> -- 
+> 2.7.3
+> 
