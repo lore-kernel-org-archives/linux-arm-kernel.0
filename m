@@ -1,73 +1,55 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Thu, 31 Mar 2016 19:23:35 +0800
-Subject: [PATCH v9 07/17] Xen: ARM: Add support for mapping AMBA device mmio
+Date: Thu, 31 Mar 2016 19:23:40 +0800
+Subject: [PATCH v9 12/17] ARM64: ACPI: Check if it runs on Xen to enable or
+ disable ACPI
 In-Reply-To: <1459423425-1220-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1459423425-1220-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1459423425-1220-8-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1459423425-1220-13-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Add a bus_notifier for AMBA bus device in order to map the device
-mmio regions when DOM0 booting with ACPI.
+When it's a Xen domain0 booting with ACPI, it will supply a /chosen and
+a /hypervisor node in DT. So check if it needs to enable ACPI.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- drivers/xen/arm-device.c | 43 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
+ arch/arm64/kernel/acpi.c | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/xen/arm-device.c b/drivers/xen/arm-device.c
-index 76e26e5..3854043 100644
---- a/drivers/xen/arm-device.c
-+++ b/drivers/xen/arm-device.c
-@@ -139,3 +139,46 @@ static int __init register_xen_platform_notifier(void)
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+index d1ce8e2..4e92be0 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -67,10 +67,13 @@ static int __init dt_scan_depth1_nodes(unsigned long node,
+ {
+ 	/*
+ 	 * Return 1 as soon as we encounter a node at depth 1 that is
+-	 * not the /chosen node.
++	 * not the /chosen node, or /hypervisor node when running on Xen.
+ 	 */
+-	if (depth == 1 && (strcmp(uname, "chosen") != 0))
+-		return 1;
++	if (depth == 1 && (strcmp(uname, "chosen") != 0)) {
++		if (!xen_initial_domain() || (strcmp(uname, "hypervisor") != 0))
++			return 1;
++	}
++
+ 	return 0;
  }
  
- arch_initcall(register_xen_platform_notifier);
-+
-+#ifdef CONFIG_ARM_AMBA
-+#include <linux/amba/bus.h>
-+
-+static int xen_amba_notifier(struct notifier_block *nb,
-+			     unsigned long action, void *data)
-+{
-+	struct amba_device *adev = to_amba_device(data);
-+	int r = 0;
-+
-+	switch (action) {
-+	case BUS_NOTIFY_ADD_DEVICE:
-+		r = xen_map_device_mmio(&adev->res, 1);
-+		break;
-+	case BUS_NOTIFY_DEL_DEVICE:
-+		r = xen_unmap_device_mmio(&adev->res, 1);
-+		break;
-+	default:
-+		return NOTIFY_DONE;
-+	}
-+	if (r)
-+		dev_err(&adev->dev, "AMBA: Failed to %s device %s MMIO!\n",
-+			action == BUS_NOTIFY_ADD_DEVICE ? "map" :
-+			(action == BUS_NOTIFY_DEL_DEVICE ? "unmap" : "?"),
-+			adev->dev.init_name);
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block amba_device_nb = {
-+	.notifier_call = xen_amba_notifier,
-+};
-+
-+static int __init register_xen_amba_notifier(void)
-+{
-+	if (!xen_initial_domain() || acpi_disabled)
-+		return 0;
-+
-+	return bus_register_notifier(&amba_bustype, &amba_device_nb);
-+}
-+
-+arch_initcall(register_xen_amba_notifier);
-+#endif
+@@ -184,7 +187,8 @@ void __init acpi_boot_table_init(void)
+ 	/*
+ 	 * Enable ACPI instead of device tree unless
+ 	 * - ACPI has been disabled explicitly (acpi=off), or
+-	 * - the device tree is not empty (it has more than just a /chosen node)
++	 * - the device tree is not empty (it has more than just a /chosen node,
++	 *   and a /hypervisor node when running on Xen)
+ 	 *   and ACPI has not been force enabled (acpi=force)
+ 	 */
+ 	if (param_acpi_off ||
 -- 
 2.0.4
