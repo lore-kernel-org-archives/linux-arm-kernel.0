@@ -1,74 +1,50 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 31 Mar 2016 15:50:38 +0200
-Subject: [PATCH] ARM: dts: rockchip: move rk3036 memory definition to board
- files
-Message-ID: <1459432238-6469-1-git-send-email-heiko@sntech.de>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Thu, 31 Mar 2016 21:51:37 +0800
+Subject: [PATCH V3 0/5] clk: support clocks which requires parent clock on
+ during operation
+In-Reply-To: <CAOMZO5D=veSYdWbjksCk-qik3OnJ2i5Wkv8MrCZnTANibeDqLA@mail.gmail.com>
+References: <1438089585-30103-1-git-send-email-aisheng.dong@freescale.com>
+ <CAOMZO5D=veSYdWbjksCk-qik3OnJ2i5Wkv8MrCZnTANibeDqLA@mail.gmail.com>
+Message-ID: <CAA+hA=Rfu58OXOFqxFK0CTwBXWPwzjM2n_52rdPbZL83YmpYRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The amount of available memory is clearly a board-specific value, so
-the core per-soc dtsi should not define a default of any sort.
-Therefore move the memory-nodes to the two board files.
+Hi Fabio,
 
-Also fix the amount of memory on Kylin (512MB instead of 1GB).
-While in most cases the bootloader will override this with the
-actual amount of memory, there is no need to keep known wrong values
-in the board-dts.
+On Thu, Mar 31, 2016 at 12:00 AM, Fabio Estevam <festevam@gmail.com> wrote:
+> Hi Dong,
+>
+> On Tue, Jul 28, 2015 at 10:19 AM, Dong Aisheng
+> <aisheng.dong@freescale.com> wrote:
+>> This patch series adds support in clock framework for clocks which operations
+>> requires its parent clock is on.
+>>
+>> Such clock type is initially met on Freescale i.MX7D platform that all clocks
+>> operations, including enable/disable, rate change and re-parent, requires its
+>> parent clock on. No sure if any other SoC has the similar clock type.
+>>
+>> Current clock core can not support such type of clock well.
+>>
+>> This patch introduce a new flag CLK_SET_PARENT_ON to handle this special case
+>> in clock core that enable its parent clock firstly for each operation and disable
+>> it later after operation complete.
+>>
+>> The most special case is for set_parent() operation which requires both parent,
+>> old one and new one, to be enabled at the same time during the operation.
+>>
+>> The patch series is based on for-next branch of Michael's git:
+>> git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git
+>
+> Do you plan to resend this series?
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm/boot/dts/rk3036-evb.dts   | 5 +++++
- arch/arm/boot/dts/rk3036-kylin.dts | 5 +++++
- arch/arm/boot/dts/rk3036.dtsi      | 5 -----
- 3 files changed, 10 insertions(+), 5 deletions(-)
+It is in my TODO list.
+I'm currently busy with some other items.
+Will be able to do it in a few days.
 
-diff --git a/arch/arm/boot/dts/rk3036-evb.dts b/arch/arm/boot/dts/rk3036-evb.dts
-index b3d6ec8..8db9e9b 100644
---- a/arch/arm/boot/dts/rk3036-evb.dts
-+++ b/arch/arm/boot/dts/rk3036-evb.dts
-@@ -45,6 +45,11 @@
- / {
- 	model = "Rockchip RK3036 Evaluation board";
- 	compatible = "rockchip,rk3036-evb", "rockchip,rk3036";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x60000000 0x40000000>;
-+	};
- };
- 
- &emac {
-diff --git a/arch/arm/boot/dts/rk3036-kylin.dts b/arch/arm/boot/dts/rk3036-kylin.dts
-index 6251d10..819d608 100644
---- a/arch/arm/boot/dts/rk3036-kylin.dts
-+++ b/arch/arm/boot/dts/rk3036-kylin.dts
-@@ -46,6 +46,11 @@
- 	model = "Rockchip RK3036 KylinBoard";
- 	compatible = "rockchip,rk3036-kylin", "rockchip,rk3036";
- 
-+	memory {
-+		device_type = "memory";
-+		reg = <0x60000000 0x20000000>;
-+	};
-+
- 	leds: gpio-leds {
- 		compatible = "gpio-leds";
- 
-diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
-index d0f4bb7..eb44a33 100644
---- a/arch/arm/boot/dts/rk3036.dtsi
-+++ b/arch/arm/boot/dts/rk3036.dtsi
-@@ -63,11 +63,6 @@
- 		spi = &spi;
- 	};
- 
--	memory {
--		device_type = "memory";
--		reg = <0x60000000 0x40000000>;
--	};
--
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--- 
-2.6.4
+Regards
+Dong Aisheng
+
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
