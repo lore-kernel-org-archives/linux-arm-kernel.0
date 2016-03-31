@@ -1,97 +1,90 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 31 Mar 2016 09:32:03 -0700
-Subject: [PATCH v7 1/5] of/serial: move earlycon early_param handling to
- serial
-In-Reply-To: <1459431629-27934-2-git-send-email-aleksey.makarov@linaro.org>
-References: <1459431629-27934-1-git-send-email-aleksey.makarov@linaro.org>
- <1459431629-27934-2-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <20160331163203.GC10256@kroah.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Thu, 31 Mar 2016 18:33:16 +0200
+Subject: [PATCH 2/7] ARM: dts: skeleton: add unit name to memory node
+In-Reply-To: <CAL_JsqKMV-k7VkzLsKMAZ9yzwoNS2nw-=DwK+MYCZkOh97P5FA@mail.gmail.com>
+References: <1459290646-3592-1-git-send-email-manabian@gmail.com>
+ <1459290646-3592-3-git-send-email-manabian@gmail.com>
+ <20160330110611.GB25354@leverpostej> <56FBCF70.80006@mentor.com>
+ <20160330134155.GC25354@leverpostej>
+ <CAGhQ9VykiwMWaw3xcJdg2CahNFt+sp7tFC5O8VwA=-_=UoJ8kA@mail.gmail.com>
+ <CAL_JsqKYx=sUjo-UTXSAFh3UpHLyTPFHwx5xg=Px-RVabHJ-Ew@mail.gmail.com>
+ <CAL_JsqKMV-k7VkzLsKMAZ9yzwoNS2nw-=DwK+MYCZkOh97P5FA@mail.gmail.com>
+Message-ID: <CAGhQ9VxcGoTBRPFJuj=mxWJ2MHhGuJXKvPm3SsvM4-aTF8EHOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 31, 2016 at 04:40:23PM +0300, Aleksey Makarov wrote:
-> From: Leif Lindholm <leif.lindholm@linaro.org>
-> 
-> We have multiple "earlycon" early_param handlers - merge the DT one into
-> the main earlycon one.  It's a cleanup that also will be useful
-> to defer setting up DT console until ACPI/DT decision is made.
-> 
-> Rename the exported function to avoid clashing with the function from
-> arch/microblaze/kernel/prom.c
-> 
-> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
-> Acked-by: Rob Herring <robh@kernel.org>
-> ---
->  drivers/of/fdt.c              | 11 +----------
->  drivers/tty/serial/earlycon.c |  2 +-
->  include/linux/of_fdt.h        |  2 ++
->  3 files changed, 4 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-> index 3349d2a..b50f775 100644
-> --- a/drivers/of/fdt.c
-> +++ b/drivers/of/fdt.c
-> @@ -805,7 +805,7 @@ static inline void early_init_dt_check_for_initrd(unsigned long node)
->  
->  #ifdef CONFIG_SERIAL_EARLYCON
->  
-> -static int __init early_init_dt_scan_chosen_serial(void)
-> +int __init early_init_dt_scan_chosen_stdout(void)
->  {
->  	int offset;
->  	const char *p, *q, *options = NULL;
-> @@ -849,15 +849,6 @@ static int __init early_init_dt_scan_chosen_serial(void)
->  	}
->  	return -ENODEV;
->  }
-> -
-> -static int __init setup_of_earlycon(char *buf)
-> -{
-> -	if (buf)
-> -		return 0;
-> -
-> -	return early_init_dt_scan_chosen_serial();
-> -}
-> -early_param("earlycon", setup_of_earlycon);
->  #endif
->  
->  /**
-> diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
-> index 067783f..7aae655 100644
-> --- a/drivers/tty/serial/earlycon.c
-> +++ b/drivers/tty/serial/earlycon.c
-> @@ -209,7 +209,7 @@ static int __init param_setup_earlycon(char *buf)
->  	 * don't generate a warning from parse_early_params() in that case
->  	 */
->  	if (!buf || !buf[0])
-> -		return 0;
-> +		return early_init_dt_scan_chosen_stdout();
->  
->  	err = setup_earlycon(buf);
->  	if (err == -ENOENT || err == -EALREADY)
-> diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
-> index 2fbe868..5cfe322 100644
-> --- a/include/linux/of_fdt.h
-> +++ b/include/linux/of_fdt.h
-> @@ -63,6 +63,7 @@ extern int early_init_dt_scan_chosen(unsigned long node, const char *uname,
->  				     int depth, void *data);
->  extern int early_init_dt_scan_memory(unsigned long node, const char *uname,
->  				     int depth, void *data);
-> +extern int early_init_dt_scan_chosen_stdout(void);
->  extern void early_init_fdt_scan_reserved_mem(void);
->  extern void early_init_fdt_reserve_self(void);
->  extern void early_init_dt_add_memory_arch(u64 base, u64 size);
-> @@ -91,6 +92,7 @@ extern void early_get_first_memblock_info(void *, phys_addr_t *);
->  extern u64 of_flat_dt_translate_address(unsigned long node);
->  extern void of_fdt_limit_memory(int limit);
->  #else /* CONFIG_OF_FLATTREE */
-> +static inline int early_init_dt_scan_chosen_stdout(void) { return -ENODEV; }
+On 31 March 2016 at 18:31, Rob Herring <robh+dt@kernel.org> wrote:
+> On Thu, Mar 31, 2016 at 11:27 AM, Rob Herring <robh+dt@kernel.org> wrote:
+>> On Wed, Mar 30, 2016 at 11:15 AM, Joachim  Eastwood <manabian@gmail.com> wrote:
+>>> Hi Mark,
+>>>
+>>> On 30 March 2016 at 15:41, Mark Rutland <mark.rutland@arm.com> wrote:
+>>>> On Wed, Mar 30, 2016 at 04:06:56PM +0300, Vladimir Zapolskiy wrote:
+>>>>> On 30.03.2016 14:06, Mark Rutland wrote:
+>>>>> > On Wed, Mar 30, 2016 at 12:30:41AM +0200, Joachim Eastwood wrote:
+>>>>> >> Add unit name to memory to remove the following warning:
+>>>>> >>  Warning (unit_address_vs_reg): Node /memory has a reg or ranges
+>>>>> >>                            property, but no unit name
+>>>>> >
+>>>>> > If anything, it would be better to get rid of the memory node from the
+>>>>> > skeleton DTs.
+>>>>> >
+>>>>> > For DTs which have a memory node there's no problem, and DTs which
+>>>>> > expect a bootlaoder to fill things in have a logical place to document
+>>>>> > that fact.
+>>>>
+>>>>> The only problem I see if DTB is updated on a board but a board bootloader
+>>>>> on fix-up is capable to fill a preexisting "/memory" device node in only,
+>>>>> otherwise it is not clear why the device node is present in skeleton.dtsi.
+>>>>
+>>>> Sure. To clarify the above, what I expect that for this case is that the
+>>>> empty memory node would exist in the dts for that particular board,
+>>>> along with a comment, e.g.
+>>>>
+>>>>         /* The firmware/bootloader for $BOARD fills this in */
+>>>>         memory {
+>>>>                 device_type = "memory";
+>>>>                 reg = <0 0 0 0>;
+>>>>         };
+>>>
+>>> To avoid the warning with the new dtc this would need to be memory at 0.
+>>
+>> Except memory is probably not actually at 0 here. This has come up
+>> before and been beaten to death. Bottom line is plain "memory" is
+>> allowed, and I plan to add that exception to dtc.
 
-Doesn't this change the default logic?  Today you are returning 0 if you
-don't have this config option set, and now you return -ENODEV, did you
-test this out?
+Okey, good.
 
-thanks,
 
-greg k-h
+>>>> That way you can tell at a glance that the lack of memory information in
+>>>> the DT for a board is intentional, and the bootloader still gets the
+>>>> node it expects.
+>>>
+>>>
+>>> But this doesn't seem to be a "problem" with any of the DTs in
+>>> arch/arm/boot as they all defined a memory node.
+>>>
+>>> I used the following script to check for the memory node in all built dtb's.
+>>>   make ARCH=arm CONFIG_OF_ALL_DTBS=y dtbs
+>>>   for i in $(ls arch/arm/boot/dts/*.dtb); do
+>>>          m=$(scripts/dtc/dtc -I dtb -O dts $i | grep -m1 'memory.*{')
+>>>          if [ -z "$m" ]; then
+>>>                  echo "Missing memory node in $i"
+>>>           fi
+>>>   done
+>>>
+>>> So it should be pretty safe to just remove the memory node entry in
+>>> the skeleton files. Unless I have missed something with the script
+>>> above.
+>>
+>> You've got to make sure they have 'device_type = "memory";' which they
+>> could rely on inheriting.
+>
+> BTW, you could add this as a check to dtc and then it will find all
+> the missing ones for you.
+
+I have created a script now that will check and add it if it is missing.
+
+
+regards,
+Joachim Eastwood
