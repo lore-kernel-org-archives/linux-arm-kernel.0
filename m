@@ -1,52 +1,320 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 31 Mar 2016 10:06:01 +0100
-Subject: [RFC PATCH 00/45] KVM: arm/arm64: Rework virtual GIC emulation
-In-Reply-To: <20160330195555.GL4126@cbox>
-References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
- <56FA7F29.4060005@arm.com> <56FBBBC2.6010602@arm.com>
- <56FBC16A.7040404@arm.com> <20160330195555.GL4126@cbox>
-Message-ID: <56FCE879.2060604@arm.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 31 Mar 2016 18:05:52 +0900
+Subject: [PATCH v7 07/20] PM / devfreq: exynos: Update documentation for bus
+ devices using passive governor
+In-Reply-To: <1459415165-32613-1-git-send-email-cw00.choi@samsung.com>
+References: <1459415165-32613-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1459415165-32613-8-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/03/16 20:55, Christoffer Dall wrote:
-> On Wed, Mar 30, 2016 at 01:07:06PM +0100, Marc Zyngier wrote:
->> On 30/03/16 12:42, Vladimir Murzin wrote:
->>> On 29/03/16 14:12, Vladimir Murzin wrote:
->>>> Hi Andre,
->>>>
->>>> On 25/03/16 02:04, Andre Przywara wrote:
->>>>> Please have a look at the series, review it and give the code some
->>>>> serious testing (and possibly debugging). All feedback is appreciated.
->>>>
->>>> I see that with the new vgic implementation kvmtool starts throwing:
->>>>
->>>> kvm [1273]: Unable to register VGICv3 redist MMIO regions
->>>>
->>>
->>> It comes from kvm_io_bus_register_dev()
->>>
->>> if (bus->dev_count - bus->ioeventfd_count > NR_IOBUS_DEVS - 1)
->>> 	return -ENOSPC;
->>>
->>> with bus->dev_count being 1000
->>
->> Ouch. That's a consequence of having one "device" per actual register
->> set, I believe. So either we bump this limit up by a factor 10 (at
->> least), or we switch back to the old way of handling access to the GIC
->> regions (big "catch-all", and further demuxing).
->>
->> Thoughts?
->>
-> Since we have to have code to iterate through the individual register
-> regions for the userland MMIO accesses anyway, I think we should just
-> revert back to the old way.
+This patch updates the documentation for passive bus devices and adds the
+detailed example of Exynos3250.
 
-That's what I was thinking as well. We could use a binary search to
-speed-up the "in-region" search, just like the kvm_io_bus stuff does.
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+---
+ .../devicetree/bindings/devfreq/exynos-bus.txt     | 250 ++++++++++++++++++++-
+ 1 file changed, 247 insertions(+), 3 deletions(-)
 
-Thanks,
-
-	M.
+diff --git a/Documentation/devicetree/bindings/devfreq/exynos-bus.txt b/Documentation/devicetree/bindings/devfreq/exynos-bus.txt
+index 78171b918e3f..03f13d38f1a1 100644
+--- a/Documentation/devicetree/bindings/devfreq/exynos-bus.txt
++++ b/Documentation/devicetree/bindings/devfreq/exynos-bus.txt
+@@ -8,22 +8,46 @@ of the bus in runtime. To monitor the usage of each bus in runtime,
+ the driver uses the PPMU (Platform Performance Monitoring Unit), which
+ is able to measure the current load of sub-blocks.
+ 
++The Exynos SoC includes the various sub-blocks which have the each AXI bus.
++The each AXI bus has the owned source clock but, has not the only owned
++power line. The power line might be shared among one more sub-blocks.
++So, we can divide into two type of device as the role of each sub-block.
++There are two type of bus devices as following:
++- parent bus device
++- passive bus device
++
++Basically, parent and passive bus device share the same power line.
++The parent bus device can only change the voltage of shared power line
++and the rest bus devices (passive bus device) depend on the decision of
++the parent bus device. If there are three blocks which share the VDD_xxx
++power line, Only one block should be parent device and then the rest blocks
++should depend on the parent device as passive device.
++
++	VDD_xxx |--- A block (parent)
++		|--- B block (passive)
++		|--- C block (passive)
++
+ There are a little different composition among Exynos SoC because each Exynos
+ SoC has different sub-blocks. Therefore, shch difference should be specified
+ in devicetree file instead of each device driver. In result, this driver
+ is able to support the bus frequency for all Exynos SoCs.
+ 
+-Required properties for bus device:
++Required properties for all bus devices:
+ - compatible: Should be "samsung,exynos-bus".
+ - clock-names : the name of clock used by the bus, "bus".
+ - clocks : phandles for clock specified in "clock-names" property.
+ - operating-points-v2: the OPP table including frequency/voltage information
+   to support DVFS (Dynamic Voltage/Frequency Scaling) feature.
++
++Required properties only for parent bus device:
+ - vdd-supply: the regulator to provide the buses with the voltage.
+ - devfreq-events: the devfreq-event device to monitor the current utilization
+   of buses.
+ 
+-Optional properties for bus device:
++Required properties only for passive bus device:
++- devfreq: the parent bus device.
++
++Optional properties only for parent bus device:
+ - exynos,saturation-ratio: the percentage value which is used to calibrate
+ 			the performance count against total cycle count.
+ - exynos,voltage-tolerance: the percentage value for bus voltage tolerance
+@@ -34,7 +58,20 @@ Example1:
+ 	power line (regulator). The MIF (Memory Interface) AXI bus is used to
+ 	transfer data between DRAM and CPU and uses the VDD_MIF regualtor.
+ 
+-	- power line(VDD_MIF) --> bus for DMC (Dynamic Memory Controller) block
++	- MIF (Memory Interface) block
++	: VDD_MIF |--- DMC (Dynamic Memory Controller)
++
++	- INT (Internal) block
++	: VDD_INT |--- LEFTBUS (parent device)
++		  |--- PERIL
++		  |--- MFC
++		  |--- G3D
++		  |--- RIGHTBUS
++		  |--- FSYS
++		  |--- LCD0
++		  |--- PERIR
++		  |--- ISP
++		  |--- CAM
+ 
+ 	- MIF bus's frequency/voltage table
+ 	-----------------------
+@@ -47,6 +84,24 @@ Example1:
+ 	|L5| 400000 |875000   |
+ 	-----------------------
+ 
++	- INT bus's frequency/voltage table
++	----------------------------------------------------------
++	|Block|LEFTBUS|RIGHTBUS|MCUISP |ISP    |PERIL  ||VDD_INT |
++	| name|       |LCD0    |       |       |       ||        |
++	|     |       |FSYS    |       |       |       ||        |
++	|     |       |MFC     |       |       |       ||        |
++	----------------------------------------------------------
++	|Mode |*parent|passive |passive|passive|passive||        |
++	----------------------------------------------------------
++	|Lv   |Frequency                               ||Voltage |
++	----------------------------------------------------------
++	|L1   |50000  |50000   |50000  |50000  |50000  ||900000  |
++	|L2   |80000  |80000   |80000  |80000  |80000  ||900000  |
++	|L3   |100000 |100000  |100000 |100000 |100000 ||1000000 |
++	|L4   |134000 |134000  |200000 |200000 |       ||1000000 |
++	|L5   |200000 |200000  |400000 |300000 |       ||1000000 |
++	----------------------------------------------------------
++
+ Example2 :
+ 	The bus of DMC (Dynamic Memory Controller) block in exynos3250.dtsi
+ 	is listed below:
+@@ -85,6 +140,154 @@ Example2 :
+ 		};
+ 	};
+ 
++	bus_leftbus: bus_leftbus {
++		compatible = "samsung,exynos-bus";
++		clocks = <&cmu CLK_DIV_GDL>;
++		clock-names = "bus";
++		operating-points-v2 = <&bus_leftbus_opp_table>;
++		status = "disabled";
++	};
++
++	bus_rightbus: bus_rightbus {
++		compatible = "samsung,exynos-bus";
++		clocks = <&cmu CLK_DIV_GDR>;
++		clock-names = "bus";
++		operating-points-v2 = <&bus_leftbus_opp_table>;
++		status = "disabled";
++	};
++
++	bus_lcd0: bus_lcd0 {
++		compatible = "samsung,exynos-bus";
++		clocks = <&cmu CLK_DIV_ACLK_160>;
++		clock-names = "bus";
++		operating-points-v2 = <&bus_leftbus_opp_table>;
++		status = "disabled";
++	};
++
++	bus_fsys: bus_fsys {
++		compatible = "samsung,exynos-bus";
++		clocks = <&cmu CLK_DIV_ACLK_200>;
++		clock-names = "bus";
++		operating-points-v2 = <&bus_leftbus_opp_table>;
++		status = "disabled";
++	};
++
++	bus_mcuisp: bus_mcuisp {
++		compatible = "samsung,exynos-bus";
++		clocks = <&cmu CLK_DIV_ACLK_400_MCUISP>;
++		clock-names = "bus";
++		operating-points-v2 = <&bus_mcuisp_opp_table>;
++		status = "disabled";
++	};
++
++	bus_isp: bus_isp {
++		compatible = "samsung,exynos-bus";
++		clocks = <&cmu CLK_DIV_ACLK_266>;
++		clock-names = "bus";
++		operating-points-v2 = <&bus_isp_opp_table>;
++		status = "disabled";
++	};
++
++	bus_peril: bus_peril {
++		compatible = "samsung,exynos-bus";
++		clocks = <&cmu CLK_DIV_ACLK_100>;
++		clock-names = "bus";
++		operating-points-v2 = <&bus_peril_opp_table>;
++		status = "disabled";
++	};
++
++	bus_mfc: bus_mfc {
++		compatible = "samsung,exynos-bus";
++		clocks = <&cmu CLK_SCLK_MFC>;
++		clock-names = "bus";
++		operating-points-v2 = <&bus_leftbus_opp_table>;
++		status = "disabled";
++	};
++
++	bus_leftbus_opp_table: opp_table1 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp at 50000000 {
++			opp-hz = /bits/ 64 <50000000>;
++			opp-microvolt = <900000>;
++		};
++		opp at 80000000 {
++			opp-hz = /bits/ 64 <80000000>;
++			opp-microvolt = <900000>;
++		};
++		opp at 100000000 {
++			opp-hz = /bits/ 64 <100000000>;
++			opp-microvolt = <1000000>;
++		};
++		opp at 134000000 {
++			opp-hz = /bits/ 64 <134000000>;
++			opp-microvolt = <1000000>;
++		};
++		opp at 200000000 {
++			opp-hz = /bits/ 64 <200000000>;
++			opp-microvolt = <1000000>;
++		};
++	};
++
++	bus_mcuisp_opp_table: opp_table2 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp at 50000000 {
++			opp-hz = /bits/ 64 <50000000>;
++		};
++		opp at 80000000 {
++			opp-hz = /bits/ 64 <80000000>;
++		};
++		opp at 100000000 {
++			opp-hz = /bits/ 64 <100000000>;
++		};
++		opp at 200000000 {
++			opp-hz = /bits/ 64 <200000000>;
++		};
++		opp at 400000000 {
++			opp-hz = /bits/ 64 <400000000>;
++		};
++	};
++
++	bus_isp_opp_table: opp_table3 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp at 50000000 {
++			opp-hz = /bits/ 64 <50000000>;
++		};
++		opp at 80000000 {
++			opp-hz = /bits/ 64 <80000000>;
++		};
++		opp at 100000000 {
++			opp-hz = /bits/ 64 <100000000>;
++		};
++		opp at 200000000 {
++			opp-hz = /bits/ 64 <200000000>;
++		};
++		opp at 300000000 {
++			opp-hz = /bits/ 64 <300000000>;
++		};
++	};
++
++	bus_peril_opp_table: opp_table4 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp at 50000000 {
++			opp-hz = /bits/ 64 <50000000>;
++		};
++		opp at 80000000 {
++			opp-hz = /bits/ 64 <80000000>;
++		};
++		opp at 100000000 {
++			opp-hz = /bits/ 64 <100000000>;
++		};
++	};
++
++
+ 	Usage case to handle the frequency and voltage of bus on runtime
+ 	in exynos3250-rinato.dts is listed below:
+ 
+@@ -93,3 +296,44 @@ Example2 :
+ 		vdd-supply = <&buck1_reg>;	/* VDD_MIF */
+ 		status = "okay";
+ 	};
++
++	&bus_leftbus {
++		devfreq-events = <&ppmu_leftbus_3>, <&ppmu_rightbus_3>;
++		vdd-supply = <&buck3_reg>;
++		status = "okay";
++	};
++
++	&bus_rightbus {
++		devfreq = <&bus_leftbus>;
++		status = "okay";
++	};
++
++	&bus_lcd0 {
++		devfreq = <&bus_leftbus>;
++		status = "okay";
++	};
++
++	&bus_fsys {
++		devfreq = <&bus_leftbus>;
++		status = "okay";
++	};
++
++	&bus_mcuisp {
++		devfreq = <&bus_leftbus>;
++		status = "okay";
++	};
++
++	&bus_isp {
++		devfreq = <&bus_leftbus>;
++		status = "okay";
++	};
++
++	&bus_peril {
++		devfreq = <&bus_leftbus>;
++		status = "okay";
++	};
++
++	&bus_mfc {
++		devfreq = <&bus_leftbus>;
++		status = "okay";
++	};
 -- 
-Jazz is not dead. It just smells funny...
+1.9.1
