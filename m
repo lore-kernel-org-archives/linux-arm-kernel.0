@@ -1,17 +1,40 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Thu, 31 Mar 2016 21:35:20 +0100
-Subject: [PATCH] efi/arm64: don't apply MEMBLOCK_NOMAP to UEFI memory map
- mapping
-In-Reply-To: <1459323983-9120-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1459323983-9120-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160331203520.GB2736@codeblueprint.co.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 31 Mar 2016 22:37:35 +0200
+Subject: [PATCH] net: mvneta: replace MVNETA_CPU_D_CACHE_LINE_SIZE with
+ L1_CACHE_BYTES
+In-Reply-To: <20160331.151547.1889188465826831929.davem@davemloft.net>
+References: <1459338921-391-1-git-send-email-jszhang@marvell.com>
+ <20160331.151547.1889188465826831929.davem@davemloft.net>
+Message-ID: <20160331223735.32904e42@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Mar, at 09:46:23AM, Ard Biesheuvel wrote:
-> Hi Matt,
-> 
-> Could we queue this as a fix for v4.6 with a cc:stable for v4.5, please?
-> (assuming no objections from any of the cc'ees)
+Hello,
 
-Yep, I've picked this up. I'll go out to tip tomorrow.
+On Thu, 31 Mar 2016 15:15:47 -0400 (EDT), David Miller wrote:
+> From: Jisheng Zhang <jszhang@marvell.com>
+> Date: Wed, 30 Mar 2016 19:55:21 +0800
+> 
+> > The mvneta is also used in some Marvell berlin family SoCs which may
+> > have 64bytes cacheline size. Replace the MVNETA_CPU_D_CACHE_LINE_SIZE
+> > usage with L1_CACHE_BYTES.
+> > 
+> > And since dma_alloc_coherent() is always cacheline size aligned, so
+> > remove the align checks.
+> > 
+> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> 
+> Applied.
+
+A new version of the patch was sent, which more rightfully uses
+cache_line_size(), see:
+
+ "[PATCH v2] net: mvneta: replace MVNETA_CPU_D_CACHE_LINE_SIZE with cache_line_size"
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
