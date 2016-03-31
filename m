@@ -1,56 +1,169 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Thu, 31 Mar 2016 19:23:37 +0800
-Subject: [PATCH v9 09/17] xen/hvm/params: Add a new delivery type for
- event-channel in HVM_PARAM_CALLBACK_IRQ
+Date: Thu, 31 Mar 2016 19:23:39 +0800
+Subject: [PATCH v9 11/17] ARM: XEN: Move xen_early_init() before efi_init()
 In-Reply-To: <1459423425-1220-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1459423425-1220-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1459423425-1220-10-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1459423425-1220-12-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-This new delivery type which is for ARM shares the same value with
-HVM_PARAM_CALLBACK_TYPE_VECTOR which is for x86.
+Move xen_early_init() before efi_init(), then when calling efi_init()
+could initialize Xen specific UEFI.
 
-val[15:8] is flag: val[7:0] is a PPI.
-To the flag, bit 8 stands the interrupt mode is edge(1) or level(0) and
-bit 9 stands the interrupt polarity is active low(1) or high(0).
+Check if it runs on Xen hypervisor through the flat dts.
 
+Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- include/xen/interface/hvm/params.h | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/kernel/setup.c   |  2 +-
+ arch/arm/xen/enlighten.c  | 56 ++++++++++++++++++++++++++++++++++-------------
+ arch/arm64/kernel/setup.c |  2 +-
+ 3 files changed, 43 insertions(+), 17 deletions(-)
 
-diff --git a/include/xen/interface/hvm/params.h b/include/xen/interface/hvm/params.h
-index 70ad208..4d61fc5 100644
---- a/include/xen/interface/hvm/params.h
-+++ b/include/xen/interface/hvm/params.h
-@@ -47,11 +47,24 @@
-  * Domain = val[47:32], Bus = val[31:16] DevFn = val[15:8], IntX = val[1:0]
-  */
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 139791e..5bc7516 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -1035,6 +1035,7 @@ void __init setup_arch(char **cmdline_p)
+ 	early_paging_init(mdesc);
+ #endif
+ 	setup_dma_zone(mdesc);
++	xen_early_init();
+ 	efi_init();
+ 	sanity_check_meminfo();
+ 	arm_memblock_init(mdesc);
+@@ -1051,7 +1052,6 @@ void __init setup_arch(char **cmdline_p)
  
-+#if defined(__i386__) || defined(__x86_64__)
- #define HVM_PARAM_CALLBACK_TYPE_VECTOR   2
+ 	arm_dt_init_cpu_maps();
+ 	psci_dt_init();
+-	xen_early_init();
+ #ifdef CONFIG_SMP
+ 	if (is_smp()) {
+ 		if (!mdesc->smp_init || !mdesc->smp_init()) {
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index 06bd61a..13e3e9f 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -20,6 +20,7 @@
+ #include <linux/irqreturn.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
++#include <linux/of_fdt.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_address.h>
+ #include <linux/cpuidle.h>
+@@ -53,8 +54,6 @@ struct xen_memory_region xen_extra_mem[XEN_EXTRA_MEM_MAX_REGIONS] __initdata;
+ 
+ static __read_mostly unsigned int xen_events_irq;
+ 
+-static __initdata struct device_node *xen_node;
+-
+ int xen_remap_domain_gfn_array(struct vm_area_struct *vma,
+ 			       unsigned long addr,
+ 			       xen_pfn_t *gfn, int nr,
+@@ -238,6 +237,33 @@ static irqreturn_t xen_arm_callback(int irq, void *arg)
+ 	return IRQ_HANDLED;
+ }
+ 
++static __initdata struct {
++	const char *compat;
++	const char *prefix;
++	const char *version;
++	bool found;
++} hyper_node = {"xen,xen", "xen,xen-", NULL, false};
++
++static int __init fdt_find_hyper_node(unsigned long node, const char *uname,
++				      int depth, void *data)
++{
++	const void *s = NULL;
++	int len;
++
++	if (depth != 1 || strcmp(uname, "hypervisor") != 0)
++		return 0;
++
++	if (of_flat_dt_is_compatible(node, hyper_node.compat))
++		hyper_node.found = true;
++
++	s = of_get_flat_dt_prop(node, "compatible", &len);
++	if (strlen(hyper_node.prefix) + 3  < len &&
++	    !strncmp(hyper_node.prefix, s, strlen(hyper_node.prefix)))
++		hyper_node.version = s + strlen(hyper_node.prefix);
++
++	return 0;
++}
++
  /*
-  * val[7:0] is a vector number.  Check for XENFEAT_hvm_callback_vector to know
-  * if this delivery method is available.
-  */
-+#elif defined(__arm__) || defined(__aarch64__)
-+#define HVM_PARAM_CALLBACK_TYPE_PPI      2
-+/*
-+ * val[55:16] needs to be zero.
-+ * val[15:8] is interrupt flag of the PPI used by event-channel:
-+ *  bit 8: the PPI is edge(1) or level(0) triggered
-+ *  bit 9: the PPI is active low(1) or high(0)
-+ * val[7:0] is a PPI number used by event-channel.
-+ * This is only used by ARM/ARM64 and masking/eoi the interrupt associated to
-+ * the notification is handled by the interrupt controller.
-+ */
-+#endif
+  * see Documentation/devicetree/bindings/arm/xen.txt for the
+  * documentation of the Xen Device Tree format.
+@@ -245,26 +271,18 @@ static irqreturn_t xen_arm_callback(int irq, void *arg)
+ #define GRANT_TABLE_PHYSADDR 0
+ void __init xen_early_init(void)
+ {
+-	int len;
+-	const char *s = NULL;
+-	const char *version = NULL;
+-	const char *xen_prefix = "xen,xen-";
+-
+-	xen_node = of_find_compatible_node(NULL, NULL, "xen,xen");
+-	if (!xen_node) {
++	of_scan_flat_dt(fdt_find_hyper_node, NULL);
++	if (!hyper_node.found) {
+ 		pr_debug("No Xen support\n");
+ 		return;
+ 	}
+-	s = of_get_property(xen_node, "compatible", &len);
+-	if (strlen(xen_prefix) + 3  < len &&
+-			!strncmp(xen_prefix, s, strlen(xen_prefix)))
+-		version = s + strlen(xen_prefix);
+-	if (version == NULL) {
++
++	if (hyper_node.version == NULL) {
+ 		pr_debug("Xen version not found\n");
+ 		return;
+ 	}
  
- #define HVM_PARAM_STORE_PFN    1
- #define HVM_PARAM_STORE_EVTCHN 2
+-	pr_info("Xen %s support found\n", version);
++	pr_info("Xen %s support found\n", hyper_node.version);
+ 
+ 	xen_domain_type = XEN_HVM_DOMAIN;
+ 
+@@ -305,6 +323,14 @@ static void __init xen_acpi_guest_init(void)
+ 
+ static void __init xen_dt_guest_init(void)
+ {
++	struct device_node *xen_node;
++
++	xen_node = of_find_compatible_node(NULL, NULL, "xen,xen");
++	if (!xen_node) {
++		pr_err("Xen support was detected before, but it has disappeared\n");
++		return;
++	}
++
+ 	xen_events_irq = irq_of_parse_and_map(xen_node, 0);
+ }
+ 
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 9dc6776..7cf992f 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -320,6 +320,7 @@ void __init setup_arch(char **cmdline_p)
+ 	 */
+ 	cpu_uninstall_idmap();
+ 
++	xen_early_init();
+ 	efi_init();
+ 	arm64_memblock_init();
+ 
+@@ -341,7 +342,6 @@ void __init setup_arch(char **cmdline_p)
+ 	} else {
+ 		psci_acpi_init();
+ 	}
+-	xen_early_init();
+ 
+ 	cpu_read_bootcpu_ops();
+ 	smp_init_cpus();
 -- 
 2.0.4
