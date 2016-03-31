@@ -1,44 +1,62 @@
-From: sstabellini@kernel.org (Stefano Stabellini)
-Date: Thu, 31 Mar 2016 16:21:45 +0100 (BST)
-Subject: [Xen-devel] [PATCH v7 12/17] ARM64: ACPI: Check if it runs on
- Xen to enable or disable ACPI
-In-Reply-To: <20160331144418.GR27408@perard.uk.xensource.com>
-References: <20160331144418.GR27408@perard.uk.xensource.com>
-Message-ID: <alpine.DEB.2.10.1603311620260.31571@sstabellini-ThinkPad-X230>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 31 Mar 2016 08:28:54 -0700
+Subject: [PATCH] ACPI / ARM64: Remove EXPERT dependency for ACPI on ARM64
+In-Reply-To: <20160331123649.GE18910@arm.com>
+References: <1459360718-24125-1-git-send-email-broonie@kernel.org>
+ <56FC9D1D.6090808@huawei.com>
+ <CAJZ5v0gv-MJ+Ss8gtc80z2_sOq-3qfBYbspRU8MWRNvn+UVbUg@mail.gmail.com>
+ <20160331123649.GE18910@arm.com>
+Message-ID: <20160331152854.GA2350@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 31 Mar 2016, Mark Rutland wrote:
-> On Thu, Mar 31, 2016 at 01:44:08PM +0200, Ard Biesheuvel wrote:
-> > The heuristic is there to decide whether some DTB image contains a
-> > complete description of the platform, or only some data handed over by
-> > the bootloader. Arguably, a DT containing both /chosen and /hypervisor
-> > but nothing else can still not describe an actual platform, and
-> > whether we execute under Xen or not is completely irrelevant.
-> 
-> I disagree somewhat.
-> 
-> In general, a /hypervisor node may not be a Xen node, and could
-> potentially imply some platform description. As /hypervisor is a generic
-> name up for grabs by any hypervisor, we simply cannot make assumptions
-> about it.
-> 
-> As /chosen is a special reserved path that implies a particular binding
-> and has no compatible string, so checking its path alone is correct.
-> 
-> While we do check that the /hypervisor node is "xen,xen" compatible
-> elsewhere, the canonical mechanism of checking for a Xen node (as
-> opposed to any hypervisor's node) is to check the compatible string.
-> 
-> If we are going to handle nodes for other hypervisors while treating the
-> DTB as empty, we need code and discussion regarding said hypervisor.
-> 
-> Hence, for checking for a Xen /hypervisor node, I would prefer we
-> checked the compatible string rather than the path.
-> 
-> An is_xen_node() helper (which could also check that the path is
-> "/hypervisor") would avoid having redundant, subtly distinct ways of
-> checking, and would explicitly document precisely what we are checking
-> for.
+On Thu, Mar 31, 2016 at 01:36:50PM +0100, Will Deacon wrote:
 
-That's also OK for me.
+> I'm unsure about whether or not we want 'default y' here, but I'd like
+
+I can easily do followup patches which change that to be "default y if
+!ARM64" (or default y if $OTHER_ARCHES) and adding CONFIG_ACPI to
+defconfig (for the test coverage) if that helps?  I think that's
+perfectly reasonable.  As Ard says if both DT and ACPI are built in then
+the kernel will continue to prefer DT if it finds one.
+
+> to wait for Catalin to come back from his 2-week holiday before going
+> anywhere with this patch. It's only fair that his opinion should be
+> taken into account, and there's not a huge rush for this. I do consider
+
+It definitely makes sense to get Catalin's input.  I do think that this
+is something we don't want to defer indefinitely though, I think we're
+hurting ourselves more than we're helping.
+
+> "ACPI-only platforms" as simply "platforms without a .dtb" (modulo
+> any significant AML code) and therefore don't view this as a blocking
+> issue.
+
+I think people with a system with no DT provided might disagree on that
+one, and that this isn't really about end users or even distros but
+rather about the people working upstream and especially doing test and
+QA work upstream.
+
+> We should also take into account the large amount of ongoing ACPI work
+> (e.g. the DSD and PRP0001 saga, PCI and IORT support, virtualisation work,
+> etc), and decide whether or not that's currently in a state where we want
+> to encourage people to start using this in their arm64 kernels.
+
+My perception is that the EXPERT dependency is not having a meaningful
+impact on people who want to use ACPI, they're just going ahead and
+doing it anyway and expecting that distros will ship kernels which
+enable ACPI (which realistically the ones that don't currently are going
+to do as they start encountering these platforms).  There doesn't seem
+to be much sign that decisions about shipping systems are being guided
+by this and the work that's happening on ACPI is going on regardless,
+some of it x86 focused.
+
+The kernel will still continue to prefer DT on arm64 systems so it's
+still the default upstream.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160331/b5cf37c5/attachment.sig>
