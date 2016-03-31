@@ -1,150 +1,214 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 31 Mar 2016 11:58:41 +0200
-Subject: [RFC PATCH 18/45] KVM: arm/arm64: vgic-new: Add ACTIVE registers
- handlers
-In-Reply-To: <1458871508-17279-19-git-send-email-andre.przywara@arm.com>
-References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
- <1458871508-17279-19-git-send-email-andre.przywara@arm.com>
-Message-ID: <20160331095841.GX4126@cbox>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 31 Mar 2016 11:05:48 +0100
+Subject: [RFC] [PATCH] arm64: survive after access to unimplemented
+ register
+In-Reply-To: <1459391223-3826-1-git-send-email-ynorov@caviumnetworks.com>
+References: <1459391223-3826-1-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <20160331100547.GA26532@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 25, 2016 at 02:04:41AM +0000, Andre Przywara wrote:
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  virt/kvm/arm/vgic/vgic_mmio.c | 81 +++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 79 insertions(+), 2 deletions(-)
+On Thu, Mar 31, 2016 at 05:27:03AM +0300, Yury Norov wrote:
+> Not all vendors implement all the system registers ARM specifies.
+
+The ID registers in question are precisely documented in the ARM ARM
+(see table C5-6 in ARM DDI 0487A.i). Specifically, the ID space
+ID_AA64MMFR2_EL1 now falls in to is listed as RAZ.
+
+Any deviation from this is an erratum, and needs to be handled as such
+(e.g. listing in silicon-errata.txt).
+
+Does the issue affect ThunderX natively?
+
+Or has this only been seen with QEMU (in TCG mode), where the bug has
+already been fixed?
+
+> So access them causes undefined instruction abort and then kernel
+> panic. There are 3 ways to handle it we can figure out:
+>  - use conditional compilation and erratas;
+>  - use kernel patching;
+>  - inline fixups resolving the abort.
 > 
-> diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
-> index 788e186..bfc530c 100644
-> --- a/virt/kvm/arm/vgic/vgic_mmio.c
-> +++ b/virt/kvm/arm/vgic/vgic_mmio.c
-> @@ -289,6 +289,83 @@ static int vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
->  	return 0;
->  }
+> Last option is more robust as it does not require additional efforts
+> to support targers. It is looking reasonable because in many cases
+> optional registers should be RAZ if not implemented. Special cases may
+> be handled by underlying __read_cpuid() when needed.
+
+I don't think we should do this if the only affected implementations are
+software emulators which can be patched (and have already been, in the
+case of QEMU).
+
+In future it's very likely that early assembly code (potentially in
+hypervisor context) will need to access ID registers which are currently
+reserved/RAZ, and it will be rather painful to fix up accesses to this.
+
+Additionally, this workaround will silently mask other bugs in this area
+(e.g. if registers like ID_AA64MMFR0_EL1 were to trap for some reason on
+an implementation), which doesn't seem good.
+
+Thanks,
+Mark.
+
+> Tested on QEMU emulator version 2.3.0 (Debian 1:2.3+dfsg-5ubuntu9.2)
+> that does not implement SYS_ID_AA64MMFR2_EL1 register. (Fixed in new
+> releases),
+> 
+> Discussion: https://lkml.org/lkml/2016/3/29/931
+> 
+> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+> ---
+>  arch/arm64/include/asm/cputype.h  | 17 +++++++++++++++--
+>  arch/arm64/include/asm/exttable.h | 21 +++++++++++++++++++++
+>  arch/arm64/include/asm/uaccess.h  | 15 ---------------
+>  arch/arm64/kernel/entry.S         |  3 ++-
+>  arch/arm64/kernel/traps.c         |  6 ++++++
+>  arch/arm64/mm/extable.c           |  2 +-
+>  6 files changed, 45 insertions(+), 19 deletions(-)
+>  create mode 100644 arch/arm64/include/asm/exttable.h
+> 
+> diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+> index 87e1985..9660130 100644
+> --- a/arch/arm64/include/asm/cputype.h
+> +++ b/arch/arm64/include/asm/cputype.h
+> @@ -90,13 +90,26 @@
+>  #ifndef __ASSEMBLY__
 >  
-> +static int vgic_mmio_read_active(struct kvm_vcpu *vcpu,
-> +				 struct kvm_io_device *this,
-> +				 gpa_t addr, int len, void *val)
+>  #include <asm/sysreg.h>
+> +#include <asm/exttable.h>
+>  
+> -#define read_cpuid(reg) ({						\
+> +#define __read_cpuid(reg, err) ({					\
+>  	u64 __val;							\
+> -	asm("mrs_s	%0, " __stringify(SYS_ ## reg) : "=r" (__val));	\
+> +	asm (								\
+> +	"1:mrs_s	%0, " reg "\n"					\
+> +	"2:\n"								\
+> +	"	.section .fixup, \"ax\"\n"				\
+> +	"	.align	2\n"						\
+> +	"3:	mov	%w0, %1\n"					\
+> +	"	b	2b\n"						\
+> +	"	.previous\n"						\
+> +	_ASM_EXTABLE(1b, 3b)						\
+> +	: "=r" (__val)							\
+> +	: "i" (err));							\
+>  	__val;								\
+>  })
+>  
+> +#define read_cpuid(reg) __read_cpuid(__stringify(SYS_ ## reg), 0)
+> +
+>  /*
+>   * The CPU ID never changes at run time, so we might as well tell the
+>   * compiler that it's constant.  Use this function to read the CPU ID
+> diff --git a/arch/arm64/include/asm/exttable.h b/arch/arm64/include/asm/exttable.h
+> new file mode 100644
+> index 0000000..c0a66c8
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/exttable.h
+> @@ -0,0 +1,21 @@
+> +#ifndef __ASM_EXTTABLE_H
+> +#define __ASM_EXTTABLE_H
+> +
+> +#include <asm/ptrace.h>
+> +
+> +#define ARCH_HAS_RELATIVE_EXTABLE
+> +
+> +#define _ASM_EXTABLE(from, to)						\
+> +	"	.pushsection	__ex_table, \"a\"\n"			\
+> +	"	.align		3\n"					\
+> +	"	.long		(" #from " - .), (" #to " - .)\n"	\
+> +	"	.popsection\n"
+> +
+> +struct exception_table_entry
 > +{
-> +	struct vgic_io_device *iodev = container_of(this,
-> +						    struct vgic_io_device, dev);
-> +	u32 intid = (addr - iodev->base_addr) * 8;
-> +	u32 value = 0;
-> +	int i;
+> +	int insn, fixup;
+> +};
 > +
-> +	if (iodev->redist_vcpu)
-> +		vcpu = iodev->redist_vcpu;
+> +extern int fixup_exception(struct pt_regs *regs);
 > +
-> +	/* Loop over all IRQs affected by this read */
-> +	for (i = 0; i < len * 8; i++) {
-> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+> +#endif /* __ASM_EXTTABLE_H */
+> diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+> index 0685d74..19cfdc5 100644
+> --- a/arch/arm64/include/asm/uaccess.h
+> +++ b/arch/arm64/include/asm/uaccess.h
+> @@ -48,15 +48,6 @@
+>   * on our cache or tlb entries.
+>   */
+>  
+> -struct exception_table_entry
+> -{
+> -	int insn, fixup;
+> -};
+> -
+> -#define ARCH_HAS_RELATIVE_EXTABLE
+> -
+> -extern int fixup_exception(struct pt_regs *regs);
+> -
+>  #define KERNEL_DS	(-1UL)
+>  #define get_ds()	(KERNEL_DS)
+>  
+> @@ -117,12 +108,6 @@ static inline void set_fs(mm_segment_t fs)
+>  #define access_ok(type, addr, size)	__range_ok(addr, size)
+>  #define user_addr_max			get_fs
+>  
+> -#define _ASM_EXTABLE(from, to)						\
+> -	"	.pushsection	__ex_table, \"a\"\n"			\
+> -	"	.align		3\n"					\
+> -	"	.long		(" #from " - .), (" #to " - .)\n"	\
+> -	"	.popsection\n"
+> -
+>  /*
+>   * The "__xxx" versions of the user access functions do not verify the address
+>   * space - it must have been done previously with a separate "access_ok()"
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index 1f7a145..6b88096 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -377,7 +377,8 @@ el1_undef:
+>  	 */
+>  	enable_dbg
+>  	mov	x0, sp
+> -	b	do_undefinstr
+> +	bl	do_undefinstr
+> +	kernel_exit 1
+>  el1_dbg:
+>  	/*
+>  	 * Debug exception handling
+> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+> index cacd30a..515444a 100644
+> --- a/arch/arm64/kernel/traps.c
+> +++ b/arch/arm64/kernel/traps.c
+> @@ -386,6 +386,12 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
+>  	if (call_undef_hook(regs) == 0)
+>  		return;
+>  
+> +	/*
+> +	 * Are we prepared to handle this kernel fault?
+> +	 */
+> +	if (fixup_exception(regs))
+> +		return;
 > +
-> +		spin_lock(&irq->irq_lock);
-> +		if (irq->active)
-> +			value |= (1U << i);
-> +		spin_unlock(&irq->irq_lock);
-
-you don't need the spinlock here (for the same reason you didn't grab it
-in the last patch, consistency above all on this matter, please).
-
-> +	}
-> +
-> +	write_mask32(value, addr & 3, len, val);
-> +	return 0;
-> +}
-> +
-> +static int vgic_mmio_write_cactive(struct kvm_vcpu *vcpu,
-> +				   struct kvm_io_device *this,
-> +				   gpa_t addr, int len, const void *val)
-> +{
-> +	struct vgic_io_device *iodev = container_of(this,
-> +						    struct vgic_io_device, dev);
-> +	u32 intid = (addr - iodev->base_addr) * 8;
-> +	int i;
-> +
-> +	if (iodev->redist_vcpu)
-> +		vcpu = iodev->redist_vcpu;
-> +
-> +	for_each_set_bit(i, val, len * 8) {
-> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-> +
-> +		spin_lock(&irq->irq_lock);
-> +
-> +		irq->active = false;
-> +		/* TODO: Anything more to do? Does flush/sync cover this? */
-
-so prune will remove this from the AP list if it's no longer
-pending/enabled as well.
-
-the question is what to do if the vcpu for this irq is running and the
-LR there has the active bit set, then we'll overwrite this change when
-we fold the LR state back into the vgic_irq struct.
-
-since I expect this to be extremely rare, one option is to force
-irq->vcpu to exit (if non-null) and then do you thing here after you've
-confirm it has exited while holding some lock preventing it from
-re-entering again.  Slightly crazy.
-
-The alternative is to put a big fat comment nothing that this is
-non-supported bad race, and wait until someone submits a bug report
-relating to this...
-
-> +
-> +		spin_unlock(&irq->irq_lock);
-> +	}
-> +	return 0;
-> +}
-> +
-> +static int vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
-> +				   struct kvm_io_device *this,
-> +				   gpa_t addr, int len, const void *val)
-> +{
-> +	struct vgic_io_device *iodev = container_of(this,
-> +						    struct vgic_io_device, dev);
-> +	u32 intid = (addr - iodev->base_addr) * 8;
-> +	int i;
-> +
-> +	if (iodev->redist_vcpu)
-> +		vcpu = iodev->redist_vcpu;
-> +
-> +	for_each_set_bit(i, val, len * 8) {
-> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-> +
-> +		spin_lock(&irq->irq_lock);
-> +
-> +		irq->active = true;
-> +		/* TODO: Anything more to do? Does flush/sync cover this? */
-
-you need to add it to the ap_list of irq->target_vcpu if irq->vcpu is
-not already set.
-
-an alternative is to expand the queue function to handle the active
-case, but I'm not sure which one is cleaner.  I think we have to try it
-to be able to tell, but my gut feeling is that implementing it here is
-better, because it's a one-off.
-
-> +
-> +		spin_unlock(&irq->irq_lock);
-> +	}
-> +	return 0;
-> +}
-> +
->  static int vgic_mmio_read_priority(struct kvm_vcpu *vcpu,
->  				   struct kvm_io_device *this,
->  				   gpa_t addr, int len, void *val)
-> @@ -347,9 +424,9 @@ struct vgic_register_region vgic_v2_dist_registers[] = {
->  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_CLEAR,
->  		vgic_mmio_read_pending, vgic_mmio_write_cpending, 1),
->  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_SET,
-> -		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 1),
-> +		vgic_mmio_read_active, vgic_mmio_write_sactive, 1),
->  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_CLEAR,
-> -		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 1),
-> +		vgic_mmio_read_active, vgic_mmio_write_cactive, 1),
->  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PRI,
->  		vgic_mmio_read_priority, vgic_mmio_write_priority, 8),
->  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_TARGET,
+>  	if (unhandled_signal(current, SIGILL) && show_unhandled_signals_ratelimited()) {
+>  		pr_info("%s[%d]: undefined instruction: pc=%p\n",
+>  			current->comm, task_pid_nr(current), pc);
+> diff --git a/arch/arm64/mm/extable.c b/arch/arm64/mm/extable.c
+> index 81acd47..c140688 100644
+> --- a/arch/arm64/mm/extable.c
+> +++ b/arch/arm64/mm/extable.c
+> @@ -3,7 +3,7 @@
+>   */
+>  
+>  #include <linux/module.h>
+> -#include <linux/uaccess.h>
+> +#include <asm/exttable.h>
+>  
+>  int fixup_exception(struct pt_regs *regs)
+>  {
 > -- 
-> 2.7.3
+> 2.5.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
