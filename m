@@ -1,97 +1,68 @@
 From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Thu, 31 Mar 2016 14:02:47 +0200
-Subject: [PATCH v9 01/17] Xen: ACPI: Hide UART used by Xen
-In-Reply-To: <1459423425-1220-2-git-send-email-zhaoshenglong@huawei.com>
-References: <1459423425-1220-1-git-send-email-zhaoshenglong@huawei.com>
- <1459423425-1220-2-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <CAJZ5v0iSDk1u47jhed9TyEef1D=nERMfBw8AzcquTgH9g=Yqpg@mail.gmail.com>
+Date: Thu, 31 Mar 2016 14:04:05 +0200
+Subject: [PATCH] ACPI / ARM64: Remove EXPERT dependency for ACPI on ARM64
+In-Reply-To: <56FC9D1D.6090808@huawei.com>
+References: <1459360718-24125-1-git-send-email-broonie@kernel.org>
+ <56FC9D1D.6090808@huawei.com>
+Message-ID: <CAJZ5v0gv-MJ+Ss8gtc80z2_sOq-3qfBYbspRU8MWRNvn+UVbUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 31, 2016 at 1:23 PM, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
+On Thu, Mar 31, 2016 at 5:44 AM, Hanjun Guo <guohanjun@huawei.com> wrote:
+> On 2016/3/31 1:58, Mark Brown wrote:
+>> When ACPI was originally merged for arm64 it had only been tested on
+>> emulators and not on real physical platforms and no platforms were
+>> relying on it.  This meant that there were concerns that there might be
+>> serious issues attempting to use it on practical systems so it had a
+>> dependency on EXPERT added to warn people that it was in an early stage
+>> of development with very little practical testing.  Since then things
+>> have moved on a bit.  We have seen people testing on real hardware and
+>> now have people starting to produce some platforms (the most prominent
+>> being the 96boards Cello) which only have ACPI support and which build
+>> and run to some useful extent with mainline.
+>>
+>> This is not to say that ACPI support or support for these systems is
+>> completely done, there are still areas being worked on such as PCI, but
+>> at this point it seems that we can be reasonably sure that ACPI will be
+>> viable for use on ARM64 and that the already merged support works for
+>> the cases it handles.  For the AMD Seattle based platforms support
+>> outside of PCI has been fairly complete in mainline a few releases now.
+>>
+>> This is also not to say that we don't have vendors working with ACPI who
+>> are trying do things that we would not consider optimal but it does not
+>> appear that the EXPERT dependency is having a substantial impact on
+>> these vendors.
+>>
+>> Given all this it seems that at this point the EXPERT dependency mainly
+>> creates inconvenience for users with systems that are doing the right
+>> thing and gets in the way of including the ACPI code in the testing that
+>> people are doing on mainline.  Removing it should help our ongoing
+>> testing cover those platforms with only ACPI support and help ensure
+>> that when ACPI code is merged any problems it causes for other users are
+>> more easily discovered.
+>>
+>> Signed-off-by: Mark Brown <broonie@kernel.org>
 >
-> ACPI 6.0 introduces a new table STAO to list the devices which are used
-> by Xen and can't be used by Dom0. On Xen virtual platforms, the physical
-> UART is used by Xen. So here it hides UART from Dom0.
+> Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
 >
-> CC: "Rafael J. Wysocki" <rjw@rjwysocki.net> (supporter:ACPI)
-> CC: Len Brown <lenb@kernel.org> (supporter:ACPI)
-> CC: linux-acpi at vger.kernel.org (open list:ACPI)
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  drivers/acpi/scan.c | 69 +++++++++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 69 insertions(+)
->
-> diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
-> index 5f28cf7..29f26fc 100644
-> --- a/drivers/acpi/scan.c
-> +++ b/drivers/acpi/scan.c
-> @@ -45,6 +45,7 @@ static LIST_HEAD(acpi_scan_handlers_list);
->  DEFINE_MUTEX(acpi_device_lock);
->  LIST_HEAD(acpi_wakeup_device_list);
->  static DEFINE_MUTEX(acpi_hp_context_lock);
-> +static u64 spcr_uart_addr;
->
->  struct acpi_dep_data {
->         struct list_head node;
-> @@ -1453,6 +1454,42 @@ static int acpi_add_single_object(struct acpi_device **child,
->         return 0;
->  }
->
-> +static acpi_status acpi_get_resource_memory(struct acpi_resource *ares,
-> +                                           void *context)
-> +{
-> +       struct resource *res = context;
-> +
-> +       if (acpi_dev_resource_memory(ares, res))
-> +               return AE_CTRL_TERMINATE;
-> +
-> +       return AE_OK;
-> +}
-> +
-> +static bool acpi_device_should_be_hidden(acpi_handle handle)
-> +{
-> +       acpi_status status;
-> +       struct resource res;
-> +
-> +       /* Check if it should ignore the UART device */
-> +       if (spcr_uart_addr != 0) {
+>> ---
+>>  drivers/acpi/Kconfig | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+>> index 82b96ee8624c..bf5dc1ac3446 100644
+>> --- a/drivers/acpi/Kconfig
+>> +++ b/drivers/acpi/Kconfig
+>> @@ -5,7 +5,7 @@
+>>  menuconfig ACPI
+>>       bool "ACPI (Advanced Configuration and Power Interface) Support"
+>>       depends on !IA64_HP_SIM
+>> -     depends on IA64 || X86 || (ARM64 && EXPERT)
+>> +     depends on IA64 || X86 || ARM64
+>>       depends on PCI
+>>       select PNP
+>>       default y
 
-Why not to write this as
+OK
 
-      if (spcr_uart_addr) {
-
-Or even
-
-      if (!spcr_uart_addr)
-            return false;
-
-and then the indentation level of the rest will be reduced.
-
-> +               if (!acpi_has_method(handle, METHOD_NAME__CRS))
-> +                       return false;
-> +
-
-I'd like to see a comment here that the devices in question are
-assumed to have only one memory resource present which is why we only
-look for the first one.
-
-> +               status = acpi_walk_resources(handle, METHOD_NAME__CRS,
-> +                                            acpi_get_resource_memory, &res);
-> +               if (ACPI_FAILURE(status))
-> +                       return false;
-> +
-> +               if (res.start == spcr_uart_addr) {
-> +                       printk(KERN_INFO PREFIX "The UART device @%pa in SPCR table will be hidden\n",
-> +                              &res.start);
-> +                       return true;
-> +               }
-> +       }
-> +
-> +       return false;
-> +}
-> +
-
-Thanks,
-Rafael
+What do the ARM64 maintainers think?
