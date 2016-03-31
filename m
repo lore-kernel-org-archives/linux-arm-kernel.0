@@ -1,29 +1,111 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Thu, 31 Mar 2016 17:09:37 +0200
-Subject: [PATCH v2 7/9] ARM: dts: Add GPIO irq support to STM2F429
-In-Reply-To: <1459436979-17275-1-git-send-email-mcoquelin.stm32@gmail.com>
-References: <1459436979-17275-1-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <1459436979-17275-8-git-send-email-mcoquelin.stm32@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 31 Mar 2016 16:09:23 +0100
+Subject: [PATCH 2/4] scatterlist: add sg_alloc_table_from_buf() helper
+In-Reply-To: <20160331164557.544ed780@bbrezillon>
+References: <1459427384-21374-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1459427384-21374-3-git-send-email-boris.brezillon@free-electrons.com>
+ <20160331141412.GK19428@n2100.arm.linux.org.uk>
+ <20160331164557.544ed780@bbrezillon>
+Message-ID: <20160331150923.GL19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
----
- arch/arm/boot/dts/stm32f429.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+On Thu, Mar 31, 2016 at 04:45:57PM +0200, Boris Brezillon wrote:
+> Hi Russell,
+> 
+> On Thu, 31 Mar 2016 15:14:13 +0100
+> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> 
+> > On Thu, Mar 31, 2016 at 02:29:42PM +0200, Boris Brezillon wrote:
+> > > sg_alloc_table_from_buf() provides an easy solution to create an sg_table
+> > > from a virtual address pointer. This function takes care of dealing with
+> > > vmallocated buffers, buffer alignment, or DMA engine limitations (maximum
+> > > DMA transfer size).
+> > 
+> > Please note that the DMA API does not take account of coherency of memory
+> > regions other than non-high/lowmem - there are specific extensions to
+> > deal with this.
+> 
+> Ok, you said 'non-high/lowmem', this means vmalloced and kmapped buffers
+> already fall in this case, right?
+> 
+> Could you tell me more about those specific extensions?
 
-diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-index 1a189d44ad38..68247625a8d5 100644
---- a/arch/arm/boot/dts/stm32f429.dtsi
-+++ b/arch/arm/boot/dts/stm32f429.dtsi
-@@ -189,6 +189,8 @@
- 			#size-cells = <1>;
- 			compatible = "st,stm32f429-pinctrl";
- 			ranges = <0 0x40020000 0x3000>;
-+			interrupt-parent = <&exti>;
-+			st,syscfg = <&syscfg 0x8>;
- 			pins-are-numbered;
- 
- 			gpioa: gpio at 40020000 {
+I was slightly confused - the extensions I was thinking of are those
+listed at the bottom of Documentation/cachetlb.txt, which have nothing
+to do with DMA.
+
+However, it's probably worth reading Documentation/DMA-API-HOWTO.txt
+to read up on what kinds of memory are considered to be DMA-able in
+the kernel.
+
+> > What this means is that having an API that takes any virtual address
+> > pointer, converts it to a scatterlist which is then DMA mapped, is
+> > unsafe.
+> 
+> Which means some implementations already get this wrong (see
+> spi_map_buf(), and I'm pretty sure it's not the only one).
+
+Quite possible, but that is driver stuff, and driver stuff gets things
+wrong all the time. :)
+
+> > It'll be okay for PIPT and non-aliasing VIPT cache architectures, but
+> > for other cache architectures this will hide this problem and make
+> > review harder.
+> > 
+> 
+> Ok, you lost me. I'll have to do my homework and try to understand what
+> this means :).
+
+P = physical address
+V = virtual address
+I = indexed
+T = tag
+
+The tag is held in each cache line.  When a location is looked up in the
+cache, an index is used to locate a set of cache lines and the tag is
+compared to check which cache line in the set is the correct one (or
+whether the address even exists in the cache.)
+
+How the index and tag are derived varies between cache architectures.
+
+PIPT = indexed by physical address, tagged with physical address.  Never
+aliases with itself in the presence of multiple virtual mappings.
+
+VIPT = indexed by virtual address, tagged with physical address.  If the
+bits from the virtual address do not overlap the MMU page size, it is
+also alias free, otherwise aliases can exist, but can be eliminated by
+"cache colouring" - ensuring that a physical address is always mapped
+with the same overlapping bits.
+
+VIVT = indexed by virtual address, tagged with virtual address.  The
+worst kind of cache, since every different mapping of the same physical
+address is guaranteed by design to alias with other mappings.
+
+There is little cache colouring between different kernel mappings (eg,
+between lowmem and vmalloc space.)
+
+What this means is that, while the DMA API takes care of DMA aliases
+in the lowmem mappings, an alias-prone VIPT cache will remain incoherent
+with DMA if it is remapped into vmalloc space, and the mapping happens
+to have a different cache colour.  In other words, this is a data
+corruption issue.
+
+Hence, taking a range of vmalloc() addresses, converting them into a
+scatterlist, then using the DMA API on the scatterlist _only_ guarantees
+that the lowmem (and kmap'd highmem mappings) are coherent with DMA.
+There is no way for the DMA API to know that other mappings exist, and
+obviously flushing every possible cache line just because a mapping might
+exist multiplies the expense of the DMA API: not only in terms of time
+spent running through all the possibilities, which doubles for every
+aliasing bit of VIPT, but also TLB pressure since you'd have to create
+a mapping for each alias and tear it back down.
+
+VIVT is even worse, since there is no other virtual mapping which is
+coherent, would need to be known, and each mapping would need to be
+individually flushed.
+
 -- 
-1.9.1
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
