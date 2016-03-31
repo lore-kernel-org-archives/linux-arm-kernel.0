@@ -1,70 +1,58 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 31 Mar 2016 15:48:42 +0200
-Subject: [PATCH v2 1/5] PM / AVS: rockchip-io: make io-domains a child of the
- GRF
+Date: Thu, 31 Mar 2016 15:48:46 +0200
+Subject: [PATCH v2 5/5] arm64: dts: rockchip: add rk3368-r88 iodomains
 In-Reply-To: <1459432126-6395-1-git-send-email-heiko@sntech.de>
 References: <1459432126-6395-1-git-send-email-heiko@sntech.de>
-Message-ID: <1459432126-6395-2-git-send-email-heiko@sntech.de>
+Message-ID: <1459432126-6395-6-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IO-domain handling is part of the general register files, so should live
-under the grf directly. This change allows the grf to be a simple-mfd and
-the io-domains fetching the syscon regmap from that parent-node.
-
-The old binding is of course preserved, though deprecated.
+Add the supply-links according to the R88 schematics.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-Acked-by: Kevin Hilman <khilman@baylibre.com>
-Tested-by: David Wu <david.wu@rock-chips.com>
 ---
- Documentation/devicetree/bindings/power/rockchip-io-domain.txt |  4 +++-
- drivers/power/avs/rockchip-io-domain.c                         | 10 +++++++++-
- 2 files changed, 12 insertions(+), 2 deletions(-)
+ arch/arm64/boot/dts/rockchip/rk3368-r88.dts | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/power/rockchip-io-domain.txt b/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
-index c84fb47..d23dc00 100644
---- a/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
-+++ b/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
-@@ -37,8 +37,10 @@ Required properties:
-   - "rockchip,rk3368-pmu-io-voltage-domain" for rk3368 pmu-domains
-   - "rockchip,rk3399-io-voltage-domain" for rk3399
-   - "rockchip,rk3399-pmu-io-voltage-domain" for rk3399 pmu-domains
--- rockchip,grf: phandle to the syscon managing the "general register files"
+diff --git a/arch/arm64/boot/dts/rockchip/rk3368-r88.dts b/arch/arm64/boot/dts/rockchip/rk3368-r88.dts
+index 1f2b642..d4dd289 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3368-r88.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3368-r88.dts
+@@ -211,6 +211,18 @@
+ 	status = "ok";
+ };
  
-+Deprecated properties:
-+- rockchip,grf: phandle to the syscon managing the "general register files"
-+    Systems should move the io-domains to a sub-node of the grf simple-mfd.
- 
- You specify supplies using the standard regulator bindings by including
- a phandle the relevant regulator.  All specified supplies must be able
-diff --git a/drivers/power/avs/rockchip-io-domain.c b/drivers/power/avs/rockchip-io-domain.c
-index 8986382..01b6d3f 100644
---- a/drivers/power/avs/rockchip-io-domain.c
-+++ b/drivers/power/avs/rockchip-io-domain.c
-@@ -336,6 +336,7 @@ static int rockchip_iodomain_probe(struct platform_device *pdev)
- 	struct device_node *np = pdev->dev.of_node;
- 	const struct of_device_id *match;
- 	struct rockchip_iodomain *iod;
-+	struct device *parent;
- 	int i, ret = 0;
- 
- 	if (!np)
-@@ -351,7 +352,14 @@ static int rockchip_iodomain_probe(struct platform_device *pdev)
- 	match = of_match_node(rockchip_iodomain_match, np);
- 	iod->soc_data = (struct rockchip_iodomain_soc_data *)match->data;
- 
--	iod->grf = syscon_regmap_lookup_by_phandle(np, "rockchip,grf");
-+	parent = pdev->dev.parent;
-+	if (parent && parent->of_node) {
-+		iod->grf = syscon_node_to_regmap(parent->of_node);
-+	} else {
-+		dev_dbg(&pdev->dev, "falling back to old binding\n");
-+		iod->grf = syscon_regmap_lookup_by_phandle(np, "rockchip,grf");
-+	}
++&grf {
++	io-domains {
++		compatible = "rockchip,rk3368-io-voltage-domain";
 +
- 	if (IS_ERR(iod->grf)) {
- 		dev_err(&pdev->dev, "couldn't find grf regmap\n");
- 		return PTR_ERR(iod->grf);
++		audio-supply = <&vcc_io>;
++		gpio30-supply = <&vcc_io>;
++		gpio1830-supply = <&vcc_io>;
++		sdcard-supply = <&vccio_sd>;
++		wifi-supply = <&vccio_wl>;
++	};
++};
++
+ &i2c0 {
+ 	status = "okay";
+ 
+@@ -331,6 +343,16 @@
+ 	};
+ };
+ 
++&pmugrf {
++	io-domains {
++		compatible = "rockchip,rk3368-pmu-io-voltage-domain";
++		rockchip,grf = <&pmugrf>;
++
++		pmu-supply = <&vcc_io>;
++		vop-supply = <&vcc_io>;
++	};
++};
++
+ &saradc {
+ 	vref-supply = <&vcc_18>;
+ 	status = "okay";
 -- 
 2.6.4
