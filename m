@@ -1,80 +1,34 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 31 Mar 2016 17:43:16 +0100
-Subject: [RFC] [PATCH] arm64: survive after access to unimplemented
- register
-In-Reply-To: <20160331160500.GC29800@yury-N73SV>
-References: <1459391223-3826-1-git-send-email-ynorov@caviumnetworks.com>
- <20160331100547.GA26532@leverpostej>
- <20160331122859.GA27859@yury-N73SV>
- <20160331131231.GF26532@leverpostej>
- <20160331160500.GC29800@yury-N73SV>
-Message-ID: <20160331164316.GB26393@leverpostej>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Thu, 31 Mar 2016 17:51:42 +0100
+Subject: [RFC PATCH 1/3] libahci: save port map for forced port map
+In-Reply-To: <20160331164328.GA24661@htj.duckdns.org>
+References: <1459257075-21393-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1459257075-21393-2-git-send-email-srinivas.kandagatla@linaro.org>
+ <20160330185706.GQ7822@mtj.duckdns.org> <56FD4923.3090209@linaro.org>
+ <20160331164328.GA24661@htj.duckdns.org>
+Message-ID: <56FD559E.1090802@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 31, 2016 at 07:05:00PM +0300, Yury Norov wrote:
-> On Thu, Mar 31, 2016 at 02:12:31PM +0100, Mark Rutland wrote:
-> > On Thu, Mar 31, 2016 at 03:28:59PM +0300, Yury Norov wrote:
-> > > On Thu, Mar 31, 2016 at 11:05:48AM +0100, Mark Rutland wrote:
-> > > > On Thu, Mar 31, 2016 at 05:27:03AM +0300, Yury Norov wrote:
-> > > > > Not all vendors implement all the system registers ARM specifies.
-> > > > 
-> > > > The ID registers in question are precisely documented in the ARM ARM
-> > > > (see table C5-6 in ARM DDI 0487A.i). Specifically, the ID space
-> > > > ID_AA64MMFR2_EL1 now falls in to is listed as RAZ.
-> > > > 
-> > > > Any deviation from this is an erratum, and needs to be handled as such
-> > > > (e.g. listing in silicon-errata.txt).
-> > > > 
-> > > > Does the issue affect ThunderX natively?
-> > > 
-> > > Yes, Thunder is involved, but I cannot tell more due to NDA.
-> > > And this error is not in silicon-errata.txt.
-> > > I'll ask permission to share more details.
-> > 
-> > Ok. Regardless of how this is solved, we need to know the details of the
-> > erratum (and need an entry in silicon-errata.txt).
 
-[...]
 
-> > Before we can do any of this, we need to know the conditions of the
-> > erratum, however.
+On 31/03/16 17:43, Tejun Heo wrote:
+> Hello,
+>
+> On Thu, Mar 31, 2016 at 04:58:27PM +0100, Srinivas Kandagatla wrote:
+>> Yes, that is the intention, I guess, This was done exactly in case where the
+>> port number was fabricated too.
+>>
+>> Without this I could not get the sata working on my board with forced port
+>> map option.
+>
+> I see.  Looks good to me then.  Can you please respin the patches with
+> the updates for the review points in the second patch?  I'll apply
+> them to libata/for-3.6-fixes.
 
-[...]
+Thanks, I will do it now.
 
-> > > Initially I was thinking about erratas as well, but Arnd suggested
-> > > this approach, and now think it's better. From consumer point of view,
-> > > it's much better to have a warning line in dmesg, instead of bricked
-> > > device, after another kernel or driver update.
-> > 
-> > Having some warning is certainly better, though I think we need to
-> > scream _very loudly_ for cases we do not expect, as non-fatal warnings
-> > are easily/often ignored, and can later turn out to be more critical
-> > than previously believed.
-> > 
-> > Thanks,
-> > Mark.
-> 
-> So what? Are we drop it? Or I can prepare new version with loud
-> warning and runtime patching.
-
-As above, we need to know the precise conditions of the erratum. For
-example:
-
-* Do all reserved / RAZ registers trap, or only a subset?
-
-* Do other registers trap?
-
-* Which revisions of the core are affected?
-
-* How widely deployed are the affected revisions (is this production
-  silicon or early test chips)?
-
-Once we know that we can assess how/where the kernel will be affected,
-which approaches are suitable as workarounds, whether this needs to be a
-selectable option, etc.
-
-Until we know that, we cannot assess the situation.
-
-Thanks,
-Mark.
+--srini
+>
+> Thanks.
+>
