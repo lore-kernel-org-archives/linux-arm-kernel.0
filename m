@@ -1,55 +1,255 @@
 From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Thu, 31 Mar 2016 16:40:24 +0300
-Subject: [PATCH v7 2/5] ACPICA: Headers: Add new constants for the DBG2 ACPI
- table
+Date: Thu, 31 Mar 2016 16:40:25 +0300
+Subject: [PATCH v7 3/5] ACPI: parse SPCR and enable matching console
 In-Reply-To: <1459431629-27934-1-git-send-email-aleksey.makarov@linaro.org>
 References: <1459431629-27934-1-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <1459431629-27934-3-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <1459431629-27934-4-git-send-email-aleksey.makarov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ACPICA commit 1607b69238df9c1b2940262a17aa94ec49033278
+'ARM Server Base Boot Requiremets' [1] mentions SPCR (Serial Port
+Console Redirection Table) [2] as a mandatory ACPI table that
+specifies the configuration of serial console.
 
-Link: https://github.com/acpica/acpica/commit/1607b692
-Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>.
-Signed-off-by: Bob Moore <robert.moore@intel.com>
-Signed-off-by: Lv Zheng <lv.zheng@intel.com>
+Defer initialization of DT earlycon until ACPI/DT decision is made.
+
+Parse the ACPI SPCR table, setup earlycon if required,
+enable specified console.
+
+Thanks to Peter Hurley for explaining how this should work.
+
+[1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0044a/index.html
+[2] https://msdn.microsoft.com/en-us/library/windows/hardware/dn639132(v=vs.85).aspx
+
+Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
 ---
+ drivers/acpi/Kconfig          |   3 ++
+ drivers/acpi/Makefile         |   1 +
+ drivers/acpi/spcr.c           | 111 ++++++++++++++++++++++++++++++++++++++++++
+ drivers/tty/serial/earlycon.c |  19 +++++++-
+ include/linux/acpi.h          |   6 +++
+ include/linux/serial_core.h   |   6 +++
+ 6 files changed, 144 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/acpi/spcr.c
 
-DO NOT MERGE
-
-This patch is from pending ACPICA series [1].  It is needed by the next patch,
-but has not been merged to linux-next yet.
-
-[1] https://lkml.kernel.org/g/cover.1458714002.git.lv.zheng at intel.com
-
- include/acpi/actbl2.h | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
-
-diff --git a/include/acpi/actbl2.h b/include/acpi/actbl2.h
-index a4ef625..7702b27 100644
---- a/include/acpi/actbl2.h
-+++ b/include/acpi/actbl2.h
-@@ -321,7 +321,7 @@ struct acpi_csrt_descriptor {
-  * DBG2 - Debug Port Table 2
-  *        Version 0 (Both main table and subtables)
-  *
-- * Conforms to "Microsoft Debug Port Table 2 (DBG2)", May 22 2012.
-+ * Conforms to "Microsoft Debug Port Table 2 (DBG2)", December 10, 2015
-  *
-  ******************************************************************************/
+diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+index 65fb483..5611eb6 100644
+--- a/drivers/acpi/Kconfig
++++ b/drivers/acpi/Kconfig
+@@ -77,6 +77,9 @@ config ACPI_DEBUGGER_USER
  
-@@ -371,6 +371,11 @@ struct acpi_dbg2_device {
+ endif
  
- #define ACPI_DBG2_16550_COMPATIBLE  0x0000
- #define ACPI_DBG2_16550_SUBSET      0x0001
-+#define ACPI_DBG2_ARM_PL011         0x0003
-+#define ACPI_DBG2_ARM_SBSA_32BIT    0x000D
-+#define ACPI_DBG2_ARM_SBSA_GENERIC  0x000E
-+#define ACPI_DBG2_ARM_DCC           0x000F
-+#define ACPI_DBG2_BCM2835           0x0010
++config ACPI_SPCR_TABLE
++	bool
++
+ config ACPI_SLEEP
+ 	bool
+ 	depends on SUSPEND || HIBERNATION
+diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+index 7395928..f70ae14 100644
+--- a/drivers/acpi/Makefile
++++ b/drivers/acpi/Makefile
+@@ -82,6 +82,7 @@ obj-$(CONFIG_ACPI_EC_DEBUGFS)	+= ec_sys.o
+ obj-$(CONFIG_ACPI_CUSTOM_METHOD)+= custom_method.o
+ obj-$(CONFIG_ACPI_BGRT)		+= bgrt.o
+ obj-$(CONFIG_ACPI_CPPC_LIB)	+= cppc_acpi.o
++obj-$(CONFIG_ACPI_SPCR_TABLE)	+= spcr.o
+ obj-$(CONFIG_ACPI_DEBUGGER_USER) += acpi_dbg.o
  
- #define ACPI_DBG2_1394_STANDARD     0x0000
+ # processor has its own "processor." module_param namespace
+diff --git a/drivers/acpi/spcr.c b/drivers/acpi/spcr.c
+new file mode 100644
+index 0000000..68ffc33
+--- /dev/null
++++ b/drivers/acpi/spcr.c
+@@ -0,0 +1,111 @@
++/*
++ * Copyright (c) 2012, Intel Corporation
++ * Copyright (c) 2015, Red Hat, Inc.
++ * Copyright (c) 2015, 2016 Linaro Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++#define pr_fmt(fmt) "ACPI: SPCR: " fmt
++
++#include <linux/acpi.h>
++#include <linux/console.h>
++#include <linux/kernel.h>
++#include <linux/serial_core.h>
++
++/**
++ * parse_spcr() - parse ACPI SPCR table and add preferred console
++ *
++ * @earlycon: set up earlycon for the console specified by the table
++ *
++ * For the architectures with support for ACPI, CONFIG_ACPI_SPCR_TABLE may be
++ * defined to parse ACPI SPCR table.  As a result of the parsing preferred
++ * console is registered and if @earlycon is true, earlycon is set up.
++ *
++ * When CONFIG_ACPI_SPCR_TABLE is defined, this function should should be called
++ * from arch inintialization code as soon as the DT/ACPI decision is made.
++ *
++ */
++int __init parse_spcr(bool earlycon)
++{
++	static char opts[64];
++	struct acpi_table_spcr *table;
++	acpi_size table_size;
++	acpi_status status;
++	char *uart;
++	char *iotype;
++	int baud_rate;
++	int err;
++
++	if (acpi_disabled)
++		return -ENODEV;
++
++	status = acpi_get_table_with_size(ACPI_SIG_SPCR, 0,
++					  (struct acpi_table_header **)&table,
++					  &table_size);
++
++	if (ACPI_FAILURE(status))
++		return -ENOENT;
++
++	if (table->header.revision < 2) {
++		err = -ENOENT;
++		pr_err("wrong table version\n");
++		goto done;
++	}
++
++	iotype = table->serial_port.space_id == ACPI_ADR_SPACE_SYSTEM_MEMORY ?
++			"mmio" : "io";
++
++	switch (table->interface_type) {
++	case ACPI_DBG2_ARM_SBSA_32BIT:
++		iotype = "mmio32";
++		/* fall through */
++	case ACPI_DBG2_ARM_PL011:
++	case ACPI_DBG2_ARM_SBSA_GENERIC:
++	case ACPI_DBG2_BCM2835:
++		uart = "pl011";
++		break;
++	case ACPI_DBG2_16550_COMPATIBLE:
++	case ACPI_DBG2_16550_SUBSET:
++		uart = "uart";
++		break;
++	default:
++		err = -ENOENT;
++		goto done;
++	}
++
++	switch (table->baud_rate) {
++	case 3:
++		baud_rate = 9600;
++		break;
++	case 4:
++		baud_rate = 19200;
++		break;
++	case 6:
++		baud_rate = 57600;
++		break;
++	case 7:
++		baud_rate = 115200;
++		break;
++	default:
++		err = -ENOENT;
++		goto done;
++	}
++
++	snprintf(opts, sizeof(opts), "%s,%s,0x%llx,%d", uart, iotype,
++		 table->serial_port.address, baud_rate);
++
++	pr_info("console: %s", opts);
++
++	if (earlycon)
++		setup_earlycon(opts);
++
++	err = add_preferred_console(uart, 0, opts + strlen(uart) + 1);
++
++done:
++	early_acpi_os_unmap_memory((void __iomem *)table, table_size);
++	return err;
++}
+diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
+index 7aae655..ea00b9f 100644
+--- a/drivers/tty/serial/earlycon.c
++++ b/drivers/tty/serial/earlycon.c
+@@ -21,6 +21,7 @@
+ #include <linux/sizes.h>
+ #include <linux/of.h>
+ #include <linux/of_fdt.h>
++#include <linux/acpi.h>
  
+ #ifdef CONFIG_FIX_EARLYCON_MEM
+ #include <asm/fixmap.h>
+@@ -199,6 +200,14 @@ int __init setup_earlycon(char *buf)
+ 	return -ENOENT;
+ }
+ 
++/*
++ * When CONFIG_ACPI_SPCR_TABLE is defined, "earlycon" without parameters in
++ * command line does not start DT earlycon immediately, instead it defers
++ * starting it until DT/ACPI decision is made.  At that time if ACPI is enabled
++ * call parse_spcr(), else call early_init_dt_scan_chosen_stdout()
++ */
++bool earlycon_init_is_deferred __initdata;
++
+ /* early_param wrapper for setup_earlycon() */
+ static int __init param_setup_earlycon(char *buf)
+ {
+@@ -208,8 +217,14 @@ static int __init param_setup_earlycon(char *buf)
+ 	 * Just 'earlycon' is a valid param for devicetree earlycons;
+ 	 * don't generate a warning from parse_early_params() in that case
+ 	 */
+-	if (!buf || !buf[0])
+-		return early_init_dt_scan_chosen_stdout();
++	if (!buf || !buf[0]) {
++		if (IS_ENABLED(CONFIG_ACPI_SPCR_TABLE)) {
++			earlycon_init_is_deferred = true;
++			return 0;
++		} else {
++			return early_init_dt_scan_chosen_stdout();
++		}
++	}
+ 
+ 	err = setup_earlycon(buf);
+ 	if (err == -ENOENT || err == -EALREADY)
+diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+index 06ed7e5..1095ed6 100644
+--- a/include/linux/acpi.h
++++ b/include/linux/acpi.h
+@@ -1004,4 +1004,10 @@ static inline struct fwnode_handle *acpi_get_next_subnode(struct device *dev,
+ #define acpi_probe_device_table(t)	({ int __r = 0; __r;})
+ #endif
+ 
++#ifdef CONFIG_ACPI_SPCR_TABLE
++int parse_spcr(bool earlycon);
++#else
++static inline int parse_spcr(bool earlycon) { return 0; }
++#endif
++
+ #endif	/*_LINUX_ACPI_H*/
+diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
+index cbfcf38..de6750f 100644
+--- a/include/linux/serial_core.h
++++ b/include/linux/serial_core.h
+@@ -363,6 +363,12 @@ extern int of_setup_earlycon(const struct earlycon_id *match,
+ 			     unsigned long node,
+ 			     const char *options);
+ 
++#ifdef CONFIG_SERIAL_EARLYCON
++extern bool earlycon_init_is_deferred __initdata;
++#else
++static const bool earlycon_init_is_deferred;
++#endif
++
+ struct uart_port *uart_get_console(struct uart_port *ports, int nr,
+ 				   struct console *c);
+ int uart_parse_earlycon(char *p, unsigned char *iotype, unsigned long *addr,
 -- 
 2.7.4
