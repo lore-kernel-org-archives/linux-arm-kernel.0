@@ -1,60 +1,45 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Thu, 31 Mar 2016 11:01:58 -0700
-Subject: [PATCH v4 1/2] watchdog: imx2_wdt: add external reset support via
- 'ext-reset-output' dt prop
-In-Reply-To: <20160331015714.GM28207@tiger>
-References: <20151106220249.GA19791@roeck-us.net>
- <565F4244.7090502@timesys.com>
- <CAJ+vNU00Bf97HUqkkW9KqOUzHXh482R9O1gasz6ju3Pn-_5chA@mail.gmail.com>
- <CAJ+vNU2qHQPSJ1KWp_3f3vAdeuOcF0ooZHmHsdafabZLXJv=Bw@mail.gmail.com>
- <20151228162923.GA31680@spo001.leaseweb.nl>
- <56AA79DA.2010305@timesys.com>
- <CAOMZO5DrTY3ho0Z_jXxeYMqbd6GmUKRwD1LB61vM1ZTGQAYOrg@mail.gmail.com>
- <56F991C3.8030201@timesys.com> <20160330012226.GD28207@tiger>
- <20160330210916.GB21993@roeck-us.net>
- <20160331015714.GM28207@tiger>
-Message-ID: <CAJ+vNU2zBCAF8hJfmSa31CyD9XcOCxYWqH9LKRm1S_sunqkgOg@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu, 31 Mar 2016 10:59:54 -0700
+Subject: [PATCH 06/18] ARM: imx: clk-gate2: allow custom gate configuration
+In-Reply-To: <20160331113728.GA18833@tiger>
+References: <1457576219-7971-1-git-send-email-stefan@agner.ch>
+ <1457576219-7971-7-git-send-email-stefan@agner.ch>
+ <20160331113728.GA18833@tiger>
+Message-ID: <f21855561b6cbf2d2a57508ed9470ed0@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 30, 2016 at 6:57 PM, Shawn Guo <shawnguo@kernel.org> wrote:
-> On Wed, Mar 30, 2016 at 02:09:16PM -0700, Guenter Roeck wrote:
->> The question was if the property name should be ext-reset-output or
->> fsl,ext-reset-output. In my opinion, it should be fsl,ext-reset-output
->> because it is not a generic property. Tim disagrees.
+On 2016-03-31 04:37, Shawn Guo wrote:
+> On Wed, Mar 09, 2016 at 06:16:47PM -0800, Stefan Agner wrote:
+>> The 2-bit gates found i.MX and Vybrid SoC support different clock
+>> configuration:
 >>
+>> 0b00: clk disabled
+>> 0b01: clk enabled in RUN mode but disabled in WAIT and STOP mode
+>> 0b10: clk enabled in RUN, WAIT and STOP mode (only Vybrid)
+>> 0b11: clk enabled in RUN and WAIT mode
+>>
+>> For some clocks, we might want to configure different behaviour,
+>> e.g. a memory clock should be on even in STOP mode. Add a new
+>> function imx_clk_gate2_cgr which allow to configure specific
+>> gate values through the cgr_val parameter.
+>>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> 
+> It's not appropriate to use 'ARM:' as subject prefix any more, since
+> clock drivers had been moved to drivers/clk.
 
-Guenter,
+Agreed. Evidence on how long I dragged those patches in my own tree :-/
 
-My issue regarding the vendor prefix was not a hard dissagreement but
-was more about me understanding the rational behind using vendor
-prefixes. In this case the imx2_wdt driver 'is' a vendor specific
-driver as its compatible strings are prefixed with 'fsl,' so isn't
-'any' property added to devicetree/bindings/watchdog/fsl-imx-wdt.txt
-inherently a vendor specific properly already? I assume that is why
-the 'big-endian' property isn't 'fsl,big-endian'.
+> 
+> I applied patch 6 ~ 9 with updating the subject prefix as below.
+> 
+> clk: imx: vf610: add suspend/resume support
+> clk: imx: vf610: add WKPU unit
+> clk: imx: vf610: leave DDR clock on
+> clk: imx: clk-gate2: allow custom gate configuration
 
-Maybe it's more about if it 'is' marked as a vendor specific property
-its much easier to get approval and accepted by a vendor-specific
-maintainer?
+Thanks!
 
->> So we have two options: Change the property name to fsl,ext-reset-output,
->> which I would accept, or wait for a devicetree maintainer to make a decision.
->
-> Guenter,
->
-> I agree with you on this point.  Before everyone agrees that this is a
-> generic binding, we should have vendor prefix for the property.
->
-> Tim,
->
-> This is a small change which, IMO, shouldn't hold an useful patch from being
-> merged.  Care to resend with the suggested change?
->
-> Shawn
-
-Shawn,
-
-Sure - I'll rebase and re-submit.
-
-Tim
+--
+Stefan
