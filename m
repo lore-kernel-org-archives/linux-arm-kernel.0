@@ -1,128 +1,115 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 31 Mar 2016 10:37:32 -0700
-Subject: [PATCH v7 1/5] of/serial: move earlycon early_param handling to
- serial
-In-Reply-To: <56FD5894.3060105@linaro.org>
-References: <1459431629-27934-1-git-send-email-aleksey.makarov@linaro.org>
- <1459431629-27934-2-git-send-email-aleksey.makarov@linaro.org>
- <20160331163203.GC10256@kroah.com> <56FD5894.3060105@linaro.org>
-Message-ID: <20160331173732.GA10567@kroah.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Thu, 31 Mar 2016 10:38:58 -0700
+Subject: [PATCH v5 32/46] pwm: deprecate pwm_config(), pwm_enable() and
+ pwm_disable()
+In-Reply-To: <1459368249-13241-33-git-send-email-boris.brezillon@free-electrons.com>
+References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1459368249-13241-33-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20160331173858.GB39098@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 31, 2016 at 08:04:20PM +0300, Aleksey Makarov wrote:
-> 
-> 
-> On 03/31/2016 07:32 PM, Greg Kroah-Hartman wrote:
-> > On Thu, Mar 31, 2016 at 04:40:23PM +0300, Aleksey Makarov wrote:
-> >> From: Leif Lindholm <leif.lindholm@linaro.org>
-> >>
-> >> We have multiple "earlycon" early_param handlers - merge the DT one into
-> >> the main earlycon one.  It's a cleanup that also will be useful
-> >> to defer setting up DT console until ACPI/DT decision is made.
-> >>
-> >> Rename the exported function to avoid clashing with the function from
-> >> arch/microblaze/kernel/prom.c
-> >>
-> >> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
-> >> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
-> >> Acked-by: Rob Herring <robh@kernel.org>
-> >> ---
-> >>  drivers/of/fdt.c              | 11 +----------
-> >>  drivers/tty/serial/earlycon.c |  2 +-
-> >>  include/linux/of_fdt.h        |  2 ++
-> >>  3 files changed, 4 insertions(+), 11 deletions(-)
-> >>
-> >> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-> >> index 3349d2a..b50f775 100644
-> >> --- a/drivers/of/fdt.c
-> >> +++ b/drivers/of/fdt.c
-> >> @@ -805,7 +805,7 @@ static inline void early_init_dt_check_for_initrd(unsigned long node)
-> >>  
-> >>  #ifdef CONFIG_SERIAL_EARLYCON
-> >>  
-> >> -static int __init early_init_dt_scan_chosen_serial(void)
-> >> +int __init early_init_dt_scan_chosen_stdout(void)
-> >>  {
-> >>  	int offset;
-> >>  	const char *p, *q, *options = NULL;
-> >> @@ -849,15 +849,6 @@ static int __init early_init_dt_scan_chosen_serial(void)
-> >>  	}
-> >>  	return -ENODEV;
-> >>  }
-> >> -
-> >> -static int __init setup_of_earlycon(char *buf)
-> >> -{
-> >> -	if (buf)
-> >> -		return 0;
-> >> -
-> >> -	return early_init_dt_scan_chosen_serial();
-> >> -}
-> >> -early_param("earlycon", setup_of_earlycon);
-> >>  #endif
-> >>  
-> >>  /**
-> >> diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
-> >> index 067783f..7aae655 100644
-> >> --- a/drivers/tty/serial/earlycon.c
-> >> +++ b/drivers/tty/serial/earlycon.c
-> >> @@ -209,7 +209,7 @@ static int __init param_setup_earlycon(char *buf)
-> >>  	 * don't generate a warning from parse_early_params() in that case
-> >>  	 */
-> >>  	if (!buf || !buf[0])
-> >> -		return 0;
-> >> +		return early_init_dt_scan_chosen_stdout();
-> >>  
-> >>  	err = setup_earlycon(buf);
-> >>  	if (err == -ENOENT || err == -EALREADY)
-> >> diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
-> >> index 2fbe868..5cfe322 100644
-> >> --- a/include/linux/of_fdt.h
-> >> +++ b/include/linux/of_fdt.h
-> >> @@ -63,6 +63,7 @@ extern int early_init_dt_scan_chosen(unsigned long node, const char *uname,
-> >>  				     int depth, void *data);
-> >>  extern int early_init_dt_scan_memory(unsigned long node, const char *uname,
-> >>  				     int depth, void *data);
-> >> +extern int early_init_dt_scan_chosen_stdout(void);
-> >>  extern void early_init_fdt_scan_reserved_mem(void);
-> >>  extern void early_init_fdt_reserve_self(void);
-> >>  extern void early_init_dt_add_memory_arch(u64 base, u64 size);
-> >> @@ -91,6 +92,7 @@ extern void early_get_first_memblock_info(void *, phys_addr_t *);
-> >>  extern u64 of_flat_dt_translate_address(unsigned long node);
-> >>  extern void of_fdt_limit_memory(int limit);
-> >>  #else /* CONFIG_OF_FLATTREE */
-> >> +static inline int early_init_dt_scan_chosen_stdout(void) { return -ENODEV; }
-> > 
-> > Doesn't this change the default logic?  Today you are returning 0 if you
-> > don't have this config option set,
-> 
-> I am not sure I understand this.  Which return value do you mean?
-> 
-> 1. early_init_dt_scan_chosen_stdout()
-> 
-> Today if CONFIG_OF_FLATTREE is not set then early_init_dt_scan_chosen_stdout() does not exist.
+Hi Boris,
 
-It "exists" in that you return -ENODEV, right?  Look at the place where
-you called this function, previously you returned 0, now you return this
-function call's return value.
+On Wed, Mar 30, 2016 at 10:03:55PM +0200, Boris Brezillon wrote:
+> Prefix those function as deprecated to encourage all existing users to
+> switch to pwm_apply_state().
 
-> 2. param_setup_earlycon()
+Why not keep at least some of them as wrappers where we do not need to
+chnage several parameters at once? It is much easier to have a driver
+do:
+
+	error = pwm_enable(pwm);
+	if (error)
+		...
+
+rather than declaring the state variable, fectch it, adjust and then
+apply.
+
 > 
-> Today we have 2 handlers for "earlycon" option.  One (in fdt.c) is for the option without args,
-> and another (earlycon.c) always expects agrs.  But both return 0 for the opposite cases becasue they
-> can not check what another hander returns.
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+>  include/linux/pwm.h | 24 ++++++++++++------------
+>  1 file changed, 12 insertions(+), 12 deletions(-)
 > 
-> Now we have just one handler and it can return correct value.
-
-I don't understand.
-
-> >  and now you return -ENODEV, did you
-> > test this out?
+> diff --git a/include/linux/pwm.h b/include/linux/pwm.h
+> index 4aad4eb..9bac10f 100644
+> --- a/include/linux/pwm.h
+> +++ b/include/linux/pwm.h
+> @@ -225,8 +225,8 @@ int pwm_apply_state(struct pwm_device *pwm, struct pwm_state *state);
+>   *
+>   * Returns: 0 on success or a negative error code on failure.
+>   */
+> -static inline int pwm_config(struct pwm_device *pwm, int duty_ns,
+> -			     int period_ns)
+> +static inline int __deprecated pwm_config(struct pwm_device *pwm, int duty_ns,
+> +					  int period_ns)
+>  {
+>  	struct pwm_state pstate;
+>  
+> @@ -252,8 +252,8 @@ static inline int pwm_config(struct pwm_device *pwm, int duty_ns,
+>   *
+>   * Returns: 0 on success or a negative error code on failure.
+>   */
+> -static inline int pwm_set_polarity(struct pwm_device *pwm,
+> -				   enum pwm_polarity polarity)
+> +static inline int __deprecated pwm_set_polarity(struct pwm_device *pwm,
+> +						enum pwm_polarity polarity)
+>  {
+>  	struct pwm_state pstate;
+>  
+> @@ -284,7 +284,7 @@ static inline int pwm_set_polarity(struct pwm_device *pwm,
+>   *
+>   * Returns: 0 on success or a negative error code on failure.
+>   */
+> -static inline int pwm_enable(struct pwm_device *pwm)
+> +static inline int __deprecated pwm_enable(struct pwm_device *pwm)
+>  {
+>  	struct pwm_state pstate;
+>  
+> @@ -303,7 +303,7 @@ static inline int pwm_enable(struct pwm_device *pwm)
+>   * pwm_disable() - stop a PWM output toggling
+>   * @pwm: PWM device
+>   */
+> -static inline void pwm_disable(struct pwm_device *pwm)
+> +static inline void __deprecated pwm_disable(struct pwm_device *pwm)
+>  {
+>  	struct pwm_state pstate;
+>  
+> @@ -360,24 +360,24 @@ static inline int pwm_apply_state(struct pwm_device *pwm,
+>  	return -ENOTSUPP;
+>  }
+>  
+> -static inline int pwm_config(struct pwm_device *pwm, int duty_ns,
+> -			     int period_ns)
+> +static inline int __deprecated pwm_config(struct pwm_device *pwm, int duty_ns,
+> +					  int period_ns)
+>  {
+>  	return -EINVAL;
+>  }
+>  
+> -static inline int pwm_set_polarity(struct pwm_device *pwm,
+> -				   enum pwm_polarity polarity)
+> +static inline int __deprecated pwm_set_polarity(struct pwm_device *pwm,
+> +						enum pwm_polarity polarity)
+>  {
+>  	return -ENOTSUPP;
+>  }
+>  
+> -static inline int pwm_enable(struct pwm_device *pwm)
+> +static inline int __deprecated pwm_enable(struct pwm_device *pwm)
+>  {
+>  	return -EINVAL;
+>  }
+>  
+> -static inline void pwm_disable(struct pwm_device *pwm)
+> +static inline void __deprecated pwm_disable(struct pwm_device *pwm)
+>  {
+>  }
+>  
+> -- 
+> 2.5.0
 > 
-> Yes, I tested it.
 
-On what platforms?  With what configurations?
-
-thanks,
-
-greg k-h
+-- 
+Dmitry
