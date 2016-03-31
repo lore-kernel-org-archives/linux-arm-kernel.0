@@ -1,108 +1,161 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Thu, 31 Mar 2016 19:05:00 +0300
-Subject: [RFC] [PATCH] arm64: survive after access to unimplemented
- register
-In-Reply-To: <20160331131231.GF26532@leverpostej>
-References: <1459391223-3826-1-git-send-email-ynorov@caviumnetworks.com>
- <20160331100547.GA26532@leverpostej>
- <20160331122859.GA27859@yury-N73SV>
- <20160331131231.GF26532@leverpostej>
-Message-ID: <20160331160500.GC29800@yury-N73SV>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 31 Mar 2016 10:18:13 -0600
+Subject: [RESEND PATCH V4 1/4] stm class: provision for statically
+ assigned masterIDs
+In-Reply-To: <878u0y7pig.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1457418835-31417-1-git-send-email-zhang.chunyan@linaro.org>
+ <1457418835-31417-2-git-send-email-zhang.chunyan@linaro.org>
+ <87wpow6znl.fsf@ashishki-desk.ger.corp.intel.com>
+ <CANLsYkxsaGmkpq6cNNw+CeMDKK7wwdDoegEuG2oNPNp185_9Mg@mail.gmail.com>
+ <878u0y7pig.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <CANLsYkxgF9SfWDD=pzUk=m7vE_DVH=4XgMPP5NmomQv5h6drow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 31, 2016 at 02:12:31PM +0100, Mark Rutland wrote:
-> On Thu, Mar 31, 2016 at 03:28:59PM +0300, Yury Norov wrote:
-> > Hi Mark,
-> > 
-> > On Thu, Mar 31, 2016 at 11:05:48AM +0100, Mark Rutland wrote:
-> > > On Thu, Mar 31, 2016 at 05:27:03AM +0300, Yury Norov wrote:
-> > > > Not all vendors implement all the system registers ARM specifies.
-> > > 
-> > > The ID registers in question are precisely documented in the ARM ARM
-> > > (see table C5-6 in ARM DDI 0487A.i). Specifically, the ID space
-> > > ID_AA64MMFR2_EL1 now falls in to is listed as RAZ.
-> > > 
-> > > Any deviation from this is an erratum, and needs to be handled as such
-> > > (e.g. listing in silicon-errata.txt).
-> > > 
-> > > Does the issue affect ThunderX natively?
-> > 
-> > Yes, Thunder is involved, but I cannot tell more due to NDA.
-> > And this error is not in silicon-errata.txt.
-> > I'll ask permission to share more details.
-> 
-> Ok. Regardless of how this is solved, we need to know the details of the
-> erratum (and need an entry in silicon-errata.txt).
-> 
-> > > > So access them causes undefined instruction abort and then kernel
-> > > > panic. There are 3 ways to handle it we can figure out:
-> > > >  - use conditional compilation and erratas;
-> > > >  - use kernel patching;
-> > > >  - inline fixups resolving the abort.
-> > > > 
-> > > > Last option is more robust as it does not require additional efforts
-> > > > to support targers. It is looking reasonable because in many cases
-> > > > optional registers should be RAZ if not implemented. Special cases may
-> > > > be handled by underlying __read_cpuid() when needed.
-> > > 
-> > > I don't think we should do this if the only affected implementations are
-> > > software emulators which can be patched (and have already been, in the
-> > > case of QEMU).
-> > > 
-> > > In future it's very likely that early assembly code (potentially in
-> > > hypervisor context) will need to access ID registers which are currently
-> > > reserved/RAZ, and it will be rather painful to fix up accesses to this.
-> > 
-> > So we will not fix. This one fixes el1 only, and don't pretend for more. 
-> 
-> At some point, it's practically guaranteed that we will have to access
-> reserved/RAZ ID registers in other cases, so we _will_ need workarounds
-> that cater for those sooner or later.
-> 
-> We need to consider how we can handle those, in case it implies
-> constraints on our solution elsewhere, or requires a more complex, but
-> more general solution (which we can implement part of today).
-> 
-> For example:
-> 
-> * The sanity checks code will perform many back-to-back register
->   accesses. Trapping lots of these could be expensive, so not performing
->   the MRS at all when known to be unsafe may be preferable.
-> 
-> * Some registers may be read in a hot/critical path, or potentially in a
->   context where we cannot handle trapping (e.g. early boot code or parts
->   of KVM). In some cases, patching may be preferable to an MRS that only
->   gets executed depending on a branch condition.
-> 
-> Before we can do any of this, we need to know the conditions of the
-> erratum, however.
-> 
+On 31 March 2016 at 07:20, Alexander Shishkin
+<alexander.shishkin@linux.intel.com> wrote:
+> Mathieu Poirier <mathieu.poirier@linaro.org> writes:
+>
+>> On 21 March 2016 at 01:47, Alexander Shishkin
+>> <alexander.shishkin@linux.intel.com> wrote:
+>>> Chunyan Zhang <zhang.chunyan@linaro.org> writes:
+>>>
+>>>> From: Mathieu Poirier <mathieu.poirier@linaro.org>
+>>>>
+>>>> Some architecture like ARM assign masterIDs at the HW design
+>>>> phase.  Those are therefore unreachable to users, making masterID
+>>>> management in the generic STM core irrelevant.
+>>>>
+>>>> In this kind of configuration channels are shared between masters
+>>>> rather than being allocated on a per master basis.
+>>>>
+>>>> This patch adds a new 'mshared' flag to struct stm_data that tells the
+>>>> core that this specific STM device doesn't need explicit masterID
+>>>> management.
+>>>
+>>> There are two kinds of 'masterIDs' that we're talking about here: the
+>>> ones that turn up in the STP stream and the ones that are accessible to
+>>> trace-side software (sw_start/sw_end). So in this case we want to
+>>> reflect the fact that there is no correlation between the two, because
+>>> hardware assigns STP channels dynamically based on the states of the
+>>> trace/execution environment. And although the trace side software can do
+>>> very little with this information, it does make sense to provide it.
+>>>
+>>> The sw_start==sw_end situation, on the other hand, is a side effect of
+>>> the above and, as I said in one of the previous threads, may not even be
+>>> the case, or at least I don't see why it has to. And when it is the
+>>> case, I don't see the point in handling it differently from
+>>> sw_start<sw_end situation.
+>
+> [snip]
+>
+>> Other than the above, is there anything you'd like to see modified in
+>> this patch, i.e how the mshared flag is used to modify the output in
+>> sysFS/configFS?
+>
+> Yes, the two paragraphs quoted above that had gone unnoticed. I've
+> been thinking some more about this and came up with the following. No
+> need to do any extra handling in the policy code or anywhere else.
 
-No matter, patching is preferable by many reasons, of course. But kernel
-patching requires some investigations, and may take time. This is the last
-resort for kernel to stay alive.
+I read the above two paragraphs many times but simply couldn't find
+anything actionable in there.
 
-> > > Additionally, this workaround will silently mask other bugs in this area
-> > > (e.g. if registers like ID_AA64MMFR0_EL1 were to trap for some reason on
-> > > an implementation), which doesn't seem good.
-> > 
-> > We can mask it less silently, for example, print message to dmesg.
-> > 
-> > Initially I was thinking about erratas as well, but Arnd suggested
-> > this approach, and now think it's better. From consumer point of view,
-> > it's much better to have a warning line in dmesg, instead of bricked
-> > device, after another kernel or driver update.
-> 
-> Having some warning is certainly better, though I think we need to
-> scream _very loudly_ for cases we do not expect, as non-fatal warnings
-> are easily/often ignored, and can later turn out to be more critical
-> than previously believed.
-> 
-> Thanks,
-> Mark.
+>
+> From 8be22a8e391b94ec13d428976e7b1410aa59991e Mon Sep 17 00:00:00 2001
+> From: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+> Date: Thu, 31 Mar 2016 15:51:29 +0300
+> Subject: [PATCH] stm class: Support devices that override software assigned
+>  masters
+>
+> Some STM devices adjust software assigned master numbers depending on
+> the trace source and its runtime state and whatnot. This patch adds
+> a sysfs attribute to inform the trace-side software that master numbers
+> assigned to software sources will not match those in the STP stream,
+> so that, for example, master/channel allocation policy can be adjusted
+> accordingly.
+>
+> Signed-off-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+> ---
+>  Documentation/ABI/testing/sysfs-class-stm | 10 ++++++++++
+>  drivers/hwtracing/stm/core.c              | 15 +++++++++++++++
+>  include/linux/stm.h                       |  3 +++
+>  3 files changed, 28 insertions(+)
+>
+> diff --git a/Documentation/ABI/testing/sysfs-class-stm b/Documentation/ABI/testing/sysfs-class-stm
+> index c9aa4f3fc9..77ed3da0f6 100644
+> --- a/Documentation/ABI/testing/sysfs-class-stm
+> +++ b/Documentation/ABI/testing/sysfs-class-stm
+> @@ -12,3 +12,13 @@ KernelVersion:       4.3
+>  Contact:       Alexander Shishkin <alexander.shishkin@linux.intel.com>
+>  Description:
+>                 Shows the number of channels per master on this STM device.
+> +
+> +What:          /sys/class/stm/<stm>/hw_override
+> +Date:          March 2016
+> +KernelVersion: 4.7
+> +Contact:       Alexander Shishkin <alexander.shishkin@linux.intel.com>
+> +Description:
+> +               Reads as 0 if master numbers in the STP stream produced by
+> +               this stm device will match the master numbers assigned by
+> +               the software or 1 if the stm hardware overrides software
+> +               assigned masters.
+> diff --git a/drivers/hwtracing/stm/core.c b/drivers/hwtracing/stm/core.c
+> index 2591442e2c..ff31108b06 100644
+> --- a/drivers/hwtracing/stm/core.c
+> +++ b/drivers/hwtracing/stm/core.c
+> @@ -67,9 +67,24 @@ static ssize_t channels_show(struct device *dev,
+>
+>  static DEVICE_ATTR_RO(channels);
+>
+> +static ssize_t hw_override_show(struct device *dev,
+> +                               struct device_attribute *attr,
+> +                               char *buf)
+> +{
+> +       struct stm_device *stm = to_stm_device(dev);
+> +       int ret;
+> +
+> +       ret = sprintf(buf, "%u\n", stm->data->hw_override);
+> +
+> +       return ret;
+> +}
+> +
+> +static DEVICE_ATTR_RO(hw_override);
 
-So what? Are we drop it? Or I can prepare new version with loud
-warning and runtime patching.
+That's also a solution but it adds another entry to sysFS, something
+that could be avoided by tweaking the output we get from the current
+infrastructure.  But I'm not strongly opinionated on that and I can go
+along with this suggestion - as long as users (that aren't familiar
+with the particulars of an STM) have a way of knowing what's going on.
 
-Yury.
+> +
+>  static struct attribute *stm_attrs[] = {
+>         &dev_attr_masters.attr,
+>         &dev_attr_channels.attr,
+> +       &dev_attr_hw_override.attr,
+>         NULL,
+>  };
+>
+> diff --git a/include/linux/stm.h b/include/linux/stm.h
+> index 1a79ed8e43..8369d8a8ca 100644
+> --- a/include/linux/stm.h
+> +++ b/include/linux/stm.h
+> @@ -50,6 +50,8 @@ struct stm_device;
+>   * @sw_end:            last STP master available to software
+>   * @sw_nchannels:      number of STP channels per master
+>   * @sw_mmiosz:         size of one channel's IO space, for mmap, optional
+> + * @hw_override:       masters in the STP stream will not match the ones
+> + *                     assigned by software, but are up to the STM hardware
+>   * @packet:            callback that sends an STP packet
+>   * @mmio_addr:         mmap callback, optional
+>   * @link:              called when a new stm_source gets linked to us, optional
+> @@ -85,6 +87,7 @@ struct stm_data {
+>         unsigned int            sw_end;
+>         unsigned int            sw_nchannels;
+>         unsigned int            sw_mmiosz;
+> +       unsigned int            hw_override;
+>         ssize_t                 (*packet)(struct stm_data *, unsigned int,
+>                                           unsigned int, unsigned int,
+>                                           unsigned int, unsigned int,
+> --
+> 2.8.0.rc3
+>
