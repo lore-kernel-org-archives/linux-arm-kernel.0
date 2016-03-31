@@ -1,42 +1,39 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 31 Mar 2016 18:31:40 +0100
-Subject: [PATCH v2 3/3] ARM: dts: apq8064: add ahci ports-implemented mask
-In-Reply-To: <1459445500-9071-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1459445500-9071-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1459445500-9071-4-git-send-email-srinivas.kandagatla@linaro.org>
+From: asamson@codeaurora.org (Azriel Samson)
+Date: Thu, 31 Mar 2016 11:31:18 -0600
+Subject: [PATCH v1] builddeb: fix missing headers in linux-headers package
+Message-ID: <1459445479-10948-1-git-send-email-asamson@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds new ports-implemented mask, which is required to get
-achi working on the mainline. Without this patch value read from
-PORTS_IMPL register which is zero would not enable any ports for
-software to use.
+The kernel headers package (linux-headers) doesn't include
+header files from other architectures required to build
+out-of-tree modules.
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+For e.g. on ARM64, opcodes.h includes the same file from ARM
+which causes the following error:
+./arch/arm64/include/asm/opcodes.h:1:43: fatal error:
+../../arm/include/asm/opcodes.h: No such file or directory
+compilation terminated.
+
+Signed-off-by: Azriel Samson <asamson@codeaurora.org>
 ---
- arch/arm/boot/dts/qcom-apq8064.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ scripts/package/builddeb | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index 252b310..71d6fcb 100644
---- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -696,7 +696,7 @@
- 		};
+diff --git a/scripts/package/builddeb b/scripts/package/builddeb
+index 6c3b038..06ba0d9 100755
+--- a/scripts/package/builddeb
++++ b/scripts/package/builddeb
+@@ -322,7 +322,7 @@ fi
  
- 		sata0: sata at 29000000 {
--			compatible		= "generic-ahci";
-+			compatible		= "generic-ahci", "qcom,apq8064-ahci";
- 			status			= "disabled";
- 			reg			= <0x29000000 0x180>;
- 			interrupts		= <GIC_SPI 209 IRQ_TYPE_NONE>;
-@@ -718,6 +718,7 @@
- 
- 			phys			= <&sata_phy0>;
- 			phy-names		= "sata-phy";
-+			ports-implemented	= <0x1>;
- 		};
- 
- 		/* Temporary fixed regulator */
+ # Build kernel header package
+ (cd $srctree; find . -name Makefile\* -o -name Kconfig\* -o -name \*.pl) > "$objtree/debian/hdrsrcfiles"
+-(cd $srctree; find arch/$SRCARCH/include include scripts -type f) >> "$objtree/debian/hdrsrcfiles"
++(cd $srctree; find arch/*/include include scripts -type f) >> "$objtree/debian/hdrsrcfiles"
+ (cd $srctree; find arch/$SRCARCH -name module.lds -o -name Kbuild.platforms -o -name Platform) >> "$objtree/debian/hdrsrcfiles"
+ (cd $srctree; find $(find arch/$SRCARCH -name include -o -name scripts -type d) -type f) >> "$objtree/debian/hdrsrcfiles"
+ (cd $objtree; find arch/$SRCARCH/include Module.symvers include scripts -type f) >> "$objtree/debian/hdrobjfiles"
 -- 
-2.5.0
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
