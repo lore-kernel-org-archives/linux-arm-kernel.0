@@ -1,124 +1,75 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Thu, 31 Mar 2016 20:04:20 +0300
-Subject: [PATCH v7 1/5] of/serial: move earlycon early_param handling to
- serial
-In-Reply-To: <20160331163203.GC10256@kroah.com>
-References: <1459431629-27934-1-git-send-email-aleksey.makarov@linaro.org>
- <1459431629-27934-2-git-send-email-aleksey.makarov@linaro.org>
- <20160331163203.GC10256@kroah.com>
-Message-ID: <56FD5894.3060105@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 31 Mar 2016 18:14:35 +0100
+Subject: [PATCH v1] arm64: allow building with kcov coverage on ARM64
+In-Reply-To: <CAG_fn=Vgvuaoz_jUNcyxvFdu4LpyO55AWmTzGvCVhOYoaX9y7Q@mail.gmail.com>
+References: <57cb1b66d85b85eadea28ef3304a62b1327ded45.1459432254.git.glider@google.com>
+ <20160331142908.GG26532@leverpostej>
+ <CAG_fn=V+e=+-svWOCUirOy4SvBNgJR5JWCFDU3uE3aKwz9ihvw@mail.gmail.com>
+ <20160331160052.GA26393@leverpostej>
+ <CAG_fn=Vgvuaoz_jUNcyxvFdu4LpyO55AWmTzGvCVhOYoaX9y7Q@mail.gmail.com>
+Message-ID: <20160331171434.GC26393@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Mar 31, 2016 at 06:33:24PM +0200, Alexander Potapenko wrote:
+> On Thu, Mar 31, 2016 at 6:00 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Thu, Mar 31, 2016 at 05:09:29PM +0200, Alexander Potapenko wrote:
+> >> Currently kcov instrumentation is disabled for the following files:
+> >
+> >> arch/x86/boot/*
+> >> arch/x86/boot/compressed/*
+> >> arch/x86/entry/vdso/*
+> >> arch/x86/realmode/rm/*
+> >
+> > These are executed outside of the usual kernel context / address space,
+> > so excluding these makes sense to me.
+> >
+> >> arch/x86/kernel/*
+> >> arch/x86/kernel/apic/*
+> >> arch/x86/kernel/cpu/common.c
+> >> arch/x86/kernel/cpu/perf_event.c
+> >> arch/x86/lib/delay.c
+> >> arch/x86/mm/tlb.c
+> >
+> > For these, it's not immediately clear to me why instrumentation is
+> > disabled, so I don't know whether or not we can instrument the analogous
+> > arm64 code.
+> According to the comments in
+> https://github.com/torvalds/linux/commit/5c9a8750a6409c63a0f01d51a9024861022f6593,
+> instrumentation of arch/x86/kernel/apic/* and arch/x86/lib/delay.c
+> leads to non-deterministic coverage,
 
+To what extent does determinism matter? Are we just ruling out the worst
+cases, or is this likely to turn into a whack-a-mole game?
 
-On 03/31/2016 07:32 PM, Greg Kroah-Hartman wrote:
-> On Thu, Mar 31, 2016 at 04:40:23PM +0300, Aleksey Makarov wrote:
->> From: Leif Lindholm <leif.lindholm@linaro.org>
->>
->> We have multiple "earlycon" early_param handlers - merge the DT one into
->> the main earlycon one.  It's a cleanup that also will be useful
->> to defer setting up DT console until ACPI/DT decision is made.
->>
->> Rename the exported function to avoid clashing with the function from
->> arch/microblaze/kernel/prom.c
->>
->> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
->> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
->> Acked-by: Rob Herring <robh@kernel.org>
->> ---
->>  drivers/of/fdt.c              | 11 +----------
->>  drivers/tty/serial/earlycon.c |  2 +-
->>  include/linux/of_fdt.h        |  2 ++
->>  3 files changed, 4 insertions(+), 11 deletions(-)
->>
->> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
->> index 3349d2a..b50f775 100644
->> --- a/drivers/of/fdt.c
->> +++ b/drivers/of/fdt.c
->> @@ -805,7 +805,7 @@ static inline void early_init_dt_check_for_initrd(unsigned long node)
->>  
->>  #ifdef CONFIG_SERIAL_EARLYCON
->>  
->> -static int __init early_init_dt_scan_chosen_serial(void)
->> +int __init early_init_dt_scan_chosen_stdout(void)
->>  {
->>  	int offset;
->>  	const char *p, *q, *options = NULL;
->> @@ -849,15 +849,6 @@ static int __init early_init_dt_scan_chosen_serial(void)
->>  	}
->>  	return -ENODEV;
->>  }
->> -
->> -static int __init setup_of_earlycon(char *buf)
->> -{
->> -	if (buf)
->> -		return 0;
->> -
->> -	return early_init_dt_scan_chosen_serial();
->> -}
->> -early_param("earlycon", setup_of_earlycon);
->>  #endif
->>  
->>  /**
->> diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
->> index 067783f..7aae655 100644
->> --- a/drivers/tty/serial/earlycon.c
->> +++ b/drivers/tty/serial/earlycon.c
->> @@ -209,7 +209,7 @@ static int __init param_setup_earlycon(char *buf)
->>  	 * don't generate a warning from parse_early_params() in that case
->>  	 */
->>  	if (!buf || !buf[0])
->> -		return 0;
->> +		return early_init_dt_scan_chosen_stdout();
->>  
->>  	err = setup_earlycon(buf);
->>  	if (err == -ENOENT || err == -EALREADY)
->> diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
->> index 2fbe868..5cfe322 100644
->> --- a/include/linux/of_fdt.h
->> +++ b/include/linux/of_fdt.h
->> @@ -63,6 +63,7 @@ extern int early_init_dt_scan_chosen(unsigned long node, const char *uname,
->>  				     int depth, void *data);
->>  extern int early_init_dt_scan_memory(unsigned long node, const char *uname,
->>  				     int depth, void *data);
->> +extern int early_init_dt_scan_chosen_stdout(void);
->>  extern void early_init_fdt_scan_reserved_mem(void);
->>  extern void early_init_fdt_reserve_self(void);
->>  extern void early_init_dt_add_memory_arch(u64 base, u64 size);
->> @@ -91,6 +92,7 @@ extern void early_get_first_memblock_info(void *, phys_addr_t *);
->>  extern u64 of_flat_dt_translate_address(unsigned long node);
->>  extern void of_fdt_limit_memory(int limit);
->>  #else /* CONFIG_OF_FLATTREE */
->> +static inline int early_init_dt_scan_chosen_stdout(void) { return -ENODEV; }
-> 
-> Doesn't this change the default logic?  Today you are returning 0 if you
-> don't have this config option set,
+Do we exclude clocksources and other driver code?
 
-I am not sure I understand this.  Which return value do you mean?
+Looking at the arm64 delay timer code, it looks like everything will be
+inlined (and therefore coverage should be deterministic so long as the
+delay functions are called deterministically). That said, the same looks
+basically true of the x86 code, so I guess I've misunderstood.
 
-1. early_init_dt_scan_chosen_stdout()
+> instrumenting others prevent the kernel from booting.
 
-Today if CONFIG_OF_FLATTREE is not set then early_init_dt_scan_chosen_stdout() does not exist.
+I haven't been able to come up with a scenario whereby kcov would be
+fatal for the above, so it's difficult to say if we have equivalent
+problems.
 
-2. param_setup_earlycon()
+For reference, do we have any examples as to why any of these prevent
+booting?
 
-Today we have 2 handlers for "earlycon" option.  One (in fdt.c) is for the option without args,
-and another (earlycon.c) always expects agrs.  But both return 0 for the opposite cases becasue they
-can not check what another hander returns.
+> >> Only a handful of the above have corresponding files in arch/arm64:
+> >> arch/arm64/boot/*
+> >> arch/arm64/kernel/*
+> >> arch/arm64/lib/delay.c
+> >
+> > We have arch/arm64/kernel/perf_event.c, and a couple of other files that
+> > are directly analogous, even if the paths don't quite line up.
+> Ok, it makes sense to also disable arch/arm64/kernel/perf_event.c then.
 
-Now we have just one handler and it can return correct value.
+Potentially, though it really depends on why it was excluded on x86.
 
->  and now you return -ENODEV, did you
-> test this out?
+Some of the arm64 perf code lives in drivers/perf/arm_pmu.c, also.
 
-Yes, I tested it.
-
-Thank you
-Aleksey Makarov
-
-> 
-> thanks,
-> 
-> greg k-h
-> 
+Thanks,
+Mark.
