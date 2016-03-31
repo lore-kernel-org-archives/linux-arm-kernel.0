@@ -1,107 +1,63 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 31 Mar 2016 19:41:48 +0800
-Subject: [PATCH 10/18] tty: serial: fsl_lpuart: support suspend/resume
-In-Reply-To: <1457576219-7971-11-git-send-email-stefan@agner.ch>
-References: <1457576219-7971-1-git-send-email-stefan@agner.ch>
- <1457576219-7971-11-git-send-email-stefan@agner.ch>
-Message-ID: <20160331114148.GC18833@tiger>
+From: chengang_rda@163.com (Chen Gang)
+Date: Thu, 31 Mar 2016 19:41:05 +0800
+Subject: [PATCH v2 1/1] ARM : missing corrupted reg in __div64_32
+In-Reply-To: <20160331103020.GH3701@e103592.cambridge.arm.com>
+References: <20160331103020.GH3701@e103592.cambridge.arm.com>
+Message-ID: <1459424465-26334-1-git-send-email-chengang_rda@163.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 09, 2016 at 06:16:51PM -0800, Stefan Agner wrote:
-> In order to allow wake support in STOP sleep mode, clocks are
-> needed. Use imx_clk_gate2_cgr to disable automatic clock gating
-> in low power mode STOP. This allows to enable wake by UART using:
-> echo enabled > /sys/class/tty/ttyLP0/power/wakeup
-> 
-> However, if wake is not enabled, the driver should disable the
-> clocks explicitly to save power.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
->  drivers/clk/imx/clk-vf610.c     | 12 ++++++------
+__xl(R0 in little endian system, or R1 in big endian system) is corrupted
+after calling __do_div64 and compiler is not informed about this.
+If n is used again afterwards, __xl won't be reloaded and n will
+contain incorrect value.
 
-It should go to a separate patch.
+Signed-off-by: Chen Gang <gangchen@rdamicro.com>
+Signed-off-by: Chen Gang <chengang_rda@163.com>
+---
+ arch/arm/include/asm/div64.h | 20 ++++++--------------
+ 1 file changed, 6 insertions(+), 14 deletions(-)
 
-Shawn
-
->  drivers/tty/serial/fsl_lpuart.c | 16 ++++++++++++++--
->  2 files changed, 20 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/clk/imx/clk-vf610.c b/drivers/clk/imx/clk-vf610.c
-> index e2e2c43..170a96c 100644
-> --- a/drivers/clk/imx/clk-vf610.c
-> +++ b/drivers/clk/imx/clk-vf610.c
-> @@ -315,12 +315,12 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
->  
->  	clk[VF610_CLK_PIT] = imx_clk_gate2("pit", "ipg_bus", CCM_CCGR1, CCM_CCGRx_CGn(7));
->  
-> -	clk[VF610_CLK_UART0] = imx_clk_gate2("uart0", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(7));
-> -	clk[VF610_CLK_UART1] = imx_clk_gate2("uart1", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(8));
-> -	clk[VF610_CLK_UART2] = imx_clk_gate2("uart2", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(9));
-> -	clk[VF610_CLK_UART3] = imx_clk_gate2("uart3", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(10));
-> -	clk[VF610_CLK_UART4] = imx_clk_gate2("uart4", "ipg_bus", CCM_CCGR6, CCM_CCGRx_CGn(9));
-> -	clk[VF610_CLK_UART5] = imx_clk_gate2("uart5", "ipg_bus", CCM_CCGR6, CCM_CCGRx_CGn(10));
-> +	clk[VF610_CLK_UART0] = imx_clk_gate2_cgr("uart0", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(7), 0x2);
-> +	clk[VF610_CLK_UART1] = imx_clk_gate2_cgr("uart1", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(8), 0x2);
-> +	clk[VF610_CLK_UART2] = imx_clk_gate2_cgr("uart2", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(9), 0x2);
-> +	clk[VF610_CLK_UART3] = imx_clk_gate2_cgr("uart3", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(10), 0x2);
-> +	clk[VF610_CLK_UART4] = imx_clk_gate2_cgr("uart4", "ipg_bus", CCM_CCGR6, CCM_CCGRx_CGn(9), 0x2);
-> +	clk[VF610_CLK_UART5] = imx_clk_gate2_cgr("uart5", "ipg_bus", CCM_CCGR6, CCM_CCGRx_CGn(10), 0x2);
->  
->  	clk[VF610_CLK_I2C0] = imx_clk_gate2("i2c0", "ipg_bus", CCM_CCGR4, CCM_CCGRx_CGn(6));
->  	clk[VF610_CLK_I2C1] = imx_clk_gate2("i2c1", "ipg_bus", CCM_CCGR4, CCM_CCGRx_CGn(7));
-> diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
-> index 3d79003..94e29ba 100644
-> --- a/drivers/tty/serial/fsl_lpuart.c
-> +++ b/drivers/tty/serial/fsl_lpuart.c
-> @@ -483,9 +483,8 @@ static void lpuart_dma_rx_complete(void *arg)
->  	spin_unlock_irqrestore(&sport->port.lock, flags);
->  }
->  
-> -static void lpuart_timer_func(unsigned long data)
-> +static void lpuart_dma_rx_terminate(struct lpuart_port *sport)
->  {
-> -	struct lpuart_port *sport = (struct lpuart_port *)data;
->  	struct tty_port *port = &sport->port.state->port;
->  	struct dma_tx_state state;
->  	unsigned long flags;
-> @@ -510,6 +509,11 @@ static void lpuart_timer_func(unsigned long data)
->  	spin_unlock_irqrestore(&sport->port.lock, flags);
->  }
->  
-> +static void lpuart_timer_func(unsigned long data)
-> +{
-> +	lpuart_dma_rx_terminate((struct lpuart_port *)data);
-> +}
-> +
->  static inline void lpuart_prepare_rx(struct lpuart_port *sport)
->  {
->  	unsigned long flags;
-> @@ -1915,7 +1919,12 @@ static int lpuart_suspend(struct device *dev)
->  		writeb(temp, sport->port.membase + UARTCR2);
->  	}
->  
-> +	if (sport->dma_rx_in_progress)
-> +		lpuart_dma_rx_terminate(sport);
-> +
->  	uart_suspend_port(&lpuart_reg, &sport->port);
-> +	if (sport->port.suspended && !sport->port.irq_wake)
-> +		clk_disable_unprepare(sport->clk);
->  
->  	return 0;
->  }
-> @@ -1925,6 +1934,9 @@ static int lpuart_resume(struct device *dev)
->  	struct lpuart_port *sport = dev_get_drvdata(dev);
->  	unsigned long temp;
->  
-> +	if (sport->port.suspended && !sport->port.irq_wake)
-> +		clk_prepare_enable(sport->clk);
-> +
->  	if (sport->lpuart32) {
->  		lpuart32_setup_watermark(sport);
->  		temp = lpuart32_read(sport->port.membase + UARTCTRL);
-> -- 
-> 2.7.2
-> 
-> 
+diff --git a/arch/arm/include/asm/div64.h b/arch/arm/include/asm/div64.h
+index e1f0776..ba3f36c 100644
+--- a/arch/arm/include/asm/div64.h
++++ b/arch/arm/include/asm/div64.h
+@@ -21,30 +21,22 @@
+  * for arguments and results (beware).
+  */
+ 
+-#ifdef __ARMEB__
+-#define __xh "r0"
+-#define __xl "r1"
+-#else
+-#define __xl "r0"
+-#define __xh "r1"
+-#endif
+ 
+ static inline uint32_t __div64_32(uint64_t *n, uint32_t base)
+ {
+ 	register unsigned int __base      asm("r4") = base;
+ 	register unsigned long long __n   asm("r0") = *n;
+ 	register unsigned long long __res asm("r2");
+-	register unsigned int __rem       asm(__xh);
+-	asm(	__asmeq("%0", __xh)
++	asm(
++		__asmeq("%0", "r0")
+ 		__asmeq("%1", "r2")
+-		__asmeq("%2", "r0")
+-		__asmeq("%3", "r4")
++		__asmeq("%2", "r4")
+ 		"bl	__do_div64"
+-		: "=r" (__rem), "=r" (__res)
+-		: "r" (__n), "r" (__base)
++		: "+r" (__n), "=r" (__res)
++		: "r" (__base)
+ 		: "ip", "lr", "cc");
+ 	*n = __res;
+-	return __rem;
++	return __n >> 32;
+ }
+ #define __div64_32 __div64_32
+ 
+-- 
+2.4.3
