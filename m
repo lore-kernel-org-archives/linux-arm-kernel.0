@@ -1,137 +1,70 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 31 Mar 2016 10:26:37 +0200
-Subject: [PATCH v2] arm64: KVM: Register CPU notifiers when the kernel
- runs at HYP
-In-Reply-To: <1459359184-15601-1-git-send-email-james.morse@arm.com>
-References: <1459359184-15601-1-git-send-email-james.morse@arm.com>
-Message-ID: <20160331082637.GO4126@cbox>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 31 Mar 2016 10:28:09 +0200
+Subject: [LINUX PATCH 1/2] mtd: Added dummy entry in the spi_transfer
+ structure.
+In-Reply-To: <4FF8F58FAA9D5D4193D4E554E4352C5902C6E92A@XAP-PVEXMBX02.xlnx.xilinx.com>
+References: <1458562809-36114-1-git-send-email-lakshmis@xilinx.com>
+ <20160321130734.GS2566@sirena.org.uk>
+ <4FF8F58FAA9D5D4193D4E554E4352C5902C6D34C@XAP-PVEXMBX02.xlnx.xilinx.com>
+ <20160322100615.GA2566@sirena.org.uk>
+ <4FF8F58FAA9D5D4193D4E554E4352C5902C6DB59@XAP-PVEXMBX02.xlnx.xilinx.com>
+ <20160325150109.GF2566@sirena.org.uk>
+ <4FF8F58FAA9D5D4193D4E554E4352C5902C6E92A@XAP-PVEXMBX02.xlnx.xilinx.com>
+Message-ID: <CAMuHMdV0B8Qka57nMv009aLdQ-fdBpAYr3wONQ7xaMfKXrORvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 30, 2016 at 06:33:04PM +0100, James Morse wrote:
-> When the kernel is running at EL2, it doesn't need init_hyp_mode() to
-> configure page tables for HYP. This function also registers the CPU
-> hotplug and lower power notifiers that cause HYP to be re-initialised
-> after the CPU has been reset.
-> 
-> To avoid losing the register state that controls stage2 translation, move
-> the registering of these notifiers into init_subsystems(), and add a
-> is_kernel_in_hyp_mode() path to each callback.
+On Thu, Mar 31, 2016 at 8:14 AM, Lakshmi Sai Krishna Potthuri
+<lakshmi.sai.krishna.potthuri@xilinx.com> wrote:
+>>> >This is really not what I'd expect to happen, I'd expect that these dummy
+>>> >cycles would be in addition to the actual data (see my request for better
+>>> >documentation...).  If they overlap with the data then what is the point in
+>>> >specifying this?  It's more work for the host, what benefit do we get from
+>>> >doing it over just handing it like a normal byte?
+>>
+>>> len field in the transfer structure contains dummy bytes along with actual
+>>data
+>>> bytes, controllers which requires dummy bytes use len field and simply
+>>Ignore
+>>> the dummy field (contains only no of cycles)added in this patch. Controllers
+>>> (like ZynqMP GQSPI) expects dummy in cycles won't work directly by using
+>>> len field because host driver doesn't know that len field of a particular
+>>transfer
+>>> includes dummy bytes or not (and also number of dummy bytes included in
+>>len
+>>> field). In such cases driver use this dummy field to identify the number of
+>>dummy
+>>> cycles and based on that it will send the required number of dummy cycles
+>>(which
+>>> i did in the second patch).
+>>
+>>This doesn't make any sense at all to me.  Why does the controller care
+>>what the bytes being sent to and from the device mean?
+>
+> From the flash point of view, it expects the controller to send the dummy
+> on 1/2/4 lines based on the command. For Quad commands, flash expects
+> 4 lines to be active during dummy phase. Similarly, 2 lines for dual
+> Commands and 1 line for normal/fast commands.
+> Since len field contains total number of cmd+addr+dummy bytes,
+> host driver should take care of sending these bytes on their respective
+> bus widths. Knowing when the dummy is being sent also helps in
+> the correct switching of IO pads (since the data lines are bidirectional)
+> ZynqMP GQSPI is a generic controller, majorly interfaced to flash devices.
+> It seems reasonable for it to know the above information from
+> the flash layer. Adding "dummy" cycles entry should be useful to any
+> controller that cares about it without affecting other spi/qspi controllers.
 
-I had naively, or perhaps supidly, assumed that a VHE kernel would
-save/restore all EL2 state as part of its suspend/resume procedure, but
-I guess that wouldn't work for hotplug anyway.
+The m25p80 driver already uses dummy cycles, using real spi_transfer
+structs, which have tx_nbits/rx_nbits fields to indicate how many data lines
+to use.
 
-In any case:
+Gr{oetje,eeting}s,
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+                        Geert
 
-And applied.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Thanks,
--Christoffer
-
-> 
-> Fixes: 1e947bad0b6 ("arm64: KVM: Skip HYP setup when already running in HYP")
-> Signed-off-by: James Morse <james.morse@arm.com>
-> ---
-> 
-> Change since v1:
->  * Moved common re-init code to cpu_hyp_reinit().
-> 
->  arch/arm/kvm/arm.c | 52 +++++++++++++++++++++++++++++++++-------------------
->  1 file changed, 33 insertions(+), 19 deletions(-)
-> 
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index 6accd66d26f0..b5384311dec4 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -1061,15 +1061,27 @@ static void cpu_init_hyp_mode(void *dummy)
->  	kvm_arm_init_debug();
->  }
->  
-> +static void cpu_hyp_reinit(void)
-> +{
-> +	if (is_kernel_in_hyp_mode()) {
-> +		/*
-> +		 * cpu_init_stage2() is safe to call even if the PM
-> +		 * event was cancelled before the CPU was reset.
-> +		 */
-> +		cpu_init_stage2(NULL);
-> +	} else {
-> +		if (__hyp_get_vectors() == hyp_default_vectors)
-> +			cpu_init_hyp_mode(NULL);
-> +	}
-> +}
-> +
->  static int hyp_init_cpu_notify(struct notifier_block *self,
->  			       unsigned long action, void *cpu)
->  {
->  	switch (action) {
->  	case CPU_STARTING:
->  	case CPU_STARTING_FROZEN:
-> -		if (__hyp_get_vectors() == hyp_default_vectors)
-> -			cpu_init_hyp_mode(NULL);
-> -		break;
-> +		cpu_hyp_reinit();
->  	}
->  
->  	return NOTIFY_OK;
-> @@ -1084,9 +1096,8 @@ static int hyp_init_cpu_pm_notifier(struct notifier_block *self,
->  				    unsigned long cmd,
->  				    void *v)
->  {
-> -	if (cmd == CPU_PM_EXIT &&
-> -	    __hyp_get_vectors() == hyp_default_vectors) {
-> -		cpu_init_hyp_mode(NULL);
-> +	if (cmd == CPU_PM_EXIT) {
-> +		cpu_hyp_reinit();
->  		return NOTIFY_OK;
->  	}
->  
-> @@ -1128,6 +1139,22 @@ static int init_subsystems(void)
->  	int err;
->  
->  	/*
-> +	 * Register CPU Hotplug notifier
-> +	 */
-> +	cpu_notifier_register_begin();
-> +	err = __register_cpu_notifier(&hyp_init_cpu_nb);
-> +	cpu_notifier_register_done();
-> +	if (err) {
-> +		kvm_err("Cannot register KVM init CPU notifier (%d)\n", err);
-> +		return err;
-> +	}
-> +
-> +	/*
-> +	 * Register CPU lower-power notifier
-> +	 */
-> +	hyp_cpu_pm_init();
-> +
-> +	/*
->  	 * Init HYP view of VGIC
->  	 */
->  	err = kvm_vgic_hyp_init();
-> @@ -1270,19 +1297,6 @@ static int init_hyp_mode(void)
->  	free_boot_hyp_pgd();
->  #endif
->  
-> -	cpu_notifier_register_begin();
-> -
-> -	err = __register_cpu_notifier(&hyp_init_cpu_nb);
-> -
-> -	cpu_notifier_register_done();
-> -
-> -	if (err) {
-> -		kvm_err("Cannot register HYP init CPU notifier (%d)\n", err);
-> -		goto out_err;
-> -	}
-> -
-> -	hyp_cpu_pm_init();
-> -
->  	/* set size of VMID supported by CPU */
->  	kvm_vmid_bits = kvm_get_vmid_bits();
->  	kvm_info("%d-bit VMID\n", kvm_vmid_bits);
-> -- 
-> 2.8.0.rc3
-> 
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
