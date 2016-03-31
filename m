@@ -1,131 +1,365 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 31 Mar 2016 13:44:08 +0200
-Subject: [PATCH v7 12/17] ARM64: ACPI: Check if it runs on Xen to enable
- or disable ACPI
-In-Reply-To: <alpine.DEB.2.02.1603311155450.11739@kaball.uk.xensource.com>
-References: <1458830676-27075-1-git-send-email-shannon.zhao@linaro.org>
- <1458830676-27075-13-git-send-email-shannon.zhao@linaro.org>
- <20160329161837.GH6745@arm.com>
- <20160329163147.GB27223@leverpostej> <56FB7E00.7030400@huawei.com>
- <alpine.DEB.2.02.1603311155450.11739@kaball.uk.xensource.com>
-Message-ID: <CAKv+Gu-wPq_FzO3sm7bhSFuu7EVxHWB_v6HOn1GqNbdaE-iBoQ@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 31 Mar 2016 13:48:50 +0200
+Subject: [RFC PATCH 23/45] KVM: arm/arm64: vgic-new: Add GICv3 emulation
+ framework
+In-Reply-To: <1458871508-17279-24-git-send-email-andre.przywara@arm.com>
+References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
+ <1458871508-17279-24-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160331114850.GC4126@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 March 2016 at 13:04, Stefano Stabellini
-<stefano.stabellini@eu.citrix.com> wrote:
-> On Wed, 30 Mar 2016, Shannon Zhao wrote:
->> Hi Will, Mark,
->>
->> On 2016/3/30 0:31, Mark Rutland wrote:
->> > On Tue, Mar 29, 2016 at 05:18:38PM +0100, Will Deacon wrote:
->> >> > On Thu, Mar 24, 2016 at 10:44:31PM +0800, Shannon Zhao wrote:
->> >>> > > When it's a Xen domain0 booting with ACPI, it will supply a /chosen and
->> >>> > > a /hypervisor node in DT. So check if it needs to enable ACPI.
->> >>> > >
->> >>> > > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->> >>> > > Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
->> >>> > > Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
->> >>> > > ---
->> >>> > >  arch/arm64/kernel/acpi.c | 12 ++++++++----
->> >>> > >  1 file changed, 8 insertions(+), 4 deletions(-)
->> >>> > >
->> >>> > > diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
->> >>> > > index d1ce8e2..4e92be0 100644
->> >>> > > --- a/arch/arm64/kernel/acpi.c
->> >>> > > +++ b/arch/arm64/kernel/acpi.c
->> >>> > > @@ -67,10 +67,13 @@ static int __init dt_scan_depth1_nodes(unsigned long node,
->> >>> > >  {
->> >>> > >       /*
->> >>> > >        * Return 1 as soon as we encounter a node at depth 1 that is
->> >>> > > -      * not the /chosen node.
->> >>> > > +      * not the /chosen node, or /hypervisor node when running on Xen.
->> >>> > >        */
->> >>> > > -     if (depth == 1 && (strcmp(uname, "chosen") != 0))
->> >>> > > -             return 1;
->> >>> > > +     if (depth == 1 && (strcmp(uname, "chosen") != 0)) {
->> >>> > > +             if (!xen_initial_domain() || (strcmp(uname, "hypervisor") != 0))
->> >>> > > +                     return 1;
->> >>> > > +     }
->> >> >
->> >> > Hmm, but xen_initial_domain() is false when xen isn't being used at all,
->> >> > so it feels to me like this is a bit too far-reaching and is basically
->> >> > claiming the "/hypervisor" namespace for Xen. Couldn't it be renamed to
->> >> > "xen,hypervisor" or something?
->> >> >
->> >> > Mark, got any thoughts on this?
->> > The node has a compatible string, "xen,xen" per [1], which would tell us
->> > absolutely that xen is present. I'd be happy checking for that
->> > explicitly.
->> >
->> I think actually the xen_initial_domain is the result of the
->> fdt_find_hyper_node. If the compatible string "xen,xen" doesn't exist,
->> the xen_initial_domain() will return false and whatever the current node
->> is the above check will return 1 since the device tree is not empty.
->
-> Right.
->
-> xen_initial_domain implies both "xen,xen" and XENFEAT_dom0 (which is a
-> feature retrieved by making a XENVER_get_features hypercall, see
-> drivers/xen/features.c:xen_setup_features).
->
-> So the following check:
->
->  +     if (!xen_initial_domain() || (strcmp(uname, "hypervisor") != 0))
->  +         return 1;
->
-> means that even if it's xen_initial_domain(), return error unless the
-> node found is "hypervisor". In other words, even if
-> xen_initial_domain(), no other nodes are allowed except /chosen and
-> /hypervisor.
->
-> This doesn't look far reaching to me, but yes, we could check explicitly
-> for the node to be compatible "xen,xen", in addition to be named
-> "hypervisor", even though the check is already done elsewhere
-> (arch/arm/xen/enlighten.c).
->
-> But I would keep it as it is.
->
+On Fri, Mar 25, 2016 at 02:04:46AM +0000, Andre Przywara wrote:
+> Describe the GICv3 distributor and redistributor registers in our
+> structure. This adds a special macro to deal with the split of
+> SGI/PPI in the redistributor and SPIs in the distributor, which
+> allows us to reuse the existing GICv2 handlers for those registers
+> which are compatible.
+> Also we register the separate MMIO page for the redistributor
+> registers dealing with private interrupts.
+> GICv3 specific registers are only implemented as stubs at this time.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  virt/kvm/arm/vgic/vgic.h      |  16 +++
+>  virt/kvm/arm/vgic/vgic_mmio.c | 246 ++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 262 insertions(+)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+> index 57aea8f..4b8952a 100644
+> --- a/virt/kvm/arm/vgic/vgic.h
+> +++ b/virt/kvm/arm/vgic/vgic.h
+> @@ -37,6 +37,10 @@ void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu);
+>  void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu);
+>  void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr);
+>  void vgic_v3_set_underflow(struct kvm_vcpu *vcpu);
+> +int vgic_v3_dist_access(struct kvm_vcpu *vcpu, bool is_write,
+> +			int offset, int len, void *val);
+> +int vgic_v3_redist_access(struct kvm_vcpu *vcpu, bool is_write,
+> +			  int offset, int len, void *val);
+>  #else
+>  static inline void vgic_v3_irq_change_affinity(struct kvm *kvm, u32 intid,
+>  					       u64 mpidr)
+> @@ -59,6 +63,18 @@ static inline void vgic_v3_populate_lr(struct kvm_vcpu *vcpu,
+>  static inline void vgic_v3_set_underflow(struct kvm_vcpu *vcpu)
+>  {
+>  }
+> +
+> +static inline int vgic_v3_dist_access(struct kvm_vcpu *vcpu, bool is_write,
+> +				      int offset, int len, void *val)
+> +{
+> +	return -ENXIO;
+> +}
+> +
+> +static inline int vgic_v3_redist_access(struct kvm_vcpu *vcpu, bool is_write,
+> +					int offset, int len, void *val)
+> +{
+> +	return -ENXIO;
+> +}
+>  #endif
+>  
+>  #endif
+> diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
+> index 2ab8961..2d10c06 100644
+> --- a/virt/kvm/arm/vgic/vgic_mmio.c
+> +++ b/virt/kvm/arm/vgic/vgic_mmio.c
+> @@ -17,6 +17,8 @@
+>  #include <kvm/vgic/vgic.h>
+>  #include <linux/bitops.h>
+>  #include <linux/irqchip/arm-gic.h>
+> +#include <linux/irqchip/arm-gic-v3.h>
+> +#include <asm/kvm_emulate.h>
+>  
+>  #include "vgic.h"
+>  #include "vgic_mmio.h"
+> @@ -595,6 +597,105 @@ static int vgic_mmio_write_sgipends(struct kvm_vcpu *vcpu,
+>  	return 0;
+>  }
+>  
+> +/*****************************/
+> +/* GICv3 emulation functions */
+> +/*****************************/
+> +#ifdef CONFIG_KVM_ARM_VGIC_V3
+> +
+> +static int vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
+> +				  struct kvm_io_device *this,
+> +				  gpa_t addr, int len, void *val)
+> +{
+> +	/* TODO: implement */
+> +	return 0;
+> +}
+> +
+> +static int vgic_mmio_write_v3_misc(struct kvm_vcpu *vcpu,
+> +				   struct kvm_io_device *this,
+> +				   gpa_t addr, int len, const void *val)
+> +{
+> +	/* TODO: implement */
+> +	return 0;
+> +}
+> +
+> +static int vgic_mmio_read_v3r_misc(struct kvm_vcpu *vcpu,
+> +				   struct kvm_io_device *this,
+> +				   gpa_t addr, int len, void *val)
+> +{
+> +	/* TODO: implement for ITS support */
+> +	return vgic_mmio_read_raz(vcpu, this, addr, len, val);
+> +}
+> +
+> +static int vgic_mmio_write_v3r_misc(struct kvm_vcpu *vcpu,
+> +				    struct kvm_io_device *this,
+> +				    gpa_t addr, int len, const void *val)
+> +{
+> +	/* TODO: implement for ITS support */
+> +	return vgic_mmio_write_wi(vcpu, this, addr, len, val);
+> +}
+> +
+> +static int vgic_mmio_read_v3r_iidr(struct kvm_vcpu *vcpu,
+> +				   struct kvm_io_device *this,
+> +				   gpa_t addr, int len, void *val)
+> +{
+> +	return 0;
+> +}
+> +
+> +static int vgic_mmio_read_v3r_typer(struct kvm_vcpu *vcpu,
+> +				    struct kvm_io_device *this,
+> +				    gpa_t addr, int len, void *val)
+> +{
+> +	/* TODO: implement */
+> +	return 0;
+> +}
+> +
+> +static int vgic_mmio_read_v3r_propbase(struct kvm_vcpu *vcpu,
+> +				       struct kvm_io_device *this,
+> +				       gpa_t addr, int len, void *val)
+> +{
+> +	/* TODO: implement */
+> +	return 0;
+> +}
+> +
+> +static int vgic_mmio_write_v3r_propbase(struct kvm_vcpu *vcpu,
+> +				        struct kvm_io_device *this,
+> +				        gpa_t addr, int len, const void *val)
+> +{
+> +	/* TODO: implement */
+> +	return 0;
+> +}
+> +
+> +static int vgic_mmio_read_v3r_pendbase(struct kvm_vcpu *vcpu,
+> +				       struct kvm_io_device *this,
+> +				       gpa_t addr, int len, void *val)
+> +{
+> +	/* TODO: implement */
+> +	return 0;
+> +}
+> +
+> +static int vgic_mmio_write_v3r_pendbase(struct kvm_vcpu *vcpu,
+> +				        struct kvm_io_device *this,
+> +				        gpa_t addr, int len, const void *val)
+> +{
+> +	/* TODO: implement */
+> +	return 0;
+> +}
+> +#endif
+> +
+> +/*
+> + * The GICv3 per-IRQ registers are split to control PPIs and SGIs in the
+> + * redistributors, while SPIs are covered by registers in the distributor
+> + * block. Trying to set private IRQs in this block gets ignored.
+> + * We take some special care here to fix the calculation of the register
+> + * offset.
+> + */
+> +#define REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(name, read_ops, write_ops, bpi) \
+> +	{.reg_offset = name, .bits_per_irq = 0, \
+> +	 .len = (bpi * VGIC_NR_PRIVATE_IRQS) / 8, \
+> +	 .ops.read = vgic_mmio_read_raz, .ops.write = vgic_mmio_write_wi, }, \
+> +	{.reg_offset = name, .bits_per_irq = bpi, .len = 0, \
+> +	 .ops.read = read_ops, .ops.write = write_ops, }
 
-The heuristic is there to decide whether some DTB image contains a
-complete description of the platform, or only some data handed over by
-the bootloader. Arguably, a DT containing both /chosen and /hypervisor
-but nothing else can still not describe an actual platform, and
-whether we execute under Xen or not is completely irrelevant.
+why do we have two regions with the same offset and why does the one
+that actually implements a handler have length 0 ?
 
-So this should be sufficient imo
+> +
+>  struct vgic_register_region vgic_v2_dist_registers[] = {
+>  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
+>  		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12),
+> @@ -626,6 +727,73 @@ struct vgic_register_region vgic_v2_dist_registers[] = {
+>  		vgic_mmio_read_sgipend, vgic_mmio_write_sgipends, 16),
+>  };
+>  
+> +#ifdef CONFIG_KVM_ARM_VGIC_V3
+> +struct vgic_register_region vgic_v3_dist_registers[] = {
+> +	REGISTER_DESC_WITH_LENGTH(GICD_CTLR,
+> +		vgic_mmio_read_v3_misc, vgic_mmio_write_v3_misc, 16),
+> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IGROUPR,
+> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 1),
+> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ISENABLER,
+> +		vgic_mmio_read_enable, vgic_mmio_write_senable, 1),
+> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ICENABLER,
+> +		vgic_mmio_read_enable, vgic_mmio_write_cenable, 1),
+> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ISPENDR,
+> +		vgic_mmio_read_pending, vgic_mmio_write_spending, 1),
+> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ICPENDR,
+> +		vgic_mmio_read_pending, vgic_mmio_write_cpending, 1),
+> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ISACTIVER,
+> +		vgic_mmio_read_active, vgic_mmio_write_sactive, 1),
+> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ICACTIVER,
+> +		vgic_mmio_read_active, vgic_mmio_write_cactive, 1),
+> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IPRIORITYR,
+> +		vgic_mmio_read_priority, vgic_mmio_write_priority, 8),
+> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ITARGETSR,
+> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 8),
+> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ICFGR,
+> +		vgic_mmio_read_config, vgic_mmio_write_config, 2),
+> +	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IGRPMODR,
+> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 1),
+> +};
+> +
+> +struct vgic_register_region vgic_v3_redist_registers[] = {
+> +	REGISTER_DESC_WITH_LENGTH(GICR_CTLR,
+> +		vgic_mmio_read_v3r_misc, vgic_mmio_write_v3r_misc, 4),
+> +	REGISTER_DESC_WITH_LENGTH(GICR_IIDR,
+> +		vgic_mmio_read_v3r_iidr, vgic_mmio_write_wi, 4),
+> +	REGISTER_DESC_WITH_LENGTH(GICR_TYPER,
+> +		vgic_mmio_read_v3r_typer, vgic_mmio_write_wi, 8),
+> +	REGISTER_DESC_WITH_LENGTH(GICR_PROPBASER,
+> +		vgic_mmio_read_v3r_propbase, vgic_mmio_write_v3r_propbase, 8),
+> +	REGISTER_DESC_WITH_LENGTH(GICR_PENDBASER,
+> +		vgic_mmio_read_v3r_pendbase, vgic_mmio_write_v3r_pendbase, 8),
+> +};
+> +
+> +struct vgic_register_region vgic_v3_private_registers[] = {
+> +	REGISTER_DESC_WITH_LENGTH(GICR_IGROUPR0,
+> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 4),
+> +	REGISTER_DESC_WITH_LENGTH(GICR_ISENABLER0,
+> +		vgic_mmio_read_enable, vgic_mmio_write_senable, 4),
+> +	REGISTER_DESC_WITH_LENGTH(GICR_ICENABLER0,
+> +		vgic_mmio_read_enable, vgic_mmio_write_cenable, 4),
+> +	REGISTER_DESC_WITH_LENGTH(GICR_ISPENDR0,
+> +		vgic_mmio_read_pending, vgic_mmio_write_spending, 4),
+> +	REGISTER_DESC_WITH_LENGTH(GICR_ICPENDR0,
+> +		vgic_mmio_read_pending, vgic_mmio_write_cpending, 4),
+> +	REGISTER_DESC_WITH_LENGTH(GICR_ISACTIVER0,
+> +		vgic_mmio_read_active, vgic_mmio_write_sactive, 4),
+> +	REGISTER_DESC_WITH_LENGTH(GICR_ICACTIVER0,
+> +		vgic_mmio_read_active, vgic_mmio_write_cactive, 4),
+> +	REGISTER_DESC_WITH_LENGTH(GICR_IPRIORITYR0,
+> +		vgic_mmio_read_priority, vgic_mmio_write_priority, 32),
+> +	REGISTER_DESC_WITH_LENGTH(GICR_ICFGR0,
+> +		vgic_mmio_read_config, vgic_mmio_write_config, 8),
+> +	REGISTER_DESC_WITH_LENGTH(GICR_IGRPMODR0,
+> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 4),
+> +	REGISTER_DESC_WITH_LENGTH(GICR_NSACR,
+> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 4),
+> +};
+> +#endif
+> +
+>  /*
+>   * Using kvm_io_bus_* to access GIC registers directly from userspace does
+>   * not work, since we would need the absolute IPA address of the register
+> @@ -671,6 +839,24 @@ int vgic_v2_dist_access(struct kvm_vcpu *vcpu, bool is_write,
+>  				is_write, offset, len, val);
+>  }
+>  
+> +#ifdef CONFIG_KVM_ARM_VGIC_V3
+> +int vgic_v3_dist_access(struct kvm_vcpu *vcpu, bool is_write,
+> +			int offset, int len, void *val)
+> +{
+> +	return vgic_mmio_access(vcpu, vgic_v3_dist_registers,
+> +				ARRAY_SIZE(vgic_v3_dist_registers),
+> +				is_write, offset, len, val);
+> +}
+> +
+> +int vgic_v3_redist_access(struct kvm_vcpu *vcpu, bool is_write,
+> +			  int offset, int len, void *val)
+> +{
+> +	return vgic_mmio_access(vcpu, vgic_v3_redist_registers,
+> +				ARRAY_SIZE(vgic_v3_redist_registers),
+> +				is_write, offset, len, val);
+> +}
+> +#endif
+> +
+>  int kvm_vgic_register_mmio_region(struct kvm *kvm, struct kvm_vcpu *vcpu,
+>  				  struct vgic_register_region *reg_desc,
+>  				  struct vgic_io_device *region,
+> @@ -717,6 +903,12 @@ int vgic_register_dist_regions(struct kvm *kvm, gpa_t dist_base_address,
+>  		reg_desc = vgic_v2_dist_registers;
+>  		nr_regions = ARRAY_SIZE(vgic_v2_dist_registers);
+>  		break;
+> +#ifdef CONFIG_KVM_ARM_VGIC_V3
+> +	case VGIC_V3:
+> +		reg_desc = vgic_v3_dist_registers;
+> +		nr_regions = ARRAY_SIZE(vgic_v3_dist_registers);
+> +		break;
+> +#endif
+>  	default:
+>  		BUG_ON(1);
+>  	}
+> @@ -750,3 +942,57 @@ int vgic_register_dist_regions(struct kvm *kvm, gpa_t dist_base_address,
+>  
+>  	return ret;
+>  }
+> +
+> +#ifdef CONFIG_KVM_ARM_VGIC_V3
+> +int vgic_register_redist_regions(struct kvm *kvm, gpa_t redist_base_address)
+> +{
+> +	int nr_vcpus = atomic_read(&kvm->online_vcpus);
+> +	int nr_regions = ARRAY_SIZE(vgic_v3_redist_registers) +
+> +			 ARRAY_SIZE(vgic_v3_private_registers);
+> +	struct kvm_vcpu *vcpu;
+> +	struct vgic_io_device *regions, *region;
+> +	int c, i, ret = 0;
+> +
+> +	regions = kmalloc(sizeof(struct vgic_io_device) * nr_regions * nr_vcpus,
+> +			  GFP_KERNEL);
+> +	if (!regions)
+> +		return -ENOMEM;
+> +
+> +	kvm_for_each_vcpu(c, vcpu, kvm) {
+> +		region = &regions[c * nr_regions];
+> +		for (i = 0; i < ARRAY_SIZE(vgic_v3_redist_registers); i++) {
+> +			region->base_addr = redist_base_address;
+> +			region->base_addr += c * 2 * SZ_64K;
+> +
+> +			ret = kvm_vgic_register_mmio_region(kvm, vcpu,
+> +						vgic_v3_redist_registers + i,
+> +						region, VGIC_NR_PRIVATE_IRQS,
+> +						false);
+> +			if (ret)
+> +				break;
+> +			region++;
+> +		}
+> +		if (ret)
+> +			break;
+> +
+> +		for (i = 0; i < ARRAY_SIZE(vgic_v3_private_registers); i++) {
+> +			region->base_addr = redist_base_address;
+> +			region->base_addr += c * 2 * SZ_64K + SZ_64K;
+> +			ret = kvm_vgic_register_mmio_region(kvm, vcpu,
+> +						vgic_v3_private_registers + i,
+> +						region, VGIC_NR_PRIVATE_IRQS,
+> +						false);
+> +			if (ret)
+> +				break;
+> +			region++;
+> +		}
+> +		if (ret)
+> +			break;
+> +	}
+> +
+> +	if (!ret)
+> +		kvm->arch.vgic.redist_iodevs = regions;
+> +
+> +	return ret;
 
-diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-index d1ce8e2f98b9..d6d61e2e4d49 100644
---- a/arch/arm64/kernel/acpi.c
-+++ b/arch/arm64/kernel/acpi.c
-@@ -67,9 +67,10 @@ static int __init dt_scan_depth1_nodes(unsigned long node,
- {
-        /*
-         * Return 1 as soon as we encounter a node at depth 1 that is
--        * not the /chosen node.
-+        * not the /chosen node or the /hypervisor node.
-         */
--       if (depth == 1 && (strcmp(uname, "chosen") != 0))
-+       if (depth == 1 && strcmp(uname, "chosen") != 0 &&
-+           strcmp(uname, "hypervisor") != 0)
-                return 1;
-        return 0;
- }
+I'm not going to review all this in detail until we've figured out the
+general approach to the IO bus stuff.
 
-
-
->> > In patch 11 fdt_find_hyper_node checks the compatible string. We could
->> > factor that out into a helper like is_xen_node(node) and use it here
->> > too.
->> >
->> I don't think so because we already check the compatible string before
->> and we could get the result simply via xen_initial_domain().
->
-> We could add a comment saying xen_initial_domain() implies "xen,xen" or
-> something.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> +}
+> +#endif
+> -- 
+> 2.7.3
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
