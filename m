@@ -1,63 +1,91 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 31 Mar 2016 11:55:50 +0100
-Subject: [PATCH v2 1/4] arm64: use 'segment' rather than 'chunk' to
- describe mapped kernel regions
-In-Reply-To: <1459352589-28721-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1459352589-28721-1-git-send-email-ard.biesheuvel@linaro.org>
- <1459352589-28721-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160331105550.GD26532@leverpostej>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 31 Mar 2016 13:04:59 +0200
+Subject: [PATCH v3 3/8] clk: samsung: exynos3250: Add MMC2 clock
+In-Reply-To: <56F9DEE6.8020203@samsung.com>
+References: <1458027490-13787-1-git-send-email-cw00.choi@samsung.com>
+ <1458027490-13787-4-git-send-email-cw00.choi@samsung.com>
+ <56F47ABC.7060006@samsung.com> <56F509E6.7080807@samsung.com>
+ <56F87E83.7060100@samsung.com> <56F9DEE6.8020203@samsung.com>
+Message-ID: <56FD045B.5020805@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 30, 2016 at 05:43:06PM +0200, Ard Biesheuvel wrote:
-> Replace the poorly defined term chunk with segment, which is a term that is
-> already used by the ELF spec to describe contiguous mappings with the same
-> permission attributes of statically allocated ranges of an executable.
+On 03/29/2016 03:48 AM, Krzysztof Kozlowski wrote:
+> On 28.03.2016 09:44, Chanwoo Choi wrote:
+>> You mean that separate patch1 include only the new clock id 
+>> about both UART2 and MMC2
+>> and the patch2/patch3 just use the new clock id as following:
+>>
+>> patch1 dt-bindings: Add the clock id of UART2 and MMC2 for Exynos3250
+>> patch2 clk: samsung: exynos3250: Add UART2 clock
+>> patch3 clk: samsung: exynos3250: Add MMC2 clock
+>>
+>> As far as I understand it is that right?
+>> If it is ok, I'll modify it on v4 patchset as you comment.
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
-Sounds better to me.
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
-
-> ---
->  arch/arm64/mm/mmu.c | 14 +++++++-------
->  1 file changed, 7 insertions(+), 7 deletions(-)
+> Hi Sylwester and Tomasz,
 > 
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index f3e5c74233f3..9be2065f8ddb 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -471,8 +471,8 @@ void fixup_init(void)
->  	unmap_kernel_range((u64)__init_begin, (u64)(__init_end - __init_begin));
->  }
->  
-> -static void __init map_kernel_chunk(pgd_t *pgd, void *va_start, void *va_end,
-> -				    pgprot_t prot, struct vm_struct *vma)
-> +static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
-> +				      pgprot_t prot, struct vm_struct *vma)
->  {
->  	phys_addr_t pa_start = __pa(va_start);
->  	unsigned long size = va_end - va_start;
-> @@ -499,11 +499,11 @@ static void __init map_kernel(pgd_t *pgd)
->  {
->  	static struct vm_struct vmlinux_text, vmlinux_rodata, vmlinux_init, vmlinux_data;
->  
-> -	map_kernel_chunk(pgd, _stext, __start_rodata, PAGE_KERNEL_EXEC, &vmlinux_text);
-> -	map_kernel_chunk(pgd, __start_rodata, _etext, PAGE_KERNEL, &vmlinux_rodata);
-> -	map_kernel_chunk(pgd, __init_begin, __init_end, PAGE_KERNEL_EXEC,
-> -			 &vmlinux_init);
-> -	map_kernel_chunk(pgd, _data, _end, PAGE_KERNEL, &vmlinux_data);
-> +	map_kernel_segment(pgd, _stext, __start_rodata, PAGE_KERNEL_EXEC, &vmlinux_text);
-> +	map_kernel_segment(pgd, __start_rodata, _etext, PAGE_KERNEL, &vmlinux_rodata);
-> +	map_kernel_segment(pgd, __init_begin, __init_end, PAGE_KERNEL_EXEC,
-> +			   &vmlinux_init);
-> +	map_kernel_segment(pgd, _data, _end, PAGE_KERNEL, &vmlinux_data);
->  
->  	if (!pgd_val(*pgd_offset_raw(pgd, FIXADDR_START))) {
->  		/*
-> -- 
-> 2.5.0
-> 
+> Can you provide me a tag with these exynos3250 clock patches (after
+> posting v4)? Of course you can also ack/review them and then I'll 
+> handle it.
+
+Here are tags with only the first (clock id definitions) and the all 
+three clk patches respectively:
+
+---------------------------------------8<--------------------------------
+The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+
+  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+
+are available in the git repository at:
+
+  git://linuxtv.org/snawrocki/samsung.git tags/clk-v4.7-exynos3250-dt
+
+for you to fetch changes up to fd00bbcddb59c4866e7c985e30f663b62cfc2588:
+
+  dt-bindings: Add the clock id of UART2 and MMC2 for Exynos3250 (2016-03-31 12:25:44 +0200)
+
+----------------------------------------------------------------
+Addition of the UART2 and MMC3 clock indices definition
+to the exynos3250 clock subsystem dt binding header file.
+
+----------------------------------------------------------------
+Chanwoo Choi (1):
+      dt-bindings: Add the clock id of UART2 and MMC2 for Exynos3250
+
+ include/dt-bindings/clock/exynos3250.h | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
+--------------------------------------->8--------------------------------
+
+
+---------------------------------------8<--------------------------------
+The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+
+  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+
+are available in the git repository at:
+
+  git://linuxtv.org/snawrocki/samsung.git tags/clk-v4.7-exynos3250
+
+for you to fetch changes up to f6764714afdde1f0f511bb0e2d531593c3bec827:
+
+  clk: samsung: exynos3250: Add MMC2 clock (2016-03-31 12:25:54 +0200)
+
+----------------------------------------------------------------
+Addition of the Exynos3250 SoC's UART2 and MMC2 clocks.
+
+----------------------------------------------------------------
+Chanwoo Choi (2):
+      dt-bindings: Add the clock id of UART2 and MMC2 for Exynos3250
+      clk: samsung: exynos3250: Add MMC2 clock
+
+Pankaj Dubey (1):
+      clk: samsung: exynos3250: Add UART2 clock
+
+ drivers/clk/samsung/clk-exynos3250.c   | 15 +++++++++++++++
+ include/dt-bindings/clock/exynos3250.h | 11 ++++++++++-
+ 2 files changed, 25 insertions(+), 1 deletion(-)
+--------------------------------------->8--------------------------------
+
+Cheers,
+Sylwester
