@@ -1,63 +1,77 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 31 Mar 2016 18:05:57 +0900
-Subject: [PATCH v7 12/20] ARM: dts: Add DMC bus frequency for
- exynos3250-rinato/monk
-In-Reply-To: <1459415165-32613-1-git-send-email-cw00.choi@samsung.com>
-References: <1459415165-32613-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1459415165-32613-13-git-send-email-cw00.choi@samsung.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 31 Mar 2016 17:03:45 +0800
+Subject: [PATCH v2] net: mvpp2: replace MVPP2_CPU_D_CACHE_LINE_SIZE with
+ cache_line_size
+Message-ID: <1459415025-6342-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the DMC (Dynamic Memory Controller) bus frequency node
-which includes the devfreq-events and regulator properties. The bus
-frequency support the DVFS (Dynamic Voltage Frequency Scaling) feature
-with ondemand governor.
+The mvpp2 ip maybe used in SoCs which may have have different cacheline
+size. Replace the MVPP2_CPU_D_CACHE_LINE_SIZE with cache_line_size.
 
-The devfreq-events (ppmu_dmc0*) can monitor the utilization of DMC bus
-on runtime and the buck1_reg (VDD_MIF power line) supplies the power to
-the DMC block.
+And since dma_alloc_coherent() is always cacheline size aligned, so
+remove the align checks.
 
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Acked-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
- arch/arm/boot/dts/exynos3250-monk.dts   | 6 ++++++
- arch/arm/boot/dts/exynos3250-rinato.dts | 6 ++++++
- 2 files changed, 12 insertions(+)
+Since v1:
+ - use cache_line_size() suggested by Marcin
 
-diff --git a/arch/arm/boot/dts/exynos3250-monk.dts b/arch/arm/boot/dts/exynos3250-monk.dts
-index 9e2840b59ae8..1fd7ecb5c415 100644
---- a/arch/arm/boot/dts/exynos3250-monk.dts
-+++ b/arch/arm/boot/dts/exynos3250-monk.dts
-@@ -156,6 +156,12 @@
- 	};
- };
+ drivers/net/ethernet/marvell/mvpp2.c | 14 +-------------
+ 1 file changed, 1 insertion(+), 13 deletions(-)
+
+diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
+index e9aa8d9..868a957 100644
+--- a/drivers/net/ethernet/marvell/mvpp2.c
++++ b/drivers/net/ethernet/marvell/mvpp2.c
+@@ -321,7 +321,6 @@
+ /* Lbtd 802.3 type */
+ #define MVPP2_IP_LBDT_TYPE		0xfffa
  
-+&bus_dmc {
-+	devfreq-events = <&ppmu_dmc0_3>, <&ppmu_dmc1_3>;
-+	vdd-supply = <&buck1_reg>;
-+	status = "okay";
-+};
-+
- &cpu0 {
- 	cpu0-supply = <&buck2_reg>;
- };
-diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
-index 1f102f3a1ab1..5175bd7e015f 100644
---- a/arch/arm/boot/dts/exynos3250-rinato.dts
-+++ b/arch/arm/boot/dts/exynos3250-rinato.dts
-@@ -147,6 +147,12 @@
- 	};
- };
+-#define MVPP2_CPU_D_CACHE_LINE_SIZE	32
+ #define MVPP2_TX_CSUM_MAX_SIZE		9800
  
-+&bus_dmc {
-+	devfreq-events = <&ppmu_dmc0_3>, <&ppmu_dmc1_3>;
-+	vdd-supply = <&buck1_reg>;
-+	status = "okay";
-+};
-+
- &cpu0 {
- 	cpu0-supply = <&buck2_reg>;
- };
+ /* Timeout constants */
+@@ -377,7 +376,7 @@
+ 
+ #define MVPP2_RX_PKT_SIZE(mtu) \
+ 	ALIGN((mtu) + MVPP2_MH_SIZE + MVPP2_VLAN_TAG_LEN + \
+-	      ETH_HLEN + ETH_FCS_LEN, MVPP2_CPU_D_CACHE_LINE_SIZE)
++	      ETH_HLEN + ETH_FCS_LEN, cache_line_size())
+ 
+ #define MVPP2_RX_BUF_SIZE(pkt_size)	((pkt_size) + NET_SKB_PAD)
+ #define MVPP2_RX_TOTAL_SIZE(buf_size)	((buf_size) + MVPP2_SKB_SHINFO_SIZE)
+@@ -4493,10 +4492,6 @@ static int mvpp2_aggr_txq_init(struct platform_device *pdev,
+ 	if (!aggr_txq->descs)
+ 		return -ENOMEM;
+ 
+-	/* Make sure descriptor address is cache line size aligned  */
+-	BUG_ON(aggr_txq->descs !=
+-	       PTR_ALIGN(aggr_txq->descs, MVPP2_CPU_D_CACHE_LINE_SIZE));
+-
+ 	aggr_txq->last_desc = aggr_txq->size - 1;
+ 
+ 	/* Aggr TXQ no reset WA */
+@@ -4526,9 +4521,6 @@ static int mvpp2_rxq_init(struct mvpp2_port *port,
+ 	if (!rxq->descs)
+ 		return -ENOMEM;
+ 
+-	BUG_ON(rxq->descs !=
+-	       PTR_ALIGN(rxq->descs, MVPP2_CPU_D_CACHE_LINE_SIZE));
+-
+ 	rxq->last_desc = rxq->size - 1;
+ 
+ 	/* Zero occupied and non-occupied counters - direct access */
+@@ -4616,10 +4608,6 @@ static int mvpp2_txq_init(struct mvpp2_port *port,
+ 	if (!txq->descs)
+ 		return -ENOMEM;
+ 
+-	/* Make sure descriptor address is cache line size aligned  */
+-	BUG_ON(txq->descs !=
+-	       PTR_ALIGN(txq->descs, MVPP2_CPU_D_CACHE_LINE_SIZE));
+-
+ 	txq->last_desc = txq->size - 1;
+ 
+ 	/* Set Tx descriptors queue starting address - indirect access */
 -- 
-1.9.1
+2.8.0.rc3
