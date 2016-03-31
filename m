@@ -1,49 +1,34 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 31 Mar 2016 18:31:37 +0100
-Subject: [PATCH v2 0/3] ahci: add ports-implemented dt bindings.
-Message-ID: <1459445500-9071-1-git-send-email-srinivas.kandagatla@linaro.org>
+Date: Thu, 31 Mar 2016 18:31:38 +0100
+Subject: [PATCH v2 1/3] libahci: save port map for forced port map
+In-Reply-To: <1459445500-9071-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1459445500-9071-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1459445500-9071-2-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tejun,
+In usecases where force_port_map is used saved_port_map is never set,
+resulting in not programming the PORTS_IMPL register as part of initial
+config. This patch fixes this by setting it to port_map even in case
+where force_port_map is used, making it more inline with other parts of
+the code.
 
-On some SOCs PORTS_IMPL register value is never programmed by the BIOS
-and left at zero value. Which means that no sata ports are available for
-software. AHCI driver used to cope up with this by fabricating the
-port_map if the PORTS_IMPL register is read zero, but recent patch [1]
-broke this workaround as zero value was valid for nvme disks.
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+ drivers/ata/libahci.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-This patch adds ports-implemented dt bindings as workaround for this issue
-in a way that DT can dictate the port_map incase where the SOCs does not
-program it already.
-
-Am sure that there are more than one SOC that hits this issue.
-
-Without this patchset, ACHI on APQ8064 Qualcomm platform is broken in mainline.
-With the below patchset am able to get back the functionality.
-
-Can you pick the first 2 patches via libata tree, I can request
-Andy Gross to take dts patch via arm-soc tree.
-
-Changes since RFC:
-	- Remove DT example as suggested by Rob.
-	- Fixed comments on DT binding patch as suggested by Rob.
-	- removed unused variable spotted by kernel test robot.
-
-Thanks,
-srini
-[1] 566d18 "libata: disable forced PORTS_IMPL for >= AHCI 1.3"
-
-Srinivas Kandagatla (3):
-  libahci: save port map for forced port map
-  ata: ahci-platform: Add ports-implemented DT bindings.
-  ARM: dts: apq8064: add ahci ports-implemented mask
-
- Documentation/devicetree/bindings/ata/ahci-platform.txt | 4 ++++
- arch/arm/boot/dts/qcom-apq8064.dtsi                     | 3 ++-
- drivers/ata/ahci_platform.c                             | 3 +++
- drivers/ata/libahci.c                                   | 1 +
- 4 files changed, 10 insertions(+), 1 deletion(-)
-
+diff --git a/drivers/ata/libahci.c b/drivers/ata/libahci.c
+index 3982054..a5d7c1c 100644
+--- a/drivers/ata/libahci.c
++++ b/drivers/ata/libahci.c
+@@ -507,6 +507,7 @@ void ahci_save_initial_config(struct device *dev, struct ahci_host_priv *hpriv)
+ 		dev_info(dev, "forcing port_map 0x%x -> 0x%x\n",
+ 			 port_map, hpriv->force_port_map);
+ 		port_map = hpriv->force_port_map;
++		hpriv->saved_port_map = port_map;
+ 	}
+ 
+ 	if (hpriv->mask_port_map) {
 -- 
 2.5.0
