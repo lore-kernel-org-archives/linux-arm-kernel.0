@@ -1,87 +1,91 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 31 Mar 2016 18:27:35 +0100
-Subject: [PATCH v3 7/7] arm64: compat: Check for AArch32 state
+Date: Thu, 31 Mar 2016 18:27:29 +0100
+Subject: [PATCH v3 1/7] arm64: hwcaps: Cleanup naming
 In-Reply-To: <1459445255-15653-1-git-send-email-suzuki.poulose@arm.com>
 References: <1459445255-15653-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1459445255-15653-8-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1459445255-15653-2-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yury Norov <ynorov@caviumnetworks.com>
+We use hwcaps for referring to ELF hwcaps capability information.
+However this can be confusing with 'cpu_hwcaps' which stands for the
+CPU capability bit field. This patch cleans up the names to make it
+a bit more readable.
 
-Make sure we have AArch32 state available for running COMPAT
-binaries and also for switching the personality to PER_LINUX32.
-
-Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-[ Added cap bit, checks for HWCAP, personality ]
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Tested-by: Yury Norov <ynorov@caviumnetworks.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/elf.h   |    3 ++-
- arch/arm64/kernel/cpufeature.c |    7 +++++--
- arch/arm64/kernel/sys.c        |    4 ++++
- 3 files changed, 11 insertions(+), 3 deletions(-)
+ arch/arm64/kernel/cpufeature.c |   18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index 24ed037..7a09c48 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -177,7 +177,8 @@ typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_ELF_NGREG];
- 
- /* AArch32 EABI. */
- #define EF_ARM_EABI_MASK		0xff000000
--#define compat_elf_check_arch(x)	(((x)->e_machine == EM_ARM) && \
-+#define compat_elf_check_arch(x)	(system_supports_32bit_el0() && \
-+					 ((x)->e_machine == EM_ARM) && \
- 					 ((x)->e_flags & EF_ARM_EABI_MASK))
- 
- #define compat_start_thread		compat_start_thread
 diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 739314b..c31be96 100644
+index 943f514..23b0f15 100644
 --- a/arch/arm64/kernel/cpufeature.c
 +++ b/arch/arm64/kernel/cpufeature.c
-@@ -982,7 +982,8 @@ void verify_local_cpu_capabilities(void)
+@@ -740,7 +740,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 		.hwcap = cap,					\
+ 	}
  
- 	verify_local_cpu_features(arm64_features);
- 	verify_local_elf_hwcaps(arm64_elf_hwcaps);
--	verify_local_elf_hwcaps(compat_elf_hwcaps);
-+	if (system_supports_32bit_el0())
-+		verify_local_elf_hwcaps(compat_elf_hwcaps);
+-static const struct arm64_cpu_capabilities arm64_hwcaps[] = {
++static const struct arm64_cpu_capabilities arm64_elf_hwcaps[] = {
+ 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_AES_SHIFT, FTR_UNSIGNED, 2, CAP_HWCAP, HWCAP_PMULL),
+ 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_AES_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_AES),
+ 	HWCAP_CAP(SYS_ID_AA64ISAR0_EL1, ID_AA64ISAR0_SHA1_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_SHA1),
+@@ -761,7 +761,7 @@ static const struct arm64_cpu_capabilities arm64_hwcaps[] = {
+ 	{},
+ };
+ 
+-static void __init cap_set_hwcap(const struct arm64_cpu_capabilities *cap)
++static void __init cap_set_elf_hwcap(const struct arm64_cpu_capabilities *cap)
+ {
+ 	switch (cap->hwcap_type) {
+ 	case CAP_HWCAP:
+@@ -782,7 +782,7 @@ static void __init cap_set_hwcap(const struct arm64_cpu_capabilities *cap)
  }
  
- static void __init setup_feature_capabilities(void)
-@@ -999,7 +1000,9 @@ void __init setup_cpu_features(void)
+ /* Check if we have a particular HWCAP enabled */
+-static bool __maybe_unused cpus_have_hwcap(const struct arm64_cpu_capabilities *cap)
++static bool cpus_have_elf_hwcap(const struct arm64_cpu_capabilities *cap)
+ {
+ 	bool rc;
+ 
+@@ -806,14 +806,14 @@ static bool __maybe_unused cpus_have_hwcap(const struct arm64_cpu_capabilities *
+ 	return rc;
+ }
+ 
+-static void __init setup_cpu_hwcaps(void)
++static void __init setup_elf_hwcaps(void)
+ {
+ 	int i;
+-	const struct arm64_cpu_capabilities *hwcaps = arm64_hwcaps;
++	const struct arm64_cpu_capabilities *hwcaps = arm64_elf_hwcaps;
+ 
+ 	for (i = 0; hwcaps[i].matches; i++)
+ 		if (hwcaps[i].matches(&hwcaps[i]))
+-			cap_set_hwcap(&hwcaps[i]);
++			cap_set_elf_hwcap(&hwcaps[i]);
+ }
+ 
+ void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+@@ -950,8 +950,8 @@ void verify_local_cpu_capabilities(void)
+ 			caps[i].enable(NULL);
+ 	}
+ 
+-	for (i = 0, caps = arm64_hwcaps; caps[i].matches; i++) {
+-		if (!cpus_have_hwcap(&caps[i]))
++	for (i = 0, caps = arm64_elf_hwcaps; caps[i].matches; i++) {
++		if (!cpus_have_elf_hwcap(&caps[i]))
+ 			continue;
+ 		if (!feature_matches(__raw_read_system_reg(caps[i].sys_reg), &caps[i])) {
+ 			pr_crit("CPU%d: missing HWCAP: %s\n",
+@@ -974,7 +974,7 @@ void __init setup_cpu_features(void)
+ 
  	/* Set the CPU feature capabilies */
  	setup_feature_capabilities();
- 	setup_elf_hwcaps(arm64_elf_hwcaps);
--	setup_elf_hwcaps(compat_elf_hwcaps);
-+
-+	if (system_supports_32bit_el0())
-+		setup_elf_hwcaps(compat_elf_hwcaps);
+-	setup_cpu_hwcaps();
++	setup_elf_hwcaps();
  
  	/* Advertise that we have computed the system capabilities */
  	set_sys_caps_initialised();
-diff --git a/arch/arm64/kernel/sys.c b/arch/arm64/kernel/sys.c
-index 817d860..26fe8ea 100644
---- a/arch/arm64/kernel/sys.c
-+++ b/arch/arm64/kernel/sys.c
-@@ -25,6 +25,7 @@
- #include <linux/sched.h>
- #include <linux/slab.h>
- #include <linux/syscalls.h>
-+#include <asm/cpufeature.h>
- 
- asmlinkage long sys_mmap(unsigned long addr, unsigned long len,
- 			 unsigned long prot, unsigned long flags,
-@@ -38,6 +39,9 @@ asmlinkage long sys_mmap(unsigned long addr, unsigned long len,
- 
- SYSCALL_DEFINE1(arm64_personality, unsigned int, personality)
- {
-+	if (personality(personality) == PER_LINUX32 &&
-+		!system_supports_32bit_el0())
-+		return -EINVAL;
- 	return sys_personality(personality);
- }
- 
 -- 
 1.7.9.5
