@@ -1,43 +1,116 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 31 Mar 2016 08:36:23 -0500
-Subject: [PATCH v3 12/18] dt-bindings: Add PLX Technology OXNAS pinctrl
- and gpio bindings
-In-Reply-To: <CACRpkdbem5a_aLTHErp0ZvanwvVPbGnDiWxM5e7iX_FdHtXprQ@mail.gmail.com>
-References: <1458838215-23314-1-git-send-email-narmstrong@baylibre.com>
- <1458838215-23314-13-git-send-email-narmstrong@baylibre.com>
- <20160325144834.GA27177@rob-hp-laptop>
- <CACRpkdbem5a_aLTHErp0ZvanwvVPbGnDiWxM5e7iX_FdHtXprQ@mail.gmail.com>
-Message-ID: <CAL_JsqLsKEb+dWLg9VD3p=kjgEV84_r8z89p0QgMJWKqjrGNpw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 31 Mar 2016 14:38:49 +0100
+Subject: [PATCH] ACPI / ARM64: Remove EXPERT dependency for ACPI on ARM64
+In-Reply-To: <CAKv+Gu_i8q_xKQgJ1mJ5hE_gcdJgHkh_QZhUNwQchsyH9r-pJQ@mail.gmail.com>
+References: <1459360718-24125-1-git-send-email-broonie@kernel.org>
+ <56FC9D1D.6090808@huawei.com>
+ <CAJZ5v0gv-MJ+Ss8gtc80z2_sOq-3qfBYbspRU8MWRNvn+UVbUg@mail.gmail.com>
+ <20160331123649.GE18910@arm.com>
+ <CAKv+Gu_i8q_xKQgJ1mJ5hE_gcdJgHkh_QZhUNwQchsyH9r-pJQ@mail.gmail.com>
+Message-ID: <20160331133848.GH18910@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 31, 2016 at 3:58 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Fri, Mar 25, 2016 at 3:48 PM, Rob Herring <robh@kernel.org> wrote:
->> On Thu, Mar 24, 2016 at 05:50:09PM +0100, Neil Armstrong wrote:
->>> Add pinctrl and gpio DT bindings for PLX Technology OXNAS SoC Family.
->>> This version supports the ARM926EJ-S based OX810SE SoC with 34 IO pins.
->>>
->>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->
->>> + - plxtech,gpio-bank: Specifies which bank a controller owns.
->>
->> How is this used?
->
-> That is used to give a unique ID number to the bank.
->
-> Hardware often need this to cross-reference pin controllers
-> to GPIO banks.
->
-> I should add it as "gpio-bank" to the generic bindings
-> instead, several platforms already use this and there is
-> no point in having a vendor prefix in front of it.
+On Thu, Mar 31, 2016 at 03:20:03PM +0200, Ard Biesheuvel wrote:
+> On 31 March 2016 at 14:36, Will Deacon <will.deacon@arm.com> wrote:
+> > On Thu, Mar 31, 2016 at 02:04:05PM +0200, Rafael J. Wysocki wrote:
+> >> On Thu, Mar 31, 2016 at 5:44 AM, Hanjun Guo <guohanjun@huawei.com> wrote:
+> >> > On 2016/3/31 1:58, Mark Brown wrote:
+> >> >> When ACPI was originally merged for arm64 it had only been tested on
+> >> >> emulators and not on real physical platforms and no platforms were
+> >> >> relying on it.  This meant that there were concerns that there might be
+> >> >> serious issues attempting to use it on practical systems so it had a
+> >> >> dependency on EXPERT added to warn people that it was in an early stage
+> >> >> of development with very little practical testing.  Since then things
+> >> >> have moved on a bit.  We have seen people testing on real hardware and
+> >> >> now have people starting to produce some platforms (the most prominent
+> >> >> being the 96boards Cello) which only have ACPI support and which build
+> >> >> and run to some useful extent with mainline.
+> >> >>
+> >> >> This is not to say that ACPI support or support for these systems is
+> >> >> completely done, there are still areas being worked on such as PCI, but
+> >> >> at this point it seems that we can be reasonably sure that ACPI will be
+> >> >> viable for use on ARM64 and that the already merged support works for
+> >> >> the cases it handles.  For the AMD Seattle based platforms support
+> >> >> outside of PCI has been fairly complete in mainline a few releases now.
+> >> >>
+> >> >> This is also not to say that we don't have vendors working with ACPI who
+> >> >> are trying do things that we would not consider optimal but it does not
+> >> >> appear that the EXPERT dependency is having a substantial impact on
+> >> >> these vendors.
+> >> >>
+> >> >> Given all this it seems that at this point the EXPERT dependency mainly
+> >> >> creates inconvenience for users with systems that are doing the right
+> >> >> thing and gets in the way of including the ACPI code in the testing that
+> >> >> people are doing on mainline.  Removing it should help our ongoing
+> >> >> testing cover those platforms with only ACPI support and help ensure
+> >> >> that when ACPI code is merged any problems it causes for other users are
+> >> >> more easily discovered.
+> >> >>
+> >> >> Signed-off-by: Mark Brown <broonie@kernel.org>
+> >> >
+> >> > Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
+> >> >
+> >> >> ---
+> >> >>  drivers/acpi/Kconfig | 2 +-
+> >> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >> >>
+> >> >> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+> >> >> index 82b96ee8624c..bf5dc1ac3446 100644
+> >> >> --- a/drivers/acpi/Kconfig
+> >> >> +++ b/drivers/acpi/Kconfig
+> >> >> @@ -5,7 +5,7 @@
+> >> >>  menuconfig ACPI
+> >> >>       bool "ACPI (Advanced Configuration and Power Interface) Support"
+> >> >>       depends on !IA64_HP_SIM
+> >> >> -     depends on IA64 || X86 || (ARM64 && EXPERT)
+> >> >> +     depends on IA64 || X86 || ARM64
+> >> >>       depends on PCI
+> >> >>       select PNP
+> >> >>       default y
+> >>
+> >> OK
+> >>
+> >> What do the ARM64 maintainers think?
+> >
+> > I'm unsure about whether or not we want 'default y' here, but I'd like
+> > to wait for Catalin to come back from his 2-week holiday before going
+> > anywhere with this patch.
+> 
+> Ack to that, but ...
+> 
+> > It's only fair that his opinion should be
+> > taken into account, and there's not a huge rush for this. I do consider
+> > "ACPI-only platforms" as simply "platforms without a .dtb" (modulo
+> > any significant AML code) and therefore don't view this as a blocking
+> > issue.
+> >
+> 
+> ... this patch will only affect those systems. DT-based systems, even
+> if they provide an ACPI description as well, will not invoke the ACPI
+> code unless you go out of your way to either boot without a DT or pass
+> 'acpi=force' on the command line. On the other hand, it will make
+> generic kernels (defconfig, etc) bootable on ACPI only systems, which
+> currently require special kernel builds. Another important reason for
+> this change is to get more build testing coverage for the arm64 ACPI
+> code that we had so much fuss about, e.g, by the kbuild test robot.
 
-Okay, now it is clearer. I don't want this documented as a common
-property because I don't want to encourage it's use. I only see 2
-users currently: ST and PIC32.
+I'd really like to get away from the concept of ACPI-only systems. Would
+we reject a .dtb contribution for such a machine?
 
-Looking at one example, it appears to be redundant already.
-nomadik-gpio-chips property already gives you the index. The index of
-the phandles is the bank numbering. PIC32 could do the same.
+> > We should also take into account the large amount of ongoing ACPI work
+> > (e.g. the DSD and PRP0001 saga, PCI and IORT support, virtualisation work,
+> > etc), and decide whether or not that's currently in a state where we want
+> > to encourage people to start using this in their arm64 kernels.
+> >
+> 
+> The question is not about using it, the question is about
+> incorporating it into the default build. The runtime opt-in is not
+> going away with this patch.
 
-Rob
+I understand that, but I still think that removing the dependency on
+EXPERT is indicative of saying "this stuff is good to be used by the
+masses", irrespective of a cmdline option. Maybe that's true, but it's
+not immediately obvious to me, with all the patches in flight.
+
+Will
