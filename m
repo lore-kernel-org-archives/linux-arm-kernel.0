@@ -1,120 +1,112 @@
-From: glider@google.com (Alexander Potapenko)
-Date: Thu, 31 Mar 2016 18:33:24 +0200
-Subject: [PATCH v1] arm64: allow building with kcov coverage on ARM64
-In-Reply-To: <20160331160052.GA26393@leverpostej>
-References: <57cb1b66d85b85eadea28ef3304a62b1327ded45.1459432254.git.glider@google.com>
- <20160331142908.GG26532@leverpostej>
- <CAG_fn=V+e=+-svWOCUirOy4SvBNgJR5JWCFDU3uE3aKwz9ihvw@mail.gmail.com>
- <20160331160052.GA26393@leverpostej>
-Message-ID: <CAG_fn=Vgvuaoz_jUNcyxvFdu4LpyO55AWmTzGvCVhOYoaX9y7Q@mail.gmail.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Thu, 31 Mar 2016 18:34:04 +0200
+Subject: [PATCH 2/7] ARM: dts: skeleton: add unit name to memory node
+In-Reply-To: <CAGhQ9Vy8TKPxPdYF-wXbCo_LZkBsSsficEG8wCn1bCbS9JN+vg@mail.gmail.com>
+References: <1459290646-3592-1-git-send-email-manabian@gmail.com>
+ <1459290646-3592-3-git-send-email-manabian@gmail.com>
+ <20160330110611.GB25354@leverpostej> <56FBCF70.80006@mentor.com>
+ <20160330134155.GC25354@leverpostej>
+ <CAGhQ9VykiwMWaw3xcJdg2CahNFt+sp7tFC5O8VwA=-_=UoJ8kA@mail.gmail.com>
+ <20160330170645.GA13690@leverpostej>
+ <CAGhQ9Vykn=G+cmVuBCAA_ATTz4XNEPeUWYbZRb5NsrVBOjaS-A@mail.gmail.com>
+ <20160331103800.GC26532@leverpostej>
+ <CAGhQ9Vy8TKPxPdYF-wXbCo_LZkBsSsficEG8wCn1bCbS9JN+vg@mail.gmail.com>
+Message-ID: <CAGhQ9VyQYeKrpPD-YhWjysvHmYaKssCO7xsU9MyRvFivEym=Hw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 31, 2016 at 6:00 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Thu, Mar 31, 2016 at 05:09:29PM +0200, Alexander Potapenko wrote:
->> On Thu, Mar 31, 2016 at 4:29 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->> > Hi,
->> >
->> > On Thu, Mar 31, 2016 at 03:54:45PM +0200, Alexander Potapenko wrote:
->> >> Add ARCH_HAS_KCOV to ARM64 config. Disable instrumentation of
->> >> arch/arm64/lib/delay.c
->> >
->> > Why do we disable instrumentation of delay.c?
->> The main purpose of kcov is collecting coverage from syscalls. As far
->> as I understand, coverage of functions from delay.c doesn't
->> deterministically depend on the syscalls being called and their
->> arguments.
->> The initial kcov implementation
->> (https://github.com/torvalds/linux/commit/5c9a8750a6409c63a0f01d51a9024861022f6593)
->> disabled instrumentation of arch/x86/lib/delay.c, so I just copied
->> that chunk.
+On 31 March 2016 at 17:21, Joachim  Eastwood <manabian@gmail.com> wrote:
+> On 31 March 2016 at 12:38, Mark Rutland <mark.rutland@arm.com> wrote:
+>> On Wed, Mar 30, 2016 at 10:45:06PM +0200, Joachim Eastwood wrote:
+>>> On 30 March 2016 at 19:06, Mark Rutland <mark.rutland@arm.com> wrote:
+>>> > On Wed, Mar 30, 2016 at 06:15:35PM +0200, Joachim Eastwood wrote:
+>>> >> I used the following script to check for the memory node in all built dtb's.
+>>> >>   make ARCH=arm CONFIG_OF_ALL_DTBS=y dtbs
+>>> >>   for i in $(ls arch/arm/boot/dts/*.dtb); do
+>>> >>          m=$(scripts/dtc/dtc -I dtb -O dts $i | grep -m1 'memory.*{')
+>>> >>          if [ -z "$m" ]; then
+>>> >>                  echo "Missing memory node in $i"
+>>> >>           fi
+>>> >>   done
+>>> >>
+>>> >> So it should be pretty safe to just remove the memory node entry in
+>>> >> the skeleton files. Unless I have missed something with the script
+>>> >> above.
+>>> >
+>>> > The above might match reserved-memory nodes; it might be better to check
+>>> > for 'device_type\s*=\s*"memory"'.
+>>>
+>>> I did check the output of the grep and it looks good. But there are
+>>> indeed DTs that are missing the 'device_type = "memory"' parameter.
+>>> Actually; _a lot_ or 438 of 741 to be exact. ugh...
+>>>
+>>> I guess all those should be fixed up before we can remove the memory
+>>> node from skeleton. :/
 >>
->> > What exactly does kcov instrumentation imply? Does it require certain
->> > data to be mapped or certain functions to be callable while instrumented
->> > functions are called?
->> Yes, there is __sanitizer_cov_trace_pc() that must be callable.
->
-> That will definitely be a problem for the KVM code which is run at a
-> different exception level with a different memory map. For GCOV, KASAN,
-> and UBSAN we simply disable instrumentation of that code [1].
->
-> We should be able to do similarly for KCOV.
-Ok, I'll send out the updated patch.
-
->> At boot time |current->kcov_mode| zero, so it virtually does nothing.
+>> Ouch, yes. :(
 >>
->> Currently kcov instrumentation is disabled for the following files:
+>> That said, the cahnges don't need to be an atomic operation. We could
+>> start adding device_type = "memory" to dts immediately (in as whatever
+>> size batches maintainers are happy with), as a duplicate device_type
+>> shouldn't be problematic.
 >
->> arch/x86/boot/*
->> arch/x86/boot/compressed/*
->> arch/x86/entry/vdso/*
->> arch/x86/realmode/rm/*
+> Yes, that is true.
 >
-> These are executed outside of the usual kernel context / address space,
-> so excluding these makes sense to me.
 >
->> arch/x86/kernel/*
->> arch/x86/kernel/apic/*
->> arch/x86/kernel/cpu/common.c
->> arch/x86/kernel/cpu/perf_event.c
->> arch/x86/lib/delay.c
->> arch/x86/mm/tlb.c
+>> When we hit critical mass, we could then remove the skeleton memory
+>> nodes, fixing up any remaining fallout.
+>>
+>> As for the mechanical changes, it sounds like we need coccinelle for DT.
+>>
+>> That, or a laptop, a long flight, and a gin and tonic.
 >
-> For these, it's not immediately clear to me why instrumentation is
-> disabled, so I don't know whether or not we can instrument the analogous
-> arm64 code.
-According to the comments in
-https://github.com/torvalds/linux/commit/5c9a8750a6409c63a0f01d51a9024861022f6593,
-instrumentation of arch/x86/kernel/apic/* and arch/x86/lib/delay.c
-leads to non-deterministic coverage, instrumenting others prevent the
-kernel from booting.
+> :-)
+>
+> I'll see if I can cook up something with awk.
 
->> Only a handful of the above have corresponding files in arch/arm64:
->> arch/arm64/boot/*
->> arch/arm64/kernel/*
->> arch/arm64/lib/delay.c
->
-> We have arch/arm64/kernel/perf_event.c, and a couple of other files that
-> are directly analogous, even if the paths don't quite line up.
-Ok, it makes sense to also disable arch/arm64/kernel/perf_event.c then.
+Something like this should do it:
+#!/usr/bin/gawk -f
+# find arch/arm/boot/dts/ -type f -name *.dts* | xargs
+./mem_node_add_dev_type.awk -i inplace
+BEGIN { go = 0 }
+/[^-]memory ?{/ { go = 1; idx = 0; device_type = 0 }
 
->> My patch explicitly disables instrumentation for arch/arm64/lib/delay.c.
->> I never had problems with arch/arm64/boot/* and arch/arm64/kernel/* in
->> the 3.18 kernel, although instrumentation of the corresponding x86
->> code is claimed to cause boot-time hangs.
->> We can act conservatively and still disable instrumentation for these
->> two dirs just to make sure nothing breaks in the future.
->
-> I'd rather that we understood why instrumentation of the above is
-> disabled, such that we can make a sensible decision from the outset.
->
->> > We have some C code that is run outside of the normal kernel context
->> > (e.g. EFI stub, KVM hyp code), and I suspect it may be necessary to
->> > disable instrumentation for those also.
->> EFI stub and a number of other files is already disabled by the
->> initial kcov patch.
->> I understand there might be some code specific to ARM64 that I may
->> have overlooked, so I'd be grateful if someone could try the patch out
->> with the upstream kernel.
->
-> The only such code that I'm immediately aware of is the hyp-context KVM
-> code, as mentioned above.
->
-> Thanks,
-> Mark.
->
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/416790.html
+go == 1 {
+        buf[idx++] = $0
+        if ($0 ~ /device_type/)
+                device_type = 1
+
+        if ($0 ~ /};/) {
+                print buf[0]
+
+                if (!device_type) {
+                        buf[0] = buf[1]
+                        gsub(/[^\t]*/, "", buf[0])
+                        buf[0] = buf[0] "device_type = \"memory\";"
+                } else {
+                        delete buf[0]
+                }
+
+                for (i in buf)
+                        print buf[i]
+                delete buf
+
+                go = 0
+                device_type = 0
+        }
+        next
+}
+
+{ print }
+
+Gives me: 249 files changed, 249 insertions(+), 1 deletion(-) on v4.6-rc1.
+
+Running the my check script after this reveals that 83 DTs lack the
+device_type parameter, but these seem to also lack the memory node as
+well. Wonder why my script didn't pick up the missing memory node in
+those... I also doubt that the memory node is set by the boot loader
+in some of these boards.
 
 
-
--- 
-Alexander Potapenko
-Software Engineer
-
-Google Germany GmbH
-Erika-Mann-Stra?e, 33
-80636 M?nchen
-
-Gesch?ftsf?hrer: Matthew Scott Sucherman, Paul Terence Manicle
-Registergericht und -nummer: Hamburg, HRB 86891
-Sitz der Gesellschaft: Hamburg
+regards,
+Joachim Eastwood
