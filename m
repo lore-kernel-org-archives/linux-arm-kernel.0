@@ -1,53 +1,97 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 31 Mar 2016 16:58:27 +0100
-Subject: [RFC PATCH 1/3] libahci: save port map for forced port map
-In-Reply-To: <20160330185706.GQ7822@mtj.duckdns.org>
-References: <1459257075-21393-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1459257075-21393-2-git-send-email-srinivas.kandagatla@linaro.org>
- <20160330185706.GQ7822@mtj.duckdns.org>
-Message-ID: <56FD4923.3090209@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 31 Mar 2016 17:00:53 +0100
+Subject: [PATCH v1] arm64: allow building with kcov coverage on ARM64
+In-Reply-To: <CAG_fn=V+e=+-svWOCUirOy4SvBNgJR5JWCFDU3uE3aKwz9ihvw@mail.gmail.com>
+References: <57cb1b66d85b85eadea28ef3304a62b1327ded45.1459432254.git.glider@google.com>
+ <20160331142908.GG26532@leverpostej>
+ <CAG_fn=V+e=+-svWOCUirOy4SvBNgJR5JWCFDU3uE3aKwz9ihvw@mail.gmail.com>
+Message-ID: <20160331160052.GA26393@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Mar 31, 2016 at 05:09:29PM +0200, Alexander Potapenko wrote:
+> On Thu, Mar 31, 2016 at 4:29 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > Hi,
+> >
+> > On Thu, Mar 31, 2016 at 03:54:45PM +0200, Alexander Potapenko wrote:
+> >> Add ARCH_HAS_KCOV to ARM64 config. Disable instrumentation of
+> >> arch/arm64/lib/delay.c
+> >
+> > Why do we disable instrumentation of delay.c?
+> The main purpose of kcov is collecting coverage from syscalls. As far
+> as I understand, coverage of functions from delay.c doesn't
+> deterministically depend on the syscalls being called and their
+> arguments.
+> The initial kcov implementation
+> (https://github.com/torvalds/linux/commit/5c9a8750a6409c63a0f01d51a9024861022f6593)
+> disabled instrumentation of arch/x86/lib/delay.c, so I just copied
+> that chunk.
+> 
+> > What exactly does kcov instrumentation imply? Does it require certain
+> > data to be mapped or certain functions to be callable while instrumented
+> > functions are called?
+> Yes, there is __sanitizer_cov_trace_pc() that must be callable.
 
+That will definitely be a problem for the KVM code which is run at a
+different exception level with a different memory map. For GCOV, KASAN,
+and UBSAN we simply disable instrumentation of that code [1].
 
-On 30/03/16 19:57, Tejun Heo wrote:
-> Hello,
->
-> On Tue, Mar 29, 2016 at 02:11:13PM +0100, Srinivas Kandagatla wrote:
->> In usecases where force_port_map is used saved_port_map is never set,
->> resulting in not programming the PORTS_IMPL register as part of intial
->> config. This patch fixes this by setting it to port_map even in case
->> where force_port_map is used, making it more inline with other parts of
->> the code.
->>
->> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->> ---
->>   drivers/ata/libahci.c | 1 +
->>   1 file changed, 1 insertion(+)
->>
->> diff --git a/drivers/ata/libahci.c b/drivers/ata/libahci.c
->> index 3982054..a5d7c1c 100644
->> --- a/drivers/ata/libahci.c
->> +++ b/drivers/ata/libahci.c
->> @@ -507,6 +507,7 @@ void ahci_save_initial_config(struct device *dev, struct ahci_host_priv *hpriv)
->>   		dev_info(dev, "forcing port_map 0x%x -> 0x%x\n",
->>   			 port_map, hpriv->force_port_map);
->>   		port_map = hpriv->force_port_map;
->> +		hpriv->saved_port_map = port_map;
->
-> So, the only change it'd cause is making the driver write the forced
-> value to the PI register.  Does that make sense?
+We should be able to do similarly for KCOV.
 
-Yes, that is the intention, I guess, This was done exactly in case where 
-the port number was fabricated too.
+> At boot time |current->kcov_mode| zero, so it virtually does nothing.
+> 
+> Currently kcov instrumentation is disabled for the following files:
 
-Without this I could not get the sata working on my board with forced 
-port map option.
+> arch/x86/boot/*
+> arch/x86/boot/compressed/*
+> arch/x86/entry/vdso/*
+> arch/x86/realmode/rm/*
 
---srini
+These are executed outside of the usual kernel context / address space,
+so excluding these makes sense to me.
 
+> arch/x86/kernel/*
+> arch/x86/kernel/apic/*
+> arch/x86/kernel/cpu/common.c
+> arch/x86/kernel/cpu/perf_event.c
+> arch/x86/lib/delay.c
+> arch/x86/mm/tlb.c
 
->
-> Thanks.
->
+For these, it's not immediately clear to me why instrumentation is
+disabled, so I don't know whether or not we can instrument the analogous
+arm64 code.
+
+> Only a handful of the above have corresponding files in arch/arm64:
+> arch/arm64/boot/*
+> arch/arm64/kernel/*
+> arch/arm64/lib/delay.c
+
+We have arch/arm64/kernel/perf_event.c, and a couple of other files that
+are directly analogous, even if the paths don't quite line up.
+
+> My patch explicitly disables instrumentation for arch/arm64/lib/delay.c.
+> I never had problems with arch/arm64/boot/* and arch/arm64/kernel/* in
+> the 3.18 kernel, although instrumentation of the corresponding x86
+> code is claimed to cause boot-time hangs.
+> We can act conservatively and still disable instrumentation for these
+> two dirs just to make sure nothing breaks in the future.
+
+I'd rather that we understood why instrumentation of the above is
+disabled, such that we can make a sensible decision from the outset.
+
+> > We have some C code that is run outside of the normal kernel context
+> > (e.g. EFI stub, KVM hyp code), and I suspect it may be necessary to
+> > disable instrumentation for those also.
+> EFI stub and a number of other files is already disabled by the
+> initial kcov patch.
+> I understand there might be some code specific to ARM64 that I may
+> have overlooked, so I'd be grateful if someone could try the patch out
+> with the upstream kernel.
+
+The only such code that I'm immediately aware of is the hyp-context KVM
+code, as mentioned above.
+
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/416790.html
