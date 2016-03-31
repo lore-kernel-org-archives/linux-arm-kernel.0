@@ -1,30 +1,41 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 31 Mar 2016 11:22:39 +0100
-Subject: [PATCH v15 17/20] arm64: kdump: implement machine_crash_shutdown()
-In-Reply-To: <20160331074635.GC2267@linaro.org>
-References: <cover.1457977401.git.geoff@infradead.org>
- <8f53a31cf8bbfdd73eb289e078addc31c5a19fcf.1457977403.git.geoff@infradead.org>
- <56EC440F.4050406@arm.com> <20160331074635.GC2267@linaro.org>
-Message-ID: <56FCFA6F.7040800@arm.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 31 Mar 2016 19:25:35 +0900
+Subject: [PATCH 2/2] ARM: uniphier: initialize outer cache for secondary
+ CPUs
+In-Reply-To: <3226381.VKfgCFa2AC@wuerfel>
+References: <201603291505.HKmOMR4P%fengguang.wu@intel.com>
+ <3226381.VKfgCFa2AC@wuerfel>
+Message-ID: <CAK7LNAS5AE9daz5F8OKAWgPHKGLB-px3-yi-hgSBfjjAUyxYnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/03/16 08:46, AKASHI Takahiro wrote:
-> James Morse wrote:
-> > This made me jump: irq_exit() may end up in the __do_softirq() (with irqs turned
-> > back on!) ... but these lines are impossible to reach. Maybe get the compiler to
-> > enforce this with an unreachable() instead?
+Hi Arnd,
+
+2016-03-29 17:11 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> On Tuesday 29 March 2016 15:59:00 kbuild test robot wrote:
+>>
+>> All warnings (new ones prefixed by >>):
+>>
+>> >> WARNING: vmlinux.o(.text+0x557b4): Section mismatch in reference from the function uniphier_cache_secondary_init() to the function .init.text:uniphier_cache_activate_all_ways()
+>>    The function uniphier_cache_secondary_init() references
+>>    the function __init uniphier_cache_activate_all_ways().
+>>    This is often because uniphier_cache_secondary_init lacks a __init
+>>    annotation or the annotation of uniphier_cache_activate_all_ways is wrong.
+>>
 >
-> I'm not sure how effective unreachable() is here, but OK I will add it.
+>
+> I guess the former: uniphier_cache_secondary_init should be __init, as it will
+> only be run at boot time.
+>
+> Please resend both patches.
+>
 
-I thought '__builtin_unreachable()' would generate a warning if it was
-reachable, but from [0] it looks like it just suppresses warnings.
+I think the alternative solution suggested by Russell is much better.
 
-You're right, it won't help.
-
-Thanks,
+I hope Russell will apply his one, and then I retract this series.
 
 
-James
 
-[0] https://gcc.gnu.org/onlinedocs/gcc/Other-Builtins.html
+-- 
+Best Regards
+Masahiro Yamada
