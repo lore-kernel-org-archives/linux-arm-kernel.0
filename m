@@ -1,206 +1,83 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 31 Mar 2016 18:11:48 -0400
-Subject: [PATCH next 1/2] PCI: keystone: add pci error irq handler
-In-Reply-To: <1458676378-24377-1-git-send-email-m-karicheri2@ti.com>
-References: <1458676378-24377-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <56FDA0A4.5040207@ti.com>
+From: b-liu@ti.com (Bin Liu)
+Date: Thu, 31 Mar 2016 17:21:12 -0500
+Subject: [PATCH v3 15/16] usb: musb: da8xx: Use devm in probe
+In-Reply-To: <1458863503-31121-16-git-send-email-david@lechnology.com>
+References: <1458863503-31121-1-git-send-email-david@lechnology.com>
+ <1458863503-31121-16-git-send-email-david@lechnology.com>
+Message-ID: <20160331222112.GA28044@uda0271908>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/22/2016 03:52 PM, Murali Karicheri wrote:
-> Keystone PCI hardware generates error interrupts at RC using platform
-> irq instead of standard msi/legacy irq. Add a simple error handler that
-> logs the fatal interrupt status to the console.
-> 
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: Kumar Gala <galak@codeaurora.org>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> ---
->  .../devicetree/bindings/pci/pci-keystone.txt       |  1 +
->  drivers/pci/host/pci-keystone-dw.c                 | 46 ++++++++++++++++++++++
->  drivers/pci/host/pci-keystone.c                    | 32 +++++++++++++++
->  drivers/pci/host/pci-keystone.h                    |  6 +++
->  4 files changed, 85 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/pci-keystone.txt b/Documentation/devicetree/bindings/pci/pci-keystone.txt
-> index 54eae29..d08a4d5 100644
-> --- a/Documentation/devicetree/bindings/pci/pci-keystone.txt
-> +++ b/Documentation/devicetree/bindings/pci/pci-keystone.txt
-> @@ -56,6 +56,7 @@ Optional properties:-
->  	phy-names: name of the Generic Keystine SerDes phy for PCI
->  	  - If boot loader already does PCI link establishment, then phys and
->  	    phy-names shouldn't be present.
-> +	interrupts: platform interrupt for error interrupts.
->  
->  Designware DT Properties not applicable for Keystone PCI
->  
-> diff --git a/drivers/pci/host/pci-keystone-dw.c b/drivers/pci/host/pci-keystone-dw.c
-> index ed34c95..524901d 100644
-> --- a/drivers/pci/host/pci-keystone-dw.c
-> +++ b/drivers/pci/host/pci-keystone-dw.c
-> @@ -53,6 +53,29 @@
->  #define IRQ_STATUS			0x184
->  #define MSI_IRQ_OFFSET			4
->  
-> +/*
-> + * error IRQ bits. Enable following errors
-> + *  - ERR_AER  - ECRC error - BIT(5)
-> + *  - ERR_AXI  - AXI tag lookup fatal error BIT(4)
-> + *  - ERR_CORR - Correctable error BIT(3)
-> + *  - ERR_NONFATAL - Non fatal error BIT(2)
-> + *  - ERR_FATAL - Fatal error BIT(1)
-> + *  - ERR_SYS - System error (fatal, nonfatal or correctable error)
-> + */
-> +#define ERR_AER				BIT(5)
-> +#define ERR_AXI				BIT(4)
-> +#define ERR_CORR			BIT(3)
-> +#define ERR_NONFATAL			BIT(2)
-> +#define ERR_FATAL			BIT(1)
-> +#define ERR_SYS				BIT(0)
-> +#define ERR_IRQ_ALL			(ERR_AER | ERR_AXI | ERR_CORR | \
-> +					ERR_NONFATAL | ERR_FATAL | ERR_SYS)
-> +#define ERR_FATAL_IRQ			(ERR_FATAL | ERR_AXI)
-> +#define ERR_IRQ_STATUS_RAW		0x1c0
-> +#define ERR_IRQ_STATUS			0x1c4
-> +#define ERR_IRQ_ENABLE_SET		0x1c8
-> +#define ERR_IRQ_ENABLE_CLR		0x1cc
-> +
->  /* Config space registers */
->  #define DEBUG0				0x728
->  
-> @@ -248,6 +271,29 @@ void ks_dw_pcie_handle_legacy_irq(struct keystone_pcie *ks_pcie, int offset)
->  	writel(offset, ks_pcie->va_app_base + IRQ_EOI);
->  }
->  
-> +void ks_dw_pcie_enable_error_irq(void __iomem *reg_base)
-> +{
-> +	writel(ERR_IRQ_ALL, reg_base + ERR_IRQ_ENABLE_SET);
-> +}
-> +
-> +bool ks_dw_pcie_handle_error_irq(struct device *dev, void __iomem *reg_base)
-> +{
-> +	u32 status;
-> +	bool ret = false;
-> +
-> +	status = readl(reg_base + ERR_IRQ_STATUS_RAW) & ERR_IRQ_ALL;
-> +	if (status) {
-> +		/* The PCIESS interrupt status buts are "write 1 to clear" */
-> +		if (status & ERR_FATAL_IRQ)
-> +			dev_err(dev, "PCIE fatal error detected\n");
-> +
-> +		/* ack the irq event. */
-> +		writel(status, reg_base + ERR_IRQ_STATUS);
-> +		ret = true;
-> +	}
-> +	return ret;
-> +}
-> +
->  static void ks_dw_pcie_ack_legacy_irq(struct irq_data *d)
->  {
->  }
-> diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
-> index b71f55b..299f2f0 100644
-> --- a/drivers/pci/host/pci-keystone.c
-> +++ b/drivers/pci/host/pci-keystone.c
-> @@ -15,6 +15,7 @@
->  #include <linux/irqchip/chained_irq.h>
->  #include <linux/clk.h>
->  #include <linux/delay.h>
-> +#include <linux/interrupt.h>
->  #include <linux/irqdomain.h>
->  #include <linux/module.h>
->  #include <linux/msi.h>
-> @@ -226,6 +227,10 @@ static void ks_pcie_setup_interrupts(struct keystone_pcie *ks_pcie)
->  							 ks_pcie);
->  		}
->  	}
-> +
-> +	/* enable error interrupt */
-> +	if (ks_pcie->error_irq > 0)
-> +		ks_dw_pcie_enable_error_irq(ks_pcie->va_app_base);
->  }
->  
->  /*
-> @@ -289,6 +294,16 @@ static struct pcie_host_ops keystone_pcie_host_ops = {
->  	.scan_bus = ks_dw_pcie_v3_65_scan_bus,
->  };
->  
-> +static irqreturn_t pcie_err_irq_handler(int irq, void *priv)
-> +{
-> +	struct keystone_pcie *ks_pcie = priv;
-> +
-> +	if (ks_dw_pcie_handle_error_irq(ks_pcie->pp.dev, ks_pcie->va_app_base))
-> +		return IRQ_HANDLED;
-> +
-> +	return IRQ_NONE;
-> +}
-> +
->  static int __init ks_add_pcie_port(struct keystone_pcie *ks_pcie,
->  			 struct platform_device *pdev)
->  {
-> @@ -309,6 +324,22 @@ static int __init ks_add_pcie_port(struct keystone_pcie *ks_pcie,
->  			return ret;
->  	}
->  
-> +	/*
-> +	 * index 0 is the platform interrupt for error interrupt
-> +	 * from RC. As this is optional to define this, we will
-> +	 * just print a warning
-> +	 */
-> +	ks_pcie->error_irq = irq_of_parse_and_map(ks_pcie->np, 0);
-> +	if (ks_pcie->error_irq <= 0)
-> +		dev_warn(&pdev->dev, "No error irq defined\n");
-> +	else {
-> +		if (request_irq(ks_pcie->error_irq, pcie_err_irq_handler,
-> +				IRQF_SHARED, "pcie-error-irq", ks_pcie) < 0) {
-> +			dev_err(&pdev->dev, "failed to request error irq\n");
-> +			return ret;
-> +		}
-> +	}
-> +
->  	pp->root_bus_nr = -1;
->  	pp->ops = &keystone_pcie_host_ops;
->  	ret = ks_dw_pcie_host_init(ks_pcie, ks_pcie->msi_intc_np);
-> @@ -376,6 +407,7 @@ static int __init ks_pcie_probe(struct platform_device *pdev)
->  	devm_release_mem_region(dev, res->start, resource_size(res));
->  
->  	pp->dev = dev;
-> +	ks_pcie->np = node;
->  	platform_set_drvdata(pdev, ks_pcie);
->  	ks_pcie->clk = devm_clk_get(dev, "pcie");
->  	if (IS_ERR(ks_pcie->clk)) {
-> diff --git a/drivers/pci/host/pci-keystone.h b/drivers/pci/host/pci-keystone.h
-> index f0944e8..2daa215 100644
-> --- a/drivers/pci/host/pci-keystone.h
-> +++ b/drivers/pci/host/pci-keystone.h
-> @@ -29,6 +29,10 @@ struct keystone_pcie {
->  	int			msi_host_irqs[MAX_MSI_HOST_IRQS];
->  	struct			device_node *msi_intc_np;
->  	struct irq_domain	*legacy_irq_domain;
-> +	struct device_node	*np;
-> +
-> +	/* error interrupt */
-> +	int error_irq;
->  
->  	/* Application register space */
->  	void __iomem		*va_app_base;
-> @@ -42,6 +46,8 @@ phys_addr_t ks_dw_pcie_get_msi_addr(struct pcie_port *pp);
->  /* Keystone specific PCI controller APIs */
->  void ks_dw_pcie_enable_legacy_irqs(struct keystone_pcie *ks_pcie);
->  void ks_dw_pcie_handle_legacy_irq(struct keystone_pcie *ks_pcie, int offset);
-> +void ks_dw_pcie_enable_error_irq(void __iomem *reg_base);
-> +bool ks_dw_pcie_handle_error_irq(struct device *dev, void __iomem *reg_base);
->  int  ks_dw_pcie_host_init(struct keystone_pcie *ks_pcie,
->  			struct device_node *msi_intc_np);
->  int ks_dw_pcie_wr_other_conf(struct pcie_port *pp, struct pci_bus *bus,
-> 
-Bjorn,
+Hi,
 
-Will you be applying this to your PCI next branch?
--- 
-Murali Karicheri
-Linux Kernel, Keystone
+On Thu, Mar 24, 2016 at 06:51:40PM -0500, David Lechner wrote:
+> Simplify things a bit by using devm functions where possible.
+> 
+> Signed-off-by: David Lechner <david@lechnology.com>
+> ---
+> 
+> v3 changes:
+> 
+> * Kept clk variable to minimize noise.
+> 
+> 
+>  drivers/usb/musb/da8xx.c | 19 +++++--------------
+>  1 file changed, 5 insertions(+), 14 deletions(-)
+> 
+> diff --git a/drivers/usb/musb/da8xx.c b/drivers/usb/musb/da8xx.c
+> index b03d3b8..0c1997c 100644
+> --- a/drivers/usb/musb/da8xx.c
+> +++ b/drivers/usb/musb/da8xx.c
+> @@ -490,20 +490,18 @@ static int da8xx_probe(struct platform_device *pdev)
+>  	struct da8xx_glue		*glue;
+>  	struct platform_device_info	pinfo;
+>  	struct clk			*clk;
+> +	int				ret;
+>  
+> -	int				ret = -ENOMEM;
+> -
+> -	glue = kzalloc(sizeof(*glue), GFP_KERNEL);
+> +	glue = devm_kzalloc(&pdev->dev, sizeof(*glue), GFP_KERNEL);
+>  	if (!glue) {
+>  		dev_err(&pdev->dev, "failed to allocate glue context\n");
+> -		goto err0;
+> +		return -ENOMEM;
+>  	}
+>  
+> -	clk = clk_get(&pdev->dev, "usb20");
+> +	clk = devm_clk_get(&pdev->dev, "usb20");
+>  	if (IS_ERR(clk)) {
+>  		dev_err(&pdev->dev, "failed to get clock\n");
+> -		ret = PTR_ERR(clk);
+> -		goto err3;
+> +		return PTR_ERR(clk);
+
+memory leak due to not kfree(glue).
+
+>  	}
+>  
+>  	ret = clk_enable(clk);
+> @@ -560,12 +558,7 @@ err5:
+>  	clk_disable(clk);
+>  
+>  err4:
+> -	clk_put(clk);
+> -
+> -err3:
+> -	kfree(glue);
+>  
+> -err0:
+>  	return ret;
+>  }
+>  
+> @@ -576,8 +569,6 @@ static int da8xx_remove(struct platform_device *pdev)
+>  	platform_device_unregister(glue->musb);
+>  	usb_phy_generic_unregister(glue->phy);
+>  	clk_disable(glue->clk);
+> -	clk_put(glue->clk);
+> -	kfree(glue);
+
+Doesn't match with $subject, I'd put them into a seperate patch.
+
+Regards,
+-Bin.
