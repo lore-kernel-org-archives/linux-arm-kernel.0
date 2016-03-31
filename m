@@ -1,90 +1,56 @@
-From: gangchen@rdamicro.com (=?utf-8?B?6ZmI5YiaKEdhbmdjaGVuKQ==?=)
-Date: Thu, 31 Mar 2016 07:56:05 +0000
-Subject: [PATCH 1/1] ARM : missing corrupted reg in __do_div_asm
-In-Reply-To: <20160330140718.GG3701@e103592.cambridge.arm.com>
-References: <1459138743-10477-1-git-send-email-chengang.beijing@gmail.com>
- <3792990.eCI4tPEEyD@wuerfel>
- <20160329102605.GC3701@e103592.cambridge.arm.com>
- <20160329103418.GX19428@n2100.arm.linux.org.uk>
- <20160329105637.GD3701@e103592.cambridge.arm.com>
- <56FB4784.1060105@rdamicro.com>
- <20160330140718.GG3701@e103592.cambridge.arm.com>
-Message-ID: <56FCD815.7000503@rdamicro.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 31 Mar 2016 09:57:49 +0200
+Subject: [PATCH v5 05/46] pwm: introduce the pwm_args concept
+In-Reply-To: <20160330215510.GS18567@codeaurora.org>
+References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1459368249-13241-6-git-send-email-boris.brezillon@free-electrons.com>
+ <20160330215510.GS18567@codeaurora.org>
+Message-ID: <20160331095749.4be1e76b@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/30/2016 10:07 PM, Dave Martin wrote:
-> On Wed, Mar 30, 2016 at 03:27:01AM +0000, ??(Gangchen) wrote:
->> On 03/29/2016 06:56 PM, Dave Martin wrote:
->>> On Tue, Mar 29, 2016 at 11:34:18AM +0100, Russell King - ARM Linux wrote:
->>>> On Tue, Mar 29, 2016 at 11:26:05AM +0100, Dave Martin wrote:
->>>>> On Tue, Mar 29, 2016 at 12:19:49PM +0200, Arnd Bergmann wrote:
->>>>>> On Monday 28 March 2016 12:19:03 Chen Gang wrote:
->>>>>>> __xl(R0 in little endian system, or R1 in big endian system) is corrupted
->>>>>>> after calling __do_div64 and compiler is not informed about this in
->>>>>>> macro __do_div_asm. If n is used again afterwards, __xl won't be
->>>>>>> reloaded and n will contain incorrect value.
->>>>>>>
->>>>>>> Signed-off-by: Chen Gang <gangchen@rdamicro.com>
->>>>>>> Signed-off-by: Chen Gang <chengang.beijing@gmail.com>
->>>>>>> ---
->>>>>> How did you find this? Did you run into this problem on a live system
->>>>>> or see it through inspection?
->>>>>>
->>>>>>>    arch/arm/include/asm/div64.h | 6 ++++--
->>>>>>>    1 file changed, 4 insertions(+), 2 deletions(-)
->>>>>>>
->>>>>>> diff --git a/arch/arm/include/asm/div64.h b/arch/arm/include/asm/div64.h
->>>>>>> index e1f0776..1a6e91a 100644
->>>>>>> --- a/arch/arm/include/asm/div64.h
->>>>>>> +++ b/arch/arm/include/asm/div64.h
->>>>>>> @@ -35,12 +35,14 @@ static inline uint32_t __div64_32(uint64_t *n, uint32_t base)
->>>>>>>           register unsigned long long __n   asm("r0") = *n;
->>>>>>>           register unsigned long long __res asm("r2");
->>>>>>>           register unsigned int __rem       asm(__xh);
->>>>>>> +       register unsigned int __clobber   asm(__xl);
->>>>>>>           asm(    __asmeq("%0", __xh)
->>>>>>>                   __asmeq("%1", "r2")
->>>>>>> +               __asmeq("%3", "r0")
->>>>>>> +               __asmeq("%4", "r4")
->>>>>>>                   __asmeq("%2", "r0")
->>>>>>> -               __asmeq("%3", "r4")
->>>>>>>                   "bl     __do_div64"
->>>>>>> -               : "=r" (__rem), "=r" (__res)
->>>>>>> +               : "=r" (__rem), "=r" (__res), "=r" (__clobber)
->>>>>>>                   : "r" (__n), "r" (__base)
->>>>>>>                   : "ip", "lr", "cc");
->>>>>>>           *n = __res;
->>>>>> Doesn't the clobber normally go in the third line along with
->>>>>> "ip" and "lr"?
->>>>> Since __xl is not used for any real argument to the asm, I think
->>>>> we can just add __xl to the clobber list directly, without needing
->>>>> to introduce an extra register variable ... no?
->>>> No, you can't.  The clobber list is not allowed to specify registers
->>>> that may be used for input or output operands, and since __xl may be
->>>> r0, and __n _is_ r0, you can't specify r0 in the clobber list.
->>> Hmm, you're right -- in which case the change looks reasonable.
->>>
->>> I wonder whether the following would be cleaner than having these
->>> aliased arguments:
->>>
->>> 	asm(	/* ... */
->>> 		"bl	__do_div64"
->>> 		: "+r" (__n), "=r" (__res)
->>> 		: "r" (__base)
->>> 		: "ip", "lr", "cc");
->>> 	*n = __res;
->>> 	return __n >> 32;
->>>
->>> (providing that GCC doesn't make a mess of the "easy" shift).
->> I tried your proposal. It didn't make any difference: this is inline
->> function and gcc just ignores your trick.
-> What doesn't work for you when using this method?
->
-> Why does the fact that this is an inline function make a difference?
-With the help of other colleagues, I understand your proposal now.
-I create a patch and I can verify that it works!
+On Wed, 30 Mar 2016 14:55:10 -0700
+Stephen Boyd <sboyd@codeaurora.org> wrote:
 
-Should I submit it, as it seems better than this one I sent?
+> On 03/30, Boris Brezillon wrote:
+> > @@ -74,6 +74,23 @@ enum pwm_polarity {
+> >  	PWM_POLARITY_INVERSED,
+> >  };
+> >  
+> > +/**
+> > + * struct pwm_args - PWM arguments
+> > + * @period: reference period
+> > + * @polarity: reference polarity
+> > + *
+> > + * This structure describe board-dependent arguments attached to a PWM
+> 
+> s/describe/describes/
+> 
+> > + * device. Those arguments are usually retrieved from the PWM lookup table or
+> > + * DT definition.
+> > + * This should not be confused with the PWM state: PWM args not representing
+> 
+> s/not representing/don't represent/ ?
 
-Cheers ---Dave
+Yes, I meant "are not representing", but "don't represent" is fine.
+
+> 
+> > + * the current PWM state, but the configuration the PWM user plan to use
+> 
+> s/plan/plans/
+> 
+> > + * on this PWM device.
+> > + */
+> > +struct pwm_args {
+> > +	unsigned int period;
+> > +	enum pwm_polarity polarity;
+> > +};
+> > +
+> 
+
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
