@@ -1,58 +1,90 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 31 Mar 2016 10:53:44 -0700
-Subject: [PATCH 02/18] ARM: dts: vf610: add GPC as new interrupt parent
-In-Reply-To: <20160331082137.GW28207@tiger>
+Date: Thu, 31 Mar 2016 10:55:13 -0700
+Subject: [PATCH 03/18] ARM: dts: vf610-colibri: GPIO wakeup key
+In-Reply-To: <20160331081908.GV28207@tiger>
 References: <1457576219-7971-1-git-send-email-stefan@agner.ch>
- <1457576219-7971-3-git-send-email-stefan@agner.ch>
- <20160331082137.GW28207@tiger>
-Message-ID: <5c2e731d0fc986bc680a582584efee19@agner.ch>
+ <1457576219-7971-4-git-send-email-stefan@agner.ch>
+ <20160331081908.GV28207@tiger>
+Message-ID: <fa5e44e044a2fd8056886c72db2f8483@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-03-31 01:21, Shawn Guo wrote:
-> On Wed, Mar 09, 2016 at 06:16:43PM -0800, Stefan Agner wrote:
+On 2016-03-31 01:19, Shawn Guo wrote:
+> On Wed, Mar 09, 2016 at 06:16:44PM -0800, Stefan Agner wrote:
+>> Enable GPIO wakeup key on Vybrid PAD 41 which is routed to the
+>> Colibri default wakeup pin SO-DIMM 45.
+>>
 >> Signed-off-by: Stefan Agner <stefan@agner.ch>
 > 
-> So this patch cannot be applied before the fsl,vf610-gpc driver gets
-> landed on mainline.
+> I think this one can be merged independently, right?  One small comment
+> below though.
+> 
 
-Yes!
+Yes, shouldn't cause any trouble even if wakeup/suspend is not yet
+implemented.
+
+>> ---
+>>  arch/arm/boot/dts/vf-colibri-eval-v3.dtsi | 22 ++++++++++++++++++++++
+>>  1 file changed, 22 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
+>> index 4d8b7f6..936ece6 100644
+>> --- a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
+>> +++ b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
+>> @@ -39,6 +39,8 @@
+>>   *     OTHER DEALINGS IN THE SOFTWARE.
+>>   */
+>>
+>> +#include <dt-bindings/input/input.h>
+>> +
+>>  / {
+>>  	chosen {
+>>  		stdout-path = "serial0:115200n8";
+>> @@ -74,6 +76,20 @@
+>>  		gpio = <&gpio2 19 GPIO_ACTIVE_LOW>; /* USBH_PEN resp. USBH_P_EN */
+>>  		vin-supply = <&reg_5v0>;
+>>  	};
+>> +
+>> +	gpio-keys {
+>> +		compatible = "gpio-keys";
+>> +		pinctrl-names = "default";
+>> +		pinctrl-0 = <&pinctrl_gpiokeys>;
+>> +
+>> +		power {
+>> +			label = "Wake-Up";
+>> +			gpios = <&gpio1 9 GPIO_ACTIVE_HIGH>;
+>> +			linux,code = <KEY_WAKEUP>;
+>> +			debounce-interval = <10>;
+>> +			gpio-key,wakeup;
+> 
+> Please use generic 'wakeup-source' instead.  See the following document
+> for details.
+> 
+> Documentation/devicetree/bindings/power/wakeup-source.txt
+
+Will do.
 
 --
 Stefan
 
->> ---
->>  arch/arm/boot/dts/vfxxx.dtsi | 10 +++++++++-
->>  1 file changed, 9 insertions(+), 1 deletion(-)
+> 
+>> +		};
+>> +	};
+>>  };
 >>
->> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
->> index 5e49fbd..909988d 100644
->> --- a/arch/arm/boot/dts/vfxxx.dtsi
->> +++ b/arch/arm/boot/dts/vfxxx.dtsi
->> @@ -88,7 +88,7 @@
->>  		#address-cells = <1>;
->>  		#size-cells = <1>;
->>  		compatible = "simple-bus";
->> -		interrupt-parent = <&mscm_ir>;
->> +		interrupt-parent = <&gpc>;
->>  		ranges;
->>
->>  		aips0: aips-bus at 40000000 {
->> @@ -475,6 +475,14 @@
->>  				reg = <0x4006e000 0x1000>;
->>  				interrupts = <96 IRQ_TYPE_LEVEL_HIGH>;
->>  			};
->> +
->> +			gpc: gpc at 4006c000 {
->> +				compatible = "fsl,vf610-gpc";
->> +				reg = <0x4006c000 0x1000>;
->> +				interrupt-controller;
->> +				#interrupt-cells = <2>;
->> +				interrupt-parent = <&mscm_ir>;
->> +			};
+>>  &bl {
+>> @@ -157,5 +173,11 @@
+>>  				VF610_PAD_PTB21__GPIO_43	0x22ed
+>>  			>;
 >>  		};
->>
->>  		aips1: aips-bus at 40080000 {
+>> +
+>> +		pinctrl_gpiokeys: gpiokeys {
+>> +			fsl,pins = <
+>> +				VF610_PAD_PTB19__GPIO_41	0x218d
+>> +			>;
+>> +		};
+>>  	};
+>>  };
 >> --
 >> 2.7.2
 >>
