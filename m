@@ -1,146 +1,43 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Thu, 31 Mar 2016 16:20:23 +0300
-Subject: [RESEND PATCH V4 1/4] stm class: provision for statically
- assigned masterIDs
-In-Reply-To: <CANLsYkxsaGmkpq6cNNw+CeMDKK7wwdDoegEuG2oNPNp185_9Mg@mail.gmail.com>
-References: <1457418835-31417-1-git-send-email-zhang.chunyan@linaro.org>
- <1457418835-31417-2-git-send-email-zhang.chunyan@linaro.org>
- <87wpow6znl.fsf@ashishki-desk.ger.corp.intel.com>
- <CANLsYkxsaGmkpq6cNNw+CeMDKK7wwdDoegEuG2oNPNp185_9Mg@mail.gmail.com>
-Message-ID: <878u0y7pig.fsf@ashishki-desk.ger.corp.intel.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 31 Mar 2016 08:36:23 -0500
+Subject: [PATCH v3 12/18] dt-bindings: Add PLX Technology OXNAS pinctrl
+ and gpio bindings
+In-Reply-To: <CACRpkdbem5a_aLTHErp0ZvanwvVPbGnDiWxM5e7iX_FdHtXprQ@mail.gmail.com>
+References: <1458838215-23314-1-git-send-email-narmstrong@baylibre.com>
+ <1458838215-23314-13-git-send-email-narmstrong@baylibre.com>
+ <20160325144834.GA27177@rob-hp-laptop>
+ <CACRpkdbem5a_aLTHErp0ZvanwvVPbGnDiWxM5e7iX_FdHtXprQ@mail.gmail.com>
+Message-ID: <CAL_JsqLsKEb+dWLg9VD3p=kjgEV84_r8z89p0QgMJWKqjrGNpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mathieu Poirier <mathieu.poirier@linaro.org> writes:
-
-> On 21 March 2016 at 01:47, Alexander Shishkin
-> <alexander.shishkin@linux.intel.com> wrote:
->> Chunyan Zhang <zhang.chunyan@linaro.org> writes:
->>
->>> From: Mathieu Poirier <mathieu.poirier@linaro.org>
+On Thu, Mar 31, 2016 at 3:58 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Fri, Mar 25, 2016 at 3:48 PM, Rob Herring <robh@kernel.org> wrote:
+>> On Thu, Mar 24, 2016 at 05:50:09PM +0100, Neil Armstrong wrote:
+>>> Add pinctrl and gpio DT bindings for PLX Technology OXNAS SoC Family.
+>>> This version supports the ARM926EJ-S based OX810SE SoC with 34 IO pins.
 >>>
->>> Some architecture like ARM assign masterIDs at the HW design
->>> phase.  Those are therefore unreachable to users, making masterID
->>> management in the generic STM core irrelevant.
->>>
->>> In this kind of configuration channels are shared between masters
->>> rather than being allocated on a per master basis.
->>>
->>> This patch adds a new 'mshared' flag to struct stm_data that tells the
->>> core that this specific STM device doesn't need explicit masterID
->>> management.
+>>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>
+>>> + - plxtech,gpio-bank: Specifies which bank a controller owns.
 >>
->> There are two kinds of 'masterIDs' that we're talking about here: the
->> ones that turn up in the STP stream and the ones that are accessible to
->> trace-side software (sw_start/sw_end). So in this case we want to
->> reflect the fact that there is no correlation between the two, because
->> hardware assigns STP channels dynamically based on the states of the
->> trace/execution environment. And although the trace side software can do
->> very little with this information, it does make sense to provide it.
->>
->> The sw_start==sw_end situation, on the other hand, is a side effect of
->> the above and, as I said in one of the previous threads, may not even be
->> the case, or at least I don't see why it has to. And when it is the
->> case, I don't see the point in handling it differently from
->> sw_start<sw_end situation.
+>> How is this used?
+>
+> That is used to give a unique ID number to the bank.
+>
+> Hardware often need this to cross-reference pin controllers
+> to GPIO banks.
+>
+> I should add it as "gpio-bank" to the generic bindings
+> instead, several platforms already use this and there is
+> no point in having a vendor prefix in front of it.
 
-[snip]
+Okay, now it is clearer. I don't want this documented as a common
+property because I don't want to encourage it's use. I only see 2
+users currently: ST and PIC32.
 
-> Other than the above, is there anything you'd like to see modified in
-> this patch, i.e how the mshared flag is used to modify the output in
-> sysFS/configFS?
+Looking at one example, it appears to be redundant already.
+nomadik-gpio-chips property already gives you the index. The index of
+the phandles is the bank numbering. PIC32 could do the same.
 
-Yes, the two paragraphs quoted above that had gone unnoticed. I've
-been thinking some more about this and came up with the following. No
-need to do any extra handling in the policy code or anywhere else.
-
->From 8be22a8e391b94ec13d428976e7b1410aa59991e Mon Sep 17 00:00:00 2001
-From: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Date: Thu, 31 Mar 2016 15:51:29 +0300
-Subject: [PATCH] stm class: Support devices that override software assigned
- masters
-
-Some STM devices adjust software assigned master numbers depending on
-the trace source and its runtime state and whatnot. This patch adds
-a sysfs attribute to inform the trace-side software that master numbers
-assigned to software sources will not match those in the STP stream,
-so that, for example, master/channel allocation policy can be adjusted
-accordingly.
-
-Signed-off-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
----
- Documentation/ABI/testing/sysfs-class-stm | 10 ++++++++++
- drivers/hwtracing/stm/core.c              | 15 +++++++++++++++
- include/linux/stm.h                       |  3 +++
- 3 files changed, 28 insertions(+)
-
-diff --git a/Documentation/ABI/testing/sysfs-class-stm b/Documentation/ABI/testing/sysfs-class-stm
-index c9aa4f3fc9..77ed3da0f6 100644
---- a/Documentation/ABI/testing/sysfs-class-stm
-+++ b/Documentation/ABI/testing/sysfs-class-stm
-@@ -12,3 +12,13 @@ KernelVersion:	4.3
- Contact:	Alexander Shishkin <alexander.shishkin@linux.intel.com>
- Description:
- 		Shows the number of channels per master on this STM device.
-+
-+What:		/sys/class/stm/<stm>/hw_override
-+Date:		March 2016
-+KernelVersion:	4.7
-+Contact:	Alexander Shishkin <alexander.shishkin@linux.intel.com>
-+Description:
-+		Reads as 0 if master numbers in the STP stream produced by
-+		this stm device will match the master numbers assigned by
-+		the software or 1 if the stm hardware overrides software
-+		assigned masters.
-diff --git a/drivers/hwtracing/stm/core.c b/drivers/hwtracing/stm/core.c
-index 2591442e2c..ff31108b06 100644
---- a/drivers/hwtracing/stm/core.c
-+++ b/drivers/hwtracing/stm/core.c
-@@ -67,9 +67,24 @@ static ssize_t channels_show(struct device *dev,
- 
- static DEVICE_ATTR_RO(channels);
- 
-+static ssize_t hw_override_show(struct device *dev,
-+				struct device_attribute *attr,
-+				char *buf)
-+{
-+	struct stm_device *stm = to_stm_device(dev);
-+	int ret;
-+
-+	ret = sprintf(buf, "%u\n", stm->data->hw_override);
-+
-+	return ret;
-+}
-+
-+static DEVICE_ATTR_RO(hw_override);
-+
- static struct attribute *stm_attrs[] = {
- 	&dev_attr_masters.attr,
- 	&dev_attr_channels.attr,
-+	&dev_attr_hw_override.attr,
- 	NULL,
- };
- 
-diff --git a/include/linux/stm.h b/include/linux/stm.h
-index 1a79ed8e43..8369d8a8ca 100644
---- a/include/linux/stm.h
-+++ b/include/linux/stm.h
-@@ -50,6 +50,8 @@ struct stm_device;
-  * @sw_end:		last STP master available to software
-  * @sw_nchannels:	number of STP channels per master
-  * @sw_mmiosz:		size of one channel's IO space, for mmap, optional
-+ * @hw_override:	masters in the STP stream will not match the ones
-+ *			assigned by software, but are up to the STM hardware
-  * @packet:		callback that sends an STP packet
-  * @mmio_addr:		mmap callback, optional
-  * @link:		called when a new stm_source gets linked to us, optional
-@@ -85,6 +87,7 @@ struct stm_data {
- 	unsigned int		sw_end;
- 	unsigned int		sw_nchannels;
- 	unsigned int		sw_mmiosz;
-+	unsigned int		hw_override;
- 	ssize_t			(*packet)(struct stm_data *, unsigned int,
- 					  unsigned int, unsigned int,
- 					  unsigned int, unsigned int,
--- 
-2.8.0.rc3
+Rob
