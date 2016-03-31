@@ -1,67 +1,79 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 31 Mar 2016 17:31:06 +0800
-Subject: [PATCH v3 1/2] ARM: cpuidle: fix !cpuidle_ops[cpu].init case during
- init
-In-Reply-To: <1459416667-307-1-git-send-email-jszhang@marvell.com>
-References: <1459416667-307-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1459416667-307-2-git-send-email-jszhang@marvell.com>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Thu, 31 Mar 2016 17:33:40 +0800
+Subject: [PATCH 2/2] arm64: dts: hip05: Add nor flash support
+In-Reply-To: <1459416820-18789-1-git-send-email-wangkefeng.wang@huawei.com>
+References: <1459416820-18789-1-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <1459416820-18789-2-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let's assume cpuidle_ops exists but it doesn't implement the according
-init callback, current arm_cpuidle_init() will return success to its
-caller, but in fact it should return -EOPNOTSUPP.
+This patch is to add support nor-flash. Notice, the pre-defined
+partitions may not be used.
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 ---
- arch/arm/kernel/cpuidle.c | 14 +++++++++++---
- 1 file changed, 11 insertions(+), 3 deletions(-)
+ arch/arm64/boot/dts/hisilicon/hip05-d02.dts | 34 +++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/hisilicon/hip05.dtsi    |  6 +++++
+ 2 files changed, 40 insertions(+)
 
-diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
-index 703926e..18b5a73 100644
---- a/arch/arm/kernel/cpuidle.c
-+++ b/arch/arm/kernel/cpuidle.c
-@@ -92,7 +92,8 @@ static struct cpuidle_ops *__init arm_cpuidle_get_ops(const char *method)
-  * process.
-  *
-  * Return 0 on sucess, -ENOENT if no 'enable-method' is defined, -EOPNOTSUPP if
-- * no cpuidle_ops is registered for the 'enable-method'.
-+ * no cpuidle_ops is registered for the 'enable-method', or if no init callback
-+ * is defined.
-  */
- static int __init arm_cpuidle_read_ops(struct device_node *dn, int cpu)
- {
-@@ -110,6 +111,12 @@ static int __init arm_cpuidle_read_ops(struct device_node *dn, int cpu)
- 		return -EOPNOTSUPP;
- 	}
- 
-+	if (!ops->init) {
-+		pr_warn("cpuidle_ops '%s': no init callback\n",
-+			enable_method);
-+		return -EOPNOTSUPP;
-+	}
+diff --git a/arch/arm64/boot/dts/hisilicon/hip05-d02.dts b/arch/arm64/boot/dts/hisilicon/hip05-d02.dts
+index e9436c0..abba750 100644
+--- a/arch/arm64/boot/dts/hisilicon/hip05-d02.dts
++++ b/arch/arm64/boot/dts/hisilicon/hip05-d02.dts
+@@ -52,3 +52,37 @@
+ &peri_gpio0 {
+ 	status = "ok";
+ };
 +
- 	cpuidle_ops[cpu] = *ops; /* structure copy */
++&lbc {
++	status = "ok";
++	#address-cells = <2>;
++	#size-cells = <1>;
++	ranges = <0 0 0x0 0x90000000 0x08000000>,
++		 <1 0 0x0 0x98000000 0x08000000>;
++
++	nor-flash at 0,0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "numonyx,js28f00a", "cfi-flash";
++		reg = <0 0x0 0x08000000>;
++		bank-width = <2>;
++		/* The three parts may not used */
++		partition at 0 {
++			label = "BIOS";
++			reg = <0x0 0x300000>;
++		};
++		partition at 300000 {
++			label = "Linux";
++			reg = <0x300000 0xa00000>;
++		};
++		partition at 1000000 {
++			label = "Rootfs";
++			reg = <0x01000000 0x02000000>;
++		};
++	};
++
++	cpld at 1,0 {
++		compatible = "hisilicon,hip05-cpld";
++		reg = <1 0x0 0x100>;
++	};
++};
+diff --git a/arch/arm64/boot/dts/hisilicon/hip05.dtsi b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
+index d1911ea..46ff5f6 100644
+--- a/arch/arm64/boot/dts/hisilicon/hip05.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
+@@ -327,6 +327,12 @@
+ 			status = "disabled";
+ 		};
  
- 	pr_notice("cpuidle: enable-method property '%s'"
-@@ -129,7 +136,8 @@ static int __init arm_cpuidle_read_ops(struct device_node *dn, int cpu)
-  * Returns:
-  *  0 on success,
-  *  -ENODEV if it fails to find the cpu node in the device tree,
-- *  -EOPNOTSUPP if it does not find a registered cpuidle_ops for this cpu,
-+ *  -EOPNOTSUPP if it does not find a registered and valid cpuidle_ops for
-+ *  this cpu,
-  *  -ENOENT if it fails to find an 'enable-method' property,
-  *  -ENXIO if the HW reports a failure or a misconfiguration,
-  *  -ENOMEM if the HW report an memory allocation failure 
-@@ -143,7 +151,7 @@ int __init arm_cpuidle_init(int cpu)
- 		return -ENODEV;
- 
- 	ret = arm_cpuidle_read_ops(cpu_node, cpu);
--	if (!ret && cpuidle_ops[cpu].init)
-+	if (!ret)
- 		ret = cpuidle_ops[cpu].init(cpu_node, cpu);
- 
- 	of_node_put(cpu_node);
++		lbc: localbus at 80380000 {
++			compatible = "hisilicon,hisi-localbus", "simple-bus";
++			reg = <0x0 0x80380000 0x0 0x10000>;
++			status = "disabled";
++		};
++
+ 		peri_gpio0: gpio at 802e0000 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
 -- 
-2.8.0.rc3
+1.7.12.4
