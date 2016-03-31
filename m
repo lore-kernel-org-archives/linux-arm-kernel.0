@@ -1,44 +1,90 @@
-From: simran.rai@broadcom.com (Simran Rai)
-Date: Thu, 31 Mar 2016 11:14:53 -0700
-Subject: [PATCH resend v5 1/3] ASoC: cygnus: Add DT bindings for Broadcom
- Cygnus audio
-In-Reply-To: <20160331141308.GA9670@rob-hp-laptop>
-References: <1459277192-10942-1-git-send-email-simran.rai@broadcom.com>
- <1459277192-10942-2-git-send-email-simran.rai@broadcom.com>
- <20160331141308.GA9670@rob-hp-laptop>
-Message-ID: <CAES42Na+wM6P5yB3tg+bxk88txQA+52kgL8uwFqEW1XO8LfUeQ@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 31 Mar 2016 20:16:56 +0200
+Subject: [RFC PATCH 44/45] KVM: arm/arm64: vgic-new: Add dummy MSI
+ implementation
+In-Reply-To: <1458871508-17279-45-git-send-email-andre.przywara@arm.com>
+References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
+ <1458871508-17279-45-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160331181656.GH4126@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Fri, Mar 25, 2016 at 02:05:07AM +0000, Andre Przywara wrote:
+> Although we don't provide any virtual MSI functionality yet, we
+> need to implement the functions required by the KVM interface.
 
-On Thu, Mar 31, 2016 at 7:13 AM, Rob Herring <robh@kernel.org> wrote:
-> On Tue, Mar 29, 2016 at 11:46:30AM -0700, Simran Rai wrote:
->> From: Simran Rai <ssimran@broadcom.com>
->>
->> Add bindings for audio driver in Broadcom Cygnus.
->>
->> Signed-off-by: Lori Hikichi <lhikichi@broadcom.com>
->> Signed-off-by: Simran Rai <ssimran@broadcom.com>
->> Reviewed-by: Ray Jui <rjui@broadcom.com>
->> Reviewed-by: Scott Branden <sbranden@broadcom.com>
->> Signed-off-by: Simran Rai <simran.rai@broadcom.com>
->> ---
->>  .../bindings/sound/brcm,cygnus-audio.txt           |   67 ++++++++++++++++++++
->>  1 file changed, 67 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/sound/brcm,cygnus-audio.txt
->
-> I acked v3 of this already. Did something change? If not, please add
-> acks when sending new versions. If things did change, explain that here.
-There was a change made in v4 that introduced assigned-clocks,
-assigned-clock-parents, and assigned-clock-rates, to allow initial
-configuration of
-default parent clock and its frequency.
->
-> And this v5 is not a resend if you didn't already send out v5 before.
-I had sent out v5 on March 01 but looks like it did not make it to
-through. Yesterday I sent out another patch (v6) to address Mark's
-comments. Can you please ack PATCH v6.
+I don't feel like this commit text accurately describes what's happening
+in the code?
+
+This seems to be about irqfds which work just fine on a GICv2m guest?
 
 Thanks,
-Simran
+-Christoffer
+
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  virt/kvm/arm/vgic/vgic_irqfd.c | 51 ++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 51 insertions(+)
+>  create mode 100644 virt/kvm/arm/vgic/vgic_irqfd.c
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic_irqfd.c b/virt/kvm/arm/vgic/vgic_irqfd.c
+> new file mode 100644
+> index 0000000..3eee1bd
+> --- /dev/null
+> +++ b/virt/kvm/arm/vgic/vgic_irqfd.c
+> @@ -0,0 +1,51 @@
+> +/*
+> + * Copyright (C) 2015, 2016 ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/kvm.h>
+> +#include <linux/kvm_host.h>
+> +#include <trace/events/kvm.h>
+> +
+> +int kvm_irq_map_gsi(struct kvm *kvm,
+> +		    struct kvm_kernel_irq_routing_entry *entries,
+> +		    int gsi)
+> +{
+> +	return 0;
+> +}
+> +
+> +int kvm_irq_map_chip_pin(struct kvm *kvm, unsigned irqchip, unsigned pin)
+> +{
+> +	return pin;
+> +}
+> +
+> +int kvm_set_irq(struct kvm *kvm, int irq_source_id,
+> +		u32 irq, int level, bool line_status)
+> +{
+> +	unsigned int spi = irq + VGIC_NR_PRIVATE_IRQS;
+> +
+> +	trace_kvm_set_irq(irq, level, irq_source_id);
+> +
+> +	BUG_ON(!vgic_initialized(kvm));
+> +
+> +	return kvm_vgic_inject_irq(kvm, 0, spi, level);
+> +}
+> +
+> +/* MSI not implemented yet */
+> +int kvm_set_msi(struct kvm_kernel_irq_routing_entry *e,
+> +		struct kvm *kvm, int irq_source_id,
+> +		int level, bool line_status)
+> +{
+> +	return 0;
+> +}
+> -- 
+> 2.7.3
+> 
