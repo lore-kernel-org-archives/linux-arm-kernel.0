@@ -1,21 +1,36 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 31 Mar 2016 10:30:55 +0200
-Subject: [PATCH] dt-bindings: Add new platforms GPIO node description
-In-Reply-To: <1458726442-1851-1-git-send-email-Gang.Liu@nxp.com>
+Date: Thu, 31 Mar 2016 10:32:11 +0200
+Subject: [PATCH v2] gpio/ls1021a: Add gpio support for ls1021a platform
+In-Reply-To: <1458726442-1851-2-git-send-email-Gang.Liu@nxp.com>
 References: <1458726442-1851-1-git-send-email-Gang.Liu@nxp.com>
-Message-ID: <CACRpkda31WUS4om_fqoW-Q3_3=Qp_+4ETrL8-StWpNqOq+LpRQ@mail.gmail.com>
+ <1458726442-1851-2-git-send-email-Gang.Liu@nxp.com>
+Message-ID: <CACRpkdZzgYMUkJHMzxZkTFRR44R+XRe77aMz89Hj=y-ZQ15qgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The subject of this patch should be:
+
+ARM: dts: ...
+
+And it should be merged through the ARM SoC tree.
+
 On Wed, Mar 23, 2016 at 10:47 AM, Liu Gang <Gang.Liu@nxp.com> wrote:
 
-> Update the NXP GPIO node dt-binding file for QorIQ and
-> Layerscape platforms, and add one more example with
-> ls2080a GPIO node.
+> Add gpio nodes for ls1021a platform dts file. The gpio
+> IP block of the ls1021a can be supported by the code
+> drivers/gpio/gpio-mpc8xxx.c.
+>
+> The compatible "fsl,qoriq-gpio" is used by gpio driver:
+> drivers/gpio/gpio-mpc8xxx.c to implement general gpio
+> functionalities.
+>
+> The chip-specific compatible "fsl,ls1021a-gpio" may be
+> used to fix potential gpio IP block errata or other
+> chip-specific gpio issues.
 >
 > Signed-off-by: Liu Gang <Gang.Liu@nxp.com>
 
-Patch applied.
+Apart from that it looks OK.
 
 Yours,
 Linus Walleij
