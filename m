@@ -1,109 +1,66 @@
 From: simran.rai@broadcom.com (Simran Rai)
-Date: Wed, 30 Mar 2016 17:09:10 -0700
-Subject: [PATCH resend v5 2/3] ASoC: cygnus: Add Cygnus audio DAI driver
-In-Reply-To: <20160329221634.GQ2350@sirena.org.uk>
-References: <1459277192-10942-1-git-send-email-simran.rai@broadcom.com>
- <1459277192-10942-3-git-send-email-simran.rai@broadcom.com>
- <20160329221634.GQ2350@sirena.org.uk>
-Message-ID: <CAES42NZ2EjuTNArnLEOTW69qKGRxnfbkJw-eo96USZ0YJdH1aQ@mail.gmail.com>
+Date: Wed, 30 Mar 2016 17:24:43 -0700
+Subject: [PATCH v6 0/3] ASoC: cygnus: Add audio support for Broadcom Cygnus SoC
+Message-ID: <1459383886-20317-1-git-send-email-simran.rai@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-Resending my replies as plain text.Apologies for the duplicate.
+Hi,
 
-On Tue, Mar 29, 2016 at 3:16 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Tue, Mar 29, 2016 at 11:46:31AM -0700, Simran Rai wrote:
->
-> A few issues here, a lot of them are stylistic though there's what look
-> like a couple of small bugs here too.
->
->> +static int cygnus_ssp_set_clocks(struct cygnus_aio_port *aio,
->> +                     struct cygnus_audio *cygaud)
->> +{
->> +     u32 value, i = 0;
->> +     u32 mask = 0xf;
->> +     u32 sclk;
->> +     bool found = false;
->> +     const struct _ssp_clk_coeff *p_entry = NULL;
->> +
->> +     if ((!aio->lrclk) || (!aio->bit_per_frame)) {
->> +             dev_err(aio->cygaud->dev, "First set up port through hw_params()\n");
->> +             return -EINVAL;
->> +     }
->
-> This function is only ever called from one site in hw_prams().  What is
-> this defending against?  A check like this seems very worrying, if it
-> ever goes off that seems to indicate either something is seriously wrong
-> or we should be recording something then coming back and trying again
-> later.
-Will remove it.
->
->> +     for (i = 0; i < ARRAY_SIZE(ssp_clk_coeff); i++) {
->> +             p_entry = &ssp_clk_coeff[i];
->> +             if ((p_entry->rate == aio->lrclk) &&
->> +                             (p_entry->sclk_rate == aio->bit_per_frame) &&
->> +                             (p_entry->mclk == aio->mclk)) {
->
-> Why the strange indentation here?
-Will fix this.
->
->> +     /* Set sclk rate */
->> +     if (aio->port_type == PORT_TDM) {
->
-> switch statment here for extensibility.
-Will replace.
->
->> +             /* Configure channels as mono or stereo */
->> +             if (params_channels(params) == 1) {
->> +                     value = readl(aio->cygaud->audio +
->> +                             aio->regs.bf_sourcech_cfg);
->> +                     value |= BIT(BF_SRC_CFGX_SAMPLE_CH_MODE);
->> +                     value &= ~BIT(BF_SRC_CFGX_BUFFER_PAIR_ENABLE);
->> +                     writel(value, aio->cygaud->audio +
->> +                             aio->regs.bf_sourcech_cfg);
->> +             } else {
->> +                     value = readl(aio->cygaud->audio +
->> +                             aio->regs.bf_sourcech_cfg);
->> +                     value &= ~BIT(BF_SRC_CFGX_SAMPLE_CH_MODE);
->> +                     writel(value, aio->cygaud->audio +
->> +                             aio->regs.bf_sourcech_cfg);
->> +             }
->
-> Either this should be a switch statement or the comment should say we
-> support more than stereo.  It's also not clear to me how
-> BUFFER_PAIR_ENABLE gets set again if we go from mono to stereo.
-Will change to switch statement. Thanks for exposing the bug related to
-BUFFER_PAIR_ENABLE. Will fix it.
->
->> +     if (!aio->is_slave) {
->> +             if (aio->clk_trace.cap_clk_en)
->> +                     clk_prepare_enable(aio->cygaud->
->> +                                     audio_clk[aio->pll_clk_num]);
->
-> Should check the return value of clk_prepare_enable().
-Will do.
->
->> +     .playback = {
->> +             .channels_min = 2,
->> +             .channels_max = 2,
->> +             .rates = CYGNUS_TDM_RATE | SNDRV_PCM_RATE_88200 |
->> +                     SNDRV_PCM_RATE_96000 | SNDRV_PCM_RATE_176400 |
->> +                     SNDRV_PCM_RATE_192000,
->> +             .formats = SNDRV_PCM_FMTBIT_S16_LE |
->> +                     SNDRV_PCM_FMTBIT_S32_LE,
->
-> According to hw_params() the driver also supports S8 and S24.
-SSP and TDM playback supports S8, S16 and S32. SSP and TDM capture
-supports S16 and S32. SPDIF playback supports S16 and S32. Will fix the
-code to reflect this.
->
->> +     if (port_type == PORT_TDM) {
->
->> +     } else { /* SPDIF case */
->
-> switch statement...
-Will do.
+This patchset contains audio support for Broadcom's Cygnus SoC.
+It contains DT bindings and core audio driver. The audio driver supports
+both capture and playback of Audio PCM samples over I2S/TDM interface and
+provides playback support over SPDIF interface.
 
-Thanks,
-Simran
+This patchset is derived from a previously submitted patchset:
+http://lkml.iu.edu/hypermail/linux/kernel/1503.3/05434.html
+
+This patchset has been tested on Cygnus wireless audio bcm958305K board.
+It is based on v4.6-rc1 and is available from github:
+
+repo: https://github.com/Broadcom/cygnus-linux/tree/cygnus-sound-v6
+
+Changes from v5:
+- Fix code style, e.g. change "if" statements to "switch" statements
+- Fix SPDIF output enable register field
+- Set BUFFER_PAIR_ENABLE for both mono, stereo and TDM modes
+- Reflect PCM bit formats for SPDIF, SSP and TDM as supported by
+hardware
+Changes from v4:
+- Fix power suspend function and add power resume function
+- Move clock initialization code from audio driver to clock framework
+Changes from v3:
+- Fix the subject lines to match the style for the subsystem
+Changes from v2:
+- Split patchset 2/2 from v2 into patchsets 2/3 and 3/3.
+- Remove SND_SOC_CYGNUS_DIAG. Diagnostics can be performed using
+standard kernel trace infrastructure.
+- Fix interrupt handler. Acknowledge only those interrupts that are
+handledby ISR.
+- Modify configure_vco() and the pll_macro_entry() struct to make it
+better readable. The functionality did not change.
+- Remove casts on macros
+- Remove surround sound channel grouping from the driver.
+Changes from v1:
+- Address code review comments. Fix print format of type size_t and
+pointer.
+
+Simran Rai (3):
+  ASoC: cygnus: Add DT bindings for Broadcom Cygnus audio
+  ASoC: cygnus: Add Cygnus audio DAI driver
+  ASoC: cygnus: Add Cygnus audio DMA driver
+
+ .../bindings/sound/brcm,cygnus-audio.txt           |   67 +
+ sound/soc/bcm/Kconfig                              |    9 +
+ sound/soc/bcm/Makefile                             |    5 +
+ sound/soc/bcm/cygnus-pcm.c                         |  861 +++++++++++
+ sound/soc/bcm/cygnus-ssp.c                         | 1529 ++++++++++++++++++++
+ sound/soc/bcm/cygnus-ssp.h                         |  139 ++
+ 6 files changed, 2610 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/brcm,cygnus-audio.txt
+ create mode 100644 sound/soc/bcm/cygnus-pcm.c
+ create mode 100644 sound/soc/bcm/cygnus-ssp.c
+ create mode 100644 sound/soc/bcm/cygnus-ssp.h
+
+-- 
+1.7.9.5
