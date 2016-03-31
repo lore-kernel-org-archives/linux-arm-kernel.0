@@ -1,97 +1,80 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Thu, 31 Mar 2016 19:23:31 +0800
-Subject: [PATCH v9 03/17] Xen: xlate: Use page_to_xen_pfn instead of
- page_to_pfn
+Date: Thu, 31 Mar 2016 19:23:41 +0800
+Subject: [PATCH v9 13/17] ARM: Xen: Document UEFI support on Xen ARM virtual
+ platforms
 In-Reply-To: <1459423425-1220-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1459423425-1220-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1459423425-1220-4-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1459423425-1220-14-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Make xen_xlate_map_ballooned_pages work with 64K pages. In that case
-Kernel pages are 64K in size but Xen pages remain 4K in size. Xen pfns
-refer to 4K pages.
+Add a "uefi" node under /hypervisor node in FDT, then Linux kernel could
+scan this to get the UEFI information.
 
+CC: Rob Herring <robh@kernel.org>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
 Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- drivers/xen/xlate_mmu.c | 38 +++++++++++++++++++++++++++-----------
- 1 file changed, 27 insertions(+), 11 deletions(-)
+ Documentation/devicetree/bindings/arm/xen.txt | 35 +++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
 
-diff --git a/drivers/xen/xlate_mmu.c b/drivers/xen/xlate_mmu.c
-index 9692656..23f1387 100644
---- a/drivers/xen/xlate_mmu.c
-+++ b/drivers/xen/xlate_mmu.c
-@@ -189,6 +189,18 @@ int xen_xlate_unmap_gfn_range(struct vm_area_struct *vma,
- }
- EXPORT_SYMBOL_GPL(xen_xlate_unmap_gfn_range);
+diff --git a/Documentation/devicetree/bindings/arm/xen.txt b/Documentation/devicetree/bindings/arm/xen.txt
+index 0f7b9c2..c9b9321 100644
+--- a/Documentation/devicetree/bindings/arm/xen.txt
++++ b/Documentation/devicetree/bindings/arm/xen.txt
+@@ -11,10 +11,32 @@ the following properties:
+   memory where the grant table should be mapped to, using an
+   HYPERVISOR_memory_op hypercall. The memory region is large enough to map
+   the whole grant table (it is larger or equal to gnttab_max_grant_frames()).
++  This property is unnecessary when booting Dom0 using ACPI.
  
-+struct map_balloon_pages {
-+	xen_pfn_t *pfns;
-+	unsigned int idx;
-+};
-+
-+static void setup_balloon_gfn(unsigned long gfn, void *data)
-+{
-+	struct map_balloon_pages *info = data;
-+
-+	info->pfns[info->idx++] = gfn;
-+}
-+
- /**
-  * xen_xlate_map_ballooned_pages - map a new set of ballooned pages
-  * @gfns: returns the array of corresponding GFNs
-@@ -205,11 +217,13 @@ int __init xen_xlate_map_ballooned_pages(xen_pfn_t **gfns, void **virt,
- 	struct page **pages;
- 	xen_pfn_t *pfns;
- 	void *vaddr;
-+	struct map_balloon_pages data;
- 	int rc;
--	unsigned int i;
-+	unsigned long nr_pages;
+ - interrupts: the interrupt used by Xen to inject event notifications.
+   A GIC node is also required.
++  This property is unnecessary when booting Dom0 using ACPI.
  
- 	BUG_ON(nr_grant_frames == 0);
--	pages = kcalloc(nr_grant_frames, sizeof(pages[0]), GFP_KERNEL);
-+	nr_pages = DIV_ROUND_UP(nr_grant_frames, XEN_PFN_PER_PAGE);
-+	pages = kcalloc(nr_pages, sizeof(pages[0]), GFP_KERNEL);
- 	if (!pages)
- 		return -ENOMEM;
- 
-@@ -218,22 +232,24 @@ int __init xen_xlate_map_ballooned_pages(xen_pfn_t **gfns, void **virt,
- 		kfree(pages);
- 		return -ENOMEM;
- 	}
--	rc = alloc_xenballooned_pages(nr_grant_frames, pages);
-+	rc = alloc_xenballooned_pages(nr_pages, pages);
- 	if (rc) {
--		pr_warn("%s Couldn't balloon alloc %ld pfns rc:%d\n", __func__,
--			nr_grant_frames, rc);
-+		pr_warn("%s Couldn't balloon alloc %ld pages rc:%d\n", __func__,
-+			nr_pages, rc);
- 		kfree(pages);
- 		kfree(pfns);
- 		return rc;
- 	}
--	for (i = 0; i < nr_grant_frames; i++)
--		pfns[i] = page_to_pfn(pages[i]);
- 
--	vaddr = vmap(pages, nr_grant_frames, 0, PAGE_KERNEL);
-+	data.pfns = pfns;
-+	data.idx = 0;
-+	xen_for_each_gfn(pages, nr_grant_frames, setup_balloon_gfn, &data);
++To support UEFI on Xen ARM virtual platforms, Xen populates the FDT "uefi" node
++under /hypervisor with following parameters:
 +
-+	vaddr = vmap(pages, nr_pages, 0, PAGE_KERNEL);
- 	if (!vaddr) {
--		pr_warn("%s Couldn't map %ld pfns rc:%d\n", __func__,
--			nr_grant_frames, rc);
--		free_xenballooned_pages(nr_grant_frames, pages);
-+		pr_warn("%s Couldn't map %ld pages rc:%d\n", __func__,
-+			nr_pages, rc);
-+		free_xenballooned_pages(nr_pages, pages);
- 		kfree(pages);
- 		kfree(pfns);
- 		return -ENOMEM;
++________________________________________________________________________________
++Name                      | Size   | Description
++================================================================================
++xen,uefi-system-table     | 64-bit | Guest physical address of the UEFI System
++			  |	   | Table.
++--------------------------------------------------------------------------------
++xen,uefi-mmap-start       | 64-bit | Guest physical address of the UEFI memory
++			  |	   | map.
++--------------------------------------------------------------------------------
++xen,uefi-mmap-size        | 32-bit | Size in bytes of the UEFI memory map
++                          |        | pointed to in previous entry.
++--------------------------------------------------------------------------------
++xen,uefi-mmap-desc-size   | 32-bit | Size in bytes of each entry in the UEFI
++                          |        | memory map.
++--------------------------------------------------------------------------------
++xen,uefi-mmap-desc-ver    | 32-bit | Version of the mmap descriptor format.
++--------------------------------------------------------------------------------
+ 
+ Example (assuming #address-cells = <2> and #size-cells = <2>):
+ 
+@@ -22,4 +44,17 @@ hypervisor {
+ 	compatible = "xen,xen-4.3", "xen,xen";
+ 	reg = <0 0xb0000000 0 0x20000>;
+ 	interrupts = <1 15 0xf08>;
++	uefi {
++		xen,uefi-system-table = <0xXXXXXXXX>;
++		xen,uefi-mmap-start = <0xXXXXXXXX>;
++		xen,uefi-mmap-size = <0xXXXXXXXX>;
++		xen,uefi-mmap-desc-size = <0xXXXXXXXX>;
++		xen,uefi-mmap-desc-ver = <0xXXXXXXXX>;
++        };
+ };
++
++The format and meaning of the "xen,uefi-*" parameters are similar to those in
++Documentation/arm/uefi.txt, which are provided by the regular UEFI stub. However
++they differ because they are provided by the Xen hypervisor, together with a set
++of UEFI runtime services implemented via hypercalls, see
++http://xenbits.xen.org/docs/unstable/hypercall/x86_64/include,public,platform.h.html.
 -- 
 2.0.4
