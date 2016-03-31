@@ -1,94 +1,100 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 31 Mar 2016 12:04:42 +0100
-Subject: [PATCH v7 12/17] ARM64: ACPI: Check if it runs on Xen to enable
- or disable ACPI
-In-Reply-To: <56FB7E00.7030400@huawei.com>
-References: <1458830676-27075-1-git-send-email-shannon.zhao@linaro.org>
- <1458830676-27075-13-git-send-email-shannon.zhao@linaro.org>
- <20160329161837.GH6745@arm.com> <20160329163147.GB27223@leverpostej>
- <56FB7E00.7030400@huawei.com>
-Message-ID: <alpine.DEB.2.02.1603311155450.11739@kaball.uk.xensource.com>
+From: lakshmi.sai.krishna.potthuri@xilinx.com (Lakshmi Sai Krishna Potthuri)
+Date: Thu, 31 Mar 2016 11:12:17 +0000
+Subject: [LINUX PATCH 1/2] mtd: Added dummy entry in the spi_transfer
+ structure.
+In-Reply-To: <CAMuHMdV0B8Qka57nMv009aLdQ-fdBpAYr3wONQ7xaMfKXrORvQ@mail.gmail.com>
+References: <1458562809-36114-1-git-send-email-lakshmis@xilinx.com>
+ <20160321130734.GS2566@sirena.org.uk>
+ <4FF8F58FAA9D5D4193D4E554E4352C5902C6D34C@XAP-PVEXMBX02.xlnx.xilinx.com>
+ <20160322100615.GA2566@sirena.org.uk>
+ <4FF8F58FAA9D5D4193D4E554E4352C5902C6DB59@XAP-PVEXMBX02.xlnx.xilinx.com>
+ <20160325150109.GF2566@sirena.org.uk>
+ <4FF8F58FAA9D5D4193D4E554E4352C5902C6E92A@XAP-PVEXMBX02.xlnx.xilinx.com>
+ <CAMuHMdV0B8Qka57nMv009aLdQ-fdBpAYr3wONQ7xaMfKXrORvQ@mail.gmail.com>
+Message-ID: <4FF8F58FAA9D5D4193D4E554E4352C5902C6EA12@XAP-PVEXMBX02.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Mar 2016, Shannon Zhao wrote:
-> Hi Will, Mark,
-> 
-> On 2016/3/30 0:31, Mark Rutland wrote:
-> > On Tue, Mar 29, 2016 at 05:18:38PM +0100, Will Deacon wrote:
-> >> > On Thu, Mar 24, 2016 at 10:44:31PM +0800, Shannon Zhao wrote:
-> >>> > > When it's a Xen domain0 booting with ACPI, it will supply a /chosen and
-> >>> > > a /hypervisor node in DT. So check if it needs to enable ACPI.
-> >>> > > 
-> >>> > > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> >>> > > Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> >>> > > Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
-> >>> > > ---
-> >>> > >  arch/arm64/kernel/acpi.c | 12 ++++++++----
-> >>> > >  1 file changed, 8 insertions(+), 4 deletions(-)
-> >>> > > 
-> >>> > > diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> >>> > > index d1ce8e2..4e92be0 100644
-> >>> > > --- a/arch/arm64/kernel/acpi.c
-> >>> > > +++ b/arch/arm64/kernel/acpi.c
-> >>> > > @@ -67,10 +67,13 @@ static int __init dt_scan_depth1_nodes(unsigned long node,
-> >>> > >  {
-> >>> > >  	/*
-> >>> > >  	 * Return 1 as soon as we encounter a node at depth 1 that is
-> >>> > > -	 * not the /chosen node.
-> >>> > > +	 * not the /chosen node, or /hypervisor node when running on Xen.
-> >>> > >  	 */
-> >>> > > -	if (depth == 1 && (strcmp(uname, "chosen") != 0))
-> >>> > > -		return 1;
-> >>> > > +	if (depth == 1 && (strcmp(uname, "chosen") != 0)) {
-> >>> > > +		if (!xen_initial_domain() || (strcmp(uname, "hypervisor") != 0))
-> >>> > > +			return 1;
-> >>> > > +	}
-> >> > 
-> >> > Hmm, but xen_initial_domain() is false when xen isn't being used at all,
-> >> > so it feels to me like this is a bit too far-reaching and is basically
-> >> > claiming the "/hypervisor" namespace for Xen. Couldn't it be renamed to
-> >> > "xen,hypervisor" or something?
-> >> > 
-> >> > Mark, got any thoughts on this?
-> > The node has a compatible string, "xen,xen" per [1], which would tell us
-> > absolutely that xen is present. I'd be happy checking for that
-> > explicitly.
-> > 
-> I think actually the xen_initial_domain is the result of the
-> fdt_find_hyper_node. If the compatible string "xen,xen" doesn't exist,
-> the xen_initial_domain() will return false and whatever the current node
-> is the above check will return 1 since the device tree is not empty.
+Hi,
 
-Right.
+>-----Original Message-----
+From: geert.uytterhoeven@gmail.com
+>[mailto:geert.uytterhoeven at gmail.com] On Behalf Of Geert Uytterhoeven
+>Sent: Thursday, March 31, 2016 1:58 PM
+>To: Lakshmi Sai Krishna Potthuri <lakshmis@xilinx.com>
+>Cc: Mark Brown <broonie@kernel.org>; Michal Simek <michals@xilinx.com>;
+>Soren Brinkmann <sorenb@xilinx.com>; David Woodhouse
+><dwmw2@infradead.org>; Brian Norris <computersforpeace@gmail.com>;
+>Javier Martinez Canillas <javier@osg.samsung.com>; Boris Brezillon
+><boris.brezillon@free-electrons.com>; Stephen Warren
+><swarren@nvidia.com>; Geert Uytterhoeven <geert+renesas@glider.be>;
+>Andrew F. Davis <afd@ti.com>; Marek Vasut <marex@denx.de>; Jagan Teki
+><jteki@openedev.com>; Rafa? Mi?ecki <zajec5@gmail.com>; linux-
+>mtd at lists.infradead.org; linux-kernel at vger.kernel.org; linux-
+>spi at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Harini Katakam
+><harinik@xilinx.com>; Punnaiah Choudary Kalluri <punnaia@xilinx.com>;
+>Anirudha Sarangi <anirudh@xilinx.com>; saikrishna12468 at gmail.com
+>Subject: Re: [LINUX PATCH 1/2] mtd: Added dummy entry in the spi_transfer
+>structure.
+>
+>On Thu, Mar 31, 2016 at 8:14 AM, Lakshmi Sai Krishna Potthuri
+><lakshmi.sai.krishna.potthuri@xilinx.com> wrote:
+>>>> >This is really not what I'd expect to happen, I'd expect that these
+>dummy
+>>>> >cycles would be in addition to the actual data (see my request for better
+>>>> >documentation...).  If they overlap with the data then what is the point
+>in
+>>>> >specifying this?  It's more work for the host, what benefit do we get
+>from
+>>>> >doing it over just handing it like a normal byte?
+>>>
+>>>> len field in the transfer structure contains dummy bytes along with actual
+>>>data
+>>>> bytes, controllers which requires dummy bytes use len field and simply
+>>>Ignore
+>>>> the dummy field (contains only no of cycles)added in this patch.
+>Controllers
+>>>> (like ZynqMP GQSPI) expects dummy in cycles won't work directly by
+>using
+>>>> len field because host driver doesn't know that len field of a particular
+>>>transfer
+>>>> includes dummy bytes or not (and also number of dummy bytes included
+>in
+>>>len
+>>>> field). In such cases driver use this dummy field to identify the number of
+>>>dummy
+>>>> cycles and based on that it will send the required number of dummy
+>cycles
+>>>(which
+>>>> i did in the second patch).
+>>>
+>>>This doesn't make any sense at all to me.  Why does the controller care
+>>>what the bytes being sent to and from the device mean?
+>>
+>> From the flash point of view, it expects the controller to send the dummy
+>> on 1/2/4 lines based on the command. For Quad commands, flash expects
+>> 4 lines to be active during dummy phase. Similarly, 2 lines for dual
+>> Commands and 1 line for normal/fast commands.
+>> Since len field contains total number of cmd+addr+dummy bytes,
+>> host driver should take care of sending these bytes on their respective
+>> bus widths. Knowing when the dummy is being sent also helps in
+>> the correct switching of IO pads (since the data lines are bidirectional)
+>> ZynqMP GQSPI is a generic controller, majorly interfaced to flash devices.
+>> It seems reasonable for it to know the above information from
+>> the flash layer. Adding "dummy" cycles entry should be useful to any
+>> controller that cares about it without affecting other spi/qspi controllers.
+>
+>The m25p80 driver already uses dummy cycles, using real spi_transfer
+>structs, which have tx_nbits/rx_nbits fields to indicate how many data lines
+>to use.
 
-xen_initial_domain implies both "xen,xen" and XENFEAT_dom0 (which is a
-feature retrieved by making a XENVER_get_features hypercall, see
-drivers/xen/features.c:xen_setup_features).
+m25p80 implementation just send command, address and dummy together
+with tx_nbit field as 1 and host driver can't differentiate between them.
+Command and address go on one line and dummy should send based
+on the command as explained my previous mail.
 
-So the following check:
+Regards
+Sai Krishna
 
- +     if (!xen_initial_domain() || (strcmp(uname, "hypervisor") != 0))
- +         return 1;
 
-means that even if it's xen_initial_domain(), return error unless the
-node found is "hypervisor". In other words, even if
-xen_initial_domain(), no other nodes are allowed except /chosen and
-/hypervisor.
-
-This doesn't look far reaching to me, but yes, we could check explicitly
-for the node to be compatible "xen,xen", in addition to be named
-"hypervisor", even though the check is already done elsewhere
-(arch/arm/xen/enlighten.c).
-
-But I would keep it as it is.
-
-> > In patch 11 fdt_find_hyper_node checks the compatible string. We could
-> > factor that out into a helper like is_xen_node(node) and use it here
-> > too.
-> > 
-> I don't think so because we already check the compatible string before
-> and we could get the result simply via xen_initial_domain().
-
-We could add a comment saying xen_initial_domain() implies "xen,xen" or
-something.
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
