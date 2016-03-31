@@ -1,99 +1,97 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 31 Mar 2016 13:53:19 +0200
-Subject: [RFC PATCH 24/45] KVM: arm/arm64: vgic-new: Add GICv3 CTLR,
- IIDR, TYPER handlers
-In-Reply-To: <1458871508-17279-25-git-send-email-andre.przywara@arm.com>
-References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
- <1458871508-17279-25-git-send-email-andre.przywara@arm.com>
-Message-ID: <20160331115319.GD4126@cbox>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Thu, 31 Mar 2016 14:02:47 +0200
+Subject: [PATCH v9 01/17] Xen: ACPI: Hide UART used by Xen
+In-Reply-To: <1459423425-1220-2-git-send-email-zhaoshenglong@huawei.com>
+References: <1459423425-1220-1-git-send-email-zhaoshenglong@huawei.com>
+ <1459423425-1220-2-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <CAJZ5v0iSDk1u47jhed9TyEef1D=nERMfBw8AzcquTgH9g=Yqpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 25, 2016 at 02:04:47AM +0000, Andre Przywara wrote:
-> As in the GICv2 emulation we handle those three registers in one
-> function.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+On Thu, Mar 31, 2016 at 1:23 PM, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+>
+> ACPI 6.0 introduces a new table STAO to list the devices which are used
+> by Xen and can't be used by Dom0. On Xen virtual platforms, the physical
+> UART is used by Xen. So here it hides UART from Dom0.
+>
+> CC: "Rafael J. Wysocki" <rjw@rjwysocki.net> (supporter:ACPI)
+> CC: Len Brown <lenb@kernel.org> (supporter:ACPI)
+> CC: linux-acpi at vger.kernel.org (open list:ACPI)
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 > ---
->  virt/kvm/arm/vgic/vgic.h      |  2 ++
->  virt/kvm/arm/vgic/vgic_mmio.c | 38 ++++++++++++++++++++++++++++++++++++--
->  2 files changed, 38 insertions(+), 2 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> index 4b8952a..0db1abe 100644
-> --- a/virt/kvm/arm/vgic/vgic.h
-> +++ b/virt/kvm/arm/vgic/vgic.h
-> @@ -19,6 +19,8 @@
->  #define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
->  #define IMPLEMENTER_ARM		0x43b
->  
-> +#define INTERRUPT_ID_BITS_SPIS	10
-> +
->  struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
->  			      u32 intid);
->  bool vgic_queue_irq(struct kvm *kvm, struct vgic_irq *irq);
-> diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
-> index 2d10c06..13e101f 100644
-> --- a/virt/kvm/arm/vgic/vgic_mmio.c
-> +++ b/virt/kvm/arm/vgic/vgic_mmio.c
-> @@ -606,7 +606,29 @@ static int vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
->  				  struct kvm_io_device *this,
->  				  gpa_t addr, int len, void *val)
->  {
-> -	/* TODO: implement */
-> +	struct vgic_io_device *iodev = container_of(this,
-> +						    struct vgic_io_device, dev);
-> +	u32 value = 0;
-> +
-> +	switch ((addr - iodev->base_addr) & ~3) {
-> +	case GICD_CTLR:
-> +		if (vcpu->kvm->arch.vgic.enabled)
-> +		       value |=	GICD_CTLR_ENABLE_SS_G1;
-> +		value |= GICD_CTLR_ARE_NS | GICD_CTLR_DS;
-> +		break;
-> +	case GICD_TYPER:
-> +		value = vcpu->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
-> +		value = (value >> 5) - 1;
-> +		value |= (INTERRUPT_ID_BITS_SPIS - 1) << 19;
-> +		break;
-> +	case GICD_IIDR:
-> +		value = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
-> +		break;
-> +	default:
-> +		return 0;
-> +	}
-> +
-> +	write_mask32(value, addr & 3, len, val);
->  	return 0;
+>  drivers/acpi/scan.c | 69 +++++++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 69 insertions(+)
+>
+> diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+> index 5f28cf7..29f26fc 100644
+> --- a/drivers/acpi/scan.c
+> +++ b/drivers/acpi/scan.c
+> @@ -45,6 +45,7 @@ static LIST_HEAD(acpi_scan_handlers_list);
+>  DEFINE_MUTEX(acpi_device_lock);
+>  LIST_HEAD(acpi_wakeup_device_list);
+>  static DEFINE_MUTEX(acpi_hp_context_lock);
+> +static u64 spcr_uart_addr;
+>
+>  struct acpi_dep_data {
+>         struct list_head node;
+> @@ -1453,6 +1454,42 @@ static int acpi_add_single_object(struct acpi_device **child,
+>         return 0;
 >  }
->  
-> @@ -614,7 +636,19 @@ static int vgic_mmio_write_v3_misc(struct kvm_vcpu *vcpu,
->  				   struct kvm_io_device *this,
->  				   gpa_t addr, int len, const void *val)
->  {
-> -	/* TODO: implement */
-> +	struct vgic_io_device *iodev = container_of(this,
-> +						    struct vgic_io_device, dev);
-> +	bool enabled;
+>
+> +static acpi_status acpi_get_resource_memory(struct acpi_resource *ares,
+> +                                           void *context)
+> +{
+> +       struct resource *res = context;
 > +
-> +	/* These are not the bits you are looking for ... */
-
-haha, nice.  But I don't understand what this case is?
-
-> +	if (addr - iodev->base_addr > 0)
-> +		return 0;
+> +       if (acpi_dev_resource_memory(ares, res))
+> +               return AE_CTRL_TERMINATE;
 > +
-> +	/* We only care about the enable bit, all other bits are WI. */
-> +	enabled = *(u8*)val & GICD_CTLR_ENABLE_SS_G1;
+> +       return AE_OK;
+> +}
 > +
-> +	vcpu->kvm->arch.vgic.enabled = enabled;
-
-I think some of the comments from the v2 side apply here as well.
-
+> +static bool acpi_device_should_be_hidden(acpi_handle handle)
+> +{
+> +       acpi_status status;
+> +       struct resource res;
 > +
->  	return 0;
->  }
->  
-> -- 
-> 2.7.3
-> 
+> +       /* Check if it should ignore the UART device */
+> +       if (spcr_uart_addr != 0) {
+
+Why not to write this as
+
+      if (spcr_uart_addr) {
+
+Or even
+
+      if (!spcr_uart_addr)
+            return false;
+
+and then the indentation level of the rest will be reduced.
+
+> +               if (!acpi_has_method(handle, METHOD_NAME__CRS))
+> +                       return false;
+> +
+
+I'd like to see a comment here that the devices in question are
+assumed to have only one memory resource present which is why we only
+look for the first one.
+
+> +               status = acpi_walk_resources(handle, METHOD_NAME__CRS,
+> +                                            acpi_get_resource_memory, &res);
+> +               if (ACPI_FAILURE(status))
+> +                       return false;
+> +
+> +               if (res.start == spcr_uart_addr) {
+> +                       printk(KERN_INFO PREFIX "The UART device @%pa in SPCR table will be hidden\n",
+> +                              &res.start);
+> +                       return true;
+> +               }
+> +       }
+> +
+> +       return false;
+> +}
+> +
+
+Thanks,
+Rafael
