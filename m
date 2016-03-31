@@ -1,36 +1,68 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 31 Mar 2016 10:32:11 +0200
-Subject: [PATCH v2] gpio/ls1021a: Add gpio support for ls1021a platform
-In-Reply-To: <1458726442-1851-2-git-send-email-Gang.Liu@nxp.com>
-References: <1458726442-1851-1-git-send-email-Gang.Liu@nxp.com>
- <1458726442-1851-2-git-send-email-Gang.Liu@nxp.com>
-Message-ID: <CACRpkdZzgYMUkJHMzxZkTFRR44R+XRe77aMz89Hj=y-ZQ15qgg@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 31 Mar 2016 10:33:23 +0200
+Subject: [PULL 0/4] ARM support for generic memremap()
+In-Reply-To: <1459235884-24318-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1459235884-24318-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu_g3mtEr9mTB0zOhuK=rsre8A5-boNjrKYjr9ELB==hHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The subject of this patch should be:
-
-ARM: dts: ...
-
-And it should be merged through the ARM SoC tree.
-
-On Wed, Mar 23, 2016 at 10:47 AM, Liu Gang <Gang.Liu@nxp.com> wrote:
-
-> Add gpio nodes for ls1021a platform dts file. The gpio
-> IP block of the ls1021a can be supported by the code
-> drivers/gpio/gpio-mpc8xxx.c.
+On 29 March 2016 at 09:18, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> Hello Russell,
 >
-> The compatible "fsl,qoriq-gpio" is used by gpio driver:
-> drivers/gpio/gpio-mpc8xxx.c to implement general gpio
-> functionalities.
+> This is a straight rebase of version 3 of this patch series, which I posted
+> here: http://thread.gmane.org/gmane.linux.ports.arm.kernel/484005. I have
+> attached the individual patches to this cover letter for reference.
 >
-> The chip-specific compatible "fsl,ls1021a-gpio" may be
-> used to fix potential gpio IP block errata or other
-> chip-specific gpio issues.
+> Please pull for v4.7. I expect some of my UEFI work regarding memory
+> protection tables and the EFI framebuffer to land in the 4.7 timeframe as well,
+> and thise rely on memremap() to do the right thing if firmware tables happen
+> to reside in memory that is also covered by memblock/the linear mapping.
 >
-> Signed-off-by: Liu Gang <Gang.Liu@nxp.com>
 
-Apart from that it looks OK.
+Please don't pull this yet. Patch #3 inadvertently changes the
+fallback behavior for memory that is not covered by the kernel direct
+mapping and is not covered by a 'System RAM' iomem entry.
 
-Yours,
-Linus Walleij
+I will follow up with a v4
+
+Thanks,
+Ard.
+
+
+> -------------8<-----------------
+> The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+>
+>   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.linaro.org/people/ard.biesheuvel/linux-arm.git \
+>                                                   tags/arm-memremap-for-v4.7
+>
+> for you to fetch changes up to fc77542bdffe9dcb3890c631ad571e1e4b0cc8c3:
+>
+>   ARM: memremap: implement arch_memremap_wb() (2016-03-29 08:19:26 +0200)
+>
+> ----------------------------------------------------------------
+> This series wires up the generic memremap() function in a way that allows it
+> to be used as intended, i.e., without regard for whether the region being
+> mapped is covered by a struct page and/or the linear mapping (lowmem)
+>
+> ----------------------------------------------------------------
+>
+> Ard Biesheuvel (4):
+>   ARM: reintroduce ioremap_cached() for creating cached I/O mappings
+>   mtd: pxa2xx-flash: switch back from memremap to ioremap_cached
+>   memremap: add arch specific hook for MEMREMAP_WB mappings
+>   ARM: memremap: implement arch_memremap_wb()
+>
+>  arch/arm/include/asm/io.h       | 12 ++++++++++++
+>  arch/arm/mm/ioremap.c           | 16 ++++++++++++++--
+>  drivers/mtd/maps/pxa2xx-flash.c |  6 +++---
+>  kernel/memremap.c               | 11 ++++++++---
+>  4 files changed, 37 insertions(+), 8 deletions(-)
+>
+> --
+> 2.5.0
+>
