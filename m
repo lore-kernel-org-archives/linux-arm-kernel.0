@@ -1,90 +1,74 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 31 Mar 2016 11:50:22 +0200
-Subject: [RFC PATCH 17/45] KVM: arm/arm64: vgic-new: Add PRIORITY
- registers handlers
-In-Reply-To: <1458871508-17279-18-git-send-email-andre.przywara@arm.com>
-References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
- <1458871508-17279-18-git-send-email-andre.przywara@arm.com>
-Message-ID: <20160331095022.GW4126@cbox>
+From: treding@nvidia.com (Thierry Reding)
+Date: Thu, 31 Mar 2016 11:56:02 +0200
+Subject: [v14, 01/17] drm: bridge: analogix/dp: split exynos dp driver to
+ bridge directory
+In-Reply-To: <20160330203204.GA24156@roeck-us.net>
+References: <1455534576-1486-1-git-send-email-ykk@rock-chips.com>
+ <20160330203204.GA24156@roeck-us.net>
+Message-ID: <20160331095600.GD26032@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 25, 2016 at 02:04:40AM +0000, Andre Przywara wrote:
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  virt/kvm/arm/vgic/vgic_mmio.c | 46 ++++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 45 insertions(+), 1 deletion(-)
+On Wed, Mar 30, 2016 at 01:32:04PM -0700, Guenter Roeck wrote:
+> Hi,
 > 
-> diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
-> index 8514f92..788e186 100644
-> --- a/virt/kvm/arm/vgic/vgic_mmio.c
-> +++ b/virt/kvm/arm/vgic/vgic_mmio.c
-> @@ -289,6 +289,50 @@ static int vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
->  	return 0;
->  }
->  
-> +static int vgic_mmio_read_priority(struct kvm_vcpu *vcpu,
-> +				   struct kvm_io_device *this,
-> +				   gpa_t addr, int len, void *val)
-> +{
-> +	struct vgic_io_device *iodev = container_of(this,
-> +						    struct vgic_io_device, dev);
-> +	u32 intid = (addr - iodev->base_addr);
-> +	int i;
-> +
-> +	if (iodev->redist_vcpu)
-> +		vcpu = iodev->redist_vcpu;
-> +
-> +	for (i = 0; i < len; i++) {
-> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-> +
-> +		((u8 *)val)[i] = irq->priority;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
-> +				    struct kvm_io_device *this,
-> +				    gpa_t addr, int len, const void *val)
-> +{
-> +	struct vgic_io_device *iodev = container_of(this,
-> +						    struct vgic_io_device, dev);
-> +	u32 intid = (addr - iodev->base_addr);
-> +	int i;
-> +
-> +	if (iodev->redist_vcpu)
-> +		vcpu = iodev->redist_vcpu;
-> +
-> +	for (i = 0; i < len; i++) {
-> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-> +
-> +		spin_lock(&irq->irq_lock);
-> +		irq->priority = ((u8 *)val)[i];
-> +		spin_unlock(&irq->irq_lock);
-
-if we add the priority check in PATCH 11 you have to kick the vcpu here
-irq->vcpu is set.  (and possibly even without a change to PATCH 11 in
-case the VCPU is running with a bund of now lower-priority interrupts in
-the LRs).
-
-> +	}
-> +
-> +	return 0;
-> +}
-> +
->  struct vgic_register_region vgic_v2_dist_registers[] = {
->  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
->  		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12),
-> @@ -307,7 +351,7 @@ struct vgic_register_region vgic_v2_dist_registers[] = {
->  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_CLEAR,
->  		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 1),
->  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PRI,
-> -		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 8),
-> +		vgic_mmio_read_priority, vgic_mmio_write_priority, 8),
->  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_TARGET,
->  		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 8),
->  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_CONFIG,
-> -- 
-> 2.7.3
+> On Mon, Feb 15, 2016 at 07:09:36PM +0800, Yakir Yang wrote:
+> > Split the dp core driver from exynos directory to bridge directory,
+> > and rename the core driver to analogix_dp_*, rename the platform
+> > code to exynos_dp.
+> > 
+> > Beside the new analogix_dp driver would export six hooks.
+> > "analogix_dp_bind()" and "analogix_dp_unbind()"
+> > "analogix_dp_suspned()" and "analogix_dp_resume()"
+> > "analogix_dp_detect()" and "analogix_dp_get_modes()"
+> > 
+> > The bind/unbind symbols is used for analogix platform driver to connect
+> > with analogix_dp core driver. And the detect/get_modes is used for analogix
+> > platform driver to init the connector.
+> > 
+> > They reason why connector need register in helper driver is rockchip drm
+> > haven't implement the atomic API, but Exynos drm have implement it, so
+> > there would need two different connector helper functions, that's why we
+> > leave the connector register in helper driver.
+> > 
+> > Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+> > 
+> [ ... ]
 > 
+> > diff --git a/drivers/gpu/drm/bridge/analogix/Makefile b/drivers/gpu/drm/bridge/analogix/Makefile
+> > new file mode 100644
+> > index 0000000..9107b86
+> > --- /dev/null
+> > +++ b/drivers/gpu/drm/bridge/analogix/Makefile
+> > @@ -0,0 +1 @@
+> > +obj-$(CONFIG_DRM_ANALOGIX_DP) += analogix_dp_core.o analogix_dp_reg.o
+> 
+> This results in the following build errors if DRM_ANALOGIX_DP
+> is configured as module.
+> 
+> ERROR: "analogix_dp_start_video" [drivers/gpu/drm/bridge/analogix/analogix_dp_core.ko] undefined!
+> ERROR: "analogix_dp_get_lane0_link_training" [drivers/gpu/drm/bridge/analogix/analogix_dp_core.ko] undefined!
+> ERROR: "analogix_dp_get_lane1_link_training" [drivers/gpu/drm/bridge/analogix/analogix_dp_core.ko] undefined!
+> ERROR: "analogix_dp_get_lane2_link_training" [drivers/gpu/drm/bridge/analogix/analogix_dp_core.ko] undefined!
+> ERROR: "analogix_dp_get_lane3_link_training" [drivers/gpu/drm/bridge/analogix/analogix_dp_core.ko] undefined!
+> ERROR: "analogix_dp_get_lane_count" [drivers/gpu/drm/bridge/analogix/analogix_dp_core.ko] undefined!
+> ERROR: "analogix_dp_get_link_bandwidth" [drivers/gpu/drm/bridge/analogix/analogix_dp_core.ko] undefined!
+> 
+> [ and so on ]
+
+Ugh... most of these functions shouldn't be there in the first place. We
+have helpers in the core that already do this. Most of the functionality
+is duplicated in this driver.
+
+I realize that this is a problem that existed in the Exynos DP driver,
+but somebody really ought to rewrite those parts to make use of the DRM
+DP helpers.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160331/5f26b101/attachment.sig>
