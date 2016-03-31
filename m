@@ -1,97 +1,33 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 31 Mar 2016 17:00:53 +0100
-Subject: [PATCH v1] arm64: allow building with kcov coverage on ARM64
-In-Reply-To: <CAG_fn=V+e=+-svWOCUirOy4SvBNgJR5JWCFDU3uE3aKwz9ihvw@mail.gmail.com>
-References: <57cb1b66d85b85eadea28ef3304a62b1327ded45.1459432254.git.glider@google.com>
- <20160331142908.GG26532@leverpostej>
- <CAG_fn=V+e=+-svWOCUirOy4SvBNgJR5JWCFDU3uE3aKwz9ihvw@mail.gmail.com>
-Message-ID: <20160331160052.GA26393@leverpostej>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 31 Mar 2016 09:02:47 -0700
+Subject: [v14, 01/17] drm: bridge: analogix/dp: split exynos dp driver to
+ bridge directory
+In-Reply-To: <20160331095600.GD26032@ulmo.nvidia.com>
+References: <1455534576-1486-1-git-send-email-ykk@rock-chips.com>
+ <20160330203204.GA24156@roeck-us.net>
+ <20160331095600.GD26032@ulmo.nvidia.com>
+Message-ID: <CAD=FV=VqWqtraAbMTN-Qn7gEOgLmrsXRAeRtxtB0qRj84JREeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 31, 2016 at 05:09:29PM +0200, Alexander Potapenko wrote:
-> On Thu, Mar 31, 2016 at 4:29 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > Hi,
-> >
-> > On Thu, Mar 31, 2016 at 03:54:45PM +0200, Alexander Potapenko wrote:
-> >> Add ARCH_HAS_KCOV to ARM64 config. Disable instrumentation of
-> >> arch/arm64/lib/delay.c
-> >
-> > Why do we disable instrumentation of delay.c?
-> The main purpose of kcov is collecting coverage from syscalls. As far
-> as I understand, coverage of functions from delay.c doesn't
-> deterministically depend on the syscalls being called and their
-> arguments.
-> The initial kcov implementation
-> (https://github.com/torvalds/linux/commit/5c9a8750a6409c63a0f01d51a9024861022f6593)
-> disabled instrumentation of arch/x86/lib/delay.c, so I just copied
-> that chunk.
-> 
-> > What exactly does kcov instrumentation imply? Does it require certain
-> > data to be mapped or certain functions to be callable while instrumented
-> > functions are called?
-> Yes, there is __sanitizer_cov_trace_pc() that must be callable.
+Hi,
 
-That will definitely be a problem for the KVM code which is run at a
-different exception level with a different memory map. For GCOV, KASAN,
-and UBSAN we simply disable instrumentation of that code [1].
+On Thu, Mar 31, 2016 at 2:56 AM, Thierry Reding <treding@nvidia.com> wrote:
+> Ugh... most of these functions shouldn't be there in the first place. We
+> have helpers in the core that already do this. Most of the functionality
+> is duplicated in this driver.
+>
+> I realize that this is a problem that existed in the Exynos DP driver,
+> but somebody really ought to rewrite those parts to make use of the DRM
+> DP helpers.
 
-We should be able to do similarly for KCOV.
+As I understand it from discussions in
+<http://article.gmane.org/gmane.linux.drivers.devicetree/162059> and
+<http://article.gmane.org/gmane.linux.kernel.samsung-soc/53048>, we
+shouldn't block merging the series but someone should pick up this
+work after the merge.
 
-> At boot time |current->kcov_mode| zero, so it virtually does nothing.
-> 
-> Currently kcov instrumentation is disabled for the following files:
+So probably Yakir should fixup the problem pointed out by Guenter and
+send a new pull.
 
-> arch/x86/boot/*
-> arch/x86/boot/compressed/*
-> arch/x86/entry/vdso/*
-> arch/x86/realmode/rm/*
-
-These are executed outside of the usual kernel context / address space,
-so excluding these makes sense to me.
-
-> arch/x86/kernel/*
-> arch/x86/kernel/apic/*
-> arch/x86/kernel/cpu/common.c
-> arch/x86/kernel/cpu/perf_event.c
-> arch/x86/lib/delay.c
-> arch/x86/mm/tlb.c
-
-For these, it's not immediately clear to me why instrumentation is
-disabled, so I don't know whether or not we can instrument the analogous
-arm64 code.
-
-> Only a handful of the above have corresponding files in arch/arm64:
-> arch/arm64/boot/*
-> arch/arm64/kernel/*
-> arch/arm64/lib/delay.c
-
-We have arch/arm64/kernel/perf_event.c, and a couple of other files that
-are directly analogous, even if the paths don't quite line up.
-
-> My patch explicitly disables instrumentation for arch/arm64/lib/delay.c.
-> I never had problems with arch/arm64/boot/* and arch/arm64/kernel/* in
-> the 3.18 kernel, although instrumentation of the corresponding x86
-> code is claimed to cause boot-time hangs.
-> We can act conservatively and still disable instrumentation for these
-> two dirs just to make sure nothing breaks in the future.
-
-I'd rather that we understood why instrumentation of the above is
-disabled, such that we can make a sensible decision from the outset.
-
-> > We have some C code that is run outside of the normal kernel context
-> > (e.g. EFI stub, KVM hyp code), and I suspect it may be necessary to
-> > disable instrumentation for those also.
-> EFI stub and a number of other files is already disabled by the
-> initial kcov patch.
-> I understand there might be some code specific to ARM64 that I may
-> have overlooked, so I'd be grateful if someone could try the patch out
-> with the upstream kernel.
-
-The only such code that I'm immediately aware of is the hyp-context KVM
-code, as mentioned above.
-
-Thanks,
-Mark.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/416790.html
+-Doug
