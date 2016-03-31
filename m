@@ -1,89 +1,175 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 31 Mar 2016 13:31:26 +0200
-Subject: [RFC PATCH 20/45] KVM: arm/arm64: vgic-new: Add TARGET registers
- handlers
-In-Reply-To: <1458871508-17279-21-git-send-email-andre.przywara@arm.com>
-References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
- <1458871508-17279-21-git-send-email-andre.przywara@arm.com>
-Message-ID: <20160331113126.GZ4126@cbox>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Thu, 31 Mar 2016 19:23:45 +0800
+Subject: [PATCH v9 17/17] Xen: EFI: Parse DT parameters for Xen specific UEFI
+In-Reply-To: <1459423425-1220-1-git-send-email-zhaoshenglong@huawei.com>
+References: <1459423425-1220-1-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1459423425-1220-18-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 25, 2016 at 02:04:43AM +0000, Andre Przywara wrote:
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  virt/kvm/arm/vgic/vgic_mmio.c | 43 ++++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 42 insertions(+), 1 deletion(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
-> index 76657ce..cde153f 100644
-> --- a/virt/kvm/arm/vgic/vgic_mmio.c
-> +++ b/virt/kvm/arm/vgic/vgic_mmio.c
-> @@ -471,6 +471,47 @@ static int vgic_mmio_write_config(struct kvm_vcpu *vcpu,
->  	return 0;
->  }
->  
-> +static int vgic_mmio_read_target(struct kvm_vcpu *vcpu,
-> +				 struct kvm_io_device *this,
-> +				 gpa_t addr, int len, void *val)
-> +{
-> +	struct vgic_io_device *iodev = container_of(this,
-> +						    struct vgic_io_device, dev);
-> +	u32 intid = (addr - iodev->base_addr);
-> +	int i;
-> +
-> +	if (iodev->redist_vcpu)
-> +		vcpu = iodev->redist_vcpu;
-> +
-> +	for (i = 0; i < len; i++) {
-> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-> +
-> +		((u8 *)val)[i] = irq->targets;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int vgic_mmio_write_target(struct kvm_vcpu *vcpu,
-> +				  struct kvm_io_device *this,
-> +				  gpa_t addr, int len, const void *val)
-> +{
-> +	struct vgic_io_device *iodev = container_of(this,
-> +						    struct vgic_io_device, dev);
-> +	u32 intid = (addr - iodev->base_addr);
-> +	int i;
-> +
-> +	/* GICD_ITARGETSR[0-7] are read-only */
-> +	if (intid < VGIC_NR_PRIVATE_IRQS)
-> +		return 0;
-> +
-> +	for (i = 0; i < len; i++)
-> +		vgic_v2_irq_change_affinity(vcpu->kvm, intid + i,
-> +					    ((u8 *)val)[i]);
-> +
-> +	return 0;
-> +}
-> +
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-these functions are v2 specific but are in a generic file and are not
-named anything specific to v2?
+Add a new function to parse DT parameters for Xen specific UEFI just
+like the way for normal UEFI. Then it could reuse the existing codes.
 
->  struct vgic_register_region vgic_v2_dist_registers[] = {
->  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
->  		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12),
-> @@ -491,7 +532,7 @@ struct vgic_register_region vgic_v2_dist_registers[] = {
->  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PRI,
->  		vgic_mmio_read_priority, vgic_mmio_write_priority, 8),
->  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_TARGET,
-> -		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 8),
-> +		vgic_mmio_read_target, vgic_mmio_write_target, 8),
->  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_CONFIG,
->  		vgic_mmio_read_config, vgic_mmio_write_config, 2),
->  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SOFTINT,
-> -- 
-> 2.7.3
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe kvm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+If Xen supports EFI, initialize runtime services.
+
+CC: Matt Fleming <matt@codeblueprint.co.uk>
+Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+Reviewed-by: Matt Fleming <matt@codeblueprint.co.uk>
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+---
+ arch/arm/xen/enlighten.c           |  6 +++++
+ drivers/firmware/efi/arm-runtime.c | 17 +++++++++-----
+ drivers/firmware/efi/efi.c         | 45 ++++++++++++++++++++++++++++++++------
+ 3 files changed, 56 insertions(+), 12 deletions(-)
+
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index 13e3e9f..e130562 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -261,6 +261,12 @@ static int __init fdt_find_hyper_node(unsigned long node, const char *uname,
+ 	    !strncmp(hyper_node.prefix, s, strlen(hyper_node.prefix)))
+ 		hyper_node.version = s + strlen(hyper_node.prefix);
+ 
++	if (IS_ENABLED(CONFIG_XEN_EFI)) {
++		/* Check if Xen supports EFI */
++		if (of_get_flat_dt_subnode_by_name(node, "uefi") > 0)
++			set_bit(EFI_PARAVIRT, &efi.flags);
++	}
++
+ 	return 0;
+ }
+ 
+diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
+index 6ae21e4..ac609b9 100644
+--- a/drivers/firmware/efi/arm-runtime.c
++++ b/drivers/firmware/efi/arm-runtime.c
+@@ -27,6 +27,7 @@
+ #include <asm/mmu.h>
+ #include <asm/pgalloc.h>
+ #include <asm/pgtable.h>
++#include <asm/xen/xen-ops.h>
+ 
+ extern u64 efi_system_table;
+ 
+@@ -107,13 +108,19 @@ static int __init arm_enable_runtime_services(void)
+ 	}
+ 	set_bit(EFI_SYSTEM_TABLES, &efi.flags);
+ 
+-	if (!efi_virtmap_init()) {
+-		pr_err("No UEFI virtual mapping was installed -- runtime services will not be available\n");
+-		return -ENOMEM;
++	if (IS_ENABLED(CONFIG_XEN_EFI) && efi_enabled(EFI_PARAVIRT)) {
++		/* Set up runtime services function pointers for Xen Dom0 */
++		xen_efi_runtime_setup();
++	} else {
++		if (!efi_virtmap_init()) {
++			pr_err("No UEFI virtual mapping was installed -- runtime services will not be available\n");
++			return -ENOMEM;
++		}
++
++		/* Set up runtime services function pointers */
++		efi_native_runtime_setup();
+ 	}
+ 
+-	/* Set up runtime services function pointers */
+-	efi_native_runtime_setup();
+ 	set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
+ 
+ 	efi.runtime_version = efi.systab->hdr.revision;
+diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
+index 3a69ed5..519c096 100644
+--- a/drivers/firmware/efi/efi.c
++++ b/drivers/firmware/efi/efi.c
+@@ -469,12 +469,14 @@ device_initcall(efi_load_efivars);
+ 		FIELD_SIZEOF(struct efi_fdt_params, field) \
+ 	}
+ 
+-static __initdata struct {
++struct params {
+ 	const char name[32];
+ 	const char propname[32];
+ 	int offset;
+ 	int size;
+-} dt_params[] = {
++};
++
++static struct params fdt_params[] __initdata = {
+ 	UEFI_PARAM("System Table", "linux,uefi-system-table", system_table),
+ 	UEFI_PARAM("MemMap Address", "linux,uefi-mmap-start", mmap),
+ 	UEFI_PARAM("MemMap Size", "linux,uefi-mmap-size", mmap_size),
+@@ -482,24 +484,45 @@ static __initdata struct {
+ 	UEFI_PARAM("MemMap Desc. Version", "linux,uefi-mmap-desc-ver", desc_ver)
+ };
+ 
++static struct params xen_fdt_params[] __initdata = {
++	UEFI_PARAM("System Table", "xen,uefi-system-table", system_table),
++	UEFI_PARAM("MemMap Address", "xen,uefi-mmap-start", mmap),
++	UEFI_PARAM("MemMap Size", "xen,uefi-mmap-size", mmap_size),
++	UEFI_PARAM("MemMap Desc. Size", "xen,uefi-mmap-desc-size", desc_size),
++	UEFI_PARAM("MemMap Desc. Version", "xen,uefi-mmap-desc-ver", desc_ver)
++};
++
+ struct param_info {
+ 	int found;
+ 	void *params;
++	struct params *dt_params;
++	int size;
+ };
+ 
+ static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
+ 				       int depth, void *data)
+ {
+ 	struct param_info *info = data;
++	struct params *dt_params = info->dt_params;
+ 	const void *prop;
+ 	void *dest;
+ 	u64 val;
+-	int i, len;
++	int i, len, offset;
+ 
+-	if (depth != 1 || strcmp(uname, "chosen") != 0)
+-		return 0;
++	if (efi_enabled(EFI_PARAVIRT)) {
++		if (depth != 1 || strcmp(uname, "hypervisor") != 0)
++			return 0;
+ 
+-	for (i = 0; i < ARRAY_SIZE(dt_params); i++) {
++		offset = of_get_flat_dt_subnode_by_name(node, "uefi");
++		if (offset < 0)
++			return 0;
++		node = offset;
++	} else {
++		if (depth != 1 || strcmp(uname, "chosen") != 0)
++			return 0;
++	}
++
++	for (i = 0; i < info->size; i++) {
+ 		prop = of_get_flat_dt_prop(node, dt_params[i].propname, &len);
+ 		if (!prop)
+ 			return 0;
+@@ -530,12 +553,20 @@ int __init efi_get_fdt_params(struct efi_fdt_params *params)
+ 	info.found = 0;
+ 	info.params = params;
+ 
++	if (efi_enabled(EFI_PARAVIRT)) {
++		info.dt_params = xen_fdt_params;
++		info.size = ARRAY_SIZE(xen_fdt_params);
++	} else {
++		info.dt_params = fdt_params;
++		info.size = ARRAY_SIZE(fdt_params);
++	}
++
+ 	ret = of_scan_flat_dt(fdt_find_uefi_params, &info);
+ 	if (!info.found)
+ 		pr_info("UEFI not found.\n");
+ 	else if (!ret)
+ 		pr_err("Can't find '%s' in device tree!\n",
+-		       dt_params[info.found].name);
++		       info.dt_params[info.found].name);
+ 
+ 	return ret;
+ }
+-- 
+2.0.4
