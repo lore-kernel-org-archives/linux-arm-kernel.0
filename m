@@ -1,51 +1,29 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 31 Mar 2016 20:30:19 +0200
-Subject: [RFC PATCH 00/45] KVM: arm/arm64: Rework virtual GIC emulation
-In-Reply-To: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
-References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <20160331183019.GK4126@cbox>
+From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
+Date: Thu, 31 Mar 2016 13:48:00 -0500
+Subject: [PATCHv2 0/7] Add Altera Arria10 OCRAM EDAC support
+Message-ID: <1459450087-24792-1-git-send-email-tthayer@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 25, 2016 at 02:04:23AM +0000, Andre Przywara wrote:
-> This series is a joint effort to re-implement KVM's GIC emulation.
-> 
-> While the current implementation is centered around providing
-> efficient MMIO emulation, the hot path for most guests is actually
-> the guest entry and exit, which currently is rather costly.
-> Also the existing emulation has a global distributor lock, which
-> quickly becomes a bottleneck once the number of VCPUs increases.
-> Additionally the emulation was originally designed for GICv2, adding
-> GICv3 ITS emulation support to this proved to be rather painful.
-> Last, but not least the existing code became less and less
-> maintainable, with many special cases handled explicitly.
-> 
-> The new implementation is build around a struct vgic_irq data data
-> structure, which holds all information about a virtual interrupt.
-> Interruts which should be injected are hold in a per-VCPU list, this
-> make the entry/exit path much more efficient. Also the new structure
-> allows to have more fine grained locking - per IRQ and per VCPU -
-> getting rid of the global distributor lock.
-> As a result of the new design ITS emulation fits in more nicely, the
-> respective code will be provided as a follow-up series.
-> 
-> This series implements the same feature set as the existing emulation,
-> as a goodie we now implement priorities correctly.
-> To allow an easy transition with good test coverage, but still maintain
-> stability, both implementations live side by side, selectable via a
-> Kconfig option. The default is the new implementation.
-> If this code proves to be reliable, we will later remove the current
-> implementation with an extra patch set.
-> 
-> Please have a look at the series, review it and give the code some
-> serious testing (and possibly debugging). All feedback is appreciated.
-> 
+From: Thor Thayer <tthayer@opensource.altera.com>
 
-Hmph, starting a guest a couple of times and running hackbench inside
-the guest actually gave me (twice) the following error:
+This series of patches adds the Arria10 OCRAM EDAC support
 
-NMI watchdog: BUG: soft lockup - CPU#0 stuck for 23s! [kworker/0:0:4]
+Thor Thayer (7):
+  EDAC, altera: New file operations for Arria10 ECC modules
+  EDAC, altera: Add register offset for ECC Enable
+  EDAC, altera: Make OCRAM ECC dependency check generic
+  Documentation: dt: socfpga: Add Altera Arria10 OCRAM binding
+  EDAC, altera: Addition of Arria10 OCRAM ECC
+  ARM: socfpga: Enable Arria10 OCRAM ECC on startup
+  ARM: dts: Add Altera Arria10 OCRAM EDAC devicetree entry
 
-(that is using your branch on Mustang).
+ .../bindings/arm/altera/socfpga-eccmgr.txt         |   10 ++
+ arch/arm/boot/dts/socfpga_arria10.dtsi             |    5 +
+ arch/arm/mach-socfpga/ocram.c                      |  128 ++++++++++++++++++++
+ drivers/edac/altera_edac.c                         |  127 +++++++++++++++----
+ drivers/edac/altera_edac.h                         |   37 ++++++
+ 5 files changed, 284 insertions(+), 23 deletions(-)
 
--Christoffer
+-- 
+1.7.9.5
