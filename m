@@ -1,32 +1,59 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Thu, 31 Mar 2016 14:25:02 +0200
-Subject: [RFC PATCH 12/45] KVM: arm/arm64: vgic-new: Add MMIO handling
- framework
-In-Reply-To: <CAMJs5B_5onpRW3DYGqO=LXc2RTM7OQV6itcfQJMy+PuR29c85w@mail.gmail.com>
-References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
- <1458871508-17279-13-git-send-email-andre.przywara@arm.com>
- <20160331090824.GR4126@cbox>
- <CAMJs5B_5onpRW3DYGqO=LXc2RTM7OQV6itcfQJMy+PuR29c85w@mail.gmail.com>
-Message-ID: <56FD171E.1040401@redhat.com>
+From: cwchoi00@gmail.com (Chanwoo Choi)
+Date: Thu, 31 Mar 2016 21:28:32 +0900
+Subject: [PATCH v7 01/20] PM / devfreq: exynos: Add generic exynos bus
+ frequency driver
+In-Reply-To: <56FD13D2.1050300@samsung.com>
+References: <1459415165-32613-1-git-send-email-cw00.choi@samsung.com>
+ <1459415165-32613-2-git-send-email-cw00.choi@samsung.com>
+ <56FD13D2.1050300@samsung.com>
+Message-ID: <CAGTfZH0mgxyQPKBTX=ZXgtSn=bQ2zAMSNMHfO+OXh3U5qrUr4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Mar 31, 2016 at 9:10 PM, Sylwester Nawrocki
+<s.nawrocki@samsung.com> wrote:
+> On 03/31/2016 11:05 AM, Chanwoo Choi wrote:
+>
+>> +static int exynos_bus_target(struct device *dev, unsigned long *freq, u32 flags)
+>> +{
+>
+>> +     new_opp = devfreq_recommended_opp(dev, freq, flags);
+>> +     if (IS_ERR_OR_NULL(new_opp)) {
+>> +             dev_err(dev, "failed to get recommed opp instance\n");
+>
+> s/recommed/recommended/
 
+OK. I'll fix it.
 
-On 31/03/2016 11:09, Christoffer Dall wrote:
->> My comments to Vladimir's bug report notwithstanding, there's still a
->> choice here to:
->>
->> 1) Expand/modify the KVM IO bus framework to take an arbitrary number of devices
->>
->> 2) Build a KVM architectureal generic framework on top of the IO bus
->> framework to handle individual register regions.
->>
->> 3) Stick with what we had before, do not modify the KVM IO bus stuff,
->> and handle the individual register region business locally within the
->> arm/vgic code.
+>
+>> +             rcu_read_unlock();
+>> +             return PTR_ERR(new_opp);
+>> +     }
+>
+>> +}
+>
+>> +static int exynos_bus_probe(struct platform_device *pdev)
+>> +{
+>
+>> +     bus->devfreq = devm_devfreq_add_device(dev, profile, "simple_ondemand",
+>> +                                             ondemand_data);
+>> +     if (IS_ERR_OR_NULL(bus->devfreq)) {
+>> +             dev_err(dev, "failed to add devfreq device\n");
+>> +             return  PTR_ERR(bus->devfreq);
+>> +     }
+>
+>> +}
+>
+> You should use IS_ERR() instead of IS_ERR_OR_NULL(), since functions
+> of which the return value is being tested return only ERR_PTR() values.
+> IS_ERR_OR_NULL() suggest NULL values are possible and then constructs
+> like
+>         if (IS_ERR_OR_NULL(result))
+>                 return PTR_ERR(result);
+>
+> are not correct anyway.
 
-I prefer 3, or alternatively just add the framework in virt/kvm/arm so
-that it can be migrated to virt/kvm if someone else needs it.
+OK. I'll use IS_ERR() instead of IS_ERR_OR_NULL()
 
-Paolo
+Thanks,
+Chanwoo Choi
