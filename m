@@ -1,13 +1,11 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 31 Mar 2016 20:28:42 +0200
+Date: Thu, 31 Mar 2016 20:30:19 +0200
 Subject: [RFC PATCH 00/45] KVM: arm/arm64: Rework virtual GIC emulation
 In-Reply-To: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
 References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <20160331182842.GJ4126@cbox>
+Message-ID: <20160331183019.GK4126@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Hi Andre,
 
 On Fri, Mar 25, 2016 at 02:04:23AM +0000, Andre Przywara wrote:
 > This series is a joint effort to re-implement KVM's GIC emulation.
@@ -43,24 +41,11 @@ On Fri, Mar 25, 2016 at 02:04:23AM +0000, Andre Przywara wrote:
 > serious testing (and possibly debugging). All feedback is appreciated.
 > 
 
-Huge thanks for all the hard work in putting this together, I'm sure it
-hasn't been easy.
+Hmph, starting a guest a couple of times and running hackbench inside
+the guest actually gave me (twice) the following error:
 
-I have gone through this series and I think we're overall in pretty good
-shape.  I haven't reviewed the code in detail, checked every bitfield
-etc., but focused on the overall design choices, locking correctness
-etc.
+NMI watchdog: BUG: soft lockup - CPU#0 stuck for 23s! [kworker/0:0:4]
 
-A number of patches don't have have commit message and some commit
-messages could be clarified, but it is what it is.
+(that is using your branch on Mustang).
 
-I've given this a quick test on Mustang and on TC2, and it builds and
-appears to run decently stable.  Obviously we should give this some more
-rigorous testing, but I will wait until v2 with that.
-
-I'll probably send the timer/vgic interface changes bits as patches for
-you to base the next series on, assuming you and the others agreed with
-my comments and suggestions on that part here.
-
-Thanks,
 -Christoffer
