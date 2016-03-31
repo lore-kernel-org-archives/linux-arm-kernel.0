@@ -1,33 +1,50 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 31 Mar 2016 09:02:47 -0700
-Subject: [v14, 01/17] drm: bridge: analogix/dp: split exynos dp driver to
- bridge directory
-In-Reply-To: <20160331095600.GD26032@ulmo.nvidia.com>
-References: <1455534576-1486-1-git-send-email-ykk@rock-chips.com>
- <20160330203204.GA24156@roeck-us.net>
- <20160331095600.GD26032@ulmo.nvidia.com>
-Message-ID: <CAD=FV=VqWqtraAbMTN-Qn7gEOgLmrsXRAeRtxtB0qRj84JREeA@mail.gmail.com>
+From: tthayer@opensource.altera.com (Thor Thayer)
+Date: Thu, 31 Mar 2016 11:08:12 -0500
+Subject: [PATCH 6/7] ARM: socfpga: Enable Arria10 OCRAM ECC on startup
+In-Reply-To: <alpine.DEB.2.02.1603301209360.21508@linux-builds1>
+References: <1459351668-14622-1-git-send-email-tthayer@opensource.altera.com>
+ <1459351668-14622-7-git-send-email-tthayer@opensource.altera.com>
+ <alpine.DEB.2.02.1603301209360.21508@linux-builds1>
+Message-ID: <56FD4B6C.3070608@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Dinh,
 
-On Thu, Mar 31, 2016 at 2:56 AM, Thierry Reding <treding@nvidia.com> wrote:
-> Ugh... most of these functions shouldn't be there in the first place. We
-> have helpers in the core that already do this. Most of the functionality
-> is duplicated in this driver.
+On 03/30/2016 12:11 PM, Dinh Nguyen wrote:
+> On Wed, 30 Mar 2016, tthayer at opensource.altera.com wrote:
 >
-> I realize that this is a problem that existed in the Exynos DP driver,
-> but somebody really ought to rewrite those parts to make use of the DRM
-> DP helpers.
-
-As I understand it from discussions in
-<http://article.gmane.org/gmane.linux.drivers.devicetree/162059> and
-<http://article.gmane.org/gmane.linux.kernel.samsung-soc/53048>, we
-shouldn't block merging the series but someone should pick up this
-work after the merge.
-
-So probably Yakir should fixup the problem pointed out by Guenter and
-send a new pull.
-
--Doug
+>> From: Thor Thayer <tthayer@opensource.altera.com>
+>>
+>> Enable ECC for Arria10 On-Chip RAM on machine startup. The ECC has to be
+>> enabled before data is stored in memory otherwise the ECC will fail
+>> on reads.
+>>
+>> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+>> ---
+>
+> [snip]
+>
+>> +
+>> +void socfpga_init_arria10_ocram_ecc(void)
+>> +{
+>> +	struct device_node *np;
+>> +	int ret;
+>> +
+>> +	/* Find the OCRAM EDAC device tree node */
+>> +	np = of_find_compatible_node(NULL, NULL, "altr,socfpga-a10-ocram-ecc");
+>> +	if (!np) {
+>> +		pr_err("Unable to find socfpga-a10-ocram-ecc\n");
+>> +		return;
+>> +	}
+>> +
+>> +	ret = altr_init_a10_ecc_block(np, A10_SYSMGR_ECC_INTSTAT_OCRAM,
+>> +				      ALTR_A10_OCRAM_ECC_EN_CTL, 0);
+>
+> I think this is a no-no, you shouldn't be making a call directly into the driver
+> from here.
+>
+> BR,
+> Dinh
+>
+OK. I'll make the initialization local and resubmit. Thanks for reviewing.
