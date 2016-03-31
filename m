@@ -1,71 +1,64 @@
-From: yao.yuan@freescale.com (Yuan Yao)
-Date: Thu, 31 Mar 2016 14:45:01 +0800
-Subject: [PATCH 2/2] dts/ls1043a: add the DTS node for QSPI support
-In-Reply-To: <1459406701-40993-1-git-send-email-yao.yuan@freescale.com>
-References: <1459406701-40993-1-git-send-email-yao.yuan@freescale.com>
-Message-ID: <1459406701-40993-3-git-send-email-yao.yuan@freescale.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 31 Mar 2016 08:57:35 +0200
+Subject: [PATCH v5 34/46] clk: pwm: switch to the atomic API
+In-Reply-To: <20160330220149.GU18567@codeaurora.org>
+References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1459368249-13241-35-git-send-email-boris.brezillon@free-electrons.com>
+ <20160330220149.GU18567@codeaurora.org>
+Message-ID: <20160331085735.3574970b@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yuan Yao <yao.yuan@nxp.com>
+Hi Stephen,
 
-Signed-off-by: Yuan Yao <yao.yuan@nxp.com>
----
- arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts | 16 ++++++++++++++++
- arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi    | 14 ++++++++++++++
- 2 files changed, 30 insertions(+)
+On Wed, 30 Mar 2016 15:01:49 -0700
+Stephen Boyd <sboyd@codeaurora.org> wrote:
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
-index 97e9906..c8303a3 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
-@@ -100,6 +100,22 @@
- 	};
- };
- 
-+&qspi {
-+	num-cs = <2>;
-+	bus-num = <0>;
-+	status = "okay";
-+	fsl,ddr-sampling-point = <4>;
-+
-+	qflash0: s25fl128s at 0 {
-+		compatible = "spansion,m25p80";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		spi-max-frequency = <20000000>;
-+		ddr-quad-read;
-+		reg = <0>;
-+	};
-+};
-+
- &i2c0 {
- 	status = "okay";
- 	pca9547 at 77 {
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-index be72bf5..49b1aeb 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-@@ -208,6 +208,20 @@
- 			status = "disabled";
- 		};
- 
-+		qspi: quadspi at 1550000 {
-+			compatible = "fsl,ls1043a-qspi", "fsl,ls1021a-qspi";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x0 0x1550000 0x0 0x10000>,
-+				<0x0 0x40000000 0x0 0x4000000>;
-+			reg-names = "QuadSPI", "QuadSPI-memory";
-+			interrupts = <0 99 0x4>;
-+			clock-names = "qspi_en", "qspi";
-+			clocks = <&clockgen 4 0>, <&clockgen 4 0>;
-+			big-endian;
-+			status = "disabled";
-+		};
-+
- 		i2c0: i2c at 2180000 {
- 			compatible = "fsl,vf610-i2c";
- 			#address-cells = <1>;
+> On 03/30, Boris Brezillon wrote:
+> > diff --git a/drivers/clk/clk-pwm.c b/drivers/clk/clk-pwm.c
+> > index ebcd738..49ec5b1 100644
+> > --- a/drivers/clk/clk-pwm.c
+> > +++ b/drivers/clk/clk-pwm.c
+> > @@ -28,15 +28,29 @@ static inline struct clk_pwm *to_clk_pwm(struct clk_hw *hw)
+> >  static int clk_pwm_prepare(struct clk_hw *hw)
+> >  {
+> >  	struct clk_pwm *clk_pwm = to_clk_pwm(hw);
+> > +	struct pwm_state pstate;
+> >  
+> > -	return pwm_enable(clk_pwm->pwm);
+> > +	pwm_get_state(clk_pwm->pwm, &pstate);
+> > +	if (pstate.enabled)
+> > +		return 0;
+> > +
+> > +	pstate.enabled = true;
+> > +
+> > +	return pwm_apply_state(clk_pwm->pwm, &pstate);
+> 
+> This doesn't seem atomic anymore if we're checking the state and
+> then not calling apply_state if it's already enabled. But I
+> assume this doesn't matter because we "own" the pwm here?
+
+Yep. Actually it's not atomic in term of concurrency (maybe the
+'atomic' word is not appropriate here). Atomicity is here referring to
+the fact that we're now providing all the PWM parameters in the same
+request instead of splitting it in pwm_config() + pwm_enable/disable()
+calls.
+
+Concurrent accesses still have to be controlled by the PWM user (which
+is already the case for this driver, thanks to the locking
+infrastructure in the CCF).
+
+> Otherwise I would think this would be unconditional apply state
+> and duplicates would be ignored in the pwm framework.
+> 
+
+Yep, I'll remove the if (pstate.enabled) branch.
+
+Thanks for your review.
+
+Boris
+
 -- 
-2.1.0.27.g96db324
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
