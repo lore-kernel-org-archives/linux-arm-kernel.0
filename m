@@ -1,49 +1,44 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 31 Mar 2016 13:42:16 +0100
-Subject: [PATCH v7 12/17] ARM64: ACPI: Check if it runs on Xen to enable
- or disable ACPI
-In-Reply-To: <CAKv+Gu-wPq_FzO3sm7bhSFuu7EVxHWB_v6HOn1GqNbdaE-iBoQ@mail.gmail.com>
-References: <1458830676-27075-1-git-send-email-shannon.zhao@linaro.org>
- <1458830676-27075-13-git-send-email-shannon.zhao@linaro.org>
- <20160329161837.GH6745@arm.com>
- <20160329163147.GB27223@leverpostej> <56FB7E00.7030400@huawei.com>
- <alpine.DEB.2.02.1603311155450.11739@kaball.uk.xensource.com>
- <CAKv+Gu-wPq_FzO3sm7bhSFuu7EVxHWB_v6HOn1GqNbdaE-iBoQ@mail.gmail.com>
-Message-ID: <20160331124216.GE26532@leverpostej>
+From: huawei.libin@huawei.com (Li Bin)
+Date: Thu, 31 Mar 2016 20:45:05 +0800
+Subject: [PATCH 2/2] arm64: Fix watchpoint recursion when single-step is
+ wrongly triggered in irq
+In-Reply-To: <20160321102423.GB15150@dhcppc6.redhat.com>
+References: <1458549470-124791-1-git-send-email-hekuang@huawei.com>
+ <1458549470-124791-2-git-send-email-hekuang@huawei.com>
+ <20160321102423.GB15150@dhcppc6.redhat.com>
+Message-ID: <56FD1BD1.7070101@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 31, 2016 at 01:44:08PM +0200, Ard Biesheuvel wrote:
-> The heuristic is there to decide whether some DTB image contains a
-> complete description of the platform, or only some data handed over by
-> the bootloader. Arguably, a DT containing both /chosen and /hypervisor
-> but nothing else can still not describe an actual platform, and
-> whether we execute under Xen or not is completely irrelevant.
+Hi Pratyush,
 
-I disagree somewhat.
+on 2016/3/21 18:24, Pratyush Anand wrote:
+> On 21/03/2016:08:37:50 AM, He Kuang wrote:
+>> On arm64, watchpoint handler enables single-step to bypass the next
+>> instruction for not recursive enter. If an irq is triggered right
+>> after the watchpoint, a single-step will be wrongly triggered in irq
+>> handler, which causes the watchpoint address not stepped over and
+>> system hang.
+> 
+> Does patch [1] resolves this issue as well? I hope it should. Patch[1] has still
+> not been sent for review. Your test result will be helpful.
+> 
+> ~Pratyush
+> 
+> [1] https://github.com/pratyushanand/linux/commit/7623c8099ac22eaa00e7e0f52430f7a4bd154652
 
-In general, a /hypervisor node may not be a Xen node, and could
-potentially imply some platform description. As /hypervisor is a generic
-name up for grabs by any hypervisor, we simply cannot make assumptions
-about it.
-
-As /chosen is a special reserved path that implies a particular binding
-and has no compatible string, so checking its path alone is correct.
-
-While we do check that the /hypervisor node is "xen,xen" compatible
-elsewhere, the canonical mechanism of checking for a Xen node (as
-opposed to any hypervisor's node) is to check the compatible string.
-
-If we are going to handle nodes for other hypervisors while treating the
-DTB as empty, we need code and discussion regarding said hypervisor.
-
-Hence, for checking for a Xen /hypervisor node, I would prefer we
-checked the compatible string rather than the path.
-
-An is_xen_node() helper (which could also check that the path is
-"/hypervisor") would avoid having redundant, subtly distinct ways of
-checking, and would explicitly document precisely what we are checking
-for.
+This patch did not consider that, when excetpion return, the singlestep flag
+should be restored, otherwise the right singlestep will not triggered.
+Right?
 
 Thanks,
-Mark.
+Li Bin
+
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> .
+> 
