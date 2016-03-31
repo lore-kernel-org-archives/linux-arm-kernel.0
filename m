@@ -1,234 +1,357 @@
-From: pmladek@suse.com (Petr Mladek)
-Date: Thu, 31 Mar 2016 14:36:57 +0200
-Subject: [PATCH v4 5/5] printk/nmi: flush NMI messages on the system panic
-In-Reply-To: <201603310000.dKufp7mg%fengguang.wu@intel.com>
-References: <1459353210-20260-6-git-send-email-pmladek@suse.com>
- <201603310000.dKufp7mg%fengguang.wu@intel.com>
-Message-ID: <20160331123657.GN5522@pathway.suse.cz>
+From: Yisen.Zhuang@huawei.com (Yisen Zhuang)
+Date: Thu, 31 Mar 2016 21:00:09 +0800
+Subject: [PATCH v2 net-next] net: hns: add support of pause frame ctrl for HNS
+ V2
+Message-ID: <1459429209-230671-1-git-send-email-Yisen.Zhuang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 2016-03-31 00:33:54, kbuild test robot wrote:
-> Hi Petr,
-> 
-> [auto build test ERROR on v4.6-rc1]
-> [cannot apply to tip/x86/core next-20160330]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
-> 
-> url:    https://github.com/0day-ci/linux/commits/Petr-Mladek/Cleaning-printk-stuff-in-NMI-context/20160330-235818
-> config: i386-randconfig-s1-201613 (attached as .config)
-> reproduce:
->         # save the attached .config to linux build tree
->         make ARCH=i386 
-> 
-> All errors (new ones prefixed by >>):
-> 
->    kernel/printk/nmi.c: In function 'printk_nmi_flush_on_panic':
-> >> kernel/printk/nmi.c:218:4: error: implicit declaration of function 'debug_locks_off' [-Werror=implicit-function-declaration]
->        debug_locks_off();
->        ^
->    cc1: some warnings being treated as errors
+From: Lisheng <lisheng011@huawei.com>
 
-Fixed by adding #include <linux/debug_locks.h> into kernel/printk/nmi.c
+The patch adds support of pause ctrl for HNS V2, and this feature is lost
+by HNS V1:
+       1) service ports can disable rx pause frame,
+       2) debug ports can open tx/rx pause frame.
 
-Please, find the updated patch below.
+And this patch updates the REGs about the pause ctrl when updated
+status function called by upper layer routine.
 
-
->From 52cc5fee3909e8955bd78a8c63b9a610dc5c11fe Mon Sep 17 00:00:00 2001
-From: Petr Mladek <pmladek@suse.com>
-Date: Thu, 24 Mar 2016 15:10:21 +0100
-Subject: [PATCH] printk/nmi: flush NMI messages on the system panic
-
-In NMI context, printk() messages are stored into per-CPU buffers to avoid
-a possible deadlock.  They are normally flushed to the main ring buffer via
-an IRQ work.  But the work is never called when the system calls panic() in
-the very same NMI handler.
-
-This patch tries to flush NMI buffers before the crash dump is generated.
-In this case it does not risk a double release and bails out when the
-logbuf_lock is already taken.  The aim is to get the messages into the main
-ring buffer when possible.  It makes them better accessible in the vmcore.
-
-Then the patch tries to flush the buffers second time when other CPUs are
-down.  It might be more aggressive and reset logbuf_lock. The aim is to
-get the messages available for the consequent kmsg_dump() and
-console_flush_on_panic() calls.
-
-The patch causes vprintk_emit() to be called even in NMI context again. But
-we do not want to call consoles in this case.  They might use internal
-locks and we could not prevent a deadlock easily.  We only want to have the
-messages in the main ring buffer for crash dump and kmsg_dump().  The
-consoles are explicitly called later by console_flush_on_panic().
-
-Signed-off-by: Petr Mladek <pmladek@suse.com>
+Signed-off-by: Lisheng <lisheng011@huawei.com>
+Signed-off-by: Yisen Zhuang <Yisen.Zhuang@huawei.com>
+Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
 ---
- include/linux/printk.h   |  4 ++++
- kernel/kexec_core.c      |  1 +
- kernel/panic.c           |  6 +++++-
- kernel/printk/internal.h |  2 ++
- kernel/printk/nmi.c      | 36 ++++++++++++++++++++++++++++++++++++
- kernel/printk/printk.c   | 14 +++++++++++---
- 6 files changed, 59 insertions(+), 4 deletions(-)
+change log:
+ PATCH V2:
+  - delete the useless code found by Andy Shevchenko
 
-diff --git a/include/linux/printk.h b/include/linux/printk.h
-index 51dd6b824fe2..2da06c2a63c3 100644
---- a/include/linux/printk.h
-+++ b/include/linux/printk.h
-@@ -123,15 +123,19 @@ void early_printk(const char *s, ...) { }
- #endif
+ PATCH V1:
+  - initial submit
+
+  V1 Link: https://lkml.org/lkml/2016/3/29/77
+---
+ drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c  | 20 +++++-
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c  | 30 ++-------
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c | 75 +++++++++++++++++++---
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h |  5 ++
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c  |  6 +-
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h  |  6 ++
+ 6 files changed, 104 insertions(+), 38 deletions(-)
+
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c b/drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c
+index a1cb461..1591422 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c
++++ b/drivers/net/ethernet/hisilicon/hns/hns_ae_adapt.c
+@@ -399,11 +399,16 @@ static void hns_ae_get_ring_bdnum_limit(struct hnae_queue *queue,
+ static void hns_ae_get_pauseparam(struct hnae_handle *handle,
+ 				  u32 *auto_neg, u32 *rx_en, u32 *tx_en)
+ {
+-	assert(handle);
++	struct hns_mac_cb *mac_cb = hns_get_mac_cb(handle);
++	struct dsaf_device *dsaf_dev = mac_cb->dsaf_dev;
  
- #ifdef CONFIG_PRINTK_NMI
-+#define deferred_console_in_nmi() in_nmi()
- extern void printk_nmi_init(void);
- extern void printk_nmi_enter(void);
- extern void printk_nmi_exit(void);
- extern void printk_nmi_flush(void);
-+extern void printk_nmi_flush_on_panic(void);
- #else
-+#define deferred_console_in_nmi() 0
- static inline void printk_nmi_init(void) { }
- static inline void printk_nmi_enter(void) { }
- static inline void printk_nmi_exit(void) { }
- static inline void printk_nmi_flush(void) { }
-+static inline void printk_nmi_flush_on_panic(void) { }
- #endif /* PRINTK_NMI */
+-	hns_mac_get_autoneg(hns_get_mac_cb(handle), auto_neg);
++	hns_mac_get_autoneg(mac_cb, auto_neg);
  
- #ifdef CONFIG_PRINTK
-diff --git a/kernel/kexec_core.c b/kernel/kexec_core.c
-index 8d34308ea449..1dc3fe8495e0 100644
---- a/kernel/kexec_core.c
-+++ b/kernel/kexec_core.c
-@@ -893,6 +893,7 @@ void crash_kexec(struct pt_regs *regs)
- 	old_cpu = atomic_cmpxchg(&panic_cpu, PANIC_CPU_INVALID, this_cpu);
- 	if (old_cpu == PANIC_CPU_INVALID) {
- 		/* This is the 1st CPU which comes here, so go ahead. */
-+		printk_nmi_flush_on_panic();
- 		__crash_kexec(regs);
- 
- 		/*
-diff --git a/kernel/panic.c b/kernel/panic.c
-index 535c96510a44..8aa74497cc5a 100644
---- a/kernel/panic.c
-+++ b/kernel/panic.c
-@@ -160,8 +160,10 @@ void panic(const char *fmt, ...)
- 	 *
- 	 * Bypass the panic_cpu check and call __crash_kexec directly.
- 	 */
--	if (!crash_kexec_post_notifiers)
-+	if (!crash_kexec_post_notifiers) {
-+		printk_nmi_flush_on_panic();
- 		__crash_kexec(NULL);
-+	}
- 
- 	/*
- 	 * Note smp_send_stop is the usual smp shutdown function, which
-@@ -176,6 +178,8 @@ void panic(const char *fmt, ...)
- 	 */
- 	atomic_notifier_call_chain(&panic_notifier_list, 0, buf);
- 
-+	/* Call flush even twice. It tries harder with a single online CPU */
-+	printk_nmi_flush_on_panic();
- 	kmsg_dump(KMSG_DUMP_PANIC);
- 
- 	/*
-diff --git a/kernel/printk/internal.h b/kernel/printk/internal.h
-index 341bedccc065..7fd2838fa417 100644
---- a/kernel/printk/internal.h
-+++ b/kernel/printk/internal.h
-@@ -22,6 +22,8 @@ int __printf(1, 0) vprintk_default(const char *fmt, va_list args);
- 
- #ifdef CONFIG_PRINTK_NMI
- 
-+extern raw_spinlock_t logbuf_lock;
+-	hns_mac_get_pauseparam(hns_get_mac_cb(handle), rx_en, tx_en);
++	hns_mac_get_pauseparam(mac_cb, rx_en, tx_en);
 +
- /*
-  * printk() could not take logbuf_lock in NMI context. Instead,
-  * it temporary stores the strings into a per-CPU buffer.
-diff --git a/kernel/printk/nmi.c b/kernel/printk/nmi.c
-index bf08557d7e3d..6dc3ff80ae89 100644
---- a/kernel/printk/nmi.c
-+++ b/kernel/printk/nmi.c
-@@ -17,6 +17,7 @@
- 
- #include <linux/preempt.h>
- #include <linux/spinlock.h>
-+#include <linux/debug_locks.h>
- #include <linux/smp.h>
- #include <linux/cpumask.h>
- #include <linux/irq_work.h>
-@@ -194,6 +195,41 @@ void printk_nmi_flush(void)
- 		__printk_nmi_flush(&per_cpu(nmi_print_seq, cpu).work);
++	/* Service port's pause feature is provided by DSAF, not mac */
++	if (handle->port_type == HNAE_PORT_SERVICE)
++		hns_dsaf_get_rx_mac_pause_en(dsaf_dev, mac_cb->mac_id, rx_en);
  }
  
-+/**
-+ * printk_nmi_flush_on_panic - flush all per-cpu nmi buffers when the system
-+ *	goes down.
-+ *
-+ * Similar to printk_nmi_flush() but it can be called even in NMI context when
-+ * the system goes down. It does the best effort to get NMI messages into
-+ * the main ring buffer.
-+ *
-+ * Note that it could try harder when there is only one CPU online.
-+ */
-+void printk_nmi_flush_on_panic(void)
-+{
-+	if (in_nmi()) {
-+		/*
-+		 * Make sure that we could access the main ring buffer.
-+		 * Do not risk a double release when more CPUs are up.
-+		 */
-+		if (raw_spin_is_locked(&logbuf_lock)) {
-+			if (num_online_cpus() > 1)
-+				return;
-+
-+			debug_locks_off();
-+			raw_spin_lock_init(&logbuf_lock);
-+		}
-+
-+		/*
-+		 * Flush the messages using the default printk handler
-+		 * to store them into the main ring buffer.
-+		 */
-+		this_cpu_write(printk_func, vprintk_default);
+ static int hns_ae_set_autoneg(struct hnae_handle *handle, u8 enable)
+@@ -436,12 +441,21 @@ static int hns_ae_set_pauseparam(struct hnae_handle *handle,
+ 				 u32 autoneg, u32 rx_en, u32 tx_en)
+ {
+ 	struct hns_mac_cb *mac_cb = hns_get_mac_cb(handle);
++	struct dsaf_device *dsaf_dev = mac_cb->dsaf_dev;
+ 	int ret;
+ 
+ 	ret = hns_mac_set_autoneg(mac_cb, autoneg);
+ 	if (ret)
+ 		return ret;
+ 
++	/* Service port's pause feature is provided by DSAF, not mac */
++	if (handle->port_type == HNAE_PORT_SERVICE) {
++		ret = hns_dsaf_set_rx_mac_pause_en(dsaf_dev,
++						   mac_cb->mac_id, rx_en);
++		if (ret)
++			return ret;
++		rx_en = 0;
 +	}
-+
-+	printk_nmi_flush();
+ 	return hns_mac_set_pauseparam(mac_cb, rx_en, tx_en);
+ }
+ 
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c
+index a38084a..10c367d 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c
++++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_mac.c
+@@ -439,9 +439,8 @@ int hns_mac_vm_config_bc_en(struct hns_mac_cb *mac_cb, u32 vmid, bool enable)
+ 
+ void hns_mac_reset(struct hns_mac_cb *mac_cb)
+ {
+-	struct mac_driver *drv;
+-
+-	drv = hns_mac_get_drv(mac_cb);
++	struct mac_driver *drv = hns_mac_get_drv(mac_cb);
++	bool is_ver1 = AE_IS_VER1(mac_cb->dsaf_dev->dsaf_ver);
+ 
+ 	drv->mac_init(drv);
+ 
+@@ -456,7 +455,7 @@ void hns_mac_reset(struct hns_mac_cb *mac_cb)
+ 
+ 	if (drv->mac_pausefrm_cfg) {
+ 		if (mac_cb->mac_type == HNAE_PORT_DEBUG)
+-			drv->mac_pausefrm_cfg(drv, 0, 0);
++			drv->mac_pausefrm_cfg(drv, !is_ver1, !is_ver1);
+ 		else /* mac rx must disable, dsaf pfc close instead of it*/
+ 			drv->mac_pausefrm_cfg(drv, 0, 1);
+ 	}
+@@ -561,14 +560,6 @@ void hns_mac_get_pauseparam(struct hns_mac_cb *mac_cb, u32 *rx_en, u32 *tx_en)
+ 		*rx_en = 0;
+ 		*tx_en = 0;
+ 	}
+-
+-	/* Due to the chip defect, the service mac's rx pause CAN'T be enabled.
+-	 * We set the rx pause frm always be true (1), because DSAF deals with
+-	 * the rx pause frm instead of service mac. After all, we still support
+-	 * rx pause frm.
+-	 */
+-	if (mac_cb->mac_type == HNAE_PORT_SERVICE)
+-		*rx_en = 1;
+ }
+ 
+ /**
+@@ -602,20 +593,13 @@ int hns_mac_set_autoneg(struct hns_mac_cb *mac_cb, u8 enable)
+ int hns_mac_set_pauseparam(struct hns_mac_cb *mac_cb, u32 rx_en, u32 tx_en)
+ {
+ 	struct mac_driver *mac_ctrl_drv = hns_mac_get_drv(mac_cb);
++	bool is_ver1 = AE_IS_VER1(mac_cb->dsaf_dev->dsaf_ver);
+ 
+-	if (mac_cb->mac_type == HNAE_PORT_SERVICE) {
+-		if (!rx_en) {
+-			dev_err(mac_cb->dev, "disable rx_pause is not allowed!");
++	if (mac_cb->mac_type == HNAE_PORT_DEBUG) {
++		if (is_ver1 && (tx_en || rx_en)) {
++			dev_err(mac_cb->dev, "macv1 cann't enable tx/rx_pause!");
+ 			return -EINVAL;
+ 		}
+-	} else if (mac_cb->mac_type == HNAE_PORT_DEBUG) {
+-		if (tx_en || rx_en) {
+-			dev_err(mac_cb->dev, "enable tx_pause or enable rx_pause are not allowed!");
+-			return -EINVAL;
+-		}
+-	} else {
+-		dev_err(mac_cb->dev, "Unsupport this operation!");
+-		return -EINVAL;
+ 	}
+ 
+ 	if (mac_ctrl_drv->mac_pausefrm_cfg)
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
+index 5c1ac9b..5b05d31 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
++++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.c
+@@ -1022,12 +1022,52 @@ static void hns_dsaf_tbl_tcam_init(struct dsaf_device *dsaf_dev)
+  * @mac_cb: mac contrl block
+  */
+ static void hns_dsaf_pfc_en_cfg(struct dsaf_device *dsaf_dev,
+-				int mac_id, int en)
++				int mac_id, int tc_en)
+ {
+-	if (!en)
+-		dsaf_write_dev(dsaf_dev, DSAF_PFC_EN_0_REG + mac_id * 4, 0);
++	dsaf_write_dev(dsaf_dev, DSAF_PFC_EN_0_REG + mac_id * 4, tc_en);
 +}
 +
- void __init printk_nmi_init(void)
++static void hns_dsaf_set_pfc_pause(struct dsaf_device *dsaf_dev,
++				   int mac_id, int tx_en, int rx_en)
++{
++	if (AE_IS_VER1(dsaf_dev->dsaf_ver)) {
++		if (!tx_en || !rx_en)
++			dev_err(dsaf_dev->dev, "dsaf v1 can not close pfc!\n");
++
++		return;
++	}
++
++	dsaf_set_dev_bit(dsaf_dev, DSAF_PAUSE_CFG_REG + mac_id * 4,
++			 DSAF_PFC_PAUSE_RX_EN_B, !!rx_en);
++	dsaf_set_dev_bit(dsaf_dev, DSAF_PAUSE_CFG_REG + mac_id * 4,
++			 DSAF_PFC_PAUSE_TX_EN_B, !!tx_en);
++}
++
++int hns_dsaf_set_rx_mac_pause_en(struct dsaf_device *dsaf_dev, int mac_id,
++				 u32 en)
++{
++	if (AE_IS_VER1(dsaf_dev->dsaf_ver)) {
++		if (!en)
++			dev_err(dsaf_dev->dev, "dsafv1 can't close rx_pause!\n");
++
++		return -EINVAL;
++	}
++
++	dsaf_set_dev_bit(dsaf_dev, DSAF_PAUSE_CFG_REG + mac_id * 4,
++			 DSAF_MAC_PAUSE_RX_EN_B, !!en);
++
++	return 0;
++}
++
++void hns_dsaf_get_rx_mac_pause_en(struct dsaf_device *dsaf_dev, int mac_id,
++				  u32 *en)
++{
++	if (AE_IS_VER1(dsaf_dev->dsaf_ver))
++		*en = 1;
+ 	else
+-		dsaf_write_dev(dsaf_dev, DSAF_PFC_EN_0_REG + mac_id * 4, 0xff);
++		*en = dsaf_get_dev_bit(dsaf_dev,
++				       DSAF_PAUSE_CFG_REG + mac_id * 4,
++				       DSAF_MAC_PAUSE_RX_EN_B);
+ }
+ 
+ /**
+@@ -1039,6 +1079,7 @@ static void hns_dsaf_comm_init(struct dsaf_device *dsaf_dev)
  {
- 	int cpu;
-diff --git a/kernel/printk/printk.c b/kernel/printk/printk.c
-index e38579d730f4..bf84df2eb3b6 100644
---- a/kernel/printk/printk.c
-+++ b/kernel/printk/printk.c
-@@ -245,7 +245,7 @@ __packed __aligned(4)
-  * within the scheduler's rq lock. It must be released before calling
-  * console_unlock() or anything else that might wake up a process.
-  */
--static DEFINE_RAW_SPINLOCK(logbuf_lock);
-+DEFINE_RAW_SPINLOCK(logbuf_lock);
+ 	u32 i;
+ 	u32 o_dsaf_cfg;
++	bool is_ver1 = AE_IS_VER1(dsaf_dev->dsaf_ver);
  
- #ifdef CONFIG_PRINTK
- DECLARE_WAIT_QUEUE_HEAD(log_wait);
-@@ -1764,8 +1764,16 @@ asmlinkage int vprintk_emit(int facility, int level,
- 	lockdep_on();
- 	local_irq_restore(flags);
+ 	o_dsaf_cfg = dsaf_read_dev(dsaf_dev, DSAF_CFG_0_REG);
+ 	dsaf_set_bit(o_dsaf_cfg, DSAF_CFG_EN_S, dsaf_dev->dsaf_en);
+@@ -1064,8 +1105,10 @@ static void hns_dsaf_comm_init(struct dsaf_device *dsaf_dev)
+ 	hns_dsaf_sw_port_type_cfg(dsaf_dev, DSAF_SW_PORT_TYPE_NON_VLAN);
  
--	/* If called from the scheduler, we can not call up(). */
--	if (!in_sched) {
-+	/*
-+	 * Console calls must be deferred when called from the scheduler.
-+	 *
-+	 * Many architectures never call vprintk_emit() in NMI context,
-+	 * see vprintk_nmi(). The only exception is when the NMI buffers
-+	 * are flushed on panic. In this case, the consoles are called
-+	 * later explicitly only when crashdump does not work, see
-+	 * console_flush_on_panic().
-+	 */
-+	if (!in_sched && !deferred_console_in_nmi()) {
- 		lockdep_off();
- 		/*
- 		 * Try to acquire and then immediately release the console
+ 	/*set dsaf pfc  to 0 for parseing rx pause*/
+-	for (i = 0; i < DSAF_COMM_CHN; i++)
++	for (i = 0; i < DSAF_COMM_CHN; i++) {
+ 		hns_dsaf_pfc_en_cfg(dsaf_dev, i, 0);
++		hns_dsaf_set_pfc_pause(dsaf_dev, i, is_ver1, is_ver1);
++	}
+ 
+ 	/*msk and  clr exception irqs */
+ 	for (i = 0; i < DSAF_COMM_CHN; i++) {
+@@ -2013,6 +2056,8 @@ void hns_dsaf_update_stats(struct dsaf_device *dsaf_dev, u32 node_num)
+ {
+ 	struct dsaf_hw_stats *hw_stats
+ 		= &dsaf_dev->hw_stats[node_num];
++	bool is_ver1 = AE_IS_VER1(dsaf_dev->dsaf_ver);
++	u32 reg_tmp;
+ 
+ 	hw_stats->pad_drop += dsaf_read_dev(dsaf_dev,
+ 		DSAF_INODE_PAD_DISCARD_NUM_0_REG + 0x80 * (u64)node_num);
+@@ -2022,8 +2067,12 @@ void hns_dsaf_update_stats(struct dsaf_device *dsaf_dev, u32 node_num)
+ 		DSAF_INODE_FINAL_IN_PKT_NUM_0_REG + 0x80 * (u64)node_num);
+ 	hw_stats->rx_pkt_id += dsaf_read_dev(dsaf_dev,
+ 		DSAF_INODE_SBM_PID_NUM_0_REG + 0x80 * (u64)node_num);
+-	hw_stats->rx_pause_frame += dsaf_read_dev(dsaf_dev,
+-		DSAF_INODE_FINAL_IN_PAUSE_NUM_0_REG + 0x80 * (u64)node_num);
++
++	reg_tmp = is_ver1 ? DSAF_INODE_FINAL_IN_PAUSE_NUM_0_REG :
++			    DSAFV2_INODE_FINAL_IN_PAUSE_NUM_0_REG;
++	hw_stats->rx_pause_frame +=
++		dsaf_read_dev(dsaf_dev, reg_tmp + 0x80 * (u64)node_num);
++
+ 	hw_stats->release_buf_num += dsaf_read_dev(dsaf_dev,
+ 		DSAF_INODE_SBM_RELS_NUM_0_REG + 0x80 * (u64)node_num);
+ 	hw_stats->sbm_drop += dsaf_read_dev(dsaf_dev,
+@@ -2056,6 +2105,8 @@ void hns_dsaf_get_regs(struct dsaf_device *ddev, u32 port, void *data)
+ 	u32 i = 0;
+ 	u32 j;
+ 	u32 *p = data;
++	u32 reg_tmp;
++	bool is_ver1 = AE_IS_VER1(ddev->dsaf_ver);
+ 
+ 	/* dsaf common registers */
+ 	p[0] = dsaf_read_dev(ddev, DSAF_SRAM_INIT_OVER_0_REG);
+@@ -2120,8 +2171,9 @@ void hns_dsaf_get_regs(struct dsaf_device *ddev, u32 port, void *data)
+ 				DSAF_INODE_FINAL_IN_PKT_NUM_0_REG + j * 0x80);
+ 		p[190 + i] = dsaf_read_dev(ddev,
+ 				DSAF_INODE_SBM_PID_NUM_0_REG + j * 0x80);
+-		p[193 + i] = dsaf_read_dev(ddev,
+-				DSAF_INODE_FINAL_IN_PAUSE_NUM_0_REG + j * 0x80);
++		reg_tmp = is_ver1 ? DSAF_INODE_FINAL_IN_PAUSE_NUM_0_REG :
++				    DSAFV2_INODE_FINAL_IN_PAUSE_NUM_0_REG;
++		p[193 + i] = dsaf_read_dev(ddev, reg_tmp + j * 0x80);
+ 		p[196 + i] = dsaf_read_dev(ddev,
+ 				DSAF_INODE_SBM_RELS_NUM_0_REG + j * 0x80);
+ 		p[199 + i] = dsaf_read_dev(ddev,
+@@ -2368,8 +2420,11 @@ void hns_dsaf_get_regs(struct dsaf_device *ddev, u32 port, void *data)
+ 	p[496] = dsaf_read_dev(ddev, DSAF_NETPORT_CTRL_SIG_0_REG + port * 0x4);
+ 	p[497] = dsaf_read_dev(ddev, DSAF_XGE_CTRL_SIG_CFG_0_REG + port * 0x4);
+ 
++	if (!is_ver1)
++		p[498] = dsaf_read_dev(ddev, DSAF_PAUSE_CFG_REG + port * 0x4);
++
+ 	/* mark end of dsaf regs */
+-	for (i = 498; i < 504; i++)
++	for (i = 499; i < 504; i++)
+ 		p[i] = 0xdddddddd;
+ }
+ 
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h
+index 5fea226..e8eedc5 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h
++++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_main.h
+@@ -417,6 +417,11 @@ void hns_dsaf_get_strings(int stringset, u8 *data, int port);
+ void hns_dsaf_get_regs(struct dsaf_device *ddev, u32 port, void *data);
+ int hns_dsaf_get_regs_count(void);
+ void hns_dsaf_set_promisc_mode(struct dsaf_device *dsaf_dev, u32 en);
++
++void hns_dsaf_get_rx_mac_pause_en(struct dsaf_device *dsaf_dev, int mac_id,
++				  u32 *en);
++int hns_dsaf_set_rx_mac_pause_en(struct dsaf_device *dsaf_dev, int mac_id,
++				 u32 en);
+ void hns_dsaf_set_inner_lb(struct dsaf_device *dsaf_dev, u32 mac_id, u32 en);
+ 
+ #endif /* __HNS_DSAF_MAIN_H__ */
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
+index 5b7ae5f..ab27b3b 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
++++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
+@@ -332,10 +332,12 @@ static void hns_ppe_init_hw(struct hns_ppe_cb *ppe_cb)
+ 	/* clr and msk except irq*/
+ 	hns_ppe_exc_irq_en(ppe_cb, 0);
+ 
+-	if (ppe_common_cb->ppe_mode == PPE_COMMON_MODE_DEBUG)
++	if (ppe_common_cb->ppe_mode == PPE_COMMON_MODE_DEBUG) {
+ 		hns_ppe_set_port_mode(ppe_cb, PPE_MODE_GE);
+-	else
++		dsaf_write_dev(ppe_cb, PPE_CFG_PAUSE_IDLE_CNT_REG, 0);
++	} else {
+ 		hns_ppe_set_port_mode(ppe_cb, PPE_MODE_XGE);
++	}
+ 
+ 	hns_ppe_checksum_hw(ppe_cb, 0xffffffff);
+ 	hns_ppe_cnt_clr_ce(ppe_cb);
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
+index 018fa7d..e021890 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
++++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
+@@ -135,6 +135,7 @@
+ #define DSAF_PPE_INT_STS_0_REG		0x1E0
+ #define DSAF_ROCEE_INT_STS_0_REG	0x200
+ #define DSAFV2_SERDES_LBK_0_REG         0x220
++#define DSAF_PAUSE_CFG_REG		0x240
+ #define DSAF_PPE_QID_CFG_0_REG		0x300
+ #define DSAF_SW_PORT_TYPE_0_REG		0x320
+ #define DSAF_STP_PORT_TYPE_0_REG	0x340
+@@ -153,6 +154,7 @@
+ #define DSAF_INODE_FINAL_IN_PKT_NUM_0_REG	0x1030
+ #define DSAF_INODE_SBM_PID_NUM_0_REG		0x1038
+ #define DSAF_INODE_FINAL_IN_PAUSE_NUM_0_REG	0x103C
++#define DSAFV2_INODE_FINAL_IN_PAUSE_NUM_0_REG	0x1024
+ #define DSAF_INODE_SBM_RELS_NUM_0_REG		0x104C
+ #define DSAF_INODE_SBM_DROP_NUM_0_REG		0x1050
+ #define DSAF_INODE_CRC_FALSE_NUM_0_REG		0x1054
+@@ -709,6 +711,10 @@
+ #define DSAF_PFC_UNINT_CNT_M ((1ULL << 9) - 1)
+ #define DSAF_PFC_UNINT_CNT_S 0
+ 
++#define DSAF_MAC_PAUSE_RX_EN_B 2
++#define DSAF_PFC_PAUSE_RX_EN_B 1
++#define DSAF_PFC_PAUSE_TX_EN_B 0
++
+ #define DSAF_PPE_QID_CFG_M 0xFF
+ #define DSAF_PPE_QID_CFG_S 0
+ 
 -- 
-1.8.5.6
+1.9.1
