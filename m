@@ -1,111 +1,72 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 31 Mar 2016 16:09:23 +0100
-Subject: [PATCH 2/4] scatterlist: add sg_alloc_table_from_buf() helper
-In-Reply-To: <20160331164557.544ed780@bbrezillon>
-References: <1459427384-21374-1-git-send-email-boris.brezillon@free-electrons.com>
- <1459427384-21374-3-git-send-email-boris.brezillon@free-electrons.com>
- <20160331141412.GK19428@n2100.arm.linux.org.uk>
- <20160331164557.544ed780@bbrezillon>
-Message-ID: <20160331150923.GL19428@n2100.arm.linux.org.uk>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Thu, 31 Mar 2016 17:21:51 +0200
+Subject: [PATCH 2/7] ARM: dts: skeleton: add unit name to memory node
+In-Reply-To: <20160331103800.GC26532@leverpostej>
+References: <1459290646-3592-1-git-send-email-manabian@gmail.com>
+ <1459290646-3592-3-git-send-email-manabian@gmail.com>
+ <20160330110611.GB25354@leverpostej> <56FBCF70.80006@mentor.com>
+ <20160330134155.GC25354@leverpostej>
+ <CAGhQ9VykiwMWaw3xcJdg2CahNFt+sp7tFC5O8VwA=-_=UoJ8kA@mail.gmail.com>
+ <20160330170645.GA13690@leverpostej>
+ <CAGhQ9Vykn=G+cmVuBCAA_ATTz4XNEPeUWYbZRb5NsrVBOjaS-A@mail.gmail.com>
+ <20160331103800.GC26532@leverpostej>
+Message-ID: <CAGhQ9Vy8TKPxPdYF-wXbCo_LZkBsSsficEG8wCn1bCbS9JN+vg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 31, 2016 at 04:45:57PM +0200, Boris Brezillon wrote:
-> Hi Russell,
-> 
-> On Thu, 31 Mar 2016 15:14:13 +0100
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> 
-> > On Thu, Mar 31, 2016 at 02:29:42PM +0200, Boris Brezillon wrote:
-> > > sg_alloc_table_from_buf() provides an easy solution to create an sg_table
-> > > from a virtual address pointer. This function takes care of dealing with
-> > > vmallocated buffers, buffer alignment, or DMA engine limitations (maximum
-> > > DMA transfer size).
-> > 
-> > Please note that the DMA API does not take account of coherency of memory
-> > regions other than non-high/lowmem - there are specific extensions to
-> > deal with this.
-> 
-> Ok, you said 'non-high/lowmem', this means vmalloced and kmapped buffers
-> already fall in this case, right?
-> 
-> Could you tell me more about those specific extensions?
+On 31 March 2016 at 12:38, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Wed, Mar 30, 2016 at 10:45:06PM +0200, Joachim Eastwood wrote:
+>> On 30 March 2016 at 19:06, Mark Rutland <mark.rutland@arm.com> wrote:
+>> > On Wed, Mar 30, 2016 at 06:15:35PM +0200, Joachim Eastwood wrote:
+>> >> I used the following script to check for the memory node in all built dtb's.
+>> >>   make ARCH=arm CONFIG_OF_ALL_DTBS=y dtbs
+>> >>   for i in $(ls arch/arm/boot/dts/*.dtb); do
+>> >>          m=$(scripts/dtc/dtc -I dtb -O dts $i | grep -m1 'memory.*{')
+>> >>          if [ -z "$m" ]; then
+>> >>                  echo "Missing memory node in $i"
+>> >>           fi
+>> >>   done
+>> >>
+>> >> So it should be pretty safe to just remove the memory node entry in
+>> >> the skeleton files. Unless I have missed something with the script
+>> >> above.
+>> >
+>> > The above might match reserved-memory nodes; it might be better to check
+>> > for 'device_type\s*=\s*"memory"'.
+>>
+>> I did check the output of the grep and it looks good. But there are
+>> indeed DTs that are missing the 'device_type = "memory"' parameter.
+>> Actually; _a lot_ or 438 of 741 to be exact. ugh...
+>>
+>> I guess all those should be fixed up before we can remove the memory
+>> node from skeleton. :/
+>
+> Ouch, yes. :(
+>
+> That said, the cahnges don't need to be an atomic operation. We could
+> start adding device_type = "memory" to dts immediately (in as whatever
+> size batches maintainers are happy with), as a duplicate device_type
+> shouldn't be problematic.
 
-I was slightly confused - the extensions I was thinking of are those
-listed at the bottom of Documentation/cachetlb.txt, which have nothing
-to do with DMA.
+Yes, that is true.
 
-However, it's probably worth reading Documentation/DMA-API-HOWTO.txt
-to read up on what kinds of memory are considered to be DMA-able in
-the kernel.
 
-> > What this means is that having an API that takes any virtual address
-> > pointer, converts it to a scatterlist which is then DMA mapped, is
-> > unsafe.
-> 
-> Which means some implementations already get this wrong (see
-> spi_map_buf(), and I'm pretty sure it's not the only one).
+> When we hit critical mass, we could then remove the skeleton memory
+> nodes, fixing up any remaining fallout.
+>
+> As for the mechanical changes, it sounds like we need coccinelle for DT.
+>
+> That, or a laptop, a long flight, and a gin and tonic.
 
-Quite possible, but that is driver stuff, and driver stuff gets things
-wrong all the time. :)
+:-)
 
-> > It'll be okay for PIPT and non-aliasing VIPT cache architectures, but
-> > for other cache architectures this will hide this problem and make
-> > review harder.
-> > 
-> 
-> Ok, you lost me. I'll have to do my homework and try to understand what
-> this means :).
+I'll see if I can cook up something with awk.
 
-P = physical address
-V = virtual address
-I = indexed
-T = tag
 
-The tag is held in each cache line.  When a location is looked up in the
-cache, an index is used to locate a set of cache lines and the tag is
-compared to check which cache line in the set is the correct one (or
-whether the address even exists in the cache.)
+Anyway, I am dropping the memory node changes from this patch set so I
+can get a pull request sent to arm-soc for lpc18xx sooner rather than
+later.
 
-How the index and tag are derived varies between cache architectures.
 
-PIPT = indexed by physical address, tagged with physical address.  Never
-aliases with itself in the presence of multiple virtual mappings.
-
-VIPT = indexed by virtual address, tagged with physical address.  If the
-bits from the virtual address do not overlap the MMU page size, it is
-also alias free, otherwise aliases can exist, but can be eliminated by
-"cache colouring" - ensuring that a physical address is always mapped
-with the same overlapping bits.
-
-VIVT = indexed by virtual address, tagged with virtual address.  The
-worst kind of cache, since every different mapping of the same physical
-address is guaranteed by design to alias with other mappings.
-
-There is little cache colouring between different kernel mappings (eg,
-between lowmem and vmalloc space.)
-
-What this means is that, while the DMA API takes care of DMA aliases
-in the lowmem mappings, an alias-prone VIPT cache will remain incoherent
-with DMA if it is remapped into vmalloc space, and the mapping happens
-to have a different cache colour.  In other words, this is a data
-corruption issue.
-
-Hence, taking a range of vmalloc() addresses, converting them into a
-scatterlist, then using the DMA API on the scatterlist _only_ guarantees
-that the lowmem (and kmap'd highmem mappings) are coherent with DMA.
-There is no way for the DMA API to know that other mappings exist, and
-obviously flushing every possible cache line just because a mapping might
-exist multiplies the expense of the DMA API: not only in terms of time
-spent running through all the possibilities, which doubles for every
-aliasing bit of VIPT, but also TLB pressure since you'd have to create
-a mapping for each alias and tear it back down.
-
-VIVT is even worse, since there is no other virtual mapping which is
-coherent, would need to be known, and each mapping would need to be
-individually flushed.
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+regards,
+Joachim Eastwood
