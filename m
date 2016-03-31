@@ -1,66 +1,97 @@
 From: simran.rai@broadcom.com (Simran Rai)
-Date: Wed, 30 Mar 2016 17:24:43 -0700
-Subject: [PATCH v6 0/3] ASoC: cygnus: Add audio support for Broadcom Cygnus SoC
-Message-ID: <1459383886-20317-1-git-send-email-simran.rai@broadcom.com>
+Date: Wed, 30 Mar 2016 17:24:44 -0700
+Subject: [PATCH v6 1/3] ASoC: cygnus: Add DT bindings for Broadcom Cygnus audio
+In-Reply-To: <1459383886-20317-1-git-send-email-simran.rai@broadcom.com>
+References: <1459383886-20317-1-git-send-email-simran.rai@broadcom.com>
+Message-ID: <1459383886-20317-2-git-send-email-simran.rai@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Simran Rai <ssimran@broadcom.com>
 
-This patchset contains audio support for Broadcom's Cygnus SoC.
-It contains DT bindings and core audio driver. The audio driver supports
-both capture and playback of Audio PCM samples over I2S/TDM interface and
-provides playback support over SPDIF interface.
+Add bindings for audio driver in Broadcom Cygnus.
 
-This patchset is derived from a previously submitted patchset:
-http://lkml.iu.edu/hypermail/linux/kernel/1503.3/05434.html
-
-This patchset has been tested on Cygnus wireless audio bcm958305K board.
-It is based on v4.6-rc1 and is available from github:
-
-repo: https://github.com/Broadcom/cygnus-linux/tree/cygnus-sound-v6
-
-Changes from v5:
-- Fix code style, e.g. change "if" statements to "switch" statements
-- Fix SPDIF output enable register field
-- Set BUFFER_PAIR_ENABLE for both mono, stereo and TDM modes
-- Reflect PCM bit formats for SPDIF, SSP and TDM as supported by
-hardware
-Changes from v4:
-- Fix power suspend function and add power resume function
-- Move clock initialization code from audio driver to clock framework
-Changes from v3:
-- Fix the subject lines to match the style for the subsystem
-Changes from v2:
-- Split patchset 2/2 from v2 into patchsets 2/3 and 3/3.
-- Remove SND_SOC_CYGNUS_DIAG. Diagnostics can be performed using
-standard kernel trace infrastructure.
-- Fix interrupt handler. Acknowledge only those interrupts that are
-handledby ISR.
-- Modify configure_vco() and the pll_macro_entry() struct to make it
-better readable. The functionality did not change.
-- Remove casts on macros
-- Remove surround sound channel grouping from the driver.
-Changes from v1:
-- Address code review comments. Fix print format of type size_t and
-pointer.
-
-Simran Rai (3):
-  ASoC: cygnus: Add DT bindings for Broadcom Cygnus audio
-  ASoC: cygnus: Add Cygnus audio DAI driver
-  ASoC: cygnus: Add Cygnus audio DMA driver
-
- .../bindings/sound/brcm,cygnus-audio.txt           |   67 +
- sound/soc/bcm/Kconfig                              |    9 +
- sound/soc/bcm/Makefile                             |    5 +
- sound/soc/bcm/cygnus-pcm.c                         |  861 +++++++++++
- sound/soc/bcm/cygnus-ssp.c                         | 1529 ++++++++++++++++++++
- sound/soc/bcm/cygnus-ssp.h                         |  139 ++
- 6 files changed, 2610 insertions(+)
+Signed-off-by: Lori Hikichi <lhikichi@broadcom.com>
+Signed-off-by: Simran Rai <ssimran@broadcom.com>
+Reviewed-by: Ray Jui <rjui@broadcom.com>
+Reviewed-by: Scott Branden <sbranden@broadcom.com>
+---
+ .../bindings/sound/brcm,cygnus-audio.txt           |   67 ++++++++++++++++++++
+ 1 file changed, 67 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/sound/brcm,cygnus-audio.txt
- create mode 100644 sound/soc/bcm/cygnus-pcm.c
- create mode 100644 sound/soc/bcm/cygnus-ssp.c
- create mode 100644 sound/soc/bcm/cygnus-ssp.h
 
+diff --git a/Documentation/devicetree/bindings/sound/brcm,cygnus-audio.txt b/Documentation/devicetree/bindings/sound/brcm,cygnus-audio.txt
+new file mode 100644
+index 0000000..b139e66
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/brcm,cygnus-audio.txt
+@@ -0,0 +1,67 @@
++BROADCOM Cygnus Audio I2S/TDM/SPDIF controller
++
++Required properties:
++	- compatible : "brcm,cygnus-audio"
++	- #address-cells: 32bit valued, 1 cell.
++	- #size-cells:  32bit valued, 0 cell.
++	- reg : Should contain audio registers location and length
++	- reg-names: names of the registers listed in "reg" property
++		Valid names are "aud" and "i2s_in". "aud" contains a
++		set of DMA, I2S_OUT and SPDIF registers. "i2s_in" contains
++		a set of I2S_IN registers.
++	- clocks: PLL and leaf clocks used by audio ports
++	- assigned-clocks: PLL and leaf clocks
++	- assigned-clock-parents: parent clocks of the assigned clocks
++		(usually the PLL)
++	- assigned-clock-rates: List of clock frequencies of the
++		assigned clocks
++	- clock-names: names of 3 leaf clocks used by audio ports
++		Valid names are "ch0_audio", "ch1_audio", "ch2_audio"
++	- interrupts: audio DMA interrupt number
++
++SSP Subnode properties:
++- reg: The index of ssp port interface to use
++	Valid value are 0, 1, 2, or 3 (for spdif)
++
++Example:
++	cygnus_audio: audio at 180ae000 {
++		compatible = "brcm,cygnus-audio";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0x180ae000 0xafd>, <0x180aec00 0x1f8>;
++		reg-names = "aud", "i2s_in";
++		clocks = <&audiopll BCM_CYGNUS_AUDIOPLL_CH0>,
++				<&audiopll BCM_CYGNUS_AUDIOPLL_CH1>,
++				<&audiopll BCM_CYGNUS_AUDIOPLL_CH2>;
++		assigned-clocks = <&audiopll BCM_CYGNUS_AUDIOPLL>,
++							<&audiopll BCM_CYGNUS_AUDIOPLL_CH0>,
++							<&audiopll BCM_CYGNUS_AUDIOPLL_CH1>,
++							<&audiopll BCM_CYGNUS_AUDIOPLL_CH2>;
++		assigned-clock-parents = <&audiopll BCM_CYGNUS_AUDIOPLL>;
++		assigned-clock-rates = <1769470191>,
++								<0>,
++								<0>,
++								<0>;
++		clock-names = "ch0_audio", "ch1_audio", "ch2_audio";
++		interrupts = <GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH>;
++
++		ssp0: ssp_port at 0 {
++			reg = <0>;
++			status = "okay";
++		};
++
++		ssp1: ssp_port at 1 {
++			reg = <1>;
++			status = "disabled";
++		};
++
++		ssp2: ssp_port at 2 {
++			reg = <2>;
++			status = "disabled";
++		};
++
++		spdif: spdif_port at 3 {
++			reg = <3>;
++			status = "disabled";
++		};
++	};
 -- 
 1.7.9.5
