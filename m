@@ -1,42 +1,58 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 31 Mar 2016 18:27:34 +0100
-Subject: [PATCH v3 6/7] arm64: Add a wrapper for personality() syscall
-In-Reply-To: <1459445255-15653-1-git-send-email-suzuki.poulose@arm.com>
-References: <1459445255-15653-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1459445255-15653-7-git-send-email-suzuki.poulose@arm.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Thu, 31 Mar 2016 18:31:39 +0100
+Subject: [PATCH v2 2/3] ata: ahci-platform: Add ports-implemented DT bindings.
+In-Reply-To: <1459445500-9071-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1459445500-9071-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1459445500-9071-3-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to prevent setting PER_LINUX32 on systems without
-32bit EL0 support, add a wrapper for personality() syscall.
+On some SOCs PORTS_IMPL register value is never programmed by the
+firmware and left at zero value. Which means that no sata ports are
+available for software. AHCI driver used to cope up with this by
+fabricating the port_map if the PORTS_IMPL register is read zero,
+but recent patch broke this workaround as zero value was valid for
+NVMe disks.
 
-Tested-by: Yury Norov <ynorov@caviumnetworks.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+This patch adds ports-implemented DT bindings as workaround for this issue
+in a way that DT can can override the PORTS_IMPL register in cases where
+the firmware did not program it already.
+
+Fixes: 566d1827df2e ("libata: disable forced PORTS_IMPL for >= AHCI 1.3)
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- arch/arm64/kernel/sys.c |    6 ++++++
- 1 file changed, 6 insertions(+)
+ Documentation/devicetree/bindings/ata/ahci-platform.txt | 4 ++++
+ drivers/ata/ahci_platform.c                             | 3 +++
+ 2 files changed, 7 insertions(+)
 
-diff --git a/arch/arm64/kernel/sys.c b/arch/arm64/kernel/sys.c
-index 75151aa..817d860 100644
---- a/arch/arm64/kernel/sys.c
-+++ b/arch/arm64/kernel/sys.c
-@@ -36,11 +36,17 @@ asmlinkage long sys_mmap(unsigned long addr, unsigned long len,
- 	return sys_mmap_pgoff(addr, len, prot, flags, fd, off >> PAGE_SHIFT);
- }
+diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+index 30df832..87adfb2 100644
+--- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
++++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+@@ -32,6 +32,10 @@ Optional properties:
+ - target-supply     : regulator for SATA target power
+ - phys              : reference to the SATA PHY node
+ - phy-names         : must be "sata-phy"
++- ports-implemented : Mask that indicates which ports that the HBA supports
++		      are available for software to use. Useful if PORTS_IMPL
++		      is not programmed by the BIOS, which is true with
++		      some embedded SOC's.
  
-+SYSCALL_DEFINE1(arm64_personality, unsigned int, personality)
-+{
-+	return sys_personality(personality);
-+}
+ Required properties when using sub-nodes:
+ - #address-cells    : number of cells to encode an address
+diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
+index 4044233..62a04c8 100644
+--- a/drivers/ata/ahci_platform.c
++++ b/drivers/ata/ahci_platform.c
+@@ -51,6 +51,9 @@ static int ahci_probe(struct platform_device *pdev)
+ 	if (rc)
+ 		return rc;
+ 
++	of_property_read_u32(dev->of_node,
++			     "ports-implemented", &hpriv->force_port_map);
 +
- /*
-  * Wrappers to pass the pt_regs argument.
-  */
- asmlinkage long sys_rt_sigreturn_wrapper(void);
- #define sys_rt_sigreturn	sys_rt_sigreturn_wrapper
-+#define sys_personality		sys_arm64_personality
+ 	if (of_device_is_compatible(dev->of_node, "hisilicon,hisi-ahci"))
+ 		hpriv->flags |= AHCI_HFLAG_NO_FBS | AHCI_HFLAG_NO_NCQ;
  
- #undef __SYSCALL
- #define __SYSCALL(nr, sym)	[nr] = sym,
 -- 
-1.7.9.5
+2.5.0
