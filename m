@@ -1,138 +1,128 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 31 Mar 2016 10:00:33 +0200
-Subject: [PATCH v5 26/46] pwm: sun4i: implement hardware readout
-In-Reply-To: <1459368249-13241-27-git-send-email-boris.brezillon@free-electrons.com>
-References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
- <1459368249-13241-27-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20160331080033.GR2346@piout.net>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Thu, 31 Mar 2016 10:00:17 +0200
+Subject: [PATCH] drm/rockchip: Return -EBUSY if there's already a pending
+ flip event
+In-Reply-To: <56FC7C97.8000506@rock-chips.com>
+References: <1459345705-4473-1-git-send-email-tomeu.vizoso@collabora.com>
+ <56FC7C97.8000506@rock-chips.com>
+Message-ID: <CAAObsKCD665onmzKtiiR2fE0jJtNLAZ2VUZyLbF7kPJKpqxXRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/03/2016 at 22:03:49 +0200, Boris Brezillon wrote :
-> Implement ->get_state() instead of only initializing the polarity in
-> the probe function.
-> 
-> This implementation also takes care of keeping the PWM clk enabled if at
-> least one of the PWM exported by the PWM chip is already enabled, which
-> should prevent glitches.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Reviewed-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+On 31 March 2016 at 03:25, Mark yao <mark.yao@rock-chips.com> wrote:
+> On 2016?03?30? 21:48, Tomeu Vizoso wrote:
+>>
+>> As per the docs, atomic_commit should return -EBUSY "if an asycnhronous
+>> updated is requested and there is an earlier updated pending".
+>>
+>> Also wait for the pending event to complete when a sync update is
+>> requested.
+>>
+>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>> ---
+>>   drivers/gpu/drm/rockchip/rockchip_drm_drv.h |  1 +
+>>   drivers/gpu/drm/rockchip/rockchip_drm_fb.c  | 14 +++++++++++++-
+>>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c |  6 ++++++
+>>   3 files changed, 20 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+>> b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+>> index 3529f692edb8..37952eefd33d 100644
+>> --- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+>> @@ -69,6 +69,7 @@ int rockchip_register_crtc_funcs(struct drm_crtc *crtc,
+>>   void rockchip_unregister_crtc_funcs(struct drm_crtc *crtc);
+>>   int rockchip_drm_crtc_mode_config(struct drm_crtc *crtc, int
+>> connector_type,
+>>                                   int out_mode);
+>> +bool rockchip_drm_crtc_has_pending_event(struct drm_crtc *crtc);
+>>   int rockchip_drm_dma_attach_device(struct drm_device *drm_dev,
+>>                                    struct device *dev);
+>>   void rockchip_drm_dma_detach_device(struct drm_device *drm_dev,
+>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+>> b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+>> index 3b8f652698f8..028fd2f8f47b 100644
+>> --- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+>> @@ -280,7 +280,19 @@ int rockchip_drm_atomic_commit(struct drm_device
+>> *dev,
+>>   {
+>>         struct rockchip_drm_private *private = dev->dev_private;
+>>         struct rockchip_atomic_commit *commit = &private->commit;
+>> -       int ret;
+>> +       struct drm_crtc_state *crtc_state;
+>> +       struct drm_crtc *crtc;
+>> +       int i, ret;
+>> +
+>> +       for_each_crtc_in_state(state, crtc, crtc_state, i) {
+>> +               if (crtc->state->event ||
+>> +                   rockchip_drm_crtc_has_pending_event(crtc)) {
+>> +                       if (async)
+>> +                               return -EBUSY;
+>> +                       else
+>> +                               rockchip_crtc_wait_for_update(crtc);
+>
+>
+>> +               }
+>> +       }
+>>         ret = drm_atomic_helper_prepare_planes(dev, state);
+>>         if (ret)
+>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> index e2118e62345b..5240bc8fe088 100644
+>> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> @@ -848,6 +848,12 @@ int rockchip_drm_crtc_mode_config(struct drm_crtc
+>> *crtc,
+>>   }
+>>   EXPORT_SYMBOL_GPL(rockchip_drm_crtc_mode_config);
+>>   +bool rockchip_drm_crtc_has_pending_event(struct drm_crtc *crtc)
+>> +{
+>> +       return to_vop(crtc)->event;
+>> +}
+>> +EXPORT_SYMBOL_GPL(rockchip_drm_crtc_has_pending_event);
+>> +
+>
+>
+> No need to do EXPORT_SYMBOL_GPL, rockchip_drm_vop.c and rockchip_drm_fb.c
+> will build into same object.
+>
+>
+>>   static int vop_crtc_enable_vblank(struct drm_crtc *crtc)
+>>   {
+>>         struct vop *vop = to_vop(crtc);
+>
+> Hi Tomeu
+>
+> Since rockchip atomic async use "serialize outstanding asynchronous
+> commits", async commit will wait on "flush_work(&commit->work);" to ensure
+> last pending event is done, so vop->event should be NULL after flush. if
+> not, it should be a BUG.
 
-> ---
->  drivers/pwm/pwm-sun4i.c | 74 ++++++++++++++++++++++++++++++++++++-------------
->  1 file changed, 55 insertions(+), 19 deletions(-)
-> 
-> diff --git a/drivers/pwm/pwm-sun4i.c b/drivers/pwm/pwm-sun4i.c
-> index 03a99a5..34cb296 100644
-> --- a/drivers/pwm/pwm-sun4i.c
-> +++ b/drivers/pwm/pwm-sun4i.c
-> @@ -252,11 +252,65 @@ static void sun4i_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
->  	clk_disable_unprepare(sun4i_pwm->clk);
->  }
->  
-> +static void sun4i_pwm_get_state(struct pwm_chip *chip,
-> +				struct pwm_device *pwm,
-> +				struct pwm_state *pstate)
-> +{
-> +	struct sun4i_pwm_chip *sun4i_pwm = to_sun4i_pwm_chip(chip);
-> +	unsigned int clk_rate = clk_get_rate(sun4i_pwm->clk);
-> +	int prescaler, prescalerid;
-> +	int ret;
-> +	u32 val;
-> +
-> +	ret = clk_prepare_enable(sun4i_pwm->clk);
-> +	if (ret) {
-> +		dev_err(chip->dev, "Failed to enable PWM clock");
-> +		return;
-> +	}
-> +
-> +	val = sun4i_pwm_readl(sun4i_pwm, PWM_CTRL_REG);
-> +	if (val & BIT_CH(PWM_ACT_STATE, pwm->hwpwm))
-> +		pstate->polarity = PWM_POLARITY_INVERSED;
-> +	else
-> +		pstate->polarity = PWM_POLARITY_NORMAL;
-> +
-> +	if ((val & BIT_CH(PWM_EN, pwm->hwpwm)) &&
-> +	    (val & BIT_CH(PWM_CLK_GATING, pwm->hwpwm)))
-> +		pstate->enabled = true;
-> +	else
-> +		pstate->enabled = false;
-> +
-> +	pstate->period = 0;
-> +	pstate->duty_cycle = 0;
-> +	prescalerid = (val >> (PWMCH_OFFSET * pwm->hwpwm)) & PWM_PRESCAL_MASK;
-> +	prescaler = prescaler_table[prescalerid];
-> +	if (prescaler) {
-> +		u64 timens;
-> +
-> +		clk_rate /= prescaler;
-> +
-> +		val = sun4i_pwm_readl(sun4i_pwm, PWM_CH_PRD(pwm->hwpwm));
-> +
-> +		timens = ((val >> 16) & PWM_PRD_MASK) + 1;
-> +		timens *= NSEC_PER_SEC;
-> +		do_div(timens, clk_rate);
-> +		pstate->period = timens;
-> +
-> +		timens = val & PWM_DTY_MASK;
-> +		timens *= NSEC_PER_SEC;
-> +		do_div(timens, clk_rate);
-> +		pstate->duty_cycle = timens;
-> +	}
-> +
-> +	clk_disable_unprepare(sun4i_pwm->clk);
-> +}
-> +
->  static const struct pwm_ops sun4i_pwm_ops = {
->  	.config = sun4i_pwm_config,
->  	.set_polarity = sun4i_pwm_set_polarity,
->  	.enable = sun4i_pwm_enable,
->  	.disable = sun4i_pwm_disable,
-> +	.get_state = sun4i_pwm_get_state,
->  	.owner = THIS_MODULE,
->  };
->  
-> @@ -307,8 +361,7 @@ static int sun4i_pwm_probe(struct platform_device *pdev)
->  {
->  	struct sun4i_pwm_chip *pwm;
->  	struct resource *res;
-> -	u32 val;
-> -	int i, ret;
-> +	int ret;
->  	const struct of_device_id *match;
->  
->  	match = of_match_device(sun4i_pwm_dt_ids, &pdev->dev);
-> @@ -345,24 +398,7 @@ static int sun4i_pwm_probe(struct platform_device *pdev)
->  
->  	platform_set_drvdata(pdev, pwm);
->  
-> -	ret = clk_prepare_enable(pwm->clk);
-> -	if (ret) {
-> -		dev_err(&pdev->dev, "failed to enable PWM clock\n");
-> -		goto clk_error;
-> -	}
-> -
-> -	val = sun4i_pwm_readl(pwm, PWM_CTRL_REG);
-> -	for (i = 0; i < pwm->chip.npwm; i++)
-> -		if (!(val & BIT_CH(PWM_ACT_STATE, i)))
-> -			pwm_set_polarity(&pwm->chip.pwms[i],
-> -					 PWM_POLARITY_INVERSED);
-> -	clk_disable_unprepare(pwm->clk);
-> -
->  	return 0;
-> -
-> -clk_error:
-> -	pwmchip_remove(&pwm->chip);
-> -	return ret;
->  }
->  
->  static int sun4i_pwm_remove(struct platform_device *pdev)
-> -- 
-> 2.5.0
-> 
+I missed that, thanks.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> Anyway, serialize async commits is not a good way, but I don't think your
+> patch is better way.
+
+Per-CRTC workqueues should improve that, but I'm right now more
+interested in correctness than performance.
+
+> I think maybe we can check the "commit->work" status(finish or running) to
+> judge return BUSY or not, instead of flush it.
+
+That sounds better indeed.
+
+Thanks,
+
+Tomeu
+
+> Thanks.
+>
+> --
+> ?ark Yao
+>
+>
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
