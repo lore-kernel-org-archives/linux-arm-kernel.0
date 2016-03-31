@@ -1,82 +1,62 @@
-From: gang.liu@nxp.com (Gang Liu)
-Date: Thu, 31 Mar 2016 03:36:58 +0000
-Subject: [PATCH v2] gpio/ls1043a: Add compatible "fsl,qoriq-gpio" for
- ls1043a gpio nodes
-In-Reply-To: <1458726442-1851-3-git-send-email-Gang.Liu@nxp.com>
-References: <1458726442-1851-1-git-send-email-Gang.Liu@nxp.com>
- <1458726442-1851-3-git-send-email-Gang.Liu@nxp.com>
-Message-ID: <DB4PR04MB2669775E0D0FDCB30C200A682990@DB4PR04MB266.eurprd04.prod.outlook.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Thu, 31 Mar 2016 11:44:29 +0800
+Subject: [PATCH] ACPI / ARM64: Remove EXPERT dependency for ACPI on ARM64
+In-Reply-To: <1459360718-24125-1-git-send-email-broonie@kernel.org>
+References: <1459360718-24125-1-git-send-email-broonie@kernel.org>
+Message-ID: <56FC9D1D.6090808@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Linus Walleij,
+On 2016/3/31 1:58, Mark Brown wrote:
+> When ACPI was originally merged for arm64 it had only been tested on
+> emulators and not on real physical platforms and no platforms were
+> relying on it.  This meant that there were concerns that there might be
+> serious issues attempting to use it on practical systems so it had a
+> dependency on EXPERT added to warn people that it was in an early stage
+> of development with very little practical testing.  Since then things
+> have moved on a bit.  We have seen people testing on real hardware and
+> now have people starting to produce some platforms (the most prominent
+> being the 96boards Cello) which only have ACPI support and which build
+> and run to some useful extent with mainline.
+>
+> This is not to say that ACPI support or support for these systems is
+> completely done, there are still areas being worked on such as PCI, but
+> at this point it seems that we can be reasonably sure that ACPI will be
+> viable for use on ARM64 and that the already merged support works for
+> the cases it handles.  For the AMD Seattle based platforms support
+> outside of PCI has been fairly complete in mainline a few releases now.
+>
+> This is also not to say that we don't have vendors working with ACPI who
+> are trying do things that we would not consider optimal but it does not
+> appear that the EXPERT dependency is having a substantial impact on
+> these vendors.
+>
+> Given all this it seems that at this point the EXPERT dependency mainly
+> creates inconvenience for users with systems that are doing the right
+> thing and gets in the way of including the ACPI code in the testing that
+> people are doing on mainline.  Removing it should help our ongoing
+> testing cover those platforms with only ACPI support and help ensure
+> that when ACPI code is merged any problems it causes for other users are
+> more easily discovered.
+>
+> Signed-off-by: Mark Brown <broonie@kernel.org>
 
-Do you have some comments about this set of patches?
-Could you please help to ACK and apply those?
+Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-Thanks a lot!
-Liu Gang
-
------Original Message-----
-From: Liu Gang [mailto:Gang.Liu at nxp.com] 
-Sent: Wednesday, March 23, 2016 5:47 PM
-To: linus.walleij at linaro.org; linux-gpio at vger.kernel.org; linux-arm-kernel at lists.infradead.org; khilman at linaro.org
-Cc: robh+dt at kernel.org; Scott Wood <scott.wood@nxp.com>; Yang-Leo Li <leoyang.li@nxp.com>; Mingkai Hu <mingkai.hu@nxp.com>; Gang Liu <gang.liu@nxp.com>
-Subject: [PATCH v2] gpio/ls1043a: Add compatible "fsl,qoriq-gpio" for ls1043a gpio nodes
-
-The compatible "fsl,qoriq-gpio" is used by gpio driver:
-drivers/gpio/gpio-mpc8xxx.c to implement general gpio functionalities.
-
-The chip-specific compatible "fsl,ls1043a-gpio" may be used to fix potential gpio IP block errata or other chip-specific gpio issues.
-
-Signed-off-by: Liu Gang <Gang.Liu@nxp.com>
----
-v2 changes:
-	Add chip-specific compatible based on Scott's
-	comment.
-
- arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-index be72bf5..bf70b27 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-@@ -284,7 +284,7 @@
- 		};
- 
- 		gpio1: gpio at 2300000 {
--			compatible = "fsl,ls1043a-gpio";
-+			compatible = "fsl,ls1043a-gpio", "fsl,qoriq-gpio";
- 			reg = <0x0 0x2300000 0x0 0x10000>;
- 			interrupts = <0 66 0x4>;
- 			gpio-controller;
-@@ -294,7 +294,7 @@
- 		};
- 
- 		gpio2: gpio at 2310000 {
--			compatible = "fsl,ls1043a-gpio";
-+			compatible = "fsl,ls1043a-gpio", "fsl,qoriq-gpio";
- 			reg = <0x0 0x2310000 0x0 0x10000>;
- 			interrupts = <0 67 0x4>;
- 			gpio-controller;
-@@ -304,7 +304,7 @@
- 		};
- 
- 		gpio3: gpio at 2320000 {
--			compatible = "fsl,ls1043a-gpio";
-+			compatible = "fsl,ls1043a-gpio", "fsl,qoriq-gpio";
- 			reg = <0x0 0x2320000 0x0 0x10000>;
- 			interrupts = <0 68 0x4>;
- 			gpio-controller;
-@@ -314,7 +314,7 @@
- 		};
- 
- 		gpio4: gpio at 2330000 {
--			compatible = "fsl,ls1043a-gpio";
-+			compatible = "fsl,ls1043a-gpio", "fsl,qoriq-gpio";
- 			reg = <0x0 0x2330000 0x0 0x10000>;
- 			interrupts = <0 134 0x4>;
- 			gpio-controller;
---
-2.1.0.27.g96db324
+> ---
+>  drivers/acpi/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+> index 82b96ee8624c..bf5dc1ac3446 100644
+> --- a/drivers/acpi/Kconfig
+> +++ b/drivers/acpi/Kconfig
+> @@ -5,7 +5,7 @@
+>  menuconfig ACPI
+>  	bool "ACPI (Advanced Configuration and Power Interface) Support"
+>  	depends on !IA64_HP_SIM
+> -	depends on IA64 || X86 || (ARM64 && EXPERT)
+> +	depends on IA64 || X86 || ARM64
+>  	depends on PCI
+>  	select PNP
+>  	default y
