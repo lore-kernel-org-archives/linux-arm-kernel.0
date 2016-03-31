@@ -1,50 +1,31 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 31 Mar 2016 23:24:43 +0200
-Subject: [PATCH] ARM: dts: rockchip: update rk3288-veyron cpu operating points
-Message-ID: <1459459483-5356-1-git-send-email-heiko@sntech.de>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 31 Mar 2016 16:26:08 -0500
+Subject: [PATCH 0/5] ARM: dts: rockchip: small cleanups
+In-Reply-To: <1459457651-4727-1-git-send-email-heiko@sntech.de>
+References: <1459457651-4727-1-git-send-email-heiko@sntech.de>
+Message-ID: <CAL_JsqJGwutf8C2b69a9zM=gj8zwgbumF-6qp4gSZ6k99QujSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The generic operating points specified in rk3288.dtsi are specified by
-Rockchip as conservative and for all cases.
+On Thu, Mar 31, 2016 at 3:54 PM, Heiko Stuebner <heiko@sntech.de> wrote:
+> Fix some missing unitnames on nodes having a reg property
+> and drop unitnames on gpio-keys.
+>
+> This explicitly leaves out the memory nodes, as it seems
+> memory without unitname will keep being allowed, also
+> to keep compatibility with bootloaders who may insert the
+> actual amount of memory into those nodes. [0]
+>
+>
+> [0] http://www.spinics.net/lists/arm-kernel/msg494038.html
+>
+> Heiko Stuebner (5):
+>   ARM: dts: rockchip: fix rk3288 power-domain unit names
+>   ARM: dts: rockchip: fix missing usbphy unit-names
+>   ARM: dts: rockchip: clean up gpio-keys nodes
+>   ARM: dts: rockchip: drop unneeded properties from mipi node
+>   ARM: dts: rockchip: add missing unitname to cpu_leakage efuse
 
-In contrast the Veyron ChromeOS devices are supposed to use a special
-chip variant often called rk3288-c and use different operating points
-in their kernel also including a higher max frequency.
+For the series:
 
-So override the operating points for veyron devices.
-
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm/boot/dts/rk3288-veyron.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
-
-diff --git a/arch/arm/boot/dts/rk3288-veyron.dtsi b/arch/arm/boot/dts/rk3288-veyron.dtsi
-index 274fa87..df7d70d 100644
---- a/arch/arm/boot/dts/rk3288-veyron.dtsi
-+++ b/arch/arm/boot/dts/rk3288-veyron.dtsi
-@@ -170,6 +170,22 @@
- 
- &cpu0 {
- 	cpu0-supply = <&vdd_cpu>;
-+	operating-points = <
-+		/* KHz    uV */
-+		1800000 1400000
-+		1704000 1350000
-+		1608000 1300000
-+		1512000 1250000
-+		1416000 1200000
-+		1200000 1100000
-+		1008000 1050000
-+		 816000 1000000
-+		 696000  950000
-+		 600000  900000
-+		 408000  900000
-+		 216000  900000
-+		 126000  900000
-+	>;
- };
- 
- &emmc {
--- 
-2.1.4
+Acked-by: Rob Herring <robh@kernel.org>
