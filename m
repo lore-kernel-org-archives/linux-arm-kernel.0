@@ -1,39 +1,49 @@
-From: asamson@codeaurora.org (Azriel Samson)
-Date: Thu, 31 Mar 2016 11:31:18 -0600
-Subject: [PATCH v1] builddeb: fix missing headers in linux-headers package
-Message-ID: <1459445479-10948-1-git-send-email-asamson@codeaurora.org>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Thu, 31 Mar 2016 18:31:37 +0100
+Subject: [PATCH v2 0/3] ahci: add ports-implemented dt bindings.
+Message-ID: <1459445500-9071-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kernel headers package (linux-headers) doesn't include
-header files from other architectures required to build
-out-of-tree modules.
+Hi Tejun,
 
-For e.g. on ARM64, opcodes.h includes the same file from ARM
-which causes the following error:
-./arch/arm64/include/asm/opcodes.h:1:43: fatal error:
-../../arm/include/asm/opcodes.h: No such file or directory
-compilation terminated.
+On some SOCs PORTS_IMPL register value is never programmed by the BIOS
+and left at zero value. Which means that no sata ports are available for
+software. AHCI driver used to cope up with this by fabricating the
+port_map if the PORTS_IMPL register is read zero, but recent patch [1]
+broke this workaround as zero value was valid for nvme disks.
 
-Signed-off-by: Azriel Samson <asamson@codeaurora.org>
----
- scripts/package/builddeb | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+This patch adds ports-implemented dt bindings as workaround for this issue
+in a way that DT can dictate the port_map incase where the SOCs does not
+program it already.
 
-diff --git a/scripts/package/builddeb b/scripts/package/builddeb
-index 6c3b038..06ba0d9 100755
---- a/scripts/package/builddeb
-+++ b/scripts/package/builddeb
-@@ -322,7 +322,7 @@ fi
- 
- # Build kernel header package
- (cd $srctree; find . -name Makefile\* -o -name Kconfig\* -o -name \*.pl) > "$objtree/debian/hdrsrcfiles"
--(cd $srctree; find arch/$SRCARCH/include include scripts -type f) >> "$objtree/debian/hdrsrcfiles"
-+(cd $srctree; find arch/*/include include scripts -type f) >> "$objtree/debian/hdrsrcfiles"
- (cd $srctree; find arch/$SRCARCH -name module.lds -o -name Kbuild.platforms -o -name Platform) >> "$objtree/debian/hdrsrcfiles"
- (cd $srctree; find $(find arch/$SRCARCH -name include -o -name scripts -type d) -type f) >> "$objtree/debian/hdrsrcfiles"
- (cd $objtree; find arch/$SRCARCH/include Module.symvers include scripts -type f) >> "$objtree/debian/hdrobjfiles"
+Am sure that there are more than one SOC that hits this issue.
+
+Without this patchset, ACHI on APQ8064 Qualcomm platform is broken in mainline.
+With the below patchset am able to get back the functionality.
+
+Can you pick the first 2 patches via libata tree, I can request
+Andy Gross to take dts patch via arm-soc tree.
+
+Changes since RFC:
+	- Remove DT example as suggested by Rob.
+	- Fixed comments on DT binding patch as suggested by Rob.
+	- removed unused variable spotted by kernel test robot.
+
+Thanks,
+srini
+[1] 566d18 "libata: disable forced PORTS_IMPL for >= AHCI 1.3"
+
+Srinivas Kandagatla (3):
+  libahci: save port map for forced port map
+  ata: ahci-platform: Add ports-implemented DT bindings.
+  ARM: dts: apq8064: add ahci ports-implemented mask
+
+ Documentation/devicetree/bindings/ata/ahci-platform.txt | 4 ++++
+ arch/arm/boot/dts/qcom-apq8064.dtsi                     | 3 ++-
+ drivers/ata/ahci_platform.c                             | 3 +++
+ drivers/ata/libahci.c                                   | 1 +
+ 4 files changed, 10 insertions(+), 1 deletion(-)
+
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+2.5.0
