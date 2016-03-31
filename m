@@ -1,23 +1,14 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri,  1 Apr 2016 01:43:02 +0900
-Subject: [PATCH 2/2] ARM: delete "*Image is ready" log
-In-Reply-To: <1459442582-23121-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1459442582-23121-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1459442582-23121-2-git-send-email-yamada.masahiro@socionext.com>
+Date: Fri,  1 Apr 2016 03:25:46 +0900
+Subject: [PATCH] ARM: suppress "include/generated/mach-types.h is up to date."
+Message-ID: <1459448746-16527-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 3939f3345050 ("ARM: 8418/1: add boot image dependencies to not
-generate invalid images") fixed bad image generation in case of
-parallel building, but as a side effect, Kbuild now descends into
-arch/arm/boot/ again and again, duplicating the same log messages.
-This is clumsy.
+For incremental build, "include/generated/mach-types.h is up to date"
+is every time displayed like follows:
 
-In the example below (incremental build),
-  "Kernel: arch/arm/boot/Image is ready" is displayed three times.
-  "Kernel: arch/arm/boot/zImage is ready" is displayed twice.
-
-$ make ARCH=arm UIMAGE_LOADADDR=0x80208000  uImage
+$ make ARCH=arm
   CHK     include/config/kernel.release
   CHK     include/generated/uapi/linux/version.h
   CHK     include/generated/utsrelease.h
@@ -25,65 +16,36 @@ make[1]: `include/generated/mach-types.h' is up to date.
   CHK     include/generated/bounds.h
   CHK     include/generated/timeconst.h
   CHK     include/generated/asm-offsets.h
-  CALL    scripts/checksyscalls.sh
-<stdin>:1310:2: warning: #warning syscall preadv2 not implemented [-Wcpp]
-<stdin>:1313:2: warning: #warning syscall pwritev2 not implemented [-Wcpp]
-  CHK     include/generated/compile.h
-  Kernel: arch/arm/boot/Image is ready
-  Kernel: arch/arm/boot/Image is ready
-  Kernel: arch/arm/boot/zImage is ready
-  Kernel: arch/arm/boot/Image is ready
-  Kernel: arch/arm/boot/zImage is ready
-  Image arch/arm/boot/uImage is ready
+
+This commit avoids such a clumsy log and introduces Kbuild standard
+log style:
+
+  GEN     include/generated/mach-types.h
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- arch/arm/boot/Makefile | 5 -----
- 1 file changed, 5 deletions(-)
+ arch/arm/tools/Makefile | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
-index 446705a..966104e 100644
---- a/arch/arm/boot/Makefile
-+++ b/arch/arm/boot/Makefile
-@@ -31,7 +31,6 @@ ifeq ($(CONFIG_XIP_KERNEL),y)
+diff --git a/arch/arm/tools/Makefile b/arch/arm/tools/Makefile
+index 32d05c8..6e4cd18 100644
+--- a/arch/arm/tools/Makefile
++++ b/arch/arm/tools/Makefile
+@@ -4,7 +4,10 @@
+ # Copyright (C) 2001 Russell King
+ #
  
- $(obj)/xipImage: vmlinux FORCE
- 	$(call if_changed,objcopy)
--	@$(kecho) '  Kernel: $@ is ready (physical address: $(CONFIG_XIP_PHYS_ADDR))'
- 
- $(obj)/Image $(obj)/zImage: FORCE
- 	@echo 'Kernel configured for XIP (CONFIG_XIP_KERNEL=y)'
-@@ -46,14 +45,12 @@ $(obj)/xipImage: FORCE
- 
- $(obj)/Image: vmlinux FORCE
- 	$(call if_changed,objcopy)
--	@$(kecho) '  Kernel: $@ is ready'
- 
- $(obj)/compressed/vmlinux: $(obj)/Image FORCE
- 	$(Q)$(MAKE) $(build)=$(obj)/compressed $@
- 
- $(obj)/zImage:	$(obj)/compressed/vmlinux FORCE
- 	$(call if_changed,objcopy)
--	@$(kecho) '  Kernel: $@ is ready'
- 
- endif
- 
-@@ -78,7 +75,6 @@ fi
- $(obj)/uImage:	$(obj)/zImage FORCE
- 	@$(check_for_multiple_loadaddr)
- 	$(call if_changed,uimage)
--	@$(kecho) '  Image $@ is ready'
- 
- $(obj)/bootp/bootp: $(obj)/zImage initrd FORCE
- 	$(Q)$(MAKE) $(build)=$(obj)/bootp $@
-@@ -86,7 +82,6 @@ $(obj)/bootp/bootp: $(obj)/zImage initrd FORCE
- 
- $(obj)/bootpImage: $(obj)/bootp/bootp FORCE
- 	$(call if_changed,objcopy)
--	@$(kecho) '  Kernel: $@ is ready'
- 
- PHONY += initrd install zinstall uinstall
- initrd:
+-include/generated/mach-types.h: $(src)/gen-mach-types $(src)/mach-types
+-	@$(kecho) '  Generating $@'
+-	@mkdir -p $(dir $@)
+-	$(Q)$(AWK) -f $^ > $@ || { rm -f $@; /bin/false; }
++quiet_cmd_gen_mach = GEN     $@
++      cmd_gen_mach = mkdir -p $(dir $@) && \
++		     $(AWK) -f $(filter-out $(PHONY),$^) > $@ || \
++		     { rm -f $@; /bin/false; }
++
++include/generated/mach-types.h: $(src)/gen-mach-types $(src)/mach-types FORCE
++	$(call if_changed,gen_mach)
 -- 
 1.9.1
