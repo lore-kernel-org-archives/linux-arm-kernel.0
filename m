@@ -1,52 +1,44 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 31 Mar 2016 11:18:50 +0200
-Subject: [PATCH v4 2/4] mtd: pxa2xx-flash: switch back from memremap to
- ioremap_cached
-In-Reply-To: <1459415932-17852-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1459415932-17852-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1459415932-17852-3-git-send-email-ard.biesheuvel@linaro.org>
+From: a0393675@ti.com (Keerthy)
+Date: Thu, 31 Mar 2016 14:52:41 +0530
+Subject: [PATCH v2] ARM: dts: dra7: Correct clock tree for sys_32k_ck
+In-Reply-To: <56FCC3FF.7080901@ti.com>
+References: <1457957001-720-1-git-send-email-j-keerthy@ti.com>
+ <20160330211828.GE9329@atomide.com> <20160330213224.GH9329@atomide.com>
+ <56FCC3FF.7080901@ti.com>
+Message-ID: <56FCEC61.5020400@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit 06968a54790d ("mtd: pxa2xx-flash: switch from
-ioremap_cache to memremap"), since NOR with memory semantics in array mode
-and RAM are not necessarily the same thing, and architectures may implement
-ioremap_cached() and memremap() with different memory attributes.
 
-For this reason, ioremap_cached() has been brought back from the dead on
-the ARM side, so switch this driver back to using it instead of memremap().
 
-Cc: David Woodhouse <dwmw2@infradead.org>
-Acked-by: Brian Norris <computersforpeace@gmail.com>
-Acked-by: Dan Williams <dan.j.williams@intel.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- drivers/mtd/maps/pxa2xx-flash.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+On Thursday 31 March 2016 12:00 PM, Tero Kristo wrote:
+> On 03/31/2016 12:32 AM, Tony Lindgren wrote:
+>> * Tony Lindgren <tony@atomide.com> [160330 14:19]:
+>>> * Keerthy <j-keerthy@ti.com> [160314 05:04]:
+>>>> This is w.r.t J6/J6eco: 32clk is pseudo (erratum i856) - clock source.
+>>>> Errata i856 for the AM572x (DRA7xx) points out that the 32.768KHz
+>>>> external
+>>>> crystal is not enabled at power up. Instead the CPU falls back to using
+>>>> an emulation for the 32KHz clock which is SYSCLK1/610.  SYSCLK1 is
+>>>> usually
+>>>> 20MHz on boards so far (which gives an emulated frequency of 32.786KHz)
+>>>
+>>> Thanks applying into omap-for-v4.6/fixes.
+>>
+>> Actually let's wait a review from Tero on this one, not sure
+>> about the pseudo clock naming here. So dropping for now.
+>
+> The patch is fine for me, I didn't comment anything before as I thought
+> you already applied it.
+>
+> Acked-by: Tero Kristo <t-kristo@ti.com>
 
-diff --git a/drivers/mtd/maps/pxa2xx-flash.c b/drivers/mtd/maps/pxa2xx-flash.c
-index 7497090e9900..2cde28ed95c9 100644
---- a/drivers/mtd/maps/pxa2xx-flash.c
-+++ b/drivers/mtd/maps/pxa2xx-flash.c
-@@ -71,8 +71,8 @@ static int pxa2xx_flash_probe(struct platform_device *pdev)
- 		       info->map.name);
- 		return -ENOMEM;
- 	}
--	info->map.cached = memremap(info->map.phys, info->map.size,
--			MEMREMAP_WB);
-+	info->map.cached =
-+		ioremap_cached(info->map.phys, info->map.size);
- 	if (!info->map.cached)
- 		printk(KERN_WARNING "Failed to ioremap cached %s\n",
- 		       info->map.name);
-@@ -111,7 +111,7 @@ static int pxa2xx_flash_remove(struct platform_device *dev)
- 	map_destroy(info->mtd);
- 	iounmap(info->map.virt);
- 	if (info->map.cached)
--		memunmap(info->map.cached);
-+		iounmap(info->map.cached);
- 	kfree(info);
- 	return 0;
- }
--- 
-2.5.0
+Thanks Tero.
+
+>
+>>
+>> Regards,
+>>
+>> Tony
+>>
+>
