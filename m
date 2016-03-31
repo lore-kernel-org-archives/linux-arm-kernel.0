@@ -1,57 +1,102 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 31 Mar 2016 11:38:00 +0100
-Subject: [PATCH 2/7] ARM: dts: skeleton: add unit name to memory node
-In-Reply-To: <CAGhQ9Vykn=G+cmVuBCAA_ATTz4XNEPeUWYbZRb5NsrVBOjaS-A@mail.gmail.com>
-References: <1459290646-3592-1-git-send-email-manabian@gmail.com>
- <1459290646-3592-3-git-send-email-manabian@gmail.com>
- <20160330110611.GB25354@leverpostej> <56FBCF70.80006@mentor.com>
- <20160330134155.GC25354@leverpostej>
- <CAGhQ9VykiwMWaw3xcJdg2CahNFt+sp7tFC5O8VwA=-_=UoJ8kA@mail.gmail.com>
- <20160330170645.GA13690@leverpostej>
- <CAGhQ9Vykn=G+cmVuBCAA_ATTz4XNEPeUWYbZRb5NsrVBOjaS-A@mail.gmail.com>
-Message-ID: <20160331103800.GC26532@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 31 Mar 2016 11:53:18 +0100
+Subject: [PATCH] efi/arm64: don't apply MEMBLOCK_NOMAP to UEFI memory map
+ mapping
+In-Reply-To: <1459323983-9120-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1459323983-9120-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160331105318.GC18910@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 30, 2016 at 10:45:06PM +0200, Joachim Eastwood wrote:
-> On 30 March 2016 at 19:06, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Wed, Mar 30, 2016 at 06:15:35PM +0200, Joachim Eastwood wrote:
-> >> I used the following script to check for the memory node in all built dtb's.
-> >>   make ARCH=arm CONFIG_OF_ALL_DTBS=y dtbs
-> >>   for i in $(ls arch/arm/boot/dts/*.dtb); do
-> >>          m=$(scripts/dtc/dtc -I dtb -O dts $i | grep -m1 'memory.*{')
-> >>          if [ -z "$m" ]; then
-> >>                  echo "Missing memory node in $i"
-> >>           fi
-> >>   done
-> >>
-> >> So it should be pretty safe to just remove the memory node entry in
-> >> the skeleton files. Unless I have missed something with the script
-> >> above.
-> >
-> > The above might match reserved-memory nodes; it might be better to check
-> > for 'device_type\s*=\s*"memory"'.
+On Wed, Mar 30, 2016 at 09:46:23AM +0200, Ard Biesheuvel wrote:
+> Hi Matt,
 > 
-> I did check the output of the grep and it looks good. But there are
-> indeed DTs that are missing the 'device_type = "memory"' parameter.
-> Actually; _a lot_ or 438 of 741 to be exact. ugh...
+> Could we queue this as a fix for v4.6 with a cc:stable for v4.5, please?
+> (assuming no objections from any of the cc'ees)
+
+FWIW:
+
+Acked-by: Will Deacon <will.deacon@arm.com>
+
+Yes, this is a temporary hack, but it's small, fixes a real issue and
+you're already working on a proper solution anyway.
+
+Will
+
+> ----------8<--------------
+> Commit 4dffbfc48d65 ("arm64/efi: mark UEFI reserved regions as
+> MEMBLOCK_NOMAP") updated the mapping logic of both the RuntimeServices
+> regions as well as the kernel's copy of the UEFI memory map to set the
+> MEMBLOCK_NOMAP flag, which causes these regions to be omitted from the
+> kernel direct mapping, and from being covered by a struct page.
+> For the RuntimeServices regions, this is an obvious win, since the contents
+> of these regions have significance to the firmware executable code itself,
+> and are mapped in the EFI page tables using attributes that are described in
+> the UEFI memory map, and which may differ from the attributes we use for
+> mapping system RAM. It also prevents the contents from being modified
+> inadvertently, since the EFI page tables are only live during runtime
+> service invocations.
 > 
-> I guess all those should be fixed up before we can remove the memory
-> node from skeleton. :/
-
-Ouch, yes. :(
-
-That said, the cahnges don't need to be an atomic operation. We could
-start adding device_type = "memory" to dts immediately (in as whatever
-size batches maintainers are happy with), as a duplicate device_type
-shouldn't be problematic.
-
-When we hit critical mass, we could then remove the skeleton memory
-nodes, fixing up any remaining fallout.
-
-As for the mechanical changes, it sounds like we need coccinelle for DT.
-
-That, or a laptop, a long flight, and a gin and tonic.
-
-Thanks,
-Mark.
+> None of these concerns apply to the allocation that covers the UEFI memory
+> map, since it is entirely owned by the kernel. Setting the MEMBLOCK_NOMAP on
+> the region did allow us to use ioremap_cache() to map it both on arm64 and
+> on ARM, since the latter does not allow ioremap_cache() to be used on
+> regions that are covered by a struct page.
+> 
+> The ioremap_cache() on ARM restriction will be lifted in the v4.7 timeframe,
+> but in the mean time, it has been reported that commit 4dffbfc48d65 causes
+> a regression on 64k granule kernels. This is due to the fact that, given
+> the 64 KB page size, the region that we end up removing from the kernel
+> direct mapping is rounded up to 64 KB, and this 64 KB page frame may be
+> shared with the initrd when booting via GRUB (which does not align its
+> EFI_LOADER_DATA allocations to 64 KB like the stub does). This will crash
+> the kernel as soon as it tries to access the initrd.
+> 
+> Since the issue is specific to arm64, revert back to memblock_reserve()'ing
+> the UEFI memory map when running on arm64. This is a temporary fix for v4.5
+> and v4.6, and will be superseded in the v4.7 timeframe when we will be able
+> to move back to memblock_reserve() unconditionally.
+> 
+> Fixes: 4dffbfc48d65 ("arm64/efi: mark UEFI reserved regions as MEMBLOCK_NOMAP")
+> Reported-by: Mark Salter <msalter@redhat.com>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  drivers/firmware/efi/arm-init.c | 18 +++++++++++++++---
+>  1 file changed, 15 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
+> index aa1f743152a2..8714f8c271ba 100644
+> --- a/drivers/firmware/efi/arm-init.c
+> +++ b/drivers/firmware/efi/arm-init.c
+> @@ -203,7 +203,19 @@ void __init efi_init(void)
+>  
+>  	reserve_regions();
+>  	early_memunmap(memmap.map, params.mmap_size);
+> -	memblock_mark_nomap(params.mmap & PAGE_MASK,
+> -			    PAGE_ALIGN(params.mmap_size +
+> -				       (params.mmap & ~PAGE_MASK)));
+> +
+> +	if (IS_ENABLED(CONFIG_ARM)) {
+> +		/*
+> +		 * ARM currently does not allow ioremap_cache() to be called on
+> +		 * memory regions that are covered by struct page. So remove the
+> +		 * UEFI memory map from the linear mapping.
+> +		 */
+> +		memblock_mark_nomap(params.mmap & PAGE_MASK,
+> +				    PAGE_ALIGN(params.mmap_size +
+> +					       (params.mmap & ~PAGE_MASK)));
+> +	} else {
+> +		memblock_reserve(params.mmap & PAGE_MASK,
+> +				 PAGE_ALIGN(params.mmap_size +
+> +					    (params.mmap & ~PAGE_MASK)));
+> +	}
+>  }
+> -- 
+> 2.5.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
