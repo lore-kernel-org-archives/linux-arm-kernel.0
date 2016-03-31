@@ -1,57 +1,69 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 31 Mar 2016 23:40:42 -0700
-Subject: [PATCH 15/18] ARM: vf610: PM: initial suspend/resume support
-In-Reply-To: <20160401022507.GF18833@tiger>
-References: <1457576219-7971-1-git-send-email-stefan@agner.ch>
- <1457576219-7971-16-git-send-email-stefan@agner.ch>
- <20160401022507.GF18833@tiger>
-Message-ID: <f8da1f10269809cd07dfdda9f43a5dbf@agner.ch>
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Thu, 31 Mar 2016 14:42:48 -0700
+Subject: [PATCH] net: thunderx: Fix broken of_node_put() code.
+Message-ID: <1459460568-2458-1-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-03-31 19:25, Shawn Guo wrote:
-> On Wed, Mar 09, 2016 at 06:16:56PM -0800, Stefan Agner wrote:
->> Add system suspend and resume support for Vybrid SoC. The standby
->> sleep state puts the SoC in STOP mode. The SoC can be woken through
->> an interrupt from GPC (Global Power Controller). The GPC can use any
->> interrupt as wake-up source. To save power the main PLL1 is bypassed
->> and uses the 24MHz on-chip oscillator. However, memory clock need to
->> be at full speed, hence the PLL2 needs to be on to keep the memory
->> clocked. The mode is completely implemented in C since we can access
->> the full memory at all times. The mode provides most power saving
->> while being able to be woken by any IRQ as wake-up source.
->>
->> The mem sleep state (Suspend-to-RAM) uses Vybrid's LPSTOP2 mode. This
->> mode powergates most parts of the SoC expect some peripherials such as
->> Wake-Up controller (WKPU) or LP RTC. Parts of the internal SRAM is
->> retained too. The suspend code written in assembly runs from this SRAM.
->> The code puts the main memory (DDR3) into self-refresh mode and takes
->> it out of self-refresh mode on resume. Verified with Colibri VF50/VF61
->> V1.2A.
->>
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
->> ---
->>  arch/arm/mach-imx/Makefile        |   3 +
->>  arch/arm/mach-imx/common.h        |  10 +
->>  arch/arm/mach-imx/mach-vf610.c    |   8 +
->>  arch/arm/mach-imx/pm-vf610.c      | 634 ++++++++++++++++++++++++++++++++++++++
->>  arch/arm/mach-imx/suspend-vf610.S | 437 ++++++++++++++++++++++++++
->>  drivers/clk/imx/clk-vf610.c       |  17 +
->>  6 files changed, 1109 insertions(+)
->>  create mode 100644 arch/arm/mach-imx/pm-vf610.c
->>  create mode 100644 arch/arm/mach-imx/suspend-vf610.S
-> 
-> I know this is how we implemented suspend for i.MX6.  But this is not
-> the direction moving forward.  When people was pushing a pile of code
-> adding suspend for i.MX7D, I refused to take it and asked them to push
-> those hardware details into firmware and use PSCI to implement suspend.
-> I would like to suggest the same for Vybrid.
+From: David Daney <david.daney@cavium.com>
 
-Yeah I saw your comment on the i.MX7D patchset, and kind of hoped it
-does not apply for Vybrid :-)
+commit b7d3e3d3d21a ("net: thunderx: Don't leak phy device references
+on -EPROBE_DEFER condition.") incorrectly moved the call to
+of_node_put() outside of the loop.  Under normal loop exit, the node
+has already had of_node_put() called, so the extra call results in:
 
-I see, need to look into PSCI closer, and see how much work it would be
-to set that up and transfer the code into it...
+[    8.228020] ERROR: Bad of_node_put() on /soc at 0/pci at 848000000000/mrml-bridge0 at 1,0/bgx0/xlaui00
+[    8.239433] CPU: 16 PID: 608 Comm: systemd-udevd Not tainted 4.6.0-rc1-numa+ #157
+[    8.247380] Hardware name: www.cavium.com EBB8800/EBB8800, BIOS 0.3 Mar  2 2016
+[    8.273541] Call trace:
+[    8.273550] [<fffffc0008097364>] dump_backtrace+0x0/0x210
+[    8.273557] [<fffffc0008097598>] show_stack+0x24/0x2c
+[    8.273560] [<fffffc0008399ed0>] dump_stack+0x8c/0xb4
+[    8.273566] [<fffffc00085aa828>] of_node_release+0xa8/0xac
+[    8.273570] [<fffffc000839cad8>] kobject_cleanup+0x8c/0x194
+[    8.273573] [<fffffc000839c97c>] kobject_put+0x44/0x6c
+[    8.273576] [<fffffc00085a9ab0>] of_node_put+0x24/0x30
+[    8.273587] [<fffffc0000bd0f74>] bgx_probe+0x17c/0xcd8 [thunder_bgx]
+[    8.273591] [<fffffc00083ed220>] pci_device_probe+0xa0/0x114
+[    8.273596] [<fffffc0008473fbc>] driver_probe_device+0x178/0x418
+[    8.273599] [<fffffc000847435c>] __driver_attach+0x100/0x118
+[    8.273602] [<fffffc0008471b58>] bus_for_each_dev+0x6c/0xac
+[    8.273605] [<fffffc0008473884>] driver_attach+0x30/0x38
+[    8.273608] [<fffffc00084732f4>] bus_add_driver+0x1f8/0x29c
+[    8.273611] [<fffffc0008475028>] driver_register+0x70/0x110
+[    8.273617] [<fffffc00083ebf08>] __pci_register_driver+0x60/0x6c
+[    8.273623] [<fffffc0000bf0040>] bgx_init_module+0x40/0x48 [thunder_bgx]
+[    8.273626] [<fffffc0008090d04>] do_one_initcall+0xcc/0x1c0
+[    8.273631] [<fffffc0008198abc>] do_init_module+0x68/0x1c8
+[    8.273635] [<fffffc0008125668>] load_module+0xf44/0x11f4
+[    8.273638] [<fffffc0008125b64>] SyS_finit_module+0xb8/0xe0
+[    8.273641] [<fffffc0008093b30>] el0_svc_naked+0x24/0x28
 
---
-Stefan
+Go back to the previous (correct) code that only did the extra
+of_node_put() call on early exit from the loop.
+
+Signed-off-by: David Daney <david.daney@cavium.com>
+---
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+index 9679515..d20539a 100644
+--- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
++++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+@@ -1011,10 +1011,11 @@ static int bgx_init_of_phy(struct bgx *bgx)
+ 		}
+ 
+ 		lmac++;
+-		if (lmac == MAX_LMAC_PER_BGX)
++		if (lmac == MAX_LMAC_PER_BGX) {
++			of_node_put(node);
+ 			break;
++		}
+ 	}
+-	of_node_put(node);
+ 	return 0;
+ 
+ defer:
+-- 
+1.8.3.1
