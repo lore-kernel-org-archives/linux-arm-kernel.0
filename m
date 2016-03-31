@@ -1,84 +1,73 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Thu, 31 Mar 2016 19:23:38 +0800
-Subject: [PATCH v9 10/17] arm/xen: Get event-channel irq through HVM_PARAM
- when booting with ACPI
+Date: Thu, 31 Mar 2016 19:23:35 +0800
+Subject: [PATCH v9 07/17] Xen: ARM: Add support for mapping AMBA device mmio
 In-Reply-To: <1459423425-1220-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1459423425-1220-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1459423425-1220-11-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1459423425-1220-8-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-The kernel will get the event-channel IRQ through
-HVM_PARAM_CALLBACK_IRQ.
+Add a bus_notifier for AMBA bus device in order to map the device
+mmio regions when DOM0 booting with ACPI.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- arch/arm/xen/enlighten.c | 36 +++++++++++++++++++++++++++++++++++-
- 1 file changed, 35 insertions(+), 1 deletion(-)
+ drivers/xen/arm-device.c | 43 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index d94f726..06bd61a 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -30,6 +30,7 @@
- #include <linux/time64.h>
- #include <linux/timekeeping.h>
- #include <linux/timekeeper_internal.h>
-+#include <linux/acpi.h>
- 
- #include <linux/mm.h>
- 
-@@ -278,6 +279,35 @@ void __init xen_early_init(void)
- 		add_preferred_console("hvc", 0, NULL);
+diff --git a/drivers/xen/arm-device.c b/drivers/xen/arm-device.c
+index 76e26e5..3854043 100644
+--- a/drivers/xen/arm-device.c
++++ b/drivers/xen/arm-device.c
+@@ -139,3 +139,46 @@ static int __init register_xen_platform_notifier(void)
  }
  
-+static void __init xen_acpi_guest_init(void)
+ arch_initcall(register_xen_platform_notifier);
++
++#ifdef CONFIG_ARM_AMBA
++#include <linux/amba/bus.h>
++
++static int xen_amba_notifier(struct notifier_block *nb,
++			     unsigned long action, void *data)
 +{
-+#ifdef CONFIG_ACPI
-+	struct xen_hvm_param a;
-+	int interrupt, trigger, polarity;
++	struct amba_device *adev = to_amba_device(data);
++	int r = 0;
 +
-+	a.domid = DOMID_SELF;
-+	a.index = HVM_PARAM_CALLBACK_IRQ;
-+
-+	if (HYPERVISOR_hvm_op(HVMOP_get_param, &a)
-+	    || (a.value >> 56) != HVM_PARAM_CALLBACK_TYPE_PPI) {
-+		xen_events_irq = 0;
-+		return;
++	switch (action) {
++	case BUS_NOTIFY_ADD_DEVICE:
++		r = xen_map_device_mmio(&adev->res, 1);
++		break;
++	case BUS_NOTIFY_DEL_DEVICE:
++		r = xen_unmap_device_mmio(&adev->res, 1);
++		break;
++	default:
++		return NOTIFY_DONE;
 +	}
++	if (r)
++		dev_err(&adev->dev, "AMBA: Failed to %s device %s MMIO!\n",
++			action == BUS_NOTIFY_ADD_DEVICE ? "map" :
++			(action == BUS_NOTIFY_DEL_DEVICE ? "unmap" : "?"),
++			adev->dev.init_name);
 +
-+	interrupt = a.value & 0xff;
-+	trigger = ((a.value >> 8) & 0x1) ? ACPI_EDGE_SENSITIVE
-+					 : ACPI_LEVEL_SENSITIVE;
-+	polarity = ((a.value >> 8) & 0x2) ? ACPI_ACTIVE_LOW
-+					  : ACPI_ACTIVE_HIGH;
-+	xen_events_irq = acpi_register_gsi(NULL, interrupt, trigger, polarity);
-+#endif
++	return NOTIFY_OK;
 +}
 +
-+static void __init xen_dt_guest_init(void)
++static struct notifier_block amba_device_nb = {
++	.notifier_call = xen_amba_notifier,
++};
++
++static int __init register_xen_amba_notifier(void)
 +{
-+	xen_events_irq = irq_of_parse_and_map(xen_node, 0);
++	if (!xen_initial_domain() || acpi_disabled)
++		return 0;
++
++	return bus_register_notifier(&amba_bustype, &amba_device_nb);
 +}
 +
- static int __init xen_guest_init(void)
- {
- 	struct xen_add_to_physmap xatp;
-@@ -286,7 +316,11 @@ static int __init xen_guest_init(void)
- 	if (!xen_domain())
- 		return 0;
- 
--	xen_events_irq = irq_of_parse_and_map(xen_node, 0);
-+	if (!acpi_disabled)
-+		xen_acpi_guest_init();
-+	else
-+		xen_dt_guest_init();
-+
- 	if (!xen_events_irq) {
- 		pr_err("Xen event channel interrupt not found\n");
- 		return -ENODEV;
++arch_initcall(register_xen_amba_notifier);
++#endif
 -- 
 2.0.4
