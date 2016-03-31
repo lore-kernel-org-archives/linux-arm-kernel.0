@@ -1,70 +1,88 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 31 Mar 2016 15:15:01 +0800
-Subject: [PATCH] net: mvneta: remove useless RX descriptor prefetch
-In-Reply-To: <20160331144537.20f04a8c@xhacker>
-References: <1459406190-2334-1-git-send-email-jszhang@marvell.com>
- <20160331144537.20f04a8c@xhacker>
-Message-ID: <20160331151501.27fe34d5@xhacker>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 31 Mar 2016 09:26:04 +0200
+Subject: [v2,4/7] scatterlist: add sg_alloc_table_from_buf() helper
+In-Reply-To: <56FCAE1B.90206@ti.com>
+References: <1459352394-22810-5-git-send-email-boris.brezillon@free-electrons.com>
+ <56FCAE1B.90206@ti.com>
+Message-ID: <20160331092604.219cf104@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi Vignesh,
 
-On Thu, 31 Mar 2016 14:45:37 +0800 Jisheng Zhang wrote:
+On Thu, 31 Mar 2016 10:26:59 +0530
+Vignesh R <vigneshr@ti.com> wrote:
 
 > Hi,
 > 
-> + linux arm kernel
+> On 03/30/2016 09:09 PM, Boris BREZILLON wrote:
 > 
-> On Thu, 31 Mar 2016 14:36:30 +0800 Jisheng Zhang wrote:
+> [...]
 > 
-> > The rx descriptors are allocated using dma_alloc_coherent, so prefetch
-> > doesn't really happen at all.  
+> > +int sg_alloc_table_from_buf(struct sg_table *sgt, const void *buf, size_t len,
+> > +			    const struct sg_constraints *constraints,
+> > +			    gfp_t gfp_mask)
+> > +{
+> > +	struct sg_constraints cons = { };
+> > +	size_t remaining, chunk_len;
+> > +	const void *sg_buf;
+> > +	int i, ret;
+> > +
+> > +	if (constraints)
+> > +		cons = *constraints;
+> > +
+> > +	ret = sg_check_constraints(&cons, buf, len);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	sg_buf = buf;
+> > +	remaining = len;
+> > +	i = 0;
+> > +	sg_for_each_chunk_in_buf(sg_buf, remaining, chunk_len, &cons)
+> > +		i++;
+> > +
+> > +	ret = sg_alloc_table(sgt, i, gfp_mask);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	sg_buf = buf;
+> > +	remaining = len;
+> > +	i = 0;
+> > +	sg_for_each_chunk_in_buf(sg_buf, remaining, chunk_len, &cons) {
+> > +		if (is_vmalloc_addr(sg_buf)) {
+> > +			struct page *vm_page;
+> > +
+> > +			vm_page = vmalloc_to_page(sg_buf);
+> > +			if (!vm_page) {
+> > +				ret = -ENOMEM;
+> > +				goto err_free_table;
+> > +			}
+> > +
+> > +			sg_set_page(&sgt->sgl[i], vm_page, chunk_len,
+> > +				    offset_in_page(sg_buf));
+> > +		} else {
+> > +			sg_set_buf(&sgt->sgl[i], sg_buf, chunk_len);
+> > +		}
+> > +
 > 
-> This is for RFC, I'm sorry to send it without changing its title -- s/PATCH/RFC.
-> 
-> I'm not sure whether there's any benefit to prefetch on space allocated from
-> dma_alloc_coherent.
+> If the buf address is in PKMAP_BASE - PAGE_OFFSET-1 region (I have
+> observed that JFFS2 FS provides buffers in above region to MTD layer),
+> if CONFIG_DEBUG_SG is set then sg_set_buf() will throw a BUG_ON() as
+> virt_addr_is_valid() will return false. Is there a sane way to handle
+> buffers of PKMAP_BASE region with sg_*  APIs?
+> Or, is the function sg_alloc_table_from_buf() not to be used with such
+> buffers?
 
-After more consideration, I think my patch is wrong.
-
-As for coherent platforms, the space allocated from dma_alloc_coherent is
-cacheable, so prefetch would definitely benefit us.
-
-As for noncoherent platforms, the space allocated from dma_alloc_coherent is
-uncacheable, but prefetch on arm/arm64 is implemented via. pld/prfm, the op
-would be nop if target address is uncacheable.
-
-So let's drop this patch.
+It should be usable with kmapped buffers too: I'll provide a new version
+to support that.
+That makes me realize I'm not checking the virtual address consistency
+in sg_check_constraints().
 
 Thanks,
-Jisheng
 
+Boris
 
-> 
-> Thanks
-> 
-> > 
-> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> > ---
-> >  drivers/net/ethernet/marvell/mvneta.c | 1 -
-> >  1 file changed, 1 deletion(-)
-> > 
-> > diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-> > index 5880871..6c09a27 100644
-> > --- a/drivers/net/ethernet/marvell/mvneta.c
-> > +++ b/drivers/net/ethernet/marvell/mvneta.c
-> > @@ -757,7 +757,6 @@ mvneta_rxq_next_desc_get(struct mvneta_rx_queue *rxq)
-> >  	int rx_desc = rxq->next_desc_to_proc;
-> >  
-> >  	rxq->next_desc_to_proc = MVNETA_QUEUE_NEXT_DESC(rxq, rx_desc);
-> > -	prefetch(rxq->descs + rxq->next_desc_to_proc);
-> >  	return rxq->descs + rx_desc;
-> >  }
-> >    
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
