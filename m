@@ -1,58 +1,139 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 31 Mar 2016 09:39:19 -0700
-Subject: [PATCH] ACPI / ARM64: Remove EXPERT dependency for ACPI on ARM64
-In-Reply-To: <CAKv+Gu_TfX8aOXig63gWH535he-dPiMr14ig7bUL+LJC_n3=9Q@mail.gmail.com>
-References: <1459360718-24125-1-git-send-email-broonie@kernel.org>
- <56FC9D1D.6090808@huawei.com>
- <CAJZ5v0gv-MJ+Ss8gtc80z2_sOq-3qfBYbspRU8MWRNvn+UVbUg@mail.gmail.com>
- <20160331123649.GE18910@arm.com>
- <CAKv+Gu_i8q_xKQgJ1mJ5hE_gcdJgHkh_QZhUNwQchsyH9r-pJQ@mail.gmail.com>
- <20160331133848.GH18910@arm.com>
- <CAKv+Gu_TfX8aOXig63gWH535he-dPiMr14ig7bUL+LJC_n3=9Q@mail.gmail.com>
-Message-ID: <20160331163919.GC2350@sirena.org.uk>
+From: glider@google.com (Alexander Potapenko)
+Date: Thu, 31 Mar 2016 18:43:18 +0200
+Subject: [PATCH v1] arm64: allow building with kcov coverage on ARM64
+In-Reply-To: <CAG_fn=Vgvuaoz_jUNcyxvFdu4LpyO55AWmTzGvCVhOYoaX9y7Q@mail.gmail.com>
+References: <57cb1b66d85b85eadea28ef3304a62b1327ded45.1459432254.git.glider@google.com>
+ <20160331142908.GG26532@leverpostej>
+ <CAG_fn=V+e=+-svWOCUirOy4SvBNgJR5JWCFDU3uE3aKwz9ihvw@mail.gmail.com>
+ <20160331160052.GA26393@leverpostej>
+ <CAG_fn=Vgvuaoz_jUNcyxvFdu4LpyO55AWmTzGvCVhOYoaX9y7Q@mail.gmail.com>
+Message-ID: <CAG_fn=WEWLodT+5yc4O12nLmaTjK5DJfXuaPX2tgXmuhrGOyCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 31, 2016 at 04:48:44PM +0200, Ard Biesheuvel wrote:
-> On 31 March 2016 at 15:38, Will Deacon <will.deacon@arm.com> wrote:
+On Thu, Mar 31, 2016 at 6:33 PM, Alexander Potapenko <glider@google.com> wrote:
+> On Thu, Mar 31, 2016 at 6:00 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> On Thu, Mar 31, 2016 at 05:09:29PM +0200, Alexander Potapenko wrote:
+>>> On Thu, Mar 31, 2016 at 4:29 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>>> > Hi,
+>>> >
+>>> > On Thu, Mar 31, 2016 at 03:54:45PM +0200, Alexander Potapenko wrote:
+>>> >> Add ARCH_HAS_KCOV to ARM64 config. Disable instrumentation of
+>>> >> arch/arm64/lib/delay.c
+>>> >
+>>> > Why do we disable instrumentation of delay.c?
+>>> The main purpose of kcov is collecting coverage from syscalls. As far
+>>> as I understand, coverage of functions from delay.c doesn't
+>>> deterministically depend on the syscalls being called and their
+>>> arguments.
+>>> The initial kcov implementation
+>>> (https://github.com/torvalds/linux/commit/5c9a8750a6409c63a0f01d51a9024861022f6593)
+>>> disabled instrumentation of arch/x86/lib/delay.c, so I just copied
+>>> that chunk.
+>>>
+>>> > What exactly does kcov instrumentation imply? Does it require certain
+>>> > data to be mapped or certain functions to be callable while instrumented
+>>> > functions are called?
+>>> Yes, there is __sanitizer_cov_trace_pc() that must be callable.
+>>
+>> That will definitely be a problem for the KVM code which is run at a
+>> different exception level with a different memory map. For GCOV, KASAN,
+>> and UBSAN we simply disable instrumentation of that code [1].
+>>
+>> We should be able to do similarly for KCOV.
+> Ok, I'll send out the updated patch.
+>
+>>> At boot time |current->kcov_mode| zero, so it virtually does nothing.
+>>>
+>>> Currently kcov instrumentation is disabled for the following files:
+>>
+>>> arch/x86/boot/*
+>>> arch/x86/boot/compressed/*
+>>> arch/x86/entry/vdso/*
+>>> arch/x86/realmode/rm/*
+>>
+>> These are executed outside of the usual kernel context / address space,
+>> so excluding these makes sense to me.
+>>
+>>> arch/x86/kernel/*
+>>> arch/x86/kernel/apic/*
+>>> arch/x86/kernel/cpu/common.c
+>>> arch/x86/kernel/cpu/perf_event.c
+>>> arch/x86/lib/delay.c
+>>> arch/x86/mm/tlb.c
+>>
+>> For these, it's not immediately clear to me why instrumentation is
+>> disabled, so I don't know whether or not we can instrument the analogous
+>> arm64 code.
+> According to the comments in
+> https://github.com/torvalds/linux/commit/5c9a8750a6409c63a0f01d51a9024861022f6593,
+> instrumentation of arch/x86/kernel/apic/* and arch/x86/lib/delay.c
+> leads to non-deterministic coverage, instrumenting others prevent the
+> kernel from booting.
+>
+>>> Only a handful of the above have corresponding files in arch/arm64:
+>>> arch/arm64/boot/*
+>>> arch/arm64/kernel/*
+>>> arch/arm64/lib/delay.c
+>>
+>> We have arch/arm64/kernel/perf_event.c, and a couple of other files that
+>> are directly analogous, even if the paths don't quite line up.
+> Ok, it makes sense to also disable arch/arm64/kernel/perf_event.c then.
+... and certainly turn off instrumentation for the "couple of other files".
+By the way, I've just noticed that arch/x86/kernel/cpu/perf_event.c
+has moved, so the Makefile isn't accurate anymore.
 
-> > I'd really like to get away from the concept of ACPI-only systems. Would
-> > we reject a .dtb contribution for such a machine?
+>>> My patch explicitly disables instrumentation for arch/arm64/lib/delay.c.
+>>> I never had problems with arch/arm64/boot/* and arch/arm64/kernel/* in
+>>> the 3.18 kernel, although instrumentation of the corresponding x86
+>>> code is claimed to cause boot-time hangs.
+>>> We can act conservatively and still disable instrumentation for these
+>>> two dirs just to make sure nothing breaks in the future.
+>>
+>> I'd rather that we understood why instrumentation of the above is
+>> disabled, such that we can make a sensible decision from the outset.
+>>
+>>> > We have some C code that is run outside of the normal kernel context
+>>> > (e.g. EFI stub, KVM hyp code), and I suspect it may be necessary to
+>>> > disable instrumentation for those also.
+>>> EFI stub and a number of other files is already disabled by the
+>>> initial kcov patch.
+>>> I understand there might be some code specific to ARM64 that I may
+>>> have overlooked, so I'd be grateful if someone could try the patch out
+>>> with the upstream kernel.
+>>
+>> The only such code that I'm immediately aware of is the hyp-context KVM
+>> code, as mentioned above.
+>>
+>> Thanks,
+>> Mark.
+>>
+>> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/416790.html
+>
+>
+>
+> --
+> Alexander Potapenko
+> Software Engineer
+>
+> Google Germany GmbH
+> Erika-Mann-Stra?e, 33
+> 80636 M?nchen
+>
+> Gesch?ftsf?hrer: Matthew Scott Sucherman, Paul Terence Manicle
+> Registergericht und -nummer: Hamburg, HRB 86891
+> Sitz der Gesellschaft: Hamburg
 
-> Absolutely not, and I expect such contributions will appear sooner
-> rather than later.
 
-> But the point of ACPI is the abstraction, and the ridiculous churn in
-> DTB's carried in mainline clearly shows the need for that*. So there
-> will be ACPI-only systems because the drivers are coded against the
-> abstracted interface, and DT is simply not a drop-in replacement in
-> that case.
 
-It's also worth remembering that just because we have a DT in tree that
-doesn't mean that people running actual systems are going to use it.
-For some systems there will be a user community that wants to do that
-but that won't be universal, there are going to be people who just use
-the default firmware.
+-- 
+Alexander Potapenko
+Software Engineer
 
-> > I understand that, but I still think that removing the dependency on
-> > EXPERT is indicative of saying "this stuff is good to be used by the
-> > masses", irrespective of a cmdline option. Maybe that's true, but it's
-> > not immediately obvious to me, with all the patches in flight.
+Google Germany GmbH
+Erika-Mann-Stra?e, 33
+80636 M?nchen
 
-> Well, we are not cc'ing to stable, are we? Or do you think the current
-> stuff is so broken that we should even protect users of the upstream
-> HEAD branch against it?
-
-Like I said in the other mail I'm also just not sure that this is
-something that people deciding what firmware to ship on their systems
-are paying much attention to.  People are coming to their own assessment
-based on their own testing and other factors.  Where I see this having
-an impact is more on having the rest of the upstream community keeping
-an eye on what the ACPI people are doing.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160331/01725641/attachment.sig>
+Gesch?ftsf?hrer: Matthew Scott Sucherman, Paul Terence Manicle
+Registergericht und -nummer: Hamburg, HRB 86891
+Sitz der Gesellschaft: Hamburg
