@@ -1,86 +1,128 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 31 Mar 2016 09:39:38 +0200
-Subject: [PATCH 11/13] dtb: amd: Add PCIe SMMU device tree node
-In-Reply-To: <20160330172412.GB10224@arm.com>
-References: <1453929121-12171-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <20160128111453.GG17123@leverpostej> <56AA07AA.7050701@arm.com>
- <6645680.g0j8d12m6d@wuerfel> <20160128142751.GA775@arm.com>
- <56FBF2B7.8090601@linaro.org> <20160330154538.GA10224@arm.com>
- <56FBF754.7020804@linaro.org> <20160330172412.GB10224@arm.com>
-Message-ID: <56FCD43A.4090409@linaro.org>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 31 Mar 2016 16:46:35 +0900
+Subject: [PATCH v15 17/20] arm64: kdump: implement machine_crash_shutdown()
+In-Reply-To: <56EC440F.4050406@arm.com>
+References: <cover.1457977401.git.geoff@infradead.org>
+ <8f53a31cf8bbfdd73eb289e078addc31c5a19fcf.1457977403.git.geoff@infradead.org>
+ <56EC440F.4050406@arm.com>
+Message-ID: <20160331074635.GC2267@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-On 03/30/2016 07:24 PM, Will Deacon wrote:
-> On Wed, Mar 30, 2016 at 05:57:08PM +0200, Eric Auger wrote:
->> On 03/30/2016 05:45 PM, Will Deacon wrote:
->>> On Wed, Mar 30, 2016 at 05:37:27PM +0200, Eric Auger wrote:
->>>> On 01/28/2016 03:27 PM, Will Deacon wrote:
->>>>> On Thu, Jan 28, 2016 at 03:17:33PM +0100, Arnd Bergmann wrote:
->>>>>> On Thursday 28 January 2016 12:20:58 Robin Murphy wrote:
->>>>>>>>
->>>>>>> Any IDs specified here would only apply to DMA by the "platform device" 
->>>>>>> side of the host controller itself (as would an equivalent "iommus" 
->>>>>>> property on pcie0 once I finish the SMMUv2 generic binding support I'm 
->>>>>>> working on). In terms of PCI devices, the "mmu-masters" property is 
->>>>>>> overloaded such that only its existence matters, to identify that there 
->>>>>>> _is_ a relationship between the SMMU and the PCI bus(es) behind that 
->>>>>>> host controller.
->>>>>>
->>>>>> I wasn't aware that this was actually still specified. I had hoped
->>>>>> we were getting rid of mmu-masters before anyone actually started
->>>>>> using it, but now I see it in ns2.dtsi and fsl-ls2080a.dtsi.
->>>>>>
->>>>>> Does anyone know what happened to the plan to use the iommu DT binding
->>>>>> for the ARM SMMU instead? Do we now have to support both ways indefinitely?
->>>>>
->>>>> We always did -- Seattle used the mmu-masters binding before the generic
->>>>> binding even existed. Robin has been working on patches to get of_xlate
->>>>> up and running, but it got held up by Laurent's series which didn't end
->>>>> up going anywhere.
->>>>>
->>>> Up to now I have used the PCI smmu description as described in Suravee's
->>>> patch and this does not work anymore with 4.6-rc1 since the default
->>>> domain was introduced. So now I see 2 SMRs matching a single streamid
->>>> (in my case 256, one steming from the "platform device" side of the host
->>>> controller and one steming from the PCI device) and this causes SMCF
->>>> (stream match conflict fault). So PCIe PF does not work.
->>>
->>> Sorry about that, it wasn't intentional. In fact, I wrote commit
->>> cbf8277ef456 ("iommu/arm-smmu: Treat IOMMU_DOMAIN_DMA as bypass for now")
->>> specifically to avoid this breakage, after seeing it myself with VFIO
->>> and an S2CR-based configuration. It looks like the check just needs moving
->>> higher up (i.e. before we initialise the SMRs).
->>>
->>> Does that fix it for you?
->> Yes this fixes the issue for me, thanks! I guess you will send that patch?
+On Fri, Mar 18, 2016 at 06:08:15PM +0000, James Morse wrote:
+> Hi!
 > 
-> I need to check that it doesn't break rebinding to the host after VFIO
-> has been used for passthrough, first.
+> On 14/03/16 17:48, Geoff Levand wrote:
+> > From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> > 
+> > Primary kernel calls machine_crash_shutdown() to shut down non-boot cpus
+> > and save registers' status in per-cpu ELF notes before starting crash
+> > dump kernel. See kernel_kexec().
+> > Even if not all secondary cpus have shut down, we do kdump anyway.
+> > 
+> > As we don't have to make non-boot(crashed) cpus offline (to preserve
+> > correct status of cpus at crash dump) before shutting down, this patch
+> > also adds a variant of smp_send_stop().
+> > 
+> > Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> 
+> > diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> > index b1adc51..76402c6cd 100644
+> > --- a/arch/arm64/kernel/smp.c
+> > +++ b/arch/arm64/kernel/smp.c
+> > @@ -701,6 +705,28 @@ static void ipi_cpu_stop(unsigned int cpu)
+> >  		cpu_relax();
+> >  }
+> >  
+> > +static atomic_t waiting_for_crash_ipi;
+> > +
+> > +static void ipi_cpu_crash_stop(unsigned int cpu, struct pt_regs *regs)
+> > +{
+> > +	crash_save_cpu(regs, cpu);
+> > +
+> > +	raw_spin_lock(&stop_lock);
+> > +	pr_debug("CPU%u: stopping\n", cpu);
+> > +	raw_spin_unlock(&stop_lock);
+> > +
+> > +	atomic_dec(&waiting_for_crash_ipi);
+> > +
+> > +	local_irq_disable();
+> 
+> Aren't irqs already disabled here? - or is this a 'just make sure'....
 
-OK. I can help testing too since I am currently working on PCIe
-passthrough respin.
-> 
-> Does your devicetree explicitly assign a StreamID to the platform device
-> for the host controller? We should probably be handling this, since it
-> will crop us as an issue again once we decide to enable the default
-> domain properly.
+Well, it also exists in ipi_cpu_stop() ...
 
-Yes it does. My dt description currently matches the one found in this
-patch from Suravee (old binding style). Hence my question. Shall I
-remove this and let PCIe register their RID=SID automatically?
+> > +
+> > +	if (cpu_ops[cpu]->cpu_die)
+> > +		cpu_ops[cpu]->cpu_die(cpu);
+> > +
+> > +	/* just in case */
+> > +	while (1)
+> > +		wfi();
+> > +}
+> > +
+> >  /*
+> >   * Main handler for inter-processor interrupts
+> >   */
+> > @@ -731,6 +757,12 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+> >  		irq_exit();
+> >  		break;
+> >  
+> > +	case IPI_CPU_CRASH_STOP:
+> > +		irq_enter();
+> > +		ipi_cpu_crash_stop(cpu, regs);
+> > +		irq_exit();
 > 
->> So eventually what is the right way to describe the smmu-masters (~
->> future of that patch)?
-> 
-> Using the generic iommu binding
-> (Documentation/devicetree/bindings/iommu/iommu.txt), which will be required
-> for of_xlate-based probing. The old binding should still continue to
-> function as it always has, though.
-OK thanks
+> This made me jump: irq_exit() may end up in the __do_softirq() (with irqs turned
+> back on!) ... but these lines are impossible to reach. Maybe get the compiler to
+> enforce this with an unreachable() instead?
 
-Eric
+I'm not sure how effective unreachable() is here, but OK I will add it.
+
+Thanks,
+-Takahiro AKASHI
+
+> > +		break;
+> > +
+> >  #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
+> >  	case IPI_TIMER:
+> >  		irq_enter();
+> > @@ -791,6 +823,30 @@ void smp_send_stop(void)
+> >  		pr_warning("SMP: failed to stop secondary CPUs\n");
+> >  }
+> >  
+> > +void smp_send_crash_stop(void)
+> > +{
+> > +	cpumask_t mask;
+> > +	unsigned long timeout;
+> > +
+> > +	if (num_online_cpus() == 1)
+> > +		return;
+> > +
+> > +	cpumask_copy(&mask, cpu_online_mask);
+> > +	cpumask_clear_cpu(smp_processor_id(), &mask);
+> > +
+> > +	atomic_set(&waiting_for_crash_ipi, num_online_cpus() - 1);
+> > +
+> > +	smp_cross_call(&mask, IPI_CPU_CRASH_STOP);
+> > +
+> > +	/* Wait up to one second for other CPUs to stop */
+> > +	timeout = USEC_PER_SEC;
+> > +	while ((atomic_read(&waiting_for_crash_ipi) > 0) && timeout--)
+> > +		udelay(1);
+> > +
+> > +	if (atomic_read(&waiting_for_crash_ipi) > 0)
+> > +		pr_warn("SMP: failed to stop secondary CPUs\n");
+> > +}
+> > +
+> >  /*
+> >   * not supported here
+> >   */
+> > 
 > 
-> Will
+> 
+> Thanks,
+> 
+> James
+> 
 > 
