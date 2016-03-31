@@ -1,23 +1,24 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 31 Mar 2016 15:15:47 -0400 (EDT)
-Subject: [PATCH] net: mvneta: replace MVNETA_CPU_D_CACHE_LINE_SIZE with
- L1_CACHE_BYTES
-In-Reply-To: <1459338921-391-1-git-send-email-jszhang@marvell.com>
-References: <1459338921-391-1-git-send-email-jszhang@marvell.com>
-Message-ID: <20160331.151547.1889188465826831929.davem@davemloft.net>
+From: leoli@freescale.com (Li Yang)
+Date: Thu, 31 Mar 2016 14:40:31 -0500
+Subject: [PATCH] gpio/ls2080a: Add compatible "fsl,ls2080a-gpio" for
+ ls2080a gpio nodes
+In-Reply-To: <CACRpkdbRwTdGNsoCgqZbgf7DVYbPJdSDey7ju6ogVtVJ+tDGoA@mail.gmail.com>
+References: <1458726442-1851-1-git-send-email-Gang.Liu@nxp.com>
+ <1458726442-1851-4-git-send-email-Gang.Liu@nxp.com>
+ <CACRpkdbRwTdGNsoCgqZbgf7DVYbPJdSDey7ju6ogVtVJ+tDGoA@mail.gmail.com>
+Message-ID: <CADRPPNTSA888Vc6E3Sg__6b7dG3Eq26=4vf0OojpjdzfrSWA2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jisheng Zhang <jszhang@marvell.com>
-Date: Wed, 30 Mar 2016 19:55:21 +0800
+On Thu, Mar 31, 2016 at 3:29 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> The subject of this patch should be:
+>
+> ARM64: dts: ...
+>
+> And it should be merged into the ARM SoC tree, not the GPIO tree.
 
-> The mvneta is also used in some Marvell berlin family SoCs which may
-> have 64bytes cacheline size. Replace the MVNETA_CPU_D_CACHE_LINE_SIZE
-> usage with L1_CACHE_BYTES.
-> 
-> And since dma_alloc_coherent() is always cacheline size aligned, so
-> remove the align checks.
-> 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Thanks for the comment.  I will help to fix the title issues for the
+dts patches and push for acceptance in arm-soc tree.
 
-Applied.
+Regards,
+Leo
