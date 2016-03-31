@@ -1,72 +1,59 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Thu, 31 Mar 2016 10:32:13 +0800
-Subject: [PATCH] mfd: mt6397: irq domain should initialize before
- mfd_add_devices()
-In-Reply-To: <1459388452.18284.2.camel@mtksdaap41>
-References: <1459322708-21363-1-git-send-email-henryc.chen@mediatek.com>
- <56FB99DB.6010901@openwrt.org> <1459388452.18284.2.camel@mtksdaap41>
-Message-ID: <1459391533.21870.15.camel@mtksdaap41>
+From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
+Date: Thu, 31 Mar 2016 10:34:15 +0800
+Subject: [Query]set clk rate must operate its coordinated clock
+In-Reply-To: <20160311165152.4103.82090@quark.deferred.io>
+References: <20160309152420.20de187a@xhacker>
+ <20160311165152.4103.82090@quark.deferred.io>
+Message-ID: <CALx668WqPF12eD=f3mfd-=TYwVe4bVk0YVoKtGV_XPM8c+_FeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-03-31 at 09:40 +0800, Henry Chen wrote:
-> On Wed, 2016-03-30 at 11:18 +0200, John Crispin wrote:
-> > Hi,
-> > 
-> > small nitpick inline
-> > 
-> > On 30/03/2016 09:25, Henry Chen wrote:
-> > > Some sub driver like RTC module need irq domain from parent to create
-> > > irq mapping when driver initialize. so move mt6397_irq_init() before
-> > > mfd_add_devices().
-> > > 
-> > > Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
-> > > ---
-> > > This patch fixed the below warning based on "Linux kernel v4.6-rc1"
-> > > WARNING: CPU: 1 PID: 132 at kernel/mediatek/kernel/irq/irqdomain.c:471
-> > > irq_create_mapping+0xc4/0xd0
-> > > ---
-> > >  drivers/mfd/mt6397-core.c | 37 ++++++++++++++++++++++---------------
-> > >  1 file changed, 22 insertions(+), 15 deletions(-)
-> > > 
-> > > diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
-> > > index 8e8d932..a879223 100644
-> > > --- a/drivers/mfd/mt6397-core.c
-> > > +++ b/drivers/mfd/mt6397-core.c
-> > > @@ -270,22 +270,36 @@ static int mt6397_probe(struct platform_device *pdev)
-> > >  		goto fail_irq;
-> > >  	}
-> > >  
-> > > +	pmic->irq = platform_get_irq(pdev, 0);
-> > > +
-> > >  	switch (id & 0xff) {
-> > >  	case MT6323_CID_CODE:
-> > > -		pmic->int_con[0] = MT6323_INT_CON0;
-> > > -		pmic->int_con[1] = MT6323_INT_CON1;
-> > > -		pmic->int_status[0] = MT6323_INT_STATUS0;
-> > > -		pmic->int_status[1] = MT6323_INT_STATUS1;
-> > > +		if (pmic->irq > 0) {
-> > 
-> > should this not be
-> > 
-> > 		if (pmic->irq >= 0) {
-> > 
-> > i think the code before your patch was wrong as linux irqs start with 0.
-> > 
-> > 	John
-> Hi John,
-> 
-> Thanks, I will modify this.
++linux-mediatek list
 
-Linux irq start from 1, 0 is invalid. I can't find the document saying
-this now, but you could see this from irq_create_mapping() in
-kernel/irq/irqdomain.c
+On Sat, Mar 12, 2016 at 12:51 AM, Michael Turquette
+<mturquette@baylibre.com> wrote:
+> Jisheng,
+>
+> Quoting Jisheng Zhang (2016-03-08 23:24:20)
+>> Dear Stephen, Michael, Sebastian and all,
+>>
+>> I have the following clk case which I dunno the elegant solution:
+>>
+>>
+>> cpuclk have two parents: cpupll and refclk. When set the cpuclk freq, we
+>> have to set its parent's freq, I.E cpupll freq. But before changing the
+>> cpupll's freq, we should set its refclk as its parent firstly.
+>>
+>> AFAIK, this is a common case, I have seen such requirement in rockchip, samsung
+>> clk driver. They solve this by notifier, but as pointed out by Michael
+>> in http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/351565.html
+>>
+>> "This is also a hack and it points towards some missing infrastructure in the
+>> clock framework."
+>>
+>> I also don't like the notifier solution, I believe the elegant solution could
+>> be using the coordinated clock infrastructure. So what's the status of
+>> this infrastructure? I can test, and I can even add some code to make it be
+>> ready to be merged if you guide me ;)
+>
+> Thanks for the email. I hope to finish that feature before ELC. I have
+> Cc'd Pi-Cheng Chen from Mediatek who is also interested in coordinated
+> clock rates.
 
-I think the code should have check return from platform_get_irq and
-handle -EPROBE_DEFER, but maybe it should be another patch?
+Hi Mike,
 
-BTW, in this function, it is possible that pmic->irq_domain will be NULL
-in fail_irq error handling. We should check before calling
-irq_domain_remove.
+Sorry for my late response.
+Glad to hear that you're still working on it.
+I am ready to test it on Mediatek platform.
+Looking forwards to the new clk feature.
 
-Joe.C
+Thanks,
+Pi-Cheng
+
+>
+> Regards,
+> Mike
+>
+>>
+>> Thanks in advance,
+>> Jisheng
