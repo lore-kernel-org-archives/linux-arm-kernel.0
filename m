@@ -1,63 +1,131 @@
-From: chengang_rda@163.com (Chen Gang)
-Date: Thu, 31 Mar 2016 19:41:05 +0800
-Subject: [PATCH v2 1/1] ARM : missing corrupted reg in __div64_32
-In-Reply-To: <20160331103020.GH3701@e103592.cambridge.arm.com>
-References: <20160331103020.GH3701@e103592.cambridge.arm.com>
-Message-ID: <1459424465-26334-1-git-send-email-chengang_rda@163.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 31 Mar 2016 13:44:08 +0200
+Subject: [PATCH v7 12/17] ARM64: ACPI: Check if it runs on Xen to enable
+ or disable ACPI
+In-Reply-To: <alpine.DEB.2.02.1603311155450.11739@kaball.uk.xensource.com>
+References: <1458830676-27075-1-git-send-email-shannon.zhao@linaro.org>
+ <1458830676-27075-13-git-send-email-shannon.zhao@linaro.org>
+ <20160329161837.GH6745@arm.com>
+ <20160329163147.GB27223@leverpostej> <56FB7E00.7030400@huawei.com>
+ <alpine.DEB.2.02.1603311155450.11739@kaball.uk.xensource.com>
+Message-ID: <CAKv+Gu-wPq_FzO3sm7bhSFuu7EVxHWB_v6HOn1GqNbdaE-iBoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-__xl(R0 in little endian system, or R1 in big endian system) is corrupted
-after calling __do_div64 and compiler is not informed about this.
-If n is used again afterwards, __xl won't be reloaded and n will
-contain incorrect value.
+On 31 March 2016 at 13:04, Stefano Stabellini
+<stefano.stabellini@eu.citrix.com> wrote:
+> On Wed, 30 Mar 2016, Shannon Zhao wrote:
+>> Hi Will, Mark,
+>>
+>> On 2016/3/30 0:31, Mark Rutland wrote:
+>> > On Tue, Mar 29, 2016 at 05:18:38PM +0100, Will Deacon wrote:
+>> >> > On Thu, Mar 24, 2016 at 10:44:31PM +0800, Shannon Zhao wrote:
+>> >>> > > When it's a Xen domain0 booting with ACPI, it will supply a /chosen and
+>> >>> > > a /hypervisor node in DT. So check if it needs to enable ACPI.
+>> >>> > >
+>> >>> > > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>> >>> > > Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+>> >>> > > Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> >>> > > ---
+>> >>> > >  arch/arm64/kernel/acpi.c | 12 ++++++++----
+>> >>> > >  1 file changed, 8 insertions(+), 4 deletions(-)
+>> >>> > >
+>> >>> > > diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+>> >>> > > index d1ce8e2..4e92be0 100644
+>> >>> > > --- a/arch/arm64/kernel/acpi.c
+>> >>> > > +++ b/arch/arm64/kernel/acpi.c
+>> >>> > > @@ -67,10 +67,13 @@ static int __init dt_scan_depth1_nodes(unsigned long node,
+>> >>> > >  {
+>> >>> > >       /*
+>> >>> > >        * Return 1 as soon as we encounter a node at depth 1 that is
+>> >>> > > -      * not the /chosen node.
+>> >>> > > +      * not the /chosen node, or /hypervisor node when running on Xen.
+>> >>> > >        */
+>> >>> > > -     if (depth == 1 && (strcmp(uname, "chosen") != 0))
+>> >>> > > -             return 1;
+>> >>> > > +     if (depth == 1 && (strcmp(uname, "chosen") != 0)) {
+>> >>> > > +             if (!xen_initial_domain() || (strcmp(uname, "hypervisor") != 0))
+>> >>> > > +                     return 1;
+>> >>> > > +     }
+>> >> >
+>> >> > Hmm, but xen_initial_domain() is false when xen isn't being used at all,
+>> >> > so it feels to me like this is a bit too far-reaching and is basically
+>> >> > claiming the "/hypervisor" namespace for Xen. Couldn't it be renamed to
+>> >> > "xen,hypervisor" or something?
+>> >> >
+>> >> > Mark, got any thoughts on this?
+>> > The node has a compatible string, "xen,xen" per [1], which would tell us
+>> > absolutely that xen is present. I'd be happy checking for that
+>> > explicitly.
+>> >
+>> I think actually the xen_initial_domain is the result of the
+>> fdt_find_hyper_node. If the compatible string "xen,xen" doesn't exist,
+>> the xen_initial_domain() will return false and whatever the current node
+>> is the above check will return 1 since the device tree is not empty.
+>
+> Right.
+>
+> xen_initial_domain implies both "xen,xen" and XENFEAT_dom0 (which is a
+> feature retrieved by making a XENVER_get_features hypercall, see
+> drivers/xen/features.c:xen_setup_features).
+>
+> So the following check:
+>
+>  +     if (!xen_initial_domain() || (strcmp(uname, "hypervisor") != 0))
+>  +         return 1;
+>
+> means that even if it's xen_initial_domain(), return error unless the
+> node found is "hypervisor". In other words, even if
+> xen_initial_domain(), no other nodes are allowed except /chosen and
+> /hypervisor.
+>
+> This doesn't look far reaching to me, but yes, we could check explicitly
+> for the node to be compatible "xen,xen", in addition to be named
+> "hypervisor", even though the check is already done elsewhere
+> (arch/arm/xen/enlighten.c).
+>
+> But I would keep it as it is.
+>
 
-Signed-off-by: Chen Gang <gangchen@rdamicro.com>
-Signed-off-by: Chen Gang <chengang_rda@163.com>
----
- arch/arm/include/asm/div64.h | 20 ++++++--------------
- 1 file changed, 6 insertions(+), 14 deletions(-)
+The heuristic is there to decide whether some DTB image contains a
+complete description of the platform, or only some data handed over by
+the bootloader. Arguably, a DT containing both /chosen and /hypervisor
+but nothing else can still not describe an actual platform, and
+whether we execute under Xen or not is completely irrelevant.
 
-diff --git a/arch/arm/include/asm/div64.h b/arch/arm/include/asm/div64.h
-index e1f0776..ba3f36c 100644
---- a/arch/arm/include/asm/div64.h
-+++ b/arch/arm/include/asm/div64.h
-@@ -21,30 +21,22 @@
-  * for arguments and results (beware).
-  */
- 
--#ifdef __ARMEB__
--#define __xh "r0"
--#define __xl "r1"
--#else
--#define __xl "r0"
--#define __xh "r1"
--#endif
- 
- static inline uint32_t __div64_32(uint64_t *n, uint32_t base)
+So this should be sufficient imo
+
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+index d1ce8e2f98b9..d6d61e2e4d49 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -67,9 +67,10 @@ static int __init dt_scan_depth1_nodes(unsigned long node,
  {
- 	register unsigned int __base      asm("r4") = base;
- 	register unsigned long long __n   asm("r0") = *n;
- 	register unsigned long long __res asm("r2");
--	register unsigned int __rem       asm(__xh);
--	asm(	__asmeq("%0", __xh)
-+	asm(
-+		__asmeq("%0", "r0")
- 		__asmeq("%1", "r2")
--		__asmeq("%2", "r0")
--		__asmeq("%3", "r4")
-+		__asmeq("%2", "r4")
- 		"bl	__do_div64"
--		: "=r" (__rem), "=r" (__res)
--		: "r" (__n), "r" (__base)
-+		: "+r" (__n), "=r" (__res)
-+		: "r" (__base)
- 		: "ip", "lr", "cc");
- 	*n = __res;
--	return __rem;
-+	return __n >> 32;
+        /*
+         * Return 1 as soon as we encounter a node at depth 1 that is
+-        * not the /chosen node.
++        * not the /chosen node or the /hypervisor node.
+         */
+-       if (depth == 1 && (strcmp(uname, "chosen") != 0))
++       if (depth == 1 && strcmp(uname, "chosen") != 0 &&
++           strcmp(uname, "hypervisor") != 0)
+                return 1;
+        return 0;
  }
- #define __div64_32 __div64_32
- 
--- 
-2.4.3
+
+
+
+>> > In patch 11 fdt_find_hyper_node checks the compatible string. We could
+>> > factor that out into a helper like is_xen_node(node) and use it here
+>> > too.
+>> >
+>> I don't think so because we already check the compatible string before
+>> and we could get the result simply via xen_initial_domain().
+>
+> We could add a comment saying xen_initial_domain() implies "xen,xen" or
+> something.
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
