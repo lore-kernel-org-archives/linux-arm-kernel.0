@@ -1,85 +1,234 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 31 Mar 2016 13:36:50 +0100
-Subject: [PATCH] ACPI / ARM64: Remove EXPERT dependency for ACPI on ARM64
-In-Reply-To: <CAJZ5v0gv-MJ+Ss8gtc80z2_sOq-3qfBYbspRU8MWRNvn+UVbUg@mail.gmail.com>
-References: <1459360718-24125-1-git-send-email-broonie@kernel.org>
- <56FC9D1D.6090808@huawei.com>
- <CAJZ5v0gv-MJ+Ss8gtc80z2_sOq-3qfBYbspRU8MWRNvn+UVbUg@mail.gmail.com>
-Message-ID: <20160331123649.GE18910@arm.com>
+From: pmladek@suse.com (Petr Mladek)
+Date: Thu, 31 Mar 2016 14:36:57 +0200
+Subject: [PATCH v4 5/5] printk/nmi: flush NMI messages on the system panic
+In-Reply-To: <201603310000.dKufp7mg%fengguang.wu@intel.com>
+References: <1459353210-20260-6-git-send-email-pmladek@suse.com>
+ <201603310000.dKufp7mg%fengguang.wu@intel.com>
+Message-ID: <20160331123657.GN5522@pathway.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 31, 2016 at 02:04:05PM +0200, Rafael J. Wysocki wrote:
-> On Thu, Mar 31, 2016 at 5:44 AM, Hanjun Guo <guohanjun@huawei.com> wrote:
-> > On 2016/3/31 1:58, Mark Brown wrote:
-> >> When ACPI was originally merged for arm64 it had only been tested on
-> >> emulators and not on real physical platforms and no platforms were
-> >> relying on it.  This meant that there were concerns that there might be
-> >> serious issues attempting to use it on practical systems so it had a
-> >> dependency on EXPERT added to warn people that it was in an early stage
-> >> of development with very little practical testing.  Since then things
-> >> have moved on a bit.  We have seen people testing on real hardware and
-> >> now have people starting to produce some platforms (the most prominent
-> >> being the 96boards Cello) which only have ACPI support and which build
-> >> and run to some useful extent with mainline.
-> >>
-> >> This is not to say that ACPI support or support for these systems is
-> >> completely done, there are still areas being worked on such as PCI, but
-> >> at this point it seems that we can be reasonably sure that ACPI will be
-> >> viable for use on ARM64 and that the already merged support works for
-> >> the cases it handles.  For the AMD Seattle based platforms support
-> >> outside of PCI has been fairly complete in mainline a few releases now.
-> >>
-> >> This is also not to say that we don't have vendors working with ACPI who
-> >> are trying do things that we would not consider optimal but it does not
-> >> appear that the EXPERT dependency is having a substantial impact on
-> >> these vendors.
-> >>
-> >> Given all this it seems that at this point the EXPERT dependency mainly
-> >> creates inconvenience for users with systems that are doing the right
-> >> thing and gets in the way of including the ACPI code in the testing that
-> >> people are doing on mainline.  Removing it should help our ongoing
-> >> testing cover those platforms with only ACPI support and help ensure
-> >> that when ACPI code is merged any problems it causes for other users are
-> >> more easily discovered.
-> >>
-> >> Signed-off-by: Mark Brown <broonie@kernel.org>
-> >
-> > Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
-> >
-> >> ---
-> >>  drivers/acpi/Kconfig | 2 +-
-> >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>
-> >> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-> >> index 82b96ee8624c..bf5dc1ac3446 100644
-> >> --- a/drivers/acpi/Kconfig
-> >> +++ b/drivers/acpi/Kconfig
-> >> @@ -5,7 +5,7 @@
-> >>  menuconfig ACPI
-> >>       bool "ACPI (Advanced Configuration and Power Interface) Support"
-> >>       depends on !IA64_HP_SIM
-> >> -     depends on IA64 || X86 || (ARM64 && EXPERT)
-> >> +     depends on IA64 || X86 || ARM64
-> >>       depends on PCI
-> >>       select PNP
-> >>       default y
+On Thu 2016-03-31 00:33:54, kbuild test robot wrote:
+> Hi Petr,
 > 
-> OK
+> [auto build test ERROR on v4.6-rc1]
+> [cannot apply to tip/x86/core next-20160330]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 > 
-> What do the ARM64 maintainers think?
+> url:    https://github.com/0day-ci/linux/commits/Petr-Mladek/Cleaning-printk-stuff-in-NMI-context/20160330-235818
+> config: i386-randconfig-s1-201613 (attached as .config)
+> reproduce:
+>         # save the attached .config to linux build tree
+>         make ARCH=i386 
+> 
+> All errors (new ones prefixed by >>):
+> 
+>    kernel/printk/nmi.c: In function 'printk_nmi_flush_on_panic':
+> >> kernel/printk/nmi.c:218:4: error: implicit declaration of function 'debug_locks_off' [-Werror=implicit-function-declaration]
+>        debug_locks_off();
+>        ^
+>    cc1: some warnings being treated as errors
 
-I'm unsure about whether or not we want 'default y' here, but I'd like
-to wait for Catalin to come back from his 2-week holiday before going
-anywhere with this patch. It's only fair that his opinion should be
-taken into account, and there's not a huge rush for this. I do consider
-"ACPI-only platforms" as simply "platforms without a .dtb" (modulo
-any significant AML code) and therefore don't view this as a blocking
-issue.
+Fixed by adding #include <linux/debug_locks.h> into kernel/printk/nmi.c
 
-We should also take into account the large amount of ongoing ACPI work
-(e.g. the DSD and PRP0001 saga, PCI and IORT support, virtualisation work,
-etc), and decide whether or not that's currently in a state where we want
-to encourage people to start using this in their arm64 kernels.
+Please, find the updated patch below.
 
-Will
+
+>From 52cc5fee3909e8955bd78a8c63b9a610dc5c11fe Mon Sep 17 00:00:00 2001
+From: Petr Mladek <pmladek@suse.com>
+Date: Thu, 24 Mar 2016 15:10:21 +0100
+Subject: [PATCH] printk/nmi: flush NMI messages on the system panic
+
+In NMI context, printk() messages are stored into per-CPU buffers to avoid
+a possible deadlock.  They are normally flushed to the main ring buffer via
+an IRQ work.  But the work is never called when the system calls panic() in
+the very same NMI handler.
+
+This patch tries to flush NMI buffers before the crash dump is generated.
+In this case it does not risk a double release and bails out when the
+logbuf_lock is already taken.  The aim is to get the messages into the main
+ring buffer when possible.  It makes them better accessible in the vmcore.
+
+Then the patch tries to flush the buffers second time when other CPUs are
+down.  It might be more aggressive and reset logbuf_lock. The aim is to
+get the messages available for the consequent kmsg_dump() and
+console_flush_on_panic() calls.
+
+The patch causes vprintk_emit() to be called even in NMI context again. But
+we do not want to call consoles in this case.  They might use internal
+locks and we could not prevent a deadlock easily.  We only want to have the
+messages in the main ring buffer for crash dump and kmsg_dump().  The
+consoles are explicitly called later by console_flush_on_panic().
+
+Signed-off-by: Petr Mladek <pmladek@suse.com>
+---
+ include/linux/printk.h   |  4 ++++
+ kernel/kexec_core.c      |  1 +
+ kernel/panic.c           |  6 +++++-
+ kernel/printk/internal.h |  2 ++
+ kernel/printk/nmi.c      | 36 ++++++++++++++++++++++++++++++++++++
+ kernel/printk/printk.c   | 14 +++++++++++---
+ 6 files changed, 59 insertions(+), 4 deletions(-)
+
+diff --git a/include/linux/printk.h b/include/linux/printk.h
+index 51dd6b824fe2..2da06c2a63c3 100644
+--- a/include/linux/printk.h
++++ b/include/linux/printk.h
+@@ -123,15 +123,19 @@ void early_printk(const char *s, ...) { }
+ #endif
+ 
+ #ifdef CONFIG_PRINTK_NMI
++#define deferred_console_in_nmi() in_nmi()
+ extern void printk_nmi_init(void);
+ extern void printk_nmi_enter(void);
+ extern void printk_nmi_exit(void);
+ extern void printk_nmi_flush(void);
++extern void printk_nmi_flush_on_panic(void);
+ #else
++#define deferred_console_in_nmi() 0
+ static inline void printk_nmi_init(void) { }
+ static inline void printk_nmi_enter(void) { }
+ static inline void printk_nmi_exit(void) { }
+ static inline void printk_nmi_flush(void) { }
++static inline void printk_nmi_flush_on_panic(void) { }
+ #endif /* PRINTK_NMI */
+ 
+ #ifdef CONFIG_PRINTK
+diff --git a/kernel/kexec_core.c b/kernel/kexec_core.c
+index 8d34308ea449..1dc3fe8495e0 100644
+--- a/kernel/kexec_core.c
++++ b/kernel/kexec_core.c
+@@ -893,6 +893,7 @@ void crash_kexec(struct pt_regs *regs)
+ 	old_cpu = atomic_cmpxchg(&panic_cpu, PANIC_CPU_INVALID, this_cpu);
+ 	if (old_cpu == PANIC_CPU_INVALID) {
+ 		/* This is the 1st CPU which comes here, so go ahead. */
++		printk_nmi_flush_on_panic();
+ 		__crash_kexec(regs);
+ 
+ 		/*
+diff --git a/kernel/panic.c b/kernel/panic.c
+index 535c96510a44..8aa74497cc5a 100644
+--- a/kernel/panic.c
++++ b/kernel/panic.c
+@@ -160,8 +160,10 @@ void panic(const char *fmt, ...)
+ 	 *
+ 	 * Bypass the panic_cpu check and call __crash_kexec directly.
+ 	 */
+-	if (!crash_kexec_post_notifiers)
++	if (!crash_kexec_post_notifiers) {
++		printk_nmi_flush_on_panic();
+ 		__crash_kexec(NULL);
++	}
+ 
+ 	/*
+ 	 * Note smp_send_stop is the usual smp shutdown function, which
+@@ -176,6 +178,8 @@ void panic(const char *fmt, ...)
+ 	 */
+ 	atomic_notifier_call_chain(&panic_notifier_list, 0, buf);
+ 
++	/* Call flush even twice. It tries harder with a single online CPU */
++	printk_nmi_flush_on_panic();
+ 	kmsg_dump(KMSG_DUMP_PANIC);
+ 
+ 	/*
+diff --git a/kernel/printk/internal.h b/kernel/printk/internal.h
+index 341bedccc065..7fd2838fa417 100644
+--- a/kernel/printk/internal.h
++++ b/kernel/printk/internal.h
+@@ -22,6 +22,8 @@ int __printf(1, 0) vprintk_default(const char *fmt, va_list args);
+ 
+ #ifdef CONFIG_PRINTK_NMI
+ 
++extern raw_spinlock_t logbuf_lock;
++
+ /*
+  * printk() could not take logbuf_lock in NMI context. Instead,
+  * it temporary stores the strings into a per-CPU buffer.
+diff --git a/kernel/printk/nmi.c b/kernel/printk/nmi.c
+index bf08557d7e3d..6dc3ff80ae89 100644
+--- a/kernel/printk/nmi.c
++++ b/kernel/printk/nmi.c
+@@ -17,6 +17,7 @@
+ 
+ #include <linux/preempt.h>
+ #include <linux/spinlock.h>
++#include <linux/debug_locks.h>
+ #include <linux/smp.h>
+ #include <linux/cpumask.h>
+ #include <linux/irq_work.h>
+@@ -194,6 +195,41 @@ void printk_nmi_flush(void)
+ 		__printk_nmi_flush(&per_cpu(nmi_print_seq, cpu).work);
+ }
+ 
++/**
++ * printk_nmi_flush_on_panic - flush all per-cpu nmi buffers when the system
++ *	goes down.
++ *
++ * Similar to printk_nmi_flush() but it can be called even in NMI context when
++ * the system goes down. It does the best effort to get NMI messages into
++ * the main ring buffer.
++ *
++ * Note that it could try harder when there is only one CPU online.
++ */
++void printk_nmi_flush_on_panic(void)
++{
++	if (in_nmi()) {
++		/*
++		 * Make sure that we could access the main ring buffer.
++		 * Do not risk a double release when more CPUs are up.
++		 */
++		if (raw_spin_is_locked(&logbuf_lock)) {
++			if (num_online_cpus() > 1)
++				return;
++
++			debug_locks_off();
++			raw_spin_lock_init(&logbuf_lock);
++		}
++
++		/*
++		 * Flush the messages using the default printk handler
++		 * to store them into the main ring buffer.
++		 */
++		this_cpu_write(printk_func, vprintk_default);
++	}
++
++	printk_nmi_flush();
++}
++
+ void __init printk_nmi_init(void)
+ {
+ 	int cpu;
+diff --git a/kernel/printk/printk.c b/kernel/printk/printk.c
+index e38579d730f4..bf84df2eb3b6 100644
+--- a/kernel/printk/printk.c
++++ b/kernel/printk/printk.c
+@@ -245,7 +245,7 @@ __packed __aligned(4)
+  * within the scheduler's rq lock. It must be released before calling
+  * console_unlock() or anything else that might wake up a process.
+  */
+-static DEFINE_RAW_SPINLOCK(logbuf_lock);
++DEFINE_RAW_SPINLOCK(logbuf_lock);
+ 
+ #ifdef CONFIG_PRINTK
+ DECLARE_WAIT_QUEUE_HEAD(log_wait);
+@@ -1764,8 +1764,16 @@ asmlinkage int vprintk_emit(int facility, int level,
+ 	lockdep_on();
+ 	local_irq_restore(flags);
+ 
+-	/* If called from the scheduler, we can not call up(). */
+-	if (!in_sched) {
++	/*
++	 * Console calls must be deferred when called from the scheduler.
++	 *
++	 * Many architectures never call vprintk_emit() in NMI context,
++	 * see vprintk_nmi(). The only exception is when the NMI buffers
++	 * are flushed on panic. In this case, the consoles are called
++	 * later explicitly only when crashdump does not work, see
++	 * console_flush_on_panic().
++	 */
++	if (!in_sched && !deferred_console_in_nmi()) {
+ 		lockdep_off();
+ 		/*
+ 		 * Try to acquire and then immediately release the console
+-- 
+1.8.5.6
