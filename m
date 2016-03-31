@@ -1,51 +1,81 @@
-From: david@lechnology.com (David Lechner)
-Date: Thu, 31 Mar 2016 17:28:48 -0500
-Subject: [PATCH v3 15/16] usb: musb: da8xx: Use devm in probe
-In-Reply-To: <20160331222112.GA28044@uda0271908>
-References: <1458863503-31121-1-git-send-email-david@lechnology.com>
- <1458863503-31121-16-git-send-email-david@lechnology.com>
- <20160331222112.GA28044@uda0271908>
-Message-ID: <56FDA4A0.6080106@lechnology.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Thu, 31 Mar 2016 15:53:26 -0700
+Subject: Issue with ioremap
+In-Reply-To: <20160331200147.GA20530@jcartwri.amer.corp.natinst.com>
+References: <CAGnW=BYw9iqm8BpuWrxgcvXV3wwvHcvMtynPeHUGHHiZfPmfuA@mail.gmail.com>
+ <20160331200147.GA20530@jcartwri.amer.corp.natinst.com>
+Message-ID: <56FDAA66.2000505@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/31/2016 05:21 PM, Bin Liu wrote:
+(cc linux-arm)
 
->> -	glue = kzalloc(sizeof(*glue), GFP_KERNEL);
->> +	glue = devm_kzalloc(&pdev->dev, sizeof(*glue), GFP_KERNEL);
->>   	if (!glue) {
->>   		dev_err(&pdev->dev, "failed to allocate glue context\n");
->> -		goto err0;
->> +		return -ENOMEM;
->>   	}
+On 03/31/2016 01:01 PM, Josh Cartwright wrote:
+> On Fri, Apr 01, 2016 at 01:13:06AM +0530, punnaiah choudary kalluri wrote:
+>> Hi,
 >>
->> -	clk = clk_get(&pdev->dev, "usb20");
->> +	clk = devm_clk_get(&pdev->dev, "usb20");
->>   	if (IS_ERR(clk)) {
->>   		dev_err(&pdev->dev, "failed to get clock\n");
->> -		ret = PTR_ERR(clk);
->> -		goto err3;
->> +		return PTR_ERR(clk);
+>> We are using the pl353 smc controller for interfacing the nand in our zynq SOC.
+>> The driver for this controller is currently under mainline review.
+>> Recently we are moved to 4.4 kernel and observing issues with the driver.
+>> while debug, found that the issue is with the virtual address returned from
+>> the ioremap is not aligned to the physical address and causing nand
+>> access failures.
+>> the nand controller physical address starts at 0xE1000000 and the size is 16MB.
+>> the ioremap function in 4.3 kernel returns the virtual address that is
+>> aligned to the size
+>> but not the case in 4.4 kernel.
 >
-> memory leak due to not kfree(glue).
-
-It is my understanding that since glue is allocated with devm_kzalloc(), 
-that if the probe function returns and error, glue and everything else 
-allocated with devm_* will be automatically freed.
-
-If this is not the case, wouldn't devm_kfree() be the appropriate 
-function instead?
-
-
->> @@ -576,8 +569,6 @@ static int da8xx_remove(struct platform_device *pdev)
->>   	platform_device_unregister(glue->musb);
->>   	usb_phy_generic_unregister(glue->phy);
->>   	clk_disable(glue->clk);
->> -	clk_put(glue->clk);
->> -	kfree(glue);
+> :(.  I had actually ran into this, too, as I was evaluating the use of
+> the upstream-targetted pl353 stuff; sorry I didn't say anything.
 >
-> Doesn't match with $subject, I'd put them into a seperate patch.
+>> this controller uses the bits [31:24] as base address and use rest all
+>> bits for configuring adders cycles, chip select information. so it
+>> expects the virtual address also aligned to 0xFF000000 otherwise the
+>> nand commands issued will fail.
+>
+> The driver _currently_ expects the virtual address to be 16M aligned,
+> but is that a hard requirement?  It seems possible that the driver could
+> be written without this assumption, correct?
+>
+> This would mean that the driver would need to maintain the cs/cycles
+> configuration state outside of the mapped virtual address, and then
+> calculate + add the calculated offset to the base.  Would that work?
+> I had been meaning to give it a try, but haven't gotten around to it.
+>
+>    Josh
+>
 
+I was curious so I took a look and this seems to be caused by
 
-I disagree. Since these are now automatically freed because of changes 
-in the probe function, these changes belong in the same patch.
+commit 803e3dbcb4cf80c898faccf01875f6ff6e5e76fd
+Author: Sergey Dyasly <dserrg@gmail.com>
+Date:   Wed Sep 9 16:27:18 2015 +0100
+
+     ARM: 8430/1: use default ioremap alignment for SMP or LPAE
+     
+     16MB alignment for ioremap mappings was added by commit a069c896d0d6 ("[ARM]
+     3705/1: add supersection support to ioremap()") in order to support supersection
+     mappings. But __arm_ioremap_pfn_caller uses section and supersection mappings
+     only in !SMP && !LPAE case. There is no need for such big alignment if either
+     SMP or LPAE is enabled.
+     
+     After this change, ioremap will use default maximum alignment of 128 pages.
+     
+     Link: https://lkml.kernel.org/g/1419328813-2211-1-git-send-email-d.safonov at partner.samsung.com
+     
+     Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
+     Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+     Cc: James Bottomley <JBottomley@parallels.com>
+     Cc: Will Deacon <will.deacon@arm.com>
+     Cc: Arnd Bergmann <arnd.bergmann@linaro.org>
+     Cc: Catalin Marinas <catalin.marinas@arm.com>
+     Cc: Andrew Morton <akpm@linux-foundation.org>
+     Cc: Dmitry Safonov <d.safonov@partner.samsung.com>
+     Signed-off-by: Sergey Dyasly <s.dyasly@samsung.com>
+     Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+The thread assumed the higher alignment behavior was only needed for super
+section mappings. Apparently not.
+
+Thanks,
+Laura
