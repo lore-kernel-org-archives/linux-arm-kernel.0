@@ -1,57 +1,58 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 31 Mar 2016 09:09:05 +0200
-Subject: [PATCH v5 05/46] pwm: introduce the pwm_args concept
-In-Reply-To: <20160330215510.GS18567@codeaurora.org>
+From: j.anaszewski@samsung.com (Jacek Anaszewski)
+Date: Thu, 31 Mar 2016 09:13:26 +0200
+Subject: [PATCH v5 10/46] leds: pwm: use pwm_get_args() where appropriate
+In-Reply-To: <1459368249-13241-11-git-send-email-boris.brezillon@free-electrons.com>
 References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
- <1459368249-13241-6-git-send-email-boris.brezillon@free-electrons.com>
- <20160330215510.GS18567@codeaurora.org>
-Message-ID: <20160331090905.05df7b05@bbrezillon>
+ <1459368249-13241-11-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <56FCCE16.8040200@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 30 Mar 2016 14:55:10 -0700
-Stephen Boyd <sboyd@codeaurora.org> wrote:
+Hi Boris,
 
-> On 03/30, Boris Brezillon wrote:
-> > @@ -74,6 +74,23 @@ enum pwm_polarity {
-> >  	PWM_POLARITY_INVERSED,
-> >  };
-> >  
-> > +/**
-> > + * struct pwm_args - PWM arguments
-> > + * @period: reference period
-> > + * @polarity: reference polarity
-> > + *
-> > + * This structure describe board-dependent arguments attached to a PWM
-> 
-> s/describe/describes/
-> 
-> > + * device. Those arguments are usually retrieved from the PWM lookup table or
-> > + * DT definition.
-> > + * This should not be confused with the PWM state: PWM args not representing
-> 
-> s/not representing/don't represent/ ?
-> 
-> > + * the current PWM state, but the configuration the PWM user plan to use
-> 
-> s/plan/plans/
-> 
-> > + * on this PWM device.
-> > + */
-> > +struct pwm_args {
-> > +	unsigned int period;
-> > +	enum pwm_polarity polarity;
-> > +};
-> > +
-> 
+On 03/30/2016 10:03 PM, Boris Brezillon wrote:
+> The PWM framework has clarified the concept of reference PWM config
+> (the platform dependent config retrieved from the DT or the PWM
+> lookup table) and real PWM state.
+>
+> Use pwm_get_args() when the PWM user wants to retrieve this reference
+> config and not the current state.
+>
+> This is part of the rework allowing the PWM framework to support
+> hardware readout and expose real PWM state even when the PWM has
+> just been requested (before the user calls pwm_config/enable/disable()).
+>
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+>   drivers/leds/leds-pwm.c | 4 +++-
+>   1 file changed, 3 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/leds/leds-pwm.c b/drivers/leds/leds-pwm.c
+> index 4783bac..b48231c 100644
+> --- a/drivers/leds/leds-pwm.c
+> +++ b/drivers/leds/leds-pwm.c
+> @@ -91,6 +91,7 @@ static int led_pwm_add(struct device *dev, struct led_pwm_priv *priv,
+>   		       struct led_pwm *led, struct device_node *child)
+>   {
+>   	struct led_pwm_data *led_data = &priv->leds[priv->num_leds];
+> +	struct pwm_args pargs = { };
+>   	int ret;
+>
+>   	led_data->active_low = led->active_low;
+> @@ -117,7 +118,8 @@ static int led_pwm_add(struct device *dev, struct led_pwm_priv *priv,
+>   	else
+>   		led_data->cdev.brightness_set_blocking = led_pwm_set_blocking;
+>
+> -	led_data->period = pwm_get_period(led_data->pwm);
+> +	pwm_get_args(led_data->pwm, &pargs);
+> +	led_data->period = pargs.period;
+>   	if (!led_data->period && (led->pwm_period_ns > 0))
+>   		led_data->period = led->pwm_period_ns;
+>
+>
 
-Will fix these errors.
-
-Thanks,
-
-Boris
+Acked-by: Jacek Anaszewski <j.anaszewski@samsung.com>
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Best regards,
+Jacek Anaszewski
