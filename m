@@ -1,28 +1,73 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 31 Mar 2016 13:46:26 +0900
-Subject: [PATCH v4 6/9] ARM: dts: Add initial gpio setting of MMC2 device
- for exynos3250-monk
-In-Reply-To: <1459392485-11327-7-git-send-email-cw00.choi@samsung.com>
-References: <1459392485-11327-1-git-send-email-cw00.choi@samsung.com>
- <1459392485-11327-7-git-send-email-cw00.choi@samsung.com>
-Message-ID: <56FCABA2.6030708@samsung.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Thu, 31 Mar 2016 10:26:59 +0530
+Subject: [v2,4/7] scatterlist: add sg_alloc_table_from_buf() helper
+In-Reply-To: <1459352394-22810-5-git-send-email-boris.brezillon@free-electrons.com>
+References: <1459352394-22810-5-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <56FCAE1B.90206@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31.03.2016 11:48, Chanwoo Choi wrote:
-> This patch adds initial pin configuration of MMC2 device on exynos3250-monk
-> board because the MMC2 gpio pin (gpk2[0-6]) are NC (not connected) state.
-> 
-> Suggested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos3250-monk.dts | 12 +++++++++++-
->  1 file changed, 11 insertions(+), 1 deletion(-)
+Hi,
 
-Thanks, applied this one for v4.7 with adjusted title.
+On 03/30/2016 09:09 PM, Boris BREZILLON wrote:
 
-I'll wait with other patches for Sylwester's branch/tag.
+[...]
 
-Best regards,
-Krzysztof
+> +int sg_alloc_table_from_buf(struct sg_table *sgt, const void *buf, size_t len,
+> +			    const struct sg_constraints *constraints,
+> +			    gfp_t gfp_mask)
+> +{
+> +	struct sg_constraints cons = { };
+> +	size_t remaining, chunk_len;
+> +	const void *sg_buf;
+> +	int i, ret;
+> +
+> +	if (constraints)
+> +		cons = *constraints;
+> +
+> +	ret = sg_check_constraints(&cons, buf, len);
+> +	if (ret)
+> +		return ret;
+> +
+> +	sg_buf = buf;
+> +	remaining = len;
+> +	i = 0;
+> +	sg_for_each_chunk_in_buf(sg_buf, remaining, chunk_len, &cons)
+> +		i++;
+> +
+> +	ret = sg_alloc_table(sgt, i, gfp_mask);
+> +	if (ret)
+> +		return ret;
+> +
+> +	sg_buf = buf;
+> +	remaining = len;
+> +	i = 0;
+> +	sg_for_each_chunk_in_buf(sg_buf, remaining, chunk_len, &cons) {
+> +		if (is_vmalloc_addr(sg_buf)) {
+> +			struct page *vm_page;
+> +
+> +			vm_page = vmalloc_to_page(sg_buf);
+> +			if (!vm_page) {
+> +				ret = -ENOMEM;
+> +				goto err_free_table;
+> +			}
+> +
+> +			sg_set_page(&sgt->sgl[i], vm_page, chunk_len,
+> +				    offset_in_page(sg_buf));
+> +		} else {
+> +			sg_set_buf(&sgt->sgl[i], sg_buf, chunk_len);
+> +		}
+> +
+
+If the buf address is in PKMAP_BASE - PAGE_OFFSET-1 region (I have
+observed that JFFS2 FS provides buffers in above region to MTD layer),
+if CONFIG_DEBUG_SG is set then sg_set_buf() will throw a BUG_ON() as
+virt_addr_is_valid() will return false. Is there a sane way to handle
+buffers of PKMAP_BASE region with sg_*  APIs?
+Or, is the function sg_alloc_table_from_buf() not to be used with such
+buffers?
+
+
+-- 
+Regards
+Vignesh
