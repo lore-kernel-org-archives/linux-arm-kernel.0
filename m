@@ -1,68 +1,78 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 31 Mar 2016 10:33:23 +0200
-Subject: [PULL 0/4] ARM support for generic memremap()
-In-Reply-To: <1459235884-24318-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1459235884-24318-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu_g3mtEr9mTB0zOhuK=rsre8A5-boNjrKYjr9ELB==hHw@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 31 Mar 2016 16:33:25 +0800
+Subject: [PATCH 04/18] ARM: dts: vf610: add on-chip SRAM
+In-Reply-To: <1457576219-7971-5-git-send-email-stefan@agner.ch>
+References: <1457576219-7971-1-git-send-email-stefan@agner.ch>
+ <1457576219-7971-5-git-send-email-stefan@agner.ch>
+Message-ID: <20160331083325.GX28207@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 March 2016 at 09:18, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> Hello Russell,
->
-> This is a straight rebase of version 3 of this patch series, which I posted
-> here: http://thread.gmane.org/gmane.linux.ports.arm.kernel/484005. I have
-> attached the individual patches to this cover letter for reference.
->
-> Please pull for v4.7. I expect some of my UEFI work regarding memory
-> protection tables and the EFI framebuffer to land in the 4.7 timeframe as well,
-> and thise rely on memremap() to do the right thing if firmware tables happen
-> to reside in memory that is also covered by memblock/the linear mapping.
->
+On Wed, Mar 09, 2016 at 06:16:45PM -0800, Stefan Agner wrote:
+> Add Vybrids massive on-chip SRAM areas. Make use of the memory
+> region functionality to denominate the retained SRAM area in
+> LPSTOP2 and LPSTOP3.
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 
-Please don't pull this yet. Patch #3 inadvertently changes the
-fallback behavior for memory that is not covered by the kernel direct
-mapping and is not covered by a 'System RAM' iomem entry.
+This one looks fine to me.  I was going to pick it up separately, but it
+doesn't apply.
 
-I will follow up with a v4
+Shawn
 
-Thanks,
-Ard.
-
-
-> -------------8<-----------------
-> The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
->
->   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
->
-> are available in the git repository at:
->
->   git://git.linaro.org/people/ard.biesheuvel/linux-arm.git \
->                                                   tags/arm-memremap-for-v4.7
->
-> for you to fetch changes up to fc77542bdffe9dcb3890c631ad571e1e4b0cc8c3:
->
->   ARM: memremap: implement arch_memremap_wb() (2016-03-29 08:19:26 +0200)
->
-> ----------------------------------------------------------------
-> This series wires up the generic memremap() function in a way that allows it
-> to be used as intended, i.e., without regard for whether the region being
-> mapped is covered by a struct page and/or the linear mapping (lowmem)
->
-> ----------------------------------------------------------------
->
-> Ard Biesheuvel (4):
->   ARM: reintroduce ioremap_cached() for creating cached I/O mappings
->   mtd: pxa2xx-flash: switch back from memremap to ioremap_cached
->   memremap: add arch specific hook for MEMREMAP_WB mappings
->   ARM: memremap: implement arch_memremap_wb()
->
->  arch/arm/include/asm/io.h       | 12 ++++++++++++
->  arch/arm/mm/ioremap.c           | 16 ++++++++++++++--
->  drivers/mtd/maps/pxa2xx-flash.c |  6 +++---
->  kernel/memremap.c               | 11 ++++++++---
->  4 files changed, 37 insertions(+), 8 deletions(-)
->
-> --
-> 2.5.0
->
+> ---
+>  arch/arm/boot/dts/vfxxx.dtsi | 37 +++++++++++++++++++++++++++++++++++++
+>  1 file changed, 37 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+> index 909988d..b038ea4 100644
+> --- a/arch/arm/boot/dts/vfxxx.dtsi
+> +++ b/arch/arm/boot/dts/vfxxx.dtsi
+> @@ -91,6 +91,43 @@
+>  		interrupt-parent = <&gpc>;
+>  		ranges;
+>  
+> +		ocram0: sram at 3f000000 {
+> +			compatible = "mmio-sram";
+> +			reg = <0x3f000000 0x40000>;
+> +
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges = <0 0x3f000000 0x40000>;
+> +
+> +			stbyram1 at 0 {
+> +				reg = <0x0 0x4000>;
+> +				label = "stbyram1";
+> +				pool;
+> +			};
+> +
+> +			stbyram2 at 4000 {
+> +				reg = <0x4000 0xc000>;
+> +				label = "stbyram2";
+> +				pool;
+> +			};
+> +		};
+> +
+> +		ocram1: sram at 3f040000 {
+> +			compatible = "mmio-sram";
+> +			reg = <0x3f040000 0x40000>;
+> +		};
+> +
+> +		gfxram0: sram at 3f400000 {
+> +			compatible = "mmio-sram";
+> +			reg = <0x3f400000 0x80000>;
+> +		};
+> +
+> +		/* used by L2 cache */
+> +		gfxram1: sram at 3f480000 {
+> +			compatible = "mmio-sram";
+> +			reg = <0x3f480000 0x80000>;
+> +		};
+> +
+>  		aips0: aips-bus at 40000000 {
+>  			compatible = "fsl,aips-bus", "simple-bus";
+>  			#address-cells = <1>;
+> -- 
+> 2.7.2
+> 
+> 
