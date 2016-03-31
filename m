@@ -1,161 +1,81 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 31 Mar 2016 10:18:13 -0600
-Subject: [RESEND PATCH V4 1/4] stm class: provision for statically
- assigned masterIDs
-In-Reply-To: <878u0y7pig.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1457418835-31417-1-git-send-email-zhang.chunyan@linaro.org>
- <1457418835-31417-2-git-send-email-zhang.chunyan@linaro.org>
- <87wpow6znl.fsf@ashishki-desk.ger.corp.intel.com>
- <CANLsYkxsaGmkpq6cNNw+CeMDKK7wwdDoegEuG2oNPNp185_9Mg@mail.gmail.com>
- <878u0y7pig.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <CANLsYkxgF9SfWDD=pzUk=m7vE_DVH=4XgMPP5NmomQv5h6drow@mail.gmail.com>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Thu, 31 Mar 2016 09:19:31 -0700
+Subject: [PATCH] i.MX6 PCIe: Fix imx6_pcie_deassert_core_reset() polarity
+In-Reply-To: <m3oa9widxk.fsf@t19.piap.pl>
+References: <m3h9fuk7ik.fsf@t19.piap.pl>
+ <CAOMZO5DcZCxoLPeGRWSGkstm7F3eN-Q-yJyf6ktMTda2zLviag@mail.gmail.com>
+ <CAOMZO5B8Lzn-E4YOeYxVtN5PN11aOvZHn4eU0ixkdV8CO8+xYw@mail.gmail.com>
+ <CAJ+vNU2Sg1ZKBsGcQswrJZyTJ1WBEZor3ZqpoYUT7i9FKjEAog@mail.gmail.com>
+ <CAOMZO5DO9G18=_YSri3a+UiYbLwN6AMG4asUXbT03mpbU3hHrw@mail.gmail.com>
+ <CAJ+vNU1_YqvWQkmuDB7r8z77iZJS6pP4Mr+j9yW4sFLAeJXQDw@mail.gmail.com>
+ <CAOMZO5A2osG3=mTaCayYfMokUj-vT+Udq9ckq45b1yaUP9Tn3g@mail.gmail.com>
+ <CAJ+vNU2ST=XG5H04-OCwpHgcvkoXOQw8F3MjXhJmWhBUbxWE-g@mail.gmail.com>
+ <1459241739.2565.9.camel@pengutronix.de>
+ <m3shz9in52.fsf@t19.piap.pl>
+ <1459248921.2565.15.camel@pengutronix.de>
+ <m3oa9widxk.fsf@t19.piap.pl>
+Message-ID: <CAJ+vNU0iKSXrKmA6jzdw5R5K3TnR3qftVn-8Ou5chHdz5aTpTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 March 2016 at 07:20, Alexander Shishkin
-<alexander.shishkin@linux.intel.com> wrote:
-> Mathieu Poirier <mathieu.poirier@linaro.org> writes:
+On Wed, Mar 30, 2016 at 1:10 AM, Krzysztof Ha?asa <khalasa@piap.pl> wrote:
+> Lucas Stach <l.stach@pengutronix.de> writes:
 >
->> On 21 March 2016 at 01:47, Alexander Shishkin
->> <alexander.shishkin@linux.intel.com> wrote:
->>> Chunyan Zhang <zhang.chunyan@linaro.org> writes:
+>>> TW6869: PCI 0000:04:00.0, IRQ 336, MMIO 0x1100000
+>>> TW686x 0000:04:00.0: enabling device (0140 -> 0142)
 >>>
->>>> From: Mathieu Poirier <mathieu.poirier@linaro.org>
->>>>
->>>> Some architecture like ARM assign masterIDs at the HW design
->>>> phase.  Those are therefore unreachable to users, making masterID
->>>> management in the generic STM core irrelevant.
->>>>
->>>> In this kind of configuration channels are shared between masters
->>>> rather than being allocated on a per master basis.
->>>>
->>>> This patch adds a new 'mshared' flag to struct stm_data that tells the
->>>> core that this specific STM device doesn't need explicit masterID
->>>> management.
->>>
->>> There are two kinds of 'masterIDs' that we're talking about here: the
->>> ones that turn up in the STP stream and the ones that are accessible to
->>> trace-side software (sw_start/sw_end). So in this case we want to
->>> reflect the fact that there is no correlation between the two, because
->>> hardware assigns STP channels dynamically based on the states of the
->>> trace/execution environment. And although the trace side software can do
->>> very little with this information, it does make sense to provide it.
->>>
->>> The sw_start==sw_end situation, on the other hand, is a side effect of
->>> the above and, as I said in one of the previous threads, may not even be
->>> the case, or at least I don't see why it has to. And when it is the
->>> case, I don't see the point in handling it differently from
->>> sw_start<sw_end situation.
+>> I don't see whee the device even tries to use MSI IRQs. Even if the
+>> infrastructure is enabled it opts to use legacy INTA.
 >
-> [snip]
+> It only tries to use normal IRQ.
 >
->> Other than the above, is there anything you'd like to see modified in
->> this patch, i.e how the mshared flag is used to modify the output in
->> sysFS/configFS?
+>> There is no upstream driver for this chip, so I don't know where to look
+>> to find out if the driver tries to enable MSI.
 >
-> Yes, the two paragraphs quoted above that had gone unnoticed. I've
-> been thinking some more about this and came up with the following. No
-> need to do any extra handling in the policy code or anywhere else.
+> It's been posted on linux-media list... I added pci_enable_msi() to this
+> driver and it didn't help.
+>
+>> Is what you are saying that if you enable MSI support in the kernel, it
+>> breaks legacy IRQs?
+>
+> Precisely.
+>
+> However, MSI doesn't seem to work either. Could be a problem specific to
+> this TW6869 card.
+>
+> Ventana GW5410 has 5 mPCIe slots, and (with MSI enabled in the system)
+> those IRQs (non-MSI) don't work in any slot:
+>
+> 304: 0 0 0 0  PCI-MSI   0 Edge   PCIe PME, aerdrv
+> 336: 0 0 0 0      GPC 123 Level  TW8689 in J7 slot
+> 337: 0 0 0 0      GPC 122 Level  TW8689 in J8, J10, J11
+> 338: 0 0 0 0      GPC 121 Level  TW8689 in J6)
+>
+> If I enable MSI on this card (adding pci_enable_msi()):
+> 313: 0 0 0 0  PCI-MSI   9 Edge   TW6869 in J7 slot
+>
+> The only way I can get it to work is by disabling MSI (system wide).
 
-I read the above two paragraphs many times but simply couldn't find
-anything actionable in there.
+Krzysztof,
 
->
-> From 8be22a8e391b94ec13d428976e7b1410aa59991e Mon Sep 17 00:00:00 2001
-> From: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-> Date: Thu, 31 Mar 2016 15:51:29 +0300
-> Subject: [PATCH] stm class: Support devices that override software assigned
->  masters
->
-> Some STM devices adjust software assigned master numbers depending on
-> the trace source and its runtime state and whatnot. This patch adds
-> a sysfs attribute to inform the trace-side software that master numbers
-> assigned to software sources will not match those in the STP stream,
-> so that, for example, master/channel allocation policy can be adjusted
-> accordingly.
->
-> Signed-off-by: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-> ---
->  Documentation/ABI/testing/sysfs-class-stm | 10 ++++++++++
->  drivers/hwtracing/stm/core.c              | 15 +++++++++++++++
->  include/linux/stm.h                       |  3 +++
->  3 files changed, 28 insertions(+)
->
-> diff --git a/Documentation/ABI/testing/sysfs-class-stm b/Documentation/ABI/testing/sysfs-class-stm
-> index c9aa4f3fc9..77ed3da0f6 100644
-> --- a/Documentation/ABI/testing/sysfs-class-stm
-> +++ b/Documentation/ABI/testing/sysfs-class-stm
-> @@ -12,3 +12,13 @@ KernelVersion:       4.3
->  Contact:       Alexander Shishkin <alexander.shishkin@linux.intel.com>
->  Description:
->                 Shows the number of channels per master on this STM device.
-> +
-> +What:          /sys/class/stm/<stm>/hw_override
-> +Date:          March 2016
-> +KernelVersion: 4.7
-> +Contact:       Alexander Shishkin <alexander.shishkin@linux.intel.com>
-> +Description:
-> +               Reads as 0 if master numbers in the STP stream produced by
-> +               this stm device will match the master numbers assigned by
-> +               the software or 1 if the stm hardware overrides software
-> +               assigned masters.
-> diff --git a/drivers/hwtracing/stm/core.c b/drivers/hwtracing/stm/core.c
-> index 2591442e2c..ff31108b06 100644
-> --- a/drivers/hwtracing/stm/core.c
-> +++ b/drivers/hwtracing/stm/core.c
-> @@ -67,9 +67,24 @@ static ssize_t channels_show(struct device *dev,
->
->  static DEVICE_ATTR_RO(channels);
->
-> +static ssize_t hw_override_show(struct device *dev,
-> +                               struct device_attribute *attr,
-> +                               char *buf)
-> +{
-> +       struct stm_device *stm = to_stm_device(dev);
-> +       int ret;
-> +
-> +       ret = sprintf(buf, "%u\n", stm->data->hw_override);
-> +
-> +       return ret;
-> +}
-> +
-> +static DEVICE_ATTR_RO(hw_override);
+I have found that MSI does work on IMX6 through a bridge (as on the
+GW5410) and not, for devices/drivers that support MSI, but it does
+break devices/drivers that use legacy irqs as we've discussed.
 
-That's also a solution but it adds another entry to sysFS, something
-that could be avoided by tweaking the output we get from the current
-infrastructure.  But I'm not strongly opinionated on that and I can go
-along with this suggestion - as long as users (that aren't familiar
-with the particulars of an STM) have a way of knowing what's going on.
+The MSI capable devices/drivers I've been able to show working with
+MSI enabled are:
+ - Marvell sky2 GigE (present on GW53xx and GW54xx both through a PEX switch)
+ - Ath10k 802.11n radio miniPCIe socket (tested on GW51xx with no
+switch and GW53xx with switch).
 
-> +
->  static struct attribute *stm_attrs[] = {
->         &dev_attr_masters.attr,
->         &dev_attr_channels.attr,
-> +       &dev_attr_hw_override.attr,
->         NULL,
->  };
->
-> diff --git a/include/linux/stm.h b/include/linux/stm.h
-> index 1a79ed8e43..8369d8a8ca 100644
-> --- a/include/linux/stm.h
-> +++ b/include/linux/stm.h
-> @@ -50,6 +50,8 @@ struct stm_device;
->   * @sw_end:            last STP master available to software
->   * @sw_nchannels:      number of STP channels per master
->   * @sw_mmiosz:         size of one channel's IO space, for mmap, optional
-> + * @hw_override:       masters in the STP stream will not match the ones
-> + *                     assigned by software, but are up to the STM hardware
->   * @packet:            callback that sends an STP packet
->   * @mmio_addr:         mmap callback, optional
->   * @link:              called when a new stm_source gets linked to us, optional
-> @@ -85,6 +87,7 @@ struct stm_data {
->         unsigned int            sw_end;
->         unsigned int            sw_nchannels;
->         unsigned int            sw_mmiosz;
-> +       unsigned int            hw_override;
->         ssize_t                 (*packet)(struct stm_data *, unsigned int,
->                                           unsigned int, unsigned int,
->                                           unsigned int, unsigned int,
-> --
-> 2.8.0.rc3
->
+So perhaps there is something else going on with the tw8689
+device/driver that is causing it to not work with MSI. We have an
+avc8000 miniPCIe with tw8689 here and can test if you send me your
+patches that enable tw8689 with msi.
+
+Regardless of MSI working in our tests we still disable it because of
+it breaking legacy irqs and for performance reasons.
+
+Regards,
+
+Tim
