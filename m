@@ -1,32 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 31 Mar 2016 15:14:13 +0100
-Subject: [PATCH 2/4] scatterlist: add sg_alloc_table_from_buf() helper
-In-Reply-To: <1459427384-21374-3-git-send-email-boris.brezillon@free-electrons.com>
-References: <1459427384-21374-1-git-send-email-boris.brezillon@free-electrons.com>
- <1459427384-21374-3-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20160331141412.GK19428@n2100.arm.linux.org.uk>
+From: Vadim.Lomovtsev@caviumnetworks.com (Lomovtsev, Vadim)
+Date: Thu, 31 Mar 2016 14:20:19 +0000
+Subject: [lmbench][question] lat_mem_rd built against ilp32 hangs forever with
+ len=2048
+Message-ID: <BN3PR07MB2643EC7405997C9E58F3FD3E87990@BN3PR07MB2643.namprd07.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 31, 2016 at 02:29:42PM +0200, Boris Brezillon wrote:
-> sg_alloc_table_from_buf() provides an easy solution to create an sg_table
-> from a virtual address pointer. This function takes care of dealing with
-> vmallocated buffers, buffer alignment, or DMA engine limitations (maximum
-> DMA transfer size).
 
-Please note that the DMA API does not take account of coherency of memory
-regions other than non-high/lowmem - there are specific extensions to
-deal with this.
+While running lat_mem_rd test build against ILP32 support at ARM64 board it hangs forever with following logs (CPU load is 100%):
 
-What this means is that having an API that takes any virtual address
-pointer, converts it to a scatterlist which is then DMA mapped, is
-unsafe.
+./lat_mem_rd -P 1 2048 16 32
+0.00049 1.501
+0.00098 1.501
+0.00195 1.501
+[.. skip] 
+1024.00000 13.076
+1536.00000 13.082
+2048.00000 13.076 
 
-It'll be okay for PIPT and non-aliasing VIPT cache architectures, but
-for other cache architectures this will hide this problem and make
-review harder.
+At the same time lat_mem_rd build with lp64 works fine with exactly same args.
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Has anyone face such issue before?
+
+My kernel version is 4.2 and ILP32 patches are under development being backported from http://lkml.iu.edu/hypermail/linux/kernel/1601.1/05453.html.
+Sources for 4.5 available at https://github.com/norov/linux
+
+Please let me know if any additional information is necessary.
+
+-Vadim
