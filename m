@@ -1,175 +1,168 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Thu, 31 Mar 2016 19:23:45 +0800
-Subject: [PATCH v9 17/17] Xen: EFI: Parse DT parameters for Xen specific UEFI
-In-Reply-To: <1459423425-1220-1-git-send-email-zhaoshenglong@huawei.com>
-References: <1459423425-1220-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1459423425-1220-18-git-send-email-zhaoshenglong@huawei.com>
+Date: Thu, 31 Mar 2016 19:23:28 +0800
+Subject: [PATCH v9 00/17] Add ACPI support for Xen Dom0 on ARM64
+Message-ID: <1459423425-1220-1-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Add a new function to parse DT parameters for Xen specific UEFI just
-like the way for normal UEFI. Then it could reuse the existing codes.
+This patch set adds ACPI support for Xen Dom0 on ARM64. The relevant Xen
+ACPI on ARM64 design document could be found from [1].
 
-If Xen supports EFI, initialize runtime services.
+This patch set adds a new FDT node "uefi" under /hypervisor to pass UEFI
+information. Introduce a bus notifier of AMBA and Platform bus to map
+the new added device's MMIO space. Make Xen domain use
+xlated_setup_gnttab_pages to setup grant table and a new hypercall to
+get event-channel irq.
 
-CC: Matt Fleming <matt@codeblueprint.co.uk>
-Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-Reviewed-by: Matt Fleming <matt@codeblueprint.co.uk>
-Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
----
- arch/arm/xen/enlighten.c           |  6 +++++
- drivers/firmware/efi/arm-runtime.c | 17 +++++++++-----
- drivers/firmware/efi/efi.c         | 45 ++++++++++++++++++++++++++++++++------
- 3 files changed, 56 insertions(+), 12 deletions(-)
+Regarding the initialization flow of Linux kernel, it needs to move
+xen_early_init() before efi_init(). Then xen_early_init() will check
+whether it runs on Xen through the /hypervisor node and efi_init() will
+call a new function fdt_find_xen_uefi_params(), to parse those
+xen,uefi-* parameters just like the existing efi_get_fdt_params().
 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 13e3e9f..e130562 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -261,6 +261,12 @@ static int __init fdt_find_hyper_node(unsigned long node, const char *uname,
- 	    !strncmp(hyper_node.prefix, s, strlen(hyper_node.prefix)))
- 		hyper_node.version = s + strlen(hyper_node.prefix);
- 
-+	if (IS_ENABLED(CONFIG_XEN_EFI)) {
-+		/* Check if Xen supports EFI */
-+		if (of_get_flat_dt_subnode_by_name(node, "uefi") > 0)
-+			set_bit(EFI_PARAVIRT, &efi.flags);
-+	}
-+
- 	return 0;
- }
- 
-diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
-index 6ae21e4..ac609b9 100644
---- a/drivers/firmware/efi/arm-runtime.c
-+++ b/drivers/firmware/efi/arm-runtime.c
-@@ -27,6 +27,7 @@
- #include <asm/mmu.h>
- #include <asm/pgalloc.h>
- #include <asm/pgtable.h>
-+#include <asm/xen/xen-ops.h>
- 
- extern u64 efi_system_table;
- 
-@@ -107,13 +108,19 @@ static int __init arm_enable_runtime_services(void)
- 	}
- 	set_bit(EFI_SYSTEM_TABLES, &efi.flags);
- 
--	if (!efi_virtmap_init()) {
--		pr_err("No UEFI virtual mapping was installed -- runtime services will not be available\n");
--		return -ENOMEM;
-+	if (IS_ENABLED(CONFIG_XEN_EFI) && efi_enabled(EFI_PARAVIRT)) {
-+		/* Set up runtime services function pointers for Xen Dom0 */
-+		xen_efi_runtime_setup();
-+	} else {
-+		if (!efi_virtmap_init()) {
-+			pr_err("No UEFI virtual mapping was installed -- runtime services will not be available\n");
-+			return -ENOMEM;
-+		}
-+
-+		/* Set up runtime services function pointers */
-+		efi_native_runtime_setup();
- 	}
- 
--	/* Set up runtime services function pointers */
--	efi_native_runtime_setup();
- 	set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
- 
- 	efi.runtime_version = efi.systab->hdr.revision;
-diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
-index 3a69ed5..519c096 100644
---- a/drivers/firmware/efi/efi.c
-+++ b/drivers/firmware/efi/efi.c
-@@ -469,12 +469,14 @@ device_initcall(efi_load_efivars);
- 		FIELD_SIZEOF(struct efi_fdt_params, field) \
- 	}
- 
--static __initdata struct {
-+struct params {
- 	const char name[32];
- 	const char propname[32];
- 	int offset;
- 	int size;
--} dt_params[] = {
-+};
-+
-+static struct params fdt_params[] __initdata = {
- 	UEFI_PARAM("System Table", "linux,uefi-system-table", system_table),
- 	UEFI_PARAM("MemMap Address", "linux,uefi-mmap-start", mmap),
- 	UEFI_PARAM("MemMap Size", "linux,uefi-mmap-size", mmap_size),
-@@ -482,24 +484,45 @@ static __initdata struct {
- 	UEFI_PARAM("MemMap Desc. Version", "linux,uefi-mmap-desc-ver", desc_ver)
- };
- 
-+static struct params xen_fdt_params[] __initdata = {
-+	UEFI_PARAM("System Table", "xen,uefi-system-table", system_table),
-+	UEFI_PARAM("MemMap Address", "xen,uefi-mmap-start", mmap),
-+	UEFI_PARAM("MemMap Size", "xen,uefi-mmap-size", mmap_size),
-+	UEFI_PARAM("MemMap Desc. Size", "xen,uefi-mmap-desc-size", desc_size),
-+	UEFI_PARAM("MemMap Desc. Version", "xen,uefi-mmap-desc-ver", desc_ver)
-+};
-+
- struct param_info {
- 	int found;
- 	void *params;
-+	struct params *dt_params;
-+	int size;
- };
- 
- static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
- 				       int depth, void *data)
- {
- 	struct param_info *info = data;
-+	struct params *dt_params = info->dt_params;
- 	const void *prop;
- 	void *dest;
- 	u64 val;
--	int i, len;
-+	int i, len, offset;
- 
--	if (depth != 1 || strcmp(uname, "chosen") != 0)
--		return 0;
-+	if (efi_enabled(EFI_PARAVIRT)) {
-+		if (depth != 1 || strcmp(uname, "hypervisor") != 0)
-+			return 0;
- 
--	for (i = 0; i < ARRAY_SIZE(dt_params); i++) {
-+		offset = of_get_flat_dt_subnode_by_name(node, "uefi");
-+		if (offset < 0)
-+			return 0;
-+		node = offset;
-+	} else {
-+		if (depth != 1 || strcmp(uname, "chosen") != 0)
-+			return 0;
-+	}
-+
-+	for (i = 0; i < info->size; i++) {
- 		prop = of_get_flat_dt_prop(node, dt_params[i].propname, &len);
- 		if (!prop)
- 			return 0;
-@@ -530,12 +553,20 @@ int __init efi_get_fdt_params(struct efi_fdt_params *params)
- 	info.found = 0;
- 	info.params = params;
- 
-+	if (efi_enabled(EFI_PARAVIRT)) {
-+		info.dt_params = xen_fdt_params;
-+		info.size = ARRAY_SIZE(xen_fdt_params);
-+	} else {
-+		info.dt_params = fdt_params;
-+		info.size = ARRAY_SIZE(fdt_params);
-+	}
-+
- 	ret = of_scan_flat_dt(fdt_find_uefi_params, &info);
- 	if (!info.found)
- 		pr_info("UEFI not found.\n");
- 	else if (!ret)
- 		pr_err("Can't find '%s' in device tree!\n",
--		       dt_params[info.found].name);
-+		       info.dt_params[info.found].name);
- 
- 	return ret;
- }
+And in arm64_enable_runtime_services() it will check whether it runs on
+Xen and call another new function xen_efi_runtime_setup() to setup
+runtime service instead of efi_native_runtime_setup(). The
+xen_efi_runtime_setup() will assign the runtime function pointers with
+the functions of driver/xen/efi.c.
+
+And since we pass a /hypervisor node and a /chosen node to Dom0, it
+needs to check whether the DTS only contains a /hypervisor node and a
+/chosen node in acpi_boot_table_init().
+
+Patches are tested on FVP base model.
+
+Thanks,
+Shannon
+
+[1] http://lists.xen.org/archives/html/xen-devel/2015-11/msg00488.html
+
+Changes since v8:
+* rebased on v4.6-rc1
+* print UART device address (PATCH 1)
+* use xen_for_each_gfn (PATCH 3)
+* reduce indentation by inverting the condition (PATCH 10)
+* move xen_early_init() before efi_init() as well for ARM (PATCH 11)
+* sync the document with Xen (PATCH 13)
+
+Changes since v7:
+* add __init prefix for acpi_get_spcr_uart_addr (PATCH 1)
+
+Changes since v6:
+* rebase on linux master
+* refactor codes as acpi_get_spcr_uart_addr (PATCH 1)
+* sync with Xen (patch 9)
+
+Changes since v5:
+* rebase on linux master
+* use acpi_dev_resource_memory to parse the device memory info(patch 1)
+* sync with Xen (patch 9)
+
+Changes since v4:
+* rebase on linux master
+* move the check acpi_device_should_be_hidden into
+  acpi_bus_type_and_status (patch 1)
+* use existing function fdt_subnode_offset (patch 16)
+
+Changes since v3:
+* rebase on linux master
+* print a warning when there is no SPCR table
+* rephase the commit message of PATCH 3
+* rephase the words of PATCH 13
+* use strcmp and factor the function in PATCH 16
+* Add several ACKs and RBs, thanks a lot
+
+
+Changes since v2:
+* Use 0 to check if it should ignore the UART
+* Fix the use of page_to_xen_pfn
+* Factor ACPI and DT parts in xen_guest_init
+* Check "uefi" node by full path
+* Fix the statement of Documentation/devicetree/bindings/arm/xen.txt
+
+Changes since v1:
+* Rebase on linux mainline and wallclock patch from Stefano
+* Refactor AMBA and platform device MMIO map to one file
+* Use EFI_PARAVIRT to check if it supports XEN EFI
+* Refactor Xen EFI codes
+* Address other comments
+
+Shannon Zhao (17):
+  Xen: ACPI: Hide UART used by Xen
+  xen/grant-table: Move xlated_setup_gnttab_pages to common place
+  Xen: xlate: Use page_to_xen_pfn instead of page_to_pfn
+  arm/xen: Use xen_xlate_map_ballooned_pages to setup grant table
+  xen: memory : Add new XENMAPSPACE type XENMAPSPACE_dev_mmio
+  Xen: ARM: Add support for mapping platform device mmio
+  Xen: ARM: Add support for mapping AMBA device mmio
+  Xen: public/hvm: sync changes of HVM_PARAM_CALLBACK_VIA ABI from Xen
+  xen/hvm/params: Add a new delivery type for event-channel in
+    HVM_PARAM_CALLBACK_IRQ
+  arm/xen: Get event-channel irq through HVM_PARAM when booting with
+    ACPI
+  ARM: XEN: Move xen_early_init() before efi_init()
+  ARM64: ACPI: Check if it runs on Xen to enable or disable ACPI
+  ARM: Xen: Document UEFI support on Xen ARM virtual platforms
+  XEN: EFI: Move x86 specific codes to architecture directory
+  ARM64: XEN: Add a function to initialize Xen specific UEFI runtime
+    services
+  FDT: Add a helper to get the subnode by given name
+  Xen: EFI: Parse DT parameters for Xen specific UEFI
+
+Shannon Zhao (17):
+  Xen: ACPI: Hide UART used by Xen
+  xen/grant-table: Move xlated_setup_gnttab_pages to common place
+  Xen: xlate: Use page_to_xen_pfn instead of page_to_pfn
+  arm/xen: Use xen_xlate_map_ballooned_pages to setup grant table
+  xen: memory : Add new XENMAPSPACE type XENMAPSPACE_dev_mmio
+  Xen: ARM: Add support for mapping platform device mmio
+  Xen: ARM: Add support for mapping AMBA device mmio
+  Xen: public/hvm: sync changes of HVM_PARAM_CALLBACK_VIA ABI from Xen
+  xen/hvm/params: Add a new delivery type for event-channel in
+    HVM_PARAM_CALLBACK_IRQ
+  arm/xen: Get event-channel irq through HVM_PARAM when booting with
+    ACPI
+  ARM: XEN: Move xen_early_init() before efi_init()
+  ARM64: ACPI: Check if it runs on Xen to enable or disable ACPI
+  ARM: Xen: Document UEFI support on Xen ARM virtual platforms
+  XEN: EFI: Move x86 specific codes to architecture directory
+  ARM64: XEN: Add a function to initialize Xen specific UEFI runtime
+    services
+  FDT: Add a helper to get the subnode by given name
+  Xen: EFI: Parse DT parameters for Xen specific UEFI
+
+ Documentation/devicetree/bindings/arm/xen.txt |  35 +++++
+ arch/arm/include/asm/xen/xen-ops.h            |   6 +
+ arch/arm/kernel/setup.c                       |   2 +-
+ arch/arm/xen/Makefile                         |   1 +
+ arch/arm/xen/efi.c                            |  40 ++++++
+ arch/arm/xen/enlighten.c                      | 109 +++++++++++----
+ arch/arm64/include/asm/xen/xen-ops.h          |   6 +
+ arch/arm64/kernel/acpi.c                      |  12 +-
+ arch/arm64/kernel/setup.c                     |   2 +-
+ arch/arm64/xen/Makefile                       |   1 +
+ arch/x86/xen/efi.c                            | 112 ++++++++++++++++
+ arch/x86/xen/grant-table.c                    |  57 +-------
+ drivers/acpi/scan.c                           |  69 ++++++++++
+ drivers/firmware/efi/arm-runtime.c            |  17 ++-
+ drivers/firmware/efi/efi.c                    |  45 ++++++-
+ drivers/of/fdt.c                              |  13 ++
+ drivers/xen/Kconfig                           |   2 +-
+ drivers/xen/Makefile                          |   1 +
+ drivers/xen/arm-device.c                      | 184 ++++++++++++++++++++++++++
+ drivers/xen/efi.c                             | 174 +++++-------------------
+ drivers/xen/xlate_mmu.c                       |  77 +++++++++++
+ include/linux/of_fdt.h                        |   2 +
+ include/xen/interface/hvm/params.h            |  40 +++++-
+ include/xen/interface/memory.h                |   1 +
+ include/xen/xen-ops.h                         |  32 +++--
+ 25 files changed, 792 insertions(+), 248 deletions(-)
+ create mode 100644 arch/arm/include/asm/xen/xen-ops.h
+ create mode 100644 arch/arm/xen/efi.c
+ create mode 100644 arch/arm64/include/asm/xen/xen-ops.h
+ create mode 100644 drivers/xen/arm-device.c
+
 -- 
 2.0.4
