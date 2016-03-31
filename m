@@ -1,102 +1,63 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 31 Mar 2016 11:53:18 +0100
-Subject: [PATCH] efi/arm64: don't apply MEMBLOCK_NOMAP to UEFI memory map
- mapping
-In-Reply-To: <1459323983-9120-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1459323983-9120-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160331105318.GC18910@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 31 Mar 2016 11:55:50 +0100
+Subject: [PATCH v2 1/4] arm64: use 'segment' rather than 'chunk' to
+ describe mapped kernel regions
+In-Reply-To: <1459352589-28721-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1459352589-28721-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1459352589-28721-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160331105550.GD26532@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 30, 2016 at 09:46:23AM +0200, Ard Biesheuvel wrote:
-> Hi Matt,
+On Wed, Mar 30, 2016 at 05:43:06PM +0200, Ard Biesheuvel wrote:
+> Replace the poorly defined term chunk with segment, which is a term that is
+> already used by the ELF spec to describe contiguous mappings with the same
+> permission attributes of statically allocated ranges of an executable.
 > 
-> Could we queue this as a fix for v4.6 with a cc:stable for v4.5, please?
-> (assuming no objections from any of the cc'ees)
-
-FWIW:
-
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-Yes, this is a temporary hack, but it's small, fixes a real issue and
-you're already working on a proper solution anyway.
-
-Will
-
-> ----------8<--------------
-> Commit 4dffbfc48d65 ("arm64/efi: mark UEFI reserved regions as
-> MEMBLOCK_NOMAP") updated the mapping logic of both the RuntimeServices
-> regions as well as the kernel's copy of the UEFI memory map to set the
-> MEMBLOCK_NOMAP flag, which causes these regions to be omitted from the
-> kernel direct mapping, and from being covered by a struct page.
-> For the RuntimeServices regions, this is an obvious win, since the contents
-> of these regions have significance to the firmware executable code itself,
-> and are mapped in the EFI page tables using attributes that are described in
-> the UEFI memory map, and which may differ from the attributes we use for
-> mapping system RAM. It also prevents the contents from being modified
-> inadvertently, since the EFI page tables are only live during runtime
-> service invocations.
-> 
-> None of these concerns apply to the allocation that covers the UEFI memory
-> map, since it is entirely owned by the kernel. Setting the MEMBLOCK_NOMAP on
-> the region did allow us to use ioremap_cache() to map it both on arm64 and
-> on ARM, since the latter does not allow ioremap_cache() to be used on
-> regions that are covered by a struct page.
-> 
-> The ioremap_cache() on ARM restriction will be lifted in the v4.7 timeframe,
-> but in the mean time, it has been reported that commit 4dffbfc48d65 causes
-> a regression on 64k granule kernels. This is due to the fact that, given
-> the 64 KB page size, the region that we end up removing from the kernel
-> direct mapping is rounded up to 64 KB, and this 64 KB page frame may be
-> shared with the initrd when booting via GRUB (which does not align its
-> EFI_LOADER_DATA allocations to 64 KB like the stub does). This will crash
-> the kernel as soon as it tries to access the initrd.
-> 
-> Since the issue is specific to arm64, revert back to memblock_reserve()'ing
-> the UEFI memory map when running on arm64. This is a temporary fix for v4.5
-> and v4.6, and will be superseded in the v4.7 timeframe when we will be able
-> to move back to memblock_reserve() unconditionally.
-> 
-> Fixes: 4dffbfc48d65 ("arm64/efi: mark UEFI reserved regions as MEMBLOCK_NOMAP")
-> Reported-by: Mark Salter <msalter@redhat.com>
 > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+Sounds better to me.
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Mark.
+
 > ---
->  drivers/firmware/efi/arm-init.c | 18 +++++++++++++++---
->  1 file changed, 15 insertions(+), 3 deletions(-)
+>  arch/arm64/mm/mmu.c | 14 +++++++-------
+>  1 file changed, 7 insertions(+), 7 deletions(-)
 > 
-> diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
-> index aa1f743152a2..8714f8c271ba 100644
-> --- a/drivers/firmware/efi/arm-init.c
-> +++ b/drivers/firmware/efi/arm-init.c
-> @@ -203,7 +203,19 @@ void __init efi_init(void)
->  
->  	reserve_regions();
->  	early_memunmap(memmap.map, params.mmap_size);
-> -	memblock_mark_nomap(params.mmap & PAGE_MASK,
-> -			    PAGE_ALIGN(params.mmap_size +
-> -				       (params.mmap & ~PAGE_MASK)));
-> +
-> +	if (IS_ENABLED(CONFIG_ARM)) {
-> +		/*
-> +		 * ARM currently does not allow ioremap_cache() to be called on
-> +		 * memory regions that are covered by struct page. So remove the
-> +		 * UEFI memory map from the linear mapping.
-> +		 */
-> +		memblock_mark_nomap(params.mmap & PAGE_MASK,
-> +				    PAGE_ALIGN(params.mmap_size +
-> +					       (params.mmap & ~PAGE_MASK)));
-> +	} else {
-> +		memblock_reserve(params.mmap & PAGE_MASK,
-> +				 PAGE_ALIGN(params.mmap_size +
-> +					    (params.mmap & ~PAGE_MASK)));
-> +	}
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index f3e5c74233f3..9be2065f8ddb 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -471,8 +471,8 @@ void fixup_init(void)
+>  	unmap_kernel_range((u64)__init_begin, (u64)(__init_end - __init_begin));
 >  }
+>  
+> -static void __init map_kernel_chunk(pgd_t *pgd, void *va_start, void *va_end,
+> -				    pgprot_t prot, struct vm_struct *vma)
+> +static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
+> +				      pgprot_t prot, struct vm_struct *vma)
+>  {
+>  	phys_addr_t pa_start = __pa(va_start);
+>  	unsigned long size = va_end - va_start;
+> @@ -499,11 +499,11 @@ static void __init map_kernel(pgd_t *pgd)
+>  {
+>  	static struct vm_struct vmlinux_text, vmlinux_rodata, vmlinux_init, vmlinux_data;
+>  
+> -	map_kernel_chunk(pgd, _stext, __start_rodata, PAGE_KERNEL_EXEC, &vmlinux_text);
+> -	map_kernel_chunk(pgd, __start_rodata, _etext, PAGE_KERNEL, &vmlinux_rodata);
+> -	map_kernel_chunk(pgd, __init_begin, __init_end, PAGE_KERNEL_EXEC,
+> -			 &vmlinux_init);
+> -	map_kernel_chunk(pgd, _data, _end, PAGE_KERNEL, &vmlinux_data);
+> +	map_kernel_segment(pgd, _stext, __start_rodata, PAGE_KERNEL_EXEC, &vmlinux_text);
+> +	map_kernel_segment(pgd, __start_rodata, _etext, PAGE_KERNEL, &vmlinux_rodata);
+> +	map_kernel_segment(pgd, __init_begin, __init_end, PAGE_KERNEL_EXEC,
+> +			   &vmlinux_init);
+> +	map_kernel_segment(pgd, _data, _end, PAGE_KERNEL, &vmlinux_data);
+>  
+>  	if (!pgd_val(*pgd_offset_raw(pgd, FIXADDR_START))) {
+>  		/*
 > -- 
 > 2.5.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
