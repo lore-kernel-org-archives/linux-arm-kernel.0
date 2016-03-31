@@ -1,42 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 31 Mar 2016 10:00:18 -0700
-Subject: [PATCH v2] ARM: dts: dra7: Correct clock tree for sys_32k_ck
-In-Reply-To: <56FCEC61.5020400@ti.com>
-References: <1457957001-720-1-git-send-email-j-keerthy@ti.com>
- <20160330211828.GE9329@atomide.com>
- <20160330213224.GH9329@atomide.com> <56FCC3FF.7080901@ti.com>
- <56FCEC61.5020400@ti.com>
-Message-ID: <20160331170017.GI9329@atomide.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 31 Mar 2016 19:02:01 +0200
+Subject: [PATCH v4 3/8] Documentation: devicetree: rockchip: Document
+ GeekBox
+In-Reply-To: <1682289.HWd4yLL18I@diego>
+References: <1458136727-32075-1-git-send-email-afaerber@suse.de>
+ <56FAE95E.6060900@suse.de> <1682289.HWd4yLL18I@diego>
+Message-ID: <1913373.6hKqMKImXt@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Keerthy <a0393675@ti.com> [160331 02:26]:
+Am Dienstag, 29. M?rz 2016, 23:21:51 schrieb Heiko St?bner:
+> Am Dienstag, 29. M?rz 2016, 22:45:18 schrieb Andreas F?rber:
+> > Am 29.03.2016 um 22:13 schrieb Heiko St?bner:
+> > > Am Mittwoch, 16. M?rz 2016, 14:58:41 schrieb Andreas F?rber:
+> > >> Use "geekbuying,geekbox" compatible string.
+> > >> 
+> > >> Acked-by: Rob Herring <robh@kernel.org>
+> > >> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> > > 
+> > > I've folded this patch into the geekbox dts patch, carrying Rob's Ack
+> > > for
+> > > the binding over.
+> > 
+> > Either you just made a mistake in my name or
+> > https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/Do
+> > cume ntation/devicetree/bindings/submitting-patches.txt needs an update.
+> > It clearly says:
+> > 
+> > "1) The Documentation/ portion of the patch should be a separate patch."
+> > 
+> > That's why I always do it this way.
 > 
+> looking at the dt-bindings git log, it seems that is handled in a variety
+> of ways :-) . Personally I'm doing completely new bindings separately but
+> the 125th addition of a board just inside the dts patch.
 > 
-> On Thursday 31 March 2016 12:00 PM, Tero Kristo wrote:
-> >On 03/31/2016 12:32 AM, Tony Lindgren wrote:
-> >>* Tony Lindgren <tony@atomide.com> [160330 14:19]:
-> >>>* Keerthy <j-keerthy@ti.com> [160314 05:04]:
-> >>>>This is w.r.t J6/J6eco: 32clk is pseudo (erratum i856) - clock source.
-> >>>>Errata i856 for the AM572x (DRA7xx) points out that the 32.768KHz
-> >>>>external
-> >>>>crystal is not enabled at power up. Instead the CPU falls back to using
-> >>>>an emulation for the 32KHz clock which is SYSCLK1/610.  SYSCLK1 is
-> >>>>usually
-> >>>>20MHz on boards so far (which gives an emulated frequency of 32.786KHz)
-> >>>
-> >>>Thanks applying into omap-for-v4.6/fixes.
-> >>
-> >>Actually let's wait a review from Tero on this one, not sure
-> >>about the pseudo clock naming here. So dropping for now.
-> >
-> >The patch is fine for me, I didn't comment anything before as I thought
-> >you already applied it.
-> >
-> >Acked-by: Tero Kristo <t-kristo@ti.com>
-> 
-> Thanks Tero.
+> But I guess we can also move it out again into a separate patch if you
+> prefer that :-) .
 
-OK applying with Tero's ack.
+I've split out that documentation addition again and applied this separate 
+patch instead :-) .
 
-Tony
+
+Heiko
