@@ -1,90 +1,60 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 31 Mar 2016 10:57:56 -0700
-Subject: [PATCH 04/18] ARM: dts: vf610: add on-chip SRAM
-In-Reply-To: <20160331083325.GX28207@tiger>
-References: <1457576219-7971-1-git-send-email-stefan@agner.ch>
- <1457576219-7971-5-git-send-email-stefan@agner.ch>
- <20160331083325.GX28207@tiger>
-Message-ID: <e6792f9813e0b8b346addebb3373d5af@agner.ch>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Thu, 31 Mar 2016 11:01:58 -0700
+Subject: [PATCH v4 1/2] watchdog: imx2_wdt: add external reset support via
+ 'ext-reset-output' dt prop
+In-Reply-To: <20160331015714.GM28207@tiger>
+References: <20151106220249.GA19791@roeck-us.net>
+ <565F4244.7090502@timesys.com>
+ <CAJ+vNU00Bf97HUqkkW9KqOUzHXh482R9O1gasz6ju3Pn-_5chA@mail.gmail.com>
+ <CAJ+vNU2qHQPSJ1KWp_3f3vAdeuOcF0ooZHmHsdafabZLXJv=Bw@mail.gmail.com>
+ <20151228162923.GA31680@spo001.leaseweb.nl>
+ <56AA79DA.2010305@timesys.com>
+ <CAOMZO5DrTY3ho0Z_jXxeYMqbd6GmUKRwD1LB61vM1ZTGQAYOrg@mail.gmail.com>
+ <56F991C3.8030201@timesys.com> <20160330012226.GD28207@tiger>
+ <20160330210916.GB21993@roeck-us.net>
+ <20160331015714.GM28207@tiger>
+Message-ID: <CAJ+vNU2zBCAF8hJfmSa31CyD9XcOCxYWqH9LKRm1S_sunqkgOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-03-31 01:33, Shawn Guo wrote:
-> On Wed, Mar 09, 2016 at 06:16:45PM -0800, Stefan Agner wrote:
->> Add Vybrids massive on-chip SRAM areas. Make use of the memory
->> region functionality to denominate the retained SRAM area in
->> LPSTOP2 and LPSTOP3.
+On Wed, Mar 30, 2016 at 6:57 PM, Shawn Guo <shawnguo@kernel.org> wrote:
+> On Wed, Mar 30, 2016 at 02:09:16PM -0700, Guenter Roeck wrote:
+>> The question was if the property name should be ext-reset-output or
+>> fsl,ext-reset-output. In my opinion, it should be fsl,ext-reset-output
+>> because it is not a generic property. Tim disagrees.
 >>
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> 
-> This one looks fine to me.  I was going to pick it up separately, but it
-> doesn't apply.
 
-... see below
+Guenter,
 
->> ---
->>  arch/arm/boot/dts/vfxxx.dtsi | 37 +++++++++++++++++++++++++++++++++++++
->>  1 file changed, 37 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
->> index 909988d..b038ea4 100644
->> --- a/arch/arm/boot/dts/vfxxx.dtsi
->> +++ b/arch/arm/boot/dts/vfxxx.dtsi
->> @@ -91,6 +91,43 @@
->>  		interrupt-parent = <&gpc>;
+My issue regarding the vendor prefix was not a hard dissagreement but
+was more about me understanding the rational behind using vendor
+prefixes. In this case the imx2_wdt driver 'is' a vendor specific
+driver as its compatible strings are prefixed with 'fsl,' so isn't
+'any' property added to devicetree/bindings/watchdog/fsl-imx-wdt.txt
+inherently a vendor specific properly already? I assume that is why
+the 'big-endian' property isn't 'fsl,big-endian'.
 
+Maybe it's more about if it 'is' marked as a vendor specific property
+its much easier to get approval and accepted by a vendor-specific
+maintainer?
 
-I guess this gpc interrupt parent causes the apply problem. I will move
-this patch to the top so it can be applied before the GPC driver and dt
-changes.
+>> So we have two options: Change the property name to fsl,ext-reset-output,
+>> which I would accept, or wait for a devicetree maintainer to make a decision.
+>
+> Guenter,
+>
+> I agree with you on this point.  Before everyone agrees that this is a
+> generic binding, we should have vendor prefix for the property.
+>
+> Tim,
+>
+> This is a small change which, IMO, shouldn't hold an useful patch from being
+> merged.  Care to resend with the suggested change?
+>
+> Shawn
 
---
-Stefan
+Shawn,
 
+Sure - I'll rebase and re-submit.
 
->>  		ranges;
->>
->> +		ocram0: sram at 3f000000 {
->> +			compatible = "mmio-sram";
->> +			reg = <0x3f000000 0x40000>;
->> +
->> +			#address-cells = <1>;
->> +			#size-cells = <1>;
->> +			ranges = <0 0x3f000000 0x40000>;
->> +
->> +			stbyram1 at 0 {
->> +				reg = <0x0 0x4000>;
->> +				label = "stbyram1";
->> +				pool;
->> +			};
->> +
->> +			stbyram2 at 4000 {
->> +				reg = <0x4000 0xc000>;
->> +				label = "stbyram2";
->> +				pool;
->> +			};
->> +		};
->> +
->> +		ocram1: sram at 3f040000 {
->> +			compatible = "mmio-sram";
->> +			reg = <0x3f040000 0x40000>;
->> +		};
->> +
->> +		gfxram0: sram at 3f400000 {
->> +			compatible = "mmio-sram";
->> +			reg = <0x3f400000 0x80000>;
->> +		};
->> +
->> +		/* used by L2 cache */
->> +		gfxram1: sram at 3f480000 {
->> +			compatible = "mmio-sram";
->> +			reg = <0x3f480000 0x80000>;
->> +		};
->> +
->>  		aips0: aips-bus at 40000000 {
->>  			compatible = "fsl,aips-bus", "simple-bus";
->>  			#address-cells = <1>;
->> --
->> 2.7.2
->>
->>
+Tim
