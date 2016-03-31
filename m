@@ -1,22 +1,44 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 31 Mar 2016 10:23:53 -0700
-Subject: [PATCH 3/4] spi: use sg_alloc_table_from_buf()
-In-Reply-To: <1459427384-21374-4-git-send-email-boris.brezillon@free-electrons.com>
-References: <1459427384-21374-1-git-send-email-boris.brezillon@free-electrons.com>
- <1459427384-21374-4-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20160331172353.GJ2350@sirena.org.uk>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 31 Mar 2016 17:25:17 +0000
+Subject: [PATCH V2] ARM: bcm2835: add CPU node for ARM core
+Message-ID: <1459445118-1733-1-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 31, 2016 at 02:29:43PM +0200, Boris Brezillon wrote:
-> Replace custom implementation of sg_alloc_table_from_buf() by a call to
-> sg_alloc_table_from_buf().
+This patch adds the CPU node of the BCM2835 into the DT.
 
-Acked-by: Mark Brown <broonie@kernel.org>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160331/eb047d16/attachment.sig>
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+
+---
+ arch/arm/boot/dts/bcm2835.dtsi |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+Changes in V2:
+- removed undocumented fallback compatible
+
+diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+index b83b326..e87aba1 100644
+--- a/arch/arm/boot/dts/bcm2835.dtsi
++++ b/arch/arm/boot/dts/bcm2835.dtsi
+@@ -3,6 +3,17 @@
+ / {
+ 	compatible = "brcm,bcm2835";
+ 
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,arm1176jzf-s";
++			reg = <0x0>;
++		};
++	};
++
+ 	soc {
+ 		ranges = <0x7e000000 0x20000000 0x02000000>;
+ 		dma-ranges = <0x40000000 0x00000000 0x20000000>;
+-- 
+1.7.9.5
