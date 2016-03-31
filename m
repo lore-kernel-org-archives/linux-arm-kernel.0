@@ -1,84 +1,71 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 31 Mar 2016 11:18:52 +0200
-Subject: [PATCH v4 4/4] ARM: memremap: implement arch_memremap_wb()
+Date: Thu, 31 Mar 2016 11:18:49 +0200
+Subject: [PATCH v4 1/4] ARM: reintroduce ioremap_cached() for creating cached
+ I/O mappings
 In-Reply-To: <1459415932-17852-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1459415932-17852-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1459415932-17852-5-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1459415932-17852-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The generic memremap() falls back to using ioremap_cache() to create
-MEMREMAP_WB mappings if the requested region is not already covered
-by the linear mapping, unless the architecture provides an implementation
-of arch_memremap_wb().
+The original ARM-only ioremap flavor 'ioremap_cached' has been renamed
+to 'ioremap_cache' to align with other architectures, and subsequently
+abused in generic code to map things like firmware tables in memory.
+For that reason, there is currently an effort underway to deprecate
+ioremap_cache, whose semantics are poorly defined, and which is typed
+with an __iomem annotation that is inappropriate for mappings of ordinary
+memory.
 
-Since ioremap_cache() is not appropriate on ARM to map memory with the
-same attributes used for the linear mapping, implement arch_memremap_wb()
-which does exactly that. Also, relax the WARN() check to allow MT_MEMORY_RW
-mappings of pfn_valid() pages.
+However, original users of ioremap_cached() used it in a context where
+the I/O connotation is appropriate, and replacing those instances with
+memremap() does not make sense. So let's revive ioremap_cached(), so
+that we can change back those original users before we drop ioremap_cache
+entirely in favor of memremap.
 
 Cc: Russell King <rmk+kernel@arm.linux.org.uk>
 Acked-by: Dan Williams <dan.j.williams@intel.com>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/include/asm/io.h |  6 ++++++
- arch/arm/mm/ioremap.c     | 12 ++++++++++--
- 2 files changed, 16 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/io.h | 6 ++++++
+ arch/arm/mm/ioremap.c     | 4 ++++
+ 2 files changed, 10 insertions(+)
 
 diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-index fb94de290edd..781ef5fe235d 100644
+index 485982084fe9..fb94de290edd 100644
 --- a/arch/arm/include/asm/io.h
 +++ b/arch/arm/include/asm/io.h
-@@ -392,6 +392,9 @@ void __iomem *ioremap(resource_size_t res_cookie, size_t size);
- #define ioremap ioremap
- #define ioremap_nocache ioremap
- 
-+/*
-+ * Do not use ioremap_cache for mapping memory. Use memremap instead.
-+ */
+@@ -395,6 +395,12 @@ void __iomem *ioremap(resource_size_t res_cookie, size_t size);
  void __iomem *ioremap_cache(resource_size_t res_cookie, size_t size);
  #define ioremap_cache ioremap_cache
  
-@@ -408,6 +411,9 @@ void __iomem *ioremap_wc(resource_size_t res_cookie, size_t size);
- void iounmap(volatile void __iomem *iomem_cookie);
- #define iounmap iounmap
- 
-+void *arch_memremap_wb(phys_addr_t phys_addr, size_t size);
-+#define arch_memremap_wb arch_memremap_wb
++/*
++ * Do not use ioremap_cached in new code. Provided for the benefit of
++ * the pxa2xx-flash MTD driver only.
++ */
++void __iomem *ioremap_cached(resource_size_t res_cookie, size_t size);
 +
- /*
-  * io{read,write}{16,32}be() macros
-  */
+ void __iomem *ioremap_wc(resource_size_t res_cookie, size_t size);
+ #define ioremap_wc ioremap_wc
+ #define ioremap_wt ioremap_wc
 diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-index d5350f6af089..ff0eed23ddf1 100644
+index 66a978d05958..d5350f6af089 100644
 --- a/arch/arm/mm/ioremap.c
 +++ b/arch/arm/mm/ioremap.c
-@@ -297,9 +297,10 @@ static void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
- 	}
+@@ -380,11 +380,15 @@ void __iomem *ioremap(resource_size_t res_cookie, size_t size)
+ EXPORT_SYMBOL(ioremap);
  
- 	/*
--	 * Don't allow RAM to be mapped - this causes problems with ARMv6+
-+	 * Don't allow RAM to be mapped with mismatched attributes - this
-+	 * causes problems with ARMv6+
- 	 */
--	if (WARN_ON(pfn_valid(pfn)))
-+	if (WARN_ON(pfn_valid(pfn) && mtype != MT_MEMORY_RW))
- 		return NULL;
- 
- 	area = get_vm_area_caller(size, VM_IOREMAP, caller);
-@@ -418,6 +419,13 @@ __arm_ioremap_exec(phys_addr_t phys_addr, size_t size, bool cached)
- 			__builtin_return_address(0));
- }
- 
-+void *arch_memremap_wb(phys_addr_t phys_addr, size_t size)
-+{
-+	return (__force void *)arch_ioremap_caller(phys_addr, size,
-+						   MT_MEMORY_RW,
-+						   __builtin_return_address(0));
-+}
+ void __iomem *ioremap_cache(resource_size_t res_cookie, size_t size)
++	__alias(ioremap_cached);
 +
- void __iounmap(volatile void __iomem *io_addr)
++void __iomem *ioremap_cached(resource_size_t res_cookie, size_t size)
  {
- 	void *addr = (void *)(PAGE_MASK & (unsigned long)io_addr);
+ 	return arch_ioremap_caller(res_cookie, size, MT_DEVICE_CACHED,
+ 				   __builtin_return_address(0));
+ }
+ EXPORT_SYMBOL(ioremap_cache);
++EXPORT_SYMBOL(ioremap_cached);
+ 
+ void __iomem *ioremap_wc(resource_size_t res_cookie, size_t size)
+ {
 -- 
 2.5.0
