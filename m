@@ -1,42 +1,36 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 31 Mar 2016 16:47:10 -0400 (EDT)
-Subject: [PATCH] net: mvneta: replace MVNETA_CPU_D_CACHE_LINE_SIZE with
- L1_CACHE_BYTES
-In-Reply-To: <20160331223735.32904e42@free-electrons.com>
-References: <1459338921-391-1-git-send-email-jszhang@marvell.com>
- <20160331.151547.1889188465826831929.davem@davemloft.net>
- <20160331223735.32904e42@free-electrons.com>
-Message-ID: <20160331.164710.1998871529914699937.davem@davemloft.net>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 31 Mar 2016 22:54:10 +0200
+Subject: [PATCH 4/5] ARM: dts: rockchip: drop unneeded properties from mipi
+ node
+In-Reply-To: <1459457651-4727-1-git-send-email-heiko@sntech.de>
+References: <1459457651-4727-1-git-send-email-heiko@sntech.de>
+Message-ID: <1459457651-4727-5-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Date: Thu, 31 Mar 2016 22:37:35 +0200
+The mipi controller node does contain an unused reg property as well as
+unnecessary #address-cells and #size-cells properties for subnodes
+not using addresses, so remove those to also make dtc happy.
 
-> Hello,
-> 
-> On Thu, 31 Mar 2016 15:15:47 -0400 (EDT), David Miller wrote:
->> From: Jisheng Zhang <jszhang@marvell.com>
->> Date: Wed, 30 Mar 2016 19:55:21 +0800
->> 
->> > The mvneta is also used in some Marvell berlin family SoCs which may
->> > have 64bytes cacheline size. Replace the MVNETA_CPU_D_CACHE_LINE_SIZE
->> > usage with L1_CACHE_BYTES.
->> > 
->> > And since dma_alloc_coherent() is always cacheline size aligned, so
->> > remove the align checks.
->> > 
->> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
->> 
->> Applied.
-> 
-> A new version of the patch was sent, which more rightfully uses
-> cache_line_size(), see:
-> 
->  "[PATCH v2] net: mvneta: replace MVNETA_CPU_D_CACHE_LINE_SIZE with cache_line_size"
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/boot/dts/rk3288.dtsi | 4 ----
+ 1 file changed, 4 deletions(-)
 
-Sorry about that.
-
-Send me a realtive fixup patch if you like.
-
-Thanks.
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index ee4085d..9114c7b 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -888,10 +888,6 @@
+ 		status = "disabled";
+ 
+ 		ports {
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-			reg = <1>;
+-
+ 			mipi_in: port {
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+-- 
+2.6.4
