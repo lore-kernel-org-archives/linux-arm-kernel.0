@@ -1,64 +1,86 @@
-From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
-Date: Thu, 31 Mar 2016 09:53:26 +0200
-Subject: [PATCH v3 0/8] arm64: rockchip: Initial GeekBox enablement
-In-Reply-To: <CADhT+wdXXp322vmgFmWTUiiRZTsCWeJSSdU=BMEEbSyb_bnrUw@mail.gmail.com>
-References: <1457294038-14243-1-git-send-email-afaerber@suse.de>	<56DE7E1D.5070508@st.com>	<CADhT+weKf+F98uxCQhRa2RfMm8+4p=rrNZc-Vf=w_HPycXto=A@mail.gmail.com>	<CAAObsKD9HoEbtV_JMz_R=bcrQseDmhncRAWP9k8djksL-LMQqw@mail.gmail.com>	<56DFE55B.2090806@st.com>	<56DFE64B.8060606@st.com>	<CAAObsKBr9SXg1-wr9O-ypR8JozdGpeAwfDLMeUKi8ozxkKyTXg@mail.gmail.com>	<56DFF253.9050208@st.com>	<56DFFA9E.7060602@st.com>	<CAAObsKBUzBXcamEyup44N1bYUzGr_ZZTsYcD5x3PXb-2E00cGA@mail.gmail.com>	<56E033C8.40506@st.com>	<56E038CE.606@st.com>	<CADhT+wcMpzA_Coj8Z5OQZsc3bF3a7yOmsbazQMPtcdUWkJSuCA@mail.gmail.com>	<56E13AAB.2080900@st.com>	<CADhT+wd=vcph2y_OxkGNO5EwHvN=kBy-BrfZHmNjZHww4LxmTg@mail.gmail.com>	<56E28B5D.6000708@st.com>	<CAAObsKB-tSCu5KMYk2Zi-oX9zMKEOwwT93sMkiZKiYvtexmHaQ@mail.gmail.com>	<56E6E4B0.8060408@st.com>	<CAAObsKCdk+6HdzFYxRKZbPiaKcfMCLjbpngurat47YvyvSgH-w@mail.gmail.com>	<56E801EB.6030107@st.com>
- <CADhT+wdXXp322vmgFmWTUiiRZTsCWeJSSdU=BMEEbSyb_bnrUw@mail.gmail.com>
-Message-ID: <56FCD776.2090206@st.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 31 Mar 2016 16:57:00 +0900
+Subject: [PATCH v15 17/20] arm64: kdump: implement machine_crash_shutdown()
+In-Reply-To: <56EFF738.1040308@arm.com>
+References: <cover.1457977401.git.geoff@infradead.org>
+ <8f53a31cf8bbfdd73eb289e078addc31c5a19fcf.1457977403.git.geoff@infradead.org>
+ <56EC440F.4050406@arm.com> <56EFF738.1040308@arm.com>
+Message-ID: <20160331075659.GD2267@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/30/2016 6:44 PM, Dinh Nguyen wrote:
-> On Tue, Mar 15, 2016 at 7:36 AM, Giuseppe CAVALLARO
-> <peppe.cavallaro@st.com> wrote:
->> Hello Tomeu
->>
->> On 3/15/2016 8:23 AM, Tomeu Vizoso wrote:
->>>
->>> Thanks.
->>>
->>> Btw, I have rebased on top of 4.5 this morning and I have noticed that
->>> 88f8b1bb41c6 ("stmmac: Fix 'eth0: No PHY found' regression") got in
->>> there, so I guess we have now a bunch of boards with broken network on
->>> that release:(
->>
->>
->>
->> This is the status on my side: I am testing on an HW that has the
->> Enhanced descriptors and all works fine.
->>
->> On this HW, if I force the driver to use the normal descriptor
->> layout, I meet problems but using both net.git and net-next.
->> So I suspect I cannot ply with this HW forcing the normal descriptors.
->> But! That is helping me to check if, on net-next, the stmmac is
->> actually  programming fine the normal desc case.
->> I have just found another fix so I kindly ask you to apply the temp
->> patch  attached and let me know.
->> In details, I have noticed that the OWN bit was not set in the right
->> TDES0.
->>
->> I also ask you to give me a log of the kernel where the stmmac was
->> running fine. I would like to see which configuration it is selected
->> at runtime by the driver on your box.
->>  From your previous logs (where the stmmac failed), it seems that
->> the  problem is on normal desc but, to be honest, this is the first
->> case I see a 3.50a with HW capability register and w/o Enhanced
->> descriptors.
->>
->
-> Are you still working on a fix for:
->
-> [    1.196110] libphy: PHY stmmac-0:ffffffff not found
-> [    1.200972] eth0: Could not attach to PHY
-> [    1.204991] stmmac_open: Cannot attach to PHY (error: -19)
->
-> I see the error still there as of linux-next 20160330.
+On Mon, Mar 21, 2016 at 01:29:28PM +0000, James Morse wrote:
+> Hi!
+> 
+> On 18/03/16 18:08, James Morse wrote:
+> > On 14/03/16 17:48, Geoff Levand wrote:
+> >> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> >>
+> >> Primary kernel calls machine_crash_shutdown() to shut down non-boot cpus
+> >> and save registers' status in per-cpu ELF notes before starting crash
+> >> dump kernel. See kernel_kexec().
+> >> Even if not all secondary cpus have shut down, we do kdump anyway.
+> >>
+> >> As we don't have to make non-boot(crashed) cpus offline (to preserve
+> >> correct status of cpus at crash dump) before shutting down, this patch
+> >> also adds a variant of smp_send_stop().
+> 
+> >> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> >> index b1adc51..76402c6cd 100644
+> >> --- a/arch/arm64/kernel/smp.c
+> >> +++ b/arch/arm64/kernel/smp.c
+> >> @@ -701,6 +705,28 @@ static void ipi_cpu_stop(unsigned int cpu)
+> >>  		cpu_relax();
+> >>  }
+> >>  
+> >> +static atomic_t waiting_for_crash_ipi;
+> >> +
+> >> +static void ipi_cpu_crash_stop(unsigned int cpu, struct pt_regs *regs)
+> >> +{
+> >> +	crash_save_cpu(regs, cpu);
+> >> +
+> >> +	raw_spin_lock(&stop_lock);
+> >> +	pr_debug("CPU%u: stopping\n", cpu);
+> >> +	raw_spin_unlock(&stop_lock);
+> >> +
+> >> +	atomic_dec(&waiting_for_crash_ipi);
+> >> +
+> >> +	local_irq_disable();
+> >> +
+> >> +	if (cpu_ops[cpu]->cpu_die)
+> >> +		cpu_ops[cpu]->cpu_die(cpu);
+> >> +
+> >> +	/* just in case */
+> >> +	while (1)
+> >> +		wfi();
+> 
+> Having thought about this some more: I don't think spinning like this is safe.
+> We need to spin with the MMU turned off, otherwise this core will pollute the
+> kdump kernel with TLB entries from the old page tables.
 
-this could be because the fixes have been not applied on net-next
-I will check and resend all asap
+I think that wfi() will never wake up since local interrupts are disabled
+here. So how can it pollute the kdump kernel?
 
-peppe
+> Suzuki added code to
+> catch this happening with cpu hotplug (grep CPU_STUCK_IN_KERNEL in
+> arm64/for-next/core), but that won't help here. If 'CPU_STUCK_IN_KERNEL' was set
+> by a core, I don't think we can kexec/kdump for this reason.
 
->
-> Dinh
->
+I will need to look into Suzuki's code.
+
+> Something like cpu_die() for spin-table is needed, naively I think it should
+> turn the MMU off, and jump back into the secondary_holding_pen, but the core
+> would still be stuck in the kernel, and the memory addresses associated with
+> secondary_holding_pen can't be re-used. (which is fine for kdump, but not kexec)
+
+Please note that the code is exercised only in kdump case
+through machine_crash_shutdown().
+
+Thanks,
+-Takahiro AKASHI
+
+> 
+> Thanks,
+> 
+> James
+> 
