@@ -1,70 +1,111 @@
-From: glider@google.com (Alexander Potapenko)
-Date: Thu, 31 Mar 2016 16:02:47 +0200
-Subject: [PATCH v1] arm64: allow building with kcov coverage on ARM64
-In-Reply-To: <57cb1b66d85b85eadea28ef3304a62b1327ded45.1459432254.git.glider@google.com>
-References: <57cb1b66d85b85eadea28ef3304a62b1327ded45.1459432254.git.glider@google.com>
-Message-ID: <CAG_fn=Vxjki4B=Z9jFtORgmnao081yE03mR1b2OQC0igrA7cdg@mail.gmail.com>
+From: blogic@openwrt.org (John Crispin)
+Date: Thu, 31 Mar 2016 16:07:20 +0200
+Subject: [PATCH] mfd: mt6397: irq domain should initialize before
+ mfd_add_devices()
+In-Reply-To: <1459431711.395.6.camel@mtksdaap41>
+References: <1459322708-21363-1-git-send-email-henryc.chen@mediatek.com>
+ <56FB99DB.6010901@openwrt.org> <1459388452.18284.2.camel@mtksdaap41>
+ <1459391533.21870.15.camel@mtksdaap41> <56FCE910.8030100@openwrt.org>
+ <1459431711.395.6.camel@mtksdaap41>
+Message-ID: <56FD2F18.4050508@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 31, 2016 at 3:54 PM, Alexander Potapenko <glider@google.com> wrote:
-> Add ARCH_HAS_KCOV to ARM64 config. Disable instrumentation of
-> arch/arm64/lib/delay.c
->
-> Signed-off-by: Alexander Potapenko <glider@google.com>
-> ---
->  arch/arm64/Kconfig      | 1 +
->  arch/arm64/lib/Makefile | 3 +++
->  2 files changed, 4 insertions(+)
->
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 4f43622..c52aa61 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -7,6 +7,7 @@ config ARM64
->         select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
->         select ARCH_HAS_ELF_RANDOMIZE
->         select ARCH_HAS_GCOV_PROFILE_ALL
-> +       select ARCH_HAS_KCOV
->         select ARCH_HAS_SG_CHAIN
->         select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
->         select ARCH_USE_CMPXCHG_LOCKREF
-> diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
-> index c86b790..b407bc1 100644
-> --- a/arch/arm64/lib/Makefile
-> +++ b/arch/arm64/lib/Makefile
-> @@ -1,3 +1,6 @@
-> +# Produces uninteresting flaky coverage.
-> +KCOV_INSTRUMENT_delay.o        := n
-> +
->  lib-y          := bitops.o clear_user.o delay.o copy_from_user.o       \
->                    copy_to_user.o copy_in_user.o copy_page.o            \
->                    clear_page.o memchr.o memcpy.o memmove.o memset.o    \
-> --
-> 2.8.0.rc3.226.g39d4020
->
 
-Hi all,
 
-I've ported the above patch from kernel 3.18, which I was able to
-successfully run with kcov support on an arm64 device.
-The original 3.18 patch is at
-https://chromium-review.googlesource.com/#/c/334560/1, it also touches
-arch/arm64/kernel/Makefile, which is unnecessary in upstream code,
-because efi-stub.c has been moved to libstub.
-Therefore I suspect the above patch should be correct, but I don't
-have an opportunity to actually test it.
+On 31/03/2016 15:41, Yingjoe Chen wrote:
+> On Thu, 2016-03-31 at 11:08 +0200, John Crispin wrote:
+>>
+>> On 31/03/2016 04:32, Yingjoe Chen wrote:
+>>> On Thu, 2016-03-31 at 09:40 +0800, Henry Chen wrote:
+>>>> On Wed, 2016-03-30 at 11:18 +0200, John Crispin wrote:
+>>>>> Hi,
+>>>>>
+>>>>> small nitpick inline
+>>>>>
+>>>>> On 30/03/2016 09:25, Henry Chen wrote:
+>>>>>> Some sub driver like RTC module need irq domain from parent to create
+>>>>>> irq mapping when driver initialize. so move mt6397_irq_init() before
+>>>>>> mfd_add_devices().
+>>>>>>
+>>>>>> Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
+>>>>>> ---
+>>>>>> This patch fixed the below warning based on "Linux kernel v4.6-rc1"
+>>>>>> WARNING: CPU: 1 PID: 132 at kernel/mediatek/kernel/irq/irqdomain.c:471
+>>>>>> irq_create_mapping+0xc4/0xd0
+>>>>>> ---
+>>>>>>  drivers/mfd/mt6397-core.c | 37 ++++++++++++++++++++++---------------
+>>>>>>  1 file changed, 22 insertions(+), 15 deletions(-)
+>>>>>>
+>>>>>> diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
+>>>>>> index 8e8d932..a879223 100644
+>>>>>> --- a/drivers/mfd/mt6397-core.c
+>>>>>> +++ b/drivers/mfd/mt6397-core.c
+>>>>>> @@ -270,22 +270,36 @@ static int mt6397_probe(struct platform_device *pdev)
+>>>>>>  		goto fail_irq;
+>>>>>>  	}
+>>>>>>  
+>>>>>> +	pmic->irq = platform_get_irq(pdev, 0);
+>>>>>> +
+>>>>>>  	switch (id & 0xff) {
+>>>>>>  	case MT6323_CID_CODE:
+>>>>>> -		pmic->int_con[0] = MT6323_INT_CON0;
+>>>>>> -		pmic->int_con[1] = MT6323_INT_CON1;
+>>>>>> -		pmic->int_status[0] = MT6323_INT_STATUS0;
+>>>>>> -		pmic->int_status[1] = MT6323_INT_STATUS1;
+>>>>>> +		if (pmic->irq > 0) {
+>>>>>
+>>>>> should this not be
+>>>>>
+>>>>> 		if (pmic->irq >= 0) {
+>>>>>
+>>>>> i think the code before your patch was wrong as linux irqs start with 0.
+>>>>>
+>>>>> 	John
+>>>> Hi John,
+>>>>
+>>>> Thanks, I will modify this.
+>>>
+>>> Linux irq start from 1, 0 is invalid. I can't find the document saying
+>>> this now, but you could see this from irq_create_mapping() in
+>>> kernel/irq/irqdomain.c
+>>>
+>>> I think the code should have check return from platform_get_irq and
+>>> handle -EPROBE_DEFER, but maybe it should be another patch?
+>>>
+>>> BTW, in this function, it is possible that pmic->irq_domain will be NULL
+>>> in fail_irq error handling. We should check before calling
+>>> irq_domain_remove.
+>>>
+>>> Joe.C
+>>>
+>>
+>> Hi,
+>>
+>> looking at
+>> http://lxr.free-electrons.com/source/drivers/base/platform.c#L87 there
+>> is a check in line #100 ret >= 0
+>>
+>> checking the return value of pmic->irq = platform_get_irq(pdev, 0);
+>> should follow the same pattern i think .. unless i have a thinko and am
+>> reading the code wrong.
+> 
+> 
+> I'm not sure why platform_get_irq() check for 0, but I think the code
+> logic is differnet.
+> 
+> When platform_get_irq() return 0 to our code, it means we don't have
+> valid irq to use. In this case it doesn't make any sense to continue
+> init irq.
+> 
+> 
+> Joe.C
+> 
 
-Alex
 
--- 
-Alexander Potapenko
-Software Engineer
+--> http://lwn.net/Articles/470820/
 
-Google Germany GmbH
-Erika-Mann-Stra?e, 33
-80636 M?nchen
+indeed ARM has changed this is seems. was not aware of this change,
+sorry for the noise
 
-Gesch?ftsf?hrer: Matthew Scott Sucherman, Paul Terence Manicle
-Registergericht und -nummer: Hamburg, HRB 86891
-Sitz der Gesellschaft: Hamburg
+	John
