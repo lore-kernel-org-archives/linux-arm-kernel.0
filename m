@@ -1,44 +1,38 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Thu, 31 Mar 2016 13:09:39 -0700
-Subject: [PATCH v2] Documentation: devicetree: Clean up gpio-keys example
-In-Reply-To: <F1BB73D3-C592-4476-91A9-0529B51C2156@gmail.com>
-References: <1458129209-15449-1-git-send-email-afaerber@suse.de>
- <CABxcv=kSax5=5mOWT7ktavFQHvdp=sxZNcJaqc=nRQN-DejnVA@mail.gmail.com>
- <F1BB73D3-C592-4476-91A9-0529B51C2156@gmail.com>
-Message-ID: <20160331200939.GM39098@dtor-ws>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 31 Mar 2016 23:25:38 +0300
+Subject: [PATCH v2 3/3] ARM: dts: apq8064: add ahci ports-implemented mask
+In-Reply-To: <1459445500-9071-4-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1459445500-9071-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1459445500-9071-4-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <56FD87C2.3020503@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 16, 2016 at 10:55:53PM +0100, Julien Chauveau wrote:
-> 
-> > Le 16 mars 2016 ? 15:47, Javier Martinez Canillas <javier@dowhile0.org> a ?crit :
-> > 
-> > Hello Andreas,
-> > 
-> > On Wed, Mar 16, 2016 at 8:53 AM, Andreas F?rber <afaerber@suse.de> wrote:
-> >> Drop #address-cells and #size-cells, which are not required by the
-> >> gpio-keys binding documentation, as button sub-nodes are not devices.
-> >> 
-> >> Rename sub-nodes to avoid new dtc unit address warnings when copied.
-> >> 
-> >> While at it, adopt the dashes convention for the node name.
-> >> 
-> >> Reported-by: Julien Chauveau <chauveau.julien@gmail.com>
-> >> Cc: Julien Chauveau <chauveau.julien@gmail.com>
-> >> Cc: Javier Martinez Canillas <javier@dowhile0.org>
-> >> Cc: Geert Uytterhoeven <geert@linux-m68k.org>
-> >> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> >> ---
-> > 
-> > Patch looks good to me.
-> > 
-> > Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> 
-> I agree.
-> 
-> Reviewed-by: Julien Chauveau <chauveau.julien@gmail.com>
+On 03/31/2016 08:31 PM, Srinivas Kandagatla wrote:
 
-Applied, thank you.
+> This patch adds new ports-implemented mask, which is required to get
+> achi working on the mainline. Without this patch value read from
+> PORTS_IMPL register which is zero would not enable any ports for
+> software to use.
+>
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> ---
+>   arch/arm/boot/dts/qcom-apq8064.dtsi | 3 ++-
+>   1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+> index 252b310..71d6fcb 100644
+> --- a/arch/arm/boot/dts/qcom-apq8064.dtsi
+> +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+> @@ -696,7 +696,7 @@
+>   		};
+>
+>   		sata0: sata at 29000000 {
+> -			compatible		= "generic-ahci";
+> +			compatible		= "generic-ahci", "qcom,apq8064-ahci";
 
--- 
-Dmitry
+    The order of values should be reverse, no?
+
+[...]
+
+MBR, Sergei
