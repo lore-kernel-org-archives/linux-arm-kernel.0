@@ -1,61 +1,85 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 31 Mar 2016 11:48:00 +0900
-Subject: [PATCH v4 4/9] clk: samsung: exynos3250: Add MMC2 clock
-In-Reply-To: <1459392485-11327-1-git-send-email-cw00.choi@samsung.com>
-References: <1459392485-11327-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1459392485-11327-5-git-send-email-cw00.choi@samsung.com>
+Date: Thu, 31 Mar 2016 11:47:56 +0900
+Subject: [PATCH v4 0/9] ARM: dts: Add new Exynos3250-based ARTIK5 module dtsi
+ file
+Message-ID: <1459392485-11327-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the MMC2 clocks (mux, divider, gate) of Exynos3250 SoC.
+This patchset add the support for Device Tree source for Samsung ARTIK5 module[1]
+based on Exynos3250 SoC and development board[2]. The ARTIK5 module includes
+the follwoing devices:
+- Application Processor (Samsung Exynos3250)
+- WiFi/BT Combo chip
+- PMIC (Samsung S2MPS14)
+- eMMC (4GB)
+- DRAM LPDDR3 (512MB)
+- Connectors pin (60 Pins x 3 set)
 
-Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Cc: Tomasz Figa <tomasz.figa@gmail.com>
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
----
- drivers/clk/samsung/clk-exynos3250.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+Also, this patchset add the ARTIK5 development board[2] dts file which includes
+the ARTIK5 module[1] and have the devices such as sound codec, sd card port,
+ethernet port, uart port and so on.
 
-diff --git a/drivers/clk/samsung/clk-exynos3250.c b/drivers/clk/samsung/clk-exynos3250.c
-index bc60e399d1bc..16575ee874cb 100644
---- a/drivers/clk/samsung/clk-exynos3250.c
-+++ b/drivers/clk/samsung/clk-exynos3250.c
-@@ -302,6 +302,7 @@ static struct samsung_mux_clock mux_clks[] __initdata = {
- 
- 	/* SRC_FSYS */
- 	MUX(CLK_MOUT_TSADC, "mout_tsadc", group_sclk_p, SRC_FSYS, 28, 4),
-+	MUX(CLK_MOUT_MMC2, "mout_mmc2", group_sclk_p, SRC_FSYS, 8, 4),
- 	MUX(CLK_MOUT_MMC1, "mout_mmc1", group_sclk_p, SRC_FSYS, 4, 4),
- 	MUX(CLK_MOUT_MMC0, "mout_mmc0", group_sclk_p, SRC_FSYS, 0, 4),
- 
-@@ -390,6 +391,11 @@ static struct samsung_div_clock div_clks[] __initdata = {
- 		CLK_SET_RATE_PARENT, 0),
- 	DIV(CLK_DIV_MMC0, "div_mmc0", "mout_mmc0", DIV_FSYS1, 0, 4),
- 
-+	/* DIV_FSYS2 */
-+	DIV_F(CLK_DIV_MMC2_PRE, "div_mmc2_pre", "div_mmc2", DIV_FSYS2, 8, 8,
-+		CLK_SET_RATE_PARENT, 0),
-+	DIV(CLK_DIV_MMC2, "div_mmc2", "mout_mmc2", DIV_FSYS2, 0, 4),
-+
- 	/* DIV_PERIL0 */
- 	DIV(CLK_DIV_UART2, "div_uart2", "mout_uart2", DIV_PERIL0, 8, 4),
- 	DIV(CLK_DIV_UART1, "div_uart1", "mout_uart1", DIV_PERIL0, 4, 4),
-@@ -540,6 +546,8 @@ static struct samsung_gate_clock gate_clks[] __initdata = {
- 		GATE_SCLK_FSYS, 9, CLK_SET_RATE_PARENT, 0),
- 	GATE(CLK_SCLK_EBI, "sclk_ebi", "div_ebi",
- 		GATE_SCLK_FSYS, 6, CLK_SET_RATE_PARENT, 0),
-+	GATE(CLK_SCLK_MMC2, "sclk_mmc2", "div_mmc2_pre",
-+		GATE_SCLK_FSYS, 2, CLK_SET_RATE_PARENT, 0),
- 	GATE(CLK_SCLK_MMC1, "sclk_mmc1", "div_mmc1_pre",
- 		GATE_SCLK_FSYS, 1, CLK_SET_RATE_PARENT, 0),
- 	GATE(CLK_SCLK_MMC0, "sclk_mmc0", "div_mmc0_pre",
-@@ -635,6 +643,7 @@ static struct samsung_gate_clock gate_clks[] __initdata = {
- 	GATE(CLK_USBOTG, "usbotg", "div_aclk_200", GATE_IP_FSYS, 13, 0, 0),
- 	GATE(CLK_USBHOST, "usbhost", "div_aclk_200", GATE_IP_FSYS, 12, 0, 0),
- 	GATE(CLK_SROMC, "sromc", "div_aclk_200", GATE_IP_FSYS, 11, 0, 0),
-+	GATE(CLK_SDMMC2, "sdmmc2", "div_aclk_200", GATE_IP_FSYS, 7, 0, 0),
- 	GATE(CLK_SDMMC1, "sdmmc1", "div_aclk_200", GATE_IP_FSYS, 6, 0, 0),
- 	GATE(CLK_SDMMC0, "sdmmc0", "div_aclk_200", GATE_IP_FSYS, 5, 0, 0),
- 	GATE(CLK_PDMA1, "pdma1", "div_aclk_200", GATE_IP_FSYS, 1, 0, 0),
+[1] https://www.artik.io/hardware/artik-5
+[2] http://www.digikey.com/product-detail/en/SIP-KITNXB001/1510-1316-ND/5825102
+
+Changes from v3:
+(https://lkml.org/lkml/2016/3/15/71)
+- Add acked-by tag from Rob Herring <robh@kernel.org> (patch8)
+- Fix typo on patch descritpion (patch8)
+- Make the separate patch for including the new clock id
+  for both MMC2 and UART2 device (patch2)
+
+Changes from v2:
+(https://lkml.org/lkml/2016/3/14/910)
+- Add reviewed tag by Krzysztof Kozlowski for all patches
+- Include the separate patch1[3] in patchset because patch5 depend on patch1[3]
+  [3] https://lkml.org/lkml/2016/3/14/245
+- Fix the order issue in exynos3250-artik5.dtsi
+- Use lowercase for hex address in exynos3250-artik5.dtsi
+
+Changes from v1:
+(https://lkml.org/lkml/2016/3/13/215)
+- Change the board name from 'artik5-devel' to 'artik5-eval'
+- Merge the patch6/7/8 to patch5
+- Add the new board information to samsung-boards.txt[1]
+  [1] Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
+- Fix minor coding style issue and remove 'wakeup' property
+- Remove 'broken-cd' and 'desc-num' property from mshc_0 node
+- Handle the LDO11/LDO12 by using XMMC0CDn pin (GPK0-2 gpio) for MMC device
+  and fix the ldo number of 'vmmc-supply' property.
+- Add the 'vqmmc-supply' property for MSHC2
+- Drop the patch10 for PPMU node
+- Add the new patch to initialize the MMC2 gpio pin on monk board
+
+Chanwoo Choi (6):
+  ARM: dts: Add initial pin configuration for exynos3250-rinato
+  dt-bindings: Add the clock id of UART2 and MMC2 for Exynos3250
+  clk: samsung: exynos3250: Add MMC2 clock
+  ARM: dts: Add initial gpio setting of MMC2 device for exynos3250-monk
+  ARM: dts: Add MSHC2 dt node for Exynos3250 SoC
+  ARM: dts: Add exynos3250-artik5 dtsi file for ARTIK5 module
+
+Jaehoon Chung (1):
+  ARM: dts: Add MSHC2 dt node for SD card for exynos3250-artik5-eval board
+
+Pankaj Dubey (2):
+  clk: samsung: exynos3250: Add UART2 clock
+  ARM: dts: Add UART2 dt node for Exynos3250 SoC
+
+ .../bindings/arm/samsung/samsung-boards.txt        |   2 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/exynos3250-artik5-eval.dts       |  43 +++
+ arch/arm/boot/dts/exynos3250-artik5.dtsi           | 334 +++++++++++++++++++++
+ arch/arm/boot/dts/exynos3250-monk.dts              |  12 +-
+ arch/arm/boot/dts/exynos3250-pinctrl.dtsi          |  80 +++++
+ arch/arm/boot/dts/exynos3250-rinato.dts            |  71 ++++-
+ arch/arm/boot/dts/exynos3250.dtsi                  |  25 ++
+ drivers/clk/samsung/clk-exynos3250.c               |  15 +
+ include/dt-bindings/clock/exynos3250.h             |  11 +-
+ 10 files changed, 590 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm/boot/dts/exynos3250-artik5-eval.dts
+ create mode 100644 arch/arm/boot/dts/exynos3250-artik5.dtsi
+
 -- 
 1.9.1
