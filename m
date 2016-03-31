@@ -1,214 +1,117 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 31 Mar 2016 11:05:48 +0100
-Subject: [RFC] [PATCH] arm64: survive after access to unimplemented
- register
-In-Reply-To: <1459391223-3826-1-git-send-email-ynorov@caviumnetworks.com>
-References: <1459391223-3826-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <20160331100547.GA26532@leverpostej>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 31 Mar 2016 12:07:27 +0200
+Subject: [RFC PATCH 19/45] KVM: arm/arm64: vgic-new: Add CONFIG registers
+ handlers
+In-Reply-To: <1458871508-17279-20-git-send-email-andre.przywara@arm.com>
+References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
+ <1458871508-17279-20-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160331100727.GY4126@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 31, 2016 at 05:27:03AM +0300, Yury Norov wrote:
-> Not all vendors implement all the system registers ARM specifies.
-
-The ID registers in question are precisely documented in the ARM ARM
-(see table C5-6 in ARM DDI 0487A.i). Specifically, the ID space
-ID_AA64MMFR2_EL1 now falls in to is listed as RAZ.
-
-Any deviation from this is an erratum, and needs to be handled as such
-(e.g. listing in silicon-errata.txt).
-
-Does the issue affect ThunderX natively?
-
-Or has this only been seen with QEMU (in TCG mode), where the bug has
-already been fixed?
-
-> So access them causes undefined instruction abort and then kernel
-> panic. There are 3 ways to handle it we can figure out:
->  - use conditional compilation and erratas;
->  - use kernel patching;
->  - inline fixups resolving the abort.
-> 
-> Last option is more robust as it does not require additional efforts
-> to support targers. It is looking reasonable because in many cases
-> optional registers should be RAZ if not implemented. Special cases may
-> be handled by underlying __read_cpuid() when needed.
-
-I don't think we should do this if the only affected implementations are
-software emulators which can be patched (and have already been, in the
-case of QEMU).
-
-In future it's very likely that early assembly code (potentially in
-hypervisor context) will need to access ID registers which are currently
-reserved/RAZ, and it will be rather painful to fix up accesses to this.
-
-Additionally, this workaround will silently mask other bugs in this area
-(e.g. if registers like ID_AA64MMFR0_EL1 were to trap for some reason on
-an implementation), which doesn't seem good.
-
-Thanks,
-Mark.
-
-> Tested on QEMU emulator version 2.3.0 (Debian 1:2.3+dfsg-5ubuntu9.2)
-> that does not implement SYS_ID_AA64MMFR2_EL1 register. (Fixed in new
-> releases),
-> 
-> Discussion: https://lkml.org/lkml/2016/3/29/931
-> 
-> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+On Fri, Mar 25, 2016 at 02:04:42AM +0000, Andre Przywara wrote:
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 > ---
->  arch/arm64/include/asm/cputype.h  | 17 +++++++++++++++--
->  arch/arm64/include/asm/exttable.h | 21 +++++++++++++++++++++
->  arch/arm64/include/asm/uaccess.h  | 15 ---------------
->  arch/arm64/kernel/entry.S         |  3 ++-
->  arch/arm64/kernel/traps.c         |  6 ++++++
->  arch/arm64/mm/extable.c           |  2 +-
->  6 files changed, 45 insertions(+), 19 deletions(-)
->  create mode 100644 arch/arm64/include/asm/exttable.h
+>  virt/kvm/arm/vgic/vgic_mmio.c | 63 ++++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 62 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
-> index 87e1985..9660130 100644
-> --- a/arch/arm64/include/asm/cputype.h
-> +++ b/arch/arm64/include/asm/cputype.h
-> @@ -90,13 +90,26 @@
->  #ifndef __ASSEMBLY__
+> diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
+> index bfc530c..76657ce 100644
+> --- a/virt/kvm/arm/vgic/vgic_mmio.c
+> +++ b/virt/kvm/arm/vgic/vgic_mmio.c
+> @@ -410,6 +410,67 @@ static int vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
+>  	return 0;
+>  }
 >  
->  #include <asm/sysreg.h>
-> +#include <asm/exttable.h>
->  
-> -#define read_cpuid(reg) ({						\
-> +#define __read_cpuid(reg, err) ({					\
->  	u64 __val;							\
-> -	asm("mrs_s	%0, " __stringify(SYS_ ## reg) : "=r" (__val));	\
-> +	asm (								\
-> +	"1:mrs_s	%0, " reg "\n"					\
-> +	"2:\n"								\
-> +	"	.section .fixup, \"ax\"\n"				\
-> +	"	.align	2\n"						\
-> +	"3:	mov	%w0, %1\n"					\
-> +	"	b	2b\n"						\
-> +	"	.previous\n"						\
-> +	_ASM_EXTABLE(1b, 3b)						\
-> +	: "=r" (__val)							\
-> +	: "i" (err));							\
->  	__val;								\
->  })
->  
-> +#define read_cpuid(reg) __read_cpuid(__stringify(SYS_ ## reg), 0)
-> +
->  /*
->   * The CPU ID never changes at run time, so we might as well tell the
->   * compiler that it's constant.  Use this function to read the CPU ID
-> diff --git a/arch/arm64/include/asm/exttable.h b/arch/arm64/include/asm/exttable.h
-> new file mode 100644
-> index 0000000..c0a66c8
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/exttable.h
-> @@ -0,0 +1,21 @@
-> +#ifndef __ASM_EXTTABLE_H
-> +#define __ASM_EXTTABLE_H
-> +
-> +#include <asm/ptrace.h>
-> +
-> +#define ARCH_HAS_RELATIVE_EXTABLE
-> +
-> +#define _ASM_EXTABLE(from, to)						\
-> +	"	.pushsection	__ex_table, \"a\"\n"			\
-> +	"	.align		3\n"					\
-> +	"	.long		(" #from " - .), (" #to " - .)\n"	\
-> +	"	.popsection\n"
-> +
-> +struct exception_table_entry
+> +static int vgic_mmio_read_config(struct kvm_vcpu *vcpu,
+> +				 struct kvm_io_device *this,
+> +				 gpa_t addr, int len, void *val)
 > +{
-> +	int insn, fixup;
-> +};
+> +	struct vgic_io_device *iodev = container_of(this,
+> +						    struct vgic_io_device, dev);
+> +	u32 intid = (addr - iodev->base_addr) * 4;
+> +	u32 value = 0;
+> +	int i;
 > +
-> +extern int fixup_exception(struct pt_regs *regs);
+> +	if (iodev->redist_vcpu)
+> +		vcpu = iodev->redist_vcpu;
 > +
-> +#endif /* __ASM_EXTTABLE_H */
-> diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-> index 0685d74..19cfdc5 100644
-> --- a/arch/arm64/include/asm/uaccess.h
-> +++ b/arch/arm64/include/asm/uaccess.h
-> @@ -48,15 +48,6 @@
->   * on our cache or tlb entries.
->   */
->  
-> -struct exception_table_entry
-> -{
-> -	int insn, fixup;
-> -};
-> -
-> -#define ARCH_HAS_RELATIVE_EXTABLE
-> -
-> -extern int fixup_exception(struct pt_regs *regs);
-> -
->  #define KERNEL_DS	(-1UL)
->  #define get_ds()	(KERNEL_DS)
->  
-> @@ -117,12 +108,6 @@ static inline void set_fs(mm_segment_t fs)
->  #define access_ok(type, addr, size)	__range_ok(addr, size)
->  #define user_addr_max			get_fs
->  
-> -#define _ASM_EXTABLE(from, to)						\
-> -	"	.pushsection	__ex_table, \"a\"\n"			\
-> -	"	.align		3\n"					\
-> -	"	.long		(" #from " - .), (" #to " - .)\n"	\
-> -	"	.popsection\n"
-> -
->  /*
->   * The "__xxx" versions of the user access functions do not verify the address
->   * space - it must have been done previously with a separate "access_ok()"
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 1f7a145..6b88096 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -377,7 +377,8 @@ el1_undef:
->  	 */
->  	enable_dbg
->  	mov	x0, sp
-> -	b	do_undefinstr
-> +	bl	do_undefinstr
-> +	kernel_exit 1
->  el1_dbg:
->  	/*
->  	 * Debug exception handling
-> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-> index cacd30a..515444a 100644
-> --- a/arch/arm64/kernel/traps.c
-> +++ b/arch/arm64/kernel/traps.c
-> @@ -386,6 +386,12 @@ asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
->  	if (call_undef_hook(regs) == 0)
->  		return;
->  
-> +	/*
-> +	 * Are we prepared to handle this kernel fault?
-> +	 */
-> +	if (fixup_exception(regs))
-> +		return;
+> +	for (i = 0; i < len * 4; i++) {
+> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
 > +
->  	if (unhandled_signal(current, SIGILL) && show_unhandled_signals_ratelimited()) {
->  		pr_info("%s[%d]: undefined instruction: pc=%p\n",
->  			current->comm, task_pid_nr(current), pc);
-> diff --git a/arch/arm64/mm/extable.c b/arch/arm64/mm/extable.c
-> index 81acd47..c140688 100644
-> --- a/arch/arm64/mm/extable.c
-> +++ b/arch/arm64/mm/extable.c
-> @@ -3,7 +3,7 @@
->   */
->  
->  #include <linux/module.h>
-> -#include <linux/uaccess.h>
-> +#include <asm/exttable.h>
->  
->  int fixup_exception(struct pt_regs *regs)
->  {
+> +		if (irq->config == VGIC_CONFIG_EDGE)
+> +			value |= (2U << (i * 2));
+> +	}
+> +
+> +	write_mask32(value, addr & 3, len, val);
+> +	return 0;
+> +}
+> +
+> +static int vgic_mmio_write_config(struct kvm_vcpu *vcpu,
+> +				  struct kvm_io_device *this,
+> +				  gpa_t addr, int len, const void *val)
+> +{
+> +	struct vgic_io_device *iodev = container_of(this,
+> +						    struct vgic_io_device, dev);
+> +	u32 intid = (addr - iodev->base_addr) * 4;
+> +	int i;
+> +
+> +	if (iodev->redist_vcpu)
+> +		vcpu = iodev->redist_vcpu;
+> +
+> +	for (i = 0; i < len * 4; i++) {
+> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+> +
+> +		if (intid + i < 16)
+> +			continue;
+> +
+> +		/*
+> +		 * The spec says that interrupts must be disabled before
+> +		 * changing the configuration to avoid UNDEFINED behaviour.
+> +		 * Is this sufficient in our case? Do we quickly enough remove
+> +		 * the IRQ from the ap_list to safely do the config change?
+
+I don't understand the question about 'quickly enough' here.
+
+> +		 * Will even a disabled interrupt in an ap_list cause us
+> +		 * headaches if we change the configuration?
+> +		 */
+
+I don't think there's any particular problem here, except for my
+comments below:
+
+(there may be some super weirdness if a VCPU is running with some bits
+of this IRQ in a LR while changing it, but I think we can ignore this
+case for now - or we can do like with the active state and force an
+exit).
+
+> +		spin_lock(&irq->irq_lock);
+> +		if (test_bit(i * 2 + 1, val))
+> +			irq->config = VGIC_CONFIG_EDGE;
+> +		else
+> +			irq->config = VGIC_CONFIG_LEVEL;
+
+I think here you have to sync pending to level | soft_pending, that's a
+rule we enforce for level triggered interrupts.
+
+> +		spin_unlock(&irq->irq_lock);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>  struct vgic_register_region vgic_v2_dist_registers[] = {
+>  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
+>  		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12),
+> @@ -432,7 +493,7 @@ struct vgic_register_region vgic_v2_dist_registers[] = {
+>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_TARGET,
+>  		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 8),
+>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_CONFIG,
+> -		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 8),
+> +		vgic_mmio_read_config, vgic_mmio_write_config, 2),
+>  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SOFTINT,
+>  		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 4),
+>  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SGI_PENDING_CLEAR,
 > -- 
-> 2.5.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 2.7.3
 > 
