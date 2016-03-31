@@ -1,197 +1,66 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Thu, 31 Mar 2016 19:23:30 +0800
-Subject: [PATCH v9 02/17] xen/grant-table: Move xlated_setup_gnttab_pages to
- common place
+Date: Thu, 31 Mar 2016 19:23:36 +0800
+Subject: [PATCH v9 08/17] Xen: public/hvm: sync changes of
+ HVM_PARAM_CALLBACK_VIA ABI from Xen
 In-Reply-To: <1459423425-1220-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1459423425-1220-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1459423425-1220-3-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1459423425-1220-9-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Move xlated_setup_gnttab_pages to common place, so it can be reused by
-ARM to setup grant table.
-
-Rename it to xen_xlate_map_ballooned_pages.
+Sync the changes of HVM_PARAM_CALLBACK_VIA ABI introduced by
+Xen commit <ca5c54b6ff05> (public/hvm: export the HVM_PARAM_CALLBACK_VIA
+ABI in the API).
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- arch/x86/xen/grant-table.c | 57 +++++--------------------------------------
- drivers/xen/xlate_mmu.c    | 61 ++++++++++++++++++++++++++++++++++++++++++++++
- include/xen/xen-ops.h      |  2 ++
- 3 files changed, 69 insertions(+), 51 deletions(-)
+ include/xen/interface/hvm/params.h | 27 +++++++++++++++++++++------
+ 1 file changed, 21 insertions(+), 6 deletions(-)
 
-diff --git a/arch/x86/xen/grant-table.c b/arch/x86/xen/grant-table.c
-index e079500..de4144c 100644
---- a/arch/x86/xen/grant-table.c
-+++ b/arch/x86/xen/grant-table.c
-@@ -111,63 +111,18 @@ int arch_gnttab_init(unsigned long nr_shared)
- }
- 
- #ifdef CONFIG_XEN_PVH
--#include <xen/balloon.h>
- #include <xen/events.h>
--#include <linux/slab.h>
--static int __init xlated_setup_gnttab_pages(void)
--{
--	struct page **pages;
--	xen_pfn_t *pfns;
--	void *vaddr;
--	int rc;
--	unsigned int i;
--	unsigned long nr_grant_frames = gnttab_max_grant_frames();
--
--	BUG_ON(nr_grant_frames == 0);
--	pages = kcalloc(nr_grant_frames, sizeof(pages[0]), GFP_KERNEL);
--	if (!pages)
--		return -ENOMEM;
--
--	pfns = kcalloc(nr_grant_frames, sizeof(pfns[0]), GFP_KERNEL);
--	if (!pfns) {
--		kfree(pages);
--		return -ENOMEM;
--	}
--	rc = alloc_xenballooned_pages(nr_grant_frames, pages);
--	if (rc) {
--		pr_warn("%s Couldn't balloon alloc %ld pfns rc:%d\n", __func__,
--			nr_grant_frames, rc);
--		kfree(pages);
--		kfree(pfns);
--		return rc;
--	}
--	for (i = 0; i < nr_grant_frames; i++)
--		pfns[i] = page_to_pfn(pages[i]);
--
--	vaddr = vmap(pages, nr_grant_frames, 0, PAGE_KERNEL);
--	if (!vaddr) {
--		pr_warn("%s Couldn't map %ld pfns rc:%d\n", __func__,
--			nr_grant_frames, rc);
--		free_xenballooned_pages(nr_grant_frames, pages);
--		kfree(pages);
--		kfree(pfns);
--		return -ENOMEM;
--	}
--	kfree(pages);
--
--	xen_auto_xlat_grant_frames.pfn = pfns;
--	xen_auto_xlat_grant_frames.count = nr_grant_frames;
--	xen_auto_xlat_grant_frames.vaddr = vaddr;
--
--	return 0;
--}
--
-+#include <xen/xen-ops.h>
- static int __init xen_pvh_gnttab_setup(void)
- {
- 	if (!xen_pvh_domain())
- 		return -ENODEV;
- 
--	return xlated_setup_gnttab_pages();
-+	xen_auto_xlat_grant_frames.count = gnttab_max_grant_frames();
-+
-+	return xen_xlate_map_ballooned_pages(&xen_auto_xlat_grant_frames.pfn,
-+					     &xen_auto_xlat_grant_frames.vaddr,
-+					     xen_auto_xlat_grant_frames.count);
- }
- /* Call it _before_ __gnttab_init as we need to initialize the
-  * xen_auto_xlat_grant_frames first. */
-diff --git a/drivers/xen/xlate_mmu.c b/drivers/xen/xlate_mmu.c
-index 5063c5e..9692656 100644
---- a/drivers/xen/xlate_mmu.c
-+++ b/drivers/xen/xlate_mmu.c
-@@ -29,6 +29,8 @@
+diff --git a/include/xen/interface/hvm/params.h b/include/xen/interface/hvm/params.h
+index a6c7991..70ad208 100644
+--- a/include/xen/interface/hvm/params.h
++++ b/include/xen/interface/hvm/params.h
+@@ -27,16 +27,31 @@
+  * Parameter space for HVMOP_{set,get}_param.
   */
- #include <linux/kernel.h>
- #include <linux/mm.h>
-+#include <linux/slab.h>
-+#include <linux/vmalloc.h>
  
- #include <asm/xen/hypercall.h>
- #include <asm/xen/hypervisor.h>
-@@ -37,6 +39,7 @@
- #include <xen/page.h>
- #include <xen/interface/xen.h>
- #include <xen/interface/memory.h>
-+#include <xen/balloon.h>
- 
- typedef void (*xen_gfn_fn_t)(unsigned long gfn, void *data);
- 
-@@ -185,3 +188,61 @@ int xen_xlate_unmap_gfn_range(struct vm_area_struct *vma,
- 	return 0;
- }
- EXPORT_SYMBOL_GPL(xen_xlate_unmap_gfn_range);
-+
-+/**
-+ * xen_xlate_map_ballooned_pages - map a new set of ballooned pages
-+ * @gfns: returns the array of corresponding GFNs
-+ * @virt: returns the virtual address of the mapped region
-+ * @nr_grant_frames: number of GFNs
-+ * @return 0 on success, error otherwise
++#define HVM_PARAM_CALLBACK_IRQ 0
+ /*
+  * How should CPU0 event-channel notifications be delivered?
+- * val[63:56] == 0: val[55:0] is a delivery GSI (Global System Interrupt).
+- * val[63:56] == 1: val[55:0] is a delivery PCI INTx line, as follows:
+- *                  Domain = val[47:32], Bus  = val[31:16],
+- *                  DevFn  = val[15: 8], IntX = val[ 1: 0]
+- * val[63:56] == 2: val[7:0] is a vector number.
 + *
-+ * This allocates a set of ballooned pages and maps them into the
-+ * kernel's address space.
+  * If val == 0 then CPU0 event-channel notifications are not delivered.
++ * If val != 0, val[63:56] encodes the type, as follows:
 + */
-+int __init xen_xlate_map_ballooned_pages(xen_pfn_t **gfns, void **virt,
-+					 unsigned long nr_grant_frames)
-+{
-+	struct page **pages;
-+	xen_pfn_t *pfns;
-+	void *vaddr;
-+	int rc;
-+	unsigned int i;
 +
-+	BUG_ON(nr_grant_frames == 0);
-+	pages = kcalloc(nr_grant_frames, sizeof(pages[0]), GFP_KERNEL);
-+	if (!pages)
-+		return -ENOMEM;
++#define HVM_PARAM_CALLBACK_TYPE_GSI      0
++/*
++ * val[55:0] is a delivery GSI.  GSI 0 cannot be used, as it aliases val == 0,
++ * and disables all notifications.
++ */
 +
-+	pfns = kcalloc(nr_grant_frames, sizeof(pfns[0]), GFP_KERNEL);
-+	if (!pfns) {
-+		kfree(pages);
-+		return -ENOMEM;
-+	}
-+	rc = alloc_xenballooned_pages(nr_grant_frames, pages);
-+	if (rc) {
-+		pr_warn("%s Couldn't balloon alloc %ld pfns rc:%d\n", __func__,
-+			nr_grant_frames, rc);
-+		kfree(pages);
-+		kfree(pfns);
-+		return rc;
-+	}
-+	for (i = 0; i < nr_grant_frames; i++)
-+		pfns[i] = page_to_pfn(pages[i]);
++#define HVM_PARAM_CALLBACK_TYPE_PCI_INTX 1
++/*
++ * val[55:0] is a delivery PCI INTx line:
++ * Domain = val[47:32], Bus = val[31:16] DevFn = val[15:8], IntX = val[1:0]
++ */
 +
-+	vaddr = vmap(pages, nr_grant_frames, 0, PAGE_KERNEL);
-+	if (!vaddr) {
-+		pr_warn("%s Couldn't map %ld pfns rc:%d\n", __func__,
-+			nr_grant_frames, rc);
-+		free_xenballooned_pages(nr_grant_frames, pages);
-+		kfree(pages);
-+		kfree(pfns);
-+		return -ENOMEM;
-+	}
-+	kfree(pages);
-+
-+	*gfns = pfns;
-+	*virt = vaddr;
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(xen_xlate_map_ballooned_pages);
-diff --git a/include/xen/xen-ops.h b/include/xen/xen-ops.h
-index 86abe07..072be1c 100644
---- a/include/xen/xen-ops.h
-+++ b/include/xen/xen-ops.h
-@@ -85,6 +85,8 @@ int xen_xlate_remap_gfn_array(struct vm_area_struct *vma,
- 			      struct page **pages);
- int xen_xlate_unmap_gfn_range(struct vm_area_struct *vma,
- 			      int nr, struct page **pages);
-+int xen_xlate_map_ballooned_pages(xen_pfn_t **pfns, void **vaddr,
-+				  unsigned long nr_grant_frames);
++#define HVM_PARAM_CALLBACK_TYPE_VECTOR   2
++/*
++ * val[7:0] is a vector number.  Check for XENFEAT_hvm_callback_vector to know
++ * if this delivery method is available.
+  */
+-#define HVM_PARAM_CALLBACK_IRQ 0
  
- bool xen_running_on_version_or_later(unsigned int major, unsigned int minor);
- 
+ #define HVM_PARAM_STORE_PFN    1
+ #define HVM_PARAM_STORE_EVTCHN 2
 -- 
 2.0.4
