@@ -1,68 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 31 Mar 2016 18:34:20 +0100
-Subject: [PATCH 11/13] dtb: amd: Add PCIe SMMU device tree node
-In-Reply-To: <56FCD43A.4090409@linaro.org>
-References: <1453929121-12171-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <20160128111453.GG17123@leverpostej> <56AA07AA.7050701@arm.com>
- <6645680.g0j8d12m6d@wuerfel> <20160128142751.GA775@arm.com>
- <56FBF2B7.8090601@linaro.org> <20160330154538.GA10224@arm.com>
- <56FBF754.7020804@linaro.org> <20160330172412.GB10224@arm.com>
- <56FCD43A.4090409@linaro.org>
-Message-ID: <20160331173419.GD17933@arm.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Thu, 31 Mar 2016 13:34:07 -0400
+Subject: [PATCH v2 2/3] ata: ahci-platform: Add ports-implemented DT
+ bindings.
+In-Reply-To: <1459445500-9071-3-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1459445500-9071-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1459445500-9071-3-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20160331173407.GE24661@htj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 31, 2016 at 09:39:38AM +0200, Eric Auger wrote:
-> On 03/30/2016 07:24 PM, Will Deacon wrote:
-> > On Wed, Mar 30, 2016 at 05:57:08PM +0200, Eric Auger wrote:
-> >> On 03/30/2016 05:45 PM, Will Deacon wrote:
-> >>> On Wed, Mar 30, 2016 at 05:37:27PM +0200, Eric Auger wrote:
-> >>>> On 01/28/2016 03:27 PM, Will Deacon wrote:
-> >>>>> On Thu, Jan 28, 2016 at 03:17:33PM +0100, Arnd Bergmann wrote:
-> >>>>>> On Thursday 28 January 2016 12:20:58 Robin Murphy wrote:
-> >>>>>>>>
-> >>>>>>> Any IDs specified here would only apply to DMA by the "platform device" 
-> >>>>>>> side of the host controller itself (as would an equivalent "iommus" 
-> >>>>>>> property on pcie0 once I finish the SMMUv2 generic binding support I'm 
-> >>>>>>> working on). In terms of PCI devices, the "mmu-masters" property is 
-> >>>>>>> overloaded such that only its existence matters, to identify that there 
-> >>>>>>> _is_ a relationship between the SMMU and the PCI bus(es) behind that 
-> >>>>>>> host controller.
-> >>>>>>
-> >>>>>> I wasn't aware that this was actually still specified. I had hoped
-> >>>>>> we were getting rid of mmu-masters before anyone actually started
-> >>>>>> using it, but now I see it in ns2.dtsi and fsl-ls2080a.dtsi.
-> >>>>>>
-> >>>>>> Does anyone know what happened to the plan to use the iommu DT binding
-> >>>>>> for the ARM SMMU instead? Do we now have to support both ways indefinitely?
-> >>>>>
-> >>>>> We always did -- Seattle used the mmu-masters binding before the generic
-> >>>>> binding even existed. Robin has been working on patches to get of_xlate
-> >>>>> up and running, but it got held up by Laurent's series which didn't end
-> >>>>> up going anywhere.
-> >>>>>
-> >>>> Up to now I have used the PCI smmu description as described in Suravee's
-> >>>> patch and this does not work anymore with 4.6-rc1 since the default
-> >>>> domain was introduced. So now I see 2 SMRs matching a single streamid
-> >>>> (in my case 256, one steming from the "platform device" side of the host
-> >>>> controller and one steming from the PCI device) and this causes SMCF
-> >>>> (stream match conflict fault). So PCIe PF does not work.
-> >>>
-> >>> Sorry about that, it wasn't intentional. In fact, I wrote commit
-> >>> cbf8277ef456 ("iommu/arm-smmu: Treat IOMMU_DOMAIN_DMA as bypass for now")
-> >>> specifically to avoid this breakage, after seeing it myself with VFIO
-> >>> and an S2CR-based configuration. It looks like the check just needs moving
-> >>> higher up (i.e. before we initialise the SMRs).
-> >>>
-> >>> Does that fix it for you?
-> >> Yes this fixes the issue for me, thanks! I guess you will send that patch?
-> > 
-> > I need to check that it doesn't break rebinding to the host after VFIO
-> > has been used for passthrough, first.
+On Thu, Mar 31, 2016 at 06:31:39PM +0100, Srinivas Kandagatla wrote:
+> On some SOCs PORTS_IMPL register value is never programmed by the
+> firmware and left at zero value. Which means that no sata ports are
+> available for software. AHCI driver used to cope up with this by
+> fabricating the port_map if the PORTS_IMPL register is read zero,
+> but recent patch broke this workaround as zero value was valid for
+> NVMe disks.
 > 
-> OK. I can help testing too since I am currently working on PCIe
-> passthrough respin.
+> This patch adds ports-implemented DT bindings as workaround for this issue
+> in a way that DT can can override the PORTS_IMPL register in cases where
+> the firmware did not program it already.
+> 
+> Fixes: 566d1827df2e ("libata: disable forced PORTS_IMPL for >= AHCI 1.3)
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
-Thanks, that would be really helpful if you have the time.
+For 1 and 2,
 
-Will
+Acked-by: Tejun Heo <tj@kernel.org>
+
+I can route all three through libata/for-4.6-fixes once the platform
+side is acked.  If it's better to route these through the platform
+tree, please feel free to do so.
+
+Thanks.
+
+-- 
+tejun
