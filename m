@@ -1,29 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 31 Mar 2016 17:53:01 +0100
-Subject: [PATCH 2/2] ARM: delete "*Image is ready" log
-In-Reply-To: <1459442582-23121-2-git-send-email-yamada.masahiro@socionext.com>
-References: <1459442582-23121-1-git-send-email-yamada.masahiro@socionext.com>
- <1459442582-23121-2-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20160331165301.GM19428@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 31 Mar 2016 10:00:18 -0700
+Subject: [PATCH v2] ARM: dts: dra7: Correct clock tree for sys_32k_ck
+In-Reply-To: <56FCEC61.5020400@ti.com>
+References: <1457957001-720-1-git-send-email-j-keerthy@ti.com>
+ <20160330211828.GE9329@atomide.com>
+ <20160330213224.GH9329@atomide.com> <56FCC3FF.7080901@ti.com>
+ <56FCEC61.5020400@ti.com>
+Message-ID: <20160331170017.GI9329@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 01, 2016 at 01:43:02AM +0900, Masahiro Yamada wrote:
-> Commit 3939f3345050 ("ARM: 8418/1: add boot image dependencies to not
-> generate invalid images") fixed bad image generation in case of
-> parallel building, but as a side effect, Kbuild now descends into
-> arch/arm/boot/ again and again, duplicating the same log messages.
-> This is clumsy.
+* Keerthy <a0393675@ti.com> [160331 02:26]:
 > 
-> In the example below (incremental build),
->   "Kernel: arch/arm/boot/Image is ready" is displayed three times.
->   "Kernel: arch/arm/boot/zImage is ready" is displayed twice.
+> 
+> On Thursday 31 March 2016 12:00 PM, Tero Kristo wrote:
+> >On 03/31/2016 12:32 AM, Tony Lindgren wrote:
+> >>* Tony Lindgren <tony@atomide.com> [160330 14:19]:
+> >>>* Keerthy <j-keerthy@ti.com> [160314 05:04]:
+> >>>>This is w.r.t J6/J6eco: 32clk is pseudo (erratum i856) - clock source.
+> >>>>Errata i856 for the AM572x (DRA7xx) points out that the 32.768KHz
+> >>>>external
+> >>>>crystal is not enabled at power up. Instead the CPU falls back to using
+> >>>>an emulation for the 32KHz clock which is SYSCLK1/610.  SYSCLK1 is
+> >>>>usually
+> >>>>20MHz on boards so far (which gives an emulated frequency of 32.786KHz)
+> >>>
+> >>>Thanks applying into omap-for-v4.6/fixes.
+> >>
+> >>Actually let's wait a review from Tero on this one, not sure
+> >>about the pseudo clock naming here. So dropping for now.
+> >
+> >The patch is fine for me, I didn't comment anything before as I thought
+> >you already applied it.
+> >
+> >Acked-by: Tero Kristo <t-kristo@ti.com>
+> 
+> Thanks Tero.
 
-I disagree.  Image and zImage are the final targets that users are
-interested in, we should tell people that they've been successfully
-created.
+OK applying with Tero's ack.
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Tony
