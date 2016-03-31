@@ -1,144 +1,71 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 31 Mar 2016 18:06:05 +0900
-Subject: [PATCH v7 20/20] ARM: dts: Add support of bus frequency for
- exynos4412-trats/odroidu3
+Date: Thu, 31 Mar 2016 18:05:56 +0900
+Subject: [PATCH v7 11/20] ARM: dts: Add DMC bus node for Exynos3250
 In-Reply-To: <1459415165-32613-1-git-send-email-cw00.choi@samsung.com>
 References: <1459415165-32613-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1459415165-32613-21-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1459415165-32613-12-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-THis patch adds the bus device tree nodes for both MIF (Memory) and INT
-(Internal) block to enable the bus frequency.
+This patch adds the DMC (Dynamic Memory Controller) bus node for Exynos3250 SoC.
+The DMC is an AMBA AXI-compliant slave to interface external JEDEC standard
+SDRAM devices. The bus includes the OPP tables and the source clock for DMC
+block.
 
-The DMC bus is parent device in MIF block using VDD_MIF and the LEFTBUS
-bus is parent device in INT block using VDD_INT.
+Following list specifies the detailed relation between the clock and DMC block:
+- The source clock of DMC block : div_dmc
 
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-[m.reichl and linux.amoon: Tested it on exynos4412-odroidu3 board]
-Tested-by: Markus Reichl <m.reichl@fivetechno.de>
-Tested-by: Anand Moon <linux.amoon@gmail.com>
+Acked-by: MyungJoo Ham <myungjoo.ham@samsung.com>
 ---
- arch/arm/boot/dts/exynos4412-odroid-common.dtsi | 47 +++++++++++++++++++++++++
- arch/arm/boot/dts/exynos4412-trats2.dts         | 47 +++++++++++++++++++++++++
- 2 files changed, 94 insertions(+)
+ arch/arm/boot/dts/exynos3250.dtsi | 34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-index b4983cbc4f8c..2015f10071f9 100644
---- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-+++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-@@ -109,6 +109,53 @@
+diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
+index 137f9015d4e8..1ae72c4fa55e 100644
+--- a/arch/arm/boot/dts/exynos3250.dtsi
++++ b/arch/arm/boot/dts/exynos3250.dtsi
+@@ -688,6 +688,40 @@
+ 			clock-names = "ppmu";
+ 			status = "disabled";
+ 		};
++
++		bus_dmc: bus_dmc {
++			compatible = "samsung,exynos-bus";
++			clocks = <&cmu_dmc CLK_DIV_DMC>;
++			clock-names = "bus";
++			operating-points-v2 = <&bus_dmc_opp_table>;
++			status = "disabled";
++		};
++
++		bus_dmc_opp_table: opp_table1 {
++			compatible = "operating-points-v2";
++			opp-shared;
++
++			opp at 50000000 {
++				opp-hz = /bits/ 64 <50000000>;
++				opp-microvolt = <800000>;
++			};
++			opp at 100000000 {
++				opp-hz = /bits/ 64 <100000000>;
++				opp-microvolt = <800000>;
++			};
++			opp at 134000000 {
++				opp-hz = /bits/ 64 <134000000>;
++				opp-microvolt = <800000>;
++			};
++			opp at 200000000 {
++				opp-hz = /bits/ 64 <200000000>;
++				opp-microvolt = <825000>;
++			};
++			opp at 400000000 {
++				opp-hz = /bits/ 64 <400000000>;
++				opp-microvolt = <875000>;
++			};
++		};
  	};
  };
  
-+&bus_dmc {
-+	devfreq-events = <&ppmu_dmc0_3>, <&ppmu_dmc1_3>;
-+	vdd-supply = <&buck1_reg>;
-+	status = "okay";
-+};
-+
-+&bus_acp {
-+	devfreq = <&bus_dmc>;
-+	status = "okay";
-+};
-+
-+&bus_c2c {
-+	devfreq = <&bus_dmc>;
-+	status = "okay";
-+};
-+
-+&bus_leftbus {
-+	devfreq-events = <&ppmu_leftbus_3>, <&ppmu_rightbus_3>;
-+	vdd-supply = <&buck3_reg>;
-+	status = "okay";
-+};
-+
-+&bus_rightbus {
-+	devfreq = <&bus_leftbus>;
-+	status = "okay";
-+};
-+
-+&bus_display {
-+	devfreq = <&bus_leftbus>;
-+	status = "okay";
-+};
-+
-+&bus_fsys {
-+	devfreq = <&bus_leftbus>;
-+	status = "okay";
-+};
-+
-+&bus_peri {
-+	devfreq = <&bus_leftbus>;
-+	status = "okay";
-+};
-+
-+&bus_mfc {
-+	devfreq = <&bus_leftbus>;
-+	status = "okay";
-+};
-+
- &cpu0 {
- 	cpu0-supply = <&buck2_reg>;
- };
-diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
-index dce3cebe0606..9f3fb9a7f5f4 100644
---- a/arch/arm/boot/dts/exynos4412-trats2.dts
-+++ b/arch/arm/boot/dts/exynos4412-trats2.dts
-@@ -289,6 +289,53 @@
- 	status = "okay";
- };
- 
-+&bus_dmc {
-+	devfreq-events = <&ppmu_dmc0_3>, <&ppmu_dmc1_3>;
-+	vdd-supply = <&buck1_reg>;
-+	status = "okay";
-+};
-+
-+&bus_acp {
-+	devfreq = <&bus_dmc>;
-+	status = "okay";
-+};
-+
-+&bus_c2c {
-+	devfreq = <&bus_dmc>;
-+	status = "okay";
-+};
-+
-+&bus_leftbus {
-+	devfreq-events = <&ppmu_leftbus_3>, <&ppmu_rightbus_3>;
-+	vdd-supply = <&buck3_reg>;
-+	status = "okay";
-+};
-+
-+&bus_rightbus {
-+	devfreq = <&bus_leftbus>;
-+	status = "okay";
-+};
-+
-+&bus_display {
-+	devfreq = <&bus_leftbus>;
-+	status = "okay";
-+};
-+
-+&bus_fsys {
-+	devfreq = <&bus_leftbus>;
-+	status = "okay";
-+};
-+
-+&bus_peri {
-+	devfreq = <&bus_leftbus>;
-+	status = "okay";
-+};
-+
-+&bus_mfc {
-+	devfreq = <&bus_leftbus>;
-+	status = "okay";
-+};
-+
- &cpu0 {
- 	cpu0-supply = <&buck2_reg>;
- };
 -- 
 1.9.1
