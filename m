@@ -1,439 +1,262 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 31 Mar 2016 11:48:04 +0900
-Subject: [PATCH v4 8/9] ARM: dts: Add exynos3250-artik5 dtsi file for ARTIK5
- module
-In-Reply-To: <1459392485-11327-1-git-send-email-cw00.choi@samsung.com>
-References: <1459392485-11327-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1459392485-11327-9-git-send-email-cw00.choi@samsung.com>
+From: zhiqiang.hou@nxp.com (Zhiqiang Hou)
+Date: Thu, 31 Mar 2016 03:31:05 +0000
+Subject: [PATCH v4 2/2] arm64: dts: add LS1043a-QDS board support
+In-Reply-To: <20160330140608.GL28207@tiger>
+References: <1457403939-12080-1-git-send-email-Zhiqiang.Hou@nxp.com>
+ <1457403939-12080-2-git-send-email-Zhiqiang.Hou@nxp.com>
+ <20160330140608.GL28207@tiger>
+Message-ID: <AM4PR04MB2148607820E25863F0BACADC84990@AM4PR04MB2148.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the support for Device Tree source for Samsung ARTIK5 module[1]
-based on Exynos3250 SoC. The ARTIK5 module includes the following devices:
-- Application Processor (Samsung Exynos3250)
-- WiFi/BT Combo chip (Broadcom4354)
-- PMIC (Samsung S2MPS14)
-- eMMC (4GB)
-- DRAM LPDDR3 (512MB)
-- Connectors pin (60 Pins x 3 set)
+Hi Shawn,
 
-Also, this patch adds the ARTIK5 evaluation board[2] dts file which includes
-the ARTIK5 module[1] and have the devices such as sound codec, sd card port,
-ethernet port, uart port and so on.
+Thanks for your comments.
 
-[1] https://www.artik.io/hardware/artik-5
-[2] http://www.digikey.com/product-search/en?FV=ffecca14
 
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
-Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
- .../bindings/arm/samsung/samsung-boards.txt        |   2 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/exynos3250-artik5-eval.dts       |  26 ++
- arch/arm/boot/dts/exynos3250-artik5.dtsi           | 334 +++++++++++++++++++++
- 4 files changed, 363 insertions(+)
- create mode 100644 arch/arm/boot/dts/exynos3250-artik5-eval.dts
- create mode 100644 arch/arm/boot/dts/exynos3250-artik5.dtsi
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawnguo at kernel.org]
+> Sent: 2016?3?30? 22:06
+> To: Zhiqiang Hou <zhiqiang.hou@nxp.com>
+> Cc: devicetree at vger.kernel.org; robh+dt at kernel.org; mark.rutland at arm.com;
+> pawel.moll at arm.com; ijc+devicetree at hellion.org.uk; galak at codeaurora.org;
+> linux-arm-kernel at lists.infradead.org; catalin.marinas at arm.com;
+> will.deacon at arm.com; Scott Wood <scott.wood@nxp.com>; Mingkai Hu
+> <mingkai.hu@nxp.com>; Shaohui Xie <shaohui.xie@nxp.com>; Shaohui Xie
+> <Shaohui.Xie@freescale.com>; Mingkai Hu <Mingkai.Hu@freescale.com>
+> Subject: Re: [PATCH v4 2/2] arm64: dts: add LS1043a-QDS board support
+> 
+> On Tue, Mar 08, 2016 at 10:25:39AM +0800, Zhiqiang Hou wrote:
+> > From: Shaohui Xie <Shaohui.Xie@freescale.com>
+> >
+> > The LS1043a-QDS board is a high-performance computing, evaluation,
+> > development, and test platform supporting the LS1043a SoC.
+> >
+> > Signed-off-by: Shaohui Xie <Shaohui.Xie@freescale.com>
+> > Signed-off-by: Mingkai Hu <Mingkai.Hu@freescale.com>
+> > Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> 
+> The series looks good to me.  There are a couple of small comments in this patch
+> as below, but I decided to fix them myself and applied both patches.
+> 
+> > ---
+> > v4:
+> >  - No change.
+> >
+> > v3:
+> >  - Resort the nodes alphabetically.
+> >  - Correct the compatible of nodes adt7461a at24,24c512 and pca9547.
+> >  - Change the name of adt7461a to temp-sensor.
+> >
+> > v2:
+> >  - Add root node compatible property.
+> >
+> >  arch/arm64/boot/dts/freescale/Makefile            |   1 +
+> >  arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts | 167
+> > ++++++++++++++++++++++
+> >  2 files changed, 168 insertions(+)
+> >  create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
+> >
+> > diff --git a/arch/arm64/boot/dts/freescale/Makefile
+> > b/arch/arm64/boot/dts/freescale/Makefile
+> > index f3c2516..1423fa4 100644
+> > --- a/arch/arm64/boot/dts/freescale/Makefile
+> > +++ b/arch/arm64/boot/dts/freescale/Makefile
+> > @@ -2,6 +2,7 @@ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-qds.dtb
+> >  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-rdb.dtb
+> >  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-simu.dtb
+> >  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1043a-rdb.dtb
+> > +dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1043a-qds.dtb
+> 
+> The list should maintained alphabetically.
+> 
+> >
+> >  always		:= $(dtb-y)
+> >  subdir-y	:= $(dts-dirs)
+> > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
+> > b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
+> > new file mode 100644
+> > index 0000000..97e9906
+> > --- /dev/null
+> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
+> > @@ -0,0 +1,167 @@
+> > +/*
+> > + * Device Tree Include file for Freescale Layerscape-1043A family SoC.
+> > + *
+> > + * Copyright 2014-2015, Freescale Semiconductor
+> > + *
+> > + * Mingkai Hu <Mingkai.hu@freescale.com>
+> > + *
+> > + * This file is dual-licensed: you can use it either under the terms
+> > + * of the GPLv2 or the X11 license, at your option. Note that this
+> > +dual
+> > + * licensing only applies to this file, and not this project as a
+> > + * whole.
+> > + *
+> > + *  a) This library is free software; you can redistribute it and/or
+> > + *     modify it under the terms of the GNU General Public License as
+> > + *     published by the Free Software Foundation; either version 2 of the
+> > + *     License, or (at your option) any later version.
+> > + *
+> > + *     This library is distributed in the hope that it will be useful,
+> > + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + *     GNU General Public License for more details.
+> > + *
+> > + * Or, alternatively,
+> > + *
+> > + *  b) Permission is hereby granted, free of charge, to any person
+> > + *     obtaining a copy of this software and associated documentation
+> > + *     files (the "Software"), to deal in the Software without
+> > + *     restriction, including without limitation the rights to use,
+> > + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> > + *     sell copies of the Software, and to permit persons to whom the
+> > + *     Software is furnished to do so, subject to the following
+> > + *     conditions:
+> > + *
+> > + *     The above copyright notice and this permission notice shall be
+> > + *     included in all copies or substantial portions of the Software.
+> > + *
+> > + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> > + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> > + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> > + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> > + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> > + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> > + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> > + *     OTHER DEALINGS IN THE SOFTWARE.
+> > + */
+> > +
+> > +/dts-v1/;
+> > +/include/ "fsl-ls1043a.dtsi"
+> > +
+> > +/ {
+> > +	model = "LS1043A QDS Board";
+> > +	compatible = "fsl,ls1043a-qds", "fsl,ls1043a";
+> > +
+> > +	aliases {
+> > +		gpio0 = &gpio1;
+> > +		gpio1 = &gpio2;
+> > +		gpio2 = &gpio3;
+> > +		gpio3 = &gpio4;
+> > +		serial0 = &lpuart0;
+> > +		serial1 = &lpuart1;
+> > +		serial2 = &lpuart2;
+> > +		serial3 = &lpuart3;
+> > +		serial4 = &lpuart4;
+> > +		serial5 = &lpuart5;
+> > +	};
+> > +};
+> > +
+> > +&duart0 {
+> > +	status = "okay";
+> > +};
+> > +
+> > +&duart1 {
+> > +	status = "okay";
+> > +};
+> > +
+> > +&ifc {
+> > +	#address-cells = <2>;
+> > +	#size-cells = <1>;
+> > +	/* NOR, NAND Flashes and FPGA on board */
+> > +	ranges = <0x0 0x0 0x0 0x60000000 0x08000000
+> > +		  0x1 0x0 0x0 0x7e800000 0x00010000
+> > +		  0x2 0x0 0x0 0x7fb00000 0x00000100>;
+> > +	status = "okay";
+> > +
+> > +	nor at 0,0 {
+> > +		compatible = "cfi-flash";
+> > +		reg = <0x0 0x0 0x8000000>;
+> > +		bank-width = <2>;
+> > +		device-width = <1>;
+> > +	};
+> > +
+> > +	nand at 1,0 {
+> > +		compatible = "fsl,ifc-nand";
+> > +		reg = <0x1 0x0 0x10000>;
+> > +	};
+> > +
+> > +	fpga: board-control at 2,0 {
+> > +		compatible = "fsl,ls1043aqds-fpga", "fsl,fpga-qixis";
+> > +		reg = <0x2 0x0 0x0000100>;
+> > +	};
+> > +};
+> > +
+> > +&i2c0 {
+> > +	status = "okay";
+> 
+> We generally have a new line between properties and sub-node.
+> 
+> Shawn
+> 
+> > +	pca9547 at 77 {
+> > +		compatible = "nxp,pca9547";
+> > +		reg = <0x77>;
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +
+> > +		i2c at 0 {
+> > +			#address-cells = <1>;
+> > +			#size-cells = <0>;
+> > +			reg = <0x0>;
+> > +
+> > +			rtc at 68 {
+> > +				compatible = "dallas,ds3232";
+> > +				reg = <0x68>;
+> > +				/* IRQ10_B */
+> > +				interrupts = <0 150 0x4>;
+> > +			};
+> > +		};
+> > +
+> > +		i2c at 2 {
+> > +			#address-cells = <1>;
+> > +			#size-cells = <0>;
+> > +			reg = <0x2>;
+> > +
+> > +			ina220 at 40 {
+> > +				compatible = "ti,ina220";
+> > +				reg = <0x40>;
+> > +				shunt-resistor = <1000>;
+> > +			};
+> > +
+> > +			ina220 at 41 {
+> > +				compatible = "ti,ina220";
+> > +				reg = <0x41>;
+> > +				shunt-resistor = <1000>;
+> > +			};
+> > +		};
+> > +
+> > +		i2c at 3 {
+> > +			#address-cells = <1>;
+> > +			#size-cells = <0>;
+> > +			reg = <0x3>;
+> > +
+> > +			eeprom at 56 {
+> > +				compatible = "atmel,24c512";
+> > +				reg = <0x56>;
+> > +			};
+> > +
+> > +			eeprom at 57 {
+> > +				compatible = "atmel,24c512";
+> > +				reg = <0x57>;
+> > +			};
+> > +
+> > +			temp-sensor at 4c {
+> > +				compatible = "adi,adt7461a";
+> > +				reg = <0x4c>;
+> > +			};
+> > +		};
+> > +	};
+> > +};
+> > +
+> > +&lpuart0 {
+> > +	status = "okay";
+> > +};
+> > --
+> > 2.1.0.27.g96db324
+> >
+> >
 
-diff --git a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
-index 12129c011c8f..f5deace2b380 100644
---- a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
-+++ b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
-@@ -2,6 +2,8 @@
- 
- Required root node properties:
-     - compatible = should be one or more of the following.
-+	- "samsung,artik5"	- for Exynos3250-based Samsung ARTIK5 module.
-+	- "samsung,artik5-eval" - for Exynos3250-based Samsung ARTIK5 eval board.
- 	- "samsung,monk"	- for Exynos3250-based Samsung Simband board.
- 	- "samsung,rinato"	- for Exynos3250-based Samsung Gear2 board.
- 	- "samsung,smdkv310"	- for Exynos4210-based Samsung SMDKV310 eval board.
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 95c1923ce6fa..bf49774d4908 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -112,6 +112,7 @@ dtb-$(CONFIG_ARCH_DIGICOLOR) += \
- dtb-$(CONFIG_ARCH_EFM32) += \
- 	efm32gg-dk3750.dtb
- dtb-$(CONFIG_ARCH_EXYNOS3) += \
-+	exynos3250-artik5-eval.dtb \
- 	exynos3250-monk.dtb \
- 	exynos3250-rinato.dtb
- dtb-$(CONFIG_ARCH_EXYNOS4) += \
-diff --git a/arch/arm/boot/dts/exynos3250-artik5-eval.dts b/arch/arm/boot/dts/exynos3250-artik5-eval.dts
-new file mode 100644
-index 000000000000..b476154590a5
---- /dev/null
-+++ b/arch/arm/boot/dts/exynos3250-artik5-eval.dts
-@@ -0,0 +1,26 @@
-+/*
-+ * Samsung's Exynos3250 based ARTIK5 evaluation board device tree source
-+ *
-+ * Copyright (c) 2016 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * Device tree source file for Samsung's ARTIK5 evaluation board
-+ * which is based on Samsung Exynos3250 SoC.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/dts-v1/;
-+#include "exynos3250-artik5.dtsi"
-+
-+/ {
-+	model = "Samsung ARTIK5 evaluation board";
-+	compatible = "samsung,artik5-eval", "samsung,artik5",
-+			"samsung,exynos3250", "samsung,exynos3";
-+};
-+
-+&serial_2 {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/exynos3250-artik5.dtsi b/arch/arm/boot/dts/exynos3250-artik5.dtsi
-new file mode 100644
-index 000000000000..130e946f1414
---- /dev/null
-+++ b/arch/arm/boot/dts/exynos3250-artik5.dtsi
-@@ -0,0 +1,334 @@
-+/*
-+ * Samsung's Exynos3250 based ARTIK5 module device tree source
-+ *
-+ * Copyright (c) 2016 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * Device tree source file for Samsung's ARTIK5 module which is based on
-+ * Samsung Exynos3250 SoC.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include "exynos3250.dtsi"
-+#include <dt-bindings/clock/samsung,s2mps11.h>
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
-+
-+/ {
-+	compatible = "samsung,artik5", "samsung,exynos3250", "samsung,exynos3";
-+
-+	chosen {
-+		stdout-path = &serial_2;
-+	};
-+
-+	memory {
-+		reg = <0x40000000 0x1ff00000>;
-+	};
-+
-+	firmware at 0205f000 {
-+		compatible = "samsung,secure-firmware";
-+		reg = <0x0205f000 0x1000>;
-+	};
-+
-+	thermal-zones {
-+		cpu_thermal: cpu-thermal {
-+			cooling-maps {
-+				map0 {
-+					/* Corresponds to 500MHz */
-+					cooling-device = <&cpu0 5 5>;
-+				};
-+				map1 {
-+					/* Corresponds to 200MHz */
-+					cooling-device = <&cpu0 8 8>;
-+				};
-+			};
-+		};
-+	};
-+};
-+
-+&adc {
-+	vdd-supply = <&ldo7_reg>;
-+	assigned-clocks = <&cmu CLK_SCLK_TSADC>;
-+	assigned-clock-rates = <6000000>;
-+};
-+
-+&cpu0 {
-+	cpu0-supply = <&buck2_reg>;
-+};
-+
-+&i2c_0 {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	samsung,i2c-sda-delay = <100>;
-+	samsung,i2c-slave-addr = <0x10>;
-+	samsung,i2c-max-bus-freq = <100000>;
-+	status = "okay";
-+
-+	s2mps14_pmic at 66 {
-+		compatible = "samsung,s2mps14-pmic";
-+		interrupt-parent = <&gpx3>;
-+		interrupts = <5 IRQ_TYPE_NONE>;
-+		reg = <0x66>;
-+
-+		s2mps14_osc: clocks {
-+			compatible = "samsung,s2mps14-clk";
-+			#clock-cells = <1>;
-+			clock-output-names = "s2mps14_ap", "unused",
-+				"s2mps14_bt";
-+		};
-+
-+		regulators {
-+			ldo1_reg: LDO1 {
-+				/* VDD_ALIVE15x */
-+				regulator-name = "VLDO1_1.0V";
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-always-on;
-+			};
-+
-+			ldo2_reg: LDO2 {
-+				/* VDDQM176 ~ VDDQM185 */
-+				regulator-name = "VLDO2_1.2V";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1200000>;
-+				regulator-always-on;
-+			};
-+
-+			ldo3_reg: LDO3 {
-+				/*
-+				 * VDD1_E106 ~ VDD1_E111
-+				 * DVDD_RTC_AP, DVDD_MMC2_AP
-+				 */
-+				regulator-name = "VLDO3_1.8V";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+			};
-+
-+			ldo4_reg: LDO4 {
-+				/*  AVDD_PLL1120 ~ AVDD_PLL11201 */
-+				regulator-name = "VLDO4_1.8V";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+			};
-+
-+			ldo5_reg: LDO5 {
-+				/* VDDI_PLL_ISO141 ~ VDDI_PLL_ISO142 */
-+				regulator-name = "VLDO5_1.0V";
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-always-on;
-+			};
-+
-+			ldo6_reg: LDO6 {
-+				/* VDD_USB, VDD10_HSIC */
-+				regulator-name = "VLDO6_1.0V";
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-always-on;
-+			};
-+
-+			ldo7_reg: LDO7 {
-+				/*
-+				 * VDD18P, AVDD18_TS, AVDD18_HSIC, AVDD_PLL2,
-+				 * AVDD_ADC, AVDD_ABB_0, M4S_VDD18
-+				 */
-+				regulator-name = "VLDO7_1.8V";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+			};
-+
-+			ldo8_reg: LDO8 {
-+				/* AVDD33_UOTG */
-+				regulator-name = "VLDO8_3.0V";
-+				regulator-min-microvolt = <3000000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-always-on;
-+			};
-+
-+			ldo9_reg: LDO9 {
-+				/* VDDQ_E86 ~ VDDQ_E105*/
-+				regulator-name = "VLDO9_1.2V";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1200000>;
-+				regulator-always-on;
-+			};
-+
-+			ldo10_reg: LDO10 {
-+				regulator-name = "VLDO10_1.0V";
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+			};
-+
-+			ldo11_reg: LDO11 {
-+				/* VDD74 ~ VDD75 */
-+				regulator-name = "VLDO11_1.8V";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				samsung,ext-control-gpios = <&gpk0 2 GPIO_ACTIVE_HIGH>;
-+			};
-+
-+			ldo12_reg: LDO12 {
-+				/* VDD72 ~ VDD73 */
-+				regulator-name = "VLDO12_2.8V";
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+				samsung,ext-control-gpios = <&gpk0 2 GPIO_ACTIVE_HIGH>;
-+			};
-+
-+			ldo13_reg: LDO13 {
-+				regulator-name = "VLDO13_2.8V";
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+			};
-+
-+			ldo14_reg: LDO14 {
-+				regulator-name = "VLDO14_2.7V";
-+				regulator-min-microvolt = <2700000>;
-+				regulator-max-microvolt = <2700000>;
-+			};
-+
-+			ldo15_reg: LDO15 {
-+				regulator-name = "VLDO_3.3V";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			ldo16_reg: LDO16 {
-+				regulator-name = "VLDO16_3.3V";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			ldo17_reg: LDO17 {
-+				regulator-name = "VLDO17_3.0V";
-+				regulator-min-microvolt = <3000000>;
-+				regulator-max-microvolt = <3000000>;
-+			};
-+
-+			ldo18_reg: LDO18 {
-+				/* DVDD_MMC2_AP */
-+				regulator-name = "VLDO18_2.8V";
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+			};
-+
-+			ldo19_reg: LDO19 {
-+				regulator-name = "VLDO19_1.8V";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+			};
-+
-+			ldo20_reg: LDO20 {
-+				regulator-name = "VLDO20_1.8V";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+			};
-+
-+			ldo21_reg: LDO21 {
-+				regulator-name = "VLDO21_1.25V";
-+				regulator-min-microvolt = <1250000>;
-+				regulator-max-microvolt = <1250000>;
-+			};
-+
-+			ldo22_reg: LDO22 {
-+				regulator-name = "VLDO22_1.2V";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1200000>;
-+			};
-+
-+			ldo23_reg: LDO23 {
-+				/* Xi2c3_SDA/SCL, Xi2c7_SDA/SCL, WLAN_SDIO */
-+				regulator-name = "VLDO23_1.8V";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+			};
-+
-+			ldo24_reg: LDO24 {
-+				regulator-name = "VLDO24_3.0V";
-+				regulator-min-microvolt = <3000000>;
-+				regulator-max-microvolt = <3000000>;
-+			};
-+
-+			ldo25_reg: LDO25 {
-+				regulator-name = "VLDO25_3.0V";
-+				regulator-min-microvolt = <3000000>;
-+				regulator-max-microvolt = <3000000>;
-+			};
-+
-+			buck1_reg: BUCK1 {
-+				/* VDD_MIF */
-+				regulator-name = "VBUCK1_1.0V";
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-always-on;
-+			};
-+
-+			buck2_reg: BUCK2 {
-+				/* VDD_CPU */
-+				regulator-name = "VBUCK2_1.2V";
-+				regulator-min-microvolt = <850000>;
-+				regulator-max-microvolt = <1200000>;
-+				regulator-always-on;
-+			};
-+
-+			buck3_reg: BUCK3 {
-+				/* VDD_G3D */
-+				regulator-name = "VBUCK3_1.0V";
-+				regulator-min-microvolt = <850000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-always-on;
-+			};
-+
-+			buck4_reg: BUCK4 {
-+				regulator-name = "VBUCK4_1.95V";
-+				regulator-min-microvolt = <1950000>;
-+				regulator-max-microvolt = <1950000>;
-+				regulator-always-on;
-+			};
-+
-+			buck5_reg: BUCK5 {
-+				regulator-name = "VBUCK5_1.35V";
-+				regulator-min-microvolt = <1350000>;
-+				regulator-max-microvolt = <1350000>;
-+				regulator-always-on;
-+			};
-+		};
-+	};
-+};
-+
-+&mshc_0 {
-+	num-slots = <1>;
-+	non-removable;
-+	cap-mmc-highspeed;
-+	card-detect-delay = <200>;
-+	vmmc-supply = <&ldo12_reg>;
-+	clock-frequency = <100000000>;
-+	clock-freq-min-max = <400000 100000000>;
-+	samsung,dw-mshc-ciu-div = <1>;
-+	samsung,dw-mshc-sdr-timing = <0 1>;
-+	samsung,dw-mshc-ddr-timing = <1 2>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8>;
-+	bus-width = <8>;
-+	status = "okay";
-+};
-+
-+&rtc {
-+	clocks = <&cmu CLK_RTC>, <&s2mps14_osc S2MPS11_CLK_AP>;
-+	clock-names = "rtc", "rtc_src";
-+	status = "okay";
-+};
-+
-+&tmu {
-+	status = "okay";
-+};
-+
-+&xusbxti {
-+	clock-frequency = <24000000>;
-+};
--- 
-1.9.1
+Thanks,
+Zhiqiang
