@@ -1,55 +1,197 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Thu, 31 Mar 2016 19:23:40 +0800
-Subject: [PATCH v9 12/17] ARM64: ACPI: Check if it runs on Xen to enable or
- disable ACPI
+Date: Thu, 31 Mar 2016 19:23:30 +0800
+Subject: [PATCH v9 02/17] xen/grant-table: Move xlated_setup_gnttab_pages to
+ common place
 In-Reply-To: <1459423425-1220-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1459423425-1220-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1459423425-1220-13-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1459423425-1220-3-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-When it's a Xen domain0 booting with ACPI, it will supply a /chosen and
-a /hypervisor node in DT. So check if it needs to enable ACPI.
+Move xlated_setup_gnttab_pages to common place, so it can be reused by
+ARM to setup grant table.
+
+Rename it to xen_xlate_map_ballooned_pages.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- arch/arm64/kernel/acpi.c | 12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
+ arch/x86/xen/grant-table.c | 57 +++++--------------------------------------
+ drivers/xen/xlate_mmu.c    | 61 ++++++++++++++++++++++++++++++++++++++++++++++
+ include/xen/xen-ops.h      |  2 ++
+ 3 files changed, 69 insertions(+), 51 deletions(-)
 
-diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-index d1ce8e2..4e92be0 100644
---- a/arch/arm64/kernel/acpi.c
-+++ b/arch/arm64/kernel/acpi.c
-@@ -67,10 +67,13 @@ static int __init dt_scan_depth1_nodes(unsigned long node,
- {
- 	/*
- 	 * Return 1 as soon as we encounter a node at depth 1 that is
--	 * not the /chosen node.
-+	 * not the /chosen node, or /hypervisor node when running on Xen.
- 	 */
--	if (depth == 1 && (strcmp(uname, "chosen") != 0))
--		return 1;
-+	if (depth == 1 && (strcmp(uname, "chosen") != 0)) {
-+		if (!xen_initial_domain() || (strcmp(uname, "hypervisor") != 0))
-+			return 1;
-+	}
-+
- 	return 0;
+diff --git a/arch/x86/xen/grant-table.c b/arch/x86/xen/grant-table.c
+index e079500..de4144c 100644
+--- a/arch/x86/xen/grant-table.c
++++ b/arch/x86/xen/grant-table.c
+@@ -111,63 +111,18 @@ int arch_gnttab_init(unsigned long nr_shared)
  }
  
-@@ -184,7 +187,8 @@ void __init acpi_boot_table_init(void)
- 	/*
- 	 * Enable ACPI instead of device tree unless
- 	 * - ACPI has been disabled explicitly (acpi=off), or
--	 * - the device tree is not empty (it has more than just a /chosen node)
-+	 * - the device tree is not empty (it has more than just a /chosen node,
-+	 *   and a /hypervisor node when running on Xen)
- 	 *   and ACPI has not been force enabled (acpi=force)
- 	 */
- 	if (param_acpi_off ||
+ #ifdef CONFIG_XEN_PVH
+-#include <xen/balloon.h>
+ #include <xen/events.h>
+-#include <linux/slab.h>
+-static int __init xlated_setup_gnttab_pages(void)
+-{
+-	struct page **pages;
+-	xen_pfn_t *pfns;
+-	void *vaddr;
+-	int rc;
+-	unsigned int i;
+-	unsigned long nr_grant_frames = gnttab_max_grant_frames();
+-
+-	BUG_ON(nr_grant_frames == 0);
+-	pages = kcalloc(nr_grant_frames, sizeof(pages[0]), GFP_KERNEL);
+-	if (!pages)
+-		return -ENOMEM;
+-
+-	pfns = kcalloc(nr_grant_frames, sizeof(pfns[0]), GFP_KERNEL);
+-	if (!pfns) {
+-		kfree(pages);
+-		return -ENOMEM;
+-	}
+-	rc = alloc_xenballooned_pages(nr_grant_frames, pages);
+-	if (rc) {
+-		pr_warn("%s Couldn't balloon alloc %ld pfns rc:%d\n", __func__,
+-			nr_grant_frames, rc);
+-		kfree(pages);
+-		kfree(pfns);
+-		return rc;
+-	}
+-	for (i = 0; i < nr_grant_frames; i++)
+-		pfns[i] = page_to_pfn(pages[i]);
+-
+-	vaddr = vmap(pages, nr_grant_frames, 0, PAGE_KERNEL);
+-	if (!vaddr) {
+-		pr_warn("%s Couldn't map %ld pfns rc:%d\n", __func__,
+-			nr_grant_frames, rc);
+-		free_xenballooned_pages(nr_grant_frames, pages);
+-		kfree(pages);
+-		kfree(pfns);
+-		return -ENOMEM;
+-	}
+-	kfree(pages);
+-
+-	xen_auto_xlat_grant_frames.pfn = pfns;
+-	xen_auto_xlat_grant_frames.count = nr_grant_frames;
+-	xen_auto_xlat_grant_frames.vaddr = vaddr;
+-
+-	return 0;
+-}
+-
++#include <xen/xen-ops.h>
+ static int __init xen_pvh_gnttab_setup(void)
+ {
+ 	if (!xen_pvh_domain())
+ 		return -ENODEV;
+ 
+-	return xlated_setup_gnttab_pages();
++	xen_auto_xlat_grant_frames.count = gnttab_max_grant_frames();
++
++	return xen_xlate_map_ballooned_pages(&xen_auto_xlat_grant_frames.pfn,
++					     &xen_auto_xlat_grant_frames.vaddr,
++					     xen_auto_xlat_grant_frames.count);
+ }
+ /* Call it _before_ __gnttab_init as we need to initialize the
+  * xen_auto_xlat_grant_frames first. */
+diff --git a/drivers/xen/xlate_mmu.c b/drivers/xen/xlate_mmu.c
+index 5063c5e..9692656 100644
+--- a/drivers/xen/xlate_mmu.c
++++ b/drivers/xen/xlate_mmu.c
+@@ -29,6 +29,8 @@
+  */
+ #include <linux/kernel.h>
+ #include <linux/mm.h>
++#include <linux/slab.h>
++#include <linux/vmalloc.h>
+ 
+ #include <asm/xen/hypercall.h>
+ #include <asm/xen/hypervisor.h>
+@@ -37,6 +39,7 @@
+ #include <xen/page.h>
+ #include <xen/interface/xen.h>
+ #include <xen/interface/memory.h>
++#include <xen/balloon.h>
+ 
+ typedef void (*xen_gfn_fn_t)(unsigned long gfn, void *data);
+ 
+@@ -185,3 +188,61 @@ int xen_xlate_unmap_gfn_range(struct vm_area_struct *vma,
+ 	return 0;
+ }
+ EXPORT_SYMBOL_GPL(xen_xlate_unmap_gfn_range);
++
++/**
++ * xen_xlate_map_ballooned_pages - map a new set of ballooned pages
++ * @gfns: returns the array of corresponding GFNs
++ * @virt: returns the virtual address of the mapped region
++ * @nr_grant_frames: number of GFNs
++ * @return 0 on success, error otherwise
++ *
++ * This allocates a set of ballooned pages and maps them into the
++ * kernel's address space.
++ */
++int __init xen_xlate_map_ballooned_pages(xen_pfn_t **gfns, void **virt,
++					 unsigned long nr_grant_frames)
++{
++	struct page **pages;
++	xen_pfn_t *pfns;
++	void *vaddr;
++	int rc;
++	unsigned int i;
++
++	BUG_ON(nr_grant_frames == 0);
++	pages = kcalloc(nr_grant_frames, sizeof(pages[0]), GFP_KERNEL);
++	if (!pages)
++		return -ENOMEM;
++
++	pfns = kcalloc(nr_grant_frames, sizeof(pfns[0]), GFP_KERNEL);
++	if (!pfns) {
++		kfree(pages);
++		return -ENOMEM;
++	}
++	rc = alloc_xenballooned_pages(nr_grant_frames, pages);
++	if (rc) {
++		pr_warn("%s Couldn't balloon alloc %ld pfns rc:%d\n", __func__,
++			nr_grant_frames, rc);
++		kfree(pages);
++		kfree(pfns);
++		return rc;
++	}
++	for (i = 0; i < nr_grant_frames; i++)
++		pfns[i] = page_to_pfn(pages[i]);
++
++	vaddr = vmap(pages, nr_grant_frames, 0, PAGE_KERNEL);
++	if (!vaddr) {
++		pr_warn("%s Couldn't map %ld pfns rc:%d\n", __func__,
++			nr_grant_frames, rc);
++		free_xenballooned_pages(nr_grant_frames, pages);
++		kfree(pages);
++		kfree(pfns);
++		return -ENOMEM;
++	}
++	kfree(pages);
++
++	*gfns = pfns;
++	*virt = vaddr;
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(xen_xlate_map_ballooned_pages);
+diff --git a/include/xen/xen-ops.h b/include/xen/xen-ops.h
+index 86abe07..072be1c 100644
+--- a/include/xen/xen-ops.h
++++ b/include/xen/xen-ops.h
+@@ -85,6 +85,8 @@ int xen_xlate_remap_gfn_array(struct vm_area_struct *vma,
+ 			      struct page **pages);
+ int xen_xlate_unmap_gfn_range(struct vm_area_struct *vma,
+ 			      int nr, struct page **pages);
++int xen_xlate_map_ballooned_pages(xen_pfn_t **pfns, void **vaddr,
++				  unsigned long nr_grant_frames);
+ 
+ bool xen_running_on_version_or_later(unsigned int major, unsigned int minor);
+ 
 -- 
 2.0.4
