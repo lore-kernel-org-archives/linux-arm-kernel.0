@@ -1,117 +1,43 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 31 Mar 2016 12:07:27 +0200
-Subject: [RFC PATCH 19/45] KVM: arm/arm64: vgic-new: Add CONFIG registers
- handlers
-In-Reply-To: <1458871508-17279-20-git-send-email-andre.przywara@arm.com>
-References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
- <1458871508-17279-20-git-send-email-andre.przywara@arm.com>
-Message-ID: <20160331100727.GY4126@cbox>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 31 Mar 2016 11:10:38 +0100
+Subject: [PATCH v15 17/20] arm64: kdump: implement machine_crash_shutdown()
+In-Reply-To: <56FCDBF0.2010505@arm.com>
+References: <cover.1457977401.git.geoff@infradead.org>
+ <8f53a31cf8bbfdd73eb289e078addc31c5a19fcf.1457977403.git.geoff@infradead.org>
+ <56EC440F.4050406@arm.com> <56EFF738.1040308@arm.com>
+ <20160331075659.GD2267@linaro.org> <56FCDBF0.2010505@arm.com>
+Message-ID: <20160331101038.GB26532@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 25, 2016 at 02:04:42AM +0000, Andre Przywara wrote:
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  virt/kvm/arm/vgic/vgic_mmio.c | 63 ++++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 62 insertions(+), 1 deletion(-)
+On Thu, Mar 31, 2016 at 09:12:32AM +0100, Marc Zyngier wrote:
+> On 31/03/16 08:57, AKASHI Takahiro wrote:
+> > On Mon, Mar 21, 2016 at 01:29:28PM +0000, James Morse wrote:
+> >> On 18/03/16 18:08, James Morse wrote:
+> >>> On 14/03/16 17:48, Geoff Levand wrote:
+> >>>> +	/* just in case */
+> >>>> +	while (1)
+> >>>> +		wfi();
+> >>
+> >> Having thought about this some more: I don't think spinning like this is safe.
+> >> We need to spin with the MMU turned off, otherwise this core will pollute the
+> >> kdump kernel with TLB entries from the old page tables.
+> > 
+> > I think that wfi() will never wake up since local interrupts are disabled
+> > here. So how can it pollute the kdump kernel?
 > 
-> diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
-> index bfc530c..76657ce 100644
-> --- a/virt/kvm/arm/vgic/vgic_mmio.c
-> +++ b/virt/kvm/arm/vgic/vgic_mmio.c
-> @@ -410,6 +410,67 @@ static int vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
->  	return 0;
->  }
->  
-> +static int vgic_mmio_read_config(struct kvm_vcpu *vcpu,
-> +				 struct kvm_io_device *this,
-> +				 gpa_t addr, int len, void *val)
-> +{
-> +	struct vgic_io_device *iodev = container_of(this,
-> +						    struct vgic_io_device, dev);
-> +	u32 intid = (addr - iodev->base_addr) * 4;
-> +	u32 value = 0;
-> +	int i;
-> +
-> +	if (iodev->redist_vcpu)
-> +		vcpu = iodev->redist_vcpu;
-> +
-> +	for (i = 0; i < len * 4; i++) {
-> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-> +
-> +		if (irq->config == VGIC_CONFIG_EDGE)
-> +			value |= (2U << (i * 2));
-> +	}
-> +
-> +	write_mask32(value, addr & 3, len, val);
-> +	return 0;
-> +}
-> +
-> +static int vgic_mmio_write_config(struct kvm_vcpu *vcpu,
-> +				  struct kvm_io_device *this,
-> +				  gpa_t addr, int len, const void *val)
-> +{
-> +	struct vgic_io_device *iodev = container_of(this,
-> +						    struct vgic_io_device, dev);
-> +	u32 intid = (addr - iodev->base_addr) * 4;
-> +	int i;
-> +
-> +	if (iodev->redist_vcpu)
-> +		vcpu = iodev->redist_vcpu;
-> +
-> +	for (i = 0; i < len * 4; i++) {
-> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-> +
-> +		if (intid + i < 16)
-> +			continue;
-> +
-> +		/*
-> +		 * The spec says that interrupts must be disabled before
-> +		 * changing the configuration to avoid UNDEFINED behaviour.
-> +		 * Is this sufficient in our case? Do we quickly enough remove
-> +		 * the IRQ from the ap_list to safely do the config change?
+> Having interrupts disabled doesn't prevent an exit from WFI. Quite the
+> opposite, actually. It is designed to wake-up the core when something
+> happens on the external interface.
 
-I don't understand the question about 'quickly enough' here.
+Further, WFI is a hint, and may simply act as a NOP. 
 
-> +		 * Will even a disabled interrupt in an ap_list cause us
-> +		 * headaches if we change the configuration?
-> +		 */
+The ARM ARM calls this out (see "D1.17.2" Wait For Interrupt in ARM DDI
+0487A.i):
 
-I don't think there's any particular problem here, except for my
-comments below:
+	Because the architecture permits a PE to leave the low-power
+	state for any reason, it is permissible for a PE to treat WFI as
+	a NOP , but this is not recommended for lowest power operation.
 
-(there may be some super weirdness if a VCPU is running with some bits
-of this IRQ in a LR while changing it, but I think we can ignore this
-case for now - or we can do like with the active state and force an
-exit).
-
-> +		spin_lock(&irq->irq_lock);
-> +		if (test_bit(i * 2 + 1, val))
-> +			irq->config = VGIC_CONFIG_EDGE;
-> +		else
-> +			irq->config = VGIC_CONFIG_LEVEL;
-
-I think here you have to sync pending to level | soft_pending, that's a
-rule we enforce for level triggered interrupts.
-
-> +		spin_unlock(&irq->irq_lock);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
->  struct vgic_register_region vgic_v2_dist_registers[] = {
->  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
->  		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12),
-> @@ -432,7 +493,7 @@ struct vgic_register_region vgic_v2_dist_registers[] = {
->  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_TARGET,
->  		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 8),
->  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_CONFIG,
-> -		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 8),
-> +		vgic_mmio_read_config, vgic_mmio_write_config, 2),
->  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SOFTINT,
->  		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 4),
->  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SGI_PENDING_CLEAR,
-> -- 
-> 2.7.3
-> 
+Thanks,
+Mark.
