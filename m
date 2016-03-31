@@ -1,173 +1,130 @@
-From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
-Date: Thu, 31 Mar 2016 13:48:06 -0500
-Subject: [PATCHv2 6/7] ARM: socfpga: Enable Arria10 OCRAM ECC on startup
-In-Reply-To: <1459450087-24792-1-git-send-email-tthayer@opensource.altera.com>
-References: <1459450087-24792-1-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <1459450087-24792-7-git-send-email-tthayer@opensource.altera.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 31 Mar 2016 20:54:54 +0200
+Subject: [PATCH v5 32/46] pwm: deprecate pwm_config(), pwm_enable() and
+ pwm_disable()
+In-Reply-To: <20160331173858.GB39098@dtor-ws>
+References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1459368249-13241-33-git-send-email-boris.brezillon@free-electrons.com>
+ <20160331173858.GB39098@dtor-ws>
+Message-ID: <20160331205454.630734ab@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thor Thayer <tthayer@opensource.altera.com>
+Hi Dmitry,
 
-Enable ECC for Arria10 On-Chip RAM on machine startup. The ECC has to
-be enabled and memory initialized before data is stored in memory
-otherwise the ECC will fail on reads.
+On Thu, 31 Mar 2016 10:38:58 -0700
+Dmitry Torokhov <dmitry.torokhov@gmail.com> wrote:
 
-Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
----
-v2: Add Arria10 ECC block initialization locally.
----
- arch/arm/mach-socfpga/ocram.c |  128 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 128 insertions(+)
+> Hi Boris,
+> 
+> On Wed, Mar 30, 2016 at 10:03:55PM +0200, Boris Brezillon wrote:
+> > Prefix those function as deprecated to encourage all existing users to
+> > switch to pwm_apply_state().
+> 
+> Why not keep at least some of them as wrappers where we do not need to
+> chnage several parameters at once? It is much easier to have a driver
+> do:
+> 
+> 	error = pwm_enable(pwm);
+> 	if (error)
+> 		...
+> 
+> rather than declaring the state variable, fectch it, adjust and then
+> apply.
 
-diff --git a/arch/arm/mach-socfpga/ocram.c b/arch/arm/mach-socfpga/ocram.c
-index 60ec643..d4a524c 100644
---- a/arch/arm/mach-socfpga/ocram.c
-+++ b/arch/arm/mach-socfpga/ocram.c
-@@ -13,12 +13,15 @@
-  * You should have received a copy of the GNU General Public License along with
-  * this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
-+#include <linux/delay.h>
- #include <linux/io.h>
- #include <linux/genalloc.h>
- #include <linux/module.h>
- #include <linux/of_address.h>
- #include <linux/of_platform.h>
- 
-+#include "core.h"
-+
- #define ALTR_OCRAM_CLEAR_ECC          0x00000018
- #define ALTR_OCRAM_ECC_EN             0x00000019
- 
-@@ -47,3 +50,128 @@ void socfpga_init_ocram_ecc(void)
- 
- 	iounmap(mapped_ocr_edac_addr);
- }
-+
-+/* Arria10 OCRAM Section */
-+#define ALTR_A10_ECC_CTRL_OFST          0x08
-+#define ALTR_A10_OCRAM_ECC_EN_CTL       (BIT(1) | BIT(0))
-+#define ALTR_A10_ECC_INITA              BIT(16)
-+
-+#define ALTR_A10_ECC_INITSTAT_OFST      0x0C
-+#define ALTR_A10_ECC_INITCOMPLETEA      BIT(0)
-+#define ALTR_A10_ECC_INITCOMPLETEB      BIT(8)
-+
-+#define ALTR_A10_ECC_ERRINTEN_OFST      0x10
-+#define ALTR_A10_ECC_SERRINTEN          BIT(0)
-+
-+#define ALTR_A10_ECC_INTSTAT_OFST       0x20
-+#define ALTR_A10_ECC_SERRPENA           BIT(0)
-+#define ALTR_A10_ECC_DERRPENA           BIT(8)
-+#define ALTR_A10_ECC_ERRPENA_MASK       (ALTR_A10_ECC_SERRPENA | \
-+					 ALTR_A10_ECC_DERRPENA)
-+/* ECC Manager Defines */
-+#define A10_SYSMGR_ECC_INTMASK_SET_OFST   0x94
-+#define A10_SYSMGR_ECC_INTMASK_CLR_OFST   0x98
-+#define A10_SYSMGR_ECC_INTMASK_OCRAM      BIT(1)
-+
-+#define ALTR_A10_ECC_INIT_WATCHDOG_10US   10000
-+
-+static void ecc_set_bits(u32 bit_mask, void __iomem *ioaddr)
-+{
-+	u32 value = readl(ioaddr);
-+
-+	value |= bit_mask;
-+	writel(value, ioaddr);
-+}
-+
-+static void ecc_clear_bits(u32 bit_mask, void __iomem *ioaddr)
-+{
-+	u32 value = readl(ioaddr);
-+
-+	value &= ~bit_mask;
-+	writel(value, ioaddr);
-+}
-+
-+static int ecc_test_bits(u32 bit_mask, void __iomem *ioaddr)
-+{
-+	u32 value = readl(ioaddr);
-+
-+	return (value & bit_mask) ? 1 : 0;
-+}
-+
-+/*
-+ * This function uses the memory initialization block in the Arria10 ECC
-+ * controller to initialize/clear the entire memory data and ECC data.
-+ */
-+static int altr_init_memory_port(void __iomem *ioaddr)
-+{
-+	int limit = ALTR_A10_ECC_INIT_WATCHDOG_10US;
-+
-+	ecc_set_bits(ALTR_A10_ECC_INITA, (ioaddr + ALTR_A10_ECC_CTRL_OFST));
-+	while (limit--) {
-+		if (ecc_test_bits(ALTR_A10_ECC_INITCOMPLETEA,
-+				  (ioaddr + ALTR_A10_ECC_INITSTAT_OFST)))
-+			break;
-+		udelay(1);
-+	}
-+	if (limit < 0)
-+		return -EBUSY;
-+
-+	/* Clear any pending ECC interrupts */
-+	writel(ALTR_A10_ECC_ERRPENA_MASK,
-+	       (ioaddr + ALTR_A10_ECC_INTSTAT_OFST));
-+
-+	return 0;
-+}
-+
-+void socfpga_init_arria10_ocram_ecc(void)
-+{
-+	struct device_node *np;
-+	int ret = 0;
-+	void __iomem *ecc_block_base;
-+
-+	if (!sys_manager_base_addr) {
-+		pr_err("SOCFPGA: sys-mgr is not initialized\n");
-+		return;
-+	}
-+
-+	/* Find the OCRAM EDAC device tree node */
-+	np = of_find_compatible_node(NULL, NULL, "altr,socfpga-a10-ocram-ecc");
-+	if (!np) {
-+		pr_err("Unable to find socfpga-a10-ocram-ecc\n");
-+		return;
-+	}
-+
-+	/* Map the ECC Block */
-+	ecc_block_base = of_iomap(np, 0);
-+	of_node_put(np);
-+	if (!ecc_block_base) {
-+		pr_err("Unable to map OCRAM ECC block\n");
-+		return;
-+	}
-+
-+	/* Disable ECC */
-+	writel(ALTR_A10_OCRAM_ECC_EN_CTL,
-+	       sys_manager_base_addr + A10_SYSMGR_ECC_INTMASK_SET_OFST);
-+	ecc_clear_bits(ALTR_A10_ECC_SERRINTEN,
-+		       (ecc_block_base + ALTR_A10_ECC_ERRINTEN_OFST));
-+	ecc_clear_bits(ALTR_A10_OCRAM_ECC_EN_CTL,
-+		       (ecc_block_base + ALTR_A10_ECC_CTRL_OFST));
-+
-+	/* Use HW initialization block to initialize memory for ECC */
-+	ret = altr_init_memory_port(ecc_block_base);
-+	if (ret) {
-+		pr_err("ECC: cannot init OCRAM PORTA memory\n");
-+		return;
-+	}
-+
-+	/* Enable ECC */
-+	ecc_set_bits(ALTR_A10_OCRAM_ECC_EN_CTL,
-+		     (ecc_block_base + ALTR_A10_ECC_CTRL_OFST));
-+	ecc_set_bits(ALTR_A10_ECC_SERRINTEN,
-+		     (ecc_block_base + ALTR_A10_ECC_ERRINTEN_OFST));
-+	writel(ALTR_A10_OCRAM_ECC_EN_CTL,
-+	       sys_manager_base_addr + A10_SYSMGR_ECC_INTMASK_CLR_OFST);
-+
-+	/* Ensure all writes complete */
-+	wmb();
-+}
+True. Actually deprecating the non-atomic API was not my primary goal.
+Thierry would you mind if we keep both APIs around?
+
+> 
+> > 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > ---
+> >  include/linux/pwm.h | 24 ++++++++++++------------
+> >  1 file changed, 12 insertions(+), 12 deletions(-)
+> > 
+> > diff --git a/include/linux/pwm.h b/include/linux/pwm.h
+> > index 4aad4eb..9bac10f 100644
+> > --- a/include/linux/pwm.h
+> > +++ b/include/linux/pwm.h
+> > @@ -225,8 +225,8 @@ int pwm_apply_state(struct pwm_device *pwm, struct pwm_state *state);
+> >   *
+> >   * Returns: 0 on success or a negative error code on failure.
+> >   */
+> > -static inline int pwm_config(struct pwm_device *pwm, int duty_ns,
+> > -			     int period_ns)
+> > +static inline int __deprecated pwm_config(struct pwm_device *pwm, int duty_ns,
+> > +					  int period_ns)
+> >  {
+> >  	struct pwm_state pstate;
+> >  
+> > @@ -252,8 +252,8 @@ static inline int pwm_config(struct pwm_device *pwm, int duty_ns,
+> >   *
+> >   * Returns: 0 on success or a negative error code on failure.
+> >   */
+> > -static inline int pwm_set_polarity(struct pwm_device *pwm,
+> > -				   enum pwm_polarity polarity)
+> > +static inline int __deprecated pwm_set_polarity(struct pwm_device *pwm,
+> > +						enum pwm_polarity polarity)
+> >  {
+> >  	struct pwm_state pstate;
+> >  
+> > @@ -284,7 +284,7 @@ static inline int pwm_set_polarity(struct pwm_device *pwm,
+> >   *
+> >   * Returns: 0 on success or a negative error code on failure.
+> >   */
+> > -static inline int pwm_enable(struct pwm_device *pwm)
+> > +static inline int __deprecated pwm_enable(struct pwm_device *pwm)
+> >  {
+> >  	struct pwm_state pstate;
+> >  
+> > @@ -303,7 +303,7 @@ static inline int pwm_enable(struct pwm_device *pwm)
+> >   * pwm_disable() - stop a PWM output toggling
+> >   * @pwm: PWM device
+> >   */
+> > -static inline void pwm_disable(struct pwm_device *pwm)
+> > +static inline void __deprecated pwm_disable(struct pwm_device *pwm)
+> >  {
+> >  	struct pwm_state pstate;
+> >  
+> > @@ -360,24 +360,24 @@ static inline int pwm_apply_state(struct pwm_device *pwm,
+> >  	return -ENOTSUPP;
+> >  }
+> >  
+> > -static inline int pwm_config(struct pwm_device *pwm, int duty_ns,
+> > -			     int period_ns)
+> > +static inline int __deprecated pwm_config(struct pwm_device *pwm, int duty_ns,
+> > +					  int period_ns)
+> >  {
+> >  	return -EINVAL;
+> >  }
+> >  
+> > -static inline int pwm_set_polarity(struct pwm_device *pwm,
+> > -				   enum pwm_polarity polarity)
+> > +static inline int __deprecated pwm_set_polarity(struct pwm_device *pwm,
+> > +						enum pwm_polarity polarity)
+> >  {
+> >  	return -ENOTSUPP;
+> >  }
+> >  
+> > -static inline int pwm_enable(struct pwm_device *pwm)
+> > +static inline int __deprecated pwm_enable(struct pwm_device *pwm)
+> >  {
+> >  	return -EINVAL;
+> >  }
+> >  
+> > -static inline void pwm_disable(struct pwm_device *pwm)
+> > +static inline void __deprecated pwm_disable(struct pwm_device *pwm)
+> >  {
+> >  }
+> >  
+> > -- 
+> > 2.5.0
+> > 
+> 
+
+
+
 -- 
-1.7.9.5
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
