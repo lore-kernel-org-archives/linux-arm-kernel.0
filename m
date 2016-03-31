@@ -1,24 +1,35 @@
-From: kaloz@openwrt.org (Imre Kaloz)
-Date: Thu, 31 Mar 2016 11:01:10 +0200
-Subject: [PATCH] ARM: mvebu: fix GPIO config on the Linksys boards
-In-Reply-To: <87vb44ux8w.fsf@free-electrons.com>
-References: <1438368120-23860-1-git-send-email-kaloz@openwrt.org>
- <op.ye4rq1ae2s3iss@ecaz> <87vb44ux8w.fsf@free-electrons.com>
-Message-ID: <op.ye6lz8sa2s3iss@ecaz>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 31 Mar 2016 17:01:23 +0800
+Subject: [PATCH] net: mvpp2: fix maybe-uninitialized warning
+Message-ID: <1459414883-6295-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+This is to fix the following maybe-uninitialized warning:
 
-On Wed, 30 Mar 2016 11:32:31 +0200, Gregory CLEMENT  
-<gregory.clement@free-electrons.com> wrote:
+drivers/net/ethernet/marvell/mvpp2.c:6007:18: warning: 'err' may be
+used uninitialized in this function [-Wmaybe-uninitialized]
 
-> Now it is applied on mvebu/dt
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ drivers/net/ethernet/marvell/mvpp2.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Thank you very much. I'll send another patch to handle the WRT1900ACS (aka  
-Shelby) today then. It's pretty much the same as the Cobra, I hope the  
-mwlwifi driver will be merged soon and I can submit the bindings for that  
-as well.
-
-
-Imre
+diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
+index c797971a..e9aa8d9 100644
+--- a/drivers/net/ethernet/marvell/mvpp2.c
++++ b/drivers/net/ethernet/marvell/mvpp2.c
+@@ -6059,8 +6059,10 @@ static int mvpp2_port_init(struct mvpp2_port *port)
+ 
+ 		/* Map physical Rx queue to port's logical Rx queue */
+ 		rxq = devm_kzalloc(dev, sizeof(*rxq), GFP_KERNEL);
+-		if (!rxq)
++		if (!rxq) {
++			err = -ENOMEM;
+ 			goto err_free_percpu;
++		}
+ 		/* Map this Rx queue to a physical queue */
+ 		rxq->id = port->first_rxq + queue;
+ 		rxq->port = port->id;
+-- 
+2.8.0.rc3
