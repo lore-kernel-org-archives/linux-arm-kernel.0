@@ -1,43 +1,29 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 31 Mar 2016 14:45:37 +0800
-Subject: [PATCH] net: mvneta: remove useless RX descriptor prefetch
-In-Reply-To: <1459406190-2334-1-git-send-email-jszhang@marvell.com>
-References: <1459406190-2334-1-git-send-email-jszhang@marvell.com>
-Message-ID: <20160331144537.20f04a8c@xhacker>
+From: yao.yuan@freescale.com (Yuan Yao)
+Date: Thu, 31 Mar 2016 14:44:59 +0800
+Subject: [PATCH 0/2] dts/ls1043a: add the DTS node for QSPI support
+Message-ID: <1459406701-40993-1-git-send-email-yao.yuan@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Yuan Yao <yao.yuan@nxp.com>
 
-+ linux arm kernel
+The QSPI controller on LS1043A is the same with the QSPI on LS1021A.
+We shuld add the QSPI support on LS1043A.
 
-On Thu, 31 Mar 2016 14:36:30 +0800 Jisheng Zhang wrote:
+So this patch try to add the dts node and binding Documentation.
 
-> The rx descriptors are allocated using dma_alloc_coherent, so prefetch
-> doesn't really happen at all.
+Depend on the patch:
+arm64: dts: add LS1043a-QDS board support
+https://patchwork.kernel.org/patch/8528821/
 
-This is for RFC, I'm sorry to send it without changing its title -- s/PATCH/RFC.
+Yuan Yao (2):
+  Documentation: fsl-quadspi: Add fsl, ls1043a-qspi compatible string
+  dts/ls1043a: add the DTS node for QSPI support
 
-I'm not sure whether there's any benefit to prefetch on space allocated from
-dma_alloc_coherent.
+ Documentation/devicetree/bindings/mtd/fsl-quadspi.txt |  3 ++-
+ arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts     | 16 ++++++++++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi        | 14 ++++++++++++++
+ 3 files changed, 32 insertions(+), 1 deletion(-)
 
-Thanks
-
-> 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> ---
->  drivers/net/ethernet/marvell/mvneta.c | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-> index 5880871..6c09a27 100644
-> --- a/drivers/net/ethernet/marvell/mvneta.c
-> +++ b/drivers/net/ethernet/marvell/mvneta.c
-> @@ -757,7 +757,6 @@ mvneta_rxq_next_desc_get(struct mvneta_rx_queue *rxq)
->  	int rx_desc = rxq->next_desc_to_proc;
->  
->  	rxq->next_desc_to_proc = MVNETA_QUEUE_NEXT_DESC(rxq, rx_desc);
-> -	prefetch(rxq->descs + rxq->next_desc_to_proc);
->  	return rxq->descs + rx_desc;
->  }
->  
+-- 
+2.1.0.27.g96db324
