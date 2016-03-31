@@ -1,41 +1,103 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 31 Mar 2016 18:05:55 +0900
-Subject: [PATCH v7 10/20] MAINTAINERS: Add samsung bus frequency driver entry
+Date: Thu, 31 Mar 2016 18:05:59 +0900
+Subject: [PATCH v7 14/20] ARM: dts: Add bus nodes using VDD_MIF for Exynos4x12
 In-Reply-To: <1459415165-32613-1-git-send-email-cw00.choi@samsung.com>
 References: <1459415165-32613-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1459415165-32613-11-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1459415165-32613-15-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the 'BUS FREQUENCY DRIVER FOR SAMSUNG EXYNOS' entry to review the
-patches as maintainer. I can access the all datasheet of Exynos SoC and test it
-on some Exynos-based board. Patches will be picked up by DEVFREQ maintainer
-on devfreq git repository.
+This patch adds the bus nodes using VDD_MIF for Exynos4x12 SoC.
+Exynos4x12 has the following AXI buses to translate data
+between DRAM and DMC/ACP/C2C.
 
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+[m.reichl and linux.amoon: Tested it on exynos4412-odroidu3 board]
+Tested-by: Markus Reichl <m.reichl@fivetechno.de>
+Tested-by: Anand Moon <linux.amoon@gmail.com>
 ---
- MAINTAINERS | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/boot/dts/exynos4x12.dtsi | 68 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 68 insertions(+)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 03e00c7c88eb..a7d276d0a9f7 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -3539,6 +3539,15 @@ F:	drivers/devfreq/devfreq-event.c
- F:	include/linux/devfreq-event.h
- F:	Documentation/devicetree/bindings/devfreq/event/
- 
-+BUS FREQUENCY DRIVER FOR SAMSUNG EXYNOS
-+M:	Chanwoo Choi <cw00.choi@samsung.com>
-+L:	linux-pm at vger.kernel.org
-+L:	linux-samsung-soc at vger.kernel.org
-+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/mzx/devfreq.git
-+S:	Maintained
-+F:	drivers/devfreq/exynos-bus.c
-+F:	Documentation/devicetree/bindings/devfreq/exynos-bus.txt
+diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
+index 84a23f962946..99a0f4ca3d47 100644
+--- a/arch/arm/boot/dts/exynos4x12.dtsi
++++ b/arch/arm/boot/dts/exynos4x12.dtsi
+@@ -281,6 +281,74 @@
+ 		clocks = <&clock CLK_SMMU_LITE1>, <&clock CLK_FIMC_LITE1>;
+ 		#iommu-cells = <0>;
+ 	};
 +
- DEVICE NUMBER REGISTRY
- M:	Torben Mathiasen <device@lanana.org>
- W:	http://lanana.org/docs/device-list/index.html
++	bus_dmc: bus_dmc {
++		compatible = "samsung,exynos-bus";
++		clocks = <&clock CLK_DIV_DMC>;
++		clock-names = "bus";
++		operating-points-v2 = <&bus_dmc_opp_table>;
++		status = "disabled";
++	};
++
++	bus_acp: bus_acp {
++		compatible = "samsung,exynos-bus";
++		clocks = <&clock CLK_DIV_ACP>;
++		clock-names = "bus";
++		operating-points-v2 = <&bus_acp_opp_table>;
++		status = "disabled";
++	};
++
++	bus_c2c: bus_c2c {
++		compatible = "samsung,exynos-bus";
++		clocks = <&clock CLK_DIV_C2C>;
++		clock-names = "bus";
++		operating-points-v2 = <&bus_dmc_opp_table>;
++		status = "disabled";
++	};
++
++	bus_dmc_opp_table: opp_table1 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp at 100000000 {
++			opp-hz = /bits/ 64 <100000000>;
++			opp-microvolt = <900000>;
++		};
++		opp at 134000000 {
++			opp-hz = /bits/ 64 <134000000>;
++			opp-microvolt = <900000>;
++		};
++		opp at 160000000 {
++			opp-hz = /bits/ 64 <160000000>;
++			opp-microvolt = <900000>;
++		};
++		opp at 267000000 {
++			opp-hz = /bits/ 64 <267000000>;
++			opp-microvolt = <950000>;
++		};
++		opp at 400000000 {
++			opp-hz = /bits/ 64 <400000000>;
++			opp-microvolt = <1050000>;
++		};
++	};
++
++	bus_acp_opp_table: opp_table2 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp at 100000000 {
++			opp-hz = /bits/ 64 <100000000>;
++		};
++		opp at 134000000 {
++			opp-hz = /bits/ 64 <134000000>;
++		};
++		opp at 160000000 {
++			opp-hz = /bits/ 64 <160000000>;
++		};
++		opp at 267000000 {
++			opp-hz = /bits/ 64 <267000000>;
++		};
++	};
+ };
+ 
+ &combiner {
 -- 
 1.9.1
