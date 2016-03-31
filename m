@@ -1,69 +1,52 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 31 Mar 2016 16:34:41 +0800
-Subject: [PATCH 05/18] ARM: dts: vf610: add modules required for PM
-In-Reply-To: <1457576219-7971-6-git-send-email-stefan@agner.ch>
-References: <1457576219-7971-1-git-send-email-stefan@agner.ch>
- <1457576219-7971-6-git-send-email-stefan@agner.ch>
-Message-ID: <20160331083441.GY28207@tiger>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 31 Mar 2016 10:46:44 +0200
+Subject: [GIT PULL] Reset controller changes for v4.7: shared resets
+Message-ID: <1459414004.4005.10.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 09, 2016 at 06:16:46PM -0800, Stefan Agner wrote:
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
->  arch/arm/boot/dts/vfxxx.dtsi | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
-> index b038ea4..335f4e5 100644
-> --- a/arch/arm/boot/dts/vfxxx.dtsi
-> +++ b/arch/arm/boot/dts/vfxxx.dtsi
-> @@ -434,6 +434,11 @@
->  				reg = <0x40050000 0x400>;
->  			};
->  
-> +			scsc: scsc at 40052000 {
-> +				compatible = "fsl,vf610-scsc";
+Dear arm-soc maintainers,
 
-These new compatible strings should be documented somewhere.
+this tag adds reference counted shared reset support for multiple
+consumers that use the same reset line for low power states.
+Also there is a cleanup patch for lpc18xx removing global variables.
 
-Shawn
+This is a rebased version of the late reset-for-4.6-2 tag. The patches
+are reordered so that Hans can base his USB changes on the reset/shared
+branch (reset-for-4.7~1) once this is merged into arm-soc.
 
-> +				reg = <0x40052000 0x1000>;
-> +			};
-> +
->  			usbphy0: usbphy at 40050800 {
->  				compatible = "fsl,vf610-usbphy";
->  				reg = <0x40050800 0x400>;
-> @@ -480,6 +485,13 @@
->  				status = "disabled";
->  			};
->  
-> +			wakeup: wkpu at 4006a000 {
-> +				compatible = "fsl,vf610-wkpu";
-> +				reg = <0x4006a000 0x1000>;
-> +				interrupts = <92 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&clks VF610_CLK_WKPU>;
-> +			};
-> +
->  			clks: ccm at 4006b000 {
->  				compatible = "fsl,vf610-ccm";
->  				reg = <0x4006b000 0x1000>;
-> @@ -600,6 +612,13 @@
->  				status = "disabled";
->  			};
->  
-> +			ddrmc: ddrmc at 400ae000 {
-> +				compatible = "fsl,vf610-ddrmc";
-> +				reg = <0x400ae000 0x400>;
-> +				clocks = <&clks VF610_CLK_DDRMC>;
-> +				clock-names = "ddrc";
-> +			};
-> +
->  			adc1: adc at 400bb000 {
->  				compatible = "fsl,vf610-adc";
->  				reg = <0x400bb000 0x1000>;
-> -- 
-> 2.7.2
-> 
-> 
+regards
+Philipp
+
+The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+
+  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/pza/linux.git tags/reset-for-4.7
+
+for you to fetch changes up to 773fe72630c8aca874ec8a07ebacace4ae305a02:
+
+  reset: lpc18xx: get rid of global variables for restart notifier (2016-03-30 15:42:07 +0200)
+
+----------------------------------------------------------------
+Reset controller changes for v4.7
+
+- add support for shared reset controls
+- remove global variables from the lpc18xx driver
+
+----------------------------------------------------------------
+Hans de Goede (3):
+      reset: Make [of_]reset_control_get[_foo] functions wrappers
+      reset: Share struct reset_control between reset_control_get calls
+      reset: Add support for shared reset controls
+
+Joachim Eastwood (1):
+      reset: lpc18xx: get rid of global variables for restart notifier
+
+ drivers/reset/core.c             | 217 ++++++++++++++++++++++-----------------
+ drivers/reset/reset-lpc18xx.c    |  22 ++--
+ include/linux/reset-controller.h |   2 +
+ include/linux/reset.h            | 188 +++++++++++++++++++++++++++------
+ 4 files changed, 289 insertions(+), 140 deletions(-)
