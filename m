@@ -1,50 +1,41 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Thu, 31 Mar 2016 21:51:37 +0800
-Subject: [PATCH V3 0/5] clk: support clocks which requires parent clock on
- during operation
-In-Reply-To: <CAOMZO5D=veSYdWbjksCk-qik3OnJ2i5Wkv8MrCZnTANibeDqLA@mail.gmail.com>
-References: <1438089585-30103-1-git-send-email-aisheng.dong@freescale.com>
- <CAOMZO5D=veSYdWbjksCk-qik3OnJ2i5Wkv8MrCZnTANibeDqLA@mail.gmail.com>
-Message-ID: <CAA+hA=Rfu58OXOFqxFK0CTwBXWPwzjM2n_52rdPbZL83YmpYRQ@mail.gmail.com>
+From: glider@google.com (Alexander Potapenko)
+Date: Thu, 31 Mar 2016 15:54:45 +0200
+Subject: [PATCH v1] arm64: allow building with kcov coverage on ARM64
+Message-ID: <57cb1b66d85b85eadea28ef3304a62b1327ded45.1459432254.git.glider@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+Add ARCH_HAS_KCOV to ARM64 config. Disable instrumentation of
+arch/arm64/lib/delay.c
 
-On Thu, Mar 31, 2016 at 12:00 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi Dong,
->
-> On Tue, Jul 28, 2015 at 10:19 AM, Dong Aisheng
-> <aisheng.dong@freescale.com> wrote:
->> This patch series adds support in clock framework for clocks which operations
->> requires its parent clock is on.
->>
->> Such clock type is initially met on Freescale i.MX7D platform that all clocks
->> operations, including enable/disable, rate change and re-parent, requires its
->> parent clock on. No sure if any other SoC has the similar clock type.
->>
->> Current clock core can not support such type of clock well.
->>
->> This patch introduce a new flag CLK_SET_PARENT_ON to handle this special case
->> in clock core that enable its parent clock firstly for each operation and disable
->> it later after operation complete.
->>
->> The most special case is for set_parent() operation which requires both parent,
->> old one and new one, to be enabled at the same time during the operation.
->>
->> The patch series is based on for-next branch of Michael's git:
->> git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git
->
-> Do you plan to resend this series?
+Signed-off-by: Alexander Potapenko <glider@google.com>
+---
+ arch/arm64/Kconfig      | 1 +
+ arch/arm64/lib/Makefile | 3 +++
+ 2 files changed, 4 insertions(+)
 
-It is in my TODO list.
-I'm currently busy with some other items.
-Will be able to do it in a few days.
-
-Regards
-Dong Aisheng
-
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 4f43622..c52aa61 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -7,6 +7,7 @@ config ARM64
+ 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+ 	select ARCH_HAS_ELF_RANDOMIZE
+ 	select ARCH_HAS_GCOV_PROFILE_ALL
++	select ARCH_HAS_KCOV
+ 	select ARCH_HAS_SG_CHAIN
+ 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
+ 	select ARCH_USE_CMPXCHG_LOCKREF
+diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
+index c86b790..b407bc1 100644
+--- a/arch/arm64/lib/Makefile
++++ b/arch/arm64/lib/Makefile
+@@ -1,3 +1,6 @@
++# Produces uninteresting flaky coverage.
++KCOV_INSTRUMENT_delay.o	:= n
++
+ lib-y		:= bitops.o clear_user.o delay.o copy_from_user.o	\
+ 		   copy_to_user.o copy_in_user.o copy_page.o		\
+ 		   clear_page.o memchr.o memcpy.o memmove.o memset.o	\
+-- 
+2.8.0.rc3.226.g39d4020
