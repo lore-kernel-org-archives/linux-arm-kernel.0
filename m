@@ -1,45 +1,124 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 31 Mar 2016 19:02:01 +0200
-Subject: [PATCH v4 3/8] Documentation: devicetree: rockchip: Document
- GeekBox
-In-Reply-To: <1682289.HWd4yLL18I@diego>
-References: <1458136727-32075-1-git-send-email-afaerber@suse.de>
- <56FAE95E.6060900@suse.de> <1682289.HWd4yLL18I@diego>
-Message-ID: <1913373.6hKqMKImXt@phil>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Thu, 31 Mar 2016 20:04:20 +0300
+Subject: [PATCH v7 1/5] of/serial: move earlycon early_param handling to
+ serial
+In-Reply-To: <20160331163203.GC10256@kroah.com>
+References: <1459431629-27934-1-git-send-email-aleksey.makarov@linaro.org>
+ <1459431629-27934-2-git-send-email-aleksey.makarov@linaro.org>
+ <20160331163203.GC10256@kroah.com>
+Message-ID: <56FD5894.3060105@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 29. M?rz 2016, 23:21:51 schrieb Heiko St?bner:
-> Am Dienstag, 29. M?rz 2016, 22:45:18 schrieb Andreas F?rber:
-> > Am 29.03.2016 um 22:13 schrieb Heiko St?bner:
-> > > Am Mittwoch, 16. M?rz 2016, 14:58:41 schrieb Andreas F?rber:
-> > >> Use "geekbuying,geekbox" compatible string.
-> > >> 
-> > >> Acked-by: Rob Herring <robh@kernel.org>
-> > >> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> > > 
-> > > I've folded this patch into the geekbox dts patch, carrying Rob's Ack
-> > > for
-> > > the binding over.
-> > 
-> > Either you just made a mistake in my name or
-> > https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/Do
-> > cume ntation/devicetree/bindings/submitting-patches.txt needs an update.
-> > It clearly says:
-> > 
-> > "1) The Documentation/ portion of the patch should be a separate patch."
-> > 
-> > That's why I always do it this way.
+
+
+On 03/31/2016 07:32 PM, Greg Kroah-Hartman wrote:
+> On Thu, Mar 31, 2016 at 04:40:23PM +0300, Aleksey Makarov wrote:
+>> From: Leif Lindholm <leif.lindholm@linaro.org>
+>>
+>> We have multiple "earlycon" early_param handlers - merge the DT one into
+>> the main earlycon one.  It's a cleanup that also will be useful
+>> to defer setting up DT console until ACPI/DT decision is made.
+>>
+>> Rename the exported function to avoid clashing with the function from
+>> arch/microblaze/kernel/prom.c
+>>
+>> Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+>> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+>> Acked-by: Rob Herring <robh@kernel.org>
+>> ---
+>>  drivers/of/fdt.c              | 11 +----------
+>>  drivers/tty/serial/earlycon.c |  2 +-
+>>  include/linux/of_fdt.h        |  2 ++
+>>  3 files changed, 4 insertions(+), 11 deletions(-)
+>>
+>> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+>> index 3349d2a..b50f775 100644
+>> --- a/drivers/of/fdt.c
+>> +++ b/drivers/of/fdt.c
+>> @@ -805,7 +805,7 @@ static inline void early_init_dt_check_for_initrd(unsigned long node)
+>>  
+>>  #ifdef CONFIG_SERIAL_EARLYCON
+>>  
+>> -static int __init early_init_dt_scan_chosen_serial(void)
+>> +int __init early_init_dt_scan_chosen_stdout(void)
+>>  {
+>>  	int offset;
+>>  	const char *p, *q, *options = NULL;
+>> @@ -849,15 +849,6 @@ static int __init early_init_dt_scan_chosen_serial(void)
+>>  	}
+>>  	return -ENODEV;
+>>  }
+>> -
+>> -static int __init setup_of_earlycon(char *buf)
+>> -{
+>> -	if (buf)
+>> -		return 0;
+>> -
+>> -	return early_init_dt_scan_chosen_serial();
+>> -}
+>> -early_param("earlycon", setup_of_earlycon);
+>>  #endif
+>>  
+>>  /**
+>> diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
+>> index 067783f..7aae655 100644
+>> --- a/drivers/tty/serial/earlycon.c
+>> +++ b/drivers/tty/serial/earlycon.c
+>> @@ -209,7 +209,7 @@ static int __init param_setup_earlycon(char *buf)
+>>  	 * don't generate a warning from parse_early_params() in that case
+>>  	 */
+>>  	if (!buf || !buf[0])
+>> -		return 0;
+>> +		return early_init_dt_scan_chosen_stdout();
+>>  
+>>  	err = setup_earlycon(buf);
+>>  	if (err == -ENOENT || err == -EALREADY)
+>> diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
+>> index 2fbe868..5cfe322 100644
+>> --- a/include/linux/of_fdt.h
+>> +++ b/include/linux/of_fdt.h
+>> @@ -63,6 +63,7 @@ extern int early_init_dt_scan_chosen(unsigned long node, const char *uname,
+>>  				     int depth, void *data);
+>>  extern int early_init_dt_scan_memory(unsigned long node, const char *uname,
+>>  				     int depth, void *data);
+>> +extern int early_init_dt_scan_chosen_stdout(void);
+>>  extern void early_init_fdt_scan_reserved_mem(void);
+>>  extern void early_init_fdt_reserve_self(void);
+>>  extern void early_init_dt_add_memory_arch(u64 base, u64 size);
+>> @@ -91,6 +92,7 @@ extern void early_get_first_memblock_info(void *, phys_addr_t *);
+>>  extern u64 of_flat_dt_translate_address(unsigned long node);
+>>  extern void of_fdt_limit_memory(int limit);
+>>  #else /* CONFIG_OF_FLATTREE */
+>> +static inline int early_init_dt_scan_chosen_stdout(void) { return -ENODEV; }
 > 
-> looking at the dt-bindings git log, it seems that is handled in a variety
-> of ways :-) . Personally I'm doing completely new bindings separately but
-> the 125th addition of a board just inside the dts patch.
+> Doesn't this change the default logic?  Today you are returning 0 if you
+> don't have this config option set,
+
+I am not sure I understand this.  Which return value do you mean?
+
+1. early_init_dt_scan_chosen_stdout()
+
+Today if CONFIG_OF_FLATTREE is not set then early_init_dt_scan_chosen_stdout() does not exist.
+
+2. param_setup_earlycon()
+
+Today we have 2 handlers for "earlycon" option.  One (in fdt.c) is for the option without args,
+and another (earlycon.c) always expects agrs.  But both return 0 for the opposite cases becasue they
+can not check what another hander returns.
+
+Now we have just one handler and it can return correct value.
+
+>  and now you return -ENODEV, did you
+> test this out?
+
+Yes, I tested it.
+
+Thank you
+Aleksey Makarov
+
 > 
-> But I guess we can also move it out again into a separate patch if you
-> prefer that :-) .
-
-I've split out that documentation addition again and applied this separate 
-patch instead :-) .
-
-
-Heiko
+> thanks,
+> 
+> greg k-h
+> 
