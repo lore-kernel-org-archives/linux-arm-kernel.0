@@ -1,60 +1,51 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 01 Apr 2016 16:11:50 +0900
-Subject: [PATCH] ARM: dts: s3c: Fix DTC unit name warnings in S3C2416 and
- S3C6410
-Message-ID: <1459494710-16269-1-git-send-email-k.kozlowski@samsung.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 1 Apr 2016 15:15:32 +0800
+Subject: [PATCH] net: mvneta: replace MVNETA_CPU_D_CACHE_LINE_SIZE with
+ L1_CACHE_BYTES
+In-Reply-To: <20160331.164710.1998871529914699937.davem@davemloft.net>
+References: <1459338921-391-1-git-send-email-jszhang@marvell.com>
+ <20160331.151547.1889188465826831929.davem@davemloft.net>
+ <20160331223735.32904e42@free-electrons.com>
+ <20160331.164710.1998871529914699937.davem@davemloft.net>
+Message-ID: <20160401151532.3c596206@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix following DTC warnings in S3C2416 and S3C6410 boards:
+Hi David, Thomas,
 
-Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+On Thu, 31 Mar 2016 16:47:10 -0400 David Miller  wrote:
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- arch/arm/boot/dts/s3c2416-smdk2416.dts | 2 +-
- arch/arm/boot/dts/s3c6410-mini6410.dts | 2 +-
- arch/arm/boot/dts/s3c6410-smdk6410.dts | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+> From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Date: Thu, 31 Mar 2016 22:37:35 +0200
+> 
+> > Hello,
+> > 
+> > On Thu, 31 Mar 2016 15:15:47 -0400 (EDT), David Miller wrote:  
+> >> From: Jisheng Zhang <jszhang@marvell.com>
+> >> Date: Wed, 30 Mar 2016 19:55:21 +0800
+> >>   
+> >> > The mvneta is also used in some Marvell berlin family SoCs which may
+> >> > have 64bytes cacheline size. Replace the MVNETA_CPU_D_CACHE_LINE_SIZE
+> >> > usage with L1_CACHE_BYTES.
+> >> > 
+> >> > And since dma_alloc_coherent() is always cacheline size aligned, so
+> >> > remove the align checks.
+> >> > 
+> >> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>  
+> >> 
+> >> Applied.  
+> > 
+> > A new version of the patch was sent, which more rightfully uses
+> > cache_line_size(), see:
+> > 
+> >  "[PATCH v2] net: mvneta: replace MVNETA_CPU_D_CACHE_LINE_SIZE with cache_line_size"  
+> 
+> Sorry about that.
+> 
+> Send me a realtive fixup patch if you like.
+> 
 
-diff --git a/arch/arm/boot/dts/s3c2416-smdk2416.dts b/arch/arm/boot/dts/s3c2416-smdk2416.dts
-index f257926c13b7..15f3d1c1bb80 100644
---- a/arch/arm/boot/dts/s3c2416-smdk2416.dts
-+++ b/arch/arm/boot/dts/s3c2416-smdk2416.dts
-@@ -15,7 +15,7 @@
- 	model = "SMDK2416";
- 	compatible = "samsung,s3c2416";
- 
--	memory {
-+	memory at 30000000 {
- 		reg =  <0x30000000 0x4000000>;
- 	};
- 
-diff --git a/arch/arm/boot/dts/s3c6410-mini6410.dts b/arch/arm/boot/dts/s3c6410-mini6410.dts
-index a25debb50401..b7d84cf816c2 100644
---- a/arch/arm/boot/dts/s3c6410-mini6410.dts
-+++ b/arch/arm/boot/dts/s3c6410-mini6410.dts
-@@ -22,7 +22,7 @@
- 	model = "FriendlyARM Mini6410 board based on S3C6410";
- 	compatible = "friendlyarm,mini6410", "samsung,s3c6410";
- 
--	memory {
-+	memory at 50000000 {
- 		reg = <0x50000000 0x10000000>;
- 	};
- 
-diff --git a/arch/arm/boot/dts/s3c6410-smdk6410.dts b/arch/arm/boot/dts/s3c6410-smdk6410.dts
-index ecf35ec466f7..dbebd58a4764 100644
---- a/arch/arm/boot/dts/s3c6410-smdk6410.dts
-+++ b/arch/arm/boot/dts/s3c6410-smdk6410.dts
-@@ -22,7 +22,7 @@
- 	model = "SAMSUNG SMDK6410 board based on S3C6410";
- 	compatible = "samsung,mini6410", "samsung,s3c6410";
- 
--	memory {
-+	memory at 50000000 {
- 		reg = <0x50000000 0x8000000>;
- 	};
- 
--- 
-2.5.0
+Sorry about inconvenience, I'll send out fixup patch.
+
+Thanks,
+Jisheng
