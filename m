@@ -1,85 +1,45 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 1 Apr 2016 11:13:43 +0800
-Subject: [PATCH 4/4] mtd: provide helper to prepare buffers for DMA
- operations
-In-Reply-To: <1459427384-21374-5-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <201604011151.adkPJgri%fengguang.wu@intel.com>
+From: yangbo.lu@nxp.com (Yangbo Lu)
+Date: Fri, 1 Apr 2016 11:07:26 +0800
+Subject: [v7, 0/5] Fix eSDHC host version register bug
+Message-ID: <1459480051-3701-1-git-send-email-yangbo.lu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+This patchset is used to fix a host version register bug in the T4240-R1.0-R2.0
+eSDHC controller. To get the SoC version and revision, it's needed to add the
+GUTS driver to access the global utilities registers.
 
-[auto build test ERROR on spi/for-next]
-[also build test ERROR on v4.6-rc1 next-20160331]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+So, the first three patches are to add the GUTS driver.
+The following two patches are to enable GUTS driver support to get SVR in eSDHC
+driver and fix host version for T4240.
 
-url:    https://github.com/0day-ci/linux/commits/Boris-Brezillon/scatterlist-sg_table-from-virtual-pointer/20160331-203118
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi for-next
-config: m32r-m32104ut_defconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=m32r 
+Yangbo Lu (5):
+  ARM64: dts: ls2080a: add device configuration node
+  soc: fsl: add GUTS driver for QorIQ platforms
+  dt: move guts devicetree doc out of powerpc directory
+  powerpc/fsl: move mpc85xx.h to include/linux/fsl
+  mmc: sdhci-of-esdhc: fix host version for T4240-R1.0-R2.0
 
-All error/warnings (new ones prefixed by >>):
+ .../bindings/{powerpc => soc}/fsl/guts.txt         |   3 +
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi     |   6 ++
+ arch/powerpc/kernel/cpu_setup_fsl_booke.S          |   2 +-
+ drivers/clk/clk-qoriq.c                            |   3 +-
+ drivers/i2c/busses/i2c-mpc.c                       |   2 +-
+ drivers/iommu/fsl_pamu.c                           |   3 +-
+ drivers/mmc/host/Kconfig                           |   1 +
+ drivers/mmc/host/sdhci-of-esdhc.c                  |  23 ++++
+ drivers/net/ethernet/freescale/gianfar.c           |   2 +-
+ drivers/soc/Kconfig                                |   2 +-
+ drivers/soc/fsl/Kconfig                            |   8 ++
+ drivers/soc/fsl/Makefile                           |   1 +
+ drivers/soc/fsl/guts.c                             | 119 +++++++++++++++++++++
+ include/linux/fsl/guts.h                           |  98 ++++++++---------
+ .../asm/mpc85xx.h => include/linux/fsl/svr.h       |   4 +-
+ 15 files changed, 219 insertions(+), 58 deletions(-)
+ rename Documentation/devicetree/bindings/{powerpc => soc}/fsl/guts.txt (91%)
+ create mode 100644 drivers/soc/fsl/Kconfig
+ create mode 100644 drivers/soc/fsl/guts.c
+ rename arch/powerpc/include/asm/mpc85xx.h => include/linux/fsl/svr.h (97%)
 
-   In file included from include/linux/mtd/super.h:17:0,
-                    from fs/romfs/storage.c:13:
->> include/linux/mtd/mtd.h:426:10: error: expected ';', ',' or ')' before 'enum'
-             enum dma_data_direction dir)
-             ^
-   include/linux/mtd/mtd.h: In function 'mtd_unmap_buf':
->> include/linux/mtd/mtd.h:434:2: warning: 'return' with a value, in function returning void
-     return -ENOTSUPP;
-     ^
-   fs/romfs/storage.c: At top level:
-   include/linux/mtd/mtd.h:431:13: warning: 'mtd_unmap_buf' defined but not used [-Wunused-function]
-    static void mtd_unmap_buf(struct mtd_info *mtd, struct device *dev,
-                ^
---
-   In file included from include/linux/mtd/super.h:17:0,
-                    from fs/romfs/super.c:72:
->> include/linux/mtd/mtd.h:426:10: error: expected ';', ',' or ')' before 'enum'
-             enum dma_data_direction dir)
-             ^
-   include/linux/mtd/mtd.h: In function 'mtd_unmap_buf':
->> include/linux/mtd/mtd.h:434:2: warning: 'return' with a value, in function returning void
-     return -ENOTSUPP;
-     ^
-   fs/romfs/super.c: At top level:
-   include/linux/mtd/mtd.h:431:13: warning: 'mtd_unmap_buf' defined but not used [-Wunused-function]
-    static void mtd_unmap_buf(struct mtd_info *mtd, struct device *dev,
-                ^
-
-vim +426 include/linux/mtd/mtd.h
-
-   420			   struct sg_table *sgt, enum dma_data_direction dir);
-   421	#else
-   422	static inline int mtd_map_buf(struct mtd_info *mtd, struct device *dev,
-   423				      struct sg_table *sgt, const void *buf,
-   424				      size_t len,
-   425				      const struct sg_constraints *constraints
- > 426				      enum dma_data_direction dir)
-   427	{
-   428		return -ENOTSUPP;
-   429	}
-   430	
-   431	static void mtd_unmap_buf(struct mtd_info *mtd, struct device *dev,
-   432				  struct sg_table *sgt, enum dma_data_direction dir)
-   433	{
- > 434		return -ENOTSUPP;
-   435	}
-   436	#endif
-   437	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 10416 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160401/54de4e78/attachment-0001.obj>
+-- 
+2.1.0.27.g96db324
