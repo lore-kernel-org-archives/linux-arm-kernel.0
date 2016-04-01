@@ -1,32 +1,48 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Fri, 1 Apr 2016 09:59:47 +0800
-Subject: [PATCH v15 00/20] arm64 kexec kernel patches v15
-In-Reply-To: <cover.1457977401.git.geoff@infradead.org>
-References: <cover.1457977401.git.geoff@infradead.org>
-Message-ID: <20160401015947.GA3835@dhcp-128-65.nay.redhat.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 1 Apr 2016 10:25:07 +0800
+Subject: [PATCH 15/18] ARM: vf610: PM: initial suspend/resume support
+In-Reply-To: <1457576219-7971-16-git-send-email-stefan@agner.ch>
+References: <1457576219-7971-1-git-send-email-stefan@agner.ch>
+ <1457576219-7971-16-git-send-email-stefan@agner.ch>
+Message-ID: <20160401022507.GF18833@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/14/16 at 05:47pm, Geoff Levand wrote:
-> This series adds the core support for kexec re-boot and kdump on ARM64.  This
-> version of the series combines Takahiro's kdump patches with my kexec patches.
-> Please consider all patches for inclusion.
+On Wed, Mar 09, 2016 at 06:16:56PM -0800, Stefan Agner wrote:
+> Add system suspend and resume support for Vybrid SoC. The standby
+> sleep state puts the SoC in STOP mode. The SoC can be woken through
+> an interrupt from GPC (Global Power Controller). The GPC can use any
+> interrupt as wake-up source. To save power the main PLL1 is bypassed
+> and uses the 24MHz on-chip oscillator. However, memory clock need to
+> be at full speed, hence the PLL2 needs to be on to keep the memory
+> clocked. The mode is completely implemented in C since we can access
+> the full memory at all times. The mode provides most power saving
+> while being able to be woken by any IRQ as wake-up source.
 > 
-> To load a second stage kernel and execute a kexec re-boot or to work with kdump
-> on ARM64 systems a series of patches to kexec-tools [2], which have not yet been
-> merged upstream, are needed.  Please update to the latest if you have been using
-> an older version.
+> The mem sleep state (Suspend-to-RAM) uses Vybrid's LPSTOP2 mode. This
+> mode powergates most parts of the SoC expect some peripherials such as
+> Wake-Up controller (WKPU) or LP RTC. Parts of the internal SRAM is
+> retained too. The suspend code written in assembly runs from this SRAM.
+> The code puts the main memory (DDR3) into self-refresh mode and takes
+> it out of self-refresh mode on resume. Verified with Colibri VF50/VF61
+> V1.2A.
 > 
-> To examine vmcore (/proc/vmcore), you should use
->   - gdb v7.7 or later
->   - crash v7.1.1 or later
-> 
-> [1]  https://git.kernel.org/cgit/linux/kernel/git/geoff/linux-kexec.git
-> [2]  https://git.kernel.org/cgit/linux/kernel/git/geoff/kexec-tools.git
-> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+>  arch/arm/mach-imx/Makefile        |   3 +
+>  arch/arm/mach-imx/common.h        |  10 +
+>  arch/arm/mach-imx/mach-vf610.c    |   8 +
+>  arch/arm/mach-imx/pm-vf610.c      | 634 ++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-imx/suspend-vf610.S | 437 ++++++++++++++++++++++++++
+>  drivers/clk/imx/clk-vf610.c       |  17 +
+>  6 files changed, 1109 insertions(+)
+>  create mode 100644 arch/arm/mach-imx/pm-vf610.c
+>  create mode 100644 arch/arm/mach-imx/suspend-vf610.S
 
-Geoff, for easier to review maybe you can send kexec patches first then AKASHI Takahiro
-can send the kdump patches as a standalone patchset?
+I know this is how we implemented suspend for i.MX6.  But this is not
+the direction moving forward.  When people was pushing a pile of code
+adding suspend for i.MX7D, I refused to take it and asked them to push
+those hardware details into firmware and use PSCI to implement suspend.
+I would like to suggest the same for Vybrid.
 
-Thanks
-Dave
+Shawn
