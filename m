@@ -1,56 +1,87 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 1 Apr 2016 10:35:40 -0400
-Subject: [PATCH 04/11] ARM: dts: exynos: Fix DTC unit name warnings in
- Trats2 board
-In-Reply-To: <1459493874-2366-4-git-send-email-k.kozlowski@samsung.com>
-References: <1459493874-2366-1-git-send-email-k.kozlowski@samsung.com>
- <1459493874-2366-4-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <56FE873C.2090503@osg.samsung.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 1 Apr 2016 16:38:07 +0200
+Subject: usb: gadget breakage on N900: bind UDC by name passed via
+ usb_gadget_driver structure
+In-Reply-To: <CAB=otbTsAwBohbYmwBERpdG-ZdAUk_vJwoZoO8dUf_H-W4jREg@mail.gmail.com>
+References: <CAB=otbRd+hZaO6ihL3c88Ys_q-R4grmup4cfP70PT+N2JEQ3WQ@mail.gmail.com>
+ <CAB=otbQ=jJNk=CtB4hu51HXxOLxhWEDaeWf3V0Uc7Uh3veXsfg@mail.gmail.com>
+ <CAB=otbQ1J7FZm9vWLwor93+uD3Fv38ykduWMXG3qByNh4mV9=g@mail.gmail.com>
+ <20160327202657.GA31059@amd>
+ <CAB=otbTsAwBohbYmwBERpdG-ZdAUk_vJwoZoO8dUf_H-W4jREg@mail.gmail.com>
+Message-ID: <20160401143807.GF11860@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+Hi!
 
-On 04/01/2016 02:57 AM, Krzysztof Kozlowski wrote:
-> Fix following DTC warnings in Trats2 board:
+> >> > Dmesg from the n900 is attached as /tmp/delme.gz. I did _not_ apply
+> >> > the patch from https://lkml.org/lkml/2016/3/24/670 , yet, as I'm using
+> >> > devicetree boot.
+> >>
+> >> Hmm.. don't see anything strange in the boot log related to USB,
+> >> I'll try your config
+> >
+> > Let me know how it went.
 > 
-> Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
-> Warning (unit_address_vs_reg): Node /i2c-gpio-1/max77693 at 66/regulators/ESAFEOUT1 at 1 has a unit name, but no reg property
-> Warning (unit_address_vs_reg): Node /i2c-gpio-1/max77693 at 66/regulators/ESAFEOUT2 at 2 has a unit name, but no reg property
-> Warning (unit_address_vs_reg): Node /i2c-gpio-1/max77693 at 66/regulators/CHARGER at 0 has a unit name, but no reg property
-> Warning (unit_address_vs_reg): Node /thermistor-ap at 0 has a unit name, but no reg property
-> Warning (unit_address_vs_reg): Node /thermistor-battery at 1 has a unit name, but no reg property
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos4412-trats2.dts | 14 +++++++-------
->  1 file changed, 7 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
-> index 2bf363c3bf62..523627003738 100644
-> --- a/arch/arm/boot/dts/exynos4412-trats2.dts
-> +++ b/arch/arm/boot/dts/exynos4412-trats2.dts
-> @@ -29,7 +29,7 @@
->  		i2c12 = &i2c_max77693_fuel;
->  	};
->  
-> -	memory {
-> +	mmemory at 40000000 {
->  		reg =  <0x40000000 0x40000000>;
->  	};
-> 
+> I tried your config (with slight modifications) with vanilla kernel v4.5
+> (modifications: cmdline changed to default; used INITRAMFS_SOURCE
+> for prebuilt cpio archive with rootfs) and Device Tree booting.
+> Works fine for me except I need to unplug-plug usb cable or issue
+> # echo connect > /sys/devices/platform/68000000.ocp/480ab000
+> .usb_otg_hs/musb-hdrc.0.auto/udc/musb-hdrc.0.auto/soft_connect
+> to make connection.
+> The gadget driver successfully binds to the gadget, but I don't know
+> why the musb core doesn't issue pullup on USB lines during boot.
 
-Besides this creating duplicated memory nodes as you said, plain memory
-should be allowed according to Rob and he plans to add an exception to dtc:
+Hmm, strange. Unplug/replug of the USB cable results in:
 
-http://www.spinics.net/lists/arm-kernel/msg494038.html
- 
-Rest of the patch looks good so after removing the memory node change:
+<6>usb 1-5: new high-speed USB device number 100 using ehci-pci
+<3>usb 1-5: device descriptor read/64, error -32
+tail: /proc/kmsg: file truncated
+<3>usb 1-5: device descriptor read/64, error -32
+<3>usb 1-5: device descriptor read/64, error -32
+<3>usb 1-5: device descriptor read/8, error -32
+<3>usb 1-5: device descriptor read/8, error -32
+<6>usb 1-5: new high-speed USB device number 103 using ehci-pci
+<3>usb 1-5: device descriptor read/8, error -32
+<3>usb 1-5: device descriptor read/8, error -32
+<3>usb usb1-port5: unable to enumerate USB device
+<6>usb 4-1: new full-speed USB device number 80 using uhci_hcd
+<3>usb 4-1: device descriptor read/64, error -32
+<3>usb 4-1: device descriptor read/64, error -32
+<6>usb 4-1: new full-speed USB device number 81 using uhci_hcd
+<3>usb 4-1: device descriptor read/64, error -32
+<3>usb 4-1: device descriptor read/64, error -32
+<3>usb usb4-port1: unable to enumerate USB device
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+echo connect does not seem to do the trick, either:
 
-Best regards,
+root at n900:~# echo connect >
+/sys/devices/platform/68000000.ocp/480ab000.usb_otg_hs/musb-hdrc.0.auto/udc/musb-hdrc.0.auto/soft_connect
+-bash: echo: write error: Operation not supported
+root at n900:~# uname -a
+Linux n900 4.4.0-omap3-149558-g5cf5ee5-dirty #168 PREEMPT Tue Mar 29
+09:49:40 CEST 2016 armv7l GNU/Linux
+
+Hmm, documentation is not too helpful, either...
+
+What:           /sys/class/udc/<udc>/soft_connect
+Date:           June 2011
+KernelVersion:  3.1
+Contact:        Felipe Balbi <balbi@kernel.org>
+Description:
+		Allows users to disconnect data pullup resistors thus
+		causing a
+ 		logical disconnection from the USB
+ 		Host.
+
+Dmesg says:
+
+[  619.471374] udc musb-hdrc.0.auto: soft-connect without a gadget
+driver
+
+Any ideas?
+									Pavel
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
