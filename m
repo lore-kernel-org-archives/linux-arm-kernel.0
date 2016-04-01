@@ -1,50 +1,50 @@
-From: b-liu@ti.com (Bin Liu)
-Date: Fri, 1 Apr 2016 14:56:35 -0500
-Subject: [PATCH v2 06/11] phy: da8xx-usb: new driver for DA8XX SoC USB PHY
-In-Reply-To: <56FECFEB.2030708@cogentembedded.com>
-References: <1458181615-27782-1-git-send-email-david@lechnology.com>
- <1458181615-27782-7-git-send-email-david@lechnology.com>
- <56FE74AC.6080303@ti.com> <20160401144510.GA6264@uda0271908>
- <56FE9B8F.7050605@lechnology.com>
- <56FECFEB.2030708@cogentembedded.com>
-Message-ID: <20160401195635.GA29841@uda0271908>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Fri,  1 Apr 2016 14:58:33 -0500
+Subject: [GIT PULL] Qualcomm SoC Updates for v4.7
+Message-ID: <1459540713-6913-1-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 
-On Fri, Apr 01, 2016 at 10:45:47PM +0300, Sergei Shtylyov wrote:
-> On 04/01/2016 07:02 PM, David Lechner wrote:
-> 
-> >>>>+EXPORT_SYMBOL_GPL(da8xx_usb20_phy_set_mode);
-> >>>
-> >>>Don't prefer export symbols from PHY driver. That'll create unnecessary
-> >>>dependencies between the controller and the PHY.
-> >>
-> >>Agreed.
-> >>
-> >>>I think it'll be better to create a new attribute and use it?
-> >>
-> >>Another simpler option is to not support _set_mode() for DA8xx, and the
-> >>phy driver set the otgmode bit in probe() based on dr_mode of the
-> >>controller.
-> >>
-> >>Regards,
-> >>-Bin.
-> >
-> >This certainly works for my particular use case, however, Sergei Shtylyov, who
-> >wrote the da8xx musb glue layer originally, seemed to recall in his review of
-> >the patch series that this really is necessary for OTG mode to work properly.
-> 
->    No, it's still not necessary, however this method is now called
-> from musb_init_controller() (it wasn't in my time). ISTR however
-> that you needed to enforce the mode override in CFGCHIP2 for the
-> host mode to function properly.
+  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
 
-Yes, but I think we don't have to rely on musb_init_controller(), what
-we can do is the phy probe() calls of_usb_get_dr_mode_by_phy() to get
-the dr_mode of the controller then sets CFGCHIP2 bits accordingly, so
-that we can drop _set_mode() in the phy driver.
+are available in the git repository at:
 
-Regards,
--Bin.
+  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-soc-for-4.7
+
+for you to fetch changes up to 028021d29ea069390e1f60c6aa5b3511d218454b:
+
+  soc: qcom: smd: Support opening additional channels (2016-03-30 17:21:12 -0500)
+
+----------------------------------------------------------------
+Qualcomm ARM Based SoC Updates for v4.7
+
+* Add stubs for smem_state to fix build issues
+* Fix module usage in SPM driver
+* Add i2c and spi entries into QCOM MAINTAINERS entry
+* Add SMD multi channel support
+* Add clks to QCOM MAINTAINERS
+
+----------------------------------------------------------------
+Bjorn Andersson (6):
+      soc: qcom: smem_state: Add stubs for disabled smem_state
+      soc: qcom: smd: Introduce callback setter
+      soc: qcom: smd: Split discovery and state change work
+      soc: qcom: smd: Refactor channel open and close handling
+      soc: qcom: smd: Support multiple channels per sdev
+      soc: qcom: smd: Support opening additional channels
+
+Lina Iyer (1):
+      drivers: qcom: spm: avoid module usage in non-modular SPM driver
+
+Srinivas Kandagatla (2):
+      MAINTAINERS: add qcom i2c and spi drivers to list
+      MAINTAINERS: add qcom clocks to the maintainers list
+
+ MAINTAINERS                         |   3 +
+ drivers/soc/qcom/smd.c              | 229 +++++++++++++++++++++++++++---------
+ drivers/soc/qcom/spm.c              |   8 +-
+ include/linux/soc/qcom/smd.h        |   8 +-
+ include/linux/soc/qcom/smem_state.h |  35 ++++++
+ 5 files changed, 220 insertions(+), 63 deletions(-)
