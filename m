@@ -1,39 +1,149 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Fri, 01 Apr 2016 08:48:49 -0700
-Subject: [PATCH 2/3] ARM: multi_v7_defconfig: Switch BCM2835 to
- sdhci-iproc.c for MMC
-In-Reply-To: <56FDD697.2050901@wwwdotorg.org>
-References: <1459470504-5007-1-git-send-email-eric@anholt.net>
- <1459470504-5007-2-git-send-email-eric@anholt.net>
- <56FDD697.2050901@wwwdotorg.org>
-Message-ID: <87h9flnxcu.fsf@eliezer.anholt.net>
+From: shannon.zhao@linaro.org (Shannon Zhao)
+Date: Fri,  1 Apr 2016 23:48:58 +0800
+Subject: [PATCH v10 00/17] Add ACPI support for Xen Dom0 on ARM64
+Message-ID: <1459525755-36968-1-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> writes:
+This patch set adds ACPI support for Xen Dom0 on ARM64. The relevant Xen
+ACPI on ARM64 design document could be found from [1].
 
-> On 03/31/2016 06:28 PM, Eric Anholt wrote:
->> This approximately triples write performance for the SD card.  My card
->> is too full of important data to collect very reliable numbers, but I
->> see 271.361% +/- 166.742% improvement (n=3 before, 6 after), for 'dd
->> if=/dev/zero of=/boot/asdf bs=1M count=3 oflag=dsync,direct'.  Read
->> performance appears to be unaffected.
->
-> I thought that switching the defconfig wasn't possible, since this HW 
-> module relies on the SoC core clock, and that can be asynchronously 
-> changed by the FW running on the VideoCore. Consequently, this change 
-> isn't safe unless the user puts non-default options in their config.txt.
->
-> The same comment applies to "[PATCH 1/4] ARM: bcm2835: Switch BCM2835 to 
-> sdhci-iproc.c for MMC" in the other series.
+This patch set adds a new FDT node "uefi" under /hypervisor to pass UEFI
+information. Introduce a bus notifier of AMBA and Platform bus to map
+the new added device's MMIO space. Make Xen domain use
+xlated_setup_gnttab_pages to setup grant table and a new hypercall to
+get event-channel irq.
 
-I think you're thinking of SDHOST, the other controller?  This is just
-switching implementations for the EMMC controller so that eventually we
-can delete our old implementation.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160401/9c01358e/attachment.sig>
+Regarding the initialization flow of Linux kernel, it needs to move
+xen_early_init() before efi_init(). Then xen_early_init() will check
+whether it runs on Xen through the /hypervisor node and efi_init() will
+call a new function fdt_find_xen_uefi_params(), to parse those
+xen,uefi-* parameters just like the existing efi_get_fdt_params().
+
+And in arm64_enable_runtime_services() it will check whether it runs on
+Xen and call another new function xen_efi_runtime_setup() to setup
+runtime service instead of efi_native_runtime_setup(). The
+xen_efi_runtime_setup() will assign the runtime function pointers with
+the functions of driver/xen/efi.c.
+
+And since we pass a /hypervisor node and a /chosen node to Dom0, it
+needs to check whether the DTS only contains a /hypervisor node and a
+/chosen node in acpi_boot_table_init().
+
+Patches are tested on FVP base model. They can be fetched from[2].
+
+Thanks,
+Shannon
+
+[1] http://lists.xen.org/archives/html/xen-devel/2015-11/msg00488.html
+[2] https://git.linaro.org/people/shannon.zhao/linux-mainline.git ACPI_XEN_ARM_Linux_V10
+
+Changes since v9:
+* address Rafael's comments on patch 1
+* check the compatible string of hypervisor node in patch 12
+
+Changes since v8:
+* rebased on v4.6-rc1
+* print UART device address (PATCH 1)
+* use xen_for_each_gfn (PATCH 3)
+* reduce indentation by inverting the condition (PATCH 10)
+* move xen_early_init() before efi_init() as well for ARM (PATCH 11)
+* sync the document with Xen (PATCH 13)
+
+Changes since v7:
+* add __init prefix for acpi_get_spcr_uart_addr (PATCH 1)
+
+Changes since v6:
+* rebase on linux master
+* refactor codes as acpi_get_spcr_uart_addr (PATCH 1)
+* sync with Xen (patch 9)
+
+Changes since v5:
+* rebase on linux master
+* use acpi_dev_resource_memory to parse the device memory info(patch 1)
+* sync with Xen (patch 9)
+
+Changes since v4:
+* rebase on linux master
+* move the check acpi_device_should_be_hidden into
+  acpi_bus_type_and_status (patch 1)
+* use existing function fdt_subnode_offset (patch 16)
+
+Changes since v3:
+* rebase on linux master
+* print a warning when there is no SPCR table
+* rephase the commit message of PATCH 3
+* rephase the words of PATCH 13
+* use strcmp and factor the function in PATCH 16
+* Add several ACKs and RBs, thanks a lot
+
+
+Changes since v2:
+* Use 0 to check if it should ignore the UART
+* Fix the use of page_to_xen_pfn
+* Factor ACPI and DT parts in xen_guest_init
+* Check "uefi" node by full path
+* Fix the statement of Documentation/devicetree/bindings/arm/xen.txt
+
+Changes since v1:
+* Rebase on linux mainline and wallclock patch from Stefano
+* Refactor AMBA and platform device MMIO map to one file
+* Use EFI_PARAVIRT to check if it supports XEN EFI
+* Refactor Xen EFI codes
+* Address other comments
+
+Shannon Zhao (17):
+  Xen: ACPI: Hide UART used by Xen
+  xen/grant-table: Move xlated_setup_gnttab_pages to common place
+  Xen: xlate: Use page_to_xen_pfn instead of page_to_pfn
+  arm/xen: Use xen_xlate_map_ballooned_pages to setup grant table
+  xen: memory : Add new XENMAPSPACE type XENMAPSPACE_dev_mmio
+  Xen: ARM: Add support for mapping platform device mmio
+  Xen: ARM: Add support for mapping AMBA device mmio
+  Xen: public/hvm: sync changes of HVM_PARAM_CALLBACK_VIA ABI from Xen
+  xen/hvm/params: Add a new delivery type for event-channel in
+    HVM_PARAM_CALLBACK_IRQ
+  arm/xen: Get event-channel irq through HVM_PARAM when booting with
+    ACPI
+  ARM: XEN: Move xen_early_init() before efi_init()
+  ARM64: ACPI: Check if it runs on Xen to enable or disable ACPI
+  ARM: Xen: Document UEFI support on Xen ARM virtual platforms
+  XEN: EFI: Move x86 specific codes to architecture directory
+  ARM64: XEN: Add a function to initialize Xen specific UEFI runtime
+    services
+  FDT: Add a helper to get the subnode by given name
+  Xen: EFI: Parse DT parameters for Xen specific UEFI
+
+ Documentation/devicetree/bindings/arm/xen.txt |  35 +++++
+ arch/arm/include/asm/xen/xen-ops.h            |   6 +
+ arch/arm/kernel/setup.c                       |   2 +-
+ arch/arm/xen/Makefile                         |   1 +
+ arch/arm/xen/efi.c                            |  40 ++++++
+ arch/arm/xen/enlighten.c                      | 109 +++++++++++----
+ arch/arm64/include/asm/xen/xen-ops.h          |   6 +
+ arch/arm64/kernel/acpi.c                      |  14 +-
+ arch/arm64/kernel/setup.c                     |   2 +-
+ arch/arm64/xen/Makefile                       |   1 +
+ arch/x86/xen/efi.c                            | 112 ++++++++++++++++
+ arch/x86/xen/grant-table.c                    |  57 +-------
+ drivers/acpi/scan.c                           |  71 ++++++++++
+ drivers/firmware/efi/arm-runtime.c            |  17 ++-
+ drivers/firmware/efi/efi.c                    |  45 ++++++-
+ drivers/of/fdt.c                              |  13 ++
+ drivers/xen/Kconfig                           |   2 +-
+ drivers/xen/Makefile                          |   1 +
+ drivers/xen/arm-device.c                      | 184 ++++++++++++++++++++++++++
+ drivers/xen/efi.c                             | 174 +++++-------------------
+ drivers/xen/xlate_mmu.c                       |  77 +++++++++++
+ include/linux/of_fdt.h                        |   2 +
+ include/xen/interface/hvm/params.h            |  40 +++++-
+ include/xen/interface/memory.h                |   1 +
+ include/xen/xen-ops.h                         |  32 +++--
+ 25 files changed, 796 insertions(+), 248 deletions(-)
+ create mode 100644 arch/arm/include/asm/xen/xen-ops.h
+ create mode 100644 arch/arm/xen/efi.c
+ create mode 100644 arch/arm64/include/asm/xen/xen-ops.h
+ create mode 100644 drivers/xen/arm-device.c
+
+-- 
+2.1.4
