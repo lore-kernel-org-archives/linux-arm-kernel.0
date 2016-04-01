@@ -1,186 +1,83 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri,  1 Apr 2016 16:16:13 +0200
-Subject: [PATCH 1/2] reset: Add Oxford Semiconductor Reset Controller driver
+Date: Fri,  1 Apr 2016 16:16:14 +0200
+Subject: [PATCH 2/2] dt-bindings: Add Oxford Semiconductor Reset Controller
+ bindings
 In-Reply-To: <1459520174-12897-1-git-send-email-narmstrong@baylibre.com>
 References: <1459520174-12897-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1459520174-12897-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1459520174-12897-3-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add System reset controller driver for Oxford Semiconductor OXNAS SoC Family.
-
-CC: Ma Haijun <mahaijuns@gmail.com>
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- drivers/reset/Kconfig       |   3 +
- drivers/reset/Makefile      |   1 +
- drivers/reset/reset-oxnas.c | 136 ++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 140 insertions(+)
- create mode 100644 drivers/reset/reset-oxnas.c
+ .../devicetree/bindings/reset/oxnas,reset.txt      | 58 ++++++++++++++++++++++
+ 1 file changed, 58 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/reset/oxnas,reset.txt
 
-diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
-index df37212..0b2733d 100644
---- a/drivers/reset/Kconfig
-+++ b/drivers/reset/Kconfig
-@@ -12,5 +12,8 @@ menuconfig RESET_CONTROLLER
- 
- 	  If unsure, say no.
- 
-+config RESET_OXNAS
-+	bool
-+
- source "drivers/reset/sti/Kconfig"
- source "drivers/reset/hisilicon/Kconfig"
-diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-index a1fc8ed..f173fc3 100644
---- a/drivers/reset/Makefile
-+++ b/drivers/reset/Makefile
-@@ -8,3 +8,4 @@ obj-$(CONFIG_ARCH_STI) += sti/
- obj-$(CONFIG_ARCH_HISI) += hisilicon/
- obj-$(CONFIG_ARCH_ZYNQ) += reset-zynq.o
- obj-$(CONFIG_ATH79) += reset-ath79.o
-+obj-$(CONFIG_RESET_OXNAS) += reset-oxnas.o
-diff --git a/drivers/reset/reset-oxnas.c b/drivers/reset/reset-oxnas.c
+diff --git a/Documentation/devicetree/bindings/reset/oxnas,reset.txt b/Documentation/devicetree/bindings/reset/oxnas,reset.txt
 new file mode 100644
-index 0000000..c60fb2d
+index 0000000..6f06db9
 --- /dev/null
-+++ b/drivers/reset/reset-oxnas.c
-@@ -0,0 +1,136 @@
-+/*
-+ * drivers/reset/reset-oxnas.c
-+ *
-+ * Copyright (C) 2016 Neil Armstrong <narmstrong@baylibre.com>
-+ * Copyright (C) 2014 Ma Haijun <mahaijuns@gmail.com>
-+ * Copyright (C) 2009 Oxford Semiconductor Ltd
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#include <linux/err.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/reset-controller.h>
-+#include <linux/slab.h>
-+#include <linux/delay.h>
-+#include <linux/types.h>
-+#include <linux/regmap.h>
-+#include <linux/mfd/syscon.h>
++++ b/Documentation/devicetree/bindings/reset/oxnas,reset.txt
+@@ -0,0 +1,58 @@
++Oxford Semiconductor OXNAS SoC Family RESET Controller
++================================================
 +
-+/* Regmap offsets */
-+#define RST_SET_REGOFFSET	0x34
-+#define RST_CLR_REGOFFSET	0x38
++Please also refer to reset.txt in this directory for common reset
++controller binding usage.
 +
-+struct oxnas_reset {
-+	struct regmap *regmap;
-+	struct reset_controller_dev rcdev;
++Required properties:
++- compatible: Should be "oxsemi,ox810se-reset"
++- #reset-cells: 1, see below
++
++Parent node should have the following properties :
++- compatible: Should be "oxsemi,ox810se-sys-ctrl", "syscon", "simple-mfd"
++
++For OX810SE, the indices are :
++ - 0 : ARM
++ - 1 : COPRO
++ - 2 : Reserved
++ - 3 : Reserved
++ - 4 : USBHS
++ - 5 : USBHSPHY
++ - 6 : MAC
++ - 7 : PCI
++ - 8 : DMA
++ - 9 : DPE
++ - 10 : DDR
++ - 11 : SATA
++ - 12 : SATA_LINK
++ - 13 : SATA_PHY
++ - 14 : Reserved
++ - 15 : NAND
++ - 16 : GPIO
++ - 17 : UART1
++ - 18 : UART2
++ - 19 : MISC
++ - 20 : I2S
++ - 21 : AHB_MON
++ - 22 : UART3
++ - 23 : UART4
++ - 24 : SGDMA
++ - 25 : Reserved
++ - 26 : Reserved
++ - 27 : Reserved
++ - 28 : Reserved
++ - 29 : Reserved
++ - 30 : Reserved
++ - 31 : BUS
++
++example:
++
++sys: sys-ctrl at 000000 {
++	compatible = "oxsemi,ox810se-sys-ctrl", "syscon", "simple-mfd";
++	reg = <0x000000 0x100000>;
++
++	reset: reset-controller {
++		compatible = "oxsemi,ox810se-reset";
++		#reset-cells = <1>;
++	};
 +};
-+
-+static int oxnas_reset_reset(struct reset_controller_dev *rcdev,
-+			      unsigned long id)
-+{
-+	struct oxnas_reset *data =
-+		container_of(rcdev, struct oxnas_reset, rcdev);
-+
-+	regmap_write(data->regmap, RST_SET_REGOFFSET, BIT(id));
-+	msleep(50);
-+	regmap_write(data->regmap, RST_CLR_REGOFFSET, BIT(id));
-+
-+	return 0;
-+}
-+
-+static int oxnas_reset_assert(struct reset_controller_dev *rcdev,
-+			      unsigned long id)
-+{
-+	struct oxnas_reset *data =
-+		container_of(rcdev, struct oxnas_reset, rcdev);
-+
-+	regmap_write(data->regmap, RST_SET_REGOFFSET, BIT(id));
-+
-+	return 0;
-+}
-+
-+static int oxnas_reset_deassert(struct reset_controller_dev *rcdev,
-+				unsigned long id)
-+{
-+	struct oxnas_reset *data =
-+		container_of(rcdev, struct oxnas_reset, rcdev);
-+
-+	regmap_write(data->regmap, RST_CLR_REGOFFSET, BIT(id));
-+
-+	return 0;
-+}
-+
-+static const struct reset_control_ops oxnas_reset_ops = {
-+	.reset		= oxnas_reset_reset,
-+	.assert		= oxnas_reset_assert,
-+	.deassert	= oxnas_reset_deassert,
-+};
-+
-+static const struct of_device_id oxnas_reset_dt_ids[] = {
-+	 { .compatible = "oxsemi,ox810se-reset", },
-+	 { /* sentinel */ },
-+};
-+MODULE_DEVICE_TABLE(of, oxnas_reset_dt_ids);
-+
-+static int oxnas_reset_probe(struct platform_device *pdev)
-+{
-+	struct oxnas_reset *data;
-+	struct device *parent;
-+
-+	parent = pdev->dev.parent;
-+	if (!parent) {
-+		dev_err(&pdev->dev, "no parent\n");
-+		return -ENODEV;
-+	}
-+
-+	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-+	if (!data)
-+		return -ENOMEM;
-+
-+	data->regmap = syscon_node_to_regmap(parent->of_node);
-+	if (IS_ERR(data->regmap)) {
-+		dev_err(&pdev->dev, "failed to get parent regmap\n");
-+		return PTR_ERR(data->regmap);
-+	}
-+
-+	platform_set_drvdata(pdev, data);
-+
-+	data->rcdev.owner = THIS_MODULE;
-+	data->rcdev.nr_resets = 32;
-+	data->rcdev.ops = &oxnas_reset_ops;
-+	data->rcdev.of_node = pdev->dev.of_node;
-+
-+	return reset_controller_register(&data->rcdev);
-+}
-+
-+static int oxnas_reset_remove(struct platform_device *pdev)
-+{
-+	struct oxnas_reset *data = platform_get_drvdata(pdev);
-+
-+	reset_controller_unregister(&data->rcdev);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver oxnas_reset_driver = {
-+	.probe	= oxnas_reset_probe,
-+	.remove	= oxnas_reset_remove,
-+	.driver = {
-+		.name		= "oxnas-reset",
-+		.of_match_table	= oxnas_reset_dt_ids,
-+	},
-+};
-+
-+module_platform_driver(oxnas_reset_driver);
 -- 
 1.9.1
