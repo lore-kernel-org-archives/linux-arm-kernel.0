@@ -1,74 +1,76 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 01 Apr 2016 09:15:20 +0900
-Subject: [PATCH v3 3/8] clk: samsung: exynos3250: Add MMC2 clock
-In-Reply-To: <56FD045B.5020805@samsung.com>
-References: <1458027490-13787-1-git-send-email-cw00.choi@samsung.com>
- <1458027490-13787-4-git-send-email-cw00.choi@samsung.com>
- <56F47ABC.7060006@samsung.com> <56F509E6.7080807@samsung.com>
- <56F87E83.7060100@samsung.com> <56F9DEE6.8020203@samsung.com>
- <56FD045B.5020805@samsung.com>
-Message-ID: <56FDBD98.30406@samsung.com>
+Date: Fri, 01 Apr 2016 09:29:57 +0900
+Subject: [PATCH v4 0/9] ARM: dts: Add new Exynos3250-based ARTIK5 module
+ dtsi file
+In-Reply-To: <1459392485-11327-1-git-send-email-cw00.choi@samsung.com>
+References: <1459392485-11327-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <56FDC105.7050709@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31.03.2016 20:04, Sylwester Nawrocki wrote:
-> On 03/29/2016 03:48 AM, Krzysztof Kozlowski wrote:
->> On 28.03.2016 09:44, Chanwoo Choi wrote:
->>> You mean that separate patch1 include only the new clock id 
->>> about both UART2 and MMC2
->>> and the patch2/patch3 just use the new clock id as following:
->>>
->>> patch1 dt-bindings: Add the clock id of UART2 and MMC2 for Exynos3250
->>> patch2 clk: samsung: exynos3250: Add UART2 clock
->>> patch3 clk: samsung: exynos3250: Add MMC2 clock
->>>
->>> As far as I understand it is that right?
->>> If it is ok, I'll modify it on v4 patchset as you comment.
->>
->> Hi Sylwester and Tomasz,
->>
->> Can you provide me a tag with these exynos3250 clock patches (after
->> posting v4)? Of course you can also ack/review them and then I'll 
->> handle it.
+On 31.03.2016 11:47, Chanwoo Choi wrote:
+> This patchset add the support for Device Tree source for Samsung ARTIK5 module[1]
+> based on Exynos3250 SoC and development board[2]. The ARTIK5 module includes
+> the follwoing devices:
+> - Application Processor (Samsung Exynos3250)
+> - WiFi/BT Combo chip
+> - PMIC (Samsung S2MPS14)
+> - eMMC (4GB)
+> - DRAM LPDDR3 (512MB)
+> - Connectors pin (60 Pins x 3 set)
 > 
-> Here are tags with only the first (clock id definitions) and the all 
-> three clk patches respectively:
+> Also, this patchset add the ARTIK5 development board[2] dts file which includes
+> the ARTIK5 module[1] and have the devices such as sound codec, sd card port,
+> ethernet port, uart port and so on.
 > 
-> ---------------------------------------8<--------------------------------
-> The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+> [1] https://www.artik.io/hardware/artik-5
+> [2] http://www.digikey.com/product-detail/en/SIP-KITNXB001/1510-1316-ND/5825102
 > 
->   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+> Changes from v3:
+> (https://lkml.org/lkml/2016/3/15/71)
+> - Add acked-by tag from Rob Herring <robh@kernel.org> (patch8)
+> - Fix typo on patch descritpion (patch8)
+> - Make the separate patch for including the new clock id
+>   for both MMC2 and UART2 device (patch2)
 > 
-> are available in the git repository at:
+> Changes from v2:
+> (https://lkml.org/lkml/2016/3/14/910)
+> - Add reviewed tag by Krzysztof Kozlowski for all patches
+> - Include the separate patch1[3] in patchset because patch5 depend on patch1[3]
+>   [3] https://lkml.org/lkml/2016/3/14/245
+> - Fix the order issue in exynos3250-artik5.dtsi
+> - Use lowercase for hex address in exynos3250-artik5.dtsi
 > 
->   git://linuxtv.org/snawrocki/samsung.git tags/clk-v4.7-exynos3250-dt
+> Changes from v1:
+> (https://lkml.org/lkml/2016/3/13/215)
+> - Change the board name from 'artik5-devel' to 'artik5-eval'
+> - Merge the patch6/7/8 to patch5
+> - Add the new board information to samsung-boards.txt[1]
+>   [1] Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
+> - Fix minor coding style issue and remove 'wakeup' property
+> - Remove 'broken-cd' and 'desc-num' property from mshc_0 node
+> - Handle the LDO11/LDO12 by using XMMC0CDn pin (GPK0-2 gpio) for MMC device
+>   and fix the ldo number of 'vmmc-supply' property.
+> - Add the 'vqmmc-supply' property for MSHC2
+> - Drop the patch10 for PPMU node
+> - Add the new patch to initialize the MMC2 gpio pin on monk board
 > 
-> for you to fetch changes up to fd00bbcddb59c4866e7c985e30f663b62cfc2588:
+> Chanwoo Choi (6):
+>   ARM: dts: Add initial pin configuration for exynos3250-rinato
+>   dt-bindings: Add the clock id of UART2 and MMC2 for Exynos3250
+>   clk: samsung: exynos3250: Add MMC2 clock
+>   ARM: dts: Add initial gpio setting of MMC2 device for exynos3250-monk
+>   ARM: dts: Add MSHC2 dt node for Exynos3250 SoC
+>   ARM: dts: Add exynos3250-artik5 dtsi file for ARTIK5 module
 > 
->   dt-bindings: Add the clock id of UART2 and MMC2 for Exynos3250 (2016-03-31 12:25:44 +0200)
+> Jaehoon Chung (1):
+>   ARM: dts: Add MSHC2 dt node for SD card for exynos3250-artik5-eval board
 > 
-> ----------------------------------------------------------------
-> Addition of the UART2 and MMC3 clock indices definition
-> to the exynos3250 clock subsystem dt binding header file.
-> 
-> ----------------------------------------------------------------
-> Chanwoo Choi (1):
->       dt-bindings: Add the clock id of UART2 and MMC2 for Exynos3250
-> 
->  include/dt-bindings/clock/exynos3250.h | 11 ++++++++++-
->  1 file changed, 10 insertions(+), 1 deletion(-)
-> --------------------------------------->8--------------------------------
-> 
-> 
-> ---------------------------------------8<--------------------------------
-> The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
-> 
->   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://linuxtv.org/snawrocki/samsung.git tags/clk-v4.7-exynos3250
+> Pankaj Dubey (2):
+>   clk: samsung: exynos3250: Add UART2 clock
+>   ARM: dts: Add UART2 dt node for Exynos3250 SoC
 
-Thanks pulled.
+Thanks, applied all non-clock patches after pulling tag from Sylwester.
 
+Best regards,
 Krzysztof
