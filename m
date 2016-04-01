@@ -1,86 +1,36 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 1 Apr 2016 09:56:35 +0100
-Subject: [PATCH V3 1/1] ARM : missing corrupted reg in __div64_32
-In-Reply-To: <BLU436-SMTP267D09D3249FC3AAF122B999A0@phx.gbl>
-References: <20160331114106.GI3701@e103592.cambridge.arm.com>
- <BLU436-SMTP267D09D3249FC3AAF122B999A0@phx.gbl>
-Message-ID: <20160401085631.GJ3701@e103592.cambridge.arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 1 Apr 2016 11:00:34 +0200
+Subject: [RFC PATCH 40/45] KVM: arm/arm64: vgic-new: vgic_init: implement
+ vgic_init
+In-Reply-To: <56FE2F6B.5000508@linaro.org>
+References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
+ <1458871508-17279-41-git-send-email-andre.przywara@arm.com>
+ <20160331175930.GF4126@cbox> <56FE2F6B.5000508@linaro.org>
+Message-ID: <20160401090034.GA20224@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 01, 2016 at 12:22:11PM +0800, chengang wrote:
-> __xl(R0 in little endian system, or R1 in big endian system) is corrupted
-> after calling __do_div64 and compiler is not informed about this.
-> If n is used again afterwards, __xl won't be reloaded and n will
-> contain incorrect value.
+On Fri, Apr 01, 2016 at 10:20:59AM +0200, Eric Auger wrote:
+> Hi Christoffer,
+> On 03/31/2016 07:59 PM, Christoffer Dall wrote:
+> > On Fri, Mar 25, 2016 at 02:05:03AM +0000, Andre Przywara wrote:
+> >> From: Eric Auger <eric.auger@linaro.org>
+> >>
+> >> This patch allocates and initializes the data structures used
+> >> to model the vgic distributor and virtual cpu interfaces. At that
+> >> stage the number of IRQs and number of virtual CPUs is frozen.
+> >>
+> >> The following realy_init functions are kept since they are called from
+> >> arm.c. However they may disappear in subsequent patches since
+> >> they are void.
+> >>
+> >> vgic_[v2|v3]_enable still is stubbed at this stage.
+> > 
+> > early init ?
+> Indeed I can mention those functions also are stubbed. Eventually it may
+> make sense to remove their call from arm.c but this was not done yet in
+> this series to avoid touching non vgic code.
 
-You should briefly explain the fix here.
+oh, my comment was to the fact that you wrote realy_init above... :)
 
-> 
-> Signed-off-by: Chen Gang <gangchen@rdamicro.com>
-> Signed-off-by: Chen Gang <changeang.beijing@outlook.com>
-> ---
->  arch/arm/include/asm/div64.h | 22 ++++++++--------------
->  1 file changed, 8 insertions(+), 14 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/div64.h b/arch/arm/include/asm/div64.h
-> index e1f0776..8d1b49a 100644
-> --- a/arch/arm/include/asm/div64.h
-> +++ b/arch/arm/include/asm/div64.h
-> @@ -21,30 +21,24 @@
->   * for arguments and results (beware).
->   */
->  
-> -#ifdef __ARMEB__
-> -#define __xh "r0"
-> -#define __xl "r1"
-> -#else
-> -#define __xl "r0"
-> -#define __xh "r1"
-> -#endif
-
-These defines aren't used by anything else, right?
-
-I grepped for them, but I didn't see any other matches.
-
->  
->  static inline uint32_t __div64_32(uint64_t *n, uint32_t base)
->  {
->  	register unsigned int __base      asm("r4") = base;
->  	register unsigned long long __n   asm("r0") = *n;
->  	register unsigned long long __res asm("r2");
-> -	register unsigned int __rem       asm(__xh);
-> -	asm(	__asmeq("%0", __xh)
-> +	asm(	__asmeq("%0", "r0")
->  		__asmeq("%1", "r2")
-> -		__asmeq("%2", "r0")
-> -		__asmeq("%3", "r4")
-> +		__asmeq("%2", "r4")
->  		"bl	__do_div64"
-> -		: "=r" (__rem), "=r" (__res)
-> -		: "r" (__n), "r" (__base)
-> +		: "+r" (__n), "=r" (__res)
-> +		: "r" (__base)
->  		: "ip", "lr", "cc");
->  	*n = __res;
-> -	return __rem;
-> +	/*
-> +	 * rem is saved at the up half of __n, see __do_div64 for more
-> +	 */
-
-Minor nit:
-
-It's useful to have a comment here, but rem is gone, and you might want
-to say "upper half", e.g., something like:
-
-	/* __do_div returns the remainder in the upper word of __n: */
-
-> +	return __n >> 32;
->  }
->  #define __div64_32 __div64_32
->  
-> -- 
-> 2.4.3
-
-Cheers
----Dave
+-Christoffer
