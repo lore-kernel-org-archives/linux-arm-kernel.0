@@ -1,126 +1,409 @@
-From: pc.liao@mediatek.com (PC Liao)
-Date: Fri, 1 Apr 2016 16:21:17 +0800
-Subject: [PATCH v2] ASoC: mediatek: Add second I2S on mt8173-rt5650 machine
- driver
-Message-ID: <1459498877-5810-1-git-send-email-pc.liao@mediatek.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Fri, 1 Apr 2016 10:20:59 +0200
+Subject: [RFC PATCH 40/45] KVM: arm/arm64: vgic-new: vgic_init: implement
+ vgic_init
+In-Reply-To: <20160331175930.GF4126@cbox>
+References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
+ <1458871508-17279-41-git-send-email-andre.przywara@arm.com>
+ <20160331175930.GF4126@cbox>
+Message-ID: <56FE2F6B.5000508@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds second I2S connection to rt5650 codec for capture path
-on mt8173-rt5650 machine driver.
+Hi Christoffer,
+On 03/31/2016 07:59 PM, Christoffer Dall wrote:
+> On Fri, Mar 25, 2016 at 02:05:03AM +0000, Andre Przywara wrote:
+>> From: Eric Auger <eric.auger@linaro.org>
+>>
+>> This patch allocates and initializes the data structures used
+>> to model the vgic distributor and virtual cpu interfaces. At that
+>> stage the number of IRQs and number of virtual CPUs is frozen.
+>>
+>> The following realy_init functions are kept since they are called from
+>> arm.c. However they may disappear in subsequent patches since
+>> they are void.
+>>
+>> vgic_[v2|v3]_enable still is stubbed at this stage.
+> 
+> early init ?
+Indeed I can mention those functions also are stubbed. Eventually it may
+make sense to remove their call from arm.c but this was not done yet in
+this series to avoid touching non vgic code.
+> 
+>>
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>>  include/kvm/vgic/vgic.h       |   7 +-
+>>  virt/kvm/arm/vgic/vgic-v2.c   |   5 +
+>>  virt/kvm/arm/vgic/vgic-v3.c   |   5 +
+>>  virt/kvm/arm/vgic/vgic.c      |   5 +
+>>  virt/kvm/arm/vgic/vgic.h      |   8 ++
+>>  virt/kvm/arm/vgic/vgic_init.c | 214 ++++++++++++++++++++++++++++++++++++++++++
+>>  6 files changed, 243 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+>> index 536582b..4a51582 100644
+>> --- a/include/kvm/vgic/vgic.h
+>> +++ b/include/kvm/vgic/vgic.h
+>> @@ -115,6 +115,7 @@ struct vgic_io_device {
+>>  struct vgic_dist {
+>>  	bool			in_kernel;
+>>  	bool			ready;
+>> +	bool			initialized;
+>>  
+>>  	/* vGIC model the kernel emulates for the guest (GICv2 or GICv3) */
+>>  	u32			vgic_model;
+>> @@ -195,7 +196,11 @@ struct vgic_cpu {
+>>  };
+>>  
+>>  int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
+>> +void kvm_vgic_early_init(struct kvm *kvm);
+>>  int kvm_vgic_create(struct kvm *kvm, u32 type);
+>> +void kvm_vgic_destroy(struct kvm *kvm);
+>> +void kvm_vgic_vcpu_early_init(struct kvm_vcpu *vcpu);
+>> +void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu);
+>>  int kvm_vgic_hyp_init(void);
+>>  
+>>  int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+>> @@ -204,7 +209,7 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+>>  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
+>>  
+>>  #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
+>> -#define vgic_initialized(k)	(false)
+>> +#define vgic_initialized(k)	((k)->arch.vgic.initialized)
+>>  #define vgic_ready(k)		((k)->arch.vgic.ready)
+>>  #define vgic_valid_spi(k,i)	(((i) >= VGIC_NR_PRIVATE_IRQS) && \
+>>  			((i) < (k)->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS))
+>> diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+>> index 0cb5c4f..c48dbd4 100644
+>> --- a/virt/kvm/arm/vgic/vgic-v2.c
+>> +++ b/virt/kvm/arm/vgic/vgic-v2.c
+>> @@ -234,6 +234,11 @@ void vgic_v2_irq_change_affinity(struct kvm *kvm, u32 intid, u8 new_targets)
+>>  	spin_unlock(&irq->irq_lock);
+>>  }
+>>  
+>> +/* not yet implemented */
+>> +void vgic_v2_enable(struct kvm_vcpu *vcpu)
+>> +{
+>> +}
+>> +
+>>  /**
+>>   * vgic_v2_probe - probe for a GICv2 compatible interrupt controller in DT
+>>   * @node:	pointer to the DT node
+>> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+>> index 1a53141..3155680 100644
+>> --- a/virt/kvm/arm/vgic/vgic-v3.c
+>> +++ b/virt/kvm/arm/vgic/vgic-v3.c
+>> @@ -220,6 +220,11 @@ void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
+>>  	vmcrp->pmr  = (vmcr & ICH_VMCR_PMR_MASK) >> ICH_VMCR_PMR_SHIFT;
+>>  }
+>>  
+>> +/* not yet implemented */
+>> +void vgic_v3_enable(struct kvm_vcpu *vcpu)
+>> +{
+>> +}
+>> +
+>>  /**
+>>   * vgic_v3_probe - probe for a GICv3 compatible interrupt controller in DT
+>>   * @node:	pointer to the DT node
+>> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+>> index 8c19379..4ade7c0 100644
+>> --- a/virt/kvm/arm/vgic/vgic.c
+>> +++ b/virt/kvm/arm/vgic/vgic.c
+>> @@ -268,6 +268,11 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+>>  			bool level)
+>>  {
+>>  	struct kvm_vcpu *vcpu;
+>> +	int ret;
+>> +
+>> +	ret = vgic_lazy_init(kvm);
+>> +	if (ret)
+>> +		return ret;
+>>  
+>>  	vcpu = kvm_get_vcpu(kvm, cpuid);
+>>  	vgic_update_irq_pending(kvm, vcpu, intid, level);
+>> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+>> index 31c9299a..4b2e1b0 100644
+>> --- a/virt/kvm/arm/vgic/vgic.h
+>> +++ b/virt/kvm/arm/vgic/vgic.h
+>> @@ -38,6 +38,7 @@ int vgic_v2_dist_access(struct kvm_vcpu *vcpu, bool is_write,
+>>  int vgic_v2_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr);
+>>  void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+>>  void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+>> +void vgic_v2_enable(struct kvm_vcpu *vcpu);
+>>  int vgic_v2_probe(struct device_node *vgic_node);
+>>  
+>>  #ifdef CONFIG_KVM_ARM_VGIC_V3
+>> @@ -52,6 +53,7 @@ int vgic_v3_redist_access(struct kvm_vcpu *vcpu, bool is_write,
+>>  			  int offset, int len, void *val);
+>>  void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+>>  void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+>> +void vgic_v3_enable(struct kvm_vcpu *vcpu);
+>>  int vgic_v3_probe(struct device_node *vgic_node);
+>>  #else
+>>  static inline void vgic_v3_irq_change_affinity(struct kvm *kvm, u32 intid,
+>> @@ -98,6 +100,10 @@ void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
+>>  {
+>>  }
+>>  
+>> +static inline void vgic_v3_enable(struct kvm_vcpu *vcpu)
+>> +{
+>> +}
+>> +
+>>  static inline int vgic_v3_probe(struct device_node *vgic_node)
+>>  {
+>>  	return -ENODEV;
+>> @@ -107,6 +113,8 @@ static inline int vgic_v3_probe(struct device_node *vgic_node)
+>>  void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+>>  void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+>>  
+>> +int vgic_lazy_init(struct kvm *kvm);
+>> +int vgic_init(struct kvm *kvm);
+>>  void kvm_register_vgic_device(unsigned long type);
+>>  
+>>  #endif
+>> diff --git a/virt/kvm/arm/vgic/vgic_init.c b/virt/kvm/arm/vgic/vgic_init.c
+>> index 80bf283..f7a6a11 100644
+>> --- a/virt/kvm/arm/vgic/vgic_init.c
+>> +++ b/virt/kvm/arm/vgic/vgic_init.c
+>> @@ -24,6 +24,42 @@
+>>  #include <asm/kvm_mmu.h>
+>>  #include "vgic.h"
+>>  
+>> +/*
+>> + * Initialization rules: there are multiple stages to the vgic
+>> + * initialization, both for the distributor and the CPU interfaces.
+>> + *
+>> + * Distributor:
+>> + *
+>> + * - kvm_vgic_early_init(): initialization of static data that doesn't
+>> + *   depend on any sizing information or emulation type. No allocation
+>> + *   is allowed there.
+>> + *
+>> + * - vgic_init(): allocation and initialization of the generic data
+>> + *   structures that depend on sizing information (number of CPUs,
+>> + *   number of interrupts). Also initializes the vcpu specific data
+>> + *   structures. Can be executed lazily for GICv2.
+>> + *
+>> + * CPU Interface:
+>> + *
+>> + * - kvm_vgic_cpu_early_init(): initialization of static data that
+>> + *   doesn't depend on any sizing information or emulation type. No
+>> + *   allocation is allowed there.
+>> + */
+>> +
+>> +/* EARLY INIT */
+>> +
+>> +/*
+>> + * Those 2 functions should not be needed anymore but they
+>> + * still are called from arm.c
+>> + */
+>> +void kvm_vgic_early_init(struct kvm *kvm)
+>> +{
+>> +}
+>> +
+>> +void kvm_vgic_vcpu_early_init(struct kvm_vcpu *vcpu)
+>> +{
+>> +}
+>> +
+>>  /* CREATION */
+>>  
+>>  /**
+>> @@ -108,6 +144,184 @@ out:
+>>  	return ret;
+>>  }
+>>  
+>> +/* INIT/DESTROY */
+>> +
+>> +/**
+>> + * kvm_vgic_dist_init: initialize the dist data structures
+>> + * @kvm: kvm struct pointer
+>> + * @nr_spis: number of spis, frozen by caller
+>> + */
+>> +int kvm_vgic_dist_init(struct kvm *kvm, unsigned int nr_spis)
+>> +{
+>> +	struct vgic_dist *dist = &kvm->arch.vgic;
+>> +	int i;
+>> +
+>> +	dist->spis = kcalloc(nr_spis, sizeof(struct vgic_irq), GFP_KERNEL);
+>> +	if (!dist->spis)
+>> +		return  -ENOMEM;
+>> +
+>> +	/*
+>> +	 * In following code we do not take the irq struct lock since
+>> +	 * no other action on irq structs can happen while the VGIC is
+>> +	 * not initialized yet:
+>> +	 * injection requires (VGICV3) or does (VGIC2) initialization.
+>> +	 * MMIO access triggers init.
+>> +	 */
+>> +	for (i = 0; i < nr_spis; i++) {
+>> +		struct vgic_irq *irq = &dist->spis[i];
+>> +
+>> +		irq->intid = i + VGIC_NR_PRIVATE_IRQS;
+>> +		INIT_LIST_HEAD(&irq->ap_list);
+>> +		spin_lock_init(&irq->irq_lock);
+>> +		irq->vcpu = NULL;
+>> +		if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V2)
+>> +			vgic_v2_irq_change_affinity(kvm, irq->intid, 0);
+>> +		else
+>> +			vgic_v3_irq_change_affinity(kvm, irq->intid, 0);
+>> +	}
+>> +	return 0;
+>> +}
+>> +
+>> +/**
+>> + * kvm_vgic_vcpu_init: initialize the vcpu data structures and
+>> + * enable the VCPU interface
+>> + * @kvm: kvm struct pointer
+>> + */
+>> +void kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+>> +{
+>> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+>> +	int i;
+>> +
+>> +	INIT_LIST_HEAD(&vgic_cpu->ap_list_head);
+>> +	spin_lock_init(&vgic_cpu->ap_list_lock);
+>> +	vgic_cpu->nr_lr = kvm_vgic_global_state.nr_lr;
+>> +
+>> +	/*
+>> +	 * Enable and configure all SGIs to be edge-triggered and
+>> +	 * configure all PPIs as level-triggered.
+>> +	 */
+>> +	for (i = 0; i < VGIC_NR_PRIVATE_IRQS; i++) {
+>> +		struct vgic_irq *irq = &vgic_cpu->private_irqs[i];
+>> +
+>> +		INIT_LIST_HEAD(&irq->ap_list);
+> 
+> I don't think this is strictly required, but ok.
+agreed
 
-Signed-off-by: PC Liao <pc.liao@mediatek.com>
----
-Changes since v1:
-Use codec dai name to determine the capture path. 
----
+Best Regards
 
- .../devicetree/bindings/sound/mt8173-rt5650.txt    |    6 +++
- sound/soc/mediatek/mt8173-rt5650.c                 |   39 ++++++++++++++++++--
- 2 files changed, 41 insertions(+), 4 deletions(-)
+Eric
 
-diff --git a/Documentation/devicetree/bindings/sound/mt8173-rt5650.txt b/Documentation/devicetree/bindings/sound/mt8173-rt5650.txt
-index fe5a5ef..383cba9 100644
---- a/Documentation/devicetree/bindings/sound/mt8173-rt5650.txt
-+++ b/Documentation/devicetree/bindings/sound/mt8173-rt5650.txt
-@@ -5,11 +5,17 @@ Required properties:
- - mediatek,audio-codec: the phandles of rt5650 codecs
- - mediatek,platform: the phandle of MT8173 ASoC platform
- 
-+Optional properties:
-+- mediatek,audio-codec-dai-capture: audio codec dai on capture path
-+  rt5645-aif1: Default setting. Connect rt5650 I2S1 for capture
-+  rt5645-aif2: Connect rt5650 I2S2 for capture
-+
- Example:
- 
- 	sound {
- 		compatible = "mediatek,mt8173-rt5650";
- 		mediatek,audio-codec = <&rt5650>;
- 		mediatek,platform = <&afe>;
-+		mediatek,audio-codec-dai-capture = "rt5645-aif2";
- 	};
- 
-diff --git a/sound/soc/mediatek/mt8173-rt5650.c b/sound/soc/mediatek/mt8173-rt5650.c
-index bb09bb1..fd2ca66 100644
---- a/sound/soc/mediatek/mt8173-rt5650.c
-+++ b/sound/soc/mediatek/mt8173-rt5650.c
-@@ -85,12 +85,26 @@ static int mt8173_rt5650_init(struct snd_soc_pcm_runtime *runtime)
- {
- 	struct snd_soc_card *card = runtime->card;
- 	struct snd_soc_codec *codec = runtime->codec_dais[0]->codec;
-+	const char *codec_dai_name_capture = runtime->codec_dais[1]->name;
- 	int ret;
- 
- 	rt5645_sel_asrc_clk_src(codec,
--				RT5645_DA_STEREO_FILTER |
--				RT5645_AD_STEREO_FILTER,
--				RT5645_CLK_SEL_I2S1_ASRC);
-+					RT5645_DA_STEREO_FILTER,
-+					RT5645_CLK_SEL_I2S1_ASRC);
-+
-+	if (!strcmp(codec_dai_name_capture, "rt5645-aif1")) {
-+		rt5645_sel_asrc_clk_src(codec,
-+					RT5645_AD_STEREO_FILTER,
-+					RT5645_CLK_SEL_I2S1_ASRC);
-+	} else if (!strcmp(codec_dai_name_capture, "rt5645-aif2")) {
-+		rt5645_sel_asrc_clk_src(codec,
-+					RT5645_AD_STEREO_FILTER,
-+					RT5645_CLK_SEL_I2S2_ASRC);
-+	} else {
-+		dev_err(card->dev, "Can't get the right codec dai\n");
-+		return -EINVAL;
-+	}
-+
- 	/* enable jack detection */
- 	ret = snd_soc_card_jack_new(card, "Headset Jack",
- 				    SND_JACK_HEADPHONE | SND_JACK_MICROPHONE |
-@@ -110,6 +124,11 @@ static int mt8173_rt5650_init(struct snd_soc_pcm_runtime *runtime)
- 
- static struct snd_soc_dai_link_component mt8173_rt5650_codecs[] = {
- 	{
-+		/* Playback */
-+		.dai_name = "rt5645-aif1",
-+	},
-+	{
-+		/* Capture */
- 		.dai_name = "rt5645-aif1",
- 	},
- };
-@@ -149,7 +168,7 @@ static struct snd_soc_dai_link mt8173_rt5650_dais[] = {
- 		.cpu_dai_name = "I2S",
- 		.no_pcm = 1,
- 		.codecs = mt8173_rt5650_codecs,
--		.num_codecs = 1,
-+		.num_codecs = 2,
- 		.init = mt8173_rt5650_init,
- 		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
- 			   SND_SOC_DAIFMT_CBS_CFS,
-@@ -177,6 +196,7 @@ static int mt8173_rt5650_dev_probe(struct platform_device *pdev)
- {
- 	struct snd_soc_card *card = &mt8173_rt5650_card;
- 	struct device_node *platform_node;
-+	const char *codec_dai_name_capture;
- 	int i, ret;
- 
- 	platform_node = of_parse_phandle(pdev->dev.of_node,
-@@ -199,6 +219,17 @@ static int mt8173_rt5650_dev_probe(struct platform_device *pdev)
- 			"Property 'audio-codec' missing or invalid\n");
- 		return -EINVAL;
- 	}
-+	mt8173_rt5650_codecs[1].of_node = mt8173_rt5650_codecs[0].of_node;
-+
-+	if (device_property_present(&pdev->dev,
-+				    "mediatek,audio-codec-dai-capture")) {
-+		device_property_read_string(&pdev->dev,
-+					    "mediatek,audio-codec-dai-capture",
-+					    &codec_dai_name_capture);
-+
-+		mt8173_rt5650_codecs[1].dai_name = codec_dai_name_capture;
-+	}
-+
- 	card->dev = &pdev->dev;
- 	platform_set_drvdata(pdev, card);
- 
--- 
-1.7.9.5
+> 
+>> +		spin_lock_init(&irq->irq_lock);
+>> +		irq->intid = i;
+>> +		irq->vcpu = NULL;
+>> +		irq->target_vcpu = vcpu;
+>> +		irq->targets = 1U << vcpu->vcpu_id;
+>> +		if (i < VGIC_NR_SGIS) {
+>> +			/* SGIs */
+>> +			irq->enabled = 1;
+>> +			irq->config = VGIC_CONFIG_EDGE;
+>> +		} else {
+>> +			/* PPIs */
+>> +			irq->config = VGIC_CONFIG_LEVEL;
+>> +		}
+>> +	}
+>> +	if (kvm_vgic_global_state.type == VGIC_V2)
+>> +		vgic_v2_enable(vcpu);
+>> +	else
+>> +		vgic_v3_enable(vcpu);
+>> +}
+>> +
+>> +/*
+>> + * vgic_init: allocates and initializes dist and vcpu data structures
+>> + * depending on two dimensioning parameters:
+>> + * - the number of spis
+>> + * - the number of vcpus
+>> + * The function is generally called when nr_spis has been explicitly set
+>> + * by the guest through the KVM DEVICE API. If not nr_spis is set to 256.
+>> + * Completion can be tested by vgic_initialized
+>> + * Must be called with kvm->lock held!
+>> + */
+>> +int vgic_init(struct kvm *kvm)
+>> +{
+>> +	struct vgic_dist *dist = &kvm->arch.vgic;
+>> +	struct kvm_vcpu *vcpu;
+>> +	int ret = 0, i;
+>> +
+>> +	if (vgic_initialized(kvm))
+>> +		return 0;
+>> +
+>> +	/* freeze the number of spis */
+>> +	if (!dist->nr_spis)
+>> +		dist->nr_spis = VGIC_NR_IRQS_LEGACY - VGIC_NR_PRIVATE_IRQS;
+>> +
+>> +	ret = kvm_vgic_dist_init(kvm, dist->nr_spis);
+>> +	if (ret)
+>> +		goto out;
+>> +
+>> +	kvm_for_each_vcpu(i, vcpu, kvm)
+>> +		kvm_vgic_vcpu_init(vcpu);
+>> +
+>> +	dist->initialized = true;
+>> +out:
+>> +	return ret;
+>> +}
+>> +
+>> +static void kvm_vgic_dist_destroy(struct kvm *kvm)
+>> +{
+>> +	struct vgic_dist *dist = &kvm->arch.vgic;
+>> +
+>> +	mutex_lock(&kvm->lock);
+>> +
+>> +	dist->ready = false;
+>> +	dist->initialized = false;
+>> +
+>> +	kfree(dist->spis);
+>> +	kfree(dist->dist_iodevs);
+>> +	kfree(dist->redist_iodevs);
+>> +	dist->nr_spis = 0;
+>> +
+>> +	mutex_unlock(&kvm->lock);
+>> +}
+>> +
+>> +void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
+>> +{
+>> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+>> +
+>> +	INIT_LIST_HEAD(&vgic_cpu->ap_list_head);
+>> +	vgic_cpu->nr_lr = 0;
+>> +}
+>> +
+>> +void kvm_vgic_destroy(struct kvm *kvm)
+>> +{
+>> +	struct kvm_vcpu *vcpu;
+>> +	int i;
+>> +
+>> +	kvm_vgic_dist_destroy(kvm);
+>> +
+>> +	kvm_for_each_vcpu(i, vcpu, kvm)
+>> +		kvm_vgic_vcpu_destroy(vcpu);
+>> +}
+>> +
+>> +/**
+>> + * Lazy init only is allowed if the GIC exposed to the guest is a GICV2.
+>> + * GICV3 must be explicitly initialized by the guest using the
+>> + * KVM_DEV_ARM_VGIC_GRP_CTRL KVM_DEVICE group
+>> + */
+>> +int vgic_lazy_init(struct kvm *kvm)
+>> +{
+>> +	int ret = 0;
+>> +
+>> +	if (unlikely(!vgic_initialized(kvm))) {
+>> +		/*
+>> +		 * We only provide the automatic initialization of the VGIC
+>> +		 * for the legacy case of a GICv2. Any other type must
+>> +		 * be explicitly initialized once setup with the respective
+>> +		 * KVM device call.
+>> +		 */
+>> +		if (kvm->arch.vgic.vgic_model != KVM_DEV_TYPE_ARM_VGIC_V2)
+>> +			return -EBUSY;
+>> +
+>> +		mutex_lock(&kvm->lock);
+>> +		ret = vgic_init(kvm);
+>> +		mutex_unlock(&kvm->lock);
+>> +	}
+>> +
+>> +	return ret;
+>> +}
+>> +
+>>  /* GENERIC PROBE */
+>>  
+>>  static void vgic_init_maintenance_interrupt(void *info)
+>> -- 
+>> 2.7.3
+>>
