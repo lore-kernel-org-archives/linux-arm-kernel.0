@@ -1,57 +1,65 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Fri, 01 Apr 2016 11:50:56 +0800
-Subject: [PATCH v3 0/3] Rockchip: rk3399: Add core dtsi for rk3399
-In-Reply-To: <16060533.TL0fcROj1E@phil>
-References: <1456456341-14282-1-git-send-email-jay.xu@rock-chips.com>
- <1983379.kJSqISDtbX@phil> <56FDE30D.6040008@rock-chips.com>
- <16060533.TL0fcROj1E@phil>
-Message-ID: <56FDF020.9070705@rock-chips.com>
+From: chengang.beijing@outlook.com (chengang)
+Date: Fri, 1 Apr 2016 12:22:11 +0800
+Subject: [PATCH V3 1/1] ARM : missing corrupted reg in __div64_32
+In-Reply-To: <20160331114106.GI3701@e103592.cambridge.arm.com>
+References: <20160331114106.GI3701@e103592.cambridge.arm.com>
+Message-ID: <BLU436-SMTP267D09D3249FC3AAF122B999A0@phx.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
-     I also updated some clock patches for RK3399 recently, and I will 
-continue to update clock patches_V7 in future.
-Please note them. :-)
+__xl(R0 in little endian system, or R1 in big endian system) is corrupted
+after calling __do_div64 and compiler is not informed about this.
+If n is used again afterwards, __xl won't be reloaded and n will
+contain incorrect value.
 
-Thanks.
+Signed-off-by: Chen Gang <gangchen@rdamicro.com>
+Signed-off-by: Chen Gang <changeang.beijing@outlook.com>
+---
+ arch/arm/include/asm/div64.h | 22 ++++++++--------------
+ 1 file changed, 8 insertions(+), 14 deletions(-)
 
-On 2016?04?01? 11:23, Heiko Stuebner wrote:
-> Hi Jianqun,
->
-> Am Freitag, 1. April 2016, 10:55:09 schrieb jay.xu:
->> After talking with xing, we plan to summit dtsi after xing's patches are
->> applied,
->> and I will update the patch for rk3399 core dtsi quickly
-> Not sure if you have seen it, but I picked up Xing's most recent clock
-> patches already [0]. So go ahead when you have time :-)
->
->
-> Heiko
->
->
-> [0] https://git.kernel.org/cgit/linux/kernel/git/mmind/linux-rockchip.git/log/?h=v4.7-clk/next
->
->
->> On 2016?04?01? 05:48, Heiko Stuebner wrote:
->>> Hi Jianqun,
->>>
->>> Am Dienstag, 1. M?rz 2016, 14:39:58 schrieb Jianqun Xu:
->>>> There is the new SoCs from Rockchip which named rk3399, the
->>>> patches are added to support them.
->>> is this still valid or does it need an update?
->>> The clock-series from Xing saw changes, so I'm guessing the devicetree
->>> side might also need some update?
->>>
->>> Especially an actual board-file would be nice ;-) .
->>>
->>>
->>> Thanks
->>> Heiko
->
->
->
-
-
+diff --git a/arch/arm/include/asm/div64.h b/arch/arm/include/asm/div64.h
+index e1f0776..8d1b49a 100644
+--- a/arch/arm/include/asm/div64.h
++++ b/arch/arm/include/asm/div64.h
+@@ -21,30 +21,24 @@
+  * for arguments and results (beware).
+  */
+ 
+-#ifdef __ARMEB__
+-#define __xh "r0"
+-#define __xl "r1"
+-#else
+-#define __xl "r0"
+-#define __xh "r1"
+-#endif
+ 
+ static inline uint32_t __div64_32(uint64_t *n, uint32_t base)
+ {
+ 	register unsigned int __base      asm("r4") = base;
+ 	register unsigned long long __n   asm("r0") = *n;
+ 	register unsigned long long __res asm("r2");
+-	register unsigned int __rem       asm(__xh);
+-	asm(	__asmeq("%0", __xh)
++	asm(	__asmeq("%0", "r0")
+ 		__asmeq("%1", "r2")
+-		__asmeq("%2", "r0")
+-		__asmeq("%3", "r4")
++		__asmeq("%2", "r4")
+ 		"bl	__do_div64"
+-		: "=r" (__rem), "=r" (__res)
+-		: "r" (__n), "r" (__base)
++		: "+r" (__n), "=r" (__res)
++		: "r" (__base)
+ 		: "ip", "lr", "cc");
+ 	*n = __res;
+-	return __rem;
++	/*
++	 * rem is saved at the up half of __n, see __do_div64 for more
++	 */
++	return __n >> 32;
+ }
+ #define __div64_32 __div64_32
+ 
 -- 
-- Xing Zheng
+2.4.3
