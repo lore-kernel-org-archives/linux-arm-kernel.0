@@ -1,31 +1,50 @@
-From: oss@buserror.net (Scott Wood)
-Date: Fri, 01 Apr 2016 17:25:43 -0500
-Subject: [v7, 0/5] Fix eSDHC host version register bug
-In-Reply-To: <1459480051-3701-1-git-send-email-yangbo.lu@nxp.com>
-References: <1459480051-3701-1-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <1459549543.32510.28.camel@buserror.net>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 1 Apr 2016 17:53:07 -0500
+Subject: [PATCH 3/3] ARM: OMAP: Catch callers of revision information prior to
+ it being populated
+In-Reply-To: <1459551187-5992-1-git-send-email-nm@ti.com>
+References: <1459551187-5992-1-git-send-email-nm@ti.com>
+Message-ID: <1459551187-5992-4-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-04-01 at 11:07 +0800, Yangbo Lu wrote:
-> This patchset is used to fix a host version register bug in the T4240-R1.0
-> -R2.0
-> eSDHC controller. To get the SoC version and revision, it's needed to add
-> the
-> GUTS driver to access the global utilities registers.
-> 
-> So, the first three patches are to add the GUTS driver.
-> The following two patches are to enable GUTS driver support to get SVR in
-> eSDHC
-> driver and fix host version for T4240.
-> 
-> Yangbo Lu (5):
->   ARM64: dts: ls2080a: add device configuration node
->   soc: fsl: add GUTS driver for QorIQ platforms
->   dt: move guts devicetree doc out of powerpc directory
->   powerpc/fsl: move mpc85xx.h to include/linux/fsl
->   mmc: sdhci-of-esdhc: fix host version for T4240-R1.0-R2.0
+omap_rev is used to detect various SoC types, however any misuse of
+the usage by invoking it earlier than it being populated will result
+in invalid results. Lets flag them as early as possible to prevent
+unintended side effects taking place. We get 0 if it is uninitialized
+and -1 when detection is done using device tree (as the case was for
+DRA7 as the case was prior to commit 06c2d368fc36 ("ARM: OMAP: DRA7:
+Make use of omap_revision information for soc_is* calls")
 
-Acked-by: Scott Wood <oss@buserror.net>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+ arch/arm/mach-omap1/id.c | 1 +
+ arch/arm/mach-omap2/id.c | 1 +
+ 2 files changed, 2 insertions(+)
 
--Scott
+diff --git a/arch/arm/mach-omap1/id.c b/arch/arm/mach-omap1/id.c
+index 52de382fc804..bfabc065d331 100644
+--- a/arch/arm/mach-omap1/id.c
++++ b/arch/arm/mach-omap1/id.c
+@@ -65,6 +65,7 @@ static struct omap_id omap_ids[] __initdata = {
+ 
+ unsigned int omap_rev(void)
+ {
++	WARN_ON_ONCE(!omap_revision || omap_revision == -1);
+ 	return omap_revision;
+ }
+ EXPORT_SYMBOL(omap_rev);
+diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+index d85c24918c17..75fb6c006e86 100644
+--- a/arch/arm/mach-omap2/id.c
++++ b/arch/arm/mach-omap2/id.c
+@@ -46,6 +46,7 @@ u32 omap_features;
+ 
+ unsigned int omap_rev(void)
+ {
++	WARN_ON_ONCE(!omap_revision || omap_revision == -1);
+ 	return omap_revision;
+ }
+ EXPORT_SYMBOL(omap_rev);
+-- 
+2.8.0
