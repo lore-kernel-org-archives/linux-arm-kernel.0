@@ -1,82 +1,48 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 1 Apr 2016 12:03:15 +0100
-Subject: [PATCH V4 1/1] ARM : missing corrupted reg in __div64_32
-In-Reply-To: <BLU436-SMTP12207857FFB72680FD3D560999A0@phx.gbl>
-References: <20160401085631.GJ3701@e103592.cambridge.arm.com>
- <BLU436-SMTP12207857FFB72680FD3D560999A0@phx.gbl>
-Message-ID: <20160401110315.GK3701@e103592.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri,  1 Apr 2016 12:12:22 +0100
+Subject: [PATCH] arm64: KVM: Add braces to multi-line if statement in virtual
+ PMU code
+Message-ID: <1459509142-13524-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 01, 2016 at 06:28:49PM +0800, chengang wrote:
-> __xl(R0 in little endian system, or R1 in big endian system) is corrupted
-> by the call to  __do_div64i(). The  compiler is not aware of this, so if
+The kernel is written in C, not python, so we need braces around
+multi-line if statements. GCC 6 actually warns about this, thanks to the
+fantastic new "-Wmisleading-indentation" flag:
 
-Should that be "__do_div64", not "__do_div64i"?
+ | virt/kvm/arm/pmu.c: In function ?kvm_pmu_overflow_status?:
+ | virt/kvm/arm/pmu.c:198:3: warning: statement is indented as if it were guarded by... [-Wmisleading-indentation]
+ |    reg &= vcpu_sys_reg(vcpu, PMCNTENSET_EL0);
+ |    ^~~
+ | arch/arm64/kvm/../../../virt/kvm/arm/pmu.c:196:2: note: ...this ?if? clause, but it is not
+ |   if ((vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMU_PMCR_E))
+ |   ^~
 
-> n is used afterwards __xl won't be reloaded and n will contain incorrect value.
-> 
-> Mark 64bits variable __n as inputi/output to inform compiler both r0 and r1
+As it turns out, this particular case is harmless (we just do some &=
+operations with 0), but worth fixing nonetheless.
 
-Typo: "inputi"
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ virt/kvm/arm/pmu.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-> are changed by the funciton call.
-> 
-> Signed-off-by: Chen Gang <gangchen@rdamicro.com>
-> Signed-off-by: Chen Gang <changeang.beijing@outlook.com>
-> ---
->  arch/arm/include/asm/div64.h | 22 ++++++++--------------
->  1 file changed, 8 insertions(+), 14 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/div64.h b/arch/arm/include/asm/div64.h
-> index e1f0776..1153e6d 100644
-> --- a/arch/arm/include/asm/div64.h
-> +++ b/arch/arm/include/asm/div64.h
-> @@ -21,30 +21,24 @@
->   * for arguments and results (beware).
->   */
->  
-> -#ifdef __ARMEB__
-> -#define __xh "r0"
-> -#define __xl "r1"
-> -#else
-> -#define __xl "r0"
-> -#define __xh "r1"
-> -#endif
->  
->  static inline uint32_t __div64_32(uint64_t *n, uint32_t base)
->  {
->  	register unsigned int __base      asm("r4") = base;
->  	register unsigned long long __n   asm("r0") = *n;
->  	register unsigned long long __res asm("r2");
-> -	register unsigned int __rem       asm(__xh);
-> -	asm(	__asmeq("%0", __xh)
-> +	asm(	__asmeq("%0", "r0")
->  		__asmeq("%1", "r2")
-> -		__asmeq("%2", "r0")
-> -		__asmeq("%3", "r4")
-> +		__asmeq("%2", "r4")
->  		"bl	__do_div64"
-> -		: "=r" (__rem), "=r" (__res)
-> -		: "r" (__n), "r" (__base)
-> +		: "+r" (__n), "=r" (__res)
-> +		: "r" (__base)
->  		: "ip", "lr", "cc");
->  	*n = __res;
-> -	return __rem;
-> +	/*
-> +	 * __do_div64 returns the remainder in the upper word of __n
-> +	 */
-
-Minor nit: ^ this is short enough to be a one-line comment
-
-> +	return __n >> 32;
->  }
->  #define __div64_32 __div64_32
-
-With those changes,
-
-Reviewed-by: Dave Martin <Dave.Martin@arm.com>
-
-Cheers
----Dave
+diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+index b5754c6c5508..575c7aa30d7e 100644
+--- a/virt/kvm/arm/pmu.c
++++ b/virt/kvm/arm/pmu.c
+@@ -193,11 +193,12 @@ static u64 kvm_pmu_overflow_status(struct kvm_vcpu *vcpu)
+ {
+ 	u64 reg = 0;
+ 
+-	if ((vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMU_PMCR_E))
++	if ((vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMU_PMCR_E)) {
+ 		reg = vcpu_sys_reg(vcpu, PMOVSSET_EL0);
+ 		reg &= vcpu_sys_reg(vcpu, PMCNTENSET_EL0);
+ 		reg &= vcpu_sys_reg(vcpu, PMINTENSET_EL1);
+ 		reg &= kvm_pmu_valid_counter_mask(vcpu);
++	}
+ 
+ 	return reg;
+ }
+-- 
+2.1.4
