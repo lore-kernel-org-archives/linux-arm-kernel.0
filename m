@@ -1,41 +1,21 @@
-From: gautamvivek1987@gmail.com (Vivek Gautam)
-Date: Fri, 1 Apr 2016 05:52:30 -0700
-Subject: [PATCH 1/2] phy: Group vendor specific phy drivers
-In-Reply-To: <20160401113919.GC2987@vireshk-i7>
-References: <1459510156-9147-1-git-send-email-gautam.vivek@samsung.com>
- <20160401113919.GC2987@vireshk-i7>
-Message-ID: <CAFp+6iGwXJHAEgm3n1S4Dfp45egCPMdoMrOqsR6W9c865-7rwA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 1 Apr 2016 14:53:51 +0200
+Subject: [PATCH v2] gpio/ls1043a: Add compatible "fsl,qoriq-gpio" for
+ ls1043a gpio nodes
+In-Reply-To: <1458726442-1851-3-git-send-email-Gang.Liu@nxp.com>
+References: <1458726442-1851-1-git-send-email-Gang.Liu@nxp.com>
+ <1458726442-1851-3-git-send-email-Gang.Liu@nxp.com>
+Message-ID: <CACRpkdbX4wx55FsBL9RWM02=Y6fKGE499E2gOfcKZpVy3O6L_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 1, 2016 at 4:39 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On 01-04-16, 16:59, Vivek Gautam wrote:
->> Adding vendor specific directories in phy to group
->> phy drivers under their respective vendor umbrella.
->>
->> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
->> ---
->>  drivers/phy/{ => st}/phy-spear1310-miphy.c        |   0
->>  drivers/phy/{ => st}/phy-spear1340-miphy.c        |   0
->>  rename drivers/phy/{ => st}/phy-spear1310-miphy.c (100%)
->>  rename drivers/phy/{ => st}/phy-spear1340-miphy.c (100%)
->>
->
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-Thanks Viresh.
+On Wed, Mar 23, 2016 at 10:47 AM, Liu Gang <Gang.Liu@nxp.com> wrote:
 
->
-> --
-> viresh
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+The subject of the patch should be
 
+ARM64: dts: ...
 
+Apart from that it looks OK, DTS files are not really my business.
 
--- 
-Best Regards
-Vivek Gautam
-Samsung R&D Institute, Bangalore
-India
+Yoursm
+Linus Walleij
