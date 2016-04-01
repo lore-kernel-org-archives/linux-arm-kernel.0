@@ -1,61 +1,56 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Fri, 1 Apr 2016 22:34:42 +0800
-Subject: [PATCH] pinctrl: mediatek: correct debounce time unit in
- mtk_gpio_set_debounce
-In-Reply-To: <CAGS+omA=xbZH04nkVddVi77xvNznjx36_rHJHhAHBLejuxZqgA@mail.gmail.com>
-References: <1459518711-61619-1-git-send-email-yingjoe.chen@mediatek.com>
- <CAGS+omA=xbZH04nkVddVi77xvNznjx36_rHJHhAHBLejuxZqgA@mail.gmail.com>
-Message-ID: <1459521282.27150.3.camel@mtksdaap41>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Fri, 1 Apr 2016 10:35:40 -0400
+Subject: [PATCH 04/11] ARM: dts: exynos: Fix DTC unit name warnings in
+ Trats2 board
+In-Reply-To: <1459493874-2366-4-git-send-email-k.kozlowski@samsung.com>
+References: <1459493874-2366-1-git-send-email-k.kozlowski@samsung.com>
+ <1459493874-2366-4-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <56FE873C.2090503@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Krzysztof,
 
-Daniel,
-
-Thanks for your review.
-
-On Fri, 2016-04-01 at 22:28 +0800, Daniel Kurtz wrote:
-> Hi Yingjoe,
+On 04/01/2016 02:57 AM, Krzysztof Kozlowski wrote:
+> Fix following DTC warnings in Trats2 board:
 > 
-> On Fri, Apr 1, 2016 at 9:51 PM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
-> > The debounce time unit for gpio_chip.set_debounce is us but
-> > mtk_gpio_set_debounce regard it as ms.
-> > Fix this by correct debounce time array dbnc_arr so it can find correct
-> > debounce setting.
+> Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+> Warning (unit_address_vs_reg): Node /i2c-gpio-1/max77693 at 66/regulators/ESAFEOUT1 at 1 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /i2c-gpio-1/max77693 at 66/regulators/ESAFEOUT2 at 2 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /i2c-gpio-1/max77693 at 66/regulators/CHARGER at 0 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /thermistor-ap at 0 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /thermistor-battery at 1 has a unit name, but no reg property
 > 
-> This patch also changes the first entry to 500 usec.  At least mention why.
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos4412-trats2.dts | 14 +++++++-------
+>  1 file changed, 7 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+> index 2bf363c3bf62..523627003738 100644
+> --- a/arch/arm/boot/dts/exynos4412-trats2.dts
+> +++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+> @@ -29,7 +29,7 @@
+>  		i2c12 = &i2c_max77693_fuel;
+>  	};
+>  
+> -	memory {
+> +	mmemory at 40000000 {
+>  		reg =  <0x40000000 0x40000000>;
+>  	};
 > 
 
-OK. Will add this:
+Besides this creating duplicated memory nodes as you said, plain memory
+should be allowed according to Rob and he plans to add an exception to dtc:
 
-Debounce time for first debounce setting is 500us, correct this as well.
+http://www.spinics.net/lists/arm-kernel/msg494038.html
+ 
+Rest of the patch looks good so after removing the memory node change:
 
-While I'm at it, also change the debounce time array name to
-"debounce_time" for readability.
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-
-> >
-> > Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> > ---
-> >  drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> > index 2bbe6f7..be72325 100644
-> > --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> > +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> > @@ -1004,7 +1004,8 @@ static int mtk_gpio_set_debounce(struct gpio_chip *chip, unsigned offset,
-> >         struct mtk_pinctrl *pctl = dev_get_drvdata(chip->parent);
-> >         int eint_num, virq, eint_offset;
-> >         unsigned int set_offset, bit, clr_bit, clr_offset, rst, i, unmask, dbnc;
-> > -       static const unsigned int dbnc_arr[] = {0 , 1, 16, 32, 64, 128, 256};
-> > +       static const unsigned int dbnc_arr[] = {500, 1000, 16000, 32000, 64000,
-> > +                                               128000, 256000};
-> 
-> While you are at it, can you please rename this to something more
-> readable than "dbnc"?
-
-
-Will change to debounce_time.
-
-Joe.C
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
