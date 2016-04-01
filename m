@@ -1,76 +1,185 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 01 Apr 2016 09:29:57 +0900
-Subject: [PATCH v4 0/9] ARM: dts: Add new Exynos3250-based ARTIK5 module
- dtsi file
-In-Reply-To: <1459392485-11327-1-git-send-email-cw00.choi@samsung.com>
-References: <1459392485-11327-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <56FDC105.7050709@samsung.com>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Fri, 1 Apr 2016 09:37:44 +0800
+Subject: [PATCH 2/2] hwrng: hisi: Add support for Hisilicon RNG support
+In-Reply-To: <1459474664-11264-1-git-send-email-wangkefeng.wang@huawei.com>
+References: <1459474664-11264-1-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <1459474664-11264-2-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31.03.2016 11:47, Chanwoo Choi wrote:
-> This patchset add the support for Device Tree source for Samsung ARTIK5 module[1]
-> based on Exynos3250 SoC and development board[2]. The ARTIK5 module includes
-> the follwoing devices:
-> - Application Processor (Samsung Exynos3250)
-> - WiFi/BT Combo chip
-> - PMIC (Samsung S2MPS14)
-> - eMMC (4GB)
-> - DRAM LPDDR3 (512MB)
-> - Connectors pin (60 Pins x 3 set)
-> 
-> Also, this patchset add the ARTIK5 development board[2] dts file which includes
-> the ARTIK5 module[1] and have the devices such as sound codec, sd card port,
-> ethernet port, uart port and so on.
-> 
-> [1] https://www.artik.io/hardware/artik-5
-> [2] http://www.digikey.com/product-detail/en/SIP-KITNXB001/1510-1316-ND/5825102
-> 
-> Changes from v3:
-> (https://lkml.org/lkml/2016/3/15/71)
-> - Add acked-by tag from Rob Herring <robh@kernel.org> (patch8)
-> - Fix typo on patch descritpion (patch8)
-> - Make the separate patch for including the new clock id
->   for both MMC2 and UART2 device (patch2)
-> 
-> Changes from v2:
-> (https://lkml.org/lkml/2016/3/14/910)
-> - Add reviewed tag by Krzysztof Kozlowski for all patches
-> - Include the separate patch1[3] in patchset because patch5 depend on patch1[3]
->   [3] https://lkml.org/lkml/2016/3/14/245
-> - Fix the order issue in exynos3250-artik5.dtsi
-> - Use lowercase for hex address in exynos3250-artik5.dtsi
-> 
-> Changes from v1:
-> (https://lkml.org/lkml/2016/3/13/215)
-> - Change the board name from 'artik5-devel' to 'artik5-eval'
-> - Merge the patch6/7/8 to patch5
-> - Add the new board information to samsung-boards.txt[1]
->   [1] Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
-> - Fix minor coding style issue and remove 'wakeup' property
-> - Remove 'broken-cd' and 'desc-num' property from mshc_0 node
-> - Handle the LDO11/LDO12 by using XMMC0CDn pin (GPK0-2 gpio) for MMC device
->   and fix the ldo number of 'vmmc-supply' property.
-> - Add the 'vqmmc-supply' property for MSHC2
-> - Drop the patch10 for PPMU node
-> - Add the new patch to initialize the MMC2 gpio pin on monk board
-> 
-> Chanwoo Choi (6):
->   ARM: dts: Add initial pin configuration for exynos3250-rinato
->   dt-bindings: Add the clock id of UART2 and MMC2 for Exynos3250
->   clk: samsung: exynos3250: Add MMC2 clock
->   ARM: dts: Add initial gpio setting of MMC2 device for exynos3250-monk
->   ARM: dts: Add MSHC2 dt node for Exynos3250 SoC
->   ARM: dts: Add exynos3250-artik5 dtsi file for ARTIK5 module
-> 
-> Jaehoon Chung (1):
->   ARM: dts: Add MSHC2 dt node for SD card for exynos3250-artik5-eval board
-> 
-> Pankaj Dubey (2):
->   clk: samsung: exynos3250: Add UART2 clock
->   ARM: dts: Add UART2 dt node for Exynos3250 SoC
+This adds the Hisilicon Random Number Generator(RNG) support,
+which is found on Hip04 and Hip05 soc.
 
-Thanks, applied all non-clock patches after pulling tag from Sylwester.
+Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+---
+ drivers/char/hw_random/Kconfig    |  13 ++++
+ drivers/char/hw_random/Makefile   |   1 +
+ drivers/char/hw_random/hisi-rng.c | 121 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 135 insertions(+)
+ create mode 100644 drivers/char/hw_random/hisi-rng.c
 
-Best regards,
-Krzysztof
+diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
+index 67ee8b0..088b1bf 100644
+--- a/drivers/char/hw_random/Kconfig
++++ b/drivers/char/hw_random/Kconfig
+@@ -333,6 +333,19 @@ config HW_RANDOM_TPM
+ 
+ 	  If unsure, say Y.
+ 
++config HW_RANDOM_HISI
++	tristate "Hisilicon Random Number Generator support"
++	depends on HW_RANDOM && ARCH_HISI
++	default HW_RANDOM
++	---help---
++	  This driver provides kernel-side support for the Random Number
++	  Generator hardware found on Hisilicon Hip04 and Hip05 SoC.
++
++	  To compile this driver as a module, choose M here: the
++	  module will be called hisi-rng.
++
++	  If unsure, say Y.
++
+ config HW_RANDOM_MSM
+ 	tristate "Qualcomm SoCs Random Number Generator support"
+ 	depends on HW_RANDOM && ARCH_QCOM
+diff --git a/drivers/char/hw_random/Makefile b/drivers/char/hw_random/Makefile
+index f5a6fa7..e09305b 100644
+--- a/drivers/char/hw_random/Makefile
++++ b/drivers/char/hw_random/Makefile
+@@ -26,6 +26,7 @@ obj-$(CONFIG_HW_RANDOM_PPC4XX) += ppc4xx-rng.o
+ obj-$(CONFIG_HW_RANDOM_PSERIES) += pseries-rng.o
+ obj-$(CONFIG_HW_RANDOM_POWERNV) += powernv-rng.o
+ obj-$(CONFIG_HW_RANDOM_EXYNOS)	+= exynos-rng.o
++obj-$(CONFIG_HW_RANDOM_HISI)	+= hisi-rng.o
+ obj-$(CONFIG_HW_RANDOM_TPM) += tpm-rng.o
+ obj-$(CONFIG_HW_RANDOM_BCM2835) += bcm2835-rng.o
+ obj-$(CONFIG_HW_RANDOM_IPROC_RNG200) += iproc-rng200.o
+diff --git a/drivers/char/hw_random/hisi-rng.c b/drivers/char/hw_random/hisi-rng.c
+new file mode 100644
+index 0000000..59580e4
+--- /dev/null
++++ b/drivers/char/hw_random/hisi-rng.c
+@@ -0,0 +1,121 @@
++/*
++ * Copyright (C) 2016 HiSilicon Co., Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/err.h>
++#include <linux/kernel.h>
++#include <linux/hw_random.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/random.h>
++
++#define RNG_SEED	0x0
++#define RNG_CTRL	0x4
++  #define RNG_SEED_SEL	BIT(2)
++  #define RNG_RING_EN	BIT(1)
++  #define RNG_EN	BIT(0)
++#define RNG_RAN_NUM	0x10
++#define RNG_PHY_SEED	0x14
++
++#define to_hisi_rng(p)	container_of(p, struct hisi_rng, rng)
++
++static int seed_sel;
++module_param(seed_sel, int, S_IRUGO);
++MODULE_PARM_DESC(seed_sel, "Auto reload seed. 0, use LFSR(default); 1, use ring oscillator.");
++
++struct hisi_rng {
++	void __iomem *base;
++	struct hwrng rng;
++};
++
++static int hisi_rng_init(struct hwrng *rng)
++{
++	struct hisi_rng *hrng = to_hisi_rng(rng);
++	int val = RNG_EN;
++	u32 seed;
++
++	/* get a random number as initial seed */
++	get_random_bytes(&seed, sizeof(seed));
++
++	writel_relaxed(seed, hrng->base + RNG_SEED);
++
++	if (seed_sel == 1)
++		val |= RNG_RING_EN | RNG_SEED_SEL;
++
++	writel_relaxed(val, hrng->base + RNG_CTRL);
++	return 0;
++}
++
++static void hisi_rng_cleanup(struct hwrng *rng)
++{
++	struct hisi_rng *hrng = to_hisi_rng(rng);
++
++	writel_relaxed(0, hrng->base + RNG_CTRL);
++}
++
++static int hisi_rng_read(struct hwrng *rng, void *buf, size_t max,
++			 bool wait)
++{
++	struct hisi_rng *hrng = to_hisi_rng(rng);
++	u32 *data = buf;
++
++	*data = readl_relaxed(hrng->base + RNG_RAN_NUM);
++	return 4;
++}
++
++static int hisi_rng_probe(struct platform_device *pdev)
++{
++	struct hisi_rng *rng;
++	struct resource *res;
++	int ret;
++
++	rng = devm_kzalloc(&pdev->dev, sizeof(*rng), GFP_KERNEL);
++	if (!rng)
++		return -ENOMEM;
++
++	platform_set_drvdata(pdev, rng);
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	rng->base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(rng->base))
++		return PTR_ERR(rng->base);
++
++	rng->rng.name = pdev->name;
++	rng->rng.init = hisi_rng_init;
++	rng->rng.cleanup = hisi_rng_cleanup;
++	rng->rng.read = hisi_rng_read;
++
++	ret = devm_hwrng_register(&pdev->dev, &rng->rng);
++	if (ret) {
++		dev_err(&pdev->dev, "failed to register hwrng\n");
++		return ret;
++	}
++
++	return 0;
++}
++
++static const struct of_device_id hisi_rng_dt_ids[] = {
++	{ .compatible = "hisilicon,hisi-rng" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, hisi_rng_dt_ids);
++
++static struct platform_driver hisi_rng_driver = {
++	.probe		= hisi_rng_probe,
++	.driver		= {
++		.name	= "hisi-rng",
++		.of_match_table = of_match_ptr(hisi_rng_dt_ids),
++	},
++};
++
++module_platform_driver(hisi_rng_driver);
++
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR("Kefeng Wang <wangkefeng.wang@huawei>");
++MODULE_DESCRIPTION("Hisilicon random number generator driver");
+-- 
+1.7.12.4
