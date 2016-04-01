@@ -1,49 +1,26 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri,  1 Apr 2016 16:42:20 +0200
-Subject: [PATCH 0/6] ARM: dts: OXNAS pull request for 4.7
-Message-ID: <1459521740-14050-1-git-send-email-narmstrong@baylibre.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Fri, 1 Apr 2016 10:44:06 -0400
+Subject: [PATCH v3 0/3] ahci: add ports-implemented dt bindings
+In-Reply-To: <1459497178-31090-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1459497178-31090-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20160401144406.GS7822@mtj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the ARM device tree pull request for arm-soc related OXNAS platform.
+On Fri, Apr 01, 2016 at 08:52:55AM +0100, Srinivas Kandagatla wrote:
+> On some SOCs PORTS_IMPL register value is never programmed by the BIOS
+> and left at zero value. Which means that no sata ports are available for
+> software. AHCI driver used to cope up with this by fabricating the
+> port_map if the PORTS_IMPL register is read zero, but recent patch [1]
+> broke this workaround as zero value was valid for nvme disks.
+> 
+> This patch adds ports-implemented dt bindings as workaround for this issue
+> in a way that DT can dictate the port_map incase where the SOCs does not
+> program it already.
 
-The following changes since commit 1e6d88ccf41c7ef2d6c99aa5e7fb9215aa0e5423:
+Applied all three patches to libata/for-4.6-fixes w/ stable cc'd.
 
-  Merge tag 'nios2-v4.6-rc2' of git://git.kernel.org/pub/scm/linux/kernel/git/lftan/nios2 (2016-03-30 20:40:42 -0500)
+Thanks.
 
-are available in the git repository at:
-
-  https://github.com/superna9999/linux.git tags/ox810se-arm-dts
-
-for you to fetch changes up to 189e7cc9d357e7b2e96ff758fe9e727cc2a4fe8d:
-
-  ARM: boot: dts: Add Western Digital My Book World Edition device tree (2016-04-01 15:42:31 +0200)
-
-----------------------------------------------------------------
-ARM: dts: Add OXNAS Platform Bindings
-
-Changes since original v3 patchset :
-- Get rid of PLX Technology
-- Add entry into MAINTAINERS files
-
-v3 patchset: http://lkml.kernel.org/r/1458838215-23314-1-git-send-email-narmstrong at baylibre.com
-
-----------------------------------------------------------------
-Neil Armstrong (6):
-      dt-bindings: irq: arm,versatile-fpga: add compatible string for OX810SE SoC
-      dt-bindings: Add Oxford Semiconductor to vendor prefixes
-      ARM: boot: dts: Add Oxford Semiconductor OX810SE dtsi
-      dt-bindings: Add OXNAS bindings
-      dt-bindings: Add Western Digital to vendor prefixes
-      ARM: boot: dts: Add Western Digital My Book World Edition device tree
-
- Documentation/devicetree/bindings/arm/oxnas.txt                                   |   9 +++
- Documentation/devicetree/bindings/interrupt-controller/arm,versatile-fpga-irq.txt |   2 +-
- Documentation/devicetree/bindings/vendor-prefixes.txt                             |   2 +
- arch/arm/boot/dts/Makefile                                                        |   2 +
- arch/arm/boot/dts/ox810se.dtsi                                                    | 336 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/wd-mbwe.dts                                                     | 112 +++++++++++++++++++++++++++++++
- 6 files changed, 462 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/arm/oxnas.txt
- create mode 100644 arch/arm/boot/dts/ox810se.dtsi
- create mode 100644 arch/arm/boot/dts/wd-mbwe.dts
+-- 
+tejun
