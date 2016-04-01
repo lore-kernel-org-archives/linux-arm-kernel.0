@@ -1,86 +1,114 @@
 From: james.morse@arm.com (James Morse)
-Date: Fri,  1 Apr 2016 17:53:38 +0100
-Subject: [PATCH v7 14/16] PM / Hibernate: Call flush_icache_range() on pages
- restored in-place
+Date: Fri,  1 Apr 2016 17:53:40 +0100
+Subject: [PATCH v7 16/16] arm64: hibernate: Prevent resume from a different
+ kernel version
 In-Reply-To: <1459529620-22150-1-git-send-email-james.morse@arm.com>
 References: <1459529620-22150-1-git-send-email-james.morse@arm.com>
-Message-ID: <1459529620-22150-15-git-send-email-james.morse@arm.com>
+Message-ID: <1459529620-22150-17-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some architectures require code written to memory as if it were data to be
-'cleaned' from any data caches before the processor can fetch them as new
-instructions.
+Resuming using a different kernel version is fragile, while there are
+sufficient details in the hibernate arch-header to perform the restore,
+changes in the boot process can have a long-lasting impact on the system.
+In particular, if the EFI stub causes more runtime services memory to be
+allocated, the amount of memory left for linux is reduced. If we are
+lucky, this will cause restore to fail with the message:
+> PM: Image mismatch: memory size
+If we are unlucky, the system will explode sometime later when an EFI
+runtime services call is made.
 
-During resume from hibernate, the snapshot code copies some pages directly,
-meaning these architectures do not get a chance to perform their cache
-maintenance. Modify the read and decompress code to call
-flush_icache_range() on all pages that are restored, so that the restored
-in-place pages are guaranteed to be executable on these architectures.
+Prevent resuming with a different kernel build, by storing UTS_VERSION
+in the hibernate header. This also ensures the page size and va bits
+configuration remain the same.
 
 Signed-off-by: James Morse <james.morse@arm.com>
-Acked-by: Pavel Machek <pavel@ucw.cz>
-Acked-by: Rafael J. Wysocki <rjw@rjwysocki.net>
 ---
- kernel/power/swap.c | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ arch/arm64/kernel/hibernate.c | 35 +++++------------------------------
+ 1 file changed, 5 insertions(+), 30 deletions(-)
 
-diff --git a/kernel/power/swap.c b/kernel/power/swap.c
-index 12cd989dadf6..a30645d2e93f 100644
---- a/kernel/power/swap.c
-+++ b/kernel/power/swap.c
-@@ -37,6 +37,14 @@
- #define HIBERNATE_SIG	"S1SUSPEND"
+diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
+index 279c556ee24b..486315249f2a 100644
+--- a/arch/arm64/kernel/hibernate.c
++++ b/arch/arm64/kernel/hibernate.c
+@@ -20,6 +20,7 @@
+ #include <linux/pm.h>
+ #include <linux/sched.h>
+ #include <linux/suspend.h>
++#include <linux/utsname.h>
+ #include <linux/version.h>
  
+ #include <asm/barrier.h>
+@@ -42,8 +43,6 @@
+ #define pud_index(x)	0
+ #endif
+ 
+-#define TCR_IPS_BITS (0x7UL<<32)
+-
  /*
-+ * When reading an {un,}compressed image, we may restore pages in place,
-+ * in which case some architectures need these pages cleaning before they
-+ * can be executed. We don't know which pages these may be, so clean the lot.
-+ */
-+bool clean_pages_on_read = false;
-+bool clean_pages_on_decompress = false;
-+
-+/*
-  *	The swap map is a data structure used for keeping track of each page
-  *	written to a swap partition.  It consists of many swap_map_page
-  *	structures that contain each an array of MAP_PAGE_ENTRIES swap entries.
-@@ -241,6 +249,9 @@ static void hib_end_io(struct bio *bio)
+  * Hibernate core relies on this value being 0 on resume, and marks it
+  * __nosavedata assuming it will keep the resume kernel's '0' value. This
+@@ -54,17 +53,6 @@
+  */
+ extern int in_suspend;
  
- 	if (bio_data_dir(bio) == WRITE)
- 		put_page(page);
-+	else if (clean_pages_on_read)
-+		flush_icache_range((unsigned long)page_address(page),
-+				   (unsigned long)page_address(page) + PAGE_SIZE);
+-/*
+- * This value is written to the hibernate arch header, and prevents resuming
+- * from a hibernate image produced by an incompatible kernel. If you change
+- * a value that isn't saved/restored by hibernate, you should change this value.
+- *
+- * For example, if the mair_el1 values used by the kernel are changed, you
+- * should prevent resuming from a kernel with incompatible attributes, as these
+- * aren't saved/restored.
+- */
+-#define HIBERNATE_VERSION	KERNEL_VERSION(4, 6, 0)
+-
+ /* Find a symbols alias in the linear map */
+ #define LMADDR(x)	phys_to_virt(virt_to_phys(x))
  
- 	if (bio->bi_error && !hb->error)
- 		hb->error = bio->bi_error;
-@@ -1049,6 +1060,7 @@ static int load_image(struct swap_map_handle *handle,
+@@ -81,8 +69,7 @@ extern char hibernate_el2_vectors[];
+ extern char el2_setup[];
  
- 	hib_init_batch(&hb);
+ struct arch_hibernate_hdr_invariants {
+-	unsigned long	version;
+-	unsigned long	tcr_el1;	/* page_size, va bit etc */
++	char		uts_version[__NEW_UTS_LEN + 1];
+ };
  
-+	clean_pages_on_read = true;
- 	printk(KERN_INFO "PM: Loading image data pages (%u pages)...\n",
- 		nr_to_read);
- 	m = nr_to_read / 10;
-@@ -1124,6 +1136,10 @@ static int lzo_decompress_threadfn(void *data)
- 		d->unc_len = LZO_UNC_SIZE;
- 		d->ret = lzo1x_decompress_safe(d->cmp + LZO_HEADER, d->cmp_len,
- 		                               d->unc, &d->unc_len);
-+		if (clean_pages_on_decompress)
-+			flush_icache_range((unsigned long)d->unc,
-+					   (unsigned long)d->unc + d->unc_len);
-+
- 		atomic_set(&d->stop, 1);
- 		wake_up(&d->done);
+ /* These values need to be know across a hibernate/restore. */
+@@ -104,11 +91,8 @@ static struct arch_hibernate_hdr {
+ 
+ static inline void arch_hdr_invariants(struct arch_hibernate_hdr_invariants *i)
+ {
+-	i->version = HIBERNATE_VERSION;
+-	asm volatile("mrs	%0, tcr_el1" : "=r"(i->tcr_el1));
+-
+-	/* IPS bits vary on big/little systems, mask them out */
+-	i->tcr_el1 &= ~TCR_IPS_BITS;
++	memset(i, 0, sizeof(*i));
++	memcpy(i->uts_version, init_utsname()->version, sizeof(i->uts_version));
+ }
+ 
+ int pfn_is_nosave(unsigned long pfn)
+@@ -155,18 +139,9 @@ int arch_hibernation_header_restore(void *addr)
+ 	struct arch_hibernate_hdr_invariants invariants;
+ 	struct arch_hibernate_hdr *hdr = addr;
+ 
+-	/*
+-	 * If this header is ancient, it may be smaller than we expect.
+-	 * Test the version first.
+-	 */
+-	if (hdr->invariants.version != HIBERNATE_VERSION) {
+-		pr_crit("Hibernate image not compatible with this kernel version!\n");
+-		return -EINVAL;
+-	}
+-
+ 	arch_hdr_invariants(&invariants);
+ 	if (memcmp(&hdr->invariants, &invariants, sizeof(invariants))) {
+-		pr_crit("Hibernate image not compatible with this kernel configuration!\n");
++		pr_crit("Hibernate image not generated by this kernel!\n");
+ 		return -EINVAL;
  	}
-@@ -1189,6 +1205,8 @@ static int load_image_lzo(struct swap_map_handle *handle,
- 	}
- 	memset(crc, 0, offsetof(struct crc_data, go));
  
-+	clean_pages_on_decompress = true;
-+
- 	/*
- 	 * Start the decompression threads.
- 	 */
 -- 
 2.8.0.rc3
