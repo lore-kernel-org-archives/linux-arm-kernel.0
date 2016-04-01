@@ -1,65 +1,42 @@
-From: chengang.beijing@outlook.com (chengang)
-Date: Fri, 1 Apr 2016 19:25:34 +0800
-Subject: [PATCH V5 1/1] ARM : missing corrupted reg in __div64_32
-In-Reply-To: <20160401110315.GK3701@e103592.cambridge.arm.com>
-References: <20160401110315.GK3701@e103592.cambridge.arm.com>
-Message-ID: <BLU436-SMTP2480AEC0BAAAECEC0C70276999A0@phx.gbl>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Fri, 01 Apr 2016 16:59:16 +0530
+Subject: [PATCH 2/2] arm: mach-spear: Enable PHY_PLAT to meet dependency
+In-Reply-To: <1459510156-9147-1-git-send-email-gautam.vivek@samsung.com>
+References: <1459510156-9147-1-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <1459510156-9147-2-git-send-email-gautam.vivek@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-__xl(R0 in little endian system, or R1 in big endian system) is corrupted
-by the call to  __do_div64(). The  compiler is not aware of this, so if
-n is used afterwards __xl won't be reloaded and n will contain incorrect value.
+mach-spear enables PHY_ST_SPEAR1310_MIPHY and
+PHY_ST_SPEAR1340_MIPHY, which now fall under PHY_PLAT
+config. So select CONFIG_PHY_PLAT as well to resolve
+dependencies.
 
-Mark 64bits variable __n as input/output to inform compiler both r0 and r1
-are changed by the funciton call.
-
-Signed-off-by: Chen Gang <gangchen@rdamicro.com>
-Signed-off-by: Chen Gang <changeang.beijing@outlook.com>
+Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+Cc: Shiraz Hashim <shiraz.linux.kernel@gmail.com>
 ---
- arch/arm/include/asm/div64.h | 20 ++++++--------------
- 1 file changed, 6 insertions(+), 14 deletions(-)
+ arch/arm/mach-spear/Kconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/include/asm/div64.h b/arch/arm/include/asm/div64.h
-index e1f0776..ba3a5fc 100644
---- a/arch/arm/include/asm/div64.h
-+++ b/arch/arm/include/asm/div64.h
-@@ -21,30 +21,22 @@
-  * for arguments and results (beware).
-  */
- 
--#ifdef __ARMEB__
--#define __xh "r0"
--#define __xl "r1"
--#else
--#define __xl "r0"
--#define __xh "r1"
--#endif
- 
- static inline uint32_t __div64_32(uint64_t *n, uint32_t base)
- {
- 	register unsigned int __base      asm("r4") = base;
- 	register unsigned long long __n   asm("r0") = *n;
- 	register unsigned long long __res asm("r2");
--	register unsigned int __rem       asm(__xh);
--	asm(	__asmeq("%0", __xh)
-+	asm(	__asmeq("%0", "r0")
- 		__asmeq("%1", "r2")
--		__asmeq("%2", "r0")
--		__asmeq("%3", "r4")
-+		__asmeq("%2", "r4")
- 		"bl	__do_div64"
--		: "=r" (__rem), "=r" (__res)
--		: "r" (__n), "r" (__base)
-+		: "+r" (__n), "=r" (__res)
-+		: "r" (__base)
- 		: "ip", "lr", "cc");
- 	*n = __res;
--	return __rem;
-+	/* __do_div64 returns the remainder in the upper word of __n */
-+	return __n >> 32;
- }
- #define __div64_32 __div64_32
- 
+diff --git a/arch/arm/mach-spear/Kconfig b/arch/arm/mach-spear/Kconfig
+index ea9ea95..c0a62fd 100644
+--- a/arch/arm/mach-spear/Kconfig
++++ b/arch/arm/mach-spear/Kconfig
+@@ -29,6 +29,7 @@ if ARCH_SPEAR13XX
+ config MACH_SPEAR1310
+ 	bool "SPEAr1310 Machine support with Device Tree"
+ 	select PINCTRL_SPEAR1310
++	select PHY_PLAT
+ 	select PHY_ST_SPEAR1310_MIPHY
+ 	help
+ 	  Supports ST SPEAr1310 machine configured via the device-tree
+@@ -36,6 +37,7 @@ config MACH_SPEAR1310
+ config MACH_SPEAR1340
+ 	bool "SPEAr1340 Machine support with Device Tree"
+ 	select PINCTRL_SPEAR1340
++	select PHY_PLAT
+ 	select PHY_ST_SPEAR1340_MIPHY
+ 	help
+ 	  Supports ST SPEAr1340 machine configured via the device-tree
 -- 
-2.4.3
+1.9.1
