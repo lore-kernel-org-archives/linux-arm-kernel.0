@@ -1,40 +1,44 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Thu, 31 Mar 2016 17:30:43 -0700
-Subject: [PATCH 4/4] ARM: bcm2835: Enable NFS root support.
+Date: Thu, 31 Mar 2016 17:30:42 -0700
+Subject: [PATCH 3/4] ARM: bcm2835: Enable the VC4 graphics driver in the
+ defconfig
 In-Reply-To: <1459470643-9070-1-git-send-email-eric@anholt.net>
 References: <1459470643-9070-1-git-send-email-eric@anholt.net>
-Message-ID: <1459470643-9070-4-git-send-email-eric@anholt.net>
+Message-ID: <1459470643-9070-3-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is also present in multi_v7_defconfig, and means that I can test
-the pi1 with the 2835 defconfig in my normal environment.
+Combined with the queued DT changes, we now get HDMI and 3D support.
 
 Signed-off-by: Eric Anholt <eric@anholt.net>
 ---
- arch/arm/configs/bcm2835_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/configs/bcm2835_defconfig | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
-index 896500f..79de828 100644
+index 1192a6f..896500f 100644
 --- a/arch/arm/configs/bcm2835_defconfig
 +++ b/arch/arm/configs/bcm2835_defconfig
-@@ -43,6 +43,8 @@ CONFIG_NET=y
- CONFIG_PACKET=y
- CONFIG_UNIX=y
- CONFIG_INET=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
- CONFIG_NETWORK_SECMARK=y
- CONFIG_NETFILTER=y
- CONFIG_CFG80211=y
-@@ -122,6 +124,7 @@ CONFIG_TMPFS=y
- CONFIG_TMPFS_POSIX_ACL=y
- # CONFIG_MISC_FILESYSTEMS is not set
- CONFIG_NFS_FS=y
-+CONFIG_ROOT_NFS=y
- CONFIG_NFSD=y
- CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_ASCII=y
+@@ -64,7 +64,6 @@ CONFIG_INPUT_EVDEV=y
+ CONFIG_SERIAL_AMBA_PL011=y
+ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+ CONFIG_TTY_PRINTK=y
+-CONFIG_I2C=y
+ CONFIG_I2C_CHARDEV=y
+ CONFIG_I2C_BCM2835=y
+ CONFIG_SPI=y
+@@ -74,10 +73,10 @@ CONFIG_GPIO_SYSFS=y
+ # CONFIG_HWMON is not set
+ CONFIG_WATCHDOG=y
+ CONFIG_BCM2835_WDT=y
+-CONFIG_FB=y
++CONFIG_DRM=y
++CONFIG_DRM_VC4=y
+ CONFIG_FB_SIMPLE=y
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+-CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
+ CONFIG_SOUND=y
+ CONFIG_SND=y
+ CONFIG_SND_SOC=y
 -- 
 2.7.0
