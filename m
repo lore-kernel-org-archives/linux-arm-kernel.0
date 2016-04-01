@@ -1,67 +1,32 @@
-From: chengang.beijing@outlook.com (chengang)
-Date: Fri, 1 Apr 2016 18:28:49 +0800
-Subject: [PATCH V4 1/1] ARM : missing corrupted reg in __div64_32
-In-Reply-To: <20160401085631.GJ3701@e103592.cambridge.arm.com>
-References: <20160401085631.GJ3701@e103592.cambridge.arm.com>
-Message-ID: <BLU436-SMTP12207857FFB72680FD3D560999A0@phx.gbl>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Fri, 1 Apr 2016 17:32:39 +0800
+Subject: [PATCH v7 12/17] ARM64: ACPI: Check if it runs on Xen to enable
+ or disable ACPI
+In-Reply-To: <56FE3E85.60403@huawei.com>
+References: <1458830676-27075-1-git-send-email-shannon.zhao@linaro.org>
+ <1458830676-27075-13-git-send-email-shannon.zhao@linaro.org>
+ <20160329161837.GH6745@arm.com> <20160329163147.GB27223@leverpostej>
+ <56FB7E00.7030400@huawei.com>
+ <alpine.DEB.2.02.1603311155450.11739@kaball.uk.xensource.com>
+ <CAKv+Gu-wPq_FzO3sm7bhSFuu7EVxHWB_v6HOn1GqNbdaE-iBoQ@mail.gmail.com>
+ <20160331124216.GE26532@leverpostej> <56FE3E85.60403@huawei.com>
+Message-ID: <56FE4037.5060305@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-__xl(R0 in little endian system, or R1 in big endian system) is corrupted
-by the call to  __do_div64i(). The  compiler is not aware of this, so if
-n is used afterwards __xl won't be reloaded and n will contain incorrect value.
 
-Mark 64bits variable __n as inputi/output to inform compiler both r0 and r1
-are changed by the funciton call.
 
-Signed-off-by: Chen Gang <gangchen@rdamicro.com>
-Signed-off-by: Chen Gang <changeang.beijing@outlook.com>
----
- arch/arm/include/asm/div64.h | 22 ++++++++--------------
- 1 file changed, 8 insertions(+), 14 deletions(-)
+On 2016/4/1 17:25, Shannon Zhao wrote:
+> If it really needs is_xen_node(), I will not factor
+> fdt_find_hyper_node() in patch 11 since it uses flat DT while here it's
+> going to use unflatten DT.
+Sorry, I'm wrong. They both use flat DT. But it's no need to factor
+fdt_find_hyper_node() since is_xen_node is very simple like below I think.
 
-diff --git a/arch/arm/include/asm/div64.h b/arch/arm/include/asm/div64.h
-index e1f0776..1153e6d 100644
---- a/arch/arm/include/asm/div64.h
-+++ b/arch/arm/include/asm/div64.h
-@@ -21,30 +21,24 @@
-  * for arguments and results (beware).
-  */
- 
--#ifdef __ARMEB__
--#define __xh "r0"
--#define __xl "r1"
--#else
--#define __xl "r0"
--#define __xh "r1"
--#endif
- 
- static inline uint32_t __div64_32(uint64_t *n, uint32_t base)
- {
- 	register unsigned int __base      asm("r4") = base;
- 	register unsigned long long __n   asm("r0") = *n;
- 	register unsigned long long __res asm("r2");
--	register unsigned int __rem       asm(__xh);
--	asm(	__asmeq("%0", __xh)
-+	asm(	__asmeq("%0", "r0")
- 		__asmeq("%1", "r2")
--		__asmeq("%2", "r0")
--		__asmeq("%3", "r4")
-+		__asmeq("%2", "r4")
- 		"bl	__do_div64"
--		: "=r" (__rem), "=r" (__res)
--		: "r" (__n), "r" (__base)
-+		: "+r" (__n), "=r" (__res)
-+		: "r" (__base)
- 		: "ip", "lr", "cc");
- 	*n = __res;
--	return __rem;
-+	/*
-+	 * __do_div64 returns the remainder in the upper word of __n
-+	 */
-+	return __n >> 32;
- }
- #define __div64_32 __div64_32
- 
+of_flat_dt_is_compatible(node, "xen,xen");
+
+And maybe it cloud directly use above check in dt_scan_depth1_nodes.
+
+Thanks,
 -- 
-2.4.3
+Shannon
