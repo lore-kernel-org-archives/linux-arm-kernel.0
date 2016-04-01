@@ -1,127 +1,60 @@
 From: shannon.zhao@linaro.org (Shannon Zhao)
-Date: Fri,  1 Apr 2016 23:49:13 +0800
-Subject: [PATCH v10 15/17] ARM64: XEN: Add a function to initialize Xen
- specific UEFI runtime services
+Date: Fri,  1 Apr 2016 23:49:14 +0800
+Subject: [PATCH v10 16/17] FDT: Add a helper to get the subnode by given name
 In-Reply-To: <1459525755-36968-1-git-send-email-shannon.zhao@linaro.org>
 References: <1459525755-36968-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1459525755-36968-16-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1459525755-36968-17-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When running on Xen hypervisor, runtime services are supported through
-hypercall. Add a Xen specific function to initialize runtime services.
+Sometimes it needs to check if there is a subnode of given node in FDT
+by given name. Introduce this helper to get the subnode if it exists.
 
+CC: Rob Herring <robh@kernel.org>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm/include/asm/xen/xen-ops.h   |  6 ++++++
- arch/arm/xen/Makefile                |  1 +
- arch/arm/xen/efi.c                   | 40 ++++++++++++++++++++++++++++++++++++
- arch/arm64/include/asm/xen/xen-ops.h |  6 ++++++
- arch/arm64/xen/Makefile              |  1 +
- drivers/xen/Kconfig                  |  2 +-
- 6 files changed, 55 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/include/asm/xen/xen-ops.h
- create mode 100644 arch/arm/xen/efi.c
- create mode 100644 arch/arm64/include/asm/xen/xen-ops.h
+ drivers/of/fdt.c       | 13 +++++++++++++
+ include/linux/of_fdt.h |  2 ++
+ 2 files changed, 15 insertions(+)
 
-diff --git a/arch/arm/include/asm/xen/xen-ops.h b/arch/arm/include/asm/xen/xen-ops.h
-new file mode 100644
-index 0000000..ec154e7
---- /dev/null
-+++ b/arch/arm/include/asm/xen/xen-ops.h
-@@ -0,0 +1,6 @@
-+#ifndef _ASM_XEN_OPS_H
-+#define _ASM_XEN_OPS_H
-+
-+void xen_efi_runtime_setup(void);
-+
-+#endif /* _ASM_XEN_OPS_H */
-diff --git a/arch/arm/xen/Makefile b/arch/arm/xen/Makefile
-index 1296952..2279521 100644
---- a/arch/arm/xen/Makefile
-+++ b/arch/arm/xen/Makefile
-@@ -1 +1,2 @@
- obj-y		:= enlighten.o hypercall.o grant-table.o p2m.o mm.o
-+obj-$(CONFIG_XEN_EFI) += efi.o
-diff --git a/arch/arm/xen/efi.c b/arch/arm/xen/efi.c
-new file mode 100644
-index 0000000..16db419
---- /dev/null
-+++ b/arch/arm/xen/efi.c
-@@ -0,0 +1,40 @@
-+/*
-+ * Copyright (c) 2015, Linaro Limited, Shannon Zhao
+diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+index 3349d2a..5c8b2f2 100644
+--- a/drivers/of/fdt.c
++++ b/drivers/of/fdt.c
+@@ -645,6 +645,19 @@ int __init of_scan_flat_dt(int (*it)(unsigned long node,
+ }
+ 
+ /**
++ * of_get_flat_dt_subnode_by_name - get the subnode by given name
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along
-+ * with this program.  If not, see <http://www.gnu.org/licenses/>.
++ * @node: the parent node
++ * @uname: the name of subnode
++ * @return offset of the subnode, or -FDT_ERR_NOTFOUND if there is none
 + */
 +
-+#include <linux/efi.h>
-+#include <xen/xen-ops.h>
-+#include <asm/xen/xen-ops.h>
-+
-+/* Set XEN EFI runtime services function pointers. Other fields of struct efi,
-+ * e.g. efi.systab, will be set like normal EFI.
-+ */
-+void __init xen_efi_runtime_setup(void)
++int of_get_flat_dt_subnode_by_name(unsigned long node, const char *uname)
 +{
-+	efi.get_time                 = xen_efi_get_time;
-+	efi.set_time                 = xen_efi_set_time;
-+	efi.get_wakeup_time          = xen_efi_get_wakeup_time;
-+	efi.set_wakeup_time          = xen_efi_set_wakeup_time;
-+	efi.get_variable             = xen_efi_get_variable;
-+	efi.get_next_variable        = xen_efi_get_next_variable;
-+	efi.set_variable             = xen_efi_set_variable;
-+	efi.query_variable_info      = xen_efi_query_variable_info;
-+	efi.update_capsule           = xen_efi_update_capsule;
-+	efi.query_capsule_caps       = xen_efi_query_capsule_caps;
-+	efi.get_next_high_mono_count = xen_efi_get_next_high_mono_count;
-+	efi.reset_system             = NULL; /* Functionality provided by Xen. */
++	return fdt_subnode_offset(initial_boot_params, node, uname);
 +}
-+EXPORT_SYMBOL_GPL(xen_efi_runtime_setup);
-diff --git a/arch/arm64/include/asm/xen/xen-ops.h b/arch/arm64/include/asm/xen/xen-ops.h
-new file mode 100644
-index 0000000..ec154e7
---- /dev/null
-+++ b/arch/arm64/include/asm/xen/xen-ops.h
-@@ -0,0 +1,6 @@
-+#ifndef _ASM_XEN_OPS_H
-+#define _ASM_XEN_OPS_H
 +
-+void xen_efi_runtime_setup(void);
-+
-+#endif /* _ASM_XEN_OPS_H */
-diff --git a/arch/arm64/xen/Makefile b/arch/arm64/xen/Makefile
-index 74a8d87..8ff8aa9 100644
---- a/arch/arm64/xen/Makefile
-+++ b/arch/arm64/xen/Makefile
-@@ -1,2 +1,3 @@
- xen-arm-y	+= $(addprefix ../../arm/xen/, enlighten.o grant-table.o p2m.o mm.o)
- obj-y		:= xen-arm.o hypercall.o
-+obj-$(CONFIG_XEN_EFI) += $(addprefix ../../arm/xen/, efi.o)
-diff --git a/drivers/xen/Kconfig b/drivers/xen/Kconfig
-index 979a8317..f15bb3b7 100644
---- a/drivers/xen/Kconfig
-+++ b/drivers/xen/Kconfig
-@@ -275,7 +275,7 @@ config XEN_HAVE_PVMMU
- 
- config XEN_EFI
- 	def_bool y
--	depends on X86_64 && EFI
-+	depends on (ARM || ARM64 || X86_64) && EFI
- 
- config XEN_AUTO_XLATE
- 	def_bool y
++/**
+  * of_get_flat_dt_root - find the root node in the flat blob
+  */
+ unsigned long __init of_get_flat_dt_root(void)
+diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
+index 2fbe868..2c3707e 100644
+--- a/include/linux/of_fdt.h
++++ b/include/linux/of_fdt.h
+@@ -52,6 +52,8 @@ extern char __dtb_end[];
+ extern int of_scan_flat_dt(int (*it)(unsigned long node, const char *uname,
+ 				     int depth, void *data),
+ 			   void *data);
++extern int of_get_flat_dt_subnode_by_name(unsigned long node,
++					  const char *uname);
+ extern const void *of_get_flat_dt_prop(unsigned long node, const char *name,
+ 				       int *size);
+ extern int of_flat_dt_is_compatible(unsigned long node, const char *name);
 -- 
 2.1.4
