@@ -1,117 +1,63 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 01 Apr 2016 18:19:47 +0200
-Subject: [PATCH v1 2/2] rockchip: power-domain: support qos save and
- restore
-In-Reply-To: <56FDDE09.9080601@rock-chips.com>
-References: <1458285444-31129-1-git-send-email-zhangqing@rock-chips.com>
- <6919893.LfaTZNRxZs@phil> <56FDDE09.9080601@rock-chips.com>
-Message-ID: <3121335.t9IV1BMS6Y@phil>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri,  1 Apr 2016 17:19:57 +0100
+Subject: [PATCH] iommu/arm-smmu: Fix stream-match conflict with
+ IOMMU_DOMAIN_DMA
+Message-ID: <1459527597-10740-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Elaine,
+Commit cbf8277ef456 ("iommu/arm-smmu: Treat IOMMU_DOMAIN_DMA as bypass
+for now") ignores requests to attach a device to the default domain
+since, without IOMMU-basked DMA ops available everywhere, the default
+domain will just lead to unexpected transaction faults being reported.
 
-Am Freitag, 1. April 2016, 10:33:45 schrieb Elaine Zhang:
-> I agree with most of your modifications.
-> Except, the u32 *qos_save_regs below
+Unfortunately, the way this was implemented on SMMUv2 causes a
+regression with VFIO PCI device passthrough under KVM on AMD Seattle.
+On this system, the host controller device is associated with both a
+pci_dev *and* a platform_device, and can therefore end up with duplicate
+SMR entries, resulting in a stream-match conflict at runtime.
 
-you're right. I didn't take that into account when my open-coding my idea.
-A bit more below:
+This patch amends the original fix so that attaching to IOMMU_DOMAIN_DMA
+is rejected even before configuring the SMRs. This restores the old
+behaviour for now, but we'll need to look at handing host controllers
+specially when we come to supporting the default domain fully.
 
-> On 04/01/2016 12:31 AM, Heiko Stuebner wrote:
-> > Hi Elaine,
-> > 
-> > Am Freitag, 18. M?rz 2016, 15:17:24 schrieb Elaine Zhang:
-> >> support qos save and restore when power domain on/off.
-> >> 
-> >> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
-> > 
-> > overall looks nice already ... some implementation-specific comments
-> > below.> 
-> >> ---
-> >> 
-> >>   drivers/soc/rockchip/pm_domains.c | 87
-> >> 
-> >> +++++++++++++++++++++++++++++++++++++-- 1 file changed, 84
-> >> insertions(+),
-> >> 3 deletions(-)
-> >> 
-> >> diff --git a/drivers/soc/rockchip/pm_domains.c
-> >> b/drivers/soc/rockchip/pm_domains.c index 18aee6b..c5f4be6 100644
-> >> --- a/drivers/soc/rockchip/pm_domains.c
-> >> +++ b/drivers/soc/rockchip/pm_domains.c
-> >> @@ -45,10 +45,21 @@ struct rockchip_pmu_info {
-> >> 
-> >>   	const struct rockchip_domain_info *domain_info;
-> >>   
-> >>   };
-> >> 
-> >> +#define MAX_QOS_NODE_NUM	20
-> >> +#define MAX_QOS_REGS_NUM	5
-> >> +#define QOS_PRIORITY		0x08
-> >> +#define QOS_MODE		0x0c
-> >> +#define QOS_BANDWIDTH		0x10
-> >> +#define QOS_SATURATION		0x14
-> >> +#define QOS_EXTCONTROL		0x18
-> >> +
-> >> 
-> >>   struct rockchip_pm_domain {
-> >>   
-> >>   	struct generic_pm_domain genpd;
-> >>   	const struct rockchip_domain_info *info;
-> >>   	struct rockchip_pmu *pmu;
-> >> 
-> >> +	int num_qos;
-> >> +	struct regmap *qos_regmap[MAX_QOS_NODE_NUM];
-> >> +	u32 qos_save_regs[MAX_QOS_NODE_NUM][MAX_QOS_REGS_NUM];
-> > 
-> > struct regmap **qos_regmap;
-> > u32 *qos_save_regs;
-> 
-> when we save and restore qos registers we need save five regs for every
-> qos. like this :
-> for (i = 0; i < pd->num_qos; i++) {
-> 		regmap_read(pd->qos_regmap[i],
-> 			    QOS_PRIORITY,
-> 			    &pd->qos_save_regs[i][0]);
-> 		regmap_read(pd->qos_regmap[i],
-> 			    QOS_MODE,
-> 			    &pd->qos_save_regs[i][1]);
-> 		regmap_read(pd->qos_regmap[i],
-> 			    QOS_BANDWIDTH,
-> 			    &pd->qos_save_regs[i][2]);
-> 		regmap_read(pd->qos_regmap[i],
-> 			    QOS_SATURATION,
-> 			    &pd->qos_save_regs[i][3]);
-> 		regmap_read(pd->qos_regmap[i],
-> 			    QOS_EXTCONTROL,
-> 			    &pd->qos_save_regs[i][4]);
-> 	}
-> so we can not define qos_save_regs like u32 *qos_save_regs;,
-> and apply buff like
-> pd->qos_save_regs = kcalloc(pd->num_qos * MAX_QOS_REGS_NUM, sizeof(u32),
-> GFP_KERNEL);
+Reported-by: Eric Auger <eric.auger@linaro.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ drivers/iommu/arm-smmu.c | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
 
-so how about simply swapping indices and doing it like
-
-u32 *qos_save_regs[MAX_QOS_REGS_NUM];
-
-for (i = 0; i < MAX_QOS_REGS_NUM; i++) {
-	qos_save_regs[i] = kcalloc(pd->num_qos, sizeof(u32));
-	/* error handling here */
-}
-
-...
-		regmap_read(pd->qos_regmap[i],
-			    QOS_SATURATION,
-			    &pd->qos_save_regs[3][i]);
-...
-
-
-Asked the other way around, how did you measure to set MAX_QOS_REGS_NUM to 
-20? From looking at the rk3399 TRM, it seems there are only 38 QoS 
-generators on the SoC in general (24 on the rk3288 with PD_VIO having a 
-maximum of 9 qos generators), so preparing for 20 seems a bit overkill ;-)
-
-
-Heiko
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index e933679a3266..2f186d22477f 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1098,18 +1098,20 @@ static int arm_smmu_domain_add_master(struct arm_smmu_domain *smmu_domain,
+ 	struct arm_smmu_device *smmu = smmu_domain->smmu;
+ 	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
+ 
+-	/* Devices in an IOMMU group may already be configured */
+-	ret = arm_smmu_master_configure_smrs(smmu, cfg);
+-	if (ret)
+-		return ret == -EEXIST ? 0 : ret;
+-
+ 	/*
+ 	 * FIXME: This won't be needed once we have IOMMU-backed DMA ops
+-	 * for all devices behind the SMMU.
++	 * for all devices behind the SMMU. Note that we need to take
++	 * care configuring SMRs for devices both a platform_device and
++	 * and a PCI device (i.e. a PCI host controller)
+ 	 */
+ 	if (smmu_domain->domain.type == IOMMU_DOMAIN_DMA)
+ 		return 0;
+ 
++	/* Devices in an IOMMU group may already be configured */
++	ret = arm_smmu_master_configure_smrs(smmu, cfg);
++	if (ret)
++		return ret == -EEXIST ? 0 : ret;
++
+ 	for (i = 0; i < cfg->num_streamids; ++i) {
+ 		u32 idx, s2cr;
+ 
+-- 
+2.1.4
