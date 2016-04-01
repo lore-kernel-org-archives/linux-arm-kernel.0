@@ -1,54 +1,136 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 1 Apr 2016 14:00:46 +0800
-Subject: [PATCH v1 3/4] ARM: dts: vfxxx: Add OCROM and phandle entries
- for Vybrid SoC bus driver
-In-Reply-To: <39ab1c08dacb7fc4e36a3f3517da16d4da47710b.1457684688.git.maitysanchayan@gmail.com>
-References: <cover.1457684688.git.maitysanchayan@gmail.com>
- <39ab1c08dacb7fc4e36a3f3517da16d4da47710b.1457684688.git.maitysanchayan@gmail.com>
-Message-ID: <20160401060046.GG18833@tiger>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 1 Apr 2016 13:16:46 +0700
+Subject: [PATCH v15 15/20] arm64: kdump: reserve memory for crash dump
+ kernel
+In-Reply-To: <20160331071903.GB2267@linaro.org>
+References: <cover.1457977401.git.geoff@infradead.org>
+ <1083d7e4a6285c39d2955fb99dc9fa4c345d00fa.1457977403.git.geoff@infradead.org>
+ <56EC441E.2040606@arm.com> <20160331071903.GB2267@linaro.org>
+Message-ID: <56FE124E.5000004@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 11, 2016 at 02:29:30PM +0530, Sanchayan Maity wrote:
-> Add OCROM node and introduce phandles to OCROM, MSCM and NVMEM
-> OCOTP for use by the Vybrid SoC bus driver.
+On 03/31/2016 02:19 PM, AKASHI Takahiro wrote:
+> On Fri, Mar 18, 2016 at 06:08:30PM +0000, James Morse wrote:
+>> Hi!
+>>
+>> On 14/03/16 17:48, Geoff Levand wrote:
+>>> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>>>
+>>> On the startup of primary kernel, the memory region used by crash dump
+>>> kernel must be specified by "crashkernel=" kernel parameter.
+>>> reserve_crashkernel() will allocate and reserve the region for later use.
+>>>
+>>> User space tools, like kexec-tools, will be able to find that region marked
+>>> as "Crash kernel" in /proc/iomem.
+>>
+>> [NB: Re-ordered diff hunks ]
+>>
+>>> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+>>> index 7802f21..4edf181 100644
+>>> --- a/arch/arm64/mm/init.c
+>>> +++ b/arch/arm64/mm/init.c
+>>> @@ -171,6 +229,8 @@ void __init arm64_memblock_init(void)
+>>>   		memblock_reserve(__virt_to_phys(initrd_start), initrd_end - initrd_start);
+>>>   #endif
+>>>
+>>> +	reserve_crashkernel();
+>>> +
+>>>   	early_init_fdt_scan_reserved_mem();
+>>>
+>>>   	/* 4GB maximum for 32-bit only capable devices */
+>>>
+>>
+>>
+>> This is 'nit' territory, but if you were to make this:
+>>> 	if (IS_ENABLED(CONFIG_KEXEC_CORE))
+>>> 		reserve_crashkernel();
+>>
+>> then the #ifdefs around reserve_crashkernel() can go, and the compiler will work
+>> out that this static function can be optimised out. It also means the
+>> compiler performs its checks, even if CONFIG_KEXEC_CORE isn't selected. The same
+>> trick can be applied in patch 18 (around reserve_elfcorehdr()).
 > 
-> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
-> ---
->  arch/arm/boot/dts/vfxxx.dtsi | 12 +++++++++++-
->  1 file changed, 11 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
-> index db9157e..0dd7ad5 100644
-> --- a/arch/arm/boot/dts/vfxxx.dtsi
-> +++ b/arch/arm/boot/dts/vfxxx.dtsi
-> @@ -87,9 +87,19 @@
->  	soc {
->  		#address-cells = <1>;
->  		#size-cells = <1>;
-> -		compatible = "simple-bus";
-> +		compatible = "fsl,vf610-soc-bus", "simple-bus";
->  		interrupt-parent = <&mscm_ir>;
->  		ranges;
-> +		fsl,rom-revision = <&ocrom 0x80>;
-> +		fsl,cpu-count = <&mscm_cpucfg 0x2C>;
-> +		fsl,l2-size = <&mscm_cpucfg 0x14>;
+> It will also make the code more understandable.
 
-We need a bindings doc for these new properties and compatible.
+I tried this change, but
+unfortunately, preserve_crashkernel() calls an external function, parse_crashkernel(),
+which is defined only if CONFIG_KEXEC_CORE. So we will see a compiler error in !CONFIG_KEXEC_CORE
+if we take #ifdef out around perserve_crashkernel().
 
-Shawn
+-Takahiro AKASHI
 
-> +		nvmem-cells = <&ocotp_cfg0>, <&ocotp_cfg1>;
-> +		nvmem-cell-names = "cfg0", "cfg1";
-> +
-> +		ocrom: ocrom at 00000000 {
-> +			compatible = "fsl,vf610-ocrom", "syscon";
-> +			reg = <0x00000000 0x18000>;
-> +		};
->  
->  		aips0: aips-bus at 40000000 {
->  			compatible = "fsl,aips-bus", "simple-bus";
-> -- 
-> 2.7.2
+
+> Thanks,
+> -Takahiro AKASHI
 > 
-> 
+>>> @@ -66,6 +67,63 @@ static int __init early_initrd(char *p)
+>>>   early_param("initrd", early_initrd);
+>>>   #endif
+>>>   
+>>> +#ifdef CONFIG_KEXEC_CORE
+>>> +/*
+>>> + * reserve_crashkernel() - reserves memory for crash kernel
+>>> + *
+>>> + * This function reserves memory area given in "crashkernel=" kernel command
+>>> + * line parameter. The memory reserved is used by dump capture kernel when
+>>> + * primary kernel is crashing.
+>>> + */
+>>> +static void __init reserve_crashkernel(void)
+>>> +{
+>>> +	unsigned long long crash_size = 0, crash_base = 0;
+>>> +	int ret;
+>>> +
+>>> +	ret = parse_crashkernel(boot_command_line, memblock_phys_mem_size(),
+>>> +				&crash_size, &crash_base);
+>>> +	if (ret)
+>>> +		return;
+>>> +
+>>> +	if (crash_base == 0) {
+>>> +		crash_base = memblock_find_in_range(0,
+>>> +				MEMBLOCK_ALLOC_ACCESSIBLE, crash_size, 1 << 21);
+>>> +		if (crash_base == 0) {
+>>> +			pr_warn("Unable to allocate crashkernel (size:%llx)\n",
+>>> +				crash_size);
+>>> +			return;
+>>> +		}
+>>> +		memblock_reserve(crash_base, crash_size);
+>>> +
+>>> +	} else {
+>>> +		/* User specifies base address explicitly. */
+>>> +		if (!memblock_is_region_memory(crash_base, crash_size) ||
+>>> +			memblock_is_region_reserved(crash_base, crash_size)) {
+>>> +			pr_warn("crashkernel has wrong address or size\n");
+>>> +			return;
+>>> +		}
+>>> +
+>>> +		if (crash_base & ((1 << 21) - 1)) {
+>>> +			pr_warn("crashkernel base address is not 2MB aligned\n");
+>>> +			return;
+>>> +		}
+>>> +
+>>> +		memblock_reserve(crash_base, crash_size);
+>>> +	}
+>>> +
+>>> +	pr_info("Reserving %lldMB of memory at %lldMB for crashkernel\n",
+>>> +		crash_size >> 20, crash_base >> 20);
+>>> +
+>>> +	crashk_res.start = crash_base;
+>>> +	crashk_res.end = crash_base + crash_size - 1;
+>>> +}
+>>> +#else
+>>> +static void __init reserve_crashkernel(void)
+>>> +{
+>>> +	;
+>>> +}
+>>> +#endif /* CONFIG_KEXEC_CORE */
+>>> +
+>>>   /*
+>>>    * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
+>>>    * currently assumes that for memory starting above 4G, 32-bit devices will
+>>
+>>
+>> Thanks,
+>>
+>> James
+>>
