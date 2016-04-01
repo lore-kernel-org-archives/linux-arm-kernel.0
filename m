@@ -1,71 +1,60 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 1 Mar 2016 08:49:37 +0100
-Subject: [PATCH 3/3] hwrng: mxc-fsl - add support for Freescale RNGC
-In-Reply-To: <CAOMZO5BLYumOrBuoB5-RgzLAJ=o4zp9ocv4jcZRy=p6Pky1SyQ@mail.gmail.com>
-References: <1456761156-27664-1-git-send-email-s.trumtrar@pengutronix.de>
- <1456761156-27664-3-git-send-email-s.trumtrar@pengutronix.de>
- <CAOMZO5BN-1U6vX0HAHWX30t+23NnqEpOw6AttSgvqaZnq=cN6Q@mail.gmail.com>
- <20160229213850.GS2613@pengutronix.de>
- <CAOMZO5BLYumOrBuoB5-RgzLAJ=o4zp9ocv4jcZRy=p6Pky1SyQ@mail.gmail.com>
-Message-ID: <20160301074937.GU2613@pengutronix.de>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 01 Apr 2016 16:11:50 +0900
+Subject: [PATCH] ARM: dts: s3c: Fix DTC unit name warnings in S3C2416 and
+ S3C6410
+Message-ID: <1459494710-16269-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Fabio,
+Fix following DTC warnings in S3C2416 and S3C6410 boards:
 
-On Mon, Feb 29, 2016 at 08:54:19PM -0300, Fabio Estevam wrote:
-> On Mon, Feb 29, 2016 at 6:38 PM, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
-> > On Mon, Feb 29, 2016 at 06:16:50PM -0300, Fabio Estevam wrote:
-> >> On Mon, Feb 29, 2016 at 12:52 PM, Steffen Trumtrar
-> >> <s.trumtrar@pengutronix.de> wrote:
-> >>
-> >> > +       ret = clk_prepare_enable(rngc->clk);
-> >> > +       if (ret)
-> >> > +               return ret;
-> >> > +
-> >> > +       rngc->irq = platform_get_irq(pdev, 0);
-> >> > +       if (!rngc->irq) {
-> >> > +               dev_err(&pdev->dev, "FSL RNGC couldn't get irq\n");
-> >> > +               clk_disable_unprepare(rngc->clk);
-> >> > +
-> >> > +               return ret;
-> >>
-> >> You are returning the wrong error code here:
-> >>
-> >> Better do like this:
-> >>
-> >>        rngc->irq = platform_get_irq(pdev, 0);
-> >>        if (rngc->irq < 0) {
-> >
-> > rngc->irq is unsigned, so this is never true.
-> >
-> >>                dev_err(&pdev->dev, "FSL RNGC couldn't get irq\n");
-> >>                clk_disable_unprepare(rngc->clk);
-> >>                return rngc->irq;
-> >>        }
-> >
-> > So here comes my better approach:
-> 
-> As irq is only used inside probe it can be removed from struct mxc_rngc.
+Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
 
-Good idea.
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ arch/arm/boot/dts/s3c2416-smdk2416.dts | 2 +-
+ arch/arm/boot/dts/s3c6410-mini6410.dts | 2 +-
+ arch/arm/boot/dts/s3c6410-smdk6410.dts | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-> Or maybe like this:
-> 
->          ret = platform_get_irq(pdev, 0);
->          if (ret < 0) {
->                  dev_err(&pdev->dev, "FSL RNGC couldn't get irq\n");
->                  clk_disable_unprepare(rngc->clk);
->                  return ret;
->          }
-
-Some people think platform_get_irq returning 0 should be handled as
-error.
-
-Best regards
-Uwe
-
+diff --git a/arch/arm/boot/dts/s3c2416-smdk2416.dts b/arch/arm/boot/dts/s3c2416-smdk2416.dts
+index f257926c13b7..15f3d1c1bb80 100644
+--- a/arch/arm/boot/dts/s3c2416-smdk2416.dts
++++ b/arch/arm/boot/dts/s3c2416-smdk2416.dts
+@@ -15,7 +15,7 @@
+ 	model = "SMDK2416";
+ 	compatible = "samsung,s3c2416";
+ 
+-	memory {
++	memory at 30000000 {
+ 		reg =  <0x30000000 0x4000000>;
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/s3c6410-mini6410.dts b/arch/arm/boot/dts/s3c6410-mini6410.dts
+index a25debb50401..b7d84cf816c2 100644
+--- a/arch/arm/boot/dts/s3c6410-mini6410.dts
++++ b/arch/arm/boot/dts/s3c6410-mini6410.dts
+@@ -22,7 +22,7 @@
+ 	model = "FriendlyARM Mini6410 board based on S3C6410";
+ 	compatible = "friendlyarm,mini6410", "samsung,s3c6410";
+ 
+-	memory {
++	memory at 50000000 {
+ 		reg = <0x50000000 0x10000000>;
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/s3c6410-smdk6410.dts b/arch/arm/boot/dts/s3c6410-smdk6410.dts
+index ecf35ec466f7..dbebd58a4764 100644
+--- a/arch/arm/boot/dts/s3c6410-smdk6410.dts
++++ b/arch/arm/boot/dts/s3c6410-smdk6410.dts
+@@ -22,7 +22,7 @@
+ 	model = "SAMSUNG SMDK6410 board based on S3C6410";
+ 	compatible = "samsung,mini6410", "samsung,s3c6410";
+ 
+-	memory {
++	memory at 50000000 {
+ 		reg = <0x50000000 0x8000000>;
+ 	};
+ 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+2.5.0
