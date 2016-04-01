@@ -1,54 +1,82 @@
 From: shannon.zhao@linaro.org (Shannon Zhao)
-Date: Fri,  1 Apr 2016 23:49:07 +0800
-Subject: [PATCH v10 09/17] xen/hvm/params: Add a new delivery type for
- event-channel in HVM_PARAM_CALLBACK_IRQ
+Date: Fri,  1 Apr 2016 23:49:08 +0800
+Subject: [PATCH v10 10/17] arm/xen: Get event-channel irq through HVM_PARAM
+ when booting with ACPI
 In-Reply-To: <1459525755-36968-1-git-send-email-shannon.zhao@linaro.org>
 References: <1459525755-36968-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1459525755-36968-10-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1459525755-36968-11-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This new delivery type which is for ARM shares the same value with
-HVM_PARAM_CALLBACK_TYPE_VECTOR which is for x86.
-
-val[15:8] is flag: val[7:0] is a PPI.
-To the flag, bit 8 stands the interrupt mode is edge(1) or level(0) and
-bit 9 stands the interrupt polarity is active low(1) or high(0).
+The kernel will get the event-channel IRQ through
+HVM_PARAM_CALLBACK_IRQ.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- include/xen/interface/hvm/params.h | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/xen/enlighten.c | 36 +++++++++++++++++++++++++++++++++++-
+ 1 file changed, 35 insertions(+), 1 deletion(-)
 
-diff --git a/include/xen/interface/hvm/params.h b/include/xen/interface/hvm/params.h
-index 70ad208..4d61fc5 100644
---- a/include/xen/interface/hvm/params.h
-+++ b/include/xen/interface/hvm/params.h
-@@ -47,11 +47,24 @@
-  * Domain = val[47:32], Bus = val[31:16] DevFn = val[15:8], IntX = val[1:0]
-  */
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index d94f726..06bd61a 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -30,6 +30,7 @@
+ #include <linux/time64.h>
+ #include <linux/timekeeping.h>
+ #include <linux/timekeeper_internal.h>
++#include <linux/acpi.h>
  
-+#if defined(__i386__) || defined(__x86_64__)
- #define HVM_PARAM_CALLBACK_TYPE_VECTOR   2
- /*
-  * val[7:0] is a vector number.  Check for XENFEAT_hvm_callback_vector to know
-  * if this delivery method is available.
-  */
-+#elif defined(__arm__) || defined(__aarch64__)
-+#define HVM_PARAM_CALLBACK_TYPE_PPI      2
-+/*
-+ * val[55:16] needs to be zero.
-+ * val[15:8] is interrupt flag of the PPI used by event-channel:
-+ *  bit 8: the PPI is edge(1) or level(0) triggered
-+ *  bit 9: the PPI is active low(1) or high(0)
-+ * val[7:0] is a PPI number used by event-channel.
-+ * This is only used by ARM/ARM64 and masking/eoi the interrupt associated to
-+ * the notification is handled by the interrupt controller.
-+ */
+ #include <linux/mm.h>
+ 
+@@ -278,6 +279,35 @@ void __init xen_early_init(void)
+ 		add_preferred_console("hvc", 0, NULL);
+ }
+ 
++static void __init xen_acpi_guest_init(void)
++{
++#ifdef CONFIG_ACPI
++	struct xen_hvm_param a;
++	int interrupt, trigger, polarity;
++
++	a.domid = DOMID_SELF;
++	a.index = HVM_PARAM_CALLBACK_IRQ;
++
++	if (HYPERVISOR_hvm_op(HVMOP_get_param, &a)
++	    || (a.value >> 56) != HVM_PARAM_CALLBACK_TYPE_PPI) {
++		xen_events_irq = 0;
++		return;
++	}
++
++	interrupt = a.value & 0xff;
++	trigger = ((a.value >> 8) & 0x1) ? ACPI_EDGE_SENSITIVE
++					 : ACPI_LEVEL_SENSITIVE;
++	polarity = ((a.value >> 8) & 0x2) ? ACPI_ACTIVE_LOW
++					  : ACPI_ACTIVE_HIGH;
++	xen_events_irq = acpi_register_gsi(NULL, interrupt, trigger, polarity);
 +#endif
++}
++
++static void __init xen_dt_guest_init(void)
++{
++	xen_events_irq = irq_of_parse_and_map(xen_node, 0);
++}
++
+ static int __init xen_guest_init(void)
+ {
+ 	struct xen_add_to_physmap xatp;
+@@ -286,7 +316,11 @@ static int __init xen_guest_init(void)
+ 	if (!xen_domain())
+ 		return 0;
  
- #define HVM_PARAM_STORE_PFN    1
- #define HVM_PARAM_STORE_EVTCHN 2
+-	xen_events_irq = irq_of_parse_and_map(xen_node, 0);
++	if (!acpi_disabled)
++		xen_acpi_guest_init();
++	else
++		xen_dt_guest_init();
++
+ 	if (!xen_events_irq) {
+ 		pr_err("Xen event channel interrupt not found\n");
+ 		return -ENODEV;
 -- 
 2.1.4
