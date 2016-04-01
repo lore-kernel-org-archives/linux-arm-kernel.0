@@ -1,33 +1,48 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 1 Apr 2016 10:04:57 +0200
-Subject: [PATCH] ARM: sa1100: Initialize gpio after gpio subsystem has
- been initialized
-In-Reply-To: <20160331162116.GB5605@roeck-us.net>
-References: <1459275349-11356-1-git-send-email-linux@roeck-us.net>
- <20160331162116.GB5605@roeck-us.net>
-Message-ID: <CACRpkdYg3-XBBCmrKHK5EukEwxU3J4h_4BAKnoVHEiZbFkU5QA@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 01 Apr 2016 17:17:16 +0900
+Subject: [PATCH 04/11] ARM: dts: exynos: Fix DTC unit name warnings in
+ Trats2 board
+In-Reply-To: <1459493874-2366-4-git-send-email-k.kozlowski@samsung.com>
+References: <1459493874-2366-1-git-send-email-k.kozlowski@samsung.com>
+ <1459493874-2366-4-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <56FE2E8C.3060107@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 31, 2016 at 6:21 PM, Guenter Roeck <linux@roeck-us.net> wrote:
-> On Tue, Mar 29, 2016 at 11:15:49AM -0700, Guenter Roeck wrote:
->> The sa1100 gpio driver was initialized from interrupt initialization code,
->> which is earlier than the gpio subsystem is initialized. Since commit
->> ff2b13592299 ("gpio: make the gpiochip a real device"), this is fatal
->> and causes the system to crash.
->>
->> The sa1100 gpio driver must be initialized prior to arch_initcall, since
->> its gpio pins are used in arch_initcall code, but after the gpio subsystem
->> is initialized (core_initcall). Initialize it with postcore_initcall.
->>
->> Fixes: ff2b13592299 ("gpio: make the gpiochip a real device")
->> Cc: Linus Walleij <linus.walleij@linaro.org>
->> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
->
-> Please ignore/drop this patch - a better (cleaner) fix is in the works
-> for gpiolib.
+On 01.04.2016 15:57, Krzysztof Kozlowski wrote:
+> Fix following DTC warnings in Trats2 board:
+> 
+> Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+> Warning (unit_address_vs_reg): Node /i2c-gpio-1/max77693 at 66/regulators/ESAFEOUT1 at 1 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /i2c-gpio-1/max77693 at 66/regulators/ESAFEOUT2 at 2 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /i2c-gpio-1/max77693 at 66/regulators/CHARGER at 0 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /thermistor-ap at 0 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /thermistor-battery at 1 has a unit name, but no reg property
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos4412-trats2.dts | 14 +++++++-------
+>  1 file changed, 7 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+> index 2bf363c3bf62..523627003738 100644
+> --- a/arch/arm/boot/dts/exynos4412-trats2.dts
+> +++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+> @@ -29,7 +29,7 @@
+>  		i2c12 = &i2c_max77693_fuel;
+>  	};
+>  
+> -	memory {
+> +	mmemory at 40000000 {
+>  		reg =  <0x40000000 0x40000000>;
+>  	};
 
-This delivers though. I tested it on my also regressing iPAQ.
+Nope, beside obvious typo here, this is bad. This causes creation of
+duplicated memory nodes, one coming from skeleton and one from here.
 
-Yours,
-Linus Walleij
+Rob,
+How the 'memory' node warning should be fixed?
+
+
+Best regards,
+Krzysztof
