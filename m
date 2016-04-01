@@ -1,41 +1,31 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Fri, 1 Apr 2016 17:53:06 -0500
-Subject: [PATCH 2/3] ARM: OMAP: DRA7: Provide proper class to
- omap2_set_globals_tap
-In-Reply-To: <1459551187-5992-1-git-send-email-nm@ti.com>
-References: <1459551187-5992-1-git-send-email-nm@ti.com>
-Message-ID: <1459551187-5992-3-git-send-email-nm@ti.com>
+Date: Fri, 1 Apr 2016 17:53:04 -0500
+Subject: [PATCH 0/3] ARM: OMAP2: Make suspend work again.
+Message-ID: <1459551187-5992-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When commit 06c2d368fc36 ("ARM: OMAP: DRA7: Make use of omap_revision
-information for soc_is* calls") introduced SoC check using
-omap_revision, it missed providing DRA7 as class for initializing
-the omap_version variable. Without doing this, soc_is_dra7xx() will
-fail and as a result, omap4_pm_init_early never initializes the dra7
-erratum for CPU power state. This causes the suspend path to fail
-on DRA7 devices.
+Hi,
+series of patches for fixing up attempt to suspend on X15 
 
-Fixes: 06c2d368fc36 ("ARM: OMAP: DRA7: Make use of omap_revision information for soc_is* calls")
-Cc: Keerthy <j-keerthy@ti.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- arch/arm/mach-omap2/io.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Test: http://pastebin.ubuntu.com/15582436/
 
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 3c87e40650cf..2b86b25bcb83 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -736,7 +736,8 @@ void __init omap5_init_late(void)
- #ifdef CONFIG_SOC_DRA7XX
- void __init dra7xx_init_early(void)
- {
--	omap2_set_globals_tap(-1, OMAP2_L4_IO_ADDRESS(DRA7XX_TAP_BASE));
-+	omap2_set_globals_tap(DRA7XX_CLASS,
-+			      OMAP2_L4_IO_ADDRESS(DRA7XX_TAP_BASE));
- 	omap2_set_globals_prcm_mpu(OMAP2_L4_IO_ADDRESS(OMAP54XX_PRCM_MPU_BASE));
- 	omap2_control_base_init();
- 	omap4_pm_init_early();
+Based on v4.6-rc1
+
+Also needs https://patchwork.kernel.org/patch/8724791/ if kernel
+modules are installed
+
+Nishanth Menon (3):
+  ARM: OMAP: DRA7: wakeupgen: Skip SAR save for wakeupgen
+  ARM: OMAP: DRA7: Provide proper class to omap2_set_globals_tap
+  ARM: OMAP: Catch callers of revision information prior to it being
+    populated
+
+ arch/arm/mach-omap1/id.c             | 1 +
+ arch/arm/mach-omap2/id.c             | 1 +
+ arch/arm/mach-omap2/io.c             | 3 ++-
+ arch/arm/mach-omap2/omap-wakeupgen.c | 7 +++++++
+ 4 files changed, 11 insertions(+), 1 deletion(-)
+
 -- 
 2.8.0
