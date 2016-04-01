@@ -1,42 +1,49 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 1 Apr 2016 09:50:55 +0100
-Subject: [PATCH] Xen on ARM and ARM64: update MAINTAINERS info
-In-Reply-To: <alpine.DEB.2.02.1603241121090.18380@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1603241121090.18380@kaball.uk.xensource.com>
-Message-ID: <20160401085054.GA21136@arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 1 Apr 2016 16:52:59 +0800
+Subject: [PATCH v2 2/3] ARM: i.MX25: add RNGC node to dtsi
+In-Reply-To: <1457705200-16951-2-git-send-email-s.trumtrar@pengutronix.de>
+References: <1457705200-16951-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1457705200-16951-2-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <20160401085259.GH18833@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 29, 2016 at 11:01:16AM +0100, Stefano Stabellini wrote:
-> Not my full time job anymore, but still maintaining it.
+On Fri, Mar 11, 2016 at 03:06:39PM +0100, Steffen Trumtrar wrote:
+> Add a devicetree entry for the Random Number Generator Version C (RNGC).
 > 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> ---
+> Changes in v2:
+>   - remove interrupt-names from dtsi
 > 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 32bafda..049aa1d 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -12193,16 +12193,16 @@ F:	include/xen/
->  F:	include/uapi/xen/
+>  arch/arm/boot/dts/imx25.dtsi | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+> index cde329e9b9e3..ebf11d9f123e 100644
+> --- a/arch/arm/boot/dts/imx25.dtsi
+> +++ b/arch/arm/boot/dts/imx25.dtsi
+> @@ -397,6 +397,14 @@
+>  				interrupts = <41>;
+>  			};
 >  
->  XEN HYPERVISOR ARM
-> -M:	Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> +M:	Stefano Stabellini <sstabellini@kernel.org>
->  L:	xen-devel at lists.xenproject.org (moderated for non-subscribers)
-> -S:	Supported
-> +S:	Maintained
->  F:	arch/arm/xen/
->  F:	arch/arm/include/asm/xen/
->  
->  XEN HYPERVISOR ARM64
-> -M:	Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> +M:	Stefano Stabellini <sstabellini@kernel.org>
->  L:	xen-devel at lists.xenproject.org (moderated for non-subscribers)
-> -S:	Supported
-> +S:	Maintained
->  F:	arch/arm64/xen/
->  F:	arch/arm64/include/asm/xen/
+> +			rng: rng at 53fb0000 {
+> +				compatible = "fsl,imx25-rng";
+> +				reg = <0x53fb0000 0x4000>;
+> +				clocks = <&clks 109>;
+> +				clock-names = "ipg";
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+I think clock-names can be dropped too.
 
-Will
+Shawn
+
+> +				interrupts = <22>;
+> +			};
+> +
+>  			esdhc1: esdhc at 53fb4000 {
+>  				compatible = "fsl,imx25-esdhc";
+>  				reg = <0x53fb4000 0x4000>;
+> -- 
+> 2.7.0
+> 
+> 
