@@ -1,64 +1,282 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 1 Apr 2016 14:17:43 +0200
-Subject: [RFC PATCH 12/45] KVM: arm/arm64: vgic-new: Add MMIO handling
- framework
-In-Reply-To: <56FE655A.1040402@arm.com>
-References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
- <1458871508-17279-13-git-send-email-andre.przywara@arm.com>
- <20160331090824.GR4126@cbox> <56FE655A.1040402@arm.com>
-Message-ID: <20160401121743.GB22170@cbox>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 1 Apr 2016 13:18:20 +0100
+Subject: [PATCH 3/4] perf: xgene: Add APM X-Gene SoC Performance
+ Monitoring Unit driver
+In-Reply-To: <1459467472-31561-4-git-send-email-ttnguyen@apm.com>
+References: <1459467472-31561-1-git-send-email-ttnguyen@apm.com>
+ <1459467472-31561-4-git-send-email-ttnguyen@apm.com>
+Message-ID: <20160401121820.GB29876@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 01, 2016 at 01:11:06PM +0100, Andr? Przywara wrote:
-> On 31/03/16 10:08, Christoffer Dall wrote:
-> > Hi Andre,
-> > 
-> > [cc'ing Paolo here for his thoughts on the KVM IO bus framework]
-> > 
-> > On Fri, Mar 25, 2016 at 02:04:35AM +0000, Andre Przywara wrote:
-> >> We register each register group of the distributor and redistributors
-> >> as separate regions of the kvm-io-bus framework. This way calls get
-> >> directly handed over to the actual handler.
-> >> This puts a lot more regions into kvm-io-bus than what we use at the
-> >> moment on other architectures, so we will probably need to revisit the
-> >> implementation of the framework later to be more efficient.
-> > 
-> > Looking more carefully at the KVM IO bus stuff, it looks like it is
-> > indeed designed to be a *per device* thing you register, not a *per
-> > register* thing.
-> > 
-> > My comments to Vladimir's bug report notwithstanding, there's still a
-> > choice here to:
-> > 
-> > 1) Expand/modify the KVM IO bus framework to take an arbitrary number of devices
-> > 
-> > 2) Build a KVM architectureal generic framework on top of the IO bus
-> > framework to handle individual register regions.
-> 
-> > 
-> > 3) Stick with what we had before, do not modify the KVM IO bus stuff,
-> > and handle the individual register region business locally within the
-> > arm/vgic code.
-> 
-> I am for either 1) or 2). I consider "the old way" a kludge. We couldn't
-> use KVM IO bus when the VGIC was introduced, because it lacked the VCPU
-> parameter. Later this was fixed, but introducing the framework all the
-> way down to the individual register handlers wasn't feasible without
-> rewriting much of the VGIC. Since we now do exactly this, I'd love to
-> pimp the KVM IO bus framework to properly cope with the "many register"
-> use case. Instead of writing KVM/ARM specific code I'd rather see this
-> solved properly for the whole KVM subsystem. The other framework users
-> don't seem to have high demands, so adjusting them should be easy.
-> If this is considered too much for the first patch incarnation, we could
-> consider a temporary wrapper that gets removed later when the KVM IO bus
-> framework gets fixed/reworked - but we should keep the VGIC MMIO handler
-> prototypes in a way that allows them to be called directly later.
-> 
-I was somewhere between (2) and (3), but given Paolo leans towards (3),
-and that we have plenty of work here already, I think that doing (3) in
-a way that allows us to do (2) easily later on if we feel like it is
-probably the rigth direction to take at the moment.
+Hi,
+
+I haven't reviewed this in great detail, but I spotted a few issues.
+
+> +static int get_next_avail_cntr(struct xgene_pmu_dev *pmu_dev)
+> +{
+> +	int shift, cntr, retval;
+> +	unsigned long flags;
+> +
+> +	raw_spin_lock_irqsave(&pmu_dev->lock, flags);
+> +
+> +	for (cntr = 0; cntr < pmu_dev->max_counters; cntr++) {
+> +		shift = cntr;
+> +		if (!(pmu_dev->cntr_assign_mask & (1ULL << shift))) {
+> +			pmu_dev->cntr_assign_mask |= (1ULL << shift);
+> +			retval = cntr;
+> +			goto out;
+> +		}
+> +	}
+> +	retval = -ENOSPC;
+
+Please use a bitmask. Then you can do something like:
+
+        cntr = find_first_zero_bit(pmu_dev->cntr_assign_mask, 
+                                   pmu_dev->max_counters);
+        if (cntr == pmu_dev->max_counters)
+                return -ENOSPC;
+        set_bit(cntr, pmu_dev->cntr_assign_mask);
+        return cntr;
+
+Are the spinlocks necessary? 
+
+I thought add and del couldn't be called in parallel for the same
+context, and those are the only users of this mask.
+
+> +
+> +out:
+> +	raw_spin_unlock_irqrestore(&pmu_dev->lock, flags);
+> +
+> +	return retval;
+> +}
+> +
+> +static int clear_avail_cntr(struct xgene_pmu_dev *pmu_dev, u8 cntr)
+> +{
+> +	unsigned long flags;
+> +	int shift;
+> +
+> +	if (cntr > pmu_dev->max_counters)
+> +		return -EINVAL;
+
+This implies we have an event we tried to del, which didn't have a
+counter. Surely we should never have added the event in that case, and
+this should never happen?
+
+> +
+> +	shift = cntr;
+> +
+> +	raw_spin_lock_irqsave(&pmu_dev->lock, flags);
+> +	pmu_dev->cntr_assign_mask &= ~(1ULL << shift);
+
+clear_bit(cntr, pmu_dev->cntr_assign_mask);
+
+> +	raw_spin_unlock_irqrestore(&pmu_dev->lock, flags);
+> +
+> +	return 0;
+> +}
+
+[...]
+
+> +static int xgene_perf_event_init(struct perf_event *event)
+> +{
+> +	struct xgene_pmu_dev *pmu_dev = to_pmu_dev(event->pmu);
+> +	struct hw_perf_event *hwc = &event->hw;
+> +	u64 config, config1;
+> +
+> +	/* test the event attr type check for PMU enumeration */
+> +	if (event->attr.type != event->pmu->type)
+> +		return -ENOENT;
+> +
+> +	/*
+> +	 * SOC PMU counters are shared across all cores.
+> +	 * Therefore, it does not support per-process mode.
+> +	 * Also, it does not support event sampling mode.
+> +	 */
+> +	if (is_sampling_event(event) || event->attach_state & PERF_ATTACH_TASK)
+> +		return -EINVAL;
+> +
+> +	/* SOC counters do not have usr/os/guest/host bits */
+> +	if (event->attr.exclude_user || event->attr.exclude_kernel ||
+> +	    event->attr.exclude_host || event->attr.exclude_guest)
+> +		return -EINVAL;
+> +
+> +	if (event->cpu < 0)
+> +		return -EINVAL;
+
+We should really have this made common for system PMUs (e.g. librify
+it). Every driver does something subtly different, and isn't kept in
+sync with new core feature addition.
+
+Even if you're happy to accept a request made with any event->cpu,
+you'll need to forcefully override that and ensure that all events are
+in the same percpu context.
+
+See what we do in drivers/bus/arm-ccn.c.
+
+> +
+> +	if (event->pmu != &pmu_dev->pmu)
+> +		return -ENOENT;
+
+If this does need to be checked, we should so so when checking the type
+above.
+
+However, the PMU should have a unique type anyway, so the type being the
+same should imply this is true anyway.
+
+> +
+> +	if (pmu_dev) {
+> +		config = event->attr.config;
+> +		config1 = event->attr.config1;
+> +	} else {
+> +		return -EINVAL;
+> +	}
+> +
+
+How can the else case ever occur? All other PMUs have been filtered away
+by this point.
+
+> +	if (pmu_dev->max_counters == 0)
+> +		return -EINVAL;
+
+Why bother registering the PMU device at all in this case?
+
+> +
+> +	hwc->config = config;
+> +	if (config1)
+> +		hwc->extra_reg.config = config1;
+> +	else
+> +		/* Enable all Agents */
+> +		hwc->extra_reg.config = 0xFFFFFFFFFFFFFFFFULL;
+
+I'm not sure I follow what's going on here.
+
+It would be good to document precisely what this means.
+
+[...]
+
+> +static int xgene_init_events_attrs(struct xgene_pmu_dev *pmu_dev,
+> +				   struct xgene_pmu_dev_event_desc *event_desc)
+> +{
+> +	struct attribute_group *attr_group;
+> +	struct attribute **attrs;
+> +	int i = 0, j;
+> +
+> +	while (event_desc[i].attr.attr.name)
+> +		i++;
+> +
+> +	attr_group = devm_kzalloc(pmu_dev->parent->dev,
+> +			sizeof(struct attribute *) * (i + 1)
+> +			+ sizeof(*attr_group), GFP_KERNEL);
+> +	if (!attr_group)
+> +		return -ENOMEM;
+> +
+> +	attrs = (struct attribute **)(attr_group + 1);
+> +	for (j = 0; j < i; j++)
+> +		attrs[j] = &event_desc[j].attr.attr;
+> +
+> +	attr_group->name = "events";
+> +	attr_group->attrs = attrs;
+> +	pmu_dev->events_group = attr_group;
+> +
+> +	return 0;
+> +}
+
+I don't think this needs to be dynamic. See what we do in
+drivers/bus/arm-cci.c with CCI_EXT_ATTR_ENTRY for a simple way of
+initialising the attribute pointer array at compile time.
+
+With that, you don't need any dynamic allocation or initialisation here.
+
+> +static void xgene_perf_pmu_init(struct xgene_pmu_dev *pmu_dev)
+> +{
+> +	pmu_dev->pmu.event_init	= xgene_perf_event_init;
+> +	pmu_dev->pmu.add	= xgene_perf_add;
+> +	pmu_dev->pmu.del	= xgene_perf_del;
+> +	pmu_dev->pmu.start	= xgene_perf_start;
+> +	pmu_dev->pmu.stop	= xgene_perf_stop;
+> +	pmu_dev->pmu.read	= xgene_perf_read;
+> +}
+
+You'll also need to set the task_ctx_nr to perf_invalid_context, as this
+is a system PMU rather than something that can profile tasks or
+individual CPUs.
+
+> +static irqreturn_t _xgene_pmu_isr(int irq, struct xgene_pmu_dev *pmu_dev)
+> +{
+> +	struct perf_event *event = NULL;
+> +	struct perf_sample_data data;
+> +	struct xgene_pmu *xgene_pmu;
+> +	struct hw_perf_event *hwc;
+> +	struct pt_regs *regs;
+
+This is _not_ a CPU PMU. There are no relevant pt_rregs.
+
+> +	int idx;
+> +	u32 val;
+> +
+> +	/* Get interrupt counter source */
+> +	val = readl(pmu_dev->inf->csr + PMU_PMOVSR);
+> +	idx = ffs(val) - 1;
+> +	if (!(val & PMU_OVERFLOW_MASK))
+> +		goto out;
+> +	event = pmu_dev->pmu_counter_event[idx];
+> +
+> +	/*
+> +	 * Handle the counter(s) overflow(s)
+> +	 */
+> +	regs = get_irq_regs();
+
+As above, this is irrelevant.
+
+> +
+> +	/* Ignore if we don't have an event. */
+> +	if (!event)
+> +		goto out;
+> +
+> +	hwc = &event->hw;
+> +
+> +	xgene_perf_event_update(event, hwc, idx);
+> +	perf_sample_data_init(&data, 0, hwc->last_period);
+> +	if (!xgene_perf_event_set_period(event, hwc, idx))
+> +		goto out;
+> +
+> +	if (perf_event_overflow(event, &data, regs))
+> +		xgene_perf_disable_event(event);
+
+perf_event_overflow skips non-sampling events (i.e. all events this PMU
+is capable of), and always returns 0, so the regs aren't even used at
+all...
+
+This can/should go.
+
+[...]
+
+> +static int xgene_pmu_probe_active_mcb_mcu(struct xgene_pmu *xgene_pmu,
+> +					  struct platform_device *pdev)
+> +{
+> +	if (efi_enabled(EFI_BOOT))
+> +		return acpi_pmu_probe_active_mcb_mcu(xgene_pmu, pdev);
+> +	else
+> +		return fdt_pmu_probe_active_mcb_mcu(xgene_pmu, pdev);
+> +}
+
+EFI has _nothing_ to do with ACPI here.
+
+EFI != ACPI; ECI && !ACPI is possible.
+
+Check whether you have an of_node or an acpi companion device.
+
+> +static int xgene_pmu_probe_pmu_dev(struct xgene_pmu *xgene_pmu,
+> +				   struct platform_device *pdev)
+> +{
+> +	if (efi_enabled(EFI_BOOT))
+> +		return acpi_pmu_probe_pmu_dev(xgene_pmu, pdev);
+> +	else
+> +		return fdt_pmu_probe_pmu_dev(xgene_pmu, pdev);
+> +}
+
+Likewise.
 
 Thanks,
--Christoffer
+Mark.
