@@ -1,33 +1,39 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 1 Apr 2016 12:28:39 -0700
-Subject: [PATCH 2/3] clk: ti: amx3xx: limit the maximum frequency of
- DPLLs based on spec
-In-Reply-To: <1458158097-21137-3-git-send-email-t-kristo@ti.com>
-References: <1458158097-21137-1-git-send-email-t-kristo@ti.com>
- <1458158097-21137-3-git-send-email-t-kristo@ti.com>
-Message-ID: <20160401192839.GW18567@codeaurora.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 1 Apr 2016 22:45:47 +0300
+Subject: [PATCH v2 06/11] phy: da8xx-usb: new driver for DA8XX SoC USB PHY
+In-Reply-To: <56FE9B8F.7050605@lechnology.com>
+References: <1458181615-27782-1-git-send-email-david@lechnology.com>
+ <1458181615-27782-7-git-send-email-david@lechnology.com>
+ <56FE74AC.6080303@ti.com> <20160401144510.GA6264@uda0271908>
+ <56FE9B8F.7050605@lechnology.com>
+Message-ID: <56FECFEB.2030708@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/16, Tero Kristo wrote:
-> AM33xx/AM43xx devices use the same DPLL IP blocks, which only support
-> maximum rate of 1GHz [1] for the default and 2GHz for the low-jitter type
-> DPLLs [2]. Reflect this limitation in the DPLL init code by adding the
-> max-rate parameter based on the DPLL types.
-> 
-> [1] Functional, integration & test specification for GS70 ADPLLS, Rev 1.0-01
-> [2] Functional, integration & test specification for GS70 ADPLLLJ, Rev 0.8-02
-> 
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> Cc: Nishanth Menon <nm@ti.com>
-> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> Cc: Lokesh Vutla <lokeshvutla@ti.com>
-> ---
+On 04/01/2016 07:02 PM, David Lechner wrote:
 
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+>>>> +EXPORT_SYMBOL_GPL(da8xx_usb20_phy_set_mode);
+>>>
+>>> Don't prefer export symbols from PHY driver. That'll create unnecessary
+>>> dependencies between the controller and the PHY.
+>>
+>> Agreed.
+>>
+>>> I think it'll be better to create a new attribute and use it?
+>>
+>> Another simpler option is to not support _set_mode() for DA8xx, and the
+>> phy driver set the otgmode bit in probe() based on dr_mode of the
+>> controller.
+>>
+>> Regards,
+>> -Bin.
+>
+> This certainly works for my particular use case, however, Sergei Shtylyov, who
+> wrote the da8xx musb glue layer originally, seemed to recall in his review of
+> the patch series that this really is necessary for OTG mode to work properly.
 
-Or I can apply these two targeting 4.7 if you like.
+    No, it's still not necessary, however this method is now called from 
+musb_init_controller() (it wasn't in my time). ISTR however that you needed to 
+enforce the mode override in CFGCHIP2 for the host mode to function properly.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+WBR, Sergei
