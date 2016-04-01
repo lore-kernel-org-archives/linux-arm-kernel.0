@@ -1,29 +1,30 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 1 Apr 2016 10:24:01 -0400
-Subject: [PATCH 01/11] ARM: dts: exynos: Fix DTC unit name warnings in
- cros-adc-thermistors
-In-Reply-To: <1459493874-2366-1-git-send-email-k.kozlowski@samsung.com>
-References: <1459493874-2366-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <56FE8481.7020202@osg.samsung.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri,  1 Apr 2016 16:26:29 +0200
+Subject: [PATCH 0/2] clk: Add Oxford Semiconductor OXNAS Clocks support
+Message-ID: <1459520791-13269-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+This patchset includes support for the standard clocks controller for the
+Oxford Semiconductor OXNAS SoC Family.
 
-On 04/01/2016 02:57 AM, Krzysztof Kozlowski wrote:
-> Fix following DTC warnings in cros-adc-thermistors:
-> Warning (unit_address_vs_reg): Node /adc at 12D10000/ncp15wb473 at 3 has a unit name, but no reg property
-> Warning (unit_address_vs_reg): Node /adc at 12D10000/ncp15wb473 at 4 has a unit name, but no reg property
-> Warning (unit_address_vs_reg): Node /adc at 12D10000/ncp15wb473 at 5 has a unit name, but no reg property
-> Warning (unit_address_vs_reg): Node /adc at 12D10000/ncp15wb473 at 6 has a unit name, but no reg property
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
+It was originally posted part of a platform patchset available here :
+http://lkml.kernel.org/r/1458838215-23314-1-git-send-email-narmstrong at baylibre.com
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Changes this v3 patchset :
+- Get rid of PLX Technology, replace by Oxford Semiconductor
 
-Best regards,
+Neil Armstrong (2):
+  clk: Add Oxford Semiconductor OXNAS Standard Clocks
+  dt-bindings: Add Oxford Semiconductor OXNAS Standard Clocks bindings
+
+ .../devicetree/bindings/clock/oxnas,stdclk.txt     |  35 ++++
+ drivers/clk/Kconfig                                |   6 +
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/clk-oxnas.c                            | 202 +++++++++++++++++++++
+ 4 files changed, 244 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/oxnas,stdclk.txt
+ create mode 100644 drivers/clk/clk-oxnas.c
+
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+1.9.1
