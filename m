@@ -1,31 +1,45 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 1 Apr 2016 17:53:04 -0500
-Subject: [PATCH 0/3] ARM: OMAP2: Make suspend work again.
-Message-ID: <1459551187-5992-1-git-send-email-nm@ti.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri,  1 Apr 2016 20:52:14 -0300
+Subject: [PATCH v2 1/4] ARM: dts: imx6sx: Fix SAI DMA index
+Message-ID: <1459554737-19684-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-series of patches for fixing up attempt to suspend on X15 
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-Test: http://pastebin.ubuntu.com/15582436/
+According to sdma_peripheral_type in include/linux/platform_data/dma-imx.h
+IMX_DMATYPE_SAI corresponds to index 24, so fix it accordingly.
 
-Based on v4.6-rc1
+Suggested-by: Zidan Wang <zidan.wang@nxp.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+Changes since v1:
+- None
 
-Also needs https://patchwork.kernel.org/patch/8724791/ if kernel
-modules are installed
+ arch/arm/boot/dts/imx6sx.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Nishanth Menon (3):
-  ARM: OMAP: DRA7: wakeupgen: Skip SAR save for wakeupgen
-  ARM: OMAP: DRA7: Provide proper class to omap2_set_globals_tap
-  ARM: OMAP: Catch callers of revision information prior to it being
-    populated
-
- arch/arm/mach-omap1/id.c             | 1 +
- arch/arm/mach-omap2/id.c             | 1 +
- arch/arm/mach-omap2/io.c             | 3 ++-
- arch/arm/mach-omap2/omap-wakeupgen.c | 7 +++++++
- 4 files changed, 11 insertions(+), 1 deletion(-)
-
+diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
+index a5f7602..c8269e7 100644
+--- a/arch/arm/boot/dts/imx6sx.dtsi
++++ b/arch/arm/boot/dts/imx6sx.dtsi
+@@ -970,7 +970,7 @@
+ 					 <&clks 0>, <&clks 0>;
+ 				clock-names = "bus", "mclk1", "mclk2", "mclk3";
+ 				dma-names = "rx", "tx";
+-				dmas = <&sdma 31 23 0>, <&sdma 32 23 0>;
++				dmas = <&sdma 31 24 0>, <&sdma 32 24 0>;
+ 				dma-source = <&gpr 0 15 0 16>;
+ 				status = "disabled";
+ 			};
+@@ -990,7 +990,7 @@
+ 					 <&clks 0>, <&clks 0>;
+ 				clock-names = "bus", "mclk1", "mclk2", "mclk3";
+ 				dma-names = "rx", "tx";
+-				dmas = <&sdma 33 23 0>, <&sdma 34 23 0>;
++				dmas = <&sdma 33 24 0>, <&sdma 34 24 0>;
+ 				dma-source = <&gpr 0 17 0 18>;
+ 				status = "disabled";
+ 			};
 -- 
-2.8.0
+1.9.1
