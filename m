@@ -1,15 +1,17 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 31 Mar 2016 20:04:57 -0600
-Subject: [PATCH 1/3] ARM: multi_v7_defconfig: Add more BCM2835 support
-In-Reply-To: <1459470504-5007-1-git-send-email-eric@anholt.net>
-References: <1459470504-5007-1-git-send-email-eric@anholt.net>
-Message-ID: <56FDD749.3070001@wwwdotorg.org>
+Date: Thu, 31 Mar 2016 20:05:35 -0600
+Subject: [PATCH 2/4] ARM: bcm2835: Enable CONFIG_PM.
+In-Reply-To: <1459470643-9070-2-git-send-email-eric@anholt.net>
+References: <1459470643-9070-1-git-send-email-eric@anholt.net>
+ <1459470643-9070-2-git-send-email-eric@anholt.net>
+Message-ID: <56FDD76F.5010803@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/31/2016 06:28 PM, Eric Anholt wrote:
-> The WDT is required for reboot and I2S is used for audio devices on
-> the P5 header (or BT audio on the Pi3).
+On 03/31/2016 06:30 PM, Eric Anholt wrote:
+> The power domain driver we've enabled doesn't actually do anything
+> without it, and we need it to do its job for VC4 to initialize
+> successfully.
 
-Patches 1 and 3,
+Patches 1, 2, and 3,
 Acked-by: Stephen Warren <swarren@wwwdotorg.org>
