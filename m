@@ -1,87 +1,27 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Fri, 1 Apr 2016 21:21:52 +0200
-Subject: [PATCH v10 01/17] Xen: ACPI: Hide UART used by Xen
-In-Reply-To: <1459525755-36968-2-git-send-email-shannon.zhao@linaro.org>
-References: <1459525755-36968-1-git-send-email-shannon.zhao@linaro.org>
- <1459525755-36968-2-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <CAJZ5v0i_h2Y+upRE1LgMiuj2srJ8Z0BJMBk4mrTppMd7V1LXbQ@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 1 Apr 2016 12:27:50 -0700
+Subject: [PATCH 1/3] clk: ti: dpll: add support for specifying max rate
+ for DPLLs
+In-Reply-To: <1458158097-21137-2-git-send-email-t-kristo@ti.com>
+References: <1458158097-21137-1-git-send-email-t-kristo@ti.com>
+ <1458158097-21137-2-git-send-email-t-kristo@ti.com>
+Message-ID: <20160401192750.GV18567@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 1, 2016 at 5:48 PM, Shannon Zhao <shannon.zhao@linaro.org> wrote:
-> ACPI 6.0 introduces a new table STAO to list the devices which are used
-> by Xen and can't be used by Dom0. On Xen virtual platforms, the physical
-> UART is used by Xen. So here it hides UART from Dom0.
->
-> CC: "Rafael J. Wysocki" <rjw@rjwysocki.net> (supporter:ACPI)
-> CC: Len Brown <lenb@kernel.org> (supporter:ACPI)
-> CC: linux-acpi at vger.kernel.org (open list:ACPI)
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+On 03/16, Tero Kristo wrote:
+> DPLLs typically have a maximum rate they can support, and this varies
+> from DPLL to DPLL. Add support of the maximum rate value to the DPLL
+> data struct, and also add check for this in the DPLL round_rate function.
+> 
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> Cc: Nishanth Menon <nm@ti.com>
+> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Cc: Lokesh Vutla <lokeshvutla@ti.com>
 > ---
->  drivers/acpi/scan.c | 71 +++++++++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 71 insertions(+)
->
-> diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
-> index 5f28cf7..4d2d9eb 100644
-> --- a/drivers/acpi/scan.c
-> +++ b/drivers/acpi/scan.c
-> @@ -45,6 +45,7 @@ static LIST_HEAD(acpi_scan_handlers_list);
->  DEFINE_MUTEX(acpi_device_lock);
->  LIST_HEAD(acpi_wakeup_device_list);
->  static DEFINE_MUTEX(acpi_hp_context_lock);
 
-A comment here would be useful explaining that the below is an
-exceptional thing an nothing like it is expected to be needed if
-foreseeable future.
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 
-> +static u64 spcr_uart_addr;
->
->  struct acpi_dep_data {
->         struct list_head node;
-> @@ -1453,6 +1454,44 @@ static int acpi_add_single_object(struct acpi_device **child,
->         return 0;
->  }
->
-> +static acpi_status acpi_get_resource_memory(struct acpi_resource *ares,
-> +                                           void *context)
-> +{
-> +       struct resource *res = context;
-> +
-> +       if (acpi_dev_resource_memory(ares, res))
-> +               return AE_CTRL_TERMINATE;
-> +
-> +       return AE_OK;
-> +}
-> +
-> +static bool acpi_device_should_be_hidden(acpi_handle handle)
-> +{
-> +       acpi_status status;
-> +       struct resource res;
-> +
-> +       /* Check if it should ignore the UART device */
-> +       if (!(spcr_uart_addr && acpi_has_method(handle, METHOD_NAME__CRS)))
-> +               return false;
-> +
-> +       /*
-> +        * The UART device described in SPCR table is assumed to have only one
-> +        * memory resource present. So we only look for the first one here.
-> +        */
-> +       status = acpi_walk_resources(handle, METHOD_NAME__CRS,
-> +                                    acpi_get_resource_memory, &res);
-> +       if (ACPI_FAILURE(status))
-> +               return false;
-> +
-> +       if (res.start == spcr_uart_addr) {
-
-What about restructuring that a bit.
-
-      if (ACPI_FAILURE(status) || res.start != spcr_uart_addr)
-            return false;
-
-> +               printk(KERN_INFO PREFIX "The UART device @%pa in SPCR table will be hidden\n",
-> +                      &res.start);
-
-And maybe use acpi_handle_info() for this message?
-
-Thanks,
-Rafael
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
