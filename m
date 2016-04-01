@@ -1,60 +1,47 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri,  1 Apr 2016 16:26:31 +0200
-Subject: [PATCH 2/2] dt-bindings: Add Oxford Semiconductor OXNAS Standard
- Clocks bindings
-In-Reply-To: <1459520791-13269-1-git-send-email-narmstrong@baylibre.com>
-References: <1459520791-13269-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1459520791-13269-3-git-send-email-narmstrong@baylibre.com>
+From: Vadim.Lomovtsev@caviumnetworks.com (Lomovtsev, Vadim)
+Date: Fri, 1 Apr 2016 14:26:58 +0000
+Subject: [lmbench][question] lat_mem_rd built against ilp32 hangs forever
+ with len=2048
+In-Reply-To: <BN3PR07MB2643EC7405997C9E58F3FD3E87990@BN3PR07MB2643.namprd07.prod.outlook.com>
+References: <BN3PR07MB2643EC7405997C9E58F3FD3E87990@BN3PR07MB2643.namprd07.prod.outlook.com>
+Message-ID: <BN3PR07MB2643822975834B66738F0C32879A0@BN3PR07MB2643.namprd07.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- .../devicetree/bindings/clock/oxnas,stdclk.txt     | 35 ++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/oxnas,stdclk.txt
+It turns to be lmbench related issue.
+Thanks.
 
-diff --git a/Documentation/devicetree/bindings/clock/oxnas,stdclk.txt b/Documentation/devicetree/bindings/clock/oxnas,stdclk.txt
-new file mode 100644
-index 0000000..208cca6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/oxnas,stdclk.txt
-@@ -0,0 +1,35 @@
-+Oxford Semiconductor OXNAS SoC Family Standard Clocks
-+================================================
-+
-+Please also refer to clock-bindings.txt in this directory for common clock
-+bindings usage.
-+
-+Required properties:
-+- compatible: Should be "oxsemi,ox810se-stdclk"
-+- #clock-cells: 1, see below
-+
-+Parent node should have the following properties :
-+- compatible: Should be "oxsemi,ox810se-sys-ctrl", "syscon", "simple-mfd"
-+
-+For OX810SE, the clock indices are :
-+ - 0: LEON
-+ - 1: DMA_SGDMA
-+ - 2: CIPHER
-+ - 3: SATA
-+ - 4: AUDIO
-+ - 5: USBMPH
-+ - 6: ETHA
-+ - 7: PCIA
-+ - 8: NAND
-+
-+example:
-+
-+sys: sys-ctrl at 000000 {
-+	compatible = "oxsemi,ox810se-sys-ctrl", "syscon", "simple-mfd";
-+	reg = <0x000000 0x100000>;
-+
-+	stdclk: stdclk {
-+		compatible = "oxsemi,ox810se-stdclk";
-+		#clock-cells = <1>;
-+	};
-+};
--- 
-1.9.1
+-Vadim
+
+________________________________________
+From: linux-arm-kernel <linux-arm-kernel-bounces@lists.infradead.org> on behalf of Lomovtsev, Vadim <Vadim.Lomovtsev@caviumnetworks.com>
+Sent: Thursday, March 31, 2016 17:20
+To: lmbench-users at lists.sourceforge.net
+Cc: Kapoor, Prasun; Norov, Yuri; linux-kernel at vger.kernel.org; Pinski, Andrew; Prakash, Brahmajyosyula; linux-arm-kernel at lists.infradead.org
+Subject: [lmbench][question] lat_mem_rd built against ilp32 hangs forever with len=2048
+
+While running lat_mem_rd test build against ILP32 support at ARM64 board it hangs forever with following logs (CPU load is 100%):
+
+./lat_mem_rd -P 1 2048 16 32
+0.00049 1.501
+0.00098 1.501
+0.00195 1.501
+[.. skip]
+1024.00000 13.076
+1536.00000 13.082
+2048.00000 13.076
+
+At the same time lat_mem_rd build with lp64 works fine with exactly same args.
+
+Has anyone face such issue before?
+
+My kernel version is 4.2 and ILP32 patches are under development being backported from http://lkml.iu.edu/hypermail/linux/kernel/1601.1/05453.html.
+Sources for 4.5 available at https://github.com/norov/linux
+
+Please let me know if any additional information is necessary.
+
+-Vadim
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
