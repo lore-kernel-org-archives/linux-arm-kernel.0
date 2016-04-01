@@ -1,96 +1,52 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Fri, 1 Apr 2016 15:22:54 +0200
-Subject: [PATCH] net: mvneta: fix changing MTU when using per-cpu
- processing
-In-Reply-To: <1459516878-2802-1-git-send-email-mw@semihalf.com>
-References: <1459516878-2802-1-git-send-email-mw@semihalf.com>
-Message-ID: <CAPv3WKfLXibDQbr71p3H4Okh-o7pv_BhjoL_T6mtHcPRQmu1Jg@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 1 Apr 2016 08:25:10 -0500
+Subject: dtc warnings
+In-Reply-To: <56FE27F9.2070100@gmail.com>
+References: <CAL_Jsq+=OjY8y_8x7OSm-MWYKbrHN5cbv4TLwULxhNq+gfiMtw@mail.gmail.com>
+ <56FE27F9.2070100@gmail.com>
+Message-ID: <CAL_Jsq+wPdkMcCkvMGQMyVdSbc_NfhbPN1PxX2c8EiWd=fpfOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+On Fri, Apr 1, 2016 at 2:49 AM, Tomi Valkeinen <tomi.valkeinen@gmail.com> wrote:
+> Hi Rob,
+>
+> On 01/04/16 04:40, Rob Herring wrote:
+>> You may have noticed that linux-next had gotten noisy with dtc
+>> warnings lately. I dropped the change for a bit, but added it back
+>> today except now it is disabled unless building with "W=1".
+>>
+>> There's ~25K (2500 unique) warnings generated from the ARM dts files.
+>> Here's the ranking of warnings by dtb. OMAP is the clear winner (based
+>> on the similar counts, probably lots of duplicates). Please help
+>> remind contributors to test with W=1 and start to fix these.
+>>
+>> At least for memory nodes, I plan to whitelist allowing no
+>> unit-address. There could be others, but none that I've seen so far.
+>
+> What's the correct way to fix nodes for display platform devices? For
+> example, omap4-panda-common.dtsi has two connector nodes:
+>
+> dvi0: connector at 0 {
+>         compatible = "dvi-connector";
+>         label = "dvi";
+>         ...
+> };
+>
+>
+> hdmi0: connector at 1 {
+>         compatible = "hdmi-connector";
+>         label = "hdmi";
+>         ...
+> };
+>
+> Should I add the reg property, or should I rename the nodes to, say,
+> connector_dvi and connector_hdmi, or connector1 and connector2?
 
-I've just realized I forgot to add an information, that this patch is
-intended for 'net' tree.
+I think adding reg only makes sense if it maps to something addressable by s/w.
 
-Best regards,
-Marcin
+So in this case: dvi-connector and hdmi-connector
 
-2016-04-01 15:21 GMT+02:00 Marcin Wojtas <mw@semihalf.com>:
-> After enabling per-cpu processing it appeared that under heavy load
-> changing MTU can result in blocking all port's interrupts and transmitting
-> data is not possible after the change.
->
-> This commit fixes above issue by disabling percpu interrupts for the
-> time, when TXQs and RXQs are reconfigured.
->
-> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
-> ---
->  drivers/net/ethernet/marvell/mvneta.c | 30 ++++++++++++++++--------------
->  1 file changed, 16 insertions(+), 14 deletions(-)
->
-> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-> index fee6a91..a433de9 100644
-> --- a/drivers/net/ethernet/marvell/mvneta.c
-> +++ b/drivers/net/ethernet/marvell/mvneta.c
-> @@ -3083,6 +3083,20 @@ static int mvneta_check_mtu_valid(struct net_device *dev, int mtu)
->         return mtu;
->  }
->
-> +static void mvneta_percpu_enable(void *arg)
-> +{
-> +       struct mvneta_port *pp = arg;
-> +
-> +       enable_percpu_irq(pp->dev->irq, IRQ_TYPE_NONE);
-> +}
-> +
-> +static void mvneta_percpu_disable(void *arg)
-> +{
-> +       struct mvneta_port *pp = arg;
-> +
-> +       disable_percpu_irq(pp->dev->irq);
-> +}
-> +
->  /* Change the device mtu */
->  static int mvneta_change_mtu(struct net_device *dev, int mtu)
->  {
-> @@ -3107,6 +3121,7 @@ static int mvneta_change_mtu(struct net_device *dev, int mtu)
->          * reallocation of the queues
->          */
->         mvneta_stop_dev(pp);
-> +       on_each_cpu(mvneta_percpu_disable, pp, true);
->
->         mvneta_cleanup_txqs(pp);
->         mvneta_cleanup_rxqs(pp);
-> @@ -3130,6 +3145,7 @@ static int mvneta_change_mtu(struct net_device *dev, int mtu)
->                 return ret;
->         }
->
-> +       on_each_cpu(mvneta_percpu_enable, pp, true);
->         mvneta_start_dev(pp);
->         mvneta_port_up(pp);
->
-> @@ -3283,20 +3299,6 @@ static void mvneta_mdio_remove(struct mvneta_port *pp)
->         pp->phy_dev = NULL;
->  }
->
-> -static void mvneta_percpu_enable(void *arg)
-> -{
-> -       struct mvneta_port *pp = arg;
-> -
-> -       enable_percpu_irq(pp->dev->irq, IRQ_TYPE_NONE);
-> -}
-> -
-> -static void mvneta_percpu_disable(void *arg)
-> -{
-> -       struct mvneta_port *pp = arg;
-> -
-> -       disable_percpu_irq(pp->dev->irq);
-> -}
-> -
->  /* Electing a CPU must be done in an atomic way: it should be done
->   * after or before the removal/insertion of a CPU and this function is
->   * not reentrant.
-> --
-> 1.8.3.1
->
+If we have 2 of the same type, we'll probably have to append a number.
+
+Rob
