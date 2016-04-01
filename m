@@ -1,52 +1,68 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 1 Apr 2016 08:25:10 -0500
-Subject: dtc warnings
-In-Reply-To: <56FE27F9.2070100@gmail.com>
-References: <CAL_Jsq+=OjY8y_8x7OSm-MWYKbrHN5cbv4TLwULxhNq+gfiMtw@mail.gmail.com>
- <56FE27F9.2070100@gmail.com>
-Message-ID: <CAL_Jsq+wPdkMcCkvMGQMyVdSbc_NfhbPN1PxX2c8EiWd=fpfOg@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri,  1 Apr 2016 14:54:26 +0200
+Subject: [PATCH 06/12] mtd: nand: gpmi: rely on generic DT parsing done in
+ nand_scan_ident()
+In-Reply-To: <1459515272-31011-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1459515272-31011-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1459515272-31011-7-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 1, 2016 at 2:49 AM, Tomi Valkeinen <tomi.valkeinen@gmail.com> wrote:
-> Hi Rob,
->
-> On 01/04/16 04:40, Rob Herring wrote:
->> You may have noticed that linux-next had gotten noisy with dtc
->> warnings lately. I dropped the change for a bit, but added it back
->> today except now it is disabled unless building with "W=1".
->>
->> There's ~25K (2500 unique) warnings generated from the ARM dts files.
->> Here's the ranking of warnings by dtb. OMAP is the clear winner (based
->> on the similar counts, probably lots of duplicates). Please help
->> remind contributors to test with W=1 and start to fix these.
->>
->> At least for memory nodes, I plan to whitelist allowing no
->> unit-address. There could be others, but none that I've seen so far.
->
-> What's the correct way to fix nodes for display platform devices? For
-> example, omap4-panda-common.dtsi has two connector nodes:
->
-> dvi0: connector at 0 {
->         compatible = "dvi-connector";
->         label = "dvi";
->         ...
-> };
->
->
-> hdmi0: connector at 1 {
->         compatible = "hdmi-connector";
->         label = "hdmi";
->         ...
-> };
->
-> Should I add the reg property, or should I rename the nodes to, say,
-> connector_dvi and connector_hdmi, or connector1 and connector2?
+The core now takes care of parsing generic DT properties in
+nand_scan_ident() when nand_set_flash_node() has been called.
+Rely on this initialization instead of calling of_get_nand_xxx()
+manually.
 
-I think adding reg only makes sense if it maps to something addressable by s/w.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 21 ++++++++++-----------
+ 1 file changed, 10 insertions(+), 11 deletions(-)
 
-So in this case: dvi-connector and hdmi-connector
-
-If we have 2 of the same type, we'll probably have to append a number.
-
-Rob
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+index 8122c69..c6e8a1c 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
+@@ -25,7 +25,6 @@
+ #include <linux/mtd/partitions.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+-#include <linux/of_mtd.h>
+ #include "gpmi-nand.h"
+ #include "bch-regs.h"
+ 
+@@ -1914,16 +1913,6 @@ static int gpmi_nand_init(struct gpmi_nand_data *this)
+ 	/* Set up swap_block_mark, must be set before the gpmi_set_geometry() */
+ 	this->swap_block_mark = !GPMI_IS_MX23(this);
+ 
+-	if (of_get_nand_on_flash_bbt(this->dev->of_node)) {
+-		chip->bbt_options |= NAND_BBT_USE_FLASH | NAND_BBT_NO_OOB;
+-
+-		if (of_property_read_bool(this->dev->of_node,
+-						"fsl,no-blockmark-swap"))
+-			this->swap_block_mark = false;
+-	}
+-	dev_dbg(this->dev, "Blockmark swapping %sabled\n",
+-		this->swap_block_mark ? "en" : "dis");
+-
+ 	/*
+ 	 * Allocate a temporary DMA buffer for reading ID in the
+ 	 * nand_scan_ident().
+@@ -1938,6 +1927,16 @@ static int gpmi_nand_init(struct gpmi_nand_data *this)
+ 	if (ret)
+ 		goto err_out;
+ 
++	if (chip->bbt_options & NAND_BBT_USE_FLASH) {
++		chip->bbt_options |= NAND_BBT_NO_OOB;
++
++		if (of_property_read_bool(this->dev->of_node,
++						"fsl,no-blockmark-swap"))
++			this->swap_block_mark = false;
++	}
++	dev_dbg(this->dev, "Blockmark swapping %sabled\n",
++		this->swap_block_mark ? "en" : "dis");
++
+ 	ret = gpmi_init_last(this);
+ 	if (ret)
+ 		goto err_out;
+-- 
+2.5.0
