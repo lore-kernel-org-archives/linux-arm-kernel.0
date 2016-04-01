@@ -1,109 +1,166 @@
 From: james.morse@arm.com (James Morse)
-Date: Fri,  1 Apr 2016 17:53:29 +0100
-Subject: [PATCH v7 05/16] arm64: kvm: Move lr save/restore from do_el2_call
- into EL1
+Date: Fri,  1 Apr 2016 17:53:30 +0100
+Subject: [PATCH v7 06/16] arm64: hyp/kvm: Extend hyp-stub API to allow
+ function calls at EL2
 In-Reply-To: <1459529620-22150-1-git-send-email-james.morse@arm.com>
 References: <1459529620-22150-1-git-send-email-james.morse@arm.com>
-Message-ID: <1459529620-22150-6-git-send-email-james.morse@arm.com>
+Message-ID: <1459529620-22150-7-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Today the 'hvc' calling kvm or the hyp-stub is expected to preserve all
-registers. Kvm saves/restores the registers it needs on the EL2 stack using
-do_el2_call. The hyp-stub has no stack, later patches need at least one
-register they can use.
+From: Geoff Levand <geoff@infradead.org>
 
-Allow theses calls to clobber the link register, and add code to
-save/restore this register at the call sites.
+The existing arm64 hcall implementations are limited in that they only
+allow for two distinct hcalls; with the x0 register either zero or not
+zero.  Also, the API of the hyp-stub exception vector routines and the
+KVM exception vector routines differ; hyp-stub uses a non-zero value in
+x0 to implement __hyp_set_vectors, whereas KVM uses it to implement
+kvm_call_hyp.
 
+To allow for additional hcalls to be defined and to make the arm64 hcall
+API more consistent across exception vector routines, change the hcall
+implementations to reserve all x0 values below PAGE_SIZE for hcalls such
+as {s,g}et_vectors().
+
+Define two new preprocessor macros HVC_GET_VECTORS, and HVC_SET_VECTORS
+to be used as hcall type specifiers and convert the existing
+__hyp_get_vectors() and __hyp_set_vectors() routines to use these new
+macros when executing an HVC call.  Also, change the corresponding
+hyp-stub and KVM el1_sync exception vector routines to use these new
+macros.
+
+Signed-off-by: Geoff Levand <geoff@infradead.org>
+[Merged two hcall patches, moved immediate value from esr to x0, use lr
+ as a scratch register]
 Signed-off-by: James Morse <james.morse@arm.com>
 ---
- arch/arm64/include/asm/virt.h  |  4 ----
- arch/arm64/kernel/hyp-stub.S   | 10 ++++++++--
- arch/arm64/kvm/hyp.S           |  7 ++++++-
- arch/arm64/kvm/hyp/hyp-entry.S |  2 ++
- 4 files changed, 16 insertions(+), 7 deletions(-)
+ arch/arm64/include/asm/virt.h  | 16 ++++++++++++++++
+ arch/arm64/kernel/hyp-stub.S   | 33 +++++++++++++++++++++++----------
+ arch/arm64/kvm/hyp.S           |  4 ++--
+ arch/arm64/kvm/hyp/hyp-entry.S |  4 ++--
+ 4 files changed, 43 insertions(+), 14 deletions(-)
 
 diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-index b8fdddeca71b..23e9c6f68b8c 100644
+index 23e9c6f68b8c..d406d2ebe80d 100644
 --- a/arch/arm64/include/asm/virt.h
 +++ b/arch/arm64/include/asm/virt.h
-@@ -27,15 +27,11 @@
- 	 * Shuffle the parameters before calling the function
- 	 * pointed to in x0. Assumes parameters in x[1,2,3].
- 	 */
--	sub	sp, sp, #16
--	str	lr, [sp]
- 	mov	lr, x0
- 	mov	x0, x1
- 	mov	x1, x2
- 	mov	x2, x3
- 	blr	lr
--	ldr	lr, [sp]
--	add	sp, sp, #16
- .endm
- #else
+@@ -18,6 +18,22 @@
+ #ifndef __ASM__VIRT_H
+ #define __ASM__VIRT_H
+ 
++/*
++ * The arm64 hcall implementation uses x0 to specify the hcall type. A value
++ * less than PAGE_SIZE indicates a special hcall, such as get/set vector.
++ * Any other value is used as a pointer to the function to call.
++ */
++
++/* HVC_GET_VECTORS - Return the value of the vbar_el2 register. */
++#define HVC_GET_VECTORS 0
++
++/*
++ * HVC_SET_VECTORS - Set the value of the vbar_el2 register.
++ *
++ * @x0: Physical address of the new vector table.
++ */
++#define HVC_SET_VECTORS 1
++
+ #define BOOT_CPU_MODE_EL1	(0xe11)
+ #define BOOT_CPU_MODE_EL2	(0xe12)
  
 diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
-index a272f335c289..7eab8acbbbd9 100644
+index 7eab8acbbbd9..6bba25cf7d15 100644
 --- a/arch/arm64/kernel/hyp-stub.S
 +++ b/arch/arm64/kernel/hyp-stub.S
-@@ -101,10 +101,16 @@ ENDPROC(\label)
-  */
+@@ -22,6 +22,7 @@
+ #include <linux/irqchip/arm-gic-v3.h>
+ 
+ #include <asm/assembler.h>
++#include <asm/kvm_arm.h>
+ #include <asm/ptrace.h>
+ #include <asm/virt.h>
+ 
+@@ -53,15 +54,25 @@ ENDPROC(__hyp_stub_vectors)
+ 	.align 11
+ 
+ el1_sync:
+-	mrs	x1, esr_el2
+-	lsr	x1, x1, #26
+-	cmp	x1, #0x16
+-	b.ne	2f				// Not an HVC trap
+-	cbz	x0, 1f
+-	msr	vbar_el2, x0			// Set vbar_el2
+-	b	2f
+-1:	mrs	x0, vbar_el2			// Return vbar_el2
+-2:	eret
++	mrs	x30, esr_el2
++	lsr	x30, x30, #ESR_ELx_EC_SHIFT
++
++	cmp	x30, #ESR_ELx_EC_HVC64
++	b.ne	9f				// Not an HVC trap
++
++	cmp	x0, #HVC_GET_VECTORS
++	b.ne	1f
++	mrs	x0, vbar_el2
++	b	9f
++
++1:	cmp	x0, #HVC_SET_VECTORS
++	b.ne	2f
++	msr	vbar_el2, x1
++	b	9f
++
++2:	do_el2_call
++
++9:	eret
+ ENDPROC(el1_sync)
+ 
+ .macro invalid_vector	label
+@@ -102,7 +113,7 @@ ENDPROC(\label)
  
  ENTRY(__hyp_get_vectors)
-+	str	lr, [sp, #-16]!
- 	mov	x0, xzr
--	// fall through
--ENTRY(__hyp_set_vectors)
+ 	str	lr, [sp, #-16]!
+-	mov	x0, xzr
++	mov	x0, #HVC_GET_VECTORS
  	hvc	#0
-+	ldr	lr, [sp], #16
+ 	ldr	lr, [sp], #16
  	ret
- ENDPROC(__hyp_get_vectors)
-+
-+ENTRY(__hyp_set_vectors)
-+	str	lr, [sp, #-16]!
-+	hvc	#0
-+	ldr	lr, [sp], #16
-+	ret
- ENDPROC(__hyp_set_vectors)
+@@ -110,6 +121,8 @@ ENDPROC(__hyp_get_vectors)
+ 
+ ENTRY(__hyp_set_vectors)
+ 	str	lr, [sp, #-16]!
++	mov	x1, x0
++	mov	x0, #HVC_SET_VECTORS
+ 	hvc	#0
+ 	ldr	lr, [sp], #16
+ 	ret
 diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index 48f19a37b3df..4ee5612f43ea 100644
+index 4ee5612f43ea..ba344942f0a8 100644
 --- a/arch/arm64/kvm/hyp.S
 +++ b/arch/arm64/kvm/hyp.S
-@@ -38,13 +38,18 @@
-  * A function pointer with a value of 0 has a special meaning, and is
-  * used to implement __hyp_get_vectors in the same way as in
+@@ -35,8 +35,8 @@
+  * in Hyp mode (see init_hyp_mode in arch/arm/kvm/arm.c).  Return values are
+  * passed in x0.
+  *
+- * A function pointer with a value of 0 has a special meaning, and is
+- * used to implement __hyp_get_vectors in the same way as in
++ * A function pointer with a value less than PAGE_SIZE has a special meaning,
++ * and is used to implement __hyp_get_vectors in the same way as in
   * arch/arm64/kernel/hyp_stub.S.
-+ * HVC behaves as a 'bl' call and will clobber lr.
+  * HVC behaves as a 'bl' call and will clobber lr.
   */
- ENTRY(__kvm_call_hyp)
--alternative_if_not ARM64_HAS_VIRT_HOST_EXTN	
-+alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
-+	str     lr, [sp, #-16]!
- 	hvc	#0
-+	ldr     lr, [sp], #16
- 	ret
- alternative_else
- 	b	__vhe_hyp_call
- 	nop
-+	nop
-+	nop
- alternative_endif
- ENDPROC(__kvm_call_hyp)
 diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-index 358f27a1edc2..2cee779ce910 100644
+index 2cee779ce910..c8ad21c78d3f 100644
 --- a/arch/arm64/kvm/hyp/hyp-entry.S
 +++ b/arch/arm64/kvm/hyp/hyp-entry.S
-@@ -39,7 +39,9 @@
- .endm
+@@ -71,8 +71,8 @@ alternative_endif
+ 	/* Here, we're pretty sure the host called HVC. */
+ 	restore_x0_to_x3
  
- ENTRY(__vhe_hyp_call)
-+	str	lr, [sp, #-16]!
- 	do_el2_call
-+	ldr	lr, [sp], #16
- 	/*
- 	 * We used to rely on having an exception return to get
- 	 * an implicit isb. In the E2H case, we don't have it anymore.
+-	/* Check for __hyp_get_vectors */
+-	cbnz	x0, 1f
++	cmp	x0, #HVC_GET_VECTORS
++	b.ne	1f
+ 	mrs	x0, vbar_el2
+ 	b	2f
+ 
 -- 
 2.8.0.rc3
