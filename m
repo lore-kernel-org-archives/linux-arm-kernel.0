@@ -1,33 +1,33 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 01 Apr 2016 15:57:52 +0900
-Subject: [PATCH 09/11] ARM: dts: exynos: Fix DTC unit name warnings in SMDK5420
+Date: Fri, 01 Apr 2016 15:57:46 +0900
+Subject: [PATCH 03/11] ARM: dts: exynos: Fix DTC unit name warnings in Exynos4
 In-Reply-To: <1459493874-2366-1-git-send-email-k.kozlowski@samsung.com>
 References: <1459493874-2366-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1459493874-2366-9-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1459493874-2366-3-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix following DTC warnings in Exynos5420 SMDK5420:
+Fix following DTC warnings in all Exynos4 boards:
 
-Warning (unit_address_vs_reg): Node /dp-controller at 145B0000/display-timings/timing at 0 has a unit name, but no reg property
+Warning (unit_address_vs_reg): Node /soc/video-phy at 10020710 has a unit name, but no reg property
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- arch/arm/boot/dts/exynos5420-smdk5420.dts | 2 +-
+ arch/arm/boot/dts/exynos4.dtsi | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-index 0785fedf441e..99160f796851 100644
---- a/arch/arm/boot/dts/exynos5420-smdk5420.dts
-+++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-@@ -111,7 +111,7 @@
+diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+index 000d506c027b..021f52d43ff7 100644
+--- a/arch/arm/boot/dts/exynos4.dtsi
++++ b/arch/arm/boot/dts/exynos4.dtsi
+@@ -82,7 +82,7 @@
+ 		reg = <0x12570000 0x14>;
+ 	};
  
- 	display-timings {
- 		native-mode = <&timing0>;
--		timing0: timing at 0 {
-+		timing0: timing {
- 			clock-frequency = <50000>;
- 			hactive = <2560>;
- 			vactive = <1600>;
+-	mipi_phy: video-phy at 10020710 {
++	mipi_phy: video-phy {
+ 		compatible = "samsung,s5pv210-mipi-video-phy";
+ 		#phy-cells = <1>;
+ 		syscon = <&pmu_system_controller>;
 -- 
 2.5.0
