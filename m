@@ -1,68 +1,146 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Fri,  1 Apr 2016 20:52:16 -0300
-Subject: [PATCH v2 3/4] fsl-imx-sdma.txt: Document 'fsl,
- sdma-event-remap' property
+Date: Fri,  1 Apr 2016 20:52:17 -0300
+Subject: [PATCH v2 4/4] ARM: dts: imx6sx-sdb: Add SAI support
 In-Reply-To: <1459554737-19684-1-git-send-email-festevam@gmail.com>
 References: <1459554737-19684-1-git-send-email-festevam@gmail.com>
-Message-ID: <1459554737-19684-3-git-send-email-festevam@gmail.com>
+Message-ID: <1459554737-19684-4-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@nxp.com>
 
-Document the 'fsl,sdma-event-remap' property and provide an example of
-its usage.
+Introduce imx6sx-sdb-sai.dts so that it is possible to use the
+SAI interface. 
 
-Cc: Vinod Koul <vinod.koul@intel.com> 
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
 Changes since v1:
-- Newly introduced in this series
+- Add imx6sx-sdb-sai.dtb into Makefile
 
- .../devicetree/bindings/dma/fsl-imx-sdma.txt       | 27 ++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ arch/arm/boot/dts/Makefile           |  1 +
+ arch/arm/boot/dts/imx6sx-sdb-sai.dts | 67 ++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6sx-sdb.dtsi    | 16 +++++++++
+ 3 files changed, 84 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6sx-sdb-sai.dts
 
-diff --git a/Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt b/Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt
-index dc8d3aa..175f0e4 100644
---- a/Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt
-+++ b/Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt
-@@ -58,6 +58,15 @@ The third cell specifies the transfer priority as below.
- 	1	Medium
- 	2	Low
- 
-+Optional properties:
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 1993333..ea71187 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -374,6 +374,7 @@ dtb-$(CONFIG_SOC_IMX6SL) += \
+ dtb-$(CONFIG_SOC_IMX6SX) += \
+ 	imx6sx-sabreauto.dtb \
+ 	imx6sx-sdb-reva.dtb \
++	imx6sx-sdb-sai.dtb \
+ 	imx6sx-sdb.dtb
+ dtb-$(CONFIG_SOC_IMX6UL) += \
+ 	imx6ul-14x14-evk.dtb \
+diff --git a/arch/arm/boot/dts/imx6sx-sdb-sai.dts b/arch/arm/boot/dts/imx6sx-sdb-sai.dts
+new file mode 100644
+index 0000000..0155450
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6sx-sdb-sai.dts
+@@ -0,0 +1,67 @@
++/*
++ * Copyright (C) 2016 NXP Semiconductors
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License
++ *     version 2 as published by the Free Software Foundation.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
-+- gpr : The phandle to the General Purpose Register (GPR) node.
-+- fsl,sdma-event-remap : Register bits of sdma event remap, the format is
-+  <reg shift val>.
-+    reg is the GPR register offset.
-+    shift is the bit position inside the GPR register.
-+    val is the value of the bit (0 or 1).
++#include "imx6sx-sdb.dts"
 +
- Examples:
- 
- sdma at 83fb0000 {
-@@ -83,3 +92,21 @@ ssi2: ssi at 70014000 {
- 	dma-names = "rx", "tx";
- 	fsl,fifo-depth = <15>;
- };
++/ {
++	sound {
++		audio-cpu = <&sai1>;
++	};
++};
 +
-+Using the fsl,sdma-event-remap property:
++&audmux {
++	/* pin conflict with sai */
++	status = "disabled";
++};
 +
-+If we want to use SDMA on the SAI1 port on a MX6SX:
++&sai1 {
++	status = "okay";
++};
 +
 +&sdma {
 +	gpr = <&gpr>;
-+	/* SDMA events remap for SAI1_RX and SAI1_TX */
++	/* SDMA event remap for SAI1 */
 +	fsl,sdma-event-remap = <0 15 1>, <0 16 1>;
 +};
 +
-+The fsl,sdma-event-remap property in this case has two values:
-+- <0 15 1> means that the offset is 0, so GPR0 is the register of the
-+SDMA remap. Bit 15 of GPR0 selects between UART4_RX and SAI1_RX.
-+Setting bit 15 to 1 selects SAI1_RX.
-+- <0 16 1> means that the offset is 0, so GPR0 is the register of the
-+SDMA remap. Bit 16 of GPR0 selects between UART4_TX and SAI1_TX.
-+Setting bit 16 to 1 selects SAI1_TX.
++&ssi2 {
++	status = "disabled";
++};
+diff --git a/arch/arm/boot/dts/imx6sx-sdb.dtsi b/arch/arm/boot/dts/imx6sx-sdb.dtsi
+index f1d3730..e5eafe4 100644
+--- a/arch/arm/boot/dts/imx6sx-sdb.dtsi
++++ b/arch/arm/boot/dts/imx6sx-sdb.dtsi
+@@ -254,6 +254,12 @@
+ 	status = "okay";
+ };
+ 
++&sai1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_sai1>;
++	status = "disabled";
++};
++
+ &ssi2 {
+ 	status = "okay";
+ };
+@@ -468,6 +474,16 @@
+ 			>;
+ 		};
+ 
++		pinctrl_sai1: sai1grp {
++			fsl,pins = <
++				MX6SX_PAD_CSI_DATA00__SAI1_TX_BCLK	0x130b0
++				MX6SX_PAD_CSI_DATA01__SAI1_TX_SYNC	0x130b0
++				MX6SX_PAD_CSI_HSYNC__SAI1_TX_DATA_0	0x120b0
++				MX6SX_PAD_CSI_VSYNC__SAI1_RX_DATA_0	0x130b0
++				MX6SX_PAD_CSI_PIXCLK__AUDMUX_MCLK	0x130b0
++			>;
++		};
++
+ 		pinctrl_uart1: uart1grp {
+ 			fsl,pins = <
+ 				MX6SX_PAD_GPIO1_IO04__UART1_TX		0x1b0b1
 -- 
 1.9.1
