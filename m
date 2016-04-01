@@ -1,46 +1,56 @@
-From: b-liu@ti.com (Bin Liu)
-Date: Fri, 1 Apr 2016 11:19:31 -0500
-Subject: [PATCH v2 06/11] phy: da8xx-usb: new driver for DA8XX SoC USB PHY
-In-Reply-To: <56FE9B8F.7050605@lechnology.com>
-References: <1458181615-27782-1-git-send-email-david@lechnology.com>
- <1458181615-27782-7-git-send-email-david@lechnology.com>
- <56FE74AC.6080303@ti.com> <20160401144510.GA6264@uda0271908>
- <56FE9B8F.7050605@lechnology.com>
-Message-ID: <20160401161931.GC6264@uda0271908>
+From: akshay.bhat@timesys.com (Akshay Bhat)
+Date: Fri, 1 Apr 2016 12:31:38 -0400
+Subject: [PATCH v5 1/2] watchdog: imx2_wdt: add external reset support via
+ dt prop
+In-Reply-To: <1459523804-11390-2-git-send-email-tharvey@gateworks.com>
+References: <1459523804-11390-1-git-send-email-tharvey@gateworks.com>
+ <1459523804-11390-2-git-send-email-tharvey@gateworks.com>
+Message-ID: <56FEA26A.5020805@timesys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Fri, Apr 01, 2016 at 11:02:23AM -0500, David Lechner wrote:
-> On 04/01/2016 09:45 AM, Bin Liu wrote:
-> >>>+EXPORT_SYMBOL_GPL(da8xx_usb20_phy_set_mode);
-> >>
-> >>Don't prefer export symbols from PHY driver. That'll create unnecessary
-> >>dependencies between the controller and the PHY.
-> >
-> >Agreed.
-> >
-> >>
-> >>I think it'll be better to create a new attribute and use it?
-> >
-> >Another simpler option is to not support _set_mode() for DA8xx, and the
-> >phy driver set the otgmode bit in probe() based on dr_mode of the
-> >controller.
-> >
-> >Regards,
-> >-Bin.
-> >
-> 
-> This certainly works for my particular use case, however, Sergei
-> Shtylyov, who wrote the da8xx musb glue layer originally, seemed to
-> recall in his review of the patch series that this really is
-> necessary for OTG mode to work properly.
 
-I don't know much about the usb module on DA8xx, but it seems to me that
-_set_mode() has nothing to do with OTG mode. musb_core only calls
-_set_mode() in two places - 1) sysfs: musb_mode_store(), 2) init:
-musb_init_controller(). None of them should be related to OTG mode.
+On 04/01/2016 11:16 AM, Tim Harvey wrote:
+> The IMX6 watchdog supports assertion of a signal (WDOG_B) which
+> can be pinmux'd to an external pin. This is typically used for boards that
+> have PMIC's in control of the IMX6 power rails. In fact, failure to use
+> such an external reset on boards with external PMIC's can result in various
+> hangs due to the IMX6 not being fully reset [1] as well as the board failing
+> to reset because its PMIC has not been reset to provide adequate voltage for
+> the CPU when coming out of reset at 800Mhz.
+>
+> This uses a new device-tree property 'fsl,ext-reset-output' to indicate the
+> board has such a reset and to cause the watchdog to be configured to assert
+> WDOG_B instead of an internal reset both on a watchdog timeout and in
+> system_restart.
+>
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/333689.html
+>
+> Cc: Fabio Estevam <festevam@gmail.com>
+> Cc: Lucas Stach <l.stach@pengutronix.de>
+> Cc: Stefan Roese <sr@denx.de>
+> Cc: Iain Paton <ipaton0@gmail.com>
+> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> Cc: Akshay Bhat <akshay.bhat@timesys.com>
+> Cc: Guenter Roeck <linux@roeck-us.net>
+> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+> Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+> v5:
+>   - rename property to 'fsl,ext-reset-output'
+> v4:
+>   - change Property to Properties in documentation
+> v3:
+>   - mandate use of 'either' internal or external reset but not both
+>     simultaneously
+> v2:
+>   - rename property to 'ext-reset-output' based on ML feedback
+>   - simplify setting SRS bit if external-reset
+>   - update comments and commit msg
+>
+> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+> ---
 
-Regards,
--Bin.
+Tested-by: Akshay Bhat <akshay.bhat@timesys.com>
