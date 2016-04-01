@@ -1,37 +1,228 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 1 Apr 2016 15:34:50 +0200
-Subject: [PATCH] kallsyms: ignore ARM mode switching veneers
-In-Reply-To: <2625557.ANpx9Yzf9D@wuerfel>
-References: <1456516254-15615-1-git-send-email-ard.biesheuvel@linaro.org>
- <2625557.ANpx9Yzf9D@wuerfel>
-Message-ID: <CAKv+Gu-4SzHjEraV48X=USRRkU6XCO8BK+7bMz78q7J_BbZb7A@mail.gmail.com>
+From: gautamvivek1987@gmail.com (Vivek Gautam)
+Date: Fri, 1 Apr 2016 06:35:28 -0700
+Subject: [PATCH 1/2] phy: Group vendor specific phy drivers
+In-Reply-To: <56FE7234.5000505@ti.com>
+References: <1459510156-9147-1-git-send-email-gautam.vivek@samsung.com>
+ <56FE7234.5000505@ti.com>
+Message-ID: <CAFp+6iEJAq6CzntpM-RXYN8NwtHUUJoFHFf17mdV4nLE8eJwyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 February 2016 at 21:21, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 26 February 2016 20:50:54 Ard Biesheuvel wrote:
->> On ARM, the linker may emit veneers to deal with relative branch
->> instructions that appear too far away from their targets. Since the second
->> kallsyms pass results in an increase of the kernel size, it may result in
->> additional veneers to be emitted, potentially affecting the output of
->> kallsyms itself if these symbols are visible to it, and for that reason,
->> symbols whose names end in '_veneer' are ignored explicitly.
->>
->> However, when building Thumb2 kernels, such veneers are named differently
->> if they also incur a mode switch, and since they are not filtered by
->> kallsyms, they may cause the build to fail. So filter symbols whose names
->> end in '_from_arm' or '_from_thumb' as well.
->>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->
->
-> Thanks again for debugging this!
->
-> I have two (randconfig) configurations that ran into this problem, and they
-> are both with your patch
->
-> Tested-by: Arnd Bergmann <arnd@arndb.de>
->
+Hi,
 
-Added to the patch tracker as #8555
+
+On Fri, Apr 1, 2016 at 6:05 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> Hi,
+>
+> On Friday 01 April 2016 04:59 PM, Vivek Gautam wrote:
+>> Adding vendor specific directories in phy to group
+>> phy drivers under their respective vendor umbrella.
+>>
+>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+>> ---
+>>
+>> With growing number of phy drivers, it makes sense to
+>> group these drivers under their respective vendor/platform
+>> umbrella directory.
+>>
+>> Build-tested 'multi_v7_defconfig'.
+>>
+>>  drivers/phy/Kconfig                               | 386 +---------------------
+>>  drivers/phy/Makefile                              |  57 +---
+>>  drivers/phy/bcom/Kconfig                          |  27 ++
+>>  drivers/phy/bcom/Makefile                         |   3 +
+>>  drivers/phy/{ => bcom}/phy-bcm-cygnus-pcie.c      |   0
+>>  drivers/phy/{ => bcom}/phy-bcm-kona-usb2.c        |   0
+>>  drivers/phy/{ => bcom}/phy-brcmstb-sata.c         |   0
+>>  drivers/phy/hisi/Kconfig                          |  20 ++
+>>  drivers/phy/hisi/Makefile                         |   2 +
+>>  drivers/phy/{ => hisi}/phy-hi6220-usb.c           |   0
+>>  drivers/phy/{ => hisi}/phy-hix5hd2-sata.c         |   0
+>>  drivers/phy/marvell/Kconfig                       |  50 +++
+>>  drivers/phy/marvell/Makefile                      |   6 +
+>>  drivers/phy/{ => marvell}/phy-armada375-usb2.c    |   0
+>>  drivers/phy/{ => marvell}/phy-berlin-sata.c       |   0
+>>  drivers/phy/{ => marvell}/phy-berlin-usb.c        |   0
+>>  drivers/phy/{ => marvell}/phy-mvebu-sata.c        |   0
+>>  drivers/phy/{ => marvell}/phy-pxa-28nm-hsic.c     |   0
+>>  drivers/phy/{ => marvell}/phy-pxa-28nm-usb2.c     |   0
+>>  drivers/phy/qcom/Kconfig                          |  23 ++
+>>  drivers/phy/qcom/Makefile                         |   5 +
+>>  drivers/phy/{ => qcom}/phy-qcom-apq8064-sata.c    |   0
+>>  drivers/phy/{ => qcom}/phy-qcom-ipq806x-sata.c    |   0
+>>  drivers/phy/{ => qcom}/phy-qcom-ufs-i.h           |   0
+>>  drivers/phy/{ => qcom}/phy-qcom-ufs-qmp-14nm.c    |   0
+>>  drivers/phy/{ => qcom}/phy-qcom-ufs-qmp-14nm.h    |   0
+>>  drivers/phy/{ => qcom}/phy-qcom-ufs-qmp-20nm.c    |   0
+>>  drivers/phy/{ => qcom}/phy-qcom-ufs-qmp-20nm.h    |   0
+>>  drivers/phy/{ => qcom}/phy-qcom-ufs.c             |   0
+>>  drivers/phy/rcar/Kconfig                          |  16 +
+>>  drivers/phy/rcar/Makefile                         |   2 +
+>>  drivers/phy/{ => rcar}/phy-rcar-gen2.c            |   0
+>>  drivers/phy/{ => rcar}/phy-rcar-gen3-usb2.c       |   0
+>>  drivers/phy/rockchip/Kconfig                      |  23 ++
+>>  drivers/phy/rockchip/Makefile                     |   3 +
+>>  drivers/phy/{ => rockchip}/phy-rockchip-dp.c      |   0
+>>  drivers/phy/{ => rockchip}/phy-rockchip-emmc.c    |   0
+>>  drivers/phy/{ => rockchip}/phy-rockchip-usb.c     |   0
+>>  drivers/phy/samsung/Kconfig                       |  87 +++++
+>>  drivers/phy/samsung/Makefile                      |  10 +
+>>  drivers/phy/{ => samsung}/phy-exynos-dp-video.c   |   0
+>>  drivers/phy/{ => samsung}/phy-exynos-mipi-video.c |   0
+>>  drivers/phy/{ => samsung}/phy-exynos4210-usb2.c   |   0
+>>  drivers/phy/{ => samsung}/phy-exynos4x12-usb2.c   |   0
+>>  drivers/phy/{ => samsung}/phy-exynos5-usbdrd.c    |   0
+>>  drivers/phy/{ => samsung}/phy-exynos5250-sata.c   |   0
+>>  drivers/phy/{ => samsung}/phy-exynos5250-usb2.c   |   0
+>>  drivers/phy/{ => samsung}/phy-s5pv210-usb2.c      |   0
+>>  drivers/phy/{ => samsung}/phy-samsung-usb2.c      |   0
+>>  drivers/phy/{ => samsung}/phy-samsung-usb2.h      |   0
+>>  drivers/phy/st/Kconfig                            |  51 +++
+>>  drivers/phy/st/Makefile                           |   6 +
+>>  drivers/phy/{ => st}/phy-miphy28lp.c              |   0
+>>  drivers/phy/{ => st}/phy-miphy365x.c              |   0
+>>  drivers/phy/{ => st}/phy-spear1310-miphy.c        |   0
+>>  drivers/phy/{ => st}/phy-spear1340-miphy.c        |   0
+>>  drivers/phy/{ => st}/phy-stih407-usb.c            |   0
+>>  drivers/phy/{ => st}/phy-stih41x-usb.c            |   0
+>>  drivers/phy/sunxi/Kconfig                         |  28 ++
+>>  drivers/phy/sunxi/Makefile                        |   2 +
+>>  drivers/phy/{ => sunxi}/phy-sun4i-usb.c           |   0
+>>  drivers/phy/{ => sunxi}/phy-sun9i-usb.c           |   0
+>>  drivers/phy/ti/Kconfig                            |  67 ++++
+>>  drivers/phy/ti/Makefile                           |   6 +
+>>  drivers/phy/{ => ti}/phy-dm816x-usb.c             |   0
+>>  drivers/phy/{ => ti}/phy-omap-control.c           |   0
+>>  drivers/phy/{ => ti}/phy-omap-usb2.c              |   0
+>>  drivers/phy/{ => ti}/phy-ti-pipe3.c               |   0
+>>  drivers/phy/{ => ti}/phy-tusb1210.c               |   0
+>>  drivers/phy/{ => ti}/phy-twl4030-usb.c            |   0
+>>  drivers/phy/{ => ti}/ulpi_phy.h                   |   0
+>
+> ulpi_phy.h is not specific to TI though at this point tusb1210 is the only ULPI
+> driver.
+
+Yes, you are right. But i was hesitant to add a multi-level header
+file include in the phy driver
+which uses it.
+
+Does it makes sense to move this ulpi_phy.h to include/linux/phy ?
+
+>>  71 files changed, 464 insertions(+), 416 deletions(-)
+>>  create mode 100644 drivers/phy/bcom/Kconfig
+>>  create mode 100644 drivers/phy/bcom/Makefile
+>>  rename drivers/phy/{ => bcom}/phy-bcm-cygnus-pcie.c (100%)
+>>  rename drivers/phy/{ => bcom}/phy-bcm-kona-usb2.c (100%)
+>>  rename drivers/phy/{ => bcom}/phy-brcmstb-sata.c (100%)
+>>  create mode 100644 drivers/phy/hisi/Kconfig
+>>  create mode 100644 drivers/phy/hisi/Makefile
+>>  rename drivers/phy/{ => hisi}/phy-hi6220-usb.c (100%)
+>>  rename drivers/phy/{ => hisi}/phy-hix5hd2-sata.c (100%)
+>>  create mode 100644 drivers/phy/marvell/Kconfig
+>>  create mode 100644 drivers/phy/marvell/Makefile
+>>  rename drivers/phy/{ => marvell}/phy-armada375-usb2.c (100%)
+>>  rename drivers/phy/{ => marvell}/phy-berlin-sata.c (100%)
+>>  rename drivers/phy/{ => marvell}/phy-berlin-usb.c (100%)
+>>  rename drivers/phy/{ => marvell}/phy-mvebu-sata.c (100%)
+>>  rename drivers/phy/{ => marvell}/phy-pxa-28nm-hsic.c (100%)
+>>  rename drivers/phy/{ => marvell}/phy-pxa-28nm-usb2.c (100%)
+>>  create mode 100644 drivers/phy/qcom/Kconfig
+>>  create mode 100644 drivers/phy/qcom/Makefile
+>>  rename drivers/phy/{ => qcom}/phy-qcom-apq8064-sata.c (100%)
+>>  rename drivers/phy/{ => qcom}/phy-qcom-ipq806x-sata.c (100%)
+>>  rename drivers/phy/{ => qcom}/phy-qcom-ufs-i.h (100%)
+>>  rename drivers/phy/{ => qcom}/phy-qcom-ufs-qmp-14nm.c (100%)
+>>  rename drivers/phy/{ => qcom}/phy-qcom-ufs-qmp-14nm.h (100%)
+>>  rename drivers/phy/{ => qcom}/phy-qcom-ufs-qmp-20nm.c (100%)
+>>  rename drivers/phy/{ => qcom}/phy-qcom-ufs-qmp-20nm.h (100%)
+>>  rename drivers/phy/{ => qcom}/phy-qcom-ufs.c (100%)
+>>  create mode 100644 drivers/phy/rcar/Kconfig
+>>  create mode 100644 drivers/phy/rcar/Makefile
+>>  rename drivers/phy/{ => rcar}/phy-rcar-gen2.c (100%)
+>>  rename drivers/phy/{ => rcar}/phy-rcar-gen3-usb2.c (100%)
+>>  create mode 100644 drivers/phy/rockchip/Kconfig
+>>  create mode 100644 drivers/phy/rockchip/Makefile
+>>  rename drivers/phy/{ => rockchip}/phy-rockchip-dp.c (100%)
+>>  rename drivers/phy/{ => rockchip}/phy-rockchip-emmc.c (100%)
+>>  rename drivers/phy/{ => rockchip}/phy-rockchip-usb.c (100%)
+>>  create mode 100644 drivers/phy/samsung/Kconfig
+>>  create mode 100644 drivers/phy/samsung/Makefile
+>>  rename drivers/phy/{ => samsung}/phy-exynos-dp-video.c (100%)
+>>  rename drivers/phy/{ => samsung}/phy-exynos-mipi-video.c (100%)
+>>  rename drivers/phy/{ => samsung}/phy-exynos4210-usb2.c (100%)
+>>  rename drivers/phy/{ => samsung}/phy-exynos4x12-usb2.c (100%)
+>>  rename drivers/phy/{ => samsung}/phy-exynos5-usbdrd.c (100%)
+>>  rename drivers/phy/{ => samsung}/phy-exynos5250-sata.c (100%)
+>>  rename drivers/phy/{ => samsung}/phy-exynos5250-usb2.c (100%)
+>>  rename drivers/phy/{ => samsung}/phy-s5pv210-usb2.c (100%)
+>>  rename drivers/phy/{ => samsung}/phy-samsung-usb2.c (100%)
+>>  rename drivers/phy/{ => samsung}/phy-samsung-usb2.h (100%)
+>>  create mode 100644 drivers/phy/st/Kconfig
+>>  create mode 100644 drivers/phy/st/Makefile
+>>  rename drivers/phy/{ => st}/phy-miphy28lp.c (100%)
+>>  rename drivers/phy/{ => st}/phy-miphy365x.c (100%)
+>>  rename drivers/phy/{ => st}/phy-spear1310-miphy.c (100%)
+>>  rename drivers/phy/{ => st}/phy-spear1340-miphy.c (100%)
+>>  rename drivers/phy/{ => st}/phy-stih407-usb.c (100%)
+>>  rename drivers/phy/{ => st}/phy-stih41x-usb.c (100%)
+>>  create mode 100644 drivers/phy/sunxi/Kconfig
+>>  create mode 100644 drivers/phy/sunxi/Makefile
+>>  rename drivers/phy/{ => sunxi}/phy-sun4i-usb.c (100%)
+>>  rename drivers/phy/{ => sunxi}/phy-sun9i-usb.c (100%)
+>>  create mode 100644 drivers/phy/ti/Kconfig
+>>  create mode 100644 drivers/phy/ti/Makefile
+>>  rename drivers/phy/{ => ti}/phy-dm816x-usb.c (100%)
+>>  rename drivers/phy/{ => ti}/phy-omap-control.c (100%)
+>>  rename drivers/phy/{ => ti}/phy-omap-usb2.c (100%)
+>>  rename drivers/phy/{ => ti}/phy-ti-pipe3.c (100%)
+>>  rename drivers/phy/{ => ti}/phy-tusb1210.c (100%)
+>>  rename drivers/phy/{ => ti}/phy-twl4030-usb.c (100%)
+>>  rename drivers/phy/{ => ti}/ulpi_phy.h (100%)
+>>
+>> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+>> index 26566db..80c8c68 100644
+>> --- a/drivers/phy/Kconfig
+>> +++ b/drivers/phy/Kconfig
+>> @@ -15,45 +15,6 @@ config GENERIC_PHY
+>>         phy users can obtain reference to the PHY. All the users of this
+>>         framework should select this config.
+>>
+>
+>> +menuconfig PHY_PLAT
+>> +     bool "Platform Phy drivers"
+>
+> Not really convinced about adding a new config here. This will create new
+> dependencies and will also start breaking users of oldconfig.
+
+This serves including all the directory paths in the 'make' for
+driver/phy/Makefile.
+
+Otherwise each directory will have to be built as per particular platform
+And, not all drivers of a vendor are built for one-kind of platform,
+for example, Samsung uses ARCH_EXYNOS, as well as ARCH_S5PV210
+Similarly, Broadcom phy drivers are based on multiple platforms, and so
+does Marvell's.
+
+Please suggest a concise way to include the vendor directories in the build path
+in drivers/phy/Makefile.
+
+>
+> Also not all of them are platform drivers (e.g ULPI PHY drivers).
+I Think this applies to ulpi_phy only at this moment, which we can resolve
+by moving that to include/linux path.
+
+>
+> Thanks
+> Kishon
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
+
+-- 
+Best Regards
+Vivek Gautam
+Samsung R&D Institute, Bangalore
+India
