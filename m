@@ -1,22 +1,19 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Fri, 01 Apr 2016 11:39:14 -0700
-Subject: [PATCH v15 00/20] arm64 kexec kernel patches v15
-In-Reply-To: <20160401015947.GA3835@dhcp-128-65.nay.redhat.com>
-References: <cover.1457977401.git.geoff@infradead.org>
- <20160401015947.GA3835@dhcp-128-65.nay.redhat.com>
-Message-ID: <1459535954.20121.3.camel@infradead.org>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 01 Apr 2016 14:44:01 -0400 (EDT)
+Subject: [PATCH] net: mvneta: use cache_line_size() to get cacheline size
+In-Reply-To: <1459501969-7083-1-git-send-email-jszhang@marvell.com>
+References: <1459501969-7083-1-git-send-email-jszhang@marvell.com>
+Message-ID: <20160401.144401.152232996846825369.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Jisheng Zhang <jszhang@marvell.com>
+Date: Fri, 1 Apr 2016 17:12:49 +0800
 
-On Fri, 2016-04-01 at 09:59 +0800, Dave Young wrote:
-> Geoff, for easier to review maybe you can send kexec patches first
-> then AKASHI Takahiro
-> can send the kdump patches as a standalone patchset?
+> L1_CACHE_BYTES may not be the real cacheline size, use cache_line_size
+> to determine the cacheline size in runtime.
+> 
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> Suggested-by: Marcin Wojtas <mw@semihalf.com>
 
-Marc Zyngier specifically asked for an integrated set
-of patches for easier review.  I will keep it that way
-for now.
-
--Geoff
+Applied.
