@@ -1,7 +1,7 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Thu, 31 Mar 2016 14:42:48 -0700
+Date: Thu, 31 Mar 2016 18:01:57 -0700
 Subject: [PATCH] net: thunderx: Fix broken of_node_put() code.
-Message-ID: <1459460568-2458-1-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1459472517-5696-1-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
