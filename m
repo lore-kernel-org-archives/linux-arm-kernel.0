@@ -1,117 +1,270 @@
 From: james.morse@arm.com (James Morse)
-Date: Fri,  1 Apr 2016 17:53:25 +0100
-Subject: [PATCH v7 01/16] arm64: KVM: Register CPU notifiers when the kernel
- runs at HYP
+Date: Fri,  1 Apr 2016 17:53:26 +0100
+Subject: [PATCH v7 02/16] arm64: Fold proc-macros.S into assembler.h
 In-Reply-To: <1459529620-22150-1-git-send-email-james.morse@arm.com>
 References: <1459529620-22150-1-git-send-email-james.morse@arm.com>
-Message-ID: <1459529620-22150-2-git-send-email-james.morse@arm.com>
+Message-ID: <1459529620-22150-3-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the kernel is running at EL2, it doesn't need init_hyp_mode() to
-configure page tables for HYP. This function also registers the CPU
-hotplug and lower power notifiers that cause HYP to be re-initialised
-after the CPU has been reset.
+From: Geoff Levand <geoff@infradead.org>
 
-To avoid losing the register state that controls stage2 translation, move
-the registering of these notifiers into init_subsystems(), and add a
-is_kernel_in_hyp_mode() path to each callback.
+To allow the assembler macros defined in arch/arm64/mm/proc-macros.S to
+be used outside the mm code move the contents of proc-macros.S to
+asm/assembler.h.  Also, delete proc-macros.S, and fix up all references
+to proc-macros.S.
 
-Fixes: 1e947bad0b6 ("arm64: KVM: Skip HYP setup when already running in HYP")
+Signed-off-by: Geoff Levand <geoff@infradead.org>
+Acked-by: Pavel Machek <pavel@ucw.cz>
+[rebased, included dcache_by_line_op]
 Signed-off-by: James Morse <james.morse@arm.com>
 ---
- arch/arm/kvm/arm.c | 52 +++++++++++++++++++++++++++++++++-------------------
- 1 file changed, 33 insertions(+), 19 deletions(-)
+ arch/arm64/include/asm/assembler.h | 82 ++++++++++++++++++++++++++++++-
+ arch/arm64/mm/cache.S              |  2 -
+ arch/arm64/mm/proc-macros.S        | 98 --------------------------------------
+ arch/arm64/mm/proc.S               |  3 --
+ 4 files changed, 81 insertions(+), 104 deletions(-)
+ delete mode 100644 arch/arm64/mm/proc-macros.S
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 6accd66d26f0..b5384311dec4 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -1061,15 +1061,27 @@ static void cpu_init_hyp_mode(void *dummy)
- 	kvm_arm_init_debug();
- }
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index 70f7b9e04598..c72474c2d4dc 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -1,5 +1,5 @@
+ /*
+- * Based on arch/arm/include/asm/assembler.h
++ * Based on arch/arm/include/asm/assembler.h, arch/arm/mm/proc-macros.S
+  *
+  * Copyright (C) 1996-2000 Russell King
+  * Copyright (C) 2012 ARM Ltd.
+@@ -23,6 +23,8 @@
+ #ifndef __ASM_ASSEMBLER_H
+ #define __ASM_ASSEMBLER_H
  
-+static void cpu_hyp_reinit(void)
-+{
-+	if (is_kernel_in_hyp_mode()) {
-+		/*
-+		 * cpu_init_stage2() is safe to call even if the PM
-+		 * event was cancelled before the CPU was reset.
-+		 */
-+		cpu_init_stage2(NULL);
-+	} else {
-+		if (__hyp_get_vectors() == hyp_default_vectors)
-+			cpu_init_hyp_mode(NULL);
-+	}
-+}
++#include <asm/asm-offsets.h>
++#include <asm/pgtable-hwdef.h>
+ #include <asm/ptrace.h>
+ #include <asm/thread_info.h>
+ 
+@@ -212,6 +214,84 @@ lr	.req	x30		// link register
+ 	.endm
+ 
+ /*
++ * vma_vm_mm - get mm pointer from vma pointer (vma->vm_mm)
++ */
++	.macro	vma_vm_mm, rd, rn
++	ldr	\rd, [\rn, #VMA_VM_MM]
++	.endm
 +
- static int hyp_init_cpu_notify(struct notifier_block *self,
- 			       unsigned long action, void *cpu)
- {
- 	switch (action) {
- 	case CPU_STARTING:
- 	case CPU_STARTING_FROZEN:
--		if (__hyp_get_vectors() == hyp_default_vectors)
--			cpu_init_hyp_mode(NULL);
--		break;
-+		cpu_hyp_reinit();
- 	}
- 
- 	return NOTIFY_OK;
-@@ -1084,9 +1096,8 @@ static int hyp_init_cpu_pm_notifier(struct notifier_block *self,
- 				    unsigned long cmd,
- 				    void *v)
- {
--	if (cmd == CPU_PM_EXIT &&
--	    __hyp_get_vectors() == hyp_default_vectors) {
--		cpu_init_hyp_mode(NULL);
-+	if (cmd == CPU_PM_EXIT) {
-+		cpu_hyp_reinit();
- 		return NOTIFY_OK;
- 	}
- 
-@@ -1128,6 +1139,22 @@ static int init_subsystems(void)
- 	int err;
- 
- 	/*
-+	 * Register CPU Hotplug notifier
-+	 */
-+	cpu_notifier_register_begin();
-+	err = __register_cpu_notifier(&hyp_init_cpu_nb);
-+	cpu_notifier_register_done();
-+	if (err) {
-+		kvm_err("Cannot register KVM init CPU notifier (%d)\n", err);
-+		return err;
-+	}
++/*
++ * mmid - get context id from mm pointer (mm->context.id)
++ */
++	.macro	mmid, rd, rn
++	ldr	\rd, [\rn, #MM_CONTEXT_ID]
++	.endm
 +
-+	/*
-+	 * Register CPU lower-power notifier
-+	 */
-+	hyp_cpu_pm_init();
++/*
++ * dcache_line_size - get the minimum D-cache line size from the CTR register.
++ */
++	.macro	dcache_line_size, reg, tmp
++	mrs	\tmp, ctr_el0			// read CTR
++	ubfm	\tmp, \tmp, #16, #19		// cache line size encoding
++	mov	\reg, #4			// bytes per word
++	lsl	\reg, \reg, \tmp		// actual cache line size
++	.endm
 +
-+	/*
- 	 * Init HYP view of VGIC
- 	 */
- 	err = kvm_vgic_hyp_init();
-@@ -1270,19 +1297,6 @@ static int init_hyp_mode(void)
- 	free_boot_hyp_pgd();
- #endif
++/*
++ * icache_line_size - get the minimum I-cache line size from the CTR register.
++ */
++	.macro	icache_line_size, reg, tmp
++	mrs	\tmp, ctr_el0			// read CTR
++	and	\tmp, \tmp, #0xf		// cache line size encoding
++	mov	\reg, #4			// bytes per word
++	lsl	\reg, \reg, \tmp		// actual cache line size
++	.endm
++
++/*
++ * tcr_set_idmap_t0sz - update TCR.T0SZ so that we can load the ID map
++ */
++	.macro	tcr_set_idmap_t0sz, valreg, tmpreg
++#ifndef CONFIG_ARM64_VA_BITS_48
++	ldr_l	\tmpreg, idmap_t0sz
++	bfi	\valreg, \tmpreg, #TCR_T0SZ_OFFSET, #TCR_TxSZ_WIDTH
++#endif
++	.endm
++
++/*
++ * Macro to perform a data cache maintenance for the interval
++ * [kaddr, kaddr + size)
++ *
++ * 	op:		operation passed to dc instruction
++ * 	domain:		domain used in dsb instruciton
++ * 	kaddr:		starting virtual address of the region
++ * 	size:		size of the region
++ * 	Corrupts:	kaddr, size, tmp1, tmp2
++ */
++	.macro dcache_by_line_op op, domain, kaddr, size, tmp1, tmp2
++	dcache_line_size \tmp1, \tmp2
++	add	\size, \kaddr, \size
++	sub	\tmp2, \tmp1, #1
++	bic	\kaddr, \kaddr, \tmp2
++9998:	dc	\op, \kaddr
++	add	\kaddr, \kaddr, \tmp1
++	cmp	\kaddr, \size
++	b.lo	9998b
++	dsb	\domain
++	.endm
++
++/*
++ * reset_pmuserenr_el0 - reset PMUSERENR_EL0 if PMUv3 present
++ */
++	.macro	reset_pmuserenr_el0, tmpreg
++	mrs	\tmpreg, id_aa64dfr0_el1	// Check ID_AA64DFR0_EL1 PMUVer
++	sbfx	\tmpreg, \tmpreg, #8, #4
++	cmp	\tmpreg, #1			// Skip if no PMU present
++	b.lt	9000f
++	msr	pmuserenr_el0, xzr		// Disable PMU access from EL0
++9000:
++	.endm
++
++/*
+  * Annotate a function as position independent, i.e., safe to be called before
+  * the kernel virtual mapping is activated.
+  */
+diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+index 6df07069a025..50ff9ba3a236 100644
+--- a/arch/arm64/mm/cache.S
++++ b/arch/arm64/mm/cache.S
+@@ -24,8 +24,6 @@
+ #include <asm/cpufeature.h>
+ #include <asm/alternative.h>
  
--	cpu_notifier_register_begin();
+-#include "proc-macros.S"
 -
--	err = __register_cpu_notifier(&hyp_init_cpu_nb);
+ /*
+  *	flush_icache_range(start,end)
+  *
+diff --git a/arch/arm64/mm/proc-macros.S b/arch/arm64/mm/proc-macros.S
+deleted file mode 100644
+index e6a30e1268a8..000000000000
+--- a/arch/arm64/mm/proc-macros.S
++++ /dev/null
+@@ -1,98 +0,0 @@
+-/*
+- * Based on arch/arm/mm/proc-macros.S
+- *
+- * Copyright (C) 2012 ARM Ltd.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+- */
 -
--	cpu_notifier_register_done();
+-#include <asm/asm-offsets.h>
+-#include <asm/thread_info.h>
 -
--	if (err) {
--		kvm_err("Cannot register HYP init CPU notifier (%d)\n", err);
--		goto out_err;
--	}
+-/*
+- * vma_vm_mm - get mm pointer from vma pointer (vma->vm_mm)
+- */
+-	.macro	vma_vm_mm, rd, rn
+-	ldr	\rd, [\rn, #VMA_VM_MM]
+-	.endm
 -
--	hyp_cpu_pm_init();
+-/*
+- * mmid - get context id from mm pointer (mm->context.id)
+- */
+-	.macro	mmid, rd, rn
+-	ldr	\rd, [\rn, #MM_CONTEXT_ID]
+-	.endm
 -
- 	/* set size of VMID supported by CPU */
- 	kvm_vmid_bits = kvm_get_vmid_bits();
- 	kvm_info("%d-bit VMID\n", kvm_vmid_bits);
+-/*
+- * dcache_line_size - get the minimum D-cache line size from the CTR register.
+- */
+-	.macro	dcache_line_size, reg, tmp
+-	mrs	\tmp, ctr_el0			// read CTR
+-	ubfm	\tmp, \tmp, #16, #19		// cache line size encoding
+-	mov	\reg, #4			// bytes per word
+-	lsl	\reg, \reg, \tmp		// actual cache line size
+-	.endm
+-
+-/*
+- * icache_line_size - get the minimum I-cache line size from the CTR register.
+- */
+-	.macro	icache_line_size, reg, tmp
+-	mrs	\tmp, ctr_el0			// read CTR
+-	and	\tmp, \tmp, #0xf		// cache line size encoding
+-	mov	\reg, #4			// bytes per word
+-	lsl	\reg, \reg, \tmp		// actual cache line size
+-	.endm
+-
+-/*
+- * tcr_set_idmap_t0sz - update TCR.T0SZ so that we can load the ID map
+- */
+-	.macro	tcr_set_idmap_t0sz, valreg, tmpreg
+-#ifndef CONFIG_ARM64_VA_BITS_48
+-	ldr_l	\tmpreg, idmap_t0sz
+-	bfi	\valreg, \tmpreg, #TCR_T0SZ_OFFSET, #TCR_TxSZ_WIDTH
+-#endif
+-	.endm
+-
+-/*
+- * Macro to perform a data cache maintenance for the interval
+- * [kaddr, kaddr + size)
+- *
+- * 	op:		operation passed to dc instruction
+- * 	domain:		domain used in dsb instruciton
+- * 	kaddr:		starting virtual address of the region
+- * 	size:		size of the region
+- * 	Corrupts: 	kaddr, size, tmp1, tmp2
+- */
+-	.macro dcache_by_line_op op, domain, kaddr, size, tmp1, tmp2
+-	dcache_line_size \tmp1, \tmp2
+-	add	\size, \kaddr, \size
+-	sub	\tmp2, \tmp1, #1
+-	bic	\kaddr, \kaddr, \tmp2
+-9998:	dc	\op, \kaddr
+-	add	\kaddr, \kaddr, \tmp1
+-	cmp	\kaddr, \size
+-	b.lo	9998b
+-	dsb	\domain
+-	.endm
+-
+-/*
+- * reset_pmuserenr_el0 - reset PMUSERENR_EL0 if PMUv3 present
+- */
+-	.macro	reset_pmuserenr_el0, tmpreg
+-	mrs	\tmpreg, id_aa64dfr0_el1	// Check ID_AA64DFR0_EL1 PMUVer
+-	sbfx	\tmpreg, \tmpreg, #8, #4
+-	cmp	\tmpreg, #1			// Skip if no PMU present
+-	b.lt	9000f
+-	msr	pmuserenr_el0, xzr		// Disable PMU access from EL0
+-9000:
+-	.endm
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 543f5198005a..9f6deacf41d2 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -23,13 +23,10 @@
+ #include <asm/assembler.h>
+ #include <asm/asm-offsets.h>
+ #include <asm/hwcap.h>
+-#include <asm/pgtable-hwdef.h>
+ #include <asm/pgtable.h>
+ #include <asm/cpufeature.h>
+ #include <asm/alternative.h>
+ 
+-#include "proc-macros.S"
+-
+ #ifdef CONFIG_ARM64_64K_PAGES
+ #define TCR_TG_FLAGS	TCR_TG0_64K | TCR_TG1_64K
+ #elif defined(CONFIG_ARM64_16K_PAGES)
 -- 
 2.8.0.rc3
