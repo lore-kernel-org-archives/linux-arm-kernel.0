@@ -1,43 +1,43 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 01 Apr 2016 05:23:55 +0200
-Subject: [PATCH v3 0/3] Rockchip: rk3399: Add core dtsi for rk3399
-In-Reply-To: <56FDE30D.6040008@rock-chips.com>
-References: <1456456341-14282-1-git-send-email-jay.xu@rock-chips.com>
- <1983379.kJSqISDtbX@phil> <56FDE30D.6040008@rock-chips.com>
-Message-ID: <16060533.TL0fcROj1E@phil>
+From: majun258@huawei.com (MaJun)
+Date: Fri, 1 Apr 2016 11:28:11 +0800
+Subject: [RFC PATCH] genirq: Change the non-balanced irq to balance irq when
+ the cpu of the irq bounded off line
+Message-ID: <1459481291-10136-1-git-send-email-majun258@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jianqun,
+From: Ma Jun <majun258@huawei.com>
 
-Am Freitag, 1. April 2016, 10:55:09 schrieb jay.xu:
-> After talking with xing, we plan to summit dtsi after xing's patches are
-> applied,
-> and I will update the patch for rk3399 core dtsi quickly
+When the CPU of a non-balanced irq bounded is off line, the irq will be migrated to other CPUs,
+usually the first cpu on-line.
 
-Not sure if you have seen it, but I picked up Xing's most recent clock 
-patches already [0]. So go ahead when you have time :-)
+We can suppose the situation if a system has more than one non-balanced irq.
+At extreme case, these irqs will be migrated to the same CPU and will cause the 
+CPU run with high irq pressure, even make the system die.
 
+So, I think maybe we need to change the non-balanced irq to a irq can be
+balanced to avoid the problem descried above.
 
-Heiko
+Maybe this is not a good solution for this problem, please offer me some
+suggestion if you have a better one.
 
+Signed-off-by: Ma Jun <majun258@huawei.com>
+---
+ kernel/irq/cpuhotplug.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-[0] https://git.kernel.org/cgit/linux/kernel/git/mmind/linux-rockchip.git/log/?h=v4.7-clk/next
-
-
-> On 2016?04?01? 05:48, Heiko Stuebner wrote:
-> > Hi Jianqun,
-> > 
-> > Am Dienstag, 1. M?rz 2016, 14:39:58 schrieb Jianqun Xu:
-> >> There is the new SoCs from Rockchip which named rk3399, the
-> >> patches are added to support them.
-> > 
-> > is this still valid or does it need an update?
-> > The clock-series from Xing saw changes, so I'm guessing the devicetree
-> > side might also need some update?
-> > 
-> > Especially an actual board-file would be nice ;-) .
-> > 
-> > 
-> > Thanks
-> > Heiko
+diff --git a/kernel/irq/cpuhotplug.c b/kernel/irq/cpuhotplug.c
+index 011f8c4..80d54a5 100644
+--- a/kernel/irq/cpuhotplug.c
++++ b/kernel/irq/cpuhotplug.c
+@@ -30,6 +30,8 @@ static bool migrate_one_irq(struct irq_desc *desc)
+ 		return false;
+ 
+ 	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids) {
++		if (irq_settings_has_no_balance_set(desc))
++			irqd_clear(d, IRQD_NO_BALANCING);
+ 		affinity = cpu_online_mask;
+ 		ret = true;
+ 	}
+-- 
+1.7.1
