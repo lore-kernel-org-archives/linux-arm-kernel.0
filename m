@@ -1,282 +1,80 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 1 Apr 2016 13:18:20 +0100
-Subject: [PATCH 3/4] perf: xgene: Add APM X-Gene SoC Performance
- Monitoring Unit driver
-In-Reply-To: <1459467472-31561-4-git-send-email-ttnguyen@apm.com>
+Date: Fri, 1 Apr 2016 13:30:01 +0100
+Subject: [PATCH 2/4] Documentation: Add documentation for APM X-Gene SoC
+ PMU DTS binding
+In-Reply-To: <1459467472-31561-3-git-send-email-ttnguyen@apm.com>
 References: <1459467472-31561-1-git-send-email-ttnguyen@apm.com>
- <1459467472-31561-4-git-send-email-ttnguyen@apm.com>
-Message-ID: <20160401121820.GB29876@leverpostej>
+ <1459467472-31561-3-git-send-email-ttnguyen@apm.com>
+Message-ID: <20160401123000.GC29876@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-I haven't reviewed this in great detail, but I spotted a few issues.
+As per Documentation/devicetree/bindings/submitting-patches.txt, please
+put binding patches earlier in a series than the code using them.
 
-> +static int get_next_avail_cntr(struct xgene_pmu_dev *pmu_dev)
-> +{
-> +	int shift, cntr, retval;
-> +	unsigned long flags;
+On Thu, Mar 31, 2016 at 04:37:50PM -0700, Tai Nguyen wrote:
+> Documentation: Add documentation for APM X-Gene SoC PMU DTS binding
+> 
+> Signed-off-by: Tai Nguyen <ttnguyen@apm.com>
+> ---
+>  .../devicetree/bindings/perf/apm-xgene-pmu.txt     | 116 +++++++++++++++++++++
+>  1 file changed, 116 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/perf/apm-xgene-pmu.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/perf/apm-xgene-pmu.txt b/Documentation/devicetree/bindings/perf/apm-xgene-pmu.txt
+> new file mode 100644
+> index 0000000..40dfd4e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/perf/apm-xgene-pmu.txt
+> @@ -0,0 +1,116 @@
+> +* APM X-Gene SoC PMU bindings
 > +
-> +	raw_spin_lock_irqsave(&pmu_dev->lock, flags);
+> +This is APM X-Gene SoC PMU (Performance Monitoring Unit) module.
+> +The following PMU devices are supported:
 > +
-> +	for (cntr = 0; cntr < pmu_dev->max_counters; cntr++) {
-> +		shift = cntr;
-> +		if (!(pmu_dev->cntr_assign_mask & (1ULL << shift))) {
-> +			pmu_dev->cntr_assign_mask |= (1ULL << shift);
-> +			retval = cntr;
-> +			goto out;
-> +		}
-> +	}
-> +	retval = -ENOSPC;
+> +  L3C			- L3 cache controller
+> +  IOB			- IO bridge
+> +  MCB			- Memory controller bridge
+> +  MC			- Memory controller
 
-Please use a bitmask. Then you can do something like:
+These sound like separate units. How do these relate?
 
-        cntr = find_first_zero_bit(pmu_dev->cntr_assign_mask, 
-                                   pmu_dev->max_counters);
-        if (cntr == pmu_dev->max_counters)
-                return -ENOSPC;
-        set_bit(cntr, pmu_dev->cntr_assign_mask);
-        return cntr;
-
-Are the spinlocks necessary? 
-
-I thought add and del couldn't be called in parallel for the same
-context, and those are the only users of this mask.
-
-> +
-> +out:
-> +	raw_spin_unlock_irqrestore(&pmu_dev->lock, flags);
-> +
-> +	return retval;
-> +}
-> +
-> +static int clear_avail_cntr(struct xgene_pmu_dev *pmu_dev, u8 cntr)
-> +{
-> +	unsigned long flags;
-> +	int shift;
-> +
-> +	if (cntr > pmu_dev->max_counters)
-> +		return -EINVAL;
-
-This implies we have an event we tried to del, which didn't have a
-counter. Surely we should never have added the event in that case, and
-this should never happen?
+Is there an SOC-wide PMU that aggregates counters, or are these actually
+independent?
 
 > +
-> +	shift = cntr;
+> +The following section describes the SoC PMU DT node binding.
 > +
-> +	raw_spin_lock_irqsave(&pmu_dev->lock, flags);
-> +	pmu_dev->cntr_assign_mask &= ~(1ULL << shift);
+> +Required properties:
+> +- compatible		: Shall be "apm,xgene-pmu" for revision 1 or
+> +                          "apm,xgene-pmu-v2" for revision 2.
 
-clear_bit(cntr, pmu_dev->cntr_assign_mask);
+That name is very general. Is there not a more specific name for the SOC
+PMU?
 
-> +	raw_spin_unlock_irqrestore(&pmu_dev->lock, flags);
+> +Required properties for L3C subnode:
+> +- compatible		: Shall be "apm,xgene-pmu-l3c".
+> +- reg			: First resource shall be the L3C PMU resource.
+> +- index			: Instance number of the L3C PMU.
 > +
-> +	return 0;
-> +}
-
-[...]
-
-> +static int xgene_perf_event_init(struct perf_event *event)
-> +{
-> +	struct xgene_pmu_dev *pmu_dev = to_pmu_dev(event->pmu);
-> +	struct hw_perf_event *hwc = &event->hw;
-> +	u64 config, config1;
+> +Required properties for IOB subnode:
+> +- compatible		: Shall be "apm,xgene-pmu-iob".
+> +- reg			: First resource shall be the IOB PMU resource.
+> +- index			: Instance number of the IOB PMU.
 > +
-> +	/* test the event attr type check for PMU enumeration */
-> +	if (event->attr.type != event->pmu->type)
-> +		return -ENOENT;
+> +Required properties for MCB subnode:
+> +- compatible		: Shall be "apm,xgene-pmu-mcb".
+> +- reg			: First resource shall be the MCB PMU resource.
+> +- index			: Instance number of the MCB PMU.
 > +
-> +	/*
-> +	 * SOC PMU counters are shared across all cores.
-> +	 * Therefore, it does not support per-process mode.
-> +	 * Also, it does not support event sampling mode.
-> +	 */
-> +	if (is_sampling_event(event) || event->attach_state & PERF_ATTACH_TASK)
-> +		return -EINVAL;
-> +
-> +	/* SOC counters do not have usr/os/guest/host bits */
-> +	if (event->attr.exclude_user || event->attr.exclude_kernel ||
-> +	    event->attr.exclude_host || event->attr.exclude_guest)
-> +		return -EINVAL;
-> +
-> +	if (event->cpu < 0)
-> +		return -EINVAL;
+> +Required properties for MC subnode:
+> +- compatible		: Shall be "apm,xgene-pmu-mc".
+> +- reg			: First resource shall be the MC PMU resource.
+> +- index			: Instance number of the MC PMU.
 
-We should really have this made common for system PMUs (e.g. librify
-it). Every driver does something subtly different, and isn't kept in
-sync with new core feature addition.
-
-Even if you're happy to accept a request made with any event->cpu,
-you'll need to forcefully override that and ensure that all events are
-in the same percpu context.
-
-See what we do in drivers/bus/arm-ccn.c.
-
-> +
-> +	if (event->pmu != &pmu_dev->pmu)
-> +		return -ENOENT;
-
-If this does need to be checked, we should so so when checking the type
-above.
-
-However, the PMU should have a unique type anyway, so the type being the
-same should imply this is true anyway.
-
-> +
-> +	if (pmu_dev) {
-> +		config = event->attr.config;
-> +		config1 = event->attr.config1;
-> +	} else {
-> +		return -EINVAL;
-> +	}
-> +
-
-How can the else case ever occur? All other PMUs have been filtered away
-by this point.
-
-> +	if (pmu_dev->max_counters == 0)
-> +		return -EINVAL;
-
-Why bother registering the PMU device at all in this case?
-
-> +
-> +	hwc->config = config;
-> +	if (config1)
-> +		hwc->extra_reg.config = config1;
-> +	else
-> +		/* Enable all Agents */
-> +		hwc->extra_reg.config = 0xFFFFFFFFFFFFFFFFULL;
-
-I'm not sure I follow what's going on here.
-
-It would be good to document precisely what this means.
-
-[...]
-
-> +static int xgene_init_events_attrs(struct xgene_pmu_dev *pmu_dev,
-> +				   struct xgene_pmu_dev_event_desc *event_desc)
-> +{
-> +	struct attribute_group *attr_group;
-> +	struct attribute **attrs;
-> +	int i = 0, j;
-> +
-> +	while (event_desc[i].attr.attr.name)
-> +		i++;
-> +
-> +	attr_group = devm_kzalloc(pmu_dev->parent->dev,
-> +			sizeof(struct attribute *) * (i + 1)
-> +			+ sizeof(*attr_group), GFP_KERNEL);
-> +	if (!attr_group)
-> +		return -ENOMEM;
-> +
-> +	attrs = (struct attribute **)(attr_group + 1);
-> +	for (j = 0; j < i; j++)
-> +		attrs[j] = &event_desc[j].attr.attr;
-> +
-> +	attr_group->name = "events";
-> +	attr_group->attrs = attrs;
-> +	pmu_dev->events_group = attr_group;
-> +
-> +	return 0;
-> +}
-
-I don't think this needs to be dynamic. See what we do in
-drivers/bus/arm-cci.c with CCI_EXT_ATTR_ENTRY for a simple way of
-initialising the attribute pointer array at compile time.
-
-With that, you don't need any dynamic allocation or initialisation here.
-
-> +static void xgene_perf_pmu_init(struct xgene_pmu_dev *pmu_dev)
-> +{
-> +	pmu_dev->pmu.event_init	= xgene_perf_event_init;
-> +	pmu_dev->pmu.add	= xgene_perf_add;
-> +	pmu_dev->pmu.del	= xgene_perf_del;
-> +	pmu_dev->pmu.start	= xgene_perf_start;
-> +	pmu_dev->pmu.stop	= xgene_perf_stop;
-> +	pmu_dev->pmu.read	= xgene_perf_read;
-> +}
-
-You'll also need to set the task_ctx_nr to perf_invalid_context, as this
-is a system PMU rather than something that can profile tasks or
-individual CPUs.
-
-> +static irqreturn_t _xgene_pmu_isr(int irq, struct xgene_pmu_dev *pmu_dev)
-> +{
-> +	struct perf_event *event = NULL;
-> +	struct perf_sample_data data;
-> +	struct xgene_pmu *xgene_pmu;
-> +	struct hw_perf_event *hwc;
-> +	struct pt_regs *regs;
-
-This is _not_ a CPU PMU. There are no relevant pt_rregs.
-
-> +	int idx;
-> +	u32 val;
-> +
-> +	/* Get interrupt counter source */
-> +	val = readl(pmu_dev->inf->csr + PMU_PMOVSR);
-> +	idx = ffs(val) - 1;
-> +	if (!(val & PMU_OVERFLOW_MASK))
-> +		goto out;
-> +	event = pmu_dev->pmu_counter_event[idx];
-> +
-> +	/*
-> +	 * Handle the counter(s) overflow(s)
-> +	 */
-> +	regs = get_irq_regs();
-
-As above, this is irrelevant.
-
-> +
-> +	/* Ignore if we don't have an event. */
-> +	if (!event)
-> +		goto out;
-> +
-> +	hwc = &event->hw;
-> +
-> +	xgene_perf_event_update(event, hwc, idx);
-> +	perf_sample_data_init(&data, 0, hwc->last_period);
-> +	if (!xgene_perf_event_set_period(event, hwc, idx))
-> +		goto out;
-> +
-> +	if (perf_event_overflow(event, &data, regs))
-> +		xgene_perf_disable_event(event);
-
-perf_event_overflow skips non-sampling events (i.e. all events this PMU
-is capable of), and always returns 0, so the regs aren't even used at
-all...
-
-This can/should go.
-
-[...]
-
-> +static int xgene_pmu_probe_active_mcb_mcu(struct xgene_pmu *xgene_pmu,
-> +					  struct platform_device *pdev)
-> +{
-> +	if (efi_enabled(EFI_BOOT))
-> +		return acpi_pmu_probe_active_mcb_mcu(xgene_pmu, pdev);
-> +	else
-> +		return fdt_pmu_probe_active_mcb_mcu(xgene_pmu, pdev);
-> +}
-
-EFI has _nothing_ to do with ACPI here.
-
-EFI != ACPI; ECI && !ACPI is possible.
-
-Check whether you have an of_node or an acpi companion device.
-
-> +static int xgene_pmu_probe_pmu_dev(struct xgene_pmu *xgene_pmu,
-> +				   struct platform_device *pdev)
-> +{
-> +	if (efi_enabled(EFI_BOOT))
-> +		return acpi_pmu_probe_pmu_dev(xgene_pmu, pdev);
-> +	else
-> +		return fdt_pmu_probe_pmu_dev(xgene_pmu, pdev);
-> +}
-
-Likewise.
+What's the index property useful for?
 
 Thanks,
 Mark.
