@@ -1,136 +1,58 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 1 Apr 2016 13:16:46 +0700
-Subject: [PATCH v15 15/20] arm64: kdump: reserve memory for crash dump
- kernel
-In-Reply-To: <20160331071903.GB2267@linaro.org>
-References: <cover.1457977401.git.geoff@infradead.org>
- <1083d7e4a6285c39d2955fb99dc9fa4c345d00fa.1457977403.git.geoff@infradead.org>
- <56EC441E.2040606@arm.com> <20160331071903.GB2267@linaro.org>
-Message-ID: <56FE124E.5000004@linaro.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 01 Apr 2016 15:57:44 +0900
+Subject: [PATCH 01/11] ARM: dts: exynos: Fix DTC unit name warnings in
+ cros-adc-thermistors
+Message-ID: <1459493874-2366-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/31/2016 02:19 PM, AKASHI Takahiro wrote:
-> On Fri, Mar 18, 2016 at 06:08:30PM +0000, James Morse wrote:
->> Hi!
->>
->> On 14/03/16 17:48, Geoff Levand wrote:
->>> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
->>>
->>> On the startup of primary kernel, the memory region used by crash dump
->>> kernel must be specified by "crashkernel=" kernel parameter.
->>> reserve_crashkernel() will allocate and reserve the region for later use.
->>>
->>> User space tools, like kexec-tools, will be able to find that region marked
->>> as "Crash kernel" in /proc/iomem.
->>
->> [NB: Re-ordered diff hunks ]
->>
->>> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
->>> index 7802f21..4edf181 100644
->>> --- a/arch/arm64/mm/init.c
->>> +++ b/arch/arm64/mm/init.c
->>> @@ -171,6 +229,8 @@ void __init arm64_memblock_init(void)
->>>   		memblock_reserve(__virt_to_phys(initrd_start), initrd_end - initrd_start);
->>>   #endif
->>>
->>> +	reserve_crashkernel();
->>> +
->>>   	early_init_fdt_scan_reserved_mem();
->>>
->>>   	/* 4GB maximum for 32-bit only capable devices */
->>>
->>
->>
->> This is 'nit' territory, but if you were to make this:
->>> 	if (IS_ENABLED(CONFIG_KEXEC_CORE))
->>> 		reserve_crashkernel();
->>
->> then the #ifdefs around reserve_crashkernel() can go, and the compiler will work
->> out that this static function can be optimised out. It also means the
->> compiler performs its checks, even if CONFIG_KEXEC_CORE isn't selected. The same
->> trick can be applied in patch 18 (around reserve_elfcorehdr()).
-> 
-> It will also make the code more understandable.
+Fix following DTC warnings in cros-adc-thermistors:
+Warning (unit_address_vs_reg): Node /adc at 12D10000/ncp15wb473 at 3 has a unit name, but no reg property
+Warning (unit_address_vs_reg): Node /adc at 12D10000/ncp15wb473 at 4 has a unit name, but no reg property
+Warning (unit_address_vs_reg): Node /adc at 12D10000/ncp15wb473 at 5 has a unit name, but no reg property
+Warning (unit_address_vs_reg): Node /adc at 12D10000/ncp15wb473 at 6 has a unit name, but no reg property
 
-I tried this change, but
-unfortunately, preserve_crashkernel() calls an external function, parse_crashkernel(),
-which is defined only if CONFIG_KEXEC_CORE. So we will see a compiler error in !CONFIG_KEXEC_CORE
-if we take #ifdef out around perserve_crashkernel().
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ arch/arm/boot/dts/cros-adc-thermistors.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
--Takahiro AKASHI
-
-
-> Thanks,
-> -Takahiro AKASHI
-> 
->>> @@ -66,6 +67,63 @@ static int __init early_initrd(char *p)
->>>   early_param("initrd", early_initrd);
->>>   #endif
->>>   
->>> +#ifdef CONFIG_KEXEC_CORE
->>> +/*
->>> + * reserve_crashkernel() - reserves memory for crash kernel
->>> + *
->>> + * This function reserves memory area given in "crashkernel=" kernel command
->>> + * line parameter. The memory reserved is used by dump capture kernel when
->>> + * primary kernel is crashing.
->>> + */
->>> +static void __init reserve_crashkernel(void)
->>> +{
->>> +	unsigned long long crash_size = 0, crash_base = 0;
->>> +	int ret;
->>> +
->>> +	ret = parse_crashkernel(boot_command_line, memblock_phys_mem_size(),
->>> +				&crash_size, &crash_base);
->>> +	if (ret)
->>> +		return;
->>> +
->>> +	if (crash_base == 0) {
->>> +		crash_base = memblock_find_in_range(0,
->>> +				MEMBLOCK_ALLOC_ACCESSIBLE, crash_size, 1 << 21);
->>> +		if (crash_base == 0) {
->>> +			pr_warn("Unable to allocate crashkernel (size:%llx)\n",
->>> +				crash_size);
->>> +			return;
->>> +		}
->>> +		memblock_reserve(crash_base, crash_size);
->>> +
->>> +	} else {
->>> +		/* User specifies base address explicitly. */
->>> +		if (!memblock_is_region_memory(crash_base, crash_size) ||
->>> +			memblock_is_region_reserved(crash_base, crash_size)) {
->>> +			pr_warn("crashkernel has wrong address or size\n");
->>> +			return;
->>> +		}
->>> +
->>> +		if (crash_base & ((1 << 21) - 1)) {
->>> +			pr_warn("crashkernel base address is not 2MB aligned\n");
->>> +			return;
->>> +		}
->>> +
->>> +		memblock_reserve(crash_base, crash_size);
->>> +	}
->>> +
->>> +	pr_info("Reserving %lldMB of memory at %lldMB for crashkernel\n",
->>> +		crash_size >> 20, crash_base >> 20);
->>> +
->>> +	crashk_res.start = crash_base;
->>> +	crashk_res.end = crash_base + crash_size - 1;
->>> +}
->>> +#else
->>> +static void __init reserve_crashkernel(void)
->>> +{
->>> +	;
->>> +}
->>> +#endif /* CONFIG_KEXEC_CORE */
->>> +
->>>   /*
->>>    * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
->>>    * currently assumes that for memory starting above 4G, 32-bit devices will
->>
->>
->> Thanks,
->>
->> James
->>
+diff --git a/arch/arm/boot/dts/cros-adc-thermistors.dtsi b/arch/arm/boot/dts/cros-adc-thermistors.dtsi
+index acd4fe1833f2..87e676917603 100644
+--- a/arch/arm/boot/dts/cros-adc-thermistors.dtsi
++++ b/arch/arm/boot/dts/cros-adc-thermistors.dtsi
+@@ -13,28 +13,28 @@
+ */
+ 
+ &adc {
+-	ncp15wb473 at 3 {
++	ncp15wb473_3 {
+ 		compatible = "murata,ncp15wb473";
+ 		pullup-uv = <1800000>;
+ 		pullup-ohm = <47000>;
+ 		pulldown-ohm = <0>;
+ 		io-channels = <&adc 3>;
+ 	};
+-	ncp15wb473 at 4 {
++	ncp15wb473_4 {
+ 		compatible = "murata,ncp15wb473";
+ 		pullup-uv = <1800000>;
+ 		pullup-ohm = <47000>;
+ 		pulldown-ohm = <0>;
+ 		io-channels = <&adc 4>;
+ 	};
+-	ncp15wb473 at 5 {
++	ncp15wb473_5 {
+ 		compatible = "murata,ncp15wb473";
+ 		pullup-uv = <1800000>;
+ 		pullup-ohm = <47000>;
+ 		pulldown-ohm = <0>;
+ 		io-channels = <&adc 5>;
+ 	};
+-	ncp15wb473 at 6 {
++	ncp15wb473_6 {
+ 		compatible = "murata,ncp15wb473";
+ 		pullup-uv = <1800000>;
+ 		pullup-ohm = <47000>;
+-- 
+2.5.0
