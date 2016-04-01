@@ -1,36 +1,60 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri,  1 Apr 2016 08:52:56 +0100
-Subject: [PATCH v3 1/3] libahci: save port map for forced port map
+Date: Fri,  1 Apr 2016 08:52:57 +0100
+Subject: [PATCH v3 2/3] ata: ahci-platform: Add ports-implemented DT bindings.
 In-Reply-To: <1459497178-31090-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1459497178-31090-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1459497178-31090-2-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1459497178-31090-3-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In usecases where force_port_map is used saved_port_map is never set,
-resulting in not programming the PORTS_IMPL register as part of initial
-config. This patch fixes this by setting it to port_map even in case
-where force_port_map is used, making it more inline with other parts of
-the code.
+On some SOCs PORTS_IMPL register value is never programmed by the
+firmware and left at zero value. Which means that no sata ports are
+available for software. AHCI driver used to cope up with this by
+fabricating the port_map if the PORTS_IMPL register is read zero,
+but recent patch broke this workaround as zero value was valid for
+NVMe disks.
 
+This patch adds ports-implemented DT bindings as workaround for this issue
+in a way that DT can can override the PORTS_IMPL register in cases where
+the firmware did not program it already.
+
+Fixes: 566d1827df2e ("libata: disable forced PORTS_IMPL for >= AHCI 1.3)
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Acked-by: Tejun Heo <tj@kernel.org>
 Reviewed-by: Andy Gross <andy.gross@linaro.org>
 ---
- drivers/ata/libahci.c | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/devicetree/bindings/ata/ahci-platform.txt | 4 ++++
+ drivers/ata/ahci_platform.c                             | 3 +++
+ 2 files changed, 7 insertions(+)
 
-diff --git a/drivers/ata/libahci.c b/drivers/ata/libahci.c
-index 3982054..a5d7c1c 100644
---- a/drivers/ata/libahci.c
-+++ b/drivers/ata/libahci.c
-@@ -507,6 +507,7 @@ void ahci_save_initial_config(struct device *dev, struct ahci_host_priv *hpriv)
- 		dev_info(dev, "forcing port_map 0x%x -> 0x%x\n",
- 			 port_map, hpriv->force_port_map);
- 		port_map = hpriv->force_port_map;
-+		hpriv->saved_port_map = port_map;
- 	}
+diff --git a/Documentation/devicetree/bindings/ata/ahci-platform.txt b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+index 30df832..87adfb2 100644
+--- a/Documentation/devicetree/bindings/ata/ahci-platform.txt
++++ b/Documentation/devicetree/bindings/ata/ahci-platform.txt
+@@ -32,6 +32,10 @@ Optional properties:
+ - target-supply     : regulator for SATA target power
+ - phys              : reference to the SATA PHY node
+ - phy-names         : must be "sata-phy"
++- ports-implemented : Mask that indicates which ports that the HBA supports
++		      are available for software to use. Useful if PORTS_IMPL
++		      is not programmed by the BIOS, which is true with
++		      some embedded SOC's.
  
- 	if (hpriv->mask_port_map) {
+ Required properties when using sub-nodes:
+ - #address-cells    : number of cells to encode an address
+diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
+index 4044233..62a04c8 100644
+--- a/drivers/ata/ahci_platform.c
++++ b/drivers/ata/ahci_platform.c
+@@ -51,6 +51,9 @@ static int ahci_probe(struct platform_device *pdev)
+ 	if (rc)
+ 		return rc;
+ 
++	of_property_read_u32(dev->of_node,
++			     "ports-implemented", &hpriv->force_port_map);
++
+ 	if (of_device_is_compatible(dev->of_node, "hisilicon,hisi-ahci"))
+ 		hpriv->flags |= AHCI_HFLAG_NO_FBS | AHCI_HFLAG_NO_NCQ;
+ 
 -- 
 2.5.0
