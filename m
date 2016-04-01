@@ -1,76 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 1 Apr 2016 09:01:15 -0700
-Subject: [GIT PULL] omap fixes against v4.6-rc1
-Message-ID: <20160401160115.GM9329@atomide.com>
+From: david@lechnology.com (David Lechner)
+Date: Fri, 1 Apr 2016 11:02:23 -0500
+Subject: [PATCH v2 06/11] phy: da8xx-usb: new driver for DA8XX SoC USB PHY
+In-Reply-To: <20160401144510.GA6264@uda0271908>
+References: <1458181615-27782-1-git-send-email-david@lechnology.com>
+ <1458181615-27782-7-git-send-email-david@lechnology.com>
+ <56FE74AC.6080303@ti.com> <20160401144510.GA6264@uda0271908>
+Message-ID: <56FE9B8F.7050605@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+On 04/01/2016 09:45 AM, Bin Liu wrote:
+>>> +EXPORT_SYMBOL_GPL(da8xx_usb20_phy_set_mode);
+>>
+>> Don't prefer export symbols from PHY driver. That'll create unnecessary
+>> dependencies between the controller and the PHY.
+>
+> Agreed.
+>
+>>
+>> I think it'll be better to create a new attribute and use it?
+>
+> Another simpler option is to not support _set_mode() for DA8xx, and the
+> phy driver set the otgmode bit in probe() based on dr_mode of the
+> controller.
+>
+> Regards,
+> -Bin.
+>
 
-  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+This certainly works for my particular use case, however, Sergei 
+Shtylyov, who wrote the da8xx musb glue layer originally, seemed to 
+recall in his review of the patch series that this really is necessary 
+for OTG mode to work properly.
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.6/fixes-rc1
-
-for you to fetch changes up to 6f40fed1c911f218e1e189a404b26ef19effabb5:
-
-  ARM: dts: am335x-baltos-ir5221: fix cpsw_emac0 link type (2016-03-30 14:33:22 -0700)
-
-----------------------------------------------------------------
-Fixes for omaps against v4.6-rc1. Mostly minor fixes for the newer
-SoCs with few board fixes and a fix for a long time hwmod bug:
-
-- Fix cpsw_emac0 link type for baltos-ir5221
-
-- Fix interrupt type for TWD
-
-- Fix edma memcpy channel allocation for am43x
-
-- Fix am43x-epos sycntimer32k by using the correct assigned clock
-
-- Fix interconnect barrier for dra7
-
-- Fix a long time hwmod bug for updating sysconfig register properly
-
-- Fix flakey booting on dm814x where USB reset needs a delay
-
-And there is one minor change that is not strictly a fix, but is
-good to have for proper hardware detection:
-
-- Detect dra7 silicon revision 2.0 properly
-
-----------------------------------------------------------------
-Jon Hunter (1):
-      ARM: OMAP: Correct interrupt type for ARM TWD
-
-Lokesh Vutla (2):
-      ARM: OMAP2+: hwmod: Fix updating of sysconfig register
-      ARM: dts: AM43x-epos: Fix clk parent for synctimer
-
-Nishanth Menon (1):
-      ARM: OMAP2: Fix up interconnect barrier initialization for DRA7
-
-Tero Kristo (1):
-      ARM: dts: am43xx: fix edma memcpy channel allocation
-
-Tony Lindgren (2):
-      ARM: OMAP2+: Use srst_udelay for USB on dm814x
-      Merge tag 'for-v4.6-rc/omap-fixes-a' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v4.6/fixes
-
-Vishal Mahaveer (1):
-      ARM: DRA722: Add ID detect for Silicon Rev 2.0
-
-Yegor Yefremov (1):
-      ARM: dts: am335x-baltos-ir5221: fix cpsw_emac0 link type
-
- arch/arm/boot/dts/am335x-baltos-ir5221.dts | 5 ++++-
- arch/arm/boot/dts/am4372.dtsi              | 2 +-
- arch/arm/boot/dts/am43x-epos-evm.dts       | 5 +++++
- arch/arm/boot/dts/omap4.dtsi               | 2 +-
- arch/arm/mach-omap2/id.c                   | 4 ++--
- arch/arm/mach-omap2/io.c                   | 1 +
- arch/arm/mach-omap2/omap_hwmod.c           | 8 ++++----
- arch/arm/mach-omap2/omap_hwmod_81xx_data.c | 2 ++
- arch/arm/mach-omap2/soc.h                  | 1 +
- 9 files changed, 21 insertions(+), 9 deletions(-)
+By the way, there is v3 of this patch series already, although this 
+patch is nearly the same.
