@@ -1,82 +1,100 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 01 Apr 2016 15:57:50 +0900
-Subject: [PATCH 07/11] ARM: dts: exynos: Fix DTC unit name warnings in
- Exynos542x
+Date: Fri, 01 Apr 2016 15:57:54 +0900
+Subject: [PATCH 11/11] ARM: dts: s5p: Fix DTC unit name warnings in S5Pv210
+ boards
 In-Reply-To: <1459493874-2366-1-git-send-email-k.kozlowski@samsung.com>
 References: <1459493874-2366-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1459493874-2366-7-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1459493874-2366-11-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix following DTC warnings in all Exynos542x/5800 boards:
+Fix following DTC warnings in S5Pv210 boards:
 
-Warning (unit_address_vs_reg): Node /video-phy at 10040728 has a unit name, but no reg property
-Warning (unit_address_vs_reg): Node /video-phy at 10040714 has a unit name, but no reg property
-Warning (unit_address_vs_reg): Node /usb at 12000000 has a unit name, but no reg property
-Warning (unit_address_vs_reg): Node /usb at 12000000/dwc3 has a reg or ranges property, but no unit name
-Warning (unit_address_vs_reg): Node /usb at 12400000 has a unit name, but no reg property
-Warning (unit_address_vs_reg): Node /usb at 12400000/dwc3 has a reg or ranges property, but no unit name
+Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+Warning (unit_address_vs_reg): Node /soc/fimd at f8000000/display-timings/timing at 0 has a unit name, but no reg property
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- arch/arm/boot/dts/exynos5420.dtsi | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/s5pv210-aquila.dts   | 2 +-
+ arch/arm/boot/dts/s5pv210-goni.dts     | 2 +-
+ arch/arm/boot/dts/s5pv210-smdkc110.dts | 2 +-
+ arch/arm/boot/dts/s5pv210-smdkv210.dts | 4 ++--
+ arch/arm/boot/dts/s5pv210-torbreck.dts | 2 +-
+ 5 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index 7b99cb58d82d..ef9fa31e916a 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -551,13 +551,13 @@
- 		clock-names = "timers";
+diff --git a/arch/arm/boot/dts/s5pv210-aquila.dts b/arch/arm/boot/dts/s5pv210-aquila.dts
+index da24ab570b0e..d763c5b4c65d 100644
+--- a/arch/arm/boot/dts/s5pv210-aquila.dts
++++ b/arch/arm/boot/dts/s5pv210-aquila.dts
+@@ -29,7 +29,7 @@
+ 		bootargs = "console=ttySAC2,115200n8 root=/dev/mmcblk1p5 rw rootwait ignore_loglevel earlyprintk";
  	};
  
--	dp_phy: video-phy at 10040728 {
-+	dp_phy: dp-video-phy {
- 		compatible = "samsung,exynos5420-dp-video-phy";
- 		samsung,pmu-syscon = <&pmu_system_controller>;
- 		#phy-cells = <0>;
+-	memory {
++	memory at 30000000 {
+ 		device_type = "memory";
+ 		reg = <0x30000000 0x05000000
+ 			0x40000000 0x18000000>;
+diff --git a/arch/arm/boot/dts/s5pv210-goni.dts b/arch/arm/boot/dts/s5pv210-goni.dts
+index 0a33d402138e..c56f51ee7897 100644
+--- a/arch/arm/boot/dts/s5pv210-goni.dts
++++ b/arch/arm/boot/dts/s5pv210-goni.dts
+@@ -29,7 +29,7 @@
+ 		bootargs = "console=ttySAC0,115200n8 root=/dev/mmcblk0p5 rw rootwait ignore_loglevel earlyprintk";
  	};
  
--	mipi_phy: video-phy at 10040714 {
-+	mipi_phy: mipi-video-phy {
- 		compatible = "samsung,s5pv210-mipi-video-phy";
- 		syscon = <&pmu_system_controller>;
- 		#phy-cells = <1>;
-@@ -913,7 +913,7 @@
- 		clock-names = "secss";
+-	memory {
++	memory at 30000000 {
+ 		device_type = "memory";
+ 		reg = <0x30000000 0x05000000
+ 			0x40000000 0x10000000
+diff --git a/arch/arm/boot/dts/s5pv210-smdkc110.dts b/arch/arm/boot/dts/s5pv210-smdkc110.dts
+index 1eedab7ffe94..5d14da911aa5 100644
+--- a/arch/arm/boot/dts/s5pv210-smdkc110.dts
++++ b/arch/arm/boot/dts/s5pv210-smdkc110.dts
+@@ -29,7 +29,7 @@
+ 		bootargs = "console=ttySAC0,115200n8 root=/dev/mmcblk0p1 rw rootwait ignore_loglevel earlyprintk";
  	};
  
--	usbdrd3_0: usb at 12000000 {
-+	usbdrd3_0: usb3_0 {
- 		compatible = "samsung,exynos5250-dwusb3";
- 		clocks = <&clock CLK_USBD300>;
- 		clock-names = "usbdrd30";
-@@ -921,7 +921,7 @@
- 		#size-cells = <1>;
- 		ranges;
- 
--		usbdrd_dwc3_0: dwc3 {
-+		usbdrd_dwc3_0: dwc3 at 12000000 {
- 			compatible = "snps,dwc3";
- 			reg = <0x12000000 0x10000>;
- 			interrupts = <0 72 0>;
-@@ -939,7 +939,7 @@
- 		#phy-cells = <1>;
+-	memory {
++	memory@20000000 {
+ 		device_type = "memory";
+ 		reg = <0x20000000 0x20000000>;
+ 	};
+diff --git a/arch/arm/boot/dts/s5pv210-smdkv210.dts b/arch/arm/boot/dts/s5pv210-smdkv210.dts
+index 54fcc3fc82e2..75398318ed57 100644
+--- a/arch/arm/boot/dts/s5pv210-smdkv210.dts
++++ b/arch/arm/boot/dts/s5pv210-smdkv210.dts
+@@ -29,7 +29,7 @@
+ 		bootargs = "console=ttySAC0,115200n8 root=/dev/mmcblk0p1 rw rootwait ignore_loglevel earlyprintk";
  	};
  
--	usbdrd3_1: usb at 12400000 {
-+	usbdrd3_1: usb3_1 {
- 		compatible = "samsung,exynos5250-dwusb3";
- 		clocks = <&clock CLK_USBD301>;
- 		clock-names = "usbdrd30";
-@@ -947,7 +947,7 @@
- 		#size-cells = <1>;
- 		ranges;
+-	memory {
++	memory at 20000000 {
+ 		device_type = "memory";
+ 		reg = <0x20000000 0x40000000>;
+ 	};
+@@ -197,7 +197,7 @@
+ 	display-timings {
+ 		native-mode = <&timing0>;
  
--		usbdrd_dwc3_1: dwc3 {
-+		usbdrd_dwc3_1: dwc3 at 12400000 {
- 			compatible = "snps,dwc3";
- 			reg = <0x12400000 0x10000>;
- 			interrupts = <0 73 0>;
+-		timing0: timing at 0 {
++		timing0: timing {
+ 			/* 800x480 at 60Hz */
+ 			clock-frequency = <24373920>;
+ 			hactive = <800>;
+diff --git a/arch/arm/boot/dts/s5pv210-torbreck.dts b/arch/arm/boot/dts/s5pv210-torbreck.dts
+index 622599fd2cfa..7cb50bcee888 100644
+--- a/arch/arm/boot/dts/s5pv210-torbreck.dts
++++ b/arch/arm/boot/dts/s5pv210-torbreck.dts
+@@ -29,7 +29,7 @@
+ 		bootargs = "console=ttySAC0,115200n8 root=/dev/mmcblk0p1 rw rootwait ignore_loglevel earlyprintk";
+ 	};
+ 
+-	memory {
++	memory at 20000000 {
+ 		device_type = "memory";
+ 		reg = <0x20000000 0x20000000>;
+ 	};
 -- 
 2.5.0
