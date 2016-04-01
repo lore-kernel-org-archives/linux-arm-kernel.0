@@ -1,87 +1,45 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 1 Apr 2016 16:38:07 +0200
-Subject: usb: gadget breakage on N900: bind UDC by name passed via
- usb_gadget_driver structure
-In-Reply-To: <CAB=otbTsAwBohbYmwBERpdG-ZdAUk_vJwoZoO8dUf_H-W4jREg@mail.gmail.com>
-References: <CAB=otbRd+hZaO6ihL3c88Ys_q-R4grmup4cfP70PT+N2JEQ3WQ@mail.gmail.com>
- <CAB=otbQ=jJNk=CtB4hu51HXxOLxhWEDaeWf3V0Uc7Uh3veXsfg@mail.gmail.com>
- <CAB=otbQ1J7FZm9vWLwor93+uD3Fv38ykduWMXG3qByNh4mV9=g@mail.gmail.com>
- <20160327202657.GA31059@amd>
- <CAB=otbTsAwBohbYmwBERpdG-ZdAUk_vJwoZoO8dUf_H-W4jREg@mail.gmail.com>
-Message-ID: <20160401143807.GF11860@amd>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Fri, 1 Apr 2016 10:38:32 -0400
+Subject: [PATCH 05/11] ARM: dts: exynos: Fix DTC unit name warnings in
+ Exynos4x12
+In-Reply-To: <1459493874-2366-5-git-send-email-k.kozlowski@samsung.com>
+References: <1459493874-2366-1-git-send-email-k.kozlowski@samsung.com>
+ <1459493874-2366-5-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <56FE87E8.60407@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hello Krzysztof,
 
-> >> > Dmesg from the n900 is attached as /tmp/delme.gz. I did _not_ apply
-> >> > the patch from https://lkml.org/lkml/2016/3/24/670 , yet, as I'm using
-> >> > devicetree boot.
-> >>
-> >> Hmm.. don't see anything strange in the boot log related to USB,
-> >> I'll try your config
-> >
-> > Let me know how it went.
+On 04/01/2016 02:57 AM, Krzysztof Kozlowski wrote:
+> Fix following DTC warnings in Exynos4x12 boards:
 > 
-> I tried your config (with slight modifications) with vanilla kernel v4.5
-> (modifications: cmdline changed to default; used INITRAMFS_SOURCE
-> for prebuilt cpio archive with rootfs) and Device Tree booting.
-> Works fine for me except I need to unplug-plug usb cable or issue
-> # echo connect > /sys/devices/platform/68000000.ocp/480ab000
-> .usb_otg_hs/musb-hdrc.0.auto/udc/musb-hdrc.0.auto/soft_connect
-> to make connection.
-> The gadget driver successfully binds to the gadget, but I don't know
-> why the musb core doesn't issue pullup on USB lines during boot.
+> Warning (unit_address_vs_reg): Node /camera/fimc-is at 12000000/pmu has a reg or ranges property, but no unit name
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos4x12.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
+> index 84a23f962946..b7490ea0c75c 100644
+> --- a/arch/arm/boot/dts/exynos4x12.dtsi
+> +++ b/arch/arm/boot/dts/exynos4x12.dtsi
+> @@ -179,7 +179,7 @@
+>  			ranges;
+>  			status = "disabled";
+>  
+> -			pmu {
+> +			pmu at 10020000 {
+>  				reg = <0x10020000 0x3000>;
+>  			};
+>  
+> 
 
-Hmm, strange. Unplug/replug of the USB cable results in:
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-<6>usb 1-5: new high-speed USB device number 100 using ehci-pci
-<3>usb 1-5: device descriptor read/64, error -32
-tail: /proc/kmsg: file truncated
-<3>usb 1-5: device descriptor read/64, error -32
-<3>usb 1-5: device descriptor read/64, error -32
-<3>usb 1-5: device descriptor read/8, error -32
-<3>usb 1-5: device descriptor read/8, error -32
-<6>usb 1-5: new high-speed USB device number 103 using ehci-pci
-<3>usb 1-5: device descriptor read/8, error -32
-<3>usb 1-5: device descriptor read/8, error -32
-<3>usb usb1-port5: unable to enumerate USB device
-<6>usb 4-1: new full-speed USB device number 80 using uhci_hcd
-<3>usb 4-1: device descriptor read/64, error -32
-<3>usb 4-1: device descriptor read/64, error -32
-<6>usb 4-1: new full-speed USB device number 81 using uhci_hcd
-<3>usb 4-1: device descriptor read/64, error -32
-<3>usb 4-1: device descriptor read/64, error -32
-<3>usb usb4-port1: unable to enumerate USB device
-
-echo connect does not seem to do the trick, either:
-
-root at n900:~# echo connect >
-/sys/devices/platform/68000000.ocp/480ab000.usb_otg_hs/musb-hdrc.0.auto/udc/musb-hdrc.0.auto/soft_connect
--bash: echo: write error: Operation not supported
-root at n900:~# uname -a
-Linux n900 4.4.0-omap3-149558-g5cf5ee5-dirty #168 PREEMPT Tue Mar 29
-09:49:40 CEST 2016 armv7l GNU/Linux
-
-Hmm, documentation is not too helpful, either...
-
-What:           /sys/class/udc/<udc>/soft_connect
-Date:           June 2011
-KernelVersion:  3.1
-Contact:        Felipe Balbi <balbi@kernel.org>
-Description:
-		Allows users to disconnect data pullup resistors thus
-		causing a
- 		logical disconnection from the USB
- 		Host.
-
-Dmesg says:
-
-[  619.471374] udc musb-hdrc.0.auto: soft-connect without a gadget
-driver
-
-Any ideas?
-									Pavel
+Best regards,
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
