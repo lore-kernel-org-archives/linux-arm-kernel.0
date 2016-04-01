@@ -1,47 +1,68 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 1 Apr 2016 17:12:26 +0530
-Subject: [PATCH 2/2] arm: mach-spear: Enable PHY_PLAT to meet dependency
-In-Reply-To: <1459510156-9147-2-git-send-email-gautam.vivek@samsung.com>
-References: <1459510156-9147-1-git-send-email-gautam.vivek@samsung.com>
- <1459510156-9147-2-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <20160401114226.GD2987@vireshk-i7>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Fri, 1 Apr 2016 13:47:30 +0200
+Subject: [PATCH] drm/rockchip: Return -EBUSY if there's already a pending
+ flip event v2
+In-Reply-To: <56FE5AE9.40806@rock-chips.com>
+References: <1459411680-6176-1-git-send-email-tomeu.vizoso@collabora.com>
+ <56FE5AE9.40806@rock-chips.com>
+Message-ID: <56FE5FD2.2050106@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01-04-16, 16:59, Vivek Gautam wrote:
-> mach-spear enables PHY_ST_SPEAR1310_MIPHY and
-> PHY_ST_SPEAR1340_MIPHY, which now fall under PHY_PLAT
-> config. So select CONFIG_PHY_PLAT as well to resolve
-> dependencies.
+On 04/01/2016 01:26 PM, Mark yao wrote:
+> On 2016?03?31? 16:08, Tomeu Vizoso wrote:
+>> As per the docs, atomic_commit should return -EBUSY "if an asycnhronous
+>> updated is requested and there is an earlier updated pending".
+>>
+>> v2: Use the status of the workqueue instead of vop->event, and don't add
+>> a superfluous wait on the workqueue.
+>>
+>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>> ---
+>>  drivers/gpu/drm/rockchip/rockchip_drm_fb.c | 3 +++
+>>  1 file changed, 3 insertions(+)
+>>
+>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+>> index 3b8f652698f8..285f8cd5afe1 100644
+>> --- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+>> @@ -282,6 +282,9 @@ int rockchip_drm_atomic_commit(struct drm_device *dev,
+>>  	struct rockchip_atomic_commit *commit = &private->commit;
+>>  	int ret;
+>>  
+>> +	if (async && work_busy(&commit->work))
+>> +		return -EBUSY;
+>> +
 > 
-> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
-> Cc: Shiraz Hashim <shiraz.linux.kernel@gmail.com>
-> ---
->  arch/arm/mach-spear/Kconfig | 2 ++
->  1 file changed, 2 insertions(+)
+> Sorry for reply late.
 > 
-> diff --git a/arch/arm/mach-spear/Kconfig b/arch/arm/mach-spear/Kconfig
-> index ea9ea95..c0a62fd 100644
-> --- a/arch/arm/mach-spear/Kconfig
-> +++ b/arch/arm/mach-spear/Kconfig
-> @@ -29,6 +29,7 @@ if ARCH_SPEAR13XX
->  config MACH_SPEAR1310
->  	bool "SPEAr1310 Machine support with Device Tree"
->  	select PINCTRL_SPEAR1310
-> +	select PHY_PLAT
->  	select PHY_ST_SPEAR1310_MIPHY
->  	help
->  	  Supports ST SPEAr1310 machine configured via the device-tree
-> @@ -36,6 +37,7 @@ config MACH_SPEAR1310
->  config MACH_SPEAR1340
->  	bool "SPEAr1340 Machine support with Device Tree"
->  	select PINCTRL_SPEAR1340
-> +	select PHY_PLAT
->  	select PHY_ST_SPEAR1340_MIPHY
->  	help
->  	  Supports ST SPEAr1340 machine configured via the device-tree
+> There is a comment on work_busy function describe :
+> 
+>     "the test result is  unreliable and only useful as advisory hints or
+> for debugging."
+> 
+> I don't know if it's suitable to use it here, does some guys know it?
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+I'm not sure, but if the reason is the caveat explained in
+find_worker_executing_work(), then it's probably safe (and would explain
+how the function is used in other parts in the kernel).
 
--- 
-viresh
+> And then, the "flush_work(&commit->work);" is no needed if return -EBUSY
+> here.
+> you can remove it at this patch.
+
+We still need to wait if it's being called in sync mode.
+
+Regards,
+
+Tomeu
+
+>>  	ret = drm_atomic_helper_prepare_planes(dev, state);
+>>  	if (ret)
+>>  		return ret;
+> 
+> 
+> 
+> -- 
+> ?ark Yao
+> 
