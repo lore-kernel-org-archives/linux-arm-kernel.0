@@ -1,33 +1,47 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 1 Apr 2016 13:42:19 +0200
-Subject: [PATCH 1/2] phy: Group vendor specific phy drivers
-In-Reply-To: <1459510156-9147-1-git-send-email-gautam.vivek@samsung.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 1 Apr 2016 17:12:26 +0530
+Subject: [PATCH 2/2] arm: mach-spear: Enable PHY_PLAT to meet dependency
+In-Reply-To: <1459510156-9147-2-git-send-email-gautam.vivek@samsung.com>
 References: <1459510156-9147-1-git-send-email-gautam.vivek@samsung.com>
-Message-ID: <20160401114219.GG4227@lukather>
+ <1459510156-9147-2-git-send-email-gautam.vivek@samsung.com>
+Message-ID: <20160401114226.GD2987@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 01-04-16, 16:59, Vivek Gautam wrote:
+> mach-spear enables PHY_ST_SPEAR1310_MIPHY and
+> PHY_ST_SPEAR1340_MIPHY, which now fall under PHY_PLAT
+> config. So select CONFIG_PHY_PLAT as well to resolve
+> dependencies.
+> 
+> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+> Cc: Shiraz Hashim <shiraz.linux.kernel@gmail.com>
+> ---
+>  arch/arm/mach-spear/Kconfig | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/mach-spear/Kconfig b/arch/arm/mach-spear/Kconfig
+> index ea9ea95..c0a62fd 100644
+> --- a/arch/arm/mach-spear/Kconfig
+> +++ b/arch/arm/mach-spear/Kconfig
+> @@ -29,6 +29,7 @@ if ARCH_SPEAR13XX
+>  config MACH_SPEAR1310
+>  	bool "SPEAr1310 Machine support with Device Tree"
+>  	select PINCTRL_SPEAR1310
+> +	select PHY_PLAT
+>  	select PHY_ST_SPEAR1310_MIPHY
+>  	help
+>  	  Supports ST SPEAr1310 machine configured via the device-tree
+> @@ -36,6 +37,7 @@ config MACH_SPEAR1310
+>  config MACH_SPEAR1340
+>  	bool "SPEAr1340 Machine support with Device Tree"
+>  	select PINCTRL_SPEAR1340
+> +	select PHY_PLAT
+>  	select PHY_ST_SPEAR1340_MIPHY
+>  	help
+>  	  Supports ST SPEAr1340 machine configured via the device-tree
 
-On Fri, Apr 01, 2016 at 04:59:15PM +0530, Vivek Gautam wrote:
->  create mode 100644 drivers/phy/sunxi/Kconfig
->  create mode 100644 drivers/phy/sunxi/Makefile
->  rename drivers/phy/{ => sunxi}/phy-sun4i-usb.c (100%)
->  rename drivers/phy/{ => sunxi}/phy-sun9i-usb.c (100%)
-
-That would be allwinner in this case, sunxi is the SoC family
-Allwinner produces.
-
-Maxime
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160401/066e380c/attachment.sig>
+viresh
