@@ -1,31 +1,92 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Fri, 01 Apr 2016 19:32:43 +0900
-Subject: [PATCH] bus: uniphier-system-bus: fix condition of overlap check
-Message-ID: <20160401193242.F963.4A936039@socionext.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 1 Apr 2016 13:36:45 +0300
+Subject: [PATCH v3 15/16] usb: musb: da8xx: Use devm in probe
+In-Reply-To: <20160331222112.GA28044@uda0271908>
+References: <1458863503-31121-1-git-send-email-david@lechnology.com>
+ <1458863503-31121-16-git-send-email-david@lechnology.com>
+ <20160331222112.GA28044@uda0271908>
+Message-ID: <56FE4F3D.9040209@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes condition whether the specified address ranges
-overlap each other.
+Hello.
 
-Fixes: 4b7f48d395a7 ("bus: uniphier-system-bus: add UniPhier System Bus driver")
-Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
----
- drivers/bus/uniphier-system-bus.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On 4/1/2016 1:21 AM, Bin Liu wrote:
 
-diff --git a/drivers/bus/uniphier-system-bus.c b/drivers/bus/uniphier-system-bus.c
-index 834a2ae..350b730 100644
---- a/drivers/bus/uniphier-system-bus.c
-+++ b/drivers/bus/uniphier-system-bus.c
-@@ -108,7 +108,7 @@ static int uniphier_system_bus_check_overlap(
- 
- 	for (i = 0; i < ARRAY_SIZE(priv->bank); i++) {
- 		for (j = i + 1; j < ARRAY_SIZE(priv->bank); j++) {
--			if (priv->bank[i].end > priv->bank[j].base ||
-+			if (priv->bank[i].end > priv->bank[j].base &&
- 			    priv->bank[i].base < priv->bank[j].end) {
- 				dev_err(priv->dev,
- 					"region overlap between bank%d and bank%d\n",
--- 
-2.1.4
+>> Simplify things a bit by using devm functions where possible.
+>>
+>> Signed-off-by: David Lechner <david@lechnology.com>
+>> ---
+>>
+>> v3 changes:
+>>
+>> * Kept clk variable to minimize noise.
+>>
+>>
+>>   drivers/usb/musb/da8xx.c | 19 +++++--------------
+>>   1 file changed, 5 insertions(+), 14 deletions(-)
+>>
+>> diff --git a/drivers/usb/musb/da8xx.c b/drivers/usb/musb/da8xx.c
+>> index b03d3b8..0c1997c 100644
+>> --- a/drivers/usb/musb/da8xx.c
+>> +++ b/drivers/usb/musb/da8xx.c
+>> @@ -490,20 +490,18 @@ static int da8xx_probe(struct platform_device *pdev)
+>>   	struct da8xx_glue		*glue;
+>>   	struct platform_device_info	pinfo;
+>>   	struct clk			*clk;
+>> +	int				ret;
+>>
+>> -	int				ret = -ENOMEM;
+>> -
+>> -	glue = kzalloc(sizeof(*glue), GFP_KERNEL);
+>> +	glue = devm_kzalloc(&pdev->dev, sizeof(*glue), GFP_KERNEL);
+>>   	if (!glue) {
+>>   		dev_err(&pdev->dev, "failed to allocate glue context\n");
+>> -		goto err0;
+>> +		return -ENOMEM;
+>>   	}
+>>
+>> -	clk = clk_get(&pdev->dev, "usb20");
+>> +	clk = devm_clk_get(&pdev->dev, "usb20");
+>>   	if (IS_ERR(clk)) {
+>>   		dev_err(&pdev->dev, "failed to get clock\n");
+>> -		ret = PTR_ERR(clk);
+>> -		goto err3;
+>> +		return PTR_ERR(clk);
+>
+> memory leak due to not kfree(glue).
+
+    No, since devm_kzalloc() was used, the memory will be automatically freed 
+on returning error by da8xx_probe().
+
+>>   	}
+>>
+>>   	ret = clk_enable(clk);
+>> @@ -560,12 +558,7 @@ err5:
+>>   	clk_disable(clk);
+>>
+>>   err4:
+>> -	clk_put(clk);
+>> -
+>> -err3:
+>> -	kfree(glue);
+>>
+>> -err0:
+>>   	return ret;
+>>   }
+>>
+>> @@ -576,8 +569,6 @@ static int da8xx_remove(struct platform_device *pdev)
+>>   	platform_device_unregister(glue->musb);
+>>   	usb_phy_generic_unregister(glue->phy);
+>>   	clk_disable(glue->clk);
+>> -	clk_put(glue->clk);
+>> -	kfree(glue);
+>
+> Doesn't match with $subject, I'd put them into a seperate patch.
+
+    Again, these are now done automatically.
+
+> Regards,
+> -Bin.
+
+MBR, Sergei
