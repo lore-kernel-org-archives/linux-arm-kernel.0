@@ -1,70 +1,69 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 1 Apr 2016 17:34:48 +0200
-Subject: [PATCH 12/12] mtd: nand: move of_get_nand_xxx() helpers into
- nand_base.c
-In-Reply-To: <201604012200.EksFk1z5%fengguang.wu@intel.com>
-References: <1459515272-31011-13-git-send-email-boris.brezillon@free-electrons.com>
- <201604012200.EksFk1z5%fengguang.wu@intel.com>
-Message-ID: <20160401173448.2a9344c5@bbrezillon>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 1 Apr 2016 08:36:06 -0700
+Subject: [PATCH v2] ARM: dts: dra7: Correct clock tree for sys_32k_ck
+In-Reply-To: <20160331170017.GI9329@atomide.com>
+References: <1457957001-720-1-git-send-email-j-keerthy@ti.com>
+ <20160330211828.GE9329@atomide.com>
+ <20160330213224.GH9329@atomide.com> <56FCC3FF.7080901@ti.com>
+ <56FCEC61.5020400@ti.com> <20160331170017.GI9329@atomide.com>
+Message-ID: <20160401153606.GJ9329@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 1 Apr 2016 22:13:43 +0800
-kbuild test robot <lkp@intel.com> wrote:
+Hi,
 
-> Hi Boris,
+* Tony Lindgren <tony@atomide.com> [160331 10:04]:
+> * Keerthy <a0393675@ti.com> [160331 02:26]:
+> > 
+> > 
+> > On Thursday 31 March 2016 12:00 PM, Tero Kristo wrote:
+> > >On 03/31/2016 12:32 AM, Tony Lindgren wrote:
+> > >>* Tony Lindgren <tony@atomide.com> [160330 14:19]:
+> > >>>* Keerthy <j-keerthy@ti.com> [160314 05:04]:
+> > >>>>This is w.r.t J6/J6eco: 32clk is pseudo (erratum i856) - clock source.
+> > >>>>Errata i856 for the AM572x (DRA7xx) points out that the 32.768KHz
+> > >>>>external
+> > >>>>crystal is not enabled at power up. Instead the CPU falls back to using
+> > >>>>an emulation for the 32KHz clock which is SYSCLK1/610.  SYSCLK1 is
+> > >>>>usually
+> > >>>>20MHz on boards so far (which gives an emulated frequency of 32.786KHz)
+> > >>>
+> > >>>Thanks applying into omap-for-v4.6/fixes.
+> > >>
+> > >>Actually let's wait a review from Tero on this one, not sure
+> > >>about the pseudo clock naming here. So dropping for now.
+> > >
+> > >The patch is fine for me, I didn't comment anything before as I thought
+> > >you already applied it.
+> > >
+> > >Acked-by: Tero Kristo <t-kristo@ti.com>
+> > 
+> > Thanks Tero.
 > 
-> [auto build test WARNING on next-20160401]
-> [cannot apply to v4.6-rc1 v4.5-rc7 v4.5-rc6 v4.6-rc1]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
-> 
-> url:    https://github.com/0day-ci/linux/commits/Boris-Brezillon/mtd-get-rid-of-of_mtd-c-h-and-of_get_nand_xx/20160401-210220
-> reproduce: make htmldocs
-> 
-> All warnings (new ones prefixed by >>):
-> 
-> >> drivers/mtd/nand/nand_base.c:3972: warning: cannot understand function prototype: 'const char * const nand_ecc_modes[] = '
->    drivers/mtd/nand/nand_bbt.c:1: warning: no structured comments found
-> >> drivers/mtd/nand/nand_base.c:3972: warning: cannot understand function prototype: 'const char * const nand_ecc_modes[] = '
-> 
-> vim +3972 drivers/mtd/nand/nand_base.c
-> 
->   3956					chip->jedec_params.model);
->   3957		else
->   3958			pr_info("%s %s\n", nand_manuf_ids[maf_idx].name,
->   3959					type->name);
->   3960	
->   3961		pr_info("%d MiB, %s, erase size: %d KiB, page size: %d, OOB size: %d\n",
->   3962			(int)(chip->chipsize >> 20), nand_is_slc(chip) ? "SLC" : "MLC",
->   3963			mtd->erasesize >> 10, mtd->writesize, mtd->oobsize);
->   3964		return type;
->   3965	}
->   3966	
->   3967	/**
->   3968	 * It maps 'enum nand_ecc_modes_t' found in include/linux/mtd/nand.h
->   3969	 * into the device tree binding of 'nand-ecc', so that MTD
->   3970	 * device driver can get nand ecc from device tree.
->   3971	 */
+> OK applying with Tero's ack.
 
-I'll remove this kerneldoc header to avoid this warning.
+I'm dropping this again as it introduces new warnings with make dtbs:
 
-> > 3972	static const char * const nand_ecc_modes[] = {
->   3973		[NAND_ECC_NONE]		= "none",
->   3974		[NAND_ECC_SOFT]		= "soft",
->   3975		[NAND_ECC_HW]		= "hw",
->   3976		[NAND_ECC_HW_SYNDROME]	= "hw_syndrome",
->   3977		[NAND_ECC_HW_OOB_FIRST]	= "hw_oob_first",
->   3978		[NAND_ECC_SOFT_BCH]	= "soft_bch",
->   3979	};
->   3980	
-> 
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+Warning (reg_format): "reg" property in /ocp/l4 at 4a000000/cm_core at 8000/clockdomains/sys_32k_ck has invalid length (4 bytes) (#address-cells == 2, #size-cells == 1)
+Warning (avoid_default_addr_size): Relying on default #address-cells value for /ocp/l4 at 4a000000/cm_core at 8000/clockdomains/sys_32k_ck
+Warning (avoid_default_addr_size): Relying on default #size-cells value for /ocp/l4 at 4a000000/cm_core at 8000/clockdomains/sys_32k_ck
+  DTC     arch/arm/boot/dts/am57xx-cl-som-am57x.dtb
+Warning (reg_format): "reg" property in /ocp/l4 at 4a000000/cm_core at 8000/clockdomains/sys_32k_ck has invalid length (4 bytes) (#address-cells == 2, #size-cells == 1)
+Warning (avoid_default_addr_size): Relying on default #address-cells value for /ocp/l4 at 4a000000/cm_core at 8000/clockdomains/sys_32k_ck
+Warning (avoid_default_addr_size): Relying on default #size-cells value for /ocp/l4 at 4a000000/cm_core at 8000/clockdomains/sys_32k_ck
+  DTC     arch/arm/boot/dts/am57xx-sbc-am57x.dtb
+Warning (reg_format): "reg" property in /ocp/l4 at 4a000000/cm_core at 8000/clockdomains/sys_32k_ck has invalid length (4 bytes) (#address-cells == 2, #size-cells == 1)
+Warning (avoid_default_addr_size): Relying on default #address-cells value for /ocp/l4 at 4a000000/cm_core at 8000/clockdomains/sys_32k_ck
+Warning (avoid_default_addr_size): Relying on default #size-cells value for /ocp/l4 at 4a000000/cm_core at 8000/clockdomains/sys_32k_ck
+  DTC     arch/arm/boot/dts/dra7-evm.dtb
+Warning (reg_format): "reg" property in /ocp/l4 at 4a000000/cm_core at 8000/clockdomains/sys_32k_ck has invalid length (4 bytes) (#address-cells == 2, #size-cells == 1)
+Warning (avoid_default_addr_size): Relying on default #address-cells value for /ocp/l4 at 4a000000/cm_core at 8000/clockdomains/sys_32k_ck
+Warning (avoid_default_addr_size): Relying on default #size-cells value for /ocp/l4 at 4a000000/cm_core at 8000/clockdomains/sys_32k_ck
+  DTC     arch/arm/boot/dts/dra72-evm.dtb
+Warning (reg_format): "reg" property in /ocp/l4 at 4a000000/cm_core at 8000/clockdomains/sys_32k_ck has invalid length (4 bytes) (#address-cells == 2, #size-cells == 1)
+Warning (avoid_default_addr_size): Relying on default #address-cells value for /ocp/l4 at 4a000000/cm_core at 8000/clockdomains/sys_32k_ck
+Warning (avoid_default_addr_size): Relying on default #size-cells value for /ocp/l4 at 4a000000/cm_core at 8000/clockdomains/sys_32k_ck
 
+Regards,
 
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Tony
