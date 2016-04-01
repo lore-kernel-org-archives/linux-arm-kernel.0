@@ -1,26 +1,64 @@
 From: ynezz@true.cz (=?UTF-8?q?Petr=20=C5=A0tetiar?=)
-Date: Fri,  1 Apr 2016 14:41:46 +0200
-Subject: [PATCH] ARM: imx6: Fix PCIe reset gpio polarity on Toradex Apalis
-Message-ID: <1459514508-8557-1-git-send-email-ynezz@true.cz>
+Date: Fri,  1 Apr 2016 14:41:48 +0200
+Subject: [PATCH 2/2] PCI: imx6: Add reset-gpio-active-high boolean property to
+ DT
+In-Reply-To: <1459514508-8557-1-git-send-email-ynezz@true.cz>
+References: <1459514508-8557-1-git-send-email-ynezz@true.cz>
+Message-ID: <1459514508-8557-3-git-send-email-ynezz@true.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In commit 5c5fb40de8f14 "PCI: imx6: Add support for active-low reset GPIO"
-I've made GPIO reset polarity aware, which made the PCIe working on Apalis SoM
-(reset active-high), but it has broken PCIe on several other i.MX6 boards
-(reset active-low) due to wrong logic level. It has made the default reset
-logic active-high, but it was active-low since beginning due to the bug in the
-reset code:
+We need that property in order to make the Toradex Apalis SoMs working
+without breaking old DTBs. On Apalis SoMs the GPIO1_IO28 used to PCIe
+reset is not connected directly to PERST# PCIe signal, but it's ORed
+with RESETBMCU coming off the PMIC, and thus is inverted, active-high.
 
-	gpio_set_value_cansleep(imx6_pcie->reset_gpio, 0);
-	msleep(100);
-	gpio_set_value_cansleep(imx6_pcie->reset_gpio, 1);
+Signed-off-by: Petr ?tetiar <ynezz@true.cz>
+---
+ drivers/pci/host/pci-imx6.c | 14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
 
-This breakage couldn't be fixed correctly by fixing the reset code snippet
-mentioned above and fixing the broken DTBs, as we can't touch the DTBs, so the
-5c5fb40de8f14 commit is going to be reverted, making PCIe reset broken on
-Apalis modules again.
-
-As suggested by Fabio, to fix this situation in backward compatible manner, we
-should introduce new boolean DT property reset-gpio-active-high, which would
-set PCIe reset GPIO polarity as needed. This patch series tries to do so.
+diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+index 2f817fa..1b3bcfe 100644
+--- a/drivers/pci/host/pci-imx6.c
++++ b/drivers/pci/host/pci-imx6.c
+@@ -33,6 +33,7 @@
+ 
+ struct imx6_pcie {
+ 	int			reset_gpio;
++	bool			gpio_active_high;
+ 	struct clk		*pcie_bus;
+ 	struct clk		*pcie_phy;
+ 	struct clk		*pcie;
+@@ -310,9 +311,11 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
+ 
+ 	/* Some boards don't have PCIe reset GPIO. */
+ 	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
+-		gpio_set_value_cansleep(imx6_pcie->reset_gpio, 0);
++		gpio_set_value_cansleep(imx6_pcie->reset_gpio,
++					!!imx6_pcie->gpio_active_high);
+ 		msleep(100);
+-		gpio_set_value_cansleep(imx6_pcie->reset_gpio, 1);
++		gpio_set_value_cansleep(imx6_pcie->reset_gpio,
++					!imx6_pcie->gpio_active_high);
+ 	}
+ 	return 0;
+ 
+@@ -546,9 +549,14 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
+ 
+ 	/* Fetch GPIOs */
+ 	imx6_pcie->reset_gpio = of_get_named_gpio(np, "reset-gpio", 0);
++	imx6_pcie->gpio_active_high = of_property_read_bool(np,
++						"reset-gpio-active-high");
+ 	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
+ 		ret = devm_gpio_request_one(&pdev->dev, imx6_pcie->reset_gpio,
+-					    GPIOF_OUT_INIT_LOW, "PCIe reset");
++				imx6_pcie->gpio_active_high ?
++					GPIOF_OUT_INIT_HIGH :
++					GPIOF_OUT_INIT_LOW,
++				"PCIe reset");
+ 		if (ret) {
+ 			dev_err(&pdev->dev, "unable to get reset gpio\n");
+ 			return ret;
+-- 
+1.9.1
