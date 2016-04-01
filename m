@@ -1,45 +1,83 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri,  1 Apr 2016 14:54:24 +0200
-Subject: [PATCH 04/12] mtd: nand: brcm: rely on generic DT parsing done in
- nand_scan_ident()
+Date: Fri,  1 Apr 2016 14:54:21 +0200
+Subject: [PATCH 01/12] mtd: nand: remove unneeded of_mtd.h inclusions
 In-Reply-To: <1459515272-31011-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1459515272-31011-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1459515272-31011-5-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1459515272-31011-2-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The core now takes care of parsing generic DT properties in
-nand_scan_ident() when nand_set_flash_node() has been called.
-Rely on this initialization instead of calling of_get_nand_xxx()
-manually.
+Some drivers are including linux/of_mtd.h even if they don't use any of
+the of_get_nand_xxx() helpers.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/mtd/nand/brcmnand/brcmnand.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ drivers/mtd/nand/jz4780_nand.c | 1 -
+ drivers/mtd/nand/lpc32xx_mlc.c | 1 -
+ drivers/mtd/nand/qcom_nandc.c  | 1 -
+ drivers/mtd/nand/sunxi_nand.c  | 1 -
+ drivers/mtd/nand/vf610_nfc.c   | 1 -
+ 5 files changed, 5 deletions(-)
 
-diff --git a/drivers/mtd/nand/brcmnand/brcmnand.c b/drivers/mtd/nand/brcmnand/brcmnand.c
-index e052839..6e2a52d 100644
---- a/drivers/mtd/nand/brcmnand/brcmnand.c
-+++ b/drivers/mtd/nand/brcmnand/brcmnand.c
-@@ -32,7 +32,6 @@
- #include <linux/mtd/nand.h>
- #include <linux/mtd/partitions.h>
+diff --git a/drivers/mtd/nand/jz4780_nand.c b/drivers/mtd/nand/jz4780_nand.c
+index e1c016c..23a1999 100644
+--- a/drivers/mtd/nand/jz4780_nand.c
++++ b/drivers/mtd/nand/jz4780_nand.c
+@@ -17,7 +17,6 @@
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/gpio/consumer.h>
+-#include <linux/of_mtd.h>
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+ #include <linux/mtd/mtd.h>
+diff --git a/drivers/mtd/nand/lpc32xx_mlc.c b/drivers/mtd/nand/lpc32xx_mlc.c
+index d8c3e7a..8e43978 100644
+--- a/drivers/mtd/nand/lpc32xx_mlc.c
++++ b/drivers/mtd/nand/lpc32xx_mlc.c
+@@ -35,7 +35,6 @@
+ #include <linux/completion.h>
+ #include <linux/interrupt.h>
  #include <linux/of.h>
 -#include <linux/of_mtd.h>
- #include <linux/of_platform.h>
- #include <linux/slab.h>
- #include <linux/list.h>
-@@ -2001,8 +2000,8 @@ static int brcmnand_init_cs(struct brcmnand_host *host, struct device_node *dn)
- 	 */
- 	chip->options |= NAND_USE_BOUNCE_BUFFER;
+ #include <linux/of_gpio.h>
+ #include <linux/mtd/lpc32xx_mlc.h>
+ #include <linux/io.h>
+diff --git a/drivers/mtd/nand/qcom_nandc.c b/drivers/mtd/nand/qcom_nandc.c
+index f550a57..f3de983 100644
+--- a/drivers/mtd/nand/qcom_nandc.c
++++ b/drivers/mtd/nand/qcom_nandc.c
+@@ -21,7 +21,6 @@
+ #include <linux/mtd/partitions.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+-#include <linux/of_mtd.h>
+ #include <linux/delay.h>
  
--	if (of_get_nand_on_flash_bbt(dn))
--		chip->bbt_options |= NAND_BBT_USE_FLASH | NAND_BBT_NO_OOB;
-+	if (chip->bbt_options & NAND_BBT_USE_FLASH)
-+		chip->bbt_options |= NAND_BBT_NO_OOB;
- 
- 	if (brcmnand_setup_dev(host))
- 		return -ENXIO;
+ /* NANDc reg offsets */
+diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
+index 1c03eee..3a97093 100644
+--- a/drivers/mtd/nand/sunxi_nand.c
++++ b/drivers/mtd/nand/sunxi_nand.c
+@@ -30,7 +30,6 @@
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+ #include <linux/of_gpio.h>
+-#include <linux/of_mtd.h>
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/nand.h>
+ #include <linux/mtd/partitions.h>
+diff --git a/drivers/mtd/nand/vf610_nfc.c b/drivers/mtd/nand/vf610_nfc.c
+index 293feb1..a7f2756 100644
+--- a/drivers/mtd/nand/vf610_nfc.c
++++ b/drivers/mtd/nand/vf610_nfc.c
+@@ -33,7 +33,6 @@
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/nand.h>
+ #include <linux/mtd/partitions.h>
+-#include <linux/of_mtd.h>
+ #include <linux/of_device.h>
+ #include <linux/pinctrl/consumer.h>
+ #include <linux/platform_device.h>
 -- 
 2.5.0
