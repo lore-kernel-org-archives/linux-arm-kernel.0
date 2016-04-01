@@ -1,30 +1,25 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 31 Mar 2016 17:53:02 -0700
-Subject: [PATCH] ARM: dts: rockchip: update rk3288-veyron cpu operating
- points
-In-Reply-To: <1459459483-5356-1-git-send-email-heiko@sntech.de>
-References: <1459459483-5356-1-git-send-email-heiko@sntech.de>
-Message-ID: <CAD=FV=XHFvHuxogFfVk5z5f8T9f1LOysPQKKK7y+EiGmvtYDRQ@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 31 Mar 2016 17:55:33 -0700
+Subject: [PATCH V2] ARM: bcm2835: add CPU node for ARM core
+In-Reply-To: <1459445118-1733-1-git-send-email-stefan.wahren@i2se.com>
+References: <1459445118-1733-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <87zitem9kq.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko
+Stefan Wahren <stefan.wahren@i2se.com> writes:
 
-On Thu, Mar 31, 2016 at 2:24 PM, Heiko Stuebner <heiko@sntech.de> wrote:
-> The generic operating points specified in rk3288.dtsi are specified by
-> Rockchip as conservative and for all cases.
+> This patch adds the CPU node of the BCM2835 into the DT.
 >
-> In contrast the Veyron ChromeOS devices are supposed to use a special
-> chip variant often called rk3288-c and use different operating points
-> in their kernel also including a higher max frequency.
->
-> So override the operating points for veyron devices.
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  arch/arm/boot/dts/rk3288-veyron.dtsi | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
 
-Matches the Chrome OS tree.
-
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
+Pulled to bcm2835-dt-next.  Thanks!
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160331/98c6b303/attachment.sig>
