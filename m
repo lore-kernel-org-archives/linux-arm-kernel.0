@@ -1,51 +1,56 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 1 Apr 2016 15:15:32 +0800
-Subject: [PATCH] net: mvneta: replace MVNETA_CPU_D_CACHE_LINE_SIZE with
- L1_CACHE_BYTES
-In-Reply-To: <20160331.164710.1998871529914699937.davem@davemloft.net>
-References: <1459338921-391-1-git-send-email-jszhang@marvell.com>
- <20160331.151547.1889188465826831929.davem@davemloft.net>
- <20160331223735.32904e42@free-electrons.com>
- <20160331.164710.1998871529914699937.davem@davemloft.net>
-Message-ID: <20160401151532.3c596206@xhacker>
+From: tomi.valkeinen@gmail.com (Tomi Valkeinen)
+Date: Fri, 1 Apr 2016 10:49:13 +0300
+Subject: dtc warnings
+In-Reply-To: <CAL_Jsq+=OjY8y_8x7OSm-MWYKbrHN5cbv4TLwULxhNq+gfiMtw@mail.gmail.com>
+References: <CAL_Jsq+=OjY8y_8x7OSm-MWYKbrHN5cbv4TLwULxhNq+gfiMtw@mail.gmail.com>
+Message-ID: <56FE27F9.2070100@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David, Thomas,
+Hi Rob,
 
-On Thu, 31 Mar 2016 16:47:10 -0400 David Miller  wrote:
+On 01/04/16 04:40, Rob Herring wrote:
+> You may have noticed that linux-next had gotten noisy with dtc
+> warnings lately. I dropped the change for a bit, but added it back
+> today except now it is disabled unless building with "W=1".
+> 
+> There's ~25K (2500 unique) warnings generated from the ARM dts files.
+> Here's the ranking of warnings by dtb. OMAP is the clear winner (based
+> on the similar counts, probably lots of duplicates). Please help
+> remind contributors to test with W=1 and start to fix these.
+> 
+> At least for memory nodes, I plan to whitelist allowing no
+> unit-address. There could be others, but none that I've seen so far.
 
-> From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Date: Thu, 31 Mar 2016 22:37:35 +0200
-> 
-> > Hello,
-> > 
-> > On Thu, 31 Mar 2016 15:15:47 -0400 (EDT), David Miller wrote:  
-> >> From: Jisheng Zhang <jszhang@marvell.com>
-> >> Date: Wed, 30 Mar 2016 19:55:21 +0800
-> >>   
-> >> > The mvneta is also used in some Marvell berlin family SoCs which may
-> >> > have 64bytes cacheline size. Replace the MVNETA_CPU_D_CACHE_LINE_SIZE
-> >> > usage with L1_CACHE_BYTES.
-> >> > 
-> >> > And since dma_alloc_coherent() is always cacheline size aligned, so
-> >> > remove the align checks.
-> >> > 
-> >> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>  
-> >> 
-> >> Applied.  
-> > 
-> > A new version of the patch was sent, which more rightfully uses
-> > cache_line_size(), see:
-> > 
-> >  "[PATCH v2] net: mvneta: replace MVNETA_CPU_D_CACHE_LINE_SIZE with cache_line_size"  
-> 
-> Sorry about that.
-> 
-> Send me a realtive fixup patch if you like.
-> 
+What's the correct way to fix nodes for display platform devices? For
+example, omap4-panda-common.dtsi has two connector nodes:
 
-Sorry about inconvenience, I'll send out fixup patch.
+dvi0: connector at 0 {
+	compatible = "dvi-connector";
+	label = "dvi";
+	...
+};
 
-Thanks,
-Jisheng
+
+hdmi0: connector at 1 {
+	compatible = "hdmi-connector";
+	label = "hdmi";
+	...
+};
+
+Should I add the reg property, or should I rename the nodes to, say,
+connector_dvi and connector_hdmi, or connector1 and connector2?
+
+The index (reg) is not used for anything, but perhaps there could be
+some use for it in the future (although I have no idea what the use
+would be).
+
+ Tomi
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160401/3f8f3529/attachment.sig>
