@@ -1,63 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri,  1 Apr 2016 17:19:57 +0100
-Subject: [PATCH] iommu/arm-smmu: Fix stream-match conflict with
- IOMMU_DOMAIN_DMA
-Message-ID: <1459527597-10740-1-git-send-email-will.deacon@arm.com>
+From: b-liu@ti.com (Bin Liu)
+Date: Fri, 1 Apr 2016 11:19:31 -0500
+Subject: [PATCH v2 06/11] phy: da8xx-usb: new driver for DA8XX SoC USB PHY
+In-Reply-To: <56FE9B8F.7050605@lechnology.com>
+References: <1458181615-27782-1-git-send-email-david@lechnology.com>
+ <1458181615-27782-7-git-send-email-david@lechnology.com>
+ <56FE74AC.6080303@ti.com> <20160401144510.GA6264@uda0271908>
+ <56FE9B8F.7050605@lechnology.com>
+Message-ID: <20160401161931.GC6264@uda0271908>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit cbf8277ef456 ("iommu/arm-smmu: Treat IOMMU_DOMAIN_DMA as bypass
-for now") ignores requests to attach a device to the default domain
-since, without IOMMU-basked DMA ops available everywhere, the default
-domain will just lead to unexpected transaction faults being reported.
+Hi,
 
-Unfortunately, the way this was implemented on SMMUv2 causes a
-regression with VFIO PCI device passthrough under KVM on AMD Seattle.
-On this system, the host controller device is associated with both a
-pci_dev *and* a platform_device, and can therefore end up with duplicate
-SMR entries, resulting in a stream-match conflict at runtime.
+On Fri, Apr 01, 2016 at 11:02:23AM -0500, David Lechner wrote:
+> On 04/01/2016 09:45 AM, Bin Liu wrote:
+> >>>+EXPORT_SYMBOL_GPL(da8xx_usb20_phy_set_mode);
+> >>
+> >>Don't prefer export symbols from PHY driver. That'll create unnecessary
+> >>dependencies between the controller and the PHY.
+> >
+> >Agreed.
+> >
+> >>
+> >>I think it'll be better to create a new attribute and use it?
+> >
+> >Another simpler option is to not support _set_mode() for DA8xx, and the
+> >phy driver set the otgmode bit in probe() based on dr_mode of the
+> >controller.
+> >
+> >Regards,
+> >-Bin.
+> >
+> 
+> This certainly works for my particular use case, however, Sergei
+> Shtylyov, who wrote the da8xx musb glue layer originally, seemed to
+> recall in his review of the patch series that this really is
+> necessary for OTG mode to work properly.
 
-This patch amends the original fix so that attaching to IOMMU_DOMAIN_DMA
-is rejected even before configuring the SMRs. This restores the old
-behaviour for now, but we'll need to look at handing host controllers
-specially when we come to supporting the default domain fully.
+I don't know much about the usb module on DA8xx, but it seems to me that
+_set_mode() has nothing to do with OTG mode. musb_core only calls
+_set_mode() in two places - 1) sysfs: musb_mode_store(), 2) init:
+musb_init_controller(). None of them should be related to OTG mode.
 
-Reported-by: Eric Auger <eric.auger@linaro.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- drivers/iommu/arm-smmu.c | 14 ++++++++------
- 1 file changed, 8 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index e933679a3266..2f186d22477f 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1098,18 +1098,20 @@ static int arm_smmu_domain_add_master(struct arm_smmu_domain *smmu_domain,
- 	struct arm_smmu_device *smmu = smmu_domain->smmu;
- 	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
- 
--	/* Devices in an IOMMU group may already be configured */
--	ret = arm_smmu_master_configure_smrs(smmu, cfg);
--	if (ret)
--		return ret == -EEXIST ? 0 : ret;
--
- 	/*
- 	 * FIXME: This won't be needed once we have IOMMU-backed DMA ops
--	 * for all devices behind the SMMU.
-+	 * for all devices behind the SMMU. Note that we need to take
-+	 * care configuring SMRs for devices both a platform_device and
-+	 * and a PCI device (i.e. a PCI host controller)
- 	 */
- 	if (smmu_domain->domain.type == IOMMU_DOMAIN_DMA)
- 		return 0;
- 
-+	/* Devices in an IOMMU group may already be configured */
-+	ret = arm_smmu_master_configure_smrs(smmu, cfg);
-+	if (ret)
-+		return ret == -EEXIST ? 0 : ret;
-+
- 	for (i = 0; i < cfg->num_streamids; ++i) {
- 		u32 idx, s2cr;
- 
--- 
-2.1.4
+Regards,
+-Bin.
