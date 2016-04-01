@@ -1,72 +1,59 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Fri, 1 Apr 2016 08:52:47 -0500
-Subject: [PATCH V2] extcon: palmas: Drop stray IRQF_EARLY_RESUME flag
-Message-ID: <1459518767-20382-1-git-send-email-nm@ti.com>
+Date: Fri, 1 Apr 2016 08:57:30 -0500
+Subject: dtc warnings
+In-Reply-To: <CAJKOXPdDyVbfSyshu4j21Ax2J-VwPpMZgAGEeO8VtgFYh4hTmw@mail.gmail.com>
+References: <CAL_Jsq+=OjY8y_8x7OSm-MWYKbrHN5cbv4TLwULxhNq+gfiMtw@mail.gmail.com>
+ <56FE27F9.2070100@gmail.com>
+ <CAJKOXPdDyVbfSyshu4j21Ax2J-VwPpMZgAGEeO8VtgFYh4hTmw@mail.gmail.com>
+Message-ID: <56FE7E4A.2000601@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Palmas extcon IRQs are nested threaded and wired to the Palmas
-interrupt controller. So, this flag is not required for nested
-IRQs anymore, since commit 3c646f2c6aa9 ("genirq: Don't suspend
-nested_thread irqs over system suspend") was merged. However, the
-fix in commit ae64e42cc2b3 ("extcon: palmas: Drop IRQF_EARLY_RESUME
-flag") missed a stray flag causing the following crash on resume on
-BeagleBoard-X15 platform:
+On 04/01/2016 02:53 AM, Krzysztof Kozlowski wrote:
+> On Fri, Apr 1, 2016 at 4:49 PM, Tomi Valkeinen <tomi.valkeinen@gmail.com> wrote:
+>>
+>> Hi Rob,
+>>
+>> On 01/04/16 04:40, Rob Herring wrote:
+>>> You may have noticed that linux-next had gotten noisy with dtc
+>>> warnings lately. I dropped the change for a bit, but added it back
+>>> today except now it is disabled unless building with "W=1".
+>>>
+>>> There's ~25K (2500 unique) warnings generated from the ARM dts files.
+>>> Here's the ranking of warnings by dtb. OMAP is the clear winner (based
+>>> on the similar counts, probably lots of duplicates). Please help
+>>> remind contributors to test with W=1 and start to fix these.
+>>>
+>>> At least for memory nodes, I plan to whitelist allowing no
+>>> unit-address. There could be others, but none that I've seen so far.
+>>
+>> What's the correct way to fix nodes for display platform devices? For
+>> example, omap4-panda-common.dtsi has two connector nodes:
+>>
+>> dvi0: connector at 0 {
+>>         compatible = "dvi-connector";
+>>         label = "dvi";
+>>         ...
+>> };
+>>
+>>
+>> hdmi0: connector at 1 {
+>>         compatible = "hdmi-connector";
+>>         label = "hdmi";
+>>         ...
+>> };
+> 
+> I have the same doubts. The ePAPR says in that case "the node-name
+> alone differentiates the node from other nodes at the same level in
+> the tree.". But which is preferred? Differentiating by number or by
+> type?
+> 
+> Similarly, what to do with the opp modes (a lot of warnings) in
+> Documentation/devicetree/bindings/opp/opp.txt?
+> 
++ linux-pm and Viresh for opp.txt
 
-[   53.670141] Unhandled fault: imprecise external abort (0x1406) at 0x00000000
-[..]
-[   53.670141] [<c04ae734>] (omap_set_gpio_triggering) from [<c04aeb94>] (omap_gpio_unmask_irq+0xc0/0xc4)
-[   53.670141] [<c04aeb94>] (omap_gpio_unmask_irq) from [<c01a0b88>] (irq_enable+0x30/0x44)
-[   53.670141] [<c01a0b88>] (irq_enable) from [<c019ebd8>] (__enable_irq+0x54/0x78)
-[   53.670141] [<c019ebd8>] (__enable_irq) from [<c01a4e60>] (resume_irqs+0xe8/0x100)
-[   53.670141] [<c01a4e60>] (resume_irqs) from [<c0514840>] (syscore_resume+0x94/0x298)
-[   53.670141] [<c0514840>] (syscore_resume) from [<c01981cc>] (suspend_devices_and_enter+0x790/0x9e4)
-[   53.670141] [<c01981cc>] (suspend_devices_and_enter) from [<c0198a60>] (pm_suspend+0x640/0x75c)
-[   53.670141] [<c0198a60>] (pm_suspend) from [<c0196bec>] (state_store+0x64/0xb8)
-[   53.670141] [<c0196bec>] (state_store) from [<c0307944>] (kernfs_fop_write+0xc0/0x1bc)
-[   53.670141] [<c0307944>] (kernfs_fop_write) from [<c028acb0>] (__vfs_write+0x1c/0xd8)
-[   53.670141] [<c028acb0>] (__vfs_write) from [<c028bba0>] (vfs_write+0x90/0x16c)
-[   53.670141] [<c028bba0>] (vfs_write) from [<c028c8c0>] (SyS_write+0x44/0x9c)
-[   53.670141] [<c028c8c0>] (SyS_write) from [<c0107840>] (ret_fast_syscall+0x0/0x1c)
-[..]
 
-Fixes: ae64e42cc2b3 ("extcon: palmas: Drop IRQF_EARLY_RESUME flag")
-Cc: Grygorii Strashko <grygorii.strashko@ti.com>
-Cc: MyungJoo Ham <myungjoo.ham@samsung.com>
-Cc: Chanwoo Choi <cw00.choi@samsung.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Lee Jones <lee.jones@linaro.org>
-Cc: Roger Quadros <rogerq@ti.com>
-
-Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
-based on v4.6-rc1
-Changes in V2:
-	- commit message updates for:
-		- Trimming the crash log down to base stack trace
-		- Fix up a few typos
-		- Update commit log to indicate that this is a completion of
-		  previously attempted fix .
-
-V1: https://patchwork.kernel.org/patch/8718431/
-
- drivers/extcon/extcon-palmas.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
-
-diff --git a/drivers/extcon/extcon-palmas.c b/drivers/extcon/extcon-palmas.c
-index 841a4b586395..8b3226dca1d9 100644
---- a/drivers/extcon/extcon-palmas.c
-+++ b/drivers/extcon/extcon-palmas.c
-@@ -348,8 +348,7 @@ static int palmas_usb_probe(struct platform_device *pdev)
- 						palmas_vbus_irq_handler,
- 						IRQF_TRIGGER_FALLING |
- 						IRQF_TRIGGER_RISING |
--						IRQF_ONESHOT |
--						IRQF_EARLY_RESUME,
-+						IRQF_ONESHOT,
- 						"palmas_usb_vbus",
- 						palmas_usb);
- 		if (status < 0) {
 -- 
-2.8.0
+Regards,
+Nishanth Menon
