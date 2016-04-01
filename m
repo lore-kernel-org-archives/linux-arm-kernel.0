@@ -1,26 +1,80 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Fri, 1 Apr 2016 10:44:06 -0400
-Subject: [PATCH v3 0/3] ahci: add ports-implemented dt bindings
-In-Reply-To: <1459497178-31090-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1459497178-31090-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <20160401144406.GS7822@mtj.duckdns.org>
+From: rogerq@ti.com (Roger Quadros)
+Date: Fri, 1 Apr 2016 17:45:17 +0300
+Subject: [PATCH V2] extcon: palmas: Drop stray IRQF_EARLY_RESUME flag
+In-Reply-To: <1459518767-20382-1-git-send-email-nm@ti.com>
+References: <1459518767-20382-1-git-send-email-nm@ti.com>
+Message-ID: <56FE897D.3040107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 01, 2016 at 08:52:55AM +0100, Srinivas Kandagatla wrote:
-> On some SOCs PORTS_IMPL register value is never programmed by the BIOS
-> and left at zero value. Which means that no sata ports are available for
-> software. AHCI driver used to cope up with this by fabricating the
-> port_map if the PORTS_IMPL register is read zero, but recent patch [1]
-> broke this workaround as zero value was valid for nvme disks.
+On 01/04/16 16:52, Nishanth Menon wrote:
+> Palmas extcon IRQs are nested threaded and wired to the Palmas
+> interrupt controller. So, this flag is not required for nested
+> IRQs anymore, since commit 3c646f2c6aa9 ("genirq: Don't suspend
+> nested_thread irqs over system suspend") was merged. However, the
+> fix in commit ae64e42cc2b3 ("extcon: palmas: Drop IRQF_EARLY_RESUME
+> flag") missed a stray flag causing the following crash on resume on
+> BeagleBoard-X15 platform:
 > 
-> This patch adds ports-implemented dt bindings as workaround for this issue
-> in a way that DT can dictate the port_map incase where the SOCs does not
-> program it already.
+> [   53.670141] Unhandled fault: imprecise external abort (0x1406) at 0x00000000
+> [..]
+> [   53.670141] [<c04ae734>] (omap_set_gpio_triggering) from [<c04aeb94>] (omap_gpio_unmask_irq+0xc0/0xc4)
+> [   53.670141] [<c04aeb94>] (omap_gpio_unmask_irq) from [<c01a0b88>] (irq_enable+0x30/0x44)
+> [   53.670141] [<c01a0b88>] (irq_enable) from [<c019ebd8>] (__enable_irq+0x54/0x78)
+> [   53.670141] [<c019ebd8>] (__enable_irq) from [<c01a4e60>] (resume_irqs+0xe8/0x100)
+> [   53.670141] [<c01a4e60>] (resume_irqs) from [<c0514840>] (syscore_resume+0x94/0x298)
+> [   53.670141] [<c0514840>] (syscore_resume) from [<c01981cc>] (suspend_devices_and_enter+0x790/0x9e4)
+> [   53.670141] [<c01981cc>] (suspend_devices_and_enter) from [<c0198a60>] (pm_suspend+0x640/0x75c)
+> [   53.670141] [<c0198a60>] (pm_suspend) from [<c0196bec>] (state_store+0x64/0xb8)
+> [   53.670141] [<c0196bec>] (state_store) from [<c0307944>] (kernfs_fop_write+0xc0/0x1bc)
+> [   53.670141] [<c0307944>] (kernfs_fop_write) from [<c028acb0>] (__vfs_write+0x1c/0xd8)
+> [   53.670141] [<c028acb0>] (__vfs_write) from [<c028bba0>] (vfs_write+0x90/0x16c)
+> [   53.670141] [<c028bba0>] (vfs_write) from [<c028c8c0>] (SyS_write+0x44/0x9c)
+> [   53.670141] [<c028c8c0>] (SyS_write) from [<c0107840>] (ret_fast_syscall+0x0/0x1c)
+> [..]
+> 
+> Fixes: ae64e42cc2b3 ("extcon: palmas: Drop IRQF_EARLY_RESUME flag")
+> Cc: Grygorii Strashko <grygorii.strashko@ti.com>
+> Cc: MyungJoo Ham <myungjoo.ham@samsung.com>
+> Cc: Chanwoo Choi <cw00.choi@samsung.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Cc: Roger Quadros <rogerq@ti.com>
+> 
+> Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
 
-Applied all three patches to libata/for-4.6-fixes w/ stable cc'd.
+Acked-by: Roger Quadros <rogerq@ti.com>
 
-Thanks.
+cheers,
+-roger
 
--- 
-tejun
+> ---
+> based on v4.6-rc1
+> Changes in V2:
+> 	- commit message updates for:
+> 		- Trimming the crash log down to base stack trace
+> 		- Fix up a few typos
+> 		- Update commit log to indicate that this is a completion of
+> 		  previously attempted fix .
+> 
+> V1: https://patchwork.kernel.org/patch/8718431/
+> 
+>  drivers/extcon/extcon-palmas.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+> 
+> diff --git a/drivers/extcon/extcon-palmas.c b/drivers/extcon/extcon-palmas.c
+> index 841a4b586395..8b3226dca1d9 100644
+> --- a/drivers/extcon/extcon-palmas.c
+> +++ b/drivers/extcon/extcon-palmas.c
+> @@ -348,8 +348,7 @@ static int palmas_usb_probe(struct platform_device *pdev)
+>  						palmas_vbus_irq_handler,
+>  						IRQF_TRIGGER_FALLING |
+>  						IRQF_TRIGGER_RISING |
+> -						IRQF_ONESHOT |
+> -						IRQF_EARLY_RESUME,
+> +						IRQF_ONESHOT,
+>  						"palmas_usb_vbus",
+>  						palmas_usb);
+>  		if (status < 0) {
+> 
