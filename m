@@ -1,124 +1,119 @@
 From: stuart.yoder@nxp.com (Stuart Yoder)
-Date: Fri, 1 Apr 2016 15:54:29 -0500
-Subject: [PATCH 1/2] Documentation: fsl-mc: binding updates for MSIs, ranges,
- PHYs
-Message-ID: <1459544069-12852-1-git-send-email-stuart.yoder@nxp.com>
+Date: Fri, 1 Apr 2016 15:54:40 -0500
+Subject: [PATCH 2/2] arm64: dts: ls2080a: fsl-mc dt node updates
+Message-ID: <1459544080-28598-1-git-send-email-stuart.yoder@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stuart Yoder <stuart.yoder@freescale.com>
+From: Stuart Yoder <stuart.yoder@nxp.com>
 
--The Freescale Management Complex and all associated objects
- use message interrupts, and thus an msi-parent is required.
-
--Define a ranges property to specify the mapping between
- the MC address space and the system address space.
-
--The fsl-mc node may optionally have dpmac sub-nodes that describe
- the relationship between the Ethernet MACs which belong to the MC
- and the Ethernet PHYs on the system board.
+updates to the fsl-mc node for full functionality:
+   -msi-parent is needed for interrupt support
+   -ranges is needed to enable the bus driver to translate bus addresses
+   -dpmac nodes provide a basis for relating dpmac objects to PHYs
 
 Signed-off-by: Stuart Yoder <stuart.yoder@nxp.com>
-Acked-by: J. German Rivera <German.Rivera@nxp.com>
 ---
- .../devicetree/bindings/misc/fsl,qoriq-mc.txt      |   81 +++++++++++++++++++-
- 1 file changed, 80 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi |   87 ++++++++++++++++++++++++
+ 1 file changed, 87 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt b/Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
-index c7a26ca..6611a7c 100644
---- a/Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
-+++ b/Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
-@@ -30,11 +30,90 @@ Required properties:
-                         region may not be present in some scenarios, such
-                         as in the device tree presented to a virtual machine.
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+index 9d746c6..449c635 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+@@ -265,6 +265,93 @@
+ 			compatible = "fsl,qoriq-mc";
+ 			reg = <0x00000008 0x0c000000 0 0x40>,	 /* MC portal base */
+ 			      <0x00000000 0x08340000 0 0x40000>; /* MC control reg */
++			msi-parent = <&its>;
++			#address-cells = <3>;
++			#size-cells = <1>;
++
++			/*
++			 * Region type 0x0 - MC portals
++			 * Region type 0x1 - QBMAN portals
++			 */
++			ranges = <0x0 0x0 0x0 0x8 0x0c000000 0x4000000
++				  0x1 0x0 0x0 0x8 0x18000000 0x8000000>;
++
++			/*
++			 * Define the maximum number of MACs present on the SoC.
++			 * They won't necessarily be all probed, since the
++			 * Data Path Layout file and the MC firmware can put
++			 * fewer actual DPMAC objects on the MC bus.
++			 */
++			dpmacs {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				dpmac1: dpmac at 1 {
++					compatible = "fsl,qoriq-mc-dpmac";
++					reg = <1>;
++				};
++				dpmac2: dpmac at 2 {
++					compatible = "fsl,qoriq-mc-dpmac";
++					reg = <2>;
++				};
++				dpmac3: dpmac at 3 {
++					compatible = "fsl,qoriq-mc-dpmac";
++					reg = <3>;
++				};
++				dpmac4: dpmac at 4 {
++					compatible = "fsl,qoriq-mc-dpmac";
++					reg = <4>;
++				};
++				dpmac5: dpmac at 5 {
++					compatible = "fsl,qoriq-mc-dpmac";
++					reg = <5>;
++				};
++				dpmac6: dpmac at 6 {
++					compatible = "fsl,qoriq-mc-dpmac";
++					reg = <6>;
++				};
++				dpmac7: dpmac at 7 {
++					compatible = "fsl,qoriq-mc-dpmac";
++					reg = <7>;
++				};
++				dpmac8: dpmac at 8 {
++					compatible = "fsl,qoriq-mc-dpmac";
++					reg = <8>;
++				};
++				dpmac9: dpmac at 9 {
++					compatible = "fsl,qoriq-mc-dpmac";
++					reg = <9>;
++				};
++				dpmac10: dpmac at 10 {
++					compatible = "fsl,qoriq-mc-dpmac";
++					reg = <0xa>;
++				};
++				dpmac11: dpmac at 11 {
++					compatible = "fsl,qoriq-mc-dpmac";
++					reg = <0xb>;
++				};
++				dpmac12: dpmac at 12 {
++					compatible = "fsl,qoriq-mc-dpmac";
++					reg = <0xc>;
++				};
++				dpmac13: dpmac at 13 {
++					compatible = "fsl,qoriq-mc-dpmac";
++					reg = <0xd>;
++				};
++				dpmac14: dpmac at 14 {
++					compatible = "fsl,qoriq-mc-dpmac";
++					reg = <0xe>;
++				};
++				dpmac15: dpmac at 15 {
++					compatible = "fsl,qoriq-mc-dpmac";
++					reg = <0xf>;
++				};
++				dpmac16: dpmac at 16 {
++					compatible = "fsl,qoriq-mc-dpmac";
++					reg = <0x10>;
++				};
++			};
++
+ 		};
  
-+    - msi-parent
-+        Value type: <phandle>
-+        Definition: Must be present and point to the MSI controller node
-+                    handling message interrupts for the MC.
-+
-+    - ranges
-+        Value type: <prop-encoded-array>
-+        Definition: A standard property.  Defines the mapping between the child
-+                    MC address space and the parent system address space.
-+
-+                    The MC address space is defined by 3 components:
-+                       <region type> <offset hi> <offset lo>
-+
-+                    Valid values for region type are
-+                       0x0 - MC portals
-+                       0x1 - QBMAN portals
-+
-+    - #address-cells
-+        Value type: <u32>
-+        Definition: Must be 3.  (see definition in 'ranges' property)
-+
-+    - #size-cells
-+        Value type: <u32>
-+        Definition: Must be 1.
-+
-+Sub-nodes:
-+
-+        The fsl-mc node may optionally have dpmac sub-nodes that describe
-+        the relationship between the Ethernet MACs which belong to the MC
-+        and the Ethernet PHYs on the system board.
-+
-+        The dpmac nodes must be under a node named "dpmacs" which contains
-+        the following properties:
-+
-+            - #address-cells
-+              Value type: <u32>
-+              Definition: Must be present if dpmac sub-nodes are defined and must
-+                          have a value of 1.
-+
-+            - #size-cells
-+              Value type: <u32>
-+              Definition: Must be present if dpmac sub-nodes are defined and must
-+                          have a value of 0.
-+
-+        These nodes must have the following properties:
-+
-+            - compatible
-+              Value type: <string>
-+              Definition: Must be "fsl,qoriq-mc-dpmac".
-+
-+            - reg
-+              Value type: <prop-encoded-array>
-+              Definition: Specifies the id of the dpmac.
-+
-+            - phy-handle
-+              Value type: <phandle>
-+              Definition: Specifies the phandle to the PHY device node associated
-+                          with the this dpmac.
-+
- Example:
- 
-         fsl_mc: fsl-mc at 80c000000 {
-                 compatible = "fsl,qoriq-mc";
-                 reg = <0x00000008 0x0c000000 0 0x40>,    /* MC portal base */
-                       <0x00000000 0x08340000 0 0x40000>; /* MC control reg */
--        };
-+                msi-parent = <&its>;
-+                #address-cells = <3>;
-+                #size-cells = <1>;
-+
-+                /*
-+                 * Region type 0x0 - MC portals
-+                 * Region type 0x1 - QBMAN portals
-+                 */
-+                ranges = <0x0 0x0 0x0 0x8 0x0c000000 0x4000000
-+                          0x1 0x0 0x0 0x8 0x18000000 0x8000000>;
- 
-+                dpmacs {
-+                    #address-cells = <1>;
-+                    #size-cells = <0>;
-+
-+                    dpmac at 1 {
-+                        compatible = "fsl,qoriq-mc-dpmac";
-+                        reg = <1>;
-+                        phy-handle = <&mdio0_phy0>;
-+                    }
-+                }
-+        };
+ 		smmu: iommu at 5000000 {
 -- 
 1.7.9.5
