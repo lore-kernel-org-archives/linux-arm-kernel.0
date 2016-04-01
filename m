@@ -1,10 +1,10 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri,  1 Apr 2016 14:54:28 +0200
-Subject: [PATCH 08/12] mtd: nand: lpc32xx: rely on generic DT parsing done in
+Date: Fri,  1 Apr 2016 14:54:30 +0200
+Subject: [PATCH 10/12] mtd: nand: pxa3xx: rely on generic DT parsing done in
  nand_scan_ident()
 In-Reply-To: <1459515272-31011-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1459515272-31011-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1459515272-31011-9-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1459515272-31011-11-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,57 +15,79 @@ manually.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/mtd/nand/lpc32xx_slc.c | 24 +++++++++---------------
- 1 file changed, 9 insertions(+), 15 deletions(-)
+ drivers/mtd/nand/pxa3xx_nand.c | 28 +++++++++++-----------------
+ 1 file changed, 11 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/mtd/nand/lpc32xx_slc.c b/drivers/mtd/nand/lpc32xx_slc.c
-index 3b8f373..99925a2 100644
---- a/drivers/mtd/nand/lpc32xx_slc.c
-+++ b/drivers/mtd/nand/lpc32xx_slc.c
-@@ -194,7 +194,6 @@ struct lpc32xx_nand_cfg_slc {
- 	uint32_t rwidth;
- 	uint32_t rhold;
- 	uint32_t rsetup;
--	bool use_bbt;
- 	int wp_gpio;
- 	struct mtd_partition *parts;
- 	unsigned num_parts;
-@@ -747,7 +746,6 @@ static struct lpc32xx_nand_cfg_slc *lpc32xx_parse_dt(struct device *dev)
- 		return NULL;
+diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+index d650885..38d26ab 100644
+--- a/drivers/mtd/nand/pxa3xx_nand.c
++++ b/drivers/mtd/nand/pxa3xx_nand.c
+@@ -29,7 +29,6 @@
+ #include <linux/slab.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+-#include <linux/of_mtd.h>
+ #include <linux/platform_data/mtd-nand-pxa3xx.h>
+ 
+ #define	CHIP_DELAY_TIMEOUT	msecs_to_jiffies(200)
+@@ -1651,6 +1650,12 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
+ 	if (info->variant == PXA3XX_NAND_VARIANT_ARMADA370)
+ 		nand_writel(info, NDECCCTRL, 0x0);
+ 
++	if (pdata->flash_bbt)
++		chip->bbt_options |= NAND_BBT_USE_FLASH;
++
++	chip->ecc.strength = pdata->ecc_strength;
++	chip->ecc.size = pdata->ecc_step_size;
++
+ 	if (nand_scan_ident(mtd, 1, NULL))
+ 		return -ENODEV;
+ 
+@@ -1663,13 +1668,12 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
+ 		}
  	}
  
--	ncfg->use_bbt = of_get_nand_on_flash_bbt(np);
- 	ncfg->wp_gpio = of_get_named_gpio(np, "gpios", 0);
+-	if (pdata->flash_bbt) {
++	if (chip->bbt_options & NAND_BBT_USE_FLASH) {
+ 		/*
+ 		 * We'll use a bad block table stored in-flash and don't
+ 		 * allow writing the bad block marker to the flash.
+ 		 */
+-		chip->bbt_options |= NAND_BBT_USE_FLASH |
+-				     NAND_BBT_NO_OOB_BBM;
++		chip->bbt_options |= NAND_BBT_NO_OOB_BBM;
+ 		chip->bbt_td = &bbt_main_descr;
+ 		chip->bbt_md = &bbt_mirror_descr;
+ 	}
+@@ -1689,10 +1693,9 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
+ 		}
+ 	}
  
- 	return ncfg;
-@@ -882,19 +880,15 @@ static int lpc32xx_nand_probe(struct platform_device *pdev)
- 	chip->ecc.bytes = LPC32XX_SLC_DEV_ECC_BYTES;
- 	chip->ecc.prepad = chip->ecc.postpad = 0;
- 
--	/* Avoid extra scan if using BBT, setup BBT support */
--	if (host->ncfg->use_bbt) {
--		chip->bbt_options |= NAND_BBT_USE_FLASH;
+-	if (pdata->ecc_strength && pdata->ecc_step_size) {
+-		ecc_strength = pdata->ecc_strength;
+-		ecc_step = pdata->ecc_step_size;
+-	} else {
++	ecc_strength = chip->ecc.strength;
++	ecc_step = chip->ecc.size;
++	if (!ecc_strength || !ecc_step) {
+ 		ecc_strength = chip->ecc_strength_ds;
+ 		ecc_step = chip->ecc_step_ds;
+ 	}
+@@ -1903,15 +1906,6 @@ static int pxa3xx_nand_probe_dt(struct platform_device *pdev)
+ 	if (of_get_property(np, "marvell,nand-keep-config", NULL))
+ 		pdata->keep_config = 1;
+ 	of_property_read_u32(np, "num-cs", &pdata->num_cs);
+-	pdata->flash_bbt = of_get_nand_on_flash_bbt(np);
 -
--		/*
--		 * Use a custom BBT marker setup for small page FLASH that
--		 * won't interfere with the ECC layout. Large and huge page
--		 * FLASH use the standard layout.
--		 */
--		if (mtd->writesize <= 512) {
--			chip->bbt_td = &bbt_smallpage_main_descr;
--			chip->bbt_md = &bbt_smallpage_mirror_descr;
--		}
-+	/*
-+	 * Use a custom BBT marker setup for small page FLASH that
-+	 * won't interfere with the ECC layout. Large and huge page
-+	 * FLASH use the standard layout.
-+	 */
-+	if ((chip->bbt_options & NAND_BBT_USE_FLASH) &&
-+	    mtd->writesize <= 512) {
-+		chip->bbt_td = &bbt_smallpage_main_descr;
-+		chip->bbt_md = &bbt_smallpage_mirror_descr;
- 	}
+-	pdata->ecc_strength = of_get_nand_ecc_strength(np);
+-	if (pdata->ecc_strength < 0)
+-		pdata->ecc_strength = 0;
+-
+-	pdata->ecc_step_size = of_get_nand_ecc_step_size(np);
+-	if (pdata->ecc_step_size < 0)
+-		pdata->ecc_step_size = 0;
  
- 	/*
+ 	pdev->dev.platform_data = pdata;
+ 
 -- 
 2.5.0
