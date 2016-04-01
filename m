@@ -1,25 +1,31 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 1 Apr 2016 12:06:27 -0700
-Subject: [PATCH v2] ARM: dts: dra7: Correct clock tree for sys_32k_ck
-In-Reply-To: <56FEC297.50102@ti.com>
-References: <1457957001-720-1-git-send-email-j-keerthy@ti.com>
- <20160330211828.GE9329@atomide.com>
- <20160330213224.GH9329@atomide.com> <56FCC3FF.7080901@ti.com>
- <56FCEC61.5020400@ti.com> <20160331170017.GI9329@atomide.com>
- <20160401153606.GJ9329@atomide.com> <56FEC297.50102@ti.com>
-Message-ID: <20160401190627.GO9329@atomide.com>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 01 Apr 2016 15:18:20 -0400 (EDT)
+Subject: [PATCH] net: mvneta: fix changing MTU when using per-cpu
+ processing
+In-Reply-To: <1459516878-2802-1-git-send-email-mw@semihalf.com>
+References: <1459516878-2802-1-git-send-email-mw@semihalf.com>
+Message-ID: <20160401.151820.127036849232206611.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [160401 11:50]:
+From: Marcin Wojtas <mw@semihalf.com>
+Date: Fri,  1 Apr 2016 15:21:18 +0200
+
+> After enabling per-cpu processing it appeared that under heavy load
+> changing MTU can result in blocking all port's interrupts and transmitting
+> data is not possible after the change.
 > 
-> Looks like a merge conflict to me, sys_32k_ck has gone under clockdomains
-> for some reason. It should be under clocks.
+> This commit fixes above issue by disabling percpu interrupts for the
+> time, when TXQs and RXQs are reconfigured.
+> 
+> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
 
-Oh OK, I'll wait for an updated patch against v4.6-rc1 then.
-Might be worth checking it applies cleanly against
-omap-for-v4.6/fixes-rc1 too.
+Applied, thanks.
 
-Regards,
+When I reviewed this I was worried that this was yet another case where
+the ndo op could be invoked in a potentially atomic or similar context,
+whereby on_each_cpu() would be illegal to use.
 
-Tony
+But that appears to not be the case, and thus this change is just fine.
+
+Thanks.
