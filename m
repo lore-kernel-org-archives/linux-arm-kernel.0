@@ -1,76 +1,63 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri,  1 Apr 2016 18:05:33 +0200
-Subject: [PATCH v3 7/9] efi/arm*: libstub: wire up GOP protocol to struct
- screen_info
+Date: Fri,  1 Apr 2016 18:05:34 +0200
+Subject: [PATCH v3 8/9] efi/arm*: wire up struct screen_info to
+ efi-framebuffer platform device
 In-Reply-To: <1459526735-24936-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1459526735-24936-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1459526735-24936-8-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1459526735-24936-9-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the code to the ARM and arm64 versions of the UEFI stub to
-populate struct screen_info based on the information received from the
-firmware via the GOP protocol.
+This adds code to the ARM and arm64 EFI init routines to expose a platform
+device of type 'efi-framebuffer' if struct screen_info has been populated
+appropriately from the GOP protocol by the stub. Since the framebuffer may
+potentially be located in system RAM, make sure that the region is reserved
+and marked MEMBLOCK_NOMAP.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/firmware/efi/libstub/arm-stub.c | 23 ++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+ drivers/firmware/efi/arm-init.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
-index 128632508fc6..993aa56755f6 100644
---- a/drivers/firmware/efi/libstub/arm-stub.c
-+++ b/drivers/firmware/efi/libstub/arm-stub.c
-@@ -169,6 +169,25 @@ void efi_char16_printk(efi_system_table_t *sys_table_arg,
- 	out->output_string(out, str);
+diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
+index 34bbad23da86..7c5a38c60037 100644
+--- a/drivers/firmware/efi/arm-init.c
++++ b/drivers/firmware/efi/arm-init.c
+@@ -19,6 +19,7 @@
+ #include <linux/mm_types.h>
+ #include <linux/of.h>
+ #include <linux/of_fdt.h>
++#include <linux/platform_device.h>
+ #include <linux/screen_info.h>
+ 
+ #include <asm/efi.h>
+@@ -80,6 +81,10 @@ static void __init init_screen_info(void)
+ 		screen_info.orig_video_cols = 80;
+ 		screen_info.orig_video_lines = 25;
+ 	}
++
++	if (screen_info.orig_video_isVGA == VIDEO_TYPE_EFI &&
++	    memblock_is_map_memory(screen_info.lfb_base))
++		memblock_mark_nomap(screen_info.lfb_base, screen_info.lfb_size);
  }
  
-+static struct screen_info *setup_graphics(efi_system_table_t *sys_table_arg)
+ static int __init uefi_init(void)
+@@ -241,3 +246,16 @@ void __init efi_init(void)
+ 
+ 	init_screen_info();
+ }
++
++static int __init register_gop_device(void)
 +{
-+	efi_guid_t gop_proto = EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
-+	efi_status_t status;
-+	unsigned long size;
-+	void **gop_handle = NULL;
-+	struct screen_info *si = NULL;
++	void *pd;
 +
-+	size = 0;
-+	status = efi_call_early(locate_handle, EFI_LOCATE_BY_PROTOCOL,
-+				&gop_proto, NULL, &size, gop_handle);
-+	if (status == EFI_BUFFER_TOO_SMALL) {
-+		si = alloc_screen_info(sys_table_arg);
-+		if (!si)
-+			return NULL;
-+		efi_setup_gop(sys_table_arg, si, &gop_proto, size);
-+	}
-+	return si;
++	if (screen_info.orig_video_isVGA != VIDEO_TYPE_EFI)
++		return 0;
++
++	pd = platform_device_register_data(NULL, "efi-framebuffer", 0,
++					   &screen_info, sizeof(screen_info));
++	return PTR_ERR_OR_ZERO(pd);
 +}
- 
- /*
-  * This function handles the architcture specific differences between arm and
-@@ -208,6 +227,7 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
- 	unsigned long reserve_addr = 0;
- 	unsigned long reserve_size = 0;
- 	int secure_boot = 0;
-+	struct screen_info *si;
- 
- 	/* Check if we were booted by the EFI firmware */
- 	if (sys_table->hdr.signature != EFI_SYSTEM_TABLE_SIGNATURE)
-@@ -260,6 +280,8 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
- 			__nokaslr = true;
- 	}
- 
-+	si = setup_graphics(sys_table);
-+
- 	status = handle_kernel_image(sys_table, image_addr, &image_size,
- 				     &reserve_addr,
- 				     &reserve_size,
-@@ -341,6 +363,7 @@ fail_free_image:
- 	efi_free(sys_table, image_size, *image_addr);
- 	efi_free(sys_table, reserve_size, reserve_addr);
- fail_free_cmdline:
-+	free_screen_info(sys_table, si);
- 	efi_free(sys_table, cmdline_size, (unsigned long)cmdline_ptr);
- fail:
- 	return EFI_ERROR;
++subsys_initcall(register_gop_device);
 -- 
 2.5.0
