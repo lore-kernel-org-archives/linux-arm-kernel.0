@@ -1,270 +1,104 @@
 From: james.morse@arm.com (James Morse)
-Date: Fri,  1 Apr 2016 17:53:26 +0100
-Subject: [PATCH v7 02/16] arm64: Fold proc-macros.S into assembler.h
+Date: Fri,  1 Apr 2016 17:53:27 +0100
+Subject: [PATCH v7 03/16] arm64: Cleanup SCTLR flags
 In-Reply-To: <1459529620-22150-1-git-send-email-james.morse@arm.com>
 References: <1459529620-22150-1-git-send-email-james.morse@arm.com>
-Message-ID: <1459529620-22150-3-git-send-email-james.morse@arm.com>
+Message-ID: <1459529620-22150-4-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geoff Levand <geoff@infradead.org>
 
-To allow the assembler macros defined in arch/arm64/mm/proc-macros.S to
-be used outside the mm code move the contents of proc-macros.S to
-asm/assembler.h.  Also, delete proc-macros.S, and fix up all references
-to proc-macros.S.
+We currently have macros defining flags for the arm64 sctlr registers in
+both kvm_arm.h and sysreg.h.  To clean things up and simplify move the
+definitions of the SCTLR_EL2 flags from kvm_arm.h to sysreg.h, rename any
+SCTLR_EL1 or SCTLR_EL2 flags that are common to both registers to be
+SCTLR_ELx, with 'x' indicating a common flag, and fixup all files to
+include the proper header or to use the new macro names.
 
 Signed-off-by: Geoff Levand <geoff@infradead.org>
-Acked-by: Pavel Machek <pavel@ucw.cz>
-[rebased, included dcache_by_line_op]
+[Restored pgtable-hwdef.h include]
 Signed-off-by: James Morse <james.morse@arm.com>
 ---
- arch/arm64/include/asm/assembler.h | 82 ++++++++++++++++++++++++++++++-
- arch/arm64/mm/cache.S              |  2 -
- arch/arm64/mm/proc-macros.S        | 98 --------------------------------------
- arch/arm64/mm/proc.S               |  3 --
- 4 files changed, 81 insertions(+), 104 deletions(-)
- delete mode 100644 arch/arm64/mm/proc-macros.S
+ arch/arm64/include/asm/kvm_arm.h | 11 -----------
+ arch/arm64/include/asm/sysreg.h  | 19 +++++++++++++++----
+ arch/arm64/kvm/hyp-init.S        |  5 +++--
+ 3 files changed, 18 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 70f7b9e04598..c72474c2d4dc 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -1,5 +1,5 @@
- /*
-- * Based on arch/arm/include/asm/assembler.h
-+ * Based on arch/arm/include/asm/assembler.h, arch/arm/mm/proc-macros.S
-  *
-  * Copyright (C) 1996-2000 Russell King
-  * Copyright (C) 2012 ARM Ltd.
-@@ -23,6 +23,8 @@
- #ifndef __ASM_ASSEMBLER_H
- #define __ASM_ASSEMBLER_H
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index 0e391dbfc420..6f8e62a65c9a 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -84,17 +84,6 @@
+ #define HCR_INT_OVERRIDE   (HCR_FMO | HCR_IMO)
+ #define HCR_HOST_VHE_FLAGS (HCR_RW | HCR_TGE | HCR_E2H)
  
-+#include <asm/asm-offsets.h>
-+#include <asm/pgtable-hwdef.h>
- #include <asm/ptrace.h>
- #include <asm/thread_info.h>
+-/* Hyp System Control Register (SCTLR_EL2) bits */
+-#define SCTLR_EL2_EE	(1 << 25)
+-#define SCTLR_EL2_WXN	(1 << 19)
+-#define SCTLR_EL2_I	(1 << 12)
+-#define SCTLR_EL2_SA	(1 << 3)
+-#define SCTLR_EL2_C	(1 << 2)
+-#define SCTLR_EL2_A	(1 << 1)
+-#define SCTLR_EL2_M	1
+-#define SCTLR_EL2_FLAGS	(SCTLR_EL2_M | SCTLR_EL2_A | SCTLR_EL2_C |	\
+-			 SCTLR_EL2_SA | SCTLR_EL2_I)
+-
+ /* TCR_EL2 Registers bits */
+ #define TCR_EL2_RES1	((1 << 31) | (1 << 23))
+ #define TCR_EL2_TBI	(1 << 20)
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index 1a78d6e2a78b..0961a24e8d48 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -86,10 +86,21 @@
+ #define SET_PSTATE_UAO(x) __inst_arm(0xd5000000 | REG_PSTATE_UAO_IMM |\
+ 				     (!!x)<<8 | 0x1f)
  
-@@ -212,6 +214,84 @@ lr	.req	x30		// link register
- 	.endm
+-/* SCTLR_EL1 */
+-#define SCTLR_EL1_CP15BEN	(0x1 << 5)
+-#define SCTLR_EL1_SED		(0x1 << 8)
+-#define SCTLR_EL1_SPAN		(0x1 << 23)
++/* Common SCTLR_ELx flags. */
++#define SCTLR_ELx_EE    (1 << 25)
++#define SCTLR_ELx_I	(1 << 12)
++#define SCTLR_ELx_SA	(1 << 3)
++#define SCTLR_ELx_C	(1 << 2)
++#define SCTLR_ELx_A	(1 << 1)
++#define SCTLR_ELx_M	1
++
++#define SCTLR_ELx_FLAGS	(SCTLR_ELx_M | SCTLR_ELx_A | SCTLR_ELx_C | \
++			 SCTLR_ELx_SA | SCTLR_ELx_I)
++
++/* SCTLR_EL1 specific flags. */
++#define SCTLR_EL1_SPAN		(1 << 23)
++#define SCTLR_EL1_SED		(1 << 8)
++#define SCTLR_EL1_CP15BEN	(1 << 5)
  
- /*
-+ * vma_vm_mm - get mm pointer from vma pointer (vma->vm_mm)
-+ */
-+	.macro	vma_vm_mm, rd, rn
-+	ldr	\rd, [\rn, #VMA_VM_MM]
-+	.endm
-+
-+/*
-+ * mmid - get context id from mm pointer (mm->context.id)
-+ */
-+	.macro	mmid, rd, rn
-+	ldr	\rd, [\rn, #MM_CONTEXT_ID]
-+	.endm
-+
-+/*
-+ * dcache_line_size - get the minimum D-cache line size from the CTR register.
-+ */
-+	.macro	dcache_line_size, reg, tmp
-+	mrs	\tmp, ctr_el0			// read CTR
-+	ubfm	\tmp, \tmp, #16, #19		// cache line size encoding
-+	mov	\reg, #4			// bytes per word
-+	lsl	\reg, \reg, \tmp		// actual cache line size
-+	.endm
-+
-+/*
-+ * icache_line_size - get the minimum I-cache line size from the CTR register.
-+ */
-+	.macro	icache_line_size, reg, tmp
-+	mrs	\tmp, ctr_el0			// read CTR
-+	and	\tmp, \tmp, #0xf		// cache line size encoding
-+	mov	\reg, #4			// bytes per word
-+	lsl	\reg, \reg, \tmp		// actual cache line size
-+	.endm
-+
-+/*
-+ * tcr_set_idmap_t0sz - update TCR.T0SZ so that we can load the ID map
-+ */
-+	.macro	tcr_set_idmap_t0sz, valreg, tmpreg
-+#ifndef CONFIG_ARM64_VA_BITS_48
-+	ldr_l	\tmpreg, idmap_t0sz
-+	bfi	\valreg, \tmpreg, #TCR_T0SZ_OFFSET, #TCR_TxSZ_WIDTH
-+#endif
-+	.endm
-+
-+/*
-+ * Macro to perform a data cache maintenance for the interval
-+ * [kaddr, kaddr + size)
-+ *
-+ * 	op:		operation passed to dc instruction
-+ * 	domain:		domain used in dsb instruciton
-+ * 	kaddr:		starting virtual address of the region
-+ * 	size:		size of the region
-+ * 	Corrupts:	kaddr, size, tmp1, tmp2
-+ */
-+	.macro dcache_by_line_op op, domain, kaddr, size, tmp1, tmp2
-+	dcache_line_size \tmp1, \tmp2
-+	add	\size, \kaddr, \size
-+	sub	\tmp2, \tmp1, #1
-+	bic	\kaddr, \kaddr, \tmp2
-+9998:	dc	\op, \kaddr
-+	add	\kaddr, \kaddr, \tmp1
-+	cmp	\kaddr, \size
-+	b.lo	9998b
-+	dsb	\domain
-+	.endm
-+
-+/*
-+ * reset_pmuserenr_el0 - reset PMUSERENR_EL0 if PMUv3 present
-+ */
-+	.macro	reset_pmuserenr_el0, tmpreg
-+	mrs	\tmpreg, id_aa64dfr0_el1	// Check ID_AA64DFR0_EL1 PMUVer
-+	sbfx	\tmpreg, \tmpreg, #8, #4
-+	cmp	\tmpreg, #1			// Skip if no PMU present
-+	b.lt	9000f
-+	msr	pmuserenr_el0, xzr		// Disable PMU access from EL0
-+9000:
-+	.endm
-+
-+/*
-  * Annotate a function as position independent, i.e., safe to be called before
-  * the kernel virtual mapping is activated.
-  */
-diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-index 6df07069a025..50ff9ba3a236 100644
---- a/arch/arm64/mm/cache.S
-+++ b/arch/arm64/mm/cache.S
-@@ -24,8 +24,6 @@
- #include <asm/cpufeature.h>
- #include <asm/alternative.h>
  
--#include "proc-macros.S"
--
- /*
-  *	flush_icache_range(start,end)
-  *
-diff --git a/arch/arm64/mm/proc-macros.S b/arch/arm64/mm/proc-macros.S
-deleted file mode 100644
-index e6a30e1268a8..000000000000
---- a/arch/arm64/mm/proc-macros.S
-+++ /dev/null
-@@ -1,98 +0,0 @@
--/*
-- * Based on arch/arm/mm/proc-macros.S
-- *
-- * Copyright (C) 2012 ARM Ltd.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-- */
--
--#include <asm/asm-offsets.h>
--#include <asm/thread_info.h>
--
--/*
-- * vma_vm_mm - get mm pointer from vma pointer (vma->vm_mm)
-- */
--	.macro	vma_vm_mm, rd, rn
--	ldr	\rd, [\rn, #VMA_VM_MM]
--	.endm
--
--/*
-- * mmid - get context id from mm pointer (mm->context.id)
-- */
--	.macro	mmid, rd, rn
--	ldr	\rd, [\rn, #MM_CONTEXT_ID]
--	.endm
--
--/*
-- * dcache_line_size - get the minimum D-cache line size from the CTR register.
-- */
--	.macro	dcache_line_size, reg, tmp
--	mrs	\tmp, ctr_el0			// read CTR
--	ubfm	\tmp, \tmp, #16, #19		// cache line size encoding
--	mov	\reg, #4			// bytes per word
--	lsl	\reg, \reg, \tmp		// actual cache line size
--	.endm
--
--/*
-- * icache_line_size - get the minimum I-cache line size from the CTR register.
-- */
--	.macro	icache_line_size, reg, tmp
--	mrs	\tmp, ctr_el0			// read CTR
--	and	\tmp, \tmp, #0xf		// cache line size encoding
--	mov	\reg, #4			// bytes per word
--	lsl	\reg, \reg, \tmp		// actual cache line size
--	.endm
--
--/*
-- * tcr_set_idmap_t0sz - update TCR.T0SZ so that we can load the ID map
-- */
--	.macro	tcr_set_idmap_t0sz, valreg, tmpreg
--#ifndef CONFIG_ARM64_VA_BITS_48
--	ldr_l	\tmpreg, idmap_t0sz
--	bfi	\valreg, \tmpreg, #TCR_T0SZ_OFFSET, #TCR_TxSZ_WIDTH
--#endif
--	.endm
--
--/*
-- * Macro to perform a data cache maintenance for the interval
-- * [kaddr, kaddr + size)
-- *
-- * 	op:		operation passed to dc instruction
-- * 	domain:		domain used in dsb instruciton
-- * 	kaddr:		starting virtual address of the region
-- * 	size:		size of the region
-- * 	Corrupts: 	kaddr, size, tmp1, tmp2
-- */
--	.macro dcache_by_line_op op, domain, kaddr, size, tmp1, tmp2
--	dcache_line_size \tmp1, \tmp2
--	add	\size, \kaddr, \size
--	sub	\tmp2, \tmp1, #1
--	bic	\kaddr, \kaddr, \tmp2
--9998:	dc	\op, \kaddr
--	add	\kaddr, \kaddr, \tmp1
--	cmp	\kaddr, \size
--	b.lo	9998b
--	dsb	\domain
--	.endm
--
--/*
-- * reset_pmuserenr_el0 - reset PMUSERENR_EL0 if PMUv3 present
-- */
--	.macro	reset_pmuserenr_el0, tmpreg
--	mrs	\tmpreg, id_aa64dfr0_el1	// Check ID_AA64DFR0_EL1 PMUVer
--	sbfx	\tmpreg, \tmpreg, #8, #4
--	cmp	\tmpreg, #1			// Skip if no PMU present
--	b.lt	9000f
--	msr	pmuserenr_el0, xzr		// Disable PMU access from EL0
--9000:
--	.endm
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 543f5198005a..9f6deacf41d2 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -23,13 +23,10 @@
- #include <asm/assembler.h>
- #include <asm/asm-offsets.h>
- #include <asm/hwcap.h>
--#include <asm/pgtable-hwdef.h>
- #include <asm/pgtable.h>
- #include <asm/cpufeature.h>
- #include <asm/alternative.h>
+ /* id_aa64isar0 */
+diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+index 7d8747c6427c..5ce1b47ef770 100644
+--- a/arch/arm64/kvm/hyp-init.S
++++ b/arch/arm64/kvm/hyp-init.S
+@@ -21,6 +21,7 @@
+ #include <asm/kvm_arm.h>
+ #include <asm/kvm_mmu.h>
+ #include <asm/pgtable-hwdef.h>
++#include <asm/sysreg.h>
  
--#include "proc-macros.S"
--
- #ifdef CONFIG_ARM64_64K_PAGES
- #define TCR_TG_FLAGS	TCR_TG0_64K | TCR_TG1_64K
- #elif defined(CONFIG_ARM64_16K_PAGES)
+ 	.text
+ 	.pushsection	.hyp.idmap.text, "ax"
+@@ -103,8 +104,8 @@ __do_hyp_init:
+ 	dsb	sy
+ 
+ 	mrs	x4, sctlr_el2
+-	and	x4, x4, #SCTLR_EL2_EE	// preserve endianness of EL2
+-	ldr	x5, =SCTLR_EL2_FLAGS
++	and	x4, x4, #SCTLR_ELx_EE	// preserve endianness of EL2
++	ldr	x5, =SCTLR_ELx_FLAGS
+ 	orr	x4, x4, x5
+ 	msr	sctlr_el2, x4
+ 	isb
 -- 
 2.8.0.rc3
