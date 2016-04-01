@@ -1,77 +1,56 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 1 Apr 2016 12:33:50 +0300
-Subject: [PATCH v2 0/3] ARM: OMAP3: Fix McBSP2/3 hwmod setup for sidetone
-In-Reply-To: <alpine.DEB.2.02.1603211743200.31059@utopia.booyaka.com>
-References: <1458311007-19168-1-git-send-email-peter.ujfalusi@ti.com>
- <alpine.DEB.2.02.1603191937430.6629@utopia.booyaka.com>
- <56EFB794.5010505@ti.com>
- <alpine.DEB.2.02.1603211743200.31059@utopia.booyaka.com>
-Message-ID: <56FE407E.9030803@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 1 Apr 2016 10:36:35 +0100
+Subject: [PATCH v15 17/20] arm64: kdump: implement machine_crash_shutdown()
+In-Reply-To: <20160401084509.GA11108@linaro.org>
+References: <cover.1457977401.git.geoff@infradead.org>
+ <8f53a31cf8bbfdd73eb289e078addc31c5a19fcf.1457977403.git.geoff@infradead.org>
+ <56EC440F.4050406@arm.com> <56EFF738.1040308@arm.com>
+ <20160331075659.GD2267@linaro.org> <56FCDBF0.2010505@arm.com>
+ <20160331101038.GB26532@leverpostej>
+ <20160401084509.GA11108@linaro.org>
+Message-ID: <20160401093635.GA29876@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
-
-On 03/21/16 19:44, Paul Walmsley wrote:
-> Hi P?ter,
+On Fri, Apr 01, 2016 at 05:45:09PM +0900, AKASHI Takahiro wrote:
+> On Thu, Mar 31, 2016 at 11:10:38AM +0100, Mark Rutland wrote:
+> > On Thu, Mar 31, 2016 at 09:12:32AM +0100, Marc Zyngier wrote:
+> > > On 31/03/16 08:57, AKASHI Takahiro wrote:
+> > > > On Mon, Mar 21, 2016 at 01:29:28PM +0000, James Morse wrote:
+> > > >> On 18/03/16 18:08, James Morse wrote:
+> > > >>> On 14/03/16 17:48, Geoff Levand wrote:
+> > > >>>> +	/* just in case */
+> > > >>>> +	while (1)
+> > > >>>> +		wfi();
+> > > >>
+> > > >> Having thought about this some more: I don't think spinning like this is safe.
+> > > >> We need to spin with the MMU turned off, otherwise this core will pollute the
+> > > >> kdump kernel with TLB entries from the old page tables.
+> > > > 
+> > > > I think that wfi() will never wake up since local interrupts are disabled
+> > > > here. So how can it pollute the kdump kernel?
+> > > 
+> > > Having interrupts disabled doesn't prevent an exit from WFI. Quite the
+> > > opposite, actually. It is designed to wake-up the core when something
+> > > happens on the external interface.
+> > 
+> > Further, WFI is a hint, and may simply act as a NOP. 
 > 
-> On Mon, 21 Mar 2016, Peter Ujfalusi wrote:
-> 
->> On 03/19/16 21:38, Paul Walmsley wrote:
->>> On Fri, 18 Mar 2016, Peter Ujfalusi wrote:
->>>
->>>> Hi,
->>>>
->>>> Chanes since v1:
->>>> - removed the ASoC patch as Mark has applied it already
->>>> - Added my signed-off to the hwmod patch
->>>> - New patch to handle the case when the sidetone hwmod has been removed for
->>>>   legacy boot.
->>>>
->>>> The series addresses a long standing issue with McBSP2/3 regarding to hwmod
->>>> setup. When booting with DT a warning is printed that mcbsp2/3 is using two
->>>> hwmod.
->>>> The root of the issue is the way how the hwmod data was constructed in the first
->>>> place for OMAP3 McBSP2/3.
->>>> After re-reading the TRM it is clear that the sidetone should not have it's
->>>> own hwmod data as it is not a separate IP, it is part of the McBSP module. It
->>>> can not affect PRCM either since it's SYSCONFIG register's AUTOIDLE bit is only
->>>> sets the autoidle from the internal McBSP_iclk clock to the sidetone block of
->>>> the same McBSP.
->>>
->>> NAK, at least without further discussion - see my comments on the v1 0/3 
->>> introduction.
->>
->> Yes, I could have sent the first series as RFC, but I believe(d) that this is
->> the correct way to fix the McBSP sidetone integration.
-> 
-> Yep not a problem.  You're handling the process correctly.  There's no 
-> need to send things as an RFC unless you are unsure. 
-> 
-> What you and I are doing now is exactly how the discussion and review 
-> process is supposed to work.
+> Ah, OK. But even so, none of interrupt handlers (nor other code) will
+> be executed after cpu wakes up, and the memory won't be polluted.
 
-So what shall we do with the OMAP3 McBSP2/3 sidetone? It has been broken in DT
-boot since the first time we booted OMAP3 with DT... Only in legacy mode we
-can have properly working ST.
+The code comprising the while(1) loop will be executed, and TLB walks,
+speculative fetches, etc may occur regardless.
 
-I have the second level of patches based on this set (I think I need to resend
-this series since I might have changed it, can not recall) for both arch/arm
-and ASoC to have working ST in legacy and DT boot. We will no longer have
-warning regarding to broken hwmod data in DT boot.
-But all is based on the assumption that we agree at some point that the ST
-block is part of the McBSP module ;)
+We don't share TLB entries between cores (we don't have support for
+ARMv8.2s CnP), and the kdump kernel should be running in a carveout from
+main memory (which IIUC is not mapped by the original kernel). So
+normally, this would not be a problem.
 
-If I need to write separate driver for the McBSP module's ST block, it would
-mean some sort of API between the McBSP and ST driver. This is not straight
-forward since there are registers both in McBSP block and ST block that needs
-to be configured in specific order -> simple enable_st() would not work
-(probably enable_st_stage1(), enable_st_stage2()) and callbacks from McBSP to
-ST, ST to McBSP also going to be needed. As far as I can see it is going to be
-a huge mess.
+However, if there is a problem with the page tables (e.g. entries
+erroneously point into a PA range the kdump kernel is using), then
+unavoidable background memory traffic from the CPU may cause problems
+for the kdump kernel.
 
-Other option would be to deprecate the ST support as such, but that would
-leave the n900 guys in trouble as they need ST to be functional...
-
--- 
-P?ter
+Thanks,
+Mark.
