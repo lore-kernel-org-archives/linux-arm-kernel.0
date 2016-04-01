@@ -1,40 +1,55 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 1 Apr 2016 07:02:18 -0700
-Subject: [PATCH] ARM: sa1100: Initialize gpio after gpio subsystem has
- been initialized
-In-Reply-To: <CACRpkdYg3-XBBCmrKHK5EukEwxU3J4h_4BAKnoVHEiZbFkU5QA@mail.gmail.com>
-References: <1459275349-11356-1-git-send-email-linux@roeck-us.net>
- <20160331162116.GB5605@roeck-us.net>
- <CACRpkdYg3-XBBCmrKHK5EukEwxU3J4h_4BAKnoVHEiZbFkU5QA@mail.gmail.com>
-Message-ID: <20160401140218.GA14502@roeck-us.net>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Fri,  1 Apr 2016 15:02:52 +0100
+Subject: [PATCH v5 01/10] dt-bindings: document the MPS2 timer bindings
+In-Reply-To: <1459519381-34441-1-git-send-email-vladimir.murzin@arm.com>
+References: <1459519381-34441-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1459519381-34441-2-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 01, 2016 at 10:04:57AM +0200, Linus Walleij wrote:
-> On Thu, Mar 31, 2016 at 6:21 PM, Guenter Roeck <linux@roeck-us.net> wrote:
-> > On Tue, Mar 29, 2016 at 11:15:49AM -0700, Guenter Roeck wrote:
-> >> The sa1100 gpio driver was initialized from interrupt initialization code,
-> >> which is earlier than the gpio subsystem is initialized. Since commit
-> >> ff2b13592299 ("gpio: make the gpiochip a real device"), this is fatal
-> >> and causes the system to crash.
-> >>
-> >> The sa1100 gpio driver must be initialized prior to arch_initcall, since
-> >> its gpio pins are used in arch_initcall code, but after the gpio subsystem
-> >> is initialized (core_initcall). Initialize it with postcore_initcall.
-> >>
-> >> Fixes: ff2b13592299 ("gpio: make the gpiochip a real device")
-> >> Cc: Linus Walleij <linus.walleij@linaro.org>
-> >> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
-> >
-> > Please ignore/drop this patch - a better (cleaner) fix is in the works
-> > for gpiolib.
-> 
-> This delivers though. I tested it on my also regressing iPAQ.
-> 
-I am a bit concerned that the gpio initialization was that early on purpose,
-and that by moving it we might miss some use cases. I did not find any, but that
-doesn't mean that there are none. Without knowing _why_ the initialization was
-that early, I would prefer not to touch the code if it can be avoided.
+This adds documentation of device tree bindings for the
+timers found on ARM MPS2 platform.
 
-Thanks,
-Guenter
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ .../devicetree/bindings/timer/arm,mps2-timer.txt   |   28 ++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/timer/arm,mps2-timer.txt
+
+diff --git a/Documentation/devicetree/bindings/timer/arm,mps2-timer.txt b/Documentation/devicetree/bindings/timer/arm,mps2-timer.txt
+new file mode 100644
+index 0000000..48f84d7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/timer/arm,mps2-timer.txt
+@@ -0,0 +1,28 @@
++ARM MPS2 timer
++
++The MPS2 platform has simple general-purpose 32 bits timers.
++
++Required properties:
++- compatible	: Should be "arm,mps2-timer"
++- reg		: Address and length of the register set
++- interrupts	: Reference to the timer interrupt
++
++Required clocking property, have to be one of:
++- clocks	  : The input clock of the timer
++- clock-frequency : The rate in HZ in input of the ARM MPS2 timer
++
++Examples:
++
++timer1: mps2-timer at 40000000 {
++	compatible = "arm,mps2-timer";
++	reg = <0x40000000 0x1000>;
++	interrupts = <8>;
++	clocks = <&sysclk>;
++};
++
++timer2: mps2-timer at 40001000 {
++	compatible = "arm,mps2-timer";
++	reg = <0x40001000 0x1000>;
++	interrupts = <9>;
++	clock-frequency = <25000000>;
++};
+-- 
+1.7.9.5
