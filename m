@@ -1,45 +1,49 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 1 Apr 2016 10:27:20 -0400
-Subject: [PATCH 02/11] ARM: dts: exynos: Fix DTC unit name warnings in
- Exynos3250
-In-Reply-To: <1459493874-2366-2-git-send-email-k.kozlowski@samsung.com>
-References: <1459493874-2366-1-git-send-email-k.kozlowski@samsung.com>
- <1459493874-2366-2-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <56FE8548.5060501@osg.samsung.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Fri, 1 Apr 2016 22:28:01 +0800
+Subject: [PATCH] pinctrl: mediatek: correct debounce time unit in
+ mtk_gpio_set_debounce
+In-Reply-To: <1459518711-61619-1-git-send-email-yingjoe.chen@mediatek.com>
+References: <1459518711-61619-1-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <CAGS+omA=xbZH04nkVddVi77xvNznjx36_rHJHhAHBLejuxZqgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+Hi Yingjoe,
 
-On 04/01/2016 02:57 AM, Krzysztof Kozlowski wrote:
-> Fix following DTC warnings in Exynos3250 boards:
-> 
-> Warning (unit_address_vs_reg): Node /soc/video-phy at 10020710 has a unit name, but no reg property
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+On Fri, Apr 1, 2016 at 9:51 PM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
+> The debounce time unit for gpio_chip.set_debounce is us but
+> mtk_gpio_set_debounce regard it as ms.
+> Fix this by correct debounce time array dbnc_arr so it can find correct
+> debounce setting.
+
+This patch also changes the first entry to 500 usec.  At least mention why.
+
+>
+> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
 > ---
->  arch/arm/boot/dts/exynos3250.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
-> index 137f9015d4e8..5225e953d2ed 100644
-> --- a/arch/arm/boot/dts/exynos3250.dtsi
-> +++ b/arch/arm/boot/dts/exynos3250.dtsi
-> @@ -153,7 +153,7 @@
->  			interrupt-parent = <&gic>;
->  		};
->  
-> -		mipi_phy: video-phy at 10020710 {
-> +		mipi_phy: video-phy {
->  			compatible = "samsung,s5pv210-mipi-video-phy";
->  			#phy-cells = <1>;
->  			syscon = <&pmu_system_controller>;
-> 
+>  drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> index 2bbe6f7..be72325 100644
+> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> @@ -1004,7 +1004,8 @@ static int mtk_gpio_set_debounce(struct gpio_chip *chip, unsigned offset,
+>         struct mtk_pinctrl *pctl = dev_get_drvdata(chip->parent);
+>         int eint_num, virq, eint_offset;
+>         unsigned int set_offset, bit, clr_bit, clr_offset, rst, i, unmask, dbnc;
+> -       static const unsigned int dbnc_arr[] = {0 , 1, 16, 32, 64, 128, 256};
+> +       static const unsigned int dbnc_arr[] = {500, 1000, 16000, 32000, 64000,
+> +                                               128000, 256000};
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+While you are at it, can you please rename this to something more
+readable than "dbnc"?
 
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+-Dan
+
+>         const struct mtk_desc_pin *pin;
+>         struct irq_data *d;
+>
+> --
+> 1.9.1
+>
