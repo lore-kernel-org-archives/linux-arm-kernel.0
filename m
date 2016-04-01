@@ -1,92 +1,50 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 1 Apr 2016 13:36:45 +0300
-Subject: [PATCH v3 15/16] usb: musb: da8xx: Use devm in probe
-In-Reply-To: <20160331222112.GA28044@uda0271908>
-References: <1458863503-31121-1-git-send-email-david@lechnology.com>
- <1458863503-31121-16-git-send-email-david@lechnology.com>
- <20160331222112.GA28044@uda0271908>
-Message-ID: <56FE4F3D.9040209@cogentembedded.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Fri, 1 Apr 2016 12:37:29 +0200
+Subject: [PULL 0/2] KVM/ARM Fixes for v4.6-rc2
+In-Reply-To: <1459501647-20726-1-git-send-email-christoffer.dall@linaro.org>
+References: <1459501647-20726-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <56FE4F69.4030400@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
 
-On 4/1/2016 1:21 AM, Bin Liu wrote:
 
->> Simplify things a bit by using devm functions where possible.
->>
->> Signed-off-by: David Lechner <david@lechnology.com>
->> ---
->>
->> v3 changes:
->>
->> * Kept clk variable to minimize noise.
->>
->>
->>   drivers/usb/musb/da8xx.c | 19 +++++--------------
->>   1 file changed, 5 insertions(+), 14 deletions(-)
->>
->> diff --git a/drivers/usb/musb/da8xx.c b/drivers/usb/musb/da8xx.c
->> index b03d3b8..0c1997c 100644
->> --- a/drivers/usb/musb/da8xx.c
->> +++ b/drivers/usb/musb/da8xx.c
->> @@ -490,20 +490,18 @@ static int da8xx_probe(struct platform_device *pdev)
->>   	struct da8xx_glue		*glue;
->>   	struct platform_device_info	pinfo;
->>   	struct clk			*clk;
->> +	int				ret;
->>
->> -	int				ret = -ENOMEM;
->> -
->> -	glue = kzalloc(sizeof(*glue), GFP_KERNEL);
->> +	glue = devm_kzalloc(&pdev->dev, sizeof(*glue), GFP_KERNEL);
->>   	if (!glue) {
->>   		dev_err(&pdev->dev, "failed to allocate glue context\n");
->> -		goto err0;
->> +		return -ENOMEM;
->>   	}
->>
->> -	clk = clk_get(&pdev->dev, "usb20");
->> +	clk = devm_clk_get(&pdev->dev, "usb20");
->>   	if (IS_ERR(clk)) {
->>   		dev_err(&pdev->dev, "failed to get clock\n");
->> -		ret = PTR_ERR(clk);
->> -		goto err3;
->> +		return PTR_ERR(clk);
->
-> memory leak due to not kfree(glue).
+On 01/04/2016 11:07, Christoffer Dall wrote:
+> Hi Paolo,
+> 
+> The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+> 
+>   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-4.6-rc2
+> 
+> for you to fetch changes up to 5f5560b1c5f3a80e91c6babb2da34a51943bbdec:
+> 
+>   arm64: KVM: Register CPU notifiers when the kernel runs at HYP (2016-03-31 10:27:28 +0200)
+> 
+> The pull contains two small patches that fix a bug that corrupts stage-2
+> translationson 16-bit VMID equipped systems and fixCPU PM and Hotplug after
+> the EL2 init code has been moved to C.
+> 
+> Thanks,
+> -Christoffer
+> 
+> ---
+> 
+> James Morse (1):
+>       arm64: KVM: Register CPU notifiers when the kernel runs at HYP
+> 
+> Suzuki K Poulose (1):
+>       arm64: kvm: 4.6-rc1: Fix VTCR_EL2 VS setting
+> 
+>  arch/arm/kvm/arm.c               | 52 +++++++++++++++++++++++++---------------
+>  arch/arm64/include/asm/kvm_arm.h |  4 +++-
+>  arch/arm64/include/asm/sysreg.h  |  3 +++
+>  arch/arm64/kvm/hyp/s2-setup.c    |  6 +++--
+>  4 files changed, 43 insertions(+), 22 deletions(-)
 
-    No, since devm_kzalloc() was used, the memory will be automatically freed 
-on returning error by da8xx_probe().
+Pulled to kvm/queue, thanks.
 
->>   	}
->>
->>   	ret = clk_enable(clk);
->> @@ -560,12 +558,7 @@ err5:
->>   	clk_disable(clk);
->>
->>   err4:
->> -	clk_put(clk);
->> -
->> -err3:
->> -	kfree(glue);
->>
->> -err0:
->>   	return ret;
->>   }
->>
->> @@ -576,8 +569,6 @@ static int da8xx_remove(struct platform_device *pdev)
->>   	platform_device_unregister(glue->musb);
->>   	usb_phy_generic_unregister(glue->phy);
->>   	clk_disable(glue->clk);
->> -	clk_put(glue->clk);
->> -	kfree(glue);
->
-> Doesn't match with $subject, I'd put them into a seperate patch.
-
-    Again, these are now done automatically.
-
-> Regards,
-> -Bin.
-
-MBR, Sergei
+Paolo
