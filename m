@@ -1,219 +1,63 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Fri,  1 Apr 2016 08:16:44 -0700
-Subject: [PATCH v5 2/2] ARM: dts: imx: ventana: Add wdt ext-reset support
-In-Reply-To: <1459523804-11390-1-git-send-email-tharvey@gateworks.com>
-References: <1459523804-11390-1-git-send-email-tharvey@gateworks.com>
-Message-ID: <1459523804-11390-3-git-send-email-tharvey@gateworks.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 1 Apr 2016 16:15:23 +0100
+Subject: [GIT PULL] arm64: fixes for -rc2
+Message-ID: <20160401151521.GA3991@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Gateworks Ventana boards have a PMIC that can be used to regulate the
-CPU voltage rails for DVFS support. In order to ensure this PMIC is properly
-reset the watchdog needs to be configured to assert its external reset
-signal.
+Hi Linus,
 
-Cc: Fabio Estevam <festevam@gmail.com>
-Cc: Lucas Stach <l.stach@pengutronix.de>
-Cc: Stefan Roese <sr@denx.de>
-Cc: Iain Paton <ipaton0@gmail.com>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Cc: Akshay Bhat <akshay.bhat@timesys.com>
-Cc: Guenter Roeck <linux@roeck-us.net>
-Signed-off-by: Tim Harvey <tharvey@gateworks.com>
-----
-v5:
- - changed property to 'fsl,ext-reset-output'
-v4:
- - put property in wdoggrp
+Here are three arm64 patches for -rc2. One of them fixes a nasty code
+patching problem for big-endian systems, whilst the other two address
+some issues remaining after the merge window. Specifically, cleaning up
+after the KVM PMU work and sweeping up some defconfig updates that were
+missed, which includes squashing a Kconfig warning from duplicate
+definitions of MMC_BLOCK_MINORS.
 
-Signed-off-by: Tim Harvey <tharvey@gateworks.com>
----
- arch/arm/boot/dts/imx6qdl-gw51xx.dtsi | 12 ++++++++++++
- arch/arm/boot/dts/imx6qdl-gw52xx.dtsi | 12 ++++++++++++
- arch/arm/boot/dts/imx6qdl-gw53xx.dtsi | 12 ++++++++++++
- arch/arm/boot/dts/imx6qdl-gw54xx.dtsi | 17 +++++++++++++++++
- arch/arm/boot/dts/imx6qdl-gw551x.dtsi | 12 ++++++++++++
- arch/arm/boot/dts/imx6qdl-gw552x.dtsi | 12 ++++++++++++
- 6 files changed, 77 insertions(+)
+We're debugging a couple of other issues at the moment, but the wheels
+don't appear to have fallen off yet.
 
-diff --git a/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi
-index 9d7ab6c..1340e27 100644
---- a/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi
-@@ -228,6 +228,12 @@
- 	status = "okay";
- };
- 
-+&wdog1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_wdog>;
-+	fsl,ext-reset-output;
-+};
-+
- &iomuxc {
- 	imx6qdl-gw51xx {
- 		pinctrl_enet: enetgrp {
-@@ -364,5 +370,11 @@
- 				MX6QDL_PAD_EIM_D22__GPIO3_IO22		0x1b0b0 /* OTG_PWR_EN */
- 			>;
- 		};
-+
-+		pinctrl_wdog: wdoggrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_DISP0_DAT8__WDOG1_B		0x1b0b0
-+			>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-index 8dd74e9..8cccc4a 100644
---- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-@@ -353,6 +353,12 @@
- 	status = "okay";
- };
- 
-+&wdog1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_wdog>;
-+	fsl,ext-reset-output;
-+};
-+
- &iomuxc {
- 	imx6qdl-gw52xx {
- 		pinctrl_audmux: audmuxgrp {
-@@ -549,5 +555,11 @@
- 				MX6QDL_PAD_NANDF_CS1__SD3_VSELECT	0x170f9
- 			>;
- 		};
-+
-+		pinctrl_wdog: wdoggrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_DISP0_DAT8__WDOG1_B		0x1b0b0
-+			>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-index ec3fe74..5f700cc 100644
---- a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-@@ -351,6 +351,12 @@
- 	status = "okay";
- };
- 
-+&wdog1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_wdog>;
-+	fsl,ext-reset-output;
-+};
-+
- &iomuxc {
- 	imx6qdl-gw53xx {
- 		pinctrl_audmux: audmuxgrp {
-@@ -539,5 +545,11 @@
- 				MX6QDL_PAD_NANDF_CS1__SD3_VSELECT	0x170f9
- 			>;
- 		};
-+
-+		pinctrl_wdog: wdoggrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_DISP0_DAT8__WDOG1_B		0x1b0b0
-+			>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-index 367cc49..d19b4cc 100644
---- a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-@@ -453,6 +453,17 @@
- 	status = "okay";
- };
- 
-+&wdog1 {
-+	status = "disabled";
-+};
-+
-+&wdog2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_wdog>;
-+	fsl,ext-reset-output;
-+	status = "okay";
-+};
-+
- &iomuxc {
- 	imx6qdl-gw54xx {
- 		pinctrl_audmux: audmuxgrp {
-@@ -654,5 +665,11 @@
- 				MX6QDL_PAD_NANDF_CS1__SD3_VSELECT	0x170f9
- 			>;
- 		};
-+
-+		pinctrl_wdog: wdoggrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD1_DAT3__WDOG2_B		0x1b0b0
-+			>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/imx6qdl-gw551x.dtsi b/arch/arm/boot/dts/imx6qdl-gw551x.dtsi
-index 118bea5..4b9fef8 100644
---- a/arch/arm/boot/dts/imx6qdl-gw551x.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw551x.dtsi
-@@ -239,6 +239,12 @@
- 	status = "okay";
- };
- 
-+&wdog1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_wdog>;
-+	fsl,ext-reset-output;
-+};
-+
- &iomuxc {
- 	imx6qdl-gw51xx {
- 		pinctrl_flexcan1: flexcan1grp {
-@@ -333,5 +339,11 @@
- 				MX6QDL_PAD_GPIO_1__USB_OTG_ID		0x17059
- 			>;
- 		};
-+
-+		pinctrl_wdog: wdoggrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_DISP0_DAT8__WDOG1_B		0x1b0b0
-+			>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/imx6qdl-gw552x.dtsi b/arch/arm/boot/dts/imx6qdl-gw552x.dtsi
-index f27f184..805e236 100644
---- a/arch/arm/boot/dts/imx6qdl-gw552x.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw552x.dtsi
-@@ -197,6 +197,12 @@
- 	status = "okay";
- };
- 
-+&wdog1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_wdog>;
-+	fsl,ext-reset-output;
-+};
-+
- &iomuxc {
- 	imx6qdl-gw552x {
- 		pinctrl_gpio_leds: gpioledsgrp {
-@@ -286,5 +292,11 @@
- 				MX6QDL_PAD_KEY_ROW1__UART5_RX_DATA	0x1b0b1
- 			>;
-                 };
-+
-+		pinctrl_wdog: wdoggrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_DISP0_DAT8__WDOG1_B		0x1b0b0
-+			>;
-+		};
- 	};
- };
--- 
-1.9.1
+Please pull.
+
+Will
+
+--->8
+
+The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+
+  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
+
+for you to fetch changes up to 431597bb95560c975221c0394c442723d7a21f2d:
+
+  arm64: defconfig: updates for 4.6 (2016-03-29 16:56:00 +0100)
+
+----------------------------------------------------------------
+arm64 fixes:
+
+- Fix oops when patching in alternative sequences on big-endian CPUs
+- Reconcile asm/perf_event.h after merge window fallout with KVM ARM
+- Defconfig updates
+
+----------------------------------------------------------------
+James Morse (1):
+      arm64: opcodes.h: Add arm big-endian config options before including arm header
+
+Shannon Zhao (1):
+      arm64: perf: Move PMU register related defines to asm/perf_event.h
+
+Will Deacon (1):
+      arm64: defconfig: updates for 4.6
+
+ arch/arm64/configs/defconfig            | 28 +++++++++----
+ arch/arm64/include/asm/kvm_host.h       |  1 -
+ arch/arm64/include/asm/kvm_hyp.h        |  1 -
+ arch/arm64/include/asm/kvm_perf_event.h | 68 -------------------------------
+ arch/arm64/include/asm/opcodes.h        |  4 ++
+ arch/arm64/include/asm/perf_event.h     | 47 +++++++++++++++++++++
+ arch/arm64/kernel/perf_event.c          | 72 +++++++++------------------------
+ 7 files changed, 90 insertions(+), 131 deletions(-)
+ delete mode 100644 arch/arm64/include/asm/kvm_perf_event.h
