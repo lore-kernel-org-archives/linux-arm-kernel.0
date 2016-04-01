@@ -1,122 +1,31 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri,  1 Apr 2016 11:07:27 +0200
-Subject: [PULL 2/2] arm64: KVM: Register CPU notifiers when the kernel runs at
- HYP
-In-Reply-To: <1459501647-20726-1-git-send-email-christoffer.dall@linaro.org>
-References: <1459501647-20726-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1459501647-20726-3-git-send-email-christoffer.dall@linaro.org>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 1 Apr 2016 17:11:05 +0800
+Subject: [PATCH] net: mvpp2: use cache_line_size() to get cacheline size
+Message-ID: <1459501865-7033-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: James Morse <james.morse@arm.com>
+L1_CACHE_BYTES may not be the real cacheline size, use cache_line_size
+to determine the cacheline size in runtime.
 
-When the kernel is running at EL2, it doesn't need init_hyp_mode() to
-configure page tables for HYP. This function also registers the CPU
-hotplug and lower power notifiers that cause HYP to be re-initialised
-after the CPU has been reset.
-
-To avoid losing the register state that controls stage2 translation, move
-the registering of these notifiers into init_subsystems(), and add a
-is_kernel_in_hyp_mode() path to each callback.
-
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-Fixes: 1e947bad0b6 ("arm64: KVM: Skip HYP setup when already running in HYP")
-Signed-off-by: James Morse <james.morse@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Suggested-by: Marcin Wojtas <mw@semihalf.com>
 ---
- arch/arm/kvm/arm.c | 52 +++++++++++++++++++++++++++++++++-------------------
- 1 file changed, 33 insertions(+), 19 deletions(-)
+ drivers/net/ethernet/marvell/mvpp2.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 6accd66..b538431 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -1061,15 +1061,27 @@ static void cpu_init_hyp_mode(void *dummy)
- 	kvm_arm_init_debug();
- }
+diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
+index 05f358b..23f3c08 100644
+--- a/drivers/net/ethernet/marvell/mvpp2.c
++++ b/drivers/net/ethernet/marvell/mvpp2.c
+@@ -376,7 +376,7 @@
  
-+static void cpu_hyp_reinit(void)
-+{
-+	if (is_kernel_in_hyp_mode()) {
-+		/*
-+		 * cpu_init_stage2() is safe to call even if the PM
-+		 * event was cancelled before the CPU was reset.
-+		 */
-+		cpu_init_stage2(NULL);
-+	} else {
-+		if (__hyp_get_vectors() == hyp_default_vectors)
-+			cpu_init_hyp_mode(NULL);
-+	}
-+}
-+
- static int hyp_init_cpu_notify(struct notifier_block *self,
- 			       unsigned long action, void *cpu)
- {
- 	switch (action) {
- 	case CPU_STARTING:
- 	case CPU_STARTING_FROZEN:
--		if (__hyp_get_vectors() == hyp_default_vectors)
--			cpu_init_hyp_mode(NULL);
--		break;
-+		cpu_hyp_reinit();
- 	}
+ #define MVPP2_RX_PKT_SIZE(mtu) \
+ 	ALIGN((mtu) + MVPP2_MH_SIZE + MVPP2_VLAN_TAG_LEN + \
+-	      ETH_HLEN + ETH_FCS_LEN, L1_CACHE_BYTES)
++	      ETH_HLEN + ETH_FCS_LEN, cache_line_size())
  
- 	return NOTIFY_OK;
-@@ -1084,9 +1096,8 @@ static int hyp_init_cpu_pm_notifier(struct notifier_block *self,
- 				    unsigned long cmd,
- 				    void *v)
- {
--	if (cmd == CPU_PM_EXIT &&
--	    __hyp_get_vectors() == hyp_default_vectors) {
--		cpu_init_hyp_mode(NULL);
-+	if (cmd == CPU_PM_EXIT) {
-+		cpu_hyp_reinit();
- 		return NOTIFY_OK;
- 	}
- 
-@@ -1128,6 +1139,22 @@ static int init_subsystems(void)
- 	int err;
- 
- 	/*
-+	 * Register CPU Hotplug notifier
-+	 */
-+	cpu_notifier_register_begin();
-+	err = __register_cpu_notifier(&hyp_init_cpu_nb);
-+	cpu_notifier_register_done();
-+	if (err) {
-+		kvm_err("Cannot register KVM init CPU notifier (%d)\n", err);
-+		return err;
-+	}
-+
-+	/*
-+	 * Register CPU lower-power notifier
-+	 */
-+	hyp_cpu_pm_init();
-+
-+	/*
- 	 * Init HYP view of VGIC
- 	 */
- 	err = kvm_vgic_hyp_init();
-@@ -1270,19 +1297,6 @@ static int init_hyp_mode(void)
- 	free_boot_hyp_pgd();
- #endif
- 
--	cpu_notifier_register_begin();
--
--	err = __register_cpu_notifier(&hyp_init_cpu_nb);
--
--	cpu_notifier_register_done();
--
--	if (err) {
--		kvm_err("Cannot register HYP init CPU notifier (%d)\n", err);
--		goto out_err;
--	}
--
--	hyp_cpu_pm_init();
--
- 	/* set size of VMID supported by CPU */
- 	kvm_vmid_bits = kvm_get_vmid_bits();
- 	kvm_info("%d-bit VMID\n", kvm_vmid_bits);
+ #define MVPP2_RX_BUF_SIZE(pkt_size)	((pkt_size) + NET_SKB_PAD)
+ #define MVPP2_RX_TOTAL_SIZE(buf_size)	((buf_size) + MVPP2_SKB_SHINFO_SIZE)
 -- 
-2.1.2.330.g565301e.dirty
+2.8.0.rc3
