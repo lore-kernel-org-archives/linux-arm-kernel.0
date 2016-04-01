@@ -1,31 +1,28 @@
-From: petr@barix.com (Petr Kulhavy)
-Date: Fri,  1 Apr 2016 17:42:05 +0200
-Subject: [PATCH 3/3] ARM: davinci: da8xx-dt: add OF_DEV_AUXDATA entry for i2c1
-In-Reply-To: <1459525325-25470-1-git-send-email-petr@barix.com>
-References: <1459525325-25470-1-git-send-email-petr@barix.com>
-Message-ID: <1459525325-25470-4-git-send-email-petr@barix.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 1 Apr 2016 08:42:37 -0700
+Subject: dtc warnings
+In-Reply-To: <CAL_Jsq+=OjY8y_8x7OSm-MWYKbrHN5cbv4TLwULxhNq+gfiMtw@mail.gmail.com>
+References: <CAL_Jsq+=OjY8y_8x7OSm-MWYKbrHN5cbv4TLwULxhNq+gfiMtw@mail.gmail.com>
+Message-ID: <20160401154237.GK9329@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add OF_DEV_AUXDATA entry for second i2c on the da850 DT board driver
-to use i2c clock.
+Hi,
 
-Signed-off-by: Petr Kulhavy <petr@barix.com>
----
- arch/arm/mach-davinci/da8xx-dt.c | 1 +
- 1 file changed, 1 insertion(+)
+* Rob Herring <robh@kernel.org> [160331 18:42]:
+> You may have noticed that linux-next had gotten noisy with dtc
+> warnings lately. I dropped the change for a bit, but added it back
+> today except now it is disabled unless building with "W=1".
+> 
+> There's ~25K (2500 unique) warnings generated from the ARM dts files.
+> Here's the ranking of warnings by dtb. OMAP is the clear winner (based
+> on the similar counts, probably lots of duplicates). Please help
+> remind contributors to test with W=1 and start to fix these.
 
-diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-index c4b5808ca7c1..880b94e64816 100644
---- a/arch/arm/mach-davinci/da8xx-dt.c
-+++ b/arch/arm/mach-davinci/da8xx-dt.c
-@@ -32,6 +32,7 @@ static void __init da8xx_init_irq(void)
- 
- static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("ti,davinci-i2c", 0x01c22000, "i2c_davinci.1", NULL),
-+	OF_DEV_AUXDATA("ti,davinci-i2c", 0x01e28000, "i2c_davinci.2", NULL),
- 	OF_DEV_AUXDATA("ti,davinci-wdt", 0x01c21000, "davinci-wdt", NULL),
- 	OF_DEV_AUXDATA("ti,da830-mmc", 0x01c40000, "da830-mmc.0", NULL),
- 	OF_DEV_AUXDATA("ti,da850-ehrpwm", 0x01f00000, "ehrpwm", NULL),
--- 
-1.9.1
+I think Tero already has been looking at fixing the omap clock
+related warnings that seem to produce most of these, so adding
+him to Cc.
+
+Regards,
+
+Tony
