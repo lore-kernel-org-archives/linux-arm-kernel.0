@@ -1,173 +1,76 @@
-From: shannon.zhao@linaro.org (Shannon Zhao)
-Date: Fri,  1 Apr 2016 23:49:15 +0800
-Subject: [PATCH v10 17/17] Xen: EFI: Parse DT parameters for Xen specific UEFI
-In-Reply-To: <1459525755-36968-1-git-send-email-shannon.zhao@linaro.org>
-References: <1459525755-36968-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1459525755-36968-18-git-send-email-shannon.zhao@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 1 Apr 2016 09:01:15 -0700
+Subject: [GIT PULL] omap fixes against v4.6-rc1
+Message-ID: <20160401160115.GM9329@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a new function to parse DT parameters for Xen specific UEFI just
-like the way for normal UEFI. Then it could reuse the existing codes.
+The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 
-If Xen supports EFI, initialize runtime services.
+  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
 
-CC: Matt Fleming <matt@codeblueprint.co.uk>
-Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-Reviewed-by: Matt Fleming <matt@codeblueprint.co.uk>
-Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
----
- arch/arm/xen/enlighten.c           |  6 +++++
- drivers/firmware/efi/arm-runtime.c | 17 +++++++++-----
- drivers/firmware/efi/efi.c         | 45 ++++++++++++++++++++++++++++++++------
- 3 files changed, 56 insertions(+), 12 deletions(-)
+are available in the git repository at:
 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 13e3e9f..e130562 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -261,6 +261,12 @@ static int __init fdt_find_hyper_node(unsigned long node, const char *uname,
- 	    !strncmp(hyper_node.prefix, s, strlen(hyper_node.prefix)))
- 		hyper_node.version = s + strlen(hyper_node.prefix);
- 
-+	if (IS_ENABLED(CONFIG_XEN_EFI)) {
-+		/* Check if Xen supports EFI */
-+		if (of_get_flat_dt_subnode_by_name(node, "uefi") > 0)
-+			set_bit(EFI_PARAVIRT, &efi.flags);
-+	}
-+
- 	return 0;
- }
- 
-diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
-index 6ae21e4..ac609b9 100644
---- a/drivers/firmware/efi/arm-runtime.c
-+++ b/drivers/firmware/efi/arm-runtime.c
-@@ -27,6 +27,7 @@
- #include <asm/mmu.h>
- #include <asm/pgalloc.h>
- #include <asm/pgtable.h>
-+#include <asm/xen/xen-ops.h>
- 
- extern u64 efi_system_table;
- 
-@@ -107,13 +108,19 @@ static int __init arm_enable_runtime_services(void)
- 	}
- 	set_bit(EFI_SYSTEM_TABLES, &efi.flags);
- 
--	if (!efi_virtmap_init()) {
--		pr_err("No UEFI virtual mapping was installed -- runtime services will not be available\n");
--		return -ENOMEM;
-+	if (IS_ENABLED(CONFIG_XEN_EFI) && efi_enabled(EFI_PARAVIRT)) {
-+		/* Set up runtime services function pointers for Xen Dom0 */
-+		xen_efi_runtime_setup();
-+	} else {
-+		if (!efi_virtmap_init()) {
-+			pr_err("No UEFI virtual mapping was installed -- runtime services will not be available\n");
-+			return -ENOMEM;
-+		}
-+
-+		/* Set up runtime services function pointers */
-+		efi_native_runtime_setup();
- 	}
- 
--	/* Set up runtime services function pointers */
--	efi_native_runtime_setup();
- 	set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
- 
- 	efi.runtime_version = efi.systab->hdr.revision;
-diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
-index 3a69ed5..519c096 100644
---- a/drivers/firmware/efi/efi.c
-+++ b/drivers/firmware/efi/efi.c
-@@ -469,12 +469,14 @@ device_initcall(efi_load_efivars);
- 		FIELD_SIZEOF(struct efi_fdt_params, field) \
- 	}
- 
--static __initdata struct {
-+struct params {
- 	const char name[32];
- 	const char propname[32];
- 	int offset;
- 	int size;
--} dt_params[] = {
-+};
-+
-+static struct params fdt_params[] __initdata = {
- 	UEFI_PARAM("System Table", "linux,uefi-system-table", system_table),
- 	UEFI_PARAM("MemMap Address", "linux,uefi-mmap-start", mmap),
- 	UEFI_PARAM("MemMap Size", "linux,uefi-mmap-size", mmap_size),
-@@ -482,24 +484,45 @@ static __initdata struct {
- 	UEFI_PARAM("MemMap Desc. Version", "linux,uefi-mmap-desc-ver", desc_ver)
- };
- 
-+static struct params xen_fdt_params[] __initdata = {
-+	UEFI_PARAM("System Table", "xen,uefi-system-table", system_table),
-+	UEFI_PARAM("MemMap Address", "xen,uefi-mmap-start", mmap),
-+	UEFI_PARAM("MemMap Size", "xen,uefi-mmap-size", mmap_size),
-+	UEFI_PARAM("MemMap Desc. Size", "xen,uefi-mmap-desc-size", desc_size),
-+	UEFI_PARAM("MemMap Desc. Version", "xen,uefi-mmap-desc-ver", desc_ver)
-+};
-+
- struct param_info {
- 	int found;
- 	void *params;
-+	struct params *dt_params;
-+	int size;
- };
- 
- static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
- 				       int depth, void *data)
- {
- 	struct param_info *info = data;
-+	struct params *dt_params = info->dt_params;
- 	const void *prop;
- 	void *dest;
- 	u64 val;
--	int i, len;
-+	int i, len, offset;
- 
--	if (depth != 1 || strcmp(uname, "chosen") != 0)
--		return 0;
-+	if (efi_enabled(EFI_PARAVIRT)) {
-+		if (depth != 1 || strcmp(uname, "hypervisor") != 0)
-+			return 0;
- 
--	for (i = 0; i < ARRAY_SIZE(dt_params); i++) {
-+		offset = of_get_flat_dt_subnode_by_name(node, "uefi");
-+		if (offset < 0)
-+			return 0;
-+		node = offset;
-+	} else {
-+		if (depth != 1 || strcmp(uname, "chosen") != 0)
-+			return 0;
-+	}
-+
-+	for (i = 0; i < info->size; i++) {
- 		prop = of_get_flat_dt_prop(node, dt_params[i].propname, &len);
- 		if (!prop)
- 			return 0;
-@@ -530,12 +553,20 @@ int __init efi_get_fdt_params(struct efi_fdt_params *params)
- 	info.found = 0;
- 	info.params = params;
- 
-+	if (efi_enabled(EFI_PARAVIRT)) {
-+		info.dt_params = xen_fdt_params;
-+		info.size = ARRAY_SIZE(xen_fdt_params);
-+	} else {
-+		info.dt_params = fdt_params;
-+		info.size = ARRAY_SIZE(fdt_params);
-+	}
-+
- 	ret = of_scan_flat_dt(fdt_find_uefi_params, &info);
- 	if (!info.found)
- 		pr_info("UEFI not found.\n");
- 	else if (!ret)
- 		pr_err("Can't find '%s' in device tree!\n",
--		       dt_params[info.found].name);
-+		       info.dt_params[info.found].name);
- 
- 	return ret;
- }
--- 
-2.1.4
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.6/fixes-rc1
+
+for you to fetch changes up to 6f40fed1c911f218e1e189a404b26ef19effabb5:
+
+  ARM: dts: am335x-baltos-ir5221: fix cpsw_emac0 link type (2016-03-30 14:33:22 -0700)
+
+----------------------------------------------------------------
+Fixes for omaps against v4.6-rc1. Mostly minor fixes for the newer
+SoCs with few board fixes and a fix for a long time hwmod bug:
+
+- Fix cpsw_emac0 link type for baltos-ir5221
+
+- Fix interrupt type for TWD
+
+- Fix edma memcpy channel allocation for am43x
+
+- Fix am43x-epos sycntimer32k by using the correct assigned clock
+
+- Fix interconnect barrier for dra7
+
+- Fix a long time hwmod bug for updating sysconfig register properly
+
+- Fix flakey booting on dm814x where USB reset needs a delay
+
+And there is one minor change that is not strictly a fix, but is
+good to have for proper hardware detection:
+
+- Detect dra7 silicon revision 2.0 properly
+
+----------------------------------------------------------------
+Jon Hunter (1):
+      ARM: OMAP: Correct interrupt type for ARM TWD
+
+Lokesh Vutla (2):
+      ARM: OMAP2+: hwmod: Fix updating of sysconfig register
+      ARM: dts: AM43x-epos: Fix clk parent for synctimer
+
+Nishanth Menon (1):
+      ARM: OMAP2: Fix up interconnect barrier initialization for DRA7
+
+Tero Kristo (1):
+      ARM: dts: am43xx: fix edma memcpy channel allocation
+
+Tony Lindgren (2):
+      ARM: OMAP2+: Use srst_udelay for USB on dm814x
+      Merge tag 'for-v4.6-rc/omap-fixes-a' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v4.6/fixes
+
+Vishal Mahaveer (1):
+      ARM: DRA722: Add ID detect for Silicon Rev 2.0
+
+Yegor Yefremov (1):
+      ARM: dts: am335x-baltos-ir5221: fix cpsw_emac0 link type
+
+ arch/arm/boot/dts/am335x-baltos-ir5221.dts | 5 ++++-
+ arch/arm/boot/dts/am4372.dtsi              | 2 +-
+ arch/arm/boot/dts/am43x-epos-evm.dts       | 5 +++++
+ arch/arm/boot/dts/omap4.dtsi               | 2 +-
+ arch/arm/mach-omap2/id.c                   | 4 ++--
+ arch/arm/mach-omap2/io.c                   | 1 +
+ arch/arm/mach-omap2/omap_hwmod.c           | 8 ++++----
+ arch/arm/mach-omap2/omap_hwmod_81xx_data.c | 2 ++
+ arch/arm/mach-omap2/soc.h                  | 1 +
+ 9 files changed, 21 insertions(+), 9 deletions(-)
