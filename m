@@ -1,50 +1,39 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Sat,  2 Apr 2016 19:47:54 +0800
-Subject: [PATCH v3 4/4] arm64: defconfig: enable configs for WLAN and TI
- WL1835 as modules
-In-Reply-To: <1459597674-6834-1-git-send-email-guodong.xu@linaro.org>
-References: <1459597674-6834-1-git-send-email-guodong.xu@linaro.org>
-Message-ID: <1459597674-6834-5-git-send-email-guodong.xu@linaro.org>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 02 Apr 2016 14:09:14 +0200
+Subject: [GIT PULL] pxa fixes for v4.6
+Message-ID: <87vb40us9h.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables TI WL1835 and builds as module. It also enables
-CFG80211, MAC80211, RFKILL and several CRYPTOs which are required
-by WLAN.
+Hello Arnd, Kevin, Olof,
 
-96boards HiKey uses TI WLAN/BT combo module WL1835MOD.
+Please consider this pull request for pxa fixes for 4.6, made of 1 trivial
+fix.
 
-Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm64/configs/defconfig | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index f31a44f..aa1909d 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -83,7 +83,10 @@ CONFIG_IP_PNP_BOOTP=y
- # CONFIG_INET_LRO is not set
- # CONFIG_IPV6 is not set
- CONFIG_BPF_JIT=y
--# CONFIG_WIRELESS is not set
-+CONFIG_CFG80211=m
-+CONFIG_MAC80211=m
-+CONFIG_MAC80211_LEDS=y
-+CONFIG_RFKILL=m
- CONFIG_NET_9P=y
- CONFIG_NET_9P_VIRTIO=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-@@ -127,7 +130,8 @@ CONFIG_USB_NET_SMSC75XX=m
- CONFIG_USB_NET_SMSC95XX=m
- CONFIG_USB_NET_PLUSB=m
- CONFIG_USB_NET_MCS7830=m
--# CONFIG_WLAN is not set
-+CONFIG_WL18XX=m
-+CONFIG_WLCORE_SDIO=m
- CONFIG_INPUT_EVDEV=y
- CONFIG_KEYBOARD_GPIO=y
- # CONFIG_SERIO_SERPORT is not set
+  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+
+are available in the git repository at:
+
+  https://github.com/rjarzmik/linux.git tags/pxa-fixes-v4.6
+
+for you to fetch changes up to 4c35430ad18f5a034302cb90e559ede5a27f93b9:
+
+  ARM: pxa: fix the number of DMA requestor lines (2016-03-29 20:59:18 +0200)
+
+----------------------------------------------------------------
+ARM: pxa: fixes for v4.6
+
+There is only a single fix for dma requestor lines initial
+setup, triggered by dmaengine previous fix.
+
+----------------------------------------------------------------
+Robert Jarzmik (1):
+      ARM: pxa: fix the number of DMA requestor lines
+
+ arch/arm/mach-pxa/devices.c | 1 +
+ 1 file changed, 1 insertion(+)
+
 -- 
-1.9.1
+Robert
