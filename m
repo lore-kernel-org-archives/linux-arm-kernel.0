@@ -1,67 +1,97 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 2 Apr 2016 09:31:18 +0800
-Subject: [PATCH v2 2/9] ARM: dts: imx7d: add flexcan support
-In-Reply-To: <1458050668-26748-3-git-send-email-gary.bisson@boundarydevices.com>
-References: <1458037826-19375-1-git-send-email-gary.bisson@boundarydevices.com>
- <1458050668-26748-1-git-send-email-gary.bisson@boundarydevices.com>
- <1458050668-26748-3-git-send-email-gary.bisson@boundarydevices.com>
-Message-ID: <20160402013118.GJ18833@tiger>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Sat, 2 Apr 2016 05:46:50 +0200
+Subject: [PATCH] sbs-battery: fix power status when battery is dry
+In-Reply-To: <1459392151.29450.44.camel@mtksdaap41>
+References: <1458801832.16645.7.camel@mtksdaap41>
+ <CAGS+omDhFP+_shCqEWasLDsHf-ab0-OWJJ-gZZkgihAgrZwBHA@mail.gmail.com>
+ <1459132330.16645.14.camel@mtksdaap41>
+ <CAGS+omBVStB3mfXtDHdbsOK+y2UesGYtZBtYm=ctcpBfm88VEg@mail.gmail.com>
+ <56F95451.5040607@nvidia.com>
+ <1459216353.16645.20.camel@mtksdaap41>
+ <56FA99D0.1010004@nvidia.com>
+ <1459328310.29450.24.camel@mtksdaap41>
+ <20160330150919.GA21068@earth>
+ <1459392151.29450.44.camel@mtksdaap41>
+Message-ID: <20160402034649.GA11414@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 15, 2016 at 03:04:21PM +0100, Gary Bisson wrote:
-> Add the device nodes for the i.MX7 FlexCAN buses.
-> 
-> Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
-> ---
-> 
-> Changelog v1 -> v2:
-> - none
-> 
-> ---
->  arch/arm/boot/dts/imx7d.dtsi | 22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
-> index a768716..c5e47a4 100644
-> --- a/arch/arm/boot/dts/imx7d.dtsi
-> +++ b/arch/arm/boot/dts/imx7d.dtsi
-> @@ -930,6 +930,28 @@
->  				fsl,num-rx-queues=<3>;
->  				status = "disabled";
->  			};
-> +
-> +			flexcan1: can at 30a00000 {
-> +				compatible = "fsl,imx7d-flexcan", "fsl,imx6q-flexcan";
-> +				reg = <0x30a00000 0x10000>;
-> +				interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&clks IMX7D_CLK_DUMMY>,
-> +					<&clks IMX7D_CAN1_ROOT_CLK>;
-> +				clock-names = "ipg", "per";
-> +				stop-mode = <&gpr 0x10 1 0x10 17>;
+Hi,
 
-Is this property documented anywhere, or even supported by mainline
-kernel?
-
-Shawn
-
-> +				status = "disabled";
-> +			};
-> +
-> +			flexcan2: can at 30a10000 {
-> +				compatible = "fsl,imx7d-flexcan", "fsl,imx6q-flexcan";
-> +				reg = <0x30a10000 0x10000>;
-> +				interrupts = <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&clks IMX7D_CLK_DUMMY>,
-> +					<&clks IMX7D_CAN2_ROOT_CLK>;
-> +				clock-names = "ipg", "per";
-> +				stop-mode = <&gpr 0x10 2 0x10 18>;
-> +				status = "disabled";
-> +			};
->  		};
->  	};
->  };
-> -- 
-> 2.7.0
+On Thu, Mar 31, 2016 at 10:42:31AM +0800, YH Huang wrote:
+> On Wed, 2016-03-30 at 17:09 +0200, Sebastian Reichel wrote:
+> > Hi,
+> > 
+> > On Wed, Mar 30, 2016 at 04:58:30PM +0800, YH Huang wrote:
+> > > If I revise the description in this way(using your clear explanation):
+> > > ------------------------------------------------------------------------
+> > > The battery capacity changing course is like this:
+> > > 
+> > > full: BATTERY_FULLY_CHARGED => POWER_SUPPLY_STATUS_FULL
+> > > <unplug AC>
+> > > high->low: BATTERY_DISCHARGING => POWER_SUPPLY_STATUS_DISCHARGING
+> > > ~0%: DISCHARGING & FULLY_DISCHARGED => POWER_SUPPLY_STATUS_NOT_CHARGING
+> > > <plug in AC>
+> > > 0%~20%: FULLY_DISCHARGED => POWER_SUPPLY_STATUS_CHARGING
+> > > 20%~: No flag => POWER_SUPPLY_STATUS_CHARGING
+> > > 
+> > > For now, it is not exactly right to show the status as
+> > > POWER_SUPPLY_STATUS_NOT_CHARGING when the battery is dry
+> > > (FULLY_DISCHARGED) and AC is plugged in.
+> > > Although the battery is in a low level, system works fine with the AC
+> > > charging.
+> > > It is better to say that the battery is charging.
+> > > ------------------------------------------------------------------------
+> > > 
+> > > How about this?
+> > > By the way, should I also revise the title?
+> > 
+> > POWER_SUPPLY_STATUS_NOT_CHARGING is used for AC connected, but
+> > battery not charging (e.g. because battery temperature is out
+> > of acceptable range). If you are discharging use
+> > POWER_SUPPLY_STATUS_DISCHARGING.
+> > 
+> > You should just ignore the FULLY_DISCHARGED bit in the status
+> > property. If you don't want to loose the information about fully
+> > discharged battery add POWER_SUPPLY_PROP_CAPACITY_LEVEL, which maps:
+> > 
+> > BATTERY_FULLY_CHARGED => POWER_SUPPLY_CAPACITY_LEVEL_FULL
+> > FULLY_DISCHARGED => POWER_SUPPLY_CAPACITY_LEVEL_CRITICAL
+> > otherwise => POWER_SUPPLY_CAPACITY_LEVEL_NORMAL
 > 
+> Oops.
+> It looks like I misunderstand POWER_SUPPLY_STATUS_NOT_CHARGING.
+> As Daniel said before, we could just ignore FULLY_DISCHARGED.
 > 
+> So change like the
+> 
+> sbs-battery: fix power status when battery charging near
+> dry
+> 
+> POWER_SUPPLY_STATUS_NOT_CHARGING is used for AC connected, but
+> battery not charging (e.g. because battery temperature is out
+> of acceptable range).
+> 
+> When battery is charging near dry and BATTERY_FULL_DISCHARGED is set,
+> it is wrong to set as POWER_SUPPLY_STATUS_NOT_CHARGING.
+> Just use BATTERY_DISCHARGING to decide the power supply status is
+> discharging or charging.
+> 
+>                 if (ret & BATTERY_FULL_CHARGED)
+>                         val->intval = POWER_SUPPLY_STATUS_FULL;
+> -               else if (ret & BATTERY_FULL_DISCHARGED)
+> -                       val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
+>                 else if (ret & BATTERY_DISCHARGING)
+>                         val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
+> 
+
+Yes, that looks fine. Can you send this correctly formated for git?
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160402/11dc6b50/attachment.sig>
