@@ -1,66 +1,43 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Sat,  2 Apr 2016 17:29:43 +0800
-Subject: [PATCH v2 16/16] arm64: dts: add wifi nodes support for hi6220-hikey
-In-Reply-To: <1459589383-16914-1-git-send-email-guodong.xu@linaro.org>
-References: <1459589383-16914-1-git-send-email-guodong.xu@linaro.org>
-Message-ID: <1459589383-16914-17-git-send-email-guodong.xu@linaro.org>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Sat, 2 Apr 2016 11:49:13 +0200
+Subject: [PATCH v4 0/3] dmaengine: sun6i: Upgrade for audio transfers
+Message-ID: <cover.1459590553.git.moinejf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add wifi nodes support for hi6220-hikey
+This patch series contains most of the required changes to
+the sun6i DMA driver for audio streaming (tested in
+a Allwinner H3 - Orange PI 2).
+It is based on the previous series 'dmaengine: sun6i: Fixes'
+(2016-03-18).
+The lacking patch (Add 4 as a possible burst value for H3) will be
+submitted when a consensus with Maxime Ripard will be found.
 
-Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
----
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 30 ++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+v4
+ - remove 'Add 4 as a possible burst value for H3'
+	(no consensus yet)
+ - remove 'Simplify some macros' (Maxime Ripard)
+ - remove 'Compact a bit some config constants' (not critical)
+ - split 'lli setting' into 'simplify' and 'default burst and bus width'
+	(Maxime Ripard)
+v3
+ - do some optimizations
+ - add a check about the maxburst value '4' (Maxime Ripard)
+ - remove the driver fixes
+v2 (comments from Vinod Koul and Sergei Shtylyov - thanks)
+ - typo fixes
+ - change some comments
+ - better handling of burst and bus width
+ - remove useless code in the cyclic capability patch
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-index a6dffa8..78ce994 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-@@ -48,6 +48,7 @@
- 		i2c0: i2c at f7100000 {
- 			status = "ok";
- 		};
-+
- 		i2c1: i2c at f7101000 {
- 			status = "ok";
- 		};
-@@ -63,6 +64,35 @@
- 		uart3: uart at f7113000 {
- 			status = "ok";
- 		};
-+
-+		dwmmc_2: dwmmc2 at f723f000 {
-+			ti,non-removable;
-+			non-removable;
-+			/* WL_EN */
-+			vmmc-supply = <&wlan_en_reg>;
-+
-+			#address-cells = <0x1>;
-+			#size-cells = <0x0>;
-+			wlcore: wlcore at 2 {
-+				compatible = "ti,wl1835";
-+				reg = <2>;	/* sdio func num */
-+				/* WL_IRQ, WL_HOST_WAKE_GPIO1_3 */
-+				interrupt-parent = <&gpio1>;
-+				interrupts = <3 IRQ_TYPE_EDGE_RISING>;
-+			};
-+		};
-+
-+		wlan_en_reg: fixedregulator at 1 {
-+			compatible = "regulator-fixed";
-+			regulator-name = "wlan-en-regulator";
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <1800000>;
-+			/* WLAN_EN GPIO */
-+			gpio = <&gpio0 5 0>;
-+			/* WLAN card specific delay */
-+			startup-delay-us = <70000>;
-+			enable-active-high;
-+		};
- 	};
- 
- 	leds {
+
+Jean-Francois Moine (3):
+  dmaengine: sun6i: Simplify lli setting
+  dmaengine: sun6i: Set default maxburst size and bus width
+  dmaengine: sun6i: Add cyclic capability
+
+ drivers/dma/sun6i-dma.c | 246 ++++++++++++++++++++++++++++++++++++------------
+ 1 file changed, 184 insertions(+), 62 deletions(-)
+
 -- 
-1.9.1
+2.8.0
