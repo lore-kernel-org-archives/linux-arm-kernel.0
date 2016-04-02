@@ -1,40 +1,49 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 2 Apr 2016 12:34:20 +0200
-Subject: [PATCH 3/3] sunxi: A20-OLinuXino-LIME2: Add i2c2 bus in DTS
-In-Reply-To: <1458932647-24268-3-git-send-email-haas@computerlinguist.org>
-References: <1458932647-24268-1-git-send-email-haas@computerlinguist.org>
- <1458932647-24268-3-git-send-email-haas@computerlinguist.org>
-Message-ID: <20160402103420.GH4227@lukather>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Sat, 2 Apr 2016 15:41:24 +0200
+Subject: [PATCH] ARM: dts: armv7-m: add address to unit name
+In-Reply-To: <1459577299-2818-1-git-send-email-stefan@agner.ch>
+References: <1459577299-2818-1-git-send-email-stefan@agner.ch>
+Message-ID: <CAGhQ9VyW4YNUGrgw1d5HBXutyBqjxP=+0ZGuYrtmnguC=MwMMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 2 April 2016 at 08:08, Stefan Agner <stefan@agner.ch> wrote:
+> Add address to unit name to remove the following warning:
+>  Warning (unit_address_vs_reg): Node /nv-interrupt-controller has a
+>  reg or ranges property, but no unit name
+>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+> Hi Arnd,
+>
+> Not sure through which tree this should go but an earlier patch
+> seemd to be applied directly by you...
+>
+> --
+> Stefan
+>
+>  arch/arm/boot/dts/armv7-m.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/armv7-m.dtsi b/arch/arm/boot/dts/armv7-m.dtsi
+> index b1ad7cf..8126bec 100644
+> --- a/arch/arm/boot/dts/armv7-m.dtsi
+> +++ b/arch/arm/boot/dts/armv7-m.dtsi
+> @@ -1,7 +1,7 @@
+>  #include "skeleton.dtsi"
+>
+>  / {
+> -       nvic: nv-interrupt-controller  {
+> +       nvic: nv-interrupt-controller at 0xe000e100 {
 
-On Fri, Mar 25, 2016 at 08:04:07PM +0100, Michael Haas wrote:
-> The A20 processor provides a third I2C bus on pins PB20 and PB21.
-> The A20-OLinuXino-LIME2 exposes this bus via its GPIO1 port.
-> 
-> Olimex also provide a breakout board called the
-> A20-OLinuXino-LIME2-UEXT. This change is required to properly
-> support I2C on the UEXT connector found there.
-> 
-> Signed-off-by: Michael Haas <haas@computerlinguist.org>
+While changing the line it might be good idea to use the standard
+'interrupt-controller' name instead.
 
-What are the other options on that pin? Is it something exclusively
-dedicated to i2c on the pin headers and the documentation, or is
-anyone free to use that pin for whatever he wishes?
+I posted the same patch couple of days ago, btw.
+http://marc.info/?l=devicetree&m=145929088915714&w=2
 
-Thanks,
-Maxime
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160402/d886af41/attachment.sig>
+But I don't care which one that is applied.
+
+regards,
+Joachim Eastwood
