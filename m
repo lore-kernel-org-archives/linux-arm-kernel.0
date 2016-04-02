@@ -1,30 +1,39 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Sat,  2 Apr 2016 01:00:32 -0300
-Subject: [PATCH] ARM: Drop CONFIG_RTC_LIB dependency
-Message-ID: <1459569633-6470-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+From: stefan@agner.ch (Stefan Agner)
+Date: Fri,  1 Apr 2016 23:08:19 -0700
+Subject: [PATCH] ARM: dts: armv7-m: add address to unit name
+Message-ID: <1459577299-2818-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rtc-lib dependency seems to be here for very old historical
-reasons, but nowadays it shouldn't be needed. If any ARM
-platform requires rtc-lib, they should select it individually.
+Add address to unit name to remove the following warning:
+ Warning (unit_address_vs_reg): Node /nv-interrupt-controller has a
+ reg or ranges property, but no unit name
 
-Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
+Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/Kconfig | 1 -
- 1 file changed, 1 deletion(-)
+Hi Arnd,
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index cdfa6c2b7626..8efb1c605ac8 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -84,7 +84,6 @@ config ARM
- 	select OLD_SIGACTION
- 	select OLD_SIGSUSPEND3
- 	select PERF_USE_VMALLOC
--	select RTC_LIB
- 	select SYS_SUPPORTS_APM_EMULATION
- 	# Above selects are sorted alphabetically; please add new ones
- 	# according to that.  Thanks.
+Not sure through which tree this should go but an earlier patch
+seemd to be applied directly by you...
+
+--
+Stefan
+
+ arch/arm/boot/dts/armv7-m.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/armv7-m.dtsi b/arch/arm/boot/dts/armv7-m.dtsi
+index b1ad7cf..8126bec 100644
+--- a/arch/arm/boot/dts/armv7-m.dtsi
++++ b/arch/arm/boot/dts/armv7-m.dtsi
+@@ -1,7 +1,7 @@
+ #include "skeleton.dtsi"
+ 
+ / {
+-	nvic: nv-interrupt-controller  {
++	nvic: nv-interrupt-controller at 0xe000e100 {
+ 		compatible = "arm,armv7m-nvic";
+ 		interrupt-controller;
+ 		#interrupt-cells = <1>;
 -- 
-2.7.0
+2.7.4
