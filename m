@@ -1,42 +1,32 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 1 Apr 2016 18:08:48 -0700
-Subject: [GIT PULL] bcm2835 clk changes for 4.6 maybe
-In-Reply-To: <877fgk5z1t.fsf@eliezer.anholt.net>
-References: <1458265130-30734-1-git-send-email-eric@anholt.net>
- <20160329233923.GR18567@codeaurora.org>
- <877fgk5z1t.fsf@eliezer.anholt.net>
-Message-ID: <20160402010848.GZ18567@codeaurora.org>
+Date: Fri, 1 Apr 2016 18:14:36 -0700
+Subject: [PATCH] clk: sunxi: Add CSI (camera's Sensors Interface) module
+ clock driver for sun[457]i
+In-Reply-To: <20160319235905.GA16539@rob-hp-laptop>
+References: <1458204222-31149-1-git-send-email-yassinjaffer@gmail.com>
+ <1458204222-31149-2-git-send-email-yassinjaffer@gmail.com>
+ <20160319235905.GA16539@rob-hp-laptop>
+Message-ID: <20160402011436.GA18567@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/29, Eric Anholt wrote:
-> Stephen Boyd <sboyd@codeaurora.org> writes:
+On 03/19, Rob Herring wrote:
+> On Thu, Mar 17, 2016 at 07:43:42PM +1100, yassinjaffer at gmail.com wrote:
+> > From: Yassin Jaffer <yassinjaffer@gmail.com>
+> > 
+> > This patch adds a composite clock type consisting of
+> > a clock gate, mux, configurable dividers, and a reset control.
+> > 
+> > Signed-off-by: Yassin Jaffer <yassinjaffer@gmail.com>
+> > ---
+> >  Documentation/devicetree/bindings/clock/sunxi.txt |   1 +
 > 
-> > On 03/17, Eric Anholt wrote:
-> >> This is late, so feel free to drop it, but I figured I'd send it to
-> >> you in case you were still open to merges.  I've pounded on it a bit
-> >> today (modesets to all sorts of resolutions on HDMI, used it for
-> >> testing the DPI panel support that I'm hoping to have for 4.7, and did
-> >> a whole lot of browsing of clk_summary as I debugged DPI), and kbuild
-> >> test robot came back clean, so I'm pretty happy with it.
-> >> 
-> >> The following changes since commit 4d3ac6662452060721599a3392bc2f524af984cb:
-> >> 
-> >>   clk: bcm2835: fix check of error code returned by devm_ioremap_resource() (2016-03-15 18:14:11 -0700)
-> >> 
-> >> are available in the git repository at:
-> >> 
-> >>   git at github.com:anholt/linux.git tags/bcm2835-clk-next-2016-03-17
-> >
-> > Please make sure to use a proper URL here. I don't have access to
-> > git at github.com, but I can fetch this from
-> > git://github.com/anholt/linux.git. The tag and the contents match
-> > so I'm fairly confident all is well.
+> I wish someone would just add all the sunxi clocks in one pass instead 
+> of one by one.
 > 
-> Yeah, it should have been https://github.com/anholt/linux -- sorry about
-> that!
+> Acked-by: Rob Herring <robh@kernel.org>
 
-Ok. Pulled towards 4.7.
+Me too!
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
