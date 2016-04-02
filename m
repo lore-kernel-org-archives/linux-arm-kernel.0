@@ -1,39 +1,37 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Fri,  1 Apr 2016 23:08:19 -0700
-Subject: [PATCH] ARM: dts: armv7-m: add address to unit name
-Message-ID: <1459577299-2818-1-git-send-email-stefan@agner.ch>
+Date: Fri,  1 Apr 2016 23:13:39 -0700
+Subject: [PATCH 1/3] ARM: dts: vf-colibri: alias the primary FEC as ethernet0
+Message-ID: <1459577621-3160-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add address to unit name to remove the following warning:
- Warning (unit_address_vs_reg): Node /nv-interrupt-controller has a
- reg or ranges property, but no unit name
+The Vybrid based Colibri modules provide a on-module PHY which is
+connected to the second FEC instance FEC1. Since the on-module
+Ethernet port is considered as primary ethernet interface, alias
+fec1 as ethernet0. This also makes sure that the first MAC address
+provided by the boot loader gets assigned to the FEC instance used
+for the on-module PHY.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
-Hi Arnd,
+ arch/arm/boot/dts/vf-colibri.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Not sure through which tree this should go but an earlier patch
-seemd to be applied directly by you...
-
---
-Stefan
-
- arch/arm/boot/dts/armv7-m.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/armv7-m.dtsi b/arch/arm/boot/dts/armv7-m.dtsi
-index b1ad7cf..8126bec 100644
---- a/arch/arm/boot/dts/armv7-m.dtsi
-+++ b/arch/arm/boot/dts/armv7-m.dtsi
-@@ -1,7 +1,7 @@
- #include "skeleton.dtsi"
+diff --git a/arch/arm/boot/dts/vf-colibri.dtsi b/arch/arm/boot/dts/vf-colibri.dtsi
+index fda7f28..7529dd7 100644
+--- a/arch/arm/boot/dts/vf-colibri.dtsi
++++ b/arch/arm/boot/dts/vf-colibri.dtsi
+@@ -40,6 +40,11 @@
+  */
  
  / {
--	nvic: nv-interrupt-controller  {
-+	nvic: nv-interrupt-controller at 0xe000e100 {
- 		compatible = "arm,armv7m-nvic";
- 		interrupt-controller;
- 		#interrupt-cells = <1>;
++	aliases {
++		ethernet0 = &fec1;
++		ethernet1 = &fec0;
++	};
++
+ 	bl: backlight {
+ 		compatible = "pwm-backlight";
+ 		pinctrl-names = "default";
 -- 
 2.7.4
