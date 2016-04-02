@@ -1,46 +1,44 @@
-From: plaes@plaes.org (Priit Laes)
-Date: Sat, 02 Apr 2016 17:42:00 +0300
-Subject: [linux-sunxi] Re: [PATCH 3/3] sunxi: A20-OLinuXino-LIME2: Add
- i2c2 bus in DTS
-In-Reply-To: <20160402103420.GH4227@lukather>
-References: <1458932647-24268-1-git-send-email-haas@computerlinguist.org>
- <1458932647-24268-3-git-send-email-haas@computerlinguist.org>
- <20160402103420.GH4227@lukather>
-Message-ID: <1459608120.29592.3.camel@plaes.org>
+From: gary.bisson@boundarydevices.com (Gary Bisson)
+Date: Sat, 2 Apr 2016 18:08:51 +0200
+Subject: [PATCH v2 1/9] ARM: dts: imx7d: add lcdif support
+In-Reply-To: <20160402012955.GI18833@tiger>
+References: <1458037826-19375-1-git-send-email-gary.bisson@boundarydevices.com>
+ <1458050668-26748-1-git-send-email-gary.bisson@boundarydevices.com>
+ <1458050668-26748-2-git-send-email-gary.bisson@boundarydevices.com>
+ <20160402012955.GI18833@tiger>
+Message-ID: <CAAMH-yt3gNcb57asbos7D=Kb8Z+bnNmYOF7qqu+dDho6HCDb4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2016-04-02 at 12:34 +0200, Maxime Ripard wrote:
-> Hi,
-> 
-> On Fri, Mar 25, 2016 at 08:04:07PM +0100, Michael Haas wrote:
-> > 
-> > The A20 processor provides a third I2C bus on pins PB20 and PB21.
-> > The A20-OLinuXino-LIME2 exposes this bus via its GPIO1 port.
-> > 
-> > Olimex also provide a breakout board called the
-> > A20-OLinuXino-LIME2-UEXT. This change is required to properly
-> > support I2C on the UEXT connector found there.
+Shawn, All,
 
-Documentation for Olimex UEXT interface:
-https://www.olimex.com/Products/Modules/UEXT/resources/UEXT_rev_B.pdf
+On Sat, Apr 2, 2016 at 3:29 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> On Tue, Mar 15, 2016 at 03:04:20PM +0100, Gary Bisson wrote:
+>> Add the device node for the i.MX7 eLCDIF interface.
+>>
+>> Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
+>> ---
+>>
+>> Changelog v1 -> v2:
+>> - none
+>>
+>> ---
+>>  arch/arm/boot/dts/imx7d.dtsi | 11 +++++++++++
+>>  1 file changed, 11 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+>> index b5a50e0..a768716 100644
+>> --- a/arch/arm/boot/dts/imx7d.dtsi
+>> +++ b/arch/arm/boot/dts/imx7d.dtsi
+>> @@ -608,6 +608,17 @@
+>>                               status = "disabled";
+>>                       };
+>>
+>> +                     lcdif: lcdif at 30730000 {
+>
+> Please add the node in order of unit-address.
 
-Basically it *should* by default work as a board to board connector
-which supports three serial communication interfaces: I2C, SPI and UART
-(original document mentions RS232, but official modules work only with
-3.3V logic levels).
+Sorry I did it alphabetically for some reason, I'll submit a v3 today.
 
-> > 
-> > Signed-off-by: Michael Haas <haas@computerlinguist.org>
-> What are the other options on that pin? Is it something exclusively
-> dedicated to i2c on the pin headers and the documentation, or is
-> anyone free to use that pin for whatever he wishes?
-> 
-> Thanks,
-> Maxime
-> 
-> --?
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
-> 
+Regards,
+Gary
