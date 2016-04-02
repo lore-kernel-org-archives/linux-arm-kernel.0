@@ -1,21 +1,25 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 1 Apr 2016 18:26:01 -0700
-Subject: [PATCH v4 2/5] dt-bindings: arm: add DT binding for Marvell
- AP806 system controller
-In-Reply-To: <1459070777-18049-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Fri, 1 Apr 2016 18:25:58 -0700
+Subject: [PATCH v4 1/5] clk: unconditionally recurse into clk/mvebu/
+In-Reply-To: <1459070777-18049-2-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1459070777-18049-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1459070777-18049-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20160402012601.GD18567@codeaurora.org>
+ <1459070777-18049-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20160402012558.GC18567@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 03/27, Thomas Petazzoni wrote:
-> This commit adds the Device Tree binding documentation for the system
-> controller found in Marvell AP806 HW block, which is one of the core
-> HW blocks of the 64-bits Marvell Armada 7K/8K family.
+> The drivers/clk/mvebu directory is only being built when
+> CONFIG_PLAT_ORION=y. As we are going to support additional mvebu
+> platforms in drivers/clk/mvebu, which don't have CONFIG_PLAT_ORION=y,
+> we need to recurse into this directory regardless of the value of
+> CONFIG_PLAT_ORION.
+> 
+> Since all files in drivers/clk/mvebu/ are already conditionally
+> compiled depending on various Kconfig options, we can recurse
+> unconditionally into drivers/clk/mvebu without any other change.
 > 
 > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Acked-by: Rob Herring <robh@kernel.org>
 > ---
 
 Applied to clk-next
