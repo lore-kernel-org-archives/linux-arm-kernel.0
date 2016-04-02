@@ -1,146 +1,76 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri,  1 Apr 2016 20:52:17 -0300
-Subject: [PATCH v2 4/4] ARM: dts: imx6sx-sdb: Add SAI support
-In-Reply-To: <1459554737-19684-1-git-send-email-festevam@gmail.com>
-References: <1459554737-19684-1-git-send-email-festevam@gmail.com>
-Message-ID: <1459554737-19684-4-git-send-email-festevam@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 1 Apr 2016 17:17:53 -0700
+Subject: [PATCH v2 0/3] ARM: OMAP3: Fix McBSP2/3 hwmod setup for sidetone
+In-Reply-To: <56FE407E.9030803@ti.com>
+References: <1458311007-19168-1-git-send-email-peter.ujfalusi@ti.com>
+ <alpine.DEB.2.02.1603191937430.6629@utopia.booyaka.com>
+ <56EFB794.5010505@ti.com>
+ <alpine.DEB.2.02.1603211743200.31059@utopia.booyaka.com>
+ <56FE407E.9030803@ti.com>
+Message-ID: <20160402001753.GR9329@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+Hi,
 
-Introduce imx6sx-sdb-sai.dts so that it is possible to use the
-SAI interface. 
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [160401 02:34]:
+> So what shall we do with the OMAP3 McBSP2/3 sidetone? It has been broken in DT
+> boot since the first time we booted OMAP3 with DT... Only in legacy mode we
+> can have properly working ST.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
-Changes since v1:
-- Add imx6sx-sdb-sai.dtb into Makefile
+Grr.
 
- arch/arm/boot/dts/Makefile           |  1 +
- arch/arm/boot/dts/imx6sx-sdb-sai.dts | 67 ++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/imx6sx-sdb.dtsi    | 16 +++++++++
- 3 files changed, 84 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6sx-sdb-sai.dts
+> I have the second level of patches based on this set (I think I need to resend
+> this series since I might have changed it, can not recall) for both arch/arm
+> and ASoC to have working ST in legacy and DT boot. We will no longer have
+> warning regarding to broken hwmod data in DT boot.
+> But all is based on the assumption that we agree at some point that the ST
+> block is part of the McBSP module ;)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 1993333..ea71187 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -374,6 +374,7 @@ dtb-$(CONFIG_SOC_IMX6SL) += \
- dtb-$(CONFIG_SOC_IMX6SX) += \
- 	imx6sx-sabreauto.dtb \
- 	imx6sx-sdb-reva.dtb \
-+	imx6sx-sdb-sai.dtb \
- 	imx6sx-sdb.dtb
- dtb-$(CONFIG_SOC_IMX6UL) += \
- 	imx6ul-14x14-evk.dtb \
-diff --git a/arch/arm/boot/dts/imx6sx-sdb-sai.dts b/arch/arm/boot/dts/imx6sx-sdb-sai.dts
-new file mode 100644
-index 0000000..0155450
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6sx-sdb-sai.dts
-@@ -0,0 +1,67 @@
-+/*
-+ * Copyright (C) 2016 NXP Semiconductors
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License
-+ *     version 2 as published by the Free Software Foundation.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#include "imx6sx-sdb.dts"
-+
-+/ {
-+	sound {
-+		audio-cpu = <&sai1>;
-+	};
-+};
-+
-+&audmux {
-+	/* pin conflict with sai */
-+	status = "disabled";
-+};
-+
-+&sai1 {
-+	status = "okay";
-+};
-+
-+&sdma {
-+	gpr = <&gpr>;
-+	/* SDMA event remap for SAI1 */
-+	fsl,sdma-event-remap = <0 15 1>, <0 16 1>;
-+};
-+
-+&ssi2 {
-+	status = "disabled";
-+};
-diff --git a/arch/arm/boot/dts/imx6sx-sdb.dtsi b/arch/arm/boot/dts/imx6sx-sdb.dtsi
-index f1d3730..e5eafe4 100644
---- a/arch/arm/boot/dts/imx6sx-sdb.dtsi
-+++ b/arch/arm/boot/dts/imx6sx-sdb.dtsi
-@@ -254,6 +254,12 @@
- 	status = "okay";
- };
- 
-+&sai1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_sai1>;
-+	status = "disabled";
-+};
-+
- &ssi2 {
- 	status = "okay";
- };
-@@ -468,6 +474,16 @@
- 			>;
- 		};
- 
-+		pinctrl_sai1: sai1grp {
-+			fsl,pins = <
-+				MX6SX_PAD_CSI_DATA00__SAI1_TX_BCLK	0x130b0
-+				MX6SX_PAD_CSI_DATA01__SAI1_TX_SYNC	0x130b0
-+				MX6SX_PAD_CSI_HSYNC__SAI1_TX_DATA_0	0x120b0
-+				MX6SX_PAD_CSI_VSYNC__SAI1_RX_DATA_0	0x130b0
-+				MX6SX_PAD_CSI_PIXCLK__AUDMUX_MCLK	0x130b0
-+			>;
-+		};
-+
- 		pinctrl_uart1: uart1grp {
- 			fsl,pins = <
- 				MX6SX_PAD_GPIO1_IO04__UART1_TX		0x1b0b1
--- 
-1.9.1
+The sidetone module is a separate target from the McBSP on the interconnect
+but there are also direct lines between sidetone and McBSP devices :)
+Here's what I'm seeing looking at the AP table on dm3730 hardware.
+
+McBSP target module:
+0x49022000, ap 5 06.0, McBSP2
+0x49024000, ap 7 08.0, McBSP3
+
+Sidetone target modules:
+0x49028000, ap 39 0a.0, mcbsp2_sidetone
+0x4902a000, ap 41 12.0, mcbsp3_sidetone
+
+And that seems to match TRM "21.6.4 SIDETONE Register Description",
+"Table 2-5. L4-Peripheral Memory Space Mapping", and "Table 9-114. Region
+Allocation for L4-Per Interconnect".
+
+> If I need to write separate driver for the McBSP module's ST block, it would
+> mean some sort of API between the McBSP and ST driver. This is not straight
+> forward since there are registers both in McBSP block and ST block that needs
+> to be configured in specific order -> simple enable_st() would not work
+> (probably enable_st_stage1(), enable_st_stage2()) and callbacks from McBSP to
+> ST, ST to McBSP also going to be needed. As far as I can see it is going to be
+> a huge mess.
+
+The McBSP and sidetone don't have parent child relationship at the
+interconnect level. So I think the best option would be to have the McBSP
+driver implement mcbsp_sidetone_register/unregister() etc functions. That
+can then set up the necessary callbacks. Then the sidetone driver can call
+them on probe/exit and set up the necessary callbacks and whatever might
+be needed.
+
+If they are currently handled in a single driver, you you need to
+pm_runtime_get both modules. So having two separate drivers might make
+things a lot simpler.
+
+If you don't treat the McBSP and sidetone as separate modules, things can
+easily fail. For example, doing a read-back to flush of posted write to
+sidetone registers flushes nothing for McBSP and the other way around.
+
+> Other option would be to deprecate the ST support as such, but that would
+> leave the n900 guys in trouble as they need ST to be functional...
+
+That does not sound like a nice option at all :(
+
+Regards,
+
+Tony
