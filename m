@@ -1,56 +1,92 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Sat, 2 Apr 2016 14:57:49 +0800
-Subject: [PATCH v2] pinctrl: mediatek: correct debounce time unit in
- mtk_gpio_set_debounce
-Message-ID: <1459580269-64531-1-git-send-email-yingjoe.chen@mediatek.com>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Sat,  2 Apr 2016 17:29:27 +0800
+Subject: [PATCH v2 00/16] DTS for hi6220 and HiKey
+Message-ID: <1459589383-16914-1-git-send-email-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The debounce time unit for gpio_chip.set_debounce is us but
-mtk_gpio_set_debounce regard it as ms.
-Fix this by correct debounce time array dbnc_arr so it can find correct
-debounce setting. Debounce time for first debounce setting is 500us,
-correct this as well.
+This patchset include dts changes for hi6220 SoC and HiKey board. These
+patches apply well one by one on top of next-20160401.
 
-While I'm at it, also change the debounce time array name to
-"debounce_time" for readability.
+To avoid merge conflicts with patches already ack'ed by maintainers,
+I picked all hi6220/hikey dts related patches into this single patchset.
+And they passed the tests on HiKey.
 
-Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
----
-This was based on v4.6-rc1
-Change since v1:
-- Improve commit message.
-- Change dbnc_arr name to debounce_time
----
- drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+Patch 1~3 are from hi6220 cpuidle support. It has been reviewed and
+ack'ed in maillist.
+[PATCH v2 RESEND 0/4] arm64: Hi6220: enable CPU idle states:
+http://archive.arm.linux.org.uk/lurker/message/20160121.105346.7d3b0470.en.html
 
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-index 2bbe6f7..6ab8c3c 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-+++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-@@ -1004,7 +1004,8 @@ static int mtk_gpio_set_debounce(struct gpio_chip *chip, unsigned offset,
- 	struct mtk_pinctrl *pctl = dev_get_drvdata(chip->parent);
- 	int eint_num, virq, eint_offset;
- 	unsigned int set_offset, bit, clr_bit, clr_offset, rst, i, unmask, dbnc;
--	static const unsigned int dbnc_arr[] = {0 , 1, 16, 32, 64, 128, 256};
-+	static const unsigned int debounce_time[] = {500, 1000, 16000, 32000, 64000,
-+						128000, 256000};
- 	const struct mtk_desc_pin *pin;
- 	struct irq_data *d;
- 
-@@ -1022,9 +1023,9 @@ static int mtk_gpio_set_debounce(struct gpio_chip *chip, unsigned offset,
- 	if (!mtk_eint_can_en_debounce(pctl, eint_num))
- 		return -ENOSYS;
- 
--	dbnc = ARRAY_SIZE(dbnc_arr);
--	for (i = 0; i < ARRAY_SIZE(dbnc_arr); i++) {
--		if (debounce <= dbnc_arr[i]) {
-+	dbnc = ARRAY_SIZE(debounce_time);
-+	for (i = 0; i < ARRAY_SIZE(debounce_time); i++) {
-+		if (debounce <= debounce_time[i]) {
- 			dbnc = i;
- 			break;
- 		}
+Patch 4~6 are for hi6220 gpio, pinctl and spi configurations respectively.
+
+Patch 7 adds hi6220 i2c nodes, and
+patch 8 enables them for hikey board usage.
+
+Patch 9 adds add hi6220 usb node. It has been sent to maillist.
+[PATCH] arm64: dts: add hi6220 usb node
+http://thread.gmane.org/gmane.linux.drivers.devicetree/146062
+http://thread.gmane.org/gmane.linux.drivers.devicetree/144335/focus=134022
+
+Patch 10 and 11 are from hi6220 mailbox support. It has been reviewed and
+ack'ed in maillist.
+[PATCH v7 RESEND 0/4] mailbox: hisilicon: add Hi6220 mailbox driver
+http://thread.gmane.org/gmane.linux.kernel/2152759/focus=2152768
+
+Patch 12 adds pinctrl to uart ports in SoC and enables them for HiKey board.
+Patch 13 adds gpio LEDs device nodes.
+
+Patch 14 adds hi655x pmic dts node and regulator support.
+[PATCH v8 5/5] arm64: dts: hisilicon: Add hi655x pmic dts node
+http://thread.gmane.org/gmane.linux.kernel/2151688
+
+Patch 15 adds dwmmc nodes description for hi6220. It refers to two LDO's
+which are defined above.
+Patch 16 adds wifi device node (TI's wl1835) for HiKey board.
+
+
+v2:
+- picked hi655x pmic dts node.
+- removed dw_mmc resets property, as it is still under review.
+- add 'non-removable' into dw_mmc2 for wifi
+
+Chen Feng (1):
+  arm64: dts: hikey: Add hi655x pmic dts node
+
+Guodong Xu (4):
+  arm64: dts: hikey: enable i2c0 and i2c1 for working with mezzanine
+    boards
+  arm64: dts: hi6220: add pinctrl for uarts and enable them
+  arm64: dts: add LED nodes for hi6220-hikey
+  arm64: dts: add wifi nodes support for hi6220-hikey
+
+Leo Yan (5):
+  arm64: dts: Reserve memory regions for hi6220
+  arm64: dts: add sp804 timer node for Hi6220
+  arm64: dts: enable idle states for Hi6220
+  arm64: dts: add mailbox node for Hi6220
+  arm64: dts: add Hi6220's stub clock node
+
+Xinwei Kong (2):
+  arm64: dts: add all hi6220 i2c nodes
+  arm64: dts: add dwmmc nodes for hi6220
+
+Zhangfei Gao (1):
+  arm64: dts: add hi6220 usb node
+
+Zhong Kaihua (3):
+  arm64: dts: Add Hi6220 gpio configuration nodes
+  arm64: dts: add Hi6220 pinctrl configuration nodes
+  arm64: dts: add Hi6220 spi configuration nodes
+
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts   | 198 ++++++-
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi        | 582 +++++++++++++++++++
+ arch/arm64/boot/dts/hisilicon/hikey-gpio.dtsi    | 607 +++++++++++++++++++
+ arch/arm64/boot/dts/hisilicon/hikey-pinctrl.dtsi | 705 +++++++++++++++++++++++
+ include/dt-bindings/pinctrl/hisi.h               |  59 ++
+ 5 files changed, 2147 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/hisilicon/hikey-gpio.dtsi
+ create mode 100644 arch/arm64/boot/dts/hisilicon/hikey-pinctrl.dtsi
+ create mode 100644 include/dt-bindings/pinctrl/hisi.h
+
 -- 
 1.9.1
