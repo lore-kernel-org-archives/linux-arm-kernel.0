@@ -1,84 +1,68 @@
 From: guodong.xu@linaro.org (Guodong Xu)
-Date: Sat,  2 Apr 2016 17:29:39 +0800
-Subject: [PATCH v2 12/16] arm64: dts: hi6220: add pinctrl for uarts and enable
- them
+Date: Sat,  2 Apr 2016 17:29:40 +0800
+Subject: [PATCH v2 13/16] arm64: dts: add LED nodes for hi6220-hikey
 In-Reply-To: <1459589383-16914-1-git-send-email-guodong.xu@linaro.org>
 References: <1459589383-16914-1-git-send-email-guodong.xu@linaro.org>
-Message-ID: <1459589383-16914-13-git-send-email-guodong.xu@linaro.org>
+Message-ID: <1459589383-16914-14-git-send-email-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinctrl for uart2 uart3 and uart4. Enable uart1 uart2 and uart3.
-
 Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
 ---
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 12 ++++++++++++
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi      |  9 +++++++++
- 2 files changed, 21 insertions(+)
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 41 ++++++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-index e00e9ec..c4f560a 100644
+index c4f560a..28bc646 100644
 --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
 +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-@@ -50,6 +50,18 @@
- 		i2c1: i2c at f7101000 {
+@@ -63,6 +63,47 @@
  			status = "ok";
  		};
-+
-+		uart1: uart at f7111000 {
-+			status = "ok";
-+		};
-+
-+		uart2: uart at f7112000 {
-+			status = "ok";
-+		};
-+
-+		uart3: uart at f7113000 {
-+			status = "ok";
-+		};
  	};
++
++	leds {
++		compatible = "gpio-leds";
++		user_led4 {
++			label = "user_led4";
++			gpios = <&gpio4 0 0>; /* <&gpio_user_led_1>; */
++			linux,default-trigger = "heartbeat";
++		};
++
++		user_led3 {
++			label = "user_led3";
++			gpios = <&gpio4 1 0>; /* <&gpio_user_led_2>; */
++			linux,default-trigger = "mmc0";
++		};
++
++		user_led2 {
++			label = "user_led2";
++			gpios = <&gpio4 2 0>; /* <&gpio_user_led_3>; */
++			linux,default-trigger = "mmc1";
++		};
++
++		user_led1 {
++			label = "user_led1";
++			gpios = <&gpio4 3 0>; /* <&gpio_user_led_4>; */
++			linux,default-trigger = "cpu0";
++		};
++
++		wlan_active_led {
++			label = "wifi_active";
++			gpios = <&gpio3 5 0>; /* <&gpio_wlan_active_led>; */
++			linux,default-trigger = "phy0tx";
++			default-state = "off";
++		};
++
++		bt_active_led {
++			label = "bt_active";
++			gpios = <&gpio4 7 0>; /* <&gpio_bt_active_led>; */
++			linux,default-trigger = "hci0rx";
++			default-state = "off";
++		};
++	};
  };
  
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-index a7ca40b..6afd327 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -266,6 +266,8 @@
- 			clocks = <&sys_ctrl HI6220_UART1_PCLK>,
- 				 <&sys_ctrl HI6220_UART1_PCLK>;
- 			clock-names = "uartclk", "apb_pclk";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&uart1_pmx_func &uart1_cfg_func1 &uart1_cfg_func2>;
- 			status = "disabled";
- 		};
- 
-@@ -276,6 +278,8 @@
- 			clocks = <&sys_ctrl HI6220_UART2_PCLK>,
- 				 <&sys_ctrl HI6220_UART2_PCLK>;
- 			clock-names = "uartclk", "apb_pclk";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&uart2_pmx_func &uart2_cfg_func>;
- 			status = "disabled";
- 		};
- 
-@@ -286,6 +290,9 @@
- 			clocks = <&sys_ctrl HI6220_UART3_PCLK>,
- 				 <&sys_ctrl HI6220_UART3_PCLK>;
- 			clock-names = "uartclk", "apb_pclk";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&uart3_pmx_func &uart3_cfg_func>;
-+			status = "disabled";
- 		};
- 
- 		uart4: uart at f7114000 {
-@@ -295,6 +302,8 @@
- 			clocks = <&sys_ctrl HI6220_UART4_PCLK>,
- 				 <&sys_ctrl HI6220_UART4_PCLK>;
- 			clock-names = "uartclk", "apb_pclk";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&uart4_pmx_func &uart4_cfg_func>;
- 			status = "disabled";
- 		};
- 
+ &uart2 {
 -- 
 1.9.1
