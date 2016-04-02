@@ -1,49 +1,46 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Sat, 2 Apr 2016 15:41:24 +0200
-Subject: [PATCH] ARM: dts: armv7-m: add address to unit name
-In-Reply-To: <1459577299-2818-1-git-send-email-stefan@agner.ch>
-References: <1459577299-2818-1-git-send-email-stefan@agner.ch>
-Message-ID: <CAGhQ9VyW4YNUGrgw1d5HBXutyBqjxP=+0ZGuYrtmnguC=MwMMA@mail.gmail.com>
+From: plaes@plaes.org (Priit Laes)
+Date: Sat, 02 Apr 2016 17:42:00 +0300
+Subject: [linux-sunxi] Re: [PATCH 3/3] sunxi: A20-OLinuXino-LIME2: Add
+ i2c2 bus in DTS
+In-Reply-To: <20160402103420.GH4227@lukather>
+References: <1458932647-24268-1-git-send-email-haas@computerlinguist.org>
+ <1458932647-24268-3-git-send-email-haas@computerlinguist.org>
+ <20160402103420.GH4227@lukather>
+Message-ID: <1459608120.29592.3.camel@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 April 2016 at 08:08, Stefan Agner <stefan@agner.ch> wrote:
-> Add address to unit name to remove the following warning:
->  Warning (unit_address_vs_reg): Node /nv-interrupt-controller has a
->  reg or ranges property, but no unit name
->
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
-> Hi Arnd,
->
-> Not sure through which tree this should go but an earlier patch
-> seemd to be applied directly by you...
->
-> --
-> Stefan
->
->  arch/arm/boot/dts/armv7-m.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/armv7-m.dtsi b/arch/arm/boot/dts/armv7-m.dtsi
-> index b1ad7cf..8126bec 100644
-> --- a/arch/arm/boot/dts/armv7-m.dtsi
-> +++ b/arch/arm/boot/dts/armv7-m.dtsi
-> @@ -1,7 +1,7 @@
->  #include "skeleton.dtsi"
->
->  / {
-> -       nvic: nv-interrupt-controller  {
-> +       nvic: nv-interrupt-controller at 0xe000e100 {
+On Sat, 2016-04-02 at 12:34 +0200, Maxime Ripard wrote:
+> Hi,
+> 
+> On Fri, Mar 25, 2016 at 08:04:07PM +0100, Michael Haas wrote:
+> > 
+> > The A20 processor provides a third I2C bus on pins PB20 and PB21.
+> > The A20-OLinuXino-LIME2 exposes this bus via its GPIO1 port.
+> > 
+> > Olimex also provide a breakout board called the
+> > A20-OLinuXino-LIME2-UEXT. This change is required to properly
+> > support I2C on the UEXT connector found there.
 
-While changing the line it might be good idea to use the standard
-'interrupt-controller' name instead.
+Documentation for Olimex UEXT interface:
+https://www.olimex.com/Products/Modules/UEXT/resources/UEXT_rev_B.pdf
 
-I posted the same patch couple of days ago, btw.
-http://marc.info/?l=devicetree&m=145929088915714&w=2
+Basically it *should* by default work as a board to board connector
+which supports three serial communication interfaces: I2C, SPI and UART
+(original document mentions RS232, but official modules work only with
+3.3V logic levels).
 
-
-But I don't care which one that is applied.
-
-regards,
-Joachim Eastwood
+> > 
+> > Signed-off-by: Michael Haas <haas@computerlinguist.org>
+> What are the other options on that pin? Is it something exclusively
+> dedicated to i2c on the pin headers and the documentation, or is
+> anyone free to use that pin for whatever he wishes?
+> 
+> Thanks,
+> Maxime
+> 
+> --?
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
+> 
