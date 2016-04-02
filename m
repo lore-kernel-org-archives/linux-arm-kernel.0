@@ -1,97 +1,31 @@
 From: guodong.xu@linaro.org (Guodong Xu)
-Date: Sat,  2 Apr 2016 19:47:51 +0800
-Subject: [PATCH v3 1/4] arm64: defconfig: Enable devices for Hi6220 and
- 96boards HiKey
+Date: Sat,  2 Apr 2016 19:47:52 +0800
+Subject: [PATCH v3 2/4] arm64: defconfig: add CONFIG_SPI_SPIDEV as module
 In-Reply-To: <1459597674-6834-1-git-send-email-guodong.xu@linaro.org>
 References: <1459597674-6834-1-git-send-email-guodong.xu@linaro.org>
-Message-ID: <1459597674-6834-2-git-send-email-guodong.xu@linaro.org>
+Message-ID: <1459597674-6834-3-git-send-email-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables a number of devices currently supported by the Hi6220
-and 96boards HiKey. These include
-a) Hi655x PMIC and regulator
-b) Hi6220 I2C, USB, MMC, mailbox, and reset
-c) CONFIG_PINCTRL_SINGLE, and CONFIG_LEDS_GPIO
-
-v2:
- - rebase to next-20160310, CONFIG_MMC_BLOCK_MINORS=16 is already in.
- - set CONFIG_I2C_DESIGNWARE_PLATFORM to be build as module
+add CONFIG_SPI_SPIDEV as module, for arm64.
 
 Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
 Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm64/configs/defconfig | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index f705051..32b4f2d 100644
+index 32b4f2d..e4952c5 100644
 --- a/arch/arm64/configs/defconfig
 +++ b/arch/arm64/configs/defconfig
-@@ -146,6 +146,7 @@ CONFIG_VIRTIO_CONSOLE=y
- # CONFIG_HW_RANDOM is not set
- CONFIG_I2C=y
- CONFIG_I2C_CHARDEV=y
-+CONFIG_I2C_DESIGNWARE_PLATFORM=m
- CONFIG_I2C_MV64XXX=y
- CONFIG_I2C_QUP=y
- CONFIG_I2C_UNIPHIER_F=y
-@@ -154,6 +155,7 @@ CONFIG_SPI=y
+@@ -154,6 +154,7 @@ CONFIG_I2C_RCAR=y
+ CONFIG_SPI=y
  CONFIG_SPI_PL022=y
  CONFIG_SPI_QUP=y
++CONFIG_SPI_SPIDEV=m
  CONFIG_SPMI=y
-+CONFIG_PINCTRL_SINGLE=y
+ CONFIG_PINCTRL_SINGLE=y
  CONFIG_PINCTRL_MSM8916=y
- CONFIG_PINCTRL_QCOM_SPMI_PMIC=y
- CONFIG_GPIO_SYSFS=y
-@@ -170,8 +172,10 @@ CONFIG_THERMAL_EMULATION=y
- CONFIG_EXYNOS_THERMAL=y
- CONFIG_MFD_SPMI_PMIC=y
- CONFIG_MFD_SEC_CORE=y
-+CONFIG_MFD_HI655X_PMIC=y
- CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
-+CONFIG_REGULATOR_HI655X=y
- CONFIG_REGULATOR_QCOM_SMD_RPM=y
- CONFIG_REGULATOR_QCOM_SPMI=y
- CONFIG_REGULATOR_S2MPS11=y
-@@ -196,6 +200,7 @@ CONFIG_USB_EHCI_HCD_PLATFORM=y
- CONFIG_USB_OHCI_HCD=y
- CONFIG_USB_OHCI_HCD_PLATFORM=y
- CONFIG_USB_STORAGE=y
-+CONFIG_USB_DWC2=y
- CONFIG_USB_CHIPIDEA=y
- CONFIG_USB_CHIPIDEA_UDC=y
- CONFIG_USB_CHIPIDEA_HOST=y
-@@ -215,9 +220,11 @@ CONFIG_MMC_SPI=y
- CONFIG_MMC_SUNXI=y
- CONFIG_MMC_DW=y
- CONFIG_MMC_DW_EXYNOS=y
-+CONFIG_MMC_DW_K3=y
- CONFIG_MMC_BLOCK_MINORS=16
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_GPIO=y
- CONFIG_LEDS_SYSCON=y
- CONFIG_LEDS_TRIGGERS=y
- CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-@@ -244,6 +251,8 @@ CONFIG_COMMON_CLK_QCOM=y
- CONFIG_MSM_GCC_8916=y
- CONFIG_HWSPINLOCK_QCOM=y
- CONFIG_ARM_SMMU=y
-+CONFIG_MAILBOX=y
-+CONFIG_HI6220_MBOX=y
- CONFIG_QCOM_SMEM=y
- CONFIG_QCOM_SMD=y
- CONFIG_QCOM_SMD_RPM=y
-@@ -252,6 +261,8 @@ CONFIG_ARCH_TEGRA_210_SOC=y
- CONFIG_HISILICON_IRQ_MBIGEN=y
- CONFIG_EXTCON_USB_GPIO=y
- CONFIG_PHY_RCAR_GEN3_USB2=y
-+CONFIG_COMMON_RESET_HI6220=y
-+CONFIG_PHY_HI6220_USB=y
- CONFIG_PHY_XGENE=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
 -- 
 1.9.1
