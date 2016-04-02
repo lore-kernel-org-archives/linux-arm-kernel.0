@@ -1,68 +1,72 @@
-From: haas@computerlinguist.org (Michael Haas)
-Date: Sat, 2 Apr 2016 18:21:17 +0200
-Subject: [linux-sunxi] Re: [PATCH 3/3] sunxi: A20-OLinuXino-LIME2: Add
- i2c2 bus in DTS
-In-Reply-To: <20160402103420.GH4227@lukather>
-References: <1458932647-24268-1-git-send-email-haas@computerlinguist.org>
- <1458932647-24268-3-git-send-email-haas@computerlinguist.org>
- <20160402103420.GH4227@lukather>
-Message-ID: <56FFF17D.9010000@computerlinguist.org>
+From: gary.bisson@boundarydevices.com (Gary Bisson)
+Date: Sat,  2 Apr 2016 18:25:42 +0200
+Subject: [PATCH v3 0/9] imx: add latest Boundary Devices boards support
+In-Reply-To: <1458050668-26748-1-git-send-email-gary.bisson@boundarydevices.com>
+References: <1458050668-26748-1-git-send-email-gary.bisson@boundarydevices.com>
+Message-ID: <1459614351-16731-1-git-send-email-gary.bisson@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Maxime,
+Hi all,
 
-thank you for taking the time to review this patch set.
+This series adds support for the following Boundary Devices boards:
+- Nitrogen7 (i.MX7)
+- Nitrogen6SX (i.MX6SoloX)
+- Nitrogen6QP_MAX (i.MX6QP)
 
-On 04/02/2016 12:34 PM, Maxime Ripard wrote:
-> Hi,
->
-> On Fri, Mar 25, 2016 at 08:04:07PM +0100, Michael Haas wrote:
->> The A20 processor provides a third I2C bus on pins PB20 and PB21.
->> The A20-OLinuXino-LIME2 exposes this bus via its GPIO1 port.
->>
->> Olimex also provide a breakout board called the
->> A20-OLinuXino-LIME2-UEXT. This change is required to properly
->> support I2C on the UEXT connector found there.
->>
->> Signed-off-by: Michael Haas <haas@computerlinguist.org>
->
-> What are the other options on that pin? Is it something exclusively
-> dedicated to i2c on the pin headers and the documentation, or is
-> anyone free to use that pin for whatever he wishes?
->
-> Thanks,
-> Maxime
+The first patches add display and CAN support to i.MX7 device tree. Those
+two features have been successfully tested on the Nitrogen7. Also the support
+of CKIL clock has been added in order to use it as slow clock for the WiFi
+module.
 
-I assume you are talking about the UEXT connector, not about PB20 and
-PB21. These are regular GPIO pins multiplexed with I2C, but no other
-function.
+Then the last 3 patches add some missing configurations in order to fully
+support Boundary platforms using imx_v6_v7_defconfig.
 
-Regarding UEXT: the A20-OLinuXino-LIME2-UEXT breakout board supports two
-use cases here.
+All the patches have been applied/tested on top of Shawn's 'for-next' branch.
 
-The first one: provide a simple adapter from the 0.05" pin headers on
-the olinuxino to the more common world of 0.1" headers. In this use
-case, you can plug the A20-OLinuXino-LIME2-UEXT intoany of LCD_CON or
-GIO-{1,2,3} and you're good to go.
+Here are some remarks/questions that came during testing:
+- Is the pxp v4l2 driver being worked on for mainline inclusion?
+- Are the ldb modifications for SoloX being worked on for mainline inclusion?
+- Is the WM8960 ASoC machine driver being worked on for mainline inclusion?
+- When booting the Nitrogen7, there's backtrace due to clk_pllv3_prepare, does
+  it happen on the sdb too? Note that it doesn't prevent the board to work.
 
-The second one: here, you want to use UEXT modules provided by Olimex.
-It's a simple connector exposing I2C, SPI and UART as mentioned by
-Priit. To use UEXT, you have to use GPIO-1 to get the correct pin mapping.
+Changes v1 -> v2:
+- Remove lines commented out from nitrogen6sx dts as suggested by Vladimir
+- Disable pcie for nitrogen6qp_max dts
+Changes v2 -> v3:
+- Re-order lcdif node by unit-address order
+- Re-order flexcan nodes by unit-address order
+- Remove flexcan unnecessary stop-mode property
+- Fix Nitrogen7 BT UART clock parent
+- Fix Nitrogen7 lvdo2 node to be always-on
 
-Regarding the official documentation provided by Olimex. The
-A20-OLinuXino-Lime2_Rev_c.pdf shows the pins on GPIO-1 as PB20 and PB21.
-In the schematics for the breakout board,
-A20-OLinuXino-Lime2-UEXT_sch.pdf, the pins for the UEXT connector are
-labeled as PB20/SCK and PB21/SDA. This acknowledges the double use.
-However, PB20 and PB21 have pull-ups by default according to
-A20-OLinuXino-Lime2_Rev_c.pdf,
-which makes them a lot more useful as I2C than as GPIO.
+Regards,
+Gary
 
-What originally prompted me to submit this patch: I bought a breakout
-board and a small LCD with UEXT connector together with my board. Then I
-found out that it doesn't work out of the box because i2c2 is not
-enabled. Since using UEXT is probably common for that particular
-vendor, I believe it should be enabled by default.
+Gary Bisson (9):
+  ARM: dts: imx7d: add lcdif support
+  ARM: dts: imx7d: add flexcan support
+  clk: imx: add ckil clock for i.MX7
+  ARM: dts: imx: add Boundary Devices Nitrogen7 board
+  ARM: dts: imx: add Boundary Devices Nitrogen6_MAX QP board
+  ARM: dts: imx: add Boundary Devices Nitrogen6_SoloX board
+  ARM: imx_v6_v7_defconfig: add FT5x06 and TSC2004 touch support
+  ARM: imx_v6_v7_defconfig: add CONFIG_I2C_MUX_GPIO
+  ARM: imx_v6_v7_defconfig: add CONFIG_RTC_DRV_M41T80
 
-Michael
+ arch/arm/boot/dts/Makefile                 |   3 +
+ arch/arm/boot/dts/imx6qp-nitrogen6_max.dts |  59 +++
+ arch/arm/boot/dts/imx6sx-nitrogen6sx.dts   | 732 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx7d-nitrogen7.dts      | 819 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx7d.dtsi               |  31 ++
+ arch/arm/configs/imx_v6_v7_defconfig       |   4 +
+ drivers/clk/imx/clk-imx7d.c                |   3 +-
+ include/dt-bindings/clock/imx7d-clock.h    |   3 +-
+ 8 files changed, 1652 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/boot/dts/imx6qp-nitrogen6_max.dts
+ create mode 100644 arch/arm/boot/dts/imx6sx-nitrogen6sx.dts
+ create mode 100644 arch/arm/boot/dts/imx7d-nitrogen7.dts
+
+-- 
+2.7.0
