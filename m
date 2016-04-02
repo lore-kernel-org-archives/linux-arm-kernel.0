@@ -1,31 +1,27 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 2 Apr 2016 18:26:56 +0200
-Subject: [PATCH] ARM: dts: kirkwood: Add DTS for Linksys EA4200v2/EA4500
-In-Reply-To: <1459601753-31193-1-git-send-email-bert@biot.com>
-References: <1459601753-31193-1-git-send-email-bert@biot.com>
-Message-ID: <20160402162656.GG32554@lunn.ch>
+From: broonie@kernel.org (Mark Brown)
+Date: Sat, 2 Apr 2016 09:34:12 -0700
+Subject: [PATCH v2] ASoC: mediatek: Add second I2S on mt8173-rt5650
+ machine driver
+In-Reply-To: <1459498877-5810-1-git-send-email-pc.liao@mediatek.com>
+References: <1459498877-5810-1-git-send-email-pc.liao@mediatek.com>
+Message-ID: <20160402163412.GC2350@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +		button at 15 {
-> +			label = "WPS Button";
-> +			linux,code = <KEY_WPS_BUTTON>;
-> +			gpios = <&gpio1 15 GPIO_ACTIVE_LOW>;
-> +		};
-> +
-> +		button at 16 {
-> +			label = "Reset Button";
-> +			linux,code = <KEY_RESTART>;
-> +			gpios = <&gpio1 16 GPIO_ACTIVE_LOW>;
-> +		};
-> +	};
+On Fri, Apr 01, 2016 at 04:21:17PM +0800, PC Liao wrote:
 
-I'm looking at the warnings the new DT compiler produces....
+> +Optional properties:
+> +- mediatek,audio-codec-dai-capture: audio codec dai on capture path
+> +  rt5645-aif1: Default setting. Connect rt5650 I2S1 for capture
+> +  rt5645-aif2: Connect rt5650 I2S2 for capture
 
-Buttons should not have a @15, etc, since they don't have a register
-property.
-
-If you can, it would be good it you can compile your .dts file using
-the dtc compile in linux-next and pass W=1.
-
-	Andrew
+No, this has exactly the same issue as the previous version.  To repeat
+what I said last time I would expect that the driver should just specify
+the links between the DAIs.  Look at how other devices reference DAIs.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160402/bf05092e/attachment-0001.sig>
