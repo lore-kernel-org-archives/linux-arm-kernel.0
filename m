@@ -1,34 +1,48 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sat, 2 Apr 2016 10:04:04 -0700
-Subject: [PATCH] ASoC: mediatek: Add second I2S on mt8173-rt5650 machine
- driver
-In-Reply-To: <1459479052.24414.3.camel@mtksdaap41>
-References: <1458877325-33980-1-git-send-email-pc.liao@mediatek.com>
- <20160328191115.GE2350@sirena.org.uk>
- <1459258103.3747.7.camel@mtksdaap41>
- <20160329160703.GN2350@sirena.org.uk>
- <1459479052.24414.3.camel@mtksdaap41>
-Message-ID: <20160402170404.GG2350@sirena.org.uk>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat,  2 Apr 2016 20:56:02 +0200
+Subject: [PATCH] ARM: pxa: activate pinctrl for device-tree machines
+Message-ID: <1459623362-18324-1-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 01, 2016 at 10:50:52AM +0800, PC Liao wrote:
-> On Wed, 2016-03-30 at 00:07 +0800, Mark Brown wrote:
+Pincontrol is not yet ready for all PXA platforms.
+For example, a legacy platform, if PINCTRL was activated, will fail its
+calls to gpio_request() or gpio_direction_output(), as the pinctrl
+driver might not be available, such as for pxa25x and pxa3xx.
 
-> > This sort of arrangement is very common - it's often needed to get
-> > different sample rates for playback and capture.  Normally it'd be
-> > represented in the DT by having the two DAI links specified normally and
-> > then having the driver look at the DT to see what's connected to work
-> > out what mode to use.
+As a step forward, activate pincontrol for all device-tree available
+machines, ie. pxa27x device-tree based and pxa3xx device-tree based.
 
-> Could you please suggest the reference driver about this?
+If it appears later that pincontrol is also required for legacy
+platforms and if the mfp->pinctrl conversion can be achieved, then
+PINCTRL will be activated for the whole PXA architecture.
 
-Any driver that can identify an individual DAI within a device by using
-sound-dai references, even simple-card does this.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160402/061b952e/attachment.sig>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ arch/arm/mach-pxa/Kconfig | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
+index 7ee4652b4c61..cd894d69e766 100644
+--- a/arch/arm/mach-pxa/Kconfig
++++ b/arch/arm/mach-pxa/Kconfig
+@@ -6,6 +6,7 @@ comment "Intel/Marvell Dev Platforms (sorted by hardware release time)"
+ 
+ config MACH_PXA27X_DT
+ 	bool "Support PXA27x platforms from device tree"
++	select PINCTRL
+ 	select POWER_SUPPLY
+ 	select PXA27x
+ 	select USE_OF
+@@ -17,6 +18,7 @@ config MACH_PXA27X_DT
+ config MACH_PXA3XX_DT
+ 	bool "Support PXA3xx platforms from device tree"
+ 	select CPU_PXA300
++	select PINCTRL
+ 	select POWER_SUPPLY
+ 	select PXA3xx
+ 	select USE_OF
+-- 
+2.1.4
