@@ -1,58 +1,68 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Fri,  1 Apr 2016 23:13:41 -0700
-Subject: [PATCH 3/3] ARM: dts: vfxxx: add missing reg properties
+Date: Fri,  1 Apr 2016 23:13:40 -0700
+Subject: [PATCH 2/3] ARM: dts: vf-colibri: increase NAND clock speed
 In-Reply-To: <1459577621-3160-1-git-send-email-stefan@agner.ch>
 References: <1459577621-3160-1-git-send-email-stefan@agner.ch>
-Message-ID: <1459577621-3160-3-git-send-email-stefan@agner.ch>
+Message-ID: <1459577621-3160-2-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing reg properties to AIPS bus and Cortex-A5's PMU unit.
-This change avoids the following warnings:
- Warning (unit_address_vs_reg): Node /soc/aips-bus at 40000000 has a unit
- name, but no reg property
- Warning (unit_address_vs_reg): Node /soc/aips-bus at 40080000 has a unit
- name, but no reg property
- Warning (unit_address_vs_reg): Node /soc/aips-bus at 40080000/pmu at 40089000
- has a unit name, but no reg property
+The NAND flash memory populated on Colibri VF61 allows faster NAND
+timings than the flash memory on VF50. Additionally, due to divider
+limitations, VF61 did clock the flash even slower than VF50. Assign
+the NFC clock in the module specific device trees vf500-colibri.dtsi
+and vf610-colibri.dtsi respectively.
+
+This increases raw read speed on Colibri VF61 by about 20%.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/boot/dts/vf500.dtsi | 1 +
- arch/arm/boot/dts/vfxxx.dtsi | 2 ++
- 2 files changed, 3 insertions(+)
+ arch/arm/boot/dts/vf-colibri.dtsi    | 2 --
+ arch/arm/boot/dts/vf500-colibri.dtsi | 5 +++++
+ arch/arm/boot/dts/vf610-colibri.dtsi | 5 +++++
+ 3 files changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/vf500.dtsi b/arch/arm/boot/dts/vf500.dtsi
-index 9d37272..a3824e6 100644
---- a/arch/arm/boot/dts/vf500.dtsi
-+++ b/arch/arm/boot/dts/vf500.dtsi
-@@ -81,6 +81,7 @@
- 				compatible = "arm,cortex-a5-pmu";
- 				interrupts = <7 IRQ_TYPE_LEVEL_HIGH>;
- 				interrupt-affinity = <&a5_cpu>;
-+				reg = <0x40089000 0x1000>;
- 			};
- 		};
+diff --git a/arch/arm/boot/dts/vf-colibri.dtsi b/arch/arm/boot/dts/vf-colibri.dtsi
+index 7529dd7..226a86f 100644
+--- a/arch/arm/boot/dts/vf-colibri.dtsi
++++ b/arch/arm/boot/dts/vf-colibri.dtsi
+@@ -130,8 +130,6 @@
+ };
  
-diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
-index 5c09754..04ef54d 100644
---- a/arch/arm/boot/dts/vfxxx.dtsi
-+++ b/arch/arm/boot/dts/vfxxx.dtsi
-@@ -95,6 +95,7 @@
- 			compatible = "fsl,aips-bus", "simple-bus";
- 			#address-cells = <1>;
- 			#size-cells = <1>;
-+			reg = <0x40000000 0x00070000>;
- 			ranges;
+ &nfc {
+-	assigned-clocks = <&clks VF610_CLK_NFC>;
+-	assigned-clock-rates = <33000000>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_nfc>;
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/vf500-colibri.dtsi b/arch/arm/boot/dts/vf500-colibri.dtsi
+index 3fe1f48..1a8a0ef 100644
+--- a/arch/arm/boot/dts/vf500-colibri.dtsi
++++ b/arch/arm/boot/dts/vf500-colibri.dtsi
+@@ -69,6 +69,11 @@
+ 	};
+ };
  
- 			mscm_cpucfg: cpucfg at 40001000 {
-@@ -481,6 +482,7 @@
- 			compatible = "fsl,aips-bus", "simple-bus";
- 			#address-cells = <1>;
- 			#size-cells = <1>;
-+			reg = <0x40080000 0x0007f000>;
- 			ranges;
- 
- 			edma1: dma-controller at 40098000 {
++&nfc {
++	assigned-clocks = <&clks VF610_CLK_NFC>;
++	assigned-clock-rates = <33000000>;
++};
++
+ &iomuxc {
+ 	vf610-colibri {
+ 		pinctrl_touchctrl_idle: touchctrl_idle {
+diff --git a/arch/arm/boot/dts/vf610-colibri.dtsi b/arch/arm/boot/dts/vf610-colibri.dtsi
+index ab4a29f..9ec9e33 100644
+--- a/arch/arm/boot/dts/vf610-colibri.dtsi
++++ b/arch/arm/boot/dts/vf610-colibri.dtsi
+@@ -50,3 +50,8 @@
+ 		reg = <0x80000000 0x10000000>;
+ 	};
+ };
++
++&nfc {
++	assigned-clocks = <&clks VF610_CLK_NFC>;
++	assigned-clock-rates = <50000000>;
++};
 -- 
 2.7.4
