@@ -1,37 +1,57 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 3 Apr 2016 11:45:18 +0800
-Subject: [PATCH v2 5/5] arm64: dts: rockchip: add rk3368-r88 iodomains
-In-Reply-To: <1459432126-6395-6-git-send-email-heiko@sntech.de>
-Message-ID: <201604031117.cyfIG89v%fengguang.wu@intel.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Sun, 3 Apr 2016 12:53:02 +0900
+Subject: [PATCH] ARM: dts: s3c: Fix DTC unit name warnings in S3C2416 and
+ S3C6410
+In-Reply-To: <CAGhQ9VwJVz0riwx=DWY=giaL=Jo6R=HYZg4hm2FQ6X2_g5hi5Q@mail.gmail.com>
+References: <1459494710-16269-1-git-send-email-k.kozlowski@samsung.com>
+ <CAGhQ9VwJVz0riwx=DWY=giaL=Jo6R=HYZg4hm2FQ6X2_g5hi5Q@mail.gmail.com>
+Message-ID: <20160403035302.GD4919@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+On Fri, Apr 01, 2016 at 04:22:59PM +0200, Joachim Eastwood wrote:
+> On 1 April 2016 at 09:11, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
+> > Fix following DTC warnings in S3C2416 and S3C6410 boards:
+> >
+> > Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+> >
+> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > ---
+> >  arch/arm/boot/dts/s3c2416-smdk2416.dts | 2 +-
+> >  arch/arm/boot/dts/s3c6410-mini6410.dts | 2 +-
+> >  arch/arm/boot/dts/s3c6410-smdk6410.dts | 2 +-
+> >  3 files changed, 3 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/s3c2416-smdk2416.dts b/arch/arm/boot/dts/s3c2416-smdk2416.dts
+> > index f257926c13b7..15f3d1c1bb80 100644
+> > --- a/arch/arm/boot/dts/s3c2416-smdk2416.dts
+> > +++ b/arch/arm/boot/dts/s3c2416-smdk2416.dts
+> > @@ -15,7 +15,7 @@
+> >         model = "SMDK2416";
+> >         compatible = "samsung,s3c2416";
+> >
+> > -       memory {
+> > +       memory at 30000000 {
+> >                 reg =  <0x30000000 0x4000000>;
+> >         };
+> 
+> This change will cause duplicated memory node entries in the DT as
+> noted by Vladimir Zapolskiy [1]. Same goes for all the other patch
+> where you make this change.
+> 
+> $ scripts/dtc/dtc -I dtb -O dts arch/arm/boot/dts/s3c2416-smdk2416.dtb
+> | grep -A2 memory
+>         memory {
+>                 device_type = "memory";
+>                 reg = <0x0 0x0>;
+>         };
+> --
+>         memory at 30000000 {
+>                 reg = <0x30000000 0x4000000>;
+>         };
 
-[auto build test ERROR on rockchip/for-next]
-[also build test ERROR on v4.6-rc1 next-20160401]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+Yeah, I also spotted this later after running scripts/dtx_diff. I will
+leave the memory node untouched.
 
-url:    https://github.com/0day-ci/linux/commits/Heiko-Stuebner/ARM-rockchip-move-io-domains-under-GRF/20160331-215117
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git for-next
-config: arm64-defconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
-
-All errors (new ones prefixed by >>):
-
->> ERROR: Input tree has errors, aborting (use -f to force output)
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 22476 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160403/a98f64fb/attachment-0001.obj>
+Thanks for feedback!
+Krzysztof
