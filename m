@@ -1,111 +1,93 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sun,  3 Apr 2016 23:39:21 +0900
-Subject: [RFC PATCH 3/9] ARM: zynq: move mach-zynq/ to platforms/zynq/
+Date: Sun,  3 Apr 2016 23:39:20 +0900
+Subject: [RFC PATCH 2/9] ARM: uniphier: move mach-uniphier/ to
+ platforms/uniphier/
 In-Reply-To: <1459694367-18635-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1459694367-18635-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1459694367-18635-4-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1459694367-18635-3-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- arch/arm/Kconfig                                 | 2 --
- arch/arm/Makefile                                | 1 -
- arch/arm/platforms/Kconfig                       | 1 +
- arch/arm/platforms/Makefile                      | 1 +
- arch/arm/{mach-zynq => platforms/zynq}/Kconfig   | 0
- arch/arm/{mach-zynq => platforms/zynq}/Makefile  | 0
- arch/arm/{mach-zynq => platforms/zynq}/common.c  | 0
- arch/arm/{mach-zynq => platforms/zynq}/common.h  | 0
- arch/arm/{mach-zynq => platforms/zynq}/headsmp.S | 0
- arch/arm/{mach-zynq => platforms/zynq}/platsmp.c | 0
- arch/arm/{mach-zynq => platforms/zynq}/pm.c      | 0
- arch/arm/{mach-zynq => platforms/zynq}/slcr.c    | 0
- 12 files changed, 2 insertions(+), 3 deletions(-)
- rename arch/arm/{mach-zynq => platforms/zynq}/Kconfig (100%)
- rename arch/arm/{mach-zynq => platforms/zynq}/Makefile (100%)
- rename arch/arm/{mach-zynq => platforms/zynq}/common.c (100%)
- rename arch/arm/{mach-zynq => platforms/zynq}/common.h (100%)
- rename arch/arm/{mach-zynq => platforms/zynq}/headsmp.S (100%)
- rename arch/arm/{mach-zynq => platforms/zynq}/platsmp.c (100%)
- rename arch/arm/{mach-zynq => platforms/zynq}/pm.c (100%)
- rename arch/arm/{mach-zynq => platforms/zynq}/slcr.c (100%)
+ arch/arm/Kconfig                                          | 2 --
+ arch/arm/Makefile                                         | 1 -
+ arch/arm/platforms/Kconfig                                | 2 ++
+ arch/arm/platforms/Makefile                               | 2 +-
+ arch/arm/{mach-uniphier => platforms/uniphier}/Kconfig    | 0
+ arch/arm/{mach-uniphier => platforms/uniphier}/Makefile   | 0
+ arch/arm/{mach-uniphier => platforms/uniphier}/headsmp.S  | 0
+ arch/arm/{mach-uniphier => platforms/uniphier}/platsmp.c  | 0
+ arch/arm/{mach-uniphier => platforms/uniphier}/uniphier.c | 0
+ 9 files changed, 3 insertions(+), 4 deletions(-)
+ rename arch/arm/{mach-uniphier => platforms/uniphier}/Kconfig (100%)
+ rename arch/arm/{mach-uniphier => platforms/uniphier}/Makefile (100%)
+ rename arch/arm/{mach-uniphier => platforms/uniphier}/headsmp.S (100%)
+ rename arch/arm/{mach-uniphier => platforms/uniphier}/platsmp.c (100%)
+ rename arch/arm/{mach-uniphier => platforms/uniphier}/uniphier.c (100%)
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index f1cfb16..394c899 100644
+index 91e62d4..f1cfb16 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -854,8 +854,6 @@ source "arch/arm/mach-w90x900/Kconfig"
+@@ -841,8 +841,6 @@ source "arch/arm/mach-tegra/Kconfig"
  
- source "arch/arm/mach-zx/Kconfig"
+ source "arch/arm/mach-u300/Kconfig"
  
--source "arch/arm/mach-zynq/Kconfig"
+-source "arch/arm/mach-uniphier/Kconfig"
 -
- # ARMv7-M architecture
- config ARCH_EFM32
- 	bool "Energy Micro efm32"
+ source "arch/arm/mach-ux500/Kconfig"
+ 
+ source "arch/arm/mach-versatile/Kconfig"
 diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 16b3eff..884114e 100644
+index 9052487..16b3eff 100644
 --- a/arch/arm/Makefile
 +++ b/arch/arm/Makefile
-@@ -220,7 +220,6 @@ machine-$(CONFIG_ARCH_VEXPRESS)		+= vexpress
+@@ -215,7 +215,6 @@ machine-$(CONFIG_ARCH_TANGO)		+= tango
+ machine-$(CONFIG_ARCH_TEGRA)		+= tegra
+ machine-$(CONFIG_ARCH_U300)		+= u300
+ machine-$(CONFIG_ARCH_U8500)		+= ux500
+-machine-$(CONFIG_ARCH_UNIPHIER)		+= uniphier
+ machine-$(CONFIG_ARCH_VERSATILE)	+= versatile
+ machine-$(CONFIG_ARCH_VEXPRESS)		+= vexpress
  machine-$(CONFIG_ARCH_VT8500)		+= vt8500
- machine-$(CONFIG_ARCH_W90X900)		+= w90x900
- machine-$(CONFIG_ARCH_ZX)		+= zx
--machine-$(CONFIG_ARCH_ZYNQ)		+= zynq
- machine-$(CONFIG_PLAT_SPEAR)		+= spear
- 
- # Platform directory name.  This list is sorted alphanumerically
 diff --git a/arch/arm/platforms/Kconfig b/arch/arm/platforms/Kconfig
-index 5bf796f..be9e2ee 100644
+index db3d104..5bf796f 100644
 --- a/arch/arm/platforms/Kconfig
 +++ b/arch/arm/platforms/Kconfig
-@@ -1,3 +1,4 @@
+@@ -1 +1,3 @@
  # This is sorted alphabetically by directory pathname.
- 
- source "arch/arm/platforms/uniphier/Kconfig"
-+source "arch/arm/platforms/zynq/Kconfig"
++
++source "arch/arm/platforms/uniphier/Kconfig"
 diff --git a/arch/arm/platforms/Makefile b/arch/arm/platforms/Makefile
-index 99090e8..68b0127 100644
+index 5b2bd85..99090e8 100644
 --- a/arch/arm/platforms/Makefile
 +++ b/arch/arm/platforms/Makefile
-@@ -1,3 +1,4 @@
+@@ -1,3 +1,3 @@
  # This list sorted alphanumerically by CONFIG_* macro name.
  
- obj-$(CONFIG_ARCH_UNIPHIER)		+= uniphier/
-+obj-$(CONFIG_ARCH_ZYNQ)			+= zynq/
-diff --git a/arch/arm/mach-zynq/Kconfig b/arch/arm/platforms/zynq/Kconfig
+-obj- += dummy.o
++obj-$(CONFIG_ARCH_UNIPHIER)		+= uniphier/
+diff --git a/arch/arm/mach-uniphier/Kconfig b/arch/arm/platforms/uniphier/Kconfig
 similarity index 100%
-rename from arch/arm/mach-zynq/Kconfig
-rename to arch/arm/platforms/zynq/Kconfig
-diff --git a/arch/arm/mach-zynq/Makefile b/arch/arm/platforms/zynq/Makefile
+rename from arch/arm/mach-uniphier/Kconfig
+rename to arch/arm/platforms/uniphier/Kconfig
+diff --git a/arch/arm/mach-uniphier/Makefile b/arch/arm/platforms/uniphier/Makefile
 similarity index 100%
-rename from arch/arm/mach-zynq/Makefile
-rename to arch/arm/platforms/zynq/Makefile
-diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/platforms/zynq/common.c
+rename from arch/arm/mach-uniphier/Makefile
+rename to arch/arm/platforms/uniphier/Makefile
+diff --git a/arch/arm/mach-uniphier/headsmp.S b/arch/arm/platforms/uniphier/headsmp.S
 similarity index 100%
-rename from arch/arm/mach-zynq/common.c
-rename to arch/arm/platforms/zynq/common.c
-diff --git a/arch/arm/mach-zynq/common.h b/arch/arm/platforms/zynq/common.h
+rename from arch/arm/mach-uniphier/headsmp.S
+rename to arch/arm/platforms/uniphier/headsmp.S
+diff --git a/arch/arm/mach-uniphier/platsmp.c b/arch/arm/platforms/uniphier/platsmp.c
 similarity index 100%
-rename from arch/arm/mach-zynq/common.h
-rename to arch/arm/platforms/zynq/common.h
-diff --git a/arch/arm/mach-zynq/headsmp.S b/arch/arm/platforms/zynq/headsmp.S
+rename from arch/arm/mach-uniphier/platsmp.c
+rename to arch/arm/platforms/uniphier/platsmp.c
+diff --git a/arch/arm/mach-uniphier/uniphier.c b/arch/arm/platforms/uniphier/uniphier.c
 similarity index 100%
-rename from arch/arm/mach-zynq/headsmp.S
-rename to arch/arm/platforms/zynq/headsmp.S
-diff --git a/arch/arm/mach-zynq/platsmp.c b/arch/arm/platforms/zynq/platsmp.c
-similarity index 100%
-rename from arch/arm/mach-zynq/platsmp.c
-rename to arch/arm/platforms/zynq/platsmp.c
-diff --git a/arch/arm/mach-zynq/pm.c b/arch/arm/platforms/zynq/pm.c
-similarity index 100%
-rename from arch/arm/mach-zynq/pm.c
-rename to arch/arm/platforms/zynq/pm.c
-diff --git a/arch/arm/mach-zynq/slcr.c b/arch/arm/platforms/zynq/slcr.c
-similarity index 100%
-rename from arch/arm/mach-zynq/slcr.c
-rename to arch/arm/platforms/zynq/slcr.c
+rename from arch/arm/mach-uniphier/uniphier.c
+rename to arch/arm/platforms/uniphier/uniphier.c
 -- 
 1.9.1
