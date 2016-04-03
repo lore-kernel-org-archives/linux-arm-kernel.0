@@ -1,51 +1,71 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Sun, 3 Apr 2016 11:56:33 +0900
-Subject: [PATCH 06/11] ARM: dts: exynos: Fix DTC unit name warnings in
- Exynos5250
-In-Reply-To: <56FEAE29.6010405@osg.samsung.com>
+Date: Sun, 3 Apr 2016 12:46:15 +0900
+Subject: [PATCH 01/11] ARM: dts: exynos: Fix DTC unit name warnings in
+ cros-adc-thermistors
+In-Reply-To: <CAL_JsqJi0w_j2wcb8f60XKOL3MFxkHFZpoyFhT-CCno_chb9Rw@mail.gmail.com>
 References: <1459493874-2366-1-git-send-email-k.kozlowski@samsung.com>
- <1459493874-2366-6-git-send-email-k.kozlowski@samsung.com>
- <56FEAE29.6010405@osg.samsung.com>
-Message-ID: <20160403025633.GA3789@kozik-lap>
+ <CAL_JsqJi0w_j2wcb8f60XKOL3MFxkHFZpoyFhT-CCno_chb9Rw@mail.gmail.com>
+Message-ID: <20160403034615.GC4919@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 01, 2016 at 01:21:45PM -0400, Javier Martinez Canillas wrote:
-> >  
-> > -	usb at 12000000 {
-> > +	usb_dwc3 {
-> >  		compatible = "samsung,exynos5250-dwusb3";
-> >  		clocks = <&clock CLK_USB3>;
-> >  		clock-names = "usbdrd30";
+On Fri, Apr 01, 2016 at 10:31:34AM -0500, Rob Herring wrote:
+> On Fri, Apr 1, 2016 at 1:57 AM, Krzysztof Kozlowski
+> <k.kozlowski@samsung.com> wrote:
+> > Fix following DTC warnings in cros-adc-thermistors:
+> > Warning (unit_address_vs_reg): Node /adc at 12D10000/ncp15wb473 at 3 has a unit name, but no reg property
+> > Warning (unit_address_vs_reg): Node /adc at 12D10000/ncp15wb473 at 4 has a unit name, but no reg property
+> > Warning (unit_address_vs_reg): Node /adc at 12D10000/ncp15wb473 at 5 has a unit name, but no reg property
+> > Warning (unit_address_vs_reg): Node /adc at 12D10000/ncp15wb473 at 6 has a unit name, but no reg property
+> >
+> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > ---
+> >  arch/arm/boot/dts/cros-adc-thermistors.dtsi | 8 ++++----
+> >  1 file changed, 4 insertions(+), 4 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/cros-adc-thermistors.dtsi b/arch/arm/boot/dts/cros-adc-thermistors.dtsi
+> > index acd4fe1833f2..87e676917603 100644
+> > --- a/arch/arm/boot/dts/cros-adc-thermistors.dtsi
+> > +++ b/arch/arm/boot/dts/cros-adc-thermistors.dtsi
+> > @@ -13,28 +13,28 @@
+> >  */
+> >
+> >  &adc {
+> > -       ncp15wb473 at 3 {
+> > +       ncp15wb473_3 {
 > 
-> The ePAPR document says that "The name of a node should be somewhat generic,
-> reflecting the function of the device and not its precise programming model"
+> Don't use underscores.
+
+The ePAPR lists underscore as a acceptable character... but if you
+insists then the sensible solution would be to rename all the nodes to
+something like:
+-       ncp15wb473 at 3 {
++       thermistor3 {
+
+Is it okay?
+
 > 
-> So I wonder if this shouldn't be instead:
+> >                 compatible = "murata,ncp15wb473";
+> >                 pullup-uv = <1800000>;
+> >                 pullup-ohm = <47000>;
+> >                 pulldown-ohm = <0>;
+> >                 io-channels = <&adc 3>;
 > 
-> usb_dwc3: usb {
+> I've not looked at the full binding here, but this case may warrant
+> adding a reg property as an ADC channel number is what i'd consider an
+> addressable thing.
 
-There are already nodes with 'usb' name:
-	ehci: usb at 12110000 {
-		compatible = "samsung,exynos4210-ehci";
-		...
-	}
-	ohci: usb at 12120000 {
-		compatible = "samsung,exynos4210-ohci";
-	}
-Having nodes with the same name but some with address some not, should
-work (none should be overridden)... but looks a little bit weird.
+This does not look entirely as an addressable thing. Altough this
+particular driver (ntc_thermistor.c) uses one iio-channel... but others
+are often using more than one.
 
-Anyway I am fine with both.
+> This is also kind of strange having a phandle to
+> the parent node.
 
+The Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
+mentions that sensors can be added as child nodes or separately. The
+exynos_adc driver indeed calls of_platform_populate() but I am not sure
+why this was added.
 
-> Although it seems that not all DT bindings follow this convention so probably
-> the name in your patch is correct.
-> 
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-Thanks for review and comments. I already spotted the 'memory' node
-issue so I won't be replying to you with acknowledging comments. :)
-
-BR,
+Best regards,
 Krzysztof
