@@ -1,31 +1,67 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 3 Apr 2016 21:13:44 +0200
-Subject: [PATCH] ARM: pxa: activate pinctrl for device-tree machines
-In-Reply-To: <1459623362-18324-1-git-send-email-robert.jarzmik@free.fr>
-References: <1459623362-18324-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <CACRpkdYnv6nVQEdErcmKuwUJ-yinrUUGaG_jkKVDsscXGdMugQ@mail.gmail.com>
+Date: Sun, 3 Apr 2016 21:23:42 +0200
+Subject: [PATCH v2 02/16] arm64: dts: add sp804 timer node for Hi6220
+In-Reply-To: <1459589383-16914-3-git-send-email-guodong.xu@linaro.org>
+References: <1459589383-16914-1-git-send-email-guodong.xu@linaro.org>
+ <1459589383-16914-3-git-send-email-guodong.xu@linaro.org>
+Message-ID: <CACRpkdbWuKx6=aF5xW=3EKfuUf-MYM_EEnovyhBnOGVOeHyCmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 2, 2016 at 8:56 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+On Sat, Apr 2, 2016 at 11:29 AM, Guodong Xu <guodong.xu@linaro.org> wrote:
 
-> Pincontrol is not yet ready for all PXA platforms.
-> For example, a legacy platform, if PINCTRL was activated, will fail its
-> calls to gpio_request() or gpio_direction_output(), as the pinctrl
-> driver might not be available, such as for pxa25x and pxa3xx.
+> From: Leo Yan <leo.yan@linaro.org>
 >
-> As a step forward, activate pincontrol for all device-tree available
-> machines, ie. pxa27x device-tree based and pxa3xx device-tree based.
+> Add sp804 timer for hi6220, so it can be used as broadcast timer.
 >
-> If it appears later that pincontrol is also required for legacy
-> platforms and if the mfp->pinctrl conversion can be achieved, then
-> PINCTRL will be activated for the whole PXA architecture.
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> Signed-off-by: Wei Xu <xuwei5@hisilicon.com>
+> ---
+>  arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 9 +++++++++
+>  1 file changed, 9 insertions(+)
 >
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> index ad1f1eb..82c4756 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> @@ -209,5 +209,14 @@
+>                         clock-names = "uartclk", "apb_pclk";
+>                         status = "disabled";
+>                 };
+> +
+> +               dual_timer0: dual_timer at f8008000 {
+> +                       compatible = "arm,sp804", "arm,primecell";
+> +                       reg = <0x0 0xf8008000 0x0 0x1000>;
+> +                       interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
+> +                                    <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
+> +                       clocks = <&ao_ctrl 27>;
+> +                       clock-names = "apb_pclk";
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+How can this work? You only give the apb_pclk for clocking the
+bus to the timer.
+
+Most platforms using this driver has something like this:
+
+                timer01: timer at 10104000 {
+                        compatible = "arm,sp804", "arm,primecell";
+                        reg = <0x10104000 0x1000>;
+                        interrupt-parent = <&intc_dc1176>;
+                        interrupts = <0 8 IRQ_TYPE_LEVEL_HIGH>, <0 9
+IRQ_TYPE_LEVEL_HIGH>;
+                        clocks = <&timclk>, <&timclk>, <&pclk>;
+                        clock-names = "timer1", "timer2", "apb_pclk";
+                };
+
+It then reads the two clocks in the beginning of clocks() to
+determine the frequency of each timer.
+
+By chance the code in the driver will allow just one clock and
+will then assume that both the bus to the timer and the timer
+itself is clocked from the same clock. But I highly doubt that this
+is the case.
+
+Please verify what clocks actually goes into this timer, it should
+nominally be three of them.
 
 Yours,
 Linus Walleij
