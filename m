@@ -1,67 +1,93 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Sun, 3 Apr 2016 17:08:54 +0900
-Subject: dtc warnings
-In-Reply-To: <20160403065909.GF2987@vireshk-i7>
-References: <CAL_Jsq+=OjY8y_8x7OSm-MWYKbrHN5cbv4TLwULxhNq+gfiMtw@mail.gmail.com>
- <56FE27F9.2070100@gmail.com>
- <CAJKOXPdDyVbfSyshu4j21Ax2J-VwPpMZgAGEeO8VtgFYh4hTmw@mail.gmail.com>
- <56FE7E4A.2000601@ti.com> <20160403065909.GF2987@vireshk-i7>
-Message-ID: <20160403080854.GA12133@kozik-lap>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sun, 3 Apr 2016 11:15:08 +0200
+Subject: [PATCH v4 01/12] KVM: extend struct kvm_msi to hold a 32-bit
+ device ID
+In-Reply-To: <1458958450-19662-2-git-send-email-andre.przywara@arm.com>
+References: <1458958450-19662-1-git-send-email-andre.przywara@arm.com>
+ <1458958450-19662-2-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160403091508.GA5261@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 03, 2016 at 12:29:09PM +0530, Viresh Kumar wrote:
-> On 01-04-16, 08:57, Nishanth Menon wrote:
-> > On 04/01/2016 02:53 AM, Krzysztof Kozlowski wrote:
-> > > On Fri, Apr 1, 2016 at 4:49 PM, Tomi Valkeinen <tomi.valkeinen@gmail.com> wrote:
-> > >>
-> > >> Hi Rob,
-> > >>
-> > >> On 01/04/16 04:40, Rob Herring wrote:
-> > >>> You may have noticed that linux-next had gotten noisy with dtc
-> > >>> warnings lately. I dropped the change for a bit, but added it back
-> > >>> today except now it is disabled unless building with "W=1".
-> > >>>
-> > >>> There's ~25K (2500 unique) warnings generated from the ARM dts files.
-> > >>> Here's the ranking of warnings by dtb. OMAP is the clear winner (based
-> > >>> on the similar counts, probably lots of duplicates). Please help
-> > >>> remind contributors to test with W=1 and start to fix these.
-> > >>>
-> > >>> At least for memory nodes, I plan to whitelist allowing no
-> > >>> unit-address. There could be others, but none that I've seen so far.
-> > >>
-> > >> What's the correct way to fix nodes for display platform devices? For
-> > >> example, omap4-panda-common.dtsi has two connector nodes:
-> > >>
-> > >> dvi0: connector at 0 {
-> > >>         compatible = "dvi-connector";
-> > >>         label = "dvi";
-> > >>         ...
-> > >> };
-> > >>
-> > >>
-> > >> hdmi0: connector at 1 {
-> > >>         compatible = "hdmi-connector";
-> > >>         label = "hdmi";
-> > >>         ...
-> > >> };
-> > > 
-> > > I have the same doubts. The ePAPR says in that case "the node-name
-> > > alone differentiates the node from other nodes at the same level in
-> > > the tree.". But which is preferred? Differentiating by number or by
-> > > type?
-> > > 
-> > > Similarly, what to do with the opp modes (a lot of warnings) in
-> > > Documentation/devicetree/bindings/opp/opp.txt?
+On Sat, Mar 26, 2016 at 02:13:59AM +0000, Andre Przywara wrote:
+> The ARM GICv3 ITS MSI controller requires a device ID to be able to
+> assign the proper interrupt vector. On real hardware, this ID is
+> sampled from the bus. To be able to emulate an ITS controller, extend
+> the KVM MSI interface to let userspace provide such a device ID. For
+> PCI devices, the device ID is simply the 16-bit bus-device-function
+> triplet, which should be easily available to the userland tool.
 > 
-> What warnings are you talking about ?
+> Also there is a new KVM capability which advertises whether the
+> current VM requires a device ID to be set along with the MSI data.
+> This flag is still reported as not available everywhere, later we will
+> enable it when ITS emulation is used.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> Reviewed-by: Eric Auger <eric.auger@linaro.org>
+> ---
+>  Documentation/virtual/kvm/api.txt | 12 ++++++++++--
+>  include/uapi/linux/kvm.h          |  5 ++++-
+>  2 files changed, 14 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+> index cb2ef0b..8f7351d 100644
+> --- a/Documentation/virtual/kvm/api.txt
+> +++ b/Documentation/virtual/kvm/api.txt
+> @@ -2163,10 +2163,18 @@ struct kvm_msi {
+>  	__u32 address_hi;
+>  	__u32 data;
+>  	__u32 flags;
+> -	__u8  pad[16];
+> +	__u32 devid;
 
-Warnings coming from recent linux-next:
+Are we imposing any unfortunate restrictions for other architectures by
+using a u32 over a u64 for the device ID?
 
-  DTC     arch/arm/boot/dts/exynos5800-peach-pi.dtb
-Warning (unit_address_vs_reg): Node /opp_table0/opp at 1800000000 has a unit name, but no reg property
-Warning (unit_address_vs_reg): Node /opp_table0/opp at 1700000000 has a unit name, but no reg property
-...
+-Christoffer
 
-Best regards,
-Krzysztof
+> +	__u8  pad[12];
+>  };
+>  
+> -No flags are defined so far. The corresponding field must be 0.
+> +flags: KVM_MSI_VALID_DEVID: devid contains a valid value
+> +devid: If KVM_MSI_VALID_DEVID is set, contains a unique device identifier
+> +       for the device that wrote the MSI message.
+> +       For PCI, this is usually a BFD identifier in the lower 16 bits.
+> +
+> +The per-VM KVM_CAP_MSI_DEVID capability advertises the need to provide
+> +the device ID. If this capability is not set, userland cannot rely on
+> +the kernel to allow the KVM_MSI_VALID_DEVID flag being set.
+>  
+>  
+>  4.71 KVM_CREATE_PIT2
+> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+> index 50f44a2..6a02871 100644
+> --- a/include/uapi/linux/kvm.h
+> +++ b/include/uapi/linux/kvm.h
+> @@ -852,6 +852,7 @@ struct kvm_ppc_smmu_info {
+>  #define KVM_CAP_S390_RI 124
+>  #define KVM_CAP_ARM_PMU_V3 125
+>  #define KVM_CAP_VCPU_ATTRIBUTES 126
+> +#define KVM_CAP_MSI_DEVID 127
+>  
+>  #ifdef KVM_CAP_IRQ_ROUTING
+>  
+> @@ -1010,12 +1011,14 @@ struct kvm_one_reg {
+>  	__u64 addr;
+>  };
+>  
+> +#define KVM_MSI_VALID_DEVID	(1U << 0)
+>  struct kvm_msi {
+>  	__u32 address_lo;
+>  	__u32 address_hi;
+>  	__u32 data;
+>  	__u32 flags;
+> -	__u8  pad[16];
+> +	__u32 devid;
+> +	__u8  pad[12];
+>  };
+>  
+>  struct kvm_arm_device_addr {
+> -- 
+> 2.7.3
+> 
