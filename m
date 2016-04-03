@@ -1,57 +1,55 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Sun, 3 Apr 2016 12:53:02 +0900
-Subject: [PATCH] ARM: dts: s3c: Fix DTC unit name warnings in S3C2416 and
- S3C6410
-In-Reply-To: <CAGhQ9VwJVz0riwx=DWY=giaL=Jo6R=HYZg4hm2FQ6X2_g5hi5Q@mail.gmail.com>
-References: <1459494710-16269-1-git-send-email-k.kozlowski@samsung.com>
- <CAGhQ9VwJVz0riwx=DWY=giaL=Jo6R=HYZg4hm2FQ6X2_g5hi5Q@mail.gmail.com>
-Message-ID: <20160403035302.GD4919@kozik-lap>
+Date: Sun, 3 Apr 2016 13:08:05 +0900
+Subject: [PATCH 06/11] ARM: dts: exynos: Fix DTC unit name warnings in
+ Exynos5250
+In-Reply-To: <56FEAE29.6010405@osg.samsung.com>
+References: <1459493874-2366-1-git-send-email-k.kozlowski@samsung.com>
+ <1459493874-2366-6-git-send-email-k.kozlowski@samsung.com>
+ <56FEAE29.6010405@osg.samsung.com>
+Message-ID: <20160403040805.GC7507@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 01, 2016 at 04:22:59PM +0200, Joachim Eastwood wrote:
-> On 1 April 2016 at 09:11, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
-> > Fix following DTC warnings in S3C2416 and S3C6410 boards:
-> >
-> > Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
-> >
-> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > ---
-> >  arch/arm/boot/dts/s3c2416-smdk2416.dts | 2 +-
-> >  arch/arm/boot/dts/s3c6410-mini6410.dts | 2 +-
-> >  arch/arm/boot/dts/s3c6410-smdk6410.dts | 2 +-
-> >  3 files changed, 3 insertions(+), 3 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/dts/s3c2416-smdk2416.dts b/arch/arm/boot/dts/s3c2416-smdk2416.dts
-> > index f257926c13b7..15f3d1c1bb80 100644
-> > --- a/arch/arm/boot/dts/s3c2416-smdk2416.dts
-> > +++ b/arch/arm/boot/dts/s3c2416-smdk2416.dts
-> > @@ -15,7 +15,7 @@
-> >         model = "SMDK2416";
-> >         compatible = "samsung,s3c2416";
-> >
-> > -       memory {
-> > +       memory at 30000000 {
-> >                 reg =  <0x30000000 0x4000000>;
-> >         };
-> 
-> This change will cause duplicated memory node entries in the DT as
-> noted by Vladimir Zapolskiy [1]. Same goes for all the other patch
-> where you make this change.
-> 
-> $ scripts/dtc/dtc -I dtb -O dts arch/arm/boot/dts/s3c2416-smdk2416.dtb
-> | grep -A2 memory
->         memory {
->                 device_type = "memory";
->                 reg = <0x0 0x0>;
->         };
-> --
->         memory at 30000000 {
->                 reg = <0x30000000 0x4000000>;
->         };
+Re-sending because my previous message was not address to all
+recipients. Sorry for the noise.
 
-Yeah, I also spotted this later after running scripts/dtx_diff. I will
-leave the memory node untouched.
 
-Thanks for feedback!
+On Fri, Apr 01, 2016 at 01:21:45PM -0400, Javier Martinez Canillas wrote:
+> >  
+> > -	usb at 12000000 {
+> > +	usb_dwc3 {
+> >  		compatible = "samsung,exynos5250-dwusb3";
+> >  		clocks = <&clock CLK_USB3>;
+> >  		clock-names = "usbdrd30";
+> 
+> The ePAPR document says that "The name of a node should be somewhat generic,
+> reflecting the function of the device and not its precise programming model"
+> 
+> So I wonder if this shouldn't be instead:
+> 
+> usb_dwc3: usb {
+
+There are already nodes with 'usb' name:
+	ehci: usb at 12110000 {
+		compatible = "samsung,exynos4210-ehci";
+		...
+	}
+	ohci: usb at 12120000 {
+		compatible = "samsung,exynos4210-ohci";
+	}
+Having nodes with the same name but some with address some not, should
+work (none should be overridden)... but looks a little bit weird.
+
+Anyway I am fine with both.
+
+
+> Although it seems that not all DT bindings follow this convention so probably
+> the name in your patch is correct.
+> 
+> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+Thanks for review and comments. I already spotted the 'memory' node
+issue so I won't be replying to you with acknowledging comments. :)
+
+BR,
 Krzysztof
