@@ -1,45 +1,31 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun,  3 Apr 2016 04:03:50 +0200
-Subject: [PATCH 8/8] ARM: kirkwood: DT: Add address go regulator unit name
-In-Reply-To: <1459649030-21886-1-git-send-email-andrew@lunn.ch>
-References: <1459649030-21886-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1459649030-21886-9-git-send-email-andrew@lunn.ch>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Sat,  2 Apr 2016 21:45:08 -0500
+Subject: [GIT PULL] Qualcomm Fixes for v4.6-rc2
+Message-ID: <1459651508-5160-1-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The regulator has a reg property so include it in the unit name.
+The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
- arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts | 2 +-
- arch/arm/boot/dts/kirkwood-netgear_readynas_nv+_v2.dts | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
 
-diff --git a/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts b/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
-index 8745484912d2..c0413b63cf2e 100644
---- a/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
-+++ b/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
-@@ -183,7 +183,7 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 
--		usb3_regulator: usb3-regulator {
-+		usb3_regulator: usb3-regulator at 1 {
- 			compatible = "regulator-fixed";
- 			reg = <1>;
- 			regulator-name = "USB 3.0 Power";
-diff --git a/arch/arm/boot/dts/kirkwood-netgear_readynas_nv+_v2.dts b/arch/arm/boot/dts/kirkwood-netgear_readynas_nv+_v2.dts
-index a4e97f7f5804..2bfc6cfa151d 100644
---- a/arch/arm/boot/dts/kirkwood-netgear_readynas_nv+_v2.dts
-+++ b/arch/arm/boot/dts/kirkwood-netgear_readynas_nv+_v2.dts
-@@ -193,7 +193,7 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 
--		usb3_regulator: usb3-regulator {
-+		usb3_regulator: usb3-regulator at 1 {
- 			compatible = "regulator-fixed";
- 			reg = <1>;
- 			regulator-name = "USB 3.0 Power";
--- 
-2.7.0
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-fixes-for-4.6-rc2
+
+for you to fetch changes up to 10c0f0e92f019ab8d0c17da3696e35b0eef4ec16:
+
+  Revert "dts: msm8974: Add dma channels for blsp2_i2c1 node" (2016-04-02 21:27:36 -0500)
+
+----------------------------------------------------------------
+Qualcomm Fixes for v4.6-rc2
+
+* Revert BAM usage on MSM8974 boards
+
+----------------------------------------------------------------
+Andy Gross (2):
+      Revert "dts: msm8974: Add blsp2_bam dma node"
+      Revert "dts: msm8974: Add dma channels for blsp2_i2c1 node"
+
+ arch/arm/boot/dts/qcom-msm8974.dtsi | 14 +-------------
+ 1 file changed, 1 insertion(+), 13 deletions(-)
