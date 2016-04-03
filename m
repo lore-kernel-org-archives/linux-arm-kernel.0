@@ -1,27 +1,34 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Sun, 3 Apr 2016 17:57:00 +0530
-Subject: dtc warnings
-In-Reply-To: <20160403080854.GA12133@kozik-lap>
-References: <CAL_Jsq+=OjY8y_8x7OSm-MWYKbrHN5cbv4TLwULxhNq+gfiMtw@mail.gmail.com>
- <56FE27F9.2070100@gmail.com>
- <CAJKOXPdDyVbfSyshu4j21Ax2J-VwPpMZgAGEeO8VtgFYh4hTmw@mail.gmail.com>
- <56FE7E4A.2000601@ti.com> <20160403065909.GF2987@vireshk-i7>
- <20160403080854.GA12133@kozik-lap>
-Message-ID: <CAKohpomijKf3m07Lc3+fWawxAPwe83F8k9akz1LOTokpZNL2ig@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Sun,  3 Apr 2016 15:26:07 +0200
+Subject: [PATCH 0/2] pinctrl: Oxford Semiconductor OXNAS pinctrl and gpio
+ support
+Message-ID: <1459689969-5326-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 April 2016 at 13:38, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
-> Warnings coming from recent linux-next:
->
->   DTC     arch/arm/boot/dts/exynos5800-peach-pi.dtb
-> Warning (unit_address_vs_reg): Node /opp_table0/opp at 1800000000 has a unit name, but no reg property
-> Warning (unit_address_vs_reg): Node /opp_table0/opp at 1700000000 has a unit name, but no reg property
+This patchset includes support for the pinctrl and gpio controller of the
+Oxford Semiconductor OXNAS SoC Family.
 
-@Rob: What should we be doing about these warnings?
-OPP-entries don't have a reg property obviously and we
-discussed earlier if naming them based on freq is fine or
-not.
+It was originally posted part of a platform patchset available here :
+http://lkml.kernel.org/r/1458838215-23314-1-git-send-email-narmstrong at baylibre.com
 
---
-viresh
+Changes this v3 patchset :
+- Get rid of PLX Technology, replace by Oxford Semiconductor
+- Get rid of gpio-bank and ngpios properties, now using gpio-ranges
+
+Neil Armstrong (2):
+  pinctrl: Add Oxford Semiconductor OXNAS pinctrl and gpio driver
+  dt-bindings: Add Oxford Semiconductor OXNAS pinctrl and gpio bindings
+
+ .../devicetree/bindings/gpio/gpio_oxnas.txt        |  43 ++
+ .../devicetree/bindings/pinctrl/oxnas,pinctrl.txt  |  57 ++
+ drivers/pinctrl/Kconfig                            |  11 +
+ drivers/pinctrl/Makefile                           |   1 +
+ drivers/pinctrl/pinctrl-oxnas.c                    | 837 +++++++++++++++++++++
+ 5 files changed, 949 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio_oxnas.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/oxnas,pinctrl.txt
+ create mode 100644 drivers/pinctrl/pinctrl-oxnas.c
+
+-- 
+1.9.1
