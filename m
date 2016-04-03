@@ -1,55 +1,73 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Sun, 3 Apr 2016 13:08:05 +0900
-Subject: [PATCH 06/11] ARM: dts: exynos: Fix DTC unit name warnings in
- Exynos5250
-In-Reply-To: <56FEAE29.6010405@osg.samsung.com>
-References: <1459493874-2366-1-git-send-email-k.kozlowski@samsung.com>
- <1459493874-2366-6-git-send-email-k.kozlowski@samsung.com>
- <56FEAE29.6010405@osg.samsung.com>
-Message-ID: <20160403040805.GC7507@kozik-lap>
+From: jitao.shi@mediatek.com (Jitao Shi)
+Date: Sun, 3 Apr 2016 12:20:44 +0800
+Subject: [PATCH v14 1/2] Documentation: bridge: Add documentation for ps8640
+ DT properties
+Message-ID: <1459657245-8971-1-git-send-email-jitao.shi@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Re-sending because my previous message was not address to all
-recipients. Sorry for the noise.
+Add documentation for DT properties supported by
+ps8640 DSI-eDP converter.
 
+Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+Changes since v13:
+ - No change
+---
+ .../devicetree/bindings/display/bridge/ps8640.txt  |   43 ++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/bridge/ps8640.txt
 
-On Fri, Apr 01, 2016 at 01:21:45PM -0400, Javier Martinez Canillas wrote:
-> >  
-> > -	usb at 12000000 {
-> > +	usb_dwc3 {
-> >  		compatible = "samsung,exynos5250-dwusb3";
-> >  		clocks = <&clock CLK_USB3>;
-> >  		clock-names = "usbdrd30";
-> 
-> The ePAPR document says that "The name of a node should be somewhat generic,
-> reflecting the function of the device and not its precise programming model"
-> 
-> So I wonder if this shouldn't be instead:
-> 
-> usb_dwc3: usb {
-
-There are already nodes with 'usb' name:
-	ehci: usb at 12110000 {
-		compatible = "samsung,exynos4210-ehci";
-		...
-	}
-	ohci: usb at 12120000 {
-		compatible = "samsung,exynos4210-ohci";
-	}
-Having nodes with the same name but some with address some not, should
-work (none should be overridden)... but looks a little bit weird.
-
-Anyway I am fine with both.
-
-
-> Although it seems that not all DT bindings follow this convention so probably
-> the name in your patch is correct.
-> 
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-Thanks for review and comments. I already spotted the 'memory' node
-issue so I won't be replying to you with acknowledging comments. :)
-
-BR,
-Krzysztof
+diff --git a/Documentation/devicetree/bindings/display/bridge/ps8640.txt b/Documentation/devicetree/bindings/display/bridge/ps8640.txt
+new file mode 100644
+index 0000000..022b33f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/bridge/ps8640.txt
+@@ -0,0 +1,43 @@
++ps8640-bridge bindings
++
++Required properties:
++	- compatible: "parade,ps8640"
++	- reg: first page address of the bridge.
++	- sleep-gpios: OF device-tree gpio specification for PD pin.
++	- reset-gpios: OF device-tree gpio specification for reset pin.
++	- mode-sel-gpios: OF device-tree gpio specification for mode-sel pin.
++	- vdd12-supply: OF device-tree regulator specification for 1.2V power.
++	- vdd33-supply: OF device-tree regulator specification for 3.3V power.
++	- ports: The device node can contain video interface port nodes per
++		 the video-interfaces bind[1]. For port at 0,set the reg = <0> as
++		 ps8640 dsi in and port at 1,set the reg = <1> as ps8640 eDP out.
++
++[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
++
++Example:
++	edp-bridge at 18 {
++		compatible = "parade,ps8640";
++		reg = <0x18>;
++		sleep-gpios = <&pio 116 GPIO_ACTIVE_LOW>;
++		reset-gpios = <&pio 115 GPIO_ACTIVE_LOW>;
++		mode-sel-gpios = <&pio 92 GPIO_ACTIVE_HIGH>;
++		vdd12-supply = <&ps8640_fixed_1v2>;
++		vdd33-supply = <&mt6397_vgp2_reg>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			port at 0 {
++				reg = <0>;
++				ps8640_in: endpoint {
++					remote-endpoint = <&dsi0_out>;
++				};
++			};
++			port at 1 {
++				reg = <1>;
++				ps8640_out: endpoint {
++					remote-endpoint = <&panel_in>;
++				};
++			};
++		};
++	};
+-- 
+1.7.9.5
