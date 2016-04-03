@@ -1,23 +1,34 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Sun, 3 Apr 2016 19:34:18 +0200
-Subject: [PATCH] ARM64: dts: amlogic: Add hiu and periphs buses
-In-Reply-To: <5701508B.1050403@suse.de>
-References: <1459703681-8689-1-git-send-email-carlo@caione.org>
- <5701508B.1050403@suse.de>
-Message-ID: <CAOQ7t2Yh7ZOw13Mjj5NLupti7_WyGZ7LEPe_mhQXtUyTGtH3ng@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 3 Apr 2016 19:25:43 +0100
+Subject: [RFC PATCH 0/9] ARM: start to move arch/arm/mach-* to
+ arch/arm/platforms/*
+In-Reply-To: <1459694367-18635-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1459694367-18635-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20160403182543.GQ19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 3, 2016 at 7:19 PM, Andreas F?rber <afaerber@suse.de> wrote:
-> Am 03.04.2016 um 19:14 schrieb Carlo Caione:
->
-> Looks sane, but where did you get that info from? The others I had found
-> in an iomap node or so but did not spot these.
+On Sun, Apr 03, 2016 at 11:39:18PM +0900, Masahiro Yamada wrote:
+> We have growing number of mach-* directories in arch/arm, and I guess
+> it might be a good time to discuss moving them into a sub-directory.
 
-For hiubus you can see the io_hiubus_base node in the gxbb_p201.dts DT file.
-For the periphs bus is a bit more tricky. The only reasonable
-information I found is oddly in
-drivers/amlogic/hdmi/hdmi_tx_20/hw/reg_ops.c.
+What does it buy us?  Let me summarise the actual change:
+
+- Move up to 71 arch/arm/mach-* directories to arch/arm/platforms/*,
+  which just means another level of directory structure.  We still
+  end up with up to 71 directories in arch/arm/platforms/
+
+- The ability to use obj-y rather than machine-y, where both already
+  work in the same way.
+
+Is there anything I missed?
+
+If that is all, then I really do not like this change - it's seems
+to be churn for no benefit, and that's something we really should be
+minimising.  Linus Torvalds has historically moaned at the ARM
+architecture for stuff like this.
 
 -- 
-Carlo Caione
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
