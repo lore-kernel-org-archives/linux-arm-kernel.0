@@ -1,491 +1,596 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sun,  3 Apr 2016 09:23:53 +0200
-Subject: [PATCH 1/2] ARM: PIE infrastructure
+Date: Sun,  3 Apr 2016 09:23:54 +0200
+Subject: [PATCH 2/2] ARM: at91: pm: switch to the PIE infrastructure
 In-Reply-To: <1459668234-16033-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1459668234-16033-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1459668234-16033-2-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1459668234-16033-3-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for embedding position independent executables (PIE) in the
-kernel. Those PIEs can then be loaded into memory allocated using genalloc.
-For example, this allows running code from SRAM which is usually needed for
-suspend/resume or to change the DDR timings. That code is usually written
-in assembly and can now be developed in C.
+Using the PIE infrastructure allows to write the whole suspend/resume
+functions in C instead of assembly.
+
+The only remaining assembly instruction is wfi for armv5
+It makes the code shorter and clearer.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/Kconfig          |   2 +
- arch/arm/Makefile         |   1 +
- arch/arm/pie/Kconfig      |   8 +++
- arch/arm/pie/Makefile     |   1 +
- arch/arm/pie/Makefile.pie |  70 ++++++++++++++++++++
- arch/arm/pie/lib/empty.c  |  15 +++++
- arch/arm/pie/pie.c        |  97 ++++++++++++++++++++++++++++
- arch/arm/pie/pie.lds.S    |  40 ++++++++++++
- include/linux/pie.h       | 159 ++++++++++++++++++++++++++++++++++++++++++++++
- 9 files changed, 393 insertions(+)
- create mode 100644 arch/arm/pie/Kconfig
- create mode 100644 arch/arm/pie/Makefile
- create mode 100644 arch/arm/pie/Makefile.pie
- create mode 100644 arch/arm/pie/lib/empty.c
- create mode 100644 arch/arm/pie/pie.c
- create mode 100644 arch/arm/pie/pie.lds.S
- create mode 100644 include/linux/pie.h
+ arch/arm/mach-at91/Kconfig       |   1 +
+ arch/arm/mach-at91/Makefile      |   2 +-
+ arch/arm/mach-at91/pm.c          |  31 ++--
+ arch/arm/mach-at91/pm/.gitignore |   2 +
+ arch/arm/mach-at91/pm/Makefile   |   3 +
+ arch/arm/mach-at91/pm/atmel_pm.c |  97 +++++++++++
+ arch/arm/mach-at91/pm_suspend.S  | 338 ---------------------------------------
+ 7 files changed, 114 insertions(+), 360 deletions(-)
+ create mode 100644 arch/arm/mach-at91/pm/.gitignore
+ create mode 100644 arch/arm/mach-at91/pm/Makefile
+ create mode 100644 arch/arm/mach-at91/pm/atmel_pm.c
+ delete mode 100644 arch/arm/mach-at91/pm_suspend.S
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index cdfa6c2b7626..e671ade2d86a 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -2148,3 +2148,5 @@ endif
- source "lib/Kconfig"
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index 08047afdf38e..ab430c04a699 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -5,6 +5,7 @@ menuconfig ARCH_AT91
+ 	select COMMON_CLK_AT91
+ 	select PINCTRL
+ 	select SOC_BUS
++	select PIE
  
- source "arch/arm/kvm/Kconfig"
-+
-+source "arch/arm/pie/Kconfig"
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 8c3ce2ac44c4..c39e6aef6ff7 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -281,6 +281,7 @@ core-$(CONFIG_VFP)		+= arch/arm/vfp/
- core-$(CONFIG_XEN)		+= arch/arm/xen/
- core-$(CONFIG_KVM_ARM_HOST) 	+= arch/arm/kvm/
- core-$(CONFIG_VDSO)		+= arch/arm/vdso/
-+core-$(CONFIG_PIE)		+= arch/arm/pie/
+ if ARCH_AT91
+ config SOC_SAMA5D2
+diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+index c5bbf8bb8c0f..062336de4f66 100644
+--- a/arch/arm/mach-at91/Makefile
++++ b/arch/arm/mach-at91/Makefile
+@@ -10,7 +10,7 @@ obj-$(CONFIG_SOC_SAMA5)		+= sama5.o
  
- # If we have a machine-specific directory, then include it in the build.
- core-y				+= arch/arm/kernel/ arch/arm/mm/ arch/arm/common/
-diff --git a/arch/arm/pie/Kconfig b/arch/arm/pie/Kconfig
-new file mode 100644
-index 000000000000..d76122140561
---- /dev/null
-+++ b/arch/arm/pie/Kconfig
-@@ -0,0 +1,8 @@
-+config PIE
-+	bool
-+	help
-+	  This option adds support for embedding position indepentant (PIE)
-+	  executables into the kernel. The PIEs can then be copied into
-+	  genalloc regions such as SRAM and executed. Some platforms require
-+	  this for suspend/resume support.
-+
-diff --git a/arch/arm/pie/Makefile b/arch/arm/pie/Makefile
-new file mode 100644
-index 000000000000..d1a6a823e431
---- /dev/null
-+++ b/arch/arm/pie/Makefile
-@@ -0,0 +1 @@
-+obj-y += pie.o
-diff --git a/arch/arm/pie/Makefile.pie b/arch/arm/pie/Makefile.pie
-new file mode 100644
-index 000000000000..709a51be1578
---- /dev/null
-+++ b/arch/arm/pie/Makefile.pie
-@@ -0,0 +1,70 @@
-+obj-y		:= pie.bin.elf
-+
-+# Report unresolved symbol references
-+ldflags-y	+= --no-undefined
-+# Delete all temporary local symbols
-+ldflags-y	+= -X
-+
-+# Reset objcopy flags
-+OBJCOPYFLAGS	=
-+
-+$(obj)/empty.o: arch/arm/pie/lib/empty.c FORCE
-+	$(call if_changed_rule,cc_o_c)
-+
-+# Reference gcc builtins for use in PIE with __pie_
-+$(obj)/pie_rename.syms: $(obj)/empty.o
-+	@$(NM) $^ | awk '{if ($$3) print $$3,"__pie_"$$3}' > $@
-+
-+# For embedding address of the symbols copied from the PIE into the kernel
-+$(obj)/pie.syms: $(obj)/pie.elf
-+	@$(NM) $^ | awk '{if ($$3 && $$2 == toupper($$2)) print $$3,"=","0x"$$1";"}' > $@
-+
-+# Collect together the libpie objects
-+LDFLAGS_libpie_stage1.o += -r
-+
-+$(obj)/libpie_stage1.o: $(obj)/empty.o
-+	$(call if_changed,ld)
-+
-+# Rename the libpie gcc builtins with a __pie_ prefix
-+OBJCOPYFLAGS_libpie_stage2.o += --redefine-syms=$(obj)/pie_rename.syms
-+
-+$(obj)/libpie_stage2.o: $(obj)/libpie_stage1.o
-+	$(call if_changed,objcopy)
-+
-+CFLAGS_$(PIE_NAME).o += -fPIE
-+
-+OBJCOPYFLAGS_pie_stage1.o += --redefine-syms=$(obj)/pie_rename.syms
-+$(obj)/pie_stage1.o: $(obj)/$(PIE_NAME).o $(obj)/pie_rename.syms
-+	$(call if_changed,objcopy)
-+
-+LDFLAGS_pie_stage2.o += -r
-+
-+$(obj)/pie_stage2.o: $(obj)/pie_stage1.o $(obj)/libpie_stage2.o
-+	$(call if_changed,ld)
-+
-+SEDFLAGS_lds	= s/PIE_NAME/$(PIE_NAME)/
-+$(obj)/pie.lds.S: arch/arm/pie/pie.lds.S
-+	@sed "$(SEDFLAGS_lds)" < $< > $@
-+
-+# Create the position independent executable
-+LDFLAGS_pie.elf += -Bstatic -T $(obj)/pie.lds
-+
-+$(obj)/pie.elf: $(obj)/pie_stage2.o $(obj)/pie.lds
-+	$(call if_changed,ld)
-+
-+# Create binary data for the kernel
-+OBJCOPYFLAGS_pie.bin += -O binary
-+
-+$(obj)/pie.bin: $(obj)/pie.elf $(obj)/pie.syms
-+	$(call if_changed,objcopy)
-+
-+# Import the data into the kernel
-+OBJCOPYFLAGS_pie.bin.o += -B $(ARCH) -I binary -O elf32-littlearm
-+
-+$(obj)/pie.bin.o: $(obj)/pie.bin
-+	$(call if_changed,objcopy)
-+
-+LDFLAGS_pie.bin.elf += --just-symbols=$(obj)/pie.syms -r
-+$(obj)/pie.bin.elf: $(obj)/pie.bin.o $(obj)/pie_stage2.o
-+	$(call if_changed,ld)
-+
-diff --git a/arch/arm/pie/lib/empty.c b/arch/arm/pie/lib/empty.c
-new file mode 100644
-index 000000000000..9a6d54956379
---- /dev/null
-+++ b/arch/arm/pie/lib/empty.c
-@@ -0,0 +1,15 @@
-+void __div0(void)
-+{
-+};
-+
-+void __aeabi_unwind_cpp_pr0(void)
-+{
-+};
-+
-+void __aeabi_unwind_cpp_pr1(void)
-+{
-+};
-+
-+void __aeabi_unwind_cpp_pr2(void)
-+{
-+};
-diff --git a/arch/arm/pie/pie.c b/arch/arm/pie/pie.c
-new file mode 100644
-index 000000000000..62406a54459f
---- /dev/null
-+++ b/arch/arm/pie/pie.c
-@@ -0,0 +1,97 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/slab.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/genalloc.h>
+ # Power Management
+ obj-$(CONFIG_PM)		+= pm.o
+-obj-$(CONFIG_PM)		+= pm_suspend.o
++obj-$(CONFIG_PM)		+= pm/
+ 
+ ifeq ($(CONFIG_CPU_V7),y)
+ AFLAGS_pm_suspend.o := -march=armv7-a
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index f06270198bf1..f2f2a97ee1de 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -21,6 +21,7 @@
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
+ #include <linux/of_address.h>
 +#include <linux/pie.h>
-+#include <asm/cacheflush.h>
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
+ #include <linux/clk/at91_pmc.h>
+@@ -56,6 +57,8 @@ static struct {
+ 
+ void __iomem *at91_ramc_base[2];
+ 
++static struct pie_chunk *atmel_pm_pie;
 +
-+struct pie_chunk {
-+	struct gen_pool *pool;
-+	unsigned long addr;
-+	size_t sz;
-+};
+ static int at91_pm_valid_state(suspend_state_t state)
+ {
+ 	switch (state) {
+@@ -133,10 +136,6 @@ EXPORT_SYMBOL(at91_suspend_entering_slow_clock);
+ static void (*at91_suspend_sram_fn)(void __iomem *pmc, void __iomem *ramc0,
+ 			  void __iomem *ramc1, int memctrl);
+ 
+-extern void at91_pm_suspend_in_sram(void __iomem *pmc, void __iomem *ramc0,
+-			    void __iomem *ramc1, int memctrl);
+-extern u32 at91_pm_suspend_in_sram_sz;
+-
+ static void at91_pm_suspend(suspend_state_t state)
+ {
+ 	unsigned int pm_data = at91_pm_data.memctrl;
+@@ -370,11 +369,12 @@ void at91sam9_idle(void)
+ 	cpu_do_idle();
+ }
+ 
++extern void atmel_pm_suspend(void __iomem *pmc, void __iomem *ramc0,
++			     void __iomem *ramc1, int memctrl);
 +
-+struct pie_chunk *__pie_load_data(struct gen_pool *pool, void *code_start,
-+				  void *code_end, bool phys)
-+{
-+	struct pie_chunk *chunk;
-+	unsigned long offset;
-+	int ret;
-+	size_t code_sz;
-+	unsigned long base;
-+	phys_addr_t pbase;
-+
-+	chunk = kzalloc(sizeof(*chunk), GFP_KERNEL);
-+	if (!chunk) {
-+		ret = -ENOMEM;
-+		goto err;
-+	}
-+
-+	code_sz = code_end - code_start;
-+	chunk->pool = pool;
-+	chunk->sz = code_sz;
-+
-+	base = gen_pool_alloc(pool, chunk->sz);
-+	if (!base) {
-+		ret = -ENOMEM;
-+		goto err_free;
-+	}
-+
-+	pbase = gen_pool_virt_to_phys(pool, base);
-+	chunk->addr = (unsigned long)__arm_ioremap_exec(pbase, code_sz, false);
-+	if (!chunk->addr) {
-+		ret = -ENOMEM;
-+		goto err_remap;
-+	}
-+
-+	/* Copy chunk specific code/data */
-+	fncpy((char *)chunk->addr, code_start, code_sz);
-+
-+	/* Calculate initial offset */
-+	if (phys)
-+		offset = gen_pool_virt_to_phys(pool, chunk->addr);
-+	else
-+		offset = chunk->addr;
-+
-+	return chunk;
-+
-+err_remap:
-+	gen_pool_free(chunk->pool, chunk->addr, chunk->sz);
-+
-+err_free:
-+	kfree(chunk);
-+err:
-+	return ERR_PTR(ret);
-+}
-+EXPORT_SYMBOL_GPL(__pie_load_data);
-+
-+phys_addr_t pie_to_phys(struct pie_chunk *chunk, unsigned long addr)
-+{
-+	return gen_pool_virt_to_phys(chunk->pool, addr);
-+}
-+EXPORT_SYMBOL_GPL(pie_to_phys);
-+
-+void __iomem *__kern_to_pie(struct pie_chunk *chunk, void *ptr)
-+{
-+	uintptr_t offset = (uintptr_t)ptr;
-+
-+	if (offset >= chunk->sz)
-+		return NULL;
-+	else
-+		return (void *)(chunk->addr + offset);
-+}
-+EXPORT_SYMBOL_GPL(__kern_to_pie);
-+
-+void pie_free(struct pie_chunk *chunk)
-+{
-+	gen_pool_free(chunk->pool, chunk->addr, chunk->sz);
-+	kfree(chunk);
-+}
-+EXPORT_SYMBOL_GPL(pie_free);
-diff --git a/arch/arm/pie/pie.lds.S b/arch/arm/pie/pie.lds.S
+ static void __init at91_pm_sram_init(void)
+ {
+ 	struct gen_pool *sram_pool;
+-	phys_addr_t sram_pbase;
+-	unsigned long sram_base;
+ 	struct device_node *node;
+ 	struct platform_device *pdev = NULL;
+ 
+@@ -397,23 +397,12 @@ static void __init at91_pm_sram_init(void)
+ 		return;
+ 	}
+ 
+-	sram_base = gen_pool_alloc(sram_pool, at91_pm_suspend_in_sram_sz);
+-	if (!sram_base) {
+-		pr_warn("%s: unable to alloc sram!\n", __func__);
++	atmel_pm_pie = pie_load_sections(sram_pool, atmel_pm,
++					 arch_arm_mach_at91_pm);
++	if (IS_ERR(atmel_pm_pie))
+ 		return;
+-	}
+-
+-	sram_pbase = gen_pool_virt_to_phys(sram_pool, sram_base);
+-	at91_suspend_sram_fn = __arm_ioremap_exec(sram_pbase,
+-					at91_pm_suspend_in_sram_sz, false);
+-	if (!at91_suspend_sram_fn) {
+-		pr_warn("SRAM: Could not map\n");
+-		return;
+-	}
+ 
+-	/* Copy the pm suspend handler to SRAM */
+-	at91_suspend_sram_fn = fncpy(at91_suspend_sram_fn,
+-			&at91_pm_suspend_in_sram, at91_pm_suspend_in_sram_sz);
++	at91_suspend_sram_fn = fn_to_pie(atmel_pm_pie, atmel_pm_suspend);
+ }
+ 
+ static const struct of_device_id atmel_pmc_ids[] __initconst = {
+diff --git a/arch/arm/mach-at91/pm/.gitignore b/arch/arm/mach-at91/pm/.gitignore
 new file mode 100644
-index 000000000000..f84391260f64
+index 000000000000..1cb8879eb0bf
 --- /dev/null
-+++ b/arch/arm/pie/pie.lds.S
-@@ -0,0 +1,40 @@
-+OUTPUT_FORMAT("elf32-littlearm", "elf32-littlearm", "elf32-littlearm")
-+OUTPUT_ARCH(arm)
++++ b/arch/arm/mach-at91/pm/.gitignore
+@@ -0,0 +1,2 @@
++*.lds*
++*.syms
+diff --git a/arch/arm/mach-at91/pm/Makefile b/arch/arm/mach-at91/pm/Makefile
+new file mode 100644
+index 000000000000..c12d54862c10
+--- /dev/null
++++ b/arch/arm/mach-at91/pm/Makefile
+@@ -0,0 +1,3 @@
++PIE_NAME := atmel_pm
 +
-+#include <linux/export.h>
++include arch/arm/pie/Makefile.pie
+diff --git a/arch/arm/mach-at91/pm/atmel_pm.c b/arch/arm/mach-at91/pm/atmel_pm.c
+new file mode 100644
+index 000000000000..7f391addd2da
+--- /dev/null
++++ b/arch/arm/mach-at91/pm/atmel_pm.c
+@@ -0,0 +1,97 @@
++#include <linux/io.h>
++#include <linux/clk/at91_pmc.h>
++#include <linux/mfd/syscon/atmel-mc.h>
++#include <linux/pie.h>
++#include "../pm.h"
 +
-+SECTIONS
++#define	SRAMC_SELF_FRESH_ACTIVE		0x01
++#define	SRAMC_SELF_FRESH_EXIT		0x00
++
++static void at91_sramc_self_refresh(unsigned int is_active,
++				    unsigned int memtype,
++				    void __iomem *sdramc_base,
++				    void __iomem *sdramc_base1)
 +{
-+	/* Don't need unwind tables */
-+	/DISCARD/ : {
-+		*(.ARM.exidx*)
-+		*(.ARM.extab*)
-+		*(.comment)
-+	}
++	static unsigned int lpr, mdr, lpr1, mdr1;
 +
-+	. = 0x0;
++	switch (memtype) {
++	case AT91_MEMCTRL_MC:
++	/*
++	 * at91rm9200 Memory controller
++	 */
++		if (is_active)
++			__raw_writel(1, sdramc_base + AT91_MC_SDRAMC_SRR);
++		break;
 +
-+	____pie_PIE_NAME_start : {
-+		VMLINUX_SYMBOL(__pie_PIE_NAME_start) = .;
-+	}
++	case AT91_MEMCTRL_DDRSDR:
++		if (is_active) {
++			mdr = __raw_readl(sdramc_base + AT91_DDRSDRC_MDR);
++			lpr = __raw_readl(sdramc_base + AT91_DDRSDRC_LPR);
 +
-+	.text : {
-+		. = ALIGN(4);
-+		KEEP(*(.text))
-+	}
++			if ((mdr & AT91_DDRSDRC_MD) == AT91_DDRSDRC_MD_LOW_POWER_DDR)
++				__raw_writel((mdr & ~AT91_DDRSDRC_MD) |
++					     AT91_DDRSDRC_MD_DDR2, sdramc_base +
++					     AT91_DDRSDRC_MDR);
++			__raw_writel((lpr & ~AT91_DDRSDRC_LPCB) |
++				     AT91_DDRSDRC_LPCB_SELF_REFRESH, sdramc_base
++				     + AT91_DDRSDRC_LPR);
 +
-+	.rodata : { *(SORT_BY_ALIGNMENT(.rodata*)) }
-+	. = ALIGN(4);
++			if (sdramc_base1) {
++				mdr1 = __raw_readl(sdramc_base1 + AT91_DDRSDRC_MDR);
++				lpr1 = __raw_readl(sdramc_base1 + AT91_DDRSDRC_LPR);
++				if ((mdr1 & AT91_DDRSDRC_MD) == AT91_DDRSDRC_MD_LOW_POWER_DDR)
++					__raw_writel((mdr1 & ~AT91_DDRSDRC_MD) |
++						     AT91_DDRSDRC_MD_DDR2,
++						     sdramc_base1 +
++						     AT91_DDRSDRC_MDR);
++				__raw_writel((lpr1 & ~AT91_DDRSDRC_LPCB) |
++					     AT91_DDRSDRC_LPCB_SELF_REFRESH,
++					     sdramc_base1 + AT91_DDRSDRC_LPR);
++			}
++		} else {
++			__raw_writel(mdr, sdramc_base + AT91_DDRSDRC_MDR);
++			__raw_writel(lpr, sdramc_base + AT91_DDRSDRC_LPR);
++			if (sdramc_base1) {
++				__raw_writel(mdr, sdramc_base1 + AT91_DDRSDRC_MDR);
++				__raw_writel(lpr, sdramc_base1 + AT91_DDRSDRC_LPR);
++			}
++		}
++		break;
 +
-+	.data : {
-+		*(SORT_BY_ALIGNMENT(.data*))
-+		. = ALIGN(4);
++	case AT91_MEMCTRL_SDRAMC:
++		if (is_active) {
++			lpr = __raw_readl(sdramc_base + AT91_SDRAMC_LPR);
 +
-+		*(SORT_BY_ALIGNMENT(.bss*))
-+		. = ALIGN(4);
-+	}
-+
-+	____pie_PIE_NAME_end : {
-+		VMLINUX_SYMBOL(__pie_PIE_NAME_end) = .;
++			__raw_writel((lpr & ~AT91_SDRAMC_LPCB) |
++				     AT91_SDRAMC_LPCB_SELF_REFRESH, sdramc_base
++				     + AT91_SDRAMC_LPR);
++		} else {
++			__raw_writel(lpr, sdramc_base + AT91_SDRAMC_LPR);
++		}
++		break;
 +	}
 +}
-diff --git a/include/linux/pie.h b/include/linux/pie.h
-new file mode 100644
-index 000000000000..1e6f0fabd08f
---- /dev/null
-+++ b/include/linux/pie.h
-@@ -0,0 +1,159 @@
-+/*
-+ * Copyright 2013 Texas Instruments, Inc.
-+ *      Russ Dill <russ.dill@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ */
 +
-+#ifndef _LINUX_PIE_H
-+#define _LINUX_PIE_H
++void atmel_pm_suspend(void __iomem *pmc, void __iomem *ramc0,
++		      void __iomem *ramc1, int memctrl)
++{
++	int memtype, pm_mode;
 +
-+#include <linux/kernel.h>
-+#include <linux/err.h>
++	memtype = memctrl & AT91_PM_MEMTYPE_MASK;
++	pm_mode = (memctrl >> AT91_PM_MODE_OFFSET) & AT91_PM_MODE_MASK;
 +
-+#include <asm/fncpy.h>
-+#include <linux/bug.h>
++	dsb();
 +
-+struct gen_pool;
-+struct pie_chunk;
++	at91_sramc_self_refresh(1, memtype, ramc0, ramc1);
 +
-+#ifdef CONFIG_PIE
-+
-+/**
-+ * __pie_load_data - load and fixup PIE code from kernel data
-+ * @pool:	pool to allocate memory from and copy code into
-+ * @start:	virtual start address in kernel of chunk specific code
-+ * @end:	virtual end address in kernel of chunk specific code
-+ * @phys:	%true to fixup to physical address of destination, %false to
-+ *		fixup to virtual address of destination
-+ *
-+ * Returns 0 on success, -EERROR otherwise
-+ */
-+struct pie_chunk *__pie_load_data(struct gen_pool *pool,
-+				  void *start, void *end, bool phys);
-+
-+/**
-+ * pie_to_phys - translate a virtual PIE address into a physical one
-+ * @chunk:	identifier returned by pie_load_sections
-+ * @addr:	virtual address within pie chunk
-+ *
-+ * Returns physical address on success, -1 otherwise
-+ */
-+phys_addr_t pie_to_phys(struct pie_chunk *chunk, unsigned long addr);
-+
-+void __iomem *__kern_to_pie(struct pie_chunk *chunk, void *ptr);
-+
-+/**
-+ * pie_free - free the pool space used by an pie chunk
-+ * @chunk:	identifier returned by pie_load_sections
-+ */
-+void pie_free(struct pie_chunk *chunk);
-+
-+#define __pie_load_sections(pool, name, folder, phys) ({		\
-+	extern char _binary_##folder##_pie_bin_start[];			\
-+	extern char __pie_##name##_start[];				\
-+	extern char __pie_##name##_end[];				\
-+	char *start = _binary_##folder##_pie_bin_start + (unsigned long)__pie_##name##_start; \
-+	char *end = _binary_##folder##_pie_bin_start + (unsigned long)__pie_##name##_end; \
-+									\
-+	__pie_load_data(pool, start, end, phys);			\
-+})
-+
-+/*
-+ * Required for any symbol within an PIE section that is referenced by the
-+ * kernel
-+ */
-+#define EXPORT_PIE_SYMBOL(sym)		extern typeof(sym) sym __weak
-+
++#if defined(CONFIG_CPU_V7)
++	dsb();
++	wfi();
 +#else
-+
-+static inline struct pie_chunk *__pie_load_data(struct gen_pool *pool,
-+						void *start, void *end,
-+						bool phys)
-+{
-+	return ERR_PTR(-EINVAL);
-+}
-+
-+static inline phys_addr_t pie_to_phys(struct pie_chunk *chunk,
-+				      unsigned long addr)
-+{
-+	return -1;
-+}
-+
-+static inline void __iomem *__kern_to_pie(struct pie_chunk *chunk, void *ptr)
-+{
-+	return NULL;
-+}
-+
-+static inline void pie_free(struct pie_chunk *chunk)
-+{
-+}
-+
-+#define __pie_load_sections(pool, name, folder, phys) ({ ERR_PTR(-EINVAL); })
-+
++	asm volatile ("mcr	p15, 0, %0, c7, c0, 4" \
++		      : : "r" (0) : "memory");
 +#endif
 +
-+/**
-+ * pie_load_sections - load and fixup sections associated with the given name
-+ * @pool:	pool to allocate memory from and copy code into
-+ *		fixup to virtual address of destination
-+ * @name:	the name given to __pie() and __pie_data() when marking
-+ *		data and code
-+ *
-+ * Returns 0 on success, -EERROR otherwise
-+ */
-+#define pie_load_sections(pool, name, folder) ({			\
-+	__pie_load_sections(pool, name, folder, false);			\
-+})
-+
-+/**
-+ * pie_load_sections_phys - load and fixup sections associated with the given
-+ * name for execution with the MMU off
-+ *
-+ * @pool:	pool to allocate memory from and copy code into
-+ *		fixup to virtual address of destination
-+ * @name:	the name given to __pie() and __pie_data() when marking
-+ *		data and code
-+ *
-+ * Returns 0 on success, -EERROR otherwise
-+ */
-+#define pie_load_sections_phys(pool, name, folder) ({			\
-+	__pie_load_sections(pool, name, folder, true);			\
-+})
-+
-+/**
-+ * kern_to_pie - convert a kernel symbol to the virtual address of where
-+ * that symbol is loaded into the given PIE chunk.
-+ *
-+ * @chunk:	identifier returned by pie_load_sections
-+ * @p:		symbol to convert
-+ *
-+ * Return type is the same as type passed
-+ */
-+#define kern_to_pie(chunk, p) ({					\
-+	void *__ptr = (void *)(p);					\
-+	typeof(p) __result = (typeof(p))__kern_to_pie(chunk, __ptr);	\
-+	__result;							\
-+})
-+
-+/**
-+ * kern_to_fn - convert a kernel function symbol to the virtual address of where
-+ * that symbol is loaded into the given PIE chunk
-+ *
-+ * @chunk:	identifier returned by pie_load_sections
-+ * @funcp:	function to convert
-+ *
-+ * Return type is the same as type passed
-+ */
-+#define fn_to_pie(chunk, funcp) ({					\
-+	uintptr_t __kern_addr, __pie_addr;				\
-+									\
-+	__kern_addr = (uintptr_t)funcp;					\
-+	__pie_addr = kern_to_pie(chunk, __kern_addr);			\
-+									\
-+	(typeof(&funcp))(__pie_addr);					\
-+})
-+
-+#endif
++	at91_sramc_self_refresh(0, memtype, ramc0, ramc1);
++}
++EXPORT_PIE_SYMBOL(atmel_pm_suspend);
+diff --git a/arch/arm/mach-at91/pm_suspend.S b/arch/arm/mach-at91/pm_suspend.S
+deleted file mode 100644
+index a25defda3d22..000000000000
+--- a/arch/arm/mach-at91/pm_suspend.S
++++ /dev/null
+@@ -1,338 +0,0 @@
+-/*
+- * arch/arm/mach-at91/pm_slow_clock.S
+- *
+- *  Copyright (C) 2006 Savin Zlobec
+- *
+- * AT91SAM9 support:
+- *  Copyright (C) 2007 Anti Sullin <anti.sullin@artecdesign.ee
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- */
+-#include <linux/linkage.h>
+-#include <linux/clk/at91_pmc.h>
+-#include "pm.h"
+-
+-#define	SRAMC_SELF_FRESH_ACTIVE		0x01
+-#define	SRAMC_SELF_FRESH_EXIT		0x00
+-
+-pmc	.req	r0
+-tmp1	.req	r4
+-tmp2	.req	r5
+-
+-/*
+- * Wait until master clock is ready (after switching master clock source)
+- */
+-	.macro wait_mckrdy
+-1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
+-	tst	tmp1, #AT91_PMC_MCKRDY
+-	beq	1b
+-	.endm
+-
+-/*
+- * Wait until master oscillator has stabilized.
+- */
+-	.macro wait_moscrdy
+-1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
+-	tst	tmp1, #AT91_PMC_MOSCS
+-	beq	1b
+-	.endm
+-
+-/*
+- * Wait until PLLA has locked.
+- */
+-	.macro wait_pllalock
+-1:	ldr	tmp1, [pmc, #AT91_PMC_SR]
+-	tst	tmp1, #AT91_PMC_LOCKA
+-	beq	1b
+-	.endm
+-
+-/*
+- * Put the processor to enter the idle state
+- */
+-	.macro at91_cpu_idle
+-
+-#if defined(CONFIG_CPU_V7)
+-	mov	tmp1, #AT91_PMC_PCK
+-	str	tmp1, [pmc, #AT91_PMC_SCDR]
+-
+-	dsb
+-
+-	wfi		@ Wait For Interrupt
+-#else
+-	mcr	p15, 0, tmp1, c7, c0, 4
+-#endif
+-
+-	.endm
+-
+-	.text
+-
+-	.arm
+-
+-/*
+- * void at91_pm_suspend_in_sram(void __iomem *pmc, void __iomem *sdramc,
+- *			void __iomem *ramc1, int memctrl)
+- * @input param:
+- * 	@r0: base address of AT91_PMC
+- *  	@r1: base address of SDRAM Controller (SDRAM, DDRSDR, or AT91_SYS)
+- *	@r2: base address of second SDRAM Controller or 0 if not present
+- *	@r3: pm information
+- */
+-/* at91_pm_suspend_in_sram must be 8-byte aligned per the requirements of fncpy() */
+-	.align 3
+-ENTRY(at91_pm_suspend_in_sram)
+-	/* Save registers on stack */
+-	stmfd	sp!, {r4 - r12, lr}
+-
+-	/* Drain write buffer */
+-	mov	tmp1, #0
+-	mcr	p15, 0, tmp1, c7, c10, 4
+-
+-	str	r0, .pmc_base
+-	str	r1, .sramc_base
+-	str	r2, .sramc1_base
+-
+-	and	r0, r3, #AT91_PM_MEMTYPE_MASK
+-	str	r0, .memtype
+-
+-	lsr	r0, r3, #AT91_PM_MODE_OFFSET
+-	and	r0, r0, #AT91_PM_MODE_MASK
+-	str	r0, .pm_mode
+-
+-	/* Active the self-refresh mode */
+-	mov	r0, #SRAMC_SELF_FRESH_ACTIVE
+-	bl	at91_sramc_self_refresh
+-
+-	ldr	r0, .pm_mode
+-	tst	r0, #AT91_PM_SLOW_CLOCK
+-	beq	skip_disable_main_clock
+-
+-	ldr	pmc, .pmc_base
+-
+-	/* Save Master clock setting */
+-	ldr	tmp1, [pmc, #AT91_PMC_MCKR]
+-	str	tmp1, .saved_mckr
+-
+-	/*
+-	 * Set the Master clock source to slow clock
+-	 */
+-	bic	tmp1, tmp1, #AT91_PMC_CSS
+-	str	tmp1, [pmc, #AT91_PMC_MCKR]
+-
+-	wait_mckrdy
+-
+-	/* Save PLLA setting and disable it */
+-	ldr	tmp1, [pmc, #AT91_CKGR_PLLAR]
+-	str	tmp1, .saved_pllar
+-
+-	mov	tmp1, #AT91_PMC_PLLCOUNT
+-	orr	tmp1, tmp1, #(1 << 29)		/* bit 29 always set */
+-	str	tmp1, [pmc, #AT91_CKGR_PLLAR]
+-
+-	/* Turn off the main oscillator */
+-	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
+-	bic	tmp1, tmp1, #AT91_PMC_MOSCEN
+-	orr	tmp1, tmp1, #AT91_PMC_KEY
+-	str	tmp1, [pmc, #AT91_CKGR_MOR]
+-
+-skip_disable_main_clock:
+-	ldr	pmc, .pmc_base
+-
+-	/* Wait for interrupt */
+-	at91_cpu_idle
+-
+-	ldr	r0, .pm_mode
+-	tst	r0, #AT91_PM_SLOW_CLOCK
+-	beq	skip_enable_main_clock
+-
+-	ldr	pmc, .pmc_base
+-
+-	/* Turn on the main oscillator */
+-	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
+-	orr	tmp1, tmp1, #AT91_PMC_MOSCEN
+-	orr	tmp1, tmp1, #AT91_PMC_KEY
+-	str	tmp1, [pmc, #AT91_CKGR_MOR]
+-
+-	wait_moscrdy
+-
+-	/* Restore PLLA setting */
+-	ldr	tmp1, .saved_pllar
+-	str	tmp1, [pmc, #AT91_CKGR_PLLAR]
+-
+-	tst	tmp1, #(AT91_PMC_MUL &  0xff0000)
+-	bne	3f
+-	tst	tmp1, #(AT91_PMC_MUL & ~0xff0000)
+-	beq	4f
+-3:
+-	wait_pllalock
+-4:
+-
+-	/*
+-	 * Restore master clock setting
+-	 */
+-	ldr	tmp1, .saved_mckr
+-	str	tmp1, [pmc, #AT91_PMC_MCKR]
+-
+-	wait_mckrdy
+-
+-skip_enable_main_clock:
+-	/* Exit the self-refresh mode */
+-	mov	r0, #SRAMC_SELF_FRESH_EXIT
+-	bl	at91_sramc_self_refresh
+-
+-	/* Restore registers, and return */
+-	ldmfd	sp!, {r4 - r12, pc}
+-ENDPROC(at91_pm_suspend_in_sram)
+-
+-/*
+- * void at91_sramc_self_refresh(unsigned int is_active)
+- *
+- * @input param:
+- *	@r0: 1 - active self-refresh mode
+- *	     0 - exit self-refresh mode
+- * register usage:
+- * 	@r1: memory type
+- *	@r2: base address of the sram controller
+- */
+-
+-ENTRY(at91_sramc_self_refresh)
+-	ldr	r1, .memtype
+-	ldr	r2, .sramc_base
+-
+-	cmp	r1, #AT91_MEMCTRL_MC
+-	bne	ddrc_sf
+-
+-	/*
+-	 * at91rm9200 Memory controller
+-	 */
+-
+-	 /*
+-	  * For exiting the self-refresh mode, do nothing,
+-	  * automatically exit the self-refresh mode.
+-	  */
+-	tst	r0, #SRAMC_SELF_FRESH_ACTIVE
+-	beq	exit_sramc_sf
+-
+-	/* Active SDRAM self-refresh mode */
+-	mov	r3, #1
+-	str	r3, [r2, #AT91_MC_SDRAMC_SRR]
+-	b	exit_sramc_sf
+-
+-ddrc_sf:
+-	cmp	r1, #AT91_MEMCTRL_DDRSDR
+-	bne	sdramc_sf
+-
+-	/*
+-	 * DDR Memory controller
+-	 */
+-	tst	r0, #SRAMC_SELF_FRESH_ACTIVE
+-	beq	ddrc_exit_sf
+-
+-	/* LPDDR1 --> force DDR2 mode during self-refresh */
+-	ldr	r3, [r2, #AT91_DDRSDRC_MDR]
+-	str	r3, .saved_sam9_mdr
+-	bic	r3, r3, #~AT91_DDRSDRC_MD
+-	cmp	r3, #AT91_DDRSDRC_MD_LOW_POWER_DDR
+-	ldreq	r3, [r2, #AT91_DDRSDRC_MDR]
+-	biceq	r3, r3, #AT91_DDRSDRC_MD
+-	orreq	r3, r3, #AT91_DDRSDRC_MD_DDR2
+-	streq	r3, [r2, #AT91_DDRSDRC_MDR]
+-
+-	/* Active DDRC self-refresh mode */
+-	ldr	r3, [r2, #AT91_DDRSDRC_LPR]
+-	str	r3, .saved_sam9_lpr
+-	bic	r3, r3, #AT91_DDRSDRC_LPCB
+-	orr	r3, r3, #AT91_DDRSDRC_LPCB_SELF_REFRESH
+-	str	r3, [r2, #AT91_DDRSDRC_LPR]
+-
+-	/* If using the 2nd ddr controller */
+-	ldr	r2, .sramc1_base
+-	cmp	r2, #0
+-	beq	no_2nd_ddrc
+-
+-	ldr	r3, [r2, #AT91_DDRSDRC_MDR]
+-	str	r3, .saved_sam9_mdr1
+-	bic	r3, r3, #~AT91_DDRSDRC_MD
+-	cmp	r3, #AT91_DDRSDRC_MD_LOW_POWER_DDR
+-	ldreq	r3, [r2, #AT91_DDRSDRC_MDR]
+-	biceq	r3, r3, #AT91_DDRSDRC_MD
+-	orreq	r3, r3, #AT91_DDRSDRC_MD_DDR2
+-	streq	r3, [r2, #AT91_DDRSDRC_MDR]
+-
+-	/* Active DDRC self-refresh mode */
+-	ldr	r3, [r2, #AT91_DDRSDRC_LPR]
+-	str	r3, .saved_sam9_lpr1
+-	bic	r3, r3, #AT91_DDRSDRC_LPCB
+-	orr	r3, r3, #AT91_DDRSDRC_LPCB_SELF_REFRESH
+-	str	r3, [r2, #AT91_DDRSDRC_LPR]
+-
+-no_2nd_ddrc:
+-	b	exit_sramc_sf
+-
+-ddrc_exit_sf:
+-	/* Restore MDR in case of LPDDR1 */
+-	ldr	r3, .saved_sam9_mdr
+-	str	r3, [r2, #AT91_DDRSDRC_MDR]
+-	/* Restore LPR on AT91 with DDRAM */
+-	ldr	r3, .saved_sam9_lpr
+-	str	r3, [r2, #AT91_DDRSDRC_LPR]
+-
+-	/* If using the 2nd ddr controller */
+-	ldr	r2, .sramc1_base
+-	cmp	r2, #0
+-	ldrne	r3, .saved_sam9_mdr1
+-	strne	r3, [r2, #AT91_DDRSDRC_MDR]
+-	ldrne	r3, .saved_sam9_lpr1
+-	strne	r3, [r2, #AT91_DDRSDRC_LPR]
+-
+-	b	exit_sramc_sf
+-
+-	/*
+-	 * SDRAMC Memory controller
+-	 */
+-sdramc_sf:
+-	tst	r0, #SRAMC_SELF_FRESH_ACTIVE
+-	beq	sdramc_exit_sf
+-
+-	/* Active SDRAMC self-refresh mode */
+-	ldr	r3, [r2, #AT91_SDRAMC_LPR]
+-	str	r3, .saved_sam9_lpr
+-	bic	r3, r3, #AT91_SDRAMC_LPCB
+-	orr	r3, r3, #AT91_SDRAMC_LPCB_SELF_REFRESH
+-	str	r3, [r2, #AT91_SDRAMC_LPR]
+-
+-sdramc_exit_sf:
+-	ldr	r3, .saved_sam9_lpr
+-	str	r3, [r2, #AT91_SDRAMC_LPR]
+-
+-exit_sramc_sf:
+-	mov	pc, lr
+-ENDPROC(at91_sramc_self_refresh)
+-
+-.pmc_base:
+-	.word 0
+-.sramc_base:
+-	.word 0
+-.sramc1_base:
+-	.word 0
+-.memtype:
+-	.word 0
+-.pm_mode:
+-	.word 0
+-.saved_mckr:
+-	.word 0
+-.saved_pllar:
+-	.word 0
+-.saved_sam9_lpr:
+-	.word 0
+-.saved_sam9_lpr1:
+-	.word 0
+-.saved_sam9_mdr:
+-	.word 0
+-.saved_sam9_mdr1:
+-	.word 0
+-
+-ENTRY(at91_pm_suspend_in_sram_sz)
+-	.word .-at91_pm_suspend_in_sram
 -- 
 2.8.0.rc3
