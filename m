@@ -1,67 +1,84 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 3 Apr 2016 21:23:42 +0200
-Subject: [PATCH v2 02/16] arm64: dts: add sp804 timer node for Hi6220
-In-Reply-To: <1459589383-16914-3-git-send-email-guodong.xu@linaro.org>
+Date: Sun, 3 Apr 2016 21:28:48 +0200
+Subject: [PATCH v2 04/16] arm64: dts: Add Hi6220 gpio configuration nodes
+In-Reply-To: <1459589383-16914-5-git-send-email-guodong.xu@linaro.org>
 References: <1459589383-16914-1-git-send-email-guodong.xu@linaro.org>
- <1459589383-16914-3-git-send-email-guodong.xu@linaro.org>
-Message-ID: <CACRpkdbWuKx6=aF5xW=3EKfuUf-MYM_EEnovyhBnOGVOeHyCmQ@mail.gmail.com>
+ <1459589383-16914-5-git-send-email-guodong.xu@linaro.org>
+Message-ID: <CACRpkdb8x1EVMDgrV36+neGk1O+rGnSpj9F0A5stHN_d6B-EAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Sat, Apr 2, 2016 at 11:29 AM, Guodong Xu <guodong.xu@linaro.org> wrote:
 
-> From: Leo Yan <leo.yan@linaro.org>
+> From: Zhong Kaihua <zhongkaihua@huawei.com>
 >
-> Add sp804 timer for hi6220, so it can be used as broadcast timer.
+> Add Hi6220 gpio configuration nodes
 >
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> Signed-off-by: Zhong Kaihua <zhongkaihua@huawei.com>
+> Signed-off-by: Kong Xinwei <kong.kongxinwei@hisilicon.com>
+>
+
+Get rid of that blank line.
+
+> Acked-by: Rob Herring <robh@kernel.org>
 > Signed-off-by: Wei Xu <xuwei5@hisilicon.com>
-> ---
->  arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 9 +++++++++
->  1 file changed, 9 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> index ad1f1eb..82c4756 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+
 > +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> @@ -209,5 +209,14 @@
->                         clock-names = "uartclk", "apb_pclk";
->                         status = "disabled";
+> @@ -249,5 +249,264 @@
+>                         clocks = <&ao_ctrl 27>;
+>                         clock-names = "apb_pclk";
 >                 };
 > +
-> +               dual_timer0: dual_timer at f8008000 {
-> +                       compatible = "arm,sp804", "arm,primecell";
-> +                       reg = <0x0 0xf8008000 0x0 0x1000>;
-> +                       interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
-> +                       clocks = <&ao_ctrl 27>;
+> +               gpio0: gpio at f8011000 {
+> +                       compatible = "arm,pl061", "arm,primecell";
+> +                       reg = <0x0 0xf8011000 0x0 0x1000>;
+> +                       interrupts = <0 52 0x4>;
+> +                       gpio-controller;
+> +                       #gpio-cells = <2>;
+> +                       interrupt-controller;
+> +                       #interrupt-cells = <2>;
+> +                       clocks = <&ao_ctrl 2>;
 > +                       clock-names = "apb_pclk";
+> +                       status = "ok";
+> +               };
 
-How can this work? You only give the apb_pclk for clocking the
-bus to the timer.
+This part with all GPIO controllers looks nice.
 
-Most platforms using this driver has something like this:
+> new file mode 100644
+> index 0000000..09242f0
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/hisilicon/hikey-gpio.dtsi
+> @@ -0,0 +1,607 @@
+> +/ {
+> +       gpio_rstout_n:gpio_rstout_n {
+> +               gpios;
+> +       };
+> +       gpio_pmu_peri_en:gpio_pmu_peri_en {
+> +               gpios;
+> +       };
+> +       gpio_sysclk0_en:gpio_sysclk0_en {
+> +               gpios;
+> +       };
+> +       gpio_jtag_tdo:gpio_jtag_tdo {
+> +               gpios;
+> +       };
+> +       /* LCB: PWR_HOLD_GPIO0_0 */
+> +       gpio_pwr_hold:gpio_pwr_hold {
+> +               gpios = <&gpio0 0 0>;
+> +       };
 
-                timer01: timer at 10104000 {
-                        compatible = "arm,sp804", "arm,primecell";
-                        reg = <0x10104000 0x1000>;
-                        interrupt-parent = <&intc_dc1176>;
-                        interrupts = <0 8 IRQ_TYPE_LEVEL_HIGH>, <0 9
-IRQ_TYPE_LEVEL_HIGH>;
-                        clocks = <&timclk>, <&timclk>, <&pclk>;
-                        clock-names = "timer1", "timer2", "apb_pclk";
-                };
+(...)
 
-It then reads the two clocks in the beginning of clocks() to
-determine the frequency of each timer.
+I don't understand any stuff in this hikey-gpio.dtsi file.
 
-By chance the code in the driver will allow just one clock and
-will then assume that both the bus to the timer and the timer
-itself is clocked from the same clock. But I highly doubt that this
-is the case.
+What does all this mean?
 
-Please verify what clocks actually goes into this timer, it should
-nominally be three of them.
+If it has any practical use whatsoever then explain it in the
+commit message, but right now it just looks like a big list
+of placeholders with no use, but you can copy-paste them
+into device nodes the day you need them?
+
+If they are unused, just drop this file please.
 
 Yours,
 Linus Walleij
