@@ -1,71 +1,37 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Sun, 3 Apr 2016 12:46:15 +0900
-Subject: [PATCH 01/11] ARM: dts: exynos: Fix DTC unit name warnings in
- cros-adc-thermistors
-In-Reply-To: <CAL_JsqJi0w_j2wcb8f60XKOL3MFxkHFZpoyFhT-CCno_chb9Rw@mail.gmail.com>
-References: <1459493874-2366-1-git-send-email-k.kozlowski@samsung.com>
- <CAL_JsqJi0w_j2wcb8f60XKOL3MFxkHFZpoyFhT-CCno_chb9Rw@mail.gmail.com>
-Message-ID: <20160403034615.GC4919@kozik-lap>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 3 Apr 2016 11:45:18 +0800
+Subject: [PATCH v2 5/5] arm64: dts: rockchip: add rk3368-r88 iodomains
+In-Reply-To: <1459432126-6395-6-git-send-email-heiko@sntech.de>
+Message-ID: <201604031117.cyfIG89v%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 01, 2016 at 10:31:34AM -0500, Rob Herring wrote:
-> On Fri, Apr 1, 2016 at 1:57 AM, Krzysztof Kozlowski
-> <k.kozlowski@samsung.com> wrote:
-> > Fix following DTC warnings in cros-adc-thermistors:
-> > Warning (unit_address_vs_reg): Node /adc at 12D10000/ncp15wb473 at 3 has a unit name, but no reg property
-> > Warning (unit_address_vs_reg): Node /adc at 12D10000/ncp15wb473 at 4 has a unit name, but no reg property
-> > Warning (unit_address_vs_reg): Node /adc at 12D10000/ncp15wb473 at 5 has a unit name, but no reg property
-> > Warning (unit_address_vs_reg): Node /adc at 12D10000/ncp15wb473 at 6 has a unit name, but no reg property
-> >
-> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > ---
-> >  arch/arm/boot/dts/cros-adc-thermistors.dtsi | 8 ++++----
-> >  1 file changed, 4 insertions(+), 4 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/dts/cros-adc-thermistors.dtsi b/arch/arm/boot/dts/cros-adc-thermistors.dtsi
-> > index acd4fe1833f2..87e676917603 100644
-> > --- a/arch/arm/boot/dts/cros-adc-thermistors.dtsi
-> > +++ b/arch/arm/boot/dts/cros-adc-thermistors.dtsi
-> > @@ -13,28 +13,28 @@
-> >  */
-> >
-> >  &adc {
-> > -       ncp15wb473 at 3 {
-> > +       ncp15wb473_3 {
-> 
-> Don't use underscores.
+Hi Heiko,
 
-The ePAPR lists underscore as a acceptable character... but if you
-insists then the sensible solution would be to rename all the nodes to
-something like:
--       ncp15wb473 at 3 {
-+       thermistor3 {
+[auto build test ERROR on rockchip/for-next]
+[also build test ERROR on v4.6-rc1 next-20160401]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-Is it okay?
+url:    https://github.com/0day-ci/linux/commits/Heiko-Stuebner/ARM-rockchip-move-io-domains-under-GRF/20160331-215117
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git for-next
+config: arm64-defconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-> 
-> >                 compatible = "murata,ncp15wb473";
-> >                 pullup-uv = <1800000>;
-> >                 pullup-ohm = <47000>;
-> >                 pulldown-ohm = <0>;
-> >                 io-channels = <&adc 3>;
-> 
-> I've not looked at the full binding here, but this case may warrant
-> adding a reg property as an ADC channel number is what i'd consider an
-> addressable thing.
+All errors (new ones prefixed by >>):
 
-This does not look entirely as an addressable thing. Altough this
-particular driver (ntc_thermistor.c) uses one iio-channel... but others
-are often using more than one.
+>> ERROR: Input tree has errors, aborting (use -f to force output)
 
-> This is also kind of strange having a phandle to
-> the parent node.
-
-The Documentation/devicetree/bindings/arm/samsung/exynos-adc.txt
-mentions that sensors can be added as child nodes or separately. The
-exynos_adc driver indeed calls of_platform_populate() but I am not sure
-why this was added.
-
-Best regards,
-Krzysztof
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 22476 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160403/a98f64fb/attachment-0001.obj>
