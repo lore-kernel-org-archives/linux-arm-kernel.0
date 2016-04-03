@@ -1,111 +1,26 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 3 Apr 2016 12:08:45 +0200
-Subject: [PATCH v4 04/12] KVM: arm64: handle ITS related GICv3
- redistributor registers
-In-Reply-To: <1458958450-19662-5-git-send-email-andre.przywara@arm.com>
-References: <1458958450-19662-1-git-send-email-andre.przywara@arm.com>
- <1458958450-19662-5-git-send-email-andre.przywara@arm.com>
-Message-ID: <20160403100845.GE5261@cbox>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sun, 3 Apr 2016 12:09:48 +0200
+Subject: [GIT PULL v2] ARM support for generic memremap()
+In-Reply-To: <1459514934-28128-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1459514934-28128-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu_=yYRzir5MjUN0fF8qxW7vmxQpRgfKPA4WYKU8nMKEKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 26, 2016 at 02:14:02AM +0000, Andre Przywara wrote:
-> In the GICv3 redistributor there are the PENDBASER and PROPBASER
-> registers which we did not emulate so far, as they only make sense
-> when having an ITS. In preparation for that emulate those MMIO
-> accesses by storing the 64-bit data written into it into a variable
-> which we later read in the ITS emulation.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  include/kvm/vgic/vgic.h       |  8 ++++++++
->  virt/kvm/arm/vgic/vgic_mmio.c | 26 ++++++++++++++++++++++----
->  2 files changed, 30 insertions(+), 4 deletions(-)
-> 
-> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-> index 11344e6..8ea5dd7 100644
-> --- a/include/kvm/vgic/vgic.h
-> +++ b/include/kvm/vgic/vgic.h
-> @@ -145,6 +145,14 @@ struct vgic_dist {
->  
->  	struct vgic_io_device	*dist_iodevs;
->  	struct vgic_io_device	*redist_iodevs;
-> +
-> +	/* Address of LPI configuration table shared by all redistributors */
-> +	u64			propbaser;
+On 1 April 2016 at 14:48, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> Hello Russell,
+>
+> This pull request covers the updated v4 of this series that I sent out
+> yesterday, which fixed a thinko in my changes to the memremap() fallback
+> logic when attempting to reuse the existing kernel direct address of a
+> memory range. Anyway, all the required acks are in place for the patches
+> that touches drivers/mtd and kernel/, so please pull.
+>
 
-is this an architectural requirement or an implementation decision?
+Sigh. Please disregard. I appear to have broken !MMU, but I have only
+been notified now (after v4) by the kbuild test robot.
 
-> +
-> +	/* Addresses of LPI pending tables per redistributor */
-> +	u64			*pendbaser;
+I will need to respin this again. v5 coming up
 
-have we considered having an array of redistributors and putting the
-field in each one of those instead?
-
-> +
-> +	bool			lpis_enabled;
->  };
->  
->  struct vgic_v2_cpu_if {
-> diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
-> index 7d5d630..252b9aff 100644
-> --- a/virt/kvm/arm/vgic/vgic_mmio.c
-> +++ b/virt/kvm/arm/vgic/vgic_mmio.c
-> @@ -771,7 +771,9 @@ static int vgic_mmio_read_v3r_propbase(struct kvm_vcpu *vcpu,
->  				       struct kvm_io_device *this,
->  				       gpa_t addr, int len, void *val)
->  {
-> -	/* TODO: implement */
-> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> +
-> +	write_mask64(dist->propbaser, addr & 7, len, val);
->  	return 0;
->  }
->  
-> @@ -779,7 +781,11 @@ static int vgic_mmio_write_v3r_propbase(struct kvm_vcpu *vcpu,
->  				        struct kvm_io_device *this,
->  				        gpa_t addr, int len, const void *val)
->  {
-> -	/* TODO: implement */
-> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> +
-> +	/* Storing a value with LPIs already enabled is undefined */
-> +	if (!dist->lpis_enabled)
-> +		dist->propbaser = mask64(dist->propbaser, addr & 7, len, val);
->  	return 0;
->  }
->  
-> @@ -787,7 +793,12 @@ static int vgic_mmio_read_v3r_pendbase(struct kvm_vcpu *vcpu,
->  				       struct kvm_io_device *this,
->  				       gpa_t addr, int len, void *val)
->  {
-> -	/* TODO: implement */
-> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> +	struct vgic_io_device *iodev = container_of(this,
-> +						    struct vgic_io_device, dev);
-> +	u64 pendbaser = dist->pendbaser[iodev->redist_vcpu->vcpu_id];
-> +
-> +	write_mask64(pendbaser, addr & 7, len, val);
->  	return 0;
->  }
->  
-> @@ -795,7 +806,14 @@ static int vgic_mmio_write_v3r_pendbase(struct kvm_vcpu *vcpu,
->  				        struct kvm_io_device *this,
->  				        gpa_t addr, int len, const void *val)
->  {
-> -	/* TODO: implement */
-> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> +	struct vgic_io_device *iodev = container_of(this,
-> +						    struct vgic_io_device, dev);
-> +	u64 *pendbaser = &dist->pendbaser[iodev->redist_vcpu->vcpu_id];
-> +
-> +	/* Storing a value with LPIs already enabled is undefined */
-> +	if (!dist->lpis_enabled)
-> +		*pendbaser = mask64(*pendbaser, addr & 7, len, val);
->  	return 0;
->  }
->  
-> -- 
-> 2.7.3
-> 
+Thanks,
+Ard.
