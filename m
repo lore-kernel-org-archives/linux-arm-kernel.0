@@ -1,41 +1,65 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  4 Apr 2016 10:22:37 +0900
-Subject: [PATCH 05/47] ARM: dts: r8a7791: use fallback can compatibility string
+Date: Mon,  4 Apr 2016 10:22:39 +0900
+Subject: [PATCH 07/47] ARM: dts: r8a7790: Reference both DMA controllers in
+ SCIFA nodes
 In-Reply-To: <cover.1459732726.git.horms+renesas@verge.net.au>
 References: <cover.1459732726.git.horms+renesas@verge.net.au>
-Message-ID: <c6bf8c86f5ba3a49fe97253c1c745dea2b734522.1459732726.git.horms+renesas@verge.net.au>
+Message-ID: <f6daccce8850251f757e2739072118b7b430c4dc.1459732726.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use recently added fallback compatibility string in r8a7791 device tree.
+From: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+R-Car Gen2 have two DMA controllers, which are equivalent. Add
+references to both dmac0 and dmac1 so the driver can fallback to the
+later if the first one is unavailable.
+
+Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/r8a7790.dtsi | 15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 9bfd1dc054b3..396a640927c8 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -1013,7 +1013,7 @@
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 0077de70b6a4..7d9ff0bde857 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -633,8 +633,9 @@
+ 		interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A7790_CLK_SCIFA0>;
+ 		clock-names = "fck";
+-		dmas = <&dmac0 0x21>, <&dmac0 0x22>;
+-		dma-names = "tx", "rx";
++		dmas = <&dmac0 0x21>, <&dmac0 0x22>,
++		       <&dmac1 0x21>, <&dmac1 0x22>;
++		dma-names = "tx", "rx", "tx", "rx";
+ 		power-domains = <&cpg_clocks>;
+ 		status = "disabled";
  	};
- 
- 	can0: can at e6e80000 {
--		compatible = "renesas,can-r8a7791";
-+		compatible = "renesas,can-r8a7791", "renesas,rcar-gen2-can";
- 		reg = <0 0xe6e80000 0 0x1000>;
- 		interrupts = <GIC_SPI 186 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp9_clks R8A7791_CLK_RCAN0>,
-@@ -1024,7 +1024,7 @@
+@@ -646,8 +647,9 @@
+ 		interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A7790_CLK_SCIFA1>;
+ 		clock-names = "fck";
+-		dmas = <&dmac0 0x25>, <&dmac0 0x26>;
+-		dma-names = "tx", "rx";
++		dmas = <&dmac0 0x25>, <&dmac0 0x26>,
++		       <&dmac1 0x25>, <&dmac1 0x26>;
++		dma-names = "tx", "rx", "tx", "rx";
+ 		power-domains = <&cpg_clocks>;
+ 		status = "disabled";
  	};
- 
- 	can1: can at e6e88000 {
--		compatible = "renesas,can-r8a7791";
-+		compatible = "renesas,can-r8a7791", "renesas,rcar-gen2-can";
- 		reg = <0 0xe6e88000 0 0x1000>;
- 		interrupts = <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp9_clks R8A7791_CLK_RCAN1>,
+@@ -659,8 +661,9 @@
+ 		interrupts = <GIC_SPI 151 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A7790_CLK_SCIFA2>;
+ 		clock-names = "fck";
+-		dmas = <&dmac0 0x27>, <&dmac0 0x28>;
+-		dma-names = "tx", "rx";
++		dmas = <&dmac0 0x27>, <&dmac0 0x28>,
++		       <&dmac1 0x27>, <&dmac1 0x28>;
++		dma-names = "tx", "rx", "tx", "rx";
+ 		power-domains = <&cpg_clocks>;
+ 		status = "disabled";
+ 	};
 -- 
 2.1.4
