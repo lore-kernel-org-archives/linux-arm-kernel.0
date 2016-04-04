@@ -1,41 +1,73 @@
-From: anna-maria@linutronix.de (Anna-Maria Gleixner)
-Date: Mon,  4 Apr 2016 12:42:49 +0200
-Subject: [PATCH] arm64: hw-breakpoint: Remove superfluous SMP function call
-Message-ID: <1459766569-17237-1-git-send-email-anna-maria@linutronix.de>
+From: harninder.rai@nxp.com (Harninder Rai)
+Date: Mon, 4 Apr 2016 10:49:01 +0000
+Subject: Help needed with kexec on arm64
+References: <DB5PR04MB168845795D86B4CE5BA5656FE68B0@DB5PR04MB1688.eurprd04.prod.outlook.com>
+ <1458230896.3391.18.camel@infradead.org>
+ <CAB5YjtBEO=efjhcFdVOaZqG13qK3uzCbS5SFym5hhw-n+_QLhw@mail.gmail.com>
+ <DB5PR04MB1688A6D4385B76DAFF71D364E68C0@DB5PR04MB1688.eurprd04.prod.outlook.com>
+ <CAB5YjtAqjL8LMvNPbxwVWe+Zhi5rFkz_X7rti9wSrXQ7Y_2kOA@mail.gmail.com>
+ <DB5PR04MB16880834700413C3B80194B5E68C0@DB5PR04MB1688.eurprd04.prod.outlook.com>
+ <CAB5YjtCP6M9=ESJhfxyyYKSGTg8s3Y83qp8RS_oyYkUqcqYcCw@mail.gmail.com>
+Message-ID: <DB5PR04MB168874758924173BBD5CC037E69D0@DB5PR04MB1688.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit 1cf4f629d9d2 ("cpu/hotplug: Move online calls to
-hotplugged cpu") it is ensured that callbacks of CPU_ONLINE and
-CPU_DOWN_PREPARE are processed on the hotplugged cpu. Due to this SMP
-function calls are no longer required.
+Hello Takahiro Akashi/Geoff,
 
-Replace smp_call_function_single() with a direct call of
-hw_breakpoint_reset(). To keep the calling convention, interrupts are
-explicitely disabled around the call.
+With memblock option added to bootargs, I get the following
+Any pointers as to what could be going wrong here?
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Anna-Maria Gleixner <anna-maria@linutronix.de>
----
- arch/arm64/kernel/hw_breakpoint.c |    8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+[    0.000000] Linux version 4.5.0-rc6-00038-gae2804a-dirty (hrai at nmglablinux22) (gcc version 4.8.3 20140401 (prerelease) (Linaro GCC 4.8-2014.04) ) #2 SMP PREEMPT Fri Mar 11 14:45:30 IST 2016
+[    0.000000] Boot CPU: AArch64 Processor [411fd071]
+[    0.000000] Ignoring memory range 0x80000000 - 0x8c000000
+[    0.000000] earlycon: Early serial console at MMIO 0x21c0600 (options '')
+[    0.000000] bootconsole [uart0] enabled
+[    0.000000] efi: Getting EFI parameters from FDT:
+[    0.000000] efi: UEFI not found.
+[    0.000000] memblock_reserve: [0x0000008c080000-0x0000008cc40fff] flags 0x0 arm64_memblock_init+0x98/0x26c
+[    0.000000] memblock_reserve: [0x0000008cc41000-0x0000008e79ffd4] flags 0x0 arm64_memblock_init+0xc0/0x26c
+[    0.000000] memblock_reserve: [0x0000008ffff000-0x0000008ffff3ff] flags 0x0 arm64_memblock_init+0x1f8/0x26c
+[    0.000000] Reserving 1KB of memory at 0x8ffff000 for elfcorehdr
+[    0.000000] early_init_fdt_scan_reserved_mem: ERROR: /memreserve/ field not compatible with kexec: 0000000080000000, 0000000000010000
+[    0.000000] memblock_reserve: [0x00000080000000-0x0000008000ffff] flags 0x0 early_init_dt_reserve_memory_arch+0x1c/0x24
+[    0.000000] early_init_fdt_scan_reserved_mem: ERROR: /memreserve/ field not compatible with kexec: 00000000fff09e90, 0000000000000578
+[    0.000000] memblock_reserve: [0x000000fff09e90-0x000000fff0a407] flags 0x0 early_init_dt_reserve_memory_arch+0x1c/0x24
+[    0.000000] early_init_fdt_scan_reserved_mem: ERROR: /memreserve/ field not compatible with kexec: 000000009fff9000, 0000000000004000
+[    0.000000] memblock_reserve: [0x0000009fff9000-0x0000009fffcfff] flags 0x0 early_init_dt_reserve_memory_arch+0x1c/0x24
+[    0.000000] early_init_fdt_scan_reserved_mem: ERROR: /memreserve/ field not compatible with kexec: 00000000a0515e2c, 0000000001a64530
+[    0.000000] memblock_reserve: [0x000000a0515e2c-0x000000a1f7a35b] flags 0x0 early_init_dt_reserve_memory_arch+0x1c/0x24
+[    0.000000] memblock_reserve: [0x0000008ec00000-0x0000008fbfffff] flags 0x0 memblock_alloc_range_nid+0x64/0x78
+[    0.000000] cma: Reserved 16 MiB at 0x000000008ec00000
+[    0.000000] MEMBLOCK configuration:
+[    0.000000]  memory size = 0x4000000 reserved size = 0x519d181
+[    0.000000]  memory.cnt  = 0x1
+[    0.000000]  memory[0x0]     [0x0000008c000000-0x0000008fffffff], 0x4000000 bytes flags: 0x0
+[    0.000000]  reserved.cnt  = 0x8
+[    0.000000]  reserved[0x0]   [0x00000080000000-0x0000008000ffff], 0x10000 bytes flags: 0x0
+[    0.000000]  reserved[0x1]   [0x0000008c080000-0x0000008e79ffd4], 0x271ffd5 bytes flags: 0x0
+[    0.000000]  reserved[0x2]   [0x0000008e7a0000-0x0000008e7a4303], 0x4304 bytes flags: 0x0
+[    0.000000]  reserved[0x3]   [0x0000008ec00000-0x0000008fbfffff], 0x1000000 bytes flags: 0x0
+[    0.000000]  reserved[0x4]   [0x0000008ffff000-0x0000008ffff3ff], 0x400 bytes flags: 0x0
+[    0.000000]  reserved[0x5]   [0x0000009fff9000-0x0000009fffcfff], 0x4000 bytes flags: 0x0
+[    0.000000]  reserved[0x6]   [0x000000a0515e2c-0x000000a1f7a35b], 0x1a64530 bytes flags: 0x0
+[    0.000000]  reserved[0x7]   [0x000000fff09e90-0x000000fff0a407], 0x578 bytes flags: 0x0
+[    0.000000] memblock_reserve: [0x0000008fffe000-0x0000008fffefff] flags 0x0 memblock_alloc_range_nid+0x64/0x78
+[    0.000000] memblock_virt_alloc_try_nid: 4096 bytes align=0x0 nid=0 from=0x0 max_addr=0x0 sparse_index_alloc+0x4c/0x58
+[    0.000000] memblock_reserve: [0x0000008fffd000-0x0000008fffdfff] flags 0x0 memblock_virt_alloc_internal+0x18c/0x1e4
+[    0.000000] memblock_virt_alloc_try_nid: 2097152 bytes align=0x0 nid=-1 from=0x0 max_addr=0x0 sparse_init+0x38/0x1f4
+[    0.000000] memblock_reserve: [0x0000008fdfd000-0x0000008fffcfff] flags 0x0 memblock_virt_alloc_internal+0x18c/0x1e4
+[    0.000000] memblock_virt_alloc_try_nid_nopanic: 256 bytes align=0x0 nid=0 from=0x0 max_addr=0x0 sparse_early_usemaps_alloc_node+0x38/0xac
+[    0.000000] memblock_reserve: [0x0000008fffff00-0x0000008fffffff] flags 0x0 memblock_virt_alloc_internal+0x18c/0x1e4
+[    0.000000] memblock_virt_alloc_try_nid: 4096 bytes align=0x1000 nid=0 from=0x8c000000 max_addr=0x0 __earlyonly_bootmem_alloc+0x20/0x28
+[    0.000000] memblock_reserve: [0x0000008fdfc000-0x0000008fdfcfff] flags 0x0 memblock_virt_alloc_internal+0x18c/0x1e4
+[    0.000000] memblock_virt_alloc_try_nid: 4096 bytes align=0x1000 nid=0 from=0x8c000000 max_addr=0x0 __earlyonly_bootmem_alloc+0x20/0x28
+[    0.000000] memblock_reserve: [0x0000008fdfb000-0x0000008fdfbfff] flags 0x0 memblock_virt_alloc_internal+0x18c/0x1e4
+[    0.000000] memblock_virt_alloc_try_nid: 2097152 bytes align=0x200000 nid=0 from=0x8c000000 max_addr=0x0 __earlyonly_bootmem_alloc+0x20/0x28
+[    0.000000] memblock_reserve: [0x0000008ea00000-0x0000008ebfffff] flags 0x0 memblock_virt_alloc_internal+0x18c/0x1e4
+[    0.000000] memblock_virt_alloc_try_nid: 2097152 bytes align=0x200000 nid=0 from=0x8c000000 max_addr=0x0 __earlyonly_bootmem_alloc+0x20/0x28
+[    0.000000] memblock_reserve: [0x0000008e800000-0x0000008e9fffff] flags 0x0 memblock_virt_alloc_internal+0x18c/0x1e4
+[    0.000000] memblock_virt_alloc_try_nid: 2097152 bytes align=0x200000 nid=0 from=0x8c000000 max_addr=0x0 __earlyonly_bootmem_alloc+0x20/0x28
+[    0.000000] Kernel panic - not syncing: memblock_virt_alloc_try_nid: Failed to allocate 2097152 bytes align=0x200000 nid=0 from=0x8c000000 max_addr=0x0
 
---- a/arch/arm64/kernel/hw_breakpoint.c
-+++ b/arch/arm64/kernel/hw_breakpoint.c
-@@ -886,9 +886,11 @@ static int hw_breakpoint_reset_notify(st
- 						unsigned long action,
- 						void *hcpu)
- {
--	int cpu = (long)hcpu;
--	if ((action & ~CPU_TASKS_FROZEN) == CPU_ONLINE)
--		smp_call_function_single(cpu, hw_breakpoint_reset, NULL, 1);
-+	if ((action & ~CPU_TASKS_FROZEN) == CPU_ONLINE) {
-+		local_irq_disable();
-+		hw_breakpoint_reset(NULL);
-+		local_irq_enable();
-+	}
- 	return NOTIFY_OK;
- }
- 
+Thanks and Regards
+Harry++
