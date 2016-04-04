@@ -1,25 +1,35 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 4 Apr 2016 00:15:39 -0500
-Subject: [PATCHv2 4/7] Documentation: dt: socfpga: Add Altera Arria10
- OCRAM binding
-In-Reply-To: <1459450087-24792-5-git-send-email-tthayer@opensource.altera.com>
-References: <1459450087-24792-1-git-send-email-tthayer@opensource.altera.com>
- <1459450087-24792-5-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <20160404051539.GC17806@rob-hp-laptop>
+Date: Mon, 4 Apr 2016 00:15:52 -0500
+Subject: [v7, 3/5] dt: move guts devicetree doc out of powerpc directory
+In-Reply-To: <1459480051-3701-4-git-send-email-yangbo.lu@nxp.com>
+References: <1459480051-3701-1-git-send-email-yangbo.lu@nxp.com>
+ <1459480051-3701-4-git-send-email-yangbo.lu@nxp.com>
+Message-ID: <20160404051552.GG17806@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 31, 2016 at 01:48:04PM -0500, tthayer at opensource.altera.com wrote:
-> From: Thor Thayer <tthayer@opensource.altera.com>
+On Fri, Apr 01, 2016 at 11:07:29AM +0800, Yangbo Lu wrote:
+> Move guts devicetree doc to Documentation/devicetree/bindings/soc/fsl/
+> since it's used by not only PowerPC but also ARM. And add a specification
+> for 'little-endian' property.
 > 
-> Add the device tree bindings needed to support the Altera On-Chip
-> RAM ECC on the Arria10 chip.
-> 
-> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+> Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
 > ---
-> v2: Align Required Properties descriptions
+> Changes for v2:
+> 	- None
+> Changes for v3:
+> 	- None
+> Changes for v4:
+> 	- Added this patch
+> Changes for v5:
+> 	- Modified the description for little-endian property
+> Changes for v6:
+> 	- None
+> Changes for v7:
+> 	- None
 > ---
->  .../bindings/arm/altera/socfpga-eccmgr.txt         |   10 ++++++++++
->  1 file changed, 10 insertions(+)
+>  Documentation/devicetree/bindings/{powerpc => soc}/fsl/guts.txt | 3 +++
+>  1 file changed, 3 insertions(+)
+>  rename Documentation/devicetree/bindings/{powerpc => soc}/fsl/guts.txt (91%)
 
 Acked-by: Rob Herring <robh@kernel.org>
