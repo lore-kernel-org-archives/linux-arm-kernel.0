@@ -1,113 +1,270 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Mon, 4 Apr 2016 23:23:25 +0200
-Subject: 4.4 BCM5301X ARM regression "External imprecise Data abort"
-In-Reply-To: <5702D7DD.2080205@broadcom.com>
-References: <CACna6rz=KE_FtNtrSKmcYE514s4-dgrnx=iGbN7JDXkQPd6bTw@mail.gmail.com>
- <5702D7DD.2080205@broadcom.com>
-Message-ID: <5702DB4D.5070203@hauke-m.de>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Mon, 4 Apr 2016 14:23:45 -0700
+Subject: [PATCH v7 3/5] ACPI: parse SPCR and enable matching console
+In-Reply-To: <1459431629-27934-4-git-send-email-aleksey.makarov@linaro.org>
+References: <1459431629-27934-1-git-send-email-aleksey.makarov@linaro.org>
+ <1459431629-27934-4-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <5702DB61.4010805@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafal,
-
-On 04/04/2016 11:08 PM, Scott Branden wrote:
-> Hi Rafal,
+On 03/31/2016 06:40 AM, Aleksey Makarov wrote:
+> 'ARM Server Base Boot Requiremets' [1] mentions SPCR (Serial Port
+> Console Redirection Table) [2] as a mandatory ACPI table that
+> specifies the configuration of serial console.
 > 
-> I do not work on BCM5301x SoCs but perhaps Jon Mason can comment.
-> A few comments inline as well.
+> Defer initialization of DT earlycon until ACPI/DT decision is made.
 > 
-> On 16-04-03 11:13 PM, Rafa? Mi?ecki wrote:
->> Hi guys,
->>
->> I got regression reports from Netgear R8000 (BCM4709A0) users and did
->> some testing & regression tracking with Aditya.
->>
->> It happens that Linux 4.4 doesn't boot due to the following commits:
->> bbeb920 ("ARM: 8422/1: enable imprecise aborts during early kernel
->> startup")
->> 9254970 ("ARM: 8447/1: catch pending imprecise abort on unmask")
->> 937b123 ("ARM: BCM5301X: remove workaround imprecise abort fault
->> handler")
->>
->> In kernel 4.3 we got that abort workaround which was resulting in:
->> [    5.007128] Freeing unused kernel memory: 212K (c0435000 - c046a000)
->> [    5.694632] init: Console is alive
->> [    5.698169] init: - watchdog -
->> [    5.701470] External imprecise Data abort at addr=0x0, fsr=0x1406
->> ignored.
->> As you can see, this abort was happening soon after freeing unused
->> memory and ignoring it *once* did the trick. It was never appearing
->> again.
+> Parse the ACPI SPCR table, setup earlycon if required,
+> enable specified console.
+> 
+> Thanks to Peter Hurley for explaining how this should work.
+> 
+> [1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0044a/index.html
+> [2] https://msdn.microsoft.com/en-us/library/windows/hardware/dn639132(v=vs.85).aspx
 
-I assume it only can throw one of these and if it is deactivated it will
-ignore the next one or overwrite it. So it could be that more than one
-is thrown here.
+So for the code:
 
->> With 4.4 similar (or the same?) abort happens earlier (during PCI host
->> driver init) and doesn't get ignored:
->> [    2.478461] pci 0000:00:00.0: PCI bridge to [bus 01]
->> [    2.483451] pci 0000:00:00.0:   bridge window [mem
->> 0x08000000-0x085fffff]
->> [    2.599449] pcie_iproc_bcma bcma0:8: PCI host bridge to bus 0001:00
->> [    2.605744] pci_bus 0001:00: root bus resource [mem
->> 0x40000000-0x47ffffff]
->> [    2.612657] pcie_iproc_bcma bcma0:8: link: UP
->> [    2.617241] PCI: bus0: Fast back to back transfers disabled
->> [    2.622845] pci 0001:00:00.0: bridge configuration invalid ([bus
->> 00-00]), reconfiguring
->> [    2.631297] PCI: bus1: Fast back to back transfers disabled
->> [    2.636887] pci 0001:01:00.0: bridge configuration invalid ([bus
->> 00-00]), reconfiguring
->> [    2.645035] Unhandled fault: imprecise external abort (0x1406) at
->> 0x00000000
->> (see 4.4.txt for the backtrace)
->>
->> At first I was hoping that we simply need to re-add the removed
->> workaround. I tried it but it appeared that one abort is immediately
->> followed by another:
->> [    2.936895] pci 0001:01:00.0: bridge configuration invalid ([bus
->> 00-00]), reconfiguring
->> [    2.945053] External imprecise Data abort at addr=0x0, fsr=0x1406
->> ignored.
->> [    2.951966] Unhandled fault: imprecise external abort (0x1406) at
->> 0x00000000
->>
->> So it seems that commits bbeb920 and 9254970 broke something in PCI
->> host initialization (or maybe just exposed another bug?). Instead of
->> getting an abort once and late we are getting now many of them and a
->> bit earlier.
+Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
 
-These commits mad the kernel earlier "listen" to such errors, so that
-they will be shown at the time they occur and not sometime later.
 
-> We do not observe such issues in Cygnus and other SoCs that use this
-> PCIe driver (we do not use bcma either - I do not know if that is related).
->>
->> Reverting all three commits from the top of 4.4.6 gives me back a
->> working & booting kernel.
->>
->> Do you have any idea how to fix this regression (and hopefully
->> original problem as well)?
-> I think the proper fix is to correct the issues in the bootloader.  It
-> was my understanding from Jon Mason that this is the root of the
-> original problem.
->>
 
-I think this is a new problem.
+However, I still have concerns regarding the license of this code
+as GPL, when the Microsoft patent notice in [2] above only provides
+two license options, neither of which are referred to in the
+drivers/acpi/spcr.c file header and neither of which (I believe) are
+GPL compatible.
 
-In the Broadcom SDK was a comment saying that probably the bootloader is
-broken and that causes this fault which was worked around in the
-mainline kernel with the fault handler in the brcm code.
 
-When I added the code Arnd asked me if this SoC has a PCIe controller
-because he saw such a problem on an other SoC with a PCIe controller.
-https://www.spinics.net/lists/arm-kernel/msg298112.html
 
-As this is now happening in the PCIe code I assume that this has
-something to do with PCIe. ;-)
-
-Have you tried to deactivate PCIe support in Device tree and see what
-happens? Have you tried to load the PCIe controller as a module later on
-so if that makes a difference?
-
-Hauke
+> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+> ---
+>  drivers/acpi/Kconfig          |   3 ++
+>  drivers/acpi/Makefile         |   1 +
+>  drivers/acpi/spcr.c           | 111 ++++++++++++++++++++++++++++++++++++++++++
+>  drivers/tty/serial/earlycon.c |  19 +++++++-
+>  include/linux/acpi.h          |   6 +++
+>  include/linux/serial_core.h   |   6 +++
+>  6 files changed, 144 insertions(+), 2 deletions(-)
+>  create mode 100644 drivers/acpi/spcr.c
+> 
+> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+> index 65fb483..5611eb6 100644
+> --- a/drivers/acpi/Kconfig
+> +++ b/drivers/acpi/Kconfig
+> @@ -77,6 +77,9 @@ config ACPI_DEBUGGER_USER
+>  
+>  endif
+>  
+> +config ACPI_SPCR_TABLE
+> +	bool
+> +
+>  config ACPI_SLEEP
+>  	bool
+>  	depends on SUSPEND || HIBERNATION
+> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+> index 7395928..f70ae14 100644
+> --- a/drivers/acpi/Makefile
+> +++ b/drivers/acpi/Makefile
+> @@ -82,6 +82,7 @@ obj-$(CONFIG_ACPI_EC_DEBUGFS)	+= ec_sys.o
+>  obj-$(CONFIG_ACPI_CUSTOM_METHOD)+= custom_method.o
+>  obj-$(CONFIG_ACPI_BGRT)		+= bgrt.o
+>  obj-$(CONFIG_ACPI_CPPC_LIB)	+= cppc_acpi.o
+> +obj-$(CONFIG_ACPI_SPCR_TABLE)	+= spcr.o
+>  obj-$(CONFIG_ACPI_DEBUGGER_USER) += acpi_dbg.o
+>  
+>  # processor has its own "processor." module_param namespace
+> diff --git a/drivers/acpi/spcr.c b/drivers/acpi/spcr.c
+> new file mode 100644
+> index 0000000..68ffc33
+> --- /dev/null
+> +++ b/drivers/acpi/spcr.c
+> @@ -0,0 +1,111 @@
+> +/*
+> + * Copyright (c) 2012, Intel Corporation
+> + * Copyright (c) 2015, Red Hat, Inc.
+> + * Copyright (c) 2015, 2016 Linaro Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + */
+> +
+> +#define pr_fmt(fmt) "ACPI: SPCR: " fmt
+> +
+> +#include <linux/acpi.h>
+> +#include <linux/console.h>
+> +#include <linux/kernel.h>
+> +#include <linux/serial_core.h>
+> +
+> +/**
+> + * parse_spcr() - parse ACPI SPCR table and add preferred console
+> + *
+> + * @earlycon: set up earlycon for the console specified by the table
+> + *
+> + * For the architectures with support for ACPI, CONFIG_ACPI_SPCR_TABLE may be
+> + * defined to parse ACPI SPCR table.  As a result of the parsing preferred
+> + * console is registered and if @earlycon is true, earlycon is set up.
+> + *
+> + * When CONFIG_ACPI_SPCR_TABLE is defined, this function should should be called
+> + * from arch inintialization code as soon as the DT/ACPI decision is made.
+> + *
+> + */
+> +int __init parse_spcr(bool earlycon)
+> +{
+> +	static char opts[64];
+> +	struct acpi_table_spcr *table;
+> +	acpi_size table_size;
+> +	acpi_status status;
+> +	char *uart;
+> +	char *iotype;
+> +	int baud_rate;
+> +	int err;
+> +
+> +	if (acpi_disabled)
+> +		return -ENODEV;
+> +
+> +	status = acpi_get_table_with_size(ACPI_SIG_SPCR, 0,
+> +					  (struct acpi_table_header **)&table,
+> +					  &table_size);
+> +
+> +	if (ACPI_FAILURE(status))
+> +		return -ENOENT;
+> +
+> +	if (table->header.revision < 2) {
+> +		err = -ENOENT;
+> +		pr_err("wrong table version\n");
+> +		goto done;
+> +	}
+> +
+> +	iotype = table->serial_port.space_id == ACPI_ADR_SPACE_SYSTEM_MEMORY ?
+> +			"mmio" : "io";
+> +
+> +	switch (table->interface_type) {
+> +	case ACPI_DBG2_ARM_SBSA_32BIT:
+> +		iotype = "mmio32";
+> +		/* fall through */
+> +	case ACPI_DBG2_ARM_PL011:
+> +	case ACPI_DBG2_ARM_SBSA_GENERIC:
+> +	case ACPI_DBG2_BCM2835:
+> +		uart = "pl011";
+> +		break;
+> +	case ACPI_DBG2_16550_COMPATIBLE:
+> +	case ACPI_DBG2_16550_SUBSET:
+> +		uart = "uart";
+> +		break;
+> +	default:
+> +		err = -ENOENT;
+> +		goto done;
+> +	}
+> +
+> +	switch (table->baud_rate) {
+> +	case 3:
+> +		baud_rate = 9600;
+> +		break;
+> +	case 4:
+> +		baud_rate = 19200;
+> +		break;
+> +	case 6:
+> +		baud_rate = 57600;
+> +		break;
+> +	case 7:
+> +		baud_rate = 115200;
+> +		break;
+> +	default:
+> +		err = -ENOENT;
+> +		goto done;
+> +	}
+> +
+> +	snprintf(opts, sizeof(opts), "%s,%s,0x%llx,%d", uart, iotype,
+> +		 table->serial_port.address, baud_rate);
+> +
+> +	pr_info("console: %s", opts);
+> +
+> +	if (earlycon)
+> +		setup_earlycon(opts);
+> +
+> +	err = add_preferred_console(uart, 0, opts + strlen(uart) + 1);
+> +
+> +done:
+> +	early_acpi_os_unmap_memory((void __iomem *)table, table_size);
+> +	return err;
+> +}
+> diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
+> index 7aae655..ea00b9f 100644
+> --- a/drivers/tty/serial/earlycon.c
+> +++ b/drivers/tty/serial/earlycon.c
+> @@ -21,6 +21,7 @@
+>  #include <linux/sizes.h>
+>  #include <linux/of.h>
+>  #include <linux/of_fdt.h>
+> +#include <linux/acpi.h>
+>  
+>  #ifdef CONFIG_FIX_EARLYCON_MEM
+>  #include <asm/fixmap.h>
+> @@ -199,6 +200,14 @@ int __init setup_earlycon(char *buf)
+>  	return -ENOENT;
+>  }
+>  
+> +/*
+> + * When CONFIG_ACPI_SPCR_TABLE is defined, "earlycon" without parameters in
+> + * command line does not start DT earlycon immediately, instead it defers
+> + * starting it until DT/ACPI decision is made.  At that time if ACPI is enabled
+> + * call parse_spcr(), else call early_init_dt_scan_chosen_stdout()
+> + */
+> +bool earlycon_init_is_deferred __initdata;
+> +
+>  /* early_param wrapper for setup_earlycon() */
+>  static int __init param_setup_earlycon(char *buf)
+>  {
+> @@ -208,8 +217,14 @@ static int __init param_setup_earlycon(char *buf)
+>  	 * Just 'earlycon' is a valid param for devicetree earlycons;
+>  	 * don't generate a warning from parse_early_params() in that case
+>  	 */
+> -	if (!buf || !buf[0])
+> -		return early_init_dt_scan_chosen_stdout();
+> +	if (!buf || !buf[0]) {
+> +		if (IS_ENABLED(CONFIG_ACPI_SPCR_TABLE)) {
+> +			earlycon_init_is_deferred = true;
+> +			return 0;
+> +		} else {
+> +			return early_init_dt_scan_chosen_stdout();
+> +		}
+> +	}
+>  
+>  	err = setup_earlycon(buf);
+>  	if (err == -ENOENT || err == -EALREADY)
+> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+> index 06ed7e5..1095ed6 100644
+> --- a/include/linux/acpi.h
+> +++ b/include/linux/acpi.h
+> @@ -1004,4 +1004,10 @@ static inline struct fwnode_handle *acpi_get_next_subnode(struct device *dev,
+>  #define acpi_probe_device_table(t)	({ int __r = 0; __r;})
+>  #endif
+>  
+> +#ifdef CONFIG_ACPI_SPCR_TABLE
+> +int parse_spcr(bool earlycon);
+> +#else
+> +static inline int parse_spcr(bool earlycon) { return 0; }
+> +#endif
+> +
+>  #endif	/*_LINUX_ACPI_H*/
+> diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
+> index cbfcf38..de6750f 100644
+> --- a/include/linux/serial_core.h
+> +++ b/include/linux/serial_core.h
+> @@ -363,6 +363,12 @@ extern int of_setup_earlycon(const struct earlycon_id *match,
+>  			     unsigned long node,
+>  			     const char *options);
+>  
+> +#ifdef CONFIG_SERIAL_EARLYCON
+> +extern bool earlycon_init_is_deferred __initdata;
+> +#else
+> +static const bool earlycon_init_is_deferred;
+> +#endif
+> +
+>  struct uart_port *uart_get_console(struct uart_port *ports, int nr,
+>  				   struct console *c);
+>  int uart_parse_earlycon(char *p, unsigned char *iotype, unsigned long *addr,
+> 
