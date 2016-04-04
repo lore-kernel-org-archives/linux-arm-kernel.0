@@ -1,99 +1,97 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 4 Apr 2016 23:30:56 +0200
-Subject: N900 sleep mode (in 4.5-rc0, if that matters)
-In-Reply-To: <20160330191208.GW9329@atomide.com>
-References: <20160130200244.GA30429@amd> <20160130201452.GC30429@amd>
- <20160130221509.GA28644@amd> <20160201181316.GM19432@atomide.com>
- <20160201211736.GA11283@amd> <20160201221111.GP19432@atomide.com>
- <20160207212316.GA6147@amd> <20160209172403.GK19432@atomide.com>
- <20160323123801.GC32031@amd> <20160330191208.GW9329@atomide.com>
-Message-ID: <20160404213056.GA25912@amd>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon,  4 Apr 2016 23:53:11 +0200
+Subject: [PATCH v5 1/2] serial: fsl_lpuart: Add DMA quirk
+In-Reply-To: <1459806792-7729-1-git-send-email-andrew@lunn.ch>
+References: <1459806792-7729-1-git-send-email-andrew@lunn.ch>
+Message-ID: <1459806792-7729-2-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Using DMA with the vf610 and other Vybrid devices results in a corrupt
+serial stream. Add a quirk to disable the use of DMA.
 
-> > How idle system do I need to have? Screen is blanked and machine
-> > should be mostly idle, but there's X running on another vt with Mate
-> > desktop, and some python scripts... GSM modem should be online.
-> 
-> Well I think it's the USB only you have blocking deeper idle states.
-> 
-> Are you sure you rmmod:ed all the USB related modules like in my
-> test script?
+Refactor the existing code to add a 32 bit access quirk for the
+fsl,ls1021a-lpuart.
 
-I tested with rmmoding two, and then modified kernel to do equivalent
-operations.
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+---
+ drivers/tty/serial/fsl_lpuart.c | 36 ++++++++++++++++++++++++++----------
+ 1 file changed, 26 insertions(+), 10 deletions(-)
 
-Let me try again:
-
-phy_module=phy_twl4030_usb
-udc_glue=omap2430
-udc_module=musb_hdrc
-
-Ok, I did "start" with your script. After some fiddling it seems to
-work, and PC detected the values:
-
-[25379.533127] usb 1-5: USB disconnect, device number 12
-[27161.884132] usb 1-5: new high-speed USB device number 13 using
-ehci-pci
-[27161.996037] usb 1-5: device descriptor read/64, error -32
-[27162.420048] usb 4-1: new full-speed USB device number 2 using
-uhci_hcd
-[27162.563098] usb 4-1: not running at top speed; connect to a high
-speed hub
-[27162.601106] usb 4-1: New USB device found, idVendor=1d6b,
-idProduct=0106
-[27162.601112] usb 4-1: New USB device strings: Mfr=1, Product=2,
-SerialNumber=3
-[27162.601115] usb 4-1: Product: Multi Gadget
-[27162.601118] usb 4-1: Manufacturer: foo
-[27162.601121] usb 4-1: SerialNumber: 123456789
-[27162.614766] cdc_ether 4-1:1.0 usb0: register 'cdc_ether' at
-usb-0000:00:1d.2-1, CDC Ethernet Device, c6:8b:83:74:f2:f3
-[27163.195272] cdc_ether 4-1:1.0 usb0: kevent 12 may have been dropped
-
-Stop seemed to work, too:
-
-root at n900:/my/tui/ofone# ./gadgets.sh stop
-rm: cannot remove `configs/c.1/acm.0': No such file or directory
-rm: cannot remove `configs/c.5/acm.0': No such file or directory
-rmdir: failed to remove `functions/acm.0': No such file or directory
-./gadgets.sh: line 74: functions/mass_storage.0/lun.0/file: No such
-file or directory
-rm: cannot remove `configs/c.1/mass_storage.0': No such file or
-directory
-rm: cannot remove `configs/c.5/mass_storage.0': No such file or
-directory
-rmdir: failed to remove `functions/mass_storage.0': No such file or
-directory
-root at n900:/my/tui/ofone# lsmod
-Module                  Size  Used by
-root at n900:/my/tui/ofone#
-
-Display off, on wifi:
-
-00001fff 48005020 (fa005020) cm_idlest_per blocking bits: 0007e000
-f7de7ebd 48004a20 (fa004a20) cm_idlest1_core blocking bits: 00218042
-0000000d 48004a28 (fa004a28) cm_idlest3_core
-
-00001fff 48005020 (fa005020) cm_idlest_per blocking bits: 0007e000
-ffde7ebd 48004a20 (fa004a20) cm_idlest1_core blocking bits: 00218042
-
-00001fff 48005020 (fa005020) cm_idlest_per blocking bits: 0007e000
-ffdffebd 48004a20 (fa004a20) cm_idlest1_core blocking bits: 00200042
-
-..so I believe gadget bits are still set.
-
-> I'm booting over smc91x using u-boot.
-
-I'm booting directly from NOLO over usb. Machine is running X, but
-they are not active -- chvt. Screen is off.
-
-Best regards,
-
-
-									Pavel
+diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
+index 3d790033744e..8d2f67b93e1f 100644
+--- a/drivers/tty/serial/fsl_lpuart.c
++++ b/drivers/tty/serial/fsl_lpuart.c
+@@ -257,12 +257,17 @@ struct lpuart_port {
+ 	struct timer_list	lpuart_timer;
+ };
+ 
++#define QUIRK_LPUART32		BIT(0)
++#define QUIRK_NO_DMA		BIT(1)
++
+ static const struct of_device_id lpuart_dt_ids[] = {
+ 	{
+ 		.compatible = "fsl,vf610-lpuart",
++		.data = (void *)QUIRK_NO_DMA,
+ 	},
+ 	{
+ 		.compatible = "fsl,ls1021a-lpuart",
++		.data = (void *)QUIRK_LPUART32,
+ 	},
+ 	{ /* sentinel */ }
+ };
+@@ -1803,7 +1808,9 @@ static struct uart_driver lpuart_reg = {
+ static int lpuart_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *np = pdev->dev.of_node;
++	const struct of_device_id *match;
+ 	struct lpuart_port *sport;
++	kernel_ulong_t quirks;
+ 	struct resource *res;
+ 	int ret;
+ 
+@@ -1819,7 +1826,10 @@ static int lpuart_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 	sport->port.line = ret;
+-	sport->lpuart32 = of_device_is_compatible(np, "fsl,ls1021a-lpuart");
++
++	match = of_match_node(lpuart_dt_ids, np);
++	quirks = (kernel_ulong_t)match->data;
++	sport->lpuart32 = quirks & QUIRK_LPUART32;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	sport->port.membase = devm_ioremap_resource(&pdev->dev, res);
+@@ -1867,15 +1877,21 @@ static int lpuart_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
+-	sport->dma_tx_chan = dma_request_slave_channel(sport->port.dev, "tx");
+-	if (!sport->dma_tx_chan)
+-		dev_info(sport->port.dev, "DMA tx channel request failed, "
+-				"operating without tx DMA\n");
+-
+-	sport->dma_rx_chan = dma_request_slave_channel(sport->port.dev, "rx");
+-	if (!sport->dma_rx_chan)
+-		dev_info(sport->port.dev, "DMA rx channel request failed, "
+-				"operating without rx DMA\n");
++	if (quirks & QUIRK_NO_DMA) {
++		dev_info(sport->port.dev, "Not using DMA\n");
++	} else {
++		sport->dma_tx_chan = dma_request_slave_channel(
++			sport->port.dev, "tx");
++		if (!sport->dma_tx_chan)
++			dev_info(sport->port.dev,
++				 "DMA tx channel request failed, operating without tx DMA\n");
++
++		sport->dma_rx_chan = dma_request_slave_channel(
++			sport->port.dev, "rx");
++		if (!sport->dma_rx_chan)
++			dev_info(sport->port.dev,
++				 "DMA rx channel request failed, operating without rx DMA\n");
++	}
+ 
+ 	return 0;
+ }
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+2.7.0
