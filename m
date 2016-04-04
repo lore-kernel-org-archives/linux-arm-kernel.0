@@ -1,36 +1,35 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 4 Apr 2016 14:10:45 +0200
-Subject: [PATCH v2] ARM: dts: kirkwood: Add DTS for Linksys EA4200v2/EA4500
-In-Reply-To: <1459770433-2876-1-git-send-email-bert@biot.com>
-References: <1459770433-2876-1-git-send-email-bert@biot.com>
-Message-ID: <20160404121045.GB21828@lunn.ch>
+Date: Mon, 4 Apr 2016 14:15:48 +0200
+Subject: [PATCH] ARM: dts: kirkwood: Add DTS for Linksys EA4200v2/EA4500
+In-Reply-To: <5702555C.1020408@biot.com>
+References: <1459601753-31193-1-git-send-email-bert@biot.com>
+ <20160402161639.GF32554@lunn.ch> <5702555C.1020408@biot.com>
+Message-ID: <20160404121548.GC21828@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 04, 2016 at 01:47:12PM +0200, Bert Vermeulen wrote:
-> This platform is based on a Marvell 88E6282 SoC and 88E6171 switch.
-> ---
+> >Could you dual license this under X11 as well? You will need agreement
+> >from the copyright holders above, if they wrote DT fragments.
+> >
+> > Not many kirkwood boards are, but we encourage most Marvell SoCs DT
+> > files to be dual license.
+> 
+> I did not get responses from all authors, so no dice.
 
-Hi Bert
+O.K. We can change this later if they do reply.
+ 
+> >The 6171 is a 7 port device. Is the last port also a 'cpu' port?
+> 
+> I don't think so. I didn't manage to get anything through it, and I
+> can't see the CPU traces on the PCB (neither 5 nor 6).
 
-Under the --- it is normal to list what you have changed. That helps
-the reviewer focus on just the changes.
+You might need to set the RGMII delay. Here is an example i use with
+another board:
 
->  arch/arm/boot/dts/kirkwood-viper.dts | 236 +++++++++++++++++++++++++++++++++++
+port at 6 {
+	reg = <6>;
+        label = "cpu";
+	phy-mode = "rgmii-txid";
+};
 
-Please include linksys in the filename.
-
-ls *linksys*
-armada-385-linksys-caiman.dts  armada-385-linksys.dtsi
-armada-385-linksys-cobra.dts   armada-xp-linksys-mamba.dts
-
->  1 file changed, 236 insertions(+)
->  create mode 100644 arch/arm/boot/dts/kirkwood-viper.dts
-
-Please add this file to the Makefile. And keep the entries in
-alphabetical order.
-
-Otherwise this looks good.
-
-Thanks
 	Andrew
