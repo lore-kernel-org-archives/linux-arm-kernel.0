@@ -1,35 +1,49 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 4 Apr 2016 00:15:52 -0500
-Subject: [v7, 3/5] dt: move guts devicetree doc out of powerpc directory
-In-Reply-To: <1459480051-3701-4-git-send-email-yangbo.lu@nxp.com>
-References: <1459480051-3701-1-git-send-email-yangbo.lu@nxp.com>
- <1459480051-3701-4-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <20160404051552.GG17806@rob-hp-laptop>
+Date: Mon, 4 Apr 2016 00:15:49 -0500
+Subject: [PATCH 1/2] dt/bindings: Add bindings for hisilicon random
+ number generator
+In-Reply-To: <1459474664-11264-1-git-send-email-wangkefeng.wang@huawei.com>
+References: <1459474664-11264-1-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <20160404051549.GF17806@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 01, 2016 at 11:07:29AM +0800, Yangbo Lu wrote:
-> Move guts devicetree doc to Documentation/devicetree/bindings/soc/fsl/
-> since it's used by not only PowerPC but also ARM. And add a specification
-> for 'little-endian' property.
+On Fri, Apr 01, 2016 at 09:37:43AM +0800, Kefeng Wang wrote:
+> Document the devicetree bindings for the random number generator
+> found on Hisilicon Hip04 and Hip05 soc.
 > 
-> Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
+> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 > ---
-> Changes for v2:
-> 	- None
-> Changes for v3:
-> 	- None
-> Changes for v4:
-> 	- Added this patch
-> Changes for v5:
-> 	- Modified the description for little-endian property
-> Changes for v6:
-> 	- None
-> Changes for v7:
-> 	- None
-> ---
->  Documentation/devicetree/bindings/{powerpc => soc}/fsl/guts.txt | 3 +++
->  1 file changed, 3 insertions(+)
->  rename Documentation/devicetree/bindings/{powerpc => soc}/fsl/guts.txt (91%)
+>  Documentation/devicetree/bindings/rng/hisi-rng.txt | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/rng/hisi-rng.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/rng/hisi-rng.txt b/Documentation/devicetree/bindings/rng/hisi-rng.txt
+> new file mode 100644
+> index 0000000..80f29b6
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/rng/hisi-rng.txt
+> @@ -0,0 +1,12 @@
+> +Hisilicon Random Number Generator
+> +
+> +Required properties:
+> +- compatible : Should be "hisilicon,hisi-rng"
 
-Acked-by: Rob Herring <robh@kernel.org>
+hisi is a bit redundant with hisilicon and please define SoC specific 
+compatible strings.
+
+> +- reg : Offset and length of the register set of this block
+> +
+> +Example:
+> +
+> +rng at d1010000 {
+> +	compatible = "hisilicon,hisi-rng";
+> +	reg = <0xd1010000 0x100>;
+> +};
+> -- 
+> 1.7.12.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
