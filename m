@@ -1,143 +1,89 @@
-From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Tue, 05 Apr 2016 09:57:20 +0800
-Subject: [PATCH v1 2/2] rockchip: power-domain: support qos save and
- restore
-In-Reply-To: <3121335.t9IV1BMS6Y@phil>
-References: <1458285444-31129-1-git-send-email-zhangqing@rock-chips.com>
- <6919893.LfaTZNRxZs@phil> <56FDDE09.9080601@rock-chips.com>
- <3121335.t9IV1BMS6Y@phil>
-Message-ID: <57031B80.1080602@rock-chips.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 5 Apr 2016 00:38:33 +0100
+Subject: [PATCH 2/4] Documentation: Add documentation for APM X-Gene SoC
+ PMU DTS binding
+In-Reply-To: <CACgAJHyS+o_Nyrc7pDxVCTHK7tue9L9F2weGQt_2WqeGfZBeag@mail.gmail.com>
+References: <1459467472-31561-1-git-send-email-ttnguyen@apm.com>
+ <1459467472-31561-3-git-send-email-ttnguyen@apm.com>
+ <20160401123000.GC29876@leverpostej>
+ <CACgAJHyS+o_Nyrc7pDxVCTHK7tue9L9F2weGQt_2WqeGfZBeag@mail.gmail.com>
+Message-ID: <20160404233831.GB1917@svinekod>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi, Heiko:
+On Mon, Apr 04, 2016 at 04:40:33PM -0700, Tai Tri Nguyen wrote:
+> On Fri, Apr 1, 2016 at 5:30 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Thu, Mar 31, 2016 at 04:37:50PM -0700, Tai Nguyen wrote:
+> >> +This is APM X-Gene SoC PMU (Performance Monitoring Unit) module.
+> >> +The following PMU devices are supported:
+> >> +
+> >> +  L3C                        - L3 cache controller
+> >> +  IOB                        - IO bridge
+> >> +  MCB                        - Memory controller bridge
+> >> +  MC                 - Memory controller
+> >
+> > These sound like separate units. How do these relate?
+> >
+> > Is there an SOC-wide PMU that aggregates counters, or are these actually
+> > independent?
+> >
+> 
+> Yes, they are independent, but sharing the same top level status interrupt.
+> There's no SOC-wide PMU which aggregates these counters.
 
-Thanks for your replay.
-For your questions, I also have the same concerns.
+If they're just sharing the interrupt, why are they not separate nodes (and
+drivers) which simply happen to share an interrupt?
 
-On 04/02/2016 12:19 AM, Heiko Stuebner wrote:
-> Hi Elaine,
->
-> Am Freitag, 1. April 2016, 10:33:45 schrieb Elaine Zhang:
->> I agree with most of your modifications.
->> Except, the u32 *qos_save_regs below
->
-> you're right. I didn't take that into account when my open-coding my idea.
-> A bit more below:
->
->> On 04/01/2016 12:31 AM, Heiko Stuebner wrote:
->>> Hi Elaine,
->>>
->>> Am Freitag, 18. M?rz 2016, 15:17:24 schrieb Elaine Zhang:
->>>> support qos save and restore when power domain on/off.
->>>>
->>>> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
->>>
->>> overall looks nice already ... some implementation-specific comments
->>> below.>
->>>> ---
->>>>
->>>>    drivers/soc/rockchip/pm_domains.c | 87
->>>>
->>>> +++++++++++++++++++++++++++++++++++++-- 1 file changed, 84
->>>> insertions(+),
->>>> 3 deletions(-)
->>>>
->>>> diff --git a/drivers/soc/rockchip/pm_domains.c
->>>> b/drivers/soc/rockchip/pm_domains.c index 18aee6b..c5f4be6 100644
->>>> --- a/drivers/soc/rockchip/pm_domains.c
->>>> +++ b/drivers/soc/rockchip/pm_domains.c
->>>> @@ -45,10 +45,21 @@ struct rockchip_pmu_info {
->>>>
->>>>    	const struct rockchip_domain_info *domain_info;
->>>>
->>>>    };
->>>>
->>>> +#define MAX_QOS_NODE_NUM	20
->>>> +#define MAX_QOS_REGS_NUM	5
->>>> +#define QOS_PRIORITY		0x08
->>>> +#define QOS_MODE		0x0c
->>>> +#define QOS_BANDWIDTH		0x10
->>>> +#define QOS_SATURATION		0x14
->>>> +#define QOS_EXTCONTROL		0x18
->>>> +
->>>>
->>>>    struct rockchip_pm_domain {
->>>>
->>>>    	struct generic_pm_domain genpd;
->>>>    	const struct rockchip_domain_info *info;
->>>>    	struct rockchip_pmu *pmu;
->>>>
->>>> +	int num_qos;
->>>> +	struct regmap *qos_regmap[MAX_QOS_NODE_NUM];
->>>> +	u32 qos_save_regs[MAX_QOS_NODE_NUM][MAX_QOS_REGS_NUM];
->>>
->>> struct regmap **qos_regmap;
->>> u32 *qos_save_regs;
->>
->> when we save and restore qos registers we need save five regs for every
->> qos. like this :
->> for (i = 0; i < pd->num_qos; i++) {
->> 		regmap_read(pd->qos_regmap[i],
->> 			    QOS_PRIORITY,
->> 			    &pd->qos_save_regs[i][0]);
->> 		regmap_read(pd->qos_regmap[i],
->> 			    QOS_MODE,
->> 			    &pd->qos_save_regs[i][1]);
->> 		regmap_read(pd->qos_regmap[i],
->> 			    QOS_BANDWIDTH,
->> 			    &pd->qos_save_regs[i][2]);
->> 		regmap_read(pd->qos_regmap[i],
->> 			    QOS_SATURATION,
->> 			    &pd->qos_save_regs[i][3]);
->> 		regmap_read(pd->qos_regmap[i],
->> 			    QOS_EXTCONTROL,
->> 			    &pd->qos_save_regs[i][4]);
->> 	}
->> so we can not define qos_save_regs like u32 *qos_save_regs;,
->> and apply buff like
->> pd->qos_save_regs = kcalloc(pd->num_qos * MAX_QOS_REGS_NUM, sizeof(u32),
->> GFP_KERNEL);
->
-> so how about simply swapping indices and doing it like
->
-> u32 *qos_save_regs[MAX_QOS_REGS_NUM];
->
-> for (i = 0; i < MAX_QOS_REGS_NUM; i++) {
-> 	qos_save_regs[i] = kcalloc(pd->num_qos, sizeof(u32));
-> 	/* error handling here */
-> }
->
-> ...
-> 		regmap_read(pd->qos_regmap[i],
-> 			    QOS_SATURATION,
-> 			    &pd->qos_save_regs[3][i]);
-> ...
+Is there anything else shared?
 
-I agree with you on this modification.
+> >> +The following section describes the SoC PMU DT node binding.
+> >> +
+> >> +Required properties:
+> >> +- compatible         : Shall be "apm,xgene-pmu" for revision 1 or
+> >> +                          "apm,xgene-pmu-v2" for revision 2.
+> >
+> > That name is very general. Is there not a more specific name for the SOC
+> > PMU?
+> >
+> 
+> Beside the ARMv8 core PMU which has the compatible name "arm,armv8-pmuv3",
+> these are all the PMUs in X-Gene SoCs. Also, we are using the same PMU
+> driver across our platforms. I think a general name is what it should be.
 
->
->
-> Asked the other way around, how did you measure to set MAX_QOS_REGS_NUM to
-> 20? From looking at the rk3399 TRM, it seems there are only 38 QoS
-> generators on the SoC in general (24 on the rk3288 with PD_VIO having a
-> maximum of 9 qos generators), so preparing for 20 seems a bit overkill ;-)
->
-About the MAX_QOS_NODE_NUM I also have some uncertaibty.
-Although there are only 38 QoS on the RK3399(24 on the rk3288),but not 
-all of the pd need to power on/off.So not all QOS need save and restore.
-So about the MAX_QOS_NODE_NUM, what do you suggest.
+Depending on my prior question, I'm not sure that's necessarily true. If
+there's no actual shared SoC PMU logic as such, the names below for each
+individual PMU seem fine.
+ 
+> >> +Required properties for L3C subnode:
+> >> +- compatible         : Shall be "apm,xgene-pmu-l3c".
+> >> +- reg                        : First resource shall be the L3C PMU resource.
+> >> +- index                      : Instance number of the L3C PMU.
+> >> +
+> >> +Required properties for IOB subnode:
+> >> +- compatible         : Shall be "apm,xgene-pmu-iob".
+> >> +- reg                        : First resource shall be the IOB PMU resource.
+> >> +- index                      : Instance number of the IOB PMU.
+> >> +
+> >> +Required properties for MCB subnode:
+> >> +- compatible         : Shall be "apm,xgene-pmu-mcb".
+> >> +- reg                        : First resource shall be the MCB PMU resource.
+> >> +- index                      : Instance number of the MCB PMU.
+> >> +
+> >> +Required properties for MC subnode:
+> >> +- compatible         : Shall be "apm,xgene-pmu-mc".
+> >> +- reg                        : First resource shall be the MC PMU resource.
+> >> +- index                      : Instance number of the MC PMU.
+> >
+> > What's the index property useful for?
+> >
+> 
+> The index property is used for indicating the physical hardware PMU id.
+> For example, on X-Gene1 there are 4 memory controllers (MC), each of them has
+> its own PMU. The index property tells us which MC a PMU belongs to.
+> The same for MCB/L3C and IOB.
 
-MAX_QOS_REGS_NUM is 5 because the QOS register is just 5 need save and 
-restore.
-like :
-#define QOS_PRIORITY		0x08
-#define QOS_MODE		0x0c
-#define QOS_BANDWIDTH		0x10
-#define QOS_SATURATION		0x14
-#define QOS_EXTCONTROL		0x18
->
-> Heiko
->
->
->
+Sure, but is this simply informative for the user, or does this have an impact
+on the programming model?
+
+Thanks,
+Mark.
