@@ -1,42 +1,32 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Mon, 4 Apr 2016 22:03:48 +0800
-Subject: [PATCH v2 02/16] arm64: dts: add sp804 timer node for Hi6220
-In-Reply-To: <CACRpkdb_aMpj3X-m-FdM-PCCSuXgHnect5+nWPFnGVzGx4zrbA@mail.gmail.com>
-References: <1459589383-16914-1-git-send-email-guodong.xu@linaro.org>
- <1459589383-16914-3-git-send-email-guodong.xu@linaro.org>
- <CACRpkdbWuKx6=aF5xW=3EKfuUf-MYM_EEnovyhBnOGVOeHyCmQ@mail.gmail.com>
- <20160404014359.GA15178@leoy-linaro>
- <CACRpkdZ=_86Rhc+ei+3uE0dda9+onC8pQwosheMfEj4tOqmcDA@mail.gmail.com>
- <20160404134237.GC402@leoy-linaro>
- <CACRpkdb_aMpj3X-m-FdM-PCCSuXgHnect5+nWPFnGVzGx4zrbA@mail.gmail.com>
-Message-ID: <20160404140348.GE402@leoy-linaro>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 4 Apr 2016 17:06:46 +0300
+Subject: [PATCH] arm64: hw-breakpoint: Remove superfluous SMP function call
+In-Reply-To: <1459766569-17237-1-git-send-email-anna-maria@linutronix.de>
+References: <1459766569-17237-1-git-send-email-anna-maria@linutronix.de>
+Message-ID: <570274F6.3050602@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 04, 2016 at 03:53:47PM +0200, Linus Walleij wrote:
-> On Mon, Apr 4, 2016 at 3:42 PM, Leo Yan <leo.yan@linaro.org> wrote:
-> > On Mon, Apr 04, 2016 at 01:21:00PM +0200, Linus Walleij wrote:
+On 4/4/2016 1:42 PM, Anna-Maria Gleixner wrote:
 
+> Since commit 1cf4f629d9d2 ("cpu/hotplug: Move online calls to
+> hotplugged cpu") it is ensured that callbacks of CPU_ONLINE and
+> CPU_DOWN_PREPARE are processed on the hotplugged cpu. Due to this SMP
+
+   CPU. My spell checker also trips over "hotplugged"...
+
+> function calls are no longer required.
+>
+> Replace smp_call_function_single() with a direct call of
+> hw_breakpoint_reset(). To keep the calling convention, interrupts are
+> explicitely disabled around the call.
+
+    Explicitly.
+
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Anna-Maria Gleixner <anna-maria@linutronix.de>
 [...]
 
-> > Also have checked Hi6220's spec, there have no timer's dediated clock
-> > enabling bits. This is the reason before I only registered one clock.
-> > So according to you and Rob's comments, how about change as below?
-> >
-> >                 dual_timer0: timer at f8008000 {
-> >                         compatible = "arm,sp804", "arm,primecell";
-> >                         reg = <0x0 0xf8008000 0x0 0x1000>;
-> >                         interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
-> >                                      <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
-> >                         clocks = <&ao_ctrl HI6220_TIMER0_PCLK>,
-> >                                  <&ao_ctrl HI6220_TIMER0_PCLK>,
-> >                                  <&ao_ctrl HI6220_TIMER0_PCLK>;
-> >                         clock-names = "apb_pclk", "apb_pclk", "apb_pclk";
-> 
-> This works for me, though I think only the last name
-> matters so I would name the first two "timer1" and "timer2".
-
-Will fix to "timer1" and "timer2" and sent out new patch.
-
-Thanks,
-Leo Yan
+MBR, Sergei
