@@ -1,111 +1,35 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Mon, 4 Apr 2016 18:30:38 -0500
-Subject: [PATCH] ARM: OMAP2+: hwmod: fix _idle() hwmod state sanity check
- sequence
-Message-ID: <1459812638-38789-1-git-send-email-s-anna@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 5 Apr 2016 00:36:40 +0100
+Subject: [PATCH RESEND] ARM: l2x0: add three special L210 aux control flags
+In-Reply-To: <20160404232926.GV28102@jcartwri.amer.corp.natinst.com>
+References: <1458043882-16881-1-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdZeAKkU4Cr6TTQor_6zw2iVGgXmTdcsQuHuR07Q8yZHiQ@mail.gmail.com>
+ <20160404232926.GV28102@jcartwri.amer.corp.natinst.com>
+Message-ID: <20160404233640.GW19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The omap_hwmod _enable() function can return success without setting
-the hwmod state to _HWMOD_STATE_ENABLED for IPs with reset lines when
-all of the reset lines are asserted. The omap_hwmod _idle() function
-also performs a similar check, but after checking for the hwmod state
-first. This triggers the WARN when pm_runtime_get and pm_runtime_put
-are invoked on IPs with all reset lines asserted. Reverse the checks
-for hwmod state and reset lines status to fix this.
+On Mon, Apr 04, 2016 at 06:29:26PM -0500, Josh Cartwright wrote:
+> Similarly, we're waiting on feedback for:
+> 
+>   http://lkml.kernel.org/r/1456761716-10174-1-git-send-email-brad.mouring at ni.com
+> 
+> Also in the queue; also w/ Rob's Ack.  There was a change awhile back to
+> unconditionally enable the power-management features of the PL310 which
+> caused a noticeable performance degradation on our boards; placing the
+> PM options behind a togglable DT property provides us an out.
 
-Issue found during a unbind operation on a device with reset lines
-still asserted, example backtrace below
+For that one, I've been wondering why it's seemingly acceptable to
+start throwing *errors* for *new* DT properties which weren't required
+before.  Also, there's no DT documentation for the new properties,
+which is a fundamental requirement - and Rob should not have given
+his ack without there being a DT documentation patch.
 
- ------------[ cut here ]------------
- WARNING: CPU: 1 PID: 879 at arch/arm/mach-omap2/omap_hwmod.c:2207 _idle+0x1e4/0x240()
- omap_hwmod: mmu_dsp: idle state can only be entered from enabled state
- Modules linked in:
- CPU: 1 PID: 879 Comm: sh Not tainted 4.4.0-00008-ga989d951331a #3
- Hardware name: Generic OMAP5 (Flattened Device Tree)
- [<c0018e60>] (unwind_backtrace) from [<c0014dc4>] (show_stack+0x10/0x14)
- [<c0014dc4>] (show_stack) from [<c037ac28>] (dump_stack+0x90/0xc0)
- [<c037ac28>] (dump_stack) from [<c003f420>] (warn_slowpath_common+0x78/0xb4)
- [<c003f420>] (warn_slowpath_common) from [<c003f48c>] (warn_slowpath_fmt+0x30/0x40)
- [<c003f48c>] (warn_slowpath_fmt) from [<c0028c20>] (_idle+0x1e4/0x240)
- [<c0028c20>] (_idle) from [<c0029080>] (omap_hwmod_idle+0x28/0x48)
- [<c0029080>] (omap_hwmod_idle) from [<c002a5a4>] (omap_device_idle+0x3c/0x90)
- [<c002a5a4>] (omap_device_idle) from [<c0427a90>] (__rpm_callback+0x2c/0x60)
- [<c0427a90>] (__rpm_callback) from [<c0427ae4>] (rpm_callback+0x20/0x80)
- [<c0427ae4>] (rpm_callback) from [<c0427f84>] (rpm_suspend+0x138/0x74c)
- [<c0427f84>] (rpm_suspend) from [<c0428b78>] (__pm_runtime_idle+0x78/0xa8)
- [<c0428b78>] (__pm_runtime_idle) from [<c041f514>] (__device_release_driver+0x64/0x100)
- [<c041f514>] (__device_release_driver) from [<c041f5d0>] (device_release_driver+0x20/0x2c)
- [<c041f5d0>] (device_release_driver) from [<c041d85c>] (unbind_store+0x78/0xf8)
- [<c041d85c>] (unbind_store) from [<c0206df8>] (kernfs_fop_write+0xc0/0x1c4)
- [<c0206df8>] (kernfs_fop_write) from [<c018a120>] (__vfs_write+0x20/0xdc)
- [<c018a120>] (__vfs_write) from [<c018a9cc>] (vfs_write+0x90/0x164)
- [<c018a9cc>] (vfs_write) from [<c018b1f0>] (SyS_write+0x44/0x9c)
- [<c018b1f0>] (SyS_write) from [<c0010420>] (ret_fast_syscall+0x0/0x1c)
- ---[ end trace a4182013c75a9f50 ]---
+Obviously, the kernel review process has broken on this one... or
+I must remember this sneaky trick for getting new DT properties in
+without the required documentation...
 
-While at this, fix the sequence in _shutdown() as well, though there
-is no easy reproducible scenario.
-
-Fixes: 747834ab8347 ("ARM: OMAP2+: hwmod: revise hardreset behavior")
-Signed-off-by: Suman Anna <s-anna@ti.com>
----
-Hi Paul,
-
-There are couple of pr_debug statements that only print once the code
-flow passes through certain conditions. Not sure if you wanted them
-to be printed first thing when entering the functions or only if the
-function is really doing something. But it is still not consistent
-between _enable(), _idle() and _shutdown().
-
-regards
-Suman
-
- arch/arm/mach-omap2/omap_hwmod.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index b6d62e4cdfdd..027371c29fb9 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -2207,15 +2207,15 @@ static int _idle(struct omap_hwmod *oh)
- 
- 	pr_debug("omap_hwmod: %s: idling\n", oh->name);
- 
-+	if (_are_all_hardreset_lines_asserted(oh))
-+		return 0;
-+
- 	if (oh->_state != _HWMOD_STATE_ENABLED) {
- 		WARN(1, "omap_hwmod: %s: idle state can only be entered from enabled state\n",
- 			oh->name);
- 		return -EINVAL;
- 	}
- 
--	if (_are_all_hardreset_lines_asserted(oh))
--		return 0;
--
- 	if (oh->class->sysc)
- 		_idle_sysc(oh);
- 	_del_initiator_dep(oh, mpu_oh);
-@@ -2262,6 +2262,9 @@ static int _shutdown(struct omap_hwmod *oh)
- 	int ret, i;
- 	u8 prev_state;
- 
-+	if (_are_all_hardreset_lines_asserted(oh))
-+		return 0;
-+
- 	if (oh->_state != _HWMOD_STATE_IDLE &&
- 	    oh->_state != _HWMOD_STATE_ENABLED) {
- 		WARN(1, "omap_hwmod: %s: disabled state can only be entered from idle, or enabled state\n",
-@@ -2269,9 +2272,6 @@ static int _shutdown(struct omap_hwmod *oh)
- 		return -EINVAL;
- 	}
- 
--	if (_are_all_hardreset_lines_asserted(oh))
--		return 0;
--
- 	pr_debug("omap_hwmod: %s: disabling\n", oh->name);
- 
- 	if (oh->class->pre_shutdown) {
 -- 
-2.7.4
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
