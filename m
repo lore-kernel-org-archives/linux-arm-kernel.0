@@ -1,52 +1,92 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  4 Apr 2016 10:31:22 +0200
-Subject: [PATCH v5 2/4] mtd: pxa2xx-flash: switch back from memremap to
- ioremap_cached
+Date: Mon,  4 Apr 2016 10:31:21 +0200
+Subject: [PATCH v5 1/4] ARM: reintroduce ioremap_cached() for creating cached
+ I/O mappings
 In-Reply-To: <1459758684-16191-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1459758684-16191-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1459758684-16191-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1459758684-16191-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit 06968a54790d ("mtd: pxa2xx-flash: switch from
-ioremap_cache to memremap"), since NOR with memory semantics in array mode
-and RAM are not necessarily the same thing, and architectures may implement
-ioremap_cached() and memremap() with different memory attributes.
+The original ARM-only ioremap flavor 'ioremap_cached' has been renamed
+to 'ioremap_cache' to align with other architectures, and subsequently
+abused in generic code to map things like firmware tables in memory.
+For that reason, there is currently an effort underway to deprecate
+ioremap_cache, whose semantics are poorly defined, and which is typed
+with an __iomem annotation that is inappropriate for mappings of ordinary
+memory.
 
-For this reason, ioremap_cached() has been brought back from the dead on
-the ARM side, so switch this driver back to using it instead of memremap().
+However, original users of ioremap_cached() used it in a context where
+the I/O connotation is appropriate, and replacing those instances with
+memremap() does not make sense. So let's revive ioremap_cached(), so
+that we can change back those original users before we drop ioremap_cache
+entirely in favor of memremap.
 
-Cc: David Woodhouse <dwmw2@infradead.org>
-Acked-by: Brian Norris <computersforpeace@gmail.com>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
 Acked-by: Dan Williams <dan.j.williams@intel.com>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/mtd/maps/pxa2xx-flash.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/include/asm/io.h | 6 ++++++
+ arch/arm/mm/ioremap.c     | 4 ++++
+ arch/arm/mm/nommu.c       | 4 ++++
+ 3 files changed, 14 insertions(+)
 
-diff --git a/drivers/mtd/maps/pxa2xx-flash.c b/drivers/mtd/maps/pxa2xx-flash.c
-index 7497090e9900..2cde28ed95c9 100644
---- a/drivers/mtd/maps/pxa2xx-flash.c
-+++ b/drivers/mtd/maps/pxa2xx-flash.c
-@@ -71,8 +71,8 @@ static int pxa2xx_flash_probe(struct platform_device *pdev)
- 		       info->map.name);
- 		return -ENOMEM;
- 	}
--	info->map.cached = memremap(info->map.phys, info->map.size,
--			MEMREMAP_WB);
-+	info->map.cached =
-+		ioremap_cached(info->map.phys, info->map.size);
- 	if (!info->map.cached)
- 		printk(KERN_WARNING "Failed to ioremap cached %s\n",
- 		       info->map.name);
-@@ -111,7 +111,7 @@ static int pxa2xx_flash_remove(struct platform_device *dev)
- 	map_destroy(info->mtd);
- 	iounmap(info->map.virt);
- 	if (info->map.cached)
--		memunmap(info->map.cached);
-+		iounmap(info->map.cached);
- 	kfree(info);
- 	return 0;
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index 485982084fe9..fb94de290edd 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -395,6 +395,12 @@ void __iomem *ioremap(resource_size_t res_cookie, size_t size);
+ void __iomem *ioremap_cache(resource_size_t res_cookie, size_t size);
+ #define ioremap_cache ioremap_cache
+ 
++/*
++ * Do not use ioremap_cached in new code. Provided for the benefit of
++ * the pxa2xx-flash MTD driver only.
++ */
++void __iomem *ioremap_cached(resource_size_t res_cookie, size_t size);
++
+ void __iomem *ioremap_wc(resource_size_t res_cookie, size_t size);
+ #define ioremap_wc ioremap_wc
+ #define ioremap_wt ioremap_wc
+diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+index 66a978d05958..d5350f6af089 100644
+--- a/arch/arm/mm/ioremap.c
++++ b/arch/arm/mm/ioremap.c
+@@ -380,11 +380,15 @@ void __iomem *ioremap(resource_size_t res_cookie, size_t size)
+ EXPORT_SYMBOL(ioremap);
+ 
+ void __iomem *ioremap_cache(resource_size_t res_cookie, size_t size)
++	__alias(ioremap_cached);
++
++void __iomem *ioremap_cached(resource_size_t res_cookie, size_t size)
+ {
+ 	return arch_ioremap_caller(res_cookie, size, MT_DEVICE_CACHED,
+ 				   __builtin_return_address(0));
  }
+ EXPORT_SYMBOL(ioremap_cache);
++EXPORT_SYMBOL(ioremap_cached);
+ 
+ void __iomem *ioremap_wc(resource_size_t res_cookie, size_t size)
+ {
+diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
+index 1dd10936d68d..f24967e8ff7f 100644
+--- a/arch/arm/mm/nommu.c
++++ b/arch/arm/mm/nommu.c
+@@ -367,11 +367,15 @@ void __iomem *ioremap(resource_size_t res_cookie, size_t size)
+ EXPORT_SYMBOL(ioremap);
+ 
+ void __iomem *ioremap_cache(resource_size_t res_cookie, size_t size)
++	__alias(ioremap_cached);
++
++void __iomem *ioremap_cached(resource_size_t res_cookie, size_t size)
+ {
+ 	return __arm_ioremap_caller(res_cookie, size, MT_DEVICE_CACHED,
+ 				    __builtin_return_address(0));
+ }
+ EXPORT_SYMBOL(ioremap_cache);
++EXPORT_SYMBOL(ioremap_cached);
+ 
+ void __iomem *ioremap_wc(resource_size_t res_cookie, size_t size)
+ {
 -- 
 2.5.0
