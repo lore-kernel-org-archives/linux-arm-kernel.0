@@ -1,86 +1,80 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 4 Apr 2016 14:55:57 +0100
-Subject: [PATCH] arm64: KVM: unregister notifiers in hyp mode teardown path
-In-Reply-To: <1459777611-22592-1-git-send-email-sudeep.holla@arm.com>
-References: <1459777611-22592-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <5702726D.7000505@arm.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Mon,  4 Apr 2016 15:55:34 +0200
+Subject: [PATCH] drm/rockchip: Return -EBUSY if there's already a pending flip
+ event v3
+Message-ID: <1459778134-30693-1-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudeep,
+As per the docs, atomic_commit should return -EBUSY "if an asycnhronous
+updated is requested and there is an earlier updated pending".
 
-On 04/04/16 14:46, Sudeep Holla wrote:
-> Commit 1e947bad0b63 ("arm64: KVM: Skip HYP setup when already running
-> in HYP") re-organized the hyp init code and ended up leaving the CPU
-> hotplug and PM notifier even if hyp mode initialization fails.
-> 
-> Since KVM is not yet supported with ACPI, the above mentioned commit
-> breaks CPU hotplug in ACPI boot.
-> 
-> This patch fixes teardown_hyp_mode to properly unregister both CPU
-> hotplug and PM notifiers in the teardown path.
-> 
-> Fixes: 1e947bad0b63 ("arm64: KVM: Skip HYP setup when already running in HYP")
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+v2: Use the status of the workqueue instead of vop->event, and don't add
+a superfluous wait on the workqueue.
 
-This looks OK to me, with a question below though:
+v3: Drop work_busy, as there's a sizeable delay when the worker
+finishes, which introduces a race in which the client has already
+received the last flip event but the next page flip ioctl will still
+return -EBUSY because work_busy returns outdated information.
 
-> ---
->  arch/arm/kvm/arm.c | 16 ++++++++++------
->  1 file changed, 10 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index 6accd66d26f0..42b3a1f83271 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -1101,10 +1101,17 @@ static void __init hyp_cpu_pm_init(void)
->  {
->  	cpu_pm_register_notifier(&hyp_init_cpu_pm_nb);
->  }
-> +static void __init hyp_cpu_pm_exit(void)
-> +{
-> +	cpu_pm_unregister_notifier(&hyp_init_cpu_pm_nb);
-> +}
->  #else
->  static inline void hyp_cpu_pm_init(void)
->  {
->  }
-> +static inline void hyp_cpu_pm_exit(void)
-> +{
-> +}
->  #endif
->  
->  static void teardown_common_resources(void)
-> @@ -1166,6 +1173,8 @@ static void teardown_hyp_mode(void)
->  	free_hyp_pgds();
->  	for_each_possible_cpu(cpu)
->  		free_page(per_cpu(kvm_arm_hyp_stack_page, cpu));
-> +	unregister_cpu_notifier(&hyp_init_cpu_nb);
-> +	hyp_cpu_pm_exit();
->  }
->  
->  static int init_vhe_mode(void)
-> @@ -1270,12 +1279,7 @@ static int init_hyp_mode(void)
->  	free_boot_hyp_pgd();
->  #endif
->  
-> -	cpu_notifier_register_begin();
-> -
-> -	err = __register_cpu_notifier(&hyp_init_cpu_nb);
-> -
-> -	cpu_notifier_register_done();
-> -
-> +	err = register_cpu_notifier(&hyp_init_cpu_nb);
+Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+---
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.h |  1 +
+ drivers/gpu/drm/rockchip/rockchip_drm_fb.c  | 13 ++++++++++++-
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c |  5 +++++
+ 3 files changed, 18 insertions(+), 1 deletion(-)
 
-We went from something like this to the cpu_notifier_register_begin/end
-with 8146875de ("arm, kvm: Fix CPU hotplug callback registration").
-
-What makes it more acceptable now?
-
-Thanks,
-
-	M.
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+index 3529f692edb8..37952eefd33d 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+@@ -69,6 +69,7 @@ int rockchip_register_crtc_funcs(struct drm_crtc *crtc,
+ void rockchip_unregister_crtc_funcs(struct drm_crtc *crtc);
+ int rockchip_drm_crtc_mode_config(struct drm_crtc *crtc, int connector_type,
+ 				  int out_mode);
++bool rockchip_drm_crtc_has_pending_event(struct drm_crtc *crtc);
+ int rockchip_drm_dma_attach_device(struct drm_device *drm_dev,
+ 				   struct device *dev);
+ void rockchip_drm_dma_detach_device(struct drm_device *drm_dev,
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+index 3b8f652698f8..8305bbd2a4d7 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+@@ -280,7 +280,18 @@ int rockchip_drm_atomic_commit(struct drm_device *dev,
+ {
+ 	struct rockchip_drm_private *private = dev->dev_private;
+ 	struct rockchip_atomic_commit *commit = &private->commit;
+-	int ret;
++	struct drm_crtc_state *crtc_state;
++	struct drm_crtc *crtc;
++	int i, ret;
++
++	if (async) {
++		for_each_crtc_in_state(state, crtc, crtc_state, i) {
++			if (crtc->state->event ||
++			    rockchip_drm_crtc_has_pending_event(crtc)) {
++				return -EBUSY;
++			}
++		}
++	}
+ 
+ 	ret = drm_atomic_helper_prepare_planes(dev, state);
+ 	if (ret)
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index e2118e62345b..5bcdd8dc7499 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -848,6 +848,11 @@ int rockchip_drm_crtc_mode_config(struct drm_crtc *crtc,
+ }
+ EXPORT_SYMBOL_GPL(rockchip_drm_crtc_mode_config);
+ 
++bool rockchip_drm_crtc_has_pending_event(struct drm_crtc *crtc)
++{
++	return to_vop(crtc)->event;
++}
++
+ static int vop_crtc_enable_vblank(struct drm_crtc *crtc)
+ {
+ 	struct vop *vop = to_vop(crtc);
 -- 
-Jazz is not dead. It just smells funny...
+2.5.5
