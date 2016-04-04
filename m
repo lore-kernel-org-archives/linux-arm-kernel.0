@@ -1,69 +1,95 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 4 Apr 2016 17:34:33 +0200
-Subject: [PATCH v5 36/46] input: misc: max77693: switch to the atomic API
-In-Reply-To: <20160331205718.057a6f38@bbrezillon>
-References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
- <1459368249-13241-37-git-send-email-boris.brezillon@free-electrons.com>
- <20160331174801.GC39098@dtor-ws>
- <20160331205718.057a6f38@bbrezillon>
-Message-ID: <20160404153433.GD17856@ulmo>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 04 Apr 2016 16:33:21 +0100
+Subject: [PATCH 3/8] arm64/kernel: use a proper stack frame in
+ __mmap_switched()
+In-Reply-To: <1459781544-14310-4-git-send-email-ard.biesheuvel@linaro.org>
+References: <1459781544-14310-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1459781544-14310-4-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <57028941.6050805@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 31, 2016 at 08:57:18PM +0200, Boris Brezillon wrote:
-> On Thu, 31 Mar 2016 10:48:01 -0700
-> Dmitry Torokhov <dmitry.torokhov@gmail.com> wrote:
-> 
-> > Hi Boris,
-> > 
-> > On Wed, Mar 30, 2016 at 10:03:59PM +0200, Boris Brezillon wrote:
-> > > pwm_config/enable/disable() have been deprecated and should be replaced
-> > > by pwm_apply_state().
-> > > 
-> > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > > ---
-> > >  drivers/input/misc/max77693-haptic.c | 23 +++++++++++++++++------
-> > >  1 file changed, 17 insertions(+), 6 deletions(-)
-> > > 
-> > > diff --git a/drivers/input/misc/max77693-haptic.c b/drivers/input/misc/max77693-haptic.c
-> > > index cf6aac0..aef7dc4 100644
-> > > --- a/drivers/input/misc/max77693-haptic.c
-> > > +++ b/drivers/input/misc/max77693-haptic.c
-> > > @@ -70,13 +70,16 @@ struct max77693_haptic {
-> > >  
-> > >  static int max77693_haptic_set_duty_cycle(struct max77693_haptic *haptic)
-> > >  {
-> > > +	struct pwm_state pstate;
-> > >  	struct pwm_args pargs = { };
-> > > -	int delta;
-> > >  	int error;
-> > >  
-> > >  	pwm_get_args(haptic->pwm_dev, &pargs);
-> > > -	delta = (pargs.period + haptic->pwm_duty) / 2;
-> > > -	error = pwm_config(haptic->pwm_dev, delta, pargs.period);
-> > > +	pwm_get_state(haptic->pwm_dev, &pstate);
-> > > +
-> > > +	pstate.period = pargs.period;
-> > > +	pstate.duty_cycle = (pargs.period + haptic->pwm_duty) / 2;
-> > > +	error = pwm_apply_state(haptic->pwm_dev, &pstate);
-> > 
-> > This does not make sense with regard to the atomic API. If you look in
-> > max77693_haptic_play_work(), right after calling
-> > max77693_haptic_set_duty_cycle() we either try to enable or disable the
-> > pwm. When switching to this new API we should combine both actions.
-> 
-> True. I'll address that, unless Thierry is fine keeping the non-atomic
-> API, in which case I'll just drop patches 32 to 46.
+Hi Ard,
 
-I'm fine with keeping the pwm_enable(), pwm_disable() and pwm_config()
-APIs, but they should only be used as shortcuts. Where possible the new
-atomic API should be used to combine multiple operations into one.
+On 04/04/16 15:52, Ard Biesheuvel wrote:
+> Considering that we can expect stack accesses from the moment we assign
+> VBAR_EL1, let's initialize the stack pointer first in __mmap_switched(),
+> and set up a proper stack frame while we're at it.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/kernel/head.S | 20 +++++++++-----------
+>  1 file changed, 9 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index 9d8f928c355c..f441fc73a7a2 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -421,9 +421,14 @@ kernel_img_size:
+>  /*
+>   * The following fragment of code is executed with the MMU enabled.
+>   */
+> -	.set	initial_sp, init_thread_union + THREAD_START_SP
+>  __mmap_switched:
+> -	mov	x28, lr				// preserve LR
+> +	adrp	x4, init_thread_union
+> +	add	sp, x4, #THREAD_SIZE
+> +	msr	sp_el0, x4			// Save thread_info
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160404/1c55206f/attachment.sig>
+(Terms describing the stack are confusing, here goes!)
+
+The address you have in x4 is the 'highest' address on the stack, (the first
+that gets used), thread_info is at the other end, the 'lowest' address.
+
+You used THREAD_SIZE instead of THREAD_START_SP, so the x4 value points to the
+'bottom' of the page after the stack, this isn't a problem because the pre-index
+addressing decrements sp before it writes, but it does break the 'and	x4, x4,
+#~(THREAD_SIZE - 1)' trick to find thread_info, which I think is what the '-16'
+in THREAD_START_SP is for...
+
+6cdf9c7ca687 ("arm64: Store struct thread_info in sp_el0") got rid of most of
+the users of this masking trick, maybe we can get rid of THREAD_START_SP too?
+(unless it is there for some other clever reason!)
+
+
+Thanks,
+
+James
+
+
+> +
+> +	stp	xzr, x30, [sp, #-16]!
+> +	mov	x29, sp
+> +
+>  	adr_l	x8, vectors			// load VBAR_EL1 with virtual
+>  	msr	vbar_el1, x8			// vector table address
+>  	isb
+> @@ -475,16 +480,9 @@ __mmap_switched:
+>  	dsb	sy				// with MMU off
+>  #endif
+>  
+> -	adr_l	sp, initial_sp, x4
+> -	mov	x4, sp
+> -	and	x4, x4, #~(THREAD_SIZE - 1)
+> -	msr	sp_el0, x4			// Save thread_info
+> -
+>  	ldr_l	x4, kimage_vaddr		// Save the offset between
+>  	sub	x4, x4, x24			// the kernel virtual and
+>  	str_l	x4, kimage_voffset, x5		// physical mappings
+> -
+> -	mov	x29, #0
+>  #ifdef CONFIG_KASAN
+>  	bl	kasan_early_init
+>  #endif
+> @@ -494,8 +492,8 @@ __mmap_switched:
+>  	bl	kaslr_early_init		// parse FDT for KASLR options
+>  	cbz	x0, 0f				// KASLR disabled? just proceed
+>  	mov	x23, x0				// record KASLR offset
+> -	ret	x28				// we must enable KASLR, return
+> -						// to __enable_mmu()
+> +	ldp	x29, x30, [sp], #16		// we must enable KASLR, return
+> +	ret					// to __enable_mmu()
+>  0:
+>  #endif
+>  	b	start_kernel
+> 
