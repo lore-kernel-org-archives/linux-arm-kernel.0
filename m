@@ -1,34 +1,32 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 04 Apr 2016 14:56:45 +0900
-Subject: dtc warnings
-In-Reply-To: <20160404055000.GA3622@vireshk-i7>
-References: <CAL_Jsq+=OjY8y_8x7OSm-MWYKbrHN5cbv4TLwULxhNq+gfiMtw@mail.gmail.com>
- <56FE27F9.2070100@gmail.com>
- <CAJKOXPdDyVbfSyshu4j21Ax2J-VwPpMZgAGEeO8VtgFYh4hTmw@mail.gmail.com>
- <56FE7E4A.2000601@ti.com> <20160403065909.GF2987@vireshk-i7>
- <20160403080854.GA12133@kozik-lap>
- <CAKohpomijKf3m07Lc3+fWawxAPwe83F8k9akz1LOTokpZNL2ig@mail.gmail.com>
- <20160404051656.GV17806@rob-hp-laptop> <20160404055000.GA3622@vireshk-i7>
-Message-ID: <5702021D.3080103@samsung.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 4 Apr 2016 08:05:58 +0200
+Subject: [PATCH 1/7] ARM: dts: armv7-m: add unit name to
+ interrupt-controller
+In-Reply-To: <1459290646-3592-2-git-send-email-manabian@gmail.com>
+References: <1459290646-3592-1-git-send-email-manabian@gmail.com>
+ <1459290646-3592-2-git-send-email-manabian@gmail.com>
+Message-ID: <20160404060558.GY6191@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04.04.2016 14:50, Viresh Kumar wrote:
-> On 04-04-16, 00:16, Rob Herring wrote:
->> On Sun, Apr 03, 2016 at 05:57:00PM +0530, Viresh Kumar wrote:
->>> On 3 April 2016 at 13:38, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
->>>> Warnings coming from recent linux-next:
->>>>
->>>>   DTC     arch/arm/boot/dts/exynos5800-peach-pi.dtb
->>>> Warning (unit_address_vs_reg): Node /opp_table0/opp at 1800000000 has a unit name, but no reg property
->>>> Warning (unit_address_vs_reg): Node /opp_table0/opp at 1700000000 has a unit name, but no reg property
-> 
-> Something isn't right in my setup, as I am not hitting these:
-> 
-> $ make CROSS_COMPILE="arm-linux-gnueabihf-" ARCH=arm O=../bexynos dtbs
+Hello Joachim,
 
-You need W=1 (that was recent change by Rob to not pollute everyone's
-builds).
+On Wed, Mar 30, 2016 at 12:30:40AM +0200, Joachim Eastwood wrote:
+> Add unit name to nvic to remove the following warning:
+>  Warning (unit_address_vs_reg): Node /nv-interrupt-controller has a reg
+> 				or ranges property, but no unit name
+> 
+> Also correct the node name to 'interrupt-controller' while changing the
+> line.
+> 
+> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+Looks right,
 
-Best regards,
-Krzysztof
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+
+Thanks
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
