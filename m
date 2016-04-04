@@ -1,114 +1,101 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  4 Apr 2016 16:52:21 +0200
-Subject: [PATCH 5/8] arm64/kernel: refer to idmap_pg_dir and swapper_pg_dir
- directly
+Date: Mon,  4 Apr 2016 16:52:23 +0200
+Subject: [PATCH 7/8] arm64/kernel: drop __PHYS_OFFSET register with file scope
+ from head.S
 In-Reply-To: <1459781544-14310-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1459781544-14310-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1459781544-14310-6-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1459781544-14310-8-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of keeping their addresses in globals in x25 and x26 in head.S,
-just refer to idmap_pg_dir or swapper_pg_dir directly using adrp
-instructions when needed. This reduces the number of callee saved register
-with file scope, which should increase maintainability.
+Instead of keeping __PHYS_OFFSET in a callee saved register with file
+scope in head.S, derive the value on demand. This makes for cleaner
+and more maintainable code.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/kernel/head.S | 28 +++++++++-----------
- 1 file changed, 13 insertions(+), 15 deletions(-)
+ arch/arm64/kernel/head.S | 26 +++++++++++---------
+ 1 file changed, 14 insertions(+), 12 deletions(-)
 
 diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 2a1b3ba1d81c..9201cddb53bc 100644
+index d28fc345bec3..23d03da7ecfe 100644
 --- a/arch/arm64/kernel/head.S
 +++ b/arch/arm64/kernel/head.S
-@@ -215,7 +215,7 @@ ENTRY(stext)
+@@ -213,7 +213,6 @@ ENTRY(stext)
+ 	bl	preserve_boot_args
+ 	bl	el2_setup			// Drop to EL1, w0=cpu_boot_mode
  	mov	x23, xzr			// KASLR offset, defaults to 0
- 	adrp	x24, __PHYS_OFFSET
+-	adrp	x24, __PHYS_OFFSET
  	bl	set_cpu_boot_mode_flag
--	bl	__create_page_tables		// x25=TTBR0, x26=TTBR1
-+	bl	__create_page_tables
+ 	bl	__create_page_tables
  	/*
- 	 * The following calls CPU setup code, see arch/arm64/mm/proc.S for
- 	 * details.
-@@ -313,23 +313,21 @@ ENDPROC(preserve_boot_args)
-  *     been enabled
-  */
- __create_page_tables:
--	adrp	x25, idmap_pg_dir
--	adrp	x26, swapper_pg_dir
- 	mov	x28, lr
- 
- 	/*
- 	 * Invalidate the idmap and swapper page tables to avoid potential
- 	 * dirty cache lines being evicted.
- 	 */
--	mov	x0, x25
--	add	x1, x26, #SWAPPER_DIR_SIZE
-+	adrp	x0, idmap_pg_dir
-+	adrp	x1, swapper_pg_dir + SWAPPER_DIR_SIZE
- 	bl	__inval_cache_range
- 
- 	/*
- 	 * Clear the idmap and swapper page tables.
- 	 */
--	mov	x0, x25
--	add	x6, x26, #SWAPPER_DIR_SIZE
-+	adrp	x0, idmap_pg_dir
-+	adrp	x6, swapper_pg_dir + SWAPPER_DIR_SIZE
- 1:	stp	xzr, xzr, [x0], #16
- 	stp	xzr, xzr, [x0], #16
- 	stp	xzr, xzr, [x0], #16
-@@ -342,7 +340,7 @@ __create_page_tables:
- 	/*
- 	 * Create the identity mapping.
- 	 */
--	mov	x0, x25				// idmap_pg_dir
-+	adrp	x0, idmap_pg_dir
- 	adrp	x3, __idmap_text_start		// __pa(__idmap_text_start)
- 
- #ifndef CONFIG_ARM64_VA_BITS_48
-@@ -392,7 +390,7 @@ __create_page_tables:
- 	/*
- 	 * Map the kernel image (starting with PHYS_OFFSET).
- 	 */
--	mov	x0, x26				// swapper_pg_dir
-+	adrp	x0, swapper_pg_dir
- 	ldr	x5, =KIMAGE_VADDR
- 	add	x5, x5, x23			// add KASLR displacement
+@@ -396,7 +395,7 @@ __create_page_tables:
  	create_pgd_entry x0, x5, x3, x6
-@@ -406,8 +404,8 @@ __create_page_tables:
- 	 * accesses (MMU disabled), invalidate the idmap and swapper page
- 	 * tables again to remove any speculatively loaded cache lines.
- 	 */
--	mov	x0, x25
--	add	x1, x26, #SWAPPER_DIR_SIZE
-+	adrp	x0, idmap_pg_dir
-+	adrp	x1, swapper_pg_dir + SWAPPER_DIR_SIZE
- 	dmb	sy
- 	bl	__inval_cache_range
+ 	ldr	w6, kernel_img_size
+ 	add	x6, x6, x5
+-	mov	x3, x24				// phys offset
++	adrp	x3, __PHYS_OFFSET
+ 	create_block_map x0, x7, x3, x5, x6
  
-@@ -696,8 +694,6 @@ ENTRY(secondary_startup)
  	/*
- 	 * Common entry point for secondary CPUs.
- 	 */
--	adrp	x25, idmap_pg_dir
--	adrp	x26, swapper_pg_dir
- 	bl	__cpu_setup			// initialise processor
+@@ -417,7 +416,7 @@ kernel_img_size:
+ 	.ltorg
  
- 	ldr	x27, .L__secondary_switched
-@@ -760,8 +756,10 @@ __enable_mmu:
- 	cmp	x2, #ID_AA64MMFR0_TGRAN_SUPPORTED
- 	b.ne	__no_granule_support
- 	update_early_cpu_boot_status 0, x1, x2
--	msr	ttbr0_el1, x25			// load TTBR0
--	msr	ttbr1_el1, x26			// load TTBR1
-+	adrp	x4, idmap_pg_dir
-+	adrp	x5, swapper_pg_dir
-+	msr	ttbr0_el1, x4			// load TTBR0
-+	msr	ttbr1_el1, x5			// load TTBR1
+ /*
+- * The following fragment of code is executed with the MMU enabled.
++ * __mmap_switched(u64 phys_offset) - virtual entry point for the boot CPU
+  */
+ __mmap_switched:
+ 	adrp	x4, init_thread_union
+@@ -431,14 +430,6 @@ __mmap_switched:
+ 	msr	vbar_el1, x8			// vector table address
  	isb
- 	msr	sctlr_el1, x0
+ 
+-	// Clear BSS
+-	adr_l	x0, __bss_start
+-	mov	x1, xzr
+-	adr_l	x2, __bss_stop
+-	sub	x2, x2, x0
+-	bl	__pi_memset
+-	dsb	ishst				// Make zero page visible to PTW
+-
+ #ifdef CONFIG_RELOCATABLE
+ 
+ 	/*
+@@ -479,8 +470,17 @@ __mmap_switched:
+ #endif
+ 
+ 	ldr_l	x4, kimage_vaddr		// Save the offset between
+-	sub	x4, x4, x24			// the kernel virtual and
++	sub	x4, x4, x0			// the kernel virtual and
+ 	str_l	x4, kimage_voffset, x5		// physical mappings
++
++	// Clear BSS
++	adr_l	x0, __bss_start
++	mov	x1, xzr
++	adr_l	x2, __bss_stop
++	sub	x2, x2, x0
++	bl	__pi_memset
++	dsb	ishst				// Make zero page visible to PTW
++
+ #ifdef CONFIG_KASAN
+ 	bl	kasan_early_init
+ #endif
+@@ -774,6 +774,7 @@ __enable_mmu:
+ 	mov	x20, x1				// preserve branch target
+ #ifdef CONFIG_RANDOMIZE_BASE
+ 	mov	x19, x0				// preserve new SCTLR_EL1 value
++	adrp	x0, __PHYS_OFFSET
+ 	blr	x1
+ 
+ 	/*
+@@ -792,6 +793,7 @@ __enable_mmu:
  	isb
+ 	add	x20, x20, x23			// relocated __mmap_switched
+ #endif
++	adrp	x0, __PHYS_OFFSET
+ 	br	x20
+ ENDPROC(__enable_mmu)
+ 
 -- 
 2.5.0
