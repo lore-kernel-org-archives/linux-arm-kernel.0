@@ -1,65 +1,161 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 4 Apr 2016 10:52:32 -0600
-Subject: coresight: tmc: allocating memory when needed
-In-Reply-To: <20160402053209.GA15353@mwanda>
-References: <20160402053209.GA15353@mwanda>
-Message-ID: <CANLsYkyTvx+TnScayzn0_wbnW+T6kknP-_r__Fv_cPYByZDb1w@mail.gmail.com>
+From: liviu.dudau@arm.com (Liviu Dudau)
+Date: Mon, 4 Apr 2016 17:54:17 +0100
+Subject: [PATCH] ARM: arm64: dts: Add expansion bus to VExpress and Juno
+In-Reply-To: <1459786850-29409-1-git-send-email-brian.starkey@arm.com>
+References: <1459786850-29409-1-git-send-email-brian.starkey@arm.com>
+Message-ID: <20160404165416.GA1312@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 April 2016 at 23:32, Dan Carpenter <dan.carpenter@oracle.com> wrote:
-> Hello Mathieu Poirier,
->
-> The patch 06ec4671e5d1: "coresight: tmc: allocating memory when
-> needed" from Dec 9, 2015, leads to the following static checker
-> warning:
->
->         drivers/hwtracing/coresight/coresight-tmc-etf.c:125 tmc_enable_etf_sink_sysfs()
->         warn: passing devm_ allocated variable to kfree. 'buf'
->
-> drivers/hwtracing/coresight/coresight-tmc-etf.c
->    109  static int tmc_enable_etf_sink_sysfs(struct coresight_device *csdev, u32 mode)
->    110  {
->    111          u32 val;
->    112          bool allocated = false;
->    113          char *buf = NULL;
->                       ^^^^^^^^^^
-> This bogus initialization disables GCC's checks for uninitialized
-> memory.  Don't disable static analysis for no reason.
+On Mon, Apr 04, 2016 at 05:20:50PM +0100, Brian Starkey wrote:
+> The VExpress and Juno development platforms have an external expansion
+> bus which can be used for additional hardware (e.g. LogicTile Express
+> daughterboards).
+> Add this bus to all VExpress CoreTile and Juno device-trees.
+> 
+> On VExpress, the bus is described for a CoreTile located on site 1.
 
-Yes, this one doesn't do anything.
+s/located on/occupying/
 
->
->    114          unsigned long flags;
->    115          struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
->    116
->    117          /* Allocating the memory here while outside of the spinlock */
->    118          buf = devm_kzalloc(drvdata->dev, drvdata->size, GFP_KERNEL);
->    119          if (!buf)
->    120                  return -ENOMEM;
->    121
->    122          spin_lock_irqsave(&drvdata->spinlock, flags);
->    123          if (drvdata->reading) {
->    124                  spin_unlock_irqrestore(&drvdata->spinlock, flags);
->    125                  kfree(buf);
->                         ^^^^^^^^^^
-> This is a double free because the buffer is allocated with
-> devm_kzalloc().  There are lots more double frees.  We double free in
-> tmc_read_unprepare_etf() as well.  It's hard to find all the bugs
-> without knowing the code more than I do.  Please review and test
-> unloading.
+You're trying to say that the CPU for which one of these DTs apply is running
+on SITE1 so the expansion bus described here is available on SITE2.
 
-This is obviously the wrong kind of memory allocator and the same will
-be true on the ETF side since they were tailored to be as similar as
-possible.  I'll revise this.
+> 
+> Signed-off-by: Brian Starkey <brian.starkey@arm.com>
 
-Thanks,
-Mathieu
+Otherwise, looks good to me.
 
->
->    126                  return -EBUSY;
->    127          }
->    128
->
-> regards,
-> dan carpenter
+With that change:
+
+Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
+
+Best regards,
+Liviu
+
+> ---
+>  arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts |   13 +++++++++++++
+>  arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts  |   13 +++++++++++++
+>  arch/arm/boot/dts/vexpress-v2p-ca5s.dts     |   13 +++++++++++++
+>  arch/arm/boot/dts/vexpress-v2p-ca9.dts      |   13 +++++++++++++
+>  arch/arm64/boot/dts/arm/juno-base.dtsi      |   10 ++++++++++
+>  5 files changed, 62 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
+> index 9420053..ec7539b 100644
+> --- a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
+> +++ b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
+> @@ -280,4 +280,17 @@
+>  
+>  		/include/ "vexpress-v2m-rs1.dtsi"
+>  	};
+> +
+> +	site2: hsb at 40000000 {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges = <0 0 0x40000000 0x3fef0000>;
+> +		#interrupt-cells = <1>;
+> +		interrupt-map-mask = <0 3>;
+> +		interrupt-map = <0 0 &gic 0 36 4>,
+> +				<0 1 &gic 0 37 4>,
+> +				<0 2 &gic 0 38 4>,
+> +				<0 3 &gic 0 39 4>;
+> +	};
+>  };
+> diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+> index 17f63f7..a339b0c 100644
+> --- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+> +++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+> @@ -638,4 +638,17 @@
+>  
+>  		/include/ "vexpress-v2m-rs1.dtsi"
+>  	};
+> +
+> +	site2: hsb at 40000000 {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges = <0 0 0x40000000 0x3fef0000>;
+> +		#interrupt-cells = <1>;
+> +		interrupt-map-mask = <0 3>;
+> +		interrupt-map = <0 0 &gic 0 36 4>,
+> +				<0 1 &gic 0 37 4>,
+> +				<0 2 &gic 0 38 4>,
+> +				<0 3 &gic 0 39 4>;
+> +	};
+>  };
+> diff --git a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+> index d2709b7..76a9ccb 100644
+> --- a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+> +++ b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+> @@ -250,4 +250,17 @@
+>  
+>  		/include/ "vexpress-v2m-rs1.dtsi"
+>  	};
+> +
+> +	site2: hsb at 40000000 {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges = <0 0x40000000 0x40000000>;
+> +		#interrupt-cells = <1>;
+> +		interrupt-map-mask = <0 3>;
+> +		interrupt-map = <0 0 &gic 0 36 4>,
+> +				<0 1 &gic 0 37 4>,
+> +				<0 2 &gic 0 38 4>,
+> +				<0 3 &gic 0 39 4>;
+> +	};
+>  };
+> diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+> index d949fac..edac212 100644
+> --- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+> +++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+> @@ -359,4 +359,17 @@
+>  
+>  		/include/ "vexpress-v2m.dtsi"
+>  	};
+> +
+> +	site2: hsb at e0000000 {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges = <0 0xe0000000 0x20000000>;
+> +		#interrupt-cells = <1>;
+> +		interrupt-map-mask = <0 3>;
+> +		interrupt-map = <0 0 &gic 0 36 4>,
+> +				<0 1 &gic 0 37 4>,
+> +				<0 2 &gic 0 38 4>,
+> +				<0 3 &gic 0 39 4>;
+> +	};
+>  };
+> diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+> index 68ccc39..dee2386 100644
+> --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
+> +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+> @@ -272,3 +272,13 @@
+>  
+>  		/include/ "juno-motherboard.dtsi"
+>  	};
+> +
+> +	site2: tlx at 60000000 {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges = <0 0 0x60000000 0x10000000>;
+> +		#interrupt-cells = <1>;
+> +		interrupt-map-mask = <0 0>;
+> +		interrupt-map = <0 0 &gic 0 0 0 168 IRQ_TYPE_LEVEL_HIGH>;
+> +	};
+> -- 
+> 1.7.9.5
+> 
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
