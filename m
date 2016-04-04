@@ -1,172 +1,298 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  4 Apr 2016 16:52:24 +0200
-Subject: [PATCH 8/8] arm64/kernel: drop global kaslr_offset in x23 from head.S
-In-Reply-To: <1459781544-14310-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1459781544-14310-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1459781544-14310-9-git-send-email-ard.biesheuvel@linaro.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 4 Apr 2016 16:55:28 +0200
+Subject: [PATCH v4] ARM: dts: kirkwood: Add DTS for Linksys
+ EA4200v2/EA4500\
+In-Reply-To: <1459781168-16708-1-git-send-email-bert@biot.com>
+References: <1459781168-16708-1-git-send-email-bert@biot.com>
+Message-ID: <20160404145528.GE25131@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of keeping a global kaslr_offset variable with file scope in
-head.S, pass the kaslr_offset as an argument to __create_page_tables()
-and __mmap_switched(), and return the new kaslr_offset from the latter
-if it returns to __enable_mmu() in order to configure KASLR.
+On Mon, Apr 04, 2016 at 04:46:07PM +0200, Bert Vermeulen wrote:
+> This platform is based on a Marvell 88E6282 SoC and 88E6171 switch.
+> 
+> Signed-off-by: Bert Vermeulen <bert@biot.com>
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/head.S | 46 +++++++++++++-------
- 1 file changed, 30 insertions(+), 16 deletions(-)
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 23d03da7ecfe..02e37f052263 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -212,8 +212,9 @@ section_table:
- ENTRY(stext)
- 	bl	preserve_boot_args
- 	bl	el2_setup			// Drop to EL1, w0=cpu_boot_mode
--	mov	x23, xzr			// KASLR offset, defaults to 0
- 	bl	set_cpu_boot_mode_flag
-+
-+	mov	x0, xzr				// KASLR offset, defaults to 0
- 	bl	__create_page_tables
- 	/*
- 	 * The following calls CPU setup code, see arch/arm64/mm/proc.S for
-@@ -305,14 +306,19 @@ ENDPROC(preserve_boot_args)
- 	.endm
- 
- /*
-+ * __create_page_tables(u64 kaslr_offset)
-+ *
-  * Setup the initial page tables. We only setup the barest amount which is
-  * required to get the kernel running. The following sections are required:
-  *   - identity mapping to enable the MMU (low address, TTBR0)
-  *   - first few MB of the kernel linear mapping to jump to once the MMU has
-  *     been enabled
-+ *
-+ * Clobbers callee saved registers x27 and x28
-  */
- __create_page_tables:
- 	mov	x28, lr
-+	mov	x27, x0
- 
- 	/*
- 	 * Invalidate the idmap and swapper page tables to avoid potential
-@@ -391,7 +397,7 @@ __create_page_tables:
- 	 */
- 	adrp	x0, swapper_pg_dir
- 	ldr	x5, =KIMAGE_VADDR
--	add	x5, x5, x23			// add KASLR displacement
-+	add	x5, x5, x27			// add KASLR displacement
- 	create_pgd_entry x0, x5, x3, x6
- 	ldr	w6, kernel_img_size
- 	add	x6, x6, x5
-@@ -416,7 +422,10 @@ kernel_img_size:
- 	.ltorg
- 
- /*
-- * __mmap_switched(u64 phys_offset) - virtual entry point for the boot CPU
-+ * __mmap_switched(u64 phys_offset, u64 kaslr_offset) - virtual entry point for
-+ *							the boot CPU
-+ *
-+ * Clobbers callee saved register x26
-  */
- __mmap_switched:
- 	adrp	x4, init_thread_union
-@@ -431,6 +440,7 @@ __mmap_switched:
- 	isb
- 
- #ifdef CONFIG_RELOCATABLE
-+	mov	x26, x1				// preserve kaslr_offset
- 
- 	/*
- 	 * Iterate over each entry in the relocation table, and apply the
-@@ -446,8 +456,8 @@ __mmap_switched:
- 	ldr	x13, [x9, #-8]
- 	cmp	w12, #R_AARCH64_RELATIVE
- 	b.ne	1f
--	add	x13, x13, x23			// relocate
--	str	x13, [x11, x23]
-+	add	x13, x13, x1			// relocate
-+	str	x13, [x11, x1]
- 	b	0b
- 
- 1:	cmp	w12, #R_AARCH64_ABS64
-@@ -457,10 +467,10 @@ __mmap_switched:
- 	ldrsh	w14, [x12, #6]			// Elf64_Sym::st_shndx
- 	ldr	x15, [x12, #8]			// Elf64_Sym::st_value
- 	cmp	w14, #-0xf			// SHN_ABS (0xfff1) ?
--	add	x14, x15, x23			// relocate
-+	add	x14, x15, x1			// relocate
- 	csel	x15, x14, x15, ne
- 	add	x15, x13, x15
--	str	x15, [x11, x23]
-+	str	x15, [x11, x1]
- 	b	0b
- 
- 2:	adr_l	x8, kimage_vaddr		// make relocated kimage_vaddr
-@@ -485,11 +495,10 @@ __mmap_switched:
- 	bl	kasan_early_init
- #endif
- #ifdef CONFIG_RANDOMIZE_BASE
--	cbnz	x23, 0f				// already running randomized?
-+	cbnz	x26, 0f				// already running randomized?
- 	ldr_l	x0, boot_args			// pass FDT address in x0
- 	bl	kaslr_early_init		// parse FDT for KASLR options
- 	cbz	x0, 0f				// KASLR disabled? just proceed
--	mov	x23, x0				// record KASLR offset
- 	ldp	x29, x30, [sp], #16		// we must enable KASLR, return
- 	ret					// to __enable_mmu()
- 0:
-@@ -747,6 +756,8 @@ ENTRY(__early_cpu_boot_status)
-  *
-  * Checks if the selected granule size is supported by the CPU.
-  * If it isn't, park the CPU
-+ *
-+ * Clobbers callee saved registers x22, x23, x24 and x25
-  */
- 	.section	".idmap.text", "ax"
- __enable_mmu:
-@@ -771,30 +782,33 @@ __enable_mmu:
- 	ic	iallu
- 	dsb	nsh
- 	isb
--	mov	x20, x1				// preserve branch target
-+	mov	x25, x1				// preserve branch target
-+	mov	x1, xzr
- #ifdef CONFIG_RANDOMIZE_BASE
--	mov	x19, x0				// preserve new SCTLR_EL1 value
-+	mov	x24, x0				// preserve new SCTLR_EL1 value
- 	adrp	x0, __PHYS_OFFSET
--	blr	x1
-+	blr	x25
- 
- 	/*
--	 * If we return here, we have a KASLR displacement in x23 which we need
-+	 * If we return here, we have a KASLR displacement in x0 which we need
- 	 * to take into account by discarding the current kernel mapping and
- 	 * creating a new one.
- 	 */
- 	msr	sctlr_el1, x22			// disable the MMU
- 	isb
-+	mov	x23, x0				// preserve new kaslr_offset
- 	bl	__create_page_tables		// recreate kernel mapping
- 
--	msr	sctlr_el1, x19			// re-enable the MMU
-+	msr	sctlr_el1, x24			// re-enable the MMU
- 	isb
- 	ic	iallu				// flush instructions fetched
- 	dsb	nsh				// via old mapping
- 	isb
--	add	x20, x20, x23			// relocated __mmap_switched
-+	add	x25, x25, x23			// relocated __mmap_switched
-+	mov	x1, x23
- #endif
- 	adrp	x0, __PHYS_OFFSET
--	br	x20
-+	br	x25
- ENDPROC(__enable_mmu)
- 
- __no_granule_support:
--- 
-2.5.0
+Thanks
+	Andrew	     
+
+
+> ---
+> Changes from v3:
+> - added comment noting eth1 is connected to switch as well
+> 
+> Changes from v2:
+> - added linksys to filename
+> - added make rule
+> 
+> Changes from v1:
+> - changed console to stdout-path
+> - removed unnecesarry @0 from dsa node, and fixed dsa/switch node
+> - fixed partitions according to the official docs
+> - prefer node labels rather than full hierarchy where possible
+> 
+>  arch/arm/boot/dts/Makefile                   |   1 +
+>  arch/arm/boot/dts/kirkwood-linksys-viper.dts | 237 +++++++++++++++++++++++++++
+>  2 files changed, 238 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/kirkwood-linksys-viper.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 95c1923..feeb3f9 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -199,6 +199,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += \
+>  	kirkwood-linkstation-lswsxl.dtb \
+>  	kirkwood-linkstation-lswvl.dtb \
+>  	kirkwood-linkstation-lswxl.dtb \
+> +	kirkwood-linksys-viper.dtb \
+>  	kirkwood-lschlv2.dtb \
+>  	kirkwood-lsxhl.dtb \
+>  	kirkwood-mplcec4.dtb \
+> diff --git a/arch/arm/boot/dts/kirkwood-linksys-viper.dts b/arch/arm/boot/dts/kirkwood-linksys-viper.dts
+> new file mode 100644
+> index 0000000..0f4631f
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/kirkwood-linksys-viper.dts
+> @@ -0,0 +1,237 @@
+> +/*
+> + * kirkwood-viper.dts - Device Tree file for Linksys viper (E4200v2 / EA4500)
+> + *
+> + * (c) 2013 Jonas Gorski <jogo@openwrt.org>
+> + * (c) 2013 Deutsche Telekom Innovation Laboratories
+> + * (c) 2014 Luka Perkov <luka@openwrt.org>
+> + * (c) 2014 Randy C. Will <randall.will@gmail.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "kirkwood.dtsi"
+> +#include "kirkwood-6282.dtsi"
+> +
+> +/ {
+> +	model = "Linksys Viper (E4200v2 / EA4500)";
+> +	compatible = "linksys,viper", "marvell,kirkwood-88f6282", "marvell,kirkwood";
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x00000000 0x8000000>;
+> +	};
+> +
+> +	aliases {
+> +		serial0 = &uart0;
+> +	};
+> +
+> +	chosen {
+> +		stdout-path = "serial0:115200n8";
+> +	};
+> +
+> +	gpio_keys {
+> +		compatible = "gpio-keys";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		pinctrl-0 = < &pmx_btn_wps &pmx_btn_reset >;
+> +		pinctrl-names = "default";
+> +
+> +		wps {
+> +			label = "WPS Button";
+> +			linux,code = <KEY_WPS_BUTTON>;
+> +			gpios = <&gpio1 15 GPIO_ACTIVE_LOW>;
+> +		};
+> +
+> +		reset {
+> +			label = "Reset Button";
+> +			linux,code = <KEY_RESTART>;
+> +			gpios = <&gpio1 16 GPIO_ACTIVE_LOW>;
+> +		};
+> +	};
+> +
+> +	gpio-leds {
+> +		compatible = "gpio-leds";
+> +		pinctrl-0 = < &pmx_led_white_health &pmx_led_white_pulse >;
+> +		pinctrl-names = "default";
+> +
+> +		white-health {
+> +			label = "viper:white:health";
+> +			gpios = <&gpio0 7 GPIO_ACTIVE_HIGH>;
+> +		};
+> +
+> +		white-pulse {
+> +			label = "viper:white:pulse";
+> +			gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>;
+> +		};
+> +	};
+> +
+> +	dsa {
+> +		compatible = "marvell,dsa";
+> +		#address-cells = <2>;
+> +		#size-cells = <0>;
+> +
+> +		dsa,ethernet = <&eth0port>;
+> +		dsa,mii-bus = <&mdio>;
+> +
+> +		switch at 16,0 {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			reg = <16 0>;	/* MDIO address 16, switch 0 in tree */
+> +
+> +			port at 0 {
+> +				reg = <0>;
+> +				label = "ethernet1";
+> +			};
+> +
+> +			port at 1 {
+> +				reg = <1>;
+> +				label = "ethernet2";
+> +			};
+> +
+> +			port at 2 {
+> +				reg = <2>;
+> +				label = "ethernet3";
+> +			};
+> +
+> +			port at 3 {
+> +				reg = <3>;
+> +				label = "ethernet4";
+> +			};
+> +
+> +			port at 4 {
+> +				reg = <4>;
+> +				label = "internet";
+> +			};
+> +
+> +			port at 5 {
+> +				reg = <5>;
+> +				label = "cpu";
+> +			};
+> +		};
+> +	};
+> +};
+> +
+> +&pinctrl {
+> +	pmx_led_white_health: pmx-led-white-health {
+> +		marvell,pins = "mpp7";
+> +		marvell,function = "gpo";
+> +	};
+> +	pmx_led_white_pulse: pmx-led-white-pulse {
+> +		marvell,pins = "mpp14";
+> +		marvell,function = "gpio";
+> +	};
+> +	pmx_btn_wps: pmx-btn-wps {
+> +		marvell,pins = "mpp47";
+> +		marvell,function = "gpio";
+> +	};
+> +	pmx_btn_reset: pmx-btn-reset {
+> +		marvell,pins = "mpp48";
+> +		marvell,function = "gpio";
+> +	};
+> +};
+> +
+> +&nand {
+> +	status = "okay";
+> +	pinctrl-0 = <&pmx_nand>;
+> +	pinctrl-names = "default";
+> +
+> +	partitions {
+> +		compatible = "fixed-partitions";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +
+> +		partition at 0 {
+> +			label = "u-boot";
+> +			reg = <0x0 0x80000>;
+> +			read-only;
+> +		};
+> +
+> +		partition at 80000 {
+> +			label = "u_env";
+> +			reg = <0x80000 0x20000>;
+> +		};
+> +
+> +		partition at A0000 {
+> +			label = "s_env";
+> +			reg = <0xA0000 0x20000>;
+> +		};
+> +
+> +		partition at 200000 {
+> +			label = "kernel";
+> +			reg = <0x200000 0x2A0000>;
+> +		};
+> +
+> +		partition at 4A0000 {
+> +			label = "rootfs";
+> +			reg = <0x4A0000 0x1760000>;
+> +		};
+> +
+> +		partition at 1C00000 {
+> +			label = "alt_kernel";
+> +			reg = <0x1C00000 0x2A0000>;
+> +		};
+> +
+> +		partition at 1EA0000 {
+> +			label = "alt_rootfs";
+> +			reg = <0x1EA0000 0x1760000>;
+> +		};
+> +
+> +		partition at 3600000 {
+> +			label = "syscfg";
+> +			reg = <0x3600000 0x4A00000>;
+> +		};
+> +
+> +		partition at C0000 {
+> +			label = "unused";
+> +			reg = <0xC0000 0x140000>;
+> +		};
+> +
+> +	};
+> +};
+> +
+> +&pciec {
+> +	status = "okay";
+> +};
+> +
+> +&pcie0 {
+> +	status = "okay";
+> +};
+> +
+> +&pcie1 {
+> +	status = "okay";
+> +};
+> +
+> +&mdio {
+> +	status = "okay";
+> +};
+> +
+> +&uart0 {
+> +	status = "okay";
+> +};
+> +
+> +/* eth0 is connected to a Marvell 88E6171 switch, without a PHY. So set
+> + * fixed speed and duplex. */
+> +&eth0 {
+> +	status = "okay";
+> +	ethernet0-port at 0 {
+> +		speed = <1000>;
+> +		duplex = <1>;
+> +	};
+> +};
+> +
+> +/* eth1 is connected to the switch at port 6. However DSA only supports a
+> + * single CPU port. So leave this port disabled to avoid confusion. */
+> +&eth1 {
+> +	status = "disabled";
+> +};
+> +
+> +/* There is no battery on the board, so the RTC does not keep
+> +   time when there is no power, making it useless. */
+> +&rtc {
+> +	status = "disabled";
+> +};
+> +
+> -- 
+> 1.9.1
+> 
