@@ -1,131 +1,59 @@
-From: brian.starkey@arm.com (Brian Starkey)
-Date: Mon,  4 Apr 2016 17:20:50 +0100
-Subject: [PATCH] ARM: arm64: dts: Add expansion bus to VExpress and Juno
-Message-ID: <1459786850-29409-1-git-send-email-brian.starkey@arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue,  5 Apr 2016 00:22:29 +0800
+Subject: [PATCH RFC 0/5] net: phy: sun8i-h3-ephy: Add Allwinner H3 Ethernet
+ PHY driver
+Message-ID: <1459786954-12649-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The VExpress and Juno development platforms have an external expansion
-bus which can be used for additional hardware (e.g. LogicTile Express
-daughterboards).
-Add this bus to all VExpress CoreTile and Juno device-trees.
+Hi everyone,
 
-On VExpress, the bus is described for a CoreTile located on site 1.
+This is an attempt to support the Ethernet PHY incorporated in Allwinner's
+H3 SoC. It is a MII PHY, supporting 10/100 Mbps Ethernet.
 
-Signed-off-by: Brian Starkey <brian.starkey@arm.com>
----
- arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts |   13 +++++++++++++
- arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts  |   13 +++++++++++++
- arch/arm/boot/dts/vexpress-v2p-ca5s.dts     |   13 +++++++++++++
- arch/arm/boot/dts/vexpress-v2p-ca9.dts      |   13 +++++++++++++
- arch/arm64/boot/dts/arm/juno-base.dtsi      |   10 ++++++++++
- 5 files changed, 62 insertions(+)
+Before the PHY can be accessed via MDIO and used, it needs to be powered
+on and configured. This is done via a system control register in the CPU
+address space. The same register also controls PHY interface mode and
+MAC TX clock sources.
 
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
-index 9420053..ec7539b 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
-@@ -280,4 +280,17 @@
- 
- 		/include/ "vexpress-v2m-rs1.dtsi"
- 	};
-+
-+	site2: hsb at 40000000 {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0 0x40000000 0x3fef0000>;
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 3>;
-+		interrupt-map = <0 0 &gic 0 36 4>,
-+				<0 1 &gic 0 37 4>,
-+				<0 2 &gic 0 38 4>,
-+				<0 3 &gic 0 39 4>;
-+	};
- };
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-index 17f63f7..a339b0c 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-@@ -638,4 +638,17 @@
- 
- 		/include/ "vexpress-v2m-rs1.dtsi"
- 	};
-+
-+	site2: hsb at 40000000 {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0 0x40000000 0x3fef0000>;
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 3>;
-+		interrupt-map = <0 0 &gic 0 36 4>,
-+				<0 1 &gic 0 37 4>,
-+				<0 2 &gic 0 38 4>,
-+				<0 3 &gic 0 39 4>;
-+	};
- };
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
-index d2709b7..76a9ccb 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
-@@ -250,4 +250,17 @@
- 
- 		/include/ "vexpress-v2m-rs1.dtsi"
- 	};
-+
-+	site2: hsb at 40000000 {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0x40000000 0x40000000>;
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 3>;
-+		interrupt-map = <0 0 &gic 0 36 4>,
-+				<0 1 &gic 0 37 4>,
-+				<0 2 &gic 0 38 4>,
-+				<0 3 &gic 0 39 4>;
-+	};
- };
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-index d949fac..edac212 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-@@ -359,4 +359,17 @@
- 
- 		/include/ "vexpress-v2m.dtsi"
- 	};
-+
-+	site2: hsb at e0000000 {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0xe0000000 0x20000000>;
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 3>;
-+		interrupt-map = <0 0 &gic 0 36 4>,
-+				<0 1 &gic 0 37 4>,
-+				<0 2 &gic 0 38 4>,
-+				<0 3 &gic 0 39 4>;
-+	};
- };
-diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
-index 68ccc39..dee2386 100644
---- a/arch/arm64/boot/dts/arm/juno-base.dtsi
-+++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
-@@ -272,3 +272,13 @@
- 
- 		/include/ "juno-motherboard.dtsi"
- 	};
-+
-+	site2: tlx at 60000000 {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0 0x60000000 0x10000000>;
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 0>;
-+		interrupt-map = <0 0 &gic 0 0 0 168 IRQ_TYPE_LEVEL_HIGH>;
-+	};
+This driver brings up the Ethernet PHY (if it is used), and exports a
+clock control for the MAC TX clock.
+
+Patch 1 adds the bindings for this piece of hardware.
+
+Patch 2 adds the driver for it.
+
+Patch 3 adds a device node for the PHY.
+
+Patch 4 & 5 are not to be merged. They are provided here as a solid
+example of how this driver is used. The sun8i-emac bindings have not
+been submitted and are not stable yet.
+
+Comments welcome.
+
+Regards
+ChenYu
+
+
+Chen-Yu Tsai (4):
+  net: phy: sun8i-h3-ephy: Add bindings for Allwinner H3 Ethernet PHY
+  net: phy: sun8i-h3-ephy: Add driver for Allwinner H3 Ethernet PHY
+  ARM: dts: sun8i-h3: Add H3 Ethernet PHY device node to sun8i-h3.dtsi
+  ARM: dts: sun8i: Enable Ethernet controller on the Orange PI PC
+
+LABBE Corentin (1):
+  ARM: dts: sun8i-h3: Add Ethernet controller device node to
+    sun8i-h3.dtsi
+
+ .../bindings/net/allwinner,sun8i-h3-ephy.txt       |  44 ++++
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts         |  14 ++
+ arch/arm/boot/dts/sun8i-h3.dtsi                    |  21 ++
+ drivers/net/phy/Kconfig                            |   8 +
+ drivers/net/phy/Makefile                           |   1 +
+ drivers/net/phy/sun8i-h3-ephy.c                    | 266 +++++++++++++++++++++
+ 6 files changed, 354 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/allwinner,sun8i-h3-ephy.txt
+ create mode 100644 drivers/net/phy/sun8i-h3-ephy.c
+
 -- 
-1.7.9.5
+2.7.0
