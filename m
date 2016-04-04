@@ -1,18 +1,25 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 4 Apr 2016 00:15:35 -0500
-Subject: [PATCH v2 5/9] Documentation: dt-bindings: Add IRQ related
- properties of STM32 pinctrl
-In-Reply-To: <1459436979-17275-6-git-send-email-mcoquelin.stm32@gmail.com>
-References: <1459436979-17275-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1459436979-17275-6-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <20160404051535.GB17806@rob-hp-laptop>
+Date: Mon, 4 Apr 2016 00:15:39 -0500
+Subject: [PATCHv2 4/7] Documentation: dt: socfpga: Add Altera Arria10
+ OCRAM binding
+In-Reply-To: <1459450087-24792-5-git-send-email-tthayer@opensource.altera.com>
+References: <1459450087-24792-1-git-send-email-tthayer@opensource.altera.com>
+ <1459450087-24792-5-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <20160404051539.GC17806@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 31, 2016 at 05:09:35PM +0200, Maxime Coquelin wrote:
-> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+On Thu, Mar 31, 2016 at 01:48:04PM -0500, tthayer at opensource.altera.com wrote:
+> From: Thor Thayer <tthayer@opensource.altera.com>
+> 
+> Add the device tree bindings needed to support the Altera On-Chip
+> RAM ECC on the Arria10 chip.
+> 
+> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
 > ---
->  Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt | 3 +++
->  1 file changed, 3 insertions(+)
+> v2: Align Required Properties descriptions
+> ---
+>  .../bindings/arm/altera/socfpga-eccmgr.txt         |   10 ++++++++++
+>  1 file changed, 10 insertions(+)
 
 Acked-by: Rob Herring <robh@kernel.org>
