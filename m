@@ -1,89 +1,101 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  4 Apr 2016 10:22:57 +0900
-Subject: [PATCH 1/2] ARM: shmobile: timer: Fix preset_lpj leading to too short
- delays
-In-Reply-To: <cover.1459732456.git.horms+renesas@verge.net.au>
-References: <cover.1459732456.git.horms+renesas@verge.net.au>
-Message-ID: <dadb875efc805fc4c1834129f01d9ca252d10ad7.1459732456.git.horms+renesas@verge.net.au>
+Date: Mon,  4 Apr 2016 10:22:48 +0900
+Subject: [PATCH 16/47] ARM: dts: r8a7791: Reference both DMA controllers in
+ SCIFA nodes
+In-Reply-To: <cover.1459732726.git.horms+renesas@verge.net.au>
+References: <cover.1459732726.git.horms+renesas@verge.net.au>
+Message-ID: <0cf6e4d854819f37e9f13d1f249cc2e0ae335ffc.1459732726.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 
-On all shmobile ARM SoCs, loop-based delays may complete early, which
-can be after only 1/3 (Cortex A9) or 1/2 (Cortex A7 or A15) of the
-minimum required time.
+R-Car Gen2 have two DMA controllers, which are equivalent. Add
+references to both dmac0 and dmac1 so the driver can fallback to the
+later if the first one is unavailable.
 
-This is caused by calculating preset_lpj based on incorrect assumptions
-about the number of clock cycles per loop:
-  - All of Cortex A7, A9, and A15 run __loop_delay() at 1 loop per
-    CPU clock cycle,
-  - As of commit 11d4bb1bd067f9d0 ("ARM: 7907/1: lib: delay-loop: Add
-    align directive to fix BogoMIPS calculation"), Cortex A8 runs
-    __loop_delay() at 1 loop per 2 instead of 3 CPU clock cycles.
-
-On SoCs with Cortex A7 and/or A15 CPU cores, this went unnoticed, as
-delays use the ARM arch timer if available. R-Car Gen2 doesn't work if
-the arch timer is disabled. However, APE6 can be used without the arch
-timer.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/timer.c | 28 +++++++++++-----------------
- 1 file changed, 11 insertions(+), 17 deletions(-)
+ arch/arm/boot/dts/r8a7791.dtsi | 30 ++++++++++++++++++------------
+ 1 file changed, 18 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/timer.c b/arch/arm/mach-shmobile/timer.c
-index ad008e4b0c49..67d79f9c6bad 100644
---- a/arch/arm/mach-shmobile/timer.c
-+++ b/arch/arm/mach-shmobile/timer.c
-@@ -40,8 +40,7 @@ static void __init shmobile_setup_delay_hz(unsigned int max_cpu_core_hz,
- void __init shmobile_init_delay(void)
- {
- 	struct device_node *np, *cpus;
--	bool is_a7_a8_a9 = false;
--	bool is_a15 = false;
-+	unsigned int div = 0;
- 	bool has_arch_timer = false;
- 	u32 max_freq = 0;
- 
-@@ -55,27 +54,22 @@ void __init shmobile_init_delay(void)
- 		if (!of_property_read_u32(np, "clock-frequency", &freq))
- 			max_freq = max(max_freq, freq);
- 
--		if (of_device_is_compatible(np, "arm,cortex-a8") ||
--		    of_device_is_compatible(np, "arm,cortex-a9")) {
--			is_a7_a8_a9 = true;
--		} else if (of_device_is_compatible(np, "arm,cortex-a7")) {
--			is_a7_a8_a9 = true;
--			has_arch_timer = true;
--		} else if (of_device_is_compatible(np, "arm,cortex-a15")) {
--			is_a15 = true;
-+		if (of_device_is_compatible(np, "arm,cortex-a8")) {
-+			div = 2;
-+		} else if (of_device_is_compatible(np, "arm,cortex-a9")) {
-+			div = 1;
-+		} else if (of_device_is_compatible(np, "arm,cortex-a7") ||
-+			 of_device_is_compatible(np, "arm,cortex-a15")) {
-+			div = 1;
- 			has_arch_timer = true;
- 		}
- 	}
- 
- 	of_node_put(cpus);
- 
--	if (!max_freq)
-+	if (!max_freq || !div)
- 		return;
- 
--	if (!has_arch_timer || !IS_ENABLED(CONFIG_ARM_ARCH_TIMER)) {
--		if (is_a7_a8_a9)
--			shmobile_setup_delay_hz(max_freq, 1, 3);
--		else if (is_a15)
--			shmobile_setup_delay_hz(max_freq, 2, 4);
--	}
-+	if (!has_arch_timer || !IS_ENABLED(CONFIG_ARM_ARCH_TIMER))
-+		shmobile_setup_delay_hz(max_freq, 1, div);
- }
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index 396a640927c8..4de4812ccf72 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -600,8 +600,9 @@
+ 		interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A7791_CLK_SCIFA0>;
+ 		clock-names = "fck";
+-		dmas = <&dmac0 0x21>, <&dmac0 0x22>;
+-		dma-names = "tx", "rx";
++		dmas = <&dmac0 0x21>, <&dmac0 0x22>,
++		       <&dmac1 0x21>, <&dmac1 0x22>;
++		dma-names = "tx", "rx", "tx", "rx";
+ 		power-domains = <&cpg_clocks>;
+ 		status = "disabled";
+ 	};
+@@ -613,8 +614,9 @@
+ 		interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A7791_CLK_SCIFA1>;
+ 		clock-names = "fck";
+-		dmas = <&dmac0 0x25>, <&dmac0 0x26>;
+-		dma-names = "tx", "rx";
++		dmas = <&dmac0 0x25>, <&dmac0 0x26>,
++		       <&dmac1 0x25>, <&dmac1 0x26>;
++		dma-names = "tx", "rx", "tx", "rx";
+ 		power-domains = <&cpg_clocks>;
+ 		status = "disabled";
+ 	};
+@@ -626,8 +628,9 @@
+ 		interrupts = <GIC_SPI 151 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp2_clks R8A7791_CLK_SCIFA2>;
+ 		clock-names = "fck";
+-		dmas = <&dmac0 0x27>, <&dmac0 0x28>;
+-		dma-names = "tx", "rx";
++		dmas = <&dmac0 0x27>, <&dmac0 0x28>,
++		       <&dmac1 0x27>, <&dmac1 0x28>;
++		dma-names = "tx", "rx", "tx", "rx";
+ 		power-domains = <&cpg_clocks>;
+ 		status = "disabled";
+ 	};
+@@ -639,8 +642,9 @@
+ 		interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp11_clks R8A7791_CLK_SCIFA3>;
+ 		clock-names = "fck";
+-		dmas = <&dmac0 0x1b>, <&dmac0 0x1c>;
+-		dma-names = "tx", "rx";
++		dmas = <&dmac0 0x1b>, <&dmac0 0x1c>,
++		       <&dmac1 0x1b>, <&dmac1 0x1c>;
++		dma-names = "tx", "rx", "tx", "rx";
+ 		power-domains = <&cpg_clocks>;
+ 		status = "disabled";
+ 	};
+@@ -652,8 +656,9 @@
+ 		interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp11_clks R8A7791_CLK_SCIFA4>;
+ 		clock-names = "fck";
+-		dmas = <&dmac0 0x1f>, <&dmac0 0x20>;
+-		dma-names = "tx", "rx";
++		dmas = <&dmac0 0x1f>, <&dmac0 0x20>,
++		       <&dmac1 0x1f>, <&dmac1 0x20>;
++		dma-names = "tx", "rx", "tx", "rx";
+ 		power-domains = <&cpg_clocks>;
+ 		status = "disabled";
+ 	};
+@@ -665,8 +670,9 @@
+ 		interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp11_clks R8A7791_CLK_SCIFA5>;
+ 		clock-names = "fck";
+-		dmas = <&dmac0 0x23>, <&dmac0 0x24>;
+-		dma-names = "tx", "rx";
++		dmas = <&dmac0 0x23>, <&dmac0 0x24>,
++		       <&dmac1 0x23>, <&dmac1 0x24>;
++		dma-names = "tx", "rx", "tx", "rx";
+ 		power-domains = <&cpg_clocks>;
+ 		status = "disabled";
+ 	};
 -- 
 2.1.4
