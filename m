@@ -1,74 +1,78 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 4 Apr 2016 11:09:13 +0200
-Subject: [GIT PULL] ARM RealView device tree files
-Message-ID: <CACRpkdZ1eEC+iDKdRhgXPGKTuoyNCo-bgk1ii62RoqR03_JUtQ@mail.gmail.com>
+From: julien.grall@arm.com (Julien Grall)
+Date: Mon, 4 Apr 2016 10:14:38 +0100
+Subject: [PATCH v4 6/9] irqchip/gic-v3: Parse and export virtual GIC
+ information
+In-Reply-To: <20160401101308.GB20224@cbox>
+References: <1458842023-31853-1-git-send-email-julien.grall@arm.com>
+ <1458842023-31853-7-git-send-email-julien.grall@arm.com>
+ <20160401101308.GB20224@cbox>
+Message-ID: <5702307E.2020304@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC folks,
+Hi Christoffer,
 
-here is a set of ARM RealView device tree files that only use
-existing bindings and with all new or controversial stuff stripped
-out.
+On 01/04/2016 11:13, Christoffer Dall wrote:
+> On Thu, Mar 24, 2016 at 05:53:40PM +0000, Julien Grall wrote:
+>> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+>> index 50e87e6..b5ed8be 100644
+>> --- a/drivers/irqchip/irq-gic-v3.c
+>> +++ b/drivers/irqchip/irq-gic-v3.c
 
-This needs to get into linux-next and get some rotation.
+[...]
 
-Please pull them to some DTS branch.
+>> @@ -901,6 +904,39 @@ static int __init gic_validate_dist_version(void __iomem *dist_base)
+>>   	return 0;
+>>   }
+>>
+>> +static void __init gic_of_setup_kvm_info(struct device_node *node)
+>> +{
+>> +	int ret;
+>> +	struct resource r;
+>> +	u32 gicv_idx;
+>> +
+>> +	gic_v3_kvm_info.type = GIC_V3;
+>> +
+>> +	gic_v3_kvm_info.maint_irq = irq_of_parse_and_map(node, 0);
+>> +	if (!gic_v3_kvm_info.maint_irq)
+>> +		return;
+>> +
+>> +	if (of_property_read_u32(node, "#redistributor-regions",
+>> +				 &gicv_idx))
+>> +		gicv_idx = 1;
+>> +
+>> +	gicv_idx += 3;	/* Also skip GICD, GICC, GICH */
+>> +	ret = of_address_to_resource(node, gicv_idx, &r);
+>> +	if (!ret) {
+>> +		if (!PAGE_ALIGNED(r.start))
+>> +			pr_warn("GICV physical address 0x%llx not page aligned\n",
+>> +				(unsigned long long)r.start);
+>> +		else if (!PAGE_ALIGNED(resource_size(&r)))
+>> +			pr_warn("GICV size 0x%llx not a multiple of page size 0x%lx\n",
+>> +				(unsigned long long)resource_size(&r),
+>> +				PAGE_SIZE);
+>> +		else
+>
+> it seems like you're also checking the above items in the KVM code
+> itself, so I still don't understand why we have to do this twice.
+>
+> My feeling here is that you want to just lookup if you have the proper
+> resources to fill in the struct in the GIC driver, and fill in the
+> struct with data if the firmware gave you something.
+>
+> It's then up to KVM to deal with its constraints, such as the resources
+> being page-aligned etc.  But I suppose you could also argue that the GIC
+> code knows how this hardware resource can or cannot be used and
+> therefore should check it.
+>
+> But in any case, I don't understand why we check it more than one place?
 
-Yours,
-Linus Walleij
+Sorry, I forgot to remove these checks when I re-introduced them in the 
+KVM code.
 
-The following changes since commit 9735a22799b9214d17d3c231fe377fc852f042e9:
+I will remove them in the next version.
 
-  Linux 4.6-rc2 (2016-04-03 09:09:40 -0500)
+Regards,
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-tags/versatile-dts-1
-
-for you to fetch changes up to dfc8a117388786ab3cfdf0880a09abd05c4e0a4d:
-
-  ARM: dts: realview: DT support for the PBA8 and PBX-A9 (2016-04-04
-10:58:05 +0200)
-
-----------------------------------------------------------------
-Versatile DTS changes, baseline for the v4.7 series:
-- Add CLCD panel nodes to PB1176 and PB11MPCore
-- Add a DT binding blurb for the Versatile IB2 syscon
-- Add DTS files for the (QEMU supported) RealView EB
-  boards in all variants.
-- Add DTS files for the (QEMU supported) RealView PBA8
-  and PBX-A9 board variants.
-
-----------------------------------------------------------------
-Linus Walleij (5):
-      Documentation/DT: add blurb for IB2 syscon to Versatile
-      ARM: dts: realview: PB11MPCore: define a standard VGA panel
-      ARM: dts: realview: PB1176: define a standard VGA panel
-      ARM: dts: realview: support all the RealView EB board variants
-      ARM: dts: realview: DT support for the PBA8 and PBX-A9
-
- Documentation/devicetree/bindings/arm/arm-boards |   8 +
- arch/arm/boot/dts/Makefile                       |   8 +-
- arch/arm/boot/dts/arm-realview-eb-11mp-revb.dts  |  93 ++++
- arch/arm/boot/dts/arm-realview-eb-11mp.dts       |  74 ++++
- arch/arm/boot/dts/arm-realview-eb-a9mp.dts       |  70 +++
- arch/arm/boot/dts/arm-realview-eb-mp.dtsi        | 225 ++++++++++
- arch/arm/boot/dts/arm-realview-eb.dts            | 166 +++++++
- arch/arm/boot/dts/arm-realview-eb.dtsi           | 453 +++++++++++++++++++
- arch/arm/boot/dts/arm-realview-pb1176.dts        |  40 ++
- arch/arm/boot/dts/arm-realview-pb11mp.dts        |  19 +-
- arch/arm/boot/dts/arm-realview-pba8.dts          | 178 ++++++++
- arch/arm/boot/dts/arm-realview-pbx-a9.dts        | 229 ++++++++++
- arch/arm/boot/dts/arm-realview-pbx.dtsi          | 542 +++++++++++++++++++++++
- 13 files changed, 2095 insertions(+), 10 deletions(-)
- create mode 100644 arch/arm/boot/dts/arm-realview-eb-11mp-revb.dts
- create mode 100644 arch/arm/boot/dts/arm-realview-eb-11mp.dts
- create mode 100644 arch/arm/boot/dts/arm-realview-eb-a9mp.dts
- create mode 100644 arch/arm/boot/dts/arm-realview-eb-mp.dtsi
- create mode 100644 arch/arm/boot/dts/arm-realview-eb.dts
- create mode 100644 arch/arm/boot/dts/arm-realview-eb.dtsi
- create mode 100644 arch/arm/boot/dts/arm-realview-pba8.dts
- create mode 100644 arch/arm/boot/dts/arm-realview-pbx-a9.dts
- create mode 100644 arch/arm/boot/dts/arm-realview-pbx.dtsi
+-- 
+Julien Grall
