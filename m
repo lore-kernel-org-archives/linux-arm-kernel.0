@@ -1,83 +1,36 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Mon, 4 Apr 2016 09:43:59 +0800
-Subject: [PATCH v2 02/16] arm64: dts: add sp804 timer node for Hi6220
-In-Reply-To: <CACRpkdbWuKx6=aF5xW=3EKfuUf-MYM_EEnovyhBnOGVOeHyCmQ@mail.gmail.com>
-References: <1459589383-16914-1-git-send-email-guodong.xu@linaro.org>
- <1459589383-16914-3-git-send-email-guodong.xu@linaro.org>
- <CACRpkdbWuKx6=aF5xW=3EKfuUf-MYM_EEnovyhBnOGVOeHyCmQ@mail.gmail.com>
-Message-ID: <20160404014359.GA15178@leoy-linaro>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Sun, 03 Apr 2016 18:53:56 -0700
+Subject: [RFC PATCH 0/9] ARM: start to move arch/arm/mach-* to
+ arch/arm/platforms/*
+In-Reply-To: <20160403182543.GQ19428@n2100.arm.linux.org.uk>
+References: <1459694367-18635-1-git-send-email-yamada.masahiro@socionext.com>
+ <20160403182543.GQ19428@n2100.arm.linux.org.uk>
+Message-ID: <58FF13BE-384C-4EF6-9202-E3A57CA7F4FF@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On April 3, 2016 11:25:43 AM PDT, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+>On Sun, Apr 03, 2016 at 11:39:18PM +0900, Masahiro Yamada wrote:
+>> We have growing number of mach-* directories in arch/arm, and I guess
+>> it might be a good time to discuss moving them into a sub-directory.
+>
+>What does it buy us?  Let me summarise the actual change:
+>
+>- Move up to 71 arch/arm/mach-* directories to arch/arm/platforms/*,
+>  which just means another level of directory structure.  We still
+>  end up with up to 71 directories in arch/arm/platforms/
+>
+>- The ability to use obj-y rather than machine-y, where both already
+>  work in the same way.
+>
+>Is there anything I missed?
+>
+>If that is all, then I really do not like this change - it's seems
+>to be churn for no benefit, and that's something we really should be
+>minimising.  Linus Torvalds has historically moaned at the ARM
+>architecture for stuff like this.
 
-Thanks for review.
+Agreed, it also makes the life of people back porting, or just  submitting changes harder (even though git does an excellent job at tracking renames). Nack from me.
 
-On Sun, Apr 03, 2016 at 09:23:42PM +0200, Linus Walleij wrote:
-> On Sat, Apr 2, 2016 at 11:29 AM, Guodong Xu <guodong.xu@linaro.org> wrote:
-> 
-> > From: Leo Yan <leo.yan@linaro.org>
-> >
-> > Add sp804 timer for hi6220, so it can be used as broadcast timer.
-> >
-> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> > Signed-off-by: Wei Xu <xuwei5@hisilicon.com>
-> > ---
-> >  arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 9 +++++++++
-> >  1 file changed, 9 insertions(+)
-> >
-> > diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> > index ad1f1eb..82c4756 100644
-> > --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> > +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> > @@ -209,5 +209,14 @@
-> >                         clock-names = "uartclk", "apb_pclk";
-> >                         status = "disabled";
-> >                 };
-> > +
-> > +               dual_timer0: dual_timer at f8008000 {
-> > +                       compatible = "arm,sp804", "arm,primecell";
-> > +                       reg = <0x0 0xf8008000 0x0 0x1000>;
-> > +                       interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
-> > +                                    <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
-> > +                       clocks = <&ao_ctrl 27>;
-> > +                       clock-names = "apb_pclk";
-> 
-> How can this work? You only give the apb_pclk for clocking the
-> bus to the timer.
-> 
-> Most platforms using this driver has something like this:
-> 
->                 timer01: timer at 10104000 {
->                         compatible = "arm,sp804", "arm,primecell";
->                         reg = <0x10104000 0x1000>;
->                         interrupt-parent = <&intc_dc1176>;
->                         interrupts = <0 8 IRQ_TYPE_LEVEL_HIGH>, <0 9
-> IRQ_TYPE_LEVEL_HIGH>;
->                         clocks = <&timclk>, <&timclk>, <&pclk>;
->                         clock-names = "timer1", "timer2", "apb_pclk";
->                 };
-> 
-> It then reads the two clocks in the beginning of clocks() to
-> determine the frequency of each timer.
-> 
-> By chance the code in the driver will allow just one clock and
-> will then assume that both the bus to the timer and the timer
-> itself is clocked from the same clock. But I highly doubt that this
-> is the case.
-
-This patch has been sent out for review previously [1]; So I refered
-other platforms and changed to only enable apb bus clock due I have
-not found timer enabling bits in Hi6220's spec.
-
-> Please verify what clocks actually goes into this timer, it should
-> nominally be three of them.
-
-Yes, it can work well even I don't enable any timer clock. I will
-check furthermore in spec to see if can bind with formal way as your
-suggestion.
-
-[1] http://archive.arm.linux.org.uk/lurker/message/20151009.131015.687ed525.en.html
-
-Thanks,
-Leo Yan
+-- 
+Florian
