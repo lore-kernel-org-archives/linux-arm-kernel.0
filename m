@@ -1,61 +1,68 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  4 Apr 2016 16:52:16 +0200
-Subject: [PATCH 0/8] arm64: 2016 head.S spring cleaning
-Message-ID: <1459781544-14310-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Mon,  4 Apr 2016 16:52:17 +0200
+Subject: [PATCH 1/8] arm64/kernel: use literal for relocated address of
+ __secondary_switched
+In-Reply-To: <1459781544-14310-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1459781544-14310-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1459781544-14310-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After having been responsible for obfuscating the head.S code in the v4.6
-cycle to implement KASLR support, this series attempts to make amends by
-performing some janitorial duties as well.
+We can simply use a relocated 64-bit literal to store the address of
+__secondary_switched(), and the relocation code will ensure that it
+holds the correct value at secondary entry time, as long as we make sure
+that the literal value is visible to the secondaries before they enable
+their MMUs. So place the literal next to kimage_vaddr, and set the alignment
+so that it is covered by the same cacheline that we already have to clean
+for a similar purpose.
 
-The main point of this series is to get rid of the file scoped callee saved
-registers in head.S to store the FDT pointer, ID map and swapper dir addresses,
-KASLR offset, PHYS offset etc. The fact that these are file scoped makes it
-unnecessarily complicated to reason about lifetimes etc, especially since the
-code is called by both the boot CPU and secondaries.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/kernel/head.S | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-Since some of these functions are called without a stack, we still need to use
-callee saved registers to preserve values across function calls without
-stacking/unstacking the previous values, but these instances are now function
-scoped, not file scoped, and documented.
-
-Patch #1 gets rid of the confusing subtraction of address and offset values to
-obtain __secondary_switched.
-
-Patch #2 gets rid of x21 in head.S
-
-Patch #3 creates moves the stack pointer init to an earlier time in
-__mmap_switched, and creates a proper stack frame.
-
-Patch #4 changes the EL2 detection code to simply use x0 as a return value and
-first argument.
-
-Patch #5 gets rid of x25 and x26 to store idmap_pg_dir and swapper_pg_dir
-
-Patch #6 gets rid of x27 to store __mmap_switched or __secondary_switched
-
-Patch #7 gets rid of x24 to store PHYS_OFFSET
-
-Patch #8 gets rid of x23 to store the kaslr offset
-
-@Maintainers: feel free to cherry pick if not all [or none] of these patches
-make sense to you
-
-Ard Biesheuvel (8):
-  arm64/kernel: use literal for relocated address of
-    __secondary_switched
-  arm64/kernel: reuse boot_args array to get to __fdt_pointer
-  arm64/kernel: use a proper stack frame in __mmap_switched()
-  arm64/kernel: use ordinary calling convention for EL2 setup
-  arm64/kernel: refer to idmap_pg_dir and swapper_pg_dir directly
-  arm64/kernel: pass virtual entry point as __enable_mmu() argument
-  arm64/kernel: drop __PHYS_OFFSET register with file scope from head.S
-  arm64/kernel: drop global kaslr_offset in x23 from head.S
-
- arch/arm64/kernel/head.S  | 177 +++++++++++---------
- arch/arm64/kernel/setup.c |   4 +-
- 2 files changed, 95 insertions(+), 86 deletions(-)
-
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 4203d5f257bc..69b33535911e 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -471,7 +471,8 @@ __mmap_switched:
+ 	b	0b
+ 
+ 2:	adr_l	x8, kimage_vaddr		// make relocated kimage_vaddr
+-	dc	cvac, x8			// value visible to secondaries
++						// and __secondary_switched
++	dc	cvac, x8			// values visible to secondaries
+ 	dsb	sy				// with MMU off
+ #endif
+ 
+@@ -506,10 +507,12 @@ ENDPROC(__mmap_switched)
+  * end early head section, begin head code that is also used for
+  * hotplug and needs to have the same protections as the text region
+  */
+-	.section ".text","ax"
+-
++	.section	".text","ax"
++	.align		4
+ ENTRY(kimage_vaddr)
+ 	.quad		_text - TEXT_OFFSET
++.L__secondary_switched:
++	.quad		__secondary_switched
+ 
+ /*
+  * If we're fortunate enough to boot at EL2, ensure that the world is
+@@ -701,12 +704,9 @@ ENTRY(secondary_startup)
+ 	adrp	x26, swapper_pg_dir
+ 	bl	__cpu_setup			// initialise processor
+ 
+-	ldr	x8, kimage_vaddr
+-	ldr	w9, 0f
+-	sub	x27, x8, w9, sxtw		// address to jump to after enabling the MMU
++	ldr	x27, .L__secondary_switched
+ 	b	__enable_mmu
+ ENDPROC(secondary_startup)
+-0:	.long	(_text - TEXT_OFFSET) - __secondary_switched
+ 
+ ENTRY(__secondary_switched)
+ 	adr_l	x5, vectors
 -- 
 2.5.0
