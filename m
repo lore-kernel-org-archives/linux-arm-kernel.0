@@ -1,64 +1,94 @@
 From: julien.grall@arm.com (Julien Grall)
-Date: Mon,  4 Apr 2016 12:37:31 +0100
-Subject: [PATCH v5 0/9] arm64: Add support for KVM with ACPI
-Message-ID: <1459769860-6629-1-git-send-email-julien.grall@arm.com>
+Date: Mon,  4 Apr 2016 12:37:32 +0100
+Subject: [PATCH v5 1/9] clocksource: arm_arch_timer: Gather KVM specific
+ information in a structure
+In-Reply-To: <1459769860-6629-1-git-send-email-julien.grall@arm.com>
+References: <1459769860-6629-1-git-send-email-julien.grall@arm.com>
+Message-ID: <1459769860-6629-2-git-send-email-julien.grall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Introduce a structure which are filled up by the arch timer driver and
+used by the virtual timer in KVM.
 
-This patch series allows KVM to work with ACPI on ARM64.
+The first member of this structure will be the timecounter. More members
+will be added later.
 
-Currently, the firmware tables are parsed by the the virtual timer and virtual
-GIC code in order to configure them correctly.
+A stub for the new helper isn't introduced because KVM requires the arch
+timer for both ARM64 and ARM32.
 
-However the parsing of these tables is already done in the GIC and arch timer
-drivers. This patch series introduces new helpers to retrieve the information
-from the different drivers in order to avoid duplication of the parsing code.
+The function arch_timer_get_timecounter is kept for the time being and
+will be dropped in a subsequent patch.
 
-To make the merge easier via the different trees, each patch modifies a single
-subsystem. The suggested plan to merge the series is divided in 3 steps:
+Signed-off-by: Julien Grall <julien.grall@arm.com>
 
-1) Patches #1-#2 are merged via the clocksource tree
-   Patches #2-#6 are merged via the irqchip tree
-2) Patches #7-#8 are merge via the KVM tree
-3) Patch #9 is merged via the clocksource tree.
+---
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
 
-For all the changes see in each patch.
+    Changes in v3:
+        - Rename the patch
+        - Move the KVM changes and removal of arch_timer_get_timecounter
+        in separate patches.
+---
+ drivers/clocksource/arm_arch_timer.c | 12 +++++++++---
+ include/clocksource/arm_arch_timer.h |  5 +++++
+ 2 files changed, 14 insertions(+), 3 deletions(-)
 
-Regards,
-
-Cc: daniel.lezcano at linaro.org
-
-Julien Grall (9):
-  clocksource: arm_arch_timer: Gather KVM specific information in a
-    structure
-  clocksource: arm_arch_timer: Extend arch_timer_kvm_info to get the
-    virtual IRQ
-  irqchip/gic-v2: Gather ACPI specific data in a single structure
-  irqchip/gic-v2: Parse and export virtual GIC information
-  irqchip/gic-v3: Gather all ACPI specific data in a single structure
-  irqchip/gic-v3: Parse and export virtual GIC information
-  KVM: arm/arm64: arch_timer: Rely on the arch timer to parse the
-    firmware tables
-  KVM: arm/arm64: vgic: Rely on the GIC driver to parse the firmware
-    tables
-  clocksource: arm_arch_timer: Remove arch_timer_get_timecounter
-
- drivers/clocksource/arm_arch_timer.c   |  11 ++-
- drivers/irqchip/irq-gic-common.c       |  13 +++
- drivers/irqchip/irq-gic-common.h       |   3 +
- drivers/irqchip/irq-gic-v3.c           | 170 +++++++++++++++++++++++++++------
- drivers/irqchip/irq-gic.c              |  87 ++++++++++++++++-
- include/clocksource/arm_arch_timer.h   |  12 +--
- include/kvm/arm_vgic.h                 |   7 +-
- include/linux/irqchip/arm-gic-common.h |  34 +++++++
- virt/kvm/arm/arch_timer.c              |  40 +++-----
- virt/kvm/arm/vgic-v2.c                 |  61 +++++-------
- virt/kvm/arm/vgic-v3.c                 |  47 ++++-----
- virt/kvm/arm/vgic.c                    |  50 +++++-----
- 12 files changed, 371 insertions(+), 164 deletions(-)
- create mode 100644 include/linux/irqchip/arm-gic-common.h
-
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 5152b38..62bdfe7 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -468,11 +468,16 @@ static struct cyclecounter cyclecounter = {
+ 	.mask	= CLOCKSOURCE_MASK(56),
+ };
+ 
+-static struct timecounter timecounter;
++static struct arch_timer_kvm_info arch_timer_kvm_info;
++
++struct arch_timer_kvm_info *arch_timer_get_kvm_info(void)
++{
++	return &arch_timer_kvm_info;
++}
+ 
+ struct timecounter *arch_timer_get_timecounter(void)
+ {
+-	return &timecounter;
++	return &arch_timer_kvm_info.timecounter;
+ }
+ 
+ static void __init arch_counter_register(unsigned type)
+@@ -500,7 +505,8 @@ static void __init arch_counter_register(unsigned type)
+ 	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
+ 	cyclecounter.mult = clocksource_counter.mult;
+ 	cyclecounter.shift = clocksource_counter.shift;
+-	timecounter_init(&timecounter, &cyclecounter, start_count);
++	timecounter_init(&arch_timer_kvm_info.timecounter,
++			 &cyclecounter, start_count);
+ 
+ 	/* 56 bits minimum, so we assume worst case rollover */
+ 	sched_clock_register(arch_timer_read_counter, 56, arch_timer_rate);
+diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
+index 25d0914..9101ed6b 100644
+--- a/include/clocksource/arm_arch_timer.h
++++ b/include/clocksource/arm_arch_timer.h
+@@ -49,11 +49,16 @@ enum arch_timer_reg {
+ 
+ #define ARCH_TIMER_EVT_STREAM_FREQ	10000	/* 100us */
+ 
++struct arch_timer_kvm_info {
++	struct timecounter timecounter;
++};
++
+ #ifdef CONFIG_ARM_ARCH_TIMER
+ 
+ extern u32 arch_timer_get_rate(void);
+ extern u64 (*arch_timer_read_counter)(void);
+ extern struct timecounter *arch_timer_get_timecounter(void);
++extern struct arch_timer_kvm_info *arch_timer_get_kvm_info(void);
+ 
+ #else
+ 
 -- 
 1.9.1
