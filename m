@@ -1,62 +1,31 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 4 Apr 2016 00:16:53 -0500
-Subject: [PATCH v2 14/16] arm64: dts: hikey: Add hi655x pmic dts node
-In-Reply-To: <1459589383-16914-15-git-send-email-guodong.xu@linaro.org>
-References: <1459589383-16914-1-git-send-email-guodong.xu@linaro.org>
- <1459589383-16914-15-git-send-email-guodong.xu@linaro.org>
-Message-ID: <20160404051653.GU17806@rob-hp-laptop>
+Date: Mon, 4 Apr 2016 00:16:56 -0500
+Subject: dtc warnings
+In-Reply-To: <CAKohpomijKf3m07Lc3+fWawxAPwe83F8k9akz1LOTokpZNL2ig@mail.gmail.com>
+References: <CAL_Jsq+=OjY8y_8x7OSm-MWYKbrHN5cbv4TLwULxhNq+gfiMtw@mail.gmail.com>
+ <56FE27F9.2070100@gmail.com>
+ <CAJKOXPdDyVbfSyshu4j21Ax2J-VwPpMZgAGEeO8VtgFYh4hTmw@mail.gmail.com>
+ <56FE7E4A.2000601@ti.com> <20160403065909.GF2987@vireshk-i7>
+ <20160403080854.GA12133@kozik-lap>
+ <CAKohpomijKf3m07Lc3+fWawxAPwe83F8k9akz1LOTokpZNL2ig@mail.gmail.com>
+Message-ID: <20160404051656.GV17806@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 02, 2016 at 05:29:41PM +0800, Guodong Xu wrote:
-> From: Chen Feng <puck.chen@hisilicon.com>
+On Sun, Apr 03, 2016 at 05:57:00PM +0530, Viresh Kumar wrote:
+> On 3 April 2016 at 13:38, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
+> > Warnings coming from recent linux-next:
+> >
+> >   DTC     arch/arm/boot/dts/exynos5800-peach-pi.dtb
+> > Warning (unit_address_vs_reg): Node /opp_table0/opp at 1800000000 has a unit name, but no reg property
+> > Warning (unit_address_vs_reg): Node /opp_table0/opp at 1700000000 has a unit name, but no reg property
 > 
-> Add the mfd hi655x dts node and regulator support on
-> hi6220 platform.
-> 
-> Signed-off-by: Chen Feng <puck.chen@hisilicon.com>
-> Signed-off-by: Fei Wang <w.f@huawei.com>
-> Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
-> Reviewed-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-> Reviewed-by: Guodong Xu <guodong.xu@linaro.org>
-> ---
->  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 87 ++++++++++++++++++++++++++
->  1 file changed, 87 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> index 28bc646..a6dffa8 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> @@ -6,6 +6,7 @@
->   */
->  
->  /dts-v1/;
-> +#include <dt-bindings/gpio/gpio.h>
->  
->  #include "hi6220.dtsi"
->  #include "hikey-gpio.dtsi"
-> @@ -104,6 +105,92 @@
->  			default-state = "off";
->  		};
->  	};
-> +
-> +	pmic: pmic at f8000000 {
-> +		compatible = "hisilicon,hi655x-pmic";
-> +		reg = <0x0 0xf8000000 0x0 0x1000>;
-> +		interrupt-controller;
-> +		#interrupt-cells = <2>;
-> +		pmic-gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
-> +		status = "okay";
-> +
-> +		regulators {
-> +			ldo2: LDO2 at a21 {
+> @Rob: What should we be doing about these warnings?
+> OPP-entries don't have a reg property obviously and we
+> discussed earlier if naming them based on freq is fine or
+> not.
 
-@a21 is not a unit address. Please drop these.
+We can whitelist opp nodes in dtc, use oppN instead, or ignore the 
+warnings for now. 
 
-> +				regulator-name = "LDO2_2V8";
-> +				regulator-min-microvolt = <2500000>;
-> +				regulator-max-microvolt = <3200000>;
-> +				regulator-enable-ramp-delay = <120>;
-> +			};
-> +
-> +			ldo7: LDO7 at a26 {
+Rob
