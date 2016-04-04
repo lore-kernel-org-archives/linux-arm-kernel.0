@@ -1,46 +1,64 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 4 Apr 2016 14:33:31 +0300
-Subject: [PATCH] usb: dwc3: keystone: drop dma_mask configuration
-Message-ID: <1459769611-16862-1-git-send-email-grygorii.strashko@ti.com>
+From: julien.grall@arm.com (Julien Grall)
+Date: Mon,  4 Apr 2016 12:37:31 +0100
+Subject: [PATCH v5 0/9] arm64: Add support for KVM with ACPI
+Message-ID: <1459769860-6629-1-git-send-email-julien.grall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Keystone 2 supports DT-boot only, as result dma_mask will be
-always configured properly from DT -
-of_platform_device_create_pdata()->of_dma_configure(). More over,
-dwc3-keystone.c can be built as module and in this case it's unsafe to
-assign local variable as dma_mask.
+Hello,
 
-Hence, remove dma_mask configuration code.
+This patch series allows KVM to work with ACPI on ARM64.
 
-Cc: Murali Karicheri <m-karicheri2@ti.com>
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
- drivers/usb/dwc3/dwc3-keystone.c | 5 -----
- 1 file changed, 5 deletions(-)
+Currently, the firmware tables are parsed by the the virtual timer and virtual
+GIC code in order to configure them correctly.
 
-diff --git a/drivers/usb/dwc3/dwc3-keystone.c b/drivers/usb/dwc3/dwc3-keystone.c
-index 2be268d..7266470 100644
---- a/drivers/usb/dwc3/dwc3-keystone.c
-+++ b/drivers/usb/dwc3/dwc3-keystone.c
-@@ -39,8 +39,6 @@
- #define USBSS_IRQ_COREIRQ_EN	BIT(0)
- #define USBSS_IRQ_COREIRQ_CLR	BIT(0)
- 
--static u64 kdwc3_dma_mask;
--
- struct dwc3_keystone {
- 	struct device			*dev;
- 	struct clk			*clk;
-@@ -108,9 +106,6 @@ static int kdwc3_probe(struct platform_device *pdev)
- 	if (IS_ERR(kdwc->usbss))
- 		return PTR_ERR(kdwc->usbss);
- 
--	kdwc3_dma_mask = dma_get_mask(dev);
--	dev->dma_mask = &kdwc3_dma_mask;
--
- 	kdwc->clk = devm_clk_get(kdwc->dev, "usb");
- 
- 	error = clk_prepare_enable(kdwc->clk);
+However the parsing of these tables is already done in the GIC and arch timer
+drivers. This patch series introduces new helpers to retrieve the information
+from the different drivers in order to avoid duplication of the parsing code.
+
+To make the merge easier via the different trees, each patch modifies a single
+subsystem. The suggested plan to merge the series is divided in 3 steps:
+
+1) Patches #1-#2 are merged via the clocksource tree
+   Patches #2-#6 are merged via the irqchip tree
+2) Patches #7-#8 are merge via the KVM tree
+3) Patch #9 is merged via the clocksource tree.
+
+For all the changes see in each patch.
+
+Regards,
+
+Cc: daniel.lezcano at linaro.org
+
+Julien Grall (9):
+  clocksource: arm_arch_timer: Gather KVM specific information in a
+    structure
+  clocksource: arm_arch_timer: Extend arch_timer_kvm_info to get the
+    virtual IRQ
+  irqchip/gic-v2: Gather ACPI specific data in a single structure
+  irqchip/gic-v2: Parse and export virtual GIC information
+  irqchip/gic-v3: Gather all ACPI specific data in a single structure
+  irqchip/gic-v3: Parse and export virtual GIC information
+  KVM: arm/arm64: arch_timer: Rely on the arch timer to parse the
+    firmware tables
+  KVM: arm/arm64: vgic: Rely on the GIC driver to parse the firmware
+    tables
+  clocksource: arm_arch_timer: Remove arch_timer_get_timecounter
+
+ drivers/clocksource/arm_arch_timer.c   |  11 ++-
+ drivers/irqchip/irq-gic-common.c       |  13 +++
+ drivers/irqchip/irq-gic-common.h       |   3 +
+ drivers/irqchip/irq-gic-v3.c           | 170 +++++++++++++++++++++++++++------
+ drivers/irqchip/irq-gic.c              |  87 ++++++++++++++++-
+ include/clocksource/arm_arch_timer.h   |  12 +--
+ include/kvm/arm_vgic.h                 |   7 +-
+ include/linux/irqchip/arm-gic-common.h |  34 +++++++
+ virt/kvm/arm/arch_timer.c              |  40 +++-----
+ virt/kvm/arm/vgic-v2.c                 |  61 +++++-------
+ virt/kvm/arm/vgic-v3.c                 |  47 ++++-----
+ virt/kvm/arm/vgic.c                    |  50 +++++-----
+ 12 files changed, 371 insertions(+), 164 deletions(-)
+ create mode 100644 include/linux/irqchip/arm-gic-common.h
+
 -- 
-2.8.0
+1.9.1
