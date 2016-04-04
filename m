@@ -1,37 +1,48 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 4 Apr 2016 14:35:08 +0200
-Subject: [PATCH v2] ARM: dts: orion5x: add device tree for kurobox-pro
-In-Reply-To: <1459267905-15403-1-git-send-email-rogershimizu@gmail.com>
-References: <1458656898-16183-1-git-send-email-rogershimizu@gmail.com>
- <1459267905-15403-1-git-send-email-rogershimizu@gmail.com>
-Message-ID: <20160404123508.GF21828@lunn.ch>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon,  4 Apr 2016 14:43:38 +0200
+Subject: [PATCH] ARM: sa1100: remove references to the defunct handhelds.org
+Message-ID: <1459773818-27373-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 30, 2016 at 01:11:45AM +0900, Roger Shimizu wrote:
-> Add dts file to support Buffalo/Revogear Kurobox-Pro, which is marvell
-> orion5x based 3.5" HDD NAS.
-> 
-> It's a quite old product and already discontinued. So there's no
-> official website for it. But it was an early product which used marvell
-> orion5x 88F5182 chipset, it's popular in the community.
-> Some unofficial site:
->   - http://buffalo.nas-central.org/wiki/Category:KuroboxPro
->   - http://nice.kaze.com/KUROPRO_ProductSpecifications.pdf
-> 
-> This device tree is based on the board file:
->   arch/arm/mach-orion5x/kurobox_pro-setup.c
-> However, the probing order of NAND and JEDEC-Flash are different from
-> the original board file, this results in incompatible minor number
-> for a few /dev/mtdX and /dev/mtdblockX devices.
-> So I still want to keep the board file for the time being.
-> 
-> Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
+The website handhelds.org has been down for a long time and is
+likely never coming back online.
 
-Hi Roger
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ARM SoC folks: please apply this patch directly to whatever
+branch is appropriate.
+---
+ arch/arm/mach-sa1100/Kconfig | 10 ++--------
+ 1 file changed, 2 insertions(+), 8 deletions(-)
 
-Looks good:
-
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
-
-	     Andrew
+diff --git a/arch/arm/mach-sa1100/Kconfig b/arch/arm/mach-sa1100/Kconfig
+index c6f6ed1cbed0..36e3c79f4973 100644
+--- a/arch/arm/mach-sa1100/Kconfig
++++ b/arch/arm/mach-sa1100/Kconfig
+@@ -61,10 +61,7 @@ config SA1100_H3100
+ 	select MFD_IPAQ_MICRO
+ 	help
+ 	  Say Y here if you intend to run this kernel on the Compaq iPAQ
+-	  H3100 handheld computer.  Information about this machine and the
+-	  Linux port to this machine can be found at:
+-
+-	  <http://www.handhelds.org/Compaq/index.html#iPAQ_H3100>
++	  H3100 handheld computer.
+ 
+ config SA1100_H3600
+ 	bool "Compaq iPAQ H3600/H3700"
+@@ -73,10 +70,7 @@ config SA1100_H3600
+ 	select MFD_IPAQ_MICRO
+ 	help
+ 	  Say Y here if you intend to run this kernel on the Compaq iPAQ
+-	  H3600 handheld computer.  Information about this machine and the
+-	  Linux port to this machine can be found at:
+-
+-	  <http://www.handhelds.org/Compaq/index.html#iPAQ_H3600>
++	  H3600 and H3700 handheld computers.
+ 
+ config SA1100_BADGE4
+ 	bool "HP Labs BadgePAD 4"
+-- 
+2.4.3
