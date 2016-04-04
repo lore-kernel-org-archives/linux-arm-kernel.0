@@ -1,26 +1,40 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 4 Apr 2016 06:18:25 -0700
-Subject: [PATCH v2 0/2] dmaengine: omap-dma: Fix polled completion
-In-Reply-To: <1457616527-979-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1457616527-979-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20160404131822.GA19738@vkoul-mobl.iind.intel.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Mon, 4 Apr 2016 16:41:22 +0300
+Subject: [PATCH] usb: dwc3: keystone: drop dma_mask configuration
+In-Reply-To: <87pou561i5.fsf@intel.com>
+References: <1459769611-16862-1-git-send-email-grygorii.strashko@ti.com>
+ <87pou561i5.fsf@intel.com>
+Message-ID: <57026F02.4060300@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 10, 2016 at 03:28:45PM +0200, Peter Ujfalusi wrote:
+On 04/04/2016 02:45 PM, Felipe Balbi wrote:
+>
 > Hi,
-> 
-> Based on the discussion on the first version:
-> https://lkml.org/lkml/2016/2/25/167
-> 
-> I have fixed the omap_dma_tx_status() - first patch and added the second patch
-> to not disable the interrupts for memcpy so multiple transfers can be queued.
+>
+> Grygorii Strashko <grygorii.strashko@ti.com> writes:
+>> The Keystone 2 supports DT-boot only, as result dma_mask will be
+>> always configured properly from DT -
+>> of_platform_device_create_pdata()->of_dma_configure(). More over,
+>> dwc3-keystone.c can be built as module and in this case it's unsafe to
+>> assign local variable as dma_mask.
+>>
+>> Hence, remove dma_mask configuration code.
+>>
+>> Cc: Murali Karicheri <m-karicheri2@ti.com>
+>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>
+> with these two patches from you, does USB Peripheral work on k2 devices ?
 
-Hi Peter,
+I've tried CONFIG_USB_DWC3_GADGET=y + g_zero and k2e was detected
+as gzero dev from Host PC
 
-These do not apply for me. Can you please check.
+>
+> I'll drop my k2 changes from my series which I sent on saturday.
+>
 
-FWIW my fixes is on -rc1
+Yes, please.
 
 -- 
-~Vinod
+regards,
+-grygorii
