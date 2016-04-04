@@ -1,58 +1,39 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Tue, 5 Apr 2016 17:35:35 +0800
-Subject: [PATCH 1/3] usb: core: add power sequence for USB devices
-In-Reply-To: <20160314104229.GA2131@shlinux2.ap.freescale.net>
-References: <1456999276-6315-1-git-send-email-peter.chen@nxp.com>
- <1456999276-6315-2-git-send-email-peter.chen@nxp.com>
- <CAL_JsqLYHzb0ABYN_P9ZOEorT6otvn_BPNzuCFhoqwa5M4y-hw@mail.gmail.com>
- <20160304020242.GB30272@shlinux2.ap.freescale.net>
- <20160304022305.GB20597@lunn.ch>
- <20160304023750.GF30272@shlinux2.ap.freescale.net>
- <20160305042854.GW13525@rob-hp-laptop>
- <20160305083347.GA28858@shlinux2.ap.freescale.net>
- <20160305141011.GA28343@lunn.ch>
- <20160314104229.GA2131@shlinux2.ap.freescale.net>
-Message-ID: <CAL411-r9BYeXcWCQuTSmUs0A-61CiBrO3xuAeW0uLSs7z-Kjrg@mail.gmail.com>
+From: anna-maria@linutronix.de (Anna-Maria Gleixner)
+Date: Mon,  4 Apr 2016 12:42:29 +0200
+Subject: [PATCH] arm64/debug: Remove superfluous SMP function call
+Message-ID: <1459766549-17189-1-git-send-email-anna-maria@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 14, 2016 at 6:42 PM, Peter Chen <hzpeterchen@gmail.com> wrote:
-> On Sat, Mar 05, 2016 at 03:10:11PM +0100, Andrew Lunn wrote:
->> > So, would you like to accept the generic solution like below:
->> >
->> > - Create a generic power sequence driver, and it will be probed
->> > according to compatible string at device tree. At its probe,
->> > we can create a power sequence structure, and let this structure
->> > as the private data for this power sequence device.
->>
->> I'm not sure a separate driver is required. Why not consider it more
->> like pinctrl properties? They are listed in the devices node. Have the
->> bus enumerate code first walk all children and run their on sequence.
->> Bus shutdown would again walk the children and run the off sequence.
->>
->
-> The device which needs power sequence may not at platform bus, it may
-> be at USB bus, MMC bus, etc.
->
-> From what I see, A generic pwrseq driver can cover gpio-en, gpio-rst, clock,
-> clock-freq, etc, but I find the pwrseq_emmc does something special, like
-> request a restart handler.
->
-> Add Ulf, who is the power sequence author for MMC.
->
-> Hi Ulf, Rob suggested that if we can create some generic things (driver
-> or library) for power sequence for all devices, what do you think?
->
-> --
->
-> Best Regards,
-> Peter Chen
+Since commit 1cf4f629d9d2 "cpu/hotplug: Move online calls to
+hotplugged cpu" it is ensured that callbacks of CPU_ONLINE and
+CPU_DOWN_PREPARE are processed on the hotplugged cpu. Due to this SMP
+function calls are no longer required.
 
-ping....
+Replace smp_call_function_single() with a direct call to
+clear_os_lock(). The function writes the OSLAR register to clear OS
+locking. This does not require to be called with interrupts disabled,
+therefore the smp_call_function_single() calling convention is not
+preserved.
 
-Any more comments? If no, I will try to create some generic stuffs for
-power sequence.
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: linux-arm-kernel at lists.infradead.or
+Signed-off-by: Anna-Maria Gleixner <anna-maria@linutronix.de>
+---
+ arch/arm64/kernel/debug-monitors.c |    3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
--- 
-BR,
-Peter Chen
+--- a/arch/arm64/kernel/debug-monitors.c
++++ b/arch/arm64/kernel/debug-monitors.c
+@@ -135,9 +135,8 @@ static void clear_os_lock(void *unused)
+ static int os_lock_notify(struct notifier_block *self,
+ 				    unsigned long action, void *data)
+ {
+-	int cpu = (unsigned long)data;
+ 	if ((action & ~CPU_TASKS_FROZEN) == CPU_ONLINE)
+-		smp_call_function_single(cpu, clear_os_lock, NULL, 1);
++		clear_os_lock(NULL);
+ 	return NOTIFY_OK;
+ }
+ 
