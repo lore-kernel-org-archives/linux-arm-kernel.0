@@ -1,37 +1,50 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sun, 3 Apr 2016 22:42:13 +0200
-Subject: Build regressions/improvements in v4.6-rc2
-In-Reply-To: <1459716033-31934-1-git-send-email-geert@linux-m68k.org>
-References: <1459716033-31934-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <CAMuHMdUmcF4h=FNs_PCKLMjKZBr2Nc_VbShy-wN1_9g=9uok8w@mail.gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 04 Apr 2016 09:58:34 +0900
+Subject: [PATCH V2] extcon: palmas: Drop stray IRQF_EARLY_RESUME flag
+In-Reply-To: <1459518767-20382-1-git-send-email-nm@ti.com>
+References: <1459518767-20382-1-git-send-email-nm@ti.com>
+Message-ID: <5701BC3A.5070606@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 3, 2016 at 10:40 PM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> JFYI, when comparing v4.6-rc2[1] to v4.6-rc1[3], the summaries are:
->   - build errors: +5/-4
+On 2016? 04? 01? 22:52, Nishanth Menon wrote:
+> Palmas extcon IRQs are nested threaded and wired to the Palmas
+> interrupt controller. So, this flag is not required for nested
+> IRQs anymore, since commit 3c646f2c6aa9 ("genirq: Don't suspend
+> nested_thread irqs over system suspend") was merged. However, the
+> fix in commit ae64e42cc2b3 ("extcon: palmas: Drop IRQF_EARLY_RESUME
+> flag") missed a stray flag causing the following crash on resume on
+> BeagleBoard-X15 platform:
+> 
+> [   53.670141] Unhandled fault: imprecise external abort (0x1406) at 0x00000000
+> [..]
+> [   53.670141] [<c04ae734>] (omap_set_gpio_triggering) from [<c04aeb94>] (omap_gpio_unmask_irq+0xc0/0xc4)
+> [   53.670141] [<c04aeb94>] (omap_gpio_unmask_irq) from [<c01a0b88>] (irq_enable+0x30/0x44)
+> [   53.670141] [<c01a0b88>] (irq_enable) from [<c019ebd8>] (__enable_irq+0x54/0x78)
+> [   53.670141] [<c019ebd8>] (__enable_irq) from [<c01a4e60>] (resume_irqs+0xe8/0x100)
+> [   53.670141] [<c01a4e60>] (resume_irqs) from [<c0514840>] (syscore_resume+0x94/0x298)
+> [   53.670141] [<c0514840>] (syscore_resume) from [<c01981cc>] (suspend_devices_and_enter+0x790/0x9e4)
+> [   53.670141] [<c01981cc>] (suspend_devices_and_enter) from [<c0198a60>] (pm_suspend+0x640/0x75c)
+> [   53.670141] [<c0198a60>] (pm_suspend) from [<c0196bec>] (state_store+0x64/0xb8)
+> [   53.670141] [<c0196bec>] (state_store) from [<c0307944>] (kernfs_fop_write+0xc0/0x1bc)
+> [   53.670141] [<c0307944>] (kernfs_fop_write) from [<c028acb0>] (__vfs_write+0x1c/0xd8)
+> [   53.670141] [<c028acb0>] (__vfs_write) from [<c028bba0>] (vfs_write+0x90/0x16c)
+> [   53.670141] [<c028bba0>] (vfs_write) from [<c028c8c0>] (SyS_write+0x44/0x9c)
+> [   53.670141] [<c028c8c0>] (SyS_write) from [<c0107840>] (ret_fast_syscall+0x0/0x1c)
+> [..]
+> 
+> Fixes: ae64e42cc2b3 ("extcon: palmas: Drop IRQF_EARLY_RESUME flag")
+> Cc: Grygorii Strashko <grygorii.strashko@ti.com>
+> Cc: MyungJoo Ham <myungjoo.ham@samsung.com>
+> Cc: Chanwoo Choi <cw00.choi@samsung.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Cc: Roger Quadros <rogerq@ti.com>
+> 
+> Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
 
-  + error: qfprom.c: undefined reference to `clk_round_rate':  =>
-.text+0x310254), .text+0x3103a8), .text+0x1f7550)
-  + error: qfprom.c: undefined reference to `clk_set_parent':  =>
-.text+0x246ca0)
-  + error: qfprom.c: undefined reference to `clk_set_rate':  =>
-.text+0x3103e8), .text+0x24be0c), .text+0x1f771c), .text+0x1dff48),
-.text+0x1f76d8)
+Applied it.
 
-arm-randconfig
-
-> [1] http://kisskb.ellerman.id.au/kisskb/head/10139/ (261 out of 262 configs)
-> [3] http://kisskb.ellerman.id.au/kisskb/head/10114/ (all 262 configs)
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks,
+Chanwoo Choi
