@@ -1,161 +1,54 @@
-From: liviu.dudau@arm.com (Liviu Dudau)
-Date: Mon, 4 Apr 2016 17:54:17 +0100
-Subject: [PATCH] ARM: arm64: dts: Add expansion bus to VExpress and Juno
-In-Reply-To: <1459786850-29409-1-git-send-email-brian.starkey@arm.com>
-References: <1459786850-29409-1-git-send-email-brian.starkey@arm.com>
-Message-ID: <20160404165416.GA1312@e106497-lin.cambridge.arm.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Mon, 4 Apr 2016 20:03:43 +0300
+Subject: [PATCH for v4.7] arm: lpc32xx: remove leftovers of legacy clock
+ source and provider drivers
+In-Reply-To: <1459784558.25564.6.camel@localhost>
+References: <1456973180-31764-1-git-send-email-vz@mleia.com>
+ <1459784558.25564.6.camel@localhost>
+Message-ID: <57029E6F.5050300@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 04, 2016 at 05:20:50PM +0100, Brian Starkey wrote:
-> The VExpress and Juno development platforms have an external expansion
-> bus which can be used for additional hardware (e.g. LogicTile Express
-> daughterboards).
-> Add this bus to all VExpress CoreTile and Juno device-trees.
+Hi Sylvain,
+
+On 04.04.2016 18:42, Sylvain Lemieux wrote:
+> Hi Vladimir,
 > 
-> On VExpress, the bus is described for a CoreTile located on site 1.
+> On Thu, 2016-03-03 at 04:46 +0200, Vladimir Zapolskiy wrote:
+>> After switching the platform to common clock framework there is no
+>> more need to keep dead code in arch/arm/mach-lpc32xx, which glued
+>> legacy clock source and clock provider drivers, remove the leftovers.
+>>
+>> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+>> ---
+>>  arch/arm/mach-lpc32xx/common.c | 95 ------------------------------------------
+>>  arch/arm/mach-lpc32xx/common.h | 23 +---------
+>>  2 files changed, 1 insertion(+), 117 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-lpc32xx/common.h b/arch/arm/mach-lpc32xx/common.h
+>> index 1cd8853..f03683f 100644
+>> --- a/arch/arm/mach-lpc32xx/common.h
+>> +++ b/arch/arm/mach-lpc32xx/common.h
+>> @@ -19,38 +19,17 @@
+>>  
+>>  #include <linux/reboot.h>
+>>  
+> It is possible to remove "reboot.h";
+> do you want me to send a separate patch for it?
 
-s/located on/occupying/
+I assume that removing of this #include entry is independent from my patch,
+and related to gone lpc32xx_restart, please send a fixup on top of v4.6-r1.
 
-You're trying to say that the CPU for which one of these DTs apply is running
-on SITE1 so the expansion bus described here is available on SITE2.
+>>  extern void lpc23xx_restart(enum reboot_mode, const char *);
+>>  
+> The patch does not apply on 4.6-rc1;
+> can you send a version 2 of your patch based on the latest mainline?
+>
 
-> 
-> Signed-off-by: Brian Starkey <brian.starkey@arm.com>
+Right, the change requires a rebase, I'll send v2 shortly.
 
-Otherwise, looks good to me.
+Thanks!
 
-With that change:
-
-Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
-
-Best regards,
-Liviu
-
-> ---
->  arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts |   13 +++++++++++++
->  arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts  |   13 +++++++++++++
->  arch/arm/boot/dts/vexpress-v2p-ca5s.dts     |   13 +++++++++++++
->  arch/arm/boot/dts/vexpress-v2p-ca9.dts      |   13 +++++++++++++
->  arch/arm64/boot/dts/arm/juno-base.dtsi      |   10 ++++++++++
->  5 files changed, 62 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
-> index 9420053..ec7539b 100644
-> --- a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
-> +++ b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
-> @@ -280,4 +280,17 @@
->  
->  		/include/ "vexpress-v2m-rs1.dtsi"
->  	};
-> +
-> +	site2: hsb at 40000000 {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges = <0 0 0x40000000 0x3fef0000>;
-> +		#interrupt-cells = <1>;
-> +		interrupt-map-mask = <0 3>;
-> +		interrupt-map = <0 0 &gic 0 36 4>,
-> +				<0 1 &gic 0 37 4>,
-> +				<0 2 &gic 0 38 4>,
-> +				<0 3 &gic 0 39 4>;
-> +	};
->  };
-> diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-> index 17f63f7..a339b0c 100644
-> --- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-> +++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-> @@ -638,4 +638,17 @@
->  
->  		/include/ "vexpress-v2m-rs1.dtsi"
->  	};
-> +
-> +	site2: hsb at 40000000 {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges = <0 0 0x40000000 0x3fef0000>;
-> +		#interrupt-cells = <1>;
-> +		interrupt-map-mask = <0 3>;
-> +		interrupt-map = <0 0 &gic 0 36 4>,
-> +				<0 1 &gic 0 37 4>,
-> +				<0 2 &gic 0 38 4>,
-> +				<0 3 &gic 0 39 4>;
-> +	};
->  };
-> diff --git a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
-> index d2709b7..76a9ccb 100644
-> --- a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
-> +++ b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
-> @@ -250,4 +250,17 @@
->  
->  		/include/ "vexpress-v2m-rs1.dtsi"
->  	};
-> +
-> +	site2: hsb at 40000000 {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges = <0 0x40000000 0x40000000>;
-> +		#interrupt-cells = <1>;
-> +		interrupt-map-mask = <0 3>;
-> +		interrupt-map = <0 0 &gic 0 36 4>,
-> +				<0 1 &gic 0 37 4>,
-> +				<0 2 &gic 0 38 4>,
-> +				<0 3 &gic 0 39 4>;
-> +	};
->  };
-> diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-> index d949fac..edac212 100644
-> --- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-> +++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-> @@ -359,4 +359,17 @@
->  
->  		/include/ "vexpress-v2m.dtsi"
->  	};
-> +
-> +	site2: hsb at e0000000 {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges = <0 0xe0000000 0x20000000>;
-> +		#interrupt-cells = <1>;
-> +		interrupt-map-mask = <0 3>;
-> +		interrupt-map = <0 0 &gic 0 36 4>,
-> +				<0 1 &gic 0 37 4>,
-> +				<0 2 &gic 0 38 4>,
-> +				<0 3 &gic 0 39 4>;
-> +	};
->  };
-> diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
-> index 68ccc39..dee2386 100644
-> --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
-> +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
-> @@ -272,3 +272,13 @@
->  
->  		/include/ "juno-motherboard.dtsi"
->  	};
-> +
-> +	site2: tlx at 60000000 {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges = <0 0 0x60000000 0x10000000>;
-> +		#interrupt-cells = <1>;
-> +		interrupt-map-mask = <0 0>;
-> +		interrupt-map = <0 0 &gic 0 0 0 168 IRQ_TYPE_LEVEL_HIGH>;
-> +	};
-> -- 
-> 1.7.9.5
-> 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+--
+With best wishes,
+Vladimir
