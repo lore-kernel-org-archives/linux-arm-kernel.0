@@ -1,56 +1,97 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Mon, 4 Apr 2016 11:35:09 +0200
-Subject: [PATCH v6 2/5] vfio: allow the user to register reserved iova
- range for MSI mapping
-In-Reply-To: <201604041755.NOuQMtNK%fengguang.wu@intel.com>
-References: <201604041755.NOuQMtNK%fengguang.wu@intel.com>
-Message-ID: <5702354D.7000101@linaro.org>
+From: pmladek@suse.com (Petr Mladek)
+Date: Mon, 4 Apr 2016 11:38:19 +0200
+Subject: [PATCH v4 1/5] printk/nmi: generic solution for safe printk in NMI
+In-Reply-To: <20160404044928.GD6164@swordfish>
+References: <1459353210-20260-1-git-send-email-pmladek@suse.com>
+ <1459353210-20260-2-git-send-email-pmladek@suse.com>
+ <20160404044928.GD6164@swordfish>
+Message-ID: <20160404093819.GH1023@pathway.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/04/2016 11:30 AM, kbuild test robot wrote:
-> Hi Eric,
+On Mon 2016-04-04 13:49:28, Sergey Senozhatsky wrote:
+> Hello,
 > 
-> [auto build test ERROR on iommu/next]
-> [also build test ERROR on v4.6-rc2 next-20160404]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+> On (03/30/16 17:53), Petr Mladek wrote:
+> [..]
+> > @@ -67,10 +67,12 @@ extern void irq_exit(void);
+> >  		preempt_count_add(NMI_OFFSET + HARDIRQ_OFFSET);	\
+> >  		rcu_nmi_enter();				\
+> >  		trace_hardirq_enter();				\
+> > +		printk_nmi_enter();				\
+> >  	} while (0)
+> >  
+> >  #define nmi_exit()						\
+> >  	do {							\
+> > +		printk_nmi_exit();				\
+> >  		trace_hardirq_exit();				\
+> >  		rcu_nmi_exit();					\
+> >  		BUG_ON(!in_nmi());				\
 > 
-> url:    https://github.com/0day-ci/linux/commits/Eric-Auger/KVM-PCIe-MSI-passthrough-on-ARM-ARM64-kernel-part-3-3-vfio-changes/20160404-163335
-> base:   https://git.kernel.org/pub/scm/linux/kernel/git/joro/iommu.git next
-> config: x86_64-randconfig-s1-04041632 (attached as .config)
-> reproduce:
->         # save the attached .config to linux build tree
->         make ARCH=x86_64 
-This series needs to be applied on top of
-- part 2: [PATCH v6 0/4] KVM PCIe/MSI passthrough on ARM/ARM64: kernel
-part 2/3: msi changes, https://lkml.org/lkml/2016/4/4/104
-- part 1 ([PATCH v6 0/7] KVM PCIe/MSI passthrough on ARM/ARM64: kernel
-part 1/3: iommu changes, https://lkml.org/lkml/2016/4/4/90)
+> isn't it a bit too early to printk_nmi_exit()? rcu_nmi_exit() can
+> WARN_ON_ONCE() in 3 places.
+> 
+> the same goes for printk_nmi_enter(). rcu_nmi_enter() can WARN_ON_ONCE().
+> 
+> seems that in both cases we can endup having WARN_ON_ONCE() from nmi,
+> but with default printk function.
+
+Great catch! You are right.
 
 
-Best Regards
+> > +/*
+> > + * Flush data from the associated per_CPU buffer. The function
+> > + * can be called either via IRQ work or independently.
+> > + */
+> > +static void __printk_nmi_flush(struct irq_work *work)
+> > +{
+> > +	static raw_spinlock_t read_lock =
+> > +		__RAW_SPIN_LOCK_INITIALIZER(read_lock);
+> > +	struct nmi_seq_buf *s = container_of(work, struct nmi_seq_buf, work);
+> > +	unsigned long flags;
+> > +	size_t len, size;
+> > +	int i, last_i;
+> > +
+> > +	/*
+> > +	 * The lock has two functions. First, one reader has to flush all
+> > +	 * available message to make the lockless synchronization with
+> > +	 * writers easier. Second, we do not want to mix messages from
+> > +	 * different CPUs. This is especially important when printing
+> > +	 * a backtrace.
+> > +	 */
+> > +	raw_spin_lock_irqsave(&read_lock, flags);
+> > +
+> 
+> hm... so here we have
+> 	for (; i < size; i++)
+> 		printk()
+> 
+> under the spinlock. the thing is that one of printk() can end up
+> in console_unlock()->call_console_drivers() loop, iterating there
+> long enough to spinlock lockup other CPUs that might want to flush
+> NMI buffers (if any), assuming that there are enough printk() (or
+> may be a slow serial console) happening concurrently on other CPUs
+> to keep the current ->read_lock busy. async printk can help here,
+> but user can request sync version of printk.
 
-Eric
-> 
-> All errors (new ones prefixed by >>):
-> 
->>> drivers/vfio/vfio_iommu_type1.c:39:38: fatal error: linux/dma-reserved-iommu.h: No such file or directory
->    compilation terminated.
-> 
-> vim +39 drivers/vfio/vfio_iommu_type1.c
-> 
->     33	#include <linux/rbtree.h>
->     34	#include <linux/sched.h>
->     35	#include <linux/slab.h>
->     36	#include <linux/uaccess.h>
->     37	#include <linux/vfio.h>
->     38	#include <linux/workqueue.h>
->   > 39	#include <linux/dma-reserved-iommu.h>
->     40	
->     41	#define DRIVER_VERSION  "0.2"
->     42	#define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
-> 
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
-> 
+I think that printk() is called on many other locations under
+a spinlock and they all are waiting for the async printk.
+
+
+> how about using deferred printk for nmi flush?
+> print_nmi_seq_line()->printk_deferred() ?
+
+But this is great idea. It will help to avoid the ugly macro
+deferred_console_in_nmi() as you mentioned in the other mail.
+
+Heh, I remember that I thought about this but I did not want
+to override the original log level of the messages. Now, I see
+that LOGLEVEL_SCHED is added on top and the original level
+is preserved.
+
+Thanks a lot for review. I am going to wait with respin a bit
+and give others some time for feedback.
+
+
+Best Regards,
+Petr
