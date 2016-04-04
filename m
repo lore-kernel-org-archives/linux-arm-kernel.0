@@ -1,61 +1,86 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 4 Apr 2016 15:53:47 +0200
-Subject: [PATCH v2 02/16] arm64: dts: add sp804 timer node for Hi6220
-In-Reply-To: <20160404134237.GC402@leoy-linaro>
-References: <1459589383-16914-1-git-send-email-guodong.xu@linaro.org>
- <1459589383-16914-3-git-send-email-guodong.xu@linaro.org>
- <CACRpkdbWuKx6=aF5xW=3EKfuUf-MYM_EEnovyhBnOGVOeHyCmQ@mail.gmail.com>
- <20160404014359.GA15178@leoy-linaro>
- <CACRpkdZ=_86Rhc+ei+3uE0dda9+onC8pQwosheMfEj4tOqmcDA@mail.gmail.com>
- <20160404134237.GC402@leoy-linaro>
-Message-ID: <CACRpkdb_aMpj3X-m-FdM-PCCSuXgHnect5+nWPFnGVzGx4zrbA@mail.gmail.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Mon, 4 Apr 2016 16:55:23 +0300
+Subject: [PATCH] i2c/omap: drop the lock hard irq context
+Message-ID: <1459778123-16267-1-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 4, 2016 at 3:42 PM, Leo Yan <leo.yan@linaro.org> wrote:
-> On Mon, Apr 04, 2016 at 01:21:00PM +0200, Linus Walleij wrote:
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
 
->> This is not about enabling/disabling the clock(s) to the timer.
->> It doesn't matter if these clocks are always on.
->>
->> It is about determining the *frequency* of the timers.
->>
->> It is vital that the timer driver get the right frequency of the clock
->> to the block from the clock implementation, and I do not think
->> it is the same as the "apb_pclk".
->
-> Thanks for reminding. Fortunately, apb_pclk and timer's clock are
-> same, all of them's rate are 19.2MHz.
+The lock is taken while reading two registers. On RT the first lock is
+taken in hard irq where it might sleep and in the threaded irq.
+The threaded irq runs in oneshot mode so the hard irq does not run until
+the thread the completes so there is no reason to grab the lock.
 
-OK I was wrong, worrying about nothing.
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+[grygorii.strashko at ti.com: drop locking from isr completely and remove
+lock field from struct omap_i2c_dev]
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+---
+RFC:
+ http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/188370.html
+ drivers/i2c/busses/i2c-omap.c | 12 +-----------
+ 1 file changed, 1 insertion(+), 11 deletions(-)
 
->> The thing is that of course "any frequency" will
->> work but what you will notice is that the timer runs very
->> weirdly compared to wall-clock time unless the right clock
->> yielding the right frequency has been specified here.
->
-> Compared sp804 timer counter with wall-clock (which is using ARM's
-> arch timer), and confirmed that sp804 timer's counter register is
-> decreasing with rate 19.2MHz.
-
-Thanks, awesome.
-
-> Also have checked Hi6220's spec, there have no timer's dediated clock
-> enabling bits. This is the reason before I only registered one clock.
-> So according to you and Rob's comments, how about change as below?
->
->                 dual_timer0: timer at f8008000 {
->                         compatible = "arm,sp804", "arm,primecell";
->                         reg = <0x0 0xf8008000 0x0 0x1000>;
->                         interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
->                                      <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
->                         clocks = <&ao_ctrl HI6220_TIMER0_PCLK>,
->                                  <&ao_ctrl HI6220_TIMER0_PCLK>,
->                                  <&ao_ctrl HI6220_TIMER0_PCLK>;
->                         clock-names = "apb_pclk", "apb_pclk", "apb_pclk";
-
-This works for me, though I think only the last name
-matters so I would name the first two "timer1" and "timer2".
-
-Yours,
-Linus Walleij
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index 13c4529..ab1279b 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -185,7 +185,6 @@ enum {
+ #define OMAP_I2C_IP_V2_INTERRUPTS_MASK	0x6FFF
+ 
+ struct omap_i2c_dev {
+-	spinlock_t		lock;		/* IRQ synchronization */
+ 	struct device		*dev;
+ 	void __iomem		*base;		/* virtual */
+ 	int			irq;
+@@ -995,15 +994,12 @@ omap_i2c_isr(int irq, void *dev_id)
+ 	u16 mask;
+ 	u16 stat;
+ 
+-	spin_lock(&omap->lock);
+-	mask = omap_i2c_read_reg(omap, OMAP_I2C_IE_REG);
+ 	stat = omap_i2c_read_reg(omap, OMAP_I2C_STAT_REG);
++	mask = omap_i2c_read_reg(omap, OMAP_I2C_IE_REG);
+ 
+ 	if (stat & mask)
+ 		ret = IRQ_WAKE_THREAD;
+ 
+-	spin_unlock(&omap->lock);
+-
+ 	return ret;
+ }
+ 
+@@ -1011,12 +1007,10 @@ static irqreturn_t
+ omap_i2c_isr_thread(int this_irq, void *dev_id)
+ {
+ 	struct omap_i2c_dev *omap = dev_id;
+-	unsigned long flags;
+ 	u16 bits;
+ 	u16 stat;
+ 	int err = 0, count = 0;
+ 
+-	spin_lock_irqsave(&omap->lock, flags);
+ 	do {
+ 		bits = omap_i2c_read_reg(omap, OMAP_I2C_IE_REG);
+ 		stat = omap_i2c_read_reg(omap, OMAP_I2C_STAT_REG);
+@@ -1142,8 +1136,6 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
+ 	omap_i2c_complete_cmd(omap, err);
+ 
+ out:
+-	spin_unlock_irqrestore(&omap->lock, flags);
+-
+ 	return IRQ_HANDLED;
+ }
+ 
+@@ -1330,8 +1322,6 @@ omap_i2c_probe(struct platform_device *pdev)
+ 	omap->dev = &pdev->dev;
+ 	omap->irq = irq;
+ 
+-	spin_lock_init(&omap->lock);
+-
+ 	platform_set_drvdata(pdev, omap);
+ 	init_completion(&omap->cmd_complete);
+ 
+-- 
+2.8.0
