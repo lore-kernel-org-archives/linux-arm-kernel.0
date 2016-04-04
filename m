@@ -1,56 +1,58 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Mon,  4 Apr 2016 17:22:06 -0300
-Subject: [PATCH 5/5] leds: gpio: Support the panic-blink firmware property
-In-Reply-To: <1459801326-5541-1-git-send-email-ezequiel@vanguardiasur.com.ar>
-References: <1459801326-5541-1-git-send-email-ezequiel@vanguardiasur.com.ar>
-Message-ID: <1459801326-5541-6-git-send-email-ezequiel@vanguardiasur.com.ar>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 4 Apr 2016 22:49:11 +0200
+Subject: DCD interrupt for i.MX25 UART
+In-Reply-To: <20160329131443.09e46ad6@ipc1.ka-ro>
+References: <20160323153638.GO6191@pengutronix.de>
+ <20160329131443.09e46ad6@ipc1.ka-ro>
+Message-ID: <20160404204911.GA5384@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GPIO LEDs are relatively cheap, and so are ideal to blink on
-a kernel panic. This commit adds support for the new "panic-blink"
-firmware property, allowing to mark a given LED to blink on
-a kernel panic.
+Hallo Lothar,
 
-Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
----
- drivers/leds/leds-gpio.c | 4 ++++
- include/linux/leds.h     | 1 +
- 2 files changed, 5 insertions(+)
+On Tue, Mar 29, 2016 at 01:14:43PM +0200, Lothar Wa?mann wrote:
+> On Wed, 23 Mar 2016 16:36:38 +0100 Uwe Kleine-K?nig wrote:
+> > Hello,
+> > 
+> > I have a problem with an UART on an i.MX25 based machine. I implemented
+> > DCD (and other handshake lines) irq handling[1].
+> > 
+> > Now a user of this patch noticed that DCD handling (at least) is broken.
+> > The problem is that the USR2_DCDDELT bit doesn't clear:
+> > 
+> > 	root at hostname:~ memtool md 0x43f90080+0x34  
+> > 	43f90080: 00000000 00004021 0000078c 00004002                ....!@....... at ..
+> > 	43f90090: 00000b41 00002040 00005268 0000002b                A...@ ..hR..+...
+> > 	43f900a0: 00000000 000000bf 00002e62 00000008                ........b.......
+> > 	43f900b0: 0000251c                                           .%..
+> > 
+> > 	root at hostname:~ memtool mw 0x43f90098 0x0x40
+>                                               ^^^^^^
+> This looks rather fishy.
 
-diff --git a/drivers/leds/leds-gpio.c b/drivers/leds/leds-gpio.c
-index 61143f55597e..74e35dcaf874 100644
---- a/drivers/leds/leds-gpio.c
-+++ b/drivers/leds/leds-gpio.c
-@@ -127,6 +127,8 @@ static int create_gpio_led(const struct gpio_led *template,
- 	led_dat->cdev.brightness = state ? LED_FULL : LED_OFF;
- 	if (!template->retain_state_suspended)
- 		led_dat->cdev.flags |= LED_CORE_SUSPENDRESUME;
-+	if (template->panic_blink)
-+		led_dat->cdev.flags |= LED_BLINK_AT_PANIC;
- 
- 	ret = gpiod_direction_output(led_dat->gpiod, state);
- 	if (ret < 0)
-@@ -200,6 +202,8 @@ static struct gpio_leds_priv *gpio_leds_create(struct platform_device *pdev)
- 
- 		if (fwnode_property_present(child, "retain-state-suspended"))
- 			led.retain_state_suspended = 1;
-+		if (fwnode_property_present(child, "panic-blink"))
-+			led.panic_blink = 1;
- 
- 		ret = create_gpio_led(&led, &priv->leds[priv->num_leds],
- 				      dev, NULL);
-diff --git a/include/linux/leds.h b/include/linux/leds.h
-index d33b230ce66d..e8e99cc5f99e 100644
---- a/include/linux/leds.h
-+++ b/include/linux/leds.h
-@@ -363,6 +363,7 @@ struct gpio_led {
- 	unsigned 	gpio;
- 	unsigned	active_low : 1;
- 	unsigned	retain_state_suspended : 1;
-+	unsigned	panic_blink : 1;
- 	unsigned	default_state : 2;
- 	/* default_state should be one of LEDS_GPIO_DEFSTATE_(ON|OFF|KEEP) */
- 	struct gpio_desc *gpiod;
+Probably a cut-and-paste problem. I tried this several times with
+various values, the bit doesn't clear.
+
+> > 	root at hostname:~ memtool md 0x43f90080+0x34  
+> > 	43f90080: 00000000 00004021 0000078c 00004002                ....!@....... at ..
+> > 	43f90090: 00000b41 00002040 00005268 0000002b                A...@ ..hR..+...
+> > 	43f900a0: 00000000 000000bf 00002e62 00000008                ........b.......
+> > 	43f900b0: 0000251c                                           .%..
+> > 
+> > In fact even writing 0xffff doesn't change the register, where I would expect
+> > that the DCDDELT bit (0x40) disappears. I'm sure there is nothing toggling this
+> > line.
+> > 
+> Are you sure the clock is enabled when doing your manual tests?
+
+I guess they are. For sure the same thing happens with the driver active
+and the device open. And the symptoms are the same: If the DCDDELTA irq
+is enabled and active the machine is stuck until the irq upper layers
+disable the respective irq.
+
+Best regards
+Uwe
+
 -- 
-2.7.0
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
