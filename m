@@ -1,31 +1,41 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Mon,  4 Apr 2016 15:48:34 -0400
-Subject: [PATCH] arm: lpc32xx: remove reboot header file
-Message-ID: <1459799314-8987-1-git-send-email-slemieux.tyco@gmail.com>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Mon,  4 Apr 2016 17:22:01 -0300
+Subject: [PATCH 0/5] Extend the LED panic trigger
+Message-ID: <1459801326-5541-1-git-send-email-ezequiel@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sylvain Lemieux <slemieux@tycoint.com>
+As per commit 916fe61995 ("leds: trigger: Introduce a kernel panic LED
+trigger"), the kernel now supports a new LED trigger to hook on
+the panic blink.
 
-The header file "reboot.h" is no longer needed, following
-the migration of the restart code into the pnx4008 watchdog.
+However, the only way of using this is to dedicate a LED device
+to this function.
 
-Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
----
- arch/arm/mach-lpc32xx/common.h | 1 -
- 1 file changed, 1 deletion(-)
+To overcome this limitation, the present series introduces the
+capability to switch the LED trigger of certain LED devices upon
+a kernel panic (using the panic notifier).
 
-diff --git a/arch/arm/mach-lpc32xx/common.h b/arch/arm/mach-lpc32xx/common.h
-index 2d90801..9b5ae42 100644
---- a/arch/arm/mach-lpc32xx/common.h
-+++ b/arch/arm/mach-lpc32xx/common.h
-@@ -21,7 +21,6 @@
- 
- #include <mach/board.h>
- #include <linux/platform_device.h>
--#include <linux/reboot.h>
- 
- /*
-  * Other arch specific structures and functions
+The decision of which LEDs should be switched to the panic trigger
+is left to each LED device driver. As an example, a devicetree
+boolean property is introduced and used in the leds-gpio driver.
+
+Feedback and other ideas on how to implement this are most welcomed.
+
+Ezequiel Garcia (5):
+  leds: triggers: Allow to switch the trigger to "panic" on a kernel
+    panic
+  leds: triggers: Add a led_trigger_event_nosleep API
+  leds: trigger: panic: Use led_trigger_event_nosleep
+  devicetree: leds: Introduce "panic-blink" optional property
+  leds: gpio: Support the panic-blink firmware property
+
+ Documentation/devicetree/bindings/leds/common.txt |  2 +
+ drivers/leds/led-triggers.c                       | 78 +++++++++++++++++++++--
+ drivers/leds/leds-gpio.c                          |  4 ++
+ drivers/leds/trigger/ledtrig-panic.c              |  2 +-
+ include/linux/leds.h                              |  6 ++
+ 5 files changed, 87 insertions(+), 5 deletions(-)
+
 -- 
-1.8.3.1
+2.7.0
