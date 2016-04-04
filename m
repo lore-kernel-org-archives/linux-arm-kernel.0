@@ -1,77 +1,31 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Mon, 4 Apr 2016 14:08:45 -0700
-Subject: 4.4 BCM5301X ARM regression "External imprecise Data abort"
-In-Reply-To: <CACna6rz=KE_FtNtrSKmcYE514s4-dgrnx=iGbN7JDXkQPd6bTw@mail.gmail.com>
-References: <CACna6rz=KE_FtNtrSKmcYE514s4-dgrnx=iGbN7JDXkQPd6bTw@mail.gmail.com>
-Message-ID: <5702D7DD.2080205@broadcom.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 4 Apr 2016 14:13:16 -0700
+Subject: [PATCH v4 1/3] dmaengine: sun6i: Simplify lli setting
+In-Reply-To: <996299d88a877386f7293b5b0eefa583cb68c8ba.1459590553.git.moinejf@free.fr>
+References: <cover.1459590553.git.moinejf@free.fr>
+ <996299d88a877386f7293b5b0eefa583cb68c8ba.1459590553.git.moinejf@free.fr>
+Message-ID: <20160404211316.GN4227@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafal,
+On Sat, Apr 02, 2016 at 11:24:45AM +0200, Jean-Francois Moine wrote:
+> Checking the DMA config before setting the lli list avoids to do tests
+> inside the setting loop.
+> 
+> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
 
-I do not work on BCM5301x SoCs but perhaps Jon Mason can comment.
-A few comments inline as well.
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-On 16-04-03 11:13 PM, Rafa? Mi?ecki wrote:
-> Hi guys,
->
-> I got regression reports from Netgear R8000 (BCM4709A0) users and did
-> some testing & regression tracking with Aditya.
->
-> It happens that Linux 4.4 doesn't boot due to the following commits:
-> bbeb920 ("ARM: 8422/1: enable imprecise aborts during early kernel startup")
-> 9254970 ("ARM: 8447/1: catch pending imprecise abort on unmask")
-> 937b123 ("ARM: BCM5301X: remove workaround imprecise abort fault handler")
->
-> In kernel 4.3 we got that abort workaround which was resulting in:
-> [    5.007128] Freeing unused kernel memory: 212K (c0435000 - c046a000)
-> [    5.694632] init: Console is alive
-> [    5.698169] init: - watchdog -
-> [    5.701470] External imprecise Data abort at addr=0x0, fsr=0x1406 ignored.
-> As you can see, this abort was happening soon after freeing unused
-> memory and ignoring it *once* did the trick. It was never appearing
-> again.
->
-> With 4.4 similar (or the same?) abort happens earlier (during PCI host
-> driver init) and doesn't get ignored:
-> [    2.478461] pci 0000:00:00.0: PCI bridge to [bus 01]
-> [    2.483451] pci 0000:00:00.0:   bridge window [mem 0x08000000-0x085fffff]
-> [    2.599449] pcie_iproc_bcma bcma0:8: PCI host bridge to bus 0001:00
-> [    2.605744] pci_bus 0001:00: root bus resource [mem 0x40000000-0x47ffffff]
-> [    2.612657] pcie_iproc_bcma bcma0:8: link: UP
-> [    2.617241] PCI: bus0: Fast back to back transfers disabled
-> [    2.622845] pci 0001:00:00.0: bridge configuration invalid ([bus
-> 00-00]), reconfiguring
-> [    2.631297] PCI: bus1: Fast back to back transfers disabled
-> [    2.636887] pci 0001:01:00.0: bridge configuration invalid ([bus
-> 00-00]), reconfiguring
-> [    2.645035] Unhandled fault: imprecise external abort (0x1406) at 0x00000000
-> (see 4.4.txt for the backtrace)
->
-> At first I was hoping that we simply need to re-add the removed
-> workaround. I tried it but it appeared that one abort is immediately
-> followed by another:
-> [    2.936895] pci 0001:01:00.0: bridge configuration invalid ([bus
-> 00-00]), reconfiguring
-> [    2.945053] External imprecise Data abort at addr=0x0, fsr=0x1406 ignored.
-> [    2.951966] Unhandled fault: imprecise external abort (0x1406) at 0x00000000
->
-> So it seems that commits bbeb920 and 9254970 broke something in PCI
-> host initialization (or maybe just exposed another bug?). Instead of
-> getting an abort once and late we are getting now many of them and a
-> bit earlier.
-We do not observe such issues in Cygnus and other SoCs that use this 
-PCIe driver (we do not use bcma either - I do not know if that is related).
->
-> Reverting all three commits from the top of 4.4.6 gives me back a
-> working & booting kernel.
->
-> Do you have any idea how to fix this regression (and hopefully
-> original problem as well)?
-I think the proper fix is to correct the issues in the bootloader.  It 
-was my understanding from Jon Mason that this is the root of the 
-original problem.
->
+Maxime
 
-Regards,
-Scott
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160404/d35bb552/attachment.sig>
