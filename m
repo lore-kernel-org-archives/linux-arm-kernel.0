@@ -1,76 +1,52 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Mon, 4 Apr 2016 11:40:29 +0200
-Subject: [PATCH] iommu/arm-smmu: Fix stream-match conflict with
- IOMMU_DOMAIN_DMA
-In-Reply-To: <1459527597-10740-1-git-send-email-will.deacon@arm.com>
-References: <1459527597-10740-1-git-send-email-will.deacon@arm.com>
-Message-ID: <5702368D.6060706@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 4 Apr 2016 10:57:57 +0100
+Subject: [PATCH 0/2] Embedding Position Independent Executables
+In-Reply-To: <1459668234-16033-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1459668234-16033-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20160404095757.GR19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-On 04/01/2016 06:19 PM, Will Deacon wrote:
-> Commit cbf8277ef456 ("iommu/arm-smmu: Treat IOMMU_DOMAIN_DMA as bypass
-> for now") ignores requests to attach a device to the default domain
-> since, without IOMMU-basked DMA ops available everywhere, the default
-> domain will just lead to unexpected transaction faults being reported.
-> 
-> Unfortunately, the way this was implemented on SMMUv2 causes a
-> regression with VFIO PCI device passthrough under KVM on AMD Seattle.
-> On this system, the host controller device is associated with both a
-> pci_dev *and* a platform_device, and can therefore end up with duplicate
-> SMR entries, resulting in a stream-match conflict at runtime.
-> 
-> This patch amends the original fix so that attaching to IOMMU_DOMAIN_DMA
-> is rejected even before configuring the SMRs. This restores the old
-> behaviour for now, but we'll need to look at handing host controllers
-> specially when we come to supporting the default domain fully.
+[Manually reformatted your email so I can reply to it sensibly - please
+don't make me have to do this again, next time I'll ignore your message
+as it's too much effort, thanks]
 
-This works fine for me, before and after PCIe assignment. However before
-giving my T-b I would like to investigate another regression I observe
-wrt SRIOV assignment. Assigning the 1st VF works fine. However assigning
-a second VF does not work anymore (it used to in the past). I get
--ENOSPC from arm_smmu_master_configure_smrs
+On Sun, Apr 03, 2016 at 09:23:52AM +0200, Alexandre Belloni wrote:
+> Hi,
+> 
+> This series tries to revive the many series trying to achieve the same
+> thing.
+> 
+> I've tried numerous approaches and while using the kernel module loader
+> is actually quite convenient from a relocation point of view it is quite
+> overkill and also it is quite often too late as a lot of the arch
+> specific PM code assume that it is running at boot time, befor having
+> access to any filesystem.
+> 
+> I've chosen to be less generic than what Russ did and only handle ARM.
+> I reused the API he defined but I actually went closer to his first
+> implementation by compiling and embedding a real PIE that doesn't
+> actually need relocations (gcc seems to be better at it thanks to ASLR).
+> 
+> In this series, I'm also converting the AT91 suspend code to use that
+> infrastructure as it is quite simple but I also toyed with more complex
+> functions.
+> 
+> The current limitation is that is doesn't actually tries to handle big
+> endian and I didn't test thumb (and this will probably require more work
+> to get that working reliably).
+> 
+> Also, to be more useful prppoer handling of a stack has to be added
+> (this is not too difficult and is planned) and will be enough to get
+> rk3288 suspend/resume and DDR timing changes working.
 
-Best Regards
+Provided there is no linking back to the kernel image (which is enforced
+by the --no-undefined flag), this at first glance looks okay, but what
+is the motivation behind this change?  Just because there's "many series
+trying to do this" isn't really a justification or a reason why we should
+include this in the mainline kernel.
 
-Eric
-> 
-> Reported-by: Eric Auger <eric.auger@linaro.org>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  drivers/iommu/arm-smmu.c | 14 ++++++++------
->  1 file changed, 8 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index e933679a3266..2f186d22477f 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -1098,18 +1098,20 @@ static int arm_smmu_domain_add_master(struct arm_smmu_domain *smmu_domain,
->  	struct arm_smmu_device *smmu = smmu_domain->smmu;
->  	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
->  
-> -	/* Devices in an IOMMU group may already be configured */
-> -	ret = arm_smmu_master_configure_smrs(smmu, cfg);
-> -	if (ret)
-> -		return ret == -EEXIST ? 0 : ret;
-> -
->  	/*
->  	 * FIXME: This won't be needed once we have IOMMU-backed DMA ops
-> -	 * for all devices behind the SMMU.
-> +	 * for all devices behind the SMMU. Note that we need to take
-> +	 * care configuring SMRs for devices both a platform_device and
-> +	 * and a PCI device (i.e. a PCI host controller)
->  	 */
->  	if (smmu_domain->domain.type == IOMMU_DOMAIN_DMA)
->  		return 0;
->  
-> +	/* Devices in an IOMMU group may already be configured */
-> +	ret = arm_smmu_master_configure_smrs(smmu, cfg);
-> +	if (ret)
-> +		return ret == -EEXIST ? 0 : ret;
-> +
->  	for (i = 0; i < cfg->num_streamids; ++i) {
->  		u32 idx, s2cr;
->  
-> 
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
