@@ -1,30 +1,31 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 4 Apr 2016 18:05:11 +0100
-Subject: [PATCH] ARM: arm64: dts: Add expansion bus to VExpress and Juno
-In-Reply-To: <1459786850-29409-1-git-send-email-brian.starkey@arm.com>
-References: <1459786850-29409-1-git-send-email-brian.starkey@arm.com>
-Message-ID: <57029EC7.8030802@arm.com>
+From: vishalm@ti.com (Vishal Mahaveer)
+Date: Mon, 4 Apr 2016 12:05:37 -0500
+Subject: [PATCH v2] ARM: DRA722: remove redundant definition of 1.0 device
+Message-ID: <1459789537-3423-1-git-send-email-vishalm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Vishal Mahaveer <vishalm@ti.com>
 
+Remove duplicate definition of Rev 1.0 device.
 
-On 04/04/16 17:20, Brian Starkey wrote:
-> The VExpress and Juno development platforms have an external expansion
-> bus which can be used for additional hardware (e.g. LogicTile Express
-> daughterboards).
+Fixes: 81032e34e184 ("ARM: DRA752: Add ID detect for ES2.0")
+Signed-off-by: Vishal Mahaveer <vishalm@ti.com>
+---
+ arch/arm/mach-omap2/soc.h |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
-How do you plan to add those additional hardware on the expansion bus ?
-
-IIUC having them in DT and running on a system without the tile
-connected will cause aborts, hence you are just adding bus definition.
-
-Is there any use in having just the bus definition in DT. If you are
-planning to add devices using overlays, can't the bus definition also
-be added then ?
-
-I am fine with the patch as such, just wanted to know the information.
-
+diff --git a/arch/arm/mach-omap2/soc.h b/arch/arm/mach-omap2/soc.h
+index 79ca3c3..83d3547 100644
+--- a/arch/arm/mach-omap2/soc.h
++++ b/arch/arm/mach-omap2/soc.h
+@@ -471,7 +471,6 @@ IS_OMAP_TYPE(3430, 0x3430)
+ #define DRA752_REV_ES1_1	(DRA7XX_CLASS | (0x52 << 16) | (0x11 << 8))
+ #define DRA752_REV_ES2_0	(DRA7XX_CLASS | (0x52 << 16) | (0x20 << 8))
+ #define DRA722_REV_ES1_0	(DRA7XX_CLASS | (0x22 << 16) | (0x10 << 8))
+-#define DRA722_REV_ES1_0	(DRA7XX_CLASS | (0x22 << 16) | (0x10 << 8))
+ 
+ void omap2xxx_check_revision(void);
+ void omap3xxx_check_revision(void);
 -- 
-Regards,
-Sudeep
+1.7.4.1
