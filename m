@@ -1,10 +1,10 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  4 Apr 2016 10:22:26 +0900
-Subject: [PATCH 18/26] ARM: dts: r8a7791: Remove unnecessary
+Date: Mon,  4 Apr 2016 10:22:33 +0900
+Subject: [PATCH 25/26] ARM: dts: r8a73a4: Remove unnecessary
  clock-output-names properties
 In-Reply-To: <cover.1459731908.git.horms+renesas@verge.net.au>
 References: <cover.1459731908.git.horms+renesas@verge.net.au>
-Message-ID: <f617604fe5d74b9c8d3333bad2e4959abe4594a4.1459731908.git.horms+renesas@verge.net.au>
+Message-ID: <57c75d1ed6890b8c57fce5d0c557a6b486c4d898.1459731908.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,278 +18,253 @@ In the above cases there is only one clock output and its name is taken
 from that of the clock node.  Accordingly, remove the unnecessary
 clock-output-names properties and as necessary update the node names.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/boot/dts/r8a7791.dtsi | 79 +++++++++++++-----------------------------
- 1 file changed, 25 insertions(+), 54 deletions(-)
+The clock-output-names property is left in place for the zb_clk which is
+thus treated as a special case as the MSTP clock driver (clk-mstp.c)
+explicitly looks for a clock with node name zb_clk for the r8a73a4 and
+sh73a0 SoCs.
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 6439f0569fe2..8010d935300f 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -1048,12 +1048,11 @@
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm/boot/dts/r8a73a4.dtsi | 75 ++++++++++++++----------------------------
+ 1 file changed, 25 insertions(+), 50 deletions(-)
+
+diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
+index 6583a1dfca1f..6954912a3753 100644
+--- a/arch/arm/boot/dts/r8a73a4.dtsi
++++ b/arch/arm/boot/dts/r8a73a4.dtsi
+@@ -486,37 +486,32 @@
  		ranges;
  
- 		/* External root clock */
--		extal_clk: extal_clk {
-+		extal_clk: extal {
+ 		/* External root clocks */
+-		extalr_clk: extalr_clk {
++		extalr_clk: extalr {
  			compatible = "fixed-clock";
  			#clock-cells = <0>;
- 			/* This value must be overriden by the board. */
- 			clock-frequency = <0>;
--			clock-output-names = "extal";
+ 			clock-frequency = <32768>;
+-			clock-output-names = "extalr";
  		};
- 
- 		/*
-@@ -1064,27 +1063,23 @@
+-		extal1_clk: extal1_clk {
++		extal1_clk: extal1 {
  			compatible = "fixed-clock";
  			#clock-cells = <0>;
- 			clock-frequency = <0>;
--			clock-output-names = "audio_clk_a";
+ 			clock-frequency = <25000000>;
+-			clock-output-names = "extal1";
  		};
- 		audio_clk_b: audio_clk_b {
- 			compatible = "fixed-clock";
- 			#clock-cells = <0>;
- 			clock-frequency = <0>;
--			clock-output-names = "audio_clk_b";
- 		};
- 		audio_clk_c: audio_clk_c {
- 			compatible = "fixed-clock";
- 			#clock-cells = <0>;
- 			clock-frequency = <0>;
--			clock-output-names = "audio_clk_c";
- 		};
- 
- 		/* External PCIe clock - can be overridden by the board */
--		pcie_bus_clk: pcie_bus_clk {
-+		pcie_bus_clk: pcie_bus {
- 			compatible = "fixed-clock";
- 			#clock-cells = <0>;
- 			clock-frequency = <100000000>;
--			clock-output-names = "pcie_bus";
- 			status = "disabled";
- 		};
- 
-@@ -1098,11 +1093,10 @@
- 		};
- 
- 		/* External USB clock - can be overridden by the board */
--		usb_extal_clk: usb_extal_clk {
-+		usb_extal_clk: usb_extal {
+-		extal2_clk: extal2_clk {
++		extal2_clk: extal2 {
  			compatible = "fixed-clock";
  			#clock-cells = <0>;
  			clock-frequency = <48000000>;
--			clock-output-names = "usb_extal";
+-			clock-output-names = "extal2";
  		};
- 
- 		/* External CAN clock */
-@@ -1111,7 +1105,6 @@
+-		fsiack_clk: fsiack_clk {
++		fsiack_clk: fsiack {
+ 			compatible = "fixed-clock";
  			#clock-cells = <0>;
  			/* This value must be overridden by the board. */
  			clock-frequency = <0>;
--			clock-output-names = "can_clk";
- 			status = "disabled";
+-			clock-output-names = "fsiack";
+ 		};
+-		fsibck_clk: fsibck_clk {
++		fsibck_clk: fsibck {
+ 			compatible = "fixed-clock";
+ 			#clock-cells = <0>;
+ 			/* This value must be overridden by the board. */
+ 			clock-frequency = <0>;
+-			clock-output-names = "fsibck";
  		};
  
-@@ -1129,178 +1122,156 @@
+ 		/* Special CPG clocks */
+@@ -540,171 +535,151 @@
+ 			#clock-cells = <0>;
+ 			clock-output-names = "zb";
  		};
- 
- 		/* Variable factor clocks */
--		sd2_clk: sd2_clk at e6150078 {
-+		sd2_clk: sd2 at e6150078 {
- 			compatible = "renesas,r8a7791-div6-clock", "renesas,cpg-div6-clock";
+-		sdhi0_clk: sdhi0_clk at e6150074 {
++		sdhi0_clk: sdhi0ck at e6150074 {
+ 			compatible = "renesas,r8a73a4-div6-clock", "renesas,cpg-div6-clock";
+ 			reg = <0 0xe6150074 0 4>;
+ 			clocks = <&pll1_div2_clk>, <&cpg_clocks R8A73A4_CLK_PLL2S>,
+ 				 <0>, <&extal2_clk>;
+ 			#clock-cells = <0>;
+-			clock-output-names = "sdhi0ck";
+ 		};
+-		sdhi1_clk: sdhi1_clk at e6150078 {
++		sdhi1_clk: sdhi1ck at e6150078 {
+ 			compatible = "renesas,r8a73a4-div6-clock", "renesas,cpg-div6-clock";
  			reg = <0 0xe6150078 0 4>;
- 			clocks = <&pll1_div2_clk>;
+ 			clocks = <&pll1_div2_clk>, <&cpg_clocks R8A73A4_CLK_PLL2S>,
+ 				 <0>, <&extal2_clk>;
  			#clock-cells = <0>;
--			clock-output-names = "sd2";
+-			clock-output-names = "sdhi1ck";
  		};
--		sd3_clk: sd3_clk at e615026c {
-+		sd3_clk: sd3 at e615026c {
- 			compatible = "renesas,r8a7791-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0 0xe615026c 0 4>;
- 			clocks = <&pll1_div2_clk>;
+-		sdhi2_clk: sdhi2_clk at e615007c {
++		sdhi2_clk: sdhi2ck at e615007c {
+ 			compatible = "renesas,r8a73a4-div6-clock", "renesas,cpg-div6-clock";
+ 			reg = <0 0xe615007c 0 4>;
+ 			clocks = <&pll1_div2_clk>, <&cpg_clocks R8A73A4_CLK_PLL2S>,
+ 				 <0>, <&extal2_clk>;
  			#clock-cells = <0>;
--			clock-output-names = "sd3";
+-			clock-output-names = "sdhi2ck";
  		};
 -		mmc0_clk: mmc0_clk at e6150240 {
 +		mmc0_clk: mmc0 at e6150240 {
- 			compatible = "renesas,r8a7791-div6-clock", "renesas,cpg-div6-clock";
+ 			compatible = "renesas,r8a73a4-div6-clock", "renesas,cpg-div6-clock";
  			reg = <0 0xe6150240 0 4>;
- 			clocks = <&pll1_div2_clk>;
+ 			clocks = <&pll1_div2_clk>, <&cpg_clocks R8A73A4_CLK_PLL2S>,
+ 				 <0>, <&extal2_clk>;
  			#clock-cells = <0>;
 -			clock-output-names = "mmc0";
  		};
--		ssp_clk: ssp_clk at e6150248 {
-+		ssp_clk: ssp at e6150248 {
- 			compatible = "renesas,r8a7791-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0 0xe6150248 0 4>;
- 			clocks = <&pll1_div2_clk>;
+-		mmc1_clk: mmc1_clk at e6150244 {
++		mmc1_clk: mmc1 at e6150244 {
+ 			compatible = "renesas,r8a73a4-div6-clock", "renesas,cpg-div6-clock";
+ 			reg = <0 0xe6150244 0 4>;
+ 			clocks = <&pll1_div2_clk>, <&cpg_clocks R8A73A4_CLK_PLL2S>,
+ 				 <0>, <&extal2_clk>;
  			#clock-cells = <0>;
--			clock-output-names = "ssp";
+-			clock-output-names = "mmc1";
  		};
--		ssprs_clk: ssprs_clk at e615024c {
-+		ssprs_clk: ssprs at e615024c {
- 			compatible = "renesas,r8a7791-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0 0xe615024c 0 4>;
- 			clocks = <&pll1_div2_clk>;
+-		vclk1_clk: vclk1_clk at e6150008 {
++		vclk1_clk: vclk1 at e6150008 {
+ 			compatible = "renesas,r8a73a4-div6-clock", "renesas,cpg-div6-clock";
+ 			reg = <0 0xe6150008 0 4>;
+ 			clocks = <&pll1_div2_clk>, <&cpg_clocks R8A73A4_CLK_PLL2S>,
+ 				 <0>, <&extal2_clk>, <&main_div2_clk>,
+ 				 <&extalr_clk>, <0>, <0>;
  			#clock-cells = <0>;
--			clock-output-names = "ssprs";
+-			clock-output-names = "vclk1";
+ 		};
+-		vclk2_clk: vclk2_clk at e615000c {
++		vclk2_clk: vclk2 at e615000c {
+ 			compatible = "renesas,r8a73a4-div6-clock", "renesas,cpg-div6-clock";
+ 			reg = <0 0xe615000c 0 4>;
+ 			clocks = <&pll1_div2_clk>, <&cpg_clocks R8A73A4_CLK_PLL2S>,
+ 				 <0>, <&extal2_clk>, <&main_div2_clk>,
+ 				 <&extalr_clk>, <0>, <0>;
+ 			#clock-cells = <0>;
+-			clock-output-names = "vclk2";
+ 		};
+-		vclk3_clk: vclk3_clk at e615001c {
++		vclk3_clk: vclk3 at e615001c {
+ 			compatible = "renesas,r8a73a4-div6-clock", "renesas,cpg-div6-clock";
+ 			reg = <0 0xe615001c 0 4>;
+ 			clocks = <&pll1_div2_clk>, <&cpg_clocks R8A73A4_CLK_PLL2S>,
+ 				 <0>, <&extal2_clk>, <&main_div2_clk>,
+ 				 <&extalr_clk>, <0>, <0>;
+ 			#clock-cells = <0>;
+-			clock-output-names = "vclk3";
+ 		};
+-		vclk4_clk: vclk4_clk at e6150014 {
++		vclk4_clk: vclk4 at e6150014 {
+ 			compatible = "renesas,r8a73a4-div6-clock", "renesas,cpg-div6-clock";
+ 			reg = <0 0xe6150014 0 4>;
+ 			clocks = <&pll1_div2_clk>, <&cpg_clocks R8A73A4_CLK_PLL2S>,
+ 				 <0>, <&extal2_clk>, <&main_div2_clk>,
+ 				 <&extalr_clk>, <0>, <0>;
+ 			#clock-cells = <0>;
+-			clock-output-names = "vclk4";
+ 		};
+-		vclk5_clk: vclk5_clk at e6150034 {
++		vclk5_clk: vclk5 at e6150034 {
+ 			compatible = "renesas,r8a73a4-div6-clock", "renesas,cpg-div6-clock";
+ 			reg = <0 0xe6150034 0 4>;
+ 			clocks = <&pll1_div2_clk>, <&cpg_clocks R8A73A4_CLK_PLL2S>,
+ 				 <0>, <&extal2_clk>, <&main_div2_clk>,
+ 				 <&extalr_clk>, <0>, <0>;
+ 			#clock-cells = <0>;
+-			clock-output-names = "vclk5";
+ 		};
+-		fsia_clk: fsia_clk at e6150018 {
++		fsia_clk: fsia at e6150018 {
+ 			compatible = "renesas,r8a73a4-div6-clock", "renesas,cpg-div6-clock";
+ 			reg = <0 0xe6150018 0 4>;
+ 			clocks = <&pll1_div2_clk>, <&cpg_clocks R8A73A4_CLK_PLL2S>,
+ 				 <&fsiack_clk>, <0>;
+ 			#clock-cells = <0>;
+-			clock-output-names = "fsia";
+ 		};
+-		fsib_clk: fsib_clk at e6150090 {
++		fsib_clk: fsib at e6150090 {
+ 			compatible = "renesas,r8a73a4-div6-clock", "renesas,cpg-div6-clock";
+ 			reg = <0 0xe6150090 0 4>;
+ 			clocks = <&pll1_div2_clk>, <&cpg_clocks R8A73A4_CLK_PLL2S>,
+ 				 <&fsibck_clk>, <0>;
+ 			#clock-cells = <0>;
+-			clock-output-names = "fsib";
+ 		};
+-		mp_clk: mp_clk at e6150080 {
++		mp_clk: mp at e6150080 {
+ 			compatible = "renesas,r8a73a4-div6-clock", "renesas,cpg-div6-clock";
+ 			reg = <0 0xe6150080 0 4>;
+ 			clocks = <&pll1_div2_clk>, <&cpg_clocks R8A73A4_CLK_PLL2S>,
+ 				 <&extal2_clk>, <&extal2_clk>;
+ 			#clock-cells = <0>;
+-			clock-output-names = "mp";
+ 		};
+-		m4_clk: m4_clk at e6150098 {
++		m4_clk: m4 at e6150098 {
+ 			compatible = "renesas,r8a73a4-div6-clock", "renesas,cpg-div6-clock";
+ 			reg = <0 0xe6150098 0 4>;
+ 			clocks = <&cpg_clocks R8A73A4_CLK_PLL2S>;
+ 			#clock-cells = <0>;
+-			clock-output-names = "m4";
+ 		};
+-		hsi_clk: hsi_clk at e615026c {
++		hsi_clk: hsi at e615026c {
+ 			compatible = "renesas,r8a73a4-div6-clock", "renesas,cpg-div6-clock";
+ 			reg = <0 0xe615026c 0 4>;
+ 			clocks = <&cpg_clocks R8A73A4_CLK_PLL2H>, <&pll1_div2_clk>,
+ 				 <&cpg_clocks R8A73A4_CLK_PLL2S>, <0>;
+ 			#clock-cells = <0>;
+-			clock-output-names = "hsi";
+ 		};
+-		spuv_clk: spuv_clk at e6150094 {
++		spuv_clk: spuv at e6150094 {
+ 			compatible = "renesas,r8a73a4-div6-clock", "renesas,cpg-div6-clock";
+ 			reg = <0 0xe6150094 0 4>;
+ 			clocks = <&pll1_div2_clk>, <&cpg_clocks R8A73A4_CLK_PLL2S>,
+ 				 <&extal2_clk>, <&extal2_clk>;
+ 			#clock-cells = <0>;
+-			clock-output-names = "spuv";
  		};
  
  		/* Fixed factor clocks */
+-		main_div2_clk: main_div2_clk {
++		main_div2_clk: main_div2 {
+ 			compatible = "fixed-factor-clock";
+ 			clocks = <&cpg_clocks R8A73A4_CLK_MAIN>;
+ 			#clock-cells = <0>;
+ 			clock-div = <2>;
+ 			clock-mult = <1>;
+-			clock-output-names = "main_div2";
+ 		};
+-		pll0_div2_clk: pll0_div2_clk {
++		pll0_div2_clk: pll0_div2 {
+ 			compatible = "fixed-factor-clock";
+ 			clocks = <&cpg_clocks R8A73A4_CLK_PLL0>;
+ 			#clock-cells = <0>;
+ 			clock-div = <2>;
+ 			clock-mult = <1>;
+-			clock-output-names = "pll0_div2";
+ 		};
 -		pll1_div2_clk: pll1_div2_clk {
 +		pll1_div2_clk: pll1_div2 {
  			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7791_CLK_PLL1>;
+ 			clocks = <&cpg_clocks R8A73A4_CLK_PLL1>;
  			#clock-cells = <0>;
  			clock-div = <2>;
  			clock-mult = <1>;
 -			clock-output-names = "pll1_div2";
  		};
--		zg_clk: zg_clk {
-+		zg_clk: zg {
+-		extal1_div2_clk: extal1_div2_clk {
++		extal1_div2_clk: extal1_div2 {
  			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7791_CLK_PLL1>;
- 			#clock-cells = <0>;
- 			clock-div = <3>;
- 			clock-mult = <1>;
--			clock-output-names = "zg";
- 		};
--		zx_clk: zx_clk {
-+		zx_clk: zx {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7791_CLK_PLL1>;
- 			#clock-cells = <0>;
- 			clock-div = <3>;
- 			clock-mult = <1>;
--			clock-output-names = "zx";
- 		};
--		zs_clk: zs_clk {
-+		zs_clk: zs {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7791_CLK_PLL1>;
- 			#clock-cells = <0>;
- 			clock-div = <6>;
- 			clock-mult = <1>;
--			clock-output-names = "zs";
- 		};
--		hp_clk: hp_clk {
-+		hp_clk: hp {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7791_CLK_PLL1>;
- 			#clock-cells = <0>;
- 			clock-div = <12>;
- 			clock-mult = <1>;
--			clock-output-names = "hp";
- 		};
--		i_clk: i_clk {
-+		i_clk: i {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7791_CLK_PLL1>;
+ 			clocks = <&extal1_clk>;
  			#clock-cells = <0>;
  			clock-div = <2>;
  			clock-mult = <1>;
--			clock-output-names = "i";
- 		};
--		b_clk: b_clk {
-+		b_clk: b {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7791_CLK_PLL1>;
- 			#clock-cells = <0>;
- 			clock-div = <12>;
- 			clock-mult = <1>;
--			clock-output-names = "b";
- 		};
--		p_clk: p_clk {
-+		p_clk: p {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7791_CLK_PLL1>;
- 			#clock-cells = <0>;
- 			clock-div = <24>;
- 			clock-mult = <1>;
--			clock-output-names = "p";
- 		};
--		cl_clk: cl_clk {
-+		cl_clk: cl {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7791_CLK_PLL1>;
- 			#clock-cells = <0>;
- 			clock-div = <48>;
- 			clock-mult = <1>;
--			clock-output-names = "cl";
- 		};
--		m2_clk: m2_clk {
-+		m2_clk: m2 {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7791_CLK_PLL1>;
- 			#clock-cells = <0>;
- 			clock-div = <8>;
- 			clock-mult = <1>;
--			clock-output-names = "m2";
- 		};
--		rclk_clk: rclk_clk {
-+		rclk_clk: rclk {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7791_CLK_PLL1>;
- 			#clock-cells = <0>;
- 			clock-div = <(48 * 1024)>;
- 			clock-mult = <1>;
--			clock-output-names = "rclk";
- 		};
--		oscclk_clk: oscclk_clk {
-+		oscclk_clk: oscclk {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7791_CLK_PLL1>;
- 			#clock-cells = <0>;
- 			clock-div = <(12 * 1024)>;
- 			clock-mult = <1>;
--			clock-output-names = "oscclk";
- 		};
--		zb3_clk: zb3_clk {
-+		zb3_clk: zb3 {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7791_CLK_PLL3>;
- 			#clock-cells = <0>;
- 			clock-div = <4>;
- 			clock-mult = <1>;
--			clock-output-names = "zb3";
- 		};
--		zb3d2_clk: zb3d2_clk {
-+		zb3d2_clk: zb3d2 {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7791_CLK_PLL3>;
- 			#clock-cells = <0>;
- 			clock-div = <8>;
- 			clock-mult = <1>;
--			clock-output-names = "zb3d2";
- 		};
--		ddr_clk: ddr_clk {
-+		ddr_clk: ddr {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7791_CLK_PLL3>;
- 			#clock-cells = <0>;
- 			clock-div = <8>;
- 			clock-mult = <1>;
--			clock-output-names = "ddr";
- 		};
--		mp_clk: mp_clk {
-+		mp_clk: mp {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&pll1_div2_clk>;
- 			#clock-cells = <0>;
- 			clock-div = <15>;
- 			clock-mult = <1>;
--			clock-output-names = "mp";
- 		};
--		cp_clk: cp_clk {
-+		cp_clk: cp {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&extal_clk>;
- 			#clock-cells = <0>;
- 			clock-div = <2>;
- 			clock-mult = <1>;
--			clock-output-names = "cp";
+-			clock-output-names = "extal1_div2";
  		};
  
  		/* Gate clocks */
