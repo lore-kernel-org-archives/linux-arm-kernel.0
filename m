@@ -1,72 +1,61 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon,  4 Apr 2016 14:46:51 +0100
-Subject: [PATCH] arm64: KVM: unregister notifiers in hyp mode teardown path
-Message-ID: <1459777611-22592-1-git-send-email-sudeep.holla@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 4 Apr 2016 15:53:47 +0200
+Subject: [PATCH v2 02/16] arm64: dts: add sp804 timer node for Hi6220
+In-Reply-To: <20160404134237.GC402@leoy-linaro>
+References: <1459589383-16914-1-git-send-email-guodong.xu@linaro.org>
+ <1459589383-16914-3-git-send-email-guodong.xu@linaro.org>
+ <CACRpkdbWuKx6=aF5xW=3EKfuUf-MYM_EEnovyhBnOGVOeHyCmQ@mail.gmail.com>
+ <20160404014359.GA15178@leoy-linaro>
+ <CACRpkdZ=_86Rhc+ei+3uE0dda9+onC8pQwosheMfEj4tOqmcDA@mail.gmail.com>
+ <20160404134237.GC402@leoy-linaro>
+Message-ID: <CACRpkdb_aMpj3X-m-FdM-PCCSuXgHnect5+nWPFnGVzGx4zrbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 1e947bad0b63 ("arm64: KVM: Skip HYP setup when already running
-in HYP") re-organized the hyp init code and ended up leaving the CPU
-hotplug and PM notifier even if hyp mode initialization fails.
+On Mon, Apr 4, 2016 at 3:42 PM, Leo Yan <leo.yan@linaro.org> wrote:
+> On Mon, Apr 04, 2016 at 01:21:00PM +0200, Linus Walleij wrote:
 
-Since KVM is not yet supported with ACPI, the above mentioned commit
-breaks CPU hotplug in ACPI boot.
+>> This is not about enabling/disabling the clock(s) to the timer.
+>> It doesn't matter if these clocks are always on.
+>>
+>> It is about determining the *frequency* of the timers.
+>>
+>> It is vital that the timer driver get the right frequency of the clock
+>> to the block from the clock implementation, and I do not think
+>> it is the same as the "apb_pclk".
+>
+> Thanks for reminding. Fortunately, apb_pclk and timer's clock are
+> same, all of them's rate are 19.2MHz.
 
-This patch fixes teardown_hyp_mode to properly unregister both CPU
-hotplug and PM notifiers in the teardown path.
+OK I was wrong, worrying about nothing.
 
-Fixes: 1e947bad0b63 ("arm64: KVM: Skip HYP setup when already running in HYP")
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- arch/arm/kvm/arm.c | 16 ++++++++++------
- 1 file changed, 10 insertions(+), 6 deletions(-)
+>> The thing is that of course "any frequency" will
+>> work but what you will notice is that the timer runs very
+>> weirdly compared to wall-clock time unless the right clock
+>> yielding the right frequency has been specified here.
+>
+> Compared sp804 timer counter with wall-clock (which is using ARM's
+> arch timer), and confirmed that sp804 timer's counter register is
+> decreasing with rate 19.2MHz.
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 6accd66d26f0..42b3a1f83271 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -1101,10 +1101,17 @@ static void __init hyp_cpu_pm_init(void)
- {
- 	cpu_pm_register_notifier(&hyp_init_cpu_pm_nb);
- }
-+static void __init hyp_cpu_pm_exit(void)
-+{
-+	cpu_pm_unregister_notifier(&hyp_init_cpu_pm_nb);
-+}
- #else
- static inline void hyp_cpu_pm_init(void)
- {
- }
-+static inline void hyp_cpu_pm_exit(void)
-+{
-+}
- #endif
- 
- static void teardown_common_resources(void)
-@@ -1166,6 +1173,8 @@ static void teardown_hyp_mode(void)
- 	free_hyp_pgds();
- 	for_each_possible_cpu(cpu)
- 		free_page(per_cpu(kvm_arm_hyp_stack_page, cpu));
-+	unregister_cpu_notifier(&hyp_init_cpu_nb);
-+	hyp_cpu_pm_exit();
- }
- 
- static int init_vhe_mode(void)
-@@ -1270,12 +1279,7 @@ static int init_hyp_mode(void)
- 	free_boot_hyp_pgd();
- #endif
- 
--	cpu_notifier_register_begin();
--
--	err = __register_cpu_notifier(&hyp_init_cpu_nb);
--
--	cpu_notifier_register_done();
--
-+	err = register_cpu_notifier(&hyp_init_cpu_nb);
- 	if (err) {
- 		kvm_err("Cannot register HYP init CPU notifier (%d)\n", err);
- 		goto out_err;
--- 
-1.9.1
+Thanks, awesome.
+
+> Also have checked Hi6220's spec, there have no timer's dediated clock
+> enabling bits. This is the reason before I only registered one clock.
+> So according to you and Rob's comments, how about change as below?
+>
+>                 dual_timer0: timer at f8008000 {
+>                         compatible = "arm,sp804", "arm,primecell";
+>                         reg = <0x0 0xf8008000 0x0 0x1000>;
+>                         interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
+>                                      <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
+>                         clocks = <&ao_ctrl HI6220_TIMER0_PCLK>,
+>                                  <&ao_ctrl HI6220_TIMER0_PCLK>,
+>                                  <&ao_ctrl HI6220_TIMER0_PCLK>;
+>                         clock-names = "apb_pclk", "apb_pclk", "apb_pclk";
+
+This works for me, though I think only the last name
+matters so I would name the first two "timer1" and "timer2".
+
+Yours,
+Linus Walleij
