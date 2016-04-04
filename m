@@ -1,86 +1,86 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 4 Apr 2016 16:55:23 +0300
-Subject: [PATCH] i2c/omap: drop the lock hard irq context
-Message-ID: <1459778123-16267-1-git-send-email-grygorii.strashko@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 4 Apr 2016 14:55:57 +0100
+Subject: [PATCH] arm64: KVM: unregister notifiers in hyp mode teardown path
+In-Reply-To: <1459777611-22592-1-git-send-email-sudeep.holla@arm.com>
+References: <1459777611-22592-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <5702726D.7000505@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+Hi Sudeep,
 
-The lock is taken while reading two registers. On RT the first lock is
-taken in hard irq where it might sleep and in the threaded irq.
-The threaded irq runs in oneshot mode so the hard irq does not run until
-the thread the completes so there is no reason to grab the lock.
+On 04/04/16 14:46, Sudeep Holla wrote:
+> Commit 1e947bad0b63 ("arm64: KVM: Skip HYP setup when already running
+> in HYP") re-organized the hyp init code and ended up leaving the CPU
+> hotplug and PM notifier even if hyp mode initialization fails.
+> 
+> Since KVM is not yet supported with ACPI, the above mentioned commit
+> breaks CPU hotplug in ACPI boot.
+> 
+> This patch fixes teardown_hyp_mode to properly unregister both CPU
+> hotplug and PM notifiers in the teardown path.
+> 
+> Fixes: 1e947bad0b63 ("arm64: KVM: Skip HYP setup when already running in HYP")
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 
-Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-[grygorii.strashko at ti.com: drop locking from isr completely and remove
-lock field from struct omap_i2c_dev]
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
-RFC:
- http://lists.infradead.org/pipermail/linux-arm-kernel/2013-August/188370.html
- drivers/i2c/busses/i2c-omap.c | 12 +-----------
- 1 file changed, 1 insertion(+), 11 deletions(-)
+This looks OK to me, with a question below though:
 
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index 13c4529..ab1279b 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -185,7 +185,6 @@ enum {
- #define OMAP_I2C_IP_V2_INTERRUPTS_MASK	0x6FFF
- 
- struct omap_i2c_dev {
--	spinlock_t		lock;		/* IRQ synchronization */
- 	struct device		*dev;
- 	void __iomem		*base;		/* virtual */
- 	int			irq;
-@@ -995,15 +994,12 @@ omap_i2c_isr(int irq, void *dev_id)
- 	u16 mask;
- 	u16 stat;
- 
--	spin_lock(&omap->lock);
--	mask = omap_i2c_read_reg(omap, OMAP_I2C_IE_REG);
- 	stat = omap_i2c_read_reg(omap, OMAP_I2C_STAT_REG);
-+	mask = omap_i2c_read_reg(omap, OMAP_I2C_IE_REG);
- 
- 	if (stat & mask)
- 		ret = IRQ_WAKE_THREAD;
- 
--	spin_unlock(&omap->lock);
--
- 	return ret;
- }
- 
-@@ -1011,12 +1007,10 @@ static irqreturn_t
- omap_i2c_isr_thread(int this_irq, void *dev_id)
- {
- 	struct omap_i2c_dev *omap = dev_id;
--	unsigned long flags;
- 	u16 bits;
- 	u16 stat;
- 	int err = 0, count = 0;
- 
--	spin_lock_irqsave(&omap->lock, flags);
- 	do {
- 		bits = omap_i2c_read_reg(omap, OMAP_I2C_IE_REG);
- 		stat = omap_i2c_read_reg(omap, OMAP_I2C_STAT_REG);
-@@ -1142,8 +1136,6 @@ omap_i2c_isr_thread(int this_irq, void *dev_id)
- 	omap_i2c_complete_cmd(omap, err);
- 
- out:
--	spin_unlock_irqrestore(&omap->lock, flags);
--
- 	return IRQ_HANDLED;
- }
- 
-@@ -1330,8 +1322,6 @@ omap_i2c_probe(struct platform_device *pdev)
- 	omap->dev = &pdev->dev;
- 	omap->irq = irq;
- 
--	spin_lock_init(&omap->lock);
--
- 	platform_set_drvdata(pdev, omap);
- 	init_completion(&omap->cmd_complete);
- 
+> ---
+>  arch/arm/kvm/arm.c | 16 ++++++++++------
+>  1 file changed, 10 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index 6accd66d26f0..42b3a1f83271 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -1101,10 +1101,17 @@ static void __init hyp_cpu_pm_init(void)
+>  {
+>  	cpu_pm_register_notifier(&hyp_init_cpu_pm_nb);
+>  }
+> +static void __init hyp_cpu_pm_exit(void)
+> +{
+> +	cpu_pm_unregister_notifier(&hyp_init_cpu_pm_nb);
+> +}
+>  #else
+>  static inline void hyp_cpu_pm_init(void)
+>  {
+>  }
+> +static inline void hyp_cpu_pm_exit(void)
+> +{
+> +}
+>  #endif
+>  
+>  static void teardown_common_resources(void)
+> @@ -1166,6 +1173,8 @@ static void teardown_hyp_mode(void)
+>  	free_hyp_pgds();
+>  	for_each_possible_cpu(cpu)
+>  		free_page(per_cpu(kvm_arm_hyp_stack_page, cpu));
+> +	unregister_cpu_notifier(&hyp_init_cpu_nb);
+> +	hyp_cpu_pm_exit();
+>  }
+>  
+>  static int init_vhe_mode(void)
+> @@ -1270,12 +1279,7 @@ static int init_hyp_mode(void)
+>  	free_boot_hyp_pgd();
+>  #endif
+>  
+> -	cpu_notifier_register_begin();
+> -
+> -	err = __register_cpu_notifier(&hyp_init_cpu_nb);
+> -
+> -	cpu_notifier_register_done();
+> -
+> +	err = register_cpu_notifier(&hyp_init_cpu_nb);
+
+We went from something like this to the cpu_notifier_register_begin/end
+with 8146875de ("arm, kvm: Fix CPU hotplug callback registration").
+
+What makes it more acceptable now?
+
+Thanks,
+
+	M.
 -- 
-2.8.0
+Jazz is not dead. It just smells funny...
