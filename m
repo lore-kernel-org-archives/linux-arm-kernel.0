@@ -1,66 +1,57 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 4 Apr 2016 10:45:48 +0200
-Subject: [GIT PULL] move Versatile flash protection to the device tree
-Message-ID: <CACRpkdZxrhkL7a6DG3frKeR+=xF6X4nczepAbqj1PGDs3VsmMQ@mail.gmail.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Mon,  4 Apr 2016 10:52:48 +0200
+Subject: [PATCH V4 0/7] Introduce ACPI world to ITS irqchip
+Message-ID: <1459759975-24097-1-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC folks,
+The following git branch contains submitted patches along with
+the useful patches from the test point of view (mainly ACPI ARM64 PCI support).
+https://github.com/semihalf-nowicki-tomasz/linux.git (its-acpi-v4)
 
-now I'm tired of waiting for the MTD maintainers' word on this patch
-series. I sent a question about this approach on february 13:
-http://marc.info/?l=linux-arm-kernel&m=145537026603174&w=2
+Series has been tested on Cavium ThunderX and Qualcomm QDF2xxx server.
 
-With subsequent pings on feb 22, mar 5, mar 31, and the cleanup
-missing the merge window.
+v3 -> v4
+- rebased against v4.5
+- add ACPI support for IRQ domain handling on a per-device basis
+- reorder domain setup step
+- improve error handling
+- code style improvements
 
-As you can see the flash protection patch also caters for the
-RealView flash protection bits.
+v2 -> v3
+- rebased on top of 4.4
+- fixes and improvements for redistributor init via GICC structures
+- fixes as per kbuild reports
 
-Please pull this into the ARM SoC tree for testing in linux-next
-for the v4.7 series. If the MTD people appear again and have issues
-you can always drop the branch.
+v1 -> v2
+- rebased on top of 4.4-rc4
+- use pci_msi_domain_get_msi_rid for requester ID to device ID translation
 
-Yours,
-Linus Walleij
+Tomasz Nowicki (7):
+  acpi, pci: Setup MSI domain on a per-devices basis.
+  irqchip, GICv3, ITS: Cleanup for ITS domain initialization.
+  irqchip, GICv3, ITS: Refator ITS DT init code to prepare for ACPI.
+  ARM64, ACPI, PCI: I/O Remapping Table (IORT) initial support.
+  irqchip, gicv3, its: Probe ITS in the ACPI way.
+  its, pci, msi: Factor out code that might be reused for ACPI.
+  acpi, gicv3, its: Use MADT ITS subtable to do PCI/MSI domain
+    initialization.
 
-The following changes since commit 9735a22799b9214d17d3c231fe377fc852f042e9:
+ drivers/acpi/Kconfig                     |   3 +
+ drivers/acpi/Makefile                    |   1 +
+ drivers/acpi/iort.c                      | 335 +++++++++++++++++++++++++++++++
+ drivers/irqchip/Kconfig                  |   1 +
+ drivers/irqchip/irq-gic-v3-its-pci-msi.c |  87 ++++++--
+ drivers/irqchip/irq-gic-v3-its.c         | 188 ++++++++++++-----
+ drivers/irqchip/irq-gic-v3.c             |   7 +-
+ drivers/pci/msi.c                        |  10 +-
+ drivers/pci/pci-acpi.c                   |  77 +++++++
+ include/linux/iort.h                     |  31 +++
+ include/linux/irqchip/arm-gic-v3.h       |   2 +-
+ include/linux/pci.h                      |  11 +
+ 12 files changed, 678 insertions(+), 75 deletions(-)
+ create mode 100644 drivers/acpi/iort.c
+ create mode 100644 include/linux/iort.h
 
-  Linux 4.6-rc2 (2016-04-03 09:09:40 -0500)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-tags/versatile-flash-for-arm-soc
-
-for you to fetch changes up to 91011a7605822cd9c16eabcd1cc11ae31d604bfd:
-
-  ARM: integrator: move flash registration to device tree (2016-04-04
-10:33:16 +0200)
-
-----------------------------------------------------------------
-This is a set of patches removing the board file code
-for Versatile flash handling and instead moving it over
-to the device tree and a special add-on file.
-
-----------------------------------------------------------------
-Linus Walleij (4):
-      mtd: physmap_of: add a hook for Versatile write protection
-      mtd: augment the "arm,versatile-flash" bindings
-      ARM: versatile: move flash registration to the device tree
-      ARM: integrator: move flash registration to device tree
-
- .../devicetree/bindings/mtd/arm-versatile.txt      |  20 +-
- arch/arm/boot/dts/integrator.dtsi                  |   3 +-
- arch/arm/boot/dts/versatile-ab.dts                 |   5 +-
- arch/arm/mach-integrator/integrator_ap.c           |  62 -----
- arch/arm/mach-integrator/integrator_cp.c           |  51 -----
- arch/arm/mach-versatile/versatile_dt.c             |  47 ----
- drivers/mtd/maps/Kconfig                           |  10 +
- drivers/mtd/maps/Makefile                          |   1 +
- drivers/mtd/maps/physmap_of.c                      |   6 +
- drivers/mtd/maps/physmap_of_versatile.c            | 253 +++++++++++++++++++++
- drivers/mtd/maps/physmap_of_versatile.h            |  16 ++
- 11 files changed, 310 insertions(+), 164 deletions(-)
- create mode 100644 drivers/mtd/maps/physmap_of_versatile.c
- create mode 100644 drivers/mtd/maps/physmap_of_versatile.h
+-- 
+1.9.1
