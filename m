@@ -1,43 +1,41 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  4 Apr 2016 10:22:46 +0900
-Subject: [PATCH 2/2] ARM: shmobile: defconfig: enable I2C demultiplexer and
- slave eeprom
-In-Reply-To: <cover.1459732004.git.horms+renesas@verge.net.au>
-References: <cover.1459732004.git.horms+renesas@verge.net.au>
-Message-ID: <352486b164ad41f2536f77d568ada7d729d080c2.1459732004.git.horms+renesas@verge.net.au>
+Date: Mon,  4 Apr 2016 10:22:38 +0900
+Subject: [PATCH 06/47] ARM: dts: r8a7790: use fallback can compatibility string
+In-Reply-To: <cover.1459732726.git.horms+renesas@verge.net.au>
+References: <cover.1459732726.git.horms+renesas@verge.net.au>
+Message-ID: <727779c6b0144dfb93dea3b09fa706760ac9e1ce.1459732726.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Use recently added fallback compatibility string in r8a7790 device tree.
 
-The Lager board shall be the reference platform for the runtime I2C IP
-core switcher and for I2C slave support. Enable the needed drivers for
-this.
-
-Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/configs/shmobile_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/r8a7790.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index b7b714c3958c..e06acb9b38ce 100644
---- a/arch/arm/configs/shmobile_defconfig
-+++ b/arch/arm/configs/shmobile_defconfig
-@@ -99,11 +99,14 @@ CONFIG_SERIAL_SH_SCI=y
- CONFIG_SERIAL_SH_SCI_NR_UARTS=20
- CONFIG_SERIAL_SH_SCI_CONSOLE=y
- CONFIG_I2C_CHARDEV=y
-+CONFIG_I2C_MUX=y
-+CONFIG_I2C_DEMUX_PINCTRL=y
- CONFIG_I2C_EMEV2=y
- CONFIG_I2C_GPIO=y
- CONFIG_I2C_RIIC=y
- CONFIG_I2C_SH_MOBILE=y
- CONFIG_I2C_RCAR=y
-+CONFIG_I2C_SLAVE_EEPROM=y
- CONFIG_SPI=y
- CONFIG_SPI_RSPI=y
- CONFIG_SPI_SH_MSIOF=y
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index b2d6a0f6105c..0077de70b6a4 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -982,7 +982,7 @@
+ 	};
+ 
+ 	can0: can at e6e80000 {
+-		compatible = "renesas,can-r8a7790";
++		compatible = "renesas,can-r8a7790", "renesas,rcar-gen2-can";
+ 		reg = <0 0xe6e80000 0 0x1000>;
+ 		interrupts = <GIC_SPI 186 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp9_clks R8A7790_CLK_RCAN0>,
+@@ -993,7 +993,7 @@
+ 	};
+ 
+ 	can1: can at e6e88000 {
+-		compatible = "renesas,can-r8a7790";
++		compatible = "renesas,can-r8a7790", "renesas,rcar-gen2-can";
+ 		reg = <0 0xe6e88000 0 0x1000>;
+ 		interrupts = <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp9_clks R8A7790_CLK_RCAN1>,
 -- 
 2.1.4
