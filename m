@@ -1,92 +1,66 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  4 Apr 2016 10:31:21 +0200
-Subject: [PATCH v5 1/4] ARM: reintroduce ioremap_cached() for creating cached
- I/O mappings
+Date: Mon,  4 Apr 2016 10:31:23 +0200
+Subject: [PATCH v5 3/4] memremap: add arch specific hook for MEMREMAP_WB
+ mappings
 In-Reply-To: <1459758684-16191-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1459758684-16191-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1459758684-16191-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1459758684-16191-4-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The original ARM-only ioremap flavor 'ioremap_cached' has been renamed
-to 'ioremap_cache' to align with other architectures, and subsequently
-abused in generic code to map things like firmware tables in memory.
-For that reason, there is currently an effort underway to deprecate
-ioremap_cache, whose semantics are poorly defined, and which is typed
-with an __iomem annotation that is inappropriate for mappings of ordinary
-memory.
+Currently, the memremap code serves MEMREMAP_WB mappings directly from
+the kernel direct mapping, unless the region is in high memory, in which
+case it falls back to using ioremap_cache(). However, the semantics of
+ioremap_cache() are not unambiguously defined, and on ARM, it will
+actually result in a mapping type that differs from the attributes used
+for the linear mapping, and for this reason, the ioremap_cache() call
+fails if the region is part of the memory managed by the kernel.
 
-However, original users of ioremap_cached() used it in a context where
-the I/O connotation is appropriate, and replacing those instances with
-memremap() does not make sense. So let's revive ioremap_cached(), so
-that we can change back those original users before we drop ioremap_cache
-entirely in favor of memremap.
+So instead, implement an optional hook 'arch_memremap_wb' whose default
+implementation calls ioremap_cache() as before, but which can be
+overridden by the architecture to do what is appropriate for it.
 
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
 Acked-by: Dan Williams <dan.j.williams@intel.com>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/include/asm/io.h | 6 ++++++
- arch/arm/mm/ioremap.c     | 4 ++++
- arch/arm/mm/nommu.c       | 4 ++++
- 3 files changed, 14 insertions(+)
+ kernel/memremap.c | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-index 485982084fe9..fb94de290edd 100644
---- a/arch/arm/include/asm/io.h
-+++ b/arch/arm/include/asm/io.h
-@@ -395,6 +395,12 @@ void __iomem *ioremap(resource_size_t res_cookie, size_t size);
- void __iomem *ioremap_cache(resource_size_t res_cookie, size_t size);
- #define ioremap_cache ioremap_cache
- 
-+/*
-+ * Do not use ioremap_cached in new code. Provided for the benefit of
-+ * the pxa2xx-flash MTD driver only.
-+ */
-+void __iomem *ioremap_cached(resource_size_t res_cookie, size_t size);
-+
- void __iomem *ioremap_wc(resource_size_t res_cookie, size_t size);
- #define ioremap_wc ioremap_wc
- #define ioremap_wt ioremap_wc
-diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-index 66a978d05958..d5350f6af089 100644
---- a/arch/arm/mm/ioremap.c
-+++ b/arch/arm/mm/ioremap.c
-@@ -380,11 +380,15 @@ void __iomem *ioremap(resource_size_t res_cookie, size_t size)
- EXPORT_SYMBOL(ioremap);
- 
- void __iomem *ioremap_cache(resource_size_t res_cookie, size_t size)
-+	__alias(ioremap_cached);
-+
-+void __iomem *ioremap_cached(resource_size_t res_cookie, size_t size)
- {
- 	return arch_ioremap_caller(res_cookie, size, MT_DEVICE_CACHED,
- 				   __builtin_return_address(0));
+diff --git a/kernel/memremap.c b/kernel/memremap.c
+index a6d382312e6f..017532193fb1 100644
+--- a/kernel/memremap.c
++++ b/kernel/memremap.c
+@@ -27,6 +27,13 @@ __weak void __iomem *ioremap_cache(resource_size_t offset, unsigned long size)
  }
- EXPORT_SYMBOL(ioremap_cache);
-+EXPORT_SYMBOL(ioremap_cached);
+ #endif
  
- void __iomem *ioremap_wc(resource_size_t res_cookie, size_t size)
- {
-diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
-index 1dd10936d68d..f24967e8ff7f 100644
---- a/arch/arm/mm/nommu.c
-+++ b/arch/arm/mm/nommu.c
-@@ -367,11 +367,15 @@ void __iomem *ioremap(resource_size_t res_cookie, size_t size)
- EXPORT_SYMBOL(ioremap);
- 
- void __iomem *ioremap_cache(resource_size_t res_cookie, size_t size)
-+	__alias(ioremap_cached);
++#ifndef arch_memremap_wb
++static void *arch_memremap_wb(resource_size_t offset, unsigned long size)
++{
++	return (__force void *)ioremap_cache(offset, size);
++}
++#endif
 +
-+void __iomem *ioremap_cached(resource_size_t res_cookie, size_t size)
+ static void *try_ram_remap(resource_size_t offset, size_t size)
  {
- 	return __arm_ioremap_caller(res_cookie, size, MT_DEVICE_CACHED,
- 				    __builtin_return_address(0));
+ 	unsigned long pfn = PHYS_PFN(offset);
+@@ -34,7 +41,7 @@ static void *try_ram_remap(resource_size_t offset, size_t size)
+ 	/* In the simple case just return the existing linear address */
+ 	if (pfn_valid(pfn) && !PageHighMem(pfn_to_page(pfn)))
+ 		return __va(offset);
+-	return NULL; /* fallback to ioremap_cache */
++	return NULL; /* fallback to arch_memremap_wb */
  }
- EXPORT_SYMBOL(ioremap_cache);
-+EXPORT_SYMBOL(ioremap_cached);
  
- void __iomem *ioremap_wc(resource_size_t res_cookie, size_t size)
- {
+ /**
+@@ -90,7 +97,7 @@ void *memremap(resource_size_t offset, size_t size, unsigned long flags)
+ 		if (is_ram == REGION_INTERSECTS)
+ 			addr = try_ram_remap(offset, size);
+ 		if (!addr)
+-			addr = ioremap_cache(offset, size);
++			addr = arch_memremap_wb(offset, size);
+ 	}
+ 
+ 	/*
 -- 
 2.5.0
