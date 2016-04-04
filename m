@@ -1,101 +1,42 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  4 Apr 2016 10:31:24 +0200
-Subject: [PATCH v5 4/4] ARM: memremap: implement arch_memremap_wb()
-In-Reply-To: <1459758684-16191-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1459758684-16191-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1459758684-16191-5-git-send-email-ard.biesheuvel@linaro.org>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Mon, 4 Apr 2016 10:32:37 +0200
+Subject: [PATCH v8] acpi, apei, arm64: APEI initial support for aarch64.
+In-Reply-To: <CAKv+Gu-BHhf=aQ6ZP3J=q8T9FRtq-hfzTNvdJ3=HgMt=hVP8nQ@mail.gmail.com>
+References: <1459237458-12352-1-git-send-email-fu.wei@linaro.org>
+ <CAKv+Gu-BHhf=aQ6ZP3J=q8T9FRtq-hfzTNvdJ3=HgMt=hVP8nQ@mail.gmail.com>
+Message-ID: <570226A5.4000304@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The generic memremap() falls back to using ioremap_cache() to create
-MEMREMAP_WB mappings if the requested region is not already covered
-by the linear mapping, unless the architecture provides an implementation
-of arch_memremap_wb().
+On 30.03.2016 09:05, Ard Biesheuvel wrote:
+> On 29 March 2016 at 09:44,  <fu.wei@linaro.org> wrote:
+>> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+>>
+>> This commit provides APEI arch-specific bits for aarch64
+>>
+>> Meanwhile,
+>> (1)add a new subfunction "hest_ia32_init" for
+>> "acpi_disable_cmcff" which is used by IA-32 Architecture
+>> Corrected Machine Check (CMC).
+>> (2)move HEST type (ACPI_HEST_TYPE_IA32_CORRECTED_CHECK) checking to
+>> a generic place.
+>> (3)select EFI when ACPI_APEI is set on ARM64,
+>> because arch_apei_get_mem_attribute is using efi_mem_attributes on ARM64.
+>
+> I think selecting 'EFI' is not the right approach here, especially
+> since EFI is implied by ACPI on that architecture. But selecting a
+> user configurable option like this is typically not recommended. Why
+> doesn't ACPI_APEI depend on ACPI?
 
-Since ioremap_cache() is not appropriate on ARM to map memory with the
-same attributes used for the linear mapping, implement arch_memremap_wb()
-which does exactly that. Also, relax the WARN() check to allow MT_MEMORY_RW
-mappings of pfn_valid() pages.
+It does, ACPI_APEI is subsection of the main ACPI menu option, but I 
+don't see that ACPI implies EFI in Kconfig.
 
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Acked-by: Dan Williams <dan.j.williams@intel.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/include/asm/io.h |  6 ++++++
- arch/arm/mm/ioremap.c     | 12 ++++++++++--
- arch/arm/mm/nommu.c       |  5 +++++
- 3 files changed, 21 insertions(+), 2 deletions(-)
+Also, I agree with Ard, EFI should not be selected conditionally for 
+ARM64 for ACPI_APEI.
 
-diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-index fb94de290edd..781ef5fe235d 100644
---- a/arch/arm/include/asm/io.h
-+++ b/arch/arm/include/asm/io.h
-@@ -392,6 +392,9 @@ void __iomem *ioremap(resource_size_t res_cookie, size_t size);
- #define ioremap ioremap
- #define ioremap_nocache ioremap
- 
-+/*
-+ * Do not use ioremap_cache for mapping memory. Use memremap instead.
-+ */
- void __iomem *ioremap_cache(resource_size_t res_cookie, size_t size);
- #define ioremap_cache ioremap_cache
- 
-@@ -408,6 +411,9 @@ void __iomem *ioremap_wc(resource_size_t res_cookie, size_t size);
- void iounmap(volatile void __iomem *iomem_cookie);
- #define iounmap iounmap
- 
-+void *arch_memremap_wb(phys_addr_t phys_addr, size_t size);
-+#define arch_memremap_wb arch_memremap_wb
-+
- /*
-  * io{read,write}{16,32}be() macros
-  */
-diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-index d5350f6af089..ff0eed23ddf1 100644
---- a/arch/arm/mm/ioremap.c
-+++ b/arch/arm/mm/ioremap.c
-@@ -297,9 +297,10 @@ static void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
- 	}
- 
- 	/*
--	 * Don't allow RAM to be mapped - this causes problems with ARMv6+
-+	 * Don't allow RAM to be mapped with mismatched attributes - this
-+	 * causes problems with ARMv6+
- 	 */
--	if (WARN_ON(pfn_valid(pfn)))
-+	if (WARN_ON(pfn_valid(pfn) && mtype != MT_MEMORY_RW))
- 		return NULL;
- 
- 	area = get_vm_area_caller(size, VM_IOREMAP, caller);
-@@ -418,6 +419,13 @@ __arm_ioremap_exec(phys_addr_t phys_addr, size_t size, bool cached)
- 			__builtin_return_address(0));
- }
- 
-+void *arch_memremap_wb(phys_addr_t phys_addr, size_t size)
-+{
-+	return (__force void *)arch_ioremap_caller(phys_addr, size,
-+						   MT_MEMORY_RW,
-+						   __builtin_return_address(0));
-+}
-+
- void __iounmap(volatile void __iomem *io_addr)
- {
- 	void *addr = (void *)(PAGE_MASK & (unsigned long)io_addr);
-diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
-index f24967e8ff7f..ca6d8e8ca1f8 100644
---- a/arch/arm/mm/nommu.c
-+++ b/arch/arm/mm/nommu.c
-@@ -384,6 +384,11 @@ void __iomem *ioremap_wc(resource_size_t res_cookie, size_t size)
- }
- EXPORT_SYMBOL(ioremap_wc);
- 
-+void *arch_memremap_wb(phys_addr_t phys_addr, size_t size)
-+{
-+	return (void *)phys_addr;
-+}
-+
- void __iounmap(volatile void __iomem *addr)
- {
- }
--- 
-2.5.0
+We need EFI only for ARM64 so how about:
++       select HAVE_ACPI_APEI if (ACPI && EFI)
+in arch/arm64/Kconfig and leave ACPI_APEI as is?
+
+Regards,
+Tomasz
