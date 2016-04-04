@@ -1,40 +1,38 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 4 Apr 2016 00:16:50 -0500
-Subject: [PATCH v2 13/16] arm64: dts: add LED nodes for hi6220-hikey
-In-Reply-To: <1459589383-16914-14-git-send-email-guodong.xu@linaro.org>
+Date: Mon, 4 Apr 2016 00:16:47 -0500
+Subject: [PATCH v2 08/16] arm64: dts: hikey: enable i2c0 and i2c1 for
+ working with mezzanine boards
+In-Reply-To: <1459589383-16914-9-git-send-email-guodong.xu@linaro.org>
 References: <1459589383-16914-1-git-send-email-guodong.xu@linaro.org>
- <1459589383-16914-14-git-send-email-guodong.xu@linaro.org>
-Message-ID: <20160404051650.GT17806@rob-hp-laptop>
+ <1459589383-16914-9-git-send-email-guodong.xu@linaro.org>
+Message-ID: <20160404051647.GS17806@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 02, 2016 at 05:29:40PM +0800, Guodong Xu wrote:
+On Sat, Apr 02, 2016 at 05:29:35PM +0800, Guodong Xu wrote:
 > Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
 > ---
->  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 41 ++++++++++++++++++++++++++
->  1 file changed, 41 insertions(+)
+>  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 9 +++++++++
+>  1 file changed, 9 insertions(+)
 > 
 > diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> index c4f560a..28bc646 100644
+> index 5c9ee31..e00e9ec 100644
 > --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
 > +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> @@ -63,6 +63,47 @@
->  			status = "ok";
->  		};
+> @@ -42,6 +42,15 @@
+>  		      <0x00000000 0x06e00000 0x00000000 0x0060f000>,
+>  		      <0x00000000 0x07410000 0x00000000 0x36bf0000>;
 >  	};
 > +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		user_led4 {
+> +	soc {
+> +		i2c0: i2c at f7100000 {
+> +			status = "ok";
+> +		};
+> +		i2c1: i2c at f7101000 {
+> +			status = "ok";
+> +		};
 
-Don't use underscores in node names: user-led4
-
-> +			label = "user_led4";
-
-We need to make sure the node names and labels are aligned with other 
-boards. There's some discussion about this for the new db600 board.
-
-This looks closer to what we should have than what we have for 
-db410c currently.
+Do these go to LS connector? If so, add 'label = "LS-I2C0";' or LS-I2C1 
+as appropriate (based on LS connector numbering).
 
 Rob
