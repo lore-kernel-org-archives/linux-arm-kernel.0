@@ -1,9 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  4 Apr 2016 10:22:14 +0900
-Subject: [PATCH 06/26] ARM: dts: koelsch: use generic pinctrl properties
+Date: Mon,  4 Apr 2016 10:22:17 +0900
+Subject: [PATCH 09/26] ARM: dts: alt: use generic pinctrl properties
 In-Reply-To: <cover.1459731908.git.horms+renesas@verge.net.au>
 References: <cover.1459731908.git.horms+renesas@verge.net.au>
-Message-ID: <fec7b9f8952f396d88228677f44d52c7e20a6be8.1459731908.git.horms+renesas@verge.net.au>
+Message-ID: <be7359dd9813e44bad827607048dd16298076bb8.1459731908.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,47 +11,33 @@ Since 16ccaf5bb5a5 ("pinctrl: sh-pfc: Accept standard function, pins and
 groups properties") renesas pfc drivers accept generic "function", "pins"
 and "groups" properties.
 
-This patch updates the koelsch device tree to use the generic properties.
+This patch updates the alt device tree to use the generic properties.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a7791-koelsch.dts | 68 +++++++++++++++++------------------
- 1 file changed, 34 insertions(+), 34 deletions(-)
+ arch/arm/boot/dts/r8a7794-alt.dts | 32 ++++++++++++++++----------------
+ 1 file changed, 16 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index 0ad71b81d3a2..c6b43c85a0b1 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -324,89 +324,89 @@
+diff --git a/arch/arm/boot/dts/r8a7794-alt.dts b/arch/arm/boot/dts/r8a7794-alt.dts
+index ca9bc4fff287..383ad791f1db 100644
+--- a/arch/arm/boot/dts/r8a7794-alt.dts
++++ b/arch/arm/boot/dts/r8a7794-alt.dts
+@@ -107,38 +107,38 @@
  	pinctrl-names = "default";
  
- 	i2c2_pins: i2c2 {
--		renesas,groups = "i2c2";
--		renesas,function = "i2c2";
-+		groups = "i2c2";
-+		function = "i2c2";
- 	};
- 
  	du_pins: du {
--		renesas,groups = "du_rgb888", "du_sync", "du_disp", "du_clk_out_0";
+-		renesas,groups = "du1_rgb666", "du1_sync", "du1_disp", "du1_dotclkout0";
 -		renesas,function = "du";
-+		groups = "du_rgb888", "du_sync", "du_disp", "du_clk_out_0";
++		groups = "du1_rgb666", "du1_sync", "du1_disp", "du1_dotclkout0";
 +		function = "du";
  	};
  
- 	scif0_pins: serial0 {
--		renesas,groups = "scif0_data_d";
--		renesas,function = "scif0";
-+		groups = "scif0_data_d";
-+		function = "scif0";
- 	};
- 
- 	scif1_pins: serial1 {
--		renesas,groups = "scif1_data_d";
--		renesas,function = "scif1";
-+		groups = "scif1_data_d";
-+		function = "scif1";
+ 	scif2_pins: serial2 {
+-		renesas,groups = "scif2_data";
+-		renesas,function = "scif2";
++		groups = "scif2_data";
++		function = "scif2";
  	};
  
  	scif_clk_pins: scif_clk {
@@ -69,81 +55,35 @@ index 0ad71b81d3a2..c6b43c85a0b1 100644
  	};
  
  	phy1_pins: phy1 {
--		renesas,groups = "intc_irq0";
+-		renesas,groups = "intc_irq8";
 -		renesas,function = "intc";
-+		groups = "intc_irq0";
++		groups = "intc_irq8";
 +		function = "intc";
  	};
  
- 	sdhi0_pins: sd0 {
--		renesas,groups = "sdhi0_data4", "sdhi0_ctrl";
--		renesas,function = "sdhi0";
-+		groups = "sdhi0_data4", "sdhi0_ctrl";
-+		function = "sdhi0";
+ 	i2c1_pins: i2c1 {
+-		renesas,groups = "i2c1";
+-		renesas,function = "i2c1";
++		groups = "i2c1";
++		function = "i2c1";
  	};
  
- 	sdhi1_pins: sd1 {
--		renesas,groups = "sdhi1_data4", "sdhi1_ctrl";
--		renesas,function = "sdhi1";
-+		groups = "sdhi1_data4", "sdhi1_ctrl";
-+		function = "sdhi1";
+ 	vin0_pins: vin0 {
+-		renesas,groups = "vin0_data8", "vin0_clk";
+-		renesas,function = "vin0";
++		groups = "vin0_data8", "vin0_clk";
++		function = "vin0";
  	};
+ };
  
- 	sdhi2_pins: sd2 {
--		renesas,groups = "sdhi2_data4", "sdhi2_ctrl";
--		renesas,function = "sdhi2";
-+		groups = "sdhi2_data4", "sdhi2_ctrl";
-+		function = "sdhi2";
- 	};
+@@ -148,8 +148,8 @@
  
+ &pfc {
  	qspi_pins: spi0 {
 -		renesas,groups = "qspi_ctrl", "qspi_data4";
 -		renesas,function = "qspi";
 +		groups = "qspi_ctrl", "qspi_data4";
 +		function = "qspi";
- 	};
- 
- 	msiof0_pins: spi1 {
--		renesas,groups = "msiof0_clk", "msiof0_sync", "msiof0_rx",
-+		groups = "msiof0_clk", "msiof0_sync", "msiof0_rx",
- 				 "msiof0_tx";
--		renesas,function = "msiof0";
-+		function = "msiof0";
- 	};
- 
- 	usb0_pins: usb0 {
--		renesas,groups = "usb0";
--		renesas,function = "usb0";
-+		groups = "usb0";
-+		function = "usb0";
- 	};
- 
- 	usb1_pins: usb1 {
--		renesas,groups = "usb1";
--		renesas,function = "usb1";
-+		groups = "usb1";
-+		function = "usb1";
- 	};
- 
- 	vin1_pins: vin1 {
--		renesas,groups = "vin1_data8", "vin1_clk";
--		renesas,function = "vin1";
-+		groups = "vin1_data8", "vin1_clk";
-+		function = "vin1";
- 	};
- 
- 	sound_pins: sound {
--		renesas,groups = "ssi0129_ctrl", "ssi0_data", "ssi1_data";
--		renesas,function = "ssi";
-+		groups = "ssi0129_ctrl", "ssi0_data", "ssi1_data";
-+		function = "ssi";
- 	};
- 
- 	sound_clk_pins: sound_clk {
--		renesas,groups = "audio_clk_a";
--		renesas,function = "audio_clk";
-+		groups = "audio_clk_a";
-+		function = "audio_clk";
  	};
  };
  
