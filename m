@@ -1,286 +1,61 @@
-From: bert@biot.com (Bert Vermeulen)
-Date: Mon,  4 Apr 2016 16:46:07 +0200
-Subject: [PATCH v4] ARM: dts: kirkwood: Add DTS for Linksys EA4200v2/EA4500
-Message-ID: <1459781168-16708-1-git-send-email-bert@biot.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon,  4 Apr 2016 16:52:16 +0200
+Subject: [PATCH 0/8] arm64: 2016 head.S spring cleaning
+Message-ID: <1459781544-14310-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This platform is based on a Marvell 88E6282 SoC and 88E6171 switch.
+After having been responsible for obfuscating the head.S code in the v4.6
+cycle to implement KASLR support, this series attempts to make amends by
+performing some janitorial duties as well.
 
-Signed-off-by: Bert Vermeulen <bert@biot.com>
----
-Changes from v3:
-- added comment noting eth1 is connected to switch as well
+The main point of this series is to get rid of the file scoped callee saved
+registers in head.S to store the FDT pointer, ID map and swapper dir addresses,
+KASLR offset, PHYS offset etc. The fact that these are file scoped makes it
+unnecessarily complicated to reason about lifetimes etc, especially since the
+code is called by both the boot CPU and secondaries.
 
-Changes from v2:
-- added linksys to filename
-- added make rule
+Since some of these functions are called without a stack, we still need to use
+callee saved registers to preserve values across function calls without
+stacking/unstacking the previous values, but these instances are now function
+scoped, not file scoped, and documented.
 
-Changes from v1:
-- changed console to stdout-path
-- removed unnecesarry @0 from dsa node, and fixed dsa/switch node
-- fixed partitions according to the official docs
-- prefer node labels rather than full hierarchy where possible
+Patch #1 gets rid of the confusing subtraction of address and offset values to
+obtain __secondary_switched.
 
- arch/arm/boot/dts/Makefile                   |   1 +
- arch/arm/boot/dts/kirkwood-linksys-viper.dts | 237 +++++++++++++++++++++++++++
- 2 files changed, 238 insertions(+)
- create mode 100644 arch/arm/boot/dts/kirkwood-linksys-viper.dts
+Patch #2 gets rid of x21 in head.S
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 95c1923..feeb3f9 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -199,6 +199,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += \
- 	kirkwood-linkstation-lswsxl.dtb \
- 	kirkwood-linkstation-lswvl.dtb \
- 	kirkwood-linkstation-lswxl.dtb \
-+	kirkwood-linksys-viper.dtb \
- 	kirkwood-lschlv2.dtb \
- 	kirkwood-lsxhl.dtb \
- 	kirkwood-mplcec4.dtb \
-diff --git a/arch/arm/boot/dts/kirkwood-linksys-viper.dts b/arch/arm/boot/dts/kirkwood-linksys-viper.dts
-new file mode 100644
-index 0000000..0f4631f
---- /dev/null
-+++ b/arch/arm/boot/dts/kirkwood-linksys-viper.dts
-@@ -0,0 +1,237 @@
-+/*
-+ * kirkwood-viper.dts - Device Tree file for Linksys viper (E4200v2 / EA4500)
-+ *
-+ * (c) 2013 Jonas Gorski <jogo@openwrt.org>
-+ * (c) 2013 Deutsche Telekom Innovation Laboratories
-+ * (c) 2014 Luka Perkov <luka@openwrt.org>
-+ * (c) 2014 Randy C. Will <randall.will@gmail.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+/dts-v1/;
-+
-+#include "kirkwood.dtsi"
-+#include "kirkwood-6282.dtsi"
-+
-+/ {
-+	model = "Linksys Viper (E4200v2 / EA4500)";
-+	compatible = "linksys,viper", "marvell,kirkwood-88f6282", "marvell,kirkwood";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x8000000>;
-+	};
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pinctrl-0 = < &pmx_btn_wps &pmx_btn_reset >;
-+		pinctrl-names = "default";
-+
-+		wps {
-+			label = "WPS Button";
-+			linux,code = <KEY_WPS_BUTTON>;
-+			gpios = <&gpio1 15 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		reset {
-+			label = "Reset Button";
-+			linux,code = <KEY_RESTART>;
-+			gpios = <&gpio1 16 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+		pinctrl-0 = < &pmx_led_white_health &pmx_led_white_pulse >;
-+		pinctrl-names = "default";
-+
-+		white-health {
-+			label = "viper:white:health";
-+			gpios = <&gpio0 7 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		white-pulse {
-+			label = "viper:white:pulse";
-+			gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+
-+	dsa {
-+		compatible = "marvell,dsa";
-+		#address-cells = <2>;
-+		#size-cells = <0>;
-+
-+		dsa,ethernet = <&eth0port>;
-+		dsa,mii-bus = <&mdio>;
-+
-+		switch at 16,0 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <16 0>;	/* MDIO address 16, switch 0 in tree */
-+
-+			port at 0 {
-+				reg = <0>;
-+				label = "ethernet1";
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+				label = "ethernet2";
-+			};
-+
-+			port at 2 {
-+				reg = <2>;
-+				label = "ethernet3";
-+			};
-+
-+			port at 3 {
-+				reg = <3>;
-+				label = "ethernet4";
-+			};
-+
-+			port at 4 {
-+				reg = <4>;
-+				label = "internet";
-+			};
-+
-+			port at 5 {
-+				reg = <5>;
-+				label = "cpu";
-+			};
-+		};
-+	};
-+};
-+
-+&pinctrl {
-+	pmx_led_white_health: pmx-led-white-health {
-+		marvell,pins = "mpp7";
-+		marvell,function = "gpo";
-+	};
-+	pmx_led_white_pulse: pmx-led-white-pulse {
-+		marvell,pins = "mpp14";
-+		marvell,function = "gpio";
-+	};
-+	pmx_btn_wps: pmx-btn-wps {
-+		marvell,pins = "mpp47";
-+		marvell,function = "gpio";
-+	};
-+	pmx_btn_reset: pmx-btn-reset {
-+		marvell,pins = "mpp48";
-+		marvell,function = "gpio";
-+	};
-+};
-+
-+&nand {
-+	status = "okay";
-+	pinctrl-0 = <&pmx_nand>;
-+	pinctrl-names = "default";
-+
-+	partitions {
-+		compatible = "fixed-partitions";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		partition at 0 {
-+			label = "u-boot";
-+			reg = <0x0 0x80000>;
-+			read-only;
-+		};
-+
-+		partition at 80000 {
-+			label = "u_env";
-+			reg = <0x80000 0x20000>;
-+		};
-+
-+		partition at A0000 {
-+			label = "s_env";
-+			reg = <0xA0000 0x20000>;
-+		};
-+
-+		partition at 200000 {
-+			label = "kernel";
-+			reg = <0x200000 0x2A0000>;
-+		};
-+
-+		partition at 4A0000 {
-+			label = "rootfs";
-+			reg = <0x4A0000 0x1760000>;
-+		};
-+
-+		partition at 1C00000 {
-+			label = "alt_kernel";
-+			reg = <0x1C00000 0x2A0000>;
-+		};
-+
-+		partition at 1EA0000 {
-+			label = "alt_rootfs";
-+			reg = <0x1EA0000 0x1760000>;
-+		};
-+
-+		partition at 3600000 {
-+			label = "syscfg";
-+			reg = <0x3600000 0x4A00000>;
-+		};
-+
-+		partition at C0000 {
-+			label = "unused";
-+			reg = <0xC0000 0x140000>;
-+		};
-+
-+	};
-+};
-+
-+&pciec {
-+	status = "okay";
-+};
-+
-+&pcie0 {
-+	status = "okay";
-+};
-+
-+&pcie1 {
-+	status = "okay";
-+};
-+
-+&mdio {
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-+
-+/* eth0 is connected to a Marvell 88E6171 switch, without a PHY. So set
-+ * fixed speed and duplex. */
-+&eth0 {
-+	status = "okay";
-+	ethernet0-port at 0 {
-+		speed = <1000>;
-+		duplex = <1>;
-+	};
-+};
-+
-+/* eth1 is connected to the switch at port 6. However DSA only supports a
-+ * single CPU port. So leave this port disabled to avoid confusion. */
-+&eth1 {
-+	status = "disabled";
-+};
-+
-+/* There is no battery on the board, so the RTC does not keep
-+   time when there is no power, making it useless. */
-+&rtc {
-+	status = "disabled";
-+};
-+
+Patch #3 creates moves the stack pointer init to an earlier time in
+__mmap_switched, and creates a proper stack frame.
+
+Patch #4 changes the EL2 detection code to simply use x0 as a return value and
+first argument.
+
+Patch #5 gets rid of x25 and x26 to store idmap_pg_dir and swapper_pg_dir
+
+Patch #6 gets rid of x27 to store __mmap_switched or __secondary_switched
+
+Patch #7 gets rid of x24 to store PHYS_OFFSET
+
+Patch #8 gets rid of x23 to store the kaslr offset
+
+@Maintainers: feel free to cherry pick if not all [or none] of these patches
+make sense to you
+
+Ard Biesheuvel (8):
+  arm64/kernel: use literal for relocated address of
+    __secondary_switched
+  arm64/kernel: reuse boot_args array to get to __fdt_pointer
+  arm64/kernel: use a proper stack frame in __mmap_switched()
+  arm64/kernel: use ordinary calling convention for EL2 setup
+  arm64/kernel: refer to idmap_pg_dir and swapper_pg_dir directly
+  arm64/kernel: pass virtual entry point as __enable_mmu() argument
+  arm64/kernel: drop __PHYS_OFFSET register with file scope from head.S
+  arm64/kernel: drop global kaslr_offset in x23 from head.S
+
+ arch/arm64/kernel/head.S  | 177 +++++++++++---------
+ arch/arm64/kernel/setup.c |   4 +-
+ 2 files changed, 95 insertions(+), 86 deletions(-)
+
 -- 
-1.9.1
+2.5.0
