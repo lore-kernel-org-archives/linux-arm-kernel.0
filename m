@@ -1,33 +1,30 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 4 Apr 2016 00:15:56 -0500
-Subject: [PATCH v3 2/3] ata: ahci-platform: Add ports-implemented DT
- bindings.
-In-Reply-To: <1459497178-31090-3-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1459497178-31090-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1459497178-31090-3-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <20160404051556.GH17806@rob-hp-laptop>
+Date: Mon, 4 Apr 2016 00:16:05 -0500
+Subject: [PATCH 1/2] Documentation: fsl-mc: binding updates for MSIs,
+ ranges, PHYs
+In-Reply-To: <1459544069-12852-1-git-send-email-stuart.yoder@nxp.com>
+References: <1459544069-12852-1-git-send-email-stuart.yoder@nxp.com>
+Message-ID: <20160404051605.GK17806@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 01, 2016 at 08:52:57AM +0100, Srinivas Kandagatla wrote:
-> On some SOCs PORTS_IMPL register value is never programmed by the
-> firmware and left at zero value. Which means that no sata ports are
-> available for software. AHCI driver used to cope up with this by
-> fabricating the port_map if the PORTS_IMPL register is read zero,
-> but recent patch broke this workaround as zero value was valid for
-> NVMe disks.
+On Fri, Apr 01, 2016 at 03:54:29PM -0500, Stuart Yoder wrote:
+> From: Stuart Yoder <stuart.yoder@freescale.com>
 > 
-> This patch adds ports-implemented DT bindings as workaround for this issue
-> in a way that DT can can override the PORTS_IMPL register in cases where
-> the firmware did not program it already.
+> -The Freescale Management Complex and all associated objects
+>  use message interrupts, and thus an msi-parent is required.
 > 
-> Fixes: 566d1827df2e ("libata: disable forced PORTS_IMPL for >= AHCI 1.3)
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> Acked-by: Tejun Heo <tj@kernel.org>
-> Reviewed-by: Andy Gross <andy.gross@linaro.org>
+> -Define a ranges property to specify the mapping between
+>  the MC address space and the system address space.
+> 
+> -The fsl-mc node may optionally have dpmac sub-nodes that describe
+>  the relationship between the Ethernet MACs which belong to the MC
+>  and the Ethernet PHYs on the system board.
+> 
+> Signed-off-by: Stuart Yoder <stuart.yoder@nxp.com>
+> Acked-by: J. German Rivera <German.Rivera@nxp.com>
 > ---
->  Documentation/devicetree/bindings/ata/ahci-platform.txt | 4 ++++
->  drivers/ata/ahci_platform.c                             | 3 +++
->  2 files changed, 7 insertions(+)
+>  .../devicetree/bindings/misc/fsl,qoriq-mc.txt      |   81 +++++++++++++++++++-
+>  1 file changed, 80 insertions(+), 1 deletion(-)
 
 Acked-by: Rob Herring <robh@kernel.org>
