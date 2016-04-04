@@ -1,99 +1,74 @@
 From: joro@8bytes.org (Joerg Roedel)
-Date: Mon,  4 Apr 2016 17:49:21 +0200
-Subject: [PATCH 5/6] of: Introduce of_phandle_iterator_args()
-In-Reply-To: <1459784962-9808-1-git-send-email-joro@8bytes.org>
-References: <1459784962-9808-1-git-send-email-joro@8bytes.org>
-Message-ID: <1459784962-9808-6-git-send-email-joro@8bytes.org>
+Date: Mon,  4 Apr 2016 17:49:16 +0200
+Subject: [PATCH 0/6 v2] of: Implement iterator for phandles
+Message-ID: <1459784962-9808-1-git-send-email-joro@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Joerg Roedel <jroedel@suse.de>
+Hi,
 
-This helper function can be used to copy the arguments of a
-phandle to an array.
+here is a new version of the implementation of the iterator
+over phandles concept which Rob Herring suggested to me some
+time ago. My approach is a little bit different from what
+the diff showed back then, but it gets rid of the allocation
+and 'struct of_phandle_args' misuse.
 
-Signed-off-by: Joerg Roedel <jroedel@suse.de>
-Acked-by: Rob Herring <robh@kernel.org>
----
- drivers/of/base.c  | 29 +++++++++++++++++++++++------
- include/linux/of.h | 10 ++++++++++
- 2 files changed, 33 insertions(+), 6 deletions(-)
+I also converted the arm-smmu driver to make use of the
+iterator. The resulting kernel boots on my AMD Seattle
+system and fixes the warning triggered there. The patches
+now also pass all dt-unittests in my kvm environment.
 
-diff --git a/drivers/of/base.c b/drivers/of/base.c
-index ea5a13d..e87e21d 100644
---- a/drivers/of/base.c
-+++ b/drivers/of/base.c
-@@ -1534,6 +1534,23 @@ err:
- 	return -EINVAL;
- }
- 
-+int of_phandle_iterator_args(struct of_phandle_iterator *it,
-+			     uint32_t *args,
-+			     int size)
-+{
-+	int i, count;
-+
-+	count = it->cur_count;
-+
-+	if (WARN_ON(size < count))
-+		count = size;
-+
-+	for (i = 0; i < count; i++)
-+		args[i] = be32_to_cpup(it->cur++);
-+
-+	return count;
-+}
-+
- static int __of_parse_phandle_with_args(const struct device_node *np,
- 					const char *list_name,
- 					const char *cells_name,
-@@ -1557,13 +1574,13 @@ static int __of_parse_phandle_with_args(const struct device_node *np,
- 				goto err;
- 
- 			if (out_args) {
--				int i;
--				if (WARN_ON(it.cur_count > MAX_PHANDLE_ARGS))
--					it.cur_count = MAX_PHANDLE_ARGS;
-+				int c;
-+
-+				c = of_phandle_iterator_args(&it,
-+							     out_args->args,
-+							     MAX_PHANDLE_ARGS);
- 				out_args->np = it.node;
--				out_args->args_count = it.cur_count;
--				for (i = 0; i < it.cur_count; i++)
--					out_args->args[i] = be32_to_cpup(it.cur++);
-+				out_args->args_count = c;
- 			} else {
- 				of_node_put(it.node);
- 			}
-diff --git a/include/linux/of.h b/include/linux/of.h
-index b0b8071..71e1c35 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -359,6 +359,9 @@ extern int of_phandle_iterator_init(struct of_phandle_iterator *it,
- 				    int cell_count);
- 
- extern int of_phandle_iterator_next(struct of_phandle_iterator *it);
-+extern int of_phandle_iterator_args(struct of_phandle_iterator *it,
-+				    uint32_t *args,
-+				    int size);
- 
- extern void of_alias_scan(void * (*dt_alloc)(u64 size, u64 align));
- extern int of_alias_get_id(struct device_node *np, const char *stem);
-@@ -648,6 +651,13 @@ static inline int of_phandle_iterator_next(struct of_phandle_iterator *it)
- 	return -ENOSYS;
- }
- 
-+static inline int of_phandle_iterator_args(struct of_phandle_iterator *it,
-+					   uint32_t *args,
-+					   int size)
-+{
-+	return 0;
-+}
-+
- static inline int of_alias_get_id(struct device_node *np, const char *stem)
- {
- 	return -ENOSYS;
+Patches are based on v4.6-rc2
+
+Thanks,
+
+	Joerg
+
+Changes since v1:
+
+* Rebased to v4.6-rc2
+
+* Removed the 'if (i == 0)...' hunk from the last patch
+
+* Tested again with DT unit-tests and on the seattle system
+
+Changes since RFC post:
+
+* Reordered members of 'struct of_phandle_iterator' and did
+  some renaming
+
+* Removed index counting from the iterator
+
+* Split up iterator implementation into multiple patches
+
+* Fixed the code to survive all dt-unittests, tested with each
+  patch in this series
+
+* Re-added and updated some comments which got lost during the
+  conversion.
+
+* Added of_for_each_phandle macro for easier handling
+
+* Moved the counting special-case from __of_parse_phandle_with_args
+  directly to of_count_phandle_with_args for code
+  simplification
+
+* Removed some iterator helper functions
+
+* Formatting and style changes
+
+Joerg Roedel (6):
+  of: Introduce struct of_phandle_iterator
+  of: Move phandle walking to of_phandle_iterator_next()
+  of: Remove counting special case from __of_parse_phandle_with_args()
+  of: Introduce of_for_each_phandle() helper macro
+  of: Introduce of_phandle_iterator_args()
+  iommu/arm-smmu: Make use of phandle iterators in device-tree parsing
+
+ drivers/iommu/arm-smmu.c |  38 +++++++--
+ drivers/of/base.c        | 206 ++++++++++++++++++++++++++++++-----------------
+ include/linux/of.h       |  56 +++++++++++++
+ 3 files changed, 219 insertions(+), 81 deletions(-)
+
 -- 
 1.9.1
