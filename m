@@ -1,41 +1,38 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  4 Apr 2016 10:22:38 +0900
-Subject: [PATCH 06/47] ARM: dts: r8a7790: use fallback can compatibility string
-In-Reply-To: <cover.1459732726.git.horms+renesas@verge.net.au>
-References: <cover.1459732726.git.horms+renesas@verge.net.au>
-Message-ID: <727779c6b0144dfb93dea3b09fa706760ac9e1ce.1459732726.git.horms+renesas@verge.net.au>
+Date: Mon,  4 Apr 2016 10:22:58 +0900
+Subject: [PATCH 2/2] ARM: shmobile: timer: Drop support for Cortex A8
+In-Reply-To: <cover.1459732456.git.horms+renesas@verge.net.au>
+References: <cover.1459732456.git.horms+renesas@verge.net.au>
+Message-ID: <cd89841fc6dbb6dc11aa113769f39dcd30be720f.1459732456.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use recently added fallback compatibility string in r8a7790 device tree.
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
+Commit edf4100906044225 ("ARM: shmobile: sh7372 dtsi: Remove Legacy
+file") removed the DTS for the last shmobile SoC with a Cortex A8 CPU
+core (sh7372 aka SH-Mobile AP4).
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a7790.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-shmobile/timer.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index b2d6a0f6105c..0077de70b6a4 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -982,7 +982,7 @@
- 	};
+diff --git a/arch/arm/mach-shmobile/timer.c b/arch/arm/mach-shmobile/timer.c
+index 67d79f9c6bad..1fc7759feab1 100644
+--- a/arch/arm/mach-shmobile/timer.c
++++ b/arch/arm/mach-shmobile/timer.c
+@@ -54,9 +54,7 @@ void __init shmobile_init_delay(void)
+ 		if (!of_property_read_u32(np, "clock-frequency", &freq))
+ 			max_freq = max(max_freq, freq);
  
- 	can0: can at e6e80000 {
--		compatible = "renesas,can-r8a7790";
-+		compatible = "renesas,can-r8a7790", "renesas,rcar-gen2-can";
- 		reg = <0 0xe6e80000 0 0x1000>;
- 		interrupts = <GIC_SPI 186 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp9_clks R8A7790_CLK_RCAN0>,
-@@ -993,7 +993,7 @@
- 	};
- 
- 	can1: can at e6e88000 {
--		compatible = "renesas,can-r8a7790";
-+		compatible = "renesas,can-r8a7790", "renesas,rcar-gen2-can";
- 		reg = <0 0xe6e88000 0 0x1000>;
- 		interrupts = <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp9_clks R8A7790_CLK_RCAN1>,
+-		if (of_device_is_compatible(np, "arm,cortex-a8")) {
+-			div = 2;
+-		} else if (of_device_is_compatible(np, "arm,cortex-a9")) {
++		if (of_device_is_compatible(np, "arm,cortex-a9")) {
+ 			div = 1;
+ 		} else if (of_device_is_compatible(np, "arm,cortex-a7") ||
+ 			 of_device_is_compatible(np, "arm,cortex-a15")) {
 -- 
 2.1.4
