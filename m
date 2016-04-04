@@ -1,242 +1,66 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Mon,  4 Apr 2016 08:30:11 +0000
-Subject: [PATCH v6 5/5] vfio/type1: return MSI mapping requirements with
- VFIO_IOMMU_GET_INFO
-In-Reply-To: <1459758611-2972-1-git-send-email-eric.auger@linaro.org>
-References: <1459758611-2972-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1459758611-2972-6-git-send-email-eric.auger@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon,  4 Apr 2016 10:31:20 +0200
+Subject: [PATCH v5 0/4] fix memremap on ARM
+Message-ID: <1459758684-16191-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch allows the user-space to know whether MSI addresses need to
-be mapped in the IOMMU. The user-space uses VFIO_IOMMU_GET_INFO ioctl and
-IOMMU_INFO_REQUIRE_MSI_MAP gets set if they need to.
+This is something I ran into while working on support for the UEFI
+memory attributes and ESRT tables. In both cases, these tables are
+passed to the kernel in memory which is guaranteed to be below 4 GB,
+but may be outside of the kernel direct mapping. (UEFI typically
+attempts to allocate from the top down, which means such tables are
+highly likely to be in highmem for any system with more than 760 MB
+of system RAM)
 
-Also the number of IOMMU pages requested to map those is returned in
-msi_iova_pages field. User-space must use this information to allocate an
-IOVA contiguous region of size msi_iova_pages * ffs(iova_pgsizes) and pass
-it with VFIO_IOMMU_MAP_DMA iotcl (VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA set).
+The recently introduced memremap() is a very useful abstraction for
+accessing such tables, because it is generic, and already attempts to
+do the right thing with respect to regions that may already have been
+mapped directly. However, it falls back to ioremap_cache() for mapping
+high memory, which is not allowed on ARM for system RAM, and also results
+in the region to be mapped with different attributes depending on whether
+it is covered by lowmem or not.
 
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
+So instead, create an arch specific hook 'arch_memremap_wb(), and
+implement it for ARM using the same memory attributes used for the
+linear mapping. Note that memremap will only call this hook for regions
+that are not already mapped permanently.
 
----
+Since this change results in memremap() to use attributes different from
+the ones used by ioremap_cache(), revert the change to pxa2xx-flash that
+moved it to memremap.
 
-Currently it is assumed a single doorbell page is used per MSI controller.
-This is the case for known ARM MSI controllers (GICv2M, GICv3 ITS, ...).
-If an MSI controller were to expose more doorbells it could implement a
-new callback at irq_chip interface.
+Changes since v4:
+- fix !MMU problems spotted by the kbuild test robot (patches #1 and #4)
+- rebased onto v4.6-rc2 (no conflicts)
 
-v4 -> v5:
-- move msi_info and ret declaration within the conditional code
+Changes since v3:
+- fix inadvertent logic change, where invoking arch_memremap_wb() would only be
+  attempted on a region that intersects System RAM
 
-v3 -> v4:
-- replace former vfio_domains_require_msi_mapping by
-  more complex computation of MSI mapping requirements, especially the
-  number of pages to be provided by the user-space.
-- reword patch title
+Changes since v2:
+- add patch to bring back ioremap_cached() on ARM
+- switch pxa2xx-flash back to ioremap_cached() not ioremap_cache()
+- use arch_ioremap_caller not __arm_ioremap_caller() in patch #4
+- deal with __iomem annotation of arch_ioremap_caller (patch #4)
 
-RFC v1 -> v1:
-- derived from
-  [RFC PATCH 3/6] vfio: Extend iommu-info to return MSIs automap state
-- renamed allow_msi_reconfig into require_msi_mapping
-- fixed VFIO_IOMMU_GET_INFO
----
- drivers/vfio/vfio_iommu_type1.c | 147 ++++++++++++++++++++++++++++++++++++++++
- include/uapi/linux/vfio.h       |   2 +
- 2 files changed, 149 insertions(+)
+Changes since v1/rfc:
+- new patch #1 that reverts the ioremap_cache->memremap conversion for the
+  pxa2xx-flash driver
+- added Dan's ack to patch #2
 
-diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
-index b330b81..f1def50 100644
---- a/drivers/vfio/vfio_iommu_type1.c
-+++ b/drivers/vfio/vfio_iommu_type1.c
-@@ -39,6 +39,7 @@
- #include <linux/dma-reserved-iommu.h>
- #include <linux/irqdomain.h>
- #include <linux/msi.h>
-+#include <linux/irq.h>
- 
- #define DRIVER_VERSION  "0.2"
- #define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
-@@ -95,6 +96,17 @@ struct vfio_group {
- 	struct list_head	next;
- };
- 
-+struct vfio_irq_chip {
-+	struct list_head next;
-+	struct irq_chip *chip;
-+};
-+
-+struct vfio_msi_map_info {
-+	bool mapping_required;
-+	unsigned int iova_pages;
-+	struct list_head irq_chip_list;
-+};
-+
- /*
-  * This code handles mapping and unmapping of user data buffers
-  * into DMA'ble space using the IOMMU
-@@ -267,6 +279,127 @@ static int vaddr_get_pfn(unsigned long vaddr, int prot, unsigned long *pfn)
- 	return ret;
- }
- 
-+#if defined(CONFIG_GENERIC_MSI_IRQ_DOMAIN) && defined(CONFIG_IOMMU_DMA_RESERVED)
-+/**
-+ * vfio_dev_compute_msi_map_info: augment MSI mapping info (@data) with
-+ * the @dev device requirements.
-+ *
-+ * @dev: device handle
-+ * @data: opaque pointing to a struct vfio_msi_map_info
-+ *
-+ * returns 0 upon success or -ENOMEM
-+ */
-+static int vfio_dev_compute_msi_map_info(struct device *dev, void *data)
-+{
-+	struct irq_domain *domain;
-+	struct msi_domain_info *info;
-+	struct vfio_msi_map_info *msi_info = (struct vfio_msi_map_info *)data;
-+	struct irq_chip *chip;
-+	struct vfio_irq_chip *iter, *new;
-+
-+	domain = dev_get_msi_domain(dev);
-+	if (!domain)
-+		return 0;
-+
-+	/* Let's compute the needs for the MSI domain */
-+	info = msi_get_domain_info(domain);
-+	chip = info->chip;
-+	list_for_each_entry(iter, &msi_info->irq_chip_list, next) {
-+		if (iter->chip == chip)
-+			return 0;
-+	}
-+
-+	new = kzalloc(sizeof(*new), GFP_KERNEL);
-+	if (!new)
-+		return -ENOMEM;
-+
-+	new->chip = chip;
-+
-+	list_add(&new->next, &msi_info->irq_chip_list);
-+
-+	/*
-+	 * new irq_chip to be taken into account; we currently assume
-+	 * a single iova doorbell by irq chip requesting MSI mapping
-+	 */
-+	msi_info->iova_pages += 1;
-+	return 0;
-+}
-+
-+/**
-+ * vfio_domain_compute_msi_map_info: compute MSI mapping requirements (@data)
-+ * for vfio_domain @d
-+ *
-+ * @d: vfio domain handle
-+ * @data: opaque pointing to a struct vfio_msi_map_info
-+ *
-+ * returns 0 upon success or -ENOMEM
-+ */
-+static int vfio_domain_compute_msi_map_info(struct vfio_domain *d, void *data)
-+{
-+	int ret = 0;
-+	struct vfio_msi_map_info *msi_info = (struct vfio_msi_map_info *)data;
-+	struct vfio_irq_chip *iter, *tmp;
-+	struct vfio_group *g;
-+
-+	msi_info->iova_pages = 0;
-+	INIT_LIST_HEAD(&msi_info->irq_chip_list);
-+
-+	if (iommu_domain_get_attr(d->domain,
-+				   DOMAIN_ATTR_MSI_MAPPING, NULL))
-+		return 0;
-+	msi_info->mapping_required = true;
-+	list_for_each_entry(g, &d->group_list, next) {
-+		ret = iommu_group_for_each_dev(g->iommu_group, msi_info,
-+			   vfio_dev_compute_msi_map_info);
-+		if (ret)
-+			goto out;
-+	}
-+out:
-+	list_for_each_entry_safe(iter, tmp, &msi_info->irq_chip_list, next) {
-+		list_del(&iter->next);
-+		kfree(iter);
-+	}
-+	return ret;
-+}
-+
-+/**
-+ * vfio_compute_msi_map_info: compute MSI mapping requirements
-+ *
-+ * Do some MSI addresses need to be mapped? IOMMU page size?
-+ * Max number of IOVA pages needed by any domain to map MSI
-+ *
-+ * @iommu: iommu handle
-+ * @info: msi map info handle
-+ *
-+ * returns 0 upon success or -ENOMEM
-+ */
-+static int vfio_compute_msi_map_info(struct vfio_iommu *iommu,
-+				 struct vfio_msi_map_info *msi_info)
-+{
-+	int ret = 0;
-+	struct vfio_domain *d;
-+	unsigned long bitmap = ULONG_MAX;
-+	unsigned int iova_pages = 0;
-+
-+	msi_info->mapping_required = false;
-+
-+	mutex_lock(&iommu->lock);
-+	list_for_each_entry(d, &iommu->domain_list, next) {
-+		bitmap &= d->domain->ops->pgsize_bitmap;
-+		ret = vfio_domain_compute_msi_map_info(d, msi_info);
-+		if (ret)
-+			goto out;
-+		if (msi_info->iova_pages > iova_pages)
-+			iova_pages = msi_info->iova_pages;
-+	}
-+out:
-+	msi_info->iova_pages = iova_pages;
-+	mutex_unlock(&iommu->lock);
-+	return ret;
-+}
-+
-+#endif
-+
- /*
-  * Attempt to pin pages.  We really don't want to track all the pfns and
-  * the iommu can only map chunks of consecutive pfns anyway, so get the
-@@ -1179,6 +1312,20 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
- 
- 		info.flags = VFIO_IOMMU_INFO_PGSIZES;
- 
-+#if defined(CONFIG_GENERIC_MSI_IRQ_DOMAIN) && defined(CONFIG_IOMMU_DMA_RESERVED)
-+		{
-+			struct vfio_msi_map_info msi_info;
-+			int ret;
-+
-+			ret = vfio_compute_msi_map_info(iommu, &msi_info);
-+			if (ret)
-+				return ret;
-+
-+			if (msi_info.mapping_required)
-+				info.flags |= VFIO_IOMMU_INFO_REQUIRE_MSI_MAP;
-+			info.msi_iova_pages = msi_info.iova_pages;
-+		}
-+#endif
- 		info.iova_pgsizes = vfio_pgsize_bitmap(iommu);
- 
- 		return copy_to_user((void __user *)arg, &info, minsz) ?
-diff --git a/include/uapi/linux/vfio.h b/include/uapi/linux/vfio.h
-index a49be8a..e3e501c 100644
---- a/include/uapi/linux/vfio.h
-+++ b/include/uapi/linux/vfio.h
-@@ -488,7 +488,9 @@ struct vfio_iommu_type1_info {
- 	__u32	argsz;
- 	__u32	flags;
- #define VFIO_IOMMU_INFO_PGSIZES (1 << 0)	/* supported page sizes info */
-+#define VFIO_IOMMU_INFO_REQUIRE_MSI_MAP (1 << 1)/* MSI must be mapped */
- 	__u64	iova_pgsizes;		/* Bitmap of supported page sizes */
-+	__u32   msi_iova_pages;	/* number of IOVA pages needed to map MSIs */
- };
- 
- #define VFIO_IOMMU_GET_INFO _IO(VFIO_TYPE, VFIO_BASE + 12)
+Ard Biesheuvel (4):
+  ARM: reintroduce ioremap_cached() for creating cached I/O mappings
+  mtd: pxa2xx-flash: switch back from memremap to ioremap_cached
+  memremap: add arch specific hook for MEMREMAP_WB mappings
+  ARM: memremap: implement arch_memremap_wb()
+
+ arch/arm/include/asm/io.h       | 12 ++++++++++++
+ arch/arm/mm/ioremap.c           | 16 ++++++++++++++--
+ arch/arm/mm/nommu.c             |  9 +++++++++
+ drivers/mtd/maps/pxa2xx-flash.c |  6 +++---
+ kernel/memremap.c               | 11 +++++++++--
+ 5 files changed, 47 insertions(+), 7 deletions(-)
+
 -- 
-1.9.1
+2.5.0
