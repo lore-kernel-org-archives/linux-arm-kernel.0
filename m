@@ -1,68 +1,88 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  4 Apr 2016 16:52:17 +0200
-Subject: [PATCH 1/8] arm64/kernel: use literal for relocated address of
- __secondary_switched
+Date: Mon,  4 Apr 2016 16:52:18 +0200
+Subject: [PATCH 2/8] arm64/kernel: reuse boot_args array to get to
+ __fdt_pointer
 In-Reply-To: <1459781544-14310-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1459781544-14310-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1459781544-14310-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1459781544-14310-3-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can simply use a relocated 64-bit literal to store the address of
-__secondary_switched(), and the relocation code will ensure that it
-holds the correct value at secondary entry time, as long as we make sure
-that the literal value is visible to the secondaries before they enable
-their MMUs. So place the literal next to kimage_vaddr, and set the alignment
-so that it is covered by the same cacheline that we already have to clean
-for a similar purpose.
+Since we record the boot_args [x0 .. x3] early at boot anyway, there is
+no need to keep the FDT address in a callee saved register with file scope
+in head.S. So simply refer to boot_args[0] directly in the call to
+setup_machine(), and drop the handling of x21 from head.S entirely.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/kernel/head.S | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ arch/arm64/kernel/head.S  | 14 ++++++--------
+ arch/arm64/kernel/setup.c |  4 +---
+ 2 files changed, 7 insertions(+), 11 deletions(-)
 
 diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 4203d5f257bc..69b33535911e 100644
+index 69b33535911e..9d8f928c355c 100644
 --- a/arch/arm64/kernel/head.S
 +++ b/arch/arm64/kernel/head.S
-@@ -471,7 +471,8 @@ __mmap_switched:
- 	b	0b
- 
- 2:	adr_l	x8, kimage_vaddr		// make relocated kimage_vaddr
--	dc	cvac, x8			// value visible to secondaries
-+						// and __secondary_switched
-+	dc	cvac, x8			// values visible to secondaries
- 	dsb	sy				// with MMU off
- #endif
- 
-@@ -506,10 +507,12 @@ ENDPROC(__mmap_switched)
-  * end early head section, begin head code that is also used for
-  * hotplug and needs to have the same protections as the text region
+@@ -234,16 +234,15 @@ ENDPROC(stext)
+  * Preserve the arguments passed by the bootloader in x0 .. x3
   */
--	.section ".text","ax"
+ preserve_boot_args:
+-	mov	x21, x0				// x21=FDT
 -
-+	.section	".text","ax"
-+	.align		4
- ENTRY(kimage_vaddr)
- 	.quad		_text - TEXT_OFFSET
-+.L__secondary_switched:
-+	.quad		__secondary_switched
+-	adr_l	x0, boot_args			// record the contents of
+-	stp	x21, x1, [x0]			// x0 .. x3 at kernel entry
+-	stp	x2, x3, [x0, #16]
++	adr_l	x4, boot_args			// record the contents of
++	stp	x0, x1, [x4]			// x0 .. x3 at kernel entry
++	stp	x2, x3, [x4, #16]
  
+ 	dmb	sy				// needed before dc ivac with
+ 						// MMU off
+ 
+-	add	x1, x0, #0x20			// 4 x 8 bytes
++	mov	x0, x4
++	add	x1, x4, #0x20			// 4 x 8 bytes
+ 	b	__inval_cache_range		// tail call
+ ENDPROC(preserve_boot_args)
+ 
+@@ -480,7 +479,6 @@ __mmap_switched:
+ 	mov	x4, sp
+ 	and	x4, x4, #~(THREAD_SIZE - 1)
+ 	msr	sp_el0, x4			// Save thread_info
+-	str_l	x21, __fdt_pointer, x5		// Save FDT pointer
+ 
+ 	ldr_l	x4, kimage_vaddr		// Save the offset between
+ 	sub	x4, x4, x24			// the kernel virtual and
+@@ -492,7 +490,7 @@ __mmap_switched:
+ #endif
+ #ifdef CONFIG_RANDOMIZE_BASE
+ 	cbnz	x23, 0f				// already running randomized?
+-	mov	x0, x21				// pass FDT address in x0
++	ldr_l	x0, boot_args			// pass FDT address in x0
+ 	bl	kaslr_early_init		// parse FDT for KASLR options
+ 	cbz	x0, 0f				// KASLR disabled? just proceed
+ 	mov	x23, x0				// record KASLR offset
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 9dc67769b6a4..83a3e484a90a 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -64,8 +64,6 @@
+ #include <asm/xen/hypervisor.h>
+ #include <asm/mmu_context.h>
+ 
+-phys_addr_t __fdt_pointer __initdata;
+-
  /*
-  * If we're fortunate enough to boot at EL2, ensure that the world is
-@@ -701,12 +704,9 @@ ENTRY(secondary_startup)
- 	adrp	x26, swapper_pg_dir
- 	bl	__cpu_setup			// initialise processor
+  * Standard memory resources
+  */
+@@ -304,7 +302,7 @@ void __init setup_arch(char **cmdline_p)
+ 	early_fixmap_init();
+ 	early_ioremap_init();
  
--	ldr	x8, kimage_vaddr
--	ldr	w9, 0f
--	sub	x27, x8, w9, sxtw		// address to jump to after enabling the MMU
-+	ldr	x27, .L__secondary_switched
- 	b	__enable_mmu
- ENDPROC(secondary_startup)
--0:	.long	(_text - TEXT_OFFSET) - __secondary_switched
+-	setup_machine_fdt(__fdt_pointer);
++	setup_machine_fdt(boot_args[0]);
  
- ENTRY(__secondary_switched)
- 	adr_l	x5, vectors
+ 	parse_early_param();
+ 
 -- 
 2.5.0
