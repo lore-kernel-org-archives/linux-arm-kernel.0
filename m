@@ -1,36 +1,34 @@
 From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Mon,  4 Apr 2016 17:22:04 -0300
-Subject: [PATCH 3/5] leds: trigger: panic: Use led_trigger_event_nosleep
+Date: Mon,  4 Apr 2016 17:22:05 -0300
+Subject: [PATCH 4/5] devicetree: leds: Introduce "panic-blink" optional
+ property
 In-Reply-To: <1459801326-5541-1-git-send-email-ezequiel@vanguardiasur.com.ar>
 References: <1459801326-5541-1-git-send-email-ezequiel@vanguardiasur.com.ar>
-Message-ID: <1459801326-5541-4-git-send-email-ezequiel@vanguardiasur.com.ar>
+Message-ID: <1459801326-5541-5-git-send-email-ezequiel@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Calling led_trigger_event may schedule a delayed LED set,
-if the LED was being used by a delayed blink trigger when
-the kernel paniced.
-
-Therefore, we must use led_trigger_event_nosleep to override
-this situation, and set the LED unconditionally.
+It's desirable to specify which LEDs are to be blinked on a kernel
+panic. Therefore, introduce a devicetree boolean property to mark
+which LEDs should be treated this way.
 
 Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
 ---
- drivers/leds/trigger/ledtrig-panic.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Documentation/devicetree/bindings/leds/common.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/leds/trigger/ledtrig-panic.c b/drivers/leds/trigger/ledtrig-panic.c
-index 627b350c5ec3..145c238d55f2 100644
---- a/drivers/leds/trigger/ledtrig-panic.c
-+++ b/drivers/leds/trigger/ledtrig-panic.c
-@@ -17,7 +17,7 @@ static struct led_trigger *trigger;
+diff --git a/Documentation/devicetree/bindings/leds/common.txt b/Documentation/devicetree/bindings/leds/common.txt
+index 68419843e32f..dd409df9203a 100644
+--- a/Documentation/devicetree/bindings/leds/common.txt
++++ b/Documentation/devicetree/bindings/leds/common.txt
+@@ -37,6 +37,8 @@ Optional properties for child nodes:
+                      property is mandatory for the LEDs in the non-flash modes
+                      (e.g. torch or indicator).
  
- static long led_panic_blink(int state)
- {
--	led_trigger_event(trigger, state ? LED_FULL : LED_OFF);
-+	led_trigger_event_nosleep(trigger, state ? LED_FULL : LED_OFF);
- 	return 0;
- }
- 
++- panic-blink : Mark this LED to be used by the panic LED trigger.
++
+ Required properties for flash LED child nodes:
+ - flash-max-microamp : Maximum flash LED supply current in microamperes.
+ - flash-max-timeout-us : Maximum timeout in microseconds after which the flash
 -- 
 2.7.0
