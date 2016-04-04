@@ -1,208 +1,91 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon,  4 Apr 2016 17:26:13 +0100
-Subject: [PATCH 13/17] kvm-arm: Add stage2 page table modifiers
-In-Reply-To: <1459787177-12767-1-git-send-email-suzuki.poulose@arm.com>
-References: <1459787177-12767-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1459787177-12767-14-git-send-email-suzuki.poulose@arm.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 4 Apr 2016 09:36:26 -0700
+Subject: [GIT PULL] move Versatile flash protection to the device tree
+In-Reply-To: <CACRpkdZxrhkL7a6DG3frKeR+=xF6X4nczepAbqj1PGDs3VsmMQ@mail.gmail.com>
+References: <CACRpkdZxrhkL7a6DG3frKeR+=xF6X4nczepAbqj1PGDs3VsmMQ@mail.gmail.com>
+Message-ID: <20160404163626.GA30894@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the hyp page table is handled by different set of
-routines, rename the original shared routines to stage2 handlers.
-Also make explicit use of the stage2 page table helpers.
+Hi Linus,
 
-unmap_range has been merged to existing unmap_stage2_range.
+On Mon, Apr 04, 2016 at 10:45:48AM +0200, Linus Walleij wrote:
+> Hi ARM SoC folks,
+> 
+> now I'm tired of waiting for the MTD maintainers' word on this patch
+> series. I sent a question about this approach on february 13:
+> http://marc.info/?l=linux-arm-kernel&m=145537026603174&w=2
+> 
+> With subsequent pings on feb 22, mar 5, mar 31, and the cleanup
+> missing the merge window.
+> 
+> As you can see the flash protection patch also caters for the
+> RealView flash protection bits.
+> 
+> Please pull this into the ARM SoC tree for testing in linux-next
+> for the v4.7 series. If the MTD people appear again and have issues
+> you can always drop the branch.
+> 
+> Yours,
+> Linus Walleij
+> 
+> The following changes since commit 9735a22799b9214d17d3c231fe377fc852f042e9:
+> 
+>   Linux 4.6-rc2 (2016-04-03 09:09:40 -0500)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
+> tags/versatile-flash-for-arm-soc
+> 
+> for you to fetch changes up to 91011a7605822cd9c16eabcd1cc11ae31d604bfd:
+> 
+>   ARM: integrator: move flash registration to device tree (2016-04-04
+> 10:33:16 +0200)
+> 
+> ----------------------------------------------------------------
+> This is a set of patches removing the board file code
+> for Versatile flash handling and instead moving it over
+> to the device tree and a special add-on file.
+> 
+> ----------------------------------------------------------------
+> Linus Walleij (4):
+>       mtd: physmap_of: add a hook for Versatile write protection
+>       mtd: augment the "arm,versatile-flash" bindings
 
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- arch/arm/kvm/mmu.c |   97 ++++++++++++++++++++++++----------------------------
- 1 file changed, 44 insertions(+), 53 deletions(-)
+I don't know that much about this hardware, but it's not clear whether
+you properly addressed Russell's comment about the sharing of the VPP
+control. The reference counting is done on a per-flash basis, so it
+doesn't actually handle multiple flash correctly AFAICT. I also don't
+know if (like Russell mentioned) this is practically important to
+anything besides just phymap/NOR flash, or if there are other flash
+types used in practice (if so, then this series is insufficient).
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 2b491e5..0009a24 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -152,26 +152,26 @@ static void *mmu_memory_cache_alloc(struct kvm_mmu_memory_cache *mc)
- 	return p;
- }
- 
--static void clear_pgd_entry(struct kvm *kvm, pgd_t *pgd, phys_addr_t addr)
-+static void clear_stage2_pgd_entry(struct kvm *kvm, pgd_t *pgd, phys_addr_t addr)
- {
--	pud_t *pud_table __maybe_unused = pud_offset(pgd, 0);
--	pgd_clear(pgd);
-+	pud_t *pud_table __maybe_unused = stage2_pud_offset(pgd, 0UL);
-+	stage2_pgd_clear(pgd);
- 	kvm_tlb_flush_vmid_ipa(kvm, addr);
--	pud_free(NULL, pud_table);
-+	stage2_pud_free(NULL, pud_table);
- 	put_page(virt_to_page(pgd));
- }
- 
--static void clear_pud_entry(struct kvm *kvm, pud_t *pud, phys_addr_t addr)
-+static void clear_stage2_pud_entry(struct kvm *kvm, pud_t *pud, phys_addr_t addr)
- {
--	pmd_t *pmd_table = pmd_offset(pud, 0);
--	VM_BUG_ON(pud_huge(*pud));
--	pud_clear(pud);
-+	pmd_t *pmd_table __maybe_unused = stage2_pmd_offset(pud, 0);
-+	VM_BUG_ON(stage2_pud_huge(*pud));
-+	stage2_pud_clear(pud);
- 	kvm_tlb_flush_vmid_ipa(kvm, addr);
--	pmd_free(NULL, pmd_table);
-+	stage2_pmd_free(NULL, pmd_table);
- 	put_page(virt_to_page(pud));
- }
- 
--static void clear_pmd_entry(struct kvm *kvm, pmd_t *pmd, phys_addr_t addr)
-+static void clear_stage2_pmd_entry(struct kvm *kvm, pmd_t *pmd, phys_addr_t addr)
- {
- 	pte_t *pte_table = pte_offset_kernel(pmd, 0);
- 	VM_BUG_ON(pmd_thp_or_huge(*pmd));
-@@ -201,7 +201,7 @@ static void clear_pmd_entry(struct kvm *kvm, pmd_t *pmd, phys_addr_t addr)
-  * the corresponding TLBs, we call kvm_flush_dcache_p*() to make sure
-  * the IO subsystem will never hit in the cache.
-  */
--static void unmap_ptes(struct kvm *kvm, pmd_t *pmd,
-+static void unmap_stage2_ptes(struct kvm *kvm, pmd_t *pmd,
- 		       phys_addr_t addr, phys_addr_t end)
- {
- 	phys_addr_t start_addr = addr;
-@@ -223,19 +223,19 @@ static void unmap_ptes(struct kvm *kvm, pmd_t *pmd,
- 		}
- 	} while (pte++, addr += PAGE_SIZE, addr != end);
- 
--	if (kvm_pte_table_empty(kvm, start_pte))
--		clear_pmd_entry(kvm, pmd, start_addr);
-+	if (stage2_pte_table_empty(start_pte))
-+		clear_stage2_pmd_entry(kvm, pmd, start_addr);
- }
- 
--static void unmap_pmds(struct kvm *kvm, pud_t *pud,
-+static void unmap_stage2_pmds(struct kvm *kvm, pud_t *pud,
- 		       phys_addr_t addr, phys_addr_t end)
- {
- 	phys_addr_t next, start_addr = addr;
- 	pmd_t *pmd, *start_pmd;
- 
--	start_pmd = pmd = pmd_offset(pud, addr);
-+	start_pmd = pmd = stage2_pmd_offset(pud, addr);
- 	do {
--		next = kvm_pmd_addr_end(addr, end);
-+		next = stage2_pmd_addr_end(addr, end);
- 		if (!pmd_none(*pmd)) {
- 			if (pmd_thp_or_huge(*pmd)) {
- 				pmd_t old_pmd = *pmd;
-@@ -247,57 +247,64 @@ static void unmap_pmds(struct kvm *kvm, pud_t *pud,
- 
- 				put_page(virt_to_page(pmd));
- 			} else {
--				unmap_ptes(kvm, pmd, addr, next);
-+				unmap_stage2_ptes(kvm, pmd, addr, next);
- 			}
- 		}
- 	} while (pmd++, addr = next, addr != end);
- 
--	if (kvm_pmd_table_empty(kvm, start_pmd))
--		clear_pud_entry(kvm, pud, start_addr);
-+	if (stage2_pmd_table_empty(start_pmd))
-+		clear_stage2_pud_entry(kvm, pud, start_addr);
- }
- 
--static void unmap_puds(struct kvm *kvm, pgd_t *pgd,
-+static void unmap_stage2_puds(struct kvm *kvm, pgd_t *pgd,
- 		       phys_addr_t addr, phys_addr_t end)
- {
- 	phys_addr_t next, start_addr = addr;
- 	pud_t *pud, *start_pud;
- 
--	start_pud = pud = pud_offset(pgd, addr);
-+	start_pud = pud = stage2_pud_offset(pgd, addr);
- 	do {
--		next = kvm_pud_addr_end(addr, end);
--		if (!pud_none(*pud)) {
--			if (pud_huge(*pud)) {
-+		next = stage2_pud_addr_end(addr, end);
-+		if (!stage2_pud_none(*pud)) {
-+			if (stage2_pud_huge(*pud)) {
- 				pud_t old_pud = *pud;
- 
--				pud_clear(pud);
-+				stage2_pud_clear(pud);
- 				kvm_tlb_flush_vmid_ipa(kvm, addr);
--
- 				kvm_flush_dcache_pud(old_pud);
--
- 				put_page(virt_to_page(pud));
- 			} else {
--				unmap_pmds(kvm, pud, addr, next);
-+				unmap_stage2_pmds(kvm, pud, addr, next);
- 			}
- 		}
- 	} while (pud++, addr = next, addr != end);
- 
--	if (kvm_pud_table_empty(kvm, start_pud))
--		clear_pgd_entry(kvm, pgd, start_addr);
-+	if (stage2_pud_table_empty(start_pud))
-+		clear_stage2_pgd_entry(kvm, pgd, start_addr);
- }
- 
--
--static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
--			phys_addr_t start, u64 size)
-+/**
-+ * unmap_stage2_range -- Clear stage2 page table entries to unmap a range
-+ * @kvm:   The VM pointer
-+ * @start: The intermediate physical base address of the range to unmap
-+ * @size:  The size of the area to unmap
-+ *
-+ * Clear a range of stage-2 mappings, lowering the various ref-counts.  Must
-+ * be called while holding mmu_lock (unless for freeing the stage2 pgd before
-+ * destroying the VM), otherwise another faulting VCPU may come in and mess
-+ * with things behind our backs.
-+ */
-+static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
- {
- 	pgd_t *pgd;
- 	phys_addr_t addr = start, end = start + size;
- 	phys_addr_t next;
- 
--	pgd = pgdp + kvm_pgd_index(addr);
-+	pgd = kvm->arch.pgd + stage2_pgd_index(addr);
- 	do {
--		next = kvm_pgd_addr_end(addr, end);
--		if (!pgd_none(*pgd))
--			unmap_puds(kvm, pgd, addr, next);
-+		next = stage2_pgd_addr_end(addr, end);
-+		if (!stage2_pgd_none(*pgd))
-+			unmap_stage2_puds(kvm, pgd, addr, next);
- 	} while (pgd++, addr = next, addr != end);
- }
- 
-@@ -811,22 +818,6 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm)
- 	return 0;
- }
- 
--/**
-- * unmap_stage2_range -- Clear stage2 page table entries to unmap a range
-- * @kvm:   The VM pointer
-- * @start: The intermediate physical base address of the range to unmap
-- * @size:  The size of the area to unmap
-- *
-- * Clear a range of stage-2 mappings, lowering the various ref-counts.  Must
-- * be called while holding mmu_lock (unless for freeing the stage2 pgd before
-- * destroying the VM), otherwise another faulting VCPU may come in and mess
-- * with things behind our backs.
-- */
--static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
--{
--	unmap_range(kvm, kvm->arch.pgd, start, size);
--}
--
- static void stage2_unmap_memslot(struct kvm *kvm,
- 				 struct kvm_memory_slot *memslot)
- {
--- 
-1.7.9.5
+Regarding your prior questions about this driver: I don't really have
+much direction for the driver, as I simply inherited it and have barely
+touched it. As your series still looks like a reasonable restructuring,
+and it isn't a regression from any existing support:
+
+Acked-by: Brian Norris <computersforpeace@gmail.com>
+
+I don't personally care where the PULL goes.
+
+Brian
+
+>       ARM: versatile: move flash registration to the device tree
+>       ARM: integrator: move flash registration to device tree
+> 
+>  .../devicetree/bindings/mtd/arm-versatile.txt      |  20 +-
+>  arch/arm/boot/dts/integrator.dtsi                  |   3 +-
+>  arch/arm/boot/dts/versatile-ab.dts                 |   5 +-
+>  arch/arm/mach-integrator/integrator_ap.c           |  62 -----
+>  arch/arm/mach-integrator/integrator_cp.c           |  51 -----
+>  arch/arm/mach-versatile/versatile_dt.c             |  47 ----
+>  drivers/mtd/maps/Kconfig                           |  10 +
+>  drivers/mtd/maps/Makefile                          |   1 +
+>  drivers/mtd/maps/physmap_of.c                      |   6 +
+>  drivers/mtd/maps/physmap_of_versatile.c            | 253 +++++++++++++++++++++
+>  drivers/mtd/maps/physmap_of_versatile.h            |  16 ++
+>  11 files changed, 310 insertions(+), 164 deletions(-)
+>  create mode 100644 drivers/mtd/maps/physmap_of_versatile.c
+>  create mode 100644 drivers/mtd/maps/physmap_of_versatile.h
