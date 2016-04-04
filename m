@@ -1,67 +1,37 @@
-From: jan.glauber@caviumnetworks.com (Jan Glauber)
-Date: Mon, 4 Apr 2016 14:19:54 +0200
-Subject: [PATCH v2 0/5] Cavium ThunderX uncore PMU support
-In-Reply-To: <cover.1457539621.git.jglauber@cavium.com>
-References: <cover.1457539621.git.jglauber@cavium.com>
-Message-ID: <20160404121954.GA9300@hardcore>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 4 Apr 2016 14:35:08 +0200
+Subject: [PATCH v2] ARM: dts: orion5x: add device tree for kurobox-pro
+In-Reply-To: <1459267905-15403-1-git-send-email-rogershimizu@gmail.com>
+References: <1458656898-16183-1-git-send-email-rogershimizu@gmail.com>
+ <1459267905-15403-1-git-send-email-rogershimizu@gmail.com>
+Message-ID: <20160404123508.GF21828@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Wed, Mar 30, 2016 at 01:11:45AM +0900, Roger Shimizu wrote:
+> Add dts file to support Buffalo/Revogear Kurobox-Pro, which is marvell
+> orion5x based 3.5" HDD NAS.
+> 
+> It's a quite old product and already discontinued. So there's no
+> official website for it. But it was an early product which used marvell
+> orion5x 88F5182 chipset, it's popular in the community.
+> Some unofficial site:
+>   - http://buffalo.nas-central.org/wiki/Category:KuroboxPro
+>   - http://nice.kaze.com/KUROPRO_ProductSpecifications.pdf
+> 
+> This device tree is based on the board file:
+>   arch/arm/mach-orion5x/kurobox_pro-setup.c
+> However, the probing order of NAND and JEDEC-Flash are different from
+> the original board file, this results in incompatible minor number
+> for a few /dev/mtdX and /dev/mtdblockX devices.
+> So I still want to keep the board file for the time being.
+> 
+> Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
 
-can you have a look at these patches?
+Hi Roger
 
-Thanks,
-Jan
+Looks good:
 
-On Wed, Mar 09, 2016 at 05:21:02PM +0100, Jan Glauber wrote:
-> This patch series provides access to various counters on the ThunderX SOC.
-> 
-> For details of the uncore implementation see patch #1.
-> 
-> Patches #2-5 add the various ThunderX specific PMUs.
-> 
-> As suggested I've put the files under drivers/perf/uncore. I would
-> prefer this location over drivers/bus because not all of the uncore
-> drivers are bus related.
-> 
-> Changes to v1:
-> - Added NUMA support
-> - Fixed CPU hotplug by pmu migration
-> - Moved files to drivers/perf/uncore
-> - Removed OCX FRC and LNE drivers, these will fit better into a edac driver
-> - improved comments abount overflow interrupts
-> - removed max device limit
-> - trimmed include files
-> 
-> Feedback welcome!
-> Jan
-> 
-> -------------------------------------------------
-> 
-> Jan Glauber (5):
->   arm64/perf: Basic uncore counter support for Cavium ThunderX
->   arm64/perf: Cavium ThunderX L2C TAD uncore support
->   arm64/perf: Cavium ThunderX L2C CBC uncore support
->   arm64/perf: Cavium ThunderX LMC uncore support
->   arm64/perf: Cavium ThunderX OCX TLK uncore support
-> 
->  drivers/perf/Makefile                       |   1 +
->  drivers/perf/uncore/Makefile                |   5 +
->  drivers/perf/uncore/uncore_cavium.c         | 314 +++++++++++++++
->  drivers/perf/uncore/uncore_cavium.h         |  95 +++++
->  drivers/perf/uncore/uncore_cavium_l2c_cbc.c | 237 +++++++++++
->  drivers/perf/uncore/uncore_cavium_l2c_tad.c | 600 ++++++++++++++++++++++++++++
->  drivers/perf/uncore/uncore_cavium_lmc.c     | 196 +++++++++
->  drivers/perf/uncore/uncore_cavium_ocx_tlk.c | 380 ++++++++++++++++++
->  8 files changed, 1828 insertions(+)
->  create mode 100644 drivers/perf/uncore/Makefile
->  create mode 100644 drivers/perf/uncore/uncore_cavium.c
->  create mode 100644 drivers/perf/uncore/uncore_cavium.h
->  create mode 100644 drivers/perf/uncore/uncore_cavium_l2c_cbc.c
->  create mode 100644 drivers/perf/uncore/uncore_cavium_l2c_tad.c
->  create mode 100644 drivers/perf/uncore/uncore_cavium_lmc.c
->  create mode 100644 drivers/perf/uncore/uncore_cavium_ocx_tlk.c
-> 
-> -- 
-> 1.9.1
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+
+	     Andrew
