@@ -1,64 +1,41 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 4 Apr 2016 17:40:22 +0200
-Subject: [PATCH 3/8] arm64/kernel: use a proper stack frame in
- __mmap_switched()
-In-Reply-To: <57028941.6050805@arm.com>
-References: <1459781544-14310-1-git-send-email-ard.biesheuvel@linaro.org>
- <1459781544-14310-4-git-send-email-ard.biesheuvel@linaro.org>
- <57028941.6050805@arm.com>
-Message-ID: <CAKv+Gu_CM61_RmCgoSPcZCJ2m4GCR7txkh6+fp_LqBqXYypZjQ@mail.gmail.com>
+From: slemieux.tyco@gmail.com (Sylvain Lemieux)
+Date: Mon, 04 Apr 2016 11:42:38 -0400
+Subject: [PATCH for v4.7] arm: lpc32xx: remove leftovers of legacy
+ clock source and provider drivers
+In-Reply-To: <1456973180-31764-1-git-send-email-vz@mleia.com>
+References: <1456973180-31764-1-git-send-email-vz@mleia.com>
+Message-ID: <1459784558.25564.6.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 April 2016 at 17:33, James Morse <james.morse@arm.com> wrote:
-> Hi Ard,
->
-> On 04/04/16 15:52, Ard Biesheuvel wrote:
->> Considering that we can expect stack accesses from the moment we assign
->> VBAR_EL1, let's initialize the stack pointer first in __mmap_switched(),
->> and set up a proper stack frame while we're at it.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/kernel/head.S | 20 +++++++++-----------
->>  1 file changed, 9 insertions(+), 11 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
->> index 9d8f928c355c..f441fc73a7a2 100644
->> --- a/arch/arm64/kernel/head.S
->> +++ b/arch/arm64/kernel/head.S
->> @@ -421,9 +421,14 @@ kernel_img_size:
->>  /*
->>   * The following fragment of code is executed with the MMU enabled.
->>   */
->> -     .set    initial_sp, init_thread_union + THREAD_START_SP
->>  __mmap_switched:
->> -     mov     x28, lr                         // preserve LR
->> +     adrp    x4, init_thread_union
->> +     add     sp, x4, #THREAD_SIZE
->> +     msr     sp_el0, x4                      // Save thread_info
->
-> (Terms describing the stack are confusing, here goes!)
->
-> The address you have in x4 is the 'highest' address on the stack, (the first
-> that gets used), thread_info is at the other end, the 'lowest' address.
->
-> You used THREAD_SIZE instead of THREAD_START_SP, so the x4 value points to the
-> 'bottom' of the page after the stack, this isn't a problem because the pre-index
-> addressing decrements sp before it writes, but it does break the 'and   x4, x4,
-> #~(THREAD_SIZE - 1)' trick to find thread_info, which I think is what the '-16'
-> in THREAD_START_SP is for...
->
+Hi Vladimir,
 
-True. But since the sp is decremented by the same 16 bytes in the next
-instruction, the net value of sp when entering start_kernel() is
-identical.
+On Thu, 2016-03-03 at 04:46 +0200, Vladimir Zapolskiy wrote:
+> After switching the platform to common clock framework there is no
+> more need to keep dead code in arch/arm/mach-lpc32xx, which glued
+> legacy clock source and clock provider drivers, remove the leftovers.
+> 
+> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+> ---
+>  arch/arm/mach-lpc32xx/common.c | 95 ------------------------------------------
+>  arch/arm/mach-lpc32xx/common.h | 23 +---------
+>  2 files changed, 1 insertion(+), 117 deletions(-)
+> 
+> diff --git a/arch/arm/mach-lpc32xx/common.h b/arch/arm/mach-lpc32xx/common.h
+> index 1cd8853..f03683f 100644
+> --- a/arch/arm/mach-lpc32xx/common.h
+> +++ b/arch/arm/mach-lpc32xx/common.h
+> @@ -19,38 +19,17 @@
+>  
+>  #include <linux/reboot.h>
+>  
+It is possible to remove "reboot.h";
+do you want me to send a separate patch for it?
 
-> 6cdf9c7ca687 ("arm64: Store struct thread_info in sp_el0") got rid of most of
-> the users of this masking trick, maybe we can get rid of THREAD_START_SP too?
-> (unless it is there for some other clever reason!)
->
+>  extern void lpc23xx_restart(enum reboot_mode, const char *);
+>  
+The patch does not apply on 4.6-rc1;
+can you send a version 2 of your patch based on the latest mainline?
 
-I agree that the whole point of the -16 is to make the masking work.
-So if we can get rid of the masking, we can get rid of
-THREAD_START_SP, and also of the natural alignment of the stacks.
+
+Sylvain
