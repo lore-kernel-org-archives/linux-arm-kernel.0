@@ -1,46 +1,80 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 4 Apr 2016 17:22:54 +0200
-Subject: [PATCH v5 32/46] pwm: deprecate pwm_config(), pwm_enable() and
- pwm_disable()
-In-Reply-To: <20160331205454.630734ab@bbrezillon>
+Date: Mon, 4 Apr 2016 17:30:29 +0200
+Subject: [PATCH v5 34/46] clk: pwm: switch to the atomic API
+In-Reply-To: <20160331085735.3574970b@bbrezillon>
 References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
- <1459368249-13241-33-git-send-email-boris.brezillon@free-electrons.com>
- <20160331173858.GB39098@dtor-ws>
- <20160331205454.630734ab@bbrezillon>
-Message-ID: <20160404152254.GB17856@ulmo>
+ <1459368249-13241-35-git-send-email-boris.brezillon@free-electrons.com>
+ <20160330220149.GU18567@codeaurora.org>
+ <20160331085735.3574970b@bbrezillon>
+Message-ID: <20160404153029.GC17856@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 31, 2016 at 08:54:54PM +0200, Boris Brezillon wrote:
-> Hi Dmitry,
+On Thu, Mar 31, 2016 at 08:57:35AM +0200, Boris Brezillon wrote:
+> Hi Stephen,
 > 
-> On Thu, 31 Mar 2016 10:38:58 -0700
-> Dmitry Torokhov <dmitry.torokhov@gmail.com> wrote:
+> On Wed, 30 Mar 2016 15:01:49 -0700
+> Stephen Boyd <sboyd@codeaurora.org> wrote:
 > 
-> > Hi Boris,
+> > On 03/30, Boris Brezillon wrote:
+> > > diff --git a/drivers/clk/clk-pwm.c b/drivers/clk/clk-pwm.c
+> > > index ebcd738..49ec5b1 100644
+> > > --- a/drivers/clk/clk-pwm.c
+> > > +++ b/drivers/clk/clk-pwm.c
+> > > @@ -28,15 +28,29 @@ static inline struct clk_pwm *to_clk_pwm(struct clk_hw *hw)
+> > >  static int clk_pwm_prepare(struct clk_hw *hw)
+> > >  {
+> > >  	struct clk_pwm *clk_pwm = to_clk_pwm(hw);
+> > > +	struct pwm_state pstate;
+> > >  
+> > > -	return pwm_enable(clk_pwm->pwm);
+> > > +	pwm_get_state(clk_pwm->pwm, &pstate);
+> > > +	if (pstate.enabled)
+> > > +		return 0;
+> > > +
+> > > +	pstate.enabled = true;
+> > > +
+> > > +	return pwm_apply_state(clk_pwm->pwm, &pstate);
 > > 
-> > On Wed, Mar 30, 2016 at 10:03:55PM +0200, Boris Brezillon wrote:
-> > > Prefix those function as deprecated to encourage all existing users to
-> > > switch to pwm_apply_state().
-> > 
-> > Why not keep at least some of them as wrappers where we do not need to
-> > chnage several parameters at once? It is much easier to have a driver
-> > do:
-> > 
-> > 	error = pwm_enable(pwm);
-> > 	if (error)
-> > 		...
-> > 
-> > rather than declaring the state variable, fectch it, adjust and then
-> > apply.
+> > This doesn't seem atomic anymore if we're checking the state and
+> > then not calling apply_state if it's already enabled. But I
+> > assume this doesn't matter because we "own" the pwm here?
 > 
-> True. Actually deprecating the non-atomic API was not my primary goal.
-> Thierry would you mind if we keep both APIs around?
+> Yep. Actually it's not atomic in term of concurrency (maybe the
+> 'atomic' word is not appropriate here). Atomicity is here referring to
+> the fact that we're now providing all the PWM parameters in the same
+> request instead of splitting it in pwm_config() + pwm_enable/disable()
+> calls.
 
-I'm fine with keeping these around, though purely as shortcuts. If users
-need to modify two parameters at once (e.g. duty cycle and enable) then
-they should be converted to use the atomic API, otherwise there'd be
-little point in introduce it.
+It's usually not possible to do really atomic updates with PWM hardware.
+The idea is merely that we should be able to submit one request and the
+framework (and drivers) will be responsible for making sure it is
+applied as a whole or not at all. With the legacy API it is possible for
+users to set the duty cycle and period, but then fail to enable/disable
+the PWM.
+
+pwm_apply_state() reporting success should indicate that the hardware
+state is now what software wanted it to be. That kind of implies that
+the application is serialized.
+
+This doesn't imply that hardware state won't change between a call to
+pwm_get_state() and pwm_apply_state(), though technically this is what
+will usually happen because PWM devices are exclusively used by a single
+user. Users are responsible for synchronizing accesses within their own
+code.
+
+> Concurrent accesses still have to be controlled by the PWM user (which
+> is already the case for this driver, thanks to the locking
+> infrastructure in the CCF).
+> 
+> > Otherwise I would think this would be unconditional apply state
+> > and duplicates would be ignored in the pwm framework.
+> > 
+> 
+> Yep, I'll remove the if (pstate.enabled) branch.
+
+Yes, it should be the PWM framework's job to check for changes in state
+and discard no-ops.
 
 Thierry
 -------------- next part --------------
@@ -49,4 +83,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160404/dba11320/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160404/5ebc1791/attachment-0001.sig>
