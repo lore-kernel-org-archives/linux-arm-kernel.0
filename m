@@ -1,97 +1,76 @@
-From: pmladek@suse.com (Petr Mladek)
-Date: Mon, 4 Apr 2016 11:38:19 +0200
-Subject: [PATCH v4 1/5] printk/nmi: generic solution for safe printk in NMI
-In-Reply-To: <20160404044928.GD6164@swordfish>
-References: <1459353210-20260-1-git-send-email-pmladek@suse.com>
- <1459353210-20260-2-git-send-email-pmladek@suse.com>
- <20160404044928.GD6164@swordfish>
-Message-ID: <20160404093819.GH1023@pathway.suse.cz>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 4 Apr 2016 11:40:29 +0200
+Subject: [PATCH] iommu/arm-smmu: Fix stream-match conflict with
+ IOMMU_DOMAIN_DMA
+In-Reply-To: <1459527597-10740-1-git-send-email-will.deacon@arm.com>
+References: <1459527597-10740-1-git-send-email-will.deacon@arm.com>
+Message-ID: <5702368D.6060706@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2016-04-04 13:49:28, Sergey Senozhatsky wrote:
-> Hello,
+Hi Will,
+On 04/01/2016 06:19 PM, Will Deacon wrote:
+> Commit cbf8277ef456 ("iommu/arm-smmu: Treat IOMMU_DOMAIN_DMA as bypass
+> for now") ignores requests to attach a device to the default domain
+> since, without IOMMU-basked DMA ops available everywhere, the default
+> domain will just lead to unexpected transaction faults being reported.
 > 
-> On (03/30/16 17:53), Petr Mladek wrote:
-> [..]
-> > @@ -67,10 +67,12 @@ extern void irq_exit(void);
-> >  		preempt_count_add(NMI_OFFSET + HARDIRQ_OFFSET);	\
-> >  		rcu_nmi_enter();				\
-> >  		trace_hardirq_enter();				\
-> > +		printk_nmi_enter();				\
-> >  	} while (0)
-> >  
-> >  #define nmi_exit()						\
-> >  	do {							\
-> > +		printk_nmi_exit();				\
-> >  		trace_hardirq_exit();				\
-> >  		rcu_nmi_exit();					\
-> >  		BUG_ON(!in_nmi());				\
+> Unfortunately, the way this was implemented on SMMUv2 causes a
+> regression with VFIO PCI device passthrough under KVM on AMD Seattle.
+> On this system, the host controller device is associated with both a
+> pci_dev *and* a platform_device, and can therefore end up with duplicate
+> SMR entries, resulting in a stream-match conflict at runtime.
 > 
-> isn't it a bit too early to printk_nmi_exit()? rcu_nmi_exit() can
-> WARN_ON_ONCE() in 3 places.
+> This patch amends the original fix so that attaching to IOMMU_DOMAIN_DMA
+> is rejected even before configuring the SMRs. This restores the old
+> behaviour for now, but we'll need to look at handing host controllers
+> specially when we come to supporting the default domain fully.
+
+This works fine for me, before and after PCIe assignment. However before
+giving my T-b I would like to investigate another regression I observe
+wrt SRIOV assignment. Assigning the 1st VF works fine. However assigning
+a second VF does not work anymore (it used to in the past). I get
+-ENOSPC from arm_smmu_master_configure_smrs
+
+Best Regards
+
+Eric
 > 
-> the same goes for printk_nmi_enter(). rcu_nmi_enter() can WARN_ON_ONCE().
+> Reported-by: Eric Auger <eric.auger@linaro.org>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  drivers/iommu/arm-smmu.c | 14 ++++++++------
+>  1 file changed, 8 insertions(+), 6 deletions(-)
 > 
-> seems that in both cases we can endup having WARN_ON_ONCE() from nmi,
-> but with default printk function.
-
-Great catch! You are right.
-
-
-> > +/*
-> > + * Flush data from the associated per_CPU buffer. The function
-> > + * can be called either via IRQ work or independently.
-> > + */
-> > +static void __printk_nmi_flush(struct irq_work *work)
-> > +{
-> > +	static raw_spinlock_t read_lock =
-> > +		__RAW_SPIN_LOCK_INITIALIZER(read_lock);
-> > +	struct nmi_seq_buf *s = container_of(work, struct nmi_seq_buf, work);
-> > +	unsigned long flags;
-> > +	size_t len, size;
-> > +	int i, last_i;
-> > +
-> > +	/*
-> > +	 * The lock has two functions. First, one reader has to flush all
-> > +	 * available message to make the lockless synchronization with
-> > +	 * writers easier. Second, we do not want to mix messages from
-> > +	 * different CPUs. This is especially important when printing
-> > +	 * a backtrace.
-> > +	 */
-> > +	raw_spin_lock_irqsave(&read_lock, flags);
-> > +
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index e933679a3266..2f186d22477f 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -1098,18 +1098,20 @@ static int arm_smmu_domain_add_master(struct arm_smmu_domain *smmu_domain,
+>  	struct arm_smmu_device *smmu = smmu_domain->smmu;
+>  	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
+>  
+> -	/* Devices in an IOMMU group may already be configured */
+> -	ret = arm_smmu_master_configure_smrs(smmu, cfg);
+> -	if (ret)
+> -		return ret == -EEXIST ? 0 : ret;
+> -
+>  	/*
+>  	 * FIXME: This won't be needed once we have IOMMU-backed DMA ops
+> -	 * for all devices behind the SMMU.
+> +	 * for all devices behind the SMMU. Note that we need to take
+> +	 * care configuring SMRs for devices both a platform_device and
+> +	 * and a PCI device (i.e. a PCI host controller)
+>  	 */
+>  	if (smmu_domain->domain.type == IOMMU_DOMAIN_DMA)
+>  		return 0;
+>  
+> +	/* Devices in an IOMMU group may already be configured */
+> +	ret = arm_smmu_master_configure_smrs(smmu, cfg);
+> +	if (ret)
+> +		return ret == -EEXIST ? 0 : ret;
+> +
+>  	for (i = 0; i < cfg->num_streamids; ++i) {
+>  		u32 idx, s2cr;
+>  
 > 
-> hm... so here we have
-> 	for (; i < size; i++)
-> 		printk()
-> 
-> under the spinlock. the thing is that one of printk() can end up
-> in console_unlock()->call_console_drivers() loop, iterating there
-> long enough to spinlock lockup other CPUs that might want to flush
-> NMI buffers (if any), assuming that there are enough printk() (or
-> may be a slow serial console) happening concurrently on other CPUs
-> to keep the current ->read_lock busy. async printk can help here,
-> but user can request sync version of printk.
-
-I think that printk() is called on many other locations under
-a spinlock and they all are waiting for the async printk.
-
-
-> how about using deferred printk for nmi flush?
-> print_nmi_seq_line()->printk_deferred() ?
-
-But this is great idea. It will help to avoid the ugly macro
-deferred_console_in_nmi() as you mentioned in the other mail.
-
-Heh, I remember that I thought about this but I did not want
-to override the original log level of the messages. Now, I see
-that LOGLEVEL_SCHED is added on top and the original level
-is preserved.
-
-Thanks a lot for review. I am going to wait with respin a bit
-and give others some time for feedback.
-
-
-Best Regards,
-Petr
