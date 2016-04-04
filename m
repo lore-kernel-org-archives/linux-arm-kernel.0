@@ -1,44 +1,67 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  4 Apr 2016 10:23:16 +0900
-Subject: [PATCH 44/47] ARM: dts: sh73a0: Correct interrupt type for ARM TWD
+Date: Mon,  4 Apr 2016 10:23:15 +0900
+Subject: [PATCH 43/47] ARM: dts: r8a7794: Add IIC nodes
 In-Reply-To: <cover.1459732726.git.horms+renesas@verge.net.au>
 References: <cover.1459732726.git.horms+renesas@verge.net.au>
-Message-ID: <eaf2be722f632d02055c63a85e966fc05a26ff33.1459732726.git.horms+renesas@verge.net.au>
+Message-ID: <9ad60d7fe899cdc7759dc8af97a6bb401872a125.1459732726.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Add IIC nodes to r8a7794 device tree.
 
-The ARM TWD interrupt is a private peripheral interrupt (PPI), and per
-the ARM GIC documentation, whether the type for PPIs can be set is
-IMPLEMENTATION DEFINED.
+Based on similar work for the r8a7793 by Laurent Pinchart.
 
-For SH-Mobile AG5 devices the PPI type cannot be set, and so when we
-attempt to set the type for the ARM TWD interrupt it fails.  This has
-gone unnoticed because it fails silently, and because we cannot
-re-configure the type it has had no impact. Nevertheless fix the type
-for the TWD interrupt so that it matches the hardware configuration.
-
-Based on patches by Jon Hunter for Tegra20/30 and OMAP4.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/sh73a0.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7794.dtsi | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
-index bf825ca4f6f7..3d41fb97689e 100644
---- a/arch/arm/boot/dts/sh73a0.dtsi
-+++ b/arch/arm/boot/dts/sh73a0.dtsi
-@@ -43,7 +43,7 @@
- 	timer at f0000600 {
- 		compatible = "arm,cortex-a9-twd-timer";
- 		reg = <0xf0000600 0x20>;
--		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_HIGH)>;
-+		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_EDGE_RISING)>;
- 		clocks = <&twd_clk>;
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index 78e0b8186e4a..93a6293fa982 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -26,6 +26,8 @@
+ 		i2c3 = &i2c3;
+ 		i2c4 = &i2c4;
+ 		i2c5 = &i2c5;
++		i2c6 = &i2c6;
++		i2c7 = &i2c7;
+ 		spi0 = &qspi;
+ 		vin0 = &vin0;
+ 		vin1 = &vin1;
+@@ -647,6 +649,32 @@
+ 		status = "disabled";
  	};
  
++	i2c6: i2c at e6500000 {
++		compatible = "renesas,iic-r8a7794", "renesas,rmobile-iic";
++		reg = <0 0xe6500000 0 0x425>;
++		interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp3_clks R8A7794_CLK_IIC0>;
++		dmas = <&dmac0 0x61>, <&dmac0 0x62>;
++		dma-names = "tx", "rx";
++		power-domains = <&cpg_clocks>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++	};
++
++	i2c7: i2c at e6510000 {
++		compatible = "renesas,iic-r8a7794", "renesas,rmobile-iic";
++		reg = <0 0xe6510000 0 0x425>;
++		interrupts = <GIC_SPI 175 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp3_clks R8A7794_CLK_IIC1>;
++		dmas = <&dmac0 0x65>, <&dmac0 0x66>;
++		dma-names = "tx", "rx";
++		power-domains = <&cpg_clocks>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++	};
++
+ 	mmcif0: mmc at ee200000 {
+ 		compatible = "renesas,mmcif-r8a7794", "renesas,sh-mmcif";
+ 		reg = <0 0xee200000 0 0x80>;
 -- 
 2.1.4
