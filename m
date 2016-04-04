@@ -1,10 +1,10 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  4 Apr 2016 10:22:23 +0900
-Subject: [PATCH 15/26] ARM: dts: r8a7740: Remove unnecessary
+Date: Mon,  4 Apr 2016 10:22:25 +0900
+Subject: [PATCH 17/26] ARM: dts: r8a7779: Remove unnecessary
  clock-output-names properties
 In-Reply-To: <cover.1459731908.git.horms+renesas@verge.net.au>
 References: <cover.1459731908.git.horms+renesas@verge.net.au>
-Message-ID: <2dca78980372f154a2181e6044db71be9da626e9.1459731908.git.horms+renesas@verge.net.au>
+Message-ID: <3f6dba702c57908c5f66601ced6ef9f131759611.1459731908.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -21,179 +21,66 @@ clock-output-names properties and as necessary update the node names.
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a7740.dtsi | 57 ++++++++++++++----------------------------
- 1 file changed, 19 insertions(+), 38 deletions(-)
+ arch/arm/boot/dts/r8a7779.dtsi | 15 +++++----------
+ 1 file changed, 5 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-index 995fbda74b7a..39b2f88ad151 100644
---- a/arch/arm/boot/dts/r8a7740.dtsi
-+++ b/arch/arm/boot/dts/r8a7740.dtsi
-@@ -422,53 +422,45 @@
+diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+index a0cc08e6295b..60bc1e66bba9 100644
+--- a/arch/arm/boot/dts/r8a7779.dtsi
++++ b/arch/arm/boot/dts/r8a7779.dtsi
+@@ -445,12 +445,11 @@
  		ranges;
  
  		/* External root clock */
--		extalr_clk: extalr_clk {
-+		extalr_clk: extalr {
+-		extal_clk: extal_clk {
++		extal_clk: extal {
  			compatible = "fixed-clock";
  			#clock-cells = <0>;
- 			clock-frequency = <32768>;
--			clock-output-names = "extalr";
- 		};
--		extal1_clk: extal1_clk {
-+		extal1_clk: extal1 {
- 			compatible = "fixed-clock";
- 			#clock-cells = <0>;
+ 			/* This value must be overriden by the board. */
  			clock-frequency = <0>;
--			clock-output-names = "extal1";
- 		};
--		extal2_clk: extal2_clk {
-+		extal2_clk: extal2 {
- 			compatible = "fixed-clock";
- 			#clock-cells = <0>;
- 			clock-frequency = <0>;
--			clock-output-names = "extal2";
- 		};
--		dv_clk: dv_clk {
-+		dv_clk: dv {
- 			compatible = "fixed-clock";
- 			#clock-cells = <0>;
- 			clock-frequency = <27000000>;
--			clock-output-names = "dv";
- 		};
--		fmsick_clk: fmsick_clk {
-+		fmsick_clk: fmsick {
- 			compatible = "fixed-clock";
- 			#clock-cells = <0>;
- 			clock-frequency = <0>;
--			clock-output-names = "fmsick";
- 		};
--		fmsock_clk: fmsock_clk {
-+		fmsock_clk: fmsock {
- 			compatible = "fixed-clock";
- 			#clock-cells = <0>;
- 			clock-frequency = <0>;
--			clock-output-names = "fmsock";
- 		};
--		fsiack_clk: fsiack_clk {
-+		fsiack_clk: fsiack {
- 			compatible = "fixed-clock";
- 			#clock-cells = <0>;
- 			clock-frequency = <0>;
--			clock-output-names = "fsiack";
- 		};
--		fsibck_clk: fsibck_clk {
-+		fsibck_clk: fsibck {
- 			compatible = "fixed-clock";
- 			#clock-cells = <0>;
- 			clock-frequency = <0>;
--			clock-output-names = "fsibck";
+-			clock-output-names = "extal";
  		};
  
- 		/* Special CPG clocks */
-@@ -486,7 +478,7 @@
- 		};
- 
- 		/* Variable factor clocks (DIV6) */
--		vclk1_clk: vclk1_clk at e6150008 {
-+		vclk1_clk: vclk1 at e6150008 {
- 			compatible = "renesas,r8a7740-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0xe6150008 4>;
- 			clocks = <&pllc1_div2_clk>, <0>, <&dv_clk>,
-@@ -494,9 +486,8 @@
- 				 <&extal1_div2_clk>, <&extalr_clk>, <0>,
- 				 <0>;
- 			#clock-cells = <0>;
--			clock-output-names = "vclk1";
- 		};
--		vclk2_clk: vclk2_clk at e615000c {
-+		vclk2_clk: vclk2 at e615000c {
- 			compatible = "renesas,r8a7740-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0xe615000c 4>;
- 			clocks = <&pllc1_div2_clk>, <0>, <&dv_clk>,
-@@ -504,77 +495,67 @@
- 				 <&extal1_div2_clk>, <&extalr_clk>, <0>,
- 				 <0>;
- 			#clock-cells = <0>;
--			clock-output-names = "vclk2";
- 		};
--		fmsi_clk: fmsi_clk at e6150010 {
-+		fmsi_clk: fmsi at e6150010 {
- 			compatible = "renesas,r8a7740-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0xe6150010 4>;
- 			clocks = <&pllc1_div2_clk>, <&fmsick_clk>, <0>, <0>;
- 			#clock-cells = <0>;
--			clock-output-names = "fmsi";
- 		};
--		fmso_clk: fmso_clk at e6150014 {
-+		fmso_clk: fmso at e6150014 {
- 			compatible = "renesas,r8a7740-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0xe6150014 4>;
- 			clocks = <&pllc1_div2_clk>, <&fmsock_clk>, <0>, <0>;
- 			#clock-cells = <0>;
--			clock-output-names = "fmso";
- 		};
--		fsia_clk: fsia_clk at e6150018 {
-+		fsia_clk: fsia at e6150018 {
- 			compatible = "renesas,r8a7740-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0xe6150018 4>;
- 			clocks = <&pllc1_div2_clk>, <&fsiack_clk>, <0>, <0>;
- 			#clock-cells = <0>;
--			clock-output-names = "fsia";
- 		};
--		sub_clk: sub_clk at e6150080 {
-+		sub_clk: sub at e6150080 {
- 			compatible = "renesas,r8a7740-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0xe6150080 4>;
- 			clocks = <&pllc1_div2_clk>,
- 				 <&cpg_clocks R8A7740_CLK_USB24S>, <0>, <0>;
- 			#clock-cells = <0>;
--			clock-output-names = "sub";
- 		};
--		spu_clk: spu_clk at e6150084 {
-+		spu_clk: spu at e6150084 {
- 			compatible = "renesas,r8a7740-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0xe6150084 4>;
- 			clocks = <&pllc1_div2_clk>,
- 				 <&cpg_clocks R8A7740_CLK_USB24S>, <0>, <0>;
- 			#clock-cells = <0>;
--			clock-output-names = "spu";
- 		};
--		vou_clk: vou_clk at e6150088 {
-+		vou_clk: vou at e6150088 {
- 			compatible = "renesas,r8a7740-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0xe6150088 4>;
- 			clocks = <&pllc1_div2_clk>, <&extal1_clk>, <&dv_clk>,
- 				 <0>;
- 			#clock-cells = <0>;
--			clock-output-names = "vou";
- 		};
--		stpro_clk: stpro_clk at e615009c {
-+		stpro_clk: stpro at e615009c {
- 			compatible = "renesas,r8a7740-div6-clock", "renesas,cpg-div6-clock";
- 			reg = <0xe615009c 4>;
- 			clocks = <&cpg_clocks R8A7740_CLK_PLLC0>;
- 			#clock-cells = <0>;
--			clock-output-names = "stpro";
+ 		/* External SCIF clock */
+@@ -474,37 +473,33 @@
  		};
  
  		/* Fixed factor clocks */
--		pllc1_div2_clk: pllc1_div2_clk {
-+		pllc1_div2_clk: pllc1_div2 {
+-		i_clk: i_clk {
++		i_clk: i {
  			compatible = "fixed-factor-clock";
- 			clocks = <&cpg_clocks R8A7740_CLK_PLLC1>;
+ 			clocks = <&cpg_clocks R8A7779_CLK_PLLA>;
  			#clock-cells = <0>;
  			clock-div = <2>;
  			clock-mult = <1>;
--			clock-output-names = "pllc1_div2";
+-			clock-output-names = "i";
  		};
--		extal1_div2_clk: extal1_div2_clk {
-+		extal1_div2_clk: extal1_div2 {
+-		s3_clk: s3_clk {
++		s3_clk: s3 {
  			compatible = "fixed-factor-clock";
- 			clocks = <&extal1_clk>;
+ 			clocks = <&cpg_clocks R8A7779_CLK_PLLA>;
  			#clock-cells = <0>;
- 			clock-div = <2>;
+ 			clock-div = <8>;
  			clock-mult = <1>;
--			clock-output-names = "extal1_div2";
+-			clock-output-names = "s3";
+ 		};
+-		s4_clk: s4_clk {
++		s4_clk: s4 {
+ 			compatible = "fixed-factor-clock";
+ 			clocks = <&cpg_clocks R8A7779_CLK_PLLA>;
+ 			#clock-cells = <0>;
+ 			clock-div = <16>;
+ 			clock-mult = <1>;
+-			clock-output-names = "s4";
+ 		};
+-		g_clk: g_clk {
++		g_clk: g {
+ 			compatible = "fixed-factor-clock";
+ 			clocks = <&cpg_clocks R8A7779_CLK_PLLA>;
+ 			#clock-cells = <0>;
+ 			clock-div = <24>;
+ 			clock-mult = <1>;
+-			clock-output-names = "g";
  		};
  
  		/* Gate clocks */
