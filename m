@@ -1,43 +1,31 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 4 Apr 2016 12:02:17 -0700
-Subject: [RFC PATCH 0/9] ARM: start to move arch/arm/mach-* to
- arch/arm/platforms/*
-In-Reply-To: <20160403182543.GQ19428@n2100.arm.linux.org.uk>
-References: <1459694367-18635-1-git-send-email-yamada.masahiro@socionext.com>
- <20160403182543.GQ19428@n2100.arm.linux.org.uk>
-Message-ID: <CAOesGMij8KUR_AxBZmUU7cM1qnvTSUjdPr=_EKsW_s5DoEmcfg@mail.gmail.com>
+From: slemieux.tyco@gmail.com (Sylvain Lemieux)
+Date: Mon,  4 Apr 2016 15:48:34 -0400
+Subject: [PATCH] arm: lpc32xx: remove reboot header file
+Message-ID: <1459799314-8987-1-git-send-email-slemieux.tyco@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 3, 2016 at 11:25 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sun, Apr 03, 2016 at 11:39:18PM +0900, Masahiro Yamada wrote:
->> We have growing number of mach-* directories in arch/arm, and I guess
->> it might be a good time to discuss moving them into a sub-directory.
->
-> What does it buy us?  Let me summarise the actual change:
->
-> - Move up to 71 arch/arm/mach-* directories to arch/arm/platforms/*,
->   which just means another level of directory structure.  We still
->   end up with up to 71 directories in arch/arm/platforms/
->
-> - The ability to use obj-y rather than machine-y, where both already
->   work in the same way.
->
-> Is there anything I missed?
->
-> If that is all, then I really do not like this change - it's seems
-> to be churn for no benefit, and that's something we really should be
-> minimising.  Linus Torvalds has historically moaned at the ARM
-> architecture for stuff like this.
+From: Sylvain Lemieux <slemieux@tycoint.com>
 
-Been behind on email so chiming in late, but I agree -- this change
-isn't bringing enough benefit to justify the churn.
+The header file "reboot.h" is no longer needed, following
+the migration of the restart code into the pnx4008 watchdog.
 
-Overall we're looking at adding as little new code into arch/arm/mach*
-as possible, so making it easier to structure up and build more
-elaborate contents in their corner of it seems a bit like a step
-backwards.
+Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
+---
+ arch/arm/mach-lpc32xx/common.h | 1 -
+ 1 file changed, 1 deletion(-)
 
-
--Olof
+diff --git a/arch/arm/mach-lpc32xx/common.h b/arch/arm/mach-lpc32xx/common.h
+index 2d90801..9b5ae42 100644
+--- a/arch/arm/mach-lpc32xx/common.h
++++ b/arch/arm/mach-lpc32xx/common.h
+@@ -21,7 +21,6 @@
+ 
+ #include <mach/board.h>
+ #include <linux/platform_device.h>
+-#include <linux/reboot.h>
+ 
+ /*
+  * Other arch specific structures and functions
+-- 
+1.8.3.1
