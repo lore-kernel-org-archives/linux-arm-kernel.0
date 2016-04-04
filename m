@@ -1,185 +1,83 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue,  5 Apr 2016 10:51:23 +0900
-Subject: [PATCH v2] clk: let clk_disable() return immediately if clk is NULL
- or error
-Message-ID: <1459821083-28116-1-git-send-email-yamada.masahiro@socionext.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 5 Apr 2016 00:33:39 +0100
+Subject: [PATCH 3/4] perf: xgene: Add APM X-Gene SoC Performance
+ Monitoring Unit driver
+In-Reply-To: <CACgAJHwZ0MwjBDa65P7tYAkF4-m+TCj-65OGpYYQD2tO6hkFqQ@mail.gmail.com>
+References: <1459467472-31561-1-git-send-email-ttnguyen@apm.com>
+ <1459467472-31561-4-git-send-email-ttnguyen@apm.com>
+ <20160401121820.GB29876@leverpostej>
+ <CACgAJHwZ0MwjBDa65P7tYAkF4-m+TCj-65OGpYYQD2tO6hkFqQ@mail.gmail.com>
+Message-ID: <20160404233338.GA1917@svinekod>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clk_disable() in the common clock framework (drivers/clk/clk.c)
-returns immediately if a given clk is NULL or an error pointer.  It
-allows clock consumers to call clk_disable() without IS_ERR_OR_NULL
-checking if drivers are only used with the common clock framework.
+On Mon, Apr 04, 2016 at 04:42:11PM -0700, Tai Tri Nguyen wrote:
+> On Fri, Apr 1, 2016 at 5:18 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> >> +static int get_next_avail_cntr(struct xgene_pmu_dev *pmu_dev)
+> >> +{
+> >> +     int shift, cntr, retval;
+> >> +     unsigned long flags;
+> >> +
+> >> +     raw_spin_lock_irqsave(&pmu_dev->lock, flags);
+> >> +
+> >> +     for (cntr = 0; cntr < pmu_dev->max_counters; cntr++) {
+> >> +             shift = cntr;
+> >> +             if (!(pmu_dev->cntr_assign_mask & (1ULL << shift))) {
+> >> +                     pmu_dev->cntr_assign_mask |= (1ULL << shift);
+> >> +                     retval = cntr;
+> >> +                     goto out;
+> >> +             }
+> >> +     }
+> >> +     retval = -ENOSPC;
 
-Unfortunately, NULL/error checking is missing from some of non-common
-clk_disable() implementations.  This prevents us from completely
-dropping NULL/error checking from callers.  Let's make it tree-wide
-consistent by adding IS_ERR_OR_NULL(clk) to all callees.
+> > Are the spinlocks necessary?
+> >
+> > I thought add and del couldn't be called in parallel for the same
+> > context, and those are the only users of this mask.
+> >
+> 
+> I'm trying to avoid the case where multiple events may claim the same
+> available counter.
+> There's a race condition here.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-Acked-by: Greg Ungerer <gerg@uclinux.org>
-Acked-by: Wan Zongshun <mcuos.com@gmail.com>
----
+I don't think there is, so long as events are all associated with the same CPU,
+and hence the same ctx.
 
-Stephen,
+As I mentioned, add and del are the only users of this mask. Both of those are
+only called with ctx->lock held, so I couldn't see how these could race.
 
-This patch has been unapplied for a long time.
+Were you considering events in different cpu contexts racing?
 
-Please let me know if there is something wrong with this patch.
+Is there something I've missed?
+
+> >> +     hwc->config = config;
+> >> +     if (config1)
+> >> +             hwc->extra_reg.config = config1;
+> >> +     else
+> >> +             /* Enable all Agents */
+> >> +             hwc->extra_reg.config = 0xFFFFFFFFFFFFFFFFULL;
+> >
+> > I'm not sure I follow what's going on here.
+> >
+> > It would be good to document precisely what this means.
+> 
+> These are X-Gene PMU specific for monitoring performance of a specific
+> data path.
+> X-Gene PMUs have 2 registers capable of masking the Agents from which
+> the request come from. If the bit with the bit number corresponding to
+> the AgentID
+> is set, the event will be counted only if it is caused by a request
+> from that agent.
+> Each PMU has different set of Agents. By default, the event will be counted for
+> all agent requests.
+> 
+> I'll have it commented better for next revision of the patch.
+
+It might be worth having something under Documentation/ for this, similarly to
+what we do for CCN in Documentation/arm/CCN.txt.
+
+How is the user expected to determine agent IDs? Is there a listing somewhere?
+Does this change between reivisions? This may be worth documenting.
 
 Thanks,
-
-
-Changes in v2:
-  - Rebase on Linux 4.6-rc1
-
- arch/arm/mach-ep93xx/clock.c     |  2 +-
- arch/arm/mach-mmp/clock.c        |  3 +++
- arch/arm/mach-sa1100/clock.c     | 15 ++++++++-------
- arch/arm/mach-w90x900/clock.c    |  3 +++
- arch/blackfin/mach-bf609/clock.c |  3 +++
- arch/m68k/coldfire/clk.c         |  4 ++++
- arch/mips/bcm63xx/clk.c          |  3 +++
- arch/mips/lantiq/clk.c           |  3 +++
- drivers/sh/clk/core.c            |  2 +-
- 9 files changed, 29 insertions(+), 9 deletions(-)
-
-diff --git a/arch/arm/mach-ep93xx/clock.c b/arch/arm/mach-ep93xx/clock.c
-index 39ef3b6..4e11f7d 100644
---- a/arch/arm/mach-ep93xx/clock.c
-+++ b/arch/arm/mach-ep93xx/clock.c
-@@ -293,7 +293,7 @@ void clk_disable(struct clk *clk)
- {
- 	unsigned long flags;
- 
--	if (!clk)
-+	if (IS_ERR_OR_NULL(clk))
- 		return;
- 
- 	spin_lock_irqsave(&clk_lock, flags);
-diff --git a/arch/arm/mach-mmp/clock.c b/arch/arm/mach-mmp/clock.c
-index ac6633d..39ad3896 100644
---- a/arch/arm/mach-mmp/clock.c
-+++ b/arch/arm/mach-mmp/clock.c
-@@ -67,6 +67,9 @@ void clk_disable(struct clk *clk)
- {
- 	unsigned long flags;
- 
-+	if (IS_ERR_OR_NULL(clk))
-+		return;
-+
- 	WARN_ON(clk->enabled == 0);
- 
- 	spin_lock_irqsave(&clocks_lock, flags);
-diff --git a/arch/arm/mach-sa1100/clock.c b/arch/arm/mach-sa1100/clock.c
-index cbf53bb..ea103fd 100644
---- a/arch/arm/mach-sa1100/clock.c
-+++ b/arch/arm/mach-sa1100/clock.c
-@@ -85,13 +85,14 @@ void clk_disable(struct clk *clk)
- {
- 	unsigned long flags;
- 
--	if (clk) {
--		WARN_ON(clk->enabled == 0);
--		spin_lock_irqsave(&clocks_lock, flags);
--		if (--clk->enabled == 0)
--			clk->ops->disable(clk);
--		spin_unlock_irqrestore(&clocks_lock, flags);
--	}
-+	if (IS_ERR_OR_NULL(clk))
-+		return;
-+
-+	WARN_ON(clk->enabled == 0);
-+	spin_lock_irqsave(&clocks_lock, flags);
-+	if (--clk->enabled == 0)
-+		clk->ops->disable(clk);
-+	spin_unlock_irqrestore(&clocks_lock, flags);
- }
- EXPORT_SYMBOL(clk_disable);
- 
-diff --git a/arch/arm/mach-w90x900/clock.c b/arch/arm/mach-w90x900/clock.c
-index 2c371ff..90ec250 100644
---- a/arch/arm/mach-w90x900/clock.c
-+++ b/arch/arm/mach-w90x900/clock.c
-@@ -46,6 +46,9 @@ void clk_disable(struct clk *clk)
- {
- 	unsigned long flags;
- 
-+	if (IS_ERR_OR_NULL(clk))
-+		return;
-+
- 	WARN_ON(clk->enabled == 0);
- 
- 	spin_lock_irqsave(&clocks_lock, flags);
-diff --git a/arch/blackfin/mach-bf609/clock.c b/arch/blackfin/mach-bf609/clock.c
-index 3783058..fed8015 100644
---- a/arch/blackfin/mach-bf609/clock.c
-+++ b/arch/blackfin/mach-bf609/clock.c
-@@ -97,6 +97,9 @@ EXPORT_SYMBOL(clk_enable);
- 
- void clk_disable(struct clk *clk)
- {
-+	if (IS_ERR_OR_NULL(clk))
-+		return;
-+
- 	if (clk->ops && clk->ops->disable)
- 		clk->ops->disable(clk);
- }
-diff --git a/arch/m68k/coldfire/clk.c b/arch/m68k/coldfire/clk.c
-index fddfdcc..eb0e8c1 100644
---- a/arch/m68k/coldfire/clk.c
-+++ b/arch/m68k/coldfire/clk.c
-@@ -101,6 +101,10 @@ EXPORT_SYMBOL(clk_enable);
- void clk_disable(struct clk *clk)
- {
- 	unsigned long flags;
-+
-+	if (IS_ERR_OR_NULL(clk))
-+		return;
-+
- 	spin_lock_irqsave(&clk_lock, flags);
- 	if ((--clk->enabled == 0) && clk->clk_ops)
- 		clk->clk_ops->disable(clk);
-diff --git a/arch/mips/bcm63xx/clk.c b/arch/mips/bcm63xx/clk.c
-index 6375652..d6a39bf 100644
---- a/arch/mips/bcm63xx/clk.c
-+++ b/arch/mips/bcm63xx/clk.c
-@@ -326,6 +326,9 @@ EXPORT_SYMBOL(clk_enable);
- 
- void clk_disable(struct clk *clk)
- {
-+	if (IS_ERR_OR_NULL(clk))
-+		return;
-+
- 	mutex_lock(&clocks_mutex);
- 	clk_disable_unlocked(clk);
- 	mutex_unlock(&clocks_mutex);
-diff --git a/arch/mips/lantiq/clk.c b/arch/mips/lantiq/clk.c
-index a0706fd..c8d87b1 100644
---- a/arch/mips/lantiq/clk.c
-+++ b/arch/mips/lantiq/clk.c
-@@ -130,6 +130,9 @@ EXPORT_SYMBOL(clk_enable);
- 
- void clk_disable(struct clk *clk)
- {
-+	if (IS_ERR_OR_NULL(clk))
-+		return;
-+
- 	if (unlikely(!clk_good(clk)))
- 		return;
- 
-diff --git a/drivers/sh/clk/core.c b/drivers/sh/clk/core.c
-index 92863e3..9978fa4 100644
---- a/drivers/sh/clk/core.c
-+++ b/drivers/sh/clk/core.c
-@@ -252,7 +252,7 @@ void clk_disable(struct clk *clk)
- {
- 	unsigned long flags;
- 
--	if (!clk)
-+	if (IS_ERR_OR_NULL(clk))
- 		return;
- 
- 	spin_lock_irqsave(&clock_lock, flags);
--- 
-1.9.1
+Mark.
