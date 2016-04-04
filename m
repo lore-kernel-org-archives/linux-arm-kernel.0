@@ -1,49 +1,33 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 4 Apr 2016 00:15:49 -0500
-Subject: [PATCH 1/2] dt/bindings: Add bindings for hisilicon random
- number generator
-In-Reply-To: <1459474664-11264-1-git-send-email-wangkefeng.wang@huawei.com>
-References: <1459474664-11264-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <20160404051549.GF17806@rob-hp-laptop>
+Date: Mon, 4 Apr 2016 00:15:56 -0500
+Subject: [PATCH v3 2/3] ata: ahci-platform: Add ports-implemented DT
+ bindings.
+In-Reply-To: <1459497178-31090-3-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1459497178-31090-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1459497178-31090-3-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20160404051556.GH17806@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 01, 2016 at 09:37:43AM +0800, Kefeng Wang wrote:
-> Document the devicetree bindings for the random number generator
-> found on Hisilicon Hip04 and Hip05 soc.
+On Fri, Apr 01, 2016 at 08:52:57AM +0100, Srinivas Kandagatla wrote:
+> On some SOCs PORTS_IMPL register value is never programmed by the
+> firmware and left at zero value. Which means that no sata ports are
+> available for software. AHCI driver used to cope up with this by
+> fabricating the port_map if the PORTS_IMPL register is read zero,
+> but recent patch broke this workaround as zero value was valid for
+> NVMe disks.
 > 
-> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+> This patch adds ports-implemented DT bindings as workaround for this issue
+> in a way that DT can can override the PORTS_IMPL register in cases where
+> the firmware did not program it already.
+> 
+> Fixes: 566d1827df2e ("libata: disable forced PORTS_IMPL for >= AHCI 1.3)
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> Acked-by: Tejun Heo <tj@kernel.org>
+> Reviewed-by: Andy Gross <andy.gross@linaro.org>
 > ---
->  Documentation/devicetree/bindings/rng/hisi-rng.txt | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/rng/hisi-rng.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/rng/hisi-rng.txt b/Documentation/devicetree/bindings/rng/hisi-rng.txt
-> new file mode 100644
-> index 0000000..80f29b6
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/rng/hisi-rng.txt
-> @@ -0,0 +1,12 @@
-> +Hisilicon Random Number Generator
-> +
-> +Required properties:
-> +- compatible : Should be "hisilicon,hisi-rng"
+>  Documentation/devicetree/bindings/ata/ahci-platform.txt | 4 ++++
+>  drivers/ata/ahci_platform.c                             | 3 +++
+>  2 files changed, 7 insertions(+)
 
-hisi is a bit redundant with hisilicon and please define SoC specific 
-compatible strings.
-
-> +- reg : Offset and length of the register set of this block
-> +
-> +Example:
-> +
-> +rng at d1010000 {
-> +	compatible = "hisilicon,hisi-rng";
-> +	reg = <0xd1010000 0x100>;
-> +};
-> -- 
-> 1.7.12.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Acked-by: Rob Herring <robh@kernel.org>
