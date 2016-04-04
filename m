@@ -1,75 +1,100 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 04 Apr 2016 17:11:47 +0200
-Subject: [PATCH 0/2] Embedding Position Independent Executables
-In-Reply-To: <20160404095757.GR19428@n2100.arm.linux.org.uk>
-References: <1459668234-16033-1-git-send-email-alexandre.belloni@free-electrons.com>
- <20160404095757.GR19428@n2100.arm.linux.org.uk>
-Message-ID: <16404629.c8PaLD68yt@phil>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 4 Apr 2016 08:12:01 -0700
+Subject: [PATCH v2 0/3] ARM: OMAP3: Fix McBSP2/3 hwmod setup for sidetone
+In-Reply-To: <57026205.6020105@ti.com>
+References: <1458311007-19168-1-git-send-email-peter.ujfalusi@ti.com>
+ <alpine.DEB.2.02.1603191937430.6629@utopia.booyaka.com>
+ <56EFB794.5010505@ti.com>
+ <alpine.DEB.2.02.1603211743200.31059@utopia.booyaka.com>
+ <56FE407E.9030803@ti.com> <20160402001753.GR9329@atomide.com>
+ <57026205.6020105@ti.com>
+Message-ID: <20160404151200.GA4652@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 4. April 2016, 10:57:57 schrieb Russell King - ARM Linux:
-> [Manually reformatted your email so I can reply to it sensibly - please
-> don't make me have to do this again, next time I'll ignore your message
-> as it's too much effort, thanks]
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [160404 05:47]:
+> On 04/02/16 03:17, Tony Lindgren wrote:
+> > * Peter Ujfalusi <peter.ujfalusi@ti.com> [160401 02:34]:
+> >> So what shall we do with the OMAP3 McBSP2/3 sidetone? It has been broken in DT
+> >> boot since the first time we booted OMAP3 with DT... Only in legacy mode we
+> >> can have properly working ST.
+> > 
+> > Grr.
 > 
-> On Sun, Apr 03, 2016 at 09:23:52AM +0200, Alexandre Belloni wrote:
-> > Hi,
-> > 
-> > This series tries to revive the many series trying to achieve the same
-> > thing.
-> > 
-> > I've tried numerous approaches and while using the kernel module loader
-> > is actually quite convenient from a relocation point of view it is quite
-> > overkill and also it is quite often too late as a lot of the arch
-> > specific PM code assume that it is running at boot time, befor having
-> > access to any filesystem.
-> > 
-> > I've chosen to be less generic than what Russ did and only handle ARM.
-> > I reused the API he defined but I actually went closer to his first
-> > implementation by compiling and embedding a real PIE that doesn't
-> > actually need relocations (gcc seems to be better at it thanks to ASLR).
-> > 
-> > In this series, I'm also converting the AT91 suspend code to use that
-> > infrastructure as it is quite simple but I also toyed with more complex
-> > functions.
-> > 
-> > The current limitation is that is doesn't actually tries to handle big
-> > endian and I didn't test thumb (and this will probably require more work
-> > to get that working reliably).
-> > 
-> > Also, to be more useful prppoer handling of a stack has to be added
-> > (this is not too difficult and is planned) and will be enough to get
-> > rk3288 suspend/resume and DDR timing changes working.
+> Yes :(
+> The reason for this is that in DT boot we can not provide the
+> enable_st_clock() callback to the mcbsp driver stack. This is done for legacy
+> boot in mach-omap2/mcbsp.c
+
+Seems like the short term fix there is to pass enable_st_clock pointer
+in pdata using pdata-quirks.c. Then for the long term solution using
+PM runtime to block gating of the clock while sidetone is active is
+the way to go it seems.
+
+> The ST does not have clocks coming from PRCM level, it only uses the McBSP
+> iclk when it is enabled (the McBSP block of the McBSP). As far as pm_runtime
+> goes I think the ST module should not use it. We can not tell hwmod to
+> enable/disable the McBSP2/3 iclk when we pm_runtime for the ST. It does not
+> help at all. We can have nop action for the ST when pm_runtime is used, but
+> then why would we have it?
+
+Using PM runtime in the sidetone driver should just work as long as the
+sidetone device driver depends on the McBSP driver before it gets probed.
+The clock framework handles things for the mcbsp ick with the usecount.
+And doing pm_runtime_get() in the sidetone driver will do what the legacy
+enable_st_clock() does currently.
+
+> > So having two separate drivers might make things a lot simpler.
 > 
-> Provided there is no linking back to the kernel image (which is enforced
-> by the --no-undefined flag), this at first glance looks okay, but what
-> is the motivation behind this change?  Just because there's "many series
-> trying to do this" isn't really a justification or a reason why we should
-> include this in the mainline kernel.
+> Not really. It will make things way more complicated imho. How to handle
+> legacy boot as we still have that supported?
 
-I'm not 100% sure if my try at an explanation will actually help things, but 
-I'll try to provide some thoughts.
+Hey both the legacy driver and DT driver are really just platform devices
+and drivers. And passing both dts and platform data can be done just
+fine, no?
 
-The series is a continuation of Russ Dill's series from 2013 [0] and Doug's 
-try from 2014 [1].
+> When the McBSP driver is loaded we must know if it has sidetone or not so
+> we can create the needed audio controls, sysfs entries. The sysfs and
+> kcontrol registration could be moved out to the new ST driver, true.
 
-The main issue being on Rockchip that right now on the rk3288 with a 
-reasonable amount of assembly we can achieve only a very light suspend mode 
-(saving a tiny amount of energy). To save more we need to reinit the ddr 
-controller as well as some regulators on resume with code that needs to run 
-in sram needing a quite bigger amount of code.
+Yeah during the probe, the sidetone driver must register with the McBSP
+driver to tell it's there. I guess no need to pass anything in the
+dts or platform_data for that.
 
-Earlier Rockchip SoCs don't even support that lighter suspend, so get none 
-currently at all, as they 
+> I actually started with two separate drivers approach first, but decided that
+> it does not worth the effort (legacy boot support, pm_runtime/hwmod hassle,
+> platform data, callback API design, etc).
+> I know, it is not rocket science but it is king of shoot out of cannon into
+> sparrows.
+> I'll think about it for a little while ;)
 
-Same reasoning for ddr frequency changes, as they also need a bigger amount 
-of code that will very much easier to handle when written in c than in 
-assembly.
+Well what we've seen so far is that any kind of non-standard solution
+will always be a pain to maintain in the long run :)
 
-So this solution is meant to provide the means to achieve all this.
+> > If you don't treat the McBSP and sidetone as separate modules, things can
+> > easily fail. For example, doing a read-back to flush of posted write to
+> > sidetone registers flushes nothing for McBSP and the other way around.
+> 
+> I don't see problem with the need of flushing if we would need it. I don't
+> think we are doing anything proactively to flush writes in the driver today
+> and we do have at least one product using the ST (n900).
 
+Usually the problem is with an interrupt ack write not reaching the device
+in time before something else happens. So I could see mysterious issues
+happening with the McBSP and sidetone having separate interrupts. Maybe
+not a real problem, but the chance for it is still there for sure.
 
+> >> Other option would be to deprecate the ST support as such, but that would
+> >> leave the n900 guys in trouble as they need ST to be functional...
+> > 
+> > That does not sound like a nice option at all :(
+> 
+> I know. This has been bugging me for a long time. I want to fix this one
+> before my beagleboard-xm gives up and won't boot up anymore since after that I
+> will have no omap3 board to work with :(
 
-[0] https://lwn.net/Articles/567051/
-[1] https://lkml.org/lkml/2014/12/1/617
+There are plenty of cheap omap3 devices available out there though :)
+
+Regards,
+
+Tony
