@@ -1,36 +1,83 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  4 Apr 2016 10:23:31 +0900
-Subject: [PATCH] bus: simple-pm-bus: Use ARCH_RENESAS
-In-Reply-To: <cover.1459732818.git.horms+renesas@verge.net.au>
-References: <cover.1459732818.git.horms+renesas@verge.net.au>
-Message-ID: <41feae79f2621d9fcea1437d4a2f29dc731fdbb0.1459732818.git.horms+renesas@verge.net.au>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Mon, 4 Apr 2016 09:43:59 +0800
+Subject: [PATCH v2 02/16] arm64: dts: add sp804 timer node for Hi6220
+In-Reply-To: <CACRpkdbWuKx6=aF5xW=3EKfuUf-MYM_EEnovyhBnOGVOeHyCmQ@mail.gmail.com>
+References: <1459589383-16914-1-git-send-email-guodong.xu@linaro.org>
+ <1459589383-16914-3-git-send-email-guodong.xu@linaro.org>
+ <CACRpkdbWuKx6=aF5xW=3EKfuUf-MYM_EEnovyhBnOGVOeHyCmQ@mail.gmail.com>
+Message-ID: <20160404014359.GA15178@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make use of ARCH_RENESAS in place of ARCH_SHMOBILE.
+Hi Linus,
 
-This is part of an ongoing process to migrate from ARCH_SHMOBILE to
-ARCH_RENESAS the motivation for which being that RENESAS seems to be a more
-appropriate name than SHMOBILE for the majority of Renesas ARM based SoCs.
+Thanks for review.
 
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- drivers/bus/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On Sun, Apr 03, 2016 at 09:23:42PM +0200, Linus Walleij wrote:
+> On Sat, Apr 2, 2016 at 11:29 AM, Guodong Xu <guodong.xu@linaro.org> wrote:
+> 
+> > From: Leo Yan <leo.yan@linaro.org>
+> >
+> > Add sp804 timer for hi6220, so it can be used as broadcast timer.
+> >
+> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> > Signed-off-by: Wei Xu <xuwei5@hisilicon.com>
+> > ---
+> >  arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 9 +++++++++
+> >  1 file changed, 9 insertions(+)
+> >
+> > diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> > index ad1f1eb..82c4756 100644
+> > --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> > +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> > @@ -209,5 +209,14 @@
+> >                         clock-names = "uartclk", "apb_pclk";
+> >                         status = "disabled";
+> >                 };
+> > +
+> > +               dual_timer0: dual_timer at f8008000 {
+> > +                       compatible = "arm,sp804", "arm,primecell";
+> > +                       reg = <0x0 0xf8008000 0x0 0x1000>;
+> > +                       interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>,
+> > +                                    <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
+> > +                       clocks = <&ao_ctrl 27>;
+> > +                       clock-names = "apb_pclk";
+> 
+> How can this work? You only give the apb_pclk for clocking the
+> bus to the timer.
+> 
+> Most platforms using this driver has something like this:
+> 
+>                 timer01: timer at 10104000 {
+>                         compatible = "arm,sp804", "arm,primecell";
+>                         reg = <0x10104000 0x1000>;
+>                         interrupt-parent = <&intc_dc1176>;
+>                         interrupts = <0 8 IRQ_TYPE_LEVEL_HIGH>, <0 9
+> IRQ_TYPE_LEVEL_HIGH>;
+>                         clocks = <&timclk>, <&timclk>, <&pclk>;
+>                         clock-names = "timer1", "timer2", "apb_pclk";
+>                 };
+> 
+> It then reads the two clocks in the beginning of clocks() to
+> determine the frequency of each timer.
+> 
+> By chance the code in the driver will allow just one clock and
+> will then assume that both the bus to the timer and the timer
+> itself is clocked from the same clock. But I highly doubt that this
+> is the case.
 
-diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-index d4a3a3133da5..67cebd3d7f2d 100644
---- a/drivers/bus/Kconfig
-+++ b/drivers/bus/Kconfig
-@@ -110,7 +110,7 @@ config OMAP_OCP2SCP
- config SIMPLE_PM_BUS
- 	bool "Simple Power-Managed Bus Driver"
- 	depends on OF && PM
--	depends on ARCH_SHMOBILE || COMPILE_TEST
-+	depends on ARCH_RENESAS || COMPILE_TEST
- 	help
- 	  Driver for transparent busses that don't need a real driver, but
- 	  where the bus controller is part of a PM domain, or under the control
--- 
-2.1.4
+This patch has been sent out for review previously [1]; So I refered
+other platforms and changed to only enable apb bus clock due I have
+not found timer enabling bits in Hi6220's spec.
+
+> Please verify what clocks actually goes into this timer, it should
+> nominally be three of them.
+
+Yes, it can work well even I don't enable any timer clock. I will
+check furthermore in spec to see if can bind with formal way as your
+suggestion.
+
+[1] http://archive.arm.linux.org.uk/lurker/message/20151009.131015.687ed525.en.html
+
+Thanks,
+Leo Yan
