@@ -1,108 +1,40 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  4 Apr 2016 10:22:12 +0900
-Subject: [PATCH] arm64: dts: salvator-x: use generic pinctrl properties
-In-Reply-To: <cover.1459731706.git.horms+renesas@verge.net.au>
-References: <cover.1459731706.git.horms+renesas@verge.net.au>
-Message-ID: <fa3d2aede8bf9dd69e9309230169b5ec1cc234e4.1459731706.git.horms+renesas@verge.net.au>
+Date: Mon,  4 Apr 2016 10:22:20 +0900
+Subject: [GIT PULL] Renesas ARM64 Based SoC DT Updates for v4.7
+Message-ID: <cover.1459731817.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since 16ccaf5bb5a5 ("pinctrl: sh-pfc: Accept standard function, pins and
-groups properties") renesas pfc drivers accept generic "function", "pins"
-and "groups" properties.
+Hi Olof, Hi Kevin, Hi Arnd,
 
-This patch updates the kzm9g device tree to use the generic properties.
+Please consider these Renesas ARM64 based SoC DT updates for v4.7.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 46 +++++++++++-----------
- 1 file changed, 23 insertions(+), 23 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-index b992b1a3d956..5165d450c10b 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-@@ -146,57 +146,57 @@
- 	pinctrl-names = "default";
- 
- 	scif1_pins: scif1 {
--		renesas,groups = "scif1_data_a", "scif1_ctrl";
--		renesas,function = "scif1";
-+		groups = "scif1_data_a", "scif1_ctrl";
-+		function = "scif1";
- 	};
- 	scif2_pins: scif2 {
--		renesas,groups = "scif2_data_a";
--		renesas,function = "scif2";
-+		groups = "scif2_data_a";
-+		function = "scif2";
- 	};
- 	scif_clk_pins: scif_clk {
--		renesas,groups = "scif_clk_a";
--		renesas,function = "scif_clk";
-+		groups = "scif_clk_a";
-+		function = "scif_clk";
- 	};
- 
- 	i2c2_pins: i2c2 {
--		renesas,groups = "i2c2_a";
--		renesas,function = "i2c2";
-+		groups = "i2c2_a";
-+		function = "i2c2";
- 	};
- 
- 	avb_pins: avb {
--		renesas,groups = "avb_mdc";
--		renesas,function = "avb";
-+		groups = "avb_mdc";
-+		function = "avb";
- 	};
- 
- 	sdhi0_pins: sd0 {
--		renesas,groups = "sdhi0_data4", "sdhi0_ctrl";
--		renesas,function = "sdhi0";
-+		groups = "sdhi0_data4", "sdhi0_ctrl";
-+		function = "sdhi0";
- 	};
- 
- 	sdhi3_pins: sd3 {
--		renesas,groups = "sdhi3_data4", "sdhi3_ctrl";
--		renesas,function = "sdhi3";
-+		groups = "sdhi3_data4", "sdhi3_ctrl";
-+		function = "sdhi3";
- 	};
- 
- 	sound_pins: sound {
--		renesas,groups = "ssi01239_ctrl", "ssi0_data", "ssi1_data_a";
--		renesas,function = "ssi";
-+		groups = "ssi01239_ctrl", "ssi0_data", "ssi1_data_a";
-+		function = "ssi";
- 	};
- 
- 	sound_clk_pins: sound_clk {
--		renesas,groups = "audio_clk_a_a", "audio_clk_b_a", "audio_clk_c_a",
--				 "audio_clkout_a", "audio_clkout3_a";
--		renesas,function = "audio_clk";
-+		groups = "audio_clk_a_a", "audio_clk_b_a", "audio_clk_c_a",
-+			 "audio_clkout_a", "audio_clkout3_a";
-+		function = "audio_clk";
- 	};
- 
- 	usb1_pins: usb1 {
--		renesas,groups = "usb1";
--		renesas,function = "usb1";
-+		groups = "usb1";
-+		function = "usb1";
- 	};
- 
- 	usb2_pins: usb2 {
--		renesas,groups = "usb2";
--		renesas,function = "usb2";
-+		groups = "usb2";
-+		function = "usb2";
- 	};
- };
- 
--- 
-2.1.4
+The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+
+  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt-for-v4.7
+
+for you to fetch changes up to 81ae0ac31bb90baef10850fdfdc2a9f72f36aa6f:
+
+  arm64: dts: r8a7795: Use USB3.0 fallback compatibility string (2016-03-28 08:52:47 +0900)
+
+----------------------------------------------------------------
+Renesas ARM64 Based SoC DT Updates for v4.7
+
+* Use USB3.0 fallback compatibility string in DT for r8a7795 SoC
+* Add CAN support to DT for r8a7795 SoC
+
+----------------------------------------------------------------
+Ramesh Shanmugasundaram (2):
+      arm64: dts: r8a7795: Add CAN external clock support
+      arm64: dts: r8a7795: Add CAN support
+
+Simon Horman (1):
+      arm64: dts: r8a7795: Use USB3.0 fallback compatibility string
+
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 42 ++++++++++++++++++++++++++++++--
+ 1 file changed, 40 insertions(+), 2 deletions(-)
