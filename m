@@ -1,48 +1,25 @@
-From: daniel@fooishbar.org (Daniel Stone)
-Date: Mon, 4 Apr 2016 16:44:17 +0100
-Subject: [PATCH] drm/rockchip: Return -EBUSY if there's already a pending
- flip event v3
-In-Reply-To: <1459778134-30693-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1459778134-30693-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <CAPj87rPtP1ph-1FMxSKUANjeKwwjwgfMzbUGHvqudEx7nYCESQ@mail.gmail.com>
+From: jroedel@suse.de (Joerg Roedel)
+Date: Mon, 4 Apr 2016 17:47:27 +0200
+Subject: [PATCH 0/6] of: Implement iterator for phandles
+In-Reply-To: <CAL_Jsq+85i+WD3wxnYoDg18v_KptVTQYTmkU_YVF00fvevwq_A@mail.gmail.com>
+References: <1458669509-7178-1-git-send-email-joro@8bytes.org>
+ <CAL_JsqJ8f0+qQk4QQxyKmwtqnejCDxdjmrZf8480j54YXUTkVg@mail.gmail.com>
+ <20160323115457.GC17838@8bytes.org>
+ <CAL_Jsq+85i+WD3wxnYoDg18v_KptVTQYTmkU_YVF00fvevwq_A@mail.gmail.com>
+Message-ID: <20160404154727.GI24141@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomeu,
+On Wed, Mar 23, 2016 at 03:37:44PM -0500, Rob Herring wrote:
+> On Wed, Mar 23, 2016 at 6:54 AM, Joerg Roedel <joro@8bytes.org> wrote:
+> > Thanks a lot for your fast reply! I guess these patches will go through
+> > the DT tree, or should I carry them in the IOMMU tree? The DT tree
+> > probably makes more sense.
+> 
+> Sure, I can take them.
 
-On 4 April 2016 at 14:55, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-> index 3b8f652698f8..8305bbd2a4d7 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-> @@ -280,7 +280,18 @@ int rockchip_drm_atomic_commit(struct drm_device *dev,
->  {
->         struct rockchip_drm_private *private = dev->dev_private;
->         struct rockchip_atomic_commit *commit = &private->commit;
-> -       int ret;
-> +       struct drm_crtc_state *crtc_state;
-> +       struct drm_crtc *crtc;
-> +       int i, ret;
-> +
-> +       if (async) {
-> +               for_each_crtc_in_state(state, crtc, crtc_state, i) {
-> +                       if (crtc->state->event ||
-> +                           rockchip_drm_crtc_has_pending_event(crtc)) {
-> +                               return -EBUSY;
-> +                       }
-> +               }
-> +       }
+Thanks! I am about to post a new version with all changes collected
+together and rebased to the latest upstream kernel.
 
-Hmmm ...
 
-Doesn't this trigger before the VOP atomic_begin() helper, meaning
-that anything with an event set will trigger the check? Seems like it
-should be && rather than ||.
-
-Also, I know rockchip_drm_vop.c isn't holding dev->event_lock when it
-checks vop->event, but it really should be ... and so should this
-check. Otherwise you can race with the IRQ handler, which isn't
-required to hold the CRTC lock.
-
-Cheers,
-Daniel
+	Joerg
