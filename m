@@ -1,31 +1,62 @@
-From: vishalm@ti.com (Vishal Mahaveer)
-Date: Mon, 4 Apr 2016 12:05:37 -0500
-Subject: [PATCH v2] ARM: DRA722: remove redundant definition of 1.0 device
-Message-ID: <1459789537-3423-1-git-send-email-vishalm@ti.com>
+From: slemieux.tyco@gmail.com (Sylvain Lemieux)
+Date: Mon, 04 Apr 2016 13:10:09 -0400
+Subject: [PATCH for v4.7] arm: lpc32xx: remove leftovers of legacy
+ clock source and provider drivers
+In-Reply-To: <57029E6F.5050300@mleia.com>
+References: <1456973180-31764-1-git-send-email-vz@mleia.com>
+ <1459784558.25564.6.camel@localhost>  <57029E6F.5050300@mleia.com>
+Message-ID: <1459789809.25564.9.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vishal Mahaveer <vishalm@ti.com>
+Hi Vladimir,
 
-Remove duplicate definition of Rev 1.0 device.
+On Mon, 2016-04-04 at 20:03 +0300, Vladimir Zapolskiy wrote:
+> Hi Sylvain,
+> 
+> On 04.04.2016 18:42, Sylvain Lemieux wrote:
+> > Hi Vladimir,
+> > 
+> > On Thu, 2016-03-03 at 04:46 +0200, Vladimir Zapolskiy wrote:
+> >> After switching the platform to common clock framework there is no
+> >> more need to keep dead code in arch/arm/mach-lpc32xx, which glued
+> >> legacy clock source and clock provider drivers, remove the leftovers.
+> >>
+> >> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+> >> ---
+> >>  arch/arm/mach-lpc32xx/common.c | 95 ------------------------------------------
+> >>  arch/arm/mach-lpc32xx/common.h | 23 +---------
+> >>  2 files changed, 1 insertion(+), 117 deletions(-)
+> >>
+> >> diff --git a/arch/arm/mach-lpc32xx/common.h b/arch/arm/mach-lpc32xx/common.h
+> >> index 1cd8853..f03683f 100644
+> >> --- a/arch/arm/mach-lpc32xx/common.h
+> >> +++ b/arch/arm/mach-lpc32xx/common.h
+> >> @@ -19,38 +19,17 @@
+> >>  
+> >>  #include <linux/reboot.h>
+> >>  
+> > It is possible to remove "reboot.h";
+> > do you want me to send a separate patch for it?
+> 
+> I assume that removing of this #include entry is independent from my patch,
+> and related to gone lpc32xx_restart, please send a fixup on top of v4.6-r1.
+> 
+yes, this is independent from this patch;
+this is related to the previous patch on restart.
 
-Fixes: 81032e34e184 ("ARM: DRA752: Add ID detect for ES2.0")
-Signed-off-by: Vishal Mahaveer <vishalm@ti.com>
----
- arch/arm/mach-omap2/soc.h |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
+I will submit a separate patch for it.
 
-diff --git a/arch/arm/mach-omap2/soc.h b/arch/arm/mach-omap2/soc.h
-index 79ca3c3..83d3547 100644
---- a/arch/arm/mach-omap2/soc.h
-+++ b/arch/arm/mach-omap2/soc.h
-@@ -471,7 +471,6 @@ IS_OMAP_TYPE(3430, 0x3430)
- #define DRA752_REV_ES1_1	(DRA7XX_CLASS | (0x52 << 16) | (0x11 << 8))
- #define DRA752_REV_ES2_0	(DRA7XX_CLASS | (0x52 << 16) | (0x20 << 8))
- #define DRA722_REV_ES1_0	(DRA7XX_CLASS | (0x22 << 16) | (0x10 << 8))
--#define DRA722_REV_ES1_0	(DRA7XX_CLASS | (0x22 << 16) | (0x10 << 8))
- 
- void omap2xxx_check_revision(void);
- void omap3xxx_check_revision(void);
--- 
-1.7.4.1
+> >>  extern void lpc23xx_restart(enum reboot_mode, const char *);
+> >>  
+> > The patch does not apply on 4.6-rc1;
+> > can you send a version 2 of your patch based on the latest mainline?
+> >
+> 
+> Right, the change requires a rebase, I'll send v2 shortly.
+> 
+> Thanks!
+> 
+> --
+> With best wishes,
+> Vladimir
