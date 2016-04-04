@@ -1,44 +1,41 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  4 Apr 2016 10:22:36 +0900
-Subject: [PATCH 04/47] ARM: dts: r8a7790: Add SCIF2 device node
+Date: Mon,  4 Apr 2016 10:22:37 +0900
+Subject: [PATCH 05/47] ARM: dts: r8a7791: use fallback can compatibility string
 In-Reply-To: <cover.1459732726.git.horms+renesas@verge.net.au>
 References: <cover.1459732726.git.horms+renesas@verge.net.au>
-Message-ID: <c18ce360ef6c97a00e7c95c60deb1e56e7bd7e14.1459732726.git.horms+renesas@verge.net.au>
+Message-ID: <c6bf8c86f5ba3a49fe97253c1c745dea2b734522.1459732726.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Use recently added fallback compatibility string in r8a7791 device tree.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a7790.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/boot/dts/r8a7791.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index cc4974a348d9..b2d6a0f6105c 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -732,6 +732,20 @@
- 		status = "disabled";
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index 9bfd1dc054b3..396a640927c8 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -1013,7 +1013,7 @@
  	};
  
-+	scif2: serial at e6e56000 {
-+		compatible = "renesas,scif-r8a7790", "renesas,rcar-gen2-scif",
-+			     "renesas,scif";
-+		reg = <0 0xe6e56000 0 64>;
-+		interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp3_clks R8A7790_CLK_SCIF2>, <&zs_clk>,
-+			 <&scif_clk>;
-+		clock-names = "fck", "brg_int", "scif_clk";
-+		dmas = <&dmac0 0x2b>, <&dmac0 0x2c>;
-+		dma-names = "tx", "rx";
-+		power-domains = <&cpg_clocks>;
-+		status = "disabled";
-+	};
-+
- 	hscif0: serial at e62c0000 {
- 		compatible = "renesas,hscif-r8a7790",
- 			     "renesas,rcar-gen2-hscif", "renesas,hscif";
+ 	can0: can at e6e80000 {
+-		compatible = "renesas,can-r8a7791";
++		compatible = "renesas,can-r8a7791", "renesas,rcar-gen2-can";
+ 		reg = <0 0xe6e80000 0 0x1000>;
+ 		interrupts = <GIC_SPI 186 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp9_clks R8A7791_CLK_RCAN0>,
+@@ -1024,7 +1024,7 @@
+ 	};
+ 
+ 	can1: can at e6e88000 {
+-		compatible = "renesas,can-r8a7791";
++		compatible = "renesas,can-r8a7791", "renesas,rcar-gen2-can";
+ 		reg = <0 0xe6e88000 0 0x1000>;
+ 		interrupts = <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp9_clks R8A7791_CLK_RCAN1>,
 -- 
 2.1.4
