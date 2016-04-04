@@ -1,71 +1,166 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon,  4 Apr 2016 17:26:17 +0100
-Subject: [PATCH 17/17] arm64: kvm: Add support for 16K pages
+Date: Mon,  4 Apr 2016 17:26:09 +0100
+Subject: [PATCH 09/17] kvm-arm: arm64: Introduce stage2 page table helpers
 In-Reply-To: <1459787177-12767-1-git-send-email-suzuki.poulose@arm.com>
 References: <1459787177-12767-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1459787177-12767-18-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1459787177-12767-10-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we can handle stage-2 page tables independent
-of the host page table levels, wire up the 16K page
-support.
+Introduce stage2 page table helpers for arm64. With the fake
+page table level still in place, the stage2 table has the same
+number of levels as that of the host (and hyp), so they all
+fallback to the host version.
 
 Cc: Marc Zyngier <marc.zyngier@arm.com>
 Cc: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/kvm_arm.h |   11 ++++++++++-
- arch/arm64/kvm/Kconfig           |    1 -
- 2 files changed, 10 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/kvm_mmu.h        |   29 +----------
+ arch/arm64/include/asm/stage2_pgtable.h |   86 +++++++++++++++++++++++++++++++
+ 2 files changed, 88 insertions(+), 27 deletions(-)
+ create mode 100644 arch/arm64/include/asm/stage2_pgtable.h
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index d5d5fdf..3d830a3 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -114,6 +114,7 @@
- #define VTCR_EL2_PS_MASK	TCR_EL2_PS_MASK
- #define VTCR_EL2_TG0_MASK	TCR_TG0_MASK
- #define VTCR_EL2_TG0_4K		TCR_TG0_4K
-+#define VTCR_EL2_TG0_16K	TCR_TG0_16K
- #define VTCR_EL2_TG0_64K	TCR_TG0_64K
- #define VTCR_EL2_SH0_MASK	TCR_SH0_MASK
- #define VTCR_EL2_SH0_INNER	TCR_SH0_INNER
-@@ -139,7 +140,7 @@
-  * (see hyp-init.S).
-  *
-  * Note that when using 4K pages, we concatenate two first level page tables
-- * together.
-+ * together. With 16K pages, we concatenate 16 first level page tables.
-  *
-  * The magic numbers used for VTTBR_X in this patch can be found in Tables
-  * D4-23 and D4-25 in ARM DDI 0487A.b.
-@@ -156,6 +157,14 @@
-  */
- #define VTCR_EL2_TGRAN_FLAGS	(VTCR_EL2_TG0_64K | VTCR_EL2_SL0_LVL1)
- #define VTTBR_X_TGRAN_MAGIC		38
-+#elif defined(CONFIG_ARM64_16K_PAGES)
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 9a3409f..e3f53e3 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -91,6 +91,8 @@ alternative_endif
+ #define KVM_PHYS_SIZE	(1UL << KVM_PHYS_SHIFT)
+ #define KVM_PHYS_MASK	(KVM_PHYS_SIZE - 1UL)
+ 
++#include <asm/stage2_pgtable.h>
++
+ int create_hyp_mappings(void *from, void *to);
+ int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
+ void free_boot_hyp_pgd(void);
+@@ -156,35 +158,8 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
+ #define kvm_pud_addr_end(addr, end)	pud_addr_end(addr, end)
+ #define kvm_pmd_addr_end(addr, end)	pmd_addr_end(addr, end)
+ 
+-/*
+- * In the case where PGDIR_SHIFT is larger than KVM_PHYS_SHIFT, we can address
+- * the entire IPA input range with a single pgd entry, and we would only need
+- * one pgd entry.  Note that in this case, the pgd is actually not used by
+- * the MMU for Stage-2 translations, but is merely a fake pgd used as a data
+- * structure for the kernel pgtable macros to work.
+- */
+-#if PGDIR_SHIFT > KVM_PHYS_SHIFT
+-#define PTRS_PER_S2_PGD_SHIFT	0
+-#else
+-#define PTRS_PER_S2_PGD_SHIFT	(KVM_PHYS_SHIFT - PGDIR_SHIFT)
+-#endif
+-#define PTRS_PER_S2_PGD		(1 << PTRS_PER_S2_PGD_SHIFT)
+-
+ #define kvm_pgd_index(addr)	(((addr) >> PGDIR_SHIFT) & (PTRS_PER_S2_PGD - 1))
+ 
+-/*
+- * If we are concatenating first level stage-2 page tables, we would have less
+- * than or equal to 16 pointers in the fake PGD, because that's what the
+- * architecture allows.  In this case, (4 - CONFIG_PGTABLE_LEVELS)
+- * represents the first level for the host, and we add 1 to go to the next
+- * level (which uses contatenation) for the stage-2 tables.
+- */
+-#if PTRS_PER_S2_PGD <= 16
+-#define KVM_PREALLOC_LEVEL	(4 - CONFIG_PGTABLE_LEVELS + 1)
+-#else
+-#define KVM_PREALLOC_LEVEL	(0)
+-#endif
+-
+ static inline void *kvm_get_hwpgd(struct kvm *kvm)
+ {
+ 	pgd_t *pgd = kvm->arch.pgd;
+diff --git a/arch/arm64/include/asm/stage2_pgtable.h b/arch/arm64/include/asm/stage2_pgtable.h
+new file mode 100644
+index 0000000..751227d
+--- /dev/null
++++ b/arch/arm64/include/asm/stage2_pgtable.h
+@@ -0,0 +1,86 @@
 +/*
-+ * Stage2 translation configuration:
-+ * 16kB pages (TG0 = 2)
-+ * 2 level page tables (SL = 1)
++ * Copyright (C) 2016 - ARM Ltd
++ *
++ * stage2 page table helpers
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+#define VTCR_EL2_TGRAN_FLAGS	(VTCR_EL2_TG0_16K | VTCR_EL2_SL0_LVL1)
-+#define VTTBR_X_TGRAN_MAGIC	42
- #else
- /*
-  * Stage2 translation configuration:
-diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-index de7450d..aa2e34e 100644
---- a/arch/arm64/kvm/Kconfig
-+++ b/arch/arm64/kvm/Kconfig
-@@ -22,7 +22,6 @@ config KVM_ARM_VGIC_V3
- config KVM
- 	bool "Kernel-based Virtual Machine (KVM) support"
- 	depends on OF
--	depends on !ARM64_16K_PAGES
- 	select MMU_NOTIFIER
- 	select PREEMPT_NOTIFIERS
- 	select ANON_INODES
++
++#ifndef __ARM64_S2_PGTABLE_H_
++#define __ARM64_S2_PGTABLE_H_
++
++#include <asm/pgtable.h>
++
++/*
++ * In the case where PGDIR_SHIFT is larger than KVM_PHYS_SHIFT, we can address
++ * the entire IPA input range with a single pgd entry, and we would only need
++ * one pgd entry.  Note that in this case, the pgd is actually not used by
++ * the MMU for Stage-2 translations, but is merely a fake pgd used as a data
++ * structure for the kernel pgtable macros to work.
++ */
++#if PGDIR_SHIFT > KVM_PHYS_SHIFT
++#define PTRS_PER_S2_PGD_SHIFT	0
++#else
++#define PTRS_PER_S2_PGD_SHIFT	(KVM_PHYS_SHIFT - PGDIR_SHIFT)
++#endif
++#define PTRS_PER_S2_PGD		(1 << PTRS_PER_S2_PGD_SHIFT)
++
++/*
++ * If we are concatenating first level stage-2 page tables, we would have less
++ * than or equal to 16 pointers in the fake PGD, because that's what the
++ * architecture allows.  In this case, (4 - CONFIG_PGTABLE_LEVELS)
++ * represents the first level for the host, and we add 1 to go to the next
++ * level (which uses contatenation) for the stage-2 tables.
++ */
++#if PTRS_PER_S2_PGD <= 16
++#define KVM_PREALLOC_LEVEL	(4 - CONFIG_PGTABLE_LEVELS + 1)
++#else
++#define KVM_PREALLOC_LEVEL	(0)
++#endif
++
++#define stage2_pgd_none(pgd)				pgd_none(pgd)
++#define stage2_pgd_clear(pgd)				pgd_clear(pgd)
++#define stage2_pgd_present(pgd)				pgd_present(pgd)
++#define stage2_pgd_populate(mm, pgd, pud)		pgd_populate(mm, pgd, pud)
++#define stage2_pud_offset(pgd, address)			pud_offset(pgd, address)
++#define stage2_pud_free(mm, pud)			pud_free(mm, pud)
++
++#define stage2_pud_none(pud)				pud_none(pud)
++#define stage2_pud_clear(pud)				pud_clear(pud)
++#define stage2_pud_present(pud)				pud_present(pud)
++#define stage2_pud_populate(mm, pud, pmd)		pud_populate(mm, pud, pmd)
++#define stage2_pmd_offset(pud, address)			pmd_offset(pud, address)
++#define stage2_pmd_free(mm, pmd)			pmd_free(mm, pmd)
++
++#define stage2_pud_huge(pud)				pud_huge(pud)
++
++#define stage2_pgd_addr_end(address, end)		pgd_addr_end(address, end)
++#define stage2_pud_addr_end(address, end)		pud_addr_end(address, end)
++#define stage2_pmd_addr_end(address, end)		pmd_addr_end(address, end)
++
++#define stage2_pte_table_empty(ptep)			kvm_page_empty(ptep)
++#ifdef __PGTABLE_PMD_FOLDED
++#define stage2_pmd_table_empty(pmdp)			(0)
++#else
++#define stage2_pmd_table_empty(pmdp)			((KVM_PREALLOC_LEVEL < 2) && kvm_page_empty(pmdp))
++#endif
++
++#ifdef __PGTABLE_PUD_FOLDED
++#define stage2_pud_table_empty(pudp)			(0)
++#else
++#define stage2_pud_table_empty(pudp)			((KVM_PREALLOC_LEVEL < 1) && kvm_page_empty(pudp))
++#endif
++
++#define stage2_pgd_index(addr)				(((addr) >> PGDIR_SHIFT) & (PTRS_PER_S2_PGD - 1))
++
++#endif	/* __ARM64_S2_PGTABLE_H_ */
 -- 
 1.7.9.5
