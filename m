@@ -1,59 +1,50 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue,  5 Apr 2016 00:22:29 +0800
-Subject: [PATCH RFC 0/5] net: phy: sun8i-h3-ephy: Add Allwinner H3 Ethernet
- PHY driver
-Message-ID: <1459786954-12649-1-git-send-email-wens@csie.org>
+Date: Tue,  5 Apr 2016 00:22:33 +0800
+Subject: [PATCH RFC 4/5] ARM: dts: sun8i-h3: Add Ethernet controller device
+ node to sun8i-h3.dtsi
+In-Reply-To: <1459786954-12649-1-git-send-email-wens@csie.org>
+References: <1459786954-12649-1-git-send-email-wens@csie.org>
+Message-ID: <1459786954-12649-5-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+From: LABBE Corentin <clabbe.montjoie@gmail.com>
 
-This is an attempt to support the Ethernet PHY incorporated in Allwinner's
-H3 SoC. It is a MII PHY, supporting 10/100 Mbps Ethernet.
+The Allwinner H3 SoC has a gigabit Ethernet controller.
 
-Before the PHY can be accessed via MDIO and used, it needs to be powered
-on and configured. This is done via a system control register in the CPU
-address space. The same register also controls PHY interface mode and
-MAC TX clock sources.
+Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
+[wens at csie.org: drop pinmux; update clocks/resets]
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
 
-This driver brings up the Ethernet PHY (if it is used), and exports a
-clock control for the MAC TX clock.
+This is not a stable binding. Do not merge.
 
-Patch 1 adds the bindings for this piece of hardware.
+---
+ arch/arm/boot/dts/sun8i-h3.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-Patch 2 adds the driver for it.
-
-Patch 3 adds a device node for the PHY.
-
-Patch 4 & 5 are not to be merged. They are provided here as a solid
-example of how this driver is used. The sun8i-emac bindings have not
-been submitted and are not stable yet.
-
-Comments welcome.
-
-Regards
-ChenYu
-
-
-Chen-Yu Tsai (4):
-  net: phy: sun8i-h3-ephy: Add bindings for Allwinner H3 Ethernet PHY
-  net: phy: sun8i-h3-ephy: Add driver for Allwinner H3 Ethernet PHY
-  ARM: dts: sun8i-h3: Add H3 Ethernet PHY device node to sun8i-h3.dtsi
-  ARM: dts: sun8i: Enable Ethernet controller on the Orange PI PC
-
-LABBE Corentin (1):
-  ARM: dts: sun8i-h3: Add Ethernet controller device node to
-    sun8i-h3.dtsi
-
- .../bindings/net/allwinner,sun8i-h3-ephy.txt       |  44 ++++
- arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts         |  14 ++
- arch/arm/boot/dts/sun8i-h3.dtsi                    |  21 ++
- drivers/net/phy/Kconfig                            |   8 +
- drivers/net/phy/Makefile                           |   1 +
- drivers/net/phy/sun8i-h3-ephy.c                    | 266 +++++++++++++++++++++
- 6 files changed, 354 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/net/allwinner,sun8i-h3-ephy.txt
- create mode 100644 drivers/net/phy/sun8i-h3-ephy.c
-
+diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+index 9a28aeba9bc6..7749af6354bb 100644
+--- a/arch/arm/boot/dts/sun8i-h3.dtsi
++++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+@@ -635,6 +635,18 @@
+ 			status = "disabled";
+ 		};
+ 
++		emac: ethernet at 1c30000 {
++			compatible = "allwinner,sun8i-h3-emac";
++			reg = <0x01c30000 0x1000>;
++			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
++			resets = <&ahb_rst 17>;
++			reset-names = "ahb";
++			clocks = <&bus_gates 17>, <&ephy>;
++			clock-names = "ahb", "tx";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
+ 		gic: interrupt-controller at 01c81000 {
+ 			compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
+ 			reg = <0x01c81000 0x1000>,
 -- 
 2.7.0
