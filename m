@@ -1,45 +1,44 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  4 Apr 2016 10:22:31 +0900
-Subject: [PATCH 23/26] ARM: dts: porter: Remove unnecessary clock-output-names
- properties
-In-Reply-To: <cover.1459731908.git.horms+renesas@verge.net.au>
-References: <cover.1459731908.git.horms+renesas@verge.net.au>
-Message-ID: <203f0ef865303412a9d03a88a2f845db682ac628.1459731908.git.horms+renesas@verge.net.au>
+Date: Mon,  4 Apr 2016 10:22:45 +0900
+Subject: [PATCH 1/2] ARM: multi_v7_defconfig: enable I2C demultiplexer and
+ slave eeprom
+In-Reply-To: <cover.1459732004.git.horms+renesas@verge.net.au>
+References: <cover.1459732004.git.horms+renesas@verge.net.au>
+Message-ID: <651435d68253b0a5059175e2f113528080e5928e.1459732004.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Fixed rate and fixed factor clocks do not require an
-  clock-output-names property.
-* Since 07705583e920fef6 ("clk: shmobile: div6: Make clock-output-names
-  optional") Renesas div6 clocks do not require a clock-output-names
-  property.
+From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-In the above cases there is only one clock output and its name is taken
-from that of the clock node.  Accordingly, remove the unnecessary
-clock-output-names properties and as necessary update the node names.
+The Renesas Lager board shall be a reference platform for the runtime
+I2C IP core switcher and for I2C slave support. Enable the needed
+drivers for this.
 
+Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a7791-porter.dts | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ arch/arm/configs/multi_v7_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791-porter.dts b/arch/arm/boot/dts/r8a7791-porter.dts
-index af3751ff519a..9554d13362f6 100644
---- a/arch/arm/boot/dts/r8a7791-porter.dts
-+++ b/arch/arm/boot/dts/r8a7791-porter.dts
-@@ -113,11 +113,10 @@
- 		clock-frequency = <74250000>;
- 	};
- 
--	x14_clk: x14-clock {
-+	x14_clk: audio_clock {
- 		compatible = "fixed-clock";
- 		#clock-cells = <0>;
- 		clock-frequency = <11289600>;
--		clock-output-names = "audio_clock";
- 	};
- 
- 	sound {
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 28234906a064..434f86b110bb 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -322,6 +322,7 @@ CONFIG_I2C_MUX=y
+ CONFIG_I2C_ARB_GPIO_CHALLENGE=m
+ CONFIG_I2C_MUX_PCA954x=y
+ CONFIG_I2C_MUX_PINCTRL=y
++CONFIG_I2C_DEMUX_PINCTRL=y
+ CONFIG_I2C_AT91=m
+ CONFIG_I2C_BCM2835=y
+ CONFIG_I2C_CADENCE=y
+@@ -345,6 +346,7 @@ CONFIG_I2C_UNIPHIER_F=y
+ CONFIG_I2C_XILINX=y
+ CONFIG_I2C_RCAR=y
+ CONFIG_I2C_CROS_EC_TUNNEL=m
++CONFIG_I2C_SLAVE_EEPROM=y
+ CONFIG_SPI=y
+ CONFIG_SPI_ATMEL=m
+ CONFIG_SPI_BCM2835=y
 -- 
 2.1.4
