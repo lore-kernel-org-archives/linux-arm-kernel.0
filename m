@@ -1,102 +1,29 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 5 Apr 2016 20:31:15 +0100
-Subject: [PATCH 2/4] Documentation: Add documentation for APM X-Gene SoC
- PMU DTS binding
-In-Reply-To: <CACgAJHwZ=CwyvxLmuXdOAw2oFhfoC2jkdOY1HPenCsEaYLjrPw@mail.gmail.com>
-References: <1459467472-31561-1-git-send-email-ttnguyen@apm.com>
- <1459467472-31561-3-git-send-email-ttnguyen@apm.com>
- <20160401123000.GC29876@leverpostej>
- <CACgAJHyS+o_Nyrc7pDxVCTHK7tue9L9F2weGQt_2WqeGfZBeag@mail.gmail.com>
- <20160404233831.GB1917@svinekod>
- <CACgAJHwZ=CwyvxLmuXdOAw2oFhfoC2jkdOY1HPenCsEaYLjrPw@mail.gmail.com>
-Message-ID: <20160405193114.GB5946@svinekod>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Tue, 5 Apr 2016 16:33:17 -0500
+Subject: [PATCH 0/4] bam dma fixes and one dt extension
+In-Reply-To: <1448961299-15161-1-git-send-email-stanimir.varbanov@linaro.org>
+References: <1448961299-15161-1-git-send-email-stanimir.varbanov@linaro.org>
+Message-ID: <20160405213317.GB3873@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 05, 2016 at 11:51:02AM -0700, Tai Tri Nguyen wrote:
-> Hi Mark,
+On Tue, Dec 01, 2015 at 11:14:55AM +0200, Stanimir Varbanov wrote:
+> Here are three bam dma fixes, which I made during testing qcrypto
+> driver. The first one is a real fix, the second one is related to
+> peripherals on which the BAM IP is initialized by remote execution
+> environment, and the third one is a sleeping bug IMO.
 > 
-> On Mon, Apr 4, 2016 at 4:38 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Mon, Apr 04, 2016 at 04:40:33PM -0700, Tai Tri Nguyen wrote:
-> >> On Fri, Apr 1, 2016 at 5:30 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> >> > On Thu, Mar 31, 2016 at 04:37:50PM -0700, Tai Nguyen wrote:
-> >> >> +This is APM X-Gene SoC PMU (Performance Monitoring Unit) module.
-> >> >> +The following PMU devices are supported:
-> >> >> +
-> >> >> +  L3C                        - L3 cache controller
-> >> >> +  IOB                        - IO bridge
-> >> >> +  MCB                        - Memory controller bridge
-> >> >> +  MC                 - Memory controller
-> >> >
-> >> > These sound like separate units. How do these relate?
-> >> >
-> >> > Is there an SOC-wide PMU that aggregates counters, or are these actually
-> >> > independent?
-> >> >
-> >>
-> >> Yes, they are independent, but sharing the same top level status interrupt.
-> >> There's no SOC-wide PMU which aggregates these counters.
-> >
-> > If they're just sharing the interrupt, why are they not separate nodes (and
-> > drivers) which simply happen to share an interrupt?
-> >
-> > Is there anything else shared?
+> The last patch is a extension again for peripherals which BAM is
+> remotely controlled by other execution environment.
 > 
-> Yes, a long with the interrupt they also share top level PMU status CSR region.
-
-Ah, ok. I had missed that.
-
-What exactly exists in that region? Are the shared registers just for handling
-the shared interrupt, or are they used to handle other parts of the PMUs too?
-
-> >> >> +Required properties for L3C subnode:
-> >> >> +- compatible         : Shall be "apm,xgene-pmu-l3c".
-> >> >> +- reg                        : First resource shall be the L3C PMU resource.
-> >> >> +- index                      : Instance number of the L3C PMU.
-> >> >> +
-> >> >> +Required properties for IOB subnode:
-> >> >> +- compatible         : Shall be "apm,xgene-pmu-iob".
-> >> >> +- reg                        : First resource shall be the IOB PMU resource.
-> >> >> +- index                      : Instance number of the IOB PMU.
-> >> >> +
-> >> >> +Required properties for MCB subnode:
-> >> >> +- compatible         : Shall be "apm,xgene-pmu-mcb".
-> >> >> +- reg                        : First resource shall be the MCB PMU resource.
-> >> >> +- index                      : Instance number of the MCB PMU.
-> >> >> +
-> >> >> +Required properties for MC subnode:
-> >> >> +- compatible         : Shall be "apm,xgene-pmu-mc".
-> >> >> +- reg                        : First resource shall be the MC PMU resource.
-> >> >> +- index                      : Instance number of the MC PMU.
-> >> >
-> >> > What's the index property useful for?
-> >> >
-> >>
-> >> The index property is used for indicating the physical hardware PMU id.
-> >> For example, on X-Gene1 there are 4 memory controllers (MC), each of them has
-> >> its own PMU. The index property tells us which MC a PMU belongs to.
-> >> The same for MCB/L3C and IOB.
-> >
-> > Sure, but is this simply informative for the user, or does this have an impact
-> > on the programming model?
-> >
+> All patches has been tested on db410c board with apq8016.
 > 
-> Yes, it does impact. For example, there are 4 PMUs associated with 4 MCs.
-> They all certainly have the same sort of events. The index will help
-> to determine
-> the right event users want to monitor. Below is an example of perf list output:
-> ...
-> mc0/mcu-rd-request/
-> ...
-> mc1/mcu-rd-request/
 
-By "programming model" I mean the way the kernel interacts with the device,
-rather than the interface exposed to userspace. For example, does the index
-affect which bits are used in the shared CSR region?
+Stan,
 
-If it's only used for the name exposed to userspace, that's fine.
+Can you resend these patches w/ updates?  Or at least the remote control patch
+if you can get that out faster.  And also include the dmaengine list.
 
-Otherwise, there may be subtle gotchas.
+Regards,
 
-Thanks,
-Mark.
+Andy
