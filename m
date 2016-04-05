@@ -1,55 +1,62 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 5 Apr 2016 08:43:15 +0100
-Subject: [PATCH RESEND] ARM: l2x0: add three special L210 aux control flags
-In-Reply-To: <CACRpkdZeAKkU4Cr6TTQor_6zw2iVGgXmTdcsQuHuR07Q8yZHiQ@mail.gmail.com>
-References: <1458043882-16881-1-git-send-email-linus.walleij@linaro.org>
- <CACRpkdZeAKkU4Cr6TTQor_6zw2iVGgXmTdcsQuHuR07Q8yZHiQ@mail.gmail.com>
-Message-ID: <20160405074315.GX19428@n2100.arm.linux.org.uk>
+From: ssambang@codeaurora.org (Sreedhar Sambangi)
+Date: Tue,  5 Apr 2016 00:54:02 -0700
+Subject: [PATCH] qcom: ipq4019: Add SDHC device nodes for SOC and DK04 board.
+Message-ID: <1459842842-8409-1-git-send-email-ssambang@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 03, 2016 at 06:22:44PM +0200, Linus Walleij wrote:
-> On Tue, Mar 15, 2016 at 1:11 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> 
-> > This adds support for setting the flag bits "wrap access disable",
-> > "write allocate override" and "exclusive abort disable" to the L210
-> > variant from the device tree.
-> >
-> > The "write allocate override" bit was used on the Nomadik and
-> > necessary to properly make use of the L210 cache on that machine
-> > without sporadic crashes.
-> >
-> > I took this oppportunity to add all three flags so we avoid excess
-> > patching for each one.
-> >
-> > Cc: Rob Herring <robh+dt@kernel.org>
-> > Cc: Pawel Moll <pawel.moll@arm.com>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> > Cc: Kumar Gala <galak@codeaurora.org>
-> > Cc: Russell King <linux@arm.linux.org.uk>
-> > Cc: devicetree at vger.kernel.org
-> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Russell, this patch is in the patch tracker with Rob's ACK from
-> the DT side, do you think you could apply it?
-> 
-> For Nomadik I actually only need the write-allocate-override
-> flag to be selectable, so if you think it is increasing complexity
-> too much I'd be happy to make a diet version which only
-> adds this flag.
+Add Support for SDHC Controller on the IPQ4019 SOC.
 
-I haven't forgotten it, but I do wonder whether this endless shovelling
-of more and more DT properties is really the way forward, or whether
-some of this stuff should be handled by the boot loader/firmware.
+Signed-off-by: Sreedhar Sambangi <ssambang@codeaurora.org>
+---
+ arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1.dtsi |  7 +++++++
+ arch/arm/boot/dts/qcom-ipq4019.dtsi           | 10 ++++++++++
+ 2 files changed, 17 insertions(+)
 
-That's the reason that you get the:
-
-"L2C: DT/platform modifies aux control register: 0x%08x -> 0x%08x"
-
-message at _warning_ level.
-
+diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1.dtsi b/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1.dtsi
+index 566e239..c8d4dbc 100644
+--- a/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1.dtsi
++++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1.dtsi
+@@ -88,6 +88,7 @@
+ 					bias-disable = <0>;
+ 				};*/
+ 			};
++
+ 		};
+ 
+ 		blsp_dma: dma at 7884000 {
+@@ -166,5 +167,11 @@
+ 			reg = <0x01948000 0x4>;
+ 			mask = <0x3>;
+ 		};
++
++		sdhci at 7824000 {
++			status = "ok";
++			vqmmc-supply = <&vccq_sd0>;
++			non-removable;
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/qcom-ipq4019.dtsi b/arch/arm/boot/dts/qcom-ipq4019.dtsi
+index 9a3cd26..d70e503 100644
+--- a/arch/arm/boot/dts/qcom-ipq4019.dtsi
++++ b/arch/arm/boot/dts/qcom-ipq4019.dtsi
+@@ -363,5 +363,15 @@
+ 			compatible = "qcom,pshold";
+ 			reg = <0x4ab000 0x4>;
+ 		};
++
++		sdhci at 7824000 {
++			compatible = "qcom,sdhci-msm-v4";
++			reg = <0x7824900 0x11c>, <0x7824000 0x800>;
++			interrupts = <0 123 0>, <0 138 0>;
++			bus-width = <8>;
++			clocks = <&gcc GCC_SDCC1_APPS_CLK>, <&gcc GCC_SDCC1_AHB_CLK>;
++			clock-names = "core", "iface";
++			status = "disabled";
++		};
+ 	};
+ };
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
