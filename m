@@ -1,36 +1,18 @@
-From: smoch@web.de (Soeren Moch)
-Date: Tue,  5 Apr 2016 16:55:04 +0200
-Subject: [PATCH] ARM: dts: imx6q-tbs2910: fix fec reset polarity
-Message-ID: <1459868104-18191-1-git-send-email-smoch@web.de>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Tue, 5 Apr 2016 16:57:26 +0200
+Subject: [PATCH] iommu/rockchip: Only log stall errors when attaching
+In-Reply-To: <1458659073-13553-1-git-send-email-tomeu.vizoso@collabora.com>
+References: <1458659073-13553-1-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <20160405145726.GD11519@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to Documentation/devicetree/bindings/net/fsl-fec.txt the polarity
-of "phy-reset-gpios" is assumed to be active-low unless a separate property
-"phy-reset-active-high" is available. So replace the inconsistent polarity
-description to make the correct active-low reset behavior more obvious.
+On Tue, Mar 22, 2016 at 04:04:33PM +0100, Tomeu Vizoso wrote:
+> Move the logging of timeouts when stalling the MMU to
+> rk_iommu_attach_device, as it's expected that sometimes the MMU won't
+> get stalled when detaching a device, and it's not a real problem that
+> would need to be communicated to the user.
+> 
+> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 
-Signed-off-by: Soeren Moch <smoch@web.de>
----
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: linux-arm-kernel at lists.infradead.org
----
- arch/arm/boot/dts/imx6q-tbs2910.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/imx6q-tbs2910.dts b/arch/arm/boot/dts/imx6q-tbs2910.dts
-index 0da81bc..2401c6b 100644
---- a/arch/arm/boot/dts/imx6q-tbs2910.dts
-+++ b/arch/arm/boot/dts/imx6q-tbs2910.dts
-@@ -141,7 +141,7 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_enet>;
- 	phy-mode = "rgmii";
--	phy-reset-gpios = <&gpio1 25 GPIO_ACTIVE_HIGH>;
-+	phy-reset-gpios = <&gpio1 25 GPIO_ACTIVE_LOW>;
- 	status = "okay";
- };
- 
--- 
-1.9.1
+Heiko, any opinion on this patch?
