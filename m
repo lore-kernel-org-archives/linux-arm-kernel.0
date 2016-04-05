@@ -1,94 +1,101 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 05 Apr 2016 12:10:05 -0700
-Subject: [PATCH] iommu/rockchip: Fix "is stall active" check
-In-Reply-To: <20160405182858.382ea465.john@metanate.com>
-References: <1459865146-25308-1-git-send-email-john@metanate.com>
- <5389576.zuTxjFsmO4@phil> <20160405182858.382ea465.john@metanate.com>
-Message-ID: <9799340.GJHE2cZK7r@phil>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue,  5 Apr 2016 13:25:07 -0600
+Subject: [PATCH] ARM: tegra: fix naming in GPIO DT binding header
+Message-ID: <1459884307-24043-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 5. April 2016, 18:28:58 schrieb John Keeping:
-> On Tue, 05 Apr 2016 10:21:27 -0700, Heiko Stuebner wrote:
-> > Am Dienstag, 5. April 2016, 15:05:46 schrieb John Keeping:
-> > > Since commit cd6438c5f844 ("iommu/rockchip: Reconstruct to support
-> > > multi
-> > > slaves") rk_iommu_is_stall_active() always returns false because the
-> > > bitwise AND operates on the boolean flag promoted to an integer and a
-> > > value that is either zero or BIT(2).
-> > > 
-> > > Explicitly convert the right-hand value to a boolean so that both
-> > > sides
-> > > are guaranteed to be either zero or one.
-> > > 
-> > > rk_iommu_is_paging_enabled() does not suffer from the same problem
-> > > since
-> > > RK_MMU_STATUS_PAGING_ENABLED is BIT(0), but let's apply the same
-> > > change
-> > > for consistency and to make it clear that it's correct without needing
-> > > to lookup the value.
-> > > 
-> > > Fixes: cd6438c5f844 ("iommu/rockchip: Reconstruct to support multi
-> > > slaves") Signed-off-by: John Keeping <john@metanate.com>
-> > 
-> > Nice catch, thanks.
-> > 
-> > Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> > 
-> > John, out of curiosity, how did you find that problem? Excess stall
-> > error
-> > messages or something else?
-> 
-> I was testing the drm iommu patches I posted today [1] and noticed an
-> "Enable stall request timed out" error when unbinding the
-> display-subsystem, but the RK_MMU_STATUS value printed in the error
-> message indicated that stall active was set.
-> 
-> [1] http://article.gmane.org/gmane.comp.video.dri.devel/150721
+From: Stephen Warren <swarren@nvidia.com>
 
-So it seems both you and Tomeu were working to resolve the same issue [2].
+According to the Tegra TRM, GPIOs are aggregated into /ports/ of 8 GPIOs,
+not into /banks/. Fix <dt-bindings/gpio/tegra-gpio.h> to correctly reflect
+this naming convention. While this seems like silly churn, it will become
+slightly more important once we introduce the GPIO binding for upcoming
+Tegra chips.
 
-And John's patch seems to actually fix the underlying problem.
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ include/dt-bindings/gpio/tegra-gpio.h | 68 +++++++++++++++++------------------
+ 1 file changed, 34 insertions(+), 34 deletions(-)
 
-
-[2] https://lkml.org/lkml/2016/3/22/493
-
-
-> > > ---
-> > > 
-> > >  drivers/iommu/rockchip-iommu.c | 8 ++++----
-> > >  1 file changed, 4 insertions(+), 4 deletions(-)
-> > > 
-> > > diff --git a/drivers/iommu/rockchip-iommu.c
-> > > b/drivers/iommu/rockchip-iommu.c index a6f593a0a29e..5710a06c3049
-> > > 100644
-> > > --- a/drivers/iommu/rockchip-iommu.c
-> > > +++ b/drivers/iommu/rockchip-iommu.c
-> > > @@ -315,8 +315,8 @@ static bool rk_iommu_is_stall_active(struct
-> > > rk_iommu
-> > > *iommu) int i;
-> > > 
-> > >  	for (i = 0; i < iommu->num_mmu; i++)
-> > > 
-> > > -		active &= rk_iommu_read(iommu->bases[i], RK_MMU_STATUS) &
-> > > -					RK_MMU_STATUS_STALL_ACTIVE;
-> > > +		active &= !!(rk_iommu_read(iommu->bases[i], RK_MMU_STATUS) &
-> > > +					   RK_MMU_STATUS_STALL_ACTIVE);
-> > > 
-> > >  	return active;
-> > >  
-> > >  }
-> > > 
-> > > @@ -327,8 +327,8 @@ static bool rk_iommu_is_paging_enabled(struct
-> > > rk_iommu *iommu) int i;
-> > > 
-> > >  	for (i = 0; i < iommu->num_mmu; i++)
-> > > 
-> > > -		enable &= rk_iommu_read(iommu->bases[i], RK_MMU_STATUS) &
-> > > -					RK_MMU_STATUS_PAGING_ENABLED;
-> > > +		enable &= !!(rk_iommu_read(iommu->bases[i], RK_MMU_STATUS) &
-> > > +					   RK_MMU_STATUS_PAGING_ENABLED);
-> > > 
-> > >  	return enable;
-> > >  
-> > >  }
+diff --git a/include/dt-bindings/gpio/tegra-gpio.h b/include/dt-bindings/gpio/tegra-gpio.h
+index 197dc28b676e..a1c09e88e80b 100644
+--- a/include/dt-bindings/gpio/tegra-gpio.h
++++ b/include/dt-bindings/gpio/tegra-gpio.h
+@@ -12,40 +12,40 @@
+ 
+ #include <dt-bindings/gpio/gpio.h>
+ 
+-#define TEGRA_GPIO_BANK_ID_A 0
+-#define TEGRA_GPIO_BANK_ID_B 1
+-#define TEGRA_GPIO_BANK_ID_C 2
+-#define TEGRA_GPIO_BANK_ID_D 3
+-#define TEGRA_GPIO_BANK_ID_E 4
+-#define TEGRA_GPIO_BANK_ID_F 5
+-#define TEGRA_GPIO_BANK_ID_G 6
+-#define TEGRA_GPIO_BANK_ID_H 7
+-#define TEGRA_GPIO_BANK_ID_I 8
+-#define TEGRA_GPIO_BANK_ID_J 9
+-#define TEGRA_GPIO_BANK_ID_K 10
+-#define TEGRA_GPIO_BANK_ID_L 11
+-#define TEGRA_GPIO_BANK_ID_M 12
+-#define TEGRA_GPIO_BANK_ID_N 13
+-#define TEGRA_GPIO_BANK_ID_O 14
+-#define TEGRA_GPIO_BANK_ID_P 15
+-#define TEGRA_GPIO_BANK_ID_Q 16
+-#define TEGRA_GPIO_BANK_ID_R 17
+-#define TEGRA_GPIO_BANK_ID_S 18
+-#define TEGRA_GPIO_BANK_ID_T 19
+-#define TEGRA_GPIO_BANK_ID_U 20
+-#define TEGRA_GPIO_BANK_ID_V 21
+-#define TEGRA_GPIO_BANK_ID_W 22
+-#define TEGRA_GPIO_BANK_ID_X 23
+-#define TEGRA_GPIO_BANK_ID_Y 24
+-#define TEGRA_GPIO_BANK_ID_Z 25
+-#define TEGRA_GPIO_BANK_ID_AA 26
+-#define TEGRA_GPIO_BANK_ID_BB 27
+-#define TEGRA_GPIO_BANK_ID_CC 28
+-#define TEGRA_GPIO_BANK_ID_DD 29
+-#define TEGRA_GPIO_BANK_ID_EE 30
+-#define TEGRA_GPIO_BANK_ID_FF 31
++#define TEGRA_GPIO_PORT_A 0
++#define TEGRA_GPIO_PORT_B 1
++#define TEGRA_GPIO_PORT_C 2
++#define TEGRA_GPIO_PORT_D 3
++#define TEGRA_GPIO_PORT_E 4
++#define TEGRA_GPIO_PORT_F 5
++#define TEGRA_GPIO_PORT_G 6
++#define TEGRA_GPIO_PORT_H 7
++#define TEGRA_GPIO_PORT_I 8
++#define TEGRA_GPIO_PORT_J 9
++#define TEGRA_GPIO_PORT_K 10
++#define TEGRA_GPIO_PORT_L 11
++#define TEGRA_GPIO_PORT_M 12
++#define TEGRA_GPIO_PORT_N 13
++#define TEGRA_GPIO_PORT_O 14
++#define TEGRA_GPIO_PORT_P 15
++#define TEGRA_GPIO_PORT_Q 16
++#define TEGRA_GPIO_PORT_R 17
++#define TEGRA_GPIO_PORT_S 18
++#define TEGRA_GPIO_PORT_T 19
++#define TEGRA_GPIO_PORT_U 20
++#define TEGRA_GPIO_PORT_V 21
++#define TEGRA_GPIO_PORT_W 22
++#define TEGRA_GPIO_PORT_X 23
++#define TEGRA_GPIO_PORT_Y 24
++#define TEGRA_GPIO_PORT_Z 25
++#define TEGRA_GPIO_PORT_AA 26
++#define TEGRA_GPIO_PORT_BB 27
++#define TEGRA_GPIO_PORT_CC 28
++#define TEGRA_GPIO_PORT_DD 29
++#define TEGRA_GPIO_PORT_EE 30
++#define TEGRA_GPIO_PORT_FF 31
+ 
+-#define TEGRA_GPIO(bank, offset) \
+-	((TEGRA_GPIO_BANK_ID_##bank * 8) + offset)
++#define TEGRA_GPIO(port, offset) \
++	((TEGRA_GPIO_PORT_##port * 8) + offset)
+ 
+ #endif
+-- 
+2.8.1
