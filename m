@@ -1,46 +1,35 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue, 5 Apr 2016 20:07:59 +0200
-Subject: [PATCH V5 01/15] ACPI: MCFG: Move mmcfg_list management to
- drivers/acpi
-In-Reply-To: <20160405164122.GA9419@localhost>
-References: <1455630825-27253-1-git-send-email-tn@semihalf.com>
- <1455630825-27253-2-git-send-email-tn@semihalf.com>
- <20160303225152.GA10472@localhost>
- <CAKc_7PUyf8ND8Nd32yDBtBnFbkd1mJ-VsCih6YsEA5ZuBUz5zA@mail.gmail.com>
- <20160305041443.GA15110@localhost> <56DFE91E.10105@semihalf.com>
- <5703C7AB.2000306@semihalf.com> <20160405164122.GA9419@localhost>
-Message-ID: <5703FEFF.202@semihalf.com>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Tue, 5 Apr 2016 13:37:49 -0500
+Subject: [PATCHv2 6/7] ARM: socfpga: Enable Arria10 OCRAM ECC on
+ startup
+In-Reply-To: <20160405053110.GA17541@pd.tnic>
+References: <1459450087-24792-1-git-send-email-tthayer@opensource.altera.com>
+ <1459450087-24792-7-git-send-email-tthayer@opensource.altera.com>
+ <57034C4D.9010204@opensource.altera.com> <20160405053110.GA17541@pd.tnic>
+Message-ID: <alpine.DEB.2.02.1604051333070.32718@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+On Tue, 5 Apr 2016, Borislav Petkov wrote:
 
-On 05.04.2016 18:41, Bjorn Helgaas wrote:
-> Hi Tomasz,
->
+> On Tue, Apr 05, 2016 at 12:25:33AM -0500, Thor Thayer wrote:
+> > I realize that I'm not calling iounmap(ecc_block_base) and I'll fix that in
+> > the next revision with a goto.
+> 
+> I'm assuming nothing else changes. Because I've applied 1-4 already.
+> 
+> Yes, no?
+> 
+> If no, then please send only an updated version of this patch as a reply
+> to this thread here.
+> 
 
-[...]
+My only suggestion was to change the 3 helper functions(ecc_set_bits,
+ecc_clear_bits, and ecc_test_bits) should be static inline.
 
->>>>
->>>
->>> As you pointed out raw_pci_{read|write} make things complicated, so IMO
->>> we should either say they are absolutely necessary (and then think how
->>> to simplify it) or just use simple bus-specific accessor (patch 02/15)
->>> e.g. for ARM64.
->>>
->>> Any comments appreciated.
->>
->> Kindly reminder. I would like to move on with this patch set. Can
->> you please comments on it so that we could decide which way to go.
->
-> Can you repost your current proposal with a version number higher than
-> any previous ones?  It's OK if the content is the same as v4; I just
-> think it's confusing if we resurrect v4 and have to follow discussion
-> from v3 to v4 to v5 and back to v4.  The archives would be a bit of a
-> muddle.
->
+So with that change:
 
-Sure I will repost ASAP.
+Acked-by: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-Thanks!
-Tomasz
+BR,
+Dinh
