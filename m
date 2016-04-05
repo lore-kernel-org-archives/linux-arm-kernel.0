@@ -1,51 +1,43 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Tue, 5 Apr 2016 19:59:14 +0800
-Subject: [arm-platforms:irq/percpu-partition 1/5]
- kernel/irq/irqdomain.c:268:13: error: 'const struct irq_domain_ops' has no
- member named 'select'
-Message-ID: <201604051912.A6F2jtZv%fengguang.wu@intel.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 5 Apr 2016 15:09:44 +0300
+Subject: [PATCH] usb: dwc3: omap: drop dma_mask configuration
+Message-ID: <1459858184-1962-1-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/percpu-partition
-head:   7b0d6b7f6f31f6e849b3195d87231246ce96df03
-commit: 07d4b0d25aba679db1864881fa51f55d0540f006 [1/5] irqdomain: Allow domain matching on irq_fwspec
-config: i386-randconfig-s0-04051858 (attached as .config)
-reproduce:
-        git checkout 07d4b0d25aba679db1864881fa51f55d0540f006
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+The DWC3 OMAP driver supports DT-boot only, as result dma_mask will be
+always configured properly from DT -
+of_platform_device_create_pdata()->of_dma_configure(). More over,
+dwc3-omap.c can be built as module and in this case it's unsafe to
+assign local variable as dma_mask.
 
-All errors (new ones prefixed by >>):
+Hence, remove dma_mask configuration code.
 
-   kernel/irq/irqdomain.c: In function 'irq_find_matching_fwspec':
->> kernel/irq/irqdomain.c:268:13: error: 'const struct irq_domain_ops' has no member named 'select'
-      if (h->ops->select && fwspec->param_count)
-                ^
-   kernel/irq/irqdomain.c:269:15: error: 'const struct irq_domain_ops' has no member named 'select'
-       rc = h->ops->select(h, fwspec, bus_token);
-                  ^
-
-vim +268 kernel/irq/irqdomain.c
-
-   262		 * bus_token == DOMAIN_BUS_ANY matches any domain, any other
-   263		 * values must generate an exact match for the domain to be
-   264		 * selected.
-   265		 */
-   266		mutex_lock(&irq_domain_mutex);
-   267		list_for_each_entry(h, &irq_domain_list, link) {
- > 268			if (h->ops->select && fwspec->param_count)
-   269				rc = h->ops->select(h, fwspec, bus_token);
-   270			else if (h->ops->match)
-   271				rc = h->ops->match(h, to_of_node(fwnode), bus_token);
-
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 25161 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160405/7234a7d4/attachment-0001.obj>
+ drivers/usb/dwc3/dwc3-omap.c | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/drivers/usb/dwc3/dwc3-omap.c b/drivers/usb/dwc3/dwc3-omap.c
+index 22e9606..e92a992 100644
+--- a/drivers/usb/dwc3/dwc3-omap.c
++++ b/drivers/usb/dwc3/dwc3-omap.c
+@@ -331,8 +331,6 @@ static void dwc3_omap_disable_irqs(struct dwc3_omap *omap)
+ 	dwc3_omap_write_irqmisc_clr(omap, reg);
+ }
+ 
+-static u64 dwc3_omap_dma_mask = DMA_BIT_MASK(32);
+-
+ static int dwc3_omap_id_notifier(struct notifier_block *nb,
+ 	unsigned long event, void *ptr)
+ {
+@@ -490,7 +488,6 @@ static int dwc3_omap_probe(struct platform_device *pdev)
+ 	omap->irq	= irq;
+ 	omap->base	= base;
+ 	omap->vbus_reg	= vbus_reg;
+-	dev->dma_mask	= &dwc3_omap_dma_mask;
+ 
+ 	pm_runtime_enable(dev);
+ 	ret = pm_runtime_get_sync(dev);
+-- 
+2.8.0
