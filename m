@@ -1,57 +1,45 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Tue, 5 Apr 2016 16:44:09 -0500
-Subject: [PATCH 1/4] ARM: dts: DRA7: Enable Timers 13 through 16
+Date: Tue, 5 Apr 2016 16:44:10 -0500
+Subject: [PATCH 2/4] ARM: dts: DRA7: Add timer12 node
 In-Reply-To: <1459892652-47845-1-git-send-email-s-anna@ti.com>
 References: <1459892652-47845-1-git-send-email-s-anna@ti.com>
-Message-ID: <1459892652-47845-2-git-send-email-s-anna@ti.com>
+Message-ID: <1459892652-47845-3-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Timers 13 through 16 have been added previously in
-disabled state. These timers are common timers that are
-present on all DRA7 family of SoCs, so enable these
-devices by default like the rest of the DMTimers.
+Add the DT node for Timer12 present on DRA7 family of
+SoCs. Timer12 is present in PD_WKUPAON power domain, and
+has the same capabilities as the other timers, except for
+the fact that it serves as a secure timer on HS devices
+and is clocked only from the secure 32K clock.
 
 Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
- arch/arm/boot/dts/dra7.dtsi | 4 ----
- 1 file changed, 4 deletions(-)
+Changes from previous post:
+Drop status = "disabled" line
+
+ arch/arm/boot/dts/dra7.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
 diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 13ac88279427..66c7924e5491 100644
+index 66c7924e5491..955d562c70f0 100644
 --- a/arch/arm/boot/dts/dra7.dtsi
 +++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -778,7 +778,6 @@
+@@ -773,6 +773,15 @@
+ 			ti,hwmods = "timer11";
+ 		};
+ 
++		timer12: timer at 4ae20000 {
++			compatible = "ti,omap5430-timer";
++			reg = <0x4ae20000 0x80>;
++			interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>;
++			ti,hwmods = "timer12";
++			ti,timer-alwon;
++			ti,timer-secure;
++		};
++
+ 		timer13: timer at 48828000 {
+ 			compatible = "ti,omap5430-timer";
  			reg = <0x48828000 0x80>;
- 			interrupts = <GIC_SPI 339 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "timer13";
--			status = "disabled";
- 		};
- 
- 		timer14: timer at 4882a000 {
-@@ -786,7 +785,6 @@
- 			reg = <0x4882a000 0x80>;
- 			interrupts = <GIC_SPI 340 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "timer14";
--			status = "disabled";
- 		};
- 
- 		timer15: timer at 4882c000 {
-@@ -794,7 +792,6 @@
- 			reg = <0x4882c000 0x80>;
- 			interrupts = <GIC_SPI 341 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "timer15";
--			status = "disabled";
- 		};
- 
- 		timer16: timer at 4882e000 {
-@@ -802,7 +799,6 @@
- 			reg = <0x4882e000 0x80>;
- 			interrupts = <GIC_SPI 342 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "timer16";
--			status = "disabled";
- 		};
- 
- 		wdt2: wdt at 4ae14000 {
 -- 
 2.7.4
