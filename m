@@ -1,97 +1,73 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Tue, 5 Apr 2016 16:44:11 -0500
-Subject: [PATCH 3/4] ARM: DRA7: hwmod: Add data for GPTimer 12
-In-Reply-To: <1459892652-47845-1-git-send-email-s-anna@ti.com>
-References: <1459892652-47845-1-git-send-email-s-anna@ti.com>
-Message-ID: <1459892652-47845-4-git-send-email-s-anna@ti.com>
+From: ttnguyen@apm.com (Tai Tri Nguyen)
+Date: Tue, 5 Apr 2016 14:50:32 -0700
+Subject: [PATCH 3/4] perf: xgene: Add APM X-Gene SoC Performance
+ Monitoring Unit driver
+In-Reply-To: <20160405192100.GA5946@svinekod>
+References: <1459467472-31561-1-git-send-email-ttnguyen@apm.com>
+ <1459467472-31561-4-git-send-email-ttnguyen@apm.com>
+ <20160401121820.GB29876@leverpostej>
+ <CACgAJHwZ0MwjBDa65P7tYAkF4-m+TCj-65OGpYYQD2tO6hkFqQ@mail.gmail.com>
+ <20160404233338.GA1917@svinekod>
+ <CACgAJHx6Y8yt57m3YB51dOQjuxNHFvEnJe255mDhnVZOjmJu_A@mail.gmail.com>
+ <20160405192100.GA5946@svinekod>
+Message-ID: <CACgAJHykV72QEWPbH33P9NgQrw4yXB-1HVdXZp0aLDP6T1+J7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the hwmod data for GPTimer 12. GPTimer 12 is present in
-WKUPAON power domain and is clocked from a secure 32K clock.
-GPTimer 12 serves as a secure timer on HS devices, but is
-available for kernel on regular GP devices.
+Hi Mark,
 
-The hwmod link is registered only on GP devices. The hwmod data
-also reused the existing timer class instead of reintroducing
-the identical dra7xx_timer_secure_sysc class which was dropped
-in commit edec17863362 ("ARM: DRA7: hwmod: Fix the hwmod class
-for GPTimer4").
+On Tue, Apr 5, 2016 at 12:21 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Tue, Apr 05, 2016 at 11:50:10AM -0700, Tai Tri Nguyen wrote:
+>> On Mon, Apr 4, 2016 at 4:33 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> > On Mon, Apr 04, 2016 at 04:42:11PM -0700, Tai Tri Nguyen wrote:
+>> >> On Fri, Apr 1, 2016 at 5:18 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> >> >> +     hwc->config = config;
+>> >> >> +     if (config1)
+>> >> >> +             hwc->extra_reg.config = config1;
+>> >> >> +     else
+>> >> >> +             /* Enable all Agents */
+>> >> >> +             hwc->extra_reg.config = 0xFFFFFFFFFFFFFFFFULL;
+>> >> >
+>> >> > I'm not sure I follow what's going on here.
+>> >> >
+>> >> > It would be good to document precisely what this means.
+>> >>
+>> >> These are X-Gene PMU specific for monitoring performance of a specific
+>> >> data path.
+>> >> X-Gene PMUs have 2 registers capable of masking the Agents from which
+>> >> the request come from. If the bit with the bit number corresponding to
+>> >> the AgentID
+>> >> is set, the event will be counted only if it is caused by a request
+>> >> from that agent.
+>> >> Each PMU has different set of Agents. By default, the event will be counted for
+>> >> all agent requests.
+>> >>
+>> >> I'll have it commented better for next revision of the patch.
+>> >
+>> > It might be worth having something under Documentation/ for this, similarly to
+>> > what we do for CCN in Documentation/arm/CCN.txt.
+>> >
+>> > How is the user expected to determine agent IDs? Is there a listing somewhere?
+>> > Does this change between reivisions? This may be worth documenting.
+>> >
+>>
+>> Each of the SoC PMU has an agent ID list in our product User Manual
+>> documentation.
+>> An user is expected to refer to the list to determine the agent ID.
+>> The agent ID list
+>> per each PMU is different. Also we may change or add more agents to the list for
+>> next generations of APM X-Gene. I think it would be too much to document it in
+>> the Documentation/ folder.
+>
+> Given that the IDs are so variable, you can simply defer to user manuals in the
+> documentation. However, there should definitely be documentation describing the
+> format of the config and config1 fields.
+>
+> Thanks,
+> Mark.
 
-Cc: Paul Walmsley <paul@pwsan.com>
-Signed-off-by: Suman Anna <s-anna@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 36 +++++++++++++++++++++++++++++--
- 1 file changed, 34 insertions(+), 2 deletions(-)
+Yes, I agree and will add it.
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index 9442d89bd229..527c7c859e41 100644
---- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -2065,6 +2065,20 @@ static struct omap_hwmod dra7xx_timer11_hwmod = {
- 	},
- };
- 
-+/* timer12 */
-+static struct omap_hwmod dra7xx_timer12_hwmod = {
-+	.name		= "timer12",
-+	.class		= &dra7xx_timer_hwmod_class,
-+	.clkdm_name	= "wkupaon_clkdm",
-+	.main_clk	= "secure_32k_clk_src_ck",
-+	.prcm = {
-+		.omap4 = {
-+			.clkctrl_offs = DRA7XX_CM_WKUPAON_TIMER12_CLKCTRL_OFFSET,
-+			.context_offs = DRA7XX_RM_WKUPAON_TIMER12_CONTEXT_OFFSET,
-+		},
-+	},
-+};
-+
- /* timer13 */
- static struct omap_hwmod dra7xx_timer13_hwmod = {
- 	.name		= "timer13",
-@@ -3281,6 +3295,14 @@ static struct omap_hwmod_ocp_if dra7xx_l4_per1__timer11 = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
-+/* l4_wkup -> timer12 */
-+static struct omap_hwmod_ocp_if dra7xx_l4_wkup__timer12 = {
-+	.master		= &dra7xx_l4_wkup_hwmod,
-+	.slave		= &dra7xx_timer12_hwmod,
-+	.clk		= "wkupaon_iclk_mux",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
- /* l4_per3 -> timer13 */
- static struct omap_hwmod_ocp_if dra7xx_l4_per3__timer13 = {
- 	.master		= &dra7xx_l4_per3_hwmod,
-@@ -3580,6 +3602,13 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
- 	NULL,
- };
- 
-+/* GP-only hwmod links */
-+static struct omap_hwmod_ocp_if *dra7xx_gp_hwmod_ocp_ifs[] __initdata = {
-+	&dra7xx_l4_wkup__timer12,
-+	NULL,
-+};
-+
-+/* SoC variant specific hwmod links */
- static struct omap_hwmod_ocp_if *dra74x_hwmod_ocp_ifs[] __initdata = {
- 	&dra7xx_l4_per3__usb_otg_ss4,
- 	NULL,
-@@ -3597,9 +3626,12 @@ int __init dra7xx_hwmod_init(void)
- 	ret = omap_hwmod_register_links(dra7xx_hwmod_ocp_ifs);
- 
- 	if (!ret && soc_is_dra74x())
--		return omap_hwmod_register_links(dra74x_hwmod_ocp_ifs);
-+		ret = omap_hwmod_register_links(dra74x_hwmod_ocp_ifs);
- 	else if (!ret && soc_is_dra72x())
--		return omap_hwmod_register_links(dra72x_hwmod_ocp_ifs);
-+		ret = omap_hwmod_register_links(dra72x_hwmod_ocp_ifs);
-+
-+	if (!ret && omap_type() == OMAP2_DEVICE_TYPE_GP)
-+		ret = omap_hwmod_register_links(dra7xx_gp_hwmod_ocp_ifs);
- 
- 	return ret;
- }
+Thanks,
 -- 
-2.7.4
+Tai
