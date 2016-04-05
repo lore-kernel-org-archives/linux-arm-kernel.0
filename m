@@ -1,37 +1,24 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Mon,  4 Apr 2016 20:20:56 -0700
-Subject: [PATCH 2/2] clk: bcm2835: Fix PLL poweron
-In-Reply-To: <1459826456-18812-1-git-send-email-eric@anholt.net>
-References: <1459826456-18812-1-git-send-email-eric@anholt.net>
-Message-ID: <1459826456-18812-3-git-send-email-eric@anholt.net>
+Date: Mon,  4 Apr 2016 20:44:14 -0700
+Subject: [PATCH 0/4] irqchip: bcm2835: arm64 port
+Message-ID: <1459827858-3871-1-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In poweroff, we set the reset bit and the power down bit, but only
-managed to unset the reset bit for poweron.  This meant that if HDMI
-did -EPROBE_DEFER after it had grabbed its clocks, we'd power down the
-PLLH (that had been on at boot time) and never recover.
+Here's the series for irqchip-bcm283x on arm64 for the Pi3.  Since I'd
+like to land Makefile changes that would enable building
+irqchip-bcm283x on arm64, it would be nice if I had either a stable
+branch to merge from, or an ack to merge them through the arm64 tree.
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
-Cc: stable at vger.kernel.org
----
- drivers/clk/bcm/clk-bcm2835.c | 4 ++++
- 1 file changed, 4 insertions(+)
+Eric Anholt (4):
+  irqchip: bcm2835: Avoid arch/arm-specific handle_IRQ
+  irqchip: bcm2836: Drop smp_set_ops on arm64 builds
+  irqchip: bcm2836: Fix compiler warning on 64-bit build
+  irqchip: bcm2836: Use a more generic memory barrier call
 
-diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-index 87616de..7a79708 100644
---- a/drivers/clk/bcm/clk-bcm2835.c
-+++ b/drivers/clk/bcm/clk-bcm2835.c
-@@ -554,6 +554,10 @@ static int bcm2835_pll_on(struct clk_hw *hw)
- 	const struct bcm2835_pll_data *data = pll->data;
- 	ktime_t timeout;
- 
-+	cprman_write(cprman, data->a2w_ctrl_reg,
-+		     cprman_read(cprman, data->a2w_ctrl_reg) &
-+		     ~A2W_PLL_CTRL_PWRDN);
-+
- 	/* Take the PLL out of reset. */
- 	cprman_write(cprman, data->cm_ctrl_reg,
- 		     cprman_read(cprman, data->cm_ctrl_reg) & ~CM_PLL_ANARST);
+ drivers/irqchip/irq-bcm2835.c |  3 +--
+ drivers/irqchip/irq-bcm2836.c | 12 ++++++++----
+ 2 files changed, 9 insertions(+), 6 deletions(-)
+
 -- 
 2.7.0
