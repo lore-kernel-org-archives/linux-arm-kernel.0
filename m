@@ -1,182 +1,221 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 5 Apr 2016 16:56:25 -0500
-Subject: [PATCH v4] PCI: imx6: Add initial imx6sx support
-In-Reply-To: <1457911870.16725.42.camel@googlemail.com>
-References: <1456411669-4699-1-git-send-email-chf.fritz@googlemail.com>
- <1456411669-4699-3-git-send-email-chf.fritz@googlemail.com>
- <20160311175850.GA4725@localhost>
- <1457911590.16725.37.camel@googlemail.com>
- <1457911870.16725.42.camel@googlemail.com>
-Message-ID: <20160405215625.GF15353@localhost>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Wed, 6 Apr 2016 01:08:22 +0300
+Subject: [RFC6 PATCH v6 00/21] ILP32 for ARM64
+Message-ID: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 14, 2016 at 12:31:10AM +0100, Christoph Fritz wrote:
-> Add initial PCIe support for the imx6 SoC derivate imx6sx.  PCI MSI support
-> is untested as the necessary suspend/resume quirk is not included in this
-> patch.
-> 
-> This patch is heavily based on patches by Richard Zhu.
-> 
-> [bhelgaas: factor out refclk enable, fix adjacent typos in imx6q-pcie.txt]
-> Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
-> Acked-by: Richard Zhu <Richard.Zhu@freescale.com>
-> Acked-by: Lucas Stach <l.stach@pengutronix.de>
+This version is rebased on kernel v4.6-rc2, and has fixes in signal subsystem.
+It works with updated glibc [1] (though very draft), and tested with LTP.
 
-Applied to pci/host-imx6 for v4.7, thanks!
+It was tested on QEMU and ThunderX machines. No major difference found.
+This is RFC because ILP32 is not tested in big-endian mode.
 
-> ---
->  .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |  8 +++-
->  drivers/pci/host/pci-imx6.c                        | 53 ++++++++++++++++++++++
->  2 files changed, 59 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-> index 6fbba53..6ee4439 100644
-> --- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-> +++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-> @@ -4,8 +4,8 @@ This PCIe host controller is based on the Synopsis Designware PCIe IP
->  and thus inherits all the common properties defined in designware-pcie.txt.
->  
->  Required properties:
-> -- compatible: "fsl,imx6q-pcie"
-> -- reg: base addresse and length of the pcie controller
-> +- compatible: "fsl,imx6q-pcie", "fsl,imx6sx-pcie"
-> +- reg: base address and length of the PCIe controller
->  - interrupts: A list of interrupt outputs of the controller. Must contain an
->    entry for each entry in the interrupt-names property.
->  - interrupt-names: Must include the following entries:
-> @@ -13,6 +13,10 @@ Required properties:
->  - clock-names: Must include the following additional entries:
->  	- "pcie_phy"
->  
-> +Additional required properties for imx6sx-pcie:
-> +- clock names: Must include the following additional entries:
-> +	- "pcie_inbound_axi"
-> +
->  Example:
->  
->  	pcie at 0x01000000 {
-> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-> index 4e0e47f..fa3a544 100644
-> --- a/drivers/pci/host/pci-imx6.c
-> +++ b/drivers/pci/host/pci-imx6.c
-> @@ -35,9 +35,11 @@ struct imx6_pcie {
->  	struct gpio_desc	*reset_gpio;
->  	struct clk		*pcie_bus;
->  	struct clk		*pcie_phy;
-> +	struct clk		*pcie_inbound_axi;
->  	struct clk		*pcie;
->  	struct pcie_port	pp;
->  	struct regmap		*iomuxc_gpr;
-> +	bool			is_imx6sx;
->  	void __iomem		*mem_base;
->  };
->  
-> @@ -231,6 +233,17 @@ static int imx6_pcie_assert_core_reset(struct pcie_port *pp)
->  	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
->  	u32 val, gpr1, gpr12;
->  
-> +	if (imx6_pcie->is_imx6sx) {
-> +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
-> +				   IMX6SX_GPR12_PCIE_TEST_POWERDOWN,
-> +				   IMX6SX_GPR12_PCIE_TEST_POWERDOWN);
-> +		/* Force PCIe PHY reset */
-> +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR5,
-> +				   IMX6SX_GPR5_PCIE_BTNRST_RESET,
-> +				   IMX6SX_GPR5_PCIE_BTNRST_RESET);
-> +		return 0;
-> +	}
-> +
->  	/*
->  	 * If the bootloader already enabled the link we need some special
->  	 * handling to get the core back into a state where it is safe to
-> @@ -266,6 +279,21 @@ static int imx6_pcie_assert_core_reset(struct pcie_port *pp)
->  
->  static int imx6_pcie_enable_ref_clk(struct imx6_pcie *imx6_pcie)
->  {
-> +	struct pcie_port *pp = &imx6_pcie->pp;
-> +	int ret;
-> +
-> +	if (imx6_pcie->is_imx6sx) {
-> +		ret = clk_prepare_enable(imx6_pcie->pcie_inbound_axi);
-> +		if (ret) {
-> +			dev_err(pp->dev, "unable to enable pcie_axi clock\n");
-> +			return ret;
-> +		}
-> +
-> +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
-> +				   IMX6SX_GPR12_PCIE_TEST_POWERDOWN, 0);
-> +		return ret;
-> +	}
-> +
->  	/* power up core phy and enable ref clock */
->  	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
->  			IMX6Q_GPR1_PCIE_TEST_PD, 0 << 18);
-> @@ -319,6 +347,11 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
->  		msleep(100);
->  		gpiod_set_value_cansleep(imx6_pcie->reset_gpio, 1);
->  	}
-> +
-> +	if (imx6_pcie->is_imx6sx)
-> +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR5,
-> +				   IMX6SX_GPR5_PCIE_BTNRST_RESET, 0);
-> +
->  	return 0;
->  
->  err_ref_clk:
-> @@ -336,6 +369,12 @@ static void imx6_pcie_init_phy(struct pcie_port *pp)
->  {
->  	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
->  
-> +	if (imx6_pcie->is_imx6sx) {
-> +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
-> +				   IMX6SX_GPR12_PCIE_RX_EQ_MASK,
-> +				   IMX6SX_GPR12_PCIE_RX_EQ_2);
-> +	}
-> +
->  	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
->  			IMX6Q_GPR12_PCIE_CTL_2, 0 << 10);
->  
-> @@ -554,6 +593,9 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
->  	pp = &imx6_pcie->pp;
->  	pp->dev = &pdev->dev;
->  
-> +	imx6_pcie->is_imx6sx = of_device_is_compatible(pp->dev->of_node,
-> +						       "fsl,imx6sx-pcie");
-> +
->  	/* Added for PCI abort handling */
->  	hook_fault_code(16 + 6, imx6q_pcie_abort_handler, SIGBUS, 0,
->  		"imprecise external abort");
-> @@ -589,6 +631,16 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
->  		return PTR_ERR(imx6_pcie->pcie);
->  	}
->  
-> +	if (imx6_pcie->is_imx6sx) {
-> +		imx6_pcie->pcie_inbound_axi = devm_clk_get(&pdev->dev,
-> +							   "pcie_inbound_axi");
-> +		if (IS_ERR(imx6_pcie->pcie_inbound_axi)) {
-> +			dev_err(&pdev->dev,
-> +				"pcie_incbound_axi clock missing or invalid\n");
-> +			return PTR_ERR(imx6_pcie->pcie_inbound_axi);
-> +		}
-> +	}
-> +
->  	/* Grab GPR config register range */
->  	imx6_pcie->iomuxc_gpr =
->  		 syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
-> @@ -615,6 +667,7 @@ static void imx6_pcie_shutdown(struct platform_device *pdev)
->  
->  static const struct of_device_id imx6_pcie_of_match[] = {
->  	{ .compatible = "fsl,imx6q-pcie", },
-> +	{ .compatible = "fsl,imx6sx-pcie", },
->  	{},
->  };
->  MODULE_DEVICE_TABLE(of, imx6_pcie_of_match);
-> -- 
-> 2.1.4
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+ v3: https://lkml.org/lkml/2014/9/3/704
+ v4: https://lkml.org/lkml/2015/4/13/691
+ v5: https://lkml.org/lkml/2015/9/29/911
+
+ v6:
+ - time_t, __kenel_off_t and other types turned to be 32-bit
+   for compatibility reasons (after v5 discussion);
+ - related changes applied to ILP32 syscall table and handlers;
+ - ILP32 VDSO code excluded. It's not mandatory, and caused questions
+   during review process. We definitely make sure we will follow up
+   with a VDSO later on because it is needed for performance reasons;
+ - fixed build issues with different combinations of AARCH32 / ILP32
+   enabling in config;
+ - ILP32 TLS bug fixed;
+ - entry32-common.S introduced to hold wrappers needed for both ILP32
+   and AARCH32_EL0;
+ - documentation updated according to latest changes;
+ - rebased to the current head;
+ - coding style re-checked;
+ - ILP32 syscall table turned around.
+
+   rfc3:
+ - all structures and system calls are just like AARCH32 ones now. with 2
+   exceptions: syscalls that take 64-bit parameter in 2 32-bit regosters
+   are replaced with LP64 version; struct rt_sigframe is constructed both
+   from LP64 and AARCH32 fields to be consistent with AARCH64 register set;
+ - documentation rewritten accordingly;
+ - common code for all 3 ABIs is moved to separated files for easy use,
+   new headers and objects are introduced, incl: is_compat.h, thread_bits.h,
+   signal_common.h, signal32_common.h.
+ - ILP32 VDSO code restored, Nathans comments are addressed;
+ - patch "arm64: ilp32: force IPC_64 in msgctl, shmctl, semctl" removed, as
+   Arnd suggested general solution for IPC_64 problem.
+
+   rfc4:
+ - sys_ilp32.c syscall list is fixed according to comments;
+ - binfmt_elf32.c and binfmt_ilp32.c are introduced to host the code handling
+   corresponding formats;
+ - statfs64, fstsatfs64 and mmap wrappers are removed;
+ - rebased on v4.4-rc8 + http://www.spinics.net/lists/kernel/msg2151759.html
+
+ rfc5:
+ - addressed rfc4 comments;
+ - turned s390 compat wrappers to be generic and applied it to arm64/ilp32.
+   Heiko Carsten and Martin Schwidefsky added to CC as s390 maintainers.
+
+ rfc6:
+ - glibc follows new ABI, [1];
+ - significant rework for signal subsystem (patches 21, 23) - struct ucontext
+   is now corresponds user representation;
+ - compat wrappers and 32-bit off_t patchsets are joined with this patchset,
+   as for now ilp32 is the only user for them;
+ - moved to kernel v4.6-rc2;
+ - few minor bugfixes.
+
+[1] https://github.com/norov/glibc/tree/new-api
+
+Andrew Pinski (7):
+  arm64: ensure the kernel is compiled for LP64
+  arm64: rename COMPAT to AARCH32_EL0 in Kconfig
+  arm64: change some CONFIG_COMPAT over to use CONFIG_AARCH32_EL0
+    instead
+  arm64:uapi: set __BITS_PER_LONG correctly for ILP32 and LP64
+  arm64:ilp32: add sys_ilp32.c and a separate table (in entry.S) to use
+    it
+  arm64: ilp32: introduce ilp32-specific handlers for sigframe and
+    ucontext
+  arm64:ilp32: add ARM64_ILP32 to Kconfig
+
+Bamvor Jian Zhang (1):
+  arm64: compat: change config dependences to aarch32
+
+Philipp Tomsich (1):
+  arm64:ilp32: add vdso-ilp32 and use for signal return
+
+Yury Norov (16):
+  all: syscall wrappers: add documentation
+  all: introduce COMPAT_WRAPPER option and enable it for s390
+  all: s390: move wrapper infrastructure to generic headers
+  all: s390: move compat_wrappers.c from arch/s390/kernel to kernel/
+  all: wrap needed syscalls in generic unistd
+  compat ABI: use non-compat openat and open_by_handle_at variants
+  32-bit ABI: introduce ARCH_32BIT_OFF_T config option
+  arm64: ilp32: add documentation on the ILP32 ABI for ARM64
+  thread: move thread bits accessors to separated file
+  arm64: introduce is_a32_task and is_a32_thread (for AArch32 compat)
+  arm64: ilp32: add is_ilp32_compat_{task,thread} and TIF_32BIT_AARCH64
+  arm64: introduce binfmt_elf32.c
+  arm64: ilp32: introduce binfmt_ilp32.c
+  arm64: ptrace: handle ptrace_request differently for aarch32 and ilp32
+  arm64: signal: share lp64 signal routines to ilp32
+  arm64: signal32: move ilp32 and aarch32 common code to separated file
+
+ Documentation/adding-syscalls.txt             |  32 +++
+ Documentation/arm64/ilp32.txt                 |  13 ++
+ arch/Kconfig                                  |   8 +
+ arch/arc/Kconfig                              |   1 +
+ arch/arm/Kconfig                              |   1 +
+ arch/arm64/Kconfig                            |  17 +-
+ arch/arm64/Makefile                           |   5 +
+ arch/arm64/include/asm/compat.h               |  19 +-
+ arch/arm64/include/asm/elf.h                  |  35 +---
+ arch/arm64/include/asm/fpsimd.h               |   2 +-
+ arch/arm64/include/asm/ftrace.h               |   2 +-
+ arch/arm64/include/asm/hwcap.h                |   6 +-
+ arch/arm64/include/asm/is_compat.h            |  84 ++++++++
+ arch/arm64/include/asm/memory.h               |   3 +-
+ arch/arm64/include/asm/processor.h            |  11 +-
+ arch/arm64/include/asm/ptrace.h               |   2 +-
+ arch/arm64/include/asm/signal32.h             |   6 +-
+ arch/arm64/include/asm/signal32_common.h      |  25 +++
+ arch/arm64/include/asm/signal_common.h        |  33 +++
+ arch/arm64/include/asm/signal_ilp32.h         |  34 ++++
+ arch/arm64/include/asm/syscall.h              |   2 +-
+ arch/arm64/include/asm/thread_info.h          |   3 +-
+ arch/arm64/include/asm/unistd.h               |  11 +-
+ arch/arm64/include/asm/unistd32.h             |   2 +-
+ arch/arm64/include/asm/vdso.h                 |   6 +
+ arch/arm64/include/uapi/asm/bitsperlong.h     |   9 +-
+ arch/arm64/kernel/Makefile                    |  12 +-
+ arch/arm64/kernel/asm-offsets.c               |   2 +-
+ arch/arm64/kernel/binfmt_elf32.c              |  33 +++
+ arch/arm64/kernel/binfmt_ilp32.c              |  91 +++++++++
+ arch/arm64/kernel/cpufeature.c                |   8 +-
+ arch/arm64/kernel/cpuinfo.c                   |   4 +-
+ arch/arm64/kernel/entry.S                     |  18 +-
+ arch/arm64/kernel/entry_ilp32.S               |  23 +++
+ arch/arm64/kernel/head.S                      |   2 +-
+ arch/arm64/kernel/hw_breakpoint.c             |  10 +-
+ arch/arm64/kernel/perf_regs.c                 |   2 +-
+ arch/arm64/kernel/process.c                   |   7 +-
+ arch/arm64/kernel/ptrace.c                    |  67 ++++++-
+ arch/arm64/kernel/signal.c                    | 100 ++++++----
+ arch/arm64/kernel/signal32.c                  |  85 --------
+ arch/arm64/kernel/signal32_common.c           | 115 +++++++++++
+ arch/arm64/kernel/signal_ilp32.c              | 192 ++++++++++++++++++
+ arch/arm64/kernel/sys32.c                     |   1 +
+ arch/arm64/kernel/sys_ilp32.c                 |  68 +++++++
+ arch/arm64/kernel/traps.c                     |   5 +-
+ arch/arm64/kernel/vdso-ilp32/.gitignore       |   2 +
+ arch/arm64/kernel/vdso-ilp32/Makefile         |  72 +++++++
+ arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S     |  33 +++
+ arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S |  95 +++++++++
+ arch/arm64/kernel/vdso.c                      |  65 ++++--
+ arch/blackfin/Kconfig                         |   1 +
+ arch/cris/Kconfig                             |   1 +
+ arch/frv/Kconfig                              |   1 +
+ arch/h8300/Kconfig                            |   1 +
+ arch/hexagon/Kconfig                          |   1 +
+ arch/m32r/Kconfig                             |   1 +
+ arch/m68k/Kconfig                             |   1 +
+ arch/metag/Kconfig                            |   1 +
+ arch/microblaze/Kconfig                       |   1 +
+ arch/mips/Kconfig                             |   1 +
+ arch/mn10300/Kconfig                          |   1 +
+ arch/nios2/Kconfig                            |   1 +
+ arch/openrisc/Kconfig                         |   1 +
+ arch/parisc/Kconfig                           |   1 +
+ arch/powerpc/Kconfig                          |   1 +
+ arch/s390/Kconfig                             |   1 +
+ arch/s390/include/asm/compat.h                |  17 +-
+ arch/s390/kernel/Makefile                     |   2 +-
+ arch/s390/kernel/compat_linux.c               |   4 +
+ arch/s390/kernel/compat_wrapper.c             | 180 -----------------
+ arch/score/Kconfig                            |   1 +
+ arch/sh/Kconfig                               |   1 +
+ arch/sparc/Kconfig                            |   1 +
+ arch/tile/Kconfig                             |   1 +
+ arch/tile/kernel/compat.c                     |   3 +
+ arch/unicore32/Kconfig                        |   1 +
+ arch/x86/Kconfig                              |   1 +
+ arch/x86/um/Kconfig                           |   1 +
+ arch/xtensa/Kconfig                           |   1 +
+ drivers/clocksource/arm_arch_timer.c          |   2 +-
+ include/linux/compat.h                        | 277 ++++++++++++++++++++++++++
+ include/linux/fcntl.h                         |   2 +-
+ include/linux/ptrace.h                        |   6 +
+ include/linux/syscalls.h                      |  57 +-----
+ include/linux/syscalls_structs.h              |  60 ++++++
+ include/linux/thread_bits.h                   |  55 +++++
+ include/linux/thread_info.h                   |  44 +---
+ include/uapi/asm-generic/unistd.h             | 231 ++++++++++-----------
+ kernel/Makefile                               |   1 +
+ kernel/compat_wrapper.c                       | 175 ++++++++++++++++
+ kernel/ptrace.c                               |  10 +-
+ 92 files changed, 1997 insertions(+), 637 deletions(-)
+ create mode 100644 Documentation/arm64/ilp32.txt
+ create mode 100644 arch/arm64/include/asm/is_compat.h
+ create mode 100644 arch/arm64/include/asm/signal32_common.h
+ create mode 100644 arch/arm64/include/asm/signal_common.h
+ create mode 100644 arch/arm64/include/asm/signal_ilp32.h
+ create mode 100644 arch/arm64/kernel/binfmt_elf32.c
+ create mode 100644 arch/arm64/kernel/binfmt_ilp32.c
+ create mode 100644 arch/arm64/kernel/entry_ilp32.S
+ create mode 100644 arch/arm64/kernel/signal32_common.c
+ create mode 100644 arch/arm64/kernel/signal_ilp32.c
+ create mode 100644 arch/arm64/kernel/sys_ilp32.c
+ create mode 100644 arch/arm64/kernel/vdso-ilp32/.gitignore
+ create mode 100644 arch/arm64/kernel/vdso-ilp32/Makefile
+ create mode 100644 arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S
+ create mode 100644 arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S
+ delete mode 100644 arch/s390/kernel/compat_wrapper.c
+ create mode 100644 include/linux/syscalls_structs.h
+ create mode 100644 include/linux/thread_bits.h
+ create mode 100644 kernel/compat_wrapper.c
+
+-- 
+2.5.0
