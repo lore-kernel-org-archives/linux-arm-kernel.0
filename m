@@ -1,63 +1,49 @@
-From: brian.starkey@arm.com (Brian Starkey)
-Date: Tue, 5 Apr 2016 09:14:59 +0100
-Subject: [PATCH] ARM: arm64: dts: Add expansion bus to VExpress and Juno
-In-Reply-To: <57029EC7.8030802@arm.com>
-References: <1459786850-29409-1-git-send-email-brian.starkey@arm.com>
- <57029EC7.8030802@arm.com>
-Message-ID: <20160405081458.GA18740@e106950-lin.cambridge.arm.com>
+From: puck.chen@hisilicon.com (Chen Feng)
+Date: Tue, 5 Apr 2016 16:22:52 +0800
+Subject: [PATCH 2/2] arm64: mm: make pfn always valid with flat memory
+In-Reply-To: <1459844572-53069-1-git-send-email-puck.chen@hisilicon.com>
+References: <1459844572-53069-1-git-send-email-puck.chen@hisilicon.com>
+Message-ID: <1459844572-53069-2-git-send-email-puck.chen@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudeep,
+Make the pfn always valid when using flat memory.
+If the reserved memory is not align to memblock-size,
+there will be holes in zone.
 
-On Mon, Apr 04, 2016 at 06:05:11PM +0100, Sudeep Holla wrote:
->How do you plan to add those additional hardware on the expansion bus ?
->
->IIUC having them in DT and running on a system without the tile
->connected will cause aborts, hence you are just adding bus definition.
->
->Is there any use in having just the bus definition in DT. If you are
->planning to add devices using overlays, can't the bus definition also
->be added then ?
+This patch makes the memory in buddy always in the
+array of mem-map.
 
-Did you mean "then" as "when I submit the overlay patches" or "add the
-bus in the overlay"?
+Signed-off-by: Chen Feng <puck.chen@hisilicon.com>
+Signed-off-by: Fu Jun <oliver.fu@hisilicon.com>
+---
+ arch/arm64/mm/init.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-I wasn't sure the overlays would get accepted into mainline as they
-describe proprietary FPGA bitfiles which aren't going to be publicly
-available. We should be able to upstream them if that's not an issue.
-
-I'm still interested in getting the bus definition upstream so that we
-have a basis for defining our bitfile overlays in our kernel tree(s).
-Previously there's been no example or convention leading us to hack the
-DTs together in various ways:
-https://git.linaro.org/landing-teams/working/arm/kernel.git/commit/14ebf51be6ead99b3861d779bdcf3cee18ab81d6
-https://git.linaro.org/landing-teams/working/arm/kernel.git/commit/8e3f902e202f48e2b424c0f049f3894ac83c4c65
-
-As for adding it via overlays; as we use the same bitfile on multiple
-platforms, we'd need to maintain and apply a bunch of overlays: one
-per-platform for the bus, and one per bitfile for the devices.
-It seemed better to get the bus definition (which is fixed) into the
-base platform definitions, then we only need overlays to describe the
-devices which are unique to a bitfile.
-
-Having the bus definition also serves to document the interrupt lines
-and address ranges on the different platforms.
-
->
->I am fine with the patch as such, just wanted to know the information.
->
-
-Thanks for having a look,
-
-Brian
-
->-- 
->Regards,
->Sudeep
->
->_______________________________________________
->linux-arm-kernel mailing list
->linux-arm-kernel at lists.infradead.org
->http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index ea989d8..0e1d5b7 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -306,7 +306,8 @@ static void __init free_unused_memmap(void)
+ 	struct memblock_region *reg;
+ 
+ 	for_each_memblock(memory, reg) {
+-		start = __phys_to_pfn(reg->base);
++		start = round_down(__phys_to_pfn(reg->base),
++				   MAX_ORDER_NR_PAGES);
+ 
+ #ifdef CONFIG_SPARSEMEM
+ 		/*
+@@ -327,8 +328,8 @@ static void __init free_unused_memmap(void)
+ 		 * memmap entries are valid from the bank end aligned to
+ 		 * MAX_ORDER_NR_PAGES.
+ 		 */
+-		prev_end = ALIGN(__phys_to_pfn(reg->base + reg->size),
+-				 MAX_ORDER_NR_PAGES);
++		prev_end = round_up(__phys_to_pfn(reg->base + reg->size),
++				    MAX_ORDER_NR_PAGES);
+ 	}
+ 
+ #ifdef CONFIG_SPARSEMEM
+-- 
+1.9.1
