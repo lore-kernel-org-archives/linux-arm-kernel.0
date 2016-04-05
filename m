@@ -1,124 +1,186 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 04 Apr 2016 22:01:12 -0700
-Subject: [PATCH v5 1/2] serial: fsl_lpuart: Add DMA quirk
-In-Reply-To: <1459806792-7729-2-git-send-email-andrew@lunn.ch>
-References: <1459806792-7729-1-git-send-email-andrew@lunn.ch>
- <1459806792-7729-2-git-send-email-andrew@lunn.ch>
-Message-ID: <3b2da30d16238b852b3792b1c62cea23@agner.ch>
+From: tthayer@opensource.altera.com (Thor Thayer)
+Date: Tue, 5 Apr 2016 00:25:33 -0500
+Subject: [PATCHv2 6/7] ARM: socfpga: Enable Arria10 OCRAM ECC on startup
+In-Reply-To: <1459450087-24792-7-git-send-email-tthayer@opensource.altera.com>
+References: <1459450087-24792-1-git-send-email-tthayer@opensource.altera.com>
+ <1459450087-24792-7-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <57034C4D.9010204@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-04-04 14:53, Andrew Lunn wrote:
-> Using DMA with the vf610 and other Vybrid devices results in a corrupt
-> serial stream. Add a quirk to disable the use of DMA.
-> 
-> Refactor the existing code to add a 32 bit access quirk for the
-> fsl,ls1021a-lpuart.
+Hi,
 
-Hi Andrew,
-
-[also added Greg and Jiri, maintainers of the tty subsystem]
-
-Well, I am not sure if that is the right approach. Quirks are usually
-used to hint to issues in the hardware. However, in this case we deal
-with (a) software issue(s)...
-
-At Toradex we were carry a patch which disabled DMA by default using a
-module parameter:
-http://git.toradex.com/cgit/linux-toradex.git/commit/?h=toradex_vf_4.4-next&id=f5baad61b77dd4b0ac0c7beeee284e12d49ba442
-
-This allowed to re-enable the DMA easily for testing... Not sure if that
-is the better approach.
-
-However, we are working on a re-implementation of the DMA modes, I hope
-we can post some patches soon.
-
-IMHO we can just omit adding such a disable work around, people lived
-with the current situation since 3.13, one more release probably doesn't
-really matter... :-)
-
---
-Stefan
-
-
-> 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+On 03/31/2016 01:48 PM, tthayer at opensource.altera.com wrote:
+> From: Thor Thayer <tthayer@opensource.altera.com>
+>
+> Enable ECC for Arria10 On-Chip RAM on machine startup. The ECC has to
+> be enabled and memory initialized before data is stored in memory
+> otherwise the ECC will fail on reads.
+>
+> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
 > ---
->  drivers/tty/serial/fsl_lpuart.c | 36 ++++++++++++++++++++++++++----------
->  1 file changed, 26 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
-> index 3d790033744e..8d2f67b93e1f 100644
-> --- a/drivers/tty/serial/fsl_lpuart.c
-> +++ b/drivers/tty/serial/fsl_lpuart.c
-> @@ -257,12 +257,17 @@ struct lpuart_port {
->  	struct timer_list	lpuart_timer;
->  };
->  
-> +#define QUIRK_LPUART32		BIT(0)
-> +#define QUIRK_NO_DMA		BIT(1)
+> v2: Add Arria10 ECC block initialization locally.
+> ---
+>   arch/arm/mach-socfpga/ocram.c |  128 +++++++++++++++++++++++++++++++++++++++++
+>   1 file changed, 128 insertions(+)
+>
+> diff --git a/arch/arm/mach-socfpga/ocram.c b/arch/arm/mach-socfpga/ocram.c
+> index 60ec643..d4a524c 100644
+> --- a/arch/arm/mach-socfpga/ocram.c
+> +++ b/arch/arm/mach-socfpga/ocram.c
+> @@ -13,12 +13,15 @@
+>    * You should have received a copy of the GNU General Public License along with
+>    * this program.  If not, see <http://www.gnu.org/licenses/>.
+>    */
+> +#include <linux/delay.h>
+>   #include <linux/io.h>
+>   #include <linux/genalloc.h>
+>   #include <linux/module.h>
+>   #include <linux/of_address.h>
+>   #include <linux/of_platform.h>
+>
+> +#include "core.h"
 > +
->  static const struct of_device_id lpuart_dt_ids[] = {
->  	{
->  		.compatible = "fsl,vf610-lpuart",
-> +		.data = (void *)QUIRK_NO_DMA,
->  	},
->  	{
->  		.compatible = "fsl,ls1021a-lpuart",
-> +		.data = (void *)QUIRK_LPUART32,
->  	},
->  	{ /* sentinel */ }
->  };
-> @@ -1803,7 +1808,9 @@ static struct uart_driver lpuart_reg = {
->  static int lpuart_probe(struct platform_device *pdev)
->  {
->  	struct device_node *np = pdev->dev.of_node;
-> +	const struct of_device_id *match;
->  	struct lpuart_port *sport;
-> +	kernel_ulong_t quirks;
->  	struct resource *res;
->  	int ret;
->  
-> @@ -1819,7 +1826,10 @@ static int lpuart_probe(struct platform_device *pdev)
->  		return ret;
->  	}
->  	sport->port.line = ret;
-> -	sport->lpuart32 = of_device_is_compatible(np, "fsl,ls1021a-lpuart");
+>   #define ALTR_OCRAM_CLEAR_ECC          0x00000018
+>   #define ALTR_OCRAM_ECC_EN             0x00000019
+>
+> @@ -47,3 +50,128 @@ void socfpga_init_ocram_ecc(void)
+>
+>   	iounmap(mapped_ocr_edac_addr);
+>   }
 > +
-> +	match = of_match_node(lpuart_dt_ids, np);
-> +	quirks = (kernel_ulong_t)match->data;
-> +	sport->lpuart32 = quirks & QUIRK_LPUART32;
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	sport->port.membase = devm_ioremap_resource(&pdev->dev, res);
-> @@ -1867,15 +1877,21 @@ static int lpuart_probe(struct platform_device *pdev)
->  		return ret;
->  	}
->  
-> -	sport->dma_tx_chan = dma_request_slave_channel(sport->port.dev, "tx");
-> -	if (!sport->dma_tx_chan)
-> -		dev_info(sport->port.dev, "DMA tx channel request failed, "
-> -				"operating without tx DMA\n");
-> -
-> -	sport->dma_rx_chan = dma_request_slave_channel(sport->port.dev, "rx");
-> -	if (!sport->dma_rx_chan)
-> -		dev_info(sport->port.dev, "DMA rx channel request failed, "
-> -				"operating without rx DMA\n");
-> +	if (quirks & QUIRK_NO_DMA) {
-> +		dev_info(sport->port.dev, "Not using DMA\n");
-> +	} else {
-> +		sport->dma_tx_chan = dma_request_slave_channel(
-> +			sport->port.dev, "tx");
-> +		if (!sport->dma_tx_chan)
-> +			dev_info(sport->port.dev,
-> +				 "DMA tx channel request failed, operating without tx DMA\n");
+> +/* Arria10 OCRAM Section */
+> +#define ALTR_A10_ECC_CTRL_OFST          0x08
+> +#define ALTR_A10_OCRAM_ECC_EN_CTL       (BIT(1) | BIT(0))
+> +#define ALTR_A10_ECC_INITA              BIT(16)
 > +
-> +		sport->dma_rx_chan = dma_request_slave_channel(
-> +			sport->port.dev, "rx");
-> +		if (!sport->dma_rx_chan)
-> +			dev_info(sport->port.dev,
-> +				 "DMA rx channel request failed, operating without rx DMA\n");
+> +#define ALTR_A10_ECC_INITSTAT_OFST      0x0C
+> +#define ALTR_A10_ECC_INITCOMPLETEA      BIT(0)
+> +#define ALTR_A10_ECC_INITCOMPLETEB      BIT(8)
+> +
+> +#define ALTR_A10_ECC_ERRINTEN_OFST      0x10
+> +#define ALTR_A10_ECC_SERRINTEN          BIT(0)
+> +
+> +#define ALTR_A10_ECC_INTSTAT_OFST       0x20
+> +#define ALTR_A10_ECC_SERRPENA           BIT(0)
+> +#define ALTR_A10_ECC_DERRPENA           BIT(8)
+> +#define ALTR_A10_ECC_ERRPENA_MASK       (ALTR_A10_ECC_SERRPENA | \
+> +					 ALTR_A10_ECC_DERRPENA)
+> +/* ECC Manager Defines */
+> +#define A10_SYSMGR_ECC_INTMASK_SET_OFST   0x94
+> +#define A10_SYSMGR_ECC_INTMASK_CLR_OFST   0x98
+> +#define A10_SYSMGR_ECC_INTMASK_OCRAM      BIT(1)
+> +
+> +#define ALTR_A10_ECC_INIT_WATCHDOG_10US   10000
+> +
+> +static void ecc_set_bits(u32 bit_mask, void __iomem *ioaddr)
+> +{
+> +	u32 value = readl(ioaddr);
+> +
+> +	value |= bit_mask;
+> +	writel(value, ioaddr);
+> +}
+> +
+> +static void ecc_clear_bits(u32 bit_mask, void __iomem *ioaddr)
+> +{
+> +	u32 value = readl(ioaddr);
+> +
+> +	value &= ~bit_mask;
+> +	writel(value, ioaddr);
+> +}
+> +
+> +static int ecc_test_bits(u32 bit_mask, void __iomem *ioaddr)
+> +{
+> +	u32 value = readl(ioaddr);
+> +
+> +	return (value & bit_mask) ? 1 : 0;
+> +}
+> +
+> +/*
+> + * This function uses the memory initialization block in the Arria10 ECC
+> + * controller to initialize/clear the entire memory data and ECC data.
+> + */
+> +static int altr_init_memory_port(void __iomem *ioaddr)
+> +{
+> +	int limit = ALTR_A10_ECC_INIT_WATCHDOG_10US;
+> +
+> +	ecc_set_bits(ALTR_A10_ECC_INITA, (ioaddr + ALTR_A10_ECC_CTRL_OFST));
+> +	while (limit--) {
+> +		if (ecc_test_bits(ALTR_A10_ECC_INITCOMPLETEA,
+> +				  (ioaddr + ALTR_A10_ECC_INITSTAT_OFST)))
+> +			break;
+> +		udelay(1);
 > +	}
->  
->  	return 0;
->  }
+> +	if (limit < 0)
+> +		return -EBUSY;
+> +
+> +	/* Clear any pending ECC interrupts */
+> +	writel(ALTR_A10_ECC_ERRPENA_MASK,
+> +	       (ioaddr + ALTR_A10_ECC_INTSTAT_OFST));
+> +
+> +	return 0;
+> +}
+> +
+> +void socfpga_init_arria10_ocram_ecc(void)
+> +{
+> +	struct device_node *np;
+> +	int ret = 0;
+> +	void __iomem *ecc_block_base;
+> +
+> +	if (!sys_manager_base_addr) {
+> +		pr_err("SOCFPGA: sys-mgr is not initialized\n");
+> +		return;
+> +	}
+> +
+> +	/* Find the OCRAM EDAC device tree node */
+> +	np = of_find_compatible_node(NULL, NULL, "altr,socfpga-a10-ocram-ecc");
+> +	if (!np) {
+> +		pr_err("Unable to find socfpga-a10-ocram-ecc\n");
+> +		return;
+> +	}
+> +
+> +	/* Map the ECC Block */
+> +	ecc_block_base = of_iomap(np, 0);
+> +	of_node_put(np);
+> +	if (!ecc_block_base) {
+> +		pr_err("Unable to map OCRAM ECC block\n");
+> +		return;
+> +	}
+> +
+> +	/* Disable ECC */
+> +	writel(ALTR_A10_OCRAM_ECC_EN_CTL,
+> +	       sys_manager_base_addr + A10_SYSMGR_ECC_INTMASK_SET_OFST);
+> +	ecc_clear_bits(ALTR_A10_ECC_SERRINTEN,
+> +		       (ecc_block_base + ALTR_A10_ECC_ERRINTEN_OFST));
+> +	ecc_clear_bits(ALTR_A10_OCRAM_ECC_EN_CTL,
+> +		       (ecc_block_base + ALTR_A10_ECC_CTRL_OFST));
+> +
+> +	/* Use HW initialization block to initialize memory for ECC */
+> +	ret = altr_init_memory_port(ecc_block_base);
+> +	if (ret) {
+> +		pr_err("ECC: cannot init OCRAM PORTA memory\n");
+> +		return;
+
+I realize that I'm not calling iounmap(ecc_block_base) and I'll fix that 
+in the next revision with a goto.
+
+> +	}
+> +
+> +	/* Enable ECC */
+> +	ecc_set_bits(ALTR_A10_OCRAM_ECC_EN_CTL,
+> +		     (ecc_block_base + ALTR_A10_ECC_CTRL_OFST));
+> +	ecc_set_bits(ALTR_A10_ECC_SERRINTEN,
+> +		     (ecc_block_base + ALTR_A10_ECC_ERRINTEN_OFST));
+> +	writel(ALTR_A10_OCRAM_ECC_EN_CTL,
+> +	       sys_manager_base_addr + A10_SYSMGR_ECC_INTMASK_CLR_OFST);
+> +
+
+The iounmap() will go here. I'd still like to hear review comments for 
+the rest.
+
+Thanks for reviewing.
+
+> +	/* Ensure all writes complete */
+> +	wmb();
+> +}
+>
