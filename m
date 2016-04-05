@@ -1,129 +1,52 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 6 Apr 2016 01:08:40 +0300
-Subject: [PATCH 18/25] arm64: ilp32: introduce binfmt_ilp32.c
+Date: Wed, 6 Apr 2016 01:08:47 +0300
+Subject: [PATCH 25/25] arm64:ilp32: add ARM64_ILP32 to Kconfig
 In-Reply-To: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
 References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1459894127-17698-19-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1459894127-17698-26-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-to handle ILP32 binaries
+From: Andrew Pinski <apinski@cavium.com>
 
+This patch adds the config option for ILP32.
+
+Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
+Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
 Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+Reviewed-by: David Daney <ddaney@caviumnetworks.com>
 ---
- arch/arm64/kernel/Makefile       |  1 +
- arch/arm64/kernel/binfmt_ilp32.c | 91 ++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 92 insertions(+)
- create mode 100644 arch/arm64/kernel/binfmt_ilp32.c
+ arch/arm64/Kconfig | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 6bc9738..9dfdf86 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -28,6 +28,7 @@ $(obj)/%.stub.o: $(obj)/%.o FORCE
- arm64-obj-$(CONFIG_AARCH32_EL0)		+= sys32.o kuser32.o signal32.o 	\
- 					   sys_compat.o entry32.o		\
- 					   ../../arm/kernel/opcodes.o binfmt_elf32.o
-+arm64-obj-$(CONFIG_ARM64_ILP32)		+= binfmt_ilp32.o
- arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
- arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
- arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
-diff --git a/arch/arm64/kernel/binfmt_ilp32.c b/arch/arm64/kernel/binfmt_ilp32.c
-new file mode 100644
-index 0000000..a934fd4
---- /dev/null
-+++ b/arch/arm64/kernel/binfmt_ilp32.c
-@@ -0,0 +1,91 @@
-+/*
-+ * Support for ILP32 Linux/aarch64 ELF binaries.
-+ */
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 46fc295..19d8e31 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -926,7 +926,7 @@ source "fs/Kconfig.binfmt"
+ 
+ config COMPAT
+ 	def_bool y
+-	depends on AARCH32_EL0
++	depends on AARCH32_EL0 || ARM64_ILP32
+ 
+ config AARCH32_EL0
+ 	bool "Kernel support for 32-bit EL0"
+@@ -946,6 +946,14 @@ config AARCH32_EL0
+ 
+ 	  If you want to execute 32-bit userspace applications, say Y.
+ 
++config ARM64_ILP32
++	bool "Kernel support for ILP32"
++	select COMPAT_WRAPPER
++	help
++	  This option enables support for AArch64 ILP32 user space.  ILP32
++	  is an ABI where long and pointers are 32bits but it uses the AARCH64
++	  instruction set.
 +
-+#include <linux/elfcore-compat.h>
-+#include <linux/time.h>
-+
-+#undef	ELF_CLASS
-+#define ELF_CLASS	ELFCLASS32
-+
-+#undef	elfhdr
-+#undef	elf_phdr
-+#undef	elf_shdr
-+#undef	elf_note
-+#undef	elf_addr_t
-+#define elfhdr		elf32_hdr
-+#define elf_phdr	elf32_phdr
-+#define elf_shdr	elf32_shdr
-+#define elf_note	elf32_note
-+#define elf_addr_t	Elf32_Addr
-+
-+/*
-+ * Some data types as stored in coredump.
-+ */
-+#define user_long_t		compat_long_t
-+#define user_siginfo_t		compat_siginfo_t
-+#define copy_siginfo_to_user	copy_siginfo_to_user32
-+
-+/*
-+ * The machine-dependent core note format types are defined in elfcore-compat.h,
-+ * which requires asm/elf.h to define compat_elf_gregset_t et al.
-+ */
-+#define elf_prstatus	compat_elf_prstatus
-+#define elf_prpsinfo	compat_elf_prpsinfo
-+
-+/*
-+ * Compat version of cputime_to_compat_timeval, perhaps this
-+ * should be an inline in <linux/compat.h>.
-+ */
-+static void cputime_to_compat_timeval(const cputime_t cputime,
-+				      struct compat_timeval *value)
-+{
-+	struct timeval tv;
-+	cputime_to_timeval(cputime, &tv);
-+	value->tv_sec = tv.tv_sec;
-+	value->tv_usec = tv.tv_usec;
-+}
-+
-+#undef cputime_to_timeval
-+#define cputime_to_timeval cputime_to_compat_timeval
-+
-+/* AARCH64 ILP32 EABI. */
-+#undef elf_check_arch
-+#define elf_check_arch(x)		(((x)->e_machine == EM_AARCH64)	\
-+					&& (x)->e_ident[EI_CLASS] == ELFCLASS32)
-+
-+#undef SET_PERSONALITY
-+#define SET_PERSONALITY(ex)						\
-+do {									\
-+	set_thread_flag(TIF_32BIT_AARCH64);				\
-+	clear_thread_flag(TIF_32BIT);					\
-+} while (0)
-+
-+#undef ARCH_DLINFO
-+#define ARCH_DLINFO							\
-+do {									\
-+	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
-+		    (elf_addr_t)(long)current->mm->context.vdso);	\
-+} while (0)
-+
-+#ifdef __AARCH64EB__
-+#define COMPAT_ELF_PLATFORM		("aarch64_be:ilp32")
-+#else
-+#define COMPAT_ELF_PLATFORM		("aarch64:ilp32")
-+#endif
-+
-+#undef ELF_HWCAP
-+#undef ELF_HWCAP2
-+#define ELF_HWCAP			((u32) elf_hwcap)
-+#define ELF_HWCAP2			((u32) (elf_hwcap >> 32))
-+
-+/*
-+ * Rename a few of the symbols that binfmt_elf.c will define.
-+ * These are all local so the names don't really matter, but it
-+ * might make some debugging less confusing not to duplicate them.
-+ */
-+#define elf_format		compat_elf_format
-+#define init_elf_binfmt		init_compat_elf_binfmt
-+#define exit_elf_binfmt		exit_compat_elf_binfmt
-+
-+#include "../../../fs/binfmt_elf.c"
+ config SYSVIPC_COMPAT
+ 	def_bool y
+ 	depends on COMPAT && SYSVIPC
 -- 
 2.5.0
