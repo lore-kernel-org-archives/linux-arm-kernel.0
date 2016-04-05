@@ -1,157 +1,131 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 05 Apr 2016 10:26:32 -0700
-Subject: [PATCH v1 2/2] rockchip: power-domain: support qos save and
- restore
-In-Reply-To: <57031B80.1080602@rock-chips.com>
-References: <1458285444-31129-1-git-send-email-zhangqing@rock-chips.com>
- <3121335.t9IV1BMS6Y@phil> <57031B80.1080602@rock-chips.com>
-Message-ID: <1635549.vLcbezZjHC@phil>
+From: cmetcalf@mellanox.com (Chris Metcalf)
+Date: Tue, 5 Apr 2016 13:26:44 -0400
+Subject: [PATCH v5 0/4] improvements to the nmi_backtrace code
+In-Reply-To: <201604031905.WLWlnyKg%fengguang.wu@intel.com>
+Message-ID: <1459877208-15119-1-git-send-email-cmetcalf@mellanox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Elaine,
+This is just a one-line change to the v4 series, to catch the new arm
+vmlinux-xip.lds.S file, which I missed when I rebased to 4.6 for v4
+(my arm config for testing did not include CONFIG_XIP_KERNEL).
+Thanks to Fengguang Wu and the 0-day test robot for that.
 
-Am Dienstag, 5. April 2016, 09:57:20 schrieb Elaine Zhang:
-> Thanks for your replay.
-> For your questions, I also have the same concerns.
-> 
-> On 04/02/2016 12:19 AM, Heiko Stuebner wrote:
-> > Am Freitag, 1. April 2016, 10:33:45 schrieb Elaine Zhang:
-> >> I agree with most of your modifications.
-> >> Except, the u32 *qos_save_regs below
-> > 
-> > you're right. I didn't take that into account when my open-coding my
-> > idea.> 
-> > A bit more below:
-> >> On 04/01/2016 12:31 AM, Heiko Stuebner wrote:
-> >>> Hi Elaine,
-> >>> 
-> >>> Am Freitag, 18. M?rz 2016, 15:17:24 schrieb Elaine Zhang:
-> >>>> support qos save and restore when power domain on/off.
-> >>>> 
-> >>>> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
-> >>> 
-> >>> overall looks nice already ... some implementation-specific comments
-> >>> below.>
-> >>> 
-> >>>> ---
-> >>>> 
-> >>>>    drivers/soc/rockchip/pm_domains.c | 87
-> >>>> 
-> >>>> +++++++++++++++++++++++++++++++++++++-- 1 file changed, 84
-> >>>> insertions(+),
-> >>>> 3 deletions(-)
-> >>>> 
-> >>>> diff --git a/drivers/soc/rockchip/pm_domains.c
-> >>>> b/drivers/soc/rockchip/pm_domains.c index 18aee6b..c5f4be6 100644
-> >>>> --- a/drivers/soc/rockchip/pm_domains.c
-> >>>> +++ b/drivers/soc/rockchip/pm_domains.c
-> >>>> @@ -45,10 +45,21 @@ struct rockchip_pmu_info {
-> >>>> 
-> >>>>    	const struct rockchip_domain_info *domain_info;
-> >>>>    
-> >>>>    };
-> >>>> 
-> >>>> +#define MAX_QOS_NODE_NUM	20
-> >>>> +#define MAX_QOS_REGS_NUM	5
-> >>>> +#define QOS_PRIORITY		0x08
-> >>>> +#define QOS_MODE		0x0c
-> >>>> +#define QOS_BANDWIDTH		0x10
-> >>>> +#define QOS_SATURATION		0x14
-> >>>> +#define QOS_EXTCONTROL		0x18
-> >>>> +
-> >>>> 
-> >>>>    struct rockchip_pm_domain {
-> >>>>    
-> >>>>    	struct generic_pm_domain genpd;
-> >>>>    	const struct rockchip_domain_info *info;
-> >>>>    	struct rockchip_pmu *pmu;
-> >>>> 
-> >>>> +	int num_qos;
-> >>>> +	struct regmap *qos_regmap[MAX_QOS_NODE_NUM];
-> >>>> +	u32 qos_save_regs[MAX_QOS_NODE_NUM][MAX_QOS_REGS_NUM];
-> >>> 
-> >>> struct regmap **qos_regmap;
-> >>> u32 *qos_save_regs;
-> >> 
-> >> when we save and restore qos registers we need save five regs for every
-> >> qos. like this :
-> >> for (i = 0; i < pd->num_qos; i++) {
-> >> 
-> >> 		regmap_read(pd->qos_regmap[i],
-> >> 		
-> >> 			    QOS_PRIORITY,
-> >> 			    &pd->qos_save_regs[i][0]);
-> >> 		
-> >> 		regmap_read(pd->qos_regmap[i],
-> >> 		
-> >> 			    QOS_MODE,
-> >> 			    &pd->qos_save_regs[i][1]);
-> >> 		
-> >> 		regmap_read(pd->qos_regmap[i],
-> >> 		
-> >> 			    QOS_BANDWIDTH,
-> >> 			    &pd->qos_save_regs[i][2]);
-> >> 		
-> >> 		regmap_read(pd->qos_regmap[i],
-> >> 		
-> >> 			    QOS_SATURATION,
-> >> 			    &pd->qos_save_regs[i][3]);
-> >> 		
-> >> 		regmap_read(pd->qos_regmap[i],
-> >> 		
-> >> 			    QOS_EXTCONTROL,
-> >> 			    &pd->qos_save_regs[i][4]);
-> >> 	
-> >> 	}
-> >> 
-> >> so we can not define qos_save_regs like u32 *qos_save_regs;,
-> >> and apply buff like
-> >> pd->qos_save_regs = kcalloc(pd->num_qos * MAX_QOS_REGS_NUM,
-> >> sizeof(u32),
-> >> GFP_KERNEL);
-> > 
-> > so how about simply swapping indices and doing it like
-> > 
-> > u32 *qos_save_regs[MAX_QOS_REGS_NUM];
-> > 
-> > for (i = 0; i < MAX_QOS_REGS_NUM; i++) {
-> > 
-> > 	qos_save_regs[i] = kcalloc(pd->num_qos, sizeof(u32));
-> > 	/* error handling here */
-> > 
-> > }
-> > 
-> > ...
-> > 
-> > 		regmap_read(pd->qos_regmap[i],
-> > 		
-> > 			    QOS_SATURATION,
-> > 			    &pd->qos_save_regs[3][i]);
-> > 
-> > ...
-> 
-> I agree with you on this modification.
-> 
-> > Asked the other way around, how did you measure to set MAX_QOS_REGS_NUM
-> > to 20? From looking at the rk3399 TRM, it seems there are only 38 QoS
-> > generators on the SoC in general (24 on the rk3288 with PD_VIO having a
-> > maximum of 9 qos generators), so preparing for 20 seems a bit overkill
-> > ;-)
-> About the MAX_QOS_NODE_NUM I also have some uncertaibty.
-> Although there are only 38 QoS on the RK3399(24 on the rk3288),but not
-> all of the pd need to power on/off.So not all QOS need save and restore.
-> So about the MAX_QOS_NODE_NUM, what do you suggest.
+Whose tree would this go through?  I have an ack for Peter Z for
+patch 4/4 and no other feedback for patches 1/4 or 2/4; I can
+certainly push 3/4 through the tile tree myself if that helps, though
+my guess is keeping it with the rest of the series makes more sense
+for tile since it doesn't lose any functionality that way.
 
-if we go the way outlined above, we don't need MAX_QOS_NODE_NUM, as the 
-driver will be counting the real number of qos nodes and allocate needed 
-structs dynamically - problem solved :-D
+>From the version 1 cover letter:
 
+  This patch series modifies the trigger_xxx_backtrace() NMI-based
+  remote backtracing code to make it more flexible, and makes a few
+  small improvements along the way.
 
-> MAX_QOS_REGS_NUM is 5 because the QOS register is just 5 need save and
-> restore.
+  The motivation comes from the task isolation code, where there are
+  scenarios where we want to be able to diagnose a case where some cpu
+  is about to interrupt a task-isolated cpu.  It can be helpful to
+  see both where the interrupting cpu is, and also an approximation
+  of where the cpu that is being interrupted is.  The nmi_backtrace
+  framework allows us to discover the stack of the interrupted cpu.
 
-yep, that is no problem and expected.
+I've tested that the change works as desired on tile, and build-tested
+x86, arm64, and arm.  For x86 and arm64 I confirmed that the generic
+cpuidle stuff as well as the architecture-specific routines are in the
+new cpuidle section.  For arm I just build-tested it and made sure the
+generic cpuidle routines were in the new cpuidle section, but I didn't
+attempt to tease apart the tangle of platform-specific idle routines
+that arm has and tag them with __cpuidle.  That might be more usefully
+done by someone with arm platform experience in a follow-up patch.
 
+I have also pushed it up to kernel.org to pull if that's easier:
 
-Heiko
+git://git.kernel.org/pub/scm/linux/kernel/git/cmetcalf/linux-tile.git nmi-backtrace
+
+The change conflicts with Petr Mladek's NMI printk cleanup patches:
+
+https://lkml.kernel.org/r/1459353210-20260-1-git-send-email-pmladek at suse.com
+
+He has kindly offered to resolve the conflicts.
+
+v5: Add CPUIDLE_TEXT to the new arch/arm/kernel/vmlinux-xip.lds.S
+
+v4: Added some more __cpuidle functions (PeterZ, Rafael Wysocki)
+    Rebased to kernel v4.6-rc1
+
+v3: Various improvements to the set of __cpuidle functions;
+    Add back in a missing section accidentally removed in modpost.c (PeterZ)
+    https://lkml.kernel.org/r/1458667179-19630-1-git-send-email-cmetcalf at mellanox.com
+
+v2: Switch to using __cpuidle tagging, switch S-O-B to Mellanox
+    https://lkml.kernel.org/r/1458147733-29338-1-git-send-email-cmetcalf at mellanox.com
+
+Chris Metcalf (4):
+  nmi_backtrace: add more trigger_*_cpu_backtrace() methods
+  nmi_backtrace: do a local dump_stack() instead of a self-NMI
+  arch/tile: adopt the new nmi_backtrace framework
+  nmi_backtrace: generate one-line reports for idle cpus
+
+ arch/alpha/kernel/vmlinux.lds.S      |  1 +
+ arch/arc/kernel/vmlinux.lds.S        |  1 +
+ arch/arm/include/asm/irq.h           |  4 +-
+ arch/arm/kernel/smp.c                | 13 +------
+ arch/arm/kernel/vmlinux-xip.lds.S    |  1 +
+ arch/arm/kernel/vmlinux.lds.S        |  1 +
+ arch/arm64/kernel/vmlinux.lds.S      |  1 +
+ arch/arm64/mm/proc.S                 |  2 +
+ arch/avr32/kernel/vmlinux.lds.S      |  1 +
+ arch/blackfin/kernel/vmlinux.lds.S   |  1 +
+ arch/c6x/kernel/vmlinux.lds.S        |  1 +
+ arch/cris/kernel/vmlinux.lds.S       |  1 +
+ arch/frv/kernel/vmlinux.lds.S        |  1 +
+ arch/h8300/kernel/vmlinux.lds.S      |  1 +
+ arch/hexagon/kernel/vmlinux.lds.S    |  1 +
+ arch/ia64/kernel/vmlinux.lds.S       |  1 +
+ arch/m32r/kernel/vmlinux.lds.S       |  1 +
+ arch/m68k/kernel/vmlinux-nommu.lds   |  1 +
+ arch/m68k/kernel/vmlinux-std.lds     |  1 +
+ arch/m68k/kernel/vmlinux-sun3.lds    |  1 +
+ arch/metag/kernel/vmlinux.lds.S      |  1 +
+ arch/microblaze/kernel/vmlinux.lds.S |  1 +
+ arch/mips/kernel/vmlinux.lds.S       |  1 +
+ arch/mn10300/kernel/vmlinux.lds.S    |  1 +
+ arch/nios2/kernel/vmlinux.lds.S      |  1 +
+ arch/openrisc/kernel/vmlinux.lds.S   |  1 +
+ arch/parisc/kernel/vmlinux.lds.S     |  1 +
+ arch/powerpc/kernel/vmlinux.lds.S    |  1 +
+ arch/s390/kernel/vmlinux.lds.S       |  1 +
+ arch/score/kernel/vmlinux.lds.S      |  1 +
+ arch/sh/kernel/vmlinux.lds.S         |  1 +
+ arch/sparc/kernel/vmlinux.lds.S      |  1 +
+ arch/tile/include/asm/irq.h          |  4 +-
+ arch/tile/kernel/entry.S             |  2 +-
+ arch/tile/kernel/pmc.c               |  3 --
+ arch/tile/kernel/process.c           | 72 ++++++++----------------------------
+ arch/tile/kernel/traps.c             |  7 +++-
+ arch/tile/kernel/vmlinux.lds.S       |  1 +
+ arch/um/kernel/dyn.lds.S             |  1 +
+ arch/um/kernel/uml.lds.S             |  1 +
+ arch/unicore32/kernel/vmlinux.lds.S  |  1 +
+ arch/x86/include/asm/irq.h           |  4 +-
+ arch/x86/kernel/acpi/cstate.c        |  2 +-
+ arch/x86/kernel/apic/hw_nmi.c        |  6 +--
+ arch/x86/kernel/process.c            |  4 +-
+ arch/x86/kernel/vmlinux.lds.S        |  1 +
+ arch/xtensa/kernel/vmlinux.lds.S     |  3 ++
+ drivers/acpi/processor_idle.c        |  5 ++-
+ drivers/cpuidle/driver.c             |  5 ++-
+ drivers/idle/intel_idle.c            |  4 +-
+ include/asm-generic/vmlinux.lds.h    |  6 +++
+ include/linux/cpu.h                  |  5 +++
+ include/linux/nmi.h                  | 63 ++++++++++++++++++++++++-------
+ kernel/sched/idle.c                  | 13 ++++++-
+ lib/nmi_backtrace.c                  | 40 +++++++++++++-------
+ scripts/mod/modpost.c                |  2 +-
+ scripts/recordmcount.c               |  1 +
+ scripts/recordmcount.pl              |  1 +
+ 58 files changed, 184 insertions(+), 121 deletions(-)
+
+-- 
+2.7.2
