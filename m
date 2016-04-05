@@ -1,108 +1,101 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 5 Apr 2016 14:53:27 -0700
-Subject: [PATCH v3 2/2] dmaengine: vdma: Fix race condition in Non-SG mode
-In-Reply-To: <1458897399-3939-1-git-send-email-appanad@xilinx.com>
-References: <1458897399-3939-1-git-send-email-appanad@xilinx.com>
-Message-ID: <20160405215326.GB11586@vkoul-mobl.iind.intel.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 5 Apr 2016 16:56:04 -0500
+Subject: PCI: imx6: Factor out ref clock enable
+In-Reply-To: <1457911855.16725.41.camel@googlemail.com>
+References: <1456411669-4699-1-git-send-email-chf.fritz@googlemail.com>
+ <1456411669-4699-3-git-send-email-chf.fritz@googlemail.com>
+ <20160311175850.GA4725@localhost>
+ <1457911590.16725.37.camel@googlemail.com>
+ <1457911855.16725.41.camel@googlemail.com>
+Message-ID: <20160405215604.GE15353@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 25, 2016 at 02:46:39PM +0530, Kedareswara rao Appana wrote:
-> When VDMA is configured in  Non-sg mode
-> Users can queue descriptors greater than h/w configured frames.
+Hi Christoph,
+
+On Mon, Mar 14, 2016 at 12:30:55AM +0100, Christoph Fritz wrote:
+> commit dfcc1a16e6954e8ca6cadfc9dd309db6b6ef46b2
+> Author: Bjorn Helgaas <bhelgaas@google.com>
+> Date: Fri, 11 Mar 2016 11:15:36 -0600
 > 
-> Current driver allows the user to queue descriptors upto h/w configured.
-> Which is wrong for non-sg mode configuration.
-
-I see to have standalone patch 2, where is 1st patch?
-
-There seems to be an issue with other 6 patch series with threading broken
-and few patches showing up standalone and not part of series
-
-Can you resend the whole thing please..
-
+> Factor out ref clock enable to make it cleaner to add imx6sx support.  No
+> functional change intended.
 > 
-> This patch fixes this issue.
-> 
-> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+> Tested-by: Christoph Fritz <chf.fritz@googlemail.com>
+
+Applied to pci/host-imx6 for v4.7, thanks!
+
 > ---
-> Changes for v3:
-> ---> New patch.
+>  drivers/pci/host/pci-imx6.c | 36 ++++++++++++++++++++++++------------
+>  1 file changed, 24 insertions(+), 12 deletions(-)
 > 
->  drivers/dma/xilinx/xilinx_vdma.c | 25 +++++++++++++++++++------
->  1 file changed, 19 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/dma/xilinx/xilinx_vdma.c b/drivers/dma/xilinx/xilinx_vdma.c
-> index abe915c..b873d98 100644
-> --- a/drivers/dma/xilinx/xilinx_vdma.c
-> +++ b/drivers/dma/xilinx/xilinx_vdma.c
-> @@ -209,6 +209,7 @@ struct xilinx_vdma_tx_descriptor {
->   * @flush_on_fsync: Flush on Frame sync
->   * @desc_pendingcount: Descriptor pending count
->   * @ext_addr: Indicates 64 bit addressing is supported by dma channel
-> + * @desc_submitcount: Descriptor h/w submitted count
->   */
->  struct xilinx_vdma_chan {
->  	struct xilinx_vdma_device *xdev;
-> @@ -233,6 +234,7 @@ struct xilinx_vdma_chan {
->  	bool flush_on_fsync;
->  	u32 desc_pendingcount;
->  	bool ext_addr;
-> +	u32 desc_submitcount;
->  };
->  
->  /**
-> @@ -716,9 +718,10 @@ static void xilinx_vdma_start_transfer(struct xilinx_vdma_chan *chan)
->  		struct xilinx_vdma_tx_segment *segment, *last = NULL;
->  		int i = 0;
->  
-> -		list_for_each_entry(desc, &chan->pending_list, node) {
-> -			segment = list_first_entry(&desc->segments,
-> -					   struct xilinx_vdma_tx_segment, node);
-> +		if (chan->desc_submitcount < chan->num_frms)
-> +			i = chan->desc_submitcount;
-> +
-> +		list_for_each_entry(segment, &desc->segments, node) {
->  			if (chan->ext_addr)
->  				vdma_desc_write_64(chan,
->  					XILINX_VDMA_REG_START_ADDRESS_64(i++),
-> @@ -742,8 +745,17 @@ static void xilinx_vdma_start_transfer(struct xilinx_vdma_chan *chan)
->  		vdma_desc_write(chan, XILINX_VDMA_REG_VSIZE, last->hw.vsize);
->  	}
->  
-> -	list_splice_tail_init(&chan->pending_list, &chan->active_list);
-> -	chan->desc_pendingcount = 0;
-> +	if (!chan->has_sg) {
-> +		list_del(&desc->node);
-> +		list_add_tail(&desc->node, &chan->active_list);
-> +		chan->desc_submitcount++;
-> +		chan->desc_pendingcount--;
-> +		if (chan->desc_submitcount == chan->num_frms)
-> +			chan->desc_submitcount = 0;
-> +	} else {
-> +		list_splice_tail_init(&chan->pending_list, &chan->active_list);
-> +		chan->desc_pendingcount = 0;
-> +	}
+> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+> index bd3f7d0..4e0e47f 100644
+> --- a/drivers/pci/host/pci-imx6.c
+> +++ b/drivers/pci/host/pci-imx6.c
+> @@ -264,6 +264,23 @@ static int imx6_pcie_assert_core_reset(struct pcie_port *pp)
+>  	return 0;
 >  }
 >  
->  /**
-> @@ -927,7 +939,8 @@ append:
->  	list_add_tail(&desc->node, &chan->pending_list);
->  	chan->desc_pendingcount++;
->  
-> -	if (unlikely(chan->desc_pendingcount > chan->num_frms)) {
-> +	if (chan->has_sg &&
-> +	    unlikely(chan->desc_pendingcount > chan->num_frms)) {
->  		dev_dbg(chan->dev, "desc pendingcount is too high\n");
->  		chan->desc_pendingcount = chan->num_frms;
+> +static int imx6_pcie_enable_ref_clk(struct imx6_pcie *imx6_pcie)
+> +{
+> +	/* power up core phy and enable ref clock */
+> +	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> +			IMX6Q_GPR1_PCIE_TEST_PD, 0 << 18);
+> +	/*
+> +	 * the async reset input need ref clock to sync internally,
+> +	 * when the ref clock comes after reset, internal synced
+> +	 * reset time is too short, cannot meet the requirement.
+> +	 * add one ~10us delay here.
+> +	 */
+> +	udelay(10);
+> +	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> +			IMX6Q_GPR1_PCIE_REF_CLK_EN, 1 << 16);
+> +	return 0;
+> +}
+> +
+>  static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
+>  {
+>  	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
+> @@ -287,18 +304,11 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
+>  		goto err_pcie;
 >  	}
+>  
+> -	/* power up core phy and enable ref clock */
+> -	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> -			IMX6Q_GPR1_PCIE_TEST_PD, 0 << 18);
+> -	/*
+> -	 * the async reset input need ref clock to sync internally,
+> -	 * when the ref clock comes after reset, internal synced
+> -	 * reset time is too short, cannot meet the requirement.
+> -	 * add one ~10us delay here.
+> -	 */
+> -	udelay(10);
+> -	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> -			IMX6Q_GPR1_PCIE_REF_CLK_EN, 1 << 16);
+> +	ret = imx6_pcie_enable_ref_clk(imx6_pcie);
+> +	if (ret) {
+> +		dev_err(pp->dev, "unable to enable pcie ref clock\n");
+> +		goto err_ref_clk;
+> +	}
+>  
+>  	/* allow the clocks to stabilize */
+>  	usleep_range(200, 500);
+> @@ -311,6 +321,8 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
+>  	}
+>  	return 0;
+>  
+> +err_ref_clk:
+> +	clk_disable_unprepare(imx6_pcie->pcie);
+>  err_pcie:
+>  	clk_disable_unprepare(imx6_pcie->pcie_bus);
+>  err_pcie_bus:
 > -- 
-> 2.1.2
+> 2.1.4
+> 
 > 
 > --
-> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
 > the body of a message to majordomo at vger.kernel.org
 > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
--- 
-~Vinod
