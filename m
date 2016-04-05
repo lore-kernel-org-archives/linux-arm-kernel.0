@@ -1,77 +1,39 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 5 Apr 2016 11:48:20 +0100
-Subject: [PATCH] iommu/arm-smmu: Fix stream-match conflict with
- IOMMU_DOMAIN_DMA
-In-Reply-To: <1459527597-10740-1-git-send-email-will.deacon@arm.com>
-References: <1459527597-10740-1-git-send-email-will.deacon@arm.com>
-Message-ID: <570397F4.8080504@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 5 Apr 2016 13:09:58 +0200
+Subject: [PATCH 2/8] arm64/kernel: reuse boot_args array to get to
+ __fdt_pointer
+In-Reply-To: <CAKv+Gu_kV0yGRB4yi4GCjQbp-ZiiMdOOE_W+Q72Bs5Ji+vaL6w@mail.gmail.com>
+References: <1459781544-14310-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1459781544-14310-3-git-send-email-ard.biesheuvel@linaro.org>
+ <570284B6.9000006@arm.com>
+ <CAKv+Gu_kV0yGRB4yi4GCjQbp-ZiiMdOOE_W+Q72Bs5Ji+vaL6w@mail.gmail.com>
+Message-ID: <CAKv+Gu8POjzGSThsrz1vev7gPNrLZbgycNhYnxUP7o4a4EFR6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/04/16 17:19, Will Deacon wrote:
-> Commit cbf8277ef456 ("iommu/arm-smmu: Treat IOMMU_DOMAIN_DMA as bypass
-> for now") ignores requests to attach a device to the default domain
-> since, without IOMMU-basked DMA ops available everywhere, the default
-> domain will just lead to unexpected transaction faults being reported.
+On 4 April 2016 at 17:19, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 4 April 2016 at 17:13, James Morse <james.morse@arm.com> wrote:
+>> Hi Ard,
+>>
+>> On 04/04/16 15:52, Ard Biesheuvel wrote:
+>>> Since we record the boot_args [x0 .. x3] early at boot anyway, there is
+>>> no need to keep the FDT address in a callee saved register with file scope
+>>> in head.S. So simply refer to boot_args[0] directly in the call to
+>>> setup_machine(), and drop the handling of x21 from head.S entirely.
+>>
+>> Won't this break Big Endian?
+>> (or more accurately: bootloader-endian != kernel-endian)
+>>
+>> The stores in preserve_boot_args happen before the EE/E0E bits have been
+>> set/cleared by el2_setup(), so they happen with boot-loader:endianness. The
+>> loads after el2_setup() happen with kernel:endianness.
+>>
 >
-> Unfortunately, the way this was implemented on SMMUv2 causes a
-> regression with VFIO PCI device passthrough under KVM on AMD Seattle.
-> On this system, the host controller device is associated with both a
-> pci_dev *and* a platform_device, and can therefore end up with duplicate
-> SMR entries, resulting in a stream-match conflict at runtime.
->
-> This patch amends the original fix so that attaching to IOMMU_DOMAIN_DMA
-> is rejected even before configuring the SMRs. This restores the old
-> behaviour for now, but we'll need to look at handing host controllers
-> specially when we come to supporting the default domain fully.
+> That is a very good point.
 
-FWIW this is already solved with the generic bindings, as in most cases 
-the host controller won't need an "iommus" property - for those that do 
-actually have their own IDs for the platform device side, any aliasing 
-with the PCI-derived IDs from "iommu-map" is magically taken care of in 
-the group allocation code. That cross-bus-grouping should also apply to 
-legacy masters too, since they look the same by the time we get to that 
-point, so there should be no more stream match conflicts either way. 
-I'll be working on a v2 of that series this week, so I'll rebase on top 
-of this fix.
-
-Robin.
-
-> Reported-by: Eric Auger <eric.auger@linaro.org>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->   drivers/iommu/arm-smmu.c | 14 ++++++++------
->   1 file changed, 8 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index e933679a3266..2f186d22477f 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -1098,18 +1098,20 @@ static int arm_smmu_domain_add_master(struct arm_smmu_domain *smmu_domain,
->   	struct arm_smmu_device *smmu = smmu_domain->smmu;
->   	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
->
-> -	/* Devices in an IOMMU group may already be configured */
-> -	ret = arm_smmu_master_configure_smrs(smmu, cfg);
-> -	if (ret)
-> -		return ret == -EEXIST ? 0 : ret;
-> -
->   	/*
->   	 * FIXME: This won't be needed once we have IOMMU-backed DMA ops
-> -	 * for all devices behind the SMMU.
-> +	 * for all devices behind the SMMU. Note that we need to take
-> +	 * care configuring SMRs for devices both a platform_device and
-> +	 * and a PCI device (i.e. a PCI host controller)
->   	 */
->   	if (smmu_domain->domain.type == IOMMU_DOMAIN_DMA)
->   		return 0;
->
-> +	/* Devices in an IOMMU group may already be configured */
-> +	ret = arm_smmu_master_configure_smrs(smmu, cfg);
-> +	if (ret)
-> +		return ret == -EEXIST ? 0 : ret;
-> +
->   	for (i = 0; i < cfg->num_streamids; ++i) {
->   		u32 idx, s2cr;
->
->
+I think it would not be unreasonable to factor out the configuration
+of the endianness at the current exception level, and invoke it first
+before recording the boot args, since we now rely on el2_setup() to do
+that. That would also fix the 'bug' where the boot_args are recorded
+in the endianness of the bootloader, although I doubt anyone cares
+deeply about that one.
