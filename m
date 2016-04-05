@@ -1,40 +1,59 @@
-From: david@lechnology.com (David Lechner)
-Date: Tue, 5 Apr 2016 12:11:23 -0500
-Subject: [PATCH v3 0/5] davinci_mmc fixes
-In-Reply-To: <5703F0DF.3020209@lechnology.com>
-References: <1458186341-6970-1-git-send-email-david@lechnology.com>
- <CAPDyKFp3UELfw2gNTh0GeX31bjwb8tbDiua6ZigLwhaUkcv3zA@mail.gmail.com>
- <5703ECFE.6060706@lechnology.com> <5703F0DF.3020209@lechnology.com>
-Message-ID: <5703F1BB.1090401@lechnology.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 5 Apr 2016 12:17:29 -0500
+Subject: [PATCH] PCI: xilinx-nwl: Fix spelling mistake "Initialization"
+In-Reply-To: <1459680976-32222-1-git-send-email-colin.king@canonical.com>
+References: <1459680976-32222-1-git-send-email-colin.king@canonical.com>
+Message-ID: <20160405171729.GB12135@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/2016 12:07 PM, David Lechner wrote:
-> On 04/05/2016 11:51 AM, David Lechner wrote:
->> On 04/05/2016 06:12 AM, Ulf Hansson wrote:
->>>
->>> Patch 3 triggers a compiler warning, please fix it.
->>>
->>> ../drivers/mmc/host/davinci_mmc.c: In function ?davinci_mmcsd_probe?:
->>> ../drivers/mmc/host/davinci_mmc.c:1208:6: warning: ?ret? may be used
->>> uninitialized in this function [-Wmaybe-uninitialized]
->>>
->>> I have applied patch 1->2 for next, so no need to resend these.
->>>
->>> Kind regards
->>> Uffe
->>>
->>
->> I am not getting a compiler warning with this commit. Can you please
->> provide a git link so that I can be sure I am building using the same
->> branch that you are using?
->
->
-> I think I figured it out. I am applying the patches on top of the next
-> branch from git://git.linaro.org/people/ulf.hansson/mmc.git. However, I
-> am still not getting a compiler warning. Perhaps it has to do with the
-> gcc version. I'm not exactly sure how to fix it since it is really not
-> used uninitialized. Just set it to 0 in the variable declaration?
+On Sun, Apr 03, 2016 at 11:56:16AM +0100, Colin King wrote:
+> From: Colin Ian King <colin.king@canonical.com>
+> 
+> Minor fix, spelling mistake "Initalization" should be
+> "Initialization".
+> 
+> Signed-off-by: Colin Ian King <colin.king@canonical.com>
 
-OK. I guess it is my compiler that is broken. :-/
-I stared at it long enough and I see the error now.
+Applied to pci/misc for v4.7, thanks, Colin!
+
+I noticed the same error in drivers/pci/pci.c and fixed that as well:
+
+commit dcbb408ac5a2803ba44ca2fae8bf53eb5d4082f3
+Author: Colin Ian King <colin.king@canonical.com>
+Date:   Tue Apr 5 12:12:45 2016 -0500
+
+    PCI: Fix spelling errors
+    
+    Fix spelling of "initalization".
+    
+    [bhelgaas: also fix pci/pci.c]
+    Signed-off-by: Colin Ian King <colin.king@canonical.com>
+    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+
+diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
+index 5139e64..3479d30 100644
+--- a/drivers/pci/host/pcie-xilinx-nwl.c
++++ b/drivers/pci/host/pcie-xilinx-nwl.c
+@@ -819,7 +819,7 @@ static int nwl_pcie_probe(struct platform_device *pdev)
+ 
+ 	err = nwl_pcie_bridge_init(pcie);
+ 	if (err) {
+-		dev_err(pcie->dev, "HW Initalization failed\n");
++		dev_err(pcie->dev, "HW Initialization failed\n");
+ 		return err;
+ 	}
+ 
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index 25e0327..e3d6b33 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -2389,7 +2389,7 @@ out:
+ 	return offset + ent_size;
+ }
+ 
+-/* Enhanced Allocation Initalization */
++/* Enhanced Allocation Initialization */
+ void pci_ea_init(struct pci_dev *dev)
+ {
+ 	int ea;
