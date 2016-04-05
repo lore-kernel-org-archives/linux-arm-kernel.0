@@ -1,44 +1,45 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 6 Apr 2016 01:08:32 +0300
-Subject: [PATCH 10/25] arm64: rename COMPAT to AARCH32_EL0 in Kconfig
+Date: Wed, 6 Apr 2016 01:08:34 +0300
+Subject: [PATCH 12/25] arm64: compat: change config dependences to aarch32
 In-Reply-To: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
 References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1459894127-17698-11-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1459894127-17698-13-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Pinski <apinski@cavium.com>
+From: Bamvor Jian Zhang <bamvor.zhangjian@linaro.org>
 
-In this patchset  ILP32 ABI support is added. Additionally to AARCH32,
-which is binary-compatible with ARM, ILP32 is (mostly) ABI-compatible.
+With the patches of ILP32, COMPAT is not equivalent to AARCH32 in EL0.
+This patch fix this by updating the dependency from COMPAT to
+AARCH32_EL0 for ARMV8_DEPRECATED and ARM64_ERRATUM_845719.
 
->From now, AARCH32_EL0 (former COMPAT) config option means the support of
-AARCH32 userspace, ARM64_ILP32 - support of ILP32 ABI (see next patches),
-and COMPAT indicates that one of them, or both, is enabled.
-
-Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
-Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
-Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
+Signed-off-by: Bamvor Jian Zhang <bamvor.zhangjian@linaro.org>
 Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-Reviewed-by: David Daney <ddaney@caviumnetworks.com>
 ---
- arch/arm64/Kconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm64/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 4f43622..f923687 100644
+index f923687..ebaf38a 100644
 --- a/arch/arm64/Kconfig
 +++ b/arch/arm64/Kconfig
-@@ -925,6 +925,10 @@ menu "Userspace binary formats"
- source "fs/Kconfig.binfmt"
+@@ -370,7 +370,7 @@ config ARM64_ERRATUM_834220
  
- config COMPAT
-+	def_bool y
+ config ARM64_ERRATUM_845719
+ 	bool "Cortex-A53: 845719: a load might read incorrect data"
+-	depends on COMPAT
 +	depends on AARCH32_EL0
-+
-+config AARCH32_EL0
- 	bool "Kernel support for 32-bit EL0"
- 	depends on ARM64_4K_PAGES || EXPERT
- 	select COMPAT_BINFMT_ELF
+ 	default y
+ 	help
+ 	  This option adds an alternative code sequence to work around ARM
+@@ -655,7 +655,7 @@ config FORCE_MAX_ZONEORDER
+ 
+ menuconfig ARMV8_DEPRECATED
+ 	bool "Emulate deprecated/obsolete ARMv8 instructions"
+-	depends on COMPAT
++	depends on AARCH32_EL0
+ 	help
+ 	  Legacy software support may require certain instructions
+ 	  that have been deprecated or obsoleted in the architecture.
 -- 
 2.5.0
