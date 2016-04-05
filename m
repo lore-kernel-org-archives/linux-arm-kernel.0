@@ -1,10 +1,10 @@
 From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Tue, 5 Apr 2016 13:59:38 +0800
-Subject: [PATCH v3 10/14] bus: imx-weim: use of_platform_default_populate() to
+Date: Tue, 5 Apr 2016 13:59:41 +0800
+Subject: [PATCH v3 13/14] of: unittest: use of_platform_default_populate() to
  populate default bus
 In-Reply-To: <1459835982-26473-1-git-send-email-wangkefeng.wang@huawei.com>
 References: <1459835982-26473-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1459835982-26473-11-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <1459835982-26473-14-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,29 +12,36 @@ Use helper of_platform_default_populate() in linux/of_platform
 when possible, instead of calling of_platform_populate() with
 the default match table.
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: Signed-off-by: Huang Shijie <b32955@freescale.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Frank Rowand <frowand.list@gmail.com>
+Cc: Grant Likely <grant.likely@linaro.org>
 Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 ---
- drivers/bus/imx-weim.c | 5 ++---
+ drivers/of/unittest.c | 5 ++---
  1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/bus/imx-weim.c b/drivers/bus/imx-weim.c
-index 1827fc4..4bd361d 100644
---- a/drivers/bus/imx-weim.c
-+++ b/drivers/bus/imx-weim.c
-@@ -163,9 +163,8 @@ static int __init weim_parse_dt(struct platform_device *pdev,
+diff --git a/drivers/of/unittest.c b/drivers/of/unittest.c
+index e986e6e..e72cee3 100644
+--- a/drivers/of/unittest.c
++++ b/drivers/of/unittest.c
+@@ -772,7 +772,7 @@ static void __init of_unittest_platform_populate(void)
+ 	};
+ 
+ 	np = of_find_node_by_path("/testcase-data");
+-	of_platform_populate(np, of_default_bus_match_table, NULL, NULL);
++	of_platform_default_populate(np, NULL, NULL);
+ 
+ 	/* Test that a missing irq domain returns -EPROBE_DEFER */
+ 	np = of_find_node_by_path("/testcase-data/testcase-device1");
+@@ -1885,8 +1885,7 @@ static void __init of_unittest_overlay(void)
+ 		goto out;
  	}
  
- 	if (have_child)
--		ret = of_platform_populate(pdev->dev.of_node,
--				   of_default_bus_match_table,
--				   NULL, &pdev->dev);
-+		ret = of_platform_default_populate(pdev->dev.of_node,
-+						   NULL, &pdev->dev);
- 	if (ret)
- 		dev_err(&pdev->dev, "%s fail to create devices.\n",
- 			pdev->dev.of_node->full_name);
+-	ret = of_platform_populate(bus_np, of_default_bus_match_table,
+-			NULL, NULL);
++	ret = of_platform_default_populate(bus_np, NULL, NULL);
+ 	if (ret != 0) {
+ 		unittest(0, "could not populate bus @ \"%s\"\n", bus_path);
+ 		goto out;
 -- 
 2.6.0.GIT
