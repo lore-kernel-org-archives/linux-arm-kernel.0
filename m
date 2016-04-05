@@ -1,46 +1,57 @@
-From: jacek.anaszewski@gmail.com (Jacek Anaszewski)
-Date: Tue, 5 Apr 2016 23:37:33 +0200
-Subject: [PATCH 4/5] devicetree: leds: Introduce "panic-blink" optional
- property
-In-Reply-To: <1459801326-5541-5-git-send-email-ezequiel@vanguardiasur.com.ar>
-References: <1459801326-5541-1-git-send-email-ezequiel@vanguardiasur.com.ar>
- <1459801326-5541-5-git-send-email-ezequiel@vanguardiasur.com.ar>
-Message-ID: <5704301D.7040300@gmail.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Tue, 5 Apr 2016 16:44:09 -0500
+Subject: [PATCH 1/4] ARM: dts: DRA7: Enable Timers 13 through 16
+In-Reply-To: <1459892652-47845-1-git-send-email-s-anna@ti.com>
+References: <1459892652-47845-1-git-send-email-s-anna@ti.com>
+Message-ID: <1459892652-47845-2-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ezequiel,
+The Timers 13 through 16 have been added previously in
+disabled state. These timers are common timers that are
+present on all DRA7 family of SoCs, so enable these
+devices by default like the rest of the DMTimers.
 
-On 04/04/2016 10:22 PM, Ezequiel Garcia wrote:
-> It's desirable to specify which LEDs are to be blinked on a kernel
-> panic. Therefore, introduce a devicetree boolean property to mark
-> which LEDs should be treated this way.
->
-> Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
-> ---
->   Documentation/devicetree/bindings/leds/common.txt | 2 ++
->   1 file changed, 2 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/leds/common.txt b/Documentation/devicetree/bindings/leds/common.txt
-> index 68419843e32f..dd409df9203a 100644
-> --- a/Documentation/devicetree/bindings/leds/common.txt
-> +++ b/Documentation/devicetree/bindings/leds/common.txt
-> @@ -37,6 +37,8 @@ Optional properties for child nodes:
->                        property is mandatory for the LEDs in the non-flash modes
->                        (e.g. torch or indicator).
->
-> +- panic-blink : Mark this LED to be used by the panic LED trigger.
+Signed-off-by: Suman Anna <s-anna@ti.com>
+---
+ arch/arm/boot/dts/dra7.dtsi | 4 ----
+ 1 file changed, 4 deletions(-)
 
-I'd say that 'panic-indicator' would be more informative.
-
-Please next time cc also devicetree list and maintainers.
-
-> +
->   Required properties for flash LED child nodes:
->   - flash-max-microamp : Maximum flash LED supply current in microamperes.
->   - flash-max-timeout-us : Maximum timeout in microseconds after which the flash
->
-
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index 13ac88279427..66c7924e5491 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -778,7 +778,6 @@
+ 			reg = <0x48828000 0x80>;
+ 			interrupts = <GIC_SPI 339 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "timer13";
+-			status = "disabled";
+ 		};
+ 
+ 		timer14: timer at 4882a000 {
+@@ -786,7 +785,6 @@
+ 			reg = <0x4882a000 0x80>;
+ 			interrupts = <GIC_SPI 340 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "timer14";
+-			status = "disabled";
+ 		};
+ 
+ 		timer15: timer at 4882c000 {
+@@ -794,7 +792,6 @@
+ 			reg = <0x4882c000 0x80>;
+ 			interrupts = <GIC_SPI 341 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "timer15";
+-			status = "disabled";
+ 		};
+ 
+ 		timer16: timer at 4882e000 {
+@@ -802,7 +799,6 @@
+ 			reg = <0x4882e000 0x80>;
+ 			interrupts = <GIC_SPI 342 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "timer16";
+-			status = "disabled";
+ 		};
+ 
+ 		wdt2: wdt at 4ae14000 {
 -- 
-Best regards,
-Jacek Anaszewski
+2.7.4
