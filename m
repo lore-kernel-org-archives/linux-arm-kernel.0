@@ -1,29 +1,94 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Tue, 5 Apr 2016 13:44:10 -0500
-Subject: [PATCHv2 7/7] ARM: dts: Add Altera Arria10 OCRAM EDAC devicetree
- entry
-In-Reply-To: <1459450087-24792-8-git-send-email-tthayer@opensource.altera.com>
-References: <1459450087-24792-1-git-send-email-tthayer@opensource.altera.com>
- <1459450087-24792-8-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <alpine.DEB.2.02.1604051343040.32718@linux-builds1>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 05 Apr 2016 12:10:05 -0700
+Subject: [PATCH] iommu/rockchip: Fix "is stall active" check
+In-Reply-To: <20160405182858.382ea465.john@metanate.com>
+References: <1459865146-25308-1-git-send-email-john@metanate.com>
+ <5389576.zuTxjFsmO4@phil> <20160405182858.382ea465.john@metanate.com>
+Message-ID: <9799340.GJHE2cZK7r@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 31 Mar 2016, tthayer at opensource.altera.com wrote:
-
-> From: Thor Thayer <tthayer@opensource.altera.com>
+Am Dienstag, 5. April 2016, 18:28:58 schrieb John Keeping:
+> On Tue, 05 Apr 2016 10:21:27 -0700, Heiko Stuebner wrote:
+> > Am Dienstag, 5. April 2016, 15:05:46 schrieb John Keeping:
+> > > Since commit cd6438c5f844 ("iommu/rockchip: Reconstruct to support
+> > > multi
+> > > slaves") rk_iommu_is_stall_active() always returns false because the
+> > > bitwise AND operates on the boolean flag promoted to an integer and a
+> > > value that is either zero or BIT(2).
+> > > 
+> > > Explicitly convert the right-hand value to a boolean so that both
+> > > sides
+> > > are guaranteed to be either zero or one.
+> > > 
+> > > rk_iommu_is_paging_enabled() does not suffer from the same problem
+> > > since
+> > > RK_MMU_STATUS_PAGING_ENABLED is BIT(0), but let's apply the same
+> > > change
+> > > for consistency and to make it clear that it's correct without needing
+> > > to lookup the value.
+> > > 
+> > > Fixes: cd6438c5f844 ("iommu/rockchip: Reconstruct to support multi
+> > > slaves") Signed-off-by: John Keeping <john@metanate.com>
+> > 
+> > Nice catch, thanks.
+> > 
+> > Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> > 
+> > John, out of curiosity, how did you find that problem? Excess stall
+> > error
+> > messages or something else?
 > 
-> Add the device tree entries needed to support the Altera On-Chip
-> RAM EDAC on the Arria10 chip.
+> I was testing the drm iommu patches I posted today [1] and noticed an
+> "Enable stall request timed out" error when unbinding the
+> display-subsystem, but the RK_MMU_STATUS value printed in the error
+> message indicated that stall active was set.
 > 
-> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
-> ---
-> v2: No change
-> ---
->  arch/arm/boot/dts/socfpga_arria10.dtsi |    5 +++++
->  1 file changed, 5 insertions(+)
+> [1] http://article.gmane.org/gmane.comp.video.dri.devel/150721
 
-I've applied this patch and will take through the arm-soc tree.
+So it seems both you and Tomeu were working to resolve the same issue [2].
 
-Thanks,
-Dinh
+And John's patch seems to actually fix the underlying problem.
+
+
+[2] https://lkml.org/lkml/2016/3/22/493
+
+
+> > > ---
+> > > 
+> > >  drivers/iommu/rockchip-iommu.c | 8 ++++----
+> > >  1 file changed, 4 insertions(+), 4 deletions(-)
+> > > 
+> > > diff --git a/drivers/iommu/rockchip-iommu.c
+> > > b/drivers/iommu/rockchip-iommu.c index a6f593a0a29e..5710a06c3049
+> > > 100644
+> > > --- a/drivers/iommu/rockchip-iommu.c
+> > > +++ b/drivers/iommu/rockchip-iommu.c
+> > > @@ -315,8 +315,8 @@ static bool rk_iommu_is_stall_active(struct
+> > > rk_iommu
+> > > *iommu) int i;
+> > > 
+> > >  	for (i = 0; i < iommu->num_mmu; i++)
+> > > 
+> > > -		active &= rk_iommu_read(iommu->bases[i], RK_MMU_STATUS) &
+> > > -					RK_MMU_STATUS_STALL_ACTIVE;
+> > > +		active &= !!(rk_iommu_read(iommu->bases[i], RK_MMU_STATUS) &
+> > > +					   RK_MMU_STATUS_STALL_ACTIVE);
+> > > 
+> > >  	return active;
+> > >  
+> > >  }
+> > > 
+> > > @@ -327,8 +327,8 @@ static bool rk_iommu_is_paging_enabled(struct
+> > > rk_iommu *iommu) int i;
+> > > 
+> > >  	for (i = 0; i < iommu->num_mmu; i++)
+> > > 
+> > > -		enable &= rk_iommu_read(iommu->bases[i], RK_MMU_STATUS) &
+> > > -					RK_MMU_STATUS_PAGING_ENABLED;
+> > > +		enable &= !!(rk_iommu_read(iommu->bases[i], RK_MMU_STATUS) &
+> > > +					   RK_MMU_STATUS_PAGING_ENABLED);
+> > > 
+> > >  	return enable;
+> > >  
+> > >  }
