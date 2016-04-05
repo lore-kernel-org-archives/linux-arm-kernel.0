@@ -1,63 +1,56 @@
-From: fcooper@ti.com (Franklin S Cooper Jr.)
-Date: Tue, 5 Apr 2016 06:25:56 -0500
-Subject: [PATCH v5 1/6] pwms: pwm-ti*: Get the clock from the PWMSS
- (parent)
-In-Reply-To: <5703564C.7090700@ti.com>
-References: <1457400224-24797-1-git-send-email-fcooper@ti.com>
- <1457400224-24797-2-git-send-email-fcooper@ti.com> <5703564C.7090700@ti.com>
-Message-ID: <5703A0C4.6010406@ti.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 5 Apr 2016 13:27:58 +0200
+Subject: [v7, 0/5] Fix eSDHC host version register bug
+In-Reply-To: <1459480051-3701-1-git-send-email-yangbo.lu@nxp.com>
+References: <1459480051-3701-1-git-send-email-yangbo.lu@nxp.com>
+Message-ID: <CAPDyKFqgMCvbqMYZ-uM-rTnVvfJkCYbhv2kucCRyNyc9FWoR=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 1 April 2016 at 05:07, Yangbo Lu <yangbo.lu@nxp.com> wrote:
+> This patchset is used to fix a host version register bug in the T4240-R1.0-R2.0
+> eSDHC controller. To get the SoC version and revision, it's needed to add the
+> GUTS driver to access the global utilities registers.
+>
+> So, the first three patches are to add the GUTS driver.
+> The following two patches are to enable GUTS driver support to get SVR in eSDHC
+> driver and fix host version for T4240.
+>
+> Yangbo Lu (5):
+>   ARM64: dts: ls2080a: add device configuration node
+>   soc: fsl: add GUTS driver for QorIQ platforms
+>   dt: move guts devicetree doc out of powerpc directory
+>   powerpc/fsl: move mpc85xx.h to include/linux/fsl
+>   mmc: sdhci-of-esdhc: fix host version for T4240-R1.0-R2.0
+>
+>  .../bindings/{powerpc => soc}/fsl/guts.txt         |   3 +
+>  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi     |   6 ++
+>  arch/powerpc/kernel/cpu_setup_fsl_booke.S          |   2 +-
+>  drivers/clk/clk-qoriq.c                            |   3 +-
+>  drivers/i2c/busses/i2c-mpc.c                       |   2 +-
+>  drivers/iommu/fsl_pamu.c                           |   3 +-
+>  drivers/mmc/host/Kconfig                           |   1 +
+>  drivers/mmc/host/sdhci-of-esdhc.c                  |  23 ++++
+>  drivers/net/ethernet/freescale/gianfar.c           |   2 +-
+>  drivers/soc/Kconfig                                |   2 +-
+>  drivers/soc/fsl/Kconfig                            |   8 ++
+>  drivers/soc/fsl/Makefile                           |   1 +
+>  drivers/soc/fsl/guts.c                             | 119 +++++++++++++++++++++
+>  include/linux/fsl/guts.h                           |  98 ++++++++---------
+>  .../asm/mpc85xx.h => include/linux/fsl/svr.h       |   4 +-
+>  15 files changed, 219 insertions(+), 58 deletions(-)
+>  rename Documentation/devicetree/bindings/{powerpc => soc}/fsl/guts.txt (91%)
+>  create mode 100644 drivers/soc/fsl/Kconfig
+>  create mode 100644 drivers/soc/fsl/guts.c
+>  rename arch/powerpc/include/asm/mpc85xx.h => include/linux/fsl/svr.h (97%)
+>
+> --
+> 2.1.0.27.g96db324
+>
 
-On 04/05/2016 01:08 AM, Sekhar Nori wrote:
-> On Tuesday 08 March 2016 06:53 AM, Franklin S Cooper Jr wrote:
-> > The eCAP and ePWM doesn't have their own separate clocks. They simply
-> > utilize the clock provided directly by the PWMSS. Therefore, they simply
-> > need to grab a reference to their parent's clock.
-> >
-> > Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
->
-> So this assumes that eCAP and eHRPWM are always under the PWMSS
-> umbrella. But on TI AM18x, thats not true. These IPs exist independently
-> and receive functional clock from PLL sysclk outputs.
->
-> > ---
-> >  drivers/pwm/pwm-tiecap.c   | 2 +-
-> >  drivers/pwm/pwm-tiehrpwm.c | 2 +-
-> >  2 files changed, 2 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/drivers/pwm/pwm-tiecap.c b/drivers/pwm/pwm-tiecap.c
-> > index 616af76..9418159 100644
-> > --- a/drivers/pwm/pwm-tiecap.c
-> > +++ b/drivers/pwm/pwm-tiecap.c
-> > @@ -212,7 +212,7 @@ static int ecap_pwm_probe(struct platform_device *pdev)
-> >      if (!pc)
-> >          return -ENOMEM;
-> >  
-> > -    clk = devm_clk_get(&pdev->dev, "fck");
-> > +    clk = devm_clk_get(pdev->dev.parent, "fck");
->
-> Even keeping the AM18x usecase aside, this seems to be pushing too much
-> platform information into the driver. The "fck" is a valid connection id
-> for the eCAP IP. Whether its valid for the parent device too is not
-> something this driver should need to know.
->
-> So it looks like what you need is for the clock hierarchy for the
-> platform to have clocks for eHRPWM and eCAP derived out of PWMSS clock?
+I was about to queue this for next, when I noticed that checkpatch is
+complaining/warning lots about these patches. Can you please a round
+of checkpatch and fix what makes sense.
 
-So I believe this is a question on if we want to hide the minor
-delta between AM18 vs AM335x, AM437x and AM57x/DRA7 in the driver
-or within the DT.
-
-Note that handling this by defining new clocks in DT will then
-result in older DTBs not working. I don't think its worth breaking
-backwards compatibility for AM335x and AM437x DTBs for fixing support
-for AM18 based SOCs. Especially since those SOCs haven't worked with
-this driver for several years. By handling things within the driver rather
-than DT we can atleast insure that we can get everything working while
-avoiding breaking backwards compatibility.
->
-> Thanks,
-> Sekhar
->
+Kind regards
+Uffe
