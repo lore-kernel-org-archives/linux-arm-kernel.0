@@ -1,26 +1,162 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Tue, 5 Apr 2016 20:44:29 +0800
-Subject: [PATCH v2 1/4] hwrng: exynos - Runtime suspend device after init
-In-Reply-To: <1457914035-26856-1-git-send-email-k.kozlowski@samsung.com>
-References: <1457914035-26856-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20160405124429.GC13048@gondor.apana.org.au>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Tue, 5 Apr 2016 14:47:51 +0200
+Subject: [PATCH v4 03/12] KVM: arm64: Introduce new MMIO region for the
+ ITS base address
+In-Reply-To: <20160403100837.GD5261@cbox>
+References: <1458958450-19662-1-git-send-email-andre.przywara@arm.com>
+ <1458958450-19662-4-git-send-email-andre.przywara@arm.com>
+ <20160403100837.GD5261@cbox>
+Message-ID: <5703B3F7.7060401@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 14, 2016 at 09:07:12AM +0900, Krzysztof Kozlowski wrote:
-> The driver uses pm_runtime_put_noidle() after initialization so the
-> device might remain in active state if the core does not read from it
-> (the read callback contains regular runtime put). The put_noidle() was
-> chosen probably to avoid unneeded suspend and resume cycle after the
-> initialization.
+Hi Andre,
+On 04/03/2016 12:08 PM, Christoffer Dall wrote:
+> On Sat, Mar 26, 2016 at 02:14:01AM +0000, Andre Przywara wrote:
+>> The ARM GICv3 ITS controller requires a separate register frame to
+>> cover ITS specific registers. Add a new VGIC address type and store
+>> the address in a field in the vgic_dist structure.
+>> Provide a function to check whether userland has provided the address,
+>> so ITS functionality can be guarded by that check.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>>  Documentation/virtual/kvm/devices/arm-vgic.txt |  9 +++++++++
+>>  arch/arm64/include/uapi/asm/kvm.h              |  2 ++
+>>  include/kvm/vgic/vgic.h                        |  5 +++++
+>>  virt/kvm/arm/vgic/vgic.c                       | 10 ++++++++++
+>>  virt/kvm/arm/vgic/vgic_init.c                  |  1 +
+>>  virt/kvm/arm/vgic/vgic_kvm_device.c            |  7 +++++++
+>>  6 files changed, 34 insertions(+)
+>>
+>> diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
+>> index 59541d4..087e2d9 100644
+>> --- a/Documentation/virtual/kvm/devices/arm-vgic.txt
+>> +++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
+>> @@ -39,6 +39,15 @@ Groups:
+>>        Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
+>>        This address needs to be 64K aligned.
+>>  
+>> +    KVM_VGIC_V3_ADDR_TYPE_ITS (rw, 64-bit)
+>> +      Base address in the guest physical address space of the GICv3 ITS
+>> +      control register frame. The ITS allows MSI(-X) interrupts to be
+>> +      injected into guests. This extension is optional, if the kernel
 > 
-> However for this purpose autosuspend is enabled so it is safe to runtime
-> put just after the initialization.
+> s/optional, if/optional. If/
 > 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> +      does not support the ITS, the call returns -ENODEV.
+>> +      This memory is solely for the guest to access the ITS control
+> 
+> s/memory/address region/ ?
+> 
+>> +      registers and does not cover the ITS translation register.
+>> +      Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
+>> +      This address needs to be 64K aligned and the region covers 64 KByte.
+> 
+> s/KByte/KBytes/
+> ...or you could you 64K both places in this line.
+> 
+>>  
+>>    KVM_DEV_ARM_VGIC_GRP_DIST_REGS
+>>    Attributes:
+>> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+>> index f209ea1..c2b257d 100644
+>> --- a/arch/arm64/include/uapi/asm/kvm.h
+>> +++ b/arch/arm64/include/uapi/asm/kvm.h
+>> @@ -87,9 +87,11 @@ struct kvm_regs {
+>>  /* Supported VGICv3 address types  */
+>>  #define KVM_VGIC_V3_ADDR_TYPE_DIST	2
+>>  #define KVM_VGIC_V3_ADDR_TYPE_REDIST	3
+>> +#define KVM_VGIC_V3_ADDR_TYPE_ITS	4
+>>  
+>>  #define KVM_VGIC_V3_DIST_SIZE		SZ_64K
+>>  #define KVM_VGIC_V3_REDIST_SIZE		(2 * SZ_64K)
+>> +#define KVM_VGIC_V3_ITS_SIZE		SZ_64K
+>>  
+>>  #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
+>>  #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
+>> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+>> index 7c1d145..11344e6 100644
+>> --- a/include/kvm/vgic/vgic.h
+>> +++ b/include/kvm/vgic/vgic.h
+>> @@ -135,6 +135,9 @@ struct vgic_dist {
+>>  		gpa_t			vgic_redist_base;
+>>  	};
+>>  
+>> +	/* The base address of the ITS control register frame */
+>> +	gpa_t			vgic_its_base;
+>> +
+>>  	/* distributor enabled */
+>>  	u32			enabled;
+>>  
+>> @@ -253,4 +256,6 @@ static inline int kvm_vgic_get_max_vcpus(void)
+>>  	return kvm_vgic_global_state.max_gic_vcpus;
+>>  }
+>>  
+>> +bool vgic_has_its(struct kvm *kvm);
+is it mandated to expose this function outside of the vgic subsystem?
+why not declaring it in /virt/kvm/arm/vgic/vgic.h?
+>> +
+>>  #endif /* __ASM_ARM_KVM_VGIC_VGIC_H */
+>> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+>> index 65395af..1de2478 100644
+>> --- a/virt/kvm/arm/vgic/vgic.c
+>> +++ b/virt/kvm/arm/vgic/vgic.c
+>> @@ -612,3 +612,13 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, u32 intid)
+>>  
+>>  	return map_is_active;
+>>  }
+>> +
+>> +bool vgic_has_its(struct kvm *kvm)
+I would implement this function vgic_init.c or vgic_kvm_device.c leaving
+vgic.c for pure vgic state mgt.
 
-All applied.
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Eric
+>> +{
+>> +	struct vgic_dist *dist = &kvm->arch.vgic;
+>> +
+>> +	if (dist->vgic_model != KVM_DEV_TYPE_ARM_VGIC_V3)
+>> +		return false;
+>> +
+>> +	return !IS_VGIC_ADDR_UNDEF(dist->vgic_its_base);
+>> +}
+>> diff --git a/virt/kvm/arm/vgic/vgic_init.c b/virt/kvm/arm/vgic/vgic_init.c
+>> index ac655b5..2301e03 100644
+>> --- a/virt/kvm/arm/vgic/vgic_init.c
+>> +++ b/virt/kvm/arm/vgic/vgic_init.c
+>> @@ -132,6 +132,7 @@ int kvm_vgic_create(struct kvm *kvm, u32 type)
+>>  	kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
+>>  	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
+>>  	kvm->arch.vgic.vgic_redist_base = VGIC_ADDR_UNDEF;
+>> +	kvm->arch.vgic.vgic_its_base = VGIC_ADDR_UNDEF;
+>>  
+>>  out_unlock:
+>>  	for (; vcpu_lock_idx >= 0; vcpu_lock_idx--) {
+>> diff --git a/virt/kvm/arm/vgic/vgic_kvm_device.c b/virt/kvm/arm/vgic/vgic_kvm_device.c
+>> index 7f78a16..3ec2ac3 100644
+>> --- a/virt/kvm/arm/vgic/vgic_kvm_device.c
+>> +++ b/virt/kvm/arm/vgic/vgic_kvm_device.c
+>> @@ -109,6 +109,12 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
+>>  		block_size = KVM_VGIC_V3_REDIST_SIZE;
+>>  		alignment = SZ_64K;
+>>  		break;
+>> +	case KVM_VGIC_V3_ADDR_TYPE_ITS:
+>> +		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
+>> +		addr_ptr = &vgic->vgic_its_base;
+>> +		block_size = KVM_VGIC_V3_ITS_SIZE;
+>> +		alignment = SZ_64K;
+>> +		break;
+>>  #endif
+>>  	default:
+>>  		r = -ENODEV;
+>> @@ -495,6 +501,7 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
+>>  		switch (attr->attr) {
+>>  		case KVM_VGIC_V3_ADDR_TYPE_DIST:
+>>  		case KVM_VGIC_V3_ADDR_TYPE_REDIST:
+>> +		case KVM_VGIC_V3_ADDR_TYPE_ITS:
+>>  			return 0;
+>>  		}
+>>  		break;
+>> -- 
+>> 2.7.3
+>>
