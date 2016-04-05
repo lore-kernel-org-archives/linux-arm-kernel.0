@@ -1,84 +1,66 @@
 From: guodong.xu@linaro.org (Guodong Xu)
-Date: Tue,  5 Apr 2016 21:27:39 +0800
-Subject: [PATCH v3 15/16] arm64: dts: add dwmmc nodes for hi6220
+Date: Tue,  5 Apr 2016 21:27:40 +0800
+Subject: [PATCH v3 16/16] arm64: dts: add wifi nodes support for hi6220-hikey
 In-Reply-To: <1459862860-9775-1-git-send-email-guodong.xu@linaro.org>
 References: <1459862860-9775-1-git-send-email-guodong.xu@linaro.org>
-Message-ID: <1459862860-9775-16-git-send-email-guodong.xu@linaro.org>
+Message-ID: <1459862860-9775-17-git-send-email-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Xinwei Kong <kong.kongxinwei@hisilicon.com>
-
-Add all three dwmmc nodes description for hi6220
+Add wifi nodes support for hi6220-hikey
 
 Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
-Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
 ---
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 53 +++++++++++++++++++++++++++++++
- 1 file changed, 53 insertions(+)
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 30 ++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-index 994622b..2e3d02d 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -740,5 +740,58 @@
- 			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
- 			#mbox-cells = <3>;
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+index a6dffa8..78ce994 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
++++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+@@ -48,6 +48,7 @@
+ 		i2c0: i2c at f7100000 {
+ 			status = "ok";
  		};
 +
-+		dwmmc_0: dwmmc0 at f723d000 {
-+			compatible = "hisilicon,hi6220-dw-mshc";
-+			num-slots = <0x1>;
-+			cap-mmc-highspeed;
-+			non-removable;
-+			reg = <0x0 0xf723d000 0x0 0x1000>;
-+			interrupts = <0x0 0x48 0x4>;
-+			clocks = <&sys_ctrl 2>, <&sys_ctrl 1>;
-+			clock-names = "ciu", "biu";
-+			bus-width = <0x8>;
-+			vmmc-supply = <&ldo19>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&emmc_pmx_func &emmc_clk_cfg_func
-+				     &emmc_cfg_func &emmc_rst_cfg_func>;
-+		};
-+
-+		dwmmc_1: dwmmc1 at f723e000 {
-+			compatible = "hisilicon,hi6220-dw-mshc";
-+			num-slots = <0x1>;
-+			card-detect-delay = <200>;
-+			hisilicon,peripheral-syscon = <&ao_ctrl>;
-+			cap-sd-highspeed;
-+			reg = <0x0 0xf723e000 0x0 0x1000>;
-+			interrupts = <0x0 0x49 0x4>;
-+			#address-cells = <0x1>;
-+			#size-cells = <0x0>;
-+			clocks = <&sys_ctrl 4>, <&sys_ctrl 3>;
-+			clock-names = "ciu", "biu";
-+			vqmmc-supply = <&ldo7>;
-+			vmmc-supply = <&ldo10>;
-+			bus-width = <0x4>;
-+			disable-wp;
-+			cd-gpios = <&gpio1 0 1>;
-+			pinctrl-names = "default", "idle";
-+			pinctrl-0 = <&sd_pmx_func &sd_clk_cfg_func &sd_cfg_func>;
-+			pinctrl-1 = <&sd_pmx_idle &sd_clk_cfg_idle &sd_cfg_idle>;
-+		};
+ 		i2c1: i2c at f7101000 {
+ 			status = "ok";
+ 		};
+@@ -63,6 +64,35 @@
+ 		uart3: uart at f7113000 {
+ 			status = "ok";
+ 		};
 +
 +		dwmmc_2: dwmmc2 at f723f000 {
-+			compatible = "hisilicon,hi6220-dw-mshc";
-+			status = "okay";
-+			num-slots = <0x1>;
-+			reg = <0x0 0xf723f000 0x0 0x1000>;
-+			interrupts = <0x0 0x4a 0x4>;
-+			clocks = <&sys_ctrl HI6220_MMC2_CIUCLK>, <&sys_ctrl HI6220_MMC2_CLK>;
-+			clock-names = "ciu", "biu";
-+			bus-width = <0x4>;
-+			broken-cd;
-+			pinctrl-names = "default", "idle";
-+			pinctrl-0 = <&sdio_pmx_func &sdio_clk_cfg_func &sdio_cfg_func>;
-+			pinctrl-1 = <&sdio_pmx_idle &sdio_clk_cfg_idle &sdio_cfg_idle>;
++			ti,non-removable;
++			non-removable;
++			/* WL_EN */
++			vmmc-supply = <&wlan_en_reg>;
++
++			#address-cells = <0x1>;
++			#size-cells = <0x0>;
++			wlcore: wlcore at 2 {
++				compatible = "ti,wl1835";
++				reg = <2>;	/* sdio func num */
++				/* WL_IRQ, WL_HOST_WAKE_GPIO1_3 */
++				interrupt-parent = <&gpio1>;
++				interrupts = <3 IRQ_TYPE_EDGE_RISING>;
++			};
++		};
++
++		wlan_en_reg: fixedregulator at 1 {
++			compatible = "regulator-fixed";
++			regulator-name = "wlan-en-regulator";
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <1800000>;
++			/* WLAN_EN GPIO */
++			gpio = <&gpio0 5 0>;
++			/* WLAN card specific delay */
++			startup-delay-us = <70000>;
++			enable-active-high;
 +		};
  	};
- };
+ 
+ 	leds {
 -- 
 1.9.1
