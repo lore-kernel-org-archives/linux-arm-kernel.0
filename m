@@ -1,24 +1,34 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Tue, 5 Apr 2016 10:26:50 +0100
-Subject: [PATCH] arm64: hw-breakpoint: Remove superfluous SMP function call
-In-Reply-To: <1459766569-17237-1-git-send-email-anna-maria@linutronix.de>
-References: <1459766569-17237-1-git-send-email-anna-maria@linutronix.de>
-Message-ID: <570384DA.6010805@arm.com>
+From: petr@barix.com (Petr Kulhavy)
+Date: Tue,  5 Apr 2016 11:31:37 +0200
+Subject: [PATCH] ARM: DTS: da850: fixed missing #gpio-cells in gpio node
+Message-ID: <1459848697-21006-1-git-send-email-petr@barix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/04/16 11:42, Anna-Maria Gleixner wrote:
-> Since commit 1cf4f629d9d2 ("cpu/hotplug: Move online calls to
-> hotplugged cpu") it is ensured that callbacks of CPU_ONLINE and
-> CPU_DOWN_PREPARE are processed on the hotplugged cpu. Due to this SMP
-> function calls are no longer required.
->
-> Replace smp_call_function_single() with a direct call of
-> hw_breakpoint_reset(). To keep the calling convention, interrupts are
-> explicitely disabled around the call.
+The gpio node was missing the mandatory property #gpio-cells, which was
+causing runtime errors when using GPIOs e.g. with gpio-leds or gpio-keys:
 
-While you are at it, could you please also fix a similar instance
-in arch/arm64/kernel/debug-monitors.c: hw_breakpoint_reset_notify() ?
+"could not get #gpio-cells for /soc/gpio at 1e26000"
 
-Thanks
-Suzuki
+This fixes the problem and adds the missing parameter.
+The value is 2 according to the gpio-davinci.txt binding.
+
+Signed-off-by: Petr Kulhavy <petr@barix.com>
+---
+ arch/arm/boot/dts/da850.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index 226cda76e77c..b0e3a4c833c3 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -312,6 +312,7 @@
+ 		gpio: gpio at 1e26000 {
+ 			compatible = "ti,dm6441-gpio";
+ 			gpio-controller;
++			#gpio-cells = <2>;
+ 			reg = <0x226000 0x1000>;
+ 			interrupts = <42 IRQ_TYPE_EDGE_BOTH
+ 				43 IRQ_TYPE_EDGE_BOTH 44 IRQ_TYPE_EDGE_BOTH
+-- 
+1.9.1
