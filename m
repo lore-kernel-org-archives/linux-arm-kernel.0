@@ -1,49 +1,39 @@
-From: sr@denx.de (Stefan Roese)
-Date: Tue, 5 Apr 2016 09:11:27 +0200
-Subject: [PATCH v2] spi: orion.c: Add direct access mode
-In-Reply-To: <13533301.gfdhE3AuMf@wuerfel>
-References: <1458663893-13766-1-git-send-email-sr@denx.de>
- <3108005.nUMWsj4kjp@wuerfel> <20160329212842.GN2350@sirena.org.uk>
- <13533301.gfdhE3AuMf@wuerfel>
-Message-ID: <5703651F.4040901@denx.de>
+From: david.s.gordon@intel.com (Dave Gordon)
+Date: Tue, 5 Apr 2016 08:11:48 +0100
+Subject: [PATCH v2 4/7] scatterlist: add sg_alloc_table_from_buf() helper
+In-Reply-To: <20160330201831.38e1d6bd@bbrezillon>
+References: <1459352394-22810-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1459352394-22810-5-git-send-email-boris.brezillon@free-electrons.com>
+ <20160330165143.GI2350@sirena.org.uk> <20160330201831.38e1d6bd@bbrezillon>
+Message-ID: <57036534.7010800@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30.03.2016 00:04, Arnd Bergmann wrote:
-> On Tuesday 29 March 2016 14:28:42 Mark Brown wrote:
->> On Tue, Mar 29, 2016 at 11:08:55PM +0200, Arnd Bergmann wrote:
->>> On Tuesday 29 March 2016 14:00:18 Mark Brown wrote:
-
-<snip>
-
->>> not impact the binding for the SPI host controller in any way, the
->>> binding just describes how the internal addressing is wired up to
->>> the mbus in hardware, and the mbus driver takes care of mapping those
->>> into CPU addresses.
+On 30/03/16 19:18, Boris Brezillon wrote:
+> On Wed, 30 Mar 2016 09:51:43 -0700
+> Mark Brown <broonie@kernel.org> wrote:
+>
+>> On Wed, Mar 30, 2016 at 05:39:51PM +0200, Boris Brezillon wrote:
+>>> sg_alloc_table_from_buf() provides an easy solution to create an sg_table
+>>> from a virtual address pointer. This function takes care of dealing with
+>>> vmallocated buffers, buffer alignment, or DMA engine limitations (maximum
+>>> DMA transfer size).
 >>
->> If we're able to do it automatically without baking this into the DT and
->> there's enough space to cope with this and PCI together then that's more
->> reasonable.
-> 
-> Ok, good. Then let's just do the SPI host driver like all the other
-> mbus slaves using whatever mbus provides, and implement dynamic remapping
-> of mbus windows whenever someone gets too annoyed with having to
-> come up with a mapping for their board.
-> 
-> At least by doing SPI like all the other devices, we don't make it
-> harder to come up with a generic algorithm for assigning the windows
-> at boot time.
+>> This seems nice.  Should we also have a further helper on top of this
+>> which will get constraints from a dmaengine, it seems like it'd be a
+>> common need?
+>
+> Yep, we could create a wrapper extracting dma_slave caps info,
+> converting it to sg_constraints and calling sg_alloc_table_from_buf().
+> But let's try to get this function accepted first, and I'll send another
+> patch providing this wrapper.
+>
+> BTW, do you see other things that should be added in sg_constraints?
+>
 
-Okay, I'll implement the static mapping as suggested by Arnd in the
-'reg' property of the SPI controller (additionally to the SPI controller
-register range). Which will get configured and enabled in the 'ranges'
-property of the per-board 'soc' node.
+You could compare with the things Solaris uses to describe the 
+restrictions on a DMA binding ...
 
-This will make the SPI driver patch very simple but will generate quite
-a big Armada dts change, moving all the SPI controllers from the
-'internal-regs' node to the 'soc' node though.
+http://docs.oracle.com/cd/E23824_01/html/821-1478/ddi-dma-attr-9s.html#REFMAN9Sddi-dma-attr-9s
 
-Please let me know if this is not the consensus.
-
-Thanks,
-Stefan
+.Dave.
