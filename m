@@ -1,38 +1,62 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue,  5 Apr 2016 08:35:54 +0200
-Subject: [PATCH 5/6] ARM: dts: pxa: add pinctrl to pxa3xx
+Date: Tue,  5 Apr 2016 08:35:51 +0200
+Subject: [PATCH 2/6] ARM: dts: pxa: add pxa3xx pwm nodes
 In-Reply-To: <1459838155-28803-1-git-send-email-robert.jarzmik@free.fr>
 References: <1459838155-28803-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1459838155-28803-5-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1459838155-28803-2-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pincontrol to pxa3xx, based on pinconf-simple.
+The pxa3xx SoC has 4 PWMs, exactly as the pxa27x does. Add them to the
+description.
 
 Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- arch/arm/boot/dts/pxa3xx.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/boot/dts/pxa3xx.dtsi | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
 diff --git a/arch/arm/boot/dts/pxa3xx.dtsi b/arch/arm/boot/dts/pxa3xx.dtsi
-index 5e2dea0f1436..6995b11ce042 100644
+index fec47bcd8292..5767ed4957ae 100644
 --- a/arch/arm/boot/dts/pxa3xx.dtsi
 +++ b/arch/arm/boot/dts/pxa3xx.dtsi
-@@ -43,6 +43,15 @@
- 			marvell,intc-nr-irqs = <56>;
+@@ -95,6 +95,38 @@
+ 			clocks = <&clks CLK_USBHOST>;
+ 			status = "disabled";
  		};
- 
-+		pinctrl: pinctrl at 40e10000 {
-+			compatible = "pinconf-single";
-+			reg = <0x40e10000 0xffff>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			pinctrl-single,register-width = <32>;
-+			pinctrl-single,function-mask = <0x7>;
++
++		pwm0: pwm at 40b00000 {
++			compatible = "marvell,pxa270-pwm";
++			reg = <0x40b00000 0x10>;
++			#pwm-cells = <1>;
++			clocks = <&clks CLK_PWM0>;
++			status = "disabled";
 +		};
 +
- 		gpio: gpio at 40e00000 {
- 			compatible = "intel,pxa3xx-gpio";
- 			reg = <0x40e00000 0x10000>;
++		pwm1: pwm at 40b00010 {
++			compatible = "marvell,pxa270-pwm";
++			reg = <0x40b00010 0x10>;
++			#pwm-cells = <1>;
++			clocks = <&clks CLK_PWM1>;
++			status = "disabled";
++		};
++
++		pwm2: pwm at 40c00000 {
++			compatible = "marvell,pxa270-pwm";
++			reg = <0x40c00000 0x10>;
++			#pwm-cells = <1>;
++			clocks = <&clks CLK_PWM0>;
++			status = "disabled";
++		};
++
++		pwm3: pwm at 40c00010 {
++			compatible = "marvell,pxa270-pwm";
++			reg = <0x40c00010 0x10>;
++			#pwm-cells = <1>;
++			clocks = <&clks CLK_PWM1>;
++			status = "disabled";
++		};
+ 	};
+ 
+ 	clocks {
 -- 
 2.1.4
