@@ -1,27 +1,106 @@
-From: david@lechnology.com (David Lechner)
-Date: Tue, 5 Apr 2016 11:51:10 -0500
-Subject: [PATCH v3 0/5] davinci_mmc fixes
-In-Reply-To: <CAPDyKFp3UELfw2gNTh0GeX31bjwb8tbDiua6ZigLwhaUkcv3zA@mail.gmail.com>
-References: <1458186341-6970-1-git-send-email-david@lechnology.com>
- <CAPDyKFp3UELfw2gNTh0GeX31bjwb8tbDiua6ZigLwhaUkcv3zA@mail.gmail.com>
-Message-ID: <5703ECFE.6060706@lechnology.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 5 Apr 2016 10:03:32 -0700
+Subject: [PATCH v2 1/2] dma/iommu: Add pgsize_bitmap confirmation in
+ __iommu_dma_alloc_pages
+In-Reply-To: <20160329170238.GK6745@arm.com>
+References: <1459146732-15620-1-git-send-email-yong.wu@mediatek.com>
+ <20160329170238.GK6745@arm.com>
+Message-ID: <CAD=FV=XdZwg8usj3bjM6W=A0Yk1AFqKFRadpiS-LGLwxVNxp7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/05/2016 06:12 AM, Ulf Hansson wrote:
->
-> Patch 3 triggers a compiler warning, please fix it.
->
-> ../drivers/mmc/host/davinci_mmc.c: In function ?davinci_mmcsd_probe?:
-> ../drivers/mmc/host/davinci_mmc.c:1208:6: warning: ?ret? may be used
-> uninitialized in this function [-Wmaybe-uninitialized]
->
-> I have applied patch 1->2 for next, so no need to resend these.
->
-> Kind regards
-> Uffe
->
+Will,
 
-I am not getting a compiler warning with this commit. Can you please 
-provide a git link so that I can be sure I am building using the same 
-branch that you are using?
+On Tue, Mar 29, 2016 at 10:02 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Mar 28, 2016 at 02:32:11PM +0800, Yong Wu wrote:
+>> Currently __iommu_dma_alloc_pages assumes that all the IOMMU support
+>> the granule of PAGE_SIZE. It call alloc_page to try allocating memory
+>> in the last time. Fortunately the mininum pagesize in all the
+>> current IOMMU is SZ_4K, so this works well.
+>>
+>> But there may be a case in which the mininum granule of IOMMU may be
+>> larger than PAGE_SIZE, then it will abort as the IOMMU cann't map the
+>> discontinuous memory within a granule. For example, the pgsize_bitmap
+>> of the IOMMU only has SZ_16K while the PAGE_SIZE is SZ_4K, then we
+>> have to prepare SZ_16K continuous memory at least for each a granule
+>> iommu mapping.
+>
+> Did you find a driver/platform that actually needs this? I certainly
+> think it's possible, but we don't necessarily need to fix it if it's
+> not broken yet! Just adding a comment would be enough.
+
+I think Yong Wu was adding this patch in response to your request from
+v1 of <https://patchwork.kernel.org/patch/8487511/>.  Fixing this
+seemed like a separate issue so I asked Yong Wu to make two patches
+rather than sticking this fix in the patch as his original.  Hopefully
+this makes sense.
+
+> Either way, a couple of review comments inline.
+>
+>>
+>> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+>>
+>> ---
+>> v2:
+>>  -rebase on v4.6-rc1.
+>>  -add a new patch([1/2] add pgsize_bitmap) here.
+>>
+>>  drivers/iommu/dma-iommu.c | 22 +++++++++++++---------
+>>  1 file changed, 13 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+>> index 72d6182..75ce71e 100644
+>> --- a/drivers/iommu/dma-iommu.c
+>> +++ b/drivers/iommu/dma-iommu.c
+>> @@ -190,11 +190,13 @@ static void __iommu_dma_free_pages(struct page **pages, int count)
+>>       kvfree(pages);
+>>  }
+>>
+>> -static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp)
+>> +static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp,
+>> +                                          unsigned long pgsize_bitmap)
+>>  {
+>>       struct page **pages;
+>>       unsigned int i = 0, array_size = count * sizeof(*pages);
+>> -     unsigned int order = MAX_ORDER;
+>> +     int min_order = get_order(1 << __ffs(pgsize_bitmap));
+>
+> 1UL
+
+Yong: presumably you will spin with this fix?
+
+
+>> +     int order = MAX_ORDER;
+>>
+>>       if (array_size <= PAGE_SIZE)
+>>               pages = kzalloc(array_size, GFP_KERNEL);
+>> @@ -213,13 +215,16 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp)
+>>               /*
+>>                * Higher-order allocations are a convenience rather
+>>                * than a necessity, hence using __GFP_NORETRY until
+>> -              * falling back to single-page allocations.
+>> +              * falling back to min size allocations.
+>>                */
+>> -             for (order = min_t(unsigned int, order, __fls(count));
+>> -                  order > 0; order--) {
+>> -                     page = alloc_pages(gfp | __GFP_NORETRY, order);
+>> +             for (order = min_t(int, order, __fls(count));
+>> +                  order >= min_order; order--) {
+>> +                     page = alloc_pages((order == min_order) ? gfp :
+>> +                                        gfp | __GFP_NORETRY, order);
+>>                       if (!page)
+>>                               continue;
+>> +                     if (!order)
+>> +                             break;
+>
+> Isn't this handled by the loop condition?
+
+He changed the loop condition to be ">= min_order" instead of "> 0",
+so now we can get here with an order == 0.  This makes sense because
+when min_order is not 0 you still want to run the code to split the
+pages and it is sane not to duplicate that below.
+
+Maybe I'm misunderstanding, though.  Perhaps you can explain how you
+think this code should look?
+
+-Doug
