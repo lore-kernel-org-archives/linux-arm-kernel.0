@@ -1,29 +1,28 @@
-From: john@metanate.com (John Keeping)
-Date: Tue,  5 Apr 2016 14:50:31 +0100
-Subject: [PATCH 1/2] drm/rockchip: remove redundant statement
-Message-ID: <1459864232-25033-1-git-send-email-john@metanate.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 5 Apr 2016 09:59:21 -0400
+Subject: [PATCH] ARM: exynos_defconfig: Enable Trats2 audio codec,
+ touchscreen and sensors
+In-Reply-To: <1459755830-20390-1-git-send-email-k.kozlowski@samsung.com>
+References: <1459755830-20390-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <5703C4B9.9030304@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The call to arm_iommu_detach_device() on the previous line sets
-dev->archdata.mapping to NULL so this call is always a no-op.
+Hello Krzysztof,
 
-Signed-off-by: John Keeping <john@metanate.com>
----
- drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 1 -
- 1 file changed, 1 deletion(-)
+On 04/04/2016 03:43 AM, Krzysztof Kozlowski wrote:
+> The Exynos4412-based Trats2 board has Asahi Kasei AK 3-Axis
+> Magnetometer, CM36651 proximity/ambient light sensor, MMS114 touchscreen
+> and Wolfson Microelectronics WM1811 CODEC. Enable them in defconfig to
+> get some testing coverage and use its features.
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-index f556a8f..7695c79 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-@@ -244,7 +244,6 @@ static int rockchip_drm_unload(struct drm_device *drm_dev)
- 	drm_kms_helper_poll_fini(drm_dev);
- 	component_unbind_all(dev, drm_dev);
- 	arm_iommu_detach_device(dev);
--	arm_iommu_release_mapping(dev->archdata.mapping);
- 	drm_mode_config_cleanup(drm_dev);
- 	drm_dev->dev_private = NULL;
- 
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+Best regards,
 -- 
-2.8.0.rc4.238.g874082a
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
