@@ -1,54 +1,75 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 5 Apr 2016 22:52:30 +0200 (CEST)
-Subject: [PATCH 2/2] clk: bcm2835: Fix PLL poweron
-In-Reply-To: <1459826456-18812-3-git-send-email-eric@anholt.net>
-References: <1459826456-18812-1-git-send-email-eric@anholt.net>
- <1459826456-18812-3-git-send-email-eric@anholt.net>
-Message-ID: <1945341121.176536.ed7e19c8-94d6-4e1c-b383-3e4ae025eeac.open-xchange@email.1und1.de>
+From: mitchelh@codeaurora.org (Mitchel Humpherys)
+Date: Tue,  5 Apr 2016 14:01:30 -0700
+Subject: [PATCH 2/2] iommu/arm-smmu: Implement .get_pgsize_bitmap for domain
+In-Reply-To: <1459890090-16040-1-git-send-email-mitchelh@codeaurora.org>
+References: <1459890090-16040-1-git-send-email-mitchelh@codeaurora.org>
+Message-ID: <1459890090-16040-2-git-send-email-mitchelh@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+Currently we restrict the pgsize_bitmap for the entire SMMU every time
+we allocate some new page tables.  However, certain io-pgtable
+implementations might wish to restrict the formats beyond the
+restrictions of the SMMU itself, which forces all domains on that SMMU
+to the same pgsize_bitmap, even if the other domains would prefer to use
+a more permissive page table format.  Besides that, some SMMUs in the
+system might have different supported page sizes at the hardware level,
+so applying those to everyone else is wrong.
 
-> Eric Anholt <eric@anholt.net> hat am 5. April 2016 um 05:20 geschrieben:
->
->
-> In poweroff, we set the reset bit and the power down bit, but only
-> managed to unset the reset bit for poweron. This meant that if HDMI
-> did -EPROBE_DEFER after it had grabbed its clocks, we'd power down the
-> PLLH (that had been on at boot time) and never recover.
->
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> Cc: stable at vger.kernel.org
+Fix these issues by implementing the new .get_pgsize_bitmap IOMMU op.
 
-please provide a Fixes tag.
+Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
+---
+ drivers/iommu/arm-smmu.c | 21 ++++++++++++++++++---
+ 1 file changed, 18 insertions(+), 3 deletions(-)
 
-Thanks Stefan
-
-> ---
-> drivers/clk/bcm/clk-bcm2835.c | 4 ++++
-> 1 file changed, 4 insertions(+)
->
-> diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-> index 87616de..7a79708 100644
-> --- a/drivers/clk/bcm/clk-bcm2835.c
-> +++ b/drivers/clk/bcm/clk-bcm2835.c
-> @@ -554,6 +554,10 @@ static int bcm2835_pll_on(struct clk_hw *hw)
-> const struct bcm2835_pll_data *data = pll->data;
-> ktime_t timeout;
->
-> + cprman_write(cprman, data->a2w_ctrl_reg,
-> + cprman_read(cprman, data->a2w_ctrl_reg) &
-> + ~A2W_PLL_CTRL_PWRDN);
-> +
-> /* Take the PLL out of reset. */
-> cprman_write(cprman, data->cm_ctrl_reg,
-> cprman_read(cprman, data->cm_ctrl_reg) & ~CM_PLL_ANARST);
-> --
-> 2.7.0
->
->
-> _______________________________________________
-> linux-rpi-kernel mailing list
-> linux-rpi-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rpi-kernel
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 2409e3bd3df2..a1b0f542d5ca 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -908,9 +908,6 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
+ 		goto out_clear_smmu;
+ 	}
+ 
+-	/* Update our support page sizes to reflect the page table format */
+-	arm_smmu_ops.pgsize_bitmap = pgtbl_cfg.pgsize_bitmap;
+-
+ 	/* Initialise the context bank with our page table cfg */
+ 	arm_smmu_init_context_bank(smmu_domain, &pgtbl_cfg);
+ 
+@@ -1462,6 +1459,23 @@ out_unlock:
+ 	return ret;
+ }
+ 
++static unsigned long arm_smmu_get_pgsize_bitmap(struct iommu_domain *domain)
++{
++	struct arm_smmu_domain *smmu_domain = domain->priv;
++
++	/*
++	 * if someone is calling map before attach just return the
++	 * supported page sizes for the hardware itself.
++	 */
++	if (!smmu_domain->pgtbl_cfg.pgsize_bitmap)
++		return arm_smmu_ops.pgsize_bitmap;
++	/*
++	 * otherwise return the page sizes supported by this specific page
++	 * table configuration
++	 */
++	return smmu_domain->pgtbl_cfg.pgsize_bitmap;
++}
++
+ static struct iommu_ops arm_smmu_ops = {
+ 	.capable		= arm_smmu_capable,
+ 	.domain_alloc		= arm_smmu_domain_alloc,
+@@ -1477,6 +1491,7 @@ static struct iommu_ops arm_smmu_ops = {
+ 	.domain_get_attr	= arm_smmu_domain_get_attr,
+ 	.domain_set_attr	= arm_smmu_domain_set_attr,
+ 	.pgsize_bitmap		= -1UL, /* Restricted during device attach */
++	.get_pgsize_bitmap	= arm_smmu_get_pgsize_bitmap,
+ };
+ 
+ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
