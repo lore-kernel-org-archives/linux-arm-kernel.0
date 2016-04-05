@@ -1,53 +1,97 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Tue, 5 Apr 2016 16:44:12 -0500
-Subject: [PATCH 4/4] ARM: DRA7: clockdomain: Implement timer workaround for
- errata i874
+Date: Tue, 5 Apr 2016 16:44:11 -0500
+Subject: [PATCH 3/4] ARM: DRA7: hwmod: Add data for GPTimer 12
 In-Reply-To: <1459892652-47845-1-git-send-email-s-anna@ti.com>
 References: <1459892652-47845-1-git-send-email-s-anna@ti.com>
-Message-ID: <1459892652-47845-5-git-send-email-s-anna@ti.com>
+Message-ID: <1459892652-47845-4-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Keerthy <j-keerthy@ti.com>
+Add the hwmod data for GPTimer 12. GPTimer 12 is present in
+WKUPAON power domain and is clocked from a secure 32K clock.
+GPTimer 12 serves as a secure timer on HS devices, but is
+available for kernel on regular GP devices.
 
-Errata Title:
-i874: TIMER5/6/7/8 interrupts not propagated
+The hwmod link is registered only on GP devices. The hwmod data
+also reused the existing timer class instead of reintroducing
+the identical dra7xx_timer_secure_sysc class which was dropped
+in commit edec17863362 ("ARM: DRA7: hwmod: Fix the hwmod class
+for GPTimer4").
 
-Description:
-When TIMER5, TIMER6, TIMER7, or TIMER8 clocks are enabled
-(CM_IPU_TIMER5/6/7/8_CLKCTRL[0:1]MODULEMODE=0x2:ENABLE) and the CD-IPU
-is in HW_AUTO mode (CM_IPU_CLKSTCTRL[0:1]CLKTRCTRL=0x3:HW_AUTO) the
-corresponding TIMER will continue counting, but enabled interrupts
-will not be propagated to the destinations (MPU, DSP, etc) in the
-SoC until the TIMER registers are accessed from the CPUs (MPU, DSP
-etc.). This can result in missed timer interrupts.
-
-Workaround:
-In order for TIMER5/6/7/8 interrupts to be propagated and serviced
-correctly the CD_IPU domain should be set to SW_WKUP mode
-(CM_IPU_CLKSTCTRL[0:1]CLKTRCTRL=0x2:SW_WKUP).
-
-The above workaround is achieved by switching the IPU clockdomain
-flags from HWSUP_SWSUP to SWSUP only.
-
-Signed-off-by: Keerthy <j-keerthy@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
 Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
- arch/arm/mach-omap2/clockdomains7xx_data.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 36 +++++++++++++++++++++++++++++--
+ 1 file changed, 34 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clockdomains7xx_data.c b/arch/arm/mach-omap2/clockdomains7xx_data.c
-index 7581e036bda6..ef9ed36e8a61 100644
---- a/arch/arm/mach-omap2/clockdomains7xx_data.c
-+++ b/arch/arm/mach-omap2/clockdomains7xx_data.c
-@@ -461,7 +461,7 @@ static struct clockdomain ipu_7xx_clkdm = {
- 	.cm_inst	  = DRA7XX_CM_CORE_AON_IPU_INST,
- 	.clkdm_offs	  = DRA7XX_CM_CORE_AON_IPU_IPU_CDOFFS,
- 	.dep_bit	  = DRA7XX_IPU_STATDEP_SHIFT,
--	.flags		  = CLKDM_CAN_HWSUP_SWSUP,
-+	.flags		  = CLKDM_CAN_SWSUP,
+diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+index 9442d89bd229..527c7c859e41 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+@@ -2065,6 +2065,20 @@ static struct omap_hwmod dra7xx_timer11_hwmod = {
+ 	},
  };
  
- static struct clockdomain mpu1_7xx_clkdm = {
++/* timer12 */
++static struct omap_hwmod dra7xx_timer12_hwmod = {
++	.name		= "timer12",
++	.class		= &dra7xx_timer_hwmod_class,
++	.clkdm_name	= "wkupaon_clkdm",
++	.main_clk	= "secure_32k_clk_src_ck",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_offs = DRA7XX_CM_WKUPAON_TIMER12_CLKCTRL_OFFSET,
++			.context_offs = DRA7XX_RM_WKUPAON_TIMER12_CONTEXT_OFFSET,
++		},
++	},
++};
++
+ /* timer13 */
+ static struct omap_hwmod dra7xx_timer13_hwmod = {
+ 	.name		= "timer13",
+@@ -3281,6 +3295,14 @@ static struct omap_hwmod_ocp_if dra7xx_l4_per1__timer11 = {
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ };
+ 
++/* l4_wkup -> timer12 */
++static struct omap_hwmod_ocp_if dra7xx_l4_wkup__timer12 = {
++	.master		= &dra7xx_l4_wkup_hwmod,
++	.slave		= &dra7xx_timer12_hwmod,
++	.clk		= "wkupaon_iclk_mux",
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
+ /* l4_per3 -> timer13 */
+ static struct omap_hwmod_ocp_if dra7xx_l4_per3__timer13 = {
+ 	.master		= &dra7xx_l4_per3_hwmod,
+@@ -3580,6 +3602,13 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
+ 	NULL,
+ };
+ 
++/* GP-only hwmod links */
++static struct omap_hwmod_ocp_if *dra7xx_gp_hwmod_ocp_ifs[] __initdata = {
++	&dra7xx_l4_wkup__timer12,
++	NULL,
++};
++
++/* SoC variant specific hwmod links */
+ static struct omap_hwmod_ocp_if *dra74x_hwmod_ocp_ifs[] __initdata = {
+ 	&dra7xx_l4_per3__usb_otg_ss4,
+ 	NULL,
+@@ -3597,9 +3626,12 @@ int __init dra7xx_hwmod_init(void)
+ 	ret = omap_hwmod_register_links(dra7xx_hwmod_ocp_ifs);
+ 
+ 	if (!ret && soc_is_dra74x())
+-		return omap_hwmod_register_links(dra74x_hwmod_ocp_ifs);
++		ret = omap_hwmod_register_links(dra74x_hwmod_ocp_ifs);
+ 	else if (!ret && soc_is_dra72x())
+-		return omap_hwmod_register_links(dra72x_hwmod_ocp_ifs);
++		ret = omap_hwmod_register_links(dra72x_hwmod_ocp_ifs);
++
++	if (!ret && omap_type() == OMAP2_DEVICE_TYPE_GP)
++		ret = omap_hwmod_register_links(dra7xx_gp_hwmod_ocp_ifs);
+ 
+ 	return ret;
+ }
 -- 
 2.7.4
