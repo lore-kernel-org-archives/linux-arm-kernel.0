@@ -1,39 +1,49 @@
-From: david.s.gordon@intel.com (Dave Gordon)
-Date: Tue, 5 Apr 2016 08:11:48 +0100
-Subject: [PATCH v2 4/7] scatterlist: add sg_alloc_table_from_buf() helper
-In-Reply-To: <20160330201831.38e1d6bd@bbrezillon>
-References: <1459352394-22810-1-git-send-email-boris.brezillon@free-electrons.com>
- <1459352394-22810-5-git-send-email-boris.brezillon@free-electrons.com>
- <20160330165143.GI2350@sirena.org.uk> <20160330201831.38e1d6bd@bbrezillon>
-Message-ID: <57036534.7010800@intel.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue,  5 Apr 2016 09:26:53 +0200
+Subject: [GIT PULL v3] ARM support for generic memremap()
+Message-ID: <1459841213-16915-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/03/16 19:18, Boris Brezillon wrote:
-> On Wed, 30 Mar 2016 09:51:43 -0700
-> Mark Brown <broonie@kernel.org> wrote:
->
->> On Wed, Mar 30, 2016 at 05:39:51PM +0200, Boris Brezillon wrote:
->>> sg_alloc_table_from_buf() provides an easy solution to create an sg_table
->>> from a virtual address pointer. This function takes care of dealing with
->>> vmallocated buffers, buffer alignment, or DMA engine limitations (maximum
->>> DMA transfer size).
->>
->> This seems nice.  Should we also have a further helper on top of this
->> which will get constraints from a dmaengine, it seems like it'd be a
->> common need?
->
-> Yep, we could create a wrapper extracting dma_slave caps info,
-> converting it to sg_constraints and calling sg_alloc_table_from_buf().
-> But let's try to get this function accepted first, and I'll send another
-> patch providing this wrapper.
->
-> BTW, do you see other things that should be added in sg_constraints?
->
+Hello Russell,
 
-You could compare with the things Solaris uses to describe the 
-restrictions on a DMA binding ...
+This pull request covers the updated v5 of this series that I sent out
+yesterday, which fixed the nommu breakage that was present in all previous
+versions. Please pull.
 
-http://docs.oracle.com/cd/E23824_01/html/821-1478/ddi-dma-attr-9s.html#REFMAN9Sddi-dma-attr-9s
+Regards,
+Ard.
 
-.Dave.
+---------8<-----------
+The following changes since commit 9735a22799b9214d17d3c231fe377fc852f042e9:
+
+  Linux 4.6-rc2 (2016-04-03 09:09:40 -0500)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/ard.biesheuvel/linux-arm.git \
+                                                 tags/arm-memremap-for-v4.7
+
+for you to fetch changes up to 9ab9e4fce45379cb6a7dbf87cf8f8e6ba01853c2:
+
+  ARM: memremap: implement arch_memremap_wb() (2016-04-04 10:26:42 +0200)
+
+----------------------------------------------------------------
+This series wires up the generic memremap() function for ARM in a way
+that allows it to be used as intended, i.e., without regard for whether
+the region being mapped is covered by a struct page and/or the linear
+mapping (lowmem)
+
+----------------------------------------------------------------
+Ard Biesheuvel (4):
+      ARM: reintroduce ioremap_cached() for creating cached I/O mappings
+      mtd: pxa2xx-flash: switch back from memremap to ioremap_cached
+      memremap: add arch specific hook for MEMREMAP_WB mappings
+      ARM: memremap: implement arch_memremap_wb()
+
+ arch/arm/include/asm/io.h       | 12 ++++++++++++
+ arch/arm/mm/ioremap.c           | 16 ++++++++++++++--
+ arch/arm/mm/nommu.c             |  9 +++++++++
+ drivers/mtd/maps/pxa2xx-flash.c |  6 +++---
+ kernel/memremap.c               | 11 +++++++++--
+ 5 files changed, 47 insertions(+), 7 deletions(-)
