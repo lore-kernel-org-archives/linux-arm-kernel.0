@@ -1,71 +1,40 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Tue, 5 Apr 2016 21:49:52 +0800
-Subject: [PATCH v8] acpi, apei, arm64: APEI initial support for aarch64.
-In-Reply-To: <570226A5.4000304@semihalf.com>
-References: <1459237458-12352-1-git-send-email-fu.wei@linaro.org>
- <CAKv+Gu-BHhf=aQ6ZP3J=q8T9FRtq-hfzTNvdJ3=HgMt=hVP8nQ@mail.gmail.com>
- <570226A5.4000304@semihalf.com>
-Message-ID: <CADyBb7ssjznmnX7smtDxf0K9xQyxg8MaUsXmp9EpvR5MhH2F3Q@mail.gmail.com>
+From: msalter@redhat.com (Mark Salter)
+Date: Tue, 05 Apr 2016 09:50:43 -0400
+Subject: [PATCH v3 04/14] c6x: use of_platform_default_populate() to
+ populate default bus
+In-Reply-To: <1459835982-26473-5-git-send-email-wangkefeng.wang@huawei.com>
+References: <1459835982-26473-1-git-send-email-wangkefeng.wang@huawei.com>
+ <1459835982-26473-5-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <1459864243.10130.17.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+On Tue, 2016-04-05 at 13:59 +0800, Kefeng Wang wrote:
+> Use helper of_platform_default_populate() in linux/of_platform
+> when possible, instead of calling of_platform_populate() with
+> the default match table.
+> 
+> Acked-by: Mark Salter <msalter@redhat.com>
+> Cc: Mark Salter <msalter@redhat.com>
+> Cc: Aurelien Jacquiot <a-jacquiot@ti.com>
+> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+> ---
 
-On 4 April 2016 at 16:32, Tomasz Nowicki <tn@semihalf.com> wrote:
-> On 30.03.2016 09:05, Ard Biesheuvel wrote:
->>
->> On 29 March 2016 at 09:44,  <fu.wei@linaro.org> wrote:
->>>
->>> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
->>>
->>> This commit provides APEI arch-specific bits for aarch64
->>>
->>> Meanwhile,
->>> (1)add a new subfunction "hest_ia32_init" for
->>> "acpi_disable_cmcff" which is used by IA-32 Architecture
->>> Corrected Machine Check (CMC).
->>> (2)move HEST type (ACPI_HEST_TYPE_IA32_CORRECTED_CHECK) checking to
->>> a generic place.
->>> (3)select EFI when ACPI_APEI is set on ARM64,
->>> because arch_apei_get_mem_attribute is using efi_mem_attributes on ARM64.
->>
->>
->> I think selecting 'EFI' is not the right approach here, especially
->> since EFI is implied by ACPI on that architecture. But selecting a
->> user configurable option like this is typically not recommended. Why
->> doesn't ACPI_APEI depend on ACPI?
->
->
-> It does, ACPI_APEI is subsection of the main ACPI menu option, but I don't
-> see that ACPI implies EFI in Kconfig.
->
-> Also, I agree with Ard, EFI should not be selected conditionally for ARM64
-> for ACPI_APEI.
->
-> We need EFI only for ARM64 so how about:
-> +       select HAVE_ACPI_APEI if (ACPI && EFI)
-> in arch/arm64/Kconfig and leave ACPI_APEI as is?
+Acked-by: Mark Salter <msalter@redhat.com>
 
-I also agree with Ard, and I like "select HAVE_ACPI_APEI if (ACPI && EFI)"
-
-Thanks for your suggestion !! :-)
-
->
-> Regards,
-> Tomasz
->
->
-
-
-
--- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat Software (Beijing) Co.,Ltd.Shanghai Branch
-Ph: +86 21 61221326(direct)
-Ph: +86 186 2020 4684 (mobile)
-Room 1512, Regus One Corporate Avenue,Level 15,
-One Corporate Avenue,222 Hubin Road,Huangpu District,
-Shanghai,China 200021
+> ?arch/c6x/platforms/platform.c | 2 +-
+> ?1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/c6x/platforms/platform.c b/arch/c6x/platforms/platform.c
+> index 26c1a35..8412334 100644
+> --- a/arch/c6x/platforms/platform.c
+> +++ b/arch/c6x/platforms/platform.c
+> @@ -11,7 +11,7 @@
+> ?
+> ?static int __init c6x_device_probe(void)
+> ?{
+> -	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> +	of_platform_default_populate(NULL, NULL, NULL);
+> ?	return 0;
+> ?}
+> ?core_initcall(c6x_device_probe);
