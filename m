@@ -1,131 +1,246 @@
 From: cmetcalf@mellanox.com (Chris Metcalf)
-Date: Tue, 5 Apr 2016 13:26:44 -0400
-Subject: [PATCH v5 0/4] improvements to the nmi_backtrace code
-In-Reply-To: <201604031905.WLWlnyKg%fengguang.wu@intel.com>
-Message-ID: <1459877208-15119-1-git-send-email-cmetcalf@mellanox.com>
+Date: Tue, 5 Apr 2016 13:26:45 -0400
+Subject: [PATCH v5 1/4] nmi_backtrace: add more trigger_*_cpu_backtrace()
+ methods
+In-Reply-To: <1459877208-15119-1-git-send-email-cmetcalf@mellanox.com>
+References: <1459877208-15119-1-git-send-email-cmetcalf@mellanox.com>
+Message-ID: <1459877208-15119-2-git-send-email-cmetcalf@mellanox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is just a one-line change to the v4 series, to catch the new arm
-vmlinux-xip.lds.S file, which I missed when I rebased to 4.6 for v4
-(my arm config for testing did not include CONFIG_XIP_KERNEL).
-Thanks to Fengguang Wu and the 0-day test robot for that.
+Currently you can only request a backtrace of either all cpus, or
+all cpus but yourself.  It can also be helpful to request a remote
+backtrace of a single cpu, and since we want that, the logical
+extension is to support a cpumask as the underlying primitive.
 
-Whose tree would this go through?  I have an ack for Peter Z for
-patch 4/4 and no other feedback for patches 1/4 or 2/4; I can
-certainly push 3/4 through the tile tree myself if that helps, though
-my guess is keeping it with the rest of the series makes more sense
-for tile since it doesn't lose any functionality that way.
+This change modifies the existing lib/nmi_backtrace.c code to take
+a cpumask as its basic primitive, and modifies the linux/nmi.h code
+to use either the old "all/all_but_self" arch methods, or the new
+"cpumask" method, depending on which is available.
 
->From the version 1 cover letter:
+The existing clients of nmi_backtrace (arm and x86) are converted
+to using the new cpumask approach in this change.
 
-  This patch series modifies the trigger_xxx_backtrace() NMI-based
-  remote backtracing code to make it more flexible, and makes a few
-  small improvements along the way.
+Signed-off-by: Chris Metcalf <cmetcalf@mellanox.com>
+---
+ arch/arm/include/asm/irq.h    |  4 +--
+ arch/arm/kernel/smp.c         |  4 +--
+ arch/x86/include/asm/irq.h    |  4 +--
+ arch/x86/kernel/apic/hw_nmi.c |  6 ++---
+ include/linux/nmi.h           | 63 ++++++++++++++++++++++++++++++++++---------
+ lib/nmi_backtrace.c           | 15 +++++------
+ 6 files changed, 65 insertions(+), 31 deletions(-)
 
-  The motivation comes from the task isolation code, where there are
-  scenarios where we want to be able to diagnose a case where some cpu
-  is about to interrupt a task-isolated cpu.  It can be helpful to
-  see both where the interrupting cpu is, and also an approximation
-  of where the cpu that is being interrupted is.  The nmi_backtrace
-  framework allows us to discover the stack of the interrupted cpu.
-
-I've tested that the change works as desired on tile, and build-tested
-x86, arm64, and arm.  For x86 and arm64 I confirmed that the generic
-cpuidle stuff as well as the architecture-specific routines are in the
-new cpuidle section.  For arm I just build-tested it and made sure the
-generic cpuidle routines were in the new cpuidle section, but I didn't
-attempt to tease apart the tangle of platform-specific idle routines
-that arm has and tag them with __cpuidle.  That might be more usefully
-done by someone with arm platform experience in a follow-up patch.
-
-I have also pushed it up to kernel.org to pull if that's easier:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/cmetcalf/linux-tile.git nmi-backtrace
-
-The change conflicts with Petr Mladek's NMI printk cleanup patches:
-
-https://lkml.kernel.org/r/1459353210-20260-1-git-send-email-pmladek at suse.com
-
-He has kindly offered to resolve the conflicts.
-
-v5: Add CPUIDLE_TEXT to the new arch/arm/kernel/vmlinux-xip.lds.S
-
-v4: Added some more __cpuidle functions (PeterZ, Rafael Wysocki)
-    Rebased to kernel v4.6-rc1
-
-v3: Various improvements to the set of __cpuidle functions;
-    Add back in a missing section accidentally removed in modpost.c (PeterZ)
-    https://lkml.kernel.org/r/1458667179-19630-1-git-send-email-cmetcalf at mellanox.com
-
-v2: Switch to using __cpuidle tagging, switch S-O-B to Mellanox
-    https://lkml.kernel.org/r/1458147733-29338-1-git-send-email-cmetcalf at mellanox.com
-
-Chris Metcalf (4):
-  nmi_backtrace: add more trigger_*_cpu_backtrace() methods
-  nmi_backtrace: do a local dump_stack() instead of a self-NMI
-  arch/tile: adopt the new nmi_backtrace framework
-  nmi_backtrace: generate one-line reports for idle cpus
-
- arch/alpha/kernel/vmlinux.lds.S      |  1 +
- arch/arc/kernel/vmlinux.lds.S        |  1 +
- arch/arm/include/asm/irq.h           |  4 +-
- arch/arm/kernel/smp.c                | 13 +------
- arch/arm/kernel/vmlinux-xip.lds.S    |  1 +
- arch/arm/kernel/vmlinux.lds.S        |  1 +
- arch/arm64/kernel/vmlinux.lds.S      |  1 +
- arch/arm64/mm/proc.S                 |  2 +
- arch/avr32/kernel/vmlinux.lds.S      |  1 +
- arch/blackfin/kernel/vmlinux.lds.S   |  1 +
- arch/c6x/kernel/vmlinux.lds.S        |  1 +
- arch/cris/kernel/vmlinux.lds.S       |  1 +
- arch/frv/kernel/vmlinux.lds.S        |  1 +
- arch/h8300/kernel/vmlinux.lds.S      |  1 +
- arch/hexagon/kernel/vmlinux.lds.S    |  1 +
- arch/ia64/kernel/vmlinux.lds.S       |  1 +
- arch/m32r/kernel/vmlinux.lds.S       |  1 +
- arch/m68k/kernel/vmlinux-nommu.lds   |  1 +
- arch/m68k/kernel/vmlinux-std.lds     |  1 +
- arch/m68k/kernel/vmlinux-sun3.lds    |  1 +
- arch/metag/kernel/vmlinux.lds.S      |  1 +
- arch/microblaze/kernel/vmlinux.lds.S |  1 +
- arch/mips/kernel/vmlinux.lds.S       |  1 +
- arch/mn10300/kernel/vmlinux.lds.S    |  1 +
- arch/nios2/kernel/vmlinux.lds.S      |  1 +
- arch/openrisc/kernel/vmlinux.lds.S   |  1 +
- arch/parisc/kernel/vmlinux.lds.S     |  1 +
- arch/powerpc/kernel/vmlinux.lds.S    |  1 +
- arch/s390/kernel/vmlinux.lds.S       |  1 +
- arch/score/kernel/vmlinux.lds.S      |  1 +
- arch/sh/kernel/vmlinux.lds.S         |  1 +
- arch/sparc/kernel/vmlinux.lds.S      |  1 +
- arch/tile/include/asm/irq.h          |  4 +-
- arch/tile/kernel/entry.S             |  2 +-
- arch/tile/kernel/pmc.c               |  3 --
- arch/tile/kernel/process.c           | 72 ++++++++----------------------------
- arch/tile/kernel/traps.c             |  7 +++-
- arch/tile/kernel/vmlinux.lds.S       |  1 +
- arch/um/kernel/dyn.lds.S             |  1 +
- arch/um/kernel/uml.lds.S             |  1 +
- arch/unicore32/kernel/vmlinux.lds.S  |  1 +
- arch/x86/include/asm/irq.h           |  4 +-
- arch/x86/kernel/acpi/cstate.c        |  2 +-
- arch/x86/kernel/apic/hw_nmi.c        |  6 +--
- arch/x86/kernel/process.c            |  4 +-
- arch/x86/kernel/vmlinux.lds.S        |  1 +
- arch/xtensa/kernel/vmlinux.lds.S     |  3 ++
- drivers/acpi/processor_idle.c        |  5 ++-
- drivers/cpuidle/driver.c             |  5 ++-
- drivers/idle/intel_idle.c            |  4 +-
- include/asm-generic/vmlinux.lds.h    |  6 +++
- include/linux/cpu.h                  |  5 +++
- include/linux/nmi.h                  | 63 ++++++++++++++++++++++++-------
- kernel/sched/idle.c                  | 13 ++++++-
- lib/nmi_backtrace.c                  | 40 +++++++++++++-------
- scripts/mod/modpost.c                |  2 +-
- scripts/recordmcount.c               |  1 +
- scripts/recordmcount.pl              |  1 +
- 58 files changed, 184 insertions(+), 121 deletions(-)
-
+diff --git a/arch/arm/include/asm/irq.h b/arch/arm/include/asm/irq.h
+index 1bd9510de1b9..13f9a9a17eca 100644
+--- a/arch/arm/include/asm/irq.h
++++ b/arch/arm/include/asm/irq.h
+@@ -36,8 +36,8 @@ extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
+ #endif
+ 
+ #ifdef CONFIG_SMP
+-extern void arch_trigger_all_cpu_backtrace(bool);
+-#define arch_trigger_all_cpu_backtrace(x) arch_trigger_all_cpu_backtrace(x)
++extern void arch_trigger_cpumask_backtrace(const cpumask_t *mask);
++#define arch_trigger_cpumask_backtrace(x) arch_trigger_cpumask_backtrace(x)
+ #endif
+ 
+ static inline int nr_legacy_irqs(void)
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index baee70267f29..72ad8485993a 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -758,7 +758,7 @@ static void raise_nmi(cpumask_t *mask)
+ 	smp_cross_call(mask, IPI_CPU_BACKTRACE);
+ }
+ 
+-void arch_trigger_all_cpu_backtrace(bool include_self)
++void arch_trigger_cpumask_backtrace(const cpumask_t *mask)
+ {
+-	nmi_trigger_all_cpu_backtrace(include_self, raise_nmi);
++	nmi_trigger_cpumask_backtrace(mask, raise_nmi);
+ }
+diff --git a/arch/x86/include/asm/irq.h b/arch/x86/include/asm/irq.h
+index e7de5c9a4fbd..18bdc8cc5c63 100644
+--- a/arch/x86/include/asm/irq.h
++++ b/arch/x86/include/asm/irq.h
+@@ -50,8 +50,8 @@ extern int vector_used_by_percpu_irq(unsigned int vector);
+ extern void init_ISA_irqs(void);
+ 
+ #ifdef CONFIG_X86_LOCAL_APIC
+-void arch_trigger_all_cpu_backtrace(bool);
+-#define arch_trigger_all_cpu_backtrace arch_trigger_all_cpu_backtrace
++void arch_trigger_cpumask_backtrace(const struct cpumask *mask);
++#define arch_trigger_cpumask_backtrace arch_trigger_cpumask_backtrace
+ #endif
+ 
+ #endif /* _ASM_X86_IRQ_H */
+diff --git a/arch/x86/kernel/apic/hw_nmi.c b/arch/x86/kernel/apic/hw_nmi.c
+index 045e424fb368..63f0b69ad6a6 100644
+--- a/arch/x86/kernel/apic/hw_nmi.c
++++ b/arch/x86/kernel/apic/hw_nmi.c
+@@ -27,15 +27,15 @@ u64 hw_nmi_get_sample_period(int watchdog_thresh)
+ }
+ #endif
+ 
+-#ifdef arch_trigger_all_cpu_backtrace
++#ifdef arch_trigger_cpumask_backtrace
+ static void nmi_raise_cpu_backtrace(cpumask_t *mask)
+ {
+ 	apic->send_IPI_mask(mask, NMI_VECTOR);
+ }
+ 
+-void arch_trigger_all_cpu_backtrace(bool include_self)
++void arch_trigger_cpumask_backtrace(const cpumask_t *mask)
+ {
+-	nmi_trigger_all_cpu_backtrace(include_self, nmi_raise_cpu_backtrace);
++	nmi_trigger_cpumask_backtrace(mask, nmi_raise_cpu_backtrace);
+ }
+ 
+ static int
+diff --git a/include/linux/nmi.h b/include/linux/nmi.h
+index 4630eeae18e0..434208af10fc 100644
+--- a/include/linux/nmi.h
++++ b/include/linux/nmi.h
+@@ -31,38 +31,75 @@ static inline void hardlockup_detector_disable(void) {}
+ #endif
+ 
+ /*
+- * Create trigger_all_cpu_backtrace() out of the arch-provided
+- * base function. Return whether such support was available,
++ * Create trigger_all_cpu_backtrace() etc out of the arch-provided
++ * base function(s). Return whether such support was available,
+  * to allow calling code to fall back to some other mechanism:
+  */
+-#ifdef arch_trigger_all_cpu_backtrace
+ static inline bool trigger_all_cpu_backtrace(void)
+ {
++#if defined(arch_trigger_all_cpu_backtrace)
+ 	arch_trigger_all_cpu_backtrace(true);
+-
+ 	return true;
++#elif defined(arch_trigger_cpumask_backtrace)
++	arch_trigger_cpumask_backtrace(cpu_online_mask);
++	return true;
++#else
++	return false;
++#endif
+ }
++
+ static inline bool trigger_allbutself_cpu_backtrace(void)
+ {
++#if defined(arch_trigger_all_cpu_backtrace)
+ 	arch_trigger_all_cpu_backtrace(false);
+ 	return true;
+-}
+-
+-/* generic implementation */
+-void nmi_trigger_all_cpu_backtrace(bool include_self,
+-				   void (*raise)(cpumask_t *mask));
+-bool nmi_cpu_backtrace(struct pt_regs *regs);
++#elif defined(arch_trigger_cpumask_backtrace)
++	cpumask_var_t mask;
++	int cpu = get_cpu();
+ 
++	if (!alloc_cpumask_var(&mask, GFP_KERNEL))
++		return false;
++	cpumask_copy(mask, cpu_online_mask);
++	cpumask_clear_cpu(cpu, mask);
++	arch_trigger_cpumask_backtrace(mask);
++	put_cpu();
++	free_cpumask_var(mask);
++	return true;
+ #else
+-static inline bool trigger_all_cpu_backtrace(void)
+-{
+ 	return false;
++#endif
+ }
+-static inline bool trigger_allbutself_cpu_backtrace(void)
++
++static inline bool trigger_cpumask_backtrace(struct cpumask *mask)
+ {
++#if defined(arch_trigger_cpumask_backtrace)
++	arch_trigger_cpumask_backtrace(mask);
++	return true;
++#else
+ 	return false;
++#endif
+ }
++
++static inline bool trigger_single_cpu_backtrace(int cpu)
++{
++#if defined(arch_trigger_cpumask_backtrace)
++	cpumask_var_t mask;
++
++	if (!zalloc_cpumask_var(&mask, GFP_KERNEL))
++		return false;
++	cpumask_set_cpu(cpu, mask);
++	arch_trigger_cpumask_backtrace(mask);
++	free_cpumask_var(mask);
++	return true;
++#else
++	return false;
+ #endif
++}
++
++/* generic implementation */
++void nmi_trigger_cpumask_backtrace(const cpumask_t *mask,
++				   void (*raise)(cpumask_t *mask));
++bool nmi_cpu_backtrace(struct pt_regs *regs);
+ 
+ #ifdef CONFIG_LOCKUP_DETECTOR
+ u64 hw_nmi_get_sample_period(int watchdog_thresh);
+diff --git a/lib/nmi_backtrace.c b/lib/nmi_backtrace.c
+index 6019c53c669e..db63ac75eba0 100644
+--- a/lib/nmi_backtrace.c
++++ b/lib/nmi_backtrace.c
+@@ -18,7 +18,7 @@
+ #include <linux/nmi.h>
+ #include <linux/seq_buf.h>
+ 
+-#ifdef arch_trigger_all_cpu_backtrace
++#ifdef arch_trigger_cpumask_backtrace
+ /* For reliability, we're prepared to waste bits here. */
+ static DECLARE_BITMAP(backtrace_mask, NR_CPUS) __read_mostly;
+ static cpumask_t printtrace_mask;
+@@ -44,12 +44,12 @@ static void print_seq_line(struct nmi_seq_buf *s, int start, int end)
+ }
+ 
+ /*
+- * When raise() is called it will be is passed a pointer to the
++ * When raise() is called it will be passed a pointer to the
+  * backtrace_mask. Architectures that call nmi_cpu_backtrace()
+  * directly from their raise() functions may rely on the mask
+  * they are passed being updated as a side effect of this call.
+  */
+-void nmi_trigger_all_cpu_backtrace(bool include_self,
++void nmi_trigger_cpumask_backtrace(const cpumask_t *mask,
+ 				   void (*raise)(cpumask_t *mask))
+ {
+ 	struct nmi_seq_buf *s;
+@@ -64,10 +64,7 @@ void nmi_trigger_all_cpu_backtrace(bool include_self,
+ 		return;
+ 	}
+ 
+-	cpumask_copy(to_cpumask(backtrace_mask), cpu_online_mask);
+-	if (!include_self)
+-		cpumask_clear_cpu(this_cpu, to_cpumask(backtrace_mask));
+-
++	cpumask_copy(to_cpumask(backtrace_mask), mask);
+ 	cpumask_copy(&printtrace_mask, to_cpumask(backtrace_mask));
+ 
+ 	/*
+@@ -80,8 +77,8 @@ void nmi_trigger_all_cpu_backtrace(bool include_self,
+ 	}
+ 
+ 	if (!cpumask_empty(to_cpumask(backtrace_mask))) {
+-		pr_info("Sending NMI to %s CPUs:\n",
+-			(include_self ? "all" : "other"));
++		pr_info("Sending NMI from CPU %d to CPUs %*pbl:\n",
++			this_cpu, nr_cpumask_bits, to_cpumask(backtrace_mask));
+ 		raise(to_cpumask(backtrace_mask));
+ 	}
+ 
 -- 
 2.7.2
