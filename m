@@ -1,107 +1,53 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Tue, 5 Apr 2016 13:59:31 +0800
-Subject: [PATCH v3 03/14] mips: use of_platform_default_populate() to populate
- default bus
-In-Reply-To: <1459835982-26473-1-git-send-email-wangkefeng.wang@huawei.com>
-References: <1459835982-26473-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1459835982-26473-4-git-send-email-wangkefeng.wang@huawei.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Tue, 5 Apr 2016 00:59:06 -0500
+Subject: [PATCH 1/2] qcom: ipq4019: Add regulator support to DK04 device
+ tree
+In-Reply-To: <1459804090-31739-1-git-send-email-ssambang@codeaurora.org>
+References: <1459804090-31739-1-git-send-email-ssambang@codeaurora.org>
+Message-ID: <20160405055906.GB2639@hector>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use helper of_platform_default_populate() in linux/of_platform
-when possible, instead of calling of_platform_populate() with
-the default match table.
+On Mon, Apr 04, 2016 at 02:08:10PM -0700, Sreedhar Sambangi wrote:
+>     This adds the regulator nodes to DK04 device tree to support
+> 
+> Change-Id: I9c1df0e720a330bf6db1889fd2247f6a70ea6faa
+> Signed-off-by: Sreedhar Sambangi <ssambang@codeaurora.org>
+> ---
+>  .../bindings/regulator/ipq4019-regulator.txt          | 19 +++++++++++++++++++
+>  arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1.dtsi         | 11 +++++++++++
+>  2 files changed, 30 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/regulator/ipq4019-regulator.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/regulator/ipq4019-regulator.txt b/Documentation/devicetree/bindings/regulator/ipq4019-regulator.txt
+> new file mode 100644
+> index 0000000..9d934a4
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/regulator/ipq4019-regulator.txt
+> @@ -0,0 +1,19 @@
+> +* Qualcomm Technologies, Inc. IPQ4019 regulators
+> +
+> +Required properties:
+> +- compatible		: Must be "regulator-ipq4019".
+> +- states		: Selection of available voltages and corresponding values
+> +- reg			: Register address for controlling LDO
+> +- mask			: Mask value for switching voltages
+> +Example:
 
-Tested-by: Joshua Henderson <joshua.henderson@microchip.com>
-Cc: Ralf Baechle <ralf@linux-mips.org>
-Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
----
- arch/mips/ath79/setup.c           | 2 +-
- arch/mips/jz4740/setup.c          | 2 +-
- arch/mips/mti-sead3/sead3-setup.c | 2 +-
- arch/mips/pic32/pic32mzda/init.c  | 3 +--
- arch/mips/pistachio/init.c        | 2 +-
- arch/mips/xilfpga/init.c          | 2 +-
- 6 files changed, 6 insertions(+), 7 deletions(-)
+How many LDOs are there on the IPQ4019?  Can you document all of the supplies?
+You can figure this out by looking for the vdd pins in the chip documentation
 
-diff --git a/arch/mips/ath79/setup.c b/arch/mips/ath79/setup.c
-index be451ee4a..51deb50 100644
---- a/arch/mips/ath79/setup.c
-+++ b/arch/mips/ath79/setup.c
-@@ -248,7 +248,7 @@ void __init plat_time_init(void)
- 
- static int __init ath79_setup(void)
- {
--	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+	of_platform_default_populate(NULL, NULL, NULL);
- 	if  (mips_machtype == ATH79_MACH_GENERIC_OF)
- 		return 0;
- 
-diff --git a/arch/mips/jz4740/setup.c b/arch/mips/jz4740/setup.c
-index 510fc0d..d175c74 100644
---- a/arch/mips/jz4740/setup.c
-+++ b/arch/mips/jz4740/setup.c
-@@ -76,7 +76,7 @@ void __init device_tree_init(void)
- 
- static int __init populate_machine(void)
- {
--	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+	of_platform_default_populate(NULL, NULL, NULL);
- 	return 0;
- }
- arch_initcall(populate_machine);
-diff --git a/arch/mips/mti-sead3/sead3-setup.c b/arch/mips/mti-sead3/sead3-setup.c
-index e43f480..bc73f32 100644
---- a/arch/mips/mti-sead3/sead3-setup.c
-+++ b/arch/mips/mti-sead3/sead3-setup.c
-@@ -105,7 +105,7 @@ void __init device_tree_init(void)
- 
- static int __init customize_machine(void)
- {
--	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+	of_platform_default_populate(NULL, NULL, NULL);
- 	return 0;
- }
- arch_initcall(customize_machine);
-diff --git a/arch/mips/pic32/pic32mzda/init.c b/arch/mips/pic32/pic32mzda/init.c
-index 775ff90..77ecf32 100644
---- a/arch/mips/pic32/pic32mzda/init.c
-+++ b/arch/mips/pic32/pic32mzda/init.c
-@@ -147,8 +147,7 @@ static int __init plat_of_setup(void)
- 		panic("Device tree not present");
- 
- 	pic32_of_prepare_platform_data(pic32_auxdata_lookup);
--	if (of_platform_populate(NULL, of_default_bus_match_table,
--				 pic32_auxdata_lookup, NULL))
-+	if (of_platform_default_populate(NULL, pic32_auxdata_lookup, NULL))
- 		panic("Failed to populate DT");
- 
- 	return 0;
-diff --git a/arch/mips/pistachio/init.c b/arch/mips/pistachio/init.c
-index 96ba2cc..0bc25e3 100644
---- a/arch/mips/pistachio/init.c
-+++ b/arch/mips/pistachio/init.c
-@@ -128,7 +128,7 @@ static int __init plat_of_setup(void)
- 	if (!of_have_populated_dt())
- 		panic("Device tree not present");
- 
--	if (of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL))
-+	if (of_platform_default_populate(NULL, NULL, NULL))
- 		panic("Failed to populate DT");
- 
- 	return 0;
-diff --git a/arch/mips/xilfpga/init.c b/arch/mips/xilfpga/init.c
-index ce2aee2..a97382f 100644
---- a/arch/mips/xilfpga/init.c
-+++ b/arch/mips/xilfpga/init.c
-@@ -49,7 +49,7 @@ static int __init plat_of_setup(void)
- 	if (!of_have_populated_dt())
- 		panic("Device tree not present");
- 
--	if (of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL))
-+	if (of_platform_default_populate(NULL, NULL, NULL))
- 		panic("Failed to populate DT");
- 
- 	return 0;
--- 
-2.6.0.GIT
+> +
+> +	vccq_sd0: regulator at 0 {
+> +		compatible = "qcom,regulator-ipq4019";
+> +		regulator-name = "SD0 VccQ";
+> +		regulator-min-microvolt = <1800000>;
+> +		regulator-max-microvolt = <3000000>;
+> +		states = <3000000 0x3
+> +			1800000 0x1>;
+
+So there are only 2 states?  No linear range from 1.8 to 3.3?
+
+> +		reg = <0x01948000 0x4>;
+> +		mask = <0x3>;
+> +	};
