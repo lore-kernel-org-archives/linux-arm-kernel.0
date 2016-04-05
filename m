@@ -1,75 +1,54 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 5 Apr 2016 22:51:37 +0200
-Subject: 4.4: camera and unlock buttons produce tons of interrupts (was
- Re: N900 sleep mode)
-In-Reply-To: <20160405152916.GE16484@atomide.com>
-References: <20160201211736.GA11283@amd> <20160201221111.GP19432@atomide.com>
- <20160207212316.GA6147@amd> <20160209172403.GK19432@atomide.com>
- <20160323123801.GC32031@amd> <20160330191208.GW9329@atomide.com>
- <20160404213056.GA25912@amd> <20160404220748.GA16484@atomide.com>
- <20160405142250.GA6429@amd> <20160405152916.GE16484@atomide.com>
-Message-ID: <20160405205137.GA10196@amd>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 5 Apr 2016 22:52:30 +0200 (CEST)
+Subject: [PATCH 2/2] clk: bcm2835: Fix PLL poweron
+In-Reply-To: <1459826456-18812-3-git-send-email-eric@anholt.net>
+References: <1459826456-18812-1-git-send-email-eric@anholt.net>
+ <1459826456-18812-3-git-send-email-eric@anholt.net>
+Message-ID: <1945341121.176536.ed7e19c8-94d6-4e1c-b383-3e4ae025eeac.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Eric,
 
-> > Ok, I realized that _something_ set up my keyboard on console, too, so
-> > I'm able to do "init 1" and still interact with the console.
-> > 
-> > cm_idlest1_core blocking bits are now 0x42 pretty consistently. But
-> > they stay 0x42, even when screen is on (and screen on prevents low
-> > power, right?) so I guess they are not the whole story.
-> 
-> Yes they stay at 0x42. And it seems you've configured the UART
-> idle timeouts too.
+> Eric Anholt <eric@anholt.net> hat am 5. April 2016 um 05:20 geschrieben:
+>
+>
+> In poweroff, we set the reset bit and the power down bit, but only
+> managed to unset the reset bit for poweron. This meant that if HDMI
+> did -EPROBE_DEFER after it had grabbed its clocks, we'd power down the
+> PLLH (that had been on at boot time) and never recover.
+>
+> Signed-off-by: Eric Anholt <eric@anholt.net>
+> Cc: stable at vger.kernel.org
 
-Yes, thanks for the script ;-).
+please provide a Fixes tag.
 
-> > I'm able to get down to 50mA power consumption with screen off. I was
-> > getting 90mA with X, wifi in powersave and screen off.
-> > 
-> > Head proximity sensor is still on in this configuration. But I guess
-> > that should not keep the system busy...?
-> > 
-> > Ok, wait a moment, I'm getting "Camera Focus", "Camera Capture" and
-> > "Lock button" interrupts ... at something like 20/second. Without
-> > touching anything. Hmm. Also "pm_wkup", but that might be
-> > expected. Plus, 49052000.gpio and 49054000.gpio are rather
-> > active. Might be related to the above. Also "gp_timer" and
-> > 48070000.i2c are active, perhaps also related. I don't think I have
-> > the camera working...
-> 
-> Hmm that does not sound right at all for the GPIOs. The pm_wkup
-> interrupt triggers every time you hit wfi pretty much, so that
-> should be OK.
+Thanks Stefan
 
-Wifi was down at that point.
-
-Some more testing: after boot, interrupt counts stay low, as
-expected. But when I attempt to enable power management, they start
-rising. Sometimes 60/second, sometimes less.
-
-Things are fine as long as I don't enable the off mode; when I enable
-the off mode, "echo 1 > /sys/kernel/debug/pm_debug/enable_off_mode"
-interrupt counts start rising immediately. "echo 0 >
-/sys/kernel/debug/pm_debug/enable_off_mode" stops that.
-
-But no matter what configuration, activity LEDs still indicate it is
-busy, and idle power consumption is cca 53mA.
-
-> > "Lock button" interrupt stops increasing as long as I hold the lock
-> > button in the "unlock" position. "Camera Focus" and "Camera Capture"
-> > will stop increasing when I hold down the Camera button.
-> 
-> I have not seen that issue last time I checked. Sorry won't
-> be able to test it until Thursday, maybe there's some GPIO
-> regression now.
-
-No problem, thanks for all the help.
-
-Best regards,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+> ---
+> drivers/clk/bcm/clk-bcm2835.c | 4 ++++
+> 1 file changed, 4 insertions(+)
+>
+> diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
+> index 87616de..7a79708 100644
+> --- a/drivers/clk/bcm/clk-bcm2835.c
+> +++ b/drivers/clk/bcm/clk-bcm2835.c
+> @@ -554,6 +554,10 @@ static int bcm2835_pll_on(struct clk_hw *hw)
+> const struct bcm2835_pll_data *data = pll->data;
+> ktime_t timeout;
+>
+> + cprman_write(cprman, data->a2w_ctrl_reg,
+> + cprman_read(cprman, data->a2w_ctrl_reg) &
+> + ~A2W_PLL_CTRL_PWRDN);
+> +
+> /* Take the PLL out of reset. */
+> cprman_write(cprman, data->cm_ctrl_reg,
+> cprman_read(cprman, data->cm_ctrl_reg) & ~CM_PLL_ANARST);
+> --
+> 2.7.0
+>
+>
+> _______________________________________________
+> linux-rpi-kernel mailing list
+> linux-rpi-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rpi-kernel
