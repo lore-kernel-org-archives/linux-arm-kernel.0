@@ -1,68 +1,71 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 5 Apr 2016 14:44:34 +0100
-Subject: [PATCH 2/4] irqchip: bcm2836: Drop smp_set_ops on arm64 builds
-In-Reply-To: <1459827858-3871-3-git-send-email-eric@anholt.net>
-References: <1459827858-3871-1-git-send-email-eric@anholt.net>
- <1459827858-3871-3-git-send-email-eric@anholt.net>
-Message-ID: <5703C142.6050904@arm.com>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Tue, 5 Apr 2016 21:49:52 +0800
+Subject: [PATCH v8] acpi, apei, arm64: APEI initial support for aarch64.
+In-Reply-To: <570226A5.4000304@semihalf.com>
+References: <1459237458-12352-1-git-send-email-fu.wei@linaro.org>
+ <CAKv+Gu-BHhf=aQ6ZP3J=q8T9FRtq-hfzTNvdJ3=HgMt=hVP8nQ@mail.gmail.com>
+ <570226A5.4000304@semihalf.com>
+Message-ID: <CADyBb7ssjznmnX7smtDxf0K9xQyxg8MaUsXmp9EpvR5MhH2F3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eric,
+Hi Tomasz,
 
-On 05/04/16 04:44, Eric Anholt wrote:
-> For arm64, the bootloader will instead be implementing the spin-table
-> enable method.
+On 4 April 2016 at 16:32, Tomasz Nowicki <tn@semihalf.com> wrote:
+> On 30.03.2016 09:05, Ard Biesheuvel wrote:
+>>
+>> On 29 March 2016 at 09:44,  <fu.wei@linaro.org> wrote:
+>>>
+>>> From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+>>>
+>>> This commit provides APEI arch-specific bits for aarch64
+>>>
+>>> Meanwhile,
+>>> (1)add a new subfunction "hest_ia32_init" for
+>>> "acpi_disable_cmcff" which is used by IA-32 Architecture
+>>> Corrected Machine Check (CMC).
+>>> (2)move HEST type (ACPI_HEST_TYPE_IA32_CORRECTED_CHECK) checking to
+>>> a generic place.
+>>> (3)select EFI when ACPI_APEI is set on ARM64,
+>>> because arch_apei_get_mem_attribute is using efi_mem_attributes on ARM64.
+>>
+>>
+>> I think selecting 'EFI' is not the right approach here, especially
+>> since EFI is implied by ACPI on that architecture. But selecting a
+>> user configurable option like this is typically not recommended. Why
+>> doesn't ACPI_APEI depend on ACPI?
+>
+>
+> It does, ACPI_APEI is subsection of the main ACPI menu option, but I don't
+> see that ACPI implies EFI in Kconfig.
+>
+> Also, I agree with Ard, EFI should not be selected conditionally for ARM64
+> for ACPI_APEI.
+>
+> We need EFI only for ARM64 so how about:
+> +       select HAVE_ACPI_APEI if (ACPI && EFI)
+> in arch/arm64/Kconfig and leave ACPI_APEI as is?
 
-You may also want to add that SMP ops simply do not exist on arm64,
-hence the bootloader [...].
+I also agree with Ard, and I like "select HAVE_ACPI_APEI if (ACPI && EFI)"
 
-> 
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> ---
->  drivers/irqchip/irq-bcm2836.c | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/irqchip/irq-bcm2836.c b/drivers/irqchip/irq-bcm2836.c
-> index 233ccdd..4ae9f76 100644
-> --- a/drivers/irqchip/irq-bcm2836.c
-> +++ b/drivers/irqchip/irq-bcm2836.c
-> @@ -223,6 +223,7 @@ static struct notifier_block bcm2836_arm_irqchip_cpu_notifier = {
->  	.priority = 100,
->  };
->  
-> +#ifdef ARM
+Thanks for your suggestion !! :-)
 
-That should really be CONFIG_ARM.
+>
+> Regards,
+> Tomasz
+>
+>
 
->  int __init bcm2836_smp_boot_secondary(unsigned int cpu,
->  				      struct task_struct *idle)
->  {
-> @@ -238,7 +239,7 @@ int __init bcm2836_smp_boot_secondary(unsigned int cpu,
->  static const struct smp_operations bcm2836_smp_ops __initconst = {
->  	.smp_boot_secondary	= bcm2836_smp_boot_secondary,
->  };
-> -
-> +#endif
->  #endif
->  
->  static const struct irq_domain_ops bcm2836_arm_irqchip_intc_ops = {
-> @@ -256,8 +257,11 @@ bcm2836_arm_irqchip_smp_init(void)
->  	register_cpu_notifier(&bcm2836_arm_irqchip_cpu_notifier);
->  
->  	set_smp_cross_call(bcm2836_arm_irqchip_send_ipi);
-> +
-> +#ifdef ARM
->  	smp_set_ops(&bcm2836_smp_ops);
->  #endif
-> +#endif
->  }
->  
->  /*
-> 
 
-Thanks,
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat Software (Beijing) Co.,Ltd.Shanghai Branch
+Ph: +86 21 61221326(direct)
+Ph: +86 186 2020 4684 (mobile)
+Room 1512, Regus One Corporate Avenue,Level 15,
+One Corporate Avenue,222 Hubin Road,Huangpu District,
+Shanghai,China 200021
