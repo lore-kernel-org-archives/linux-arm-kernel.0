@@ -1,43 +1,53 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Tue, 5 Apr 2016 16:44:08 -0500
-Subject: [PATCH 0/4] DRA7 Timer extended support
-Message-ID: <1459892652-47845-1-git-send-email-s-anna@ti.com>
+Date: Tue, 5 Apr 2016 16:44:12 -0500
+Subject: [PATCH 4/4] ARM: DRA7: clockdomain: Implement timer workaround for
+ errata i874
+In-Reply-To: <1459892652-47845-1-git-send-email-s-anna@ti.com>
+References: <1459892652-47845-1-git-send-email-s-anna@ti.com>
+Message-ID: <1459892652-47845-5-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+From: Keerthy <j-keerthy@ti.com>
 
-Following series includes couple of patches to add the missing
-Timer12 and enable Timers 13 through 16 by default, and a timer
-errata fix on DRA7 platforms.  The Timer errata is documented in
-the public AM572x Silicon Errata document [1].
+Errata Title:
+i874: TIMER5/6/7/8 interrupts not propagated
 
-Patches 2 and 3 were reposted versions of the two patches left
-out from the DRA7 Timer12 Support series [1] from last year.
-Only difference is in Patch 2 where the node is not marked
-as disabled anymore compared to the previous version [3]
+Description:
+When TIMER5, TIMER6, TIMER7, or TIMER8 clocks are enabled
+(CM_IPU_TIMER5/6/7/8_CLKCTRL[0:1]MODULEMODE=0x2:ENABLE) and the CD-IPU
+is in HW_AUTO mode (CM_IPU_CLKSTCTRL[0:1]CLKTRCTRL=0x3:HW_AUTO) the
+corresponding TIMER will continue counting, but enabled interrupts
+will not be propagated to the destinations (MPU, DSP, etc) in the
+SoC until the TIMER registers are accessed from the CPUs (MPU, DSP
+etc.). This can result in missed timer interrupts.
 
-Patches baselined on 4.6-rc2.
+Workaround:
+In order for TIMER5/6/7/8 interrupts to be propagated and serviced
+correctly the CD_IPU domain should be set to SW_WKUP mode
+(CM_IPU_CLKSTCTRL[0:1]CLKTRCTRL=0x2:SW_WKUP).
 
-regards
-Suman
+The above workaround is achieved by switching the IPU clockdomain
+flags from HWSUP_SWSUP to SWSUP only.
 
-[1] http://www.ti.com/lit/er/sprz429h/sprz429h.pdf
-[2] http://marc.info/?l=linux-omap&m=144408774017569&w=2
-[3] https://patchwork.kernel.org/patch/7332221/
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+Signed-off-by: Suman Anna <s-anna@ti.com>
+---
+ arch/arm/mach-omap2/clockdomains7xx_data.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Keerthy (1):
-  ARM: DRA7: clockdomain: Implement timer workaround for errata i874
-
-Suman Anna (3):
-  ARM: dts: DRA7: Enable Timers 13 through 16
-  ARM: dts: DRA7: Add timer12 node
-  ARM: DRA7: hwmod: Add data for GPTimer 12
-
- arch/arm/boot/dts/dra7.dtsi                | 13 +++++++----
- arch/arm/mach-omap2/clockdomains7xx_data.c |  2 +-
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c  | 36 ++++++++++++++++++++++++++++--
- 3 files changed, 44 insertions(+), 7 deletions(-)
-
+diff --git a/arch/arm/mach-omap2/clockdomains7xx_data.c b/arch/arm/mach-omap2/clockdomains7xx_data.c
+index 7581e036bda6..ef9ed36e8a61 100644
+--- a/arch/arm/mach-omap2/clockdomains7xx_data.c
++++ b/arch/arm/mach-omap2/clockdomains7xx_data.c
+@@ -461,7 +461,7 @@ static struct clockdomain ipu_7xx_clkdm = {
+ 	.cm_inst	  = DRA7XX_CM_CORE_AON_IPU_INST,
+ 	.clkdm_offs	  = DRA7XX_CM_CORE_AON_IPU_IPU_CDOFFS,
+ 	.dep_bit	  = DRA7XX_IPU_STATDEP_SHIFT,
+-	.flags		  = CLKDM_CAN_HWSUP_SWSUP,
++	.flags		  = CLKDM_CAN_SWSUP,
+ };
+ 
+ static struct clockdomain mpu1_7xx_clkdm = {
 -- 
 2.7.4
