@@ -1,52 +1,71 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 5 Apr 2016 15:06:41 +0100
-Subject: [PATCH 1/2] iommu/dma: Restore scatterlist offsets correctly
-In-Reply-To: <20160405133310.GA9516@8bytes.org>
-References: <c14a93373a34633f6db89214ca2ddf69b0eaa1c3.1457637385.git.robin.murphy@arm.com>
- <20160405125926.GI17838@8bytes.org> <5703B98A.6010200@arm.com>
- <20160405133310.GA9516@8bytes.org>
-Message-ID: <5703C671.6030207@arm.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Tue, 5 Apr 2016 16:07:36 +0200
+Subject: [PATCH] drm/rockchip: Return -EBUSY if there's already a pending
+ flip event v3
+In-Reply-To: <CAPj87rPtP1ph-1FMxSKUANjeKwwjwgfMzbUGHvqudEx7nYCESQ@mail.gmail.com>
+References: <1459778134-30693-1-git-send-email-tomeu.vizoso@collabora.com>
+ <CAPj87rPtP1ph-1FMxSKUANjeKwwjwgfMzbUGHvqudEx7nYCESQ@mail.gmail.com>
+Message-ID: <CAAObsKAyeg9JsPhCyWqLpg3n6V9Ab8OCJKXX41A86rQWWs+SdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/04/16 14:33, Joerg Roedel wrote:
-> On Tue, Apr 05, 2016 at 02:11:38PM +0100, Robin Murphy wrote:
->> On 05/04/16 13:59, Joerg Roedel wrote:
->>> On Thu, Mar 10, 2016 at 07:28:12PM +0000, Robin Murphy wrote:
->>>> With the change to stashing just the IOVA-page-aligned remainder of the
->>>> CPU-page offset rather than the whole thing, the failure path in
->>>> __invalidate_sg() also needs tweaking to account for that in the case of
->>>> differing page sizes where the two offsets may not be equivalent.
->>>> Similarly in __finalise_sg(), lest the architecture-specific wrappers
->>>> later get the wrong address for cache maintenance on sync or unmap.
->>>>
->>>> Fixes: 164afb1d85b8 ("iommu/dma: Use correct offset in map_sg")
->>>> Reported-by: Magnus Damm <damm+renesas@opensource.se>
->>>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->>>
->>> Cc: stable at ver.kernel.org # v4.4+ ?
->>
->> Good point - the kind of people using 64k pages are also likely to
->> be the ones sticking to stable kernels. Are you able to handle that,
->> or would you like me to resend?
+On 4 April 2016 at 17:44, Daniel Stone <daniel@fooishbar.org> wrote:
+> Hi Tomeu,
 >
-> I added the tag and put the commit into my iommu/fixes branch. Can you
-> re-send me the second commit when the first is upstream (I'll send the
-> pull-req this week)? I'd like to avoid creating an additional
-> merge-commit just for this patch.
+> On 4 April 2016 at 14:55, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
+>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+>> index 3b8f652698f8..8305bbd2a4d7 100644
+>> --- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+>> @@ -280,7 +280,18 @@ int rockchip_drm_atomic_commit(struct drm_device *dev,
+>>  {
+>>         struct rockchip_drm_private *private = dev->dev_private;
+>>         struct rockchip_atomic_commit *commit = &private->commit;
+>> -       int ret;
+>> +       struct drm_crtc_state *crtc_state;
+>> +       struct drm_crtc *crtc;
+>> +       int i, ret;
+>> +
+>> +       if (async) {
+>> +               for_each_crtc_in_state(state, crtc, crtc_state, i) {
+>> +                       if (crtc->state->event ||
+>> +                           rockchip_drm_crtc_has_pending_event(crtc)) {
+>> +                               return -EBUSY;
+>> +                       }
+>> +               }
+>> +       }
+>
+> Hmmm ...
+>
+> Doesn't this trigger before the VOP atomic_begin() helper, meaning
+> that anything with an event set will trigger the check? Seems like it
+> should be && rather than ||.
 
-Sure, will do - I agree there's absolutely no need to be mucking about 
-with context conflicts right now.
+So, these are the two cases that this code aims to handle:
 
-Thanks a lot,
-Robin.
+1. A previous request with an event set hasn't progressed to
+atomic_begin yet, so the event field in drm_crtc_state (at this point,
+the old state) is still populated but vop->event still isn't.
 
->
->
-> 	Joerg
->
+2. A previous request has already progressed to atomic_begin but we
+haven't gotten yet the interrupt that signals its completion, so
+vop->event is populated but crtc->state->event isn't anymore.
+
+My understanding is that in both cases there's a pending flip event
+and we have to return -EBUSY if it's as async request.
+
+> Also, I know rockchip_drm_vop.c isn't holding dev->event_lock when it
+> checks vop->event, but it really should be ... and so should this
+> check. Otherwise you can race with the IRQ handler, which isn't
+> required to hold the CRTC lock.
+
+Cool, thanks.
+
+Tomeu
+
+> Cheers,
+> Daniel
 > _______________________________________________
-> iommu mailing list
-> iommu at lists.linux-foundation.org
-> https://lists.linuxfoundation.org/mailman/listinfo/iommu
->
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
