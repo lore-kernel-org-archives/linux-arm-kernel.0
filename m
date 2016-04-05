@@ -1,45 +1,63 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 5 Apr 2016 09:08:27 +0100
-Subject: [PATCH RESEND] ARM: l2x0: add three special L210 aux control flags
-In-Reply-To: <20160404233640.GW19428@n2100.arm.linux.org.uk>
-References: <1458043882-16881-1-git-send-email-linus.walleij@linaro.org>
- <CACRpkdZeAKkU4Cr6TTQor_6zw2iVGgXmTdcsQuHuR07Q8yZHiQ@mail.gmail.com>
- <20160404232926.GV28102@jcartwri.amer.corp.natinst.com>
- <20160404233640.GW19428@n2100.arm.linux.org.uk>
-Message-ID: <20160405080827.GA19428@n2100.arm.linux.org.uk>
+From: brian.starkey@arm.com (Brian Starkey)
+Date: Tue, 5 Apr 2016 09:14:59 +0100
+Subject: [PATCH] ARM: arm64: dts: Add expansion bus to VExpress and Juno
+In-Reply-To: <57029EC7.8030802@arm.com>
+References: <1459786850-29409-1-git-send-email-brian.starkey@arm.com>
+ <57029EC7.8030802@arm.com>
+Message-ID: <20160405081458.GA18740@e106950-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 05, 2016 at 12:36:40AM +0100, Russell King - ARM Linux wrote:
-> On Mon, Apr 04, 2016 at 06:29:26PM -0500, Josh Cartwright wrote:
-> > Similarly, we're waiting on feedback for:
-> > 
-> >   http://lkml.kernel.org/r/1456761716-10174-1-git-send-email-brad.mouring at ni.com
-> > 
-> > Also in the queue; also w/ Rob's Ack.  There was a change awhile back to
-> > unconditionally enable the power-management features of the PL310 which
-> > caused a noticeable performance degradation on our boards; placing the
-> > PM options behind a togglable DT property provides us an out.
-> 
-> For that one, I've been wondering why it's seemingly acceptable to
-> start throwing *errors* for *new* DT properties which weren't required
-> before.  Also, there's no DT documentation for the new properties,
-> which is a fundamental requirement - and Rob should not have given
-> his ack without there being a DT documentation patch.
-> 
-> Obviously, the kernel review process has broken on this one... or
-> I must remember this sneaky trick for getting new DT properties in
-> without the required documentation...
+Hi Sudeep,
 
-There's another issue here - we go from enabling these options by
-default to leaving them as the firmware specified them.  While that's
-something I approve of, I'm not happy because it means all platforms
-that have these PM bits enabled today could end up losing them - so
-it's a PM regression waiting to happen.  Who's going to add them to
-all the dt blobs where platforms _can_ cope with having these PM bits
-enabled?
+On Mon, Apr 04, 2016 at 06:05:11PM +0100, Sudeep Holla wrote:
+>How do you plan to add those additional hardware on the expansion bus ?
+>
+>IIUC having them in DT and running on a system without the tile
+>connected will cause aborts, hence you are just adding bus definition.
+>
+>Is there any use in having just the bus definition in DT. If you are
+>planning to add devices using overlays, can't the bus definition also
+>be added then ?
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Did you mean "then" as "when I submit the overlay patches" or "add the
+bus in the overlay"?
+
+I wasn't sure the overlays would get accepted into mainline as they
+describe proprietary FPGA bitfiles which aren't going to be publicly
+available. We should be able to upstream them if that's not an issue.
+
+I'm still interested in getting the bus definition upstream so that we
+have a basis for defining our bitfile overlays in our kernel tree(s).
+Previously there's been no example or convention leading us to hack the
+DTs together in various ways:
+https://git.linaro.org/landing-teams/working/arm/kernel.git/commit/14ebf51be6ead99b3861d779bdcf3cee18ab81d6
+https://git.linaro.org/landing-teams/working/arm/kernel.git/commit/8e3f902e202f48e2b424c0f049f3894ac83c4c65
+
+As for adding it via overlays; as we use the same bitfile on multiple
+platforms, we'd need to maintain and apply a bunch of overlays: one
+per-platform for the bus, and one per bitfile for the devices.
+It seemed better to get the bus definition (which is fixed) into the
+base platform definitions, then we only need overlays to describe the
+devices which are unique to a bitfile.
+
+Having the bus definition also serves to document the interrupt lines
+and address ranges on the different platforms.
+
+>
+>I am fine with the patch as such, just wanted to know the information.
+>
+
+Thanks for having a look,
+
+Brian
+
+>-- 
+>Regards,
+>Sudeep
+>
+>_______________________________________________
+>linux-arm-kernel mailing list
+>linux-arm-kernel at lists.infradead.org
+>http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
