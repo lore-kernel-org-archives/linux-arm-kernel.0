@@ -1,134 +1,63 @@
-From: mitchelh@codeaurora.org (Mitchel Humpherys)
-Date: Tue,  5 Apr 2016 14:01:29 -0700
-Subject: [PATCH 1/2] iommu: Support dynamic pgsize_bitmap
-Message-ID: <1459890090-16040-1-git-send-email-mitchelh@codeaurora.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 5 Apr 2016 20:21:00 +0100
+Subject: [PATCH 3/4] perf: xgene: Add APM X-Gene SoC Performance
+ Monitoring Unit driver
+In-Reply-To: <CACgAJHx6Y8yt57m3YB51dOQjuxNHFvEnJe255mDhnVZOjmJu_A@mail.gmail.com>
+References: <1459467472-31561-1-git-send-email-ttnguyen@apm.com>
+ <1459467472-31561-4-git-send-email-ttnguyen@apm.com>
+ <20160401121820.GB29876@leverpostej>
+ <CACgAJHwZ0MwjBDa65P7tYAkF4-m+TCj-65OGpYYQD2tO6hkFqQ@mail.gmail.com>
+ <20160404233338.GA1917@svinekod>
+ <CACgAJHx6Y8yt57m3YB51dOQjuxNHFvEnJe255mDhnVZOjmJu_A@mail.gmail.com>
+Message-ID: <20160405192100.GA5946@svinekod>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we use a single pgsize_bitmap per IOMMU driver.  However, some
-IOMMU drivers might service different IOMMUs with different supported
-page sizes.  Some drivers might also want to restrict page sizes for
-different use cases.  Support these use cases by adding a
-.get_pgsize_bitmap function to the iommu_ops which can optionally be
-used by the driver to return a domain-specific pgsize_bitmap.
+On Tue, Apr 05, 2016 at 11:50:10AM -0700, Tai Tri Nguyen wrote:
+> On Mon, Apr 4, 2016 at 4:33 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Mon, Apr 04, 2016 at 04:42:11PM -0700, Tai Tri Nguyen wrote:
+> >> On Fri, Apr 1, 2016 at 5:18 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> >> >> +     hwc->config = config;
+> >> >> +     if (config1)
+> >> >> +             hwc->extra_reg.config = config1;
+> >> >> +     else
+> >> >> +             /* Enable all Agents */
+> >> >> +             hwc->extra_reg.config = 0xFFFFFFFFFFFFFFFFULL;
+> >> >
+> >> > I'm not sure I follow what's going on here.
+> >> >
+> >> > It would be good to document precisely what this means.
+> >>
+> >> These are X-Gene PMU specific for monitoring performance of a specific
+> >> data path.
+> >> X-Gene PMUs have 2 registers capable of masking the Agents from which
+> >> the request come from. If the bit with the bit number corresponding to
+> >> the AgentID
+> >> is set, the event will be counted only if it is caused by a request
+> >> from that agent.
+> >> Each PMU has different set of Agents. By default, the event will be counted for
+> >> all agent requests.
+> >>
+> >> I'll have it commented better for next revision of the patch.
+> >
+> > It might be worth having something under Documentation/ for this, similarly to
+> > what we do for CCN in Documentation/arm/CCN.txt.
+> >
+> > How is the user expected to determine agent IDs? Is there a listing somewhere?
+> > Does this change between reivisions? This may be worth documenting.
+> >
+> 
+> Each of the SoC PMU has an agent ID list in our product User Manual
+> documentation.
+> An user is expected to refer to the list to determine the agent ID.
+> The agent ID list
+> per each PMU is different. Also we may change or add more agents to the list for
+> next generations of APM X-Gene. I think it would be too much to document it in
+> the Documentation/ folder.
 
-Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
----
- drivers/iommu/iommu.c | 28 +++++++++++++++++++---------
- include/linux/iommu.h |  3 +++
- 2 files changed, 22 insertions(+), 9 deletions(-)
+Given that the IDs are so variable, you can simply defer to user manuals in the
+documentation. However, there should definitely be documentation describing the
+format of the config and config1 fields.
 
-diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-index bfd4f7c3b1d8..6141710f3091 100644
---- a/drivers/iommu/iommu.c
-+++ b/drivers/iommu/iommu.c
-@@ -325,6 +325,13 @@ int iommu_group_set_name(struct iommu_group *group, const char *name)
- }
- EXPORT_SYMBOL_GPL(iommu_group_set_name);
- 
-+static unsigned long iommu_get_pgsize_bitmap(struct iommu_domain *domain)
-+{
-+	if (domain->ops->get_pgsize_bitmap)
-+		return domain->ops->get_pgsize_bitmap(domain);
-+	return domain->ops->pgsize_bitmap;
-+}
-+
- static int iommu_group_create_direct_mappings(struct iommu_group *group,
- 					      struct device *dev)
- {
-@@ -337,9 +344,9 @@ static int iommu_group_create_direct_mappings(struct iommu_group *group,
- 	if (!domain || domain->type != IOMMU_DOMAIN_DMA)
- 		return 0;
- 
--	BUG_ON(!domain->ops->pgsize_bitmap);
-+	BUG_ON(!(domain->ops->pgsize_bitmap || domain->ops->get_pgsize_bitmap));
- 
--	pg_size = 1UL << __ffs(domain->ops->pgsize_bitmap);
-+	pg_size = 1UL << __ffs(iommu_get_pgsize_bitmap(domain));
- 	INIT_LIST_HEAD(&mappings);
- 
- 	iommu_get_dm_regions(dev, &mappings);
-@@ -1318,14 +1325,15 @@ int iommu_map(struct iommu_domain *domain, unsigned long iova,
- 	int ret = 0;
- 
- 	if (unlikely(domain->ops->map == NULL ||
--		     domain->ops->pgsize_bitmap == 0UL))
-+		     (domain->ops->pgsize_bitmap == 0UL &&
-+		      !domain->ops->get_pgsize_bitmap)))
- 		return -ENODEV;
- 
- 	if (unlikely(!(domain->type & __IOMMU_DOMAIN_PAGING)))
- 		return -EINVAL;
- 
- 	/* find out the minimum page size supported */
--	min_pagesz = 1 << __ffs(domain->ops->pgsize_bitmap);
-+	min_pagesz = 1 << __ffs(iommu_get_pgsize_bitmap(domain));
- 
- 	/*
- 	 * both the virtual address and the physical one, as well as
-@@ -1372,14 +1380,15 @@ size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova, size_t size)
- 	unsigned long orig_iova = iova;
- 
- 	if (unlikely(domain->ops->unmap == NULL ||
--		     domain->ops->pgsize_bitmap == 0UL))
-+		     (domain->ops->pgsize_bitmap == 0UL &&
-+		      !domain->ops->get_pgsize_bitmap)))
- 		return -ENODEV;
- 
- 	if (unlikely(!(domain->type & __IOMMU_DOMAIN_PAGING)))
- 		return -EINVAL;
- 
- 	/* find out the minimum page size supported */
--	min_pagesz = 1 << __ffs(domain->ops->pgsize_bitmap);
-+	min_pagesz = 1 << __ffs(iommu_get_pgsize_bitmap(domain));
- 
- 	/*
- 	 * The virtual address, as well as the size of the mapping, must be
-@@ -1425,10 +1434,11 @@ size_t default_iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
- 	unsigned int i, min_pagesz;
- 	int ret;
- 
--	if (unlikely(domain->ops->pgsize_bitmap == 0UL))
-+	if (unlikely(domain->ops->pgsize_bitmap == 0UL &&
-+		     !domain->ops->get_pgsize_bitmap))
- 		return 0;
- 
--	min_pagesz = 1 << __ffs(domain->ops->pgsize_bitmap);
-+	min_pagesz = 1 << __ffs(iommu_get_pgsize_bitmap(domain));
- 
- 	for_each_sg(sg, s, nents, i) {
- 		phys_addr_t phys = page_to_phys(sg_page(s)) + s->offset;
-@@ -1509,7 +1519,7 @@ int iommu_domain_get_attr(struct iommu_domain *domain,
- 		break;
- 	case DOMAIN_ATTR_PAGING:
- 		paging  = data;
--		*paging = (domain->ops->pgsize_bitmap != 0UL);
-+		*paging = (iommu_get_pgsize_bitmap(domain) != 0UL);
- 		break;
- 	case DOMAIN_ATTR_WINDOWS:
- 		count = data;
-diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index a5c539fa5d2b..03f8d50670db 100644
---- a/include/linux/iommu.h
-+++ b/include/linux/iommu.h
-@@ -156,6 +156,8 @@ struct iommu_dm_region {
-  * @domain_get_windows: Return the number of windows for a domain
-  * @of_xlate: add OF master IDs to iommu grouping
-  * @pgsize_bitmap: bitmap of supported page sizes
-+ * @get_pgsize_bitmap: gets a bitmap of supported page sizes for a domain
-+ *                     This takes precedence over @pgsize_bitmap.
-  * @priv: per-instance data private to the iommu driver
-  */
- struct iommu_ops {
-@@ -200,6 +202,7 @@ struct iommu_ops {
- #endif
- 
- 	unsigned long pgsize_bitmap;
-+	unsigned long (*get_pgsize_bitmap)(struct iommu_domain *domain);
- 	void *priv;
- };
- 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Thanks,
+Mark.
