@@ -1,203 +1,171 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue,  5 Apr 2016 11:53:49 -0600
-Subject: [PATCH 08/11] coresight: etm4x: implementing the perf PMU API
+Date: Tue,  5 Apr 2016 11:53:50 -0600
+Subject: [PATCH 09/11] coresight: moving coresight_simple_func() to header file
 In-Reply-To: <1459878832-15219-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1459878832-15219-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1459878832-15219-9-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1459878832-15219-10-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding a set of API allowing the Perf core to treat ETMv4
-tracers like other PMUs.
+Macro "coresight_simple_func()" can be used by several drivers.
+As such making the structure type generic and moving to a
+globally available header file.  That way individual drivers
+can use the functionality by simply specifying the structure
+they need to work with.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/Makefile          |  5 +-
- drivers/hwtracing/coresight/coresight-etm4x.c | 85 +++++++++++++++++++++++++--
- 2 files changed, 82 insertions(+), 8 deletions(-)
+ .../hwtracing/coresight/coresight-etm3x-sysfs.c    | 33 +++++-------
+ .../hwtracing/coresight/coresight-etm4x-sysfs.c    | 63 ++++++++++------------
+ drivers/hwtracing/coresight/coresight-priv.h       | 10 ++++
+ 3 files changed, 51 insertions(+), 55 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/Makefile b/drivers/hwtracing/coresight/Makefile
-index 637ca978cd05..1d0e32c7dbe4 100644
---- a/drivers/hwtracing/coresight/Makefile
-+++ b/drivers/hwtracing/coresight/Makefile
-@@ -1,7 +1,7 @@
- #
- # Makefile for CoreSight drivers.
- #
--obj-$(CONFIG_CORESIGHT) += coresight.o
-+obj-$(CONFIG_CORESIGHT) += coresight.o coresight-etm-perf.o
- obj-$(CONFIG_OF) += of_coresight.o
- obj-$(CONFIG_CORESIGHT_LINK_AND_SINK_TMC) += coresight-tmc.o
- obj-$(CONFIG_CORESIGHT_SINK_TPIU) += coresight-tpiu.o
-@@ -9,8 +9,7 @@ obj-$(CONFIG_CORESIGHT_SINK_ETBV10) += coresight-etb10.o
- obj-$(CONFIG_CORESIGHT_LINKS_AND_SINKS) += coresight-funnel.o \
- 					   coresight-replicator.o
- obj-$(CONFIG_CORESIGHT_SOURCE_ETM3X) += coresight-etm3x.o coresight-etm-cp14.o \
--					coresight-etm3x-sysfs.o \
--					coresight-etm-perf.o
-+					coresight-etm3x-sysfs.o
- obj-$(CONFIG_CORESIGHT_SOURCE_ETM4X) += coresight-etm4x.o \
- 					coresight-etm4x-sysfs.o
- obj-$(CONFIG_CORESIGHT_QCOM_REPLICATOR) += coresight-replicator-qcom.o
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index 88b8bc0f6549..6396b28993da 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -31,12 +31,14 @@
- #include <linux/amba/bus.h>
- #include <linux/seq_file.h>
- #include <linux/uaccess.h>
-+#include <linux/perf_event.h>
- #include <linux/pm_runtime.h>
- #include <linux/perf_event.h>
- #include <asm/sections.h>
- #include <asm/local.h>
+diff --git a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+index cbb4046c1070..02d4b629891f 100644
+--- a/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
++++ b/drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+@@ -1221,26 +1221,19 @@ static struct attribute *coresight_etm_attrs[] = {
+ 	NULL,
+ };
  
- #include "coresight-etm4x.h"
-+#include "coresight-etm-perf.h"
- 
- static int boot_enable;
- module_param_named(boot_enable, boot_enable, int, S_IRUGO);
-@@ -44,6 +46,7 @@ module_param_named(boot_enable, boot_enable, int, S_IRUGO);
- /* The number of ETMv4 currently registered */
- static int etm4_count;
- static struct etmv4_drvdata *etmdrvdata[NR_CPUS];
-+static void etm4_set_default(struct etmv4_config *config);
- 
- static void etm4_os_unlock(struct etmv4_drvdata *drvdata)
- {
-@@ -189,6 +192,58 @@ static void etm4_enable_hw(void *info)
- 	dev_dbg(drvdata->dev, "cpu: %d enable smp call done\n", drvdata->cpu);
- }
- 
-+static int etm4_parse_event_config(struct etmv4_drvdata *drvdata,
-+				   struct perf_event_attr *attr)
-+{
-+	struct etmv4_config *config = &drvdata->config;
-+
-+	if (!attr)
-+		return -EINVAL;
-+
-+	/* Clear configuration from previous run */
-+	memset(config, 0, sizeof(struct etmv4_config));
-+
-+	if (attr->exclude_kernel)
-+		config->mode = ETM_MODE_EXCL_KERN;
-+
-+	if (attr->exclude_user)
-+		config->mode = ETM_MODE_EXCL_USER;
-+
-+	/* Always start from the default config */
-+	etm4_set_default(config);
-+
-+	/*
-+	 * By default the tracers are configured to trace the whole address
-+	 * range.  Narrow the field only if requested by user space.
-+	 */
-+	if (config->mode)
-+		etm4_config_trace_mode(config);
-+
-+	/* Go from generic option to ETMv4 specifics */
-+	if (attr->config & BIT(ETM_OPT_CYCACC))
-+		config->cfg |= ETMv4_MODE_CYCACC;
-+	if (attr->config & BIT(ETM_OPT_TS))
-+		config->cfg |= ETMv4_MODE_TIMESTAMP;
-+
-+	return 0;
-+}
-+
-+static int etm4_enable_perf(struct coresight_device *csdev,
-+			    struct perf_event_attr *attr)
-+{
-+	struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-+
-+	if (WARN_ON_ONCE(drvdata->cpu != smp_processor_id()))
-+		return -EINVAL;
-+
-+	/* Configure the tracer based on the session's specifics */
-+	etm4_parse_event_config(drvdata, attr);
-+	/* And enable it */
-+	etm4_enable_hw(drvdata);
-+
-+	return 0;
-+}
-+
- static int etm4_enable_sysfs(struct coresight_device *csdev)
- {
- 	struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-@@ -233,6 +288,9 @@ static int etm4_enable(struct coresight_device *csdev,
- 	case CS_MODE_SYSFS:
- 		ret = etm4_enable_sysfs(csdev);
- 		break;
-+	case CS_MODE_PERF:
-+		ret = etm4_enable_perf(csdev, attr);
-+		break;
- 	default:
- 		ret = -EINVAL;
- 	}
-@@ -266,6 +324,17 @@ static void etm4_disable_hw(void *info)
- 	dev_dbg(drvdata->dev, "cpu: %d disable smp call done\n", drvdata->cpu);
- }
- 
-+static int etm4_disable_perf(struct coresight_device *csdev)
-+{
-+	struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-+
-+	if (WARN_ON_ONCE(drvdata->cpu != smp_processor_id()))
-+		return -EINVAL;
-+
-+	etm4_disable_hw(drvdata);
-+	return 0;
-+}
-+
- static void etm4_disable_sysfs(struct coresight_device *csdev)
- {
- 	struct etmv4_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-@@ -309,6 +378,9 @@ static void etm4_disable(struct coresight_device *csdev)
- 	case CS_MODE_SYSFS:
- 		etm4_disable_sysfs(csdev);
- 		break;
-+	case CS_MODE_PERF:
-+		etm4_disable_perf(csdev);
-+		break;
- 	}
- 
- 	if (mode)
-@@ -708,8 +780,6 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
- 	etm4_init_trace_id(drvdata);
- 	etm4_set_default(&drvdata->config);
- 
--	pm_runtime_put(&adev->dev);
+-#define coresight_simple_func(name, offset)                             \
+-static ssize_t name##_show(struct device *_dev,                         \
+-			   struct device_attribute *attr, char *buf)    \
+-{                                                                       \
+-	struct etm_drvdata *drvdata = dev_get_drvdata(_dev->parent);    \
+-	return scnprintf(buf, PAGE_SIZE, "0x%x\n",                      \
+-			 readl_relaxed(drvdata->base + offset));        \
+-}                                                                       \
+-DEVICE_ATTR_RO(name)
 -
- 	desc->type = CORESIGHT_DEV_TYPE_SOURCE;
- 	desc->subtype.source_subtype = CORESIGHT_DEV_SUBTYPE_SOURCE_PROC;
- 	desc->ops = &etm4_cs_ops;
-@@ -719,9 +789,16 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
- 	drvdata->csdev = coresight_register(desc);
- 	if (IS_ERR(drvdata->csdev)) {
- 		ret = PTR_ERR(drvdata->csdev);
--		goto err_coresight_register;
-+		goto err_arch_supported;
- 	}
- 
-+	ret = etm_perf_symlink(drvdata->csdev, true);
-+	if (ret) {
-+		coresight_unregister(drvdata->csdev);
-+		goto err_arch_supported;
-+	}
+-coresight_simple_func(etmccr, ETMCCR);
+-coresight_simple_func(etmccer, ETMCCER);
+-coresight_simple_func(etmscr, ETMSCR);
+-coresight_simple_func(etmidr, ETMIDR);
+-coresight_simple_func(etmcr, ETMCR);
+-coresight_simple_func(etmtraceidr, ETMTRACEIDR);
+-coresight_simple_func(etmteevr, ETMTEEVR);
+-coresight_simple_func(etmtssvr, ETMTSSCR);
+-coresight_simple_func(etmtecr1, ETMTECR1);
+-coresight_simple_func(etmtecr2, ETMTECR2);
++#define coresight_etm3x_simple_func(name, offset)			\
++	coresight_simple_func(struct etm_drvdata, name, offset)
 +
-+	pm_runtime_put(&adev->dev);
- 	dev_info(dev, "%s initialized\n", (char *)id->data);
++coresight_etm3x_simple_func(etmccr, ETMCCR);
++coresight_etm3x_simple_func(etmccer, ETMCCER);
++coresight_etm3x_simple_func(etmscr, ETMSCR);
++coresight_etm3x_simple_func(etmidr, ETMIDR);
++coresight_etm3x_simple_func(etmcr, ETMCR);
++coresight_etm3x_simple_func(etmtraceidr, ETMTRACEIDR);
++coresight_etm3x_simple_func(etmteevr, ETMTEEVR);
++coresight_etm3x_simple_func(etmtssvr, ETMTSSCR);
++coresight_etm3x_simple_func(etmtecr1, ETMTECR1);
++coresight_etm3x_simple_func(etmtecr2, ETMTECR2);
  
- 	if (boot_enable) {
-@@ -732,8 +809,6 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
- 	return 0;
+ static struct attribute *coresight_etm_mgmt_attrs[] = {
+ 	&dev_attr_etmccr.attr,
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c b/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c
+index 0e80ec668402..7c84308c5564 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x-sysfs.c
+@@ -2039,29 +2039,22 @@ static struct attribute *coresight_etmv4_attrs[] = {
+ 	NULL,
+ };
  
- err_arch_supported:
--	pm_runtime_put(&adev->dev);
--err_coresight_register:
- 	if (--etm4_count == 0)
- 		unregister_hotcpu_notifier(&etm4_cpu_notifier);
- 	return ret;
+-#define coresight_simple_func(name, offset)				\
+-static ssize_t name##_show(struct device *_dev,				\
+-			   struct device_attribute *attr, char *buf)	\
+-{									\
+-	struct etmv4_drvdata *drvdata = dev_get_drvdata(_dev->parent);	\
+-	return scnprintf(buf, PAGE_SIZE, "0x%x\n",			\
+-			 readl_relaxed(drvdata->base + offset));	\
+-}									\
+-DEVICE_ATTR_RO(name)
+-
+-coresight_simple_func(trcoslsr, TRCOSLSR);
+-coresight_simple_func(trcpdcr, TRCPDCR);
+-coresight_simple_func(trcpdsr, TRCPDSR);
+-coresight_simple_func(trclsr, TRCLSR);
+-coresight_simple_func(trcconfig, TRCCONFIGR);
+-coresight_simple_func(trctraceid, TRCTRACEIDR);
+-coresight_simple_func(trcauthstatus, TRCAUTHSTATUS);
+-coresight_simple_func(trcdevid, TRCDEVID);
+-coresight_simple_func(trcdevtype, TRCDEVTYPE);
+-coresight_simple_func(trcpidr0, TRCPIDR0);
+-coresight_simple_func(trcpidr1, TRCPIDR1);
+-coresight_simple_func(trcpidr2, TRCPIDR2);
+-coresight_simple_func(trcpidr3, TRCPIDR3);
++#define coresight_etm4x_simple_func(name, offset)			\
++	coresight_simple_func(struct etmv4_drvdata, name, offset)
++
++coresight_etm4x_simple_func(trcoslsr, TRCOSLSR);
++coresight_etm4x_simple_func(trcpdcr, TRCPDCR);
++coresight_etm4x_simple_func(trcpdsr, TRCPDSR);
++coresight_etm4x_simple_func(trclsr, TRCLSR);
++coresight_etm4x_simple_func(trcconfig, TRCCONFIGR);
++coresight_etm4x_simple_func(trctraceid, TRCTRACEIDR);
++coresight_etm4x_simple_func(trcauthstatus, TRCAUTHSTATUS);
++coresight_etm4x_simple_func(trcdevid, TRCDEVID);
++coresight_etm4x_simple_func(trcdevtype, TRCDEVTYPE);
++coresight_etm4x_simple_func(trcpidr0, TRCPIDR0);
++coresight_etm4x_simple_func(trcpidr1, TRCPIDR1);
++coresight_etm4x_simple_func(trcpidr2, TRCPIDR2);
++coresight_etm4x_simple_func(trcpidr3, TRCPIDR3);
+ 
+ static struct attribute *coresight_etmv4_mgmt_attrs[] = {
+ 	&dev_attr_trcoslsr.attr,
+@@ -2080,19 +2073,19 @@ static struct attribute *coresight_etmv4_mgmt_attrs[] = {
+ 	NULL,
+ };
+ 
+-coresight_simple_func(trcidr0, TRCIDR0);
+-coresight_simple_func(trcidr1, TRCIDR1);
+-coresight_simple_func(trcidr2, TRCIDR2);
+-coresight_simple_func(trcidr3, TRCIDR3);
+-coresight_simple_func(trcidr4, TRCIDR4);
+-coresight_simple_func(trcidr5, TRCIDR5);
++coresight_etm4x_simple_func(trcidr0, TRCIDR0);
++coresight_etm4x_simple_func(trcidr1, TRCIDR1);
++coresight_etm4x_simple_func(trcidr2, TRCIDR2);
++coresight_etm4x_simple_func(trcidr3, TRCIDR3);
++coresight_etm4x_simple_func(trcidr4, TRCIDR4);
++coresight_etm4x_simple_func(trcidr5, TRCIDR5);
+ /* trcidr[6,7] are reserved */
+-coresight_simple_func(trcidr8, TRCIDR8);
+-coresight_simple_func(trcidr9, TRCIDR9);
+-coresight_simple_func(trcidr10, TRCIDR10);
+-coresight_simple_func(trcidr11, TRCIDR11);
+-coresight_simple_func(trcidr12, TRCIDR12);
+-coresight_simple_func(trcidr13, TRCIDR13);
++coresight_etm4x_simple_func(trcidr8, TRCIDR8);
++coresight_etm4x_simple_func(trcidr9, TRCIDR9);
++coresight_etm4x_simple_func(trcidr10, TRCIDR10);
++coresight_etm4x_simple_func(trcidr11, TRCIDR11);
++coresight_etm4x_simple_func(trcidr12, TRCIDR12);
++coresight_etm4x_simple_func(trcidr13, TRCIDR13);
+ 
+ static struct attribute *coresight_etmv4_trcidr_attrs[] = {
+ 	&dev_attr_trcidr0.attr,
+diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
+index 333eddaed339..3b5dd95a3588 100644
+--- a/drivers/hwtracing/coresight/coresight-priv.h
++++ b/drivers/hwtracing/coresight/coresight-priv.h
+@@ -37,6 +37,16 @@
+ #define ETM_MODE_EXCL_KERN	BIT(30)
+ #define ETM_MODE_EXCL_USER	BIT(31)
+ 
++#define coresight_simple_func(type, name, offset)			\
++static ssize_t name##_show(struct device *_dev,				\
++			   struct device_attribute *attr, char *buf)	\
++{									\
++	type *drvdata = dev_get_drvdata(_dev->parent);			\
++	return scnprintf(buf, PAGE_SIZE, "0x%x\n",			\
++			 readl_relaxed(drvdata->base + offset));	\
++}									\
++static DEVICE_ATTR_RO(name)
++
+ enum cs_mode {
+ 	CS_MODE_DISABLED,
+ 	CS_MODE_SYSFS,
 -- 
 2.1.4
