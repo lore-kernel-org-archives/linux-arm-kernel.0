@@ -1,21 +1,22 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue, 5 Apr 2016 09:59:21 -0400
-Subject: [PATCH] ARM: exynos_defconfig: Enable Trats2 audio codec,
- touchscreen and sensors
-In-Reply-To: <1459755830-20390-1-git-send-email-k.kozlowski@samsung.com>
-References: <1459755830-20390-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <5703C4B9.9030304@osg.samsung.com>
+Date: Tue, 5 Apr 2016 10:02:06 -0400
+Subject: [PATCH 1/2] mfd: max77693: Allow building as a module
+In-Reply-To: <1459756459-22061-1-git-send-email-k.kozlowski@samsung.com>
+References: <1459756459-22061-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <5703C55E.1000805@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello Krzysztof,
 
-On 04/04/2016 03:43 AM, Krzysztof Kozlowski wrote:
-> The Exynos4412-based Trats2 board has Asahi Kasei AK 3-Axis
-> Magnetometer, CM36651 proximity/ambient light sensor, MMS114 touchscreen
-> and Wolfson Microelectronics WM1811 CODEC. Enable them in defconfig to
-> get some testing coverage and use its features.
+On 04/04/2016 03:54 AM, Krzysztof Kozlowski wrote:
+> The consumer of max77693 regulators on Trats2 board (samsung-usb2-phy
+> driver) supports deferred probing so the max77693 main MFD driver can be
+> built now as a module. This gives more flexibility and removes manual
+> ordering of init calls.
 > 
+> Suggested-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+> Cc: Paul Gortmaker <paul.gortmaker@windriver.com>
 > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 > ---
 
