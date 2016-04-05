@@ -1,113 +1,61 @@
-From: ttnguyen@apm.com (Tai Tri Nguyen)
-Date: Tue, 5 Apr 2016 11:51:02 -0700
-Subject: [PATCH 2/4] Documentation: Add documentation for APM X-Gene SoC
- PMU DTS binding
-In-Reply-To: <20160404233831.GB1917@svinekod>
-References: <1459467472-31561-1-git-send-email-ttnguyen@apm.com>
- <1459467472-31561-3-git-send-email-ttnguyen@apm.com>
- <20160401123000.GC29876@leverpostej>
- <CACgAJHyS+o_Nyrc7pDxVCTHK7tue9L9F2weGQt_2WqeGfZBeag@mail.gmail.com>
- <20160404233831.GB1917@svinekod>
-Message-ID: <CACgAJHwZ=CwyvxLmuXdOAw2oFhfoC2jkdOY1HPenCsEaYLjrPw@mail.gmail.com>
+From: jchandra@broadcom.com (Jayachandran C)
+Date: Wed, 6 Apr 2016 00:20:32 +0530
+Subject: [PATCH V5 01/15] ACPI: MCFG: Move mmcfg_list management to
+ drivers/acpi
+In-Reply-To: <20160405164122.GA9419@localhost>
+References: <1455630825-27253-1-git-send-email-tn@semihalf.com>
+ <1455630825-27253-2-git-send-email-tn@semihalf.com>
+ <20160303225152.GA10472@localhost>
+ <CAKc_7PUyf8ND8Nd32yDBtBnFbkd1mJ-VsCih6YsEA5ZuBUz5zA@mail.gmail.com>
+ <20160305041443.GA15110@localhost> <56DFE91E.10105@semihalf.com>
+ <5703C7AB.2000306@semihalf.com> <20160405164122.GA9419@localhost>
+Message-ID: <CAKc_7PWFGJSYk0nmLX7cG_1HDHdKSK7NCwWN0_G_e+WwqEs5aQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Bjorn,
 
-On Mon, Apr 4, 2016 at 4:38 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Mon, Apr 04, 2016 at 04:40:33PM -0700, Tai Tri Nguyen wrote:
->> On Fri, Apr 1, 2016 at 5:30 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->> > On Thu, Mar 31, 2016 at 04:37:50PM -0700, Tai Nguyen wrote:
->> >> +This is APM X-Gene SoC PMU (Performance Monitoring Unit) module.
->> >> +The following PMU devices are supported:
->> >> +
->> >> +  L3C                        - L3 cache controller
->> >> +  IOB                        - IO bridge
->> >> +  MCB                        - Memory controller bridge
->> >> +  MC                 - Memory controller
->> >
->> > These sound like separate units. How do these relate?
->> >
->> > Is there an SOC-wide PMU that aggregates counters, or are these actually
->> > independent?
->> >
->>
->> Yes, they are independent, but sharing the same top level status interrupt.
->> There's no SOC-wide PMU which aggregates these counters.
+On Tue, Apr 5, 2016 at 10:11 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
 >
-> If they're just sharing the interrupt, why are they not separate nodes (and
-> drivers) which simply happen to share an interrupt?
+> Hi Tomasz,
 >
-> Is there anything else shared?
+> On Tue, Apr 05, 2016 at 04:11:55PM +0200, Tomasz Nowicki wrote:
+> > On 09.03.2016 10:13, Tomasz Nowicki wrote:
+> > >Hi Bjorn,
+> > >
+> > >Thanks for your pointers! See my comments inline. Aslo, can you please
+> > >have a look at my previous patch set v4 and check how many of your
+> > >comments are already addressed there. We may want to back to it then.
+> > >
+> > >https://lkml.org/lkml/2016/2/4/646
+> > >Especially patches [0-6] which handle MMCONFIG refactoring.
+> > >
+> > >
+> > >On 05.03.2016 05:14, Bjorn Helgaas wrote:
+> [...]
+> > >
+> > >As you pointed out raw_pci_{read|write} make things complicated, so IMO
+> > >we should either say they are absolutely necessary (and then think how
+> > >to simplify it) or just use simple bus-specific accessor (patch 02/15)
+> > >e.g. for ARM64.
+> > >
+> > >Any comments appreciated.
+>
+> > Kindly reminder. I would like to move on with this patch set. Can
+> > you please comments on it so that we could decide which way to go.
+>
+> Can you repost your current proposal with a version number higher than
+> any previous ones?  It's OK if the content is the same as v4; I just
+> think it's confusing if we resurrect v4 and have to follow discussion
+> from v3 to v4 to v5 and back to v4.  The archives would be a bit of a
+> muddle.
 
-Yes, a long with the interrupt they also share top level PMU status CSR region.
+I had posted a patchset based on your suggestions in this thread
+https://lkml.org/lkml/2016/3/17/621
 
->
->> >> +The following section describes the SoC PMU DT node binding.
->> >> +
->> >> +Required properties:
->> >> +- compatible         : Shall be "apm,xgene-pmu" for revision 1 or
->> >> +                          "apm,xgene-pmu-v2" for revision 2.
->> >
->> > That name is very general. Is there not a more specific name for the SOC
->> > PMU?
->> >
->>
->> Beside the ARMv8 core PMU which has the compatible name "arm,armv8-pmuv3",
->> these are all the PMUs in X-Gene SoCs. Also, we are using the same PMU
->> driver across our platforms. I think a general name is what it should be.
->
-> Depending on my prior question, I'm not sure that's necessarily true. If
-> there's no actual shared SoC PMU logic as such, the names below for each
-> individual PMU seem fine.
->
+Would appreciate any comments on that. Like I said in the earlier
+mail, if this is a reasonable approach, I can combine this with
+Tomasz patchset to provide the full patchset for ACPI support.
 
-Given that they are sharing the same top level PMU status CSRs, a
-combined driver
-seems to be the best approach in my opinion.
-
->> >> +Required properties for L3C subnode:
->> >> +- compatible         : Shall be "apm,xgene-pmu-l3c".
->> >> +- reg                        : First resource shall be the L3C PMU resource.
->> >> +- index                      : Instance number of the L3C PMU.
->> >> +
->> >> +Required properties for IOB subnode:
->> >> +- compatible         : Shall be "apm,xgene-pmu-iob".
->> >> +- reg                        : First resource shall be the IOB PMU resource.
->> >> +- index                      : Instance number of the IOB PMU.
->> >> +
->> >> +Required properties for MCB subnode:
->> >> +- compatible         : Shall be "apm,xgene-pmu-mcb".
->> >> +- reg                        : First resource shall be the MCB PMU resource.
->> >> +- index                      : Instance number of the MCB PMU.
->> >> +
->> >> +Required properties for MC subnode:
->> >> +- compatible         : Shall be "apm,xgene-pmu-mc".
->> >> +- reg                        : First resource shall be the MC PMU resource.
->> >> +- index                      : Instance number of the MC PMU.
->> >
->> > What's the index property useful for?
->> >
->>
->> The index property is used for indicating the physical hardware PMU id.
->> For example, on X-Gene1 there are 4 memory controllers (MC), each of them has
->> its own PMU. The index property tells us which MC a PMU belongs to.
->> The same for MCB/L3C and IOB.
->
-> Sure, but is this simply informative for the user, or does this have an impact
-> on the programming model?
->
-
-Yes, it does impact. For example, there are 4 PMUs associated with 4 MCs.
-They all certainly have the same sort of events. The index will help
-to determine
-the right event users want to monitor. Below is an example of perf list output:
-...
-mc0/mcu-rd-request/
-...
-mc1/mcu-rd-request/
-...
-
-Regards,
--- 
-Tai
+Thanks,
+JC.
