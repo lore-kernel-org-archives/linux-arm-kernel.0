@@ -1,74 +1,22 @@
-From: john@metanate.com (John Keeping)
-Date: Tue, 5 Apr 2016 18:28:58 +0100
-Subject: [PATCH] iommu/rockchip: Fix "is stall active" check
-In-Reply-To: <5389576.zuTxjFsmO4@phil>
-References: <1459865146-25308-1-git-send-email-john@metanate.com>
- <5389576.zuTxjFsmO4@phil>
-Message-ID: <20160405182858.382ea465.john@metanate.com>
+From: david@lechnology.com (David Lechner)
+Date: Tue,  5 Apr 2016 12:31:48 -0500
+Subject: [PATCH v4 0/3] davinci_mmc fixes
+Message-ID: <1459877512-25479-1-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 05 Apr 2016 10:21:27 -0700, Heiko Stuebner wrote:
+This fixes a compiler warning in the "fix unwinding in probe" patch where ret
+was used uninitalized.
 
-> Am Dienstag, 5. April 2016, 15:05:46 schrieb John Keeping:
-> > Since commit cd6438c5f844 ("iommu/rockchip: Reconstruct to support multi
-> > slaves") rk_iommu_is_stall_active() always returns false because the
-> > bitwise AND operates on the boolean flag promoted to an integer and a
-> > value that is either zero or BIT(2).
-> > 
-> > Explicitly convert the right-hand value to a boolean so that both sides
-> > are guaranteed to be either zero or one.
-> > 
-> > rk_iommu_is_paging_enabled() does not suffer from the same problem since
-> > RK_MMU_STATUS_PAGING_ENABLED is BIT(0), but let's apply the same change
-> > for consistency and to make it clear that it's correct without needing
-> > to lookup the value.
-> > 
-> > Fixes: cd6438c5f844 ("iommu/rockchip: Reconstruct to support multi
-> > slaves") Signed-off-by: John Keeping <john@metanate.com>  
-> 
-> Nice catch, thanks.
-> 
-> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> 
-> John, out of curiosity, how did you find that problem? Excess stall error 
-> messages or something else?
+David Lechner (3):
+  mmc: davinci: fix unwinding in probe
+  mmc: davinci: prepare clock
+  ARM: davinci: remove mmc dma resources
 
-I was testing the drm iommu patches I posted today [1] and noticed an
-"Enable stall request timed out" error when unbinding the
-display-subsystem, but the RK_MMU_STATUS value printed in the error
-message indicated that stall active was set.
+ arch/arm/mach-davinci/devices-da8xx.c |  20 -------
+ arch/arm/mach-davinci/devices.c       |  16 ------
+ drivers/mmc/host/davinci_mmc.c        | 100 ++++++++++++++--------------------
+ 3 files changed, 40 insertions(+), 96 deletions(-)
 
-[1] http://article.gmane.org/gmane.comp.video.dri.devel/150721
-
-> > ---
-> >  drivers/iommu/rockchip-iommu.c | 8 ++++----
-> >  1 file changed, 4 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/drivers/iommu/rockchip-iommu.c
-> > b/drivers/iommu/rockchip-iommu.c index a6f593a0a29e..5710a06c3049 100644
-> > --- a/drivers/iommu/rockchip-iommu.c
-> > +++ b/drivers/iommu/rockchip-iommu.c
-> > @@ -315,8 +315,8 @@ static bool rk_iommu_is_stall_active(struct rk_iommu
-> > *iommu) int i;
-> > 
-> >  	for (i = 0; i < iommu->num_mmu; i++)
-> > -		active &= rk_iommu_read(iommu->bases[i], RK_MMU_STATUS) &
-> > -					RK_MMU_STATUS_STALL_ACTIVE;
-> > +		active &= !!(rk_iommu_read(iommu->bases[i], RK_MMU_STATUS) &
-> > +					   RK_MMU_STATUS_STALL_ACTIVE);
-> > 
-> >  	return active;
-> >  }
-> > @@ -327,8 +327,8 @@ static bool rk_iommu_is_paging_enabled(struct rk_iommu
-> > *iommu) int i;
-> > 
-> >  	for (i = 0; i < iommu->num_mmu; i++)
-> > -		enable &= rk_iommu_read(iommu->bases[i], RK_MMU_STATUS) &
-> > -					RK_MMU_STATUS_PAGING_ENABLED;
-> > +		enable &= !!(rk_iommu_read(iommu->bases[i], RK_MMU_STATUS) &
-> > +					   RK_MMU_STATUS_PAGING_ENABLED);
-> > 
-> >  	return enable;
-> >  }  
-> 
+-- 
+1.9.1
