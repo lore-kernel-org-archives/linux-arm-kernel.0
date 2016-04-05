@@ -1,71 +1,185 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Tue, 5 Apr 2016 09:49:28 +0800
-Subject: [v14, 01/17] drm: bridge: analogix/dp: split exynos dp driver to
- bridge directory
-In-Reply-To: <20160330203204.GA24156@roeck-us.net>
-References: <1455534576-1486-1-git-send-email-ykk@rock-chips.com>
- <20160330203204.GA24156@roeck-us.net>
-Message-ID: <570319A8.8080400@rock-chips.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue,  5 Apr 2016 10:51:23 +0900
+Subject: [PATCH v2] clk: let clk_disable() return immediately if clk is NULL
+ or error
+Message-ID: <1459821083-28116-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter
+The clk_disable() in the common clock framework (drivers/clk/clk.c)
+returns immediately if a given clk is NULL or an error pointer.  It
+allows clock consumers to call clk_disable() without IS_ERR_OR_NULL
+checking if drivers are only used with the common clock framework.
 
-On 03/31/2016 04:32 AM, Guenter Roeck wrote:
-> Hi,
->
-> On Mon, Feb 15, 2016 at 07:09:36PM +0800, Yakir Yang wrote:
->> Split the dp core driver from exynos directory to bridge directory,
->> and rename the core driver to analogix_dp_*, rename the platform
->> code to exynos_dp.
->>
->> Beside the new analogix_dp driver would export six hooks.
->> "analogix_dp_bind()" and "analogix_dp_unbind()"
->> "analogix_dp_suspned()" and "analogix_dp_resume()"
->> "analogix_dp_detect()" and "analogix_dp_get_modes()"
->>
->> The bind/unbind symbols is used for analogix platform driver to connect
->> with analogix_dp core driver. And the detect/get_modes is used for analogix
->> platform driver to init the connector.
->>
->> They reason why connector need register in helper driver is rockchip drm
->> haven't implement the atomic API, but Exynos drm have implement it, so
->> there would need two different connector helper functions, that's why we
->> leave the connector register in helper driver.
->>
->> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
->>
-> [ ... ]
->
->> diff --git a/drivers/gpu/drm/bridge/analogix/Makefile b/drivers/gpu/drm/bridge/analogix/Makefile
->> new file mode 100644
->> index 0000000..9107b86
->> --- /dev/null
->> +++ b/drivers/gpu/drm/bridge/analogix/Makefile
->> @@ -0,0 +1 @@
->> +obj-$(CONFIG_DRM_ANALOGIX_DP) += analogix_dp_core.o analogix_dp_reg.o
-> This results in the following build errors if DRM_ANALOGIX_DP
-> is configured as module.
->
-> ERROR: "analogix_dp_start_video" [drivers/gpu/drm/bridge/analogix/analogix_dp_core.ko] undefined!
-> ERROR: "analogix_dp_get_lane0_link_training" [drivers/gpu/drm/bridge/analogix/analogix_dp_core.ko] undefined!
-> ERROR: "analogix_dp_get_lane1_link_training" [drivers/gpu/drm/bridge/analogix/analogix_dp_core.ko] undefined!
-> ERROR: "analogix_dp_get_lane2_link_training" [drivers/gpu/drm/bridge/analogix/analogix_dp_core.ko] undefined!
-> ERROR: "analogix_dp_get_lane3_link_training" [drivers/gpu/drm/bridge/analogix/analogix_dp_core.ko] undefined!
-> ERROR: "analogix_dp_get_lane_count" [drivers/gpu/drm/bridge/analogix/analogix_dp_core.ko] undefined!
-> ERROR: "analogix_dp_get_link_bandwidth" [drivers/gpu/drm/bridge/analogix/analogix_dp_core.ko] undefined!
->
-> [ and so on ]
->
-> It should probably be something like
->
-> analogix_dp-objs := analogix_dp_core.o analogix_dp_reg.o
-> obj-$(CONFIG_DRM_ANALOGIX_DP) += analogix_dp.o
+Unfortunately, NULL/error checking is missing from some of non-common
+clk_disable() implementations.  This prevents us from completely
+dropping NULL/error checking from callers.  Let's make it tree-wide
+consistent by adding IS_ERR_OR_NULL(clk) to all callees.
 
-Thanks, good catch, will fix it now.
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Acked-by: Greg Ungerer <gerg@uclinux.org>
+Acked-by: Wan Zongshun <mcuos.com@gmail.com>
+---
 
-- Yakir
-> Guenter
->
->
->
+Stephen,
+
+This patch has been unapplied for a long time.
+
+Please let me know if there is something wrong with this patch.
+
+Thanks,
+
+
+Changes in v2:
+  - Rebase on Linux 4.6-rc1
+
+ arch/arm/mach-ep93xx/clock.c     |  2 +-
+ arch/arm/mach-mmp/clock.c        |  3 +++
+ arch/arm/mach-sa1100/clock.c     | 15 ++++++++-------
+ arch/arm/mach-w90x900/clock.c    |  3 +++
+ arch/blackfin/mach-bf609/clock.c |  3 +++
+ arch/m68k/coldfire/clk.c         |  4 ++++
+ arch/mips/bcm63xx/clk.c          |  3 +++
+ arch/mips/lantiq/clk.c           |  3 +++
+ drivers/sh/clk/core.c            |  2 +-
+ 9 files changed, 29 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/mach-ep93xx/clock.c b/arch/arm/mach-ep93xx/clock.c
+index 39ef3b6..4e11f7d 100644
+--- a/arch/arm/mach-ep93xx/clock.c
++++ b/arch/arm/mach-ep93xx/clock.c
+@@ -293,7 +293,7 @@ void clk_disable(struct clk *clk)
+ {
+ 	unsigned long flags;
+ 
+-	if (!clk)
++	if (IS_ERR_OR_NULL(clk))
+ 		return;
+ 
+ 	spin_lock_irqsave(&clk_lock, flags);
+diff --git a/arch/arm/mach-mmp/clock.c b/arch/arm/mach-mmp/clock.c
+index ac6633d..39ad3896 100644
+--- a/arch/arm/mach-mmp/clock.c
++++ b/arch/arm/mach-mmp/clock.c
+@@ -67,6 +67,9 @@ void clk_disable(struct clk *clk)
+ {
+ 	unsigned long flags;
+ 
++	if (IS_ERR_OR_NULL(clk))
++		return;
++
+ 	WARN_ON(clk->enabled == 0);
+ 
+ 	spin_lock_irqsave(&clocks_lock, flags);
+diff --git a/arch/arm/mach-sa1100/clock.c b/arch/arm/mach-sa1100/clock.c
+index cbf53bb..ea103fd 100644
+--- a/arch/arm/mach-sa1100/clock.c
++++ b/arch/arm/mach-sa1100/clock.c
+@@ -85,13 +85,14 @@ void clk_disable(struct clk *clk)
+ {
+ 	unsigned long flags;
+ 
+-	if (clk) {
+-		WARN_ON(clk->enabled == 0);
+-		spin_lock_irqsave(&clocks_lock, flags);
+-		if (--clk->enabled == 0)
+-			clk->ops->disable(clk);
+-		spin_unlock_irqrestore(&clocks_lock, flags);
+-	}
++	if (IS_ERR_OR_NULL(clk))
++		return;
++
++	WARN_ON(clk->enabled == 0);
++	spin_lock_irqsave(&clocks_lock, flags);
++	if (--clk->enabled == 0)
++		clk->ops->disable(clk);
++	spin_unlock_irqrestore(&clocks_lock, flags);
+ }
+ EXPORT_SYMBOL(clk_disable);
+ 
+diff --git a/arch/arm/mach-w90x900/clock.c b/arch/arm/mach-w90x900/clock.c
+index 2c371ff..90ec250 100644
+--- a/arch/arm/mach-w90x900/clock.c
++++ b/arch/arm/mach-w90x900/clock.c
+@@ -46,6 +46,9 @@ void clk_disable(struct clk *clk)
+ {
+ 	unsigned long flags;
+ 
++	if (IS_ERR_OR_NULL(clk))
++		return;
++
+ 	WARN_ON(clk->enabled == 0);
+ 
+ 	spin_lock_irqsave(&clocks_lock, flags);
+diff --git a/arch/blackfin/mach-bf609/clock.c b/arch/blackfin/mach-bf609/clock.c
+index 3783058..fed8015 100644
+--- a/arch/blackfin/mach-bf609/clock.c
++++ b/arch/blackfin/mach-bf609/clock.c
+@@ -97,6 +97,9 @@ EXPORT_SYMBOL(clk_enable);
+ 
+ void clk_disable(struct clk *clk)
+ {
++	if (IS_ERR_OR_NULL(clk))
++		return;
++
+ 	if (clk->ops && clk->ops->disable)
+ 		clk->ops->disable(clk);
+ }
+diff --git a/arch/m68k/coldfire/clk.c b/arch/m68k/coldfire/clk.c
+index fddfdcc..eb0e8c1 100644
+--- a/arch/m68k/coldfire/clk.c
++++ b/arch/m68k/coldfire/clk.c
+@@ -101,6 +101,10 @@ EXPORT_SYMBOL(clk_enable);
+ void clk_disable(struct clk *clk)
+ {
+ 	unsigned long flags;
++
++	if (IS_ERR_OR_NULL(clk))
++		return;
++
+ 	spin_lock_irqsave(&clk_lock, flags);
+ 	if ((--clk->enabled == 0) && clk->clk_ops)
+ 		clk->clk_ops->disable(clk);
+diff --git a/arch/mips/bcm63xx/clk.c b/arch/mips/bcm63xx/clk.c
+index 6375652..d6a39bf 100644
+--- a/arch/mips/bcm63xx/clk.c
++++ b/arch/mips/bcm63xx/clk.c
+@@ -326,6 +326,9 @@ EXPORT_SYMBOL(clk_enable);
+ 
+ void clk_disable(struct clk *clk)
+ {
++	if (IS_ERR_OR_NULL(clk))
++		return;
++
+ 	mutex_lock(&clocks_mutex);
+ 	clk_disable_unlocked(clk);
+ 	mutex_unlock(&clocks_mutex);
+diff --git a/arch/mips/lantiq/clk.c b/arch/mips/lantiq/clk.c
+index a0706fd..c8d87b1 100644
+--- a/arch/mips/lantiq/clk.c
++++ b/arch/mips/lantiq/clk.c
+@@ -130,6 +130,9 @@ EXPORT_SYMBOL(clk_enable);
+ 
+ void clk_disable(struct clk *clk)
+ {
++	if (IS_ERR_OR_NULL(clk))
++		return;
++
+ 	if (unlikely(!clk_good(clk)))
+ 		return;
+ 
+diff --git a/drivers/sh/clk/core.c b/drivers/sh/clk/core.c
+index 92863e3..9978fa4 100644
+--- a/drivers/sh/clk/core.c
++++ b/drivers/sh/clk/core.c
+@@ -252,7 +252,7 @@ void clk_disable(struct clk *clk)
+ {
+ 	unsigned long flags;
+ 
+-	if (!clk)
++	if (IS_ERR_OR_NULL(clk))
+ 		return;
+ 
+ 	spin_lock_irqsave(&clock_lock, flags);
+-- 
+1.9.1
