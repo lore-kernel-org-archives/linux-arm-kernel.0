@@ -1,104 +1,63 @@
 From: guodong.xu@linaro.org (Guodong Xu)
-Date: Tue,  5 Apr 2016 21:27:24 +0800
-Subject: [PATCH v3 00/16] DTS for hi6220 and HiKey
-Message-ID: <1459862860-9775-1-git-send-email-guodong.xu@linaro.org>
+Date: Tue,  5 Apr 2016 21:27:25 +0800
+Subject: [PATCH v3 01/16] arm64: dts: Reserve memory regions for hi6220
+In-Reply-To: <1459862860-9775-1-git-send-email-guodong.xu@linaro.org>
+References: <1459862860-9775-1-git-send-email-guodong.xu@linaro.org>
+Message-ID: <1459862860-9775-2-git-send-email-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset include dts changes for hi6220 SoC and HiKey board. These
-patches apply well one by one on top of next-20160401. All tested on HiKey
-and pass.
+From: Leo Yan <leo.yan@linaro.org>
 
-To avoid merge conflicts with patches already ack'ed by maintainers,
-I picked all hi6220/hikey dts related patches into this single patchset.
-And they passed the tests on HiKey.
+On Hi6220, below memory regions in DDR have specific purpose:
 
-Patch 1~3 are from hi6220 cpuidle support. It has been reviewed and
-ack'ed in maillist.
-[PATCH v2 RESEND 0/4] arm64: Hi6220: enable CPU idle states:
-http://archive.arm.linux.org.uk/lurker/message/20160121.105346.7d3b0470.en.html
+  0x05e0,0000 - 0x05ef,ffff: For MCU firmware using at runtime;
+  0x06df,f000 - 0x06df,ffff: For mailbox message data;
+  0x0740,f000 - 0x0740,ffff: For MCU firmware's section;
+  0x3e00,0000 - 0x3fff,ffff: For OP-TEE.
 
-Patch 4 is for hi6220 gpio.
+This patch reserves these memory regions in DT.
 
-Patch 5 is for pinctl.
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Acked-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 16 ++++++++++++----
+ 1 file changed, 12 insertions(+), 4 deletions(-)
 
-Patch 6 is for spi configuration.
-
-Patch 7 adds hi6220 i2c nodes, and
-patch 8 enables them for hikey board usage.
-
-Patch 9 adds add hi6220 usb node. It has been sent to maillist.
-[PATCH] arm64: dts: add hi6220 usb node
-http://thread.gmane.org/gmane.linux.drivers.devicetree/146062
-http://thread.gmane.org/gmane.linux.drivers.devicetree/144335/focus=134022
-Acked-by: Rob Herring <robh@kernel.org>
-
-Patch 10 and 11 are from hi6220 mailbox support. It has been reviewed and
-ack'ed in maillist.
-[PATCH v7 RESEND 0/4] mailbox: hisilicon: add Hi6220 mailbox driver
-http://thread.gmane.org/gmane.linux.kernel/2152759/focus=2152768
-Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
-Acked-by: Wei Xu <xuwei5@hisilicon.com>
-Patch 13 adds gpio LEDs device nodes.
-
-Patch 14 adds hi655x pmic dts node and regulator support.
-[PATCH v8 5/5] arm64: dts: hisilicon: Add hi655x pmic dts node
-http://thread.gmane.org/gmane.linux.kernel/2151688
-Acked-by: Lee Jones <lee.jones@linaro.org>
-
-Patch 15 adds dwmmc nodes description for hi6220. It refers to two LDO's
-which are defined above.
-Patch 16 adds wifi device node (TI's wl1835) for HiKey board.
-
-v3:
-- update patch 2 sp804 clocks and clock-names
-- add Acked-by into commits where applies.
-
-v2:
-- picked hi655x pmic dts node.
-- removed dw_mmc resets property, as it is still under review.
-- add 'non-removable' into dw_mmc2 for wifi
-
-Chen Feng (1):
-  arm64: dts: hikey: Add hi655x pmic dts node
-
-Guodong Xu (4):
-  arm64: dts: hikey: enable i2c0 and i2c1 for working with mezzanine
-    boards
-  arm64: dts: hi6220: add pinctrl for uarts and enable them
-  arm64: dts: add LED nodes for hi6220-hikey
-  arm64: dts: add wifi nodes support for hi6220-hikey
-
-Leo Yan (5):
-  arm64: dts: Reserve memory regions for hi6220
-  arm64: dts: add sp804 timer node for Hi6220
-  arm64: dts: enable idle states for Hi6220
-  arm64: dts: add mailbox node for Hi6220
-  arm64: dts: add Hi6220's stub clock node
-
-Xinwei Kong (2):
-  arm64: dts: add all hi6220 i2c nodes
-  arm64: dts: add dwmmc nodes for hi6220
-
-Zhangfei Gao (1):
-  arm64: dts: add hi6220 usb node
-
-Zhong Kaihua (3):
-  arm64: dts: Add Hi6220 gpio configuration nodes
-  arm64: dts: add Hi6220 pinctrl configuration nodes
-  arm64: dts: add Hi6220 spi configuration nodes
-
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts   | 198 ++++++-
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi        | 584 +++++++++++++++++++
- arch/arm64/boot/dts/hisilicon/hikey-gpio.dtsi    | 607 +++++++++++++++++++
- arch/arm64/boot/dts/hisilicon/hikey-pinctrl.dtsi | 705 +++++++++++++++++++++++
- include/dt-bindings/pinctrl/hisi.h               |  59 ++
- 5 files changed, 2149 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm64/boot/dts/hisilicon/hikey-gpio.dtsi
- create mode 100644 arch/arm64/boot/dts/hisilicon/hikey-pinctrl.dtsi
- create mode 100644 include/dt-bindings/pinctrl/hisi.h
-
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+index 8185251..17bd793 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
++++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+@@ -7,9 +7,6 @@
+ 
+ /dts-v1/;
+ 
+-/*Reserved 1MB memory for MCU*/
+-/memreserve/ 0x05e00000 0x00100000;
+-
+ #include "hi6220.dtsi"
+ 
+ / {
+@@ -27,9 +24,20 @@
+ 		stdout-path = "serial3:115200n8";
+ 	};
+ 
++	/*
++	 * Reserve below regions from memory node:
++	 *
++	 *  0x05e0,0000 - 0x05ef,ffff: MCU firmware runtime using
++	 *  0x06df,f000 - 0x06df,ffff: Mailbox message data
++	 *  0x0740,f000 - 0x0740,ffff: MCU firmware section
++	 *  0x3e00,0000 - 0x3fff,ffff: OP-TEE
++	 */
+ 	memory at 0 {
+ 		device_type = "memory";
+-		reg = <0x0 0x0 0x0 0x40000000>;
++		reg = <0x00000000 0x00000000 0x00000000 0x05e00000>,
++		      <0x00000000 0x05f00000 0x00000000 0x00eff000>,
++		      <0x00000000 0x06e00000 0x00000000 0x0060f000>,
++		      <0x00000000 0x07410000 0x00000000 0x36bf0000>;
+ 	};
+ };
+ 
 -- 
 1.9.1
