@@ -1,29 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 5 Apr 2016 08:56:17 +0100
-Subject: [GIT PULL v3] ARM support for generic memremap()
-In-Reply-To: <1459841213-16915-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1459841213-16915-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160405075617.GZ19428@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 5 Apr 2016 09:57:54 +0200
+Subject: [PATCH RESEND] ARM: l2x0: add three special L210 aux control flags
+In-Reply-To: <20160405074315.GX19428@n2100.arm.linux.org.uk>
+References: <1458043882-16881-1-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdZeAKkU4Cr6TTQor_6zw2iVGgXmTdcsQuHuR07Q8yZHiQ@mail.gmail.com>
+ <20160405074315.GX19428@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdakozuVt8F9siqxULp7oYqoeXtmnobw3CWbmHkz6hs+nQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 05, 2016 at 09:26:53AM +0200, Ard Biesheuvel wrote:
-> Hello Russell,
-> 
-> This pull request covers the updated v5 of this series that I sent out
-> yesterday, which fixed the nommu breakage that was present in all previous
-> versions. Please pull.
+On Tue, Apr 5, 2016 at 9:43 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
->From the record so far, it seems that it's in my interest to wait
-a few days before doing anything with these pull requests, so I'm
-going to wait until the end of the week before doing anything with
-them... and then I'm going to need to work out which requests have
-been superseded.
+> I haven't forgotten it, but I do wonder whether this endless shovelling
+> of more and more DT properties is really the way forward, or whether
+> some of this stuff should be handled by the boot loader/firmware.
+>
+> That's the reason that you get the:
+>
+> "L2C: DT/platform modifies aux control register: 0x%08x -> 0x%08x"
+>
+> message at _warning_ level.
 
-So, I suggest that you re-send all the pull requests on Friday,
-assuming this has now stabilised.
+I see your concern.
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Unfortunately it's one of those bootloaders that I cannot replace.
+There is nothing in the way of official support for it, and
+you have to use a custom protocol to replace the boot loader,
+so if I start to experiment with it I may end up bricking my
+device beyond recovery :(
+
+Yours,
+Linus Walleij
