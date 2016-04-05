@@ -1,31 +1,27 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 05 Apr 2016 09:48:15 -0700
-Subject: [PATCH] iommu/rockchip: Only log stall errors when attaching
-In-Reply-To: <20160405145726.GD11519@8bytes.org>
-References: <1458659073-13553-1-git-send-email-tomeu.vizoso@collabora.com>
- <20160405145726.GD11519@8bytes.org>
-Message-ID: <7194078.9M5myMDU4z@phil>
+From: david@lechnology.com (David Lechner)
+Date: Tue, 5 Apr 2016 11:51:10 -0500
+Subject: [PATCH v3 0/5] davinci_mmc fixes
+In-Reply-To: <CAPDyKFp3UELfw2gNTh0GeX31bjwb8tbDiua6ZigLwhaUkcv3zA@mail.gmail.com>
+References: <1458186341-6970-1-git-send-email-david@lechnology.com>
+ <CAPDyKFp3UELfw2gNTh0GeX31bjwb8tbDiua6ZigLwhaUkcv3zA@mail.gmail.com>
+Message-ID: <5703ECFE.6060706@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 5. April 2016, 16:57:26 schrieb Joerg Roedel:
-> On Tue, Mar 22, 2016 at 04:04:33PM +0100, Tomeu Vizoso wrote:
-> > Move the logging of timeouts when stalling the MMU to
-> > rk_iommu_attach_device, as it's expected that sometimes the MMU won't
-> > get stalled when detaching a device, and it's not a real problem that
-> > would need to be communicated to the user.
-> > 
-> > Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> 
-> Heiko, any opinion on this patch?
+On 04/05/2016 06:12 AM, Ulf Hansson wrote:
+>
+> Patch 3 triggers a compiler warning, please fix it.
+>
+> ../drivers/mmc/host/davinci_mmc.c: In function ?davinci_mmcsd_probe?:
+> ../drivers/mmc/host/davinci_mmc.c:1208:6: warning: ?ret? may be used
+> uninitialized in this function [-Wmaybe-uninitialized]
+>
+> I have applied patch 1->2 for next, so no need to resend these.
+>
+> Kind regards
+> Uffe
+>
 
-I don't know enough about iommus (and the rockchip implementation) to judge 
-if this is correct. The reasoning sound right though and it seems to fix an 
-issue for Tomeu.
-
-One complaint would be that I'd expect the behaviour to match between the 
-enable and disable functions. Meaning I'd want the error message from 
-rk_iommu_disable_stall to also move rk_iommu_attach_device.
-
-
-Heiko
+I am not getting a compiler warning with this commit. Can you please 
+provide a git link so that I can be sure I am building using the same 
+branch that you are using?
