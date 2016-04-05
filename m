@@ -1,56 +1,71 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Tue, 5 Apr 2016 04:24:27 +0300
-Subject: [PATCH 00/10] irqchip: lpc32xx: add LPC32xx irqchip driver
-In-Reply-To: <1459791432.25564.15.camel@localhost>
-References: <1447982925-30138-1-git-send-email-vz@mleia.com>
- <loom.20160210T204046-649@post.gmane.org>
- <1459791432.25564.15.camel@localhost>
-Message-ID: <570313CB.5090204@mleia.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Tue, 5 Apr 2016 09:49:28 +0800
+Subject: [v14, 01/17] drm: bridge: analogix/dp: split exynos dp driver to
+ bridge directory
+In-Reply-To: <20160330203204.GA24156@roeck-us.net>
+References: <1455534576-1486-1-git-send-email-ykk@rock-chips.com>
+ <20160330203204.GA24156@roeck-us.net>
+Message-ID: <570319A8.8080400@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylvain,
+Hi Guenter
 
-On 04.04.2016 20:37, Sylvain Lemieux wrote:
-> Hi Vladimir,
-> 
-> On Wed, 2016-02-10 at 19:45 +0000, Sylvain Lemieux wrote:
->> Vladimir Zapolskiy <vz@...> writes:
->>>
->>> The change adds wakeup controller platform driver and irqchip driver
->>> for NXP LPC32xx boards.
->>  
->> Hi Vladimir,
+On 03/31/2016 04:32 AM, Guenter Roeck wrote:
+> Hi,
+>
+> On Mon, Feb 15, 2016 at 07:09:36PM +0800, Yakir Yang wrote:
+>> Split the dp core driver from exynos directory to bridge directory,
+>> and rename the core driver to analogix_dp_*, rename the platform
+>> code to exynos_dp.
 >>
->> Just to let you know that we did some testing using this changeset;
->> I tested the change on 4.5-rc1 with patch 4 to 7, 10 & 11 from:
->> http://permalink.gmane.org/gmane.linux.drivers.devicetree/144671
+>> Beside the new analogix_dp driver would export six hooks.
+>> "analogix_dp_bind()" and "analogix_dp_unbind()"
+>> "analogix_dp_suspned()" and "analogix_dp_resume()"
+>> "analogix_dp_detect()" and "analogix_dp_get_modes()"
 >>
->> I was able to run our software (I2C SIC1 interrupt enable)
->> without any problem on a custom LPC32xx board.
+>> The bind/unbind symbols is used for analogix platform driver to connect
+>> with analogix_dp core driver. And the detect/get_modes is used for analogix
+>> platform driver to init the connector.
 >>
->>> Vladimir Zapolskiy (10):
->>>   dt-bindings: create arm/nxp folder and move LPC32xx SoC description to it
->>>   dt-bindings: nxp: add description of wakeup controller on LPC32xx
->>>   dt-bindings: interrupt-controllers: add description of SIC1 and SIC2
->>>   arm: lpc32xx: add wakeup platform driver
->>>   arm: dts: lpc32xx: assign interrupt types
->>>   arm: dts: lpc32xx: add description of IC wakeup controllers
->>>   arm: dts: lpc32xx: reparent SIC1 and SIC2 interrupts from MIC
->>>   irqchip: add LPC32xx interrupt controller driver
->>>   irqchip: lpc32xx: add option to wakeup from an interrupt
->>>   arm: dts: lpc32xx: enable SIC1 and SIC2 by default
+>> They reason why connector need register in helper driver is rockchip drm
+>> haven't implement the atomic API, but Exynos drm have implement it, so
+>> there would need two different connector helper functions, that's why we
+>> leave the connector register in helper driver.
 >>
-> 
-> As per the feedback you gave in the following message:
-> http://article.gmane.org/gmane.linux.ports.arm.kernel/483540
-> 
-> are you planning to send a version 2 of this patch for v4.7?
-> 
+>> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+>>
+> [ ... ]
+>
+>> diff --git a/drivers/gpu/drm/bridge/analogix/Makefile b/drivers/gpu/drm/bridge/analogix/Makefile
+>> new file mode 100644
+>> index 0000000..9107b86
+>> --- /dev/null
+>> +++ b/drivers/gpu/drm/bridge/analogix/Makefile
+>> @@ -0,0 +1 @@
+>> +obj-$(CONFIG_DRM_ANALOGIX_DP) += analogix_dp_core.o analogix_dp_reg.o
+> This results in the following build errors if DRM_ANALOGIX_DP
+> is configured as module.
+>
+> ERROR: "analogix_dp_start_video" [drivers/gpu/drm/bridge/analogix/analogix_dp_core.ko] undefined!
+> ERROR: "analogix_dp_get_lane0_link_training" [drivers/gpu/drm/bridge/analogix/analogix_dp_core.ko] undefined!
+> ERROR: "analogix_dp_get_lane1_link_training" [drivers/gpu/drm/bridge/analogix/analogix_dp_core.ko] undefined!
+> ERROR: "analogix_dp_get_lane2_link_training" [drivers/gpu/drm/bridge/analogix/analogix_dp_core.ko] undefined!
+> ERROR: "analogix_dp_get_lane3_link_training" [drivers/gpu/drm/bridge/analogix/analogix_dp_core.ko] undefined!
+> ERROR: "analogix_dp_get_lane_count" [drivers/gpu/drm/bridge/analogix/analogix_dp_core.ko] undefined!
+> ERROR: "analogix_dp_get_link_bandwidth" [drivers/gpu/drm/bridge/analogix/analogix_dp_core.ko] undefined!
+>
+> [ and so on ]
+>
+> It should probably be something like
+>
+> analogix_dp-objs := analogix_dp_core.o analogix_dp_reg.o
+> obj-$(CONFIG_DRM_ANALOGIX_DP) += analogix_dp.o
 
-definitely, I plan to find enough time this week to rebase and submit v2.
-FWIW 2 changes from the series are found in v4.6.
+Thanks, good catch, will fix it now.
 
---
-With best wishes,
-Vladimir
+- Yakir
+> Guenter
+>
+>
+>
