@@ -1,403 +1,74 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 5 Apr 2016 18:28:55 +0100
-Subject: [RFC PATCH 06/45] KVM: arm/arm64: vgic-new: Implement virtual IRQ
- injection
-In-Reply-To: <20160329211650.GF4126@cbox>
-References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
- <1458871508-17279-7-git-send-email-andre.przywara@arm.com>
- <20160329211650.GF4126@cbox>
-Message-ID: <5703F5D7.5060803@arm.com>
+From: john@metanate.com (John Keeping)
+Date: Tue, 5 Apr 2016 18:28:58 +0100
+Subject: [PATCH] iommu/rockchip: Fix "is stall active" check
+In-Reply-To: <5389576.zuTxjFsmO4@phil>
+References: <1459865146-25308-1-git-send-email-john@metanate.com>
+ <5389576.zuTxjFsmO4@phil>
+Message-ID: <20160405182858.382ea465.john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, 05 Apr 2016 10:21:27 -0700, Heiko Stuebner wrote:
 
-On 29/03/16 22:16, Christoffer Dall wrote:
-> On Fri, Mar 25, 2016 at 02:04:29AM +0000, Andre Przywara wrote:
->> From: Christoffer Dall <christoffer.dall@linaro.org>
->>
->> Provide a vgic_queue_irq() function which decides whether a given
->> IRQ needs to be queued to a VCPU's ap_list.
->> This should be called whenever an IRQ became pending or got enabled,
+> Am Dienstag, 5. April 2016, 15:05:46 schrieb John Keeping:
+> > Since commit cd6438c5f844 ("iommu/rockchip: Reconstruct to support multi
+> > slaves") rk_iommu_is_stall_active() always returns false because the
+> > bitwise AND operates on the boolean flag promoted to an integer and a
+> > value that is either zero or BIT(2).
+> > 
+> > Explicitly convert the right-hand value to a boolean so that both sides
+> > are guaranteed to be either zero or one.
+> > 
+> > rk_iommu_is_paging_enabled() does not suffer from the same problem since
+> > RK_MMU_STATUS_PAGING_ENABLED is BIT(0), but let's apply the same change
+> > for consistency and to make it clear that it's correct without needing
+> > to lookup the value.
+> > 
+> > Fixes: cd6438c5f844 ("iommu/rockchip: Reconstruct to support multi
+> > slaves") Signed-off-by: John Keeping <john@metanate.com>  
 > 
-> becomes pending or enabled,
+> Nice catch, thanks.
 > 
->> either as a result of userspace injection, from in-kernel emulated
->> devices like the architected timer or from MMIO accesses to the
->> distributor emulation.
->> Also provides the necessary functions to allow userland to inject an
->> IRQ to a guest.
+> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 > 
-> Since this is the first code that starts using our locking mechanism, we
-> add some (hopefully) clear documentation of our locking strategy and
-> requirements along with this patch.
-> 
->> [Andre: refactor out vgic_queue_irq()]
->>
->> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->>  include/kvm/vgic/vgic.h  |   3 +
->>  virt/kvm/arm/vgic/vgic.c | 181 +++++++++++++++++++++++++++++++++++++++++++++++
->>  virt/kvm/arm/vgic/vgic.h |   1 +
->>  3 files changed, 185 insertions(+)
->>
->> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
->> index 659f8b1..f32b284 100644
->> --- a/include/kvm/vgic/vgic.h
->> +++ b/include/kvm/vgic/vgic.h
->> @@ -178,6 +178,9 @@ struct vgic_cpu {
->>  	struct list_head ap_list_head;
->>  };
->>  
->> +int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
->> +			bool level);
->> +
->>  #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
->>  #define vgic_initialized(k)	(false)
->>  #define vgic_ready(k)		((k)->arch.vgic.ready)
->> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
->> index 8e34916..a95aabc 100644
->> --- a/virt/kvm/arm/vgic/vgic.c
->> +++ b/virt/kvm/arm/vgic/vgic.c
->> @@ -19,8 +19,25 @@
->>  
->>  #include "vgic.h"
->>  
->> +#define CREATE_TRACE_POINTS
->> +#include "../trace.h"
->> +
->>  struct vgic_global kvm_vgic_global_state;
->>  
->> +/*
->> + * Locking order is always:
->> + *   vgic_cpu->ap_list_lock
->> + *     vgic_irq->irq_lock
->> + *
->> + * (that is, always take the ap_list_lock before the struct vgic_irq lock).
->> + *
->> + * When taking more than one ap_list_lock at the same time, always take the
->> + * lowest numbered VCPU's ap_list_lock first, so:
->> + *   vcpuX->vcpu_id < vcpuY->vcpu_id:
->> + *     spin_lock(vcpuX->arch.vgic_cpu.ap_list_lock);
->> + *     spin_lock(vcpuY->arch.vgic_cpu.ap_list_lock);
->> + */
->> +
->>  struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
->>  			      u32 intid)
->>  {
->> @@ -39,3 +56,167 @@ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
->>  	WARN(1, "Looking up struct vgic_irq for reserved INTID");
->>  	return NULL;
->>  }
->> +
->> +/**
->> + * kvm_vgic_target_oracle - compute the target vcpu for an irq
->> + *
->> + * @irq:	The irq to route. Must be already locked.
+> John, out of curiosity, how did you find that problem? Excess stall error 
+> messages or something else?
 
-                                  ^^^^^^^^^^^^^^^^^^^^^^
+I was testing the drm iommu patches I posted today [1] and noticed an
+"Enable stall request timed out" error when unbinding the
+display-subsystem, but the RK_MMU_STATUS value printed in the error
+message indicated that stall active was set.
 
->> + *
->> + * Based on the current state of the interrupt (enabled, pending,
->> + * active, vcpu and target_vcpu), compute the next vcpu this should be
->> + * given to. Return NULL if this shouldn't be injected at all.
->> + */
->> +static struct kvm_vcpu *vgic_target_oracle(struct vgic_irq *irq)
->> +{
->> +	/* If the interrupt is active, it must stay on the current vcpu */
->> +	if (irq->active)
->> +		return irq->vcpu;
-> 
-> we are not taking a lock here.  What are the locking expectations?  If
-> the expectarions are that the IRQ is locked when calling this function,
-> can we have a BIG FAT COMMENT saying that then?
+[1] http://article.gmane.org/gmane.comp.video.dri.devel/150721
 
-Do you mean really BIG FAT or is the above sufficient? (I guess not).
-I will make it more prominent.
-
-> It seems to me that we are somehow expecting irq->active and irq->vcpu
-> to be in sync, but that's not necessarily the case if the IRQ is not
-> locked.
-> 
->> +
->> +	/* If enabled and pending, it can migrate to a new one */
-> 
-> I think this comment should be rewritten to:
-> 
-> If the IRQ is not active but enabled and pending, we should direct it to
-> its configured target VCPU.
-> 
->> +	if (irq->enabled && irq->pending)
->> +		return irq->target_vcpu;
->> +
->> +	/* Otherwise, it is considered idle */
-> 
-> not sure what idle means here, I suggest something like:
-> 
-> If neither active nor pending and enabled, then this IRQ should not be
-> queued to any VCPU.
-> 
->> +	return NULL;
->> +}
->> +
->> +/*
->> + * Only valid injection if changing level for level-triggered IRQs or for a
->> + * rising edge.
->> + */
->> +static bool vgic_validate_injection(struct vgic_irq *irq, bool level)
->> +{
->> +	switch (irq->config) {
->> +	case VGIC_CONFIG_LEVEL:
->> +		return irq->line_level != level;
->> +	case VGIC_CONFIG_EDGE:
->> +		return level;
->> +	default:
->> +		BUG();
-> 
-> is the default case there for making the compiler happy or can we just
-> get rid of it?
-
-Just removing it was fine (for GCC 5.3.0, at least).
-
->> +	}
->> +}
->> +
->> +/*
->> + * Check whether an IRQ needs to (and can) be queued to a VCPU's ap list.
->> + * Do the queuing if necessary, taking the right locks in the right order.
->> + * Returns true when the IRQ was queued, false otherwise.
->> + *
->> + * Needs to be entered with the IRQ lock already held, but will return
->> + * with all locks dropped.
->> + */
->> +bool vgic_queue_irq(struct kvm *kvm, struct vgic_irq *irq)
-> 
-> should we name this vgic_try_queue_irq_locked ?
-
-Mmh, since it (re-)tries quite hard I am not sure _try_ would be
-misleading. Basically it queues the IRQ whenever possible and/or
-sensible. Having _unlock in it like you suggested in another reply makes
-more sense, I think.
-
->> +{
->> +	struct kvm_vcpu *vcpu = vgic_target_oracle(irq);
-> 
-> should we have something like BUG_ON(!spin_is_locked(irq->irq_lock));
-> here?
-> 
-> Not sure if there's some bug checking here which is only emitted if a
-> user select CONFIG_CHECK_SOME_LOCKING_THINGS that we could use...?
-
-There is CONFIG_DEBUG_SPINLOCK, but I couldn't find some conditional
-debug macro suitable for the purpose. I defined one now for the file
-only (since we have quite some users here).
-
->> +
->> +	if (irq->vcpu || !(irq->pending && irq->enabled) || !vcpu) {
->> +		/*
->> +		 * If this IRQ is already on a VCPU's ap_list, then it
->> +		 * cannot be moved or modified and there is no more work for
->> +		 * us to do.
->> +		 *
->> +		 * Otherwise, if the irq is not pending and enabled, it does
->> +		 * not need to be inserted into an ap_list and there is also
->> +		 * no more work for us to do.
->> +		 */
-> 
-> is the !vcpu check here not redundant because if you ever get to
-> evaluating it, then irq->vcpu is null, and pending and enabled are set,
-> which means the oracle couldn't have returned null, could it?
-
-In this case vcpu is always irq->target_vcpu, if I did the math
-correctly. So can this be NULL?
-Even if this is correct reasoning, I wonder if we optimize something
-prematurely here and rely on the current implementation of
-vgic_target_oracle(). I think the check for "!vcpu" is here to avoid a
-NULL pointer deference below (in the first spin_lock after the retry:
-label), so I'd rather keep this explicit check in here.
-
-> that would also explain why we don't have to re-check the same
-> conditions below...
-> 
-> or am I getting this wrong, because you could also have someone
-> explicitly setting the IRQ to active via trapped MMIO, in which case we
-> should be able to queue it without it being pending && enabled, which
-> would indicate that it's the other way around, you should only evaluate
-> !vcpu and kup the !(pending && enabled) part....?
-
-You lost me here, which hints at the fragility of this optimization ;-)
-
->> +		spin_unlock(&irq->irq_lock);
->> +		return false;
->> +	}
->> +
->> +	/*
->> +	 * We must unlock the irq lock to take the ap_list_lock where
->> +	 * we are going to insert this new pending interrupt.
->> +	 */
->> +	spin_unlock(&irq->irq_lock);
->> +
->> +	/* someone can do stuff here, which we re-check below */
->> +retry:
->> +	spin_lock(&vcpu->arch.vgic_cpu.ap_list_lock);
->> +	spin_lock(&irq->irq_lock);
->> +
->> +	/*
->> +	 * Did something change behind our backs?
->> +	 *
->> +	 * There are two cases:
->> +	 * 1) The irq became pending or active behind our backs and/or
->> +	 *    the irq->vcpu field was set correspondingly when putting
->> +	 *    the irq on an ap_list. Then drop the locks and return.
->> +	 * 2) Someone changed the affinity on this irq behind our
->> +	 *    backs and we are now holding the wrong ap_list_lock.
->> +	 *    Then drop the locks and try the new VCPU.
->> +	 */
->> +	if (irq->vcpu || !(irq->pending && irq->enabled)) {
-> 
-> here I'm concerned about the active state again.
-
-Mmmh, can you elaborate and sketch a case where the active state would
-cause trouble? This check is just here to avoid iterating on a no longer
-pending or enabled IRQ. I wonder if an active IRQ can really sneak into
-this function here in the first place?
-
-> I feel like something more similar to my initial version of this patch
-> is what we really want:
-> 
->        if (irq->vcpu || vcpu != vgic_target_oracle(irq))
->            goto real_retry;
-> 
-> and read_retry is then a label at the very top of this function, before
-> the initial call to vgic_target_oracle()....
-> 
->> +		spin_unlock(&irq->irq_lock);
->> +		spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
->> +		return false;
->> +	}
->> +
->> +	if (irq->target_vcpu != vcpu) {
->> +		spin_unlock(&irq->irq_lock);
->> +		spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
->> +
->> +		vcpu = irq->target_vcpu;
->> +		goto retry;
->> +	}
->> +
->> +	list_add_tail(&irq->ap_list, &vcpu->arch.vgic_cpu.ap_list_head);
->> +	irq->vcpu = vcpu;
->> +
->> +	spin_unlock(&irq->irq_lock);
->> +	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
->> +
->> +	kvm_vcpu_kick(vcpu);
->> +
->> +	return true;
->> +}
->> +
->> +static void vgic_update_irq_pending(struct kvm *kvm, struct kvm_vcpu *vcpu,
->> +				    u32 intid, bool level)
->> +{
->> +	struct vgic_irq *irq = vgic_get_irq(kvm, vcpu, intid);
->> +
->> +	trace_vgic_update_irq_pending(vcpu->vcpu_id, intid, level);
->> +
->> +	BUG_ON(in_interrupt());
-> 
-> I don't remember why we thought it was a good idea to have this BUG_ON()
-> anymore.  Anyone?
-
-Me neither. Is that because of the case where "kvm_notify_acked_irq
-calls kvm_set_irq" (which in turn may call this function)?
-I am happy to remove it, also as the old VGIC doesn't seem to have it.
-
->> +
->> +	spin_lock(&irq->irq_lock);
->> +
->> +	if (!vgic_validate_injection(irq, level)) {
->> +		/* Nothing to see here, move along... */
->> +		spin_unlock(&irq->irq_lock);
->> +		return;
->> +	}
->> +
->> +	if (irq->config == VGIC_CONFIG_LEVEL) {
->> +		irq->line_level = level;
->> +		irq->pending = level || irq->soft_pending;
->> +	} else {
->> +		irq->pending = true;
->> +	}
->> +
->> +	vgic_queue_irq(kvm, irq);
->> +}
->> +
->> +/**
->> + * kvm_vgic_inject_irq - Inject an IRQ from a device to the vgic
->> + * @kvm:     The VM structure pointer
->> + * @cpuid:   The CPU for PPIs
->> + * @intid:   The INTID to inject a new state to.
->> + *           must not be mapped to a HW interrupt.
-> 
-> stray line here?  I don't understand this bit about 'must not be mapped'
-> and I think that should be moved to the explanation below with some
-> rationale, and if important, perhaps guarded with a BUG_ON() ?
-
-I think this is a copy&paste leftover from the old VGIC with the old way
-of handling mapped IRQs. Actually the implementations of
-kvm_vgic_inject_irq() and kvm_vgic_inject_mapped_irq() are now
-identical, so the former differentiation does not apply anymore. I will
-#define the latter to the former for the new VGIC and we should schedule
-the removal of the the "mapped" version when the old VGIC gets removed.
-
-Btw: Are we OK with marking those cases which deserve some rework after
-the old VGIC is gone with some kind of TODO comments?
-
-Cheers,
-Andre.
-
-> 
->> + * @level:   Edge-triggered:  true:  to trigger the interrupt
->> + *			      false: to ignore the call
->> + *	     Level-sensitive  true:  raise the input signal
->> + *			      false: lower the input signal
->> + *
->> + * The GIC is not concerned with devices being active-LOW or active-HIGH for
-> 
-> We should probably write VGIC here instead of GIC, just to avoid
-> confusion.
-> 
->> + * level-sensitive interrupts.  You can think of the level parameter as 1
->> + * being HIGH and 0 being LOW and all devices being active-HIGH.
->> + */
->> +int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
->> +			bool level)
->> +{
->> +	struct kvm_vcpu *vcpu;
->> +
->> +	vcpu = kvm_get_vcpu(kvm, cpuid);
->> +	vgic_update_irq_pending(kvm, vcpu, intid, level);
->> +	return 0;
->> +}
->> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
->> index 61b8d22..e9f4aa6 100644
->> --- a/virt/kvm/arm/vgic/vgic.h
->> +++ b/virt/kvm/arm/vgic/vgic.h
->> @@ -18,5 +18,6 @@
->>  
->>  struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
->>  			      u32 intid);
->> +bool vgic_queue_irq(struct kvm *kvm, struct vgic_irq *irq);
->>  
->>  #endif
->> -- 
->> 2.7.3
->>
-> 
-> Otherwise the split between update/queue looks reasonable here.
-> 
-> Btw., anywhere where I write 'you' in this mail, I mean 'we' and take
-> partial blame for any bugs here :)
-> 
-> Thanks,
-> -Christoffer
+> > ---
+> >  drivers/iommu/rockchip-iommu.c | 8 ++++----
+> >  1 file changed, 4 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/drivers/iommu/rockchip-iommu.c
+> > b/drivers/iommu/rockchip-iommu.c index a6f593a0a29e..5710a06c3049 100644
+> > --- a/drivers/iommu/rockchip-iommu.c
+> > +++ b/drivers/iommu/rockchip-iommu.c
+> > @@ -315,8 +315,8 @@ static bool rk_iommu_is_stall_active(struct rk_iommu
+> > *iommu) int i;
+> > 
+> >  	for (i = 0; i < iommu->num_mmu; i++)
+> > -		active &= rk_iommu_read(iommu->bases[i], RK_MMU_STATUS) &
+> > -					RK_MMU_STATUS_STALL_ACTIVE;
+> > +		active &= !!(rk_iommu_read(iommu->bases[i], RK_MMU_STATUS) &
+> > +					   RK_MMU_STATUS_STALL_ACTIVE);
+> > 
+> >  	return active;
+> >  }
+> > @@ -327,8 +327,8 @@ static bool rk_iommu_is_paging_enabled(struct rk_iommu
+> > *iommu) int i;
+> > 
+> >  	for (i = 0; i < iommu->num_mmu; i++)
+> > -		enable &= rk_iommu_read(iommu->bases[i], RK_MMU_STATUS) &
+> > -					RK_MMU_STATUS_PAGING_ENABLED;
+> > +		enable &= !!(rk_iommu_read(iommu->bases[i], RK_MMU_STATUS) &
+> > +					   RK_MMU_STATUS_PAGING_ENABLED);
+> > 
+> >  	return enable;
+> >  }  
 > 
