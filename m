@@ -1,21 +1,15 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 5 Apr 2016 15:36:21 +0200
-Subject: [PATCH] ARM: multi_v7_defconfig: Remove unused Kconfig option
- MACH_UX500_DT
-In-Reply-To: <1459413924-19351-1-git-send-email-lee.jones@linaro.org>
-References: <1459413924-19351-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdbmZoS4E3F1iD4CYd_+LSNaKtLDdS0fyJVDMX1_g+1xJw@mail.gmail.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Tue, 5 Apr 2016 15:41:02 +0200
+Subject: [PATCH v2 0/2] MT8173 IOMMU 4GB MODE SUPPORT
+In-Reply-To: <1457906471-31549-1-git-send-email-yong.wu@mediatek.com>
+References: <1457906471-31549-1-git-send-email-yong.wu@mediatek.com>
+Message-ID: <20160405134102.GA10930@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 31, 2016 at 10:45 AM, Lee Jones <lee.jones@linaro.org> wrote:
+On Mon, Mar 14, 2016 at 06:01:09AM +0800, Yong Wu wrote:
+> Yong Wu (2):
+>   iommu/io-pgtable: Add MTK 4GB mode in Short-descriptor
+>   iommu/mediatek: Add 4GB mode support
 
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-
-I've applied the patch to my ux500-defconfig branch, though
-I'm not sure that it's the right way. If the ARM SoC folks
-want it through one of their branches I guess they will tell.
-
-Yours,
-Linus Walleij
+Applied both, thanks.
