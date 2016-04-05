@@ -1,39 +1,29 @@
 From: anna-maria@linutronix.de (Anna-Maria Gleixner)
-Date: Mon,  4 Apr 2016 12:42:29 +0200
-Subject: [PATCH] arm64/debug: Remove superfluous SMP function call
-Message-ID: <1459766549-17189-1-git-send-email-anna-maria@linutronix.de>
+Date: Tue, 5 Apr 2016 11:39:18 +0200 (CEST)
+Subject: [PATCH] arm64: hw-breakpoint: Remove superfluous SMP function call
+In-Reply-To: <570384DA.6010805@arm.com>
+References: <1459766569-17237-1-git-send-email-anna-maria@linutronix.de>
+ <570384DA.6010805@arm.com>
+Message-ID: <alpine.DEB.2.11.1604051137150.12514@hypnos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit 1cf4f629d9d2 "cpu/hotplug: Move online calls to
-hotplugged cpu" it is ensured that callbacks of CPU_ONLINE and
-CPU_DOWN_PREPARE are processed on the hotplugged cpu. Due to this SMP
-function calls are no longer required.
+On Tue, 5 Apr 2016, Suzuki K. Poulose wrote:
 
-Replace smp_call_function_single() with a direct call to
-clear_os_lock(). The function writes the OSLAR register to clear OS
-locking. This does not require to be called with interrupts disabled,
-therefore the smp_call_function_single() calling convention is not
-preserved.
+> On 04/04/16 11:42, Anna-Maria Gleixner wrote:
+> > Since commit 1cf4f629d9d2 ("cpu/hotplug: Move online calls to
+> > hotplugged cpu") it is ensured that callbacks of CPU_ONLINE and
+> > CPU_DOWN_PREPARE are processed on the hotplugged cpu. Due to this SMP
+> > function calls are no longer required.
+> > 
+> > Replace smp_call_function_single() with a direct call of
+> > hw_breakpoint_reset(). To keep the calling convention, interrupts are
+> > explicitely disabled around the call.
+> 
+> While you are at it, could you please also fix a similar instance
+> in arch/arm64/kernel/debug-monitors.c: hw_breakpoint_reset_notify() ?
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel at lists.infradead.or
-Signed-off-by: Anna-Maria Gleixner <anna-maria@linutronix.de>
----
- arch/arm64/kernel/debug-monitors.c |    3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+I already sent a patch for it, but I misspelled the arm mailinglist
+address... I bounced it to the mailinglist.
 
---- a/arch/arm64/kernel/debug-monitors.c
-+++ b/arch/arm64/kernel/debug-monitors.c
-@@ -135,9 +135,8 @@ static void clear_os_lock(void *unused)
- static int os_lock_notify(struct notifier_block *self,
- 				    unsigned long action, void *data)
- {
--	int cpu = (unsigned long)data;
- 	if ((action & ~CPU_TASKS_FROZEN) == CPU_ONLINE)
--		smp_call_function_single(cpu, clear_os_lock, NULL, 1);
-+		clear_os_lock(NULL);
- 	return NOTIFY_OK;
- }
- 
+Anna-Maria
