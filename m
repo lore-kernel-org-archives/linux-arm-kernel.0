@@ -1,19 +1,26 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Tue, 5 Apr 2016 12:35:26 +0200
-Subject: [v7, 4/5] powerpc/fsl: move mpc85xx.h to include/linux/fsl
-In-Reply-To: <1459480051-3701-5-git-send-email-yangbo.lu@nxp.com>
-References: <1459480051-3701-1-git-send-email-yangbo.lu@nxp.com>
- <1459480051-3701-5-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <20160405103526.GG17838@8bytes.org>
+From: harninder.rai@nxp.com (Harninder Rai)
+Date: Tue, 5 Apr 2016 10:42:58 +0000
+Subject: Help needed with kexec on arm64
+In-Reply-To: <20160405052341.GA19476@linaro.org>
+References: <DB5PR04MB168845795D86B4CE5BA5656FE68B0@DB5PR04MB1688.eurprd04.prod.outlook.com>
+ <1458230896.3391.18.camel@infradead.org>
+ <CAB5YjtBEO=efjhcFdVOaZqG13qK3uzCbS5SFym5hhw-n+_QLhw@mail.gmail.com>
+ <DB5PR04MB1688A6D4385B76DAFF71D364E68C0@DB5PR04MB1688.eurprd04.prod.outlook.com>
+ <CAB5YjtAqjL8LMvNPbxwVWe+Zhi5rFkz_X7rti9wSrXQ7Y_2kOA@mail.gmail.com>
+ <DB5PR04MB16880834700413C3B80194B5E68C0@DB5PR04MB1688.eurprd04.prod.outlook.com>
+ <CAB5YjtCP6M9=ESJhfxyyYKSGTg8s3Y83qp8RS_oyYkUqcqYcCw@mail.gmail.com>
+ <DB5PR04MB168874758924173BBD5CC037E69D0@DB5PR04MB1688.eurprd04.prod.outlook.com>
+ <20160405052341.GA19476@linaro.org>
+Message-ID: <HE1PR04MB169039A2FC3CAA56A67CD4A6E69E0@HE1PR04MB1690.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 01, 2016 at 11:07:30AM +0800, Yangbo Lu wrote:
-> Move mpc85xx.h to include/linux/fsl and rename it to svr.h as
-> a common header file. It has been used for mpc85xx and it will
-> be used for ARM-based SoC as well.
-> 
-> Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
-> Acked-by: Wolfram Sang <wsa@the-dreams.de>
+> This means that there is no enough space left at this point.
+> I guess that you are using too big initramfs against 64MB of total memory.
+> Just increase the memory size for crash dump kernel.
 
-Acked-by: Joerg Roedel <jroedel@suse.de>
+Thanks Takahiro. Let me try either with small initramfs or increase memory size for crash dump kernel
+
+
+Thanks and Regards
+Harry++
