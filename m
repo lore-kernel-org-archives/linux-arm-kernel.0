@@ -1,106 +1,37 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 5 Apr 2016 10:03:32 -0700
-Subject: [PATCH v2 1/2] dma/iommu: Add pgsize_bitmap confirmation in
- __iommu_dma_alloc_pages
-In-Reply-To: <20160329170238.GK6745@arm.com>
-References: <1459146732-15620-1-git-send-email-yong.wu@mediatek.com>
- <20160329170238.GK6745@arm.com>
-Message-ID: <CAD=FV=XdZwg8usj3bjM6W=A0Yk1AFqKFRadpiS-LGLwxVNxp7A@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 5 Apr 2016 10:03:37 -0700
+Subject: [PATCH 0/3] dmaengine: bcm2835: support dma channel 11 to 14
+In-Reply-To: <1458228273-15591-1-git-send-email-kernel@martin.sperl.org>
+References: <1458228273-15591-1-git-send-email-kernel@martin.sperl.org>
+Message-ID: <20160405170336.GB5392@vkoul-mobl.iind.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will,
+On Thu, Mar 17, 2016 at 03:24:30PM +0000, kernel at martin.sperl.org wrote:
+> From: Martin Sperl <kernel@martin.sperl.org>
+> 
+> Right now the dma engine officially supports dma channel 11 and 12.
+> But the use of dma channel 12 immediately stalls the system.
+> 
+> The reason is that the interrupt assigned right now to dma channel 11
+> is actually a shared interrupt for dma channels 11 to 12.
+> So whenever the dma channel 12, 13 or 14 is used, it triggers the interrupt
+> for dma 11 which only clears the interrupt flag for dma channel 11.
+> This results in the interrupt 11 is triggered all the time.
+> 
+> On top the requesting dma channel12 (and the corresponding irq) triggers
+> an immeditate stall of the system, because for the 12th interrupt
+> any dma channel will trigger also this interrupt - even if the dma channel
+> is controlled by the firmware.
+> 
+> As the description in the default device-tree is (for the above reasons)
+> wrong a new means had to get devised that allows correct representation
+> of the mapping between interrupts and dma channels.
+> 
+> For this the existing (but unused) device-tree property "interrupt-names"
+> is used to define the mapping.
 
-On Tue, Mar 29, 2016 at 10:02 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Mar 28, 2016 at 02:32:11PM +0800, Yong Wu wrote:
->> Currently __iommu_dma_alloc_pages assumes that all the IOMMU support
->> the granule of PAGE_SIZE. It call alloc_page to try allocating memory
->> in the last time. Fortunately the mininum pagesize in all the
->> current IOMMU is SZ_4K, so this works well.
->>
->> But there may be a case in which the mininum granule of IOMMU may be
->> larger than PAGE_SIZE, then it will abort as the IOMMU cann't map the
->> discontinuous memory within a granule. For example, the pgsize_bitmap
->> of the IOMMU only has SZ_16K while the PAGE_SIZE is SZ_4K, then we
->> have to prepare SZ_16K continuous memory at least for each a granule
->> iommu mapping.
->
-> Did you find a driver/platform that actually needs this? I certainly
-> think it's possible, but we don't necessarily need to fix it if it's
-> not broken yet! Just adding a comment would be enough.
+This looks fine by me, need an ACK on ARM patch before this can be applied.
 
-I think Yong Wu was adding this patch in response to your request from
-v1 of <https://patchwork.kernel.org/patch/8487511/>.  Fixing this
-seemed like a separate issue so I asked Yong Wu to make two patches
-rather than sticking this fix in the patch as his original.  Hopefully
-this makes sense.
-
-> Either way, a couple of review comments inline.
->
->>
->> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
->>
->> ---
->> v2:
->>  -rebase on v4.6-rc1.
->>  -add a new patch([1/2] add pgsize_bitmap) here.
->>
->>  drivers/iommu/dma-iommu.c | 22 +++++++++++++---------
->>  1 file changed, 13 insertions(+), 9 deletions(-)
->>
->> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
->> index 72d6182..75ce71e 100644
->> --- a/drivers/iommu/dma-iommu.c
->> +++ b/drivers/iommu/dma-iommu.c
->> @@ -190,11 +190,13 @@ static void __iommu_dma_free_pages(struct page **pages, int count)
->>       kvfree(pages);
->>  }
->>
->> -static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp)
->> +static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp,
->> +                                          unsigned long pgsize_bitmap)
->>  {
->>       struct page **pages;
->>       unsigned int i = 0, array_size = count * sizeof(*pages);
->> -     unsigned int order = MAX_ORDER;
->> +     int min_order = get_order(1 << __ffs(pgsize_bitmap));
->
-> 1UL
-
-Yong: presumably you will spin with this fix?
-
-
->> +     int order = MAX_ORDER;
->>
->>       if (array_size <= PAGE_SIZE)
->>               pages = kzalloc(array_size, GFP_KERNEL);
->> @@ -213,13 +215,16 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp)
->>               /*
->>                * Higher-order allocations are a convenience rather
->>                * than a necessity, hence using __GFP_NORETRY until
->> -              * falling back to single-page allocations.
->> +              * falling back to min size allocations.
->>                */
->> -             for (order = min_t(unsigned int, order, __fls(count));
->> -                  order > 0; order--) {
->> -                     page = alloc_pages(gfp | __GFP_NORETRY, order);
->> +             for (order = min_t(int, order, __fls(count));
->> +                  order >= min_order; order--) {
->> +                     page = alloc_pages((order == min_order) ? gfp :
->> +                                        gfp | __GFP_NORETRY, order);
->>                       if (!page)
->>                               continue;
->> +                     if (!order)
->> +                             break;
->
-> Isn't this handled by the loop condition?
-
-He changed the loop condition to be ">= min_order" instead of "> 0",
-so now we can get here with an order == 0.  This makes sense because
-when min_order is not 0 you still want to run the code to split the
-pages and it is sane not to duplicate that below.
-
-Maybe I'm misunderstanding, though.  Perhaps you can explain how you
-think this code should look?
-
--Doug
+-- 
+~Vinod
