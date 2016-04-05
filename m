@@ -1,10 +1,10 @@
 From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Tue, 5 Apr 2016 13:59:33 +0800
-Subject: [PATCH v3 05/14] metag: use of_platform_default_populate() to
- populate default bus
+Date: Tue, 5 Apr 2016 13:59:34 +0800
+Subject: [PATCH v3 06/14] cris: use of_platform_default_populate() to populate
+ default bus
 In-Reply-To: <1459835982-26473-1-git-send-email-wangkefeng.wang@huawei.com>
 References: <1459835982-26473-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1459835982-26473-6-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <1459835982-26473-7-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,26 +12,25 @@ Use helper of_platform_default_populate() in linux/of_platform
 when possible, instead of calling of_platform_populate() with
 the default match table.
 
-Acked-by: James Hogan <james.hogan@imgtec.com>
-Cc: James Hogan <james.hogan@imgtec.com>
+Cc: Mikael Starvik <starvik@axis.com>
+Cc: Jesper Nilsson <jesper.nilsson@axis.com>
 Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 ---
- arch/metag/kernel/setup.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ arch/cris/kernel/setup.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/metag/kernel/setup.c b/arch/metag/kernel/setup.c
-index 31cf53d..c88f937 100644
---- a/arch/metag/kernel/setup.c
-+++ b/arch/metag/kernel/setup.c
-@@ -415,8 +415,7 @@ static int __init customize_machine(void)
- 	if (machine_desc->init_machine)
- 		machine_desc->init_machine();
- 	else
--		of_platform_populate(NULL, of_default_bus_match_table, NULL,
--				     NULL);
-+		of_platform_default_populate(NULL, NULL, NULL);
+diff --git a/arch/cris/kernel/setup.c b/arch/cris/kernel/setup.c
+index bb12aa9..5ee5dfc 100644
+--- a/arch/cris/kernel/setup.c
++++ b/arch/cris/kernel/setup.c
+@@ -215,7 +215,7 @@ subsys_initcall(topology_init);
+ 
+ static int __init cris_of_init(void)
+ {
+-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++	of_platform_default_populate(NULL, NULL, NULL);
  	return 0;
  }
- arch_initcall(customize_machine);
+ core_initcall(cris_of_init);
 -- 
 2.6.0.GIT
