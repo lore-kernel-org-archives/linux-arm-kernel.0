@@ -1,59 +1,67 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 5 Apr 2016 12:17:29 -0500
-Subject: [PATCH] PCI: xilinx-nwl: Fix spelling mistake "Initialization"
-In-Reply-To: <1459680976-32222-1-git-send-email-colin.king@canonical.com>
-References: <1459680976-32222-1-git-send-email-colin.king@canonical.com>
-Message-ID: <20160405171729.GB12135@localhost>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 05 Apr 2016 10:21:27 -0700
+Subject: [PATCH] iommu/rockchip: Fix "is stall active" check
+In-Reply-To: <1459865146-25308-1-git-send-email-john@metanate.com>
+References: <1459865146-25308-1-git-send-email-john@metanate.com>
+Message-ID: <5389576.zuTxjFsmO4@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 03, 2016 at 11:56:16AM +0100, Colin King wrote:
-> From: Colin Ian King <colin.king@canonical.com>
+Am Dienstag, 5. April 2016, 15:05:46 schrieb John Keeping:
+> Since commit cd6438c5f844 ("iommu/rockchip: Reconstruct to support multi
+> slaves") rk_iommu_is_stall_active() always returns false because the
+> bitwise AND operates on the boolean flag promoted to an integer and a
+> value that is either zero or BIT(2).
 > 
-> Minor fix, spelling mistake "Initalization" should be
-> "Initialization".
+> Explicitly convert the right-hand value to a boolean so that both sides
+> are guaranteed to be either zero or one.
 > 
-> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+> rk_iommu_is_paging_enabled() does not suffer from the same problem since
+> RK_MMU_STATUS_PAGING_ENABLED is BIT(0), but let's apply the same change
+> for consistency and to make it clear that it's correct without needing
+> to lookup the value.
+> 
+> Fixes: cd6438c5f844 ("iommu/rockchip: Reconstruct to support multi
+> slaves") Signed-off-by: John Keeping <john@metanate.com>
 
-Applied to pci/misc for v4.7, thanks, Colin!
+Nice catch, thanks.
 
-I noticed the same error in drivers/pci/pci.c and fixed that as well:
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 
-commit dcbb408ac5a2803ba44ca2fae8bf53eb5d4082f3
-Author: Colin Ian King <colin.king@canonical.com>
-Date:   Tue Apr 5 12:12:45 2016 -0500
+John, out of curiosity, how did you find that problem? Excess stall error 
+messages or something else?
 
-    PCI: Fix spelling errors
-    
-    Fix spelling of "initalization".
-    
-    [bhelgaas: also fix pci/pci.c]
-    Signed-off-by: Colin Ian King <colin.king@canonical.com>
-    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
 
-diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
-index 5139e64..3479d30 100644
---- a/drivers/pci/host/pcie-xilinx-nwl.c
-+++ b/drivers/pci/host/pcie-xilinx-nwl.c
-@@ -819,7 +819,7 @@ static int nwl_pcie_probe(struct platform_device *pdev)
- 
- 	err = nwl_pcie_bridge_init(pcie);
- 	if (err) {
--		dev_err(pcie->dev, "HW Initalization failed\n");
-+		dev_err(pcie->dev, "HW Initialization failed\n");
- 		return err;
- 	}
- 
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index 25e0327..e3d6b33 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -2389,7 +2389,7 @@ out:
- 	return offset + ent_size;
- }
- 
--/* Enhanced Allocation Initalization */
-+/* Enhanced Allocation Initialization */
- void pci_ea_init(struct pci_dev *dev)
- {
- 	int ea;
+Thanks
+Heiko
+
+> ---
+>  drivers/iommu/rockchip-iommu.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/iommu/rockchip-iommu.c
+> b/drivers/iommu/rockchip-iommu.c index a6f593a0a29e..5710a06c3049 100644
+> --- a/drivers/iommu/rockchip-iommu.c
+> +++ b/drivers/iommu/rockchip-iommu.c
+> @@ -315,8 +315,8 @@ static bool rk_iommu_is_stall_active(struct rk_iommu
+> *iommu) int i;
+> 
+>  	for (i = 0; i < iommu->num_mmu; i++)
+> -		active &= rk_iommu_read(iommu->bases[i], RK_MMU_STATUS) &
+> -					RK_MMU_STATUS_STALL_ACTIVE;
+> +		active &= !!(rk_iommu_read(iommu->bases[i], RK_MMU_STATUS) &
+> +					   RK_MMU_STATUS_STALL_ACTIVE);
+> 
+>  	return active;
+>  }
+> @@ -327,8 +327,8 @@ static bool rk_iommu_is_paging_enabled(struct rk_iommu
+> *iommu) int i;
+> 
+>  	for (i = 0; i < iommu->num_mmu; i++)
+> -		enable &= rk_iommu_read(iommu->bases[i], RK_MMU_STATUS) &
+> -					RK_MMU_STATUS_PAGING_ENABLED;
+> +		enable &= !!(rk_iommu_read(iommu->bases[i], RK_MMU_STATUS) &
+> +					   RK_MMU_STATUS_PAGING_ENABLED);
+> 
+>  	return enable;
+>  }
