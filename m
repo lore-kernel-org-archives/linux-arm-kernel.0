@@ -1,36 +1,24 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 5 Apr 2016 10:43:00 +0200
-Subject: [GIT PULL v3] ARM support for generic memremap()
-In-Reply-To: <20160405075617.GZ19428@n2100.arm.linux.org.uk>
-References: <1459841213-16915-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160405075617.GZ19428@n2100.arm.linux.org.uk>
-Message-ID: <0B712833-FDD1-4A19-B92F-F51D300365B0@linaro.org>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Tue, 5 Apr 2016 10:26:50 +0100
+Subject: [PATCH] arm64: hw-breakpoint: Remove superfluous SMP function call
+In-Reply-To: <1459766569-17237-1-git-send-email-anna-maria@linutronix.de>
+References: <1459766569-17237-1-git-send-email-anna-maria@linutronix.de>
+Message-ID: <570384DA.6010805@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 04/04/16 11:42, Anna-Maria Gleixner wrote:
+> Since commit 1cf4f629d9d2 ("cpu/hotplug: Move online calls to
+> hotplugged cpu") it is ensured that callbacks of CPU_ONLINE and
+> CPU_DOWN_PREPARE are processed on the hotplugged cpu. Due to this SMP
+> function calls are no longer required.
+>
+> Replace smp_call_function_single() with a direct call of
+> hw_breakpoint_reset(). To keep the calling convention, interrupts are
+> explicitely disabled around the call.
 
-> On 5 apr. 2016, at 09:56, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> 
->> On Tue, Apr 05, 2016 at 09:26:53AM +0200, Ard Biesheuvel wrote:
->> Hello Russell,
->> 
->> This pull request covers the updated v5 of this series that I sent out
->> yesterday, which fixed the nommu breakage that was present in all previous
->> versions. Please pull.
-> 
-> From the record so far, it seems that it's in my interest to wait
-> a few days before doing anything with these pull requests, so I'm
-> going to wait until the end of the week before doing anything with
-> them... and then I'm going to need to work out which requests have
-> been superseded.
-> 
+While you are at it, could you please also fix a similar instance
+in arch/arm64/kernel/debug-monitors.c: hw_breakpoint_reset_notify() ?
 
-I guess I had that coming.
-
-> So, I suggest that you re-send all the pull requests on Friday,
-> assuming this has now stabilised.
-
-There is only one pull request, and this v3 supersedes all earlier ones. But I will resend on Friday regardless.
-
-Thanks,
-Ard.
+Thanks
+Suzuki
