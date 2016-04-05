@@ -1,49 +1,55 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue,  5 Apr 2016 09:26:53 +0200
-Subject: [GIT PULL v3] ARM support for generic memremap()
-Message-ID: <1459841213-16915-1-git-send-email-ard.biesheuvel@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 5 Apr 2016 08:43:15 +0100
+Subject: [PATCH RESEND] ARM: l2x0: add three special L210 aux control flags
+In-Reply-To: <CACRpkdZeAKkU4Cr6TTQor_6zw2iVGgXmTdcsQuHuR07Q8yZHiQ@mail.gmail.com>
+References: <1458043882-16881-1-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdZeAKkU4Cr6TTQor_6zw2iVGgXmTdcsQuHuR07Q8yZHiQ@mail.gmail.com>
+Message-ID: <20160405074315.GX19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+On Sun, Apr 03, 2016 at 06:22:44PM +0200, Linus Walleij wrote:
+> On Tue, Mar 15, 2016 at 1:11 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> 
+> > This adds support for setting the flag bits "wrap access disable",
+> > "write allocate override" and "exclusive abort disable" to the L210
+> > variant from the device tree.
+> >
+> > The "write allocate override" bit was used on the Nomadik and
+> > necessary to properly make use of the L210 cache on that machine
+> > without sporadic crashes.
+> >
+> > I took this oppportunity to add all three flags so we avoid excess
+> > patching for each one.
+> >
+> > Cc: Rob Herring <robh+dt@kernel.org>
+> > Cc: Pawel Moll <pawel.moll@arm.com>
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> > Cc: Kumar Gala <galak@codeaurora.org>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Cc: devicetree at vger.kernel.org
+> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> Russell, this patch is in the patch tracker with Rob's ACK from
+> the DT side, do you think you could apply it?
+> 
+> For Nomadik I actually only need the write-allocate-override
+> flag to be selectable, so if you think it is increasing complexity
+> too much I'd be happy to make a diet version which only
+> adds this flag.
 
-This pull request covers the updated v5 of this series that I sent out
-yesterday, which fixed the nommu breakage that was present in all previous
-versions. Please pull.
+I haven't forgotten it, but I do wonder whether this endless shovelling
+of more and more DT properties is really the way forward, or whether
+some of this stuff should be handled by the boot loader/firmware.
 
-Regards,
-Ard.
+That's the reason that you get the:
 
----------8<-----------
-The following changes since commit 9735a22799b9214d17d3c231fe377fc852f042e9:
+"L2C: DT/platform modifies aux control register: 0x%08x -> 0x%08x"
 
-  Linux 4.6-rc2 (2016-04-03 09:09:40 -0500)
+message at _warning_ level.
 
-are available in the git repository at:
-
-  git://git.linaro.org/people/ard.biesheuvel/linux-arm.git \
-                                                 tags/arm-memremap-for-v4.7
-
-for you to fetch changes up to 9ab9e4fce45379cb6a7dbf87cf8f8e6ba01853c2:
-
-  ARM: memremap: implement arch_memremap_wb() (2016-04-04 10:26:42 +0200)
-
-----------------------------------------------------------------
-This series wires up the generic memremap() function for ARM in a way
-that allows it to be used as intended, i.e., without regard for whether
-the region being mapped is covered by a struct page and/or the linear
-mapping (lowmem)
-
-----------------------------------------------------------------
-Ard Biesheuvel (4):
-      ARM: reintroduce ioremap_cached() for creating cached I/O mappings
-      mtd: pxa2xx-flash: switch back from memremap to ioremap_cached
-      memremap: add arch specific hook for MEMREMAP_WB mappings
-      ARM: memremap: implement arch_memremap_wb()
-
- arch/arm/include/asm/io.h       | 12 ++++++++++++
- arch/arm/mm/ioremap.c           | 16 ++++++++++++++--
- arch/arm/mm/nommu.c             |  9 +++++++++
- drivers/mtd/maps/pxa2xx-flash.c |  6 +++---
- kernel/memremap.c               | 11 +++++++++--
- 5 files changed, 47 insertions(+), 7 deletions(-)
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
