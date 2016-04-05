@@ -1,248 +1,199 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 5 Apr 2016 22:10:09 +0200
-Subject: [RFC PATCH 04/45] KVM: arm/arm64: vgic-new: Add data structure
- definitions
-In-Reply-To: <5703BEF2.7090507@arm.com>
-References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
- <1458871508-17279-5-git-send-email-andre.przywara@arm.com>
- <20160329130922.GE4126@cbox> <5703BEF2.7090507@arm.com>
-Message-ID: <20160405201009.GA10522@cbox>
+From: jonas.rabenstein@studium.uni-erlangen.de (Jonas Rabenstein)
+Date: Tue,  5 Apr 2016 22:09:31 +0200
+Subject: [PATCH] arm: omap2: remove redundant multiplatform checks
+Message-ID: <1459886971-32723-1-git-send-email-jonas.rabenstein@studium.uni-erlangen.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 05, 2016 at 02:34:42PM +0100, Andre Przywara wrote:
-> Hi,
-> 
-> On 29/03/16 14:09, Christoffer Dall wrote:
-> > On Fri, Mar 25, 2016 at 02:04:27AM +0000, Andre Przywara wrote:
-> >> From: Christoffer Dall <christoffer.dall@linaro.org>
-> >>
-> >> Add a new header file for the new and improved GIC implementation.
-> >> The big change is that we now have a struct vgic_irq per IRQ instead
-> >> of spreading all the information over various bitmaps.
-> >>
-> >> We include this new header conditionally from within the old header
-> >> file for the time being to avoid touching all the users.
-> >>
-> >> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> >> ---
-> >>  include/kvm/arm_vgic.h  |   5 ++
-> >>  include/kvm/vgic/vgic.h | 198 ++++++++++++++++++++++++++++++++++++++++++++++++
-> >>  2 files changed, 203 insertions(+)
-> >>  create mode 100644 include/kvm/vgic/vgic.h
-> >>
-> >> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> >> index 7656a46..db289a2 100644
-> >> --- a/include/kvm/arm_vgic.h
-> >> +++ b/include/kvm/arm_vgic.h
-> >> @@ -19,6 +19,10 @@
-> >>  #ifndef __ASM_ARM_KVM_VGIC_H
-> >>  #define __ASM_ARM_KVM_VGIC_H
-> >>  
-> >> +#ifdef CONFIG_KVM_NEW_VGIC
-> >> +#include <kvm/vgic/vgic.h>
-> >> +#else
-> >> +
-> >>  #include <linux/kernel.h>
-> >>  #include <linux/kvm.h>
-> >>  #include <linux/irqreturn.h>
-> >> @@ -376,4 +380,5 @@ static inline int vgic_v3_probe(struct device_node *vgic_node,
-> >>  }
-> >>  #endif
-> >>  
-> >> +#endif	/* old VGIC include */
-> >>  #endif
-> >> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-> >> new file mode 100644
-> >> index 0000000..659f8b1
-> >> --- /dev/null
-> >> +++ b/include/kvm/vgic/vgic.h
-> >> @@ -0,0 +1,198 @@
-> >> +/*
-> >> + * Copyright (C) 2015, 2016 ARM Ltd.
-> >> + *
-> >> + * This program is free software; you can redistribute it and/or modify
-> >> + * it under the terms of the GNU General Public License version 2 as
-> >> + * published by the Free Software Foundation.
-> >> + *
-> >> + * This program is distributed in the hope that it will be useful,
-> >> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> >> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> >> + * GNU General Public License for more details.
-> >> + *
-> >> + * You should have received a copy of the GNU General Public License
-> >> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> >> + */
-> >> +#ifndef __ASM_ARM_KVM_VGIC_VGIC_H
-> >> +#define __ASM_ARM_KVM_VGIC_VGIC_H
-> >> +
-> >> +#include <linux/kernel.h>
-> >> +#include <linux/kvm.h>
-> >> +#include <linux/irqreturn.h>
-> >> +#include <linux/spinlock.h>
-> >> +#include <linux/types.h>
-> >> +#include <kvm/iodev.h>
-> >> +
-> >> +#define VGIC_V3_MAX_CPUS	255
-> >> +#define VGIC_V2_MAX_CPUS	8
-> >> +#define VGIC_NR_IRQS_LEGACY     256
-> >> +#define VGIC_NR_SGIS		16
-> >> +#define VGIC_NR_PPIS		16
-> >> +#define VGIC_NR_PRIVATE_IRQS	(VGIC_NR_SGIS + VGIC_NR_PPIS)
-> >> +#define VGIC_MAX_PRIVATE	(VGIC_NR_PRIVATE_IRQS - 1)
-> >> +#define VGIC_MAX_SPI		1019
-> >> +#define VGIC_MAX_RESERVED	1023
-> >> +#define VGIC_MIN_LPI		8192
-> >> +
-> >> +enum vgic_type {
-> >> +	VGIC_V2,		/* Good ol' GICv2 */
-> >> +	VGIC_V3,		/* New fancy GICv3 */
-> >> +};
-> >> +
-> >> +/* same for all guests, as depending only on the _host's_ GIC model */
-> >> +struct vgic_global {
-> >> +	/* type of the host GIC */
-> >> +	enum vgic_type		type;
-> >> +
-> >> +	/* Physical address of vgic virtual cpu interface */
-> >> +	phys_addr_t		vcpu_base;
-> >> +
-> >> +	/* virtual control interface mapping */
-> >> +	void __iomem		*vctrl_base;
-> >> +
-> >> +	/* Number of implemented list registers */
-> >> +	int			nr_lr;
-> >> +
-> >> +	/* Maintenance IRQ number */
-> >> +	unsigned int		maint_irq;
-> >> +
-> >> +	/* maximum number of VCPUs allowed (GICv2 limits us to 8) */
-> >> +	int			max_gic_vcpus;
-> >> +
-> >> +	/* Only needed for the legacy KVM_CREATE_IRQCHIP */
-> >> +	bool			can_emulate_gicv2;
-> >> +};
-> >> +
-> >> +extern struct vgic_global kvm_vgic_global_state;
-> >> +
-> >> +#define VGIC_V2_MAX_LRS		(1 << 6)
-> >> +#define VGIC_V3_MAX_LRS		16
-> >> +#define VGIC_V3_LR_INDEX(lr)	(VGIC_V3_MAX_LRS - 1 - lr)
-> >> +
-> >> +enum vgic_irq_config {
-> >> +	VGIC_CONFIG_EDGE = 0,
-> >> +	VGIC_CONFIG_LEVEL
-> >> +};
-> >> +
-> >> +struct vgic_irq {
-> >> +	spinlock_t irq_lock;		/* Protects the content of the struct */
-> >> +	struct list_head ap_list;
-> >> +
-> >> +	struct kvm_vcpu *vcpu;		/* SGIs and PPIs: The VCPU
-> >> +					 * SPIs and LPIs: The VCPU whose ap_list
-> >> +					 * on which this is queued.
-> >> +					 */
-> >> +
-> >> +	struct kvm_vcpu *target_vcpu;	/* The VCPU that this interrupt should
-> >> +					 * be send to, as a result of the
-> >> +					 * targets reg (v2) or the
-> >> +					 * affinity reg (v3).
-> >> +					 */
-> >> +
-> >> +	u32 intid;			/* Guest visible INTID */
-> >> +	bool pending;
-> >> +	bool line_level;		/* Level only */
-> >> +	bool soft_pending;		/* Level only */
-> >> +	bool active;			/* not used for LPIs */
-> >> +	bool enabled;
-> >> +	bool hw;			/* Tied to HW IRQ */
-> >> +	u32 hwintid;			/* HW INTID number */
-> >> +	union {
-> >> +		u8 targets;			/* GICv2 target VCPUs mask */
-> >> +		u32 mpidr;			/* GICv3 target VCPU */
-> >> +	};
-> >> +	u8 source;			/* GICv2 SGIs only */
-> >> +	u8 priority;
-> >> +	enum vgic_irq_config config;	/* Level or edge */
-> >> +};
-> >> +
-> >> +struct vgic_dist {
-> >> +	bool			in_kernel;
-> >> +	bool			ready;
-> >> +
-> >> +	/* vGIC model the kernel emulates for the guest (GICv2 or GICv3) */
-> >> +	u32			vgic_model;
-> >> +
-> >> +	int			nr_spis;
-> >> +
-> >> +	/* TODO: Consider moving to global state */
-> >> +	/* Virtual control interface mapping */
-> >> +	void __iomem		*vctrl_base;
-> >> +
-> >> +	/* base addresses in guest physical address space: */
-> >> +	gpa_t			vgic_dist_base;		/* distributor */
-> >> +	union {
-> >> +		/* either a GICv2 CPU interface */
-> >> +		gpa_t			vgic_cpu_base;
-> >> +		/* or a number of GICv3 redistributor regions */
-> >> +		gpa_t			vgic_redist_base;
-> >> +	};
-> >> +
-> >> +	/* distributor enabled */
-> >> +	u32			enabled;
-> >> +
-> >> +	struct vgic_irq		*spis;
-> >> +};
-> >> +
-> >> +struct vgic_v2_cpu_if {
-> >> +	u32		vgic_hcr;
-> >> +	u32		vgic_vmcr;
-> >> +	u32		vgic_misr;	/* Saved only */
-> >> +	u64		vgic_eisr;	/* Saved only */
-> >> +	u64		vgic_elrsr;	/* Saved only */
-> >> +	u32		vgic_apr;
-> >> +	u32		vgic_lr[VGIC_V2_MAX_LRS];
-> >> +};
-> >> +
-> >> +struct vgic_v3_cpu_if {
-> >> +#ifdef CONFIG_KVM_ARM_VGIC_V3
-> >> +	u32		vgic_hcr;
-> >> +	u32		vgic_vmcr;
-> >> +	u32		vgic_sre;	/* Restored only, change ignored */
-> >> +	u32		vgic_misr;	/* Saved only */
-> >> +	u32		vgic_eisr;	/* Saved only */
-> >> +	u32		vgic_elrsr;	/* Saved only */
-> >> +	u32		vgic_ap0r[4];
-> >> +	u32		vgic_ap1r[4];
-> >> +	u64		vgic_lr[VGIC_V3_MAX_LRS];
-> >> +#endif
-> >> +};
-> >> +
-> >> +struct vgic_cpu {
-> >> +	/* CPU vif control registers for world switch */
-> >> +	union {
-> >> +		struct vgic_v2_cpu_if	vgic_v2;
-> >> +		struct vgic_v3_cpu_if	vgic_v3;
-> >> +	};
-> >> +
-> >> +	/* TODO: Move nr_lr to a global state */
-> > 
-> > what is our current plan and status about this TODO?
-> 
-> The point is that the current HYP code is accessing this field. We do
-> have this field in the current "global" struct vgic_params there as
-> well, but this struct is (more or less) private to vgic-v2.c, so not
-> easily accessible from virt/kvm/arm/hyp/*.c.
-> So I suggest we keep this in here for the time being and eventually
-> remove it (and rework the save/restore code) once we get rid of the old
-> VGIC code.
-> 
-Hmmm, I haven't tried it, but I don't understand why moving it now is
-difficult.  I'd really like to avoid having a bunch of todo's lingering
-around and having duplicated state in the new code.
+The directory arch/arm/mach-omap2 is only selected for compilation if
+CONFIG_ARCH_OMAP2PLUS is selected. CONFIG_ARCH_OMAP2PLUS itself is a
+silent option and all machines selecting this option are multiplatform
+devices. As a consequence checks for CONFIG_ARCH_MULTIPLATFORM as well
+as CONFIG_ARCH_OMAP2PLUS within that directory are superfluous and can
+be removed.
 
-I think I noticed a number of places in this patch series which refers
-tot he vgic_cpu->nr_lr instead of the global place already...
+Signed-off-by: Jonas Rabenstein <jonas.rabenstein@studium.uni-erlangen.de>
+---
+ arch/arm/mach-omap2/Makefile |   2 +-
+ arch/arm/mach-omap2/soc.h    | 119 ++-----------------------------------------
+ 2 files changed, 6 insertions(+), 115 deletions(-)
 
--Christoffer
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index 0ba6a0e..04e276c 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -2,7 +2,7 @@
+ # Makefile for the linux kernel.
+ #
+ 
+-ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
++ccflags-y := -I$(srctree)/$(src)/include \
+ 	-I$(srctree)/arch/arm/plat-omap/include
+ 
+ # Common support
+diff --git a/arch/arm/mach-omap2/soc.h b/arch/arm/mach-omap2/soc.h
+index 364418c..f1418d4 100644
+--- a/arch/arm/mach-omap2/soc.h
++++ b/arch/arm/mach-omap2/soc.h
+@@ -42,79 +42,7 @@
+  * Test if multicore OMAP support is needed
+  */
+ #undef MULTI_OMAP2
+-#undef OMAP_NAME
+-
+-#ifdef CONFIG_ARCH_MULTIPLATFORM
+ #define MULTI_OMAP2
+-#endif
+-#ifdef CONFIG_SOC_OMAP2420
+-# ifdef OMAP_NAME
+-#  undef  MULTI_OMAP2
+-#  define MULTI_OMAP2
+-# else
+-#  define OMAP_NAME omap2420
+-# endif
+-#endif
+-#ifdef CONFIG_SOC_OMAP2430
+-# ifdef OMAP_NAME
+-#  undef  MULTI_OMAP2
+-#  define MULTI_OMAP2
+-# else
+-#  define OMAP_NAME omap2430
+-# endif
+-#endif
+-#ifdef CONFIG_ARCH_OMAP3
+-# ifdef OMAP_NAME
+-#  undef  MULTI_OMAP2
+-#  define MULTI_OMAP2
+-# else
+-#  define OMAP_NAME omap3
+-# endif
+-#endif
+-#ifdef CONFIG_ARCH_OMAP4
+-# ifdef OMAP_NAME
+-#  undef  MULTI_OMAP2
+-#  define MULTI_OMAP2
+-# else
+-#  define OMAP_NAME omap4
+-# endif
+-#endif
+-
+-#ifdef CONFIG_SOC_OMAP5
+-# ifdef OMAP_NAME
+-#  undef  MULTI_OMAP2
+-#  define MULTI_OMAP2
+-# else
+-#  define OMAP_NAME omap5
+-# endif
+-#endif
+-
+-#ifdef CONFIG_SOC_AM33XX
+-# ifdef OMAP_NAME
+-#  undef  MULTI_OMAP2
+-#  define MULTI_OMAP2
+-# else
+-#  define OMAP_NAME am33xx
+-# endif
+-#endif
+-
+-#ifdef CONFIG_SOC_AM43XX
+-# ifdef OMAP_NAME
+-#  undef  MULTI_OMAP2
+-#  define MULTI_OMAP2
+-# else
+-#  define OMAP_NAME am43xx
+-# endif
+-#endif
+-
+-#ifdef CONFIG_SOC_DRA7XX
+-# ifdef OMAP_NAME
+-#  undef MULTI_OMAP2
+-#  define MULTI_OMAP2
+-# else
+-#  define OMAP_NAME DRA7XX
+-# endif
+-#endif
+ 
+ /*
+  * Omap device type i.e. EMU/HS/TST/GP/BAD
+@@ -242,11 +170,6 @@ IS_AM_SUBCLASS(437x, 0x437)
+ IS_DRA_SUBCLASS(75x, 0x75)
+ IS_DRA_SUBCLASS(72x, 0x72)
+ 
+-#define soc_is_omap24xx()		0
+-#define soc_is_omap242x()		0
+-#define soc_is_omap243x()		0
+-#define soc_is_omap34xx()		0
+-#define soc_is_omap343x()		0
+ #define soc_is_ti81xx()			0
+ #define soc_is_ti816x()			0
+ #define soc_is_ti814x()			0
+@@ -265,46 +188,16 @@ IS_DRA_SUBCLASS(72x, 0x72)
+ #define soc_is_dra74x()			0
+ #define soc_is_dra72x()			0
+ 
+-#if defined(MULTI_OMAP2)
+-# if defined(CONFIG_ARCH_OMAP2)
+-#  undef  soc_is_omap24xx
++#if defined(CONFIG_ARCH_OMAP2)
+ #  define soc_is_omap24xx()		is_omap24xx()
+-# endif
+-# if defined (CONFIG_SOC_OMAP2420)
+-#  undef  soc_is_omap242x
++#endif
++#if defined(CONFIG_SOC_OMAP2420)
+ #  define soc_is_omap242x()		is_omap242x()
+-# endif
+-# if defined (CONFIG_SOC_OMAP2430)
+-#  undef  soc_is_omap243x
++#if defined(CONFIG_SOC_OMAP2430)
+ #  define soc_is_omap243x()		is_omap243x()
+-# endif
+-# if defined(CONFIG_ARCH_OMAP3)
+-#  undef  soc_is_omap34xx
+-#  undef  soc_is_omap343x
++#if defined(CONFIG_ARCH_OMAP3)
+ #  define soc_is_omap34xx()		is_omap34xx()
+ #  define soc_is_omap343x()		is_omap343x()
+-# endif
+-#else
+-# if defined(CONFIG_ARCH_OMAP2)
+-#  undef  soc_is_omap24xx
+-#  define soc_is_omap24xx()		1
+-# endif
+-# if defined(CONFIG_SOC_OMAP2420)
+-#  undef  soc_is_omap242x
+-#  define soc_is_omap242x()		1
+-# endif
+-# if defined(CONFIG_SOC_OMAP2430)
+-#  undef  soc_is_omap243x
+-#  define soc_is_omap243x()		1
+-# endif
+-# if defined(CONFIG_ARCH_OMAP3)
+-#  undef  soc_is_omap34xx
+-#  define soc_is_omap34xx()		1
+-# endif
+-# if defined(CONFIG_SOC_OMAP3430)
+-#  undef  soc_is_omap343x
+-#  define soc_is_omap343x()		1
+-# endif
+ #endif
+ 
+ /*
+@@ -339,7 +232,6 @@ IS_OMAP_TYPE(3430, 0x3430)
+ #define soc_is_omap5430()		0
+ 
+ /* These are needed for the common code */
+-#ifdef CONFIG_ARCH_OMAP2PLUS
+ #define soc_is_omap7xx()		0
+ #define soc_is_omap15xx()		0
+ #define soc_is_omap16xx()		0
+@@ -350,7 +242,6 @@ IS_OMAP_TYPE(3430, 0x3430)
+ #define soc_is_omap1710()		0
+ #define cpu_class_is_omap1()		0
+ #define cpu_class_is_omap2()		1
+-#endif
+ 
+ #if defined(CONFIG_ARCH_OMAP2)
+ # undef  soc_is_omap2420
+-- 
+2.7.3
