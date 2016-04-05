@@ -1,23 +1,48 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Mon, 4 Apr 2016 19:13:51 -0700
-Subject: [PATCH 0/2] ARM: keystone: Enable CPU hotplug
-In-Reply-To: <1459794543-4822-1-git-send-email-j-keerthy@ti.com>
-References: <1459794543-4822-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <57031F5F.3020300@oracle.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 5 Apr 2016 11:14:06 +0900
+Subject: [PATCH] ARM: keystone: remove redundant depends on
+ ARM_PATCH_PHYS_VIRT
+In-Reply-To: <56B4EA78.6050203@oracle.com>
+References: <1454694041-14990-1-git-send-email-yamada.masahiro@socionext.com>
+ <56B4E257.5050308@oracle.com>
+ <CAK7LNAQQ-fT38pg2S7QmbuZ3dmpy6qE6viQD87ec=QMNnUx6zQ@mail.gmail.com>
+ <56B4EA78.6050203@oracle.com>
+Message-ID: <CAK7LNAR+kU4F-rLDOpf_772am3gS86uizHZG4tZpPSCpyjdR4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/4/2016 11:29 AM, Keerthy wrote:
-> Series enables CPU hotplug for K2HK. CPU Hotplug tested on
-> K2HK-EVM.
+2016-02-06 3:31 GMT+09:00 santosh shilimkar <santosh.shilimkar@oracle.com>:
+> On 2/5/2016 10:13 AM, Masahiro Yamada wrote:
+>>
+>> 2016-02-06 2:56 GMT+09:00 santosh shilimkar
+>> <santosh.shilimkar@oracle.com>:
+>>>
+>>> On 2/5/2016 9:40 AM, Masahiro Yamada wrote:
+>>>>
+>>>>
+>>>> KeyStone is Multi-platform.  ARM_PATCH_PHYS_VIRT is already select'ed
+>>>> by ARCH_MULTIPLATFORM.
+>>>>
+>>>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>>>> ---
+>>>>
+>>> There is also Keystone config so its nit redundant as you think.
+>>>
+>>> P.S: arch/arm/configs/keystone_defconfig
+>>>
+>>
+>> It *is* redundant.
+>>
+>> keystone_defconfig also creates Multiplatform configuration.
+>>
+> Fair enough. Should I checked it.
+> For patch,
+> Acked-by: Santosh Shilimkar<ssantosh@kernel.org>
 >
-> It is on top of 4.6-rc2.
->
-> Keerthy (2):
->    keystone: dts: add psci command definition
->    ARM: configs: keystone: Add CPU Hotplug related options
->
-Looks fine to me. Will add it to the 4.7 queue. Thanks !!
 
-Reagrds,
-Santosh
+If it is OK with you, please apply this patch.
+
+
+-- 
+Best Regards
+Masahiro Yamada
