@@ -1,66 +1,21 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Tue,  5 Apr 2016 21:27:40 +0800
-Subject: [PATCH v3 16/16] arm64: dts: add wifi nodes support for hi6220-hikey
-In-Reply-To: <1459862860-9775-1-git-send-email-guodong.xu@linaro.org>
-References: <1459862860-9775-1-git-send-email-guodong.xu@linaro.org>
-Message-ID: <1459862860-9775-17-git-send-email-guodong.xu@linaro.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 5 Apr 2016 15:31:58 +0200
+Subject: [PATCH v2] spi: orion.c: Add direct access mode
+In-Reply-To: <5703BB82.4090204@denx.de>
+References: <1458663893-13766-1-git-send-email-sr@denx.de>
+ <3108005.nUMWsj4kjp@wuerfel> <20160329212842.GN2350@sirena.org.uk>
+ <13533301.gfdhE3AuMf@wuerfel> <5703651F.4040901@denx.de>
+ <20160405131529.GA30881@lunn.ch> <5703BB82.4090204@denx.de>
+Message-ID: <20160405133158.GC30881@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add wifi nodes support for hi6220-hikey
+> Yes, I wanted to suggest this change as well. I hope its
+> acceptable that I only change the SPI nodes to using the
+> "labels style" in this attempt though?
 
-Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
----
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 30 ++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+Gregory and Thomas should give their O.K. for armada-* files. If you
+need to change kirkwood-*, dove-* or orion5-* files, im happy with
+label style.
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-index a6dffa8..78ce994 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-@@ -48,6 +48,7 @@
- 		i2c0: i2c at f7100000 {
- 			status = "ok";
- 		};
-+
- 		i2c1: i2c at f7101000 {
- 			status = "ok";
- 		};
-@@ -63,6 +64,35 @@
- 		uart3: uart at f7113000 {
- 			status = "ok";
- 		};
-+
-+		dwmmc_2: dwmmc2 at f723f000 {
-+			ti,non-removable;
-+			non-removable;
-+			/* WL_EN */
-+			vmmc-supply = <&wlan_en_reg>;
-+
-+			#address-cells = <0x1>;
-+			#size-cells = <0x0>;
-+			wlcore: wlcore at 2 {
-+				compatible = "ti,wl1835";
-+				reg = <2>;	/* sdio func num */
-+				/* WL_IRQ, WL_HOST_WAKE_GPIO1_3 */
-+				interrupt-parent = <&gpio1>;
-+				interrupts = <3 IRQ_TYPE_EDGE_RISING>;
-+			};
-+		};
-+
-+		wlan_en_reg: fixedregulator at 1 {
-+			compatible = "regulator-fixed";
-+			regulator-name = "wlan-en-regulator";
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <1800000>;
-+			/* WLAN_EN GPIO */
-+			gpio = <&gpio0 5 0>;
-+			/* WLAN card specific delay */
-+			startup-delay-us = <70000>;
-+			enable-active-high;
-+		};
- 	};
- 
- 	leds {
--- 
-1.9.1
+      Andrew
