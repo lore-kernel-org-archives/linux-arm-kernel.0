@@ -1,37 +1,39 @@
 From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Tue, 5 Apr 2016 13:59:32 +0800
-Subject: [PATCH v3 04/14] c6x: use of_platform_default_populate() to populate
- default bus
+Date: Tue, 5 Apr 2016 13:59:42 +0800
+Subject: [PATCH v3 14/14] Revert "of/platform: export
+ of_default_bus_match_table"
 In-Reply-To: <1459835982-26473-1-git-send-email-wangkefeng.wang@huawei.com>
 References: <1459835982-26473-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1459835982-26473-5-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <1459835982-26473-15-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use helper of_platform_default_populate() in linux/of_platform
-when possible, instead of calling of_platform_populate() with
-the default match table.
+This reverts commit b80443c2211c7daaabd20fbbe9e7beb3fa3408e0.
 
-Acked-by: Mark Salter <msalter@redhat.com>
-Cc: Mark Salter <msalter@redhat.com>
-Cc: Aurelien Jacquiot <a-jacquiot@ti.com>
+After covering to use helper of_platform_default_populate() to populate
+the default bus, no need to export of_default_bus_match_table anymore.
+
+Reviewed-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Frank Rowand <frowand.list@gmail.com>
+Cc: Grant Likely <grant.likely@linaro.org>
 Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 ---
- arch/c6x/platforms/platform.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/of/platform.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/c6x/platforms/platform.c b/arch/c6x/platforms/platform.c
-index 26c1a35..8412334 100644
---- a/arch/c6x/platforms/platform.c
-+++ b/arch/c6x/platforms/platform.c
-@@ -11,7 +11,7 @@
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index 8d103e4..af98343 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -31,7 +31,6 @@ const struct of_device_id of_default_bus_match_table[] = {
+ #endif /* CONFIG_ARM_AMBA */
+ 	{} /* Empty terminated list */
+ };
+-EXPORT_SYMBOL(of_default_bus_match_table);
  
- static int __init c6x_device_probe(void)
+ static int of_dev_node_match(struct device *dev, void *data)
  {
--	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+	of_platform_default_populate(NULL, NULL, NULL);
- 	return 0;
- }
- core_initcall(c6x_device_probe);
 -- 
 2.6.0.GIT
