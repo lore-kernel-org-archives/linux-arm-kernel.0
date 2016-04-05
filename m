@@ -1,48 +1,41 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 5 Apr 2016 11:14:06 +0900
-Subject: [PATCH] ARM: keystone: remove redundant depends on
- ARM_PATCH_PHYS_VIRT
-In-Reply-To: <56B4EA78.6050203@oracle.com>
-References: <1454694041-14990-1-git-send-email-yamada.masahiro@socionext.com>
- <56B4E257.5050308@oracle.com>
- <CAK7LNAQQ-fT38pg2S7QmbuZ3dmpy6qE6viQD87ec=QMNnUx6zQ@mail.gmail.com>
- <56B4EA78.6050203@oracle.com>
-Message-ID: <CAK7LNAR+kU4F-rLDOpf_772am3gS86uizHZG4tZpPSCpyjdR4A@mail.gmail.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Tue, 5 Apr 2016 10:15:24 +0800
+Subject: [v14, 01/17] drm: bridge: analogix/dp: split exynos dp driver to
+ bridge directory
+In-Reply-To: <CAD=FV=VqWqtraAbMTN-Qn7gEOgLmrsXRAeRtxtB0qRj84JREeA@mail.gmail.com>
+References: <1455534576-1486-1-git-send-email-ykk@rock-chips.com>
+ <20160330203204.GA24156@roeck-us.net>
+ <20160331095600.GD26032@ulmo.nvidia.com>
+ <CAD=FV=VqWqtraAbMTN-Qn7gEOgLmrsXRAeRtxtB0qRj84JREeA@mail.gmail.com>
+Message-ID: <57031FBC.5000904@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-02-06 3:31 GMT+09:00 santosh shilimkar <santosh.shilimkar@oracle.com>:
-> On 2/5/2016 10:13 AM, Masahiro Yamada wrote:
->>
->> 2016-02-06 2:56 GMT+09:00 santosh shilimkar
->> <santosh.shilimkar@oracle.com>:
->>>
->>> On 2/5/2016 9:40 AM, Masahiro Yamada wrote:
->>>>
->>>>
->>>> KeyStone is Multi-platform.  ARM_PATCH_PHYS_VIRT is already select'ed
->>>> by ARCH_MULTIPLATFORM.
->>>>
->>>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
->>>> ---
->>>>
->>> There is also Keystone config so its nit redundant as you think.
->>>
->>> P.S: arch/arm/configs/keystone_defconfig
->>>
->>
->> It *is* redundant.
->>
->> keystone_defconfig also creates Multiplatform configuration.
->>
-> Fair enough. Should I checked it.
-> For patch,
-> Acked-by: Santosh Shilimkar<ssantosh@kernel.org>
+
+On 04/01/2016 12:02 AM, Doug Anderson wrote:
+> Hi,
 >
+> On Thu, Mar 31, 2016 at 2:56 AM, Thierry Reding <treding@nvidia.com> wrote:
+>> Ugh... most of these functions shouldn't be there in the first place. We
+>> have helpers in the core that already do this. Most of the functionality
+>> is duplicated in this driver.
+>>
+>> I realize that this is a problem that existed in the Exynos DP driver,
+>> but somebody really ought to rewrite those parts to make use of the DRM
+>> DP helpers.
+> As I understand it from discussions in
+> <http://article.gmane.org/gmane.linux.drivers.devicetree/162059> and
+> <http://article.gmane.org/gmane.linux.kernel.samsung-soc/53048>, we
+> shouldn't block merging the series but someone should pick up this
+> work after the merge.
+>
+> So probably Yakir should fixup the problem pointed out by Guenter and
+> send a new pull.
+Yep, should I just update the pull request. Or I should send v15 first
+and then update the pull request ?
 
-If it is OK with you, please apply this patch.
-
-
--- 
-Best Regards
-Masahiro Yamada
+- Yakir
+> -Doug
+>
+>
+>
