@@ -1,45 +1,49 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Mon,  4 Apr 2016 22:28:33 -0700
-Subject: [PATCH v3 1/9] ARM: imx: clk-vf610: fix DCU clock tree
+Date: Mon,  4 Apr 2016 22:28:34 -0700
+Subject: [PATCH v3 2/9] ARM: imx: clk-vf610: add TCON ipg clock
 In-Reply-To: <1459834121-25997-1-git-send-email-stefan@agner.ch>
 References: <1459834121-25997-1-git-send-email-stefan@agner.ch>
-Message-ID: <1459834121-25997-2-git-send-email-stefan@agner.ch>
+Message-ID: <1459834121-25997-3-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Similar to an earlier fix for the SAI clocks, the DCU clock hierarchy
-mixes the bus clock with the display controllers pixel clock. Tests
-have shown that the gates in CCM_CCGR3/9 registers do not control
-the DCU pixel clock, but only the register access clock (bus clock).
-
-Fix this by defining the parent clock of VF610_CLK_DCUx to be the bus
-clock (ipg_bus).
-
-Since the clock has not been used far, there are no further changes
-needed.
+Add the ipg (bus) clock for the TCON modules (Timing Controller). This
+module is required by the new DCU DRM driver, since the display signals
+pass through TCON.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- drivers/clk/imx/clk-vf610.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/clk/imx/clk-vf610.c             | 3 +++
+ include/dt-bindings/clock/vf610-clock.h | 4 +++-
+ 2 files changed, 6 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/clk/imx/clk-vf610.c b/drivers/clk/imx/clk-vf610.c
-index 0a94d96..426fde2 100644
+index 426fde2..43be1cf 100644
 --- a/drivers/clk/imx/clk-vf610.c
 +++ b/drivers/clk/imx/clk-vf610.c
-@@ -321,11 +321,11 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
- 	clk[VF610_CLK_DCU0_SEL] = imx_clk_mux("dcu0_sel", CCM_CSCMR1, 28, 1, dcu_sels, 2);
- 	clk[VF610_CLK_DCU0_EN] = imx_clk_gate("dcu0_en", "dcu0_sel", CCM_CSCDR3, 19);
- 	clk[VF610_CLK_DCU0_DIV] = imx_clk_divider("dcu0_div", "dcu0_en", CCM_CSCDR3, 16, 3);
--	clk[VF610_CLK_DCU0] = imx_clk_gate2("dcu0", "dcu0_div", CCM_CCGR3, CCM_CCGRx_CGn(8));
-+	clk[VF610_CLK_DCU0] = imx_clk_gate2("dcu0", "ipg_bus", CCM_CCGR3, CCM_CCGRx_CGn(8));
- 	clk[VF610_CLK_DCU1_SEL] = imx_clk_mux("dcu1_sel", CCM_CSCMR1, 29, 1, dcu_sels, 2);
- 	clk[VF610_CLK_DCU1_EN] = imx_clk_gate("dcu1_en", "dcu1_sel", CCM_CSCDR3, 23);
+@@ -327,6 +327,9 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
  	clk[VF610_CLK_DCU1_DIV] = imx_clk_divider("dcu1_div", "dcu1_en", CCM_CSCDR3, 20, 3);
--	clk[VF610_CLK_DCU1] = imx_clk_gate2("dcu1", "dcu1_div", CCM_CCGR9, CCM_CCGRx_CGn(8));
-+	clk[VF610_CLK_DCU1] = imx_clk_gate2("dcu1", "ipg_bus", CCM_CCGR9, CCM_CCGRx_CGn(8));
+ 	clk[VF610_CLK_DCU1] = imx_clk_gate2("dcu1", "ipg_bus", CCM_CCGR9, CCM_CCGRx_CGn(8));
  
++	clk[VF610_CLK_TCON0] = imx_clk_gate2("tcon0", "platform_bus", CCM_CCGR1, CCM_CCGRx_CGn(13));
++	clk[VF610_CLK_TCON1] = imx_clk_gate2("tcon1", "platform_bus", CCM_CCGR7, CCM_CCGRx_CGn(13));
++
  	clk[VF610_CLK_ESAI_SEL] = imx_clk_mux("esai_sel", CCM_CSCMR1, 20, 2, esai_sels, 4);
  	clk[VF610_CLK_ESAI_EN] = imx_clk_gate("esai_en", "esai_sel", CCM_CSCDR2, 30);
+ 	clk[VF610_CLK_ESAI_DIV] = imx_clk_divider("esai_div", "esai_en", CCM_CSCDR2, 24, 4);
+diff --git a/include/dt-bindings/clock/vf610-clock.h b/include/dt-bindings/clock/vf610-clock.h
+index 56c16aa..fbe17cc 100644
+--- a/include/dt-bindings/clock/vf610-clock.h
++++ b/include/dt-bindings/clock/vf610-clock.h
+@@ -195,6 +195,8 @@
+ #define VF610_CLK_SNVS			182
+ #define VF610_CLK_DAP			183
+ #define VF610_CLK_OCOTP         184
+-#define VF610_CLK_END			185
++#define VF610_CLK_TCON0			185
++#define VF610_CLK_TCON1			186
++#define VF610_CLK_END			187
+ 
+ #endif /* __DT_BINDINGS_CLOCK_VF610_H */
 -- 
 2.7.4
