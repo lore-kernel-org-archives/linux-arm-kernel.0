@@ -1,37 +1,29 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon,  4 Apr 2016 22:28:41 -0700
-Subject: [PATCH v3 9/9] ARM: dts: ls1021a: add pix clock to DCU dts node
-In-Reply-To: <1459834121-25997-1-git-send-email-stefan@agner.ch>
-References: <1459834121-25997-1-git-send-email-stefan@agner.ch>
-Message-ID: <1459834121-25997-10-git-send-email-stefan@agner.ch>
+From: bp@alien8.de (Borislav Petkov)
+Date: Tue, 5 Apr 2016 07:31:10 +0200
+Subject: [PATCHv2 6/7] ARM: socfpga: Enable Arria10 OCRAM ECC on startup
+In-Reply-To: <57034C4D.9010204@opensource.altera.com>
+References: <1459450087-24792-1-git-send-email-tthayer@opensource.altera.com>
+ <1459450087-24792-7-git-send-email-tthayer@opensource.altera.com>
+ <57034C4D.9010204@opensource.altera.com>
+Message-ID: <20160405053110.GA17541@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DCU IP has distinct clock inputs for register access and the
-pixel clocks, at least in some implementations. LS1021a seems to
-use the same clock, therefore specify the same clock for "dcu"
-and "pix".
+On Tue, Apr 05, 2016 at 12:25:33AM -0500, Thor Thayer wrote:
+> I realize that I'm not calling iounmap(ecc_block_base) and I'll fix that in
+> the next revision with a goto.
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- arch/arm/boot/dts/ls1021a.dtsi | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+I'm assuming nothing else changes. Because I've applied 1-4 already.
 
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index 2c84ca2..cd5c76d 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -443,8 +443,9 @@
- 			compatible = "fsl,ls1021a-dcu";
- 			reg = <0x0 0x2ce0000 0x0 0x10000>;
- 			interrupts = <GIC_SPI 172 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&platform_clk 0>;
--			clock-names = "dcu";
-+			clocks = <&platform_clk 0>,
-+				<&platform_clk 0>;
-+			clock-names = "dcu", "pix";
- 			big-endian;
- 			status = "disabled";
- 		};
+Yes, no?
+
+If no, then please send only an updated version of this patch as a reply
+to this thread here.
+
+Thanks.
+
 -- 
-2.7.4
+Regards/Gruss,
+    Boris.
+
+ECO tip #101: Trim your mails when you reply.
