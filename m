@@ -1,38 +1,36 @@
-From: puck.chen@hisilicon.com (Chen Feng)
-Date: Tue, 5 Apr 2016 16:22:51 +0800
-Subject: [PATCH 1/2] arm64: mem-model: add flatmem model for arm64
-Message-ID: <1459844572-53069-1-git-send-email-puck.chen@hisilicon.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 5 Apr 2016 10:43:00 +0200
+Subject: [GIT PULL v3] ARM support for generic memremap()
+In-Reply-To: <20160405075617.GZ19428@n2100.arm.linux.org.uk>
+References: <1459841213-16915-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20160405075617.GZ19428@n2100.arm.linux.org.uk>
+Message-ID: <0B712833-FDD1-4A19-B92F-F51D300365B0@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can reduce the memory allocated at mem-map
-by flatmem.
 
-currently, the default memory-model in arm64 is
-sparse memory. The mem-map array is not freed in
-this scene. If the physical address is too long,
-it will reserved too much memory for the mem-map
-array.
+> On 5 apr. 2016, at 09:56, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> 
+>> On Tue, Apr 05, 2016 at 09:26:53AM +0200, Ard Biesheuvel wrote:
+>> Hello Russell,
+>> 
+>> This pull request covers the updated v5 of this series that I sent out
+>> yesterday, which fixed the nommu breakage that was present in all previous
+>> versions. Please pull.
+> 
+> From the record so far, it seems that it's in my interest to wait
+> a few days before doing anything with these pull requests, so I'm
+> going to wait until the end of the week before doing anything with
+> them... and then I'm going to need to work out which requests have
+> been superseded.
+> 
 
-Signed-off-by: Chen Feng <puck.chen@hisilicon.com>
-Signed-off-by: Fu Jun <oliver.fu@hisilicon.com>
----
- arch/arm64/Kconfig | 3 +++
- 1 file changed, 3 insertions(+)
+I guess I had that coming.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 4f43622..c18930d 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -559,6 +559,9 @@ config ARCH_SPARSEMEM_ENABLE
- 	def_bool y
- 	select SPARSEMEM_VMEMMAP_ENABLE
- 
-+config ARCH_FLATMEM_ENABLE
-+	def_bool y
-+
- config ARCH_SPARSEMEM_DEFAULT
- 	def_bool ARCH_SPARSEMEM_ENABLE
- 
--- 
-1.9.1
+> So, I suggest that you re-send all the pull requests on Friday,
+> assuming this has now stabilised.
+
+There is only one pull request, and this v3 supersedes all earlier ones. But I will resend on Friday regardless.
+
+Thanks,
+Ard.
