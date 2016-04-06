@@ -1,109 +1,116 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Wed, 6 Apr 2016 09:47:37 -0700
-Subject: [PATCH net-next V3 00/16] net: fec: cleanup and fixes
-In-Reply-To: <57053C94.2000009@boundarydevices.com>
-References: <1459909562-22865-1-git-send-email-troy.kisky@boundarydevices.com>
- <VI1PR0401MB1855C389F2265E30252D62B5FF9F0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
- <57053C94.2000009@boundarydevices.com>
-Message-ID: <57053DA9.2090404@boundarydevices.com>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Wed,  6 Apr 2016 18:49:55 +0200
+Subject: [PATCH] ARM: BCM5301X: Enable earlycon on tested devices
+Message-ID: <1459961395-22702-1-git-send-email-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/6/2016 9:43 AM, Troy Kisky wrote:
-> On 4/6/2016 1:51 AM, Fugang Duan wrote:
->> From: Troy Kisky <troy.kisky@boundarydevices.com> Sent: Wednesday, April 06, 2016 10:26 AM
->>> To: netdev at vger.kernel.org; davem at davemloft.net; Fugang Duan
->>> <fugang.duan@nxp.com>; lznuaa at gmail.com
->>> Cc: Fabio Estevam <fabio.estevam@nxp.com>; l.stach at pengutronix.de;
->>> andrew at lunn.ch; tremyfr at gmail.com; gerg at uclinux.org; linux-arm-
->>> kernel at lists.infradead.org; johannes at sipsolutions.net;
->>> stillcompiling at gmail.com; sergei.shtylyov at cogentembedded.com;
->>> arnd at arndb.de; Troy Kisky <troy.kisky@boundarydevices.com>
->>> Subject: [PATCH net-next V3 00/16] net: fec: cleanup and fixes
->>>
->>> V3 has
->>>
->>> 1 dropped patch "net: fec: print more debug info in fec_timeout"
->>> 2 new patches
->>> 0002-net-fec-remove-unused-interrupt-FEC_ENET_TS_TIMER.patch
->>> 0003-net-fec-return-IRQ_HANDLED-if-fec_ptp_check_pps_even.patch
->>>
->>> 1 combined patch
->>> 0004-net-fec-pass-rxq-txq-to-fec_enet_rx-tx_queue-instead.patch
->>>
->>> The changes are noted on individual patches
->>>
->>> My measured performance of this series is
->>>
->>> before patch set
->>> 365 Mbits/sec Tx/407 RX
->>>
->>> after patch set
->>> 374 Tx/427 Rx
->>>
->>
->> I doubt the performance data,  I validate it on i.MX6q sabresd board on the latest commit(4da46cebbd3b) in net tree.
-> 
-> 
-> 
-> I was doing UDP tests, as outlined in my V2 cover letter. Also, my cpu is 1G. Is yours 1.2G?
-> 
-> 
-> 
-> 
->> root at imx6qdlsolo:~# uname -a
->> Linux imx6qdlsolo 4.6.0-rc1-00318-g4da46ce #180 SMP Wed Apr 6 16:24:09 CST 2016 armv7l GNU/Linux
-> 
-> 
-> This is the V2 patch that I dropped.
+This allows reporting & debugging problems occurring early in the boot
+process.
 
+Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+---
+ arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts  | 2 +-
+ arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts       | 2 +-
+ arch/arm/boot/dts/bcm4708-netgear-r6250.dts        | 2 +-
+ arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts      | 2 +-
+ arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts | 2 +-
+ arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts      | 2 +-
+ arch/arm/boot/dts/bcm5301x.dtsi                    | 4 ++++
+ 7 files changed, 10 insertions(+), 6 deletions(-)
 
-Sorry, your right. It is the current head, without this series.
-
-
-> 
-> I will force update my local net-next_master branch, to make testing this series easier.
-> Note that my local net-next_master branch has about 19 patches on top of this series.
-> so,
-> 
-> tkisky at office-server2:~/linux-imx6$ git reset --hard HEAD~19
-> HEAD is now at a125da7 net: fec: don't set cbd_bufaddr unless no mapping error
-> 
-> 
->>
->> TCP RX performance is 602Mbps, TX is only 325Mbps,   TX path has some performance issue in net tree.
->> I will dig out it.
->>
->>
-> 
-> 
-> More testing is always better. Thanks
-> 
-> 
->>>
->>> Troy Kisky (16):
->>>   net: fec: only check queue 0 if RXF_0/TXF_0 interrupt is set
->>>   net: fec: remove unused interrupt FEC_ENET_TS_TIMER
->>>   net: fec: return IRQ_HANDLED if fec_ptp_check_pps_event handled it
->>>   net: fec: pass rxq/txq to fec_enet_rx/tx_queue instead of queue_id
->>>   net: fec: reduce interrupts
->>>   net: fec: split off napi routine with 3 queues
->>>   net: fec: don't clear all rx queue bits when just one is being checked
->>>   net: fec: set cbd_sc without relying on previous value
->>>   net: fec: eliminate calls to fec_enet_get_prevdesc
->>>   net: fec: move restart test for efficiency
->>>   net: fec: clear cbd_sc after transmission to help with debugging
->>>   net: fec: dump all tx queues in fec_dump
->>>   net: fec: detect tx int lost
->>>   net: fec: create subroutine reset_tx_queue
->>>   net: fec: call dma_unmap_single on mapped tx buffers at restart
->>>   net: fec: don't set cbd_bufaddr unless no mapping error
->>>
->>>  drivers/net/ethernet/freescale/fec.h      |  10 +-
->>>  drivers/net/ethernet/freescale/fec_main.c | 410 ++++++++++++++++------------
->>> --
->>>  2 files changed, 218 insertions(+), 202 deletions(-)
->>>
->>> --
->>> 2.5.0
->>
+diff --git a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
+index fb62ed6..5087aa8 100644
+--- a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
++++ b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
+@@ -17,7 +17,7 @@
+ 	model = "Buffalo WZR-1750DHP (BCM4708)";
+ 
+ 	chosen {
+-		bootargs = "console=ttyS0,115200";
++		bootargs = "console=ttyS0,115200 earlycon";
+ 	};
+ 
+ 	memory {
+diff --git a/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts b/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
+index f18e80e..c973f768 100644
+--- a/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
++++ b/arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts
+@@ -17,7 +17,7 @@
+ 	model = "Luxul XWC-1000 (BCM4708)";
+ 
+ 	chosen {
+-		bootargs = "console=ttyS0,115200";
++		bootargs = "console=ttyS0,115200 earlycon";
+ 	};
+ 
+ 	memory {
+diff --git a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
+index 6bebfa6..1049ab1 100644
+--- a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
++++ b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
+@@ -17,7 +17,7 @@
+ 	model = "Netgear R6250 V1 (BCM4708)";
+ 
+ 	chosen {
+-		bootargs = "console=ttyS0,115200";
++		bootargs = "console=ttyS0,115200 earlycon";
+ 	};
+ 
+ 	memory {
+diff --git a/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts b/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
+index 64a5e8a..4d610ff 100644
+--- a/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
++++ b/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
+@@ -17,7 +17,7 @@
+ 	model = "SmartRG SR400ac";
+ 
+ 	chosen {
+-		bootargs = "console=ttyS0,115200";
++		bootargs = "console=ttyS0,115200 earlycon";
+ 	};
+ 
+ 	memory {
+diff --git a/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts b/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
+index 38f0c00..a9c8def 100644
+--- a/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
++++ b/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
+@@ -17,7 +17,7 @@
+ 	model = "Buffalo WZR-600DHP2 (BCM47081)";
+ 
+ 	chosen {
+-		bootargs = "console=ttyS0,115200";
++		bootargs = "console=ttyS0,115200 earlycon";
+ 	};
+ 
+ 	memory {
+diff --git a/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts b/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
+index 9205c03..ace38ef 100644
+--- a/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
++++ b/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
+@@ -17,7 +17,7 @@
+ 	model = "D-Link DIR-885L";
+ 
+ 	chosen {
+-		bootargs = "console=ttyS0,115200";
++		bootargs = "console=ttyS0,115200 earlycon";
+ 	};
+ 
+ 	memory {
+diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
+index b3e9d28..9c06d91 100644
+--- a/arch/arm/boot/dts/bcm5301x.dtsi
++++ b/arch/arm/boot/dts/bcm5301x.dtsi
+@@ -18,6 +18,10 @@
+ / {
+ 	interrupt-parent = <&gic>;
+ 
++	chosen {
++		stdout-path = &uart0;
++	};
++
+ 	chipcommonA {
+ 		compatible = "simple-bus";
+ 		ranges = <0x00000000 0x18000000 0x00001000>;
+-- 
+1.8.4.5
