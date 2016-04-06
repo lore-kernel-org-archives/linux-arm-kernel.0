@@ -1,36 +1,65 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 6 Apr 2016 19:28:45 +0200
-Subject: [PATCH] ARM: tegra: fix naming in GPIO DT binding header
-In-Reply-To: <1459884307-24043-1-git-send-email-swarren@wwwdotorg.org>
-References: <1459884307-24043-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20160406172845.GC28843@ulmo.ba.sec>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 6 Apr 2016 10:31:40 -0700
+Subject: [PATCH v4 3/3] ARM: dts: use syscon in cygnus touchscreen dt node
+In-Reply-To: <1456556396-4759-4-git-send-email-raveendra.padasalagi@broadcom.com>
+References: <1456556396-4759-1-git-send-email-raveendra.padasalagi@broadcom.com>
+ <1456556396-4759-4-git-send-email-raveendra.padasalagi@broadcom.com>
+Message-ID: <20160406173140.GB38452@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 05, 2016 at 01:25:07PM -0600, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
+On Sat, Feb 27, 2016 at 12:29:56PM +0530, Raveendra Padasalagi wrote:
+> In Cygnus SOC touch screen controller registers are shared
+> with ADC and flex timer. Using readl/writel could lead to
+> race condition. So touchscreen driver is enhanced to support
+> syscon based register access to take care of mutually exclusive
+> access.
 > 
-> According to the Tegra TRM, GPIOs are aggregated into /ports/ of 8 GPIOs,
-> not into /banks/. Fix <dt-bindings/gpio/tegra-gpio.h> to correctly reflect
-> this naming convention. While this seems like silly churn, it will become
-> slightly more important once we introduce the GPIO binding for upcoming
-> Tegra chips.
+> This patch enables syscon support in touchscreen driver
+> by adding necessary properties in touchscreen dt node and
+> in addition to this renamed existing "tsc" touchscreen node
+> name to "touchscreen".
 > 
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> Signed-off-by: Raveendra Padasalagi <raveendra.padasalagi@broadcom.com>
+> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+
+OK, since the new dts is really needed for the driver I'll be folding
+this into the touchscreen driver patch unless I hear someone yelling at
+me.
+
+Thanks!
+
 > ---
->  include/dt-bindings/gpio/tegra-gpio.h | 68 +++++++++++++++++------------------
->  1 file changed, 34 insertions(+), 34 deletions(-)
+>  arch/arm/boot/dts/bcm-cygnus.dtsi | 11 +++++++++--
+>  1 file changed, 9 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
+> index 3878793..b42fe55 100644
+> --- a/arch/arm/boot/dts/bcm-cygnus.dtsi
+> +++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
+> @@ -351,9 +351,16 @@
+>  					<&pinctrl 142 10 1>;
+>  		};
+>  
+> -		touchscreen: tsc at 180a6000 {
+> +		ts_adc_syscon: ts_adc_syscon at 180a6000 {
+> +			compatible = "brcm,iproc-ts-adc-syscon", "syscon";
+> +			reg = <0x180a6000 0xc30>;
+> +		};
+> +
+> +		touchscreen: touchscreen at 180a6000 {
+>  			compatible = "brcm,iproc-touchscreen";
+> -			reg = <0x180a6000 0x40>;
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ts_syscon = <&ts_adc_syscon>;
+>  			clocks = <&asiu_clks BCM_CYGNUS_ASIU_ADC_CLK>;
+>  			clock-names = "tsc_clk";
+>  			interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
+> -- 
+> 1.9.1
+> 
 
-It's not clear to me where this should be applied. This is technically
-part of the GPIO controller bindings, in which case it'd need to go via
-the GPIO tree. I'm fine with taking it through the Tegra tree, too, but
-in case you agree that it should go through the GPIO tree:
-
-Acked-by: Thierry Reding <treding@nvidia.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160406/132c303f/attachment.sig>
+-- 
+Dmitry
