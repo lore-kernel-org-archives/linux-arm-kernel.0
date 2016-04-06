@@ -1,68 +1,123 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Wed, 6 Apr 2016 14:57:20 +0800
-Subject: [PATCH] ARM: kexec: fix crashkernel= handling
-In-Reply-To: <20160401132535.GP19428@n2100.arm.linux.org.uk>
-References: <E1akqb5-0002LZ-1f@rmk-PC.arm.linux.org.uk>
- <20160330014638.GA6993@dhcp-128-65.nay.redhat.com>
- <20160330123922.GA11351@dhcppc0.redhat.com>
- <20160330130530.GH19428@n2100.arm.linux.org.uk>
- <20160330132708.GC32738@redhat.com>
- <20160401132535.GP19428@n2100.arm.linux.org.uk>
-Message-ID: <20160406065720.GA9157@dhcp-128-65.nay.redhat.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 06 Apr 2016 09:03:00 +0200
+Subject: [PATCH 1/9] iio: adc: exynos_adc: use regmap to retrieve struct
+ device
+In-Reply-To: <2329d20396db00b60f4e7d2e783ea46b48eea9c1.1459918214.git.amsfield22@gmail.com>
+References: <cover.1459918214.git.amsfield22@gmail.com>
+ <2329d20396db00b60f4e7d2e783ea46b48eea9c1.1459918214.git.amsfield22@gmail.com>
+Message-ID: <5704B4A4.1070704@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/01/16 at 02:25pm, Russell King - ARM Linux wrote:
+Hello,
 
-[snip]
+On 2016-04-06 07:15, Alison Schofield wrote:
+> Driver includes struct regmap and struct device in its global data.
+> Remove the struct device and use regmap API to retrieve device info.
+>
+> Patch created using Coccinelle plus manual edits.
+>
+> Signed-off-by: Alison Schofield <amsfield22@gmail.com>
 
-> Well, if we want to remove it, we then need to sort out a method of
-> specifying a limit on the address - where platforms physical memory
-> bridges the 4GB CPU-accessible limit, the crashkernel region must be
-> allocated below that so that it is boot-time accessible.
-> 
-> Some patches also have boot-time only aliases of RAM, with the normal
-> alias above 4GB (eg, TI Keystone2) where the running view of RAM is
-> at 0x800000000, but it has a non-coherent boot alias at 0x80000000.
-> 
-> I've patches which resolve some of the issues there, and making that
-> change would make this patch dependent on those changes.  So, I
-> recommend that this patch remains as-is for the time being, and this
-> issue is addressed in a later patch after the Keystone2 idmap_to_phys()
-> patches, similar to:
-> 
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 0a12fcf1aff6..74781e6d4e87 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -962,7 +962,6 @@ late_initcall(init_machine_late);
->   * zImage relocating below the reserved region.
->   */
->  #define CRASH_ALIGN	(128 << 20)
-> -#define CRASH_ADDR_MAX	(PHYS_OFFSET + (512 << 20))
->  
->  static inline unsigned long long get_total_mem(void)
->  {
-> @@ -992,7 +991,8 @@ static void __init reserve_crashkernel(void)
->  		return;
->  
->  	if (crash_base <= 0) {
-> -		crash_base = memblock_find_in_range(CRASH_ALIGN, CRASH_ADDR_MAX,
-> +		unsigned long long crash_max = idmap_to_phys((u32)~0);
-> +		crash_base = memblock_find_in_range(CRASH_ALIGN, crash_max,
->  						    crash_size, CRASH_ALIGN);
->  		if (!crash_base) {
->  			pr_err("crashkernel reservation failed - No suitable area found.\n");
-> 
-> Right now, I don't want to tie this facility to TI Keystone2 support
-> as what this patch is doing is something that the ARM kexec support
-> should have been doing since it was first introduced, so folk may
-> want to backport this change to stable trees.
+This patch changes the struct device which is used by the driver to 
+report errors. The driver used correctly the struct device associated 
+with its device tree node, while after the patch it will use device 
+which is associated with PMU regmap, which is a different device. PMU 
+regmap is there only to enable/disable the ADC block and it is not the 
+regmap used to access registers of the ADC device.
 
-Is it possible for PHYS_OFFSET + (512 << 20) be larger than 4G assume that phys_addr_t is 32bit, if so it can be trunked to a small value then
-the max will be wrong?
+I would prefer to drop this patch.
 
-Otherwise I think use it temprarily is fine.
+> ---
+>   drivers/iio/adc/exynos_adc.c | 18 +++++++++---------
+>   1 file changed, 9 insertions(+), 9 deletions(-)
+>
+> diff --git a/drivers/iio/adc/exynos_adc.c b/drivers/iio/adc/exynos_adc.c
+> index c15756d..0313e0f 100644
+> --- a/drivers/iio/adc/exynos_adc.c
+> +++ b/drivers/iio/adc/exynos_adc.c
+> @@ -130,7 +130,6 @@
+>   
+>   struct exynos_adc {
+>   	struct exynos_adc_data	*data;
+> -	struct device		*dev;
+>   	struct input_dev	*input;
+>   	void __iomem		*regs;
+>   	struct regmap		*pmu_map;
+> @@ -173,11 +172,12 @@ static void exynos_adc_unprepare_clk(struct exynos_adc *info)
+>   
+>   static int exynos_adc_prepare_clk(struct exynos_adc *info)
+>   {
+> +	struct device *dev = regmap_get_device(info->pmu_map);
+>   	int ret;
+>   
+>   	ret = clk_prepare(info->clk);
+>   	if (ret) {
+> -		dev_err(info->dev, "failed preparing adc clock: %d\n", ret);
+> +		dev_err(dev, "failed preparing adc clock: %d\n", ret);
+>   		return ret;
+>   	}
+>   
+> @@ -185,7 +185,7 @@ static int exynos_adc_prepare_clk(struct exynos_adc *info)
+>   		ret = clk_prepare(info->sclk);
+>   		if (ret) {
+>   			clk_unprepare(info->clk);
+> -			dev_err(info->dev,
+> +			dev_err(dev,
+>   				"failed preparing sclk_adc clock: %d\n", ret);
+>   			return ret;
+>   		}
+> @@ -203,11 +203,12 @@ static void exynos_adc_disable_clk(struct exynos_adc *info)
+>   
+>   static int exynos_adc_enable_clk(struct exynos_adc *info)
+>   {
+> +	struct device *dev = regmap_get_device(info->pmu_map);
+>   	int ret;
+>   
+>   	ret = clk_enable(info->clk);
+>   	if (ret) {
+> -		dev_err(info->dev, "failed enabling adc clock: %d\n", ret);
+> +		dev_err(dev, "failed enabling adc clock: %d\n", ret);
+>   		return ret;
+>   	}
+>   
+> @@ -215,7 +216,7 @@ static int exynos_adc_enable_clk(struct exynos_adc *info)
+>   		ret = clk_enable(info->sclk);
+>   		if (ret) {
+>   			clk_disable(info->clk);
+> -			dev_err(info->dev,
+> +			dev_err(dev,
+>   				"failed enabling sclk_adc clock: %d\n", ret);
+>   			return ret;
+>   		}
+> @@ -610,13 +611,14 @@ static irqreturn_t exynos_adc_isr(int irq, void *dev_id)
+>   static irqreturn_t exynos_ts_isr(int irq, void *dev_id)
+>   {
+>   	struct exynos_adc *info = dev_id;
+> -	struct iio_dev *dev = dev_get_drvdata(info->dev);
+> +	struct device *dev = regmap_get_device(info->pmu_map);
+> +	struct iio_dev *indio_dev = dev_get_drvdata(dev);
+>   	u32 x, y;
+>   	bool pressed;
+>   	int ret;
+>   
+>   	while (info->input->users) {
+> -		ret = exynos_read_s3c64xx_ts(dev, &x, &y);
+> +		ret = exynos_read_s3c64xx_ts(indio_dev, &x, &y);
+>   		if (ret == -ETIMEDOUT)
+>   			break;
+>   
+> @@ -800,8 +802,6 @@ static int exynos_adc_probe(struct platform_device *pdev)
+>   
+>   	info->tsirq = irq;
+>   
+> -	info->dev = &pdev->dev;
+> -
+>   	init_completion(&info->completion);
+>   
+>   	info->clk = devm_clk_get(&pdev->dev, "adc");
 
-Thanks
-Dave
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
