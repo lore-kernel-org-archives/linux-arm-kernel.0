@@ -1,113 +1,137 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  6 Apr 2016 09:37:22 +0100
-Subject: [PATCH] KVM: arm/arm64: Handle forward time correction gracefully
-Message-ID: <1459931842-29465-1-git-send-email-marc.zyngier@arm.com>
+From: sugar.zhang@rock-chips.com (Sugar Zhang)
+Date: Wed,  6 Apr 2016 16:38:22 +0800
+Subject: [PATCH] ASoC: rockchip: i2s: configure the sdio pins' iomux mode
+Message-ID: <1459931902-77324-1-git-send-email-sugar.zhang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On a host that runs NTP, corrections can have a direct impact on
-the background timer that we program on the behalf of a vcpu.
+There are 3 i2s sdio pins, which iomux mode is as follows:
 
-In particular, NTP performing a forward correction will result in
-a timer expiring sooner than expected from a guest point of view.
-Not a big deal, we kick the vcpu anyway.
+ - sdi3_sdo1
+ - sdi2_sdo2
+ - sdi1_sdo3
 
-But on wake-up, the vcpu thread is going to perform a check to
-find out whether or not it should block. And at that point, the
-timer check is going to say "timer has not expired yet, go back
-to sleep". This results in the timer event being lost forever.
+we need to configure these pins' iomux mode via the GRF register
+when use multi channel playback/capture.
 
-There are multiple ways to handle this. One would be record that
-the timer has expired and let kvm_cpu_has_pending_timer return
-true in that case, but that would be fairly invasive. Another is
-to check for the "short sleep" condition in the hrtimer callback,
-and restart the timer for the remaining time when the condition
-is detected.
-
-This patch implements the latter, with a bit of refactoring in
-order to avoid too much code duplication.
-
-Reported-by: Alexander Graf <agraf@suse.de>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Sugar Zhang <sugar.zhang@rock-chips.com>
 ---
- virt/kvm/arm/arch_timer.c | 47 +++++++++++++++++++++++++++++++++++++----------
- 1 file changed, 37 insertions(+), 10 deletions(-)
 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index a9ad4fe..4d0e77a 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -98,10 +98,46 @@ static void kvm_timer_inject_irq_work(struct work_struct *work)
- 	kvm_vcpu_kick(vcpu);
- }
+ .../devicetree/bindings/sound/rockchip-i2s.txt     |  5 +++
+ sound/soc/rockchip/rockchip_i2s.c                  | 39 +++++++++++++++++++++-
+ sound/soc/rockchip/rockchip_i2s.h                  |  8 +++++
+ 3 files changed, 51 insertions(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/sound/rockchip-i2s.txt b/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
+index 6e86d8a..ad72a7d 100644
+--- a/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
++++ b/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
+@@ -23,6 +23,11 @@ Required properties:
+ - rockchip,playback-channels: max playback channels, if not set, 8 channels default.
+ - rockchip,capture-channels: max capture channels, if not set, 2 channels default.
  
-+static u64 kvm_timer_compute_delta(struct kvm_vcpu *vcpu)
-+{
-+	cycle_t cval, now;
++Required properties for controller which support multi channels playback/capture:
 +
-+	cval = vcpu->arch.timer_cpu.cntv_cval;
-+	now = kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
++- rockchip,grf: Should be phandle/offset pair. the phandle of the syscon node for GRF register,
++  and the offset of the GRF for control register.
 +
-+	if (now < cval) {
-+		u64 ns;
+ Example for rk3288 I2S controller:
+ 
+ i2s at ff890000 {
+diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
+index 2f8e204..bc72780 100644
+--- a/sound/soc/rockchip/rockchip_i2s.c
++++ b/sound/soc/rockchip/rockchip_i2s.c
+@@ -11,6 +11,7 @@
+  */
+ 
+ #include <linux/module.h>
++#include <linux/mfd/syscon.h>
+ #include <linux/delay.h>
+ #include <linux/of_gpio.h>
+ #include <linux/clk.h>
+@@ -33,6 +34,8 @@ struct rk_i2s_dev {
+ 	struct snd_dmaengine_dai_dma_data playback_dma_data;
+ 
+ 	struct regmap *regmap;
++	struct regmap *grf;
++	u32 iocfg_reg;
+ 
+ 	bool is_master_mode;
+ };
+@@ -277,6 +280,29 @@ static int rockchip_i2s_hw_params(struct snd_pcm_substream *substream,
+ 				   I2S_TXCR_VDW_MASK | I2S_TXCR_CSR_MASK,
+ 				   val);
+ 
++	if (!IS_ERR(i2s->grf)) {
++		regmap_read(i2s->regmap, I2S_TXCR, &val);
++		val &= I2S_TXCR_CSR_MASK;
 +
-+		ns = cyclecounter_cyc2ns(timecounter->cc,
-+					 cval - now,
-+					 timecounter->mask,
-+					 &timecounter->frac);
-+		return ns;
++		switch (val) {
++		case I2S_CHN_4:
++			val = I2S_IO_4CH_OUT_6CH_IN;
++			break;
++		case I2S_CHN_6:
++			val = I2S_IO_6CH_OUT_4CH_IN;
++			break;
++		case I2S_CHN_8:
++			val = I2S_IO_8CH_OUT_2CH_IN;
++			break;
++		default:
++			val = I2S_IO_2CH_OUT_8CH_IN;
++			break;
++		}
++
++		regmap_write(i2s->grf, i2s->iocfg_reg,
++			     I2S_IO_DIRECTION_MASK << 16 | val);
 +	}
 +
-+	return 0;
-+}
+ 	regmap_update_bits(i2s->regmap, I2S_DMACR, I2S_DMACR_TDL_MASK,
+ 			   I2S_DMACR_TDL(16));
+ 	regmap_update_bits(i2s->regmap, I2S_DMACR, I2S_DMACR_RDL_MASK,
+@@ -478,6 +504,18 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 	}
+ 
++	i2s->dev = &pdev->dev;
 +
- static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
- {
- 	struct arch_timer_cpu *timer;
-+	struct kvm_vcpu *vcpu;
-+	u64 ns;
-+
- 	timer = container_of(hrt, struct arch_timer_cpu, timer);
-+	vcpu = container_of(timer, struct kvm_vcpu, arch.timer_cpu);
-+
-+	/*
-+	 * Check that the timer has really expired from the guest's
-+	 * PoV (NTP on the host may have forced it to expire
-+	 * early). If we should have slept longer, restart it.
-+	 */
-+	ns = kvm_timer_compute_delta(vcpu);
-+	if (unlikely(ns)) {
-+		hrtimer_forward_now(hrt, ns_to_ktime(ns));
-+		return HRTIMER_RESTART;
++	i2s->grf = syscon_regmap_lookup_by_phandle(node, "rockchip,grf");
++	if (!IS_ERR(i2s->grf)) {
++		ret = of_property_read_u32_index(node, "rockchip,grf",
++						 1, &i2s->iocfg_reg);
++		if (ret) {
++			dev_err(&pdev->dev, "Can't get iocfg_reg offset\n");
++			return ret;
++		}
 +	}
 +
- 	queue_work(wqueue, &timer->expired);
- 	return HRTIMER_NORESTART;
- }
-@@ -176,8 +212,6 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
- void kvm_timer_schedule(struct kvm_vcpu *vcpu)
- {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
--	u64 ns;
--	cycle_t cval, now;
+ 	/* try to prepare related clocks */
+ 	i2s->hclk = devm_clk_get(&pdev->dev, "i2s_hclk");
+ 	if (IS_ERR(i2s->hclk)) {
+@@ -517,7 +555,6 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
+ 	i2s->capture_dma_data.addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+ 	i2s->capture_dma_data.maxburst = 4;
  
- 	BUG_ON(timer_is_armed(timer));
+-	i2s->dev = &pdev->dev;
+ 	dev_set_drvdata(&pdev->dev, i2s);
  
-@@ -197,14 +231,7 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
- 		return;
+ 	pm_runtime_enable(&pdev->dev);
+diff --git a/sound/soc/rockchip/rockchip_i2s.h b/sound/soc/rockchip/rockchip_i2s.h
+index dc6e2c7..9a6aabf 100644
+--- a/sound/soc/rockchip/rockchip_i2s.h
++++ b/sound/soc/rockchip/rockchip_i2s.h
+@@ -236,4 +236,12 @@ enum {
+ #define I2S_TXDR	(0x0024)
+ #define I2S_RXDR	(0x0028)
  
- 	/*  The timer has not yet expired, schedule a background timer */
--	cval = timer->cntv_cval;
--	now = kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
--
--	ns = cyclecounter_cyc2ns(timecounter->cc,
--				 cval - now,
--				 timecounter->mask,
--				 &timecounter->frac);
--	timer_arm(timer, ns);
-+	timer_arm(timer, kvm_timer_compute_delta(vcpu));
- }
- 
- void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
++/* io direction cfg register */
++#define I2S_IO_DIRECTION_SHIFT	11
++#define I2S_IO_DIRECTION_MASK	(7 << I2S_IO_DIRECTION_SHIFT)
++#define I2S_IO_8CH_OUT_2CH_IN	(0 << I2S_IO_DIRECTION_SHIFT)
++#define I2S_IO_6CH_OUT_4CH_IN	(1 << I2S_IO_DIRECTION_SHIFT)
++#define I2S_IO_4CH_OUT_6CH_IN	(3 << I2S_IO_DIRECTION_SHIFT)
++#define I2S_IO_2CH_OUT_8CH_IN	(7 << I2S_IO_DIRECTION_SHIFT)
++
+ #endif /* _ROCKCHIP_IIS_H */
 -- 
-2.1.4
+1.9.1
