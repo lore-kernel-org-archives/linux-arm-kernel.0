@@ -1,123 +1,72 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 06 Apr 2016 09:03:00 +0200
-Subject: [PATCH 1/9] iio: adc: exynos_adc: use regmap to retrieve struct
- device
-In-Reply-To: <2329d20396db00b60f4e7d2e783ea46b48eea9c1.1459918214.git.amsfield22@gmail.com>
-References: <cover.1459918214.git.amsfield22@gmail.com>
- <2329d20396db00b60f4e7d2e783ea46b48eea9c1.1459918214.git.amsfield22@gmail.com>
-Message-ID: <5704B4A4.1070704@samsung.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 6 Apr 2016 15:28:00 +0800
+Subject: [PATCH] i2c: designware-platdrv: get fast/std speed scl high/low
+ count from DT
+Message-ID: <1459927680-5480-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Sometimes, it's convenient to define the scl's high/low count directly,
+e.g HW people would do some measurement then directly give out the
+optimum counts. Previously, we solved the sda falling time and scl
+falling time by i2c_dw_scl_hcnt() and i2c_dw_scl_lcnt(), then put them
+into dt, but what we really care isn't the sda/scl falling time.
 
-On 2016-04-06 07:15, Alison Schofield wrote:
-> Driver includes struct regmap and struct device in its global data.
-> Remove the struct device and use regmap API to retrieve device info.
->
-> Patch created using Coccinelle plus manual edits.
->
-> Signed-off-by: Alison Schofield <amsfield22@gmail.com>
+>From another side, the dw_i2c_acpi_configure() on ACPI platform also
+get hcnt/lcnt values rather than the sda/scl falling time from ACPI
+method, we want similar feature for DT platforms.
 
-This patch changes the struct device which is used by the driver to 
-report errors. The driver used correctly the struct device associated 
-with its device tree node, while after the patch it will use device 
-which is associated with PMU regmap, which is a different device. PMU 
-regmap is there only to enable/disable the ADC block and it is not the 
-regmap used to access registers of the ADC device.
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ Documentation/devicetree/bindings/i2c/i2c-designware.txt | 16 ++++++++++++++++
+ drivers/i2c/busses/i2c-designware-platdrv.c              |  8 ++++++++
+ 2 files changed, 24 insertions(+)
 
-I would prefer to drop this patch.
-
-> ---
->   drivers/iio/adc/exynos_adc.c | 18 +++++++++---------
->   1 file changed, 9 insertions(+), 9 deletions(-)
->
-> diff --git a/drivers/iio/adc/exynos_adc.c b/drivers/iio/adc/exynos_adc.c
-> index c15756d..0313e0f 100644
-> --- a/drivers/iio/adc/exynos_adc.c
-> +++ b/drivers/iio/adc/exynos_adc.c
-> @@ -130,7 +130,6 @@
->   
->   struct exynos_adc {
->   	struct exynos_adc_data	*data;
-> -	struct device		*dev;
->   	struct input_dev	*input;
->   	void __iomem		*regs;
->   	struct regmap		*pmu_map;
-> @@ -173,11 +172,12 @@ static void exynos_adc_unprepare_clk(struct exynos_adc *info)
->   
->   static int exynos_adc_prepare_clk(struct exynos_adc *info)
->   {
-> +	struct device *dev = regmap_get_device(info->pmu_map);
->   	int ret;
->   
->   	ret = clk_prepare(info->clk);
->   	if (ret) {
-> -		dev_err(info->dev, "failed preparing adc clock: %d\n", ret);
-> +		dev_err(dev, "failed preparing adc clock: %d\n", ret);
->   		return ret;
->   	}
->   
-> @@ -185,7 +185,7 @@ static int exynos_adc_prepare_clk(struct exynos_adc *info)
->   		ret = clk_prepare(info->sclk);
->   		if (ret) {
->   			clk_unprepare(info->clk);
-> -			dev_err(info->dev,
-> +			dev_err(dev,
->   				"failed preparing sclk_adc clock: %d\n", ret);
->   			return ret;
->   		}
-> @@ -203,11 +203,12 @@ static void exynos_adc_disable_clk(struct exynos_adc *info)
->   
->   static int exynos_adc_enable_clk(struct exynos_adc *info)
->   {
-> +	struct device *dev = regmap_get_device(info->pmu_map);
->   	int ret;
->   
->   	ret = clk_enable(info->clk);
->   	if (ret) {
-> -		dev_err(info->dev, "failed enabling adc clock: %d\n", ret);
-> +		dev_err(dev, "failed enabling adc clock: %d\n", ret);
->   		return ret;
->   	}
->   
-> @@ -215,7 +216,7 @@ static int exynos_adc_enable_clk(struct exynos_adc *info)
->   		ret = clk_enable(info->sclk);
->   		if (ret) {
->   			clk_disable(info->clk);
-> -			dev_err(info->dev,
-> +			dev_err(dev,
->   				"failed enabling sclk_adc clock: %d\n", ret);
->   			return ret;
->   		}
-> @@ -610,13 +611,14 @@ static irqreturn_t exynos_adc_isr(int irq, void *dev_id)
->   static irqreturn_t exynos_ts_isr(int irq, void *dev_id)
->   {
->   	struct exynos_adc *info = dev_id;
-> -	struct iio_dev *dev = dev_get_drvdata(info->dev);
-> +	struct device *dev = regmap_get_device(info->pmu_map);
-> +	struct iio_dev *indio_dev = dev_get_drvdata(dev);
->   	u32 x, y;
->   	bool pressed;
->   	int ret;
->   
->   	while (info->input->users) {
-> -		ret = exynos_read_s3c64xx_ts(dev, &x, &y);
-> +		ret = exynos_read_s3c64xx_ts(indio_dev, &x, &y);
->   		if (ret == -ETIMEDOUT)
->   			break;
->   
-> @@ -800,8 +802,6 @@ static int exynos_adc_probe(struct platform_device *pdev)
->   
->   	info->tsirq = irq;
->   
-> -	info->dev = &pdev->dev;
-> -
->   	init_completion(&info->completion);
->   
->   	info->clk = devm_clk_get(&pdev->dev, "adc");
-
-Best regards
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-designware.txt b/Documentation/devicetree/bindings/i2c/i2c-designware.txt
+index fee26dc..05176fbf 100644
+--- a/Documentation/devicetree/bindings/i2c/i2c-designware.txt
++++ b/Documentation/devicetree/bindings/i2c/i2c-designware.txt
+@@ -20,6 +20,22 @@ Optional properties :
+  - i2c-sda-falling-time-ns : should contain the SDA falling time in nanoseconds.
+    This value which is by default 300ns is used to compute the tHIGH period.
+ 
++ - i2c-ss-scl-high-count : should contain the standard speed i2c clock SCL high
++   count. If defined, the i2c-scl-falling-time-ns and i2c-sda-falling-time-ns
++   will be ignored.
++
++ - i2c-ss-scl-low-count : should contain the standard speed i2c clock SCL low
++   count. If defined, the i2c-scl-falling-time-ns and i2c-sda-falling-time-ns
++   will be ignored.
++
++ - i2c-fs-scl-high-count : should contain the fast speed i2c clock SCL high
++   count. If defined, the i2c-scl-falling-time-ns and i2c-sda-falling-time-ns
++   will be ignored.
++
++ - i2c-fs-scl-low-count : should contain the fast speed i2c clock SCL low
++   count. If defined, the i2c-scl-falling-time-ns and i2c-sda-falling-time-ns
++   will be ignored.
++
+ Example :
+ 
+ 	i2c at f0000 {
+diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
+index d656657..8739a60 100644
+--- a/drivers/i2c/busses/i2c-designware-platdrv.c
++++ b/drivers/i2c/busses/i2c-designware-platdrv.c
+@@ -188,6 +188,14 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
+ 					 &dev->scl_falling_time);
+ 		device_property_read_u32(&pdev->dev, "clock-frequency",
+ 					 &clk_freq);
++		device_property_read_u16(&pdev->dev, "i2c-ss-scl-high-count",
++					 &dev->ss_hcnt);
++		device_property_read_u16(&pdev->dev, "i2c-ss-scl-low-count",
++					 &dev->ss_lcnt);
++		device_property_read_u16(&pdev->dev, "i2c-fs-scl-high-count",
++					 &dev->fs_hcnt);
++		device_property_read_u16(&pdev->dev, "i2c-fs-scl-low-count",
++					 &dev->fs_lcnt);
+ 	}
+ 
+ 	if (has_acpi_companion(&pdev->dev))
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+2.8.0.rc3
