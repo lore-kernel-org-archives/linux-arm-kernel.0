@@ -1,61 +1,41 @@
-From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
-Date: Wed, 6 Apr 2016 10:44:59 +0530
-Subject: [RESEND PATCH v2 5/6] Documentation: DT: vdma: update binding doc for
- AXI CDMA
-In-Reply-To: <1459919700-6692-1-git-send-email-appanad@xilinx.com>
-References: <1459919700-6692-1-git-send-email-appanad@xilinx.com>
-Message-ID: <1459919700-6692-6-git-send-email-appanad@xilinx.com>
+From: amsfield22@gmail.com (Alison Schofield)
+Date: Tue, 5 Apr 2016 22:15:15 -0700
+Subject: [PATCH 0/9] iio: use regmap to retrieve struct device
+Message-ID: <cover.1459918214.git.amsfield22@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the device-tree binding doc for
-adding support for AXI CDMA.
+These drivers include both struct regmap and struct device in their
+global data.  Remove the redundant copy by deleting struct device 
+from the drivers global data and using regmap API to retrieve when
+needed.
 
-Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
----
-Changes for v2:
----> Modified commit message as suggested by Vinod.
----> Moved the patch to forward in the series as suggested by vinod.
+This patchset removes all such redundancies in drivers/iio/.
 
- .../devicetree/bindings/dma/xilinx/xilinx_vdma.txt     | 18 +++++++++++++++++-
- 1 file changed, 17 insertions(+), 1 deletion(-)
+Patches created using Coccinelle plus hand edits for whitespace and
+one local var naming collision.
 
-diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-index 5841421..2b0c12b 100644
---- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-+++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-@@ -8,8 +8,12 @@ target devices. It can be configured to have one channel or two channels.
- If configured as two channels, one is to transmit to the device and another
- is to receive from the device.
- 
-+Xilinx AXI CDMA engine, it does transfers between memory-mapped source
-+address and a memory-mapped destination address.
-+
- Required properties:
--- compatible: Should be "xlnx,axi-vdma-1.00.a" or "xlnx,axi-dma-1.00.a"
-+- compatible: Should be "xlnx,axi-vdma-1.00.a" or "xlnx,axi-dma-1.00.a" or
-+	      "xlnx,axi-cdma-1.00.a""
- - #dma-cells: Should be <1>, see "dmas" property below
- - reg: Should contain VDMA registers location and length.
- - xlnx,num-fstores: Should be the number of framebuffers as configured in h/w.
-@@ -80,6 +84,18 @@ axi_dma_0: axidma at 40400000 {
- 	} ;
- } ;
- 
-+axi_cdma_0: axicdma at 7e200000 {
-+       compatible = "xlnx,axi-cdma-1.00.a";
-+       #dma-cells = <1>;
-+       reg = < 0x7e200000 0x10000 >;
-+       xlnx,addrwidth = <0x20>;
-+       dma-channel at 7e200000 {
-+               compatible = "xlnx,axi-dma-mm2s-channel";
-+               interrupts = < 0 55 4 >;
-+               xlnx,datawidth = <0x40>;
-+       } ;
-+} ;
-+
- * DMA client
- 
- Required properties:
+Alison Schofield (9):
+  iio: adc: exynos_adc: use regmap to retrieve struct device
+  iio: adc: qcom-spmi-iadc: use regmap to retrieve struct device
+  iio: adc: qcom-spmi-vadc: use regmap to retrieve struct device
+  iio: accel: bmc150: use regmap to retrieve struct device
+  iio: accel: mma7455: use regmap to retrieve struct device
+  iio: accel: mxc4005: use regmap to retrieve struct device
+  iio: health: afe4403: use regmap to retrieve struct device
+  iio: health: afe4404: use regmap to retrieve struct device
+  iio: gyro: bmg160_core: use regmap to retrieve struct device
+
+ drivers/iio/accel/bmc150-accel-core.c | 99 +++++++++++++++++++----------------
+ drivers/iio/accel/mma7455_core.c      |  5 +-
+ drivers/iio/accel/mxc4005.c           | 26 +++++----
+ drivers/iio/adc/exynos_adc.c          | 18 +++----
+ drivers/iio/adc/qcom-spmi-iadc.c      | 32 +++++------
+ drivers/iio/adc/qcom-spmi-vadc.c      | 37 +++++++------
+ drivers/iio/gyro/bmg160_core.c        | 86 +++++++++++++++---------------
+ drivers/iio/health/afe4403.c          | 36 ++++++-------
+ drivers/iio/health/afe4404.c          | 38 +++++++-------
+ 9 files changed, 197 insertions(+), 180 deletions(-)
+
 -- 
-2.1.2
+2.1.4
