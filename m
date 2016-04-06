@@ -1,65 +1,61 @@
 From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
-Date: Wed, 6 Apr 2016 10:44:55 +0530
-Subject: [RESEND PATCH v2 1/6] dmaengine: vdma: Fix checkpatch.pl warnings
+Date: Wed, 6 Apr 2016 10:44:59 +0530
+Subject: [RESEND PATCH v2 5/6] Documentation: DT: vdma: update binding doc for
+ AXI CDMA
 In-Reply-To: <1459919700-6692-1-git-send-email-appanad@xilinx.com>
 References: <1459919700-6692-1-git-send-email-appanad@xilinx.com>
-Message-ID: <1459919700-6692-2-git-send-email-appanad@xilinx.com>
+Message-ID: <1459919700-6692-6-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the below checkpatch.pl warnings.
+This patch updates the device-tree binding doc for
+adding support for AXI CDMA.
 
-WARNING: void function return statements are not generally useful
-+	return;
-+}
-
-WARNING: void function return statements are not generally useful
-+	return;
-+}
-
-WARNING: Missing a blank line after declarations
-+		u32 errors = status & XILINX_VDMA_DMASR_ALL_ERR_MASK;
-+		vdma_ctrl_write(chan, XILINX_VDMA_REG_DMASR,
-
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Acked-by: Moritz Fischer <moritz.fischer@ettus.com>
 Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
 ---
 Changes for v2:
----> None.
+---> Modified commit message as suggested by Vinod.
+---> Moved the patch to forward in the series as suggested by vinod.
 
- drivers/dma/xilinx/xilinx_vdma.c | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+ .../devicetree/bindings/dma/xilinx/xilinx_vdma.txt     | 18 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/dma/xilinx/xilinx_vdma.c b/drivers/dma/xilinx/xilinx_vdma.c
-index b873d98..3c5ce37 100644
---- a/drivers/dma/xilinx/xilinx_vdma.c
-+++ b/drivers/dma/xilinx/xilinx_vdma.c
-@@ -597,8 +597,6 @@ static void xilinx_vdma_halt(struct xilinx_vdma_chan *chan)
- 			chan, vdma_ctrl_read(chan, XILINX_VDMA_REG_DMASR));
- 		chan->err = true;
- 	}
--
--	return;
- }
+diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+index 5841421..2b0c12b 100644
+--- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
++++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+@@ -8,8 +8,12 @@ target devices. It can be configured to have one channel or two channels.
+ If configured as two channels, one is to transmit to the device and another
+ is to receive from the device.
  
- /**
-@@ -623,8 +621,6 @@ static void xilinx_vdma_start(struct xilinx_vdma_chan *chan)
- 
- 		chan->err = true;
- 	}
--
--	return;
- }
- 
- /**
-@@ -874,6 +870,7 @@ static irqreturn_t xilinx_vdma_irq_handler(int irq, void *data)
- 		 * make sure not to write to other error bits to 1.
- 		 */
- 		u32 errors = status & XILINX_VDMA_DMASR_ALL_ERR_MASK;
++Xilinx AXI CDMA engine, it does transfers between memory-mapped source
++address and a memory-mapped destination address.
 +
- 		vdma_ctrl_write(chan, XILINX_VDMA_REG_DMASR,
- 				errors & XILINX_VDMA_DMASR_ERR_RECOVER_MASK);
+ Required properties:
+-- compatible: Should be "xlnx,axi-vdma-1.00.a" or "xlnx,axi-dma-1.00.a"
++- compatible: Should be "xlnx,axi-vdma-1.00.a" or "xlnx,axi-dma-1.00.a" or
++	      "xlnx,axi-cdma-1.00.a""
+ - #dma-cells: Should be <1>, see "dmas" property below
+ - reg: Should contain VDMA registers location and length.
+ - xlnx,num-fstores: Should be the number of framebuffers as configured in h/w.
+@@ -80,6 +84,18 @@ axi_dma_0: axidma at 40400000 {
+ 	} ;
+ } ;
  
++axi_cdma_0: axicdma at 7e200000 {
++       compatible = "xlnx,axi-cdma-1.00.a";
++       #dma-cells = <1>;
++       reg = < 0x7e200000 0x10000 >;
++       xlnx,addrwidth = <0x20>;
++       dma-channel at 7e200000 {
++               compatible = "xlnx,axi-dma-mm2s-channel";
++               interrupts = < 0 55 4 >;
++               xlnx,datawidth = <0x40>;
++       } ;
++} ;
++
+ * DMA client
+ 
+ Required properties:
 -- 
 2.1.2
