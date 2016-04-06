@@ -1,36 +1,79 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 6 Apr 2016 11:32:13 -0600
-Subject: [PATCH] ARM: tegra: fix naming in GPIO DT binding header
-In-Reply-To: <20160406172845.GC28843@ulmo.ba.sec>
-References: <1459884307-24043-1-git-send-email-swarren@wwwdotorg.org>
- <20160406172845.GC28843@ulmo.ba.sec>
-Message-ID: <5705481D.3030700@wwwdotorg.org>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 6 Apr 2016 20:32:37 +0300
+Subject: [PATCH] extcon: usb-gpio: switch to use pm wakeirq apis
+Message-ID: <1459963957-21883-1-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/2016 11:28 AM, Thierry Reding wrote:
-> On Tue, Apr 05, 2016 at 01:25:07PM -0600, Stephen Warren wrote:
->> From: Stephen Warren <swarren@nvidia.com>
->>
->> According to the Tegra TRM, GPIOs are aggregated into /ports/ of 8 GPIOs,
->> not into /banks/. Fix <dt-bindings/gpio/tegra-gpio.h> to correctly reflect
->> this naming convention. While this seems like silly churn, it will become
->> slightly more important once we introduce the GPIO binding for upcoming
->> Tegra chips.
->>
->> Signed-off-by: Stephen Warren <swarren@nvidia.com>
->> ---
->>   include/dt-bindings/gpio/tegra-gpio.h | 68 +++++++++++++++++------------------
->>   1 file changed, 34 insertions(+), 34 deletions(-)
->
-> It's not clear to me where this should be applied. This is technically
-> part of the GPIO controller bindings, in which case it'd need to go via
-> the GPIO tree. I'm fine with taking it through the Tegra tree, too, but
-> in case you agree that it should go through the GPIO tree:
->
-> Acked-by: Thierry Reding <treding@nvidia.com>
+Switch to use PM wakeirq APIs which automates wakeup IRQs
+enabling/disabling and so allows to make code simpler.
 
-I typically consider bindings part of the SoC code-base they related to, 
-so I'd imagine this going through the Tegra tree. I didn't Cc LinusW on 
-the patch because of that thinking and oversight, but have done so now 
-just in case he feels strongly.
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+---
+Unfortunately this simple patch depends on:
+"[RFC PATCH] PM / wakeirq: fix wakeirq setting after wakup re-configuration from sysfs"
+https://lkml.org/lkml/2016/4/6/296
+
+ drivers/extcon/extcon-usb-gpio.c | 19 ++++++-------------
+ 1 file changed, 6 insertions(+), 13 deletions(-)
+
+diff --git a/drivers/extcon/extcon-usb-gpio.c b/drivers/extcon/extcon-usb-gpio.c
+index 2b2fecf..bc61d11 100644
+--- a/drivers/extcon/extcon-usb-gpio.c
++++ b/drivers/extcon/extcon-usb-gpio.c
+@@ -24,6 +24,7 @@
+ #include <linux/module.h>
+ #include <linux/of_gpio.h>
+ #include <linux/platform_device.h>
++#include <linux/pm_wakeirq.h>
+ #include <linux/slab.h>
+ #include <linux/workqueue.h>
+ 
+@@ -141,7 +142,8 @@ static int usb_extcon_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	platform_set_drvdata(pdev, info);
+-	device_init_wakeup(dev, 1);
++	device_init_wakeup(dev, true);
++	dev_pm_set_wake_irq(dev, info->id_irq);
+ 
+ 	/* Perform initial detection */
+ 	usb_extcon_detect_cable(&info->wq_detcable.work);
+@@ -155,6 +157,9 @@ static int usb_extcon_remove(struct platform_device *pdev)
+ 
+ 	cancel_delayed_work_sync(&info->wq_detcable);
+ 
++	dev_pm_clear_wake_irq(&pdev->dev);
++	device_init_wakeup(&pdev->dev, false);
++
+ 	return 0;
+ }
+ 
+@@ -164,12 +169,6 @@ static int usb_extcon_suspend(struct device *dev)
+ 	struct usb_extcon_info *info = dev_get_drvdata(dev);
+ 	int ret = 0;
+ 
+-	if (device_may_wakeup(dev)) {
+-		ret = enable_irq_wake(info->id_irq);
+-		if (ret)
+-			return ret;
+-	}
+-
+ 	/*
+ 	 * We don't want to process any IRQs after this point
+ 	 * as GPIOs used behind I2C subsystem might not be
+@@ -185,12 +184,6 @@ static int usb_extcon_resume(struct device *dev)
+ 	struct usb_extcon_info *info = dev_get_drvdata(dev);
+ 	int ret = 0;
+ 
+-	if (device_may_wakeup(dev)) {
+-		ret = disable_irq_wake(info->id_irq);
+-		if (ret)
+-			return ret;
+-	}
+-
+ 	enable_irq(info->id_irq);
+ 
+ 	return ret;
+-- 
+2.8.0
