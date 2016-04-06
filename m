@@ -1,33 +1,57 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 6 Apr 2016 12:14:34 -0700
-Subject: [PATCH v3] arm: omap2: remove redundant multiplatform checks
-In-Reply-To: <5704CC9F.6010502@ti.com>
-References: <201604060526.ouhQYqrT%fengguang.wu@intel.com>
- <1459895738-6546-1-git-send-email-jonas.rabenstein@studium.uni-erlangen.de>
- <1459930448-32638-1-git-send-email-ve92mose@stud.informatik.uni-erlangen.de>
- <5704CC9F.6010502@ti.com>
-Message-ID: <20160406191433.GF16484@atomide.com>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Wed,  6 Apr 2016 21:32:06 +0200
+Subject: [PATCH] Revert "ARM: dts: porter: Enable SCIF_CLK frequency and pins"
+Message-ID: <1459971126-26622-1-git-send-email-sjoerd.simons@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Lokesh Vutla <lokeshvutla@ti.com> [160406 01:50]:
-> +Tony
-> 
-> On Wednesday 06 April 2016 01:44 PM, Jonas Rabenstein wrote:
-> > From: Jonas Rabenstein <jonas.rabenstein@studium.uni-erlangen.de>
-> > 
-> > The directory arch/arm/mach-omap2 is only selected for compilation if
-> > CONFIG_ARCH_OMAP2PLUS is selected. CONFIG_ARCH_OMAP2PLUS itself is a
-> > silent option and all machines selecting this option are multiplatform
-> > devices. As a consequence checks for CONFIG_ARCH_MULTIPLATFORM as well
-> > as CONFIG_ARCH_OMAP2PLUS within that directory are superfluous and can
-> > be removed.
-> 
-> Reviewed-by: Lokesh Vutla <lokeshvutla@ti.com>
+This reverts commit 19417bd9c5112f58ea63e97ba72edabd5e1cc0fe as
+according to
+http://elinux.org/File:R-CarM2-KOELSCH_PORTER-B_PORTER_C_Comparison.pdf
+the external oscilator for SCIF_CLK is not mounted on the porter boards.
 
-Yeah nice if we can remove the legacy multi SoC options. I'll take
-a closer look within few days as I'm still at ELC.
+Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
 
-Regards,
+---
 
-Tony
+ arch/arm/boot/dts/r8a7791-porter.dts | 13 -------------
+ 1 file changed, 13 deletions(-)
+
+diff --git a/arch/arm/boot/dts/r8a7791-porter.dts b/arch/arm/boot/dts/r8a7791-porter.dts
+index 9554d13..dbcf3bb 100644
+--- a/arch/arm/boot/dts/r8a7791-porter.dts
++++ b/arch/arm/boot/dts/r8a7791-porter.dts
+@@ -142,19 +142,11 @@
+ };
+ 
+ &pfc {
+-	pinctrl-0 = <&scif_clk_pins>;
+-	pinctrl-names = "default";
+-
+ 	scif0_pins: serial0 {
+ 		groups = "scif0_data_d";
+ 		function = "scif0";
+ 	};
+ 
+-	scif_clk_pins: scif_clk {
+-		groups = "scif_clk";
+-		function = "scif_clk";
+-	};
+-
+ 	ether_pins: ether {
+ 		groups = "eth_link", "eth_mdio", "eth_rmii";
+ 		function = "eth";
+@@ -228,11 +220,6 @@
+ 	status = "okay";
+ };
+ 
+-&scif_clk {
+-	clock-frequency = <14745600>;
+-	status = "okay";
+-};
+-
+ &ether {
+ 	pinctrl-0 = <&ether_pins &phy1_pins>;
+ 	pinctrl-names = "default";
+-- 
+2.8.0.rc3
