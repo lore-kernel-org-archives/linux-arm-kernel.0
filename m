@@ -1,41 +1,30 @@
-From: amsfield22@gmail.com (Alison Schofield)
-Date: Tue, 5 Apr 2016 22:15:15 -0700
-Subject: [PATCH 0/9] iio: use regmap to retrieve struct device
-Message-ID: <cover.1459918214.git.amsfield22@gmail.com>
+From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
+Date: Wed, 6 Apr 2016 10:44:54 +0530
+Subject: [RESEND PATCH v2 0/6] dmaengine: vdma: AXI DMA's enhancments
+Message-ID: <1459919700-6692-1-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These drivers include both struct regmap and struct device in their
-global data.  Remove the redundant copy by deleting struct device 
-from the drivers global data and using regmap API to retrieve when
-needed.
+This patch series does some enhancments to the VDMA driver
+which includes
+--> Adding support for AXI DMA IP.
+--> Adding support for AXI CDMA IP.
+--> Fixing checkpatch warnings.
 
-This patchset removes all such redundancies in drivers/iio/.
+Kedareswara rao Appana (6):
+  dmaengine: vdma: Fix checkpatch.pl warnings
+  dmaengine: vdma: Rename xilinx_vdma_ prefix to xilinx_dma
+  Documentation: DT: vdma: update binding doc for AXI DMA
+  dmaengine: vdma: Add Support for Xilinx AXI Direct Memory Access
+    Engine
+  Documentation: DT: vdma: update binding doc for AXI CDMA
+  dmaengine: vdma: Add Support for Xilinx AXI Central Direct Memory
+    Access Engine
 
-Patches created using Coccinelle plus hand edits for whitespace and
-one local var naming collision.
-
-Alison Schofield (9):
-  iio: adc: exynos_adc: use regmap to retrieve struct device
-  iio: adc: qcom-spmi-iadc: use regmap to retrieve struct device
-  iio: adc: qcom-spmi-vadc: use regmap to retrieve struct device
-  iio: accel: bmc150: use regmap to retrieve struct device
-  iio: accel: mma7455: use regmap to retrieve struct device
-  iio: accel: mxc4005: use regmap to retrieve struct device
-  iio: health: afe4403: use regmap to retrieve struct device
-  iio: health: afe4404: use regmap to retrieve struct device
-  iio: gyro: bmg160_core: use regmap to retrieve struct device
-
- drivers/iio/accel/bmc150-accel-core.c | 99 +++++++++++++++++++----------------
- drivers/iio/accel/mma7455_core.c      |  5 +-
- drivers/iio/accel/mxc4005.c           | 26 +++++----
- drivers/iio/adc/exynos_adc.c          | 18 +++----
- drivers/iio/adc/qcom-spmi-iadc.c      | 32 +++++------
- drivers/iio/adc/qcom-spmi-vadc.c      | 37 +++++++------
- drivers/iio/gyro/bmg160_core.c        | 86 +++++++++++++++---------------
- drivers/iio/health/afe4403.c          | 36 ++++++-------
- drivers/iio/health/afe4404.c          | 38 +++++++-------
- 9 files changed, 197 insertions(+), 180 deletions(-)
+ .../devicetree/bindings/dma/xilinx/xilinx_vdma.txt |   38 +-
+ drivers/dma/xilinx/xilinx_vdma.c                   | 1335 ++++++++++++++------
+ include/linux/dma/xilinx_dma.h                     |   14 +
+ 3 files changed, 1028 insertions(+), 359 deletions(-)
 
 -- 
-2.1.4
+2.1.2
