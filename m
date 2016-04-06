@@ -1,53 +1,39 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Wed, 6 Apr 2016 13:11:55 -0400
-Subject: [PATCH next 1/2] PCI: keystone: add pci error irq handler
-In-Reply-To: <201603230621.h4pXMyFx%fengguang.wu@intel.com>
-References: <201603230621.h4pXMyFx%fengguang.wu@intel.com>
-Message-ID: <5705435B.6020806@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 6 Apr 2016 10:17:50 -0700
+Subject: [PATCH] ASoC: mediatek: Add second I2S on mt8173-rt5650 machine
+ driver
+In-Reply-To: <1459951105.28748.12.camel@mtksdaap41>
+References: <1458877325-33980-1-git-send-email-pc.liao@mediatek.com>
+ <20160328191115.GE2350@sirena.org.uk>
+ <1459258103.3747.7.camel@mtksdaap41>
+ <20160329160703.GN2350@sirena.org.uk>
+ <1459479052.24414.3.camel@mtksdaap41>
+ <20160402170404.GG2350@sirena.org.uk>
+ <1459951105.28748.12.camel@mtksdaap41>
+Message-ID: <20160406171750.GR1924@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/22/2016 06:23 PM, kbuild test robot wrote:
-> Hi Murali,
-> 
-> [auto build test ERROR on next-20160322]
-> 
-> url:    https://github.com/0day-ci/linux/commits/Murali-Karicheri/PCI-keystone-add-pci-error-irq-handler/20160323-035516
-> config: arm-multi_v7_defconfig (attached as .config)
-> reproduce:
->         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         # save the attached .config to linux build tree
->         make.cross ARCH=arm 
-> 
-> All errors (new ones prefixed by >>):
-> 
->    drivers/pci/host/pci-keystone.c: In function 'ks_pcie_probe':
->>> drivers/pci/host/pci-keystone.c:410:16: error: 'node' undeclared (first use in this function)
->      ks_pcie->np = node;
->                    ^
->    drivers/pci/host/pci-keystone.c:410:16: note: each undeclared identifier is reported only once for each function it appears in
-> 
-> vim +/node +410 drivers/pci/host/pci-keystone.c
-> 
->    404			return PTR_ERR(reg_p);
->    405		ks_pcie->device_id = readl(reg_p) >> 16;
->    406		devm_iounmap(dev, reg_p);
->    407		devm_release_mem_region(dev, res->start, resource_size(res));
->    408	
->    409		pp->dev = dev;
->  > 410		ks_pcie->np = node;
->    411		platform_set_drvdata(pdev, ks_pcie);
->    412		ks_pcie->clk = devm_clk_get(dev, "pcie");
->    413		if (IS_ERR(ks_pcie->clk)) {
-> 
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
-> 
-I had posted v1 of this patch which is still waiting to be applied. Wondering
-who is going to pick this up?
+On Wed, Apr 06, 2016 at 09:58:25PM +0800, PC Liao wrote:
+> On Sun, 2016-04-03 at 01:04 +0800, Mark Brown wrote:
 
--- 
-Murali Karicheri
-Linux Kernel, Keystone
+> > Any driver that can identify an individual DAI within a device by using
+> > sound-dai references, even simple-card does this.
+
+> Thanks for suggestion.
+> This machine driver is based on DPCM.
+> Should I add BE DAI and use DAPM, then using ucm-config(mixer control)
+> to control the path?
+> Or, do I think the wrong direction?
+> Thanks!
+
+It sounds like the configuration is fixed in these systems and can't
+be usefully varied at runtime?  If that's the case then there's no need
+for a userspace control.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160406/ea49fd01/attachment.sig>
