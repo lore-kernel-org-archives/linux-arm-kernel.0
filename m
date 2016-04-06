@@ -1,60 +1,45 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Tue,  5 Apr 2016 19:26:02 -0700
-Subject: [PATCH net-next V3 16/16] net: fec: don't set cbd_bufaddr unless no
- mapping error
-In-Reply-To: <1459909562-22865-1-git-send-email-troy.kisky@boundarydevices.com>
-References: <1459909562-22865-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <1459909562-22865-17-git-send-email-troy.kisky@boundarydevices.com>
+From: yh.huang@mediatek.com (YH Huang)
+Date: Wed, 6 Apr 2016 10:32:25 +0800
+Subject: [PATCH] sbs-battery: fix power status when battery charging near dry
+Message-ID: <1459909945-36541-1-git-send-email-yh.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Not assigning cbd_bufaddr on error will prevent trying to
-unmap the error in case the FEC is reset.
+POWER_SUPPLY_STATUS_NOT_CHARGING is used for AC connected, but
+battery not charging (e.g. because battery temperature is out
+of acceptable range).
 
-Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+When battery is charging near dry and BATTERY_FULL_DISCHARGED is set,
+it is wrong to set as POWER_SUPPLY_STATUS_NOT_CHARGING.
+Just use BATTERY_DISCHARGING to decide the power supply status is
+discharging or charging.
 
+Signed-off-by: YH Huang <yh.huang@mediatek.com>
 ---
-v3: no change
----
- drivers/net/ethernet/freescale/fec_main.c | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+ drivers/power/sbs-battery.c |    4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index 101d820..c2ed8be 100644
---- a/drivers/net/ethernet/freescale/fec_main.c
-+++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -600,7 +600,7 @@ fec_enet_txq_put_hdr_tso(struct fec_enet_priv_tx_q *txq,
- 	int hdr_len = skb_transport_offset(skb) + tcp_hdrlen(skb);
- 	struct bufdesc_ex *ebdp = container_of(bdp, struct bufdesc_ex, desc);
- 	void *bufaddr;
--	unsigned long dmabuf;
-+	dma_addr_t dmabuf;
- 	unsigned int estatus = 0;
+diff --git a/drivers/power/sbs-battery.c b/drivers/power/sbs-battery.c
+index d6226d6..768b9fc 100644
+--- a/drivers/power/sbs-battery.c
++++ b/drivers/power/sbs-battery.c
+@@ -382,8 +382,6 @@ static int sbs_get_battery_property(struct i2c_client *client,
  
- 	bufaddr = txq->tso_hdrs + index * TSO_HEADER_SIZE;
-@@ -1295,17 +1295,21 @@ fec_enet_new_rxbdp(struct net_device *ndev, struct bufdesc *bdp, struct sk_buff
- {
- 	struct  fec_enet_private *fep = netdev_priv(ndev);
- 	int off;
-+	dma_addr_t dmabuf;
+ 		if (ret & BATTERY_FULL_CHARGED)
+ 			val->intval = POWER_SUPPLY_STATUS_FULL;
+-		else if (ret & BATTERY_FULL_DISCHARGED)
+-			val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
+ 		else if (ret & BATTERY_DISCHARGING)
+ 			val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
+ 		else
+@@ -702,8 +700,6 @@ static void sbs_delayed_work(struct work_struct *work)
  
- 	off = ((unsigned long)skb->data) & fep->rx_align;
- 	if (off)
- 		skb_reserve(skb, fep->rx_align + 1 - off);
- 
--	bdp->cbd_bufaddr = cpu_to_fec32(dma_map_single(&fep->pdev->dev, skb->data, FEC_ENET_RX_FRSIZE - fep->rx_align, DMA_FROM_DEVICE));
--	if (dma_mapping_error(&fep->pdev->dev, fec32_to_cpu(bdp->cbd_bufaddr))) {
-+	dmabuf = dma_map_single(&fep->pdev->dev, skb->data,
-+				FEC_ENET_RX_FRSIZE - fep->rx_align,
-+				DMA_FROM_DEVICE);
-+	if (dma_mapping_error(&fep->pdev->dev, dmabuf)) {
- 		if (net_ratelimit())
- 			netdev_err(ndev, "Rx DMA memory map failed\n");
- 		return -ENOMEM;
- 	}
-+	bdp->cbd_bufaddr = cpu_to_fec32(dmabuf);
- 
- 	return 0;
- }
+ 	if (ret & BATTERY_FULL_CHARGED)
+ 		ret = POWER_SUPPLY_STATUS_FULL;
+-	else if (ret & BATTERY_FULL_DISCHARGED)
+-		ret = POWER_SUPPLY_STATUS_NOT_CHARGING;
+ 	else if (ret & BATTERY_DISCHARGING)
+ 		ret = POWER_SUPPLY_STATUS_DISCHARGING;
+ 	else
 -- 
-2.5.0
+1.7.9.5
