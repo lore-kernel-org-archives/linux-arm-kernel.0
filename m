@@ -1,44 +1,49 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Wed, 6 Apr 2016 18:37:17 -0500
-Subject: [PATCH 1/4] mailbox/omap: store mailbox interrupt type in
- omap_mbox_device
+Date: Wed, 6 Apr 2016 18:37:19 -0500
+Subject: [PATCH 3/4] mailbox/omap: check for any unread messages during suspend
 In-Reply-To: <1459985840-1106-1-git-send-email-s-anna@ti.com>
 References: <1459985840-1106-1-git-send-email-s-anna@ti.com>
-Message-ID: <1459985840-1106-2-git-send-email-s-anna@ti.com>
+Message-ID: <1459985840-1106-4-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The interrupt type used for identifying the layout of the interrupt
-configuration registers between OMAP4+ SoCs and older SoCs is stored
-only in the sub-mailbox structures for easier access. Store this type
-in the the omap_mbox_device structure as well along with the other
-global variables. This is being done to facilitate the context save
-and restore of appropriate registers during system suspend/resume.
+The OMAP mailbox driver is used by clients to communicate with remote
+processors in general. The mailbox clients are expected to have stopped
+communicating with these remote processors during a system suspend. The
+OMAP mailbox fifos are expected to not have any messages as such. Add a
+check for any pending unprocessed messages in the suspend callback, to
+detect any communication protocol issues of the mailbox clients. The
+system suspend is aborted if any messages are found.
 
 Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
- drivers/mailbox/omap-mailbox.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/mailbox/omap-mailbox.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/mailbox/omap-mailbox.c b/drivers/mailbox/omap-mailbox.c
-index 84cafc02e761..adf37f494690 100644
+index 1b90eb380d44..b61c6e8654b5 100644
 --- a/drivers/mailbox/omap-mailbox.c
 +++ b/drivers/mailbox/omap-mailbox.c
-@@ -90,6 +90,7 @@ struct omap_mbox_device {
- 	void __iomem *mbox_base;
- 	u32 num_users;
- 	u32 num_fifos;
-+	u32 intr_type;
- 	struct omap_mbox **mboxes;
- 	struct mbox_controller controller;
- 	struct list_head elem;
-@@ -828,6 +829,7 @@ static int omap_mbox_probe(struct platform_device *pdev)
- 	mdev->dev = &pdev->dev;
- 	mdev->num_users = num_users;
- 	mdev->num_fifos = num_fifos;
-+	mdev->intr_type = intr_type;
- 	mdev->mboxes = list;
+@@ -655,11 +655,19 @@ static const struct mbox_chan_ops omap_mbox_chan_ops = {
+ static int omap_mbox_suspend(struct device *dev)
+ {
+ 	struct omap_mbox_device *mdev = dev_get_drvdata(dev);
+-	u32 usr, reg;
++	u32 usr, fifo, reg;
  
- 	/* OMAP does not have a Tx-Done IRQ, but rather a Tx-Ready IRQ */
+ 	if (pm_runtime_status_suspended(dev))
+ 		return 0;
+ 
++	for (fifo = 0; fifo < mdev->num_fifos; fifo++) {
++		if (mbox_read_reg(mdev, MAILBOX_MSGSTATUS(fifo))) {
++			dev_err(mdev->dev, "fifo %d has unexpected unread messages\n",
++				fifo);
++			return -EBUSY;
++		}
++	}
++
+ 	for (usr = 0; usr < mdev->num_users; usr++) {
+ 		reg = MAILBOX_IRQENABLE(mdev->intr_type, usr);
+ 		mdev->irq_ctx[usr] = mbox_read_reg(mdev, reg);
 -- 
 2.7.4
