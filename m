@@ -1,244 +1,253 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 6 Apr 2016 15:41:14 +0200
-Subject: [PATCH v4 09/12] KVM: arm64: sync LPI configuration and pending
- tables
-In-Reply-To: <1458958450-19662-10-git-send-email-andre.przywara@arm.com>
-References: <1458958450-19662-1-git-send-email-andre.przywara@arm.com>
- <1458958450-19662-10-git-send-email-andre.przywara@arm.com>
-Message-ID: <570511FA.7010906@linaro.org>
+From: gautamvivek1987@gmail.com (Vivek Gautam)
+Date: Wed, 6 Apr 2016 06:48:00 -0700
+Subject: [PATCH 1/2] phy: Group vendor specific phy drivers
+In-Reply-To: <5705066A.8010903@ti.com>
+References: <1459510156-9147-1-git-send-email-gautam.vivek@samsung.com>
+ <56FE7234.5000505@ti.com>
+ <CAFp+6iEJAq6CzntpM-RXYN8NwtHUUJoFHFf17mdV4nLE8eJwyA@mail.gmail.com>
+ <5705066A.8010903@ti.com>
+Message-ID: <CAFp+6iEyY0F46W+5aGZkDieYgSdsVogO4LWhkKnOZbNVH+hUmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
-On 03/26/2016 03:14 AM, Andre Przywara wrote:
-> The LPI configuration and pending tables of the GICv3 LPIs are held
-> in tables in (guest) memory. To achieve reasonable performance, we
-> cache this data in our own data structures, so we need to sync those
-> two views from time to time. This behaviour is well described in the
-> GICv3 spec and is also exercised by hardware, so the sync points are
-> well known.
-> 
-> Provide functions that read the guest memory and store the
-> information from the configuration and pending tables in the kernel.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  include/kvm/vgic/vgic.h      |   2 +
->  virt/kvm/arm/vgic/its-emul.c | 135 +++++++++++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic.h     |   1 +
->  3 files changed, 138 insertions(+)
-> 
-> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-> index ecf3260..ea98133 100644
-> --- a/include/kvm/vgic/vgic.h
-> +++ b/include/kvm/vgic/vgic.h
-> @@ -121,6 +121,8 @@ struct vgic_its {
->  	int			cwriter;
->  	struct list_head	device_list;
->  	struct list_head	collection_list;
-> +	/* memory used for buffering guest's memory */
-> +	void			*buffer_page;
->  };
->  
->  struct vgic_dist {
-> diff --git a/virt/kvm/arm/vgic/its-emul.c b/virt/kvm/arm/vgic/its-emul.c
-> index 1188e9a..d82ba9b 100644
-> --- a/virt/kvm/arm/vgic/its-emul.c
-> +++ b/virt/kvm/arm/vgic/its-emul.c
-> @@ -78,8 +78,130 @@ static struct its_itte *find_itte_by_lpi(struct kvm *kvm, int lpi)
->  	return NULL;
->  }
->  
-> +#define LPI_PROP_ENABLE_BIT(p)	((p) & LPI_PROP_ENABLED)
-> +#define LPI_PROP_PRIORITY(p)	((p) & 0xfc)
-> +
-> +/* stores the priority and enable bit for a given LPI */
-> +static void update_lpi_config(struct kvm *kvm, struct its_itte *itte, u8 prop)
-> +{
-> +	spin_lock(&itte->irq.irq_lock);
-> +	itte->irq.priority = LPI_PROP_PRIORITY(prop);
-> +	itte->irq.enabled = LPI_PROP_ENABLE_BIT(prop);
-> +
-would put a comment saying that vgic_queue_irq is unlocking since it
-looks weird.
-> +	vgic_queue_irq(kvm, &itte->irq);
-> +}
-> +
-> +#define GIC_LPI_OFFSET 8192
-> +
-> +/* We scan the table in chunks the size of the smallest page size */
-> +#define CHUNK_SIZE 4096U
-> +
->  #define BASER_BASE_ADDRESS(x) ((x) & 0xfffffffff000ULL)
->  
-> +static int nr_idbits_propbase(u64 propbaser)
-> +{
-> +	int nr_idbits = (1U << (propbaser & 0x1f)) + 1;
-> +
-> +	return max(nr_idbits, INTERRUPT_ID_BITS_ITS);
-don't get this.
-don't you want to take the min of INTERRUPT_ID_BITS_ITS  (16) and
-propbaser & 0x1f +1.
+Hi Kishon,
 
-Spec says IDbits should not exceed GICD_TYPER.IDbit ==
-INTERRUPT_ID_BITS_ITS - 1 = 15.
 
-and in case the purpose of the function is to return the size of the
-table, which is not obvious given its name ;-), we should return 1U <<
-min(), no?
-> +}
-> +
-> +/*
-> + * Scan the whole LPI configuration table and put the LPI configuration
-> + * data in our own data structures. This relies on the LPI being
-> + * mapped before.
-> + */
-> +static bool its_update_lpis_configuration(struct kvm *kvm, u64 prop_base_reg)
-> +{
-> +	struct vgic_dist *dist = &kvm->arch.vgic;
-> +	u8 *prop = dist->its.buffer_page;
-> +	u32 tsize;
-> +	gpa_t propbase;
-> +	int lpi = GIC_LPI_OFFSET;
-> +	struct its_itte *itte;
-> +	struct its_device *device;
-> +	int ret;
-> +
-> +	propbase = BASER_BASE_ADDRESS(prop_base_reg);
-> +	tsize = nr_idbits_propbase(prop_base_reg);
-> +
-> +	while (tsize > 0) {
-> +		int chunksize = min(tsize, CHUNK_SIZE);
-> +
-> +		ret = kvm_read_guest(kvm, propbase, prop, chunksize);
-> +		if (ret)
-> +			return false;
-> +
-> +		spin_lock(&dist->its.lock);
-as we start holding several locks maybe worth to comment somewhere about
-order lock: its lock > vcpu lock > irq lock
-> +		/*
-> +		 * Updating the status for all allocated LPIs. We catch
-> +		 * those LPIs that get disabled. We really don't care
-> +		 * about unmapped LPIs, as they need to be updated
-> +		 * later manually anyway once they get mapped.
-> +		 */
-> +		for_each_lpi(device, itte, kvm) {
-> +			if (itte->lpi < lpi || itte->lpi >= lpi + chunksize)
-> +				continue;
-> +
-> +			update_lpi_config(kvm, itte, prop[itte->lpi - lpi]);
-> +		}
-> +		spin_unlock(&dist->its.lock);
-> +		tsize -= chunksize;
-> +		lpi += chunksize;
-> +		propbase += chunksize;
-> +	}
-> +
-> +	return true;
-> +}
-> +
-> +/*
-> + * Scan the whole LPI pending table and sync the pending bit in there
-> + * with our own data structures. This relies on the LPI being
-> + * mapped before.
-> + */
-> +static bool its_sync_lpi_pending_table(struct kvm_vcpu *vcpu, u64 base_addr_reg)
-> +{
-> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> +	unsigned long *pendmask = dist->its.buffer_page;
-> +	u32 nr_lpis = 1U << INTERRUPT_ID_BITS_ITS;
-shouldn't we use value computed as in nr_idbits_propbase instead?
-> +	gpa_t pendbase;
-> +	int lpi = 0;
-> +	struct its_itte *itte;
-> +	struct its_device *device;
-> +	int ret;
-> +	int lpi_bit, nr_bits;
-> +
-> +	pendbase = BASER_BASE_ADDRESS(base_addr_reg);
-> +
-I understand we should start reading at pendbase + 1KB. (4.8.5 pending
-tables)
+On Wed, Apr 6, 2016 at 5:51 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> Hi,
+>
+> On Friday 01 April 2016 07:05 PM, Vivek Gautam wrote:
+>> Hi,
+>>
+>>
+>> On Fri, Apr 1, 2016 at 6:05 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>>> Hi,
+>>>
+>>> On Friday 01 April 2016 04:59 PM, Vivek Gautam wrote:
+>>>> Adding vendor specific directories in phy to group
+>>>> phy drivers under their respective vendor umbrella.
+>>>>
+>>>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+>>>> ---
+>>>>
+>>>> With growing number of phy drivers, it makes sense to
+>>>> group these drivers under their respective vendor/platform
+>>>> umbrella directory.
+>>>>
+>>>> Build-tested 'multi_v7_defconfig'.
+>>>>
+>>>>  drivers/phy/Kconfig                               | 386 +---------------------
+>>>>  drivers/phy/Makefile                              |  57 +---
+>>>>  drivers/phy/bcom/Kconfig                          |  27 ++
+>>>>  drivers/phy/bcom/Makefile                         |   3 +
+>>>>  drivers/phy/{ => bcom}/phy-bcm-cygnus-pcie.c      |   0
+>>>>  drivers/phy/{ => bcom}/phy-bcm-kona-usb2.c        |   0
+>>>>  drivers/phy/{ => bcom}/phy-brcmstb-sata.c         |   0
+>>>>  drivers/phy/hisi/Kconfig                          |  20 ++
+>>>>  drivers/phy/hisi/Makefile                         |   2 +
+>>>>  drivers/phy/{ => hisi}/phy-hi6220-usb.c           |   0
+>>>>  drivers/phy/{ => hisi}/phy-hix5hd2-sata.c         |   0
+>>>>  drivers/phy/marvell/Kconfig                       |  50 +++
+>>>>  drivers/phy/marvell/Makefile                      |   6 +
+>>>>  drivers/phy/{ => marvell}/phy-armada375-usb2.c    |   0
+>>>>  drivers/phy/{ => marvell}/phy-berlin-sata.c       |   0
+>>>>  drivers/phy/{ => marvell}/phy-berlin-usb.c        |   0
+>>>>  drivers/phy/{ => marvell}/phy-mvebu-sata.c        |   0
+>>>>  drivers/phy/{ => marvell}/phy-pxa-28nm-hsic.c     |   0
+>>>>  drivers/phy/{ => marvell}/phy-pxa-28nm-usb2.c     |   0
+>>>>  drivers/phy/qcom/Kconfig                          |  23 ++
+>>>>  drivers/phy/qcom/Makefile                         |   5 +
+>>>>  drivers/phy/{ => qcom}/phy-qcom-apq8064-sata.c    |   0
+>>>>  drivers/phy/{ => qcom}/phy-qcom-ipq806x-sata.c    |   0
+>>>>  drivers/phy/{ => qcom}/phy-qcom-ufs-i.h           |   0
+>>>>  drivers/phy/{ => qcom}/phy-qcom-ufs-qmp-14nm.c    |   0
+>>>>  drivers/phy/{ => qcom}/phy-qcom-ufs-qmp-14nm.h    |   0
+>>>>  drivers/phy/{ => qcom}/phy-qcom-ufs-qmp-20nm.c    |   0
+>>>>  drivers/phy/{ => qcom}/phy-qcom-ufs-qmp-20nm.h    |   0
+>>>>  drivers/phy/{ => qcom}/phy-qcom-ufs.c             |   0
+>>>>  drivers/phy/rcar/Kconfig                          |  16 +
+>>>>  drivers/phy/rcar/Makefile                         |   2 +
+>>>>  drivers/phy/{ => rcar}/phy-rcar-gen2.c            |   0
+>>>>  drivers/phy/{ => rcar}/phy-rcar-gen3-usb2.c       |   0
+>>>>  drivers/phy/rockchip/Kconfig                      |  23 ++
+>>>>  drivers/phy/rockchip/Makefile                     |   3 +
+>>>>  drivers/phy/{ => rockchip}/phy-rockchip-dp.c      |   0
+>>>>  drivers/phy/{ => rockchip}/phy-rockchip-emmc.c    |   0
+>>>>  drivers/phy/{ => rockchip}/phy-rockchip-usb.c     |   0
+>>>>  drivers/phy/samsung/Kconfig                       |  87 +++++
+>>>>  drivers/phy/samsung/Makefile                      |  10 +
+>>>>  drivers/phy/{ => samsung}/phy-exynos-dp-video.c   |   0
+>>>>  drivers/phy/{ => samsung}/phy-exynos-mipi-video.c |   0
+>>>>  drivers/phy/{ => samsung}/phy-exynos4210-usb2.c   |   0
+>>>>  drivers/phy/{ => samsung}/phy-exynos4x12-usb2.c   |   0
+>>>>  drivers/phy/{ => samsung}/phy-exynos5-usbdrd.c    |   0
+>>>>  drivers/phy/{ => samsung}/phy-exynos5250-sata.c   |   0
+>>>>  drivers/phy/{ => samsung}/phy-exynos5250-usb2.c   |   0
+>>>>  drivers/phy/{ => samsung}/phy-s5pv210-usb2.c      |   0
+>>>>  drivers/phy/{ => samsung}/phy-samsung-usb2.c      |   0
+>>>>  drivers/phy/{ => samsung}/phy-samsung-usb2.h      |   0
+>>>>  drivers/phy/st/Kconfig                            |  51 +++
+>>>>  drivers/phy/st/Makefile                           |   6 +
+>>>>  drivers/phy/{ => st}/phy-miphy28lp.c              |   0
+>>>>  drivers/phy/{ => st}/phy-miphy365x.c              |   0
+>>>>  drivers/phy/{ => st}/phy-spear1310-miphy.c        |   0
+>>>>  drivers/phy/{ => st}/phy-spear1340-miphy.c        |   0
+>>>>  drivers/phy/{ => st}/phy-stih407-usb.c            |   0
+>>>>  drivers/phy/{ => st}/phy-stih41x-usb.c            |   0
+>>>>  drivers/phy/sunxi/Kconfig                         |  28 ++
+>>>>  drivers/phy/sunxi/Makefile                        |   2 +
+>>>>  drivers/phy/{ => sunxi}/phy-sun4i-usb.c           |   0
+>>>>  drivers/phy/{ => sunxi}/phy-sun9i-usb.c           |   0
+>>>>  drivers/phy/ti/Kconfig                            |  67 ++++
+>>>>  drivers/phy/ti/Makefile                           |   6 +
+>>>>  drivers/phy/{ => ti}/phy-dm816x-usb.c             |   0
+>>>>  drivers/phy/{ => ti}/phy-omap-control.c           |   0
+>>>>  drivers/phy/{ => ti}/phy-omap-usb2.c              |   0
+>>>>  drivers/phy/{ => ti}/phy-ti-pipe3.c               |   0
+>>>>  drivers/phy/{ => ti}/phy-tusb1210.c               |   0
+>>>>  drivers/phy/{ => ti}/phy-twl4030-usb.c            |   0
+>>>>  drivers/phy/{ => ti}/ulpi_phy.h                   |   0
+>>>
+>>> ulpi_phy.h is not specific to TI though at this point tusb1210 is the only ULPI
+>>> driver.
+>>
+>> Yes, you are right. But i was hesitant to add a multi-level header
+>> file include in the phy driver
+>> which uses it.
+>>
+>> Does it makes sense to move this ulpi_phy.h to include/linux/phy ?
+>
+> yeah.. that should be okay.
+Alright, i will move this file there then.
 
-Eric
-> +	while (nr_lpis > 0) {
-> +		nr_bits = min(nr_lpis, CHUNK_SIZE * 8);
-> +
-> +		ret = kvm_read_guest(vcpu->kvm, pendbase, pendmask,
-> +				     nr_bits / 8);
-> +		if (ret)
-> +			return false;
-> +
-> +		spin_lock(&dist->its.lock);
-> +		for_each_lpi(device, itte, vcpu->kvm) {
-> +			lpi_bit = itte->lpi - lpi;
-> +			if (lpi_bit < 0 || lpi_bit >= nr_bits)
-> +				continue;
-> +
-> +			if (!test_bit(lpi_bit, pendmask))
-> +				continue;
-> +
-> +			spin_lock(&itte->irq.irq_lock);
-> +			itte->irq.pending = true;
-> +			vgic_queue_irq(vcpu->kvm, &itte->irq);
-> +		}
-> +		spin_unlock(&dist->its.lock);
-> +		nr_lpis -= nr_bits;
-> +		lpi += nr_bits;
-> +		pendbase += nr_bits / 8;
-> +	}
-> +
-> +	return true;
-> +}
-> +
->  static int vgic_mmio_read_its_ctlr(struct kvm_vcpu *vcpu,
->  				   struct kvm_io_device *this,
->  				   gpa_t addr, int len, void *val)
-> @@ -357,6 +479,14 @@ struct vgic_register_region its_registers[] = {
->  /* This is called on setting the LPI enable bit in the redistributor. */
->  void vgic_enable_lpis(struct kvm_vcpu *vcpu)
->  {
-> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> +	u64 prop_base_reg, pend_base_reg;
-> +
-> +	pend_base_reg = dist->pendbaser[vcpu->vcpu_id];
-> +	prop_base_reg = dist->propbaser;
-> +
-> +	its_update_lpis_configuration(vcpu->kvm, prop_base_reg);
-> +	its_sync_lpi_pending_table(vcpu, pend_base_reg);
->  }
->  
->  int vits_init(struct kvm *kvm)
-> @@ -371,6 +501,10 @@ int vits_init(struct kvm *kvm)
->  	if (!dist->pendbaser)
->  		return -ENOMEM;
->  
-> +	its->buffer_page = kmalloc(CHUNK_SIZE, GFP_KERNEL);
-> +	if (!its->buffer_page)
-> +		return -ENOMEM;
-> +
->  	spin_lock_init(&its->lock);
->  
->  	INIT_LIST_HEAD(&its->device_list);
-> @@ -430,6 +564,7 @@ void vits_destroy(struct kvm *kvm)
->  		kfree(container_of(cur, struct its_collection, coll_list));
->  	}
->  
-> +	kfree(its->buffer_page);
->  	kfree(dist->pendbaser);
->  
->  	its->enabled = false;
-> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> index 160c511..a7218b0 100644
-> --- a/virt/kvm/arm/vgic/vgic.h
-> +++ b/virt/kvm/arm/vgic/vgic.h
-> @@ -23,6 +23,7 @@
->  #define IS_VGIC_ADDR_UNDEF(_x)  ((_x) == VGIC_ADDR_UNDEF)
->  
->  #define INTERRUPT_ID_BITS_SPIS	10
-> +#define INTERRUPT_ID_BITS_ITS	16
->  
->  struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
->  			      u32 intid);
-> 
+>>
+>>>>  71 files changed, 464 insertions(+), 416 deletions(-)
+>>>>  create mode 100644 drivers/phy/bcom/Kconfig
+>>>>  create mode 100644 drivers/phy/bcom/Makefile
+>>>>  rename drivers/phy/{ => bcom}/phy-bcm-cygnus-pcie.c (100%)
+>>>>  rename drivers/phy/{ => bcom}/phy-bcm-kona-usb2.c (100%)
+>>>>  rename drivers/phy/{ => bcom}/phy-brcmstb-sata.c (100%)
+>>>>  create mode 100644 drivers/phy/hisi/Kconfig
+>>>>  create mode 100644 drivers/phy/hisi/Makefile
+>>>>  rename drivers/phy/{ => hisi}/phy-hi6220-usb.c (100%)
+>>>>  rename drivers/phy/{ => hisi}/phy-hix5hd2-sata.c (100%)
+>>>>  create mode 100644 drivers/phy/marvell/Kconfig
+>>>>  create mode 100644 drivers/phy/marvell/Makefile
+>>>>  rename drivers/phy/{ => marvell}/phy-armada375-usb2.c (100%)
+>>>>  rename drivers/phy/{ => marvell}/phy-berlin-sata.c (100%)
+>>>>  rename drivers/phy/{ => marvell}/phy-berlin-usb.c (100%)
+>>>>  rename drivers/phy/{ => marvell}/phy-mvebu-sata.c (100%)
+>>>>  rename drivers/phy/{ => marvell}/phy-pxa-28nm-hsic.c (100%)
+>>>>  rename drivers/phy/{ => marvell}/phy-pxa-28nm-usb2.c (100%)
+>>>>  create mode 100644 drivers/phy/qcom/Kconfig
+>>>>  create mode 100644 drivers/phy/qcom/Makefile
+>>>>  rename drivers/phy/{ => qcom}/phy-qcom-apq8064-sata.c (100%)
+>>>>  rename drivers/phy/{ => qcom}/phy-qcom-ipq806x-sata.c (100%)
+>>>>  rename drivers/phy/{ => qcom}/phy-qcom-ufs-i.h (100%)
+>>>>  rename drivers/phy/{ => qcom}/phy-qcom-ufs-qmp-14nm.c (100%)
+>>>>  rename drivers/phy/{ => qcom}/phy-qcom-ufs-qmp-14nm.h (100%)
+>>>>  rename drivers/phy/{ => qcom}/phy-qcom-ufs-qmp-20nm.c (100%)
+>>>>  rename drivers/phy/{ => qcom}/phy-qcom-ufs-qmp-20nm.h (100%)
+>>>>  rename drivers/phy/{ => qcom}/phy-qcom-ufs.c (100%)
+>>>>  create mode 100644 drivers/phy/rcar/Kconfig
+>>>>  create mode 100644 drivers/phy/rcar/Makefile
+>>>>  rename drivers/phy/{ => rcar}/phy-rcar-gen2.c (100%)
+>>>>  rename drivers/phy/{ => rcar}/phy-rcar-gen3-usb2.c (100%)
+>>>>  create mode 100644 drivers/phy/rockchip/Kconfig
+>>>>  create mode 100644 drivers/phy/rockchip/Makefile
+>>>>  rename drivers/phy/{ => rockchip}/phy-rockchip-dp.c (100%)
+>>>>  rename drivers/phy/{ => rockchip}/phy-rockchip-emmc.c (100%)
+>>>>  rename drivers/phy/{ => rockchip}/phy-rockchip-usb.c (100%)
+>>>>  create mode 100644 drivers/phy/samsung/Kconfig
+>>>>  create mode 100644 drivers/phy/samsung/Makefile
+>>>>  rename drivers/phy/{ => samsung}/phy-exynos-dp-video.c (100%)
+>>>>  rename drivers/phy/{ => samsung}/phy-exynos-mipi-video.c (100%)
+>>>>  rename drivers/phy/{ => samsung}/phy-exynos4210-usb2.c (100%)
+>>>>  rename drivers/phy/{ => samsung}/phy-exynos4x12-usb2.c (100%)
+>>>>  rename drivers/phy/{ => samsung}/phy-exynos5-usbdrd.c (100%)
+>>>>  rename drivers/phy/{ => samsung}/phy-exynos5250-sata.c (100%)
+>>>>  rename drivers/phy/{ => samsung}/phy-exynos5250-usb2.c (100%)
+>>>>  rename drivers/phy/{ => samsung}/phy-s5pv210-usb2.c (100%)
+>>>>  rename drivers/phy/{ => samsung}/phy-samsung-usb2.c (100%)
+>>>>  rename drivers/phy/{ => samsung}/phy-samsung-usb2.h (100%)
+>>>>  create mode 100644 drivers/phy/st/Kconfig
+>>>>  create mode 100644 drivers/phy/st/Makefile
+>>>>  rename drivers/phy/{ => st}/phy-miphy28lp.c (100%)
+>>>>  rename drivers/phy/{ => st}/phy-miphy365x.c (100%)
+>>>>  rename drivers/phy/{ => st}/phy-spear1310-miphy.c (100%)
+>>>>  rename drivers/phy/{ => st}/phy-spear1340-miphy.c (100%)
+>>>>  rename drivers/phy/{ => st}/phy-stih407-usb.c (100%)
+>>>>  rename drivers/phy/{ => st}/phy-stih41x-usb.c (100%)
+>>>>  create mode 100644 drivers/phy/sunxi/Kconfig
+>>>>  create mode 100644 drivers/phy/sunxi/Makefile
+>>>>  rename drivers/phy/{ => sunxi}/phy-sun4i-usb.c (100%)
+>>>>  rename drivers/phy/{ => sunxi}/phy-sun9i-usb.c (100%)
+>>>>  create mode 100644 drivers/phy/ti/Kconfig
+>>>>  create mode 100644 drivers/phy/ti/Makefile
+>>>>  rename drivers/phy/{ => ti}/phy-dm816x-usb.c (100%)
+>>>>  rename drivers/phy/{ => ti}/phy-omap-control.c (100%)
+>>>>  rename drivers/phy/{ => ti}/phy-omap-usb2.c (100%)
+>>>>  rename drivers/phy/{ => ti}/phy-ti-pipe3.c (100%)
+>>>>  rename drivers/phy/{ => ti}/phy-tusb1210.c (100%)
+>>>>  rename drivers/phy/{ => ti}/phy-twl4030-usb.c (100%)
+>>>>  rename drivers/phy/{ => ti}/ulpi_phy.h (100%)
+>>>>
+>>>> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+>>>> index 26566db..80c8c68 100644
+>>>> --- a/drivers/phy/Kconfig
+>>>> +++ b/drivers/phy/Kconfig
+>>>> @@ -15,45 +15,6 @@ config GENERIC_PHY
+>>>>         phy users can obtain reference to the PHY. All the users of this
+>>>>         framework should select this config.
+>>>>
+>>>
+>>>> +menuconfig PHY_PLAT
+>>>> +     bool "Platform Phy drivers"
+>>>
+>>> Not really convinced about adding a new config here. This will create new
+>>> dependencies and will also start breaking users of oldconfig.
+>>
+>> This serves including all the directory paths in the 'make' for
+>> driver/phy/Makefile.
+>>
+>> Otherwise each directory will have to be built as per particular platform
+>> And, not all drivers of a vendor are built for one-kind of platform,
+>> for example, Samsung uses ARCH_EXYNOS, as well as ARCH_S5PV210
+>> Similarly, Broadcom phy drivers are based on multiple platforms, and so
+>> does Marvell's.
+>>
+>> Please suggest a concise way to include the vendor directories in the build path
+>> in drivers/phy/Makefile.
+>
+> obj-y   += vendor/?
+
+Yea, correct. Thanks
+Will respin the patch with all the comments.
+
+>
+> -Kishon
+>
+>>
+>>>
+>>> Also not all of them are platform drivers (e.g ULPI PHY drivers).
+>> I Think this applies to ulpi_phy only at this moment, which we can resolve
+>> by moving that to include/linux path.
+>>
+>>>
+>>> Thanks
+>>> Kishon
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
+>>
+>>
+
+
+
+-- 
+Best Regards
+Vivek Gautam
+Samsung R&D Institute, Bangalore
+India
