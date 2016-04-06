@@ -1,57 +1,37 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Wed,  6 Apr 2016 21:32:06 +0200
-Subject: [PATCH] Revert "ARM: dts: porter: Enable SCIF_CLK frequency and pins"
-Message-ID: <1459971126-26622-1-git-send-email-sjoerd.simons@collabora.co.uk>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 6 Apr 2016 13:25:52 -0700
+Subject: [PATCH v4 3/3] ARM: dts: use syscon in cygnus touchscreen dt node
+In-Reply-To: <20160406173140.GB38452@dtor-ws>
+References: <1456556396-4759-1-git-send-email-raveendra.padasalagi@broadcom.com>
+ <1456556396-4759-4-git-send-email-raveendra.padasalagi@broadcom.com>
+ <20160406173140.GB38452@dtor-ws>
+Message-ID: <CAGVrzcbCZn6RYFwJTkffkct1DiiG+tBJnKELDn32T38_s5mjOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit 19417bd9c5112f58ea63e97ba72edabd5e1cc0fe as
-according to
-http://elinux.org/File:R-CarM2-KOELSCH_PORTER-B_PORTER_C_Comparison.pdf
-the external oscilator for SCIF_CLK is not mounted on the porter boards.
+2016-04-06 10:31 GMT-07:00 Dmitry Torokhov <dmitry.torokhov@gmail.com>:
+> On Sat, Feb 27, 2016 at 12:29:56PM +0530, Raveendra Padasalagi wrote:
+>> In Cygnus SOC touch screen controller registers are shared
+>> with ADC and flex timer. Using readl/writel could lead to
+>> race condition. So touchscreen driver is enhanced to support
+>> syscon based register access to take care of mutually exclusive
+>> access.
+>>
+>> This patch enables syscon support in touchscreen driver
+>> by adding necessary properties in touchscreen dt node and
+>> in addition to this renamed existing "tsc" touchscreen node
+>> name to "touchscreen".
+>>
+>> Signed-off-by: Raveendra Padasalagi <raveendra.padasalagi@broadcom.com>
+>> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+>
+> OK, since the new dts is really needed for the driver I'll be folding
+> this into the touchscreen driver patch unless I hear someone yelling at
+> me.
 
-Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+Works for me:
 
----
-
- arch/arm/boot/dts/r8a7791-porter.dts | 13 -------------
- 1 file changed, 13 deletions(-)
-
-diff --git a/arch/arm/boot/dts/r8a7791-porter.dts b/arch/arm/boot/dts/r8a7791-porter.dts
-index 9554d13..dbcf3bb 100644
---- a/arch/arm/boot/dts/r8a7791-porter.dts
-+++ b/arch/arm/boot/dts/r8a7791-porter.dts
-@@ -142,19 +142,11 @@
- };
- 
- &pfc {
--	pinctrl-0 = <&scif_clk_pins>;
--	pinctrl-names = "default";
--
- 	scif0_pins: serial0 {
- 		groups = "scif0_data_d";
- 		function = "scif0";
- 	};
- 
--	scif_clk_pins: scif_clk {
--		groups = "scif_clk";
--		function = "scif_clk";
--	};
--
- 	ether_pins: ether {
- 		groups = "eth_link", "eth_mdio", "eth_rmii";
- 		function = "eth";
-@@ -228,11 +220,6 @@
- 	status = "okay";
- };
- 
--&scif_clk {
--	clock-frequency = <14745600>;
--	status = "okay";
--};
--
- &ether {
- 	pinctrl-0 = <&ether_pins &phy1_pins>;
- 	pinctrl-names = "default";
--- 
-2.8.0.rc3
+Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+--
+Florian
