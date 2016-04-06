@@ -1,31 +1,113 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 6 Apr 2016 10:32:54 +0200
-Subject: [PATCH v4 0/3] davinci_mmc fixes
-In-Reply-To: <1459877512-25479-1-git-send-email-david@lechnology.com>
-References: <1459877512-25479-1-git-send-email-david@lechnology.com>
-Message-ID: <CAPDyKFrAWu7hYY_Jwpm5qWz=b=cvDrFwMFedhZHRWCwP-EtJsw@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed,  6 Apr 2016 09:37:22 +0100
+Subject: [PATCH] KVM: arm/arm64: Handle forward time correction gracefully
+Message-ID: <1459931842-29465-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 April 2016 at 19:31, David Lechner <david@lechnology.com> wrote:
-> This fixes a compiler warning in the "fix unwinding in probe" patch where ret
-> was used uninitalized.
->
-> David Lechner (3):
->   mmc: davinci: fix unwinding in probe
->   mmc: davinci: prepare clock
->   ARM: davinci: remove mmc dma resources
->
->  arch/arm/mach-davinci/devices-da8xx.c |  20 -------
->  arch/arm/mach-davinci/devices.c       |  16 ------
->  drivers/mmc/host/davinci_mmc.c        | 100 ++++++++++++++--------------------
->  3 files changed, 40 insertions(+), 96 deletions(-)
->
-> --
-> 1.9.1
->
+On a host that runs NTP, corrections can have a direct impact on
+the background timer that we program on the behalf of a vcpu.
 
-Thanks, applied for next!
+In particular, NTP performing a forward correction will result in
+a timer expiring sooner than expected from a guest point of view.
+Not a big deal, we kick the vcpu anyway.
 
-Kind regards
-Uffe
+But on wake-up, the vcpu thread is going to perform a check to
+find out whether or not it should block. And at that point, the
+timer check is going to say "timer has not expired yet, go back
+to sleep". This results in the timer event being lost forever.
+
+There are multiple ways to handle this. One would be record that
+the timer has expired and let kvm_cpu_has_pending_timer return
+true in that case, but that would be fairly invasive. Another is
+to check for the "short sleep" condition in the hrtimer callback,
+and restart the timer for the remaining time when the condition
+is detected.
+
+This patch implements the latter, with a bit of refactoring in
+order to avoid too much code duplication.
+
+Reported-by: Alexander Graf <agraf@suse.de>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ virt/kvm/arm/arch_timer.c | 47 +++++++++++++++++++++++++++++++++++++----------
+ 1 file changed, 37 insertions(+), 10 deletions(-)
+
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index a9ad4fe..4d0e77a 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -98,10 +98,46 @@ static void kvm_timer_inject_irq_work(struct work_struct *work)
+ 	kvm_vcpu_kick(vcpu);
+ }
+ 
++static u64 kvm_timer_compute_delta(struct kvm_vcpu *vcpu)
++{
++	cycle_t cval, now;
++
++	cval = vcpu->arch.timer_cpu.cntv_cval;
++	now = kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
++
++	if (now < cval) {
++		u64 ns;
++
++		ns = cyclecounter_cyc2ns(timecounter->cc,
++					 cval - now,
++					 timecounter->mask,
++					 &timecounter->frac);
++		return ns;
++	}
++
++	return 0;
++}
++
+ static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
+ {
+ 	struct arch_timer_cpu *timer;
++	struct kvm_vcpu *vcpu;
++	u64 ns;
++
+ 	timer = container_of(hrt, struct arch_timer_cpu, timer);
++	vcpu = container_of(timer, struct kvm_vcpu, arch.timer_cpu);
++
++	/*
++	 * Check that the timer has really expired from the guest's
++	 * PoV (NTP on the host may have forced it to expire
++	 * early). If we should have slept longer, restart it.
++	 */
++	ns = kvm_timer_compute_delta(vcpu);
++	if (unlikely(ns)) {
++		hrtimer_forward_now(hrt, ns_to_ktime(ns));
++		return HRTIMER_RESTART;
++	}
++
+ 	queue_work(wqueue, &timer->expired);
+ 	return HRTIMER_NORESTART;
+ }
+@@ -176,8 +212,6 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
+ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
+ {
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+-	u64 ns;
+-	cycle_t cval, now;
+ 
+ 	BUG_ON(timer_is_armed(timer));
+ 
+@@ -197,14 +231,7 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
+ 		return;
+ 
+ 	/*  The timer has not yet expired, schedule a background timer */
+-	cval = timer->cntv_cval;
+-	now = kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
+-
+-	ns = cyclecounter_cyc2ns(timecounter->cc,
+-				 cval - now,
+-				 timecounter->mask,
+-				 &timecounter->frac);
+-	timer_arm(timer, ns);
++	timer_arm(timer, kvm_timer_compute_delta(vcpu));
+ }
+ 
+ void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
+-- 
+2.1.4
