@@ -1,65 +1,65 @@
 From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
-Date: Wed, 6 Apr 2016 10:44:57 +0530
-Subject: [RESEND PATCH v2 3/6] Documentation: DT: vdma: update binding doc for
- AXI DMA
+Date: Wed, 6 Apr 2016 10:44:55 +0530
+Subject: [RESEND PATCH v2 1/6] dmaengine: vdma: Fix checkpatch.pl warnings
 In-Reply-To: <1459919700-6692-1-git-send-email-appanad@xilinx.com>
 References: <1459919700-6692-1-git-send-email-appanad@xilinx.com>
-Message-ID: <1459919700-6692-4-git-send-email-appanad@xilinx.com>
+Message-ID: <1459919700-6692-2-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the device-tree binding doc for
-adding support for AXI DMA.
+This patch fixes the below checkpatch.pl warnings.
 
+WARNING: void function return statements are not generally useful
++	return;
++}
+
+WARNING: void function return statements are not generally useful
++	return;
++}
+
+WARNING: Missing a blank line after declarations
++		u32 errors = status & XILINX_VDMA_DMASR_ALL_ERR_MASK;
++		vdma_ctrl_write(chan, XILINX_VDMA_REG_DMASR,
+
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Acked-by: Moritz Fischer <moritz.fischer@ettus.com>
 Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
 ---
 Changes for v2:
----> Modified commit message as suggested by Vinod.
----> Moved the patch to forward in the series as suggested by vinod.
+---> None.
 
- .../devicetree/bindings/dma/xilinx/xilinx_vdma.txt | 22 +++++++++++++++++++++-
- 1 file changed, 21 insertions(+), 1 deletion(-)
+ drivers/dma/xilinx/xilinx_vdma.c | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-index a86737c..5841421 100644
---- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-+++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-@@ -3,8 +3,13 @@ It can be configured to have one channel or two channels. If configured
- as two channels, one is to transmit to the video device and another is
- to receive from the video device.
+diff --git a/drivers/dma/xilinx/xilinx_vdma.c b/drivers/dma/xilinx/xilinx_vdma.c
+index b873d98..3c5ce37 100644
+--- a/drivers/dma/xilinx/xilinx_vdma.c
++++ b/drivers/dma/xilinx/xilinx_vdma.c
+@@ -597,8 +597,6 @@ static void xilinx_vdma_halt(struct xilinx_vdma_chan *chan)
+ 			chan, vdma_ctrl_read(chan, XILINX_VDMA_REG_DMASR));
+ 		chan->err = true;
+ 	}
+-
+-	return;
+ }
  
-+Xilinx AXI DMA engine, it does transfers between memory and AXI4 stream
-+target devices. It can be configured to have one channel or two channels.
-+If configured as two channels, one is to transmit to the device and another
-+is to receive from the device.
+ /**
+@@ -623,8 +621,6 @@ static void xilinx_vdma_start(struct xilinx_vdma_chan *chan)
+ 
+ 		chan->err = true;
+ 	}
+-
+-	return;
+ }
+ 
+ /**
+@@ -874,6 +870,7 @@ static irqreturn_t xilinx_vdma_irq_handler(int irq, void *data)
+ 		 * make sure not to write to other error bits to 1.
+ 		 */
+ 		u32 errors = status & XILINX_VDMA_DMASR_ALL_ERR_MASK;
 +
- Required properties:
--- compatible: Should be "xlnx,axi-vdma-1.00.a"
-+- compatible: Should be "xlnx,axi-vdma-1.00.a" or "xlnx,axi-dma-1.00.a"
- - #dma-cells: Should be <1>, see "dmas" property below
- - reg: Should contain VDMA registers location and length.
- - xlnx,num-fstores: Should be the number of framebuffers as configured in h/w.
-@@ -59,6 +64,21 @@ axi_vdma_0: axivdma at 40030000 {
- 	} ;
- } ;
- 
-+axi_dma_0: axidma at 40400000 {
-+	compatible = "xlnx,axi-dma-1.00.a";
-+	#dma-cells = <1>;
-+	reg = < 0x40400000 0x10000 >;
-+	dma-channel at 40400000 {
-+		compatible = "xlnx,axi-dma-mm2s-channel";
-+		interrupts = < 0 59 4 >;
-+		xlnx,datawidth = <0x40>;
-+	} ;
-+	dma-channel at 40400030 {
-+		compatible = "xlnx,axi-dma-s2mm-channel";
-+		interrupts = < 0 58 4 >;
-+		xlnx,datawidth = <0x40>;
-+	} ;
-+} ;
- 
- * DMA client
+ 		vdma_ctrl_write(chan, XILINX_VDMA_REG_DMASR,
+ 				errors & XILINX_VDMA_DMASR_ERR_RECOVER_MASK);
  
 -- 
 2.1.2
