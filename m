@@ -1,73 +1,59 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 06 Apr 2016 10:00:13 +0900
-Subject: [PATCH v7 2/4] power: reset: add reboot mode driver
-In-Reply-To: <57045D6B.2080907@rock-chips.com>
-References: <1459304304-9713-1-git-send-email-andy.yan@rock-chips.com>
- <1459304443-9811-1-git-send-email-andy.yan@rock-chips.com>
- <56FB49B3.2040505@samsung.com> <57045D6B.2080907@rock-chips.com>
-Message-ID: <57045F9D.1000502@samsung.com>
+Date: Wed, 06 Apr 2016 11:00:40 +0900
+Subject: [PATCH v2 01/11] ARM: dts: exynos: Fix DTC unit name warnings in
+ cros-adc-thermistors
+Message-ID: <1459908050-16430-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06.04.2016 09:50, Andy Yan wrote:
+Fix following DTC warnings in cros-adc-thermistors:
 
-(...)
+Warning (unit_address_vs_reg): Node /adc at 12D10000/ncp15wb473 at 3 has a unit name, but no reg property
+Warning (unit_address_vs_reg): Node /adc at 12D10000/ncp15wb473 at 4 has a unit name, but no reg property
+Warning (unit_address_vs_reg): Node /adc at 12D10000/ncp15wb473 at 5 has a unit name, but no reg property
+Warning (unit_address_vs_reg): Node /adc at 12D10000/ncp15wb473 at 6 has a unit name, but no reg property
 
->>> +            return -ENOMEM;
->>> +
->>> +        info->mode = kstrdup_const(prop->name + len, GFP_KERNEL);
->>> +        if (of_property_read_u32(np, prop->name, &info->magic)) {
->>> +            dev_err(dev, "reboot mode %s without magic number\n",
->>> +                info->mode);
->>> +            devm_kfree(dev, info);
->>> +            continue;
->>> +        }
->>> +        list_add_tail(&info->list, &reboot->head);
->>> +    }
->>> +    of_node_put(np);
->> If you of_node_put() here, there is no sense in getting it before. I
->> mentioned of_node_get() only because I am not sure about life-cycle of
->> nodes in case of DT overlays and you are storing the pointer to string
->> from DT.
->>
->> The doubts I have are concerning only the case of freeing nodes from
->> overlay.
->>
->> I don't know if of_node_get() is needed but of_node_get()+of_node_put()
->> seems useless.
-> 
-> 
->  I am also not sure about it. Maybe just drop of_node_get/put ?
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ arch/arm/boot/dts/cros-adc-thermistors.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-OK, let's drop both get() and put().
-
-(...)
-
->>> +
->>> +static const struct of_device_id syscon_reboot_mode_of_match[] = {
->>> +    { .compatible = "syscon-reboot-mode" },
->>> +    {}
->>> +};
->>> +
->>> +static struct platform_driver syscon_reboot_mode_driver = {
->>> +    .probe = syscon_reboot_mode_probe,
->> Cleanup needed. What will happen after device unbind? Memory will be
->> released (devm-*()) but reboot notifier won't thus leading to OOPS on
->> reboot.
-> 
->     From the kernel_restart_prepare function, the reboot notifier will
-> be called before device_shutdown. Is there any other case the device
-> unbind before reboot notifier
-> called?
-
-This is a regular module platform driver so unbind can happen any time
-initiated by user, either by unbind command or by module removal. User
-can then re-bind device or not - probably does not matter. Anyway after
-such first unbind, the restart will kaboom instead of do a restart.
-
-Beside that, you always should clean up, regardless of restart or not.
-If you do not want unbind (thus no need of cleanup) then forbid it by
-making it a non-module with suppressed bind.
-
-Best regards,
-Krzysztof
+diff --git a/arch/arm/boot/dts/cros-adc-thermistors.dtsi b/arch/arm/boot/dts/cros-adc-thermistors.dtsi
+index acd4fe1833f2..ce7fca76b0d6 100644
+--- a/arch/arm/boot/dts/cros-adc-thermistors.dtsi
++++ b/arch/arm/boot/dts/cros-adc-thermistors.dtsi
+@@ -13,28 +13,28 @@
+ */
+ 
+ &adc {
+-	ncp15wb473 at 3 {
++	thermistor3 {
+ 		compatible = "murata,ncp15wb473";
+ 		pullup-uv = <1800000>;
+ 		pullup-ohm = <47000>;
+ 		pulldown-ohm = <0>;
+ 		io-channels = <&adc 3>;
+ 	};
+-	ncp15wb473 at 4 {
++	thermistor4 {
+ 		compatible = "murata,ncp15wb473";
+ 		pullup-uv = <1800000>;
+ 		pullup-ohm = <47000>;
+ 		pulldown-ohm = <0>;
+ 		io-channels = <&adc 4>;
+ 	};
+-	ncp15wb473 at 5 {
++	thermistor5 {
+ 		compatible = "murata,ncp15wb473";
+ 		pullup-uv = <1800000>;
+ 		pullup-ohm = <47000>;
+ 		pulldown-ohm = <0>;
+ 		io-channels = <&adc 5>;
+ 	};
+-	ncp15wb473 at 6 {
++	thermistor6 {
+ 		compatible = "murata,ncp15wb473";
+ 		pullup-uv = <1800000>;
+ 		pullup-ohm = <47000>;
+-- 
+2.5.0
