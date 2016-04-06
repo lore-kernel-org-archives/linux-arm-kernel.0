@@ -1,9 +1,9 @@
 From: amsfield22@gmail.com (Alison Schofield)
-Date: Tue, 5 Apr 2016 22:19:25 -0700
-Subject: [PATCH 6/9] iio: accel: mxc4005: use regmap to retrieve struct device
+Date: Tue, 5 Apr 2016 22:20:00 -0700
+Subject: [PATCH 7/9] iio: health: afe4403: use regmap to retrieve struct device
 In-Reply-To: <cover.1459918214.git.amsfield22@gmail.com>
 References: <cover.1459918214.git.amsfield22@gmail.com>
-Message-ID: <765e752b36e9b809217ed15aad75efb9593f22ce.1459918214.git.amsfield22@gmail.com>
+Message-ID: <7150183b87729a0d287cf270f58de85079d40468.1459918214.git.amsfield22@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,145 +14,152 @@ Patch created using Coccinelle plus manual edits.
 
 Signed-off-by: Alison Schofield <amsfield22@gmail.com>
 ---
- drivers/iio/accel/mxc4005.c | 26 +++++++++++++++-----------
- 1 file changed, 15 insertions(+), 11 deletions(-)
+ drivers/iio/health/afe4403.c | 36 +++++++++++++++++-------------------
+ 1 file changed, 17 insertions(+), 19 deletions(-)
 
-diff --git a/drivers/iio/accel/mxc4005.c b/drivers/iio/accel/mxc4005.c
-index c23f47a..013d511 100644
---- a/drivers/iio/accel/mxc4005.c
-+++ b/drivers/iio/accel/mxc4005.c
-@@ -60,7 +60,6 @@ enum mxc4005_range {
- };
+diff --git a/drivers/iio/health/afe4403.c b/drivers/iio/health/afe4403.c
+index 88e43f8..71b8f70 100644
+--- a/drivers/iio/health/afe4403.c
++++ b/drivers/iio/health/afe4403.c
+@@ -104,7 +104,6 @@
  
- struct mxc4005_data {
+ /**
+  * struct afe4403_data
+- * @dev - Device structure
+  * @spi - SPI device handle
+  * @regmap - Register map of the device
+  * @regulator - Pointer to the regulator for the IC
+@@ -112,7 +111,6 @@
+  * @irq - ADC_RDY line interrupt number
+  */
+ struct afe4403_data {
 -	struct device *dev;
- 	struct mutex mutex;
+ 	struct spi_device *spi;
  	struct regmap *regmap;
- 	struct iio_trigger *dready_trig;
-@@ -140,12 +139,13 @@ static const struct regmap_config mxc4005_regmap_config = {
+ 	struct regulator *regulator;
+@@ -562,55 +560,54 @@ static int afe4403_probe(struct spi_device *spi)
+ 	afe = iio_priv(indio_dev);
+ 	spi_set_drvdata(spi, indio_dev);
  
- static int mxc4005_read_xyz(struct mxc4005_data *data)
- {
-+	struct device *dev = regmap_get_device(data->regmap);
- 	int ret;
+-	afe->dev = &spi->dev;
+ 	afe->spi = spi;
+ 	afe->irq = spi->irq;
  
- 	ret = regmap_bulk_read(data->regmap, MXC4005_REG_XOUT_UPPER,
- 			       (u8 *) data->buffer, sizeof(data->buffer));
- 	if (ret < 0) {
--		dev_err(data->dev, "failed to read axes\n");
-+		dev_err(dev, "failed to read axes\n");
+ 	afe->regmap = devm_regmap_init_spi(spi, &afe4403_regmap_config);
+ 	if (IS_ERR(afe->regmap)) {
+-		dev_err(afe->dev, "Unable to allocate register map\n");
++		dev_err(&spi->dev, "Unable to allocate register map\n");
+ 		return PTR_ERR(afe->regmap);
+ 	}
+ 
+-	afe->regulator = devm_regulator_get(afe->dev, "tx_sup");
++	afe->regulator = devm_regulator_get(&spi->dev, "tx_sup");
+ 	if (IS_ERR(afe->regulator)) {
+-		dev_err(afe->dev, "Unable to get regulator\n");
++		dev_err(&spi->dev, "Unable to get regulator\n");
+ 		return PTR_ERR(afe->regulator);
+ 	}
+ 	ret = regulator_enable(afe->regulator);
+ 	if (ret) {
+-		dev_err(afe->dev, "Unable to enable regulator\n");
++		dev_err(&spi->dev, "Unable to enable regulator\n");
  		return ret;
  	}
  
-@@ -155,12 +155,13 @@ static int mxc4005_read_xyz(struct mxc4005_data *data)
- static int mxc4005_read_axis(struct mxc4005_data *data,
- 			     unsigned int addr)
- {
-+	struct device *dev = regmap_get_device(data->regmap);
- 	__be16 reg;
- 	int ret;
- 
- 	ret = regmap_bulk_read(data->regmap, addr, (u8 *) &reg, sizeof(reg));
- 	if (ret < 0) {
--		dev_err(data->dev, "failed to read reg %02x\n", addr);
-+		dev_err(dev, "failed to read reg %02x\n", addr);
- 		return ret;
+ 	ret = regmap_write(afe->regmap, AFE440X_CONTROL0,
+ 			   AFE440X_CONTROL0_SW_RESET);
+ 	if (ret) {
+-		dev_err(afe->dev, "Unable to reset device\n");
++		dev_err(&spi->dev, "Unable to reset device\n");
+ 		goto err_disable_reg;
  	}
  
-@@ -169,13 +170,14 @@ static int mxc4005_read_axis(struct mxc4005_data *data,
- 
- static int mxc4005_read_scale(struct mxc4005_data *data)
- {
-+	struct device *dev = regmap_get_device(data->regmap);
- 	unsigned int reg;
- 	int ret;
- 	int i;
- 
- 	ret = regmap_read(data->regmap, MXC4005_REG_CONTROL, &reg);
- 	if (ret < 0) {
--		dev_err(data->dev, "failed to read reg_control\n");
-+		dev_err(dev, "failed to read reg_control\n");
- 		return ret;
+ 	ret = regmap_multi_reg_write(afe->regmap, afe4403_reg_sequences,
+ 				     ARRAY_SIZE(afe4403_reg_sequences));
+ 	if (ret) {
+-		dev_err(afe->dev, "Unable to set register defaults\n");
++		dev_err(&spi->dev, "Unable to set register defaults\n");
+ 		goto err_disable_reg;
  	}
  
-@@ -189,6 +191,7 @@ static int mxc4005_read_scale(struct mxc4005_data *data)
+ 	indio_dev->modes = INDIO_DIRECT_MODE;
+-	indio_dev->dev.parent = afe->dev;
++	indio_dev->dev.parent = &spi->dev;
+ 	indio_dev->channels = afe4403_channels;
+ 	indio_dev->num_channels = ARRAY_SIZE(afe4403_channels);
+ 	indio_dev->name = AFE4403_DRIVER_NAME;
+ 	indio_dev->info = &afe4403_iio_info;
  
- static int mxc4005_set_scale(struct mxc4005_data *data, int val)
- {
-+	struct device *dev = regmap_get_device(data->regmap);
- 	unsigned int reg;
- 	int i;
- 	int ret;
-@@ -201,8 +204,7 @@ static int mxc4005_set_scale(struct mxc4005_data *data, int val)
- 						 MXC4005_REG_CONTROL_MASK_FSR,
- 						 reg);
- 			if (ret < 0)
--				dev_err(data->dev,
--					"failed to write reg_control\n");
-+				dev_err(dev, "failed to write reg_control\n");
- 			return ret;
+ 	if (afe->irq > 0) {
+-		afe->trig = devm_iio_trigger_alloc(afe->dev,
++		afe->trig = devm_iio_trigger_alloc(&spi->dev,
+ 						   "%s-dev%d",
+ 						   indio_dev->name,
+ 						   indio_dev->id);
+ 		if (!afe->trig) {
+-			dev_err(afe->dev, "Unable to allocate IIO trigger\n");
++			dev_err(&spi->dev, "Unable to allocate IIO trigger\n");
+ 			ret = -ENOMEM;
+ 			goto err_disable_reg;
+ 		}
+@@ -618,21 +615,21 @@ static int afe4403_probe(struct spi_device *spi)
+ 		iio_trigger_set_drvdata(afe->trig, indio_dev);
+ 
+ 		afe->trig->ops = &afe4403_trigger_ops;
+-		afe->trig->dev.parent = afe->dev;
++		afe->trig->dev.parent = &spi->dev;
+ 
+ 		ret = iio_trigger_register(afe->trig);
+ 		if (ret) {
+-			dev_err(afe->dev, "Unable to register IIO trigger\n");
++			dev_err(&spi->dev, "Unable to register IIO trigger\n");
+ 			goto err_disable_reg;
+ 		}
+ 
+-		ret = devm_request_threaded_irq(afe->dev, afe->irq,
++		ret = devm_request_threaded_irq(&spi->dev, afe->irq,
+ 						iio_trigger_generic_data_rdy_poll,
+ 						NULL, IRQF_ONESHOT,
+ 						AFE4403_DRIVER_NAME,
+ 						afe->trig);
+ 		if (ret) {
+-			dev_err(afe->dev, "Unable to request IRQ\n");
++			dev_err(&spi->dev, "Unable to request IRQ\n");
+ 			goto err_trig;
  		}
  	}
-@@ -321,13 +323,14 @@ err:
+@@ -640,13 +637,13 @@ static int afe4403_probe(struct spi_device *spi)
+ 	ret = iio_triggered_buffer_setup(indio_dev, &iio_pollfunc_store_time,
+ 					 afe4403_trigger_handler, NULL);
+ 	if (ret) {
+-		dev_err(afe->dev, "Unable to setup buffer\n");
++		dev_err(&spi->dev, "Unable to setup buffer\n");
+ 		goto err_trig;
+ 	}
  
- static int mxc4005_clr_intr(struct mxc4005_data *data)
+ 	ret = iio_device_register(indio_dev);
+ 	if (ret) {
+-		dev_err(afe->dev, "Unable to register IIO device\n");
++		dev_err(&spi->dev, "Unable to register IIO device\n");
+ 		goto err_buff;
+ 	}
+ 
+@@ -667,6 +664,7 @@ static int afe4403_remove(struct spi_device *spi)
  {
-+	struct device *dev = regmap_get_device(data->regmap);
+ 	struct iio_dev *indio_dev = spi_get_drvdata(spi);
+ 	struct afe4403_data *afe = iio_priv(indio_dev);
++	struct device *dev = regmap_get_device(afe->regmap);
  	int ret;
  
- 	/* clear interrupt */
- 	ret = regmap_write(data->regmap, MXC4005_REG_INT_CLR1,
- 			   MXC4005_REG_INT_CLR1_BIT_DRDYC);
- 	if (ret < 0) {
--		dev_err(data->dev, "failed to write to reg_int_clr1\n");
-+		dev_err(dev, "failed to write to reg_int_clr1\n");
+ 	iio_device_unregister(indio_dev);
+@@ -678,7 +676,7 @@ static int afe4403_remove(struct spi_device *spi)
+ 
+ 	ret = regulator_disable(afe->regulator);
+ 	if (ret) {
+-		dev_err(afe->dev, "Unable to disable regulator\n");
++		dev_err(dev, "Unable to disable regulator\n");
  		return ret;
  	}
  
-@@ -339,6 +342,7 @@ static int mxc4005_set_trigger_state(struct iio_trigger *trig,
- {
- 	struct iio_dev *indio_dev = iio_trigger_get_drvdata(trig);
- 	struct mxc4005_data *data = iio_priv(indio_dev);
-+	struct device *dev = regmap_get_device(data->regmap);
- 	int ret;
- 
- 	mutex_lock(&data->mutex);
-@@ -352,7 +356,7 @@ static int mxc4005_set_trigger_state(struct iio_trigger *trig,
- 
- 	if (ret < 0) {
- 		mutex_unlock(&data->mutex);
--		dev_err(data->dev, "failed to update reg_int_mask1");
-+		dev_err(dev, "failed to update reg_int_mask1");
- 		return ret;
- 	}
- 
-@@ -381,16 +385,17 @@ static const struct iio_trigger_ops mxc4005_trigger_ops = {
- 
- static int mxc4005_chip_init(struct mxc4005_data *data)
- {
-+	struct device *dev = regmap_get_device(data->regmap);
- 	int ret;
- 	unsigned int reg;
- 
- 	ret = regmap_read(data->regmap, MXC4005_REG_DEVICE_ID, &reg);
- 	if (ret < 0) {
--		dev_err(data->dev, "failed to read chip id\n");
-+		dev_err(dev, "failed to read chip id\n");
- 		return ret;
- 	}
- 
--	dev_dbg(data->dev, "MXC4005 chip id %02x\n", reg);
-+	dev_dbg(dev, "MXC4005 chip id %02x\n", reg);
- 
- 	return 0;
- }
-@@ -415,7 +420,6 @@ static int mxc4005_probe(struct i2c_client *client,
- 
- 	data = iio_priv(indio_dev);
- 	i2c_set_clientdata(client, indio_dev);
--	data->dev = &client->dev;
- 	data->regmap = regmap;
- 
- 	ret = mxc4005_chip_init(data);
 -- 
 2.1.4
