@@ -1,79 +1,35 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 6 Apr 2016 20:32:37 +0300
-Subject: [PATCH] extcon: usb-gpio: switch to use pm wakeirq apis
-Message-ID: <1459963957-21883-1-git-send-email-grygorii.strashko@ti.com>
+From: julien.grall@arm.com (Julien Grall)
+Date: Wed, 6 Apr 2016 18:40:41 +0100
+Subject: [PATCH v5 4/9] irqchip/gic-v2: Parse and export virtual GIC
+ information
+In-Reply-To: <20160406170432.GD8961@cbox>
+References: <1459769860-6629-1-git-send-email-julien.grall@arm.com>
+ <1459769860-6629-5-git-send-email-julien.grall@arm.com>
+ <20160406170432.GD8961@cbox>
+Message-ID: <57054A19.1090208@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch to use PM wakeirq APIs which automates wakeup IRQs
-enabling/disabling and so allows to make code simpler.
+Hi Christoffer,
 
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
-Unfortunately this simple patch depends on:
-"[RFC PATCH] PM / wakeirq: fix wakeirq setting after wakup re-configuration from sysfs"
-https://lkml.org/lkml/2016/4/6/296
+On 06/04/2016 18:04, Christoffer Dall wrote:
+> On Mon, Apr 04, 2016 at 12:37:35PM +0100, Julien Grall wrote:
+>> diff --git a/include/linux/irqchip/arm-gic-common.h b/include/linux/irqchip/arm-gic-common.h
+>> new file mode 100644
+>> index 0000000..ef34f6f
+>> --- /dev/null
+>> +++ b/include/linux/irqchip/arm-gic-common.h
+>
+> just out of curiosity, why is include/linux/irqchip/arm-gic.h not
+> suitable?
 
- drivers/extcon/extcon-usb-gpio.c | 19 ++++++-------------
- 1 file changed, 6 insertions(+), 13 deletions(-)
+Because arm-gic.h contains the definitions for GICv2 only. At least one 
+of them is clashing with the GICv3 ones.
 
-diff --git a/drivers/extcon/extcon-usb-gpio.c b/drivers/extcon/extcon-usb-gpio.c
-index 2b2fecf..bc61d11 100644
---- a/drivers/extcon/extcon-usb-gpio.c
-+++ b/drivers/extcon/extcon-usb-gpio.c
-@@ -24,6 +24,7 @@
- #include <linux/module.h>
- #include <linux/of_gpio.h>
- #include <linux/platform_device.h>
-+#include <linux/pm_wakeirq.h>
- #include <linux/slab.h>
- #include <linux/workqueue.h>
- 
-@@ -141,7 +142,8 @@ static int usb_extcon_probe(struct platform_device *pdev)
- 	}
- 
- 	platform_set_drvdata(pdev, info);
--	device_init_wakeup(dev, 1);
-+	device_init_wakeup(dev, true);
-+	dev_pm_set_wake_irq(dev, info->id_irq);
- 
- 	/* Perform initial detection */
- 	usb_extcon_detect_cable(&info->wq_detcable.work);
-@@ -155,6 +157,9 @@ static int usb_extcon_remove(struct platform_device *pdev)
- 
- 	cancel_delayed_work_sync(&info->wq_detcable);
- 
-+	dev_pm_clear_wake_irq(&pdev->dev);
-+	device_init_wakeup(&pdev->dev, false);
-+
- 	return 0;
- }
- 
-@@ -164,12 +169,6 @@ static int usb_extcon_suspend(struct device *dev)
- 	struct usb_extcon_info *info = dev_get_drvdata(dev);
- 	int ret = 0;
- 
--	if (device_may_wakeup(dev)) {
--		ret = enable_irq_wake(info->id_irq);
--		if (ret)
--			return ret;
--	}
--
- 	/*
- 	 * We don't want to process any IRQs after this point
- 	 * as GPIOs used behind I2C subsystem might not be
-@@ -185,12 +184,6 @@ static int usb_extcon_resume(struct device *dev)
- 	struct usb_extcon_info *info = dev_get_drvdata(dev);
- 	int ret = 0;
- 
--	if (device_may_wakeup(dev)) {
--		ret = disable_irq_wake(info->id_irq);
--		if (ret)
--			return ret;
--	}
--
- 	enable_irq(info->id_irq);
- 
- 	return ret;
+For instance, the function gic_send_sgi is defined statically the in 
+GICv3 code, but exported for GICv2.
+
+Regards,
+
 -- 
-2.8.0
+Julien Grall
