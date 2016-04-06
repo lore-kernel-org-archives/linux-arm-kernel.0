@@ -1,46 +1,105 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Wed, 6 Apr 2016 09:35:49 +0200
-Subject: [PATCH 5/9] iio: accel: mma7455: use regmap to retrieve struct
- device
-In-Reply-To: <acaeee6c3c1f99900614baf99ab31e6e5b515970.1459918214.git.amsfield22@gmail.com>
-References: <cover.1459918214.git.amsfield22@gmail.com>
- <acaeee6c3c1f99900614baf99ab31e6e5b515970.1459918214.git.amsfield22@gmail.com>
-Message-ID: <CAGhQ9VxnwX6n6PfOFAhYSPfP7eAA+YFLjTcJf+Ay60R8sHV_Ww@mail.gmail.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Wed, 6 Apr 2016 09:45:46 +0200
+Subject: [PATCH] iommu/rockchip: Fix "is stall active" check
+In-Reply-To: <9799340.GJHE2cZK7r@phil>
+References: <1459865146-25308-1-git-send-email-john@metanate.com>
+ <5389576.zuTxjFsmO4@phil> <20160405182858.382ea465.john@metanate.com>
+ <9799340.GJHE2cZK7r@phil>
+Message-ID: <CAAObsKC9d17jh1xOfGGSo6ULesYFAENYSNEFrr4ee4h_JgahYw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alison,
-
-On 6 April 2016 at 07:18, Alison Schofield <amsfield22@gmail.com> wrote:
-> Driver includes struct regmap and struct device in its global data.
-> Remove the struct device and use regmap API to retrieve device info.
+On 5 April 2016 at 21:10, Heiko Stuebner <heiko@sntech.de> wrote:
+> Am Dienstag, 5. April 2016, 18:28:58 schrieb John Keeping:
+>> On Tue, 05 Apr 2016 10:21:27 -0700, Heiko Stuebner wrote:
+>> > Am Dienstag, 5. April 2016, 15:05:46 schrieb John Keeping:
+>> > > Since commit cd6438c5f844 ("iommu/rockchip: Reconstruct to support
+>> > > multi
+>> > > slaves") rk_iommu_is_stall_active() always returns false because the
+>> > > bitwise AND operates on the boolean flag promoted to an integer and a
+>> > > value that is either zero or BIT(2).
+>> > >
+>> > > Explicitly convert the right-hand value to a boolean so that both
+>> > > sides
+>> > > are guaranteed to be either zero or one.
+>> > >
+>> > > rk_iommu_is_paging_enabled() does not suffer from the same problem
+>> > > since
+>> > > RK_MMU_STATUS_PAGING_ENABLED is BIT(0), but let's apply the same
+>> > > change
+>> > > for consistency and to make it clear that it's correct without needing
+>> > > to lookup the value.
+>> > >
+>> > > Fixes: cd6438c5f844 ("iommu/rockchip: Reconstruct to support multi
+>> > > slaves") Signed-off-by: John Keeping <john@metanate.com>
+>> >
+>> > Nice catch, thanks.
+>> >
+>> > Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+>> >
+>> > John, out of curiosity, how did you find that problem? Excess stall
+>> > error
+>> > messages or something else?
+>>
+>> I was testing the drm iommu patches I posted today [1] and noticed an
+>> "Enable stall request timed out" error when unbinding the
+>> display-subsystem, but the RK_MMU_STATUS value printed in the error
+>> message indicated that stall active was set.
+>>
+>> [1] http://article.gmane.org/gmane.comp.video.dri.devel/150721
 >
-> Patch created using Coccinelle plus manual edits.
+> So it seems both you and Tomeu were working to resolve the same issue [2].
 >
-> Signed-off-by: Alison Schofield <amsfield22@gmail.com>
-> ---
->  drivers/iio/accel/mma7455_core.c | 5 ++---
->  1 file changed, 2 insertions(+), 3 deletions(-)
+> And John's patch seems to actually fix the underlying problem.
+
+Indeed, I don't get spurious messages any more with this patch.
+
+Tested-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+
+Thanks,
+
+Tomeu
+
 >
-> diff --git a/drivers/iio/accel/mma7455_core.c b/drivers/iio/accel/mma7455_core.c
-> index c633cc2..c902f54 100644
-> --- a/drivers/iio/accel/mma7455_core.c
-> +++ b/drivers/iio/accel/mma7455_core.c
-> @@ -55,11 +55,11 @@
+> [2] https://lkml.org/lkml/2016/3/22/493
 >
->  struct mma7455_data {
->         struct regmap *regmap;
-> -       struct device *dev;
->  };
 >
->  static int mma7455_drdy(struct mma7455_data *mma7455)
->  {
-> +       struct device *dev = regmap_get_device(mma7455->regmap);
-
-ah, nice!
-
-Acked-by: Joachim Eastwood <manabian@gmail.com>
-
-
-regards,
-Joachim Eastwood
+>> > > ---
+>> > >
+>> > >  drivers/iommu/rockchip-iommu.c | 8 ++++----
+>> > >  1 file changed, 4 insertions(+), 4 deletions(-)
+>> > >
+>> > > diff --git a/drivers/iommu/rockchip-iommu.c
+>> > > b/drivers/iommu/rockchip-iommu.c index a6f593a0a29e..5710a06c3049
+>> > > 100644
+>> > > --- a/drivers/iommu/rockchip-iommu.c
+>> > > +++ b/drivers/iommu/rockchip-iommu.c
+>> > > @@ -315,8 +315,8 @@ static bool rk_iommu_is_stall_active(struct
+>> > > rk_iommu
+>> > > *iommu) int i;
+>> > >
+>> > >   for (i = 0; i < iommu->num_mmu; i++)
+>> > >
+>> > > -         active &= rk_iommu_read(iommu->bases[i], RK_MMU_STATUS) &
+>> > > -                                 RK_MMU_STATUS_STALL_ACTIVE;
+>> > > +         active &= !!(rk_iommu_read(iommu->bases[i], RK_MMU_STATUS) &
+>> > > +                                    RK_MMU_STATUS_STALL_ACTIVE);
+>> > >
+>> > >   return active;
+>> > >
+>> > >  }
+>> > >
+>> > > @@ -327,8 +327,8 @@ static bool rk_iommu_is_paging_enabled(struct
+>> > > rk_iommu *iommu) int i;
+>> > >
+>> > >   for (i = 0; i < iommu->num_mmu; i++)
+>> > >
+>> > > -         enable &= rk_iommu_read(iommu->bases[i], RK_MMU_STATUS) &
+>> > > -                                 RK_MMU_STATUS_PAGING_ENABLED;
+>> > > +         enable &= !!(rk_iommu_read(iommu->bases[i], RK_MMU_STATUS) &
+>> > > +                                    RK_MMU_STATUS_PAGING_ENABLED);
+>> > >
+>> > >   return enable;
+>> > >
+>> > >  }
+>
