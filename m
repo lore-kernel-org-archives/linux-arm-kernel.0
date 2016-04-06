@@ -1,32 +1,22 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Wed,  6 Apr 2016 19:59:35 +0530
-Subject: [PATCH V2 5/5] iommu/msm: Remove driver BROKEN
-In-Reply-To: <1459952975-1250-1-git-send-email-sricharan@codeaurora.org>
-References: <1459952975-1250-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1459952975-1250-6-git-send-email-sricharan@codeaurora.org>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 6 Apr 2016 07:30:35 -0700
+Subject: [RESEND 0/2] dmaengine: edma: cyclic slot limitation wa and TPTC
+ pm fix
+In-Reply-To: <1459936907-23920-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1459936907-23920-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20160406143034.GD27292@vkoul-mobl.iind.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the driver is DT adapted, bus_set_iommu gets called only
-when on compatible matching. So the driver should not break multiplatform
-builds now. So remove the BROKEN config.
+On Wed, Apr 06, 2016 at 01:01:45PM +0300, Peter Ujfalusi wrote:
+> Hi Vinod,
+> 
+> I just noticed that the following two patch got lost somehow. If it is still
+> possible, it would be great to send them for 4.6 as they are correcting
+> important issues in the driver.
 
-Signed-off-by: Sricharan R <sricharan@codeaurora.org>
----
- drivers/iommu/Kconfig | 1 -
- 1 file changed, 1 deletion(-)
+Done now. I will check how they got dropped
+They should be in topic branch though..
 
-diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-index 1f5d496..b81a0bb 100644
---- a/drivers/iommu/Kconfig
-+++ b/drivers/iommu/Kconfig
-@@ -90,7 +90,6 @@ config MSM_IOMMU
- 	bool "MSM IOMMU Support"
- 	depends on ARM
- 	depends on ARCH_MSM8X60 || ARCH_MSM8960 || COMPILE_TEST
--	depends on BROKEN
- 	select IOMMU_API
- 	select IOMMU_IO_PGTABLE_ARMV7S
- 	help
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+~Vinod
