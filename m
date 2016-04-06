@@ -1,76 +1,134 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 7 Apr 2016 02:15:00 +0300
-Subject: [PATCH] ARM: dts: r8a7791: Don't disable referenced optional
- clocks
-In-Reply-To: <1459947173-6664-1-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1459947173-6664-1-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <57059874.1070309@cogentembedded.com>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Wed, 6 Apr 2016 17:15:34 -0600
+Subject: [PATCH v6 0/7] KVM PCIe/MSI passthrough on ARM/ARM64: kernel
+ part 1/3: iommu changes
+In-Reply-To: <1459757222-2668-1-git-send-email-eric.auger@linaro.org>
+References: <1459757222-2668-1-git-send-email-eric.auger@linaro.org>
+Message-ID: <20160406171534.794c6824@t450s.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/2016 03:52 PM, Sjoerd Simons wrote:
+On Mon,  4 Apr 2016 08:06:55 +0000
+Eric Auger <eric.auger@linaro.org> wrote:
 
-> clk_get on a disabled clock node will return EPROBE_DEFER, which can
-> cause drivers to be deferred forever if such clocks are referenced in
-> their clocks property.
->
-> Update the various disabled external clock nodes to default to a
-> frequency of 0, but don't disable them to prevent this.
->
-> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
->
-> ---
->
->   arch/arm/boot/dts/r8a7791-koelsch.dts | 1 +
->   arch/arm/boot/dts/r8a7791-porter.dts  | 1 +
->   arch/arm/boot/dts/r8a7791.dtsi        | 5 +----
->   3 files changed, 3 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-> index 1adf877..da59c28 100644
-> --- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-> +++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-> @@ -660,6 +660,7 @@
->   };
->
->   &pcie_bus_clk {
-> +	clock-frequency = <100000000>;
+> This series introduces the dma-reserved-iommu api used to:
+> - create/destroy an iova domain dedicated to reserved iova bindings
+> - map/unmap physical addresses onto reserved IOVAs.
+> - unmap and destroy all IOVA reserved bindings
 
-    Hmmm, looking at the Koelsch schematics, I don't see this clock. :-/
+Why are we making the decision to have an unbalanced map vs unmap, we
+can create individual mappings, but only unmap the whole thing and
+start over?  That's a strange interface.  Thanks,
 
->   	status = "okay";
->   };
->
-> diff --git a/arch/arm/boot/dts/r8a7791-porter.dts b/arch/arm/boot/dts/r8a7791-porter.dts
-> index 9554d13..19b257e 100644
-> --- a/arch/arm/boot/dts/r8a7791-porter.dts
-> +++ b/arch/arm/boot/dts/r8a7791-porter.dts
-> @@ -413,6 +413,7 @@
->   };
->
->   &pcie_bus_clk {
-> +	clock-frequency = <100000000>;
->   	status = "okay";
->   };
->
-
-    Again, looking at the Porter schematics, I don't see this clock either. :-/
-
-> diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-> index 8693888..676df63 100644
-> --- a/arch/arm/boot/dts/r8a7791.dtsi
-> +++ b/arch/arm/boot/dts/r8a7791.dtsi
-> @@ -1104,8 +1104,7 @@
->   		pcie_bus_clk: pcie_bus {
->   			compatible = "fixed-clock";
->   			#clock-cells = <0>;
-> -			clock-frequency = <100000000>;
-> -			status = "disabled";
-> +			clock-frequency = <0>;
-
-    If the clock has a good default frequency, I don't think you need to 
-remove it. Otherwise you missed USB_EXTAL which is 48 MHz (and can be overridden).
-
-[...]
-
-MBR, Sergei
+Alex
+ 
+> Currently reserved IOVAs are meant to map MSI physical doorbells. A single
+> reserved domain does exit per domain.
+> 
+> Also a new domain attribute is introduced to signal whether the MSI
+> addresses must be mapped in the IOMMU
+> 
+> VFIO subsystem is supposed to create/destroy the iommu reserved domain.
+> 
+> When the MSI sub-system is about to handle an MSI physical address
+> that needs to be bound, it uses the dma-reserved_iommu API to map/unmap
+> the address. Since several drivers are likely to use the same doorbell,
+> a reference counting must exist on the bindings. An RB-tree indexed by PA
+> is used.
+> 
+> More details & context can be found at:
+> http://www.linaro.org/blog/core-dump/kvm-pciemsi-passthrough-armarm64/
+> 
+> Best Regards
+> 
+> Eric
+> 
+> Git: complete series available at
+> https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.6-rc1-pcie-passthrough-v6
+> 
+> History:
+> 
+> RFC v5 -> patch v6:
+> - split to ease the review process
+> - in dma-reserved-api use a spin lock instead of a mutex (reported by
+>   Jean-Philippe)
+> - revisit iommu_get_reserved_iova API to pass a size parameter upon
+>   Marc's request
+> - Consistently use the page order passed when creating the iova domain.
+> - init reserved_binding_list (reported by Julien)
+> 
+> RFC v4 -> RFC v5:
+> - take into account Thomas' comments on MSI related patches
+>   - split "msi: IOMMU map the doorbell address when needed"
+>   - increase readability and add comments
+>   - fix style issues
+>  - split "iommu: Add DOMAIN_ATTR_MSI_MAPPING attribute"
+>  - platform ITS now advertises IOMMU_CAP_INTR_REMAP
+>  - fix compilation issue with CONFIG_IOMMU API unset
+>  - arm-smmu-v3 now advertises DOMAIN_ATTR_MSI_MAPPING
+> 
+> RFC v3 -> v4:
+> - Move doorbell mapping/unmapping in msi.c
+> - fix ref count issue on set_affinity: in case of a change in the address
+>   the previous address is decremented
+> - doorbell map/unmap now is done on msi composition. Should allow the use
+>   case for platform MSI controllers
+> - create dma-reserved-iommu.h/c exposing/implementing a new API dedicated
+>   to reserved IOVA management (looking like dma-iommu glue)
+> - series reordering to ease the review:
+>   - first part is related to IOMMU
+>   - second related to MSI sub-system
+>   - third related to VFIO (except arm-smmu IOMMU_CAP_INTR_REMAP removal)
+> - expose the number of requested IOVA pages through VFIO_IOMMU_GET_INFO
+>   [this partially addresses Marc's comments on iommu_get/put_single_reserved
+>    size/alignment problematic - which I did not ignore - but I don't know
+>    how much I can do at the moment]
+> 
+> RFC v2 -> RFC v3:
+> - should fix wrong handling of some CONFIG combinations:
+>   CONFIG_IOVA, CONFIG_IOMMU_API, CONFIG_PCI_MSI_IRQ_DOMAIN
+> - fix MSI_FLAG_IRQ_REMAPPING setting in GICv3 ITS (although not tested)
+> 
+> PATCH v1 -> RFC v2:
+> - reverted to RFC since it looks more reasonable ;-) the code is split
+>   between VFIO, IOMMU, MSI controller and I am not sure I did the right
+>   choices. Also API need to be further discussed.
+> - iova API usage in arm-smmu.c.
+> - MSI controller natively programs the MSI addr with either the PA or IOVA.
+>   This is not done anymore in vfio-pci driver as suggested by Alex.
+> - check irq remapping capability of the group
+> 
+> RFC v1 [2] -> PATCH v1:
+> - use the existing dma map/unmap ioctl interface with a flag to register a
+>   reserved IOVA range. Use the legacy Rb to store this special vfio_dma.
+> - a single reserved IOVA contiguous region now is allowed
+> - use of an RB tree indexed by PA to store allocated reserved slots
+> - use of a vfio_domain iova_domain to manage iova allocation within the
+>   window provided by the userspace
+> - vfio alloc_map/unmap_free take a vfio_group handle
+> - vfio_group handle is cached in vfio_pci_device
+> - add ref counting to bindings
+> - user modality enabled at the end of the series
+> 
+> 
+> Eric Auger (7):
+>   iommu: Add DOMAIN_ATTR_MSI_MAPPING attribute
+>   iommu/arm-smmu: advertise DOMAIN_ATTR_MSI_MAPPING attribute
+>   iommu: introduce a reserved iova cookie
+>   dma-reserved-iommu: alloc/free_reserved_iova_domain
+>   dma-reserved-iommu: reserved binding rb-tree and helpers
+>   dma-reserved-iommu: iommu_get/put_single_reserved
+>   dma-reserved-iommu: iommu_unmap_reserved
+> 
+>  drivers/iommu/Kconfig              |   8 +
+>  drivers/iommu/Makefile             |   1 +
+>  drivers/iommu/arm-smmu-v3.c        |   2 +
+>  drivers/iommu/arm-smmu.c           |   2 +
+>  drivers/iommu/dma-reserved-iommu.c | 321 +++++++++++++++++++++++++++++++++++++
+>  drivers/iommu/iommu.c              |   2 +
+>  include/linux/dma-reserved-iommu.h |  80 +++++++++
+>  include/linux/iommu.h              |   7 +
+>  8 files changed, 423 insertions(+)
+>  create mode 100644 drivers/iommu/dma-reserved-iommu.c
+>  create mode 100644 include/linux/dma-reserved-iommu.h
+> 
