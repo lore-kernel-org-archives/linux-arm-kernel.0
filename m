@@ -1,263 +1,296 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 6 Apr 2016 15:09:50 +0100
-Subject: [RFC PATCH 04/45] KVM: arm/arm64: vgic-new: Add data structure
- definitions
-In-Reply-To: <20160406135753.GE16355@cbox>
-References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
- <1458871508-17279-5-git-send-email-andre.przywara@arm.com>
- <20160329130922.GE4126@cbox> <5703BEF2.7090507@arm.com>
- <20160405201009.GA10522@cbox> <20160406135753.GE16355@cbox>
-Message-ID: <570518AE.7010107@arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 6 Apr 2016 22:15:57 +0800
+Subject: [PATCH v3 4/9] ARM: dts: imx: add Boundary Devices Nitrogen7 board
+In-Reply-To: <1459614351-16731-5-git-send-email-gary.bisson@boundarydevices.com>
+References: <1458050668-26748-1-git-send-email-gary.bisson@boundarydevices.com>
+ <1459614351-16731-1-git-send-email-gary.bisson@boundarydevices.com>
+ <1459614351-16731-5-git-send-email-gary.bisson@boundarydevices.com>
+Message-ID: <20160406141555.GL18833@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, Apr 02, 2016 at 06:25:46PM +0200, Gary Bisson wrote:
+> Based on i.MX7 Dual with 1GB of RAM.
+> 
+> https://boundarydevices.com/product/nitrogen7/
+> 
+> Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
+> ---
+> 
+> Changes v1 -> v2:
+> - none
+> Changes v2 -> v3:
+> - Fix Nitrogen7 BT UART clock parent
+> - Fix Nitrogen7 lvdo2 node to be always-on
+> 
+> ---
+>  arch/arm/boot/dts/Makefile            |   1 +
+>  arch/arm/boot/dts/imx7d-nitrogen7.dts | 819 ++++++++++++++++++++++++++++++++++
+>  2 files changed, 820 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx7d-nitrogen7.dts
 
+<snip>
 
-On 06/04/16 14:57, Christoffer Dall wrote:
-> On Tue, Apr 05, 2016 at 10:10:09PM +0200, Christoffer Dall wrote:
->> On Tue, Apr 05, 2016 at 02:34:42PM +0100, Andre Przywara wrote:
->>> Hi,
->>>
->>> On 29/03/16 14:09, Christoffer Dall wrote:
->>>> On Fri, Mar 25, 2016 at 02:04:27AM +0000, Andre Przywara wrote:
->>>>> From: Christoffer Dall <christoffer.dall@linaro.org>
->>>>>
->>>>> Add a new header file for the new and improved GIC implementation.
->>>>> The big change is that we now have a struct vgic_irq per IRQ instead
->>>>> of spreading all the information over various bitmaps.
->>>>>
->>>>> We include this new header conditionally from within the old header
->>>>> file for the time being to avoid touching all the users.
->>>>>
->>>>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
->>>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>>>> ---
->>>>>  include/kvm/arm_vgic.h  |   5 ++
->>>>>  include/kvm/vgic/vgic.h | 198 ++++++++++++++++++++++++++++++++++++++++++++++++
->>>>>  2 files changed, 203 insertions(+)
->>>>>  create mode 100644 include/kvm/vgic/vgic.h
->>>>>
->>>>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
->>>>> index 7656a46..db289a2 100644
->>>>> --- a/include/kvm/arm_vgic.h
->>>>> +++ b/include/kvm/arm_vgic.h
->>>>> @@ -19,6 +19,10 @@
->>>>>  #ifndef __ASM_ARM_KVM_VGIC_H
->>>>>  #define __ASM_ARM_KVM_VGIC_H
->>>>>
->>>>> +#ifdef CONFIG_KVM_NEW_VGIC
->>>>> +#include <kvm/vgic/vgic.h>
->>>>> +#else
->>>>> +
->>>>>  #include <linux/kernel.h>
->>>>>  #include <linux/kvm.h>
->>>>>  #include <linux/irqreturn.h>
->>>>> @@ -376,4 +380,5 @@ static inline int vgic_v3_probe(struct device_node *vgic_node,
->>>>>  }
->>>>>  #endif
->>>>>
->>>>> +#endif   /* old VGIC include */
->>>>>  #endif
->>>>> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
->>>>> new file mode 100644
->>>>> index 0000000..659f8b1
->>>>> --- /dev/null
->>>>> +++ b/include/kvm/vgic/vgic.h
->>>>> @@ -0,0 +1,198 @@
->>>>> +/*
->>>>> + * Copyright (C) 2015, 2016 ARM Ltd.
->>>>> + *
->>>>> + * This program is free software; you can redistribute it and/or modify
->>>>> + * it under the terms of the GNU General Public License version 2 as
->>>>> + * published by the Free Software Foundation.
->>>>> + *
->>>>> + * This program is distributed in the hope that it will be useful,
->>>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->>>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>>>> + * GNU General Public License for more details.
->>>>> + *
->>>>> + * You should have received a copy of the GNU General Public License
->>>>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->>>>> + */
->>>>> +#ifndef __ASM_ARM_KVM_VGIC_VGIC_H
->>>>> +#define __ASM_ARM_KVM_VGIC_VGIC_H
->>>>> +
->>>>> +#include <linux/kernel.h>
->>>>> +#include <linux/kvm.h>
->>>>> +#include <linux/irqreturn.h>
->>>>> +#include <linux/spinlock.h>
->>>>> +#include <linux/types.h>
->>>>> +#include <kvm/iodev.h>
->>>>> +
->>>>> +#define VGIC_V3_MAX_CPUS 255
->>>>> +#define VGIC_V2_MAX_CPUS 8
->>>>> +#define VGIC_NR_IRQS_LEGACY     256
->>>>> +#define VGIC_NR_SGIS             16
->>>>> +#define VGIC_NR_PPIS             16
->>>>> +#define VGIC_NR_PRIVATE_IRQS     (VGIC_NR_SGIS + VGIC_NR_PPIS)
->>>>> +#define VGIC_MAX_PRIVATE (VGIC_NR_PRIVATE_IRQS - 1)
->>>>> +#define VGIC_MAX_SPI             1019
->>>>> +#define VGIC_MAX_RESERVED        1023
->>>>> +#define VGIC_MIN_LPI             8192
->>>>> +
->>>>> +enum vgic_type {
->>>>> + VGIC_V2,                /* Good ol' GICv2 */
->>>>> + VGIC_V3,                /* New fancy GICv3 */
->>>>> +};
->>>>> +
->>>>> +/* same for all guests, as depending only on the _host's_ GIC model */
->>>>> +struct vgic_global {
->>>>> + /* type of the host GIC */
->>>>> + enum vgic_type          type;
->>>>> +
->>>>> + /* Physical address of vgic virtual cpu interface */
->>>>> + phys_addr_t             vcpu_base;
->>>>> +
->>>>> + /* virtual control interface mapping */
->>>>> + void __iomem            *vctrl_base;
->>>>> +
->>>>> + /* Number of implemented list registers */
->>>>> + int                     nr_lr;
->>>>> +
->>>>> + /* Maintenance IRQ number */
->>>>> + unsigned int            maint_irq;
->>>>> +
->>>>> + /* maximum number of VCPUs allowed (GICv2 limits us to 8) */
->>>>> + int                     max_gic_vcpus;
->>>>> +
->>>>> + /* Only needed for the legacy KVM_CREATE_IRQCHIP */
->>>>> + bool                    can_emulate_gicv2;
->>>>> +};
->>>>> +
->>>>> +extern struct vgic_global kvm_vgic_global_state;
->>>>> +
->>>>> +#define VGIC_V2_MAX_LRS          (1 << 6)
->>>>> +#define VGIC_V3_MAX_LRS          16
->>>>> +#define VGIC_V3_LR_INDEX(lr)     (VGIC_V3_MAX_LRS - 1 - lr)
->>>>> +
->>>>> +enum vgic_irq_config {
->>>>> + VGIC_CONFIG_EDGE = 0,
->>>>> + VGIC_CONFIG_LEVEL
->>>>> +};
->>>>> +
->>>>> +struct vgic_irq {
->>>>> + spinlock_t irq_lock;            /* Protects the content of the struct */
->>>>> + struct list_head ap_list;
->>>>> +
->>>>> + struct kvm_vcpu *vcpu;          /* SGIs and PPIs: The VCPU
->>>>> +                                  * SPIs and LPIs: The VCPU whose ap_list
->>>>> +                                  * on which this is queued.
->>>>> +                                  */
->>>>> +
->>>>> + struct kvm_vcpu *target_vcpu;   /* The VCPU that this interrupt should
->>>>> +                                  * be send to, as a result of the
->>>>> +                                  * targets reg (v2) or the
->>>>> +                                  * affinity reg (v3).
->>>>> +                                  */
->>>>> +
->>>>> + u32 intid;                      /* Guest visible INTID */
->>>>> + bool pending;
->>>>> + bool line_level;                /* Level only */
->>>>> + bool soft_pending;              /* Level only */
->>>>> + bool active;                    /* not used for LPIs */
->>>>> + bool enabled;
->>>>> + bool hw;                        /* Tied to HW IRQ */
->>>>> + u32 hwintid;                    /* HW INTID number */
->>>>> + union {
->>>>> +         u8 targets;                     /* GICv2 target VCPUs mask */
->>>>> +         u32 mpidr;                      /* GICv3 target VCPU */
->>>>> + };
->>>>> + u8 source;                      /* GICv2 SGIs only */
->>>>> + u8 priority;
->>>>> + enum vgic_irq_config config;    /* Level or edge */
->>>>> +};
->>>>> +
->>>>> +struct vgic_dist {
->>>>> + bool                    in_kernel;
->>>>> + bool                    ready;
->>>>> +
->>>>> + /* vGIC model the kernel emulates for the guest (GICv2 or GICv3) */
->>>>> + u32                     vgic_model;
->>>>> +
->>>>> + int                     nr_spis;
->>>>> +
->>>>> + /* TODO: Consider moving to global state */
->>>>> + /* Virtual control interface mapping */
->>>>> + void __iomem            *vctrl_base;
->>>>> +
->>>>> + /* base addresses in guest physical address space: */
->>>>> + gpa_t                   vgic_dist_base;         /* distributor */
->>>>> + union {
->>>>> +         /* either a GICv2 CPU interface */
->>>>> +         gpa_t                   vgic_cpu_base;
->>>>> +         /* or a number of GICv3 redistributor regions */
->>>>> +         gpa_t                   vgic_redist_base;
->>>>> + };
->>>>> +
->>>>> + /* distributor enabled */
->>>>> + u32                     enabled;
->>>>> +
->>>>> + struct vgic_irq         *spis;
->>>>> +};
->>>>> +
->>>>> +struct vgic_v2_cpu_if {
->>>>> + u32             vgic_hcr;
->>>>> + u32             vgic_vmcr;
->>>>> + u32             vgic_misr;      /* Saved only */
->>>>> + u64             vgic_eisr;      /* Saved only */
->>>>> + u64             vgic_elrsr;     /* Saved only */
->>>>> + u32             vgic_apr;
->>>>> + u32             vgic_lr[VGIC_V2_MAX_LRS];
->>>>> +};
->>>>> +
->>>>> +struct vgic_v3_cpu_if {
->>>>> +#ifdef CONFIG_KVM_ARM_VGIC_V3
->>>>> + u32             vgic_hcr;
->>>>> + u32             vgic_vmcr;
->>>>> + u32             vgic_sre;       /* Restored only, change ignored */
->>>>> + u32             vgic_misr;      /* Saved only */
->>>>> + u32             vgic_eisr;      /* Saved only */
->>>>> + u32             vgic_elrsr;     /* Saved only */
->>>>> + u32             vgic_ap0r[4];
->>>>> + u32             vgic_ap1r[4];
->>>>> + u64             vgic_lr[VGIC_V3_MAX_LRS];
->>>>> +#endif
->>>>> +};
->>>>> +
->>>>> +struct vgic_cpu {
->>>>> + /* CPU vif control registers for world switch */
->>>>> + union {
->>>>> +         struct vgic_v2_cpu_if   vgic_v2;
->>>>> +         struct vgic_v3_cpu_if   vgic_v3;
->>>>> + };
->>>>> +
->>>>> + /* TODO: Move nr_lr to a global state */
->>>>
->>>> what is our current plan and status about this TODO?
->>>
->>> The point is that the current HYP code is accessing this field. We do
->>> have this field in the current "global" struct vgic_params there as
->>> well, but this struct is (more or less) private to vgic-v2.c, so not
->>> easily accessible from virt/kvm/arm/hyp/*.c.
->>> So I suggest we keep this in here for the time being and eventually
->>> remove it (and rework the save/restore code) once we get rid of the old
->>> VGIC code.
->>>
->> Hmmm, I haven't tried it, but I don't understand why moving it now is
->> difficult.  I'd really like to avoid having a bunch of todo's lingering
->> around and having duplicated state in the new code.
->>
->> I think I noticed a number of places in this patch series which refers
->> tot he vgic_cpu->nr_lr instead of the global place already...
->>
-> So I wrote a patch for this and it doesn't really look that bad.  I'll
-> send it as part of a little prerequisite series later.
+> +/ {
+> +	model = "Boundary Devices i.MX7 Nitrogen7 Board";
+> +	compatible = "boundary,imx7d-nitrogen7", "fsl,imx7d";
+> +
+> +	aliases {
+> +		fb_lcd = &lcdif;
+> +		t_lcd = &t_lcd;
+> +	};
+> +
+> +	memory {
+> +		reg = <0x80000000 0x40000000>;
+> +	};
+> +
+> +	backlight_j9 {
 
-I just fixed it as well - the private new VGIC part is trivial indeed.
-But how did you solve the reference to the vgic_cpu.nr_lr in
-virt/kvm/arm/hyp/vgic-v2-sr.c? With #ifdef .. #else? Or passing in the
-number as in vgic-v3-sr.c?
+Use hyphen instead of underscore in node name.
 
-Cheers,
-Andre.
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+> +		compatible = "gpio-backlight";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_backlight_j9>;
+> +		gpios = <&gpio1 7 GPIO_ACTIVE_HIGH>;
+> +		default-on;
+> +	};
+> +
+> +	backlight_j20 {
+> +		compatible = "pwm-backlight";
+> +		pwms = <&pwm1 0 5000000>;
+> +		brightness-levels = <0 4 8 16 32 64 128 255>;
+> +		default-brightness-level = <6>;
+> +		status = "okay";
+> +	};
+> +
+> +	regulators {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+
+DT maintainers do not like this fake "simple-bus".  Please put all these
+fixed regulators directly under root node in the naming schema below.
+
+	reg_xxx: regulator-xxx {
+		...
+	};
+
+> +
+> +		reg_usb_otg1_vbus: regulator at 0 {
+> +			compatible = "regulator-fixed";
+> +			reg = <0>;
+> +			regulator-name = "usb_otg1_vbus";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +			gpio = <&gpio1 5 GPIO_ACTIVE_HIGH>;
+> +			enable-active-high;
+> +		};
+
+<snip>
+
+> +&uart3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart3>;
+> +	assigned-clocks = <&clks IMX7D_UART3_ROOT_SRC>;
+> +	assigned-clock-parents = <&clks IMX7D_OSC_24M_CLK>;
+> +	control-gpios = <&gpio2 4 GPIO_ACTIVE_HIGH>;
+> +	uart-has-rs485-half-duplex;
+> +	rs485-mode = <1>;
+
+The above 3 properties are undefined?
+
+> +	status = "okay";
+> +};
+> +
+> +&uart6 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart6>;
+> +	assigned-clocks = <&clks IMX7D_UART6_ROOT_SRC>;
+> +	assigned-clock-parents = <&clks IMX7D_PLL_SYS_MAIN_240M_CLK>;
+> +	fsl,uart-has-rtscts;
+> +	status = "okay";
+> +};
+> +
+> +&usbotg1 {
+> +	vbus-supply = <&reg_usb_otg1_vbus>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usbotg1>;
+> +	status = "okay";
+> +};
+> +
+> +&usbotg2 {
+> +	vbus-supply = <&reg_usb_otg2_vbus>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usbotg2>;
+> +	dr_mode = "host";
+> +	status = "okay";
+> +};
+> +
+> +&usdhc1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usdhc1>;
+> +	cd-gpios = <&gpio5 0 GPIO_ACTIVE_LOW>;
+> +	vmmc-supply = <&vgen3_reg>;
+> +	bus-width = <4>;
+> +	fsl,tuning-step = <2>;
+> +	wakeup-source;
+> +	keep-power-in-suspend;
+> +	status = "okay";
+> +};
+> +
+> +&usdhc2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usdhc2>;
+> +	bus-width = <4>;
+> +	non-removable;
+> +	vmmc-supply = <&reg_wlan>;
+> +	vqmmc-1-8-v;
+
+Unsupported property?
+
+> +	cap-power-off-card;
+> +	keep-power-in-suspend;
+> +	status = "okay";
+> +
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+
+Move these two up to the top of property list.
+
+> +	wlcore: wlcore at 2 {
+> +		compatible = "ti,wl1271";
+> +		reg = <2>;
+> +		interrupt-parent = <&gpio4>;
+> +		interrupts = <20 IRQ_TYPE_LEVEL_HIGH>;
+> +		ref-clock-frequency = <38400000>;
+> +	};
+> +};
+> +
+> +&usdhc3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usdhc3>;
+> +	assigned-clocks = <&clks IMX7D_USDHC3_ROOT_CLK>;
+> +	assigned-clock-rates = <400000000>;
+> +	bus-width = <8>;
+> +	fsl,tuning-step = <2>;
+> +	non-removable;
+> +	status = "okay";
+> +};
+> +
+> +&wdog1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_wdog1>;
+> +	status = "okay";
+> +};
+> +
+> +&iomuxc {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_hog_1 &pinctrl_j2>;
+> +
+> +	imx7d-nitrogen7 {
+
+Since commit 5fcdf6a7ed95 (pinctrl: imx: Allow parsing DT without
+function nodes), we can drop this container code to save one level of
+indentation.
+
+> +		pinctrl_hog_1: hoggrp-1 {
+> +			fsl,pins = <
+> +				MX7D_PAD_SD3_RESET_B__GPIO6_IO11	0x5d
+> +				MX7D_PAD_GPIO1_IO13__GPIO1_IO13		0x7d
+> +				MX7D_PAD_ECSPI2_MISO__GPIO4_IO22	0x7d
+> +			>;
+> +		};
+> +
+> +		pinctrl_bt_rfkill: btrfkillgrp {
+> +			fsl,pins = <
+> +				MX7D_PAD_ECSPI2_SS0__GPIO4_IO23		0x7d
+> +			>;
+> +		};
+
+Drop unused pinctrl entries, and let's add it when needed.
+
+> +
+> +		pinctrl_enet1: enet1grp {
+> +			fsl,pins = <
+> +				MX7D_PAD_GPIO1_IO10__ENET1_MDIO			0x3
+> +				MX7D_PAD_GPIO1_IO11__ENET1_MDC			0x3
+> +				MX7D_PAD_GPIO1_IO12__CCM_ENET_REF_CLK1		0x3
+> +				MX7D_PAD_ENET1_RGMII_TXC__ENET1_RGMII_TXC	0x71
+> +				MX7D_PAD_ENET1_RGMII_TD0__ENET1_RGMII_TD0	0x71
+> +				MX7D_PAD_ENET1_RGMII_TD1__ENET1_RGMII_TD1	0x71
+> +				MX7D_PAD_ENET1_RGMII_TD2__ENET1_RGMII_TD2	0x71
+> +				MX7D_PAD_ENET1_RGMII_TD3__ENET1_RGMII_TD3	0x71
+> +				MX7D_PAD_ENET1_RGMII_TX_CTL__ENET1_RGMII_TX_CTL	0x71
+> +				MX7D_PAD_ENET1_RGMII_RXC__ENET1_RGMII_RXC	0x71
+> +				MX7D_PAD_ENET1_RGMII_RD0__ENET1_RGMII_RD0	0x11
+> +				MX7D_PAD_ENET1_RGMII_RD1__ENET1_RGMII_RD1	0x11
+> +				MX7D_PAD_ENET1_RGMII_RD2__ENET1_RGMII_RD2	0x11
+> +				MX7D_PAD_ENET1_RGMII_RD3__ENET1_RGMII_RD3	0x71
+> +				MX7D_PAD_ENET1_RGMII_RX_CTL__ENET1_RGMII_RX_CTL	0x11
+> +				MX7D_PAD_SD3_STROBE__GPIO6_IO10			0x75 /* Reset */
+> +			>;
+> +		};
+> +
+> +		pinctrl_flash: flashgrp {
+
+Ditto
+
+> +			fsl,pins = <
+> +				MX7D_PAD_EPDC_DATA00__QSPI_A_DATA0	0x71
+> +				MX7D_PAD_EPDC_DATA01__QSPI_A_DATA1	0x71
+> +				MX7D_PAD_EPDC_DATA02__GPIO2_IO2		0x7d
+> +				MX7D_PAD_EPDC_DATA03__GPIO2_IO3		0x7d
+> +				MX7D_PAD_EPDC_DATA05__QSPI_A_SCLK	0x71
+> +				MX7D_PAD_EPDC_DATA06__GPIO2_IO6		0x71
+> +			>;
+> +		};
+
+<snip>
+
+> +&iomuxc_lpsr {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_hog_2>;
+> +
+> +	imx7d-nitrogen7 {
+
+Drop this container node.
+
+Shawn
+
+> +		pinctrl_hog_2: hoggrp-2 {
+> +			fsl,pins = <
+> +				MX7D_PAD_GPIO1_IO02__GPIO1_IO2		0x7d
+> +				MX7D_PAD_GPIO1_IO03__CCM_CLKO2		0x7d
+> +			>;
+> +		};
+> +
+> +		pinctrl_backlight_j9: backlightj9grp {
+> +			fsl,pins = <
+> +				MX7D_PAD_GPIO1_IO07__GPIO1_IO7		0x7d
+> +			>;
+> +		};
+> +
+> +		pinctrl_pwm1: pwm1grp {
+> +			fsl,pins = <
+> +				MX7D_PAD_GPIO1_IO01__PWM1_OUT		0x7d
+> +			>;
+> +		};
+> +
+> +		pinctrl_usbotg1: usbotg1grp {
+> +			fsl,pins = <
+> +				MX7D_PAD_GPIO1_IO04__USB_OTG1_OC	0x7d
+> +				MX7D_PAD_GPIO1_IO05__GPIO1_IO5		0x14
+> +			>;
+> +		};
+> +
+> +		pinctrl_wdog1: wdog1grp {
+> +			fsl,pins = <
+> +				MX7D_PAD_GPIO1_IO00__WDOD1_WDOG_B	0x75
+> +			>;
+> +		};
+> +	};
+> +};
+> -- 
+> 2.7.0
+> 
+> 
