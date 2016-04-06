@@ -1,53 +1,41 @@
-From: fugang.duan@nxp.com (Fugang Duan)
-Date: Wed, 6 Apr 2016 09:12:31 +0000
-Subject: [PATCH net-next V3 03/16] net: fec: return IRQ_HANDLED if
- fec_ptp_check_pps_event handled it
-In-Reply-To: <1459909562-22865-4-git-send-email-troy.kisky@boundarydevices.com>
-References: <1459909562-22865-1-git-send-email-troy.kisky@boundarydevices.com>
- <1459909562-22865-4-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <VI1PR0401MB18556863D9FD7D4590D2DD38FF9F0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
+From: agraf@suse.de (Alexander Graf)
+Date: Wed, 6 Apr 2016 11:14:15 +0200
+Subject: [PATCH] KVM: arm/arm64: Handle forward time correction gracefully
+In-Reply-To: <1459931842-29465-1-git-send-email-marc.zyngier@arm.com>
+References: <1459931842-29465-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <5704D367.5040500@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Troy Kisky <troy.kisky@boundarydevices.com> Sent: Wednesday, April 06, 2016 10:26 AM
-> To: netdev at vger.kernel.org; davem at davemloft.net; Fugang Duan
-> <fugang.duan@nxp.com>; lznuaa at gmail.com
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>; l.stach at pengutronix.de;
-> andrew at lunn.ch; tremyfr at gmail.com; gerg at uclinux.org; linux-arm-
-> kernel at lists.infradead.org; johannes at sipsolutions.net;
-> stillcompiling at gmail.com; sergei.shtylyov at cogentembedded.com;
-> arnd at arndb.de; Troy Kisky <troy.kisky@boundarydevices.com>
-> Subject: [PATCH net-next V3 03/16] net: fec: return IRQ_HANDLED if
-> fec_ptp_check_pps_event handled it
-> 
-> fec_ptp_check_pps_event will return 1 if FEC_T_TF_MASK caused an interrupt.
-> Don't return IRQ_NONE in this case.
-> 
-> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
-> 
-> ---
-> v3: New patch, came from feedback from another patch.
-> ---
->  drivers/net/ethernet/freescale/fec_main.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/net/ethernet/freescale/fec_main.c
-> b/drivers/net/ethernet/freescale/fec_main.c
-> index a011719..7993040 100644
-> --- a/drivers/net/ethernet/freescale/fec_main.c
-> +++ b/drivers/net/ethernet/freescale/fec_main.c
-> @@ -1579,8 +1579,8 @@ fec_enet_interrupt(int irq, void *dev_id)
->  	}
-> 
->  	if (fep->ptp_clock)
-> -		fec_ptp_check_pps_event(fep);
-> -
-> +		if (fec_ptp_check_pps_event(fep))
-> +			ret = IRQ_HANDLED;
->  	return ret;
->  }
-> 
-> --
-> 2.5.0
+On 04/06/2016 10:37 AM, Marc Zyngier wrote:
+> On a host that runs NTP, corrections can have a direct impact on
+> the background timer that we program on the behalf of a vcpu.
+>
+> In particular, NTP performing a forward correction will result in
+> a timer expiring sooner than expected from a guest point of view.
+> Not a big deal, we kick the vcpu anyway.
+>
+> But on wake-up, the vcpu thread is going to perform a check to
+> find out whether or not it should block. And at that point, the
+> timer check is going to say "timer has not expired yet, go back
+> to sleep". This results in the timer event being lost forever.
+>
+> There are multiple ways to handle this. One would be record that
+> the timer has expired and let kvm_cpu_has_pending_timer return
+> true in that case, but that would be fairly invasive. Another is
+> to check for the "short sleep" condition in the hrtimer callback,
+> and restart the timer for the remaining time when the condition
+> is detected.
+>
+> This patch implements the latter, with a bit of refactoring in
+> order to avoid too much code duplication.
+>
+> Reported-by: Alexander Graf <agraf@suse.de>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Acked-by: Fugang Duan <fugang.duan@nxp.com>
+Looks good, I can give it a test run later as well, but for now
+
+Reviewed-by: Alexander Graf <agraf@suse.de>
+
+
+Alex
