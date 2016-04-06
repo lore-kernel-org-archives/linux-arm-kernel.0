@@ -1,100 +1,65 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 6 Apr 2016 15:09:20 +0200
-Subject: [PATCH] ARM: dts: r8a7791: Don't disable referenced optional
- clocks
-In-Reply-To: <1459947173-6664-1-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1459947173-6664-1-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <CAMuHMdWriHffbdXH0bDwgoCsn0zzhC3_c3X6dYVU1-8DzFLCWQ@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 6 Apr 2016 14:09:22 +0100
+Subject: [PATCH] arm64: KVM: unregister notifiers in hyp mode teardown path
+In-Reply-To: <20160406115250.GC16355@cbox>
+References: <1459777611-22592-1-git-send-email-sudeep.holla@arm.com>
+ <20160406115250.GC16355@cbox>
+Message-ID: <57050A82.7030905@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CC Mike, Stephen, linux-clk
+Hi Christoffer,
 
-On Wed, Apr 6, 2016 at 2:52 PM, Sjoerd Simons
-<sjoerd.simons@collabora.co.uk> wrote:
-> clk_get on a disabled clock node will return EPROBE_DEFER, which can
-> cause drivers to be deferred forever if such clocks are referenced in
-> their clocks property.
+On 06/04/16 12:52, Christoffer Dall wrote:
+> Hi Sudeep,
+>
+>
+> On Mon, Apr 04, 2016 at 02:46:51PM +0100, Sudeep Holla wrote:
+>> Commit 1e947bad0b63 ("arm64: KVM: Skip HYP setup when already running
+>> in HYP") re-organized the hyp init code and ended up leaving the CPU
+>> hotplug and PM notifier even if hyp mode initialization fails.
+>>
+>> Since KVM is not yet supported with ACPI, the above mentioned commit
+>> breaks CPU hotplug in ACPI boot.
+>>
+>> This patch fixes teardown_hyp_mode to properly unregister both CPU
+>> hotplug and PM notifiers in the teardown path.
+>>
+>> Fixes: 1e947bad0b63 ("arm64: KVM: Skip HYP setup when already running in HYP")
+>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>
+> I fixed up your patch to apply after James' patch:
+> 5f5560b (arm64: KVM: Register CPU notifiers when the kernel runs at HYP, 2016-03-30)
+>
 
-Is this a side effect of commit 3e5dd6f6e690048d ("clk: Ignore disabled DT
-clock providers")?
+Thanks for that, sorry I didn't realize it would conflict with that change.
 
-> Update the various disabled external clock nodes to default to a
-> frequency of 0, but don't disable them to prevent this.
+> My only concern with this approach is that we're not checking the return
+> values from the cpu_pm_register_notifier calls, and we're potentially
+> calling unregister_cpu_notifier even if the original registration
+> failed.
 >
-> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
->
-> ---
->
->  arch/arm/boot/dts/r8a7791-koelsch.dts | 1 +
->  arch/arm/boot/dts/r8a7791-porter.dts  | 1 +
->  arch/arm/boot/dts/r8a7791.dtsi        | 5 +----
->  3 files changed, 3 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-> index 1adf877..da59c28 100644
-> --- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-> +++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-> @@ -660,6 +660,7 @@
->  };
->
->  &pcie_bus_clk {
-> +       clock-frequency = <100000000>;
->         status = "okay";
->  };
->
-> diff --git a/arch/arm/boot/dts/r8a7791-porter.dts b/arch/arm/boot/dts/r8a7791-porter.dts
-> index 9554d13..19b257e 100644
-> --- a/arch/arm/boot/dts/r8a7791-porter.dts
-> +++ b/arch/arm/boot/dts/r8a7791-porter.dts
-> @@ -413,6 +413,7 @@
->  };
->
->  &pcie_bus_clk {
-> +       clock-frequency = <100000000>;
->         status = "okay";
->  };
->
-> diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-> index 8693888..676df63 100644
-> --- a/arch/arm/boot/dts/r8a7791.dtsi
-> +++ b/arch/arm/boot/dts/r8a7791.dtsi
-> @@ -1104,8 +1104,7 @@
->                 pcie_bus_clk: pcie_bus {
->                         compatible = "fixed-clock";
->                         #clock-cells = <0>;
-> -                       clock-frequency = <100000000>;
-> -                       status = "disabled";
-> +                       clock-frequency = <0>;
->                 };
->
->                 /* External SCIF clock */
-> @@ -1114,7 +1113,6 @@
->                         #clock-cells = <0>;
->                         /* This value must be overridden by the board. */
->                         clock-frequency = <0>;
-> -                       status = "disabled";
->                 };
->
->                 /* External USB clock - can be overridden by the board */
-> @@ -1130,7 +1128,6 @@
->                         #clock-cells = <0>;
->                         /* This value must be overridden by the board. */
->                         clock-frequency = <0>;
-> -                       status = "disabled";
->                 };
->
->                 /* Special CPG clocks */
-> --
-> 2.8.0.rc3
 
-Gr{oetje,eeting}s,
+I agree with your concern and I had the same when I first wrote the
+patch. But considering the return values makes it unnecessarily ugly, so
+I dropped it and kept it simple.
 
-                        Geert
+> I know this can't happen given current implementations, but if any of
+> these functions ever start returning error values, then we're silently
+> ignoring them.  What is our policy on these things?
+>
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+I am fine to handle that, but as you mentioned it's not really needed.
+May be we can add some error message if that's really required.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> Let me know if the following revised version of your patch looks ok to
+> you (against kvmarm/master):
+>
+
+Looks fine and tested kvmarm/master with this patch on top.
+
+-- 
+Regards,
+Sudeep
