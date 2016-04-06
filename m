@@ -1,271 +1,127 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 6 Apr 2016 16:46:29 +0200
-Subject: [RFC PATCH 04/45] KVM: arm/arm64: vgic-new: Add data structure
- definitions
-In-Reply-To: <570518AE.7010107@arm.com>
-References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
- <1458871508-17279-5-git-send-email-andre.przywara@arm.com>
- <20160329130922.GE4126@cbox> <5703BEF2.7090507@arm.com>
- <20160405201009.GA10522@cbox> <20160406135753.GE16355@cbox>
- <570518AE.7010107@arm.com>
-Message-ID: <20160406144629.GA8961@cbox>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Wed, 6 Apr 2016 14:50:29 +0000
+Subject: [PATCH v2] PCI: designware: move remaining rc setup code to
+ dw_pcie_setup_rc()
+In-Reply-To: <1458128433-3020-1-git-send-email-jszhang@marvell.com>
+References: <1458128433-3020-1-git-send-email-jszhang@marvell.com>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1ED40E52@lhreml503-mbs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 06, 2016 at 03:09:50PM +0100, Andre Przywara wrote:
-> 
-> 
-> On 06/04/16 14:57, Christoffer Dall wrote:
-> > On Tue, Apr 05, 2016 at 10:10:09PM +0200, Christoffer Dall wrote:
-> >> On Tue, Apr 05, 2016 at 02:34:42PM +0100, Andre Przywara wrote:
-> >>> Hi,
-> >>>
-> >>> On 29/03/16 14:09, Christoffer Dall wrote:
-> >>>> On Fri, Mar 25, 2016 at 02:04:27AM +0000, Andre Przywara wrote:
-> >>>>> From: Christoffer Dall <christoffer.dall@linaro.org>
-> >>>>>
-> >>>>> Add a new header file for the new and improved GIC implementation.
-> >>>>> The big change is that we now have a struct vgic_irq per IRQ instead
-> >>>>> of spreading all the information over various bitmaps.
-> >>>>>
-> >>>>> We include this new header conditionally from within the old header
-> >>>>> file for the time being to avoid touching all the users.
-> >>>>>
-> >>>>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> >>>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> >>>>> ---
-> >>>>>  include/kvm/arm_vgic.h  |   5 ++
-> >>>>>  include/kvm/vgic/vgic.h | 198 ++++++++++++++++++++++++++++++++++++++++++++++++
-> >>>>>  2 files changed, 203 insertions(+)
-> >>>>>  create mode 100644 include/kvm/vgic/vgic.h
-> >>>>>
-> >>>>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> >>>>> index 7656a46..db289a2 100644
-> >>>>> --- a/include/kvm/arm_vgic.h
-> >>>>> +++ b/include/kvm/arm_vgic.h
-> >>>>> @@ -19,6 +19,10 @@
-> >>>>>  #ifndef __ASM_ARM_KVM_VGIC_H
-> >>>>>  #define __ASM_ARM_KVM_VGIC_H
-> >>>>>
-> >>>>> +#ifdef CONFIG_KVM_NEW_VGIC
-> >>>>> +#include <kvm/vgic/vgic.h>
-> >>>>> +#else
-> >>>>> +
-> >>>>>  #include <linux/kernel.h>
-> >>>>>  #include <linux/kvm.h>
-> >>>>>  #include <linux/irqreturn.h>
-> >>>>> @@ -376,4 +380,5 @@ static inline int vgic_v3_probe(struct device_node *vgic_node,
-> >>>>>  }
-> >>>>>  #endif
-> >>>>>
-> >>>>> +#endif   /* old VGIC include */
-> >>>>>  #endif
-> >>>>> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-> >>>>> new file mode 100644
-> >>>>> index 0000000..659f8b1
-> >>>>> --- /dev/null
-> >>>>> +++ b/include/kvm/vgic/vgic.h
-> >>>>> @@ -0,0 +1,198 @@
-> >>>>> +/*
-> >>>>> + * Copyright (C) 2015, 2016 ARM Ltd.
-> >>>>> + *
-> >>>>> + * This program is free software; you can redistribute it and/or modify
-> >>>>> + * it under the terms of the GNU General Public License version 2 as
-> >>>>> + * published by the Free Software Foundation.
-> >>>>> + *
-> >>>>> + * This program is distributed in the hope that it will be useful,
-> >>>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> >>>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> >>>>> + * GNU General Public License for more details.
-> >>>>> + *
-> >>>>> + * You should have received a copy of the GNU General Public License
-> >>>>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> >>>>> + */
-> >>>>> +#ifndef __ASM_ARM_KVM_VGIC_VGIC_H
-> >>>>> +#define __ASM_ARM_KVM_VGIC_VGIC_H
-> >>>>> +
-> >>>>> +#include <linux/kernel.h>
-> >>>>> +#include <linux/kvm.h>
-> >>>>> +#include <linux/irqreturn.h>
-> >>>>> +#include <linux/spinlock.h>
-> >>>>> +#include <linux/types.h>
-> >>>>> +#include <kvm/iodev.h>
-> >>>>> +
-> >>>>> +#define VGIC_V3_MAX_CPUS 255
-> >>>>> +#define VGIC_V2_MAX_CPUS 8
-> >>>>> +#define VGIC_NR_IRQS_LEGACY     256
-> >>>>> +#define VGIC_NR_SGIS             16
-> >>>>> +#define VGIC_NR_PPIS             16
-> >>>>> +#define VGIC_NR_PRIVATE_IRQS     (VGIC_NR_SGIS + VGIC_NR_PPIS)
-> >>>>> +#define VGIC_MAX_PRIVATE (VGIC_NR_PRIVATE_IRQS - 1)
-> >>>>> +#define VGIC_MAX_SPI             1019
-> >>>>> +#define VGIC_MAX_RESERVED        1023
-> >>>>> +#define VGIC_MIN_LPI             8192
-> >>>>> +
-> >>>>> +enum vgic_type {
-> >>>>> + VGIC_V2,                /* Good ol' GICv2 */
-> >>>>> + VGIC_V3,                /* New fancy GICv3 */
-> >>>>> +};
-> >>>>> +
-> >>>>> +/* same for all guests, as depending only on the _host's_ GIC model */
-> >>>>> +struct vgic_global {
-> >>>>> + /* type of the host GIC */
-> >>>>> + enum vgic_type          type;
-> >>>>> +
-> >>>>> + /* Physical address of vgic virtual cpu interface */
-> >>>>> + phys_addr_t             vcpu_base;
-> >>>>> +
-> >>>>> + /* virtual control interface mapping */
-> >>>>> + void __iomem            *vctrl_base;
-> >>>>> +
-> >>>>> + /* Number of implemented list registers */
-> >>>>> + int                     nr_lr;
-> >>>>> +
-> >>>>> + /* Maintenance IRQ number */
-> >>>>> + unsigned int            maint_irq;
-> >>>>> +
-> >>>>> + /* maximum number of VCPUs allowed (GICv2 limits us to 8) */
-> >>>>> + int                     max_gic_vcpus;
-> >>>>> +
-> >>>>> + /* Only needed for the legacy KVM_CREATE_IRQCHIP */
-> >>>>> + bool                    can_emulate_gicv2;
-> >>>>> +};
-> >>>>> +
-> >>>>> +extern struct vgic_global kvm_vgic_global_state;
-> >>>>> +
-> >>>>> +#define VGIC_V2_MAX_LRS          (1 << 6)
-> >>>>> +#define VGIC_V3_MAX_LRS          16
-> >>>>> +#define VGIC_V3_LR_INDEX(lr)     (VGIC_V3_MAX_LRS - 1 - lr)
-> >>>>> +
-> >>>>> +enum vgic_irq_config {
-> >>>>> + VGIC_CONFIG_EDGE = 0,
-> >>>>> + VGIC_CONFIG_LEVEL
-> >>>>> +};
-> >>>>> +
-> >>>>> +struct vgic_irq {
-> >>>>> + spinlock_t irq_lock;            /* Protects the content of the struct */
-> >>>>> + struct list_head ap_list;
-> >>>>> +
-> >>>>> + struct kvm_vcpu *vcpu;          /* SGIs and PPIs: The VCPU
-> >>>>> +                                  * SPIs and LPIs: The VCPU whose ap_list
-> >>>>> +                                  * on which this is queued.
-> >>>>> +                                  */
-> >>>>> +
-> >>>>> + struct kvm_vcpu *target_vcpu;   /* The VCPU that this interrupt should
-> >>>>> +                                  * be send to, as a result of the
-> >>>>> +                                  * targets reg (v2) or the
-> >>>>> +                                  * affinity reg (v3).
-> >>>>> +                                  */
-> >>>>> +
-> >>>>> + u32 intid;                      /* Guest visible INTID */
-> >>>>> + bool pending;
-> >>>>> + bool line_level;                /* Level only */
-> >>>>> + bool soft_pending;              /* Level only */
-> >>>>> + bool active;                    /* not used for LPIs */
-> >>>>> + bool enabled;
-> >>>>> + bool hw;                        /* Tied to HW IRQ */
-> >>>>> + u32 hwintid;                    /* HW INTID number */
-> >>>>> + union {
-> >>>>> +         u8 targets;                     /* GICv2 target VCPUs mask */
-> >>>>> +         u32 mpidr;                      /* GICv3 target VCPU */
-> >>>>> + };
-> >>>>> + u8 source;                      /* GICv2 SGIs only */
-> >>>>> + u8 priority;
-> >>>>> + enum vgic_irq_config config;    /* Level or edge */
-> >>>>> +};
-> >>>>> +
-> >>>>> +struct vgic_dist {
-> >>>>> + bool                    in_kernel;
-> >>>>> + bool                    ready;
-> >>>>> +
-> >>>>> + /* vGIC model the kernel emulates for the guest (GICv2 or GICv3) */
-> >>>>> + u32                     vgic_model;
-> >>>>> +
-> >>>>> + int                     nr_spis;
-> >>>>> +
-> >>>>> + /* TODO: Consider moving to global state */
-> >>>>> + /* Virtual control interface mapping */
-> >>>>> + void __iomem            *vctrl_base;
-> >>>>> +
-> >>>>> + /* base addresses in guest physical address space: */
-> >>>>> + gpa_t                   vgic_dist_base;         /* distributor */
-> >>>>> + union {
-> >>>>> +         /* either a GICv2 CPU interface */
-> >>>>> +         gpa_t                   vgic_cpu_base;
-> >>>>> +         /* or a number of GICv3 redistributor regions */
-> >>>>> +         gpa_t                   vgic_redist_base;
-> >>>>> + };
-> >>>>> +
-> >>>>> + /* distributor enabled */
-> >>>>> + u32                     enabled;
-> >>>>> +
-> >>>>> + struct vgic_irq         *spis;
-> >>>>> +};
-> >>>>> +
-> >>>>> +struct vgic_v2_cpu_if {
-> >>>>> + u32             vgic_hcr;
-> >>>>> + u32             vgic_vmcr;
-> >>>>> + u32             vgic_misr;      /* Saved only */
-> >>>>> + u64             vgic_eisr;      /* Saved only */
-> >>>>> + u64             vgic_elrsr;     /* Saved only */
-> >>>>> + u32             vgic_apr;
-> >>>>> + u32             vgic_lr[VGIC_V2_MAX_LRS];
-> >>>>> +};
-> >>>>> +
-> >>>>> +struct vgic_v3_cpu_if {
-> >>>>> +#ifdef CONFIG_KVM_ARM_VGIC_V3
-> >>>>> + u32             vgic_hcr;
-> >>>>> + u32             vgic_vmcr;
-> >>>>> + u32             vgic_sre;       /* Restored only, change ignored */
-> >>>>> + u32             vgic_misr;      /* Saved only */
-> >>>>> + u32             vgic_eisr;      /* Saved only */
-> >>>>> + u32             vgic_elrsr;     /* Saved only */
-> >>>>> + u32             vgic_ap0r[4];
-> >>>>> + u32             vgic_ap1r[4];
-> >>>>> + u64             vgic_lr[VGIC_V3_MAX_LRS];
-> >>>>> +#endif
-> >>>>> +};
-> >>>>> +
-> >>>>> +struct vgic_cpu {
-> >>>>> + /* CPU vif control registers for world switch */
-> >>>>> + union {
-> >>>>> +         struct vgic_v2_cpu_if   vgic_v2;
-> >>>>> +         struct vgic_v3_cpu_if   vgic_v3;
-> >>>>> + };
-> >>>>> +
-> >>>>> + /* TODO: Move nr_lr to a global state */
-> >>>>
-> >>>> what is our current plan and status about this TODO?
-> >>>
-> >>> The point is that the current HYP code is accessing this field. We do
-> >>> have this field in the current "global" struct vgic_params there as
-> >>> well, but this struct is (more or less) private to vgic-v2.c, so not
-> >>> easily accessible from virt/kvm/arm/hyp/*.c.
-> >>> So I suggest we keep this in here for the time being and eventually
-> >>> remove it (and rework the save/restore code) once we get rid of the old
-> >>> VGIC code.
-> >>>
-> >> Hmmm, I haven't tried it, but I don't understand why moving it now is
-> >> difficult.  I'd really like to avoid having a bunch of todo's lingering
-> >> around and having duplicated state in the new code.
-> >>
-> >> I think I noticed a number of places in this patch series which refers
-> >> tot he vgic_cpu->nr_lr instead of the global place already...
-> >>
-> > So I wrote a patch for this and it doesn't really look that bad.  I'll
-> > send it as part of a little prerequisite series later.
-> 
-> I just fixed it as well - the private new VGIC part is trivial indeed.
-> But how did you solve the reference to the vgic_cpu.nr_lr in
-> virt/kvm/arm/hyp/vgic-v2-sr.c? With #ifdef .. #else? Or passing in the
-> number as in vgic-v3-sr.c?
-> 
+Hi, sorry to be late on this
 
-I sent you a couple of patches as I said I would.
+> -----Original Message-----
+> From: linux-kernel-owner at vger.kernel.org [mailto:linux-kernel-
+> owner at vger.kernel.org] On Behalf Of Jisheng Zhang
+> Sent: 16 March 2016 11:41
+> To: jingoohan1 at gmail.com; pratyush.anand at gmail.com; bhelgaas at google.com
+> Cc: linux-pci at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; Jisheng Zhang
+> Subject: [PATCH v2] PCI: designware: move remaining rc setup code to
+> dw_pcie_setup_rc()
+> 
+> dw_pcie_setup_rc(), as its name indicates, setups the RC. But current
+> dw_pcie_host_init() also contains some necessary rc setup code.
+> 
+> Another reason: the host may lost power during suspend to ram, the RC
+> need to be re-setup after resume. The rc can't be correctly resumed
+> without the rc setup code in dw_pcie_host_init().
+> 
+> So this patch moves the code to dw_pcie_setup_rc() to address the above
+> two issues. After this patch, each pcie designware driver users could
+> call dw_pcie_setup_rc() to re-setup rc when resume back.
 
-I just used an extern with the kern_hyp_va() macro trickery applied.
-Not the prettiest thing in the world, but hey.  It should serve just
-fine for moving on with this, and then we can worry about the finesses
-as the vgic series progresses.
+I think this patch breaks the Hisilicon driver...
 
--Christoffer
+Our driver performs linkup setup in UEFI therefore we do not call
+dw_pcie_setup_rc(), we only call dw_pcie_host_init().
+
+Maybe better to group the part of code to be moved in as separate
+function...
+
+Thanks and sorry for late reply.
+
+Gab
+
+
+> 
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> ---
+> Since v1:
+>  - fix gcc warning found by lkp, thanks
+> 
+>  drivers/pci/host/pcie-designware.c | 39 +++++++++++++++++++-----------
+> --------
+>  1 file changed, 19 insertions(+), 20 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pcie-designware.c
+> b/drivers/pci/host/pcie-designware.c
+> index a4cccd3..261e4a11 100644
+> --- a/drivers/pci/host/pcie-designware.c
+> +++ b/drivers/pci/host/pcie-designware.c
+> @@ -434,7 +434,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
+>  	struct platform_device *pdev = to_platform_device(pp->dev);
+>  	struct pci_bus *bus, *child;
+>  	struct resource *cfg_res;
+> -	u32 val;
+>  	int i, ret;
+>  	LIST_HEAD(res);
+>  	struct resource_entry *win;
+> @@ -544,25 +543,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
+>  	if (pp->ops->host_init)
+>  		pp->ops->host_init(pp);
+> 
+> -	/*
+> -	 * If the platform provides ->rd_other_conf, it means the
+> platform
+> -	 * uses its own address translation component rather than ATU, so
+> -	 * we should not program the ATU here.
+> -	 */
+> -	if (!pp->ops->rd_other_conf)
+> -		dw_pcie_prog_outbound_atu(pp, PCIE_ATU_REGION_INDEX1,
+> -					  PCIE_ATU_TYPE_MEM, pp->mem_base,
+> -					  pp->mem_bus_addr, pp->mem_size);
+> -
+> -	dw_pcie_wr_own_conf(pp, PCI_BASE_ADDRESS_0, 4, 0);
+> -
+> -	/* program correct class for RC */
+> -	dw_pcie_wr_own_conf(pp, PCI_CLASS_DEVICE, 2,
+> PCI_CLASS_BRIDGE_PCI);
+> -
+> -	dw_pcie_rd_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, &val);
+> -	val |= PORT_LOGIC_SPEED_CHANGE;
+> -	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
+> -
+>  	pp->root_bus_nr = pp->busn->start;
+>  	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+>  		bus = pci_scan_root_bus_msi(pp->dev, pp->root_bus_nr,
+> @@ -800,6 +780,25 @@ void dw_pcie_setup_rc(struct pcie_port *pp)
+>  	val |= PCI_COMMAND_IO | PCI_COMMAND_MEMORY |
+>  		PCI_COMMAND_MASTER | PCI_COMMAND_SERR;
+>  	dw_pcie_writel_rc(pp, val, PCI_COMMAND);
+> +
+> +	/*
+> +	 * If the platform provides ->rd_other_conf, it means the
+> platform
+> +	 * uses its own address translation component rather than ATU, so
+> +	 * we should not program the ATU here.
+> +	 */
+> +	if (!pp->ops->rd_other_conf)
+> +		dw_pcie_prog_outbound_atu(pp, PCIE_ATU_REGION_INDEX1,
+> +					  PCIE_ATU_TYPE_MEM, pp->mem_base,
+> +					  pp->mem_bus_addr, pp->mem_size);
+> +
+> +	dw_pcie_wr_own_conf(pp, PCI_BASE_ADDRESS_0, 4, 0);
+> +
+> +	/* program correct class for RC */
+> +	dw_pcie_wr_own_conf(pp, PCI_CLASS_DEVICE, 2,
+> PCI_CLASS_BRIDGE_PCI);
+> +
+> +	dw_pcie_rd_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, &val);
+> +	val |= PORT_LOGIC_SPEED_CHANGE;
+> +	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
+>  }
+> 
+>  MODULE_AUTHOR("Jingoo Han <jg1.han@samsung.com>");
+> --
+> 2.7.0
