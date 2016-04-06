@@ -1,127 +1,234 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 06 Apr 2016 14:40:02 +0200
-Subject: [PATCH v3 2/2] PCI: imx6: Add reset-gpio-active-high boolean
- property to DT
-In-Reply-To: <1459946207-11923-1-git-send-email-ynezz@true.cz>
-References: <1459936100.2256.30.camel@pengutronix.de>
- <1459946207-11923-1-git-send-email-ynezz@true.cz>
-Message-ID: <1459946402.14999.1.camel@pengutronix.de>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 6 Apr 2016 18:21:54 +0530
+Subject: [PATCH 1/2] phy: Group vendor specific phy drivers
+In-Reply-To: <CAFp+6iEJAq6CzntpM-RXYN8NwtHUUJoFHFf17mdV4nLE8eJwyA@mail.gmail.com>
+References: <1459510156-9147-1-git-send-email-gautam.vivek@samsung.com>
+ <56FE7234.5000505@ti.com>
+ <CAFp+6iEJAq6CzntpM-RXYN8NwtHUUJoFHFf17mdV4nLE8eJwyA@mail.gmail.com>
+Message-ID: <5705066A.8010903@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 06.04.2016, 14:36 +0200 schrieb Petr ?tetiar:
-> Currently the reset-gpio DT property which controls the PCI bus device
-> reset signal defaults to active-low reset sequence (L=reset state,
-> H=operation state) plus the code in reset function isn't GPIO polarity
-> aware - it doesn't matter if the defined reset-gpio is active-low or
-> active-high, it will always result into active-low reset sequence.
-> 
-> I've tried to fix it properly and changed the reset-gpio reset sequence
-> to be polarity aware, but this patch has been accepted and then reverted
-> as it has introduced few backward incompatible issues:
-> 
-> 1. Some of the DTBs as for example imx6qdl-sabresd, doesn't define
-> reset-gpio polarity correctly:
-> 
->   reset-gpio = <&gpio7 12 0>;
-> 
-> which means, that it's defined as active-high, but in reality it's
-> active-low, thus it wouldn't work without DTS fix.
-> 
-> 2. The logic in reset function is inverted:
-> 
-> 	gpio_set_value_cansleep(imx6_pcie->reset_gpio, 0)
-> 	msleep(100);
-> 	gpio_set_value_cansleep(imx6_pcie->reset_gpio, 1);
-> 
-> so even if some of the i.MX6 boards had reset-gpio polarity defined
-> correctly in their DTSes, they would stop working.
-> 
-> As we can't break old DTBs, we can't fix them and that's why we need to
-> introduce this new DT reset-gpio-active-high boolean property, so we can
-> support boards with active-high reset sequence.
-> 
-> This active-high reset sequence is for example needed on Apalis SoMs,
-> where GPIO1_IO28, used to PCIe reset is not connected directly to PERST#
-> PCIe signal, but it's ORed with RESETBMCU coming off the PMIC, and thus
-> is inverted, active-high.
-> 
-> Signed-off-by: Petr ?tetiar <ynezz@true.cz>
+Hi,
 
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+On Friday 01 April 2016 07:05 PM, Vivek Gautam wrote:
+> Hi,
+> 
+> 
+> On Fri, Apr 1, 2016 at 6:05 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>> Hi,
+>>
+>> On Friday 01 April 2016 04:59 PM, Vivek Gautam wrote:
+>>> Adding vendor specific directories in phy to group
+>>> phy drivers under their respective vendor umbrella.
+>>>
+>>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
+>>> ---
+>>>
+>>> With growing number of phy drivers, it makes sense to
+>>> group these drivers under their respective vendor/platform
+>>> umbrella directory.
+>>>
+>>> Build-tested 'multi_v7_defconfig'.
+>>>
+>>>  drivers/phy/Kconfig                               | 386 +---------------------
+>>>  drivers/phy/Makefile                              |  57 +---
+>>>  drivers/phy/bcom/Kconfig                          |  27 ++
+>>>  drivers/phy/bcom/Makefile                         |   3 +
+>>>  drivers/phy/{ => bcom}/phy-bcm-cygnus-pcie.c      |   0
+>>>  drivers/phy/{ => bcom}/phy-bcm-kona-usb2.c        |   0
+>>>  drivers/phy/{ => bcom}/phy-brcmstb-sata.c         |   0
+>>>  drivers/phy/hisi/Kconfig                          |  20 ++
+>>>  drivers/phy/hisi/Makefile                         |   2 +
+>>>  drivers/phy/{ => hisi}/phy-hi6220-usb.c           |   0
+>>>  drivers/phy/{ => hisi}/phy-hix5hd2-sata.c         |   0
+>>>  drivers/phy/marvell/Kconfig                       |  50 +++
+>>>  drivers/phy/marvell/Makefile                      |   6 +
+>>>  drivers/phy/{ => marvell}/phy-armada375-usb2.c    |   0
+>>>  drivers/phy/{ => marvell}/phy-berlin-sata.c       |   0
+>>>  drivers/phy/{ => marvell}/phy-berlin-usb.c        |   0
+>>>  drivers/phy/{ => marvell}/phy-mvebu-sata.c        |   0
+>>>  drivers/phy/{ => marvell}/phy-pxa-28nm-hsic.c     |   0
+>>>  drivers/phy/{ => marvell}/phy-pxa-28nm-usb2.c     |   0
+>>>  drivers/phy/qcom/Kconfig                          |  23 ++
+>>>  drivers/phy/qcom/Makefile                         |   5 +
+>>>  drivers/phy/{ => qcom}/phy-qcom-apq8064-sata.c    |   0
+>>>  drivers/phy/{ => qcom}/phy-qcom-ipq806x-sata.c    |   0
+>>>  drivers/phy/{ => qcom}/phy-qcom-ufs-i.h           |   0
+>>>  drivers/phy/{ => qcom}/phy-qcom-ufs-qmp-14nm.c    |   0
+>>>  drivers/phy/{ => qcom}/phy-qcom-ufs-qmp-14nm.h    |   0
+>>>  drivers/phy/{ => qcom}/phy-qcom-ufs-qmp-20nm.c    |   0
+>>>  drivers/phy/{ => qcom}/phy-qcom-ufs-qmp-20nm.h    |   0
+>>>  drivers/phy/{ => qcom}/phy-qcom-ufs.c             |   0
+>>>  drivers/phy/rcar/Kconfig                          |  16 +
+>>>  drivers/phy/rcar/Makefile                         |   2 +
+>>>  drivers/phy/{ => rcar}/phy-rcar-gen2.c            |   0
+>>>  drivers/phy/{ => rcar}/phy-rcar-gen3-usb2.c       |   0
+>>>  drivers/phy/rockchip/Kconfig                      |  23 ++
+>>>  drivers/phy/rockchip/Makefile                     |   3 +
+>>>  drivers/phy/{ => rockchip}/phy-rockchip-dp.c      |   0
+>>>  drivers/phy/{ => rockchip}/phy-rockchip-emmc.c    |   0
+>>>  drivers/phy/{ => rockchip}/phy-rockchip-usb.c     |   0
+>>>  drivers/phy/samsung/Kconfig                       |  87 +++++
+>>>  drivers/phy/samsung/Makefile                      |  10 +
+>>>  drivers/phy/{ => samsung}/phy-exynos-dp-video.c   |   0
+>>>  drivers/phy/{ => samsung}/phy-exynos-mipi-video.c |   0
+>>>  drivers/phy/{ => samsung}/phy-exynos4210-usb2.c   |   0
+>>>  drivers/phy/{ => samsung}/phy-exynos4x12-usb2.c   |   0
+>>>  drivers/phy/{ => samsung}/phy-exynos5-usbdrd.c    |   0
+>>>  drivers/phy/{ => samsung}/phy-exynos5250-sata.c   |   0
+>>>  drivers/phy/{ => samsung}/phy-exynos5250-usb2.c   |   0
+>>>  drivers/phy/{ => samsung}/phy-s5pv210-usb2.c      |   0
+>>>  drivers/phy/{ => samsung}/phy-samsung-usb2.c      |   0
+>>>  drivers/phy/{ => samsung}/phy-samsung-usb2.h      |   0
+>>>  drivers/phy/st/Kconfig                            |  51 +++
+>>>  drivers/phy/st/Makefile                           |   6 +
+>>>  drivers/phy/{ => st}/phy-miphy28lp.c              |   0
+>>>  drivers/phy/{ => st}/phy-miphy365x.c              |   0
+>>>  drivers/phy/{ => st}/phy-spear1310-miphy.c        |   0
+>>>  drivers/phy/{ => st}/phy-spear1340-miphy.c        |   0
+>>>  drivers/phy/{ => st}/phy-stih407-usb.c            |   0
+>>>  drivers/phy/{ => st}/phy-stih41x-usb.c            |   0
+>>>  drivers/phy/sunxi/Kconfig                         |  28 ++
+>>>  drivers/phy/sunxi/Makefile                        |   2 +
+>>>  drivers/phy/{ => sunxi}/phy-sun4i-usb.c           |   0
+>>>  drivers/phy/{ => sunxi}/phy-sun9i-usb.c           |   0
+>>>  drivers/phy/ti/Kconfig                            |  67 ++++
+>>>  drivers/phy/ti/Makefile                           |   6 +
+>>>  drivers/phy/{ => ti}/phy-dm816x-usb.c             |   0
+>>>  drivers/phy/{ => ti}/phy-omap-control.c           |   0
+>>>  drivers/phy/{ => ti}/phy-omap-usb2.c              |   0
+>>>  drivers/phy/{ => ti}/phy-ti-pipe3.c               |   0
+>>>  drivers/phy/{ => ti}/phy-tusb1210.c               |   0
+>>>  drivers/phy/{ => ti}/phy-twl4030-usb.c            |   0
+>>>  drivers/phy/{ => ti}/ulpi_phy.h                   |   0
+>>
+>> ulpi_phy.h is not specific to TI though at this point tusb1210 is the only ULPI
+>> driver.
+> 
+> Yes, you are right. But i was hesitant to add a multi-level header
+> file include in the phy driver
+> which uses it.
+> 
+> Does it makes sense to move this ulpi_phy.h to include/linux/phy ?
 
-> ---
->  Changes since v1:
+yeah.. that should be okay.
 > 
->   * Added documentation of reset-gpio and reset-gpio-active-high DT properties
->   * Removed unnecessary double negation of GPIO value
+>>>  71 files changed, 464 insertions(+), 416 deletions(-)
+>>>  create mode 100644 drivers/phy/bcom/Kconfig
+>>>  create mode 100644 drivers/phy/bcom/Makefile
+>>>  rename drivers/phy/{ => bcom}/phy-bcm-cygnus-pcie.c (100%)
+>>>  rename drivers/phy/{ => bcom}/phy-bcm-kona-usb2.c (100%)
+>>>  rename drivers/phy/{ => bcom}/phy-brcmstb-sata.c (100%)
+>>>  create mode 100644 drivers/phy/hisi/Kconfig
+>>>  create mode 100644 drivers/phy/hisi/Makefile
+>>>  rename drivers/phy/{ => hisi}/phy-hi6220-usb.c (100%)
+>>>  rename drivers/phy/{ => hisi}/phy-hix5hd2-sata.c (100%)
+>>>  create mode 100644 drivers/phy/marvell/Kconfig
+>>>  create mode 100644 drivers/phy/marvell/Makefile
+>>>  rename drivers/phy/{ => marvell}/phy-armada375-usb2.c (100%)
+>>>  rename drivers/phy/{ => marvell}/phy-berlin-sata.c (100%)
+>>>  rename drivers/phy/{ => marvell}/phy-berlin-usb.c (100%)
+>>>  rename drivers/phy/{ => marvell}/phy-mvebu-sata.c (100%)
+>>>  rename drivers/phy/{ => marvell}/phy-pxa-28nm-hsic.c (100%)
+>>>  rename drivers/phy/{ => marvell}/phy-pxa-28nm-usb2.c (100%)
+>>>  create mode 100644 drivers/phy/qcom/Kconfig
+>>>  create mode 100644 drivers/phy/qcom/Makefile
+>>>  rename drivers/phy/{ => qcom}/phy-qcom-apq8064-sata.c (100%)
+>>>  rename drivers/phy/{ => qcom}/phy-qcom-ipq806x-sata.c (100%)
+>>>  rename drivers/phy/{ => qcom}/phy-qcom-ufs-i.h (100%)
+>>>  rename drivers/phy/{ => qcom}/phy-qcom-ufs-qmp-14nm.c (100%)
+>>>  rename drivers/phy/{ => qcom}/phy-qcom-ufs-qmp-14nm.h (100%)
+>>>  rename drivers/phy/{ => qcom}/phy-qcom-ufs-qmp-20nm.c (100%)
+>>>  rename drivers/phy/{ => qcom}/phy-qcom-ufs-qmp-20nm.h (100%)
+>>>  rename drivers/phy/{ => qcom}/phy-qcom-ufs.c (100%)
+>>>  create mode 100644 drivers/phy/rcar/Kconfig
+>>>  create mode 100644 drivers/phy/rcar/Makefile
+>>>  rename drivers/phy/{ => rcar}/phy-rcar-gen2.c (100%)
+>>>  rename drivers/phy/{ => rcar}/phy-rcar-gen3-usb2.c (100%)
+>>>  create mode 100644 drivers/phy/rockchip/Kconfig
+>>>  create mode 100644 drivers/phy/rockchip/Makefile
+>>>  rename drivers/phy/{ => rockchip}/phy-rockchip-dp.c (100%)
+>>>  rename drivers/phy/{ => rockchip}/phy-rockchip-emmc.c (100%)
+>>>  rename drivers/phy/{ => rockchip}/phy-rockchip-usb.c (100%)
+>>>  create mode 100644 drivers/phy/samsung/Kconfig
+>>>  create mode 100644 drivers/phy/samsung/Makefile
+>>>  rename drivers/phy/{ => samsung}/phy-exynos-dp-video.c (100%)
+>>>  rename drivers/phy/{ => samsung}/phy-exynos-mipi-video.c (100%)
+>>>  rename drivers/phy/{ => samsung}/phy-exynos4210-usb2.c (100%)
+>>>  rename drivers/phy/{ => samsung}/phy-exynos4x12-usb2.c (100%)
+>>>  rename drivers/phy/{ => samsung}/phy-exynos5-usbdrd.c (100%)
+>>>  rename drivers/phy/{ => samsung}/phy-exynos5250-sata.c (100%)
+>>>  rename drivers/phy/{ => samsung}/phy-exynos5250-usb2.c (100%)
+>>>  rename drivers/phy/{ => samsung}/phy-s5pv210-usb2.c (100%)
+>>>  rename drivers/phy/{ => samsung}/phy-samsung-usb2.c (100%)
+>>>  rename drivers/phy/{ => samsung}/phy-samsung-usb2.h (100%)
+>>>  create mode 100644 drivers/phy/st/Kconfig
+>>>  create mode 100644 drivers/phy/st/Makefile
+>>>  rename drivers/phy/{ => st}/phy-miphy28lp.c (100%)
+>>>  rename drivers/phy/{ => st}/phy-miphy365x.c (100%)
+>>>  rename drivers/phy/{ => st}/phy-spear1310-miphy.c (100%)
+>>>  rename drivers/phy/{ => st}/phy-spear1340-miphy.c (100%)
+>>>  rename drivers/phy/{ => st}/phy-stih407-usb.c (100%)
+>>>  rename drivers/phy/{ => st}/phy-stih41x-usb.c (100%)
+>>>  create mode 100644 drivers/phy/sunxi/Kconfig
+>>>  create mode 100644 drivers/phy/sunxi/Makefile
+>>>  rename drivers/phy/{ => sunxi}/phy-sun4i-usb.c (100%)
+>>>  rename drivers/phy/{ => sunxi}/phy-sun9i-usb.c (100%)
+>>>  create mode 100644 drivers/phy/ti/Kconfig
+>>>  create mode 100644 drivers/phy/ti/Makefile
+>>>  rename drivers/phy/{ => ti}/phy-dm816x-usb.c (100%)
+>>>  rename drivers/phy/{ => ti}/phy-omap-control.c (100%)
+>>>  rename drivers/phy/{ => ti}/phy-omap-usb2.c (100%)
+>>>  rename drivers/phy/{ => ti}/phy-ti-pipe3.c (100%)
+>>>  rename drivers/phy/{ => ti}/phy-tusb1210.c (100%)
+>>>  rename drivers/phy/{ => ti}/phy-twl4030-usb.c (100%)
+>>>  rename drivers/phy/{ => ti}/ulpi_phy.h (100%)
+>>>
+>>> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+>>> index 26566db..80c8c68 100644
+>>> --- a/drivers/phy/Kconfig
+>>> +++ b/drivers/phy/Kconfig
+>>> @@ -15,45 +15,6 @@ config GENERIC_PHY
+>>>         phy users can obtain reference to the PHY. All the users of this
+>>>         framework should select this config.
+>>>
+>>
+>>> +menuconfig PHY_PLAT
+>>> +     bool "Platform Phy drivers"
+>>
+>> Not really convinced about adding a new config here. This will create new
+>> dependencies and will also start breaking users of oldconfig.
 > 
->  Changes since v2:
+> This serves including all the directory paths in the 'make' for
+> driver/phy/Makefile.
 > 
->   * Changed commit message so it explains in more detail why we need new DT
->     property
->   * Changed PHY to 'bus device' in binding's documentation
+> Otherwise each directory will have to be built as per particular platform
+> And, not all drivers of a vendor are built for one-kind of platform,
+> for example, Samsung uses ARCH_EXYNOS, as well as ARCH_S5PV210
+> Similarly, Broadcom phy drivers are based on multiple platforms, and so
+> does Marvell's.
 > 
->  Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt |  6 ++++++
->  drivers/pci/host/pci-imx6.c                              | 14 +++++++++++---
->  2 files changed, 17 insertions(+), 3 deletions(-)
+> Please suggest a concise way to include the vendor directories in the build path
+> in drivers/phy/Makefile.
+
+obj-y	+= vendor/?
+
+-Kishon
+
 > 
-> diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-> index 3be80c6..072efbf 100644
-> --- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-> +++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-> @@ -19,6 +19,12 @@ Optional properties:
->  - fsl,tx-deemph-gen2-6db: Gen2 (6db) De-emphasis value. Default: 20
->  - fsl,tx-swing-full: Gen2 TX SWING FULL value. Default: 127
->  - fsl,tx-swing-low: TX launch amplitude swing_low value. Default: 127
-> +- reset-gpio: Should specify the GPIO for controlling the PCI bus device reset
-> +  signal. Its not polarity aware and defaults to active-low reset sequence
-> +  (L=reset state, H=operation state).
-> +- reset-gpio-active-high: If present then the reset sequence using the GPIO
-> +  specified in the "reset-gpio" property is reversed (H=reset state,
-> +  L=operation state).
->  
->  Example:
->  
-> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-> index 2f817fa..17f4cc3 100644
-> --- a/drivers/pci/host/pci-imx6.c
-> +++ b/drivers/pci/host/pci-imx6.c
-> @@ -33,6 +33,7 @@
->  
->  struct imx6_pcie {
->  	int			reset_gpio;
-> +	bool			gpio_active_high;
->  	struct clk		*pcie_bus;
->  	struct clk		*pcie_phy;
->  	struct clk		*pcie;
-> @@ -310,9 +311,11 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
->  
->  	/* Some boards don't have PCIe reset GPIO. */
->  	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
-> -		gpio_set_value_cansleep(imx6_pcie->reset_gpio, 0);
-> +		gpio_set_value_cansleep(imx6_pcie->reset_gpio,
-> +					imx6_pcie->gpio_active_high);
->  		msleep(100);
-> -		gpio_set_value_cansleep(imx6_pcie->reset_gpio, 1);
-> +		gpio_set_value_cansleep(imx6_pcie->reset_gpio,
-> +					!imx6_pcie->gpio_active_high);
->  	}
->  	return 0;
->  
-> @@ -546,9 +549,14 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
->  
->  	/* Fetch GPIOs */
->  	imx6_pcie->reset_gpio = of_get_named_gpio(np, "reset-gpio", 0);
-> +	imx6_pcie->gpio_active_high = of_property_read_bool(np,
-> +						"reset-gpio-active-high");
->  	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
->  		ret = devm_gpio_request_one(&pdev->dev, imx6_pcie->reset_gpio,
-> -					    GPIOF_OUT_INIT_LOW, "PCIe reset");
-> +				imx6_pcie->gpio_active_high ?
-> +					GPIOF_OUT_INIT_HIGH :
-> +					GPIOF_OUT_INIT_LOW,
-> +				"PCIe reset");
->  		if (ret) {
->  			dev_err(&pdev->dev, "unable to get reset gpio\n");
->  			return ret;
+>>
+>> Also not all of them are platform drivers (e.g ULPI PHY drivers).
+> I Think this applies to ulpi_phy only at this moment, which we can resolve
+> by moving that to include/linux path.
+> 
+>>
+>> Thanks
+>> Kishon
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> 
+> 
