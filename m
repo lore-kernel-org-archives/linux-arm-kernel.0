@@ -1,169 +1,167 @@
-From: fugang.duan@nxp.com (Fugang Duan)
-Date: Wed, 6 Apr 2016 09:51:48 +0000
-Subject: [PATCH net-next V3 08/16] net: fec: set cbd_sc without relying on
- previous value
-In-Reply-To: <1459909562-22865-9-git-send-email-troy.kisky@boundarydevices.com>
-References: <1459909562-22865-1-git-send-email-troy.kisky@boundarydevices.com>
- <1459909562-22865-9-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <VI1PR0401MB1855C3C8F4D4C2012CDB33DBFF9F0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Wed, 6 Apr 2016 11:53:47 +0200
+Subject: [PATCH v4 07/12] KVM: arm64: add data structures to model ITS
+ interrupt translation
+In-Reply-To: <1458958450-19662-8-git-send-email-andre.przywara@arm.com>
+References: <1458958450-19662-1-git-send-email-andre.przywara@arm.com>
+ <1458958450-19662-8-git-send-email-andre.przywara@arm.com>
+Message-ID: <5704DCAB.7040207@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Troy Kisky <troy.kisky@boundarydevices.com> Sent: Wednesday, April 06, 2016 10:26 AM
-> To: netdev at vger.kernel.org; davem at davemloft.net; Fugang Duan
-> <fugang.duan@nxp.com>; lznuaa at gmail.com
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>; l.stach at pengutronix.de;
-> andrew at lunn.ch; tremyfr at gmail.com; gerg at uclinux.org; linux-arm-
-> kernel at lists.infradead.org; johannes at sipsolutions.net;
-> stillcompiling at gmail.com; sergei.shtylyov at cogentembedded.com;
-> arnd at arndb.de; Troy Kisky <troy.kisky@boundarydevices.com>
-> Subject: [PATCH net-next V3 08/16] net: fec: set cbd_sc without relying on
-> previous value
+On 03/26/2016 03:14 AM, Andre Przywara wrote:
+> The GICv3 Interrupt Translation Service (ITS) uses tables in memory
+> to allow a sophisticated interrupt routing. It features device tables,
+> an interrupt table per device and a table connecting "collections" to
+> actual CPUs (aka. redistributors in the GICv3 lingo).
+> Since the interrupt numbers for the LPIs are allocated quite sparsely
+> and the range can be quite huge (8192 LPIs being the minimum), using
+> bitmaps or arrays for storing information is a waste of memory.
+> We use linked lists instead, which we iterate linearily. This works
+> very well with the actual number of LPIs/MSIs in the guest being
+> quite low. Should the number of LPIs exceed the number where iterating
+> through lists seems acceptable, we can later revisit this and use more
+> efficient data structures.
 > 
-> Relying on the wrap bit of cdb_sc to stay valid once initialized when the
-> controller also writes to this byte seems undesirable since we can easily know
-> what the value should be.
-> 
-> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
-> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 > ---
-> v3: change commit message
-> ---
->  drivers/net/ethernet/freescale/fec_main.c | 38 +++++++++----------------------
->  1 file changed, 11 insertions(+), 27 deletions(-)
+>  include/kvm/vgic/vgic.h      |  3 ++
+>  virt/kvm/arm/vgic/its-emul.c | 66 ++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 69 insertions(+)
 > 
-> diff --git a/drivers/net/ethernet/freescale/fec_main.c
-> b/drivers/net/ethernet/freescale/fec_main.c
-> index 3cd0cdf..21d2cd0 100644
-> --- a/drivers/net/ethernet/freescale/fec_main.c
-> +++ b/drivers/net/ethernet/freescale/fec_main.c
-> @@ -340,9 +340,8 @@ fec_enet_txq_submit_frag_skb(struct
-> fec_enet_priv_tx_q *txq,
->  		bdp = fec_enet_get_nextdesc(bdp, &txq->bd);
->  		ebdp = (struct bufdesc_ex *)bdp;
-> 
-> -		status = fec16_to_cpu(bdp->cbd_sc);
-> -		status &= ~BD_ENET_TX_STATS;
-> -		status |= (BD_ENET_TX_TC | BD_ENET_TX_READY);
-> +		status = BD_ENET_TX_TC | BD_ENET_TX_READY |
-> +				((bdp == txq->bd.last) ? BD_SC_WRAP : 0);
->  		frag_len = skb_shinfo(skb)->frags[frag].size;
-> 
->  		/* Handle the last BD specially */
-> @@ -436,8 +435,6 @@ static int fec_enet_txq_submit_skb(struct
-> fec_enet_priv_tx_q *txq,
->  	/* Fill in a Tx ring entry */
->  	bdp = txq->bd.cur;
->  	last_bdp = bdp;
-> -	status = fec16_to_cpu(bdp->cbd_sc);
-> -	status &= ~BD_ENET_TX_STATS;
-> 
->  	/* Set buffer length and buffer pointer */
->  	bufaddr = skb->data;
-> @@ -462,6 +459,8 @@ static int fec_enet_txq_submit_skb(struct
-> fec_enet_priv_tx_q *txq,
->  		return NETDEV_TX_OK;
->  	}
-> 
-> +	status = BD_ENET_TX_TC | BD_ENET_TX_READY |
-> +			((bdp == txq->bd.last) ? BD_SC_WRAP : 0);
->  	if (nr_frags) {
->  		last_bdp = fec_enet_txq_submit_frag_skb(txq, skb, ndev);
->  		if (IS_ERR(last_bdp)) {
-> @@ -512,7 +511,6 @@ static int fec_enet_txq_submit_skb(struct
-> fec_enet_priv_tx_q *txq,
->  	/* Send it on its way.  Tell FEC it's ready, interrupt when done,
->  	 * it's the last BD of the frame, and to put the CRC on the end.
->  	 */
-> -	status |= (BD_ENET_TX_READY | BD_ENET_TX_TC);
->  	bdp->cbd_sc = cpu_to_fec16(status);
-> 
->  	/* If this was the last BD in the ring, start at the beginning again. */ @@ -
-> 544,11 +542,6 @@ fec_enet_txq_put_data_tso(struct fec_enet_priv_tx_q *txq,
-> struct sk_buff *skb,
->  	unsigned int estatus = 0;
->  	dma_addr_t addr;
-> 
-> -	status = fec16_to_cpu(bdp->cbd_sc);
-> -	status &= ~BD_ENET_TX_STATS;
-> -
-> -	status |= (BD_ENET_TX_TC | BD_ENET_TX_READY);
-> -
->  	if (((unsigned long) data) & fep->tx_align ||
->  		fep->quirks & FEC_QUIRK_SWAP_FRAME) {
->  		memcpy(txq->tx_bounce[index], data, size); @@ -578,15
-> +571,16 @@ fec_enet_txq_put_data_tso(struct fec_enet_priv_tx_q *txq,
-> struct sk_buff *skb,
->  		ebdp->cbd_esc = cpu_to_fec32(estatus);
->  	}
-> 
-> +	status = BD_ENET_TX_TC | BD_ENET_TX_READY |
-> +			((bdp == txq->bd.last) ? BD_SC_WRAP : 0);
->  	/* Handle the last BD specially */
->  	if (last_tcp)
-> -		status |= (BD_ENET_TX_LAST | BD_ENET_TX_TC);
-> +		status |= BD_ENET_TX_LAST;
->  	if (is_last) {
->  		status |= BD_ENET_TX_INTR;
->  		if (fep->bufdesc_ex)
->  			ebdp->cbd_esc |= cpu_to_fec32(BD_ENET_TX_INT);
->  	}
-> -
->  	bdp->cbd_sc = cpu_to_fec16(status);
-> 
->  	return 0;
-> @@ -602,13 +596,8 @@ fec_enet_txq_put_hdr_tso(struct fec_enet_priv_tx_q
-> *txq,
->  	struct bufdesc_ex *ebdp = container_of(bdp, struct bufdesc_ex, desc);
->  	void *bufaddr;
->  	unsigned long dmabuf;
-> -	unsigned short status;
->  	unsigned int estatus = 0;
-> 
-> -	status = fec16_to_cpu(bdp->cbd_sc);
-> -	status &= ~BD_ENET_TX_STATS;
-> -	status |= (BD_ENET_TX_TC | BD_ENET_TX_READY);
-> -
->  	bufaddr = txq->tso_hdrs + index * TSO_HEADER_SIZE;
->  	dmabuf = txq->tso_hdrs_dma + index * TSO_HEADER_SIZE;
->  	if (((unsigned long)bufaddr) & fep->tx_align || @@ -641,8 +630,8 @@
-> fec_enet_txq_put_hdr_tso(struct fec_enet_priv_tx_q *txq,
->  		ebdp->cbd_esc = cpu_to_fec32(estatus);
->  	}
-> 
-> -	bdp->cbd_sc = cpu_to_fec16(status);
-> -
-> +	bdp->cbd_sc = cpu_to_fec16(BD_ENET_TX_TC | BD_ENET_TX_READY |
-> +			((bdp == txq->bd.last) ? BD_SC_WRAP : 0));
+> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+> index bafea11..ecf3260 100644
+> --- a/include/kvm/vgic/vgic.h
+> +++ b/include/kvm/vgic/vgic.h
+> @@ -22,6 +22,7 @@
+>  #include <linux/spinlock.h>
+>  #include <linux/types.h>
+>  #include <kvm/iodev.h>
+> +#include <linux/list.h>
+>  
+>  #define VGIC_V3_MAX_CPUS	255
+>  #define VGIC_V2_MAX_CPUS	8
+> @@ -118,6 +119,8 @@ struct vgic_its {
+>  	u64			cbaser;
+>  	int			creadr;
+>  	int			cwriter;
+> +	struct list_head	device_list;
+> +	struct list_head	collection_list;
+>  };
+>  
+>  struct vgic_dist {
+> diff --git a/virt/kvm/arm/vgic/its-emul.c b/virt/kvm/arm/vgic/its-emul.c
+> index de8d360..c0334ff 100644
+> --- a/virt/kvm/arm/vgic/its-emul.c
+> +++ b/virt/kvm/arm/vgic/its-emul.c
+> @@ -21,6 +21,7 @@
+>  #include <linux/kvm.h>
+>  #include <linux/kvm_host.h>
+>  #include <linux/interrupt.h>
+> +#include <linux/list.h>
+>  
+>  #include <linux/irqchip/arm-gic-v3.h>
+>  
+> @@ -31,6 +32,34 @@
+>  #include "vgic.h"
+>  #include "vgic_mmio.h"
+>  
+> +struct its_device {
+> +	struct list_head dev_list;
+> +
+> +	/* the head for the list of ITTEs */
+> +	struct list_head itt;
+> +	u32 device_id;
+> +};
+> +
+> +#define COLLECTION_NOT_MAPPED ((u32)-1)
+> +
+> +struct its_collection {
+> +	struct list_head coll_list;
+> +
+> +	u32 collection_id;
+> +	u32 target_addr;
+> +};
+> +
+> +#define its_is_collection_mapped(coll) ((coll) && \
+> +				((coll)->target_addr != COLLECTION_NOT_MAPPED))
+> +
+> +struct its_itte {
+> +	struct list_head itte_list;
+> +
+> +	struct its_collection *collection;
+> +	u32 lpi;
+> +	u32 event_id;
+> +};
+> +
+>  #define BASER_BASE_ADDRESS(x) ((x) & 0xfffffffff000ULL)
+>  
+>  static int vgic_mmio_read_its_ctlr(struct kvm_vcpu *vcpu,
+> @@ -137,6 +166,12 @@ static int vgic_mmio_read_its_idregs(struct kvm_vcpu *vcpu,
 >  	return 0;
 >  }
-> 
-> @@ -1454,12 +1443,6 @@ static int fec_rxq(struct net_device *ndev, struct
-> fec_enet_priv_rx_q *rxq,
->  		}
-> 
->  rx_processing_done:
-> -		/* Clear the status flags for this buffer */
-> -		status &= ~BD_ENET_RX_STATS;
-> -
-> -		/* Mark the buffer empty */
-> -		status |= BD_ENET_RX_EMPTY;
-> -
->  		if (fep->bufdesc_ex) {
->  			struct bufdesc_ex *ebdp = (struct bufdesc_ex *)bdp;
-> 
-> @@ -1471,7 +1454,8 @@ rx_processing_done:
->  		 * performed before transferring ownership.
->  		 */
->  		wmb();
-> -		bdp->cbd_sc = cpu_to_fec16(status);
-> +		bdp->cbd_sc = cpu_to_fec16(BD_ENET_RX_EMPTY |
-> +				((bdp == rxq->bd.last) ? BD_SC_WRAP : 0));
-> 
->  		/* Update BD pointer to next entry */
->  		bdp = fec_enet_get_nextdesc(bdp, &rxq->bd);
-> --
-> 2.5.0
+>  
+> +static void its_free_itte(struct its_itte *itte)
+> +{
+> +	list_del(&itte->itte_list);
+> +	kfree(itte);
+> +}
+> +
+>  /*
+>   * This function is called with both the ITS and the distributor lock dropped,
+>   * so the actual command handlers must take the respective locks when needed.
+> @@ -309,6 +344,9 @@ int vits_init(struct kvm *kvm)
+>  
+>  	spin_lock_init(&its->lock);
+>  
+> +	INIT_LIST_HEAD(&its->device_list);
+> +	INIT_LIST_HEAD(&its->collection_list);
+> +
+>  	regions = kmalloc_array(ARRAY_SIZE(its_registers),
+>  				sizeof(struct vgic_io_device), GFP_KERNEL);
+>  
+> @@ -332,11 +370,39 @@ void vits_destroy(struct kvm *kvm)
+>  {
+>  	struct vgic_dist *dist = &kvm->arch.vgic;
+>  	struct vgic_its *its = &dist->its;
+> +	struct its_device *dev;
+> +	struct its_itte *itte;
+> +	struct list_head *dev_cur, *dev_temp;
+> +	struct list_head *cur, *temp;
+>  
+>  	if (!vgic_has_its(kvm))
+>  		return;
+>  
+> +	/*
+> +	 * We may end up here without the lists ever having been initialized.
+> +	 * Check this and bail out early to avoid dereferencing a NULL pointer.
+> +	 */
+> +	if (!its->device_list.next)
+> +		return;
+don't you check collection_list in a similar way then?
+> +
+> +	spin_lock(&its->lock);
+> +	list_for_each_safe(dev_cur, dev_temp, &its->device_list) {
+> +		dev = container_of(dev_cur, struct its_device, dev_list);
+> +		list_for_each_safe(cur, temp, &dev->itt) {
+use list_for_each_safe_entry instead?
 
-
-Patch 08 ~ 16:  Acked-by: Fugang Duan <fugang.duan@nxp.com>
+Eric
+> +			itte = (container_of(cur, struct its_itte, itte_list));
+> +			its_free_itte(itte);
+> +		}
+> +		list_del(dev_cur);
+> +		kfree(dev);
+> +	}
+> +
+> +	list_for_each_safe(cur, temp, &its->collection_list) {
+> +		list_del(cur);
+> +		kfree(container_of(cur, struct its_collection, coll_list));
+> +	}
+> +
+>  	kfree(dist->pendbaser);
+>  
+>  	its->enabled = false;
+> +	spin_unlock(&its->lock);
+>  }
+> 
