@@ -1,41 +1,52 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 06 Apr 2016 11:00:50 +0900
-Subject: [PATCH v2 11/11] ARM: dts: s5p: Fix DTC unit name warnings in SMDKv210
- board
-In-Reply-To: <1459908050-16430-1-git-send-email-k.kozlowski@samsung.com>
-References: <1459908050-16430-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1459908050-16430-11-git-send-email-k.kozlowski@samsung.com>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Tue,  5 Apr 2016 19:25:46 -0700
+Subject: [PATCH net-next V3 00/16] net: fec: cleanup and fixes
+Message-ID: <1459909562-22865-1-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix following DTC warnings in SMDKv210 board:
+V3 has
 
-Warning (unit_address_vs_reg): Node /soc/fimd at f8000000/display-timings/timing at 0 has a unit name, but no reg property
+1 dropped patch "net: fec: print more debug info in fec_timeout"
+2 new patches
+0002-net-fec-remove-unused-interrupt-FEC_ENET_TS_TIMER.patch
+0003-net-fec-return-IRQ_HANDLED-if-fec_ptp_check_pps_even.patch
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+1 combined patch
+0004-net-fec-pass-rxq-txq-to-fec_enet_rx-tx_queue-instead.patch
 
----
+The changes are noted on individual patches
 
-Changes since v1:
-1. Don't add unit name to memory.
-2. Add Javier's tag.
----
- arch/arm/boot/dts/s5pv210-smdkv210.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+My measured performance of this series is
 
-diff --git a/arch/arm/boot/dts/s5pv210-smdkv210.dts b/arch/arm/boot/dts/s5pv210-smdkv210.dts
-index 54fcc3fc82e2..9eb6aff3e38f 100644
---- a/arch/arm/boot/dts/s5pv210-smdkv210.dts
-+++ b/arch/arm/boot/dts/s5pv210-smdkv210.dts
-@@ -197,7 +197,7 @@
- 	display-timings {
- 		native-mode = <&timing0>;
- 
--		timing0: timing at 0 {
-+		timing0: timing {
- 			/* 800x480 at 60Hz */
- 			clock-frequency = <24373920>;
- 			hactive = <800>;
+before patch set
+365 Mbits/sec Tx/407 RX
+
+after patch set
+374 Tx/427 Rx
+
+
+Troy Kisky (16):
+  net: fec: only check queue 0 if RXF_0/TXF_0 interrupt is set
+  net: fec: remove unused interrupt FEC_ENET_TS_TIMER
+  net: fec: return IRQ_HANDLED if fec_ptp_check_pps_event handled it
+  net: fec: pass rxq/txq to fec_enet_rx/tx_queue instead of queue_id
+  net: fec: reduce interrupts
+  net: fec: split off napi routine with 3 queues
+  net: fec: don't clear all rx queue bits when just one is being checked
+  net: fec: set cbd_sc without relying on previous value
+  net: fec: eliminate calls to fec_enet_get_prevdesc
+  net: fec: move restart test for efficiency
+  net: fec: clear cbd_sc after transmission to help with debugging
+  net: fec: dump all tx queues in fec_dump
+  net: fec: detect tx int lost
+  net: fec: create subroutine reset_tx_queue
+  net: fec: call dma_unmap_single on mapped tx buffers at restart
+  net: fec: don't set cbd_bufaddr unless no mapping error
+
+ drivers/net/ethernet/freescale/fec.h      |  10 +-
+ drivers/net/ethernet/freescale/fec_main.c | 410 ++++++++++++++++--------------
+ 2 files changed, 218 insertions(+), 202 deletions(-)
+
 -- 
 2.5.0
