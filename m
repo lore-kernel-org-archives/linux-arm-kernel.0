@@ -1,78 +1,60 @@
 From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Tue,  5 Apr 2016 19:25:59 -0700
-Subject: [PATCH net-next V3 13/16] net: fec: detect tx int lost
+Date: Tue,  5 Apr 2016 19:26:02 -0700
+Subject: [PATCH net-next V3 16/16] net: fec: don't set cbd_bufaddr unless no
+ mapping error
 In-Reply-To: <1459909562-22865-1-git-send-email-troy.kisky@boundarydevices.com>
 References: <1459909562-22865-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <1459909562-22865-14-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <1459909562-22865-17-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a tx int is lost, no need to reset
-the fec. Just mark the event and call napi_schedule.
+Not assigning cbd_bufaddr on error will prevent trying to
+unmap the error in case the FEC is reset.
 
 Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
 
 ---
 v3: no change
 ---
- drivers/net/ethernet/freescale/fec_main.c | 38 ++++++++++++++++++++++++++++++-
- 1 file changed, 37 insertions(+), 1 deletion(-)
+ drivers/net/ethernet/freescale/fec_main.c | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index be875fd..445443d 100644
+index 101d820..c2ed8be 100644
 --- a/drivers/net/ethernet/freescale/fec_main.c
 +++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -1094,14 +1094,50 @@ fec_stop(struct net_device *ndev)
- 	}
- }
+@@ -600,7 +600,7 @@ fec_enet_txq_put_hdr_tso(struct fec_enet_priv_tx_q *txq,
+ 	int hdr_len = skb_transport_offset(skb) + tcp_hdrlen(skb);
+ 	struct bufdesc_ex *ebdp = container_of(bdp, struct bufdesc_ex, desc);
+ 	void *bufaddr;
+-	unsigned long dmabuf;
++	dma_addr_t dmabuf;
+ 	unsigned int estatus = 0;
  
-+static const uint txint_flags[] = {
-+	FEC_ENET_TXF_0, FEC_ENET_TXF_1, FEC_ENET_TXF_2
-+};
- 
- static void
- fec_timeout(struct net_device *ndev)
+ 	bufaddr = txq->tso_hdrs + index * TSO_HEADER_SIZE;
+@@ -1295,17 +1295,21 @@ fec_enet_new_rxbdp(struct net_device *ndev, struct bufdesc *bdp, struct sk_buff
  {
- 	struct fec_enet_private *fep = netdev_priv(ndev);
-+	struct bufdesc *bdp;
-+	unsigned short status;
-+	int i;
-+	uint events = 0;
+ 	struct  fec_enet_private *fep = netdev_priv(ndev);
+ 	int off;
++	dma_addr_t dmabuf;
  
--	fec_dump(ndev);
-+	for (i = 0; i < fep->num_tx_queues; i++) {
-+		struct fec_enet_priv_tx_q *txq = fep->tx_queue[i];
-+		int index;
-+		struct sk_buff *skb = NULL;
+ 	off = ((unsigned long)skb->data) & fep->rx_align;
+ 	if (off)
+ 		skb_reserve(skb, fep->rx_align + 1 - off);
  
-+		bdp = txq->dirty_tx;
-+		while (1) {
-+			bdp = fec_enet_get_nextdesc(bdp, &txq->bd);
-+			if (bdp == txq->bd.cur)
-+				break;
-+			index = fec_enet_get_bd_index(bdp, &txq->bd);
-+			skb = txq->tx_skbuff[index];
-+			if (skb) {
-+				status = fec16_to_cpu(bdp->cbd_sc);
-+				if ((status & BD_ENET_TX_READY) == 0)
-+					events |= txint_flags[i];
-+				break;
-+			}
-+		}
-+	}
-+	if (events) {
-+		fep->events |= events;
-+		/* Disable the RX/TX interrupt */
-+		writel(FEC_NAPI_IMASK, fep->hwp + FEC_IMASK);
-+		napi_schedule(&fep->napi);
-+		netif_wake_queue(fep->netdev);
-+		pr_err("%s: tx int lost\n", __func__);
-+		return;
-+	}
-+
-+	fec_dump(ndev);
- 	ndev->stats.tx_errors++;
+-	bdp->cbd_bufaddr = cpu_to_fec32(dma_map_single(&fep->pdev->dev, skb->data, FEC_ENET_RX_FRSIZE - fep->rx_align, DMA_FROM_DEVICE));
+-	if (dma_mapping_error(&fep->pdev->dev, fec32_to_cpu(bdp->cbd_bufaddr))) {
++	dmabuf = dma_map_single(&fep->pdev->dev, skb->data,
++				FEC_ENET_RX_FRSIZE - fep->rx_align,
++				DMA_FROM_DEVICE);
++	if (dma_mapping_error(&fep->pdev->dev, dmabuf)) {
+ 		if (net_ratelimit())
+ 			netdev_err(ndev, "Rx DMA memory map failed\n");
+ 		return -ENOMEM;
+ 	}
++	bdp->cbd_bufaddr = cpu_to_fec32(dmabuf);
  
- 	schedule_work(&fep->tx_timeout_work);
+ 	return 0;
+ }
 -- 
 2.5.0
