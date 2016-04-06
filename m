@@ -1,112 +1,296 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 6 Apr 2016 08:05:56 +0800
-Subject: [PATCH v2] arm: omap2: remove redundant multiplatform checks
-In-Reply-To: <1459895738-6546-1-git-send-email-jonas.rabenstein@studium.uni-erlangen.de>
-Message-ID: <201604060800.bQaPgVZ1%fengguang.wu@intel.com>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Wed, 6 Apr 2016 08:50:51 +0800
+Subject: [PATCH v7 2/4] power: reset: add reboot mode driver
+In-Reply-To: <56FB49B3.2040505@samsung.com>
+References: <1459304304-9713-1-git-send-email-andy.yan@rock-chips.com>
+ <1459304443-9811-1-git-send-email-andy.yan@rock-chips.com>
+ <56FB49B3.2040505@samsung.com>
+Message-ID: <57045D6B.2080907@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jonas,
+Hi Krzysztof:
 
-[auto build test ERROR on arm-soc/for-next]
-[also build test ERROR on v4.6-rc2 next-20160405]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+     Thanks for you comments.
 
-url:    https://github.com/0day-ci/linux/commits/Jonas-Rabenstein/arm-omap2-remove-redundant-multiplatform-checks/20160406-064050
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git for-next
-config: arm-multi_v7_defconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+On 2016?03?30? 11:36, Krzysztof Kozlowski wrote:
+> On 30.03.2016 11:20, Andy Yan wrote:
+>> This driver parses the reboot commands like "reboot bootloader"
+>> and "reboot recovery" to get a boot mode described in the
+>> device tree , then call the write interfae to store the boot
+>> mode in some place like special register or sram, which can
+>> be read by the bootloader after system reboot, then the bootloader
+>> can take different action according to the mode stored.
+>>
+>> This is commonly used on Android based devices, in order to
+>> reboot the device into fastboot or recovery mode.
+>>
+>> Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+>> Reviewed-by: Moritz Fischer <moritz.fischer@ettus.com>
+>> Tested-by: John Stultz <john.stultz@linaro.org>
+>> Acked-by: John Stultz <john.stultz@linaro.org>
+>> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+>>
+>> ---
+>>
+>> Changes in v7:
+>> - address some suggestions from Krzysztof, make syscon-reboot-mode driver data self-contained.
+>>
+> Thanks for changes, few comments below.
+>
+> (...)
+>
+>> diff --git a/drivers/power/reset/reboot-mode.c b/drivers/power/reset/reboot-mode.c
+>> new file mode 100644
+>> index 0000000..ae6f931
+>> --- /dev/null
+>> +++ b/drivers/power/reset/reboot-mode.c
+>> @@ -0,0 +1,115 @@
+>> +/*
+>> + * Copyright (c) 2016, Fuzhou Rockchip Electronics Co., Ltd
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License, or
+>> + * (at your option) any later version.
+>> + */
+>> +
+>> +#include <linux/device.h>
+>> +#include <linux/init.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/module.h>
+>> +#include <linux/of.h>
+>> +#include <linux/reboot.h>
+>> +#include "reboot-mode.h"
+>> +
+>> +#define PREFIX "mode-"
+>> +
+>> +struct mode_info {
+>> +	const char *mode;
+>> +	unsigned int magic;
+>> +	struct list_head list;
+>> +};
+>> +
+>> +struct reboot_mode_driver {
+>> +	struct device *dev;
+>> +	struct list_head head;
+>> +	int (*write)(struct device *dev, int magic);
+>> +	struct notifier_block reboot_notifier;
+>> +};
+>> +
+>> +static int get_reboot_mode_magic(struct reboot_mode_driver *reboot,
+>> +				 const char *cmd)
+>> +{
+>> +	const char *normal = "normal";
+>> +	int magic = 0;
+>> +	struct mode_info *info;
+>> +
+>> +	if (!cmd)
+>> +		cmd = normal;
+>> +
+>> +	list_for_each_entry(info, &reboot->head, list) {
+>> +		if (!strcmp(info->mode, cmd)) {
+>> +			magic = info->magic;
+>> +			break;
+>> +		}
+>> +	}
+>> +
+>> +	return magic;
+>> +}
+>> +
+>> +static int reboot_mode_notify(struct notifier_block *this,
+>> +			      unsigned long mode, void *cmd)
+>> +{
+>> +	struct reboot_mode_driver *reboot;
+>> +	int magic;
+>> +
+>> +	reboot = container_of(this, struct reboot_mode_driver, reboot_notifier);
+>> +	magic = get_reboot_mode_magic(reboot, cmd);
+>> +	if (magic)
+>> +		reboot->write(reboot->dev, magic);
+>> +
+>> +	return NOTIFY_DONE;
+>> +}
+>> +
+>> +int reboot_mode_register(struct device *dev, int (*write)(struct device *, int))
+>> +{
+>> +	struct reboot_mode_driver *reboot;
+>> +	struct mode_info *info;
+>> +	struct property *prop;
+>> +	struct device_node *np;
+>> +	size_t len = strlen(PREFIX);
+>> +	int ret;
+>> +
+>> +	reboot = devm_kzalloc(dev, sizeof(*reboot), GFP_KERNEL);
+>> +	if (!reboot)
+>> +		return -ENOMEM;
+>> +
+>> +	reboot->dev = dev;
+>> +	reboot->write = write;
+>> +	INIT_LIST_HEAD(&reboot->head);
+>> +
+>> +	np = of_node_get(dev->of_node);
+>> +	for_each_property_of_node(np, prop) {
+>> +		if (len > strlen(prop->name) || strncmp(prop->name, PREFIX, len))
+>> +			continue;
+>> +
+>> +		info = devm_kzalloc(dev, sizeof(*info), GFP_KERNEL);
+>> +		if (!info)
+> Clean up needed: of_node_put() and kfree_const() for items stored on the
+> list from previous iterations.
 
-All errors (new ones prefixed by >>):
+     Okay, I will add it in V8.
+>> +			return -ENOMEM;
+>> +
+>> +		info->mode = kstrdup_const(prop->name + len, GFP_KERNEL);
+>> +		if (of_property_read_u32(np, prop->name, &info->magic)) {
+>> +			dev_err(dev, "reboot mode %s without magic number\n",
+>> +				info->mode);
+>> +			devm_kfree(dev, info);
+>> +			continue;
+>> +		}
+>> +		list_add_tail(&info->list, &reboot->head);
+>> +	}
+>> +	of_node_put(np);
+> If you of_node_put() here, there is no sense in getting it before. I
+> mentioned of_node_get() only because I am not sure about life-cycle of
+> nodes in case of DT overlays and you are storing the pointer to string
+> from DT.
+>
+> The doubts I have are concerning only the case of freeing nodes from
+> overlay.
+>
+> I don't know if of_node_get() is needed but of_node_get()+of_node_put()
+> seems useless.
 
-   arch/arm/mach-omap2/io.c: In function 'omap_sdrc_init':
->> arch/arm/mach-omap2/io.c:766:2: error: implicit declaration of function 'soc_is_omap24xx' [-Werror=implicit-function-declaration]
-     if (cpu_is_omap24xx() || omap3_has_sdrc()) {
-     ^
-   cc1: some warnings being treated as errors
---
-   arch/arm/mach-omap2/control.c: In function 'omap_ctrl_write_dsp_boot_addr':
->> arch/arm/mach-omap2/control.c:245:2: error: implicit declaration of function 'soc_is_omap243x' [-Werror=implicit-function-declaration]
-     u32 offset = cpu_is_omap243x() ? OMAP243X_CONTROL_IVA2_BOOTADDR :
-     ^
-   cc1: some warnings being treated as errors
---
-   arch/arm/mach-omap2/timer.c: In function 'omap_dm_timer_get_errata':
->> arch/arm/mach-omap2/timer.c:223:2: error: implicit declaration of function 'soc_is_omap24xx' [-Werror=implicit-function-declaration]
-     if (cpu_is_omap24xx())
-     ^
-   cc1: some warnings being treated as errors
---
-   arch/arm/mach-omap2/display.c: In function 'omap_display_get_version':
->> arch/arm/mach-omap2/display.c:265:2: error: implicit declaration of function 'soc_is_omap24xx' [-Werror=implicit-function-declaration]
-     if (cpu_is_omap24xx())
-     ^
-   cc1: some warnings being treated as errors
---
-   arch/arm/mach-omap2/i2c.c: In function 'omap_i2c_nr_ports':
->> arch/arm/mach-omap2/i2c.c:115:2: error: implicit declaration of function 'soc_is_omap24xx' [-Werror=implicit-function-declaration]
-     if (cpu_is_omap24xx())
-     ^
-   cc1: some warnings being treated as errors
---
-   arch/arm/mach-omap2/omap_hwmod.c: In function 'omap_hwmod_init':
->> arch/arm/mach-omap2/omap_hwmod.c:3895:2: error: implicit declaration of function 'soc_is_omap24xx' [-Werror=implicit-function-declaration]
-     if (cpu_is_omap24xx()) {
-     ^
-   cc1: some warnings being treated as errors
---
-   arch/arm/mach-omap2/sram.c: In function 'is_sram_locked':
->> arch/arm/mach-omap2/sram.c:66:3: error: implicit declaration of function 'soc_is_omap242x' [-Werror=implicit-function-declaration]
-      if (cpu_is_omap242x()) {
-      ^
-   arch/arm/mach-omap2/sram.c: In function 'omap_detect_sram':
->> arch/arm/mach-omap2/sram.c:114:4: error: implicit declaration of function 'soc_is_omap243x' [-Werror=implicit-function-declaration]
-       else if (cpu_is_omap243x())
-       ^
-   cc1: some warnings being treated as errors
---
-   arch/arm/mach-omap2/clockdomain.c: In function 'clkdm_hwmod_enable':
->> arch/arm/mach-omap2/clockdomain.c:1233:2: error: implicit declaration of function 'soc_is_omap24xx' [-Werror=implicit-function-declaration]
-     if (cpu_is_omap24xx() || cpu_is_omap34xx())
-     ^
-   cc1: some warnings being treated as errors
---
-   arch/arm/mach-omap2/clock.c: In function 'ti_clk_init_features':
->> arch/arm/mach-omap2/clock.c:194:2: error: implicit declaration of function 'soc_is_omap24xx' [-Werror=implicit-function-declaration]
-     if (cpu_is_omap24xx()) {
-     ^
-   cc1: some warnings being treated as errors
 
-vim +/soc_is_omap24xx +766 arch/arm/mach-omap2/io.c
+  I am also not sure about it. Maybe just drop of_node_get/put ?
+>> +
+>> +	reboot->reboot_notifier.notifier_call = reboot_mode_notify;
+>> +	ret = register_reboot_notifier(&reboot->reboot_notifier);
+>> +	if (ret)
+>> +		dev_err(dev, "can't register reboot notifier\n");
+>> +
+>> +	return ret;
+>> +}
+>> +EXPORT_SYMBOL_GPL(reboot_mode_register);
+>> +
+>> +MODULE_AUTHOR("Andy Yan <andy.yan@rock-chips.com");
+>> +MODULE_DESCRIPTION("System reboot mode driver");
+>> +MODULE_LICENSE("GPL v2");
+>> diff --git a/drivers/power/reset/reboot-mode.h b/drivers/power/reset/reboot-mode.h
+>> new file mode 100644
+>> index 0000000..c861129
+>> --- /dev/null
+>> +++ b/drivers/power/reset/reboot-mode.h
+>> @@ -0,0 +1,6 @@
+>> +#ifndef __REBOOT_MODE_H__
+>> +#define __REBOOT_MODE_H__
+>> +
+>> +int reboot_mode_register(struct device *dev, int (*write)(struct device *, int));
+>> +
+>> +#endif
+>> diff --git a/drivers/power/reset/syscon-reboot-mode.c b/drivers/power/reset/syscon-reboot-mode.c
+>> new file mode 100644
+>> index 0000000..f1b8072
+>> --- /dev/null
+>> +++ b/drivers/power/reset/syscon-reboot-mode.c
+>> @@ -0,0 +1,86 @@
+>> +/*
+>> + * Copyright (c) 2016, Fuzhou Rockchip Electronics Co., Ltd
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License, or
+>> + * (at your option) any later version.
+>> + */
+>> +
+>> +#include <linux/init.h>
+>> +#include <linux/module.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/of.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/reboot.h>
+>> +#include <linux/regmap.h>
+>> +#include <linux/mfd/syscon.h>
+>> +#include "reboot-mode.h"
+>> +
+>> +struct syscon_reboot_mode {
+>> +	struct device *dev;
+> 'dev' looks unused (only set).
 
-a3a9384a R Sricharan      2013-07-03  760  
-a4ca9dbe Tony Lindgren    2011-08-22  761  void __init omap_sdrc_init(struct omap_sdrc_params *sdrc_cs0,
-4805734b Paul Walmsley    2010-12-21  762  				      struct omap_sdrc_params *sdrc_cs1)
-4805734b Paul Walmsley    2010-12-21  763  {
-a66cb345 Tony Lindgren    2011-10-04  764  	omap_sram_init();
-a66cb345 Tony Lindgren    2011-10-04  765  
-01001712 Hemant Pedanekar 2011-02-16 @766  	if (cpu_is_omap24xx() || omap3_has_sdrc()) {
-58cda884 Jean Pihet       2009-07-24  767  		omap2_sdrc_init(sdrc_cs0, sdrc_cs1);
-2f135eaf Paul Walmsley    2009-06-19  768  		_omap2_init_reprogram_sdrc();
-aa4b1f6e Kevin Hilman     2010-03-10  769  	}
+     This will be removed.
+>
+>> +	struct regmap *map;
+>> +	u32 offset;
+>> +	u32 mask;
+>> +};
+>> +
+>> +static int syscon_reboot_mode_write(struct device *dev, int magic)
+>> +{
+>> +	struct syscon_reboot_mode *syscon_rbm = dev_get_drvdata(dev);
+>> +	int ret;
+>> +
+>> +	ret = regmap_update_bits(syscon_rbm->map, syscon_rbm->offset,
+>> +				 syscon_rbm->mask, magic);
+>> +	if (ret < 0)
+>> +		dev_err(dev, "update reboot mode bits failed\n");
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +static int syscon_reboot_mode_probe(struct platform_device *pdev)
+>> +{
+>> +	int ret;
+>> +	struct syscon_reboot_mode *syscon_rbm;
+>> +
+>> +	syscon_rbm = devm_kzalloc(&pdev->dev, sizeof(*syscon_rbm), GFP_KERNEL);
+>> +	if (!syscon_rbm)
+>> +		return -ENOMEM;
+>> +
+>> +	syscon_rbm->dev = &pdev->dev;
+>> +	syscon_rbm->mask = 0xffffffff;
+>> +
+>> +	syscon_rbm->map = syscon_node_to_regmap(pdev->dev.parent->of_node);
+>> +	if (IS_ERR(syscon_rbm->map))
+>> +		return PTR_ERR(syscon_rbm->map);
+>> +
+>> +	if (of_property_read_u32(pdev->dev.of_node, "offset", &syscon_rbm->offset))
+>> +		return -EINVAL;
+>> +
+>> +	of_property_read_u32(pdev->dev.of_node, "mask", &syscon_rbm->mask);
+>> +
+>> +	dev_set_drvdata(&pdev->dev, syscon_rbm);
+>> +
+>> +	ret = reboot_mode_register(&pdev->dev, syscon_reboot_mode_write);
+>> +	if (ret)
+>> +		dev_err(&pdev->dev, "can't register reboot mode\n");
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +static const struct of_device_id syscon_reboot_mode_of_match[] = {
+>> +	{ .compatible = "syscon-reboot-mode" },
+>> +	{}
+>> +};
+>> +
+>> +static struct platform_driver syscon_reboot_mode_driver = {
+>> +	.probe = syscon_reboot_mode_probe,
+> Cleanup needed. What will happen after device unbind? Memory will be
+> released (devm-*()) but reboot notifier won't thus leading to OOPS on
+> reboot.
 
-:::::: The code at line 766 was first introduced by commit
-:::::: 01001712c96f82e6317b1e09729d8fc4bcc66957 TI816X: Update common OMAP machine specific sources
-
-:::::: TO: Hemant Pedanekar <hemantp@ti.com>
-:::::: CC: Tony Lindgren <tony@atomide.com>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 36970 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160406/553231e4/attachment-0001.obj>
+     From the kernel_restart_prepare function, the reboot notifier will 
+be called before device_shutdown. Is there any other case the device 
+unbind before reboot notifier
+called?
+> Best regards,
+> Krzysztof
+>
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+>
+>
+>
