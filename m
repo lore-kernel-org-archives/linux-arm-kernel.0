@@ -1,72 +1,51 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 6 Apr 2016 15:28:00 +0800
-Subject: [PATCH] i2c: designware-platdrv: get fast/std speed scl high/low
- count from DT
-Message-ID: <1459927680-5480-1-git-send-email-jszhang@marvell.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Wed,  6 Apr 2016 09:32:59 +0200
+Subject: [PATCH] ARM: dts: imx28: add alternative pinmuxing for mac0
+Message-ID: <1459927979-11665-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sometimes, it's convenient to define the scl's high/low count directly,
-e.g HW people would do some measurement then directly give out the
-optimum counts. Previously, we solved the sda falling time and scl
-falling time by i2c_dw_scl_hcnt() and i2c_dw_scl_lcnt(), then put them
-into dt, but what we really care isn't the sda/scl falling time.
-
->From another side, the dw_i2c_acpi_configure() on ACPI platform also
-get hcnt/lcnt values rather than the sda/scl falling time from ACPI
-method, we want similar feature for DT platforms.
-
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- Documentation/devicetree/bindings/i2c/i2c-designware.txt | 16 ++++++++++++++++
- drivers/i2c/busses/i2c-designware-platdrv.c              |  8 ++++++++
- 2 files changed, 24 insertions(+)
+ arch/arm/boot/dts/imx28.dtsi | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-designware.txt b/Documentation/devicetree/bindings/i2c/i2c-designware.txt
-index fee26dc..05176fbf 100644
---- a/Documentation/devicetree/bindings/i2c/i2c-designware.txt
-+++ b/Documentation/devicetree/bindings/i2c/i2c-designware.txt
-@@ -20,6 +20,22 @@ Optional properties :
-  - i2c-sda-falling-time-ns : should contain the SDA falling time in nanoseconds.
-    This value which is by default 300ns is used to compute the tHIGH period.
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index 4e073e854742..8058adf42ea6 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -423,6 +423,32 @@
+ 					fsl,pull-up = <MXS_PULL_ENABLE>;
+ 				};
  
-+ - i2c-ss-scl-high-count : should contain the standard speed i2c clock SCL high
-+   count. If defined, the i2c-scl-falling-time-ns and i2c-sda-falling-time-ns
-+   will be ignored.
++				mac0_pins_b: mac0 at 1 {
++					reg = <1>;
++					fsl,pinmux-ids = <
++						MX28_PAD_ENET0_MDC__ENET0_MDC
++						MX28_PAD_ENET0_MDIO__ENET0_MDIO
++						MX28_PAD_ENET0_RX_EN__ENET0_RX_EN
++						MX28_PAD_ENET0_RXD0__ENET0_RXD0
++						MX28_PAD_ENET0_RXD1__ENET0_RXD1
++						MX28_PAD_ENET0_RXD2__ENET0_RXD2
++						MX28_PAD_ENET0_RXD3__ENET0_RXD3
++						MX28_PAD_ENET0_TX_EN__ENET0_TX_EN
++						MX28_PAD_ENET0_TXD0__ENET0_TXD0
++						MX28_PAD_ENET0_TXD1__ENET0_TXD1
++						MX28_PAD_ENET0_TXD2__ENET0_TXD2
++						MX28_PAD_ENET0_TXD3__ENET0_TXD3
++						MX28_PAD_ENET_CLK__CLKCTRL_ENET
++						MX28_PAD_ENET0_COL__ENET0_COL
++						MX28_PAD_ENET0_CRS__ENET0_CRS
++						MX28_PAD_ENET0_TX_CLK__ENET0_TX_CLK
++						MX28_PAD_ENET0_RX_CLK__ENET0_RX_CLK
++						>;
++					fsl,drive-strength = <MXS_DRIVE_8mA>;
++					fsl,voltage = <MXS_VOLTAGE_HIGH>;
++					fsl,pull-up = <MXS_PULL_ENABLE>;
++				};
 +
-+ - i2c-ss-scl-low-count : should contain the standard speed i2c clock SCL low
-+   count. If defined, the i2c-scl-falling-time-ns and i2c-sda-falling-time-ns
-+   will be ignored.
-+
-+ - i2c-fs-scl-high-count : should contain the fast speed i2c clock SCL high
-+   count. If defined, the i2c-scl-falling-time-ns and i2c-sda-falling-time-ns
-+   will be ignored.
-+
-+ - i2c-fs-scl-low-count : should contain the fast speed i2c clock SCL low
-+   count. If defined, the i2c-scl-falling-time-ns and i2c-sda-falling-time-ns
-+   will be ignored.
-+
- Example :
- 
- 	i2c at f0000 {
-diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
-index d656657..8739a60 100644
---- a/drivers/i2c/busses/i2c-designware-platdrv.c
-+++ b/drivers/i2c/busses/i2c-designware-platdrv.c
-@@ -188,6 +188,14 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
- 					 &dev->scl_falling_time);
- 		device_property_read_u32(&pdev->dev, "clock-frequency",
- 					 &clk_freq);
-+		device_property_read_u16(&pdev->dev, "i2c-ss-scl-high-count",
-+					 &dev->ss_hcnt);
-+		device_property_read_u16(&pdev->dev, "i2c-ss-scl-low-count",
-+					 &dev->ss_lcnt);
-+		device_property_read_u16(&pdev->dev, "i2c-fs-scl-high-count",
-+					 &dev->fs_hcnt);
-+		device_property_read_u16(&pdev->dev, "i2c-fs-scl-low-count",
-+					 &dev->fs_lcnt);
- 	}
- 
- 	if (has_acpi_companion(&pdev->dev))
+ 				mac1_pins_a: mac1 at 0 {
+ 					reg = <0>;
+ 					fsl,pinmux-ids = <
 -- 
-2.8.0.rc3
+2.7.0
