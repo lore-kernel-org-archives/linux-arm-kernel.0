@@ -1,52 +1,68 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 6 Apr 2016 08:51:50 +0200
-Subject: [RFC6 PATCH v6 00/21] ILP32 for ARM64
-In-Reply-To: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <CAMuHMdUUkaYVZ3-Jh6o1b++R=yFBg7siQt+A+TqqXRSa953CAw@mail.gmail.com>
+From: dyoung@redhat.com (Dave Young)
+Date: Wed, 6 Apr 2016 14:57:20 +0800
+Subject: [PATCH] ARM: kexec: fix crashkernel= handling
+In-Reply-To: <20160401132535.GP19428@n2100.arm.linux.org.uk>
+References: <E1akqb5-0002LZ-1f@rmk-PC.arm.linux.org.uk>
+ <20160330014638.GA6993@dhcp-128-65.nay.redhat.com>
+ <20160330123922.GA11351@dhcppc0.redhat.com>
+ <20160330130530.GH19428@n2100.arm.linux.org.uk>
+ <20160330132708.GC32738@redhat.com>
+ <20160401132535.GP19428@n2100.arm.linux.org.uk>
+Message-ID: <20160406065720.GA9157@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yuri,
+On 04/01/16 at 02:25pm, Russell King - ARM Linux wrote:
 
-On Wed, Apr 6, 2016 at 12:08 AM, Yury Norov <ynorov@caviumnetworks.com> wrote:
-> This version is rebased on kernel v4.6-rc2, and has fixes in signal subsystem.
-> It works with updated glibc [1] (though very draft), and tested with LTP.
->
-> It was tested on QEMU and ThunderX machines. No major difference found.
-> This is RFC because ILP32 is not tested in big-endian mode.
->
->  v3: https://lkml.org/lkml/2014/9/3/704
->  v4: https://lkml.org/lkml/2015/4/13/691
->  v5: https://lkml.org/lkml/2015/9/29/911
->
->  v6:
->  - time_t, __kenel_off_t and other types turned to be 32-bit
->    for compatibility reasons (after v5 discussion);
+[snip]
 
-Reading this sparked my interest, so I went to the links above...
+> Well, if we want to remove it, we then need to sort out a method of
+> specifying a limit on the address - where platforms physical memory
+> bridges the 4GB CPU-accessible limit, the crashkernel region must be
+> allocated below that so that it is boot-time accessible.
+> 
+> Some patches also have boot-time only aliases of RAM, with the normal
+> alias above 4GB (eg, TI Keystone2) where the running view of RAM is
+> at 0x800000000, but it has a non-coherent boot alias at 0x80000000.
+> 
+> I've patches which resolve some of the issues there, and making that
+> change would make this patch dependent on those changes.  So, I
+> recommend that this patch remains as-is for the time being, and this
+> issue is addressed in a later patch after the Keystone2 idmap_to_phys()
+> patches, similar to:
+> 
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 0a12fcf1aff6..74781e6d4e87 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -962,7 +962,6 @@ late_initcall(init_machine_late);
+>   * zImage relocating below the reserved region.
+>   */
+>  #define CRASH_ALIGN	(128 << 20)
+> -#define CRASH_ADDR_MAX	(PHYS_OFFSET + (512 << 20))
+>  
+>  static inline unsigned long long get_total_mem(void)
+>  {
+> @@ -992,7 +991,8 @@ static void __init reserve_crashkernel(void)
+>  		return;
+>  
+>  	if (crash_base <= 0) {
+> -		crash_base = memblock_find_in_range(CRASH_ALIGN, CRASH_ADDR_MAX,
+> +		unsigned long long crash_max = idmap_to_phys((u32)~0);
+> +		crash_base = memblock_find_in_range(CRASH_ALIGN, crash_max,
+>  						    crash_size, CRASH_ALIGN);
+>  		if (!crash_base) {
+>  			pr_err("crashkernel reservation failed - No suitable area found.\n");
+> 
+> Right now, I don't want to tie this facility to TI Keystone2 support
+> as what this patch is doing is something that the ARM kexec support
+> should have been doing since it was first introduced, so folk may
+> want to backport this change to stable trees.
 
-What makes you think these "applications that can?t readily be migrated to LP64
-because they were written assuming an ILP32 data model, and that will never
-become suitable for a LP64 data model and will remain locked into ILP32
-operating environments" are more likely to be fixed for y2038 later, than for
-LP64 now?
+Is it possible for PHYS_OFFSET + (512 << 20) be larger than 4G assume that phys_addr_t is 32bit, if so it can be trunked to a small value then
+the max will be wrong?
 
-We're already closer to the (future) y2038 than to the (past) introduction of
-LP64...
+Otherwise I think use it temprarily is fine.
 
-These unfixable legacy applications have been spreading through x32 to
-the shiny new arm64 server architecture (does ppc64el also have an ILP32 mode,
-or is it planned)? Lots of resources are spent on maintaining the status quo,
-instead of on fixing the real problems.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks
+Dave
