@@ -1,42 +1,39 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 6 Apr 2016 19:26:20 +0200
-Subject: [PATCH v5 5/9] irqchip/gic-v3: Gather all ACPI specific data in
- a single structure
-In-Reply-To: <1459769860-6629-6-git-send-email-julien.grall@arm.com>
+Date: Wed, 6 Apr 2016 19:28:05 +0200
+Subject: [PATCH v5 0/9] arm64: Add support for KVM with ACPI
+In-Reply-To: <1459769860-6629-1-git-send-email-julien.grall@arm.com>
 References: <1459769860-6629-1-git-send-email-julien.grall@arm.com>
- <1459769860-6629-6-git-send-email-julien.grall@arm.com>
-Message-ID: <20160406172620.GI8961@cbox>
+Message-ID: <20160406172805.GJ8961@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 04, 2016 at 12:37:36PM +0100, Julien Grall wrote:
-> The ACPI code requires to use global variales in order to collect
+On Mon, Apr 04, 2016 at 12:37:31PM +0100, Julien Grall wrote:
+> Hello,
+> 
+> This patch series allows KVM to work with ACPI on ARM64.
+> 
+> Currently, the firmware tables are parsed by the the virtual timer and virtual
+> GIC code in order to configure them correctly.
+> 
+> However the parsing of these tables is already done in the GIC and arch timer
+> drivers. This patch series introduces new helpers to retrieve the information
+> from the different drivers in order to avoid duplication of the parsing code.
+> 
+> To make the merge easier via the different trees, each patch modifies a single
+> subsystem. The suggested plan to merge the series is divided in 3 steps:
+> 
+> 1) Patches #1-#2 are merged via the clocksource tree
+>    Patches #2-#6 are merged via the irqchip tree
+> 2) Patches #7-#8 are merge via the KVM tree
+> 3) Patch #9 is merged via the clocksource tree.
+> 
 
-s/variales/variables/
+I'm not a clocksource or irqchip expert, and far from an ACPI expert,
+but this series overall looks good to me now.
 
-> information from the tables.
-> 
-> To make clear those variables are ACPI specific, gather all of them in a
-> single structure.
-> 
-> Furthermore, even if some of the variables are not marked with
-> __initdata, they are all only used during the initialization. Therefore,
-> the new variable, which hold the structure, can be marked with
-> __initdata.
-> 
-> Signed-off-by: Julien Grall <julien.grall@arm.com>
-> 
-> ---
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> 
->     Changes in v4:
->         - Rework commit message
-> 
->     Changes in v3:
->         - Patch added
-> ---
+I guess we'll need to wait until the patches are in the clocksource and
+irqchip trees, and then merge that into the kvmarm tree, and apply patch
+7 and 8 on top, or is there a simpler way to do this?
 
-Otherwise:
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Thanks,
+-Christoffer
