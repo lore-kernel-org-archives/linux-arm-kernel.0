@@ -1,142 +1,74 @@
-From: a0131933@ti.com (Lokesh Vutla)
-Date: Wed, 6 Apr 2016 09:56:11 +0530
-Subject: [PATCH v2] arm: omap2: remove redundant multiplatform checks
-In-Reply-To: <1459895738-6546-1-git-send-email-jonas.rabenstein@studium.uni-erlangen.de>
-References: <201604060526.ouhQYqrT%fengguang.wu@intel.com>
- <1459895738-6546-1-git-send-email-jonas.rabenstein@studium.uni-erlangen.de>
-Message-ID: <57048FE3.30909@ti.com>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Wed, 6 Apr 2016 01:38:18 -0300
+Subject: [PATCH 2/5] leds: triggers: Add a led_trigger_event_nosleep API
+In-Reply-To: <57042FD8.1090100@gmail.com>
+References: <1459801326-5541-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+ <1459801326-5541-3-git-send-email-ezequiel@vanguardiasur.com.ar>
+ <57042FD8.1090100@gmail.com>
+Message-ID: <CAAEAJfCoJEM9+Y_=B=YKFG_zT5TMHEKqzrX-nns7L8Mx5WqSug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 5 April 2016 at 18:36, Jacek Anaszewski <jacek.anaszewski@gmail.com> wrote:
+> Hi Ezequiel,
+>
+>
+> On 04/04/2016 10:22 PM, Ezequiel Garcia wrote:
+>>
+>> Now that we can mark any LED (even those in use by delayed blink
+>> triggers) to trigger on a kernel panic, let's introduce a nosleep
+>> led_trigger_event API.
+>>
+>> This API is needed to skip the delayed blink path on
+>> led_trigger_event. LEDs that are switched on a kernel panic,
+>> might be in use by a delayed blink trigger.
+>>
+>> This will be used by the panic LED trigger.
+>>
+>> Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
+>> ---
+>>   drivers/leds/led-triggers.c | 26 ++++++++++++++++++++++----
+>>   include/linux/leds.h        |  4 ++++
+>>   2 files changed, 26 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/leds/led-triggers.c b/drivers/leds/led-triggers.c
+>> index f5c9d7c4d181..00b9d8497777 100644
+>> --- a/drivers/leds/led-triggers.c
+>> +++ b/drivers/leds/led-triggers.c
+>> @@ -307,8 +307,9 @@ EXPORT_SYMBOL_GPL(devm_led_trigger_register);
+>>
+>>   /* Simple LED Tigger Interface */
+>>
+>> -void led_trigger_event(struct led_trigger *trig,
+>> -                       enum led_brightness brightness)
+>> +static void do_led_trigger_event(struct led_trigger *trig,
+>> +                                enum led_brightness brightness,
+>> +                                bool nosleep)
+>>   {
+>>         struct led_classdev *led_cdev;
+>>
+>> @@ -316,12 +317,29 @@ void led_trigger_event(struct led_trigger *trig,
+>>                 return;
+>>
+>>         read_lock(&trig->leddev_list_lock);
+>> -       list_for_each_entry(led_cdev, &trig->led_cdevs, trig_list)
+>> -               led_set_brightness(led_cdev, brightness);
+>
+>
+> led_set_brightness() can gently disable blinking if passed 0 in the
+> brightness argument. IMHO this patch is not needed then.
+>
+>
 
+Yes, but the blinking disable is deferred, and so might never
+run (e.g. I'd say it won't run on a non-preemptible kernel).
 
-On Wednesday 06 April 2016 04:05 AM, Jonas Rabenstein wrote:
-> The directory arch/arm/mach-omap2 is only selected for compilation if
-> CONFIG_ARCH_OMAP2PLUS is selected. CONFIG_ARCH_OMAP2PLUS itself is a
-> silent option and all machines selecting this option are multiplatform
-> devices. As a consequence checks for CONFIG_ARCH_MULTIPLATFORM as well
-> as CONFIG_ARCH_OMAP2PLUS within that directory are superfluous and can
-> be removed.
-> 
-> Signed-off-by: Jonas Rabenstein <jonas.rabenstein@studium.uni-erlangen.de>
-> ---
-> changes in v2:
->  * missed two #endif's
-> 
->  arch/arm/mach-omap2/Makefile |   2 +-
->  arch/arm/mach-omap2/soc.h    | 121 +++----------------------------------------
->  2 files changed, 8 insertions(+), 115 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-> index 0ba6a0e..04e276c 100644
-> --- a/arch/arm/mach-omap2/Makefile
-> +++ b/arch/arm/mach-omap2/Makefile
-> @@ -2,7 +2,7 @@
->  # Makefile for the linux kernel.
->  #
->  
-> -ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
-> +ccflags-y := -I$(srctree)/$(src)/include \
->  	-I$(srctree)/arch/arm/plat-omap/include
->  
->  # Common support
-> diff --git a/arch/arm/mach-omap2/soc.h b/arch/arm/mach-omap2/soc.h
-> index 364418c..79f1573 100644
-> --- a/arch/arm/mach-omap2/soc.h
-> +++ b/arch/arm/mach-omap2/soc.h
-> @@ -42,79 +42,7 @@
->   * Test if multicore OMAP support is needed
->   */
->  #undef MULTI_OMAP2
-> -#undef OMAP_NAME
-> -
-> -#ifdef CONFIG_ARCH_MULTIPLATFORM
->  #define MULTI_OMAP2
-> -#endif
-> -#ifdef CONFIG_SOC_OMAP2420
-> -# ifdef OMAP_NAME
-> -#  undef  MULTI_OMAP2
-> -#  define MULTI_OMAP2
-> -# else
-> -#  define OMAP_NAME omap2420
-> -# endif
-> -#endif
-> -#ifdef CONFIG_SOC_OMAP2430
-> -# ifdef OMAP_NAME
-> -#  undef  MULTI_OMAP2
-> -#  define MULTI_OMAP2
-> -# else
-> -#  define OMAP_NAME omap2430
-> -# endif
-> -#endif
-> -#ifdef CONFIG_ARCH_OMAP3
-> -# ifdef OMAP_NAME
-> -#  undef  MULTI_OMAP2
-> -#  define MULTI_OMAP2
-> -# else
-> -#  define OMAP_NAME omap3
-> -# endif
-> -#endif
-> -#ifdef CONFIG_ARCH_OMAP4
-> -# ifdef OMAP_NAME
-> -#  undef  MULTI_OMAP2
-> -#  define MULTI_OMAP2
-> -# else
-> -#  define OMAP_NAME omap4
-> -# endif
-> -#endif
-> -
-> -#ifdef CONFIG_SOC_OMAP5
-> -# ifdef OMAP_NAME
-> -#  undef  MULTI_OMAP2
-> -#  define MULTI_OMAP2
-> -# else
-> -#  define OMAP_NAME omap5
-> -# endif
-> -#endif
-> -
-> -#ifdef CONFIG_SOC_AM33XX
-> -# ifdef OMAP_NAME
-> -#  undef  MULTI_OMAP2
-> -#  define MULTI_OMAP2
-> -# else
-> -#  define OMAP_NAME am33xx
-> -# endif
-> -#endif
-> -
-> -#ifdef CONFIG_SOC_AM43XX
-> -# ifdef OMAP_NAME
-> -#  undef  MULTI_OMAP2
-> -#  define MULTI_OMAP2
-> -# else
-> -#  define OMAP_NAME am43xx
-> -# endif
-> -#endif
-> -
-> -#ifdef CONFIG_SOC_DRA7XX
-> -# ifdef OMAP_NAME
-> -#  undef MULTI_OMAP2
-> -#  define MULTI_OMAP2
-> -# else
-> -#  define OMAP_NAME DRA7XX
-> -# endif
-> -#endif
->  
->  /*
->   * Omap device type i.e. EMU/HS/TST/GP/BAD
-> @@ -242,11 +170,6 @@ IS_AM_SUBCLASS(437x, 0x437)
->  IS_DRA_SUBCLASS(75x, 0x75)
->  IS_DRA_SUBCLASS(72x, 0x72)
->  
-> -#define soc_is_omap24xx()		0
-> -#define soc_is_omap242x()		0
-> -#define soc_is_omap243x()		0
-> -#define soc_is_omap34xx()		0
-> -#define soc_is_omap343x()		0
+I think we need this API, or otherwise some way of circumventing
+the deferred path on led_set_brightness. For instance, we
+could turn off delay_on and delay_off in the panic atomic notifier.
 
-Why are you deleting these definitions. Without these I am sure there
-will be a build error when you don't select ARCH_OMAP2 or ARCH_OMAP3 and
-building with omap2plus_defconfig.
-
-Thanks and regards,
-Lokesh
+I'm not strongly convinced by any approach, but this API seemed
+slightly cleaner.
+-- 
+Ezequiel Garc?a, VanguardiaSur
+www.vanguardiasur.com.ar
