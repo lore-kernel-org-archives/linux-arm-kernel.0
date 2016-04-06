@@ -1,263 +1,147 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Wed, 6 Apr 2016 13:31:07 +0300
-Subject: [PATCH v7 3/5] ACPI: parse SPCR and enable matching console
-In-Reply-To: <1459431629-27934-4-git-send-email-aleksey.makarov@linaro.org>
-References: <1459431629-27934-1-git-send-email-aleksey.makarov@linaro.org>
- <1459431629-27934-4-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <5704E56B.3070808@linaro.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 6 Apr 2016 11:47:19 +0100
+Subject: [PATCH 1/2] iommu: Support dynamic pgsize_bitmap
+In-Reply-To: <1459890090-16040-1-git-send-email-mitchelh@codeaurora.org>
+References: <1459890090-16040-1-git-send-email-mitchelh@codeaurora.org>
+Message-ID: <5704E937.3020602@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+Hi Mitch,
 
-May I ask for review/ACK for this new version please?
+On 05/04/16 22:01, Mitchel Humpherys wrote:
+> Currently we use a single pgsize_bitmap per IOMMU driver.  However, some
+> IOMMU drivers might service different IOMMUs with different supported
+> page sizes.  Some drivers might also want to restrict page sizes for
+> different use cases.  Support these use cases by adding a
+> .get_pgsize_bitmap function to the iommu_ops which can optionally be
+> used by the driver to return a domain-specific pgsize_bitmap.
 
-Thank you
-Aleksey Makarov
+Funnily enough, I've just been doing very much the same thing. How would 
+you handle said restriction of page sizes under this scheme? What you 
+hint at in the commit message sounds the same as the mumblings I've 
+heard from graphics guys about e.g. using short-descriptor at forced 1MB 
+granularity for minimal table walk latency - to me it seemed most 
+logical in that situation to simply let the owner of the domain mess 
+directly with its bitmap themselves. I'll clean up what I have and try 
+to get it posted this afternoon so we can compare.
 
-On 03/31/2016 04:40 PM, Aleksey Makarov wrote:
-> 'ARM Server Base Boot Requiremets' [1] mentions SPCR (Serial Port
-> Console Redirection Table) [2] as a mandatory ACPI table that
-> specifies the configuration of serial console.
-> 
-> Defer initialization of DT earlycon until ACPI/DT decision is made.
-> 
-> Parse the ACPI SPCR table, setup earlycon if required,
-> enable specified console.
-> 
-> Thanks to Peter Hurley for explaining how this should work.
-> 
-> [1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0044a/index.html
-> [2] https://msdn.microsoft.com/en-us/library/windows/hardware/dn639132(v=vs.85).aspx
-> 
-> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+Robin.
+
+> Signed-off-by: Mitchel Humpherys <mitchelh@codeaurora.org>
 > ---
->  drivers/acpi/Kconfig          |   3 ++
->  drivers/acpi/Makefile         |   1 +
->  drivers/acpi/spcr.c           | 111 ++++++++++++++++++++++++++++++++++++++++++
->  drivers/tty/serial/earlycon.c |  19 +++++++-
->  include/linux/acpi.h          |   6 +++
->  include/linux/serial_core.h   |   6 +++
->  6 files changed, 144 insertions(+), 2 deletions(-)
->  create mode 100644 drivers/acpi/spcr.c
-> 
-> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-> index 65fb483..5611eb6 100644
-> --- a/drivers/acpi/Kconfig
-> +++ b/drivers/acpi/Kconfig
-> @@ -77,6 +77,9 @@ config ACPI_DEBUGGER_USER
->  
->  endif
->  
-> +config ACPI_SPCR_TABLE
-> +	bool
-> +
->  config ACPI_SLEEP
->  	bool
->  	depends on SUSPEND || HIBERNATION
-> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-> index 7395928..f70ae14 100644
-> --- a/drivers/acpi/Makefile
-> +++ b/drivers/acpi/Makefile
-> @@ -82,6 +82,7 @@ obj-$(CONFIG_ACPI_EC_DEBUGFS)	+= ec_sys.o
->  obj-$(CONFIG_ACPI_CUSTOM_METHOD)+= custom_method.o
->  obj-$(CONFIG_ACPI_BGRT)		+= bgrt.o
->  obj-$(CONFIG_ACPI_CPPC_LIB)	+= cppc_acpi.o
-> +obj-$(CONFIG_ACPI_SPCR_TABLE)	+= spcr.o
->  obj-$(CONFIG_ACPI_DEBUGGER_USER) += acpi_dbg.o
->  
->  # processor has its own "processor." module_param namespace
-> diff --git a/drivers/acpi/spcr.c b/drivers/acpi/spcr.c
-> new file mode 100644
-> index 0000000..68ffc33
-> --- /dev/null
-> +++ b/drivers/acpi/spcr.c
-> @@ -0,0 +1,111 @@
-> +/*
-> + * Copyright (c) 2012, Intel Corporation
-> + * Copyright (c) 2015, Red Hat, Inc.
-> + * Copyright (c) 2015, 2016 Linaro Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + */
-> +
-> +#define pr_fmt(fmt) "ACPI: SPCR: " fmt
-> +
-> +#include <linux/acpi.h>
-> +#include <linux/console.h>
-> +#include <linux/kernel.h>
-> +#include <linux/serial_core.h>
-> +
-> +/**
-> + * parse_spcr() - parse ACPI SPCR table and add preferred console
-> + *
-> + * @earlycon: set up earlycon for the console specified by the table
-> + *
-> + * For the architectures with support for ACPI, CONFIG_ACPI_SPCR_TABLE may be
-> + * defined to parse ACPI SPCR table.  As a result of the parsing preferred
-> + * console is registered and if @earlycon is true, earlycon is set up.
-> + *
-> + * When CONFIG_ACPI_SPCR_TABLE is defined, this function should should be called
-> + * from arch inintialization code as soon as the DT/ACPI decision is made.
-> + *
-> + */
-> +int __init parse_spcr(bool earlycon)
+>   drivers/iommu/iommu.c | 28 +++++++++++++++++++---------
+>   include/linux/iommu.h |  3 +++
+>   2 files changed, 22 insertions(+), 9 deletions(-)
+>
+> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+> index bfd4f7c3b1d8..6141710f3091 100644
+> --- a/drivers/iommu/iommu.c
+> +++ b/drivers/iommu/iommu.c
+> @@ -325,6 +325,13 @@ int iommu_group_set_name(struct iommu_group *group, const char *name)
+>   }
+>   EXPORT_SYMBOL_GPL(iommu_group_set_name);
+>
+> +static unsigned long iommu_get_pgsize_bitmap(struct iommu_domain *domain)
 > +{
-> +	static char opts[64];
-> +	struct acpi_table_spcr *table;
-> +	acpi_size table_size;
-> +	acpi_status status;
-> +	char *uart;
-> +	char *iotype;
-> +	int baud_rate;
-> +	int err;
-> +
-> +	if (acpi_disabled)
-> +		return -ENODEV;
-> +
-> +	status = acpi_get_table_with_size(ACPI_SIG_SPCR, 0,
-> +					  (struct acpi_table_header **)&table,
-> +					  &table_size);
-> +
-> +	if (ACPI_FAILURE(status))
-> +		return -ENOENT;
-> +
-> +	if (table->header.revision < 2) {
-> +		err = -ENOENT;
-> +		pr_err("wrong table version\n");
-> +		goto done;
-> +	}
-> +
-> +	iotype = table->serial_port.space_id == ACPI_ADR_SPACE_SYSTEM_MEMORY ?
-> +			"mmio" : "io";
-> +
-> +	switch (table->interface_type) {
-> +	case ACPI_DBG2_ARM_SBSA_32BIT:
-> +		iotype = "mmio32";
-> +		/* fall through */
-> +	case ACPI_DBG2_ARM_PL011:
-> +	case ACPI_DBG2_ARM_SBSA_GENERIC:
-> +	case ACPI_DBG2_BCM2835:
-> +		uart = "pl011";
-> +		break;
-> +	case ACPI_DBG2_16550_COMPATIBLE:
-> +	case ACPI_DBG2_16550_SUBSET:
-> +		uart = "uart";
-> +		break;
-> +	default:
-> +		err = -ENOENT;
-> +		goto done;
-> +	}
-> +
-> +	switch (table->baud_rate) {
-> +	case 3:
-> +		baud_rate = 9600;
-> +		break;
-> +	case 4:
-> +		baud_rate = 19200;
-> +		break;
-> +	case 6:
-> +		baud_rate = 57600;
-> +		break;
-> +	case 7:
-> +		baud_rate = 115200;
-> +		break;
-> +	default:
-> +		err = -ENOENT;
-> +		goto done;
-> +	}
-> +
-> +	snprintf(opts, sizeof(opts), "%s,%s,0x%llx,%d", uart, iotype,
-> +		 table->serial_port.address, baud_rate);
-> +
-> +	pr_info("console: %s", opts);
-> +
-> +	if (earlycon)
-> +		setup_earlycon(opts);
-> +
-> +	err = add_preferred_console(uart, 0, opts + strlen(uart) + 1);
-> +
-> +done:
-> +	early_acpi_os_unmap_memory((void __iomem *)table, table_size);
-> +	return err;
+> +	if (domain->ops->get_pgsize_bitmap)
+> +		return domain->ops->get_pgsize_bitmap(domain);
+> +	return domain->ops->pgsize_bitmap;
 > +}
-> diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
-> index 7aae655..ea00b9f 100644
-> --- a/drivers/tty/serial/earlycon.c
-> +++ b/drivers/tty/serial/earlycon.c
-> @@ -21,6 +21,7 @@
->  #include <linux/sizes.h>
->  #include <linux/of.h>
->  #include <linux/of_fdt.h>
-> +#include <linux/acpi.h>
->  
->  #ifdef CONFIG_FIX_EARLYCON_MEM
->  #include <asm/fixmap.h>
-> @@ -199,6 +200,14 @@ int __init setup_earlycon(char *buf)
->  	return -ENOENT;
->  }
->  
-> +/*
-> + * When CONFIG_ACPI_SPCR_TABLE is defined, "earlycon" without parameters in
-> + * command line does not start DT earlycon immediately, instead it defers
-> + * starting it until DT/ACPI decision is made.  At that time if ACPI is enabled
-> + * call parse_spcr(), else call early_init_dt_scan_chosen_stdout()
-> + */
-> +bool earlycon_init_is_deferred __initdata;
 > +
->  /* early_param wrapper for setup_earlycon() */
->  static int __init param_setup_earlycon(char *buf)
->  {
-> @@ -208,8 +217,14 @@ static int __init param_setup_earlycon(char *buf)
->  	 * Just 'earlycon' is a valid param for devicetree earlycons;
->  	 * don't generate a warning from parse_early_params() in that case
->  	 */
-> -	if (!buf || !buf[0])
-> -		return early_init_dt_scan_chosen_stdout();
-> +	if (!buf || !buf[0]) {
-> +		if (IS_ENABLED(CONFIG_ACPI_SPCR_TABLE)) {
-> +			earlycon_init_is_deferred = true;
-> +			return 0;
-> +		} else {
-> +			return early_init_dt_scan_chosen_stdout();
-> +		}
-> +	}
->  
->  	err = setup_earlycon(buf);
->  	if (err == -ENOENT || err == -EALREADY)
-> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-> index 06ed7e5..1095ed6 100644
-> --- a/include/linux/acpi.h
-> +++ b/include/linux/acpi.h
-> @@ -1004,4 +1004,10 @@ static inline struct fwnode_handle *acpi_get_next_subnode(struct device *dev,
->  #define acpi_probe_device_table(t)	({ int __r = 0; __r;})
->  #endif
->  
-> +#ifdef CONFIG_ACPI_SPCR_TABLE
-> +int parse_spcr(bool earlycon);
-> +#else
-> +static inline int parse_spcr(bool earlycon) { return 0; }
-> +#endif
-> +
->  #endif	/*_LINUX_ACPI_H*/
-> diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
-> index cbfcf38..de6750f 100644
-> --- a/include/linux/serial_core.h
-> +++ b/include/linux/serial_core.h
-> @@ -363,6 +363,12 @@ extern int of_setup_earlycon(const struct earlycon_id *match,
->  			     unsigned long node,
->  			     const char *options);
->  
-> +#ifdef CONFIG_SERIAL_EARLYCON
-> +extern bool earlycon_init_is_deferred __initdata;
-> +#else
-> +static const bool earlycon_init_is_deferred;
-> +#endif
-> +
->  struct uart_port *uart_get_console(struct uart_port *ports, int nr,
->  				   struct console *c);
->  int uart_parse_earlycon(char *p, unsigned char *iotype, unsigned long *addr,
-> 
+>   static int iommu_group_create_direct_mappings(struct iommu_group *group,
+>   					      struct device *dev)
+>   {
+> @@ -337,9 +344,9 @@ static int iommu_group_create_direct_mappings(struct iommu_group *group,
+>   	if (!domain || domain->type != IOMMU_DOMAIN_DMA)
+>   		return 0;
+>
+> -	BUG_ON(!domain->ops->pgsize_bitmap);
+> +	BUG_ON(!(domain->ops->pgsize_bitmap || domain->ops->get_pgsize_bitmap));
+>
+> -	pg_size = 1UL << __ffs(domain->ops->pgsize_bitmap);
+> +	pg_size = 1UL << __ffs(iommu_get_pgsize_bitmap(domain));
+>   	INIT_LIST_HEAD(&mappings);
+>
+>   	iommu_get_dm_regions(dev, &mappings);
+> @@ -1318,14 +1325,15 @@ int iommu_map(struct iommu_domain *domain, unsigned long iova,
+>   	int ret = 0;
+>
+>   	if (unlikely(domain->ops->map == NULL ||
+> -		     domain->ops->pgsize_bitmap == 0UL))
+> +		     (domain->ops->pgsize_bitmap == 0UL &&
+> +		      !domain->ops->get_pgsize_bitmap)))
+>   		return -ENODEV;
+>
+>   	if (unlikely(!(domain->type & __IOMMU_DOMAIN_PAGING)))
+>   		return -EINVAL;
+>
+>   	/* find out the minimum page size supported */
+> -	min_pagesz = 1 << __ffs(domain->ops->pgsize_bitmap);
+> +	min_pagesz = 1 << __ffs(iommu_get_pgsize_bitmap(domain));
+>
+>   	/*
+>   	 * both the virtual address and the physical one, as well as
+> @@ -1372,14 +1380,15 @@ size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova, size_t size)
+>   	unsigned long orig_iova = iova;
+>
+>   	if (unlikely(domain->ops->unmap == NULL ||
+> -		     domain->ops->pgsize_bitmap == 0UL))
+> +		     (domain->ops->pgsize_bitmap == 0UL &&
+> +		      !domain->ops->get_pgsize_bitmap)))
+>   		return -ENODEV;
+>
+>   	if (unlikely(!(domain->type & __IOMMU_DOMAIN_PAGING)))
+>   		return -EINVAL;
+>
+>   	/* find out the minimum page size supported */
+> -	min_pagesz = 1 << __ffs(domain->ops->pgsize_bitmap);
+> +	min_pagesz = 1 << __ffs(iommu_get_pgsize_bitmap(domain));
+>
+>   	/*
+>   	 * The virtual address, as well as the size of the mapping, must be
+> @@ -1425,10 +1434,11 @@ size_t default_iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
+>   	unsigned int i, min_pagesz;
+>   	int ret;
+>
+> -	if (unlikely(domain->ops->pgsize_bitmap == 0UL))
+> +	if (unlikely(domain->ops->pgsize_bitmap == 0UL &&
+> +		     !domain->ops->get_pgsize_bitmap))
+>   		return 0;
+>
+> -	min_pagesz = 1 << __ffs(domain->ops->pgsize_bitmap);
+> +	min_pagesz = 1 << __ffs(iommu_get_pgsize_bitmap(domain));
+>
+>   	for_each_sg(sg, s, nents, i) {
+>   		phys_addr_t phys = page_to_phys(sg_page(s)) + s->offset;
+> @@ -1509,7 +1519,7 @@ int iommu_domain_get_attr(struct iommu_domain *domain,
+>   		break;
+>   	case DOMAIN_ATTR_PAGING:
+>   		paging  = data;
+> -		*paging = (domain->ops->pgsize_bitmap != 0UL);
+> +		*paging = (iommu_get_pgsize_bitmap(domain) != 0UL);
+>   		break;
+>   	case DOMAIN_ATTR_WINDOWS:
+>   		count = data;
+> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+> index a5c539fa5d2b..03f8d50670db 100644
+> --- a/include/linux/iommu.h
+> +++ b/include/linux/iommu.h
+> @@ -156,6 +156,8 @@ struct iommu_dm_region {
+>    * @domain_get_windows: Return the number of windows for a domain
+>    * @of_xlate: add OF master IDs to iommu grouping
+>    * @pgsize_bitmap: bitmap of supported page sizes
+> + * @get_pgsize_bitmap: gets a bitmap of supported page sizes for a domain
+> + *                     This takes precedence over @pgsize_bitmap.
+>    * @priv: per-instance data private to the iommu driver
+>    */
+>   struct iommu_ops {
+> @@ -200,6 +202,7 @@ struct iommu_ops {
+>   #endif
+>
+>   	unsigned long pgsize_bitmap;
+> +	unsigned long (*get_pgsize_bitmap)(struct iommu_domain *domain);
+>   	void *priv;
+>   };
+>
+>
