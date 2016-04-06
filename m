@@ -1,49 +1,54 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Wed, 6 Apr 2016 13:13:21 -0300
-Subject: [PATCH 4/5] devicetree: leds: Introduce "panic-blink" optional
- property
-In-Reply-To: <CAL_JsqLF-cMtGERnZ0wO_GUkhsf23LQhOm6PwwKAa5evSkOHDg@mail.gmail.com>
-References: <1459801326-5541-1-git-send-email-ezequiel@vanguardiasur.com.ar>
- <1459801326-5541-5-git-send-email-ezequiel@vanguardiasur.com.ar>
- <CAL_JsqLF-cMtGERnZ0wO_GUkhsf23LQhOm6PwwKAa5evSkOHDg@mail.gmail.com>
-Message-ID: <CAAEAJfDVzXaXjT=E+VRKg6kDR+V-QNJrhfeFk0ritymDPvTVLA@mail.gmail.com>
+From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
+Date: Wed, 6 Apr 2016 21:45:31 +0530
+Subject: [PATCH v3 1/5] Documentation: DT: vdma: Rename vdma-chan prefix to
+ dma-chan
+In-Reply-To: <1459959335-24083-1-git-send-email-appanad@xilinx.com>
+References: <1459959335-24083-1-git-send-email-appanad@xilinx.com>
+Message-ID: <1459959335-24083-2-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 April 2016 at 12:12, Rob Herring <robh@kernel.org> wrote:
-> On Mon, Apr 4, 2016 at 3:22 PM, Ezequiel Garcia
-> <ezequiel@vanguardiasur.com.ar> wrote:
->> It's desirable to specify which LEDs are to be blinked on a kernel
->> panic. Therefore, introduce a devicetree boolean property to mark
->> which LEDs should be treated this way.
->>
->> Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
->> ---
->>  Documentation/devicetree/bindings/leds/common.txt | 2 ++
->>  1 file changed, 2 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/leds/common.txt b/Documentation/devicetree/bindings/leds/common.txt
->> index 68419843e32f..dd409df9203a 100644
->> --- a/Documentation/devicetree/bindings/leds/common.txt
->> +++ b/Documentation/devicetree/bindings/leds/common.txt
->> @@ -37,6 +37,8 @@ Optional properties for child nodes:
->>                       property is mandatory for the LEDs in the non-flash modes
->>                       (e.g. torch or indicator).
->>
->> +- panic-blink : Mark this LED to be used by the panic LED trigger.
->> +
->
-> We already have a way to specify LED triggers. Why can't that be used?
->
+This patch renames the vdma-mm2s-channel/vdma-s2mm-channel
+property with dma-mm2s-channel/dma-s2mm-channel to sync with
+the driver.
 
-Because this is not about specifying a LED trigger.
+Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+---
+Changes for v3:
+---> New patch.
 
-The use case is the following: a LED is assigned to some LED trigger.
-When the kernel panics, we want to switch that LED to the panic trigger,
-so it blinks signalling the panic.
+ Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-IOW, this allows a LED to be used for "normal operation stuff trigger",
-but blink if the kernel panics.
+diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+index a86737c..762938f 100644
+--- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
++++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+@@ -24,8 +24,8 @@ Optional properties:
+ 	{3}, flush s2mm channel
+ 
+ Required child node properties:
+-- compatible: It should be either "xlnx,axi-vdma-mm2s-channel" or
+-	"xlnx,axi-vdma-s2mm-channel".
++- compatible: It should be either "xlnx,axi-dma-mm2s-channel" or
++	"xlnx,axi-dma-s2mm-channel".
+ - interrupts: Should contain per channel VDMA interrupts.
+ - xlnx,datawidth: Should contain the stream data width, take values
+ 	{32,64...1024}.
+@@ -48,12 +48,12 @@ axi_vdma_0: axivdma at 40030000 {
+ 	xlnx,flush-fsync = <0x1>;
+ 	xlnx,addrwidth = <0x20>;
+ 	dma-channel at 40030000 {
+-		compatible = "xlnx,axi-vdma-mm2s-channel";
++		compatible = "xlnx,axi-dma-mm2s-channel";
+ 		interrupts = < 0 54 4 >;
+ 		xlnx,datawidth = <0x40>;
+ 	} ;
+ 	dma-channel at 40030030 {
+-		compatible = "xlnx,axi-vdma-s2mm-channel";
++		compatible = "xlnx,axi-dma-s2mm-channel";
+ 		interrupts = < 0 53 4 >;
+ 		xlnx,datawidth = <0x40>;
+ 	} ;
 -- 
-Ezequiel Garc?a, VanguardiaSur
-www.vanguardiasur.com.ar
+2.1.2
