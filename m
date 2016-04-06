@@ -1,75 +1,71 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 6 Apr 2016 08:34:51 -0700
-Subject: [RESEND PATCH v2 3/6] Documentation: DT: vdma: update binding
- doc for AXI DMA
-In-Reply-To: <1459919700-6692-4-git-send-email-appanad@xilinx.com>
-References: <1459919700-6692-1-git-send-email-appanad@xilinx.com>
- <1459919700-6692-4-git-send-email-appanad@xilinx.com>
-Message-ID: <20160406153428.GA29770@vkoul-mobl.iind.intel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 6 Apr 2016 16:36:46 +0100
+Subject: [PATCH V2 5/9] arm64: exception: handle instruction abort at
+ current EL
+In-Reply-To: <1459955578-24602-6-git-send-email-tbaicar@codeaurora.org>
+References: <1459955578-24602-1-git-send-email-tbaicar@codeaurora.org>
+ <1459955578-24602-6-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <57052D0E.5070903@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 06, 2016 at 10:44:57AM +0530, Kedareswara rao Appana wrote:
-> This patch updates the device-tree binding doc for
-> adding support for AXI DMA.
+On 06/04/16 16:12, Tyler Baicar wrote:
+> Add a handler for instruction aborts at the current EL
+> (ESR_ELx_EC_IABT_CUR) so they are no longer handled in el1_inv.
+> This allows firmware first handling for possible SEA
+> (Synchronous External Abort) caused instruction abort at
+> current EL.
 > 
-> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
 > ---
-> Changes for v2:
-> ---> Modified commit message as suggested by Vinod.
-> ---> Moved the patch to forward in the series as suggested by vinod.
+>  arch/arm64/kernel/entry.S | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
 > 
->  .../devicetree/bindings/dma/xilinx/xilinx_vdma.txt | 22 +++++++++++++++++++++-
->  1 file changed, 21 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-> index a86737c..5841421 100644
-> --- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-> +++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-> @@ -3,8 +3,13 @@ It can be configured to have one channel or two channels. If configured
->  as two channels, one is to transmit to the video device and another is
->  to receive from the video device.
->  
-> +Xilinx AXI DMA engine, it does transfers between memory and AXI4 stream
-> +target devices. It can be configured to have one channel or two channels.
-> +If configured as two channels, one is to transmit to the device and another
-> +is to receive from the device.
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index 12e8d2b..f257856 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -336,6 +336,8 @@ el1_sync:
+>  	lsr	x24, x1, #ESR_ELx_EC_SHIFT	// exception class
+>  	cmp	x24, #ESR_ELx_EC_DABT_CUR	// data abort in EL1
+>  	b.eq	el1_da
+> +	cmp	x24, #ESR_ELx_EC_IABT_CUR	// instruction abort in EL1
+> +	b.eq	el1_ia
+>  	cmp	x24, #ESR_ELx_EC_SYS64		// configurable trap
+>  	b.eq	el1_undef
+>  	cmp	x24, #ESR_ELx_EC_SP_ALIGN	// stack alignment exception
+> @@ -363,6 +365,23 @@ el1_da:
+>  	// disable interrupts before pulling preserved data off the stack
+>  	disable_irq
+>  	kernel_exit 1
+> +el1_ia:
+> +	/*
+> +	 * Instruction abort handling
+> +	 */
+> +	mrs	x0, far_el1
+> +	enable_dbg
+> +	// re-enable interrupts if they were enabled in the aborted context
+> +	tbnz	x23, #7, 1f			// PSR_I_BIT
+> +	enable_irq
+> +1:
+> +	orr	x1, x1, #1 << 24		// use reserved ISS bit for instruction aborts
+> +	mov	x2, sp				// struct pt_regs
+> +	bl	do_mem_abort
 > +
->  Required properties:
-> -- compatible: Should be "xlnx,axi-vdma-1.00.a"
-> +- compatible: Should be "xlnx,axi-vdma-1.00.a" or "xlnx,axi-dma-1.00.a"
->  - #dma-cells: Should be <1>, see "dmas" property below
->  - reg: Should contain VDMA registers location and length.
->  - xlnx,num-fstores: Should be the number of framebuffers as configured in h/w.
-> @@ -59,6 +64,21 @@ axi_vdma_0: axivdma at 40030000 {
->  	} ;
->  } ;
->  
-> +axi_dma_0: axidma at 40400000 {
-
-Why have you ignored Robs comment on this? Ideally you should have posted
-these fixed.
-
-> +	compatible = "xlnx,axi-dma-1.00.a";
-> +	#dma-cells = <1>;
-> +	reg = < 0x40400000 0x10000 >;
-> +	dma-channel at 40400000 {
-> +		compatible = "xlnx,axi-dma-mm2s-channel";
-> +		interrupts = < 0 59 4 >;
-> +		xlnx,datawidth = <0x40>;
-> +	} ;
-> +	dma-channel at 40400030 {
-> +		compatible = "xlnx,axi-dma-s2mm-channel";
-> +		interrupts = < 0 58 4 >;
-> +		xlnx,datawidth = <0x40>;
-> +	} ;
-> +} ;
->  
->  * DMA client
->  
-> -- 
-> 2.1.2
+> +	// disable interrupts before pulling preserved data off the stack
+> +	disable_irq
+> +	kernel_exit 1
+>  el1_sp_pc:
+>  	/*
+>  	 * Stack or PC alignment exception handling
 > 
 
+What happens if you were running at EL2 when this faults gets injected?
+It looks like KVM needs something similar, doesn't it?
+
+Thanks,
+
+	M.
 -- 
-~Vinod
+Jazz is not dead. It just smells funny...
