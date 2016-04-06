@@ -1,155 +1,58 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 6 Apr 2016 11:58:36 +0100
-Subject: [PATCH] KVM: arm/arm64: Handle forward time correction gracefully
-In-Reply-To: <20160406103344.GA17975@cbox>
-References: <1459931842-29465-1-git-send-email-marc.zyngier@arm.com>
- <20160406103344.GA17975@cbox>
-Message-ID: <5704EBDC.9000206@arm.com>
+From: Minghuan.Lian@nxp.com (Minghuan Lian)
+Date: Wed, 6 Apr 2016 19:02:07 +0800
+Subject: [PATCH] ARM: dts: ls1021a: add SCFG MSI dts node
+Message-ID: <1459940527-26437-1-git-send-email-Minghuan.Lian@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/16 11:33, Christoffer Dall wrote:
-> On Wed, Apr 06, 2016 at 09:37:22AM +0100, Marc Zyngier wrote:
->> On a host that runs NTP, corrections can have a direct impact on
->> the background timer that we program on the behalf of a vcpu.
->>
->> In particular, NTP performing a forward correction will result in
->> a timer expiring sooner than expected from a guest point of view.
->> Not a big deal, we kick the vcpu anyway.
->>
->> But on wake-up, the vcpu thread is going to perform a check to
->> find out whether or not it should block. And at that point, the
->> timer check is going to say "timer has not expired yet, go back
->> to sleep". This results in the timer event being lost forever.
->>
->> There are multiple ways to handle this. One would be record that
->> the timer has expired and let kvm_cpu_has_pending_timer return
->> true in that case, but that would be fairly invasive. Another is
->> to check for the "short sleep" condition in the hrtimer callback,
->> and restart the timer for the remaining time when the condition
->> is detected.
->>
->> This patch implements the latter, with a bit of refactoring in
->> order to avoid too much code duplication.
->>
->> Reported-by: Alexander Graf <agraf@suse.de>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  virt/kvm/arm/arch_timer.c | 47 +++++++++++++++++++++++++++++++++++++----------
->>  1 file changed, 37 insertions(+), 10 deletions(-)
->>
->> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
->> index a9ad4fe..4d0e77a 100644
->> --- a/virt/kvm/arm/arch_timer.c
->> +++ b/virt/kvm/arm/arch_timer.c
->> @@ -98,10 +98,46 @@ static void kvm_timer_inject_irq_work(struct work_struct *work)
->>  	kvm_vcpu_kick(vcpu);
->>  }
->>  
->> +static u64 kvm_timer_compute_delta(struct kvm_vcpu *vcpu)
->> +{
->> +	cycle_t cval, now;
->> +
->> +	cval = vcpu->arch.timer_cpu.cntv_cval;
->> +	now = kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
->> +
->> +	if (now < cval) {
->> +		u64 ns;
->> +
->> +		ns = cyclecounter_cyc2ns(timecounter->cc,
->> +					 cval - now,
->> +					 timecounter->mask,
->> +					 &timecounter->frac);
->> +		return ns;
->> +	}
->> +
->> +	return 0;
->> +}
->> +
->>  static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
->>  {
->>  	struct arch_timer_cpu *timer;
->> +	struct kvm_vcpu *vcpu;
->> +	u64 ns;
->> +
->>  	timer = container_of(hrt, struct arch_timer_cpu, timer);
->> +	vcpu = container_of(timer, struct kvm_vcpu, arch.timer_cpu);
->> +
->> +	/*
->> +	 * Check that the timer has really expired from the guest's
->> +	 * PoV (NTP on the host may have forced it to expire
->> +	 * early). If we should have slept longer, restart it.
->> +	 */
->> +	ns = kvm_timer_compute_delta(vcpu);
->> +	if (unlikely(ns)) {
->> +		hrtimer_forward_now(hrt, ns_to_ktime(ns));
->> +		return HRTIMER_RESTART;
->> +	}
->> +
->>  	queue_work(wqueue, &timer->expired);
->>  	return HRTIMER_NORESTART;
->>  }
->> @@ -176,8 +212,6 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
->>  void kvm_timer_schedule(struct kvm_vcpu *vcpu)
->>  {
->>  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
->> -	u64 ns;
->> -	cycle_t cval, now;
->>  
->>  	BUG_ON(timer_is_armed(timer));
->>  
->> @@ -197,14 +231,7 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
->>  		return;
->>  
->>  	/*  The timer has not yet expired, schedule a background timer */
->> -	cval = timer->cntv_cval;
->> -	now = kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
->> -
->> -	ns = cyclecounter_cyc2ns(timecounter->cc,
->> -				 cval - now,
->> -				 timecounter->mask,
->> -				 &timecounter->frac);
->> -	timer_arm(timer, ns);
->> +	timer_arm(timer, kvm_timer_compute_delta(vcpu));
->>  }
->>  
->>  void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
->> -- 
->> 2.1.4
->>
-> 
-> How do you guys feel about adding this to the patch for improved sleep
-> at night (pun intended):
-> 
-> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> index a9ad4fe..230f720 100644
-> --- a/virt/kvm/arm/arch_timer.c
-> +++ b/virt/kvm/arm/arch_timer.c
-> @@ -91,6 +91,8 @@ static void kvm_timer_inject_irq_work(struct work_struct *work)
->  	vcpu = container_of(work, struct kvm_vcpu, arch.timer_cpu.expired);
->  	vcpu->arch.timer_cpu.armed = false;
->  
-> +	BUG_ON(!kvm_timer_should_fire(vcpu));
-> +
+Add SCFG MSI dts node and add msi-parent property to PCIe dts node
+that points to the corresponding MSI node.
 
-I would probably turn this into a WARN_ON() rather than bringing the
-whole system down (keeping it alive would help debugging), but otherwise
-looks good to me.
+Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
+---
+ arch/arm/boot/dts/ls1021a.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
->  	/*
->  	 * If the vcpu is blocked we want to wake it up so that it will see
->  	 * the timer has expired when entering the guest.
-> 
-> 
-> Otherwise:
-> 
-> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-> 
-> And I can queue this with CC to stable, but I would like Alex's
-> tested-by if possible.
-
-Thanks,
-
-	M.
+diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+index 726372d..c0dee50 100644
+--- a/arch/arm/boot/dts/ls1021a.dtsi
++++ b/arch/arm/boot/dts/ls1021a.dtsi
+@@ -119,6 +119,20 @@
+ 
+ 		};
+ 
++		msi1: msi-controller at 1570e00 {
++			compatible = "fsl,1s1021a-msi";
++			reg = <0x0 0x1570e00 0x0 0x8>;
++			msi-controller;
++			interrupts =  <GIC_SPI 179 IRQ_TYPE_LEVEL_HIGH>;
++		};
++
++		msi2: msi-controller at 1570e08 {
++			compatible = "fsl,1s1021a-msi";
++			reg = <0x0 0x1570e08 0x0 0x8>;
++			msi-controller;
++			interrupts = <GIC_SPI 180 IRQ_TYPE_LEVEL_HIGH>;
++		};
++
+ 		ifc: ifc at 1530000 {
+ 			compatible = "fsl,ifc", "simple-bus";
+ 			reg = <0x0 0x1530000 0x0 0x10000>;
+@@ -587,6 +601,7 @@
+ 			bus-range = <0x0 0xff>;
+ 			ranges = <0x81000000 0x0 0x00000000 0x40 0x00010000 0x0 0x00010000   /* downstream I/O */
+ 				  0x82000000 0x0 0x40000000 0x40 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
++			msi-parent = <&msi1>;
+ 			#interrupt-cells = <1>;
+ 			interrupt-map-mask = <0 0 0 7>;
+ 			interrupt-map = <0000 0 0 1 &gic GIC_SPI 91  IRQ_TYPE_LEVEL_HIGH>,
+@@ -609,6 +624,7 @@
+ 			bus-range = <0x0 0xff>;
+ 			ranges = <0x81000000 0x0 0x00000000 0x48 0x00010000 0x0 0x00010000   /* downstream I/O */
+ 				  0x82000000 0x0 0x40000000 0x48 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
++			msi-parent = <&msi2>;
+ 			#interrupt-cells = <1>;
+ 			interrupt-map-mask = <0 0 0 7>;
+ 			interrupt-map = <0000 0 0 1 &gic GIC_SPI 92  IRQ_TYPE_LEVEL_HIGH>,
 -- 
-Jazz is not dead. It just smells funny...
+1.9.1
