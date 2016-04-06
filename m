@@ -1,24 +1,43 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Wed, 6 Apr 2016 12:44:53 +0100
-Subject: [PATCH v10 05/17] xen: memory : Add new XENMAPSPACE type
- XENMAPSPACE_dev_mmio
-In-Reply-To: <1459525755-36968-6-git-send-email-shannon.zhao@linaro.org>
-References: <1459525755-36968-1-git-send-email-shannon.zhao@linaro.org>
- <1459525755-36968-6-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <5704F6B5.5080000@arm.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 6 Apr 2016 14:45:53 +0300
+Subject: [RFC PATCH] PM / wakeirq: fix wakeirq setting after wakup
+ re-configuration from sysfs
+Message-ID: <1459943153-2553-1-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shannon,
+Now wakeirq stops working for device if wakeup option for
+this device will be reconfigured through sysfs, like:
 
-On 01/04/2016 16:49, Shannon Zhao wrote:
-> Add a new type of Xen map space for Dom0 to map device's MMIO region.
->
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+echo disabled > /sys/devices/platform/extcon_usb1/power/wakeup
+echo enabled > /sys/devices/platform/extcon_usb1/power/wakeup
 
-Reviewed-by: Julien Grall <julien.grall@arm.com>
+Once above set of commands is executed the device's wakeup_source
+opject will be recreated and dev->power.wakeup->wakeirq field will
+contain NULL. As result, device_wakeup_arm_wake_irqs() will not arm
+wakeirq for the affected device.
 
-Regards,
+Hece, lets try to fix it in the following way:
+  check for dev->wakeirq field when device_wakeup_attach() is called
+  and if !NULL re-attach wakeirq to the device
 
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+---
+ drivers/base/power/wakeup.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/base/power/wakeup.c b/drivers/base/power/wakeup.c
+index a2657f1..52a0c25 100644
+--- a/drivers/base/power/wakeup.c
++++ b/drivers/base/power/wakeup.c
+@@ -246,6 +246,8 @@ static int device_wakeup_attach(struct device *dev, struct wakeup_source *ws)
+ 		return -EEXIST;
+ 	}
+ 	dev->power.wakeup = ws;
++	if (dev->power.wakeirq)
++		device_wakeup_attach_irq(dev, dev->power.wakeirq);
+ 	spin_unlock_irq(&dev->power.lock);
+ 	return 0;
+ }
 -- 
-Julien Grall
+2.8.0
