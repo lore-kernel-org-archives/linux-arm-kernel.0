@@ -1,121 +1,91 @@
-From: henryc.chen@mediatek.com (Henry Chen)
-Date: Wed, 6 Apr 2016 10:47:46 +0800
-Subject: [PATCH] mfd: mt6397: irq domain should initialize before
- mfd_add_devices()
-In-Reply-To: <56FD2F18.4050508@openwrt.org>
-References: <1459322708-21363-1-git-send-email-henryc.chen@mediatek.com>
- <56FB99DB.6010901@openwrt.org> <1459388452.18284.2.camel@mtksdaap41>
- <1459391533.21870.15.camel@mtksdaap41> <56FCE910.8030100@openwrt.org>
- <1459431711.395.6.camel@mtksdaap41> <56FD2F18.4050508@openwrt.org>
-Message-ID: <1459910866.18284.27.camel@mtksdaap41>
+From: yh.huang@mediatek.com (YH Huang)
+Date: Wed, 6 Apr 2016 10:35:37 +0800
+Subject: [PATCH] sbs-battery: fix power status when battery is dry
+In-Reply-To: <20160402034649.GA11414@earth>
+References: <1458801832.16645.7.camel@mtksdaap41>
+ <CAGS+omDhFP+_shCqEWasLDsHf-ab0-OWJJ-gZZkgihAgrZwBHA@mail.gmail.com>
+ <1459132330.16645.14.camel@mtksdaap41>
+ <CAGS+omBVStB3mfXtDHdbsOK+y2UesGYtZBtYm=ctcpBfm88VEg@mail.gmail.com>
+ <56F95451.5040607@nvidia.com> <1459216353.16645.20.camel@mtksdaap41>
+ <56FA99D0.1010004@nvidia.com> <1459328310.29450.24.camel@mtksdaap41>
+ <20160330150919.GA21068@earth> <1459392151.29450.44.camel@mtksdaap41>
+ <20160402034649.GA11414@earth>
+Message-ID: <1459910137.7609.0.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-03-31 at 16:07 +0200, John Crispin wrote:
+On Sat, 2016-04-02 at 05:46 +0200, Sebastian Reichel wrote:
+> Hi,
 > 
-> On 31/03/2016 15:41, Yingjoe Chen wrote:
-> > On Thu, 2016-03-31 at 11:08 +0200, John Crispin wrote:
-> >>
-> >> On 31/03/2016 04:32, Yingjoe Chen wrote:
-> >>> On Thu, 2016-03-31 at 09:40 +0800, Henry Chen wrote:
-> >>>> On Wed, 2016-03-30 at 11:18 +0200, John Crispin wrote:
-> >>>>> Hi,
-> >>>>>
-> >>>>> small nitpick inline
-> >>>>>
-> >>>>> On 30/03/2016 09:25, Henry Chen wrote:
-> >>>>>> Some sub driver like RTC module need irq domain from parent to create
-> >>>>>> irq mapping when driver initialize. so move mt6397_irq_init() before
-> >>>>>> mfd_add_devices().
-> >>>>>>
-> >>>>>> Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
-> >>>>>> ---
-> >>>>>> This patch fixed the below warning based on "Linux kernel v4.6-rc1"
-> >>>>>> WARNING: CPU: 1 PID: 132 at kernel/mediatek/kernel/irq/irqdomain.c:471
-> >>>>>> irq_create_mapping+0xc4/0xd0
-> >>>>>> ---
-> >>>>>>  drivers/mfd/mt6397-core.c | 37 ++++++++++++++++++++++---------------
-> >>>>>>  1 file changed, 22 insertions(+), 15 deletions(-)
-> >>>>>>
-> >>>>>> diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
-> >>>>>> index 8e8d932..a879223 100644
-> >>>>>> --- a/drivers/mfd/mt6397-core.c
-> >>>>>> +++ b/drivers/mfd/mt6397-core.c
-> >>>>>> @@ -270,22 +270,36 @@ static int mt6397_probe(struct platform_device *pdev)
-> >>>>>>  		goto fail_irq;
-> >>>>>>  	}
-> >>>>>>  
-> >>>>>> +	pmic->irq = platform_get_irq(pdev, 0);
-> >>>>>> +
-> >>>>>>  	switch (id & 0xff) {
-> >>>>>>  	case MT6323_CID_CODE:
-> >>>>>> -		pmic->int_con[0] = MT6323_INT_CON0;
-> >>>>>> -		pmic->int_con[1] = MT6323_INT_CON1;
-> >>>>>> -		pmic->int_status[0] = MT6323_INT_STATUS0;
-> >>>>>> -		pmic->int_status[1] = MT6323_INT_STATUS1;
-> >>>>>> +		if (pmic->irq > 0) {
-> >>>>>
-> >>>>> should this not be
-> >>>>>
-> >>>>> 		if (pmic->irq >= 0) {
-> >>>>>
-> >>>>> i think the code before your patch was wrong as linux irqs start with 0.
-> >>>>>
-> >>>>> 	John
-> >>>> Hi John,
-> >>>>
-> >>>> Thanks, I will modify this.
-> >>>
-> >>> Linux irq start from 1, 0 is invalid. I can't find the document saying
-> >>> this now, but you could see this from irq_create_mapping() in
-> >>> kernel/irq/irqdomain.c
-> >>>
-> >>> I think the code should have check return from platform_get_irq and
-> >>> handle -EPROBE_DEFER, but maybe it should be another patch?
-> >>>
-> >>> BTW, in this function, it is possible that pmic->irq_domain will be NULL
-> >>> in fail_irq error handling. We should check before calling
-> >>> irq_domain_remove.
-> >>>
-> >>> Joe.C
-> >>>
-> >>
-> >> Hi,
-> >>
-> >> looking at
-> >> http://lxr.free-electrons.com/source/drivers/base/platform.c#L87 there
-> >> is a check in line #100 ret >= 0
-> >>
-> >> checking the return value of pmic->irq = platform_get_irq(pdev, 0);
-> >> should follow the same pattern i think .. unless i have a thinko and am
-> >> reading the code wrong.
+> On Thu, Mar 31, 2016 at 10:42:31AM +0800, YH Huang wrote:
+> > On Wed, 2016-03-30 at 17:09 +0200, Sebastian Reichel wrote:
+> > > Hi,
+> > > 
+> > > On Wed, Mar 30, 2016 at 04:58:30PM +0800, YH Huang wrote:
+> > > > If I revise the description in this way(using your clear explanation):
+> > > > ------------------------------------------------------------------------
+> > > > The battery capacity changing course is like this:
+> > > > 
+> > > > full: BATTERY_FULLY_CHARGED => POWER_SUPPLY_STATUS_FULL
+> > > > <unplug AC>
+> > > > high->low: BATTERY_DISCHARGING => POWER_SUPPLY_STATUS_DISCHARGING
+> > > > ~0%: DISCHARGING & FULLY_DISCHARGED => POWER_SUPPLY_STATUS_NOT_CHARGING
+> > > > <plug in AC>
+> > > > 0%~20%: FULLY_DISCHARGED => POWER_SUPPLY_STATUS_CHARGING
+> > > > 20%~: No flag => POWER_SUPPLY_STATUS_CHARGING
+> > > > 
+> > > > For now, it is not exactly right to show the status as
+> > > > POWER_SUPPLY_STATUS_NOT_CHARGING when the battery is dry
+> > > > (FULLY_DISCHARGED) and AC is plugged in.
+> > > > Although the battery is in a low level, system works fine with the AC
+> > > > charging.
+> > > > It is better to say that the battery is charging.
+> > > > ------------------------------------------------------------------------
+> > > > 
+> > > > How about this?
+> > > > By the way, should I also revise the title?
+> > > 
+> > > POWER_SUPPLY_STATUS_NOT_CHARGING is used for AC connected, but
+> > > battery not charging (e.g. because battery temperature is out
+> > > of acceptable range). If you are discharging use
+> > > POWER_SUPPLY_STATUS_DISCHARGING.
+> > > 
+> > > You should just ignore the FULLY_DISCHARGED bit in the status
+> > > property. If you don't want to loose the information about fully
+> > > discharged battery add POWER_SUPPLY_PROP_CAPACITY_LEVEL, which maps:
+> > > 
+> > > BATTERY_FULLY_CHARGED => POWER_SUPPLY_CAPACITY_LEVEL_FULL
+> > > FULLY_DISCHARGED => POWER_SUPPLY_CAPACITY_LEVEL_CRITICAL
+> > > otherwise => POWER_SUPPLY_CAPACITY_LEVEL_NORMAL
 > > 
+> > Oops.
+> > It looks like I misunderstand POWER_SUPPLY_STATUS_NOT_CHARGING.
+> > As Daniel said before, we could just ignore FULLY_DISCHARGED.
 > > 
-> > I'm not sure why platform_get_irq() check for 0, but I think the code
-> > logic is differnet.
+> > So change like the
 > > 
-> > When platform_get_irq() return 0 to our code, it means we don't have
-> > valid irq to use. In this case it doesn't make any sense to continue
-> > init irq.
+> > sbs-battery: fix power status when battery charging near
+> > dry
 > > 
+> > POWER_SUPPLY_STATUS_NOT_CHARGING is used for AC connected, but
+> > battery not charging (e.g. because battery temperature is out
+> > of acceptable range).
 > > 
-> > Joe.C
+> > When battery is charging near dry and BATTERY_FULL_DISCHARGED is set,
+> > it is wrong to set as POWER_SUPPLY_STATUS_NOT_CHARGING.
+> > Just use BATTERY_DISCHARGING to decide the power supply status is
+> > discharging or charging.
+> > 
+> >                 if (ret & BATTERY_FULL_CHARGED)
+> >                         val->intval = POWER_SUPPLY_STATUS_FULL;
+> > -               else if (ret & BATTERY_FULL_DISCHARGED)
+> > -                       val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
+> >                 else if (ret & BATTERY_DISCHARGING)
+> >                         val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
 > > 
 > 
-> 
-> --> http://lwn.net/Articles/470820/
-> 
-> indeed ARM has changed this is seems. was not aware of this change,
-> sorry for the noise
-> 
-> 	John
+> Yes, that looks fine. Can you send this correctly formated for git?
 
-Hi Lee/Joe/John,
+Sure, I will send a new patch for it.
 
-Thanks for comment, that means we can keep this patch for 4.6-rc1
-regression (RTC get NULL irq issue), right?
-
-I will send another patch to fixed above error handling problem.
-
-Thanks.
-Henry
+YH Huang
