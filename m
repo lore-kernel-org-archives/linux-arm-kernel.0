@@ -1,56 +1,49 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 6 Apr 2016 17:58:19 +0200
-Subject: [PATCH 2/3] iommu/io-pgtable-arm: Support IOMMU_MMIO flag
-In-Reply-To: <1e6ddedc0bb08b6581f6e0e80710c2ed03830647.1459854346.git.robin.murphy@arm.com>
-References: <d80a42ceae3a39ef7c593a5181a1742a84c65533.1459854346.git.robin.murphy@arm.com>
- <1e6ddedc0bb08b6581f6e0e80710c2ed03830647.1459854346.git.robin.murphy@arm.com>
-Message-ID: <5705321B.3040200@linaro.org>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Wed, 6 Apr 2016 13:13:21 -0300
+Subject: [PATCH 4/5] devicetree: leds: Introduce "panic-blink" optional
+ property
+In-Reply-To: <CAL_JsqLF-cMtGERnZ0wO_GUkhsf23LQhOm6PwwKAa5evSkOHDg@mail.gmail.com>
+References: <1459801326-5541-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+ <1459801326-5541-5-git-send-email-ezequiel@vanguardiasur.com.ar>
+ <CAL_JsqLF-cMtGERnZ0wO_GUkhsf23LQhOm6PwwKAa5evSkOHDg@mail.gmail.com>
+Message-ID: <CAAEAJfDVzXaXjT=E+VRKg6kDR+V-QNJrhfeFk0ritymDPvTVLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
-On 04/05/2016 01:39 PM, Robin Murphy wrote:
-> Teach the LPAE format to create Device mappings when asked.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-don't know if it helps in any way but I tested that with my KVM PCIe/MSI
-passthrough series for mapping the GICv2m doorbell.
+On 6 April 2016 at 12:12, Rob Herring <robh@kernel.org> wrote:
+> On Mon, Apr 4, 2016 at 3:22 PM, Ezequiel Garcia
+> <ezequiel@vanguardiasur.com.ar> wrote:
+>> It's desirable to specify which LEDs are to be blinked on a kernel
+>> panic. Therefore, introduce a devicetree boolean property to mark
+>> which LEDs should be treated this way.
+>>
+>> Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
+>> ---
+>>  Documentation/devicetree/bindings/leds/common.txt | 2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/leds/common.txt b/Documentation/devicetree/bindings/leds/common.txt
+>> index 68419843e32f..dd409df9203a 100644
+>> --- a/Documentation/devicetree/bindings/leds/common.txt
+>> +++ b/Documentation/devicetree/bindings/leds/common.txt
+>> @@ -37,6 +37,8 @@ Optional properties for child nodes:
+>>                       property is mandatory for the LEDs in the non-flash modes
+>>                       (e.g. torch or indicator).
+>>
+>> +- panic-blink : Mark this LED to be used by the panic LED trigger.
+>> +
+>
+> We already have a way to specify LED triggers. Why can't that be used?
+>
 
-Tested-by: Eric Auger <eric.auger@linaro.org>
+Because this is not about specifying a LED trigger.
 
-Best Regards
+The use case is the following: a LED is assigned to some LED trigger.
+When the kernel panics, we want to switch that LED to the panic trigger,
+so it blinks signalling the panic.
 
-Eric
-
-> ---
->  drivers/iommu/io-pgtable-arm.c | 9 +++++++--
->  1 file changed, 7 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-> index f433b51..a1ed1b7 100644
-> --- a/drivers/iommu/io-pgtable-arm.c
-> +++ b/drivers/iommu/io-pgtable-arm.c
-> @@ -355,7 +355,10 @@ static arm_lpae_iopte arm_lpae_prot_to_pte(struct arm_lpae_io_pgtable *data,
->  		if (!(prot & IOMMU_WRITE) && (prot & IOMMU_READ))
->  			pte |= ARM_LPAE_PTE_AP_RDONLY;
->  
-> -		if (prot & IOMMU_CACHE)
-> +		if (prot & IOMMU_MMIO)
-> +			pte |= (ARM_LPAE_MAIR_ATTR_IDX_DEV
-> +				<< ARM_LPAE_PTE_ATTRINDX_SHIFT);
-> +		else if (prot & IOMMU_CACHE)
->  			pte |= (ARM_LPAE_MAIR_ATTR_IDX_CACHE
->  				<< ARM_LPAE_PTE_ATTRINDX_SHIFT);
->  	} else {
-> @@ -364,7 +367,9 @@ static arm_lpae_iopte arm_lpae_prot_to_pte(struct arm_lpae_io_pgtable *data,
->  			pte |= ARM_LPAE_PTE_HAP_READ;
->  		if (prot & IOMMU_WRITE)
->  			pte |= ARM_LPAE_PTE_HAP_WRITE;
-> -		if (prot & IOMMU_CACHE)
-> +		if (prot & IOMMU_MMIO)
-> +			pte |= ARM_LPAE_PTE_MEMATTR_DEV;
-> +		else if (prot & IOMMU_CACHE)
->  			pte |= ARM_LPAE_PTE_MEMATTR_OIWB;
->  		else
->  			pte |= ARM_LPAE_PTE_MEMATTR_NC;
-> 
+IOW, this allows a LED to be used for "normal operation stuff trigger",
+but blink if the kernel panics.
+-- 
+Ezequiel Garc?a, VanguardiaSur
+www.vanguardiasur.com.ar
