@@ -1,9 +1,9 @@
 From: agraf@suse.de (Alexander Graf)
-Date: Wed, 6 Apr 2016 11:14:15 +0200
+Date: Wed, 6 Apr 2016 11:14:42 +0200
 Subject: [PATCH] KVM: arm/arm64: Handle forward time correction gracefully
 In-Reply-To: <1459931842-29465-1-git-send-email-marc.zyngier@arm.com>
 References: <1459931842-29465-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <5704D367.5040500@suse.de>
+Message-ID: <5704D382.7010309@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -33,9 +33,7 @@ On 04/06/2016 10:37 AM, Marc Zyngier wrote:
 > Reported-by: Alexander Graf <agraf@suse.de>
 > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Looks good, I can give it a test run later as well, but for now
-
-Reviewed-by: Alexander Graf <agraf@suse.de>
+Oh - before I forget. This should go out with CC stable :)
 
 
 Alex
