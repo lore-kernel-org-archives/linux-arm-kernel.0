@@ -1,71 +1,57 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 6 Apr 2016 10:05:02 +0100
-Subject: [PATCH] arm64/sunxi: 4.6-rc1: Add dependency on generic irq chip
-In-Reply-To: <1459245786-11905-1-git-send-email-suzuki.poulose@arm.com>
-References: <1459245786-11905-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <5704D13E.6060701@arm.com>
+From: fugang.duan@nxp.com (Fugang Duan)
+Date: Wed, 6 Apr 2016 09:10:30 +0000
+Subject: [PATCH net-next V3 02/16] net: fec: remove unused interrupt
+ FEC_ENET_TS_TIMER
+In-Reply-To: <1459909562-22865-3-git-send-email-troy.kisky@boundarydevices.com>
+References: <1459909562-22865-1-git-send-email-troy.kisky@boundarydevices.com>
+ <1459909562-22865-3-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <VI1PR0401MB1855BC1C6A65516245790BA3FF9F0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 29/03/16 11:03, Suzuki K Poulose wrote:
-> Commit ce3dd55b99b1 ("arm64: Introduce Allwinner SoC config option"),
-> added support for ARCH_SUNXI on arm64, but failed to select
-> GENERIC_IRQ_CHIP, which is required for drivers/irqchip/irq-sunxi-nmi.c
-> and causes build failures like :
-
-Thanks for the catch! GENERIC_IRQ_CHIP somehow gets selected by
-defconfig, so I didn't see the issue.
-
-Currently we don't need the irq-sunxi-nmi driver, but we may in the
-future and it depends on CONFIG_ARCH_SUNXI only, so I guess this patch
-is the easiest solution (rather than creating a separate config symbol
-for it, which may be an option for later).
-
-So...
-
+From: Troy Kisky <troy.kisky@boundarydevices.com> Sent: Wednesday, April 06, 2016 10:26 AM
+> To: netdev at vger.kernel.org; davem at davemloft.net; Fugang Duan
+> <fugang.duan@nxp.com>; lznuaa at gmail.com
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>; l.stach at pengutronix.de;
+> andrew at lunn.ch; tremyfr at gmail.com; gerg at uclinux.org; linux-arm-
+> kernel at lists.infradead.org; johannes at sipsolutions.net;
+> stillcompiling at gmail.com; sergei.shtylyov at cogentembedded.com;
+> arnd at arndb.de; Troy Kisky <troy.kisky@boundarydevices.com>
+> Subject: [PATCH net-next V3 02/16] net: fec: remove unused interrupt
+> FEC_ENET_TS_TIMER
 > 
->   UPD     include/generated/compile.h
->   CC      init/version.o
->   LD      init/built-in.o
-> drivers/built-in.o: In function `sunxi_sc_nmi_set_type':
-> drivers/irqchip/irq-sunxi-nmi.c:114: undefined reference to `irq_setup_alt_chip'
-> drivers/built-in.o: In function `irq_domain_add_linear':
-> include/linux/irqdomain.h:253: undefined reference to `irq_generic_chip_ops'
-> include/linux/irqdomain.h:253: undefined reference to `irq_generic_chip_ops'
-> drivers/built-in.o: In function `sunxi_sc_nmi_irq_init':
-> drivers/irqchip/irq-sunxi-nmi.c:146: undefined reference to `irq_alloc_domain_generic_chips'
-> drivers/irqchip/irq-sunxi-nmi.c:161: undefined reference to `irq_get_domain_generic_chip'
-> drivers/irqchip/irq-sunxi-nmi.c:170: undefined reference to `irq_gc_mask_clr_bit'
-> drivers/irqchip/irq-sunxi-nmi.c:171: undefined reference to `irq_gc_mask_set_bit'
-> drivers/irqchip/irq-sunxi-nmi.c:172: undefined reference to `irq_gc_ack_set_bit'
-> drivers/irqchip/irq-sunxi-nmi.c:170: undefined reference to `irq_gc_mask_clr_bit'
+> FEC_ENET_TS_TIMER is not checked in the interrupt routine so there is no need
+> to enable it.
 > 
-> Fixes: commit ce3dd55b99b1 ("arm64: Introduce Allwinner SoC config option")
-> Cc: Andre Przywara <andre.przywara@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-
-Acked-by: Andre Przywara <andre.przywara@arm.com>
-
-Cheers,
-Andre.
-
-
+> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+> 
 > ---
->  arch/arm64/Kconfig.platforms |    1 +
->  1 file changed, 1 insertion(+)
+> v3: New patch
 > 
-> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-> index efa77c1..521b1ec 100644
-> --- a/arch/arm64/Kconfig.platforms
-> +++ b/arch/arm64/Kconfig.platforms
-> @@ -2,6 +2,7 @@ menu "Platform selection"
->  
->  config ARCH_SUNXI
->  	bool "Allwinner sunxi 64-bit SoC Family"
-> +	select GENERIC_IRQ_CHIP
->  	help
->  	  This enables support for Allwinner sunxi based SoCs like the A64.
->  
+> Frank Li said "TS_TIMER should never be triggered."
+> when discussing another patch.
+> ---
+>  drivers/net/ethernet/freescale/fec.h | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
+> diff --git a/drivers/net/ethernet/freescale/fec.h
+> b/drivers/net/ethernet/freescale/fec.h
+> index 195122e..6dd0ba8 100644
+> --- a/drivers/net/ethernet/freescale/fec.h
+> +++ b/drivers/net/ethernet/freescale/fec.h
+> @@ -374,8 +374,8 @@ struct bufdesc_ex {
+>  #define FEC_ENET_TS_AVAIL       ((uint)0x00010000)
+>  #define FEC_ENET_TS_TIMER       ((uint)0x00008000)
+> 
+> -#define FEC_DEFAULT_IMASK (FEC_ENET_TXF | FEC_ENET_RXF | FEC_ENET_MII
+> | FEC_ENET_TS_TIMER)
+> -#define FEC_NAPI_IMASK	(FEC_ENET_MII | FEC_ENET_TS_TIMER)
+> +#define FEC_DEFAULT_IMASK (FEC_ENET_TXF | FEC_ENET_RXF | FEC_ENET_MII)
+> +#define FEC_NAPI_IMASK	FEC_ENET_MII
+>  #define FEC_RX_DISABLED_IMASK (FEC_DEFAULT_IMASK & (~FEC_ENET_RXF))
+> 
+>  /* ENET interrupt coalescing macro define */
+> --
+> 2.5.0
+
+Acked-by: Fugang Duan <fugang.duan@nxp.com>
