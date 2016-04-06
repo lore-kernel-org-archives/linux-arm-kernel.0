@@ -1,61 +1,75 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Wed, 6 Apr 2016 14:43:04 -0600
-Subject: [PATCH V2 1/9] acpi: apei: read ack upon ghes record consumption
-In-Reply-To: <57053100.7050305@arm.com>
-References: <1459955578-24602-1-git-send-email-tbaicar@codeaurora.org>
- <1459955578-24602-2-git-send-email-tbaicar@codeaurora.org>
- <57053100.7050305@arm.com>
-Message-ID: <570574D8.8060402@codeaurora.org>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Wed, 6 Apr 2016 23:16:11 +0200
+Subject: [PATCH v3 1/5] Documentation: DT: vdma: Rename vdma-chan prefix
+ to dma-chan
+In-Reply-To: <C246CAC1457055469EF09E3A7AC4E11A4A57364B@XAP-PVEXMBX01.xlnx.xilinx.com>
+References: <1459959335-24083-1-git-send-email-appanad@xilinx.com>
+ <1459959335-24083-2-git-send-email-appanad@xilinx.com>
+ <20160406162022.GS23198@xsjsorenbubuntu>
+ <C246CAC1457055469EF09E3A7AC4E11A4A57364B@XAP-PVEXMBX01.xlnx.xilinx.com>
+Message-ID: <57057C9B.8040804@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Suzuki,
+On 04/06/2016 06:25 PM, Appana Durga Kedareswara Rao wrote:
+> Hi Soren,
+> 
+> 
+>> -----Original Message-----
+>> From: S?ren Brinkmann [mailto:soren.brinkmann at xilinx.com]
+>> Sent: Wednesday, April 06, 2016 9:50 PM
+>> To: Appana Durga Kedareswara Rao <appanad@xilinx.com>
+>> Cc: robh+dt at kernel.org; pawel.moll at arm.com; mark.rutland at arm.com;
+>> ijc+devicetree at hellion.org.uk; galak at codeaurora.org; Michal Simek
+>> <michals@xilinx.com>; vinod.koul at intel.com; dan.j.williams at intel.com;
+>> Appana Durga Kedareswara Rao <appanad@xilinx.com>;
+>> moritz.fischer at ettus.com; laurent.pinchart at ideasonboard.com;
+>> luis at debethencourt.com; Srikanth Vemula <svemula@xilinx.com>; Anirudha
+>> Sarangi <anirudh@xilinx.com>; devicetree at vger.kernel.org; linux-arm-
+>> kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+>> dmaengine at vger.kernel.org
+>> Subject: Re: [PATCH v3 1/5] Documentation: DT: vdma: Rename vdma-chan
+>> prefix to dma-chan
+>>
+>> On Wed, 2016-04-06 at 21:45:31 +0530, Kedareswara rao Appana wrote:
+>>> This patch renames the vdma-mm2s-channel/vdma-s2mm-channel
+>>> property with dma-mm2s-channel/dma-s2mm-channel to sync with the
+>>> driver.
+>>>
+>>> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+>>> ---
+>>> Changes for v3:
+>>> ---> New patch.
+>>>
+>>>  Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt | 8
+>>> ++++----
+>>>  1 file changed, 4 insertions(+), 4 deletions(-)
+>>>
+>>> diff --git
+>>> a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+>>> b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+>>> index a86737c..762938f 100644
+>>> --- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+>>> +++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+>>> @@ -24,8 +24,8 @@ Optional properties:
+>>>  	{3}, flush s2mm channel
+>>>
+>>>  Required child node properties:
+>>> -- compatible: It should be either "xlnx,axi-vdma-mm2s-channel" or
+>>> -	"xlnx,axi-vdma-s2mm-channel".
+>>> +- compatible: It should be either "xlnx,axi-dma-mm2s-channel" or
+>>> +	"xlnx,axi-dma-s2mm-channel".
+>>
+>> This change is not backwards compatible and breaks every user of the current
+>> binding.
+> 
+> This commit http://git.kernel.org/cgit/linux/kernel/git/vkoul/slave-dma.git/commit/?h=next&id=8e66e7d682b04f7141f8ae666908c8dcd7fc0bfa 
+> Renames xilinx_vdma_ prefix to xilinx_dma which includes renaming of the above properties.
+> The patch (dmaengine: vdma: Rename xilinx_vdma_ prefix to xilinx_dma) already got applied in the dma-next tree.
+> That's why sent this patch to sync with the current driver I mean latest driver.
 
-On 4/6/2016 9:53 AM, Suzuki K Poulose wrote:
-> On 06/04/16 16:12, Tyler Baicar wrote:
->> +    hest_hdr = (struct acpi_hest_header *)generic;
->> +    if (hest_hdr->type == ACPI_HEST_TYPE_GENERIC_ERROR_V2) {
->> +        ghes->generic_v2 = (struct acpi_hest_generic_v2 *)generic;
->> +        rc = apei_map_generic_address(
->> +            &ghes->generic_v2->read_ack_register);
->> +        if (rc)
->> +            goto err_unmap;
->> +    } else
->> +        ghes->generic_v2 = NULL;
-> ...
->>   err_unmap:
->> apei_unmap_generic_address(&generic->error_status_address);
->> +    if (ghes->generic_v2)
->> +        apei_unmap_generic_address(
->> +            &ghes->generic_v2->read_ack_register);
->>   err_free:
->>       kfree(ghes);
->>       return ERR_PTR(rc);
->> @@ -279,6 +295,9 @@ static void ghes_fini(struct ghes *ghes)
->>   {
->>       kfree(ghes->estatus);
->> apei_unmap_generic_address(&ghes->generic->error_status_address);
->> +    if (ghes->generic_v2)
->> +        apei_unmap_generic_address(
->> +            &ghes->generic_v2->error_status_address);
->
-> I am not familiar with the APEI code, but is this error_status_address or
-> read_ack_register ? We don't seem to be mapping error_status_address 
-> in generic_v2 header
-> which is introduced in this patch ? Am I missing something ?
->
-> Suzuki
-
-Thank you for your feedback. This does look like an error; it should be 
-&ghes->generic_v2->read_ack_register. The variable 
-&ghes->generic_v2->error_status_address is the same as 
-&ghes->generic->error_status_address which is unmapped on the line above 
-the if statement here.
+The correct solution for this is to revert that part of the change ASAP,
+since, as Soeren pointed out, it breaks all existing users.
 
 Thanks,
-Tyler
-
--- 
-Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+- Lars
