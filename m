@@ -1,105 +1,41 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Wed, 6 Apr 2016 09:45:46 +0200
-Subject: [PATCH] iommu/rockchip: Fix "is stall active" check
-In-Reply-To: <9799340.GJHE2cZK7r@phil>
-References: <1459865146-25308-1-git-send-email-john@metanate.com>
- <5389576.zuTxjFsmO4@phil> <20160405182858.382ea465.john@metanate.com>
- <9799340.GJHE2cZK7r@phil>
-Message-ID: <CAAObsKC9d17jh1xOfGGSo6ULesYFAENYSNEFrr4ee4h_JgahYw@mail.gmail.com>
+From: ynezz@true.cz (Petr =?iso-8859-2?Q?=A9tetiar?=)
+Date: Wed, 6 Apr 2016 10:11:40 +0200
+Subject: [PATCH 2/2] PCI: imx6: Add reset-gpio-active-high boolean
+ property to DT
+In-Reply-To: <CAOMZO5AnN4_RrA4bksWNmioAP1PCBT1Ax4of_OnoCvG+VXgDUQ@mail.gmail.com>
+References: <1459514508-8557-1-git-send-email-ynezz@true.cz>
+ <1459514508-8557-3-git-send-email-ynezz@true.cz>
+ <CAOMZO5AnN4_RrA4bksWNmioAP1PCBT1Ax4of_OnoCvG+VXgDUQ@mail.gmail.com>
+Message-ID: <20160406081140.GR20367@ibawizard.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 April 2016 at 21:10, Heiko Stuebner <heiko@sntech.de> wrote:
-> Am Dienstag, 5. April 2016, 18:28:58 schrieb John Keeping:
->> On Tue, 05 Apr 2016 10:21:27 -0700, Heiko Stuebner wrote:
->> > Am Dienstag, 5. April 2016, 15:05:46 schrieb John Keeping:
->> > > Since commit cd6438c5f844 ("iommu/rockchip: Reconstruct to support
->> > > multi
->> > > slaves") rk_iommu_is_stall_active() always returns false because the
->> > > bitwise AND operates on the boolean flag promoted to an integer and a
->> > > value that is either zero or BIT(2).
->> > >
->> > > Explicitly convert the right-hand value to a boolean so that both
->> > > sides
->> > > are guaranteed to be either zero or one.
->> > >
->> > > rk_iommu_is_paging_enabled() does not suffer from the same problem
->> > > since
->> > > RK_MMU_STATUS_PAGING_ENABLED is BIT(0), but let's apply the same
->> > > change
->> > > for consistency and to make it clear that it's correct without needing
->> > > to lookup the value.
->> > >
->> > > Fixes: cd6438c5f844 ("iommu/rockchip: Reconstruct to support multi
->> > > slaves") Signed-off-by: John Keeping <john@metanate.com>
->> >
->> > Nice catch, thanks.
->> >
->> > Reviewed-by: Heiko Stuebner <heiko@sntech.de>
->> >
->> > John, out of curiosity, how did you find that problem? Excess stall
->> > error
->> > messages or something else?
->>
->> I was testing the drm iommu patches I posted today [1] and noticed an
->> "Enable stall request timed out" error when unbinding the
->> display-subsystem, but the RK_MMU_STATUS value printed in the error
->> message indicated that stall active was set.
->>
->> [1] http://article.gmane.org/gmane.comp.video.dri.devel/150721
->
-> So it seems both you and Tomeu were working to resolve the same issue [2].
->
-> And John's patch seems to actually fix the underlying problem.
+Fabio Estevam <festevam@gmail.com> [2016-04-05 12:46:53]:
 
-Indeed, I don't get spurious messages any more with this patch.
+> > @@ -546,9 +549,14 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
+> >
+> >         /* Fetch GPIOs */
+> >         imx6_pcie->reset_gpio = of_get_named_gpio(np, "reset-gpio", 0);
+> > +       imx6_pcie->gpio_active_high = of_property_read_bool(np,
+> > +                                               "reset-gpio-active-high");
+> 
+> You need to document reset-gpio-active-high property in
+> Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt.
 
-Tested-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+Is something like this fine?
 
-Thanks,
+diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+index 3be80c6..23ecb47 100644
+--- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
++++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+@@ -19,6 +19,11 @@ Optional properties:
+ - fsl,tx-deemph-gen2-6db: Gen2 (6db) De-emphasis value. Default: 20
+ - fsl,tx-swing-full: Gen2 TX SWING FULL value. Default: 127
+ - fsl,tx-swing-low: TX launch amplitude swing_low value. Default: 127
++- reset-gpio: Should specify the GPIO for PHY reset. Its not polarity aware
++  and defaults to active-low reset sequence (L=reset state, H=operation state).
++- reset-gpio-active-high: If present then the reset sequence using the GPIO
++  specified in the "reset-gpio" property is reversed (H=reset state,
++  L=operation state).
 
-Tomeu
-
->
-> [2] https://lkml.org/lkml/2016/3/22/493
->
->
->> > > ---
->> > >
->> > >  drivers/iommu/rockchip-iommu.c | 8 ++++----
->> > >  1 file changed, 4 insertions(+), 4 deletions(-)
->> > >
->> > > diff --git a/drivers/iommu/rockchip-iommu.c
->> > > b/drivers/iommu/rockchip-iommu.c index a6f593a0a29e..5710a06c3049
->> > > 100644
->> > > --- a/drivers/iommu/rockchip-iommu.c
->> > > +++ b/drivers/iommu/rockchip-iommu.c
->> > > @@ -315,8 +315,8 @@ static bool rk_iommu_is_stall_active(struct
->> > > rk_iommu
->> > > *iommu) int i;
->> > >
->> > >   for (i = 0; i < iommu->num_mmu; i++)
->> > >
->> > > -         active &= rk_iommu_read(iommu->bases[i], RK_MMU_STATUS) &
->> > > -                                 RK_MMU_STATUS_STALL_ACTIVE;
->> > > +         active &= !!(rk_iommu_read(iommu->bases[i], RK_MMU_STATUS) &
->> > > +                                    RK_MMU_STATUS_STALL_ACTIVE);
->> > >
->> > >   return active;
->> > >
->> > >  }
->> > >
->> > > @@ -327,8 +327,8 @@ static bool rk_iommu_is_paging_enabled(struct
->> > > rk_iommu *iommu) int i;
->> > >
->> > >   for (i = 0; i < iommu->num_mmu; i++)
->> > >
->> > > -         enable &= rk_iommu_read(iommu->bases[i], RK_MMU_STATUS) &
->> > > -                                 RK_MMU_STATUS_PAGING_ENABLED;
->> > > +         enable &= !!(rk_iommu_read(iommu->bases[i], RK_MMU_STATUS) &
->> > > +                                    RK_MMU_STATUS_PAGING_ENABLED);
->> > >
->> > >   return enable;
->> > >
->> > >  }
->
+-- ynezz
