@@ -1,9 +1,10 @@
 From: amsfield22@gmail.com (Alison Schofield)
-Date: Tue, 5 Apr 2016 22:15:55 -0700
-Subject: [PATCH 1/9] iio: adc: exynos_adc: use regmap to retrieve struct device
+Date: Tue, 5 Apr 2016 22:16:31 -0700
+Subject: [PATCH 2/9] iio: adc: qcom-spmi-iadc: use regmap to retrieve struct
+ device
 In-Reply-To: <cover.1459918214.git.amsfield22@gmail.com>
 References: <cover.1459918214.git.amsfield22@gmail.com>
-Message-ID: <2329d20396db00b60f4e7d2e783ea46b48eea9c1.1459918214.git.amsfield22@gmail.com>
+Message-ID: <aaffb79b464a361556e098d42081406813c511c4.1459918214.git.amsfield22@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,92 +15,184 @@ Patch created using Coccinelle plus manual edits.
 
 Signed-off-by: Alison Schofield <amsfield22@gmail.com>
 ---
- drivers/iio/adc/exynos_adc.c | 18 +++++++++---------
- 1 file changed, 9 insertions(+), 9 deletions(-)
+ drivers/iio/adc/qcom-spmi-iadc.c | 32 +++++++++++++++++---------------
+ 1 file changed, 17 insertions(+), 15 deletions(-)
 
-diff --git a/drivers/iio/adc/exynos_adc.c b/drivers/iio/adc/exynos_adc.c
-index c15756d..0313e0f 100644
---- a/drivers/iio/adc/exynos_adc.c
-+++ b/drivers/iio/adc/exynos_adc.c
-@@ -130,7 +130,6 @@
+diff --git a/drivers/iio/adc/qcom-spmi-iadc.c b/drivers/iio/adc/qcom-spmi-iadc.c
+index fabd24e..f69a057 100644
+--- a/drivers/iio/adc/qcom-spmi-iadc.c
++++ b/drivers/iio/adc/qcom-spmi-iadc.c
+@@ -102,7 +102,6 @@
+ /**
+  * struct iadc_chip - IADC Current ADC device structure.
+  * @regmap: regmap for register read/write.
+- * @dev: This device pointer.
+  * @base: base offset for the ADC peripheral.
+  * @rsense: Values of the internal and external sense resister in micro Ohms.
+  * @poll_eoc: Poll for end of conversion instead of waiting for IRQ.
+@@ -113,7 +112,6 @@
+  */
+ struct iadc_chip {
+ 	struct regmap	*regmap;
+-	struct device	*dev;
+ 	u16		base;
+ 	bool		poll_eoc;
+ 	u32		rsense[2];
+@@ -170,6 +168,7 @@ static int iadc_set_state(struct iadc_chip *iadc, bool state)
  
- struct exynos_adc {
- 	struct exynos_adc_data	*data;
--	struct device		*dev;
- 	struct input_dev	*input;
- 	void __iomem		*regs;
- 	struct regmap		*pmu_map;
-@@ -173,11 +172,12 @@ static void exynos_adc_unprepare_clk(struct exynos_adc *info)
- 
- static int exynos_adc_prepare_clk(struct exynos_adc *info)
+ static void iadc_status_show(struct iadc_chip *iadc)
  {
-+	struct device *dev = regmap_get_device(info->pmu_map);
++	struct device *dev = regmap_get_device(iadc->regmap);
+ 	u8 mode, sta1, chan, dig, en, req;
  	int ret;
  
- 	ret = clk_prepare(info->clk);
- 	if (ret) {
--		dev_err(info->dev, "failed preparing adc clock: %d\n", ret);
-+		dev_err(dev, "failed preparing adc clock: %d\n", ret);
+@@ -197,7 +196,7 @@ static void iadc_status_show(struct iadc_chip *iadc)
+ 	if (ret < 0)
+ 		return;
+ 
+-	dev_err(iadc->dev,
++	dev_err(dev,
+ 		"mode:%02x en:%02x chan:%02x dig:%02x req:%02x sta1:%02x\n",
+ 		mode, en, chan, dig, req, sta1);
+ }
+@@ -284,6 +283,7 @@ static int iadc_read_result(struct iadc_chip *iadc, u16 *data)
+ 
+ static int iadc_do_conversion(struct iadc_chip *iadc, int chan, u16 *data)
+ {
++	struct device *dev = regmap_get_device(iadc->regmap);
+ 	unsigned int wait;
+ 	int ret;
+ 
+@@ -310,7 +310,7 @@ static int iadc_do_conversion(struct iadc_chip *iadc, int chan, u16 *data)
+ exit:
+ 	iadc_set_state(iadc, false);
+ 	if (ret < 0)
+-		dev_err(iadc->dev, "conversion failed\n");
++		dev_err(dev, "conversion failed\n");
+ 
+ 	return ret;
+ }
+@@ -320,6 +320,7 @@ static int iadc_read_raw(struct iio_dev *indio_dev,
+ 			 int *val, int *val2, long mask)
+ {
+ 	struct iadc_chip *iadc = iio_priv(indio_dev);
++	struct device *dev = regmap_get_device(iadc->regmap);
+ 	s32 isense_ua, vsense_uv;
+ 	u16 adc_raw, vsense_raw;
+ 	int ret;
+@@ -339,7 +340,7 @@ static int iadc_read_raw(struct iio_dev *indio_dev,
+ 
+ 		isense_ua = vsense_uv / iadc->rsense[chan->channel];
+ 
+-		dev_dbg(iadc->dev, "off %d gain %d adc %d %duV I %duA\n",
++		dev_dbg(dev, "off %d gain %d adc %d %duV I %duA\n",
+ 			iadc->offset[chan->channel], iadc->gain,
+ 			adc_raw, vsense_uv, isense_ua);
+ 
+@@ -370,6 +371,7 @@ static irqreturn_t iadc_isr(int irq, void *dev_id)
+ 
+ static int iadc_update_offset(struct iadc_chip *iadc)
+ {
++	struct device *dev = regmap_get_device(iadc->regmap);
+ 	int ret;
+ 
+ 	ret = iadc_do_conversion(iadc, IADC_GAIN_17P857MV, &iadc->gain);
+@@ -382,7 +384,7 @@ static int iadc_update_offset(struct iadc_chip *iadc)
  		return ret;
+ 
+ 	if (iadc->gain == iadc->offset[IADC_INT_RSENSE]) {
+-		dev_err(iadc->dev, "error: internal offset == gain %d\n",
++		dev_err(dev, "error: internal offset == gain %d\n",
+ 			iadc->gain);
+ 		return -EINVAL;
+ 	}
+@@ -393,8 +395,7 @@ static int iadc_update_offset(struct iadc_chip *iadc)
+ 		return ret;
+ 
+ 	if (iadc->gain == iadc->offset[IADC_EXT_RSENSE]) {
+-		dev_err(iadc->dev, "error: external offset == gain %d\n",
+-			iadc->gain);
++		dev_err(dev, "error: external offset == gain %d\n", iadc->gain);
+ 		return -EINVAL;
  	}
  
-@@ -185,7 +185,7 @@ static int exynos_adc_prepare_clk(struct exynos_adc *info)
- 		ret = clk_prepare(info->sclk);
- 		if (ret) {
- 			clk_unprepare(info->clk);
--			dev_err(info->dev,
-+			dev_err(dev,
- 				"failed preparing sclk_adc clock: %d\n", ret);
- 			return ret;
- 		}
-@@ -203,11 +203,12 @@ static void exynos_adc_disable_clk(struct exynos_adc *info)
+@@ -403,6 +404,7 @@ static int iadc_update_offset(struct iadc_chip *iadc)
  
- static int exynos_adc_enable_clk(struct exynos_adc *info)
+ static int iadc_version_check(struct iadc_chip *iadc)
  {
-+	struct device *dev = regmap_get_device(info->pmu_map);
++	struct device *dev = regmap_get_device(iadc->regmap);
+ 	u8 val;
  	int ret;
  
- 	ret = clk_enable(info->clk);
- 	if (ret) {
--		dev_err(info->dev, "failed enabling adc clock: %d\n", ret);
-+		dev_err(dev, "failed enabling adc clock: %d\n", ret);
+@@ -411,7 +413,7 @@ static int iadc_version_check(struct iadc_chip *iadc)
  		return ret;
+ 
+ 	if (val < IADC_PERPH_TYPE_ADC) {
+-		dev_err(iadc->dev, "%d is not ADC\n", val);
++		dev_err(dev, "%d is not ADC\n", val);
+ 		return -EINVAL;
  	}
  
-@@ -215,7 +216,7 @@ static int exynos_adc_enable_clk(struct exynos_adc *info)
- 		ret = clk_enable(info->sclk);
- 		if (ret) {
- 			clk_disable(info->clk);
--			dev_err(info->dev,
-+			dev_err(dev,
- 				"failed enabling sclk_adc clock: %d\n", ret);
- 			return ret;
- 		}
-@@ -610,13 +611,14 @@ static irqreturn_t exynos_adc_isr(int irq, void *dev_id)
- static irqreturn_t exynos_ts_isr(int irq, void *dev_id)
+@@ -420,7 +422,7 @@ static int iadc_version_check(struct iadc_chip *iadc)
+ 		return ret;
+ 
+ 	if (val < IADC_PERPH_SUBTYPE_IADC) {
+-		dev_err(iadc->dev, "%d is not IADC\n", val);
++		dev_err(dev, "%d is not IADC\n", val);
+ 		return -EINVAL;
+ 	}
+ 
+@@ -429,7 +431,7 @@ static int iadc_version_check(struct iadc_chip *iadc)
+ 		return ret;
+ 
+ 	if (val < IADC_REVISION2_SUPPORTED_IADC) {
+-		dev_err(iadc->dev, "revision %d not supported\n", val);
++		dev_err(dev, "revision %d not supported\n", val);
+ 		return -EINVAL;
+ 	}
+ 
+@@ -438,6 +440,7 @@ static int iadc_version_check(struct iadc_chip *iadc)
+ 
+ static int iadc_rsense_read(struct iadc_chip *iadc, struct device_node *node)
  {
- 	struct exynos_adc *info = dev_id;
--	struct iio_dev *dev = dev_get_drvdata(info->dev);
-+	struct device *dev = regmap_get_device(info->pmu_map);
-+	struct iio_dev *indio_dev = dev_get_drvdata(dev);
- 	u32 x, y;
- 	bool pressed;
- 	int ret;
++	struct device *dev = regmap_get_device(iadc->regmap);
+ 	int ret, sign, int_sense;
+ 	u8 deviation;
  
- 	while (info->input->users) {
--		ret = exynos_read_s3c64xx_ts(dev, &x, &y);
-+		ret = exynos_read_s3c64xx_ts(indio_dev, &x, &y);
- 		if (ret == -ETIMEDOUT)
- 			break;
+@@ -447,7 +450,7 @@ static int iadc_rsense_read(struct iadc_chip *iadc, struct device_node *node)
+ 		iadc->rsense[IADC_EXT_RSENSE] = IADC_INT_RSENSE_IDEAL_VALUE;
  
-@@ -800,8 +802,6 @@ static int exynos_adc_probe(struct platform_device *pdev)
+ 	if (!iadc->rsense[IADC_EXT_RSENSE]) {
+-		dev_err(iadc->dev, "external resistor can't be zero Ohms");
++		dev_err(dev, "external resistor can't be zero Ohms");
+ 		return -EINVAL;
+ 	}
  
- 	info->tsirq = irq;
+@@ -505,7 +508,6 @@ static int iadc_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
  
--	info->dev = &pdev->dev;
--
- 	init_completion(&info->completion);
+ 	iadc = iio_priv(indio_dev);
+-	iadc->dev = dev;
  
- 	info->clk = devm_clk_get(&pdev->dev, "adc");
+ 	iadc->regmap = dev_get_regmap(dev->parent, NULL);
+ 	if (!iadc->regmap)
+@@ -528,7 +530,7 @@ static int iadc_probe(struct platform_device *pdev)
+ 	if (ret < 0)
+ 		return -ENODEV;
+ 
+-	dev_dbg(iadc->dev, "sense resistors %d and %d micro Ohm\n",
++	dev_dbg(&pdev->dev, "sense resistors %d and %d micro Ohm\n",
+ 		iadc->rsense[IADC_INT_RSENSE],
+ 		iadc->rsense[IADC_EXT_RSENSE]);
+ 
+@@ -553,7 +555,7 @@ static int iadc_probe(struct platform_device *pdev)
+ 		else
+ 			return ret;
+ 	} else {
+-		device_init_wakeup(iadc->dev, 1);
++		device_init_wakeup(&pdev->dev, 1);
+ 	}
+ 
+ 	ret = iadc_update_offset(iadc);
 -- 
 2.1.4
