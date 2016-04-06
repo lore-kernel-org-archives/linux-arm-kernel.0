@@ -1,18 +1,24 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 6 Apr 2016 22:35:48 +0800
-Subject: [PATCH v3 7/9] ARM: imx_v6_v7_defconfig: add FT5x06 and TSC2004
- touch support
-In-Reply-To: <1459614351-16731-8-git-send-email-gary.bisson@boundarydevices.com>
-References: <1458050668-26748-1-git-send-email-gary.bisson@boundarydevices.com>
- <1459614351-16731-1-git-send-email-gary.bisson@boundarydevices.com>
- <1459614351-16731-8-git-send-email-gary.bisson@boundarydevices.com>
-Message-ID: <20160406143548.GN18833@tiger>
+Date: Wed, 6 Apr 2016 22:44:53 +0800
+Subject: [PATCH 1/2] ARM: multi_v5_defconfig: Enable support for MX21/MX27
+In-Reply-To: <20160401115316.GE31470@pengutronix.de>
+References: <1458991706-30109-1-git-send-email-jlu@pengutronix.de>
+ <20160401115316.GE31470@pengutronix.de>
+Message-ID: <20160406144453.GA4022@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 02, 2016 at 06:25:49PM +0200, Gary Bisson wrote:
-> Those two touch controllers are used by Boundary Devices platforms.
+On Fri, Apr 01, 2016 at 01:53:16PM +0200, Sascha Hauer wrote:
+> On Sat, Mar 26, 2016 at 12:28:25PM +0100, Jan Luebbe wrote:
+> > Although the SoC support was already enabled, the drivers and machines
+> > were missing.
+> > 
+> > Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
 > 
-> Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
+> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+> 
+> Shawn, can you take this one?
 
-Applied 7 ~ 9, thanks.
+I applied this one (but not 2/2).
+
+Shawn
