@@ -1,253 +1,253 @@
-From: gautamvivek1987@gmail.com (Vivek Gautam)
-Date: Wed, 6 Apr 2016 06:48:00 -0700
-Subject: [PATCH 1/2] phy: Group vendor specific phy drivers
-In-Reply-To: <5705066A.8010903@ti.com>
-References: <1459510156-9147-1-git-send-email-gautam.vivek@samsung.com>
- <56FE7234.5000505@ti.com>
- <CAFp+6iEJAq6CzntpM-RXYN8NwtHUUJoFHFf17mdV4nLE8eJwyA@mail.gmail.com>
- <5705066A.8010903@ti.com>
-Message-ID: <CAFp+6iEyY0F46W+5aGZkDieYgSdsVogO4LWhkKnOZbNVH+hUmA@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 6 Apr 2016 15:57:53 +0200
+Subject: [RFC PATCH 04/45] KVM: arm/arm64: vgic-new: Add data structure
+ definitions
+In-Reply-To: <20160405201009.GA10522@cbox>
+References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
+ <1458871508-17279-5-git-send-email-andre.przywara@arm.com>
+ <20160329130922.GE4126@cbox> <5703BEF2.7090507@arm.com>
+ <20160405201009.GA10522@cbox>
+Message-ID: <20160406135753.GE16355@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+On Tue, Apr 05, 2016 at 10:10:09PM +0200, Christoffer Dall wrote:
+> On Tue, Apr 05, 2016 at 02:34:42PM +0100, Andre Przywara wrote:
+> > Hi,
+> > 
+> > On 29/03/16 14:09, Christoffer Dall wrote:
+> > > On Fri, Mar 25, 2016 at 02:04:27AM +0000, Andre Przywara wrote:
+> > >> From: Christoffer Dall <christoffer.dall@linaro.org>
+> > >>
+> > >> Add a new header file for the new and improved GIC implementation.
+> > >> The big change is that we now have a struct vgic_irq per IRQ instead
+> > >> of spreading all the information over various bitmaps.
+> > >>
+> > >> We include this new header conditionally from within the old header
+> > >> file for the time being to avoid touching all the users.
+> > >>
+> > >> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> > >> ---
+> > >>  include/kvm/arm_vgic.h  |   5 ++
+> > >>  include/kvm/vgic/vgic.h | 198 ++++++++++++++++++++++++++++++++++++++++++++++++
+> > >>  2 files changed, 203 insertions(+)
+> > >>  create mode 100644 include/kvm/vgic/vgic.h
+> > >>
+> > >> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> > >> index 7656a46..db289a2 100644
+> > >> --- a/include/kvm/arm_vgic.h
+> > >> +++ b/include/kvm/arm_vgic.h
+> > >> @@ -19,6 +19,10 @@
+> > >>  #ifndef __ASM_ARM_KVM_VGIC_H
+> > >>  #define __ASM_ARM_KVM_VGIC_H
+> > >>  
+> > >> +#ifdef CONFIG_KVM_NEW_VGIC
+> > >> +#include <kvm/vgic/vgic.h>
+> > >> +#else
+> > >> +
+> > >>  #include <linux/kernel.h>
+> > >>  #include <linux/kvm.h>
+> > >>  #include <linux/irqreturn.h>
+> > >> @@ -376,4 +380,5 @@ static inline int vgic_v3_probe(struct device_node *vgic_node,
+> > >>  }
+> > >>  #endif
+> > >>  
+> > >> +#endif	/* old VGIC include */
+> > >>  #endif
+> > >> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+> > >> new file mode 100644
+> > >> index 0000000..659f8b1
+> > >> --- /dev/null
+> > >> +++ b/include/kvm/vgic/vgic.h
+> > >> @@ -0,0 +1,198 @@
+> > >> +/*
+> > >> + * Copyright (C) 2015, 2016 ARM Ltd.
+> > >> + *
+> > >> + * This program is free software; you can redistribute it and/or modify
+> > >> + * it under the terms of the GNU General Public License version 2 as
+> > >> + * published by the Free Software Foundation.
+> > >> + *
+> > >> + * This program is distributed in the hope that it will be useful,
+> > >> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > >> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > >> + * GNU General Public License for more details.
+> > >> + *
+> > >> + * You should have received a copy of the GNU General Public License
+> > >> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> > >> + */
+> > >> +#ifndef __ASM_ARM_KVM_VGIC_VGIC_H
+> > >> +#define __ASM_ARM_KVM_VGIC_VGIC_H
+> > >> +
+> > >> +#include <linux/kernel.h>
+> > >> +#include <linux/kvm.h>
+> > >> +#include <linux/irqreturn.h>
+> > >> +#include <linux/spinlock.h>
+> > >> +#include <linux/types.h>
+> > >> +#include <kvm/iodev.h>
+> > >> +
+> > >> +#define VGIC_V3_MAX_CPUS	255
+> > >> +#define VGIC_V2_MAX_CPUS	8
+> > >> +#define VGIC_NR_IRQS_LEGACY     256
+> > >> +#define VGIC_NR_SGIS		16
+> > >> +#define VGIC_NR_PPIS		16
+> > >> +#define VGIC_NR_PRIVATE_IRQS	(VGIC_NR_SGIS + VGIC_NR_PPIS)
+> > >> +#define VGIC_MAX_PRIVATE	(VGIC_NR_PRIVATE_IRQS - 1)
+> > >> +#define VGIC_MAX_SPI		1019
+> > >> +#define VGIC_MAX_RESERVED	1023
+> > >> +#define VGIC_MIN_LPI		8192
+> > >> +
+> > >> +enum vgic_type {
+> > >> +	VGIC_V2,		/* Good ol' GICv2 */
+> > >> +	VGIC_V3,		/* New fancy GICv3 */
+> > >> +};
+> > >> +
+> > >> +/* same for all guests, as depending only on the _host's_ GIC model */
+> > >> +struct vgic_global {
+> > >> +	/* type of the host GIC */
+> > >> +	enum vgic_type		type;
+> > >> +
+> > >> +	/* Physical address of vgic virtual cpu interface */
+> > >> +	phys_addr_t		vcpu_base;
+> > >> +
+> > >> +	/* virtual control interface mapping */
+> > >> +	void __iomem		*vctrl_base;
+> > >> +
+> > >> +	/* Number of implemented list registers */
+> > >> +	int			nr_lr;
+> > >> +
+> > >> +	/* Maintenance IRQ number */
+> > >> +	unsigned int		maint_irq;
+> > >> +
+> > >> +	/* maximum number of VCPUs allowed (GICv2 limits us to 8) */
+> > >> +	int			max_gic_vcpus;
+> > >> +
+> > >> +	/* Only needed for the legacy KVM_CREATE_IRQCHIP */
+> > >> +	bool			can_emulate_gicv2;
+> > >> +};
+> > >> +
+> > >> +extern struct vgic_global kvm_vgic_global_state;
+> > >> +
+> > >> +#define VGIC_V2_MAX_LRS		(1 << 6)
+> > >> +#define VGIC_V3_MAX_LRS		16
+> > >> +#define VGIC_V3_LR_INDEX(lr)	(VGIC_V3_MAX_LRS - 1 - lr)
+> > >> +
+> > >> +enum vgic_irq_config {
+> > >> +	VGIC_CONFIG_EDGE = 0,
+> > >> +	VGIC_CONFIG_LEVEL
+> > >> +};
+> > >> +
+> > >> +struct vgic_irq {
+> > >> +	spinlock_t irq_lock;		/* Protects the content of the struct */
+> > >> +	struct list_head ap_list;
+> > >> +
+> > >> +	struct kvm_vcpu *vcpu;		/* SGIs and PPIs: The VCPU
+> > >> +					 * SPIs and LPIs: The VCPU whose ap_list
+> > >> +					 * on which this is queued.
+> > >> +					 */
+> > >> +
+> > >> +	struct kvm_vcpu *target_vcpu;	/* The VCPU that this interrupt should
+> > >> +					 * be send to, as a result of the
+> > >> +					 * targets reg (v2) or the
+> > >> +					 * affinity reg (v3).
+> > >> +					 */
+> > >> +
+> > >> +	u32 intid;			/* Guest visible INTID */
+> > >> +	bool pending;
+> > >> +	bool line_level;		/* Level only */
+> > >> +	bool soft_pending;		/* Level only */
+> > >> +	bool active;			/* not used for LPIs */
+> > >> +	bool enabled;
+> > >> +	bool hw;			/* Tied to HW IRQ */
+> > >> +	u32 hwintid;			/* HW INTID number */
+> > >> +	union {
+> > >> +		u8 targets;			/* GICv2 target VCPUs mask */
+> > >> +		u32 mpidr;			/* GICv3 target VCPU */
+> > >> +	};
+> > >> +	u8 source;			/* GICv2 SGIs only */
+> > >> +	u8 priority;
+> > >> +	enum vgic_irq_config config;	/* Level or edge */
+> > >> +};
+> > >> +
+> > >> +struct vgic_dist {
+> > >> +	bool			in_kernel;
+> > >> +	bool			ready;
+> > >> +
+> > >> +	/* vGIC model the kernel emulates for the guest (GICv2 or GICv3) */
+> > >> +	u32			vgic_model;
+> > >> +
+> > >> +	int			nr_spis;
+> > >> +
+> > >> +	/* TODO: Consider moving to global state */
+> > >> +	/* Virtual control interface mapping */
+> > >> +	void __iomem		*vctrl_base;
+> > >> +
+> > >> +	/* base addresses in guest physical address space: */
+> > >> +	gpa_t			vgic_dist_base;		/* distributor */
+> > >> +	union {
+> > >> +		/* either a GICv2 CPU interface */
+> > >> +		gpa_t			vgic_cpu_base;
+> > >> +		/* or a number of GICv3 redistributor regions */
+> > >> +		gpa_t			vgic_redist_base;
+> > >> +	};
+> > >> +
+> > >> +	/* distributor enabled */
+> > >> +	u32			enabled;
+> > >> +
+> > >> +	struct vgic_irq		*spis;
+> > >> +};
+> > >> +
+> > >> +struct vgic_v2_cpu_if {
+> > >> +	u32		vgic_hcr;
+> > >> +	u32		vgic_vmcr;
+> > >> +	u32		vgic_misr;	/* Saved only */
+> > >> +	u64		vgic_eisr;	/* Saved only */
+> > >> +	u64		vgic_elrsr;	/* Saved only */
+> > >> +	u32		vgic_apr;
+> > >> +	u32		vgic_lr[VGIC_V2_MAX_LRS];
+> > >> +};
+> > >> +
+> > >> +struct vgic_v3_cpu_if {
+> > >> +#ifdef CONFIG_KVM_ARM_VGIC_V3
+> > >> +	u32		vgic_hcr;
+> > >> +	u32		vgic_vmcr;
+> > >> +	u32		vgic_sre;	/* Restored only, change ignored */
+> > >> +	u32		vgic_misr;	/* Saved only */
+> > >> +	u32		vgic_eisr;	/* Saved only */
+> > >> +	u32		vgic_elrsr;	/* Saved only */
+> > >> +	u32		vgic_ap0r[4];
+> > >> +	u32		vgic_ap1r[4];
+> > >> +	u64		vgic_lr[VGIC_V3_MAX_LRS];
+> > >> +#endif
+> > >> +};
+> > >> +
+> > >> +struct vgic_cpu {
+> > >> +	/* CPU vif control registers for world switch */
+> > >> +	union {
+> > >> +		struct vgic_v2_cpu_if	vgic_v2;
+> > >> +		struct vgic_v3_cpu_if	vgic_v3;
+> > >> +	};
+> > >> +
+> > >> +	/* TODO: Move nr_lr to a global state */
+> > > 
+> > > what is our current plan and status about this TODO?
+> > 
+> > The point is that the current HYP code is accessing this field. We do
+> > have this field in the current "global" struct vgic_params there as
+> > well, but this struct is (more or less) private to vgic-v2.c, so not
+> > easily accessible from virt/kvm/arm/hyp/*.c.
+> > So I suggest we keep this in here for the time being and eventually
+> > remove it (and rework the save/restore code) once we get rid of the old
+> > VGIC code.
+> > 
+> Hmmm, I haven't tried it, but I don't understand why moving it now is
+> difficult.  I'd really like to avoid having a bunch of todo's lingering
+> around and having duplicated state in the new code.
+> 
+> I think I noticed a number of places in this patch series which refers
+> tot he vgic_cpu->nr_lr instead of the global place already...
+> 
+So I wrote a patch for this and it doesn't really look that bad.  I'll
+send it as part of a little prerequisite series later.
 
-
-On Wed, Apr 6, 2016 at 5:51 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> Hi,
->
-> On Friday 01 April 2016 07:05 PM, Vivek Gautam wrote:
->> Hi,
->>
->>
->> On Fri, Apr 1, 2016 at 6:05 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->>> Hi,
->>>
->>> On Friday 01 April 2016 04:59 PM, Vivek Gautam wrote:
->>>> Adding vendor specific directories in phy to group
->>>> phy drivers under their respective vendor umbrella.
->>>>
->>>> Signed-off-by: Vivek Gautam <gautam.vivek@samsung.com>
->>>> ---
->>>>
->>>> With growing number of phy drivers, it makes sense to
->>>> group these drivers under their respective vendor/platform
->>>> umbrella directory.
->>>>
->>>> Build-tested 'multi_v7_defconfig'.
->>>>
->>>>  drivers/phy/Kconfig                               | 386 +---------------------
->>>>  drivers/phy/Makefile                              |  57 +---
->>>>  drivers/phy/bcom/Kconfig                          |  27 ++
->>>>  drivers/phy/bcom/Makefile                         |   3 +
->>>>  drivers/phy/{ => bcom}/phy-bcm-cygnus-pcie.c      |   0
->>>>  drivers/phy/{ => bcom}/phy-bcm-kona-usb2.c        |   0
->>>>  drivers/phy/{ => bcom}/phy-brcmstb-sata.c         |   0
->>>>  drivers/phy/hisi/Kconfig                          |  20 ++
->>>>  drivers/phy/hisi/Makefile                         |   2 +
->>>>  drivers/phy/{ => hisi}/phy-hi6220-usb.c           |   0
->>>>  drivers/phy/{ => hisi}/phy-hix5hd2-sata.c         |   0
->>>>  drivers/phy/marvell/Kconfig                       |  50 +++
->>>>  drivers/phy/marvell/Makefile                      |   6 +
->>>>  drivers/phy/{ => marvell}/phy-armada375-usb2.c    |   0
->>>>  drivers/phy/{ => marvell}/phy-berlin-sata.c       |   0
->>>>  drivers/phy/{ => marvell}/phy-berlin-usb.c        |   0
->>>>  drivers/phy/{ => marvell}/phy-mvebu-sata.c        |   0
->>>>  drivers/phy/{ => marvell}/phy-pxa-28nm-hsic.c     |   0
->>>>  drivers/phy/{ => marvell}/phy-pxa-28nm-usb2.c     |   0
->>>>  drivers/phy/qcom/Kconfig                          |  23 ++
->>>>  drivers/phy/qcom/Makefile                         |   5 +
->>>>  drivers/phy/{ => qcom}/phy-qcom-apq8064-sata.c    |   0
->>>>  drivers/phy/{ => qcom}/phy-qcom-ipq806x-sata.c    |   0
->>>>  drivers/phy/{ => qcom}/phy-qcom-ufs-i.h           |   0
->>>>  drivers/phy/{ => qcom}/phy-qcom-ufs-qmp-14nm.c    |   0
->>>>  drivers/phy/{ => qcom}/phy-qcom-ufs-qmp-14nm.h    |   0
->>>>  drivers/phy/{ => qcom}/phy-qcom-ufs-qmp-20nm.c    |   0
->>>>  drivers/phy/{ => qcom}/phy-qcom-ufs-qmp-20nm.h    |   0
->>>>  drivers/phy/{ => qcom}/phy-qcom-ufs.c             |   0
->>>>  drivers/phy/rcar/Kconfig                          |  16 +
->>>>  drivers/phy/rcar/Makefile                         |   2 +
->>>>  drivers/phy/{ => rcar}/phy-rcar-gen2.c            |   0
->>>>  drivers/phy/{ => rcar}/phy-rcar-gen3-usb2.c       |   0
->>>>  drivers/phy/rockchip/Kconfig                      |  23 ++
->>>>  drivers/phy/rockchip/Makefile                     |   3 +
->>>>  drivers/phy/{ => rockchip}/phy-rockchip-dp.c      |   0
->>>>  drivers/phy/{ => rockchip}/phy-rockchip-emmc.c    |   0
->>>>  drivers/phy/{ => rockchip}/phy-rockchip-usb.c     |   0
->>>>  drivers/phy/samsung/Kconfig                       |  87 +++++
->>>>  drivers/phy/samsung/Makefile                      |  10 +
->>>>  drivers/phy/{ => samsung}/phy-exynos-dp-video.c   |   0
->>>>  drivers/phy/{ => samsung}/phy-exynos-mipi-video.c |   0
->>>>  drivers/phy/{ => samsung}/phy-exynos4210-usb2.c   |   0
->>>>  drivers/phy/{ => samsung}/phy-exynos4x12-usb2.c   |   0
->>>>  drivers/phy/{ => samsung}/phy-exynos5-usbdrd.c    |   0
->>>>  drivers/phy/{ => samsung}/phy-exynos5250-sata.c   |   0
->>>>  drivers/phy/{ => samsung}/phy-exynos5250-usb2.c   |   0
->>>>  drivers/phy/{ => samsung}/phy-s5pv210-usb2.c      |   0
->>>>  drivers/phy/{ => samsung}/phy-samsung-usb2.c      |   0
->>>>  drivers/phy/{ => samsung}/phy-samsung-usb2.h      |   0
->>>>  drivers/phy/st/Kconfig                            |  51 +++
->>>>  drivers/phy/st/Makefile                           |   6 +
->>>>  drivers/phy/{ => st}/phy-miphy28lp.c              |   0
->>>>  drivers/phy/{ => st}/phy-miphy365x.c              |   0
->>>>  drivers/phy/{ => st}/phy-spear1310-miphy.c        |   0
->>>>  drivers/phy/{ => st}/phy-spear1340-miphy.c        |   0
->>>>  drivers/phy/{ => st}/phy-stih407-usb.c            |   0
->>>>  drivers/phy/{ => st}/phy-stih41x-usb.c            |   0
->>>>  drivers/phy/sunxi/Kconfig                         |  28 ++
->>>>  drivers/phy/sunxi/Makefile                        |   2 +
->>>>  drivers/phy/{ => sunxi}/phy-sun4i-usb.c           |   0
->>>>  drivers/phy/{ => sunxi}/phy-sun9i-usb.c           |   0
->>>>  drivers/phy/ti/Kconfig                            |  67 ++++
->>>>  drivers/phy/ti/Makefile                           |   6 +
->>>>  drivers/phy/{ => ti}/phy-dm816x-usb.c             |   0
->>>>  drivers/phy/{ => ti}/phy-omap-control.c           |   0
->>>>  drivers/phy/{ => ti}/phy-omap-usb2.c              |   0
->>>>  drivers/phy/{ => ti}/phy-ti-pipe3.c               |   0
->>>>  drivers/phy/{ => ti}/phy-tusb1210.c               |   0
->>>>  drivers/phy/{ => ti}/phy-twl4030-usb.c            |   0
->>>>  drivers/phy/{ => ti}/ulpi_phy.h                   |   0
->>>
->>> ulpi_phy.h is not specific to TI though at this point tusb1210 is the only ULPI
->>> driver.
->>
->> Yes, you are right. But i was hesitant to add a multi-level header
->> file include in the phy driver
->> which uses it.
->>
->> Does it makes sense to move this ulpi_phy.h to include/linux/phy ?
->
-> yeah.. that should be okay.
-Alright, i will move this file there then.
-
->>
->>>>  71 files changed, 464 insertions(+), 416 deletions(-)
->>>>  create mode 100644 drivers/phy/bcom/Kconfig
->>>>  create mode 100644 drivers/phy/bcom/Makefile
->>>>  rename drivers/phy/{ => bcom}/phy-bcm-cygnus-pcie.c (100%)
->>>>  rename drivers/phy/{ => bcom}/phy-bcm-kona-usb2.c (100%)
->>>>  rename drivers/phy/{ => bcom}/phy-brcmstb-sata.c (100%)
->>>>  create mode 100644 drivers/phy/hisi/Kconfig
->>>>  create mode 100644 drivers/phy/hisi/Makefile
->>>>  rename drivers/phy/{ => hisi}/phy-hi6220-usb.c (100%)
->>>>  rename drivers/phy/{ => hisi}/phy-hix5hd2-sata.c (100%)
->>>>  create mode 100644 drivers/phy/marvell/Kconfig
->>>>  create mode 100644 drivers/phy/marvell/Makefile
->>>>  rename drivers/phy/{ => marvell}/phy-armada375-usb2.c (100%)
->>>>  rename drivers/phy/{ => marvell}/phy-berlin-sata.c (100%)
->>>>  rename drivers/phy/{ => marvell}/phy-berlin-usb.c (100%)
->>>>  rename drivers/phy/{ => marvell}/phy-mvebu-sata.c (100%)
->>>>  rename drivers/phy/{ => marvell}/phy-pxa-28nm-hsic.c (100%)
->>>>  rename drivers/phy/{ => marvell}/phy-pxa-28nm-usb2.c (100%)
->>>>  create mode 100644 drivers/phy/qcom/Kconfig
->>>>  create mode 100644 drivers/phy/qcom/Makefile
->>>>  rename drivers/phy/{ => qcom}/phy-qcom-apq8064-sata.c (100%)
->>>>  rename drivers/phy/{ => qcom}/phy-qcom-ipq806x-sata.c (100%)
->>>>  rename drivers/phy/{ => qcom}/phy-qcom-ufs-i.h (100%)
->>>>  rename drivers/phy/{ => qcom}/phy-qcom-ufs-qmp-14nm.c (100%)
->>>>  rename drivers/phy/{ => qcom}/phy-qcom-ufs-qmp-14nm.h (100%)
->>>>  rename drivers/phy/{ => qcom}/phy-qcom-ufs-qmp-20nm.c (100%)
->>>>  rename drivers/phy/{ => qcom}/phy-qcom-ufs-qmp-20nm.h (100%)
->>>>  rename drivers/phy/{ => qcom}/phy-qcom-ufs.c (100%)
->>>>  create mode 100644 drivers/phy/rcar/Kconfig
->>>>  create mode 100644 drivers/phy/rcar/Makefile
->>>>  rename drivers/phy/{ => rcar}/phy-rcar-gen2.c (100%)
->>>>  rename drivers/phy/{ => rcar}/phy-rcar-gen3-usb2.c (100%)
->>>>  create mode 100644 drivers/phy/rockchip/Kconfig
->>>>  create mode 100644 drivers/phy/rockchip/Makefile
->>>>  rename drivers/phy/{ => rockchip}/phy-rockchip-dp.c (100%)
->>>>  rename drivers/phy/{ => rockchip}/phy-rockchip-emmc.c (100%)
->>>>  rename drivers/phy/{ => rockchip}/phy-rockchip-usb.c (100%)
->>>>  create mode 100644 drivers/phy/samsung/Kconfig
->>>>  create mode 100644 drivers/phy/samsung/Makefile
->>>>  rename drivers/phy/{ => samsung}/phy-exynos-dp-video.c (100%)
->>>>  rename drivers/phy/{ => samsung}/phy-exynos-mipi-video.c (100%)
->>>>  rename drivers/phy/{ => samsung}/phy-exynos4210-usb2.c (100%)
->>>>  rename drivers/phy/{ => samsung}/phy-exynos4x12-usb2.c (100%)
->>>>  rename drivers/phy/{ => samsung}/phy-exynos5-usbdrd.c (100%)
->>>>  rename drivers/phy/{ => samsung}/phy-exynos5250-sata.c (100%)
->>>>  rename drivers/phy/{ => samsung}/phy-exynos5250-usb2.c (100%)
->>>>  rename drivers/phy/{ => samsung}/phy-s5pv210-usb2.c (100%)
->>>>  rename drivers/phy/{ => samsung}/phy-samsung-usb2.c (100%)
->>>>  rename drivers/phy/{ => samsung}/phy-samsung-usb2.h (100%)
->>>>  create mode 100644 drivers/phy/st/Kconfig
->>>>  create mode 100644 drivers/phy/st/Makefile
->>>>  rename drivers/phy/{ => st}/phy-miphy28lp.c (100%)
->>>>  rename drivers/phy/{ => st}/phy-miphy365x.c (100%)
->>>>  rename drivers/phy/{ => st}/phy-spear1310-miphy.c (100%)
->>>>  rename drivers/phy/{ => st}/phy-spear1340-miphy.c (100%)
->>>>  rename drivers/phy/{ => st}/phy-stih407-usb.c (100%)
->>>>  rename drivers/phy/{ => st}/phy-stih41x-usb.c (100%)
->>>>  create mode 100644 drivers/phy/sunxi/Kconfig
->>>>  create mode 100644 drivers/phy/sunxi/Makefile
->>>>  rename drivers/phy/{ => sunxi}/phy-sun4i-usb.c (100%)
->>>>  rename drivers/phy/{ => sunxi}/phy-sun9i-usb.c (100%)
->>>>  create mode 100644 drivers/phy/ti/Kconfig
->>>>  create mode 100644 drivers/phy/ti/Makefile
->>>>  rename drivers/phy/{ => ti}/phy-dm816x-usb.c (100%)
->>>>  rename drivers/phy/{ => ti}/phy-omap-control.c (100%)
->>>>  rename drivers/phy/{ => ti}/phy-omap-usb2.c (100%)
->>>>  rename drivers/phy/{ => ti}/phy-ti-pipe3.c (100%)
->>>>  rename drivers/phy/{ => ti}/phy-tusb1210.c (100%)
->>>>  rename drivers/phy/{ => ti}/phy-twl4030-usb.c (100%)
->>>>  rename drivers/phy/{ => ti}/ulpi_phy.h (100%)
->>>>
->>>> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
->>>> index 26566db..80c8c68 100644
->>>> --- a/drivers/phy/Kconfig
->>>> +++ b/drivers/phy/Kconfig
->>>> @@ -15,45 +15,6 @@ config GENERIC_PHY
->>>>         phy users can obtain reference to the PHY. All the users of this
->>>>         framework should select this config.
->>>>
->>>
->>>> +menuconfig PHY_PLAT
->>>> +     bool "Platform Phy drivers"
->>>
->>> Not really convinced about adding a new config here. This will create new
->>> dependencies and will also start breaking users of oldconfig.
->>
->> This serves including all the directory paths in the 'make' for
->> driver/phy/Makefile.
->>
->> Otherwise each directory will have to be built as per particular platform
->> And, not all drivers of a vendor are built for one-kind of platform,
->> for example, Samsung uses ARCH_EXYNOS, as well as ARCH_S5PV210
->> Similarly, Broadcom phy drivers are based on multiple platforms, and so
->> does Marvell's.
->>
->> Please suggest a concise way to include the vendor directories in the build path
->> in drivers/phy/Makefile.
->
-> obj-y   += vendor/?
-
-Yea, correct. Thanks
-Will respin the patch with all the comments.
-
->
-> -Kishon
->
->>
->>>
->>> Also not all of them are platform drivers (e.g ULPI PHY drivers).
->> I Think this applies to ulpi_phy only at this moment, which we can resolve
->> by moving that to include/linux path.
->>
->>>
->>> Thanks
->>> Kishon
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
->>
->>
-
-
-
--- 
-Best Regards
-Vivek Gautam
-Samsung R&D Institute, Bangalore
-India
+-Christoffer
