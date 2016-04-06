@@ -1,71 +1,37 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 6 Apr 2016 16:36:46 +0100
-Subject: [PATCH V2 5/9] arm64: exception: handle instruction abort at
- current EL
-In-Reply-To: <1459955578-24602-6-git-send-email-tbaicar@codeaurora.org>
-References: <1459955578-24602-1-git-send-email-tbaicar@codeaurora.org>
- <1459955578-24602-6-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <57052D0E.5070903@arm.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Wed,  6 Apr 2016 17:39:07 +0200
+Subject: [PATCH] ARM: imx: always use TWD on IMX6Q
+Message-ID: <1459957147-10133-1-git-send-email-bigeasy@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/16 16:12, Tyler Baicar wrote:
-> Add a handler for instruction aborts at the current EL
-> (ESR_ELx_EC_IABT_CUR) so they are no longer handled in el1_inv.
-> This allows firmware first handling for possible SEA
-> (Synchronous External Abort) caused instruction abort at
-> current EL.
-> 
-> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
-> ---
->  arch/arm64/kernel/entry.S | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
-> 
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 12e8d2b..f257856 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -336,6 +336,8 @@ el1_sync:
->  	lsr	x24, x1, #ESR_ELx_EC_SHIFT	// exception class
->  	cmp	x24, #ESR_ELx_EC_DABT_CUR	// data abort in EL1
->  	b.eq	el1_da
-> +	cmp	x24, #ESR_ELx_EC_IABT_CUR	// instruction abort in EL1
-> +	b.eq	el1_ia
->  	cmp	x24, #ESR_ELx_EC_SYS64		// configurable trap
->  	b.eq	el1_undef
->  	cmp	x24, #ESR_ELx_EC_SP_ALIGN	// stack alignment exception
-> @@ -363,6 +365,23 @@ el1_da:
->  	// disable interrupts before pulling preserved data off the stack
->  	disable_irq
->  	kernel_exit 1
-> +el1_ia:
-> +	/*
-> +	 * Instruction abort handling
-> +	 */
-> +	mrs	x0, far_el1
-> +	enable_dbg
-> +	// re-enable interrupts if they were enabled in the aborted context
-> +	tbnz	x23, #7, 1f			// PSR_I_BIT
-> +	enable_irq
-> +1:
-> +	orr	x1, x1, #1 << 24		// use reserved ISS bit for instruction aborts
-> +	mov	x2, sp				// struct pt_regs
-> +	bl	do_mem_abort
-> +
-> +	// disable interrupts before pulling preserved data off the stack
-> +	disable_irq
-> +	kernel_exit 1
->  el1_sp_pc:
->  	/*
->  	 * Stack or PC alignment exception handling
-> 
+There is no reason to limit the TWD to be used on SMP kernels only if the
+hardware has it available.
+On Wandboard i.MX6SOLO, running PREEMPT-RT and cyclictest I see as max
+immediately after start in idle:
+UP : ~90us
+SMP: ~50us
+UP + TWD: ~20us.
+Based on this numbers I prefer the TWD over the slightly slower MXC
+timer.
 
-What happens if you were running at EL2 when this faults gets injected?
-It looks like KVM needs something similar, doesn't it?
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+ arch/arm/mach-imx/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks,
-
-	M.
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 8ceda2844c4f..08bcf8fb76f2 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -524,7 +524,7 @@ config SOC_IMX6Q
+ 	bool "i.MX6 Quad/DualLite support"
+ 	select ARM_ERRATA_764369 if SMP
+ 	select HAVE_ARM_SCU if SMP
+-	select HAVE_ARM_TWD if SMP
++	select HAVE_ARM_TWD
+ 	select PCI_DOMAINS if PCI
+ 	select PINCTRL_IMX6Q
+ 	select SOC_IMX6
 -- 
-Jazz is not dead. It just smells funny...
+2.8.0.rc3
