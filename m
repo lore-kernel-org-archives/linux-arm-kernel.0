@@ -1,296 +1,247 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 6 Apr 2016 22:15:57 +0800
-Subject: [PATCH v3 4/9] ARM: dts: imx: add Boundary Devices Nitrogen7 board
-In-Reply-To: <1459614351-16731-5-git-send-email-gary.bisson@boundarydevices.com>
-References: <1458050668-26748-1-git-send-email-gary.bisson@boundarydevices.com>
- <1459614351-16731-1-git-send-email-gary.bisson@boundarydevices.com>
- <1459614351-16731-5-git-send-email-gary.bisson@boundarydevices.com>
-Message-ID: <20160406141555.GL18833@tiger>
+From: msalter@redhat.com (Mark Salter)
+Date: Wed, 06 Apr 2016 10:18:14 -0400
+Subject: [PATCH v7 0/5] ACPI: parse the SPCR table
+In-Reply-To: <20160406105252.GB2820@xora-haswell.xora.org.uk>
+References: <1459431629-27934-1-git-send-email-aleksey.makarov@linaro.org>
+ <1459873627.10130.21.camel@redhat.com> <5704E3CC.8000104@linaro.org>
+ <20160406105252.GB2820@xora-haswell.xora.org.uk>
+Message-ID: <1459952294.10130.32.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 02, 2016 at 06:25:46PM +0200, Gary Bisson wrote:
-> Based on i.MX7 Dual with 1GB of RAM.
+On Wed, 2016-04-06 at 11:52 +0100, Graeme Gregory wrote:
+> On Wed, Apr 06, 2016 at 01:24:12PM +0300, Aleksey Makarov wrote:
+> > 
+> > 
+> > 
+> > On 04/05/2016 07:27 PM, Mark Salter wrote:
+> > > 
+> > > Could you CC me on future postings of this series, please?
+> > > 
+> > > So v3 fixed a problem where platforms using 8250 didn't work.
+> > > Then in v5, that fix was lost so 8250 no longer works.
+> > That fix was dropped because now this is implemented differently.??
+> > Now the code uses the existing match() member of struct console.
+> > It has already been implemented for 8250.??
+> > Probably SPCR table specifies incorrect data.
+> > It was reported that D02 board has similar issue.
+> > 
+> The D02 issue referred to is the 8250 implementation they used has 32bit
+> only MMIO access which there is no manner to represent in SPCR. It also
+> doesn't use the "standard" 16550 clock rate so supplying a baud rate
+> makes it change to a random baud rate.
+
+So, the problem with Mustang and m400 was the mmio vs mmio32. Right now,
+the kernel only supports mmio32 in the 8250_dw.c driver when probed with
+ACPI. Other x86 machines just use legacy 8250 ports which don't need
+entries in the DSDT and use legacy io. The 8250_dw driver does support
+non-standard clocks specified in the DSDT. That works fine for Mustang
+and m400.
+
+So with this quick hack, v7 is working with Mustang/m400:
+
+diff --git a/drivers/acpi/spcr.c b/drivers/acpi/spcr.c
+index 68ffc33..dade9de 100644
+--- a/drivers/acpi/spcr.c
++++ b/drivers/acpi/spcr.c
+@@ -37,6 +37,7 @@ int __init parse_spcr(bool earlycon)
+?	acpi_status status;
+?	char *uart;
+?	char *iotype;
++	int mmio;
+?	int baud_rate;
+?	int err;
+?
+@@ -56,8 +57,8 @@ int __init parse_spcr(bool earlycon)
+?		goto done;
+?	}
+?
+-	iotype = table->serial_port.space_id == ACPI_ADR_SPACE_SYSTEM_MEMORY ?
+-			"mmio" : "io";
++	mmio = table->serial_port.space_id == ACPI_ADR_SPACE_SYSTEM_MEMORY;
++	iotype = mmio ? "mmio" : "io";
+?
+?	switch (table->interface_type) {
+?	case ACPI_DBG2_ARM_SBSA_32BIT:
+@@ -71,6 +72,8 @@ int __init parse_spcr(bool earlycon)
+?	case ACPI_DBG2_16550_COMPATIBLE:
+?	case ACPI_DBG2_16550_SUBSET:
+?		uart = "uart";
++		if (mmio)
++			iotype = "mmio32";
+?		break;
+?	default:
+?		err = -ENOENT;
+
 > 
-> https://boundarydevices.com/product/nitrogen7/
+> We may need two 8250 subset entries, one just means no clock given, and
+> one no clock given + mmio32 only.
 > 
-> Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
-> ---
-> 
-> Changes v1 -> v2:
-> - none
-> Changes v2 -> v3:
-> - Fix Nitrogen7 BT UART clock parent
-> - Fix Nitrogen7 lvdo2 node to be always-on
-> 
-> ---
->  arch/arm/boot/dts/Makefile            |   1 +
->  arch/arm/boot/dts/imx7d-nitrogen7.dts | 819 ++++++++++++++++++++++++++++++++++
->  2 files changed, 820 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx7d-nitrogen7.dts
-
-<snip>
-
-> +/ {
-> +	model = "Boundary Devices i.MX7 Nitrogen7 Board";
-> +	compatible = "boundary,imx7d-nitrogen7", "fsl,imx7d";
-> +
-> +	aliases {
-> +		fb_lcd = &lcdif;
-> +		t_lcd = &t_lcd;
-> +	};
-> +
-> +	memory {
-> +		reg = <0x80000000 0x40000000>;
-> +	};
-> +
-> +	backlight_j9 {
-
-Use hyphen instead of underscore in node name.
-
-> +		compatible = "gpio-backlight";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_backlight_j9>;
-> +		gpios = <&gpio1 7 GPIO_ACTIVE_HIGH>;
-> +		default-on;
-> +	};
-> +
-> +	backlight_j20 {
-> +		compatible = "pwm-backlight";
-> +		pwms = <&pwm1 0 5000000>;
-> +		brightness-levels = <0 4 8 16 32 64 128 255>;
-> +		default-brightness-level = <6>;
-> +		status = "okay";
-> +	};
-> +
-> +	regulators {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-
-DT maintainers do not like this fake "simple-bus".  Please put all these
-fixed regulators directly under root node in the naming schema below.
-
-	reg_xxx: regulator-xxx {
-		...
-	};
-
-> +
-> +		reg_usb_otg1_vbus: regulator at 0 {
-> +			compatible = "regulator-fixed";
-> +			reg = <0>;
-> +			regulator-name = "usb_otg1_vbus";
-> +			regulator-min-microvolt = <5000000>;
-> +			regulator-max-microvolt = <5000000>;
-> +			gpio = <&gpio1 5 GPIO_ACTIVE_HIGH>;
-> +			enable-active-high;
-> +		};
-
-<snip>
-
-> +&uart3 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart3>;
-> +	assigned-clocks = <&clks IMX7D_UART3_ROOT_SRC>;
-> +	assigned-clock-parents = <&clks IMX7D_OSC_24M_CLK>;
-> +	control-gpios = <&gpio2 4 GPIO_ACTIVE_HIGH>;
-> +	uart-has-rs485-half-duplex;
-> +	rs485-mode = <1>;
-
-The above 3 properties are undefined?
-
-> +	status = "okay";
-> +};
-> +
-> +&uart6 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart6>;
-> +	assigned-clocks = <&clks IMX7D_UART6_ROOT_SRC>;
-> +	assigned-clock-parents = <&clks IMX7D_PLL_SYS_MAIN_240M_CLK>;
-> +	fsl,uart-has-rtscts;
-> +	status = "okay";
-> +};
-> +
-> +&usbotg1 {
-> +	vbus-supply = <&reg_usb_otg1_vbus>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_usbotg1>;
-> +	status = "okay";
-> +};
-> +
-> +&usbotg2 {
-> +	vbus-supply = <&reg_usb_otg2_vbus>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_usbotg2>;
-> +	dr_mode = "host";
-> +	status = "okay";
-> +};
-> +
-> +&usdhc1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_usdhc1>;
-> +	cd-gpios = <&gpio5 0 GPIO_ACTIVE_LOW>;
-> +	vmmc-supply = <&vgen3_reg>;
-> +	bus-width = <4>;
-> +	fsl,tuning-step = <2>;
-> +	wakeup-source;
-> +	keep-power-in-suspend;
-> +	status = "okay";
-> +};
-> +
-> +&usdhc2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_usdhc2>;
-> +	bus-width = <4>;
-> +	non-removable;
-> +	vmmc-supply = <&reg_wlan>;
-> +	vqmmc-1-8-v;
-
-Unsupported property?
-
-> +	cap-power-off-card;
-> +	keep-power-in-suspend;
-> +	status = "okay";
-> +
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-
-Move these two up to the top of property list.
-
-> +	wlcore: wlcore at 2 {
-> +		compatible = "ti,wl1271";
-> +		reg = <2>;
-> +		interrupt-parent = <&gpio4>;
-> +		interrupts = <20 IRQ_TYPE_LEVEL_HIGH>;
-> +		ref-clock-frequency = <38400000>;
-> +	};
-> +};
-> +
-> +&usdhc3 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_usdhc3>;
-> +	assigned-clocks = <&clks IMX7D_USDHC3_ROOT_CLK>;
-> +	assigned-clock-rates = <400000000>;
-> +	bus-width = <8>;
-> +	fsl,tuning-step = <2>;
-> +	non-removable;
-> +	status = "okay";
-> +};
-> +
-> +&wdog1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_wdog1>;
-> +	status = "okay";
-> +};
-> +
-> +&iomuxc {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_hog_1 &pinctrl_j2>;
-> +
-> +	imx7d-nitrogen7 {
-
-Since commit 5fcdf6a7ed95 (pinctrl: imx: Allow parsing DT without
-function nodes), we can drop this container code to save one level of
-indentation.
-
-> +		pinctrl_hog_1: hoggrp-1 {
-> +			fsl,pins = <
-> +				MX7D_PAD_SD3_RESET_B__GPIO6_IO11	0x5d
-> +				MX7D_PAD_GPIO1_IO13__GPIO1_IO13		0x7d
-> +				MX7D_PAD_ECSPI2_MISO__GPIO4_IO22	0x7d
-> +			>;
-> +		};
-> +
-> +		pinctrl_bt_rfkill: btrfkillgrp {
-> +			fsl,pins = <
-> +				MX7D_PAD_ECSPI2_SS0__GPIO4_IO23		0x7d
-> +			>;
-> +		};
-
-Drop unused pinctrl entries, and let's add it when needed.
-
-> +
-> +		pinctrl_enet1: enet1grp {
-> +			fsl,pins = <
-> +				MX7D_PAD_GPIO1_IO10__ENET1_MDIO			0x3
-> +				MX7D_PAD_GPIO1_IO11__ENET1_MDC			0x3
-> +				MX7D_PAD_GPIO1_IO12__CCM_ENET_REF_CLK1		0x3
-> +				MX7D_PAD_ENET1_RGMII_TXC__ENET1_RGMII_TXC	0x71
-> +				MX7D_PAD_ENET1_RGMII_TD0__ENET1_RGMII_TD0	0x71
-> +				MX7D_PAD_ENET1_RGMII_TD1__ENET1_RGMII_TD1	0x71
-> +				MX7D_PAD_ENET1_RGMII_TD2__ENET1_RGMII_TD2	0x71
-> +				MX7D_PAD_ENET1_RGMII_TD3__ENET1_RGMII_TD3	0x71
-> +				MX7D_PAD_ENET1_RGMII_TX_CTL__ENET1_RGMII_TX_CTL	0x71
-> +				MX7D_PAD_ENET1_RGMII_RXC__ENET1_RGMII_RXC	0x71
-> +				MX7D_PAD_ENET1_RGMII_RD0__ENET1_RGMII_RD0	0x11
-> +				MX7D_PAD_ENET1_RGMII_RD1__ENET1_RGMII_RD1	0x11
-> +				MX7D_PAD_ENET1_RGMII_RD2__ENET1_RGMII_RD2	0x11
-> +				MX7D_PAD_ENET1_RGMII_RD3__ENET1_RGMII_RD3	0x71
-> +				MX7D_PAD_ENET1_RGMII_RX_CTL__ENET1_RGMII_RX_CTL	0x11
-> +				MX7D_PAD_SD3_STROBE__GPIO6_IO10			0x75 /* Reset */
-> +			>;
-> +		};
-> +
-> +		pinctrl_flash: flashgrp {
-
-Ditto
-
-> +			fsl,pins = <
-> +				MX7D_PAD_EPDC_DATA00__QSPI_A_DATA0	0x71
-> +				MX7D_PAD_EPDC_DATA01__QSPI_A_DATA1	0x71
-> +				MX7D_PAD_EPDC_DATA02__GPIO2_IO2		0x7d
-> +				MX7D_PAD_EPDC_DATA03__GPIO2_IO3		0x7d
-> +				MX7D_PAD_EPDC_DATA05__QSPI_A_SCLK	0x71
-> +				MX7D_PAD_EPDC_DATA06__GPIO2_IO6		0x71
-> +			>;
-> +		};
-
-<snip>
-
-> +&iomuxc_lpsr {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_hog_2>;
-> +
-> +	imx7d-nitrogen7 {
-
-Drop this container node.
-
-Shawn
-
-> +		pinctrl_hog_2: hoggrp-2 {
-> +			fsl,pins = <
-> +				MX7D_PAD_GPIO1_IO02__GPIO1_IO2		0x7d
-> +				MX7D_PAD_GPIO1_IO03__CCM_CLKO2		0x7d
-> +			>;
-> +		};
-> +
-> +		pinctrl_backlight_j9: backlightj9grp {
-> +			fsl,pins = <
-> +				MX7D_PAD_GPIO1_IO07__GPIO1_IO7		0x7d
-> +			>;
-> +		};
-> +
-> +		pinctrl_pwm1: pwm1grp {
-> +			fsl,pins = <
-> +				MX7D_PAD_GPIO1_IO01__PWM1_OUT		0x7d
-> +			>;
-> +		};
-> +
-> +		pinctrl_usbotg1: usbotg1grp {
-> +			fsl,pins = <
-> +				MX7D_PAD_GPIO1_IO04__USB_OTG1_OC	0x7d
-> +				MX7D_PAD_GPIO1_IO05__GPIO1_IO5		0x14
-> +			>;
-> +		};
-> +
-> +		pinctrl_wdog1: wdog1grp {
-> +			fsl,pins = <
-> +				MX7D_PAD_GPIO1_IO00__WDOD1_WDOG_B	0x75
-> +			>;
-> +		};
-> +	};
-> +};
-> -- 
-> 2.7.0
+> Graeme
 > 
 > 
+> > 
+> > Thank you
+> > Aleksey Makarov
+> > 
+> > > 
+> > > 
+> > > --Mark
+> > > 
+> > > 
+> > > On Thu, 2016-03-31 at 16:40 +0300, Aleksey Makarov wrote:
+> > > > 
+> > > > 'ARM Server Base Boot Requirements' [1] mentions SPCR (Serial Port
+> > > > Console Redirection Table) [2] as a mandatory ACPI table that
+> > > > specifies the configuration of serial console.
+> > > > 
+> > > > Move "earlycon" early_param handling to earlycon.c to parse this option once
+> > > > 
+> > > > *** PATCH??"ACPICA: Headers: Add new constants for the DBG2 ACPI table"
+> > > > *** IS JUST TO ENABLE BUILDING THE PATCHSET ON linux-next
+> > > > 
+> > > > Patch "ACPICA: Headers: Add new constants for the DBG2 ACPI table" is required
+> > > > for the next patch.??It is taken from ACPICA series [3], but it has not appeared
+> > > > in linux-next yet.
+> > > > 
+> > > > Parse SPCR table, setup earlycon and add register specified console.
+> > > > 
+> > > > Enable parsing this table on ARM64.??Earlycon should be set up
+> > > > as early as possible.??ACPI boot tables are mapped in
+> > > > arch/arm64/kernel/acpi.c:acpi_boot_table_init() called from setup_arch()
+> > > > and that's where we parse spcr.??So it has to be opted-in per-arch.
+> > > > 
+> > > > Implement console_match() for pl011.
+> > > > 
+> > > > Based on the work by Leif Lindholm [4]
+> > > > Thanks to Peter Hurley for explaining how this should work.
+> > > > 
+> > > > Should be applied to next-20160331.
+> > > > 
+> > > > Tested on QEMU.??SPCR support is included in QEMU's ARM mach-virt
+> > > > since 2.4 release.
+> > > > 
+> > > > v7:
+> > > > - add Acked-by: Rob Herring for "of/serial: move earlycon early_param handling
+> > > > ? to serial"
+> > > > - call DT earlycon initialization from the arch ACPI code, not from parse_spcr()
+> > > > ? (Rafael J. Wysocki)
+> > > > - fix a few minor issues (Rafael J. Wysocki)
+> > > > 
+> > > > v6:
+> > > > https://lkml.kernel.org/g/1458823925-19560-1-git-send-email-aleksey.makarov at linaro.org
+> > > > - add documentation for parse_spcr() functioin (Yury Norov)
+> > > > - don't initialize err variable (Yury Norov)
+> > > > - add __initdata for the earlycon_init_is_deferred flag variable
+> > > > - rename the function exported in "of/serial: move earlycon early_param handling
+> > > > ? to serial" to avoid clash with the function from arch/microblaze/kernel/prom.c
+> > > > - defer initialization of DT earlycon until DT/ACPI decision is made
+> > > > ? (Rob Herring, Peter Hurley)
+> > > > - use snprintf instead of sprintf (Andy Shevchenko)
+> > > > - drop patch that adds EARLYCON_DECLARE for pl011 as EARLYCON_DECLARE is
+> > > > ? equivalent to OF_EARLYCON_DECLARE for 4.6+ (Peter Hurley).??This means that
+> > > > ? SPCR earlycon will not work on the kernels before 4.6
+> > > > 
+> > > > v5:
+> > > > https://lkml.kernel.org/g/1458643595-14719-1-git-send-email-aleksey.makarov at linaro.org
+> > > > - drop patch "serial: pl011: use ACPI SPCR to setup 32-bit access" because
+> > > > ? it is ugly. Also because Christopher Covington came with a better solution [5]
+> > > > - remove error message when the table is not provided by ACPI (Andy Shevchenko)
+> > > > - rewrite spcr.c following the suggestions by Peter Hurley
+> > > > - add console_match() for pl011 in a separate patch
+> > > > - add EARLYCON_DECLARE for pl011 in a separate patch
+> > > > - add patch "of/serial: move earlycon early_param handling to serial" from
+> > > > ? the GDB2 series
+> > > > 
+> > > > v4:
+> > > > https://lkml.kernel.org/g/1456747355-15692-1-git-send-email-aleksey.makarov at linaro.org
+> > > > - drop patch "ACPI: change __init to __ref for early_acpi_os_unmap_memory()"
+> > > > ? ACPI developers work on a new API and asked not to do that.
+> > > > ? Instead, use acpi_get_table_with_size()/early_acpi_os_unmap_memory() once
+> > > > ? and cache the result. (Lv Zheng)
+> > > > - fix some style issues (Yury Norov)
+> > > > 
+> > > > v3:
+> > > > https://lkml.kernel.org/g/1455559532-8305-1-git-send-email-aleksey.makarov at linaro.org
+> > > > 
+> > > > Greg Kroah-Hartman did not like v2 so I have rewritten this patchset:
+> > > > 
+> > > > - drop acpi_match() member of struct console
+> > > > - drop implementations of this member for pl011 and 8250
+> > > > - drop the patch that renames some vars in printk.c as it is not needed anymore
+> > > > - drop patch that introduces system wide acpi_table_parse2().
+> > > > ? Instead introduce a custom acpi_table_parse_spcr() in spcr.c
+> > > > 
+> > > > Instead of introducing a new match_acpi() member of struct console,
+> > > > this patchset introduces a new function acpi_console_check().
+> > > > This function is called when a new uart is registered at serial_core.c
+> > > > the same way OF code checks for console.??If the registered uart is the
+> > > > console specified by SPCR table, this function calls add_preferred_console()
+> > > > 
+> > > > The restrictions of this approach are:
+> > > > 
+> > > > - only serial consoles can be set up
+> > > > - only consoles specified by the memory/io address can be set up
+> > > > ? (SPCR can specify devices by PCI id/PCI address)
+> > > > 
+> > > > v2:
+> > > > https://lkml.kernel.org/g/1455299022-11641-1-git-send-email-aleksey.makarov at linaro.org
+> > > > - don't use SPCR if user specified console in command line
+> > > > - fix initialization order of newcon->index = 0
+> > > > - rename some variables at printk.c (Joe Perches, Peter Hurley)
+> > > > - enable ACPI_SPCR_TABLE in a separate patch (Andy Shevchenko)
+> > > > - remove the retry loop for console registering (Peter Hurley).
+> > > > ? Instead, obtain SPCR with acpi_get_table().??That works after
+> > > > ? call to acpi_early_init() i. e. in any *_initcall()
+> > > > - describe design decision behind introducing acpi_match() (Peter Hurley)
+> > > > - fix compilation for x86 + ACPI (Graeme Gregory)
+> > > > - introduce DBG2 constants in a separate patch (Andy Shevchenko)
+> > > > - fix a typo in DBG2 constants (Andy Shevchenko)
+> > > > - add ACPI_DBG2_ARM_SBSA_32BIT constant (Christopher Covington)
+> > > > - add support for ACPI_DBG2_ARM_SBSA_* consoles (Christopher Covington)
+> > > > - add documentation for functions
+> > > > - add a patch that uses SPCR to find if SBSA serial driver should use 32-bit
+> > > > ? accessor functions (Christopher Covington)
+> > > > - change __init to __ref for early_acpi_os_unmap_memory() in a separate patch
+> > > > - introduce acpi_table_parse2() in a separate patch
+> > > > - fix fetching the SPCR table early (Mark Salter)
+> > > > - add a patch from Mark Salter that introduces support for matching 8250-based
+> > > > ? consoles
+> > > > 
+> > > > v1:
+> > > > https://lkml.kernel.org/g/1453722324-22407-1-git-send-email-aleksey.makarov at linaro.org
+> > > > 
+> > > > [1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0044a/index.html
+> > > > [2] https://msdn.microsoft.com/en-us/library/windows/hardware/dn639132(v=vs.85).aspx
+> > > > [3] https://lkml.kernel.org/g/cover.1458714002.git.lv.zheng at intel.com
+> > > > [4] https://lkml.kernel.org/g/1441716217-23786-1-git-send-email-leif.lindholm at linaro.org
+> > > > [5] https://lkml.kernel.org/g/1457415800-8799-1-git-send-email-cov at codeaurora.org
+> > > > 
+> > > > Aleksey Makarov (4):
+> > > > ? ACPICA: Headers: Add new constants for the DBG2 ACPI table
+> > > > ? ACPI: parse SPCR and enable matching console
+> > > > ? ARM64: ACPI: enable ACPI_SPCR_TABLE
+> > > > ? serial: pl011: add console matching function
+> > > > 
+> > > > Leif Lindholm (1):
+> > > > ? of/serial: move earlycon early_param handling to serial
+> > > > 
+> > > > ?arch/arm64/Kconfig??????????????|???1 +
+> > > > ?arch/arm64/kernel/acpi.c????????|??11 +++-
+> > > > ?drivers/acpi/Kconfig????????????|???3 ++
+> > > > ?drivers/acpi/Makefile???????????|???1 +
+> > > > ?drivers/acpi/spcr.c?????????????| 111 ++++++++++++++++++++++++++++++++++++++++
+> > > > ?drivers/of/fdt.c????????????????|??11 +---
+> > > > ?drivers/tty/serial/amba-pl011.c |??56 ++++++++++++++++++++
+> > > > ?drivers/tty/serial/earlycon.c???|??19 ++++++-
+> > > > ?include/acpi/actbl2.h???????????|???7 ++-
+> > > > ?include/linux/acpi.h????????????|???6 +++
+> > > > ?include/linux/of_fdt.h??????????|???2 +
+> > > > ?include/linux/serial_core.h?????|???6 +++
+> > > > ?12 files changed, 220 insertions(+), 14 deletions(-)
+> > > > ?create mode 100644 drivers/acpi/spcr.c
+> > > > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
