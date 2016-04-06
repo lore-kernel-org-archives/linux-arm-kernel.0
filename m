@@ -1,11 +1,11 @@
 From: fugang.duan@nxp.com (Fugang Duan)
-Date: Wed, 6 Apr 2016 09:10:30 +0000
-Subject: [PATCH net-next V3 02/16] net: fec: remove unused interrupt
- FEC_ENET_TS_TIMER
-In-Reply-To: <1459909562-22865-3-git-send-email-troy.kisky@boundarydevices.com>
+Date: Wed, 6 Apr 2016 09:12:31 +0000
+Subject: [PATCH net-next V3 03/16] net: fec: return IRQ_HANDLED if
+ fec_ptp_check_pps_event handled it
+In-Reply-To: <1459909562-22865-4-git-send-email-troy.kisky@boundarydevices.com>
 References: <1459909562-22865-1-git-send-email-troy.kisky@boundarydevices.com>
- <1459909562-22865-3-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <VI1PR0401MB1855BC1C6A65516245790BA3FF9F0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
+ <1459909562-22865-4-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <VI1PR0401MB18556863D9FD7D4590D2DD38FF9F0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,40 +17,36 @@ From: Troy Kisky <troy.kisky@boundarydevices.com> Sent: Wednesday, April 06, 201
 > kernel at lists.infradead.org; johannes at sipsolutions.net;
 > stillcompiling at gmail.com; sergei.shtylyov at cogentembedded.com;
 > arnd at arndb.de; Troy Kisky <troy.kisky@boundarydevices.com>
-> Subject: [PATCH net-next V3 02/16] net: fec: remove unused interrupt
-> FEC_ENET_TS_TIMER
+> Subject: [PATCH net-next V3 03/16] net: fec: return IRQ_HANDLED if
+> fec_ptp_check_pps_event handled it
 > 
-> FEC_ENET_TS_TIMER is not checked in the interrupt routine so there is no need
-> to enable it.
+> fec_ptp_check_pps_event will return 1 if FEC_T_TF_MASK caused an interrupt.
+> Don't return IRQ_NONE in this case.
 > 
 > Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
 > 
 > ---
-> v3: New patch
-> 
-> Frank Li said "TS_TIMER should never be triggered."
-> when discussing another patch.
+> v3: New patch, came from feedback from another patch.
 > ---
->  drivers/net/ethernet/freescale/fec.h | 4 ++--
+>  drivers/net/ethernet/freescale/fec_main.c | 4 ++--
 >  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/net/ethernet/freescale/fec.h
-> b/drivers/net/ethernet/freescale/fec.h
-> index 195122e..6dd0ba8 100644
-> --- a/drivers/net/ethernet/freescale/fec.h
-> +++ b/drivers/net/ethernet/freescale/fec.h
-> @@ -374,8 +374,8 @@ struct bufdesc_ex {
->  #define FEC_ENET_TS_AVAIL       ((uint)0x00010000)
->  #define FEC_ENET_TS_TIMER       ((uint)0x00008000)
+> diff --git a/drivers/net/ethernet/freescale/fec_main.c
+> b/drivers/net/ethernet/freescale/fec_main.c
+> index a011719..7993040 100644
+> --- a/drivers/net/ethernet/freescale/fec_main.c
+> +++ b/drivers/net/ethernet/freescale/fec_main.c
+> @@ -1579,8 +1579,8 @@ fec_enet_interrupt(int irq, void *dev_id)
+>  	}
 > 
-> -#define FEC_DEFAULT_IMASK (FEC_ENET_TXF | FEC_ENET_RXF | FEC_ENET_MII
-> | FEC_ENET_TS_TIMER)
-> -#define FEC_NAPI_IMASK	(FEC_ENET_MII | FEC_ENET_TS_TIMER)
-> +#define FEC_DEFAULT_IMASK (FEC_ENET_TXF | FEC_ENET_RXF | FEC_ENET_MII)
-> +#define FEC_NAPI_IMASK	FEC_ENET_MII
->  #define FEC_RX_DISABLED_IMASK (FEC_DEFAULT_IMASK & (~FEC_ENET_RXF))
+>  	if (fep->ptp_clock)
+> -		fec_ptp_check_pps_event(fep);
+> -
+> +		if (fec_ptp_check_pps_event(fep))
+> +			ret = IRQ_HANDLED;
+>  	return ret;
+>  }
 > 
->  /* ENET interrupt coalescing macro define */
 > --
 > 2.5.0
 
