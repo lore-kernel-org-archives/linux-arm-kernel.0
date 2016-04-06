@@ -1,80 +1,80 @@
-From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Wed, 6 Apr 2016 06:12:58 +0000
-Subject: [v7, 0/5] Fix eSDHC host version register bug
-In-Reply-To: <CAPDyKFqgMCvbqMYZ-uM-rTnVvfJkCYbhv2kucCRyNyc9FWoR=Q@mail.gmail.com>
-References: <1459480051-3701-1-git-send-email-yangbo.lu@nxp.com>
- <CAPDyKFqgMCvbqMYZ-uM-rTnVvfJkCYbhv2kucCRyNyc9FWoR=Q@mail.gmail.com>
-Message-ID: <HE1PR04MB0889D75DC56E180D3508E7A1F89F0@HE1PR04MB0889.eurprd04.prod.outlook.com>
+From: jacek.anaszewski@gmail.com (Jacek Anaszewski)
+Date: Wed, 6 Apr 2016 08:12:40 +0200
+Subject: [PATCH 2/5] leds: triggers: Add a led_trigger_event_nosleep API
+In-Reply-To: <CAAEAJfCoJEM9+Y_=B=YKFG_zT5TMHEKqzrX-nns7L8Mx5WqSug@mail.gmail.com>
+References: <1459801326-5541-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+ <1459801326-5541-3-git-send-email-ezequiel@vanguardiasur.com.ar>
+ <57042FD8.1090100@gmail.com>
+ <CAAEAJfCoJEM9+Y_=B=YKFG_zT5TMHEKqzrX-nns7L8Mx5WqSug@mail.gmail.com>
+Message-ID: <5704A8D8.8090004@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Ulf Hansson [mailto:ulf.hansson at linaro.org]
-> Sent: Tuesday, April 05, 2016 7:28 PM
-> To: Yangbo Lu
-> Cc: devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> linux-kernel at vger.kernel.org; linuxppc-dev at lists.ozlabs.org; linux-
-> clk at vger.kernel.org; linux-i2c at vger.kernel.org; iommu at lists.linux-
-> foundation.org; netdev at vger.kernel.org; linux-mmc; Rob Herring; Scott
-> Wood; Russell King; Jochen Friedrich; Joerg Roedel; Claudiu Manoil;
-> Bhupesh Sharma; Zhao Qiang; Kumar Gala; Santosh Shilimkar; Yang-Leo Li;
-> Xiaobo Xie
-> Subject: Re: [v7, 0/5] Fix eSDHC host version register bug
-> 
-> On 1 April 2016 at 05:07, Yangbo Lu <yangbo.lu@nxp.com> wrote:
-> > This patchset is used to fix a host version register bug in the
-> > T4240-R1.0-R2.0 eSDHC controller. To get the SoC version and revision,
-> > it's needed to add the GUTS driver to access the global utilities
-> registers.
-> >
-> > So, the first three patches are to add the GUTS driver.
-> > The following two patches are to enable GUTS driver support to get SVR
-> > in eSDHC driver and fix host version for T4240.
-> >
-> > Yangbo Lu (5):
-> >   ARM64: dts: ls2080a: add device configuration node
-> >   soc: fsl: add GUTS driver for QorIQ platforms
-> >   dt: move guts devicetree doc out of powerpc directory
-> >   powerpc/fsl: move mpc85xx.h to include/linux/fsl
-> >   mmc: sdhci-of-esdhc: fix host version for T4240-R1.0-R2.0
-> >
-> >  .../bindings/{powerpc => soc}/fsl/guts.txt         |   3 +
-> >  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi     |   6 ++
-> >  arch/powerpc/kernel/cpu_setup_fsl_booke.S          |   2 +-
-> >  drivers/clk/clk-qoriq.c                            |   3 +-
-> >  drivers/i2c/busses/i2c-mpc.c                       |   2 +-
-> >  drivers/iommu/fsl_pamu.c                           |   3 +-
-> >  drivers/mmc/host/Kconfig                           |   1 +
-> >  drivers/mmc/host/sdhci-of-esdhc.c                  |  23 ++++
-> >  drivers/net/ethernet/freescale/gianfar.c           |   2 +-
-> >  drivers/soc/Kconfig                                |   2 +-
-> >  drivers/soc/fsl/Kconfig                            |   8 ++
-> >  drivers/soc/fsl/Makefile                           |   1 +
-> >  drivers/soc/fsl/guts.c                             | 119
-> +++++++++++++++++++++
-> >  include/linux/fsl/guts.h                           |  98 ++++++++-----
-> ----
-> >  .../asm/mpc85xx.h => include/linux/fsl/svr.h       |   4 +-
-> >  15 files changed, 219 insertions(+), 58 deletions(-)  rename
-> > Documentation/devicetree/bindings/{powerpc => soc}/fsl/guts.txt (91%)
-> > create mode 100644 drivers/soc/fsl/Kconfig  create mode 100644
-> > drivers/soc/fsl/guts.c  rename arch/powerpc/include/asm/mpc85xx.h =>
-> > include/linux/fsl/svr.h (97%)
-> >
-> > --
-> > 2.1.0.27.g96db324
-> >
-> 
-> I was about to queue this for next, when I noticed that checkpatch is
-> complaining/warning lots about these patches. Can you please a round of
-> checkpatch and fix what makes sense.
-> 
-> Kind regards
-> Uffe
+On 04/06/2016 06:38 AM, Ezequiel Garcia wrote:
+> On 5 April 2016 at 18:36, Jacek Anaszewski <jacek.anaszewski@gmail.com> wrote:
+>> Hi Ezequiel,
+>>
+>>
+>> On 04/04/2016 10:22 PM, Ezequiel Garcia wrote:
+>>>
+>>> Now that we can mark any LED (even those in use by delayed blink
+>>> triggers) to trigger on a kernel panic, let's introduce a nosleep
+>>> led_trigger_event API.
+>>>
+>>> This API is needed to skip the delayed blink path on
+>>> led_trigger_event. LEDs that are switched on a kernel panic,
+>>> might be in use by a delayed blink trigger.
+>>>
+>>> This will be used by the panic LED trigger.
+>>>
+>>> Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
+>>> ---
+>>>    drivers/leds/led-triggers.c | 26 ++++++++++++++++++++++----
+>>>    include/linux/leds.h        |  4 ++++
+>>>    2 files changed, 26 insertions(+), 4 deletions(-)
+>>>
+>>> diff --git a/drivers/leds/led-triggers.c b/drivers/leds/led-triggers.c
+>>> index f5c9d7c4d181..00b9d8497777 100644
+>>> --- a/drivers/leds/led-triggers.c
+>>> +++ b/drivers/leds/led-triggers.c
+>>> @@ -307,8 +307,9 @@ EXPORT_SYMBOL_GPL(devm_led_trigger_register);
+>>>
+>>>    /* Simple LED Tigger Interface */
+>>>
+>>> -void led_trigger_event(struct led_trigger *trig,
+>>> -                       enum led_brightness brightness)
+>>> +static void do_led_trigger_event(struct led_trigger *trig,
+>>> +                                enum led_brightness brightness,
+>>> +                                bool nosleep)
+>>>    {
+>>>          struct led_classdev *led_cdev;
+>>>
+>>> @@ -316,12 +317,29 @@ void led_trigger_event(struct led_trigger *trig,
+>>>                  return;
+>>>
+>>>          read_lock(&trig->leddev_list_lock);
+>>> -       list_for_each_entry(led_cdev, &trig->led_cdevs, trig_list)
+>>> -               led_set_brightness(led_cdev, brightness);
+>>
+>>
+>> led_set_brightness() can gently disable blinking if passed 0 in the
+>> brightness argument. IMHO this patch is not needed then.
+>>
+>>
+>
+> Yes, but the blinking disable is deferred, and so might never
+> run (e.g. I'd say it won't run on a non-preemptible kernel).
+>
+> I think we need this API, or otherwise some way of circumventing
+> the deferred path on led_set_brightness. For instance, we
+> could turn off delay_on and delay_off in the panic atomic notifier.
 
-[Lu Yangbo-B47093] Sorry about this, Uffe...
-Should I ignore the warnings that update MAINTAINERS?
-Regarding the 'undocumented' warning, I will added a patch updates doc before all the patches, Ok?
+Yes, I prefer the latter, as it requires less changes.
 
-Thanks a lot :)
- 
+> I'm not strongly convinced by any approach, but this API seemed
+> slightly cleaner.
+>
+
+-- 
+Best regards,
+Jacek Anaszewski
