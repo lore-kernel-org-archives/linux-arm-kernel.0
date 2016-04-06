@@ -1,51 +1,46 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Wed,  6 Apr 2016 09:32:59 +0200
-Subject: [PATCH] ARM: dts: imx28: add alternative pinmuxing for mac0
-Message-ID: <1459927979-11665-1-git-send-email-u.kleine-koenig@pengutronix.de>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Wed, 6 Apr 2016 09:35:49 +0200
+Subject: [PATCH 5/9] iio: accel: mma7455: use regmap to retrieve struct
+ device
+In-Reply-To: <acaeee6c3c1f99900614baf99ab31e6e5b515970.1459918214.git.amsfield22@gmail.com>
+References: <cover.1459918214.git.amsfield22@gmail.com>
+ <acaeee6c3c1f99900614baf99ab31e6e5b515970.1459918214.git.amsfield22@gmail.com>
+Message-ID: <CAGhQ9VxnwX6n6PfOFAhYSPfP7eAA+YFLjTcJf+Ay60R8sHV_Ww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
- arch/arm/boot/dts/imx28.dtsi | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+Hi Alison,
 
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index 4e073e854742..8058adf42ea6 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -423,6 +423,32 @@
- 					fsl,pull-up = <MXS_PULL_ENABLE>;
- 				};
- 
-+				mac0_pins_b: mac0 at 1 {
-+					reg = <1>;
-+					fsl,pinmux-ids = <
-+						MX28_PAD_ENET0_MDC__ENET0_MDC
-+						MX28_PAD_ENET0_MDIO__ENET0_MDIO
-+						MX28_PAD_ENET0_RX_EN__ENET0_RX_EN
-+						MX28_PAD_ENET0_RXD0__ENET0_RXD0
-+						MX28_PAD_ENET0_RXD1__ENET0_RXD1
-+						MX28_PAD_ENET0_RXD2__ENET0_RXD2
-+						MX28_PAD_ENET0_RXD3__ENET0_RXD3
-+						MX28_PAD_ENET0_TX_EN__ENET0_TX_EN
-+						MX28_PAD_ENET0_TXD0__ENET0_TXD0
-+						MX28_PAD_ENET0_TXD1__ENET0_TXD1
-+						MX28_PAD_ENET0_TXD2__ENET0_TXD2
-+						MX28_PAD_ENET0_TXD3__ENET0_TXD3
-+						MX28_PAD_ENET_CLK__CLKCTRL_ENET
-+						MX28_PAD_ENET0_COL__ENET0_COL
-+						MX28_PAD_ENET0_CRS__ENET0_CRS
-+						MX28_PAD_ENET0_TX_CLK__ENET0_TX_CLK
-+						MX28_PAD_ENET0_RX_CLK__ENET0_RX_CLK
-+						>;
-+					fsl,drive-strength = <MXS_DRIVE_8mA>;
-+					fsl,voltage = <MXS_VOLTAGE_HIGH>;
-+					fsl,pull-up = <MXS_PULL_ENABLE>;
-+				};
-+
- 				mac1_pins_a: mac1 at 0 {
- 					reg = <0>;
- 					fsl,pinmux-ids = <
--- 
-2.7.0
+On 6 April 2016 at 07:18, Alison Schofield <amsfield22@gmail.com> wrote:
+> Driver includes struct regmap and struct device in its global data.
+> Remove the struct device and use regmap API to retrieve device info.
+>
+> Patch created using Coccinelle plus manual edits.
+>
+> Signed-off-by: Alison Schofield <amsfield22@gmail.com>
+> ---
+>  drivers/iio/accel/mma7455_core.c | 5 ++---
+>  1 file changed, 2 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/iio/accel/mma7455_core.c b/drivers/iio/accel/mma7455_core.c
+> index c633cc2..c902f54 100644
+> --- a/drivers/iio/accel/mma7455_core.c
+> +++ b/drivers/iio/accel/mma7455_core.c
+> @@ -55,11 +55,11 @@
+>
+>  struct mma7455_data {
+>         struct regmap *regmap;
+> -       struct device *dev;
+>  };
+>
+>  static int mma7455_drdy(struct mma7455_data *mma7455)
+>  {
+> +       struct device *dev = regmap_get_device(mma7455->regmap);
+
+ah, nice!
+
+Acked-by: Joachim Eastwood <manabian@gmail.com>
+
+
+regards,
+Joachim Eastwood
