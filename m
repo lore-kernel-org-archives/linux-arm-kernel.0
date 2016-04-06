@@ -1,52 +1,45 @@
 From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Tue,  5 Apr 2016 19:25:46 -0700
-Subject: [PATCH net-next V3 00/16] net: fec: cleanup and fixes
-Message-ID: <1459909562-22865-1-git-send-email-troy.kisky@boundarydevices.com>
+Date: Tue,  5 Apr 2016 19:25:47 -0700
+Subject: [PATCH net-next V3 01/16] net: fec: only check queue 0 if RXF_0/TXF_0
+ interrupt is set
+In-Reply-To: <1459909562-22865-1-git-send-email-troy.kisky@boundarydevices.com>
+References: <1459909562-22865-1-git-send-email-troy.kisky@boundarydevices.com>
+Message-ID: <1459909562-22865-2-git-send-email-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-V3 has
+Before queue 0 was always checked if any queue caused an interrupt.
+It is better to just mark queue 0 if queue 0 has caused an interrupt.
 
-1 dropped patch "net: fec: print more debug info in fec_timeout"
-2 new patches
-0002-net-fec-remove-unused-interrupt-FEC_ENET_TS_TIMER.patch
-0003-net-fec-return-IRQ_HANDLED-if-fec_ptp_check_pps_even.patch
+Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+Acked-by: Fugang Duan <Fugang.duan@nxp.com>
 
-1 combined patch
-0004-net-fec-pass-rxq-txq-to-fec_enet_rx-tx_queue-instead.patch
+---
+v3: add Acked-by
+---
+ drivers/net/ethernet/freescale/fec_main.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-The changes are noted on individual patches
-
-My measured performance of this series is
-
-before patch set
-365 Mbits/sec Tx/407 RX
-
-after patch set
-374 Tx/427 Rx
-
-
-Troy Kisky (16):
-  net: fec: only check queue 0 if RXF_0/TXF_0 interrupt is set
-  net: fec: remove unused interrupt FEC_ENET_TS_TIMER
-  net: fec: return IRQ_HANDLED if fec_ptp_check_pps_event handled it
-  net: fec: pass rxq/txq to fec_enet_rx/tx_queue instead of queue_id
-  net: fec: reduce interrupts
-  net: fec: split off napi routine with 3 queues
-  net: fec: don't clear all rx queue bits when just one is being checked
-  net: fec: set cbd_sc without relying on previous value
-  net: fec: eliminate calls to fec_enet_get_prevdesc
-  net: fec: move restart test for efficiency
-  net: fec: clear cbd_sc after transmission to help with debugging
-  net: fec: dump all tx queues in fec_dump
-  net: fec: detect tx int lost
-  net: fec: create subroutine reset_tx_queue
-  net: fec: call dma_unmap_single on mapped tx buffers at restart
-  net: fec: don't set cbd_bufaddr unless no mapping error
-
- drivers/net/ethernet/freescale/fec.h      |  10 +-
- drivers/net/ethernet/freescale/fec_main.c | 410 ++++++++++++++++--------------
- 2 files changed, 218 insertions(+), 202 deletions(-)
-
+diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
+index 08243c2..a011719 100644
+--- a/drivers/net/ethernet/freescale/fec_main.c
++++ b/drivers/net/ethernet/freescale/fec_main.c
+@@ -1534,14 +1534,14 @@ fec_enet_collect_events(struct fec_enet_private *fep, uint int_events)
+ 	if (int_events == 0)
+ 		return false;
+ 
+-	if (int_events & FEC_ENET_RXF)
++	if (int_events & FEC_ENET_RXF_0)
+ 		fep->work_rx |= (1 << 2);
+ 	if (int_events & FEC_ENET_RXF_1)
+ 		fep->work_rx |= (1 << 0);
+ 	if (int_events & FEC_ENET_RXF_2)
+ 		fep->work_rx |= (1 << 1);
+ 
+-	if (int_events & FEC_ENET_TXF)
++	if (int_events & FEC_ENET_TXF_0)
+ 		fep->work_tx |= (1 << 2);
+ 	if (int_events & FEC_ENET_TXF_1)
+ 		fep->work_tx |= (1 << 0);
 -- 
 2.5.0
