@@ -1,117 +1,210 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 6 Apr 2016 14:00:23 +0200
-Subject: [PATCH v4 08/12] KVM: arm64: connect LPIs to the VGIC emulation
-In-Reply-To: <1458958450-19662-9-git-send-email-andre.przywara@arm.com>
-References: <1458958450-19662-1-git-send-email-andre.przywara@arm.com>
- <1458958450-19662-9-git-send-email-andre.przywara@arm.com>
-Message-ID: <5704FA57.7040106@linaro.org>
+From: julien.grall@arm.com (Julien Grall)
+Date: Wed, 6 Apr 2016 13:16:44 +0100
+Subject: [PATCH v10 06/17] Xen: ARM: Add support for mapping platform
+ device mmio
+In-Reply-To: <1459525755-36968-7-git-send-email-shannon.zhao@linaro.org>
+References: <1459525755-36968-1-git-send-email-shannon.zhao@linaro.org>
+ <1459525755-36968-7-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <5704FE2C.5000902@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
-On 03/26/2016 03:14 AM, Andre Przywara wrote:
-> LPIs are dynamically created (mapped) at guest runtime and their
-> actual numbers can be quite high, but is mostly assigned using a very
-> sparse allocation scheme. So arrays are not an ideal data structure
-> to hold the information. We use our equivalent of the "Interrupt
-> Translation Table Entry" (ITTE) to hold the vgic_irq struct for a
-> virtual LPI embedded in in the ITTE.
-> Connect the VGIC core code via an accessor function to help it get the
-> struct vgic_irq for a certain LPI.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Looks OK to me
-Reviewed-by: Eric Auger <eric.auger@linaro.org>
+Hi Shannon,
 
-Eric
+Sorry to come late in the review process.
+
+On 01/04/2016 16:49, Shannon Zhao wrote:
+> Add a bus_notifier for platform bus device in order to map the device
+> mmio regions when DOM0 booting with ACPI.
+>
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 > ---
->  virt/kvm/arm/vgic/its-emul.c | 29 +++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic.h     |  8 +++++++-
->  2 files changed, 36 insertions(+), 1 deletion(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/its-emul.c b/virt/kvm/arm/vgic/its-emul.c
-> index c0334ff..1188e9a 100644
-> --- a/virt/kvm/arm/vgic/its-emul.c
-> +++ b/virt/kvm/arm/vgic/its-emul.c
-> @@ -55,11 +55,29 @@ struct its_collection {
->  struct its_itte {
->  	struct list_head itte_list;
->  
-> +	struct vgic_irq irq;
->  	struct its_collection *collection;
->  	u32 lpi;
->  	u32 event_id;
->  };
->  
-> +/* To be used as an iterator this macro misses the enclosing parentheses */
-> +#define for_each_lpi(dev, itte, kvm) \
-> +	list_for_each_entry(dev, &(kvm)->arch.vgic.its.device_list, dev_list) \
-> +		list_for_each_entry(itte, &(dev)->itt, itte_list)
+>   drivers/xen/Makefile     |   1 +
+>   drivers/xen/arm-device.c | 141 +++++++++++++++++++++++++++++++++++++++++++++++
+>   2 files changed, 142 insertions(+)
+>   create mode 100644 drivers/xen/arm-device.c
+>
+> diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
+> index 9b7a35c..415f286 100644
+> --- a/drivers/xen/Makefile
+> +++ b/drivers/xen/Makefile
+> @@ -9,6 +9,7 @@ CFLAGS_features.o			:= $(nostackp)
+>
+>   CFLAGS_efi.o				+= -fshort-wchar
+>
+> +dom0-$(CONFIG_ARM64) += arm-device.o
+>   dom0-$(CONFIG_PCI) += pci.o
+>   dom0-$(CONFIG_USB_SUPPORT) += dbgp.o
+>   dom0-$(CONFIG_XEN_ACPI) += acpi.o $(xen-pad-y)
+> diff --git a/drivers/xen/arm-device.c b/drivers/xen/arm-device.c
+> new file mode 100644
+> index 0000000..76e26e5
+> --- /dev/null
+> +++ b/drivers/xen/arm-device.c
+> @@ -0,0 +1,141 @@
+> +/*
+> + * Copyright (c) 2015, Linaro Limited, Shannon Zhao
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
 > +
-> +static struct its_itte *find_itte_by_lpi(struct kvm *kvm, int lpi)
+> +#include <linux/platform_device.h>
+> +#include <linux/acpi.h>
+> +#include <xen/xen.h>
+> +#include <xen/page.h>
+> +#include <xen/interface/memory.h>
+> +#include <asm/xen/hypervisor.h>
+> +#include <asm/xen/hypercall.h>
+> +
+> +static int xen_unmap_device_mmio(struct resource *resource, unsigned int count)
+
+NITs:
+
+There is multiple resource so s/resource/resources/.
+
+Also the variable could be const.
+
 > +{
-> +	struct its_device *device;
-> +	struct its_itte *itte;
+> +	unsigned int i, j, nr;
+> +	int rc = 0;
+> +	struct resource *r;
+> +	struct xen_remove_from_physmap xrp;
 > +
-> +	for_each_lpi(device, itte, kvm) {
-> +		if (itte->lpi == lpi)
-> +			return itte;
+> +	for (i = 0; i < count; i++) {
+> +		r = &resource[i];
+> +		nr = DIV_ROUND_UP(resource_size(r), XEN_PAGE_SIZE);
+> +		if ((resource_type(r) != IORESOURCE_MEM) || (nr == 0))
+> +			continue;
+> +
+> +		for (j = 0; j < nr; j++) {
+> +			xrp.domid = DOMID_SELF;
+> +			xrp.gpfn = XEN_PFN_DOWN(r->start) + j;
+> +			rc = HYPERVISOR_memory_op(XENMEM_remove_from_physmap,
+> +						  &xrp);
+> +			if (rc)
+> +				return rc;
+> +		}
 > +	}
-> +	return NULL;
+> +
+> +	return rc;
 > +}
 > +
->  #define BASER_BASE_ADDRESS(x) ((x) & 0xfffffffff000ULL)
->  
->  static int vgic_mmio_read_its_ctlr(struct kvm_vcpu *vcpu,
-> @@ -166,6 +184,17 @@ static int vgic_mmio_read_its_idregs(struct kvm_vcpu *vcpu,
->  	return 0;
->  }
->  
-> +struct vgic_irq *vgic_its_get_lpi(struct kvm *kvm, u32 intid)
+> +static int xen_map_device_mmio(struct resource *resource, unsigned int count)
+
+Ditto
+
 > +{
-> +	struct its_itte *itte;
+> +	unsigned int i, j, nr;
+> +	int rc = 0;
+> +	struct resource *r;
+> +	xen_pfn_t *gpfns;
+> +	xen_ulong_t *idxs;
+> +	int *errs;
+> +	struct xen_add_to_physmap_range xatp;
 > +
-> +	itte = find_itte_by_lpi(kvm, intid);
-> +	if (!itte)
-> +		return NULL;
+> +	for (i = 0; i < count; i++) {
+> +		r = &resource[i];
+> +		nr = DIV_ROUND_UP(resource_size(r), XEN_PAGE_SIZE);
+> +		if ((resource_type(r) != IORESOURCE_MEM) || (nr == 0))
+> +			continue;
 > +
-> +	return &itte->irq;
+> +		gpfns = kzalloc(sizeof(xen_pfn_t) * nr, GFP_KERNEL);
+> +		idxs = kzalloc(sizeof(xen_ulong_t) * nr, GFP_KERNEL);
+> +		errs = kzalloc(sizeof(int) * nr, GFP_KERNEL);
+> +		if (!gpfns || !idxs || !errs) {
+> +			kfree(gpfns);
+> +			kfree(idxs);
+> +			kfree(errs);
+> +			return -ENOMEM;
+> +		}
+> +
+> +		for (j = 0; j < nr; j++) {
+
+I would add a comment to explain that the regions are always mapped 1:1 
+to DOM0, and this is fine because the memory map for DOM0 is the same as 
+the host (except for the RAM).
+
+> +			gpfns[j] = XEN_PFN_DOWN(r->start) + j;
+> +			idxs[j] = XEN_PFN_DOWN(r->start) + j;
+> +		}
+> +
+> +		xatp.domid = DOMID_SELF;
+> +		xatp.size = nr;
+> +		xatp.space = XENMAPSPACE_dev_mmio;
+> +
+> +		set_xen_guest_handle(xatp.gpfns, gpfns);
+> +		set_xen_guest_handle(xatp.idxs, idxs);
+> +		set_xen_guest_handle(xatp.errs, errs);
+> +
+> +		rc = HYPERVISOR_memory_op(XENMEM_add_to_physmap_range, &xatp);
+> +		kfree(gpfns);
+> +		kfree(idxs);
+> +		kfree(errs);
+> +		if (rc)
+> +			return rc;
+
+Shouldn't we redo the mapping if the hypercall fails?
+
+> +	}
+> +
+> +	return rc;
 > +}
 > +
->  static void its_free_itte(struct its_itte *itte)
->  {
->  	list_del(&itte->itte_list);
-> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> index 08f97d1..160c511 100644
-> --- a/virt/kvm/arm/vgic/vgic.h
-> +++ b/virt/kvm/arm/vgic/vgic.h
-> @@ -63,6 +63,7 @@ int vgic_register_redist_regions(struct kvm *kvm, gpa_t dist_base_address);
->  
->  int vits_init(struct kvm *kvm);
->  void vgic_enable_lpis(struct kvm_vcpu *vcpu);
-> +struct vgic_irq *vgic_its_get_lpi(struct kvm *kvm, u32 intid);
->  void vits_destroy(struct kvm *kvm);
->  #else
->  static inline void vgic_v3_irq_change_affinity(struct kvm *kvm, u32 intid,
-> @@ -129,7 +130,7 @@ static inline int vgic_register_redist_regions(struct kvm *kvm,
->  	return -ENODEV;
->  }
->  
-> -int vits_init(struct kvm *kvm)
-> +static inline int vits_init(struct kvm *kvm)
->  {
->  	return 0;
->  }
-> @@ -139,6 +140,11 @@ static inline void vgic_enable_lpis(struct kvm_vcpu *vcpu)
->  	return;
->  }
->  
-> +static inline struct vgic_irq *vgic_its_get_lpi(struct kvm *kvm, u32 intid)
+> +static int xen_platform_notifier(struct notifier_block *nb,
+> +				 unsigned long action, void *data)
 > +{
-> +	return NULL;
+> +	struct platform_device *pdev = to_platform_device(data);
+> +	int r = 0;
+> +
+> +	if (pdev->num_resources == 0 || pdev->resource == NULL)
+> +		return NOTIFY_OK;
+> +
+> +	switch (action) {
+> +	case BUS_NOTIFY_ADD_DEVICE:
+> +		r = xen_map_device_mmio(pdev->resource, pdev->num_resources);
+> +		break;
+> +	case BUS_NOTIFY_DEL_DEVICE:
+> +		r = xen_unmap_device_mmio(pdev->resource, pdev->num_resources);
+> +		break;
+> +	default:
+> +		return NOTIFY_DONE;
+> +	}
+> +	if (r)
+> +		dev_err(&pdev->dev, "Platform: Failed to %s device %s MMIO!\n",
+> +			action == BUS_NOTIFY_ADD_DEVICE ? "map" :
+> +			(action == BUS_NOTIFY_DEL_DEVICE ? "unmap" : "?"),
+> +			pdev->name);
+> +
+> +	return NOTIFY_OK;
 > +}
 > +
->  static inline void vits_destroy(struct kvm *kvm)
->  {
->  	return;
-> 
+> +static struct notifier_block platform_device_nb = {
+> +	.notifier_call = xen_platform_notifier,
+> +};
+> +
+> +static int __init register_xen_platform_notifier(void)
+> +{
+> +	if (!xen_initial_domain() || acpi_disabled)
+> +		return 0;
+> +
+> +	return bus_register_notifier(&platform_bus_type, &platform_device_nb);
+> +}
+> +
+> +arch_initcall(register_xen_platform_notifier);
+>
+
+Regards,
+
+-- 
+Julien Grall
