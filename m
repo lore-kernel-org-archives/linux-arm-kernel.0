@@ -1,80 +1,52 @@
-From: jacek.anaszewski@gmail.com (Jacek Anaszewski)
-Date: Wed, 6 Apr 2016 08:12:40 +0200
-Subject: [PATCH 2/5] leds: triggers: Add a led_trigger_event_nosleep API
-In-Reply-To: <CAAEAJfCoJEM9+Y_=B=YKFG_zT5TMHEKqzrX-nns7L8Mx5WqSug@mail.gmail.com>
-References: <1459801326-5541-1-git-send-email-ezequiel@vanguardiasur.com.ar>
- <1459801326-5541-3-git-send-email-ezequiel@vanguardiasur.com.ar>
- <57042FD8.1090100@gmail.com>
- <CAAEAJfCoJEM9+Y_=B=YKFG_zT5TMHEKqzrX-nns7L8Mx5WqSug@mail.gmail.com>
-Message-ID: <5704A8D8.8090004@gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 6 Apr 2016 08:51:50 +0200
+Subject: [RFC6 PATCH v6 00/21] ILP32 for ARM64
+In-Reply-To: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <CAMuHMdUUkaYVZ3-Jh6o1b++R=yFBg7siQt+A+TqqXRSa953CAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/2016 06:38 AM, Ezequiel Garcia wrote:
-> On 5 April 2016 at 18:36, Jacek Anaszewski <jacek.anaszewski@gmail.com> wrote:
->> Hi Ezequiel,
->>
->>
->> On 04/04/2016 10:22 PM, Ezequiel Garcia wrote:
->>>
->>> Now that we can mark any LED (even those in use by delayed blink
->>> triggers) to trigger on a kernel panic, let's introduce a nosleep
->>> led_trigger_event API.
->>>
->>> This API is needed to skip the delayed blink path on
->>> led_trigger_event. LEDs that are switched on a kernel panic,
->>> might be in use by a delayed blink trigger.
->>>
->>> This will be used by the panic LED trigger.
->>>
->>> Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
->>> ---
->>>    drivers/leds/led-triggers.c | 26 ++++++++++++++++++++++----
->>>    include/linux/leds.h        |  4 ++++
->>>    2 files changed, 26 insertions(+), 4 deletions(-)
->>>
->>> diff --git a/drivers/leds/led-triggers.c b/drivers/leds/led-triggers.c
->>> index f5c9d7c4d181..00b9d8497777 100644
->>> --- a/drivers/leds/led-triggers.c
->>> +++ b/drivers/leds/led-triggers.c
->>> @@ -307,8 +307,9 @@ EXPORT_SYMBOL_GPL(devm_led_trigger_register);
->>>
->>>    /* Simple LED Tigger Interface */
->>>
->>> -void led_trigger_event(struct led_trigger *trig,
->>> -                       enum led_brightness brightness)
->>> +static void do_led_trigger_event(struct led_trigger *trig,
->>> +                                enum led_brightness brightness,
->>> +                                bool nosleep)
->>>    {
->>>          struct led_classdev *led_cdev;
->>>
->>> @@ -316,12 +317,29 @@ void led_trigger_event(struct led_trigger *trig,
->>>                  return;
->>>
->>>          read_lock(&trig->leddev_list_lock);
->>> -       list_for_each_entry(led_cdev, &trig->led_cdevs, trig_list)
->>> -               led_set_brightness(led_cdev, brightness);
->>
->>
->> led_set_brightness() can gently disable blinking if passed 0 in the
->> brightness argument. IMHO this patch is not needed then.
->>
->>
->
-> Yes, but the blinking disable is deferred, and so might never
-> run (e.g. I'd say it won't run on a non-preemptible kernel).
->
-> I think we need this API, or otherwise some way of circumventing
-> the deferred path on led_set_brightness. For instance, we
-> could turn off delay_on and delay_off in the panic atomic notifier.
+Hi Yuri,
 
-Yes, I prefer the latter, as it requires less changes.
-
-> I'm not strongly convinced by any approach, but this API seemed
-> slightly cleaner.
+On Wed, Apr 6, 2016 at 12:08 AM, Yury Norov <ynorov@caviumnetworks.com> wrote:
+> This version is rebased on kernel v4.6-rc2, and has fixes in signal subsystem.
+> It works with updated glibc [1] (though very draft), and tested with LTP.
 >
+> It was tested on QEMU and ThunderX machines. No major difference found.
+> This is RFC because ILP32 is not tested in big-endian mode.
+>
+>  v3: https://lkml.org/lkml/2014/9/3/704
+>  v4: https://lkml.org/lkml/2015/4/13/691
+>  v5: https://lkml.org/lkml/2015/9/29/911
+>
+>  v6:
+>  - time_t, __kenel_off_t and other types turned to be 32-bit
+>    for compatibility reasons (after v5 discussion);
 
--- 
-Best regards,
-Jacek Anaszewski
+Reading this sparked my interest, so I went to the links above...
+
+What makes you think these "applications that can?t readily be migrated to LP64
+because they were written assuming an ILP32 data model, and that will never
+become suitable for a LP64 data model and will remain locked into ILP32
+operating environments" are more likely to be fixed for y2038 later, than for
+LP64 now?
+
+We're already closer to the (future) y2038 than to the (past) introduction of
+LP64...
+
+These unfixable legacy applications have been spreading through x32 to
+the shiny new arm64 server architecture (does ppc64el also have an ILP32 mode,
+or is it planned)? Lots of resources are spent on maintaining the status quo,
+instead of on fixing the real problems.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
