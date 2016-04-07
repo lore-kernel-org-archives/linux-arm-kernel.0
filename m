@@ -1,48 +1,71 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 7 Apr 2016 12:01:34 -0500
-Subject: [PATCH] ARM: dts: k2*: Rename the k2* files to keystone-k2* files
-In-Reply-To: <56E97F0E.6070309@oracle.com>
-References: <1458139150-30382-1-git-send-email-nm@ti.com>
- <56E97F0E.6070309@oracle.com>
-Message-ID: <CAGo_u6oMYZvzkvCsi8H3hvOBrPLZ-EL-T3RCA6E8BnmThrLYfA@mail.gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 7 Apr 2016 18:19:10 +0100
+Subject: [PATCH 09/14] coresight: tmc: adding mode of operation for
+ link/sinks
+In-Reply-To: <1458678202-3447-10-git-send-email-mathieu.poirier@linaro.org>
+References: <1458678202-3447-1-git-send-email-mathieu.poirier@linaro.org>
+ <1458678202-3447-10-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <5706968E.1050409@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
-
-On Wed, Mar 16, 2016 at 10:43 AM, santosh shilimkar
-<santosh.shilimkar@oracle.com> wrote:
-> On 3/16/2016 7:39 AM, Nishanth Menon wrote:
->>
->> As reported in [1], rename the k2* dts files to keystone-* files
->> this will force consistency throughout.
->>
->> Script for the same (and hand modified for Makefile and MAINTAINERS
->> files):
->> for i in arch/arm/boot/dts/k2*
->> do
->>         b=`basename $i`;
->>         git mv $i arch/arm/boot/dts/keystone-$b;
->>         sed -i -e "s/$b/keystone-$b/g" arch/arm/boot/dts/*[si]
->> done
->>
->> NOTE: bootloaders that depend on older dtb names will need to be
->> updated as well.
->>
->> [1] http://marc.info/?l=linux-arm-kernel&m=145637407804754&w=2
->>
->> Reported-by: Olof Johansson <olof@lixom.net>
->> Signed-off-by: Nishanth Menon <nm@ti.com>
->> ---
->>
-> Thanks Nishant for taking care of this. I will add this to the
-> next soon.
+On 22/03/16 20:23, Mathieu Poirier wrote:
+> Moving tmc_drvdata::enable to a local_t mode.  That way the
+> sink interface is aware of it's orgin and the foundation for
+> mutual exclusion between the sysFS and Perf interface can be
+> laid out.
 >
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-I dont see this in 4.6-rc2 yet.. did this slip our pull request? will
-be good to get this in so that we can fix up u-boot consistently.
+>   static int tmc_enable_etf_sink(struct coresight_device *csdev, u32 mode)
+>   {
+> +	u32 val;
+>   	bool allocated = false;
+>   	char *buf = NULL;
+>   	unsigned long flags;
+> @@ -125,6 +126,15 @@ static int tmc_enable_etf_sink(struct coresight_device *csdev, u32 mode)
+>   		return -EBUSY;
+>   	}
+>
+> +	val = local_cmpxchg(&drvdata->mode, CS_MODE_DISABLED, mode);
 
--- 
----
-Regards,
-Nishanth Menon
+Since we don't support PERF mode yet, should we check that before setting the mode ?
+
+>
+>   static int tmc_enable_etr_sink(struct coresight_device *csdev, u32 mode)
+>   {
+> +	u32 val;
+>   	bool allocated = false;
+>   	unsigned long flags;
+>   	void __iomem *vaddr;
+> @@ -107,6 +108,15 @@ static int tmc_enable_etr_sink(struct coresight_device *csdev, u32 mode)
+>   		return -EBUSY;
+>   	}
+>
+> +	val = local_cmpxchg(&drvdata->mode, CS_MODE_DISABLED, mode);
+> +	/*
+> +	 * In sysFS mode we can have multiple writers per sink.  Since this
+> +	 * sink is already enabled no memory is needed and the HW need not be
+> +	 * touched.
+> +	 */
+> +	if (val == CS_MODE_SYSFS)
+> +		goto out;
+> +
+
+Should we make sure 'mode' is not PERF ? Since we assume that the mode is
+could be SYSFS in disable below ?
+
+
+> diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
+> index 6b11caf77ad1..6dbd70861b17 100644
+> --- a/drivers/hwtracing/coresight/coresight-tmc.h
+> +++ b/drivers/hwtracing/coresight/coresight-tmc.h
+> @@ -18,6 +18,7 @@
+>   #ifndef _CORESIGHT_TMC_H
+>   #define _CORESIGHT_TMC_H
+>
+> +#include <linux/io.h>
+
+Why ?
+
+Suzuki
