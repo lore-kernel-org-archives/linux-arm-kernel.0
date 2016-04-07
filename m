@@ -1,206 +1,70 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 7 Apr 2016 08:55:22 -0600
-Subject: [PATCH v2 2/2] hwrng: hisi: Add support for Hisilicon SoC RNG
-In-Reply-To: <1460017397-30996-3-git-send-email-wangkefeng.wang@huawei.com>
-References: <1460017397-30996-1-git-send-email-wangkefeng.wang@huawei.com>
- <1460017397-30996-3-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <CANLsYkwRGm3oBWaoKki4Ge3A_-temOsdJcwby6ds_X5_XGYZtQ@mail.gmail.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Thu, 7 Apr 2016 17:02:44 +0200
+Subject: [LINUX PATCH v2 1/3] spi: Added dummy_cycle entry in the
+ spi_transfer structure.
+In-Reply-To: <1460039969-9835-1-git-send-email-lakshmis@xilinx.com>
+References: <1460039969-9835-1-git-send-email-lakshmis@xilinx.com>
+Message-ID: <57067694.8030806@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 April 2016 at 02:23, Kefeng Wang <wangkefeng.wang@huawei.com> wrote:
-> This adds the Hisilicon Random Number Generator(RNG) support,
-> which is found in Hip04 and Hip05 soc.
->
-> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+Hi all,
+
+Le 07/04/2016 16:39, P L Sai Krishna a ?crit :
+> This patch adds dummy_cycles entry in the spi_transfer structure.
+> len field in the transfer structure contains dummy bytes along with
+> actual data bytes, controllers which requires dummy bytes use len
+> field and simply Ignore the dummy_cycles field. Controllers which
+> expects dummy cycles won't work directly by using len field because
+> host driver doesn't know that len field of a particular transfer
+> includes dummy bytes or not (and also number of dummy bytes included
+> in len field). In such cases host driver use this dummy_cycles field
+> to identify the number of dummy cycles and based on that it will send
+> the required number of dummy cycles.
+
+Dummy cycles are only used with SPI NOR flashes, aren't they?
+I guess so since there is also a patch dedicated to the m25p80 driver.
+
+So why not using the spi_flash_read() API already introduced by Vignesh
+in the SPI layer?
+
+struct spi_flash_read_message already includes a 'dummy_bytes' member.
+
+> 
+> Signed-off-by: P L Sai Krishna <lakshmis@xilinx.com>
 > ---
->  drivers/char/hw_random/Kconfig    |  13 ++++
->  drivers/char/hw_random/Makefile   |   1 +
->  drivers/char/hw_random/hisi-rng.c | 121 ++++++++++++++++++++++++++++++++++++++
->  3 files changed, 135 insertions(+)
->  create mode 100644 drivers/char/hw_random/hisi-rng.c
->
-> diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
-> index 67ee8b0..088b1bf 100644
-> --- a/drivers/char/hw_random/Kconfig
-> +++ b/drivers/char/hw_random/Kconfig
-> @@ -333,6 +333,19 @@ config HW_RANDOM_TPM
->
->           If unsure, say Y.
->
-> +config HW_RANDOM_HISI
-> +       tristate "Hisilicon Random Number Generator support"
-> +       depends on HW_RANDOM && ARCH_HISI
-> +       default HW_RANDOM
-> +       ---help---
-> +         This driver provides kernel-side support for the Random Number
-> +         Generator hardware found on Hisilicon Hip04 and Hip05 SoC.
-> +
-> +         To compile this driver as a module, choose M here: the
-> +         module will be called hisi-rng.
-> +
-> +         If unsure, say Y.
-> +
->  config HW_RANDOM_MSM
->         tristate "Qualcomm SoCs Random Number Generator support"
->         depends on HW_RANDOM && ARCH_QCOM
-> diff --git a/drivers/char/hw_random/Makefile b/drivers/char/hw_random/Makefile
-> index f5a6fa7..e09305b 100644
-> --- a/drivers/char/hw_random/Makefile
-> +++ b/drivers/char/hw_random/Makefile
-> @@ -26,6 +26,7 @@ obj-$(CONFIG_HW_RANDOM_PPC4XX) += ppc4xx-rng.o
->  obj-$(CONFIG_HW_RANDOM_PSERIES) += pseries-rng.o
->  obj-$(CONFIG_HW_RANDOM_POWERNV) += powernv-rng.o
->  obj-$(CONFIG_HW_RANDOM_EXYNOS) += exynos-rng.o
-> +obj-$(CONFIG_HW_RANDOM_HISI)   += hisi-rng.o
->  obj-$(CONFIG_HW_RANDOM_TPM) += tpm-rng.o
->  obj-$(CONFIG_HW_RANDOM_BCM2835) += bcm2835-rng.o
->  obj-$(CONFIG_HW_RANDOM_IPROC_RNG200) += iproc-rng200.o
-> diff --git a/drivers/char/hw_random/hisi-rng.c b/drivers/char/hw_random/hisi-rng.c
-> new file mode 100644
-> index 0000000..3e18e58
-> --- /dev/null
-> +++ b/drivers/char/hw_random/hisi-rng.c
-> @@ -0,0 +1,121 @@
-> +/*
-> + * Copyright (C) 2016 HiSilicon Co., Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/err.h>
-> +#include <linux/kernel.h>
-> +#include <linux/hw_random.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/platform_device.h>
-> +
-> +#define RNG_SEED       0x0
-> +#define RNG_CTRL       0x4
-> +  #define RNG_SEED_SEL BIT(2)
-> +  #define RNG_RING_EN  BIT(1)
-> +  #define RNG_EN       BIT(0)
-> +#define RNG_RAN_NUM    0x10
-> +#define RNG_PHY_SEED   0x14
-> +#define RNG_RELOAD_ERR 0x84
-> +
-> +#define to_hisi_rng(p) container_of(p, struct hisi_rng, rng)
-> +
-> +static int seed_sel;
-> +module_param(seed_sel, int, S_IRUGO);
-> +MODULE_PARM_DESC(seed_sel, "Auto reload seed. 0, use LFSR(default); 1, use ring oscillator.");
-> +
-> +struct hisi_rng {
-> +       void __iomem *base;
-> +       struct hwrng rng;
-> +};
-> +
-> +static int hisi_rng_init(struct hwrng *rng)
-> +{
-> +       struct hisi_rng *hrng = to_hisi_rng(rng);
-> +       int val = RNG_EN;
-> +       u32 seed;
-> +
-> +       /* get a random number as initial seed */
-> +       get_random_bytes(&seed, sizeof(seed));
-> +
-> +       writel_relaxed(seed, hrng->base + RNG_SEED);
-> +
-> +       if (seed_sel == 1)
-> +               val |= RNG_RING_EN | RNG_SEED_SEL;
+> v2: 
+>  - Changed the structure member name from dummy to dummy_cycles.
+>  - Updated the documentation of dummy_cycles.
+>  - m25p80 changes split into another patch.
+> 
+>  include/linux/spi/spi.h | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/include/linux/spi/spi.h b/include/linux/spi/spi.h
+> index 857a9a1..63135b3 100644
+> --- a/include/linux/spi/spi.h
+> +++ b/include/linux/spi/spi.h
+> @@ -664,6 +664,9 @@ extern void spi_res_release(struct spi_master *master,
+>   * @len: size of rx and tx buffers (in bytes)
+>   * @speed_hz: Select a speed other than the device default for this
+>   *      transfer. If 0 the default (from @spi_device) is used.
+> + * @dummy_cycles: number of dummy cycles. If host controller requires
+> + * 	dummy cycles rather than dummy bytes which send along with Cmd
+> + *	and address then this dummy_cycles is used.
+>   * @bits_per_word: select a bits_per_word other than the device default
+>   *      for this transfer. If 0 the default (from @spi_device) is used.
+>   * @cs_change: affects chipselect after this transfer completes
+> @@ -752,6 +755,7 @@ struct spi_transfer {
+>  	u8		bits_per_word;
+>  	u16		delay_usecs;
+>  	u32		speed_hz;
+> +	u32		dummy_cycles;
+>  
+>  	struct list_head transfer_list;
+>  };
+> 
 
-Hello Kefeng,
+Best regards,
 
-Please explain what this mode does.  Otherwise reviewers have to make
-a guess based on the description of the module parameter.
-
-> +
-> +       writel_relaxed(val, hrng->base + RNG_CTRL);
-> +       return 0;
-> +}
-> +
-> +static void hisi_rng_cleanup(struct hwrng *rng)
-> +{
-> +       struct hisi_rng *hrng = to_hisi_rng(rng);
-> +
-> +       writel_relaxed(0, hrng->base + RNG_CTRL);
-> +}
-> +
-> +static int hisi_rng_read(struct hwrng *rng, void *buf, size_t max,
-> +                          bool wait)
-
-What are variable 'max' and 'wait' used for?  As far as I can tell
-they can be removed.
-
-> +{
-> +       struct hisi_rng *hrng = to_hisi_rng(rng);
-> +       u32 *data = buf;
-> +
-> +       *data = readl_relaxed(hrng->base + RNG_RAN_NUM);
-> +       return 4;
-
-Why not simply doing the readl_relaxed() in the the code rather than
-introducing a new function?
-
-> +}
-> +
-> +static int hisi_rng_probe(struct platform_device *pdev)
-> +{
-> +       struct hisi_rng *rng;
-> +       struct resource *res;
-> +       int ret;
-> +
-> +       rng = devm_kzalloc(&pdev->dev, sizeof(*rng), GFP_KERNEL);
-> +       if (!rng)
-> +               return -ENOMEM;
-> +
-> +       platform_set_drvdata(pdev, rng);
-> +
-> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +       rng->base = devm_ioremap_resource(&pdev->dev, res);
-> +       if (IS_ERR(rng->base))
-> +               return PTR_ERR(rng->base);
-> +
-> +       rng->rng.name = pdev->name;
-> +       rng->rng.init = hisi_rng_init;
-> +       rng->rng.cleanup = hisi_rng_cleanup;
-> +       rng->rng.read = hisi_rng_read;
-> +
-> +       ret = devm_hwrng_register(&pdev->dev, &rng->rng);
-> +       if (ret) {
-> +               dev_err(&pdev->dev, "failed to register hwrng\n");
-> +               return ret;
-> +       }
-> +
-> +       return 0;
-> +}
-> +
-> +static const struct of_device_id hisi_rng_dt_ids[] = {
-> +       { .compatible = "hisilicon,rng" },
-> +       { }
-> +};
-> +MODULE_DEVICE_TABLE(of, hisi_rng_dt_ids);
-> +
-> +static struct platform_driver hisi_rng_driver = {
-> +       .probe          = hisi_rng_probe,
-> +       .driver         = {
-> +               .name   = "hisi-rng",
-> +               .of_match_table = of_match_ptr(hisi_rng_dt_ids),
-> +       },
-> +};
-> +
-> +module_platform_driver(hisi_rng_driver);
-> +
-> +MODULE_LICENSE("GPL");
-> +MODULE_AUTHOR("Kefeng Wang <wangkefeng.wang@huawei>");
-> +MODULE_DESCRIPTION("Hisilicon random number generator driver");
-> --
-> 2.6.0.GIT
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Cyrille
