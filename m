@@ -1,150 +1,169 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu,  7 Apr 2016 18:42:07 +0100
-Subject: [PATCH 4/5] iommu/dma: Finish optimising higher-order allocations
+Date: Thu,  7 Apr 2016 18:42:08 +0100
+Subject: [PATCH 5/5] iommu/arm-smmu: Use per-domain page sizes.
 In-Reply-To: <cover.1460048991.git.robin.murphy@arm.com>
 References: <cover.1460048991.git.robin.murphy@arm.com>
-Message-ID: <89763f6b1ac684c3d8712e38760bec55b7885e3b.1460048991.git.robin.murphy@arm.com>
+Message-ID: <ea520b8c72b5a72a1731bd35f6e3e50872fe6764.1460048991.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we know exactly which page sizes our caller wants to use in the
-given domain, we can restrict higher-order allocation attempts to just
-those sizes, if any, and avoid wasting any time or effort on other sizes
-which offer no benefit. In the same vein, this also lets us accommodate
-a minimum order greater than 0 for special cases.
+Now that we can accurately reflect the context format we choose for each
+domain, do that instead of imposing the global lowest-common-denominator
+restriction and potentially ending up with nothing. We currently have a
+strict 1:1 correspondence between domains and context banks, so we don't
+need to entertain the possibility of multiple formats _within_ a domain.
 
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+[rm: split from original patch, added SMMUv3]
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- arch/arm64/mm/dma-mapping.c |  4 ++--
- drivers/iommu/dma-iommu.c   | 37 ++++++++++++++++++++++++++++---------
- include/linux/dma-iommu.h   |  4 ++--
- 3 files changed, 32 insertions(+), 13 deletions(-)
+ drivers/iommu/arm-smmu-v3.c | 19 ++++++++++---------
+ drivers/iommu/arm-smmu.c    | 26 ++++++++++++++------------
+ 2 files changed, 24 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index 5d36907..41d19a0 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -562,8 +562,8 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
- 		struct page **pages;
- 		pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, coherent);
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 4ff73ff..ebab33e 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -590,6 +590,7 @@ struct arm_smmu_device {
  
--		pages = iommu_dma_alloc(dev, iosize, gfp, ioprot, handle,
--					flush_page);
-+		pages = iommu_dma_alloc(dev, iosize, gfp, attrs, ioprot,
-+					handle, flush_page);
- 		if (!pages)
- 			return NULL;
+ 	unsigned long			ias; /* IPA */
+ 	unsigned long			oas; /* PA */
++	unsigned long			pgsize_bitmap;
  
-diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-index 6edc852..6dc8dfc 100644
---- a/drivers/iommu/dma-iommu.c
-+++ b/drivers/iommu/dma-iommu.c
-@@ -190,11 +190,16 @@ static void __iommu_dma_free_pages(struct page **pages, int count)
- 	kvfree(pages);
+ #define ARM_SMMU_MAX_ASIDS		(1 << 16)
+ 	unsigned int			asid_bits;
+@@ -1516,8 +1517,6 @@ static int arm_smmu_domain_finalise_s2(struct arm_smmu_domain *smmu_domain,
+ 	return 0;
  }
  
--static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp)
-+static struct page **__iommu_dma_alloc_pages(unsigned int count,
-+		unsigned long pgsize_orders, gfp_t gfp)
+-static struct iommu_ops arm_smmu_ops;
+-
+ static int arm_smmu_domain_finalise(struct iommu_domain *domain)
  {
- 	struct page **pages;
- 	unsigned int i = 0, array_size = count * sizeof(*pages);
--	unsigned int order = MAX_ORDER;
-+	unsigned int min_order = __ffs(pgsize_orders);
-+
-+	pgsize_orders &= (2U << MAX_ORDER) - 1;
-+	if (!pgsize_orders)
-+		return NULL;
+ 	int ret;
+@@ -1555,7 +1554,7 @@ static int arm_smmu_domain_finalise(struct iommu_domain *domain)
+ 	}
  
- 	if (array_size <= PAGE_SIZE)
- 		pages = kzalloc(array_size, GFP_KERNEL);
-@@ -208,6 +213,7 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp)
+ 	pgtbl_cfg = (struct io_pgtable_cfg) {
+-		.pgsize_bitmap	= arm_smmu_ops.pgsize_bitmap,
++		.pgsize_bitmap	= smmu->pgsize_bitmap,
+ 		.ias		= ias,
+ 		.oas		= oas,
+ 		.tlb		= &arm_smmu_gather_ops,
+@@ -1566,7 +1565,7 @@ static int arm_smmu_domain_finalise(struct iommu_domain *domain)
+ 	if (!pgtbl_ops)
+ 		return -ENOMEM;
  
- 	while (count) {
- 		struct page *page = NULL;
-+		unsigned int order;
- 		int j;
+-	arm_smmu_ops.pgsize_bitmap = pgtbl_cfg.pgsize_bitmap;
++	domain->pgsize_bitmap = pgtbl_cfg.pgsize_bitmap;
+ 	smmu_domain->pgtbl_ops = pgtbl_ops;
  
- 		/*
-@@ -215,8 +221,9 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp)
- 		 * than a necessity, hence using __GFP_NORETRY until
- 		 * falling back to single-page allocations.
- 		 */
--		for (order = min_t(unsigned int, order, __fls(count));
--		     order > 0; order--) {
-+		for (pgsize_orders &= (2U << __fls(count)) - 1;
-+		     (order = __fls(pgsize_orders)) > min_order;
-+		     pgsize_orders &= (1U << order) - 1) {
- 			page = alloc_pages(gfp | __GFP_NORETRY, order);
- 			if (!page)
- 				continue;
-@@ -230,7 +237,7 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp)
- 			}
- 		}
- 		if (!page)
--			page = alloc_page(gfp);
-+			page = alloc_pages(gfp, order);
- 		if (!page) {
- 			__iommu_dma_free_pages(pages, i);
- 			return NULL;
-@@ -267,6 +274,7 @@ void iommu_dma_free(struct device *dev, struct page **pages, size_t size,
-  *	 attached to an iommu_dma_domain
-  * @size: Size of buffer in bytes
-  * @gfp: Allocation flags
-+ * @attrs: DMA attributes for this allocation
-  * @prot: IOMMU mapping flags
-  * @handle: Out argument for allocated DMA handle
-  * @flush_page: Arch callback which must ensure PAGE_SIZE bytes from the
-@@ -278,8 +286,8 @@ void iommu_dma_free(struct device *dev, struct page **pages, size_t size,
-  * Return: Array of struct page pointers describing the buffer,
-  *	   or NULL on failure.
-  */
--struct page **iommu_dma_alloc(struct device *dev, size_t size,
--		gfp_t gfp, int prot, dma_addr_t *handle,
-+struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
-+		struct dma_attrs *attrs, int prot, dma_addr_t *handle,
- 		void (*flush_page)(struct device *, const void *, phys_addr_t))
+ 	ret = finalise_stage_fn(smmu_domain, &pgtbl_cfg);
+@@ -2410,7 +2409,6 @@ static int arm_smmu_device_probe(struct arm_smmu_device *smmu)
  {
- 	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
-@@ -288,11 +296,22 @@ struct page **iommu_dma_alloc(struct device *dev, size_t size,
- 	struct page **pages;
- 	struct sg_table sgt;
- 	dma_addr_t dma_addr;
--	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
-+	unsigned int count, min_pgsize, pgsizes = domain->pgsize_bitmap;
+ 	u32 reg;
+ 	bool coherent;
+-	unsigned long pgsize_bitmap = 0;
  
- 	*handle = DMA_ERROR_CODE;
+ 	/* IDR0 */
+ 	reg = readl_relaxed(smmu->base + ARM_SMMU_IDR0);
+@@ -2541,13 +2539,16 @@ static int arm_smmu_device_probe(struct arm_smmu_device *smmu)
  
--	pages = __iommu_dma_alloc_pages(count, gfp);
-+	if (pgsizes & (PAGE_SIZE - 1)) {
-+		pgsizes &= PAGE_MASK;
-+		pgsizes |= PAGE_SIZE;
-+	}
-+
-+	min_pgsize = pgsizes ^ (pgsizes & (pgsizes - 1));
-+	if (dma_get_attr(DMA_ATTR_ALLOC_SINGLE_PAGES, attrs))
-+		pgsizes = min_pgsize;
-+
-+	size = ALIGN(size, min_pgsize);
-+	count = size >> PAGE_SHIFT;
-+	pages = __iommu_dma_alloc_pages(count, pgsizes >> PAGE_SHIFT, gfp);
- 	if (!pages)
- 		return NULL;
+ 	/* Page sizes */
+ 	if (reg & IDR5_GRAN64K)
+-		pgsize_bitmap |= SZ_64K | SZ_512M;
++		smmu->pgsize_bitmap |= SZ_64K | SZ_512M;
+ 	if (reg & IDR5_GRAN16K)
+-		pgsize_bitmap |= SZ_16K | SZ_32M;
++		smmu->pgsize_bitmap |= SZ_16K | SZ_32M;
+ 	if (reg & IDR5_GRAN4K)
+-		pgsize_bitmap |= SZ_4K | SZ_2M | SZ_1G;
++		smmu->pgsize_bitmap |= SZ_4K | SZ_2M | SZ_1G;
  
-diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
-index fc48103..8443bbb 100644
---- a/include/linux/dma-iommu.h
-+++ b/include/linux/dma-iommu.h
-@@ -38,8 +38,8 @@ int dma_direction_to_prot(enum dma_data_direction dir, bool coherent);
-  * These implement the bulk of the relevant DMA mapping callbacks, but require
-  * the arch code to take care of attributes and cache maintenance
-  */
--struct page **iommu_dma_alloc(struct device *dev, size_t size,
--		gfp_t gfp, int prot, dma_addr_t *handle,
-+struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
-+		struct dma_attrs *attrs, int prot, dma_addr_t *handle,
- 		void (*flush_page)(struct device *, const void *, phys_addr_t));
- void iommu_dma_free(struct device *dev, struct page **pages, size_t size,
- 		dma_addr_t *handle);
+-	arm_smmu_ops.pgsize_bitmap &= pgsize_bitmap;
++	if (arm_smmu_ops.pgsize_bitmap == -1UL)
++		arm_smmu_ops.pgsize_bitmap = smmu->pgsize_bitmap;
++	else
++		arm_smmu_ops.pgsize_bitmap |= smmu->pgsize_bitmap;
+ 
+ 	/* Output address size */
+ 	switch (reg & IDR5_OAS_MASK << IDR5_OAS_SHIFT) {
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 2409e3b..e9535f0 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -322,6 +322,7 @@ struct arm_smmu_device {
+ 	unsigned long			va_size;
+ 	unsigned long			ipa_size;
+ 	unsigned long			pa_size;
++	unsigned long			pgsize_bitmap;
+ 
+ 	u32				num_global_irqs;
+ 	u32				num_context_irqs;
+@@ -357,8 +358,6 @@ struct arm_smmu_domain {
+ 	struct iommu_domain		domain;
+ };
+ 
+-static struct iommu_ops arm_smmu_ops;
+-
+ static DEFINE_SPINLOCK(arm_smmu_devices_lock);
+ static LIST_HEAD(arm_smmu_devices);
+ 
+@@ -894,7 +893,7 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
+ 	}
+ 
+ 	pgtbl_cfg = (struct io_pgtable_cfg) {
+-		.pgsize_bitmap	= arm_smmu_ops.pgsize_bitmap,
++		.pgsize_bitmap	= smmu->pgsize_bitmap,
+ 		.ias		= ias,
+ 		.oas		= oas,
+ 		.tlb		= &arm_smmu_gather_ops,
+@@ -908,8 +907,8 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
+ 		goto out_clear_smmu;
+ 	}
+ 
+-	/* Update our support page sizes to reflect the page table format */
+-	arm_smmu_ops.pgsize_bitmap = pgtbl_cfg.pgsize_bitmap;
++	/* Update the domain's page sizes to reflect the page table format */
++	domain->pgsize_bitmap = pgtbl_cfg.pgsize_bitmap;
+ 
+ 	/* Initialise the context bank with our page table cfg */
+ 	arm_smmu_init_context_bank(smmu_domain, &pgtbl_cfg);
+@@ -1690,24 +1689,27 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
+ 
+ 	if (smmu->version == ARM_SMMU_V1) {
+ 		smmu->va_size = smmu->ipa_size;
+-		size = SZ_4K | SZ_2M | SZ_1G;
++		smmu->pgsize_bitmap = SZ_4K | SZ_2M | SZ_1G;
+ 	} else {
+ 		size = (id >> ID2_UBS_SHIFT) & ID2_UBS_MASK;
+ 		smmu->va_size = arm_smmu_id_size_to_bits(size);
+ #ifndef CONFIG_64BIT
+ 		smmu->va_size = min(32UL, smmu->va_size);
+ #endif
+-		size = 0;
+ 		if (id & ID2_PTFS_4K)
+-			size |= SZ_4K | SZ_2M | SZ_1G;
++			smmu->pgsize_bitmap |= SZ_4K | SZ_2M | SZ_1G;
+ 		if (id & ID2_PTFS_16K)
+-			size |= SZ_16K | SZ_32M;
++			smmu->pgsize_bitmap |= SZ_16K | SZ_32M;
+ 		if (id & ID2_PTFS_64K)
+-			size |= SZ_64K | SZ_512M;
++			smmu->pgsize_bitmap |= SZ_64K | SZ_512M;
+ 	}
+ 
+-	arm_smmu_ops.pgsize_bitmap &= size;
+-	dev_notice(smmu->dev, "\tSupported page sizes: 0x%08lx\n", size);
++	if (arm_smmu_ops.pgsize_bitmap == -1UL)
++		arm_smmu_ops.pgsize_bitmap = smmu->pgsize_bitmap;
++	else
++		arm_smmu_ops.pgsize_bitmap |= smmu->pgsize_bitmap;
++	dev_notice(smmu->dev, "\tSupported page sizes: 0x%08lx\n",
++		   smmu->pgsize_bitmap);
+ 
+ 	if (smmu->features & ARM_SMMU_FEAT_TRANS_S1)
+ 		dev_notice(smmu->dev, "\tStage-1: %lu-bit VA -> %lu-bit IPA\n",
 -- 
 2.7.3.dirty
