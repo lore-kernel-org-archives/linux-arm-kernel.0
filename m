@@ -1,85 +1,30 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 07 Apr 2016 11:51:22 -0700
-Subject: [PATCH v6 0/2] Fix dma mapping when the cache is coherent
-In-Reply-To: <CAPv3WKfKJS4WEVNJBHu3063kFkMBEdqUgb5mSpQYyeN1pL5_QQ@mail.gmail.com>
- (Marcin Wojtas's message of "Fri, 1 Apr 2016 15:01:06 +0200")
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 7 Apr 2016 19:57:04 +0100
+Subject: [PATCH v6 1/2] ARM: dma-mapping: Don't use outer_flush_range
+ when the L2C is coherent
+In-Reply-To: <1459415380-18004-2-git-send-email-gregory.clement@free-electrons.com>
 References: <1459415380-18004-1-git-send-email-gregory.clement@free-electrons.com>
- <CAPv3WKfKJS4WEVNJBHu3063kFkMBEdqUgb5mSpQYyeN1pL5_QQ@mail.gmail.com>
-Message-ID: <87d1q1jlqt.fsf@free-electrons.com>
+ <1459415380-18004-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20160407185704.GH19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
- 
- On ven., avril 01 2016, Marcin Wojtas <mw@semihalf.com> wrote:
+On Thu, Mar 31, 2016 at 11:09:39AM +0200, Gregory CLEMENT wrote:
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index deac58d5f1f7..1538bb293e90 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -61,7 +61,7 @@ struct arm_dma_free_args {
+>  
+>  struct arm_dma_allocator {
+>  	void *(*alloc)(struct arm_dma_alloc_args *args,
+> -		       struct page **ret_page);
+> +		       struct page **ret_page, bool is_coherent);
 
-> Hi Gregory,
->
-> With the patches an issue with SoC hang in under-stress MTU change
-> test of network is no longer a problem. If you wish you can add:
->
-> Tested-by: Marcin Wojtas <mw@semihalf.com>
-
-I submitted both patches to Russell King's Patch Tracking System.
-
-Thanks,
-
-Gregory
-
->
-> Best regards,
-> Marcin
->
-> 2016-03-31 11:09 GMT+02:00 Gregory CLEMENT <gregory.clement@free-electrons.com>:
->> Hi,
->>
->> These two patches fixes the dma mapping functions when the system is
->> cache coherent. The first one allows to fix an issue we have on Armada
->> 375/38x with the PL310 that's why it is tagged for stable too.
->>
->> I didn't got any feedback on the fifth version 5 monthsago, and then I
->> forgot to submit it to Russell patch system. In the meantime, there
->> was many changes in the arch/arm/mm/dma-mapping.c file. So I had to
->> rework the patch that's why I removed the reviewed flag from Catalin.
->>
->> The last version was posted here:
->> http://thread.gmane.org/gmane.linux.ports.arm.kernel/446603
->>
->> Thanks,
->>
->> Gregory
->>
->> Changelog
->> v5 -> v6:
->>  - Rebased on v4.6-rc1
->>
->> v4 -> v5
->>  - Keep the dmac_* function outside the !is_coherent case.
->>
->> v3 -> v4:
->>  - Rebased on v4.3-rc1
->>  - Fix conflict with commit "21caf3a765b0 ARM: 8398/1: arm DMA: Fix
->>    allocation from CMA for coherent DMA"
->>
->> v2 -> v3:
->>
->>  - Fix comments in patch 1 as suggested by Catalin.
->>  - Fix build issues in patch 2 (by using the multi_v7_defconfig +
->>    CONFIG_ROCKCHIP_IOMMU).
->>  - Add the arm_coherent_iommu_mmap_attrs function.
->> Gregory CLEMENT (2):
->>   ARM: dma-mapping: Don't use outer_flush_range when the L2C is coherent
->>   ARM: dma-mapping: Fix the coherent case when iommu is used
->>
->>  arch/arm/mm/dma-mapping.c | 144 ++++++++++++++++++++++++++++++++--------------
->>  1 file changed, 101 insertions(+), 43 deletions(-)
->>
->> --
->> 2.5.0
->>
+This should be named "l2_coherent" because it controls whether L2
+cache flushing is done: L1 cache flushing calls are still present.
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
