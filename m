@@ -1,42 +1,54 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu,  7 Apr 2016 14:20:19 +0200
-Subject: [PATCH v4 02/11] soc: renesas: rcar-sysc: Improve rcar_sysc_power()
- debug info
+Date: Thu,  7 Apr 2016 14:20:21 +0200
+Subject: [PATCH v4 04/11] soc: renesas: rcar-sysc: Make
+ rcar_sysc_power_is_off() static
 In-Reply-To: <1460031628-13336-1-git-send-email-geert+renesas@glider.be>
 References: <1460031628-13336-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1460031628-13336-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <1460031628-13336-5-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Print requested power domain state.
+As of commit b12ff41658171f53 ("ARM: shmobile: r8a7779: Remove legacy PM
+Domain remainings"), rcar_sysc_power_is_off() is no longer used from
+SoC-specific code.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
 v4:
-  - No changes,
-
-v3:
   - Add Reviewed-by,
 
-v2:
+v3:
   - New.
 ---
- drivers/soc/renesas/rcar-sysc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/soc/renesas/rcar-sysc.c       | 2 +-
+ include/linux/soc/renesas/rcar-sysc.h | 1 -
+ 2 files changed, 1 insertion(+), 2 deletions(-)
 
 diff --git a/drivers/soc/renesas/rcar-sysc.c b/drivers/soc/renesas/rcar-sysc.c
-index d59bcdf78f0b56ba..9ba5fd15c53bf9b9 100644
+index 3cb19b599cee4ee5..bdab8ac6803300e7 100644
 --- a/drivers/soc/renesas/rcar-sysc.c
 +++ b/drivers/soc/renesas/rcar-sysc.c
-@@ -128,7 +128,7 @@ static int rcar_sysc_power(const struct rcar_sysc_ch *sysc_ch, bool on)
-  out:
- 	spin_unlock_irqrestore(&rcar_sysc_lock, flags);
- 
--	pr_debug("sysc power domain %d: %08x -> %d\n",
-+	pr_debug("sysc power %s domain %d: %08x -> %d\n", on ? "on" : "off",
- 		 sysc_ch->isr_bit, ioread32(rcar_sysc_base + SYSCISR), ret);
- 	return ret;
+@@ -154,7 +154,7 @@ int rcar_sysc_power_up(const struct rcar_sysc_ch *sysc_ch)
+ 	return rcar_sysc_power(sysc_ch, true);
  }
+ 
+-bool rcar_sysc_power_is_off(const struct rcar_sysc_ch *sysc_ch)
++static bool rcar_sysc_power_is_off(const struct rcar_sysc_ch *sysc_ch)
+ {
+ 	unsigned int st;
+ 
+diff --git a/include/linux/soc/renesas/rcar-sysc.h b/include/linux/soc/renesas/rcar-sysc.h
+index 96f30c2883881d97..92fc613ab23db091 100644
+--- a/include/linux/soc/renesas/rcar-sysc.h
++++ b/include/linux/soc/renesas/rcar-sysc.h
+@@ -11,7 +11,6 @@ struct rcar_sysc_ch {
+ 
+ int rcar_sysc_power_down(const struct rcar_sysc_ch *sysc_ch);
+ int rcar_sysc_power_up(const struct rcar_sysc_ch *sysc_ch);
+-bool rcar_sysc_power_is_off(const struct rcar_sysc_ch *sysc_ch);
+ void __iomem *rcar_sysc_init(phys_addr_t base);
+ 
+ #endif /* __LINUX_SOC_RENESAS_RCAR_SYSC_H__ */
 -- 
 1.9.1
