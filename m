@@ -1,36 +1,54 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 7 Apr 2016 14:32:30 -0700
-Subject: 4.4, 4.6: camera and unlock buttons produce tons of interrupts
- (was Re: N900 sleep mode)
-In-Reply-To: <20160407194828.GA13338@amd>
-References: <20160209172403.GK19432@atomide.com> <20160323123801.GC32031@amd>
- <20160330191208.GW9329@atomide.com> <20160404213056.GA25912@amd>
- <20160404220748.GA16484@atomide.com> <20160405142250.GA6429@amd>
- <20160405152916.GE16484@atomide.com> <20160405205137.GA10196@amd>
- <20160407174019.GM16484@atomide.com> <20160407194828.GA13338@amd>
-Message-ID: <20160407213229.GO16484@atomide.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 7 Apr 2016 16:41:08 -0500
+Subject: [PATCH 2/2] pci, acpi: free IO resource during shutdown
+In-Reply-To: <57069CAF.8090803@codeaurora.org>
+References: <1457389310-3538-1-git-send-email-okaya@codeaurora.org>
+ <1457389310-3538-2-git-send-email-okaya@codeaurora.org>
+ <20160407160624.GB8780@localhost> <57069CAF.8090803@codeaurora.org>
+Message-ID: <20160407214108.GB24492@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pavel Machek <pavel@ucw.cz> [160407 12:49]:
+On Thu, Apr 07, 2016 at 01:45:19PM -0400, Sinan Kaya wrote:
+> On 4/7/2016 12:06 PM, Bjorn Helgaas wrote:
+> >> __release_pci_root_info function if the region type is IO.
+> > I don't know what "removing a slot" means.  You're changing
+> > pci_root.c, so I assume this is really an ACPI host bridge removal?
+> > 
 > 
-> gzipped config is attached.
+> Correct, I'm removing the host bridge.
 > 
-> Note that I'm still using NOLO. I enabled the sleep, then went to
-> runlevel 1. LEDs still stay on, 55mA power consumption. That was with
-> 1 in off_mode.
+> > The release should correspond to a mapping, and the changelog should
+> > point out where that mapping happens so we can see the symmetry.
+> > 
+> 
+> I apologize. This is based on Tomasz's v5 patch here.
+> 
+> https://github.com/semihalf-nowicki-tomasz/linux/blob/pci-acpi-v5/drivers/acpi/pci_root.c
+> 
+> 
+> > You say this is undoing the effect of pci_remap_iospace(), but that's
+> > only called by native drivers and the generic (OF) driver, not by
+> > pci_root.c.
+> 
+> See the ACPI root bridge driver above.
 
-Nothing idling for me with your .config.. And it seems slower to boot
-compared to omap2plus_defconfig? Maybe because of the extra GPIO
-interrupts?
+If this is a fix to patches that haven't been merged yet, we need to
+squash the fix into the patches.
 
-Looks like you have 117 additional entries in .config enabled compared
-to omap2plus_defconfig. Maybe go back to omap2plus_defconfig with minimal
-changes and verify it idles properly first?
+> > Please combine this with the previous patch so we have the new
+> > function and its use in the same patch.
+> 
+> I can do that. I was trying to keep the reviews as small as possible.
 
-I'm suspecting it's some driver(s) you have enabled causing the
-issue.
+The object is not to make patches as small as possible.  The object is
+to make them easy to review, merge, bisect, revert, and backport.  If
+we're adding something new and it's called by many arches or many
+drivers, we might have to split it up for merging through several
+trees or so we can revert pieces independently.  But here there's only
+one caller and I don't think we get any benefit from splitting it.
 
-Regards,
+But I guess this is all moot since it should be squashed into whatever
+added the pci_remap_iospace() in the first place.
 
-Tony
+Bjorn
