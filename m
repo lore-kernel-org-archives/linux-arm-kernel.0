@@ -1,111 +1,128 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Thu, 07 Apr 2016 09:00:50 +0200
-Subject: [PATCH] ARM: dts: r8a7791: Don't disable referenced optional
- clocks
-In-Reply-To: <57059874.1070309@cogentembedded.com>
-References: <1459947173-6664-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <57059874.1070309@cogentembedded.com>
-Message-ID: <1460012450.13819.38.camel@collabora.co.uk>
+From: pc.liao@mediatek.com (PC Liao)
+Date: Thu, 7 Apr 2016 15:35:17 +0800
+Subject: [PATCH v3] ASoC: mediatek: Add second I2S on mt8173-rt5650 machine
+ driver
+Message-ID: <1460014517-20359-1-git-send-email-pc.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Sergei,
+This patch adds second I2S connection to rt5650 codec for capture path on
+mt8173-rt5650 machine driver.
 
-Thanks for your review.
+Signed-off-by: PC Liao <pc.liao@mediatek.com>
+---
+Changes since v2:
+Use sound-dai to determine the capture path.
+---
+ .../devicetree/bindings/sound/mt8173-rt5650.txt    |    6 +++
+ sound/soc/mediatek/mt8173-rt5650.c                 |   42 ++++++++++++++++++--
+ 2 files changed, 44 insertions(+), 4 deletions(-)
 
-On Thu, 2016-04-07 at 02:15 +0300, Sergei Shtylyov wrote:
-> On 04/06/2016 03:52 PM, Sjoerd Simons wrote:
-> 
-> > 
-> > clk_get on a disabled clock node will return EPROBE_DEFER, which
-> > can
-> > cause drivers to be deferred forever if such clocks are referenced
-> > in
-> > their clocks property.
-> > 
-> > Update the various disabled external clock nodes to default to a
-> > frequency of 0, but don't disable them to prevent this.
-> > 
-> > Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-> > 
-> > ---
-> > 
-> > ? arch/arm/boot/dts/r8a7791-koelsch.dts | 1 +
-> > ? arch/arm/boot/dts/r8a7791-porter.dts??| 1 +
-> > ? arch/arm/boot/dts/r8a7791.dtsi????????| 5 +----
-> > ? 3 files changed, 3 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts
-> > b/arch/arm/boot/dts/r8a7791-koelsch.dts
-> > index 1adf877..da59c28 100644
-> > --- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-> > +++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-> > @@ -660,6 +660,7 @@
-> > ? };
-> > 
-> > ? &pcie_bus_clk {
-> > +	clock-frequency = <100000000>;
-> ????Hmmm, looking at the Koelsch schematics, I don't see this clock.
-> :-/
-
-I don't have the schematics so i was simply keeping the current state.
-I've added Phil Edworthy to the list as he was the one originally
-enable the bus clk for Koelsh according to git. Hopefully he can
-clarify :)
-
-> > ??	status = "okay";
-> > ? };
-> > 
-> > diff --git a/arch/arm/boot/dts/r8a7791-porter.dts
-> > b/arch/arm/boot/dts/r8a7791-porter.dts
-> > index 9554d13..19b257e 100644
-> > --- a/arch/arm/boot/dts/r8a7791-porter.dts
-> > +++ b/arch/arm/boot/dts/r8a7791-porter.dts
-> > @@ -413,6 +413,7 @@
-> > ? };
-> > 
-> > ? &pcie_bus_clk {
-> > +	clock-frequency = <100000000>;
-> > ??	status = "okay";
-> > ? };
-> > 
-> ????Again, looking at the Porter schematics, I don't see this clock
-> either. :-/
-
-You were the one enabling this clock for Porter ;) I don't have PCIE
-hardware to test with on my porter board, might be worth if you could
-disable this clock and see if PCI-E still fucntions as expected (maybe
-in practise it just happens to prefer the internal clock?) ?
-
-> > 
-> > diff --git a/arch/arm/boot/dts/r8a7791.dtsi
-> > b/arch/arm/boot/dts/r8a7791.dtsi
-> > index 8693888..676df63 100644
-> > --- a/arch/arm/boot/dts/r8a7791.dtsi
-> > +++ b/arch/arm/boot/dts/r8a7791.dtsi
-> > @@ -1104,8 +1104,7 @@
-> > ??		pcie_bus_clk: pcie_bus {
-> > ??			compatible = "fixed-clock";
-> > ??			#clock-cells = <0>;
-> > -			clock-frequency = <100000000>;
-> > -			status = "disabled";
-> > +			clock-frequency = <0>;
-> ????If the clock has a good default frequency, I don't think you need
-> to?
-> remove it. Otherwise you missed USB_EXTAL which is 48 MHz (and can be
-> overridden).
-
-I did that as it was by default disabled, so if i do enable it but
-don't drop the default frequency to 0 board swithout that clock will
-suddenly have it added to their dtb.
-
-For the usb external clock I didn't touch it as it was already enabled
-by default with a proper frequency, so it wouldn't hit the issue i was
-trying to fix here. But i agree, both looking at other Renesas dtsis
-and how all other external clocks are done in this dtsi, this node is
-odd.
-
-
+diff --git a/Documentation/devicetree/bindings/sound/mt8173-rt5650.txt b/Documentation/devicetree/bindings/sound/mt8173-rt5650.txt
+index fe5a5ef..4ed768e 100644
+--- a/Documentation/devicetree/bindings/sound/mt8173-rt5650.txt
++++ b/Documentation/devicetree/bindings/sound/mt8173-rt5650.txt
+@@ -5,11 +5,17 @@ Required properties:
+ - mediatek,audio-codec: the phandles of rt5650 codecs
+ - mediatek,platform: the phandle of MT8173 ASoC platform
+ 
++Optional properties:
++- sound-dai: audio codec dai on capture path
++  <&rt5650 0> : Default setting. Connect rt5650 I2S1 for capture. (dai_name = rt5645-aif1)
++  <&rt5650 1> : Connect rt5650 I2S2 for capture. (dai_name = rt5645-aif2)
++
+ Example:
+ 
+ 	sound {
+ 		compatible = "mediatek,mt8173-rt5650";
+ 		mediatek,audio-codec = <&rt5650>;
+ 		mediatek,platform = <&afe>;
++		sound-dai = <&rt5650 1>;
+ 	};
+ 
+diff --git a/sound/soc/mediatek/mt8173-rt5650.c b/sound/soc/mediatek/mt8173-rt5650.c
+index bb09bb1..9f56df9 100644
+--- a/sound/soc/mediatek/mt8173-rt5650.c
++++ b/sound/soc/mediatek/mt8173-rt5650.c
+@@ -85,12 +85,26 @@ static int mt8173_rt5650_init(struct snd_soc_pcm_runtime *runtime)
+ {
+ 	struct snd_soc_card *card = runtime->card;
+ 	struct snd_soc_codec *codec = runtime->codec_dais[0]->codec;
++	const char *codec_dai_capture = runtime->codec_dais[1]->name;
+ 	int ret;
+ 
+ 	rt5645_sel_asrc_clk_src(codec,
+-				RT5645_DA_STEREO_FILTER |
+-				RT5645_AD_STEREO_FILTER,
+-				RT5645_CLK_SEL_I2S1_ASRC);
++					RT5645_DA_STEREO_FILTER,
++					RT5645_CLK_SEL_I2S1_ASRC);
++
++	if (!strcmp(codec_dai_capture, "rt5645-aif1")) {
++		rt5645_sel_asrc_clk_src(codec,
++					RT5645_AD_STEREO_FILTER,
++					RT5645_CLK_SEL_I2S1_ASRC);
++	} else if (!strcmp(codec_dai_capture, "rt5645-aif2")) {
++		rt5645_sel_asrc_clk_src(codec,
++					RT5645_AD_STEREO_FILTER,
++					RT5645_CLK_SEL_I2S2_ASRC);
++	} else {
++		dev_err(card->dev, "Can't get the right codec dai\n");
++		return -EINVAL;
++	}
++
+ 	/* enable jack detection */
+ 	ret = snd_soc_card_jack_new(card, "Headset Jack",
+ 				    SND_JACK_HEADPHONE | SND_JACK_MICROPHONE |
+@@ -110,6 +124,11 @@ static int mt8173_rt5650_init(struct snd_soc_pcm_runtime *runtime)
+ 
+ static struct snd_soc_dai_link_component mt8173_rt5650_codecs[] = {
+ 	{
++		/* Playback */
++		.dai_name = "rt5645-aif1",
++	},
++	{
++		/* Capture */
+ 		.dai_name = "rt5645-aif1",
+ 	},
+ };
+@@ -149,7 +168,7 @@ static struct snd_soc_dai_link mt8173_rt5650_dais[] = {
+ 		.cpu_dai_name = "I2S",
+ 		.no_pcm = 1,
+ 		.codecs = mt8173_rt5650_codecs,
+-		.num_codecs = 1,
++		.num_codecs = 2,
+ 		.init = mt8173_rt5650_init,
+ 		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
+ 			   SND_SOC_DAIFMT_CBS_CFS,
+@@ -177,6 +196,7 @@ static int mt8173_rt5650_dev_probe(struct platform_device *pdev)
+ {
+ 	struct snd_soc_card *card = &mt8173_rt5650_card;
+ 	struct device_node *platform_node;
++	const char *codec_dai_capture;
+ 	int i, ret;
+ 
+ 	platform_node = of_parse_phandle(pdev->dev.of_node,
+@@ -199,6 +219,20 @@ static int mt8173_rt5650_dev_probe(struct platform_device *pdev)
+ 			"Property 'audio-codec' missing or invalid\n");
+ 		return -EINVAL;
+ 	}
++	mt8173_rt5650_codecs[1].of_node = mt8173_rt5650_codecs[0].of_node;
++
++	if (device_property_present(&pdev->dev, "sound-dai")) {
++		ret = snd_soc_of_get_dai_name(pdev->dev.of_node,
++					      &codec_dai_capture);
++		if (ret < 0) {
++			dev_err(&pdev->dev,
++				"%s snd_soc_of_get_dai_name fail %d\n",
++				__func__, ret);
++			return ret;
++		}
++		mt8173_rt5650_codecs[1].dai_name = codec_dai_capture;
++	}
++
+ 	card->dev = &pdev->dev;
+ 	platform_set_drvdata(pdev, card);
+ 
 -- 
-Sjoerd Simons
-Collabora Ltd.
+1.7.9.5
