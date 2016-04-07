@@ -1,26 +1,87 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Thu, 7 Apr 2016 16:23:15 +0800
-Subject: [PATCH v2 0/2] Add Hisilicon Random Number Generator(RNG) support
-Message-ID: <1460017397-30996-1-git-send-email-wangkefeng.wang@huawei.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 7 Apr 2016 11:23:25 +0300
+Subject: [PATCH] extcon: usb-gpio: switch to use pm wakeirq apis
+In-Reply-To: <1459963957-21883-1-git-send-email-grygorii.strashko@ti.com>
+References: <1459963957-21883-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <570618FD.8030602@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset add the Hisilicon Random Number Generator(RNG) support.
+On 06/04/16 20:32, Grygorii Strashko wrote:
+> Switch to use PM wakeirq APIs which automates wakeup IRQs
+> enabling/disabling and so allows to make code simpler.
+> 
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 
-Changes since v1:
-- Rename compatible name from "hisilicon,hisi-rng" to "hisilicon,rng"
+Acked-by: Roger Quadros <rogerq@ti.com>
 
-Kefeng Wang (2):
-  dt/bindings: Add bindings for hisilicon random number generator
-  hwrng: hisi: Add support for Hisilicon SoC RNG
+cheers,
+-roger
 
- Documentation/devicetree/bindings/rng/hisi-rng.txt |  12 ++
- drivers/char/hw_random/Kconfig                     |  13 +++
- drivers/char/hw_random/Makefile                    |   1 +
- drivers/char/hw_random/hisi-rng.c                  | 121 +++++++++++++++++++++
- 4 files changed, 147 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/rng/hisi-rng.txt
- create mode 100644 drivers/char/hw_random/hisi-rng.c
-
--- 
-2.6.0.GIT
+> ---
+> Unfortunately this simple patch depends on:
+> "[RFC PATCH] PM / wakeirq: fix wakeirq setting after wakup re-configuration from sysfs"
+> https://lkml.org/lkml/2016/4/6/296
+> 
+>  drivers/extcon/extcon-usb-gpio.c | 19 ++++++-------------
+>  1 file changed, 6 insertions(+), 13 deletions(-)
+> 
+> diff --git a/drivers/extcon/extcon-usb-gpio.c b/drivers/extcon/extcon-usb-gpio.c
+> index 2b2fecf..bc61d11 100644
+> --- a/drivers/extcon/extcon-usb-gpio.c
+> +++ b/drivers/extcon/extcon-usb-gpio.c
+> @@ -24,6 +24,7 @@
+>  #include <linux/module.h>
+>  #include <linux/of_gpio.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/pm_wakeirq.h>
+>  #include <linux/slab.h>
+>  #include <linux/workqueue.h>
+>  
+> @@ -141,7 +142,8 @@ static int usb_extcon_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	platform_set_drvdata(pdev, info);
+> -	device_init_wakeup(dev, 1);
+> +	device_init_wakeup(dev, true);
+> +	dev_pm_set_wake_irq(dev, info->id_irq);
+>  
+>  	/* Perform initial detection */
+>  	usb_extcon_detect_cable(&info->wq_detcable.work);
+> @@ -155,6 +157,9 @@ static int usb_extcon_remove(struct platform_device *pdev)
+>  
+>  	cancel_delayed_work_sync(&info->wq_detcable);
+>  
+> +	dev_pm_clear_wake_irq(&pdev->dev);
+> +	device_init_wakeup(&pdev->dev, false);
+> +
+>  	return 0;
+>  }
+>  
+> @@ -164,12 +169,6 @@ static int usb_extcon_suspend(struct device *dev)
+>  	struct usb_extcon_info *info = dev_get_drvdata(dev);
+>  	int ret = 0;
+>  
+> -	if (device_may_wakeup(dev)) {
+> -		ret = enable_irq_wake(info->id_irq);
+> -		if (ret)
+> -			return ret;
+> -	}
+> -
+>  	/*
+>  	 * We don't want to process any IRQs after this point
+>  	 * as GPIOs used behind I2C subsystem might not be
+> @@ -185,12 +184,6 @@ static int usb_extcon_resume(struct device *dev)
+>  	struct usb_extcon_info *info = dev_get_drvdata(dev);
+>  	int ret = 0;
+>  
+> -	if (device_may_wakeup(dev)) {
+> -		ret = disable_irq_wake(info->id_irq);
+> -		if (ret)
+> -			return ret;
+> -	}
+> -
+>  	enable_irq(info->id_irq);
+>  
+>  	return ret;
+> 
