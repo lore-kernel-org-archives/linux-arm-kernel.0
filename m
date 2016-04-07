@@ -1,271 +1,242 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 7 Apr 2016 15:04:55 +0100
-Subject: [PATCH v4 05/12] KVM: arm64: introduce ITS emulation file with
- stub functions
-In-Reply-To: <1458958450-19662-6-git-send-email-andre.przywara@arm.com>
-References: <1458958450-19662-1-git-send-email-andre.przywara@arm.com>
- <1458958450-19662-6-git-send-email-andre.przywara@arm.com>
-Message-ID: <57066907.2020103@arm.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 7 Apr 2016 09:05:52 -0500
+Subject: [PATCH v2] PCI: designware: move remaining rc setup code to
+ dw_pcie_setup_rc()
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1ED44208@lhreml503-mbs>
+References: <1458128433-3020-1-git-send-email-jszhang@marvell.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ED40E52@lhreml503-mbs>
+ <20160407103734.55e72da7@xhacker>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ED43F95@lhreml503-mbs>
+ <20160407163443.291fbd49@xhacker>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ED44208@lhreml503-mbs>
+Message-ID: <20160407140551.GA2648@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/03/16 02:14, Andre Przywara wrote:
-> The ARM GICv3 ITS emulation code goes into a separate file, but
-> needs to be connected to the GICv3 emulation, of which it is an
-> option.
-> Introduce the skeleton with function stubs to be filled later.
-> Introduce the basic ITS data structure and initialize it, but don't
-> return any success yet, as we are not yet ready for the show.
+On Thu, Apr 07, 2016 at 10:06:45AM +0000, Gabriele Paoloni wrote:
+> Hi Jisheng
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  arch/arm64/kvm/Makefile            |  1 +
->  include/kvm/vgic/vgic.h            |  6 +++
->  include/linux/irqchip/arm-gic-v3.h |  1 +
->  virt/kvm/arm/vgic/its-emul.c       | 84 ++++++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic.h           | 14 +++++++
->  virt/kvm/arm/vgic/vgic_init.c      |  6 +++
->  virt/kvm/arm/vgic/vgic_mmio.c      | 18 ++++++--
->  7 files changed, 126 insertions(+), 4 deletions(-)
->  create mode 100644 virt/kvm/arm/vgic/its-emul.c
+> > -----Original Message-----
+> > From: Jisheng Zhang [mailto:jszhang at marvell.com]
+> > Sent: 07 April 2016 09:35
+> > To: Gabriele Paoloni
+> > Cc: jingoohan1 at gmail.com; pratyush.anand at gmail.com;
+> > bhelgaas at google.com; linux-pci at vger.kernel.org; linux-
+> > kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> > Subject: Re: [PATCH v2] PCI: designware: move remaining rc setup code
+> > to dw_pcie_setup_rc()
+> > 
+> > Hi Gabriele,
+> > 
+> > On Thu, 7 Apr 2016 08:20:28 +0000 Gabriele Paoloni wrote:
+> > 
+> > > Hi Jisheng
+> > >
+> > > Thanks for your reply
+> > >
+> > > > -----Original Message-----
+> > > > From: Jisheng Zhang [mailto:jszhang at marvell.com]
+> > > > Sent: 07 April 2016 03:38
+> > > > To: Gabriele Paoloni; jingoohan1 at gmail.com;
+> > pratyush.anand at gmail.com;
+> > > > bhelgaas at google.com
+> > > > Cc: linux-pci at vger.kernel.org; linux-kernel at vger.kernel.org; linux-
+> > arm-
+> > > > kernel at lists.infradead.org
+> > > > Subject: Re: [PATCH v2] PCI: designware: move remaining rc setup
+> > code
+> > > > to dw_pcie_setup_rc()
+> > > >
+> > > > Hi Gabriele,
+> > > >
+> > > > On Wed, 6 Apr 2016 14:50:29 +0000 Gabriele Paoloni wrote:
+> > > >
+> > > > > Hi, sorry to be late on this
+> > > > >
+> > > > > > -----Original Message-----
+> > > > > > From: linux-kernel-owner at vger.kernel.org [mailto:linux-kernel-
+> > > > > > owner at vger.kernel.org] On Behalf Of Jisheng Zhang
+> > > > > > Sent: 16 March 2016 11:41
+> > > > > > To: jingoohan1 at gmail.com; pratyush.anand at gmail.com;
+> > > > bhelgaas at google.com
+> > > > > > Cc: linux-pci at vger.kernel.org; linux-kernel at vger.kernel.org;
+> > linux-
+> > > > arm-
+> > > > > > kernel at lists.infradead.org; Jisheng Zhang
+> > > > > > Subject: [PATCH v2] PCI: designware: move remaining rc setup
+> > code
+> > > > to
+> > > > > > dw_pcie_setup_rc()
+> > > > > >
+> > > > > > dw_pcie_setup_rc(), as its name indicates, setups the RC. But
+> > > > current
+> > > > > > dw_pcie_host_init() also contains some necessary rc setup code.
+> > > > > >
+> > > > > > Another reason: the host may lost power during suspend to ram,
+> > the
+> > > > RC
+> > > > > > need to be re-setup after resume. The rc can't be correctly
+> > resumed
+> > > > > > without the rc setup code in dw_pcie_host_init().
+> > > > > >
+> > > > > > So this patch moves the code to dw_pcie_setup_rc() to address
+> > the
+> > > > above
+> > > > > > two issues. After this patch, each pcie designware driver users
+> > > > could
+> > > > > > call dw_pcie_setup_rc() to re-setup rc when resume back.
+> > > > >
+> > > > > I think this patch breaks the Hisilicon driver...
+> > > > >
+> > > > > Our driver performs linkup setup in UEFI therefore we do not call
+> > > > > dw_pcie_setup_rc(), we only call dw_pcie_host_init().
+> > > >
+> > > > Thanks for the information. So pcie-hisi rely on UEFI to do
+> > something
+> > > > similar
+> > > > in dw_pcie_setup_rc(), this comes to a common driver implement
+> > > > question: should
+> > > > linux device driver rely on bootloader to configure HW device?
+> > >
+> > > I don't see any issue with this...
+> > >
+> > > >
+> > > > Is it acceptable that pcie-hisi adds a call to dw_pcie_setup_rc()
+> > in
+> > > > hisi_add_pcie_port()?
+> > >
+> > > I don't think so...that would try to overwrite what is already set by
+> > > the bootloader; so it is wrong in principle and maybe it can lead to
+> > > undefined behaviours...
+> > 
+> > make sense! This commit is intend to re-setup the rc when waken from
+> > s2ram (in
+> > s2ram state, the host lost power)
+> > 
+> > I have no good solution but to introduce one function e.g
+> > dw_pcie_setup_rc_after_linkup(), then move related code from
+> > dw_pcie_host_init
+> > to it, then let my host driver resume hook to call.
+> > 
+> > Hi Pratyush, Jingoo and Bjorn etc.
+> > 
+> > any suggestions are appreciated!
 > 
-> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-> index 2f5d431..3bec10e 100644
-> --- a/arch/arm64/kvm/Makefile
-> +++ b/arch/arm64/kvm/Makefile
-> @@ -28,6 +28,7 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-v2.o
->  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-v3.o
->  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic_mmio.o
->  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic_kvm_device.o
-> +kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/its-emul.o
->  else
->  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic.o
->  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v2.o
-> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-> index 8ea5dd7..c79bed5 100644
-> --- a/include/kvm/vgic/vgic.h
-> +++ b/include/kvm/vgic/vgic.h
-> @@ -112,6 +112,11 @@ struct vgic_io_device {
->  	struct kvm_io_device dev;
+> What about:
+> 
+> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+> index a4cccd3..e461f5d 100644
+> --- a/drivers/pci/host/pcie-designware.c
+> +++ b/drivers/pci/host/pcie-designware.c
+> @@ -434,7 +434,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
+>  	struct platform_device *pdev = to_platform_device(pp->dev);
+>  	struct pci_bus *bus, *child;
+>  	struct resource *cfg_res;
+> -	u32 val;
+>  	int i, ret;
+>  	LIST_HEAD(res);
+>  	struct resource_entry *win;
+> @@ -544,25 +543,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
+>  	if (pp->ops->host_init)
+>  		pp->ops->host_init(pp);
+>  
+> -	/*
+> -	 * If the platform provides ->rd_other_conf, it means the platform
+> -	 * uses its own address translation component rather than ATU, so
+> -	 * we should not program the ATU here.
+> -	 */
+> -	if (!pp->ops->rd_other_conf)
+> -		dw_pcie_prog_outbound_atu(pp, PCIE_ATU_REGION_INDEX1,
+> -					  PCIE_ATU_TYPE_MEM, pp->mem_base,
+> -					  pp->mem_bus_addr, pp->mem_size);
+> -
+> -	dw_pcie_wr_own_conf(pp, PCI_BASE_ADDRESS_0, 4, 0);
+> -
+> -	/* program correct class for RC */
+> -	dw_pcie_wr_own_conf(pp, PCI_CLASS_DEVICE, 2, PCI_CLASS_BRIDGE_PCI);
+> -
+> -	dw_pcie_rd_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, &val);
+> -	val |= PORT_LOGIC_SPEED_CHANGE;
+> -	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
+> -
+>  	pp->root_bus_nr = pp->busn->start;
+>  	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+>  		bus = pci_scan_root_bus_msi(pp->dev, pp->root_bus_nr,
+> @@ -725,6 +705,29 @@ static struct pci_ops dw_pcie_ops = {
+>  	.write = dw_pcie_wr_conf,
 >  };
 >  
-> +struct vgic_its {
-> +	bool			enabled;
-> +	spinlock_t		lock;
-> +};
-> +
->  struct vgic_dist {
->  	bool			in_kernel;
->  	bool			ready;
-> @@ -153,6 +158,7 @@ struct vgic_dist {
->  	u64			*pendbaser;
->  
->  	bool			lpis_enabled;
-> +	struct vgic_its		its;
->  };
->  
->  struct vgic_v2_cpu_if {
-> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-> index d5d798b..a813c3e 100644
-> --- a/include/linux/irqchip/arm-gic-v3.h
-> +++ b/include/linux/irqchip/arm-gic-v3.h
-> @@ -177,6 +177,7 @@
->  #define GITS_CWRITER			0x0088
->  #define GITS_CREADR			0x0090
->  #define GITS_BASER			0x0100
-> +#define GITS_IDREGS_BASE		0xffd0
->  #define GITS_PIDR2			GICR_PIDR2
->  
->  #define GITS_TRANSLATER			0x10040
-> diff --git a/virt/kvm/arm/vgic/its-emul.c b/virt/kvm/arm/vgic/its-emul.c
-> new file mode 100644
-> index 0000000..49dd5e4
-> --- /dev/null
-> +++ b/virt/kvm/arm/vgic/its-emul.c
-> @@ -0,0 +1,84 @@
-> +/*
-> + * GICv3 ITS emulation
-> + *
-> + * Copyright (C) 2015 ARM Ltd.
-> + * Author: Andre Przywara <andre.przywara@arm.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/cpu.h>
-> +#include <linux/kvm.h>
-> +#include <linux/kvm_host.h>
-> +#include <linux/interrupt.h>
-> +
-> +#include <linux/irqchip/arm-gic-v3.h>
-> +
-> +#include <asm/kvm_emulate.h>
-> +#include <asm/kvm_arm.h>
-> +#include <asm/kvm_mmu.h>
-> +
-> +#include "vgic.h"
-> +#include "vgic_mmio.h"
-> +
-> +struct vgic_register_region its_registers[] = {
-> +	REGISTER_DESC_WITH_LENGTH(GITS_CTLR,
-> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 4),
-> +	REGISTER_DESC_WITH_LENGTH(GITS_IIDR,
-> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 4),
-> +	REGISTER_DESC_WITH_LENGTH(GITS_TYPER,
-> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 4),
-
-GITS_TYPER is a 64bit register with plenty of things in the upper bits.
-
-> +	REGISTER_DESC_WITH_LENGTH(GITS_CBASER,
-> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 8),
-> +	REGISTER_DESC_WITH_LENGTH(GITS_CWRITER,
-> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 8),
-> +	REGISTER_DESC_WITH_LENGTH(GITS_CREADR,
-> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 8),
-> +	REGISTER_DESC_WITH_LENGTH(GITS_BASER,
-> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 0x40),
-> +	REGISTER_DESC_WITH_LENGTH(GITS_IDREGS_BASE,
-> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 0x30),
-> +};
-> +
-> +/* This is called on setting the LPI enable bit in the redistributor. */
-> +void vgic_enable_lpis(struct kvm_vcpu *vcpu)
+> +void dw_pcie_setup_own_cfg(struct pcie_port *pp)
 > +{
+> +	u32 val;
+> +	/*
+> +	 * If the platform provides ->rd_other_conf, it means the platform
+> +	 * uses its own address translation component rather than ATU, so
+> +	 * we should not program the ATU here.
+> +	 */
+> +	if (!pp->ops->rd_other_conf)
+> +		dw_pcie_prog_outbound_atu(pp, PCIE_ATU_REGION_INDEX1,
+> +					  PCIE_ATU_TYPE_MEM, pp->mem_base,
+> +					  pp->mem_bus_addr, pp->mem_size);
+> +
+> +	dw_pcie_wr_own_conf(pp, PCI_BASE_ADDRESS_0, 4, 0);
+> +
+> +	/* program correct class for RC */
+> +	dw_pcie_wr_own_conf(pp, PCI_CLASS_DEVICE, 2, PCI_CLASS_BRIDGE_PCI);
+> +
+> +	dw_pcie_rd_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, &val);
+> +	val |= PORT_LOGIC_SPEED_CHANGE;
+> +	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
 > +}
 > +
-> +int vits_init(struct kvm *kvm)
-> +{
-> +	struct vgic_dist *dist = &kvm->arch.vgic;
-> +	struct vgic_its *its = &dist->its;
-> +	struct vgic_io_device *regions;
-> +	int ret, i;
-> +
-> +	spin_lock_init(&its->lock);
-> +
-> +	regions = kmalloc_array(ARRAY_SIZE(its_registers),
-> +				sizeof(struct vgic_io_device), GFP_KERNEL);
-> +
-> +	for (i = 0; i < ARRAY_SIZE(its_registers); i++) {
-> +		regions[i].base_addr = dist->vgic_its_base;
-> +
-> +		ret = kvm_vgic_register_mmio_region(kvm, NULL,
-> +						    &its_registers[i],
-> +						    &regions[i], 0, false);
-> +	}
-> +
-> +	if (ret)
-> +		return ret;
-> +
-> +	its->enabled = false;
-> +
-> +	return -ENXIO;
-> +}
-> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> index db9dfd7..4e7dcb8 100644
-> --- a/virt/kvm/arm/vgic/vgic.h
-> +++ b/virt/kvm/arm/vgic/vgic.h
-> @@ -60,6 +60,9 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu);
->  int vgic_v3_probe(struct device_node *vgic_node);
->  int vgic_v3_map_resources(struct kvm *kvm);
->  int vgic_register_redist_regions(struct kvm *kvm, gpa_t dist_base_address);
-> +
-> +int vits_init(struct kvm *kvm);
-> +void vgic_enable_lpis(struct kvm_vcpu *vcpu);
->  #else
->  static inline void vgic_v3_irq_change_affinity(struct kvm *kvm, u32 intid,
->  					       u64 mpidr)
-> @@ -124,6 +127,16 @@ static inline int vgic_register_redist_regions(struct kvm *kvm,
+>  void dw_pcie_setup_rc(struct pcie_port *pp)
 >  {
->  	return -ENODEV;
->  }
+>  	u32 val;
+> @@ -800,6 +803,8 @@ void dw_pcie_setup_rc(struct pcie_port *pp)
+>  	val |= PCI_COMMAND_IO | PCI_COMMAND_MEMORY |
+>  		PCI_COMMAND_MASTER | PCI_COMMAND_SERR;
+>  	dw_pcie_writel_rc(pp, val, PCI_COMMAND);
 > +
-> +int vits_init(struct kvm *kvm)
-> +{
-> +	return 0;
-> +}
-> +
-> +static inline void vgic_enable_lpis(struct kvm_vcpu *vcpu)
-> +{
-> +	return;
-> +}
->  #endif
->  
->  void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
-> @@ -131,6 +144,7 @@ void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
->  
->  int vgic_lazy_init(struct kvm *kvm);
->  int vgic_init(struct kvm *kvm);
-> +int vits_init(struct kvm *kvm);
->  void kvm_register_vgic_device(unsigned long type);
->  
->  #endif
-> diff --git a/virt/kvm/arm/vgic/vgic_init.c b/virt/kvm/arm/vgic/vgic_init.c
-> index 2301e03..dcfb93d 100644
-> --- a/virt/kvm/arm/vgic/vgic_init.c
-> +++ b/virt/kvm/arm/vgic/vgic_init.c
-> @@ -252,6 +252,12 @@ int vgic_init(struct kvm *kvm)
->  	if (ret)
->  		goto out;
->  
-> +	if (vgic_has_its(kvm)) {
-> +		ret = vits_init(kvm);
-> +		if (ret)
-> +			goto out;
-> +	}
-
-You can move the vgic_has_its() test inside vits_init().
-
-> +
->  	kvm_for_each_vcpu(i, vcpu, kvm)
->  		kvm_vgic_vcpu_init(vcpu);
->  
-> diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
-> index 252b9aff..086555e 100644
-> --- a/virt/kvm/arm/vgic/vgic_mmio.c
-> +++ b/virt/kvm/arm/vgic/vgic_mmio.c
-> @@ -726,16 +726,26 @@ static int vgic_mmio_read_v3r_misc(struct kvm_vcpu *vcpu,
->  				   struct kvm_io_device *this,
->  				   gpa_t addr, int len, void *val)
->  {
-> -	/* TODO: implement for ITS support */
-> -	return vgic_mmio_read_raz(vcpu, this, addr, len, val);
-> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> +	u32 reg = dist->lpis_enabled ? GICR_CTLR_ENABLE_LPIS : 0;
-> +
-> +	write_mask32(reg, addr & 3, len, val);
-> +	return 0;
+> +	dw_pcie_setup_own_cfg(pp);
 >  }
 >  
->  static int vgic_mmio_write_v3r_misc(struct kvm_vcpu *vcpu,
->  				    struct kvm_io_device *this,
->  				    gpa_t addr, int len, const void *val)
->  {
-> -	/* TODO: implement for ITS support */
-> -	return vgic_mmio_write_wi(vcpu, this, addr, len, val);
-> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> +	u32 reg = mask32(!!dist->lpis_enabled, addr & 3, len, val);
-> +
-> +	if (vgic_has_its(vcpu->kvm) && !dist->lpis_enabled &&
-> +	    (reg & GICR_CTLR_ENABLE_LPIS)) {
-> +		/* Eventually do something */
-> +	}
-> +
-> +	return 0;
->  }
+>  MODULE_AUTHOR("Jingoo Han <jg1.han@samsung.com>");
+> diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
+> index f437f9b..caf0f5d 100644
+> --- a/drivers/pci/host/pcie-designware.h
+> +++ b/drivers/pci/host/pcie-designware.h
+> @@ -85,5 +85,6 @@ int dw_pcie_wait_for_link(struct pcie_port *pp);
+>  int dw_pcie_link_up(struct pcie_port *pp);
+>  void dw_pcie_setup_rc(struct pcie_port *pp);
+>  int dw_pcie_host_init(struct pcie_port *pp);
+> +void dw_pcie_setup_own_cfg(struct pcie_port *pp);
 >  
->  static int vgic_mmio_read_v3r_iidr(struct kvm_vcpu *vcpu,
-> 
+>  #endif /* _PCIE_DESIGNWARE_H */
+> diff --git a/drivers/pci/host/pcie-hisi.c b/drivers/pci/host/pcie-hisi.c
+> index 3e98d4e..8da29b2 100644
+> --- a/drivers/pci/host/pcie-hisi.c
+> +++ b/drivers/pci/host/pcie-hisi.c
+> @@ -164,6 +164,7 @@ static int hisi_add_pcie_port(struct pcie_port *pp,
+>  		dev_err(&pdev->dev, "failed to initialize host\n");
+>  		return ret;
+>  	}
+> +	dw_pcie_setup_own_cfg(pp);
+>  
+>  	return 0;
+>  }
 
+What's the hisi plan for resuming after suspend-to-RAM?  How does the
+RC get reprogrammed after it loses all its state?
 
--- 
-Jazz is not dead. It just smells funny...
+What would break if hisi did call dw_pcie_setup_rc()?  I know you said
+it would overwrite what the bootloader already did, which is true.
+
+But hisi does call dw_pcie_host_init(), so it reads pp->mem (which
+determines pp->mem_base) and pp->lanes from the DT.  Other drivers
+then call dw_pcie_setup_rc() which programs the RC based on
+pp->mem_base and pp->lanes.  So hisi assumes UEFI programmed the RC to
+match the DT, while the other drivers read the DT and program the RC
+to match.  The latter seems more robust because it enforces the
+consistency rather than relying on it.
+
+Bjorn
