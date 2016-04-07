@@ -1,87 +1,121 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 08 Apr 2016 08:04:37 +0900
-Subject: [PATCH] extcon: usb-gpio: switch to use pm wakeirq apis
-In-Reply-To: <1459963957-21883-1-git-send-email-grygorii.strashko@ti.com>
-References: <1459963957-21883-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <5706E785.9020308@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 7 Apr 2016 16:16:04 -0700
+Subject: [PATCH] ARM: OMAP3: Fix imprecise external abort for off mode on
+ 36xx
+In-Reply-To: <5706C062.4040803@ti.com>
+References: <1455140107-3328-1-git-send-email-tony@atomide.com>
+ <5706C062.4040803@ti.com>
+Message-ID: <20160407231604.GP16484@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016? 04? 07? 02:32, Grygorii Strashko wrote:
-> Switch to use PM wakeirq APIs which automates wakeup IRQs
-> enabling/disabling and so allows to make code simpler.
+* Dave Gerlach <d-gerlach@ti.com> [160407 13:18]:
 > 
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> I have a series to convert omap3 PM code to using generic SRAM driver but
+> when testing I see an external abort on BBXM off mode resume very similar to
+> this that seems to be timing related caused by using generic SRAM driver to
+> re-copy PM code rather than omap3_sram_restore_context.
+> 
+> By tracing the resume path I believe the abort is caused by
+> omap3_intc_resume_idle in pm34xx.c, which writes to two registers in the
+> INTC. Removing this call makes the abort unreproducible in my experiments
+> and changing the writes to reads causes a bus lock, so I'm pretty confident
+> it's coming from this call attempting to write to an idled INTC.
+> 
+> Advisory 1.106 in DM3730 Silicon Errata Document [1] describes an issue with
+> "MPU Leaves MSTANDBY State Before IDLEREQ of Interrupt Controller is
+> Released" which sounds like a very similar failure situation to what we are
+> seeing even though the timing of INTC access is a bit further from WFI exit
+> than it describes. Perhaps there are more conditions where it can occur.
+> Pushed my WIP branch for SRAM series that shows the same failure here [2].
 
-Applied it.
+Interesting, I think you may have something with the errata 1.106.. And
+looks like we also need still errata 1.62 handled also on 36xx in the
+same pdf. And need to disable intc autoidle early at least for HS omaps
+as save_secure_ram context supposedly also can do WFI.
 
-Thanks,
-Chanwoo Choi
+Maybe something like the following would make sense? It seems to work
+here without external aborts with your test branch on dm3730, and boots
+fine on omap3430 hs (n900).
 
-> ---
-> Unfortunately this simple patch depends on:
-> "[RFC PATCH] PM / wakeirq: fix wakeirq setting after wakup re-configuration from sysfs"
-> https://lkml.org/lkml/2016/4/6/296
-> 
->  drivers/extcon/extcon-usb-gpio.c | 19 ++++++-------------
->  1 file changed, 6 insertions(+), 13 deletions(-)
-> 
-> diff --git a/drivers/extcon/extcon-usb-gpio.c b/drivers/extcon/extcon-usb-gpio.c
-> index 2b2fecf..bc61d11 100644
-> --- a/drivers/extcon/extcon-usb-gpio.c
-> +++ b/drivers/extcon/extcon-usb-gpio.c
-> @@ -24,6 +24,7 @@
->  #include <linux/module.h>
->  #include <linux/of_gpio.h>
->  #include <linux/platform_device.h>
-> +#include <linux/pm_wakeirq.h>
->  #include <linux/slab.h>
->  #include <linux/workqueue.h>
->  
-> @@ -141,7 +142,8 @@ static int usb_extcon_probe(struct platform_device *pdev)
->  	}
->  
->  	platform_set_drvdata(pdev, info);
-> -	device_init_wakeup(dev, 1);
-> +	device_init_wakeup(dev, true);
-> +	dev_pm_set_wake_irq(dev, info->id_irq);
->  
->  	/* Perform initial detection */
->  	usb_extcon_detect_cable(&info->wq_detcable.work);
-> @@ -155,6 +157,9 @@ static int usb_extcon_remove(struct platform_device *pdev)
->  
->  	cancel_delayed_work_sync(&info->wq_detcable);
->  
-> +	dev_pm_clear_wake_irq(&pdev->dev);
-> +	device_init_wakeup(&pdev->dev, false);
-> +
->  	return 0;
->  }
->  
-> @@ -164,12 +169,6 @@ static int usb_extcon_suspend(struct device *dev)
->  	struct usb_extcon_info *info = dev_get_drvdata(dev);
->  	int ret = 0;
->  
-> -	if (device_may_wakeup(dev)) {
-> -		ret = enable_irq_wake(info->id_irq);
-> -		if (ret)
-> -			return ret;
-> -	}
-> -
->  	/*
->  	 * We don't want to process any IRQs after this point
->  	 * as GPIOs used behind I2C subsystem might not be
-> @@ -185,12 +184,6 @@ static int usb_extcon_resume(struct device *dev)
->  	struct usb_extcon_info *info = dev_get_drvdata(dev);
->  	int ret = 0;
->  
-> -	if (device_may_wakeup(dev)) {
-> -		ret = disable_irq_wake(info->id_irq);
-> -		if (ret)
-> -			return ret;
-> -	}
-> -
->  	enable_irq(info->id_irq);
->  
->  	return ret;
-> 
+Or do you have some better ideas for a fix?
+
+Regards,
+
+Tony
+
+8< ------------------------
+From: Tony Lindgren <tony@atomide.com>
+Date: Thu, 7 Apr 2016 16:06:35 -0700
+Subject: [PATCH] ARM: OMAP3: Fix external abort on 36xx waking from off mode
+ idle
+
+Depending on the timings affected by .config options, we may get
+external aborts with 36xx. These seem to be caused by the following:
+
+- omap3 errata 1.62 "MPU Cannot Exit from Standby" says we need to
+  disable disable intc autoidle before WFI
+
+- dm3730 errata 1.106 "MPU Leaves MSTANDBY State Before IDLEREQ of
+  Interrupt Controller is Released" says we need to wait before
+  accessing intc
+
+Looks like we're currently disabling intc autoidle after we save
+the intc context. And then we attempt to re-enable intc autoidle
+after we restore intc context.
+
+This means we're trying to restore intc autoidle twice, and it
+occasionally fails as the intc restore may take a while for
+things to get configured?
+
+So we should either completely leave out omap3_intc_resume_idle()
+assuming that the context restore really also enables the intc
+autoidle.
+
+Or we can disable intc autoidle before saving context, and then
+reenable intc autoidle only after the context restore. This pairs
+the calls, can we can call omap3_intc_resume_idle() later to
+allow some time for intc to settle down.
+
+Note that supposedly save_secure_ram() also can cause a WFI
+in the secure ram code, so we need to disable intc autoidle
+early. There's some information about that in the old thread
+"[PATCH 09/13] OMAP3: PM: Apply errata i540 before save
+secure ram".
+
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -303,6 +303,8 @@ void omap_sram_idle(void)
+ 		omap2_gpio_prepare_for_idle(per_going_off);
+ 	}
+ 
++	omap3_intc_prepare_idle();
++
+ 	/* CORE */
+ 	if (core_next_state < PWRDM_POWER_ON) {
+ 		if (core_next_state == PWRDM_POWER_OFF) {
+@@ -314,8 +316,6 @@ void omap_sram_idle(void)
+ 	/* Configure PMIC signaling for I2C4 or sys_off_mode */
+ 	omap3_vc_set_pmic_signaling(core_next_state);
+ 
+-	omap3_intc_prepare_idle();
+-
+ 	/*
+ 	 * On EMU/HS devices ROM code restores a SRDC value
+ 	 * from scratchpad which has automatic self refresh on timeout
+@@ -358,13 +358,14 @@ void omap_sram_idle(void)
+ 			omap2_sms_restore_context();
+ 		}
+ 	}
+-	omap3_intc_resume_idle();
+ 
+ 	pwrdm_post_transition(NULL);
+ 
+ 	/* PER */
+ 	if (per_next_state < PWRDM_POWER_ON)
+ 		omap2_gpio_resume_after_idle();
++
++	omap3_intc_resume_idle();
+ }
+ 
+ static void omap3_pm_idle(void)
