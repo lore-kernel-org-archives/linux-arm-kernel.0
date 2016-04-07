@@ -1,62 +1,30 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Thu, 7 Apr 2016 07:24:48 -0500
-Subject: [PATCH 1/4] mailbox/omap: store mailbox interrupt type in
- omap_mbox_device
-In-Reply-To: <57063731.9010201@ti.com>
-References: <1459985840-1106-1-git-send-email-s-anna@ti.com>
- <1459985840-1106-2-git-send-email-s-anna@ti.com> <57063731.9010201@ti.com>
-Message-ID: <57065190.4050904@ti.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 7 Apr 2016 14:28:43 +0200
+Subject: [RFC6 PATCH v6 00/21] ILP32 for ARM64
+In-Reply-To: <20160406122924.GA21527@yury-N73SV>
+References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+ <CAMuHMdUUkaYVZ3-Jh6o1b++R=yFBg7siQt+A+TqqXRSa953CAw@mail.gmail.com>
+ <20160406122924.GA21527@yury-N73SV>
+Message-ID: <CAMuHMdVTw=UjRZqJZCj=OS4SzrFt22SVaC39ePYC_1THZzX1Fw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grygorii,
+On Wed, Apr 6, 2016 at 2:29 PM, Yury Norov <ynorov@caviumnetworks.com> wrote:
+>> We're already closer to the (future) y2038 than to the (past) introduction of
+>> LP64...
+>
+> This is not about Y2038 at all. In fact, current version doesn't fix
+> Y2038 problem, as we decided finally.
 
-On 04/07/2016 05:32 AM, Grygorii Strashko wrote:
-> On 04/07/2016 02:37 AM, Suman Anna wrote:
->> The interrupt type used for identifying the layout of the interrupt
->> configuration registers between OMAP4+ SoCs and older SoCs is stored
->> only in the sub-mailbox structures for easier access. Store this type
->> in the the omap_mbox_device structure as well along with the other
->> global variables. This is being done to facilitate the context save
->> and restore of appropriate registers during system suspend/resume.
->>
->> Signed-off-by: Suman Anna <s-anna@ti.com>
->> ---
->>   drivers/mailbox/omap-mailbox.c | 2 ++
->>   1 file changed, 2 insertions(+)
->>
->> diff --git a/drivers/mailbox/omap-mailbox.c
->> b/drivers/mailbox/omap-mailbox.c
->> index 84cafc02e761..adf37f494690 100644
->> --- a/drivers/mailbox/omap-mailbox.c
->> +++ b/drivers/mailbox/omap-mailbox.c
->> @@ -90,6 +90,7 @@ struct omap_mbox_device {
->>       void __iomem *mbox_base;
->>       u32 num_users;
->>       u32 num_fifos;
->> +    u32 intr_type;
->>       struct omap_mbox **mboxes;
->>       struct mbox_controller controller;
->>       struct list_head elem;
->> @@ -828,6 +829,7 @@ static int omap_mbox_probe(struct platform_device
->> *pdev)
->>       mdev->dev = &pdev->dev;
->>       mdev->num_users = num_users;
->>       mdev->num_fifos = num_fifos;
->> +    mdev->intr_type = intr_type;
->>       mdev->mboxes = list;
->>
->>       /* OMAP does not have a Tx-Done IRQ, but rather a Tx-Ready IRQ */
->>
-> 
-> This smth. which definitely has to be done using compatible props.
-> Why not to pass more info through of_device_id->data?
-> 
+Indeed. So these legacy applications have to be fixed later anyway.
 
-Yeah, that's already the case, intr_type is a local variable assigned
-from compatible match data. This patch merely caches it in the
-omap_mbox_device structure so that it can be leveraged by the PM
-callback functions in the next patch.
+Gr{oetje,eeting}s,
 
-regards
-Suman
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
