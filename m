@@ -1,31 +1,52 @@
-From: petr@barix.com (Petr Kulhavy)
-Date: Thu, 7 Apr 2016 17:05:07 +0200
-Subject: [PATCH 1/3] dt: davinci: use proper address after @
-In-Reply-To: <57066FC7.1030706@ti.com>
-References: <1459525325-25470-1-git-send-email-petr@barix.com>
- <1459525325-25470-2-git-send-email-petr@barix.com> <57066FC7.1030706@ti.com>
-Message-ID: <57067723.90808@barix.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 7 Apr 2016 22:59:02 +0800
+Subject: [LINUX PATCH v2 2/3] mtd:m25p80: Assigned number of dummy cycles
+ to dummy_cycles.
+In-Reply-To: <1460039969-9835-2-git-send-email-lakshmis@xilinx.com>
+Message-ID: <201604072216.DexSMTuF%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07.04.2016 16:33, Sekhar Nori wrote:
-> On Friday 01 April 2016 09:12 PM, Petr Kulhavy wrote:
->> From: David Lechner <david@lechnology.com>
->>
->> TI has been using the physical address in DT after the @ in device nodes.
->> The device tree convention is to use the same address that is used for
->> the reg property. This updates all davinci DT files to use the proper
->> convention.
->>
->> Signed-off-by: David Lechner <david@lechnology.com>
->> Acked-by: Rob Herring <robh@kernel.org>
-> Applied for v4.7. Fixed the subject prefix to "ARM: dts: davinci: " as
-> is the convention for device tree updates.
->
-> Regards,
-> Sekhar
->
-Thanks, Sekhar for applying the series.
+Hi L,
 
-Regards
-Petr
+[auto build test ERROR on spi/for-next]
+[also build test ERROR on v4.6-rc2 next-20160407]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+
+url:    https://github.com/0day-ci/linux/commits/P-L-Sai-Krishna/spi-Added-dummy_cycle-entry-in-the-spi_transfer-structure/20160407-225040
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi for-next
+config: x86_64-randconfig-x014-201614 (attached as .config)
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
+
+All errors (new ones prefixed by >>):
+
+   drivers/mtd/devices/m25p80.c: In function 'm25p80_read':
+>> drivers/mtd/devices/m25p80.c:142:6: error: 'struct spi_transfer' has no member named 'dummy'
+     t[0].dummy = nor->read_dummy;
+         ^
+
+vim +142 drivers/mtd/devices/m25p80.c
+
+   136	
+   137		flash->command[0] = nor->read_opcode;
+   138		m25p_addr2cmd(nor, from, flash->command);
+   139	
+   140		t[0].tx_buf = flash->command;
+   141		t[0].len = m25p_cmdsz(nor) + dummy;
+ > 142		t[0].dummy = nor->read_dummy;
+   143		spi_message_add_tail(&t[0], &m);
+   144	
+   145		t[1].rx_buf = buf;
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 24963 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160407/f1f74f04/attachment-0001.obj>
