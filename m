@@ -1,86 +1,63 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Thu, 7 Apr 2016 21:05:35 +0300
-Subject: [PATCH] i2c: designware-platdrv: get fast/std speed scl high/low
- count from DT
-In-Reply-To: <1459927680-5480-1-git-send-email-jszhang@marvell.com>
-References: <1459927680-5480-1-git-send-email-jszhang@marvell.com>
-Message-ID: <CAHp75VcHNdAUeob2iR6U1HbUQzEccdjPy8ffuG4mB_=ZX7EokQ@mail.gmail.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Thu, 7 Apr 2016 13:11:22 -0500
+Subject: [PATCH 1/2] qcom: ipq4019: Add regulator support to DK04 device
+ tree
+In-Reply-To: <20160407175736.GI32257@rob-hp-laptop>
+References: <1459804090-31739-1-git-send-email-ssambang@codeaurora.org>
+ <20160407175736.GI32257@rob-hp-laptop>
+Message-ID: <20160407181122.GA18396@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 6, 2016 at 10:28 AM, Jisheng Zhang <jszhang@marvell.com> wrote:
-> Sometimes, it's convenient to define the scl's high/low count directly,
-> e.g HW people would do some measurement then directly give out the
-> optimum counts. Previously, we solved the sda falling time and scl
-> falling time by i2c_dw_scl_hcnt() and i2c_dw_scl_lcnt(), then put them
-> into dt, but what we really care isn't the sda/scl falling time.
->
-> From another side, the dw_i2c_acpi_configure() on ACPI platform also
-> get hcnt/lcnt values rather than the sda/scl falling time from ACPI
-> method, we want similar feature for DT platforms.
->
+On Thu, Apr 07, 2016 at 12:57:36PM -0500, Rob Herring wrote:
+> On Mon, Apr 04, 2016 at 02:08:10PM -0700, Sreedhar Sambangi wrote:
+> >     This adds the regulator nodes to DK04 device tree to support
+> > 
+> > Change-Id: I9c1df0e720a330bf6db1889fd2247f6a70ea6faa
+> > Signed-off-by: Sreedhar Sambangi <ssambang@codeaurora.org>
+> > ---
+> >  .../bindings/regulator/ipq4019-regulator.txt          | 19 +++++++++++++++++++
+> >  arch/arm/boot/dts/qcom-ipq4019-ap.dk04.1.dtsi         | 11 +++++++++++
+> >  2 files changed, 30 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/regulator/ipq4019-regulator.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/regulator/ipq4019-regulator.txt b/Documentation/devicetree/bindings/regulator/ipq4019-regulator.txt
+> > new file mode 100644
+> > index 0000000..9d934a4
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/regulator/ipq4019-regulator.txt
+> > @@ -0,0 +1,19 @@
+> > +* Qualcomm Technologies, Inc. IPQ4019 regulators
+> > +
+> > +Required properties:
+> > +- compatible		: Must be "regulator-ipq4019".
+> 
+> Doesn't match your example which correctly has vendor prefix. Also, the 
+> preferred form is <vendor>,<soc>-<block>.
+> 
+> > +- states		: Selection of available voltages and corresponding values
+> 
+> Too generic of a name.
+> 
+> Is this not fixed by the h/w block?
 
-Instead of duplicating some words maybe better to explicitly define
-two groups of parameters and one which supersedes the other.
+I'd put this info in the driver itself.  I believe it has 4 fixed states.
 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> ---
->  Documentation/devicetree/bindings/i2c/i2c-designware.txt | 16 ++++++++++++++++
->  drivers/i2c/busses/i2c-designware-platdrv.c              |  8 ++++++++
->  2 files changed, 24 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/i2c/i2c-designware.txt b/Documentation/devicetree/bindings/i2c/i2c-designware.txt
-> index fee26dc..05176fbf 100644
-> --- a/Documentation/devicetree/bindings/i2c/i2c-designware.txt
-> +++ b/Documentation/devicetree/bindings/i2c/i2c-designware.txt
-> @@ -20,6 +20,22 @@ Optional properties :
->   - i2c-sda-falling-time-ns : should contain the SDA falling time in nanoseconds.
->     This value which is by default 300ns is used to compute the tHIGH period.
->
-> + - i2c-ss-scl-high-count : should contain the standard speed i2c clock SCL high
-> +   count. If defined, the i2c-scl-falling-time-ns and i2c-sda-falling-time-ns
-> +   will be ignored.
-> +
-> + - i2c-ss-scl-low-count : should contain the standard speed i2c clock SCL low
-> +   count. If defined, the i2c-scl-falling-time-ns and i2c-sda-falling-time-ns
-> +   will be ignored.
-> +
-> + - i2c-fs-scl-high-count : should contain the fast speed i2c clock SCL high
-> +   count. If defined, the i2c-scl-falling-time-ns and i2c-sda-falling-time-ns
-> +   will be ignored.
-> +
-> + - i2c-fs-scl-low-count : should contain the fast speed i2c clock SCL low
-> +   count. If defined, the i2c-scl-falling-time-ns and i2c-sda-falling-time-ns
-> +   will be ignored.
-> +
->  Example :
->
->         i2c at f0000 {
-> diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
-> index d656657..8739a60 100644
-> --- a/drivers/i2c/busses/i2c-designware-platdrv.c
-> +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
-> @@ -188,6 +188,14 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
->                                          &dev->scl_falling_time);
->                 device_property_read_u32(&pdev->dev, "clock-frequency",
->                                          &clk_freq);
-> +               device_property_read_u16(&pdev->dev, "i2c-ss-scl-high-count",
-> +                                        &dev->ss_hcnt);
-> +               device_property_read_u16(&pdev->dev, "i2c-ss-scl-low-count",
-> +                                        &dev->ss_lcnt);
-> +               device_property_read_u16(&pdev->dev, "i2c-fs-scl-high-count",
-> +                                        &dev->fs_hcnt);
-> +               device_property_read_u16(&pdev->dev, "i2c-fs-scl-low-count",
-> +                                        &dev->fs_lcnt);
->         }
->
->         if (has_acpi_companion(&pdev->dev))
-> --
-> 2.8.0.rc3
->
+> 
+> > +- reg			: Register address for controlling LDO
+> > +- mask			: Mask value for switching voltages
+> 
+> What else is in this register? If something unrelated, then this is all 
+> wrong to the regulator. You can only define the register address in one 
+> place in the DT. Otherwise, you should know the mask from the compatible 
+> string.
+
+I agree.  All of this needs to be done inside the code itself.  All you need is
+the register.  This is a TCSR register which means that it could have other bits
+doing other things.  I would hope that the hw guys isolated only regulator bits
+in here.
 
 
+Regards,
 
--- 
-With Best Regards,
-Andy Shevchenko
+Andy Gross
