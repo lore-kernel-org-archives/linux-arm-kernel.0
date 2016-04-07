@@ -1,204 +1,141 @@
-From: sr@denx.de (Stefan Roese)
-Date: Thu,  7 Apr 2016 14:06:51 +0200
-Subject: [PATCH v3] spi: orion.c: Add direct access mode
-Message-ID: <1460030811-13787-1-git-send-email-sr@denx.de>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Thu, 7 Apr 2016 20:03:18 +0800
+Subject: [PATCH v11 01/17] Xen: ACPI: Hide UART used by Xen
+In-Reply-To: <1460030614-16112-1-git-send-email-zhaoshenglong@huawei.com>
+References: <1460030614-16112-1-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1460030614-16112-2-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the direct access mode to the Orion SPI
-driver which is used on the Marvell Armada based SoCs. In this direct
-mode, all data written to (or read from) a specifically mapped MBus
-window (linked to one SPI chip-select on one of the SPI controllers)
-will be transferred directly to the SPI bus. Without the need to control
-the SPI registers in between. This can improve the SPI transfer rate in
-such cases.
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Both, direct-read and -write mode are supported. But only the write
-mode has been tested. This mode especially benefits from the SPI direct
-mode, as the data bytes are written head-to-head to the SPI bus,
-without any additional addresses.
+ACPI 6.0 introduces a new table STAO to list the devices which are used
+by Xen and can't be used by Dom0. On Xen virtual platforms, the physical
+UART is used by Xen. So here it hides UART from Dom0.
 
-One use-case for this direct write mode is, programming a FPGA bitstream
-image into the FPGA connected to the SPI bus at maximum speed.
-
-This mode is described in chapter "22.5.2 Direct Write to SPI" in the
-Marvell Armada XP Functional Spec Datasheet.
-
-Signed-off-by: Stefan Roese <sr@denx.de>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Mark Brown <broonie@kernel.org>
+CC: "Rafael J. Wysocki" <rjw@rjwysocki.net> (supporter:ACPI)
+CC: Len Brown <lenb@kernel.org> (supporter:ACPI)
+CC: linux-acpi at vger.kernel.org (open list:ACPI)
+Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
-v3:
-- Used static MBus windows again, as suggested by Arnd
-- No new DT bindings needed for this. The MBus windows need to be
-  configured in the 'reg' property of the SPI controller. This is
-  done in a separate patch for the Armada platforms.
-- The direct mapping is configured and enable by adding the
-  specific MBus entry to the 'ranges' property of the 'soc' node
-  in the board dts file.
+ drivers/acpi/scan.c | 74 +++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 74 insertions(+)
 
-v2:
-- Use one MBus window for each SPI controller instead of one for
-  for each SPI device. This MBus window is re-assigned, once the
-  CS changes.
-- Assert the CS over the entire message
-- Don't restrict the direct access mode to only direct write mode
-- Add check for max size before using memcpy()
-- Remove spidev from DT bindings documentation
-
- drivers/spi/spi-orion.c | 86 +++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 86 insertions(+)
-
-diff --git a/drivers/spi/spi-orion.c b/drivers/spi/spi-orion.c
-index a87cfd4..69e710e 100644
---- a/drivers/spi/spi-orion.c
-+++ b/drivers/spi/spi-orion.c
-@@ -18,6 +18,7 @@
- #include <linux/module.h>
- #include <linux/pm_runtime.h>
- #include <linux/of.h>
-+#include <linux/of_address.h>
- #include <linux/of_device.h>
- #include <linux/clk.h>
- #include <linux/sizes.h>
-@@ -43,6 +44,9 @@
- #define ORION_SPI_INT_CAUSE_REG		0x10
- #define ORION_SPI_TIMING_PARAMS_REG	0x18
+diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+index 5f28cf7..cfc73fe 100644
+--- a/drivers/acpi/scan.c
++++ b/drivers/acpi/scan.c
+@@ -46,6 +46,13 @@ DEFINE_MUTEX(acpi_device_lock);
+ LIST_HEAD(acpi_wakeup_device_list);
+ static DEFINE_MUTEX(acpi_hp_context_lock);
  
-+/* Register for the "Direct Mode" */
-+#define SPI_DIRECT_WRITE_CONFIG_REG	0x20
++/*
++ * The UART device described by the SPCR table is the only object which needs
++ * special-casing. Everything else is covered by ACPI namespace paths in STAO
++ * table.
++ */
++static u64 spcr_uart_addr;
 +
- #define ORION_SPI_TMISO_SAMPLE_MASK	(0x3 << 6)
- #define ORION_SPI_TMISO_SAMPLE_1	(1 << 6)
- #define ORION_SPI_TMISO_SAMPLE_2	(2 << 6)
-@@ -78,11 +82,18 @@ struct orion_spi_dev {
- 	bool			is_errata_50mhz_ac;
- };
- 
-+struct orion_direct_acc {
-+	void __iomem		*vaddr;
-+	u32			size;
-+};
-+
- struct orion_spi {
- 	struct spi_master	*master;
- 	void __iomem		*base;
- 	struct clk              *clk;
- 	const struct orion_spi_dev *devdata;
-+
-+	struct orion_direct_acc	direct_access[ORION_NUM_CHIPSELECTS];
- };
- 
- static inline void __iomem *spi_reg(struct orion_spi *orion_spi, u32 reg)
-@@ -372,10 +383,44 @@ orion_spi_write_read(struct spi_device *spi, struct spi_transfer *xfer)
- {
- 	unsigned int count;
- 	int word_len;
-+	struct orion_spi *orion_spi;
-+	int cs = spi->chip_select;
- 
- 	word_len = spi->bits_per_word;
- 	count = xfer->len;
- 
-+	orion_spi = spi_master_get_devdata(spi->master);
-+
-+	/* Use SPI direct access mode if base address is available */
-+	if (orion_spi->direct_access[cs].vaddr) {
-+		struct orion_direct_acc *da = &orion_spi->direct_access[cs];
-+
-+		if (count > da->size) {
-+			dev_err(&spi->dev,
-+				"max transfer size exceeded (%d > %d)\n",
-+				count, da->size);
-+			return 0;
-+		}
-+
-+		if (xfer->tx_buf) {
-+			/*
-+			 * Send the tx-data to the SPI device via the direct
-+			 * mapped address window
-+			 */
-+			memcpy(da->vaddr, xfer->tx_buf, count);
-+		}
-+
-+		if (xfer->rx_buf) {
-+			/*
-+			 * Read the rx-data from the SPI device via the direct
-+			 * mapped address window
-+			 */
-+			memcpy(xfer->rx_buf, da->vaddr, count);
-+		}
-+
-+		return count;
-+	}
-+
- 	if (word_len == 8) {
- 		const u8 *tx = xfer->tx_buf;
- 		u8 *rx = xfer->rx_buf;
-@@ -425,6 +470,10 @@ static int orion_spi_reset(struct orion_spi *orion_spi)
- {
- 	/* Verify that the CS is deasserted */
- 	orion_spi_clrbits(orion_spi, ORION_SPI_IF_CTRL_REG, 0x1);
-+
-+	/* Don't deassert CS between the direct mapped SPI transfers */
-+	writel(0, spi_reg(orion_spi, SPI_DIRECT_WRITE_CONFIG_REG));
-+
+ struct acpi_dep_data {
+ 	struct list_head node;
+ 	acpi_handle master;
+@@ -1453,6 +1460,41 @@ static int acpi_add_single_object(struct acpi_device **child,
  	return 0;
  }
  
-@@ -504,6 +553,7 @@ static int orion_spi_probe(struct platform_device *pdev)
- 	struct resource *r;
- 	unsigned long tclk_hz;
- 	int status = 0;
-+	struct device_node *np;
++static acpi_status acpi_get_resource_memory(struct acpi_resource *ares,
++					    void *context)
++{
++	struct resource *res = context;
++
++	if (acpi_dev_resource_memory(ares, res))
++		return AE_CTRL_TERMINATE;
++
++	return AE_OK;
++}
++
++static bool acpi_device_should_be_hidden(acpi_handle handle)
++{
++	acpi_status status;
++	struct resource res;
++
++	/* Check if it should ignore the UART device */
++	if (!(spcr_uart_addr && acpi_has_method(handle, METHOD_NAME__CRS)))
++		return false;
++
++	/*
++	 * The UART device described in SPCR table is assumed to have only one
++	 * memory resource present. So we only look for the first one here.
++	 */
++	status = acpi_walk_resources(handle, METHOD_NAME__CRS,
++				     acpi_get_resource_memory, &res);
++	if (ACPI_FAILURE(status) || res.start != spcr_uart_addr)
++		return false;
++
++	acpi_handle_info(handle, "The UART device @%pa in SPCR table will be hidden\n",
++			 &res.start);
++
++	return true;
++}
++
+ static int acpi_bus_type_and_status(acpi_handle handle, int *type,
+ 				    unsigned long long *sta)
+ {
+@@ -1466,6 +1508,9 @@ static int acpi_bus_type_and_status(acpi_handle handle, int *type,
+ 	switch (acpi_type) {
+ 	case ACPI_TYPE_ANY:		/* for ACPI_ROOT_OBJECT */
+ 	case ACPI_TYPE_DEVICE:
++		if (acpi_device_should_be_hidden(handle))
++			return -ENODEV;
++
+ 		*type = ACPI_BUS_TYPE_DEVICE;
+ 		status = acpi_bus_get_status_handle(handle, sta);
+ 		if (ACPI_FAILURE(status))
+@@ -1916,9 +1961,24 @@ static int acpi_bus_scan_fixed(void)
+ 	return result < 0 ? result : 0;
+ }
  
- 	master = spi_alloc_master(&pdev->dev, sizeof(*spi));
- 	if (master == NULL) {
-@@ -576,6 +626,42 @@ static int orion_spi_probe(struct platform_device *pdev)
- 		goto out_rel_clk;
- 	}
++static void __init acpi_get_spcr_uart_addr(void)
++{
++	acpi_status status;
++	struct acpi_table_spcr *spcr_ptr;
++
++	status = acpi_get_table(ACPI_SIG_SPCR, 0,
++				(struct acpi_table_header **)&spcr_ptr);
++	if (ACPI_SUCCESS(status))
++		spcr_uart_addr = spcr_ptr->serial_port.address;
++	else
++		printk(KERN_WARNING PREFIX "STAO table present, but SPCR is missing\n");
++}
++
+ int __init acpi_scan_init(void)
+ {
+ 	int result;
++	acpi_status status;
++	struct acpi_table_stao *stao_ptr;
  
-+	/* Scan all SPI devices of this controller for direct mapped devices */
-+	for_each_available_child_of_node(pdev->dev.of_node, np) {
-+		u32 cs;
+ 	acpi_pci_root_init();
+ 	acpi_pci_link_init();
+@@ -1934,6 +1994,20 @@ int __init acpi_scan_init(void)
+ 
+ 	acpi_scan_add_handler(&generic_device_handler);
+ 
++	/*
++	 * If there is STAO table, check whether it needs to ignore the UART
++	 * device in SPCR table.
++	 */
++	status = acpi_get_table(ACPI_SIG_STAO, 0,
++				(struct acpi_table_header **)&stao_ptr);
++	if (ACPI_SUCCESS(status)) {
++		if (stao_ptr->header.length > sizeof(struct acpi_table_stao))
++			printk(KERN_INFO PREFIX "STAO Name List not yet supported.");
 +
-+		/* Get chip-select number from the "reg" property */
-+		status = of_property_read_u32(np, "reg", &cs);
-+		if (status) {
-+			dev_err(&pdev->dev,
-+				"%s has no valid 'reg' property (%d)\n",
-+				np->full_name, status);
-+			status = 0;
-+			continue;
-+		}
-+
-+		/*
-+		 * Check if an address is configured for this SPI device. If
-+		 * not, the MBus mapping via the 'ranges' property in the 'soc'
-+		 * node is not configured and this device should not use the
-+		 * direct mode. In this case, just continue with the next
-+		 * device.
-+		 */
-+		status = of_address_to_resource(pdev->dev.of_node, cs + 1, r);
-+		if (status)
-+			continue;
-+
-+		spi->direct_access[cs].vaddr = devm_ioremap_resource(&pdev->dev,
-+								     r);
-+		if (IS_ERR(spi->direct_access[cs].vaddr)) {
-+			status = PTR_ERR(spi->direct_access[cs].vaddr);
-+			goto out_rel_clk;
-+		}
-+
-+		spi->direct_access[cs].size = resource_size(r);
-+		dev_info(&pdev->dev, "CS%d configured for direct access\n", cs);
++		if (stao_ptr->ignore_uart)
++			acpi_get_spcr_uart_addr();
 +	}
 +
- 	pm_runtime_set_active(&pdev->dev);
- 	pm_runtime_use_autosuspend(&pdev->dev);
- 	pm_runtime_set_autosuspend_delay(&pdev->dev, SPI_AUTOSUSPEND_TIMEOUT);
+ 	mutex_lock(&acpi_scan_lock);
+ 	/*
+ 	 * Enumerate devices in the ACPI namespace.
 -- 
-2.8.1
+2.0.4
