@@ -1,17 +1,48 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 7 Apr 2016 11:54:01 -0500
-Subject: [PATCH 0/2] PCI: mvebu: trivial cleanup
-In-Reply-To: <1458122381-2280-1-git-send-email-jszhang@marvell.com>
-References: <1458122381-2280-1-git-send-email-jszhang@marvell.com>
-Message-ID: <20160407165400.GD8780@localhost>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 7 Apr 2016 12:01:34 -0500
+Subject: [PATCH] ARM: dts: k2*: Rename the k2* files to keystone-k2* files
+In-Reply-To: <56E97F0E.6070309@oracle.com>
+References: <1458139150-30382-1-git-send-email-nm@ti.com>
+ <56E97F0E.6070309@oracle.com>
+Message-ID: <CAGo_u6oMYZvzkvCsi8H3hvOBrPLZ-EL-T3RCA6E8BnmThrLYfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 16, 2016 at 05:59:39PM +0800, Jisheng Zhang wrote:
-> trivial clean ups to pci-mvebu.c
-> 
-> Jisheng Zhang (2):
->   PCI: mvebu: constify mvebu_pcie_pm_ops structure
->   PCI: mvebu: use SET_NOIRQ_SYSTEM_SLEEP_PM_OPS for mvebu_pcie_pm_ops
+Hi Santosh,
 
-Applied with Thomas' ack to pci/host-mvebu for v4.7, thanks!
+On Wed, Mar 16, 2016 at 10:43 AM, santosh shilimkar
+<santosh.shilimkar@oracle.com> wrote:
+> On 3/16/2016 7:39 AM, Nishanth Menon wrote:
+>>
+>> As reported in [1], rename the k2* dts files to keystone-* files
+>> this will force consistency throughout.
+>>
+>> Script for the same (and hand modified for Makefile and MAINTAINERS
+>> files):
+>> for i in arch/arm/boot/dts/k2*
+>> do
+>>         b=`basename $i`;
+>>         git mv $i arch/arm/boot/dts/keystone-$b;
+>>         sed -i -e "s/$b/keystone-$b/g" arch/arm/boot/dts/*[si]
+>> done
+>>
+>> NOTE: bootloaders that depend on older dtb names will need to be
+>> updated as well.
+>>
+>> [1] http://marc.info/?l=linux-arm-kernel&m=145637407804754&w=2
+>>
+>> Reported-by: Olof Johansson <olof@lixom.net>
+>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>> ---
+>>
+> Thanks Nishant for taking care of this. I will add this to the
+> next soon.
+>
+
+I dont see this in 4.6-rc2 yet.. did this slip our pull request? will
+be good to get this in so that we can fix up u-boot consistently.
+
+-- 
+---
+Regards,
+Nishanth Menon
