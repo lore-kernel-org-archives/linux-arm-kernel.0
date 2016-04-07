@@ -1,68 +1,85 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 7 Apr 2016 15:39:02 +0300
-Subject: [PATCH 1/4] mailbox/omap: store mailbox interrupt type in
- omap_mbox_device
-In-Reply-To: <57065190.4050904@ti.com>
-References: <1459985840-1106-1-git-send-email-s-anna@ti.com>
- <1459985840-1106-2-git-send-email-s-anna@ti.com> <57063731.9010201@ti.com>
- <57065190.4050904@ti.com>
-Message-ID: <570654E6.20908@ti.com>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Thu, 7 Apr 2016 20:03:27 +0800
+Subject: [PATCH v11 10/17] arm/xen: Get event-channel irq through HVM_PARAM
+ when booting with ACPI
+In-Reply-To: <1460030614-16112-1-git-send-email-zhaoshenglong@huawei.com>
+References: <1460030614-16112-1-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1460030614-16112-11-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/07/2016 03:24 PM, Suman Anna wrote:
-> Hi Grygorii,
->
-> On 04/07/2016 05:32 AM, Grygorii Strashko wrote:
->> On 04/07/2016 02:37 AM, Suman Anna wrote:
->>> The interrupt type used for identifying the layout of the interrupt
->>> configuration registers between OMAP4+ SoCs and older SoCs is stored
->>> only in the sub-mailbox structures for easier access. Store this type
->>> in the the omap_mbox_device structure as well along with the other
->>> global variables. This is being done to facilitate the context save
->>> and restore of appropriate registers during system suspend/resume.
->>>
->>> Signed-off-by: Suman Anna <s-anna@ti.com>
->>> ---
->>>    drivers/mailbox/omap-mailbox.c | 2 ++
->>>    1 file changed, 2 insertions(+)
->>>
->>> diff --git a/drivers/mailbox/omap-mailbox.c
->>> b/drivers/mailbox/omap-mailbox.c
->>> index 84cafc02e761..adf37f494690 100644
->>> --- a/drivers/mailbox/omap-mailbox.c
->>> +++ b/drivers/mailbox/omap-mailbox.c
->>> @@ -90,6 +90,7 @@ struct omap_mbox_device {
->>>        void __iomem *mbox_base;
->>>        u32 num_users;
->>>        u32 num_fifos;
->>> +    u32 intr_type;
->>>        struct omap_mbox **mboxes;
->>>        struct mbox_controller controller;
->>>        struct list_head elem;
->>> @@ -828,6 +829,7 @@ static int omap_mbox_probe(struct platform_device
->>> *pdev)
->>>        mdev->dev = &pdev->dev;
->>>        mdev->num_users = num_users;
->>>        mdev->num_fifos = num_fifos;
->>> +    mdev->intr_type = intr_type;
->>>        mdev->mboxes = list;
->>>
->>>        /* OMAP does not have a Tx-Done IRQ, but rather a Tx-Ready IRQ */
->>>
->>
->> This smth. which definitely has to be done using compatible props.
->> Why not to pass more info through of_device_id->data?
->>
->
-> Yeah, that's already the case, intr_type is a local variable assigned
-> from compatible match data. This patch merely caches it in the
-> omap_mbox_device structure so that it can be leveraged by the PM
-> callback functions in the next patch.
->
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Ah ok. Thanks for explanation.
+The kernel will get the event-channel IRQ through
+HVM_PARAM_CALLBACK_IRQ.
 
+Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Reviewed-by: Julien Grall <julien.grall@arm.com>
+---
+ arch/arm/xen/enlighten.c | 36 +++++++++++++++++++++++++++++++++++-
+ 1 file changed, 35 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index d94f726..06bd61a 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -30,6 +30,7 @@
+ #include <linux/time64.h>
+ #include <linux/timekeeping.h>
+ #include <linux/timekeeper_internal.h>
++#include <linux/acpi.h>
+ 
+ #include <linux/mm.h>
+ 
+@@ -278,6 +279,35 @@ void __init xen_early_init(void)
+ 		add_preferred_console("hvc", 0, NULL);
+ }
+ 
++static void __init xen_acpi_guest_init(void)
++{
++#ifdef CONFIG_ACPI
++	struct xen_hvm_param a;
++	int interrupt, trigger, polarity;
++
++	a.domid = DOMID_SELF;
++	a.index = HVM_PARAM_CALLBACK_IRQ;
++
++	if (HYPERVISOR_hvm_op(HVMOP_get_param, &a)
++	    || (a.value >> 56) != HVM_PARAM_CALLBACK_TYPE_PPI) {
++		xen_events_irq = 0;
++		return;
++	}
++
++	interrupt = a.value & 0xff;
++	trigger = ((a.value >> 8) & 0x1) ? ACPI_EDGE_SENSITIVE
++					 : ACPI_LEVEL_SENSITIVE;
++	polarity = ((a.value >> 8) & 0x2) ? ACPI_ACTIVE_LOW
++					  : ACPI_ACTIVE_HIGH;
++	xen_events_irq = acpi_register_gsi(NULL, interrupt, trigger, polarity);
++#endif
++}
++
++static void __init xen_dt_guest_init(void)
++{
++	xen_events_irq = irq_of_parse_and_map(xen_node, 0);
++}
++
+ static int __init xen_guest_init(void)
+ {
+ 	struct xen_add_to_physmap xatp;
+@@ -286,7 +316,11 @@ static int __init xen_guest_init(void)
+ 	if (!xen_domain())
+ 		return 0;
+ 
+-	xen_events_irq = irq_of_parse_and_map(xen_node, 0);
++	if (!acpi_disabled)
++		xen_acpi_guest_init();
++	else
++		xen_dt_guest_init();
++
+ 	if (!xen_events_irq) {
+ 		pr_err("Xen event channel interrupt not found\n");
+ 		return -ENODEV;
 -- 
-regards,
--grygorii
+2.0.4
