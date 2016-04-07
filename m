@@ -1,49 +1,57 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 07 Apr 2016 14:45:46 -0700
-Subject: [PATCH v6 1/2] ARM: dma-mapping: Don't use outer_flush_range when
- the L2C is coherent
-In-Reply-To: <20160407185704.GH19428@n2100.arm.linux.org.uk> (Russell King's
- message of "Thu, 7 Apr 2016 19:57:04 +0100")
-References: <1459415380-18004-1-git-send-email-gregory.clement@free-electrons.com>
- <1459415380-18004-2-git-send-email-gregory.clement@free-electrons.com>
- <20160407185704.GH19428@n2100.arm.linux.org.uk>
-Message-ID: <871t6hjdo5.fsf@free-electrons.com>
+From: astone@redhat.com (Al Stone)
+Date: Thu, 7 Apr 2016 15:50:55 -0600
+Subject: [PATCH v3] ARM64: ACPI: Update documentation for latest
+ specification version
+In-Reply-To: <1459210002-3387-1-git-send-email-al.stone@linaro.org>
+References: <1459210002-3387-1-git-send-email-al.stone@linaro.org>
+Message-ID: <5706D63F.7050107@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell King,
- 
- On jeu., avril 07 2016, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+On 03/28/2016 06:06 PM, Al Stone wrote:
+> The ACPI 6.1 specification was recently released at the end of January
+> 2016, but the arm64 kernel documentation for the use of ACPI was written
+> for the 5.1 version of the spec.  There were significant additions to the
+> spec that had not yet been mentioned -- for example, the 6.0 mechanisms
+> added to make it easier to define processors and low power idle states,
+> as well as the 6.1 addition allowing regular interrupts (not just from
+> GPIO) be used to signal ACPI general purpose events.
+> 
+> This patch reflects going back through and examining the specs in detail
+> and updating content appropriately.  Whilst there, a few odds and ends of
+> typos were caught as well.  This brings the documentation up to date with
+> ACPI 6.1 for arm64.
+> 
+> Changes for v3:
+>    -- Clarify use of _LPI/_RDI (Vikas Sajjan)
+>    -- Whitespace cleanup as pointed out by checkpatch
+> 
+> Changes for v2:
+>    -- Clean up white space (Harb Abdulhahmid)
+>    -- Clarification on _CCA usage (Harb Abdulhamid)
+>    -- IORT moved to required from recommended (Hanjun Guo)
+>    -- Clarify IORT description (Hanjun Guo)
+> 
+> Signed-off-by: Al Stone <al.stone@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Jonathan Corbet <corbet@lwn.net>
+> ---
+>  Documentation/arm64/acpi_object_usage.txt | 446 ++++++++++++++++++++++--------
+>  Documentation/arm64/arm-acpi.txt          |  28 +-
+>  2 files changed, 357 insertions(+), 117 deletions(-)
+> [snip...]
 
-> On Thu, Mar 31, 2016 at 11:09:39AM +0200, Gregory CLEMENT wrote:
->> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
->> index deac58d5f1f7..1538bb293e90 100644
->> --- a/arch/arm/mm/dma-mapping.c
->> +++ b/arch/arm/mm/dma-mapping.c
->> @@ -61,7 +61,7 @@ struct arm_dma_free_args {
->>  
->>  struct arm_dma_allocator {
->>  	void *(*alloc)(struct arm_dma_alloc_args *args,
->> -		       struct page **ret_page);
->> +		       struct page **ret_page, bool is_coherent);
->
-> This should be named "l2_coherent" because it controls whether L2
-> cache flushing is done: L1 cache flushing calls are still present.
+Ping?  Any further comments or is this good to go?
 
-I've just sent a new version taking into account your remark.
-
-Thanks,
-
-Gregory
-
->
-> -- 
-> RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+Thanks.
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Red Hat, Inc.
+ahs3 at redhat.com
+-----------------------------------
