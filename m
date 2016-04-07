@@ -1,35 +1,88 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 7 Apr 2016 16:31:13 -0700
-Subject: [PATCH 1/2] clk: Add Oxford Semiconductor OXNAS Standard Clocks
-In-Reply-To: <5701210A.4060807@baylibre.com>
-References: <1459520791-13269-1-git-send-email-narmstrong@baylibre.com>
- <1459520791-13269-2-git-send-email-narmstrong@baylibre.com>
- <20160402005045.GX18567@codeaurora.org>
- <5701210A.4060807@baylibre.com>
-Message-ID: <20160407233113.GI18567@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 7 Apr 2016 16:41:34 -0700
+Subject: 4.4, 4.6: camera and unlock buttons produce tons of interrupts
+ (was Re: N900 sleep mode)
+In-Reply-To: <20160407230150.GA16552@amd>
+References: <20160330191208.GW9329@atomide.com> <20160404213056.GA25912@amd>
+ <20160404220748.GA16484@atomide.com> <20160405142250.GA6429@amd>
+ <20160405152916.GE16484@atomide.com> <20160405205137.GA10196@amd>
+ <20160407174019.GM16484@atomide.com> <20160407194828.GA13338@amd>
+ <20160407213229.GO16484@atomide.com> <20160407230150.GA16552@amd>
+Message-ID: <20160407234134.GQ16484@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03, Neil Armstrong wrote:
-> On 04/02/2016 02:50 AM, Stephen Boyd wrote:
-> > On 04/01, Neil Armstrong wrote:
-> >> +	if (!onecell_data)
-> >> +		return -ENOMEM;
-> >> +
-> >> +	regmap = syscon_node_to_regmap(of_get_parent(np));
-> > 
-> > Can we use dev_get_regmap(&pdev->dev.parent) here instead? I'd
-> > prefer device APIs over DT APIs here. 
-> > 
+* Pavel Machek <pavel@ucw.cz> [160407 16:02]:
+> Hi!
 > 
-> It will not work here since the parent node is a syscon, the call to syscon_node_to_regmap() will call of_syscon_register() and create the regmap, the dev_get_regmap() needs a proper platform device registered as regmap here.
+> > > gzipped config is attached.
+> > > 
+> > > Note that I'm still using NOLO. I enabled the sleep, then went to
+> > > runlevel 1. LEDs still stay on, 55mA power consumption. That was with
+> > > 1 in off_mode.
+> > 
+> > Nothing idling for me with your .config.. And it seems slower to boot
+> > compared to omap2plus_defconfig? Maybe because of the extra GPIO
+> > interrupts?
 > 
+> Extra interrupts only happen when enable_off_mode is 1, so that should
+> not be an issue during boot.
 
-Ok. I was hoping that we could make simple-mfd look to see if
-there's a syscon and then attach it to the parent device, but it
-seems that simple-mfd is not actually a driver and it might not
-even make a parent device for the children nodes?
+OK maybe it's just the extra driver probe time then.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> > Looks like you have 117 additional entries in .config enabled compared
+> > to omap2plus_defconfig. Maybe go back to omap2plus_defconfig with minimal
+> > changes and verify it idles properly first?
+> > 
+> > I'm suspecting it's some driver(s) you have enabled causing the
+> > issue.
+> 
+> I guess so. Do you (or anyone else) have minimum non-modular config
+> for N900 that boots with video? Could I get lsmod from your system?
+> (Yes, I still have nightmares from getting .config that works).
+
+Well I've been just using omap2plus_defconfig with:
+
+# modprobe tsc2005
+# modprobe gpio_backlight
+# modprobe panel_sony_acx565akm
+# modprobe omapfb
+
+# echo 255 > /sys/class/backlight/acx565akm/brightness
+
+And then the following to blank for idle:
+
+# echo 1 > /sys/devices/platform/omapfb/graphics/fb0/blank
+
+But in the world of eternal regressions, I'm not seeing anything
+on the framebuffer with v4.6-rc2 :( No idea what broke it or when
+as my n900 is in the rack.
+
+Anyways, below is also my lsmod output.
+
+Regards,
+
+Tony
+
+
+Module                  Size  Used by
+panel_sharp_ls037v7dw01     4148  0
+ads7846                12959  0
+hwmon                   4213  1 ads7846
+gpio_keys               9053  0
+twl4030_keypad          3896  0
+matrix_keymap           2801  1 twl4030_keypad
+omapfb                 39255  1
+cfbfillrect             3614  1 omapfb
+cfbimgblt               2416  1 omapfb
+cfbcopyarea             3187  1 omapfb
+panel_sony_acx565akm     7895  1
+omapdss               269684  4 panel_sharp_ls037v7dw01,omapfb,panel_sony_acx565akm
+gpio_backlight          2804  0
+tsc2005                 1782  0
+tsc200x_core            7337  1 tsc2005
+ledtrig_default_on      1119  0
+leds_gpio               3530  0
+led_class               5418  1 leds_gpio
+rtc_twl                 6234  0
+twl4030_wdt             2711  0
