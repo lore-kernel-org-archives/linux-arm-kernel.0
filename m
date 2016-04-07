@@ -1,131 +1,118 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 7 Apr 2016 08:52:14 +0100
-Subject: [PATCH] mfd: mt6397: irq domain should initialize before
- mfd_add_devices()
-In-Reply-To: <1459910866.18284.27.camel@mtksdaap41>
-References: <1459322708-21363-1-git-send-email-henryc.chen@mediatek.com>
- <56FB99DB.6010901@openwrt.org>
- <1459388452.18284.2.camel@mtksdaap41>
- <1459391533.21870.15.camel@mtksdaap41>
- <56FCE910.8030100@openwrt.org> <1459431711.395.6.camel@mtksdaap41>
- <56FD2F18.4050508@openwrt.org>
- <1459910866.18284.27.camel@mtksdaap41>
-Message-ID: <20160407075214.GX3323@x1>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 7 Apr 2016 08:54:14 +0100
+Subject: [PATCH V2 5/9] arm64: exception: handle instruction abort at
+ current EL
+In-Reply-To: <57058140.5040507@codeaurora.org>
+References: <1459955578-24602-1-git-send-email-tbaicar@codeaurora.org>
+ <1459955578-24602-6-git-send-email-tbaicar@codeaurora.org>
+ <57052D0E.5070903@arm.com> <57058140.5040507@codeaurora.org>
+Message-ID: <20160407085414.5be649f0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 06 Apr 2016, Henry Chen wrote:
+On Wed, 6 Apr 2016 15:36:00 -0600
+"Baicar, Tyler" <tbaicar@codeaurora.org> wrote:
 
-> On Thu, 2016-03-31 at 16:07 +0200, John Crispin wrote:
-> > 
-> > On 31/03/2016 15:41, Yingjoe Chen wrote:
-> > > On Thu, 2016-03-31 at 11:08 +0200, John Crispin wrote:
-> > >>
-> > >> On 31/03/2016 04:32, Yingjoe Chen wrote:
-> > >>> On Thu, 2016-03-31 at 09:40 +0800, Henry Chen wrote:
-> > >>>> On Wed, 2016-03-30 at 11:18 +0200, John Crispin wrote:
-> > >>>>> Hi,
-> > >>>>>
-> > >>>>> small nitpick inline
-> > >>>>>
-> > >>>>> On 30/03/2016 09:25, Henry Chen wrote:
-> > >>>>>> Some sub driver like RTC module need irq domain from parent to create
-> > >>>>>> irq mapping when driver initialize. so move mt6397_irq_init() before
-> > >>>>>> mfd_add_devices().
-> > >>>>>>
-> > >>>>>> Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
-> > >>>>>> ---
-> > >>>>>> This patch fixed the below warning based on "Linux kernel v4.6-rc1"
-> > >>>>>> WARNING: CPU: 1 PID: 132 at kernel/mediatek/kernel/irq/irqdomain.c:471
-> > >>>>>> irq_create_mapping+0xc4/0xd0
-> > >>>>>> ---
-> > >>>>>>  drivers/mfd/mt6397-core.c | 37 ++++++++++++++++++++++---------------
-> > >>>>>>  1 file changed, 22 insertions(+), 15 deletions(-)
-> > >>>>>>
-> > >>>>>> diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
-> > >>>>>> index 8e8d932..a879223 100644
-> > >>>>>> --- a/drivers/mfd/mt6397-core.c
-> > >>>>>> +++ b/drivers/mfd/mt6397-core.c
-> > >>>>>> @@ -270,22 +270,36 @@ static int mt6397_probe(struct platform_device *pdev)
-> > >>>>>>  		goto fail_irq;
-> > >>>>>>  	}
-> > >>>>>>  
-> > >>>>>> +	pmic->irq = platform_get_irq(pdev, 0);
-> > >>>>>> +
-> > >>>>>>  	switch (id & 0xff) {
-> > >>>>>>  	case MT6323_CID_CODE:
-> > >>>>>> -		pmic->int_con[0] = MT6323_INT_CON0;
-> > >>>>>> -		pmic->int_con[1] = MT6323_INT_CON1;
-> > >>>>>> -		pmic->int_status[0] = MT6323_INT_STATUS0;
-> > >>>>>> -		pmic->int_status[1] = MT6323_INT_STATUS1;
-> > >>>>>> +		if (pmic->irq > 0) {
-> > >>>>>
-> > >>>>> should this not be
-> > >>>>>
-> > >>>>> 		if (pmic->irq >= 0) {
-> > >>>>>
-> > >>>>> i think the code before your patch was wrong as linux irqs start with 0.
-> > >>>>>
-> > >>>>> 	John
-> > >>>> Hi John,
-> > >>>>
-> > >>>> Thanks, I will modify this.
-> > >>>
-> > >>> Linux irq start from 1, 0 is invalid. I can't find the document saying
-> > >>> this now, but you could see this from irq_create_mapping() in
-> > >>> kernel/irq/irqdomain.c
-> > >>>
-> > >>> I think the code should have check return from platform_get_irq and
-> > >>> handle -EPROBE_DEFER, but maybe it should be another patch?
-> > >>>
-> > >>> BTW, in this function, it is possible that pmic->irq_domain will be NULL
-> > >>> in fail_irq error handling. We should check before calling
-> > >>> irq_domain_remove.
-> > >>>
-> > >>> Joe.C
-> > >>>
-> > >>
-> > >> Hi,
-> > >>
-> > >> looking at
-> > >> http://lxr.free-electrons.com/source/drivers/base/platform.c#L87 there
-> > >> is a check in line #100 ret >= 0
-> > >>
-> > >> checking the return value of pmic->irq = platform_get_irq(pdev, 0);
-> > >> should follow the same pattern i think .. unless i have a thinko and am
-> > >> reading the code wrong.
-> > > 
-> > > 
-> > > I'm not sure why platform_get_irq() check for 0, but I think the code
-> > > logic is differnet.
-> > > 
-> > > When platform_get_irq() return 0 to our code, it means we don't have
-> > > valid irq to use. In this case it doesn't make any sense to continue
-> > > init irq.
-> > > 
-> > > 
-> > > Joe.C
-> > > 
-> > 
-> > 
-> > --> http://lwn.net/Articles/470820/
-> > 
-> > indeed ARM has changed this is seems. was not aware of this change,
-> > sorry for the noise
-> > 
-> > 	John
+Hi Tyler,
+
+> Hello Marc,
 > 
-> Hi Lee/Joe/John,
+> On 4/6/2016 9:36 AM, Marc Zyngier wrote:
+> > On 06/04/16 16:12, Tyler Baicar wrote:
+> >> Add a handler for instruction aborts at the current EL
+> >> (ESR_ELx_EC_IABT_CUR) so they are no longer handled in el1_inv.
+> >> This allows firmware first handling for possible SEA
+> >> (Synchronous External Abort) caused instruction abort at
+> >> current EL.
+> >>
+> >> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+> >> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
+> >> ---
+> >>   arch/arm64/kernel/entry.S | 19 +++++++++++++++++++
+> >>   1 file changed, 19 insertions(+)
+> >>
+> >> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> >> index 12e8d2b..f257856 100644
+> >> --- a/arch/arm64/kernel/entry.S
+> >> +++ b/arch/arm64/kernel/entry.S
+> >> @@ -336,6 +336,8 @@ el1_sync:
+> >>   	lsr	x24, x1, #ESR_ELx_EC_SHIFT	// exception class
+> >>   	cmp	x24, #ESR_ELx_EC_DABT_CUR	// data abort in EL1
+> >>   	b.eq	el1_da
+> >> +	cmp	x24, #ESR_ELx_EC_IABT_CUR	// instruction abort in EL1
+> >> +	b.eq	el1_ia
+> >>   	cmp	x24, #ESR_ELx_EC_SYS64		// configurable trap
+> >>   	b.eq	el1_undef
+> >>   	cmp	x24, #ESR_ELx_EC_SP_ALIGN	// stack alignment exception
+> >> @@ -363,6 +365,23 @@ el1_da:
+> >>   	// disable interrupts before pulling preserved data off the stack
+> >>   	disable_irq
+> >>   	kernel_exit 1
+> >> +el1_ia:
+> >> +	/*
+> >> +	 * Instruction abort handling
+> >> +	 */
+> >> +	mrs	x0, far_el1
+> >> +	enable_dbg
+> >> +	// re-enable interrupts if they were enabled in the aborted context
+> >> +	tbnz	x23, #7, 1f			// PSR_I_BIT
+> >> +	enable_irq
+> >> +1:
+> >> +	orr	x1, x1, #1 << 24		// use reserved ISS bit for instruction aborts
+> >> +	mov	x2, sp				// struct pt_regs
+> >> +	bl	do_mem_abort
+> >> +
+> >> +	// disable interrupts before pulling preserved data off the stack
+> >> +	disable_irq
+> >> +	kernel_exit 1
+> >>   el1_sp_pc:
+> >>   	/*
+> >>   	 * Stack or PC alignment exception handling
+> >>
+> > What happens if you were running at EL2 when this faults gets injected?
+> > It looks like KVM needs something similar, doesn't it?
+> >
+> > Thanks,
+> >
+> > 	M.
+> Thank you for your comment. I don't think this case is possible, or at 
+> least the current KVM code suggests that this case should never happen.  
+> In the EL1 code, we get to this case via the vector:
 > 
-> Thanks for comment, that means we can keep this patch for 4.6-rc1
-> regression (RTC get NULL irq issue), right?
+> ventry  el1_sync                        // Synchronous EL1h
+> 
+> The EL2 KVM equivalent appears to be in arch/arm64/kvm/hyp-entry.S and is:
+> 
+> ventry  el2h_sync_invalid               // Synchronous EL2h
+> 
+> This vector is defined as an invalid_vector and has a comment suggesting 
+> that it should never happen:
+> 
+> /* None of these should ever happen */
+> ...
+>          invalid_vector  el2h_sync_invalid
+> 
+> Please correct me if I am wrong, but it looks like this case should not 
+> be possible.
 
-Just re-send everything with any Acks that you collected.
+This comments really means that we shouldn't ever take any of these
+exception. If we do, we'll crash and burn (just like the kernel didn't
+expect to take an instruction fault from the kernel itself, up until
+this patch).
 
-> I will send another patch to fixed above error handling problem.
+I expect that the firmware does inject the fault into the exception
+level it has preempted. So let me turn the question the other way
+around: what guarantees that we will never have to handle such a fault
+at EL2?
 
+As a corollary, what happens when the firmware injects a fault
+triggered by a VM running at EL1, under the control of a hypervisor
+running at EL2? There should be some form of exception delegation to
+the hypervisor, which makes the lack of handling at EL2 even more
+worrying.
+
+Thanks,
+
+	M.
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Jazz is not dead. It just smells funny.
