@@ -1,179 +1,144 @@
-From: Jean-Philippe.Brucker@arm.com (Jean-Philippe Brucker)
-Date: Thu, 7 Apr 2016 15:38:53 +0100
-Subject: [PATCH v6 6/7] dma-reserved-iommu: iommu_get/put_single_reserved
-In-Reply-To: <57062976.8090900@linaro.org>
-References: <1459757222-2668-1-git-send-email-eric.auger@linaro.org>
- <1459757222-2668-7-git-send-email-eric.auger@linaro.org>
- <20160406171207.750f1224@t450s.home> <57062976.8090900@linaro.org>
-Message-ID: <20160407143852.GA26432@e106794-lin.cambridge.arm.com>
+From: lakshmi.sai.krishna.potthuri@xilinx.com (P L Sai Krishna)
+Date: Thu, 7 Apr 2016 20:09:29 +0530
+Subject: [LINUX PATCH v2 3/3] spi:zynqmp:gqspi: Added separate dummy entry.
+In-Reply-To: <1460039969-9835-1-git-send-email-lakshmis@xilinx.com>
+References: <1460039969-9835-1-git-send-email-lakshmis@xilinx.com>
+Message-ID: <1460039969-9835-3-git-send-email-lakshmis@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+This patch sends dummy as a separate entry.
+Break the Address+Cmd+dummy transfer into multiple transfers.
+Address+Cmd as one transfer.
+Dummy cycles as another transfer.
+As per the controller spec, immediate data field of dummy entry
+in the GenFifo represent dummy cycles.
+Bus width for dummy cycles transfer should be same as
+Rx bus width.
 
-On Thu, Apr 07, 2016 at 11:33:42AM +0200, Eric Auger wrote:
-> Alex,
-> On 04/07/2016 01:12 AM, Alex Williamson wrote:
-> > On Mon,  4 Apr 2016 08:07:01 +0000
-> > Eric Auger <eric.auger@linaro.org> wrote:
-> > 
-> >> This patch introduces iommu_get/put_single_reserved.
-> >>
-> >> iommu_get_single_reserved allows to allocate a new reserved iova page
-> >> and map it onto the physical page that contains a given physical address.
-> >> Page size is the IOMMU page one. It is the responsability of the
-> >> system integrator to make sure the in use IOMMU page size corresponds
-> >> to the granularity of the MSI frame.
-> >>
-> >> It returns the iova that is mapped onto the provided physical address.
-> >> Hence the physical address passed in argument does not need to be aligned.
-> >>
-> >> In case a mapping already exists between both pages, the IOVA mapped
-> >> to the PA is directly returned.
-> >>
-> >> Each time an iova is successfully returned a binding ref count is
-> >> incremented.
-> >>
-> >> iommu_put_single_reserved decrements the ref count and when this latter
-> >> is null, the mapping is destroyed and the iova is released.
-> >>
-> >> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> >> Signed-off-by: Ankit Jindal <ajindal@apm.com>
-> >> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-> >> Signed-off-by: Bharat Bhushan <Bharat.Bhushan@freescale.com>
-> >>
-> >> ---
-> >>
-> >> v5 -> v6:
-> >> - revisit locking with spin_lock instead of mutex
-> >> - do not kref_get on 1st get
-> >> - add size parameter to the get function following Marc's request
-> >> - use the iova domain shift instead of using the smallest supported page size
-> >>
-> >> v3 -> v4:
-> >> - formerly in iommu: iommu_get/put_single_reserved &
-> >>   iommu/arm-smmu: implement iommu_get/put_single_reserved
-> >> - Attempted to address Marc's doubts about missing size/alignment
-> >>   at VFIO level (user-space knows the IOMMU page size and the number
-> >>   of IOVA pages to provision)
-> >>
-> >> v2 -> v3:
-> >> - remove static implementation of iommu_get_single_reserved &
-> >>   iommu_put_single_reserved when CONFIG_IOMMU_API is not set
-> >>
-> >> v1 -> v2:
-> >> - previously a VFIO API, named vfio_alloc_map/unmap_free_reserved_iova
-> >> ---
-> >>  drivers/iommu/dma-reserved-iommu.c | 146 +++++++++++++++++++++++++++++++++++++
-> >>  include/linux/dma-reserved-iommu.h |  28 +++++++
-> >>  2 files changed, 174 insertions(+)
-> >>
-> >> diff --git a/drivers/iommu/dma-reserved-iommu.c b/drivers/iommu/dma-reserved-iommu.c
-> >> index f592118..3c759d9 100644
-> >> --- a/drivers/iommu/dma-reserved-iommu.c
-> >> +++ b/drivers/iommu/dma-reserved-iommu.c
-> >> @@ -136,3 +136,149 @@ void iommu_free_reserved_iova_domain(struct iommu_domain *domain)
-> >>  	spin_unlock_irqrestore(&domain->reserved_lock, flags);
-> >>  }
-> >>  EXPORT_SYMBOL_GPL(iommu_free_reserved_iova_domain);
-> >> +
-> >> +static void delete_reserved_binding(struct iommu_domain *domain,
-> >> +				    struct iommu_reserved_binding *b)
-> >> +{
-> >> +	struct iova_domain *iovad =
-> >> +		(struct iova_domain *)domain->reserved_iova_cookie;
-> >> +	unsigned long order = iova_shift(iovad);
-> >> +
-> >> +	iommu_unmap(domain, b->iova, b->size);
-> >> +	free_iova(iovad, b->iova >> order);
-> >> +	kfree(b);
-> >> +}
-> >> +
-> >> +int iommu_get_reserved_iova(struct iommu_domain *domain,
-> >> +			      phys_addr_t addr, size_t size, int prot,
-> >> +			      dma_addr_t *iova)
-> >> +{
-> >> +	struct iova_domain *iovad =
-> >> +		(struct iova_domain *)domain->reserved_iova_cookie;
-> >> +	unsigned long order = iova_shift(iovad);
+Signed-off-by: P L Sai Krishna <lakshmis@xilinx.com>
+---
+v2:
+ - Replaced dummy with dummy_cycles.
+ 
+ drivers/spi/spi-zynqmp-gqspi.c | 57 ++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 55 insertions(+), 2 deletions(-)
 
-Another nit: this call should be after the !iovad check below
-
-> >> +	unsigned long  base_pfn, end_pfn, nb_iommu_pages;
-> >> +	size_t iommu_page_size = 1 << order, binding_size;
-> >> +	phys_addr_t aligned_base, offset;
-> >> +	struct iommu_reserved_binding *b, *newb;
-> >> +	unsigned long flags;
-> >> +	struct iova *p_iova;
-> >> +	bool unmap = false;
-> >> +	int ret;
-> >> +
-> >> +	base_pfn = addr >> order;
-> >> +	end_pfn = (addr + size - 1) >> order;
-> >> +	nb_iommu_pages = end_pfn - base_pfn + 1;
-> >> +	aligned_base = base_pfn << order;
-> >> +	offset = addr - aligned_base;
-> >> +	binding_size = nb_iommu_pages * iommu_page_size;
-> >> +
-> >> +	if (!iovad)
-> >> +		return -EINVAL;
-> >> +
-> >> +	spin_lock_irqsave(&domain->reserved_lock, flags);
-> >> +
-> >> +	b = find_reserved_binding(domain, aligned_base, binding_size);
-> >> +	if (b) {
-> >> +		*iova = b->iova + offset;
-> >> +		kref_get(&b->kref);
-> >> +		ret = 0;
-> >> +		goto unlock;
-> >> +	}
-> >> +
-> >> +	spin_unlock_irqrestore(&domain->reserved_lock, flags);
-> >> +
-> >> +	/*
-> >> +	 * no reserved IOVA was found for this PA, start allocating and
-> >> +	 * registering one while the spin-lock is not held. iommu_map/unmap
-> >> +	 * are not supposed to be atomic
-> >> +	 */
-> >> +
-> >> +	p_iova = alloc_iova(iovad, nb_iommu_pages, iovad->dma_32bit_pfn, true);
-> >> +	if (!p_iova)
-> >> +		return -ENOMEM;
-> > 
-> > Here we're using iovad, which was the reserved_iova_cookie outside of
-> > the locking, which makes the locking ineffective.  Isn't this lock also
-> > protecting our iova domain, I'm confused.
-> I think I was too when I wrote that :-(
-> > 
-> >> +
-> >> +	*iova = iova_dma_addr(iovad, p_iova);
-> >> +
-> >> +	newb = kzalloc(sizeof(*b), GFP_KERNEL);
-> needs to to be GPF_ATOMIC as Jean-Philippe stated before.
-> >> +	if (!newb) {
-> >> +		free_iova(iovad, p_iova->pfn_lo);
-> >> +		return -ENOMEM;
-> >> +	}
-> >> +
-> >> +	ret = iommu_map(domain, *iova, aligned_base, binding_size, prot);
-> one problem I have is I would need iommu_map to be atomic (because of
-> the call sequence reported by Jean-Philippe) and I have no guarantee it
-> is in general I think . It is for arm-smmu(-v3).c which covers the ARM
-> use case. But what about other smmus potentially used in that process?
-
-Hmm, indeed. How about we move all the heavy mapping work to
-msi_domain_prepare_irqs instead? It is allowed to sleep and, more
-importantly, fail. It is called much earlier, by pci_enable_msi_range.
-
-All we are missing is details about doorbells, which we could retrieve
-from the MSI controller's driver, using one or more additional callbacks
-in msi_domain_ops. Currently, we already need one such callbacks for
-querying the number of doorbell pages, maybe we could also ask the
-driver to provide their addresses? And in msi_domain_activate, simply
-search for the IOVA already associated with the MSI message?
-
-I only briefly though about it from the host point of view, not sure how
-VFIO would cope with this method.
-
-Thanks,
-Jean-Philippe
+diff --git a/drivers/spi/spi-zynqmp-gqspi.c b/drivers/spi/spi-zynqmp-gqspi.c
+index aab9b49..a4b109e 100644
+--- a/drivers/spi/spi-zynqmp-gqspi.c
++++ b/drivers/spi/spi-zynqmp-gqspi.c
+@@ -134,6 +134,9 @@
+ #define GQSPI_SELECT_MODE_QUADSPI	0x4
+ #define GQSPI_DMA_UNALIGN		0x3
+ #define GQSPI_DEFAULT_NUM_CS	1	/* Default number of chip selects */
++#define GQSPI_RX_BUS_WIDTH_QUAD		0x4
++#define GQSPI_RX_BUS_WIDTH_DUAL		0x2
++#define GQSPI_RX_BUS_WIDTH_SINGLE	0x1
+ 
+ enum mode_type {GQSPI_MODE_IO, GQSPI_MODE_DMA};
+ 
+@@ -169,6 +172,7 @@ struct zynqmp_qspi {
+ 	u32 genfifobus;
+ 	u32 dma_rx_bytes;
+ 	dma_addr_t dma_addr;
++	u32 rx_bus_width;
+ 	u32 genfifoentry;
+ 	enum mode_type mode;
+ };
+@@ -541,6 +545,35 @@ static void zynqmp_qspi_filltxfifo(struct zynqmp_qspi *xqspi, int size)
+ }
+ 
+ /**
++ * zynqmp_qspi_preparedummy:	Prepares the dummy entry
++ *
++ * @xqspi:	Pointer to the zynqmp_qspi structure
++ * @transfer:	It is a pointer to the structure containing transfer data.
++ * @genfifoentry:	genfifoentry is pointer to the variable in which
++ *			GENFIFO	mask is returned to calling function
++ */
++static void zynqmp_qspi_preparedummy(struct zynqmp_qspi *xqspi,
++					struct spi_transfer *transfer,
++					u32 *genfifoentry)
++{
++	/* For dummy Tx and Rx are NULL */
++	*genfifoentry &= ~(GQSPI_GENFIFO_TX | GQSPI_GENFIFO_RX);
++
++	/* SPI mode */
++	*genfifoentry &= ~GQSPI_GENFIFO_MODE_QUADSPI;
++	if (xqspi->rx_bus_width == GQSPI_RX_BUS_WIDTH_QUAD)
++		*genfifoentry |= GQSPI_GENFIFO_MODE_QUADSPI;
++	else if (xqspi->rx_bus_width == GQSPI_RX_BUS_WIDTH_DUAL)
++		*genfifoentry |= GQSPI_GENFIFO_MODE_DUALSPI;
++	else
++		*genfifoentry |= GQSPI_GENFIFO_MODE_SPI;
++
++	/* Immediate data */
++	*genfifoentry &= ~GQSPI_GENFIFO_IMM_DATA_MASK;
++	*genfifoentry |= transfer->dummy_cycles;
++}
++
++/**
+  * zynqmp_qspi_readrxfifo:	Fills the RX FIFO as long as there is room in
+  *				the FIFO.
+  * @xqspi:	Pointer to the zynqmp_qspi structure
+@@ -771,7 +804,7 @@ static void zynqmp_qspi_txrxsetup(struct zynqmp_qspi *xqspi,
+ 		*genfifoentry |= GQSPI_GENFIFO_TX;
+ 		*genfifoentry |=
+ 			zynqmp_qspi_selectspimode(xqspi, transfer->tx_nbits);
+-		xqspi->bytes_to_transfer = transfer->len;
++		xqspi->bytes_to_transfer = transfer->len - (transfer->dummy_cycles/8);
+ 		if (xqspi->mode == GQSPI_MODE_DMA) {
+ 			config_reg = zynqmp_gqspi_read(xqspi,
+ 							GQSPI_CONFIG_OFST);
+@@ -832,13 +865,19 @@ static int zynqmp_qspi_start_transfer(struct spi_master *master,
+ 	if (xqspi->mode == GQSPI_MODE_DMA)
+ 		transfer_len = xqspi->dma_rx_bytes;
+ 	else
+-		transfer_len = transfer->len;
++		transfer_len = transfer->len - (transfer->dummy_cycles/8);
+ 
+ 	xqspi->genfifoentry = genfifoentry;
+ 	if ((transfer_len) < GQSPI_GENFIFO_IMM_DATA_MASK) {
+ 		genfifoentry &= ~GQSPI_GENFIFO_IMM_DATA_MASK;
+ 		genfifoentry |= transfer_len;
+ 		zynqmp_gqspi_write(xqspi, GQSPI_GEN_FIFO_OFST, genfifoentry);
++		if (transfer->dummy_cycles) {
++			zynqmp_qspi_preparedummy(xqspi, transfer,
++					&genfifoentry);
++			zynqmp_gqspi_write(xqspi, GQSPI_GEN_FIFO_OFST,
++					genfifoentry);
++		}
+ 	} else {
+ 		int tempcount = transfer_len;
+ 		u32 exponent = 8;	/* 2^8 = 256 */
+@@ -979,6 +1018,8 @@ static int zynqmp_qspi_probe(struct platform_device *pdev)
+ 	struct zynqmp_qspi *xqspi;
+ 	struct resource *res;
+ 	struct device *dev = &pdev->dev;
++	struct device_node *nc;
++	u32 rx_bus_width;
+ 
+ 	master = spi_alloc_master(&pdev->dev, sizeof(*xqspi));
+ 	if (!master)
+@@ -1039,6 +1080,18 @@ static int zynqmp_qspi_probe(struct platform_device *pdev)
+ 		goto clk_dis_all;
+ 	}
+ 
++	xqspi->rx_bus_width = GQSPI_RX_BUS_WIDTH_SINGLE;
++	for_each_available_child_of_node(pdev->dev.of_node, nc) {
++		ret = of_property_read_u32(nc, "spi-rx-bus-width",
++					&rx_bus_width);
++		if (!ret) {
++			xqspi->rx_bus_width = rx_bus_width;
++			break;
++		}
++	}
++	if (ret)
++		dev_err(dev, "rx bus width not found\n");
++
+ 	master->num_chipselect = GQSPI_DEFAULT_NUM_CS;
+ 
+ 	master->setup = zynqmp_qspi_setup;
+-- 
+2.1.2
