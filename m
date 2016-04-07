@@ -1,54 +1,49 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 7 Apr 2016 16:41:08 -0500
-Subject: [PATCH 2/2] pci, acpi: free IO resource during shutdown
-In-Reply-To: <57069CAF.8090803@codeaurora.org>
-References: <1457389310-3538-1-git-send-email-okaya@codeaurora.org>
- <1457389310-3538-2-git-send-email-okaya@codeaurora.org>
- <20160407160624.GB8780@localhost> <57069CAF.8090803@codeaurora.org>
-Message-ID: <20160407214108.GB24492@localhost>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 07 Apr 2016 14:45:46 -0700
+Subject: [PATCH v6 1/2] ARM: dma-mapping: Don't use outer_flush_range when
+ the L2C is coherent
+In-Reply-To: <20160407185704.GH19428@n2100.arm.linux.org.uk> (Russell King's
+ message of "Thu, 7 Apr 2016 19:57:04 +0100")
+References: <1459415380-18004-1-git-send-email-gregory.clement@free-electrons.com>
+ <1459415380-18004-2-git-send-email-gregory.clement@free-electrons.com>
+ <20160407185704.GH19428@n2100.arm.linux.org.uk>
+Message-ID: <871t6hjdo5.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 07, 2016 at 01:45:19PM -0400, Sinan Kaya wrote:
-> On 4/7/2016 12:06 PM, Bjorn Helgaas wrote:
-> >> __release_pci_root_info function if the region type is IO.
-> > I don't know what "removing a slot" means.  You're changing
-> > pci_root.c, so I assume this is really an ACPI host bridge removal?
-> > 
-> 
-> Correct, I'm removing the host bridge.
-> 
-> > The release should correspond to a mapping, and the changelog should
-> > point out where that mapping happens so we can see the symmetry.
-> > 
-> 
-> I apologize. This is based on Tomasz's v5 patch here.
-> 
-> https://github.com/semihalf-nowicki-tomasz/linux/blob/pci-acpi-v5/drivers/acpi/pci_root.c
-> 
-> 
-> > You say this is undoing the effect of pci_remap_iospace(), but that's
-> > only called by native drivers and the generic (OF) driver, not by
-> > pci_root.c.
-> 
-> See the ACPI root bridge driver above.
+Hi Russell King,
+ 
+ On jeu., avril 07 2016, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-If this is a fix to patches that haven't been merged yet, we need to
-squash the fix into the patches.
+> On Thu, Mar 31, 2016 at 11:09:39AM +0200, Gregory CLEMENT wrote:
+>> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+>> index deac58d5f1f7..1538bb293e90 100644
+>> --- a/arch/arm/mm/dma-mapping.c
+>> +++ b/arch/arm/mm/dma-mapping.c
+>> @@ -61,7 +61,7 @@ struct arm_dma_free_args {
+>>  
+>>  struct arm_dma_allocator {
+>>  	void *(*alloc)(struct arm_dma_alloc_args *args,
+>> -		       struct page **ret_page);
+>> +		       struct page **ret_page, bool is_coherent);
+>
+> This should be named "l2_coherent" because it controls whether L2
+> cache flushing is done: L1 cache flushing calls are still present.
 
-> > Please combine this with the previous patch so we have the new
-> > function and its use in the same patch.
-> 
-> I can do that. I was trying to keep the reviews as small as possible.
+I've just sent a new version taking into account your remark.
 
-The object is not to make patches as small as possible.  The object is
-to make them easy to review, merge, bisect, revert, and backport.  If
-we're adding something new and it's called by many arches or many
-drivers, we might have to split it up for merging through several
-trees or so we can revert pieces independently.  But here there's only
-one caller and I don't think we get any benefit from splitting it.
+Thanks,
 
-But I guess this is all moot since it should be squashed into whatever
-added the pci_remap_iospace() in the first place.
+Gregory
 
-Bjorn
+>
+> -- 
+> RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
