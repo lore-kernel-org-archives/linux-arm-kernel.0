@@ -1,45 +1,46 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 7 Apr 2016 13:45:19 -0400
-Subject: [PATCH 2/2] pci, acpi: free IO resource during shutdown
-In-Reply-To: <20160407160624.GB8780@localhost>
-References: <1457389310-3538-1-git-send-email-okaya@codeaurora.org>
- <1457389310-3538-2-git-send-email-okaya@codeaurora.org>
- <20160407160624.GB8780@localhost>
-Message-ID: <57069CAF.8090803@codeaurora.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 07 Apr 2016 10:46:18 -0700
+Subject: [GIT PULL] ARM: mvebu: defconfig for v4.7 (#1)
+Message-ID: <87pou1jor9.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/7/2016 12:06 PM, Bjorn Helgaas wrote:
->> __release_pci_root_info function if the region type is IO.
-> I don't know what "removing a slot" means.  You're changing
-> pci_root.c, so I assume this is really an ACPI host bridge removal?
-> 
+Hi,
 
-Correct, I'm removing the host bridge.
+Here is the first pull request for defconfig for mvebu for v4.7.
 
-> The release should correspond to a mapping, and the changelog should
-> point out where that mapping happens so we can see the symmetry.
-> 
+Gregory
 
-I apologize. This is based on Tomasz's v5 patch here.
+The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 
-https://github.com/semihalf-nowicki-tomasz/linux/blob/pci-acpi-v5/drivers/acpi/pci_root.c
+  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
 
+are available in the git repository at:
 
-> You say this is undoing the effect of pci_remap_iospace(), but that's
-> only called by native drivers and the generic (OF) driver, not by
-> pci_root.c.
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-defconfig-4.7-1
 
-See the ACPI root bridge driver above.
+for you to fetch changes up to e5a80a6e2f2d1b2afd6439d8f58356e93b77cb2d:
 
-> 
-> Please combine this with the previous patch so we have the new
-> function and its use in the same patch.
-> 
+  ARM: configs: Switching to the new Marvell's cryptographic engine driver for mvebu_v5_defconfig (2016-03-30 11:51:16 +0200)
 
-I can do that. I was trying to keep the reviews as small as possible.
+----------------------------------------------------------------
+mvebu defconfig for 4.7 (part 1)
 
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+- Use the new cryto engine(mv_cesa) in the mvebu and multi-arm
+  defcongig files
+- Attach mvebu_*_defconfig to the mvebu maintainers
+
+----------------------------------------------------------------
+Romain Perier (3):
+      ARM: configs: Enabling the new Marvell's cryptographic engine driver for mvebu_v7_defconfig
+      ARM: configs: Enabling the new Marvell's cryptographic engine driver for multi_v7_defconfig
+      ARM: configs: Switching to the new Marvell's cryptographic engine driver for mvebu_v5_defconfig
+
+Thomas Petazzoni (1):
+      MAINTAINERS: attach arch/arm/configs/mvebu_*_defconfig to relevant maintainers
+
+ MAINTAINERS                         | 2 +-
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ arch/arm/configs/mvebu_v5_defconfig | 2 +-
+ arch/arm/configs/mvebu_v7_defconfig | 1 +
+ 4 files changed, 4 insertions(+), 2 deletions(-)
