@@ -1,54 +1,62 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 7 Apr 2016 13:32:17 +0300
-Subject: [PATCH 1/4] mailbox/omap: store mailbox interrupt type in
- omap_mbox_device
-In-Reply-To: <1459985840-1106-2-git-send-email-s-anna@ti.com>
-References: <1459985840-1106-1-git-send-email-s-anna@ti.com>
- <1459985840-1106-2-git-send-email-s-anna@ti.com>
-Message-ID: <57063731.9010201@ti.com>
+From: julien.grall@arm.com (Julien Grall)
+Date: Thu, 7 Apr 2016 11:32:50 +0100
+Subject: [PATCH v10 06/17] Xen: ARM: Add support for mapping platform
+ device mmio
+In-Reply-To: <5705B9BD.1020403@huawei.com>
+References: <1459525755-36968-1-git-send-email-shannon.zhao@linaro.org>
+ <1459525755-36968-7-git-send-email-shannon.zhao@linaro.org>
+ <5704FE2C.5000902@arm.com> <5705B9BD.1020403@huawei.com>
+Message-ID: <57063752.4020805@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/07/2016 02:37 AM, Suman Anna wrote:
-> The interrupt type used for identifying the layout of the interrupt
-> configuration registers between OMAP4+ SoCs and older SoCs is stored
-> only in the sub-mailbox structures for easier access. Store this type
-> in the the omap_mbox_device structure as well along with the other
-> global variables. This is being done to facilitate the context save
-> and restore of appropriate registers during system suspend/resume.
->
-> Signed-off-by: Suman Anna <s-anna@ti.com>
-> ---
->   drivers/mailbox/omap-mailbox.c | 2 ++
->   1 file changed, 2 insertions(+)
->
-> diff --git a/drivers/mailbox/omap-mailbox.c b/drivers/mailbox/omap-mailbox.c
-> index 84cafc02e761..adf37f494690 100644
-> --- a/drivers/mailbox/omap-mailbox.c
-> +++ b/drivers/mailbox/omap-mailbox.c
-> @@ -90,6 +90,7 @@ struct omap_mbox_device {
->   	void __iomem *mbox_base;
->   	u32 num_users;
->   	u32 num_fifos;
-> +	u32 intr_type;
->   	struct omap_mbox **mboxes;
->   	struct mbox_controller controller;
->   	struct list_head elem;
-> @@ -828,6 +829,7 @@ static int omap_mbox_probe(struct platform_device *pdev)
->   	mdev->dev = &pdev->dev;
->   	mdev->num_users = num_users;
->   	mdev->num_fifos = num_fifos;
-> +	mdev->intr_type = intr_type;
->   	mdev->mboxes = list;
->
->   	/* OMAP does not have a Tx-Done IRQ, but rather a Tx-Ready IRQ */
->
+Hi Shannon,
 
-This smth. which definitely has to be done using compatible props.
-Why not to pass more info through of_device_id->data?
+On 07/04/16 02:37, Shannon Zhao wrote:
+>
+>
+> On 2016/4/6 20:16, Julien Grall wrote:
+>>> +            gpfns[j] = XEN_PFN_DOWN(r->start) + j;
+>>> +            idxs[j] = XEN_PFN_DOWN(r->start) + j;
+>>> +        }
+>>> +
+>>> +        xatp.domid = DOMID_SELF;
+>>> +        xatp.size = nr;
+>>> +        xatp.space = XENMAPSPACE_dev_mmio;
+>>> +
+>>> +        set_xen_guest_handle(xatp.gpfns, gpfns);
+>>> +        set_xen_guest_handle(xatp.idxs, idxs);
+>>> +        set_xen_guest_handle(xatp.errs, errs);
+>>> +
+>>> +        rc = HYPERVISOR_memory_op(XENMEM_add_to_physmap_range, &xatp);
+>>> +        kfree(gpfns);
+>>> +        kfree(idxs);
+>>> +        kfree(errs);
+>>> +        if (rc)
+>>> +            return rc;
+>>
+>> Shouldn't we redo the mapping if the hypercall fails?
+> Hmm, why? If it fails again when we redo the mapping, what should we do
+> then? Redo again?
 
+Because the device MMIO region is left half mapped in DOM0 address space.
 
+After having another look to your patch, if an error occurs, the 
+notifier will still return NOTIFY_OK. This will lead to random data 
+abort when the driver is accessing the MMIO regions as the device will 
+be considered fully functional.
+
+However, even if the notifier return NOTIFY_BAD, the function device_add 
+doesn't care about the return value of blocking_notifier_call_chain. I 
+think this need to be fixed.
+
+> I think if it fails at the first time it will always fail no matter how
+> many times we do.
+
+I was speaking about the mappings that succeeded. They will unlikely 
+fail during removal. If they ever fail you can just ignore the error.
+
+Regards,
 
 -- 
-regards,
--grygorii
+Julien Grall
