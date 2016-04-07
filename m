@@ -1,81 +1,170 @@
 From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 7 Apr 2016 11:06:24 -0500
-Subject: [PATCH 2/2] pci, acpi: free IO resource during shutdown
-In-Reply-To: <1457389310-3538-2-git-send-email-okaya@codeaurora.org>
-References: <1457389310-3538-1-git-send-email-okaya@codeaurora.org>
- <1457389310-3538-2-git-send-email-okaya@codeaurora.org>
-Message-ID: <20160407160624.GB8780@localhost>
+Date: Thu, 7 Apr 2016 11:19:42 -0500
+Subject: [PATCH] arm/arm64/irqchip/pci: select PCI_MSI instead of
+ depending on it
+In-Reply-To: <1458212069-896315-1-git-send-email-arnd@arndb.de>
+References: <1458212069-896315-1-git-send-email-arnd@arndb.de>
+Message-ID: <20160407161942.GC8780@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sinan,
-
-On Mon, Mar 07, 2016 at 05:21:50PM -0500, Sinan Kaya wrote:
-> The ACPI PCI driver is leaking out memory mappings
-> when a slot is removed. Upon insertion following a
-> removal, we are hitting a BUG statement. Second call
-> to the remap API hits a bug statement because the area is
-> already mapped. This patch releases additional virtual
-> memory mapped by pci_remap_iospace function as part of
-> __release_pci_root_info function if the region type is IO.
-
-I don't know what "removing a slot" means.  You're changing
-pci_root.c, so I assume this is really an ACPI host bridge removal?
-
-The release should correspond to a mapping, and the changelog should
-point out where that mapping happens so we can see the symmetry.
-
-You say this is undoing the effect of pci_remap_iospace(), but that's
-only called by native drivers and the generic (OF) driver, not by
-pci_root.c.
-
-Please combine this with the previous patch so we have the new
-function and its use in the same patch.
-
->  BUG: failure at kernel/lib/ioremap.c:31/ioremap_pte_range()!
->  Kernel panic - not syncing: BUG!
->  CPU: 1 PID: 630 Comm: kworker/u48:3 Not tainted
->  Workqueue: kacpi_hotplug acpi_hotplug_work_fn Call trace:
->  dump_backtrace+0x0/0x10c [<ffff800000086e58>]
->  show_stack+0x10/0x1c [<ffff8000004d1f50>]
->  dump_stack+0x74/0xc4
->  panic+0xe4/0x21c [<ffff8000002577cc>]
->  ioremap_page_range+0x290/0x30c [<ffff8000002861dc>]
->  pci_remap_iospace+0x88/0xa0 [<ffff8000000908f8>]
->  setup_resource+0x114/0x16c [<ffff8000002c0fc0>]
->  acpi_walk_resource_buffer+0x54/0xb0
->  acpi_walk_resources+0x90/0xbc
->  pci_acpi_scan_root+0x184/0x2d0
->  acpi_pci_root_add+0x368/0x434
->  acpi_bus_attach+0x124/0x22c [<ffff8000002a5628>]
->  acpi_bus_scan+0x58/0x74 [<ffff8000002a57c0>]
->  acpi_device_hotplug+0xc4/0x3f0 [<ffff8000002a0468>]
->  acpi_hotplug_work_fn+0x1c/0x34 [<ffff8000000b9310>]
->  process_one_work+0x1e8/0x308 [<ffff8000000b9b04>]
->  worker_thread+0x294/0x3cc  [<ffff8000000bd9
+On Thu, Mar 17, 2016 at 11:52:49AM +0100, Arnd Bergmann wrote:
+> The PCI_MSI symbol is used inconsistently throughout the tree,
+> with some drivers using 'select' and others using 'depends on',
+> or using conditional selects. This keeps causing problems,
+> and the latest one is a result of ARCH_ALPINE using a 'select'
+> statement to enable its platform specific MSI driver but not
+> enabling MSI support first:
 > 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> warning: (ARCH_ALPINE) selects ALPINE_MSI which has unmet direct dependencies (PCI && PCI_MSI)
+> drivers/irqchip/irq-alpine-msi.c:104:15: error: variable 'alpine_msix_domain_info' has initializer but incomplete type
+>  static struct msi_domain_info alpine_msix_domain_info = {
+>                ^~~~~~~~~~~~~~~
+> drivers/irqchip/irq-alpine-msi.c:105:2: error: unknown field 'flags' specified in initializer
+>   .flags = MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
+>   ^
+> drivers/irqchip/irq-alpine-msi.c:105:11: error: 'MSI_FLAG_USE_DEF_DOM_OPS' undeclared here (not in a function)
+>   .flags = MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
+>            ^~~~~~~~~~~~~~~~~~~~~~~~
+> 
+> There is little reason to enable PCI support for a platform that
+> uses MSI but then leaving MSI disabled at compile time, so this
+> patch changes the various Kconfig statement relating to PCI_MSI
+> so they all use 'select'.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Suggested-by: Marc Zyngier <marc.zyngier@arm.com>
+
+I tentatively applied this with Jason's ack to pci/msi for v4.7.
+
+But it sounds like ALPINE is currently broken, so maybe this should go
+in v4.6 instead?  Or if it should go through a different tree, that's
+fine too.  Just let me know.
+
 > ---
->  drivers/acpi/pci_root.c | 2 ++
->  1 file changed, 2 insertions(+)
+>  arch/arm/Kconfig         |  3 ++-
+>  arch/arm64/Kconfig       |  4 ++--
+>  drivers/irqchip/Kconfig  | 11 ++++++++---
+>  drivers/pci/host/Kconfig | 10 ++++++----
+>  4 files changed, 18 insertions(+), 10 deletions(-)
 > 
-> diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
-> index 71bbfae..6d4bc2d 100644
-> --- a/drivers/acpi/pci_root.c
-> +++ b/drivers/acpi/pci_root.c
-> @@ -946,6 +946,8 @@ static void acpi_pci_root_release_info(struct pci_host_bridge *bridge)
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index aa9f67a89620..1c4e38764f02 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -703,9 +703,10 @@ config ARCH_VIRT
+>  	depends on ARCH_MULTI_V7
+>  	select ARM_AMBA
+>  	select ARM_GIC
+> -	select ARM_GIC_V2M if PCI_MSI
+> +	select ARM_GIC_V2M
+>  	select ARM_GIC_V3
+>  	select ARM_PSCI
+> +	select PCI
+>  	select HAVE_ARM_ARCH_TIMER
 >  
->  	resource_list_for_each_entry(entry, &bridge->windows) {
->  		res = entry->res;
-> +		if (res->flags & IORESOURCE_IO)
-> +			pci_unmap_iospace(res);
->  		if (res->parent &&
->  		    (res->flags & (IORESOURCE_MEM | IORESOURCE_IO)))
->  			release_resource(res);
+>  #
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 4f436220384f..c9a3161e0aed 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -19,9 +19,9 @@ config ARM64
+>  	select ARM_ARCH_TIMER
+>  	select ARM_GIC
+>  	select AUDIT_ARCH_COMPAT_GENERIC
+> -	select ARM_GIC_V2M if PCI_MSI
+> +	select ARM_GIC_V2M
+>  	select ARM_GIC_V3
+> -	select ARM_GIC_V3_ITS if PCI_MSI
+> +	select ARM_GIC_V3_ITS
+>  	select ARM_PSCI_FW
+>  	select BUILDTIME_EXTABLE_SORT
+>  	select CLONE_BACKWARDS
+> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+> index 7e8c441ff2de..73ab0ecb9b3b 100644
+> --- a/drivers/irqchip/Kconfig
+> +++ b/drivers/irqchip/Kconfig
+> @@ -16,7 +16,8 @@ config ARM_GIC_MAX_NR
+>  config ARM_GIC_V2M
+>  	bool
+>  	depends on ARM_GIC
+> -	depends on PCI && PCI_MSI
+> +	depends on PCI
+> +	select PCI_MSI
+>  	select PCI_MSI_IRQ_DOMAIN
+>  
+>  config GIC_NON_BANKED
+> @@ -30,6 +31,8 @@ config ARM_GIC_V3
+>  
+>  config ARM_GIC_V3_ITS
+>  	bool
+> +	depends on PCI
+> +	select PCI_MSI
+>  	select PCI_MSI_IRQ_DOMAIN
+>  
+>  config HISILICON_IRQ_MBIGEN
+> @@ -63,11 +66,13 @@ config ARM_VIC_NR
+>  config ARMADA_370_XP_IRQ
+>  	bool
+>  	select GENERIC_IRQ_CHIP
+> -	select PCI_MSI_IRQ_DOMAIN if PCI_MSI
+> +	select PCI_MSI if PCI
+> +	select PCI_MSI_IRQ_DOMAIN if PCI
+>  
+>  config ALPINE_MSI
+>  	bool
+> -	depends on PCI && PCI_MSI
+> +	depends on PCI
+> +	select PCI_MSI
+>  	select GENERIC_IRQ_CHIP
+>  	select PCI_MSI_IRQ_DOMAIN
+>  
+> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> index c5014bf95a20..844d7eb79c45 100644
+> --- a/drivers/pci/host/Kconfig
+> +++ b/drivers/pci/host/Kconfig
+> @@ -118,7 +118,6 @@ config PCI_XGENE
+>  	depends on ARCH_XGENE
+>  	depends on OF
+>  	select PCIEPORTBUS
+> -	select PCI_MSI_IRQ_DOMAIN if PCI_MSI
+>  	help
+>  	  Say Y here if you want internal PCI support on APM X-Gene SoC.
+>  	  There are 5 internal PCIe ports available. Each port is GEN3 capable
+> @@ -126,7 +125,9 @@ config PCI_XGENE
+>  
+>  config PCI_XGENE_MSI
+>  	bool "X-Gene v1 PCIe MSI feature"
+> -	depends on PCI_XGENE && PCI_MSI
+> +	depends on PCI_XGENE
+> +	select PCI_MSI
+> +	select PCI_MSI_IRQ_DOMAIN
+>  	default y
+>  	help
+>  	  Say Y here if you want PCIe MSI support for the APM X-Gene v1 SoC.
+> @@ -175,7 +176,7 @@ config PCIE_IPROC_BCMA
+>  config PCIE_IPROC_MSI
+>  	bool "Broadcom iProc PCIe MSI support"
+>  	depends on PCIE_IPROC_PLATFORM || PCIE_IPROC_BCMA
+> -	depends on PCI_MSI
+> +	select PCI_MSI
+>  	select PCI_MSI_IRQ_DOMAIN
+>  	default ARCH_BCM_IPROC
+>  	help
+> @@ -193,7 +194,8 @@ config PCIE_ALTERA
+>  
+>  config PCIE_ALTERA_MSI
+>  	bool "Altera PCIe MSI feature"
+> -	depends on PCIE_ALTERA && PCI_MSI
+> +	depends on PCIE_ALTERA
+> +	select PCI_MSI
+>  	select PCI_MSI_IRQ_DOMAIN
+>  	help
+>  	  Say Y here if you want PCIe MSI support for the Altera FPGA.
 > -- 
-> 1.8.2.1
+> 2.7.0
 > 
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
 > the body of a message to majordomo at vger.kernel.org
 > More majordomo info at  http://vger.kernel.org/majordomo-info.html
