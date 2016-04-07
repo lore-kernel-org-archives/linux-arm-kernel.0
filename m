@@ -1,46 +1,56 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Thu, 07 Apr 2016 14:28:47 +0800
-Subject: [PATCH RESEND] ARM: zx: zx296702-pm-domain.c: Fix check return
- value of devm_ioremap_resource
-Message-ID: <1460010527.21561.0.camel@ingics.com>
+From: pratyush.anand@gmail.com (Pratyush Anand)
+Date: Thu, 7 Apr 2016 12:29:09 +0530
+Subject: [PATCH v2] PCI: designware: move remaining rc setup code to
+ dw_pcie_setup_rc()
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1ED40E52@lhreml503-mbs>
+References: <1458128433-3020-1-git-send-email-jszhang@marvell.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ED40E52@lhreml503-mbs>
+Message-ID: <CAHM4w1khRn4xbWbj5Qk-p5DMGjEdWfgr1W1OSsXPFVaYenFa8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-devm_ioremap_resource() returns ERR_PTR on failure.
-devm_ioremap_resource() will also check res argument and show proper error
-on error path, so remove the redundant checking for res and error messages.
+Hi Gab,
 
-Signed-off-by: Axel Lin <axel.lin@ingics.com>
-Reviewed-by: Jun Nie <jun.nie@linaro.org>
----
-This was sent on
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/370318.html
+Thanks for bringing it.
 
- arch/arm/mach-zx/zx296702-pm-domain.c | 11 ++---------
- 1 file changed, 2 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-zx/zx296702-pm-domain.c b/arch/arm/mach-zx/zx296702-pm-domain.c
-index e08574d..17f778b 100644
---- a/arch/arm/mach-zx/zx296702-pm-domain.c
-+++ b/arch/arm/mach-zx/zx296702-pm-domain.c
-@@ -163,16 +163,9 @@ static int zx296702_pd_probe(struct platform_device *pdev)
- 	genpd_data->num_domains = ARRAY_SIZE(zx296702_pm_domains);
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	if (!res) {
--		dev_err(&pdev->dev, "no memory resource defined\n");
--		return -ENODEV;
--	}
--
- 	pcubase = devm_ioremap_resource(&pdev->dev, res);
--	if (!pcubase) {
--		dev_err(&pdev->dev, "ioremap fail.\n");
--		return -EIO;
--	}
-+	if (IS_ERR(pcubase))
-+		return PTR_ERR(pcubase);
- 
- 	for (i = 0; i < ARRAY_SIZE(zx296702_pm_domains); ++i)
- 		pm_genpd_init(zx296702_pm_domains[i], NULL, false);
--- 
-2.1.4
+On Wed, Apr 6, 2016 at 8:20 PM, Gabriele Paoloni
+<gabriele.paoloni@huawei.com> wrote:
+> Hi, sorry to be late on this
+>
+>> -----Original Message-----
+>> From: linux-kernel-owner at vger.kernel.org [mailto:linux-kernel-
+>> owner at vger.kernel.org] On Behalf Of Jisheng Zhang
+>> Sent: 16 March 2016 11:41
+>> To: jingoohan1 at gmail.com; pratyush.anand at gmail.com; bhelgaas at google.com
+>> Cc: linux-pci at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
+>> kernel at lists.infradead.org; Jisheng Zhang
+>> Subject: [PATCH v2] PCI: designware: move remaining rc setup code to
+>> dw_pcie_setup_rc()
+>>
+>> dw_pcie_setup_rc(), as its name indicates, setups the RC. But current
+>> dw_pcie_host_init() also contains some necessary rc setup code.
+>>
+>> Another reason: the host may lost power during suspend to ram, the RC
+>> need to be re-setup after resume. The rc can't be correctly resumed
+>> without the rc setup code in dw_pcie_host_init().
+>>
+>> So this patch moves the code to dw_pcie_setup_rc() to address the above
+>> two issues. After this patch, each pcie designware driver users could
+>> call dw_pcie_setup_rc() to re-setup rc when resume back.
+>
+> I think this patch breaks the Hisilicon driver...
+>
+> Our driver performs linkup setup in UEFI therefore we do not call
+> dw_pcie_setup_rc(), we only call dw_pcie_host_init().
+>
+> Maybe better to group the part of code to be moved in as separate
+> function...
+>
+> Thanks and sorry for late reply.
+>
+
+I am just wondering, should n't then what ever we do in
+dw_pcie_setup_rc() be done in your boot loader and not just link up.
+
+~Pratyush
