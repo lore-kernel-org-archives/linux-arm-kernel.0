@@ -1,41 +1,72 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 07 Apr 2016 10:35:45 -0700
-Subject: [GIT PULL] ARM: mvebu: fixes for v4.6 (#1)
-Message-ID: <87r3ehjp8u.fsf@free-electrons.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 7 Apr 2016 10:40:20 -0700
+Subject: 4.4: camera and unlock buttons produce tons of interrupts (was
+ Re: N900 sleep mode)
+In-Reply-To: <20160405205137.GA10196@amd>
+References: <20160201221111.GP19432@atomide.com> <20160207212316.GA6147@amd>
+ <20160209172403.GK19432@atomide.com> <20160323123801.GC32031@amd>
+ <20160330191208.GW9329@atomide.com> <20160404213056.GA25912@amd>
+ <20160404220748.GA16484@atomide.com> <20160405142250.GA6429@amd>
+ <20160405152916.GE16484@atomide.com> <20160405205137.GA10196@amd>
+Message-ID: <20160407174019.GM16484@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Here is the first pull request for fixes for mvebu for v4.6.
+* Pavel Machek <pavel@ucw.cz> [160405 13:52]:
+> Hi!
+> 
+> > > Ok, I realized that _something_ set up my keyboard on console, too, so
+> > > I'm able to do "init 1" and still interact with the console.
+> > > 
+> > > cm_idlest1_core blocking bits are now 0x42 pretty consistently. But
+> > > they stay 0x42, even when screen is on (and screen on prevents low
+> > > power, right?) so I guess they are not the whole story.
+> > 
+> > Yes they stay at 0x42. And it seems you've configured the UART
+> > idle timeouts too.
+> 
+> Yes, thanks for the script ;-).
+> 
+> > > I'm able to get down to 50mA power consumption with screen off. I was
+> > > getting 90mA with X, wifi in powersave and screen off.
+> > > 
+> > > Head proximity sensor is still on in this configuration. But I guess
+> > > that should not keep the system busy...?
+> > > 
+> > > Ok, wait a moment, I'm getting "Camera Focus", "Camera Capture" and
+> > > "Lock button" interrupts ... at something like 20/second. Without
+> > > touching anything. Hmm. Also "pm_wkup", but that might be
+> > > expected. Plus, 49052000.gpio and 49054000.gpio are rather
+> > > active. Might be related to the above. Also "gp_timer" and
+> > > 48070000.i2c are active, perhaps also related. I don't think I have
+> > > the camera working...
+> > 
+> > Hmm that does not sound right at all for the GPIOs. The pm_wkup
+> > interrupt triggers every time you hit wfi pretty much, so that
+> > should be OK.
+> 
+> Wifi was down at that point.
+> 
+> Some more testing: after boot, interrupt counts stay low, as
+> expected. But when I attempt to enable power management, they start
+> rising. Sometimes 60/second, sometimes less.
+> 
+> Things are fine as long as I don't enable the off mode; when I enable
+> the off mode, "echo 1 > /sys/kernel/debug/pm_debug/enable_off_mode"
+> interrupt counts start rising immediately. "echo 0 >
+> /sys/kernel/debug/pm_debug/enable_off_mode" stops that.
+> 
+> But no matter what configuration, activity LEDs still indicate it is
+> busy, and idle power consumption is cca 53mA.
 
-Gregory
+Not seeing that here at all. My n900 with v4.6-rc2 and omap2plus_defconfig
+booted with u-boot keeps hitting off mode with both LEDs going off just
+fine. It's waking up about once a second or a litte bit more often.
 
-The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+Care to post your .config somewhere, I could give that a try?
 
-  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+Regards,
 
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.6-1
-
-for you to fetch changes up to 199831c77c50e6913e893b6bc268ba9f4a9a2bf8:
-
-  ARM: mvebu: Correct unit address for linksys (2016-03-30 11:58:48 +0200)
-
-----------------------------------------------------------------
-mvebu fixes for 4.6 (part 1)
-
-- fix USB adress register for Linksys Armada 388 based boards
-- fix build warning in mvebu-mbus
-
-----------------------------------------------------------------
-Arnd Bergmann (1):
-      bus: mvebu-mbus: use %pa to print phys_addr_t
-
-Patrick Uiterwijk (1):
-      ARM: mvebu: Correct unit address for linksys
-
- arch/arm/boot/dts/armada-385-linksys.dtsi | 2 +-
- drivers/bus/mvebu-mbus.c                  | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+Tony
