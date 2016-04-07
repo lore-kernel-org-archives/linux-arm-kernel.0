@@ -1,185 +1,99 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Thu, 7 Apr 2016 16:23:17 +0800
-Subject: [PATCH v2 2/2] hwrng: hisi: Add support for Hisilicon SoC RNG
-In-Reply-To: <1460017397-30996-1-git-send-email-wangkefeng.wang@huawei.com>
-References: <1460017397-30996-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1460017397-30996-3-git-send-email-wangkefeng.wang@huawei.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 7 Apr 2016 16:34:43 +0800
+Subject: [PATCH v2] PCI: designware: move remaining rc setup code to
+ dw_pcie_setup_rc()
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1ED43F95@lhreml503-mbs>
+References: <1458128433-3020-1-git-send-email-jszhang@marvell.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ED40E52@lhreml503-mbs>
+ <20160407103734.55e72da7@xhacker>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ED43F95@lhreml503-mbs>
+Message-ID: <20160407163443.291fbd49@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the Hisilicon Random Number Generator(RNG) support,
-which is found in Hip04 and Hip05 soc.
+Hi Gabriele,
 
-Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
----
- drivers/char/hw_random/Kconfig    |  13 ++++
- drivers/char/hw_random/Makefile   |   1 +
- drivers/char/hw_random/hisi-rng.c | 121 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 135 insertions(+)
- create mode 100644 drivers/char/hw_random/hisi-rng.c
+On Thu, 7 Apr 2016 08:20:28 +0000 Gabriele Paoloni wrote:
 
-diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
-index 67ee8b0..088b1bf 100644
---- a/drivers/char/hw_random/Kconfig
-+++ b/drivers/char/hw_random/Kconfig
-@@ -333,6 +333,19 @@ config HW_RANDOM_TPM
- 
- 	  If unsure, say Y.
- 
-+config HW_RANDOM_HISI
-+	tristate "Hisilicon Random Number Generator support"
-+	depends on HW_RANDOM && ARCH_HISI
-+	default HW_RANDOM
-+	---help---
-+	  This driver provides kernel-side support for the Random Number
-+	  Generator hardware found on Hisilicon Hip04 and Hip05 SoC.
-+
-+	  To compile this driver as a module, choose M here: the
-+	  module will be called hisi-rng.
-+
-+	  If unsure, say Y.
-+
- config HW_RANDOM_MSM
- 	tristate "Qualcomm SoCs Random Number Generator support"
- 	depends on HW_RANDOM && ARCH_QCOM
-diff --git a/drivers/char/hw_random/Makefile b/drivers/char/hw_random/Makefile
-index f5a6fa7..e09305b 100644
---- a/drivers/char/hw_random/Makefile
-+++ b/drivers/char/hw_random/Makefile
-@@ -26,6 +26,7 @@ obj-$(CONFIG_HW_RANDOM_PPC4XX) += ppc4xx-rng.o
- obj-$(CONFIG_HW_RANDOM_PSERIES) += pseries-rng.o
- obj-$(CONFIG_HW_RANDOM_POWERNV) += powernv-rng.o
- obj-$(CONFIG_HW_RANDOM_EXYNOS)	+= exynos-rng.o
-+obj-$(CONFIG_HW_RANDOM_HISI)	+= hisi-rng.o
- obj-$(CONFIG_HW_RANDOM_TPM) += tpm-rng.o
- obj-$(CONFIG_HW_RANDOM_BCM2835) += bcm2835-rng.o
- obj-$(CONFIG_HW_RANDOM_IPROC_RNG200) += iproc-rng200.o
-diff --git a/drivers/char/hw_random/hisi-rng.c b/drivers/char/hw_random/hisi-rng.c
-new file mode 100644
-index 0000000..3e18e58
---- /dev/null
-+++ b/drivers/char/hw_random/hisi-rng.c
-@@ -0,0 +1,121 @@
-+/*
-+ * Copyright (C) 2016 HiSilicon Co., Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/err.h>
-+#include <linux/kernel.h>
-+#include <linux/hw_random.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+
-+#define RNG_SEED	0x0
-+#define RNG_CTRL	0x4
-+  #define RNG_SEED_SEL	BIT(2)
-+  #define RNG_RING_EN	BIT(1)
-+  #define RNG_EN	BIT(0)
-+#define RNG_RAN_NUM	0x10
-+#define RNG_PHY_SEED	0x14
-+#define RNG_RELOAD_ERR	0x84
-+
-+#define to_hisi_rng(p)	container_of(p, struct hisi_rng, rng)
-+
-+static int seed_sel;
-+module_param(seed_sel, int, S_IRUGO);
-+MODULE_PARM_DESC(seed_sel, "Auto reload seed. 0, use LFSR(default); 1, use ring oscillator.");
-+
-+struct hisi_rng {
-+	void __iomem *base;
-+	struct hwrng rng;
-+};
-+
-+static int hisi_rng_init(struct hwrng *rng)
-+{
-+	struct hisi_rng *hrng = to_hisi_rng(rng);
-+	int val = RNG_EN;
-+	u32 seed;
-+
-+	/* get a random number as initial seed */
-+	get_random_bytes(&seed, sizeof(seed));
-+
-+	writel_relaxed(seed, hrng->base + RNG_SEED);
-+
-+	if (seed_sel == 1)
-+		val |= RNG_RING_EN | RNG_SEED_SEL;
-+
-+	writel_relaxed(val, hrng->base + RNG_CTRL);
-+	return 0;
-+}
-+
-+static void hisi_rng_cleanup(struct hwrng *rng)
-+{
-+	struct hisi_rng *hrng = to_hisi_rng(rng);
-+
-+	writel_relaxed(0, hrng->base + RNG_CTRL);
-+}
-+
-+static int hisi_rng_read(struct hwrng *rng, void *buf, size_t max,
-+			   bool wait)
-+{
-+	struct hisi_rng *hrng = to_hisi_rng(rng);
-+	u32 *data = buf;
-+
-+	*data = readl_relaxed(hrng->base + RNG_RAN_NUM);
-+	return 4;
-+}
-+
-+static int hisi_rng_probe(struct platform_device *pdev)
-+{
-+	struct hisi_rng *rng;
-+	struct resource *res;
-+	int ret;
-+
-+	rng = devm_kzalloc(&pdev->dev, sizeof(*rng), GFP_KERNEL);
-+	if (!rng)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(pdev, rng);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	rng->base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(rng->base))
-+		return PTR_ERR(rng->base);
-+
-+	rng->rng.name = pdev->name;
-+	rng->rng.init = hisi_rng_init;
-+	rng->rng.cleanup = hisi_rng_cleanup;
-+	rng->rng.read = hisi_rng_read;
-+
-+	ret = devm_hwrng_register(&pdev->dev, &rng->rng);
-+	if (ret) {
-+		dev_err(&pdev->dev, "failed to register hwrng\n");
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id hisi_rng_dt_ids[] = {
-+	{ .compatible = "hisilicon,rng" },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, hisi_rng_dt_ids);
-+
-+static struct platform_driver hisi_rng_driver = {
-+	.probe		= hisi_rng_probe,
-+	.driver		= {
-+		.name	= "hisi-rng",
-+		.of_match_table = of_match_ptr(hisi_rng_dt_ids),
-+	},
-+};
-+
-+module_platform_driver(hisi_rng_driver);
-+
-+MODULE_LICENSE("GPL");
-+MODULE_AUTHOR("Kefeng Wang <wangkefeng.wang@huawei>");
-+MODULE_DESCRIPTION("Hisilicon random number generator driver");
--- 
-2.6.0.GIT
+> Hi Jisheng
+> 
+> Thanks for your reply
+> 
+> > -----Original Message-----
+> > From: Jisheng Zhang [mailto:jszhang at marvell.com]
+> > Sent: 07 April 2016 03:38
+> > To: Gabriele Paoloni; jingoohan1 at gmail.com; pratyush.anand at gmail.com;
+> > bhelgaas at google.com
+> > Cc: linux-pci at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
+> > kernel at lists.infradead.org
+> > Subject: Re: [PATCH v2] PCI: designware: move remaining rc setup code
+> > to dw_pcie_setup_rc()
+> > 
+> > Hi Gabriele,
+> > 
+> > On Wed, 6 Apr 2016 14:50:29 +0000 Gabriele Paoloni wrote:
+> >   
+> > > Hi, sorry to be late on this
+> > >  
+> > > > -----Original Message-----
+> > > > From: linux-kernel-owner at vger.kernel.org [mailto:linux-kernel-
+> > > > owner at vger.kernel.org] On Behalf Of Jisheng Zhang
+> > > > Sent: 16 March 2016 11:41
+> > > > To: jingoohan1 at gmail.com; pratyush.anand at gmail.com;  
+> > bhelgaas at google.com  
+> > > > Cc: linux-pci at vger.kernel.org; linux-kernel at vger.kernel.org; linux-  
+> > arm-  
+> > > > kernel at lists.infradead.org; Jisheng Zhang
+> > > > Subject: [PATCH v2] PCI: designware: move remaining rc setup code  
+> > to  
+> > > > dw_pcie_setup_rc()
+> > > >
+> > > > dw_pcie_setup_rc(), as its name indicates, setups the RC. But  
+> > current  
+> > > > dw_pcie_host_init() also contains some necessary rc setup code.
+> > > >
+> > > > Another reason: the host may lost power during suspend to ram, the  
+> > RC  
+> > > > need to be re-setup after resume. The rc can't be correctly resumed
+> > > > without the rc setup code in dw_pcie_host_init().
+> > > >
+> > > > So this patch moves the code to dw_pcie_setup_rc() to address the  
+> > above  
+> > > > two issues. After this patch, each pcie designware driver users  
+> > could  
+> > > > call dw_pcie_setup_rc() to re-setup rc when resume back.  
+> > >
+> > > I think this patch breaks the Hisilicon driver...
+> > >
+> > > Our driver performs linkup setup in UEFI therefore we do not call
+> > > dw_pcie_setup_rc(), we only call dw_pcie_host_init().  
+> > 
+> > Thanks for the information. So pcie-hisi rely on UEFI to do something
+> > similar
+> > in dw_pcie_setup_rc(), this comes to a common driver implement
+> > question: should
+> > linux device driver rely on bootloader to configure HW device?  
+> 
+> I don't see any issue with this...
+> 
+> > 
+> > Is it acceptable that pcie-hisi adds a call to dw_pcie_setup_rc() in
+> > hisi_add_pcie_port()?  
+> 
+> I don't think so...that would try to overwrite what is already set by
+> the bootloader; so it is wrong in principle and maybe it can lead to
+> undefined behaviours...
+
+make sense! This commit is intend to re-setup the rc when waken from s2ram (in
+s2ram state, the host lost power)
+
+I have no good solution but to introduce one function e.g 
+dw_pcie_setup_rc_after_linkup(), then move related code from dw_pcie_host_init
+to it, then let my host driver resume hook to call.
+
+Hi Pratyush, Jingoo and Bjorn etc.
+
+any suggestions are appreciated!
+
+Thanks,
+Jisheng
