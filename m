@@ -1,95 +1,255 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu,  7 Apr 2016 14:20:22 +0200
-Subject: [PATCH v4 05/11] soc: renesas: rcar-sysc: Enable Clock Domain for
- r8a7795 I/O devices
+Date: Thu,  7 Apr 2016 14:20:18 +0200
+Subject: [PATCH v4 01/11] soc: renesas: Move pm-rcar to
+ drivers/soc/renesas/rcar-sysc
 In-Reply-To: <1460031628-13336-1-git-send-email-geert+renesas@glider.be>
 References: <1460031628-13336-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1460031628-13336-6-git-send-email-geert+renesas@glider.be>
+Message-ID: <1460031628-13336-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On R-Car H3, some power areas (e.g. A3VP) contain I/O devices, which are
-also part of the CPG/MSSR Clock Domain.  Hook up the CPG/MSSR Clock
-Domain attach/detach callbacks to enable power management using module
-clocks.
+Move the pm-rcar driver from arch/arm/mach-shmobile/ to
+drivers/soc/renesas/, and its header file to include/linux/soc/renesas/,
+so it can be shared between arm32 (R-Car H1 and Gen2) and arm64 (R-Car
+Gen3). Rename it to rcar-sysc as it's really a driver for the R-Car
+System Controller (SYSC).
 
-This also allows to support the Clock Domain for devices in the
-"always-on" power area.
+Kill the intermediate PM_RCAR config symbol, as it's not user
+configurable anymore, and to prepare for SoC-specific make rules.
+
+Add the missing #include <linux/types.h> to rcar-sysc.h, which was
+exposed by different include order.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
 v4:
-  - Remove the explicit dependency on the CPG/MSSR driver by forwarding
-    the attach/detach callbacks to the parent PM Domain.
-    If deemed reusable, rcar_sysc_{at,de}tach_dev() can be moved to
-    common genpd code later.
+  - Update MAINTAINERS,
 
 v3:
-  - Hook up the CPG/MSSR Clock Domain attach/detach callbacks instead of
-    using our own copies,
+  - Add Reviewed-by,
+  - Rename driver from pm-rcar to rcar-sysc,
+  - Kill CONFIG_PM_RCAR,
+  - Add missing include,
 
 v2:
   - New.
 ---
- drivers/soc/renesas/rcar-sysc.c | 39 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+ MAINTAINERS                                                   |  4 ++++
+ arch/arm/mach-shmobile/Kconfig                                | 11 ++++-------
+ arch/arm/mach-shmobile/Makefile                               |  1 -
+ arch/arm/mach-shmobile/pm-r8a7779.c                           |  3 ++-
+ arch/arm/mach-shmobile/pm-rcar-gen2.c                         |  2 +-
+ arch/arm/mach-shmobile/smp-r8a7779.c                          |  2 +-
+ arch/arm/mach-shmobile/smp-r8a7790.c                          |  2 +-
+ drivers/soc/Makefile                                          |  3 ++-
+ drivers/soc/renesas/Makefile                                  |  5 +++++
+ .../pm-rcar.c => drivers/soc/renesas/rcar-sysc.c              |  2 +-
+ .../pm-rcar.h => include/linux/soc/renesas/rcar-sysc.h        |  8 +++++---
+ 11 files changed, 26 insertions(+), 17 deletions(-)
+ create mode 100644 drivers/soc/renesas/Makefile
+ rename arch/arm/mach-shmobile/pm-rcar.c => drivers/soc/renesas/rcar-sysc.c (99%)
+ rename arch/arm/mach-shmobile/pm-rcar.h => include/linux/soc/renesas/rcar-sysc.h (66%)
 
-diff --git a/drivers/soc/renesas/rcar-sysc.c b/drivers/soc/renesas/rcar-sysc.c
-index bdab8ac6803300e7..6fad1311133a3ac7 100644
---- a/drivers/soc/renesas/rcar-sysc.c
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 1c32f8a3d6c4a707..9e05c2283154c371 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1491,6 +1491,8 @@ Q:	http://patchwork.kernel.org/project/linux-renesas-soc/list/
+ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git next
+ S:	Supported
+ F:	arch/arm64/boot/dts/renesas/
++F:	drivers/soc/renesas/
++F:	include/linux/soc/renesas/
+ 
+ ARM/RISCPC ARCHITECTURE
+ M:	Russell King <linux@arm.linux.org.uk>
+@@ -1604,6 +1606,8 @@ F:	arch/arm/configs/shmobile_defconfig
+ F:	arch/arm/include/debug/renesas-scif.S
+ F:	arch/arm/mach-shmobile/
+ F:	drivers/sh/
++F:	drivers/soc/renesas/
++F:	include/linux/soc/renesas/
+ 
+ ARM/SOCFPGA ARCHITECTURE
+ M:	Dinh Nguyen <dinguyen@opensource.altera.com>
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index f2bc5c353119e96d..fe4ccb52f9213d8b 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -4,11 +4,6 @@ config ARCH_SHMOBILE
+ config ARCH_SHMOBILE_MULTI
+ 	bool
+ 
+-config PM_RCAR
+-	bool
+-	select PM
+-	select PM_GENERIC_DOMAINS
+-
+ config PM_RMOBILE
+ 	bool
+ 	select PM
+@@ -16,13 +11,15 @@ config PM_RMOBILE
+ 
+ config ARCH_RCAR_GEN1
+ 	bool
+-	select PM_RCAR
++	select PM
++	select PM_GENERIC_DOMAINS
+ 	select RENESAS_INTC_IRQPIN
+ 	select SYS_SUPPORTS_SH_TMU
+ 
+ config ARCH_RCAR_GEN2
+ 	bool
+-	select PM_RCAR
++	select PM
++	select PM_GENERIC_DOMAINS
+ 	select RENESAS_IRQC
+ 	select SYS_SUPPORTS_SH_CMT
+ 	select PCI_DOMAINS if PCI
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index a65c80ac9009d51f..ebb909c55b856a58 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -39,7 +39,6 @@ smp-$(CONFIG_ARCH_EMEV2)	+= smp-emev2.o headsmp-scu.o platsmp-scu.o
+ # PM objects
+ obj-$(CONFIG_SUSPEND)		+= suspend.o
+ obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
+-obj-$(CONFIG_PM_RCAR)		+= pm-rcar.o
+ obj-$(CONFIG_PM_RMOBILE)	+= pm-rmobile.o
+ obj-$(CONFIG_ARCH_RCAR_GEN2)	+= pm-rcar-gen2.o
+ 
+diff --git a/arch/arm/mach-shmobile/pm-r8a7779.c b/arch/arm/mach-shmobile/pm-r8a7779.c
+index 14c42a1bdf1ef20d..4174cbcbc467d047 100644
+--- a/arch/arm/mach-shmobile/pm-r8a7779.c
++++ b/arch/arm/mach-shmobile/pm-r8a7779.c
+@@ -9,9 +9,10 @@
+  * for more details.
+  */
+ 
++#include <linux/soc/renesas/rcar-sysc.h>
++
+ #include <asm/io.h>
+ 
+-#include "pm-rcar.h"
+ #include "r8a7779.h"
+ 
+ /* SYSC */
+diff --git a/arch/arm/mach-shmobile/pm-rcar-gen2.c b/arch/arm/mach-shmobile/pm-rcar-gen2.c
+index 6815781ad1165ef3..691ac166a277c03f 100644
+--- a/arch/arm/mach-shmobile/pm-rcar-gen2.c
++++ b/arch/arm/mach-shmobile/pm-rcar-gen2.c
+@@ -13,9 +13,9 @@
+ #include <linux/kernel.h>
+ #include <linux/of.h>
+ #include <linux/smp.h>
++#include <linux/soc/renesas/rcar-sysc.h>
+ #include <asm/io.h>
+ #include "common.h"
+-#include "pm-rcar.h"
+ #include "rcar-gen2.h"
+ 
+ /* RST */
+diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c b/arch/arm/mach-shmobile/smp-r8a7779.c
+index f5c31fbc10b2efbf..c6951ee245889b8f 100644
+--- a/arch/arm/mach-shmobile/smp-r8a7779.c
++++ b/arch/arm/mach-shmobile/smp-r8a7779.c
+@@ -19,13 +19,13 @@
+ #include <linux/spinlock.h>
+ #include <linux/io.h>
+ #include <linux/delay.h>
++#include <linux/soc/renesas/rcar-sysc.h>
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/smp_plat.h>
+ #include <asm/smp_scu.h>
+ 
+ #include "common.h"
+-#include "pm-rcar.h"
+ #include "r8a7779.h"
+ 
+ #define AVECR IOMEM(0xfe700040)
+diff --git a/arch/arm/mach-shmobile/smp-r8a7790.c b/arch/arm/mach-shmobile/smp-r8a7790.c
+index f6426c6fdefcb489..28f26d5362d8d4d2 100644
+--- a/arch/arm/mach-shmobile/smp-r8a7790.c
++++ b/arch/arm/mach-shmobile/smp-r8a7790.c
+@@ -17,12 +17,12 @@
+ #include <linux/init.h>
+ #include <linux/smp.h>
+ #include <linux/io.h>
++#include <linux/soc/renesas/rcar-sysc.h>
+ 
+ #include <asm/smp_plat.h>
+ 
+ #include "common.h"
+ #include "platsmp-apmu.h"
+-#include "pm-rcar.h"
+ #include "rcar-gen2.h"
+ #include "r8a7790.h"
+ 
+diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
+index 5ade71306ee10d08..380230f03874d4ad 100644
+--- a/drivers/soc/Makefile
++++ b/drivers/soc/Makefile
+@@ -9,7 +9,8 @@ obj-$(CONFIG_MACH_DOVE)		+= dove/
+ obj-y				+= fsl/
+ obj-$(CONFIG_ARCH_MEDIATEK)	+= mediatek/
+ obj-$(CONFIG_ARCH_QCOM)		+= qcom/
+-obj-$(CONFIG_ARCH_ROCKCHIP)		+= rockchip/
++obj-$(CONFIG_ARCH_RENESAS)	+= renesas/
++obj-$(CONFIG_ARCH_ROCKCHIP)	+= rockchip/
+ obj-$(CONFIG_SOC_SAMSUNG)	+= samsung/
+ obj-$(CONFIG_ARCH_SUNXI)	+= sunxi/
+ obj-$(CONFIG_ARCH_TEGRA)	+= tegra/
+diff --git a/drivers/soc/renesas/Makefile b/drivers/soc/renesas/Makefile
+new file mode 100644
+index 0000000000000000..2b64f6c9468136f9
+--- /dev/null
++++ b/drivers/soc/renesas/Makefile
+@@ -0,0 +1,5 @@
++obj-$(CONFIG_ARCH_R8A7779)	+= rcar-sysc.o
++obj-$(CONFIG_ARCH_R8A7790)	+= rcar-sysc.o
++obj-$(CONFIG_ARCH_R8A7791)	+= rcar-sysc.o
++obj-$(CONFIG_ARCH_R8A7793)	+= rcar-sysc.o
++obj-$(CONFIG_ARCH_R8A7794)	+= rcar-sysc.o
+diff --git a/arch/arm/mach-shmobile/pm-rcar.c b/drivers/soc/renesas/rcar-sysc.c
+similarity index 99%
+rename from arch/arm/mach-shmobile/pm-rcar.c
+rename to drivers/soc/renesas/rcar-sysc.c
+index 0af05d288b09c3ab..d59bcdf78f0b56ba 100644
+--- a/arch/arm/mach-shmobile/pm-rcar.c
 +++ b/drivers/soc/renesas/rcar-sysc.c
-@@ -224,6 +224,36 @@ static int rcar_sysc_pd_power_on(struct generic_pm_domain *genpd)
- 	return rcar_sysc_power_up(&pd->ch);
- }
+@@ -13,7 +13,7 @@
+ #include <linux/mm.h>
+ #include <linux/spinlock.h>
+ #include <linux/io.h>
+-#include "pm-rcar.h"
++#include <linux/soc/renesas/rcar-sysc.h>
  
-+#ifdef CONFIG_ARCH_R8A7795
-+static int rcar_sysc_attach_dev(struct generic_pm_domain *genpd,
-+				struct device *dev)
-+{
-+	struct gpd_link *link;
-+	int error;
+ /* SYSC Common */
+ #define SYSCSR			0x00	/* SYSC Status Register */
+diff --git a/arch/arm/mach-shmobile/pm-rcar.h b/include/linux/soc/renesas/rcar-sysc.h
+similarity index 66%
+rename from arch/arm/mach-shmobile/pm-rcar.h
+rename to include/linux/soc/renesas/rcar-sysc.h
+index 1b901db4a24c4633..96f30c2883881d97 100644
+--- a/arch/arm/mach-shmobile/pm-rcar.h
++++ b/include/linux/soc/renesas/rcar-sysc.h
+@@ -1,5 +1,7 @@
+-#ifndef PM_RCAR_H
+-#define PM_RCAR_H
++#ifndef __LINUX_SOC_RENESAS_RCAR_SYSC_H__
++#define __LINUX_SOC_RENESAS_RCAR_SYSC_H__
 +
-+	/* Forward call to parent */
-+	list_for_each_entry(link, &genpd->slave_links, slave_node)
-+		if (link->master && link->master->attach_dev) {
-+			error = link->master->attach_dev(link->master, dev);
-+			if (error)
-+				return error;
-+		}
-+
-+	return 0;
-+}
-+
-+static void rcar_sysc_detach_dev(struct generic_pm_domain *genpd,
-+				 struct device *dev)
-+{
-+	struct gpd_link *link;
-+
-+	/* Forward call to parent */
-+	list_for_each_entry(link, &genpd->slave_links, slave_node)
-+		if (link->master && link->master->detach_dev)
-+			link->master->detach_dev(link->master, dev);
-+}
-+#endif /* CONFIG_ARCH_R8A7795 */
-+
- static void __init rcar_sysc_pd_setup(struct rcar_sysc_pd *pd)
- {
- 	struct generic_pm_domain *genpd = &pd->genpd;
-@@ -249,6 +279,15 @@ static void __init rcar_sysc_pd_setup(struct rcar_sysc_pd *pd)
- 		gov = &pm_domain_always_on_gov;
- 	}
++#include <linux/types.h>
  
-+#ifdef CONFIG_ARCH_R8A7795
-+	if (!(pd->flags & (PD_CPU | PD_SCU))) {
-+		/* Enable Clock Domain for I/O devices */
-+		genpd->flags = GENPD_FLAG_PM_CLK;
-+		genpd->attach_dev = rcar_sysc_attach_dev;
-+		genpd->detach_dev = rcar_sysc_detach_dev;
-+	}
-+#endif
-+
- 	pm_genpd_init(genpd, gov, false);
- 	genpd->dev_ops.active_wakeup = rcar_sysc_active_wakeup;
- 	genpd->power_off = rcar_sysc_pd_power_off;
+ struct rcar_sysc_ch {
+ 	u16 chan_offs;
+@@ -12,4 +14,4 @@ int rcar_sysc_power_up(const struct rcar_sysc_ch *sysc_ch);
+ bool rcar_sysc_power_is_off(const struct rcar_sysc_ch *sysc_ch);
+ void __iomem *rcar_sysc_init(phys_addr_t base);
+ 
+-#endif /* PM_RCAR_H */
++#endif /* __LINUX_SOC_RENESAS_RCAR_SYSC_H__ */
 -- 
 1.9.1
