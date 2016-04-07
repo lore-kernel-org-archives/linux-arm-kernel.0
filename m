@@ -1,175 +1,114 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Thu, 7 Apr 2016 20:03:34 +0800
-Subject: [PATCH v11 17/17] Xen: EFI: Parse DT parameters for Xen specific UEFI
-In-Reply-To: <1460030614-16112-1-git-send-email-zhaoshenglong@huawei.com>
-References: <1460030614-16112-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1460030614-16112-18-git-send-email-zhaoshenglong@huawei.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Thu,  7 Apr 2016 14:20:24 +0200
+Subject: [PATCH v4 07/11] soc: renesas: rcar-sysc: Add support for R-Car H2
+ power areas
+In-Reply-To: <1460031628-13336-1-git-send-email-geert+renesas@glider.be>
+References: <1460031628-13336-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1460031628-13336-8-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shannon Zhao <shannon.zhao@linaro.org>
-
-Add a new function to parse DT parameters for Xen specific UEFI just
-like the way for normal UEFI. Then it could reuse the existing codes.
-
-If Xen supports EFI, initialize runtime services.
-
-CC: Matt Fleming <matt@codeblueprint.co.uk>
-Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-Reviewed-by: Matt Fleming <matt@codeblueprint.co.uk>
-Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/xen/enlighten.c           |  6 +++++
- drivers/firmware/efi/arm-runtime.c | 17 +++++++++-----
- drivers/firmware/efi/efi.c         | 45 ++++++++++++++++++++++++++++++++------
- 3 files changed, 56 insertions(+), 12 deletions(-)
+v4:
+  - Rename R8A7790_PD_SH to R8A7790_PD_SH_4A, "sh" to "sh-4a",
+  - Reformat table,
 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 13e3e9f..e130562 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -261,6 +261,12 @@ static int __init fdt_find_hyper_node(unsigned long node, const char *uname,
- 	    !strncmp(hyper_node.prefix, s, strlen(hyper_node.prefix)))
- 		hyper_node.version = s + strlen(hyper_node.prefix);
- 
-+	if (IS_ENABLED(CONFIG_XEN_EFI)) {
-+		/* Check if Xen supports EFI */
-+		if (of_get_flat_dt_subnode_by_name(node, "uefi") > 0)
-+			set_bit(EFI_PARAVIRT, &efi.flags);
-+	}
+v3:
+  - New (converted from DT to C).
+---
+ drivers/soc/renesas/Makefile       |  2 +-
+ drivers/soc/renesas/r8a7790-sysc.c | 45 ++++++++++++++++++++++++++++++++++++++
+ drivers/soc/renesas/rcar-sysc.c    |  3 +++
+ drivers/soc/renesas/rcar-sysc.h    |  1 +
+ 4 files changed, 50 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/soc/renesas/r8a7790-sysc.c
+
+diff --git a/drivers/soc/renesas/Makefile b/drivers/soc/renesas/Makefile
+index b8aa9db4fdd95eb8..6588be3c6776fadf 100644
+--- a/drivers/soc/renesas/Makefile
++++ b/drivers/soc/renesas/Makefile
+@@ -1,5 +1,5 @@
+ obj-$(CONFIG_ARCH_R8A7779)	+= rcar-sysc.o r8a7779-sysc.o
+-obj-$(CONFIG_ARCH_R8A7790)	+= rcar-sysc.o
++obj-$(CONFIG_ARCH_R8A7790)	+= rcar-sysc.o r8a7790-sysc.o
+ obj-$(CONFIG_ARCH_R8A7791)	+= rcar-sysc.o
+ obj-$(CONFIG_ARCH_R8A7793)	+= rcar-sysc.o
+ obj-$(CONFIG_ARCH_R8A7794)	+= rcar-sysc.o
+diff --git a/drivers/soc/renesas/r8a7790-sysc.c b/drivers/soc/renesas/r8a7790-sysc.c
+new file mode 100644
+index 0000000000000000..05cb857bee31af9f
+--- /dev/null
++++ b/drivers/soc/renesas/r8a7790-sysc.c
+@@ -0,0 +1,45 @@
++/*
++ * Renesas R-Car H2 System Controller
++ *
++ * Copyright (C) 2016 Glider bvba
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ */
 +
- 	return 0;
- }
- 
-diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
-index 6ae21e4..ac609b9 100644
---- a/drivers/firmware/efi/arm-runtime.c
-+++ b/drivers/firmware/efi/arm-runtime.c
-@@ -27,6 +27,7 @@
- #include <asm/mmu.h>
- #include <asm/pgalloc.h>
- #include <asm/pgtable.h>
-+#include <asm/xen/xen-ops.h>
- 
- extern u64 efi_system_table;
- 
-@@ -107,13 +108,19 @@ static int __init arm_enable_runtime_services(void)
- 	}
- 	set_bit(EFI_SYSTEM_TABLES, &efi.flags);
- 
--	if (!efi_virtmap_init()) {
--		pr_err("No UEFI virtual mapping was installed -- runtime services will not be available\n");
--		return -ENOMEM;
-+	if (IS_ENABLED(CONFIG_XEN_EFI) && efi_enabled(EFI_PARAVIRT)) {
-+		/* Set up runtime services function pointers for Xen Dom0 */
-+		xen_efi_runtime_setup();
-+	} else {
-+		if (!efi_virtmap_init()) {
-+			pr_err("No UEFI virtual mapping was installed -- runtime services will not be available\n");
-+			return -ENOMEM;
-+		}
++#include <linux/bug.h>
++#include <linux/kernel.h>
 +
-+		/* Set up runtime services function pointers */
-+		efi_native_runtime_setup();
- 	}
- 
--	/* Set up runtime services function pointers */
--	efi_native_runtime_setup();
- 	set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
- 
- 	efi.runtime_version = efi.systab->hdr.revision;
-diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
-index 3a69ed5..519c096 100644
---- a/drivers/firmware/efi/efi.c
-+++ b/drivers/firmware/efi/efi.c
-@@ -469,12 +469,14 @@ device_initcall(efi_load_efivars);
- 		FIELD_SIZEOF(struct efi_fdt_params, field) \
- 	}
- 
--static __initdata struct {
-+struct params {
- 	const char name[32];
- 	const char propname[32];
- 	int offset;
- 	int size;
--} dt_params[] = {
++#include <dt-bindings/power/r8a7790-sysc.h>
++
++#include "rcar-sysc.h"
++
++static const struct rcar_sysc_area r8a7790_areas[] __initconst = {
++	{ "ca15-scu",	0x180, 0, R8A7790_PD_CA15_SCU,	-1, PD_SCU },
++	{ "ca15-cpu0",	 0x40, 0, R8A7790_PD_CA15_CPU0,	R8A7790_PD_CA15_SCU,
++	  PD_CPU_NOCR },
++	{ "ca15-cpu1",	 0x40, 1, R8A7790_PD_CA15_CPU1,	R8A7790_PD_CA15_SCU,
++	  PD_CPU_NOCR },
++	{ "ca15-cpu2",	 0x40, 2, R8A7790_PD_CA15_CPU2,	R8A7790_PD_CA15_SCU,
++	  PD_CPU_NOCR },
++	{ "ca15-cpu3",	 0x40, 3, R8A7790_PD_CA15_CPU3,	R8A7790_PD_CA15_SCU,
++	  PD_CPU_NOCR },
++	{ "ca7-scu",	0x100, 0, R8A7790_PD_CA7_SCU,	-1, PD_SCU },
++	{ "ca7-cpu0",	0x1c0, 0, R8A7790_PD_CA7_CPU0,	R8A7790_PD_CA7_SCU,
++	  PD_CPU_NOCR },
++	{ "ca7-cpu1",	0x1c0, 1, R8A7790_PD_CA7_CPU1,	R8A7790_PD_CA7_SCU,
++	  PD_CPU_NOCR },
++	{ "ca7-cpu2",	0x1c0, 2, R8A7790_PD_CA7_CPU2,	R8A7790_PD_CA7_SCU,
++	  PD_CPU_NOCR },
++	{ "ca7-cpu3",	0x1c0, 3, R8A7790_PD_CA7_CPU3,	R8A7790_PD_CA7_SCU,
++	  PD_CPU_NOCR },
++	{ "sh-4a",	 0x80, 0, R8A7790_PD_SH_4A,	-1 },
++	{ "rgx",	 0xc0, 0, R8A7790_PD_RGX,	-1 },
++	{ "imp",	0x140, 0, R8A7790_PD_IMP,	-1 },
 +};
 +
-+static struct params fdt_params[] __initdata = {
- 	UEFI_PARAM("System Table", "linux,uefi-system-table", system_table),
- 	UEFI_PARAM("MemMap Address", "linux,uefi-mmap-start", mmap),
- 	UEFI_PARAM("MemMap Size", "linux,uefi-mmap-size", mmap_size),
-@@ -482,24 +484,45 @@ static __initdata struct {
- 	UEFI_PARAM("MemMap Desc. Version", "linux,uefi-mmap-desc-ver", desc_ver)
- };
- 
-+static struct params xen_fdt_params[] __initdata = {
-+	UEFI_PARAM("System Table", "xen,uefi-system-table", system_table),
-+	UEFI_PARAM("MemMap Address", "xen,uefi-mmap-start", mmap),
-+	UEFI_PARAM("MemMap Size", "xen,uefi-mmap-size", mmap_size),
-+	UEFI_PARAM("MemMap Desc. Size", "xen,uefi-mmap-desc-size", desc_size),
-+	UEFI_PARAM("MemMap Desc. Version", "xen,uefi-mmap-desc-ver", desc_ver)
++const struct rcar_sysc_info r8a7790_sysc_info __initconst = {
++	.areas = r8a7790_areas,
++	.num_areas = ARRAY_SIZE(r8a7790_areas),
 +};
-+
- struct param_info {
- 	int found;
- 	void *params;
-+	struct params *dt_params;
-+	int size;
+diff --git a/drivers/soc/renesas/rcar-sysc.c b/drivers/soc/renesas/rcar-sysc.c
+index 89505e3dae9be4bd..d25eff00baf6a828 100644
+--- a/drivers/soc/renesas/rcar-sysc.c
++++ b/drivers/soc/renesas/rcar-sysc.c
+@@ -311,6 +311,9 @@ static const struct of_device_id rcar_sysc_matches[] = {
+ #ifdef CONFIG_ARCH_R8A7779
+ 	{ .compatible = "renesas,r8a7779-sysc", .data = &r8a7779_sysc_info },
+ #endif
++#ifdef CONFIG_ARCH_R8A7790
++	{ .compatible = "renesas,r8a7790-sysc", .data = &r8a7790_sysc_info },
++#endif
+ 	{ /* sentinel */ }
  };
  
- static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
- 				       int depth, void *data)
- {
- 	struct param_info *info = data;
-+	struct params *dt_params = info->dt_params;
- 	const void *prop;
- 	void *dest;
- 	u64 val;
--	int i, len;
-+	int i, len, offset;
+diff --git a/drivers/soc/renesas/rcar-sysc.h b/drivers/soc/renesas/rcar-sysc.h
+index d1ec6fad38b35681..a202a765345ac50a 100644
+--- a/drivers/soc/renesas/rcar-sysc.h
++++ b/drivers/soc/renesas/rcar-sysc.h
+@@ -50,4 +50,5 @@ struct rcar_sysc_info {
+ };
  
--	if (depth != 1 || strcmp(uname, "chosen") != 0)
--		return 0;
-+	if (efi_enabled(EFI_PARAVIRT)) {
-+		if (depth != 1 || strcmp(uname, "hypervisor") != 0)
-+			return 0;
- 
--	for (i = 0; i < ARRAY_SIZE(dt_params); i++) {
-+		offset = of_get_flat_dt_subnode_by_name(node, "uefi");
-+		if (offset < 0)
-+			return 0;
-+		node = offset;
-+	} else {
-+		if (depth != 1 || strcmp(uname, "chosen") != 0)
-+			return 0;
-+	}
-+
-+	for (i = 0; i < info->size; i++) {
- 		prop = of_get_flat_dt_prop(node, dt_params[i].propname, &len);
- 		if (!prop)
- 			return 0;
-@@ -530,12 +553,20 @@ int __init efi_get_fdt_params(struct efi_fdt_params *params)
- 	info.found = 0;
- 	info.params = params;
- 
-+	if (efi_enabled(EFI_PARAVIRT)) {
-+		info.dt_params = xen_fdt_params;
-+		info.size = ARRAY_SIZE(xen_fdt_params);
-+	} else {
-+		info.dt_params = fdt_params;
-+		info.size = ARRAY_SIZE(fdt_params);
-+	}
-+
- 	ret = of_scan_flat_dt(fdt_find_uefi_params, &info);
- 	if (!info.found)
- 		pr_info("UEFI not found.\n");
- 	else if (!ret)
- 		pr_err("Can't find '%s' in device tree!\n",
--		       dt_params[info.found].name);
-+		       info.dt_params[info.found].name);
- 
- 	return ret;
- }
+ extern const struct rcar_sysc_info r8a7779_sysc_info;
++extern const struct rcar_sysc_info r8a7790_sysc_info;
+ #endif /* __SOC_RENESAS_RCAR_SYSC_H__ */
 -- 
-2.0.4
+1.9.1
