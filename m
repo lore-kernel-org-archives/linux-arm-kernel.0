@@ -1,87 +1,185 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 7 Apr 2016 11:23:25 +0300
-Subject: [PATCH] extcon: usb-gpio: switch to use pm wakeirq apis
-In-Reply-To: <1459963957-21883-1-git-send-email-grygorii.strashko@ti.com>
-References: <1459963957-21883-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <570618FD.8030602@ti.com>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Thu, 7 Apr 2016 16:23:17 +0800
+Subject: [PATCH v2 2/2] hwrng: hisi: Add support for Hisilicon SoC RNG
+In-Reply-To: <1460017397-30996-1-git-send-email-wangkefeng.wang@huawei.com>
+References: <1460017397-30996-1-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <1460017397-30996-3-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/16 20:32, Grygorii Strashko wrote:
-> Switch to use PM wakeirq APIs which automates wakeup IRQs
-> enabling/disabling and so allows to make code simpler.
-> 
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+This adds the Hisilicon Random Number Generator(RNG) support,
+which is found in Hip04 and Hip05 soc.
 
-Acked-by: Roger Quadros <rogerq@ti.com>
+Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+---
+ drivers/char/hw_random/Kconfig    |  13 ++++
+ drivers/char/hw_random/Makefile   |   1 +
+ drivers/char/hw_random/hisi-rng.c | 121 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 135 insertions(+)
+ create mode 100644 drivers/char/hw_random/hisi-rng.c
 
-cheers,
--roger
-
-> ---
-> Unfortunately this simple patch depends on:
-> "[RFC PATCH] PM / wakeirq: fix wakeirq setting after wakup re-configuration from sysfs"
-> https://lkml.org/lkml/2016/4/6/296
-> 
->  drivers/extcon/extcon-usb-gpio.c | 19 ++++++-------------
->  1 file changed, 6 insertions(+), 13 deletions(-)
-> 
-> diff --git a/drivers/extcon/extcon-usb-gpio.c b/drivers/extcon/extcon-usb-gpio.c
-> index 2b2fecf..bc61d11 100644
-> --- a/drivers/extcon/extcon-usb-gpio.c
-> +++ b/drivers/extcon/extcon-usb-gpio.c
-> @@ -24,6 +24,7 @@
->  #include <linux/module.h>
->  #include <linux/of_gpio.h>
->  #include <linux/platform_device.h>
-> +#include <linux/pm_wakeirq.h>
->  #include <linux/slab.h>
->  #include <linux/workqueue.h>
->  
-> @@ -141,7 +142,8 @@ static int usb_extcon_probe(struct platform_device *pdev)
->  	}
->  
->  	platform_set_drvdata(pdev, info);
-> -	device_init_wakeup(dev, 1);
-> +	device_init_wakeup(dev, true);
-> +	dev_pm_set_wake_irq(dev, info->id_irq);
->  
->  	/* Perform initial detection */
->  	usb_extcon_detect_cable(&info->wq_detcable.work);
-> @@ -155,6 +157,9 @@ static int usb_extcon_remove(struct platform_device *pdev)
->  
->  	cancel_delayed_work_sync(&info->wq_detcable);
->  
-> +	dev_pm_clear_wake_irq(&pdev->dev);
-> +	device_init_wakeup(&pdev->dev, false);
-> +
->  	return 0;
->  }
->  
-> @@ -164,12 +169,6 @@ static int usb_extcon_suspend(struct device *dev)
->  	struct usb_extcon_info *info = dev_get_drvdata(dev);
->  	int ret = 0;
->  
-> -	if (device_may_wakeup(dev)) {
-> -		ret = enable_irq_wake(info->id_irq);
-> -		if (ret)
-> -			return ret;
-> -	}
-> -
->  	/*
->  	 * We don't want to process any IRQs after this point
->  	 * as GPIOs used behind I2C subsystem might not be
-> @@ -185,12 +184,6 @@ static int usb_extcon_resume(struct device *dev)
->  	struct usb_extcon_info *info = dev_get_drvdata(dev);
->  	int ret = 0;
->  
-> -	if (device_may_wakeup(dev)) {
-> -		ret = disable_irq_wake(info->id_irq);
-> -		if (ret)
-> -			return ret;
-> -	}
-> -
->  	enable_irq(info->id_irq);
->  
->  	return ret;
-> 
+diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
+index 67ee8b0..088b1bf 100644
+--- a/drivers/char/hw_random/Kconfig
++++ b/drivers/char/hw_random/Kconfig
+@@ -333,6 +333,19 @@ config HW_RANDOM_TPM
+ 
+ 	  If unsure, say Y.
+ 
++config HW_RANDOM_HISI
++	tristate "Hisilicon Random Number Generator support"
++	depends on HW_RANDOM && ARCH_HISI
++	default HW_RANDOM
++	---help---
++	  This driver provides kernel-side support for the Random Number
++	  Generator hardware found on Hisilicon Hip04 and Hip05 SoC.
++
++	  To compile this driver as a module, choose M here: the
++	  module will be called hisi-rng.
++
++	  If unsure, say Y.
++
+ config HW_RANDOM_MSM
+ 	tristate "Qualcomm SoCs Random Number Generator support"
+ 	depends on HW_RANDOM && ARCH_QCOM
+diff --git a/drivers/char/hw_random/Makefile b/drivers/char/hw_random/Makefile
+index f5a6fa7..e09305b 100644
+--- a/drivers/char/hw_random/Makefile
++++ b/drivers/char/hw_random/Makefile
+@@ -26,6 +26,7 @@ obj-$(CONFIG_HW_RANDOM_PPC4XX) += ppc4xx-rng.o
+ obj-$(CONFIG_HW_RANDOM_PSERIES) += pseries-rng.o
+ obj-$(CONFIG_HW_RANDOM_POWERNV) += powernv-rng.o
+ obj-$(CONFIG_HW_RANDOM_EXYNOS)	+= exynos-rng.o
++obj-$(CONFIG_HW_RANDOM_HISI)	+= hisi-rng.o
+ obj-$(CONFIG_HW_RANDOM_TPM) += tpm-rng.o
+ obj-$(CONFIG_HW_RANDOM_BCM2835) += bcm2835-rng.o
+ obj-$(CONFIG_HW_RANDOM_IPROC_RNG200) += iproc-rng200.o
+diff --git a/drivers/char/hw_random/hisi-rng.c b/drivers/char/hw_random/hisi-rng.c
+new file mode 100644
+index 0000000..3e18e58
+--- /dev/null
++++ b/drivers/char/hw_random/hisi-rng.c
+@@ -0,0 +1,121 @@
++/*
++ * Copyright (C) 2016 HiSilicon Co., Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/err.h>
++#include <linux/kernel.h>
++#include <linux/hw_random.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++
++#define RNG_SEED	0x0
++#define RNG_CTRL	0x4
++  #define RNG_SEED_SEL	BIT(2)
++  #define RNG_RING_EN	BIT(1)
++  #define RNG_EN	BIT(0)
++#define RNG_RAN_NUM	0x10
++#define RNG_PHY_SEED	0x14
++#define RNG_RELOAD_ERR	0x84
++
++#define to_hisi_rng(p)	container_of(p, struct hisi_rng, rng)
++
++static int seed_sel;
++module_param(seed_sel, int, S_IRUGO);
++MODULE_PARM_DESC(seed_sel, "Auto reload seed. 0, use LFSR(default); 1, use ring oscillator.");
++
++struct hisi_rng {
++	void __iomem *base;
++	struct hwrng rng;
++};
++
++static int hisi_rng_init(struct hwrng *rng)
++{
++	struct hisi_rng *hrng = to_hisi_rng(rng);
++	int val = RNG_EN;
++	u32 seed;
++
++	/* get a random number as initial seed */
++	get_random_bytes(&seed, sizeof(seed));
++
++	writel_relaxed(seed, hrng->base + RNG_SEED);
++
++	if (seed_sel == 1)
++		val |= RNG_RING_EN | RNG_SEED_SEL;
++
++	writel_relaxed(val, hrng->base + RNG_CTRL);
++	return 0;
++}
++
++static void hisi_rng_cleanup(struct hwrng *rng)
++{
++	struct hisi_rng *hrng = to_hisi_rng(rng);
++
++	writel_relaxed(0, hrng->base + RNG_CTRL);
++}
++
++static int hisi_rng_read(struct hwrng *rng, void *buf, size_t max,
++			   bool wait)
++{
++	struct hisi_rng *hrng = to_hisi_rng(rng);
++	u32 *data = buf;
++
++	*data = readl_relaxed(hrng->base + RNG_RAN_NUM);
++	return 4;
++}
++
++static int hisi_rng_probe(struct platform_device *pdev)
++{
++	struct hisi_rng *rng;
++	struct resource *res;
++	int ret;
++
++	rng = devm_kzalloc(&pdev->dev, sizeof(*rng), GFP_KERNEL);
++	if (!rng)
++		return -ENOMEM;
++
++	platform_set_drvdata(pdev, rng);
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	rng->base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(rng->base))
++		return PTR_ERR(rng->base);
++
++	rng->rng.name = pdev->name;
++	rng->rng.init = hisi_rng_init;
++	rng->rng.cleanup = hisi_rng_cleanup;
++	rng->rng.read = hisi_rng_read;
++
++	ret = devm_hwrng_register(&pdev->dev, &rng->rng);
++	if (ret) {
++		dev_err(&pdev->dev, "failed to register hwrng\n");
++		return ret;
++	}
++
++	return 0;
++}
++
++static const struct of_device_id hisi_rng_dt_ids[] = {
++	{ .compatible = "hisilicon,rng" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, hisi_rng_dt_ids);
++
++static struct platform_driver hisi_rng_driver = {
++	.probe		= hisi_rng_probe,
++	.driver		= {
++		.name	= "hisi-rng",
++		.of_match_table = of_match_ptr(hisi_rng_dt_ids),
++	},
++};
++
++module_platform_driver(hisi_rng_driver);
++
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR("Kefeng Wang <wangkefeng.wang@huawei>");
++MODULE_DESCRIPTION("Hisilicon random number generator driver");
+-- 
+2.6.0.GIT
