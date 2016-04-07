@@ -1,57 +1,76 @@
-From: astone@redhat.com (Al Stone)
-Date: Thu, 7 Apr 2016 15:50:55 -0600
-Subject: [PATCH v3] ARM64: ACPI: Update documentation for latest
- specification version
-In-Reply-To: <1459210002-3387-1-git-send-email-al.stone@linaro.org>
-References: <1459210002-3387-1-git-send-email-al.stone@linaro.org>
-Message-ID: <5706D63F.7050107@redhat.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 7 Apr 2016 23:54:31 +0200
+Subject: [PATCH v5 30/46] regulator: pwm: retrieve correct voltage
+In-Reply-To: <20160330212410.GX2350@sirena.org.uk>
+References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1459368249-13241-31-git-send-email-boris.brezillon@free-electrons.com>
+ <20160330212410.GX2350@sirena.org.uk>
+Message-ID: <20160407235431.788dc24a@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/28/2016 06:06 PM, Al Stone wrote:
-> The ACPI 6.1 specification was recently released at the end of January
-> 2016, but the arm64 kernel documentation for the use of ACPI was written
-> for the 5.1 version of the spec.  There were significant additions to the
-> spec that had not yet been mentioned -- for example, the 6.0 mechanisms
-> added to make it easier to define processors and low power idle states,
-> as well as the 6.1 addition allowing regular interrupts (not just from
-> GPIO) be used to signal ACPI general purpose events.
-> 
-> This patch reflects going back through and examining the specs in detail
-> and updating content appropriately.  Whilst there, a few odds and ends of
-> typos were caught as well.  This brings the documentation up to date with
-> ACPI 6.1 for arm64.
-> 
-> Changes for v3:
->    -- Clarify use of _LPI/_RDI (Vikas Sajjan)
->    -- Whitespace cleanup as pointed out by checkpatch
-> 
-> Changes for v2:
->    -- Clean up white space (Harb Abdulhahmid)
->    -- Clarification on _CCA usage (Harb Abdulhamid)
->    -- IORT moved to required from recommended (Hanjun Guo)
->    -- Clarify IORT description (Hanjun Guo)
-> 
-> Signed-off-by: Al Stone <al.stone@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Jonathan Corbet <corbet@lwn.net>
-> ---
->  Documentation/arm64/acpi_object_usage.txt | 446 ++++++++++++++++++++++--------
->  Documentation/arm64/arm-acpi.txt          |  28 +-
->  2 files changed, 357 insertions(+), 117 deletions(-)
-> [snip...]
+Hi Mark,
 
-Ping?  Any further comments or is this good to go?
+On Wed, 30 Mar 2016 14:24:10 -0700
+Mark Brown <broonie@kernel.org> wrote:
 
-Thanks.
+> On Wed, Mar 30, 2016 at 10:03:53PM +0200, Boris Brezillon wrote:
+> > The continuous PWM voltage regulator is caching the voltage value in
+> > the ->volt_uV field. While most of the time this value should reflect the
+> > real voltage, sometime it can be sightly different if the PWM device
+> > rounded the set_duty_cycle request.
+> > Moreover, this value is not valid until someone has modified the regulator
+> > output.
+> 
+> Acked-by: Mark Brown <broonie@kernel.org>
 
--- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Red Hat, Inc.
-ahs3 at redhat.com
------------------------------------
+Actually this patch introduces a bug (reported by Stephen):
+
+"
+I applied your patch series [PATCH v5 00/46] pwm: add support for
+atomic update and found a null pointer dereference when probing a
+pwm-regulator at boot. See the below stack trace:
+
+[ 4.282374] [<ffffffc000399088>] pwm_regulator_get_voltage+0x78/0xa0
+[ 4.289344] [<ffffffc000390740>] regulator_attr_is_visible+0x7c/0x264
+[ 4.296408] [<ffffffc0001f75a0>] internal_create_group+0x14c/0x280
+[ 4.303184] [<ffffffc0001f76e8>] sysfs_create_group+0x14/0x1c
+[ 4.309483] [<ffffffc0001f77c8>] sysfs_create_groups+0x30/0x78
+[ 4.315881] [<ffffffc00043631c>] device_add+0x224/0x4d8
+[ 4.321609] [<ffffffc0004365ec>] device_register+0x1c/0x28
+[ 4.327623] [<ffffffc0003952a4>] regulator_register+0x2e4/0xc14
+[ 4.334112] [<ffffffc000396844>] devm_regulator_register+0x54/0x94
+[ 4.340887] [<ffffffc000399328>] pwm_regulator_probe+0x278/0x2b8
+[ 4.347473] [<ffffffc000439fe4>] platform_drv_probe+0x58/0xa4
+[ 4.353772] [<ffffffc0004387a8>] driver_probe_device+0x114/0x2ac
+[ 4.360358] [<ffffffc0004389a4>] __driver_attach+0x64/0x90
+[ 4.366371] [<ffffffc000436f50>] bus_for_each_dev+0x74/0x90
+[ 4.372478] [<ffffffc000438bd4>] driver_attach+0x20/0x28
+[ 4.378299] [<ffffffc00043778c>] bus_add_driver+0xe8/0x1e0
+[ 4.384312] [<ffffffc00043959c>] driver_register+0x98/0xe4
+[ 4.390326] [<ffffffc00043aa04>] __platform_driver_register+0x48/0x50
+[ 4.397388] [<ffffffc000cb2710>] pwm_regulator_driver_init+0x18/0x20
+[ 4.404356] [<ffffffc000c8ca7c>] do_one_initcall+0xf8/0x180
+[ 4.410466] [<ffffffc000c8cc58>] kernel_init_freeable+0x154/0x1f4
+[ 4.417148] [<ffffffc000929cf4>] kernel_init+0x10/0xf8
+[ 4.422782] [<ffffffc000084450>] ret_from_fork+0x10/0x40
+
+It looks like the root cause is that regulator_attr_is_visible will
+try to get the voltage, but at this point in regulator_register,
+rdev->constraints is still null. So
+pwm_duty_cycle_percentage_to_voltage will dereference a null
+rdev->constraints pointer.
+"
+
+The problem is that we need to know the min and max voltage constraints
+to calculate the current voltage. ->get_voltage() is called when the
+sysfs attributes are created (part of device registration), and
+set_machine_constraints() is called after device_register(), thus
+leading to the NULL pointer dereference.
+
+Is there any reason for calling set_machine_constraints() after
+device_register() in regulator_register()?
+
+Best Regards,
+
+Boris
