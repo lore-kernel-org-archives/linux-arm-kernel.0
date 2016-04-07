@@ -1,46 +1,61 @@
-From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
-Date: Thu, 7 Apr 2016 10:59:44 +0530
-Subject: [PATCH v4 4/5] Documentation: DT: vdma: update binding doc for AXI
- CDMA
-In-Reply-To: <1460006985-14805-1-git-send-email-appanad@xilinx.com>
-References: <1460006985-14805-1-git-send-email-appanad@xilinx.com>
-Message-ID: <1460006985-14805-5-git-send-email-appanad@xilinx.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 07 Apr 2016 07:33:37 +0200
+Subject: [PATCH 1/9] iio: adc: exynos_adc: use regmap to retrieve struct
+ device
+In-Reply-To: <20160406203308.GA3462@d830.WORKGROUP>
+References: <cover.1459918214.git.amsfield22@gmail.com>
+ <2329d20396db00b60f4e7d2e783ea46b48eea9c1.1459918214.git.amsfield22@gmail.com>
+ <5704B4A4.1070704@samsung.com> <20160406203308.GA3462@d830.WORKGROUP>
+Message-ID: <5705F131.4090201@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the device-tree binding doc for
-adding support for AXI CDMA.
+Hello,
 
-Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
----
-Changes for v4:
----> None.
-Changes for v3:
----> Removed CDMA DT example from the patch as suggested by the Rob.
-Changes for v2:
----> Modified commit message as suggested by Vinod.
----> Moved the patch to forward in the series as suggested by vinod.
+On 2016-04-06 22:33, Alison Schofield wrote:
+> On Wed, Apr 06, 2016 at 09:03:00AM +0200, Marek Szyprowski wrote:
+>> Hello,
+>>
+>> On 2016-04-06 07:15, Alison Schofield wrote:
+>>> Driver includes struct regmap and struct device in its global data.
+>>> Remove the struct device and use regmap API to retrieve device info.
+>>>
+>>> Patch created using Coccinelle plus manual edits.
+>>>
+>>> Signed-off-by: Alison Schofield <amsfield22@gmail.com>
+>> This patch changes the struct device which is used by the driver to report
+>> errors. The driver used correctly the struct device associated with its
+>> device tree node, while after the patch it will use device which is
+>> associated with PMU regmap, which is a different device. PMU regmap is there
+>> only to enable/disable the ADC block and it is not the regmap used to access
+>> registers of the ADC device.
+>>
+>> I would prefer to drop this patch.
+> Thanks Marek!  Please check my understanding.  Driver is not carrying
+> a duplicate struct device. The regmap in exynos_adc is *not* this
+> devices regmap. It belongs to the PMU, (power mgmt unit?)
 
- Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+Exactly.
 
-diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-index 3fb23fe..fcc2b65 100644
---- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-+++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
-@@ -8,8 +8,12 @@ target devices. It can be configured to have one channel or two channels.
- If configured as two channels, one is to transmit to the device and another
- is to receive from the device.
- 
-+Xilinx AXI CDMA engine, it does transfers between memory-mapped source
-+address and a memory-mapped destination address.
-+
- Required properties:
--- compatible: Should be "xlnx,axi-vdma-1.00.a" or "xlnx,axi-dma-1.00.a"
-+- compatible: Should be "xlnx,axi-vdma-1.00.a" or "xlnx,axi-dma-1.00.a" or
-+	      "xlnx,axi-cdma-1.00.a""
- - #dma-cells: Should be <1>, see "dmas" property below
- - reg: Should contain VDMA registers location and length.
- - xlnx,addrwidth: Should be the vdma addressing size in bits(ex: 32 bits).
+> It seemed excessive to carry around a struct device just for the
+> dev_err messages, but, we need that struct to extract the correct
+> iio_dev struct. Without a regmap belonging to this actual device,
+> no efficiencies can be gained in exynos, and the patch will be
+> dropped from set v2.
+
+Thanks.
+
+> Now I need to be able to recognize such cases elsewhere. I'm going
+> back though other patches in this set looking for that, but I'm not
+> so sure I would recognize it.
+>
+> Jonathan & all, Any hints on the rule of regmap?
+
+You may check how the regmap is initialized. When it is retrieved by
+phandle from device tree, then you might be almost sure that it refers
+to the different device.
+
+Best regards
 -- 
-2.1.2
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
