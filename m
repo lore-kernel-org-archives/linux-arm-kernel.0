@@ -1,46 +1,87 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 8 Apr 2016 01:01:50 +0200
-Subject: 4.4, 4.6: camera and unlock buttons produce tons of interrupts
- (was Re: N900 sleep mode)
-In-Reply-To: <20160407213229.GO16484@atomide.com>
-References: <20160323123801.GC32031@amd> <20160330191208.GW9329@atomide.com>
- <20160404213056.GA25912@amd> <20160404220748.GA16484@atomide.com>
- <20160405142250.GA6429@amd> <20160405152916.GE16484@atomide.com>
- <20160405205137.GA10196@amd> <20160407174019.GM16484@atomide.com>
- <20160407194828.GA13338@amd> <20160407213229.GO16484@atomide.com>
-Message-ID: <20160407230150.GA16552@amd>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Fri, 08 Apr 2016 08:04:37 +0900
+Subject: [PATCH] extcon: usb-gpio: switch to use pm wakeirq apis
+In-Reply-To: <1459963957-21883-1-git-send-email-grygorii.strashko@ti.com>
+References: <1459963957-21883-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <5706E785.9020308@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> > gzipped config is attached.
-> > 
-> > Note that I'm still using NOLO. I enabled the sleep, then went to
-> > runlevel 1. LEDs still stay on, 55mA power consumption. That was with
-> > 1 in off_mode.
+On 2016? 04? 07? 02:32, Grygorii Strashko wrote:
+> Switch to use PM wakeirq APIs which automates wakeup IRQs
+> enabling/disabling and so allows to make code simpler.
 > 
-> Nothing idling for me with your .config.. And it seems slower to boot
-> compared to omap2plus_defconfig? Maybe because of the extra GPIO
-> interrupts?
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 
-Extra interrupts only happen when enable_off_mode is 1, so that should
-not be an issue during boot.
+Applied it.
 
-> Looks like you have 117 additional entries in .config enabled compared
-> to omap2plus_defconfig. Maybe go back to omap2plus_defconfig with minimal
-> changes and verify it idles properly first?
+Thanks,
+Chanwoo Choi
+
+> ---
+> Unfortunately this simple patch depends on:
+> "[RFC PATCH] PM / wakeirq: fix wakeirq setting after wakup re-configuration from sysfs"
+> https://lkml.org/lkml/2016/4/6/296
 > 
-> I'm suspecting it's some driver(s) you have enabled causing the
-> issue.
-
-I guess so. Do you (or anyone else) have minimum non-modular config
-for N900 that boots with video? Could I get lsmod from your system?
-(Yes, I still have nightmares from getting .config that works).
-
-Thanks and best regards,
-									Pavel
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+>  drivers/extcon/extcon-usb-gpio.c | 19 ++++++-------------
+>  1 file changed, 6 insertions(+), 13 deletions(-)
+> 
+> diff --git a/drivers/extcon/extcon-usb-gpio.c b/drivers/extcon/extcon-usb-gpio.c
+> index 2b2fecf..bc61d11 100644
+> --- a/drivers/extcon/extcon-usb-gpio.c
+> +++ b/drivers/extcon/extcon-usb-gpio.c
+> @@ -24,6 +24,7 @@
+>  #include <linux/module.h>
+>  #include <linux/of_gpio.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/pm_wakeirq.h>
+>  #include <linux/slab.h>
+>  #include <linux/workqueue.h>
+>  
+> @@ -141,7 +142,8 @@ static int usb_extcon_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	platform_set_drvdata(pdev, info);
+> -	device_init_wakeup(dev, 1);
+> +	device_init_wakeup(dev, true);
+> +	dev_pm_set_wake_irq(dev, info->id_irq);
+>  
+>  	/* Perform initial detection */
+>  	usb_extcon_detect_cable(&info->wq_detcable.work);
+> @@ -155,6 +157,9 @@ static int usb_extcon_remove(struct platform_device *pdev)
+>  
+>  	cancel_delayed_work_sync(&info->wq_detcable);
+>  
+> +	dev_pm_clear_wake_irq(&pdev->dev);
+> +	device_init_wakeup(&pdev->dev, false);
+> +
+>  	return 0;
+>  }
+>  
+> @@ -164,12 +169,6 @@ static int usb_extcon_suspend(struct device *dev)
+>  	struct usb_extcon_info *info = dev_get_drvdata(dev);
+>  	int ret = 0;
+>  
+> -	if (device_may_wakeup(dev)) {
+> -		ret = enable_irq_wake(info->id_irq);
+> -		if (ret)
+> -			return ret;
+> -	}
+> -
+>  	/*
+>  	 * We don't want to process any IRQs after this point
+>  	 * as GPIOs used behind I2C subsystem might not be
+> @@ -185,12 +184,6 @@ static int usb_extcon_resume(struct device *dev)
+>  	struct usb_extcon_info *info = dev_get_drvdata(dev);
+>  	int ret = 0;
+>  
+> -	if (device_may_wakeup(dev)) {
+> -		ret = disable_irq_wake(info->id_irq);
+> -		if (ret)
+> -			return ret;
+> -	}
+> -
+>  	enable_irq(info->id_irq);
+>  
+>  	return ret;
+> 
