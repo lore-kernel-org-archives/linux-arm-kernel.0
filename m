@@ -1,168 +1,67 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 7 Apr 2016 19:42:59 +0800
-Subject: [PATCH v2] PCI: designware: move remaining rc setup code to
- dw_pcie_setup_rc()
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1ED44208@lhreml503-mbs>
-References: <1458128433-3020-1-git-send-email-jszhang@marvell.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ED40E52@lhreml503-mbs>
- <20160407103734.55e72da7@xhacker>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ED43F95@lhreml503-mbs>
- <20160407163443.291fbd49@xhacker>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ED44208@lhreml503-mbs>
-Message-ID: <20160407194259.5c13742c@xhacker>
+From: sr@denx.de (Stefan Roese)
+Date: Thu,  7 Apr 2016 14:02:17 +0200
+Subject: [PATCH 2/2] ARM: dts: mvebu: armada-370-xp: Add MBus mappings for all
+ SPI devices
+In-Reply-To: <1460030537-10054-1-git-send-email-sr@denx.de>
+References: <1460030537-10054-1-git-send-email-sr@denx.de>
+Message-ID: <1460030537-10054-2-git-send-email-sr@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 7 Apr 2016 10:06:45 +0000 Gabriele Paoloni wrote:
+This patch adds the static MBus mappings for all supported SPI devices
+(8 per controller) for the direct access SPI mode. They can be configured
+and enabled by setting these MBus mapping in the 'ranges' property of the
+per-board 'soc' node. If nothing is changed here, the default 'normal'
+(indirect) SPI mode is used.
 
-> Hi Jisheng
-> 
-..
-> > >  
-> > > >
-> > > > Is it acceptable that pcie-hisi adds a call to dw_pcie_setup_rc()  
-> > in  
-> > > > hisi_add_pcie_port()?  
-> > >
-> > > I don't think so...that would try to overwrite what is already set by
-> > > the bootloader; so it is wrong in principle and maybe it can lead to
-> > > undefined behaviours...  
-> > 
-> > make sense! This commit is intend to re-setup the rc when waken from
-> > s2ram (in
-> > s2ram state, the host lost power)
-> > 
-> > I have no good solution but to introduce one function e.g
-> > dw_pcie_setup_rc_after_linkup(), then move related code from
-> > dw_pcie_host_init
-> > to it, then let my host driver resume hook to call.
-> > 
-> > Hi Pratyush, Jingoo and Bjorn etc.
-> > 
-> > any suggestions are appreciated!  
-> 
-> What about:
-> 
-> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> index a4cccd3..e461f5d 100644
-> --- a/drivers/pci/host/pcie-designware.c
-> +++ b/drivers/pci/host/pcie-designware.c
-> @@ -434,7 +434,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
->  	struct platform_device *pdev = to_platform_device(pp->dev);
->  	struct pci_bus *bus, *child;
->  	struct resource *cfg_res;
-> -	u32 val;
->  	int i, ret;
->  	LIST_HEAD(res);
->  	struct resource_entry *win;
-> @@ -544,25 +543,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
->  	if (pp->ops->host_init)
->  		pp->ops->host_init(pp);
->  
-> -	/*
-> -	 * If the platform provides ->rd_other_conf, it means the platform
-> -	 * uses its own address translation component rather than ATU, so
-> -	 * we should not program the ATU here.
-> -	 */
-> -	if (!pp->ops->rd_other_conf)
-> -		dw_pcie_prog_outbound_atu(pp, PCIE_ATU_REGION_INDEX1,
-> -					  PCIE_ATU_TYPE_MEM, pp->mem_base,
-> -					  pp->mem_bus_addr, pp->mem_size);
-> -
-> -	dw_pcie_wr_own_conf(pp, PCI_BASE_ADDRESS_0, 4, 0);
-> -
-> -	/* program correct class for RC */
-> -	dw_pcie_wr_own_conf(pp, PCI_CLASS_DEVICE, 2, PCI_CLASS_BRIDGE_PCI);
-> -
-> -	dw_pcie_rd_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, &val);
-> -	val |= PORT_LOGIC_SPEED_CHANGE;
-> -	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
+Signed-off-by: Stefan Roese <sr@denx.de>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Jason Cooper <jason@lakedameon.net>
+Cc: Mark Brown <broonie@kernel.org>
+Cc: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/boot/dts/armada-370-xp.dtsi | 20 ++++++++++++++++++--
+ 1 file changed, 18 insertions(+), 2 deletions(-)
 
-If we introduced one global function, is it better to keep the RC registers
-program sequence not changed at all? And ask each pcie dw users to call this
-new function in its resume hook if necessary. Either is fine, and can provide
-what I want, let's wait maintainers' comments.
-
-Something like:
-
-
-diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-index a4cccd3..53c6176 100644
---- a/drivers/pci/host/pcie-designware.c
-+++ b/drivers/pci/host/pcie-designware.c
-@@ -434,7 +434,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 	struct platform_device *pdev = to_platform_device(pp->dev);
- 	struct pci_bus *bus, *child;
- 	struct resource *cfg_res;
--	u32 val;
- 	int i, ret;
- 	LIST_HEAD(res);
- 	struct resource_entry *win;
-@@ -544,24 +543,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 	if (pp->ops->host_init)
- 		pp->ops->host_init(pp);
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index a0903cd..c3ebf88 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -302,7 +302,15 @@
+ 		};
  
--	/*
--	 * If the platform provides ->rd_other_conf, it means the platform
--	 * uses its own address translation component rather than ATU, so
--	 * we should not program the ATU here.
--	 */
--	if (!pp->ops->rd_other_conf)
--		dw_pcie_prog_outbound_atu(pp, PCIE_ATU_REGION_INDEX1,
--					  PCIE_ATU_TYPE_MEM, pp->mem_base,
--					  pp->mem_bus_addr, pp->mem_size);
--
--	dw_pcie_wr_own_conf(pp, PCI_BASE_ADDRESS_0, 4, 0);
--
--	/* program correct class for RC */
--	dw_pcie_wr_own_conf(pp, PCI_CLASS_DEVICE, 2, PCI_CLASS_BRIDGE_PCI);
--
--	dw_pcie_rd_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, &val);
--	val |= PORT_LOGIC_SPEED_CHANGE;
--	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
-+	dw_pcie_setup_rc_after_linkup(pp);
+ 		spi0: spi at 10600 {
+-			reg = <MBUS_ID(0xf0, 0x01) 0x10600 0x28>;
++			reg = <MBUS_ID(0xf0, 0x01) 0x10600 0x28	/* control */
++			       MBUS_ID(0x01, 0x1e) 0 0x100000	/* CS0 */
++			       MBUS_ID(0x01, 0x5e) 0 0x100000	/* CS1 */
++			       MBUS_ID(0x01, 0x9e) 0 0x100000	/* CS2 */
++			       MBUS_ID(0x01, 0xde) 0 0x100000	/* CS3 */
++			       MBUS_ID(0x01, 0x1f) 0 0x100000	/* CS4 */
++			       MBUS_ID(0x01, 0x5f) 0 0x100000	/* CS5 */
++			       MBUS_ID(0x01, 0x9f) 0 0x100000	/* CS6 */
++			       MBUS_ID(0x01, 0xdf) 0 0x100000>;	/* CS7 */
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			cell-index = <0>;
+@@ -312,7 +320,15 @@
+ 		};
  
- 	pp->root_bus_nr = pp->busn->start;
- 	if (IS_ENABLED(CONFIG_PCI_MSI)) {
-@@ -725,6 +707,30 @@ static struct pci_ops dw_pcie_ops = {
- 	.write = dw_pcie_wr_conf,
- };
- 
-+void dw_pcie_setup_rc_after_linkup(struct pcie_port *pp)
-+{
-+	u32 val;
-+
-+	/*
-+	 * If the platform provides ->rd_other_conf, it means the platform
-+	 * uses its own address translation component rather than ATU, so
-+	 * we should not program the ATU here.
-+	 */
-+	if (!pp->ops->rd_other_conf)
-+		dw_pcie_prog_outbound_atu(pp, PCIE_ATU_REGION_INDEX1,
-+					  PCIE_ATU_TYPE_MEM, pp->mem_base,
-+					  pp->mem_bus_addr, pp->mem_size);
-+
-+	dw_pcie_wr_own_conf(pp, PCI_BASE_ADDRESS_0, 4, 0);
-+
-+	/* program correct class for RC */
-+	dw_pcie_wr_own_conf(pp, PCI_CLASS_DEVICE, 2, PCI_CLASS_BRIDGE_PCI);
-+
-+	dw_pcie_rd_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, &val);
-+	val |= PORT_LOGIC_SPEED_CHANGE;
-+	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
-+}
-+
- void dw_pcie_setup_rc(struct pcie_port *pp)
- {
- 	u32 val;
-diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
-index f437f9b..f7746bf 100644
---- a/drivers/pci/host/pcie-designware.h
-+++ b/drivers/pci/host/pcie-designware.h
-@@ -85,5 +85,6 @@ int dw_pcie_wait_for_link(struct pcie_port *pp);
- int dw_pcie_link_up(struct pcie_port *pp);
- void dw_pcie_setup_rc(struct pcie_port *pp);
- int dw_pcie_host_init(struct pcie_port *pp);
-+void dw_pcie_setup_rc_after_linkup(struct pcie_port *pp);
- 
- #endif /* _PCIE_DESIGNWARE_H */
+ 		spi1: spi at 10680 {
+-			reg = <MBUS_ID(0xf0, 0x01) 0x10680 0x28>;
++			reg = <MBUS_ID(0xf0, 0x01) 0x10680 0x28	/* control */
++			       MBUS_ID(0x01, 0x1a) 0 0x100000	/* CS0 */
++			       MBUS_ID(0x01, 0x5a) 0 0x100000	/* CS1 */
++			       MBUS_ID(0x01, 0x9a) 0 0x100000	/* CS2 */
++			       MBUS_ID(0x01, 0xda) 0 0x100000	/* CS3 */
++			       MBUS_ID(0x01, 0x1b) 0 0x100000	/* CS4 */
++			       MBUS_ID(0x01, 0x5b) 0 0x100000	/* CS5 */
++			       MBUS_ID(0x01, 0x9b) 0 0x100000	/* CS6 */
++			       MBUS_ID(0x01, 0xdb) 0 0x100000>;	/* CS7 */
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			cell-index = <1>;
+-- 
+2.8.1
