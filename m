@@ -1,138 +1,429 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu,  7 Apr 2016 14:20:17 +0200
-Subject: [PATCH v4 00/11] soc: renesas: Add R-Car SYSC PM Domain Support
-Message-ID: <1460031628-13336-1-git-send-email-geert+renesas@glider.be>
+Date: Thu,  7 Apr 2016 14:20:20 +0200
+Subject: [PATCH v4 03/11] soc: renesas: rcar-sysc: Add DT support for SYSC PM
+ domains
+In-Reply-To: <1460031628-13336-1-git-send-email-geert+renesas@glider.be>
+References: <1460031628-13336-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1460031628-13336-4-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	Hi Simon, Magnus,
+Populate the SYSC PM domains from DT, based on the presence of a device
+node for the System Controller. The actual power area hiearchy, and
+features of specific areas are obtained from tables in the C code.
 
-This patch series introduces a DT-based driver for the R-Car System
-Controller, as found on Renesas R-Car H1, R-Car Gen2, and R-Car Gen3
-SoCs.
+The SYSCIER and SYSCIMR register values are derived from the power areas
+present, which will help to get rid of the hardcoded values in R-Car H1
+and R-Car Gen2 platform code later.
 
-This is a dependency for the enablement of DU and VSP on R-Car H3, as
-the VSPs are located in a PM Domain.
+Initialization is done in two phases:
+  1. SYSC initialization and setup of power areas containing CPUs or
+     SCUs is done from an early_initcall(), to make sure these PM
+     Domains are initialized before secondary CPU bringup,
+  2. Setup of the always-on power area (which is basically an alias for
+     the CPG/MSSR or CPG/MSTP Clock Domain), and of I/O power areas is
+     done from builtin_platform_driver_probe(), when the Clock Domain is
+     available.
 
-Changes compared to v3:
-  - Add Reviewed-by,
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+v4:
   - Make sure not to clear reserved SYSCIMR bits that were set before,
   - Make the always-on power area implicit and always present, and an
     alias of the existing SoC's Clock Domain. This makes the number of
     power areas a compile-time constant, and allows to drop PD_ALWAYS_ON
     and some checks.
   - Split initialization in two phases,
-  - Remove the explicit dependency on the CPG/MSSR driver by forwarding
-    the attach/detach callbacks to the parent PM Domain.
-    If deemed reusable, rcar_sysc_{at,de}tach_dev() can be moved to
-    common genpd code later.
   - Document that ARM cores are controlled by PSCI on R-Car Gen3
     (although the underlying CPG/APMU hardware is the same as on Gen2),
-  - Drop R8A7779_PD_SH, as it's not documented in the datasheet,
-  - Rename R8A779*_PD_SH to R8A779*_PD_SH_4A, and "sh" to "sh-4a" on
-    R-Car Gen2,
-  - Remove always-on power area from the R-Car Gen3 table, as it's now
-    implicitly handled by the rcar-sysc driver,
-  - Reformat tables,
   - Minor improvements (double evaluation, unused parameter, debug
     message consolidation),
-  - Update MAINTAINERS.
 
-Changes compared to v2:
-  - Add Reviewed-by,
-  - Rename driver from pm-rcar to rcar-sysc,
+v3:
+  - Drop check for CONFIG_PM_GENERIC_DOMAINS, which is now always
+    enabled on R-Car SoCs,
   - Create PM Domains from hierarchy in C data instead of DT,
-  - Add support for an "always-on" domain, which is currently used on
-    R-Car H3 only (support can be added for other R-Car SoCs, preferably
-    after their migration to CPG/MSSR),
-  - Drop power area A3SH on R-Car H3, as it's no longer
-    documented in the datasheet, and touching it seems to crash SYSC,
-  - Hook up the CPG/MSSR Clock Domain attach/detach callbacks instead of
-    using our own copies,
   - Initialize SYSCIER early, as SYSC needs the interrupt sources to be
     enabled to control power,
   - Mask all SYSC interrupt sources for the CPU,
-  - Drop check for CONFIG_PM_GENERIC_DOMAINS, which is now always
-    enabled on R-Car SoCs,
+  - Add support for an "always-on" domain,
   - Use early_initcall() instead of core_initcall(),
   - Do not power up CPU power areas during initialization, as this is
     handled later (directly or indirectly) by the SMP code,
-  - Extract bindings into its own series, "[PATCH v3 0/7] PM / Domains:
-    Add DT bindings for the R-Car System Controller".
 
-Changes compared to v1 (more details in the individual patches):
-  - Moved pm-rcar from arch/arm/mach-shmobile/ to drivers/soc/renesas/,
-  - Added R-Car H3 (r8a7795) support, incl. support for devices part of
-    a SYSC PM domain and the CPG/MSSR clock domain,
-  - Use "renesas,<type>-sysc" instead of "renesas,sysc-<type>",
-  - Added fallback compatibility strings for R-Car Gen2 and Gen3.
-  - Changed one-line summary prefix to match current arm-soc practices,
-  - The L2 cache-controller patches have been extracted into a separate
-    series ("[PATCH v3 0/7] ARM/arm64: dts: renesas: Add/complete L2
-    cache-controller nodes"),
-  - Minor fixes.
-
-Dependencies:
-  - renesas-devel-20160406-v4.6-rc2.
-
-This has been tested on r8a7779/marzen, r8a7790/lager, r8a7791/koelsch,
-r8a7794/alt, and r8a7795/salvator-x.
-
-Thanks for applying!
-
-Geert Uytterhoeven (11):
-  soc: renesas: Move pm-rcar to drivers/soc/renesas/rcar-sysc
-  soc: renesas: rcar-sysc: Improve rcar_sysc_power() debug info
-  soc: renesas: rcar-sysc: Add DT support for SYSC PM domains
-  soc: renesas: rcar-sysc: Make rcar_sysc_power_is_off() static
-  soc: renesas: rcar-sysc: Enable Clock Domain for r8a7795 I/O devices
-  soc: renesas: rcar-sysc: Add support for R-Car H1 power areas
-  soc: renesas: rcar-sysc: Add support for R-Car H2 power areas
-  soc: renesas: rcar-sysc: Add support for R-Car M2-W power areas
-  soc: renesas: rcar-sysc: Add support for R-Car M2-N power areas
-  soc: renesas: rcar-sysc: Add support for R-Car E2 power areas
-  soc: renesas: rcar-sysc: Add support for R-Car H3 power areas
-
- MAINTAINERS                                        |   4 +
- arch/arm/mach-shmobile/Kconfig                     |  11 +-
- arch/arm/mach-shmobile/Makefile                    |   1 -
- arch/arm/mach-shmobile/pm-r8a7779.c                |   3 +-
- arch/arm/mach-shmobile/pm-rcar-gen2.c              |   2 +-
- arch/arm/mach-shmobile/pm-rcar.c                   | 164 -------
- arch/arm/mach-shmobile/smp-r8a7779.c               |   2 +-
- arch/arm/mach-shmobile/smp-r8a7790.c               |   2 +-
- drivers/soc/Makefile                               |   3 +-
- drivers/soc/renesas/Makefile                       |   7 +
- drivers/soc/renesas/r8a7779-sysc.c                 |  30 ++
- drivers/soc/renesas/r8a7790-sysc.c                 |  45 ++
- drivers/soc/renesas/r8a7791-sysc.c                 |  31 ++
- drivers/soc/renesas/r8a7794-sysc.c                 |  31 ++
- drivers/soc/renesas/r8a7795-sysc.c                 |  53 +++
- drivers/soc/renesas/rcar-sysc.c                    | 480 +++++++++++++++++++++
- drivers/soc/renesas/rcar-sysc.h                    |  59 +++
- .../linux/soc/renesas/rcar-sysc.h                  |   9 +-
- 18 files changed, 756 insertions(+), 181 deletions(-)
- delete mode 100644 arch/arm/mach-shmobile/pm-rcar.c
- create mode 100644 drivers/soc/renesas/Makefile
- create mode 100644 drivers/soc/renesas/r8a7779-sysc.c
- create mode 100644 drivers/soc/renesas/r8a7790-sysc.c
- create mode 100644 drivers/soc/renesas/r8a7791-sysc.c
- create mode 100644 drivers/soc/renesas/r8a7794-sysc.c
- create mode 100644 drivers/soc/renesas/r8a7795-sysc.c
- create mode 100644 drivers/soc/renesas/rcar-sysc.c
+v2:
+  - Add missing definitions for SYSC_PWR_CA15_CPU and SYSC_PWR_CA7_CPU,
+  - Add R-Car H3 (r8a7795) support,
+  - Drop tests for CONFIG_ARCH_SHMOBILE_LEGACY,
+  - Add missing break statements in rcar_sysc_pwr_on_off(),
+  - Add missing calls to of_node_put() in error paths,
+  - Fix build if CONFIG_PM=n,
+  - Update compatible values,
+  - Update copyright.
+---
+ drivers/soc/renesas/rcar-sysc.c | 261 +++++++++++++++++++++++++++++++++++++++-
+ drivers/soc/renesas/rcar-sysc.h |  52 ++++++++
+ 2 files changed, 312 insertions(+), 1 deletion(-)
  create mode 100644 drivers/soc/renesas/rcar-sysc.h
- rename arch/arm/mach-shmobile/pm-rcar.h => include/linux/soc/renesas/rcar-sysc.h (60%)
 
+diff --git a/drivers/soc/renesas/rcar-sysc.c b/drivers/soc/renesas/rcar-sysc.c
+index 9ba5fd15c53bf9b9..3cb19b599cee4ee5 100644
+--- a/drivers/soc/renesas/rcar-sysc.c
++++ b/drivers/soc/renesas/rcar-sysc.c
+@@ -2,6 +2,7 @@
+  * R-Car SYSC Power management support
+  *
+  * Copyright (C) 2014  Magnus Damm
++ * Copyright (C) 2015-2016 Glider bvba
+  *
+  * This file is subject to the terms and conditions of the GNU General Public
+  * License.  See the file "COPYING" in the main directory of this archive
+@@ -11,10 +12,17 @@
+ #include <linux/delay.h>
+ #include <linux/err.h>
+ #include <linux/mm.h>
++#include <linux/of_address.h>
++#include <linux/of_device.h>
++#include <linux/platform_device.h>
++#include <linux/pm_domain.h>
++#include <linux/slab.h>
+ #include <linux/spinlock.h>
+ #include <linux/io.h>
+ #include <linux/soc/renesas/rcar-sysc.h>
+ 
++#include "rcar-sysc.h"
++
+ /* SYSC Common */
+ #define SYSCSR			0x00	/* SYSC Status Register */
+ #define SYSCISR			0x04	/* Interrupt Status Register */
+@@ -29,7 +37,8 @@
+ /*
+  * Power Control Register Offsets inside the register block for each domain
+  * Note: The "CR" registers for ARM cores exist on H1 only
+- *       Use WFI to power off, CPG/APMU to resume ARM cores on R-Car Gen2
++ *	 Use WFI to power off, CPG/APMU to resume ARM cores on R-Car Gen2
++ *	 Use PSCI on R-Car Gen3
+  */
+ #define PWRSR_OFFS		0x00	/* Power Status Register */
+ #define PWROFFCR_OFFS		0x04	/* Power Shutoff Control Register */
+@@ -48,6 +57,8 @@
+ #define SYSCISR_RETRIES		1000
+ #define SYSCISR_DELAY_US	1
+ 
++#define RCAR_PD_ALWAYS_ON	32	/* Always-on power area */
++
+ static void __iomem *rcar_sysc_base;
+ static DEFINE_SPINLOCK(rcar_sysc_lock); /* SMP CPUs + I/O devices */
+ 
+@@ -162,3 +173,251 @@ void __iomem *rcar_sysc_init(phys_addr_t base)
+ 
+ 	return rcar_sysc_base;
+ }
++
++struct rcar_sysc_pd {
++	struct generic_pm_domain genpd;
++	struct rcar_sysc_ch ch;
++	unsigned int flags;
++	char name[0];
++};
++
++static inline struct rcar_sysc_pd *to_rcar_pd(struct generic_pm_domain *d)
++{
++	return container_of(d, struct rcar_sysc_pd, genpd);
++}
++
++static bool rcar_sysc_active_wakeup(struct device *dev)
++{
++	return true;
++}
++
++static int rcar_sysc_pd_power_off(struct generic_pm_domain *genpd)
++{
++	struct rcar_sysc_pd *pd = to_rcar_pd(genpd);
++
++	pr_debug("%s: %s\n", __func__, genpd->name);
++
++	if (pd->flags & PD_NO_CR) {
++		pr_debug("%s: Cannot control %s\n", __func__, genpd->name);
++		return -EBUSY;
++	}
++
++	if (pd->flags & PD_BUSY) {
++		pr_debug("%s: %s busy\n", __func__, genpd->name);
++		return -EBUSY;
++	}
++
++	return rcar_sysc_power_down(&pd->ch);
++}
++
++static int rcar_sysc_pd_power_on(struct generic_pm_domain *genpd)
++{
++	struct rcar_sysc_pd *pd = to_rcar_pd(genpd);
++
++	pr_debug("%s: %s\n", __func__, genpd->name);
++
++	if (pd->flags & PD_NO_CR) {
++		pr_debug("%s: Cannot control %s\n", __func__, genpd->name);
++		return 0;
++	}
++
++	return rcar_sysc_power_up(&pd->ch);
++}
++
++static void __init rcar_sysc_pd_setup(struct rcar_sysc_pd *pd)
++{
++	struct generic_pm_domain *genpd = &pd->genpd;
++	const char *name = pd->genpd.name;
++	struct dev_power_governor *gov = &simple_qos_governor;
++
++	if (pd->flags & PD_CPU) {
++		/*
++		 * This domain contains a CPU core and therefore it should
++		 * only be turned off if the CPU is not in use.
++		 */
++		pr_debug("PM domain %s contains %s\n", name, "CPU");
++		pd->flags |= PD_BUSY;
++		gov = &pm_domain_always_on_gov;
++	} else if (pd->flags & PD_SCU) {
++		/*
++		 * This domain contains an SCU and cache-controller, and
++		 * therefore it should only be turned off if the CPU cores are
++		 * not in use.
++		 */
++		pr_debug("PM domain %s contains %s\n", name, "SCU");
++		pd->flags |= PD_BUSY;
++		gov = &pm_domain_always_on_gov;
++	}
++
++	pm_genpd_init(genpd, gov, false);
++	genpd->dev_ops.active_wakeup = rcar_sysc_active_wakeup;
++	genpd->power_off = rcar_sysc_pd_power_off;
++	genpd->power_on = rcar_sysc_pd_power_on;
++
++	if (pd->flags & PD_CPU) {
++		/* Skip CPUs (handled by SMP code) */
++		pr_debug("%s: Not touching %s\n", __func__, genpd->name);
++		return;
++	}
++
++	if (!rcar_sysc_power_is_off(&pd->ch)) {
++		pr_debug("%s: %s is already powered\n", __func__, genpd->name);
++		return;
++	}
++
++	rcar_sysc_power_up(&pd->ch);
++}
++
++static const struct of_device_id rcar_sysc_matches[] = {
++	{ /* sentinel */ }
++};
++
++struct rcar_pm_domains {
++	struct genpd_onecell_data onecell_data;
++	struct generic_pm_domain *domains[RCAR_PD_ALWAYS_ON + 1];
++};
++
++static struct genpd_onecell_data *rcar_sysc_onecell_data;
++
++static int __init rcar_sysc_pd_init(const struct rcar_sysc_info *info,
++				    bool early)
++{
++	struct generic_pm_domain **domains = rcar_sysc_onecell_data->domains;
++	unsigned int i;
++
++	for (i = 0; i < info->num_areas; i++) {
++		const struct rcar_sysc_area *area = &info->areas[i];
++		struct rcar_sysc_pd *pd;
++
++		/* Skip non-CPU/SCU domains during phase 1 */
++		if (early && !(area->flags & (PD_CPU | PD_SCU)))
++			continue;
++
++		/* Tie CPU/SCU domains to always-on domain during phase 2 * */
++		if (!early && (area->flags & (PD_CPU | PD_SCU))) {
++			if (area->parent < 0)
++				pm_genpd_add_subdomain(
++					domains[RCAR_PD_ALWAYS_ON],
++					domains[area->isr_bit]);
++			continue;
++		}
++
++		pd = kzalloc(sizeof(*pd) + strlen(area->name) + 1, GFP_KERNEL);
++		if (!pd)
++			return -ENOMEM;
++
++		strcpy(pd->name, area->name);
++		pd->genpd.name = pd->name;
++		pd->ch.chan_offs = area->chan_offs;
++		pd->ch.chan_bit = area->chan_bit;
++		pd->ch.isr_bit = area->isr_bit;
++		pd->flags = area->flags;
++
++		rcar_sysc_pd_setup(pd);
++		if (area->parent >= 0)
++			pm_genpd_add_subdomain(domains[area->parent],
++					       &pd->genpd);
++		else if (domains[RCAR_PD_ALWAYS_ON])
++			pm_genpd_add_subdomain(domains[RCAR_PD_ALWAYS_ON],
++					       &pd->genpd);
++
++		domains[area->isr_bit] = &pd->genpd;
++	}
++
++	return 0;
++}
++
++/*
++ * Initialization phase 1, including setup of CPU and SCU domains
++ */
++static int __init rcar_sysc_early(void)
++{
++	const struct rcar_sysc_info *info;
++	const struct of_device_id *match;
++	struct rcar_pm_domains *domains;
++	struct device_node *np;
++	u32 syscier, syscimr;
++	void __iomem *base;
++	unsigned int i;
++	int error;
++
++	np = of_find_matching_node_and_match(NULL, rcar_sysc_matches, &match);
++	if (!np)
++		return -ENODEV;
++
++	info = match->data;
++
++	base = of_iomap(np, 0);
++	if (!base) {
++		pr_warn("%s: Cannot map regs\n", np->full_name);
++		error = -ENOMEM;
++		goto out_put;
++	}
++
++	rcar_sysc_base = base;
++
++	domains = kzalloc(sizeof(*domains), GFP_KERNEL);
++	if (!domains) {
++		error = -ENOMEM;
++		goto out_put;
++	}
++
++	domains->onecell_data.domains = domains->domains;
++	domains->onecell_data.num_domains = ARRAY_SIZE(domains->domains);
++
++	/*
++	 * SYSC needs all interrupt sources enabled to control power.
++	 */
++	for (i = 0, syscier = 0; i < info->num_areas; i++)
++		syscier |= BIT(info->areas[i].isr_bit);
++	pr_debug("%s: syscier = 0x%08x\n", np->full_name, syscier);
++	iowrite32(syscier, base + SYSCIER);
++
++	/*
++	 * Mask all interrupt sources to prevent the CPU from receiving them.
++	 * Make sure not to clear reserved bits that were set before.
++	 */
++	syscimr = ioread32(base + SYSCIMR);
++	syscimr |= syscier;
++	pr_debug("%s: syscimr = 0x%08x\n", np->full_name, syscimr);
++	iowrite32(syscimr, base + SYSCIMR);
++
++	rcar_sysc_onecell_data = &domains->onecell_data;
++
++	error = rcar_sysc_pd_init(info, true);
++	if (error)
++		goto out_put;
++
++	of_genpd_add_provider_onecell(np, &domains->onecell_data);
++
++out_put:
++	of_node_put(np);
++	return error;
++}
++early_initcall(rcar_sysc_early);
++
++
++/*
++ * Initialization phase 2, including setup of always-on and I/O domains
++ */
++static int __init rcar_sysc_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++
++	if (!rcar_sysc_onecell_data)
++		return -ENODEV;
++
++	rcar_sysc_onecell_data->domains[RCAR_PD_ALWAYS_ON] =
++		pd_to_genpd(dev->pm_domain);
++
++	return rcar_sysc_pd_init(of_device_get_match_data(dev), false);
++}
++
++static struct platform_driver rcar_sysc_driver = {
++	.driver = {
++		.name = "rcar-sysc",
++		.of_match_table = rcar_sysc_matches,
++	},
++};
++
++builtin_platform_driver_probe(rcar_sysc_driver, rcar_sysc_probe);
+diff --git a/drivers/soc/renesas/rcar-sysc.h b/drivers/soc/renesas/rcar-sysc.h
+new file mode 100644
+index 0000000000000000..4aeb3541227a5456
+--- /dev/null
++++ b/drivers/soc/renesas/rcar-sysc.h
+@@ -0,0 +1,52 @@
++/*
++ * Renesas R-Car System Controller
++ *
++ * Copyright (C) 2016 Glider bvba
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ */
++#ifndef __SOC_RENESAS_RCAR_SYSC_H__
++#define __SOC_RENESAS_RCAR_SYSC_H__
++
++#include <linux/types.h>
++
++
++/*
++ * Power Domain flags
++ */
++#define PD_CPU		BIT(0)	/* Area contains main CPU core */
++#define PD_SCU		BIT(1)	/* Area contains SCU and L2 cache */
++#define PD_NO_CR	BIT(2)	/* Area lacks PWR{ON,OFF}CR registers */
++
++#define PD_BUSY		BIT(3)	/* Busy, for internal use only */
++
++#define PD_CPU_CR	PD_CPU		  /* CPU area has CR (R-Car H1) */
++#define PD_CPU_NOCR	PD_CPU | PD_NO_CR /* CPU area lacks CR (R-Car Gen2/3) */
++
++
++/*
++ * Description of a Power Area
++ */
++
++struct rcar_sysc_area {
++	const char *name;
++	u16 chan_offs;		/* Offset of PWRSR register for this area */
++	u8 chan_bit;		/* Bit in PWR* (except for PWRUP in PWRSR) */
++	u8 isr_bit;		/* Bit in SYSCI*R */
++	int parent;		/* -1 if none (i.e. always-on) */
++	unsigned int flags;	/* See PD_* */
++};
++
++
++/*
++ * SoC-specific Power Area Description
++ */
++
++struct rcar_sysc_info {
++	const struct rcar_sysc_area *areas;
++	unsigned int num_areas;
++};
++
++#endif /* __SOC_RENESAS_RCAR_SYSC_H__ */
 -- 
 1.9.1
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
