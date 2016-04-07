@@ -1,18 +1,48 @@
 From: joro@8bytes.org (Joerg Roedel)
-Date: Thu, 7 Apr 2016 15:08:17 +0200
-Subject: [PATCH 1/3] iommu: Add MMIO mapping type
-In-Reply-To: <d80a42ceae3a39ef7c593a5181a1742a84c65533.1459854346.git.robin.murphy@arm.com>
-References: <d80a42ceae3a39ef7c593a5181a1742a84c65533.1459854346.git.robin.murphy@arm.com>
-Message-ID: <20160407130817.GD31146@8bytes.org>
+Date: Thu, 7 Apr 2016 15:24:30 +0200
+Subject: [PATCH 1/2] iommu: Support dynamic pgsize_bitmap
+In-Reply-To: <1459890090-16040-1-git-send-email-mitchelh@codeaurora.org>
+References: <1459890090-16040-1-git-send-email-mitchelh@codeaurora.org>
+Message-ID: <20160407132430.GE31146@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 05, 2016 at 12:39:30PM +0100, Robin Murphy wrote:
-> On some platforms, MMIO regions might need slightly different treatment
-> compared to mapping regular memory; add the notion of MMIO mappings to
-> the IOMMU API's memory type flags, so that callers can let the IOMMU
-> drivers know to do the right thing.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+On Tue, Apr 05, 2016 at 02:01:29PM -0700, Mitchel Humpherys wrote:
+> Currently we use a single pgsize_bitmap per IOMMU driver.  However, some
+> IOMMU drivers might service different IOMMUs with different supported
+> page sizes.  Some drivers might also want to restrict page sizes for
+> different use cases.  Support these use cases by adding a
+> .get_pgsize_bitmap function to the iommu_ops which can optionally be
+> used by the driver to return a domain-specific pgsize_bitmap.
 
-Applied the series, thanks.
+No, at least not this way. I said it before and I say it again: We are
+not going to lift the iommu-api requirements in this undetectable way.
+
+The iommu-api works with domains/groups and devices. The general
+expectation is that every group can be part of every domain. I know that
+this is not the case already with some drivers, but I am not going to
+move the code further into the wrong direction.
+
+The way I'd like to see that solved is:
+
+	* Introduce per-group pgsize-bitmaps (group->pgsize_bmp)
+
+	* Calculate a global pgsize-bitmap from all groups
+	  pgsize-bitmaps
+
+	* Also store a pgsize_bitmap in each domain on allocation
+
+	* Modify iommu_domain_alloc to set domain->pgsize_bmp to the
+	  global pgsize_bitmap
+
+	* Introduce an iommu_group_alloc_domain(group) function which
+	  allocates a new domain only for the given group. This function
+	  sets domain->pgsize_bitmap to group->pgsize_bmp.
+
+	* Note that now you can have multiple page-tables per domain,
+	  one page-table for each required format.
+
+
+Regards,
+
+	Joerg
