@@ -1,53 +1,62 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Thu, 7 Apr 2016 09:39:45 +0800
-Subject: [PATCH v10 00/17] Add ACPI support for Xen Dom0 on ARM64
-In-Reply-To: <5704F3E1.7020508@arm.com>
-References: <1459525755-36968-1-git-send-email-shannon.zhao@linaro.org>
- <5704F3E1.7020508@arm.com>
-Message-ID: <5705BA61.7000205@huawei.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 7 Apr 2016 10:37:34 +0800
+Subject: [PATCH v2] PCI: designware: move remaining rc setup code to
+ dw_pcie_setup_rc()
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1ED40E52@lhreml503-mbs>
+References: <1458128433-3020-1-git-send-email-jszhang@marvell.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ED40E52@lhreml503-mbs>
+Message-ID: <20160407103734.55e72da7@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julien,
+Hi Gabriele,
 
-On 2016/4/6 19:32, Julien Grall wrote:
-> Hi Shannon,
+On Wed, 6 Apr 2016 14:50:29 +0000 Gabriele Paoloni wrote:
+
+> Hi, sorry to be late on this
 > 
-> On 01/04/2016 16:48, Shannon Zhao wrote:
->> This patch set adds ACPI support for Xen Dom0 on ARM64. The relevant Xen
->> ACPI on ARM64 design document could be found from [1].
->>
->> This patch set adds a new FDT node "uefi" under /hypervisor to pass UEFI
->> information. Introduce a bus notifier of AMBA and Platform bus to map
->> the new added device's MMIO space. Make Xen domain use
->> xlated_setup_gnttab_pages to setup grant table and a new hypercall to
->> get event-channel irq.
->>
->> Regarding the initialization flow of Linux kernel, it needs to move
->> xen_early_init() before efi_init(). Then xen_early_init() will check
->> whether it runs on Xen through the /hypervisor node and efi_init() will
->> call a new function fdt_find_xen_uefi_params(), to parse those
->> xen,uefi-* parameters just like the existing efi_get_fdt_params().
->>
->> And in arm64_enable_runtime_services() it will check whether it runs on
->> Xen and call another new function xen_efi_runtime_setup() to setup
->> runtime service instead of efi_native_runtime_setup(). The
->> xen_efi_runtime_setup() will assign the runtime function pointers with
->> the functions of driver/xen/efi.c.
->>
->> And since we pass a /hypervisor node and a /chosen node to Dom0, it
->> needs to check whether the DTS only contains a /hypervisor node and a
->> /chosen node in acpi_boot_table_init().
->>
->> Patches are tested on FVP base model. They can be fetched from[2].
+> > -----Original Message-----
+> > From: linux-kernel-owner at vger.kernel.org [mailto:linux-kernel-
+> > owner at vger.kernel.org] On Behalf Of Jisheng Zhang
+> > Sent: 16 March 2016 11:41
+> > To: jingoohan1 at gmail.com; pratyush.anand at gmail.com; bhelgaas at google.com
+> > Cc: linux-pci at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
+> > kernel at lists.infradead.org; Jisheng Zhang
+> > Subject: [PATCH v2] PCI: designware: move remaining rc setup code to
+> > dw_pcie_setup_rc()
+> > 
+> > dw_pcie_setup_rc(), as its name indicates, setups the RC. But current
+> > dw_pcie_host_init() also contains some necessary rc setup code.
+> > 
+> > Another reason: the host may lost power during suspend to ram, the RC
+> > need to be re-setup after resume. The rc can't be correctly resumed
+> > without the rc setup code in dw_pcie_host_init().
+> > 
+> > So this patch moves the code to dw_pcie_setup_rc() to address the above
+> > two issues. After this patch, each pcie designware driver users could
+> > call dw_pcie_setup_rc() to re-setup rc when resume back.  
 > 
-> I have tested this series and Linux is booting up to the prompt:
+> I think this patch breaks the Hisilicon driver...
 > 
-> Tested-by: Julien Grall <julien.grall@arm.com>
-Thanks a lot. There are several patches which you didn't give your
-comments. So I assume you will review them. If so, I'll wait and update
-this series later.
+> Our driver performs linkup setup in UEFI therefore we do not call
+> dw_pcie_setup_rc(), we only call dw_pcie_host_init().
+
+Thanks for the information. So pcie-hisi rely on UEFI to do something similar
+in dw_pcie_setup_rc(), this comes to a common driver implement question: should
+linux device driver rely on bootloader to configure HW device?
+
+Is it acceptable that pcie-hisi adds a call to dw_pcie_setup_rc() in
+hisi_add_pcie_port()?
 
 Thanks,
--- 
-Shannon
+Jisheng
+
+> 
+> Maybe better to group the part of code to be moved in as separate
+> function...
+> 
+> Thanks and sorry for late reply.
+> 
+> Gab
+> 
+> 
