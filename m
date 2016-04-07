@@ -1,47 +1,46 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 07 Apr 2016 15:30:28 -0700
-Subject: [PATCH v4] ARM: dts: kirkwood: Add DTS for Linksys
- EA4200v2/EA4500\
-In-Reply-To: <op.yff250112s3iss@ecaz> (Imre Kaloz's message of "Tue, 05 Apr
- 2016 13:50:14 +0200")
-References: <1459781168-16708-1-git-send-email-bert@biot.com>
- <20160404145528.GE25131@lunn.ch> <op.yff250112s3iss@ecaz>
-Message-ID: <87pou1hx17.fsf@free-electrons.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 8 Apr 2016 01:01:50 +0200
+Subject: 4.4, 4.6: camera and unlock buttons produce tons of interrupts
+ (was Re: N900 sleep mode)
+In-Reply-To: <20160407213229.GO16484@atomide.com>
+References: <20160323123801.GC32031@amd> <20160330191208.GW9329@atomide.com>
+ <20160404213056.GA25912@amd> <20160404220748.GA16484@atomide.com>
+ <20160405142250.GA6429@amd> <20160405152916.GE16484@atomide.com>
+ <20160405205137.GA10196@amd> <20160407174019.GM16484@atomide.com>
+ <20160407194828.GA13338@amd> <20160407213229.GO16484@atomide.com>
+Message-ID: <20160407230150.GA16552@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bert,
- 
- On mar., avril 05 2016, "Imre Kaloz" <kaloz@openwrt.org> wrote:
+Hi!
 
-> On Mon, 04 Apr 2016 16:55:28 +0200, Andrew Lunn <andrew@lunn.ch> wrote:
->
->> On Mon, Apr 04, 2016 at 04:46:07PM +0200, Bert Vermeulen wrote:
->>> This platform is based on a Marvell 88E6282 SoC and 88E6171 switch.
->>>
->>> Signed-off-by: Bert Vermeulen <bert@biot.com>
->>
->> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
->
-> Reviewed-by: Imre Kaloz <kaloz@openwrt.org>
+> > gzipped config is attached.
+> > 
+> > Note that I'm still using NOLO. I enabled the sleep, then went to
+> > runlevel 1. LEDs still stay on, 55mA power consumption. That was with
+> > 1 in off_mode.
+> 
+> Nothing idling for me with your .config.. And it seems slower to boot
+> compared to omap2plus_defconfig? Maybe because of the extra GPIO
+> interrupts?
 
+Extra interrupts only happen when enable_off_mode is 1, so that should
+not be an issue during boot.
 
-Applied on mvebu/dt with the reviewed-by flags and a fix on the comment
-block style.
+> Looks like you have 117 additional entries in .config enabled compared
+> to omap2plus_defconfig. Maybe go back to omap2plus_defconfig with minimal
+> changes and verify it idles properly first?
+> 
+> I'm suspecting it's some driver(s) you have enabled causing the
+> issue.
 
-Thanks,
+I guess so. Do you (or anyone else) have minimum non-modular config
+for N900 that boots with video? Could I get lsmod from your system?
+(Yes, I still have nightmares from getting .config that works).
 
-Gregory
-
-
->
->
-> Thanks,
->
-> Imre
+Thanks and best regards,
+									Pavel
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
