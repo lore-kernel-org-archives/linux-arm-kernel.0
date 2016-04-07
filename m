@@ -1,74 +1,98 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Thu, 7 Apr 2016 20:03:24 +0800
-Subject: [PATCH v11 07/17] Xen: ARM: Add support for mapping AMBA device mmio
+Date: Thu, 7 Apr 2016 20:03:20 +0800
+Subject: [PATCH v11 03/17] Xen: xlate: Use page_to_xen_pfn instead of
+ page_to_pfn
 In-Reply-To: <1460030614-16112-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1460030614-16112-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1460030614-16112-8-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1460030614-16112-4-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Add a bus_notifier for AMBA bus device in order to map the device
-mmio regions when DOM0 booting with ACPI.
+Make xen_xlate_map_ballooned_pages work with 64K pages. In that case
+Kernel pages are 64K in size but Xen pages remain 4K in size. Xen pfns
+refer to 4K pages.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 Reviewed-by: Julien Grall <julien.grall@arm.com>
 ---
- drivers/xen/arm-device.c | 43 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
+ drivers/xen/xlate_mmu.c | 38 +++++++++++++++++++++++++++-----------
+ 1 file changed, 27 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/xen/arm-device.c b/drivers/xen/arm-device.c
-index b918e8e..778acf8 100644
---- a/drivers/xen/arm-device.c
-+++ b/drivers/xen/arm-device.c
-@@ -151,3 +151,46 @@ static int __init register_xen_platform_notifier(void)
+diff --git a/drivers/xen/xlate_mmu.c b/drivers/xen/xlate_mmu.c
+index 9692656..23f1387 100644
+--- a/drivers/xen/xlate_mmu.c
++++ b/drivers/xen/xlate_mmu.c
+@@ -189,6 +189,18 @@ int xen_xlate_unmap_gfn_range(struct vm_area_struct *vma,
  }
+ EXPORT_SYMBOL_GPL(xen_xlate_unmap_gfn_range);
  
- arch_initcall(register_xen_platform_notifier);
-+
-+#ifdef CONFIG_ARM_AMBA
-+#include <linux/amba/bus.h>
-+
-+static int xen_amba_notifier(struct notifier_block *nb,
-+			     unsigned long action, void *data)
-+{
-+	struct amba_device *adev = to_amba_device(data);
-+	int r = 0;
-+
-+	switch (action) {
-+	case BUS_NOTIFY_ADD_DEVICE:
-+		r = xen_map_device_mmio(&adev->res, 1);
-+		break;
-+	case BUS_NOTIFY_DEL_DEVICE:
-+		r = xen_unmap_device_mmio(&adev->res, 1);
-+		break;
-+	default:
-+		return NOTIFY_DONE;
-+	}
-+	if (r)
-+		dev_err(&adev->dev, "AMBA: Failed to %s device %s MMIO!\n",
-+			action == BUS_NOTIFY_ADD_DEVICE ? "map" :
-+			(action == BUS_NOTIFY_DEL_DEVICE ? "unmap" : "?"),
-+			adev->dev.init_name);
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block amba_device_nb = {
-+	.notifier_call = xen_amba_notifier,
++struct map_balloon_pages {
++	xen_pfn_t *pfns;
++	unsigned int idx;
 +};
 +
-+static int __init register_xen_amba_notifier(void)
++static void setup_balloon_gfn(unsigned long gfn, void *data)
 +{
-+	if (!xen_initial_domain() || acpi_disabled)
-+		return 0;
++	struct map_balloon_pages *info = data;
 +
-+	return bus_register_notifier(&amba_bustype, &amba_device_nb);
++	info->pfns[info->idx++] = gfn;
 +}
 +
-+arch_initcall(register_xen_amba_notifier);
-+#endif
+ /**
+  * xen_xlate_map_ballooned_pages - map a new set of ballooned pages
+  * @gfns: returns the array of corresponding GFNs
+@@ -205,11 +217,13 @@ int __init xen_xlate_map_ballooned_pages(xen_pfn_t **gfns, void **virt,
+ 	struct page **pages;
+ 	xen_pfn_t *pfns;
+ 	void *vaddr;
++	struct map_balloon_pages data;
+ 	int rc;
+-	unsigned int i;
++	unsigned long nr_pages;
+ 
+ 	BUG_ON(nr_grant_frames == 0);
+-	pages = kcalloc(nr_grant_frames, sizeof(pages[0]), GFP_KERNEL);
++	nr_pages = DIV_ROUND_UP(nr_grant_frames, XEN_PFN_PER_PAGE);
++	pages = kcalloc(nr_pages, sizeof(pages[0]), GFP_KERNEL);
+ 	if (!pages)
+ 		return -ENOMEM;
+ 
+@@ -218,22 +232,24 @@ int __init xen_xlate_map_ballooned_pages(xen_pfn_t **gfns, void **virt,
+ 		kfree(pages);
+ 		return -ENOMEM;
+ 	}
+-	rc = alloc_xenballooned_pages(nr_grant_frames, pages);
++	rc = alloc_xenballooned_pages(nr_pages, pages);
+ 	if (rc) {
+-		pr_warn("%s Couldn't balloon alloc %ld pfns rc:%d\n", __func__,
+-			nr_grant_frames, rc);
++		pr_warn("%s Couldn't balloon alloc %ld pages rc:%d\n", __func__,
++			nr_pages, rc);
+ 		kfree(pages);
+ 		kfree(pfns);
+ 		return rc;
+ 	}
+-	for (i = 0; i < nr_grant_frames; i++)
+-		pfns[i] = page_to_pfn(pages[i]);
+ 
+-	vaddr = vmap(pages, nr_grant_frames, 0, PAGE_KERNEL);
++	data.pfns = pfns;
++	data.idx = 0;
++	xen_for_each_gfn(pages, nr_grant_frames, setup_balloon_gfn, &data);
++
++	vaddr = vmap(pages, nr_pages, 0, PAGE_KERNEL);
+ 	if (!vaddr) {
+-		pr_warn("%s Couldn't map %ld pfns rc:%d\n", __func__,
+-			nr_grant_frames, rc);
+-		free_xenballooned_pages(nr_grant_frames, pages);
++		pr_warn("%s Couldn't map %ld pages rc:%d\n", __func__,
++			nr_pages, rc);
++		free_xenballooned_pages(nr_pages, pages);
+ 		kfree(pages);
+ 		kfree(pfns);
+ 		return -ENOMEM;
 -- 
 2.0.4
