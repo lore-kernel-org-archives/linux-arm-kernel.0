@@ -1,29 +1,26 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 7 Apr 2016 10:56:01 -0700
-Subject: [RFC PATCH] PM / wakeirq: fix wakeirq setting after wakup
- re-configuration from sysfs
-In-Reply-To: <1459943153-2553-1-git-send-email-grygorii.strashko@ti.com>
-References: <1459943153-2553-1-git-send-email-grygorii.strashko@ti.com>
-Message-ID: <20160407175600.GN16484@atomide.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 7 Apr 2016 12:57:25 -0500
+Subject: [PATCH RFC 1/5] net: phy: sun8i-h3-ephy: Add bindings for
+ Allwinner H3 Ethernet PHY
+In-Reply-To: <1459786954-12649-2-git-send-email-wens@csie.org>
+References: <1459786954-12649-1-git-send-email-wens@csie.org>
+ <1459786954-12649-2-git-send-email-wens@csie.org>
+Message-ID: <20160407175725.GG32257@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grygorii Strashko <grygorii.strashko@ti.com> [160406 04:47]:
-> Now wakeirq stops working for device if wakeup option for
-> this device will be reconfigured through sysfs, like:
+On Tue, Apr 05, 2016 at 12:22:30AM +0800, Chen-Yu Tsai wrote:
+> The Allwinner H3 SoC incorporates an Ethernet PHY. This is enabled and
+> configured through a memory mapped hardware register.
 > 
-> echo disabled > /sys/devices/platform/extcon_usb1/power/wakeup
-> echo enabled > /sys/devices/platform/extcon_usb1/power/wakeup
+> This same register also configures the MAC interface mode and TX clock
+> source. Also covered by the register, but not supported in these bindings,
+> are TX/RX clock delay chains and inverters, and an RMII module.
 > 
-> Once above set of commands is executed the device's wakeup_source
-> opject will be recreated and dev->power.wakeup->wakeirq field will
-> contain NULL. As result, device_wakeup_arm_wake_irqs() will not arm
-> wakeirq for the affected device.
-> 
-> Hece, lets try to fix it in the following way:
->   check for dev->wakeirq field when device_wakeup_attach() is called
->   and if !NULL re-attach wakeirq to the device
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  .../bindings/net/allwinner,sun8i-h3-ephy.txt       | 44 ++++++++++++++++++++++
+>  1 file changed, 44 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/net/allwinner,sun8i-h3-ephy.txt
 
-Yeah I think that's all there is to it, thanks for fixing it:
-
-Acked-by: Tony Lindgren <tony@atomide.com>
+Acked-by: Rob Herring <robh@kernel.org>
