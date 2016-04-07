@@ -1,45 +1,34 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 7 Apr 2016 16:21:55 -0700
-Subject: [PATCH] ARM: dts: r8a7791: Don't disable referenced optional
- clocks
-In-Reply-To: <1459949826.23936.19.camel@collabora.co.uk>
-References: <1459947173-6664-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <CAMuHMdUtPhBT0_+hSk_t5osHC8TssyGMFo+YOWetTGBkbpB4PQ@mail.gmail.com>
- <1459949826.23936.19.camel@collabora.co.uk>
-Message-ID: <20160407232155.GH18567@codeaurora.org>
+Date: Thu, 7 Apr 2016 16:31:13 -0700
+Subject: [PATCH 1/2] clk: Add Oxford Semiconductor OXNAS Standard Clocks
+In-Reply-To: <5701210A.4060807@baylibre.com>
+References: <1459520791-13269-1-git-send-email-narmstrong@baylibre.com>
+ <1459520791-13269-2-git-send-email-narmstrong@baylibre.com>
+ <20160402005045.GX18567@codeaurora.org>
+ <5701210A.4060807@baylibre.com>
+Message-ID: <20160407233113.GI18567@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06, Sjoerd Simons wrote:
-> On Wed, 2016-04-06 at 15:11 +0200, Geert Uytterhoeven wrote:
-> > CC Mike, Stephen, linux-clk (this time with the new Mike)
+On 04/03, Neil Armstrong wrote:
+> On 04/02/2016 02:50 AM, Stephen Boyd wrote:
+> > On 04/01, Neil Armstrong wrote:
+> >> +	if (!onecell_data)
+> >> +		return -ENOMEM;
+> >> +
+> >> +	regmap = syscon_node_to_regmap(of_get_parent(np));
 > > 
-> > On Wed, Apr 6, 2016 at 2:52 PM, Sjoerd Simons
-> > <sjoerd.simons@collabora.co.uk> wrote:
-> > > 
-> > > clk_get on a disabled clock node will return EPROBE_DEFER, which
-> > > can
-> > > cause drivers to be deferred forever if such clocks are referenced
-> > > in
-> > > their clocks property.
-> > Is this a side effect of commit 3e5dd6f6e690048d ("clk: Ignore
-> > disabled DT
-> > clock providers")?
+> > Can we use dev_get_regmap(&pdev->dev.parent) here instead? I'd
+> > prefer device APIs over DT APIs here. 
+> > 
 > 
-> Yes it seems so. Reverting that patch means that i can drop this one
-> and get the expected behaviour again.
-
-The DT is broken then? Is it possible to mark these status =
-"okay" so that things work again?
-
-> 
-> Though even so I'm not sure what the convention is for clocks like
-> these, the r8a7791.dtsi is inconsistent, as some are disabled while
-> others (e.g. the audio clocks) are 0hz. Would be good to get some input
-> on that regardless.
+> It will not work here since the parent node is a syscon, the call to syscon_node_to_regmap() will call of_syscon_register() and create the regmap, the dev_get_regmap() needs a proper platform device registered as regmap here.
 > 
 
-What's the question here?
+Ok. I was hoping that we could make simple-mfd look to see if
+there's a syscon and then attach it to the parent device, but it
+seems that simple-mfd is not actually a driver and it might not
+even make a parent device for the children nodes?
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
