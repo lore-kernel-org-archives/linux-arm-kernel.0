@@ -1,28 +1,48 @@
-From: tthayer@opensource.altera.com (Thor Thayer)
-Date: Wed, 6 Apr 2016 19:36:49 -0500
-Subject: [PATCHv2 6/7] ARM: socfpga: Enable Arria10 OCRAM ECC on startup
-In-Reply-To: <20160405053110.GA17541@pd.tnic>
-References: <1459450087-24792-1-git-send-email-tthayer@opensource.altera.com>
- <1459450087-24792-7-git-send-email-tthayer@opensource.altera.com>
- <57034C4D.9010204@opensource.altera.com> <20160405053110.GA17541@pd.tnic>
-Message-ID: <5705ABA1.4000308@opensource.altera.com>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Wed, 6 Apr 2016 17:42:47 -0700
+Subject: [PATCH net-next V3 05/16] net: fec: reduce interrupts
+In-Reply-To: <20160406.172008.266926707628676037.davem@davemloft.net>
+References: <1459909562-22865-1-git-send-email-troy.kisky@boundarydevices.com>
+ <1459909562-22865-6-git-send-email-troy.kisky@boundarydevices.com>
+ <20160406.172008.266926707628676037.davem@davemloft.net>
+Message-ID: <5705AD07.10009@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+On 4/6/2016 2:20 PM, David Miller wrote:
+> From: Troy Kisky <troy.kisky@boundarydevices.com>
+> Date: Tue,  5 Apr 2016 19:25:51 -0700
+> 
+>> By clearing the NAPI interrupts in the NAPI routine
+>> and not in the interrupt handler, we can reduce the
+>> number of interrupts. We also don't need any status
+>> variables as the registers are still valid.
+>>
+>> Also, notice that if budget pkts are received, the
+>> next call to fec_enet_rx_napi will now continue to
+>> receive the previously pending packets.
+>>
+>> To test that this actually reduces interrupts, try
+>> this command before/after patch
+>>
+>> cat /proc/interrupts |grep ether; \
+>> ping -s2800 192.168.0.201 -f -c1000 ; \
+>> cat /proc/interrupts |grep ether
+>>
+>> For me, before this patch is 2996 interrupts.
+>> After patch is 2010 interrupts.
+>>
+>> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+> 
+> I really don't think this is a good idea at all.
+> 
+> I would instead really rather see you stash away the
+> status register values into some piece of software state,
+> and then re-read them before you are about to finish a
+> NAPI poll cycle.
+> 
+> 
 
-On 04/05/2016 12:31 AM, Borislav Petkov wrote:
-> On Tue, Apr 05, 2016 at 12:25:33AM -0500, Thor Thayer wrote:
->> I realize that I'm not calling iounmap(ecc_block_base) and I'll fix that in
->> the next revision with a goto.
->
-> I'm assuming nothing else changes. Because I've applied 1-4 already.
->
-> Yes, no?
->
-> If no, then please send only an updated version of this patch as a reply
-> to this thread here.
->
-> Thanks.
->
-Yes, nothing else changes. The rest was OK. Thanks!
+Sure, that's an easy change. But if a TX int is what caused the interrupt
+and masks them, and then a RX packet happens before napi runs, do you want
+the TX serviced 1st, or RX ?
