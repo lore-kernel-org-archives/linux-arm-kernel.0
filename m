@@ -1,59 +1,34 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Thu, 7 Apr 2016 20:03:21 +0800
-Subject: [PATCH v11 04/17] arm/xen: Use xen_xlate_map_ballooned_pages to setup
- grant table
+Date: Thu, 7 Apr 2016 20:03:22 +0800
+Subject: [PATCH v11 05/17] xen: memory : Add new XENMAPSPACE type
+ XENMAPSPACE_dev_mmio
 In-Reply-To: <1460030614-16112-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1460030614-16112-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1460030614-16112-5-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1460030614-16112-6-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Use xen_xlate_map_ballooned_pages to setup grant table. Then it doesn't
-rely on DT or ACPI to pass the start address and size of grant table.
+Add a new type of Xen map space for Dom0 to map device's MMIO region.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 Reviewed-by: Julien Grall <julien.grall@arm.com>
 ---
- arch/arm/xen/enlighten.c | 13 ++++---------
- 1 file changed, 4 insertions(+), 9 deletions(-)
+ include/xen/interface/memory.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 75cd734..d94f726 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -282,18 +282,10 @@ static int __init xen_guest_init(void)
- {
- 	struct xen_add_to_physmap xatp;
- 	struct shared_info *shared_info_page = NULL;
--	struct resource res;
--	phys_addr_t grant_frames;
+diff --git a/include/xen/interface/memory.h b/include/xen/interface/memory.h
+index 2ecfe4f..9aa8988 100644
+--- a/include/xen/interface/memory.h
++++ b/include/xen/interface/memory.h
+@@ -160,6 +160,7 @@ DEFINE_GUEST_HANDLE_STRUCT(xen_machphys_mapping_t);
+ #define XENMAPSPACE_gmfn_foreign 4 /* GMFN from another dom,
+ 				    * XENMEM_add_to_physmap_range only.
+ 				    */
++#define XENMAPSPACE_dev_mmio     5 /* device mmio region */
  
- 	if (!xen_domain())
- 		return 0;
- 
--	if (of_address_to_resource(xen_node, GRANT_TABLE_PHYSADDR, &res)) {
--		pr_err("Xen grant table base address not found\n");
--		return -ENODEV;
--	}
--	grant_frames = res.start;
--
- 	xen_events_irq = irq_of_parse_and_map(xen_node, 0);
- 	if (!xen_events_irq) {
- 		pr_err("Xen event channel interrupt not found\n");
-@@ -328,7 +320,10 @@ static int __init xen_guest_init(void)
- 	if (xen_vcpu_info == NULL)
- 		return -ENOMEM;
- 
--	if (gnttab_setup_auto_xlat_frames(grant_frames)) {
-+	xen_auto_xlat_grant_frames.count = gnttab_max_grant_frames();
-+	if (xen_xlate_map_ballooned_pages(&xen_auto_xlat_grant_frames.pfn,
-+					  &xen_auto_xlat_grant_frames.vaddr,
-+					  xen_auto_xlat_grant_frames.count)) {
- 		free_percpu(xen_vcpu_info);
- 		return -ENOMEM;
- 	}
+ /*
+  * Sets the GPFN at which a particular page appears in the specified guest's
 -- 
 2.0.4
