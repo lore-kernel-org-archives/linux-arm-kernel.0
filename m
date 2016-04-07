@@ -1,277 +1,581 @@
 From: blogic@openwrt.org (John Crispin)
-Date: Thu,  7 Apr 2016 20:46:15 +0200
-Subject: [RESEND/PATCH V7 1/2] regulator: Add document for MT6323 regulator
-Message-ID: <1460054776-54782-1-git-send-email-blogic@openwrt.org>
+Date: Thu,  7 Apr 2016 20:46:16 +0200
+Subject: [RESEND/PATCH V7 2/2] regulator: mt6323: Add support for MT6323
+ regulator
+In-Reply-To: <1460054776-54782-1-git-send-email-blogic@openwrt.org>
+References: <1460054776-54782-1-git-send-email-blogic@openwrt.org>
+Message-ID: <1460054776-54782-2-git-send-email-blogic@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Chen Zhong <chen.zhong@mediatek.com>
+
+The MT6323 is a regulator found on boards based on MediaTek MT7623 and
+probably other SoCs. It is a so called pmic and connects as a slave to
+SoC using SPI, wrapped inside the pmic-wrapper.
+
+Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
 Signed-off-by: John Crispin <blogic@openwrt.org>
-Cc: devicetree at vger.kernel.org
 ---
 Series was dropped in the 4.6-rc1 merge window to avoid a merge order
 conflict with the corresponding MFD driver.
 
 Changes in V7
-* remove another compatible string
-* small wording changes
+* none
 
 Changes in V6
-* remove the compatible string
+* add back the set/get mode callbacks
 
 Changes in V5
-* regulator vs regulators
+* remove the code that modifies constraints
+* remove the code allows mode changes
 
-Changes in V4
-* regulator is a subnode and not a property
+Changes in V4:
+* add id_table and of_match_table
+* use short GPL text
+* change MODULE_LICENSE to GPL V2
 
- .../bindings/regulator/mt6323-regulator.txt        |  239 ++++++++++++++++++++
- 1 file changed, 239 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
+Changes in V3:
+* none
 
-diff --git a/Documentation/devicetree/bindings/regulator/mt6323-regulator.txt b/Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
+Changes in V2:
+* send to the the proper maintainer
+
+ drivers/regulator/Kconfig                  |    9 +
+ drivers/regulator/Makefile                 |    1 +
+ drivers/regulator/mt6323-regulator.c       |  432 ++++++++++++++++++++++++++++
+ include/linux/regulator/mt6323-regulator.h |   52 ++++
+ 4 files changed, 494 insertions(+)
+ create mode 100644 drivers/regulator/mt6323-regulator.c
+ create mode 100644 include/linux/regulator/mt6323-regulator.h
+
+diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
+index c77dc08..a0082c2 100644
+--- a/drivers/regulator/Kconfig
++++ b/drivers/regulator/Kconfig
+@@ -488,6 +488,15 @@ config REGULATOR_MT6311
+ 	  This driver supports the control of different power rails of device
+ 	  through regulator interface.
+ 
++config REGULATOR_MT6323
++	tristate "MediaTek MT6323 PMIC"
++	depends on MFD_MT6397
++	help
++	  Say y here to select this option to enable the power regulator of
++	  MediaTek MT6323 PMIC.
++	  This driver supports the control of different power rails of device
++	  through regulator interface.
++
+ config REGULATOR_MT6397
+ 	tristate "MediaTek MT6397 PMIC"
+ 	depends on MFD_MT6397
+diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
+index 61bfbb9..a76659e 100644
+--- a/drivers/regulator/Makefile
++++ b/drivers/regulator/Makefile
+@@ -64,6 +64,7 @@ obj-$(CONFIG_REGULATOR_MC13783) += mc13783-regulator.o
+ obj-$(CONFIG_REGULATOR_MC13892) += mc13892-regulator.o
+ obj-$(CONFIG_REGULATOR_MC13XXX_CORE) +=  mc13xxx-regulator-core.o
+ obj-$(CONFIG_REGULATOR_MT6311) += mt6311-regulator.o
++obj-$(CONFIG_REGULATOR_MT6323)	+= mt6323-regulator.o
+ obj-$(CONFIG_REGULATOR_MT6397)	+= mt6397-regulator.o
+ obj-$(CONFIG_REGULATOR_QCOM_RPM) += qcom_rpm-regulator.o
+ obj-$(CONFIG_REGULATOR_QCOM_SMD_RPM) += qcom_smd-regulator.o
+diff --git a/drivers/regulator/mt6323-regulator.c b/drivers/regulator/mt6323-regulator.c
 new file mode 100644
-index 0000000..9fd95e7
+index 0000000..28ebbda
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
-@@ -0,0 +1,239 @@
-+Mediatek MT6323 Regulator Driver
++++ b/drivers/regulator/mt6323-regulator.c
+@@ -0,0 +1,432 @@
++/*
++ * Copyright (c) 2016 MediaTek Inc.
++ * Author: Chen Zhong <chen.zhong@mediatek.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
 +
-+All voltage regulators are defined as subnodes of the regulators node. A list
-+of regulators provided by this controller are defined as subnodes of the
-+PMIC's node. Each regulator is named according to its regulator type,
-+buck_<name> and ldo_<name>. The definition for each of these nodes is defined
-+using the standard binding for regulators at
-+Documentation/devicetree/bindings/regulator/regulator.txt.
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/regmap.h>
++#include <linux/mfd/mt6397/core.h>
++#include <linux/mfd/mt6323/registers.h>
++#include <linux/regulator/driver.h>
++#include <linux/regulator/machine.h>
++#include <linux/regulator/mt6323-regulator.h>
++#include <linux/regulator/of_regulator.h>
 +
-+The valid names for regulators are::
-+BUCK:
-+  buck_vproc, buck_vsys, buck_vpa
-+LDO:
-+  ldo_vtcxo, ldo_vcn28, ldo_vcn33_bt, ldo_vcn33_wifi, ldo_va, ldo_vcama,
-+  ldo_vio28, ldo_vusb, ldo_vmc, ldo_vmch, ldo_vemc3v3, ldo_vgp1, ldo_vgp2,
-+  ldo_vgp3, ldo_vcn18, ldo_vsim1, ldo_vsim2, ldo_vrtc, ldo_vcamaf, ldo_vibr,
-+  ldo_vrf18, ldo_vm, ldo_vio18, ldo_vcamd, ldo_vcamio
++#define MT6323_LDO_MODE_NORMAL	0
++#define MT6323_LDO_MODE_LP	1
 +
-+Example:
++/*
++ * MT6323 regulators' information
++ *
++ * @desc: standard fields of regulator description.
++ * @qi: Mask for query enable signal status of regulators
++ * @vselon_reg: Register sections for hardware control mode of bucks
++ * @vselctrl_reg: Register for controlling the buck control mode.
++ * @vselctrl_mask: Mask for query buck's voltage control mode.
++ */
++struct mt6323_regulator_info {
++	struct regulator_desc desc;
++	u32 qi;
++	u32 vselon_reg;
++	u32 vselctrl_reg;
++	u32 vselctrl_mask;
++	u32 modeset_reg;
++	u32 modeset_mask;
++};
 +
-+	pmic: mt6323 {
-+		compatible = "mediatek,mt6323";
++#define MT6323_BUCK(match, vreg, min, max, step, volt_ranges, enreg,	\
++		vosel, vosel_mask, voselon, vosel_ctrl)			\
++[MT6323_ID_##vreg] = {							\
++	.desc = {							\
++		.name = #vreg,						\
++		.of_match = of_match_ptr(match),			\
++		.ops = &mt6323_volt_range_ops,				\
++		.type = REGULATOR_VOLTAGE,				\
++		.id = MT6323_ID_##vreg,					\
++		.owner = THIS_MODULE,					\
++		.n_voltages = (max - min)/step + 1,			\
++		.linear_ranges = volt_ranges,				\
++		.n_linear_ranges = ARRAY_SIZE(volt_ranges),		\
++		.vsel_reg = vosel,					\
++		.vsel_mask = vosel_mask,				\
++		.enable_reg = enreg,					\
++		.enable_mask = BIT(0),					\
++	},								\
++	.qi = BIT(13),							\
++	.vselon_reg = voselon,						\
++	.vselctrl_reg = vosel_ctrl,					\
++	.vselctrl_mask = BIT(1),					\
++}
 +
-+		mt6323regulator: regulators {
-+			mt6323_vproc_reg: buck_vproc{
-+				regulator-name = "vproc";
-+				regulator-min-microvolt = < 700000>;
-+				regulator-max-microvolt = <1350000>;
-+				regulator-ramp-delay = <12500>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
++#define MT6323_LDO(match, vreg, ldo_volt_table, enreg, enbit, vosel,	\
++		vosel_mask, _modeset_reg, _modeset_mask)		\
++[MT6323_ID_##vreg] = {							\
++	.desc = {							\
++		.name = #vreg,						\
++		.of_match = of_match_ptr(match),			\
++		.ops = &mt6323_volt_table_ops,				\
++		.type = REGULATOR_VOLTAGE,				\
++		.id = MT6323_ID_##vreg,					\
++		.owner = THIS_MODULE,					\
++		.n_voltages = ARRAY_SIZE(ldo_volt_table),		\
++		.volt_table = ldo_volt_table,				\
++		.vsel_reg = vosel,					\
++		.vsel_mask = vosel_mask,				\
++		.enable_reg = enreg,					\
++		.enable_mask = BIT(enbit),				\
++	},								\
++	.qi = BIT(15),							\
++	.modeset_reg = _modeset_reg,					\
++	.modeset_mask = _modeset_mask,					\
++}
 +
-+			mt6323_vsys_reg: buck_vsys{
-+				regulator-name = "vsys";
-+				regulator-min-microvolt = <1400000>;
-+				regulator-max-microvolt = <2987500>;
-+				regulator-ramp-delay = <25000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
++#define MT6323_REG_FIXED(match, vreg, enreg, enbit, volt,		\
++		_modeset_reg, _modeset_mask)				\
++[MT6323_ID_##vreg] = {							\
++	.desc = {							\
++		.name = #vreg,						\
++		.of_match = of_match_ptr(match),			\
++		.ops = &mt6323_volt_fixed_ops,				\
++		.type = REGULATOR_VOLTAGE,				\
++		.id = MT6323_ID_##vreg,					\
++		.owner = THIS_MODULE,					\
++		.n_voltages = 1,					\
++		.enable_reg = enreg,					\
++		.enable_mask = BIT(enbit),				\
++		.min_uV = volt,						\
++	},								\
++	.qi = BIT(15),							\
++	.modeset_reg = _modeset_reg,					\
++	.modeset_mask = _modeset_mask,					\
++}
 +
-+			mt6323_vpa_reg: buck_vpa{
-+				regulator-name = "vpa";
-+				regulator-min-microvolt = < 500000>;
-+				regulator-max-microvolt = <3650000>;
-+			};
++static const struct regulator_linear_range buck_volt_range1[] = {
++	REGULATOR_LINEAR_RANGE(700000, 0, 0x7f, 6250),
++};
 +
-+			mt6323_vtcxo_reg: ldo_vtcxo{
-+				regulator-name = "vtcxo";
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+				regulator-enable-ramp-delay = <90>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
++static const struct regulator_linear_range buck_volt_range2[] = {
++	REGULATOR_LINEAR_RANGE(1400000, 0, 0x7f, 12500),
++};
 +
-+			mt6323_vcn28_reg: ldo_vcn28{
-+				regulator-name = "vcn28";
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+				regulator-enable-ramp-delay = <185>;
-+			};
++static const struct regulator_linear_range buck_volt_range3[] = {
++	REGULATOR_LINEAR_RANGE(500000, 0, 0x3f, 50000),
++};
 +
-+			mt6323_vcn33_bt_reg: ldo_vcn33_bt{
-+				regulator-name = "vcn33_bt";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3600000>;
-+				regulator-enable-ramp-delay = <185>;
-+			};
++static const u32 ldo_volt_table1[] = {
++	3300000, 3400000, 3500000, 3600000,
++};
 +
-+			mt6323_vcn33_wifi_reg: ldo_vcn33_wifi{
-+				regulator-name = "vcn33_wifi";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3600000>;
-+				regulator-enable-ramp-delay = <185>;
-+			};
++static const u32 ldo_volt_table2[] = {
++	1500000, 1800000, 2500000, 2800000,
++};
 +
-+			mt6323_va_reg: ldo_va{
-+				regulator-name = "va";
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+				regulator-enable-ramp-delay = <216>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
++static const u32 ldo_volt_table3[] = {
++	1800000, 3300000,
++};
 +
-+			mt6323_vcama_reg: ldo_vcama{
-+				regulator-name = "vcama";
-+				regulator-min-microvolt = <1500000>;
-+				regulator-max-microvolt = <2800000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
++static const u32 ldo_volt_table4[] = {
++	3000000, 3300000,
++};
 +
-+			mt6323_vio28_reg: ldo_vio28{
-+				regulator-name = "vio28";
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+				regulator-enable-ramp-delay = <216>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
++static const u32 ldo_volt_table5[] = {
++	1200000, 1300000, 1500000, 1800000, 2000000, 2800000, 3000000, 3300000,
++};
 +
-+			mt6323_vusb_reg: ldo_vusb{
-+				regulator-name = "vusb";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-enable-ramp-delay = <216>;
-+				regulator-boot-on;
-+			};
++static const u32 ldo_volt_table6[] = {
++	1200000, 1300000, 1500000, 1800000, 2500000, 2800000, 3000000, 2000000,
++};
 +
-+			mt6323_vmc_reg: ldo_vmc{
-+				regulator-name = "vmc";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-enable-ramp-delay = <36>;
-+				regulator-boot-on;
-+			};
++static const u32 ldo_volt_table7[] = {
++	1200000, 1300000, 1500000, 1800000,
++};
 +
-+			mt6323_vmch_reg: ldo_vmch{
-+				regulator-name = "vmch";
-+				regulator-min-microvolt = <3000000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-enable-ramp-delay = <36>;
-+				regulator-boot-on;
-+			};
++static const u32 ldo_volt_table8[] = {
++	1800000, 3000000,
++};
 +
-+			mt6323_vemc3v3_reg: ldo_vemc3v3{
-+				regulator-name = "vemc3v3";
-+				regulator-min-microvolt = <3000000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-enable-ramp-delay = <36>;
-+				regulator-boot-on;
-+			};
++static const u32 ldo_volt_table9[] = {
++	1200000, 1350000, 1500000, 1800000,
++};
 +
-+			mt6323_vgp1_reg: ldo_vgp1{
-+				regulator-name = "vgp1";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
++static const u32 ldo_volt_table10[] = {
++	1200000, 1300000, 1500000, 1800000,
++};
 +
-+			mt6323_vgp2_reg: ldo_vgp2{
-+				regulator-name = "vgp2";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
++static int mt6323_get_status(struct regulator_dev *rdev)
++{
++	int ret;
++	u32 regval;
++	struct mt6323_regulator_info *info = rdev_get_drvdata(rdev);
 +
-+			mt6323_vgp3_reg: ldo_vgp3{
-+				regulator-name = "vgp3";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
++	ret = regmap_read(rdev->regmap, info->desc.enable_reg, &regval);
++	if (ret != 0) {
++		dev_err(&rdev->dev, "Failed to get enable reg: %d\n", ret);
++		return ret;
++	}
 +
-+			mt6323_vcn18_reg: ldo_vcn18{
-+				regulator-name = "vcn18";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
++	return (regval & info->qi) ? REGULATOR_STATUS_ON : REGULATOR_STATUS_OFF;
++}
 +
-+			mt6323_vsim1_reg: ldo_vsim1{
-+				regulator-name = "vsim1";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
++static int mt6323_ldo_set_mode(struct regulator_dev *rdev, unsigned int mode)
++{
++	int ret, val = 0;
++	struct mt6323_regulator_info *info = rdev_get_drvdata(rdev);
 +
-+			mt6323_vsim2_reg: ldo_vsim2{
-+				regulator-name = "vsim2";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
++	if (!info->modeset_mask) {
++		dev_err(&rdev->dev, "regulator %s doesn't support set_mode\n",
++			info->desc.name);
++		return -EINVAL;
++	}
 +
-+			mt6323_vrtc_reg: ldo_vrtc{
-+				regulator-name = "vrtc";
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
++	switch (mode) {
++	case REGULATOR_MODE_STANDBY:
++		val = MT6323_LDO_MODE_LP;
++		break;
++	case REGULATOR_MODE_NORMAL:
++		val = MT6323_LDO_MODE_NORMAL;
++		break;
++	default:
++		return -EINVAL;
++	}
 +
-+			mt6323_vcamaf_reg: ldo_vcamaf{
-+				regulator-name = "vcamaf";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
++	val <<= ffs(info->modeset_mask) - 1;
 +
-+			mt6323_vibr_reg: ldo_vibr{
-+				regulator-name = "vibr";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-enable-ramp-delay = <36>;
-+			};
++	ret = regmap_update_bits(rdev->regmap, info->modeset_reg,
++				  info->modeset_mask, val);
 +
-+			mt6323_vrf18_reg: ldo_vrf18{
-+				regulator-name = "vrf18";
-+				regulator-min-microvolt = <1825000>;
-+				regulator-max-microvolt = <1825000>;
-+				regulator-enable-ramp-delay = <187>;
-+			};
++	return ret;
++}
 +
-+			mt6323_vm_reg: ldo_vm{
-+				regulator-name = "vm";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-enable-ramp-delay = <216>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
++static unsigned int mt6323_ldo_get_mode(struct regulator_dev *rdev)
++{
++	unsigned int val;
++	unsigned int mode;
++	int ret;
++	struct mt6323_regulator_info *info = rdev_get_drvdata(rdev);
 +
-+			mt6323_vio18_reg: ldo_vio18{
-+				regulator-name = "vio18";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-enable-ramp-delay = <216>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
++	if (!info->modeset_mask) {
++		dev_err(&rdev->dev, "regulator %s doesn't support get_mode\n",
++			info->desc.name);
++		return -EINVAL;
++	}
 +
-+			mt6323_vcamd_reg: ldo_vcamd{
-+				regulator-name = "vcamd";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
++	ret = regmap_read(rdev->regmap, info->modeset_reg, &val);
++	if (ret < 0)
++		return ret;
 +
-+			mt6323_vcamio_reg: ldo_vcamio{
-+				regulator-name = "vcamio";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
-+		};
-+	};
++	val &= info->modeset_mask;
++	val >>= ffs(info->modeset_mask) - 1;
++
++	if (val & 0x1)
++		mode = REGULATOR_MODE_STANDBY;
++	else
++		mode = REGULATOR_MODE_NORMAL;
++
++	return mode;
++}
++
++static struct regulator_ops mt6323_volt_range_ops = {
++	.list_voltage = regulator_list_voltage_linear_range,
++	.map_voltage = regulator_map_voltage_linear_range,
++	.set_voltage_sel = regulator_set_voltage_sel_regmap,
++	.get_voltage_sel = regulator_get_voltage_sel_regmap,
++	.set_voltage_time_sel = regulator_set_voltage_time_sel,
++	.enable = regulator_enable_regmap,
++	.disable = regulator_disable_regmap,
++	.is_enabled = regulator_is_enabled_regmap,
++	.get_status = mt6323_get_status,
++};
++
++static struct regulator_ops mt6323_volt_table_ops = {
++	.list_voltage = regulator_list_voltage_table,
++	.map_voltage = regulator_map_voltage_iterate,
++	.set_voltage_sel = regulator_set_voltage_sel_regmap,
++	.get_voltage_sel = regulator_get_voltage_sel_regmap,
++	.set_voltage_time_sel = regulator_set_voltage_time_sel,
++	.enable = regulator_enable_regmap,
++	.disable = regulator_disable_regmap,
++	.is_enabled = regulator_is_enabled_regmap,
++	.get_status = mt6323_get_status,
++	.set_mode = mt6323_ldo_set_mode,
++	.get_mode = mt6323_ldo_get_mode,
++};
++
++static struct regulator_ops mt6323_volt_fixed_ops = {
++	.list_voltage = regulator_list_voltage_linear,
++	.enable = regulator_enable_regmap,
++	.disable = regulator_disable_regmap,
++	.is_enabled = regulator_is_enabled_regmap,
++	.get_status = mt6323_get_status,
++	.set_mode = mt6323_ldo_set_mode,
++	.get_mode = mt6323_ldo_get_mode,
++};
++
++/* The array is indexed by id(MT6323_ID_XXX) */
++static struct mt6323_regulator_info mt6323_regulators[] = {
++	MT6323_BUCK("buck_vproc", VPROC, 700000, 1493750, 6250,
++		buck_volt_range1, MT6323_VPROC_CON7, MT6323_VPROC_CON9, 0x7f,
++		MT6323_VPROC_CON10, MT6323_VPROC_CON5),
++	MT6323_BUCK("buck_vsys", VSYS, 1400000, 2987500, 12500,
++		buck_volt_range2, MT6323_VSYS_CON7, MT6323_VSYS_CON9, 0x7f,
++		MT6323_VSYS_CON10, MT6323_VSYS_CON5),
++	MT6323_BUCK("buck_vpa", VPA, 500000, 3650000, 50000,
++		buck_volt_range3, MT6323_VPA_CON7, MT6323_VPA_CON9,
++		0x3f, MT6323_VPA_CON10, MT6323_VPA_CON5),
++	MT6323_REG_FIXED("ldo_vtcxo", VTCXO, MT6323_ANALDO_CON1, 10, 2800000,
++		MT6323_ANALDO_CON1, 0x2),
++	MT6323_REG_FIXED("ldo_vcn28", VCN28, MT6323_ANALDO_CON19, 12, 2800000,
++		MT6323_ANALDO_CON20, 0x2),
++	MT6323_LDO("ldo_vcn33_bt", VCN33_BT, ldo_volt_table1,
++		MT6323_ANALDO_CON16, 7, MT6323_ANALDO_CON16, 0xC,
++		MT6323_ANALDO_CON21, 0x2),
++	MT6323_LDO("ldo_vcn33_wifi", VCN33_WIFI, ldo_volt_table1,
++		MT6323_ANALDO_CON17, 12, MT6323_ANALDO_CON16, 0xC,
++		MT6323_ANALDO_CON21, 0x2),
++	MT6323_REG_FIXED("ldo_va", VA, MT6323_ANALDO_CON2, 14, 2800000,
++		MT6323_ANALDO_CON2, 0x2),
++	MT6323_LDO("ldo_vcama", VCAMA, ldo_volt_table2,
++		MT6323_ANALDO_CON4, 15, MT6323_ANALDO_CON10, 0x60, -1, 0),
++	MT6323_REG_FIXED("ldo_vio28", VIO28, MT6323_DIGLDO_CON0, 14, 2800000,
++		MT6323_DIGLDO_CON0, 0x2),
++	MT6323_REG_FIXED("ldo_vusb", VUSB, MT6323_DIGLDO_CON2, 14, 3300000,
++		MT6323_DIGLDO_CON2, 0x2),
++	MT6323_LDO("ldo_vmc", VMC, ldo_volt_table3,
++		MT6323_DIGLDO_CON3, 12, MT6323_DIGLDO_CON24, 0x10,
++		MT6323_DIGLDO_CON3, 0x2),
++	MT6323_LDO("ldo_vmch", VMCH, ldo_volt_table4,
++		MT6323_DIGLDO_CON5, 14, MT6323_DIGLDO_CON26, 0x80,
++		MT6323_DIGLDO_CON5, 0x2),
++	MT6323_LDO("ldo_vemc3v3", VEMC3V3, ldo_volt_table4,
++		MT6323_DIGLDO_CON6, 14, MT6323_DIGLDO_CON27, 0x80,
++		MT6323_DIGLDO_CON6, 0x2),
++	MT6323_LDO("ldo_vgp1", VGP1, ldo_volt_table5,
++		MT6323_DIGLDO_CON7, 15, MT6323_DIGLDO_CON28, 0xE0,
++		MT6323_DIGLDO_CON7, 0x2),
++	MT6323_LDO("ldo_vgp2", VGP2, ldo_volt_table6,
++		MT6323_DIGLDO_CON8, 15, MT6323_DIGLDO_CON29, 0xE0,
++		MT6323_DIGLDO_CON8, 0x2),
++	MT6323_LDO("ldo_vgp3", VGP3, ldo_volt_table7,
++		MT6323_DIGLDO_CON9, 15, MT6323_DIGLDO_CON30, 0x60,
++		MT6323_DIGLDO_CON9, 0x2),
++	MT6323_REG_FIXED("ldo_vcn18", VCN18, MT6323_DIGLDO_CON11, 14, 1800000,
++		MT6323_DIGLDO_CON11, 0x2),
++	MT6323_LDO("ldo_vsim1", VSIM1, ldo_volt_table8,
++		MT6323_DIGLDO_CON13, 15, MT6323_DIGLDO_CON34, 0x20,
++		MT6323_DIGLDO_CON13, 0x2),
++	MT6323_LDO("ldo_vsim2", VSIM2, ldo_volt_table8,
++		MT6323_DIGLDO_CON14, 15, MT6323_DIGLDO_CON35, 0x20,
++		MT6323_DIGLDO_CON14, 0x2),
++	MT6323_REG_FIXED("ldo_vrtc", VRTC, MT6323_DIGLDO_CON15, 8, 2800000,
++		-1, 0),
++	MT6323_LDO("ldo_vcamaf", VCAMAF, ldo_volt_table5,
++		MT6323_DIGLDO_CON31, 15, MT6323_DIGLDO_CON32, 0xE0,
++		MT6323_DIGLDO_CON31, 0x2),
++	MT6323_LDO("ldo_vibr", VIBR, ldo_volt_table5,
++		MT6323_DIGLDO_CON39, 15, MT6323_DIGLDO_CON40, 0xE0,
++		MT6323_DIGLDO_CON39, 0x2),
++	MT6323_REG_FIXED("ldo_vrf18", VRF18, MT6323_DIGLDO_CON45, 15, 1825000,
++		MT6323_DIGLDO_CON45, 0x2),
++	MT6323_LDO("ldo_vm", VM, ldo_volt_table9,
++		MT6323_DIGLDO_CON47, 14, MT6323_DIGLDO_CON48, 0x30,
++		MT6323_DIGLDO_CON47, 0x2),
++	MT6323_REG_FIXED("ldo_vio18", VIO18, MT6323_DIGLDO_CON49, 14, 1800000,
++		MT6323_DIGLDO_CON49, 0x2),
++	MT6323_LDO("ldo_vcamd", VCAMD, ldo_volt_table10,
++		MT6323_DIGLDO_CON51, 14, MT6323_DIGLDO_CON52, 0x60,
++		MT6323_DIGLDO_CON51, 0x2),
++	MT6323_REG_FIXED("ldo_vcamio", VCAMIO, MT6323_DIGLDO_CON53, 14, 1800000,
++		MT6323_DIGLDO_CON53, 0x2),
++};
++
++static int mt6323_set_buck_vosel_reg(struct platform_device *pdev)
++{
++	struct mt6397_chip *mt6323 = dev_get_drvdata(pdev->dev.parent);
++	int i;
++	u32 regval;
++
++	for (i = 0; i < MT6323_MAX_REGULATOR; i++) {
++		if (mt6323_regulators[i].vselctrl_reg) {
++			if (regmap_read(mt6323->regmap,
++				mt6323_regulators[i].vselctrl_reg,
++				&regval) < 0) {
++				dev_err(&pdev->dev,
++					"Failed to read buck ctrl\n");
++				return -EIO;
++			}
++
++			if (regval & mt6323_regulators[i].vselctrl_mask) {
++				mt6323_regulators[i].desc.vsel_reg =
++				mt6323_regulators[i].vselon_reg;
++			}
++		}
++	}
++
++	return 0;
++}
++
++static int mt6323_regulator_probe(struct platform_device *pdev)
++{
++	struct mt6397_chip *mt6323 = dev_get_drvdata(pdev->dev.parent);
++	struct regulator_config config = {};
++	struct regulator_dev *rdev;
++	int i;
++	u32 reg_value;
++
++	/* Query buck controller to select activated voltage register part */
++	if (mt6323_set_buck_vosel_reg(pdev))
++		return -EIO;
++
++	/* Read PMIC chip revision to update constraints and voltage table */
++	if (regmap_read(mt6323->regmap, MT6323_CID, &reg_value) < 0) {
++		dev_err(&pdev->dev, "Failed to read Chip ID\n");
++		return -EIO;
++	}
++	dev_info(&pdev->dev, "Chip ID = 0x%x\n", reg_value);
++
++	for (i = 0; i < MT6323_MAX_REGULATOR; i++) {
++		config.dev = &pdev->dev;
++		config.driver_data = &mt6323_regulators[i];
++		config.regmap = mt6323->regmap;
++		rdev = devm_regulator_register(&pdev->dev,
++				&mt6323_regulators[i].desc, &config);
++		if (IS_ERR(rdev)) {
++			dev_err(&pdev->dev, "failed to register %s\n",
++				mt6323_regulators[i].desc.name);
++			return PTR_ERR(rdev);
++		}
++	}
++	return 0;
++}
++
++static const struct platform_device_id mt6323_platform_ids[] = {
++	{"mt6323-regulator", 0},
++	{ /* sentinel */ },
++};
++MODULE_DEVICE_TABLE(platform, mt6323_platform_ids);
++
++static const struct of_device_id mt6323_of_match[] = {
++	{ .compatible = "mediatek,mt6323-regulator", },
++	{ /* sentinel */ },
++};
++MODULE_DEVICE_TABLE(of, mt6323_of_match);
++
++static struct platform_driver mt6323_regulator_driver = {
++	.driver = {
++		.name = "mt6323-regulator",
++		.of_match_table = of_match_ptr(mt6323_of_match),
++	},
++	.probe = mt6323_regulator_probe,
++	.id_table = mt6323_platform_ids,
++};
++
++module_platform_driver(mt6323_regulator_driver);
++
++MODULE_AUTHOR("Chen Zhong <chen.zhong@mediatek.com>");
++MODULE_DESCRIPTION("Regulator Driver for MediaTek MT6397 PMIC");
++MODULE_LICENSE("GPL v2");
+diff --git a/include/linux/regulator/mt6323-regulator.h b/include/linux/regulator/mt6323-regulator.h
+new file mode 100644
+index 0000000..67011cd
+--- /dev/null
++++ b/include/linux/regulator/mt6323-regulator.h
+@@ -0,0 +1,52 @@
++/*
++ * Copyright (c) 2016 MediaTek Inc.
++ * Author: Chen Zhong <chen.zhong@mediatek.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __LINUX_REGULATOR_MT6323_H
++#define __LINUX_REGULATOR_MT6323_H
++
++enum {
++	MT6323_ID_VPROC = 0,
++	MT6323_ID_VSYS,
++	MT6323_ID_VPA,
++	MT6323_ID_VTCXO,
++	MT6323_ID_VCN28,
++	MT6323_ID_VCN33_BT,
++	MT6323_ID_VCN33_WIFI,
++	MT6323_ID_VA,
++	MT6323_ID_VCAMA,
++	MT6323_ID_VIO28 = 9,
++	MT6323_ID_VUSB,
++	MT6323_ID_VMC,
++	MT6323_ID_VMCH,
++	MT6323_ID_VEMC3V3,
++	MT6323_ID_VGP1,
++	MT6323_ID_VGP2,
++	MT6323_ID_VGP3,
++	MT6323_ID_VCN18,
++	MT6323_ID_VSIM1,
++	MT6323_ID_VSIM2,
++	MT6323_ID_VRTC,
++	MT6323_ID_VCAMAF,
++	MT6323_ID_VIBR,
++	MT6323_ID_VRF18,
++	MT6323_ID_VM,
++	MT6323_ID_VIO18,
++	MT6323_ID_VCAMD,
++	MT6323_ID_VCAMIO,
++	MT6323_ID_RG_MAX,
++};
++
++#define MT6323_MAX_REGULATOR	MT6323_ID_RG_MAX
++
++#endif /* __LINUX_REGULATOR_MT6323_H */
 -- 
 1.7.10.4
