@@ -1,98 +1,138 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu,  7 Apr 2016 14:20:23 +0200
-Subject: [PATCH v4 06/11] soc: renesas: rcar-sysc: Add support for R-Car H1
- power areas
-In-Reply-To: <1460031628-13336-1-git-send-email-geert+renesas@glider.be>
-References: <1460031628-13336-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1460031628-13336-7-git-send-email-geert+renesas@glider.be>
+Date: Thu,  7 Apr 2016 14:20:17 +0200
+Subject: [PATCH v4 00/11] soc: renesas: Add R-Car SYSC PM Domain Support
+Message-ID: <1460031628-13336-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-v4:
+	Hi Simon, Magnus,
+
+This patch series introduces a DT-based driver for the R-Car System
+Controller, as found on Renesas R-Car H1, R-Car Gen2, and R-Car Gen3
+SoCs.
+
+This is a dependency for the enablement of DU and VSP on R-Car H3, as
+the VSPs are located in a PM Domain.
+
+Changes compared to v3:
+  - Add Reviewed-by,
+  - Make sure not to clear reserved SYSCIMR bits that were set before,
+  - Make the always-on power area implicit and always present, and an
+    alias of the existing SoC's Clock Domain. This makes the number of
+    power areas a compile-time constant, and allows to drop PD_ALWAYS_ON
+    and some checks.
+  - Split initialization in two phases,
+  - Remove the explicit dependency on the CPG/MSSR driver by forwarding
+    the attach/detach callbacks to the parent PM Domain.
+    If deemed reusable, rcar_sysc_{at,de}tach_dev() can be moved to
+    common genpd code later.
+  - Document that ARM cores are controlled by PSCI on R-Car Gen3
+    (although the underlying CPG/APMU hardware is the same as on Gen2),
   - Drop R8A7779_PD_SH, as it's not documented in the datasheet,
-  - Reformat table,
+  - Rename R8A779*_PD_SH to R8A779*_PD_SH_4A, and "sh" to "sh-4a" on
+    R-Car Gen2,
+  - Remove always-on power area from the R-Car Gen3 table, as it's now
+    implicitly handled by the rcar-sysc driver,
+  - Reformat tables,
+  - Minor improvements (double evaluation, unused parameter, debug
+    message consolidation),
+  - Update MAINTAINERS.
 
-v3:
-  - New (converted from DT to C).
----
- drivers/soc/renesas/Makefile       |  2 +-
- drivers/soc/renesas/r8a7779-sysc.c | 30 ++++++++++++++++++++++++++++++
- drivers/soc/renesas/rcar-sysc.c    |  3 +++
- drivers/soc/renesas/rcar-sysc.h    |  1 +
- 4 files changed, 35 insertions(+), 1 deletion(-)
+Changes compared to v2:
+  - Add Reviewed-by,
+  - Rename driver from pm-rcar to rcar-sysc,
+  - Create PM Domains from hierarchy in C data instead of DT,
+  - Add support for an "always-on" domain, which is currently used on
+    R-Car H3 only (support can be added for other R-Car SoCs, preferably
+    after their migration to CPG/MSSR),
+  - Drop power area A3SH on R-Car H3, as it's no longer
+    documented in the datasheet, and touching it seems to crash SYSC,
+  - Hook up the CPG/MSSR Clock Domain attach/detach callbacks instead of
+    using our own copies,
+  - Initialize SYSCIER early, as SYSC needs the interrupt sources to be
+    enabled to control power,
+  - Mask all SYSC interrupt sources for the CPU,
+  - Drop check for CONFIG_PM_GENERIC_DOMAINS, which is now always
+    enabled on R-Car SoCs,
+  - Use early_initcall() instead of core_initcall(),
+  - Do not power up CPU power areas during initialization, as this is
+    handled later (directly or indirectly) by the SMP code,
+  - Extract bindings into its own series, "[PATCH v3 0/7] PM / Domains:
+    Add DT bindings for the R-Car System Controller".
+
+Changes compared to v1 (more details in the individual patches):
+  - Moved pm-rcar from arch/arm/mach-shmobile/ to drivers/soc/renesas/,
+  - Added R-Car H3 (r8a7795) support, incl. support for devices part of
+    a SYSC PM domain and the CPG/MSSR clock domain,
+  - Use "renesas,<type>-sysc" instead of "renesas,sysc-<type>",
+  - Added fallback compatibility strings for R-Car Gen2 and Gen3.
+  - Changed one-line summary prefix to match current arm-soc practices,
+  - The L2 cache-controller patches have been extracted into a separate
+    series ("[PATCH v3 0/7] ARM/arm64: dts: renesas: Add/complete L2
+    cache-controller nodes"),
+  - Minor fixes.
+
+Dependencies:
+  - renesas-devel-20160406-v4.6-rc2.
+
+This has been tested on r8a7779/marzen, r8a7790/lager, r8a7791/koelsch,
+r8a7794/alt, and r8a7795/salvator-x.
+
+Thanks for applying!
+
+Geert Uytterhoeven (11):
+  soc: renesas: Move pm-rcar to drivers/soc/renesas/rcar-sysc
+  soc: renesas: rcar-sysc: Improve rcar_sysc_power() debug info
+  soc: renesas: rcar-sysc: Add DT support for SYSC PM domains
+  soc: renesas: rcar-sysc: Make rcar_sysc_power_is_off() static
+  soc: renesas: rcar-sysc: Enable Clock Domain for r8a7795 I/O devices
+  soc: renesas: rcar-sysc: Add support for R-Car H1 power areas
+  soc: renesas: rcar-sysc: Add support for R-Car H2 power areas
+  soc: renesas: rcar-sysc: Add support for R-Car M2-W power areas
+  soc: renesas: rcar-sysc: Add support for R-Car M2-N power areas
+  soc: renesas: rcar-sysc: Add support for R-Car E2 power areas
+  soc: renesas: rcar-sysc: Add support for R-Car H3 power areas
+
+ MAINTAINERS                                        |   4 +
+ arch/arm/mach-shmobile/Kconfig                     |  11 +-
+ arch/arm/mach-shmobile/Makefile                    |   1 -
+ arch/arm/mach-shmobile/pm-r8a7779.c                |   3 +-
+ arch/arm/mach-shmobile/pm-rcar-gen2.c              |   2 +-
+ arch/arm/mach-shmobile/pm-rcar.c                   | 164 -------
+ arch/arm/mach-shmobile/smp-r8a7779.c               |   2 +-
+ arch/arm/mach-shmobile/smp-r8a7790.c               |   2 +-
+ drivers/soc/Makefile                               |   3 +-
+ drivers/soc/renesas/Makefile                       |   7 +
+ drivers/soc/renesas/r8a7779-sysc.c                 |  30 ++
+ drivers/soc/renesas/r8a7790-sysc.c                 |  45 ++
+ drivers/soc/renesas/r8a7791-sysc.c                 |  31 ++
+ drivers/soc/renesas/r8a7794-sysc.c                 |  31 ++
+ drivers/soc/renesas/r8a7795-sysc.c                 |  53 +++
+ drivers/soc/renesas/rcar-sysc.c                    | 480 +++++++++++++++++++++
+ drivers/soc/renesas/rcar-sysc.h                    |  59 +++
+ .../linux/soc/renesas/rcar-sysc.h                  |   9 +-
+ 18 files changed, 756 insertions(+), 181 deletions(-)
+ delete mode 100644 arch/arm/mach-shmobile/pm-rcar.c
+ create mode 100644 drivers/soc/renesas/Makefile
  create mode 100644 drivers/soc/renesas/r8a7779-sysc.c
+ create mode 100644 drivers/soc/renesas/r8a7790-sysc.c
+ create mode 100644 drivers/soc/renesas/r8a7791-sysc.c
+ create mode 100644 drivers/soc/renesas/r8a7794-sysc.c
+ create mode 100644 drivers/soc/renesas/r8a7795-sysc.c
+ create mode 100644 drivers/soc/renesas/rcar-sysc.c
+ create mode 100644 drivers/soc/renesas/rcar-sysc.h
+ rename arch/arm/mach-shmobile/pm-rcar.h => include/linux/soc/renesas/rcar-sysc.h (60%)
 
-diff --git a/drivers/soc/renesas/Makefile b/drivers/soc/renesas/Makefile
-index 2b64f6c9468136f9..b8aa9db4fdd95eb8 100644
---- a/drivers/soc/renesas/Makefile
-+++ b/drivers/soc/renesas/Makefile
-@@ -1,4 +1,4 @@
--obj-$(CONFIG_ARCH_R8A7779)	+= rcar-sysc.o
-+obj-$(CONFIG_ARCH_R8A7779)	+= rcar-sysc.o r8a7779-sysc.o
- obj-$(CONFIG_ARCH_R8A7790)	+= rcar-sysc.o
- obj-$(CONFIG_ARCH_R8A7791)	+= rcar-sysc.o
- obj-$(CONFIG_ARCH_R8A7793)	+= rcar-sysc.o
-diff --git a/drivers/soc/renesas/r8a7779-sysc.c b/drivers/soc/renesas/r8a7779-sysc.c
-new file mode 100644
-index 0000000000000000..389d6c7120be4c54
---- /dev/null
-+++ b/drivers/soc/renesas/r8a7779-sysc.c
-@@ -0,0 +1,30 @@
-+/*
-+ * Renesas R-Car H1 System Controller
-+ *
-+ * Copyright (C) 2016 Glider bvba
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; version 2 of the License.
-+ */
-+
-+#include <linux/bug.h>
-+#include <linux/kernel.h>
-+
-+#include <dt-bindings/power/r8a7779-sysc.h>
-+
-+#include "rcar-sysc.h"
-+
-+static const struct rcar_sysc_area r8a7779_areas[] __initconst = {
-+	{ "arm1",	 0x40, 1, R8A7779_PD_ARM1,	-1, PD_CPU_CR },
-+	{ "arm2",	 0x40, 2, R8A7779_PD_ARM2,	-1, PD_CPU_CR },
-+	{ "arm3",	 0x40, 3, R8A7779_PD_ARM3,	-1, PD_CPU_CR },
-+	{ "sgx",	 0xc0, 0, R8A7779_PD_SGX,	-1 },
-+	{ "vdp",	0x100, 0, R8A7779_PD_VDP,	-1 },
-+	{ "imp",	0x140, 0, R8A7779_PD_IMP,	-1 },
-+};
-+
-+const struct rcar_sysc_info r8a7779_sysc_info __initconst = {
-+	.areas = r8a7779_areas,
-+	.num_areas = ARRAY_SIZE(r8a7779_areas),
-+};
-diff --git a/drivers/soc/renesas/rcar-sysc.c b/drivers/soc/renesas/rcar-sysc.c
-index 6fad1311133a3ac7..89505e3dae9be4bd 100644
---- a/drivers/soc/renesas/rcar-sysc.c
-+++ b/drivers/soc/renesas/rcar-sysc.c
-@@ -308,6 +308,9 @@ static void __init rcar_sysc_pd_setup(struct rcar_sysc_pd *pd)
- }
- 
- static const struct of_device_id rcar_sysc_matches[] = {
-+#ifdef CONFIG_ARCH_R8A7779
-+	{ .compatible = "renesas,r8a7779-sysc", .data = &r8a7779_sysc_info },
-+#endif
- 	{ /* sentinel */ }
- };
- 
-diff --git a/drivers/soc/renesas/rcar-sysc.h b/drivers/soc/renesas/rcar-sysc.h
-index 4aeb3541227a5456..d1ec6fad38b35681 100644
---- a/drivers/soc/renesas/rcar-sysc.h
-+++ b/drivers/soc/renesas/rcar-sysc.h
-@@ -49,4 +49,5 @@ struct rcar_sysc_info {
- 	unsigned int num_areas;
- };
- 
-+extern const struct rcar_sysc_info r8a7779_sysc_info;
- #endif /* __SOC_RENESAS_RCAR_SYSC_H__ */
 -- 
 1.9.1
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
