@@ -1,228 +1,280 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Thu, 7 Apr 2016 10:06:45 +0000
-Subject: [PATCH v2] PCI: designware: move remaining rc setup code to
- dw_pcie_setup_rc()
-In-Reply-To: <20160407163443.291fbd49@xhacker>
-References: <1458128433-3020-1-git-send-email-jszhang@marvell.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ED40E52@lhreml503-mbs>
- <20160407103734.55e72da7@xhacker>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ED43F95@lhreml503-mbs>
- <20160407163443.291fbd49@xhacker>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1ED44208@lhreml503-mbs>
+From: gary.bisson@boundarydevices.com (Gary Bisson)
+Date: Thu, 7 Apr 2016 12:07:23 +0200
+Subject: [PATCH v3 4/9] ARM: dts: imx: add Boundary Devices Nitrogen7 board
+In-Reply-To: <20160406141555.GL18833@tiger>
+References: <1458050668-26748-1-git-send-email-gary.bisson@boundarydevices.com>
+ <1459614351-16731-1-git-send-email-gary.bisson@boundarydevices.com>
+ <1459614351-16731-5-git-send-email-gary.bisson@boundarydevices.com>
+ <20160406141555.GL18833@tiger>
+Message-ID: <CAAMH-yu+wKKV_K3qXQoS43T9uOzSWWNO-++055QZyLZpS8Pc2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jisheng
+HI Shawn,
 
-> -----Original Message-----
-> From: Jisheng Zhang [mailto:jszhang at marvell.com]
-> Sent: 07 April 2016 09:35
-> To: Gabriele Paoloni
-> Cc: jingoohan1 at gmail.com; pratyush.anand at gmail.com;
-> bhelgaas at google.com; linux-pci at vger.kernel.org; linux-
-> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v2] PCI: designware: move remaining rc setup code
-> to dw_pcie_setup_rc()
-> 
-> Hi Gabriele,
-> 
-> On Thu, 7 Apr 2016 08:20:28 +0000 Gabriele Paoloni wrote:
-> 
-> > Hi Jisheng
-> >
-> > Thanks for your reply
-> >
-> > > -----Original Message-----
-> > > From: Jisheng Zhang [mailto:jszhang at marvell.com]
-> > > Sent: 07 April 2016 03:38
-> > > To: Gabriele Paoloni; jingoohan1 at gmail.com;
-> pratyush.anand at gmail.com;
-> > > bhelgaas at google.com
-> > > Cc: linux-pci at vger.kernel.org; linux-kernel at vger.kernel.org; linux-
-> arm-
-> > > kernel at lists.infradead.org
-> > > Subject: Re: [PATCH v2] PCI: designware: move remaining rc setup
-> code
-> > > to dw_pcie_setup_rc()
-> > >
-> > > Hi Gabriele,
-> > >
-> > > On Wed, 6 Apr 2016 14:50:29 +0000 Gabriele Paoloni wrote:
-> > >
-> > > > Hi, sorry to be late on this
-> > > >
-> > > > > -----Original Message-----
-> > > > > From: linux-kernel-owner at vger.kernel.org [mailto:linux-kernel-
-> > > > > owner at vger.kernel.org] On Behalf Of Jisheng Zhang
-> > > > > Sent: 16 March 2016 11:41
-> > > > > To: jingoohan1 at gmail.com; pratyush.anand at gmail.com;
-> > > bhelgaas at google.com
-> > > > > Cc: linux-pci at vger.kernel.org; linux-kernel at vger.kernel.org;
-> linux-
-> > > arm-
-> > > > > kernel at lists.infradead.org; Jisheng Zhang
-> > > > > Subject: [PATCH v2] PCI: designware: move remaining rc setup
-> code
-> > > to
-> > > > > dw_pcie_setup_rc()
-> > > > >
-> > > > > dw_pcie_setup_rc(), as its name indicates, setups the RC. But
-> > > current
-> > > > > dw_pcie_host_init() also contains some necessary rc setup code.
-> > > > >
-> > > > > Another reason: the host may lost power during suspend to ram,
-> the
-> > > RC
-> > > > > need to be re-setup after resume. The rc can't be correctly
-> resumed
-> > > > > without the rc setup code in dw_pcie_host_init().
-> > > > >
-> > > > > So this patch moves the code to dw_pcie_setup_rc() to address
-> the
-> > > above
-> > > > > two issues. After this patch, each pcie designware driver users
-> > > could
-> > > > > call dw_pcie_setup_rc() to re-setup rc when resume back.
-> > > >
-> > > > I think this patch breaks the Hisilicon driver...
-> > > >
-> > > > Our driver performs linkup setup in UEFI therefore we do not call
-> > > > dw_pcie_setup_rc(), we only call dw_pcie_host_init().
-> > >
-> > > Thanks for the information. So pcie-hisi rely on UEFI to do
-> something
-> > > similar
-> > > in dw_pcie_setup_rc(), this comes to a common driver implement
-> > > question: should
-> > > linux device driver rely on bootloader to configure HW device?
-> >
-> > I don't see any issue with this...
-> >
-> > >
-> > > Is it acceptable that pcie-hisi adds a call to dw_pcie_setup_rc()
-> in
-> > > hisi_add_pcie_port()?
-> >
-> > I don't think so...that would try to overwrite what is already set by
-> > the bootloader; so it is wrong in principle and maybe it can lead to
-> > undefined behaviours...
-> 
-> make sense! This commit is intend to re-setup the rc when waken from
-> s2ram (in
-> s2ram state, the host lost power)
-> 
-> I have no good solution but to introduce one function e.g
-> dw_pcie_setup_rc_after_linkup(), then move related code from
-> dw_pcie_host_init
-> to it, then let my host driver resume hook to call.
-> 
-> Hi Pratyush, Jingoo and Bjorn etc.
-> 
-> any suggestions are appreciated!
+On Wed, Apr 6, 2016 at 4:15 PM, Shawn Guo <shawnguo@kernel.org> wrote:
+> On Sat, Apr 02, 2016 at 06:25:46PM +0200, Gary Bisson wrote:
+>> Based on i.MX7 Dual with 1GB of RAM.
+>>
+>> https://boundarydevices.com/product/nitrogen7/
+>>
+>> Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
+>> ---
+>>
+>> Changes v1 -> v2:
+>> - none
+>> Changes v2 -> v3:
+>> - Fix Nitrogen7 BT UART clock parent
+>> - Fix Nitrogen7 lvdo2 node to be always-on
+>>
+>> ---
+>>  arch/arm/boot/dts/Makefile            |   1 +
+>>  arch/arm/boot/dts/imx7d-nitrogen7.dts | 819 ++++++++++++++++++++++++++++++++++
+>>  2 files changed, 820 insertions(+)
+>>  create mode 100644 arch/arm/boot/dts/imx7d-nitrogen7.dts
+>
+> <snip>
+>
+>> +/ {
+>> +     model = "Boundary Devices i.MX7 Nitrogen7 Board";
+>> +     compatible = "boundary,imx7d-nitrogen7", "fsl,imx7d";
+>> +
+>> +     aliases {
+>> +             fb_lcd = &lcdif;
+>> +             t_lcd = &t_lcd;
+>> +     };
+>> +
+>> +     memory {
+>> +             reg = <0x80000000 0x40000000>;
+>> +     };
+>> +
+>> +     backlight_j9 {
+>
+> Use hyphen instead of underscore in node name.
 
-What about:
+Sorry I forgot about that.
 
-diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-index a4cccd3..e461f5d 100644
---- a/drivers/pci/host/pcie-designware.c
-+++ b/drivers/pci/host/pcie-designware.c
-@@ -434,7 +434,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 	struct platform_device *pdev = to_platform_device(pp->dev);
- 	struct pci_bus *bus, *child;
- 	struct resource *cfg_res;
--	u32 val;
- 	int i, ret;
- 	LIST_HEAD(res);
- 	struct resource_entry *win;
-@@ -544,25 +543,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 	if (pp->ops->host_init)
- 		pp->ops->host_init(pp);
- 
--	/*
--	 * If the platform provides ->rd_other_conf, it means the platform
--	 * uses its own address translation component rather than ATU, so
--	 * we should not program the ATU here.
--	 */
--	if (!pp->ops->rd_other_conf)
--		dw_pcie_prog_outbound_atu(pp, PCIE_ATU_REGION_INDEX1,
--					  PCIE_ATU_TYPE_MEM, pp->mem_base,
--					  pp->mem_bus_addr, pp->mem_size);
--
--	dw_pcie_wr_own_conf(pp, PCI_BASE_ADDRESS_0, 4, 0);
--
--	/* program correct class for RC */
--	dw_pcie_wr_own_conf(pp, PCI_CLASS_DEVICE, 2, PCI_CLASS_BRIDGE_PCI);
--
--	dw_pcie_rd_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, &val);
--	val |= PORT_LOGIC_SPEED_CHANGE;
--	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
--
- 	pp->root_bus_nr = pp->busn->start;
- 	if (IS_ENABLED(CONFIG_PCI_MSI)) {
- 		bus = pci_scan_root_bus_msi(pp->dev, pp->root_bus_nr,
-@@ -725,6 +705,29 @@ static struct pci_ops dw_pcie_ops = {
- 	.write = dw_pcie_wr_conf,
- };
- 
-+void dw_pcie_setup_own_cfg(struct pcie_port *pp)
-+{
-+	u32 val;
-+	/*
-+	 * If the platform provides ->rd_other_conf, it means the platform
-+	 * uses its own address translation component rather than ATU, so
-+	 * we should not program the ATU here.
-+	 */
-+	if (!pp->ops->rd_other_conf)
-+		dw_pcie_prog_outbound_atu(pp, PCIE_ATU_REGION_INDEX1,
-+					  PCIE_ATU_TYPE_MEM, pp->mem_base,
-+					  pp->mem_bus_addr, pp->mem_size);
-+
-+	dw_pcie_wr_own_conf(pp, PCI_BASE_ADDRESS_0, 4, 0);
-+
-+	/* program correct class for RC */
-+	dw_pcie_wr_own_conf(pp, PCI_CLASS_DEVICE, 2, PCI_CLASS_BRIDGE_PCI);
-+
-+	dw_pcie_rd_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, &val);
-+	val |= PORT_LOGIC_SPEED_CHANGE;
-+	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
-+}
-+
- void dw_pcie_setup_rc(struct pcie_port *pp)
- {
- 	u32 val;
-@@ -800,6 +803,8 @@ void dw_pcie_setup_rc(struct pcie_port *pp)
- 	val |= PCI_COMMAND_IO | PCI_COMMAND_MEMORY |
- 		PCI_COMMAND_MASTER | PCI_COMMAND_SERR;
- 	dw_pcie_writel_rc(pp, val, PCI_COMMAND);
-+
-+	dw_pcie_setup_own_cfg(pp);
- }
- 
- MODULE_AUTHOR("Jingoo Han <jg1.han@samsung.com>");
-diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
-index f437f9b..caf0f5d 100644
---- a/drivers/pci/host/pcie-designware.h
-+++ b/drivers/pci/host/pcie-designware.h
-@@ -85,5 +85,6 @@ int dw_pcie_wait_for_link(struct pcie_port *pp);
- int dw_pcie_link_up(struct pcie_port *pp);
- void dw_pcie_setup_rc(struct pcie_port *pp);
- int dw_pcie_host_init(struct pcie_port *pp);
-+void dw_pcie_setup_own_cfg(struct pcie_port *pp);
- 
- #endif /* _PCIE_DESIGNWARE_H */
-diff --git a/drivers/pci/host/pcie-hisi.c b/drivers/pci/host/pcie-hisi.c
-index 3e98d4e..8da29b2 100644
---- a/drivers/pci/host/pcie-hisi.c
-+++ b/drivers/pci/host/pcie-hisi.c
-@@ -164,6 +164,7 @@ static int hisi_add_pcie_port(struct pcie_port *pp,
- 		dev_err(&pdev->dev, "failed to initialize host\n");
- 		return ret;
- 	}
-+	dw_pcie_setup_own_cfg(pp);
- 
- 	return 0;
- }
+>> +             compatible = "gpio-backlight";
+>> +             pinctrl-names = "default";
+>> +             pinctrl-0 = <&pinctrl_backlight_j9>;
+>> +             gpios = <&gpio1 7 GPIO_ACTIVE_HIGH>;
+>> +             default-on;
+>> +     };
+>> +
+>> +     backlight_j20 {
+>> +             compatible = "pwm-backlight";
+>> +             pwms = <&pwm1 0 5000000>;
+>> +             brightness-levels = <0 4 8 16 32 64 128 255>;
+>> +             default-brightness-level = <6>;
+>> +             status = "okay";
+>> +     };
+>> +
+>> +     regulators {
+>> +             compatible = "simple-bus";
+>> +             #address-cells = <1>;
+>> +             #size-cells = <0>;
+>
+> DT maintainers do not like this fake "simple-bus".  Please put all these
+> fixed regulators directly under root node in the naming schema below.
+>
+>         reg_xxx: regulator-xxx {
+>                 ...
+>         };
 
-> 
-> Thanks,
-> Jisheng
+Ok, good to know, will be fixed in v4.
+
+>> +
+>> +             reg_usb_otg1_vbus: regulator at 0 {
+>> +                     compatible = "regulator-fixed";
+>> +                     reg = <0>;
+>> +                     regulator-name = "usb_otg1_vbus";
+>> +                     regulator-min-microvolt = <5000000>;
+>> +                     regulator-max-microvolt = <5000000>;
+>> +                     gpio = <&gpio1 5 GPIO_ACTIVE_HIGH>;
+>> +                     enable-active-high;
+>> +             };
+>
+> <snip>
+>
+>> +&uart3 {
+>> +     pinctrl-names = "default";
+>> +     pinctrl-0 = <&pinctrl_uart3>;
+>> +     assigned-clocks = <&clks IMX7D_UART3_ROOT_SRC>;
+>> +     assigned-clock-parents = <&clks IMX7D_OSC_24M_CLK>;
+>> +     control-gpios = <&gpio2 4 GPIO_ACTIVE_HIGH>;
+>> +     uart-has-rs485-half-duplex;
+>> +     rs485-mode = <1>;
+>
+> The above 3 properties are undefined?
+
+You're right, the mainline i.MX UART driver doesn't have those.
+
+>> +     status = "okay";
+>> +};
+>> +
+>> +&uart6 {
+>> +     pinctrl-names = "default";
+>> +     pinctrl-0 = <&pinctrl_uart6>;
+>> +     assigned-clocks = <&clks IMX7D_UART6_ROOT_SRC>;
+>> +     assigned-clock-parents = <&clks IMX7D_PLL_SYS_MAIN_240M_CLK>;
+>> +     fsl,uart-has-rtscts;
+>> +     status = "okay";
+>> +};
+>> +
+>> +&usbotg1 {
+>> +     vbus-supply = <&reg_usb_otg1_vbus>;
+>> +     pinctrl-names = "default";
+>> +     pinctrl-0 = <&pinctrl_usbotg1>;
+>> +     status = "okay";
+>> +};
+>> +
+>> +&usbotg2 {
+>> +     vbus-supply = <&reg_usb_otg2_vbus>;
+>> +     pinctrl-names = "default";
+>> +     pinctrl-0 = <&pinctrl_usbotg2>;
+>> +     dr_mode = "host";
+>> +     status = "okay";
+>> +};
+>> +
+>> +&usdhc1 {
+>> +     pinctrl-names = "default";
+>> +     pinctrl-0 = <&pinctrl_usdhc1>;
+>> +     cd-gpios = <&gpio5 0 GPIO_ACTIVE_LOW>;
+>> +     vmmc-supply = <&vgen3_reg>;
+>> +     bus-width = <4>;
+>> +     fsl,tuning-step = <2>;
+>> +     wakeup-source;
+>> +     keep-power-in-suspend;
+>> +     status = "okay";
+>> +};
+>> +
+>> +&usdhc2 {
+>> +     pinctrl-names = "default";
+>> +     pinctrl-0 = <&pinctrl_usdhc2>;
+>> +     bus-width = <4>;
+>> +     non-removable;
+>> +     vmmc-supply = <&reg_wlan>;
+>> +     vqmmc-1-8-v;
+>
+> Unsupported property?
+
+Same here.
+
+>> +     cap-power-off-card;
+>> +     keep-power-in-suspend;
+>> +     status = "okay";
+>> +
+>> +     #address-cells = <1>;
+>> +     #size-cells = <0>;
+>
+> Move these two up to the top of property list.
+
+Ok.
+
+>> +     wlcore: wlcore at 2 {
+>> +             compatible = "ti,wl1271";
+>> +             reg = <2>;
+>> +             interrupt-parent = <&gpio4>;
+>> +             interrupts = <20 IRQ_TYPE_LEVEL_HIGH>;
+>> +             ref-clock-frequency = <38400000>;
+>> +     };
+>> +};
+>> +
+>> +&usdhc3 {
+>> +     pinctrl-names = "default";
+>> +     pinctrl-0 = <&pinctrl_usdhc3>;
+>> +     assigned-clocks = <&clks IMX7D_USDHC3_ROOT_CLK>;
+>> +     assigned-clock-rates = <400000000>;
+>> +     bus-width = <8>;
+>> +     fsl,tuning-step = <2>;
+>> +     non-removable;
+>> +     status = "okay";
+>> +};
+>> +
+>> +&wdog1 {
+>> +     pinctrl-names = "default";
+>> +     pinctrl-0 = <&pinctrl_wdog1>;
+>> +     status = "okay";
+>> +};
+>> +
+>> +&iomuxc {
+>> +     pinctrl-names = "default";
+>> +     pinctrl-0 = <&pinctrl_hog_1 &pinctrl_j2>;
+>> +
+>> +     imx7d-nitrogen7 {
+>
+> Since commit 5fcdf6a7ed95 (pinctrl: imx: Allow parsing DT without
+> function nodes), we can drop this container code to save one level of
+> indentation.
+
+Great, that will remove all the over 80 lines with checkpatch.
+
+>> +             pinctrl_hog_1: hoggrp-1 {
+>> +                     fsl,pins = <
+>> +                             MX7D_PAD_SD3_RESET_B__GPIO6_IO11        0x5d
+>> +                             MX7D_PAD_GPIO1_IO13__GPIO1_IO13         0x7d
+>> +                             MX7D_PAD_ECSPI2_MISO__GPIO4_IO22        0x7d
+>> +                     >;
+>> +             };
+>> +
+>> +             pinctrl_bt_rfkill: btrfkillgrp {
+>> +                     fsl,pins = <
+>> +                             MX7D_PAD_ECSPI2_SS0__GPIO4_IO23         0x7d
+>> +                     >;
+>> +             };
+>
+> Drop unused pinctrl entries, and let's add it when needed.
+
+Ok, makes sense.
+
+>> +
+>> +             pinctrl_enet1: enet1grp {
+>> +                     fsl,pins = <
+>> +                             MX7D_PAD_GPIO1_IO10__ENET1_MDIO                 0x3
+>> +                             MX7D_PAD_GPIO1_IO11__ENET1_MDC                  0x3
+>> +                             MX7D_PAD_GPIO1_IO12__CCM_ENET_REF_CLK1          0x3
+>> +                             MX7D_PAD_ENET1_RGMII_TXC__ENET1_RGMII_TXC       0x71
+>> +                             MX7D_PAD_ENET1_RGMII_TD0__ENET1_RGMII_TD0       0x71
+>> +                             MX7D_PAD_ENET1_RGMII_TD1__ENET1_RGMII_TD1       0x71
+>> +                             MX7D_PAD_ENET1_RGMII_TD2__ENET1_RGMII_TD2       0x71
+>> +                             MX7D_PAD_ENET1_RGMII_TD3__ENET1_RGMII_TD3       0x71
+>> +                             MX7D_PAD_ENET1_RGMII_TX_CTL__ENET1_RGMII_TX_CTL 0x71
+>> +                             MX7D_PAD_ENET1_RGMII_RXC__ENET1_RGMII_RXC       0x71
+>> +                             MX7D_PAD_ENET1_RGMII_RD0__ENET1_RGMII_RD0       0x11
+>> +                             MX7D_PAD_ENET1_RGMII_RD1__ENET1_RGMII_RD1       0x11
+>> +                             MX7D_PAD_ENET1_RGMII_RD2__ENET1_RGMII_RD2       0x11
+>> +                             MX7D_PAD_ENET1_RGMII_RD3__ENET1_RGMII_RD3       0x71
+>> +                             MX7D_PAD_ENET1_RGMII_RX_CTL__ENET1_RGMII_RX_CTL 0x11
+>> +                             MX7D_PAD_SD3_STROBE__GPIO6_IO10                 0x75 /* Reset */
+>> +                     >;
+>> +             };
+>> +
+>> +             pinctrl_flash: flashgrp {
+>
+> Ditto
+>
+>> +                     fsl,pins = <
+>> +                             MX7D_PAD_EPDC_DATA00__QSPI_A_DATA0      0x71
+>> +                             MX7D_PAD_EPDC_DATA01__QSPI_A_DATA1      0x71
+>> +                             MX7D_PAD_EPDC_DATA02__GPIO2_IO2         0x7d
+>> +                             MX7D_PAD_EPDC_DATA03__GPIO2_IO3         0x7d
+>> +                             MX7D_PAD_EPDC_DATA05__QSPI_A_SCLK       0x71
+>> +                             MX7D_PAD_EPDC_DATA06__GPIO2_IO6         0x71
+>> +                     >;
+>> +             };
+>
+> <snip>
+>
+>> +&iomuxc_lpsr {
+>> +     pinctrl-names = "default";
+>> +     pinctrl-0 = <&pinctrl_hog_2>;
+>> +
+>> +     imx7d-nitrogen7 {
+>
+> Drop this container node.
+
+I'll submit a v4 shortly. I'll also make sure to do the same on the
+6SX device tree.
+
+Regards,
+Gary
