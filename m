@@ -1,47 +1,33 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 07 Apr 2016 15:09:06 -0700
-Subject: [PATCH v2] ARM: dts: orion5x: add device tree for kurobox-pro
-In-Reply-To: <20160404123508.GF21828@lunn.ch> (Andrew Lunn's message of "Mon,
- 4 Apr 2016 14:35:08 +0200")
-References: <1458656898-16183-1-git-send-email-rogershimizu@gmail.com>
- <1459267905-15403-1-git-send-email-rogershimizu@gmail.com>
- <20160404123508.GF21828@lunn.ch>
-Message-ID: <87twjdhy0t.fsf@free-electrons.com>
+Date: Thu, 07 Apr 2016 15:30:28 -0700
+Subject: [PATCH v4] ARM: dts: kirkwood: Add DTS for Linksys
+ EA4200v2/EA4500\
+In-Reply-To: <op.yff250112s3iss@ecaz> (Imre Kaloz's message of "Tue, 05 Apr
+ 2016 13:50:14 +0200")
+References: <1459781168-16708-1-git-send-email-bert@biot.com>
+ <20160404145528.GE25131@lunn.ch> <op.yff250112s3iss@ecaz>
+Message-ID: <87pou1hx17.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roger,
+Hi Bert,
  
- On lun., avril 04 2016, Andrew Lunn <andrew@lunn.ch> wrote:
+ On mar., avril 05 2016, "Imre Kaloz" <kaloz@openwrt.org> wrote:
 
-> On Wed, Mar 30, 2016 at 01:11:45AM +0900, Roger Shimizu wrote:
->> Add dts file to support Buffalo/Revogear Kurobox-Pro, which is marvell
->> orion5x based 3.5" HDD NAS.
->> 
->> It's a quite old product and already discontinued. So there's no
->> official website for it. But it was an early product which used marvell
->> orion5x 88F5182 chipset, it's popular in the community.
->> Some unofficial site:
->>   - http://buffalo.nas-central.org/wiki/Category:KuroboxPro
->>   - http://nice.kaze.com/KUROPRO_ProductSpecifications.pdf
->> 
->> This device tree is based on the board file:
->>   arch/arm/mach-orion5x/kurobox_pro-setup.c
->> However, the probing order of NAND and JEDEC-Flash are different from
->> the original board file, this results in incompatible minor number
->> for a few /dev/mtdX and /dev/mtdblockX devices.
->> So I still want to keep the board file for the time being.
->> 
->> Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
+> On Mon, 04 Apr 2016 16:55:28 +0200, Andrew Lunn <andrew@lunn.ch> wrote:
 >
-> Hi Roger
+>> On Mon, Apr 04, 2016 at 04:46:07PM +0200, Bert Vermeulen wrote:
+>>> This platform is based on a Marvell 88E6282 SoC and 88E6171 switch.
+>>>
+>>> Signed-off-by: Bert Vermeulen <bert@biot.com>
+>>
+>> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 >
-> Looks good:
->
-> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+> Reviewed-by: Imre Kaloz <kaloz@openwrt.org>
 
 
-Applied on mvebu/dt
+Applied on mvebu/dt with the reviewed-by flags and a fix on the comment
+block style.
 
 Thanks,
 
@@ -49,7 +35,10 @@ Gregory
 
 
 >
-> 	     Andrew
+>
+> Thanks,
+>
+> Imre
 
 -- 
 Gregory Clement, Free Electrons
