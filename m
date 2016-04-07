@@ -1,52 +1,149 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 7 Apr 2016 22:59:02 +0800
-Subject: [LINUX PATCH v2 2/3] mtd:m25p80: Assigned number of dummy cycles
- to dummy_cycles.
-In-Reply-To: <1460039969-9835-2-git-send-email-lakshmis@xilinx.com>
-Message-ID: <201604072216.DexSMTuF%fengguang.wu@intel.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Thu, 7 Apr 2016 17:09:51 +0200
+Subject: [PATCH v4 05/12] KVM: arm64: introduce ITS emulation file with
+ stub functions
+In-Reply-To: <57067356.40508@arm.com>
+References: <1458958450-19662-1-git-send-email-andre.przywara@arm.com>
+ <1458958450-19662-6-git-send-email-andre.przywara@arm.com>
+ <57066907.2020103@arm.com> <570669E3.3070907@linaro.org>
+ <57067356.40508@arm.com>
+Message-ID: <5706783F.4040906@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi L,
+On 04/07/2016 04:48 PM, Marc Zyngier wrote:
+> Hi Eric,
+> 
+> On 07/04/16 15:08, Eric Auger wrote:
+>> Hi Marc,
+>> On 04/07/2016 04:04 PM, Marc Zyngier wrote:
+>>> On 26/03/16 02:14, Andre Przywara wrote:
+>>>> The ARM GICv3 ITS emulation code goes into a separate file, but
+>>>> needs to be connected to the GICv3 emulation, of which it is an
+>>>> option.
+>>>> Introduce the skeleton with function stubs to be filled later.
+>>>> Introduce the basic ITS data structure and initialize it, but don't
+>>>> return any success yet, as we are not yet ready for the show.
+>>>>
+>>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>>>> ---
+>>>>  arch/arm64/kvm/Makefile            |  1 +
+>>>>  include/kvm/vgic/vgic.h            |  6 +++
+>>>>  include/linux/irqchip/arm-gic-v3.h |  1 +
+>>>>  virt/kvm/arm/vgic/its-emul.c       | 84 ++++++++++++++++++++++++++++++++++++++
+>>>>  virt/kvm/arm/vgic/vgic.h           | 14 +++++++
+>>>>  virt/kvm/arm/vgic/vgic_init.c      |  6 +++
+>>>>  virt/kvm/arm/vgic/vgic_mmio.c      | 18 ++++++--
+>>>>  7 files changed, 126 insertions(+), 4 deletions(-)
+>>>>  create mode 100644 virt/kvm/arm/vgic/its-emul.c
+>>>>
+>>>> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+>>>> index 2f5d431..3bec10e 100644
+>>>> --- a/arch/arm64/kvm/Makefile
+>>>> +++ b/arch/arm64/kvm/Makefile
+>>>> @@ -28,6 +28,7 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-v2.o
+>>>>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-v3.o
+>>>>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic_mmio.o
+>>>>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic_kvm_device.o
+>>>> +kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/its-emul.o
+>>>>  else
+>>>>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic.o
+>>>>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v2.o
+>>>> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+>>>> index 8ea5dd7..c79bed5 100644
+>>>> --- a/include/kvm/vgic/vgic.h
+>>>> +++ b/include/kvm/vgic/vgic.h
+>>>> @@ -112,6 +112,11 @@ struct vgic_io_device {
+>>>>  	struct kvm_io_device dev;
+>>>>  };
+>>>>  
+>>>> +struct vgic_its {
+>>>> +	bool			enabled;
+>>>> +	spinlock_t		lock;
+>>>> +};
+>>>> +
+>>>>  struct vgic_dist {
+>>>>  	bool			in_kernel;
+>>>>  	bool			ready;
+>>>> @@ -153,6 +158,7 @@ struct vgic_dist {
+>>>>  	u64			*pendbaser;
+>>>>  
+>>>>  	bool			lpis_enabled;
+>>>> +	struct vgic_its		its;
+>>>>  };
+>>>>  
+>>>>  struct vgic_v2_cpu_if {
+>>>> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+>>>> index d5d798b..a813c3e 100644
+>>>> --- a/include/linux/irqchip/arm-gic-v3.h
+>>>> +++ b/include/linux/irqchip/arm-gic-v3.h
+>>>> @@ -177,6 +177,7 @@
+>>>>  #define GITS_CWRITER			0x0088
+>>>>  #define GITS_CREADR			0x0090
+>>>>  #define GITS_BASER			0x0100
+>>>> +#define GITS_IDREGS_BASE		0xffd0
+>>>>  #define GITS_PIDR2			GICR_PIDR2
+>>>>  
+>>>>  #define GITS_TRANSLATER			0x10040
+>>>> diff --git a/virt/kvm/arm/vgic/its-emul.c b/virt/kvm/arm/vgic/its-emul.c
+>>>> new file mode 100644
+>>>> index 0000000..49dd5e4
+>>>> --- /dev/null
+>>>> +++ b/virt/kvm/arm/vgic/its-emul.c
+>>>> @@ -0,0 +1,84 @@
+>>>> +/*
+>>>> + * GICv3 ITS emulation
+>>>> + *
+>>>> + * Copyright (C) 2015 ARM Ltd.
+>>>> + * Author: Andre Przywara <andre.przywara@arm.com>
+>>>> + *
+>>>> + * This program is free software; you can redistribute it and/or modify
+>>>> + * it under the terms of the GNU General Public License version 2 as
+>>>> + * published by the Free Software Foundation.
+>>>> + *
+>>>> + * This program is distributed in the hope that it will be useful,
+>>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>>> + * GNU General Public License for more details.
+>>>> + *
+>>>> + * You should have received a copy of the GNU General Public License
+>>>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>>>> + */
+>>>> +
+>>>> +#include <linux/cpu.h>
+>>>> +#include <linux/kvm.h>
+>>>> +#include <linux/kvm_host.h>
+>>>> +#include <linux/interrupt.h>
+>>>> +
+>>>> +#include <linux/irqchip/arm-gic-v3.h>
+>>>> +
+>>>> +#include <asm/kvm_emulate.h>
+>>>> +#include <asm/kvm_arm.h>
+>>>> +#include <asm/kvm_mmu.h>
+>>>> +
+>>>> +#include "vgic.h"
+>>>> +#include "vgic_mmio.h"
+>>>> +
+>>>> +struct vgic_register_region its_registers[] = {
+>>>> +	REGISTER_DESC_WITH_LENGTH(GITS_CTLR,
+>>>> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 4),
+>>>> +	REGISTER_DESC_WITH_LENGTH(GITS_IIDR,
+>>>> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 4),
+>>>> +	REGISTER_DESC_WITH_LENGTH(GITS_TYPER,
+>>>> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 4),
+>>>
+>>> GITS_TYPER is a 64bit register with plenty of things in the upper bits.
+>> In practice I think the 32 upper bits are reserved.
+> 
+> Not quite. Only bits [63:38] are reserved. See 8.19.8 in the
+> Architecture Specification (IHI 0069B).
 
-[auto build test ERROR on spi/for-next]
-[also build test ERROR on v4.6-rc2 next-20160407]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+Ah OK. Was using an older arch spec(PRD03-GENC-010745 22.0) Now switched
+to the indicated one and indeed it's different !;-)
 
-url:    https://github.com/0day-ci/linux/commits/P-L-Sai-Krishna/spi-Added-dummy_cycle-entry-in-the-spi_transfer-structure/20160407-225040
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi for-next
-config: x86_64-randconfig-x014-201614 (attached as .config)
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
-
-All errors (new ones prefixed by >>):
-
-   drivers/mtd/devices/m25p80.c: In function 'm25p80_read':
->> drivers/mtd/devices/m25p80.c:142:6: error: 'struct spi_transfer' has no member named 'dummy'
-     t[0].dummy = nor->read_dummy;
-         ^
-
-vim +142 drivers/mtd/devices/m25p80.c
-
-   136	
-   137		flash->command[0] = nor->read_opcode;
-   138		m25p_addr2cmd(nor, from, flash->command);
-   139	
-   140		t[0].tx_buf = flash->command;
-   141		t[0].len = m25p_cmdsz(nor) + dummy;
- > 142		t[0].dummy = nor->read_dummy;
-   143		spi_message_add_tail(&t[0], &m);
-   144	
-   145		t[1].rx_buf = buf;
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 24963 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160407/f1f74f04/attachment-0001.obj>
+Eric
+> 
+> Thanks,
+> 
+> 	M.
+> 
