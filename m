@@ -1,127 +1,67 @@
-From: fugang.duan@nxp.com (Fugang Duan)
-Date: Thu, 7 Apr 2016 01:23:23 +0000
-Subject: [PATCH net-next V3 00/16] net: fec: cleanup and fixes
-In-Reply-To: <57053C94.2000009@boundarydevices.com>
-References: <1459909562-22865-1-git-send-email-troy.kisky@boundarydevices.com>
- <VI1PR0401MB1855C389F2265E30252D62B5FF9F0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
- <57053C94.2000009@boundarydevices.com>
-Message-ID: <VI1PR0401MB18557A4CD2207C45D499F59AFF900@VI1PR0401MB1855.eurprd04.prod.outlook.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 6 Apr 2016 18:26:39 -0700
+Subject: [PATCH 1/4] drivers/bus: make brcmstb_gisb.c driver explicitly
+ non-modular
+In-Reply-To: <1459113058-14340-2-git-send-email-paul.gortmaker@windriver.com>
+References: <1459113058-14340-1-git-send-email-paul.gortmaker@windriver.com>
+ <1459113058-14340-2-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <20160407012639.GA30748@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Troy Kisky <troy.kisky@boundarydevices.com> Sent: Thursday, April 07, 2016 12:43 AM
-> To: Fugang Duan <fugang.duan@nxp.com>; netdev at vger.kernel.org;
-> davem at davemloft.net; lznuaa at gmail.com
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>; l.stach at pengutronix.de;
-> andrew at lunn.ch; tremyfr at gmail.com; gerg at uclinux.org; linux-arm-
-> kernel at lists.infradead.org; johannes at sipsolutions.net;
-> stillcompiling at gmail.com; sergei.shtylyov at cogentembedded.com;
-> arnd at arndb.de
-> Subject: Re: [PATCH net-next V3 00/16] net: fec: cleanup and fixes
+On Sun, Mar 27, 2016 at 05:10:55PM -0400, Paul Gortmaker wrote:
+> The Kconfig for this driver is currently:
 > 
-> On 4/6/2016 1:51 AM, Fugang Duan wrote:
-> > From: Troy Kisky <troy.kisky@boundarydevices.com> Sent: Wednesday,
-> > April 06, 2016 10:26 AM
-> >> To: netdev at vger.kernel.org; davem at davemloft.net; Fugang Duan
-> >> <fugang.duan@nxp.com>; lznuaa at gmail.com
-> >> Cc: Fabio Estevam <fabio.estevam@nxp.com>; l.stach at pengutronix.de;
-> >> andrew at lunn.ch; tremyfr at gmail.com; gerg at uclinux.org; linux-arm-
-> >> kernel at lists.infradead.org; johannes at sipsolutions.net;
-> >> stillcompiling at gmail.com; sergei.shtylyov at cogentembedded.com;
-> >> arnd at arndb.de; Troy Kisky <troy.kisky@boundarydevices.com>
-> >> Subject: [PATCH net-next V3 00/16] net: fec: cleanup and fixes
-> >>
-> >> V3 has
-> >>
-> >> 1 dropped patch "net: fec: print more debug info in fec_timeout"
-> >> 2 new patches
-> >> 0002-net-fec-remove-unused-interrupt-FEC_ENET_TS_TIMER.patch
-> >> 0003-net-fec-return-IRQ_HANDLED-if-fec_ptp_check_pps_even.patch
-> >>
-> >> 1 combined patch
-> >> 0004-net-fec-pass-rxq-txq-to-fec_enet_rx-tx_queue-instead.patch
-> >>
-> >> The changes are noted on individual patches
-> >>
-> >> My measured performance of this series is
-> >>
-> >> before patch set
-> >> 365 Mbits/sec Tx/407 RX
-> >>
-> >> after patch set
-> >> 374 Tx/427 Rx
-> >>
-> >
-> > I doubt the performance data,  I validate it on i.MX6q sabresd board on the
-> latest commit(4da46cebbd3b) in net tree.
+> config BRCMSTB_GISB_ARB
+>         bool "Broadcom STB GISB bus arbiter"
 > 
+> ...meaning that it currently is not being built as a module by anyone.
+> Lets remove all modular references, so that when reading the driver
+> there is no doubt it is builtin-only.
 > 
+> Since module_init translates to device_initcall in the non-modular
+> case, the init ordering remains unchanged with this commit.
 > 
-> I was doing UDP tests, as outlined in my V2 cover letter. Also, my cpu is 1G. Is
-> yours 1.2G?
-> 
-It is also 1GHz.
+> Cc: Brian Norris <computersforpeace@gmail.com>
+> Cc: Gregory Fong <gregory.0xf0@gmail.com>
+> Cc: Florian Fainelli <f.fainelli@gmail.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 
-I will double test UDP performance.
+I think this driver probably doesn't make too much sense as a module
+anyway (among other things, we can't hook the ARM fault handler beyond
+init time, as it's marked __init). So:
 
-> 
-> 
-> 
-> > root at imx6qdlsolo:~# uname -a
-> > Linux imx6qdlsolo 4.6.0-rc1-00318-g4da46ce #180 SMP Wed Apr 6 16:24:09
-> > CST 2016 armv7l GNU/Linux
-> 
-> 
-> This is the V2 patch that I dropped.
-> 
-> I will force update my local net-next_master branch, to make testing this series
-> easier.
-> Note that my local net-next_master branch has about 19 patches on top of this
-> series.
-> so,
-> 
-> tkisky at office-server2:~/linux-imx6$ git reset --hard HEAD~19 HEAD is now at
-> a125da7 net: fec: don't set cbd_bufaddr unless no mapping error
-> 
-I see.
+Acked-by: Brian Norris <computersforpeace@gmail.com>
 
+Might be good to get Florian's ack though, as I'm not using this
+platform any more.
+
+Brian
+
+> ---
+>  drivers/bus/brcmstb_gisb.c | 4 +---
+>  1 file changed, 1 insertion(+), 3 deletions(-)
 > 
-> >
-> > TCP RX performance is 602Mbps, TX is only 325Mbps,   TX path has some
-> performance issue in net tree.
-> > I will dig out it.
-> >
-> >
+> diff --git a/drivers/bus/brcmstb_gisb.c b/drivers/bus/brcmstb_gisb.c
+> index f364fa4d24eb..319104b22ca4 100644
+> --- a/drivers/bus/brcmstb_gisb.c
+> +++ b/drivers/bus/brcmstb_gisb.c
+> @@ -13,7 +13,6 @@
+>  
+>  #include <linux/init.h>
+>  #include <linux/types.h>
+> -#include <linux/module.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/sysfs.h>
+> @@ -408,5 +407,4 @@ static int __init brcm_gisb_driver_init(void)
+>  	return platform_driver_probe(&brcmstb_gisb_arb_driver,
+>  				     brcmstb_gisb_arb_probe);
+>  }
+> -
+> -module_init(brcm_gisb_driver_init);
+> +device_initcall(brcm_gisb_driver_init);
+> -- 
+> 2.6.1
 > 
-> 
-> More testing is always better. Thanks
-> 
-> 
-> >>
-> >> Troy Kisky (16):
-> >>   net: fec: only check queue 0 if RXF_0/TXF_0 interrupt is set
-> >>   net: fec: remove unused interrupt FEC_ENET_TS_TIMER
-> >>   net: fec: return IRQ_HANDLED if fec_ptp_check_pps_event handled it
-> >>   net: fec: pass rxq/txq to fec_enet_rx/tx_queue instead of queue_id
-> >>   net: fec: reduce interrupts
-> >>   net: fec: split off napi routine with 3 queues
-> >>   net: fec: don't clear all rx queue bits when just one is being checked
-> >>   net: fec: set cbd_sc without relying on previous value
-> >>   net: fec: eliminate calls to fec_enet_get_prevdesc
-> >>   net: fec: move restart test for efficiency
-> >>   net: fec: clear cbd_sc after transmission to help with debugging
-> >>   net: fec: dump all tx queues in fec_dump
-> >>   net: fec: detect tx int lost
-> >>   net: fec: create subroutine reset_tx_queue
-> >>   net: fec: call dma_unmap_single on mapped tx buffers at restart
-> >>   net: fec: don't set cbd_bufaddr unless no mapping error
-> >>
-> >>  drivers/net/ethernet/freescale/fec.h      |  10 +-
-> >>  drivers/net/ethernet/freescale/fec_main.c | 410
-> >> ++++++++++++++++------------
-> >> --
-> >>  2 files changed, 218 insertions(+), 202 deletions(-)
-> >>
-> >> --
-> >> 2.5.0
-> >
