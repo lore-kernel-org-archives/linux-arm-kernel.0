@@ -1,53 +1,86 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 7 Apr 2016 12:58:11 -0500
-Subject: [PATCH] ASoC: rockchip: i2s: configure the sdio pins' iomux mode
-In-Reply-To: <1459931902-77324-1-git-send-email-sugar.zhang@rock-chips.com>
-References: <1459931902-77324-1-git-send-email-sugar.zhang@rock-chips.com>
-Message-ID: <20160407175811.GP32257@rob-hp-laptop>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Thu, 7 Apr 2016 21:05:35 +0300
+Subject: [PATCH] i2c: designware-platdrv: get fast/std speed scl high/low
+ count from DT
+In-Reply-To: <1459927680-5480-1-git-send-email-jszhang@marvell.com>
+References: <1459927680-5480-1-git-send-email-jszhang@marvell.com>
+Message-ID: <CAHp75VcHNdAUeob2iR6U1HbUQzEccdjPy8ffuG4mB_=ZX7EokQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 06, 2016 at 04:38:22PM +0800, Sugar Zhang wrote:
-> There are 3 i2s sdio pins, which iomux mode is as follows:
+On Wed, Apr 6, 2016 at 10:28 AM, Jisheng Zhang <jszhang@marvell.com> wrote:
+> Sometimes, it's convenient to define the scl's high/low count directly,
+> e.g HW people would do some measurement then directly give out the
+> optimum counts. Previously, we solved the sda falling time and scl
+> falling time by i2c_dw_scl_hcnt() and i2c_dw_scl_lcnt(), then put them
+> into dt, but what we really care isn't the sda/scl falling time.
+>
+> From another side, the dw_i2c_acpi_configure() on ACPI platform also
+> get hcnt/lcnt values rather than the sda/scl falling time from ACPI
+> method, we want similar feature for DT platforms.
+>
 
-s/i2s sdio/I2S\/SDIO muxed/
+Instead of duplicating some words maybe better to explicitly define
+two groups of parameters and one which supersedes the other.
 
-> 
->  - sdi3_sdo1
->  - sdi2_sdo2
->  - sdi1_sdo3
-> 
-> we need to configure these pins' iomux mode via the GRF register
-> when use multi channel playback/capture.
-
-Why not a pinctrl binding here? If you want SDIO mode, then you need 
-similar code in the SDIO driver (or just rely on default mode).
-
-> 
-> Signed-off-by: Sugar Zhang <sugar.zhang@rock-chips.com>
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 > ---
-> 
->  .../devicetree/bindings/sound/rockchip-i2s.txt     |  5 +++
->  sound/soc/rockchip/rockchip_i2s.c                  | 39 +++++++++++++++++++++-
->  sound/soc/rockchip/rockchip_i2s.h                  |  8 +++++
->  3 files changed, 51 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/sound/rockchip-i2s.txt b/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
-> index 6e86d8a..ad72a7d 100644
-> --- a/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
-> +++ b/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
-> @@ -23,6 +23,11 @@ Required properties:
->  - rockchip,playback-channels: max playback channels, if not set, 8 channels default.
->  - rockchip,capture-channels: max capture channels, if not set, 2 channels default.
->  
-> +Required properties for controller which support multi channels playback/capture:
+>  Documentation/devicetree/bindings/i2c/i2c-designware.txt | 16 ++++++++++++++++
+>  drivers/i2c/busses/i2c-designware-platdrv.c              |  8 ++++++++
+>  2 files changed, 24 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-designware.txt b/Documentation/devicetree/bindings/i2c/i2c-designware.txt
+> index fee26dc..05176fbf 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-designware.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-designware.txt
+> @@ -20,6 +20,22 @@ Optional properties :
+>   - i2c-sda-falling-time-ns : should contain the SDA falling time in nanoseconds.
+>     This value which is by default 300ns is used to compute the tHIGH period.
+>
+> + - i2c-ss-scl-high-count : should contain the standard speed i2c clock SCL high
+> +   count. If defined, the i2c-scl-falling-time-ns and i2c-sda-falling-time-ns
+> +   will be ignored.
 > +
-> +- rockchip,grf: Should be phandle/offset pair. the phandle of the syscon node for GRF register,
-
-Wrap your lines at less than 80 chars.
-
-> +  and the offset of the GRF for control register.
+> + - i2c-ss-scl-low-count : should contain the standard speed i2c clock SCL low
+> +   count. If defined, the i2c-scl-falling-time-ns and i2c-sda-falling-time-ns
+> +   will be ignored.
 > +
->  Example for rk3288 I2S controller:
->  
->  i2s at ff890000 {
+> + - i2c-fs-scl-high-count : should contain the fast speed i2c clock SCL high
+> +   count. If defined, the i2c-scl-falling-time-ns and i2c-sda-falling-time-ns
+> +   will be ignored.
+> +
+> + - i2c-fs-scl-low-count : should contain the fast speed i2c clock SCL low
+> +   count. If defined, the i2c-scl-falling-time-ns and i2c-sda-falling-time-ns
+> +   will be ignored.
+> +
+>  Example :
+>
+>         i2c at f0000 {
+> diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
+> index d656657..8739a60 100644
+> --- a/drivers/i2c/busses/i2c-designware-platdrv.c
+> +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
+> @@ -188,6 +188,14 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
+>                                          &dev->scl_falling_time);
+>                 device_property_read_u32(&pdev->dev, "clock-frequency",
+>                                          &clk_freq);
+> +               device_property_read_u16(&pdev->dev, "i2c-ss-scl-high-count",
+> +                                        &dev->ss_hcnt);
+> +               device_property_read_u16(&pdev->dev, "i2c-ss-scl-low-count",
+> +                                        &dev->ss_lcnt);
+> +               device_property_read_u16(&pdev->dev, "i2c-fs-scl-high-count",
+> +                                        &dev->fs_hcnt);
+> +               device_property_read_u16(&pdev->dev, "i2c-fs-scl-low-count",
+> +                                        &dev->fs_lcnt);
+>         }
+>
+>         if (has_acpi_companion(&pdev->dev))
+> --
+> 2.8.0.rc3
+>
+
+
+
+-- 
+With Best Regards,
+Andy Shevchenko
