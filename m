@@ -1,42 +1,52 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Thu, 7 Apr 2016 09:37:01 +0800
-Subject: [PATCH v10 06/17] Xen: ARM: Add support for mapping platform
- device mmio
-In-Reply-To: <5704FE2C.5000902@arm.com>
+Date: Thu, 7 Apr 2016 09:39:45 +0800
+Subject: [PATCH v10 00/17] Add ACPI support for Xen Dom0 on ARM64
+In-Reply-To: <5704F3E1.7020508@arm.com>
 References: <1459525755-36968-1-git-send-email-shannon.zhao@linaro.org>
- <1459525755-36968-7-git-send-email-shannon.zhao@linaro.org>
- <5704FE2C.5000902@arm.com>
-Message-ID: <5705B9BD.1020403@huawei.com>
+ <5704F3E1.7020508@arm.com>
+Message-ID: <5705BA61.7000205@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Julien,
 
-
-On 2016/4/6 20:16, Julien Grall wrote:
->> +            gpfns[j] = XEN_PFN_DOWN(r->start) + j;
->> +            idxs[j] = XEN_PFN_DOWN(r->start) + j;
->> +        }
->> +
->> +        xatp.domid = DOMID_SELF;
->> +        xatp.size = nr;
->> +        xatp.space = XENMAPSPACE_dev_mmio;
->> +
->> +        set_xen_guest_handle(xatp.gpfns, gpfns);
->> +        set_xen_guest_handle(xatp.idxs, idxs);
->> +        set_xen_guest_handle(xatp.errs, errs);
->> +
->> +        rc = HYPERVISOR_memory_op(XENMEM_add_to_physmap_range, &xatp);
->> +        kfree(gpfns);
->> +        kfree(idxs);
->> +        kfree(errs);
->> +        if (rc)
->> +            return rc;
+On 2016/4/6 19:32, Julien Grall wrote:
+> Hi Shannon,
 > 
-> Shouldn't we redo the mapping if the hypercall fails?
-Hmm, why? If it fails again when we redo the mapping, what should we do
-then? Redo again?
-I think if it fails at the first time it will always fail no matter how
-many times we do.
+> On 01/04/2016 16:48, Shannon Zhao wrote:
+>> This patch set adds ACPI support for Xen Dom0 on ARM64. The relevant Xen
+>> ACPI on ARM64 design document could be found from [1].
+>>
+>> This patch set adds a new FDT node "uefi" under /hypervisor to pass UEFI
+>> information. Introduce a bus notifier of AMBA and Platform bus to map
+>> the new added device's MMIO space. Make Xen domain use
+>> xlated_setup_gnttab_pages to setup grant table and a new hypercall to
+>> get event-channel irq.
+>>
+>> Regarding the initialization flow of Linux kernel, it needs to move
+>> xen_early_init() before efi_init(). Then xen_early_init() will check
+>> whether it runs on Xen through the /hypervisor node and efi_init() will
+>> call a new function fdt_find_xen_uefi_params(), to parse those
+>> xen,uefi-* parameters just like the existing efi_get_fdt_params().
+>>
+>> And in arm64_enable_runtime_services() it will check whether it runs on
+>> Xen and call another new function xen_efi_runtime_setup() to setup
+>> runtime service instead of efi_native_runtime_setup(). The
+>> xen_efi_runtime_setup() will assign the runtime function pointers with
+>> the functions of driver/xen/efi.c.
+>>
+>> And since we pass a /hypervisor node and a /chosen node to Dom0, it
+>> needs to check whether the DTS only contains a /hypervisor node and a
+>> /chosen node in acpi_boot_table_init().
+>>
+>> Patches are tested on FVP base model. They can be fetched from[2].
+> 
+> I have tested this series and Linux is booting up to the prompt:
+> 
+> Tested-by: Julien Grall <julien.grall@arm.com>
+Thanks a lot. There are several patches which you didn't give your
+comments. So I assume you will review them. If so, I'll wait and update
+this series later.
 
 Thanks,
 -- 
