@@ -1,56 +1,31 @@
-From: pratyush.anand@gmail.com (Pratyush Anand)
-Date: Thu, 7 Apr 2016 12:29:09 +0530
-Subject: [PATCH v2] PCI: designware: move remaining rc setup code to
- dw_pcie_setup_rc()
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1ED40E52@lhreml503-mbs>
-References: <1458128433-3020-1-git-send-email-jszhang@marvell.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ED40E52@lhreml503-mbs>
-Message-ID: <CAHM4w1khRn4xbWbj5Qk-p5DMGjEdWfgr1W1OSsXPFVaYenFa8A@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 7 Apr 2016 09:00:00 +0200
+Subject: [PATCH] Revert "ARM: dts: porter: Enable SCIF_CLK frequency and
+ pins"
+In-Reply-To: <1459971126-26622-1-git-send-email-sjoerd.simons@collabora.co.uk>
+References: <1459971126-26622-1-git-send-email-sjoerd.simons@collabora.co.uk>
+Message-ID: <CAMuHMdWnJn8-FybRrZH1+72GbyKa-kM_JG6PR01mZHn=4ZNuxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gab,
+On Wed, Apr 6, 2016 at 9:32 PM, Sjoerd Simons
+<sjoerd.simons@collabora.co.uk> wrote:
+> This reverts commit 19417bd9c5112f58ea63e97ba72edabd5e1cc0fe as
+> according to
+> http://elinux.org/File:R-CarM2-KOELSCH_PORTER-B_PORTER_C_Comparison.pdf
+> the external oscilator for SCIF_CLK is not mounted on the porter boards.
+>
+> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
 
-Thanks for bringing it.
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
+Gr{oetje,eeting}s,
 
-On Wed, Apr 6, 2016 at 8:20 PM, Gabriele Paoloni
-<gabriele.paoloni@huawei.com> wrote:
-> Hi, sorry to be late on this
->
->> -----Original Message-----
->> From: linux-kernel-owner at vger.kernel.org [mailto:linux-kernel-
->> owner at vger.kernel.org] On Behalf Of Jisheng Zhang
->> Sent: 16 March 2016 11:41
->> To: jingoohan1 at gmail.com; pratyush.anand at gmail.com; bhelgaas at google.com
->> Cc: linux-pci at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
->> kernel at lists.infradead.org; Jisheng Zhang
->> Subject: [PATCH v2] PCI: designware: move remaining rc setup code to
->> dw_pcie_setup_rc()
->>
->> dw_pcie_setup_rc(), as its name indicates, setups the RC. But current
->> dw_pcie_host_init() also contains some necessary rc setup code.
->>
->> Another reason: the host may lost power during suspend to ram, the RC
->> need to be re-setup after resume. The rc can't be correctly resumed
->> without the rc setup code in dw_pcie_host_init().
->>
->> So this patch moves the code to dw_pcie_setup_rc() to address the above
->> two issues. After this patch, each pcie designware driver users could
->> call dw_pcie_setup_rc() to re-setup rc when resume back.
->
-> I think this patch breaks the Hisilicon driver...
->
-> Our driver performs linkup setup in UEFI therefore we do not call
-> dw_pcie_setup_rc(), we only call dw_pcie_host_init().
->
-> Maybe better to group the part of code to be moved in as separate
-> function...
->
-> Thanks and sorry for late reply.
->
+                        Geert
 
-I am just wondering, should n't then what ever we do in
-dw_pcie_setup_rc() be done in your boot loader and not just link up.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-~Pratyush
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
