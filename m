@@ -1,35 +1,34 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 7 Apr 2016 12:57:52 -0500
-Subject: [PATCH v2 3/5] dmaengine: qcom: bam_dma: add controlled remotely
- dt property
-In-Reply-To: <1459896982-30171-4-git-send-email-stanimir.varbanov@linaro.org>
-References: <1459896982-30171-1-git-send-email-stanimir.varbanov@linaro.org>
- <1459896982-30171-4-git-send-email-stanimir.varbanov@linaro.org>
-Message-ID: <20160407175752.GM32257@rob-hp-laptop>
+Date: Thu, 7 Apr 2016 12:57:59 -0500
+Subject: [PATCH] i2c: designware-platdrv: get fast/std speed scl high/low
+ count from DT
+In-Reply-To: <1459927680-5480-1-git-send-email-jszhang@marvell.com>
+References: <1459927680-5480-1-git-send-email-jszhang@marvell.com>
+Message-ID: <20160407175759.GO32257@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 06, 2016 at 01:56:20AM +0300, Stanimir Varbanov wrote:
-> Some of the peripherals has bam which is controlled by remote
-> processor, thus the bam dma driver must avoid register writes
-> which initialise bam hw block. Those registers are protected
-> from xPU block and any writes to them will lead to secure
-> violation and system reboot.
+On Wed, Apr 06, 2016 at 03:28:00PM +0800, Jisheng Zhang wrote:
+> Sometimes, it's convenient to define the scl's high/low count directly,
+> e.g HW people would do some measurement then directly give out the
+> optimum counts. Previously, we solved the sda falling time and scl
+> falling time by i2c_dw_scl_hcnt() and i2c_dw_scl_lcnt(), then put them
+> into dt, but what we really care isn't the sda/scl falling time.
+
+This is just so you can put specific clock count instead of converting 
+from nanoseconds with standard properties or you gain some additional 
+control of the timing. If only the former, then I prefer we stick with 
+the common properties.
+
+> From another side, the dw_i2c_acpi_configure() on ACPI platform also
+> get hcnt/lcnt values rather than the sda/scl falling time from ACPI
+> method, we want similar feature for DT platforms.
+
+That's nice, but not really a reason IMO.
+
 > 
-> Adding the contolled_remotely flag in bam driver to avoid
-> not permitted register writes in bam_init function.
-> 
-> Signed-off-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
-> Reviewed-by: Andy Gross <andy.gross@linaro.org>
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 > ---
->  Documentation/devicetree/bindings/dma/qcom_bam_dma.txt | 2 ++
->  drivers/dma/qcom/bam_dma.c                             | 7 +++++++
->  2 files changed, 9 insertions(+)
-
-Acked-by: Rob Herring <robh@kernel.org>
-
-On being a separate patch, yes that is always the preference. However, 
-this change is so small it doesn't matter to me. But this is going in 
-thru Vinod's tree, so it is his call.
-
-Rob
+>  Documentation/devicetree/bindings/i2c/i2c-designware.txt | 16 ++++++++++++++++
+>  drivers/i2c/busses/i2c-designware-platdrv.c              |  8 ++++++++
+>  2 files changed, 24 insertions(+)
