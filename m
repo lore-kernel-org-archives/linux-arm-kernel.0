@@ -1,27 +1,18 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Thu, 7 Apr 2016 14:03:54 +0100
-Subject: [PATCH v5 04/10] serial: mps2-uart: add MPS2 UART driver
-In-Reply-To: <1459519381-34441-5-git-send-email-vladimir.murzin@arm.com>
-References: <1459519381-34441-1-git-send-email-vladimir.murzin@arm.com>
- <1459519381-34441-5-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <57065ABA.4080506@arm.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Thu, 7 Apr 2016 15:08:17 +0200
+Subject: [PATCH 1/3] iommu: Add MMIO mapping type
+In-Reply-To: <d80a42ceae3a39ef7c593a5181a1742a84c65533.1459854346.git.robin.murphy@arm.com>
+References: <d80a42ceae3a39ef7c593a5181a1742a84c65533.1459854346.git.robin.murphy@arm.com>
+Message-ID: <20160407130817.GD31146@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/04/16 15:02, Vladimir Murzin wrote:
-> This driver adds support to the UART controller found on ARM MPS2
-> platform.
+On Tue, Apr 05, 2016 at 12:39:30PM +0100, Robin Murphy wrote:
+> On some platforms, MMIO regions might need slightly different treatment
+> compared to mapping regular memory; add the notion of MMIO mappings to
+> the IOMMU API's memory type flags, so that callers can let the IOMMU
+> drivers know to do the right thing.
 > 
-> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> ---
->  drivers/tty/serial/Kconfig       |   12 +
->  drivers/tty/serial/Makefile      |    1 +
->  drivers/tty/serial/mps2-uart.c   |  598 ++++++++++++++++++++++++++++++++++++++
->  include/uapi/linux/serial_core.h |    3 +
->  4 files changed, 614 insertions(+)
->  create mode 100644 drivers/tty/serial/mps2-uart.c
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
-Greg, any comments from you?
-
-Cheers
-Vladimir
+Applied the series, thanks.
