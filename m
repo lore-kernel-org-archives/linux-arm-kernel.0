@@ -1,68 +1,84 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 07 Apr 2016 13:11:20 -0700
-Subject: [PATCH] pwm: ftm: use flat regmap cache
-In-Reply-To: <1453344982-4529-1-git-send-email-stefan@agner.ch>
-References: <1453344982-4529-1-git-send-email-stefan@agner.ch>
-Message-ID: <8ff78a1435de405578e77451658dac77@agner.ch>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Thu, 7 Apr 2016 15:17:38 -0500
+Subject: [PATCH] ARM: OMAP3: Fix imprecise external abort for off mode on
+ 36xx
+In-Reply-To: <1455140107-3328-1-git-send-email-tony@atomide.com>
+References: <1455140107-3328-1-git-send-email-tony@atomide.com>
+Message-ID: <5706C062.4040803@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
-
-This seems not to have made it into 4.6-rc1, any chance to get it still
-into 4.6?
-
-It seems also to resolve an issue when using cat on the debug file:
-# cat /sys/kernel/debug/regmap/40039000.pwm/registers 
-
-[  326.707319] Unhandled fault: external abort on non-linefetch (0x1008)
-at 0x9083e01c
-[  326.715097] pgd = 8de50000
-[  326.717848] [9083e01c] *pgd=8f805811, *pte=40039653, *ppte=40039453
-[  326.724222] Internal error: : 1008 [#3] ARM
-[  326.728445] Modules linked in:
-[  326.731556] CPU: 0 PID: 19407 Comm: cat Tainted: G      D 4.6.0-rc1
-#359
-
-This is gone when using REGCACHE_FLAT...
-
---
-Stefan
-
-
-On 2016-01-20 18:56, Stefan Agner wrote:
-> Use flat regmap cache to avoid lockdep warning at probe:
-> [    0.697285] WARNING: CPU: 0 PID: 1 at kernel/locking/lockdep.c:2755
-> lockdep_trace_alloc+0x15c/0x160()
-> [    0.697449] DEBUG_LOCKS_WARN_ON(irqs_disabled_flags(flags))
-> 
-> The RB-tree regmap cache needs to allocate new space on first
-> writes. However, allocations in an atomic context (e.g. when a
-> spinlock is held) are not allowed. The function regmap_write
-> calls map->lock, which acquires a spinlock in the fast_io case.
-> Since the pwm-fsl-ftm driver uses MMIO, the regmap bus of type
-> regmap_mmio is being used which has fast_io set to true.
-> 
-> The MMIO space of the pwm-fsl-ftm driver is reasonable condense,
-> hence using the much faster flat regmap cache is anyway the better
-> choice.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> Cc: Mark Brown <broonie@kernel.org>
+Hi,
+On 02/10/2016 03:35 PM, Tony Lindgren wrote:
+> With CONFIG_DEBUG_RODATA enabled I started noticing imprecise external
+> aborts on a dm3730 when hitting off idle. These don't seem to happen
+> on 34xx.
+>
+> Pretty much changing anything in the code made these go away, like
+> changing .config options. At first I though it might be an alignment
+> issue in the 36xx specific assembly code in sleep34xx.S, or something
+> related to the recent rodata fixes. But that does not seem to be
+> the case. It seems to be a timing issue instead.
+>
+> Adding few extra nop instructions after the wfi seems to fix the
+> issue. When adding 5 nops, the errors showed up less often. With
+> add ed 6 nops, I don't seem to get them at all any longer.
+>
+> Cc: Grygorii Strashko <grygorii.strashko@ti.com>
+> Cc: Nishanth Menon <nm@ti.com>
+> Cc: Richard Woodruff <r-woodruff2@ti.com>
+> Cc: Tero Kristo <t-kristo@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 > ---
->  drivers/pwm/pwm-fsl-ftm.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pwm/pwm-fsl-ftm.c b/drivers/pwm/pwm-fsl-ftm.c
-> index f9dfc8b..ed39e8e 100644
-> --- a/drivers/pwm/pwm-fsl-ftm.c
-> +++ b/drivers/pwm/pwm-fsl-ftm.c
-> @@ -414,7 +414,7 @@ static const struct regmap_config fsl_pwm_regmap_config = {
->  
->  	.max_register = FTM_PWMLOAD,
->  	.volatile_reg = fsl_pwm_volatile_reg,
-> -	.cache_type = REGCACHE_RBTREE,
-> +	.cache_type = REGCACHE_FLAT,
->  };
->  
->  static int fsl_pwm_probe(struct platform_device *pdev)
+>
+> Anybody else seen this issue before?
+
+I have a series to convert omap3 PM code to using generic SRAM driver 
+but when testing I see an external abort on BBXM off mode resume very 
+similar to this that seems to be timing related caused by using generic 
+SRAM driver to re-copy PM code rather than omap3_sram_restore_context.
+
+By tracing the resume path I believe the abort is caused by 
+omap3_intc_resume_idle in pm34xx.c, which writes to two registers in the 
+INTC. Removing this call makes the abort unreproducible in my 
+experiments and changing the writes to reads causes a bus lock, so I'm 
+pretty confident it's coming from this call attempting to write to an 
+idled INTC.
+
+Advisory 1.106 in DM3730 Silicon Errata Document [1] describes an issue 
+with "MPU Leaves MSTANDBY State Before IDLEREQ of Interrupt Controller 
+is Released" which sounds like a very similar failure situation to what 
+we are seeing even though the timing of INTC access is a bit further 
+from WFI exit than it describes. Perhaps there are more conditions where 
+it can occur. Pushed my WIP branch for SRAM series that shows the same 
+failure here [2].
+
+Regards,
+Dave
+
+[1] http://www.ti.com/lit/er/sprz319f/sprz319f.pdf
+[2] https://github.com/dgerlach/linux-pm/tree/beagle-sram-wip-v4.5
+
+>
+> ---
+>   arch/arm/mach-omap2/sleep34xx.S | 6 ++++++
+>   1 file changed, 6 insertions(+)
+>
+> diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-omap2/sleep34xx.S
+> index 1b9f052..0fbaa08 100644
+> --- a/arch/arm/mach-omap2/sleep34xx.S
+> +++ b/arch/arm/mach-omap2/sleep34xx.S
+> @@ -264,6 +264,12 @@ ENTRY(omap3_do_wfi)
+>   	nop
+>   	nop
+>   	nop
+> +	nop
+> +	nop
+> +	nop
+> +	nop
+> +	nop
+> +	nop
+>
+>   /*
+>    * This function implements the erratum ID i581 WA:
+>
