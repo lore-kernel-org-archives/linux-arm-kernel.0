@@ -1,79 +1,54 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu,  7 Apr 2016 11:07:26 +0100
-Subject: [UPDATED] [PATCH 5/5] arm64: Fix behavior of maxcpus=N
-In-Reply-To: <570625FE.4040001@arm.com>
-References: <570625FE.4040001@arm.com>
-Message-ID: <1460023646-21581-1-git-send-email-suzuki.poulose@arm.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 7 Apr 2016 13:32:17 +0300
+Subject: [PATCH 1/4] mailbox/omap: store mailbox interrupt type in
+ omap_mbox_device
+In-Reply-To: <1459985840-1106-2-git-send-email-s-anna@ti.com>
+References: <1459985840-1106-1-git-send-email-s-anna@ti.com>
+ <1459985840-1106-2-git-send-email-s-anna@ti.com>
+Message-ID: <57063731.9010201@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-maxcpu=n sets the number of CPUs activated at boot time to a max of n,
-but allowing the remaining CPUs to be brought up later if the user
-decides to do so. However, on arm64 due to various reasons, we disallowed
-hotplugging CPUs beyond n, by marking them not present. Now that
-we have checks in place to make sure the hotplugged CPUs have compatible
-features with system and requires no new errata, relax the restriction.
+On 04/07/2016 02:37 AM, Suman Anna wrote:
+> The interrupt type used for identifying the layout of the interrupt
+> configuration registers between OMAP4+ SoCs and older SoCs is stored
+> only in the sub-mailbox structures for easier access. Store this type
+> in the the omap_mbox_device structure as well along with the other
+> global variables. This is being done to facilitate the context save
+> and restore of appropriate registers during system suspend/resume.
+>
+> Signed-off-by: Suman Anna <s-anna@ti.com>
+> ---
+>   drivers/mailbox/omap-mailbox.c | 2 ++
+>   1 file changed, 2 insertions(+)
+>
+> diff --git a/drivers/mailbox/omap-mailbox.c b/drivers/mailbox/omap-mailbox.c
+> index 84cafc02e761..adf37f494690 100644
+> --- a/drivers/mailbox/omap-mailbox.c
+> +++ b/drivers/mailbox/omap-mailbox.c
+> @@ -90,6 +90,7 @@ struct omap_mbox_device {
+>   	void __iomem *mbox_base;
+>   	u32 num_users;
+>   	u32 num_fifos;
+> +	u32 intr_type;
+>   	struct omap_mbox **mboxes;
+>   	struct mbox_controller controller;
+>   	struct list_head elem;
+> @@ -828,6 +829,7 @@ static int omap_mbox_probe(struct platform_device *pdev)
+>   	mdev->dev = &pdev->dev;
+>   	mdev->num_users = num_users;
+>   	mdev->num_fifos = num_fifos;
+> +	mdev->intr_type = intr_type;
+>   	mdev->mboxes = list;
+>
+>   	/* OMAP does not have a Tx-Done IRQ, but rather a Tx-Ready IRQ */
+>
 
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: James Morse <james.morse@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
+This smth. which definitely has to be done using compatible props.
+Why not to pass more info through of_device_id->data?
 
-Changes:
-  - Remove dead code (ncores) - [James Morse]
 
----
- arch/arm64/kernel/smp.c |   18 +-----------------
- 1 file changed, 1 insertion(+), 17 deletions(-)
 
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index b2d5f4e..fa9dbaa 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -647,33 +647,18 @@ void __init smp_init_cpus(void)
- void __init smp_prepare_cpus(unsigned int max_cpus)
- {
- 	int err;
--	unsigned int cpu, ncores = num_possible_cpus();
-+	unsigned int cpu;
- 
- 	init_cpu_topology();
- 
- 	smp_store_cpu_info(smp_processor_id());
- 
- 	/*
--	 * are we trying to boot more cores than exist?
--	 */
--	if (max_cpus > ncores)
--		max_cpus = ncores;
--
--	/* Don't bother if we're effectively UP */
--	if (max_cpus <= 1)
--		return;
--
--	/*
- 	 * Initialise the present map (which describes the set of CPUs
- 	 * actually populated at the present time) and release the
- 	 * secondaries from the bootloader.
--	 *
--	 * Make sure we online@most (max_cpus - 1) additional CPUs.
- 	 */
--	max_cpus--;
- 	for_each_possible_cpu(cpu) {
--		if (max_cpus == 0)
--			break;
- 
- 		if (cpu == smp_processor_id())
- 			continue;
-@@ -686,7 +671,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
- 			continue;
- 
- 		set_cpu_present(cpu, true);
--		max_cpus--;
- 	}
- }
- 
 -- 
-1.7.9.5
+regards,
+-grygorii
