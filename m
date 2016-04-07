@@ -1,169 +1,45 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu,  7 Apr 2016 18:42:08 +0100
-Subject: [PATCH 5/5] iommu/arm-smmu: Use per-domain page sizes.
-In-Reply-To: <cover.1460048991.git.robin.murphy@arm.com>
-References: <cover.1460048991.git.robin.murphy@arm.com>
-Message-ID: <ea520b8c72b5a72a1731bd35f6e3e50872fe6764.1460048991.git.robin.murphy@arm.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 7 Apr 2016 13:45:19 -0400
+Subject: [PATCH 2/2] pci, acpi: free IO resource during shutdown
+In-Reply-To: <20160407160624.GB8780@localhost>
+References: <1457389310-3538-1-git-send-email-okaya@codeaurora.org>
+ <1457389310-3538-2-git-send-email-okaya@codeaurora.org>
+ <20160407160624.GB8780@localhost>
+Message-ID: <57069CAF.8090803@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we can accurately reflect the context format we choose for each
-domain, do that instead of imposing the global lowest-common-denominator
-restriction and potentially ending up with nothing. We currently have a
-strict 1:1 correspondence between domains and context banks, so we don't
-need to entertain the possibility of multiple formats _within_ a domain.
+On 4/7/2016 12:06 PM, Bjorn Helgaas wrote:
+>> __release_pci_root_info function if the region type is IO.
+> I don't know what "removing a slot" means.  You're changing
+> pci_root.c, so I assume this is really an ACPI host bridge removal?
+> 
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-[rm: split from original patch, added SMMUv3]
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/iommu/arm-smmu-v3.c | 19 ++++++++++---------
- drivers/iommu/arm-smmu.c    | 26 ++++++++++++++------------
- 2 files changed, 24 insertions(+), 21 deletions(-)
+Correct, I'm removing the host bridge.
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 4ff73ff..ebab33e 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -590,6 +590,7 @@ struct arm_smmu_device {
- 
- 	unsigned long			ias; /* IPA */
- 	unsigned long			oas; /* PA */
-+	unsigned long			pgsize_bitmap;
- 
- #define ARM_SMMU_MAX_ASIDS		(1 << 16)
- 	unsigned int			asid_bits;
-@@ -1516,8 +1517,6 @@ static int arm_smmu_domain_finalise_s2(struct arm_smmu_domain *smmu_domain,
- 	return 0;
- }
- 
--static struct iommu_ops arm_smmu_ops;
--
- static int arm_smmu_domain_finalise(struct iommu_domain *domain)
- {
- 	int ret;
-@@ -1555,7 +1554,7 @@ static int arm_smmu_domain_finalise(struct iommu_domain *domain)
- 	}
- 
- 	pgtbl_cfg = (struct io_pgtable_cfg) {
--		.pgsize_bitmap	= arm_smmu_ops.pgsize_bitmap,
-+		.pgsize_bitmap	= smmu->pgsize_bitmap,
- 		.ias		= ias,
- 		.oas		= oas,
- 		.tlb		= &arm_smmu_gather_ops,
-@@ -1566,7 +1565,7 @@ static int arm_smmu_domain_finalise(struct iommu_domain *domain)
- 	if (!pgtbl_ops)
- 		return -ENOMEM;
- 
--	arm_smmu_ops.pgsize_bitmap = pgtbl_cfg.pgsize_bitmap;
-+	domain->pgsize_bitmap = pgtbl_cfg.pgsize_bitmap;
- 	smmu_domain->pgtbl_ops = pgtbl_ops;
- 
- 	ret = finalise_stage_fn(smmu_domain, &pgtbl_cfg);
-@@ -2410,7 +2409,6 @@ static int arm_smmu_device_probe(struct arm_smmu_device *smmu)
- {
- 	u32 reg;
- 	bool coherent;
--	unsigned long pgsize_bitmap = 0;
- 
- 	/* IDR0 */
- 	reg = readl_relaxed(smmu->base + ARM_SMMU_IDR0);
-@@ -2541,13 +2539,16 @@ static int arm_smmu_device_probe(struct arm_smmu_device *smmu)
- 
- 	/* Page sizes */
- 	if (reg & IDR5_GRAN64K)
--		pgsize_bitmap |= SZ_64K | SZ_512M;
-+		smmu->pgsize_bitmap |= SZ_64K | SZ_512M;
- 	if (reg & IDR5_GRAN16K)
--		pgsize_bitmap |= SZ_16K | SZ_32M;
-+		smmu->pgsize_bitmap |= SZ_16K | SZ_32M;
- 	if (reg & IDR5_GRAN4K)
--		pgsize_bitmap |= SZ_4K | SZ_2M | SZ_1G;
-+		smmu->pgsize_bitmap |= SZ_4K | SZ_2M | SZ_1G;
- 
--	arm_smmu_ops.pgsize_bitmap &= pgsize_bitmap;
-+	if (arm_smmu_ops.pgsize_bitmap == -1UL)
-+		arm_smmu_ops.pgsize_bitmap = smmu->pgsize_bitmap;
-+	else
-+		arm_smmu_ops.pgsize_bitmap |= smmu->pgsize_bitmap;
- 
- 	/* Output address size */
- 	switch (reg & IDR5_OAS_MASK << IDR5_OAS_SHIFT) {
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 2409e3b..e9535f0 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -322,6 +322,7 @@ struct arm_smmu_device {
- 	unsigned long			va_size;
- 	unsigned long			ipa_size;
- 	unsigned long			pa_size;
-+	unsigned long			pgsize_bitmap;
- 
- 	u32				num_global_irqs;
- 	u32				num_context_irqs;
-@@ -357,8 +358,6 @@ struct arm_smmu_domain {
- 	struct iommu_domain		domain;
- };
- 
--static struct iommu_ops arm_smmu_ops;
--
- static DEFINE_SPINLOCK(arm_smmu_devices_lock);
- static LIST_HEAD(arm_smmu_devices);
- 
-@@ -894,7 +893,7 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
- 	}
- 
- 	pgtbl_cfg = (struct io_pgtable_cfg) {
--		.pgsize_bitmap	= arm_smmu_ops.pgsize_bitmap,
-+		.pgsize_bitmap	= smmu->pgsize_bitmap,
- 		.ias		= ias,
- 		.oas		= oas,
- 		.tlb		= &arm_smmu_gather_ops,
-@@ -908,8 +907,8 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
- 		goto out_clear_smmu;
- 	}
- 
--	/* Update our support page sizes to reflect the page table format */
--	arm_smmu_ops.pgsize_bitmap = pgtbl_cfg.pgsize_bitmap;
-+	/* Update the domain's page sizes to reflect the page table format */
-+	domain->pgsize_bitmap = pgtbl_cfg.pgsize_bitmap;
- 
- 	/* Initialise the context bank with our page table cfg */
- 	arm_smmu_init_context_bank(smmu_domain, &pgtbl_cfg);
-@@ -1690,24 +1689,27 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
- 
- 	if (smmu->version == ARM_SMMU_V1) {
- 		smmu->va_size = smmu->ipa_size;
--		size = SZ_4K | SZ_2M | SZ_1G;
-+		smmu->pgsize_bitmap = SZ_4K | SZ_2M | SZ_1G;
- 	} else {
- 		size = (id >> ID2_UBS_SHIFT) & ID2_UBS_MASK;
- 		smmu->va_size = arm_smmu_id_size_to_bits(size);
- #ifndef CONFIG_64BIT
- 		smmu->va_size = min(32UL, smmu->va_size);
- #endif
--		size = 0;
- 		if (id & ID2_PTFS_4K)
--			size |= SZ_4K | SZ_2M | SZ_1G;
-+			smmu->pgsize_bitmap |= SZ_4K | SZ_2M | SZ_1G;
- 		if (id & ID2_PTFS_16K)
--			size |= SZ_16K | SZ_32M;
-+			smmu->pgsize_bitmap |= SZ_16K | SZ_32M;
- 		if (id & ID2_PTFS_64K)
--			size |= SZ_64K | SZ_512M;
-+			smmu->pgsize_bitmap |= SZ_64K | SZ_512M;
- 	}
- 
--	arm_smmu_ops.pgsize_bitmap &= size;
--	dev_notice(smmu->dev, "\tSupported page sizes: 0x%08lx\n", size);
-+	if (arm_smmu_ops.pgsize_bitmap == -1UL)
-+		arm_smmu_ops.pgsize_bitmap = smmu->pgsize_bitmap;
-+	else
-+		arm_smmu_ops.pgsize_bitmap |= smmu->pgsize_bitmap;
-+	dev_notice(smmu->dev, "\tSupported page sizes: 0x%08lx\n",
-+		   smmu->pgsize_bitmap);
- 
- 	if (smmu->features & ARM_SMMU_FEAT_TRANS_S1)
- 		dev_notice(smmu->dev, "\tStage-1: %lu-bit VA -> %lu-bit IPA\n",
+> The release should correspond to a mapping, and the changelog should
+> point out where that mapping happens so we can see the symmetry.
+> 
+
+I apologize. This is based on Tomasz's v5 patch here.
+
+https://github.com/semihalf-nowicki-tomasz/linux/blob/pci-acpi-v5/drivers/acpi/pci_root.c
+
+
+> You say this is undoing the effect of pci_remap_iospace(), but that's
+> only called by native drivers and the generic (OF) driver, not by
+> pci_root.c.
+
+See the ACPI root bridge driver above.
+
+> 
+> Please combine this with the previous patch so we have the new
+> function and its use in the same patch.
+> 
+
+I can do that. I was trying to keep the reviews as small as possible.
+
 -- 
-2.7.3.dirty
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
