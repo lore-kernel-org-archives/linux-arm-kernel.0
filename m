@@ -1,28 +1,25 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 7 Apr 2016 16:33:45 +0530
-Subject: [PATCH] ARM: DTS: da850: fixed missing #gpio-cells in gpio node
-In-Reply-To: <1459848697-21006-1-git-send-email-petr@barix.com>
-References: <1459848697-21006-1-git-send-email-petr@barix.com>
-Message-ID: <57063E91.9010106@ti.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Thu, 7 Apr 2016 13:10:24 +0200
+Subject: [PATCHv2 6/7] ARM: socfpga: Enable Arria10 OCRAM ECC on startup
+In-Reply-To: <5705ABA1.4000308@opensource.altera.com>
+References: <1459450087-24792-1-git-send-email-tthayer@opensource.altera.com>
+ <1459450087-24792-7-git-send-email-tthayer@opensource.altera.com>
+ <57034C4D.9010204@opensource.altera.com>
+ <20160405053110.GA17541@pd.tnic>
+ <5705ABA1.4000308@opensource.altera.com>
+Message-ID: <20160407111024.GC3735@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Petr,
+On Wed, Apr 06, 2016 at 07:36:49PM -0500, Thor Thayer wrote:
+> Yes, nothing else changes. The rest was OK. Thanks!
 
-On Tuesday 05 April 2016 03:01 PM, Petr Kulhavy wrote:
-> The gpio node was missing the mandatory property #gpio-cells, which was
-> causing runtime errors when using GPIOs e.g. with gpio-leds or gpio-keys:
-> 
-> "could not get #gpio-cells for /soc/gpio at 1e26000"
-> 
-> This fixes the problem and adds the missing parameter.
-> The value is 2 according to the gpio-davinci.txt binding.
-> 
-> Signed-off-by: Petr Kulhavy <petr@barix.com>
+Cool. The two remaining applied and pushed out.
 
-Thanks for the patch. Queuing this for v4.7 since it has been this way
-since beginning and there seem to be no in-kernel device-tree files with
-a gpio consumerm, so no one seems to be immediately affected.
+Thanks.
 
-Thanks,
-Sekhar
+-- 
+Regards/Gruss,
+    Boris.
+
+ECO tip #101: Trim your mails when you reply.
