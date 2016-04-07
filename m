@@ -1,108 +1,119 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 07 Apr 2016 10:49:32 -0700
-Subject: [GIT PULL] ARM: mvebu: dt for v4.7 (#1)
-Message-ID: <87oa9ljolv.fsf@free-electrons.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 7 Apr 2016 13:49:41 -0400
+Subject: [PATCH 1/2] pci: add pci_unmap_iospace function for PCI_IOBASE
+In-Reply-To: <20160407160004.GA8780@localhost>
+References: <1457389310-3538-1-git-send-email-okaya@codeaurora.org>
+ <20160407160004.GA8780@localhost>
+Message-ID: <57069DB5.9060404@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 4/7/2016 12:00 PM, Bjorn Helgaas wrote:
+> Hi Sinan,
+> 
+> On Mon, Mar 07, 2016 at 05:21:49PM -0500, Sinan Kaya wrote:
+>> The PCI_IOBASE needs to be released after hotplug removal so that it can be
+>> re-added back by the pci_remap_iospace function during insertion.
+>>
+>> Adding unmap function to follow IO remap function.
+>>
+>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+>> ---
+>>  drivers/pci/pci.c   | 25 +++++++++++++++++++++++++
+>>  include/linux/pci.h |  1 +
+>>  2 files changed, 26 insertions(+)
+>>
+>> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+>> index 3a516c0..f5faed2 100644
+>> --- a/drivers/pci/pci.c
+>> +++ b/drivers/pci/pci.c
+>> @@ -26,6 +26,7 @@
+>>  #include <linux/device.h>
+>>  #include <linux/pm_runtime.h>
+>>  #include <linux/pci_hotplug.h>
+>> +#include <linux/vmalloc.h>
+>>  #include <asm-generic/pci-bridge.h>
+>>  #include <asm/setup.h>
+>>  #include <linux/aer.h>
+>> @@ -3169,6 +3170,30 @@ int __weak pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
+>>  #endif
+>>  }
+>>  
+>> +/**
+>> + *	pci_unmap_iospace - Unmap the memory mapped I/O space
+>> + *	@virt_addr: virtual address to be unmapped
+>> + *	@size: size of the physical address to be unmapped
+>> + *
+>> + *	Unmap the CPU virtual address @virt_addr from virtual address space.
+>> + *	Only architectures that have memory mapped IO functions defined
+>> + *	(and the PCI_IOBASE value defined) should call this function.
+>> + */
+>> +void  __weak pci_unmap_iospace(struct resource *res)
+> 
+> Why is this weak?  I assume probably because pci_remap_iospace() is
+> weak, but I don't see any reason why *that* needs to be weak.  There's
+> only one implementation.  I think neither one should be weak unless we
+> have an actual need for that.
+> 
 
-Here is the first pull request for dt for mvebu for v4.7.
+Right, copy paste mistake. Even the function parameter description above
+is not right. 
 
-Gregory
+I can get rid of the __weak from both on the next iteration.
 
-The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+>> +{
+>> +#if defined(PCI_IOBASE) && defined(CONFIG_MMU)
+>> +	unsigned long vaddr = (unsigned long)PCI_IOBASE + res->start;
+>> +
+>> +	unmap_kernel_range(vaddr, resource_size(res));
+> 
+> There really aren't any other generic uses of unmap_kernel_range().
+> This isn't an unusual scenario, so I would expect this code to use a
+> pattern that's used elsewhere.
 
-  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+OK, What's the best way to remove a mapping? I'm open for suggestions.
+I copied this pattern from GHES driver.
 
-are available in the git repository at:
+> 
+>> +#else
+>> +	/*
+>> +	 * This architecture does not have memory mapped I/O space,
+>> +	 * so this function should never be called.
+>> +	 */
+>> +	WARN_ONCE(1, "This architecture does not support memory mapped I/O\n");
+>> +#endif
+>> +}
+>> +
+>>  static void __pci_set_master(struct pci_dev *dev, bool enable)
+>>  {
+>>  	u16 old_cmd, cmd;
+>> diff --git a/include/linux/pci.h b/include/linux/pci.h
+>> index 398ae7e..c6e3f0e 100644
+>> --- a/include/linux/pci.h
+>> +++ b/include/linux/pci.h
+>> @@ -1172,6 +1172,7 @@ int pci_register_io_range(phys_addr_t addr, resource_size_t size);
+>>  unsigned long pci_address_to_pio(phys_addr_t addr);
+>>  phys_addr_t pci_pio_to_address(unsigned long pio);
+>>  int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr);
+>> +void pci_unmap_iospace(struct resource *res);
+>>  
+>>  static inline pci_bus_addr_t pci_bus_address(struct pci_dev *pdev, int bar)
+>>  {
+>> -- 
+>> 1.8.2.1
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
 
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.7-1
 
-for you to fetch changes up to 6280ed04f56d2bc651d1bcc97b1034161c04832c:
-
-  ARM: kirkwood: DT: Add address go regulator unit name (2016-04-03 14:12:39 +0200)
-
-----------------------------------------------------------------
-mvebu dt for 4.6 (part 1)
-
-- add hardware monitor support in the NSA320 device tree
-- update makefile with kirkwood-ds112.dtb and kirkwood-nsa320.dtb
-- fix GPIO config on the Linksys boards
-- various Kirkwood DT warning fixup from the newer DT compiler
-
-----------------------------------------------------------------
-Adam Baker (1):
-      ARM: dts: kirkwood: Add the hardware monitor to the NSA320 device tree
-
-Andrew Lunn (8):
-      ARM: kirkwood: DT: Remove button address and fixup names
-      ARM: kirkwood: DT: Remove node address from leds
-      ARM: kirkwood: DT: Remove address from dsa unit name
-      ARM: kirkwood: DT: Add address to ethernet-phy unit name
-      ARM: kirkwood: DT: Fixup pcie DT warnings
-      ARM: kirkwood: DT: Remove address from gpio-i2c unit name
-      ARM: kirkwood: DT: Add address to mbus unit name
-      ARM: kirkwood: DT: Add address go regulator unit name
-
-Heinrich Schuchardt (2):
-      ARM: dts: kirkwood: add kirkwood-ds112.dtb to Makefile
-      ARM: dts: kirkwood: add kirkwood-nsa320.dtb to Makefile
-
-Imre Kaloz (1):
-      ARM: mvebu: fix GPIO config on the Linksys boards
-
- arch/arm/boot/dts/Makefile                         |  2 ++
- arch/arm/boot/dts/armada-385-linksys.dtsi          |  6 ++---
- arch/arm/boot/dts/armada-xp-linksys-mamba.dts      |  4 +--
- arch/arm/boot/dts/kirkwood-6192.dtsi               |  4 +--
- arch/arm/boot/dts/kirkwood-6281.dtsi               |  4 +--
- arch/arm/boot/dts/kirkwood-6282.dtsi               |  4 +--
- arch/arm/boot/dts/kirkwood-98dx4122.dtsi           |  4 +--
- arch/arm/boot/dts/kirkwood-b3.dts                  | 19 ++++++-------
- arch/arm/boot/dts/kirkwood-blackarmor-nas220.dts   |  4 +--
- arch/arm/boot/dts/kirkwood-cloudbox.dts            |  2 +-
- arch/arm/boot/dts/kirkwood-db-88f6281.dts          | 14 +++++-----
- arch/arm/boot/dts/kirkwood-db-88f6282.dts          | 20 +++++++-------
- arch/arm/boot/dts/kirkwood-dir665.dts              | 20 +++++++-------
- arch/arm/boot/dts/kirkwood-dnskw.dtsi              |  6 ++---
- arch/arm/boot/dts/kirkwood-ds111.dts               |  2 +-
- arch/arm/boot/dts/kirkwood-ds112.dts               |  6 ++++-
- arch/arm/boot/dts/kirkwood-ds212.dts               |  2 +-
- arch/arm/boot/dts/kirkwood-ds411.dts               |  6 ++++-
- arch/arm/boot/dts/kirkwood-ds411slim.dts           |  2 +-
- arch/arm/boot/dts/kirkwood-ib62x0.dts              |  4 +--
- arch/arm/boot/dts/kirkwood-iconnect.dts            | 22 +++++++--------
- arch/arm/boot/dts/kirkwood-km_common.dtsi          | 20 +++++++-------
- arch/arm/boot/dts/kirkwood-laplug.dts              | 19 +++++++------
- arch/arm/boot/dts/kirkwood-linkstation.dtsi        | 17 ++++++------
- arch/arm/boot/dts/kirkwood-lsxl.dtsi               | 16 +++++------
- arch/arm/boot/dts/kirkwood-mplcec4.dts             | 18 ++++++-------
- arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts     | 24 ++++++++---------
- arch/arm/boot/dts/kirkwood-nas2big.dts             | 18 ++++++-------
- .../boot/dts/kirkwood-netgear_readynas_duo_v2.dts  | 20 +++++++-------
- .../boot/dts/kirkwood-netgear_readynas_nv+_v2.dts  | 23 +++++++---------
- arch/arm/boot/dts/kirkwood-netxbig.dtsi            |  8 +++---
- arch/arm/boot/dts/kirkwood-ns2-common.dtsi         |  4 +--
- arch/arm/boot/dts/kirkwood-nsa310.dts              | 18 ++++++-------
- arch/arm/boot/dts/kirkwood-nsa320.dts              | 31 +++++++++++++---------
- arch/arm/boot/dts/kirkwood-nsa325.dts              | 17 +++++-------
- arch/arm/boot/dts/kirkwood-nsa3x0-common.dtsi      | 24 ++++++++---------
- arch/arm/boot/dts/kirkwood-openblocks_a6.dts       |  2 +-
- arch/arm/boot/dts/kirkwood-openblocks_a7.dts       |  2 +-
- arch/arm/boot/dts/kirkwood-openrd.dtsi             | 14 +++-------
- arch/arm/boot/dts/kirkwood-pogoplug-series-4.dts   |  2 +-
- arch/arm/boot/dts/kirkwood-rd88f6192.dts           | 20 +++++++-------
- arch/arm/boot/dts/kirkwood-rd88f6281-a.dts         |  2 +-
- arch/arm/boot/dts/kirkwood-rd88f6281-z0.dts        |  2 +-
- arch/arm/boot/dts/kirkwood-rd88f6281.dtsi          | 20 +++++++-------
- arch/arm/boot/dts/kirkwood-rs212.dts               |  6 ++++-
- arch/arm/boot/dts/kirkwood-synology.dtsi           | 22 ++++++---------
- arch/arm/boot/dts/kirkwood-t5325.dts               | 22 +++++++--------
- arch/arm/boot/dts/kirkwood-ts219-6281.dts          |  4 +--
- arch/arm/boot/dts/kirkwood-ts219-6282.dts          | 16 +++--------
- arch/arm/boot/dts/kirkwood-ts219.dtsi              | 20 +++++++-------
- arch/arm/boot/dts/kirkwood-ts419-6282.dts          | 15 +++--------
- arch/arm/boot/dts/kirkwood-ts419.dtsi              |  4 +--
- arch/arm/boot/dts/kirkwood.dtsi                    |  2 +-
- 53 files changed, 280 insertions(+), 329 deletions(-)
+-- 
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
