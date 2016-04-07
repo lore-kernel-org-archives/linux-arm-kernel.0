@@ -1,67 +1,49 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Thu, 7 Apr 2016 19:25:40 +0800
-Subject: [PATCH v10 06/17] Xen: ARM: Add support for mapping platform
- device mmio
-In-Reply-To: <57063752.4020805@arm.com>
-References: <1459525755-36968-1-git-send-email-shannon.zhao@linaro.org>
- <1459525755-36968-7-git-send-email-shannon.zhao@linaro.org>
- <5704FE2C.5000902@arm.com> <5705B9BD.1020403@huawei.com>
- <57063752.4020805@arm.com>
-Message-ID: <570643B4.3070502@huawei.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 7 Apr 2016 12:34:48 +0100
+Subject: [PATCH v2] arm, hw-breakpoint: Remove superfluous SMP function
+ call
+In-Reply-To: <1459932030-43882-1-git-send-email-anna-maria@linutronix.de>
+References: <1459932030-43882-1-git-send-email-anna-maria@linutronix.de>
+Message-ID: <20160407113448.GF5657@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Apr 06, 2016 at 10:40:30AM +0200, Anna-Maria Gleixner wrote:
+> Since commit 1cf4f629d9d2 ("cpu/hotplug: Move online calls to
+> hotplugged cpu") it is ensured that callbacks of CPU_ONLINE and
+> CPU_DOWN_PREPARE are processed on the hotplugged CPU. Due to this SMP
+> function calls are no longer required.
+> 
+> Replace smp_call_function_single() with a direct call of
+> reset_ctrl_regs(). To keep the calling convention, interrupts are
+> explicitly disabled around the call.
+> 
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Anna-Maria Gleixner <anna-maria@linutronix.de>
+> ---
+>  arch/arm/kernel/hw_breakpoint.c |    7 +++++--
+>  1 file changed, 5 insertions(+), 2 deletions(-)
+> 
+> --- a/arch/arm/kernel/hw_breakpoint.c
+> +++ b/arch/arm/kernel/hw_breakpoint.c
+> @@ -1023,8 +1023,11 @@ static void reset_ctrl_regs(void *unused
+>  static int dbg_reset_notify(struct notifier_block *self,
+>  				      unsigned long action, void *cpu)
+>  {
+> -	if ((action & ~CPU_TASKS_FROZEN) == CPU_ONLINE)
+> -		smp_call_function_single((int)cpu, reset_ctrl_regs, NULL, 1);
+> +	if ((action & ~CPU_TASKS_FROZEN) == CPU_ONLINE) {
+> +		local_irq_disable();
+> +		reset_ctrl_regs(NULL);
+> +		local_irq_enable();
+> +	}
+>  
+>  	return NOTIFY_OK;
+>  }
 
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-On 2016/4/7 18:32, Julien Grall wrote:
-> Hi Shannon,
-> 
-> On 07/04/16 02:37, Shannon Zhao wrote:
->>
->>
->> On 2016/4/6 20:16, Julien Grall wrote:
->>>> +            gpfns[j] = XEN_PFN_DOWN(r->start) + j;
->>>> +            idxs[j] = XEN_PFN_DOWN(r->start) + j;
->>>> +        }
->>>> +
->>>> +        xatp.domid = DOMID_SELF;
->>>> +        xatp.size = nr;
->>>> +        xatp.space = XENMAPSPACE_dev_mmio;
->>>> +
->>>> +        set_xen_guest_handle(xatp.gpfns, gpfns);
->>>> +        set_xen_guest_handle(xatp.idxs, idxs);
->>>> +        set_xen_guest_handle(xatp.errs, errs);
->>>> +
->>>> +        rc = HYPERVISOR_memory_op(XENMEM_add_to_physmap_range, &xatp);
->>>> +        kfree(gpfns);
->>>> +        kfree(idxs);
->>>> +        kfree(errs);
->>>> +        if (rc)
->>>> +            return rc;
->>>
->>> Shouldn't we redo the mapping if the hypercall fails?
->> Hmm, why? If it fails again when we redo the mapping, what should we do
->> then? Redo again?
-> 
-> Because the device MMIO region is left half mapped in DOM0 address space.
-> 
-> After having another look to your patch, if an error occurs, the
-> notifier will still return NOTIFY_OK. This will lead to random data
-> abort when the driver is accessing the MMIO regions as the device will
-> be considered fully functional.
-> 
-> However, even if the notifier return NOTIFY_BAD, the function device_add
-> doesn't care about the return value of blocking_notifier_call_chain. I
-> think this need to be fixed.
-> 
->> I think if it fails at the first time it will always fail no matter how
->> many times we do.
-> 
-> I was speaking about the mappings that succeeded. They will unlikely
-> fail during removal. If they ever fail you can just ignore the error.
-Ok, I see. I thought you mean that it needs to map the regions again.
-But what you really mean is undoing the mappings.
-
-Thanks,
--- 
-Shannon
+Will
