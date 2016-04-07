@@ -1,58 +1,97 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 7 Apr 2016 10:50:42 +0800
-Subject: [PATCH v2 3/3] ARM: imx6: adopt DT to new GPC binding
-In-Reply-To: <1458128514-9560-3-git-send-email-l.stach@pengutronix.de>
-References: <1458128514-9560-1-git-send-email-l.stach@pengutronix.de>
- <1458128514-9560-3-git-send-email-l.stach@pengutronix.de>
-Message-ID: <20160407025042.GB3111@x250>
+From: zhang.chunyan@linaro.org (Chunyan Zhang)
+Date: Thu,  7 Apr 2016 10:51:15 +0800
+Subject: [PATCH V5 0/4] Introduce CoreSight STM support
+Message-ID: <1459997479-19431-1-git-send-email-zhang.chunyan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 16, 2016 at 12:41:54PM +0100, Lucas Stach wrote:
-> @@ -786,14 +787,29 @@
->  				interrupts = <0 89 IRQ_TYPE_LEVEL_HIGH>,
->  					     <0 90 IRQ_TYPE_LEVEL_HIGH>;
->  				interrupt-parent = <&intc>;
-> -				pu-supply = <&reg_pu>;
-> -				clocks = <&clks IMX6QDL_CLK_GPU3D_CORE>,
-> -					 <&clks IMX6QDL_CLK_GPU3D_SHADER>,
-> -					 <&clks IMX6QDL_CLK_GPU2D_CORE>,
-> -					 <&clks IMX6QDL_CLK_GPU2D_AXI>,
-> -					 <&clks IMX6QDL_CLK_OPENVG_AXI>,
-> -					 <&clks IMX6QDL_CLK_VPU_AXI>;
-> -				#power-domain-cells = <1>;
-> +				clocks = <&clks IMX6QDL_CLK_IPG>;
-> +				clock-names = "ipg";
-> +
-> +				pgc {
-> +					#address-cells = <1>;
-> +					#size-cells = <0>;
-> +
-> +					power-domain at 0 {
-> +						reg = <0>;
-> +						#power-domain-cells = <0>;
-> +					};
+This patchset adds support for the CoreSight STM IP block.
 
-Have a new line between nodes please.
+Changes from V4:
+ - Rebased the whole patch set onto [4] (v4.6-rc1).
+ - Made a few minor modifications according to the code changes since v4.5.
+ - Replaced the original 1/4 with a new patch the Alex provided.
+ - Another new patch 2/4 in this set is for storing path from CS-STM to sink.
+ - Addressed comments from V4.
+ - Removed coresight_simple_func() from CS-STM driver, used the common definition instead.
+ - Modified STM tracer-id from an arbitrary value 0x20 to 0x1.
+ - Replaced module_amba_driver() with builtin_amba_driver() according to [5].
+ - Used driver->suppress_bind_attr to prevent CS-STM being unbound from the driver.
+ - Updated the kernel version (4.7) and month in sysfs-bus-coresight-devices-stm.
+ - Replaced 'mshared' with 'hw_override' in CS-STM driver.
+ - Initialized sw_start and sw_end with 1.
+ - Returned a size of '1' after processing FLAG packets.
+ - Removed pre-compile option 'CONFIG_64BIT' for the packet size of 8.
+ - Added Michael Williams's Reviewed-by in 4/4.
 
-Shawn
+Changes from V3:
+ - Removed ioctl get_options interface from the generic STM code and CoreSight STM driver.
+ - Removed 'write_max' from the structure 'stm_drvdata', and changed 'write_64bit' to 'write_bytes'.
+ - Revised stm_fundamental_data_size() to return the fundamental data size instead of 0/1.
+ - Removed stm_remove() from the driver.
+ - Revised the return value of ::packet() callback function according to [2].
+ - Modified stm_send() to send one STP packet at a time.
+ - Added comments to invariant/guaranteed CoreSight STM transaction mode.
 
-> +					pd_pu: power-domain at 1 {
-> +						reg = <1>;
-> +						#power-domain-cells = <0>;
-> +						domain-supply = <&reg_pu>;
-> +						clocks = <&clks IMX6QDL_CLK_GPU3D_CORE>,
-> +						         <&clks IMX6QDL_CLK_GPU3D_SHADER>,
-> +						         <&clks IMX6QDL_CLK_GPU2D_CORE>,
-> +						         <&clks IMX6QDL_CLK_GPU2D_AXI>,
-> +						         <&clks IMX6QDL_CLK_OPENVG_AXI>,
-> +						         <&clks IMX6QDL_CLK_VPU_AXI>;
-> +					};
-> +				};
->  			};
->  
->  			gpr: iomuxc-gpr at 020e0000 {
-> -- 
-> 2.7.0
-> 
-> 
+Changes from V2:
+ - Changed to return -EFAULT if failed on the command STP_GET_OPTIONS.
+ - Used Alex's patch [1] instead of the last 2/6.
+ - Removed the while loop from stm_send(), since the packet size passed
+   to it isn't larger than 4 bytes on 32-bit system and 8 bytes on
+   64-bit system.
+ - Removed stm_send_64bit(), since the process of packets on 64-bit
+   CS-STM should be basically the same with on 32-bit system, except the 
+   maximum length of writing STM at a time.
+ - Removed the support of writing 64-bit to CoreSight STM buffer at a time
+   on 32-bit ARM architecture according to an ARM engineer suggestion.  As
+   he said that the STM might receive a 64-bit write, or might receive a
+   pair of 32-bit writes to the two addressed words in either order.
+   So 64-bit write isn't guaranteed to work on the ARM 32-bit architecture.
+
+Changes from v1:
+ - Added a definition of coresight_simple_func() in CS-STM driver to
+   avoid the kbuild test robot error for the time being.  This
+   modification will be removed when merging the code in which the
+   coresight_simple_func() has been moved to the header file.
+ - Calculate the channel number according to the channel memory space size.
+
+
+Thanks,
+Chunyan
+
+[1] https://lkml.org/lkml/2016/2/4/652
+[2] https://lkml.org/lkml/2016/2/12/397
+[3] https://lkml.org/lkml/2015/12/22/348
+[4] https://git.linaro.org/kernel/coresight.git/shortlog/refs/heads/next
+[5] http://www.spinics.net/lists/kernel/msg2187320.html
+
+Alexander Shishkin (1):
+  stm class: Support devices that override software assigned masters
+
+Mathieu Poirier (2):
+  coresight: adding path for STM device
+  coresight-stm: Bindings for System Trace Macrocell
+
+Pratik Patel (1):
+  coresight-stm: adding driver for CoreSight STM component
+
+ .../ABI/testing/sysfs-bus-coresight-devices-stm    |  53 ++
+ Documentation/ABI/testing/sysfs-class-stm          |  10 +
+ .../devicetree/bindings/arm/coresight.txt          |  28 +
+ Documentation/trace/coresight.txt                  |  37 +-
+ drivers/hwtracing/coresight/Kconfig                |  11 +
+ drivers/hwtracing/coresight/Makefile               |   1 +
+ drivers/hwtracing/coresight/coresight-stm.c        | 918 +++++++++++++++++++++
+ drivers/hwtracing/coresight/coresight.c            | 106 ++-
+ drivers/hwtracing/stm/core.c                       |  15 +
+ include/linux/coresight-stm.h                      |   6 +
+ include/linux/stm.h                                |   3 +
+ include/uapi/linux/coresight-stm.h                 |  21 +
+ 12 files changed, 1183 insertions(+), 26 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-bus-coresight-devices-stm
+ create mode 100644 drivers/hwtracing/coresight/coresight-stm.c
+ create mode 100644 include/linux/coresight-stm.h
+ create mode 100644 include/uapi/linux/coresight-stm.h
+
+-- 
+1.9.1
