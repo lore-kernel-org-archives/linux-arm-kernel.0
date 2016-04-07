@@ -1,78 +1,85 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Thu, 7 Apr 2016 20:48:26 +0200
-Subject: 4.4 BCM5301X ARM regression "External imprecise Data abort"
-In-Reply-To: <CAC3K-4pHw1YQbcD2pp3eaJp0o5OSO+Ft0B_0o1y6uRCJGxGhaw@mail.gmail.com>
-References: <CACna6rz=KE_FtNtrSKmcYE514s4-dgrnx=iGbN7JDXkQPd6bTw@mail.gmail.com>
- <CAC3K-4pHw1YQbcD2pp3eaJp0o5OSO+Ft0B_0o1y6uRCJGxGhaw@mail.gmail.com>
-Message-ID: <CACna6rzw9_AP6sfNkjeoOFtpb90oUCNDmJzx88Xtn2-oxnNSFA@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 07 Apr 2016 11:51:22 -0700
+Subject: [PATCH v6 0/2] Fix dma mapping when the cache is coherent
+In-Reply-To: <CAPv3WKfKJS4WEVNJBHu3063kFkMBEdqUgb5mSpQYyeN1pL5_QQ@mail.gmail.com>
+ (Marcin Wojtas's message of "Fri, 1 Apr 2016 15:01:06 +0200")
+References: <1459415380-18004-1-git-send-email-gregory.clement@free-electrons.com>
+ <CAPv3WKfKJS4WEVNJBHu3063kFkMBEdqUgb5mSpQYyeN1pL5_QQ@mail.gmail.com>
+Message-ID: <87d1q1jlqt.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 April 2016 at 23:10, Jon Mason <jon.mason@broadcom.com> wrote:
-> On Mon, Apr 4, 2016 at 2:13 AM, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
->> I got regression reports from Netgear R8000 (BCM4709A0) users and did
->> some testing & regression tracking with Aditya.
->>
->> It happens that Linux 4.4 doesn't boot due to the following commits:
->> bbeb920 ("ARM: 8422/1: enable imprecise aborts during early kernel
->> startup")
->> 9254970 ("ARM: 8447/1: catch pending imprecise abort on unmask")
->> 937b123 ("ARM: BCM5301X: remove workaround imprecise abort fault handler")
->>
->> In kernel 4.3 we got that abort workaround which was resulting in:
->> [    5.007128] Freeing unused kernel memory: 212K (c0435000 - c046a000)
->> [    5.694632] init: Console is alive
->> [    5.698169] init: - watchdog -
->> [    5.701470] External imprecise Data abort at addr=0x0, fsr=0x1406
->> ignored.
->> As you can see, this abort was happening soon after freeing unused
->> memory and ignoring it *once* did the trick. It was never appearing
->> again.
->>
->> With 4.4 similar (or the same?) abort happens earlier (during PCI host
->> driver init) and doesn't get ignored:
->> [    2.478461] pci 0000:00:00.0: PCI bridge to [bus 01]
->> [    2.483451] pci 0000:00:00.0:   bridge window [mem
->> 0x08000000-0x085fffff]
->> [    2.599449] pcie_iproc_bcma bcma0:8: PCI host bridge to bus 0001:00
->> [    2.605744] pci_bus 0001:00: root bus resource [mem
->> 0x40000000-0x47ffffff]
->> [    2.612657] pcie_iproc_bcma bcma0:8: link: UP
->> [    2.617241] PCI: bus0: Fast back to back transfers disabled
->> [    2.622845] pci 0001:00:00.0: bridge configuration invalid ([bus
->> 00-00]), reconfiguring
->> [    2.631297] PCI: bus1: Fast back to back transfers disabled
->> [    2.636887] pci 0001:01:00.0: bridge configuration invalid ([bus
->> 00-00]), reconfiguring
->> [    2.645035] Unhandled fault: imprecise external abort (0x1406) at
->> 0x00000000
->> (see 4.4.txt for the backtrace)
->>
->> At first I was hoping that we simply need to re-add the removed
->> workaround. I tried it but it appeared that one abort is immediately
->> followed by another:
->> [    2.936895] pci 0001:01:00.0: bridge configuration invalid ([bus
->> 00-00]), reconfiguring
->> [    2.945053] External imprecise Data abort at addr=0x0, fsr=0x1406
->> ignored.
->> [    2.951966] Unhandled fault: imprecise external abort (0x1406) at
->> 0x00000000
->>
->> So it seems that commits bbeb920 and 9254970 broke something in PCI
->> host initialization (or maybe just exposed another bug?). Instead of
->> getting an abort once and late we are getting now many of them and a
->> bit earlier.
+Hi,
+ 
+ On ven., avril 01 2016, Marcin Wojtas <mw@semihalf.com> wrote:
+
+> Hi Gregory,
 >
-> Do you know if the device causing it is a PCI multifunction device?
+> With the patches an issue with SoC hang in under-stress MTU change
+> test of network is no longer a problem. If you wish you can add:
+>
+> Tested-by: Marcin Wojtas <mw@semihalf.com>
 
-I don't know. What gets discovered on the first controller are two
-devices: 14e4:d612 (kind of bridge I believe) and 14e4:4365 (wireless
-with BCM4366).
+I submitted both patches to Russell King's Patch Tracking System.
 
+Thanks,
 
-> Can you try regressing the PCI host driver and isolate that?
+Gregory
 
-What do you mean by regressing PCI host driver?
+>
+> Best regards,
+> Marcin
+>
+> 2016-03-31 11:09 GMT+02:00 Gregory CLEMENT <gregory.clement@free-electrons.com>:
+>> Hi,
+>>
+>> These two patches fixes the dma mapping functions when the system is
+>> cache coherent. The first one allows to fix an issue we have on Armada
+>> 375/38x with the PL310 that's why it is tagged for stable too.
+>>
+>> I didn't got any feedback on the fifth version 5 monthsago, and then I
+>> forgot to submit it to Russell patch system. In the meantime, there
+>> was many changes in the arch/arm/mm/dma-mapping.c file. So I had to
+>> rework the patch that's why I removed the reviewed flag from Catalin.
+>>
+>> The last version was posted here:
+>> http://thread.gmane.org/gmane.linux.ports.arm.kernel/446603
+>>
+>> Thanks,
+>>
+>> Gregory
+>>
+>> Changelog
+>> v5 -> v6:
+>>  - Rebased on v4.6-rc1
+>>
+>> v4 -> v5
+>>  - Keep the dmac_* function outside the !is_coherent case.
+>>
+>> v3 -> v4:
+>>  - Rebased on v4.3-rc1
+>>  - Fix conflict with commit "21caf3a765b0 ARM: 8398/1: arm DMA: Fix
+>>    allocation from CMA for coherent DMA"
+>>
+>> v2 -> v3:
+>>
+>>  - Fix comments in patch 1 as suggested by Catalin.
+>>  - Fix build issues in patch 2 (by using the multi_v7_defconfig +
+>>    CONFIG_ROCKCHIP_IOMMU).
+>>  - Add the arm_coherent_iommu_mmap_attrs function.
+>> Gregory CLEMENT (2):
+>>   ARM: dma-mapping: Don't use outer_flush_range when the L2C is coherent
+>>   ARM: dma-mapping: Fix the coherent case when iommu is used
+>>
+>>  arch/arm/mm/dma-mapping.c | 144 ++++++++++++++++++++++++++++++++--------------
+>>  1 file changed, 101 insertions(+), 43 deletions(-)
+>>
+>> --
+>> 2.5.0
+>>
 
 -- 
-Rafa?
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
