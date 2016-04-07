@@ -1,95 +1,64 @@
-From: blogic@openwrt.org (John Crispin)
-Date: Thu, 7 Apr 2016 10:51:46 +0200
-Subject: [PATCH] mfd: mt6397: irq domain should initialize before
- mfd_add_devices()
-In-Reply-To: <1459322708-21363-1-git-send-email-henryc.chen@mediatek.com>
-References: <1459322708-21363-1-git-send-email-henryc.chen@mediatek.com>
-Message-ID: <57061FA2.7010305@openwrt.org>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 07 Apr 2016 10:18:54 +0100
+Subject: [PATCH 5/5] arm64: Fix behavior of maxcpus=N
+In-Reply-To: <1459941854-5190-6-git-send-email-suzuki.poulose@arm.com>
+References: <1459941854-5190-1-git-send-email-suzuki.poulose@arm.com>
+ <1459941854-5190-6-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <570625FE.4040001@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Suzuki,
+
+On 06/04/16 12:24, Suzuki K Poulose wrote:
+> maxcpu=n sets the number of CPUs activated at boot time to a max of n,
+> but allowing the remaining CPUs to be brought up later if the user
+> decides to do so. However, on arm64 due to various reasons, we disallowed
+> hotplugging CPUs beyond n, by marking them not present. Now that
+> we have checks in place to make sure the hotplugged CPUs have compatible
+> features with system and requires no new errata, relax the restriction.
+
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index b2d5f4e..0988ccc 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -659,21 +659,12 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+>  	if (max_cpus > ncores)
+>  		max_cpus = ncores;
+
+This "if (max_cpus > ncores)" is the only user of max_cpus left in this
+function, and 'ncores' isn't used for anything else. Dead code?
 
 
-On 30/03/2016 09:25, Henry Chen wrote:
-> Some sub driver like RTC module need irq domain from parent to create
-> irq mapping when driver initialize. so move mt6397_irq_init() before
-> mfd_add_devices().
-> 
-> Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
-
-Acked-by: John Crispin <blogic@openwrt.org>
-
-
-
-> ---
-> This patch fixed the below warning based on "Linux kernel v4.6-rc1"
-> WARNING: CPU: 1 PID: 132 at kernel/mediatek/kernel/irq/irqdomain.c:471
-> irq_create_mapping+0xc4/0xd0
-> ---
->  drivers/mfd/mt6397-core.c | 37 ++++++++++++++++++++++---------------
->  1 file changed, 22 insertions(+), 15 deletions(-)
-> 
-> diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
-> index 8e8d932..a879223 100644
-> --- a/drivers/mfd/mt6397-core.c
-> +++ b/drivers/mfd/mt6397-core.c
-> @@ -270,22 +270,36 @@ static int mt6397_probe(struct platform_device *pdev)
->  		goto fail_irq;
->  	}
->  
-> +	pmic->irq = platform_get_irq(pdev, 0);
-> +
->  	switch (id & 0xff) {
->  	case MT6323_CID_CODE:
-> -		pmic->int_con[0] = MT6323_INT_CON0;
-> -		pmic->int_con[1] = MT6323_INT_CON1;
-> -		pmic->int_status[0] = MT6323_INT_STATUS0;
-> -		pmic->int_status[1] = MT6323_INT_STATUS1;
-> +		if (pmic->irq > 0) {
-> +			pmic->int_con[0] = MT6323_INT_CON0;
-> +			pmic->int_con[1] = MT6323_INT_CON1;
-> +			pmic->int_status[0] = MT6323_INT_STATUS0;
-> +			pmic->int_status[1] = MT6323_INT_STATUS1;
-> +			ret = mt6397_irq_init(pmic);
-> +			if (ret)
-> +				return ret;
-> +		}
-> +
->  		ret = mfd_add_devices(&pdev->dev, -1, mt6323_devs,
->  				ARRAY_SIZE(mt6323_devs), NULL, 0, NULL);
->  		break;
->  
->  	case MT6397_CID_CODE:
->  	case MT6391_CID_CODE:
-> -		pmic->int_con[0] = MT6397_INT_CON0;
-> -		pmic->int_con[1] = MT6397_INT_CON1;
-> -		pmic->int_status[0] = MT6397_INT_STATUS0;
-> -		pmic->int_status[1] = MT6397_INT_STATUS1;
-> +		if (pmic->irq > 0) {
-> +			pmic->int_con[0] = MT6397_INT_CON0;
-> +			pmic->int_con[1] = MT6397_INT_CON1;
-> +			pmic->int_status[0] = MT6397_INT_STATUS0;
-> +			pmic->int_status[1] = MT6397_INT_STATUS1;
-> +			ret = mt6397_irq_init(pmic);
-> +			if (ret)
-> +				return ret;
-> +		}
-> +
->  		ret = mfd_add_devices(&pdev->dev, -1, mt6397_devs,
->  				ARRAY_SIZE(mt6397_devs), NULL, 0, NULL);
->  		break;
-> @@ -296,13 +310,6 @@ static int mt6397_probe(struct platform_device *pdev)
->  		break;
->  	}
->  
-> -	pmic->irq = platform_get_irq(pdev, 0);
-> -	if (pmic->irq > 0) {
-> -		ret = mt6397_irq_init(pmic);
-> -		if (ret)
-> -			return ret;
-> -	}
+> -	/* Don't bother if we're effectively UP */
+> -	if (max_cpus <= 1)
+> -		return;
 > -
->  fail_irq:
->  	if (ret) {
->  		irq_domain_remove(pmic->irq_domain);
+>  	/*
+>  	 * Initialise the present map (which describes the set of CPUs
+>  	 * actually populated at the present time) and release the
+>  	 * secondaries from the bootloader.
+> -	 *
+> -	 * Make sure we online at most (max_cpus - 1) additional CPUs.
+>  	 */
+> -	max_cpus--;
+>  	for_each_possible_cpu(cpu) {
+> -		if (max_cpus == 0)
+> -			break;
+>  
+>  		if (cpu == smp_processor_id())
+>  			continue;
+> @@ -686,7 +677,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+>  			continue;
+>  
+>  		set_cpu_present(cpu, true);
+> -		max_cpus--;
+>  	}
+>  }
+>  
 > 
+
+
+Thanks,
+
+James
