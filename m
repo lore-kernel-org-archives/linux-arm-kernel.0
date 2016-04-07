@@ -1,80 +1,146 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu,  7 Apr 2016 14:20:24 +0200
-Subject: [PATCH v4 01/12] ARM: dts: r8a7779: Add SYSC PM Domains
-In-Reply-To: <1460031635-13452-1-git-send-email-geert+renesas@glider.be>
-References: <1460031635-13452-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1460031635-13452-2-git-send-email-geert+renesas@glider.be>
+Date: Thu,  7 Apr 2016 14:20:23 +0200
+Subject: [PATCH v4 00/12] ARM/arm64: dts: rcar: Add SYSC PM domains
+Message-ID: <1460031635-13452-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a device node for the System Controller, and hook it up to the
-CPG/MSTP Clock Domain.
-Hook up ARM CPU cores 1-3 to their respective PM Domains.
-Note that ARM CPU core 0 cannot be shut off.
+	Hi Simon, Magnus,
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-v4:
-  - Add power-domains property to the sysc node, to refer to the SoC's
-    Clock Domain,
+This patch series adds the R-Car System Controller to the DTS files for
+the various Renesas R-Car SoCs, and hooks up devices to their respective
+PM domains.
 
-v3:
-  - Drop power area hiearchy from DT,
-  - Switch to "#power-domain-cells = <1>",
+This is a dependency for the enablement of DU and VSP on R-Car H3, as
+on this SoC the VSPs are located in a PM Domain.
 
-v2:
-  - Correct sysc "reg" property (#address/size-cells = 1, not 2),
-  - Change one-line summary prefix to match current arm-soc practices,
-  - Update compatible values.
----
- arch/arm/boot/dts/r8a7779.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+This series contains 2 parts:
+  1. Patches 1-6 add device node for the System Controllers, and hook
+     up CPU cores and L2 caches/SCUs to their respective PM Domains,
+  2. Patches 7-12 hook up devices to the SYSC "always-on" PM Domain, for
+     a more consistent device-power-area description in DT.
 
-diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
-index 5c1d48d712a18652..2679ab4629d5c2b2 100644
---- a/arch/arm/boot/dts/r8a7779.dtsi
-+++ b/arch/arm/boot/dts/r8a7779.dtsi
-@@ -14,6 +14,7 @@
- #include <dt-bindings/clock/r8a7779-clock.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/power/r8a7779-sysc.h>
- 
- / {
- 	compatible = "renesas,r8a7779";
-@@ -34,18 +35,21 @@
- 			compatible = "arm,cortex-a9";
- 			reg = <1>;
- 			clock-frequency = <1000000000>;
-+			power-domains = <&sysc R8A7779_PD_ARM1>;
- 		};
- 		cpu at 2 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a9";
- 			reg = <2>;
- 			clock-frequency = <1000000000>;
-+			power-domains = <&sysc R8A7779_PD_ARM2>;
- 		};
- 		cpu at 3 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a9";
- 			reg = <3>;
- 			clock-frequency = <1000000000>;
-+			power-domains = <&sysc R8A7779_PD_ARM3>;
- 		};
- 	};
- 
-@@ -586,4 +590,11 @@
- 				"mmc1", "mmc0";
- 		};
- 	};
-+
-+	sysc: system-controller at ffd85000 {
-+		compatible = "renesas,r8a7779-sysc";
-+		reg = <0xffd85000 0x0200>;
-+		power-domains = <&cpg_clocks>;
-+		#power-domain-cells = <1>;
-+	};
- };
+While part 1 is safe to apply, part 2 causes more deferred probing,
+which exposes a few deficiencies in subsystems and drivers:
+
+  1. The PHY subsystem doesn't support deferred probe, so Micrel
+     KSZ8041RNLI (R-Car Gen2) or KSZ9031 (R-Car Gen3) falls back to
+     polling:
+
+	irq: no irq domain found for /interrupt-controller at e61c0000 !
+	Micrel KSZ8041RNLI ee700000.etherne:01: attached PHY driver [Micrel KSZ8041RNLI] (mii_bus:phy_addr=ee700000.etherne:01, irq=-1)
+
+	irq: no irq domain found for /soc/gpio at e6052000 !
+	Micrel KSZ9031 Gigabit PHY e6800000.etherne:00: attached PHY driver [Micrel KSZ9031 Gigabit PHY] (mii_bus:phy_addr=e6800000.etherne:00, irq=-1)
+
+  2. The Audio DMAC is now initialized after rcar_sound on R-Car Gen2
+     and Gen3, so rcar_sound falls back to PIO:
+
+	rcar_sound ec500000.sound: can't get dma channel
+	rcar_sound ec500000.sound: ssi[0] fallback to PIO mode
+	rcar_sound ec500000.sound: can't get dma channel
+	rcar_sound ec500000.sound: ssi[1] fallback to PIO mode
+
+  3. The System DMAC is now initialized after the SPI drivers on R-Car
+     Gen2, hence they fall back to PIO:
+
+	renesas_spi e6b10000.spi: dma_request_slave_channel_compat failed
+	renesas_spi e6b10000.spi: DMA not available, using PIO
+
+	spi_sh_msiof e6e20000.spi: dma_request_slave_channel_compat failed
+	spi_sh_msiof e6e20000.spi: DMA not available, using PIO
+
+  4. On r8a7790/lager, I see various i2c failures:
+
+	adv7180 6-0020: chip found @ 0x20 (e6520000.i2c)
+	adv7180: probe of 6-0020 failed with error -110
+
+	i2c 7-0058: Masking da9063 interrupt sources
+	i2c 7-0058: i2c error -110
+	da9063 7-0058: Cannot read FAULT_LOG.
+	da9063 7-0058: Cannot clear fault log
+	da9063 7-0058: Cannot read chip model id.
+	da9063: probe of 7-0058 failed with error -5
+	i2c 7-0068: Masking da9210 interrupt sources
+	i2c 7-0068: i2c error -110
+	da9210 7-0068: Failed to write to mask reg: -110
+	da9210: probe of 7-0068 failed with error -110
+
+Hence for now I think it's best to just apply the first part, to allow
+progress on R-Car H3, and postpone the second part until the issues are
+sorted out.
+
+Changes compared to v3:
+  - Add power-domains properties to the sysc nodes, to refer to the
+    SoC's Clock Domains,
+  - Extract using the SYSC "always-on" PM Domain on R-Car H3 into its
+    own patch,
+  - Add patches to use the SYSC "always-on" PM Domain on R-Car H1 and
+    R-Car Gen2,
+  - Update for recently added can0, can1, pciec0, and pciec1 device
+    nodes on R-Car H3.
+
+Changes compared to v2:
+  - Move power area hierarchy from DT to C (cfr. DT bindings for Renesas
+    CPG/MSSR), and switch to "#power-domain-cells = <1>",
+  - Drop fallback compatibility strings, as the bindings are
+    SoC-specific,
+  - Add an "always-on" power area on R-Car H3.
+
+Changes compared to v1:
+  - Add R-Car H3 (r8a7795) support,
+  - Use "renesas,<type>-sysc" instead of "renesas,sysc-<type>",
+  - Add fallback compatibility strings for R-Car Gen2 and Gen3.
+
+Dependencies:
+  - renesas-devel-20160406-v4.6-rc2,
+  - "[PATCH v4 0/7] PM / Domains: Add DT bindings for the R-Car System
+    Controller",
+  - "[PATCH v4 00/11] soc: renesas: Add R-Car SYSC PM Domain Support".
+Note that these are hard dependencies: adding SYSC PM Domains to DTS
+files without driver support may cause breakage!
+
+For your convenience, I've pushed this, incl. all dependencies, to the
+topic/rcar-sysc-pd-v4 branch of
+https://git.kernel.org/cgit/linux/kernel/git/geert/renesas-drivers.git
+
+This has been tested on r8a7779/marzen, r8a7790/lager, r8a7791/koelsch,
+r8a7794/alt, and r8a7795/salvator-x.
+
+Thanks for applying part 1 (patches 1-6)!
+
+Geert Uytterhoeven (12):
+  ARM: dts: r8a7779: Add SYSC PM Domains
+  ARM: dts: r8a7790: Add SYSC PM Domains
+  ARM: dts: r8a7791: Add SYSC PM Domains
+  ARM: dts: r8a7793: Add SYSC PM Domains
+  ARM: dts: r8a7794: Add SYSC PM Domains
+  arm64: dts: r8a7795: Add SYSC PM Domains
+  ARM: dts: r8a7779: Use SYSC "always-on" PM Domain
+  ARM: dts: r8a7790: Use SYSC "always-on" PM Domain
+  ARM: dts: r8a7791: Use SYSC "always-on" PM Domain
+  ARM: dts: r8a7793: Use SYSC "always-on" PM Domain
+  ARM: dts: r8a7794: Use SYSC "always-on" PM Domain
+  arm64: dts: r8a7795: Use SYSC "always-on" PM Domain
+
+ arch/arm/boot/dts/r8a7779.dtsi           |  55 ++++++-----
+ arch/arm/boot/dts/r8a7790.dtsi           | 156 ++++++++++++++++--------------
+ arch/arm/boot/dts/r8a7791.dtsi           | 157 +++++++++++++++++--------------
+ arch/arm/boot/dts/r8a7793.dtsi           | 106 +++++++++++----------
+ arch/arm/boot/dts/r8a7794.dtsi           | 117 ++++++++++++-----------
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 124 +++++++++++++-----------
+ 6 files changed, 395 insertions(+), 320 deletions(-)
+
 -- 
 1.9.1
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
