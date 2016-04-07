@@ -1,26 +1,35 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 7 Apr 2016 12:57:40 -0500
-Subject: [PATCH v3 4/9] drm/fsl-dcu: add extra clock for pixel clock
-In-Reply-To: <1459834121-25997-5-git-send-email-stefan@agner.ch>
-References: <1459834121-25997-1-git-send-email-stefan@agner.ch>
- <1459834121-25997-5-git-send-email-stefan@agner.ch>
-Message-ID: <20160407175740.GJ32257@rob-hp-laptop>
+Date: Thu, 7 Apr 2016 12:57:52 -0500
+Subject: [PATCH v2 3/5] dmaengine: qcom: bam_dma: add controlled remotely
+ dt property
+In-Reply-To: <1459896982-30171-4-git-send-email-stanimir.varbanov@linaro.org>
+References: <1459896982-30171-1-git-send-email-stanimir.varbanov@linaro.org>
+ <1459896982-30171-4-git-send-email-stanimir.varbanov@linaro.org>
+Message-ID: <20160407175752.GM32257@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 04, 2016 at 10:28:36PM -0700, Stefan Agner wrote:
-> The Vybrid DCU variant has two independent clock inputs, one
-> for the registers (IPG bus clock) and one for the pixel clock.
-> Support this distinction in the DCU DRM driver while staying
-> backward compatible for old device trees.
+On Wed, Apr 06, 2016 at 01:56:20AM +0300, Stanimir Varbanov wrote:
+> Some of the peripherals has bam which is controlled by remote
+> processor, thus the bam dma driver must avoid register writes
+> which initialise bam hw block. Those registers are protected
+> from xPU block and any writes to them will lead to secure
+> violation and system reboot.
 > 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> Adding the contolled_remotely flag in bam driver to avoid
+> not permitted register writes in bam_init function.
+> 
+> Signed-off-by: Stanimir Varbanov <stanimir.varbanov@linaro.org>
+> Reviewed-by: Andy Gross <andy.gross@linaro.org>
 > ---
->  Documentation/devicetree/bindings/display/fsl,dcu.txt | 11 +++++++----
+>  Documentation/devicetree/bindings/dma/qcom_bam_dma.txt | 2 ++
+>  drivers/dma/qcom/bam_dma.c                             | 7 +++++++
+>  2 files changed, 9 insertions(+)
 
 Acked-by: Rob Herring <robh@kernel.org>
 
->  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_crtc.c            |  2 +-
->  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.c             | 16 +++++++++++++++-
->  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.h             |  1 +
->  4 files changed, 24 insertions(+), 6 deletions(-)
+On being a separate patch, yes that is always the preference. However, 
+this change is so small it doesn't matter to me. But this is going in 
+thru Vinod's tree, so it is his call.
+
+Rob
