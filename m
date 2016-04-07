@@ -1,119 +1,47 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 7 Apr 2016 13:49:41 -0400
-Subject: [PATCH 1/2] pci: add pci_unmap_iospace function for PCI_IOBASE
-In-Reply-To: <20160407160004.GA8780@localhost>
-References: <1457389310-3538-1-git-send-email-okaya@codeaurora.org>
- <20160407160004.GA8780@localhost>
-Message-ID: <57069DB5.9060404@codeaurora.org>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Thu, 7 Apr 2016 11:50:01 -0600
+Subject: [PATCH v6 0/7] KVM PCIe/MSI passthrough on ARM/ARM64: kernel
+ part 1/3: iommu changes
+In-Reply-To: <5706528B.2010906@linaro.org>
+References: <1459757222-2668-1-git-send-email-eric.auger@linaro.org>
+ <20160406171534.794c6824@t450s.home> <5706528B.2010906@linaro.org>
+Message-ID: <20160407115001.25de7d1e@t450s.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/7/2016 12:00 PM, Bjorn Helgaas wrote:
-> Hi Sinan,
+On Thu, 7 Apr 2016 14:28:59 +0200
+Eric Auger <eric.auger@linaro.org> wrote:
+
+> Hi Alex,
+> On 04/07/2016 01:15 AM, Alex Williamson wrote:
+> > On Mon,  4 Apr 2016 08:06:55 +0000
+> > Eric Auger <eric.auger@linaro.org> wrote:
+> >   
+> >> This series introduces the dma-reserved-iommu api used to:
+> >> - create/destroy an iova domain dedicated to reserved iova bindings
+> >> - map/unmap physical addresses onto reserved IOVAs.
+> >> - unmap and destroy all IOVA reserved bindings  
+> > 
+> > Why are we making the decision to have an unbalanced map vs unmap, we
+> > can create individual mappings, but only unmap the whole thing and
+> > start over?  That's a strange interface.  Thanks,  
+> The "individual" balanced unmap also exists (iommu_put_reserved_iova)
+> and this is the "normal" path. This happens on msi_domain_deactivate
+> (and possibly on msi_domain_set_affinity).
 > 
-> On Mon, Mar 07, 2016 at 05:21:49PM -0500, Sinan Kaya wrote:
->> The PCI_IOBASE needs to be released after hotplug removal so that it can be
->> re-added back by the pci_remap_iospace function during insertion.
->>
->> Adding unmap function to follow IO remap function.
->>
->> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
->> ---
->>  drivers/pci/pci.c   | 25 +++++++++++++++++++++++++
->>  include/linux/pci.h |  1 +
->>  2 files changed, 26 insertions(+)
->>
->> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
->> index 3a516c0..f5faed2 100644
->> --- a/drivers/pci/pci.c
->> +++ b/drivers/pci/pci.c
->> @@ -26,6 +26,7 @@
->>  #include <linux/device.h>
->>  #include <linux/pm_runtime.h>
->>  #include <linux/pci_hotplug.h>
->> +#include <linux/vmalloc.h>
->>  #include <asm-generic/pci-bridge.h>
->>  #include <asm/setup.h>
->>  #include <linux/aer.h>
->> @@ -3169,6 +3170,30 @@ int __weak pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
->>  #endif
->>  }
->>  
->> +/**
->> + *	pci_unmap_iospace - Unmap the memory mapped I/O space
->> + *	@virt_addr: virtual address to be unmapped
->> + *	@size: size of the physical address to be unmapped
->> + *
->> + *	Unmap the CPU virtual address @virt_addr from virtual address space.
->> + *	Only architectures that have memory mapped IO functions defined
->> + *	(and the PCI_IOBASE value defined) should call this function.
->> + */
->> +void  __weak pci_unmap_iospace(struct resource *res)
+> I added iommu_unmap_reserved to handle the case where the userspace
+> registers a reserved iova domain and fails to unregister it. In that
+> case one need to handle the cleanup on kernel-side and I chose to
+> implement this on vfio_iommu_type1 release. All the reserved IOMMU
+> bindings get destroyed on that event.
 > 
-> Why is this weak?  I assume probably because pci_remap_iospace() is
-> weak, but I don't see any reason why *that* needs to be weak.  There's
-> only one implementation.  I think neither one should be weak unless we
-> have an actual need for that.
-> 
+> Any advice to handle this situation?
 
-Right, copy paste mistake. Even the function parameter description above
-is not right. 
+If we want to model it similar to regular iommu domains, then
+iommu_free_reserved_iova_domain() should release all the mappings and
+destroy the iova domain.  Additionally, since the reserved iova domain
+is just a construct on top of an iommu domain, it should be sufficient
+to call iommu_domain_free() to also remove the reserved iova domain if
+one exists.  Thanks,
 
-I can get rid of the __weak from both on the next iteration.
-
->> +{
->> +#if defined(PCI_IOBASE) && defined(CONFIG_MMU)
->> +	unsigned long vaddr = (unsigned long)PCI_IOBASE + res->start;
->> +
->> +	unmap_kernel_range(vaddr, resource_size(res));
-> 
-> There really aren't any other generic uses of unmap_kernel_range().
-> This isn't an unusual scenario, so I would expect this code to use a
-> pattern that's used elsewhere.
-
-OK, What's the best way to remove a mapping? I'm open for suggestions.
-I copied this pattern from GHES driver.
-
-> 
->> +#else
->> +	/*
->> +	 * This architecture does not have memory mapped I/O space,
->> +	 * so this function should never be called.
->> +	 */
->> +	WARN_ONCE(1, "This architecture does not support memory mapped I/O\n");
->> +#endif
->> +}
->> +
->>  static void __pci_set_master(struct pci_dev *dev, bool enable)
->>  {
->>  	u16 old_cmd, cmd;
->> diff --git a/include/linux/pci.h b/include/linux/pci.h
->> index 398ae7e..c6e3f0e 100644
->> --- a/include/linux/pci.h
->> +++ b/include/linux/pci.h
->> @@ -1172,6 +1172,7 @@ int pci_register_io_range(phys_addr_t addr, resource_size_t size);
->>  unsigned long pci_address_to_pio(phys_addr_t addr);
->>  phys_addr_t pci_pio_to_address(unsigned long pio);
->>  int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr);
->> +void pci_unmap_iospace(struct resource *res);
->>  
->>  static inline pci_bus_addr_t pci_bus_address(struct pci_dev *pdev, int bar)
->>  {
->> -- 
->> 1.8.2.1
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-
-
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+Alex
