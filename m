@@ -1,25 +1,39 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Fri, 8 Apr 2016 11:21:05 -0400 (EDT)
-Subject: [PATCH] usb: core: buffer: avoid NULL pointer dereferrence
-In-Reply-To: <20160408140701.GA3547@kroah.com>
-Message-ID: <Pine.LNX.4.44L0.1604081120190.2069-100000@iolanthe.rowland.org>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 8 Apr 2016 16:37:02 +0100
+Subject: [PATCH 13/17] kvm-arm: Add stage2 page table modifiers
+In-Reply-To: <20160408134257.GW8961@cbox>
+References: <1459787177-12767-1-git-send-email-suzuki.poulose@arm.com>
+ <1459787177-12767-14-git-send-email-suzuki.poulose@arm.com>
+ <20160408134257.GW8961@cbox>
+Message-ID: <5707D01E.1050309@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 8 Apr 2016, Greg Kroah-Hartman wrote:
+On 08/04/16 14:42, Christoffer Dall wrote:
+> On Mon, Apr 04, 2016 at 05:26:13PM +0100, Suzuki K Poulose wrote:
 
-> On Fri, Apr 08, 2016 at 05:08:03PM +0800, Chunfeng Yun wrote:
-> > NULL pointer dereferrence will happen when class driver
-> > wants to allocate zero length buffer and pool_max[0]
-> > can't be used, so skip reserved pool in this case.
-> 
-> Why would a driver want to allocate a 0 length buffer?  What driver does
-> this?
-> 
-> Shouldn't we fix that issue instead?
+>>
+>> -static void clear_pud_entry(struct kvm *kvm, pud_t *pud, phys_addr_t addr)
+>> +static void clear_stage2_pud_entry(struct kvm *kvm, pud_t *pud, phys_addr_t addr)
+>>   {
+>> -	pmd_t *pmd_table = pmd_offset(pud, 0);
+>> -	VM_BUG_ON(pud_huge(*pud));
+>> -	pud_clear(pud);
+>> +	pmd_t *pmd_table __maybe_unused = stage2_pmd_offset(pud, 0);
+>
+> The __maybe_unused are slightly ugly, so it may be nicer to create the
+> stage2_pmd_free() as static inline's if they're defined to do nothing
+> instead.
+>
 
-And even if a driver does want to allocate a 0-length buffer, shouldn't 
-the function simply return early instead of running through all its 
-calculations?
+Sure, we could do that for stage2. However, we will need to fix the host helpers
+as well for making such a change in the _hyp version (for 16K + 36bit VA).
 
-Alan Stern
+>>
+>
+> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+>
+
+
+Thanks
+Suzuki
