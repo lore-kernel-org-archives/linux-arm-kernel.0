@@ -1,179 +1,158 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Fri, 8 Apr 2016 15:41:11 -0700
-Subject: 4.4 BCM5301X ARM regression "External imprecise Data abort"
-In-Reply-To: <CACna6rxU8g2HsgYO=X953RFBSxbmmrGhms+gUpwDdhfmgoBmGA@mail.gmail.com>
-References: <CACna6rz=KE_FtNtrSKmcYE514s4-dgrnx=iGbN7JDXkQPd6bTw@mail.gmail.com>
- <5702D7DD.2080205@broadcom.com> <5702DB4D.5070203@hauke-m.de>
- <CACna6rwVR3mBqHbxq-J3wPqOiajsxatAQfzH0hb1SYjc-cmx8w@mail.gmail.com>
- <1460104993.32099.18.camel@pengutronix.de>
- <96f638d9-fa40-c599-b708-8a687569a016@broadcom.com>
- <CACna6rwfHzB=zP6GWbLFW5j9hXYGhgWCn+qRKmWHggsPT8frYQ@mail.gmail.com>
- <82c99715-ce74-a743-ace3-4cb3e32ef2b4@broadcom.com>
- <CACna6rxU8g2HsgYO=X953RFBSxbmmrGhms+gUpwDdhfmgoBmGA@mail.gmail.com>
-Message-ID: <18d2b4ec-c607-c651-999d-40ec5fa5bbf1@broadcom.com>
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Fri,  8 Apr 2016 15:50:22 -0700
+Subject: [PATCH v16 0/6] arm64, numa: Add numa support for arm64 platforms
+Message-ID: <1460155828-8690-1-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: David Daney <david.daney@cavium.com>
 
+v16:
 
-On 4/8/2016 3:11 PM, Rafa? Mi?ecki wrote:
-> On 9 April 2016 at 00:08, Ray Jui <ray.jui@broadcom.com> wrote:
->> On 4/8/2016 3:05 PM, Rafa? Mi?ecki wrote:
->>>
->>> On 9 April 2016 at 00:02, Ray Jui <ray.jui@broadcom.com> wrote:
->>>>
->>>> On 4/8/2016 1:43 AM, Lucas Stach wrote:
->>>>>
->>>>>
->>>>> Am Freitag, den 08.04.2016, 08:45 +0200 schrieb Rafa? Mi?ecki:
->>>>>>
->>>>>>
->>>>>> On 4 April 2016 at 23:23, Hauke Mehrtens <hauke@hauke-m.de> wrote:
->>>>>>>
->>>>>>>
->>>>>>> On 04/04/2016 11:08 PM, Scott Branden wrote:
->>>>>>>>
->>>>>>>>
->>>>>>>> On 16-04-03 11:13 PM, Rafa? Mi?ecki wrote:
->>>>>>>>>
->>>>>>>>>
->>>>>>>>> I got regression reports from Netgear R8000 (BCM4709A0) users and
->>>>>>>>> did
->>>>>>>>> some testing & regression tracking with Aditya.
->>>>>>>>>
->>>>>>>>> It happens that Linux 4.4 doesn't boot due to the following commits:
->>>>>>>>> bbeb920 ("ARM: 8422/1: enable imprecise aborts during early kernel
->>>>>>>>> startup")
->>>>>>>>> 9254970 ("ARM: 8447/1: catch pending imprecise abort on unmask")
->>>>>>>>> 937b123 ("ARM: BCM5301X: remove workaround imprecise abort fault
->>>>>>>>> handler")
->>>>>>>>>
->>>>>>>>> In kernel 4.3 we got that abort workaround which was resulting in:
->>>>>>>>> [    5.007128] Freeing unused kernel memory: 212K (c0435000 -
->>>>>>>>> c046a000)
->>>>>>>>> [    5.694632] init: Console is alive
->>>>>>>>> [    5.698169] init: - watchdog -
->>>>>>>>> [    5.701470] External imprecise Data abort at addr=0x0, fsr=0x1406
->>>>>>>>> ignored.
->>>>>>>>> As you can see, this abort was happening soon after freeing unused
->>>>>>>>> memory and ignoring it *once* did the trick. It was never appearing
->>>>>>>>> again.
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>> I assume it only can throw one of these and if it is deactivated it
->>>>>>> will
->>>>>>> ignore the next one or overwrite it. So it could be that more than one
->>>>>>> is thrown here.
->>>>>>>
->>>>>>>>> With 4.4 similar (or the same?) abort happens earlier (during PCI
->>>>>>>>> host
->>>>>>>>> driver init) and doesn't get ignored:
->>>>>>>>> [    2.478461] pci 0000:00:00.0: PCI bridge to [bus 01]
->>>>>>>>> [    2.483451] pci 0000:00:00.0:   bridge window [mem
->>>>>>>>> 0x08000000-0x085fffff]
->>>>>>>>> [    2.599449] pcie_iproc_bcma bcma0:8: PCI host bridge to bus
->>>>>>>>> 0001:00
->>>>>>>>> [    2.605744] pci_bus 0001:00: root bus resource [mem
->>>>>>>>> 0x40000000-0x47ffffff]
->>>>>>>>> [    2.612657] pcie_iproc_bcma bcma0:8: link: UP
->>>>>>>>> [    2.617241] PCI: bus0: Fast back to back transfers disabled
->>>>>>>>> [    2.622845] pci 0001:00:00.0: bridge configuration invalid ([bus
->>>>>>>>> 00-00]), reconfiguring
->>>>>>>>> [    2.631297] PCI: bus1: Fast back to back transfers disabled
->>>>>>>>> [    2.636887] pci 0001:01:00.0: bridge configuration invalid ([bus
->>>>>>>>> 00-00]), reconfiguring
->>>>>>>>> [    2.645035] Unhandled fault: imprecise external abort (0x1406) at
->>>>>>>>> 0x00000000
->>>>>>>>> (see 4.4.txt for the backtrace)
->>>>>>>>>
->>>>>>>>> At first I was hoping that we simply need to re-add the removed
->>>>>>>>> workaround. I tried it but it appeared that one abort is immediately
->>>>>>>>> followed by another:
->>>>>>>>> [    2.936895] pci 0001:01:00.0: bridge configuration invalid ([bus
->>>>>>>>> 00-00]), reconfiguring
->>>>>>>>> [    2.945053] External imprecise Data abort at addr=0x0, fsr=0x1406
->>>>>>>>> ignored.
->>>>>>>>> [    2.951966] Unhandled fault: imprecise external abort (0x1406) at
->>>>>>>>> 0x00000000
->>>>>>>>>
->>>>>>>>> So it seems that commits bbeb920 and 9254970 broke something in PCI
->>>>>>>>> host initialization (or maybe just exposed another bug?). Instead of
->>>>>>>>> getting an abort once and late we are getting now many of them and a
->>>>>>>>> bit earlier.
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>> These commits mad the kernel earlier "listen" to such errors, so that
->>>>>>> they will be shown at the time they occur and not sometime later.
->>>>>>
->>>>>>
->>>>>>
->>>>>> So AFAIU with kernel 4.3:
->>>>>> 1) Aborts were masked (silent) until "Freeing unused kernel memory"
->>>>>> 2) There was one (silent) abort caused by a bootloader
->>>>>> 3) There were likely multiple aborts (silent) during early PCI init
->>>>>> 4) After unmasking we got only a single abort reported and we were
->>>>>> ignoring it
->>>>>>
->>>>>> With kernel 4.4:
->>>>>> 1) All aborts are reported immediately
->>>>>> 2) Abort caused by a bootloader gets ignored by ARM code:
->>>>>> "Hit pending asynchronous external abort (FSR=0x00001c06) during first
->>>>>> unmask"
->>>>>> thanks to 9254970 ("ARM: 8447/1: catch pending imprecise abort on
->>>>>> unmask")
->>>>>> 3) There are still multiple aborts during PCI init (reported
->>>>>> immediately
->>>>>> now)
->>>>>> 4) To work as before (in 4.3) we should ignore all aborts, not only the
->>>>>> 1st one
->>>>>>
->>>>>> Of course proposed solution is an ugly workaround, we should have no
->>>>>> aborts reported in the first place.
->>>>>>
->>>>> A master abort on the PCI bus during probe of the PCI config space
->>>>> (device enumeration) is expected. Most host bridges ignore those errors
->>>>> and just return 0 for the read transaction.
->>>>>
->>>>> Some bridges forward the error onto the AXI/AMBA bus and thus cause
->>>>> imprecise external aborts on the ARM core.
->>>>
->>>>
->>>>
->>>> Yes, I suspect this is the case for these imprecise external abort
->>>> triggered
->>>> by the iProc PCIe.
->>>>
->>>>> If your host bridge doesn't
->>>>> have a way to disable error forwarding during PCI bus probe you need to
->>>>> install an abort handler. Most implementations based on the designware
->>>>> PCIe core do this already.
->>>>
->>>>
->>>>
->>>> Is this as simple as registering an abort handler to the hook in the
->>>> iProc
->>>> PCIe driver, and based on the fsr (0x1406 in our case), simply ignore the
->>>> abort by returning zero from the abort handler?
->>>
->>>
->>> This is what I did in OpenWrt an hour ago and it seems to be working:
->>>
->>> http://git.openwrt.org/?p=openwrt.git;a=commitdiff;h=f823c5da71f0dd859facc5ece575a48c28279d35
->>>
->>
->> It looks good to me except that I think you should register the hook in
->> "iproc_pcie_setup" so both the BCMA and platform based iProc PCIe drivers
->> can use it.
->
-> Should I add some new field to struct iproc_pcie, like "bool
-> hook_abort_handler"?
->
+	- No functional change.
 
-You want to enable/disable them based on platforms? I don't see a need 
-at this point...
+	- Rebase to v4.6-rc2 to avoid merge conflicts.
 
-Thanks,
+v15:
 
-Ray
+	- Make the distance-map node optional (again), if it is not in
+          the device tree, default values are used.
+
+	- Minor cleanups to of_numa.c as suggested by Rob Harring.
+
+v14:
+	- Revised patch to unflatten the device tree earlier.
+
+	- Cleanups and added EXPORT_SYMBOL to of_numa.c as suggested
+          by Rob Harring
+
+v13:
+	- Added patch to unflatten the device tree earlier.
+
+	- Rewrote of_numa.c to work on unflattened the device tree.
+
+	- Cleanup of EXPORTs in arch/arm64/mm/numa.c as suggested by
+          Will Deacon.
+
+v12:
+
+	- Replaced 6 patches from Ard Biesheuvel with new simpler, and
+          more correct, single patch, also from Ard.
+
+v11:
+	- Dropped cleanup patches for other architectures, they will be
+          submitted as a separate set after more testing.
+
+	- Added patch set from Ard Biesheuvel that are needed to make
+          the whole thing actually work.  Previously this was a
+          separate set.
+
+	- Kconfig and other fixes and simplifications as suggested by
+          Rob Herring.
+
+	- Rearranged, refactored and reordered so that we don't patch
+          new files multiple times.
+
+	- Summary:
+
+		o 6 patches from Ard Biesheuvel to allow use of
+		  "memory" nodes with efi stub.
+
+		o 2 patches to document and add of_numa.c
+
+		o 1 patch to add arm64 NUMA support.
+
+		o 1 patch to add NUMA balancing support for arm64.
+
+v10:
+	- Incorporated review comments from Rob Herring.
+	- Moved numa binding and implementation to devicetree core.
+	- Added cleanup patch to remove redundant NODE_DATA macro from asm header files
+	- Include numa balancing support for arm64 patch in this series.
+	- Fix tile build issue reported by the kbuild robot(patch 7)
+
+v9:	- Added cleanup patch to reuse and avoid redefinition of cpumask_of_pcibus
+	  as suggested from Will Deacon and Bjorn Helgaas.
+	  - Including patch to Make pci-host-generic driver numa aware.
+	  - Incorporated comment from Shannon Zhao.
+
+v8:
+	- Incorporated review comments of Mark Rutland and Will Deacon.
+	- Added pci helper function and macro for numa.
+
+v7:
+	- managing numa memory mapping using memblock.
+	- Incorporated review comments of Mark Rutland.
+
+v6:
+	- defined and implemented the numa dt binding using
+	node property proximity and device node distance-map.
+	- renamed dt_numa to of_numa
+
+v5:
+        - created base verion of numa.c which creates dummy numa without using dt
+          on single socket platforms. Then added patches for dt support.
+        - Incorporated review comments from Hanjun Guo.
+
+v4:
+done changes as per Arnd review comments.
+
+v3:
+Added changes to support numa on arm64 based platforms.
+Tested these patches on cavium's multinode(2 node topology) platform.
+In this patchset, defined and implemented dt bindings for numa mapping
+for core and memory using device node property arm,associativity.
+
+v2:
+Defined and implemented numa map for memory, cores to node and
+proximity distance matrix of nodes.
+
+v1:
+Initial patchset to support numa on arm64 platforms.
+
+Note: 1. This patchset is tested for NUMA and without NUMA with dt
+        (both with and without NUMA bindings) on thunderx single
+        socket and dual socket boards.
+
+Ard Biesheuvel (1):
+  efi: ARM/arm64: ignore DT memory nodes instead of removing them
+
+David Daney (2):
+  of, numa: Add NUMA of binding implementation.
+  arm64: Move unflatten_device_tree() call earlier.
+
+Ganapatrao Kulkarni (3):
+  Documentation, dt, numa: dt bindings for NUMA.
+  arm64, numa: Add NUMA support for arm64 platforms.
+  arm64, mm, numa: Add NUMA balancing support for arm64.
+
+ Documentation/devicetree/bindings/numa.txt | 275 ++++++++++++++++++++
+ arch/arm64/Kconfig                         |  27 ++
+ arch/arm64/include/asm/mmu.h               |   1 +
+ arch/arm64/include/asm/mmzone.h            |  12 +
+ arch/arm64/include/asm/numa.h              |  45 ++++
+ arch/arm64/include/asm/pgtable.h           |  15 ++
+ arch/arm64/include/asm/topology.h          |  10 +
+ arch/arm64/kernel/pci.c                    |  10 +
+ arch/arm64/kernel/setup.c                  |  17 +-
+ arch/arm64/kernel/smp.c                    |   4 +
+ arch/arm64/mm/Makefile                     |   1 +
+ arch/arm64/mm/init.c                       |  35 ++-
+ arch/arm64/mm/mm.h                         |   1 -
+ arch/arm64/mm/mmu.c                        |   2 -
+ arch/arm64/mm/numa.c                       | 396 +++++++++++++++++++++++++++++
+ drivers/firmware/efi/arm-init.c            |   8 +
+ drivers/firmware/efi/libstub/fdt.c         |  24 +-
+ drivers/of/Kconfig                         |   3 +
+ drivers/of/Makefile                        |   1 +
+ drivers/of/of_numa.c                       | 211 +++++++++++++++
+ include/linux/of.h                         |   9 +
+ 21 files changed, 1072 insertions(+), 35 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/numa.txt
+ create mode 100644 arch/arm64/include/asm/mmzone.h
+ create mode 100644 arch/arm64/include/asm/numa.h
+ create mode 100644 arch/arm64/mm/numa.c
+ create mode 100644 drivers/of/of_numa.c
+
+-- 
+1.8.3.1
