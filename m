@@ -1,109 +1,112 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Fri, 8 Apr 2016 10:03:14 +0800
-Subject: [PATCH v2 2/2] hwrng: hisi: Add support for Hisilicon SoC RNG
-In-Reply-To: <CANLsYkwRGm3oBWaoKki4Ge3A_-temOsdJcwby6ds_X5_XGYZtQ@mail.gmail.com>
-References: <1460017397-30996-1-git-send-email-wangkefeng.wang@huawei.com>
- <1460017397-30996-3-git-send-email-wangkefeng.wang@huawei.com>
- <CANLsYkwRGm3oBWaoKki4Ge3A_-temOsdJcwby6ds_X5_XGYZtQ@mail.gmail.com>
-Message-ID: <57071162.908@huawei.com>
+From: dyoung@redhat.com (Dave Young)
+Date: Fri, 8 Apr 2016 10:12:01 +0800
+Subject: [PATCH v2] ARM: kexec: fix crashkernel= handling
+In-Reply-To: <E1aoH5h-0003LZ-O9@rmk-PC.arm.linux.org.uk>
+References: <E1akqb5-0002LZ-1f@rmk-PC.arm.linux.org.uk>
+ <E1aoH5h-0003LZ-O9@rmk-PC.arm.linux.org.uk>
+Message-ID: <20160408021201.GA4186@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 04/07/16 at 10:03pm, Russell King wrote:
+> When the kernel crashkernel parameter is specified with just a size, we
+> are supposed to allocate a region from RAM to store the crashkernel.
+> However, ARM merely reserves physical address zero with no checking that
+> there is even RAM there.
+> 
+> Fix this by lifting similar code from x86, importing it to ARM with the
+> ARM specific parameters added.  In the absence of any platform specific
+> information, we allocate the crashkernel region from the first 512MB of
+> physical memory.
+> 
+> Update the kdump documentation to reflect this change.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  Documentation/kdump/kdump.txt | 13 +++----------
+>  arch/arm/kernel/setup.c       | 29 +++++++++++++++++++++++++++++
+>  2 files changed, 32 insertions(+), 10 deletions(-)
+> 
+> diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
+> index bc4bd5a44b88..88ff63d5fde3 100644
+> --- a/Documentation/kdump/kdump.txt
+> +++ b/Documentation/kdump/kdump.txt
+> @@ -263,12 +263,6 @@ been removed from the machine.
+>      crashkernel=<range1>:<size1>[,<range2>:<size2>,...][@offset]
+>      range=start-[end]
+>  
+> -Please note, on arm, the offset is required.
+> -    crashkernel=<range1>:<size1>[,<range2>:<size2>,...]@offset
+> -    range=start-[end]
+> -
+> -    'start' is inclusive and 'end' is exclusive.
+> -
+>  For example:
+>  
+>      crashkernel=512M-2G:64M,2G-:128M
+> @@ -307,10 +301,9 @@ Boot into System Kernel
+>     on the memory consumption of the kdump system. In general this is not
+>     dependent on the memory size of the production system.
+>  
+> -   On arm, use "crashkernel=Y at X". Note that the start address of the kernel
+> -   will be aligned to 128MiB (0x08000000), so if the start address is not then
+> -   any space below the alignment point may be overwritten by the dump-capture kernel,
+> -   which means it is possible that the vmcore is not that precise as expected.
+> +   On arm, the use of "crashkernel=Y at X" is no longer necessary; the
+> +   kernel will automatically locate the crash kernel image within the
+> +   first 512MB of RAM if X is not given.
+>  
+>  
+>  Load the Dump-capture Kernel
+> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+> index 139791ed473d..77b54c461c52 100644
+> --- a/arch/arm/kernel/setup.c
+> +++ b/arch/arm/kernel/setup.c
+> @@ -938,6 +938,13 @@ static int __init init_machine_late(void)
+>  late_initcall(init_machine_late);
+>  
+>  #ifdef CONFIG_KEXEC
+> +/*
+> + * The crash region must be aligned to 128MB to avoid
+> + * zImage relocating below the reserved region.
+> + */
+> +#define CRASH_ALIGN	(128 << 20)
+> +#define CRASH_ADDR_MAX	(PHYS_OFFSET + (512 << 20))
+> +
+>  static inline unsigned long long get_total_mem(void)
+>  {
+>  	unsigned long total;
+> @@ -965,6 +972,28 @@ static void __init reserve_crashkernel(void)
+>  	if (ret)
+>  		return;
+>  
+> +	if (crash_base <= 0) {
+> +		unsigned long long crash_max = CRASH_ADDR_MAX;
+> +		if (crash_max > (u32)~0)
+> +			crash_max = (u32)~0;
+> +		crash_base = memblock_find_in_range(CRASH_ALIGN, crash_max,
+> +						    crash_size, CRASH_ALIGN);
+> +		if (!crash_base) {
+> +			pr_err("crashkernel reservation failed - No suitable area found.\n");
+> +			return;
+> +		}
+> +	} else {
+> +		unsigned long long start;
+> +
+> +		start = memblock_find_in_range(crash_base,
+> +					       crash_base + crash_size,
+> +					       crash_size, SECTION_SIZE);
+> +		if (start != crash_base) {
+> +			pr_err("crashkernel reservation failed - memory is in use.\n");
+> +			return;
+> +		}
+> +	}
+> +
+>  	ret = memblock_reserve(crash_base, crash_size);
+>  	if (ret < 0) {
+>  		pr_warn("crashkernel reservation failed - memory is in use (0x%lx)\n",
 
+Reviewed-by: Dave Young <dyoung@redhat.com>
 
-On 2016/4/7 22:55, Mathieu Poirier wrote:
-> On 7 April 2016 at 02:23, Kefeng Wang <wangkefeng.wang@huawei.com> wrote:
->> This adds the Hisilicon Random Number Generator(RNG) support,
->> which is found in Hip04 and Hip05 soc.
->>
->> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
->> ---
->>  drivers/char/hw_random/Kconfig    |  13 ++++
->>  drivers/char/hw_random/Makefile   |   1 +
->>  drivers/char/hw_random/hisi-rng.c | 121 ++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 135 insertions(+)
->>  create mode 100644 drivers/char/hw_random/hisi-rng.c
-[...]
->> +
->> +#define RNG_SEED       0x0
->> +#define RNG_CTRL       0x4
->> +  #define RNG_SEED_SEL BIT(2)
->> +  #define RNG_RING_EN  BIT(1)
->> +  #define RNG_EN       BIT(0)
->> +#define RNG_RAN_NUM    0x10
->> +#define RNG_PHY_SEED   0x14
->> +#define RNG_RELOAD_ERR 0x84
->> +
->> +#define to_hisi_rng(p) container_of(p, struct hisi_rng, rng)
->> +
->> +static int seed_sel;
->> +module_param(seed_sel, int, S_IRUGO);
->> +MODULE_PARM_DESC(seed_sel, "Auto reload seed. 0, use LFSR(default); 1, use ring oscillator.");
->> +
->> +struct hisi_rng {
->> +       void __iomem *base;
->> +       struct hwrng rng;
->> +};
->> +
->> +static int hisi_rng_init(struct hwrng *rng)
->> +{
->> +       struct hisi_rng *hrng = to_hisi_rng(rng);
->> +       int val = RNG_EN;
->> +       u32 seed;
->> +
->> +       /* get a random number as initial seed */
->> +       get_random_bytes(&seed, sizeof(seed));
->> +
->> +       writel_relaxed(seed, hrng->base + RNG_SEED);
->> +
->> +       if (seed_sel == 1)
->> +               val |= RNG_RING_EN | RNG_SEED_SEL;
-> 
-> Hello Kefeng,
-> 
-> Please explain what this mode does.  Otherwise reviewers have to make
-> a guess based on the description of the module parameter.
-The seed is reload periodically, there are two choice of seeds, default using
-the val from LFSR, seed_sel = 1  will use the val generated by ring oscillator.
-> 
->> +
->> +       writel_relaxed(val, hrng->base + RNG_CTRL);
->> +       return 0;
->> +}
->> +
->> +static void hisi_rng_cleanup(struct hwrng *rng)
->> +{
->> +       struct hisi_rng *hrng = to_hisi_rng(rng);
->> +
->> +       writel_relaxed(0, hrng->base + RNG_CTRL);
->> +}
->> +
->> +static int hisi_rng_read(struct hwrng *rng, void *buf, size_t max,
->> +                          bool wait)
-> 
-> What are variable 'max' and 'wait' used for?  As far as I can tell
-> they can be removed.
-Ok, will use data_read callback in struct hwrng.
-
-> 
->> +{
->> +       struct hisi_rng *hrng = to_hisi_rng(rng);
->> +       u32 *data = buf;
->> +
->> +       *data = readl_relaxed(hrng->base + RNG_RAN_NUM);
->> +       return 4;
-> 
-> Why not simply doing the readl_relaxed() in the the code rather than
-> introducing a new function?
-Not clear, your mean introduce the data variable?
-Will use following data_read, thanks.
-
-static int hisi_rng_data_read(struct hwrng *rng, u32 *data)
-{
-       struct hisi_rng *hrng = to_hisi_rng(rng);
-       *data = readl_relaxed(hrng->base + RNG_RAN_NUM);
-       return 4;
-}
-
-Thanks,
-Kefeng
+Thanks
+Dave
