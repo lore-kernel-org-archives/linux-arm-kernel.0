@@ -1,52 +1,201 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 8 Apr 2016 11:19:35 +0200
-Subject: 4.4, 4.6: camera and unlock buttons produce tons of interrupts
- (was Re: N900 sleep mode)
-In-Reply-To: <20160407234134.GQ16484@atomide.com>
-References: <20160404213056.GA25912@amd> <20160404220748.GA16484@atomide.com>
- <20160405142250.GA6429@amd> <20160405152916.GE16484@atomide.com>
- <20160405205137.GA10196@amd> <20160407174019.GM16484@atomide.com>
- <20160407194828.GA13338@amd> <20160407213229.GO16484@atomide.com>
- <20160407230150.GA16552@amd> <20160407234134.GQ16484@atomide.com>
-Message-ID: <20160408091934.GA15221@amd>
+From: lipengcheng8@huawei.com (lipengcheng)
+Date: Fri, 8 Apr 2016 17:19:10 +0800
+Subject: [PATCH RESEND] coresight-etm4x: Change ETM setting.
+Message-ID: <1460107150-241958-1-git-send-email-lipengcheng8@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+From: Pengcheng Li <lipengcheng8@huawei.com>
 
-> > > Looks like you have 117 additional entries in .config enabled compared
-> > > to omap2plus_defconfig. Maybe go back to omap2plus_defconfig with minimal
-> > > changes and verify it idles properly first?
-> > > 
-> > > I'm suspecting it's some driver(s) you have enabled causing the
-> > > issue.
-> > 
-> > I guess so. Do you (or anyone else) have minimum non-modular config
-> > for N900 that boots with video? Could I get lsmod from your system?
-> > (Yes, I still have nightmares from getting .config that works).
-> 
-> Well I've been just using omap2plus_defconfig with:
-> 
-> # modprobe tsc2005
-> # modprobe gpio_backlight
-> # modprobe panel_sony_acx565akm
-> # modprobe omapfb
-> 
-> # echo 255 > /sys/class/backlight/acx565akm/brightness
-> 
-> And then the following to blank for idle:
-> 
-> # echo 1 > /sys/devices/platform/omapfb/graphics/fb0/blank
-> 
-> But in the world of eternal regressions, I'm not seeing anything
-> on the framebuffer with v4.6-rc2 :( No idea what broke it or when
-> as my n900 is in the rack.
+Force ETM idle acknowleghe when CPU enter WFI.
+writel_relaxed(0x2, drvdata->base + TRCAUXCTLR);
 
-Well, for the record, framebuffer works in my config with v4.6-rc2. So
-that is another config issue. Hopefully it is not the same issue ;-).
+Because linux kernel execute on EL1,
+so we just need to open EL1 trace?close EL1 trace.
+drvdata->vinst_ctrl |= BIT(20);
 
-Best regards,
-									Pavel
+Because this operation exceed the range of boolean,
+so we should modify q_support to unit32 bit.
+drvdata->q_support = BMVAL(etmidr0, 15, 16)
+
+Adding PM runtime operations in Coresight devices.
+	-static int etmv4_suspend(struct device *dev)
+	-static int etmv4_resume(struct device *dev)
+
+Signed-off-by: Li Pengcheng <lipengcheng8@huawei.com>
+Signed-off-by: Li Zhong <lizhong11@hisilicon.com>
+---
+ drivers/hwtracing/coresight/coresight-etm4x.c | 58 +++++++++++++++++++++++++--
+ drivers/hwtracing/coresight/coresight-etm4x.h |  2 +-
+ drivers/hwtracing/coresight/coresight.c       | 10 +++--
+ 3 files changed, 62 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+index 1c59bd3..3a21409 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -33,7 +33,7 @@
+ #include <linux/pm_runtime.h>
+ #include <linux/perf_event.h>
+ #include <asm/sections.h>
+-
++#include<linux/cpuidle.h>
+ #include "coresight-etm4x.h"
+ 
+ static int boot_enable;
+@@ -111,8 +111,8 @@ static void etm4_enable_hw(void *info)
+ 
+ 	writel_relaxed(drvdata->pe_sel, drvdata->base + TRCPROCSELR);
+ 	writel_relaxed(drvdata->cfg, drvdata->base + TRCCONFIGR);
+-	/* nothing specific implemented */
+-	writel_relaxed(0x0, drvdata->base + TRCAUXCTLR);
++	/* Force ETM idle acknowleghe when CPU enter WFI */
++	writel_relaxed(0x2, drvdata->base + TRCAUXCTLR);
+ 	writel_relaxed(drvdata->eventctrl0, drvdata->base + TRCEVENTCTL0R);
+ 	writel_relaxed(drvdata->eventctrl1, drvdata->base + TRCEVENTCTL1R);
+ 	writel_relaxed(drvdata->stall_ctrl, drvdata->base + TRCSTALLCTLR);
+@@ -2491,6 +2491,8 @@ static void etm4_init_default_data(struct etmv4_drvdata *drvdata)
+ 	 *  started state
+ 	 */
+ 	drvdata->vinst_ctrl |= BIT(0);
++	/* Not generate EL0-NS trace */
++	drvdata->vinst_ctrl |= BIT(20);
+ 	/* set initial state of start-stop logic */
+ 	if (drvdata->nr_addr_cmp)
+ 		drvdata->vinst_ctrl |= BIT(9);
+@@ -2595,6 +2597,42 @@ static struct notifier_block etm4_cpu_notifier = {
+ 	.notifier_call = etm4_cpu_callback,
+ };
+ 
++#ifdef CONFIG_PM
++
++static int etmv4_suspend(struct device *dev)
++{
++	int ret = 0;
++	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev);
++
++	dev_info(drvdata->dev, "%s: CPU+%d\n", __func__, drvdata->cpu);
++	if (drvdata->enable) {
++		cpuidle_pause();
++		coresight_disable(drvdata->csdev);
++		cpuidle_resume();
++	}
++
++	return ret;
++}
++
++static int etmv4_resume(struct device *dev)
++{
++	int ret = 0;
++	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev);
++
++	dev_info(drvdata->dev, "%s: CPU+%d\n", __func__, drvdata->cpu);
++	if (!drvdata->enable && drvdata->boot_enable) {
++		cpuidle_pause();
++		coresight_enable(drvdata->csdev);
++		cpuidle_resume();
++	}
++
++	return ret;
++}
++
++static SIMPLE_DEV_PM_OPS(etm4x_dev_pm_ops, etmv4_suspend, etmv4_resume);
++
++#endif
++
+ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
+ {
+ 	int ret;
+@@ -2673,7 +2711,9 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
+ 	dev_info(dev, "%s initialized\n", (char *)id->data);
+ 
+ 	if (boot_enable) {
++		cpuidle_pause();
+ 		coresight_enable(drvdata->csdev);
++		cpuidle_resume();
+ 		drvdata->boot_enable = true;
+ 	}
+ 
+@@ -2698,7 +2738,17 @@ static struct amba_id etm4_ids[] = {
+ 		.mask	= 0x000fffff,
+ 		.data	= "ETM 4.0",
+ 	},
+-	{ 0, 0},
++	{       /* ETM 4.0 - A72 board */
++		.id = 0x000bb95a,
++		.mask = 0x000fffff,
++		.data = "ETM 4.0",
++	},
++	{       /* ETM 4.0 - Atermis board */
++		.id = 0x000bb959,
++		.mask = 0x000fffff,
++		.data = "ETM 4.0",
++	},
++	{0, 0},
+ };
+ 
+ static struct amba_driver etm4x_driver = {
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.h b/drivers/hwtracing/coresight/coresight-etm4x.h
+index c341002..305b29a 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.h
++++ b/drivers/hwtracing/coresight/coresight-etm4x.h
+@@ -330,7 +330,7 @@ struct etmv4_drvdata {
+ 	u32				ccctlr;
+ 	bool				trcbb;
+ 	u32				bb_ctrl;
+-	bool				q_support;
++	u32				q_support;
+ 	u32				vinst_ctrl;
+ 	u32				viiectlr;
+ 	u32				vissctlr;
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index 2ea5961..8b9fda4 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -24,6 +24,7 @@
+ #include <linux/of_platform.h>
+ #include <linux/delay.h>
+ #include <linux/pm_runtime.h>
++#include <linux/cpuidle.h>
+ 
+ #include "coresight-priv.h"
+ 
+@@ -514,7 +515,7 @@ static ssize_t enable_sink_show(struct device *dev,
+ {
+ 	struct coresight_device *csdev = to_coresight_device(dev);
+ 
+-	return scnprintf(buf, PAGE_SIZE, "%u\n", (unsigned)csdev->activated);
++	return scnprintf(buf, PAGE_SIZE, "%u\n", csdev->activated);
+ }
+ 
+ static ssize_t enable_sink_store(struct device *dev,
+@@ -544,7 +545,7 @@ static ssize_t enable_source_show(struct device *dev,
+ {
+ 	struct coresight_device *csdev = to_coresight_device(dev);
+ 
+-	return scnprintf(buf, PAGE_SIZE, "%u\n", (unsigned)csdev->enable);
++	return scnprintf(buf, PAGE_SIZE, "%u\n", csdev->enable);
+ }
+ 
+ static ssize_t enable_source_store(struct device *dev,
+@@ -559,6 +560,8 @@ static ssize_t enable_source_store(struct device *dev,
+ 	if (ret)
+ 		return ret;
+ 
++	/* suspend cpuidle */
++	cpuidle_pause();
+ 	if (val) {
+ 		ret = coresight_enable(csdev);
+ 		if (ret)
+@@ -566,7 +569,8 @@ static ssize_t enable_source_store(struct device *dev,
+ 	} else {
+ 		coresight_disable(csdev);
+ 	}
+-
++	/* resume cpuidle */
++	cpuidle_resume();
+ 	return size;
+ }
+ static DEVICE_ATTR_RW(enable_source);
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.8.3.2
