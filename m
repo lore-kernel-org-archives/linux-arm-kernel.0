@@ -1,79 +1,54 @@
-From: sugar.zhang@rock-chips.com (sugar)
-Date: Fri, 8 Apr 2016 17:26:57 +0800
-Subject: [PATCH] ASoC: rockchip: i2s: configure the sdio pins' iomux mode
-In-Reply-To: <20160407175811.GP32257@rob-hp-laptop>
-References: <1459931902-77324-1-git-send-email-sugar.zhang@rock-chips.com>
- <20160407175811.GP32257@rob-hp-laptop>
-Message-ID: <57077961.6010200@rock-chips.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 8 Apr 2016 11:38:40 +0200
+Subject: [PATCH v2 2/9] drivers: irqchip: Add STM32 external interrupts
+ support
+In-Reply-To: <1459436979-17275-3-git-send-email-mcoquelin.stm32@gmail.com>
+References: <1459436979-17275-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1459436979-17275-3-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <CACRpkdaiE1cJM6uq_bQuRS2NJTwniPREBsgwuxEjRjB5yTfc9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Thu, Mar 31, 2016 at 5:09 PM, Maxime Coquelin
+<mcoquelin.stm32@gmail.com> wrote:
 
-On 4/8/2016 01:58, Rob Herring Wrote:
-> On Wed, Apr 06, 2016 at 04:38:22PM +0800, Sugar Zhang wrote:
->> There are 3 i2s sdio pins, which iomux mode is as follows:
->
-> s/i2s sdio/I2S\/SDIO muxed/
->
->>
->>   - sdi3_sdo1
->>   - sdi2_sdo2
->>   - sdi1_sdo3
->>
->> we need to configure these pins' iomux mode via the GRF register
->> when use multi channel playback/capture.
->
-> Why not a pinctrl binding here? If you want SDIO mode, then you need
-> similar code in the SDIO driver (or just rely on default mode).
->
-here, i2s_sdio means i2s_sdi/i2s_sdo, not means SDIO bus interface.
-for example:
+> +static void stm32_irq_handler(struct irq_desc *desc)
+> +{
+> +       struct irq_domain *domain = irq_desc_get_handler_data(desc);
+> +       struct irq_chip_generic *gc = domain->gc->gc[0];
+> +       struct irq_chip *chip = irq_desc_get_chip(desc);
+> +       unsigned long pending;
+> +       int n;
+> +
+> +       chained_irq_enter(chip, desc);
+> +
+> +       pending = irq_reg_readl(gc, EXTI_PR);
+> +       for_each_set_bit(n, &pending, BITS_PER_LONG) {
+> +               generic_handle_irq(irq_find_mapping(domain, n));
+> +       }
+> +
+> +       chained_irq_exit(chip, desc);
+> +}
 
-gpio3d[6] iomux select:
-2'b 00: gpio
-2'b 01: i2s0_sdi3sdo1
-2'b 10: xxx
-2'b 11: xxx
+Is this one of those cases where you should re-read the status register
+on every iteration, so as to avoid exiting and immediately re-entering
+the irq handler?
 
-we configure the i2s_sdi3sdo1 mode via the pinctrl, and then need another
-grf register to configure it is used for i2s0_sdi3 or i2s0_sdo1.
+C.g irq-vic.c:
 
->>
->> Signed-off-by: Sugar Zhang <sugar.zhang@rock-chips.com>
->> ---
->>
->>   .../devicetree/bindings/sound/rockchip-i2s.txt     |  5 +++
->>   sound/soc/rockchip/rockchip_i2s.c                  | 39 +++++++++++++++++++++-
->>   sound/soc/rockchip/rockchip_i2s.h                  |  8 +++++
->>   3 files changed, 51 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/devicetree/bindings/sound/rockchip-i2s.txt b/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
->> index 6e86d8a..ad72a7d 100644
->> --- a/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
->> +++ b/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
->> @@ -23,6 +23,11 @@ Required properties:
->>   - rockchip,playback-channels: max playback channels, if not set, 8 channels default.
->>   - rockchip,capture-channels: max capture channels, if not set, 2 channels default.
->>
->> +Required properties for controller which support multi channels playback/capture:
->> +
->> +- rockchip,grf: Should be phandle/offset pair. the phandle of the syscon node for GRF register,
->
-> Wrap your lines at less than 80 chars.
+static int handle_one_vic(struct vic_device *vic, struct pt_regs *regs)
+{
+        u32 stat, irq;
+        int handled = 0;
 
-Ok, will fix.
->
->> +  and the offset of the GRF for control register.
->> +
->>   Example for rk3288 I2S controller:
->>
->>   i2s at ff890000 {
->
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
->
->
->
+        while ((stat = readl_relaxed(vic->base + VIC_IRQ_STATUS))) {
+                irq = ffs(stat) - 1;
+                handle_domain_irq(vic->domain, irq, regs);
+                handled = 1;
+        }
+
+        return handled;
+}
+
+Yours,
+Linus Walleij
