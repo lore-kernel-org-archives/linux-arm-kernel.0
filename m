@@ -1,136 +1,59 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 08 Apr 2016 14:00:44 +0900
-Subject: [PATCH 5/7] clk: samsung: exynos542x: Add the clock id for ACLK
+Date: Fri, 08 Apr 2016 14:00:43 +0900
+Subject: [PATCH 4/7] dt-bindings: clock: Add the clock id for ACLK clock of
+ Exynos542x SoC
 In-Reply-To: <1460091646-28701-1-git-send-email-cw00.choi@samsung.com>
 References: <1460091646-28701-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1460091646-28701-6-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1460091646-28701-5-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the clock id for ACLK clock which is source clock of AMBA AXI
-Bus. This clock should be handled in Bus frequency scaling driver.
+This patch adds the clock id for ACLK clock of Exynos542x SoC. ACLK clock mean
+the source clock of AMBA AXI bus. This clock id should be used for Bus
+frequency scaling.
 
+Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Cc: Tomasz Figa <tomasz.figa@gmail.com>
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 ---
- drivers/clk/samsung/clk-exynos5420.c | 85 +++++++++++++++++++++++-------------
- 1 file changed, 55 insertions(+), 30 deletions(-)
+ include/dt-bindings/clock/exynos5420.h | 24 +++++++++++++++++++++++-
+ 1 file changed, 23 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-index be03ed0fcb6b..d7c62dfb1646 100644
---- a/drivers/clk/samsung/clk-exynos5420.c
-+++ b/drivers/clk/samsung/clk-exynos5420.c
-@@ -554,8 +554,9 @@ static struct samsung_mux_clock exynos5800_mux_clks[] __initdata = {
- };
+diff --git a/include/dt-bindings/clock/exynos5420.h b/include/dt-bindings/clock/exynos5420.h
+index 7699ee9c16c0..17ab8394bec7 100644
+--- a/include/dt-bindings/clock/exynos5420.h
++++ b/include/dt-bindings/clock/exynos5420.h
+@@ -217,8 +217,30 @@
  
- static struct samsung_div_clock exynos5800_div_clks[] __initdata = {
--	DIV(0, "dout_aclk400_wcore", "mout_aclk400_wcore", DIV_TOP0, 16, 3),
--
-+	DIV_F(CLK_DOUT_ACLK400_WCORE, "dout_aclk400_wcore",
-+			"mout_aclk400_wcore",
-+			DIV_TOP0, 16, 3, CLK_SET_RATE_PARENT, 0),
- 	DIV(0, "dout_aclk550_cam", "mout_aclk550_cam",
- 				DIV_TOP8, 16, 3),
- 	DIV(0, "dout_aclkfl1_550_cam", "mout_aclkfl1_550_cam",
-@@ -607,8 +608,9 @@ static struct samsung_mux_clock exynos5420_mux_clks[] __initdata = {
- };
+ /* divider clocks */
+ #define CLK_DOUT_PIXEL		768
++#define CLK_DOUT_ACLK400_WCORE	769
++#define CLK_DOUT_ACLK400_ISP	770
++#define CLK_DOUT_ACLK400_MSCL	771
++#define CLK_DOUT_ACLK200	772
++#define CLK_DOUT_ACLK200_FSYS2	773
++#define CLK_DOUT_ACLK100_NOC	774
++#define CLK_DOUT_PCLK200_FSYS	775
++#define CLK_DOUT_ACLK200_FSYS	776
++#define CLK_DOUT_ACLK333_432_GSCL	777
++#define CLK_DOUT_ACLK333_432_ISP	778
++#define CLK_DOUT_ACLK66		779
++#define CLK_DOUT_ACLK333_432_ISP0	780
++#define CLK_DOUT_ACLK266	781
++#define CLK_DOUT_ACLK166	782
++#define CLK_DOUT_ACLK333	783
++#define CLK_DOUT_ACLK333_G2D	784
++#define CLK_DOUT_ACLK266_G2D	785
++#define CLK_DOUT_ACLK_G3D	786
++#define CLK_DOUT_ACLK300_JPEG	787
++#define CLK_DOUT_ACLK300_DISP1	788
++#define CLK_DOUT_ACLK300_GSCL	789
++#define CLK_DOUT_ACLK400_DISP1	790
  
- static struct samsung_div_clock exynos5420_div_clks[] __initdata = {
--	DIV(0, "dout_aclk400_wcore", "mout_aclk400_wcore_bpll",
--			DIV_TOP0, 16, 3),
-+	DIV_F(CLK_DOUT_ACLK400_WCORE, "dout_aclk400_wcore",
-+			"mout_aclk400_wcore_bpll",
-+			DIV_TOP0, 16, 3, CLK_SET_RATE_PARENT, 0),
- };
+ /* must be greater than maximal clock id */
+-#define CLK_NR_CLKS		769
++#define CLK_NR_CLKS		791
  
- static struct samsung_mux_clock exynos5x_mux_clks[] __initdata = {
-@@ -785,31 +787,52 @@ static struct samsung_div_clock exynos5x_div_clks[] __initdata = {
- 	DIV(0, "div_kfc", "mout_kfc", DIV_KFC0, 0, 3),
- 	DIV(0, "sclk_kpll", "mout_kpll", DIV_KFC0, 24, 3),
- 
--	DIV(0, "dout_aclk400_isp", "mout_aclk400_isp", DIV_TOP0, 0, 3),
--	DIV(0, "dout_aclk400_mscl", "mout_aclk400_mscl", DIV_TOP0, 4, 3),
--	DIV(0, "dout_aclk200", "mout_aclk200", DIV_TOP0, 8, 3),
--	DIV(0, "dout_aclk200_fsys2", "mout_aclk200_fsys2", DIV_TOP0, 12, 3),
--	DIV(0, "dout_aclk100_noc", "mout_aclk100_noc", DIV_TOP0, 20, 3),
--	DIV(0, "dout_pclk200_fsys", "mout_pclk200_fsys", DIV_TOP0, 24, 3),
--	DIV(0, "dout_aclk200_fsys", "mout_aclk200_fsys", DIV_TOP0, 28, 3),
--
--	DIV(0, "dout_aclk333_432_gscl", "mout_aclk333_432_gscl",
--			DIV_TOP1, 0, 3),
--	DIV(0, "dout_aclk333_432_isp", "mout_aclk333_432_isp",
--			DIV_TOP1, 4, 3),
--	DIV(0, "dout_aclk66", "mout_aclk66", DIV_TOP1, 8, 6),
--	DIV(0, "dout_aclk333_432_isp0", "mout_aclk333_432_isp0",
--			DIV_TOP1, 16, 3),
--	DIV(0, "dout_aclk266", "mout_aclk266", DIV_TOP1, 20, 3),
--	DIV(0, "dout_aclk166", "mout_aclk166", DIV_TOP1, 24, 3),
--	DIV(0, "dout_aclk333", "mout_aclk333", DIV_TOP1, 28, 3),
--
--	DIV(0, "dout_aclk333_g2d", "mout_aclk333_g2d", DIV_TOP2, 8, 3),
--	DIV(0, "dout_aclk266_g2d", "mout_aclk266_g2d", DIV_TOP2, 12, 3),
--	DIV(0, "dout_aclk_g3d", "mout_aclk_g3d", DIV_TOP2, 16, 3),
--	DIV(0, "dout_aclk300_jpeg", "mout_aclk300_jpeg", DIV_TOP2, 20, 3),
--	DIV(0, "dout_aclk300_disp1", "mout_aclk300_disp1", DIV_TOP2, 24, 3),
--	DIV(0, "dout_aclk300_gscl", "mout_aclk300_gscl", DIV_TOP2, 28, 3),
-+	DIV_F(CLK_DOUT_ACLK400_ISP, "dout_aclk400_isp", "mout_aclk400_isp",
-+			DIV_TOP0, 0, 3, CLK_SET_RATE_PARENT, 0),
-+	DIV_F(CLK_DOUT_ACLK400_MSCL, "dout_aclk400_mscl", "mout_aclk400_mscl",
-+			DIV_TOP0, 4, 3, CLK_SET_RATE_PARENT, 0),
-+	DIV_F(CLK_DOUT_ACLK200, "dout_aclk200", "mout_aclk200",
-+			DIV_TOP0, 8, 3, CLK_SET_RATE_PARENT, 0),
-+	DIV_F(CLK_DOUT_ACLK200_FSYS2, "dout_aclk200_fsys2",
-+			"mout_aclk200_fsys2",
-+			DIV_TOP0, 12, 3, CLK_SET_RATE_PARENT, 0),
-+	DIV_F(CLK_DOUT_ACLK100_NOC, "dout_aclk100_noc", "mout_aclk100_noc",
-+			DIV_TOP0, 20, 3, CLK_SET_RATE_PARENT, 0),
-+	DIV_F(CLK_DOUT_PCLK200_FSYS, "dout_pclk200_fsys", "mout_pclk200_fsys",
-+			DIV_TOP0, 24, 3, CLK_SET_RATE_PARENT, 0),
-+	DIV_F(CLK_DOUT_ACLK200_FSYS, "dout_aclk200_fsys", "mout_aclk200_fsys",
-+			DIV_TOP0, 28, 3, CLK_SET_RATE_PARENT, 0),
-+	DIV_F(CLK_DOUT_ACLK333_432_GSCL, "dout_aclk333_432_gscl",
-+			"mout_aclk333_432_gscl",
-+			DIV_TOP1, 0, 3, CLK_SET_RATE_PARENT, 0),
-+	DIV_F(CLK_DOUT_ACLK333_432_ISP, "dout_aclk333_432_isp",
-+			"mout_aclk333_432_isp",
-+			DIV_TOP1, 4, 3, CLK_SET_RATE_PARENT, 0),
-+	DIV_F(CLK_DOUT_ACLK66, "dout_aclk66", "mout_aclk66",
-+			DIV_TOP1, 8, 6, CLK_SET_RATE_PARENT, 0),
-+	DIV_F(CLK_DOUT_ACLK333_432_ISP0, "dout_aclk333_432_isp0",
-+			"mout_aclk333_432_isp0",
-+			DIV_TOP1, 16, 3, CLK_SET_RATE_PARENT, 0),
-+	DIV_F(CLK_DOUT_ACLK266, "dout_aclk266", "mout_aclk266",
-+			DIV_TOP1, 20, 3, CLK_SET_RATE_PARENT, 0),
-+	DIV_F(CLK_DOUT_ACLK166, "dout_aclk166", "mout_aclk166",
-+			DIV_TOP1, 24, 3, CLK_SET_RATE_PARENT, 0),
-+	DIV_F(CLK_DOUT_ACLK333, "dout_aclk333", "mout_aclk333",
-+			DIV_TOP1, 28, 3, CLK_SET_RATE_PARENT, 0),
-+
-+	DIV_F(CLK_DOUT_ACLK333_G2D, "dout_aclk333_g2d", "mout_aclk333_g2d",
-+			DIV_TOP2, 8, 3, CLK_SET_RATE_PARENT, 0),
-+	DIV_F(CLK_DOUT_ACLK266_G2D, "dout_aclk266_g2d", "mout_aclk266_g2d",
-+			DIV_TOP2, 12, 3, CLK_SET_RATE_PARENT, 0),
-+	DIV_F(CLK_DOUT_ACLK_G3D, "dout_aclk_g3d", "mout_aclk_g3d", DIV_TOP2,
-+			16, 3, CLK_SET_RATE_PARENT, 0),
-+	DIV_F(CLK_DOUT_ACLK300_JPEG, "dout_aclk300_jpeg", "mout_aclk300_jpeg",
-+			DIV_TOP2, 20, 3, CLK_SET_RATE_PARENT, 0),
-+	DIV_F(CLK_DOUT_ACLK300_DISP1, "dout_aclk300_disp1",
-+			"mout_aclk300_disp1",
-+			DIV_TOP2, 24, 3, CLK_SET_RATE_PARENT, 0),
-+	DIV_F(CLK_DOUT_ACLK300_GSCL, "dout_aclk300_gscl", "mout_aclk300_gscl",
-+			DIV_TOP2, 28, 3, CLK_SET_RATE_PARENT, 0),
- 
- 	/* DISP1 Block */
- 	DIV(0, "dout_fimd1", "mout_fimd1_final", DIV_DISP10, 0, 4),
-@@ -817,7 +840,9 @@ static struct samsung_div_clock exynos5x_div_clks[] __initdata = {
- 	DIV(0, "dout_dp1", "mout_dp1", DIV_DISP10, 24, 4),
- 	DIV(CLK_DOUT_PIXEL, "dout_hdmi_pixel", "mout_pixel", DIV_DISP10, 28, 4),
- 	DIV(0, "dout_disp1_blk", "aclk200_disp1", DIV2_RATIO0, 16, 2),
--	DIV(0, "dout_aclk400_disp1", "mout_aclk400_disp1", DIV_TOP2, 4, 3),
-+	DIV_F(CLK_DOUT_ACLK400_DISP1, "dout_aclk400_disp1",
-+			"mout_aclk400_disp1",
-+			DIV_TOP2, 4, 3, CLK_SET_RATE_PARENT, 0),
- 
- 	/* Audio Block */
- 	DIV(0, "dout_maudio0", "mout_maudio0", DIV_MAU, 20, 4),
+ #endif /* _DT_BINDINGS_CLOCK_EXYNOS_5420_H */
 -- 
 1.9.1
