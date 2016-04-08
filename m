@@ -1,53 +1,52 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 8 Apr 2016 14:07:33 +0100
-Subject: [PATCH v2 1/2] dma/iommu: Add pgsize_bitmap confirmation in
- __iommu_dma_alloc_pages
-In-Reply-To: <CAD=FV=XdZwg8usj3bjM6W=A0Yk1AFqKFRadpiS-LGLwxVNxp7A@mail.gmail.com>
-References: <1459146732-15620-1-git-send-email-yong.wu@mediatek.com>
- <20160329170238.GK6745@arm.com>
- <CAD=FV=XdZwg8usj3bjM6W=A0Yk1AFqKFRadpiS-LGLwxVNxp7A@mail.gmail.com>
-Message-ID: <20160408130733.GD23750@arm.com>
+Date: Fri, 8 Apr 2016 14:12:08 +0100
+Subject: [PATCH v3] ARM64: ACPI: Update documentation for latest
+ specification version
+In-Reply-To: <5706D63F.7050107@redhat.com>
+References: <1459210002-3387-1-git-send-email-al.stone@linaro.org>
+ <5706D63F.7050107@redhat.com>
+Message-ID: <20160408131208.GE23750@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 05, 2016 at 10:03:32AM -0700, Doug Anderson wrote:
-> On Tue, Mar 29, 2016 at 10:02 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Mon, Mar 28, 2016 at 02:32:11PM +0800, Yong Wu wrote:
-> >> @@ -213,13 +215,16 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp)
-> >>               /*
-> >>                * Higher-order allocations are a convenience rather
-> >>                * than a necessity, hence using __GFP_NORETRY until
-> >> -              * falling back to single-page allocations.
-> >> +              * falling back to min size allocations.
-> >>                */
-> >> -             for (order = min_t(unsigned int, order, __fls(count));
-> >> -                  order > 0; order--) {
-> >> -                     page = alloc_pages(gfp | __GFP_NORETRY, order);
-> >> +             for (order = min_t(int, order, __fls(count));
-> >> +                  order >= min_order; order--) {
-> >> +                     page = alloc_pages((order == min_order) ? gfp :
-> >> +                                        gfp | __GFP_NORETRY, order);
-> >>                       if (!page)
-> >>                               continue;
-> >> +                     if (!order)
-> >> +                             break;
-> >
-> > Isn't this handled by the loop condition?
+On Thu, Apr 07, 2016 at 03:50:55PM -0600, Al Stone wrote:
+> On 03/28/2016 06:06 PM, Al Stone wrote:
+> > The ACPI 6.1 specification was recently released at the end of January
+> > 2016, but the arm64 kernel documentation for the use of ACPI was written
+> > for the 5.1 version of the spec.  There were significant additions to the
+> > spec that had not yet been mentioned -- for example, the 6.0 mechanisms
+> > added to make it easier to define processors and low power idle states,
+> > as well as the 6.1 addition allowing regular interrupts (not just from
+> > GPIO) be used to signal ACPI general purpose events.
+> > 
+> > This patch reflects going back through and examining the specs in detail
+> > and updating content appropriately.  Whilst there, a few odds and ends of
+> > typos were caught as well.  This brings the documentation up to date with
+> > ACPI 6.1 for arm64.
+> > 
+> > Changes for v3:
+> >    -- Clarify use of _LPI/_RDI (Vikas Sajjan)
+> >    -- Whitespace cleanup as pointed out by checkpatch
+> > 
+> > Changes for v2:
+> >    -- Clean up white space (Harb Abdulhahmid)
+> >    -- Clarification on _CCA usage (Harb Abdulhamid)
+> >    -- IORT moved to required from recommended (Hanjun Guo)
+> >    -- Clarify IORT description (Hanjun Guo)
+> > 
+> > Signed-off-by: Al Stone <al.stone@linaro.org>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: Jonathan Corbet <corbet@lwn.net>
+> > ---
+> >  Documentation/arm64/acpi_object_usage.txt | 446 ++++++++++++++++++++++--------
+> >  Documentation/arm64/arm-acpi.txt          |  28 +-
+> >  2 files changed, 357 insertions(+), 117 deletions(-)
+> > [snip...]
 > 
-> He changed the loop condition to be ">= min_order" instead of "> 0",
-> so now we can get here with an order == 0.  This makes sense because
-> when min_order is not 0 you still want to run the code to split the
-> pages and it is sane not to duplicate that below.
-> 
-> Maybe I'm misunderstanding, though.  Perhaps you can explain how you
-> think this code should look?
+> Ping?  Any further comments or is this good to go?
 
-My reading of the code was that we require order >= min_order to enter
-the loop. Given that order doesn't change between the loop header and the
-if (!order) check, then that must mean we can enter the loop body with
-order == 0 and order >= min_order, which means that min_order is allowed
-to be negative. That feels weird.
-
-Am I barking up the wrong tree?
+It would be nice to see an ack from some other ACPI people, if that's
+possible. Which tree were you planning to merge this through?
 
 Will
