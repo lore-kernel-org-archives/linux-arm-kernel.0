@@ -1,155 +1,81 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 8 Apr 2016 11:46:00 +0100
-Subject: [PATCH] irqchip/mbigen: Display message of MBIGEN domain created
-In-Reply-To: <570788E3.3080901@huawei.com>
-References: <1460099762-51497-1-git-send-email-wangkefeng.wang@huawei.com>
- <20160408090935.4ec95aa8@arm.com> <57076B2D.8050006@huawei.com>
- <20160408095325.49aaf6b0@arm.com> <570788E3.3080901@huawei.com>
-Message-ID: <57078BE8.8040604@arm.com>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Fri, 08 Apr 2016 12:50:54 +0200
+Subject: [PATCH] ARM: dts: r8a7791: Don't disable referenced optional
+ clocks
+In-Reply-To: <20160407232155.GH18567@codeaurora.org>
+References: <1459947173-6664-1-git-send-email-sjoerd.simons@collabora.co.uk>
+ <CAMuHMdUtPhBT0_+hSk_t5osHC8TssyGMFo+YOWetTGBkbpB4PQ@mail.gmail.com>
+ <1459949826.23936.19.camel@collabora.co.uk>
+ <20160407232155.GH18567@codeaurora.org>
+Message-ID: <1460112654.31245.20.camel@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/04/16 11:33, Kefeng Wang wrote:
-> 
-> 
-> On 2016/4/8 16:53, Marc Zyngier wrote:
->> On Fri, 8 Apr 2016 16:26:21 +0800
->> Kefeng Wang <wangkefeng.wang@huawei.com> wrote:
-> 
->>>> Overall, this doesn't look like a critical patch to me. I think Ma Jun
->>>> is working on separate series reworking the way the mgigen is getting
->>>> probed, so I'd advise you to work with him in order to integrate this
->>>> patch in his series, as it would make a lot more sense.
->>>
->>> When try to enable hip06 d03 board[1], we met following error log, so I add
->>> some debug message. The mbigen driver use module_platform_driver, the driver
->>> initialization is too late, and it is without any message,  we don't know
->>> about any info of mbigen.  I think we should show something about the mbigen
->>> domain creation at least. What's your option?
->>>
->>> Is there a way to solve this improper print?
->>> -----------
->>> [    1.345945] irq: no irq domain found for /mbigen_pcie at a0080000/intc_usb !
->>> [    1.353660] irq: no irq domain found for /mbigen_pcie at a0080000/intc_usb !
->>
->> How can printing anything solve this issue? Furthermore, the error
->> message you quote is pretty explicit: no mbigen for you, move along.
->>
->> There is a long standing dependency issue for interrupt controllers
->> that are also platform devices, and until you resolve (or help
->> resolving) that issue, you will get that kind of problem. As I
->> mentioned countless times (both on list and in person), you only have
->> two options:
->>
->> - either you defer probing devices behind the mbigen until the mbigen
->>   itself is up and running
->> - or you solve the generic dependency problem.
->>
-> Ok?got it?thanks for your explanation.
->> I feel a bit like a stuck record here.
-> 
-> But there is still one issue in the for_each_child_of_node loop of
-> mbigen_device_probe. Assume that there are 3+ child node(mbigen_gmac,
-> mbigen_i2c, mbigen_xxx, etc) in mbigen_chip_dsa, if one of them with
-> incorrect configuration, then the loop will end, but we still need 
-> parse the left child node. we should consider this situation, right?
+On Thu, 2016-04-07 at 16:21 -0700, Stephen Boyd wrote:
+> On 04/06, Sjoerd Simons wrote:
+> > 
+> > On Wed, 2016-04-06 at 15:11 +0200, Geert Uytterhoeven wrote:
+> > > 
+> > > CC Mike, Stephen, linux-clk (this time with the new Mike)
+> > > 
+> > > On Wed, Apr 6, 2016 at 2:52 PM, Sjoerd Simons
+> > > <sjoerd.simons@collabora.co.uk> wrote:
+> > > > 
+> > > > 
+> > > > clk_get on a disabled clock node will return EPROBE_DEFER,
+> > > > which
+> > > > can
+> > > > cause drivers to be deferred forever if such clocks are
+> > > > referenced
+> > > > in
+> > > > their clocks property.
+> > > Is this a side effect of commit 3e5dd6f6e690048d ("clk: Ignore
+> > > disabled DT
+> > > clock providers")?
+> > Yes it seems so. Reverting that patch means that i can drop this
+> > one
+> > and get the expected behaviour again.
+> The DT is broken then? Is it possible to mark these status =
+> "okay" so that things work again?
 
-That's up to whoever designed the driver to decide, really. I don't know
-if it is worth continuing in that case (and you are in a better position
-than me to find out).
+> > 
+> > 
+> > Though even so I'm not sure what the convention is for clocks like
+> > these, the r8a7791.dtsi is inconsistent, as some are disabled while
+> > others (e.g. the audio clocks) are 0hz. Would be good to get some
+> > input
+> > on that regardless.
+> > 
+> What's the question here?
 
-> How about split that part into a new mbigen_create_domain(), shown below, and display
-> the result of mbigen domain creation in it.
-> 
-> 
-> diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
-> index d67baa2..9c1d22e 100644
-> --- a/drivers/irqchip/irq-mbigen.c
-> +++ b/drivers/irqchip/irq-mbigen.c
-> @@ -236,15 +236,41 @@ static struct irq_domain_ops mbigen_domain_ops = {
->  	.free		= irq_domain_free_irqs_common,
->  };
-> 
-> -static int mbigen_device_probe(struct platform_device *pdev)
-> +static void mbigen_create_domain(struct mbigen_device *mgn_dev, struct device_node *np)
->  {
-> -	struct mbigen_device *mgn_chip;
-> +	struct device *parent = platform_bus_type.dev_root;
-> +	struct device *dev = &mgn_dev->pdev->dev;
->  	struct platform_device *child;
->  	struct irq_domain *domain;
-> +	u32 num_pins;
-> +
-> +	if (!of_property_read_bool(np, "interrupt-controller"))
-> +		goto err;
-> +
-> +	if (of_property_read_u32(np, "num-pins", &num_pins))
-> +		goto err;
-> +
-> +	child = of_platform_device_create(np, NULL, parent);
-> +	if (IS_ERR(child))
-> +		goto err;
-> +
-> +	domain = platform_msi_create_device_domain(&child->dev, num_pins,
-> +						   mbigen_write_msg,
-> +						   &mbigen_domain_ops,
-> +						   mgn_dev);
-> +	if (!domain)
-> +		goto err;
-> +
-> +	dev_info(dev, "%s domain created\n", np->full_name);
+So the question is how to model unconnected external clocks in device-
+tree.
 
-You're probably missing a "return" here.
+The dtsi we're loooking at has (in pseudo dt):
 
-> +err:
-> +	dev_err(dev, "unable to create %s domain\n", np->full_name);
-> +}
-> +
-> +static int mbigen_device_probe(struct platform_device *pdev)
-> +{
-> +	struct mbigen_device *mgn_chip;
->  	struct device_node *np;
-> -	struct device *parent;
->  	struct resource *res;
-> -	u32 num_pins;
-> 
->  	mgn_chip = devm_kzalloc(&pdev->dev, sizeof(*mgn_chip), GFP_KERNEL);
->  	if (!mgn_chip)
-> @@ -257,28 +283,8 @@ static int mbigen_device_probe(struct platform_device *pdev)
->  	if (IS_ERR(mgn_chip->base))
->  		return PTR_ERR(mgn_chip->base);
-> 
-> -	for_each_child_of_node(pdev->dev.of_node, np) {
-> -		if (!of_property_read_bool(np, "interrupt-controller"))
-> -			continue;
-> -
-> -		parent = platform_bus_type.dev_root;
-> -		child = of_platform_device_create(np, NULL, parent);
-> -		if (IS_ERR(child))
-> -			return PTR_ERR(child);
-> -
-> -		if (of_property_read_u32(child->dev.of_node, "num-pins",
-> -					 &num_pins) < 0) {
-> -			dev_err(&pdev->dev, "No num-pins property\n");
-> -			return -EINVAL;
-> -		}
-> -
-> -		domain = platform_msi_create_device_domain(&child->dev, num_pins,
-> -							   mbigen_write_msg,
-> -							   &mbigen_domain_ops,
-> -							   mgn_chip);
-> -		if (!domain)
-> -			return -ENOMEM;
-> -	}
-> +	for_each_child_of_node(pdev->dev.of_node, np)
-> +		mbigen_create_domain(mgn_chip, np);
-> 
->  	platform_set_drvdata(pdev, mgn_chip);
+device {
+? clock-names = "internal", "external";
+? clocks = <&internal, &external>
+};
 
-In general, I'd suggest you work with Ma Jun, as he maintains that driver.
+external {
+? compatible = "fixed-clock";
+? clock-frequency = <12345>;
+? status = "disabled";
+};
 
-Thanks,
+Before?3e5dd6f6e690048d ("clk: Ignore?disabled DT?clock providers")
+this apparently worked. Afterwards drivers getting all the clocks would
+fail to probe with -EPROBE_DEFER.
 
-	M.
+Judging by your comment I assume this way of modelling it is broken
+(and the behaviour caused by the patch is correct)??
+
+And as a follow-up, is modelling unconnected clocks as enabled with a
+frequency of 0hz as my proposed patch does seen as the right way of
+doing things?
+
+
 -- 
-Jazz is not dead. It just smells funny...
+Sjoerd Simons
+Collabora Ltd.
