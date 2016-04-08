@@ -1,78 +1,89 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Fri, 8 Apr 2016 09:41:35 -0700
-Subject: [PATCH] net: thunderx: Fix broken of_node_put() code.
-In-Reply-To: <1459472517-5696-1-git-send-email-ddaney.cavm@gmail.com>
-References: <1459472517-5696-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <5707DF3F.3000508@caviumnetworks.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 8 Apr 2016 09:50:43 -0700
+Subject: [PATCH v2 1/2] dma/iommu: Add pgsize_bitmap confirmation in
+ __iommu_dma_alloc_pages
+In-Reply-To: <20160408130733.GD23750@arm.com>
+References: <1459146732-15620-1-git-send-email-yong.wu@mediatek.com>
+ <20160329170238.GK6745@arm.com>
+ <CAD=FV=XdZwg8usj3bjM6W=A0Yk1AFqKFRadpiS-LGLwxVNxp7A@mail.gmail.com>
+ <20160408130733.GD23750@arm.com>
+Message-ID: <CAD=FV=VbekVUHW3=d0icSgUO1M-1cccwCAZ+s=YSzOtEveCQag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to mail server malfunction, this patch was sent twice.  Please 
-ignore this duplicate.
+Will,
 
-Thanks,
-David Daney
+On Fri, Apr 8, 2016 at 6:07 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Apr 05, 2016 at 10:03:32AM -0700, Doug Anderson wrote:
+>> On Tue, Mar 29, 2016 at 10:02 AM, Will Deacon <will.deacon@arm.com> wrote:
+>> > On Mon, Mar 28, 2016 at 02:32:11PM +0800, Yong Wu wrote:
+>> >> @@ -213,13 +215,16 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp)
+>> >>               /*
+>> >>                * Higher-order allocations are a convenience rather
+>> >>                * than a necessity, hence using __GFP_NORETRY until
+>> >> -              * falling back to single-page allocations.
+>> >> +              * falling back to min size allocations.
+>> >>                */
+>> >> -             for (order = min_t(unsigned int, order, __fls(count));
+>> >> -                  order > 0; order--) {
+>> >> -                     page = alloc_pages(gfp | __GFP_NORETRY, order);
+>> >> +             for (order = min_t(int, order, __fls(count));
+>> >> +                  order >= min_order; order--) {
+>> >> +                     page = alloc_pages((order == min_order) ? gfp :
+>> >> +                                        gfp | __GFP_NORETRY, order);
+>> >>                       if (!page)
+>> >>                               continue;
+>> >> +                     if (!order)
+>> >> +                             break;
+>> >
+>> > Isn't this handled by the loop condition?
+>>
+>> He changed the loop condition to be ">= min_order" instead of "> 0",
+>> so now we can get here with an order == 0.  This makes sense because
+>> when min_order is not 0 you still want to run the code to split the
+>> pages and it is sane not to duplicate that below.
+>>
+>> Maybe I'm misunderstanding, though.  Perhaps you can explain how you
+>> think this code should look?
+>
+> My reading of the code was that we require order >= min_order to enter
+> the loop. Given that order doesn't change between the loop header and the
+> if (!order) check, then that must mean we can enter the loop body with
+> order == 0 and order >= min_order, which means that min_order is allowed
+> to be negative. That feels weird.
+>
+> Am I barking up the wrong tree?
+
+I don't think min_order can be negative.  Certainly we could enter the
+loop with order == 0 and min_order == 0, though.
 
 
-On 03/31/2016 06:01 PM, David Daney wrote:
-> From: David Daney <david.daney@cavium.com>
->
-> commit b7d3e3d3d21a ("net: thunderx: Don't leak phy device references
-> on -EPROBE_DEFER condition.") incorrectly moved the call to
-> of_node_put() outside of the loop.  Under normal loop exit, the node
-> has already had of_node_put() called, so the extra call results in:
->
-> [    8.228020] ERROR: Bad of_node_put() on /soc at 0/pci at 848000000000/mrml-bridge0 at 1,0/bgx0/xlaui00
-> [    8.239433] CPU: 16 PID: 608 Comm: systemd-udevd Not tainted 4.6.0-rc1-numa+ #157
-> [    8.247380] Hardware name: www.cavium.com EBB8800/EBB8800, BIOS 0.3 Mar  2 2016
-> [    8.273541] Call trace:
-> [    8.273550] [<fffffc0008097364>] dump_backtrace+0x0/0x210
-> [    8.273557] [<fffffc0008097598>] show_stack+0x24/0x2c
-> [    8.273560] [<fffffc0008399ed0>] dump_stack+0x8c/0xb4
-> [    8.273566] [<fffffc00085aa828>] of_node_release+0xa8/0xac
-> [    8.273570] [<fffffc000839cad8>] kobject_cleanup+0x8c/0x194
-> [    8.273573] [<fffffc000839c97c>] kobject_put+0x44/0x6c
-> [    8.273576] [<fffffc00085a9ab0>] of_node_put+0x24/0x30
-> [    8.273587] [<fffffc0000bd0f74>] bgx_probe+0x17c/0xcd8 [thunder_bgx]
-> [    8.273591] [<fffffc00083ed220>] pci_device_probe+0xa0/0x114
-> [    8.273596] [<fffffc0008473fbc>] driver_probe_device+0x178/0x418
-> [    8.273599] [<fffffc000847435c>] __driver_attach+0x100/0x118
-> [    8.273602] [<fffffc0008471b58>] bus_for_each_dev+0x6c/0xac
-> [    8.273605] [<fffffc0008473884>] driver_attach+0x30/0x38
-> [    8.273608] [<fffffc00084732f4>] bus_add_driver+0x1f8/0x29c
-> [    8.273611] [<fffffc0008475028>] driver_register+0x70/0x110
-> [    8.273617] [<fffffc00083ebf08>] __pci_register_driver+0x60/0x6c
-> [    8.273623] [<fffffc0000bf0040>] bgx_init_module+0x40/0x48 [thunder_bgx]
-> [    8.273626] [<fffffc0008090d04>] do_one_initcall+0xcc/0x1c0
-> [    8.273631] [<fffffc0008198abc>] do_init_module+0x68/0x1c8
-> [    8.273635] [<fffffc0008125668>] load_module+0xf44/0x11f4
-> [    8.273638] [<fffffc0008125b64>] SyS_finit_module+0xb8/0xe0
-> [    8.273641] [<fffffc0008093b30>] el0_svc_naked+0x24/0x28
->
-> Go back to the previous (correct) code that only did the extra
-> of_node_put() call on early exit from the loop.
->
-> Signed-off-by: David Daney <david.daney@cavium.com>
-> ---
->   drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 5 +++--
->   1 file changed, 3 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-> index 9679515..d20539a 100644
-> --- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-> +++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-> @@ -1011,10 +1011,11 @@ static int bgx_init_of_phy(struct bgx *bgx)
->   		}
->
->   		lmac++;
-> -		if (lmac == MAX_LMAC_PER_BGX)
-> +		if (lmac == MAX_LMAC_PER_BGX) {
-> +			of_node_put(node);
->   			break;
-> +		}
->   	}
-> -	of_node_put(node);
->   	return 0;
->
->   defer:
->
+Some examples:
+
+order = 0, min_order = 0
+-> Want alloc_pages _without_ __GFP_NORETRY.  OK
+-> If alloc_pages fails, return NULL.  OK
+-> If alloc pages succeeds, don't need splitting since single page.  OK
+
+order = 1, min_order = 1
+-> Want alloc_pages _without_ __GFP_NORETRY.  OK
+-> If alloc_pages fails, return NULL.  OK
+-> If alloc pages succeeds, DO need splitting.  OK
+
+order = 1, min_order = 0
+-> Want alloc_pages with __GFP_NORETRY.  OK
+-> If alloc_pages fails, try order = 0.  OK
+-> If alloc pages succeeds, DO need splitting.  OK
+
+order = 2, min_order = 1
+-> Want alloc_pages with __GFP_NORETRY.  OK
+-> If alloc_pages fails, try order = 1.  OK
+-> If alloc pages succeeds, DO need splitting.  OK
+
+
+I think those are all right.  Did I mess up?  You could certainly
+structure the loop in a different way but you need to make sure you
+handle all of those cases.  If you have an alternate structure that
+handles all those, let's consider it.
+
+-Doug
