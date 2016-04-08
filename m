@@ -1,112 +1,60 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Fri, 8 Apr 2016 10:12:01 +0800
-Subject: [PATCH v2] ARM: kexec: fix crashkernel= handling
-In-Reply-To: <E1aoH5h-0003LZ-O9@rmk-PC.arm.linux.org.uk>
-References: <E1akqb5-0002LZ-1f@rmk-PC.arm.linux.org.uk>
- <E1aoH5h-0003LZ-O9@rmk-PC.arm.linux.org.uk>
-Message-ID: <20160408021201.GA4186@dhcp-128-65.nay.redhat.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri,  8 Apr 2016 11:16:10 +0900
+Subject: [PATCH] kbuild: drop redundant "PHONY += FORCE"
+Message-ID: <1460081770-29437-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/07/16 at 10:03pm, Russell King wrote:
-> When the kernel crashkernel parameter is specified with just a size, we
-> are supposed to allocate a region from RAM to store the crashkernel.
-> However, ARM merely reserves physical address zero with no checking that
-> there is even RAM there.
-> 
-> Fix this by lifting similar code from x86, importing it to ARM with the
-> ARM specific parameters added.  In the absence of any platform specific
-> information, we allocate the crashkernel region from the first 512MB of
-> physical memory.
-> 
-> Update the kdump documentation to reflect this change.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  Documentation/kdump/kdump.txt | 13 +++----------
->  arch/arm/kernel/setup.c       | 29 +++++++++++++++++++++++++++++
->  2 files changed, 32 insertions(+), 10 deletions(-)
-> 
-> diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
-> index bc4bd5a44b88..88ff63d5fde3 100644
-> --- a/Documentation/kdump/kdump.txt
-> +++ b/Documentation/kdump/kdump.txt
-> @@ -263,12 +263,6 @@ been removed from the machine.
->      crashkernel=<range1>:<size1>[,<range2>:<size2>,...][@offset]
->      range=start-[end]
->  
-> -Please note, on arm, the offset is required.
-> -    crashkernel=<range1>:<size1>[,<range2>:<size2>,...]@offset
-> -    range=start-[end]
-> -
-> -    'start' is inclusive and 'end' is exclusive.
-> -
->  For example:
->  
->      crashkernel=512M-2G:64M,2G-:128M
-> @@ -307,10 +301,9 @@ Boot into System Kernel
->     on the memory consumption of the kdump system. In general this is not
->     dependent on the memory size of the production system.
->  
-> -   On arm, use "crashkernel=Y at X". Note that the start address of the kernel
-> -   will be aligned to 128MiB (0x08000000), so if the start address is not then
-> -   any space below the alignment point may be overwritten by the dump-capture kernel,
-> -   which means it is possible that the vmcore is not that precise as expected.
-> +   On arm, the use of "crashkernel=Y at X" is no longer necessary; the
-> +   kernel will automatically locate the crash kernel image within the
-> +   first 512MB of RAM if X is not given.
->  
->  
->  Load the Dump-capture Kernel
-> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-> index 139791ed473d..77b54c461c52 100644
-> --- a/arch/arm/kernel/setup.c
-> +++ b/arch/arm/kernel/setup.c
-> @@ -938,6 +938,13 @@ static int __init init_machine_late(void)
->  late_initcall(init_machine_late);
->  
->  #ifdef CONFIG_KEXEC
-> +/*
-> + * The crash region must be aligned to 128MB to avoid
-> + * zImage relocating below the reserved region.
-> + */
-> +#define CRASH_ALIGN	(128 << 20)
-> +#define CRASH_ADDR_MAX	(PHYS_OFFSET + (512 << 20))
-> +
->  static inline unsigned long long get_total_mem(void)
->  {
->  	unsigned long total;
-> @@ -965,6 +972,28 @@ static void __init reserve_crashkernel(void)
->  	if (ret)
->  		return;
->  
-> +	if (crash_base <= 0) {
-> +		unsigned long long crash_max = CRASH_ADDR_MAX;
-> +		if (crash_max > (u32)~0)
-> +			crash_max = (u32)~0;
-> +		crash_base = memblock_find_in_range(CRASH_ALIGN, crash_max,
-> +						    crash_size, CRASH_ALIGN);
-> +		if (!crash_base) {
-> +			pr_err("crashkernel reservation failed - No suitable area found.\n");
-> +			return;
-> +		}
-> +	} else {
-> +		unsigned long long start;
-> +
-> +		start = memblock_find_in_range(crash_base,
-> +					       crash_base + crash_size,
-> +					       crash_size, SECTION_SIZE);
-> +		if (start != crash_base) {
-> +			pr_err("crashkernel reservation failed - memory is in use.\n");
-> +			return;
-> +		}
-> +	}
-> +
->  	ret = memblock_reserve(crash_base, crash_size);
->  	if (ret < 0) {
->  		pr_warn("crashkernel reservation failed - memory is in use (0x%lx)\n",
+"PHONY += FORCE" is already cared by scripts/Makefile.build,
+which these files are included from.
 
-Reviewed-by: Dave Young <dyoung@redhat.com>
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-Thanks
-Dave
+Please apply the following to avoid conflicts.
+https://patchwork.kernel.org/patch/8572451/
+
+
+ arch/arm/boot/bootp/Makefile | 2 +-
+ arch/ia64/Makefile           | 2 +-
+ arch/unicore32/boot/Makefile | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/boot/bootp/Makefile b/arch/arm/boot/bootp/Makefile
+index 52a543b..5e4acd2 100644
+--- a/arch/arm/boot/bootp/Makefile
++++ b/arch/arm/boot/bootp/Makefile
+@@ -25,4 +25,4 @@ $(obj)/kernel.o: arch/arm/boot/zImage FORCE
+ 
+ $(obj)/initrd.o: $(INITRD) FORCE
+ 
+-PHONY += $(INITRD) FORCE
++PHONY += $(INITRD)
+diff --git a/arch/ia64/Makefile b/arch/ia64/Makefile
+index 648f1ce..c100d78 100644
+--- a/arch/ia64/Makefile
++++ b/arch/ia64/Makefile
+@@ -96,7 +96,7 @@ define archhelp
+ endef
+ 
+ archprepare: make_nr_irqs_h
+-PHONY += make_nr_irqs_h FORCE
++PHONY += make_nr_irqs_h
+ 
+ make_nr_irqs_h:
+ 	$(Q)$(MAKE) $(build)=arch/ia64/kernel include/generated/nr-irqs.h
+diff --git a/arch/unicore32/boot/Makefile b/arch/unicore32/boot/Makefile
+index ec7fb70..8288550 100644
+--- a/arch/unicore32/boot/Makefile
++++ b/arch/unicore32/boot/Makefile
+@@ -31,7 +31,7 @@ $(obj)/uImage: $(obj)/zImage FORCE
+ 	$(call if_changed,uimage)
+ 	@echo '  Image $@ is ready'
+ 
+-PHONY += initrd FORCE
++PHONY += initrd
+ initrd:
+ 	@test "$(INITRD)" != "" || \
+ 	(echo You must specify INITRD; exit -1)
+-- 
+1.9.1
