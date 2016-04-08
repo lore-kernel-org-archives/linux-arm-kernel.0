@@ -1,60 +1,73 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri,  8 Apr 2016 11:16:10 +0900
-Subject: [PATCH] kbuild: drop redundant "PHONY += FORCE"
-Message-ID: <1460081770-29437-1-git-send-email-yamada.masahiro@socionext.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 8 Apr 2016 04:18:02 +0200
+Subject: [PATCH] mtd: nand: s3c2410: fix bug in s3c2410_nand_correct_data()
+In-Reply-To: <57070E88.5020008@gmail.com>
+References: <1460047697-72830-1-git-send-email-zengzhaoxiu@163.com>
+ <20160408021817.274d4e59@bbrezillon> <57070E88.5020008@gmail.com>
+Message-ID: <20160408041802.5c47a4be@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"PHONY += FORCE" is already cared by scripts/Makefile.build,
-which these files are included from.
+On Fri, 8 Apr 2016 09:51:04 +0800
+Zeng Zhaoxiu <zhaoxiu.zeng@gmail.com> wrote:
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+> 
+> 
+> ? 2016?04?08? 08:18, Boris Brezillon ??:
+> > Hi Zeng,
+> >
+> > On Fri,  8 Apr 2016 00:48:17 +0800
+> > zengzhaoxiu at 163.com wrote:
+> >
+> >> From: Zeng Zhaoxiu <zhaoxiu.zeng@gmail.com>
+> >>
+> >> If there is only one bit difference in the ECC, the function should return 1.
+> >> The result of "diff0 & ~(1<<fls(diff0))" is equal to diff0, so the function
+> >> actually returns -1.
+> >>
+> >> Here, we can use the simple expression "(diff0 & (diff0 - 1)) == 0" to determine
+> >> whether the diff0 has only one 1-bit.
+> > Missing Signed-off-by here.
+> >
+> >> ---
+> >>   drivers/mtd/nand/s3c2410.c | 2 +-
+> >>   1 file changed, 1 insertion(+), 1 deletion(-)
+> >>
+> >> diff --git a/drivers/mtd/nand/s3c2410.c b/drivers/mtd/nand/s3c2410.c
+> >> index 9c9397b..c9698cf 100644
+> >> --- a/drivers/mtd/nand/s3c2410.c
+> >> +++ b/drivers/mtd/nand/s3c2410.c
+> >> @@ -542,7 +542,7 @@ static int s3c2410_nand_correct_data(struct mtd_info *mtd, u_char *dat,
+> >>   	diff0 |= (diff1 << 8);
+> >>   	diff0 |= (diff2 << 16);
+> >>   
+> >> -	if ((diff0 & ~(1<<fls(diff0))) == 0)
+> >> +	if ((diff0 & (diff0 - 1)) == 0)
+> > Or just
+> >
+> > 	if (hweight_long((unsigned long)diff0) == 1)
+> >
+> > which is doing exactly what the comment says.
+> >
+> > BTW, I don't understand why the current code is wrong? To me, it seems
+> > it's correctly detecting the case where only a single bit is different.
+> > What are you trying to fix exactly?
+> >
+> > Best Regards,
+> >
+> > Boris
+> >
+> 
+> For example, assuming diff0 is 1, then fls(diff0) is equal to 1, then "~(1 << fls(diff0))" is equal to 0xfffffffd,
+> then the result of "(diff0 & ~(1 << fls(diff0)))" is 1 , not we expected 0.
+> 
+> __fls(diff0) and "(fls(diff0) - 1)" are all right, but fls(diff0) is wrong.
+> 
 
-Please apply the following to avoid conflicts.
-https://patchwork.kernel.org/patch/8572451/
+Indeed, I forgot that fls() was returning (position + 1). Anyway, I
+still think using hweight clarifies what you really want to test.
 
-
- arch/arm/boot/bootp/Makefile | 2 +-
- arch/ia64/Makefile           | 2 +-
- arch/unicore32/boot/Makefile | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/boot/bootp/Makefile b/arch/arm/boot/bootp/Makefile
-index 52a543b..5e4acd2 100644
---- a/arch/arm/boot/bootp/Makefile
-+++ b/arch/arm/boot/bootp/Makefile
-@@ -25,4 +25,4 @@ $(obj)/kernel.o: arch/arm/boot/zImage FORCE
- 
- $(obj)/initrd.o: $(INITRD) FORCE
- 
--PHONY += $(INITRD) FORCE
-+PHONY += $(INITRD)
-diff --git a/arch/ia64/Makefile b/arch/ia64/Makefile
-index 648f1ce..c100d78 100644
---- a/arch/ia64/Makefile
-+++ b/arch/ia64/Makefile
-@@ -96,7 +96,7 @@ define archhelp
- endef
- 
- archprepare: make_nr_irqs_h
--PHONY += make_nr_irqs_h FORCE
-+PHONY += make_nr_irqs_h
- 
- make_nr_irqs_h:
- 	$(Q)$(MAKE) $(build)=arch/ia64/kernel include/generated/nr-irqs.h
-diff --git a/arch/unicore32/boot/Makefile b/arch/unicore32/boot/Makefile
-index ec7fb70..8288550 100644
---- a/arch/unicore32/boot/Makefile
-+++ b/arch/unicore32/boot/Makefile
-@@ -31,7 +31,7 @@ $(obj)/uImage: $(obj)/zImage FORCE
- 	$(call if_changed,uimage)
- 	@echo '  Image $@ is ready'
- 
--PHONY += initrd FORCE
-+PHONY += initrd
- initrd:
- 	@test "$(INITRD)" != "" || \
- 	(echo You must specify INITRD; exit -1)
 -- 
-1.9.1
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
