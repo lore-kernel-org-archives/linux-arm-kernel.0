@@ -1,143 +1,85 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Fri, 8 Apr 2016 23:41:20 +0530
-Subject: [PATCH 0/7] PM / devfreq: Add NoCP devfreq-event and support
- busfreq on exyno5422-odroidxu3
-In-Reply-To: <1460091646-28701-1-git-send-email-cw00.choi@samsung.com>
-References: <1460091646-28701-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <CANAwSgQuWBRiRhjd-E-WaSdhe2njE262CEG8uVH83jJDGFJVKA@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 8 Apr 2016 11:20:11 -0700
+Subject: [Xen-devel] [PATCH 2/6] ARM: xen: Register with kernel restart
+ handler
+In-Reply-To: <20160408152257.GJ15411@char.us.oracle.com>
+References: <1460120039-2497-1-git-send-email-linux@roeck-us.net>
+ <1460120039-2497-3-git-send-email-linux@roeck-us.net>
+ <20160408152257.GJ15411@char.us.oracle.com>
+Message-ID: <20160408182011.GA7083@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo,
+On Fri, Apr 08, 2016 at 11:22:57AM -0400, Konrad Rzeszutek Wilk wrote:
+> On Fri, Apr 08, 2016 at 05:53:55AM -0700, Guenter Roeck wrote:
+> > Register with kernel restart handler instead of setting arm_pm_restart
+> > directly.
+> > 
+> > Select a high priority of 192 to ensure that default restart handlers
+> 
+> Is there some macro for that magic value?
+> 
+No, only guidelines in kernel/reboot.c.
 
-On 8 April 2016 at 10:30, Chanwoo Choi <cw00.choi@samsung.com> wrote:
-> This patchset support the AMBA bus frequency scaling on Exynos5422-based
-> Odroid-XU3 board. But, this series only support the bus frequency scaling
-> for INT (Internal) block using VDD_INT power line.
->
-> Also, to support the bus frequency scaling for Exynos542x SoC,
-> Exynos542x SoC has the specific 'NoC (Network on Chip) Probe' device
-> to measure the transfered data traffic on NoC (Network on Chip)
-> instead of PPMU (Platform Performance Monitoring Unit). NoC Probe device
-> provide the utilization for INT block of Exynos542x SoC.
->
-> The generic exynos-bus frequency driver uses the 'NoC Probe' devfreq-event
-> device (drivers/devfreq/event/exynos-nocp.c) without any modification.
-> Just add the phandle of 'NoC Probe' dt node to bus dt node.
->
-> Depend on:
-> This patchset depends on patch[1] which support the generic exynos-bus
-> frequency driver.
->
-> [1] https://lkml.org/lkml/2016/4/8/14
-> - [PATCH v8 00/20] PM / devferq: Add generic exynos bus frequency driver and new passive governor
->
-> Chanwoo Choi (7):
->   PM / devfreq: event: Add new Exynos NoC probe driver
->   PM / devfreq: exynos: Add the detailed correlation for Exynos5422 bus
->   ARM: dts: Add NoC Probe dt node for Exynos542x SoC
->   dt-bindings: clock: Add the clock id for ACLK clock of Exynos542x SoC
->   clk: samsung: exynos542x: Add the clock id for ACLK
->   ARM: dts: Add bus nodes using VDD_INT for Exynos542x SoC
->   ARM: dts: Add support of Bus frequency using VDD_INT for exynos5422-odroidxu3
->
->  .../bindings/devfreq/event/exynos-nocp.txt         |  86 +++++
->  .../devicetree/bindings/devfreq/exynos-bus.txt     |  19 +
->  arch/arm/boot/dts/exynos5420.dtsi                  | 407 +++++++++++++++++++++
->  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  99 +++++
->  drivers/clk/samsung/clk-exynos5420.c               |  85 +++--
->  drivers/devfreq/event/Kconfig                      |   8 +
->  drivers/devfreq/event/Makefile                     |   2 +
->  drivers/devfreq/event/exynos-nocp.c                | 247 +++++++++++++
->  drivers/devfreq/event/exynos-nocp.h                |  78 ++++
->  include/dt-bindings/clock/exynos5420.h             |  24 +-
->  10 files changed, 1024 insertions(+), 31 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/devfreq/event/exynos-nocp.txt
->  create mode 100644 drivers/devfreq/event/exynos-nocp.c
->  create mode 100644 drivers/devfreq/event/exynos-nocp.h
->
-> --
-> 1.9.1
->
+Guenter
 
-I am observing following deadlock. Both on Odroid U3 and Odroid XU4.
-
-[    7.718372] [ INFO: possible recursive locking detected ]
-[    7.723747] 4.6.0-rc2-xu4ml #4 Not tainted
-[    7.727817] ---------------------------------------------
-[    7.733190] kworker/u16:1/136 is trying to acquire lock:
-[    7.738476]  (&devfreq->lock){+.+.+.}, at: [<c05be41c>]
-update_devfreq_passive+0x2c/0x88
-[    7.746534]
-[    7.746534] but task is already holding lock:
-[    7.752339]  (&devfreq->lock){+.+.+.}, at: [<c05bd838>]
-devfreq_monitor+0x1c/0x78
-[    7.759791]
-[    7.759791] other info that might help us debug this:
-[    7.766291]  Possible unsafe locking scenario:
-[    7.766291]
-[    7.766307] usb 5-1: new high-speed USB device number 2 using xhci-hcd
-[    7.778682]        CPU0
-[    7.781107]        ----
-[    7.783533]   lock(&devfreq->lock);
-[    7.786999]   lock(&devfreq->lock);
-[    7.790467]
-[    7.790467]  *** DEADLOCK ***
-[    7.790467]
-[    7.796359]  May be due to missing lock nesting notation
-[    7.796359]
-[    7.803120] 4 locks held by kworker/u16:1/136:
-[    7.807537]  #0:  ("%s"("devfreq_wq")){.+.+..}, at: [<c013b41c>]
-process_one_work+0x13c/0x454
-[    7.816029]  #1:  ((&(&devfreq->work)->work)){+.+...}, at:
-[<c013b41c>] process_one_work+0x13c/0x454
-[    7.825128]  #2:  (&devfreq->lock){+.+.+.}, at: [<c05bd838>]
-devfreq_monitor+0x1c/0x78
-[    7.833013]  #3:  (&nh->srcu){......}, at: [<c014309c>]
-__srcu_notifier_call_chain+0x54/0xe0
-[    7.841419]
-[    7.841419] stack backtrace:
-[    7.845758] CPU: 1 PID: 136 Comm: kworker/u16:1 Not tainted
-4.6.0-rc2-xu4ml #4
-[    7.852946] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
-[    7.859017] Workqueue: devfreq_wq devfreq_monitor
-[    7.863717] [<c010eb48>] (unwind_backtrace) from [<c010b884>]
-(show_stack+0x10/0x14)
-[    7.871417] [<c010b884>] (show_stack) from [<c037715c>]
-(dump_stack+0xa4/0xd0)
-[    7.878613] [<c037715c>] (dump_stack) from [<c017112c>]
-(__lock_acquire+0x1ce8/0x207c)
-[    7.886492] [<c017112c>] (__lock_acquire) from [<c0172010>]
-(lock_acquire+0x90/0xd4)
-[    7.892726] usb 5-1: New USB device found, idVendor=0bda, idProduct=8153
-[    7.892737] usb 5-1: New USB device strings: Mfr=1, Product=2, SerialNumber=6
-[    7.892745] usb 5-1: Product: USB 10/100/1000 LAN
-[    7.892753] usb 5-1: Manufacturer: Realtek
-[    7.892761] usb 5-1: SerialNumber: 000001000000
-[    7.921248] [<c0172010>] (lock_acquire) from [<c075d298>]
-(mutex_lock_nested+0x78/0x4ec)
-[    7.929301] [<c075d298>] (mutex_lock_nested) from [<c05be41c>]
-(update_devfreq_passive+0x2c/0x88)
-[    7.938138] [<c05be41c>] (update_devfreq_passive) from [<c05be4c0>]
-(devfreq_passive_notifier_call+0x48/0x50)
-[    7.948016] [<c05be4c0>] (devfreq_passive_notifier_call) from
-[<c0142d84>] (notifier_call_chain+0x54/0xa4)
-[    7.957633] [<c0142d84>] (notifier_call_chain) from [<c01430e0>]
-(__srcu_notifier_call_chain+0x98/0xe0)
-[    7.966991] [<c01430e0>] (__srcu_notifier_call_chain) from
-[<c0143140>] (srcu_notifier_call_chain+0x18/0x20)
-[    7.976783] [<c0143140>] (srcu_notifier_call_chain) from
-[<c05bd774>] (update_devfreq+0xe4/0x18c)
-[    7.985622] [<c05bd774>] (update_devfreq) from [<c05bd840>]
-(devfreq_monitor+0x24/0x78)
-[    7.993595] [<c05bd840>] (devfreq_monitor) from [<c013b48c>]
-(process_one_work+0x1ac/0x454)
-[    8.001913] [<c013b48c>] (process_one_work) from [<c013b784>]
-(worker_thread+0x50/0x508)
-[    8.009976] [<c013b784>] (worker_thread) from [<c0141cf4>]
-(kthread+0xf8/0x110)
-[    8.017254] [<c0141cf4>] (kthread) from [<c0107750>]
-(ret_from_fork+0x14/0x24)
-
-Best Regards
--Anand Moon
+> > are replaced if Xen is running.
+> > 
+> > Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> > ---
+> >  arch/arm/xen/enlighten.c | 13 +++++++++++--
+> >  1 file changed, 11 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> > index 75cd7345c654..76a1d12fd27e 100644
+> > --- a/arch/arm/xen/enlighten.c
+> > +++ b/arch/arm/xen/enlighten.c
+> > @@ -27,6 +27,7 @@
+> >  #include <linux/cpu.h>
+> >  #include <linux/console.h>
+> >  #include <linux/pvclock_gtod.h>
+> > +#include <linux/reboot.h>
+> >  #include <linux/time64.h>
+> >  #include <linux/timekeeping.h>
+> >  #include <linux/timekeeper_internal.h>
+> > @@ -193,14 +194,22 @@ after_register_vcpu_info:
+> >  	put_cpu();
+> >  }
+> >  
+> > -static void xen_restart(enum reboot_mode reboot_mode, const char *cmd)
+> > +static int xen_restart(struct notifier_block *nb, unsigned long action,
+> > +		       void *data)
+> >  {
+> >  	struct sched_shutdown r = { .reason = SHUTDOWN_reboot };
+> >  	int rc;
+> >  	rc = HYPERVISOR_sched_op(SCHEDOP_shutdown, &r);
+> >  	BUG_ON(rc);
+> > +
+> > +	return NOTIFY_DONE;
+> >  }
+> >  
+> > +static struct notifier_block xen_restart_nb = {
+> > +	.notifier_call = xen_restart,
+> > +	.priority = 192,
+> > +};
+> > +
+> >  static void xen_power_off(void)
+> >  {
+> >  	struct sched_shutdown r = { .reason = SHUTDOWN_poweroff };
+> > @@ -370,7 +379,7 @@ static int __init xen_pm_init(void)
+> >  		return -ENODEV;
+> >  
+> >  	pm_power_off = xen_power_off;
+> > -	arm_pm_restart = xen_restart;
+> > +	register_restart_handler(&xen_restart_nb);
+> >  	if (!xen_initial_domain()) {
+> >  		struct timespec64 ts;
+> >  		xen_read_wallclock(&ts);
+> > -- 
+> > 2.5.0
+> > 
+> > 
+> > _______________________________________________
+> > Xen-devel mailing list
+> > Xen-devel at lists.xen.org
+> > http://lists.xen.org/xen-devel
