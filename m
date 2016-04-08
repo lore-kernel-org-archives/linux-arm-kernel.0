@@ -1,40 +1,59 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Fri, 8 Apr 2016 15:23:02 +0200
-Subject: [GIT PULL] STi SoC updates for v4.7 #1
-Message-ID: <5707B0B6.1030209@st.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Fri, 8 Apr 2016 15:31:49 +0200
+Subject: [PATCH v6 0/7] KVM PCIe/MSI passthrough on ARM/ARM64: kernel part
+ 1/3: iommu changes
+In-Reply-To: <20160407115001.25de7d1e@t450s.home>
+References: <1459757222-2668-1-git-send-email-eric.auger@linaro.org>
+ <20160406171534.794c6824@t450s.home> <5706528B.2010906@linaro.org>
+ <20160407115001.25de7d1e@t450s.home>
+Message-ID: <5707B2C5.5050008@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Arnd and Kevin,
+Hi Alex,
+On 04/07/2016 07:50 PM, Alex Williamson wrote:
+> On Thu, 7 Apr 2016 14:28:59 +0200
+> Eric Auger <eric.auger@linaro.org> wrote:
+> 
+>> Hi Alex,
+>> On 04/07/2016 01:15 AM, Alex Williamson wrote:
+>>> On Mon,  4 Apr 2016 08:06:55 +0000
+>>> Eric Auger <eric.auger@linaro.org> wrote:
+>>>   
+>>>> This series introduces the dma-reserved-iommu api used to:
+>>>> - create/destroy an iova domain dedicated to reserved iova bindings
+>>>> - map/unmap physical addresses onto reserved IOVAs.
+>>>> - unmap and destroy all IOVA reserved bindings  
+>>>
+>>> Why are we making the decision to have an unbalanced map vs unmap, we
+>>> can create individual mappings, but only unmap the whole thing and
+>>> start over?  That's a strange interface.  Thanks,  
+>> The "individual" balanced unmap also exists (iommu_put_reserved_iova)
+>> and this is the "normal" path. This happens on msi_domain_deactivate
+>> (and possibly on msi_domain_set_affinity).
+>>
+>> I added iommu_unmap_reserved to handle the case where the userspace
+>> registers a reserved iova domain and fails to unregister it. In that
+>> case one need to handle the cleanup on kernel-side and I chose to
+>> implement this on vfio_iommu_type1 release. All the reserved IOMMU
+>> bindings get destroyed on that event.
+>>
+>> Any advice to handle this situation?
+> 
+> If we want to model it similar to regular iommu domains, then
+> iommu_free_reserved_iova_domain() should release all the mappings and
+> destroy the iova domain.
+Yes this sounds obvious now.
+  Additionally, since the reserved iova domain
+> is just a construct on top of an iommu domain, it should be sufficient
+> to call iommu_domain_free() to also remove the reserved iova domain if
+> one exists.  Thanks,
+Yes. For dma cookie (iommu_put_dma_cookie) I see this is done from the
+iommu driver domain_free callback.
 
-Please consider this first round of STi SoC updates for v4.7:
+Thanks
 
-The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
-
-   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
-
-are available in the git repository at:
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/mcoquelin/sti.git 
-tags/sti-soc-for-v4.7-1
-
-for you to fetch changes up to 33406c805730377ff48741f9ad99e7aada91595b:
-
-   ARM: STi: Update platform level menuconfig 'help' (2016-04-07 
-16:32:14 +0200)
-
-----------------------------------------------------------------
-Highlights:
------------
-  - Add CPUFreq and RProc drivers to STI maintainers file list
-  - Improve STi's menuconfig help entry
-
-----------------------------------------------------------------
-Lee Jones (3):
-       MAINTAINERS: Add ST's CPUFreq driver to the STI file list
-       MAINTAINERS: Add ST's Remote Processor Driver to ARM/STI ARCHITECTURE
-       ARM: STi: Update platform level menuconfig 'help'
-
-  MAINTAINERS               | 2 ++
-  arch/arm/mach-sti/Kconfig | 9 ++++-----
-  2 files changed, 6 insertions(+), 5 deletions(-)
+Eric
+> 
+> Alex
+> 
