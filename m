@@ -1,52 +1,220 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 8 Apr 2016 14:12:08 +0100
-Subject: [PATCH v3] ARM64: ACPI: Update documentation for latest
- specification version
-In-Reply-To: <5706D63F.7050107@redhat.com>
-References: <1459210002-3387-1-git-send-email-al.stone@linaro.org>
- <5706D63F.7050107@redhat.com>
-Message-ID: <20160408131208.GE23750@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 8 Apr 2016 15:15:37 +0200
+Subject: [PATCH 12/17] kvm-arm: Add explicit hyp page table modifiers
+In-Reply-To: <1459787177-12767-13-git-send-email-suzuki.poulose@arm.com>
+References: <1459787177-12767-1-git-send-email-suzuki.poulose@arm.com>
+ <1459787177-12767-13-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20160408131537.GR8961@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 07, 2016 at 03:50:55PM -0600, Al Stone wrote:
-> On 03/28/2016 06:06 PM, Al Stone wrote:
-> > The ACPI 6.1 specification was recently released at the end of January
-> > 2016, but the arm64 kernel documentation for the use of ACPI was written
-> > for the 5.1 version of the spec.  There were significant additions to the
-> > spec that had not yet been mentioned -- for example, the 6.0 mechanisms
-> > added to make it easier to define processors and low power idle states,
-> > as well as the 6.1 addition allowing regular interrupts (not just from
-> > GPIO) be used to signal ACPI general purpose events.
-> > 
-> > This patch reflects going back through and examining the specs in detail
-> > and updating content appropriately.  Whilst there, a few odds and ends of
-> > typos were caught as well.  This brings the documentation up to date with
-> > ACPI 6.1 for arm64.
-> > 
-> > Changes for v3:
-> >    -- Clarify use of _LPI/_RDI (Vikas Sajjan)
-> >    -- Whitespace cleanup as pointed out by checkpatch
-> > 
-> > Changes for v2:
-> >    -- Clean up white space (Harb Abdulhahmid)
-> >    -- Clarification on _CCA usage (Harb Abdulhamid)
-> >    -- IORT moved to required from recommended (Hanjun Guo)
-> >    -- Clarify IORT description (Hanjun Guo)
-> > 
-> > Signed-off-by: Al Stone <al.stone@linaro.org>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Jonathan Corbet <corbet@lwn.net>
-> > ---
-> >  Documentation/arm64/acpi_object_usage.txt | 446 ++++++++++++++++++++++--------
-> >  Documentation/arm64/arm-acpi.txt          |  28 +-
-> >  2 files changed, 357 insertions(+), 117 deletions(-)
-> > [snip...]
+On Mon, Apr 04, 2016 at 05:26:12PM +0100, Suzuki K Poulose wrote:
+> We have common routines to modify hyp and stage2 page tables
+> based on the 'kvm' parameter. For a smoother transition to
+> using separate routines for each, duplicate the routines
+> and modify the copy to work on hyp.
 > 
-> Ping?  Any further comments or is this good to go?
+> Marks the forked routines with _hyp_ and gets rid of the
+> kvm parameter which is no longer needed and is NULL for hyp.
+> Also, gets rid of calls to kvm_tlb_flush_by_vmid_ipa() calls
+> from the hyp versions. Uses explicit host page table accessors
+> instead of the kvm_* page table helpers.
+> 
+> Suggested-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  arch/arm/kvm/mmu.c |  123 +++++++++++++++++++++++++++++++++++++++++++++++++---
+>  1 file changed, 118 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index b46a337..2b491e5 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -388,6 +388,119 @@ static void stage2_flush_vm(struct kvm *kvm)
+>  	srcu_read_unlock(&kvm->srcu, idx);
+>  }
+>  
+> +static void clear_hyp_pgd_entry(pgd_t *pgd)
+> +{
+> +	pud_t *pud_table __maybe_unused = pud_offset(pgd, 0UL);
+> +	pgd_clear(pgd);
+> +	pud_free(NULL, pud_table);
+> +	put_page(virt_to_page(pgd));
+> +}
+> +
+> +static void clear_hyp_pud_entry(pud_t *pud)
+> +{
+> +	pmd_t *pmd_table __maybe_unused = pmd_offset(pud, 0);
+> +	VM_BUG_ON(pud_huge(*pud));
+> +	pud_clear(pud);
+> +	pmd_free(NULL, pmd_table);
+> +	put_page(virt_to_page(pud));
+> +}
+> +
+> +static void clear_hyp_pmd_entry(pmd_t *pmd)
+> +{
+> +	pte_t *pte_table = pte_offset_kernel(pmd, 0);
+> +	VM_BUG_ON(pmd_thp_or_huge(*pmd));
+> +	pmd_clear(pmd);
+> +	pte_free_kernel(NULL, pte_table);
+> +	put_page(virt_to_page(pmd));
+> +}
+> +
+> +static void unmap_hyp_ptes(pmd_t *pmd, phys_addr_t addr, phys_addr_t end)
+> +{
+> +	pte_t *pte, *start_pte;
+> +
+> +	start_pte = pte = pte_offset_kernel(pmd, addr);
+> +	do {
+> +		if (!pte_none(*pte)) {
+> +			pte_t old_pte = *pte;
+> +
+> +			kvm_set_pte(pte, __pte(0));
+> +
+> +			/* XXX: Do we need to invalidate the cache for device mappings ? */
 
-It would be nice to see an ack from some other ACPI people, if that's
-possible. Which tree were you planning to merge this through?
+no, we will not be swapping out any pages mapped in Hyp mode so you can
+get rid of both of the following two lines.
 
-Will
+> +			if (!kvm_is_device_pfn(pte_pfn(old_pte)))
+> +				kvm_flush_dcache_pte(old_pte);
+> +
+> +			put_page(virt_to_page(pte));
+> +		}
+> +	} while (pte++, addr += PAGE_SIZE, addr != end);
+> +
+> +	if (hyp_pte_table_empty(start_pte))
+> +		clear_hyp_pmd_entry(pmd);
+> +}
+> +
+> +static void unmap_hyp_pmds(pud_t *pud, phys_addr_t addr, phys_addr_t end)
+> +{
+> +	phys_addr_t next;
+> +	pmd_t *pmd, *start_pmd;
+> +
+> +	start_pmd = pmd = pmd_offset(pud, addr);
+> +	do {
+> +		next = pmd_addr_end(addr, end);
+> +		if (!pmd_none(*pmd)) {
+> +			if (pmd_thp_or_huge(*pmd)) {
+
+do we ever actually map anything with section mappings in the Hyp
+mappings?
+
+> +				pmd_t old_pmd = *pmd;
+> +
+> +				pmd_clear(pmd);
+> +				kvm_flush_dcache_pmd(old_pmd);
+> +				put_page(virt_to_page(pmd));
+> +			} else {
+> +				unmap_hyp_ptes(pmd, addr, next);
+> +			}
+> +		}
+> +	} while (pmd++, addr = next, addr != end);
+> +
+> +	if (hyp_pmd_table_empty(start_pmd))
+> +		clear_hyp_pud_entry(pud);
+> +}
+> +
+> +static void unmap_hyp_puds(pgd_t *pgd, phys_addr_t addr, phys_addr_t end)
+> +{
+> +	phys_addr_t next;
+> +	pud_t *pud, *start_pud;
+> +
+> +	start_pud = pud = pud_offset(pgd, addr);
+> +	do {
+> +		next = pud_addr_end(addr, end);
+> +		if (!pud_none(*pud)) {
+> +			if (pud_huge(*pud)) {
+
+do we ever actually map anything with huge pud
+mappings for the Hyp space?
+
+> +				pud_t old_pud = *pud;
+> +
+> +				pud_clear(pud);
+> +				kvm_flush_dcache_pud(old_pud);
+> +				put_page(virt_to_page(pud));
+> +			} else {
+> +				unmap_hyp_pmds(pud, addr, next);
+> +			}
+> +		}
+> +	} while (pud++, addr = next, addr != end);
+> +
+> +	if (hyp_pud_table_empty(start_pud))
+> +		clear_hyp_pgd_entry(pgd);
+> +}
+> +
+> +static void unmap_hyp_range(pgd_t *pgdp, phys_addr_t start, u64 size)
+> +{
+> +	pgd_t *pgd;
+> +	phys_addr_t addr = start, end = start + size;
+> +	phys_addr_t next;
+> +
+> +	pgd = pgdp + pgd_index(addr);
+> +	do {
+> +		next = pgd_addr_end(addr, end);
+> +		if (!pgd_none(*pgd))
+> +			unmap_hyp_puds(pgd, addr, next);
+> +	} while (pgd++, addr = next, addr != end);
+
+shouldn't we flush the EL2 (hyp) TLB here, strictly speaking?
+
+Or do we rely on all mappings ever created/torn down here to always have
+the same VA/PA relationship?  Since we didn't flush the EL2 TLB in the
+existing code, that indeed does seem to be the case.
+
+That, in turn, raises the question why we don't simply map all pages
+that could be referenced by a kmalloc() in Hyp mode during the init
+phase and be done with all this hyp mapping/unmapping stuff?
+
+In any case, that behavior doesn't have to change now, but if we don't
+add a TLB flush here, I'd like a comment to explain why that's not
+needed.
+
+> +}
+> +
+>  /**
+>   * free_boot_hyp_pgd - free HYP boot page tables
+>   *
+> @@ -398,14 +511,14 @@ void free_boot_hyp_pgd(void)
+>  	mutex_lock(&kvm_hyp_pgd_mutex);
+>  
+>  	if (boot_hyp_pgd) {
+> -		unmap_range(NULL, boot_hyp_pgd, hyp_idmap_start, PAGE_SIZE);
+> -		unmap_range(NULL, boot_hyp_pgd, TRAMPOLINE_VA, PAGE_SIZE);
+> +		unmap_hyp_range(boot_hyp_pgd, hyp_idmap_start, PAGE_SIZE);
+> +		unmap_hyp_range(boot_hyp_pgd, TRAMPOLINE_VA, PAGE_SIZE);
+>  		free_pages((unsigned long)boot_hyp_pgd, hyp_pgd_order);
+>  		boot_hyp_pgd = NULL;
+>  	}
+>  
+>  	if (hyp_pgd)
+> -		unmap_range(NULL, hyp_pgd, TRAMPOLINE_VA, PAGE_SIZE);
+> +		unmap_hyp_range(hyp_pgd, TRAMPOLINE_VA, PAGE_SIZE);
+>  
+>  	mutex_unlock(&kvm_hyp_pgd_mutex);
+>  }
+> @@ -430,9 +543,9 @@ void free_hyp_pgds(void)
+>  
+>  	if (hyp_pgd) {
+>  		for (addr = PAGE_OFFSET; virt_addr_valid(addr); addr += PGDIR_SIZE)
+> -			unmap_range(NULL, hyp_pgd, KERN_TO_HYP(addr), PGDIR_SIZE);
+> +			unmap_hyp_range(hyp_pgd, KERN_TO_HYP(addr), PGDIR_SIZE);
+>  		for (addr = VMALLOC_START; is_vmalloc_addr((void*)addr); addr += PGDIR_SIZE)
+> -			unmap_range(NULL, hyp_pgd, KERN_TO_HYP(addr), PGDIR_SIZE);
+> +			unmap_hyp_range(hyp_pgd, KERN_TO_HYP(addr), PGDIR_SIZE);
+>  
+>  		free_pages((unsigned long)hyp_pgd, hyp_pgd_order);
+>  		hyp_pgd = NULL;
+> -- 
+> 1.7.9.5
+> 
+
+Otherwise looks good!
+
+I'm quite happy to see the hyp/stage2 stuff decoupled.
+
+Thanks,
+-Christoffer
