@@ -1,54 +1,33 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 8 Apr 2016 11:38:40 +0200
-Subject: [PATCH v2 2/9] drivers: irqchip: Add STM32 external interrupts
- support
-In-Reply-To: <1459436979-17275-3-git-send-email-mcoquelin.stm32@gmail.com>
+Date: Fri, 8 Apr 2016 11:43:12 +0200
+Subject: [PATCH v2 6/9] pinctrl: Add IRQ support to STM32 gpios
+In-Reply-To: <1459436979-17275-7-git-send-email-mcoquelin.stm32@gmail.com>
 References: <1459436979-17275-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1459436979-17275-3-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <CACRpkdaiE1cJM6uq_bQuRS2NJTwniPREBsgwuxEjRjB5yTfc9Q@mail.gmail.com>
+ <1459436979-17275-7-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <CACRpkdYLPWNQZgdFHVwLOZv+rS=bdERM9St5b0hVHTd_+ZJMKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, Mar 31, 2016 at 5:09 PM, Maxime Coquelin
 <mcoquelin.stm32@gmail.com> wrote:
 
-> +static void stm32_irq_handler(struct irq_desc *desc)
+> +static int stm32_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
 > +{
-> +       struct irq_domain *domain = irq_desc_get_handler_data(desc);
-> +       struct irq_chip_generic *gc = domain->gc->gc[0];
-> +       struct irq_chip *chip = irq_desc_get_chip(desc);
-> +       unsigned long pending;
-> +       int n;
+> +       struct stm32_pinctrl *pctl = dev_get_drvdata(chip->parent);
+> +       struct stm32_gpio_bank *bank = gpiochip_get_data(chip);
+> +       unsigned int irq;
 > +
-> +       chained_irq_enter(chip, desc);
-> +
-> +       pending = irq_reg_readl(gc, EXTI_PR);
-> +       for_each_set_bit(n, &pending, BITS_PER_LONG) {
-> +               generic_handle_irq(irq_find_mapping(domain, n));
-> +       }
-> +
-> +       chained_irq_exit(chip, desc);
-> +}
+> +       regmap_field_write(pctl->irqmux[offset], bank->range.id);
 
-Is this one of those cases where you should re-read the status register
-on every iteration, so as to avoid exiting and immediately re-entering
-the irq handler?
+No. You must implement the irqchip and GPIO controllers to
+be orthogonal, doing things like this creates a semantic that
+assumes .to_irq() is always called before using the IRQ and
+that is not guaranteed at all. A consumer may very well
+use an interrupt right off the irqchip without this being called
+first. All this function should do is translate a number. No
+other semantics.
 
-C.g irq-vic.c:
-
-static int handle_one_vic(struct vic_device *vic, struct pt_regs *regs)
-{
-        u32 stat, irq;
-        int handled = 0;
-
-        while ((stat = readl_relaxed(vic->base + VIC_IRQ_STATUS))) {
-                irq = ffs(stat) - 1;
-                handle_domain_irq(vic->domain, irq, regs);
-                handled = 1;
-        }
-
-        return handled;
-}
+This needs to be done from the irqchip (sorry).
 
 Yours,
 Linus Walleij
