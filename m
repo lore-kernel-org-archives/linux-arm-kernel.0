@@ -1,28 +1,34 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Fri, 8 Apr 2016 06:41:10 +0200
-Subject: [PATCH v6 1/2] ARM: dma-mapping: Don't use outer_flush_range
- when the L2C is coherent
-In-Reply-To: <1459415380-18004-2-git-send-email-gregory.clement@free-electrons.com>
-References: <1459415380-18004-1-git-send-email-gregory.clement@free-electrons.com>
- <1459415380-18004-2-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20160408044110.GA11802@lnxrabinv.se.axis.com>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Fri, 8 Apr 2016 13:47:49 +0900
+Subject: Nouveau crashes in 4.6-rc on arm64
+In-Reply-To: <57064992.1060509@arm.com>
+References: <57064992.1060509@arm.com>
+Message-ID: <570737F5.30105@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 31, 2016 at 11:09:39AM +0200, Gregory CLEMENT wrote:
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index deac58d5f1f7..1538bb293e90 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -61,7 +61,7 @@ struct arm_dma_free_args {
->  
->  struct arm_dma_allocator {
->  	void *(*alloc)(struct arm_dma_alloc_args *args,
-> -		       struct page **ret_page);
-> +		       struct page **ret_page, bool is_coherent);
->  	void (*free)(struct arm_dma_free_args *args);
->  };
+Hi Robin,
 
-Could you please add this parameter to the arm_dma_alloc_args structure
-instead?  As you see from the code, that's where all the other various
-parameters needed by the allocators are grouped.
+On 04/07/2016 08:50 PM, Robin Murphy wrote:
+> Hello,
+>
+> With 4.6-rc2 (and -rc1) I'm seeing Nouveau blowing up at boot, from the
+> look of it by dereferencing some offset from NULL inside
+> nouveau_fbcon_imageblit(). My setup is an old XFX 7600GT card plugged
+> into an ARM Juno r1 board, which works fine with 4.5 and earlier.
+>
+> Attached are a couple of logs from booting arm64 defconfig plus DRM and
+> Nouveau enabled - the second also has framebuffer console rotation
+> turned on, which interestingly seems to move the point of failure, and
+> the display does eventually come up to show the tail end of the panic in
+> that case.
+>
+> I might be able to find time for a full bisection next week if isn't
+> something sufficiently obvious to anyone who knows this driver.
+
+Looking at the log it is not clear to me what could be causing this. I 
+can boot 4.6-rc2 with a GM206 card without any issue. A bisect would 
+indeed be useful here.
+
+Thanks,
+Alex.
