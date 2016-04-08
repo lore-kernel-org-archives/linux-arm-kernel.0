@@ -1,127 +1,384 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 8 Apr 2016 16:22:56 +0100
-Subject: [PATCH 12/17] kvm-arm: Add explicit hyp page table modifiers
-In-Reply-To: <5707C997.3030304@arm.com>
-References: <1459787177-12767-1-git-send-email-suzuki.poulose@arm.com>
- <1459787177-12767-13-git-send-email-suzuki.poulose@arm.com>
- <20160408131537.GR8961@cbox> <5707C997.3030304@arm.com>
-Message-ID: <5707CCD0.2040606@arm.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 8 Apr 2016 09:23:39 -0600
+Subject: [PATCH 08/14] coresight: tmc: allocating memory when needed
+In-Reply-To: <57068FE4.7080005@arm.com>
+References: <1458678202-3447-1-git-send-email-mathieu.poirier@linaro.org>
+ <1458678202-3447-9-git-send-email-mathieu.poirier@linaro.org>
+ <57068FE4.7080005@arm.com>
+Message-ID: <CANLsYkx__bL6Sj35V2h1hPoR-2c48E=qYXv=P6L0rx9G-ZHB_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/04/16 16:09, Marc Zyngier wrote:
-> On 08/04/16 14:15, Christoffer Dall wrote:
->> On Mon, Apr 04, 2016 at 05:26:12PM +0100, Suzuki K Poulose wrote:
->>> We have common routines to modify hyp and stage2 page tables
->>> based on the 'kvm' parameter. For a smoother transition to
->>> using separate routines for each, duplicate the routines
->>> and modify the copy to work on hyp.
->>>
->>> Marks the forked routines with _hyp_ and gets rid of the
->>> kvm parameter which is no longer needed and is NULL for hyp.
->>> Also, gets rid of calls to kvm_tlb_flush_by_vmid_ipa() calls
->>> from the hyp versions. Uses explicit host page table accessors
->>> instead of the kvm_* page table helpers.
->>>
->>> Suggested-by: Christoffer Dall <christoffer.dall@linaro.org>
->>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-
->>> +static void unmap_hyp_ptes(pmd_t *pmd, phys_addr_t addr, phys_addr_t end)
->>> +{
->>> +	pte_t *pte, *start_pte;
->>> +
->>> +	start_pte = pte = pte_offset_kernel(pmd, addr);
->>> +	do {
->>> +		if (!pte_none(*pte)) {
->>> +			pte_t old_pte = *pte;
->>> +
->>> +			kvm_set_pte(pte, __pte(0));
->>> +
->>> +			/* XXX: Do we need to invalidate the cache for device mappings ? */
+On 7 April 2016 at 10:50, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+> On 22/03/16 20:23, Mathieu Poirier wrote:
 >>
->> no, we will not be swapping out any pages mapped in Hyp mode so you can
->> get rid of both of the following two lines.
-
-OK, will remove this hunk.
-
+>> In it's current form the TMC probe() function allocates
+>> trace buffer memory at boot time, event if coresight isn't
+>> used.  This is highly inefficient since trace buffers can
+>> occupy a lot of memory that could be used otherwised.
 >>
->>> +			if (!kvm_is_device_pfn(pte_pfn(old_pte)))
->>> +				kvm_flush_dcache_pte(old_pte);
->>> +
->>> +			put_page(virt_to_page(pte));
->>> +		}
->>> +	} while (pte++, addr += PAGE_SIZE, addr != end);
->>> +
->>> +	if (hyp_pte_table_empty(start_pte))
->>> +		clear_hyp_pmd_entry(pmd);
->>> +}
->>> +
->>> +static void unmap_hyp_pmds(pud_t *pud, phys_addr_t addr, phys_addr_t end)
->>> +{
->>> +	phys_addr_t next;
->>> +	pmd_t *pmd, *start_pmd;
->>> +
->>> +	start_pmd = pmd = pmd_offset(pud, addr);
->>> +	do {
->>> +		next = pmd_addr_end(addr, end);
->>> +		if (!pmd_none(*pmd)) {
->>> +			if (pmd_thp_or_huge(*pmd)) {
->>
->> do we ever actually map anything with section mappings in the Hyp
->> mappings?
+>> This patch allocates trace buffers on the fly, when the
+>> coresight subsytem is sollicited.  Allocated buffers are
 >
-> No, this is purely a page mapping so far. On my system, the HYP text is
-> just over 4 pages big (4k pages), so the incentive is pretty low, unless
-> we can demonstrate some big gains due to the reduced TLB impact.
-
-
->>> +static void unmap_hyp_puds(pgd_t *pgd, phys_addr_t addr, phys_addr_t end)
->>> +{
->>> +	phys_addr_t next;
->>> +	pud_t *pud, *start_pud;
->>> +
->>> +	start_pud = pud = pud_offset(pgd, addr);
->>> +	do {
->>> +		next = pud_addr_end(addr, end);
->>> +		if (!pud_none(*pud)) {
->>> +			if (pud_huge(*pud)) {
->>
->> do we ever actually map anything with huge pud
->> mappings for the Hyp space?
 >
-> Same thing. Looks like there is some potential simplification here.
+> nit: *subsystem* is *solicited*.
 
-Right, we don't map anything with section mapping. I can clean these up.
+Ack
 
->>> +static void unmap_hyp_range(pgd_t *pgdp, phys_addr_t start, u64 size)
->>> +{
->>> +	pgd_t *pgd;
->>> +	phys_addr_t addr = start, end = start + size;
->>> +	phys_addr_t next;
->>> +
->>> +	pgd = pgdp + pgd_index(addr);
->>> +	do {
->>> +		next = pgd_addr_end(addr, end);
->>> +		if (!pgd_none(*pgd))
->>> +			unmap_hyp_puds(pgd, addr, next);
->>> +	} while (pgd++, addr = next, addr != end);
->>
->> shouldn't we flush the EL2 (hyp) TLB here, strictly speaking?
->>
->> Or do we rely on all mappings ever created/torn down here to always have
->> the same VA/PA relationship?  Since we didn't flush the EL2 TLB in the
->> existing code, that indeed does seem to be the case.
 >
-> Actually, we never unmap anything from HYP.
+>> released when traces are read using the device descriptors
+>> under /dev.
+>>
+>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> ---
+>>   drivers/hwtracing/coresight/coresight-tmc-etf.c | 97
+>> ++++++++++++++++++++-----
+>>   drivers/hwtracing/coresight/coresight-tmc-etr.c | 97
+>> ++++++++++++++++++++++---
+>>   drivers/hwtracing/coresight/coresight-tmc.c     | 14 ----
+>>   3 files changed, 164 insertions(+), 44 deletions(-)
+>>
+>> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c
+>> b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+>> index f9749924a055..e5d67e01409c 100644
+>> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
+>> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+>
+>
+>
+>> @@ -205,52 +231,75 @@ const struct coresight_ops tmc_etf_cs_ops = {
+>>
+>>   int tmc_read_prepare_etf(struct tmc_drvdata *drvdata)
+>>   {
+>> -       int ret = 0;
+>>         enum tmc_mode mode;
+>>         unsigned long flags;
+>>
+>>         spin_lock_irqsave(&drvdata->spinlock, flags);
+>>
+>> -       /* The TMC isn't enable, so there is no need to disable it */
+>> -       if (!drvdata->enable)
+>> +       /* The TMC isn't enabled, so there is no need to disable it */
+>> +       if (!drvdata->enable) {
+>> +               /*
+>> +                * The ETB/ETF is disabled already.  If drvdata::buf is
+>> NULL
+>> +                * trace data has been harvested.
+>> +                */
+>> +               if (!drvdata->buf) {
+>> +                       spin_unlock_irqrestore(&drvdata->spinlock, flags);
+>> +                       return -EINVAL;
+>> +               }
+>> +
+>>                 goto out;
+>> +       }
+>>
+>>         if (drvdata->config_type != TMC_CONFIG_TYPE_ETB &&
+>>             drvdata->config_type != TMC_CONFIG_TYPE_ETF) {
+>> -               ret = -EINVAL;
+>> -               goto out;
+>> +               spin_unlock_irqrestore(&drvdata->spinlock, flags);
+>> +               return -EINVAL;
+>>         }
+>>
+>>         /* There is no point in reading a TMC in HW FIFO mode */
+>>         mode = readl_relaxed(drvdata->base + TMC_MODE);
+>>         if (mode != TMC_MODE_CIRCULAR_BUFFER) {
+>> -               ret = -EINVAL;
+>> -               goto out;
+>> +               spin_unlock_irqrestore(&drvdata->spinlock, flags);
+>> +               return -EINVAL;
+>>         }
+>
+>
+>>
+>>         tmc_etb_disable_hw(drvdata);
+>> -       drvdata->reading = true;
+>> +       tmc_etb_dump_hw(drvdata);
+>
+>
+> The addition of tmc_etb_dump_hw() should have been part of the previous
+> patch,
+> which made disable() reusable.
 
-Except for the kvm tearing down where we clean up all the hyp table.
+Thanks for your comment on this patchset.
 
-> Once a structure (kvm, vcpu)is mapped there, it stays forever, whatever happens
-> to the VM (that's because we'd otherwise have to refcount the number of objects in a page,
-> and I'm lazy...).
+After Dan found an error with the memory allocation I started to look
+at the driver again and found several areas worth improving.  I'm
+currently re-writing this patchset and the result should be much
+easier to follow.  I would appreciate if you can have a look when V2
+is out.
 
-Thats one of my TODO list if there is sufficient interest in getting that done.
+Best regards,
+Mathieu
 
-Thanks
-Suzuki
+[1]. http://www.spinics.net/lists/arm-kernel/msg494888.html
+
+>
+>>
+>>   out:
+>> +       drvdata->reading = true;
+>
+>
+> Instead of spilling the spin_unlock_irq_restore() and return from too many
+> different places in the function above, could we do :
+>
+> done:
+>         drvdata->reading = true;
+>
+> out:
+>>
+>>         spin_unlock_irqrestore(&drvdata->spinlock, flags);
+>> -       return ret;
+>> +       return 0;
+>
+>
+>
+>>   }
+>>
+>>   int tmc_read_unprepare_etf(struct tmc_drvdata *drvdata)
+>>   {
+>
+>
+> ...
+>
+>> +       }
+>> +
+>> +       /* The TMC isn't enabled, so there is no need to enable it */
+>> +       if (!drvdata->enable) {
+>> +               /*
+>> +                * The ETB/ETF is not tracing and the buffer was just
+>> read.
+>> +                * As such prepare to free the trace buffer.
+>> +                */
+>> +               buf = drvdata->buf;
+>> +
+>> +               /*
+>> +                * drvdata::buf is switched on in tmc_read_prepare_etf()
+>> so
+>> +                * it is important to set it back to NULL.
+>> +                */
+>> +               drvdata->buf = NULL;
+>>                 goto out;
+>>         }
+>
+>
+> This check should be brought down after the MODE check below for better
+> error
+> check.
+>
+>>
+>> @@ -258,13 +307,25 @@ int tmc_read_unprepare_etf(struct tmc_drvdata
+>> *drvdata)
+>>         mode = readl_relaxed(drvdata->base + TMC_MODE);
+>>         if (mode != TMC_MODE_CIRCULAR_BUFFER) {
+>>                 ret = -EINVAL;
+>> -               goto out;
+>> +               goto err;
+>>         }
+>>
+>> +       /*
+>> +        * The trace run will continue with the same allocated trace
+>> buffer.
+>> +        * As such zero-out the buffer so that we don't end up with stale
+>> +        * data.
+>> +        */
+>
+>
+> Could this drvdata->buf be NULL here ?
+>
+>> +       memset(drvdata->buf, 0, drvdata->size);
+>>         tmc_etb_enable_hw(drvdata);
+>> -       drvdata->reading = false;
+>>
+>>   out:
+>> +       drvdata->reading = false;
+>> +
+>> +err:
+>>         spin_unlock_irqrestore(&drvdata->spinlock, flags);
+>> +
+>> +       /* Free allocated memory outside of the spinlock */
+>> +       kfree(buf);
+>> +
+>>         return ret;
+>>   }
+>> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c
+>> b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+>> index 67e7d5dd891f..c4962568276e 100644
+>> --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
+>> +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+>> @@ -16,6 +16,8 @@
+>>    */
+>>
+>>   #include <linux/coresight.h>
+>> +#include <linux/dma-mapping.h>
+>> +
+>>   #include "coresight-priv.h"
+>>   #include "coresight-tmc.h"
+>>
+>> @@ -82,19 +84,51 @@ static void tmc_etr_disable_hw(struct tmc_drvdata
+>> *drvdata)
+>>
+>>   static int tmc_enable_etr_sink(struct coresight_device *csdev, u32 mode)
+>>   {
+>> +       bool allocated = false;
+>>         unsigned long flags;
+>> +       void __iomem *vaddr;
+>> +       dma_addr_t paddr;
+>>         struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+>>
+>> +       /*
+>> +        * Contiguous  memory can't be allocated while a spinlock is held.
+>> +        * As such allocate memory here and free it if a buffer has
+>> already
+>> +        * been allocated (from a previous session).
+>> +        */
+>> +       vaddr = dma_alloc_coherent(drvdata->dev, drvdata->size,
+>> +                                  &paddr, GFP_KERNEL);
+>> +       if (!vaddr)
+>> +               return -ENOMEM;
+>> +
+>>         spin_lock_irqsave(&drvdata->spinlock, flags);
+>>         if (drvdata->reading) {
+>>                 spin_unlock_irqrestore(&drvdata->spinlock, flags);
+>> +               dma_free_coherent(drvdata->dev, drvdata->size, vaddr,
+>> paddr);
+>>                 return -EBUSY;
+>>         }
+>
+>
+> Both here and above in the etf/etb case, could we do a preliminary check
+> by taking the lock where we may not have to allocate the buffer and allocate
+> it if necessary and retake the lock ? I know it could make the code a bit
+> more
+> complex, but could save us on unnecessary allocations.
+>
+> Also it would be good to consolidate the return points here as well for the
+> error path.
+>
+>>
+>> +       /*
+>> +        * If drvdata::buf == NULL, use the memory allocated above.
+>> +        * Otherwise a buffer still exists from a previous session, so
+>> +        * simply use that.
+>> +        */
+>> +       if (!drvdata->buf) {
+>> +               allocated = true;
+>> +               drvdata->vaddr = vaddr;
+>> +               drvdata->paddr = paddr;
+>> +               drvdata->buf = drvdata->vaddr;
+>> +       }
+>> +
+>> +       memset(drvdata->vaddr, 0, drvdata->size);
+>> +
+>>         tmc_etr_enable_hw(drvdata);
+>>         drvdata->enable = true;
+>>         spin_unlock_irqrestore(&drvdata->spinlock, flags);
+>>
+>> +       /* Free memory outside the spinlock if need be */
+>> +       if (!allocated)
+>> +               dma_free_coherent(drvdata->dev, drvdata->size, vaddr,
+>> paddr);
+>> +
+>>         dev_info(drvdata->dev, "TMC-ETR enabled\n");
+>>         return 0;
+>>   }
+>> @@ -129,48 +163,87 @@ const struct coresight_ops tmc_etr_cs_ops = {
+>>
+>>   int tmc_read_prepare_etr(struct tmc_drvdata *drvdata)
+>>   {
+>> -       int ret = 0;
+>>         unsigned long flags;
+>>
+>>         spin_lock_irqsave(&drvdata->spinlock, flags);
+>>
+>> -       /* The TMC isn't enable, so there is no need to disable it */
+>> -       if (!drvdata->enable)
+>> +       /* The TMC isn't enabled, so there is no need to disable it */
+>> +       if (!drvdata->enable) {
+>> +               /*
+>> +                * The ETR is disabled already.  If drvdata::buf is NULL
+>> +                * trace data has been harvested.
+>> +                */
+>> +               if (!drvdata->buf) {
+>> +                       spin_unlock_irqrestore(&drvdata->spinlock, flags);
+>> +                       return -EINVAL;
+>> +               }
+>> +
+>>                 goto out;
+>> +       }
+>>
+>>         if (drvdata->config_type != TMC_CONFIG_TYPE_ETR) {
+>> -               ret = -EINVAL;
+>> -               goto out;
+>> +               spin_unlock_irqrestore(&drvdata->spinlock, flags);
+>> +               return -EINVAL;
+>>         }
+>>
+>>         tmc_etr_disable_hw(drvdata);
+>> -       drvdata->reading = true;
+>> +       tmc_etr_dump_hw(drvdata);
+>
+>
+> Same as for etf/etb, shouldn't the above dump_hw be part of the previous
+> patch ?
+>
+>>
+>>   out:
+>> +       drvdata->reading = true;
+>>         spin_unlock_irqrestore(&drvdata->spinlock, flags);
+>> -       return ret;
+>> +       return 0;
+>>   }
+>>
+>>   int tmc_read_unprepare_etr(struct tmc_drvdata *drvdata)
+>>   {
+>>         int ret = 0;
+>>         unsigned long flags;
+>> +       void __iomem *vaddr = NULL;
+>> +       dma_addr_t paddr;
+>>
+>>         spin_lock_irqsave(&drvdata->spinlock, flags);
+>>
+>> -       /* The TMC isn't enable, so there is no need to enable it */
+>> -       if (!drvdata->enable)
+>> -               goto out;
+>> -
+>>         if (drvdata->config_type != TMC_CONFIG_TYPE_ETR) {
+>>                 ret = -EINVAL;
+>> +               goto err;
+>> +       }
+>> +
+>> +       /* The TMC isn't enabled, so there is no need to enable it */
+>> +       if (!drvdata->enable) {
+>> +               /*
+>> +                * The ETR is not tracing and trace data was just read. As
+>> +                * such prepare to free the trace buffer.
+>> +                */
+>> +               vaddr = drvdata->vaddr;
+>> +               paddr = drvdata->paddr;
+>> +
+>> +               /*
+>> +                * drvdata::buf is switched on in tmc_read_prepare_etr()
+>> and
+>> +                * tmc_enable_etr_sink so it is important to set it back
+>> to
+>> +                * NULL.
+>> +                */
+>> +               drvdata->buf = NULL;
+>>                 goto out;
+>>         }
+>>
+>> +       /*
+>> +        * The trace run will continue with the same allocated trace
+>> buffer.
+>> +        * As such zero-out the buffer so that we don't end up with stale
+>> +        * data.
+>> +        */
+>> +       memset(drvdata->buf, 0, drvdata->size);
+>
+>
+> Are we sure drvdata->buf is not NULL here ?
+>
+>
+> Suzuki
