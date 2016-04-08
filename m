@@ -1,303 +1,219 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Fri, 8 Apr 2016 13:33:28 +0000
-Subject: [PATCH v2] PCI: designware: move remaining rc setup code to
- dw_pcie_setup_rc()
-In-Reply-To: <20160407140551.GA2648@localhost>
-References: <1458128433-3020-1-git-send-email-jszhang@marvell.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ED40E52@lhreml503-mbs>
- <20160407103734.55e72da7@xhacker>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ED43F95@lhreml503-mbs>
- <20160407163443.291fbd49@xhacker>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ED44208@lhreml503-mbs>
- <20160407140551.GA2648@localhost>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1ED45C38@lhreml503-mbs>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 8 Apr 2016 15:42:57 +0200
+Subject: [PATCH 13/17] kvm-arm: Add stage2 page table modifiers
+In-Reply-To: <1459787177-12767-14-git-send-email-suzuki.poulose@arm.com>
+References: <1459787177-12767-1-git-send-email-suzuki.poulose@arm.com>
+ <1459787177-12767-14-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20160408134257.GW8961@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn
-
-Many thanks for your reply
-
-> -----Original Message-----
-> From: Bjorn Helgaas [mailto:helgaas at kernel.org]
-> Sent: 07 April 2016 15:06
-> To: Gabriele Paoloni
-> Cc: Jisheng Zhang; jingoohan1 at gmail.com; pratyush.anand at gmail.com;
-> bhelgaas at google.com; linux-pci at vger.kernel.org; linux-
-> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v2] PCI: designware: move remaining rc setup code
-> to dw_pcie_setup_rc()
+On Mon, Apr 04, 2016 at 05:26:13PM +0100, Suzuki K Poulose wrote:
+> Now that the hyp page table is handled by different set of
+> routines, rename the original shared routines to stage2 handlers.
+> Also make explicit use of the stage2 page table helpers.
 > 
-> On Thu, Apr 07, 2016 at 10:06:45AM +0000, Gabriele Paoloni wrote:
-> > Hi Jisheng
-> >
-> > > -----Original Message-----
-> > > From: Jisheng Zhang [mailto:jszhang at marvell.com]
-> > > Sent: 07 April 2016 09:35
-> > > To: Gabriele Paoloni
-> > > Cc: jingoohan1 at gmail.com; pratyush.anand at gmail.com;
-> > > bhelgaas at google.com; linux-pci at vger.kernel.org; linux-
-> > > kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> > > Subject: Re: [PATCH v2] PCI: designware: move remaining rc setup
-> code
-> > > to dw_pcie_setup_rc()
-> > >
-> > > Hi Gabriele,
-> > >
-> > > On Thu, 7 Apr 2016 08:20:28 +0000 Gabriele Paoloni wrote:
-> > >
-> > > > Hi Jisheng
-> > > >
-> > > > Thanks for your reply
-> > > >
-> > > > > -----Original Message-----
-> > > > > From: Jisheng Zhang [mailto:jszhang at marvell.com]
-> > > > > Sent: 07 April 2016 03:38
-> > > > > To: Gabriele Paoloni; jingoohan1 at gmail.com;
-> > > pratyush.anand at gmail.com;
-> > > > > bhelgaas at google.com
-> > > > > Cc: linux-pci at vger.kernel.org; linux-kernel at vger.kernel.org;
-> linux-
-> > > arm-
-> > > > > kernel at lists.infradead.org
-> > > > > Subject: Re: [PATCH v2] PCI: designware: move remaining rc
-> setup
-> > > code
-> > > > > to dw_pcie_setup_rc()
-> > > > >
-> > > > > Hi Gabriele,
-> > > > >
-> > > > > On Wed, 6 Apr 2016 14:50:29 +0000 Gabriele Paoloni wrote:
-> > > > >
-> > > > > > Hi, sorry to be late on this
-> > > > > >
-> > > > > > > -----Original Message-----
-> > > > > > > From: linux-kernel-owner at vger.kernel.org [mailto:linux-
-> kernel-
-> > > > > > > owner at vger.kernel.org] On Behalf Of Jisheng Zhang
-> > > > > > > Sent: 16 March 2016 11:41
-> > > > > > > To: jingoohan1 at gmail.com; pratyush.anand at gmail.com;
-> > > > > bhelgaas at google.com
-> > > > > > > Cc: linux-pci at vger.kernel.org; linux-
-> kernel at vger.kernel.org;
-> > > linux-
-> > > > > arm-
-> > > > > > > kernel at lists.infradead.org; Jisheng Zhang
-> > > > > > > Subject: [PATCH v2] PCI: designware: move remaining rc
-> setup
-> > > code
-> > > > > to
-> > > > > > > dw_pcie_setup_rc()
-> > > > > > >
-> > > > > > > dw_pcie_setup_rc(), as its name indicates, setups the RC.
-> But
-> > > > > current
-> > > > > > > dw_pcie_host_init() also contains some necessary rc setup
-> code.
-> > > > > > >
-> > > > > > > Another reason: the host may lost power during suspend to
-> ram,
-> > > the
-> > > > > RC
-> > > > > > > need to be re-setup after resume. The rc can't be correctly
-> > > resumed
-> > > > > > > without the rc setup code in dw_pcie_host_init().
-> > > > > > >
-> > > > > > > So this patch moves the code to dw_pcie_setup_rc() to
-> address
-> > > the
-> > > > > above
-> > > > > > > two issues. After this patch, each pcie designware driver
-> users
-> > > > > could
-> > > > > > > call dw_pcie_setup_rc() to re-setup rc when resume back.
-> > > > > >
-> > > > > > I think this patch breaks the Hisilicon driver...
-> > > > > >
-> > > > > > Our driver performs linkup setup in UEFI therefore we do not
-> call
-> > > > > > dw_pcie_setup_rc(), we only call dw_pcie_host_init().
-> > > > >
-> > > > > Thanks for the information. So pcie-hisi rely on UEFI to do
-> > > something
-> > > > > similar
-> > > > > in dw_pcie_setup_rc(), this comes to a common driver implement
-> > > > > question: should
-> > > > > linux device driver rely on bootloader to configure HW device?
-> > > >
-> > > > I don't see any issue with this...
-> > > >
-> > > > >
-> > > > > Is it acceptable that pcie-hisi adds a call to
-> dw_pcie_setup_rc()
-> > > in
-> > > > > hisi_add_pcie_port()?
-> > > >
-> > > > I don't think so...that would try to overwrite what is already
-> set by
-> > > > the bootloader; so it is wrong in principle and maybe it can lead
-> to
-> > > > undefined behaviours...
-> > >
-> > > make sense! This commit is intend to re-setup the rc when waken
-> from
-> > > s2ram (in
-> > > s2ram state, the host lost power)
-> > >
-> > > I have no good solution but to introduce one function e.g
-> > > dw_pcie_setup_rc_after_linkup(), then move related code from
-> > > dw_pcie_host_init
-> > > to it, then let my host driver resume hook to call.
-> > >
-> > > Hi Pratyush, Jingoo and Bjorn etc.
-> > >
-> > > any suggestions are appreciated!
-> >
-> > What about:
-> >
-> > diff --git a/drivers/pci/host/pcie-designware.c
-> b/drivers/pci/host/pcie-designware.c
-> > index a4cccd3..e461f5d 100644
-> > --- a/drivers/pci/host/pcie-designware.c
-> > +++ b/drivers/pci/host/pcie-designware.c
-> > @@ -434,7 +434,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
-> >  	struct platform_device *pdev = to_platform_device(pp->dev);
-> >  	struct pci_bus *bus, *child;
-> >  	struct resource *cfg_res;
-> > -	u32 val;
-> >  	int i, ret;
-> >  	LIST_HEAD(res);
-> >  	struct resource_entry *win;
-> > @@ -544,25 +543,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
-> >  	if (pp->ops->host_init)
-> >  		pp->ops->host_init(pp);
-> >
-> > -	/*
-> > -	 * If the platform provides ->rd_other_conf, it means the
-> platform
-> > -	 * uses its own address translation component rather than ATU, so
-> > -	 * we should not program the ATU here.
-> > -	 */
-> > -	if (!pp->ops->rd_other_conf)
-> > -		dw_pcie_prog_outbound_atu(pp, PCIE_ATU_REGION_INDEX1,
-> > -					  PCIE_ATU_TYPE_MEM, pp->mem_base,
-> > -					  pp->mem_bus_addr, pp->mem_size);
-> > -
-> > -	dw_pcie_wr_own_conf(pp, PCI_BASE_ADDRESS_0, 4, 0);
-> > -
-> > -	/* program correct class for RC */
-> > -	dw_pcie_wr_own_conf(pp, PCI_CLASS_DEVICE, 2,
-> PCI_CLASS_BRIDGE_PCI);
-> > -
-> > -	dw_pcie_rd_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, &val);
-> > -	val |= PORT_LOGIC_SPEED_CHANGE;
-> > -	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
-> > -
-> >  	pp->root_bus_nr = pp->busn->start;
-> >  	if (IS_ENABLED(CONFIG_PCI_MSI)) {
-> >  		bus = pci_scan_root_bus_msi(pp->dev, pp->root_bus_nr,
-> > @@ -725,6 +705,29 @@ static struct pci_ops dw_pcie_ops = {
-> >  	.write = dw_pcie_wr_conf,
-> >  };
-> >
-> > +void dw_pcie_setup_own_cfg(struct pcie_port *pp)
-> > +{
-> > +	u32 val;
-> > +	/*
-> > +	 * If the platform provides ->rd_other_conf, it means the
-> platform
-> > +	 * uses its own address translation component rather than ATU, so
-> > +	 * we should not program the ATU here.
-> > +	 */
-> > +	if (!pp->ops->rd_other_conf)
-> > +		dw_pcie_prog_outbound_atu(pp, PCIE_ATU_REGION_INDEX1,
-> > +					  PCIE_ATU_TYPE_MEM, pp->mem_base,
-> > +					  pp->mem_bus_addr, pp->mem_size);
-> > +
-> > +	dw_pcie_wr_own_conf(pp, PCI_BASE_ADDRESS_0, 4, 0);
-> > +
-> > +	/* program correct class for RC */
-> > +	dw_pcie_wr_own_conf(pp, PCI_CLASS_DEVICE, 2,
-> PCI_CLASS_BRIDGE_PCI);
-> > +
-> > +	dw_pcie_rd_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, &val);
-> > +	val |= PORT_LOGIC_SPEED_CHANGE;
-> > +	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
-> > +}
-> > +
-> >  void dw_pcie_setup_rc(struct pcie_port *pp)
-> >  {
-> >  	u32 val;
-> > @@ -800,6 +803,8 @@ void dw_pcie_setup_rc(struct pcie_port *pp)
-> >  	val |= PCI_COMMAND_IO | PCI_COMMAND_MEMORY |
-> >  		PCI_COMMAND_MASTER | PCI_COMMAND_SERR;
-> >  	dw_pcie_writel_rc(pp, val, PCI_COMMAND);
-> > +
-> > +	dw_pcie_setup_own_cfg(pp);
-> >  }
-> >
-> >  MODULE_AUTHOR("Jingoo Han <jg1.han@samsung.com>");
-> > diff --git a/drivers/pci/host/pcie-designware.h
-> b/drivers/pci/host/pcie-designware.h
-> > index f437f9b..caf0f5d 100644
-> > --- a/drivers/pci/host/pcie-designware.h
-> > +++ b/drivers/pci/host/pcie-designware.h
-> > @@ -85,5 +85,6 @@ int dw_pcie_wait_for_link(struct pcie_port *pp);
-> >  int dw_pcie_link_up(struct pcie_port *pp);
-> >  void dw_pcie_setup_rc(struct pcie_port *pp);
-> >  int dw_pcie_host_init(struct pcie_port *pp);
-> > +void dw_pcie_setup_own_cfg(struct pcie_port *pp);
-> >
-> >  #endif /* _PCIE_DESIGNWARE_H */
-> > diff --git a/drivers/pci/host/pcie-hisi.c b/drivers/pci/host/pcie-
-> hisi.c
-> > index 3e98d4e..8da29b2 100644
-> > --- a/drivers/pci/host/pcie-hisi.c
-> > +++ b/drivers/pci/host/pcie-hisi.c
-> > @@ -164,6 +164,7 @@ static int hisi_add_pcie_port(struct pcie_port
-> *pp,
-> >  		dev_err(&pdev->dev, "failed to initialize host\n");
-> >  		return ret;
-> >  	}
-> > +	dw_pcie_setup_own_cfg(pp);
-> >
-> >  	return 0;
-> >  }
+> unmap_range has been merged to existing unmap_stage2_range.
 > 
-> What's the hisi plan for resuming after suspend-to-RAM?  How does the
-> RC get reprogrammed after it loses all its state?
-
-PM is not part of the driver yet. This is planned for near
-future release so haven't made such considerations yet
-
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  arch/arm/kvm/mmu.c |   97 ++++++++++++++++++++++++----------------------------
+>  1 file changed, 44 insertions(+), 53 deletions(-)
 > 
-> What would break if hisi did call dw_pcie_setup_rc()?  I know you said
-> it would overwrite what the bootloader already did, which is true.
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 2b491e5..0009a24 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -152,26 +152,26 @@ static void *mmu_memory_cache_alloc(struct kvm_mmu_memory_cache *mc)
+>  	return p;
+>  }
+>  
+> -static void clear_pgd_entry(struct kvm *kvm, pgd_t *pgd, phys_addr_t addr)
+> +static void clear_stage2_pgd_entry(struct kvm *kvm, pgd_t *pgd, phys_addr_t addr)
+>  {
+> -	pud_t *pud_table __maybe_unused = pud_offset(pgd, 0);
+> -	pgd_clear(pgd);
+> +	pud_t *pud_table __maybe_unused = stage2_pud_offset(pgd, 0UL);
+> +	stage2_pgd_clear(pgd);
+>  	kvm_tlb_flush_vmid_ipa(kvm, addr);
+> -	pud_free(NULL, pud_table);
+> +	stage2_pud_free(NULL, pud_table);
+>  	put_page(virt_to_page(pgd));
+>  }
+>  
+> -static void clear_pud_entry(struct kvm *kvm, pud_t *pud, phys_addr_t addr)
+> +static void clear_stage2_pud_entry(struct kvm *kvm, pud_t *pud, phys_addr_t addr)
+>  {
+> -	pmd_t *pmd_table = pmd_offset(pud, 0);
+> -	VM_BUG_ON(pud_huge(*pud));
+> -	pud_clear(pud);
+> +	pmd_t *pmd_table __maybe_unused = stage2_pmd_offset(pud, 0);
 
-I am try to figure this out now with our HW team.
+The __maybe_unused are slightly ugly, so it may be nicer to create the
+stage2_pmd_free() as static inline's if they're defined to do nothing
+instead.
 
+
+> +	VM_BUG_ON(stage2_pud_huge(*pud));
+> +	stage2_pud_clear(pud);
+>  	kvm_tlb_flush_vmid_ipa(kvm, addr);
+> -	pmd_free(NULL, pmd_table);
+> +	stage2_pmd_free(NULL, pmd_table);
+>  	put_page(virt_to_page(pud));
+>  }
+>  
+> -static void clear_pmd_entry(struct kvm *kvm, pmd_t *pmd, phys_addr_t addr)
+> +static void clear_stage2_pmd_entry(struct kvm *kvm, pmd_t *pmd, phys_addr_t addr)
+>  {
+>  	pte_t *pte_table = pte_offset_kernel(pmd, 0);
+>  	VM_BUG_ON(pmd_thp_or_huge(*pmd));
+> @@ -201,7 +201,7 @@ static void clear_pmd_entry(struct kvm *kvm, pmd_t *pmd, phys_addr_t addr)
+>   * the corresponding TLBs, we call kvm_flush_dcache_p*() to make sure
+>   * the IO subsystem will never hit in the cache.
+>   */
+> -static void unmap_ptes(struct kvm *kvm, pmd_t *pmd,
+> +static void unmap_stage2_ptes(struct kvm *kvm, pmd_t *pmd,
+>  		       phys_addr_t addr, phys_addr_t end)
+>  {
+>  	phys_addr_t start_addr = addr;
+> @@ -223,19 +223,19 @@ static void unmap_ptes(struct kvm *kvm, pmd_t *pmd,
+>  		}
+>  	} while (pte++, addr += PAGE_SIZE, addr != end);
+>  
+> -	if (kvm_pte_table_empty(kvm, start_pte))
+> -		clear_pmd_entry(kvm, pmd, start_addr);
+> +	if (stage2_pte_table_empty(start_pte))
+> +		clear_stage2_pmd_entry(kvm, pmd, start_addr);
+>  }
+>  
+> -static void unmap_pmds(struct kvm *kvm, pud_t *pud,
+> +static void unmap_stage2_pmds(struct kvm *kvm, pud_t *pud,
+>  		       phys_addr_t addr, phys_addr_t end)
+>  {
+>  	phys_addr_t next, start_addr = addr;
+>  	pmd_t *pmd, *start_pmd;
+>  
+> -	start_pmd = pmd = pmd_offset(pud, addr);
+> +	start_pmd = pmd = stage2_pmd_offset(pud, addr);
+>  	do {
+> -		next = kvm_pmd_addr_end(addr, end);
+> +		next = stage2_pmd_addr_end(addr, end);
+>  		if (!pmd_none(*pmd)) {
+>  			if (pmd_thp_or_huge(*pmd)) {
+>  				pmd_t old_pmd = *pmd;
+> @@ -247,57 +247,64 @@ static void unmap_pmds(struct kvm *kvm, pud_t *pud,
+>  
+>  				put_page(virt_to_page(pmd));
+>  			} else {
+> -				unmap_ptes(kvm, pmd, addr, next);
+> +				unmap_stage2_ptes(kvm, pmd, addr, next);
+>  			}
+>  		}
+>  	} while (pmd++, addr = next, addr != end);
+>  
+> -	if (kvm_pmd_table_empty(kvm, start_pmd))
+> -		clear_pud_entry(kvm, pud, start_addr);
+> +	if (stage2_pmd_table_empty(start_pmd))
+> +		clear_stage2_pud_entry(kvm, pud, start_addr);
+>  }
+>  
+> -static void unmap_puds(struct kvm *kvm, pgd_t *pgd,
+> +static void unmap_stage2_puds(struct kvm *kvm, pgd_t *pgd,
+>  		       phys_addr_t addr, phys_addr_t end)
+>  {
+>  	phys_addr_t next, start_addr = addr;
+>  	pud_t *pud, *start_pud;
+>  
+> -	start_pud = pud = pud_offset(pgd, addr);
+> +	start_pud = pud = stage2_pud_offset(pgd, addr);
+>  	do {
+> -		next = kvm_pud_addr_end(addr, end);
+> -		if (!pud_none(*pud)) {
+> -			if (pud_huge(*pud)) {
+> +		next = stage2_pud_addr_end(addr, end);
+> +		if (!stage2_pud_none(*pud)) {
+> +			if (stage2_pud_huge(*pud)) {
+>  				pud_t old_pud = *pud;
+>  
+> -				pud_clear(pud);
+> +				stage2_pud_clear(pud);
+>  				kvm_tlb_flush_vmid_ipa(kvm, addr);
+> -
+>  				kvm_flush_dcache_pud(old_pud);
+> -
+>  				put_page(virt_to_page(pud));
+>  			} else {
+> -				unmap_pmds(kvm, pud, addr, next);
+> +				unmap_stage2_pmds(kvm, pud, addr, next);
+>  			}
+>  		}
+>  	} while (pud++, addr = next, addr != end);
+>  
+> -	if (kvm_pud_table_empty(kvm, start_pud))
+> -		clear_pgd_entry(kvm, pgd, start_addr);
+> +	if (stage2_pud_table_empty(start_pud))
+> +		clear_stage2_pgd_entry(kvm, pgd, start_addr);
+>  }
+>  
+> -
+> -static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
+> -			phys_addr_t start, u64 size)
+> +/**
+> + * unmap_stage2_range -- Clear stage2 page table entries to unmap a range
+> + * @kvm:   The VM pointer
+> + * @start: The intermediate physical base address of the range to unmap
+> + * @size:  The size of the area to unmap
+> + *
+> + * Clear a range of stage-2 mappings, lowering the various ref-counts.  Must
+> + * be called while holding mmu_lock (unless for freeing the stage2 pgd before
+> + * destroying the VM), otherwise another faulting VCPU may come in and mess
+> + * with things behind our backs.
+> + */
+> +static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
+>  {
+>  	pgd_t *pgd;
+>  	phys_addr_t addr = start, end = start + size;
+>  	phys_addr_t next;
+>  
+> -	pgd = pgdp + kvm_pgd_index(addr);
+> +	pgd = kvm->arch.pgd + stage2_pgd_index(addr);
+>  	do {
+> -		next = kvm_pgd_addr_end(addr, end);
+> -		if (!pgd_none(*pgd))
+> -			unmap_puds(kvm, pgd, addr, next);
+> +		next = stage2_pgd_addr_end(addr, end);
+> +		if (!stage2_pgd_none(*pgd))
+> +			unmap_stage2_puds(kvm, pgd, addr, next);
+>  	} while (pgd++, addr = next, addr != end);
+>  }
+>  
+> @@ -811,22 +818,6 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm)
+>  	return 0;
+>  }
+>  
+> -/**
+> - * unmap_stage2_range -- Clear stage2 page table entries to unmap a range
+> - * @kvm:   The VM pointer
+> - * @start: The intermediate physical base address of the range to unmap
+> - * @size:  The size of the area to unmap
+> - *
+> - * Clear a range of stage-2 mappings, lowering the various ref-counts.  Must
+> - * be called while holding mmu_lock (unless for freeing the stage2 pgd before
+> - * destroying the VM), otherwise another faulting VCPU may come in and mess
+> - * with things behind our backs.
+> - */
+> -static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
+> -{
+> -	unmap_range(kvm, kvm->arch.pgd, start, size);
+> -}
+> -
+>  static void stage2_unmap_memslot(struct kvm *kvm,
+>  				 struct kvm_memory_slot *memslot)
+>  {
+> -- 
+> 1.7.9.5
 > 
-> But hisi does call dw_pcie_host_init(), so it reads pp->mem (which
-> determines pp->mem_base) and pp->lanes from the DT.  Other drivers
-> then call dw_pcie_setup_rc() which programs the RC based on
-> pp->mem_base and pp->lanes.  So hisi assumes UEFI programmed the RC to
-> match the DT, while the other drivers read the DT and program the RC
-> to match.  The latter seems more robust because it enforces the
-> consistency rather than relying on it.
 
-Yes I agree with you, however we have preferred to move RC config to
-BIOS to have a single driver to support multiple versions of the
-same SoC.
-
-The patch I proposed above does the same job as the original patch
-proposed by Jisheng and also allows hisi driver to call the moved
-code.
-
-Do you see anything wrong with it?
-
-Thanks
-
-Gab
-
-> 
-> Bjorn
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
