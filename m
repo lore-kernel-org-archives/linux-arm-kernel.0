@@ -1,13 +1,13 @@
 From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Fri, 8 Apr 2016 15:22:09 +0200
-Subject: [GIT PULL] STi defconfig updates for v4.7 #1
-Message-ID: <5707B081.9030508@st.com>
+Date: Fri, 8 Apr 2016 15:23:02 +0200
+Subject: [GIT PULL] STi SoC updates for v4.7 #1
+Message-ID: <5707B0B6.1030209@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Olof, Arnd and Kevin,
 
-Please consider this first round of STi defconfig updates for v4.7:
+Please consider this first round of STi SoC updates for v4.7:
 
 The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 
@@ -16,27 +16,25 @@ The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 are available in the git repository at:
 
    git://git.kernel.org/pub/scm/linux/kernel/git/mcoquelin/sti.git 
-tags/sti-defconfig-for-v4.7-1
+tags/sti-soc-for-v4.7-1
 
-for you to fetch changes up to 6d54fb8a08a7b9ac06bbf4d7c41e6818d22e392f:
+for you to fetch changes up to 33406c805730377ff48741f9ad99e7aada91595b:
 
-   ARM: multi_v7_defconfig: Enable ST's HW Random Number Generator 
-(2016-04-07 09:38:13 +0200)
+   ARM: STi: Update platform level menuconfig 'help' (2016-04-07 
+16:32:14 +0200)
 
 ----------------------------------------------------------------
 Highlights:
 -----------
-  - Enable ST's HW Random number generator in multi_v7 defconfig
-  - Enable PWM regulator support in multi_v7 defconfig
-  - Enable ST's Power and Reset driver in multi_v7 defconfig
-  - Enable ST's PWM in multi_v7 defconfig
+  - Add CPUFreq and RProc drivers to STI maintainers file list
+  - Improve STi's menuconfig help entry
 
 ----------------------------------------------------------------
-Lee Jones (4):
-       ARM: multi_v7_defconfig: Enable ST's PWM driver
-       ARM: multi_v7_defconfig: Enable ST's Power Reset driver
-       ARM: multi_v7_defconfig: Enable support for PWM Regulators
-       ARM: multi_v7_defconfig: Enable ST's HW Random Number Generator
+Lee Jones (3):
+       MAINTAINERS: Add ST's CPUFreq driver to the STI file list
+       MAINTAINERS: Add ST's Remote Processor Driver to ARM/STI ARCHITECTURE
+       ARM: STi: Update platform level menuconfig 'help'
 
-  arch/arm/configs/multi_v7_defconfig | 7 +++++--
-  1 file changed, 5 insertions(+), 2 deletions(-
+  MAINTAINERS               | 2 ++
+  arch/arm/mach-sti/Kconfig | 9 ++++-----
+  2 files changed, 6 insertions(+), 5 deletions(-)
