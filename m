@@ -1,48 +1,69 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Fri, 8 Apr 2016 13:34:26 -0700
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Fri,  8 Apr 2016 13:37:27 -0700
 Subject: [PATCH] net: thunderx: Fix broken of_node_put() code.
-In-Reply-To: <20160408.161557.850174112269792582.davem@davemloft.net>
-References: <1459472517-5696-1-git-send-email-ddaney.cavm@gmail.com>
- <5707DF3F.3000508@caviumnetworks.com>
- <20160408.161557.850174112269792582.davem@davemloft.net>
-Message-ID: <570815D2.5050608@caviumnetworks.com>
+Message-ID: <1460147847-6963-1-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/08/2016 01:15 PM, David Miller wrote:
-> From: David Daney <ddaney@caviumnetworks.com>
-> Date: Fri, 8 Apr 2016 09:41:35 -0700
->
->> Due to mail server malfunction, this patch was sent twice.  Please
->> ignore this duplicate.
->
-> This submission had another problem too.
->
-> Do not use the date of your commit as the date that gets put into
-> your email headers.
+From: David Daney <david.daney@cavium.com>
 
-I don't.  This is standard git-send-email 1.7.11.7.
+commit b7d3e3d3d21a ("net: thunderx: Don't leak phy device references
+on -EPROBE_DEFER condition.") incorrectly moved the call to
+of_node_put() outside of the loop.  Under normal loop exit, the node
+has already had of_node_put() called, so the extra call results in:
 
+[    8.228020] ERROR: Bad of_node_put() on /soc at 0/pci at 848000000000/mrml-bridge0 at 1,0/bgx0/xlaui00
+[    8.239433] CPU: 16 PID: 608 Comm: systemd-udevd Not tainted 4.6.0-rc1-numa+ #157
+[    8.247380] Hardware name: www.cavium.com EBB8800/EBB8800, BIOS 0.3 Mar  2 2016
+[    8.273541] Call trace:
+[    8.273550] [<fffffc0008097364>] dump_backtrace+0x0/0x210
+[    8.273557] [<fffffc0008097598>] show_stack+0x24/0x2c
+[    8.273560] [<fffffc0008399ed0>] dump_stack+0x8c/0xb4
+[    8.273566] [<fffffc00085aa828>] of_node_release+0xa8/0xac
+[    8.273570] [<fffffc000839cad8>] kobject_cleanup+0x8c/0x194
+[    8.273573] [<fffffc000839c97c>] kobject_put+0x44/0x6c
+[    8.273576] [<fffffc00085a9ab0>] of_node_put+0x24/0x30
+[    8.273587] [<fffffc0000bd0f74>] bgx_probe+0x17c/0xcd8 [thunder_bgx]
+[    8.273591] [<fffffc00083ed220>] pci_device_probe+0xa0/0x114
+[    8.273596] [<fffffc0008473fbc>] driver_probe_device+0x178/0x418
+[    8.273599] [<fffffc000847435c>] __driver_attach+0x100/0x118
+[    8.273602] [<fffffc0008471b58>] bus_for_each_dev+0x6c/0xac
+[    8.273605] [<fffffc0008473884>] driver_attach+0x30/0x38
+[    8.273608] [<fffffc00084732f4>] bus_add_driver+0x1f8/0x29c
+[    8.273611] [<fffffc0008475028>] driver_register+0x70/0x110
+[    8.273617] [<fffffc00083ebf08>] __pci_register_driver+0x60/0x6c
+[    8.273623] [<fffffc0000bf0040>] bgx_init_module+0x40/0x48 [thunder_bgx]
+[    8.273626] [<fffffc0008090d04>] do_one_initcall+0xcc/0x1c0
+[    8.273631] [<fffffc0008198abc>] do_init_module+0x68/0x1c8
+[    8.273635] [<fffffc0008125668>] load_module+0xf44/0x11f4
+[    8.273638] [<fffffc0008125b64>] SyS_finit_module+0xb8/0xe0
+[    8.273641] [<fffffc0008093b30>] el0_svc_naked+0x24/0x28
 
->
-> This makes all of your patch submissions look like they occurred in
-> the past, and this mixes up the ordering of patches in patchwork.
+Go back to the previous (correct) code that only did the extra
+of_node_put() call on early exit from the loop.
 
+Signed-off-by: David Daney <david.daney@cavium.com>
+---
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-They did occur in the past.  Just like all e-mail you read, they were 
-sent before you read them.
-
-I ran git-send-email for this on  Thu, 31 Mar 2016 18:01:57 -0700.  I 
-observed that the patch didn't seem to make it to the public lists, so I 
-figured I screwed something up and I sent it again, with the same results.
-
-Then I went on vacation, and came back today to sort everything out.  My 
-MTA had died, so I restarted it, and ... the backlog of messages was 
-sent and you read it.
-
-
->
-> So please resubmit this properly with a normal, current, date in your
-> email headers.
-
-OK, I will resend the identical patch for the third time...
+diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+index 9679515..d20539a 100644
+--- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
++++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+@@ -1011,10 +1011,11 @@ static int bgx_init_of_phy(struct bgx *bgx)
+ 		}
+ 
+ 		lmac++;
+-		if (lmac == MAX_LMAC_PER_BGX)
++		if (lmac == MAX_LMAC_PER_BGX) {
++			of_node_put(node);
+ 			break;
++		}
+ 	}
+-	of_node_put(node);
+ 	return 0;
+ 
+ defer:
+-- 
+1.8.3.1
