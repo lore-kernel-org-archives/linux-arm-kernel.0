@@ -1,51 +1,81 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 8 Apr 2016 19:25:10 +0200
-Subject: [PATCH 13/17] kvm-arm: Add stage2 page table modifiers
-In-Reply-To: <5707E541.5040205@arm.com>
-References: <1459787177-12767-1-git-send-email-suzuki.poulose@arm.com>
- <1459787177-12767-14-git-send-email-suzuki.poulose@arm.com>
- <20160408134257.GW8961@cbox> <5707D01E.1050309@arm.com>
- <20160408170302.GA13247@cbox> <5707E541.5040205@arm.com>
-Message-ID: <20160408172510.GD13247@cbox>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 8 Apr 2016 18:30:03 +0100
+Subject: [PATCH v2 1/2] dma/iommu: Add pgsize_bitmap confirmation in
+ __iommu_dma_alloc_pages
+In-Reply-To: <CAD=FV=VbekVUHW3=d0icSgUO1M-1cccwCAZ+s=YSzOtEveCQag@mail.gmail.com>
+References: <1459146732-15620-1-git-send-email-yong.wu@mediatek.com>
+ <20160329170238.GK6745@arm.com>
+ <CAD=FV=XdZwg8usj3bjM6W=A0Yk1AFqKFRadpiS-LGLwxVNxp7A@mail.gmail.com>
+ <20160408130733.GD23750@arm.com>
+ <CAD=FV=VbekVUHW3=d0icSgUO1M-1cccwCAZ+s=YSzOtEveCQag@mail.gmail.com>
+Message-ID: <20160408173002.GJ23750@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 08, 2016 at 06:07:13PM +0100, Suzuki K Poulose wrote:
-> On 08/04/16 18:03, Christoffer Dall wrote:
-> >On Fri, Apr 08, 2016 at 04:37:02PM +0100, Suzuki K Poulose wrote:
-> >>On 08/04/16 14:42, Christoffer Dall wrote:
-> >>>On Mon, Apr 04, 2016 at 05:26:13PM +0100, Suzuki K Poulose wrote:
+On Fri, Apr 08, 2016 at 09:50:43AM -0700, Doug Anderson wrote:
+> On Fri, Apr 8, 2016 at 6:07 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Tue, Apr 05, 2016 at 10:03:32AM -0700, Doug Anderson wrote:
+> >> On Tue, Mar 29, 2016 at 10:02 AM, Will Deacon <will.deacon@arm.com> wrote:
+> >> > On Mon, Mar 28, 2016 at 02:32:11PM +0800, Yong Wu wrote:
+> >> >> @@ -213,13 +215,16 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp)
+> >> >>               /*
+> >> >>                * Higher-order allocations are a convenience rather
+> >> >>                * than a necessity, hence using __GFP_NORETRY until
+> >> >> -              * falling back to single-page allocations.
+> >> >> +              * falling back to min size allocations.
+> >> >>                */
+> >> >> -             for (order = min_t(unsigned int, order, __fls(count));
+> >> >> -                  order > 0; order--) {
+> >> >> -                     page = alloc_pages(gfp | __GFP_NORETRY, order);
+> >> >> +             for (order = min_t(int, order, __fls(count));
+> >> >> +                  order >= min_order; order--) {
+> >> >> +                     page = alloc_pages((order == min_order) ? gfp :
+> >> >> +                                        gfp | __GFP_NORETRY, order);
+> >> >>                       if (!page)
+> >> >>                               continue;
+> >> >> +                     if (!order)
+> >> >> +                             break;
+> >> >
+> >> > Isn't this handled by the loop condition?
 > >>
-> >>>>
-> >>>>-static void clear_pud_entry(struct kvm *kvm, pud_t *pud, phys_addr_t addr)
-> >>>>+static void clear_stage2_pud_entry(struct kvm *kvm, pud_t *pud, phys_addr_t addr)
-> >>>>  {
-> >>>>-	pmd_t *pmd_table = pmd_offset(pud, 0);
-> >>>>-	VM_BUG_ON(pud_huge(*pud));
-> >>>>-	pud_clear(pud);
-> >>>>+	pmd_t *pmd_table __maybe_unused = stage2_pmd_offset(pud, 0);
-> >>>
-> >>>The __maybe_unused are slightly ugly, so it may be nicer to create the
-> >>>stage2_pmd_free() as static inline's if they're defined to do nothing
-> >>>instead.
-> >>>
+> >> He changed the loop condition to be ">= min_order" instead of "> 0",
+> >> so now we can get here with an order == 0.  This makes sense because
+> >> when min_order is not 0 you still want to run the code to split the
+> >> pages and it is sane not to duplicate that below.
 > >>
-> >>Sure, we could do that for stage2. However, we will need to fix the host helpers
-> >>as well for making such a change in the _hyp version (for 16K + 36bit VA).
-> >>
+> >> Maybe I'm misunderstanding, though.  Perhaps you can explain how you
+> >> think this code should look?
 > >
-> >I thought the host helpers were already done like that, since we don't
-> >need the __maybe_unused currently.  If it involves changing core code
-> >etc. then don't bother.
+> > My reading of the code was that we require order >= min_order to enter
+> > the loop. Given that order doesn't change between the loop header and the
+> > if (!order) check, then that must mean we can enter the loop body with
+> > order == 0 and order >= min_order, which means that min_order is allowed
+> > to be negative. That feels weird.
+> >
+> > Am I barking up the wrong tree?
 > 
-> Unfortunately no, e.g,
-> 
-> include/asm-generic/pgtable-nopud.h defines:
-> 
-> #define pud_free(mm, x)                         do { } while (0)
-> 
+> I don't think min_order can be negative.  Certainly we could enter the
+> loop with order == 0 and min_order == 0, though.
 
-Leave it then :)
+... and in that case, PageCompound will be false, and we'll call split_page
+which won't do anything, so we break out.
 
-Thanks,
--Christoffer
+> 
+> Some examples:
+> 
+> order = 0, min_order = 0
+> -> Want alloc_pages _without_ __GFP_NORETRY.  OK
+> -> If alloc_pages fails, return NULL.  OK
+> -> If alloc pages succeeds, don't need splitting since single page.  OK
+
+[...]
+
+> I think those are all right.  Did I mess up?  You could certainly
+> structure the loop in a different way but you need to make sure you
+> handle all of those cases.  If you have an alternate structure that
+> handles all those, let's consider it.
+
+Right, I don't think the code is broken, I just think the !order check is
+confusing and not needed.
+
+Will
