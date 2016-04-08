@@ -1,167 +1,78 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Fri, 8 Apr 2016 10:41:39 -0600
-Subject: [PATCH v6 2/5] vfio: allow the user to register reserved iova
- range for MSI mapping
-In-Reply-To: <5707D2B1.8080802@linaro.org>
-References: <1459758611-2972-1-git-send-email-eric.auger@linaro.org>
- <1459758611-2972-3-git-send-email-eric.auger@linaro.org>
- <20160406160709.1d208b45@t450s.home> <57066401.7060406@linaro.org>
- <20160407122931.1ba3c01c@t450s.home> <5707D2B1.8080802@linaro.org>
-Message-ID: <20160408104139.210cb1f1@t450s.home>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Fri, 8 Apr 2016 09:41:35 -0700
+Subject: [PATCH] net: thunderx: Fix broken of_node_put() code.
+In-Reply-To: <1459472517-5696-1-git-send-email-ddaney.cavm@gmail.com>
+References: <1459472517-5696-1-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <5707DF3F.3000508@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 8 Apr 2016 17:48:01 +0200
-Eric Auger <eric.auger@linaro.org> wrote:
+Due to mail server malfunction, this patch was sent twice.  Please 
+ignore this duplicate.
 
-Hi Eric,
+Thanks,
+David Daney
 
-> Hi Alex,
-> On 04/07/2016 08:29 PM, Alex Williamson wrote:
-> > On Thu, 7 Apr 2016 15:43:29 +0200
-> > Eric Auger <eric.auger@linaro.org> wrote:
-> >   
-> >> Hi Alex,
-> >> On 04/07/2016 12:07 AM, Alex Williamson wrote:  
-> >>> On Mon,  4 Apr 2016 08:30:08 +0000
-> >>> Eric Auger <eric.auger@linaro.org> wrote:
-> >>>     
-> >>>> The user is allowed to [un]register a reserved IOVA range by using the
-> >>>> DMA MAP API and setting the new flag: VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA.
-> >>>> It provides the base address and the size. This region is stored in the
-> >>>> vfio_dma rb tree. At that point the iova range is not mapped to any target
-> >>>> address yet. The host kernel will use those iova when needed, typically
-> >>>> when the VFIO-PCI device allocates its MSIs.
-> >>>>
-> >>>> This patch also handles the destruction of the reserved binding RB-tree and
-> >>>> domain's iova_domains.
-> >>>>
-> >>>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> >>>> Signed-off-by: Bharat Bhushan <Bharat.Bhushan@freescale.com>
-> >>>>
-> >>>> ---
-> >>>> v3 -> v4:
-> >>>> - use iommu_alloc/free_reserved_iova_domain exported by dma-reserved-iommu
-> >>>> - protect vfio_register_reserved_iova_range implementation with
-> >>>>   CONFIG_IOMMU_DMA_RESERVED
-> >>>> - handle unregistration by user-space and on vfio_iommu_type1 release
-> >>>>
-> >>>> v1 -> v2:
-> >>>> - set returned value according to alloc_reserved_iova_domain result
-> >>>> - free the iova domains in case any error occurs
-> >>>>
-> >>>> RFC v1 -> v1:
-> >>>> - takes into account Alex comments, based on
-> >>>>   [RFC PATCH 1/6] vfio: Add interface for add/del reserved iova region:
-> >>>> - use the existing dma map/unmap ioctl interface with a flag to register
-> >>>>   a reserved IOVA range. A single reserved iova region is allowed.
-> >>>>
-> >>>> Conflicts:
-> >>>> 	drivers/vfio/vfio_iommu_type1.c
-> >>>> ---
-> >>>>  drivers/vfio/vfio_iommu_type1.c | 141 +++++++++++++++++++++++++++++++++++++++-
-> >>>>  include/uapi/linux/vfio.h       |  12 +++-
-> >>>>  2 files changed, 150 insertions(+), 3 deletions(-)
-> >>>>
-> >>>> diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
-> >>>> index c9ddbde..4497b20 100644
-> >>>> --- a/drivers/vfio/vfio_iommu_type1.c
-> >>>> +++ b/drivers/vfio/vfio_iommu_type1.c
-> >>>> @@ -36,6 +36,7 @@
-> >>>>  #include <linux/uaccess.h>
-> >>>>  #include <linux/vfio.h>
-> >>>>  #include <linux/workqueue.h>
-> >>>> +#include <linux/dma-reserved-iommu.h>
-> >>>>  
-> >>>>  #define DRIVER_VERSION  "0.2"
-> >>>>  #define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
-> >>>> @@ -403,10 +404,22 @@ static void vfio_unmap_unpin(struct vfio_iommu *iommu, struct vfio_dma *dma)
-> >>>>  	vfio_lock_acct(-unlocked);
-> >>>>  }
-> >>>>  
-> >>>> +static void vfio_unmap_reserved(struct vfio_iommu *iommu)
-> >>>> +{
-> >>>> +#ifdef CONFIG_IOMMU_DMA_RESERVED
-> >>>> +	struct vfio_domain *d;
-> >>>> +
-> >>>> +	list_for_each_entry(d, &iommu->domain_list, next)
-> >>>> +		iommu_unmap_reserved(d->domain);
-> >>>> +#endif
-> >>>> +}
-> >>>> +
-> >>>>  static void vfio_remove_dma(struct vfio_iommu *iommu, struct vfio_dma *dma)
-> >>>>  {
-> >>>>  	if (likely(dma->type != VFIO_IOVA_RESERVED))
-> >>>>  		vfio_unmap_unpin(iommu, dma);
-> >>>> +	else
-> >>>> +		vfio_unmap_reserved(iommu);
-> >>>>  	vfio_unlink_dma(iommu, dma);
-> >>>>  	kfree(dma);
-> >>>>  }    
-> >>>
-> >>> This makes me nervous, apparently we can add reserved mappings
-> >>> individually, but we have absolutely no granularity on remove, so if we
-> >>> remove one, we've removed them all even though we still have them
-> >>> linked in our rb tree.  I see later that only one reserved region is
-> >>> allowed, but that seems very short sighted, especially to impose that
-> >>> on the user level API.    
-> >> On kernel-size the reserved region is currently backed by a unique
-> >> iova_domain. Do you mean you would like me to handle a list of
-> >> iova_domains instead of using a single "cookie"?  
-> > 
-> > TBH, I'm not really sure how this works with a single iova domain.  If
-> > we have multiple irq chips and each gets mapped by a separate page in
-> > the iova space, then is it really sufficient to do a lookup from the
-> > irq_data to the msi_desc to the device to the domain in order to get
-> > reserved iova to map that msi doorbell?  Don't we need an iova from the
-> > pool mapping the specific irqchip associated with our device?  The IOMMU
-> > domain might span any number of irq chips, how can we assume there's
-> > one only reserved iova space?  Maybe I'm not understanding how the code
-> > works.  
-> 
-> On vfio_iommu_type1 we currently compute the reserved iova needs for
-> each domain and we take the max. Each domain then is assigned a reserved
-> iova domain of this max size.
-> 
-> So let's say domain1 has the largest needs (say 2 doorbells)
-> domain 1: iova domain size = 2
-> dev A --> doorbell 1
-> dev B -> doorbell 1
-> dev C -> doorbell 2
-> 2 iova pages are used
-> 
-> domain 2: iova domain size = 2
-> dev D -> doorbell 1
-> 1 iova page is used.
-> 
-> Do you see something wrong here?
 
-Can we really know the maximum reserved iova space for a domain?  It
-seems like this depends on the current composition of the domain, so it
-could change as devices are added to the domain.  Or perhaps the
-maximum is based on a maximally configured domain, but even then the
-system itself may be expandable so it might need to account for an
-architectural maximum.  A user like QEMU would likely have an easier
-time dealing with an absolute maximum than a current maximum.  Maybe a
-single range would be sufficient under those conditions.
-
-> > Conceptually, this is a generic IOMMU API extension to include reserved
-> > ioor va space, MSI mappings are a consumer of that reserved iova pool but
-> > I don't think we can say they will necessarily be the only consumer.
-> > So building into the interface that there's only one is like making a
-> > fixed length array to hold a string, it works for the initial
-> > implementation, but it's not a robust solution.  
-> 
-> I see. On the other hand the code is quite specific to MSI binding
-> problematic today (rb-tree indexed on PA, locking, ...). argh, storm in
-> a teacup...
-
-For the vfio api, the interface is already specific to MSI, so that
-seems reasonable.  I'd still rather expose somehow to the user that
-only a single reserved MSI region is supported, even if that's all the
-implementation can handle, just so we have the option to expand that in
-the future.  The iommu api is internal, so we can expand it as we go, i
-just want to be sure to raise the issue even if we think the
-restrictions are sufficient for now.  Thanks,
-
-Alex
+On 03/31/2016 06:01 PM, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
+>
+> commit b7d3e3d3d21a ("net: thunderx: Don't leak phy device references
+> on -EPROBE_DEFER condition.") incorrectly moved the call to
+> of_node_put() outside of the loop.  Under normal loop exit, the node
+> has already had of_node_put() called, so the extra call results in:
+>
+> [    8.228020] ERROR: Bad of_node_put() on /soc at 0/pci at 848000000000/mrml-bridge0 at 1,0/bgx0/xlaui00
+> [    8.239433] CPU: 16 PID: 608 Comm: systemd-udevd Not tainted 4.6.0-rc1-numa+ #157
+> [    8.247380] Hardware name: www.cavium.com EBB8800/EBB8800, BIOS 0.3 Mar  2 2016
+> [    8.273541] Call trace:
+> [    8.273550] [<fffffc0008097364>] dump_backtrace+0x0/0x210
+> [    8.273557] [<fffffc0008097598>] show_stack+0x24/0x2c
+> [    8.273560] [<fffffc0008399ed0>] dump_stack+0x8c/0xb4
+> [    8.273566] [<fffffc00085aa828>] of_node_release+0xa8/0xac
+> [    8.273570] [<fffffc000839cad8>] kobject_cleanup+0x8c/0x194
+> [    8.273573] [<fffffc000839c97c>] kobject_put+0x44/0x6c
+> [    8.273576] [<fffffc00085a9ab0>] of_node_put+0x24/0x30
+> [    8.273587] [<fffffc0000bd0f74>] bgx_probe+0x17c/0xcd8 [thunder_bgx]
+> [    8.273591] [<fffffc00083ed220>] pci_device_probe+0xa0/0x114
+> [    8.273596] [<fffffc0008473fbc>] driver_probe_device+0x178/0x418
+> [    8.273599] [<fffffc000847435c>] __driver_attach+0x100/0x118
+> [    8.273602] [<fffffc0008471b58>] bus_for_each_dev+0x6c/0xac
+> [    8.273605] [<fffffc0008473884>] driver_attach+0x30/0x38
+> [    8.273608] [<fffffc00084732f4>] bus_add_driver+0x1f8/0x29c
+> [    8.273611] [<fffffc0008475028>] driver_register+0x70/0x110
+> [    8.273617] [<fffffc00083ebf08>] __pci_register_driver+0x60/0x6c
+> [    8.273623] [<fffffc0000bf0040>] bgx_init_module+0x40/0x48 [thunder_bgx]
+> [    8.273626] [<fffffc0008090d04>] do_one_initcall+0xcc/0x1c0
+> [    8.273631] [<fffffc0008198abc>] do_init_module+0x68/0x1c8
+> [    8.273635] [<fffffc0008125668>] load_module+0xf44/0x11f4
+> [    8.273638] [<fffffc0008125b64>] SyS_finit_module+0xb8/0xe0
+> [    8.273641] [<fffffc0008093b30>] el0_svc_naked+0x24/0x28
+>
+> Go back to the previous (correct) code that only did the extra
+> of_node_put() call on early exit from the loop.
+>
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> ---
+>   drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 5 +++--
+>   1 file changed, 3 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+> index 9679515..d20539a 100644
+> --- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+> +++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+> @@ -1011,10 +1011,11 @@ static int bgx_init_of_phy(struct bgx *bgx)
+>   		}
+>
+>   		lmac++;
+> -		if (lmac == MAX_LMAC_PER_BGX)
+> +		if (lmac == MAX_LMAC_PER_BGX) {
+> +			of_node_put(node);
+>   			break;
+> +		}
+>   	}
+> -	of_node_put(node);
+>   	return 0;
+>
+>   defer:
+>
