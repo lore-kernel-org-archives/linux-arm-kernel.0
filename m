@@ -1,58 +1,60 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri,  8 Apr 2016 05:53:58 -0700
-Subject: [PATCH 5/6] ARM64: Remove arm_pm_restart
+Date: Fri,  8 Apr 2016 05:53:56 -0700
+Subject: [PATCH 3/6] ARM: PSCI: Register with kernel restart handler
 In-Reply-To: <1460120039-2497-1-git-send-email-linux@roeck-us.net>
 References: <1460120039-2497-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1460120039-2497-6-git-send-email-linux@roeck-us.net>
+Message-ID: <1460120039-2497-4-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All users of arm_pm_restart have been converted to use the kernel restart
-handler.
+Register with kernel restart handler instead of setting arm_pm_restart
+directly. This enables support for replacing the PSCI restart handler
+with a different handler if necessary for a specific board.
+
+Select a priority of 129 to indicate a higher than default priority, but
+keep it as low as possible since PSCI reset is known to fail on some
+boards.
 
 Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 ---
- arch/arm64/include/asm/system_misc.h | 2 --
- arch/arm64/kernel/process.c          | 7 +------
- 2 files changed, 1 insertion(+), 8 deletions(-)
+It might make sense to introduce a restart-priority property for devicetree
+based configurations, but I am not sure if this would be acceptable.
 
-diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
-index 57f110bea6a8..f1d865b7d38d 100644
---- a/arch/arm64/include/asm/system_misc.h
-+++ b/arch/arm64/include/asm/system_misc.h
-@@ -43,8 +43,6 @@ struct mm_struct;
- extern void show_pte(struct mm_struct *mm, unsigned long addr);
- extern void __show_regs(struct pt_regs *);
+ drivers/firmware/psci.c | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index 11bfee8b79a9..99fab3ac3fd5 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -231,11 +231,18 @@ static int get_set_conduit_method(struct device_node *np)
+ 	return 0;
+ }
  
--extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
--
- #define show_unhandled_signals_ratelimited()				\
- ({									\
- 	static DEFINE_RATELIMIT_STATE(_rs,				\
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index 80624829db61..29c29984eca0 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -66,8 +66,6 @@ EXPORT_SYMBOL(__stack_chk_guard);
- void (*pm_power_off)(void);
- EXPORT_SYMBOL_GPL(pm_power_off);
+-static void psci_sys_reset(enum reboot_mode reboot_mode, const char *cmd)
++static int psci_sys_reset(struct notifier_block *np, unsigned long action,
++			  void *data)
+ {
+ 	invoke_psci_fn(PSCI_0_2_FN_SYSTEM_RESET, 0, 0, 0);
++	return NOTIFY_DONE;
+ }
  
--void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
--
- /*
-  * This is our default idle handler.
-  */
-@@ -153,10 +151,7 @@ void machine_restart(char *cmd)
- 		efi_reboot(reboot_mode, NULL);
++static struct notifier_block psci_sys_reset_nb = {
++	.notifier_call = psci_sys_reset,
++	.priority = 129,
++};
++
+ static void psci_sys_poweroff(void)
+ {
+ 	invoke_psci_fn(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
+@@ -461,7 +468,7 @@ static void __init psci_0_2_set_functions(void)
  
- 	/* Now call the architecture specific reboot code. */
--	if (arm_pm_restart)
--		arm_pm_restart(reboot_mode, cmd);
--	else
--		do_kernel_restart(cmd);
-+	do_kernel_restart(cmd);
+ 	psci_ops.migrate_info_type = psci_migrate_info_type;
  
- 	/*
- 	 * Whoops - the architecture was unable to reboot.
+-	arm_pm_restart = psci_sys_reset;
++	register_restart_handler(&psci_sys_reset_nb);
+ 
+ 	pm_power_off = psci_sys_poweroff;
+ }
 -- 
 2.5.0
