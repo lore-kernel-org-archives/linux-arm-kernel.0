@@ -1,40 +1,28 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Fri, 08 Apr 2016 13:05:06 -0700
-Subject: [PATCH 2/2] clk: bcm2835: Fix PLL poweron
-In-Reply-To: <1945341121.176536.ed7e19c8-94d6-4e1c-b383-3e4ae025eeac.open-xchange@email.1und1.de>
-References: <1459826456-18812-1-git-send-email-eric@anholt.net>
- <1459826456-18812-3-git-send-email-eric@anholt.net>
- <1945341121.176536.ed7e19c8-94d6-4e1c-b383-3e4ae025eeac.open-xchange@email.1und1.de>
-Message-ID: <87lh4nzx1p.fsf@eliezer.anholt.net>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 08 Apr 2016 16:15:57 -0400 (EDT)
+Subject: [PATCH] net: thunderx: Fix broken of_node_put() code.
+In-Reply-To: <5707DF3F.3000508@caviumnetworks.com>
+References: <1459472517-5696-1-git-send-email-ddaney.cavm@gmail.com>
+ <5707DF3F.3000508@caviumnetworks.com>
+Message-ID: <20160408.161557.850174112269792582.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren <stefan.wahren@i2se.com> writes:
+From: David Daney <ddaney@caviumnetworks.com>
+Date: Fri, 8 Apr 2016 09:41:35 -0700
 
-> Hi Eric,
->
->> Eric Anholt <eric@anholt.net> hat am 5. April 2016 um 05:20 geschrieben:
->>
->>
->> In poweroff, we set the reset bit and the power down bit, but only
->> managed to unset the reset bit for poweron. This meant that if HDMI
->> did -EPROBE_DEFER after it had grabbed its clocks, we'd power down the
->> PLLH (that had been on at boot time) and never recover.
->>
->> Signed-off-by: Eric Anholt <eric@anholt.net>
->> Cc: stable at vger.kernel.org
->
-> please provide a Fixes tag.
->
-> Thanks Stefan
+> Due to mail server malfunction, this patch was sent twice.  Please
+> ignore this duplicate.
 
-That should be:
+This submission had another problem too.
 
-Fixes: 41691b8862e2 ("clk: bcm2835: Add support for programming the audio domain clocks")
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160408/65ee536a/attachment.sig>
+Do not use the date of your commit as the date that gets put into
+your email headers.
+
+This makes all of your patch submissions look like they occurred in
+the past, and this mixes up the ordering of patches in patchwork.
+
+So please resubmit this properly with a normal, current, date in your
+email headers.
+
+Thanks.
