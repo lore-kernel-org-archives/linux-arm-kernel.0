@@ -1,95 +1,289 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Fri,  8 Apr 2016 15:50:23 -0700
-Subject: [PATCH v16 1/6] efi: ARM/arm64: ignore DT memory nodes instead of
- removing them
+Date: Fri,  8 Apr 2016 15:50:25 -0700
+Subject: [PATCH v16 3/6] of, numa: Add NUMA of binding implementation.
 In-Reply-To: <1460155828-8690-1-git-send-email-ddaney.cavm@gmail.com>
 References: <1460155828-8690-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1460155828-8690-2-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1460155828-8690-4-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+From: David Daney <david.daney@cavium.com>
 
-There are two problems with the UEFI stub DT memory node removal
-routine:
-- it deletes nodes as it traverses the tree, which happens to work
-  but is not supported, as deletion invalidates the node iterator;
-- deleting memory nodes entirely may discard annotations in the form
-  of additional properties on the nodes.
+Add device tree parsing for NUMA topology using device
+"numa-node-id" property in distance-map and cpu nodes.
 
-Since the discovery of DT memory nodes occurs strictly before the
-UEFI init sequence, we can simply clear the memblock memory table
-before parsing the UEFI memory map. This way, it is no longer
-necessary to remove the nodes, so we can remove that logic from the
-stub as well.
+This is a complete rewrite of a previous patch by:
+   Ganapatrao Kulkarni<gkulkarni@caviumnetworks.com>
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Signed-off-by: David Daney <david.daney@cavium.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- drivers/firmware/efi/arm-init.c    |  8 ++++++++
- drivers/firmware/efi/libstub/fdt.c | 24 +-----------------------
- 2 files changed, 9 insertions(+), 23 deletions(-)
+ drivers/of/Kconfig   |   3 +
+ drivers/of/Makefile  |   1 +
+ drivers/of/of_numa.c | 211 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/of.h   |   9 +++
+ 4 files changed, 224 insertions(+)
+ create mode 100644 drivers/of/of_numa.c
 
-diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
-index aa1f743..5d6945b 100644
---- a/drivers/firmware/efi/arm-init.c
-+++ b/drivers/firmware/efi/arm-init.c
-@@ -143,6 +143,14 @@ static __init void reserve_regions(void)
- 	if (efi_enabled(EFI_DBG))
- 		pr_info("Processing EFI memory map:\n");
+diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
+index e2a4841..b3bec3a 100644
+--- a/drivers/of/Kconfig
++++ b/drivers/of/Kconfig
+@@ -112,4 +112,7 @@ config OF_OVERLAY
+ 	  While this option is selected automatically when needed, you can
+ 	  enable it manually to improve device tree unit test coverage.
  
-+	/*
-+	 * Discard memblocks discovered so far: if there are any at this
-+	 * point, they originate from memory nodes in the DT, and UEFI
-+	 * uses its own memory map instead.
-+	 */
-+	memblock_dump_all();
-+	memblock_remove(0, ULLONG_MAX);
++config OF_NUMA
++	bool
 +
- 	for_each_efi_memory_desc(&memmap, md) {
- 		paddr = md->phys_addr;
- 		npages = md->num_pages;
-diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
-index 6dba78a..e58abfa 100644
---- a/drivers/firmware/efi/libstub/fdt.c
-+++ b/drivers/firmware/efi/libstub/fdt.c
-@@ -24,7 +24,7 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
- 			unsigned long map_size, unsigned long desc_size,
- 			u32 desc_ver)
- {
--	int node, prev, num_rsv;
-+	int node, num_rsv;
- 	int status;
- 	u32 fdt_val32;
- 	u64 fdt_val64;
-@@ -54,28 +54,6 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
- 		goto fdt_set_fail;
+ endif # OF
+diff --git a/drivers/of/Makefile b/drivers/of/Makefile
+index 156c072..bee3fa9 100644
+--- a/drivers/of/Makefile
++++ b/drivers/of/Makefile
+@@ -14,5 +14,6 @@ obj-$(CONFIG_OF_MTD)	+= of_mtd.o
+ obj-$(CONFIG_OF_RESERVED_MEM) += of_reserved_mem.o
+ obj-$(CONFIG_OF_RESOLVE)  += resolver.o
+ obj-$(CONFIG_OF_OVERLAY) += overlay.o
++obj-$(CONFIG_OF_NUMA) += of_numa.o
  
- 	/*
--	 * Delete any memory nodes present. We must delete nodes which
--	 * early_init_dt_scan_memory may try to use.
--	 */
--	prev = 0;
--	for (;;) {
--		const char *type;
--		int len;
--
--		node = fdt_next_node(fdt, prev, NULL);
--		if (node < 0)
--			break;
--
--		type = fdt_getprop(fdt, node, "device_type", &len);
--		if (type && strncmp(type, "memory", len) == 0) {
--			fdt_del_node(fdt, node);
--			continue;
--		}
--
--		prev = node;
--	}
--
--	/*
- 	 * Delete all memory reserve map entries. When booting via UEFI,
- 	 * kernel will use the UEFI memory map to find reserved regions.
- 	 */
+ obj-$(CONFIG_OF_UNITTEST) += unittest-data/
+diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
+new file mode 100644
+index 0000000..0f2784b
+--- /dev/null
++++ b/drivers/of/of_numa.c
+@@ -0,0 +1,211 @@
++/*
++ * OF NUMA Parsing support.
++ *
++ * Copyright (C) 2015 - 2016 Cavium Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/nodemask.h>
++
++#include <asm/numa.h>
++
++/* define default numa node to 0 */
++#define DEFAULT_NODE 0
++
++/*
++ * Even though we connect cpus to numa domains later in SMP
++ * init, we need to know the node ids now for all cpus.
++*/
++static void __init of_numa_parse_cpu_nodes(void)
++{
++	u32 nid;
++	int r;
++	struct device_node *cpus;
++	struct device_node *np = NULL;
++
++	cpus = of_find_node_by_path("/cpus");
++	if (!cpus)
++		return;
++
++	for_each_child_of_node(cpus, np) {
++		/* Skip things that are not CPUs */
++		if (of_node_cmp(np->type, "cpu") != 0)
++			continue;
++
++		r = of_property_read_u32(np, "numa-node-id", &nid);
++		if (r)
++			continue;
++
++		pr_debug("NUMA: CPU on %u\n", nid);
++		if (nid >= MAX_NUMNODES)
++			pr_warn("NUMA: Node id %u exceeds maximum value\n",
++				nid);
++		else
++			node_set(nid, numa_nodes_parsed);
++	}
++}
++
++static int __init of_numa_parse_memory_nodes(void)
++{
++	struct device_node *np = NULL;
++	struct resource rsrc;
++	u32 nid;
++	int r = 0;
++
++	for (;;) {
++		np = of_find_node_by_type(np, "memory");
++		if (!np)
++			break;
++
++		r = of_property_read_u32(np, "numa-node-id", &nid);
++		if (r == -EINVAL)
++			/*
++			 * property doesn't exist if -EINVAL, continue
++			 * looking for more memory nodes with
++			 * "numa-node-id" property
++			 */
++			continue;
++		else if (r)
++			/* some other error */
++			break;
++
++		r = of_address_to_resource(np, 0, &rsrc);
++		if (r) {
++			pr_err("NUMA: bad reg property in memory node\n");
++			break;
++		}
++
++		pr_debug("NUMA:  base = %llx len = %llx, node = %u\n",
++			 rsrc.start, rsrc.end - rsrc.start + 1, nid);
++
++		r = numa_add_memblk(nid, rsrc.start,
++				    rsrc.end - rsrc.start + 1);
++		if (r)
++			break;
++	}
++	of_node_put(np);
++
++	return r;
++}
++
++static int __init of_numa_parse_distance_map_v1(struct device_node *map)
++{
++	const __be32 *matrix;
++	int entry_count;
++	int i;
++
++	pr_info("NUMA: parsing numa-distance-map-v1\n");
++
++	matrix = of_get_property(map, "distance-matrix", NULL);
++	if (!matrix) {
++		pr_err("NUMA: No distance-matrix property in distance-map\n");
++		return -EINVAL;
++	}
++
++	entry_count = of_property_count_u32_elems(map, "distance-matrix");
++	if (entry_count <= 0) {
++		pr_err("NUMA: Invalid distance-matrix\n");
++		return -EINVAL;
++	}
++
++	for (i = 0; i + 2 < entry_count; i += 3) {
++		u32 nodea, nodeb, distance;
++
++		nodea = of_read_number(matrix, 1);
++		matrix++;
++		nodeb = of_read_number(matrix, 1);
++		matrix++;
++		distance = of_read_number(matrix, 1);
++		matrix++;
++
++		numa_set_distance(nodea, nodeb, distance);
++		pr_debug("NUMA:  distance[node%d -> node%d] = %d\n",
++			 nodea, nodeb, distance);
++
++		/* Set default distance of node B->A same as A->B */
++		if (nodeb > nodea)
++			numa_set_distance(nodeb, nodea, distance);
++	}
++
++	return 0;
++}
++
++static int __init of_numa_parse_distance_map(void)
++{
++	int ret = 0;
++	struct device_node *np;
++
++	np = of_find_compatible_node(NULL, NULL,
++				     "numa-distance-map-v1");
++	if (np)
++		ret = of_numa_parse_distance_map_v1(np);
++
++	of_node_put(np);
++	return ret;
++}
++
++int of_node_to_nid(struct device_node *device)
++{
++	struct device_node *np;
++	u32 nid;
++	int r = -ENODATA;
++
++	np = of_node_get(device);
++
++	while (np) {
++		struct device_node *parent;
++
++		r = of_property_read_u32(np, "numa-node-id", &nid);
++		/*
++		 * -EINVAL indicates the property was not found, and
++		 *  we walk up the tree trying to find a parent with a
++		 *  "numa-node-id".  Any other type of error indicates
++		 *  a bad device tree and we give up.
++		 */
++		if (r != -EINVAL)
++			break;
++
++		parent = of_get_parent(np);
++		of_node_put(np);
++		np = parent;
++	}
++	if (np && r)
++		pr_warn("NUMA: Invalid \"numa-node-id\" property in node %s\n",
++			np->name);
++	of_node_put(np);
++
++	if (!r) {
++		if (nid >= MAX_NUMNODES)
++			pr_warn("NUMA: Node id %u exceeds maximum value\n",
++				nid);
++		else
++			return nid;
++	}
++
++	return NUMA_NO_NODE;
++}
++EXPORT_SYMBOL(of_node_to_nid);
++
++int __init of_numa_init(void)
++{
++	int r;
++
++	of_numa_parse_cpu_nodes();
++	r = of_numa_parse_memory_nodes();
++	if (r)
++		return r;
++	return of_numa_parse_distance_map();
++}
+diff --git a/include/linux/of.h b/include/linux/of.h
+index 7fcb681..76f07c8 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -685,6 +685,15 @@ static inline int of_node_to_nid(struct device_node *device)
+ }
+ #endif
+ 
++#ifdef CONFIG_OF_NUMA
++extern int of_numa_init(void);
++#else
++static inline int of_numa_init(void)
++{
++	return -ENOSYS;
++}
++#endif
++
+ static inline struct device_node *of_find_matching_node(
+ 	struct device_node *from,
+ 	const struct of_device_id *matches)
 -- 
 1.8.3.1
