@@ -1,40 +1,45 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri,  8 Apr 2016 15:02:10 -0400
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable CPUFreq governors as
- modules
-In-Reply-To: <1460142130-31822-1-git-send-email-javier@osg.samsung.com>
-References: <1460142130-31822-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <1460142130-31822-2-git-send-email-javier@osg.samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 8 Apr 2016 12:18:54 -0700
+Subject: [GIT PULL] omap fixes against v4.6-rc2
+Message-ID: <20160408191854.GZ16484@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently only the ondemand and performance CPUFreq policy governors are
-enabled in multi_v7 defconfig. But the other governors are also useful
-for some cases, enable them to allow users change the default if needed.
+The following changes since commit 9735a22799b9214d17d3c231fe377fc852f042e9:
 
-The options are enabled as module to keep the kernel image size minimal.
+  Linux 4.6-rc2 (2016-04-03 09:09:40 -0500)
 
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+are available in the git repository at:
 
----
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.6/fixes-rc2
 
- arch/arm/configs/multi_v7_defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+for you to fetch changes up to 571afb4c8a4bbe88541364e7f6827340562f2736:
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 4eb10f5ea493..a8afbd9d4ead 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -131,6 +131,10 @@ CONFIG_KEXEC=y
- CONFIG_CPU_FREQ=y
- CONFIG_CPU_FREQ_STAT_DETAILS=y
- CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
-+CONFIG_CPU_FREQ_GOV_POWERSAVE=m
-+CONFIG_CPU_FREQ_GOV_USERSPACE=m
-+CONFIG_CPU_FREQ_GOV_CONSERVATIVE=m
-+CONFIG_CPU_FREQ_GOV_SCHEDUTIL=m
- CONFIG_QORIQ_CPUFREQ=y
- CONFIG_CPU_IDLE=y
- CONFIG_ARM_CPUIDLE=y
--- 
-2.5.0
+  ARM: OMAP: Catch callers of revision information prior to it being populated (2016-04-08 09:02:39 -0700)
+
+----------------------------------------------------------------
+Fixes for omaps against v4.6-rc2, mostly to fix suspend for beagle-x15
+that broke when we added runtime based SoC revision detection earlier.
+
+It seems suspend worked earlier as things were only partially initialized,
+while now we initialize things properly for dra7. Let's also add a warning
+if SoC is not properly detected to prevent similar issues later on.
+
+Also included is a fix for dra7 sys_32k_ck clock source that is not
+enabled on boot making system fall back to using emulated clock.
+
+----------------------------------------------------------------
+Keerthy (1):
+      ARM: dts: dra7: Correct clock tree for sys_32k_ck
+
+Nishanth Menon (3):
+      ARM: OMAP: DRA7: wakeupgen: Skip SAR save for wakeupgen
+      ARM: OMAP: DRA7: Provide proper class to omap2_set_globals_tap
+      ARM: OMAP: Catch callers of revision information prior to it being populated
+
+ arch/arm/boot/dts/dra7xx-clocks.dtsi | 18 +++++++++++++++++-
+ arch/arm/mach-omap1/id.c             |  1 +
+ arch/arm/mach-omap2/id.c             |  1 +
+ arch/arm/mach-omap2/io.c             |  3 ++-
+ arch/arm/mach-omap2/omap-wakeupgen.c |  7 +++++++
+ 5 files changed, 28 insertions(+), 2 deletions(-)
