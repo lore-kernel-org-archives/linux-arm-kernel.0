@@ -1,17 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 8 Apr 2016 22:46:49 +0200
-Subject: [PATCH 0/6] ARM/ARM64: Drop arm_pm_restart
-In-Reply-To: <1460120039-2497-1-git-send-email-linux@roeck-us.net>
-References: <1460120039-2497-1-git-send-email-linux@roeck-us.net>
-Message-ID: <201604082246.49653.arnd@arndb.de>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 08 Apr 2016 14:54:38 -0700
+Subject: [PATCH] ARM: davinci_all_defconfig: enable CONFIG_FHANDLE
+In-Reply-To: <1460023562-7907-1-git-send-email-nsekhar@ti.com> (Sekhar Nori's
+ message of "Thu, 7 Apr 2016 15:36:02 +0530")
+References: <1460023562-7907-1-git-send-email-nsekhar@ti.com>
+Message-ID: <7h37qvn4v5.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 08 April 2016, Guenter Roeck wrote:
-> This is the final push to replace arm_pm_restart with the kernel restart
-> handler. Finally drop arm_pm_restart after it is no longer used.
-> The following changes since commit 541d8f4d59d79f5d37c8c726f723d42ff307db57:
+Sekhar Nori <nsekhar@ti.com> writes:
 
-Looks good to me,
+> CONFIG_FHANDLE is required by systemd, which is the
+> default init system in more and more distributions.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+There's a bunch more options required for basic systemd support also[1],
+so those should probably be added with the changelog referencing the
+source[1]
+
+Kevin
+
+[1] https://github.com/systemd/systemd/blob/master/README#L37
