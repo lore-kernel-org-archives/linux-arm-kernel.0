@@ -1,107 +1,51 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Fri, 8 Apr 2016 12:54:10 +0200
-Subject: [PATCH 1/2] drm/rockchip: vop: Do check if an update is pending
- during disable
-In-Reply-To: <5707043D.6060706@rock-chips.com>
-References: <1459937686-9142-1-git-send-email-tomeu.vizoso@collabora.com>
- <5707043D.6060706@rock-chips.com>
-Message-ID: <CAAObsKAeAjUP1retiZqo5geOK2OkVjKvSB6g6nvGTh_rdNiFJQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 8 Apr 2016 12:00:10 +0100
+Subject: [PATCH] arm64: erratum: Workaround for Kryo reserved system
+ register read
+In-Reply-To: <5707887E.3030406@arm.com>
+References: <1460044456-5297-1-git-send-email-nkaje@codeaurora.org>
+ <57069977.5050205@arm.com> <570780D2.3060104@arm.com>
+ <570786C9.6020804@arm.com> <5707887E.3030406@arm.com>
+Message-ID: <57078F3A.7020406@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 April 2016 at 03:07, Mark yao <mark.yao@rock-chips.com> wrote:
-> On 2016?04?06? 18:14, Tomeu Vizoso wrote:
->
-> When a plane is being disabled but it's still enabled, do check if the
-> previous update has been completed by reading yrgb_mst back.
->
-> Otherwise, pending pageflips would remain pending after a CRTC is
-> disabled.
->
-> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> ---
->  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> index a9b1e8b5ac85..f46b1fd1887b 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> @@ -1064,8 +1064,9 @@ static bool vop_win_pending_is_complete(struct vop_win
-> *vop_win)
->   struct vop_plane_state *state = to_vop_plane_state(plane->state);
->   dma_addr_t yrgb_mst;
->
-> - if (!state->enable)
-> - return VOP_WIN_GET(vop_win->vop, vop_win->data, enable) == 0;
-> + if (!state->enable &&
-> +    VOP_WIN_GET(vop_win->vop, vop_win->data, enable) == 0)
-> + return true;
->
->
-> It is wrong, the patch would cause a bug.
->
-> when state->enable is 0, check yrgb_mst == state->yrgb_mst always be true,
-> because state->yrgb_mst not update on plane disabled funtion, that would
-> cause iommu crash.
+On 08/04/16 11:31, Suzuki K Poulose wrote:
+> On 08/04/16 11:24, Marc Zyngier wrote:
+>> On 08/04/16 10:58, Suzuki K Poulose wrote:
+>>> On 07/04/16 18:31, Marc Zyngier wrote:
+>>>
+>>>>> +	All system register encodings above use the form
+>>>>> +
+>>>>> +	Op0, Op1, CRn, CRm, Op2.
+>>>>> +
+>>>>> +	Note that some of the encodings listed above include
+>>>>> +	the system register space reserved for the following
+>>>>> +	identification registers which may appear in future revisions
+>>>>> +	of the ARM architecture beyond ARMv8.0.
+>>>>> +	This space includes:
+>>>>> +	ID_AA64PFR[2-7]_EL1
+>>>>> +	ID_AA64DFR[2-3]_EL1
+>>>>> +	ID_AA64AFR[2-3]_EL1
+>>>>> +	ID_AA64ISAR[2-7]_EL1
+>>>>> +	ID_AA64MMFR[2-7]_EL1
+>>>
+>>>
+>>> AFAIK, the id space is unassigned. So the naming above could cause confusion
+>>> if the register is named something else.
+>>
+>> It is reserved *at the moment*, but already has a defined behaviour. My
+> 
+> Absolutely, they do need to be RAZ.  My point was assigning names to the reserved
+> space where the names are unassigned.
 
-Sorry, but I don't understand where's the bug and what could cause
-that crash. What the existing code was doing is saying that a pageflip
-event is still pending if we have told the plane to disable but for
-some reason it hasn't yet.
+Sorry - I misread your statement. It makes a lot more sense now that the
+coffee has trickled in.
 
-With this modification, if we read back that it's already disabled, we
-return true as before. But if we read back that it isn't disabled yet,
-then we still check the fb pointers and compare them.
-
-The iommu mapping is removed when the _CRTC_ is disabled, and what
-this series does is to wait for the pending pageflip to finish before
-conitnuing with CRTC disablement.
-
-> About pending pageflips would remain pending, can you  describe more info
-> about it? I think those pending pageflips should be ignore when CRTC is
-> disabled.
-
-Well, right now in rockchip-drm pending pageflips won't be ignored
-when a CRTC is disabled, but will be delivered when it's re-enabled.
-
-If they would be to be ignored (understanding that as dropped), that
-would require modifications to clients so they keep track of which fbs
-were used in a particular crtc and destroy them when the crtc is
-disabled, but that would be incorrect when using the i915 DRM driver
-(I also assume others do the same). Given that the pageflip ioctl
-isn't driver-specific, I think there cannot be such a difference in
-behavior between drivers.
-
-With the current behavior (pending pageflip events being delayed until
-the CRTC is enabled again), compositors and other clients will be
-holding on to the fb in the pending pageflip until an arbitrary point
-in the future that may not ever come. To me that sounds like a serious
-modification of the assumptions on fb lifecycle that might not be
-warranted.
-
-So in summary, even if I haven't found any explicit documentation on
-this, I think the ABI is that any pending pageflips are to be
-delivered when that CRTC is being disabled and not later.
+We're in violent agreement! ;-)
 
 Thanks,
 
-Tomeu
-
-> Thanks.
->
->
->   yrgb_mst = VOP_WIN_GET_YRGBADDR(vop_win->vop, vop_win->data);
->
->
->
-> --
-> ?ark Yao
->
->
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
->
+	M.
+-- 
+Jazz is not dead. It just smells funny...
