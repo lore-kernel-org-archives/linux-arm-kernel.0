@@ -1,59 +1,303 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Fri, 8 Apr 2016 15:31:49 +0200
-Subject: [PATCH v6 0/7] KVM PCIe/MSI passthrough on ARM/ARM64: kernel part
- 1/3: iommu changes
-In-Reply-To: <20160407115001.25de7d1e@t450s.home>
-References: <1459757222-2668-1-git-send-email-eric.auger@linaro.org>
- <20160406171534.794c6824@t450s.home> <5706528B.2010906@linaro.org>
- <20160407115001.25de7d1e@t450s.home>
-Message-ID: <5707B2C5.5050008@linaro.org>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Fri, 8 Apr 2016 13:33:28 +0000
+Subject: [PATCH v2] PCI: designware: move remaining rc setup code to
+ dw_pcie_setup_rc()
+In-Reply-To: <20160407140551.GA2648@localhost>
+References: <1458128433-3020-1-git-send-email-jszhang@marvell.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ED40E52@lhreml503-mbs>
+ <20160407103734.55e72da7@xhacker>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ED43F95@lhreml503-mbs>
+ <20160407163443.291fbd49@xhacker>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ED44208@lhreml503-mbs>
+ <20160407140551.GA2648@localhost>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1ED45C38@lhreml503-mbs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
-On 04/07/2016 07:50 PM, Alex Williamson wrote:
-> On Thu, 7 Apr 2016 14:28:59 +0200
-> Eric Auger <eric.auger@linaro.org> wrote:
+Hi Bjorn
+
+Many thanks for your reply
+
+> -----Original Message-----
+> From: Bjorn Helgaas [mailto:helgaas at kernel.org]
+> Sent: 07 April 2016 15:06
+> To: Gabriele Paoloni
+> Cc: Jisheng Zhang; jingoohan1 at gmail.com; pratyush.anand at gmail.com;
+> bhelgaas at google.com; linux-pci at vger.kernel.org; linux-
+> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v2] PCI: designware: move remaining rc setup code
+> to dw_pcie_setup_rc()
 > 
->> Hi Alex,
->> On 04/07/2016 01:15 AM, Alex Williamson wrote:
->>> On Mon,  4 Apr 2016 08:06:55 +0000
->>> Eric Auger <eric.auger@linaro.org> wrote:
->>>   
->>>> This series introduces the dma-reserved-iommu api used to:
->>>> - create/destroy an iova domain dedicated to reserved iova bindings
->>>> - map/unmap physical addresses onto reserved IOVAs.
->>>> - unmap and destroy all IOVA reserved bindings  
->>>
->>> Why are we making the decision to have an unbalanced map vs unmap, we
->>> can create individual mappings, but only unmap the whole thing and
->>> start over?  That's a strange interface.  Thanks,  
->> The "individual" balanced unmap also exists (iommu_put_reserved_iova)
->> and this is the "normal" path. This happens on msi_domain_deactivate
->> (and possibly on msi_domain_set_affinity).
->>
->> I added iommu_unmap_reserved to handle the case where the userspace
->> registers a reserved iova domain and fails to unregister it. In that
->> case one need to handle the cleanup on kernel-side and I chose to
->> implement this on vfio_iommu_type1 release. All the reserved IOMMU
->> bindings get destroyed on that event.
->>
->> Any advice to handle this situation?
+> On Thu, Apr 07, 2016 at 10:06:45AM +0000, Gabriele Paoloni wrote:
+> > Hi Jisheng
+> >
+> > > -----Original Message-----
+> > > From: Jisheng Zhang [mailto:jszhang at marvell.com]
+> > > Sent: 07 April 2016 09:35
+> > > To: Gabriele Paoloni
+> > > Cc: jingoohan1 at gmail.com; pratyush.anand at gmail.com;
+> > > bhelgaas at google.com; linux-pci at vger.kernel.org; linux-
+> > > kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> > > Subject: Re: [PATCH v2] PCI: designware: move remaining rc setup
+> code
+> > > to dw_pcie_setup_rc()
+> > >
+> > > Hi Gabriele,
+> > >
+> > > On Thu, 7 Apr 2016 08:20:28 +0000 Gabriele Paoloni wrote:
+> > >
+> > > > Hi Jisheng
+> > > >
+> > > > Thanks for your reply
+> > > >
+> > > > > -----Original Message-----
+> > > > > From: Jisheng Zhang [mailto:jszhang at marvell.com]
+> > > > > Sent: 07 April 2016 03:38
+> > > > > To: Gabriele Paoloni; jingoohan1 at gmail.com;
+> > > pratyush.anand at gmail.com;
+> > > > > bhelgaas at google.com
+> > > > > Cc: linux-pci at vger.kernel.org; linux-kernel at vger.kernel.org;
+> linux-
+> > > arm-
+> > > > > kernel at lists.infradead.org
+> > > > > Subject: Re: [PATCH v2] PCI: designware: move remaining rc
+> setup
+> > > code
+> > > > > to dw_pcie_setup_rc()
+> > > > >
+> > > > > Hi Gabriele,
+> > > > >
+> > > > > On Wed, 6 Apr 2016 14:50:29 +0000 Gabriele Paoloni wrote:
+> > > > >
+> > > > > > Hi, sorry to be late on this
+> > > > > >
+> > > > > > > -----Original Message-----
+> > > > > > > From: linux-kernel-owner at vger.kernel.org [mailto:linux-
+> kernel-
+> > > > > > > owner at vger.kernel.org] On Behalf Of Jisheng Zhang
+> > > > > > > Sent: 16 March 2016 11:41
+> > > > > > > To: jingoohan1 at gmail.com; pratyush.anand at gmail.com;
+> > > > > bhelgaas at google.com
+> > > > > > > Cc: linux-pci at vger.kernel.org; linux-
+> kernel at vger.kernel.org;
+> > > linux-
+> > > > > arm-
+> > > > > > > kernel at lists.infradead.org; Jisheng Zhang
+> > > > > > > Subject: [PATCH v2] PCI: designware: move remaining rc
+> setup
+> > > code
+> > > > > to
+> > > > > > > dw_pcie_setup_rc()
+> > > > > > >
+> > > > > > > dw_pcie_setup_rc(), as its name indicates, setups the RC.
+> But
+> > > > > current
+> > > > > > > dw_pcie_host_init() also contains some necessary rc setup
+> code.
+> > > > > > >
+> > > > > > > Another reason: the host may lost power during suspend to
+> ram,
+> > > the
+> > > > > RC
+> > > > > > > need to be re-setup after resume. The rc can't be correctly
+> > > resumed
+> > > > > > > without the rc setup code in dw_pcie_host_init().
+> > > > > > >
+> > > > > > > So this patch moves the code to dw_pcie_setup_rc() to
+> address
+> > > the
+> > > > > above
+> > > > > > > two issues. After this patch, each pcie designware driver
+> users
+> > > > > could
+> > > > > > > call dw_pcie_setup_rc() to re-setup rc when resume back.
+> > > > > >
+> > > > > > I think this patch breaks the Hisilicon driver...
+> > > > > >
+> > > > > > Our driver performs linkup setup in UEFI therefore we do not
+> call
+> > > > > > dw_pcie_setup_rc(), we only call dw_pcie_host_init().
+> > > > >
+> > > > > Thanks for the information. So pcie-hisi rely on UEFI to do
+> > > something
+> > > > > similar
+> > > > > in dw_pcie_setup_rc(), this comes to a common driver implement
+> > > > > question: should
+> > > > > linux device driver rely on bootloader to configure HW device?
+> > > >
+> > > > I don't see any issue with this...
+> > > >
+> > > > >
+> > > > > Is it acceptable that pcie-hisi adds a call to
+> dw_pcie_setup_rc()
+> > > in
+> > > > > hisi_add_pcie_port()?
+> > > >
+> > > > I don't think so...that would try to overwrite what is already
+> set by
+> > > > the bootloader; so it is wrong in principle and maybe it can lead
+> to
+> > > > undefined behaviours...
+> > >
+> > > make sense! This commit is intend to re-setup the rc when waken
+> from
+> > > s2ram (in
+> > > s2ram state, the host lost power)
+> > >
+> > > I have no good solution but to introduce one function e.g
+> > > dw_pcie_setup_rc_after_linkup(), then move related code from
+> > > dw_pcie_host_init
+> > > to it, then let my host driver resume hook to call.
+> > >
+> > > Hi Pratyush, Jingoo and Bjorn etc.
+> > >
+> > > any suggestions are appreciated!
+> >
+> > What about:
+> >
+> > diff --git a/drivers/pci/host/pcie-designware.c
+> b/drivers/pci/host/pcie-designware.c
+> > index a4cccd3..e461f5d 100644
+> > --- a/drivers/pci/host/pcie-designware.c
+> > +++ b/drivers/pci/host/pcie-designware.c
+> > @@ -434,7 +434,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
+> >  	struct platform_device *pdev = to_platform_device(pp->dev);
+> >  	struct pci_bus *bus, *child;
+> >  	struct resource *cfg_res;
+> > -	u32 val;
+> >  	int i, ret;
+> >  	LIST_HEAD(res);
+> >  	struct resource_entry *win;
+> > @@ -544,25 +543,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
+> >  	if (pp->ops->host_init)
+> >  		pp->ops->host_init(pp);
+> >
+> > -	/*
+> > -	 * If the platform provides ->rd_other_conf, it means the
+> platform
+> > -	 * uses its own address translation component rather than ATU, so
+> > -	 * we should not program the ATU here.
+> > -	 */
+> > -	if (!pp->ops->rd_other_conf)
+> > -		dw_pcie_prog_outbound_atu(pp, PCIE_ATU_REGION_INDEX1,
+> > -					  PCIE_ATU_TYPE_MEM, pp->mem_base,
+> > -					  pp->mem_bus_addr, pp->mem_size);
+> > -
+> > -	dw_pcie_wr_own_conf(pp, PCI_BASE_ADDRESS_0, 4, 0);
+> > -
+> > -	/* program correct class for RC */
+> > -	dw_pcie_wr_own_conf(pp, PCI_CLASS_DEVICE, 2,
+> PCI_CLASS_BRIDGE_PCI);
+> > -
+> > -	dw_pcie_rd_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, &val);
+> > -	val |= PORT_LOGIC_SPEED_CHANGE;
+> > -	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
+> > -
+> >  	pp->root_bus_nr = pp->busn->start;
+> >  	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+> >  		bus = pci_scan_root_bus_msi(pp->dev, pp->root_bus_nr,
+> > @@ -725,6 +705,29 @@ static struct pci_ops dw_pcie_ops = {
+> >  	.write = dw_pcie_wr_conf,
+> >  };
+> >
+> > +void dw_pcie_setup_own_cfg(struct pcie_port *pp)
+> > +{
+> > +	u32 val;
+> > +	/*
+> > +	 * If the platform provides ->rd_other_conf, it means the
+> platform
+> > +	 * uses its own address translation component rather than ATU, so
+> > +	 * we should not program the ATU here.
+> > +	 */
+> > +	if (!pp->ops->rd_other_conf)
+> > +		dw_pcie_prog_outbound_atu(pp, PCIE_ATU_REGION_INDEX1,
+> > +					  PCIE_ATU_TYPE_MEM, pp->mem_base,
+> > +					  pp->mem_bus_addr, pp->mem_size);
+> > +
+> > +	dw_pcie_wr_own_conf(pp, PCI_BASE_ADDRESS_0, 4, 0);
+> > +
+> > +	/* program correct class for RC */
+> > +	dw_pcie_wr_own_conf(pp, PCI_CLASS_DEVICE, 2,
+> PCI_CLASS_BRIDGE_PCI);
+> > +
+> > +	dw_pcie_rd_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, &val);
+> > +	val |= PORT_LOGIC_SPEED_CHANGE;
+> > +	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
+> > +}
+> > +
+> >  void dw_pcie_setup_rc(struct pcie_port *pp)
+> >  {
+> >  	u32 val;
+> > @@ -800,6 +803,8 @@ void dw_pcie_setup_rc(struct pcie_port *pp)
+> >  	val |= PCI_COMMAND_IO | PCI_COMMAND_MEMORY |
+> >  		PCI_COMMAND_MASTER | PCI_COMMAND_SERR;
+> >  	dw_pcie_writel_rc(pp, val, PCI_COMMAND);
+> > +
+> > +	dw_pcie_setup_own_cfg(pp);
+> >  }
+> >
+> >  MODULE_AUTHOR("Jingoo Han <jg1.han@samsung.com>");
+> > diff --git a/drivers/pci/host/pcie-designware.h
+> b/drivers/pci/host/pcie-designware.h
+> > index f437f9b..caf0f5d 100644
+> > --- a/drivers/pci/host/pcie-designware.h
+> > +++ b/drivers/pci/host/pcie-designware.h
+> > @@ -85,5 +85,6 @@ int dw_pcie_wait_for_link(struct pcie_port *pp);
+> >  int dw_pcie_link_up(struct pcie_port *pp);
+> >  void dw_pcie_setup_rc(struct pcie_port *pp);
+> >  int dw_pcie_host_init(struct pcie_port *pp);
+> > +void dw_pcie_setup_own_cfg(struct pcie_port *pp);
+> >
+> >  #endif /* _PCIE_DESIGNWARE_H */
+> > diff --git a/drivers/pci/host/pcie-hisi.c b/drivers/pci/host/pcie-
+> hisi.c
+> > index 3e98d4e..8da29b2 100644
+> > --- a/drivers/pci/host/pcie-hisi.c
+> > +++ b/drivers/pci/host/pcie-hisi.c
+> > @@ -164,6 +164,7 @@ static int hisi_add_pcie_port(struct pcie_port
+> *pp,
+> >  		dev_err(&pdev->dev, "failed to initialize host\n");
+> >  		return ret;
+> >  	}
+> > +	dw_pcie_setup_own_cfg(pp);
+> >
+> >  	return 0;
+> >  }
 > 
-> If we want to model it similar to regular iommu domains, then
-> iommu_free_reserved_iova_domain() should release all the mappings and
-> destroy the iova domain.
-Yes this sounds obvious now.
-  Additionally, since the reserved iova domain
-> is just a construct on top of an iommu domain, it should be sufficient
-> to call iommu_domain_free() to also remove the reserved iova domain if
-> one exists.  Thanks,
-Yes. For dma cookie (iommu_put_dma_cookie) I see this is done from the
-iommu driver domain_free callback.
+> What's the hisi plan for resuming after suspend-to-RAM?  How does the
+> RC get reprogrammed after it loses all its state?
+
+PM is not part of the driver yet. This is planned for near
+future release so haven't made such considerations yet
+
+> 
+> What would break if hisi did call dw_pcie_setup_rc()?  I know you said
+> it would overwrite what the bootloader already did, which is true.
+
+I am try to figure this out now with our HW team.
+
+> 
+> But hisi does call dw_pcie_host_init(), so it reads pp->mem (which
+> determines pp->mem_base) and pp->lanes from the DT.  Other drivers
+> then call dw_pcie_setup_rc() which programs the RC based on
+> pp->mem_base and pp->lanes.  So hisi assumes UEFI programmed the RC to
+> match the DT, while the other drivers read the DT and program the RC
+> to match.  The latter seems more robust because it enforces the
+> consistency rather than relying on it.
+
+Yes I agree with you, however we have preferred to move RC config to
+BIOS to have a single driver to support multiple versions of the
+same SoC.
+
+The patch I proposed above does the same job as the original patch
+proposed by Jisheng and also allows hisi driver to call the moved
+code.
+
+Do you see anything wrong with it?
 
 Thanks
 
-Eric
+Gab
+
 > 
-> Alex
-> 
+> Bjorn
