@@ -1,51 +1,61 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 8 Apr 2016 10:34:10 -0700
-Subject: [PATCH v2 1/2] dma/iommu: Add pgsize_bitmap confirmation in
- __iommu_dma_alloc_pages
-In-Reply-To: <20160408173002.GJ23750@arm.com>
-References: <1459146732-15620-1-git-send-email-yong.wu@mediatek.com>
- <20160329170238.GK6745@arm.com>
- <CAD=FV=XdZwg8usj3bjM6W=A0Yk1AFqKFRadpiS-LGLwxVNxp7A@mail.gmail.com>
- <20160408130733.GD23750@arm.com>
- <CAD=FV=VbekVUHW3=d0icSgUO1M-1cccwCAZ+s=YSzOtEveCQag@mail.gmail.com>
- <20160408173002.GJ23750@arm.com>
-Message-ID: <CAD=FV=XbL6gbdmX62Q3QJQ6R-rC7cCd44RLPgK3kvhAC49BJjA@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 8 Apr 2016 13:46:23 -0400
+Subject: [PATCH 2/2] pci, acpi: free IO resource during shutdown
+In-Reply-To: <570754D7.3010009@semihalf.com>
+References: <1457389310-3538-1-git-send-email-okaya@codeaurora.org>
+ <1457389310-3538-2-git-send-email-okaya@codeaurora.org>
+ <20160407160624.GB8780@localhost> <57069CAF.8090803@codeaurora.org>
+ <20160407214108.GB24492@localhost> <5707281B.6020805@codeaurora.org>
+ <570754D7.3010009@semihalf.com>
+Message-ID: <5707EE6F.2050509@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Tomasz,
 
-On Fri, Apr 8, 2016 at 10:30 AM, Will Deacon <will.deacon@arm.com> wrote:
->> > Am I barking up the wrong tree?
+On 4/8/2016 2:51 AM, Tomasz Nowicki wrote:
+> Hi Sinan,
+> 
+> On 08.04.2016 05:40, Sinan Kaya wrote:
+>> Hi Tomasz,
 >>
->> I don't think min_order can be negative.  Certainly we could enter the
->> loop with order == 0 and min_order == 0, though.
->
-> ... and in that case, PageCompound will be false, and we'll call split_page
-> which won't do anything, so we break out.
->
+>> On 4/7/2016 5:41 PM, Bjorn Helgaas wrote:
+>>>>> You say this is undoing the effect of pci_remap_iospace(), but that's
+>>>>>>> only called by native drivers and the generic (OF) driver, not by
+>>>>>>> pci_root.c.
+>>>>>
+>>>>> See the ACPI root bridge driver above.
+>>> If this is a fix to patches that haven't been merged yet, we need to
+>>> squash the fix into the patches.
+>>>
 >>
->> Some examples:
+>> Can you merge these to two patches to your series for the next post?
 >>
->> order = 0, min_order = 0
->> -> Want alloc_pages _without_ __GFP_NORETRY.  OK
->> -> If alloc_pages fails, return NULL.  OK
->> -> If alloc pages succeeds, don't need splitting since single page.  OK
->
-> [...]
->
->> I think those are all right.  Did I mess up?  You could certainly
->> structure the loop in a different way but you need to make sure you
->> handle all of those cases.  If you have an alternate structure that
->> handles all those, let's consider it.
->
-> Right, I don't think the code is broken, I just think the !order check is
-> confusing and not needed.
+>> I need to remove weak on the first patch per direction from Bjorn and
+>> fix the function comments. You could as well do this while you are merging.
+>>
+>> Let me know what your preference is.
+>>
+> 
+> Please do necessary fixes for your patches and send me the repo reference link. I will merge these to my patch set. Thanks!
+> 
+> Tomasz
+> -- 
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Ah ha!  Got it.  I didn't dig into split_page() to see that it was a
-no-op when "order == 0".  I just know that the old code didn't call
-split_page() with order == 0 so I assumed that was wise to keep.  If
-we don't need to keep that then agreed that the "if" test can simply
-be removed.  :)
+I posted the updated patch here. Changes are:
 
--Doug
+- I squashed these two patches together per Bjorn's request.
+- Removed the weak declarations from both remap and unmap calls.
+- Fixed the doxygen document to match the actual parameters.
+
+https://us.codeaurora.org/cgit/quic/server/kernel/commit/?h=okaya/pciunmapv2&id=6120a5f0c5e6d757f18a076917fa202e2c9823d0
+
+Sinan
+
+-- 
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
