@@ -1,51 +1,28 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 08 Apr 2016 13:25:08 +0900
-Subject: [PATCH v8 19/20] ARM: dts: Expand the voltage range of buck1/3
- regulator for exynos4412-odroidu3
-In-Reply-To: <1460089509-16260-1-git-send-email-cw00.choi@samsung.com>
-References: <1460089509-16260-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1460089509-16260-20-git-send-email-cw00.choi@samsung.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Fri, 8 Apr 2016 06:41:10 +0200
+Subject: [PATCH v6 1/2] ARM: dma-mapping: Don't use outer_flush_range
+ when the L2C is coherent
+In-Reply-To: <1459415380-18004-2-git-send-email-gregory.clement@free-electrons.com>
+References: <1459415380-18004-1-git-send-email-gregory.clement@free-electrons.com>
+ <1459415380-18004-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20160408044110.GA11802@lnxrabinv.se.axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch expands the voltage range of buck1/3 regulator due to as following:
-- MIF (Memory Interface) bus frequency needs the range of '900 - 1100 mV'.
-- INT (Internal) bus frequency needs the range of '900 - 1050 mV'.
+On Thu, Mar 31, 2016 at 11:09:39AM +0200, Gregory CLEMENT wrote:
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index deac58d5f1f7..1538bb293e90 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -61,7 +61,7 @@ struct arm_dma_free_args {
+>  
+>  struct arm_dma_allocator {
+>  	void *(*alloc)(struct arm_dma_alloc_args *args,
+> -		       struct page **ret_page);
+> +		       struct page **ret_page, bool is_coherent);
+>  	void (*free)(struct arm_dma_free_args *args);
+>  };
 
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-[m.reichl and linux.amoon: Tested it on exynos4412-odroidu3 board]
-Tested-by: Markus Reichl <m.reichl@fivetechno.de>
-Tested-by: Anand Moon <linux.amoon@gmail.com>
----
- arch/arm/boot/dts/exynos4412-odroid-common.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-index cba37c974703..b4983cbc4f8c 100644
---- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-+++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-@@ -356,8 +356,8 @@
- 
- 			buck1_reg: BUCK1 {
- 				regulator-name = "vdd_mif";
--				regulator-min-microvolt = <1000000>;
--				regulator-max-microvolt = <1000000>;
-+				regulator-min-microvolt = <900000>;
-+				regulator-max-microvolt = <1100000>;
- 				regulator-always-on;
- 				regulator-boot-on;
- 			};
-@@ -372,8 +372,8 @@
- 
- 			buck3_reg: BUCK3 {
- 				regulator-name = "vdd_int";
--				regulator-min-microvolt = <1000000>;
--				regulator-max-microvolt = <1000000>;
-+				regulator-min-microvolt = <900000>;
-+				regulator-max-microvolt = <1050000>;
- 				regulator-always-on;
- 				regulator-boot-on;
- 			};
--- 
-1.9.1
+Could you please add this parameter to the arm_dma_alloc_args structure
+instead?  As you see from the code, that's where all the other various
+parameters needed by the allocators are grouped.
