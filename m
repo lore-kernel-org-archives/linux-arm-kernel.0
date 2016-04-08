@@ -1,57 +1,53 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri,  8 Apr 2016 11:52:11 +0200
-Subject: [PULL 0/4] KVM/ARM Fixes for v4.6-rc4
-Message-ID: <1460109135-6612-1-git-send-email-christoffer.dall@linaro.org>
+Date: Fri,  8 Apr 2016 11:52:12 +0200
+Subject: [PULL 1/4] arm64: KVM: Add braces to multi-line if statement in
+ virtual PMU code
+In-Reply-To: <1460109135-6612-1-git-send-email-christoffer.dall@linaro.org>
+References: <1460109135-6612-1-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1460109135-6612-2-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paolo and Radim,
+From: Will Deacon <will.deacon@arm.com>
 
-Here's another set of fixes for KVM/ARM for this release.  I guess this was
-expected given the size of our patch queue for this merge window.
+The kernel is written in C, not python, so we need braces around
+multi-line if statements. GCC 6 actually warns about this, thanks to the
+fantastic new "-Wmisleading-indentation" flag:
 
-The following changes since commit 5f5560b1c5f3a80e91c6babb2da34a51943bbdec:
+ | virt/kvm/arm/pmu.c: In function ?kvm_pmu_overflow_status?:
+ | virt/kvm/arm/pmu.c:198:3: warning: statement is indented as if it were guarded by... [-Wmisleading-indentation]
+ |    reg &= vcpu_sys_reg(vcpu, PMCNTENSET_EL0);
+ |    ^~~
+ | arch/arm64/kvm/../../../virt/kvm/arm/pmu.c:196:2: note: ...this ?if? clause, but it is not
+ |   if ((vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMU_PMCR_E))
+ |   ^~
 
-  arm64: KVM: Register CPU notifiers when the kernel runs at HYP (2016-03-31 10:27:28 +0200)
+As it turns out, this particular case is harmless (we just do some &=
+operations with 0), but worth fixing nonetheless.
 
-are available in the git repository at:
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ virt/kvm/arm/pmu.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-4.6-rc4
-
-for you to fetch changes up to 06a71a24bae57a07afee9cda6b00495347d8a448:
-
-  arm64: KVM: unregister notifiers in hyp mode teardown path (2016-04-06 13:47:52 +0200)
-
-
-Thanks,
--Christoffer
-
-----------------------------------------------------------------
-KVM/ARM Fixes for v4.6-rc4
-
-Addresses:
- - Wrong indentation in the PMU code from the merge window
- - A long-time bug occuring with running ntpd on the host, candidate for stable
- - Properly handle (and warn about) the unsupported configuration of running on
-   systems with less than 40 bits of PA space
- - More fixes to the PM and hotplug notifier stuff from the merge window
-
-----------------------------------------------------------------
-Marc Zyngier (2):
-      KVM: arm/arm64: Handle forward time correction gracefully
-      arm64: KVM: Warn when PARange is less than 40 bits
-
-Sudeep Holla (1):
-      arm64: KVM: unregister notifiers in hyp mode teardown path
-
-Will Deacon (1):
-      arm64: KVM: Add braces to multi-line if statement in virtual PMU code
-
- arch/arm/kvm/arm.c                | 13 ++++++++---
- arch/arm64/include/asm/kvm_arm.h  |  6 ++---
- arch/arm64/include/asm/kvm_asm.h  |  2 +-
- arch/arm64/include/asm/kvm_host.h |  7 +++---
- arch/arm64/kvm/hyp/s2-setup.c     | 39 +++++++++++++++++++++++++++++--
- virt/kvm/arm/arch_timer.c         | 49 +++++++++++++++++++++++++++++++--------
- virt/kvm/arm/pmu.c                |  3 ++-
- 7 files changed, 95 insertions(+), 24 deletions(-)
+diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+index b5754c6..575c7aa 100644
+--- a/virt/kvm/arm/pmu.c
++++ b/virt/kvm/arm/pmu.c
+@@ -193,11 +193,12 @@ static u64 kvm_pmu_overflow_status(struct kvm_vcpu *vcpu)
+ {
+ 	u64 reg = 0;
+ 
+-	if ((vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMU_PMCR_E))
++	if ((vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMU_PMCR_E)) {
+ 		reg = vcpu_sys_reg(vcpu, PMOVSSET_EL0);
+ 		reg &= vcpu_sys_reg(vcpu, PMCNTENSET_EL0);
+ 		reg &= vcpu_sys_reg(vcpu, PMINTENSET_EL1);
+ 		reg &= kvm_pmu_valid_counter_mask(vcpu);
++	}
+ 
+ 	return reg;
+ }
+-- 
+2.1.2.330.g565301e.dirty
