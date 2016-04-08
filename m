@@ -1,61 +1,65 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri,  8 Apr 2016 05:53:57 -0700
-Subject: [PATCH 4/6] ARM: Register with kernel restart handler
-In-Reply-To: <1460120039-2497-1-git-send-email-linux@roeck-us.net>
-References: <1460120039-2497-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1460120039-2497-5-git-send-email-linux@roeck-us.net>
+From: m.reichl@fivetechno.de (Markus Reichl)
+Date: Fri, 8 Apr 2016 14:55:35 +0200
+Subject: [PATCH 0/7] PM / devfreq: Add NoCP devfreq-event and support
+ busfreq on exyno5422-odroidxu3
+In-Reply-To: <1460091646-28701-1-git-send-email-cw00.choi@samsung.com>
+References: <1460091646-28701-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <5707AA47.7090506@fivetechno.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-By making use of the kernel restart handler, board specific restart
-handlers can be prioritized amongst available mechanisms for a particular
-board or system.
+Hi Chanwoo,
 
-Select the default priority of 128 to indicate that the restart callback
-in the machine description is the default restart mechanism.
+I tested both sets on odroid XU4 and U3.
+Tested-by: Markus Reichl <m.reichl@fivetechno.de>
 
-Signed-off-by: Guenter Roeck <linux@roeck-us.net>
----
- arch/arm/kernel/setup.c | 20 ++++++++++++++++++--
- 1 file changed, 18 insertions(+), 2 deletions(-)
+Am 08.04.2016 um 07:00 schrieb Chanwoo Choi:
+> This patchset support the AMBA bus frequency scaling on Exynos5422-based
+> Odroid-XU3 board. But, this series only support the bus frequency scaling
+> for INT (Internal) block using VDD_INT power line.
+> 
+> Also, to support the bus frequency scaling for Exynos542x SoC,
+> Exynos542x SoC has the specific 'NoC (Network on Chip) Probe' device
+> to measure the transfered data traffic on NoC (Network on Chip)
+> instead of PPMU (Platform Performance Monitoring Unit). NoC Probe device
+> provide the utilization for INT block of Exynos542x SoC.
+> 
+> The generic exynos-bus frequency driver uses the 'NoC Probe' devfreq-event
+> device (drivers/devfreq/event/exynos-nocp.c) without any modification.
+> Just add the phandle of 'NoC Probe' dt node to bus dt node.
+> 
+> Depend on:
+> This patchset depends on patch[1] which support the generic exynos-bus
+> frequency driver.
+> 
+> [1] https://lkml.org/lkml/2016/4/8/14
+> - [PATCH v8 00/20] PM / devferq: Add generic exynos bus frequency driver and new passive governor
+> 
+> Chanwoo Choi (7):
+>   PM / devfreq: event: Add new Exynos NoC probe driver
+>   PM / devfreq: exynos: Add the detailed correlation for Exynos5422 bus
+>   ARM: dts: Add NoC Probe dt node for Exynos542x SoC
+>   dt-bindings: clock: Add the clock id for ACLK clock of Exynos542x SoC
+>   clk: samsung: exynos542x: Add the clock id for ACLK
+>   ARM: dts: Add bus nodes using VDD_INT for Exynos542x SoC
+>   ARM: dts: Add support of Bus frequency using VDD_INT for exynos5422-odroidxu3
+> 
+>  .../bindings/devfreq/event/exynos-nocp.txt         |  86 +++++
+>  .../devicetree/bindings/devfreq/exynos-bus.txt     |  19 +
+>  arch/arm/boot/dts/exynos5420.dtsi                  | 407 +++++++++++++++++++++
+>  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  99 +++++
+>  drivers/clk/samsung/clk-exynos5420.c               |  85 +++--
+>  drivers/devfreq/event/Kconfig                      |   8 +
+>  drivers/devfreq/event/Makefile                     |   2 +
+>  drivers/devfreq/event/exynos-nocp.c                | 247 +++++++++++++
+>  drivers/devfreq/event/exynos-nocp.h                |  78 ++++
+>  include/dt-bindings/clock/exynos5420.h             |  24 +-
+>  10 files changed, 1024 insertions(+), 31 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/devfreq/event/exynos-nocp.txt
+>  create mode 100644 drivers/devfreq/event/exynos-nocp.c
+>  create mode 100644 drivers/devfreq/event/exynos-nocp.h
+> 
 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 139791ed473d..232dba199702 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -1002,6 +1002,20 @@ void __init hyp_mode_check(void)
- #endif
- }
- 
-+static void (*__arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
-+
-+static int arm_restart(struct notifier_block *nb, unsigned long action,
-+		       void *data)
-+{
-+	__arm_pm_restart(action, data);
-+	return NOTIFY_DONE;
-+}
-+
-+static struct notifier_block arm_restart_nb = {
-+	.notifier_call = arm_restart,
-+	.priority = 128,
-+};
-+
- void __init setup_arch(char **cmdline_p)
- {
- 	const struct machine_desc *mdesc;
-@@ -1044,8 +1058,10 @@ void __init setup_arch(char **cmdline_p)
- 	paging_init(mdesc);
- 	request_standard_resources(mdesc);
- 
--	if (mdesc->restart)
--		arm_pm_restart = mdesc->restart;
-+	if (mdesc->restart) {
-+		__arm_pm_restart = mdesc->restart;
-+		register_restart_handler(&arm_restart_nb);
-+	}
- 
- 	unflatten_device_tree();
- 
--- 
-2.5.0
+Thanks,
+--
+Markus Reichl
