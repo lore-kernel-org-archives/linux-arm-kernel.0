@@ -1,95 +1,32 @@
-From: ralf@linux-mips.org (Ralf Baechle)
-Date: Fri, 8 Apr 2016 12:06:00 +0200
-Subject: [PATCH v2] clk: let clk_disable() return immediately if clk is
- NULL or error
-In-Reply-To: <20160408003328.GA14441@codeaurora.org>
-References: <1459821083-28116-1-git-send-email-yamada.masahiro@socionext.com>
- <20160408003328.GA14441@codeaurora.org>
-Message-ID: <20160408100600.GI1668@linux-mips.org>
+From: yegorslists@googlemail.com (yegorslists at googlemail.com)
+Date: Fri,  8 Apr 2016 12:11:59 +0200
+Subject: [PATCH] ARM: omap2plus_defconfig: Enable MDIO Bus/PHY emulation
+ support
+Message-ID: <1460110319-31525-1-git-send-email-yegorslists@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 07, 2016 at 05:33:28PM -0700, Stephen Boyd wrote:
+From: Yegor Yefremov <yegorslists@googlemail.com>
 
-> On 04/05, Masahiro Yamada wrote:
-> > The clk_disable() in the common clock framework (drivers/clk/clk.c)
-> > returns immediately if a given clk is NULL or an error pointer.  It
-> > allows clock consumers to call clk_disable() without IS_ERR_OR_NULL
-> > checking if drivers are only used with the common clock framework.
-> > 
-> > Unfortunately, NULL/error checking is missing from some of non-common
-> > clk_disable() implementations.  This prevents us from completely
-> > dropping NULL/error checking from callers.  Let's make it tree-wide
-> > consistent by adding IS_ERR_OR_NULL(clk) to all callees.
-> > 
-> > Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> > Acked-by: Greg Ungerer <gerg@uclinux.org>
-> > Acked-by: Wan Zongshun <mcuos.com@gmail.com>
-> > ---
-> > 
-> > Stephen,
-> > 
-> > This patch has been unapplied for a long time.
-> > 
-> > Please let me know if there is something wrong with this patch.
-> > 
-> 
-> I'm mostly confused why we wouldn't want to encourage people to
-> call clk_disable or unprepare on a clk that's an error pointer.
-> Typically an error pointer should be dealt with, instead of
-> silently ignored, so why wasn't it dealt with by passing it up
-> the probe() path?
+MDIO Bus/PHY emulation with fixed speed/link PHYs will be used in
+Baltos iR5221 devices to connect to ICPlus IP175D switch IC.
 
-While your argument makes perfect sense, Many clk_disable implementations
-are already doing similar checks, for example:
+Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
+---
+ arch/arm/configs/omap2plus_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-arch/arm/mach-davinci/clock.c:
-
-void clk_disable(struct clk *clk)
-{
-	unsigned long flags;
-
-	if (clk == NULL || IS_ERR(clk))
-		return;
-[...]
-
-arch/arm/mach-omap1/clock.c
-
-void clk_disable(struct clk *clk)
-{
-        unsigned long flags;
-
-        if (clk == NULL || IS_ERR(clk))
-                return;
-[...]
-
-arch/avr32/mach-at32ap/clock.c
-
-void clk_disable(struct clk *clk)
-{
-        unsigned long flags;
-
-        if (IS_ERR_OR_NULL(clk))
-                return;
-[...]
-
-arch/mips/lantiq/clk.c:
-
-static inline int clk_good(struct clk *clk)
-{
-	return clk && !IS_ERR(clk);
-}
-
-[...]
-
-void clk_disable(struct clk *clk)
-{
-	if (unlikely(!clk_good(clk)))
-		return;
-
-	if (clk->disable)
-[...]
-
-So should we go and weed out these checks?
-
-  Ralf
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index 156bc88..e5a2782 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -178,6 +178,7 @@ CONFIG_TI_CPTS=y
+ # CONFIG_NET_VENDOR_WIZNET is not set
+ CONFIG_AT803X_PHY=y
+ CONFIG_SMSC_PHY=y
++CONFIG_FIXED_PHY=y
+ CONFIG_USB_USBNET=m
+ CONFIG_USB_NET_SMSC75XX=m
+ CONFIG_USB_NET_SMSC95XX=m
+-- 
+2.1.4
