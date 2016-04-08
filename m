@@ -1,50 +1,67 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 8 Apr 2016 08:17:21 +0100
-Subject: [PATCH 1/2] mfd: max77693: Allow building as a module
-In-Reply-To: <20160408035445.GA9532@kozik-lap>
-References: <1459756459-22061-1-git-send-email-k.kozlowski@samsung.com>
- <20160407132947.GB3323@x1> <20160408035445.GA9532@kozik-lap>
-Message-ID: <20160408071721.GE3323@x1>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Fri, 8 Apr 2016 15:16:02 +0800
+Subject: [PATCH] irqchip/mbigen: Display message of MBIGEN domain created
+Message-ID: <1460099762-51497-1-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 08 Apr 2016, Krzysztof Kozlowski wrote:
+Add message of MBIGEN domain created, it's useful for check
+which MBIGEN domain is created.
 
-> On Thu, Apr 07, 2016 at 02:29:47PM +0100, Lee Jones wrote:
-> > On Mon, 04 Apr 2016, Krzysztof Kozlowski wrote:
-> > 
-> > > The consumer of max77693 regulators on Trats2 board (samsung-usb2-phy
-> > > driver) supports deferred probing so the max77693 main MFD driver can be
-> > > built now as a module. This gives more flexibility and removes manual
-> > > ordering of init calls.
-> > > 
-> > > Suggested-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-> > > Cc: Paul Gortmaker <paul.gortmaker@windriver.com>
-> > > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > > ---
-> > >  drivers/mfd/Kconfig    |  4 ++--
-> > >  drivers/mfd/max77693.c | 14 ++------------
-> > >  2 files changed, 4 insertions(+), 14 deletions(-)
-> > 
-> > I assume this can be taken immediately and doesn't depend on anything
-> > external to the set?
-> > 
-> > For my own reference:
-> >   Acked-by: Lee Jones <lee.jones@linaro.org>
-> 
-> Hi,
-> 
-> Yes, this can be taken as is. Only second patch (changing defconfig)
-> depends on this. I can take the second patch through samsung tree but
-> that would require a tag/branch with this... which looks like an
-> overkill. So maybe you would take both?
+Meanwhile, drop module owner, it will be set by driver core.
 
-If I take the defconfig patch without a tag, there will almost
-certainly be merge conflicts.  Other solutions include; delaying the
-defconfig patch for one cycle or trying to get it in post -rc1.
+Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+---
+ drivers/irqchip/irq-mbigen.c | 15 ++++++++++++---
+ 1 file changed, 12 insertions(+), 3 deletions(-)
 
+diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
+index d67baa2..a4dc7a0 100644
+--- a/drivers/irqchip/irq-mbigen.c
++++ b/drivers/irqchip/irq-mbigen.c
+@@ -257,14 +257,19 @@ static int mbigen_device_probe(struct platform_device *pdev)
+ 	if (IS_ERR(mgn_chip->base))
+ 		return PTR_ERR(mgn_chip->base);
+ 
++	dev_info(&pdev->dev, "%s\n", pdev->dev.of_node->full_name);
++
+ 	for_each_child_of_node(pdev->dev.of_node, np) {
+ 		if (!of_property_read_bool(np, "interrupt-controller"))
+ 			continue;
+ 
+ 		parent = platform_bus_type.dev_root;
+ 		child = of_platform_device_create(np, NULL, parent);
+-		if (IS_ERR(child))
++		if (IS_ERR(child)) {
++			dev_err(&pdev->dev, "failed to create for %s\n",
++				np->full_name);
+ 			return PTR_ERR(child);
++		}
+ 
+ 		if (of_property_read_u32(child->dev.of_node, "num-pins",
+ 					 &num_pins) < 0) {
+@@ -276,8 +281,13 @@ static int mbigen_device_probe(struct platform_device *pdev)
+ 							   mbigen_write_msg,
+ 							   &mbigen_domain_ops,
+ 							   mgn_chip);
+-		if (!domain)
++		if (!domain) {
++			dev_info(&pdev->dev, "unable to create %s domain\n",
++				 np->full_name);
+ 			return -ENOMEM;
++		}
++
++		dev_info(&pdev->dev, "%s domain created\n", np->full_name);
+ 	}
+ 
+ 	platform_set_drvdata(pdev, mgn_chip);
+@@ -293,7 +303,6 @@ MODULE_DEVICE_TABLE(of, mbigen_of_match);
+ static struct platform_driver mbigen_platform_driver = {
+ 	.driver = {
+ 		.name		= "Hisilicon MBIGEN-V2",
+-		.owner		= THIS_MODULE,
+ 		.of_match_table	= mbigen_of_match,
+ 	},
+ 	.probe			= mbigen_device_probe,
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.12.4
