@@ -1,65 +1,53 @@
-From: m.reichl@fivetechno.de (Markus Reichl)
-Date: Fri, 8 Apr 2016 14:55:35 +0200
-Subject: [PATCH 0/7] PM / devfreq: Add NoCP devfreq-event and support
- busfreq on exyno5422-odroidxu3
-In-Reply-To: <1460091646-28701-1-git-send-email-cw00.choi@samsung.com>
-References: <1460091646-28701-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <5707AA47.7090506@fivetechno.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 8 Apr 2016 14:07:33 +0100
+Subject: [PATCH v2 1/2] dma/iommu: Add pgsize_bitmap confirmation in
+ __iommu_dma_alloc_pages
+In-Reply-To: <CAD=FV=XdZwg8usj3bjM6W=A0Yk1AFqKFRadpiS-LGLwxVNxp7A@mail.gmail.com>
+References: <1459146732-15620-1-git-send-email-yong.wu@mediatek.com>
+ <20160329170238.GK6745@arm.com>
+ <CAD=FV=XdZwg8usj3bjM6W=A0Yk1AFqKFRadpiS-LGLwxVNxp7A@mail.gmail.com>
+Message-ID: <20160408130733.GD23750@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo,
+On Tue, Apr 05, 2016 at 10:03:32AM -0700, Doug Anderson wrote:
+> On Tue, Mar 29, 2016 at 10:02 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Mon, Mar 28, 2016 at 02:32:11PM +0800, Yong Wu wrote:
+> >> @@ -213,13 +215,16 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp)
+> >>               /*
+> >>                * Higher-order allocations are a convenience rather
+> >>                * than a necessity, hence using __GFP_NORETRY until
+> >> -              * falling back to single-page allocations.
+> >> +              * falling back to min size allocations.
+> >>                */
+> >> -             for (order = min_t(unsigned int, order, __fls(count));
+> >> -                  order > 0; order--) {
+> >> -                     page = alloc_pages(gfp | __GFP_NORETRY, order);
+> >> +             for (order = min_t(int, order, __fls(count));
+> >> +                  order >= min_order; order--) {
+> >> +                     page = alloc_pages((order == min_order) ? gfp :
+> >> +                                        gfp | __GFP_NORETRY, order);
+> >>                       if (!page)
+> >>                               continue;
+> >> +                     if (!order)
+> >> +                             break;
+> >
+> > Isn't this handled by the loop condition?
+> 
+> He changed the loop condition to be ">= min_order" instead of "> 0",
+> so now we can get here with an order == 0.  This makes sense because
+> when min_order is not 0 you still want to run the code to split the
+> pages and it is sane not to duplicate that below.
+> 
+> Maybe I'm misunderstanding, though.  Perhaps you can explain how you
+> think this code should look?
 
-I tested both sets on odroid XU4 and U3.
-Tested-by: Markus Reichl <m.reichl@fivetechno.de>
+My reading of the code was that we require order >= min_order to enter
+the loop. Given that order doesn't change between the loop header and the
+if (!order) check, then that must mean we can enter the loop body with
+order == 0 and order >= min_order, which means that min_order is allowed
+to be negative. That feels weird.
 
-Am 08.04.2016 um 07:00 schrieb Chanwoo Choi:
-> This patchset support the AMBA bus frequency scaling on Exynos5422-based
-> Odroid-XU3 board. But, this series only support the bus frequency scaling
-> for INT (Internal) block using VDD_INT power line.
-> 
-> Also, to support the bus frequency scaling for Exynos542x SoC,
-> Exynos542x SoC has the specific 'NoC (Network on Chip) Probe' device
-> to measure the transfered data traffic on NoC (Network on Chip)
-> instead of PPMU (Platform Performance Monitoring Unit). NoC Probe device
-> provide the utilization for INT block of Exynos542x SoC.
-> 
-> The generic exynos-bus frequency driver uses the 'NoC Probe' devfreq-event
-> device (drivers/devfreq/event/exynos-nocp.c) without any modification.
-> Just add the phandle of 'NoC Probe' dt node to bus dt node.
-> 
-> Depend on:
-> This patchset depends on patch[1] which support the generic exynos-bus
-> frequency driver.
-> 
-> [1] https://lkml.org/lkml/2016/4/8/14
-> - [PATCH v8 00/20] PM / devferq: Add generic exynos bus frequency driver and new passive governor
-> 
-> Chanwoo Choi (7):
->   PM / devfreq: event: Add new Exynos NoC probe driver
->   PM / devfreq: exynos: Add the detailed correlation for Exynos5422 bus
->   ARM: dts: Add NoC Probe dt node for Exynos542x SoC
->   dt-bindings: clock: Add the clock id for ACLK clock of Exynos542x SoC
->   clk: samsung: exynos542x: Add the clock id for ACLK
->   ARM: dts: Add bus nodes using VDD_INT for Exynos542x SoC
->   ARM: dts: Add support of Bus frequency using VDD_INT for exynos5422-odroidxu3
-> 
->  .../bindings/devfreq/event/exynos-nocp.txt         |  86 +++++
->  .../devicetree/bindings/devfreq/exynos-bus.txt     |  19 +
->  arch/arm/boot/dts/exynos5420.dtsi                  | 407 +++++++++++++++++++++
->  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  99 +++++
->  drivers/clk/samsung/clk-exynos5420.c               |  85 +++--
->  drivers/devfreq/event/Kconfig                      |   8 +
->  drivers/devfreq/event/Makefile                     |   2 +
->  drivers/devfreq/event/exynos-nocp.c                | 247 +++++++++++++
->  drivers/devfreq/event/exynos-nocp.h                |  78 ++++
->  include/dt-bindings/clock/exynos5420.h             |  24 +-
->  10 files changed, 1024 insertions(+), 31 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/devfreq/event/exynos-nocp.txt
->  create mode 100644 drivers/devfreq/event/exynos-nocp.c
->  create mode 100644 drivers/devfreq/event/exynos-nocp.h
-> 
+Am I barking up the wrong tree?
 
-Thanks,
---
-Markus Reichl
+Will
