@@ -1,63 +1,103 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 08 Apr 2016 13:25:01 +0900
-Subject: [PATCH v8 12/20] ARM: dts: Add DMC bus frequency for
- exynos3250-rinato/monk
+Date: Fri, 08 Apr 2016 13:25:03 +0900
+Subject: [PATCH v8 14/20] ARM: dts: Add bus nodes using VDD_MIF for Exynos4x12
 In-Reply-To: <1460089509-16260-1-git-send-email-cw00.choi@samsung.com>
 References: <1460089509-16260-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1460089509-16260-13-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1460089509-16260-15-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the DMC (Dynamic Memory Controller) bus frequency node
-which includes the devfreq-events and regulator properties. The bus
-frequency support the DVFS (Dynamic Voltage Frequency Scaling) feature
-with ondemand governor.
-
-The devfreq-events (ppmu_dmc0*) can monitor the utilization of DMC bus
-on runtime and the buck1_reg (VDD_MIF power line) supplies the power to
-the DMC block.
+This patch adds the bus nodes using VDD_MIF for Exynos4x12 SoC.
+Exynos4x12 has the following AXI buses to translate data
+between DRAM and DMC/ACP/C2C.
 
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Acked-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+[m.reichl and linux.amoon: Tested it on exynos4412-odroidu3 board]
+Tested-by: Markus Reichl <m.reichl@fivetechno.de>
+Tested-by: Anand Moon <linux.amoon@gmail.com>
 ---
- arch/arm/boot/dts/exynos3250-monk.dts   | 6 ++++++
- arch/arm/boot/dts/exynos3250-rinato.dts | 6 ++++++
- 2 files changed, 12 insertions(+)
+ arch/arm/boot/dts/exynos4x12.dtsi | 68 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 68 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos3250-monk.dts b/arch/arm/boot/dts/exynos3250-monk.dts
-index 9e2840b59ae8..1fd7ecb5c415 100644
---- a/arch/arm/boot/dts/exynos3250-monk.dts
-+++ b/arch/arm/boot/dts/exynos3250-monk.dts
-@@ -156,6 +156,12 @@
+diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
+index 84a23f962946..99a0f4ca3d47 100644
+--- a/arch/arm/boot/dts/exynos4x12.dtsi
++++ b/arch/arm/boot/dts/exynos4x12.dtsi
+@@ -281,6 +281,74 @@
+ 		clocks = <&clock CLK_SMMU_LITE1>, <&clock CLK_FIMC_LITE1>;
+ 		#iommu-cells = <0>;
  	};
++
++	bus_dmc: bus_dmc {
++		compatible = "samsung,exynos-bus";
++		clocks = <&clock CLK_DIV_DMC>;
++		clock-names = "bus";
++		operating-points-v2 = <&bus_dmc_opp_table>;
++		status = "disabled";
++	};
++
++	bus_acp: bus_acp {
++		compatible = "samsung,exynos-bus";
++		clocks = <&clock CLK_DIV_ACP>;
++		clock-names = "bus";
++		operating-points-v2 = <&bus_acp_opp_table>;
++		status = "disabled";
++	};
++
++	bus_c2c: bus_c2c {
++		compatible = "samsung,exynos-bus";
++		clocks = <&clock CLK_DIV_C2C>;
++		clock-names = "bus";
++		operating-points-v2 = <&bus_dmc_opp_table>;
++		status = "disabled";
++	};
++
++	bus_dmc_opp_table: opp_table1 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp at 100000000 {
++			opp-hz = /bits/ 64 <100000000>;
++			opp-microvolt = <900000>;
++		};
++		opp at 134000000 {
++			opp-hz = /bits/ 64 <134000000>;
++			opp-microvolt = <900000>;
++		};
++		opp at 160000000 {
++			opp-hz = /bits/ 64 <160000000>;
++			opp-microvolt = <900000>;
++		};
++		opp at 267000000 {
++			opp-hz = /bits/ 64 <267000000>;
++			opp-microvolt = <950000>;
++		};
++		opp at 400000000 {
++			opp-hz = /bits/ 64 <400000000>;
++			opp-microvolt = <1050000>;
++		};
++	};
++
++	bus_acp_opp_table: opp_table2 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp at 100000000 {
++			opp-hz = /bits/ 64 <100000000>;
++		};
++		opp at 134000000 {
++			opp-hz = /bits/ 64 <134000000>;
++		};
++		opp at 160000000 {
++			opp-hz = /bits/ 64 <160000000>;
++		};
++		opp at 267000000 {
++			opp-hz = /bits/ 64 <267000000>;
++		};
++	};
  };
  
-+&bus_dmc {
-+	devfreq-events = <&ppmu_dmc0_3>, <&ppmu_dmc1_3>;
-+	vdd-supply = <&buck1_reg>;
-+	status = "okay";
-+};
-+
- &cpu0 {
- 	cpu0-supply = <&buck2_reg>;
- };
-diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
-index 1f102f3a1ab1..5175bd7e015f 100644
---- a/arch/arm/boot/dts/exynos3250-rinato.dts
-+++ b/arch/arm/boot/dts/exynos3250-rinato.dts
-@@ -147,6 +147,12 @@
- 	};
- };
- 
-+&bus_dmc {
-+	devfreq-events = <&ppmu_dmc0_3>, <&ppmu_dmc1_3>;
-+	vdd-supply = <&buck1_reg>;
-+	status = "okay";
-+};
-+
- &cpu0 {
- 	cpu0-supply = <&buck2_reg>;
- };
+ &combiner {
 -- 
 1.9.1
