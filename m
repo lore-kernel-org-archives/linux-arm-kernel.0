@@ -1,41 +1,189 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 08 Apr 2016 13:24:59 +0900
-Subject: [PATCH v8 10/20] MAINTAINERS: Add samsung bus frequency driver entry
+Date: Fri, 08 Apr 2016 13:25:02 +0900
+Subject: [PATCH v8 13/20] ARM: dts: Add bus nodes using VDD_INT for Exynos3250
 In-Reply-To: <1460089509-16260-1-git-send-email-cw00.choi@samsung.com>
 References: <1460089509-16260-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1460089509-16260-11-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1460089509-16260-14-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the 'BUS FREQUENCY DRIVER FOR SAMSUNG EXYNOS' entry to review the
-patches as maintainer. I can access the all datasheet of Exynos SoC and test it
-on some Exynos-based board. Patches will be picked up by DEVFREQ maintainer
-on devfreq git repository.
+This patch adds the bus nodes using VDD_INT for Exynos3250 SoC.
+Exynos3250 has following AXI buses to translate data between
+DRAM and sub-blocks.
+
+Following list specifies the detailed relation between DRAM and sub-blocks:
+- ACLK400 clock for MCUISP
+- ACLK266 clock for ISP
+- ACLK200 clock for FSYS
+- ACLK160 clock for LCD0
+- ACLK100 clock for PERIL
+- GDL clock for LEFTBUS
+- GDR clock for RIGHTBUS
+- SCLK_MFC clock for MFC
 
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- MAINTAINERS | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/boot/dts/exynos3250.dtsi | 147 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 147 insertions(+)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 1c32f8a3d6c4..4cdef4d9ba29 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -3539,6 +3539,15 @@ F:	drivers/devfreq/devfreq-event.c
- F:	include/linux/devfreq-event.h
- F:	Documentation/devicetree/bindings/devfreq/event/
- 
-+BUS FREQUENCY DRIVER FOR SAMSUNG EXYNOS
-+M:	Chanwoo Choi <cw00.choi@samsung.com>
-+L:	linux-pm at vger.kernel.org
-+L:	linux-samsung-soc at vger.kernel.org
-+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/mzx/devfreq.git
-+S:	Maintained
-+F:	drivers/devfreq/exynos-bus.c
-+F:	Documentation/devicetree/bindings/devfreq/exynos-bus.txt
+diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
+index 1ae72c4fa55e..b5157492a422 100644
+--- a/arch/arm/boot/dts/exynos3250.dtsi
++++ b/arch/arm/boot/dts/exynos3250.dtsi
+@@ -722,6 +722,153 @@
+ 				opp-microvolt = <875000>;
+ 			};
+ 		};
 +
- DEVICE NUMBER REGISTRY
- M:	Torben Mathiasen <device@lanana.org>
- W:	http://lanana.org/docs/device-list/index.html
++		bus_leftbus: bus_leftbus {
++			compatible = "samsung,exynos-bus";
++			clocks = <&cmu CLK_DIV_GDL>;
++			clock-names = "bus";
++			operating-points-v2 = <&bus_leftbus_opp_table>;
++			status = "disabled";
++		};
++
++		bus_rightbus: bus_rightbus {
++			compatible = "samsung,exynos-bus";
++			clocks = <&cmu CLK_DIV_GDR>;
++			clock-names = "bus";
++			operating-points-v2 = <&bus_leftbus_opp_table>;
++			status = "disabled";
++		};
++
++		bus_lcd0: bus_lcd0 {
++			compatible = "samsung,exynos-bus";
++			clocks = <&cmu CLK_DIV_ACLK_160>;
++			clock-names = "bus";
++			operating-points-v2 = <&bus_leftbus_opp_table>;
++			status = "disabled";
++		};
++
++		bus_fsys: bus_fsys {
++			compatible = "samsung,exynos-bus";
++			clocks = <&cmu CLK_DIV_ACLK_200>;
++			clock-names = "bus";
++			operating-points-v2 = <&bus_leftbus_opp_table>;
++			status = "disabled";
++		};
++
++		bus_mcuisp: bus_mcuisp {
++			compatible = "samsung,exynos-bus";
++			clocks = <&cmu CLK_DIV_ACLK_400_MCUISP>;
++			clock-names = "bus";
++			operating-points-v2 = <&bus_mcuisp_opp_table>;
++			status = "disabled";
++		};
++
++		bus_isp: bus_isp {
++			compatible = "samsung,exynos-bus";
++			clocks = <&cmu CLK_DIV_ACLK_266>;
++			clock-names = "bus";
++			operating-points-v2 = <&bus_isp_opp_table>;
++			status = "disabled";
++		};
++
++		bus_peril: bus_peril {
++			compatible = "samsung,exynos-bus";
++			clocks = <&cmu CLK_DIV_ACLK_100>;
++			clock-names = "bus";
++			operating-points-v2 = <&bus_peril_opp_table>;
++			status = "disabled";
++		};
++
++		bus_mfc: bus_mfc {
++			compatible = "samsung,exynos-bus";
++			clocks = <&cmu CLK_SCLK_MFC>;
++			clock-names = "bus";
++			operating-points-v2 = <&bus_leftbus_opp_table>;
++			status = "disabled";
++		};
++
++		bus_leftbus_opp_table: opp_table2 {
++			compatible = "operating-points-v2";
++			opp-shared;
++
++			opp at 50000000 {
++				opp-hz = /bits/ 64 <50000000>;
++				opp-microvolt = <900000>;
++			};
++			opp at 80000000 {
++				opp-hz = /bits/ 64 <80000000>;
++				opp-microvolt = <900000>;
++			};
++			opp at 100000000 {
++				opp-hz = /bits/ 64 <100000000>;
++				opp-microvolt = <1000000>;
++			};
++			opp at 134000000 {
++				opp-hz = /bits/ 64 <134000000>;
++				opp-microvolt = <1000000>;
++			};
++			opp at 200000000 {
++				opp-hz = /bits/ 64 <200000000>;
++				opp-microvolt = <1000000>;
++			};
++		};
++
++		bus_mcuisp_opp_table: opp_table3 {
++			compatible = "operating-points-v2";
++			opp-shared;
++
++			opp at 50000000 {
++				opp-hz = /bits/ 64 <50000000>;
++			};
++			opp at 80000000 {
++				opp-hz = /bits/ 64 <80000000>;
++			};
++			opp at 100000000 {
++				opp-hz = /bits/ 64 <100000000>;
++			};
++			opp at 200000000 {
++				opp-hz = /bits/ 64 <200000000>;
++			};
++			opp at 400000000 {
++				opp-hz = /bits/ 64 <400000000>;
++			};
++		};
++
++		bus_isp_opp_table: opp_table4 {
++			compatible = "operating-points-v2";
++			opp-shared;
++
++			opp at 50000000 {
++				opp-hz = /bits/ 64 <50000000>;
++			};
++			opp at 80000000 {
++				opp-hz = /bits/ 64 <80000000>;
++			};
++			opp at 100000000 {
++				opp-hz = /bits/ 64 <100000000>;
++			};
++			opp at 200000000 {
++				opp-hz = /bits/ 64 <200000000>;
++			};
++			opp at 300000000 {
++				opp-hz = /bits/ 64 <300000000>;
++			};
++		};
++
++		bus_peril_opp_table: opp_table5 {
++			compatible = "operating-points-v2";
++			opp-shared;
++
++			opp at 50000000 {
++				opp-hz = /bits/ 64 <50000000>;
++			};
++			opp at 80000000 {
++				opp-hz = /bits/ 64 <80000000>;
++			};
++			opp at 100000000 {
++				opp-hz = /bits/ 64 <100000000>;
++			};
++		};
+ 	};
+ };
+ 
 -- 
 1.9.1
