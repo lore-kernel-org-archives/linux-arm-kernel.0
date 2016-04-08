@@ -1,137 +1,50 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 08 Apr 2016 14:00:46 +0900
-Subject: [PATCH 7/7] ARM: dts: Add support of Bus frequency using VDD_INT for
- exynos5422-odroidxu3
+Date: Fri, 08 Apr 2016 14:00:41 +0900
+Subject: [PATCH 2/7] PM / devfreq: exynos: Add the detailed correlation for
+ Exynos5422 bus
 In-Reply-To: <1460091646-28701-1-git-send-email-cw00.choi@samsung.com>
 References: <1460091646-28701-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1460091646-28701-8-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1460091646-28701-3-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the bus device tree nodes for INT (Internal) block
-to enable the AMBA bus frequency scaling and add the NoC (Network on Chip)
-Probe Device Tree node to measure the bandwidht for AMBA AXI bus.
-
-The WCORE bus bus is parent device in INT block using VDD_INT.
+This patch adds the detailed corrleation between sub-blocks and power line
+for Exynos5422.
 
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 ---
- arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 99 ++++++++++++++++++++++
- 1 file changed, 99 insertions(+)
+ .../devicetree/bindings/devfreq/exynos-bus.txt        | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-index 1bd507bfa750..2a74abe6fc5d 100644
---- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-+++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-@@ -361,6 +361,22 @@
- 	cap-sd-highspeed;
- };
+diff --git a/Documentation/devicetree/bindings/devfreq/exynos-bus.txt b/Documentation/devicetree/bindings/devfreq/exynos-bus.txt
+index b098fa2ba5d4..5a37f51adacf 100644
+--- a/Documentation/devicetree/bindings/devfreq/exynos-bus.txt
++++ b/Documentation/devicetree/bindings/devfreq/exynos-bus.txt
+@@ -104,6 +104,25 @@ Detailed correlation between sub-blocks and power line according to Exynos SoC:
+ 		|--- LCD0
+ 		|--- ISP
  
-+&nocp_mem0_0 {
-+	status = "okay";
-+};
++- In case of Exynos5422, there are two power line as following:
++	VDD_MIF |--- DREX 0 (parent device, DRAM EXpress controller)
++	        |--- DREX 1
 +
-+&nocp_mem0_1 {
-+	status = "okay";
-+};
++	VDD_INT |--- NoC_Core (parent device)
++		|--- G2D
++		|--- G3D
++		|--- DISP1
++		|--- NoC_WCORE
++		|--- GSCL
++		|--- MSCL
++		|--- ISP
++		|--- MFC
++		|--- GEN
++		|--- PERIS
++		|--- PERIC
++		|--- FSYS
++		|--- FSYS2
 +
-+&nocp_mem0_2 {
-+	status = "okay";
-+};
-+
-+&nocp_mem0_3 {
-+	status = "okay";
-+};
-+
- &pinctrl_0 {
- 	hdmi_hpd_irq: hdmi-hpd-irq {
- 		samsung,pins = "gpx3-7";
-@@ -432,3 +448,86 @@
- 	vdd33-supply = <&ldo9_reg>;
- 	vdd10-supply = <&ldo11_reg>;
- };
-+
-+&bus_wcore {
-+	devfreq-events = <&nocp_mem0_0>, <&nocp_mem0_1>,
-+			<&nocp_mem0_2>, <&nocp_mem0_3>;
-+	vdd-supply = <&buck3_reg>;
-+	exynos,saturation-ratio = <100>;
-+	status = "okay";
-+};
-+
-+&bus_noc {
-+	devfreq = <&bus_wcore>;
-+	status = "okay";
-+};
-+
-+&bus_fsys_apb {
-+	devfreq = <&bus_wcore>;
-+	status = "okay";
-+};
-+
-+&bus_fsys {
-+	devfreq = <&bus_wcore>;
-+	status = "okay";
-+};
-+
-+&bus_fsys2 {
-+	devfreq = <&bus_wcore>;
-+	status = "okay";
-+};
-+
-+&bus_mfc {
-+	devfreq = <&bus_wcore>;
-+	status = "okay";
-+};
-+
-+&bus_gen {
-+	devfreq = <&bus_wcore>;
-+	status = "okay";
-+};
-+
-+&bus_peri {
-+	devfreq = <&bus_wcore>;
-+	status = "okay";
-+};
-+
-+&bus_g2d {
-+	devfreq = <&bus_wcore>;
-+	status = "okay";
-+};
-+
-+&bus_g2d_acp {
-+	devfreq = <&bus_wcore>;
-+	status = "okay";
-+};
-+
-+&bus_jpeg {
-+	devfreq = <&bus_wcore>;
-+	status = "okay";
-+};
-+
-+&bus_jpeg_apb {
-+	devfreq = <&bus_wcore>;
-+	status = "okay";
-+};
-+
-+&bus_disp1_fimd {
-+	devfreq = <&bus_wcore>;
-+	status = "okay";
-+};
-+
-+&bus_disp1 {
-+	devfreq = <&bus_wcore>;
-+	status = "okay";
-+};
-+
-+&bus_gscl_scaler {
-+	devfreq = <&bus_wcore>;
-+	status = "okay";
-+};
-+
-+&bus_mscl {
-+	devfreq = <&bus_wcore>;
-+	status = "okay";
-+};
+ Example1:
+ 	Show the AXI buses of Exynos3250 SoC. Exynos3250 divides the buses to
+ 	power line (regulator). The MIF (Memory Interface) AXI bus is used to
 -- 
 1.9.1
