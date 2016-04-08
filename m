@@ -1,113 +1,114 @@
-From: huawei.libin@huawei.com (Li Bin)
-Date: Fri, 8 Apr 2016 16:07:12 +0800
-Subject: [PATCH 2/2] arm64: Fix watchpoint recursion when single-step is
- wrongly triggered in irq
-In-Reply-To: <20160408051408.GA28371@dhcppc6.redhat.com>
-References: <1458549470-124791-1-git-send-email-hekuang@huawei.com>
- <1458549470-124791-2-git-send-email-hekuang@huawei.com>
- <20160321102423.GB15150@dhcppc6.redhat.com> <56FD1BD1.7070101@huawei.com>
- <20160404051714.GH28435@dhcppc0.redhat.com> <570645CD.6030400@huawei.com>
- <20160408051408.GA28371@dhcppc6.redhat.com>
-Message-ID: <570766B0.60100@huawei.com>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Fri, 8 Apr 2016 16:26:21 +0800
+Subject: [PATCH] irqchip/mbigen: Display message of MBIGEN domain created
+In-Reply-To: <20160408090935.4ec95aa8@arm.com>
+References: <1460099762-51497-1-git-send-email-wangkefeng.wang@huawei.com>
+ <20160408090935.4ec95aa8@arm.com>
+Message-ID: <57076B2D.8050006@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-on 2016/4/8 13:14, Pratyush Anand wrote:
-> Hi Li,
+On 2016/4/8 16:09, Marc Zyngier wrote:
+> On Fri, 8 Apr 2016 15:16:02 +0800
+> Kefeng Wang <wangkefeng.wang@huawei.com> wrote:
 > 
-> On 07/04/2016:07:34:37 PM, Li Bin wrote:
->> Hi Pratyush,
+>> Add message of MBIGEN domain created, it's useful for check
+>> which MBIGEN domain is created.
 >>
->> on 2016/4/4 13:17, Pratyush Anand wrote:
->>> Hi Li,
->>>
->>> On 31/03/2016:08:45:05 PM, Li Bin wrote:
->>>> Hi Pratyush,
->>>>
->>>> on 2016/3/21 18:24, Pratyush Anand wrote:
->>>>> On 21/03/2016:08:37:50 AM, He Kuang wrote:
->>>>>> On arm64, watchpoint handler enables single-step to bypass the next
->>>>>> instruction for not recursive enter. If an irq is triggered right
->>>>>> after the watchpoint, a single-step will be wrongly triggered in irq
->>>>>> handler, which causes the watchpoint address not stepped over and
->>>>>> system hang.
->>>>>
->>>>> Does patch [1] resolves this issue as well? I hope it should. Patch[1] has still
->>>>> not been sent for review. Your test result will be helpful.
->>>>>
->>>>> ~Pratyush
->>>>>
->>>>> [1] https://github.com/pratyushanand/linux/commit/7623c8099ac22eaa00e7e0f52430f7a4bd154652
->>>>
->>>> This patch did not consider that, when excetpion return, the singlestep flag
->>>> should be restored, otherwise the right singlestep will not triggered.
->>>> Right?
->>>
->>> Yes, you are right, and there are other problems as well. Will Deacon pointed
->>> out [1] that kernel debugging is per-cpu rather than per-task. So, I did thought
->>> of a per-cpu implementation by introducing a new element "flags" in struct
->>> pt_regs. But even with that I see issues. For example:
->>> - While executing single step instruction, we get a data abort
->>> - In the kernel_entry of data abort we disable single stepping based on "flags"
->>>   bit field
->>> - While handling data abort we receive anther interrupt, so we are again in
->>>   kernel_entry (for el1_irq). Single stepping will be disabled again (although
->>>   it does not matter).
->>>
->>> Now the issue is that, what condition should be verified in kernel_exit for
->>> enabling single step again? In the above scenario, kernel_exit for el1_irq
->>> should not enable single stepping, but how to prevent that elegantly?
+>> Meanwhile, drop module owner, it will be set by driver core.
 >>
->> The condition for kernel_entry to disable the single step is that MDSCR_EL1.SS
->> has been set. And only when the corresponding kernel_entry has disabled the single
->> step, the kernel_exit should enable it, but the kernel_exit of single-step exception
->> should be handled specially, that when disable single step in single-step exception
->> handler, flag of pt_regs stored in stack should be cleard to prevent to be re-enabled
->> by kernel_exit.
+>> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+>> ---
+>>  drivers/irqchip/irq-mbigen.c | 15 ++++++++++++---
+>>  1 file changed, 12 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
+>> index d67baa2..a4dc7a0 100644
+>> --- a/drivers/irqchip/irq-mbigen.c
+>> +++ b/drivers/irqchip/irq-mbigen.c
+>> @@ -257,14 +257,19 @@ static int mbigen_device_probe(struct platform_device *pdev)
+>>  	if (IS_ERR(mgn_chip->base))
+>>  		return PTR_ERR(mgn_chip->base);
+>>  
+>> +	dev_info(&pdev->dev, "%s\n", pdev->dev.of_node->full_name);
+>> +
 > 
-> Nice, :-)
-> I had latter on almost similar patch [1], but it did fail when I merged two of
-> the tests.
-> -- I inserted kprobe to an instruction in function __copy_to_user() which could
-> generate data abort.
-> -- In parallel I also run test case which is defined here [2]
-> -- As soon as I did `cat /proc/version`, kernel crashed.
+> How is that a useful information?
+> 
+>>  	for_each_child_of_node(pdev->dev.of_node, np) {
+>>  		if (!of_property_read_bool(np, "interrupt-controller"))
+>>  			continue;
+>>  
+>>  		parent = platform_bus_type.dev_root;
+>>  		child = of_platform_device_create(np, NULL, parent);
+>> -		if (IS_ERR(child))
+>> +		if (IS_ERR(child)) {
+>> +			dev_err(&pdev->dev, "failed to create for %s\n",
+> 
+> Failed to create what?
+> 
+>> +				np->full_name);
+>>  			return PTR_ERR(child);
+>> +		}
+>>  
+>>  		if (of_property_read_u32(child->dev.of_node, "num-pins",
+>>  					 &num_pins) < 0) {
+>> @@ -276,8 +281,13 @@ static int mbigen_device_probe(struct platform_device *pdev)
+>>  							   mbigen_write_msg,
+>>  							   &mbigen_domain_ops,
+>>  							   mgn_chip);
+>> -		if (!domain)
+>> +		if (!domain) {
+>> +			dev_info(&pdev->dev, "unable to create %s domain\n",
+>> +				 np->full_name);
+> 
+> And what about failure to read num_pin? No need for a debug print in
+> this case?
+> 
+>>  			return -ENOMEM;
+>> +		}
+>> +
+>> +		dev_info(&pdev->dev, "%s domain created\n", np->full_name);
+>>  	}
+>>  
+>>  	platform_set_drvdata(pdev, mgn_chip);
+>> @@ -293,7 +303,6 @@ MODULE_DEVICE_TABLE(of, mbigen_of_match);
+>>  static struct platform_driver mbigen_platform_driver = {
+>>  	.driver = {
+>>  		.name		= "Hisilicon MBIGEN-V2",
+>> -		.owner		= THIS_MODULE,
+>>  		.of_match_table	= mbigen_of_match,
+>>  	},
+>>  	.probe			= mbigen_device_probe,
+> 
+> 
+> Overall, this doesn't look like a critical patch to me. I think Ma Jun
+> is working on separate series reworking the way the mgigen is getting
+> probed, so I'd advise you to work with him in order to integrate this
+> patch in his series, as it would make a lot more sense.
 
-Hi Pratyush,
+When try to enable hip06 d03 board[1], we met following error log, so I add
+some debug message. The mbigen driver use module_platform_driver, the driver
+initialization is too late, and it is without any message,  we don't know
+about any info of mbigen.  I think we should show something about the mbigen
+domain creation at least. What's your option?
 
-Firstly, I have test this case, and it does not trigger failture as you describing.
-But it indeed may trigger problem, and it is an another issue that if an exception
-triggered before single-step exception, changes the regs->pc (data abort exception will
-fixup_exception), the current implemetion of kprobes does not support, for example:
-1. kprobes brk exception setup single-step, regs->pc points to the slot, MDSCR.SS=1,
-SPSR_EL1.SS=1 (Inactive state)
-2. brk exception eret (Active-not-pending state)
-3. execute the slot instruction and trigger data abort exception, and this case the
-return addr is also the slot instruction, so the SPSR_EL1.SS is set to 1 (Inactive state)
-4. but in the data abort exception, fixup_exception will change the regs->pc to the fixup
-code
-5. data abort exception eret, going into Active-not-pending state, executing fixup code
-without taking an exception, going into Active-pending state, triggering single-step
-exception. But the single-step instruction is not the target instrution, so kprobe fails.
+Is there a way to solve this improper print?
+-----------
+[    1.345945] irq: no irq domain found for /mbigen_pcie at a0080000/intc_usb !
+[    1.353660] irq: no irq domain found for /mbigen_pcie at a0080000/intc_usb !
 
-And so this case including copy_to/from_user should be added to kprobes blacklist.
-Right, or am i missing something?
 
-Thanks,
-Li Bin
+[1] http://www.spinics.net/lists/arm-kernel/msg495732.html
+
+Thanks
+Kefeng
+
 
 > 
-> Although, just by comparing visually I do not see any functional difference with
-> the patch you inlined below, still can you please try both of the above test
-> case in parallel and see how does it behave? To insert kprobe within
-> __copy_to_user() you need to revert "arm64: add copy_to/from_user to kprobes
-> blacklist".
+> Thanks,
 > 
-> [1] https://github.com/pratyushanand/linux/commit/9182afbe640ea7caf52e209eb8e5f00bdf91b0c0
-> [2] http://thread.gmane.org/gmane.linux.kernel/2167918
->>
->> Thanks,
->> Li Bin
->>
+> 	M.
+> 
