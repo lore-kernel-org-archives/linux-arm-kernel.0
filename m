@@ -1,105 +1,125 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 08 Apr 2016 10:43:13 +0200
-Subject: 4.4 BCM5301X ARM regression "External imprecise Data abort"
-In-Reply-To: <CACna6rwVR3mBqHbxq-J3wPqOiajsxatAQfzH0hb1SYjc-cmx8w@mail.gmail.com>
-References: <CACna6rz=KE_FtNtrSKmcYE514s4-dgrnx=iGbN7JDXkQPd6bTw@mail.gmail.com>
- <5702D7DD.2080205@broadcom.com> <5702DB4D.5070203@hauke-m.de>
- <CACna6rwVR3mBqHbxq-J3wPqOiajsxatAQfzH0hb1SYjc-cmx8w@mail.gmail.com>
-Message-ID: <1460104993.32099.18.camel@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 8 Apr 2016 09:53:25 +0100
+Subject: [PATCH] irqchip/mbigen: Display message of MBIGEN domain created
+In-Reply-To: <57076B2D.8050006@huawei.com>
+References: <1460099762-51497-1-git-send-email-wangkefeng.wang@huawei.com>
+ <20160408090935.4ec95aa8@arm.com> <57076B2D.8050006@huawei.com>
+Message-ID: <20160408095325.49aaf6b0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 08.04.2016, 08:45 +0200 schrieb Rafa? Mi?ecki:
-> On 4 April 2016 at 23:23, Hauke Mehrtens <hauke@hauke-m.de> wrote:
-> > On 04/04/2016 11:08 PM, Scott Branden wrote:
-> >> On 16-04-03 11:13 PM, Rafa? Mi?ecki wrote:
-> >>> I got regression reports from Netgear R8000 (BCM4709A0) users and did
-> >>> some testing & regression tracking with Aditya.
-> >>>
-> >>> It happens that Linux 4.4 doesn't boot due to the following commits:
-> >>> bbeb920 ("ARM: 8422/1: enable imprecise aborts during early kernel
-> >>> startup")
-> >>> 9254970 ("ARM: 8447/1: catch pending imprecise abort on unmask")
-> >>> 937b123 ("ARM: BCM5301X: remove workaround imprecise abort fault
-> >>> handler")
-> >>>
-> >>> In kernel 4.3 we got that abort workaround which was resulting in:
-> >>> [    5.007128] Freeing unused kernel memory: 212K (c0435000 - c046a000)
-> >>> [    5.694632] init: Console is alive
-> >>> [    5.698169] init: - watchdog -
-> >>> [    5.701470] External imprecise Data abort at addr=0x0, fsr=0x1406
-> >>> ignored.
-> >>> As you can see, this abort was happening soon after freeing unused
-> >>> memory and ignoring it *once* did the trick. It was never appearing
-> >>> again.
-> >
-> > I assume it only can throw one of these and if it is deactivated it will
-> > ignore the next one or overwrite it. So it could be that more than one
-> > is thrown here.
-> >
-> >>> With 4.4 similar (or the same?) abort happens earlier (during PCI host
-> >>> driver init) and doesn't get ignored:
-> >>> [    2.478461] pci 0000:00:00.0: PCI bridge to [bus 01]
-> >>> [    2.483451] pci 0000:00:00.0:   bridge window [mem
-> >>> 0x08000000-0x085fffff]
-> >>> [    2.599449] pcie_iproc_bcma bcma0:8: PCI host bridge to bus 0001:00
-> >>> [    2.605744] pci_bus 0001:00: root bus resource [mem
-> >>> 0x40000000-0x47ffffff]
-> >>> [    2.612657] pcie_iproc_bcma bcma0:8: link: UP
-> >>> [    2.617241] PCI: bus0: Fast back to back transfers disabled
-> >>> [    2.622845] pci 0001:00:00.0: bridge configuration invalid ([bus
-> >>> 00-00]), reconfiguring
-> >>> [    2.631297] PCI: bus1: Fast back to back transfers disabled
-> >>> [    2.636887] pci 0001:01:00.0: bridge configuration invalid ([bus
-> >>> 00-00]), reconfiguring
-> >>> [    2.645035] Unhandled fault: imprecise external abort (0x1406) at
-> >>> 0x00000000
-> >>> (see 4.4.txt for the backtrace)
-> >>>
-> >>> At first I was hoping that we simply need to re-add the removed
-> >>> workaround. I tried it but it appeared that one abort is immediately
-> >>> followed by another:
-> >>> [    2.936895] pci 0001:01:00.0: bridge configuration invalid ([bus
-> >>> 00-00]), reconfiguring
-> >>> [    2.945053] External imprecise Data abort at addr=0x0, fsr=0x1406
-> >>> ignored.
-> >>> [    2.951966] Unhandled fault: imprecise external abort (0x1406) at
-> >>> 0x00000000
-> >>>
-> >>> So it seems that commits bbeb920 and 9254970 broke something in PCI
-> >>> host initialization (or maybe just exposed another bug?). Instead of
-> >>> getting an abort once and late we are getting now many of them and a
-> >>> bit earlier.
-> >
-> > These commits mad the kernel earlier "listen" to such errors, so that
-> > they will be shown at the time they occur and not sometime later.
-> 
-> So AFAIU with kernel 4.3:
-> 1) Aborts were masked (silent) until "Freeing unused kernel memory"
-> 2) There was one (silent) abort caused by a bootloader
-> 3) There were likely multiple aborts (silent) during early PCI init
-> 4) After unmasking we got only a single abort reported and we were ignoring it
-> 
-> With kernel 4.4:
-> 1) All aborts are reported immediately
-> 2) Abort caused by a bootloader gets ignored by ARM code:
-> "Hit pending asynchronous external abort (FSR=0x00001c06) during first unmask"
-> thanks to 9254970 ("ARM: 8447/1: catch pending imprecise abort on unmask")
-> 3) There are still multiple aborts during PCI init (reported immediately now)
-> 4) To work as before (in 4.3) we should ignore all aborts, not only the 1st one
-> 
-> Of course proposed solution is an ugly workaround, we should have no
-> aborts reported in the first place.
-> 
-A master abort on the PCI bus during probe of the PCI config space
-(device enumeration) is expected. Most host bridges ignore those errors
-and just return 0 for the read transaction.
+On Fri, 8 Apr 2016 16:26:21 +0800
+Kefeng Wang <wangkefeng.wang@huawei.com> wrote:
 
-Some bridges forward the error onto the AXI/AMBA bus and thus cause
-imprecise external aborts on the ARM core. If your host bridge doesn't
-have a way to disable error forwarding during PCI bus probe you need to
-install an abort handler. Most implementations based on the designware
-PCIe core do this already.
+> 
+> 
+> On 2016/4/8 16:09, Marc Zyngier wrote:
+> > On Fri, 8 Apr 2016 15:16:02 +0800
+> > Kefeng Wang <wangkefeng.wang@huawei.com> wrote:
+> > 
+> >> Add message of MBIGEN domain created, it's useful for check
+> >> which MBIGEN domain is created.
+> >>
+> >> Meanwhile, drop module owner, it will be set by driver core.
+> >>
+> >> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+> >> ---
+> >>  drivers/irqchip/irq-mbigen.c | 15 ++++++++++++---
+> >>  1 file changed, 12 insertions(+), 3 deletions(-)
+> >>
+> >> diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
+> >> index d67baa2..a4dc7a0 100644
+> >> --- a/drivers/irqchip/irq-mbigen.c
+> >> +++ b/drivers/irqchip/irq-mbigen.c
+> >> @@ -257,14 +257,19 @@ static int mbigen_device_probe(struct platform_device *pdev)
+> >>  	if (IS_ERR(mgn_chip->base))
+> >>  		return PTR_ERR(mgn_chip->base);
+> >>  
+> >> +	dev_info(&pdev->dev, "%s\n", pdev->dev.of_node->full_name);
+> >> +
+> > 
+> > How is that a useful information?
+> > 
+> >>  	for_each_child_of_node(pdev->dev.of_node, np) {
+> >>  		if (!of_property_read_bool(np, "interrupt-controller"))
+> >>  			continue;
+> >>  
+> >>  		parent = platform_bus_type.dev_root;
+> >>  		child = of_platform_device_create(np, NULL, parent);
+> >> -		if (IS_ERR(child))
+> >> +		if (IS_ERR(child)) {
+> >> +			dev_err(&pdev->dev, "failed to create for %s\n",
+> > 
+> > Failed to create what?
+> > 
+> >> +				np->full_name);
+> >>  			return PTR_ERR(child);
+> >> +		}
+> >>  
+> >>  		if (of_property_read_u32(child->dev.of_node, "num-pins",
+> >>  					 &num_pins) < 0) {
+> >> @@ -276,8 +281,13 @@ static int mbigen_device_probe(struct platform_device *pdev)
+> >>  							   mbigen_write_msg,
+> >>  							   &mbigen_domain_ops,
+> >>  							   mgn_chip);
+> >> -		if (!domain)
+> >> +		if (!domain) {
+> >> +			dev_info(&pdev->dev, "unable to create %s domain\n",
+> >> +				 np->full_name);
+> > 
+> > And what about failure to read num_pin? No need for a debug print in
+> > this case?
+> > 
+> >>  			return -ENOMEM;
+> >> +		}
+> >> +
+> >> +		dev_info(&pdev->dev, "%s domain created\n", np->full_name);
+> >>  	}
+> >>  
+> >>  	platform_set_drvdata(pdev, mgn_chip);
+> >> @@ -293,7 +303,6 @@ MODULE_DEVICE_TABLE(of, mbigen_of_match);
+> >>  static struct platform_driver mbigen_platform_driver = {
+> >>  	.driver = {
+> >>  		.name		= "Hisilicon MBIGEN-V2",
+> >> -		.owner		= THIS_MODULE,
+> >>  		.of_match_table	= mbigen_of_match,
+> >>  	},
+> >>  	.probe			= mbigen_device_probe,
+> > 
+> > 
+> > Overall, this doesn't look like a critical patch to me. I think Ma Jun
+> > is working on separate series reworking the way the mgigen is getting
+> > probed, so I'd advise you to work with him in order to integrate this
+> > patch in his series, as it would make a lot more sense.
+> 
+> When try to enable hip06 d03 board[1], we met following error log, so I add
+> some debug message. The mbigen driver use module_platform_driver, the driver
+> initialization is too late, and it is without any message,  we don't know
+> about any info of mbigen.  I think we should show something about the mbigen
+> domain creation at least. What's your option?
+> 
+> Is there a way to solve this improper print?
+> -----------
+> [    1.345945] irq: no irq domain found for /mbigen_pcie at a0080000/intc_usb !
+> [    1.353660] irq: no irq domain found for /mbigen_pcie at a0080000/intc_usb !
 
-Regards,
-Lucas
+How can printing anything solve this issue? Furthermore, the error
+message you quote is pretty explicit: no mbigen for you, move along.
+
+There is a long standing dependency issue for interrupt controllers
+that are also platform devices, and until you resolve (or help
+resolving) that issue, you will get that kind of problem. As I
+mentioned countless times (both on list and in person), you only have
+two options:
+
+- either you defer probing devices behind the mbigen until the mbigen
+  itself is up and running
+- or you solve the generic dependency problem.
+
+I feel a bit like a stuck record here.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
