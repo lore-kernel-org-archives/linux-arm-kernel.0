@@ -1,88 +1,58 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 7 Apr 2016 16:41:34 -0700
-Subject: 4.4, 4.6: camera and unlock buttons produce tons of interrupts
- (was Re: N900 sleep mode)
-In-Reply-To: <20160407230150.GA16552@amd>
-References: <20160330191208.GW9329@atomide.com> <20160404213056.GA25912@amd>
- <20160404220748.GA16484@atomide.com> <20160405142250.GA6429@amd>
- <20160405152916.GE16484@atomide.com> <20160405205137.GA10196@amd>
- <20160407174019.GM16484@atomide.com> <20160407194828.GA13338@amd>
- <20160407213229.GO16484@atomide.com> <20160407230150.GA16552@amd>
-Message-ID: <20160407234134.GQ16484@atomide.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 8 Apr 2016 02:18:17 +0200
+Subject: [PATCH] mtd: nand: s3c2410: fix bug in s3c2410_nand_correct_data()
+In-Reply-To: <1460047697-72830-1-git-send-email-zengzhaoxiu@163.com>
+References: <1460047697-72830-1-git-send-email-zengzhaoxiu@163.com>
+Message-ID: <20160408021817.274d4e59@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pavel Machek <pavel@ucw.cz> [160407 16:02]:
-> Hi!
+Hi Zeng,
+
+On Fri,  8 Apr 2016 00:48:17 +0800
+zengzhaoxiu at 163.com wrote:
+
+> From: Zeng Zhaoxiu <zhaoxiu.zeng@gmail.com>
 > 
-> > > gzipped config is attached.
-> > > 
-> > > Note that I'm still using NOLO. I enabled the sleep, then went to
-> > > runlevel 1. LEDs still stay on, 55mA power consumption. That was with
-> > > 1 in off_mode.
-> > 
-> > Nothing idling for me with your .config.. And it seems slower to boot
-> > compared to omap2plus_defconfig? Maybe because of the extra GPIO
-> > interrupts?
+> If there is only one bit difference in the ECC, the function should return 1.
+> The result of "diff0 & ~(1<<fls(diff0))" is equal to diff0, so the function
+> actually returns -1.
 > 
-> Extra interrupts only happen when enable_off_mode is 1, so that should
-> not be an issue during boot.
+> Here, we can use the simple expression "(diff0 & (diff0 - 1)) == 0" to determine
+> whether the diff0 has only one 1-bit.
 
-OK maybe it's just the extra driver probe time then.
+Missing Signed-off-by here.
 
-> > Looks like you have 117 additional entries in .config enabled compared
-> > to omap2plus_defconfig. Maybe go back to omap2plus_defconfig with minimal
-> > changes and verify it idles properly first?
-> > 
-> > I'm suspecting it's some driver(s) you have enabled causing the
-> > issue.
+> ---
+>  drivers/mtd/nand/s3c2410.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> I guess so. Do you (or anyone else) have minimum non-modular config
-> for N900 that boots with video? Could I get lsmod from your system?
-> (Yes, I still have nightmares from getting .config that works).
+> diff --git a/drivers/mtd/nand/s3c2410.c b/drivers/mtd/nand/s3c2410.c
+> index 9c9397b..c9698cf 100644
+> --- a/drivers/mtd/nand/s3c2410.c
+> +++ b/drivers/mtd/nand/s3c2410.c
+> @@ -542,7 +542,7 @@ static int s3c2410_nand_correct_data(struct mtd_info *mtd, u_char *dat,
+>  	diff0 |= (diff1 << 8);
+>  	diff0 |= (diff2 << 16);
+>  
+> -	if ((diff0 & ~(1<<fls(diff0))) == 0)
+> +	if ((diff0 & (diff0 - 1)) == 0)
 
-Well I've been just using omap2plus_defconfig with:
+Or just
 
-# modprobe tsc2005
-# modprobe gpio_backlight
-# modprobe panel_sony_acx565akm
-# modprobe omapfb
+	if (hweight_long((unsigned long)diff0) == 1)
 
-# echo 255 > /sys/class/backlight/acx565akm/brightness
+which is doing exactly what the comment says.
 
-And then the following to blank for idle:
+BTW, I don't understand why the current code is wrong? To me, it seems
+it's correctly detecting the case where only a single bit is different.
+What are you trying to fix exactly?
 
-# echo 1 > /sys/devices/platform/omapfb/graphics/fb0/blank
+Best Regards,
 
-But in the world of eternal regressions, I'm not seeing anything
-on the framebuffer with v4.6-rc2 :( No idea what broke it or when
-as my n900 is in the rack.
+Boris
 
-Anyways, below is also my lsmod output.
-
-Regards,
-
-Tony
-
-
-Module                  Size  Used by
-panel_sharp_ls037v7dw01     4148  0
-ads7846                12959  0
-hwmon                   4213  1 ads7846
-gpio_keys               9053  0
-twl4030_keypad          3896  0
-matrix_keymap           2801  1 twl4030_keypad
-omapfb                 39255  1
-cfbfillrect             3614  1 omapfb
-cfbimgblt               2416  1 omapfb
-cfbcopyarea             3187  1 omapfb
-panel_sony_acx565akm     7895  1
-omapdss               269684  4 panel_sharp_ls037v7dw01,omapfb,panel_sony_acx565akm
-gpio_backlight          2804  0
-tsc2005                 1782  0
-tsc200x_core            7337  1 tsc2005
-ledtrig_default_on      1119  0
-leds_gpio               3530  0
-led_class               5418  1 leds_gpio
-rtc_twl                 6234  0
-twl4030_wdt             2711  0
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
