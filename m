@@ -1,45 +1,95 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 8 Apr 2016 10:58:42 +0100
-Subject: [PATCH] arm64: erratum: Workaround for Kryo reserved system
- register read
-In-Reply-To: <57069977.5050205@arm.com>
-References: <1460044456-5297-1-git-send-email-nkaje@codeaurora.org>
- <57069977.5050205@arm.com>
-Message-ID: <570780D2.3060104@arm.com>
+From: ralf@linux-mips.org (Ralf Baechle)
+Date: Fri, 8 Apr 2016 12:06:00 +0200
+Subject: [PATCH v2] clk: let clk_disable() return immediately if clk is
+ NULL or error
+In-Reply-To: <20160408003328.GA14441@codeaurora.org>
+References: <1459821083-28116-1-git-send-email-yamada.masahiro@socionext.com>
+ <20160408003328.GA14441@codeaurora.org>
+Message-ID: <20160408100600.GI1668@linux-mips.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/04/16 18:31, Marc Zyngier wrote:
+On Thu, Apr 07, 2016 at 05:33:28PM -0700, Stephen Boyd wrote:
 
->> +	All system register encodings above use the form
->> +
->> +	Op0, Op1, CRn, CRm, Op2.
->> +
->> +	Note that some of the encodings listed above include
->> +	the system register space reserved for the following
->> +	identification registers which may appear in future revisions
->> +	of the ARM architecture beyond ARMv8.0.
->> +	This space includes:
->> +	ID_AA64PFR[2-7]_EL1
->> +	ID_AA64DFR[2-3]_EL1
->> +	ID_AA64AFR[2-3]_EL1
->> +	ID_AA64ISAR[2-7]_EL1
->> +	ID_AA64MMFR[2-7]_EL1
+> On 04/05, Masahiro Yamada wrote:
+> > The clk_disable() in the common clock framework (drivers/clk/clk.c)
+> > returns immediately if a given clk is NULL or an error pointer.  It
+> > allows clock consumers to call clk_disable() without IS_ERR_OR_NULL
+> > checking if drivers are only used with the common clock framework.
+> > 
+> > Unfortunately, NULL/error checking is missing from some of non-common
+> > clk_disable() implementations.  This prevents us from completely
+> > dropping NULL/error checking from callers.  Let's make it tree-wide
+> > consistent by adding IS_ERR_OR_NULL(clk) to all callees.
+> > 
+> > Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> > Acked-by: Greg Ungerer <gerg@uclinux.org>
+> > Acked-by: Wan Zongshun <mcuos.com@gmail.com>
+> > ---
+> > 
+> > Stephen,
+> > 
+> > This patch has been unapplied for a long time.
+> > 
+> > Please let me know if there is something wrong with this patch.
+> > 
+> 
+> I'm mostly confused why we wouldn't want to encourage people to
+> call clk_disable or unprepare on a clk that's an error pointer.
+> Typically an error pointer should be dealt with, instead of
+> silently ignored, so why wasn't it dealt with by passing it up
+> the probe() path?
 
+While your argument makes perfect sense, Many clk_disable implementations
+are already doing similar checks, for example:
 
-AFAIK, the id space is unassigned. So the naming above could cause confusion
-if the register is named something else.
+arch/arm/mach-davinci/clock.c:
 
->> +
->> +	check_local_cpu_errata();
->> +
->
-> What is the impact of moving this around? Suzuki, was there any
-> particular reason why this check was done later rather than earlier?
+void clk_disable(struct clk *clk)
+{
+	unsigned long flags;
 
-All the existing errata look for MIDR to match, which is read separately
-using read_cpuid_id(). The moment we need to do something w.r.t an ID register,
-this will break. So at the moment moving this doesn't have much of an impact.
+	if (clk == NULL || IS_ERR(clk))
+		return;
+[...]
 
-Thanks
-Suzuki
+arch/arm/mach-omap1/clock.c
+
+void clk_disable(struct clk *clk)
+{
+        unsigned long flags;
+
+        if (clk == NULL || IS_ERR(clk))
+                return;
+[...]
+
+arch/avr32/mach-at32ap/clock.c
+
+void clk_disable(struct clk *clk)
+{
+        unsigned long flags;
+
+        if (IS_ERR_OR_NULL(clk))
+                return;
+[...]
+
+arch/mips/lantiq/clk.c:
+
+static inline int clk_good(struct clk *clk)
+{
+	return clk && !IS_ERR(clk);
+}
+
+[...]
+
+void clk_disable(struct clk *clk)
+{
+	if (unlikely(!clk_good(clk)))
+		return;
+
+	if (clk->disable)
+[...]
+
+So should we go and weed out these checks?
+
+  Ralf
