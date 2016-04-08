@@ -1,71 +1,113 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 08 Apr 2016 13:25:00 +0900
-Subject: [PATCH v8 11/20] ARM: dts: Add DMC bus node for Exynos3250
+Date: Fri, 08 Apr 2016 13:24:52 +0900
+Subject: [PATCH v8 03/20] PM / devfreq: Add devfreq_get_devfreq_by_phandle()
 In-Reply-To: <1460089509-16260-1-git-send-email-cw00.choi@samsung.com>
 References: <1460089509-16260-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1460089509-16260-12-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1460089509-16260-4-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the DMC (Dynamic Memory Controller) bus node for Exynos3250 SoC.
-The DMC is an AMBA AXI-compliant slave to interface external JEDEC standard
-SDRAM devices. The bus includes the OPP tables and the source clock for DMC
-block.
-
-Following list specifies the detailed relation between the clock and DMC block:
-- The source clock of DMC block : div_dmc
+This patch adds the new devfreq_get_devfreq_by_phandle() OF helper function
+which can find the instance of devfreq device by using phandle ("devfreq").
 
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Acked-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+[m.reichl and linux.amoon: Tested it on exynos4412-odroidu3 board]
+Tested-by: Markus Reichl <m.reichl@fivetechno.de>
+Tested-by: Anand Moon <linux.amoon@gmail.com>
 ---
- arch/arm/boot/dts/exynos3250.dtsi | 34 ++++++++++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+ drivers/devfreq/devfreq.c | 44 ++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/devfreq.h   |  9 +++++++++
+ 2 files changed, 53 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
-index 137f9015d4e8..1ae72c4fa55e 100644
---- a/arch/arm/boot/dts/exynos3250.dtsi
-+++ b/arch/arm/boot/dts/exynos3250.dtsi
-@@ -688,6 +688,40 @@
- 			clock-names = "ppmu";
- 			status = "disabled";
- 		};
-+
-+		bus_dmc: bus_dmc {
-+			compatible = "samsung,exynos-bus";
-+			clocks = <&cmu_dmc CLK_DIV_DMC>;
-+			clock-names = "bus";
-+			operating-points-v2 = <&bus_dmc_opp_table>;
-+			status = "disabled";
-+		};
-+
-+		bus_dmc_opp_table: opp_table1 {
-+			compatible = "operating-points-v2";
-+			opp-shared;
-+
-+			opp at 50000000 {
-+				opp-hz = /bits/ 64 <50000000>;
-+				opp-microvolt = <800000>;
-+			};
-+			opp at 100000000 {
-+				opp-hz = /bits/ 64 <100000000>;
-+				opp-microvolt = <800000>;
-+			};
-+			opp at 134000000 {
-+				opp-hz = /bits/ 64 <134000000>;
-+				opp-microvolt = <800000>;
-+			};
-+			opp at 200000000 {
-+				opp-hz = /bits/ 64 <200000000>;
-+				opp-microvolt = <825000>;
-+			};
-+			opp at 400000000 {
-+				opp-hz = /bits/ 64 <400000000>;
-+				opp-microvolt = <875000>;
-+			};
-+		};
- 	};
- };
+diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
+index 984c5e9e7bdd..20a9422c2552 100644
+--- a/drivers/devfreq/devfreq.c
++++ b/drivers/devfreq/devfreq.c
+@@ -25,6 +25,7 @@
+ #include <linux/list.h>
+ #include <linux/printk.h>
+ #include <linux/hrtimer.h>
++#include <linux/of.h>
+ #include "governor.h"
  
+ static struct class *devfreq_class;
+@@ -639,6 +640,49 @@ struct devfreq *devm_devfreq_add_device(struct device *dev,
+ }
+ EXPORT_SYMBOL(devm_devfreq_add_device);
+ 
++#ifdef CONFIG_OF
++/*
++ * devfreq_get_devfreq_by_phandle - Get the devfreq device from devicetree
++ * @dev - instance to the given device
++ * @index - index into list of devfreq
++ *
++ * return the instance of devfreq device
++ */
++struct devfreq *devfreq_get_devfreq_by_phandle(struct device *dev, int index)
++{
++	struct device_node *node;
++	struct devfreq *devfreq;
++
++	if (!dev)
++		return ERR_PTR(-EINVAL);
++
++	if (!dev->of_node)
++		return ERR_PTR(-EINVAL);
++
++	node = of_parse_phandle(dev->of_node, "devfreq", index);
++	if (!node)
++		return ERR_PTR(-ENODEV);
++
++	mutex_lock(&devfreq_list_lock);
++	list_for_each_entry(devfreq, &devfreq_list, node) {
++		if (devfreq->dev.parent
++			&& devfreq->dev.parent->of_node == node) {
++			mutex_unlock(&devfreq_list_lock);
++			return devfreq;
++		}
++	}
++	mutex_unlock(&devfreq_list_lock);
++
++	return ERR_PTR(-EPROBE_DEFER);
++}
++#else
++struct devfreq *devfreq_get_devfreq_by_phandle(struct device *dev, int index)
++{
++	return ERR_PTR(-ENODEV);
++}
++#endif /* CONFIG_OF */
++EXPORT_SYMBOL_GPL(devfreq_get_devfreq_by_phandle);
++
+ /**
+  * devm_devfreq_remove_device() - Resource-managed devfreq_remove_device()
+  * @dev:	the device to add devfreq feature.
+diff --git a/include/linux/devfreq.h b/include/linux/devfreq.h
+index 6fa02a20eb63..aa0b8424ebc3 100644
+--- a/include/linux/devfreq.h
++++ b/include/linux/devfreq.h
+@@ -208,6 +208,9 @@ extern int devm_devfreq_register_opp_notifier(struct device *dev,
+ extern void devm_devfreq_unregister_opp_notifier(struct device *dev,
+ 						struct devfreq *devfreq);
+ 
++extern struct devfreq *devfreq_get_devfreq_by_phandle(struct device *dev,
++						int index);
++
+ /**
+  * devfreq_update_stats() - update the last_status pointer in struct devfreq
+  * @df:		the devfreq instance whose status needs updating
+@@ -307,6 +310,12 @@ static inline void devm_devfreq_unregister_opp_notifier(struct device *dev,
+ {
+ }
+ 
++static inline struct devfreq *devfreq_get_devfreq_by_phandle(struct device *dev,
++							int index)
++{
++	return ERR_PTR(-ENODEV);
++}
++
+ static inline int devfreq_update_stats(struct devfreq *df)
+ {
+ 	return -EINVAL;
 -- 
 1.9.1
