@@ -1,43 +1,19 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 8 Apr 2016 14:43:53 +0200
-Subject: [PATCH 04/17] arm64: Introduce pmd_thp_or_huge
-In-Reply-To: <1459787177-12767-5-git-send-email-suzuki.poulose@arm.com>
+Date: Fri, 8 Apr 2016 14:44:04 +0200
+Subject: [PATCH 06/17] kvm-arm: Remove kvm_pud_huge()
+In-Reply-To: <1459787177-12767-7-git-send-email-suzuki.poulose@arm.com>
 References: <1459787177-12767-1-git-send-email-suzuki.poulose@arm.com>
- <1459787177-12767-5-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20160408124353.GO8961@cbox>
+ <1459787177-12767-7-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20160408124404.GQ8961@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 04, 2016 at 05:26:04PM +0100, Suzuki K Poulose wrote:
-> Add a helper to determine if a given pmd represents a huge page
-> either by hugetlb or thp, as we have for arm. This will be used
-> by KVM MMU code.
+On Mon, Apr 04, 2016 at 05:26:06PM +0100, Suzuki K Poulose wrote:
+> Get rid of kvm_pud_huge() which falls back to pud_huge. Use
+> pud_huge instead.
 > 
-> Suggested-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Steve Capper <steve.capper@linaro.org>
-> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
 > Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
 Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-
-> ---
->  arch/arm64/include/asm/pgtable.h |    2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index 989fef1..dda4aa9 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -290,6 +290,8 @@ static inline pgprot_t mk_sect_prot(pgprot_t prot)
->  #define pmd_mkyoung(pmd)	pte_pmd(pte_mkyoung(pmd_pte(pmd)))
->  #define pmd_mknotpresent(pmd)	(__pmd(pmd_val(pmd) & ~PMD_TYPE_MASK))
->  
-> +#define pmd_thp_or_huge(pmd)	(pmd_huge(pmd) || pmd_trans_huge(pmd))
-> +
->  #define __HAVE_ARCH_PMD_WRITE
->  #define pmd_write(pmd)		pte_write(pmd_pte(pmd))
->  
-> -- 
-> 1.7.9.5
-> 
