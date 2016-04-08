@@ -1,113 +1,144 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 08 Apr 2016 13:24:52 +0900
-Subject: [PATCH v8 03/20] PM / devfreq: Add devfreq_get_devfreq_by_phandle()
+Date: Fri, 08 Apr 2016 13:25:09 +0900
+Subject: [PATCH v8 20/20] ARM: dts: Add support of bus frequency for
+ exynos4412-trats/odroidu3
 In-Reply-To: <1460089509-16260-1-git-send-email-cw00.choi@samsung.com>
 References: <1460089509-16260-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1460089509-16260-4-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1460089509-16260-21-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the new devfreq_get_devfreq_by_phandle() OF helper function
-which can find the instance of devfreq device by using phandle ("devfreq").
+THis patch adds the bus device tree nodes for both MIF (Memory) and INT
+(Internal) block to enable the bus frequency.
+
+The DMC bus is parent device in MIF block using VDD_MIF and the LEFTBUS
+bus is parent device in INT block using VDD_INT.
 
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 [m.reichl and linux.amoon: Tested it on exynos4412-odroidu3 board]
 Tested-by: Markus Reichl <m.reichl@fivetechno.de>
 Tested-by: Anand Moon <linux.amoon@gmail.com>
 ---
- drivers/devfreq/devfreq.c | 44 ++++++++++++++++++++++++++++++++++++++++++++
- include/linux/devfreq.h   |  9 +++++++++
- 2 files changed, 53 insertions(+)
+ arch/arm/boot/dts/exynos4412-odroid-common.dtsi | 47 +++++++++++++++++++++++++
+ arch/arm/boot/dts/exynos4412-trats2.dts         | 47 +++++++++++++++++++++++++
+ 2 files changed, 94 insertions(+)
 
-diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
-index 984c5e9e7bdd..20a9422c2552 100644
---- a/drivers/devfreq/devfreq.c
-+++ b/drivers/devfreq/devfreq.c
-@@ -25,6 +25,7 @@
- #include <linux/list.h>
- #include <linux/printk.h>
- #include <linux/hrtimer.h>
-+#include <linux/of.h>
- #include "governor.h"
+diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+index b4983cbc4f8c..2015f10071f9 100644
+--- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
++++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+@@ -109,6 +109,53 @@
+ 	};
+ };
  
- static struct class *devfreq_class;
-@@ -639,6 +640,49 @@ struct devfreq *devm_devfreq_add_device(struct device *dev,
- }
- EXPORT_SYMBOL(devm_devfreq_add_device);
++&bus_dmc {
++	devfreq-events = <&ppmu_dmc0_3>, <&ppmu_dmc1_3>;
++	vdd-supply = <&buck1_reg>;
++	status = "okay";
++};
++
++&bus_acp {
++	devfreq = <&bus_dmc>;
++	status = "okay";
++};
++
++&bus_c2c {
++	devfreq = <&bus_dmc>;
++	status = "okay";
++};
++
++&bus_leftbus {
++	devfreq-events = <&ppmu_leftbus_3>, <&ppmu_rightbus_3>;
++	vdd-supply = <&buck3_reg>;
++	status = "okay";
++};
++
++&bus_rightbus {
++	devfreq = <&bus_leftbus>;
++	status = "okay";
++};
++
++&bus_display {
++	devfreq = <&bus_leftbus>;
++	status = "okay";
++};
++
++&bus_fsys {
++	devfreq = <&bus_leftbus>;
++	status = "okay";
++};
++
++&bus_peri {
++	devfreq = <&bus_leftbus>;
++	status = "okay";
++};
++
++&bus_mfc {
++	devfreq = <&bus_leftbus>;
++	status = "okay";
++};
++
+ &cpu0 {
+ 	cpu0-supply = <&buck2_reg>;
+ };
+diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+index dce3cebe0606..9f3fb9a7f5f4 100644
+--- a/arch/arm/boot/dts/exynos4412-trats2.dts
++++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+@@ -289,6 +289,53 @@
+ 	status = "okay";
+ };
  
-+#ifdef CONFIG_OF
-+/*
-+ * devfreq_get_devfreq_by_phandle - Get the devfreq device from devicetree
-+ * @dev - instance to the given device
-+ * @index - index into list of devfreq
-+ *
-+ * return the instance of devfreq device
-+ */
-+struct devfreq *devfreq_get_devfreq_by_phandle(struct device *dev, int index)
-+{
-+	struct device_node *node;
-+	struct devfreq *devfreq;
++&bus_dmc {
++	devfreq-events = <&ppmu_dmc0_3>, <&ppmu_dmc1_3>;
++	vdd-supply = <&buck1_reg>;
++	status = "okay";
++};
 +
-+	if (!dev)
-+		return ERR_PTR(-EINVAL);
++&bus_acp {
++	devfreq = <&bus_dmc>;
++	status = "okay";
++};
 +
-+	if (!dev->of_node)
-+		return ERR_PTR(-EINVAL);
++&bus_c2c {
++	devfreq = <&bus_dmc>;
++	status = "okay";
++};
 +
-+	node = of_parse_phandle(dev->of_node, "devfreq", index);
-+	if (!node)
-+		return ERR_PTR(-ENODEV);
++&bus_leftbus {
++	devfreq-events = <&ppmu_leftbus_3>, <&ppmu_rightbus_3>;
++	vdd-supply = <&buck3_reg>;
++	status = "okay";
++};
 +
-+	mutex_lock(&devfreq_list_lock);
-+	list_for_each_entry(devfreq, &devfreq_list, node) {
-+		if (devfreq->dev.parent
-+			&& devfreq->dev.parent->of_node == node) {
-+			mutex_unlock(&devfreq_list_lock);
-+			return devfreq;
-+		}
-+	}
-+	mutex_unlock(&devfreq_list_lock);
++&bus_rightbus {
++	devfreq = <&bus_leftbus>;
++	status = "okay";
++};
 +
-+	return ERR_PTR(-EPROBE_DEFER);
-+}
-+#else
-+struct devfreq *devfreq_get_devfreq_by_phandle(struct device *dev, int index)
-+{
-+	return ERR_PTR(-ENODEV);
-+}
-+#endif /* CONFIG_OF */
-+EXPORT_SYMBOL_GPL(devfreq_get_devfreq_by_phandle);
++&bus_display {
++	devfreq = <&bus_leftbus>;
++	status = "okay";
++};
 +
- /**
-  * devm_devfreq_remove_device() - Resource-managed devfreq_remove_device()
-  * @dev:	the device to add devfreq feature.
-diff --git a/include/linux/devfreq.h b/include/linux/devfreq.h
-index 6fa02a20eb63..aa0b8424ebc3 100644
---- a/include/linux/devfreq.h
-+++ b/include/linux/devfreq.h
-@@ -208,6 +208,9 @@ extern int devm_devfreq_register_opp_notifier(struct device *dev,
- extern void devm_devfreq_unregister_opp_notifier(struct device *dev,
- 						struct devfreq *devfreq);
- 
-+extern struct devfreq *devfreq_get_devfreq_by_phandle(struct device *dev,
-+						int index);
++&bus_fsys {
++	devfreq = <&bus_leftbus>;
++	status = "okay";
++};
 +
- /**
-  * devfreq_update_stats() - update the last_status pointer in struct devfreq
-  * @df:		the devfreq instance whose status needs updating
-@@ -307,6 +310,12 @@ static inline void devm_devfreq_unregister_opp_notifier(struct device *dev,
- {
- }
- 
-+static inline struct devfreq *devfreq_get_devfreq_by_phandle(struct device *dev,
-+							int index)
-+{
-+	return ERR_PTR(-ENODEV);
-+}
++&bus_peri {
++	devfreq = <&bus_leftbus>;
++	status = "okay";
++};
 +
- static inline int devfreq_update_stats(struct devfreq *df)
- {
- 	return -EINVAL;
++&bus_mfc {
++	devfreq = <&bus_leftbus>;
++	status = "okay";
++};
++
+ &cpu0 {
+ 	cpu0-supply = <&buck2_reg>;
+ };
 -- 
 1.9.1
