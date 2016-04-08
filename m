@@ -1,201 +1,79 @@
-From: lipengcheng8@huawei.com (lipengcheng)
-Date: Fri, 8 Apr 2016 17:19:10 +0800
-Subject: [PATCH RESEND] coresight-etm4x: Change ETM setting.
-Message-ID: <1460107150-241958-1-git-send-email-lipengcheng8@huawei.com>
+From: sugar.zhang@rock-chips.com (sugar)
+Date: Fri, 8 Apr 2016 17:26:57 +0800
+Subject: [PATCH] ASoC: rockchip: i2s: configure the sdio pins' iomux mode
+In-Reply-To: <20160407175811.GP32257@rob-hp-laptop>
+References: <1459931902-77324-1-git-send-email-sugar.zhang@rock-chips.com>
+ <20160407175811.GP32257@rob-hp-laptop>
+Message-ID: <57077961.6010200@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pengcheng Li <lipengcheng8@huawei.com>
+Hi Rob,
 
-Force ETM idle acknowleghe when CPU enter WFI.
-writel_relaxed(0x2, drvdata->base + TRCAUXCTLR);
+On 4/8/2016 01:58, Rob Herring Wrote:
+> On Wed, Apr 06, 2016 at 04:38:22PM +0800, Sugar Zhang wrote:
+>> There are 3 i2s sdio pins, which iomux mode is as follows:
+>
+> s/i2s sdio/I2S\/SDIO muxed/
+>
+>>
+>>   - sdi3_sdo1
+>>   - sdi2_sdo2
+>>   - sdi1_sdo3
+>>
+>> we need to configure these pins' iomux mode via the GRF register
+>> when use multi channel playback/capture.
+>
+> Why not a pinctrl binding here? If you want SDIO mode, then you need
+> similar code in the SDIO driver (or just rely on default mode).
+>
+here, i2s_sdio means i2s_sdi/i2s_sdo, not means SDIO bus interface.
+for example:
 
-Because linux kernel execute on EL1,
-so we just need to open EL1 trace?close EL1 trace.
-drvdata->vinst_ctrl |= BIT(20);
+gpio3d[6] iomux select:
+2'b 00: gpio
+2'b 01: i2s0_sdi3sdo1
+2'b 10: xxx
+2'b 11: xxx
 
-Because this operation exceed the range of boolean,
-so we should modify q_support to unit32 bit.
-drvdata->q_support = BMVAL(etmidr0, 15, 16)
+we configure the i2s_sdi3sdo1 mode via the pinctrl, and then need another
+grf register to configure it is used for i2s0_sdi3 or i2s0_sdo1.
 
-Adding PM runtime operations in Coresight devices.
-	-static int etmv4_suspend(struct device *dev)
-	-static int etmv4_resume(struct device *dev)
+>>
+>> Signed-off-by: Sugar Zhang <sugar.zhang@rock-chips.com>
+>> ---
+>>
+>>   .../devicetree/bindings/sound/rockchip-i2s.txt     |  5 +++
+>>   sound/soc/rockchip/rockchip_i2s.c                  | 39 +++++++++++++++++++++-
+>>   sound/soc/rockchip/rockchip_i2s.h                  |  8 +++++
+>>   3 files changed, 51 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/sound/rockchip-i2s.txt b/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
+>> index 6e86d8a..ad72a7d 100644
+>> --- a/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
+>> +++ b/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
+>> @@ -23,6 +23,11 @@ Required properties:
+>>   - rockchip,playback-channels: max playback channels, if not set, 8 channels default.
+>>   - rockchip,capture-channels: max capture channels, if not set, 2 channels default.
+>>
+>> +Required properties for controller which support multi channels playback/capture:
+>> +
+>> +- rockchip,grf: Should be phandle/offset pair. the phandle of the syscon node for GRF register,
+>
+> Wrap your lines at less than 80 chars.
 
-Signed-off-by: Li Pengcheng <lipengcheng8@huawei.com>
-Signed-off-by: Li Zhong <lizhong11@hisilicon.com>
----
- drivers/hwtracing/coresight/coresight-etm4x.c | 58 +++++++++++++++++++++++++--
- drivers/hwtracing/coresight/coresight-etm4x.h |  2 +-
- drivers/hwtracing/coresight/coresight.c       | 10 +++--
- 3 files changed, 62 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index 1c59bd3..3a21409 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -33,7 +33,7 @@
- #include <linux/pm_runtime.h>
- #include <linux/perf_event.h>
- #include <asm/sections.h>
--
-+#include<linux/cpuidle.h>
- #include "coresight-etm4x.h"
- 
- static int boot_enable;
-@@ -111,8 +111,8 @@ static void etm4_enable_hw(void *info)
- 
- 	writel_relaxed(drvdata->pe_sel, drvdata->base + TRCPROCSELR);
- 	writel_relaxed(drvdata->cfg, drvdata->base + TRCCONFIGR);
--	/* nothing specific implemented */
--	writel_relaxed(0x0, drvdata->base + TRCAUXCTLR);
-+	/* Force ETM idle acknowleghe when CPU enter WFI */
-+	writel_relaxed(0x2, drvdata->base + TRCAUXCTLR);
- 	writel_relaxed(drvdata->eventctrl0, drvdata->base + TRCEVENTCTL0R);
- 	writel_relaxed(drvdata->eventctrl1, drvdata->base + TRCEVENTCTL1R);
- 	writel_relaxed(drvdata->stall_ctrl, drvdata->base + TRCSTALLCTLR);
-@@ -2491,6 +2491,8 @@ static void etm4_init_default_data(struct etmv4_drvdata *drvdata)
- 	 *  started state
- 	 */
- 	drvdata->vinst_ctrl |= BIT(0);
-+	/* Not generate EL0-NS trace */
-+	drvdata->vinst_ctrl |= BIT(20);
- 	/* set initial state of start-stop logic */
- 	if (drvdata->nr_addr_cmp)
- 		drvdata->vinst_ctrl |= BIT(9);
-@@ -2595,6 +2597,42 @@ static struct notifier_block etm4_cpu_notifier = {
- 	.notifier_call = etm4_cpu_callback,
- };
- 
-+#ifdef CONFIG_PM
-+
-+static int etmv4_suspend(struct device *dev)
-+{
-+	int ret = 0;
-+	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev);
-+
-+	dev_info(drvdata->dev, "%s: CPU+%d\n", __func__, drvdata->cpu);
-+	if (drvdata->enable) {
-+		cpuidle_pause();
-+		coresight_disable(drvdata->csdev);
-+		cpuidle_resume();
-+	}
-+
-+	return ret;
-+}
-+
-+static int etmv4_resume(struct device *dev)
-+{
-+	int ret = 0;
-+	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev);
-+
-+	dev_info(drvdata->dev, "%s: CPU+%d\n", __func__, drvdata->cpu);
-+	if (!drvdata->enable && drvdata->boot_enable) {
-+		cpuidle_pause();
-+		coresight_enable(drvdata->csdev);
-+		cpuidle_resume();
-+	}
-+
-+	return ret;
-+}
-+
-+static SIMPLE_DEV_PM_OPS(etm4x_dev_pm_ops, etmv4_suspend, etmv4_resume);
-+
-+#endif
-+
- static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
- {
- 	int ret;
-@@ -2673,7 +2711,9 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
- 	dev_info(dev, "%s initialized\n", (char *)id->data);
- 
- 	if (boot_enable) {
-+		cpuidle_pause();
- 		coresight_enable(drvdata->csdev);
-+		cpuidle_resume();
- 		drvdata->boot_enable = true;
- 	}
- 
-@@ -2698,7 +2738,17 @@ static struct amba_id etm4_ids[] = {
- 		.mask	= 0x000fffff,
- 		.data	= "ETM 4.0",
- 	},
--	{ 0, 0},
-+	{       /* ETM 4.0 - A72 board */
-+		.id = 0x000bb95a,
-+		.mask = 0x000fffff,
-+		.data = "ETM 4.0",
-+	},
-+	{       /* ETM 4.0 - Atermis board */
-+		.id = 0x000bb959,
-+		.mask = 0x000fffff,
-+		.data = "ETM 4.0",
-+	},
-+	{0, 0},
- };
- 
- static struct amba_driver etm4x_driver = {
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.h b/drivers/hwtracing/coresight/coresight-etm4x.h
-index c341002..305b29a 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.h
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.h
-@@ -330,7 +330,7 @@ struct etmv4_drvdata {
- 	u32				ccctlr;
- 	bool				trcbb;
- 	u32				bb_ctrl;
--	bool				q_support;
-+	u32				q_support;
- 	u32				vinst_ctrl;
- 	u32				viiectlr;
- 	u32				vissctlr;
-diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
-index 2ea5961..8b9fda4 100644
---- a/drivers/hwtracing/coresight/coresight.c
-+++ b/drivers/hwtracing/coresight/coresight.c
-@@ -24,6 +24,7 @@
- #include <linux/of_platform.h>
- #include <linux/delay.h>
- #include <linux/pm_runtime.h>
-+#include <linux/cpuidle.h>
- 
- #include "coresight-priv.h"
- 
-@@ -514,7 +515,7 @@ static ssize_t enable_sink_show(struct device *dev,
- {
- 	struct coresight_device *csdev = to_coresight_device(dev);
- 
--	return scnprintf(buf, PAGE_SIZE, "%u\n", (unsigned)csdev->activated);
-+	return scnprintf(buf, PAGE_SIZE, "%u\n", csdev->activated);
- }
- 
- static ssize_t enable_sink_store(struct device *dev,
-@@ -544,7 +545,7 @@ static ssize_t enable_source_show(struct device *dev,
- {
- 	struct coresight_device *csdev = to_coresight_device(dev);
- 
--	return scnprintf(buf, PAGE_SIZE, "%u\n", (unsigned)csdev->enable);
-+	return scnprintf(buf, PAGE_SIZE, "%u\n", csdev->enable);
- }
- 
- static ssize_t enable_source_store(struct device *dev,
-@@ -559,6 +560,8 @@ static ssize_t enable_source_store(struct device *dev,
- 	if (ret)
- 		return ret;
- 
-+	/* suspend cpuidle */
-+	cpuidle_pause();
- 	if (val) {
- 		ret = coresight_enable(csdev);
- 		if (ret)
-@@ -566,7 +569,8 @@ static ssize_t enable_source_store(struct device *dev,
- 	} else {
- 		coresight_disable(csdev);
- 	}
--
-+	/* resume cpuidle */
-+	cpuidle_resume();
- 	return size;
- }
- static DEVICE_ATTR_RW(enable_source);
--- 
-1.8.3.2
+Ok, will fix.
+>
+>> +  and the offset of the GRF for control register.
+>> +
+>>   Example for rk3288 I2S controller:
+>>
+>>   i2s at ff890000 {
+>
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+>
+>
+>
