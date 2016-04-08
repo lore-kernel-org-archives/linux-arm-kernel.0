@@ -1,45 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 8 Apr 2016 12:18:54 -0700
-Subject: [GIT PULL] omap fixes against v4.6-rc2
-Message-ID: <20160408191854.GZ16484@atomide.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Fri, 08 Apr 2016 13:05:06 -0700
+Subject: [PATCH 2/2] clk: bcm2835: Fix PLL poweron
+In-Reply-To: <1945341121.176536.ed7e19c8-94d6-4e1c-b383-3e4ae025eeac.open-xchange@email.1und1.de>
+References: <1459826456-18812-1-git-send-email-eric@anholt.net>
+ <1459826456-18812-3-git-send-email-eric@anholt.net>
+ <1945341121.176536.ed7e19c8-94d6-4e1c-b383-3e4ae025eeac.open-xchange@email.1und1.de>
+Message-ID: <87lh4nzx1p.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 9735a22799b9214d17d3c231fe377fc852f042e9:
+Stefan Wahren <stefan.wahren@i2se.com> writes:
 
-  Linux 4.6-rc2 (2016-04-03 09:09:40 -0500)
+> Hi Eric,
+>
+>> Eric Anholt <eric@anholt.net> hat am 5. April 2016 um 05:20 geschrieben:
+>>
+>>
+>> In poweroff, we set the reset bit and the power down bit, but only
+>> managed to unset the reset bit for poweron. This meant that if HDMI
+>> did -EPROBE_DEFER after it had grabbed its clocks, we'd power down the
+>> PLLH (that had been on at boot time) and never recover.
+>>
+>> Signed-off-by: Eric Anholt <eric@anholt.net>
+>> Cc: stable at vger.kernel.org
+>
+> please provide a Fixes tag.
+>
+> Thanks Stefan
 
-are available in the git repository at:
+That should be:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.6/fixes-rc2
-
-for you to fetch changes up to 571afb4c8a4bbe88541364e7f6827340562f2736:
-
-  ARM: OMAP: Catch callers of revision information prior to it being populated (2016-04-08 09:02:39 -0700)
-
-----------------------------------------------------------------
-Fixes for omaps against v4.6-rc2, mostly to fix suspend for beagle-x15
-that broke when we added runtime based SoC revision detection earlier.
-
-It seems suspend worked earlier as things were only partially initialized,
-while now we initialize things properly for dra7. Let's also add a warning
-if SoC is not properly detected to prevent similar issues later on.
-
-Also included is a fix for dra7 sys_32k_ck clock source that is not
-enabled on boot making system fall back to using emulated clock.
-
-----------------------------------------------------------------
-Keerthy (1):
-      ARM: dts: dra7: Correct clock tree for sys_32k_ck
-
-Nishanth Menon (3):
-      ARM: OMAP: DRA7: wakeupgen: Skip SAR save for wakeupgen
-      ARM: OMAP: DRA7: Provide proper class to omap2_set_globals_tap
-      ARM: OMAP: Catch callers of revision information prior to it being populated
-
- arch/arm/boot/dts/dra7xx-clocks.dtsi | 18 +++++++++++++++++-
- arch/arm/mach-omap1/id.c             |  1 +
- arch/arm/mach-omap2/id.c             |  1 +
- arch/arm/mach-omap2/io.c             |  3 ++-
- arch/arm/mach-omap2/omap-wakeupgen.c |  7 +++++++
- 5 files changed, 28 insertions(+), 2 deletions(-)
+Fixes: 41691b8862e2 ("clk: bcm2835: Add support for programming the audio domain clocks")
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160408/65ee536a/attachment.sig>
