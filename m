@@ -1,129 +1,74 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri,  8 Apr 2016 11:52:13 +0200
-Subject: [PULL 2/4] KVM: arm/arm64: Handle forward time correction gracefully
+Date: Fri,  8 Apr 2016 11:52:15 +0200
+Subject: [PULL 4/4] arm64: KVM: unregister notifiers in hyp mode teardown path
 In-Reply-To: <1460109135-6612-1-git-send-email-christoffer.dall@linaro.org>
 References: <1460109135-6612-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1460109135-6612-3-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1460109135-6612-5-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+From: Sudeep Holla <sudeep.holla@arm.com>
 
-On a host that runs NTP, corrections can have a direct impact on
-the background timer that we program on the behalf of a vcpu.
+Commit 1e947bad0b63 ("arm64: KVM: Skip HYP setup when already running
+in HYP") re-organized the hyp init code and ended up leaving the CPU
+hotplug and PM notifier even if hyp mode initialization fails.
 
-In particular, NTP performing a forward correction will result in
-a timer expiring sooner than expected from a guest point of view.
-Not a big deal, we kick the vcpu anyway.
+Since KVM is not yet supported with ACPI, the above mentioned commit
+breaks CPU hotplug in ACPI boot.
 
-But on wake-up, the vcpu thread is going to perform a check to
-find out whether or not it should block. And at that point, the
-timer check is going to say "timer has not expired yet, go back
-to sleep". This results in the timer event being lost forever.
+This patch fixes teardown_hyp_mode to properly unregister both CPU
+hotplug and PM notifiers in the teardown path.
 
-There are multiple ways to handle this. One would be record that
-the timer has expired and let kvm_cpu_has_pending_timer return
-true in that case, but that would be fairly invasive. Another is
-to check for the "short sleep" condition in the hrtimer callback,
-and restart the timer for the remaining time when the condition
-is detected.
-
-This patch implements the latter, with a bit of refactoring in
-order to avoid too much code duplication.
-
-Cc: <stable@vger.kernel.org>
-Reported-by: Alexander Graf <agraf@suse.de>
-Reviewed-by: Alexander Graf <agraf@suse.de>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Fixes: 1e947bad0b63 ("arm64: KVM: Skip HYP setup when already running in HYP")
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/arch_timer.c | 49 +++++++++++++++++++++++++++++++++++++----------
- 1 file changed, 39 insertions(+), 10 deletions(-)
+ arch/arm/kvm/arm.c | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index a9ad4fe..9aaa35d 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -91,6 +91,8 @@ static void kvm_timer_inject_irq_work(struct work_struct *work)
- 	vcpu = container_of(work, struct kvm_vcpu, arch.timer_cpu.expired);
- 	vcpu->arch.timer_cpu.armed = false;
- 
-+	WARN_ON(!kvm_timer_should_fire(vcpu));
-+
- 	/*
- 	 * If the vcpu is blocked we want to wake it up so that it will see
- 	 * the timer has expired when entering the guest.
-@@ -98,10 +100,46 @@ static void kvm_timer_inject_irq_work(struct work_struct *work)
- 	kvm_vcpu_kick(vcpu);
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index b538431..dded1b7 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -1112,10 +1112,17 @@ static void __init hyp_cpu_pm_init(void)
+ {
+ 	cpu_pm_register_notifier(&hyp_init_cpu_pm_nb);
  }
- 
-+static u64 kvm_timer_compute_delta(struct kvm_vcpu *vcpu)
++static void __init hyp_cpu_pm_exit(void)
 +{
-+	cycle_t cval, now;
-+
-+	cval = vcpu->arch.timer_cpu.cntv_cval;
-+	now = kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
-+
-+	if (now < cval) {
-+		u64 ns;
-+
-+		ns = cyclecounter_cyc2ns(timecounter->cc,
-+					 cval - now,
-+					 timecounter->mask,
-+					 &timecounter->frac);
-+		return ns;
-+	}
-+
-+	return 0;
++	cpu_pm_unregister_notifier(&hyp_init_cpu_pm_nb);
 +}
-+
- static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
+ #else
+ static inline void hyp_cpu_pm_init(void)
  {
- 	struct arch_timer_cpu *timer;
-+	struct kvm_vcpu *vcpu;
-+	u64 ns;
-+
- 	timer = container_of(hrt, struct arch_timer_cpu, timer);
-+	vcpu = container_of(timer, struct kvm_vcpu, arch.timer_cpu);
-+
-+	/*
-+	 * Check that the timer has really expired from the guest's
-+	 * PoV (NTP on the host may have forced it to expire
-+	 * early). If we should have slept longer, restart it.
-+	 */
-+	ns = kvm_timer_compute_delta(vcpu);
-+	if (unlikely(ns)) {
-+		hrtimer_forward_now(hrt, ns_to_ktime(ns));
-+		return HRTIMER_RESTART;
-+	}
-+
- 	queue_work(wqueue, &timer->expired);
- 	return HRTIMER_NORESTART;
  }
-@@ -176,8 +214,6 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
- void kvm_timer_schedule(struct kvm_vcpu *vcpu)
- {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
--	u64 ns;
--	cycle_t cval, now;
++static inline void hyp_cpu_pm_exit(void)
++{
++}
+ #endif
  
- 	BUG_ON(timer_is_armed(timer));
- 
-@@ -197,14 +233,7 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
- 		return;
- 
- 	/*  The timer has not yet expired, schedule a background timer */
--	cval = timer->cntv_cval;
--	now = kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
--
--	ns = cyclecounter_cyc2ns(timecounter->cc,
--				 cval - now,
--				 timecounter->mask,
--				 &timecounter->frac);
--	timer_arm(timer, ns);
-+	timer_arm(timer, kvm_timer_compute_delta(vcpu));
+ static void teardown_common_resources(void)
+@@ -1141,9 +1148,7 @@ static int init_subsystems(void)
+ 	/*
+ 	 * Register CPU Hotplug notifier
+ 	 */
+-	cpu_notifier_register_begin();
+-	err = __register_cpu_notifier(&hyp_init_cpu_nb);
+-	cpu_notifier_register_done();
++	err = register_cpu_notifier(&hyp_init_cpu_nb);
+ 	if (err) {
+ 		kvm_err("Cannot register KVM init CPU notifier (%d)\n", err);
+ 		return err;
+@@ -1193,6 +1198,8 @@ static void teardown_hyp_mode(void)
+ 	free_hyp_pgds();
+ 	for_each_possible_cpu(cpu)
+ 		free_page(per_cpu(kvm_arm_hyp_stack_page, cpu));
++	unregister_cpu_notifier(&hyp_init_cpu_nb);
++	hyp_cpu_pm_exit();
  }
  
- void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
+ static int init_vhe_mode(void)
 -- 
 2.1.2.330.g565301e.dirty
