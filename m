@@ -1,31 +1,52 @@
 From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Fri, 8 Apr 2016 15:27:10 +0800
-Subject: [PATCH 0/2] arm64: hisilicon: add support hip06 d03 board
-Message-ID: <1460100432-52722-1-git-send-email-wangkefeng.wang@huawei.com>
+Date: Fri, 8 Apr 2016 15:31:50 +0800
+Subject: [PATCH v2 1/2] arm64: dts: hip05: fix its node without msi-cells
+In-Reply-To: <1460100711-54144-1-git-send-email-wangkefeng.wang@huawei.com>
+References: <1460100711-54144-1-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <1460100711-54144-2-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial dts for Hip06 D03 board and documentation.
+Fix commit abf9c25d55e8 ("arm64: dts: hip05: Append all gicv3 ITS
+entries"), it forgets the property msi-cell, see arm,gic-v3.txt.
 
-The Hip06 soc has same cpu topology compared with Hip05, four clusters
-and each cluster has quard Cortex-A57, but with different IO part,
-like HNS, SAS and PCI, they are all upgraded. There are also not same
-in ITS, MBIGEN and SMMU, etc.
+Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+---
+ arch/arm64/boot/dts/hisilicon/hip05.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Note, there is no serial, because the soc use LPC uart, the serial node
-is not needed.
-
-Kefeng Wang (2):
-  arm64: dts: Add initial dts for Hisilicon Hip06 D03 board
-  Documentation: arm64: Add Hisilicon Hip06 D03 dts binding
-
- .../bindings/arm/hisilicon/hisilicon.txt           |  20 +-
- arch/arm64/boot/dts/hisilicon/Makefile             |   4 +-
- arch/arm64/boot/dts/hisilicon/hip06-d03.dts        |  34 +++
- arch/arm64/boot/dts/hisilicon/hip06.dtsi           | 307 +++++++++++++++++++++
- 4 files changed, 356 insertions(+), 9 deletions(-)
- create mode 100644 arch/arm64/boot/dts/hisilicon/hip06-d03.dts
- create mode 100644 arch/arm64/boot/dts/hisilicon/hip06.dtsi
-
+diff --git a/arch/arm64/boot/dts/hisilicon/hip05.dtsi b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
+index 6319ff3..52d06ab 100644
+--- a/arch/arm64/boot/dts/hisilicon/hip05.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
+@@ -249,24 +249,28 @@
+ 		its_peri: interrupt-controller at 8c000000 {
+ 			compatible = "arm,gic-v3-its";
+ 			msi-controller;
++			#msi-cells = <1>;
+ 			reg = <0x0 0x8c000000 0x0 0x40000>;
+ 		};
+ 
+ 		its_m3: interrupt-controller at a3000000 {
+ 			compatible = "arm,gic-v3-its";
+ 			msi-controller;
++			#msi-cells = <1>;
+ 			reg = <0x0 0xa3000000 0x0 0x40000>;
+ 		};
+ 
+ 		its_pcie: interrupt-controller at b7000000 {
+ 			compatible = "arm,gic-v3-its";
+ 			msi-controller;
++			#msi-cells = <1>;
+ 			reg = <0x0 0xb7000000 0x0 0x40000>;
+ 		};
+ 
+ 		its_dsa: interrupt-controller at c6000000 {
+ 			compatible = "arm,gic-v3-its";
+ 			msi-controller;
++			#msi-cells = <1>;
+ 			reg = <0x0 0xc6000000 0x0 0x40000>;
+ 		};
+ 	};
 -- 
 1.7.12.4
