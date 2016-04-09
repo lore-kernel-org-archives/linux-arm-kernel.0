@@ -1,35 +1,60 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 8 Apr 2016 23:26:22 -0600
-Subject: [PATCH 4/4] irqchip: bcm2836: Use a more generic memory barrier
- call
-In-Reply-To: <87a8l40xox.fsf@eliezer.anholt.net>
-References: <1459827858-3871-1-git-send-email-eric@anholt.net>
- <1459827858-3871-5-git-send-email-eric@anholt.net>
- <570497C7.10501@wwwdotorg.org> <87a8l40xox.fsf@eliezer.anholt.net>
-Message-ID: <5708927E.9030406@wwwdotorg.org>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Sat, 9 Apr 2016 10:44:17 +0200
+Subject: [PATCH 2/2] pci, acpi: free IO resource during shutdown
+In-Reply-To: <5707EE6F.2050509@codeaurora.org>
+References: <1457389310-3538-1-git-send-email-okaya@codeaurora.org>
+ <1457389310-3538-2-git-send-email-okaya@codeaurora.org>
+ <20160407160624.GB8780@localhost> <57069CAF.8090803@codeaurora.org>
+ <20160407214108.GB24492@localhost> <5707281B.6020805@codeaurora.org>
+ <570754D7.3010009@semihalf.com> <5707EE6F.2050509@codeaurora.org>
+Message-ID: <5708C0E1.2020303@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/08/2016 12:20 PM, Eric Anholt wrote:
-> Stephen Warren <swarren@wwwdotorg.org> writes:
+On 08.04.2016 19:46, Sinan Kaya wrote:
+> Hi Tomasz,
 >
->> On 04/04/2016 09:44 PM, Eric Anholt wrote:
->>> dsb() requires an argument on arm64, so we needed to add "sy".
->>> Instead, take this opportunity to switch to the same smp_wmb() call
->>> that gic uses for its IPIs.  This is a less strong barrier than we
->>> were doing before (dmb(ishst) compared to dsb(sy)), but it seems to be
->>> the correct one.
+> On 4/8/2016 2:51 AM, Tomasz Nowicki wrote:
+>> Hi Sinan,
 >>
->> I assume all MMIO is part of the ish domain?
+>> On 08.04.2016 05:40, Sinan Kaya wrote:
+>>> Hi Tomasz,
+>>>
+>>> On 4/7/2016 5:41 PM, Bjorn Helgaas wrote:
+>>>>>> You say this is undoing the effect of pci_remap_iospace(), but that's
+>>>>>>>> only called by native drivers and the generic (OF) driver, not by
+>>>>>>>> pci_root.c.
+>>>>>>
+>>>>>> See the ACPI root bridge driver above.
+>>>> If this is a fix to patches that haven't been merged yet, we need to
+>>>> squash the fix into the patches.
+>>>>
+>>>
+>>> Can you merge these to two patches to your series for the next post?
+>>>
+>>> I need to remove weak on the first patch per direction from Bjorn and
+>>> fix the function comments. You could as well do this while you are merging.
+>>>
+>>> Let me know what your preference is.
+>>>
 >>
->> If so, the series,
->> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+>> Please do necessary fixes for your patches and send me the repo reference link. I will merge these to my patch set. Thanks!
+>>
+>> Tomasz
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 >
-> I don't know if this barrier implies ordering all the way out to AXI on
-> this HW, but I don't think that's a requirement of this function.
+> I posted the updated patch here. Changes are:
+>
+> - I squashed these two patches together per Bjorn's request.
+> - Removed the weak declarations from both remap and unmap calls.
+> - Fixed the doxygen document to match the actual parameters.
+>
+> https://us.codeaurora.org/cgit/quic/server/kernel/commit/?h=okaya/pciunmapv2&id=6120a5f0c5e6d757f18a076917fa202e2c9823d0
+>
 
-My understanding was that the barrier was explicitly to work around a 
-bug in the bus fabric of the SoC, and hence the barrier very much does 
-have to affect the transaction all the way out to AXI. Re-reading 
-BCM2835-ARM-Peripherals.pdf section 1.3 "Peripheral access precautions 
-for correct memory ordering" seems to confirm this.
+Thanks Sinan!
+
+Tomasz
