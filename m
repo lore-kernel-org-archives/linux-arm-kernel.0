@@ -1,183 +1,37 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat,  9 Apr 2016 15:22:41 +0200
-Subject: [PATCH] ARM: dts: sun8i: Add dts file for the Orange Pi One SBC
-Message-ID: <1460208161-16463-1-git-send-email-hdegoede@redhat.com>
+Date: Sat,  9 Apr 2016 16:15:13 +0200
+Subject: [PATCH v5 0/2] ?hci-platform: Add support for controllers with more
+ then one reset line
+Message-ID: <1460211315-17915-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Orange Pi One SBC, is a stripped down version of the popular
-Orange Pi PC. The one is a H3 based SBC, with 512M of RAM,
-micro-sd slot, 1 host usb, 1 otg usb, hdmi and 100Mbit ethernet.
+Hi Greg, et al,
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/Makefile                  |   1 +
- arch/arm/boot/dts/sun8i-h3-orangepi-one.dts | 145 ++++++++++++++++++++++++++++
- 2 files changed, 146 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
+Here is a resend of my last version of the patch set to support usb
+controllers which have multiple resets.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 9208da8..e06a5ab 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -720,6 +720,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
- 	sun8i-a83t-allwinner-h8homlet-v2.dtb \
- 	sun8i-a83t-cubietruck-plus.dtb \
- 	sun8i-h3-orangepi-2.dtb \
-+	sun8i-h3-orangepi-one.dtb \
- 	sun8i-h3-orangepi-pc.dtb \
- 	sun8i-h3-orangepi-plus.dtb
- dtb-$(CONFIG_MACH_SUN9I) += \
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
-new file mode 100644
-index 0000000..0adf932
---- /dev/null
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
-@@ -0,0 +1,145 @@
-+/*
-+ * Copyright (C) 2016 Hans de Goede <hdegoede@redhat.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun8i-h3.dtsi"
-+#include "sunxi-common-regulators.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
-+
-+/ {
-+	model = "Xunlong Orange Pi One";
-+	compatible = "xunlong,orangepi-one", "allwinner,sun8i-h3";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&leds_opc>, <&leds_r_opc>;
-+
-+		pwr_led {
-+			label = "orangepi:green:pwr";
-+			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>;
-+			default-state = "on";
-+		};
-+
-+		status_led {
-+			label = "orangepi:red:status";
-+			gpios = <&pio 0 15 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+
-+	r_gpio_keys {
-+		compatible = "gpio-keys";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&sw_r_opc>;
-+
-+		sw4 {
-+			label = "sw4";
-+			linux,code = <BTN_0>;
-+			gpios = <&r_pio 0 3 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+};
-+
-+&ehci1 {
-+	status = "okay";
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&ohci1 {
-+	status = "okay";
-+};
-+
-+&pio {
-+	leds_opc: led_pins at 0 {
-+		allwinner,pins = "PA15";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+};
-+
-+&r_pio {
-+	leds_r_opc: led_pins at 0 {
-+		allwinner,pins = "PL10";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
-+	sw_r_opc: key_pins at 0 {
-+		allwinner,pins = "PL3";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	/* USB VBUS is always on */
-+	status = "okay";
-+};
--- 
-2.7.3
+Unfortunately the shared reset controller support this depends on did
+not make it into 4.6. Philipp Zabel, the reset maintainer (in the Cc)
+has put these patches in a stable branch / tag here:
+
+git://git.pengutronix.de/git/pza/linux.git tags/reset-for-4.7
+
+Can you please merge in this tag and then these 2 patches for 4.7 ?
+
+Changes in v2:
+-Switch to now shared reset_[de]assert functions
+
+Changes in v3:
+-Adjust for changes to shared-reset reset-controller functions
+
+Changes in v4:
+-Fix Ugly continuation line
+-Add Acked-by: Alan Stern <stern@xxxxxxxxxxxxxxxxxxx>
+
+Changes in v5:
+-No changes, resend for merging into 4.7
+
+Thanks & Regards,
+
+Hans
