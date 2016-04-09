@@ -1,132 +1,438 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat,  9 Apr 2016 16:15:15 +0200
-Subject: [PATCH v5 2/2] ohci-platform: Add support for controllers with
- multiple reset lines
-In-Reply-To: <1460211315-17915-1-git-send-email-hdegoede@redhat.com>
-References: <1460211315-17915-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1460211315-17915-3-git-send-email-hdegoede@redhat.com>
+From: sergio.prado@e-labworks.com (Sergio Prado)
+Date: Sat,  9 Apr 2016 14:43:49 -0300
+Subject: [PATCH] ARM: dts: imx6: Add dts for Embest MarS Board
+Message-ID: <1460223829-13926-1-git-send-email-sergio.prado@e-labworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At least the EHCI/OHCI found on the Allwinnner H3 SoC needs multiple
-reset lines, the controller will not initialize while the reset for
-its companion is still asserted, which means we need to de-assert
-2 resets for the controller to work.
+Embest MarS Board [1] is a multi-core platform based on Freescale i.MX6
+Cortex-A9 Dual Core, running up to 1GHz with 1 GB of RAM, 4GB of eMMC
+and with a 4MB SPI flash.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
-Changes in v2:
--New patch in v2 of this patch-set, to complement the identical patch for
- the ehci-platform code
----
- Documentation/devicetree/bindings/usb/usb-ohci.txt |  2 +-
- drivers/usb/host/ohci-platform.c                   | 43 ++++++++++++----------
- 2 files changed, 24 insertions(+), 21 deletions(-)
+[1] http://www.embest-tech.com/shop/star/marsboard.html
 
-diff --git a/Documentation/devicetree/bindings/usb/usb-ohci.txt b/Documentation/devicetree/bindings/usb/usb-ohci.txt
-index 19233b7..9df4569 100644
---- a/Documentation/devicetree/bindings/usb/usb-ohci.txt
-+++ b/Documentation/devicetree/bindings/usb/usb-ohci.txt
-@@ -14,7 +14,7 @@ Optional properties:
- - clocks : a list of phandle + clock specifier pairs
- - phys : phandle + phy specifier pair
- - phy-names : "usb"
--- resets : phandle + reset specifier pair
-+- resets : a list of phandle + reset specifier pairs
- 
- Example:
- 
-diff --git a/drivers/usb/host/ohci-platform.c b/drivers/usb/host/ohci-platform.c
-index ae1c988..898b740 100644
---- a/drivers/usb/host/ohci-platform.c
-+++ b/drivers/usb/host/ohci-platform.c
-@@ -33,11 +33,12 @@
- 
- #define DRIVER_DESC "OHCI generic platform driver"
- #define OHCI_MAX_CLKS 3
-+#define OHCI_MAX_RESETS 2
- #define hcd_to_ohci_priv(h) ((struct ohci_platform_priv *)hcd_to_ohci(h)->priv)
- 
- struct ohci_platform_priv {
- 	struct clk *clks[OHCI_MAX_CLKS];
--	struct reset_control *rst;
-+	struct reset_control *resets[OHCI_MAX_RESETS];
- 	struct phy **phys;
- 	int num_phys;
- };
-@@ -117,7 +118,7 @@ static int ohci_platform_probe(struct platform_device *dev)
- 	struct usb_ohci_pdata *pdata = dev_get_platdata(&dev->dev);
- 	struct ohci_platform_priv *priv;
- 	struct ohci_hcd *ohci;
--	int err, irq, phy_num, clk = 0;
-+	int err, irq, phy_num, clk = 0, rst = 0;
- 
- 	if (usb_disabled())
- 		return -ENODEV;
-@@ -195,19 +196,21 @@ static int ohci_platform_probe(struct platform_device *dev)
- 				break;
- 			}
- 		}
--
--	}
--
--	priv->rst = devm_reset_control_get_optional(&dev->dev, NULL);
--	if (IS_ERR(priv->rst)) {
--		err = PTR_ERR(priv->rst);
--		if (err == -EPROBE_DEFER)
--			goto err_put_clks;
--		priv->rst = NULL;
--	} else {
--		err = reset_control_deassert(priv->rst);
--		if (err)
--			goto err_put_clks;
-+		for (rst = 0; rst < OHCI_MAX_RESETS; rst++) {
-+			priv->resets[rst] =
-+				devm_reset_control_get_shared_by_index(
-+								&dev->dev, rst);
-+			if (IS_ERR(priv->resets[rst])) {
-+				err = PTR_ERR(priv->resets[rst]);
-+				if (err == -EPROBE_DEFER)
-+					goto err_reset;
-+				priv->resets[rst] = NULL;
-+				break;
-+			}
-+			err = reset_control_deassert(priv->resets[rst]);
-+			if (err)
-+				goto err_reset;
-+		}
- 	}
- 
- 	if (pdata->big_endian_desc)
-@@ -265,8 +268,8 @@ err_power:
- 	if (pdata->power_off)
- 		pdata->power_off(dev);
- err_reset:
--	if (priv->rst)
--		reset_control_assert(priv->rst);
-+	while (--rst >= 0)
-+		reset_control_assert(priv->resets[rst]);
- err_put_clks:
- 	while (--clk >= 0)
- 		clk_put(priv->clks[clk]);
-@@ -284,15 +287,15 @@ static int ohci_platform_remove(struct platform_device *dev)
- 	struct usb_hcd *hcd = platform_get_drvdata(dev);
- 	struct usb_ohci_pdata *pdata = dev_get_platdata(&dev->dev);
- 	struct ohci_platform_priv *priv = hcd_to_ohci_priv(hcd);
--	int clk;
-+	int clk, rst;
- 
- 	usb_remove_hcd(hcd);
- 
- 	if (pdata->power_off)
- 		pdata->power_off(dev);
- 
--	if (priv->rst)
--		reset_control_assert(priv->rst);
-+	for (rst = 0; rst < OHCI_MAX_RESETS && priv->resets[rst]; rst++)
-+		reset_control_assert(priv->resets[rst]);
- 
- 	for (clk = 0; clk < OHCI_MAX_CLKS && priv->clks[clk]; clk++)
- 		clk_put(priv->clks[clk]);
+Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
+---
+ arch/arm/boot/dts/imx6q-marsboard.dts | 411 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 411 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6q-marsboard.dts
+
+diff --git a/arch/arm/boot/dts/imx6q-marsboard.dts b/arch/arm/boot/dts/imx6q-marsboard.dts
+new file mode 100644
+index 000000000000..a2bcc795ef3f
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6q-marsboard.dts
+@@ -0,0 +1,411 @@
++/*
++ * Copyright (C) 2016 Sergio Prado (sergio.prado at e-labworks.com)
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License
++ *     version 2 as published by the Free Software Foundation.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "imx6q.dtsi"
++#include <dt-bindings/gpio/gpio.h>
++
++/ {
++	model = "Embest MarS Board i.MX6Dual";
++	compatible = "embest,imx6q-marsboard", "fsl,imx6dl";
++
++	memory {
++		reg = <0x10000000 0x40000000>;
++	};
++
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		reg_3p3v: regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "3P3V";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++		};
++
++		reg_usb_otg_vbus: regulator at 2 {
++			compatible = "regulator-fixed";
++			reg = <2>;
++			regulator-name = "usb_otg_vbus";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_led>;
++
++		led at 1 {
++			label = "imx6:green:user1";
++			gpios = <&gpio5 2 GPIO_ACTIVE_LOW>;
++			default-state = "off";
++			linux,default-trigger = "heartbeat";
++		};
++
++		led at 2 {
++			label = "imx6:green:user2";
++			gpios = <&gpio3 28 GPIO_ACTIVE_LOW>;
++			default-state = "off";
++		};
++	};
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1>;
++	status = "okay";
++};
++
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart2>;
++	status = "okay";
++};
++
++&uart3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart3>;
++	status = "okay";
++};
++
++&uart4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart4>;
++	status = "okay";
++};
++
++&uart5 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart5>;
++	status = "okay";
++};
++
++&fec {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_enet>;
++	phy-mode = "rgmii";
++	phy-reset-gpios = <&gpio3 31 GPIO_ACTIVE_HIGH>;
++	status = "okay";
++};
++
++&usdhc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc2>;
++	vmmc-supply = <&reg_3p3v>;
++	cd-gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
++	wp-gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
++	status = "okay";
++};
++
++&usdhc3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc3>;
++	vmmc-supply = <&reg_3p3v>;
++	non-removable;
++	status = "okay";
++};
++
++&i2c1 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1>;
++	status = "okay";
++};
++
++&i2c2 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2>;
++	status = "okay";
++};
++
++&i2c3 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c3>;
++	status = "okay";
++};
++
++&ecspi1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_ecspi1>;
++	cs-gpios = <&gpio2 30 GPIO_ACTIVE_LOW>;
++	fsl,spi-num-chipselects = <1>;
++	status = "okay";
++
++	m25p80 at 0 {
++		compatible = "microchip,sst25vf016b";
++		spi-max-frequency = <20000000>;
++		reg = <0>;
++	};
++};
++
++&pwm1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm1>;
++	status = "okay";
++};
++
++&pwm2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm2>;
++	status = "okay";
++};
++
++&pwm3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm3>;
++	status = "okay";
++};
++
++&pwm4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm4>;
++	status = "okay";
++};
++
++&usbh1 {
++	dr_mode = "host";
++	disable-over-current;
++	status = "okay";
++};
++
++&usbotg {
++	vbus-supply = <&reg_usb_otg_vbus>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usbotg>;
++	dr_mode = "otg";
++	disable-over-current;
++	status = "okay";
++};
++
++&hdmi {
++	ddc-i2c-bus = <&i2c2>;
++	status = "okay";
++};
++
++&audmux {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_audmux>;
++	status = "okay";
++};
++
++&iomuxc {
++	imx6-riotboard {
++		pinctrl_uart1: uart1grp {
++			fsl,pins = <
++				MX6QDL_PAD_CSI0_DAT10__UART1_TX_DATA	0x1b0b1
++				MX6QDL_PAD_CSI0_DAT11__UART1_RX_DATA	0x1b0b1
++			>;
++		};
++
++		pinctrl_uart2: uart2grp {
++			fsl,pins = <
++				MX6QDL_PAD_EIM_D26__UART2_TX_DATA	0x1b0b1
++				MX6QDL_PAD_EIM_D27__UART2_RX_DATA	0x1b0b1
++			>;
++		};
++
++		pinctrl_uart3: uart3grp {
++			fsl,pins = <
++				MX6QDL_PAD_EIM_D24__UART3_TX_DATA	0x1b0b1
++				MX6QDL_PAD_EIM_D25__UART3_RX_DATA	0x1b0b1
++			>;
++		};
++
++		pinctrl_uart4: uart4grp {
++			fsl,pins = <
++				MX6QDL_PAD_KEY_COL0__UART4_TX_DATA	0x1b0b1
++				MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA	0x1b0b1
++			>;
++		};
++
++		pinctrl_uart5: uart5grp {
++			fsl,pins = <
++				MX6QDL_PAD_KEY_COL1__UART5_TX_DATA	0x1b0b1
++				MX6QDL_PAD_KEY_ROW1__UART5_RX_DATA	0x1b0b1
++			>;
++		};
++
++		pinctrl_enet: enetgrp {
++			fsl,pins = <
++				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
++				MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
++				MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x1b0b0
++				MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b0b0
++				MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b0b0
++				MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b0b0
++				MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x1b0b0
++				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x1b0b0
++				/* AR8035 CLK_25M --> ENET_REF_CLK (V22) */
++				MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x0a0b1
++				/* AR8035 pin strapping: IO voltage: pull up */
++				MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0
++				/* AR8035 pin strapping: PHYADDR#0: pull down */
++				MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x130b0
++				/* AR8035 pin strapping: PHYADDR#1: pull down */
++				MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x130b0
++				/* AR8035 pin strapping: MODE#1: pull up */
++				MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b0b0
++				/* AR8035 pin strapping: MODE#3: pull up */
++				MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b0b0
++				/* AR8035 pin strapping: MODE#0: pull down */
++				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x130b0
++				/* GPIO16 -> AR8035 25MHz */
++				MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x4001b0a8
++				/* RGMII_nRST */
++			        MX6QDL_PAD_EIM_D31__GPIO3_IO31		0x130b0
++				/* AR8035 interrupt */
++				MX6QDL_PAD_ENET_TX_EN__GPIO1_IO28	0x180b0
++			>;
++		};
++
++		pinctrl_led: ledgrp {
++			fsl,pins = <
++				MX6QDL_PAD_EIM_A25__GPIO5_IO02		0x1b0b1	/* LED0 */
++				MX6QDL_PAD_EIM_D28__GPIO3_IO28		0x1b0b1	/* LED1 */
++			>;
++		};
++
++		pinctrl_usdhc2: usdhc2grp {
++			fsl,pins = <
++				MX6QDL_PAD_SD2_CMD__SD2_CMD		0x17059
++				MX6QDL_PAD_SD2_CLK__SD2_CLK		0x10059
++				MX6QDL_PAD_SD2_DAT0__SD2_DATA0		0x17059
++				MX6QDL_PAD_SD2_DAT1__SD2_DATA1		0x17059
++				MX6QDL_PAD_SD2_DAT2__SD2_DATA2		0x17059
++				MX6QDL_PAD_SD2_DAT3__SD2_DATA3		0x17059
++				MX6QDL_PAD_GPIO_4__GPIO1_IO04		0x1b0b0	/* CD */
++				MX6QDL_PAD_GPIO_2__GPIO1_IO02		0x1f0b0	/* WP */
++			>;
++		};
++
++		pinctrl_usdhc3: usdhc3grp {
++			fsl,pins = <
++				MX6QDL_PAD_SD3_CMD__SD3_CMD		0x17009
++				MX6QDL_PAD_SD3_CLK__SD3_CLK		0x10009
++				MX6QDL_PAD_SD3_DAT0__SD3_DATA0		0x17009
++				MX6QDL_PAD_SD3_DAT1__SD3_DATA1		0x17009
++				MX6QDL_PAD_SD3_DAT2__SD3_DATA2		0x17009
++				MX6QDL_PAD_SD3_DAT3__SD3_DATA3		0x17009
++				MX6QDL_PAD_SD3_RST__SD3_RESET		0x17009
++			>;
++		};
++
++		pinctrl_i2c1: i2c1grp {
++			fsl,pins = <
++				MX6QDL_PAD_CSI0_DAT8__I2C1_SDA		0x4001b8b1
++				MX6QDL_PAD_CSI0_DAT9__I2C1_SCL		0x4001b8b1
++			>;
++		};
++
++		pinctrl_i2c2: i2c2grp {
++			fsl,pins = <
++				MX6QDL_PAD_KEY_COL3__I2C2_SCL		0x4001b8b1
++				MX6QDL_PAD_KEY_ROW3__I2C2_SDA		0x4001b8b1
++			>;
++		};
++
++		pinctrl_i2c3: i2c3grp {
++			fsl,pins = <
++				MX6QDL_PAD_GPIO_5__I2C3_SCL		0x4001b8b1
++				MX6QDL_PAD_GPIO_6__I2C3_SDA		0x4001b8b1
++			>;
++		};
++
++		pinctrl_ecspi1: ecspi1grp {
++			fsl,pins = <
++				MX6QDL_PAD_EIM_D16__ECSPI1_SCLK		0x100b1
++				MX6QDL_PAD_EIM_D17__ECSPI1_MISO		0x100b1
++				MX6QDL_PAD_EIM_D18__ECSPI1_MOSI		0x100b1
++				MX6QDL_PAD_EIM_EB2__GPIO2_IO30		0x000b1	/* CS0 */
++			>;
++		};
++
++		pinctrl_pwm1: pwm1grp {
++			fsl,pins = <
++				MX6QDL_PAD_DISP0_DAT8__PWM1_OUT		0x1b0b1
++			>;
++		};
++
++		pinctrl_pwm2: pwm2grp {
++			fsl,pins = <
++				MX6QDL_PAD_DISP0_DAT9__PWM2_OUT		0x1b0b1
++			>;
++		};
++
++		pinctrl_pwm3: pwm3grp {
++			fsl,pins = <
++				MX6QDL_PAD_SD1_DAT1__PWM3_OUT		0x1b0b1
++			>;
++		};
++
++		pinctrl_pwm4: pwm4grp {
++			fsl,pins = <
++				MX6QDL_PAD_SD1_CMD__PWM4_OUT		0x1b0b1
++			>;
++		};
++
++		pinctrl_usbotg: usbotggrp {
++			fsl,pins = <
++				MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID	0x17059
++				MX6QDL_PAD_EIM_D21__USB_OTG_OC		0x1b0b0
++				MX6QDL_PAD_EIM_D22__GPIO3_IO22		0x000b0	/* USB OTG POWER ENABLE */
++			>;
++		};
++
++		pinctrl_audmux: audmuxgrp {
++			fsl,pins = <
++				MX6QDL_PAD_CSI0_DAT7__AUD3_RXD		0x130b0
++				MX6QDL_PAD_CSI0_DAT4__AUD3_TXC		0x130b0
++				MX6QDL_PAD_CSI0_DAT5__AUD3_TXD		0x110b0
++				MX6QDL_PAD_CSI0_DAT6__AUD3_TXFS		0x130b0
++				MX6QDL_PAD_GPIO_0__CCM_CLKO1		0x130b0	/* CAM_MCLK */
++			>;
++		};
++	};
++};
 -- 
-2.7.3
+1.9.1
