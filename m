@@ -1,144 +1,56 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Sun, 10 Apr 2016 01:38:05 +0300
-Subject: [PATCH V2 1/5] iommu/msm: Add DT adaptation
-In-Reply-To: <1459952975-1250-2-git-send-email-sricharan@codeaurora.org>
-References: <1459952975-1250-1-git-send-email-sricharan@codeaurora.org>
- <1459952975-1250-2-git-send-email-sricharan@codeaurora.org>
-Message-ID: <6297087.btlKtGepct@avalon>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 10 Apr 2016 06:42:17 +0800
+Subject: [PATCH v5 2/2] ohci-platform: Add support for controllers with
+ multiple reset lines
+In-Reply-To: <1460211315-17915-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <201604100613.ZjXMnHgp%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sricharan,
+Hi Hans,
 
-Thank you for the patch.
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.6-rc2 next-20160408]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-On Wednesday 06 Apr 2016 19:59:31 Sricharan R wrote:
-> The driver currently works based on platform data. Remove this
-> and add support for DT. A single master can have multiple ports
-> connected to more than one iommu.
-> 
->                      master
->                        |
->                        |
->                        |
->           ------------------------
->           |                      |
->        IOMMU0                  IOMMU1
->           |                      |
->      ctx0   ctx1            ctx0   ctx1
-> 
-> This association of master and iommus/contexts were previously
-> represented by platform data parent/child device details. The client
-> drivers were responsible for programming all of the iommus/contexts
-> for the device. Now while adapting to generic DT bindings we maintain the
-> list of iommus, contexts that each master domain is connected to and
-> program all of them on attach/detach.
-> 
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-> ---
->  .../devicetree/bindings/iommu/msm,iommu-v0.txt     |  59 ++++
->  drivers/iommu/msm_iommu.c                          | 252 +++++++++--------
->  drivers/iommu/msm_iommu.h                          |  73 ++---
->  drivers/iommu/msm_iommu_dev.c                      | 315 ++++--------------
->  4 files changed, 296 insertions(+), 403 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/iommu/msm,iommu-v0.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/iommu/msm,iommu-v0.txt
-> b/Documentation/devicetree/bindings/iommu/msm,iommu-v0.txt new file mode
-> 100644
-> index 0000000..21bfbfc
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/iommu/msm,iommu-v0.txt
-> @@ -0,0 +1,59 @@
-> +* QCOM IOMMU
-> +
-> +The QCOM IOMMU is an implementation compatible with the ARM VMSA short
-> +descriptor page tables. It provides address translation for bus masters
-> outside
-> +of the CPU, each connected to the IOMMU through a port called micro-TLB.
-> +
-> +Required Properties:
-> +
-> +  - compatible: Must contain "qcom,iommu-v0".
-> +  - reg: Base address and size of the IOMMU registers.
-> +  - interrupts: Specifiers for the MMU fault interrupts. For instances that
-> +    support secure mode two interrupts must be specified, for non-secure
-> and
-> +    secure mode, in that order. For instances that don't support secure
-> mode a
-> +    single interrupt must be specified.
-> +  - #iommu-cells: This is the total number of stream ids that a master
-> would
-> +		  use during transactions which will be specified as a list
-> +		  as a part of iommus property below.
+url:    https://github.com/0day-ci/linux/commits/Hans-de-Goede/hci-platform-Add-support-for-controllers-with-more-then-one-reset-line/20160409-221746
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
+config: x86_64-randconfig-s5-04100613 (attached as .config)
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-That's not correct. #iommu-cells, as defined in the core IOMMU DT bindings, is 
-"the number of cells in an IOMMU specifier needed to encode an address" 
-(address being a stream id here).
+All errors (new ones prefixed by >>):
 
-Can the number of cells differ from instance to instance, or is it always 2 ?
+   drivers/usb/host/ohci-platform.c: In function 'ohci_platform_probe':
+>> drivers/usb/host/ohci-platform.c:201:5: error: implicit declaration of function 'devm_reset_control_get_shared_by_index' [-Werror=implicit-function-declaration]
+        devm_reset_control_get_shared_by_index(
+        ^
+   drivers/usb/host/ohci-platform.c:200:22: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
+       priv->resets[rst] =
+                         ^
+   cc1: some warnings being treated as errors
 
-> +  - ncb: The total number of context banks in the IOMMU.
+vim +/devm_reset_control_get_shared_by_index +201 drivers/usb/host/ohci-platform.c
 
-Should this be qcom,ncb ?
+   195					priv->clks[clk] = NULL;
+   196					break;
+   197				}
+   198			}
+   199			for (rst = 0; rst < OHCI_MAX_RESETS; rst++) {
+   200				priv->resets[rst] =
+ > 201					devm_reset_control_get_shared_by_index(
+   202									&dev->dev, rst);
+   203				if (IS_ERR(priv->resets[rst])) {
+   204					err = PTR_ERR(priv->resets[rst]);
 
-> +  - clocks	: List of clocks to be used during SMMU register access. See
-> +		  Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +		  for information about the format. For each clock specified
-> +		  here, there must be a corresponding entry in clock-names
-> +		  (see below).
-> +
-> +  - clock-names	: List of clock names corresponding to the clocks specified
-> in
-> +		  the "clocks" property (above). See
-> +		  Documentation/devicetree/bindings/clock/clock-bindings.txt
-> +		  for more info.
-> +
-> +Each bus master connected to an IOMMU must reference the IOMMU in its
-> device
-> +node with the following property:
-> +
-> +  - iommus: A reference to the IOMMU in multiple cells. The first cell is a
-> +	    phandle to the IOMMU and the second cell is the list of the
-> +	    stream ids used by the device.
-
-You mention in your cover letter that a master device can be connected to 
-multiple iommus, shouldn't that be stated here ? On the same topic, do your 
-masters need to selectively enable/disable memory ports to IOMMUs, or can they 
-all be enabled/disabled together ?
-
-Also, the second cell can't be a list of stream ids, as one cell stores one 
-value. A master device using multiple stream ids should use multiple entries 
-in the iommus property.
-
-> +Example: mdp iommu and its bus master
-> +
-> +                mdp_port0: qcom,iommu at 7500000 {
-
-I think you can use iommu instead of qcom,iommu.
-
-> +			compatible = "msm,iommu-v0";
-> +			#iommu-cells = <2>;
-> +			clock-names =
-> +			    "smmu_pclk",
-> +			    "iommu_clk";
-> +			clocks =
-> +			    <&mmcc SMMU_AHB_CLK>,
-> +			    <&mmcc MDP_AXI_CLK>;
-> +			reg = <0x07500000 0x100000>;
-> +			interrupts =
-> +			    <GIC_SPI 63 0>,
-> +			    <GIC_SPI 64 0>;
-> +			ncb = <2>;
-> +		};
-> +
-> +		mdp: qcom,mdp at 5100000 {
-> +			compatible = "qcom,mdp";
-> +			...
-> +			iommus = <&mdp_port0 0 2>;
-> +		};
-
--- 
-Regards,
-
-Laurent Pinchart
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 25550 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160410/af0aa259/attachment-0001.obj>
