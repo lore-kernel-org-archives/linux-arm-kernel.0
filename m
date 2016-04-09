@@ -1,252 +1,96 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Fri, 8 Apr 2016 21:29:02 -0500
-Subject: [PATCH v5 6/9] irqchip/gic-v3: Parse and export virtual GIC
- information
-In-Reply-To: <1459769860-6629-7-git-send-email-julien.grall@arm.com>
-References: <1459769860-6629-1-git-send-email-julien.grall@arm.com>
- <1459769860-6629-7-git-send-email-julien.grall@arm.com>
-Message-ID: <570868EE.9090200@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 9 Apr 2016 04:42:54 +0200
+Subject: [RFC6 PATCH v6 00/21] ILP32 for ARM64
+In-Reply-To: <CA+=Sn1kx1UumTYHa8AE-XAUNiSXTd5zoDxae1LL5YczC_VXe_w@mail.gmail.com>
+References: <20160407121838.GA22098@angband.pl>
+ <CA+=Sn1kx1UumTYHa8AE-XAUNiSXTd5zoDxae1LL5YczC_VXe_w@mail.gmail.com>
+Message-ID: <201604090442.54328.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julien,
+On Friday 08 April 2016, Andrew Pinski wrote:
+> On Thu, Apr 7, 2016 at 5:18 AM, Adam Borowski <kilobyte@angband.pl> wrote:
+> > On Wed, 6 Apr 2016, Geert Uytterhoeven wrote:
+> >> On Wed, Apr 6, 2016 at 12:08 AM, Yury Norov <ynorov@caviumnetworks.com> wrote:
+> >>>  v6:
+> >>>  - time_t, __kenel_off_t and other types turned to be 32-bit
+> >>>    for compatibility reasons (after v5 discussion);
+> >
+> > Introducing a new arch today with y2038 problems is not a good idea.
+> > Linus said so with appropriately pointy words in 2011.
 
-On 04/04/2016 06:37 AM, Julien Grall wrote:
-> Fill up the recently introduced gic_kvm_info with the hardware
-> information used for virtualization.
->
-> Signed-off-by: Julien Grall <julien.grall@arm.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
->
-> ---
->     Changes in v5:
->         - Remove the alignment check for GICV. It's already done in the
->         KVM code.
->         - Fix initialization of KVM with ACPI.
->
->     Changes in v4:
->         - Change the flow to call gic_kvm_set_info only when all the
->         mandatory information are valid.
->         - Remove unecessary code in ACPI parsing (the virtual control
->         interface doesn't exist for GICv3).
->         - Rework commit message
->         - Rework the ACPI support as it didn't collect hardware info for
->         virtualization when there is more than 1 redistributor region
->
->     Changes in v3:
->         - Add ACPI support
->
->     Changes in v2:
->         - Use 0 rather than a negative value to know when the maintenance
-> IRQ
->         is not present.
->         - Use resource for vcpu and vctrl
-> ---
->  drivers/irqchip/irq-gic-v3.c           | 110
-> ++++++++++++++++++++++++++++++++-
->  include/linux/irqchip/arm-gic-common.h |   1 +
->  2 files changed, 110 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-> index 50e87e6..08afbfe 100644
-> --- a/drivers/irqchip/irq-gic-v3.c
-> +++ b/drivers/irqchip/irq-gic-v3.c
-> @@ -28,6 +28,7 @@
->  #include <linux/slab.h>
->  
->  #include <linux/irqchip.h>
-> +#include <linux/irqchip/arm-gic-common.h>
->  #include <linux/irqchip/arm-gic-v3.h>
->  
->  #include <asm/cputype.h>
-> @@ -56,6 +57,8 @@ struct gic_chip_data {
->  static struct gic_chip_data gic_data __read_mostly;
->  static struct static_key supports_deactivate = STATIC_KEY_INIT_TRUE;
->  
-> +static struct gic_kvm_info gic_v3_kvm_info;
-> +
->  #define gic_data_rdist()
-> (this_cpu_ptr(gic_data.rdists.rdist))
->  #define gic_data_rdist_rd_base()	(gic_data_rdist()->rd_base)
->  #define gic_data_rdist_sgi_base()	(gic_data_rdist_rd_base() +
-> SZ_64K)
-> @@ -901,6 +904,30 @@ static int __init gic_validate_dist_version(void
-> __iomem *dist_base)
->  	return 0;
->  }
->  
-> +static void __init gic_of_setup_kvm_info(struct device_node *node)
-> +{
-> +	int ret;
-> +	struct resource r;
-> +	u32 gicv_idx;
-> +
-> +	gic_v3_kvm_info.type = GIC_V3;
-> +
-> +	gic_v3_kvm_info.maint_irq = irq_of_parse_and_map(node, 0);
-> +	if (!gic_v3_kvm_info.maint_irq)
-> +		return;
-> +
-> +	if (of_property_read_u32(node, "#redistributor-regions",
-> +				 &gicv_idx))
-> +		gicv_idx = 1;
-> +
-> +	gicv_idx += 3;	/* Also skip GICD, GICC, GICH */
-> +	ret = of_address_to_resource(node, gicv_idx, &r);
-> +	if (!ret)
-> +		gic_v3_kvm_info.vcpu = r;
-> +
-> +	gic_set_kvm_info(&gic_v3_kvm_info);
-> +}
-> +
->  static int __init gic_of_init(struct device_node *node, struct
-> device_node *parent)
->  {
->  	void __iomem *dist_base;
-> @@ -952,8 +979,10 @@ static int __init gic_of_init(struct device_node
-> *node, struct device_node *pare
->  
->  	err = gic_init_bases(dist_base, rdist_regs, nr_redist_regions,
->  			     redist_stride, &node->fwnode);
-> -	if (!err)
-> +	if (!err) {
-> +		gic_of_setup_kvm_info(node);
->  		return 0;
-> +	}
->  
->  out_unmap_rdist:
->  	for (i = 0; i < nr_redist_regions; i++)
-> @@ -974,6 +1003,9 @@ static struct
->  	struct redist_region *redist_regs;
->  	u32 nr_redist_regions;
->  	bool single_redist;
-> +	u32 maint_irq;
-> +	int maint_irq_mode;
-> +	phys_addr_t vcpu_base;
->  } acpi_data __initdata;
->  
->  static void __init
-> @@ -1110,7 +1142,81 @@ static bool __init acpi_validate_gic_table(struct
-> acpi_subtable_header *header,
->  	return true;
->  }
->  
-> +static int __init gic_acpi_parse_virt_madt_gicc(struct
-> acpi_subtable_header *header,
-> +						const unsigned long end)
-> +{
-> +	struct acpi_madt_generic_interrupt *gicc =
-> +		(struct acpi_madt_generic_interrupt *)header;
-> +	int maint_irq_mode;
-> +	static int first_madt = true;
-> +
-> +	maint_irq_mode = (gicc->flags & ACPI_MADT_VGIC_IRQ_MODE) ?
-> +		ACPI_EDGE_SENSITIVE : ACPI_LEVEL_SENSITIVE;
-> +
-Do you think GICC parameters are valid for an unusable processor?
-If not we need a validation check here, some thing like this to skip
-GICC subtable entry.
- 
-            if (!(gicc->flags & ACPI_MADT_ENABLED))
-                return 0;
+This was before we made the decision to fix the y2038 problem for all
+architectures.
 
-> +	if (first_madt) {
-> +		first_madt = false;
-> +
-> +		acpi_data.maint_irq = gicc->vgic_interrupt;
-> +		acpi_data.maint_irq_mode = maint_irq_mode;
-> +		acpi_data.vcpu_base = gicc->gicv_base_address;
-> +
-> +		return 0;
-> +	}
-> +
-> +	/*
-> +	 * The maintenance interrupt and GICV should be the same for every
-> CPU
-> +	 */
-> +	if ((acpi_data.maint_irq != gicc->vgic_interrupt) ||
-> +	    (acpi_data.maint_irq_mode != maint_irq_mode) ||
-> +	    (acpi_data.vcpu_base != gicc->gicv_base_address))
-> +		return -EINVAL;
-> +
-> +	return 0;
-> +}
-> +
-> +static bool __init gic_acpi_collect_virt_info(void)
-> +{
-> +	int count;
-> +
-> +	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
-> +				      gic_acpi_parse_virt_madt_gicc, 0);
-> +
-> +	return (count > 0);
-> +}
-> +
->  #define ACPI_GICV3_DIST_MEM_SIZE (SZ_64K)
-> +#define ACPI_GICV2_VCTRL_MEM_SIZE	(SZ_4K)
-> +#define ACPI_GICV2_VCPU_MEM_SIZE	(SZ_8K)
-> +
-> +static void __init gic_acpi_setup_kvm_info(void)
-> +{
-> +	int irq;
-> +
-> +	if (!gic_acpi_collect_virt_info()) {
-> +		pr_warn("Unable to get hardware information used for
-> virtualization\n");
-> +		return;
-> +	}
-> +
-> +	gic_v3_kvm_info.type = GIC_V3;
-> +
-> +	irq = acpi_register_gsi(NULL, acpi_data.maint_irq,
-> +				acpi_data.maint_irq_mode,
-> +				ACPI_ACTIVE_HIGH);
-> +	if (irq <= 0)
-> +		return;
-> +
-> +	gic_v3_kvm_info.maint_irq = irq;
-> +
-> +	if (acpi_data.vcpu_base) {
-> +		struct resource *vcpu = &gic_v3_kvm_info.vcpu;
-> +
-> +		vcpu->flags = IORESOURCE_MEM;
-> +		vcpu->start = acpi_data.vcpu_base;
-> +		vcpu->end = vcpu->start + ACPI_GICV2_VCPU_MEM_SIZE - 1;
-> +	}
-> +
-> +	gic_set_kvm_info(&gic_v3_kvm_info);
-> +}
->  
->  static int __init
->  gic_acpi_init(struct acpi_subtable_header *header, const unsigned long
-> end)
-> @@ -1159,6 +1265,8 @@ gic_acpi_init(struct acpi_subtable_header *header,
-> const unsigned long end)
->  		goto out_fwhandle_free;
->  
->  	acpi_set_irq_model(ACPI_IRQ_MODEL_GIC, domain_handle);
-> +	gic_acpi_setup_kvm_info();
-> +
->  	return 0;
->  
->  out_fwhandle_free:
-> diff --git a/include/linux/irqchip/arm-gic-common.h
-> b/include/linux/irqchip/arm-gic-common.h
-> index ef34f6f..c647b05 100644
-> --- a/include/linux/irqchip/arm-gic-common.h
-> +++ b/include/linux/irqchip/arm-gic-common.h
-> @@ -15,6 +15,7 @@
->  
->  enum gic_type {
->  	GIC_V2,
-> +	GIC_V3,
->  };
->  
->  struct gic_kvm_info {
+> This is the third time we had this discussion on time_t for ILP32.  I
+> had originally it as 32bit, then Catalin suggested I change it to
+> 64bit and then Arnd (with his work for 2038 issue on 32bit arch) said
+> ILP32 should match all other 32bit targets and the other 64bit time_t
+> be fixed by the current work he was working on.  Now you are
+> suggesting we change it again.
+> Arnd can you please comment more on why we want 32bit time_t instead
+> of the 64bit one?  I Know there was some POSIX (or was it C90)
+> violation but I suspect there is an easy way to workaround this inside
+> the kernel but the discussion to move over to 32bit time_t was already
+> made by the time I started to look into that.
 
--- 
-Shanker Donthineni
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+x32 still runs into new problems today, and will continue to have problems
+with newly added drivers that pass time_t (or other __kernel_long_t) arguments
+through ioctl.
+
+To avoid having to audit every new driver for interfaces that behave
+differently based on the __kernel_long_t definition, arm64 is not following
+the same route as x86 here and instead uses the normal 32-bit ABI like
+any other architecture. This means we use 32-bit time_t, aio_context_t,
+size_t and clock_t and share the system call implementation with the
+compat handling for arm (aarch32) mode.
+
+Once we have the interfaces for 64-bit time_t in place in the kernel,
+we will be able to rebuild glibc on all 32-bit architectures including
+arm and arm64/ilp32 that way.
+
+The POSIX and C99 incompatibility you mention is about struct timespec,
+which uses 'long' as the type for the tv_nsec member. This is vaguely
+related to the issue of 64-bit time_t, but is not the reason for
+starting out with 32-bit time_t for the new ABI here.
+
+[side note:
+How to precisely handle tv_nsec on 32-bit architectures is still an open
+issue that will have to be solved when we nail down the new system call
+interfaces:
+The issue specifically is what happens when the upper half of the
+second 64-bit word in struct timespec argument passed into a system
+call is nonzero: the normal 64-bit syscalls must return an error,
+while the 32-bit user space expects the kernel to ignore the upper bits.
+This means something between the application and the native system call
+has to clear the bits, and this can either be done by copying the
+data inside of glibc (as done on x32) or by adding an extra system
+call entry point in the kernel.]
+
+> >> We're already closer to the (future) y2038 than to the (past) introduction of
+> >> LP64...
+> >>
+> >> These unfixable legacy applications have been spreading through x32 to
+> >> the shiny new arm64 server architecture (does ppc64el also have an ILP32 mode,
+> >> or is it planned)? Lots of resources are spent on maintaining the status quo,
+> >> instead of on fixing the real problems.
+> >
+> > As an x32 (userland) porter, I can tell you that time_t!=long _did_ cause
+> > non-trivial amounts of work.  But that work is already done (at least in
+> > Debian), so you might as well benefit from it.
+> 
+> There is actually private code out there which uses timespec and
+> timeval to pass time over the wire; yes I know bad coding style and
+> all but they did it that way.  This is code which was working for x86
+> and we are porting it to ARM64; a data center code by the way; not
+> some networking code even.  This means they have not ported the code
+> to fully 64bit yet and they might never.
+
+This code will run into the same problem on arm64/ilp32 when built against
+a future libc implementation that defines time_t as 64-bit, but at least
+the glibc maintainers so far plan to leave this as a per-application
+option for the forseeable future: even on a system that uses 64-bit time_t
+in user space and kernel by default, you should be able to build an
+application using a 32-bit time_t.
+
+	Arnd
