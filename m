@@ -1,60 +1,53 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Sat, 9 Apr 2016 10:44:17 +0200
-Subject: [PATCH 2/2] pci, acpi: free IO resource during shutdown
-In-Reply-To: <5707EE6F.2050509@codeaurora.org>
-References: <1457389310-3538-1-git-send-email-okaya@codeaurora.org>
- <1457389310-3538-2-git-send-email-okaya@codeaurora.org>
- <20160407160624.GB8780@localhost> <57069CAF.8090803@codeaurora.org>
- <20160407214108.GB24492@localhost> <5707281B.6020805@codeaurora.org>
- <570754D7.3010009@semihalf.com> <5707EE6F.2050509@codeaurora.org>
-Message-ID: <5708C0E1.2020303@semihalf.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Sat, 9 Apr 2016 20:38:30 +1000
+Subject: [PATCH] sbs-battery: fix power status when battery charging near
+ dry
+In-Reply-To: <1459909945-36541-1-git-send-email-yh.huang@mediatek.com>
+References: <1459909945-36541-1-git-send-email-yh.huang@mediatek.com>
+Message-ID: <CAGS+omA7YgCvEJNTU2VB2xOu52nkowTuhBpykk=wOnjDAYFQWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.04.2016 19:46, Sinan Kaya wrote:
-> Hi Tomasz,
+On Wed, Apr 6, 2016 at 12:32 PM, YH Huang <yh.huang@mediatek.com> wrote:
+> POWER_SUPPLY_STATUS_NOT_CHARGING is used for AC connected, but
+> battery not charging (e.g. because battery temperature is out
+> of acceptable range).
 >
-> On 4/8/2016 2:51 AM, Tomasz Nowicki wrote:
->> Hi Sinan,
->>
->> On 08.04.2016 05:40, Sinan Kaya wrote:
->>> Hi Tomasz,
->>>
->>> On 4/7/2016 5:41 PM, Bjorn Helgaas wrote:
->>>>>> You say this is undoing the effect of pci_remap_iospace(), but that's
->>>>>>>> only called by native drivers and the generic (OF) driver, not by
->>>>>>>> pci_root.c.
->>>>>>
->>>>>> See the ACPI root bridge driver above.
->>>> If this is a fix to patches that haven't been merged yet, we need to
->>>> squash the fix into the patches.
->>>>
->>>
->>> Can you merge these to two patches to your series for the next post?
->>>
->>> I need to remove weak on the first patch per direction from Bjorn and
->>> fix the function comments. You could as well do this while you are merging.
->>>
->>> Let me know what your preference is.
->>>
->>
->> Please do necessary fixes for your patches and send me the repo reference link. I will merge these to my patch set. Thanks!
->>
->> Tomasz
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> When battery is charging near dry and BATTERY_FULL_DISCHARGED is set,
+> it is wrong to set as POWER_SUPPLY_STATUS_NOT_CHARGING.
+> Just use BATTERY_DISCHARGING to decide the power supply status is
+> discharging or charging.
 >
-> I posted the updated patch here. Changes are:
->
-> - I squashed these two patches together per Bjorn's request.
-> - Removed the weak declarations from both remap and unmap calls.
-> - Fixed the doxygen document to match the actual parameters.
->
-> https://us.codeaurora.org/cgit/quic/server/kernel/commit/?h=okaya/pciunmapv2&id=6120a5f0c5e6d757f18a076917fa202e2c9823d0
->
+> Signed-off-by: YH Huang <yh.huang@mediatek.com>
 
-Thanks Sinan!
+Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
 
-Tomasz
+> ---
+>  drivers/power/sbs-battery.c |    4 ----
+>  1 file changed, 4 deletions(-)
+>
+> diff --git a/drivers/power/sbs-battery.c b/drivers/power/sbs-battery.c
+> index d6226d6..768b9fc 100644
+> --- a/drivers/power/sbs-battery.c
+> +++ b/drivers/power/sbs-battery.c
+> @@ -382,8 +382,6 @@ static int sbs_get_battery_property(struct i2c_client *client,
+>
+>                 if (ret & BATTERY_FULL_CHARGED)
+>                         val->intval = POWER_SUPPLY_STATUS_FULL;
+> -               else if (ret & BATTERY_FULL_DISCHARGED)
+> -                       val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
+>                 else if (ret & BATTERY_DISCHARGING)
+>                         val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
+>                 else
+> @@ -702,8 +700,6 @@ static void sbs_delayed_work(struct work_struct *work)
+>
+>         if (ret & BATTERY_FULL_CHARGED)
+>                 ret = POWER_SUPPLY_STATUS_FULL;
+> -       else if (ret & BATTERY_FULL_DISCHARGED)
+> -               ret = POWER_SUPPLY_STATUS_NOT_CHARGING;
+>         else if (ret & BATTERY_DISCHARGING)
+>                 ret = POWER_SUPPLY_STATUS_DISCHARGING;
+>         else
+> --
+> 1.7.9.5
+>
