@@ -1,30 +1,57 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 10 Apr 2016 17:57:22 +0000 (UTC)
-Subject: [PATCH 3/4] ARM: DRA7: hwmod: Add data for GPTimer 12
-In-Reply-To: <1459892652-47845-4-git-send-email-s-anna@ti.com>
-References: <1459892652-47845-1-git-send-email-s-anna@ti.com>
- <1459892652-47845-4-git-send-email-s-anna@ti.com>
-Message-ID: <alpine.DEB.2.02.1604101757100.11457@utopia.booyaka.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Sun, 10 Apr 2016 11:32:03 -0700
+Subject: [PATCH 4/4] irqchip: bcm2836: Use a more generic memory barrier
+ call
+In-Reply-To: <5708927E.9030406@wwwdotorg.org>
+References: <1459827858-3871-1-git-send-email-eric@anholt.net>
+ <1459827858-3871-5-git-send-email-eric@anholt.net>
+ <570497C7.10501@wwwdotorg.org> <87a8l40xox.fsf@eliezer.anholt.net>
+ <5708927E.9030406@wwwdotorg.org>
+Message-ID: <878u0l1fj0.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 5 Apr 2016, Suman Anna wrote:
+Stephen Warren <swarren@wwwdotorg.org> writes:
 
-> Add the hwmod data for GPTimer 12. GPTimer 12 is present in
-> WKUPAON power domain and is clocked from a secure 32K clock.
-> GPTimer 12 serves as a secure timer on HS devices, but is
-> available for kernel on regular GP devices.
-> 
-> The hwmod link is registered only on GP devices. The hwmod data
-> also reused the existing timer class instead of reintroducing
-> the identical dra7xx_timer_secure_sysc class which was dropped
-> in commit edec17863362 ("ARM: DRA7: hwmod: Fix the hwmod class
-> for GPTimer4").
-> 
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Signed-off-by: Suman Anna <s-anna@ti.com>
+> On 04/08/2016 12:20 PM, Eric Anholt wrote:
+>> Stephen Warren <swarren@wwwdotorg.org> writes:
+>>
+>>> On 04/04/2016 09:44 PM, Eric Anholt wrote:
+>>>> dsb() requires an argument on arm64, so we needed to add "sy".
+>>>> Instead, take this opportunity to switch to the same smp_wmb() call
+>>>> that gic uses for its IPIs.  This is a less strong barrier than we
+>>>> were doing before (dmb(ishst) compared to dsb(sy)), but it seems to be
+>>>> the correct one.
+>>>
+>>> I assume all MMIO is part of the ish domain?
+>>>
+>>> If so, the series,
+>>> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+>>
+>> I don't know if this barrier implies ordering all the way out to AXI on
+>> this HW, but I don't think that's a requirement of this function.
+>
+> My understanding was that the barrier was explicitly to work around a 
+> bug in the bus fabric of the SoC, and hence the barrier very much does 
+> have to affect the transaction all the way out to AXI. Re-reading 
+> BCM2835-ARM-Peripherals.pdf section 1.3 "Peripheral access precautions 
+> for correct memory ordering" seems to confirm this.
 
-Thanks, queued for v4.7.
+My understanding of the explicit barrier here, which was copied from
+other irqchips, is "Make sure that normal memory writes before our IPI
+on this CPU appear on the other CPUs before they get the IPI" (like the
+comment says).  This barrier was not put in to deal with the
+283x-specific weird AXI behavior.
 
-
-- Paul
+Note that we had previously decided that the weird AXI ordering
+behavior, which is about repeated reads or repeated writes from the same
+CPU across different peripherals, is already covered by the barriers
+present in readl() and writel().  The writel() barrier happens to be a
+dsb() as well, so this explicit barrier is actually redundant.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160410/cdaf3077/attachment.sig>
