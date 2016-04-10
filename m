@@ -1,118 +1,148 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 10 Apr 2016 21:30:00 +0200
-Subject: [PATCH 3/3] ARM: dts: add pxa25x .dtsi file
+Date: Sun, 10 Apr 2016 21:29:59 +0200
+Subject: [PATCH 2/3] ARM: pxa: add pxa25x device-tree support
 In-Reply-To: <1460316600-15978-1-git-send-email-robert.jarzmik@free.fr>
 References: <1460316600-15978-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1460316600-15978-3-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1460316600-15978-2-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This file describes pxa25x SoCs. Not all devices are listed yet, only
-the subset which was already tested with a lubbock board.
+Add a device-tree machine entry (DT_MACHINE_START) for pxa25x based
+platforms.
+
+Take the opportunity to sort the file machine descriptions by
+alphabetical order.
 
 Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- arch/arm/boot/dts/pxa25x.dtsi | 92 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 92 insertions(+)
- create mode 100644 arch/arm/boot/dts/pxa25x.dtsi
+ arch/arm/mach-pxa/Kconfig  | 11 +++++++++++
+ arch/arm/mach-pxa/Makefile |  3 ++-
+ arch/arm/mach-pxa/pxa-dt.c | 37 ++++++++++++++++++++++++++-----------
+ arch/arm/mach-pxa/pxa25x.c | 12 ++++++------
+ 4 files changed, 45 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/boot/dts/pxa25x.dtsi b/arch/arm/boot/dts/pxa25x.dtsi
-new file mode 100644
-index 000000000000..0d1e012178c4
---- /dev/null
-+++ b/arch/arm/boot/dts/pxa25x.dtsi
-@@ -0,0 +1,92 @@
-+/*
-+ * Copyright (C) 2016 Robert Jarzmik <robert.jarzmik@free.fr>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+#include "pxa2xx.dtsi"
-+#include "dt-bindings/clock/pxa-clock.h"
+diff --git a/arch/arm/mach-pxa/Kconfig b/arch/arm/mach-pxa/Kconfig
+index cd894d69e766..76fbc115ec33 100644
+--- a/arch/arm/mach-pxa/Kconfig
++++ b/arch/arm/mach-pxa/Kconfig
+@@ -4,6 +4,17 @@ menu "Intel PXA2xx/PXA3xx Implementations"
+ 
+ comment "Intel/Marvell Dev Platforms (sorted by hardware release time)"
+ 
++config MACH_PXA25X_DT
++	bool "Support PXA25x platforms from device tree"
++	select PINCTRL
++	select POWER_SUPPLY
++	select PXA25x
++	select USE_OF
++	help
++	  Include support for Marvell PXA25x based platforms using
++	  the device tree. Needn't select any other machine while
++	  MACH_PXA25x_DT is enabled.
 +
-+/ {
-+	model = "Marvell PXA25x family SoC";
-+	compatible = "marvell,pxa250";
+ config MACH_PXA27X_DT
+ 	bool "Support PXA27x platforms from device tree"
+ 	select PINCTRL
+diff --git a/arch/arm/mach-pxa/Makefile b/arch/arm/mach-pxa/Makefile
+index 2ceed407eda9..ef25dc597f30 100644
+--- a/arch/arm/mach-pxa/Makefile
++++ b/arch/arm/mach-pxa/Makefile
+@@ -19,8 +19,9 @@ obj-$(CONFIG_CPU_PXA930)	+= pxa930.o
+ # NOTE: keep the order of boards in accordance to their order in Kconfig
+ 
+ # Device Tree support
+-obj-$(CONFIG_MACH_PXA3XX_DT)	+= pxa-dt.o
++obj-$(CONFIG_MACH_PXA25X_DT)	+= pxa-dt.o
+ obj-$(CONFIG_MACH_PXA27X_DT)	+= pxa-dt.o
++obj-$(CONFIG_MACH_PXA3XX_DT)	+= pxa-dt.o
+ 
+ # Intel/Marvell Dev Platforms
+ obj-$(CONFIG_ARCH_LUBBOCK)	+= lubbock.o
+diff --git a/arch/arm/mach-pxa/pxa-dt.c b/arch/arm/mach-pxa/pxa-dt.c
+index f128133a8f30..3e331e61f995 100644
+--- a/arch/arm/mach-pxa/pxa-dt.c
++++ b/arch/arm/mach-pxa/pxa-dt.c
+@@ -18,20 +18,18 @@
+ 
+ #include "generic.h"
+ 
+-#ifdef CONFIG_PXA3xx
+-static const char *const pxa3xx_dt_board_compat[] __initconst = {
+-	"marvell,pxa300",
+-	"marvell,pxa310",
+-	"marvell,pxa320",
++#ifdef CONFIG_PXA25x
++static const char * const pxa25x_dt_board_compat[] __initconst = {
++	"marvell,pxa250",
+ 	NULL,
+ };
+ 
+-DT_MACHINE_START(PXA_DT, "Marvell PXA3xx (Device Tree Support)")
+-	.map_io		= pxa3xx_map_io,
+-	.init_irq	= pxa3xx_dt_init_irq,
+-	.handle_irq	= pxa3xx_handle_irq,
++DT_MACHINE_START(PXA25X_DT, "Marvell PXA25x (Device Tree Support)")
++	.map_io		= pxa25x_map_io,
++	.init_irq	= pxa25x_dt_init_irq,
++	.handle_irq	= pxa25x_handle_irq,
+ 	.restart	= pxa_restart,
+-	.dt_compat	= pxa3xx_dt_board_compat,
++	.dt_compat	= pxa25x_dt_board_compat,
+ MACHINE_END
+ #endif
+ 
+@@ -41,7 +39,7 @@ static const char * const pxa27x_dt_board_compat[] __initconst = {
+ 	NULL,
+ };
+ 
+-DT_MACHINE_START(PXA27X_DT, "Marvell PXA2xx (Device Tree Support)")
++DT_MACHINE_START(PXA27X_DT, "Marvell PXA27x (Device Tree Support)")
+ 	.map_io		= pxa27x_map_io,
+ 	.init_irq	= pxa27x_dt_init_irq,
+ 	.handle_irq	= pxa27x_handle_irq,
+@@ -49,3 +47,20 @@ DT_MACHINE_START(PXA27X_DT, "Marvell PXA2xx (Device Tree Support)")
+ 	.dt_compat	= pxa27x_dt_board_compat,
+ MACHINE_END
+ #endif
 +
-+	clocks {
-+	       /*
-+		* The muxing of external clocks/internal dividers for osc* clock
-+		* sources has been hidden under the carpet by now.
-+		*/
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		clks: pxa2xx_clks at 41300004 {
-+			compatible = "marvell,pxa250-core-clocks";
-+			#clock-cells = <1>;
-+			status = "okay";
-+		};
-+
-+		/* timer oscillator */
-+		clktimer: oscillator {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency  = <3686400>;
-+			clock-output-names = "ostimer";
-+		};
-+	};
-+
-+	pxabus {
-+		pdma: dma-controller at 40000000 {
-+			compatible = "marvell,pdma-1.0";
-+			reg = <0x40000000 0x10000>;
-+			interrupts = <25>;
-+			#dma-channels = <16>;
-+			#dma-cells = <2>;
-+			#dma-requests = <40>;
-+			status = "okay";
-+		};
-+
-+		pxairq: interrupt-controller at 40d00000 {
-+			marvell,intc-priority;
-+			marvell,intc-nr-irqs = <32>;
-+		};
-+
-+		pinctrl: pinctrl at 40e00000 {
-+			reg = <0x40e00054 0x20 0x40e0000c 0xc 0x40e0010c 4
-+			       0x40f00020 0x10>;
-+			compatible = "marvell,pxa25x-pinctrl";
-+		};
-+
-+		gpio: gpio at 40e00000 {
-+			compatible = "intel,pxa25x-gpio";
-+			gpio-ranges = <&pinctrl 0 0 84>;
-+			clocks = <&clks CLK_NONE>;
-+		};
-+
-+		pwm0: pwm at 40b00000 {
-+			compatible = "marvell,pxa250-pwm";
-+			reg = <0x40b00000 0x10>;
-+			#pwm-cells = <1>;
-+			clocks = <&clks CLK_PWM0>;
-+		};
-+
-+		pwm1: pwm at 40b00010 {
-+			compatible = "marvell,pxa250-pwm";
-+			reg = <0x40b00010 0x10>;
-+			#pwm-cells = <1>;
-+			clocks = <&clks CLK_PWM1>;
-+		};
-+	};
-+
-+	timer at 40a00000 {
-+		compatible = "marvell,pxa-timer";
-+		reg = <0x40a00000 0x20>;
-+		interrupts = <26>;
-+		clocks = <&clktimer>;
-+		status = "okay";
-+	};
++#ifdef CONFIG_PXA3xx
++static const char *const pxa3xx_dt_board_compat[] __initconst = {
++	"marvell,pxa300",
++	"marvell,pxa310",
++	"marvell,pxa320",
++	NULL,
 +};
++
++DT_MACHINE_START(PXA_DT, "Marvell PXA3xx (Device Tree Support)")
++	.map_io		= pxa3xx_map_io,
++	.init_irq	= pxa3xx_dt_init_irq,
++	.handle_irq	= pxa3xx_handle_irq,
++	.restart	= pxa_restart,
++	.dt_compat	= pxa3xx_dt_board_compat,
++MACHINE_END
++#endif
+diff --git a/arch/arm/mach-pxa/pxa25x.c b/arch/arm/mach-pxa/pxa25x.c
+index a0de9a9ae64e..6110fa91be5e 100644
+--- a/arch/arm/mach-pxa/pxa25x.c
++++ b/arch/arm/mach-pxa/pxa25x.c
+@@ -212,12 +212,12 @@ static int __init pxa25x_init(void)
+ 		register_syscore_ops(&pxa_irq_syscore_ops);
+ 		register_syscore_ops(&pxa2xx_mfp_syscore_ops);
+ 
+-		pxa2xx_set_dmac_info(16, 40);
+-		pxa_register_device(&pxa25x_device_gpio, &pxa25x_gpio_info);
+-		ret = platform_add_devices(pxa25x_devices,
+-					   ARRAY_SIZE(pxa25x_devices));
+-		if (ret)
+-			return ret;
++		if (!of_have_populated_dt()) {
++			pxa2xx_set_dmac_info(16, 40);
++			pxa_register_device(&pxa25x_device_gpio, &pxa25x_gpio_info);
++			ret = platform_add_devices(pxa25x_devices,
++						   ARRAY_SIZE(pxa25x_devices));
++		}
+ 	}
+ 
+ 	return ret;
 -- 
 2.1.4
