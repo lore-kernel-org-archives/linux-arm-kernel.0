@@ -1,42 +1,30 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 10 Apr 2016 17:44:53 +0000 (UTC)
-Subject: [PATCH 4/4] ARM: DRA7: clockdomain: Implement timer workaround
- for errata i874
-In-Reply-To: <1459892652-47845-5-git-send-email-s-anna@ti.com>
+Date: Sun, 10 Apr 2016 17:57:22 +0000 (UTC)
+Subject: [PATCH 3/4] ARM: DRA7: hwmod: Add data for GPTimer 12
+In-Reply-To: <1459892652-47845-4-git-send-email-s-anna@ti.com>
 References: <1459892652-47845-1-git-send-email-s-anna@ti.com>
- <1459892652-47845-5-git-send-email-s-anna@ti.com>
-Message-ID: <alpine.DEB.2.02.1604101744350.11457@utopia.booyaka.com>
+ <1459892652-47845-4-git-send-email-s-anna@ti.com>
+Message-ID: <alpine.DEB.2.02.1604101757100.11457@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, 5 Apr 2016, Suman Anna wrote:
 
-> From: Keerthy <j-keerthy@ti.com>
+> Add the hwmod data for GPTimer 12. GPTimer 12 is present in
+> WKUPAON power domain and is clocked from a secure 32K clock.
+> GPTimer 12 serves as a secure timer on HS devices, but is
+> available for kernel on regular GP devices.
 > 
-> Errata Title:
-> i874: TIMER5/6/7/8 interrupts not propagated
+> The hwmod link is registered only on GP devices. The hwmod data
+> also reused the existing timer class instead of reintroducing
+> the identical dra7xx_timer_secure_sysc class which was dropped
+> in commit edec17863362 ("ARM: DRA7: hwmod: Fix the hwmod class
+> for GPTimer4").
 > 
-> Description:
-> When TIMER5, TIMER6, TIMER7, or TIMER8 clocks are enabled
-> (CM_IPU_TIMER5/6/7/8_CLKCTRL[0:1]MODULEMODE=0x2:ENABLE) and the CD-IPU
-> is in HW_AUTO mode (CM_IPU_CLKSTCTRL[0:1]CLKTRCTRL=0x3:HW_AUTO) the
-> corresponding TIMER will continue counting, but enabled interrupts
-> will not be propagated to the destinations (MPU, DSP, etc) in the
-> SoC until the TIMER registers are accessed from the CPUs (MPU, DSP
-> etc.). This can result in missed timer interrupts.
-> 
-> Workaround:
-> In order for TIMER5/6/7/8 interrupts to be propagated and serviced
-> correctly the CD_IPU domain should be set to SW_WKUP mode
-> (CM_IPU_CLKSTCTRL[0:1]CLKTRCTRL=0x2:SW_WKUP).
-> 
-> The above workaround is achieved by switching the IPU clockdomain
-> flags from HWSUP_SWSUP to SWSUP only.
-> 
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
 > Signed-off-by: Suman Anna <s-anna@ti.com>
 
-Thanks, queued for v4.6-rc fixes.
+Thanks, queued for v4.7.
 
 
 - Paul
