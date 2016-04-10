@@ -1,20 +1,32 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 10 Apr 2016 02:40:55 -0700
-Subject: [PATCH 1/3] clk: sunxi: Add sun6i/8i display support
-In-Reply-To: <2b347763e38cfeeb7a2d6af6357eaea6c4ec07ac.1459358017.git.moinejf@free.fr>
-References: <cover.1459358017.git.moinejf@free.fr>
- <2b347763e38cfeeb7a2d6af6357eaea6c4ec07ac.1459358017.git.moinejf@free.fr>
-Message-ID: <20160410094055.GW4227@lukather>
+Date: Sun, 10 Apr 2016 02:16:30 -0700
+Subject: [PATCH v3 01/19] clk: composite: Add unregister function
+In-Reply-To: <1458751122-23976-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1458751122-23976-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1458751122-23976-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20160410091630.GV4227@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 30, 2016 at 06:43:29PM +0200, Jean-Francois Moine wrote:
-> Add the clock type which is used by the sun6i/8i families for video display.
+Hi Stephen, Mike,
+
+On Wed, Mar 23, 2016 at 05:38:24PM +0100, Maxime Ripard wrote:
+> The composite clock didn't have any unregistration function, which forced
+> us to use clk_unregister directly on it.
 > 
-> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> While it was already not great from an API point of view, it also meant
+> that we were leaking the clk_composite structure allocated in
+> clk_register_composite.
+> 
+> Add a clk_unregister_composite function to fix this.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Applied, thanks
+Any comment on this one ?
 
+(and the other clock patches)
+
+Thanks,
 Maxime
 
 -- 
@@ -27,4 +39,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160410/e5effe89/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160410/9c1e564a/attachment.sig>
