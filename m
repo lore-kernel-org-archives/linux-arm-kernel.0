@@ -1,38 +1,29 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 10 Apr 2016 10:59:46 +0800
-Subject: [PATCH 1/2] PCI: iproc: Support DT property for ignoring aborts
- when probing
-In-Reply-To: <1460238624-2086-1-git-send-email-zajec5@gmail.com>
-Message-ID: <201604101000.oQktaJEg%fengguang.wu@intel.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Sun, 10 Apr 2016 10:13:13 +0200
+Subject: [PATCH 1/2] ARM: exynos_defconfig: Enable CPUFreq governors as
+ modules
+In-Reply-To: <1460142130-31822-1-git-send-email-javier@osg.samsung.com>
+References: <1460142130-31822-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <20160410081313.GA7137@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafa?,
+On Fri, Apr 08, 2016 at 03:02:09PM -0400, Javier Martinez Canillas wrote:
+> Currently only the ondemand and performance CPUFreq policy governors are
+> enabled in the Exynos defconfig. But the other governors are also useful
+> for some cases, enable them to allow users change the default if needed.
+> 
+> The options are enabled as module to keep the kernel image size minimal.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> ---
+> 
+>  arch/arm/configs/exynos_defconfig | 4 ++++
+>  1 file changed, 4 insertions(+)
 
-[auto build test ERROR on pci/next]
-[also build test ERROR on v4.6-rc2 next-20160408]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+Hi,
 
-url:    https://github.com/0day-ci/linux/commits/Rafa-Mi-ecki/PCI-iproc-Support-DT-property-for-ignoring-aborts-when-probing/20160410-055241
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git next
-config: arm-allmodconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-All errors (new ones prefixed by >>):
-
->> ERROR: "hook_fault_code" [drivers/pci/host/pcie-iproc.ko] undefined!
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 56979 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160410/a13388e0/attachment-0001.obj>
+Best regards,
+Krzysztof
