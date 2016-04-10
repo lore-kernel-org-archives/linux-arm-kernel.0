@@ -1,335 +1,75 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 10 Apr 2016 21:39:51 +0200
-Subject: [PATCH] pinctrl: pxa: add pxa25x architecture
-Message-ID: <1460317191-17026-1-git-send-email-robert.jarzmik@free.fr>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sun, 10 Apr 2016 20:51:33 +0000 (UTC)
+Subject: [PATCH v5 1/6] pwms: pwm-ti*: Get the clock from the PWMSS
+ (parent)
+In-Reply-To: <5703A0C4.6010406@ti.com>
+References: <1457400224-24797-1-git-send-email-fcooper@ti.com>
+ <1457400224-24797-2-git-send-email-fcooper@ti.com> <5703564C.7090700@ti.com>
+ <5703A0C4.6010406@ti.com>
+Message-ID: <alpine.DEB.2.02.1604102048380.11457@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the pxa25x architecture, which is a pxa2xx with 85 pins. The
-registers spacing, and pins logic is common to pxa2xx, only the pins and
-their alternate function are specific to pxa25x.
+Hi guys
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
----
- drivers/pinctrl/pxa/Kconfig          |  10 +-
- drivers/pinctrl/pxa/Makefile         |   1 +
- drivers/pinctrl/pxa/pinctrl-pxa25x.c | 274 +++++++++++++++++++++++++++++++++++
- 3 files changed, 284 insertions(+), 1 deletion(-)
- create mode 100644 drivers/pinctrl/pxa/pinctrl-pxa25x.c
+On Tue, 5 Apr 2016, Franklin S Cooper Jr. wrote:
 
-diff --git a/drivers/pinctrl/pxa/Kconfig b/drivers/pinctrl/pxa/Kconfig
-index 990667ff772c..c29bdcfa80af 100644
---- a/drivers/pinctrl/pxa/Kconfig
-+++ b/drivers/pinctrl/pxa/Kconfig
-@@ -6,12 +6,20 @@ config PINCTRL_PXA
- 	select PINCONF
- 	select GENERIC_PINCONF
- 
-+config PINCTRL_PXA25X
-+	tristate "Marvell PXA25x pin controller driver"
-+	select PINCTRL_PXA
-+	default y if PXA25x
-+	help
-+	  This is the pinctrl, pinmux, pinconf driver for the Marvell
-+	  PXA2xx block found in the pxa25x platforms.
-+
- config PINCTRL_PXA27X
- 	tristate "Marvell PXA27x pin controller driver"
- 	select PINCTRL_PXA
- 	default y if PXA27x
- 	help
- 	  This is the pinctrl, pinmux, pinconf driver for the Marvell
--	  PXA2xx block found in the pxa25x and pxa27x platforms.
-+	  PXA2xx block found in the pxa27x platforms.
- 
- endif
-diff --git a/drivers/pinctrl/pxa/Makefile b/drivers/pinctrl/pxa/Makefile
-index f1d56af2bfc0..ca2ade1a177b 100644
---- a/drivers/pinctrl/pxa/Makefile
-+++ b/drivers/pinctrl/pxa/Makefile
-@@ -1,2 +1,3 @@
- # Marvell PXA pin control drivers
-+obj-$(CONFIG_PINCTRL_PXA25X)	+= pinctrl-pxa2xx.o pinctrl-pxa25x.o
- obj-$(CONFIG_PINCTRL_PXA27X)	+= pinctrl-pxa2xx.o pinctrl-pxa27x.o
-diff --git a/drivers/pinctrl/pxa/pinctrl-pxa25x.c b/drivers/pinctrl/pxa/pinctrl-pxa25x.c
-new file mode 100644
-index 000000000000..b98ecb3c0683
---- /dev/null
-+++ b/drivers/pinctrl/pxa/pinctrl-pxa25x.c
-@@ -0,0 +1,274 @@
-+/*
-+ * Marvell PXA25x family pin control
-+ *
-+ * Copyright (C) 2016 Robert Jarzmik
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; version 2 of the License.
-+ *
-+ */
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/pinctrl/pinctrl.h>
-+
-+#include "pinctrl-pxa2xx.h"
-+
-+static const struct pxa_desc_pin pxa25x_pins[] = {
-+	PXA_GPIO_ONLY_PIN(PXA_PINCTRL_PIN(0)),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(1),
-+		     PXA_FUNCTION(0, 1, "GP_RST")),
-+	PXA_GPIO_ONLY_PIN(PXA_PINCTRL_PIN(2)),
-+	PXA_GPIO_ONLY_PIN(PXA_PINCTRL_PIN(3)),
-+	PXA_GPIO_ONLY_PIN(PXA_PINCTRL_PIN(4)),
-+	PXA_GPIO_ONLY_PIN(PXA_PINCTRL_PIN(5)),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(6),
-+		     PXA_FUNCTION(1, 1, "MMCCLK")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(7),
-+		     PXA_FUNCTION(1, 1, "48_MHz")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(8),
-+		     PXA_FUNCTION(1, 1, "MMCCS0")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(9),
-+		     PXA_FUNCTION(1, 1, "MMCCS1")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(10),
-+		     PXA_FUNCTION(1, 1, "RTCCLK")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(11),
-+		     PXA_FUNCTION(1, 1, "3_6_MHz")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(12),
-+		     PXA_FUNCTION(1, 1, "32_kHz")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(13),
-+		     PXA_FUNCTION(1, 2, "MBGNT")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(14),
-+		     PXA_FUNCTION(0, 1, "MBREQ")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(15),
-+		     PXA_FUNCTION(1, 2, "nCS_1")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(16),
-+		     PXA_FUNCTION(1, 2, "PWM0")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(17),
-+		     PXA_FUNCTION(1, 2, "PWM1")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(18),
-+		     PXA_FUNCTION(0, 1, "RDY")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(19),
-+		     PXA_FUNCTION(0, 1, "DREQ[1]")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(20),
-+		     PXA_FUNCTION(0, 1, "DREQ[0]")),
-+	PXA_GPIO_ONLY_PIN(PXA_PINCTRL_PIN(21)),
-+	PXA_GPIO_ONLY_PIN(PXA_PINCTRL_PIN(22)),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(23),
-+		     PXA_FUNCTION(1, 2, "SCLK")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(24),
-+		     PXA_FUNCTION(1, 2, "SFRM")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(25),
-+		     PXA_FUNCTION(1, 2, "TXD")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(26),
-+		     PXA_FUNCTION(0, 1, "RXD")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(27),
-+		     PXA_FUNCTION(0, 1, "EXTCLK")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(28),
-+		     PXA_FUNCTION(0, 1, "BITCLK"),
-+		     PXA_FUNCTION(0, 2, "BITCLK"),
-+		     PXA_FUNCTION(1, 1, "BITCLK")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(29),
-+		     PXA_FUNCTION(0, 1, "SDATA_IN0"),
-+		     PXA_FUNCTION(0, 2, "SDATA_IN")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(30),
-+		     PXA_FUNCTION(1, 1, "SDATA_OUT"),
-+		     PXA_FUNCTION(1, 2, "SDATA_OUT")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(31),
-+		     PXA_FUNCTION(1, 1, "SYNC"),
-+		     PXA_FUNCTION(1, 2, "SYNC")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(32),
-+		     PXA_FUNCTION(0, 1, "SDATA_IN1"),
-+		     PXA_FUNCTION(1, 1, "SYSCLK")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(33),
-+		     PXA_FUNCTION(1, 2, "nCS[5]")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(34),
-+		     PXA_FUNCTION(0, 1, "FFRXD"),
-+		     PXA_FUNCTION(1, 2, "MMCCS0")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(35),
-+		     PXA_FUNCTION(0, 1, "CTS")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(36),
-+		     PXA_FUNCTION(0, 1, "DCD")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(37),
-+		     PXA_FUNCTION(0, 1, "DSR")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(38),
-+		     PXA_FUNCTION(0, 1, "RI")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(39),
-+		     PXA_FUNCTION(1, 1, "MMCC1"),
-+		     PXA_FUNCTION(1, 2, "FFTXD")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(40),
-+		     PXA_FUNCTION(1, 2, "DTR")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(41),
-+		     PXA_FUNCTION(1, 2, "RTS")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(42),
-+		     PXA_FUNCTION(0, 1, "BTRXD"),
-+		     PXA_FUNCTION(0, 3, "HWRXD")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(43),
-+		     PXA_FUNCTION(1, 2, "BTTXD"),
-+		     PXA_FUNCTION(1, 3, "HWTXD")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(44),
-+		     PXA_FUNCTION(0, 1, "BTCTS"),
-+		     PXA_FUNCTION(0, 3, "HWCTS")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(45),
-+		     PXA_FUNCTION(1, 2, "BTRTS"),
-+		     PXA_FUNCTION(1, 3, "HWRTS")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(46),
-+		     PXA_FUNCTION(0, 1, "ICP_RXD"),
-+		     PXA_FUNCTION(0, 2, "RXD")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(47),
-+		     PXA_FUNCTION(1, 1, "TXD"),
-+		     PXA_FUNCTION(1, 2, "ICP_TXD")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(48),
-+		     PXA_FUNCTION(1, 1, "HWTXD"),
-+		     PXA_FUNCTION(1, 2, "nPOE")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(49),
-+		     PXA_FUNCTION(0, 1, "HWRXD"),
-+		     PXA_FUNCTION(1, 2, "nPWE")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(50),
-+		     PXA_FUNCTION(0, 1, "HWCTS"),
-+		     PXA_FUNCTION(1, 2, "nPIOR")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(51),
-+		     PXA_FUNCTION(1, 1, "HWRTS"),
-+		     PXA_FUNCTION(1, 2, "nPIOW")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(52),
-+		     PXA_FUNCTION(1, 2, "nPCE[1]")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(53),
-+		     PXA_FUNCTION(1, 1, "MMCCLK"),
-+		     PXA_FUNCTION(1, 2, "nPCE[2]")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(54),
-+		     PXA_FUNCTION(1, 1, "MMCCLK"),
-+		     PXA_FUNCTION(1, 2, "nPSKTSEL")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(55),
-+		     PXA_FUNCTION(1, 2, "nPREG")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(56),
-+		     PXA_FUNCTION(0, 1, "nPWAIT")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(57),
-+		     PXA_FUNCTION(0, 1, "nIOIS16")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(58),
-+		     PXA_FUNCTION(1, 2, "LDD<0>")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(59),
-+		     PXA_FUNCTION(1, 2, "LDD<1>")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(60),
-+		     PXA_FUNCTION(1, 2, "LDD<2>")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(61),
-+		     PXA_FUNCTION(1, 2, "LDD<3>")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(62),
-+		     PXA_FUNCTION(1, 2, "LDD<4>")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(63),
-+		     PXA_FUNCTION(1, 2, "LDD<5>")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(64),
-+		     PXA_FUNCTION(1, 2, "LDD<6>")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(65),
-+		     PXA_FUNCTION(1, 2, "LDD<7>")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(66),
-+		     PXA_FUNCTION(0, 1, "MBREQ"),
-+		     PXA_FUNCTION(1, 2, "LDD<8>")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(67),
-+		     PXA_FUNCTION(1, 1, "MMCCS0"),
-+		     PXA_FUNCTION(1, 2, "LDD<9>")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(68),
-+		     PXA_FUNCTION(1, 1, "MMCCS1"),
-+		     PXA_FUNCTION(1, 2, "LDD<10>")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(69),
-+		     PXA_FUNCTION(1, 1, "MMCCLK"),
-+		     PXA_FUNCTION(1, 2, "LDD<11>")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(70),
-+		     PXA_FUNCTION(1, 1, "RTCCLK"),
-+		     PXA_FUNCTION(1, 2, "LDD<12>")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(71),
-+		     PXA_FUNCTION(1, 1, "3_6_MHz"),
-+		     PXA_FUNCTION(1, 2, "LDD<13>")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(72),
-+		     PXA_FUNCTION(1, 1, "32_kHz"),
-+		     PXA_FUNCTION(1, 2, "LDD<14>")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(73),
-+		     PXA_FUNCTION(1, 1, "MBGNT"),
-+		     PXA_FUNCTION(1, 2, "LDD<15>")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(74),
-+		     PXA_FUNCTION(1, 2, "LCD_FCLK")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(75),
-+		     PXA_FUNCTION(1, 2, "LCD_LCLK")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(76),
-+		     PXA_FUNCTION(1, 2, "LCD_PCLK")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(77),
-+		     PXA_FUNCTION(1, 2, "LCD_ACBIAS")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(78),
-+		     PXA_FUNCTION(1, 2, "nCS<2>")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(79),
-+		     PXA_FUNCTION(1, 2, "nCS<3>")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(80),
-+		     PXA_FUNCTION(1, 2, "nCS<4>")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(81),
-+		     PXA_FUNCTION(0, 1, "NSSPSCLK"),
-+		     PXA_FUNCTION(1, 1, "NSSPSCLK")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(82),
-+		     PXA_FUNCTION(0, 1, "NSSPSFRM"),
-+		     PXA_FUNCTION(1, 1, "NSSPSFRM")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(83),
-+		     PXA_FUNCTION(0, 2, "NSSPRXD"),
-+		     PXA_FUNCTION(1, 1, "NSSPTXD")),
-+	PXA_GPIO_PIN(PXA_PINCTRL_PIN(84),
-+		     PXA_FUNCTION(0, 2, "NSSPRXD"),
-+		     PXA_FUNCTION(1, 1, "NSSPTXD")),
-+};
-+
-+static int pxa25x_pinctrl_probe(struct platform_device *pdev)
-+{
-+	int ret, i;
-+	void __iomem *base_af[8];
-+	void __iomem *base_dir[4];
-+	void __iomem *base_sleep[4];
-+	struct resource *res;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	base_af[0] = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(base_af[0]))
-+		return PTR_ERR(base_af[0]);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	base_dir[0] = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(base_dir[0]))
-+		return PTR_ERR(base_dir[0]);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
-+	base_dir[3] = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(base_dir[3]))
-+		return PTR_ERR(base_dir[3]);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 3);
-+	base_sleep[0] = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(base_sleep[0]))
-+		return PTR_ERR(base_sleep[0]);
-+
-+	for (i = 0; i < ARRAY_SIZE(base_af); i++)
-+		base_af[i] = base_af[0] + sizeof(base_af[0]) * i;
-+	for (i = 0; i < 3; i++)
-+		base_dir[i] = base_dir[0] + sizeof(base_dir[0]) * i;
-+	for (i = 0; i < ARRAY_SIZE(base_sleep); i++)
-+		base_sleep[i] = base_sleep[0] + sizeof(base_af[0]) * i;
-+
-+	ret = pxa2xx_pinctrl_init(pdev, pxa25x_pins, ARRAY_SIZE(pxa25x_pins),
-+				  base_af, base_dir, base_sleep);
-+	return ret;
-+}
-+
-+static const struct of_device_id pxa25x_pinctrl_match[] = {
-+	{ .compatible = "marvell,pxa25x-pinctrl", },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, pxa25x_pinctrl_match);
-+
-+static struct platform_driver pxa25x_pinctrl_driver = {
-+	.probe	= pxa25x_pinctrl_probe,
-+	.driver	= {
-+		.name		= "pxa25x-pinctrl",
-+		.of_match_table	= pxa25x_pinctrl_match,
-+	},
-+};
-+module_platform_driver(pxa25x_pinctrl_driver);
-+
-+MODULE_AUTHOR("Robert Jarzmik <robert.jarzmik@free.fr>");
-+MODULE_DESCRIPTION("Marvell PXA25x pinctrl driver");
-+MODULE_LICENSE("GPL v2");
--- 
-2.1.4
+> On 04/05/2016 01:08 AM, Sekhar Nori wrote:
+> > On Tuesday 08 March 2016 06:53 AM, Franklin S Cooper Jr wrote:
+> > > The eCAP and ePWM doesn't have their own separate clocks. They simply
+> > > utilize the clock provided directly by the PWMSS. Therefore, they simply
+> > > need to grab a reference to their parent's clock.
+> > >
+> > > Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+> >
+> > So this assumes that eCAP and eHRPWM are always under the PWMSS
+> > umbrella. But on TI AM18x, thats not true. These IPs exist independently
+> > and receive functional clock from PLL sysclk outputs.
+> >
+> > > ---
+> > >  drivers/pwm/pwm-tiecap.c   | 2 +-
+> > >  drivers/pwm/pwm-tiehrpwm.c | 2 +-
+> > >  2 files changed, 2 insertions(+), 2 deletions(-)
+> > >
+> > > diff --git a/drivers/pwm/pwm-tiecap.c b/drivers/pwm/pwm-tiecap.c
+> > > index 616af76..9418159 100644
+> > > --- a/drivers/pwm/pwm-tiecap.c
+> > > +++ b/drivers/pwm/pwm-tiecap.c
+> > > @@ -212,7 +212,7 @@ static int ecap_pwm_probe(struct platform_device *pdev)
+> > >      if (!pc)
+> > >          return -ENOMEM;
+> > >  
+> > > -    clk = devm_clk_get(&pdev->dev, "fck");
+> > > +    clk = devm_clk_get(pdev->dev.parent, "fck");
+> >
+> > Even keeping the AM18x usecase aside, this seems to be pushing too much
+> > platform information into the driver. The "fck" is a valid connection id
+> > for the eCAP IP. Whether its valid for the parent device too is not
+> > something this driver should need to know.
+> >
+> > So it looks like what you need is for the clock hierarchy for the
+> > platform to have clocks for eHRPWM and eCAP derived out of PWMSS clock?
+> 
+> So I believe this is a question on if we want to hide the minor
+> delta between AM18 vs AM335x, AM437x and AM57x/DRA7 in the driver
+> or within the DT.
+> 
+> Note that handling this by defining new clocks in DT will then
+> result in older DTBs not working. I don't think its worth breaking
+> backwards compatibility for AM335x and AM437x DTBs for fixing support
+> for AM18 based SOCs. Especially since those SOCs haven't worked with
+> this driver for several years. By handling things within the driver rather
+> than DT we can atleast insure that we can get everything working while
+> avoiding breaking backwards compatibility.
+
+I agree with Sekhar that we shouldn't embed this parent clock quirk 
+into the driver.  
+
+Can you just define a new compatibility string such that the driver can be 
+written with no embedded integration quirks?  Then add a workaround in the 
+driver that will use pdev->dev.parent for the old (deprecated) 
+compatibility string and log a warning to the kernel console that the DT 
+needs to be updated.
+
+
+- Paul
