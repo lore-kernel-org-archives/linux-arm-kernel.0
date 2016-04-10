@@ -1,51 +1,50 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sun, 10 Apr 2016 17:43:52 +0200
-Subject: [PATCH 1/2] char: PC rtc: replace blacklist with whitelist
-In-Reply-To: <CAMuHMdU26GkyUYxs3DJOFRB5LTdYCOaGTMUwFMd9YXYhkS1W3g@mail.gmail.com>
-References: <1456912137-1578635-1-git-send-email-arnd@arndb.de>
- <CAMuHMdU26GkyUYxs3DJOFRB5LTdYCOaGTMUwFMd9YXYhkS1W3g@mail.gmail.com>
-Message-ID: <20160410154352.GH5377@piout.net>
+From: carlo@caione.org (Carlo Caione)
+Date: Sun, 10 Apr 2016 18:24:31 +0200
+Subject: [GIT PULL] ARM: Amlogic: DT fix for v4.6-rc
+In-Reply-To: <570A24E4.6090109@suse.de>
+References: <CAOQ7t2arscn+pe4FpgzEL26rt3HtoMBP2ndSMvGQtqnDuU4pEg@mail.gmail.com>
+ <7hvb3rlm47.fsf@baylibre.com> <570A24E4.6090109@suse.de>
+Message-ID: <CAOQ7t2aKppmQ0_ue_su6vdYtDbneObHdc0A_4Y=na6DmvweHZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
+On Sun, Apr 10, 2016 at 12:03 PM, Andreas F?rber <afaerber@suse.de> wrote:
+> Am 09.04.2016 um 01:24 schrieb Kevin Hilman:
+>> Carlo Caione <carlo@caione.org> writes:
+>>
+>>> This is a fix for v4.6-rc since the Meson8 / Meson8b platforms are
+>>> currently broken.
+>>>
+>>> The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+>>>
+>>>   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+>>>
+>>> are available in the git repository at:
+>>>
+>>>   https://github.com/carlocaione/linux-meson tags/meson8-dt-fix
+>>>
+>>> for you to fetch changes up to 11ca873574c2314de9f0cf1adf8b3be88e4e19ae:
+>>>
+>>>   documentation: Fix pinctrl documentation for Meson8 / Meson8b
+>>> (2016-03-30 19:51:57 +0200)
+>>>
+>>> ----------------------------------------------------------------
+>>> With http://www.spinics.net/lists/devicetree/msg116771.html we split / refactor
+>>> the pinctrl driver to have two different pinctrl devices for each bus on the
+>>> Amlogic Meson8 / Meson8b SoCs.
+>>> These are the missing patches for documentation and DT that weren't pulled into
+>>> mainline with the driver changes.
+>>>
+>>> ----------------------------------------------------------------
+>>
+>> Strictly speaking, these aren't just documentation patches.  The missing
+>> .dtsi changes were what was causing boot breakage.
+>
+> The above tag says "documentation and DT" and the subject says "DT fix"?
 
-On 02/03/2016 at 11:22:04 +0100, Geert Uytterhoeven wrote :
-> On Wed, Mar 2, 2016 at 10:48 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > Every new architecture has to add itself to the growing list of those
-> > that do not support the legacy PC RTC driver.
-> >
-> > This replaces the long list of architectures that don't support it
-> > with a shorter list of those that do.
-> >
-> > The list is taken from those architectures that have a non-empty
-> > asm/mc146818rtc.h header file and were not explicitly blacklisted.
-> 
-> M68K was blacklisted...
-> 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > ---
-> >  drivers/char/Kconfig | 3 +--
-> >  1 file changed, 1 insertion(+), 2 deletions(-)
-> >
-> > diff --git a/drivers/char/Kconfig b/drivers/char/Kconfig
-> > index a043107da2af..9716bc36495a 100644
-> > --- a/drivers/char/Kconfig
-> > +++ b/drivers/char/Kconfig
-> > @@ -279,8 +279,7 @@ if RTC_LIB=n
-> >
-> >  config RTC
-> >         tristate "Enhanced Real Time Clock Support (legacy PC RTC driver)"
-> > -       depends on !PPC && !PARISC && !IA64 && !M68K && !SPARC && !FRV \
-> > -                       && !ARM && !SUPERH && !S390 && !AVR32 && !BLACKFIN && !UML
-> > +       depends on ALPHA || M32R || M68K || MIPS || MN10300 || PPC || X86
-> 
-> ... so please drop it here.
-> 
+Yeah, I hoped that the PR message would have been enough.
 
-Do you plan to resend that one?
+Cheers,
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Carlo Caione
