@@ -1,127 +1,147 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Sun, 10 Apr 2016 19:11:21 +0200
-Subject: [PATCH 2/3] clk: sunxi: Add sun6i/8i PLL video support
-In-Reply-To: <20160410095006.GY4227@lukather>
-References: <cover.1459358017.git.moinejf@free.fr>
- <e63499f789971b8c45a0ae5e90bd127371cbcf19.1459358017.git.moinejf@free.fr>
- <20160410095006.GY4227@lukather>
-Message-ID: <20160410191121.6f791f375110cf358b0ee1ab@free.fr>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sun, 10 Apr 2016 17:28:31 +0000 (UTC)
+Subject: OMAP baseline test results for v4.6-rc2
+Message-ID: <alpine.DEB.2.02.1604101722210.11457@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 10 Apr 2016 02:50:06 -0700
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
-> Hi,
-> 
-> On Wed, Mar 30, 2016 at 06:50:43PM +0200, Jean-Francois Moine wrote:
-> > Add the PLL type which is used by the sun6i/8i families for video display.
-> > 
-> > Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
-> > ---
-> >  Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
-> >  drivers/clk/sunxi/clk-sunxi.c                     | 65 +++++++++++++++++++++++
-> >  2 files changed, 66 insertions(+)
-	[snip]
-> > diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> > index 0581e1b..270f2a9 100644
-> > --- a/drivers/clk/sunxi/clk-sunxi.c
-> > +++ b/drivers/clk/sunxi/clk-sunxi.c
-> > @@ -23,6 +23,7 @@
-> >  #include <linux/slab.h>
-> >  #include <linux/spinlock.h>
-> >  #include <linux/log2.h>
-> > +#include <linux/rational.h>
-> >  
-> >  #include "clk-factors.h"
-> >  
-> > @@ -1129,6 +1130,70 @@ CLK_OF_DECLARE(sun6i_pll6, "allwinner,sun6i-a31-pll6-clk",
-> >  	       sun6i_pll6_clk_setup);
-> >  
-> >  /*
-> > + * sun6i pll3
-> > + *
-> > + * if (p == 0) rate = k ? 270MHz : 297MHz
-> > + * else rate = parent_rate / (m + 1) * (n + 1);
-> > + */
-> > +static void sun6i_pll3_factors(struct factors_request *req)
-> > +{
-> > +	unsigned long n, m;
-> > +
-> > +	if (req->rate == 270000000) {
-> > +		req->m = 0;
-> > +		req->p = 0;
-> > +		req->k = 0;
-> > +	} else if (req->rate == 297000000) {
-> > +		req->m = 0;
-> > +		req->p = 0;
-> > +		req->k = 1;
-> > +	} else {
-> > +		rational_best_approximation(req->rate,
-> > +					req->parent_rate,
-> > +					1 << 7, 1 << 4, &n, &m);
-> > +		req->rate = req->parent_rate / m * n;
-> > +		req->p = 1;
-> > +		req->m = m - 1;
-> > +		req->n = n - 1;
-> > +	}
-> > +}
-> > +
-> > +static void sun6i_pll3_recalc(struct factors_request *req)
-> > +{
-> > +	if (req->p)
-> > +		req->rate = req->parent_rate / (req->m + 1) * (req->n + 1);
-> > +	else if (req->k)
-> > +		req->rate = 270000000;
-> > +	else
-> > +		req->rate = 297000000;
-> > +}
-> > +
-> > +static const struct clk_factors_config sun6i_pll3_config = {
-> > +	.mshift = 0,
-> > +	.mwidth = 4,
-> > +	.nshift = 8,
-> > +	.nwidth = 7,
-> > +	.pshift = 24,	/* mode selection fractional / integer */
-> > +	.pwidth = 1,
-> > +	.kshift = 25,	/* fraction 270 / 297 MHz */
-> > +	.kwidth = 1,
-> > +};
-> 
-> That's not what p and k are.
-> 
-> Please add extra parameters to deal with fractional rates in the
-> clk_factors_config (like an extra bit + an array with the two rate
-> exposed.
-> 
-> That way, you can also deal with it in the core, instead of doing a
-> hack.
+Here are some basic OMAP test results for Linux v4.6-rc2.
+Logs and other details at:
 
-It is really a good way to add generic code for only one clock?
-Otherwise, there is no 'P' nor 'K' in the pll3 documentation, what is
-the trouble of using the variables 'p' and 'k' for other functions? And
-noone said that the variables should have the same name as those of the
-documentation.
-Anyway, I am stupid and obedient: this code was proposed by Chen-Yu Tsai
-on Sat, 6 Feb 2016 17:56:00 +0800:
+    http://www.pwsan.com/omap/testlogs/test_v4.6-rc2/20160410004807/
 
-> clk-factors now supports a custom .recalc callback. Along with get_factors,
-> you can support pretty much any clock that has four variables, not including
-> the mux and clock gate.
-> 
-> So for this you'd have the div as factor m, and the integer mode bit as p,
-> and the fraction bit as n, and recalc would be somewhat like this:
-> 
-> if (p) {
->         rate = parent_rate / (m + 1);
-> } else if (n) {
->         rate = 297000000;
-> } else {
->         rate = 270000000;
-> }
-> 
-> get_factors should be easy enough to figure out.
 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Test summary
+------------
+
+Build: uImage:
+    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
+
+Build: uImage+dtb:
+    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es,
+		  omap2plus_defconfig/omap4-var-stk-om44,
+		  omap2plus_defconfig/omap3-evm-37xx,
+		  omap2plus_defconfig_n800_only_a/omap2420-n800,
+		  omap2plus_defconfig/omap2430-sdp,
+		  omap2plus_defconfig/am3517-evm,
+		  omap2plus_defconfig/omap3-beagle,
+		  omap2plus_defconfig/omap3-beagle-xm,
+		  omap2plus_defconfig/omap3-sbc-t3517,
+		  omap2plus_defconfig/omap5-uevm,
+		  omap2plus_defconfig/omap5-sbc-t54
+
+Build: zImage:
+    Pass (18/18): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  omap2plus_defconfig_omap5_only,
+		  omap2plus_defconfig_dra7xx_only,
+		  omap2plus_defconfig_am43xx_only,
+		  omap2plus_defconfig_ti81xx_only,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap4430_sdp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
+
+Build warnings from toolchain: uImage:
+    (none)
+
+Build warnings from toolchain: uImage+dtb:
+    (none)
+
+Build warnings from toolchain: zImage:
+    FAIL (16/18): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  omap2plus_defconfig_omap5_only,
+		  omap2plus_defconfig_dra7xx_only,
+		  omap2plus_defconfig_am43xx_only,
+		  omap2plus_defconfig_ti81xx_only,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap4430_sdp_oldconfig, multi_v7_defconfig
+
+Boot to userspace:
+    FAIL ( 1/18): 2430sdp
+    skip ( 3/18): 5912osk, 3517evm, 5430es2sbct54
+    Pass (14/18): am335xbonelt, am437xsk, am335xbone, 4430es2panda,
+		  4460pandaes, 4460varsomom, 37xxevm, 3530es3beagle,
+		  3530es31beagle, 3730beaglexm, 3730es12beaglexm,
+		  cmt3517, 5430es2uevm, 2420n800
+
+Kernel warnings during boot to userspace:
+    FAIL ( 2/18): 4430es2panda, cmt3517
+
+PM: chip retention via suspend:
+    FAIL ( 6/11): am335xbonelt, 4430es2panda, 4460varsomom, 37xxevm,
+		  2430sdp, 5430es2uevm
+    Pass ( 5/11): 4460pandaes, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm
+
+PM: chip retention via dynamic idle:
+    FAIL ( 8/11): am335xbonelt, 4430es2panda, 4460varsomom, 37xxevm,
+		  3530es3beagle, 3530es31beagle, 2430sdp, 5430es2uevm
+    Pass ( 3/11): 4460pandaes, 3730beaglexm, 3730es12beaglexm
+
+PM: chip off (except CORE, due to errata) via suspend:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off (except CORE, due to errata) via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    FAIL ( 2/ 4): 37xxevm, 3530es3beagle
+    Pass ( 2/ 4): 3530es31beagle, 3730es12beaglexm
+
+PM: chip off via dynamic idle:
+    FAIL ( 3/ 4): 37xxevm, 3530es3beagle, 3530es31beagle
+    Pass ( 1/ 4): 3730es12beaglexm
+
+Kernel warnings during PM test:
+    FAIL ( 1/18): 4430es2panda
+
+Obsolete Kconfig symbols:
+    FAIL ( 3/21): omap1_defconfig, omap2plus_defconfig,
+		  multi_v7_defconfig
+
+
+vmlinux object size
+(delta in bytes from test_v4.6-rc1 (f55532a0c0b8bb6148f4e07853b876ef73bc69ca)):
+   text     data      bss    total  kernel
+  +4223        0        0    +4223  omap1_defconfig
+  +4259       -8        0    +4251  omap1_defconfig_1510innovator_only
+  +4215        0        0    +4215  omap1_defconfig_5912osk_only
+   +344     -128        0     +216  multi_v7_defconfig
+   +200        0        0     +200  omap2plus_defconfig
+   +136        0        0     +136  omap2plus_defconfig_2430sdp_only
+   +136        0        0     +136  omap2plus_defconfig_am33xx_only
+   +136        0        0     +136  omap2plus_defconfig_am43xx_only
+   +200        0        0     +200  omap2plus_defconfig_cpupm
+   +136        0        0     +136  omap2plus_defconfig_dra7xx_only
+    +64        0        0      +64  omap2plus_defconfig_n800_multi_omap2xxx
+    +64        0        0      +64  omap2plus_defconfig_n800_only_a
+   +200        0        0     +200  omap2plus_defconfig_no_pm
+   +200        0        0     +200  omap2plus_defconfig_omap2_4_only
+   +136        0        0     +136  omap2plus_defconfig_omap3_4_only
+   +136        0        0     +136  omap2plus_defconfig_omap5_only
+   +136        0        0     +136  omap2plus_defconfig_ti81xx_only
+  +3964        0      -36    +3928  rmk_omap3430_ldp_allnoconfig
+   +208       +8        0     +216  rmk_omap3430_ldp_oldconfig
+  +4308        0     -380    +3928  rmk_omap4430_sdp_allnoconfig
+  +4039        0        0    +4039  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v4.6-rc1 (f55532a0c0b8bb6148f4e07853b876ef73bc69ca))
+  avail  rsrvd   high  freed  board          kconfig
+    -4k     4k      .      .  4430es2panda   omap2plus_defconfig
