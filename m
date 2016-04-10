@@ -1,57 +1,74 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Sun, 10 Apr 2016 11:32:03 -0700
-Subject: [PATCH 4/4] irqchip: bcm2836: Use a more generic memory barrier
- call
-In-Reply-To: <5708927E.9030406@wwwdotorg.org>
-References: <1459827858-3871-1-git-send-email-eric@anholt.net>
- <1459827858-3871-5-git-send-email-eric@anholt.net>
- <570497C7.10501@wwwdotorg.org> <87a8l40xox.fsf@eliezer.anholt.net>
- <5708927E.9030406@wwwdotorg.org>
-Message-ID: <878u0l1fj0.fsf@eliezer.anholt.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sun, 10 Apr 2016 18:42:28 +0000 (UTC)
+Subject: [PATCH] ARM: OMAP2+: hwmod: fix _idle() hwmod state sanity check
+ sequence
+In-Reply-To: <1459812638-38789-1-git-send-email-s-anna@ti.com>
+References: <1459812638-38789-1-git-send-email-s-anna@ti.com>
+Message-ID: <alpine.DEB.2.02.1604101840270.11457@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> writes:
+Hi Suman
 
-> On 04/08/2016 12:20 PM, Eric Anholt wrote:
->> Stephen Warren <swarren@wwwdotorg.org> writes:
->>
->>> On 04/04/2016 09:44 PM, Eric Anholt wrote:
->>>> dsb() requires an argument on arm64, so we needed to add "sy".
->>>> Instead, take this opportunity to switch to the same smp_wmb() call
->>>> that gic uses for its IPIs.  This is a less strong barrier than we
->>>> were doing before (dmb(ishst) compared to dsb(sy)), but it seems to be
->>>> the correct one.
->>>
->>> I assume all MMIO is part of the ish domain?
->>>
->>> If so, the series,
->>> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
->>
->> I don't know if this barrier implies ordering all the way out to AXI on
->> this HW, but I don't think that's a requirement of this function.
->
-> My understanding was that the barrier was explicitly to work around a 
-> bug in the bus fabric of the SoC, and hence the barrier very much does 
-> have to affect the transaction all the way out to AXI. Re-reading 
-> BCM2835-ARM-Peripherals.pdf section 1.3 "Peripheral access precautions 
-> for correct memory ordering" seems to confirm this.
+On Mon, 4 Apr 2016, Suman Anna wrote:
 
-My understanding of the explicit barrier here, which was copied from
-other irqchips, is "Make sure that normal memory writes before our IPI
-on this CPU appear on the other CPUs before they get the IPI" (like the
-comment says).  This barrier was not put in to deal with the
-283x-specific weird AXI behavior.
+> The omap_hwmod _enable() function can return success without setting
+> the hwmod state to _HWMOD_STATE_ENABLED for IPs with reset lines when
+> all of the reset lines are asserted. The omap_hwmod _idle() function
+> also performs a similar check, but after checking for the hwmod state
+> first. This triggers the WARN when pm_runtime_get and pm_runtime_put
+> are invoked on IPs with all reset lines asserted. Reverse the checks
+> for hwmod state and reset lines status to fix this.
+> 
+> Issue found during a unbind operation on a device with reset lines
+> still asserted, example backtrace below
+> 
+>  ------------[ cut here ]------------
+>  WARNING: CPU: 1 PID: 879 at arch/arm/mach-omap2/omap_hwmod.c:2207 _idle+0x1e4/0x240()
+>  omap_hwmod: mmu_dsp: idle state can only be entered from enabled state
+>  Modules linked in:
+>  CPU: 1 PID: 879 Comm: sh Not tainted 4.4.0-00008-ga989d951331a #3
+>  Hardware name: Generic OMAP5 (Flattened Device Tree)
+>  [<c0018e60>] (unwind_backtrace) from [<c0014dc4>] (show_stack+0x10/0x14)
+>  [<c0014dc4>] (show_stack) from [<c037ac28>] (dump_stack+0x90/0xc0)
+>  [<c037ac28>] (dump_stack) from [<c003f420>] (warn_slowpath_common+0x78/0xb4)
+>  [<c003f420>] (warn_slowpath_common) from [<c003f48c>] (warn_slowpath_fmt+0x30/0x40)
+>  [<c003f48c>] (warn_slowpath_fmt) from [<c0028c20>] (_idle+0x1e4/0x240)
+>  [<c0028c20>] (_idle) from [<c0029080>] (omap_hwmod_idle+0x28/0x48)
+>  [<c0029080>] (omap_hwmod_idle) from [<c002a5a4>] (omap_device_idle+0x3c/0x90)
+>  [<c002a5a4>] (omap_device_idle) from [<c0427a90>] (__rpm_callback+0x2c/0x60)
+>  [<c0427a90>] (__rpm_callback) from [<c0427ae4>] (rpm_callback+0x20/0x80)
+>  [<c0427ae4>] (rpm_callback) from [<c0427f84>] (rpm_suspend+0x138/0x74c)
+>  [<c0427f84>] (rpm_suspend) from [<c0428b78>] (__pm_runtime_idle+0x78/0xa8)
+>  [<c0428b78>] (__pm_runtime_idle) from [<c041f514>] (__device_release_driver+0x64/0x100)
+>  [<c041f514>] (__device_release_driver) from [<c041f5d0>] (device_release_driver+0x20/0x2c)
+>  [<c041f5d0>] (device_release_driver) from [<c041d85c>] (unbind_store+0x78/0xf8)
+>  [<c041d85c>] (unbind_store) from [<c0206df8>] (kernfs_fop_write+0xc0/0x1c4)
+>  [<c0206df8>] (kernfs_fop_write) from [<c018a120>] (__vfs_write+0x20/0xdc)
+>  [<c018a120>] (__vfs_write) from [<c018a9cc>] (vfs_write+0x90/0x164)
+>  [<c018a9cc>] (vfs_write) from [<c018b1f0>] (SyS_write+0x44/0x9c)
+>  [<c018b1f0>] (SyS_write) from [<c0010420>] (ret_fast_syscall+0x0/0x1c)
+>  ---[ end trace a4182013c75a9f50 ]---
+> 
+> While at this, fix the sequence in _shutdown() as well, though there
+> is no easy reproducible scenario.
+> 
+> Fixes: 747834ab8347 ("ARM: OMAP2+: hwmod: revise hardreset behavior")
+> Signed-off-by: Suman Anna <s-anna@ti.com>
 
-Note that we had previously decided that the weird AXI ordering
-behavior, which is about repeated reads or repeated writes from the same
-CPU across different peripherals, is already covered by the barriers
-present in readl() and writel().  The writel() barrier happens to be a
-dsb() as well, so this explicit barrier is actually redundant.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160410/cdaf3077/attachment.sig>
+Thanks, I'm going to queue this for v4.7, mostly to get in more testing 
+and integration time.  Let me know if you think it's important enough to 
+go into v4.6-rc.
+
+
+> There are couple of pr_debug statements that only print once the code
+> flow passes through certain conditions. Not sure if you wanted them
+> to be printed first thing when entering the functions or only if the
+> function is really doing something. But it is still not consistent
+> between _enable(), _idle() and _shutdown().
+
+Yeah those need to be cleaned up.  Seems like the best thing to do 
+is to move them all to the beginning of their respective functions.
+
+
+- Paul
