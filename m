@@ -1,36 +1,126 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Sun, 10 Apr 2016 12:54:22 +0200
-Subject: [PATCH 1/2] PCI: iproc: Support DT property for ignoring aborts
- when probing
-In-Reply-To: <201604101000.oQktaJEg%fengguang.wu@intel.com>
-References: <1460238624-2086-1-git-send-email-zajec5@gmail.com>
- <201604101000.oQktaJEg%fengguang.wu@intel.com>
-Message-ID: <CACna6rzz+j6GONeh31xOfX+MuHERxAz9z9fREwZXp2=7Xodknw@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 10 Apr 2016 13:49:38 +0200
+Subject: [PATCH v6 14/14] arm64: hibernate: Prevent resume from a
+ different kernel version
+In-Reply-To: <1456766423-1554-15-git-send-email-james.morse@arm.com>
+References: <1456766423-1554-1-git-send-email-james.morse@arm.com>
+ <1456766423-1554-15-git-send-email-james.morse@arm.com>
+Message-ID: <20160410114938.GB30188@xo-6d-61-c0.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 April 2016 at 04:59, kbuild test robot <lkp@intel.com> wrote:
-> [auto build test ERROR on pci/next]
-> [also build test ERROR on v4.6-rc2 next-20160408]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
->
-> url:    https://github.com/0day-ci/linux/commits/Rafa-Mi-ecki/PCI-iproc-Support-DT-property-for-ignoring-aborts-when-probing/20160410-055241
-> base:   https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git next
-> config: arm-allmodconfig (attached as .config)
-> reproduce:
->         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         # save the attached .config to linux build tree
->         make.cross ARCH=arm
->
-> All errors (new ones prefixed by >>):
->
->>> ERROR: "hook_fault_code" [drivers/pci/host/pcie-iproc.ko] undefined!
+On Mon 2016-02-29 17:20:23, James Morse wrote:
+> Resuming using a different kernel version is fragile, while there are
+> sufficient details in the hibernate arch-header to perform the restore,
+> changes in the boot process can have a long-lasting impact on the system.
+> In particular, if the EFI stub causes more runtime services memory to be
+> allocated, the amount of memory left for linux is reduced. If we are
+> lucky, this will cause restore to fail with the message:
+> > PM: Image mismatch: memory size
+> If we are unlucky, the system will explode sometime later when an EFI
+> runtime services call is made.
+> 
+> Prevent resuming with a different kernel build, by storing UTS_VERSION
+> in the hibernate header. This also ensures the page size and va bits
+> configuration remain the same.
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
 
-Oh, it seems  hook_fault_code is not an exported SYMBOL and can't be
-used when building iproc as module.
+Better solution would be to store the current bits _and_ UTS version. Then bump UTS_VERSION
+every time Linux behaviour changes w.r.t. EFI. For a while, it would change a lot, but then
+it should stabilize, as the port stabilizes
 
-Any idea how to resolve this problem?
+
+> ---
+>  arch/arm64/kernel/hibernate.c | 35 +++++------------------------------
+>  1 file changed, 5 insertions(+), 30 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
+> index 279c556ee24b..486315249f2a 100644
+> --- a/arch/arm64/kernel/hibernate.c
+> +++ b/arch/arm64/kernel/hibernate.c
+> @@ -20,6 +20,7 @@
+>  #include <linux/pm.h>
+>  #include <linux/sched.h>
+>  #include <linux/suspend.h>
+> +#include <linux/utsname.h>
+>  #include <linux/version.h>
+>  
+>  #include <asm/barrier.h>
+> @@ -42,8 +43,6 @@
+>  #define pud_index(x)	0
+>  #endif
+>  
+> -#define TCR_IPS_BITS (0x7UL<<32)
+> -
+>  /*
+>   * Hibernate core relies on this value being 0 on resume, and marks it
+>   * __nosavedata assuming it will keep the resume kernel's '0' value. This
+> @@ -54,17 +53,6 @@
+>   */
+>  extern int in_suspend;
+>  
+> -/*
+> - * This value is written to the hibernate arch header, and prevents resuming
+> - * from a hibernate image produced by an incompatible kernel. If you change
+> - * a value that isn't saved/restored by hibernate, you should change this value.
+> - *
+> - * For example, if the mair_el1 values used by the kernel are changed, you
+> - * should prevent resuming from a kernel with incompatible attributes, as these
+> - * aren't saved/restored.
+> - */
+> -#define HIBERNATE_VERSION	KERNEL_VERSION(4, 6, 0)
+> -
+>  /* Find a symbols alias in the linear map */
+>  #define LMADDR(x)	phys_to_virt(virt_to_phys(x))
+>  
+> @@ -81,8 +69,7 @@ extern char hibernate_el2_vectors[];
+>  extern char el2_setup[];
+>  
+>  struct arch_hibernate_hdr_invariants {
+> -	unsigned long	version;
+> -	unsigned long	tcr_el1;	/* page_size, va bit etc */
+> +	char		uts_version[__NEW_UTS_LEN + 1];
+>  };
+>  
+>  /* These values need to be know across a hibernate/restore. */
+> @@ -104,11 +91,8 @@ static struct arch_hibernate_hdr {
+>  
+>  static inline void arch_hdr_invariants(struct arch_hibernate_hdr_invariants *i)
+>  {
+> -	i->version = HIBERNATE_VERSION;
+> -	asm volatile("mrs	%0, tcr_el1" : "=r"(i->tcr_el1));
+> -
+> -	/* IPS bits vary on big/little systems, mask them out */
+> -	i->tcr_el1 &= ~TCR_IPS_BITS;
+> +	memset(i, 0, sizeof(*i));
+> +	memcpy(i->uts_version, init_utsname()->version, sizeof(i->uts_version));
+>  }
+>  
+>  int pfn_is_nosave(unsigned long pfn)
+> @@ -155,18 +139,9 @@ int arch_hibernation_header_restore(void *addr)
+>  	struct arch_hibernate_hdr_invariants invariants;
+>  	struct arch_hibernate_hdr *hdr = addr;
+>  
+> -	/*
+> -	 * If this header is ancient, it may be smaller than we expect.
+> -	 * Test the version first.
+> -	 */
+> -	if (hdr->invariants.version != HIBERNATE_VERSION) {
+> -		pr_crit("Hibernate image not compatible with this kernel version!\n");
+> -		return -EINVAL;
+> -	}
+> -
+>  	arch_hdr_invariants(&invariants);
+>  	if (memcmp(&hdr->invariants, &invariants, sizeof(invariants))) {
+> -		pr_crit("Hibernate image not compatible with this kernel configuration!\n");
+> +		pr_crit("Hibernate image not generated by this kernel!\n");
+>  		return -EINVAL;
+>  	}
+>  
+> -- 
+> 2.7.0
 
 -- 
-Rafa?
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
