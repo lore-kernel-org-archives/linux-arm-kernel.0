@@ -1,53 +1,36 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sun, 10 Apr 2016 12:03:16 +0200
-Subject: [GIT PULL] ARM: Amlogic: DT fix for v4.6-rc
-In-Reply-To: <7hvb3rlm47.fsf@baylibre.com>
-References: <CAOQ7t2arscn+pe4FpgzEL26rt3HtoMBP2ndSMvGQtqnDuU4pEg@mail.gmail.com>
- <7hvb3rlm47.fsf@baylibre.com>
-Message-ID: <570A24E4.6090109@suse.de>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Sun, 10 Apr 2016 12:54:22 +0200
+Subject: [PATCH 1/2] PCI: iproc: Support DT property for ignoring aborts
+ when probing
+In-Reply-To: <201604101000.oQktaJEg%fengguang.wu@intel.com>
+References: <1460238624-2086-1-git-send-email-zajec5@gmail.com>
+ <201604101000.oQktaJEg%fengguang.wu@intel.com>
+Message-ID: <CACna6rzz+j6GONeh31xOfX+MuHERxAz9z9fREwZXp2=7Xodknw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 09.04.2016 um 01:24 schrieb Kevin Hilman:
-> Carlo Caione <carlo@caione.org> writes:
-> 
->> This is a fix for v4.6-rc since the Meson8 / Meson8b platforms are
->> currently broken.
->>
->> The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
->>
->>   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
->>
->> are available in the git repository at:
->>
->>   https://github.com/carlocaione/linux-meson tags/meson8-dt-fix
->>
->> for you to fetch changes up to 11ca873574c2314de9f0cf1adf8b3be88e4e19ae:
->>
->>   documentation: Fix pinctrl documentation for Meson8 / Meson8b
->> (2016-03-30 19:51:57 +0200)
->>
->> ----------------------------------------------------------------
->> With http://www.spinics.net/lists/devicetree/msg116771.html we split / refactor
->> the pinctrl driver to have two different pinctrl devices for each bus on the
->> Amlogic Meson8 / Meson8b SoCs.
->> These are the missing patches for documentation and DT that weren't pulled into
->> mainline with the driver changes.
->>
->> ----------------------------------------------------------------
-> 
-> Strictly speaking, these aren't just documentation patches.  The missing
-> .dtsi changes were what was causing boot breakage.
+On 10 April 2016 at 04:59, kbuild test robot <lkp@intel.com> wrote:
+> [auto build test ERROR on pci/next]
+> [also build test ERROR on v4.6-rc2 next-20160408]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+>
+> url:    https://github.com/0day-ci/linux/commits/Rafa-Mi-ecki/PCI-iproc-Support-DT-property-for-ignoring-aborts-when-probing/20160410-055241
+> base:   https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git next
+> config: arm-allmodconfig (attached as .config)
+> reproduce:
+>         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=arm
+>
+> All errors (new ones prefixed by >>):
+>
+>>> ERROR: "hook_fault_code" [drivers/pci/host/pcie-iproc.ko] undefined!
 
-The above tag says "documentation and DT" and the subject says "DT fix"?
+Oh, it seems  hook_fault_code is not an exported SYMBOL and can't be
+used when building iproc as module.
 
-> Anyways, pulled this into arm-soc/fixes and it will be included with our
-> other misc. fixes for v4.6-rc.
-
-Thanks,
-Andreas
+Any idea how to resolve this problem?
 
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+Rafa?
