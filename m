@@ -1,311 +1,265 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 11 Apr 2016 09:34:22 -0400
-Subject: [PATCH V16 2/3] dmaengine: qcom_hidma: add debugfs hooks
+Date: Mon, 11 Apr 2016 09:34:23 -0400
+Subject: [PATCH V16 3/3] dmaengine: qcom_hidma: add support for object
+ hierarchy
 In-Reply-To: <1460381663-16765-1-git-send-email-okaya@codeaurora.org>
 References: <1460381663-16765-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1460381663-16765-3-git-send-email-okaya@codeaurora.org>
+Message-ID: <1460381663-16765-4-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add debugfs hooks for debugging the execution behavior of the DMA
-channel. The debugfs hooks get initialized by the probe function and
-uninitialized by the remove function.
+In order to create a relationship model between the channels and the
+management object, we are adding support for object hierarchy to the
+drivers. This patch simplifies the userspace application development.
+We will not have to traverse different firmware paths based on device
+tree or ACPI based kernels.
 
-A stats file is created in debugfs. The stats file will show the
-information about each HIDMA channel as well as each asynchronous job
-queued and completed at a given time.
+No matter what flavor of kernel is used, objects will be represented as
+platform devices.
+
+The new layout is as follows:
+
+hidmam_10: hidma-mgmt at 0x5A000000 {
+	compatible = "qcom,hidma-mgmt-1.0";
+	...
+
+	hidma_10: hidma at 0x5a010000 {
+			compatible = "qcom,hidma-1.0";
+			...
+	}
+}
+
+The hidma_mgmt_init detects each instance of the hidma-mgmt-1.0 objects
+in device tree and calls into the channel driver to create platform devices
+for each child of the management object.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/dma/qcom/Makefile    |   2 +-
- drivers/dma/qcom/hidma.c     |   5 +-
- drivers/dma/qcom/hidma.h     |   2 +
- drivers/dma/qcom/hidma_dbg.c | 219 +++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 226 insertions(+), 2 deletions(-)
- create mode 100644 drivers/dma/qcom/hidma_dbg.c
+ Documentation/ABI/testing/sysfs-platform-hidma |   9 ++
+ drivers/dma/qcom/hidma.c                       |  39 ++++++++-
+ drivers/dma/qcom/hidma_mgmt.c                  | 113 ++++++++++++++++++++++++-
+ 3 files changed, 156 insertions(+), 5 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-platform-hidma
 
-diff --git a/drivers/dma/qcom/Makefile b/drivers/dma/qcom/Makefile
-index 6bf9267..4bfc38b 100644
---- a/drivers/dma/qcom/Makefile
-+++ b/drivers/dma/qcom/Makefile
-@@ -2,4 +2,4 @@ obj-$(CONFIG_QCOM_BAM_DMA) += bam_dma.o
- obj-$(CONFIG_QCOM_HIDMA_MGMT) += hdma_mgmt.o
- hdma_mgmt-objs	 := hidma_mgmt.o hidma_mgmt_sys.o
- obj-$(CONFIG_QCOM_HIDMA) +=  hdma.o
--hdma-objs        := hidma_ll.o hidma.o
-+hdma-objs        := hidma_ll.o hidma.o hidma_dbg.o
+diff --git a/Documentation/ABI/testing/sysfs-platform-hidma b/Documentation/ABI/testing/sysfs-platform-hidma
+new file mode 100644
+index 0000000..d364415
+--- /dev/null
++++ b/Documentation/ABI/testing/sysfs-platform-hidma
+@@ -0,0 +1,9 @@
++What:		/sys/devices/platform/hidma-*/chid
++		/sys/devices/platform/QCOM8061:*/chid
++Date:		Dec 2015
++KernelVersion:	4.4
++Contact:	"Sinan Kaya <okaya@cudeaurora.org>"
++Description:
++		Contains the ID of the channel within the HIDMA instance.
++		It is used to associate a given HIDMA channel with the
++		priority and weight calls in the management interface.
 diff --git a/drivers/dma/qcom/hidma.c b/drivers/dma/qcom/hidma.c
-index f8960f1..8972508 100644
+index 8972508..1f48f6d 100644
 --- a/drivers/dma/qcom/hidma.c
 +++ b/drivers/dma/qcom/hidma.c
+@@ -549,6 +549,43 @@ static irqreturn_t hidma_chirq_handler(int chirq, void *arg)
+ 	return hidma_ll_inthandler(chirq, lldev);
+ }
+ 
++static ssize_t hidma_show_values(struct device *dev,
++				 struct device_attribute *attr, char *buf)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct hidma_dev *mdev = platform_get_drvdata(pdev);
++
++	buf[0] = 0;
++
++	if (strcmp(attr->attr.name, "chid") == 0)
++		sprintf(buf, "%d\n", mdev->chidx);
++
++	return strlen(buf);
++}
++
++static int hidma_create_sysfs_entry(struct hidma_dev *dev, char *name,
++				    int mode)
++{
++	struct device_attribute *attrs;
++	char *name_copy;
++
++	attrs = devm_kmalloc(dev->ddev.dev, sizeof(struct device_attribute),
++			     GFP_KERNEL);
++	if (!attrs)
++		return -ENOMEM;
++
++	name_copy = devm_kstrdup(dev->ddev.dev, name, GFP_KERNEL);
++	if (!name_copy)
++		return -ENOMEM;
++
++	attrs->attr.name = name_copy;
++	attrs->attr.mode = mode;
++	attrs->show = hidma_show_values;
++	sysfs_attr_init(&attrs->attr);
++
++	return device_create_file(dev->ddev.dev, attrs);
++}
++
+ static int hidma_probe(struct platform_device *pdev)
+ {
+ 	struct hidma_dev *dmadev;
+@@ -682,6 +719,7 @@ static int hidma_probe(struct platform_device *pdev)
+ 	dmadev->irq = chirq;
+ 	tasklet_init(&dmadev->task, hidma_issue_task, (unsigned long)dmadev);
+ 	hidma_debug_init(dmadev);
++	hidma_create_sysfs_entry(dmadev, "chid", S_IRUGO);
+ 	dev_info(&pdev->dev, "HI-DMA engine driver registration complete\n");
+ 	platform_set_drvdata(pdev, dmadev);
+ 	pm_runtime_mark_last_busy(dmadev->ddev.dev);
+@@ -730,7 +768,6 @@ static const struct of_device_id hidma_match[] = {
+ 	{.compatible = "qcom,hidma-1.0",},
+ 	{},
+ };
+-
+ MODULE_DEVICE_TABLE(of, hidma_match);
+ 
+ static struct platform_driver hidma_driver = {
+diff --git a/drivers/dma/qcom/hidma_mgmt.c b/drivers/dma/qcom/hidma_mgmt.c
+index ef491b8..c0e3653 100644
+--- a/drivers/dma/qcom/hidma_mgmt.c
++++ b/drivers/dma/qcom/hidma_mgmt.c
 @@ -1,7 +1,7 @@
  /*
-  * Qualcomm Technologies HIDMA DMA engine interface
+  * Qualcomm Technologies HIDMA DMA engine Management interface
   *
 - * Copyright (c) 2015, The Linux Foundation. All rights reserved.
 + * Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
   *
   * This program is free software; you can redistribute it and/or modify
   * it under the terms of the GNU General Public License version 2 and
-@@ -681,6 +681,7 @@ static int hidma_probe(struct platform_device *pdev)
+@@ -17,13 +17,14 @@
+ #include <linux/acpi.h>
+ #include <linux/of.h>
+ #include <linux/property.h>
+-#include <linux/interrupt.h>
+-#include <linux/platform_device.h>
++#include <linux/of_irq.h>
++#include <linux/of_platform.h>
+ #include <linux/module.h>
+ #include <linux/uaccess.h>
+ #include <linux/slab.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/bitops.h>
++#include <linux/dma-mapping.h>
  
- 	dmadev->irq = chirq;
- 	tasklet_init(&dmadev->task, hidma_issue_task, (unsigned long)dmadev);
-+	hidma_debug_init(dmadev);
- 	dev_info(&pdev->dev, "HI-DMA engine driver registration complete\n");
- 	platform_set_drvdata(pdev, dmadev);
- 	pm_runtime_mark_last_busy(dmadev->ddev.dev);
-@@ -689,6 +690,7 @@ static int hidma_probe(struct platform_device *pdev)
- 	return 0;
+ #include "hidma_mgmt.h"
  
- uninit:
-+	hidma_debug_uninit(dmadev);
- 	hidma_ll_uninit(dmadev->lldev);
- dmafree:
- 	if (dmadev)
-@@ -706,6 +708,7 @@ static int hidma_remove(struct platform_device *pdev)
- 	pm_runtime_get_sync(dmadev->ddev.dev);
- 	dma_async_device_unregister(&dmadev->ddev);
- 	devm_free_irq(dmadev->ddev.dev, dmadev->irq, dmadev->lldev);
-+	hidma_debug_uninit(dmadev);
- 	hidma_ll_uninit(dmadev->lldev);
- 	hidma_free(dmadev);
+@@ -298,5 +299,109 @@ static struct platform_driver hidma_mgmt_driver = {
+ 	},
+ };
  
-diff --git a/drivers/dma/qcom/hidma.h b/drivers/dma/qcom/hidma.h
-index c5eea65..22806a2 100644
---- a/drivers/dma/qcom/hidma.h
-+++ b/drivers/dma/qcom/hidma.h
-@@ -157,4 +157,6 @@ int hidma_ll_uninit(struct hidma_lldev *llhndl);
- irqreturn_t hidma_ll_inthandler(int irq, void *arg);
- void hidma_cleanup_pending_tre(struct hidma_lldev *llhndl, u8 err_info,
- 				u8 err_code);
-+int hidma_debug_init(struct hidma_dev *dmadev);
-+void hidma_debug_uninit(struct hidma_dev *dmadev);
- #endif
-diff --git a/drivers/dma/qcom/hidma_dbg.c b/drivers/dma/qcom/hidma_dbg.c
-new file mode 100644
-index 0000000..68e779e
---- /dev/null
-+++ b/drivers/dma/qcom/hidma_dbg.c
-@@ -0,0 +1,219 @@
-+/*
-+ * Qualcomm Technologies HIDMA debug file
-+ *
-+ * Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
+-module_platform_driver(hidma_mgmt_driver);
++#if defined(CONFIG_OF) && defined(CONFIG_OF_IRQ)
++static int object_counter;
 +
-+#include <linux/debugfs.h>
-+#include <linux/device.h>
-+#include <linux/list.h>
-+#include <linux/pm_runtime.h>
-+
-+#include "hidma.h"
-+
-+static void hidma_ll_chstats(struct seq_file *s, void *llhndl, u32 tre_ch)
++static int __init hidma_mgmt_of_populate_channels(struct device_node *np)
 +{
-+	struct hidma_lldev *lldev = llhndl;
-+	struct hidma_tre *tre;
-+	u32 length;
-+	dma_addr_t src_start;
-+	dma_addr_t dest_start;
-+	u32 *tre_local;
++	struct platform_device *pdev_parent = of_find_device_by_node(np);
++	struct platform_device_info pdevinfo;
++	struct of_phandle_args out_irq;
++	struct device_node *child;
++	struct resource *res;
++	const __be32 *cell;
++	int ret = 0, size, i, num;
++	u64 addr, addr_size;
 +
-+	if (tre_ch >= lldev->nr_tres) {
-+		dev_err(lldev->dev, "invalid TRE number in chstats:%d", tre_ch);
-+		return;
-+	}
-+	tre = &lldev->trepool[tre_ch];
-+	seq_printf(s, "------Channel %d -----\n", tre_ch);
-+	seq_printf(s, "allocated=%d\n", atomic_read(&tre->allocated));
-+	seq_printf(s, "queued = 0x%x\n", tre->queued);
-+	seq_printf(s, "err_info = 0x%x\n",
-+		   lldev->tx_status_list[tre->idx].err_info);
-+	seq_printf(s, "err_code = 0x%x\n",
-+		   lldev->tx_status_list[tre->idx].err_code);
-+	seq_printf(s, "status = 0x%x\n", tre->status);
-+	seq_printf(s, "idx = 0x%x\n", tre->idx);
-+	seq_printf(s, "dma_sig = 0x%x\n", tre->dma_sig);
-+	seq_printf(s, "dev_name=%s\n", tre->dev_name);
-+	seq_printf(s, "callback=%p\n", tre->callback);
-+	seq_printf(s, "data=%p\n", tre->data);
-+	seq_printf(s, "tre_index = 0x%x\n", tre->tre_index);
++	for_each_available_child_of_node(np, child) {
++		struct resource *res_iter;
++		struct platform_device *new_pdev;
 +
-+	tre_local = &tre->tre_local[0];
-+	src_start = tre_local[HIDMA_TRE_SRC_LOW_IDX];
-+	src_start = ((u64) (tre_local[HIDMA_TRE_SRC_HI_IDX]) << 32) + src_start;
-+	dest_start = tre_local[HIDMA_TRE_DEST_LOW_IDX];
-+	dest_start += ((u64) (tre_local[HIDMA_TRE_DEST_HI_IDX]) << 32);
-+	length = tre_local[HIDMA_TRE_LEN_IDX];
-+
-+	seq_printf(s, "src=%pap\n", &src_start);
-+	seq_printf(s, "dest=%pap\n", &dest_start);
-+	seq_printf(s, "length = 0x%x\n", length);
-+}
-+
-+static void hidma_ll_devstats(struct seq_file *s, void *llhndl)
-+{
-+	struct hidma_lldev *lldev = llhndl;
-+
-+	seq_puts(s, "------Device -----\n");
-+	seq_printf(s, "lldev init = 0x%x\n", lldev->initialized);
-+	seq_printf(s, "trch_state = 0x%x\n", lldev->trch_state);
-+	seq_printf(s, "evch_state = 0x%x\n", lldev->evch_state);
-+	seq_printf(s, "chidx = 0x%x\n", lldev->chidx);
-+	seq_printf(s, "nr_tres = 0x%x\n", lldev->nr_tres);
-+	seq_printf(s, "trca=%p\n", lldev->trca);
-+	seq_printf(s, "tre_ring=%p\n", lldev->tre_ring);
-+	seq_printf(s, "tre_ring_handle=%pap\n", &lldev->tre_ring_handle);
-+	seq_printf(s, "tre_ring_size = 0x%x\n", lldev->tre_ring_size);
-+	seq_printf(s, "tre_processed_off = 0x%x\n", lldev->tre_processed_off);
-+	seq_printf(s, "pending_tre_count=%d\n", lldev->pending_tre_count);
-+	seq_printf(s, "evca=%p\n", lldev->evca);
-+	seq_printf(s, "evre_ring=%p\n", lldev->evre_ring);
-+	seq_printf(s, "evre_ring_handle=%pap\n", &lldev->evre_ring_handle);
-+	seq_printf(s, "evre_ring_size = 0x%x\n", lldev->evre_ring_size);
-+	seq_printf(s, "evre_processed_off = 0x%x\n", lldev->evre_processed_off);
-+	seq_printf(s, "tre_write_offset = 0x%x\n", lldev->tre_write_offset);
-+}
-+
-+/*
-+ * hidma_chan_stats: display HIDMA channel statistics
-+ *
-+ * Display the statistics for the current HIDMA virtual channel device.
-+ */
-+static int hidma_chan_stats(struct seq_file *s, void *unused)
-+{
-+	struct hidma_chan *mchan = s->private;
-+	struct hidma_desc *mdesc;
-+	struct hidma_dev *dmadev = mchan->dmadev;
-+
-+	pm_runtime_get_sync(dmadev->ddev.dev);
-+	seq_printf(s, "paused=%u\n", mchan->paused);
-+	seq_printf(s, "dma_sig=%u\n", mchan->dma_sig);
-+	seq_puts(s, "prepared\n");
-+	list_for_each_entry(mdesc, &mchan->prepared, node)
-+		hidma_ll_chstats(s, mchan->dmadev->lldev, mdesc->tre_ch);
-+
-+	seq_puts(s, "active\n");
-+	list_for_each_entry(mdesc, &mchan->active, node)
-+		hidma_ll_chstats(s, mchan->dmadev->lldev, mdesc->tre_ch);
-+
-+	seq_puts(s, "completed\n");
-+	list_for_each_entry(mdesc, &mchan->completed, node)
-+		hidma_ll_chstats(s, mchan->dmadev->lldev, mdesc->tre_ch);
-+
-+	hidma_ll_devstats(s, mchan->dmadev->lldev);
-+	pm_runtime_mark_last_busy(dmadev->ddev.dev);
-+	pm_runtime_put_autosuspend(dmadev->ddev.dev);
-+	return 0;
-+}
-+
-+/*
-+ * hidma_dma_info: display HIDMA device info
-+ *
-+ * Display the info for the current HIDMA device.
-+ */
-+static int hidma_dma_info(struct seq_file *s, void *unused)
-+{
-+	struct hidma_dev *dmadev = s->private;
-+	resource_size_t sz;
-+
-+	seq_printf(s, "nr_descriptors=%d\n", dmadev->nr_descriptors);
-+	seq_printf(s, "dev_trca=%p\n", &dmadev->dev_trca);
-+	seq_printf(s, "dev_trca_phys=%pa\n", &dmadev->trca_resource->start);
-+	sz = resource_size(dmadev->trca_resource);
-+	seq_printf(s, "dev_trca_size=%pa\n", &sz);
-+	seq_printf(s, "dev_evca=%p\n", &dmadev->dev_evca);
-+	seq_printf(s, "dev_evca_phys=%pa\n", &dmadev->evca_resource->start);
-+	sz = resource_size(dmadev->evca_resource);
-+	seq_printf(s, "dev_evca_size=%pa\n", &sz);
-+	return 0;
-+}
-+
-+static int hidma_chan_stats_open(struct inode *inode, struct file *file)
-+{
-+	return single_open(file, hidma_chan_stats, inode->i_private);
-+}
-+
-+static int hidma_dma_info_open(struct inode *inode, struct file *file)
-+{
-+	return single_open(file, hidma_dma_info, inode->i_private);
-+}
-+
-+static const struct file_operations hidma_chan_fops = {
-+	.open = hidma_chan_stats_open,
-+	.read = seq_read,
-+	.llseek = seq_lseek,
-+	.release = single_release,
-+};
-+
-+static const struct file_operations hidma_dma_fops = {
-+	.open = hidma_dma_info_open,
-+	.read = seq_read,
-+	.llseek = seq_lseek,
-+	.release = single_release,
-+};
-+
-+void hidma_debug_uninit(struct hidma_dev *dmadev)
-+{
-+	debugfs_remove_recursive(dmadev->debugfs);
-+	debugfs_remove_recursive(dmadev->stats);
-+}
-+
-+int hidma_debug_init(struct hidma_dev *dmadev)
-+{
-+	int rc = 0;
-+	int chidx = 0;
-+	struct list_head *position = NULL;
-+
-+	dmadev->debugfs = debugfs_create_dir(dev_name(dmadev->ddev.dev), NULL);
-+	if (!dmadev->debugfs) {
-+		rc = -ENODEV;
-+		return rc;
-+	}
-+
-+	/* walk through the virtual channel list */
-+	list_for_each(position, &dmadev->ddev.channels) {
-+		struct hidma_chan *chan;
-+
-+		chan = list_entry(position, struct hidma_chan,
-+				  chan.device_node);
-+		sprintf(chan->dbg_name, "chan%d", chidx);
-+		chan->debugfs = debugfs_create_dir(chan->dbg_name,
-+						   dmadev->debugfs);
-+		if (!chan->debugfs) {
-+			rc = -ENOMEM;
-+			goto cleanup;
++		cell = of_get_property(child, "reg", &size);
++		if (!cell) {
++			ret = -EINVAL;
++			goto out;
 +		}
-+		chan->stats = debugfs_create_file("stats", S_IRUGO,
-+						  chan->debugfs, chan,
-+						  &hidma_chan_fops);
-+		if (!chan->stats) {
-+			rc = -ENOMEM;
-+			goto cleanup;
-+		}
-+		chidx++;
-+	}
 +
-+	dmadev->stats = debugfs_create_file("stats", S_IRUGO,
-+					    dmadev->debugfs, dmadev,
-+					    &hidma_dma_fops);
-+	if (!dmadev->stats) {
-+		rc = -ENOMEM;
-+		goto cleanup;
++		size /= sizeof(*cell);
++		num = size /
++			(of_n_addr_cells(child) + of_n_size_cells(child)) + 1;
++
++		/* allocate a resource array */
++		res = kcalloc(num, sizeof(*res), GFP_KERNEL);
++		if (!res) {
++			ret = -ENOMEM;
++			goto out;
++		}
++
++		/* read each reg value */
++		i = 0;
++		res_iter = res;
++		while (i < size) {
++			addr = of_read_number(&cell[i],
++					      of_n_addr_cells(child));
++			i += of_n_addr_cells(child);
++
++			addr_size = of_read_number(&cell[i],
++						   of_n_size_cells(child));
++			i += of_n_size_cells(child);
++
++			res_iter->start = addr;
++			res_iter->end = res_iter->start + addr_size - 1;
++			res_iter->flags = IORESOURCE_MEM;
++			res_iter++;
++		}
++
++		ret = of_irq_parse_one(child, 0, &out_irq);
++		if (ret)
++			goto out;
++
++		res_iter->start = irq_create_of_mapping(&out_irq);
++		res_iter->name = "hidma event irq";
++		res_iter->flags = IORESOURCE_IRQ;
++
++		memset(&pdevinfo, 0, sizeof(pdevinfo));
++		pdevinfo.fwnode = &child->fwnode;
++		pdevinfo.parent = pdev_parent ? &pdev_parent->dev : NULL;
++		pdevinfo.name = child->name;
++		pdevinfo.id = object_counter++;
++		pdevinfo.res = res;
++		pdevinfo.num_res = num;
++		pdevinfo.data = NULL;
++		pdevinfo.size_data = 0;
++		pdevinfo.dma_mask = DMA_BIT_MASK(64);
++		new_pdev = platform_device_register_full(&pdevinfo);
++		if (!new_pdev) {
++			ret = -ENODEV;
++			goto out;
++		}
++		of_dma_configure(&new_pdev->dev, child);
++
++		kfree(res);
++		res = NULL;
 +	}
++out:
++	kfree(res);
++
++	return ret;
++}
++#endif
++
++static int __init hidma_mgmt_init(void)
++{
++#if defined(CONFIG_OF) && defined(CONFIG_OF_IRQ)
++	struct device_node *child;
++
++	for (child = of_find_matching_node(NULL, hidma_mgmt_match); child;
++	     child = of_find_matching_node(child, hidma_mgmt_match)) {
++		/* device tree based firmware here */
++		hidma_mgmt_of_populate_channels(child);
++		of_node_put(child);
++	}
++#endif
++	platform_driver_register(&hidma_mgmt_driver);
 +
 +	return 0;
-+cleanup:
-+	hidma_debug_uninit(dmadev);
-+	return rc;
 +}
++module_init(hidma_mgmt_init);
+ MODULE_LICENSE("GPL v2");
 -- 
 1.8.2.1
