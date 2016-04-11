@@ -1,32 +1,33 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 11 Apr 2016 21:57:49 +0800
-Subject: [PATCHv3 0/5] ARM: dts: update Ka-Ro i.MX6 module support
-In-Reply-To: <1459427625-15568-1-git-send-email-LW@KARO-electronics.de>
-References: <1457424244-14549-1-git-send-email-LW@KARO-electronics.de>
- <1459427625-15568-1-git-send-email-LW@KARO-electronics.de>
-Message-ID: <20160411135749.GD13735@tiger>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 11 Apr 2016 08:59:36 -0500
+Subject: [PATCH v4 2/5] Documentation: DT: vdma: update binding doc for
+ AXI DMA
+In-Reply-To: <1460006985-14805-3-git-send-email-appanad@xilinx.com>
+References: <1460006985-14805-1-git-send-email-appanad@xilinx.com>
+ <1460006985-14805-3-git-send-email-appanad@xilinx.com>
+Message-ID: <20160411135936.GA32212@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 31, 2016 at 02:33:40PM +0200, Lothar Wa?mann wrote:
-> This patch set updates the Ka-Ro electronics i.MX6 based module
-> support and adds support for some new modules and a new baseboard.
+On Thu, Apr 07, 2016 at 10:59:42AM +0530, Kedareswara rao Appana wrote:
+> This patch updates the device-tree binding doc for
+> adding support for AXI DMA.
+> Also this patch differentiates required properties b/w
+> DMA and VDMA.
 > 
-> changes vs. v1:
-> - relicense DTS files under GPLv2/X11
-> - dropped patches which have been applied already
-> - added some cleanup patches
+> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> ---
+> Changes for v4:
+> ---> None.
+> Changes for v3:
+> ---> Removed AXI DMA DT example from the patch as suggested by Rob.
+> ---> Differentiated required/optional properties for each DMA's
+>      as suggested by Rob.
+> Changes for v2:
+> ---> Modified commit message as suggested by Vinod.
+> ---> Moved the patch to forward in the series as suggested by vinod.
 > 
-> changes vs. v2:
-> - dropped patches which have been applied already
-> - addressed comments from Shawn Guo
-> - added patch to remove LED pinctrl from hoggrp
-> - added patch to enable rtscts support on UARTs
-> 
-> [PATCHv3 1/5] ARM: dts: imx6-tx6: remove regulator bus
-> [PATCHv3 2/5] ARM: dts: imx6-tx6: remove LED pinctrl setting from hoggrp
-> [PATCHv3 3/5] ARM: dts: imx6-tx6: enable support for rtscts on UARTs
-> [PATCHv3 4/5] ARM: dts: imx6: add support for more Ka-Ro electronics modules
-> [PATCHv3 5/5] ARM: dts: imx6: add support for the Ka-Ro electronics 'MB7' baseboard
+>  .../devicetree/bindings/dma/xilinx/xilinx_vdma.txt          | 13 +++++++++++--
+>  1 file changed, 11 insertions(+), 2 deletions(-)
 
-Applied all, thanks.
+Acked-by: Rob Herring <robh@kernel.org>
