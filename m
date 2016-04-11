@@ -1,174 +1,168 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 11 Apr 2016 15:51:05 -0700
-Subject: [PATCH 1/2] PCI: iproc: Support DT property for ignoring aborts
- when probing
-In-Reply-To: <0464ed02-5d41-f111-b8c1-aa9aa638c872@broadcom.com>
-References: <1460238624-2086-1-git-send-email-zajec5@gmail.com>
- <79DC79A7-D4CE-4983-B1C5-CBD2E9CBBFB9@gmail.com>
- <4768648c-841b-490d-a752-f31cba545f74@broadcom.com>
- <570C1D47.7010102@gmail.com>
- <ccabf53c-c035-be4b-a016-389bb7531557@broadcom.com>
- <570C24B3.4080104@broadcom.com>
- <18045be8-9ee3-7644-6fbb-d352e107d111@broadcom.com>
- <570C2806.8070700@gmail.com>
- <0464ed02-5d41-f111-b8c1-aa9aa638c872@broadcom.com>
-Message-ID: <570C2A59.4010105@gmail.com>
+From: harba@codeaurora.org (Abdulhamid, Harb)
+Date: Mon, 11 Apr 2016 18:57:24 -0400
+Subject: [PATCH V2 5/9] arm64: exception: handle instruction abort at
+ current EL
+In-Reply-To: <20160407085414.5be649f0@arm.com>
+References: <1459955578-24602-1-git-send-email-tbaicar@codeaurora.org>
+ <1459955578-24602-6-git-send-email-tbaicar@codeaurora.org>
+ <57052D0E.5070903@arm.com> <57058140.5040507@codeaurora.org>
+ <20160407085414.5be649f0@arm.com>
+Message-ID: <570C2BD4.6070402@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/16 15:51, Ray Jui wrote:
+On 4/7/2016 3:54 AM, Marc Zyngier wrote:
+> On Wed, 6 Apr 2016 15:36:00 -0600
+> "Baicar, Tyler" <tbaicar@codeaurora.org> wrote:
 > 
+> Hi Tyler,
 > 
-> On 4/11/2016 3:41 PM, Florian Fainelli wrote:
->> On 11/04/16 15:34, Ray Jui wrote:
->>>
->>>
->>> On 4/11/2016 3:26 PM, Scott Branden wrote:
->>>> One Comment below
+>> Hello Marc,
+>>
+>> On 4/6/2016 9:36 AM, Marc Zyngier wrote:
+>>> On 06/04/16 16:12, Tyler Baicar wrote:
+>>>> Add a handler for instruction aborts at the current EL
+>>>> (ESR_ELx_EC_IABT_CUR) so they are no longer handled in el1_inv.
+>>>> This allows firmware first handling for possible SEA
+>>>> (Synchronous External Abort) caused instruction abort at
+>>>> current EL.
 >>>>
->>>> On 16-04-11 03:24 PM, Ray Jui wrote:
->>>>>
->>>>>
->>>>> On 4/11/2016 2:55 PM, Florian Fainelli wrote:
->>>>>> On 11/04/16 13:06, Ray Jui wrote:
->>>>>>>
->>>>>>>
->>>>>>> On 4/10/2016 6:43 PM, Florian Fainelli wrote:
->>>>>>>> On April 9, 2016 2:50:23 PM PDT, "Rafa? Mi?ecki" <zajec5@gmail.com>
->>>>>>>> wrote:
->>>>>>>>> Some devices (e.g. Northstar ones) may have bridges that forward
->>>>>>>>> harmless errors to the ARM core. In such case we need an option to
->>>>>>>>> add a handler ignoring them.
->>>>>>>>>
->>>>>>>>> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
->>>>>>>>> ---
->>>>>>>>
->>>>>>>>> +- brcm,pcie-hook-abort-handler: During PCI bus probing (device
->>>>>>>>> enumeration)
->>>>>>>>> +  there can be errors that are expected and harmless.
->>>>>>>>> Unfortunately
->>>>>>>>> some bridges
->>>>>>>>> +  can't be configured to ignore them and they forward them to the
->>>>>>>>> ARM
->>>>>>>>> core
->>>>>>>>> +  triggering die().
->>>>>>>>> +  This property should be set in such case, it will make
->>>>>>>>> driver add
->>>>>>>>> its own
->>>>>>>>> +  handler ignoring such errors.
->>>>>>>>
->>>>>>>> The property is named after the function that allows you to catch
->>>>>>>> abort handlers, whereas you should be describing the HW here.
->>>>>>>> Something like brcm,bridge-error-forward or a better name even
->>>>>>>> would
->>>>>>>> be preferable.
->>>>>>>>
->>>>>>>>> +#ifdef CONFIG_ARM
->>>>>>>>> +static int iproc_pcie_abort_handler(unsigned long addr, unsigned
->>>>>>>>> int
->>>>>>>>> fsr,
->>>>>>>>> +                    struct pt_regs *regs)
->>>>>>>>> +{
->>>>>>>>> +    if (fsr == 0x1406)
->>>>>>>>> +        return 0;
->>>>>>>>> +
->>>>>>>>> +    return 1;
->>>>>>>>
->>>>>>>> As you later noted this prevents this driver from being a module
->>>>>>>> now.
->>>>>>>> Since the expectation is that either a fixed bootloader or a
->>>>>>>> platform
->>>>>>>> should enot produce these data aborts, or allow them to be ignored,
->>>>>>>> why not just put this code back where it belongs in the machine
->>>>>>>> specific file which kills many birds with the same stone:
->>>>>>>>
->>>>>>>
->>>>>>> I assume the module compile issue can be simply fixed by exporting
->>>>>>> symbol of "hook_fault_code"?
->>>>>>
->>>>>> I do not think it is desireable for this symbol to be exported in the
->>>>>> first place, also last I looked, this was a one time registration
->>>>>> thing,
->>>>>> you cannot undo the hook you installed, but everything can be fixed.
->>>>>>
->>>>>
->>>>> Okay.
->>>>>
->>>>>>>
->>>>>>> I believe ARM64 based NS2 that uses the same iProc PCIe driver might
->>>>>>> also need something like this (I'm still waiting for Jon Mason to
->>>>>>> give
->>>>>>> me some more information on the NS2 errors that he saw, which is
->>>>>>> likely
->>>>>>> related to this). I assume there will be something similar to the
->>>>>>> ARM
->>>>>>> specific "hook_fault_code" for ARM64, but then ARM64 does not
->>>>>>> have any
->>>>>>> "mach" specific directory. Where can this type of hook be installed
->>>>>>> for
->>>>>>> ARM64 based platforms if not in the PCIe driver?
->>>>>>
->>>>>> OK, that is a fair point, then maybe have a two stage process,
->>>>>> where we
->>>>>> make sure that the part that installs the hook is always available
->>>>>> and
->>>>>> built-into the kernel, but let the iProc PCIe driver remain a module?
->>>>>>
->>>>>
->>>>> I guess we are sort of stuck on this. If "hook_fault_code" is not
->>>>> supposed to be used by any driver compiled as module like you
->>>>> described,
->>>>> then yes, I agree, I don't see how we can leave this in the iProc PCIe
->>>>> driver.
->>>>>
->>>> Why does thie PCI driver need to be compiled as module though?  Why
->>>> can't we limit it to being linked in the kernel?
+>>>> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+>>>> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
+>>>> ---
+>>>>   arch/arm64/kernel/entry.S | 19 +++++++++++++++++++
+>>>>   1 file changed, 19 insertions(+)
 >>>>
->>>> Regards,
->>>> Scott
+>>>> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+>>>> index 12e8d2b..f257856 100644
+>>>> --- a/arch/arm64/kernel/entry.S
+>>>> +++ b/arch/arm64/kernel/entry.S
+>>>> @@ -336,6 +336,8 @@ el1_sync:
+>>>>   	lsr	x24, x1, #ESR_ELx_EC_SHIFT	// exception class
+>>>>   	cmp	x24, #ESR_ELx_EC_DABT_CUR	// data abort in EL1
+>>>>   	b.eq	el1_da
+>>>> +	cmp	x24, #ESR_ELx_EC_IABT_CUR	// instruction abort in EL1
+>>>> +	b.eq	el1_ia
+>>>>   	cmp	x24, #ESR_ELx_EC_SYS64		// configurable trap
+>>>>   	b.eq	el1_undef
+>>>>   	cmp	x24, #ESR_ELx_EC_SP_ALIGN	// stack alignment exception
+>>>> @@ -363,6 +365,23 @@ el1_da:
+>>>>   	// disable interrupts before pulling preserved data off the stack
+>>>>   	disable_irq
+>>>>   	kernel_exit 1
+>>>> +el1_ia:
+>>>> +	/*
+>>>> +	 * Instruction abort handling
+>>>> +	 */
+>>>> +	mrs	x0, far_el1
+>>>> +	enable_dbg
+>>>> +	// re-enable interrupts if they were enabled in the aborted context
+>>>> +	tbnz	x23, #7, 1f			// PSR_I_BIT
+>>>> +	enable_irq
+>>>> +1:
+>>>> +	orr	x1, x1, #1 << 24		// use reserved ISS bit for instruction aborts
+>>>> +	mov	x2, sp				// struct pt_regs
+>>>> +	bl	do_mem_abort
+>>>> +
+>>>> +	// disable interrupts before pulling preserved data off the stack
+>>>> +	disable_irq
+>>>> +	kernel_exit 1
+>>>>   el1_sp_pc:
+>>>>   	/*
+>>>>   	 * Stack or PC alignment exception handling
+>>>>
+>>> What happens if you were running at EL2 when this faults gets injected?
+>>> It looks like KVM needs something similar, doesn't it?
 >>>
->>> There are minor benefits allowing this driver to be compiled as module,
->>> although in our use case (Cygnus and NS2), we always compile this driver
->>> as statically linked in the kernel. I'm not sure if NS/BCMA has any use
->>> case that requires this driver to be a module.
+>>> Thanks,
 >>>
->>> In fact, being able to compile this driver as a module and loaded after
->>> kernel init process is done just helped to confirm this imprecise abort
->>> issue to be PCIe specific, :)
+>>> 	M.
+>> Thank you for your comment. I don't think this case is possible, or at 
+>> least the current KVM code suggests that this case should never happen.  
+>> In the EL1 code, we get to this case via the vector:
 >>
->> For the STB platforms for instance, we actually like to have the PCIE RC
->> driver as a module (not iproc-pcie, still downstream for now) because it
->> allows us to put the entire set of EPs and RCs into the lowest power
->> state (L23 + turning off external regulators) without messing with PCI
->> bus scanning. In general, it seems like a good practice to allow this
->> since, that helps with distributions not having to ship gigantic kernels
->> that need this driver built in, and also helps us with development (when
->> faults are handled).
+>> ventry  el1_sync                        // Synchronous EL1h
 >>
->> My suggestion about the PCIe-specific hook fault handler is to do
->> something like this: introduce a iproc-pcie-fault.c file which is
->> built-into the kernel if PCIE_IPROC=m || PCIE_IPROC=y and have it
->> contain a function which is hooked at arch_initcall level for instance,
->> so before module_init.
+>> The EL2 KVM equivalent appears to be in arch/arm64/kvm/hyp-entry.S and is:
 >>
->> Of course, there could be different ways to solve that problem, it just
->> happens to be one of them.
+>> ventry  el2h_sync_invalid               // Synchronous EL2h
 >>
+>> This vector is defined as an invalid_vector and has a comment suggesting 
+>> that it should never happen:
+>>
+>> /* None of these should ever happen */
+>> ...
+>>          invalid_vector  el2h_sync_invalid
+>>
+>> Please correct me if I am wrong, but it looks like this case should not 
+>> be possible.
 > 
-> That sounds good to me.
+> This comments really means that we shouldn't ever take any of these
+> exception. If we do, we'll crash and burn (just like the kernel didn't
+> expect to take an instruction fault from the kernel itself, up until
+> this patch).
 > 
-> But how is the hook in iproc-pcie-fault.c activated? Still based on a DT
-> property under the iProc PCIe device node or based on a specific
-> architecture dependent config flag (note we do not have any platform
-> specific config flag under ARM64)?
+> I expect that the firmware does inject the fault into the exception
+> level it has preempted. So let me turn the question the other way
+> around: what guarantees that we will never have to handle such a fault
+> at EL2?
+> 
 
-I would go with something that does:
+It is definitely possible to take an external abort (instruction or
+data) as well as SError interrupts in EL2.  One would expect that they
+would be trapped in EL2 when running guest VMs.
 
-if (of_machine_is_compatible("brcm,bcm53012") ||
-    of_machine_is_compatible("brcm.ns2"))
+However, this patch was not intended to address KVM APEI support at EL2
+(at this point).  The aim here was to enable APEI (namely firmware first
+error handling support) in the host/root kernel.
 
-or something along these lines, as opposed to a boolean flag at the PCIe
-DT node level, but maybe this is not quite a good understanding of how
-the HW works.
+The general idea of how APEI would work with Hypervisors may vary
+depending on the specific Hypervisor (e.g. KVM, Xen, HyperV, VMWare,
+etc.).
+
+For example, if the Hypervisor (i.e. code running at EL2) traps SEI/SEA
+exceptions (either during EL2 code execution or an SEI/SEA exception
+encountered during guest VM execution), the Hypervisor may not have
+built-in APEI support, or the ability to handle such faults directly.
+One option is for the Hypervisor to forward or "replay" SEA/SEI
+exceptions to the host/root kernel for handling of such exceptions.  If
+the root/host kernel happens to support APEI, the kernel will attempt to
+leverage GHES information to identify the severity of the error, and if
+possible, may attempt to recover from the error.  Essentially, the final
+decision on how to handle SEA/SEI faults falls on the root/host kernel.
+
+Extending APEI support to KVM should be addressed in a separate
+patchset, as the implication would go beyond just the EL2 exception
+handlers we are referencing here.  There would be much more work and
+validation needed.
+
+> As a corollary, what happens when the firmware injects a fault
+> triggered by a VM running at EL1, under the control of a hypervisor
+> running at EL2? There should be some form of exception delegation to
+> the hypervisor, which makes the lack of handling at EL2 even more
+> worrying.
+> 
+> Thanks,
+> 
+> 	M.
+> 
+
+See above example.  The Hypervisor could forward/replay such faults to
+the root/host kernel (or DOM0 in the case of Xen).
+
+Just a clarification on firmware injecting faults:  The firmware does
+not inject faults directly into a particular exception level.  If
+hardware error injection is supported, it will be at a particular
+physical address in memory, possibly a specific cache line, or other
+specific hardware component.  For example, one could target a specific
+exception level by injecting an error at an instruction address that is
+known to run at EL2, but the fault injection itself does not usually
+target exception levels.
+
+Thanks,
+Harb
 -- 
-Florian
+Qualcomm Technologies, Inc.
+on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
