@@ -1,67 +1,120 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 11 Apr 2016 14:13:39 -0700
-Subject: [PATCH] ARM: OMAP3: Fix imprecise external abort for off mode on
- 36xx
-In-Reply-To: <570BEAFB.6000409@ti.com>
-References: <1455140107-3328-1-git-send-email-tony@atomide.com>
- <5706C062.4040803@ti.com> <20160407231604.GP16484@atomide.com>
- <570BEAFB.6000409@ti.com>
-Message-ID: <20160411211339.GI5995@atomide.com>
+Date: Mon, 11 Apr 2016 14:28:45 -0700
+Subject: [PATCH v2 0/3] ARM: OMAP3: Fix McBSP2/3 hwmod setup for sidetone
+In-Reply-To: <5703BA6B.1080208@ti.com>
+References: <1458311007-19168-1-git-send-email-peter.ujfalusi@ti.com>
+ <alpine.DEB.2.02.1603191937430.6629@utopia.booyaka.com>
+ <56EFB794.5010505@ti.com>
+ <alpine.DEB.2.02.1603211743200.31059@utopia.booyaka.com>
+ <56FE407E.9030803@ti.com> <20160402001753.GR9329@atomide.com>
+ <57026205.6020105@ti.com> <20160404151200.GA4652@atomide.com>
+ <5703BA6B.1080208@ti.com>
+Message-ID: <20160411212845.GJ5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Gerlach <d-gerlach@ti.com> [160411 11:21]:
-> Tony,
-> On 04/07/2016 06:16 PM, Tony Lindgren wrote:
-> >* Dave Gerlach <d-gerlach@ti.com> [160407 13:18]:
-> >>
-> >>I have a series to convert omap3 PM code to using generic SRAM driver but
-> >>when testing I see an external abort on BBXM off mode resume very similar to
-> >>this that seems to be timing related caused by using generic SRAM driver to
-> >>re-copy PM code rather than omap3_sram_restore_context.
-> >>
-> >>By tracing the resume path I believe the abort is caused by
-> >>omap3_intc_resume_idle in pm34xx.c, which writes to two registers in the
-> >>INTC. Removing this call makes the abort unreproducible in my experiments
-> >>and changing the writes to reads causes a bus lock, so I'm pretty confident
-> >>it's coming from this call attempting to write to an idled INTC.
-> >>
-> >>Advisory 1.106 in DM3730 Silicon Errata Document [1] describes an issue with
-> >>"MPU Leaves MSTANDBY State Before IDLEREQ of Interrupt Controller is
-> >>Released" which sounds like a very similar failure situation to what we are
-> >>seeing even though the timing of INTC access is a bit further from WFI exit
-> >>than it describes. Perhaps there are more conditions where it can occur.
-> >>Pushed my WIP branch for SRAM series that shows the same failure here [2].
-> >
-> >Interesting, I think you may have something with the errata 1.106.. And
-> >looks like we also need still errata 1.62 handled also on 36xx in the
-> >same pdf. And need to disable intc autoidle early at least for HS omaps
-> >as save_secure_ram context supposedly also can do WFI.
-> >
-> >Maybe something like the following would make sense? It seems to work
-> >here without external aborts with your test branch on dm3730, and boots
-> >fine on omap3430 hs (n900).
-> >
-> >Or do you have some better ideas for a fix?
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [160405 06:16]:
+> On 04/04/16 18:12, Tony Lindgren wrote:
+> >> The reason for this is that in DT boot we can not provide the
+> >> enable_st_clock() callback to the mcbsp driver stack. This is done for legacy
+> >> boot in mach-omap2/mcbsp.c
+> > 
+> > Seems like the short term fix there is to pass enable_st_clock pointer
+> > in pdata using pdata-quirks.c.
 > 
-> I can also confirm that this fixes the external abort, I can not cause it
-> with your attached patch.
-
-OK. I still can't quite see why exactly this patch fixes things. So
-I'm afraid it might be just hiding the problem..
-
-> I would be ok with the solution you have proposed and I was unable to come
-> up with anything better while trying to debug the issue originally.
+> I don't think there is a point to spend effort on a workaround via pdata-quirks.
 > 
-> We still need the call to omap3_intc_resume_idle because the intc restore
-> context only gets called on resume from off mode. Perhaps we only need to
-> call omap3_intc_resume_idle when coming back from non-off modes, otherwise
-> let the context restore handle the reconfig of the INTC idle/sysconfig
-> registers?
+> > Then for the long term solution using
+> > PM runtime to block gating of the clock while sidetone is active is
+> > the way to go it seems.
+> 
+> Hrm, I think one of the main issue is that with pm_runtime we can not block
+> the clock gating, this is why legacy code uses enable_st_clock(), which will
+> call omap2_clk_deny_idle() or omap2_clk_allow_idle().
 
-OK. Did you actually test by commenting out omap3_intc_resume_idle()?
+I see. I think Tero wanted to export omap2_clk_allow_idle() and
+omap2_clk_deny_idle() for drivers to use. That should get discussed in
+the linux-clk list, probably best to use the pdata callbacks until
+the clock idling issue has been discussed.
 
-Yeah sounds like we can optimize out the restore there for non-off
-modes.
+> >> The ST does not have clocks coming from PRCM level, it only uses the McBSP
+> >> iclk when it is enabled (the McBSP block of the McBSP). As far as pm_runtime
+> >> goes I think the ST module should not use it. We can not tell hwmod to
+> >> enable/disable the McBSP2/3 iclk when we pm_runtime for the ST. It does not
+> >> help at all. We can have nop action for the ST when pm_runtime is used, but
+> >> then why would we have it?
+> > 
+> > Using PM runtime in the sidetone driver should just work as long as the
+> > sidetone device driver depends on the McBSP driver before it gets probed.
+> > The clock framework handles things for the mcbsp ick with the usecount.
+> 
+> Yes, that is not the problem. The problem is that when McBSP is used w/o
+> sidetone the iclk can and should be autogated, but if the sidetone is enabled
+> then the iclk must not autogate and this needs to be prevented in PRCM level.
+> Note also that while the McBSP is running we must be able to enable/disable
+> the sidetone any time w/o affecting the McBSP operation.
+
+OK I see.
+
+> > And doing pm_runtime_get() in the sidetone driver will do what the legacy
+> > enable_st_clock() does currently.
+> 
+> it can't do that as we do not have way to deny/enable just the autoidle for a
+> given clock.
+
+Yup. So I suggest the pdata callbacs for the omap2_clk_allow_idle() and
+omap2_clk_deny_idle() for now.
+
+> >>> So having two separate drivers might make things a lot simpler.
+> >>
+> >> Not really. It will make things way more complicated imho. How to handle
+> >> legacy boot as we still have that supported?
+> > 
+> > Hey both the legacy driver and DT driver are really just platform devices
+> > and drivers. And passing both dts and platform data can be done just
+> > fine, no?
+> 
+> Sure, but McBSP2-ST needs to bind with McBSP2 driver instance and the
+> McBSP3-ST should bind with McBSP3 instance. In legacy mode we can store the
+> McBSP pdev pointers in a array and use the devid or get the McBSP id from the
+> device name. While with DT boot we must have phandle pointing to/from ST
+> from/to McBSP node to be able to figure out who is who.
+> 
+> >> When the McBSP driver is loaded we must know if it has sidetone or not so
+> >> we can create the needed audio controls, sysfs entries. The sysfs and
+> >> kcontrol registration could be moved out to the new ST driver, true.
+> > 
+> > Yeah during the probe, the sidetone driver must register with the McBSP
+> > driver to tell it's there.
+> 
+> When McBSP driver probes, it registers itself to ASoC core and it needs to
+> know at that point if we need to prepare for ST or not. So probably the McBSP
+> driver needs to register to ST driver?
+
+OK yes if that makes more sense.
+
+> > I guess no need to pass anything in the
+> > dts or platform_data for that.
+> > 
+> >> I actually started with two separate drivers approach first, but decided that
+> >> it does not worth the effort (legacy boot support, pm_runtime/hwmod hassle,
+> >> platform data, callback API design, etc).
+> >> I know, it is not rocket science but it is king of shoot out of cannon into
+> >> sparrows.
+> >> I'll think about it for a little while ;)
+> > 
+> > Well what we've seen so far is that any kind of non-standard solution
+> > will always be a pain to maintain in the long run :)
+> 
+> The current implementation (one driver to handle McBSP and the ST) is there
+> ever since OMAP3 was introduced afaik. Changing a working (was working) design
+> to something which has not been tested will for sure going to open issues we
+> have not prepared for.
+> I would avoid the rewrite of a proven driver architecture if it is not broken.
+
+Well probably the best thing to do is the use of platform callback
+for now until we know how it can be done incrementally :)
+
+Regards,
 
 Tony
