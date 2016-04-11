@@ -1,135 +1,90 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 11 Apr 2016 15:45:02 +0100
-Subject: [RFC PATCH 45/45] KVM: arm/arm64: vgic-new: enable build
-In-Reply-To: <20160331181850.GI4126@cbox>
-References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
- <1458871508-17279-46-git-send-email-andre.przywara@arm.com>
- <20160331181850.GI4126@cbox>
-Message-ID: <570BB86E.2000208@arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 11 Apr 2016 22:49:18 +0800
+Subject: [PATCH] ARM: dts: imx6qdl-sabresd: Pass the hannstar panel
+ compatible string
+In-Reply-To: <1459185048-25702-1-git-send-email-festevam@gmail.com>
+References: <1459185048-25702-1-git-send-email-festevam@gmail.com>
+Message-ID: <20160411144918.GA15904@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 31/03/16 19:18, Christoffer Dall wrote:
-> On Fri, Mar 25, 2016 at 02:05:08AM +0000, Andre Przywara wrote:
->> Now that the new VGIC implementation has reached feature parity with
->> the old one, add the new files to the build system and add a Kconfig
->> option to switch between the two versions.
->> We set the default to the new version to get maximum test coverage,
->> in case people experience problems they can switch back to the old
->> behaviour if needed.
->>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->>  arch/arm/kvm/Kconfig    |  7 +++++++
->>  arch/arm/kvm/Makefile   | 10 ++++++++++
->>  arch/arm64/kvm/Kconfig  |  7 +++++++
->>  arch/arm64/kvm/Makefile | 10 ++++++++++
->>  4 files changed, 34 insertions(+)
->>
->> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
->> index 95a0005..02abfff 100644
->> --- a/arch/arm/kvm/Kconfig
->> +++ b/arch/arm/kvm/Kconfig
->> @@ -46,6 +46,13 @@ config KVM_ARM_HOST
->>  	---help---
->>  	  Provides host support for ARM processors.
->>  
->> +config KVM_NEW_VGIC
->> +	bool "New VGIC implementation"
->> +	depends on KVM
->> +	default y
->> +	---help---
->> +	  uses the new VGIC implementation
->> +
+On Mon, Mar 28, 2016 at 02:10:48PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
 > 
-> I had imagined we'd name it in the reverse, so the option would have
-> been CONFIG_KVM_VGIC_LEGACY, but I guess the net effect should be the
-> same, assuming most people just go with the default anyway.
+> It is preferred to use the panel compatible string rather than passing the
+> LCD timings in the device tree.
+> 
+> So pass the "hannstar,hsd100pxn1" compatible string to describe
+> the LVDS panel on this board.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> ---
+>  arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 30 +++++++++++++++++-------------
+>  1 file changed, 17 insertions(+), 13 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> index 0b5c4de..b78cd79 100644
+> --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> @@ -115,7 +115,7 @@
+>  		mux-ext-port = <3>;
+>  	};
+>  
+> -	backlight {
+> +	backlight_lvds: backlight_lvds {
 
-I think originally the assumption was to make the old VGIC the default
-in the beginning, but that changed later. By that time I considered it
-too tedious to change all patches in this regard, so I just kept the old
-symbol and semantic in.
-Shouldn't matter, really, I guess there are arguments for both ways.
+Hyphen instead of underscore should be used in node names.
 
-Cheers,
-Andre.
+I fixed it up and applied patch.
 
->>  source drivers/vhost/Kconfig
->>  
->>  endif # VIRTUALIZATION
->> diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
->> index eb1bf43..aa7d724 100644
->> --- a/arch/arm/kvm/Makefile
->> +++ b/arch/arm/kvm/Makefile
->> @@ -21,7 +21,17 @@ obj-$(CONFIG_KVM_ARM_HOST) += hyp/
->>  obj-y += kvm-arm.o init.o interrupts.o
->>  obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
->>  obj-y += coproc.o coproc_a15.o coproc_a7.o mmio.o psci.o perf.o
->> +
->> +ifeq ($(CONFIG_KVM_NEW_VGIC),y)
->> +obj-y += $(KVM)/arm/vgic/vgic.o
->> +obj-y += $(KVM)/arm/vgic/vgic_init.o
->> +obj-y += $(KVM)/arm/vgic/vgic_irqfd.o
->> +obj-y += $(KVM)/arm/vgic/vgic-v2.o
->> +obj-y += $(KVM)/arm/vgic/vgic_mmio.o
->> +obj-y += $(KVM)/arm/vgic/vgic_kvm_device.o
->> +else
->>  obj-y += $(KVM)/arm/vgic.o
->>  obj-y += $(KVM)/arm/vgic-v2.o
->>  obj-y += $(KVM)/arm/vgic-v2-emul.o
->> +endif
->>  obj-y += $(KVM)/arm/arch_timer.o
->> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
->> index de7450d..3f0e1ce 100644
->> --- a/arch/arm64/kvm/Kconfig
->> +++ b/arch/arm64/kvm/Kconfig
->> @@ -55,6 +55,13 @@ config KVM_ARM_PMU
->>  	  Adds support for a virtual Performance Monitoring Unit (PMU) in
->>  	  virtual machines.
->>  
->> +config KVM_NEW_VGIC
->> +	bool "New VGIC implementation"
->> +	depends on KVM
->> +	default y
->> +        ---help---
->> +          uses the new VGIC implementation
->> +
->>  source drivers/vhost/Kconfig
->>  
->>  endif # VIRTUALIZATION
->> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
->> index 122cff4..2f5d431 100644
->> --- a/arch/arm64/kvm/Makefile
->> +++ b/arch/arm64/kvm/Makefile
->> @@ -20,10 +20,20 @@ kvm-$(CONFIG_KVM_ARM_HOST) += emulate.o inject_fault.o regmap.o
->>  kvm-$(CONFIG_KVM_ARM_HOST) += hyp.o hyp-init.o handle_exit.o
->>  kvm-$(CONFIG_KVM_ARM_HOST) += guest.o debug.o reset.o sys_regs.o sys_regs_generic_v8.o
->>  
->> +ifeq ($(CONFIG_KVM_NEW_VGIC),y)
->> +kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic.o
->> +kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic_init.o
->> +kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic_irqfd.o
->> +kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-v2.o
->> +kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-v3.o
->> +kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic_mmio.o
->> +kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic_kvm_device.o
->> +else
->>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic.o
->>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v2.o
->>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v2-emul.o
->>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3.o
->>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3-emul.o
->> +endif
->>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
->>  kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
->> -- 
->> 2.7.3
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe kvm" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Shawn
+
+>  		compatible = "pwm-backlight";
+>  		pwms = <&pwm1 0 5000000>;
+>  		brightness-levels = <0 4 8 16 32 64 128 255>;
+> @@ -133,6 +133,17 @@
+>  		        default-state = "on";
+>  		};
+>  	};
+> +
+> +	panel {
+> +		compatible = "hannstar,hsd100pxn1";
+> +		backlight = <&backlight_lvds>;
+> +
+> +		port {
+> +			panel_in: endpoint {
+> +				remote-endpoint = <&lvds0_out>;
+> +			};
+> +		};
+> +	};
+>  };
+>  
+>  &audmux {
+> @@ -509,18 +520,11 @@
+>  		fsl,data-width = <18>;
+>  		status = "okay";
+>  
+> -		display-timings {
+> -			native-mode = <&timing0>;
+> -			timing0: hsd100pxn1 {
+> -				clock-frequency = <65000000>;
+> -				hactive = <1024>;
+> -				vactive = <768>;
+> -				hback-porch = <220>;
+> -				hfront-porch = <40>;
+> -				vback-porch = <21>;
+> -				vfront-porch = <7>;
+> -				hsync-len = <60>;
+> -				vsync-len = <10>;
+> +		port at 4 {
+> +			reg = <4>;
+> +
+> +			lvds0_out: endpoint {
+> +				remote-endpoint = <&panel_in>;
+>  			};
+>  		};
+>  	};
+> -- 
+> 1.9.1
+> 
 > 
