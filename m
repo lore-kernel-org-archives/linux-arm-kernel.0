@@ -1,121 +1,113 @@
-From: nava.manne@xilinx.com (Nava kishore Manne)
-Date: Mon, 11 Apr 2016 13:11:46 +0530
-Subject: [PATCH] Axi-usb: Add support for 64-bit addressing.
-Message-ID: <1460360506-14692-1-git-send-email-navam@xilinx.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 11 Apr 2016 09:49:01 +0200
+Subject: [PATCH] mtd: nand: s3c2410: fix bug in s3c2410_nand_correct_data()
+In-Reply-To: <57074392.2030601@gmail.com>
+References: <1460047697-72830-1-git-send-email-zengzhaoxiu@163.com>
+ <20160408021817.274d4e59@bbrezillon> <57070E88.5020008@gmail.com>
+ <20160408041802.5c47a4be@bbrezillon> <57074392.2030601@gmail.com>
+Message-ID: <20160411094901.74e68f91@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the driver to support 64-bit DMA
-addressing.
+Hi Zeng,
 
-Signed-off-by: Nava kishore Manne <navam@xilinx.com>
----
- .../devicetree/bindings/usb/udc-xilinx.txt         |  3 +-
- drivers/usb/gadget/udc/udc-xilinx.c                | 38 ++++++++++++++++++++--
- 2 files changed, 37 insertions(+), 4 deletions(-)
+On Fri, 8 Apr 2016 13:37:22 +0800
+Zeng Zhaoxiu <zhaoxiu.zeng@gmail.com> wrote:
 
-diff --git a/Documentation/devicetree/bindings/usb/udc-xilinx.txt b/Documentation/devicetree/bindings/usb/udc-xilinx.txt
-index 47b4e39..d417872 100644
---- a/Documentation/devicetree/bindings/usb/udc-xilinx.txt
-+++ b/Documentation/devicetree/bindings/usb/udc-xilinx.txt
-@@ -7,12 +7,13 @@ Required properties:
- - interrupts		: Should contain single irq line of USB2 device
- 			  controller
- - xlnx,has-builtin-dma	: if DMA is included
--
-+- xlnx,addrwidth       : Should be the dma addressing size in bits(ex: 40 bits).
- Example:
-  		axi-usb2-device at 42e00000 {
-                         compatible = "xlnx,usb2-device-4.00.a";
-                         interrupts = <0x0 0x39 0x1>;
-                         reg = <0x42e00000 0x10000>;
-                         xlnx,has-builtin-dma;
-+			xlnx,addrwidth = <0x28>;
-                 };
- 
-diff --git a/drivers/usb/gadget/udc/udc-xilinx.c b/drivers/usb/gadget/udc/udc-xilinx.c
-index 1cbb0ac..eeb1401 100644
---- a/drivers/usb/gadget/udc/udc-xilinx.c
-+++ b/drivers/usb/gadget/udc/udc-xilinx.c
-@@ -47,6 +47,15 @@
- #define XUSB_DMA_LENGTH_OFFSET		0x0210	/* DMA Length Register */
- #define XUSB_DMA_STATUS_OFFSET		0x0214	/* DMA Status Register */
- 
-+/* DMA source Address Reg for LSB */
-+#define XUSB_DMA_DSAR_ADDR_OFFSET_LSB   0x0308
-+/* DMA source Address Reg for MSB */
-+#define XUSB_DMA_DSAR_ADDR_OFFSET_MSB   0x030C
-+/* DMA destination Addr Reg LSB */
-+#define XUSB_DMA_DDAR_ADDR_OFFSET_LSB   0x0310
-+/* DMA destination Addr Reg MSB */
-+#define XUSB_DMA_DDAR_ADDR_OFFSET_MSB   0x0314
-+
- /* Endpoint Configuration Space offsets */
- #define XUSB_EP_CFGSTATUS_OFFSET	0x00	/* Endpoint Config Status  */
- #define XUSB_EP_BUF0COUNT_OFFSET	0x08	/* Buffer 0 Count */
-@@ -176,6 +185,7 @@ struct xusb_ep {
-  * @addr: the usb device base address
-  * @lock: instance of spinlock
-  * @dma_enabled: flag indicating whether the dma is included in the system
-+ * @dma_addrwidth:Indicate the DMA address width.
-  * @read_fn: function pointer to read device registers
-  * @write_fn: function pointer to write to device registers
-  */
-@@ -193,7 +203,7 @@ struct xusb_udc {
- 	void __iomem *addr;
- 	spinlock_t lock;
- 	bool dma_enabled;
--
-+	u32 dma_addrwidth;
- 	unsigned int (*read_fn)(void __iomem *);
- 	void (*write_fn)(void __iomem *, u32, u32);
- };
-@@ -215,6 +225,19 @@ static const struct usb_endpoint_descriptor config_bulk_out_desc = {
- };
- 
- /**
-+ * xudc_write64 - write 64bit value to device registers
-+ * @addr: base addr of device registers
-+ * @offset: register offset
-+ * @val: data to be written
-+ **/
-+static void xudc_write64(void __iomem *addr, u32 offset, u64 val)
-+{
-+#if defined(CONFIG_PHYS_ADDR_T_64BIT)
-+	writeq(val, addr + offset);
-+#endif
-+}
-+
-+/**
-  * xudc_write32 - little endian write to device registers
-  * @addr: base addr of device registers
-  * @offset: register offset
-@@ -330,8 +353,13 @@ static int xudc_start_dma(struct xusb_ep *ep, dma_addr_t src,
- 	 * destination registers and then set the length
- 	 * into the DMA length register.
- 	 */
--	udc->write_fn(udc->addr, XUSB_DMA_DSAR_ADDR_OFFSET, src);
--	udc->write_fn(udc->addr, XUSB_DMA_DDAR_ADDR_OFFSET, dst);
-+	if (udc->dma_addrwidth > 32) {
-+		xudc_write64(udc->addr, XUSB_DMA_DSAR_ADDR_OFFSET_LSB, src);
-+		xudc_write64(udc->addr, XUSB_DMA_DDAR_ADDR_OFFSET_LSB, dst);
-+	} else {
-+		udc->write_fn(udc->addr, XUSB_DMA_DSAR_ADDR_OFFSET, src);
-+		udc->write_fn(udc->addr, XUSB_DMA_DDAR_ADDR_OFFSET, dst);
-+	}
- 	udc->write_fn(udc->addr, XUSB_DMA_LENGTH_OFFSET, length);
- 
- 	/*
-@@ -2097,6 +2125,10 @@ static int xudc_probe(struct platform_device *pdev)
- 
- 	udc->dma_enabled = of_property_read_bool(np, "xlnx,has-builtin-dma");
- 
-+	ret = of_property_read_u32(np, "xlnx,addrwidth", &udc->dma_addrwidth);
-+	if (ret < 0)
-+		dev_warn(&pdev->dev, "missing xlnx,addrwidth property\n");
-+
- 	/* Setup gadget structure */
- 	udc->gadget.ops = &xusb_udc_ops;
- 	udc->gadget.max_speed = USB_SPEED_HIGH;
+> ? 2016?04?08? 10:18, Boris Brezillon ??:
+> > On Fri, 8 Apr 2016 09:51:04 +0800
+> > Zeng Zhaoxiu <zhaoxiu.zeng@gmail.com> wrote:
+> >
+> >>
+> >> ? 2016?04?08? 08:18, Boris Brezillon ??:
+> >>> Hi Zeng,
+> >>>
+> >>> On Fri,  8 Apr 2016 00:48:17 +0800
+> >>> zengzhaoxiu at 163.com wrote:
+> >>>
+> >>>> From: Zeng Zhaoxiu <zhaoxiu.zeng@gmail.com>
+> >>>>
+> >>>> If there is only one bit difference in the ECC, the function should return 1.
+> >>>> The result of "diff0 & ~(1<<fls(diff0))" is equal to diff0, so the function
+> >>>> actually returns -1.
+> >>>>
+> >>>> Here, we can use the simple expression "(diff0 & (diff0 - 1)) == 0" to determine
+> >>>> whether the diff0 has only one 1-bit.
+> >>> Missing Signed-off-by here.
+> >>>
+> >>>> ---
+> >>>>    drivers/mtd/nand/s3c2410.c | 2 +-
+> >>>>    1 file changed, 1 insertion(+), 1 deletion(-)
+> >>>>
+> >>>> diff --git a/drivers/mtd/nand/s3c2410.c b/drivers/mtd/nand/s3c2410.c
+> >>>> index 9c9397b..c9698cf 100644
+> >>>> --- a/drivers/mtd/nand/s3c2410.c
+> >>>> +++ b/drivers/mtd/nand/s3c2410.c
+> >>>> @@ -542,7 +542,7 @@ static int s3c2410_nand_correct_data(struct mtd_info *mtd, u_char *dat,
+> >>>>    	diff0 |= (diff1 << 8);
+> >>>>    	diff0 |= (diff2 << 16);
+> >>>>    
+> >>>> -	if ((diff0 & ~(1<<fls(diff0))) == 0)
+> >>>> +	if ((diff0 & (diff0 - 1)) == 0)
+> >>> Or just
+> >>>
+> >>> 	if (hweight_long((unsigned long)diff0) == 1)
+> >>>
+> >>> which is doing exactly what the comment says.
+> >>>
+> >>> BTW, I don't understand why the current code is wrong? To me, it seems
+> >>> it's correctly detecting the case where only a single bit is different.
+> >>> What are you trying to fix exactly?
+> >>>
+> >>> Best Regards,
+> >>>
+> >>> Boris
+> >>>
+> >> For example, assuming diff0 is 1, then fls(diff0) is equal to 1, then "~(1 << fls(diff0))" is equal to 0xfffffffd,
+> >> then the result of "(diff0 & ~(1 << fls(diff0)))" is 1 , not we expected 0.
+> >>
+> >> __fls(diff0) and "(fls(diff0) - 1)" are all right, but fls(diff0) is wrong.
+> >>
+> > Indeed, I forgot that fls() was returning (position + 1). Anyway, I
+> > still think using hweight clarifies what you really want to test.
+> >
+> 
+> "(n & (n - 1))" is used in is_power_of_2() in incluse/linux/log2.h,
+> it's result is equal to "n & ~(1 << __ffs(n))".
+> 
+> "(diff & (diff - 1))" is simple and fast, although here is not performance critical.
+> To improve readability of this code, we should add a new function and use it.
+> 
+> /*
+>   *  Determine whether some value has more than one 1-bits
+>   */
+> 
+> static inline __attribute__((const))
+> bool more_than_1_bit_set(unsigned long n)
+> {
+>      return (n & (n - 1)) != 0;
+> }
+> 
+> OTOH, I found many determinations like "hweightN(n) > 1" distributed in kernel,
+> these determinations are slower than "(n & (n - 1)) != 0" on most CPUs.
+
+Yes, probably, but it may be faster on a few CPUs :). Anyway, not sure
+you should bother optimizing this now, especially since this test is in
+the ECC correction path, and I doubt it makes any difference (detecting
+and correcting errors is what takes most of the time here).
+
+> We can use this new function instead.
+> 
+
+In the end, I don't care that much which solution you'll choose, since
+it's driver specific code. Pick whatever implementation you prefer and
+resend the patch with your SoB.
+
+Thanks,
+
+Boris
+
 -- 
-2.1.2
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
