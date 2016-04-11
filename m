@@ -1,62 +1,29 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Mon, 11 Apr 2016 15:02:46 -0500
-Subject: [GIT PULL] SoCFPGA DTS updates for v4.7
-Message-ID: <1460404966-3636-1-git-send-email-dinguyen@kernel.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 11 Apr 2016 13:06:26 -0700
+Subject: [PATCH v2 00/10] ARM: DTS/clk: DRA7 family: enable eDMA and
+ audio updates
+In-Reply-To: <570BA7A2.3080507@ti.com>
+References: <1457363857-20797-1-git-send-email-peter.ujfalusi@ti.com>
+ <570BA7A2.3080507@ti.com>
+Message-ID: <20160411200625.GD5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, and Olof,
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [160411 06:34]:
+> Tony,
+> 
+> according to Nishanth, linux-next is broken for dra7 family:
+> http://pastebin.ubuntu.com/15758542/ on x15 next-20160411
+> because of the missing DT patches.
 
-Please pull in these DTS updates for v4.7.
+OK yeah thanks for letting me know.
 
-Thanks,
-Dinh
+> Do you want me to resend this series w/o the hwmod patch?
 
-The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+No need to, applying your dts patches into omap-for-v4.7/dt
+thanks.
 
-  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+The epwmss entries still produce warnings, looks like there's
+discussion still going on with those.
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git socfpga_dts_for_v4.7
-
-for you to fetch changes up to 249ff32e1f8b6ffa92e1390e371702dd8633bcac:
-
-  ARM: dts: socfpga: add reset control for USB (2016-04-11 14:04:06 -0500)
-
-----------------------------------------------------------------
-SoCFPGA DTS updates for v4.7
-- Update SD/MMC node for Arria10
-- Update Arria10 with clock and interrupt fields for DMA
-- Remove 'phy-addr' from stmmac node
-- Remove ethernet node from Cyclone5 DTSI
-- Add LEDs/KEYs/SWs support on Sockit
-- Add L2 and OCRAM EDAC dts entries
-- Add reset control for USB
-
-----------------------------------------------------------------
-Dinh Nguyen (3):
-      ARM: dts: socfpga: add cap-sd-highspeed for SD/MMC node
-      ARM: dts: socfpga: add the clk-phase property for sd/mmc clock
-      ARM: dts: socfpga: add reset control for USB
-
-Graham Moore (1):
-      ARM: dts: socfpga: Add missing clock and interrupt fields for Arria10 DMA
-
-Marek Vasut (4):
-      ARM: dts: socfpga: Drop phy-addr OF property from CV dtsi
-      ARM: dts: socfpga: Drop gmac0 from CV dtsi
-      ARM: dts: socfpga: Add support for HPS LEDs on SoCKit
-      ARM: dts: socfpga: Add support for HPS KEYs/SWs on SoCKit
-
-Thor Thayer (2):
-      ARM: dts: socfpga: Add Altera Arria10 L2 Cache EDAC devicetree entry
-      ARM: dts: socfpga: Add Altera Arria10 OCRAM EDAC devicetree entry
-
- arch/arm/boot/dts/socfpga.dtsi                    |  4 +
- arch/arm/boot/dts/socfpga_arria10.dtsi            | 32 +++++++-
- arch/arm/boot/dts/socfpga_arria10_socdk_sdmmc.dts |  1 +
- arch/arm/boot/dts/socfpga_cyclone5.dtsi           |  6 --
- arch/arm/boot/dts/socfpga_cyclone5_sockit.dts     | 94 ++++++++++++++++++++++-
- arch/arm/boot/dts/socfpga_cyclone5_socrates.dts   |  1 +
- 6 files changed, 129 insertions(+), 9 deletions(-)
+Tony
