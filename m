@@ -1,199 +1,113 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 11 Apr 2016 12:57:54 +0900
-Subject: [PATCH v9 16/20] ARM: dts: Add bus nodes using VDD_MIF for Exynos4210
+Date: Mon, 11 Apr 2016 12:57:41 +0900
+Subject: [PATCH v9 03/20] PM / devfreq: Add devfreq_get_devfreq_by_phandle()
 In-Reply-To: <1460347078-15175-1-git-send-email-cw00.choi@samsung.com>
 References: <1460347078-15175-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1460347078-15175-17-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1460347078-15175-4-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the bus nodes for Exynos4210 SoC. Exynos4210 SoC has
-one power line for all buses to translate data between DRAM and sub-blocks.
-
-Following list specifies the detailed relation between DRAM and sub-blocks:
-- DMC/ACP clock for DMC (Dynamic Memory Controller)
-- ACLK200 clock for LCD0
-- ACLK100 clock for PERIL/PERIR/MFC(PCLK)
-- ACLK160 clock for CAM/TV/LCD0/LCD1
-- ACLK133 clock for FSYS/GPS
-- GDL/GDR clock for LEFTBUS/RIGHTBUS
-- SCLK_MFC clock for MFC
+This patch adds the new devfreq_get_devfreq_by_phandle() OF helper function
+which can find the instance of devfreq device by using phandle ("devfreq").
 
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+[m.reichl and linux.amoon: Tested it on exynos4412-odroidu3 board]
+Tested-by: Markus Reichl <m.reichl@fivetechno.de>
+Tested-by: Anand Moon <linux.amoon@gmail.com>
 ---
- arch/arm/boot/dts/exynos4210.dtsi | 159 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 159 insertions(+)
+ drivers/devfreq/devfreq.c | 44 ++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/devfreq.h   |  9 +++++++++
+ 2 files changed, 53 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-index c1cb8df6da07..2d9b02967105 100644
---- a/arch/arm/boot/dts/exynos4210.dtsi
-+++ b/arch/arm/boot/dts/exynos4210.dtsi
-@@ -257,6 +257,165 @@
- 		power-domains = <&pd_lcd1>;
- 		#iommu-cells = <0>;
- 	};
-+
-+	bus_dmc: bus_dmc {
-+		compatible = "samsung,exynos-bus";
-+		clocks = <&clock CLK_DIV_DMC>;
-+		clock-names = "bus";
-+		operating-points-v2 = <&bus_dmc_opp_table>;
-+		status = "disabled";
-+	};
-+
-+	bus_acp: bus_acp {
-+		compatible = "samsung,exynos-bus";
-+		clocks = <&clock CLK_DIV_ACP>;
-+		clock-names = "bus";
-+		operating-points-v2 = <&bus_acp_opp_table>;
-+		status = "disabled";
-+	};
-+
-+	bus_peri: bus_peri {
-+		compatible = "samsung,exynos-bus";
-+		clocks = <&clock CLK_ACLK100>;
-+		clock-names = "bus";
-+		operating-points-v2 = <&bus_peri_opp_table>;
-+		status = "disabled";
-+	};
-+
-+	bus_fsys: bus_fsys {
-+		compatible = "samsung,exynos-bus";
-+		clocks = <&clock CLK_ACLK133>;
-+		clock-names = "bus";
-+		operating-points-v2 = <&bus_fsys_opp_table>;
-+		status = "disabled";
-+	};
-+
-+	bus_display: bus_display {
-+		compatible = "samsung,exynos-bus";
-+		clocks = <&clock CLK_ACLK160>;
-+		clock-names = "bus";
-+		operating-points-v2 = <&bus_display_opp_table>;
-+		status = "disabled";
-+	};
-+
-+	bus_lcd0: bus_lcd0 {
-+		compatible = "samsung,exynos-bus";
-+		clocks = <&clock CLK_ACLK200>;
-+		clock-names = "bus";
-+		operating-points-v2 = <&bus_leftbus_opp_table>;
-+		status = "disabled";
-+	};
-+
-+	bus_leftbus: bus_leftbus {
-+		compatible = "samsung,exynos-bus";
-+		clocks = <&clock CLK_DIV_GDL>;
-+		clock-names = "bus";
-+		operating-points-v2 = <&bus_leftbus_opp_table>;
-+		status = "disabled";
-+	};
-+
-+	bus_rightbus: bus_rightbus {
-+		compatible = "samsung,exynos-bus";
-+		clocks = <&clock CLK_DIV_GDR>;
-+		clock-names = "bus";
-+		operating-points-v2 = <&bus_leftbus_opp_table>;
-+		status = "disabled";
-+	};
-+
-+	bus_mfc: bus_mfc {
-+		compatible = "samsung,exynos-bus";
-+		clocks = <&clock CLK_SCLK_MFC>;
-+		clock-names = "bus";
-+		operating-points-v2 = <&bus_leftbus_opp_table>;
-+		status = "disabled";
-+	};
-+
-+	bus_dmc_opp_table: opp_table1 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp at 134000000 {
-+			opp-hz = /bits/ 64 <134000000>;
-+			opp-microvolt = <1025000>;
-+		};
-+		opp at 267000000 {
-+			opp-hz = /bits/ 64 <267000000>;
-+			opp-microvolt = <1050000>;
-+		};
-+		opp at 400000000 {
-+			opp-hz = /bits/ 64 <400000000>;
-+			opp-microvolt = <1150000>;
-+		};
-+	};
-+
-+	bus_acp_opp_table: opp_table2 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp at 134000000 {
-+			opp-hz = /bits/ 64 <134000000>;
-+		};
-+		opp at 160000000 {
-+			opp-hz = /bits/ 64 <160000000>;
-+		};
-+		opp at 200000000 {
-+			opp-hz = /bits/ 64 <200000000>;
-+		};
-+	};
-+
-+	bus_peri_opp_table: opp_table3 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp at 5000000 {
-+			opp-hz = /bits/ 64 <5000000>;
-+		};
-+		opp at 100000000 {
-+			opp-hz = /bits/ 64 <100000000>;
-+		};
-+	};
-+
-+	bus_fsys_opp_table: opp_table4 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp at 10000000 {
-+			opp-hz = /bits/ 64 <10000000>;
-+		};
-+		opp at 134000000 {
-+			opp-hz = /bits/ 64 <134000000>;
-+		};
-+	};
-+
-+	bus_display_opp_table: opp_table5 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp at 100000000 {
-+			opp-hz = /bits/ 64 <100000000>;
-+		};
-+		opp at 134000000 {
-+			opp-hz = /bits/ 64 <134000000>;
-+		};
-+		opp at 160000000 {
-+			opp-hz = /bits/ 64 <160000000>;
-+		};
-+	};
-+
-+	bus_leftbus_opp_table: opp_table6 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp at 100000000 {
-+			opp-hz = /bits/ 64 <100000000>;
-+		};
-+		opp at 160000000 {
-+			opp-hz = /bits/ 64 <160000000>;
-+		};
-+		opp at 200000000 {
-+			opp-hz = /bits/ 64 <200000000>;
-+		};
-+	};
- };
+diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
+index 984c5e9e7bdd..20a9422c2552 100644
+--- a/drivers/devfreq/devfreq.c
++++ b/drivers/devfreq/devfreq.c
+@@ -25,6 +25,7 @@
+ #include <linux/list.h>
+ #include <linux/printk.h>
+ #include <linux/hrtimer.h>
++#include <linux/of.h>
+ #include "governor.h"
  
- &gic {
+ static struct class *devfreq_class;
+@@ -639,6 +640,49 @@ struct devfreq *devm_devfreq_add_device(struct device *dev,
+ }
+ EXPORT_SYMBOL(devm_devfreq_add_device);
+ 
++#ifdef CONFIG_OF
++/*
++ * devfreq_get_devfreq_by_phandle - Get the devfreq device from devicetree
++ * @dev - instance to the given device
++ * @index - index into list of devfreq
++ *
++ * return the instance of devfreq device
++ */
++struct devfreq *devfreq_get_devfreq_by_phandle(struct device *dev, int index)
++{
++	struct device_node *node;
++	struct devfreq *devfreq;
++
++	if (!dev)
++		return ERR_PTR(-EINVAL);
++
++	if (!dev->of_node)
++		return ERR_PTR(-EINVAL);
++
++	node = of_parse_phandle(dev->of_node, "devfreq", index);
++	if (!node)
++		return ERR_PTR(-ENODEV);
++
++	mutex_lock(&devfreq_list_lock);
++	list_for_each_entry(devfreq, &devfreq_list, node) {
++		if (devfreq->dev.parent
++			&& devfreq->dev.parent->of_node == node) {
++			mutex_unlock(&devfreq_list_lock);
++			return devfreq;
++		}
++	}
++	mutex_unlock(&devfreq_list_lock);
++
++	return ERR_PTR(-EPROBE_DEFER);
++}
++#else
++struct devfreq *devfreq_get_devfreq_by_phandle(struct device *dev, int index)
++{
++	return ERR_PTR(-ENODEV);
++}
++#endif /* CONFIG_OF */
++EXPORT_SYMBOL_GPL(devfreq_get_devfreq_by_phandle);
++
+ /**
+  * devm_devfreq_remove_device() - Resource-managed devfreq_remove_device()
+  * @dev:	the device to add devfreq feature.
+diff --git a/include/linux/devfreq.h b/include/linux/devfreq.h
+index 6fa02a20eb63..aa0b8424ebc3 100644
+--- a/include/linux/devfreq.h
++++ b/include/linux/devfreq.h
+@@ -208,6 +208,9 @@ extern int devm_devfreq_register_opp_notifier(struct device *dev,
+ extern void devm_devfreq_unregister_opp_notifier(struct device *dev,
+ 						struct devfreq *devfreq);
+ 
++extern struct devfreq *devfreq_get_devfreq_by_phandle(struct device *dev,
++						int index);
++
+ /**
+  * devfreq_update_stats() - update the last_status pointer in struct devfreq
+  * @df:		the devfreq instance whose status needs updating
+@@ -307,6 +310,12 @@ static inline void devm_devfreq_unregister_opp_notifier(struct device *dev,
+ {
+ }
+ 
++static inline struct devfreq *devfreq_get_devfreq_by_phandle(struct device *dev,
++							int index)
++{
++	return ERR_PTR(-ENODEV);
++}
++
+ static inline int devfreq_update_stats(struct devfreq *df)
+ {
+ 	return -EINVAL;
 -- 
 1.9.1
