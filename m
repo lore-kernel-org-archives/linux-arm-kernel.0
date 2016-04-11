@@ -1,298 +1,120 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 11 Apr 2016 14:25:15 +0530
-Subject: [PATCH v3 03/16] ARM: davinici: da8xx: move usb code to new file
-In-Reply-To: <1458863503-31121-4-git-send-email-david@lechnology.com>
-References: <1458863503-31121-1-git-send-email-david@lechnology.com>
- <1458863503-31121-4-git-send-email-david@lechnology.com>
-Message-ID: <570B6673.80108@ti.com>
+From: xinliang.liu@linaro.org (Xinliang Liu)
+Date: Mon, 11 Apr 2016 16:55:33 +0800
+Subject: [PATCH v8 00/10] Add DRM Driver for HiSilicon Kirin hi6220 SoC
+Message-ID: <1460364943-76135-1-git-send-email-xinliang.liu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 25 March 2016 05:21 AM, David Lechner wrote:
-> We will be adding more da8xx-specific code for phy and clocks, so it will
-> be better to have this in a separate file. This way we don't have a bunch
-> of #ifdefs for all of the da8xx stuff.
-> 
-> Signed-off-by: David Lechner <david@lechnology.com>
+This patch set adds a new drm driver for HiSilicon Kirin hi6220 SoC.
+Current testing and support board is Hikey board which is one of Linaro
+96boards. It is an arm64 open source board. For more information about
+this board, please access https://www.96boards.org.
 
-Applied this patch with a couple of local changes.
+Hardware Detail
+---------------
+  The display subsystem of Hi6220 SoC is shown as bellow:
+ +-----+       +----------+     +-----+     +-------------+
+ |     |       |          |     |     |     |             |             	
+ | FB  |------>|   ADE    |---->| DSI |---->|   External  |
+ |     |       |          |     |     |     |  HDMI/panel |
+ +-----+       +----------+     +-----+     +-------------+
 
-1) The subject line has a typo: s/davinici/davinci
-2) There are checkpatch warnings in new code that are coming from old 
-code. Even though this is just code movement, I prefer new code is free 
-of checkpatch warnings.
+- ADE(Advanced Display Engine) is the display controller. It contains 7
+channels, 3 overlay compositors and a LDI.
+  - A channel looks like: DMA-->clip-->scale-->ctrans(or called csc).
+  - Overlay compositor is response to compose planes which come from 7
+  channels and pass composed image to LDI.
+  - LDI is response to generate timings and RGB data stream.
+- DSI converts the RGB data stream from ADE to DSI packets.
+- External HDMI/panel module is connected with DSI bus. Now Hikey use a
+  ADI's ADV7533 external HDMI chip.
 
-Here is the updated patch.
+Change History
+-------------
+Changes in v8:
+- Rebase to v4.6-rc3
 
-Thanks,
-Sekhar
+Changes in v7:
+- Add config.mutex protection when accessing mode_config.connector_list.
+- Clean up match data getting of kirin_drm_drv.c.
+- A few Regs define clean up and typo fixs for ADE crtc and DSI encoder
+  driver.
+- Fix vblank irq flag "DRIVER_IRQF_SHARED" to "IRQF_SHARED".
 
----8<---
-From: David Lechner <david@lechnology.com>
-Date: Thu, 24 Mar 2016 18:51:28 -0500
-Subject: [PATCH] ARM: davinci: da8xx: move usb code to new file
+Changes in v6:
+- Cleanup values part of reg and clocks relevant properties.
+- Change "pclk_dsi" clock name to "pclk".
 
-We will be adding more da8xx-specific code for phy and clocks, so it will
-be better to have this in a separate file. This way we don't have a bunch
-of #ifdefs for all of the da8xx stuff.
+Changes in v5:
+- Remove endpoint unit address of dsi output port.
+- Use syscon to access ADE media NOC QoS registers instread of directly
+  writing registers.
+- Use reset controller to reset ADE instead of directly writing registers.
 
-While at it, fix some checkpatch warnings coming from existing code.
+Changes in v4:
+- Describe more specific of clocks and ports of binding docs.
+- Fix indentation of binding docs.
 
-Signed-off-by: David Lechner <david@lechnology.com>
-[nsekhar at ti.com: typo and checkpatch fixes]
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
- arch/arm/mach-davinci/Makefile    |   4 +-
- arch/arm/mach-davinci/usb-da8xx.c | 124 ++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-davinci/usb.c       |  74 +----------------------
- 3 files changed, 127 insertions(+), 75 deletions(-)
- create mode 100644 arch/arm/mach-davinci/usb-da8xx.c
+Changes in v3:
+- Move and rename all the files to kirin sub-directory.
+  So that we could separate different seires SoCs' driver.
+- Make ade as the drm master node.
+- Replace drm_platform_init, load, unload implementation.
+- Use assigned-clocks to set clock rate.
+- Use ports to connect display relevant nodes.
+- Rename hisi_drm_dsi.c to dw_drm_dsi.c
+- Make encoder type as DRM_MODE_ENCODER_DSI.
+- A few cleanup on regs and code.
 
-diff --git a/arch/arm/mach-davinci/Makefile b/arch/arm/mach-davinci/Makefile
-index 2e3464b8bab4..da4c336b4637 100644
---- a/arch/arm/mach-davinci/Makefile
-+++ b/arch/arm/mach-davinci/Makefile
-@@ -14,8 +14,8 @@ obj-$(CONFIG_ARCH_DAVINCI_DM644x)       += dm644x.o devices.o
- obj-$(CONFIG_ARCH_DAVINCI_DM355)        += dm355.o devices.o
- obj-$(CONFIG_ARCH_DAVINCI_DM646x)       += dm646x.o devices.o
- obj-$(CONFIG_ARCH_DAVINCI_DM365)	+= dm365.o devices.o
--obj-$(CONFIG_ARCH_DAVINCI_DA830)        += da830.o devices-da8xx.o
--obj-$(CONFIG_ARCH_DAVINCI_DA850)        += da850.o devices-da8xx.o
-+obj-$(CONFIG_ARCH_DAVINCI_DA830)	+= da830.o devices-da8xx.o usb-da8xx.o
-+obj-$(CONFIG_ARCH_DAVINCI_DA850)	+= da850.o devices-da8xx.o usb-da8xx.o
- 
- obj-$(CONFIG_AINTC)			+= irq.o
- obj-$(CONFIG_CP_INTC)			+= cp_intc.o
-diff --git a/arch/arm/mach-davinci/usb-da8xx.c b/arch/arm/mach-davinci/usb-da8xx.c
-new file mode 100644
-index 000000000000..0cab01f79825
---- /dev/null
-+++ b/arch/arm/mach-davinci/usb-da8xx.c
-@@ -0,0 +1,124 @@
-+/*
-+ * DA8xx USB
-+ */
-+#include <linux/init.h>
-+#include <linux/platform_device.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/usb/musb.h>
-+
-+#include <mach/common.h>
-+#include <mach/irqs.h>
-+#include <mach/cputype.h>
-+#include <mach/da8xx.h>
-+#include <linux/platform_data/usb-davinci.h>
-+
-+#define DA8XX_USB0_BASE		0x01e00000
-+#define DA8XX_USB1_BASE		0x01e25000
-+
-+#if IS_ENABLED(CONFIG_USB_MUSB_HDRC)
-+
-+static struct musb_hdrc_eps_bits musb_eps[] = {
-+	{ "ep1_tx", 8, },
-+	{ "ep1_rx", 8, },
-+	{ "ep2_tx", 8, },
-+	{ "ep2_rx", 8, },
-+	{ "ep3_tx", 5, },
-+	{ "ep3_rx", 5, },
-+	{ "ep4_tx", 5, },
-+	{ "ep4_rx", 5, },
-+};
-+
-+static struct musb_hdrc_config musb_config = {
-+	.multipoint	= true,
-+	.dyn_fifo	= true,
-+	.soft_con	= true,
-+	.dma		= true,
-+
-+	.num_eps	= 5,
-+	.dma_channels	= 8,
-+	.ram_bits	= 10,
-+	.eps_bits	= musb_eps,
-+};
-+
-+static struct musb_hdrc_platform_data usb_data = {
-+	/* OTG requires a Mini-AB connector */
-+	.mode           = MUSB_OTG,
-+	.clock		= "usb20",
-+	.config		= &musb_config,
-+};
-+
-+static struct resource da8xx_usb20_resources[] = {
-+	{
-+		.start		= DA8XX_USB0_BASE,
-+		.end		= DA8XX_USB0_BASE + SZ_64K - 1,
-+		.flags		= IORESOURCE_MEM,
-+	},
-+	{
-+		.start		= IRQ_DA8XX_USB_INT,
-+		.flags		= IORESOURCE_IRQ,
-+		.name		= "mc",
-+	},
-+};
-+
-+static u64 usb_dmamask = DMA_BIT_MASK(32);
-+
-+static struct platform_device usb_dev = {
-+	.name		= "musb-da8xx",
-+	.id             = -1,
-+	.dev = {
-+		.platform_data		= &usb_data,
-+		.dma_mask		= &usb_dmamask,
-+		.coherent_dma_mask      = DMA_BIT_MASK(32),
-+	},
-+	.resource	= da8xx_usb20_resources,
-+	.num_resources	= ARRAY_SIZE(da8xx_usb20_resources),
-+};
-+
-+int __init da8xx_register_usb20(unsigned int mA, unsigned int potpgt)
-+{
-+	usb_data.power	= mA > 510 ? 255 : mA / 2;
-+	usb_data.potpgt = (potpgt + 1) / 2;
-+
-+	return platform_device_register(&usb_dev);
-+}
-+
-+#else
-+
-+int __init da8xx_register_usb20(unsigned int mA, unsigned int potpgt)
-+{
-+	return 0;
-+}
-+
-+#endif  /* CONFIG_USB_MUSB_HDRC */
-+
-+static struct resource da8xx_usb11_resources[] = {
-+	[0] = {
-+		.start	= DA8XX_USB1_BASE,
-+		.end	= DA8XX_USB1_BASE + SZ_4K - 1,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	[1] = {
-+		.start	= IRQ_DA8XX_IRQN,
-+		.end	= IRQ_DA8XX_IRQN,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static u64 da8xx_usb11_dma_mask = DMA_BIT_MASK(32);
-+
-+static struct platform_device da8xx_usb11_device = {
-+	.name		= "ohci",
-+	.id		= 0,
-+	.dev = {
-+		.dma_mask		= &da8xx_usb11_dma_mask,
-+		.coherent_dma_mask	= DMA_BIT_MASK(32),
-+	},
-+	.num_resources	= ARRAY_SIZE(da8xx_usb11_resources),
-+	.resource	= da8xx_usb11_resources,
-+};
-+
-+int __init da8xx_register_usb11(struct da8xx_ohci_root_hub *pdata)
-+{
-+	da8xx_usb11_device.dev.platform_data = pdata;
-+	return platform_device_register(&da8xx_usb11_device);
-+}
-diff --git a/arch/arm/mach-davinci/usb.c b/arch/arm/mach-davinci/usb.c
-index b0a6b522575f..9980ddb7ae83 100644
---- a/arch/arm/mach-davinci/usb.c
-+++ b/arch/arm/mach-davinci/usb.c
-@@ -10,15 +10,12 @@
- #include <mach/common.h>
- #include <mach/irqs.h>
- #include <mach/cputype.h>
--#include <mach/da8xx.h>
- #include <linux/platform_data/usb-davinci.h>
- 
- #define DAVINCI_USB_OTG_BASE	0x01c64000
- 
--#define DA8XX_USB0_BASE 	0x01e00000
--#define DA8XX_USB1_BASE 	0x01e25000
--
- #if IS_ENABLED(CONFIG_USB_MUSB_HDRC)
-+
- static struct musb_hdrc_eps_bits musb_eps[] = {
- 	{ "ep1_tx", 8, },
- 	{ "ep1_rx", 8, },
-@@ -97,79 +94,10 @@ void __init davinci_setup_usb(unsigned mA, unsigned potpgt_ms)
- 	platform_device_register(&usb_dev);
- }
- 
--#ifdef CONFIG_ARCH_DAVINCI_DA8XX
--static struct resource da8xx_usb20_resources[] = {
--	{
--		.start		= DA8XX_USB0_BASE,
--		.end		= DA8XX_USB0_BASE + SZ_64K - 1,
--		.flags		= IORESOURCE_MEM,
--	},
--	{
--		.start		= IRQ_DA8XX_USB_INT,
--		.flags		= IORESOURCE_IRQ,
--		.name		= "mc",
--	},
--};
--
--int __init da8xx_register_usb20(unsigned mA, unsigned potpgt)
--{
--	usb_data.clock  = "usb20";
--	usb_data.power	= mA > 510 ? 255 : mA / 2;
--	usb_data.potpgt = (potpgt + 1) / 2;
--
--	usb_dev.resource = da8xx_usb20_resources;
--	usb_dev.num_resources = ARRAY_SIZE(da8xx_usb20_resources);
--	usb_dev.name = "musb-da8xx";
--
--	return platform_device_register(&usb_dev);
--}
--#endif	/* CONFIG_DAVINCI_DA8XX */
--
- #else
- 
- void __init davinci_setup_usb(unsigned mA, unsigned potpgt_ms)
- {
- }
- 
--#ifdef CONFIG_ARCH_DAVINCI_DA8XX
--int __init da8xx_register_usb20(unsigned mA, unsigned potpgt)
--{
--	return 0;
--}
--#endif
--
- #endif  /* CONFIG_USB_MUSB_HDRC */
--
--#ifdef	CONFIG_ARCH_DAVINCI_DA8XX
--static struct resource da8xx_usb11_resources[] = {
--	[0] = {
--		.start	= DA8XX_USB1_BASE,
--		.end	= DA8XX_USB1_BASE + SZ_4K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= IRQ_DA8XX_IRQN,
--		.end	= IRQ_DA8XX_IRQN,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static u64 da8xx_usb11_dma_mask = DMA_BIT_MASK(32);
--
--static struct platform_device da8xx_usb11_device = {
--	.name		= "ohci",
--	.id		= 0,
--	.dev = {
--		.dma_mask		= &da8xx_usb11_dma_mask,
--		.coherent_dma_mask	= DMA_BIT_MASK(32),
--	},
--	.num_resources	= ARRAY_SIZE(da8xx_usb11_resources),
--	.resource	= da8xx_usb11_resources,
--};
--
--int __init da8xx_register_usb11(struct da8xx_ohci_root_hub *pdata)
--{
--	da8xx_usb11_device.dev.platform_data = pdata;
--	return platform_device_register(&da8xx_usb11_device);
--}
--#endif	/* CONFIG_DAVINCI_DA8XX */
+Changes in v2:
+- Remove abtraction layer of plane/crtc/encoder/connector.
+- Refactor atomic implementation according to Daniel Vetter's guides:
+http://blog.ffwll.ch/2014/11/atomic-modeset-support-for-kms-drivers.html
+http://blog.ffwll.ch/2015/09/xdc-2015-atomic-modesetting-for-drivers.html
+http://blog.ffwll.ch/2015/08/atomic-modesetting-design-overview.html
+- Use bridge instead of slave encoder to connect external HDMI.
+- Move dt binding docs to bindings/display/hisilicon directory.
+
+Xinliang Liu (10):
+  drm/hisilicon: Add device tree binding for hi6220 display subsystem
+  drm/hisilicon: Add hisilicon kirin drm master driver
+  drm/hisilicon: Add crtc driver for ADE
+  drm/hisilicon: Add plane driver for ADE
+  drm/hisilicon: Add vblank driver for ADE
+  drm/hisilicon: Add cma fbdev and hotplug
+  drm/hisilicon: Add designware dsi encoder driver
+  drm/hisilicon: Add designware dsi host driver
+  drm/hisilicon: Add support for external bridge
+  MAINTAINERS: Add maintainer for hisilicon DRM driver
+
+ .../bindings/display/hisilicon/dw-dsi.txt          |   72 ++
+ .../bindings/display/hisilicon/hisi-ade.txt        |   64 ++
+ MAINTAINERS                                        |   10 +
+ drivers/gpu/drm/Kconfig                            |    2 +
+ drivers/gpu/drm/Makefile                           |    1 +
+ drivers/gpu/drm/hisilicon/Kconfig                  |    5 +
+ drivers/gpu/drm/hisilicon/Makefile                 |    5 +
+ drivers/gpu/drm/hisilicon/kirin/Kconfig            |   10 +
+ drivers/gpu/drm/hisilicon/kirin/Makefile           |    5 +
+ drivers/gpu/drm/hisilicon/kirin/dw_drm_dsi.c       |  857 ++++++++++++++++
+ drivers/gpu/drm/hisilicon/kirin/dw_dsi_reg.h       |  103 ++
+ drivers/gpu/drm/hisilicon/kirin/kirin_ade_reg.h    |  230 +++++
+ drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c    | 1057 ++++++++++++++++++++
+ drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.c    |  367 +++++++
+ drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.h    |   31 +
+ 15 files changed, 2819 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/hisilicon/dw-dsi.txt
+ create mode 100644 Documentation/devicetree/bindings/display/hisilicon/hisi-ade.txt
+ create mode 100644 drivers/gpu/drm/hisilicon/Kconfig
+ create mode 100644 drivers/gpu/drm/hisilicon/Makefile
+ create mode 100644 drivers/gpu/drm/hisilicon/kirin/Kconfig
+ create mode 100644 drivers/gpu/drm/hisilicon/kirin/Makefile
+ create mode 100644 drivers/gpu/drm/hisilicon/kirin/dw_drm_dsi.c
+ create mode 100644 drivers/gpu/drm/hisilicon/kirin/dw_dsi_reg.h
+ create mode 100644 drivers/gpu/drm/hisilicon/kirin/kirin_ade_reg.h
+ create mode 100644 drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
+ create mode 100644 drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.c
+ create mode 100644 drivers/gpu/drm/hisilicon/kirin/kirin_drm_drv.h
+
 -- 
-2.6.3
+2.8.0
