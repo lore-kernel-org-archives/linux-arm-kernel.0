@@ -1,116 +1,58 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Mon, 11 Apr 2016 16:29:32 -0700
-Subject: [PATCH] pci,
- pci-thunder-pem: Don't clobber read-only bits in bridge config
- registers.
-Message-ID: <1460417372-13147-1-git-send-email-ddaney.cavm@gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 11 Apr 2016 16:39:00 -0700
+Subject: [GIT PULL] ARM: Amlogic: DT fix for v4.6-rc
+In-Reply-To: <CAOQ7t2aKppmQ0_ue_su6vdYtDbneObHdc0A_4Y=na6DmvweHZQ@mail.gmail.com>
+ (Carlo Caione's message of "Sun, 10 Apr 2016 18:24:31 +0200")
+References: <CAOQ7t2arscn+pe4FpgzEL26rt3HtoMBP2ndSMvGQtqnDuU4pEg@mail.gmail.com>
+ <7hvb3rlm47.fsf@baylibre.com> <570A24E4.6090109@suse.de>
+ <CAOQ7t2aKppmQ0_ue_su6vdYtDbneObHdc0A_4Y=na6DmvweHZQ@mail.gmail.com>
+Message-ID: <7h7fg3k963.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Daney <david.daney@cavium.com>
+Carlo Caione <carlo@caione.org> writes:
 
-The 32-bit addressing modes in the I/O and Prefetchable Memory
-registers are required to be read-only.  Since the underlying access
-method allows them to be set, we must emulate their read-only nature
-and always set them.
+> On Sun, Apr 10, 2016 at 12:03 PM, Andreas F?rber <afaerber@suse.de> wrote:
+>> Am 09.04.2016 um 01:24 schrieb Kevin Hilman:
+>>> Carlo Caione <carlo@caione.org> writes:
+>>>
+>>>> This is a fix for v4.6-rc since the Meson8 / Meson8b platforms are
+>>>> currently broken.
+>>>>
+>>>> The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+>>>>
+>>>>   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+>>>>
+>>>> are available in the git repository at:
+>>>>
+>>>>   https://github.com/carlocaione/linux-meson tags/meson8-dt-fix
+>>>>
+>>>> for you to fetch changes up to 11ca873574c2314de9f0cf1adf8b3be88e4e19ae:
+>>>>
+>>>>   documentation: Fix pinctrl documentation for Meson8 / Meson8b
+>>>> (2016-03-30 19:51:57 +0200)
+>>>>
+>>>> ----------------------------------------------------------------
+>>>> With http://www.spinics.net/lists/devicetree/msg116771.html we split / refactor
+>>>> the pinctrl driver to have two different pinctrl devices for each bus on the
+>>>> Amlogic Meson8 / Meson8b SoCs.
+>>>> These are the missing patches for documentation and DT that weren't pulled into
+>>>> mainline with the driver changes.
+>>>>
+>>>> ----------------------------------------------------------------
+>>>
+>>> Strictly speaking, these aren't just documentation patches.  The missing
+>>> .dtsi changes were what was causing boot breakage.
+>>
+>> The above tag says "documentation and DT" and the subject says "DT fix"?
+>
+> Yeah, I hoped that the PR message would have been enough.
 
-Signed-off-by: David Daney <david.daney@cavium.com>
----
- drivers/pci/host/pci-thunder-pem.c | 42 ++++++++++++++++++++++++++++++--------
- 1 file changed, 34 insertions(+), 8 deletions(-)
+The message in the signed tag goes into the git history, so that is the
+part that is important to get correct.
 
-diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
-index cabb92a..196adf6 100644
---- a/drivers/pci/host/pci-thunder-pem.c
-+++ b/drivers/pci/host/pci-thunder-pem.c
-@@ -153,11 +153,11 @@ static int thunder_pem_config_read(struct pci_bus *bus, unsigned int devfn,
-  * reserved bits, this makes the code simpler and is OK as the bits
-  * are not affected by writing zeros to them.
-  */
--static u32 thunder_pem_bridge_w1c_bits(int where)
-+static u32 thunder_pem_bridge_w1c_bits(u64 where_aligned)
- {
- 	u32 w1c_bits = 0;
- 
--	switch (where & ~3) {
-+	switch (where_aligned) {
- 	case 0x04: /* Command/Status */
- 	case 0x1c: /* Base and I/O Limit/Secondary Status */
- 		w1c_bits = 0xff000000;
-@@ -184,12 +184,34 @@ static u32 thunder_pem_bridge_w1c_bits(int where)
- 	return w1c_bits;
- }
- 
-+/* Some bits must be written to one so they appear to be read-only. */
-+static u32 thunder_pem_bridge_w1_bits(u64 where_aligned)
-+{
-+	u32 w1_bits;
-+
-+	switch (where_aligned) {
-+	case 0x1c: /* I/O Base / I/O Limit, Secondary Status*/
-+		/* Force 32-bit I/O addressing. */
-+		w1_bits = 0x0101;
-+		break;
-+	case 0x24: /* Prefetchable Memory Base / Prefetchable Memory Limit */
-+		/* Force 64-bit addressing */
-+		w1_bits = 0x00010001;
-+		break;
-+	default:
-+		w1_bits = 0;
-+		break;
-+	}
-+	return w1_bits;
-+}
-+
- static int thunder_pem_bridge_write(struct pci_bus *bus, unsigned int devfn,
- 				    int where, int size, u32 val)
- {
- 	struct gen_pci *pci = bus->sysdata;
- 	struct thunder_pem_pci *pem_pci;
- 	u64 write_val, read_val;
-+	u64 where_aligned = where & ~3ull;
- 	u32 mask = 0;
- 
- 	pem_pci = container_of(pci, struct thunder_pem_pci, gen_pci);
-@@ -205,8 +227,7 @@ static int thunder_pem_bridge_write(struct pci_bus *bus, unsigned int devfn,
- 	 */
- 	switch (size) {
- 	case 1:
--		read_val = where & ~3ull;
--		writeq(read_val, pem_pci->pem_reg_base + PEM_CFG_RD);
-+		writeq(where_aligned, pem_pci->pem_reg_base + PEM_CFG_RD);
- 		read_val = readq(pem_pci->pem_reg_base + PEM_CFG_RD);
- 		read_val >>= 32;
- 		mask = ~(0xff << (8 * (where & 3)));
-@@ -215,8 +236,7 @@ static int thunder_pem_bridge_write(struct pci_bus *bus, unsigned int devfn,
- 		val |= (u32)read_val;
- 		break;
- 	case 2:
--		read_val = where & ~3ull;
--		writeq(read_val, pem_pci->pem_reg_base + PEM_CFG_RD);
-+		writeq(where_aligned, pem_pci->pem_reg_base + PEM_CFG_RD);
- 		read_val = readq(pem_pci->pem_reg_base + PEM_CFG_RD);
- 		read_val >>= 32;
- 		mask = ~(0xffff << (8 * (where & 3)));
-@@ -244,11 +264,17 @@ static int thunder_pem_bridge_write(struct pci_bus *bus, unsigned int devfn,
- 	}
- 
- 	/*
-+	 * Some bits must be read-only with value of one.  Since the
-+	 * access method allows these to be cleared if a zero is
-+	 * written, force them to one before writing.
-+	 */
-+	val |= thunder_pem_bridge_w1_bits(where_aligned);
-+
-+	/*
- 	 * Low order bits are the config address, the high order 32
- 	 * bits are the data to be written.
- 	 */
--	write_val = where & ~3ull;
--	write_val |= (((u64)val) << 32);
-+	write_val = (((u64)val) << 32) | where_aligned;
- 	writeq(write_val, pem_pci->pem_reg_base + PEM_CFG_WR);
- 	return PCIBIOS_SUCCESSFUL;
- }
--- 
-1.8.3.1
+This was just a minor nit, and I merged it anyways since I was able to
+use my super detective skills and figure it out.  I just wanted to point
+it out for future reference.
+
+Kevin
