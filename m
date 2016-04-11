@@ -1,117 +1,116 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Mon, 11 Apr 2016 18:16:16 -0500
-Subject: [PATCH] ARM: OMAP3: Fix imprecise external abort for off mode
- on 36xx
-In-Reply-To: <20160411211339.GI5995@atomide.com>
-References: <1455140107-3328-1-git-send-email-tony@atomide.com>
- <5706C062.4040803@ti.com> <20160407231604.GP16484@atomide.com>
- <570BEAFB.6000409@ti.com> <20160411211339.GI5995@atomide.com>
-Message-ID: <570C3040.3030001@ti.com>
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Mon, 11 Apr 2016 16:29:32 -0700
+Subject: [PATCH] pci,
+ pci-thunder-pem: Don't clobber read-only bits in bridge config
+ registers.
+Message-ID: <1460417372-13147-1-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/11/2016 04:13 PM, Tony Lindgren wrote:
-> * Dave Gerlach <d-gerlach@ti.com> [160411 11:21]:
->> Tony,
->> On 04/07/2016 06:16 PM, Tony Lindgren wrote:
->>> * Dave Gerlach <d-gerlach@ti.com> [160407 13:18]:
->>>>
->>>> I have a series to convert omap3 PM code to using generic SRAM driver but
->>>> when testing I see an external abort on BBXM off mode resume very similar to
->>>> this that seems to be timing related caused by using generic SRAM driver to
->>>> re-copy PM code rather than omap3_sram_restore_context.
->>>>
->>>> By tracing the resume path I believe the abort is caused by
->>>> omap3_intc_resume_idle in pm34xx.c, which writes to two registers in the
->>>> INTC. Removing this call makes the abort unreproducible in my experiments
->>>> and changing the writes to reads causes a bus lock, so I'm pretty confident
->>>> it's coming from this call attempting to write to an idled INTC.
->>>>
->>>> Advisory 1.106 in DM3730 Silicon Errata Document [1] describes an issue with
->>>> "MPU Leaves MSTANDBY State Before IDLEREQ of Interrupt Controller is
->>>> Released" which sounds like a very similar failure situation to what we are
->>>> seeing even though the timing of INTC access is a bit further from WFI exit
->>>> than it describes. Perhaps there are more conditions where it can occur.
->>>> Pushed my WIP branch for SRAM series that shows the same failure here [2].
->>>
->>> Interesting, I think you may have something with the errata 1.106.. And
->>> looks like we also need still errata 1.62 handled also on 36xx in the
->>> same pdf. And need to disable intc autoidle early at least for HS omaps
->>> as save_secure_ram context supposedly also can do WFI.
->>>
->>> Maybe something like the following would make sense? It seems to work
->>> here without external aborts with your test branch on dm3730, and boots
->>> fine on omap3430 hs (n900).
->>>
->>> Or do you have some better ideas for a fix?
->>
->> I can also confirm that this fixes the external abort, I can not cause it
->> with your attached patch.
-> 
-> OK. I still can't quite see why exactly this patch fixes things. So
-> I'm afraid it might be just hiding the problem..
+From: David Daney <david.daney@cavium.com>
 
-I agree, moving the omap3_intc_resume_idle may just be masking the issue for
-that exact situation, but I think we can get rid of it for off mode...
+The 32-bit addressing modes in the I/O and Prefetchable Memory
+registers are required to be read-only.  Since the underlying access
+method allows them to be set, we must emulate their read-only nature
+and always set them.
 
-> 
->> I would be ok with the solution you have proposed and I was unable to come
->> up with anything better while trying to debug the issue originally.
->>
->> We still need the call to omap3_intc_resume_idle because the intc restore
->> context only gets called on resume from off mode. Perhaps we only need to
->> call omap3_intc_resume_idle when coming back from non-off modes, otherwise
->> let the context restore handle the reconfig of the INTC idle/sysconfig
->> registers?
-> 
-> OK. Did you actually test by commenting out omap3_intc_resume_idle()?
-> 
-> Yeah sounds like we can optimize out the restore there for non-off
-> modes.
+Signed-off-by: David Daney <david.daney@cavium.com>
+---
+ drivers/pci/host/pci-thunder-pem.c | 42 ++++++++++++++++++++++++++++++--------
+ 1 file changed, 34 insertions(+), 8 deletions(-)
 
-Yes I removed it entirely for testing, and I also tried something like this for
-a possible workable solution (without your patch applied):
-
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index fcf975eb5e9d..8d39b44ba3a3 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -268,7 +268,6 @@ void omap_sram_idle(void)
-        int per_next_state = PWRDM_POWER_ON;
-        int core_next_state = PWRDM_POWER_ON;
-        int per_going_off;
--       int core_prev_state;
-        u32 sdrc_pwr = 0;
-
-        mpu_next_state = pwrdm_read_next_pwrst(mpu_pwrdm);
-@@ -348,17 +347,16 @@ void omap_sram_idle(void)
-                sdrc_write_reg(sdrc_pwr, SDRC_POWER);
-
-        /* CORE */
--       if (core_next_state < PWRDM_POWER_ON) {
--               core_prev_state = pwrdm_read_prev_pwrst(core_pwrdm);
--               if (core_prev_state == PWRDM_POWER_OFF) {
-+       if (core_next_state < PWRDM_POWER_ON &&
-+           pwrdm_read_prev_pwrst(core_pwrdm) == PWRDM_POWER_OFF) {
-                        omap3_core_restore_context();
-                        omap3_cm_restore_context();
-                        omap3_push_sram_idle();
-                        omap3_push_sram_secure_idle();
-                        omap2_sms_restore_context();
--               }
--       }
--       omap3_intc_resume_idle();
-+       } else
-+               omap3_intc_resume_idle();
+diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
+index cabb92a..196adf6 100644
+--- a/drivers/pci/host/pci-thunder-pem.c
++++ b/drivers/pci/host/pci-thunder-pem.c
+@@ -153,11 +153,11 @@ static int thunder_pem_config_read(struct pci_bus *bus, unsigned int devfn,
+  * reserved bits, this makes the code simpler and is OK as the bits
+  * are not affected by writing zeros to them.
+  */
+-static u32 thunder_pem_bridge_w1c_bits(int where)
++static u32 thunder_pem_bridge_w1c_bits(u64 where_aligned)
+ {
+ 	u32 w1c_bits = 0;
+ 
+-	switch (where & ~3) {
++	switch (where_aligned) {
+ 	case 0x04: /* Command/Status */
+ 	case 0x1c: /* Base and I/O Limit/Secondary Status */
+ 		w1c_bits = 0xff000000;
+@@ -184,12 +184,34 @@ static u32 thunder_pem_bridge_w1c_bits(int where)
+ 	return w1c_bits;
+ }
+ 
++/* Some bits must be written to one so they appear to be read-only. */
++static u32 thunder_pem_bridge_w1_bits(u64 where_aligned)
++{
++	u32 w1_bits;
 +
-
-        pwrdm_post_transition(NULL);
-
-
-Regards,
-Dave
-
-
-> 
-> Tony
-> 
++	switch (where_aligned) {
++	case 0x1c: /* I/O Base / I/O Limit, Secondary Status*/
++		/* Force 32-bit I/O addressing. */
++		w1_bits = 0x0101;
++		break;
++	case 0x24: /* Prefetchable Memory Base / Prefetchable Memory Limit */
++		/* Force 64-bit addressing */
++		w1_bits = 0x00010001;
++		break;
++	default:
++		w1_bits = 0;
++		break;
++	}
++	return w1_bits;
++}
++
+ static int thunder_pem_bridge_write(struct pci_bus *bus, unsigned int devfn,
+ 				    int where, int size, u32 val)
+ {
+ 	struct gen_pci *pci = bus->sysdata;
+ 	struct thunder_pem_pci *pem_pci;
+ 	u64 write_val, read_val;
++	u64 where_aligned = where & ~3ull;
+ 	u32 mask = 0;
+ 
+ 	pem_pci = container_of(pci, struct thunder_pem_pci, gen_pci);
+@@ -205,8 +227,7 @@ static int thunder_pem_bridge_write(struct pci_bus *bus, unsigned int devfn,
+ 	 */
+ 	switch (size) {
+ 	case 1:
+-		read_val = where & ~3ull;
+-		writeq(read_val, pem_pci->pem_reg_base + PEM_CFG_RD);
++		writeq(where_aligned, pem_pci->pem_reg_base + PEM_CFG_RD);
+ 		read_val = readq(pem_pci->pem_reg_base + PEM_CFG_RD);
+ 		read_val >>= 32;
+ 		mask = ~(0xff << (8 * (where & 3)));
+@@ -215,8 +236,7 @@ static int thunder_pem_bridge_write(struct pci_bus *bus, unsigned int devfn,
+ 		val |= (u32)read_val;
+ 		break;
+ 	case 2:
+-		read_val = where & ~3ull;
+-		writeq(read_val, pem_pci->pem_reg_base + PEM_CFG_RD);
++		writeq(where_aligned, pem_pci->pem_reg_base + PEM_CFG_RD);
+ 		read_val = readq(pem_pci->pem_reg_base + PEM_CFG_RD);
+ 		read_val >>= 32;
+ 		mask = ~(0xffff << (8 * (where & 3)));
+@@ -244,11 +264,17 @@ static int thunder_pem_bridge_write(struct pci_bus *bus, unsigned int devfn,
+ 	}
+ 
+ 	/*
++	 * Some bits must be read-only with value of one.  Since the
++	 * access method allows these to be cleared if a zero is
++	 * written, force them to one before writing.
++	 */
++	val |= thunder_pem_bridge_w1_bits(where_aligned);
++
++	/*
+ 	 * Low order bits are the config address, the high order 32
+ 	 * bits are the data to be written.
+ 	 */
+-	write_val = where & ~3ull;
+-	write_val |= (((u64)val) << 32);
++	write_val = (((u64)val) << 32) | where_aligned;
+ 	writeq(write_val, pem_pci->pem_reg_base + PEM_CFG_WR);
+ 	return PCIBIOS_SUCCESSFUL;
+ }
+-- 
+1.8.3.1
