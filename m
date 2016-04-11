@@ -1,58 +1,45 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 11 Apr 2016 11:31:04 +0100
-Subject: [PATCH] scatterlist: use sg_dma_len() in sg_set_page()
-In-Reply-To: <1460342864-27891-1-git-send-email-shawnguo@kernel.org>
-References: <1460342864-27891-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <570B7CE8.3020307@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 11 Apr 2016 11:40:13 +0100
+Subject: [PATCH 1/2] arm64: mem-model: add flatmem model for arm64
+In-Reply-To: <CAKv+Gu-cWWUi6fCiveqaZRVhGCpEasCLEs7wq6t+C-x65g4cgQ@mail.gmail.com>
+References: <1459844572-53069-1-git-send-email-puck.chen@hisilicon.com>
+ <20160407142148.GI5657@arm.com> <570B10B2.2000000@hisilicon.com>
+ <CAKv+Gu8iQ0NzLFWHy9Ggyv+jL-BqJ3x-KaRD1SZ1mU6yU3c7UQ@mail.gmail.com>
+ <570B5875.20804@hisilicon.com>
+ <CAKv+Gu9aqR=E3TmbPDFEUC+Q13bAJTU5wVTTHkOr6aX6BZ1OVA@mail.gmail.com>
+ <570B758E.7070005@hisilicon.com>
+ <CAKv+Gu-cWWUi6fCiveqaZRVhGCpEasCLEs7wq6t+C-x65g4cgQ@mail.gmail.com>
+Message-ID: <20160411104013.GG15729@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Mon, Apr 11, 2016 at 12:31:53PM +0200, Ard Biesheuvel wrote:
+> On 11 April 2016 at 11:59, Chen Feng <puck.chen@hisilicon.com> wrote:
+> > Please see the pg-tables below.
+> >
+> >
+> > With sparse and vmemmap enable.
+> >
+> > ---[ vmemmap start ]---
+> > 0xffffffbdc0200000-0xffffffbdc4800000          70M     RW NX SHD AF    UXN MEM/NORMAL
+> > ---[ vmemmap end ]---
+> >
+> 
+> OK, I see what you mean now. Sorry for taking so long to catch up.
+> 
+> > The board is 4GB, and the memap is 70MB
+> > 1G memory --- 14MB mem_map array.
+> 
+> No, this is incorrect. 1 GB corresponds with 16 MB worth of struct
+> pages assuming sizeof(struct page) == 64
+> 
+> So you are losing 6 MB to rounding here, which I agree is significant.
+> I wonder if it makes sense to use a lower value for SECTION_SIZE_BITS
+> on 4k pages kernels, but perhaps we're better off asking the opinion
+> of the other cc'ees.
 
-On 11/04/16 03:47, Shawn Guo wrote:
-> The macro sg_dma_len(sg) is commonly used to retrieve length of sg,
-> which could be 'dma_length' or 'length' field, depending on whether
-> NEED_SG_DMA_LENGTH is enabled or not.  On the other hand, many driver
-> code use helper function sg_set_page() to set an sg entry pointing at
-> a page, with offset and length set up in one call.  But sg_set_page()
-> does not consider NEED_SG_DMA_LENGTH case and only set up 'length'
-> field.  This causes problem on platforms like ARM64, where
-> NEED_SG_DMA_LENGTH is enabled by default, i.e. sg_set_page() sets up
-> 'length' while sg_dma_len(sg) returns 'dma_length' field.
->
-> The patch changes sg_set_page() to use sg_dma_len() for sg length setup
-> as well, so that NEED_SG_DMA_LENGTH case can be handled.
->
-> Signed-off-by: Shawn Guo <shawnguo@kernel.org>
-> ---
->   include/linux/scatterlist.h | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/include/linux/scatterlist.h b/include/linux/scatterlist.h
-> index 556ec1ea2574..b0e32ea594c3 100644
-> --- a/include/linux/scatterlist.h
-> +++ b/include/linux/scatterlist.h
-> @@ -114,7 +114,7 @@ static inline void sg_set_page(struct scatterlist *sg, struct page *page,
->   {
->   	sg_assign_page(sg, page);
->   	sg->offset = offset;
-> -	sg->length = len;
-> +	sg_dma_len(sg) = len;
+You need to be really careful making SECTION_SIZE_BITS smaller because
+it has a direct correlation on the use of page->flags and you can end up
+running out of bits fairly easily.
 
-This looks wrong. If a driver is building a scatterlist, then it needs 
-to fill in the page, offset and length fields to describe the physical 
-layout - leaving sg->length uninitialised would be a recipe for disaster 
-- then pass it to the DMA API. Only the DMA API implementation should be 
-setting dma_addr and dma_len, and they may not correspond to the 
-physical layout at all (e.g. an IOMMU could concatenate the entire list 
-into a single much longer segment at whatever arbitrary DMA address it 
-chooses).
-
-Is there some particular driver hiccup behind this?
-
-Robin.
-
->   }
->
->   static inline struct page *sg_page(struct scatterlist *sg)
->
+Will
