@@ -1,34 +1,59 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 11 Apr 2016 10:25:25 -0500
-Subject: [RESEND/PATCH V7 1/2] regulator: Add document for MT6323 regulator
-In-Reply-To: <1460054776-54782-1-git-send-email-blogic@openwrt.org>
-References: <1460054776-54782-1-git-send-email-blogic@openwrt.org>
-Message-ID: <20160411152525.GA18883@rob-hp-laptop>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Mon, 11 Apr 2016 10:25:33 -0500
+Subject: [PATCH v5 6/9] irqchip/gic-v3: Parse and export virtual GIC
+ information
+In-Reply-To: <570BB461.4040704@arm.com>
+References: <1459769860-6629-1-git-send-email-julien.grall@arm.com>
+ <1459769860-6629-7-git-send-email-julien.grall@arm.com>
+ <570B35DA.5050600@linaro.org> <570BB461.4040704@arm.com>
+Message-ID: <570BC1ED.9080200@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 07, 2016 at 08:46:15PM +0200, John Crispin wrote:
-> Signed-off-by: John Crispin <blogic@openwrt.org>
-> Cc: devicetree at vger.kernel.org
-> ---
-> Series was dropped in the 4.6-rc1 merge window to avoid a merge order
-> conflict with the corresponding MFD driver.
-> 
-> Changes in V7
-> * remove another compatible string
-> * small wording changes
-> 
-> Changes in V6
-> * remove the compatible string
-> 
-> Changes in V5
-> * regulator vs regulators
-> 
-> Changes in V4
-> * regulator is a subnode and not a property
-> 
->  .../bindings/regulator/mt6323-regulator.txt        |  239 ++++++++++++++++++++
->  1 file changed, 239 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
+Hi Julien,
 
-Acked-by: Rob Herring <robh@kernel.org>
+On 04/11/2016 09:27 AM, Julien Grall wrote:
+> Hello Hanjun,
+>
+> On 11/04/16 06:27, Hanjun Guo wrote:
+>> On 2016/4/4 19:37, Julien Grall wrote:
+>>> +static void __init gic_acpi_setup_kvm_info(void)
+>>> +{
+>>> +    int irq;
+>>> +
+>>> +    if (!gic_acpi_collect_virt_info()) {
+>>> +        pr_warn("Unable to get hardware information used for
+>>> virtualization\n");
+>>> +        return;
+>>> +    }
+>>> +
+>>> +    gic_v3_kvm_info.type = GIC_V3;
+>>> +
+>>> +    irq = acpi_register_gsi(NULL, acpi_data.maint_irq,
+>>> +                acpi_data.maint_irq_mode,
+>>> +                ACPI_ACTIVE_HIGH);
+>>> +    if (irq <= 0)
+>>> +        return;
+>>> +
+>>> +    gic_v3_kvm_info.maint_irq = irq;
+>>> +
+>>> +    if (acpi_data.vcpu_base) {
+>>
+>> Sorry, I'm not familiar with KVM, but I got a question here, will
+>> KVM works without valid vcpu_base in GICv3 mode?
+>
+Yes, KVM works without vcpu_base in GICv3 mode. The vcpu_base will be used
+for emulatingvGICv2 feature. The vGICv3 emulation isdone through the
+system registers.
+
+> vcpu_base is only required for supporting GICv2 on GICv3.
+>
+Yes, you are right,
+
+> Regards,
+>
+
+-- 
+Shanker Donthineni
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
