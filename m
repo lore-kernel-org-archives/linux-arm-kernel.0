@@ -1,44 +1,89 @@
-From: felipe.balbi@linux.intel.com (Felipe Balbi)
-Date: Mon, 11 Apr 2016 11:24:22 +0300
-Subject: [PATCH] usb: core: buffer: avoid NULL pointer dereferrence
-In-Reply-To: <1460358968.10419.26.camel@mhfsdcap03>
-References: <1460106483-24793-1-git-send-email-chunfeng.yun@mediatek.com>
- <20160408140701.GA3547@kroah.com> <1460343705.10419.12.camel@mhfsdcap03>
- <87shyspwbz.fsf@intel.com> <1460358968.10419.26.camel@mhfsdcap03>
-Message-ID: <87y48ko8nd.fsf@intel.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 11 Apr 2016 10:27:42 +0200
+Subject: 4.6-rc2: regression with omap video and lockdep (was Re: 4.4, 4.6:
+ camera and unlock buttons produce tons of interrupts (was Re: N900 sleep
+ mode))
+In-Reply-To: <20160407234134.GQ16484@atomide.com>
+References: <20160404213056.GA25912@amd> <20160404220748.GA16484@atomide.com>
+ <20160405142250.GA6429@amd> <20160405152916.GE16484@atomide.com>
+ <20160405205137.GA10196@amd> <20160407174019.GM16484@atomide.com>
+ <20160407194828.GA13338@amd> <20160407213229.GO16484@atomide.com>
+ <20160407230150.GA16552@amd> <20160407234134.GQ16484@atomide.com>
+Message-ID: <20160411082742.GA1993@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi!
 
-Hi,
+> > > Nothing idling for me with your .config.. And it seems slower to boot
+> > > compared to omap2plus_defconfig? Maybe because of the extra GPIO
+> > > interrupts?
+> > 
+> > Extra interrupts only happen when enable_off_mode is 1, so that should
+> > not be an issue during boot.
+> 
+> OK maybe it's just the extra driver probe time then.
 
-chunfeng yun <chunfeng.yun@mediatek.com> writes:
->> > On Fri, 2016-04-08 at 07:07 -0700, Greg Kroah-Hartman wrote:
->> >> On Fri, Apr 08, 2016 at 05:08:03PM +0800, Chunfeng Yun wrote:
->> >> > NULL pointer dereferrence will happen when class driver
->> >> > wants to allocate zero length buffer and pool_max[0]
->> >> > can't be used, so skip reserved pool in this case.
->> >> 
->> >> Why would a driver want to allocate a 0 length buffer?  What driver does
->> >> this?
->> > It's misc/usbtest.c
->> 
->> that'll do what you ask it to do with the userspace tool testusb. Are
->> you trying to pass a size of 0 ?
->> 
-> No, I just ran "testusb -t10" which called test_ctrl_queue().
-> In this function, sub-case 8 passed a parameter @len as 0 to
-> simple_alloc_urb(), and then it tried to allocate a 0-length buffer.
+Heh. I had earlyprintk enabled. That should explain it.
 
-odd, I have never seen this problem running testusb with the same
-arguments.
+> Well I've been just using omap2plus_defconfig with:
+> 
+> # modprobe tsc2005
+> # modprobe gpio_backlight
+> # modprobe panel_sony_acx565akm
+> # modprobe omapfb
+> 
+> # echo 255 > /sys/class/backlight/acx565akm/brightness
+> 
+> And then the following to blank for idle:
+> 
+> # echo 1 > /sys/devices/platform/omapfb/graphics/fb0/blank
+> 
+> But in the world of eternal regressions, I'm not seeing anything
+> on the framebuffer with v4.6-rc2 :( No idea what broke it or when
+> as my n900 is in the rack.
+
+Can you try this patch to your config -- disabling lockdep? It should
+fix the video for you. (And if you have the serial console... do you
+see any warnings from lockdep?)
+
+Thanks,
+								Pavel
+								
+--- config.def	2016-04-08 21:50:04.519622137 +0200
++++ .config	2016-04-11 10:22:52.988193318 +0200
+@@ -4183,15 +4183,12 @@
+ CONFIG_DEBUG_SPINLOCK=y
+ CONFIG_DEBUG_MUTEXES=y
+ # CONFIG_DEBUG_WW_MUTEX_SLOWPATH is not set
+-CONFIG_DEBUG_LOCK_ALLOC=y
+-CONFIG_PROVE_LOCKING=y
+-CONFIG_LOCKDEP=y
++# CONFIG_DEBUG_LOCK_ALLOC is not set
++# CONFIG_PROVE_LOCKING is not set
+ # CONFIG_LOCK_STAT is not set
+-# CONFIG_DEBUG_LOCKDEP is not set
+ # CONFIG_DEBUG_ATOMIC_SLEEP is not set
+ # CONFIG_DEBUG_LOCKING_API_SELFTESTS is not set
+ # CONFIG_LOCK_TORTURE_TEST is not set
+-CONFIG_TRACE_IRQFLAGS=y
+ CONFIG_STACKTRACE=y
+ # CONFIG_DEBUG_KOBJECT is not set
+ # CONFIG_DEBUG_BUGVERBOSE is not set
+@@ -4204,8 +4201,7 @@
+ #
+ # RCU Debugging
+ #
+-CONFIG_PROVE_RCU=y
+-# CONFIG_PROVE_RCU_REPEATEDLY is not set
++# CONFIG_PROVE_RCU is not set
+ # CONFIG_SPARSE_RCU_POINTER is not set
+ # CONFIG_TORTURE_TEST is not set
+ # CONFIG_RCU_TORTURE_TEST is not set
+
+
+
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160411/abb676eb/attachment.sig>
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
