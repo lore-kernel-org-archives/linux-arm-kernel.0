@@ -1,390 +1,86 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 11 Apr 2016 11:53:21 +0100
-Subject: [RFC PATCH 12/45] KVM: arm/arm64: vgic-new: Add MMIO handling
- framework
-In-Reply-To: <20160331090824.GR4126@cbox>
-References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
- <1458871508-17279-13-git-send-email-andre.przywara@arm.com>
- <20160331090824.GR4126@cbox>
-Message-ID: <570B8221.3050506@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 11 Apr 2016 11:57:40 +0100
+Subject: [PATCH v3] spi: orion.c: Add direct access mode
+In-Reply-To: <1460030811-13787-1-git-send-email-sr@denx.de>
+References: <1460030811-13787-1-git-send-email-sr@denx.de>
+Message-ID: <20160411105740.GB3351@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+On Thu, Apr 07, 2016 at 02:06:51PM +0200, Stefan Roese wrote:
 
-On 31/03/16 10:08, Christoffer Dall wrote:
-> Hi Andre,
-> 
-> [cc'ing Paolo here for his thoughts on the KVM IO bus framework]
-> 
-> On Fri, Mar 25, 2016 at 02:04:35AM +0000, Andre Przywara wrote:
->> We register each register group of the distributor and redistributors
->> as separate regions of the kvm-io-bus framework. This way calls get
->> directly handed over to the actual handler.
->> This puts a lot more regions into kvm-io-bus than what we use at the
->> moment on other architectures, so we will probably need to revisit the
->> implementation of the framework later to be more efficient.
-> 
-> Looking more carefully at the KVM IO bus stuff, it looks like it is
-> indeed designed to be a *per device* thing you register, not a *per
-> register* thing.
-> 
-> My comments to Vladimir's bug report notwithstanding, there's still a
-> choice here to:
-> 
-> 1) Expand/modify the KVM IO bus framework to take an arbitrary number of devices
-> 
-> 2) Build a KVM architectureal generic framework on top of the IO bus
-> framework to handle individual register regions.
-> 
-> 3) Stick with what we had before, do not modify the KVM IO bus stuff,
-> and handle the individual register region business locally within the
-> arm/vgic code.
-> 
-> 
->>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->> ---
->>  include/kvm/vgic/vgic.h       |   9 ++
->>  virt/kvm/arm/vgic/vgic_mmio.c | 194 ++++++++++++++++++++++++++++++++++++++++++
->>  virt/kvm/arm/vgic/vgic_mmio.h |  47 ++++++++++
->>  3 files changed, 250 insertions(+)
->>  create mode 100644 virt/kvm/arm/vgic/vgic_mmio.c
->>  create mode 100644 virt/kvm/arm/vgic/vgic_mmio.h
->>
->> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
->> index 2ce9b4a..a8262c7 100644
->> --- a/include/kvm/vgic/vgic.h
->> +++ b/include/kvm/vgic/vgic.h
->> @@ -106,6 +106,12 @@ struct vgic_irq {
->>  	enum vgic_irq_config config;	/* Level or edge */
->>  };
->>  
->> +struct vgic_io_device {
->> +	gpa_t base_addr;
->> +	struct kvm_vcpu *redist_vcpu;
->> +	struct kvm_io_device dev;
->> +};
->> +
->>  struct vgic_dist {
->>  	bool			in_kernel;
->>  	bool			ready;
->> @@ -132,6 +138,9 @@ struct vgic_dist {
->>  	u32			enabled;
->>  
->>  	struct vgic_irq		*spis;
->> +
->> +	struct vgic_io_device	*dist_iodevs;
->> +	struct vgic_io_device	*redist_iodevs;
->>  };
->>  
->>  struct vgic_v2_cpu_if {
->> diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
->> new file mode 100644
->> index 0000000..26c46e7
->> --- /dev/null
->> +++ b/virt/kvm/arm/vgic/vgic_mmio.c
->> @@ -0,0 +1,194 @@
->> +/*
->> + * VGIC MMIO handling functions
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +#include <linux/kvm.h>
->> +#include <linux/kvm_host.h>
->> +#include <kvm/iodev.h>
->> +#include <kvm/vgic/vgic.h>
->> +#include <linux/bitops.h>
->> +#include <linux/irqchip/arm-gic.h>
->> +
->> +#include "vgic.h"
->> +#include "vgic_mmio.h"
->> +
->> +void write_mask32(u32 value, int offset, int len, void *val)
->> +{
->> +	value = cpu_to_le32(value) >> (offset * 8);
->> +	memcpy(val, &value, len);
->> +}
->> +
->> +u32 mask32(u32 origvalue, int offset, int len, const void *val)
->> +{
->> +	origvalue &= ~((BIT_ULL(len) - 1) << (offset * 8));
->> +	memcpy((char *)&origvalue + (offset * 8), val, len);
->> +	return origvalue;
->> +}
->> +
->> +#ifdef CONFIG_KVM_ARM_VGIC_V3
->> +void write_mask64(u64 value, int offset, int len, void *val)
->> +{
->> +	value = cpu_to_le64(value) >> (offset * 8);
->> +	memcpy(val, &value, len);
->> +}
->> +
->> +/* FIXME: I am clearly misguided here, there must be some saner way ... */
-> 
-> I'm confuses in general.  Can you explain what these mask functions do
-> overall at some higher level?
+> @@ -372,10 +383,44 @@ orion_spi_write_read(struct spi_device *spi, struct spi_transfer *xfer)
+>  {
+>  	unsigned int count;
+>  	int word_len;
+> +	struct orion_spi *orion_spi;
+> +	int cs = spi->chip_select;
+>  
+>  	word_len = spi->bits_per_word;
+>  	count = xfer->len;
+>  
+> +	orion_spi = spi_master_get_devdata(spi->master);
+> +
+> +	/* Use SPI direct access mode if base address is available */
+> +	if (orion_spi->direct_access[cs].vaddr) {
+> +		struct orion_direct_acc *da = &orion_spi->direct_access[cs];
+> +
+> +		if (count > da->size) {
+> +			dev_err(&spi->dev,
+> +				"max transfer size exceeded (%d > %d)\n",
+> +				count, da->size);
+> +			return 0;
+> +		}
 
-They do what you already guessed: take care about masking and endianness.
+This seems obviously broken, we're neither returning an error nor
+falling back to PIO here but instead silently ignoring the transfer.  If
+we can't fall back then I'd expect the driver to be setting
+max_transfer_size but it isn't, it's probably a good idea from a
+performance point of view to set it even if we can fall back.
 
-> I also keep having a feeling that mixing endianness stuff into the
-> emulation code itself is the wrong way to go about it.
+> +		if (xfer->tx_buf) {
+> +			/*
+> +			 * Send the tx-data to the SPI device via the direct
+> +			 * mapped address window
+> +			 */
+> +			memcpy(da->vaddr, xfer->tx_buf, count);
+> +		}
+> +
+> +		if (xfer->rx_buf) {
+> +			/*
+> +			 * Read the rx-data from the SPI device via the direct
+> +			 * mapped address window
+> +			 */
+> +			memcpy(xfer->rx_buf, da->vaddr, count);
+> +		}
 
-I agree.
+Do bidirectional transfers work properly with this method (how much
+incoming data can we queue up, is there memory backing the whole
+region?), and are we guaranteed that the transfer finished by the time
+we return?  I'm also not seeing anything here that handles word size so
+I suspect this will cause data corruption with anything other than 8 bit
+words and the driver does support 16 bit with PIO.  If only 8 bit words
+can be supported with direct access I'd expect to see the
+bits_per_word_mask updated.
 
->  The emulation
-> code should just deal with register values of varying length and the
-> interface to the VGIC should abstract all endianness nonsense for us,
-> but I also think I've lost this argument some time in the past.  Sigh.
-> 
-> But, is the maximum read/write unit for any MMIO access not a 64-bit
-> value?  So why can't we let the VGIC emulation code simply take/return a
-> u64 which is then masked off/morphed into the right endianness outside
-> the VGIC code?
+> +               spi->direct_access[cs].vaddr = devm_ioremap_resource(&pdev->dev,
+> +                                                                    r);
+> +               if (IS_ERR(spi->direct_access[cs].vaddr)) {
+> +                       status = PTR_ERR(spi->direct_access[cs].vaddr);
+> +                       goto out_rel_clk;
+> +               }
+> +
+> +               spi->direct_access[cs].size = resource_size(r);
+> +               dev_info(&pdev->dev, "CS%d configured for direct access\n", cs);
+> +       }
 
-The main problem is that the interface for kvm_io_bus is (int len, void
-*val).
-And since the guest's MMIO access can be of different length, we need to
-take care of this in any case (since we need to know how many IRQs we
-need to update). So we cannot get rid of the length parameter.
-I guess what we could do is to either:
-a) Declare the VGIC as purely little endian (which it really is, AFAIK).
-We care about the necessary endianness conversion in mmio.c before
-invoking the kvm_io_bus framework. But that means that we need to deal
-with the _host's_ endianness in the VGIC emulation.
-I think this is very close to what we currently do.    OR
-b) Declare our VGIC emulation as always using the host's endianess. We
-wouldn't need to care about endianness in the VGIC code anymore (is that
-actually true?) We convert the MMIO traps (which are little endian
-always) into the host's endianness before passing it on to kvm-io-bus.
-
-I just see that this probably adds more to the confusion, oh well...
-
-Thoughts?
-
-Cheers,
-Andre.
-
->> +u64 mask64(u64 origvalue, int offset, int len, const void *val)
->> +{
->> +	origvalue &= ~((BIT_ULL(len) - 1) << (offset * 8));
->> +	memcpy((char *)&origvalue + (offset * 8), val, len);
->> +	return origvalue;
->> +}
->> +#endif
->> +
->> +int vgic_mmio_read_raz(struct kvm_vcpu *vcpu, struct kvm_io_device *this,
->> +		       gpa_t addr, int len, void *val)
->> +{
->> +	memset(val, 0, len);
->> +
->> +	return 0;
->> +}
->> +
->> +int vgic_mmio_write_wi(struct kvm_vcpu *vcpu, struct kvm_io_device *this,
->> +		       gpa_t addr, int len, const void *val)
->> +{
->> +	return 0;
->> +}
-> 
-> I dislike the use of 'this' as a parameter name, why not 'dev' ?
-> 
->> +
->> +static int vgic_mmio_read_nyi(struct kvm_vcpu *vcpu,
->> +			      struct kvm_io_device *this,
->> +			      gpa_t addr, int len, void *val)
->> +{
->> +	pr_warn("KVM: handling unimplemented VGIC MMIO read: VCPU %d, address: 0x%llx\n",
->> +		vcpu->vcpu_id, (unsigned long long)addr);
->> +	return 0;
->> +}
->> +
->> +static int vgic_mmio_write_nyi(struct kvm_vcpu *vcpu,
->> +			       struct kvm_io_device *this,
->> +			       gpa_t addr, int len, const void *val)
->> +{
->> +	pr_warn("KVM: handling unimplemented VGIC MMIO write: VCPU %d, address: 0x%llx\n",
->> +		vcpu->vcpu_id, (unsigned long long)addr);
->> +	return 0;
->> +}
->> +
->> +struct vgic_register_region vgic_v2_dist_registers[] = {
->> +	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
->> +		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 12),
->> +	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_IGROUP,
->> +		vgic_mmio_read_raz, vgic_mmio_write_wi, 1),
->> +	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_SET,
->> +		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 1),
->> +	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_CLEAR,
->> +		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 1),
->> +	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_SET,
->> +		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 1),
->> +	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_CLEAR,
->> +		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 1),
->> +	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_SET,
->> +		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 1),
->> +	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_CLEAR,
->> +		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 1),
->> +	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PRI,
->> +		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 8),
->> +	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_TARGET,
->> +		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 8),
->> +	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_CONFIG,
->> +		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 8),
->> +	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SOFTINT,
->> +		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 4),
->> +	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SGI_PENDING_CLEAR,
->> +		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 16),
->> +	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SGI_PENDING_SET,
->> +		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 16),
->> +};
->> +
->> +int kvm_vgic_register_mmio_region(struct kvm *kvm, struct kvm_vcpu *vcpu,
->> +				  struct vgic_register_region *reg_desc,
->> +				  struct vgic_io_device *region,
->> +				  int nr_irqs, bool offset_private)
->> +{
->> +	int bpi = reg_desc->bits_per_irq;
->> +	int offset = 0;
->> +	int len, ret;
->> +
->> +	region->base_addr	+= reg_desc->reg_offset;
->> +	region->redist_vcpu	= vcpu;
->> +
->> +	kvm_iodevice_init(&region->dev, &reg_desc->ops);
->> +
->> +	if (bpi) {
->> +		len = (bpi * nr_irqs) / 8;
->> +		if (offset_private)
->> +			offset = (bpi * VGIC_NR_PRIVATE_IRQS) / 8;
->> +	} else {
->> +		len = reg_desc->len;
->> +	}
->> +
->> +	mutex_lock(&kvm->slots_lock);
->> +	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS,
->> +				      region->base_addr + offset,
->> +				      len - offset, &region->dev);
->> +	mutex_unlock(&kvm->slots_lock);
->> +
->> +	return ret;
->> +}
->> +
->> +int vgic_register_dist_regions(struct kvm *kvm, gpa_t dist_base_address,
->> +			       enum vgic_type type)
->> +{
->> +	struct vgic_io_device *regions;
->> +	struct vgic_register_region *reg_desc;
->> +	int nr_regions;
->> +	int nr_irqs = kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
->> +	int i;
->> +	int ret = 0;
->> +
->> +	switch (type) {
->> +	case VGIC_V2:
->> +		reg_desc = vgic_v2_dist_registers;
->> +		nr_regions = ARRAY_SIZE(vgic_v2_dist_registers);
->> +		break;
->> +	default:
->> +		BUG_ON(1);
->> +	}
->> +
->> +	regions = kmalloc_array(nr_regions, sizeof(struct vgic_io_device),
->> +				GFP_KERNEL);
->> +	if (!regions)
->> +		return -ENOMEM;
->> +
->> +	for (i = 0; i < nr_regions; i++) {
->> +		regions[i].base_addr	= dist_base_address;
->> +
->> +		ret = kvm_vgic_register_mmio_region(kvm, NULL, reg_desc,
->> +						    regions + i, nr_irqs,
->> +						    type == VGIC_V3);
->> +		if (ret)
->> +			break;
->> +
->> +		reg_desc++;
->> +	}
->> +
->> +	if (ret) {
->> +		mutex_lock(&kvm->slots_lock);
->> +		for (i--; i >= 0; i--)
->> +			kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
->> +						  &regions[i].dev);
->> +		mutex_unlock(&kvm->slots_lock);
->> +	} else {
->> +		kvm->arch.vgic.dist_iodevs = regions;
->> +	}
->> +
->> +	return ret;
->> +}
->> diff --git a/virt/kvm/arm/vgic/vgic_mmio.h b/virt/kvm/arm/vgic/vgic_mmio.h
->> new file mode 100644
->> index 0000000..cf2314c
->> --- /dev/null
->> +++ b/virt/kvm/arm/vgic/vgic_mmio.h
->> @@ -0,0 +1,47 @@
->> +/*
->> + * Copyright (C) 2015, 2016 ARM Ltd.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +#ifndef __KVM_ARM_VGIC_MMIO_H__
->> +#define __KVM_ARM_VGIC_MMIO_H__
->> +
->> +struct vgic_register_region {
->> +	int reg_offset;
->> +	int len;
->> +	int bits_per_irq;
->> +	struct kvm_io_device_ops ops;
->> +};
->> +
->> +#define REGISTER_DESC_WITH_BITS_PER_IRQ(name, read_ops, write_ops, bpi) \
->> +	{.reg_offset = name, .bits_per_irq = bpi, .len = 0, \
->> +	 .ops.read = read_ops, .ops.write = write_ops}
->> +#define REGISTER_DESC_WITH_LENGTH(name, read_ops, write_ops, length) \
->> +	{.reg_offset = name, .bits_per_irq = 0, .len = length, \
->> +	 .ops.read = read_ops, .ops.write = write_ops}
->> +
->> +int vgic_mmio_read_raz(struct kvm_vcpu *vcpu, struct kvm_io_device *this,
->> +		       gpa_t addr, int len, void *val);
->> +int vgic_mmio_write_wi(struct kvm_vcpu *vcpu, struct kvm_io_device *this,
->> +		       gpa_t addr, int len, const void *val);
->> +int kvm_vgic_register_mmio_region(struct kvm *kvm, struct kvm_vcpu *vcpu,
->> +				  struct vgic_register_region *reg_desc,
->> +				  struct vgic_io_device *region,
->> +				  int nr_irqs, bool offset_private);
->> +
->> +void write_mask32(u32 value, int offset, int len, void *val);
->> +void write_mask64(u64 value, int offset, int len, void *val);
->> +u32 mask32(u32 origvalue, int offset, int len, const void *val);
->> +u64 mask64(u64 origvalue, int offset, int len, const void *val);
->> +
->> +#endif
->> -- 
->> 2.7.3
->>
->>
-> 
-> Thanks,
-> -Christoffer
-> 
+I seem to be missing where we configure the hardware to connect the
+windows to the chip selects.  We just seem to map the windows but never
+otherwise interact with the hardware.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160411/a428120e/attachment.sig>
