@@ -1,82 +1,73 @@
-From: finley.xiao@rock-chips.com (Finlye Xiao)
-Date: Mon, 11 Apr 2016 09:54:12 +0800
-Subject: [PATCH v1] clk: Add clk_composite_set_rate_and_parent
-Message-ID: <1460339652-63498-1-git-send-email-finley.xiao@rock-chips.com>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Mon, 11 Apr 2016 11:02:03 +0900
+Subject: next-20160401+: ARM: DRA7: linux-next regression: mm/slab:
+ clean-up kmem_cache_node setup
+In-Reply-To: <570816F8.9070301@ti.com>
+References: <570816F8.9070301@ti.com>
+Message-ID: <20160411020203.GA25211@js1304-P5Q-DELUXE>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Finley Xiao <finley.xiao@rock-chips.com>
+On Fri, Apr 08, 2016 at 03:39:20PM -0500, Nishanth Menon wrote:
+> Hi,
+> 
+> http://marc.info/?l=linux-omap&m=146014314115625&w=2 series works with
+> v4.6-rc2 kernel, however, it fails with linux-next for suspend-to-ram
+> (mem) on BeagleBoard-X15
+> 
+> next-20160327 - good
+> next-20160329 - good
+> next-20160330 - Fails to boot - I2C crashes
+> next-20160331-  Fails to boot - USB crashes
+> next-20160401 -> bad
+> next-20160408 -> bad
+> 
+> Bisect log of next-20160408 vs v4.6-rc2 ->
+> http://pastebin.ubuntu.com/15697856/
+> 
+> # first bad commit: [2b629704a2b6a5b239f23750e5517a9d8c3a4e8c]
+> mm/slab: clean-up kmem_cache_node setup
+> 
 
-Some of Rockchip's clocks should consider the priority of .set_parent
-and .set_rate to prevent a too large temporary clock rate.
+Hello,
 
-For example, the gpu clock can be parented to cpll(750MHz) and
-usbphy_480m(480MHz), 375MHz comes from cpll and the div is set
-to 2, 480MHz comes from usbphy_480m and the div is set to 1.
+I made a mistake on that patch. Could you try to test below one on
+top of it.
 
->From the code, when change rate from 480MHz to 375MHz, it changes
-the gpu's parent from USBPHY_480M to cpll first(.set_parent), but the
-div value is still 1 and the gpu's rate will be 750MHz at the moment,
-then it changes the div value from 1 to 2(.set_rate) and the gpu's
-rate will be changed to 375MHz(480MHZ->750MHz->375MHz), here temporary
-rate is 750MHz, the voltage which supply for 480MHz certainly can not
-supply for 750MHz, so the gpu will crash.
+Thanks.
 
-Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
+--------->8----------------
+>From d3af3cc409527e9be6beb62ea395cde67f3c5029 Mon Sep 17 00:00:00 2001
+From: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+Date: Mon, 11 Apr 2016 10:48:29 +0900
+Subject: [PATCH] mm/slab: clean-up kmem_cache_node setup-fix
+
+After calling free_block(), we need to re-calculate array_cache's
+avail counter. Fix it.
+
+And, it's better to free objects in shared array when it is
+really necessary. Check it before calling free_block().
+
+Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
 ---
- drivers/clk/clk-composite.c | 33 +++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+ mm/slab.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
-index 1f903e1f8..4d4b5ab 100644
---- a/drivers/clk/clk-composite.c
-+++ b/drivers/clk/clk-composite.c
-@@ -151,6 +151,33 @@ static int clk_composite_set_rate(struct clk_hw *hw, unsigned long rate,
- 	return rate_ops->set_rate(rate_hw, rate, parent_rate);
- }
+diff --git a/mm/slab.c b/mm/slab.c
+index fcd5fbb..27cb390 100644
+--- a/mm/slab.c
++++ b/mm/slab.c
+@@ -927,9 +927,10 @@ static int setup_kmem_cache_node(struct kmem_cache *cachep,
  
-+static int clk_composite_set_rate_and_parent(struct clk_hw *hw,
-+					     unsigned long rate,
-+					     unsigned long parent_rate,
-+					     u8 index)
-+{
-+	struct clk_composite *composite = to_clk_composite(hw);
-+	const struct clk_ops *rate_ops = composite->rate_ops;
-+	const struct clk_ops *mux_ops = composite->mux_ops;
-+	struct clk_hw *rate_hw = composite->rate_hw;
-+	struct clk_hw *mux_hw = composite->mux_hw;
-+	unsigned long temp_rate;
-+
-+	__clk_hw_set_clk(rate_hw, hw);
-+	__clk_hw_set_clk(mux_hw, hw);
-+
-+	temp_rate = rate_ops->recalc_rate(rate_hw, parent_rate);
-+	if (temp_rate > rate) {
-+		rate_ops->set_rate(rate_hw, rate, parent_rate);
-+		mux_ops->set_parent(mux_hw, index);
-+	} else {
-+		mux_ops->set_parent(mux_hw, index);
-+		rate_ops->set_rate(rate_hw, rate, parent_rate);
-+	}
-+
-+	return 0;
-+}
-+
- static int clk_composite_is_enabled(struct clk_hw *hw)
- {
- 	struct clk_composite *composite = to_clk_composite(hw);
-@@ -250,6 +277,12 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
- 		composite->rate_ops = rate_ops;
+ 	n = get_node(cachep, node);
+ 	spin_lock_irq(&n->list_lock);
+-	if (n->shared) {
++	if (n->shared && force_change) {
+ 		free_block(cachep, n->shared->entry,
+ 				n->shared->avail, node, &list);
++		n->shared->avail = 0;
  	}
  
-+	if (mux_hw && mux_ops && rate_hw && rate_ops) {
-+		if (mux_ops->set_parent && rate_ops->set_rate)
-+			clk_composite_ops->set_rate_and_parent =
-+			clk_composite_set_rate_and_parent;
-+	}
-+
- 	if (gate_hw && gate_ops) {
- 		if (!gate_ops->is_enabled || !gate_ops->enable ||
- 		    !gate_ops->disable) {
+ 	if (!n->shared || force_change) {
 -- 
 1.9.1
