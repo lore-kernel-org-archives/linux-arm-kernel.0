@@ -1,92 +1,119 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 11 Apr 2016 08:59:27 +0100
-Subject: [PATCH resend v2 0/9] mfd: axp20x: Add support for AXP809 PMIC
-In-Reply-To: <CAGb2v64fU+n-mrVk=+ox5e-np_oK3ZiVk-YMknriGQsnxOVBvQ@mail.gmail.com>
-References: <1459243352-23344-1-git-send-email-wens@csie.org>
- <CAGb2v64fU+n-mrVk=+ox5e-np_oK3ZiVk-YMknriGQsnxOVBvQ@mail.gmail.com>
-Message-ID: <20160411075927.GA4592@x1>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 11 Apr 2016 10:00:14 +0200
+Subject: [PATCH 1/2] arm64: mem-model: add flatmem model for arm64
+In-Reply-To: <570B5875.20804@hisilicon.com>
+References: <1459844572-53069-1-git-send-email-puck.chen@hisilicon.com>
+ <20160407142148.GI5657@arm.com> <570B10B2.2000000@hisilicon.com>
+ <CAKv+Gu8iQ0NzLFWHy9Ggyv+jL-BqJ3x-KaRD1SZ1mU6yU3c7UQ@mail.gmail.com>
+ <570B5875.20804@hisilicon.com>
+Message-ID: <CAKv+Gu9aqR=E3TmbPDFEUC+Q13bAJTU5wVTTHkOr6aX6BZ1OVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 11 Apr 2016, Chen-Yu Tsai wrote:
-> On Tue, Mar 29, 2016 at 5:22 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-> > Hi everyone,
-> >
-> > This is a resend of v2 of the AXP809 PMIC support series. This adds
-> > support for X-Powers' AXP809 PMIC. This is the primary PMIC accompanying
-> > Allwinner's A80 SoC. For now, only the power button (PEK) and regulators
-> > are supported. These are supported using existing axp20x drivers.
-> >
-> > Driver patches are based on v4.6-rc1, while DT patches are based on
-> > Maxime's sunxi/dt-for-4.7 branch.
-> 
-> Any news on this series? It's been almost 2 weeks since I reposted
-> them for 4.7, and longer since I first posted v2.
+On 11 April 2016 at 09:55, Chen Feng <puck.chen@hisilicon.com> wrote:
+> Hi Ard,
+>
+> On 2016/4/11 15:35, Ard Biesheuvel wrote:
+>> On 11 April 2016 at 04:49, Chen Feng <puck.chen@hisilicon.com> wrote:
+>>> Hi will,
+>>> Thanks for review.
+>>>
+>>> On 2016/4/7 22:21, Will Deacon wrote:
+>>>> On Tue, Apr 05, 2016 at 04:22:51PM +0800, Chen Feng wrote:
+>>>>> We can reduce the memory allocated at mem-map
+>>>>> by flatmem.
+>>>>>
+>>>>> currently, the default memory-model in arm64 is
+>>>>> sparse memory. The mem-map array is not freed in
+>>>>> this scene. If the physical address is too long,
+>>>>> it will reserved too much memory for the mem-map
+>>>>> array.
+>>>>
+>>>> Can you elaborate a bit more on this, please? We use the vmemmap, so any
+>>>> spaces between memory banks only burns up virtual space. What exactly is
+>>>> the problem you're seeing that makes you want to use flatmem (which is
+>>>> probably unsuitable for the majority of arm64 machines).
+>>>>
+>>> The root cause we want to use flat-mem is the mam_map alloced in sparse-mem
+>>> is not freed.
+>>>
+>>> take a look at here:
+>>> arm64/mm/init.c
+>>> void __init mem_init(void)
+>>> {
+>>> #ifndef CONFIG_SPARSEMEM_VMEMMAP
+>>>         free_unused_memmap();
+>>> #endif
+>>> }
+>>>
+>>> Memory layout (3GB)
+>>>
+>>>  0             1.5G    2G             3.5G            4G
+>>>  |              |      |               |              |
+>>>  +--------------+------+---------------+--------------+
+>>>  |    MEM       | hole |     MEM       |   IO (regs)  |
+>>>  +--------------+------+---------------+--------------+
+>>>
+>>>
+>>> Memory layout (4GB)
+>>>
+>>>  0                                    3.5G            4G    4.5G
+>>>  |                                     |              |       |
+>>>  +-------------------------------------+--------------+-------+
+>>>  |                   MEM               |   IO (regs)  |  MEM  |
+>>>  +-------------------------------------+--------------+-------+
+>>>
+>>> Currently, the sparse memory section is 1GB.
+>>>
+>>> 3GB ddr: the 1.5 ~2G and 3.5 ~ 4G are holes.
+>>> 3GB ddr: the 3.5 ~ 4G and 4.5 ~ 5G are holes.
+>>>
+>>> This will alloc 1G/4K * (struct page) memory for mem_map array.
+>>>
+>>
+>> No, this is incorrect. Sparsemem vmemmap only allocates struct pages
+>> for memory regions that are actually populated.
+>>
+>> For instance, on the Foundation model with 4 GB of memory, you may see
+>> something like this in the boot log
+>>
+>> [    0.000000]     vmemmap : 0xffffffbdc0000000 - 0xffffffbfc0000000
+>> (     8 GB maximum)
+>> [    0.000000]               0xffffffbdc0000000 - 0xffffffbde2000000
+>> (   544 MB actual)
+>>
+>> but in reality, only the following regions have been allocated
+>>
+>> ---[ vmemmap start ]---
+>> 0xffffffbdc0000000-0xffffffbdc2000000          32M       RW NX SHD AF
+>>       BLK UXN MEM/NORMAL
+>> 0xffffffbde0000000-0xffffffbde2000000          32M       RW NX SHD AF
+>>       BLK UXN MEM/NORMAL
+>> ---[ vmemmap end ]---
+>>
+>> so only 64 MB is used to back 4 GB of RAM with struct pages, which is
+>> minimal. Moving to flatmem will not reduce the memory footprint at
+>> all.
+>
+> Yes,but the populate is section, which is 1GB. Take a look at the above
+> memory layout.
+>
+> The section 1G ~ 2G is a section. But 1.5G ~ 2G is a hole.
+>
+> The section 3G ~ 4G is a section. But 3.5G ~ 4G is a hole.
+>>>  0             1.5G    2G             3.5G            4G
+>>>  |              |      |               |              |
+>>>  +--------------+------+---------------+--------------+
+>>>  |    MEM       | hole |     MEM       |   IO (regs)  |
+>>>  +--------------+------+---------------+--------------+
+> The hole in 1.5G ~ 2G is also allocated mem-map array. And also with the 3.5G ~ 4G.
+>
 
-Nope, no news yet.
+No, it is not. It may be covered by a section, but that does not mean
+sparsemem vmemmap will actually allocate backing for it. The
+granularity used by sparsemem vmemmap on a 4k pages kernel is 128 MB,
+due to the fact that the backing is performed at PMD granularity.
 
-I'm swamped and will get round to them in good time.
-
-> > Some regulator patches were merged into v4.6-rc1. Those have been
-> > dropped from this series. Other than that there are no changes.
-> >
-> > Patch 1 adds a MAINTAINERS entry for the X-Powers AXP PMICs.
-> > I list myself as the maintainer.
-> >
-> > Patch 2 adds AXP809 to the axp20x bindings.
-> >
-> > Patch 3 adds AXP809 support to the axp20x mfd driver.
-> >
-> > Patch 4 adds AXP809 support to the axp20x regulator driver.
-> > This patch depends on patch 3.
-> >
-> > Patch 5 adds a dtsi file for AXP809.
-> >
-> > Patch 6 enables AXP809 support on the A80 Optimus board.
-> >
-> > Patch 7 enables AXP809 support on the Cubieboard 4.
-> >
-> > Patch 8 disables the dummy regulators from sunxi-common-regulators.dtsi
-> > on the A80 Optimus board. These aren't used in the board DTS anymore.
-> >
-> > Patch 9 disables the dummy regulators from sunxi-common-regulators.dtsi,
-> > on the Cubieboard4. These aren't used in the board DTS anymore.
-> >
-> >
-> > Regards
-> > ChenYu
-> >
-> > Chen-Yu Tsai (9):
-> >   MAINTAINERS: Add entry for X-Powers AXP family PMIC drivers
-> >   mfd: axp20x: Add bindings for AXP809 PMIC
-> >   mfd: axp20x: Add support for AXP809 PMIC
-> >   regulator: axp20x: support AXP809 variant
-> >   ARM: dts: sunxi: Add dtsi file for AXP809 PMIC
-> >   ARM: dts: sun9i: a80-optimus: Add AXP809 PMIC device node and
-> >     regulators
-> >   ARM: dts: sun9i: cubieboard4: Add AXP809 PMIC device node and
-> >     regulators
-> >   ARM: dts: sun9i: a80-optimus: Disable dummy regulators vcc3v0, vcc3v3,
-> >     vcc5v0
-> >   ARM: dts: sun9i: cubieboard4: Disable dummy regulators vcc3v0, vcc3v3,
-> >     vcc5v0
-> >
-> >  Documentation/devicetree/bindings/mfd/axp20x.txt   |  31 ++++-
-> >  MAINTAINERS                                        |   6 +
-> >  .../dts/{sun9i-a80-cubieboard4.dts => axp809.dtsi} |  98 ++------------
-> >  arch/arm/boot/dts/sun9i-a80-cubieboard4.dts        | 143 ++++++++++++++++++++-
-> >  arch/arm/boot/dts/sun9i-a80-optimus.dts            | 143 ++++++++++++++++++++-
-> >  drivers/mfd/axp20x-rsb.c                           |   1 +
-> >  drivers/mfd/axp20x.c                               |  79 ++++++++++++
-> >  drivers/regulator/axp20x-regulator.c               | 119 ++++++++++++-----
-> >  include/linux/mfd/axp20x.h                         |  59 +++++++++
-> >  9 files changed, 554 insertions(+), 125 deletions(-)
-> >  copy arch/arm/boot/dts/{sun9i-a80-cubieboard4.dts => axp809.dtsi} (52%)
-> >
-> >
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Please, could you share the contents of the vmemmap section in
+/sys/kernel/debug/kernel_page_tables of your system running with
+sparsemem vmemmap enabled? You will need to set CONFIG_ARM64_PTDUMP=y
