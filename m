@@ -1,52 +1,52 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 11 Apr 2016 16:08:14 +0800
-Subject: [PATCH] Axi-usb: Add support for 64-bit addressing.
-In-Reply-To: <1460360506-14692-1-git-send-email-navam@xilinx.com>
-Message-ID: <201604111626.g2x2SCHX%fengguang.wu@intel.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 11 Apr 2016 11:18:55 +0300
+Subject: [PATCH 04/30] ARM: OMAP2+: hwmod: use new ti_clk_get API to search
+ for clock handles
+In-Reply-To: <1460362761-4842-1-git-send-email-t-kristo@ti.com>
+References: <1460362761-4842-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1460362761-4842-5-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nava,
+The new API avoids the need to add clock aliases for most of the clocks,
+should use of it is preferred. Many of the existing clock aliases are
+only created because of hwmod data.
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.6-rc3 next-20160411]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
-
-url:    https://github.com/0day-ci/linux/commits/Nava-kishore-Manne/Axi-usb-Add-support-for-64-bit-addressing/20160411-154657
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
-config: i386-randconfig-x015-201615 (attached as .config)
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
-
-All errors (new ones prefixed by >>):
-
-   drivers/usb/gadget/udc/udc-xilinx.c: In function 'xudc_write64':
->> drivers/usb/gadget/udc/udc-xilinx.c:236:2: error: implicit declaration of function 'writeq' [-Werror=implicit-function-declaration]
-     writeq(val, addr + offset);
-     ^
-   cc1: some warnings being treated as errors
-
-vim +/writeq +236 drivers/usb/gadget/udc/udc-xilinx.c
-
-   230	 * @offset: register offset
-   231	 * @val: data to be written
-   232	 **/
-   233	static void xudc_write64(void __iomem *addr, u32 offset, u64 val)
-   234	{
-   235	#if defined(CONFIG_PHYS_ADDR_T_64BIT)
- > 236		writeq(val, addr + offset);
-   237	#endif
-   238	}
-   239	
-
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 24377 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160411/624cd719/attachment-0001.obj>
+ arch/arm/mach-omap2/omap_hwmod.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index b6d62e4..c2f6811 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -786,7 +786,7 @@ static int _init_main_clk(struct omap_hwmod *oh)
+ 	if (!oh->main_clk)
+ 		return 0;
+ 
+-	oh->_clk = clk_get(NULL, oh->main_clk);
++	oh->_clk = ti_clk_get(oh->main_clk);
+ 	if (IS_ERR(oh->_clk)) {
+ 		pr_warn("omap_hwmod: %s: cannot clk_get main_clk %s\n",
+ 			oh->name, oh->main_clk);
+@@ -831,7 +831,7 @@ static int _init_interface_clks(struct omap_hwmod *oh)
+ 		if (!os->clk)
+ 			continue;
+ 
+-		c = clk_get(NULL, os->clk);
++		c = ti_clk_get(os->clk);
+ 		if (IS_ERR(c)) {
+ 			pr_warn("omap_hwmod: %s: cannot clk_get interface_clk %s\n",
+ 				oh->name, os->clk);
+@@ -868,7 +868,7 @@ static int _init_opt_clks(struct omap_hwmod *oh)
+ 	int ret = 0;
+ 
+ 	for (i = oh->opt_clks_cnt, oc = oh->opt_clks; i > 0; i--, oc++) {
+-		c = clk_get(NULL, oc->clk);
++		c = ti_clk_get(oc->clk);
+ 		if (IS_ERR(c)) {
+ 			pr_warn("omap_hwmod: %s: cannot clk_get opt_clk %s\n",
+ 				oh->name, oc->clk);
+-- 
+1.7.9.5
