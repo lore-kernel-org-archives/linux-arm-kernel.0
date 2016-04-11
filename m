@@ -1,89 +1,52 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 11 Apr 2016 10:27:42 +0200
-Subject: 4.6-rc2: regression with omap video and lockdep (was Re: 4.4, 4.6:
- camera and unlock buttons produce tons of interrupts (was Re: N900 sleep
- mode))
-In-Reply-To: <20160407234134.GQ16484@atomide.com>
-References: <20160404213056.GA25912@amd> <20160404220748.GA16484@atomide.com>
- <20160405142250.GA6429@amd> <20160405152916.GE16484@atomide.com>
- <20160405205137.GA10196@amd> <20160407174019.GM16484@atomide.com>
- <20160407194828.GA13338@amd> <20160407213229.GO16484@atomide.com>
- <20160407230150.GA16552@amd> <20160407234134.GQ16484@atomide.com>
-Message-ID: <20160411082742.GA1993@amd>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 11 Apr 2016 10:35:11 +0200
+Subject: [PATCH] ARM: mach-imx: sdhci-esdhc-imx: initialize DMA mask
+In-Reply-To: <1460362846-2906-1-git-send-email-akurz@blala.de>
+References: <1460362846-2906-1-git-send-email-akurz@blala.de>
+Message-ID: <20160411083510.GN10108@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hello,
 
-> > > Nothing idling for me with your .config.. And it seems slower to boot
-> > > compared to omap2plus_defconfig? Maybe because of the extra GPIO
-> > > interrupts?
-> > 
-> > Extra interrupts only happen when enable_off_mode is 1, so that should
-> > not be an issue during boot.
+I added the people involved in 7b91369b4655 to Cc.
+
+On Mon, Apr 11, 2016 at 10:20:46AM +0200, Alexander Kurz wrote:
+> With commit 7b91369b DMA access got disabled for device drivers with zero
+
+Please reference commits like:
+
+	With commit 7b91369b4655 ("mmc: sdhci: Set DMA mask when adding
+	host") DMA access ...
+
+
+> DMA mask property. sdhci-esdhc-imx got blocked from DMA access by this.
+> Hence: initialize the dma mask to enable access again.
 > 
-> OK maybe it's just the extra driver probe time then.
-
-Heh. I had earlyprintk enabled. That should explain it.
-
-> Well I've been just using omap2plus_defconfig with:
+> Signed-off-by: Alexander Kurz <akurz@blala.de>
+> ---
+>  arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
 > 
-> # modprobe tsc2005
-> # modprobe gpio_backlight
-> # modprobe panel_sony_acx565akm
-> # modprobe omapfb
+> diff --git a/arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c b/arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c
+> index a5edd7d..3d039ef 100644
+> --- a/arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c
+> +++ b/arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c
+> @@ -71,6 +71,7 @@ struct platform_device *__init imx_add_sdhci_esdhc_imx(
+>  	if (!pdata)
+>  		pdata = &default_esdhc_pdata;
+>  
+> -	return imx_add_platform_device(data->devid, data->id, res,
+> -			ARRAY_SIZE(res), pdata, sizeof(*pdata));
+> +	return imx_add_platform_device_dmamask(data->devid, data->id, res,
+> +			ARRAY_SIZE(res), pdata, sizeof(*pdata),
+> +			DMA_BIT_MASK(32));
+>  }
+> -- 
+> 2.1.4
 > 
-> # echo 255 > /sys/class/backlight/acx565akm/brightness
 > 
-> And then the following to blank for idle:
-> 
-> # echo 1 > /sys/devices/platform/omapfb/graphics/fb0/blank
-> 
-> But in the world of eternal regressions, I'm not seeing anything
-> on the framebuffer with v4.6-rc2 :( No idea what broke it or when
-> as my n900 is in the rack.
-
-Can you try this patch to your config -- disabling lockdep? It should
-fix the video for you. (And if you have the serial console... do you
-see any warnings from lockdep?)
-
-Thanks,
-								Pavel
-								
---- config.def	2016-04-08 21:50:04.519622137 +0200
-+++ .config	2016-04-11 10:22:52.988193318 +0200
-@@ -4183,15 +4183,12 @@
- CONFIG_DEBUG_SPINLOCK=y
- CONFIG_DEBUG_MUTEXES=y
- # CONFIG_DEBUG_WW_MUTEX_SLOWPATH is not set
--CONFIG_DEBUG_LOCK_ALLOC=y
--CONFIG_PROVE_LOCKING=y
--CONFIG_LOCKDEP=y
-+# CONFIG_DEBUG_LOCK_ALLOC is not set
-+# CONFIG_PROVE_LOCKING is not set
- # CONFIG_LOCK_STAT is not set
--# CONFIG_DEBUG_LOCKDEP is not set
- # CONFIG_DEBUG_ATOMIC_SLEEP is not set
- # CONFIG_DEBUG_LOCKING_API_SELFTESTS is not set
- # CONFIG_LOCK_TORTURE_TEST is not set
--CONFIG_TRACE_IRQFLAGS=y
- CONFIG_STACKTRACE=y
- # CONFIG_DEBUG_KOBJECT is not set
- # CONFIG_DEBUG_BUGVERBOSE is not set
-@@ -4204,8 +4201,7 @@
- #
- # RCU Debugging
- #
--CONFIG_PROVE_RCU=y
--# CONFIG_PROVE_RCU_REPEATEDLY is not set
-+# CONFIG_PROVE_RCU is not set
- # CONFIG_SPARSE_RCU_POINTER is not set
- # CONFIG_TORTURE_TEST is not set
- # CONFIG_RCU_TORTURE_TEST is not set
-
-
-
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
