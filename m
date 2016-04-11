@@ -1,115 +1,184 @@
-From: ashoks@broadcom.com (Ashok Kumar)
-Date: Mon, 11 Apr 2016 06:02:19 -0700
-Subject: [PATCH v4 4/6] arm64/perf: Define complete ARMv8 recommended
- implementation defined events
-In-Reply-To: <1460379741-1181-1-git-send-email-ashoks@broadcom.com>
-References: <1460379741-1181-1-git-send-email-ashoks@broadcom.com>
-Message-ID: <1460379741-1181-5-git-send-email-ashoks@broadcom.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 11 Apr 2016 14:11:59 +0100
+Subject: [RFC PATCH 28/45] KVM: arm/arm64: vgic-new: Add GICv3 SGI system
+ register trap handler
+In-Reply-To: <20160331120755.GE4126@cbox>
+References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
+ <1458871508-17279-29-git-send-email-andre.przywara@arm.com>
+ <20160331120755.GE4126@cbox>
+Message-ID: <570BA29F.4050505@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Defined all the ARMv8 recommended implementation defined events
-from J3 - "ARM recommendations for IMPLEMENTATION DEFINED event numbers"
-in ARMv8 ARM.
+Hi,
 
-Signed-off-by: Ashok Kumar <ashoks@broadcom.com>
----
- arch/arm64/kernel/perf_event.c | 79 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 79 insertions(+)
+On 31/03/16 13:07, Christoffer Dall wrote:
+> On Fri, Mar 25, 2016 at 02:04:51AM +0000, Andre Przywara wrote:
+>> In contrast to GICv2 SGIs in a GICv3 implementation are not triggered
+>> by a MMIO write, but with a system register write. KVM knows about
+>> that register already, we just need to implement the handler and wire
+>> it up to the core KVM/ARM code.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> ---
+>>  include/kvm/vgic/vgic.h       |   8 ++++
+>>  virt/kvm/arm/vgic/vgic_mmio.c | 101 ++++++++++++++++++++++++++++++++++++++++++
+>>  2 files changed, 109 insertions(+)
+>>
+>> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+>> index a8262c7..ab5fcc7 100644
+>> --- a/include/kvm/vgic/vgic.h
+>> +++ b/include/kvm/vgic/vgic.h
+>> @@ -202,6 +202,14 @@ bool kvm_vcpu_has_pending_irqs(struct kvm_vcpu *vcpu);
+>>  void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
+>>  void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
+>>  
+>> +#ifdef CONFIG_KVM_ARM_VGIC_V3
+>> +void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
+>> +#else
+>> +static inline void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
+>> +{
+>> +}
+>> +#endif
+>> +
+>>  /**
+>>   * kvm_vgic_get_max_vcpus - Get the maximum number of VCPUs allowed by HW
+>>   *
+>> diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
+>> index 44fdba5..7eb6b93 100644
+>> --- a/virt/kvm/arm/vgic/vgic_mmio.c
+>> +++ b/virt/kvm/arm/vgic/vgic_mmio.c
+>> @@ -1139,4 +1139,105 @@ int vgic_register_redist_regions(struct kvm *kvm, gpa_t redist_base_address)
+>>  
+>>  	return ret;
+>>  }
+>> +
+>> +/*
+>> + * Compare a given affinity (level 1-3 and a level 0 mask, from the SGI
+>> + * generation register ICC_SGI1R_EL1) with a given VCPU.
+>> + * If the VCPU's MPIDR matches, return the level0 affinity, otherwise
+>> + * return -1.
+>> + */
+>> +static int match_mpidr(u64 sgi_aff, u16 sgi_cpu_mask, struct kvm_vcpu *vcpu)
+>> +{
+>> +	unsigned long affinity;
+>> +	int level0;
+>> +
+>> +	/*
+>> +	 * Split the current VCPU's MPIDR into affinity level 0 and the
+>> +	 * rest as this is what we have to compare against.
+>> +	 */
+>> +	affinity = kvm_vcpu_get_mpidr_aff(vcpu);
+>> +	level0 = MPIDR_AFFINITY_LEVEL(affinity, 0);
+>> +	affinity &= ~MPIDR_LEVEL_MASK;
+>> +
+>> +	/* bail out if the upper three levels don't match */
+>> +	if (sgi_aff != affinity)
+>> +		return -1;
+>> +
+>> +	/* Is this VCPU's bit set in the mask ? */
+>> +	if (!(sgi_cpu_mask & BIT(level0)))
+>> +		return -1;
+>> +
+>> +	return level0;
+>> +}
+>> +
+>> +#define SGI_AFFINITY_LEVEL(reg, level) \
+>> +	((((reg) & ICC_SGI1R_AFFINITY_## level ##_MASK) \
+>> +	>> ICC_SGI1R_AFFINITY_## level ##_SHIFT) << MPIDR_LEVEL_SHIFT(level))
+> 
+> wholy crap?  What is this?  Yikes, this is already in the kernel.  Oh
+> well, I'm not going to try to understand it again then.
 
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index 59d5091..2ee61e8 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -94,10 +94,89 @@
- #define ARMV8_IMPDEF_PERFCTR_L1D_CACHE_WR			0x41
- #define ARMV8_IMPDEF_PERFCTR_L1D_CACHE_REFILL_RD		0x42
- #define ARMV8_IMPDEF_PERFCTR_L1D_CACHE_REFILL_WR		0x43
-+#define ARMV8_IMPDEF_PERFCTR_L1D_CACHE_REFILL_INNER		0x44
-+#define ARMV8_IMPDEF_PERFCTR_L1D_CACHE_REFILL_OUTER		0x45
-+#define ARMV8_IMPDEF_PERFCTR_L1D_CACHE_WB_VICTIM		0x46
-+#define ARMV8_IMPDEF_PERFCTR_L1D_CACHE_WB_CLEAN			0x47
-+#define ARMV8_IMPDEF_PERFCTR_L1D_CACHE_INVAL			0x48
-+
- #define ARMV8_IMPDEF_PERFCTR_L1D_TLB_REFILL_RD			0x4C
- #define ARMV8_IMPDEF_PERFCTR_L1D_TLB_REFILL_WR			0x4D
- #define ARMV8_IMPDEF_PERFCTR_L1D_TLB_RD				0x4E
- #define ARMV8_IMPDEF_PERFCTR_L1D_TLB_WR				0x4F
-+#define ARMV8_IMPDEF_PERFCTR_L2D_CACHE_RD			0x50
-+#define ARMV8_IMPDEF_PERFCTR_L2D_CACHE_WR			0x51
-+#define ARMV8_IMPDEF_PERFCTR_L2D_CACHE_REFILL_RD		0x52
-+#define ARMV8_IMPDEF_PERFCTR_L2D_CACHE_REFILL_WR		0x53
-+
-+#define ARMV8_IMPDEF_PERFCTR_L2D_CACHE_WB_VICTIM		0x56
-+#define ARMV8_IMPDEF_PERFCTR_L2D_CACHE_WB_CLEAN			0x57
-+#define ARMV8_IMPDEF_PERFCTR_L2D_CACHE_INVAL			0x58
-+
-+#define ARMV8_IMPDEF_PERFCTR_L2D_TLB_REFILL_RD			0x5C
-+#define ARMV8_IMPDEF_PERFCTR_L2D_TLB_REFILL_WR			0x5D
-+#define ARMV8_IMPDEF_PERFCTR_L2D_TLB_RD				0x5E
-+#define ARMV8_IMPDEF_PERFCTR_L2D_TLB_WR				0x5F
-+
-+#define ARMV8_IMPDEF_PERFCTR_BUS_ACCESS_RD			0x60
-+#define ARMV8_IMPDEF_PERFCTR_BUS_ACCESS_WR			0x61
-+#define ARMV8_IMPDEF_PERFCTR_BUS_ACCESS_SHARED			0x62
-+#define ARMV8_IMPDEF_PERFCTR_BUS_ACCESS_NOT_SHARED		0x63
-+#define ARMV8_IMPDEF_PERFCTR_BUS_ACCESS_NORMAL			0x64
-+#define ARMV8_IMPDEF_PERFCTR_BUS_ACCESS_PERIPH			0x65
-+
-+#define ARMV8_IMPDEF_PERFCTR_MEM_ACCESS_RD			0x66
-+#define ARMV8_IMPDEF_PERFCTR_MEM_ACCESS_WR			0x67
-+#define ARMV8_IMPDEF_PERFCTR_UNALIGNED_LD_SPEC			0x68
-+#define ARMV8_IMPDEF_PERFCTR_UNALIGNED_ST_SPEC			0x69
-+#define ARMV8_IMPDEF_PERFCTR_UNALIGNED_LDST_SPEC		0x6A
-+
-+#define ARMV8_IMPDEF_PERFCTR_LDREX_SPEC				0x6C
-+#define ARMV8_IMPDEF_PERFCTR_STREX_PASS_SPEC			0x6D
-+#define ARMV8_IMPDEF_PERFCTR_STREX_FAIL_SPEC			0x6E
-+#define ARMV8_IMPDEF_PERFCTR_STREX_SPEC				0x6F
-+#define ARMV8_IMPDEF_PERFCTR_LD_SPEC				0x70
-+#define ARMV8_IMPDEF_PERFCTR_ST_SPEC				0x71
-+#define ARMV8_IMPDEF_PERFCTR_LDST_SPEC				0x72
-+#define ARMV8_IMPDEF_PERFCTR_DP_SPEC				0x73
-+#define ARMV8_IMPDEF_PERFCTR_ASE_SPEC				0x74
-+#define ARMV8_IMPDEF_PERFCTR_VFP_SPEC				0x75
-+#define ARMV8_IMPDEF_PERFCTR_PC_WRITE_SPEC			0x76
-+#define ARMV8_IMPDEF_PERFCTR_CRYPTO_SPEC			0x77
-+#define ARMV8_IMPDEF_PERFCTR_BR_IMMED_SPEC			0x78
-+#define ARMV8_IMPDEF_PERFCTR_BR_RETURN_SPEC			0x79
-+#define ARMV8_IMPDEF_PERFCTR_BR_INDIRECT_SPEC			0x7A
-+
-+#define ARMV8_IMPDEF_PERFCTR_ISB_SPEC				0x7C
-+#define ARMV8_IMPDEF_PERFCTR_DSB_SPEC				0x7D
-+#define ARMV8_IMPDEF_PERFCTR_DMB_SPEC				0x7E
-+
-+#define ARMV8_IMPDEF_PERFCTR_EXC_UNDEF				0x81
-+#define ARMV8_IMPDEF_PERFCTR_EXC_SVC				0x82
-+#define ARMV8_IMPDEF_PERFCTR_EXC_PABORT				0x83
-+#define ARMV8_IMPDEF_PERFCTR_EXC_DABORT				0x84
-+
-+#define ARMV8_IMPDEF_PERFCTR_EXC_IRQ				0x86
-+#define ARMV8_IMPDEF_PERFCTR_EXC_FIQ				0x87
-+#define ARMV8_IMPDEF_PERFCTR_EXC_SMC				0x88
-+
-+#define ARMV8_IMPDEF_PERFCTR_EXC_HVC				0x8A
-+#define ARMV8_IMPDEF_PERFCTR_EXC_TRAP_PABORT			0x8B
-+#define ARMV8_IMPDEF_PERFCTR_EXC_TRAP_DABORT			0x8C
-+#define ARMV8_IMPDEF_PERFCTR_EXC_TRAP_OTHER			0x8D
-+#define ARMV8_IMPDEF_PERFCTR_EXC_TRAP_IRQ			0x8E
-+#define ARMV8_IMPDEF_PERFCTR_EXC_TRAP_FIQ			0x8F
-+#define ARMV8_IMPDEF_PERFCTR_RC_LD_SPEC				0x90
-+#define ARMV8_IMPDEF_PERFCTR_RC_ST_SPEC				0x91
-+
-+#define ARMV8_IMPDEF_PERFCTR_L3D_CACHE_RD			0xA0
-+#define ARMV8_IMPDEF_PERFCTR_L3D_CACHE_WR			0xA1
-+#define ARMV8_IMPDEF_PERFCTR_L3D_CACHE_REFILL_RD		0xA2
-+#define ARMV8_IMPDEF_PERFCTR_L3D_CACHE_REFILL_WR		0xA3
-+
-+#define ARMV8_IMPDEF_PERFCTR_L3D_CACHE_WB_VICTIM		0xA6
-+#define ARMV8_IMPDEF_PERFCTR_L3D_CACHE_WB_CLEAN			0xA7
-+#define ARMV8_IMPDEF_PERFCTR_L3D_CACHE_INVAL			0xA8
- 
- /* ARMv8 Cortex-A53 specific event types. */
- #define ARMV8_A53_PERFCTR_PREFETCH_LINEFILL			0xC2
--- 
-2.1.0
+This is to isolate a certain SGI affinity encoding, which uses a
+different bitmasking than the MPIDR. Plus we use the existing defines
+here, which looks a bit more complicated than it actually is: basically
+just masking and shifting.
+I added a comment.
+
+Cheers,
+Andre.
+
+>> +
+>> +/**
+>> + * vgic_v3_dispatch_sgi - handle SGI requests from VCPUs
+>> + * @vcpu: The VCPU requesting a SGI
+>> + * @reg: The value written into the ICC_SGI1R_EL1 register by that VCPU
+>> + *
+>> + * With GICv3 (and ARE=1) CPUs trigger SGIs by writing to a system register.
+>> + * This will trap in sys_regs.c and call this function.
+>> + * This ICC_SGI1R_EL1 register contains the upper three affinity levels of the
+>> + * target processors as well as a bitmask of 16 Aff0 CPUs.
+>> + * If the interrupt routing mode bit is not set, we iterate over all VCPUs to
+>> + * check for matching ones. If this bit is set, we signal all, but not the
+>> + * calling VCPU.
+>> + */
+>> +void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
+>> +{
+>> +	struct kvm *kvm = vcpu->kvm;
+>> +	struct kvm_vcpu *c_vcpu;
+>> +	u16 target_cpus;
+>> +	u64 mpidr;
+>> +	int sgi, c;
+>> +	int vcpu_id = vcpu->vcpu_id;
+>> +	bool broadcast;
+>> +
+>> +	sgi = (reg & ICC_SGI1R_SGI_ID_MASK) >> ICC_SGI1R_SGI_ID_SHIFT;
+>> +	broadcast = reg & BIT(ICC_SGI1R_IRQ_ROUTING_MODE_BIT);
+>> +	target_cpus = (reg & ICC_SGI1R_TARGET_LIST_MASK) >> ICC_SGI1R_TARGET_LIST_SHIFT;
+>> +	mpidr = SGI_AFFINITY_LEVEL(reg, 3);
+>> +	mpidr |= SGI_AFFINITY_LEVEL(reg, 2);
+>> +	mpidr |= SGI_AFFINITY_LEVEL(reg, 1);
+>> +
+>> +	/*
+>> +	 * We iterate over all VCPUs to find the MPIDRs matching the request.
+>> +	 * If we have handled one CPU, we clear it's bit to detect early
+> 
+> s/it's/its/
+> 
+>> +	 * if we are already finished. This avoids iterating through all
+>> +	 * VCPUs when most of the times we just signal a single VCPU.
+>> +	 */
+>> +	kvm_for_each_vcpu(c, c_vcpu, kvm) {
+>> +		struct vgic_irq *irq;
+>> +
+>> +		/* Exit early if we have dealt with all requested CPUs */
+>> +		if (!broadcast && target_cpus == 0)
+>> +			break;
+>> +
+>> +		/* Don't signal the calling VCPU */
+>> +		if (broadcast && c == vcpu_id)
+>> +			continue;
+>> +
+>> +		if (!broadcast) {
+>> +			int level0;
+>> +
+>> +			level0 = match_mpidr(mpidr, target_cpus, c_vcpu);
+>> +			if (level0 == -1)
+>> +				continue;
+>> +
+>> +			/* remove this matching VCPU from the mask */
+>> +			target_cpus &= ~BIT(level0);
+>> +		}
+>> +
+>> +		irq = vgic_get_irq(vcpu->kvm, c_vcpu, sgi);
+>> +
+>> +		spin_lock(&irq->irq_lock);
+>> +		irq->pending = true;
+>> +
+>> +		vgic_queue_irq(vcpu->kvm, irq);
+>> +	}
+> 
+> eventually I suspect we should implement a linear time 'give me a vcpu
+> based on this mpidr' lookup function, but this should be fine for now.
+> 
+>> +}
+>>  #endif
+>> -- 
+>> 2.7.3
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe kvm" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
