@@ -1,120 +1,127 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 11 Apr 2016 14:28:45 -0700
-Subject: [PATCH v2 0/3] ARM: OMAP3: Fix McBSP2/3 hwmod setup for sidetone
-In-Reply-To: <5703BA6B.1080208@ti.com>
-References: <1458311007-19168-1-git-send-email-peter.ujfalusi@ti.com>
- <alpine.DEB.2.02.1603191937430.6629@utopia.booyaka.com>
- <56EFB794.5010505@ti.com>
- <alpine.DEB.2.02.1603211743200.31059@utopia.booyaka.com>
- <56FE407E.9030803@ti.com> <20160402001753.GR9329@atomide.com>
- <57026205.6020105@ti.com> <20160404151200.GA4652@atomide.com>
- <5703BA6B.1080208@ti.com>
-Message-ID: <20160411212845.GJ5995@atomide.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 11 Apr 2016 14:55:19 -0700
+Subject: [PATCH 1/2] PCI: iproc: Support DT property for ignoring aborts
+ when probing
+In-Reply-To: <4768648c-841b-490d-a752-f31cba545f74@broadcom.com>
+References: <1460238624-2086-1-git-send-email-zajec5@gmail.com>
+ <79DC79A7-D4CE-4983-B1C5-CBD2E9CBBFB9@gmail.com>
+ <4768648c-841b-490d-a752-f31cba545f74@broadcom.com>
+Message-ID: <570C1D47.7010102@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [160405 06:16]:
-> On 04/04/16 18:12, Tony Lindgren wrote:
-> >> The reason for this is that in DT boot we can not provide the
-> >> enable_st_clock() callback to the mcbsp driver stack. This is done for legacy
-> >> boot in mach-omap2/mcbsp.c
-> > 
-> > Seems like the short term fix there is to pass enable_st_clock pointer
-> > in pdata using pdata-quirks.c.
+On 11/04/16 13:06, Ray Jui wrote:
 > 
-> I don't think there is a point to spend effort on a workaround via pdata-quirks.
 > 
-> > Then for the long term solution using
-> > PM runtime to block gating of the clock while sidetone is active is
-> > the way to go it seems.
+> On 4/10/2016 6:43 PM, Florian Fainelli wrote:
+>> On April 9, 2016 2:50:23 PM PDT, "Rafa? Mi?ecki" <zajec5@gmail.com>
+>> wrote:
+>>> Some devices (e.g. Northstar ones) may have bridges that forward
+>>> harmless errors to the ARM core. In such case we need an option to
+>>> add a handler ignoring them.
+>>>
+>>> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+>>> ---
+>>
+>>> +- brcm,pcie-hook-abort-handler: During PCI bus probing (device
+>>> enumeration)
+>>> +  there can be errors that are expected and harmless. Unfortunately
+>>> some bridges
+>>> +  can't be configured to ignore them and they forward them to the ARM
+>>> core
+>>> +  triggering die().
+>>> +  This property should be set in such case, it will make driver add
+>>> its own
+>>> +  handler ignoring such errors.
+>>
+>> The property is named after the function that allows you to catch
+>> abort handlers, whereas you should be describing the HW here.
+>> Something like brcm,bridge-error-forward or a better name even would
+>> be preferable.
+>>
+>>> +#ifdef CONFIG_ARM
+>>> +static int iproc_pcie_abort_handler(unsigned long addr, unsigned int
+>>> fsr,
+>>> +                    struct pt_regs *regs)
+>>> +{
+>>> +    if (fsr == 0x1406)
+>>> +        return 0;
+>>> +
+>>> +    return 1;
+>>
+>> As you later noted this prevents this driver from being a module now.
+>> Since the expectation is that either a fixed bootloader or a platform
+>> should enot produce these data aborts, or allow them to be ignored,
+>> why not just put this code back where it belongs in the machine
+>> specific file which kills many birds with the same stone:
+>>
 > 
-> Hrm, I think one of the main issue is that with pm_runtime we can not block
-> the clock gating, this is why legacy code uses enable_st_clock(), which will
-> call omap2_clk_deny_idle() or omap2_clk_allow_idle().
+> I assume the module compile issue can be simply fixed by exporting
+> symbol of "hook_fault_code"?
 
-I see. I think Tero wanted to export omap2_clk_allow_idle() and
-omap2_clk_deny_idle() for drivers to use. That should get discussed in
-the linux-clk list, probably best to use the pdata callbacks until
-the clock idling issue has been discussed.
+I do not think it is desireable for this symbol to be exported in the
+first place, also last I looked, this was a one time registration thing,
+you cannot undo the hook you installed, but everything can be fixed.
 
-> >> The ST does not have clocks coming from PRCM level, it only uses the McBSP
-> >> iclk when it is enabled (the McBSP block of the McBSP). As far as pm_runtime
-> >> goes I think the ST module should not use it. We can not tell hwmod to
-> >> enable/disable the McBSP2/3 iclk when we pm_runtime for the ST. It does not
-> >> help at all. We can have nop action for the ST when pm_runtime is used, but
-> >> then why would we have it?
-> > 
-> > Using PM runtime in the sidetone driver should just work as long as the
-> > sidetone device driver depends on the McBSP driver before it gets probed.
-> > The clock framework handles things for the mcbsp ick with the usecount.
 > 
-> Yes, that is not the problem. The problem is that when McBSP is used w/o
-> sidetone the iclk can and should be autogated, but if the sidetone is enabled
-> then the iclk must not autogate and this needs to be prevented in PRCM level.
-> Note also that while the McBSP is running we must be able to enable/disable
-> the sidetone any time w/o affecting the McBSP operation.
+> I believe ARM64 based NS2 that uses the same iProc PCIe driver might
+> also need something like this (I'm still waiting for Jon Mason to give
+> me some more information on the NS2 errors that he saw, which is likely
+> related to this). I assume there will be something similar to the ARM
+> specific "hook_fault_code" for ARM64, but then ARM64 does not have any
+> "mach" specific directory. Where can this type of hook be installed for
+> ARM64 based platforms if not in the PCIe driver?
 
-OK I see.
+OK, that is a fair point, then maybe have a two stage process, where we
+make sure that the part that installs the hook is always available and
+built-into the kernel, but let the iProc PCIe driver remain a module?
 
-> > And doing pm_runtime_get() in the sidetone driver will do what the legacy
-> > enable_st_clock() does currently.
 > 
-> it can't do that as we do not have way to deny/enable just the autoidle for a
-> given clock.
-
-Yup. So I suggest the pdata callbacs for the omap2_clk_allow_idle() and
-omap2_clk_deny_idle() for now.
-
-> >>> So having two separate drivers might make things a lot simpler.
-> >>
-> >> Not really. It will make things way more complicated imho. How to handle
-> >> legacy boot as we still have that supported?
-> > 
-> > Hey both the legacy driver and DT driver are really just platform devices
-> > and drivers. And passing both dts and platform data can be done just
-> > fine, no?
+>> - code is ways built-in, and hook_fault_code is installed prior to
+>> PCIe loading (function is marked with __init)
+>> - platforms which do not need that, just do not install it for that
+>> specific code
+>> - it is clear which platforms need it and which do not, yet the driver
+>> remains agnostic
 > 
-> Sure, but McBSP2-ST needs to bind with McBSP2 driver instance and the
-> McBSP3-ST should bind with McBSP3 instance. In legacy mode we can store the
-> McBSP pdev pointers in a array and use the devid or get the McBSP id from the
-> device name. While with DT boot we must have phandle pointing to/from ST
-> from/to McBSP node to be able to figure out who is who.
+> It's actually unclear to me which iProc platforms need this.
+> - We know NS needs it
+> - Someone mentioned NSP does not need this? But where does the
+> information come from? Do we have similar PCIe connection configuration
+> on NSP as NS?
+> - I cannot confirm whether Cygnus needs this or not since we do not have
+> similar board configurations on Cygnus (on Cygnus each host is always
+> connected to a single device). I can check with the ASIC team, but that
+> will be a very lengthy process and I'm not sure when I can get the
+> answer we need (and yes I do work at Broadcom, :))
+> - Jon Mason reported similar abort issues on NS2 when an externally
+> connected, multi function device is used. I'm still waiting for him to
+> send me the error log and see if it's the same type of data abort.
+
+Is there really no way to flip some chicken bits to prevent the PCIe
+root complex from forwarding some of these errors?
+
+Also, sorry if this is repeating information, but how can we generate
+spurious aborts if we are scanning the PCIe bus, are we possibly trying
+to access the RC's config space before it is set up (this should not
+fail), or something else?
+
+Thanks!
+
 > 
-> >> When the McBSP driver is loaded we must know if it has sidetone or not so
-> >> we can create the needed audio controls, sysfs entries. The sysfs and
-> >> kcontrol registration could be moved out to the new ST driver, true.
-> > 
-> > Yeah during the probe, the sidetone driver must register with the McBSP
-> > driver to tell it's there.
+>>
+>> NB: there could be other platforms some day needing that which also
+>> propagate the error differently, forcing you to add more and more of
+>> these codes in the PCIe driver.
+>>
 > 
-> When McBSP driver probes, it registers itself to ASoC core and it needs to
-> know at that point if we need to prepare for ST or not. So probably the McBSP
-> driver needs to register to ST driver?
-
-OK yes if that makes more sense.
-
-> > I guess no need to pass anything in the
-> > dts or platform_data for that.
-> > 
-> >> I actually started with two separate drivers approach first, but decided that
-> >> it does not worth the effort (legacy boot support, pm_runtime/hwmod hassle,
-> >> platform data, callback API design, etc).
-> >> I know, it is not rocket science but it is king of shoot out of cannon into
-> >> sparrows.
-> >> I'll think about it for a little while ;)
-> > 
-> > Well what we've seen so far is that any kind of non-standard solution
-> > will always be a pain to maintain in the long run :)
+> Yes, at this point, we are unsure whether the same or different code is
+> used among different platforms.
 > 
-> The current implementation (one driver to handle McBSP and the ST) is there
-> ever since OMAP3 was introduced afaik. Changing a working (was working) design
-> to something which has not been tested will for sure going to open issues we
-> have not prepared for.
-> I would avoid the rewrite of a proven driver architecture if it is not broken.
+> Thanks,
+> 
+> Ray
 
-Well probably the best thing to do is the use of platform callback
-for now until we know how it can be done incrementally :)
 
-Regards,
-
-Tony
+-- 
+Florian
