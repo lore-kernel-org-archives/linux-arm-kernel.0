@@ -1,29 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 11 Apr 2016 16:01:31 +0100
-Subject: [PATCH v1 1/2] amba: Defer device peripheral ID read
-In-Reply-To: <1460386716-23262-1-git-send-email-georgi.djakov@linaro.org>
-References: <1460386716-23262-1-git-send-email-georgi.djakov@linaro.org>
-Message-ID: <20160411150130.GL19428@n2100.arm.linux.org.uk>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 11 Apr 2016 10:25:25 -0500
+Subject: [RESEND/PATCH V7 1/2] regulator: Add document for MT6323 regulator
+In-Reply-To: <1460054776-54782-1-git-send-email-blogic@openwrt.org>
+References: <1460054776-54782-1-git-send-email-blogic@openwrt.org>
+Message-ID: <20160411152525.GA18883@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 11, 2016 at 05:58:35PM +0300, Georgi Djakov wrote:
-> From: "Ivan T. Ivanov" <ivan.ivanov@linaro.org>
+On Thu, Apr 07, 2016 at 08:46:15PM +0200, John Crispin wrote:
+> Signed-off-by: John Crispin <blogic@openwrt.org>
+> Cc: devicetree at vger.kernel.org
+> ---
+> Series was dropped in the 4.6-rc1 merge window to avoid a merge order
+> conflict with the corresponding MFD driver.
 > 
-> To be able to read peripheral ID during device create time
-> bus code have turn on device interface clock, but this
-> clock could be unavailable at this time. Fix this by defer
-> device ID read until driver match time.
+> Changes in V7
+> * remove another compatible string
+> * small wording changes
 > 
-> Signed-off-by: Ivan T. Ivanov <ivan.ivanov@linaro.org>
-> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+> Changes in V6
+> * remove the compatible string
+> 
+> Changes in V5
+> * regulator vs regulators
+> 
+> Changes in V4
+> * regulator is a subnode and not a property
+> 
+>  .../bindings/regulator/mt6323-regulator.txt        |  239 ++++++++++++++++++++
+>  1 file changed, 239 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/regulator/mt6323-regulator.txt
 
-Can't do this.  See comments on previous similar patches trying to do the
-very same thing.  (Sorry, I don't have time to provide a fuller reply,
-especially given that there's already a fuller reply in the last two
-months of mailing list archives.)
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Acked-by: Rob Herring <robh@kernel.org>
