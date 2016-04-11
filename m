@@ -1,446 +1,153 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 11 Apr 2016 10:52:15 +0100
-Subject: [RFC PATCH 1/2] ARM/ARM64: arch_timer: Work around QorIQ Erratum
- A-008585
-In-Reply-To: <1460341353-15619-2-git-send-email-oss@buserror.net>
+Date: Mon, 11 Apr 2016 10:55:18 +0100
+Subject: [RFC PATCH 2/2] ARM64: arch_timer: Work around QorIQ Erratum
+ A-009971
+In-Reply-To: <1460341353-15619-3-git-send-email-oss@buserror.net>
 References: <1460341353-15619-1-git-send-email-oss@buserror.net>
- <1460341353-15619-2-git-send-email-oss@buserror.net>
-Message-ID: <570B73CF.6070502@arm.com>
+ <1460341353-15619-3-git-send-email-oss@buserror.net>
+Message-ID: <570B7486.3080204@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Scott,
-
 On 11/04/16 03:22, Scott Wood wrote:
-> Erratum A-008585 says that the ARM generic timer "has the potential to
-> contain an erroneous value for a small number of core clock cycles
-> every time the timer value changes" and that the workaround is to
-> reread TVAL and count registers until successive reads return the same
-> value.
+> From: Priyanka Jain <priyanka.jain@nxp.com>
 > 
-> This erratum can be found on LS1021A (32-bit), LS1043A (64-bit), and
-> LS2080A (64-bit).
+> Erratum A-009971 says that it is possible for the timer value register
+> to be written incorrectly, resulting in "an incorrect and potentially
+> very long timeout".  The workaround is to read the timer count
+> immediately before and after writing the timer value register, and
+> repeat if the counter reads don't match.
 > 
-> This patch is loosely based on work by Priyanka Jain and Bhupesh
-> Sharma.
+> This erratum can be found on LS2080A.
 > 
+> Signed-off-by: Priyanka Jain <priyanka.jain@nxp.com>
+> [scottwood: cleanup and fixes]
 > Signed-off-by: Scott Wood <oss@buserror.net>
 > ---
->  .../devicetree/bindings/arm/arch_timer.txt         |  4 ++
->  arch/arm/boot/dts/ls1021a.dtsi                     |  1 +
->  arch/arm/include/asm/arch_timer.h                  | 71 +++++++++++++++++++---
->  arch/arm/include/asm/vdso_datapage.h               |  1 +
->  arch/arm/kernel/vdso.c                             |  1 +
->  arch/arm/vdso/vgettimeofday.c                      |  2 +-
->  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi     |  1 +
+>  .../devicetree/bindings/arm/arch_timer.txt         |  5 ++++
 >  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi     |  1 +
->  arch/arm64/include/asm/arch_timer.h                | 35 ++++++++---
->  arch/arm64/include/asm/vdso_datapage.h             |  1 +
->  arch/arm64/kernel/asm-offsets.c                    |  1 +
->  arch/arm64/kernel/vdso.c                           |  2 +
->  arch/arm64/kernel/vdso/gettimeofday.S              | 14 ++++-
->  drivers/clocksource/arm_arch_timer.c               |  5 ++
->  14 files changed, 121 insertions(+), 19 deletions(-)
+>  arch/arm64/include/asm/arch_timer.h                | 27 ++++++++++++++++++++--
+>  drivers/clocksource/arm_arch_timer.c               |  3 +++
+>  4 files changed, 34 insertions(+), 2 deletions(-)
 > 
 > diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
-> index e774128..7117fbd 100644
+> index 7117fbd..ab4d3b1 100644
 > --- a/Documentation/devicetree/bindings/arm/arch_timer.txt
 > +++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
-> @@ -25,6 +25,10 @@ to deliver its interrupts via SPIs.
->  - always-on : a boolean property. If present, the timer is powered through an
->    always-on power domain, therefore it never loses context.
+> @@ -29,6 +29,11 @@ to deliver its interrupts via SPIs.
+>    QorIQ erratum A-008585, which says reading the timer is unreliable
+>    unless the same value is returned by back-to-back reads.
 >  
-> +- fsl,erratum-a008585 : A boolean property. Indicates the presence of
-> +  QorIQ erratum A-008585, which says reading the timer is unreliable
-> +  unless the same value is returned by back-to-back reads.
+> +- fsl,erratum-a009971 : A boolean property. Indicates the presence of
+> +  QorIQ erratum A-009971, which says writing the timer value register
+> +  is unreliable unless timer count reads before and after the timer write
+> +  return the same value.
 > +
 >  ** Optional properties:
 >  
 >  - arm,cpu-registers-not-fw-configured : Firmware does not initialize
-> diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-> index 726372d..a2e9f66 100644
-> --- a/arch/arm/boot/dts/ls1021a.dtsi
-> +++ b/arch/arm/boot/dts/ls1021a.dtsi
-> @@ -91,6 +91,7 @@
->  			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
->  			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
->  			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
-> +		fsl,erratum-a008585;
->  	};
->  
->  	pmu {
-> diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-> index d4ebf56..5b8e1f9 100644
-> --- a/arch/arm/include/asm/arch_timer.h
-> +++ b/arch/arm/include/asm/arch_timer.h
-> @@ -12,6 +12,8 @@
->  #ifdef CONFIG_ARM_ARCH_TIMER
->  int arch_timer_arch_init(void);
->  
-> +extern bool arm_arch_timer_reread;
-> +
->  /*
->   * These register accessors are marked inline so the compiler can
->   * nicely work out which register we want, and chuck away the rest of
-> @@ -44,7 +46,7 @@ void arch_timer_reg_write_cp15(int access, enum arch_timer_reg reg, u32 val)
->  }
->  
->  static __always_inline
-> -u32 arch_timer_reg_read_cp15(int access, enum arch_timer_reg reg)
-> +u32 arch_timer_reg_read_cp15_raw(int access, enum arch_timer_reg reg)
->  {
->  	u32 val = 0;
->  
-> @@ -71,6 +73,38 @@ u32 arch_timer_reg_read_cp15(int access, enum arch_timer_reg reg)
->  	return val;
->  }
->  
-> +static __always_inline
-> +u32 arch_timer_reg_tval_reread(int access, enum arch_timer_reg reg)
-> +{
-> +	u32 val, val_new;
-> +	int timeout = 200;
-> +
-> +	do {
-> +		if (access == ARCH_TIMER_PHYS_ACCESS) {
-> +			asm volatile("mrc p15, 0, %0, c14, c2, 0;"
-> +				     "mrc p15, 0, %1, c14, c2, 0"
-> +				     : "=r" (val), "=r" (val_new));
-> +		} else if (access == ARCH_TIMER_VIRT_ACCESS) {
-> +			asm volatile("mrc p15, 0, %0, c14, c3, 0;"
-> +				     "mrc p15, 0, %1, c14, c3, 0"
-> +				     : "=r" (val), "=r" (val_new));
-> +		}
-> +		timeout--;
-> +	} while (val != val_new && timeout);
-> +
-> +	WARN_ON_ONCE(!timeout);
-> +	return val;
-> +}
-> +
-> +static __always_inline
-> +u32 arch_timer_reg_read_cp15(int access, enum arch_timer_reg reg)
-> +{
-> +	if (arm_arch_timer_reread && reg == ARCH_TIMER_REG_TVAL)
-> +		return arch_timer_reg_tval_reread(access, reg);
-
-I'm really not keen on this. Please implement this workaround as a
-static_key, and branch to the workaround in the slow path.
-
-> +
-> +	return arch_timer_reg_read_cp15_raw(access, reg);
-> +}
-> +
->  static inline u32 arch_timer_get_cntfrq(void)
->  {
->  	u32 val;
-> @@ -78,22 +112,39 @@ static inline u32 arch_timer_get_cntfrq(void)
->  	return val;
->  }
->  
-> -static inline u64 arch_counter_get_cntpct(void)
-> +static __always_inline u64 arch_counter_get_cnt(int opcode, bool reread)
-
-Why the __always_inline? The compiler should already do the right thing.
-
->  {
-> -	u64 cval;
-> +	u64 val, val_new;
-> +	int timeout = 200;
->  
->  	isb();
-> -	asm volatile("mrrc p15, 0, %Q0, %R0, c14" : "=r" (cval));
-> -	return cval;
-> +
-> +	if (reread) {
-> +		do {
-> +			asm volatile("mrrc p15, %2, %Q0, %R0, c14;"
-> +				     "mrrc p15, %2, %Q1, %R1, c14"
-> +				     : "=r" (val), "=r" (val_new)
-> +				     : "i" (opcode));
-> +			timeout--;
-> +		} while (val != val_new && timeout);
-> +
-> +		BUG_ON(!timeout);
-
-BUG_ON()? Really? Is there any condition where you wouldn't be able to
-converge to a single value?
-
-> +	} else {
-> +		asm volatile("mrrc p15, %1, %Q0, %R0, c14" : "=r" (val)
-> +			     : "i" (opcode));
-> +	}
-> +
-> +	return val;
->  }
->  
-> -static inline u64 arch_counter_get_cntvct(void)
-> +static inline u64 arch_counter_get_cntpct(void)
->  {
-> -	u64 cval;
-> +	return arch_counter_get_cnt(0, arm_arch_timer_reread);
-> +}
->  
-> -	isb();
-> -	asm volatile("mrrc p15, 1, %Q0, %R0, c14" : "=r" (cval));
-> -	return cval;
-> +static inline u64 arch_counter_get_cntvct(void)
-> +{
-> +	return arch_counter_get_cnt(1, arm_arch_timer_reread);
->  }
->  
->  static inline u32 arch_timer_get_cntkctl(void)
-> diff --git a/arch/arm/include/asm/vdso_datapage.h b/arch/arm/include/asm/vdso_datapage.h
-> index 9be2594..6c8e1cb 100644
-> --- a/arch/arm/include/asm/vdso_datapage.h
-> +++ b/arch/arm/include/asm/vdso_datapage.h
-> @@ -46,6 +46,7 @@ struct vdso_data {
->  	u64 xtime_clock_snsec;	/* CLOCK_REALTIME sub-ns base */
->  	u32 tz_minuteswest;	/* timezone info for gettimeofday(2) */
->  	u32 tz_dsttime;
-> +	u32 timer_reread;	/* Erratum requires two equal timer reads */
->  };
->  
->  union vdso_data_store {
-> diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
-> index 994e971..8885e76 100644
-> --- a/arch/arm/kernel/vdso.c
-> +++ b/arch/arm/kernel/vdso.c
-> @@ -307,6 +307,7 @@ void update_vsyscall(struct timekeeper *tk)
->  
->  	vdso_write_begin(vdso_data);
->  
-> +	vdso_data->timer_reread			= arm_arch_timer_reread;
->  	vdso_data->tk_is_cntvct			= tk_is_cntvct(tk);
->  	vdso_data->xtime_coarse_sec		= tk->xtime_sec;
->  	vdso_data->xtime_coarse_nsec		= (u32)(tk->tkr_mono.xtime_nsec >>
-> diff --git a/arch/arm/vdso/vgettimeofday.c b/arch/arm/vdso/vgettimeofday.c
-> index 79214d5..a29fc61 100644
-> --- a/arch/arm/vdso/vgettimeofday.c
-> +++ b/arch/arm/vdso/vgettimeofday.c
-> @@ -123,7 +123,7 @@ static notrace u64 get_ns(struct vdso_data *vdata)
->  	u64 cycle_now;
->  	u64 nsec;
->  
-> -	cycle_now = arch_counter_get_cntvct();
-> +	cycle_now = arch_counter_get_cnt(1, vdata->timer_reread);
->  
->  	cycle_delta = (cycle_now - vdata->cs_cycle_last) & vdata->cs_mask;
->  
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-> index be72bf5..596420c 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-> @@ -115,6 +115,7 @@
->  			     <1 14 0x1>, /* Physical Non-Secure PPI */
->  			     <1 11 0x1>, /* Virtual PPI */
->  			     <1 10 0x1>; /* Hypervisor PPI */
-> +		fsl,erratum-a008585;
->  	};
->  
->  	pmu {
 > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-> index 9d746c6..0270ccf 100644
+> index 0270ccf..529e441 100644
 > --- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
 > +++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-> @@ -171,6 +171,7 @@
->  			     <1 14 0x8>, /* Physical Non-Secure PPI, active-low */
+> @@ -172,6 +172,7 @@
 >  			     <1 11 0x8>, /* Virtual PPI, active-low */
 >  			     <1 10 0x8>; /* Hypervisor PPI, active-low */
-> +		fsl,erratum-a008585;
+>  		fsl,erratum-a008585;
+> +		fsl,erratum-a009971;
 >  	};
 >  
 >  	pmu {
 > diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-> index fbe0ca3..9367ee3 100644
+> index 9367ee3..1867e60 100644
 > --- a/arch/arm64/include/asm/arch_timer.h
 > +++ b/arch/arm64/include/asm/arch_timer.h
-> @@ -27,6 +27,31 @@
->  
+> @@ -28,6 +28,7 @@
 >  #include <clocksource/arm_arch_timer.h>
 >  
-> +extern bool arm_arch_timer_reread;
-> +
-> +/* QorIQ errata workarounds */
-> +#define ARCH_TIMER_REREAD(reg) ({ \
-> +	u64 _val_old, _val_new; \
+>  extern bool arm_arch_timer_reread;
+> +extern bool arm_arch_timer_rewrite;
+
+Just as for the other bug, please implement this as a static key.
+
+>  
+>  /* QorIQ errata workarounds */
+>  #define ARCH_TIMER_REREAD(reg) ({ \
+> @@ -52,6 +53,20 @@ extern bool arm_arch_timer_reread;
+>  	_val; \
+>  })
+>  
+> +#define ARCH_TIMER_TVAL_REWRITE(pv, val) do { \
+> +	u64 _cnt_old, _cnt_new; \
 > +	int _timeout = 200; \
 > +	do { \
-> +		asm volatile("mrs %0, " reg ";" \
-> +			     "mrs %1, " reg \
-> +			     : "=r" (_val_old), "=r" (_val_new)); \
+> +		asm volatile("mrs %0, cntvct_el0;" \
+> +			     "msr cnt" pv "_tval_el0, %2;" \
+> +			     "mrs %1, cntvct_el0" \
+> +			     : "=&r" (_cnt_old), "=r" (_cnt_new) \
+> +			     : "r" (val)); \
 > +		_timeout--; \
-> +	} while (_val_old != _val_new && _timeout); \
+> +	} while (_cnt_old != _cnt_new && _timeout); \
 > +	WARN_ON_ONCE(!_timeout); \
-
-And here we only warn? I'd expect some degree of consistency between the
-two architectures.
-
-> +	_val_old; \
-> +})
+> +} while (0)
 > +
-> +#define ARCH_TIMER_READ(reg) ({ \
-> +	u64 _val; \
-> +	if (arm_arch_timer_reread) \
-> +		_val = ARCH_TIMER_REREAD(reg); \
-> +	else \
-> +		asm volatile("mrs %0, " reg : "=r" (_val)); \
-> +	_val; \
-> +})
 
-This should also be implemented as a static key.
+Given how many times you've written that loop, I'm sure you can have a
+preprocessor macro that will do the right thing.
 
-> +
 >  /*
 >   * These register accessors are marked inline so the compiler can
 >   * nicely work out which register we want, and chuck away the rest of
-> @@ -69,7 +94,7 @@ u32 arch_timer_reg_read_cp15(int access, enum arch_timer_reg reg)
->  			asm volatile("mrs %0,  cntp_ctl_el0" : "=r" (val));
+> @@ -66,7 +81,11 @@ void arch_timer_reg_write_cp15(int access, enum arch_timer_reg reg, u32 val)
+>  			asm volatile("msr cntp_ctl_el0,  %0" : : "r" (val));
 >  			break;
 >  		case ARCH_TIMER_REG_TVAL:
-> -			asm volatile("mrs %0, cntp_tval_el0" : "=r" (val));
-> +			val = ARCH_TIMER_READ("cntp_tval_el0");
+> -			asm volatile("msr cntp_tval_el0, %0" : : "r" (val));
+> +			if (arm_arch_timer_rewrite)
+> +				ARCH_TIMER_TVAL_REWRITE("p", val);
+> +			else
+> +				asm volatile("msr cntp_tval_el0, %0" : :
+> +					     "r" (val));
 >  			break;
 >  		}
 >  	} else if (access == ARCH_TIMER_VIRT_ACCESS) {
-> @@ -78,7 +103,7 @@ u32 arch_timer_reg_read_cp15(int access, enum arch_timer_reg reg)
->  			asm volatile("mrs %0,  cntv_ctl_el0" : "=r" (val));
+> @@ -75,7 +94,11 @@ void arch_timer_reg_write_cp15(int access, enum arch_timer_reg reg, u32 val)
+>  			asm volatile("msr cntv_ctl_el0,  %0" : : "r" (val));
 >  			break;
 >  		case ARCH_TIMER_REG_TVAL:
-> -			asm volatile("mrs %0, cntv_tval_el0" : "=r" (val));
-> +			val = ARCH_TIMER_READ("cntv_tval_el0");
+> -			asm volatile("msr cntv_tval_el0, %0" : : "r" (val));
+> +			if (arm_arch_timer_rewrite)
+> +				ARCH_TIMER_TVAL_REWRITE("v", val);
+> +			else
+> +				asm volatile("msr cntv_tval_el0, %0" : :
+> +					     "r" (val));
 >  			break;
 >  		}
 >  	}
-> @@ -116,12 +141,8 @@ static inline u64 arch_counter_get_cntpct(void)
->  
->  static inline u64 arch_counter_get_cntvct(void)
->  {
-> -	u64 cval;
-> -
->  	isb();
-> -	asm volatile("mrs %0, cntvct_el0" : "=r" (cval));
-> -
-> -	return cval;
-> +	return ARCH_TIMER_READ("cntvct_el0");
->  }
->  
->  static inline int arch_timer_arch_init(void)
-> diff --git a/arch/arm64/include/asm/vdso_datapage.h b/arch/arm64/include/asm/vdso_datapage.h
-> index de66199..9f64af4 100644
-> --- a/arch/arm64/include/asm/vdso_datapage.h
-> +++ b/arch/arm64/include/asm/vdso_datapage.h
-> @@ -34,6 +34,7 @@ struct vdso_data {
->  	__u32 tz_minuteswest;	/* Whacky timezone stuff */
->  	__u32 tz_dsttime;
->  	__u32 use_syscall;
-> +	__u32 timer_reread;	/* Erratum requires two equal timer reads */
->  };
->  
->  #endif /* !__ASSEMBLY__ */
-> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-> index 3ae6b31..c9dca8d 100644
-> --- a/arch/arm64/kernel/asm-offsets.c
-> +++ b/arch/arm64/kernel/asm-offsets.c
-> @@ -95,6 +95,7 @@ int main(void)
->    DEFINE(VDSO_TZ_MINWEST,	offsetof(struct vdso_data, tz_minuteswest));
->    DEFINE(VDSO_TZ_DSTTIME,	offsetof(struct vdso_data, tz_dsttime));
->    DEFINE(VDSO_USE_SYSCALL,	offsetof(struct vdso_data, use_syscall));
-> +  DEFINE(VDSO_TIMER_REREAD,	offsetof(struct vdso_data, timer_reread));
->    BLANK();
->    DEFINE(TVAL_TV_SEC,		offsetof(struct timeval, tv_sec));
->    DEFINE(TVAL_TV_USEC,		offsetof(struct timeval, tv_usec));
-> diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
-> index 97bc68f..f8c6158 100644
-> --- a/arch/arm64/kernel/vdso.c
-> +++ b/arch/arm64/kernel/vdso.c
-> @@ -31,6 +31,7 @@
->  #include <linux/timekeeper_internal.h>
->  #include <linux/vmalloc.h>
->  
-> +#include <asm/arch_timer.h>
->  #include <asm/cacheflush.h>
->  #include <asm/signal32.h>
->  #include <asm/vdso.h>
-> @@ -204,6 +205,7 @@ void update_vsyscall(struct timekeeper *tk)
->  	++vdso_data->tb_seq_count;
->  	smp_wmb();
->  
-> +	vdso_data->timer_reread			= arm_arch_timer_reread;
->  	vdso_data->use_syscall			= use_syscall;
->  	vdso_data->xtime_coarse_sec		= tk->xtime_sec;
->  	vdso_data->xtime_coarse_nsec		= tk->tkr_mono.xtime_nsec >>
-> diff --git a/arch/arm64/kernel/vdso/gettimeofday.S b/arch/arm64/kernel/vdso/gettimeofday.S
-> index efa79e8..2e6008d 100644
-> --- a/arch/arm64/kernel/vdso/gettimeofday.S
-> +++ b/arch/arm64/kernel/vdso/gettimeofday.S
-> @@ -207,7 +207,7 @@ ENDPROC(__kernel_clock_getres)
->  /*
->   * Read the current time from the architected counter.
->   * Expects vdso_data to be initialised.
-> - * Clobbers the temporary registers (x9 - x15).
-> + * Clobbers the temporary registers (x9 - x17).
->   * Returns:
->   *  - w9		= vDSO sequence counter
->   *  - (x10, x11)	= (ts->tv_sec, shifted ts->tv_nsec)
-> @@ -217,6 +217,7 @@ ENTRY(__do_get_tspec)
->  	.cfi_startproc
->  
->  	/* Read from the vDSO data page. */
-> +	ldr	w17, [vdso_data, #VDSO_TIMER_REREAD]
->  	ldr	x10, [vdso_data, #VDSO_CS_CYCLE_LAST]
->  	ldp	x13, x14, [vdso_data, #VDSO_XTIME_CLK_SEC]
->  	ldp	w11, w12, [vdso_data, #VDSO_CS_MULT]
-> @@ -225,6 +226,17 @@ ENTRY(__do_get_tspec)
->  	/* Read the virtual counter. */
->  	isb
->  	mrs	x15, cntvct_el0
-> +	/*
-> +	 * Erratum A-008585 requires back-to-back reads to be identical
-> +	 * in order to avoid glitches.
-> +	 */
-> +	cmp	w17, #0
-> +	b.eq	2f
-> +1:	mrs	x15, cntvct_el0
-> +	mrs	x16, cntvct_el0
-> +	cmp	x16, x15
-> +	b.ne	1b
-> +2:
-
-Could userspace lock-up here? If it can, you need to be able to bail
-out. If not, then your BUG_ON() sprinkling is bogus.
-
->  
->  	/* Calculate cycle delta and convert to ns. */
->  	sub	x10, x15, x10
 > diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 5152b38..5ed7c7f 100644
+> index 5ed7c7f..82b32cb 100644
 > --- a/drivers/clocksource/arm_arch_timer.c
 > +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -79,6 +79,9 @@ static enum ppi_nr arch_timer_uses_ppi = VIRT_PPI;
->  static bool arch_timer_c3stop;
->  static bool arch_timer_mem_use_virtual;
+> @@ -81,6 +81,7 @@ static bool arch_timer_mem_use_virtual;
 >  
-> +bool arm_arch_timer_reread; /* QorIQ erratum A-008585 */
-> +EXPORT_SYMBOL(arm_arch_timer_reread);
-> +
+>  bool arm_arch_timer_reread; /* QorIQ erratum A-008585 */
+>  EXPORT_SYMBOL(arm_arch_timer_reread);
+> +bool arm_arch_timer_rewrite; /* QorIQ erratum A-009971 */
+>  
 >  /*
 >   * Architected system timer support.
->   */
-> @@ -762,6 +765,8 @@ static void __init arch_timer_of_init(struct device_node *np)
->  	arch_timer_detect_rate(NULL, np);
->  
+> @@ -767,6 +768,8 @@ static void __init arch_timer_of_init(struct device_node *np)
 >  	arch_timer_c3stop = !of_property_read_bool(np, "always-on");
-> +	arm_arch_timer_reread =
-> +		of_property_read_bool(np, "fsl,erratum-a008585");
+>  	arm_arch_timer_reread =
+>  		of_property_read_bool(np, "fsl,erratum-a008585");
+> +	arm_arch_timer_rewrite =
+> +		of_property_read_bool(np, "fsl,erratum-a009971");
 >  
 >  	/*
 >  	 * If we cannot rely on firmware initializing the timer registers then
 > 
 
-The elephant in the room is KVM. I'm pretty sure it suffers from the
-same erratum, yet you did not handle it at all. I'd expect to see
-something in an upcoming version of the patch.
+This also requires handling in KVM.
 
 Thanks,
 
