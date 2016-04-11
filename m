@@ -1,52 +1,58 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 11 Apr 2016 09:04:09 +0200
-Subject: [PATCH] ARM: tegra: fix naming in GPIO DT binding header
-In-Reply-To: <5705481D.3030700@wwwdotorg.org>
-References: <1459884307-24043-1-git-send-email-swarren@wwwdotorg.org>
- <20160406172845.GC28843@ulmo.ba.sec>
- <5705481D.3030700@wwwdotorg.org>
-Message-ID: <CACRpkdZxeV07_rb2xL+HRGp-ay1B-U=_tEbPCYqvM+ZYD-wpYQ@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 11 Apr 2016 09:11:19 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v4.6
+In-Reply-To: <cover.1460339328.git.horms+renesas@verge.net.au>
+References: <cover.1460339328.git.horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdUwuabK2Ajo5dMWEf014Xvk-1WYz4YBTw1jVScrTKSx0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 6, 2016 at 7:32 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 04/06/2016 11:28 AM, Thierry Reding wrote:
->>
->> On Tue, Apr 05, 2016 at 01:25:07PM -0600, Stephen Warren wrote:
->>>
->>> From: Stephen Warren <swarren@nvidia.com>
->>>
->>> According to the Tegra TRM, GPIOs are aggregated into /ports/ of 8 GPIOs,
->>> not into /banks/. Fix <dt-bindings/gpio/tegra-gpio.h> to correctly
->>> reflect
->>> this naming convention. While this seems like silly churn, it will become
->>> slightly more important once we introduce the GPIO binding for upcoming
->>> Tegra chips.
->>>
->>> Signed-off-by: Stephen Warren <swarren@nvidia.com>
->>> ---
->>>   include/dt-bindings/gpio/tegra-gpio.h | 68
->>> +++++++++++++++++------------------
->>>   1 file changed, 34 insertions(+), 34 deletions(-)
->>
->>
->> It's not clear to me where this should be applied. This is technically
->> part of the GPIO controller bindings, in which case it'd need to go via
->> the GPIO tree. I'm fine with taking it through the Tegra tree, too, but
->> in case you agree that it should go through the GPIO tree:
->>
->> Acked-by: Thierry Reding <treding@nvidia.com>
+Hi Simon,
+
+On Mon, Apr 11, 2016 at 3:52 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 >
-> I typically consider bindings part of the SoC code-base they related to, so
-> I'd imagine this going through the Tegra tree. I didn't Cc LinusW on the
-> patch because of that thinking and oversight, but have done so now just in
-> case he feels strongly.
+> Please consider these Renesas ARM based SoC fixes for v4.6.
+>
+>
+> Allow serial to work once again on the Porter board (Revision B) which
+> does not have the oscillator in question mounted.
 
-No strong opinion, only time I care is when we merge a new driver
-and it #includes <dt-bindings/...>.
+Have you tested this on Porter?
 
-Take it through the tegra tree.
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+I believe there's another change to be made for this revert to actually work,
+cfr. "[PATCH] ARM: dts: r8a7791: Don't disable referenced optional clocks"
+(https://lkml.org/lkml/2016/4/6/350)
 
-Yours,
-Linus Walleij
+> The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+>
+>   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes-for-v4.6
+>
+> for you to fetch changes up to e885767418bff0c591cc1e45babdd25d91b4a795:
+>
+>   Revert "ARM: dts: porter: Enable SCIF_CLK frequency and pins" (2016-04-08 15:56:28 +0900)
+>
+> ----------------------------------------------------------------
+> Renesas ARM Based SoC Fixes for v4.6
+>
+> * Revert "ARM: dts: porter: Enable SCIF_CLK frequency and pins"
+>
+> ----------------------------------------------------------------
+> Sjoerd Simons (1):
+>       Revert "ARM: dts: porter: Enable SCIF_CLK frequency and pins"
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
