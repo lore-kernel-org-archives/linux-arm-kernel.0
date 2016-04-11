@@ -1,54 +1,24 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Mon, 11 Apr 2016 13:10:22 +0300
-Subject: [PATCH] ARM: mach-imx: sdhci-esdhc-imx: initialize DMA mask
-In-Reply-To: <20160411083510.GN10108@pengutronix.de>
-References: <1460362846-2906-1-git-send-email-akurz@blala.de>
- <20160411083510.GN10108@pengutronix.de>
-Message-ID: <570B780E.7090801@intel.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 11 Apr 2016 15:59:29 +0530
+Subject: [PATCH] ARM: davinci_all_defconfig: enable CONFIG_FHANDLE
+In-Reply-To: <7h37qvn4v5.fsf@baylibre.com>
+References: <1460023562-7907-1-git-send-email-nsekhar@ti.com>
+ <7h37qvn4v5.fsf@baylibre.com>
+Message-ID: <570B7C89.9030200@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/16 11:35, Uwe Kleine-K?nig wrote:
-> Hello,
+On Saturday 09 April 2016 03:24 AM, Kevin Hilman wrote:
+> Sekhar Nori <nsekhar@ti.com> writes:
 > 
-> I added the people involved in 7b91369b4655 to Cc.
+>> CONFIG_FHANDLE is required by systemd, which is the
+>> default init system in more and more distributions.
 > 
-> On Mon, Apr 11, 2016 at 10:20:46AM +0200, Alexander Kurz wrote:
->> With commit 7b91369b DMA access got disabled for device drivers with zero
+> There's a bunch more options required for basic systemd support also[1],
+> so those should probably be added with the changelog referencing the
+> source[1]
 
-Is that because dma_set_mask_and_coherent() fails?
+Good point. Will send a v2.
 
-> 
-> Please reference commits like:
-> 
-> 	With commit 7b91369b4655 ("mmc: sdhci: Set DMA mask when adding
-> 	host") DMA access ...
-> 
-> 
->> DMA mask property. sdhci-esdhc-imx got blocked from DMA access by this.
->> Hence: initialize the dma mask to enable access again.
->>
->> Signed-off-by: Alexander Kurz <akurz@blala.de>
->> ---
->>  arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c | 5 +++--
->>  1 file changed, 3 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c b/arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c
->> index a5edd7d..3d039ef 100644
->> --- a/arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c
->> +++ b/arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c
->> @@ -71,6 +71,7 @@ struct platform_device *__init imx_add_sdhci_esdhc_imx(
->>  	if (!pdata)
->>  		pdata = &default_esdhc_pdata;
->>  
->> -	return imx_add_platform_device(data->devid, data->id, res,
->> -			ARRAY_SIZE(res), pdata, sizeof(*pdata));
->> +	return imx_add_platform_device_dmamask(data->devid, data->id, res,
->> +			ARRAY_SIZE(res), pdata, sizeof(*pdata),
->> +			DMA_BIT_MASK(32));
->>  }
->> -- 
->> 2.1.4
->>
->>
-> 
+Regards,
+Sekhar
