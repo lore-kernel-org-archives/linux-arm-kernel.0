@@ -1,58 +1,85 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon, 11 Apr 2016 16:39:00 -0700
-Subject: [GIT PULL] ARM: Amlogic: DT fix for v4.6-rc
-In-Reply-To: <CAOQ7t2aKppmQ0_ue_su6vdYtDbneObHdc0A_4Y=na6DmvweHZQ@mail.gmail.com>
- (Carlo Caione's message of "Sun, 10 Apr 2016 18:24:31 +0200")
-References: <CAOQ7t2arscn+pe4FpgzEL26rt3HtoMBP2ndSMvGQtqnDuU4pEg@mail.gmail.com>
- <7hvb3rlm47.fsf@baylibre.com> <570A24E4.6090109@suse.de>
- <CAOQ7t2aKppmQ0_ue_su6vdYtDbneObHdc0A_4Y=na6DmvweHZQ@mail.gmail.com>
-Message-ID: <7h7fg3k963.fsf@baylibre.com>
+From: roy.lists@gmail.com (Roy Franz)
+Date: Mon, 11 Apr 2016 16:53:56 -0700
+Subject: [PATCH] arm64: acpi: add a Kconfig option to prefer ACPI boot
+ over DT
+In-Reply-To: <20160411120134.GA6724@xora-mmax.xora.org.uk>
+References: <1460373568-4374-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20160411120134.GA6724@xora-mmax.xora.org.uk>
+Message-ID: <CAK-u0Q=Z4FDPhitnw5qOQLbvwgwZDyqU5SFT8SEkf=dd=OMUJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Carlo Caione <carlo@caione.org> writes:
-
-> On Sun, Apr 10, 2016 at 12:03 PM, Andreas F?rber <afaerber@suse.de> wrote:
->> Am 09.04.2016 um 01:24 schrieb Kevin Hilman:
->>> Carlo Caione <carlo@caione.org> writes:
->>>
->>>> This is a fix for v4.6-rc since the Meson8 / Meson8b platforms are
->>>> currently broken.
->>>>
->>>> The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
->>>>
->>>>   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
->>>>
->>>> are available in the git repository at:
->>>>
->>>>   https://github.com/carlocaione/linux-meson tags/meson8-dt-fix
->>>>
->>>> for you to fetch changes up to 11ca873574c2314de9f0cf1adf8b3be88e4e19ae:
->>>>
->>>>   documentation: Fix pinctrl documentation for Meson8 / Meson8b
->>>> (2016-03-30 19:51:57 +0200)
->>>>
->>>> ----------------------------------------------------------------
->>>> With http://www.spinics.net/lists/devicetree/msg116771.html we split / refactor
->>>> the pinctrl driver to have two different pinctrl devices for each bus on the
->>>> Amlogic Meson8 / Meson8b SoCs.
->>>> These are the missing patches for documentation and DT that weren't pulled into
->>>> mainline with the driver changes.
->>>>
->>>> ----------------------------------------------------------------
->>>
->>> Strictly speaking, these aren't just documentation patches.  The missing
->>> .dtsi changes were what was causing boot breakage.
+On Mon, Apr 11, 2016 at 5:01 AM, Graeme Gregory
+<graeme.gregory@linaro.org> wrote:
+> On Mon, Apr 11, 2016 at 01:19:28PM +0200, Ard Biesheuvel wrote:
+>> If both ACPI and DT platform descriptions are available, and the
+>> kernel was configured at build time to support both flavours, the
+>> default policy in absence of a acpi=[off|force] kernel command line
+>> parameter is to prefer DT over ACPI.
 >>
->> The above tag says "documentation and DT" and the subject says "DT fix"?
+>> This adds an option to invert that default policy, and prefer ACPI
+>> over DT instead. Note that this policy is still superseded by the
+>> value of the acpi= command line parameter.
+>>
 >
-> Yeah, I hoped that the PR message would have been enough.
+> Looks sane to me
+>
+> Reviewed-by: Graeme Gregory <graeme.gregory@linaro.org>
+>
+> G
+>
+Reviewed-by: Roy Franz <roy.franz@hpe.com>
 
-The message in the signed tag goes into the git history, so that is the
-part that is important to get correct.
 
-This was just a minor nit, and I merged it anyways since I was able to
-use my super detective skills and figure it out.  I just wanted to point
-it out for future reference.
-
-Kevin
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  arch/arm64/Kconfig       | 13 +++++++++++++
+>>  arch/arm64/kernel/acpi.c |  3 ++-
+>>  2 files changed, 15 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index 4f436220384f..f3aef40ad0ac 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -918,6 +918,19 @@ config DMI
+>>         However, even with this option, the resultant kernel should
+>>         continue to boot on existing non-UEFI platforms.
+>>
+>> +config PREFER_ACPI_OVER_DT
+>> +     bool "Prefer booting via ACPI if both ACPI and DT are available"
+>> +     depends on ACPI
+>> +     help
+>> +       If both ACPI and DT platform descriptions are available, and the
+>> +       kernel was configured at build time to support both flavours, the
+>> +       default policy in absence of a acpi=[off|force] kernel command line
+>> +       parameter is to prefer DT over ACPI.
+>> +
+>> +       This option inverts that default policy, by preferring ACPI over DT
+>> +       instead. Note that this default policy is still superseded by the
+>> +       value of the acpi= command line parameter.
+>> +
+>>  endmenu
+>>
+>>  menu "Userspace binary formats"
+>> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+>> index d1ce8e2f98b9..50ac056fb1fd 100644
+>> --- a/arch/arm64/kernel/acpi.c
+>> +++ b/arch/arm64/kernel/acpi.c
+>> @@ -188,7 +188,8 @@ void __init acpi_boot_table_init(void)
+>>        *   and ACPI has not been force enabled (acpi=force)
+>>        */
+>>       if (param_acpi_off ||
+>> -         (!param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
+>> +         (!IS_ENABLED(CONFIG_PREFER_ACPI_OVER_DT) &&
+>> +          !param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
+>>               return;
+>>
+>>       /*
+>> --
+>> 2.5.0
+>>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
