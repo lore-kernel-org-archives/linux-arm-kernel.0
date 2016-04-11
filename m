@@ -1,50 +1,38 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 11 Apr 2016 10:40:13 -0500
-Subject: [PATCH v8 02/20] PM / devfreq: exynos: Add documentation for
- generic exynos bus frequency driver
-In-Reply-To: <1460089509-16260-3-git-send-email-cw00.choi@samsung.com>
-References: <1460089509-16260-1-git-send-email-cw00.choi@samsung.com>
- <1460089509-16260-3-git-send-email-cw00.choi@samsung.com>
-Message-ID: <20160411154012.GA24665@rob-hp-laptop>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Mon, 11 Apr 2016 16:44:36 +0100
+Subject: [PATCH] usb: host: xhci-plat: Make enum xhci_plat_type start at
+ a non zero value
+In-Reply-To: <1458917188-28452-1-git-send-email-peter.griffin@linaro.org>
+References: <1458917188-28452-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20160411154436.GA14580@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 08, 2016 at 01:24:51PM +0900, Chanwoo Choi wrote:
-> This patch adds the documentation for generic exynos bus frequency
-> driver.
-> 
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-> ---
->  .../devicetree/bindings/devfreq/exynos-bus.txt     | 95 ++++++++++++++++++++++
->  1 file changed, 95 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/devfreq/exynos-bus.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/devfreq/exynos-bus.txt b/Documentation/devicetree/bindings/devfreq/exynos-bus.txt
-> new file mode 100644
-> index 000000000000..78171b918e3f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/devfreq/exynos-bus.txt
-> @@ -0,0 +1,95 @@
-> +* Generic Exynos Bus frequency device
-> +
-> +The Samsung Exynos SoC has many buses for data transfer between DRAM
-> +and sub-blocks in SoC. Most Exynos SoCs share the common architecture
-> +for buses. Generally, each bus of Exynos SoC includes a source clock
-> +and a power line, which are able to change the clock frequency
-> +of the bus in runtime. To monitor the usage of each bus in runtime,
-> +the driver uses the PPMU (Platform Performance Monitoring Unit), which
-> +is able to measure the current load of sub-blocks.
-> +
-> +There are a little different composition among Exynos SoC because each Exynos
-> +SoC has different sub-blocks. Therefore, shch difference should be specified
-> +in devicetree file instead of each device driver. In result, this driver
-> +is able to support the bus frequency for all Exynos SoCs.
+Hi Mathias,
 
-I still have issues with this whole series. The DT hierarchy represents 
-buses. You are describing buses here and control of them. I would expect 
-to see some hierarchy, but there is none. What this looks like is you 
-are adding nodes based on what fits the current driver.
+On Fri, 25 Mar 2016, Peter Griffin wrote:
 
-Rob
+> Otherwise generic-xhci and xhci-platform which have no data get wrongly
+> detected as XHCI_PLAT_TYPE_MARVELL_ARMADA by xhci_plat_type_is().
+> 
+> This fixes a regression in v4.5 for STiH407 family SoC's which use the
+> synopsis dwc3 IP, whereby the disable_clk error path gets taken due to
+> wrongly being detected as XHCI_PLAT_TYPE_MARVELL_ARMADA and the hcd never
+> gets added.
+> 
+> I suspect this will also fix other dwc3 DT platforms such as Exynos,
+> although I've only tested on STih410 SoC.
+> 
+> Fixes: 4efb2f694114 ("usb: host: xhci-plat: add struct xhci_plat_priv")
+
+Can you take this 1 charcter fix for the next -rc?
+
+It fixes a regression introduced in commit 4efb2f694114 for usb3 for some
+DT platforms.
+
+Then Felipes series which re-works this code will hopefully be merged in the
+next merge window.
+
+regards,
+
+Peter.
