@@ -1,83 +1,41 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 11 Apr 2016 12:57:46 +0900
-Subject: [PATCH v9 08/20] PM / devfreq: exynos: Add the detailed correlation
- between sub-blocks and power line
+Date: Mon, 11 Apr 2016 12:57:48 +0900
+Subject: [PATCH v9 10/20] MAINTAINERS: Add samsung bus frequency driver entry
 In-Reply-To: <1460347078-15175-1-git-send-email-cw00.choi@samsung.com>
 References: <1460347078-15175-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1460347078-15175-9-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1460347078-15175-11-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the detailed corrleation between sub-blocks and power line
-for Exynos3250, Exynos4210 and Exynos4x12.
+This patch adds the 'BUS FREQUENCY DRIVER FOR SAMSUNG EXYNOS' entry to review the
+patches as maintainer. I can access the all datasheet of Exynos SoC and test it
+on some Exynos-based board. Patches will be picked up by DEVFREQ maintainer
+on devfreq git repository.
 
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Acked-by: MyungJoo Ham <myungjoo.ham@samsung.com>
 ---
- .../devicetree/bindings/devfreq/exynos-bus.txt     | 51 ++++++++++++++++++++++
- 1 file changed, 51 insertions(+)
+ MAINTAINERS | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/devfreq/exynos-bus.txt b/Documentation/devicetree/bindings/devfreq/exynos-bus.txt
-index 03f13d38f1a1..b098fa2ba5d4 100644
---- a/Documentation/devicetree/bindings/devfreq/exynos-bus.txt
-+++ b/Documentation/devicetree/bindings/devfreq/exynos-bus.txt
-@@ -53,6 +53,57 @@ Optional properties only for parent bus device:
- - exynos,voltage-tolerance: the percentage value for bus voltage tolerance
- 			which is used to calculate the max voltage.
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 1c32f8a3d6c4..4cdef4d9ba29 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -3539,6 +3539,15 @@ F:	drivers/devfreq/devfreq-event.c
+ F:	include/linux/devfreq-event.h
+ F:	Documentation/devicetree/bindings/devfreq/event/
  
-+Detailed correlation between sub-blocks and power line according to Exynos SoC:
-+- In case of Exynos3250, there are two power line as following:
-+	VDD_MIF |--- DMC
++BUS FREQUENCY DRIVER FOR SAMSUNG EXYNOS
++M:	Chanwoo Choi <cw00.choi@samsung.com>
++L:	linux-pm at vger.kernel.org
++L:	linux-samsung-soc at vger.kernel.org
++T:	git git://git.kernel.org/pub/scm/linux/kernel/git/mzx/devfreq.git
++S:	Maintained
++F:	drivers/devfreq/exynos-bus.c
++F:	Documentation/devicetree/bindings/devfreq/exynos-bus.txt
 +
-+	VDD_INT |--- LEFTBUS (parent device)
-+		|--- PERIL
-+		|--- MFC
-+		|--- G3D
-+		|--- RIGHTBUS
-+		|--- PERIR
-+		|--- FSYS
-+		|--- LCD0
-+		|--- PERIR
-+		|--- ISP
-+		|--- CAM
-+
-+- In case of Exynos4210, there is one power line as following:
-+	VDD_INT |--- DMC (parent device)
-+		|--- LEFTBUS
-+		|--- PERIL
-+		|--- MFC(L)
-+		|--- G3D
-+		|--- TV
-+		|--- LCD0
-+		|--- RIGHTBUS
-+		|--- PERIR
-+		|--- MFC(R)
-+		|--- CAM
-+		|--- FSYS
-+		|--- GPS
-+		|--- LCD0
-+		|--- LCD1
-+
-+- In case of Exynos4x12, there are two power line as following:
-+	VDD_MIF |--- DMC
-+
-+	VDD_INT |--- LEFTBUS (parent device)
-+		|--- PERIL
-+		|--- MFC(L)
-+		|--- G3D
-+		|--- TV
-+		|--- IMAGE
-+		|--- RIGHTBUS
-+		|--- PERIR
-+		|--- MFC(R)
-+		|--- CAM
-+		|--- FSYS
-+		|--- GPS
-+		|--- LCD0
-+		|--- ISP
-+
- Example1:
- 	Show the AXI buses of Exynos3250 SoC. Exynos3250 divides the buses to
- 	power line (regulator). The MIF (Memory Interface) AXI bus is used to
+ DEVICE NUMBER REGISTRY
+ M:	Torben Mathiasen <device@lanana.org>
+ W:	http://lanana.org/docs/device-list/index.html
 -- 
 1.9.1
