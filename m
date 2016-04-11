@@ -1,127 +1,140 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Mon, 11 Apr 2016 09:15:46 +0800
-Subject: [PATCH 1/2] drm/rockchip: vop: Do check if an update is pending
- during disable
-In-Reply-To: <CAAObsKAeAjUP1retiZqo5geOK2OkVjKvSB6g6nvGTh_rdNiFJQ@mail.gmail.com>
-References: <1459937686-9142-1-git-send-email-tomeu.vizoso@collabora.com>
- <5707043D.6060706@rock-chips.com>
- <CAAObsKAeAjUP1retiZqo5geOK2OkVjKvSB6g6nvGTh_rdNiFJQ@mail.gmail.com>
-Message-ID: <570AFAC2.8080907@rock-chips.com>
+From: sugar.zhang@rock-chips.com (sugar)
+Date: Mon, 11 Apr 2016 09:18:40 +0800
+Subject: [PATCH] ASoC: rockchip: i2s: configure the sdio pins' iomux mode
+In-Reply-To: <3304388.ZeDefZvcUO@phil>
+References: <1459931902-77324-1-git-send-email-sugar.zhang@rock-chips.com>
+ <3304388.ZeDefZvcUO@phil>
+Message-ID: <570AFB70.8040003@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016?04?08? 18:54, Tomeu Vizoso wrote:
-> On 8 April 2016 at 03:07, Mark yao <mark.yao@rock-chips.com> wrote:
->> On 2016?04?06? 18:14, Tomeu Vizoso wrote:
+Hi Heiko,
+
+Got it, thanks for your advice, these will be done in next version.
+
+On 4/9/2016 01:14, Heiko Stuebner Wrote:
+> Hi,
+>
+> Am Mittwoch, 6. April 2016, 16:38:22 schrieb Sugar Zhang:
+>> There are 3 i2s sdio pins, which iomux mode is as follows:
 >>
->> When a plane is being disabled but it's still enabled, do check if the
->> previous update has been completed by reading yrgb_mst back.
+>>   - sdi3_sdo1
+>>   - sdi2_sdo2
+>>   - sdi1_sdo3
 >>
->> Otherwise, pending pageflips would remain pending after a CRTC is
->> disabled.
+>> we need to configure these pins' iomux mode via the GRF register
+>> when use multi channel playback/capture.
 >>
->> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>> Signed-off-by: Sugar Zhang <sugar.zhang@rock-chips.com>
 >> ---
->>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 5 +++--
->>   1 file changed, 3 insertions(+), 2 deletions(-)
 >>
->> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->> b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->> index a9b1e8b5ac85..f46b1fd1887b 100644
->> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->> @@ -1064,8 +1064,9 @@ static bool vop_win_pending_is_complete(struct vop_win
->> *vop_win)
->>    struct vop_plane_state *state = to_vop_plane_state(plane->state);
->>    dma_addr_t yrgb_mst;
+>>   .../devicetree/bindings/sound/rockchip-i2s.txt     |  5 +++
+>>   sound/soc/rockchip/rockchip_i2s.c                  | 39
+>> +++++++++++++++++++++- sound/soc/rockchip/rockchip_i2s.h
+>> |  8 +++++
+>>   3 files changed, 51 insertions(+), 1 deletion(-)
 >>
->> - if (!state->enable)
->> - return VOP_WIN_GET(vop_win->vop, vop_win->data, enable) == 0;
->> + if (!state->enable &&
->> +    VOP_WIN_GET(vop_win->vop, vop_win->data, enable) == 0)
->> + return true;
+>> diff --git a/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
+>> b/Documentation/devicetree/bindings/sound/rockchip-i2s.txt index
+>> 6e86d8a..ad72a7d 100644
+>> --- a/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
+>> +++ b/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
+>> @@ -23,6 +23,11 @@ Required properties:
+>>   - rockchip,playback-channels: max playback channels, if not set, 8
+>> channels default. - rockchip,capture-channels: max capture channels, if
+>> not set, 2 channels default.
 >>
->>
->> It is wrong, the patch would cause a bug.
->>
->> when state->enable is 0, check yrgb_mst == state->yrgb_mst always be true,
->> because state->yrgb_mst not update on plane disabled funtion, that would
->> cause iommu crash.
-> Sorry, but I don't understand where's the bug and what could cause
-> that crash. What the existing code was doing is saying that a pageflip
-> event is still pending if we have told the plane to disable but for
-> some reason it hasn't yet.
+>> +Required properties for controller which support multi channels
+>> playback/capture: +
+>> +- rockchip,grf: Should be phandle/offset pair. the phandle of the syscon
+>> node for GRF register, +  and the offset of the GRF for control register.
 >
-> With this modification, if we read back that it's already disabled, we
-> return true as before. But if we read back that it isn't disabled yet,
-> then we still check the fb pointers and compare them.
+> I think I'd like it more to use the generic grf-binding we always use
+> everwhere else (just the phandle without any offset) and keep the actual
+> offset in the driver on a per-soc basis.
 >
-> The iommu mapping is removed when the _CRTC_ is disabled, and what
-> this series does is to wait for the pending pageflip to finish before
-> conitnuing with CRTC disablement.
-
-the iommu mapping will unmap after plane disabled, we need sure that the 
-plane really disabled before unmap, if not, the unmap may call before 
-plane really disable, vop may access unmap address, then would get iommu 
-page fault.
-
->> About pending pageflips would remain pending, can you  describe more info
->> about it? I think those pending pageflips should be ignore when CRTC is
->> disabled.
-> Well, right now in rockchip-drm pending pageflips won't be ignored
-> when a CRTC is disabled, but will be delivered when it's re-enabled.
+> That way rockchip,grf stays consistent over all users.
 >
-> If they would be to be ignored (understanding that as dropped), that
-> would require modifications to clients so they keep track of which fbs
-> were used in a particular crtc and destroy them when the crtc is
-> disabled, but that would be incorrect when using the i915 DRM driver
-> (I also assume others do the same). Given that the pageflip ioctl
-> isn't driver-specific, I think there cannot be such a difference in
-> behavior between drivers.
+> We already have the per-soc compatible values, so it should a easy to add a
+> .data element with the necessary offset-information.
 >
-> With the current behavior (pending pageflip events being delayed until
-> the CRTC is enabled again), compositors and other clients will be
-> holding on to the fb in the pending pageflip until an arbitrary point
-> in the future that may not ever come. To me that sounds like a serious
-> modification of the assumptions on fb lifecycle that might not be
-> warranted.
+>> +
+>>   Example for rk3288 I2S controller:
+>>
+>>   i2s at ff890000 {
+>> diff --git a/sound/soc/rockchip/rockchip_i2s.c
+>> b/sound/soc/rockchip/rockchip_i2s.c index 2f8e204..bc72780 100644
+>> --- a/sound/soc/rockchip/rockchip_i2s.c
+>> +++ b/sound/soc/rockchip/rockchip_i2s.c
 >
-> So in summary, even if I haven't found any explicit documentation on
-> this, I think the ABI is that any pending pageflips are to be
-> delivered when that CRTC is being disabled and not later.
-
-on drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-
-drm_atomic_helper_commit_planes(dev, state, true);
-rockchip_atomic_wait_for_complete(dev, state);
-
-We set active_only = true, I think planes can only update when crtc is 
-active. and rockchip_atomic_wait_for_complete only wait when crtc is active.
-
-Thanks.
-> Thanks,
+> [...]
 >
-> Tomeu
+>> @@ -478,6 +504,18 @@ static int rockchip_i2s_probe(struct platform_device
+>> *pdev) return -ENOMEM;
+>>   	}
+>>
+>> +	i2s->dev = &pdev->dev;
+>> +
+>> +	i2s->grf = syscon_regmap_lookup_by_phandle(node, "rockchip,grf");
+>> +	if (!IS_ERR(i2s->grf)) {
+>> +		ret = of_property_read_u32_index(node, "rockchip,grf",
+>> +						 1, &i2s->iocfg_reg);
+>> +		if (ret) {
+>> +			dev_err(&pdev->dev, "Can't get iocfg_reg offset\n");
+>> +			return ret;
+>> +		}
+>> +	}
+>> +
 >
->> Thanks.
->>
->>
->>    yrgb_mst = VOP_WIN_GET_YRGBADDR(vop_win->vop, vop_win->data);
->>
->>
->>
->> --
->> ?ark Yao
->>
->>
->> _______________________________________________
->> dri-devel mailing list
->> dri-devel at lists.freedesktop.org
->> https://lists.freedesktop.org/mailman/listinfo/dri-devel
->>
+> as said in the binding part, please use the generic grf handling and get the
+> io-offset from per-soc devicetree data in the driver itself.
 >
 >
-
-
--- 
-?ark Yao
+>>   	/* try to prepare related clocks */
+>>   	i2s->hclk = devm_clk_get(&pdev->dev, "i2s_hclk");
+>>   	if (IS_ERR(i2s->hclk)) {
+>> @@ -517,7 +555,6 @@ static int rockchip_i2s_probe(struct platform_device
+>> *pdev) i2s->capture_dma_data.addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+>> i2s->capture_dma_data.maxburst = 4;
+>>
+>> -	i2s->dev = &pdev->dev;
+>>   	dev_set_drvdata(&pdev->dev, i2s);
+>>
+>>   	pm_runtime_enable(&pdev->dev);
+>> diff --git a/sound/soc/rockchip/rockchip_i2s.h
+>> b/sound/soc/rockchip/rockchip_i2s.h index dc6e2c7..9a6aabf 100644
+>> --- a/sound/soc/rockchip/rockchip_i2s.h
+>> +++ b/sound/soc/rockchip/rockchip_i2s.h
+>> @@ -236,4 +236,12 @@ enum {
+>>   #define I2S_TXDR	(0x0024)
+>>   #define I2S_RXDR	(0x0028)
+>>
+>> +/* io direction cfg register */
+>> +#define I2S_IO_DIRECTION_SHIFT	11
+>
+> this setting is sitting in GRF_SOC_CON8 on the rk3399. That is part of the
+> very volatile register set where settings move around a lot for each soc.
+>
+> So if we're having the io-offset in per-soc data, we can easily put the
+> shift into it as well.
+>
+>> +#define I2S_IO_DIRECTION_MASK	(7 << I2S_IO_DIRECTION_SHIFT)
+>> +#define I2S_IO_8CH_OUT_2CH_IN	(0 << I2S_IO_DIRECTION_SHIFT)
+>> +#define I2S_IO_6CH_OUT_4CH_IN	(1 << I2S_IO_DIRECTION_SHIFT)
+>> +#define I2S_IO_4CH_OUT_6CH_IN	(3 << I2S_IO_DIRECTION_SHIFT)
+>> +#define I2S_IO_2CH_OUT_8CH_IN	(7 << I2S_IO_DIRECTION_SHIFT)
+>
+> Keep the settings without the shift here and do the shift dynamically with
+> the per-soc setting when changing the setting.
+>
+>
+> Thanks
+> Heiko
+>
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+>
+>
+>
