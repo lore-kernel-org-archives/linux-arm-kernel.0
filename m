@@ -1,73 +1,74 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 11 Apr 2016 16:33:22 +0300
-Subject: [PATCH v2 00/10] ARM: DTS/clk: DRA7 family: enable eDMA and audio
- updates
-In-Reply-To: <1457363857-20797-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1457363857-20797-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <570BA7A2.3080507@ti.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 11 Apr 2016 09:34:20 -0400
+Subject: [PATCH V16 0/3] dmaengine: add Qualcomm Technologies HIDMA driver
+Message-ID: <1460381663-16765-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+The Qualcomm Technologies HIDMA device has been designed
+to support virtualization technology. The driver has been
+divided into two to follow the hardware design.
 
-according to Nishanth, linux-next is broken for dra7 family:
-http://pastebin.ubuntu.com/15758542/ on x15 next-20160411
-because of the missing DT patches.
-Do you want me to resend this series w/o the hwmod patch?
+1. HIDMA Management driver
+2. HIDMA Channel driver
+
+Each HIDMA HW consists of multiple channels. These channels
+share some set of common parameters. These parameters are
+initialized by the management driver during power up.
+Same management driver is used for monitoring the execution
+of the channels. Management driver can change the performance
+behavior dynamically such as bandwidth allocation and
+prioritization in the future.
+
+The management driver is executed in host context and
+is the main management entity for all channels provided by
+the device.
+
+------------------------
+What's new
+------------------------
+- Fix tabs and spaces here and there.
+- Cleanup timeout in ISR
+
+------------------------
+Git repos
+------------------------
+QEMU Support
+https://www.codeaurora.org/cgit/quic/qemu/qemu/log/?h=v2.5.0-sriov
+
+------------------------
+History of Changes
+------------------------
+dma: qcom_hidma: add support for object hierarchy
+Changes from V15: (https://lkml.org/lkml/2016/3/11/619)
+* copyright year update
+
+dma: qcom_hidma: implement lower level hardware interface
+Changes from V15: (https://lkml.org/lkml/2016/3/11/617)
+* remove timeout in interrupt handling
+* fixed a couple of spaces and tabs
+
+dma: qcom_hidma: add debugfs hooks
+Changes from V15: (https://lkml.org/lkml/2016/3/11/616)
+* copyright year update
+
+
+Sinan Kaya (3):
+  dmaengine: qcom_hidma: implement lower level hardware interface
+  dmaengine: qcom_hidma: add debugfs hooks
+  dmaengine: qcom_hidma: add support for object hierarchy
+
+ Documentation/ABI/testing/sysfs-platform-hidma |   9 +
+ drivers/dma/qcom/Makefile                      |   2 +
+ drivers/dma/qcom/hidma.c                       |  44 +-
+ drivers/dma/qcom/hidma.h                       |  22 +-
+ drivers/dma/qcom/hidma_dbg.c                   | 219 ++++++
+ drivers/dma/qcom/hidma_ll.c                    | 900 +++++++++++++++++++++++++
+ drivers/dma/qcom/hidma_mgmt.c                  | 113 +++-
+ 7 files changed, 1293 insertions(+), 16 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-platform-hidma
+ create mode 100644 drivers/dma/qcom/hidma_dbg.c
+ create mode 100644 drivers/dma/qcom/hidma_ll.c
 
 -- 
-P?ter
-
-On 03/07/16 17:17, Peter Ujfalusi wrote:
-> Hi,
-> 
-> Changes since v1:
-> - hwmod patch for eDMA (tpcc/tptc0/tptc1) removed as it is already in linux-next
-> - mcasp hwmod changes:
->  - all module have HWMOD_OPT_CLKS_NEEDED and no HWMOD_SWSUP_SIDLE (per Paul's
->    comment)
->  - mcasp1,2: add ahclkr as opt clock since those modules have fclk, ahclkx and
->    ahclkr marked as functional clocks.
->    Same change is added to the DTS patch
-> 
-> On dra7 family we have two DMA engine available: sDMA (omap-dma) and eDMA.
-> For some peripherals the use of eDMA is better due to L3 interconnect limitation
-> when using sDMA. Such peripherals are McASP1/2/3. By switching to eDMA we can
-> enable the AFIFO which will help to avoid under or overruns in audio.
-> 
-> This set will:
-> - add the hwmod data for eDMA TPCC and TPTCs
-> - add the needed DT nodes for eDMA and the crossbar
-> - we will enable the AFIFO use for audio
-> - add hwmod data and DT nodes for all McASP ports
-> - Fix the beagle-x15's clkout2 parent setting for the codec
-> 
-> The patch set has been tested on top of linux-next.
-> 
-> Regards,
-> Peter
-> ---
-> Misael Lopez Cruz (1):
->   ARM: DTS: dra7: Use eDMA and add DAT port address for McASP3
-> 
-> Peter Ujfalusi (9):
->   ARM: DTS: dra7: Move the sDMA crossbar node under l4_cfg/scm
->   ARM: DTS: dra7: Enable eDMA
->   ARM: DTS: dra7-evm: Enable AFIFO use for McASP3
->   ARM: DTS: dra72-evm: Enable AFIFO use for McASP3
->   ARM: DTS: am57xx-beagle-x15: Move clkout2 source selection to codec
->     node
->   ARM: DTS: am57xx-beagle-x15: Enable AFIFO use for McASP3
->   ARM: clk: dra7xx: Correct mcasp8_ahclkx_mux name
->   ARM: DRA7: hwmod: Add data for McASP1/2/4/5/6/7/8
->   ARM: DTS: dra7: Add nodes for McASP1/2/4/5/6/7/8
-> 
->  arch/arm/boot/dts/am57xx-beagle-x15.dts   |   7 +-
->  arch/arm/boot/dts/dra7-evm.dts            |   2 +
->  arch/arm/boot/dts/dra7.dtsi               | 183 +++++++++++++++++++++--
->  arch/arm/boot/dts/dra72-evm.dts           |   2 +
->  arch/arm/boot/dts/dra7xx-clocks.dtsi      |   2 +-
->  arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 237 ++++++++++++++++++++++++++++++
->  drivers/clk/ti/clk-7xx.c                  |   2 +-
->  7 files changed, 421 insertions(+), 14 deletions(-)
-> 
+1.8.2.1
