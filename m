@@ -1,90 +1,48 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 11 Apr 2016 09:24:22 +0100
-Subject: [PATCH resend v2 2/9] mfd: axp20x: Add bindings for AXP809 PMIC
-In-Reply-To: <1459243352-23344-3-git-send-email-wens@csie.org>
-References: <1459243352-23344-1-git-send-email-wens@csie.org>
- <1459243352-23344-3-git-send-email-wens@csie.org>
-Message-ID: <20160411082422.GH4592@x1>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 11 Apr 2016 13:53:57 +0530
+Subject: [PATCH v3 02/16] mfd: da8xx-cfgchip: New header file for CFGCHIP
+ registers.
+In-Reply-To: <56F95EE6.1010403@cogentembedded.com>
+References: <1458863503-31121-1-git-send-email-david@lechnology.com>
+ <1458863503-31121-3-git-send-email-david@lechnology.com>
+ <56F573F3.90500@cogentembedded.com> <56F94772.7070009@lechnology.com>
+ <56F95EE6.1010403@cogentembedded.com>
+Message-ID: <570B5F1D.7030609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 29 Mar 2016, Chen-Yu Tsai wrote:
-
-> This patch adds the basic and regulator bindings for the X-Powers AXP809
-> PMIC.
+On Monday 28 March 2016 10:12 PM, Sergei Shtylyov wrote:
+> Hello.
 > 
-> Also update the DC-DC converter operating frequency for AXP22X/AXP80X.
+> On 03/28/2016 06:02 PM, David Lechner wrote:
 > 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> Acked-by: Rob Herring <robh@kernel.org>
-> ---
->  Documentation/devicetree/bindings/mfd/axp20x.txt | 31 ++++++++++++++++++++++--
->  1 file changed, 29 insertions(+), 2 deletions(-)
+>>>> +/* register offsets */
+>>>> +#define CFGCHIP_REG(n)                (n * 4)
+>>>> +#define CFGCHIP0_REG                CFGCHIP_REG(0)
+>>>> +#define CFGCHIP1_REG                CFGCHIP_REG(1)
+>>>> +#define CFGCHIP2_REG                CFGCHIP_REG(2)
+>>>> +#define CFGCHIP3_REG                CFGCHIP_REG(3)
+>>>> +#define CFGCHIP4_REG                CFGCHIP_REG(4)
+>>>
+>>>     Why not just use CFGCHIP_REG(n) directly?
+>>
+>> I considered that, but I went this way because A) the TRM uses, for
+>> example,
+>> "CFGCHIP2", so I wanted to keep "CFGCHIP" and "2" together
 
-Applied, thanks.
+IMO, this is not that big of an issue. Anyone reading should be able to
+make out that CFGCHIP_REG(0) is same as CFGCHIP0 referred to in the TRM.
 
-> diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
-> index fd39fa54571b..d20b1034e967 100644
-> --- a/Documentation/devicetree/bindings/mfd/axp20x.txt
-> +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
-> @@ -6,10 +6,11 @@ axp202 (X-Powers)
->  axp209 (X-Powers)
->  axp221 (X-Powers)
->  axp223 (X-Powers)
-> +axp809 (X-Powers)
->  
->  Required properties:
->  - compatible: "x-powers,axp152", "x-powers,axp202", "x-powers,axp209",
-> -	      "x-powers,axp221", "x-powers,axp223"
-> +	      "x-powers,axp221", "x-powers,axp223", "x-powers,axp809"
->  - reg: The I2C slave address or RSB hardware address for the AXP chip
->  - interrupt-parent: The parent interrupt controller
->  - interrupts: SoC NMI / GPIO interrupt connected to the PMIC's IRQ pin
-> @@ -18,7 +19,9 @@ Required properties:
->  
->  Optional properties:
->  - x-powers,dcdc-freq: defines the work frequency of DC-DC in KHz
-> -		      (range: 750-1875). Default: 1.5MHz
-> +		      AXP152/20X: range:  750-1875, Default: 1.5 MHz
-> +		      AXP22X/80X: range: 1800-4050, Default: 3   MHz
-> +
->  - <input>-supply: a phandle to the regulator supply node. May be omitted if
->  		  inputs are unregulated, such as using the IPSOUT output
->  		  from the PMIC.
-> @@ -77,6 +80,30 @@ LDO_IO0		: LDO		: ips-supply		: GPIO 0
->  LDO_IO1		: LDO		: ips-supply		: GPIO 1
->  RTC_LDO		: LDO		: ips-supply		: always on
->  
-> +AXP809 regulators, type, and corresponding input supply names:
-> +
-> +Regulator	  Type		  Supply Name		  Notes
-> +---------	  ----		  -----------		  -----
-> +DCDC1		: DC-DC buck	: vin1-supply
-> +DCDC2		: DC-DC buck	: vin2-supply
-> +DCDC3		: DC-DC	buck	: vin3-supply
-> +DCDC4		: DC-DC	buck	: vin4-supply
-> +DCDC5		: DC-DC	buck	: vin5-supply
-> +DC1SW		: On/Off Switch	:			: DCDC1 secondary output
-> +DC5LDO		: LDO		:			: input from DCDC5
-> +ALDO1		: LDO		: aldoin-supply		: shared supply
-> +ALDO2		: LDO		: aldoin-supply		: shared supply
-> +ALDO3		: LDO		: aldoin-supply		: shared supply
-> +DLDO1		: LDO		: dldoin-supply		: shared supply
-> +DLDO2		: LDO		: dldoin-supply		: shared supply
-> +ELDO1		: LDO		: eldoin-supply		: shared supply
-> +ELDO2		: LDO		: eldoin-supply		: shared supply
-> +ELDO3		: LDO		: eldoin-supply		: shared supply
-> +LDO_IO0		: LDO		: ips-supply		: GPIO 0
-> +LDO_IO1		: LDO		: ips-supply		: GPIO 1
-> +RTC_LDO		: LDO		: ips-supply		: always on
-> +SW		: On/Off Switch : swin-supply
-> +
->  Example:
->  
->  axp209: pmic at 34 {
+> 
+>    I'd just drop the _REG suffix.
+> 
+>> and B) this tells
+>> you how many CFGCHIP registers there are, i.e. there is no CFGCHIP5_REG.
+> 
+>    You can tell that in a comment. Having a parametrized macro and using
+> it to just #define more macros doesn't appeal to me at all...
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Agree with Sergei, I don't prefer the additional #defines as well.
+
+Regards,
+Sekhar
