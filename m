@@ -1,58 +1,69 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Mon, 11 Apr 2016 10:50:31 -0400
-Subject: [PATCH next v2 2/2] PCI: keystone: remove unnecessary goto statement
-In-Reply-To: <1460386231-8377-1-git-send-email-m-karicheri2@ti.com>
-References: <1460386231-8377-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1460386231-8377-2-git-send-email-m-karicheri2@ti.com>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Mon, 11 Apr 2016 17:58:36 +0300
+Subject: [PATCH v1 2/2] amba: Propagate match errors to the driver core
+In-Reply-To: <1460386716-23262-1-git-send-email-georgi.djakov@linaro.org>
+References: <1460386716-23262-1-git-send-email-georgi.djakov@linaro.org>
+Message-ID: <1460386716-23262-2-git-send-email-georgi.djakov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the misuse of goto statement in ks_pcie_get_irq_controller_info()
-as simple return is more appropriate for this function. While at
-it add an error log for absence of interrupt controller node.
+Currently, when we scan the bus for matching devices, we assume that
+the clock controller is probed and available, but that might be not
+always true. If the bus clock is unavailable, we just silently fail
+to detect devices.
 
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Kumar Gala <galak@codeaurora.org>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
+Handle this by propagating the errors up to the driver core, so that
+it can retry the scan later.
 
+Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
 ---
- v2 - removed an unnecessary extra line added in the previous version
- v1 - same as before initial version
- drivers/pci/host/pci-keystone.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+ drivers/amba/bus.c |   17 ++++++++++++++---
+ 1 file changed, 14 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
-index 299f2f0..0234828 100644
---- a/drivers/pci/host/pci-keystone.c
-+++ b/drivers/pci/host/pci-keystone.c
-@@ -181,11 +181,13 @@ static int ks_pcie_get_irq_controller_info(struct keystone_pcie *ks_pcie,
- 	*np_temp = of_find_node_by_name(np_pcie, controller);
- 	if (!(*np_temp)) {
- 		dev_err(dev, "Node for %s is absent\n", controller);
--		goto out;
-+		return ret;
- 	}
- 	temp = of_irq_count(*np_temp);
--	if (!temp)
--		goto out;
-+	if (!temp) {
-+		dev_err(dev, "No entries in %s\n", controller);
-+		return ret;
-+	}
- 	if (temp > max_host_irqs)
- 		dev_warn(dev, "Too many %s interrupts defined %u\n",
- 			(legacy ? "legacy" : "MSI"), temp);
-@@ -203,7 +205,6 @@ static int ks_pcie_get_irq_controller_info(struct keystone_pcie *ks_pcie,
- 		*num_irqs = temp;
- 		ret = 0;
- 	}
--out:
- 	return ret;
+diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
+index a32a43dbaccc..0d9a342a73f8 100644
+--- a/drivers/amba/bus.c
++++ b/drivers/amba/bus.c
+@@ -86,15 +86,21 @@ static int amba_read_periphid(struct amba_device *adev)
+ 
+ 	iounmap(tmp);
+ 
++	if (r < 0)
++		return r;
++
+ 	return adev->periphid ? 0 : -ENODEV;
  }
  
--- 
-1.9.1
+ static const struct amba_id *
+ amba_lookup(const struct amba_id *table, struct amba_device *dev)
+ {
+-	int ret = 0;
++	int ret;
+ 
+-	if (amba_read_periphid(dev))
++	ret = amba_read_periphid(dev);
++	if (ret < 0)
++		return ERR_PTR(ret);
++	if (ret)
+ 		return NULL;
+ 
+ 	while (table->mask) {
+@@ -111,12 +117,17 @@ static int amba_match(struct device *dev, struct device_driver *drv)
+ {
+ 	struct amba_device *pcdev = to_amba_device(dev);
+ 	struct amba_driver *pcdrv = to_amba_driver(drv);
++	const struct amba_id *id;
+ 
+ 	/* When driver_override is set, only bind to the matching driver */
+ 	if (pcdev->driver_override)
+ 		return !strcmp(pcdev->driver_override, drv->name);
+ 
+-	return amba_lookup(pcdrv->id_table, pcdev) != NULL;
++	id = amba_lookup(pcdrv->id_table, pcdev);
++	if (IS_ERR(id))
++		return PTR_ERR(id);
++
++	return id != NULL;
+ }
+ 
+ static int amba_uevent(struct device *dev, struct kobj_uevent_env *env)
