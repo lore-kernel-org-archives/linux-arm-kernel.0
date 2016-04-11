@@ -1,53 +1,63 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 11 Apr 2016 09:52:27 -0600
-Subject: [PATCH 4/4] irqchip: bcm2836: Use a more generic memory barrier
- call
-In-Reply-To: <878u0l1fj0.fsf@eliezer.anholt.net>
-References: <1459827858-3871-1-git-send-email-eric@anholt.net>
- <1459827858-3871-5-git-send-email-eric@anholt.net>
- <570497C7.10501@wwwdotorg.org> <87a8l40xox.fsf@eliezer.anholt.net>
- <5708927E.9030406@wwwdotorg.org> <878u0l1fj0.fsf@eliezer.anholt.net>
-Message-ID: <570BC83B.4020106@wwwdotorg.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 11 Apr 2016 17:56:51 +0200
+Subject: [PATCH 2/2] pci: host: new driver for Marvell Armada 7K/8K PCIe
+ controller
+In-Reply-To: <20160327140348.GA19498@lunn.ch>
+References: <1459071058-18328-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1459071058-18328-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160327140348.GA19498@lunn.ch>
+Message-ID: <20160411175651.5f32a990@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/10/2016 12:32 PM, Eric Anholt wrote:
-> Stephen Warren <swarren@wwwdotorg.org> writes:
->
->> On 04/08/2016 12:20 PM, Eric Anholt wrote:
->>> Stephen Warren <swarren@wwwdotorg.org> writes:
->>>
->>>> On 04/04/2016 09:44 PM, Eric Anholt wrote:
->>>>> dsb() requires an argument on arm64, so we needed to add "sy".
->>>>> Instead, take this opportunity to switch to the same smp_wmb() call
->>>>> that gic uses for its IPIs.  This is a less strong barrier than we
->>>>> were doing before (dmb(ishst) compared to dsb(sy)), but it seems to be
->>>>> the correct one.
->>>>
->>>> I assume all MMIO is part of the ish domain?
->>>>
->>>> If so, the series,
->>>> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
->>>
->>> I don't know if this barrier implies ordering all the way out to AXI on
->>> this HW, but I don't think that's a requirement of this function.
->>
->> My understanding was that the barrier was explicitly to work around a
->> bug in the bus fabric of the SoC, and hence the barrier very much does
->> have to affect the transaction all the way out to AXI. Re-reading
->> BCM2835-ARM-Peripherals.pdf section 1.3 "Peripheral access precautions
->> for correct memory ordering" seems to confirm this.
->
-> My understanding of the explicit barrier here, which was copied from
-> other irqchips, is "Make sure that normal memory writes before our IPI
-> on this CPU appear on the other CPUs before they get the IPI" (like the
-> comment says).  This barrier was not put in to deal with the
-> 283x-specific weird AXI behavior.
->
-> Note that we had previously decided that the weird AXI ordering
-> behavior, which is about repeated reads or repeated writes from the same
-> CPU across different peripherals, is already covered by the barriers
-> present in readl() and writel().  The writel() barrier happens to be a
-> dsb() as well, so this explicit barrier is actually redundant.
+Hello,
 
-Ah OK. In that case, the change seems fine.
+On Sun, 27 Mar 2016 16:03:48 +0200, Andrew Lunn wrote:
+> > +static irqreturn_t armada8k_pcie_irq_handler(int irq, void *arg)
+> > +{
+> > +	struct pcie_port *pp = arg;
+> > +	struct armada8k_pcie *pcie = to_armada8k_pcie(pp);
+> > +	void __iomem *base = pcie->base;
+> > +	u32 val;
+> > +
+> > +	val = readl(base + PCIE_GLOBAL_INT_CAUSE1_REG);
+> > +	writel(val, base + PCIE_GLOBAL_INT_CAUSE1_REG);
+> > +
+> > +	return IRQ_HANDLED;
+> 
+> Maybe a comment as to why you are just throwing them away.
+
+I'll have a look into this.
+
+> > +static int armada8k_pcie_probe(struct platform_device *pdev)
+> > +{
+> > +	struct armada8k_pcie *pcie;
+> > +	struct pcie_port *pp;
+> > +	struct device *dev = &pdev->dev;
+> > +	struct resource *base;
+> > +	int ret;
+> > +
+> > +	pcie = devm_kzalloc(dev, sizeof(*pcie), GFP_KERNEL);
+> > +	if (!pcie)
+> > +		return -ENOMEM;
+> > +
+> > +	pcie->main_clk = devm_clk_get(dev, "main");
+> > +	if (!IS_ERR(pcie->main_clk))
+> > +		clk_prepare_enable(pcie->main_clk);
+> > +
+> > +	pcie->lane_clk = devm_clk_get(dev, "port");
+> > +	if (!IS_ERR(pcie->lane_clk))
+> > +		clk_prepare_enable(pcie->lane_clk);
+> 
+> Any need to handle -EPRODE_DEFERED here?
+
+Is this needed? The clocks are registered in of_clk_init(), i.e at
+time_init() time. This is way before the device drivers get probed, no?
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
