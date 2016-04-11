@@ -1,251 +1,320 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 11 Apr 2016 13:12:26 +0530
-Subject: [RESPIN v2 4/6] ARM: EXYNOS: Remove SROM related register settings
- from mach-exynos
+Date: Mon, 11 Apr 2016 13:12:24 +0530
+Subject: [RESPIN v2 2/6] memory: Add support for Exynos SROM driver
 In-Reply-To: <1460360548-32127-1-git-send-email-pankaj.dubey@samsung.com>
 References: <1460360548-32127-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1460360548-32127-5-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <1460360548-32127-3-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As now we have dedicated driver for SROM controller, it will take care
-of saving register banks during S2R so we can safely remove these
-settings from mach-exynos.
+This patch adds Exynos SROM controller driver which will handle
+save restore of SROM registers during S2R.
 
 Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+[p.fedin at samsung.com: tested on SMDK5410]
+Tested-by: Pavel Fedin <p.fedin@samsung.com>
 Signed-off-by: Kukjin Kim <kgene@kernel.org>
-[k.kozlowski: Need to select also SAMSUNG_MC]
+[k.kozlowski: Minor COMPILE_TEST adjustments in Kconfig entries]
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- arch/arm/mach-exynos/Kconfig                 |  3 ++
- arch/arm/mach-exynos/exynos.c                | 17 ---------
- arch/arm/mach-exynos/include/mach/map.h      |  3 --
- arch/arm/mach-exynos/regs-srom.h             | 53 ----------------------------
- arch/arm/mach-exynos/suspend.c               | 20 ++---------
- arch/arm/plat-samsung/include/plat/map-s5p.h |  1 -
- 6 files changed, 5 insertions(+), 92 deletions(-)
- delete mode 100644 arch/arm/mach-exynos/regs-srom.h
+ drivers/memory/Kconfig               |   1 +
+ drivers/memory/Makefile              |   1 +
+ drivers/memory/samsung/Kconfig       |  13 +++
+ drivers/memory/samsung/Makefile      |   1 +
+ drivers/memory/samsung/exynos-srom.c | 175 +++++++++++++++++++++++++++++++++++
+ drivers/memory/samsung/exynos-srom.h |  51 ++++++++++
+ 6 files changed, 242 insertions(+)
+ create mode 100644 drivers/memory/samsung/Kconfig
+ create mode 100644 drivers/memory/samsung/Makefile
+ create mode 100644 drivers/memory/samsung/exynos-srom.c
+ create mode 100644 drivers/memory/samsung/exynos-srom.h
 
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index 207fa2c..28f9928 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -18,6 +18,7 @@ menuconfig ARCH_EXYNOS
- 	select COMMON_CLK_SAMSUNG
- 	select EXYNOS_THERMAL
- 	select EXYNOS_PMU
-+	select EXYNOS_SROM if PM
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_S3C2410_I2C if I2C
- 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
-@@ -26,11 +27,13 @@ menuconfig ARCH_EXYNOS
- 	select PINCTRL_EXYNOS
- 	select PM_GENERIC_DOMAINS if PM
- 	select S5P_DEV_MFC
-+	select SAMSUNG_MC
- 	select SOC_SAMSUNG
- 	select SRAM
- 	select THERMAL
- 	select THERMAL_OF
- 	select MFD_SYSCON
-+	select MEMORY
- 	select CLKSRC_EXYNOS_MCT
- 	select POWER_RESET
- 	select POWER_RESET_SYSCON
-diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index bbf51a4..f977eea 100644
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@ -31,11 +31,6 @@
+diff --git a/drivers/memory/Kconfig b/drivers/memory/Kconfig
+index 51d5cd2..c61a284 100644
+--- a/drivers/memory/Kconfig
++++ b/drivers/memory/Kconfig
+@@ -122,6 +122,7 @@ config MTK_SMI
+ 	  mainly help enable/disable iommu and control the power domain and
+ 	  clocks for each local arbiter.
  
- static struct map_desc exynos4_iodesc[] __initdata = {
- 	{
--		.virtual	= (unsigned long)S5P_VA_SROMC,
--		.pfn		= __phys_to_pfn(EXYNOS4_PA_SROMC),
--		.length		= SZ_4K,
--		.type		= MT_DEVICE,
--	}, {
- 		.virtual	= (unsigned long)S5P_VA_CMU,
- 		.pfn		= __phys_to_pfn(EXYNOS4_PA_CMU),
- 		.length		= SZ_128K,
-@@ -58,15 +53,6 @@ static struct map_desc exynos4_iodesc[] __initdata = {
- 	},
- };
++source "drivers/memory/samsung/Kconfig"
+ source "drivers/memory/tegra/Kconfig"
  
--static struct map_desc exynos5_iodesc[] __initdata = {
--	{
--		.virtual	= (unsigned long)S5P_VA_SROMC,
--		.pfn		= __phys_to_pfn(EXYNOS5_PA_SROMC),
--		.length		= SZ_4K,
--		.type		= MT_DEVICE,
--	},
--};
--
- static struct platform_device exynos_cpuidle = {
- 	.name              = "exynos_cpuidle",
- #ifdef CONFIG_ARM_EXYNOS_CPUIDLE
-@@ -138,9 +124,6 @@ static void __init exynos_map_io(void)
- {
- 	if (soc_is_exynos4())
- 		iotable_init(exynos4_iodesc, ARRAY_SIZE(exynos4_iodesc));
--
--	if (soc_is_exynos5())
--		iotable_init(exynos5_iodesc, ARRAY_SIZE(exynos5_iodesc));
- }
+ endif
+diff --git a/drivers/memory/Makefile b/drivers/memory/Makefile
+index 890bdf4..cb0b7a1 100644
+--- a/drivers/memory/Makefile
++++ b/drivers/memory/Makefile
+@@ -17,4 +17,5 @@ obj-$(CONFIG_TEGRA20_MC)	+= tegra20-mc.o
+ obj-$(CONFIG_JZ4780_NEMC)	+= jz4780-nemc.o
+ obj-$(CONFIG_MTK_SMI)		+= mtk-smi.o
  
- static void __init exynos_init_io(void)
-diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-index c88325d..c48ba4f 100644
---- a/arch/arm/mach-exynos/include/mach/map.h
-+++ b/arch/arm/mach-exynos/include/mach/map.h
-@@ -25,7 +25,4 @@
- 
- #define EXYNOS4_PA_COREPERI		0x10500000
- 
--#define EXYNOS4_PA_SROMC		0x12570000
--#define EXYNOS5_PA_SROMC		0x12250000
--
- #endif /* __ASM_ARCH_MAP_H */
-diff --git a/arch/arm/mach-exynos/regs-srom.h b/arch/arm/mach-exynos/regs-srom.h
-deleted file mode 100644
-index 5c4d442..0000000
---- a/arch/arm/mach-exynos/regs-srom.h
-+++ /dev/null
-@@ -1,53 +0,0 @@
--/*
-- * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-- *		http://www.samsung.com
-- *
-- * S5P SROMC register definitions
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--#ifndef __PLAT_SAMSUNG_REGS_SROM_H
--#define __PLAT_SAMSUNG_REGS_SROM_H __FILE__
--
--#include <mach/map.h>
--
--#define S5P_SROMREG(x)		(S5P_VA_SROMC + (x))
--
--#define S5P_SROM_BW		S5P_SROMREG(0x0)
--#define S5P_SROM_BC0		S5P_SROMREG(0x4)
--#define S5P_SROM_BC1		S5P_SROMREG(0x8)
--#define S5P_SROM_BC2		S5P_SROMREG(0xc)
--#define S5P_SROM_BC3		S5P_SROMREG(0x10)
--#define S5P_SROM_BC4		S5P_SROMREG(0x14)
--#define S5P_SROM_BC5		S5P_SROMREG(0x18)
--
--/* one register BW holds 4 x 4-bit packed settings for NCS0 - NCS3 */
--
--#define S5P_SROM_BW__DATAWIDTH__SHIFT		0
--#define S5P_SROM_BW__ADDRMODE__SHIFT		1
--#define S5P_SROM_BW__WAITENABLE__SHIFT		2
--#define S5P_SROM_BW__BYTEENABLE__SHIFT		3
--
--#define S5P_SROM_BW__CS_MASK			0xf
--
--#define S5P_SROM_BW__NCS0__SHIFT		0
--#define S5P_SROM_BW__NCS1__SHIFT		4
--#define S5P_SROM_BW__NCS2__SHIFT		8
--#define S5P_SROM_BW__NCS3__SHIFT		12
--#define S5P_SROM_BW__NCS4__SHIFT		16
--#define S5P_SROM_BW__NCS5__SHIFT		20
--
--/* applies to same to BCS0 - BCS3 */
--
--#define S5P_SROM_BCX__PMC__SHIFT		0
--#define S5P_SROM_BCX__TACP__SHIFT		4
--#define S5P_SROM_BCX__TCAH__SHIFT		8
--#define S5P_SROM_BCX__TCOH__SHIFT		12
--#define S5P_SROM_BCX__TACC__SHIFT		16
--#define S5P_SROM_BCX__TCOS__SHIFT		24
--#define S5P_SROM_BCX__TACS__SHIFT		28
--
--#endif /* __PLAT_SAMSUNG_REGS_SROM_H */
-diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
-index fee2b00..f216909 100644
---- a/arch/arm/mach-exynos/suspend.c
-+++ b/arch/arm/mach-exynos/suspend.c
-@@ -34,10 +34,11 @@
- #include <asm/smp_scu.h>
- #include <asm/suspend.h>
- 
-+#include <mach/map.h>
++obj-$(CONFIG_SAMSUNG_MC)	+= samsung/
+ obj-$(CONFIG_TEGRA_MC)		+= tegra/
+diff --git a/drivers/memory/samsung/Kconfig b/drivers/memory/samsung/Kconfig
+new file mode 100644
+index 0000000..64ab5dd
+--- /dev/null
++++ b/drivers/memory/samsung/Kconfig
+@@ -0,0 +1,13 @@
++config SAMSUNG_MC
++	bool "Samsung Exynos Memory Controller support" if COMPILE_TEST
++	help
++	  Support for the Memory Controller (MC) devices found on
++	  Samsung Exynos SoCs.
 +
- #include <plat/pm-common.h>
- 
- #include "common.h"
--#include "regs-srom.h"
- 
- #define REG_TABLE_END (-1U)
- 
-@@ -53,15 +54,6 @@ struct exynos_wkup_irq {
- 	u32 mask;
- };
- 
--static struct sleep_save exynos_core_save[] = {
--	/* SROM side */
--	SAVE_ITEM(S5P_SROM_BW),
--	SAVE_ITEM(S5P_SROM_BC0),
--	SAVE_ITEM(S5P_SROM_BC1),
--	SAVE_ITEM(S5P_SROM_BC2),
--	SAVE_ITEM(S5P_SROM_BC3),
--};
--
- struct exynos_pm_data {
- 	const struct exynos_wkup_irq *wkup_irq;
- 	unsigned int wake_disable_mask;
-@@ -343,8 +335,6 @@ static void exynos_pm_prepare(void)
- 	/* Set wake-up mask registers */
- 	exynos_pm_set_wakeup_mask();
- 
--	s3c_pm_do_save(exynos_core_save, ARRAY_SIZE(exynos_core_save));
--
- 	exynos_pm_enter_sleep_mode();
- 
- 	/* ensure at least INFORM0 has the resume address */
-@@ -375,8 +365,6 @@ static void exynos5420_pm_prepare(void)
- 	/* Set wake-up mask registers */
- 	exynos_pm_set_wakeup_mask();
- 
--	s3c_pm_do_save(exynos_core_save, ARRAY_SIZE(exynos_core_save));
--
- 	exynos_pmu_spare3 = pmu_raw_readl(S5P_PMU_SPARE3);
- 	/*
- 	 * The cpu state needs to be saved and restored so that the
-@@ -467,8 +455,6 @@ static void exynos_pm_resume(void)
- 	/* For release retention */
- 	exynos_pm_release_retention();
- 
--	s3c_pm_do_restore_core(exynos_core_save, ARRAY_SIZE(exynos_core_save));
--
- 	if (cpuid == ARM_CPU_PART_CORTEX_A9)
- 		scu_enable(S5P_VA_SCU);
- 
-@@ -535,8 +521,6 @@ static void exynos5420_pm_resume(void)
- 
- 	pmu_raw_writel(exynos_pmu_spare3, S5P_PMU_SPARE3);
- 
--	s3c_pm_do_restore_core(exynos_core_save, ARRAY_SIZE(exynos_core_save));
--
- early_wakeup:
- 
- 	tmp = pmu_raw_readl(EXYNOS5420_SFR_AXI_CGDIS1);
-diff --git a/arch/arm/plat-samsung/include/plat/map-s5p.h b/arch/arm/plat-samsung/include/plat/map-s5p.h
-index 4ec9a70..b63aeeb 100644
---- a/arch/arm/plat-samsung/include/plat/map-s5p.h
-+++ b/arch/arm/plat-samsung/include/plat/map-s5p.h
-@@ -18,7 +18,6 @@
- 
- #define S5P_VA_DMC0		S3C_ADDR(0x02440000)
- #define S5P_VA_DMC1		S3C_ADDR(0x02480000)
--#define S5P_VA_SROMC		S3C_ADDR(0x024C0000)
- 
- #define S5P_VA_COREPERI_BASE	S3C_ADDR(0x02800000)
- #define S5P_VA_COREPERI(x)	(S5P_VA_COREPERI_BASE + (x))
++if SAMSUNG_MC
++
++config EXYNOS_SROM
++	bool "Exynos SROM controller driver" if COMPILE_TEST
++	depends on (ARM && ARCH_EXYNOS && PM) || (COMPILE_TEST && HAS_IOMEM)
++
++endif
+diff --git a/drivers/memory/samsung/Makefile b/drivers/memory/samsung/Makefile
+new file mode 100644
+index 0000000..9c554d5
+--- /dev/null
++++ b/drivers/memory/samsung/Makefile
+@@ -0,0 +1 @@
++obj-$(CONFIG_EXYNOS_SROM)	+= exynos-srom.o
+diff --git a/drivers/memory/samsung/exynos-srom.c b/drivers/memory/samsung/exynos-srom.c
+new file mode 100644
+index 0000000..68e073c
+--- /dev/null
++++ b/drivers/memory/samsung/exynos-srom.c
+@@ -0,0 +1,175 @@
++/*
++ * Copyright (c) 2015 Samsung Electronics Co., Ltd.
++ *	      http://www.samsung.com/
++ *
++ * EXYNOS - SROM Controller support
++ * Author: Pankaj Dubey <pankaj.dubey@samsung.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++
++#include "exynos-srom.h"
++
++static const unsigned long exynos_srom_offsets[] = {
++	/* SROM side */
++	EXYNOS_SROM_BW,
++	EXYNOS_SROM_BC0,
++	EXYNOS_SROM_BC1,
++	EXYNOS_SROM_BC2,
++	EXYNOS_SROM_BC3,
++};
++
++/**
++ * struct exynos_srom_reg_dump: register dump of SROM Controller registers.
++ * @offset: srom register offset from the controller base address.
++ * @value: the value of register under the offset.
++ */
++struct exynos_srom_reg_dump {
++	u32     offset;
++	u32     value;
++};
++
++/**
++ * struct exynos_srom: platform data for exynos srom controller driver.
++ * @dev: platform device pointer
++ * @reg_base: srom base address
++ * @reg_offset: exynos_srom_reg_dump pointer to hold offset and its value.
++ */
++struct exynos_srom {
++	struct device *dev;
++	void __iomem *reg_base;
++	struct exynos_srom_reg_dump *reg_offset;
++};
++
++static struct exynos_srom_reg_dump *exynos_srom_alloc_reg_dump(
++		const unsigned long *rdump,
++		unsigned long nr_rdump)
++{
++	struct exynos_srom_reg_dump *rd;
++	unsigned int i;
++
++	rd = kcalloc(nr_rdump, sizeof(*rd), GFP_KERNEL);
++	if (!rd)
++		return NULL;
++
++	for (i = 0; i < nr_rdump; ++i)
++		rd[i].offset = rdump[i];
++
++	return rd;
++}
++
++static int exynos_srom_probe(struct platform_device *pdev)
++{
++	struct device_node *np;
++	struct exynos_srom *srom;
++	struct device *dev = &pdev->dev;
++
++	np = dev->of_node;
++	if (!np) {
++		dev_err(&pdev->dev, "could not find device info\n");
++		return -EINVAL;
++	}
++
++	srom = devm_kzalloc(&pdev->dev,
++			sizeof(struct exynos_srom), GFP_KERNEL);
++	if (!srom)
++		return -ENOMEM;
++
++	srom->dev = dev;
++	srom->reg_base = of_iomap(np, 0);
++	if (!srom->reg_base) {
++		dev_err(&pdev->dev, "iomap of exynos srom controller failed\n");
++		return -ENOMEM;
++	}
++
++	platform_set_drvdata(pdev, srom);
++
++	srom->reg_offset = exynos_srom_alloc_reg_dump(exynos_srom_offsets,
++			sizeof(exynos_srom_offsets));
++	if (!srom->reg_offset) {
++		iounmap(srom->reg_base);
++		return -ENOMEM;
++	}
++
++	return 0;
++}
++
++static int exynos_srom_remove(struct platform_device *pdev)
++{
++	struct exynos_srom *srom = platform_get_drvdata(pdev);
++
++	kfree(srom->reg_offset);
++	iounmap(srom->reg_base);
++
++	return 0;
++}
++
++#ifdef CONFIG_PM_SLEEP
++static void exynos_srom_save(void __iomem *base,
++				    struct exynos_srom_reg_dump *rd,
++				    unsigned int num_regs)
++{
++	for (; num_regs > 0; --num_regs, ++rd)
++		rd->value = readl(base + rd->offset);
++}
++
++static void exynos_srom_restore(void __iomem *base,
++				      const struct exynos_srom_reg_dump *rd,
++				      unsigned int num_regs)
++{
++	for (; num_regs > 0; --num_regs, ++rd)
++		writel(rd->value, base + rd->offset);
++}
++
++static int exynos_srom_suspend(struct device *dev)
++{
++	struct exynos_srom *srom = dev_get_drvdata(dev);
++
++	exynos_srom_save(srom->reg_base, srom->reg_offset,
++				ARRAY_SIZE(exynos_srom_offsets));
++	return 0;
++}
++
++static int exynos_srom_resume(struct device *dev)
++{
++	struct exynos_srom *srom = dev_get_drvdata(dev);
++
++	exynos_srom_restore(srom->reg_base, srom->reg_offset,
++				ARRAY_SIZE(exynos_srom_offsets));
++	return 0;
++}
++#endif
++
++static const struct of_device_id of_exynos_srom_ids[] = {
++	{
++		.compatible	= "samsung,exynos4210-srom",
++	},
++	{},
++};
++MODULE_DEVICE_TABLE(of, of_exynos_srom_ids);
++
++static SIMPLE_DEV_PM_OPS(exynos_srom_pm_ops, exynos_srom_suspend, exynos_srom_resume);
++
++static struct platform_driver exynos_srom_driver = {
++	.probe = exynos_srom_probe,
++	.remove = exynos_srom_remove,
++	.driver = {
++		.name = "exynos-srom",
++		.of_match_table = of_exynos_srom_ids,
++		.pm = &exynos_srom_pm_ops,
++	},
++};
++module_platform_driver(exynos_srom_driver);
++
++MODULE_AUTHOR("Pankaj Dubey <pankaj.dubey@samsung.com>");
++MODULE_DESCRIPTION("Exynos SROM Controller Driver");
++MODULE_LICENSE("GPL");
+diff --git a/drivers/memory/samsung/exynos-srom.h b/drivers/memory/samsung/exynos-srom.h
+new file mode 100644
+index 0000000..34660c6
+--- /dev/null
++++ b/drivers/memory/samsung/exynos-srom.h
+@@ -0,0 +1,51 @@
++/*
++ * Copyright (c) 2015 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ *
++ * Exynos SROMC register definitions
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#ifndef __EXYNOS_SROM_H
++#define __EXYNOS_SROM_H __FILE__
++
++#define EXYNOS_SROMREG(x)		(x)
++
++#define EXYNOS_SROM_BW		EXYNOS_SROMREG(0x0)
++#define EXYNOS_SROM_BC0		EXYNOS_SROMREG(0x4)
++#define EXYNOS_SROM_BC1		EXYNOS_SROMREG(0x8)
++#define EXYNOS_SROM_BC2		EXYNOS_SROMREG(0xc)
++#define EXYNOS_SROM_BC3		EXYNOS_SROMREG(0x10)
++#define EXYNOS_SROM_BC4		EXYNOS_SROMREG(0x14)
++#define EXYNOS_SROM_BC5		EXYNOS_SROMREG(0x18)
++
++/* one register BW holds 4 x 4-bit packed settings for NCS0 - NCS3 */
++
++#define EXYNOS_SROM_BW__DATAWIDTH__SHIFT	0
++#define EXYNOS_SROM_BW__ADDRMODE__SHIFT		1
++#define EXYNOS_SROM_BW__WAITENABLE__SHIFT	2
++#define EXYNOS_SROM_BW__BYTEENABLE__SHIFT	3
++
++#define EXYNOS_SROM_BW__CS_MASK			0xf
++
++#define EXYNOS_SROM_BW__NCS0__SHIFT		0
++#define EXYNOS_SROM_BW__NCS1__SHIFT		4
++#define EXYNOS_SROM_BW__NCS2__SHIFT		8
++#define EXYNOS_SROM_BW__NCS3__SHIFT		12
++#define EXYNOS_SROM_BW__NCS4__SHIFT		16
++#define EXYNOS_SROM_BW__NCS5__SHIFT		20
++
++/* applies to same to BCS0 - BCS3 */
++
++#define EXYNOS_SROM_BCX__PMC__SHIFT		0
++#define EXYNOS_SROM_BCX__TACP__SHIFT		4
++#define EXYNOS_SROM_BCX__TCAH__SHIFT		8
++#define EXYNOS_SROM_BCX__TCOH__SHIFT		12
++#define EXYNOS_SROM_BCX__TACC__SHIFT		16
++#define EXYNOS_SROM_BCX__TCOS__SHIFT		24
++#define EXYNOS_SROM_BCX__TACS__SHIFT		28
++
++#endif /* __EXYNOS_SROM_H */
 -- 
 2.4.5
