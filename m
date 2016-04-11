@@ -1,38 +1,127 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Mon, 11 Apr 2016 09:04:29 +0800
-Subject: [PATCH] irqchip/mbigen: Display message of MBIGEN domain created
-In-Reply-To: <57078BE8.8040604@arm.com>
-References: <1460099762-51497-1-git-send-email-wangkefeng.wang@huawei.com>
- <20160408090935.4ec95aa8@arm.com> <57076B2D.8050006@huawei.com>
- <20160408095325.49aaf6b0@arm.com> <570788E3.3080901@huawei.com>
- <57078BE8.8040604@arm.com>
-Message-ID: <570AF81D.90302@huawei.com>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Mon, 11 Apr 2016 09:15:46 +0800
+Subject: [PATCH 1/2] drm/rockchip: vop: Do check if an update is pending
+ during disable
+In-Reply-To: <CAAObsKAeAjUP1retiZqo5geOK2OkVjKvSB6g6nvGTh_rdNiFJQ@mail.gmail.com>
+References: <1459937686-9142-1-git-send-email-tomeu.vizoso@collabora.com>
+ <5707043D.6060706@rock-chips.com>
+ <CAAObsKAeAjUP1retiZqo5geOK2OkVjKvSB6g6nvGTh_rdNiFJQ@mail.gmail.com>
+Message-ID: <570AFAC2.8080907@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2016/4/8 18:46, Marc Zyngier wrote:
-> On 08/04/16 11:33, Kefeng Wang wrote:
+On 2016?04?08? 18:54, Tomeu Vizoso wrote:
+> On 8 April 2016 at 03:07, Mark yao <mark.yao@rock-chips.com> wrote:
+>> On 2016?04?06? 18:14, Tomeu Vizoso wrote:
+>>
+>> When a plane is being disabled but it's still enabled, do check if the
+>> previous update has been completed by reading yrgb_mst back.
+>>
+>> Otherwise, pending pageflips would remain pending after a CRTC is
+>> disabled.
+>>
+>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>> ---
+>>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 5 +++--
+>>   1 file changed, 3 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> index a9b1e8b5ac85..f46b1fd1887b 100644
+>> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> @@ -1064,8 +1064,9 @@ static bool vop_win_pending_is_complete(struct vop_win
+>> *vop_win)
+>>    struct vop_plane_state *state = to_vop_plane_state(plane->state);
+>>    dma_addr_t yrgb_mst;
+>>
+>> - if (!state->enable)
+>> - return VOP_WIN_GET(vop_win->vop, vop_win->data, enable) == 0;
+>> + if (!state->enable &&
+>> +    VOP_WIN_GET(vop_win->vop, vop_win->data, enable) == 0)
+>> + return true;
 >>
 >>
->> On 2016/4/8 16:53, Marc Zyngier wrote:
->>> On Fri, 8 Apr 2016 16:26:21 +0800
->>> Kefeng Wang <wangkefeng.wang@huawei.com> wrote:
+>> It is wrong, the patch would cause a bug.
 >>
-[...]
->> But there is still one issue in the for_each_child_of_node loop of
->> mbigen_device_probe. Assume that there are 3+ child node(mbigen_gmac,
->> mbigen_i2c, mbigen_xxx, etc) in mbigen_chip_dsa, if one of them with
->> incorrect configuration, then the loop will end, but we still need 
->> parse the left child node. we should consider this situation, right?
-> 
-> That's up to whoever designed the driver to decide, really. I don't know
-> if it is worth continuing in that case (and you are in a better position
-> than me to find out).
+>> when state->enable is 0, check yrgb_mst == state->yrgb_mst always be true,
+>> because state->yrgb_mst not update on plane disabled funtion, that would
+>> cause iommu crash.
+> Sorry, but I don't understand where's the bug and what could cause
+> that crash. What the existing code was doing is saying that a pageflip
+> event is still pending if we have told the plane to disable but for
+> some reason it hasn't yet.
+>
+> With this modification, if we read back that it's already disabled, we
+> return true as before. But if we read back that it isn't disabled yet,
+> then we still check the fb pointers and compare them.
+>
+> The iommu mapping is removed when the _CRTC_ is disabled, and what
+> this series does is to wait for the pending pageflip to finish before
+> conitnuing with CRTC disablement.
 
-Ok, will talk with Ma Jun directly, and if the change is needed, I will send
-a new patch after reviewed by Ma Jun.
+the iommu mapping will unmap after plane disabled, we need sure that the 
+plane really disabled before unmap, if not, the unmap may call before 
+plane really disable, vop may access unmap address, then would get iommu 
+page fault.
 
-Thanks,
-Kefeng
+>> About pending pageflips would remain pending, can you  describe more info
+>> about it? I think those pending pageflips should be ignore when CRTC is
+>> disabled.
+> Well, right now in rockchip-drm pending pageflips won't be ignored
+> when a CRTC is disabled, but will be delivered when it's re-enabled.
+>
+> If they would be to be ignored (understanding that as dropped), that
+> would require modifications to clients so they keep track of which fbs
+> were used in a particular crtc and destroy them when the crtc is
+> disabled, but that would be incorrect when using the i915 DRM driver
+> (I also assume others do the same). Given that the pageflip ioctl
+> isn't driver-specific, I think there cannot be such a difference in
+> behavior between drivers.
+>
+> With the current behavior (pending pageflip events being delayed until
+> the CRTC is enabled again), compositors and other clients will be
+> holding on to the fb in the pending pageflip until an arbitrary point
+> in the future that may not ever come. To me that sounds like a serious
+> modification of the assumptions on fb lifecycle that might not be
+> warranted.
+>
+> So in summary, even if I haven't found any explicit documentation on
+> this, I think the ABI is that any pending pageflips are to be
+> delivered when that CRTC is being disabled and not later.
+
+on drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+
+drm_atomic_helper_commit_planes(dev, state, true);
+rockchip_atomic_wait_for_complete(dev, state);
+
+We set active_only = true, I think planes can only update when crtc is 
+active. and rockchip_atomic_wait_for_complete only wait when crtc is active.
+
+Thanks.
+> Thanks,
+>
+> Tomeu
+>
+>> Thanks.
+>>
+>>
+>>    yrgb_mst = VOP_WIN_GET_YRGBADDR(vop_win->vop, vop_win->data);
+>>
+>>
+>>
+>> --
+>> ?ark Yao
+>>
+>>
+>> _______________________________________________
+>> dri-devel mailing list
+>> dri-devel at lists.freedesktop.org
+>> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+>>
+>
+>
+
+
+-- 
+?ark Yao
