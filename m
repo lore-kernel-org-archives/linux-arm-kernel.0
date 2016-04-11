@@ -1,34 +1,117 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 12 Apr 2016 08:02:54 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v4.6
-In-Reply-To: <CAMuHMdUwuabK2Ajo5dMWEf014Xvk-1WYz4YBTw1jVScrTKSx0g@mail.gmail.com>
-References: <cover.1460339328.git.horms+renesas@verge.net.au>
- <CAMuHMdUwuabK2Ajo5dMWEf014Xvk-1WYz4YBTw1jVScrTKSx0g@mail.gmail.com>
-Message-ID: <20160411230253.GB1589@verge.net.au>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Mon, 11 Apr 2016 18:16:16 -0500
+Subject: [PATCH] ARM: OMAP3: Fix imprecise external abort for off mode
+ on 36xx
+In-Reply-To: <20160411211339.GI5995@atomide.com>
+References: <1455140107-3328-1-git-send-email-tony@atomide.com>
+ <5706C062.4040803@ti.com> <20160407231604.GP16484@atomide.com>
+ <570BEAFB.6000409@ti.com> <20160411211339.GI5995@atomide.com>
+Message-ID: <570C3040.3030001@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 11, 2016 at 09:11:19AM +0200, Geert Uytterhoeven wrote:
-> Hi Simon,
+On 04/11/2016 04:13 PM, Tony Lindgren wrote:
+> * Dave Gerlach <d-gerlach@ti.com> [160411 11:21]:
+>> Tony,
+>> On 04/07/2016 06:16 PM, Tony Lindgren wrote:
+>>> * Dave Gerlach <d-gerlach@ti.com> [160407 13:18]:
+>>>>
+>>>> I have a series to convert omap3 PM code to using generic SRAM driver but
+>>>> when testing I see an external abort on BBXM off mode resume very similar to
+>>>> this that seems to be timing related caused by using generic SRAM driver to
+>>>> re-copy PM code rather than omap3_sram_restore_context.
+>>>>
+>>>> By tracing the resume path I believe the abort is caused by
+>>>> omap3_intc_resume_idle in pm34xx.c, which writes to two registers in the
+>>>> INTC. Removing this call makes the abort unreproducible in my experiments
+>>>> and changing the writes to reads causes a bus lock, so I'm pretty confident
+>>>> it's coming from this call attempting to write to an idled INTC.
+>>>>
+>>>> Advisory 1.106 in DM3730 Silicon Errata Document [1] describes an issue with
+>>>> "MPU Leaves MSTANDBY State Before IDLEREQ of Interrupt Controller is
+>>>> Released" which sounds like a very similar failure situation to what we are
+>>>> seeing even though the timing of INTC access is a bit further from WFI exit
+>>>> than it describes. Perhaps there are more conditions where it can occur.
+>>>> Pushed my WIP branch for SRAM series that shows the same failure here [2].
+>>>
+>>> Interesting, I think you may have something with the errata 1.106.. And
+>>> looks like we also need still errata 1.62 handled also on 36xx in the
+>>> same pdf. And need to disable intc autoidle early at least for HS omaps
+>>> as save_secure_ram context supposedly also can do WFI.
+>>>
+>>> Maybe something like the following would make sense? It seems to work
+>>> here without external aborts with your test branch on dm3730, and boots
+>>> fine on omap3430 hs (n900).
+>>>
+>>> Or do you have some better ideas for a fix?
+>>
+>> I can also confirm that this fixes the external abort, I can not cause it
+>> with your attached patch.
 > 
-> On Mon, Apr 11, 2016 at 3:52 AM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > Hi Olof, Hi Kevin, Hi Arnd,
-> >
-> > Please consider these Renesas ARM based SoC fixes for v4.6.
-> >
-> >
-> > Allow serial to work once again on the Porter board (Revision B) which
-> > does not have the oscillator in question mounted.
+> OK. I still can't quite see why exactly this patch fixes things. So
+> I'm afraid it might be just hiding the problem..
+
+I agree, moving the omap3_intc_resume_idle may just be masking the issue for
+that exact situation, but I think we can get rid of it for off mode...
+
 > 
-> Have you tested this on Porter?
+>> I would be ok with the solution you have proposed and I was unable to come
+>> up with anything better while trying to debug the issue originally.
+>>
+>> We still need the call to omap3_intc_resume_idle because the intc restore
+>> context only gets called on resume from off mode. Perhaps we only need to
+>> call omap3_intc_resume_idle when coming back from non-off modes, otherwise
+>> let the context restore handle the reconfig of the INTC idle/sysconfig
+>> registers?
+> 
+> OK. Did you actually test by commenting out omap3_intc_resume_idle()?
+> 
+> Yeah sounds like we can optimize out the restore there for non-off
+> modes.
 
-I don't have working access to a porter at this time.
+Yes I removed it entirely for testing, and I also tried something like this for
+a possible workable solution (without your patch applied):
 
-> I believe there's another change to be made for this revert to actually work,
-> cfr. "[PATCH] ARM: dts: r8a7791: Don't disable referenced optional clocks"
-> (https://lkml.org/lkml/2016/4/6/350)
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index fcf975eb5e9d..8d39b44ba3a3 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -268,7 +268,6 @@ void omap_sram_idle(void)
+        int per_next_state = PWRDM_POWER_ON;
+        int core_next_state = PWRDM_POWER_ON;
+        int per_going_off;
+-       int core_prev_state;
+        u32 sdrc_pwr = 0;
 
-Ok, understood.
+        mpu_next_state = pwrdm_read_next_pwrst(mpu_pwrdm);
+@@ -348,17 +347,16 @@ void omap_sram_idle(void)
+                sdrc_write_reg(sdrc_pwr, SDRC_POWER);
 
-Could someone verify that?
+        /* CORE */
+-       if (core_next_state < PWRDM_POWER_ON) {
+-               core_prev_state = pwrdm_read_prev_pwrst(core_pwrdm);
+-               if (core_prev_state == PWRDM_POWER_OFF) {
++       if (core_next_state < PWRDM_POWER_ON &&
++           pwrdm_read_prev_pwrst(core_pwrdm) == PWRDM_POWER_OFF) {
+                        omap3_core_restore_context();
+                        omap3_cm_restore_context();
+                        omap3_push_sram_idle();
+                        omap3_push_sram_secure_idle();
+                        omap2_sms_restore_context();
+-               }
+-       }
+-       omap3_intc_resume_idle();
++       } else
++               omap3_intc_resume_idle();
++
+
+        pwrdm_post_transition(NULL);
+
+
+Regards,
+Dave
+
+
+> 
+> Tony
+> 
