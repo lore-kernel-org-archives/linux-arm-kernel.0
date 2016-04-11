@@ -1,65 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 11 Apr 2016 11:06:10 +0100
-Subject: [PATCH] arm64: erratum: Workaround for Kryo reserved system
- register read
-In-Reply-To: <570B48F0.5020408@arm.com>
-References: <1460044456-5297-1-git-send-email-nkaje@codeaurora.org>
- <57069977.5050205@arm.com> <570780D2.3060104@arm.com>
- <570786C9.6020804@arm.com> <570B48F0.5020408@arm.com>
-Message-ID: <20160411100609.GE15729@arm.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Mon, 11 Apr 2016 13:10:22 +0300
+Subject: [PATCH] ARM: mach-imx: sdhci-esdhc-imx: initialize DMA mask
+In-Reply-To: <20160411083510.GN10108@pengutronix.de>
+References: <1460362846-2906-1-git-send-email-akurz@blala.de>
+ <20160411083510.GN10108@pengutronix.de>
+Message-ID: <570B780E.7090801@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 11, 2016 at 07:49:20AM +0100, James Morse wrote:
-> On 08/04/16 11:24, Marc Zyngier wrote:
-> > On 08/04/16 10:58, Suzuki K Poulose wrote:
-> >> On 07/04/16 18:31, Marc Zyngier wrote:
-> >>
-> >>>> +	All system register encodings above use the form
-> >>>> +
-> >>>> +	Op0, Op1, CRn, CRm, Op2.
-> >>>> +
-> >>>> +	Note that some of the encodings listed above include
-> >>>> +	the system register space reserved for the following
-> >>>> +	identification registers which may appear in future revisions
-> >>>> +	of the ARM architecture beyond ARMv8.0.
-> >>>> +	This space includes:
-> >>>> +	ID_AA64PFR[2-7]_EL1
-> >>>> +	ID_AA64DFR[2-3]_EL1
-> >>>> +	ID_AA64AFR[2-3]_EL1
-> >>>> +	ID_AA64ISAR[2-7]_EL1
-> >>>> +	ID_AA64MMFR[2-7]_EL1
-> >>
-> >>
-> >> AFAIK, the id space is unassigned. So the naming above could cause confusion
-> >> if the register is named something else.
-> > 
-> > It is reserved *at the moment*, but already has a defined behaviour. My
-> > worry is that when some new architecture revision comes around, we start
-> > using these registers without thinking much about it (because we should
-> > be able to). At this point, your SoC will catch fire and nobody will
-> > have a clue about the problem because it is not apparent in the code.
-> > 
-> > I'd really like to see something a bit more forward looking that covers
-> > that space for good.
+On 11/04/16 11:35, Uwe Kleine-K?nig wrote:
+> Hello,
 > 
-> At the risk of volunteering...
-> Registering these instructions with the undef hooks would be ideal, but they
-> won't catch this instruction abort. I guess refactor them to be generic faulting
-> instruction hooks, and have a list for the existing undef cases, and a new one
-> for this instruction abort.
+> I added the people involved in 7b91369b4655 to Cc.
 > 
-> This won't cover early code in head.S, or KVM code that runs at EL2. Is this
-> sufficient, or should any approach cover those too?
+> On Mon, Apr 11, 2016 at 10:20:46AM +0200, Alexander Kurz wrote:
+>> With commit 7b91369b DMA access got disabled for device drivers with zero
 
-I much prefer a trapping approach than trying to patch the instructions
-accessing the ID registers. The ID registers are used to figure out which
-alternatives need to be applied and having this circular dependency feels
-particularly fragile.
+Is that because dma_set_mask_and_coherent() fails?
 
-So, we need to figure out (a) what sort of exceptions we're likely to
-get and (b) what syndrome information is provided. In the worst case,
-we'll end up disassembling the instruction stream (or using an ugly
-out-of-line function to access system registers).
-
-Will
+> 
+> Please reference commits like:
+> 
+> 	With commit 7b91369b4655 ("mmc: sdhci: Set DMA mask when adding
+> 	host") DMA access ...
+> 
+> 
+>> DMA mask property. sdhci-esdhc-imx got blocked from DMA access by this.
+>> Hence: initialize the dma mask to enable access again.
+>>
+>> Signed-off-by: Alexander Kurz <akurz@blala.de>
+>> ---
+>>  arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c | 5 +++--
+>>  1 file changed, 3 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c b/arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c
+>> index a5edd7d..3d039ef 100644
+>> --- a/arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c
+>> +++ b/arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c
+>> @@ -71,6 +71,7 @@ struct platform_device *__init imx_add_sdhci_esdhc_imx(
+>>  	if (!pdata)
+>>  		pdata = &default_esdhc_pdata;
+>>  
+>> -	return imx_add_platform_device(data->devid, data->id, res,
+>> -			ARRAY_SIZE(res), pdata, sizeof(*pdata));
+>> +	return imx_add_platform_device_dmamask(data->devid, data->id, res,
+>> +			ARRAY_SIZE(res), pdata, sizeof(*pdata),
+>> +			DMA_BIT_MASK(32));
+>>  }
+>> -- 
+>> 2.1.4
+>>
+>>
+> 
