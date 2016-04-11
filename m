@@ -1,111 +1,58 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 11 Apr 2016 13:10:24 +0100
-Subject: [RFC PATCH 20/45] KVM: arm/arm64: vgic-new: Add TARGET registers
- handlers
-In-Reply-To: <20160331113126.GZ4126@cbox>
-References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
- <1458871508-17279-21-git-send-email-andre.przywara@arm.com>
- <20160331113126.GZ4126@cbox>
-Message-ID: <570B9430.2040305@arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 11 Apr 2016 20:31:03 +0800
+Subject: [PATCH] scatterlist: use sg_dma_len() in sg_set_page()
+In-Reply-To: <570B7CE8.3020307@arm.com>
+References: <1460342864-27891-1-git-send-email-shawnguo@kernel.org>
+ <570B7CE8.3020307@arm.com>
+Message-ID: <20160411123103.GC13735@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/03/16 12:31, Christoffer Dall wrote:
-> On Fri, Mar 25, 2016 at 02:04:43AM +0000, Andre Przywara wrote:
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->>  virt/kvm/arm/vgic/vgic_mmio.c | 43 ++++++++++++++++++++++++++++++++++++++++++-
->>  1 file changed, 42 insertions(+), 1 deletion(-)
->>
->> diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
->> index 76657ce..cde153f 100644
->> --- a/virt/kvm/arm/vgic/vgic_mmio.c
->> +++ b/virt/kvm/arm/vgic/vgic_mmio.c
->> @@ -471,6 +471,47 @@ static int vgic_mmio_write_config(struct kvm_vcpu *vcpu,
->>  	return 0;
->>  }
->>  
->> +static int vgic_mmio_read_target(struct kvm_vcpu *vcpu,
->> +				 struct kvm_io_device *this,
->> +				 gpa_t addr, int len, void *val)
->> +{
->> +	struct vgic_io_device *iodev = container_of(this,
->> +						    struct vgic_io_device, dev);
->> +	u32 intid = (addr - iodev->base_addr);
->> +	int i;
->> +
->> +	if (iodev->redist_vcpu)
->> +		vcpu = iodev->redist_vcpu;
->> +
->> +	for (i = 0; i < len; i++) {
->> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
->> +
->> +		((u8 *)val)[i] = irq->targets;
->> +	}
->> +
->> +	return 0;
->> +}
->> +
->> +static int vgic_mmio_write_target(struct kvm_vcpu *vcpu,
->> +				  struct kvm_io_device *this,
->> +				  gpa_t addr, int len, const void *val)
->> +{
->> +	struct vgic_io_device *iodev = container_of(this,
->> +						    struct vgic_io_device, dev);
->> +	u32 intid = (addr - iodev->base_addr);
->> +	int i;
->> +
->> +	/* GICD_ITARGETSR[0-7] are read-only */
->> +	if (intid < VGIC_NR_PRIVATE_IRQS)
->> +		return 0;
->> +
->> +	for (i = 0; i < len; i++)
->> +		vgic_v2_irq_change_affinity(vcpu->kvm, intid + i,
->> +					    ((u8 *)val)[i]);
->> +
->> +	return 0;
->> +}
->> +
+On Mon, Apr 11, 2016 at 11:31:04AM +0100, Robin Murphy wrote:
+> Hi Shawn,
 > 
-> these functions are v2 specific but are in a generic file and are not
-> named anything specific to v2?
-
-Well, technically the target register is still defined for the GICv3
-distributor, but just RES0 if affinity routing is enabled.
-But I can of course easily add a _v2_ in here.
-
-While I look at the function, it makes me wonder if the abstraction for
-the affinity change call is actually correct at all. In contrast to the
-other vgic_v<n>_* functions this one is about the _emulated_ VGIC model,
-not the hardware GIC version.
-Also we actually only have this one user here, the other call is about
-initializing the affinity setting, for which this function is really
-overkill.
-So what about we move the content of the change_affinity function in
-here (same for the v3 case later), and tackle the init case separately
-(which is trivial)?
-
-Cheers,
-Andre.
-
+> On 11/04/16 03:47, Shawn Guo wrote:
+> >The macro sg_dma_len(sg) is commonly used to retrieve length of sg,
+> >which could be 'dma_length' or 'length' field, depending on whether
+> >NEED_SG_DMA_LENGTH is enabled or not.  On the other hand, many driver
+> >code use helper function sg_set_page() to set an sg entry pointing at
+> >a page, with offset and length set up in one call.  But sg_set_page()
+> >does not consider NEED_SG_DMA_LENGTH case and only set up 'length'
+> >field.  This causes problem on platforms like ARM64, where
+> >NEED_SG_DMA_LENGTH is enabled by default, i.e. sg_set_page() sets up
+> >'length' while sg_dma_len(sg) returns 'dma_length' field.
+> >
+> >The patch changes sg_set_page() to use sg_dma_len() for sg length setup
+> >as well, so that NEED_SG_DMA_LENGTH case can be handled.
+> >
+> >Signed-off-by: Shawn Guo <shawnguo@kernel.org>
+> >---
+> >  include/linux/scatterlist.h | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> >diff --git a/include/linux/scatterlist.h b/include/linux/scatterlist.h
+> >index 556ec1ea2574..b0e32ea594c3 100644
+> >--- a/include/linux/scatterlist.h
+> >+++ b/include/linux/scatterlist.h
+> >@@ -114,7 +114,7 @@ static inline void sg_set_page(struct scatterlist *sg, struct page *page,
+> >  {
+> >  	sg_assign_page(sg, page);
+> >  	sg->offset = offset;
+> >-	sg->length = len;
+> >+	sg_dma_len(sg) = len;
 > 
->>  struct vgic_register_region vgic_v2_dist_registers[] = {
->>  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
->>  		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12),
->> @@ -491,7 +532,7 @@ struct vgic_register_region vgic_v2_dist_registers[] = {
->>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PRI,
->>  		vgic_mmio_read_priority, vgic_mmio_write_priority, 8),
->>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_TARGET,
->> -		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 8),
->> +		vgic_mmio_read_target, vgic_mmio_write_target, 8),
->>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_CONFIG,
->>  		vgic_mmio_read_config, vgic_mmio_write_config, 2),
->>  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SOFTINT,
->> -- 
->> 2.7.3
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe kvm" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> This looks wrong. If a driver is building a scatterlist, then it
+> needs to fill in the page, offset and length fields to describe the
+> physical layout - leaving sg->length uninitialised would be a recipe
+> for disaster - then pass it to the DMA API. Only the DMA API
+> implementation should be setting dma_addr and dma_len, and they may
+> not correspond to the physical layout at all (e.g. an IOMMU could
+> concatenate the entire list into a single much longer segment at
+> whatever arbitrary DMA address it chooses).
+
+Thanks for the hint, Robin.  Yes, you're right, the proposed change is
+just wrong.  I just found the correct fix to my problem, i.e. commit
+70bc916b2c80 (staging: android: ion: Set the length of the DMA sg entries
+in buffer).  It should be applied for stable kernel, IMO.
+
+Shawn
