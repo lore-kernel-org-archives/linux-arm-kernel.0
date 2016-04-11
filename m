@@ -1,41 +1,29 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 11 Apr 2016 22:58:49 +0800
-Subject: [PATCH] arm: dts: imx6q-ba16: Remove unused vqmmc-supply
-In-Reply-To: <1459194163-8540-1-git-send-email-akshay.bhat@timesys.com>
-References: <1459194163-8540-1-git-send-email-akshay.bhat@timesys.com>
-Message-ID: <20160411145849.GA15949@tiger>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 11 Apr 2016 16:01:31 +0100
+Subject: [PATCH v1 1/2] amba: Defer device peripheral ID read
+In-Reply-To: <1460386716-23262-1-git-send-email-georgi.djakov@linaro.org>
+References: <1460386716-23262-1-git-send-email-georgi.djakov@linaro.org>
+Message-ID: <20160411150130.GL19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Mar 28, 2016 at 03:42:43PM -0400, Akshay Bhat wrote:
-> The vqmmc supply is not connected to bio supply on the BA16 module.
-> Remove the same.
-
-'the same'?
-
-Also, please use 'ARM: ' than lowercase for patch subject.
-
-Shawn
-
+On Mon, Apr 11, 2016 at 05:58:35PM +0300, Georgi Djakov wrote:
+> From: "Ivan T. Ivanov" <ivan.ivanov@linaro.org>
 > 
-> Signed-off-by: Akshay Bhat <akshay.bhat@timesys.com>
-> ---
->  arch/arm/boot/dts/imx6q-ba16.dtsi | 1 -
->  1 file changed, 1 deletion(-)
+> To be able to read peripheral ID during device create time
+> bus code have turn on device interface clock, but this
+> clock could be unavailable at this time. Fix this by defer
+> device ID read until driver match time.
 > 
-> diff --git a/arch/arm/boot/dts/imx6q-ba16.dtsi b/arch/arm/boot/dts/imx6q-ba16.dtsi
-> index 8f6e603..96701a3 100644
-> --- a/arch/arm/boot/dts/imx6q-ba16.dtsi
-> +++ b/arch/arm/boot/dts/imx6q-ba16.dtsi
-> @@ -390,7 +390,6 @@
->  	pinctrl-0 = <&pinctrl_usdhc3 &pinctrl_usdhc3_reset>;
->  	bus-width = <8>;
->  	vmmc-supply = <&vdd_bperi>;
-> -	vqmmc-supply = <&vdd_bio>;
->  	non-removable;
->  	keep-power-in-suspend;
->  	status = "okay";
-> -- 
-> 2.7.4
-> 
-> 
+> Signed-off-by: Ivan T. Ivanov <ivan.ivanov@linaro.org>
+> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+
+Can't do this.  See comments on previous similar patches trying to do the
+very same thing.  (Sorry, I don't have time to provide a fuller reply,
+especially given that there's already a fuller reply in the last two
+months of mailing list archives.)
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
