@@ -1,60 +1,67 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Mon, 11 Apr 2016 15:40:10 +0800
-Subject: [PATCH v2 1/2] dma/iommu: Add pgsize_bitmap confirmation in
- __iommu_dma_alloc_pages
-In-Reply-To: <CAD=FV=XbL6gbdmX62Q3QJQ6R-rC7cCd44RLPgK3kvhAC49BJjA@mail.gmail.com>
-References: <1459146732-15620-1-git-send-email-yong.wu@mediatek.com>
- <20160329170238.GK6745@arm.com>
- <CAD=FV=XdZwg8usj3bjM6W=A0Yk1AFqKFRadpiS-LGLwxVNxp7A@mail.gmail.com>
- <20160408130733.GD23750@arm.com>
- <CAD=FV=VbekVUHW3=d0icSgUO1M-1cccwCAZ+s=YSzOtEveCQag@mail.gmail.com>
- <20160408173002.GJ23750@arm.com>
- <CAD=FV=XbL6gbdmX62Q3QJQ6R-rC7cCd44RLPgK3kvhAC49BJjA@mail.gmail.com>
-Message-ID: <1460360410.18251.10.camel@mhfsdcap03>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Mon, 11 Apr 2016 13:12:22 +0530
+Subject: [RESPIN v2 0/6] Add support for Exynos SROM Controller driver
+Message-ID: <1460360548-32127-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-04-08 at 10:34 -0700, Doug Anderson wrote:
-> Hi,
-> 
-> On Fri, Apr 8, 2016 at 10:30 AM, Will Deacon <will.deacon@arm.com> wrote:
-> >> > Am I barking up the wrong tree?
-> >>
-> >> I don't think min_order can be negative.  Certainly we could enter the
-> >> loop with order == 0 and min_order == 0, though.
-> >
-> > ... and in that case, PageCompound will be false, and we'll call split_page
-> > which won't do anything, so we break out.
-> >
-> >>
-> >> Some examples:
-> >>
-> >> order = 0, min_order = 0
-> >> -> Want alloc_pages _without_ __GFP_NORETRY.  OK
-> >> -> If alloc_pages fails, return NULL.  OK
-> >> -> If alloc pages succeeds, don't need splitting since single page.  OK
-> >
-> > [...]
-> >
-> >> I think those are all right.  Did I mess up?  You could certainly
-> >> structure the loop in a different way but you need to make sure you
-> >> handle all of those cases.  If you have an alternate structure that
-> >> handles all those, let's consider it.
-> >
-> > Right, I don't think the code is broken, I just think the !order check is
-> > confusing and not needed.
-> 
-> Ah ha!  Got it.  I didn't dig into split_page() to see that it was a
-> no-op when "order == 0".  I just know that the old code didn't call
-> split_page() with order == 0 so I assumed that was wise to keep.  If
-> we don't need to keep that then agreed that the "if" test can simply
-> be removed.  :)
-> 
-> -Doug
+This is second attemp for making in this series. This is a collection of patches
+already reviewed and merged in maintainer's tree, but could not make it thorugh main linus tree,
+due to last moment suggestion of proper location of driver should be
+"drivers/memory" instead of "drivers/soc". I have rebased all the patches
+and moved into "drivers/memory/samsung". Second time due to some suggestions in binding document.
 
-Hi Will, Doug,
+As this is just a movement without changing actual driver code,
+I have not removed "Reviewed-By", "Tested-By" or "Acked-By".
 
-Thanks very much for review this patch, and Thanks Robin's work,
-Currently this one is obsoleted since it's included in [1].
+To make sure everything is fine, I have again tested it on Exynos5880 based
+Chromebook for normal boot, S2R functionality and its working fine.
 
-[1]:http://lists.linuxfoundation.org/pipermail/iommu/2016-April/016402.html
+This series has been prepared on top of next-soc branch of Krzysztof's tree.
+
+Changes since RESPIN-v1:
+ - Addressed review comments in srom binding documentation mainly from Rob Herring.
+ - Modified compatibility from "samsung, exynos-srom" to "samsung, exynos4210-srom"
+ - Changed type of optional property "samsung,srom-page-mode" from int to bool
+ - Adjusted exynos-srom driver code for reflecting change in type of above property.
+ - Renamed exynos SROM dt node as "memory-controller" instead of "sromc".
+
+
+Pankaj Dubey (5):
+  dt-bindings: EXYNOS: Add exynos-srom device tree binding
+  memory: Add support for Exynos SROM driver
+  MAINTAINERS: Add maintainers entry for drivers/memory/samsung
+  ARM: EXYNOS: Remove SROM related register settings from mach-exynos
+  ARM: dts: change SROM node compatible from generic to model specific
+
+Pavel Fedin (1):
+  memory: samsung: exynos-srom: Add support for bank configuration
+
+ .../bindings/memory-controllers/exynos-srom.txt    |  79 +++++++
+ MAINTAINERS                                        |   1 +
+ arch/arm/boot/dts/exynos4.dtsi                     |   4 +-
+ arch/arm/boot/dts/exynos5.dtsi                     |   4 +-
+ arch/arm/boot/dts/exynos5410-smdk5410.dts          |   2 +-
+ arch/arm/boot/dts/exynos5410.dtsi                  |   4 +-
+ arch/arm/mach-exynos/Kconfig                       |   3 +
+ arch/arm/mach-exynos/exynos.c                      |  17 --
+ arch/arm/mach-exynos/include/mach/map.h            |   3 -
+ arch/arm/mach-exynos/regs-srom.h                   |  53 -----
+ arch/arm/mach-exynos/suspend.c                     |  20 +-
+ arch/arm/plat-samsung/include/plat/map-s5p.h       |   1 -
+ drivers/memory/Kconfig                             |   1 +
+ drivers/memory/Makefile                            |   1 +
+ drivers/memory/samsung/Kconfig                     |  13 ++
+ drivers/memory/samsung/Makefile                    |   1 +
+ drivers/memory/samsung/exynos-srom.c               | 231 +++++++++++++++++++++
+ drivers/memory/samsung/exynos-srom.h               |  51 +++++
+ 18 files changed, 390 insertions(+), 99 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/exynos-srom.txt
+ delete mode 100644 arch/arm/mach-exynos/regs-srom.h
+ create mode 100644 drivers/memory/samsung/Kconfig
+ create mode 100644 drivers/memory/samsung/Makefile
+ create mode 100644 drivers/memory/samsung/exynos-srom.c
+ create mode 100644 drivers/memory/samsung/exynos-srom.h
+
+-- 
+2.4.5
