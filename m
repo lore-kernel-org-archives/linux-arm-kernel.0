@@ -1,152 +1,58 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 11 Apr 2016 12:31:53 +0200
-Subject: [PATCH 1/2] arm64: mem-model: add flatmem model for arm64
-In-Reply-To: <570B758E.7070005@hisilicon.com>
-References: <1459844572-53069-1-git-send-email-puck.chen@hisilicon.com>
- <20160407142148.GI5657@arm.com> <570B10B2.2000000@hisilicon.com>
- <CAKv+Gu8iQ0NzLFWHy9Ggyv+jL-BqJ3x-KaRD1SZ1mU6yU3c7UQ@mail.gmail.com>
- <570B5875.20804@hisilicon.com>
- <CAKv+Gu9aqR=E3TmbPDFEUC+Q13bAJTU5wVTTHkOr6aX6BZ1OVA@mail.gmail.com>
- <570B758E.7070005@hisilicon.com>
-Message-ID: <CAKv+Gu-cWWUi6fCiveqaZRVhGCpEasCLEs7wq6t+C-x65g4cgQ@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 11 Apr 2016 11:31:04 +0100
+Subject: [PATCH] scatterlist: use sg_dma_len() in sg_set_page()
+In-Reply-To: <1460342864-27891-1-git-send-email-shawnguo@kernel.org>
+References: <1460342864-27891-1-git-send-email-shawnguo@kernel.org>
+Message-ID: <570B7CE8.3020307@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 April 2016 at 11:59, Chen Feng <puck.chen@hisilicon.com> wrote:
-> Hi Ard,
->
-> On 2016/4/11 16:00, Ard Biesheuvel wrote:
->> On 11 April 2016 at 09:55, Chen Feng <puck.chen@hisilicon.com> wrote:
->>> Hi Ard,
->>>
->>> On 2016/4/11 15:35, Ard Biesheuvel wrote:
->>>> On 11 April 2016 at 04:49, Chen Feng <puck.chen@hisilicon.com> wrote:
->>>>> Hi will,
->>>>> Thanks for review.
->>>>>
->>>>> On 2016/4/7 22:21, Will Deacon wrote:
->>>>>> On Tue, Apr 05, 2016 at 04:22:51PM +0800, Chen Feng wrote:
->>>>>>> We can reduce the memory allocated at mem-map
->>>>>>> by flatmem.
->>>>>>>
->>>>>>> currently, the default memory-model in arm64 is
->>>>>>> sparse memory. The mem-map array is not freed in
->>>>>>> this scene. If the physical address is too long,
->>>>>>> it will reserved too much memory for the mem-map
->>>>>>> array.
->>>>>>
->>>>>> Can you elaborate a bit more on this, please? We use the vmemmap, so any
->>>>>> spaces between memory banks only burns up virtual space. What exactly is
->>>>>> the problem you're seeing that makes you want to use flatmem (which is
->>>>>> probably unsuitable for the majority of arm64 machines).
->>>>>>
->>>>> The root cause we want to use flat-mem is the mam_map alloced in sparse-mem
->>>>> is not freed.
->>>>>
->>>>> take a look at here:
->>>>> arm64/mm/init.c
->>>>> void __init mem_init(void)
->>>>> {
->>>>> #ifndef CONFIG_SPARSEMEM_VMEMMAP
->>>>>         free_unused_memmap();
->>>>> #endif
->>>>> }
->>>>>
->>>>> Memory layout (3GB)
->>>>>
->>>>>  0             1.5G    2G             3.5G            4G
->>>>>  |              |      |               |              |
->>>>>  +--------------+------+---------------+--------------+
->>>>>  |    MEM       | hole |     MEM       |   IO (regs)  |
->>>>>  +--------------+------+---------------+--------------+
->>>>>
->>>>>
->>>>> Memory layout (4GB)
->>>>>
->>>>>  0                                    3.5G            4G    4.5G
->>>>>  |                                     |              |       |
->>>>>  +-------------------------------------+--------------+-------+
->>>>>  |                   MEM               |   IO (regs)  |  MEM  |
->>>>>  +-------------------------------------+--------------+-------+
->>>>>
->>>>> Currently, the sparse memory section is 1GB.
->>>>>
->>>>> 3GB ddr: the 1.5 ~2G and 3.5 ~ 4G are holes.
->>>>> 3GB ddr: the 3.5 ~ 4G and 4.5 ~ 5G are holes.
->>>>>
->>>>> This will alloc 1G/4K * (struct page) memory for mem_map array.
->>>>>
->>>>
->>>> No, this is incorrect. Sparsemem vmemmap only allocates struct pages
->>>> for memory regions that are actually populated.
->>>>
->>>> For instance, on the Foundation model with 4 GB of memory, you may see
->>>> something like this in the boot log
->>>>
->>>> [    0.000000]     vmemmap : 0xffffffbdc0000000 - 0xffffffbfc0000000
->>>> (     8 GB maximum)
->>>> [    0.000000]               0xffffffbdc0000000 - 0xffffffbde2000000
->>>> (   544 MB actual)
->>>>
->>>> but in reality, only the following regions have been allocated
->>>>
->>>> ---[ vmemmap start ]---
->>>> 0xffffffbdc0000000-0xffffffbdc2000000          32M       RW NX SHD AF
->>>>       BLK UXN MEM/NORMAL
->>>> 0xffffffbde0000000-0xffffffbde2000000          32M       RW NX SHD AF
->>>>       BLK UXN MEM/NORMAL
->>>> ---[ vmemmap end ]---
->>>>
->>>> so only 64 MB is used to back 4 GB of RAM with struct pages, which is
->>>> minimal. Moving to flatmem will not reduce the memory footprint at
->>>> all.
->>>
->>> Yes,but the populate is section, which is 1GB. Take a look at the above
->>> memory layout.
->>>
->>> The section 1G ~ 2G is a section. But 1.5G ~ 2G is a hole.
->>>
->>> The section 3G ~ 4G is a section. But 3.5G ~ 4G is a hole.
->>>>>  0             1.5G    2G             3.5G            4G
->>>>>  |              |      |               |              |
->>>>>  +--------------+------+---------------+--------------+
->>>>>  |    MEM       | hole |     MEM       |   IO (regs)  |
->>>>>  +--------------+------+---------------+--------------+
->>> The hole in 1.5G ~ 2G is also allocated mem-map array. And also with the 3.5G ~ 4G.
->>>
->>
->> No, it is not. It may be covered by a section, but that does not mean
->> sparsemem vmemmap will actually allocate backing for it. The
->> granularity used by sparsemem vmemmap on a 4k pages kernel is 128 MB,
->> due to the fact that the backing is performed at PMD granularity.
->>
->> Please, could you share the contents of the vmemmap section in
->> /sys/kernel/debug/kernel_page_tables of your system running with
->> sparsemem vmemmap enabled? You will need to set CONFIG_ARM64_PTDUMP=y
->>
->
-> Please see the pg-tables below.
->
->
-> With sparse and vmemmap enable.
->
-> ---[ vmemmap start ]---
-> 0xffffffbdc0200000-0xffffffbdc4800000          70M     RW NX SHD AF    UXN MEM/NORMAL
-> ---[ vmemmap end ]---
->
+Hi Shawn,
 
-OK, I see what you mean now. Sorry for taking so long to catch up.
+On 11/04/16 03:47, Shawn Guo wrote:
+> The macro sg_dma_len(sg) is commonly used to retrieve length of sg,
+> which could be 'dma_length' or 'length' field, depending on whether
+> NEED_SG_DMA_LENGTH is enabled or not.  On the other hand, many driver
+> code use helper function sg_set_page() to set an sg entry pointing at
+> a page, with offset and length set up in one call.  But sg_set_page()
+> does not consider NEED_SG_DMA_LENGTH case and only set up 'length'
+> field.  This causes problem on platforms like ARM64, where
+> NEED_SG_DMA_LENGTH is enabled by default, i.e. sg_set_page() sets up
+> 'length' while sg_dma_len(sg) returns 'dma_length' field.
+>
+> The patch changes sg_set_page() to use sg_dma_len() for sg length setup
+> as well, so that NEED_SG_DMA_LENGTH case can be handled.
+>
+> Signed-off-by: Shawn Guo <shawnguo@kernel.org>
+> ---
+>   include/linux/scatterlist.h | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/include/linux/scatterlist.h b/include/linux/scatterlist.h
+> index 556ec1ea2574..b0e32ea594c3 100644
+> --- a/include/linux/scatterlist.h
+> +++ b/include/linux/scatterlist.h
+> @@ -114,7 +114,7 @@ static inline void sg_set_page(struct scatterlist *sg, struct page *page,
+>   {
+>   	sg_assign_page(sg, page);
+>   	sg->offset = offset;
+> -	sg->length = len;
+> +	sg_dma_len(sg) = len;
 
-> The board is 4GB, and the memap is 70MB
-> 1G memory --- 14MB mem_map array.
+This looks wrong. If a driver is building a scatterlist, then it needs 
+to fill in the page, offset and length fields to describe the physical 
+layout - leaving sg->length uninitialised would be a recipe for disaster 
+- then pass it to the DMA API. Only the DMA API implementation should be 
+setting dma_addr and dma_len, and they may not correspond to the 
+physical layout at all (e.g. an IOMMU could concatenate the entire list 
+into a single much longer segment at whatever arbitrary DMA address it 
+chooses).
 
-No, this is incorrect. 1 GB corresponds with 16 MB worth of struct
-pages assuming sizeof(struct page) == 64
+Is there some particular driver hiccup behind this?
 
-So you are losing 6 MB to rounding here, which I agree is significant.
-I wonder if it makes sense to use a lower value for SECTION_SIZE_BITS
-on 4k pages kernels, but perhaps we're better off asking the opinion
-of the other cc'ees.
+Robin.
 
-Thanks,
-Ard.
+>   }
+>
+>   static inline struct page *sg_page(struct scatterlist *sg)
+>
