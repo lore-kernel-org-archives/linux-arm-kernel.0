@@ -1,126 +1,179 @@
 From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Mon, 11 Apr 2016 13:29:06 +0000
-Subject: [PATCH V2 0/3] dmaengine: bcm2835: support dma channel 11 to 14
-Message-ID: <1460381349-14408-1-git-send-email-kernel@martin.sperl.org>
+Date: Mon, 11 Apr 2016 13:29:08 +0000
+Subject: [PATCH V2 2/3] dmaengine: bcm2835: use platform_get_irq_byname
+In-Reply-To: <1460381349-14408-1-git-send-email-kernel@martin.sperl.org>
+References: <1460381349-14408-1-git-send-email-kernel@martin.sperl.org>
+Message-ID: <1460381349-14408-3-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Martin Sperl <kernel@martin.sperl.org>
 
-Right now the dma engine officially supports dma channel 11 and 12.
-But the use of dma channel 12 immediately stalls the system.
+Use platform_get_irq_byname to allow for correct mapping of
+interrupts to dma channels.
 
-The reason is that the interrupt assigned right now to dma channel 11
-is actually a shared interrupt for dma channels 11 to 12.
-So whenever the dma channel 12, 13 or 14 is used, it triggers the interrupt
-for dma 11 which only clears the interrupt flag for dma channel 11.
-This results in the interrupt 11 is triggered all the time.
+The currently implemented device tree is unfortunately
+implemented with the wrong assumption, that each dma-channel
+has its own dma channel, but dma-irq 11 is handling
+dma-channel 11-14 and dma-irq 12 is actually a "catch all"
+interrupt.
 
-On top the requesting dma channel12 (and the corresponding irq) triggers
-an immeditate stall of the system, because for the 12th interrupt
-any dma channel will trigger also this interrupt - even if the dma channel
-is controlled by the firmware.
+So here we use the byname variant and require that interrupts
+are explicitly named via the interrupts-name property in the
+device tree.
 
-As the description in the default device-tree is (for the above reasons)
-wrong a new means had to get devised that allows correct representation
-of the mapping between interrupts and dma channels.
+The use of shared interrupts is also implemented.
 
-For this the existing (but unused) device-tree property "interrupt-names"
-is used to define the mapping.
+As a side-effect this means we can now use dma channels 12, 13 and 14
+in a correct manner - also testing shows that onl using
+channels 11 to 14 for spi and i2s works perfectly (when playing
+some video)
 
-Implementing shared interrupts is another necessity when using dma channel
-11 to 14, so it is a part of this patch.
+Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+Acked-by: Eric Anholt <eric@anholt.net>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+---
+ drivers/dma/bcm2835-dma.c | 77 ++++++++++++++++++++++++++++++++++++++---------
+ 1 file changed, 63 insertions(+), 14 deletions(-)
 
-This patchset requires: [PATCH 0/8 v4] bcm2835 DMA slave support
-to be applied.
-
-Tested playing BigBuckBunny on:
-* fb-tft device (fb_st7735r)
-  - via spi-bcm2835 using slave_sg dma
-* I2S Hifiberry DAC (snd_soc_hifiberry_dac)
-  - via bcm2835-i2s using cyclic dma
-(with a few pending patches to make i2s work propperly)
-
-Interrupt statistics after playing Big Buck Bunny:
-root at raspcm:~# cat /proc/interrupts
-           CPU0
- 17:          0  ARMCTRL-level   1 Edge      2000b880.mailbox
- 27:      47685  ARMCTRL-level  35 Edge      timer
- 33:    6042130  ARMCTRL-level  41 Edge      20980000.usb, dwc2_hsotg:usb1
- 40:      13250  ARMCTRL-level  48 Edge      DMA IRQ
- 42:      13250  ARMCTRL-level  50 Edge      DMA IRQ
- 44:      19087  ARMCTRL-level  52 Edge      DMA IRQ
- 45:          0  ARMCTRL-level  53 Edge      DMA IRQ
- 73:          0  ARMCTRL-level  81 Edge      20200000.gpio:bank0
- 74:          0  ARMCTRL-level  82 Edge      20200000.gpio:bank1
- 77:          0  ARMCTRL-level  85 Edge      20205000.i2c, 20804000.i2c, 20805000.i2c
- 78:          0  ARMCTRL-level  86 Edge      20204000.spi
- 81:        708  ARMCTRL-level  89 Edge      uart-pl011
- 86:     277629  ARMCTRL-level  94 Edge      mmc0
-Err:          0
-
-Tested also with the following property set:
-  brcm,dma-channel-mask = <0x7800>;
-which results in only dma channels 11-14 being available
-and thus all using the single shared irq.
-
-Interrupt statistics for this case:
-           CPU0
- 17:          0  ARMCTRL-level   1 Edge      2000b880.mailbox
- 27:      46843  ARMCTRL-level  35 Edge      timer
- 33:    5412801  ARMCTRL-level  41 Edge      20980000.usb, dwc2_hsotg:usb1
- 51:      45502  ARMCTRL-level  59 Edge      DMA IRQ, DMA IRQ, DMA IRQ, DMA IRQ
- 73:          0  ARMCTRL-level  81 Edge      20200000.gpio:bank0
- 74:          0  ARMCTRL-level  82 Edge      20200000.gpio:bank1
- 77:          0  ARMCTRL-level  85 Edge      20205000.i2c, 20804000.i2c, 20805000.i2c
- 78:          0  ARMCTRL-level  86 Edge      20204000.spi
- 81:        706  ARMCTRL-level  89 Edge      uart-pl011
- 86:     297235  ARMCTRL-level  94 Edge      mmc0
-Err:          0
-
-Note that support for more interrupts than irq 0 to 14
-is not implemented (and this value is also hard-coded).
-
-Allowing dma channel 15 to get controlled well would require
-further extensive changes to the device-tree (separate register region).
-
-Also as mentioned above dma-channel 15 is used by the firmware
-and is - for all practical purposes - not available to
-the kernel.
-
-Only when this situation changes a valid effort can get made.
-
-One major concern here is the fact that we have no dedicated interrupt
-for dma channel 15. There is only the "catch all" interrupt, which - as
-mentioned above - also triggers for dma channels used by the firmware,
-which leads to an unnecessary amount of interrupts and can result
-in system lockups...
-
-The only potential usage would be for dma transfers where we do
-not need an interrupt, but that may require further changes
-to the dmaengine and more to support correctly.
-
-One such "candidate" for the use of dma channel 15 could be
-the tx-dma of spi-bcm2835, as for this specifically we only need
-to get the interrupt when the rx-dma finishes, but that is a
-very special case.
-
-Avoiding the interrupt for the spi-tx-dma is still something that
-could get investigated in a different patch-set.
-
-Changelog:
-  V1 -> V2: added explicit documentation for "dma-shared-all"
-            to the dt-bindings documentation
-
-Martin Sperl (3):
-  dt/bindings: bcm2835: add interrupt-names property
-  dmaengine: bcm2835: use platform_get_irq_byname
-  ARM: bcm2835: add interrupt-names and apply correct mapping
-
- .../devicetree/bindings/dma/brcm,bcm2835-dma.txt   | 26 ++++++++
- arch/arm/boot/dts/bcm283x.dtsi                     | 22 ++++++-
- drivers/dma/bcm2835-dma.c                          | 77 ++++++++++++++++++----
- 3 files changed, 110 insertions(+), 15 deletions(-)
-
---
+diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
+index cc771cd..9740151 100644
+--- a/drivers/dma/bcm2835-dma.c
++++ b/drivers/dma/bcm2835-dma.c
+@@ -46,6 +46,9 @@
+ 
+ #include "virt-dma.h"
+ 
++#define BCM2835_DMA_MAX_DMA_CHAN_SUPPORTED 14
++#define BCM2835_DMA_CHAN_NAME_SIZE 8
++
+ struct bcm2835_dmadev {
+ 	struct dma_device ddev;
+ 	spinlock_t lock;
+@@ -81,6 +84,7 @@ struct bcm2835_chan {
+ 
+ 	void __iomem *chan_base;
+ 	int irq_number;
++	unsigned int irq_flags;
+ 
+ 	bool is_lite_channel;
+ };
+@@ -466,6 +470,15 @@ static irqreturn_t bcm2835_dma_callback(int irq, void *data)
+ 	struct bcm2835_desc *d;
+ 	unsigned long flags;
+ 
++	/* check the shared interrupt */
++	if (c->irq_flags & IRQF_SHARED) {
++		/* check if the interrupt is enabled */
++		flags = readl(c->chan_base + BCM2835_DMA_CS);
++		/* if not set then we are not the reason for the irq */
++		if (!(flags & BCM2835_DMA_INT))
++			return IRQ_NONE;
++	}
++
+ 	spin_lock_irqsave(&c->vc.lock, flags);
+ 
+ 	/* Acknowledge interrupt */
+@@ -506,8 +519,8 @@ static int bcm2835_dma_alloc_chan_resources(struct dma_chan *chan)
+ 		return -ENOMEM;
+ 	}
+ 
+-	return request_irq(c->irq_number,
+-			bcm2835_dma_callback, 0, "DMA IRQ", c);
++	return request_irq(c->irq_number, bcm2835_dma_callback,
++			   c->irq_flags, "DMA IRQ", c);
+ }
+ 
+ static void bcm2835_dma_free_chan_resources(struct dma_chan *chan)
+@@ -819,7 +832,8 @@ static int bcm2835_dma_terminate_all(struct dma_chan *chan)
+ 	return 0;
+ }
+ 
+-static int bcm2835_dma_chan_init(struct bcm2835_dmadev *d, int chan_id, int irq)
++static int bcm2835_dma_chan_init(struct bcm2835_dmadev *d, int chan_id,
++				 int irq, unsigned int irq_flags)
+ {
+ 	struct bcm2835_chan *c;
+ 
+@@ -834,6 +848,7 @@ static int bcm2835_dma_chan_init(struct bcm2835_dmadev *d, int chan_id, int irq)
+ 	c->chan_base = BCM2835_DMA_CHANIO(d->base, chan_id);
+ 	c->ch = chan_id;
+ 	c->irq_number = irq;
++	c->irq_flags = irq_flags;
+ 
+ 	/* check in DEBUG register if this is a LITE channel */
+ 	if (readl(c->chan_base + BCM2835_DMA_DEBUG) &
+@@ -882,9 +897,11 @@ static int bcm2835_dma_probe(struct platform_device *pdev)
+ 	struct resource *res;
+ 	void __iomem *base;
+ 	int rc;
+-	int i;
+-	int irq;
++	int i, j;
++	int irq[BCM2835_DMA_MAX_DMA_CHAN_SUPPORTED + 1];
++	int irq_flags;
+ 	uint32_t chans_available;
++	char chan_name[BCM2835_DMA_CHAN_NAME_SIZE];
+ 
+ 	if (!pdev->dev.dma_mask)
+ 		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
+@@ -941,16 +958,48 @@ static int bcm2835_dma_probe(struct platform_device *pdev)
+ 		goto err_no_dma;
+ 	}
+ 
+-	for (i = 0; i < pdev->num_resources; i++) {
+-		irq = platform_get_irq(pdev, i);
+-		if (irq < 0)
+-			break;
+-
+-		if (chans_available & (1 << i)) {
+-			rc = bcm2835_dma_chan_init(od, i, irq);
+-			if (rc)
+-				goto err_no_dma;
++	/* get irqs for each channel that we support */
++	for (i = 0; i <= BCM2835_DMA_MAX_DMA_CHAN_SUPPORTED; i++) {
++		/* skip masked out channels */
++		if (!(chans_available & (1 << i))) {
++			irq[i] = -1;
++			continue;
+ 		}
++
++		/* get the named irq */
++		snprintf(chan_name, sizeof(chan_name), "dma%i", i);
++		irq[i] = platform_get_irq_byname(pdev, chan_name);
++		if (irq[i] >= 0)
++			continue;
++
++		/* legacy device tree case handling */
++		dev_warn_once(&pdev->dev,
++			      "missing interrupts-names property in device tree - legacy interpretation is used");
++		/*
++		 * in case of channel >= 11
++		 * use the 11th interrupt and that is shared
++		 */
++		irq[i] = platform_get_irq(pdev, i < 11 ? i : 11);
++	}
++
++	/* get irqs for each channel */
++	for (i = 0; i <= BCM2835_DMA_MAX_DMA_CHAN_SUPPORTED; i++) {
++		/* skip channels without irq */
++		if (irq[i] < 0)
++			continue;
++
++		/* check if there are other channels that also use this irq */
++		irq_flags = 0;
++		for (j = 0; j <= BCM2835_DMA_MAX_DMA_CHAN_SUPPORTED; j++)
++			if ((i != j) && (irq[j] == irq[i])) {
++				irq_flags = IRQF_SHARED;
++				break;
++			}
++
++		/* initialize the channel */
++		rc = bcm2835_dma_chan_init(od, i, irq[i], irq_flags);
++		if (rc)
++			goto err_no_dma;
+ 	}
+ 
+ 	dev_dbg(&pdev->dev, "Initialized %i DMA channels\n", i);
+-- 
 2.1.4
