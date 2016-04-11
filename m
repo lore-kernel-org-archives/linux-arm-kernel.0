@@ -1,82 +1,32 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 11 Apr 2016 13:12:28 +0530
-Subject: [RESPIN v2 6/6] ARM: dts: change SROM node compatible from generic to
- model specific
-In-Reply-To: <1460360548-32127-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1460360548-32127-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1460360548-32127-7-git-send-email-pankaj.dubey@samsung.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Mon, 11 Apr 2016 15:41:29 +0800
+Subject: [PATCH v2 1/2] dt-bindings: phy-mt65xx-usb: add support for mt2701
+ platform
+Message-ID: <1460360490-18606-1-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch changes SROM nodes compatible from generic to model specific
-to match with binding documentation. Also updating property
-"samsung,srom-page-mode" as it is not defined as bool instead of int
+A new compatible string, "mediatek,mt2701-u3phy", is added.
 
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- arch/arm/boot/dts/exynos4.dtsi            | 4 ++--
- arch/arm/boot/dts/exynos5.dtsi            | 4 ++--
- arch/arm/boot/dts/exynos5410-smdk5410.dts | 2 +-
- arch/arm/boot/dts/exynos5410.dtsi         | 4 ++--
- 4 files changed, 7 insertions(+), 7 deletions(-)
+ .../devicetree/bindings/phy/phy-mt65xx-usb.txt     |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-index 000d506..a55a159 100644
---- a/arch/arm/boot/dts/exynos4.dtsi
-+++ b/arch/arm/boot/dts/exynos4.dtsi
-@@ -77,8 +77,8 @@
- 		reg = <0x10000000 0x100>;
- 	};
+diff --git a/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt b/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
+index 00100cf..33a2b1e 100644
+--- a/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
++++ b/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
+@@ -4,7 +4,9 @@ mt65xx USB3.0 PHY binding
+ This binding describes a usb3.0 phy for mt65xx platforms of Medaitek SoC.
  
--	sromc at 12570000 {
--		compatible = "samsung,exynos-srom";
-+	memory-controller at 12570000 {
-+		compatible = "samsung,exynos4210-srom";
- 		reg = <0x12570000 0x14>;
- 	};
- 
-diff --git a/arch/arm/boot/dts/exynos5.dtsi b/arch/arm/boot/dts/exynos5.dtsi
-index 92313ca..d5c0f18 100644
---- a/arch/arm/boot/dts/exynos5.dtsi
-+++ b/arch/arm/boot/dts/exynos5.dtsi
-@@ -31,8 +31,8 @@
- 		reg = <0x10000000 0x100>;
- 	};
- 
--	sromc at 12250000 {
--		compatible = "samsung,exynos-srom";
-+	memory-controller at 12250000 {
-+		compatible = "samsung,exynos4210-srom";
- 		reg = <0x12250000 0x14>;
- 	};
- 
-diff --git a/arch/arm/boot/dts/exynos5410-smdk5410.dts b/arch/arm/boot/dts/exynos5410-smdk5410.dts
-index a731fbe..0f6429e 100644
---- a/arch/arm/boot/dts/exynos5410-smdk5410.dts
-+++ b/arch/arm/boot/dts/exynos5410-smdk5410.dts
-@@ -97,7 +97,7 @@
- 		smsc,irq-push-pull;
- 		smsc,force-internal-phy;
- 
--		samsung,srom-page-mode = <1>;
-+		samsung,srom-page-mode;
- 		samsung,srom-timing = <9 12 1 9 1 1>;
- 	};
- };
-diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
-index fa55867..7a56aec 100644
---- a/arch/arm/boot/dts/exynos5410.dtsi
-+++ b/arch/arm/boot/dts/exynos5410.dtsi
-@@ -102,8 +102,8 @@
- 			reg = <0x10000000 0x100>;
- 		};
- 
--		sromc: sromc at 12250000 {
--			compatible = "samsung,exynos-srom";
-+		sromc: memory-controller at 12250000 {
-+			compatible = "samsung,exynos4210-srom";
- 			reg = <0x12250000 0x14>;
- 			#address-cells = <2>;
- 			#size-cells = <1>;
+ Required properties (controller (parent) node):
+- - compatible	: should be "mediatek,mt8173-u3phy"
++ - compatible	: should be one of
++		  "mediatek,mt2701-u3phy"
++		  "mediatek,mt8173-u3phy"
+  - reg		: offset and length of register for phy, exclude port's
+ 		  register.
+  - clocks	: a list of phandle + clock-specifier pairs, one for each
 -- 
-2.4.5
+1.7.9.5
