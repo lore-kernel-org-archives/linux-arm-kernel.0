@@ -1,71 +1,36 @@
 From: julien.grall@arm.com (Julien Grall)
-Date: Mon, 11 Apr 2016 16:33:00 +0100
-Subject: [PATCH v6 10/10] clocksource: arm_arch_timer: Remove
- arch_timer_get_timecounter
+Date: Mon, 11 Apr 2016 16:32:55 +0100
+Subject: [PATCH v6 05/10] irqchip/gic-v3: Prefix all pr_* messages by "GICv3: "
 In-Reply-To: <1460388780-914-1-git-send-email-julien.grall@arm.com>
 References: <1460388780-914-1-git-send-email-julien.grall@arm.com>
-Message-ID: <1460388780-914-11-git-send-email-julien.grall@arm.com>
+Message-ID: <1460388780-914-6-git-send-email-julien.grall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The only call of arch_timer_get_timecounter (in KVM) has been removed.
+Currently, most of the pr_* messages in the GICv3 driver don't have a
+prefix.  Add one to make clear where the messages come from.
 
 Signed-off-by: Julien Grall <julien.grall@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 
 ---
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-
-    Changes in v4:
-        - Add Christoffer's acked-by
-
-    Changes in v3:
+    Changes in v6:
         - Patch added
 ---
- drivers/clocksource/arm_arch_timer.c | 5 -----
- include/clocksource/arm_arch_timer.h | 6 ------
- 2 files changed, 11 deletions(-)
+ drivers/irqchip/irq-gic-v3.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index bb58224..4814446 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -475,11 +475,6 @@ struct arch_timer_kvm_info *arch_timer_get_kvm_info(void)
- 	return &arch_timer_kvm_info;
- }
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index 5b7d3c2..6dc6f03 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -15,6 +15,8 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
  
--struct timecounter *arch_timer_get_timecounter(void)
--{
--	return &arch_timer_kvm_info.timecounter;
--}
--
- static void __init arch_counter_register(unsigned type)
- {
- 	u64 start_count;
-diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
-index 9dd996a..caedb74 100644
---- a/include/clocksource/arm_arch_timer.h
-+++ b/include/clocksource/arm_arch_timer.h
-@@ -58,7 +58,6 @@ struct arch_timer_kvm_info {
- 
- extern u32 arch_timer_get_rate(void);
- extern u64 (*arch_timer_read_counter)(void);
--extern struct timecounter *arch_timer_get_timecounter(void);
- extern struct arch_timer_kvm_info *arch_timer_get_kvm_info(void);
- 
- #else
-@@ -73,11 +72,6 @@ static inline u64 arch_timer_read_counter(void)
- 	return 0;
- }
- 
--static inline struct timecounter *arch_timer_get_timecounter(void)
--{
--	return NULL;
--}
--
- #endif
- 
- #endif
++#define pr_fmt(fmt)	"GICv3: " fmt
++
+ #include <linux/acpi.h>
+ #include <linux/cpu.h>
+ #include <linux/cpu_pm.h>
 -- 
 1.9.1
