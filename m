@@ -1,225 +1,83 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon, 11 Apr 2016 11:17:31 +0800
-Subject: [PATCH v5 4/9] irqchip/gic-v2: Parse and export virtual GIC
- information
-In-Reply-To: <1459769860-6629-5-git-send-email-julien.grall@arm.com>
-References: <1459769860-6629-1-git-send-email-julien.grall@arm.com>
- <1459769860-6629-5-git-send-email-julien.grall@arm.com>
-Message-ID: <570B174B.2050905@linaro.org>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 11 Apr 2016 12:57:46 +0900
+Subject: [PATCH v9 08/20] PM / devfreq: exynos: Add the detailed correlation
+ between sub-blocks and power line
+In-Reply-To: <1460347078-15175-1-git-send-email-cw00.choi@samsung.com>
+References: <1460347078-15175-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1460347078-15175-9-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julian,
+This patch adds the detailed corrleation between sub-blocks and power line
+for Exynos3250, Exynos4210 and Exynos4x12.
 
-On 2016/4/4 19:37, Julien Grall wrote:
-> For now, the firmware tables are parsed 2 times: once in the GIC
-> drivers, the other timer when initializing the vGIC. It means code
-> duplication and make more tedious to add the support for another
-> firmware table (like ACPI).
->
-> Introduce a new structure and set of helpers to get/set the virtual GIC
-> information. Also fill up the structure for GICv2.
->
-> Signed-off-by: Julien Grall <julien.grall@arm.com>
->
-> ---
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
->
->      Changes in v4:
->          - Change the flow to call gic_set_kvm_info when all the
->          information are present.
->          - Rework comments in arm-gic-common.h
->          - Replace WARN_ON with BUG_ON in gic_set_kvm_info
->
->      Changes in v2:
->          - Use 0 rather than a negative value to know when the maintenance IRQ
->          is not present.
->          - Use resource for vcpu and vctrl
-> ---
->   drivers/irqchip/irq-gic-common.c       | 13 ++++++
->   drivers/irqchip/irq-gic-common.h       |  3 ++
->   drivers/irqchip/irq-gic.c              | 76 +++++++++++++++++++++++++++++++++-
->   include/linux/irqchip/arm-gic-common.h | 33 +++++++++++++++
->   4 files changed, 124 insertions(+), 1 deletion(-)
->   create mode 100644 include/linux/irqchip/arm-gic-common.h
->
-> diff --git a/drivers/irqchip/irq-gic-common.c b/drivers/irqchip/irq-gic-common.c
-> index f174ce0..2e9443b 100644
-> --- a/drivers/irqchip/irq-gic-common.c
-> +++ b/drivers/irqchip/irq-gic-common.c
-> @@ -21,6 +21,19 @@
->
->   #include "irq-gic-common.h"
->
-> +static const struct gic_kvm_info *gic_kvm_info;
-> +
-> +const struct gic_kvm_info *gic_get_kvm_info(void)
-> +{
-> +	return gic_kvm_info;
-> +}
-> +
-> +void gic_set_kvm_info(const struct gic_kvm_info *info)
-> +{
-> +	BUG_ON(gic_kvm_info != NULL);
-> +	gic_kvm_info = info;
-> +}
-> +
->   void gic_enable_quirks(u32 iidr, const struct gic_quirk *quirks,
->   		void *data)
->   {
-> diff --git a/drivers/irqchip/irq-gic-common.h b/drivers/irqchip/irq-gic-common.h
-> index fff697d..205e5fd 100644
-> --- a/drivers/irqchip/irq-gic-common.h
-> +++ b/drivers/irqchip/irq-gic-common.h
-> @@ -19,6 +19,7 @@
->
->   #include <linux/of.h>
->   #include <linux/irqdomain.h>
-> +#include <linux/irqchip/arm-gic-common.h>
->
->   struct gic_quirk {
->   	const char *desc;
-> @@ -35,4 +36,6 @@ void gic_cpu_config(void __iomem *base, void (*sync_access)(void));
->   void gic_enable_quirks(u32 iidr, const struct gic_quirk *quirks,
->   		void *data);
->
-> +void gic_set_kvm_info(const struct gic_kvm_info *info);
-> +
->   #endif /* _IRQ_GIC_COMMON_H */
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index 7a73786..24c05f3 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -102,6 +102,8 @@ static struct static_key supports_deactivate = STATIC_KEY_INIT_TRUE;
->
->   static struct gic_chip_data gic_data[CONFIG_ARM_GIC_MAX_NR] __read_mostly;
->
-> +static struct gic_kvm_info gic_v2_kvm_info;
-> +
->   #ifdef CONFIG_GIC_NON_BANKED
->   static void __iomem *gic_get_percpu_base(union gic_base *base)
->   {
-> @@ -1189,6 +1191,29 @@ static bool gic_check_eoimode(struct device_node *node, void __iomem **base)
->   	return true;
->   }
->
-> +static void __init gic_of_setup_kvm_info(struct device_node *node)
-> +{
-> +	int ret;
-> +	struct resource *vctrl_res = &gic_v2_kvm_info.vctrl;
-> +	struct resource *vcpu_res = &gic_v2_kvm_info.vcpu;
-> +
-> +	gic_v2_kvm_info.type = GIC_V2;
-> +
-> +	gic_v2_kvm_info.maint_irq = irq_of_parse_and_map(node, 0);
-> +	if (!gic_v2_kvm_info.maint_irq)
-> +		return;
-> +
-> +	ret = of_address_to_resource(node, 2, vctrl_res);
-> +	if (ret)
-> +		return;
-> +
-> +	ret = of_address_to_resource(node, 3, vcpu_res);
-> +	if (ret)
-> +		return;
-> +
-> +	gic_set_kvm_info(&gic_v2_kvm_info);
-> +}
-> +
->   int __init
->   gic_of_init(struct device_node *node, struct device_node *parent)
->   {
-> @@ -1218,8 +1243,10 @@ gic_of_init(struct device_node *node, struct device_node *parent)
->
->   	__gic_init_bases(gic_cnt, -1, dist_base, cpu_base, percpu_offset,
->   			 &node->fwnode);
-> -	if (!gic_cnt)
-> +	if (!gic_cnt) {
->   		gic_init_physaddr(node);
-> +		gic_of_setup_kvm_info(node);
-> +	}
->
->   	if (parent) {
->   		irq = irq_of_parse_and_map(node, 0);
-> @@ -1248,6 +1275,10 @@ IRQCHIP_DECLARE(pl390, "arm,pl390", gic_of_init);
->   static struct
->   {
->   	phys_addr_t cpu_phys_base;
-> +	u32 maint_irq;
-> +	int maint_irq_mode;
-> +	phys_addr_t vctrl_base;
-> +	phys_addr_t vcpu_base;
->   } acpi_data __initdata;
->
->   static int __init
-> @@ -1272,6 +1303,12 @@ gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
->   		return -EINVAL;
->
->   	acpi_data.cpu_phys_base = gic_cpu_base;
-> +	acpi_data.maint_irq = processor->vgic_interrupt;
-> +	acpi_data.maint_irq_mode = (processor->flags & ACPI_MADT_VGIC_IRQ_MODE) ?
-> +				    ACPI_EDGE_SENSITIVE : ACPI_LEVEL_SENSITIVE;
-> +	acpi_data.vctrl_base = processor->gich_base_address;
-> +	acpi_data.vcpu_base = processor->gicv_base_address;
-> +
->   	cpu_base_assigned = 1;
->   	return 0;
->   }
-> @@ -1302,6 +1339,41 @@ static bool __init gic_validate_dist(struct acpi_subtable_header *header,
->
->   #define ACPI_GICV2_DIST_MEM_SIZE	(SZ_4K)
->   #define ACPI_GIC_CPU_IF_MEM_SIZE	(SZ_8K)
-> +#define ACPI_GICV2_VCTRL_MEM_SIZE	(SZ_4K)
-> +#define ACPI_GICV2_VCPU_MEM_SIZE	(SZ_8K)
-> +
-> +static void __init gic_acpi_setup_kvm_info(void)
-> +{
-> +	int irq;
-> +	struct resource *vctrl_res = &gic_v2_kvm_info.vctrl;
-> +	struct resource *vcpu_res = &gic_v2_kvm_info.vcpu;
-> +
-> +	gic_v2_kvm_info.type = GIC_V2;
-> +
-> +	irq = acpi_register_gsi(NULL, acpi_data.maint_irq,
-> +				acpi_data.maint_irq_mode,
-> +				ACPI_ACTIVE_HIGH);
-> +	if (irq <= 0)
-> +		return;
-> +
-> +	gic_v2_kvm_info.maint_irq = irq;
-> +
-> +	if (!acpi_data.vctrl_base)
-> +		return;
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Acked-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+---
+ .../devicetree/bindings/devfreq/exynos-bus.txt     | 51 ++++++++++++++++++++++
+ 1 file changed, 51 insertions(+)
 
-It might be worth to unregister gsi before return, or just
-move
-
-+	irq = acpi_register_gsi(NULL, acpi_data.maint_irq,
-+				acpi_data.maint_irq_mode,
-+				ACPI_ACTIVE_HIGH);
-+	if (irq <= 0)
-+		return;
+diff --git a/Documentation/devicetree/bindings/devfreq/exynos-bus.txt b/Documentation/devicetree/bindings/devfreq/exynos-bus.txt
+index 03f13d38f1a1..b098fa2ba5d4 100644
+--- a/Documentation/devicetree/bindings/devfreq/exynos-bus.txt
++++ b/Documentation/devicetree/bindings/devfreq/exynos-bus.txt
+@@ -53,6 +53,57 @@ Optional properties only for parent bus device:
+ - exynos,voltage-tolerance: the percentage value for bus voltage tolerance
+ 			which is used to calculate the max voltage.
+ 
++Detailed correlation between sub-blocks and power line according to Exynos SoC:
++- In case of Exynos3250, there are two power line as following:
++	VDD_MIF |--- DMC
 +
-+	gic_v2_kvm_info.maint_irq = irq;
-
-before gic_set_kvm_info(&gic_v2_kvm_info); below...
-
-> +
-> +	vctrl_res->flags = IORESOURCE_MEM;
-> +	vctrl_res->start = acpi_data.vctrl_base;
-> +	vctrl_res->end = vctrl_res->start + ACPI_GICV2_VCTRL_MEM_SIZE - 1;
-> +
-> +	if (!acpi_data.vcpu_base)
-> +		return;
-> +
-> +	vcpu_res->flags = IORESOURCE_MEM;
-> +	vcpu_res->start = acpi_data.vcpu_base;
-> +	vcpu_res->end = vcpu_res->start + ACPI_GICV2_VCPU_MEM_SIZE - 1;
-
-...
-Move them just here will be better.
-
-Thanks
-Hanjun
++	VDD_INT |--- LEFTBUS (parent device)
++		|--- PERIL
++		|--- MFC
++		|--- G3D
++		|--- RIGHTBUS
++		|--- PERIR
++		|--- FSYS
++		|--- LCD0
++		|--- PERIR
++		|--- ISP
++		|--- CAM
++
++- In case of Exynos4210, there is one power line as following:
++	VDD_INT |--- DMC (parent device)
++		|--- LEFTBUS
++		|--- PERIL
++		|--- MFC(L)
++		|--- G3D
++		|--- TV
++		|--- LCD0
++		|--- RIGHTBUS
++		|--- PERIR
++		|--- MFC(R)
++		|--- CAM
++		|--- FSYS
++		|--- GPS
++		|--- LCD0
++		|--- LCD1
++
++- In case of Exynos4x12, there are two power line as following:
++	VDD_MIF |--- DMC
++
++	VDD_INT |--- LEFTBUS (parent device)
++		|--- PERIL
++		|--- MFC(L)
++		|--- G3D
++		|--- TV
++		|--- IMAGE
++		|--- RIGHTBUS
++		|--- PERIR
++		|--- MFC(R)
++		|--- CAM
++		|--- FSYS
++		|--- GPS
++		|--- LCD0
++		|--- ISP
++
+ Example1:
+ 	Show the AXI buses of Exynos3250 SoC. Exynos3250 divides the buses to
+ 	power line (regulator). The MIF (Memory Interface) AXI bus is used to
+-- 
+1.9.1
