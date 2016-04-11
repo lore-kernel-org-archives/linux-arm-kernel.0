@@ -1,50 +1,72 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Mon, 11 Apr 2016 10:52:49 +0800
-Subject: [PATCH 2/2] drm/rockchip: don't leak iommu mapping
-In-Reply-To: <1459864232-25033-2-git-send-email-john@metanate.com>
-References: <1459864232-25033-1-git-send-email-john@metanate.com>
- <1459864232-25033-2-git-send-email-john@metanate.com>
-Message-ID: <570B1181.706@rock-chips.com>
+From: yangbo.lu@nxp.com (Yangbo Lu)
+Date: Mon, 11 Apr 2016 02:54:31 +0000
+Subject: [v7, 0/5] Fix eSDHC host version register bug
+In-Reply-To: <CAPDyKFp8GDzSkpbTKoRL=rwiBrsWmsgN95zB-QJwfZTnq4M8BA@mail.gmail.com>
+References: <1459480051-3701-1-git-send-email-yangbo.lu@nxp.com>
+ <CAPDyKFqgMCvbqMYZ-uM-rTnVvfJkCYbhv2kucCRyNyc9FWoR=Q@mail.gmail.com>
+ <HE1PR04MB0889D75DC56E180D3508E7A1F89F0@HE1PR04MB0889.eurprd04.prod.outlook.com>
+ <CAPDyKFp8GDzSkpbTKoRL=rwiBrsWmsgN95zB-QJwfZTnq4M8BA@mail.gmail.com>
+Message-ID: <HE1PR04MB0889938012DBB9B1F91C6C65F8940@HE1PR04MB0889.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016?04?05? 21:50, John Keeping wrote:
-> arm_iommu_attach_device() takes its own reference to the mapping we give
-> it.  Since we do not keep a reference to the mapping ourselves, we must
-> release it before returning.
->
-> Also fix the error path, which fails to release the mapping if it has
-> called arm_iommu_detach_device() since that clears archdata.mapping.
->
-> Signed-off-by: John Keeping <john@metanate.com>
-> ---
->   drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 3 ++-
->   1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-> index 7695c79..1e2d88b 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-> @@ -218,6 +218,7 @@ static int rockchip_drm_load(struct drm_device *drm_dev, unsigned long flags)
->   	if (ret)
->   		goto err_vblank_cleanup;
->   
-> +	arm_iommu_release_mapping(mapping);
->   	return 0;
->   err_vblank_cleanup:
->   	drm_vblank_cleanup(drm_dev);
-> @@ -228,7 +229,7 @@ err_unbind:
->   err_detach_device:
->   	arm_iommu_detach_device(dev);
->   err_release_mapping:
-> -	arm_iommu_release_mapping(dev->archdata.mapping);
-> +	arm_iommu_release_mapping(mapping);
->   err_config_cleanup:
->   	drm_mode_config_cleanup(drm_dev);
->   	drm_dev->dev_private = NULL;
-Applied to my drm-fixes
+Hi Leo and Scott,
 
-Thanks.
 
--- 
-?ark Yao
+> -----Original Message-----
+> From: Ulf Hansson [mailto:ulf.hansson at linaro.org]
+> Sent: Wednesday, April 06, 2016 4:15 PM
+> To: Yangbo Lu; Scott Wood
+> Cc: devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> linux-kernel at vger.kernel.org; linuxppc-dev at lists.ozlabs.org; linux-
+> clk at vger.kernel.org; linux-i2c at vger.kernel.org; iommu at lists.linux-
+> foundation.org; netdev at vger.kernel.org; linux-mmc; Rob Herring; Russell
+> King; Jochen Friedrich; Joerg Roedel; Claudiu Manoil; Bhupesh Sharma;
+> Zhao Qiang; Kumar Gala; Santosh Shilimkar; Yang-Leo Li; Xiaobo Xie
+> Subject: Re: [v7, 0/5] Fix eSDHC host version register bug
+> 
+> >>
+> >> I was about to queue this for next, when I noticed that checkpatch is
+> >> complaining/warning lots about these patches. Can you please a round
+> >> of checkpatch and fix what makes sense.
+> >>
+> >> Kind regards
+> >> Uffe
+> >
+> > [Lu Yangbo-B47093] Sorry about this, Uffe...
+> 
+> No worries!
+> 
+> > Should I ignore the warnings that update MAINTAINERS?
+> 
+> drivers/soc/fsl/guts.c isn't part of the MAINTAINERS file, it should be.
+> 
+> I also realize that the FREESCALE QUICC ENGINE LIBRARY section
+> drivers/soc/fsl/qe/* also need an active maintainer, as it's currently
+> orphan.
+> 
+> Perhaps we should have create a new section for drivers/soc/fsl/* instead
+> that covers all of the above? Maybe you or Scott are interested to pick
+> it up?
+> 
+> I also noted that, "include/linux/fsl/" isn't present in MAINTAINERS,
+> please add that as well.
+
+[Lu Yangbo-B47093] Could give some advice on the MAINTAINERS for these 'fsl' files
+since I really don?t know who should be the right person?
+I will appreciate that!
+
+Thanks a lot.
+
+> 
+> > Regarding the 'undocumented' warning, I will added a patch updates doc
+> before all the patches, Ok?
+> 
+> Yes, good!
+> 
+> >
+> > Thanks a lot :)
+> >
+> 
+> Kind regards
+> Uffe
