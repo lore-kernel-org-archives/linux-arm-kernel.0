@@ -1,42 +1,48 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 11 Apr 2016 11:19:06 +0300
-Subject: [PATCH 15/30] clk: ti: remove un-used definitions from public
- clk_hw_omap struct
+Date: Mon, 11 Apr 2016 11:18:54 +0300
+Subject: [PATCH 03/30] ARM: OMAP2+: omap_device: create clock alias purely
+ from DT data
 In-Reply-To: <1460362761-4842-1-git-send-email-t-kristo@ti.com>
 References: <1460362761-4842-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1460362761-4842-16-git-send-email-t-kristo@ti.com>
+Message-ID: <1460362761-4842-4-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clksel support has been deprecated a while back, so remove these from
-the struct also.
+This avoids the need to add most of the clock aliases under
+drivers/clk/ti/clk-xyz.c files.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- include/linux/clk/ti.h |    4 ----
- 1 file changed, 4 deletions(-)
+ arch/arm/mach-omap2/omap_device.c |   17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
 
-diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
-index 210e946..1451291 100644
---- a/include/linux/clk/ti.h
-+++ b/include/linux/clk/ti.h
-@@ -127,8 +127,6 @@ struct clk_hw_omap_ops {
-  * @enable_bit: bitshift to write to enable/disable the clock (see @enable_reg)
-  * @flags: see "struct clk.flags possibilities" above
-  * @clksel_reg: for clksel clks, register va containing src/divisor select
-- * @clksel_mask: bitmask in @clksel_reg for the src/divisor selector
-- * @clksel: for clksel clks, pointer to struct clksel for this clock
-  * @dpll_data: for DPLLs, pointer to struct dpll_data for this clock
-  * @clkdm_name: clockdomain name that this clock is contained in
-  * @clkdm: pointer to struct clockdomain, resolved from @clkdm_name at runtime
-@@ -143,8 +141,6 @@ struct clk_hw_omap {
- 	u8			enable_bit;
- 	u8			flags;
- 	void __iomem		*clksel_reg;
--	u32			clksel_mask;
--	const struct clksel	*clksel;
- 	struct dpll_data	*dpll_data;
- 	const char		*clkdm_name;
- 	struct clockdomain	*clkdm;
+diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
+index f7ff3b9..b32d7c8 100644
+--- a/arch/arm/mach-omap2/omap_device.c
++++ b/arch/arm/mach-omap2/omap_device.c
+@@ -63,7 +63,22 @@ static void _add_clkdev(struct omap_device *od, const char *clk_alias,
+ 		return;
+ 	}
+ 
+-	rc = clk_add_alias(clk_alias, dev_name(&od->pdev->dev), clk_name, NULL);
++	r = clk_get_sys(NULL, clk_name);
++
++	if (IS_ERR(r) && of_have_populated_dt()) {
++		struct of_phandle_args clkspec;
++
++		clkspec.np = of_find_node_by_name(NULL, clk_name);
++
++		r = of_clk_get_from_provider(&clkspec);
++
++		rc = clk_register_clkdev(r, clk_alias,
++					 dev_name(&od->pdev->dev));
++	} else {
++		rc = clk_add_alias(clk_alias, dev_name(&od->pdev->dev),
++				   clk_name, NULL);
++	}
++
+ 	if (rc) {
+ 		if (rc == -ENODEV || rc == -ENOMEM)
+ 			dev_err(&od->pdev->dev,
 -- 
 1.7.9.5
