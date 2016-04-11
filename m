@@ -1,86 +1,200 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 11 Apr 2016 11:57:40 +0100
-Subject: [PATCH v3] spi: orion.c: Add direct access mode
-In-Reply-To: <1460030811-13787-1-git-send-email-sr@denx.de>
-References: <1460030811-13787-1-git-send-email-sr@denx.de>
-Message-ID: <20160411105740.GB3351@sirena.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 11 Apr 2016 13:02:02 +0200
+Subject: [PATCH 1/2] arm64: mem-model: add flatmem model for arm64
+In-Reply-To: <570B8118.1010809@hisilicon.com>
+References: <1459844572-53069-1-git-send-email-puck.chen@hisilicon.com>
+ <20160407142148.GI5657@arm.com> <570B10B2.2000000@hisilicon.com>
+ <CAKv+Gu8iQ0NzLFWHy9Ggyv+jL-BqJ3x-KaRD1SZ1mU6yU3c7UQ@mail.gmail.com>
+ <570B5875.20804@hisilicon.com>
+ <CAKv+Gu9aqR=E3TmbPDFEUC+Q13bAJTU5wVTTHkOr6aX6BZ1OVA@mail.gmail.com>
+ <570B758E.7070005@hisilicon.com> <570B8118.1010809@hisilicon.com>
+Message-ID: <CAKv+Gu9nY4_AkoN-V+jM00_76TLOOOqR4+5q+VKK9FPpFNpCbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 07, 2016 at 02:06:51PM +0200, Stefan Roese wrote:
+On 11 April 2016 at 12:48, Chen Feng <puck.chen@hisilicon.com> wrote:
+>
+>
+> On 2016/4/11 17:59, Chen Feng wrote:
+>> Hi Ard,
+>>
+>> On 2016/4/11 16:00, Ard Biesheuvel wrote:
+>>> On 11 April 2016 at 09:55, Chen Feng <puck.chen@hisilicon.com> wrote:
+>>>> Hi Ard,
+>>>>
+>>>> On 2016/4/11 15:35, Ard Biesheuvel wrote:
+>>>>> On 11 April 2016 at 04:49, Chen Feng <puck.chen@hisilicon.com> wrote:
+>>>>>> Hi will,
+>>>>>> Thanks for review.
+>>>>>>
+>>>>>> On 2016/4/7 22:21, Will Deacon wrote:
+>>>>>>> On Tue, Apr 05, 2016 at 04:22:51PM +0800, Chen Feng wrote:
+>>>>>>>> We can reduce the memory allocated at mem-map
+>>>>>>>> by flatmem.
+>>>>>>>>
+>>>>>>>> currently, the default memory-model in arm64 is
+>>>>>>>> sparse memory. The mem-map array is not freed in
+>>>>>>>> this scene. If the physical address is too long,
+>>>>>>>> it will reserved too much memory for the mem-map
+>>>>>>>> array.
+>>>>>>>
+>>>>>>> Can you elaborate a bit more on this, please? We use the vmemmap, so any
+>>>>>>> spaces between memory banks only burns up virtual space. What exactly is
+>>>>>>> the problem you're seeing that makes you want to use flatmem (which is
+>>>>>>> probably unsuitable for the majority of arm64 machines).
+>>>>>>>
+>>>>>> The root cause we want to use flat-mem is the mam_map alloced in sparse-mem
+>>>>>> is not freed.
+>>>>>>
+>>>>>> take a look at here:
+>>>>>> arm64/mm/init.c
+>>>>>> void __init mem_init(void)
+>>>>>> {
+>>>>>> #ifndef CONFIG_SPARSEMEM_VMEMMAP
+>>>>>>         free_unused_memmap();
+>>>>>> #endif
+>>>>>> }
+>>>>>>
+>>>>>> Memory layout (3GB)
+>>>>>>
+>>>>>>  0             1.5G    2G             3.5G            4G
+>>>>>>  |              |      |               |              |
+>>>>>>  +--------------+------+---------------+--------------+
+>>>>>>  |    MEM       | hole |     MEM       |   IO (regs)  |
+>>>>>>  +--------------+------+---------------+--------------+
+>>>>>>
+>>>>>>
+>>>>>> Memory layout (4GB)
+>>>>>>
+>>>>>>  0                                    3.5G            4G    4.5G
+>>>>>>  |                                     |              |       |
+>>>>>>  +-------------------------------------+--------------+-------+
+>>>>>>  |                   MEM               |   IO (regs)  |  MEM  |
+>>>>>>  +-------------------------------------+--------------+-------+
+>>>>>>
+>>>>>> Currently, the sparse memory section is 1GB.
+>>>>>>
+>>>>>> 3GB ddr: the 1.5 ~2G and 3.5 ~ 4G are holes.
+>>>>>> 3GB ddr: the 3.5 ~ 4G and 4.5 ~ 5G are holes.
+>>>>>>
+>>>>>> This will alloc 1G/4K * (struct page) memory for mem_map array.
+>>>>>>
+>>>>>
+>>>>> No, this is incorrect. Sparsemem vmemmap only allocates struct pages
+>>>>> for memory regions that are actually populated.
+>>>>>
+>>>>> For instance, on the Foundation model with 4 GB of memory, you may see
+>>>>> something like this in the boot log
+>>>>>
+>>>>> [    0.000000]     vmemmap : 0xffffffbdc0000000 - 0xffffffbfc0000000
+>>>>> (     8 GB maximum)
+>>>>> [    0.000000]               0xffffffbdc0000000 - 0xffffffbde2000000
+>>>>> (   544 MB actual)
+>>>>>
+>>>>> but in reality, only the following regions have been allocated
+>>>>>
+>>>>> ---[ vmemmap start ]---
+>>>>> 0xffffffbdc0000000-0xffffffbdc2000000          32M       RW NX SHD AF
+>>>>>       BLK UXN MEM/NORMAL
+>>>>> 0xffffffbde0000000-0xffffffbde2000000          32M       RW NX SHD AF
+>>>>>       BLK UXN MEM/NORMAL
+>>>>> ---[ vmemmap end ]---
+>>>>>
+>>>>> so only 64 MB is used to back 4 GB of RAM with struct pages, which is
+>>>>> minimal. Moving to flatmem will not reduce the memory footprint at
+>>>>> all.
+>>>>
+>>>> Yes,but the populate is section, which is 1GB. Take a look at the above
+>>>> memory layout.
+>>>>
+>>>> The section 1G ~ 2G is a section. But 1.5G ~ 2G is a hole.
+>>>>
+>>>> The section 3G ~ 4G is a section. But 3.5G ~ 4G is a hole.
+>>>>>>  0             1.5G    2G             3.5G            4G
+>>>>>>  |              |      |               |              |
+>>>>>>  +--------------+------+---------------+--------------+
+>>>>>>  |    MEM       | hole |     MEM       |   IO (regs)  |
+>>>>>>  +--------------+------+---------------+--------------+
+>>>> The hole in 1.5G ~ 2G is also allocated mem-map array. And also with the 3.5G ~ 4G.
+>>>>
+>>>
+>>> No, it is not. It may be covered by a section, but that does not mean
+>>> sparsemem vmemmap will actually allocate backing for it. The
+>>> granularity used by sparsemem vmemmap on a 4k pages kernel is 128 MB,
+>>> due to the fact that the backing is performed at PMD granularity.
+>>>
+>>> Please, could you share the contents of the vmemmap section in
+>>> /sys/kernel/debug/kernel_page_tables of your system running with
+>>> sparsemem vmemmap enabled? You will need to set CONFIG_ARM64_PTDUMP=y
+>>>
+>>
+>> Please see the pg-tables below.
+>>
+>>
+>> With sparse and vmemmap enable.
+>>
+>> ---[ vmemmap start ]---
+>> 0xffffffbdc0200000-0xffffffbdc4800000          70M     RW NX SHD AF    UXN MEM/NORMAL
+>> ---[ vmemmap end ]---
+>>
+>>
+>> The board is 4GB, and the memap is 70MB
+>> 1G memory --- 14MB mem_map array.
+>> So the 4GB has 5 sections, which used 5 * 14MB memory.
+>>
+>>
+> Sorry, 1G memory is 16GB
+> 5 sections is 5 * 16 = 80MB
+>
+> 1G / 4K * (struct page) 64B = 16MB
+>
+> I don't know why the vmemap dump in pg-tables is 70MB.
+>
 
-> @@ -372,10 +383,44 @@ orion_spi_write_read(struct spi_device *spi, struct spi_transfer *xfer)
->  {
->  	unsigned int count;
->  	int word_len;
-> +	struct orion_spi *orion_spi;
-> +	int cs = spi->chip_select;
->  
->  	word_len = spi->bits_per_word;
->  	count = xfer->len;
->  
-> +	orion_spi = spi_master_get_devdata(spi->master);
-> +
-> +	/* Use SPI direct access mode if base address is available */
-> +	if (orion_spi->direct_access[cs].vaddr) {
-> +		struct orion_direct_acc *da = &orion_spi->direct_access[cs];
-> +
-> +		if (count > da->size) {
-> +			dev_err(&spi->dev,
-> +				"max transfer size exceeded (%d > %d)\n",
-> +				count, da->size);
-> +			return 0;
-> +		}
+It may be the PTDUMP code that emits the vmemmap start marker
+incorrectly. Could you please double check?
 
-This seems obviously broken, we're neither returning an error nor
-falling back to PIO here but instead silently ignoring the transfer.  If
-we can't fall back then I'd expect the driver to be setting
-max_transfer_size but it isn't, it's probably a good idea from a
-performance point of view to set it even if we can fall back.
+> I add hack code in vmemmap_populate sparse_mem_map_populate.
+>
+> here is the log:
+> sparse_mem_map_populate 188 start ffffffbdc0000000 end ffffffbdc1000000 PAGES_PER_SECTION 40000 nid 0
+> vmemmap_populate 549 size 200000 total 200000 addr ffffffbdc0000000
+> vmemmap_populate 549 size 200000 total 400000 addr ffffffbdc0200000
+> vmemmap_populate 549 size 200000 total 600000 addr ffffffbdc0400000
+> vmemmap_populate 549 size 200000 total 800000 addr ffffffbdc0600000
+> vmemmap_populate 549 size 200000 total a00000 addr ffffffbdc0800000
+> vmemmap_populate 549 size 200000 total c00000 addr ffffffbdc0a00000
+> vmemmap_populate 549 size 200000 total e00000 addr ffffffbdc0c00000
+> vmemmap_populate 549 size 200000 total 1000000 addr ffffffbdc0e00000
+> sparse_mem_map_populate 188 start ffffffbdc1000000 end ffffffbdc2000000 PAGES_PER_SECTION 40000 nid 0
+> ...
+> sparse_mem_map_populate 188 start ffffffbdc2000000 end ffffffbdc3000000 PAGES_PER_SECTION 40000 nid 0
+> sparse_mem_map_populate 188 start ffffffbdc3000000 end ffffffbdc4000000 PAGES_PER_SECTION 40000 nid 0
+> sparse_mem_map_populate 188 start ffffffbdc4000000 end ffffffbdc5000000 PAGES_PER_SECTION 40000 nid 0
+>
+>
+> With 4GB memory, it allocated 2MB *  8  * 5 = 80MB.
+>>  0                                    3.5G            4G    4.5G
+>>  |                                     |              |       |
+>>  +-------------------------------------+--------------+-------+
+>>  |                   MEM               |   IO (regs)  |  MEM  |
+>>  +-------------------------------------+--------------+-------+
+>
+> 4GB memory ,5 sections. 80MB mem_map allocated.
+>
 
-> +		if (xfer->tx_buf) {
-> +			/*
-> +			 * Send the tx-data to the SPI device via the direct
-> +			 * mapped address window
-> +			 */
-> +			memcpy(da->vaddr, xfer->tx_buf, count);
-> +		}
-> +
-> +		if (xfer->rx_buf) {
-> +			/*
-> +			 * Read the rx-data from the SPI device via the direct
-> +			 * mapped address window
-> +			 */
-> +			memcpy(xfer->rx_buf, da->vaddr, count);
-> +		}
+I suppose using
 
-Do bidirectional transfers work properly with this method (how much
-incoming data can we queue up, is there memory backing the whole
-region?), and are we guaranteed that the transfer finished by the time
-we return?  I'm also not seeing anything here that handles word size so
-I suspect this will cause data corruption with anything other than 8 bit
-words and the driver does support 16 bit with PIO.  If only 8 bit words
-can be supported with direct access I'd expect to see the
-bits_per_word_mask updated.
+#define SECTION_SIZE_BITS      29
 
-> +               spi->direct_access[cs].vaddr = devm_ioremap_resource(&pdev->dev,
-> +                                                                    r);
-> +               if (IS_ERR(spi->direct_access[cs].vaddr)) {
-> +                       status = PTR_ERR(spi->direct_access[cs].vaddr);
-> +                       goto out_rel_clk;
-> +               }
-> +
-> +               spi->direct_access[cs].size = resource_size(r);
-> +               dev_info(&pdev->dev, "CS%d configured for direct access\n", cs);
-> +       }
+in arch/arm64/include/asm/sparsemem.h would get rid of the overhead
+completely in this particular case. Could you confirm, please?
 
-I seem to be missing where we configure the hardware to connect the
-windows to the chip selects.  We just seem to map the windows but never
-otherwise interact with the hardware.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160411/a428120e/attachment.sig>
+@Will: is the rationale for the default value of 30 for
+SECTION_SIZE_BITS documented anywhere? Compared to other
+architectures, it seems on the high side, but I did notice that 64k
+granule kernels require at least 28 in order not to trigger the
+following assertion
+
+include/linux/mmzone.h:1029:2: error: #error Allocator MAX_ORDER
+exceeds SECTION_SIZE
