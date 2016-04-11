@@ -1,54 +1,47 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 11 Apr 2016 09:57:59 +0100
-Subject: [PATCH 1/2] PCI: iproc: Support DT property for ignoring aborts
- when probing
-In-Reply-To: <1460238624-2086-1-git-send-email-zajec5@gmail.com>
-References: <1460238624-2086-1-git-send-email-zajec5@gmail.com>
-Message-ID: <20160411085759.GA7088@leverpostej>
+From: xinliang.liu@linaro.org (Xinliang Liu)
+Date: Mon, 11 Apr 2016 16:55:43 +0800
+Subject: [PATCH v8 10/10] MAINTAINERS: Add maintainer for hisilicon DRM driver
+In-Reply-To: <1460364943-76135-1-git-send-email-xinliang.liu@linaro.org>
+References: <1460364943-76135-1-git-send-email-xinliang.liu@linaro.org>
+Message-ID: <1460364943-76135-11-git-send-email-xinliang.liu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please Cc the device tree mailing list (devicetree at vger.kernel.org) when
-sending device tree patches.
+Add maintainer and reviewer for hisilicon DRM driver.
 
-On Sat, Apr 09, 2016 at 11:50:23PM +0200, Rafa? Mi?ecki wrote:
-> Some devices (e.g. Northstar ones) may have bridges that forward
-> harmless errors to the ARM core. In such case we need an option to
-> add a handler ignoring them.
-> 
-> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
-> ---
->  .../devicetree/bindings/pci/brcm,iproc-pcie.txt         |  6 ++++++
->  drivers/pci/host/pcie-iproc-platform.c                  |  2 ++
->  drivers/pci/host/pcie-iproc.c                           | 17 +++++++++++++++++
->  drivers/pci/host/pcie-iproc.h                           |  1 +
->  4 files changed, 26 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt b/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
-> index 01b88f4..c91b20a 100644
-> --- a/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
-> +++ b/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
-> @@ -22,6 +22,12 @@ Optional properties:
->  
->  - brcm,pcie-ob: Some iProc SoCs do not have the outbound address mapping done
->  by the ASIC after power on reset. In this case, SW needs to configure it
-> +- brcm,pcie-hook-abort-handler: During PCI bus probing (device enumeration)
-> +  there can be errors that are expected and harmless. Unfortunately some bridges
-> +  can't be configured to ignore them and they forward them to the ARM core
-> +  triggering die().
-> +  This property should be set in such case, it will make driver add its own
-> +  handler ignoring such errors.
+v8: None.
+v7: None.
+v6: None.
+v5: None.
+v4:
+- Add Chen Feng <puck.chen@hisilicon.com> as Designated reviewer.
+v3: First version.
 
-Rather than describing what the kernel should do, this should describe
-the property of the hardware (e.g. this should be named something like
-brcm,spurious-probing-abort).
+Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
+---
+ MAINTAINERS | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-Is there absolutely no mechanism to disable this, even if
-board-specific?
-
-Are the aborts synchronous or asynchronous?
-
-When specifically do they actually occur?
-
-Thanks,
-Mark.
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 61a323a6b2cf..a2ef58860689 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -3840,6 +3840,16 @@ S:	Maintained
+ F:	drivers/gpu/drm/gma500
+ F:	include/drm/gma500*
+ 
++DRM DRIVERS FOR HISILICON
++M:	Xinliang Liu <z.liuxinliang@hisilicon.com>
++R:	Xinwei Kong <kong.kongxinwei@hisilicon.com>
++R:	Chen Feng <puck.chen@hisilicon.com>
++L:	dri-devel at lists.freedesktop.org
++T:	git git://github.com/xin3liang/linux.git
++S:	Maintained
++F:	drivers/gpu/drm/hisilicon
++F:	Documentation/devicetree/bindings/display/hisilicon
++
+ DRM DRIVERS FOR NVIDIA TEGRA
+ M:	Thierry Reding <thierry.reding@gmail.com>
+ M:	Terje Bergstr?m <tbergstrom@nvidia.com>
+-- 
+2.8.0
