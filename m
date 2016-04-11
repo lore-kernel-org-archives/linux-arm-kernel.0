@@ -1,66 +1,116 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 11 Apr 2016 08:38:10 -0500
-Subject: [PATCH v3 2/2] PCI: imx6: Add reset-gpio-active-high boolean
- property to DT
-In-Reply-To: <1459946207-11923-1-git-send-email-ynezz@true.cz>
-References: <1459936100.2256.30.camel@pengutronix.de>
- <1459946207-11923-1-git-send-email-ynezz@true.cz>
-Message-ID: <20160411133810.GA15094@rob-hp-laptop>
+Date: Mon, 11 Apr 2016 08:47:28 -0500
+Subject: [PATCH V2 1/5] iommu/msm: Add DT adaptation
+In-Reply-To: <1459952975-1250-2-git-send-email-sricharan@codeaurora.org>
+References: <1459952975-1250-1-git-send-email-sricharan@codeaurora.org>
+ <1459952975-1250-2-git-send-email-sricharan@codeaurora.org>
+Message-ID: <20160411134728.GA21468@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 06, 2016 at 02:36:47PM +0200, Petr ?tetiar wrote:
-> Currently the reset-gpio DT property which controls the PCI bus device
-> reset signal defaults to active-low reset sequence (L=reset state,
-> H=operation state) plus the code in reset function isn't GPIO polarity
-> aware - it doesn't matter if the defined reset-gpio is active-low or
-> active-high, it will always result into active-low reset sequence.
+On Wed, Apr 06, 2016 at 07:59:31PM +0530, Sricharan R wrote:
+> The driver currently works based on platform data. Remove this
+> and add support for DT. A single master can have multiple ports
+> connected to more than one iommu.
 > 
-> I've tried to fix it properly and changed the reset-gpio reset sequence
-> to be polarity aware, but this patch has been accepted and then reverted
-> as it has introduced few backward incompatible issues:
-> 
-> 1. Some of the DTBs as for example imx6qdl-sabresd, doesn't define
-> reset-gpio polarity correctly:
-> 
->   reset-gpio = <&gpio7 12 0>;
-> 
-> which means, that it's defined as active-high, but in reality it's
-> active-low, thus it wouldn't work without DTS fix.
-> 
-> 2. The logic in reset function is inverted:
-> 
-> 	gpio_set_value_cansleep(imx6_pcie->reset_gpio, 0)
-> 	msleep(100);
-> 	gpio_set_value_cansleep(imx6_pcie->reset_gpio, 1);
-> 
-> so even if some of the i.MX6 boards had reset-gpio polarity defined
-> correctly in their DTSes, they would stop working.
-> 
-> As we can't break old DTBs, we can't fix them and that's why we need to
-> introduce this new DT reset-gpio-active-high boolean property, so we can
-> support boards with active-high reset sequence.
-> 
-> This active-high reset sequence is for example needed on Apalis SoMs,
-> where GPIO1_IO28, used to PCIe reset is not connected directly to PERST#
-> PCIe signal, but it's ORed with RESETBMCU coming off the PMIC, and thus
-> is inverted, active-high.
-> 
-> Signed-off-by: Petr ?tetiar <ynezz@true.cz>
-> ---
->  Changes since v1:
-> 
->   * Added documentation of reset-gpio and reset-gpio-active-high DT properties
->   * Removed unnecessary double negation of GPIO value
-> 
->  Changes since v2:
-> 
->   * Changed commit message so it explains in more detail why we need new DT
->     property
->   * Changed PHY to 'bus device' in binding's documentation
-> 
->  Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt |  6 ++++++
->  drivers/pci/host/pci-imx6.c                              | 14 +++++++++++---
->  2 files changed, 17 insertions(+), 3 deletions(-)
+> 	  	      master
+>         	        |
+> 	                |
+> 	                |
+> 	   ------------------------
+>            |  			  |
+> 	IOMMU0			IOMMU1
 
-Acked-by: Rob Herring <robh@kernel.org>
+You've got mixtures of tabs and spaces here. Either fully use leading 
+tabs or use spaces everywhere.
+
+>            |			  |
+>       ctx0   ctx1	     ctx0   ctx1
+> 
+> This association of master and iommus/contexts were previously
+> represented by platform data parent/child device details. The client
+> drivers were responsible for programming all of the iommus/contexts
+> for the device. Now while adapting to generic DT bindings we maintain the
+> list of iommus, contexts that each master domain is connected to and
+> program all of them on attach/detach.
+> 
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> ---
+>  .../devicetree/bindings/iommu/msm,iommu-v0.txt     |  59 ++++
+
+It is preferred to split bindings to separate patch.
+
+>  drivers/iommu/msm_iommu.c                          | 252 +++++++++--------
+>  drivers/iommu/msm_iommu.h                          |  73 ++---
+>  drivers/iommu/msm_iommu_dev.c                      | 315 +++++----------------
+>  4 files changed, 296 insertions(+), 403 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/iommu/msm,iommu-v0.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/iommu/msm,iommu-v0.txt b/Documentation/devicetree/bindings/iommu/msm,iommu-v0.txt
+> new file mode 100644
+> index 0000000..21bfbfc
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/iommu/msm,iommu-v0.txt
+> @@ -0,0 +1,59 @@
+> +* QCOM IOMMU
+> +
+> +The QCOM IOMMU is an implementation compatible with the ARM VMSA short
+> +descriptor page tables. It provides address translation for bus masters outside
+> +of the CPU, each connected to the IOMMU through a port called micro-TLB.
+> +
+> +Required Properties:
+> +
+> +  - compatible: Must contain "qcom,iommu-v0".
+
+You need SoC specific compatible strings in addition.
+
+> +  - reg: Base address and size of the IOMMU registers.
+> +  - interrupts: Specifiers for the MMU fault interrupts. For instances that
+> +    support secure mode two interrupts must be specified, for non-secure and
+> +    secure mode, in that order. For instances that don't support secure mode a
+> +    single interrupt must be specified.
+> +  - #iommu-cells: This is the total number of stream ids that a master would
+> +		  use during transactions which will be specified as a list
+> +		  as a part of iommus property below.
+> +  - ncb: The total number of context banks in the IOMMU.
+> +  - clocks	: List of clocks to be used during SMMU register access. See
+> +		  Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +		  for information about the format. For each clock specified
+> +		  here, there must be a corresponding entry in clock-names
+> +		  (see below).
+> +
+> +  - clock-names	: List of clock names corresponding to the clocks specified in
+> +		  the "clocks" property (above). See
+> +		  Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +		  for more info.
+> +
+> +Each bus master connected to an IOMMU must reference the IOMMU in its device
+> +node with the following property:
+> +
+> +  - iommus: A reference to the IOMMU in multiple cells. The first cell is a
+> +	    phandle to the IOMMU and the second cell is the list of the
+> +	    stream ids used by the device.
+> +
+> +Example: mdp iommu and its bus master
+> +
+> +                mdp_port0: qcom,iommu at 7500000 {
+> +			compatible = "msm,iommu-v0";
+> +			#iommu-cells = <2>;
+> +			clock-names =
+> +			    "smmu_pclk",
+> +			    "iommu_clk";
+> +			clocks =
+> +			    <&mmcc SMMU_AHB_CLK>,
+> +			    <&mmcc MDP_AXI_CLK>;
+> +			reg = <0x07500000 0x100000>;
+> +			interrupts =
+> +			    <GIC_SPI 63 0>,
+> +			    <GIC_SPI 64 0>;
+> +			ncb = <2>;
+> +		};
+> +
+> +		mdp: qcom,mdp at 5100000 {
+> +			compatible = "qcom,mdp";
+> +			...
+> +			iommus = <&mdp_port0 0 2>;
+> +		};
