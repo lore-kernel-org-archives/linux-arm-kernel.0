@@ -1,38 +1,25 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Mon, 11 Apr 2016 16:44:36 +0100
-Subject: [PATCH] usb: host: xhci-plat: Make enum xhci_plat_type start at
- a non zero value
-In-Reply-To: <1458917188-28452-1-git-send-email-peter.griffin@linaro.org>
-References: <1458917188-28452-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20160411154436.GA14580@griffinp-ThinkPad-X1-Carbon-2nd>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 11 Apr 2016 10:45:14 -0500
+Subject: [PATCH 2/7] PM / devfreq: exynos: Add the detailed correlation
+ for Exynos5422 bus
+In-Reply-To: <1460091646-28701-3-git-send-email-cw00.choi@samsung.com>
+References: <1460091646-28701-1-git-send-email-cw00.choi@samsung.com>
+ <1460091646-28701-3-git-send-email-cw00.choi@samsung.com>
+Message-ID: <20160411154514.GA29936@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mathias,
-
-On Fri, 25 Mar 2016, Peter Griffin wrote:
-
-> Otherwise generic-xhci and xhci-platform which have no data get wrongly
-> detected as XHCI_PLAT_TYPE_MARVELL_ARMADA by xhci_plat_type_is().
+On Fri, Apr 08, 2016 at 02:00:41PM +0900, Chanwoo Choi wrote:
+> This patch adds the detailed corrleation between sub-blocks and power line
+> for Exynos5422.
 > 
-> This fixes a regression in v4.5 for STiH407 family SoC's which use the
-> synopsis dwc3 IP, whereby the disable_clk error path gets taken due to
-> wrongly being detected as XHCI_PLAT_TYPE_MARVELL_ARMADA and the hcd never
-> gets added.
-> 
-> I suspect this will also fix other dwc3 DT platforms such as Exynos,
-> although I've only tested on STih410 SoC.
-> 
-> Fixes: 4efb2f694114 ("usb: host: xhci-plat: add struct xhci_plat_priv")
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> ---
+>  .../devicetree/bindings/devfreq/exynos-bus.txt        | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
 
-Can you take this 1 charcter fix for the next -rc?
+This belongs with your previous series. Probably, all of this should be 
+1 DT patch rather than piecemeal. Any division should be by h/w block, 
+not as a driver is using features.
 
-It fixes a regression introduced in commit 4efb2f694114 for usb3 for some
-DT platforms.
-
-Then Felipes series which re-works this code will hopefully be merged in the
-next merge window.
-
-regards,
-
-Peter.
+Rob
