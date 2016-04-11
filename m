@@ -1,145 +1,153 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 11 Apr 2016 12:31:32 +0100
-Subject: [RFC PATCH 16/45] KVM: arm/arm64: vgic-new: Add PENDING registers
- handlers
-In-Reply-To: <20160331093551.GV4126@cbox>
-References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
- <1458871508-17279-17-git-send-email-andre.przywara@arm.com>
- <20160331093551.GV4126@cbox>
-Message-ID: <570B8B14.3050007@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 11 Apr 2016 12:32:31 +0100
+Subject: [PATCH RESEND] iommu/dma: Implement scatterlist segment merging
+Message-ID: <b87bf47e79febb3ca904140db09cf095238b2817.1460373907.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/03/16 10:35, Christoffer Dall wrote:
-> On Fri, Mar 25, 2016 at 02:04:39AM +0000, Andre Przywara wrote:
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->>  virt/kvm/arm/vgic/vgic_mmio.c | 87 ++++++++++++++++++++++++++++++++++++++++++-
->>  1 file changed, 85 insertions(+), 2 deletions(-)
->>
->> diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
->> index 0688a69..8514f92 100644
->> --- a/virt/kvm/arm/vgic/vgic_mmio.c
->> +++ b/virt/kvm/arm/vgic/vgic_mmio.c
->> @@ -206,6 +206,89 @@ static int vgic_mmio_write_cenable(struct kvm_vcpu *vcpu,
->>  	return 0;
->>  }
->>  
->> +static int vgic_mmio_read_pending(struct kvm_vcpu *vcpu,
->> +				  struct kvm_io_device *this,
->> +				  gpa_t addr, int len, void *val)
->> +{
->> +	struct vgic_io_device *iodev = container_of(this,
->> +						    struct vgic_io_device, dev);
->> +	u32 intid = (addr - iodev->base_addr) * 8;
->> +	u32 value = 0;
->> +	int i;
->> +
->> +	if (iodev->redist_vcpu)
->> +		vcpu = iodev->redist_vcpu;
->> +
->> +	/* Loop over all IRQs affected by this read */
->> +	for (i = 0; i < len * 8; i++) {
->> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
->> +
->> +		spin_lock(&irq->irq_lock);
->> +		if (irq->pending)
->> +			value |= (1U << i);
->> +		spin_unlock(&irq->irq_lock);
-> 
-> here there clearly is no need to take the lock (because a bool read is
-> atomic), but that should be explained in a one-line comment.
+Stop wasting IOVA space by over-aligning scatterlist segments for a
+theoretical worst-case segment boundary mask, and instead take the real
+limits into account to merge consecutive segments wherever appropriate,
+so our callers can benefit from getting back nicely simplified lists.
 
-Is that really true? Isn't it that another lock holder expects full
-control over the IRQ struct, including the freedom to change values at
-will without caring about other observers?
-I might be too paranoid here, but I think I explicitly added the lock
-here for a reason (which I don't remember anymore, sadly).
+This also represents the last piece of functionality wanted by users of
+the current arch/arm implementation, thus brings us a small step closer
+to converting that over to the common code.
 
-Cheers,
-Andre.
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
 
->> +	}
->> +
->> +	write_mask32(value, addr & 3, len, val);
->> +	return 0;
->> +}
->> +
->> +static int vgic_mmio_write_spending(struct kvm_vcpu *vcpu,
->> +				    struct kvm_io_device *this,
->> +				    gpa_t addr, int len, const void *val)
->> +{
->> +	struct vgic_io_device *iodev = container_of(this,
->> +						    struct vgic_io_device, dev);
->> +	u32 intid = (addr - iodev->base_addr) * 8;
->> +	int i;
->> +
->> +	if (iodev->redist_vcpu)
->> +		vcpu = iodev->redist_vcpu;
->> +
->> +	for_each_set_bit(i, val, len * 8) {
->> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
->> +
->> +		spin_lock(&irq->irq_lock);
->> +		irq->pending = true;
->> +		if (irq->config == VGIC_CONFIG_LEVEL)
->> +			irq->soft_pending = true;
->> +
->> +		vgic_queue_irq(vcpu->kvm, irq);
->> +	}
->> +
->> +	return 0;
->> +}
->> +
->> +static int vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
->> +				    struct kvm_io_device *this,
->> +				    gpa_t addr, int len, const void *val)
->> +{
->> +	struct vgic_io_device *iodev = container_of(this,
->> +						    struct vgic_io_device, dev);
->> +	u32 intid = (addr - iodev->base_addr) * 8;
->> +	int i;
->> +
->> +	if (iodev->redist_vcpu)
->> +		vcpu = iodev->redist_vcpu;
->> +
->> +	for_each_set_bit(i, val, len * 8) {
->> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
->> +
->> +		spin_lock(&irq->irq_lock);
->> +
->> +		if (irq->config == VGIC_CONFIG_LEVEL) {
->> +			irq->soft_pending = false;
->> +			irq->pending = irq->line_level;
->> +		} else {
->> +			irq->pending = false;
->> +		}
->> +		/* TODO: Does the exit/entry code take care of "unqueuing"? */
-> 
-> see previous patch comment
-> 
->> +
->> +		spin_unlock(&irq->irq_lock);
->> +	}
->> +	return 0;
->> +}
->> +
->>  struct vgic_register_region vgic_v2_dist_registers[] = {
->>  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
->>  		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12),
->> @@ -216,9 +299,9 @@ struct vgic_register_region vgic_v2_dist_registers[] = {
->>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_CLEAR,
->>  		vgic_mmio_read_enable, vgic_mmio_write_cenable, 1),
->>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_SET,
->> -		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 1),
->> +		vgic_mmio_read_pending, vgic_mmio_write_spending, 1),
->>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_CLEAR,
->> -		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 1),
->> +		vgic_mmio_read_pending, vgic_mmio_write_cpending, 1),
->>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_SET,
->>  		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 1),
->>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_CLEAR,
->> -- 
->> 2.7.3
->>
-> 
+As requested, reposting rebased onto -rc3.
+
+ drivers/iommu/dma-iommu.c | 84 ++++++++++++++++++++++++++++++++++-------------
+ 1 file changed, 61 insertions(+), 23 deletions(-)
+
+diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+index 58f2fe6..886cb3a 100644
+--- a/drivers/iommu/dma-iommu.c
++++ b/drivers/iommu/dma-iommu.c
+@@ -389,26 +389,58 @@ void iommu_dma_unmap_page(struct device *dev, dma_addr_t handle, size_t size,
+ 
+ /*
+  * Prepare a successfully-mapped scatterlist to give back to the caller.
+- * Handling IOVA concatenation can come later, if needed
++ *
++ * At this point the segments are already laid out by iommu_dma_map_sg() to
++ * avoid individually crossing any boundaries, so we merely need to check a
++ * segment's start address to avoid concatenating across one.
+  */
+ static int __finalise_sg(struct device *dev, struct scatterlist *sg, int nents,
+ 		dma_addr_t dma_addr)
+ {
+-	struct scatterlist *s;
+-	int i;
++	struct scatterlist *s, *cur = sg;
++	unsigned long seg_mask = dma_get_seg_boundary(dev);
++	unsigned int cur_len = 0, max_len = dma_get_max_seg_size(dev);
++	int i, count = 0;
+ 
+ 	for_each_sg(sg, s, nents, i) {
+-		/* Un-swizzling the fields here, hence the naming mismatch */
+-		unsigned int s_offset = sg_dma_address(s);
++		/* Restore this segment's original unaligned fields first */
++		unsigned int s_iova_off = sg_dma_address(s);
+ 		unsigned int s_length = sg_dma_len(s);
+-		unsigned int s_dma_len = s->length;
++		unsigned int s_iova_len = s->length;
+ 
+-		s->offset += s_offset;
++		s->offset += s_iova_off;
+ 		s->length = s_length;
+-		sg_dma_address(s) = dma_addr + s_offset;
+-		dma_addr += s_dma_len;
++		sg_dma_address(s) = DMA_ERROR_CODE;
++		sg_dma_len(s) = 0;
++
++		/*
++		 * Now fill in the real DMA data. If...
++		 * - there is a valid output segment to append to
++		 * - and this segment starts on an IOVA page boundary
++		 * - but doesn't fall at a segment boundary
++		 * - and wouldn't make the resulting output segment too long
++		 */
++		if (cur_len && !s_iova_off && (dma_addr & seg_mask) &&
++		    (cur_len + s_length <= max_len)) {
++			/* ...then concatenate it with the previous one */
++			cur_len += s_length;
++		} else {
++			/* Otherwise start the next output segment */
++			if (i > 0)
++				cur = sg_next(cur);
++			cur_len = s_length;
++			count++;
++
++			sg_dma_address(cur) = dma_addr + s_iova_off;
++		}
++
++		sg_dma_len(cur) = cur_len;
++		dma_addr += s_iova_len;
++
++		if (s_length + s_iova_off < s_iova_len)
++			cur_len = 0;
+ 	}
+-	return i;
++	return count;
+ }
+ 
+ /*
+@@ -446,34 +478,40 @@ int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
+ 	struct scatterlist *s, *prev = NULL;
+ 	dma_addr_t dma_addr;
+ 	size_t iova_len = 0;
++	unsigned long mask = dma_get_seg_boundary(dev);
+ 	int i;
+ 
+ 	/*
+ 	 * Work out how much IOVA space we need, and align the segments to
+ 	 * IOVA granules for the IOMMU driver to handle. With some clever
+ 	 * trickery we can modify the list in-place, but reversibly, by
+-	 * hiding the original data in the as-yet-unused DMA fields.
++	 * stashing the unaligned parts in the as-yet-unused DMA fields.
+ 	 */
+ 	for_each_sg(sg, s, nents, i) {
+-		size_t s_offset = iova_offset(iovad, s->offset);
++		size_t s_iova_off = iova_offset(iovad, s->offset);
+ 		size_t s_length = s->length;
++		size_t pad_len = (mask - iova_len + 1) & mask;
+ 
+-		sg_dma_address(s) = s_offset;
++		sg_dma_address(s) = s_iova_off;
+ 		sg_dma_len(s) = s_length;
+-		s->offset -= s_offset;
+-		s_length = iova_align(iovad, s_length + s_offset);
++		s->offset -= s_iova_off;
++		s_length = iova_align(iovad, s_length + s_iova_off);
+ 		s->length = s_length;
+ 
+ 		/*
+-		 * The simple way to avoid the rare case of a segment
+-		 * crossing the boundary mask is to pad the previous one
+-		 * to end at a naturally-aligned IOVA for this one's size,
+-		 * at the cost of potentially over-allocating a little.
++		 * Due to the alignment of our single IOVA allocation, we can
++		 * depend on these assumptions about the segment boundary mask:
++		 * - If mask size >= IOVA size, then the IOVA range cannot
++		 *   possibly fall across a boundary, so we don't care.
++		 * - If mask size < IOVA size, then the IOVA range must start
++		 *   exactly on a boundary, therefore we can lay things out
++		 *   based purely on segment lengths without needing to know
++		 *   the actual addresses beforehand.
++		 * - The mask must be a power of 2, so pad_len == 0 if
++		 *   iova_len == 0, thus we cannot dereference prev the first
++		 *   time through here (i.e. before it has a meaningful value).
+ 		 */
+-		if (prev) {
+-			size_t pad_len = roundup_pow_of_two(s_length);
+-
+-			pad_len = (pad_len - iova_len) & (pad_len - 1);
++		if (pad_len && pad_len < s_length - 1) {
+ 			prev->length += pad_len;
+ 			iova_len += pad_len;
+ 		}
+-- 
+2.7.3.dirty
