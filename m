@@ -1,73 +1,40 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Mon, 11 Apr 2016 11:02:03 +0900
-Subject: next-20160401+: ARM: DRA7: linux-next regression: mm/slab:
- clean-up kmem_cache_node setup
-In-Reply-To: <570816F8.9070301@ti.com>
-References: <570816F8.9070301@ti.com>
-Message-ID: <20160411020203.GA25211@js1304-P5Q-DELUXE>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Mon, 11 Apr 2016 10:12:42 +0800
+Subject: [PATCH v3] ARM64: ACPI: Update documentation for latest
+ specification version
+In-Reply-To: <1459210002-3387-1-git-send-email-al.stone@linaro.org>
+References: <1459210002-3387-1-git-send-email-al.stone@linaro.org>
+Message-ID: <570B081A.3070403@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 08, 2016 at 03:39:20PM -0500, Nishanth Menon wrote:
-> Hi,
-> 
-> http://marc.info/?l=linux-omap&m=146014314115625&w=2 series works with
-> v4.6-rc2 kernel, however, it fails with linux-next for suspend-to-ram
-> (mem) on BeagleBoard-X15
-> 
-> next-20160327 - good
-> next-20160329 - good
-> next-20160330 - Fails to boot - I2C crashes
-> next-20160331-  Fails to boot - USB crashes
-> next-20160401 -> bad
-> next-20160408 -> bad
-> 
-> Bisect log of next-20160408 vs v4.6-rc2 ->
-> http://pastebin.ubuntu.com/15697856/
-> 
-> # first bad commit: [2b629704a2b6a5b239f23750e5517a9d8c3a4e8c]
-> mm/slab: clean-up kmem_cache_node setup
-> 
+On 2016/3/29 8:06, Al Stone wrote:
+> The ACPI 6.1 specification was recently released at the end of January
+> 2016, but the arm64 kernel documentation for the use of ACPI was written
+> for the 5.1 version of the spec.  There were significant additions to the
+> spec that had not yet been mentioned -- for example, the 6.0 mechanisms
+> added to make it easier to define processors and low power idle states,
+> as well as the 6.1 addition allowing regular interrupts (not just from
+> GPIO) be used to signal ACPI general purpose events.
+>
+> This patch reflects going back through and examining the specs in detail
+> and updating content appropriately.  Whilst there, a few odds and ends of
+> typos were caught as well.  This brings the documentation up to date with
+> ACPI 6.1 for arm64.
+>
+> Changes for v3:
+>    -- Clarify use of _LPI/_RDI (Vikas Sajjan)
+>    -- Whitespace cleanup as pointed out by checkpatch
+>
+> Changes for v2:
+>    -- Clean up white space (Harb Abdulhahmid)
+>    -- Clarification on _CCA usage (Harb Abdulhamid)
+>    -- IORT moved to required from recommended (Hanjun Guo)
+>    -- Clarify IORT description (Hanjun Guo)
+>
+> Signed-off-by: Al Stone <al.stone@linaro.org>
 
-Hello,
+Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-I made a mistake on that patch. Could you try to test below one on
-top of it.
-
-Thanks.
-
---------->8----------------
->From d3af3cc409527e9be6beb62ea395cde67f3c5029 Mon Sep 17 00:00:00 2001
-From: Joonsoo Kim <iamjoonsoo.kim@lge.com>
-Date: Mon, 11 Apr 2016 10:48:29 +0900
-Subject: [PATCH] mm/slab: clean-up kmem_cache_node setup-fix
-
-After calling free_block(), we need to re-calculate array_cache's
-avail counter. Fix it.
-
-And, it's better to free objects in shared array when it is
-really necessary. Check it before calling free_block().
-
-Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
----
- mm/slab.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/mm/slab.c b/mm/slab.c
-index fcd5fbb..27cb390 100644
---- a/mm/slab.c
-+++ b/mm/slab.c
-@@ -927,9 +927,10 @@ static int setup_kmem_cache_node(struct kmem_cache *cachep,
- 
- 	n = get_node(cachep, node);
- 	spin_lock_irq(&n->list_lock);
--	if (n->shared) {
-+	if (n->shared && force_change) {
- 		free_block(cachep, n->shared->entry,
- 				n->shared->avail, node, &list);
-+		n->shared->avail = 0;
- 	}
- 
- 	if (!n->shared || force_change) {
--- 
-1.9.1
+Thanks for the doc updating!
+Hanjun
