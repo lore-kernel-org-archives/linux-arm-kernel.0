@@ -1,31 +1,44 @@
-From: vaishali.thakkar@oracle.com (Vaishali Thakkar)
-Date: Mon, 11 Apr 2016 10:23:03 +0530
-Subject: [PATCH] clk: sunxi: Use resource_size
-Message-ID: <1460350383-7661-1-git-send-email-vaishali.thakkar@oracle.com>
+From: felipe.balbi@linux.intel.com (Felipe Balbi)
+Date: Mon, 11 Apr 2016 08:07:28 +0300
+Subject: [PATCH] usb: core: buffer: avoid NULL pointer dereferrence
+In-Reply-To: <1460343705.10419.12.camel@mhfsdcap03>
+References: <1460106483-24793-1-git-send-email-chunfeng.yun@mediatek.com>
+ <20160408140701.GA3547@kroah.com> <1460343705.10419.12.camel@mhfsdcap03>
+Message-ID: <87shyspwbz.fsf@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the function resource_size instaed of explicit computation.
 
-Problem found using Coccinelle.
+Hi,
 
-Signed-off-by: Vaishali Thakkar <vaishali.thakkar@oracle.com>
----
- drivers/clk/sunxi/clk-sun9i-mmc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+chunfeng yun <chunfeng.yun@mediatek.com> writes:
+> On Fri, 2016-04-08 at 07:07 -0700, Greg Kroah-Hartman wrote:
+>> On Fri, Apr 08, 2016 at 05:08:03PM +0800, Chunfeng Yun wrote:
+>> > NULL pointer dereferrence will happen when class driver
+>> > wants to allocate zero length buffer and pool_max[0]
+>> > can't be used, so skip reserved pool in this case.
+>> 
+>> Why would a driver want to allocate a 0 length buffer?  What driver does
+>> this?
+> It's misc/usbtest.c
 
-diff --git a/drivers/clk/sunxi/clk-sun9i-mmc.c b/drivers/clk/sunxi/clk-sun9i-mmc.c
-index 028dd83..7167373 100644
---- a/drivers/clk/sunxi/clk-sun9i-mmc.c
-+++ b/drivers/clk/sunxi/clk-sun9i-mmc.c
-@@ -106,7 +106,7 @@ static int sun9i_a80_mmc_config_clk_probe(struct platform_device *pdev)
- 
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	/* one clock/reset pair per word */
--	count = DIV_ROUND_UP((r->end - r->start + 1), SUN9I_MMC_WIDTH);
-+	count = DIV_ROUND_UP((resource_size(r)), SUN9I_MMC_WIDTH);
- 	data->membase = devm_ioremap_resource(&pdev->dev, r);
- 	if (IS_ERR(data->membase))
- 		return PTR_ERR(data->membase);
+that'll do what you ask it to do with the userspace tool testusb. Are
+you trying to pass a size of 0 ?
+
+>> Shouldn't we fix that issue instead?
+> I don't know which way is better, but it seems simple to fix it up in
+> buffer.c 
+
+I think we should, really, avoid a 0-length allocation, but passing a
+size of 0 to testusb isn't very good either ;-) How are you calling
+testusb ?
+
 -- 
-2.1.4
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160411/f31cbb2b/attachment.sig>
