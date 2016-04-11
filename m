@@ -1,16 +1,18 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 11 Apr 2016 12:57:57 +0900
-Subject: [PATCH v9 19/20] ARM: dts: Expand the voltage range of buck1/3
- regulator for exynos4412-odroidu3
+Date: Mon, 11 Apr 2016 12:57:58 +0900
+Subject: [PATCH v9 20/20] ARM: dts: Add support of bus frequency for
+ exynos4412-trats/odroidu3
 In-Reply-To: <1460347078-15175-1-git-send-email-cw00.choi@samsung.com>
 References: <1460347078-15175-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1460347078-15175-20-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1460347078-15175-21-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch expands the voltage range of buck1/3 regulator due to as following:
-- MIF (Memory Interface) bus frequency needs the range of '900 - 1100 mV'.
-- INT (Internal) bus frequency needs the range of '900 - 1050 mV'.
+THis patch adds the bus device tree nodes for both MIF (Memory) and INT
+(Internal) block to enable the bus frequency.
+
+The DMC bus is parent device in MIF block using VDD_MIF and the LEFTBUS
+bus is parent device in INT block using VDD_INT.
 
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
@@ -18,34 +20,125 @@ Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 Tested-by: Markus Reichl <m.reichl@fivetechno.de>
 Tested-by: Anand Moon <linux.amoon@gmail.com>
 ---
- arch/arm/boot/dts/exynos4412-odroid-common.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/exynos4412-odroid-common.dtsi | 47 +++++++++++++++++++++++++
+ arch/arm/boot/dts/exynos4412-trats2.dts         | 47 +++++++++++++++++++++++++
+ 2 files changed, 94 insertions(+)
 
 diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-index cba37c974703..b4983cbc4f8c 100644
+index b4983cbc4f8c..2015f10071f9 100644
 --- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
 +++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-@@ -356,8 +356,8 @@
+@@ -109,6 +109,53 @@
+ 	};
+ };
  
- 			buck1_reg: BUCK1 {
- 				regulator-name = "vdd_mif";
--				regulator-min-microvolt = <1000000>;
--				regulator-max-microvolt = <1000000>;
-+				regulator-min-microvolt = <900000>;
-+				regulator-max-microvolt = <1100000>;
- 				regulator-always-on;
- 				regulator-boot-on;
- 			};
-@@ -372,8 +372,8 @@
++&bus_dmc {
++	devfreq-events = <&ppmu_dmc0_3>, <&ppmu_dmc1_3>;
++	vdd-supply = <&buck1_reg>;
++	status = "okay";
++};
++
++&bus_acp {
++	devfreq = <&bus_dmc>;
++	status = "okay";
++};
++
++&bus_c2c {
++	devfreq = <&bus_dmc>;
++	status = "okay";
++};
++
++&bus_leftbus {
++	devfreq-events = <&ppmu_leftbus_3>, <&ppmu_rightbus_3>;
++	vdd-supply = <&buck3_reg>;
++	status = "okay";
++};
++
++&bus_rightbus {
++	devfreq = <&bus_leftbus>;
++	status = "okay";
++};
++
++&bus_display {
++	devfreq = <&bus_leftbus>;
++	status = "okay";
++};
++
++&bus_fsys {
++	devfreq = <&bus_leftbus>;
++	status = "okay";
++};
++
++&bus_peri {
++	devfreq = <&bus_leftbus>;
++	status = "okay";
++};
++
++&bus_mfc {
++	devfreq = <&bus_leftbus>;
++	status = "okay";
++};
++
+ &cpu0 {
+ 	cpu0-supply = <&buck2_reg>;
+ };
+diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+index dce3cebe0606..9f3fb9a7f5f4 100644
+--- a/arch/arm/boot/dts/exynos4412-trats2.dts
++++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+@@ -289,6 +289,53 @@
+ 	status = "okay";
+ };
  
- 			buck3_reg: BUCK3 {
- 				regulator-name = "vdd_int";
--				regulator-min-microvolt = <1000000>;
--				regulator-max-microvolt = <1000000>;
-+				regulator-min-microvolt = <900000>;
-+				regulator-max-microvolt = <1050000>;
- 				regulator-always-on;
- 				regulator-boot-on;
- 			};
++&bus_dmc {
++	devfreq-events = <&ppmu_dmc0_3>, <&ppmu_dmc1_3>;
++	vdd-supply = <&buck1_reg>;
++	status = "okay";
++};
++
++&bus_acp {
++	devfreq = <&bus_dmc>;
++	status = "okay";
++};
++
++&bus_c2c {
++	devfreq = <&bus_dmc>;
++	status = "okay";
++};
++
++&bus_leftbus {
++	devfreq-events = <&ppmu_leftbus_3>, <&ppmu_rightbus_3>;
++	vdd-supply = <&buck3_reg>;
++	status = "okay";
++};
++
++&bus_rightbus {
++	devfreq = <&bus_leftbus>;
++	status = "okay";
++};
++
++&bus_display {
++	devfreq = <&bus_leftbus>;
++	status = "okay";
++};
++
++&bus_fsys {
++	devfreq = <&bus_leftbus>;
++	status = "okay";
++};
++
++&bus_peri {
++	devfreq = <&bus_leftbus>;
++	status = "okay";
++};
++
++&bus_mfc {
++	devfreq = <&bus_leftbus>;
++	status = "okay";
++};
++
+ &cpu0 {
+ 	cpu0-supply = <&buck2_reg>;
+ };
 -- 
 1.9.1
