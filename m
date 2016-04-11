@@ -1,28 +1,29 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 11 Apr 2016 16:00:03 +0200
-Subject: [PATCH 1/2] clk: Add Oxford Semiconductor OXNAS Standard Clocks
-In-Reply-To: <20160407233113.GI18567@codeaurora.org>
-References: <1459520791-13269-1-git-send-email-narmstrong@baylibre.com>
- <1459520791-13269-2-git-send-email-narmstrong@baylibre.com>
- <20160402005045.GX18567@codeaurora.org> <5701210A.4060807@baylibre.com>
- <20160407233113.GI18567@codeaurora.org>
-Message-ID: <570BADE3.8080201@baylibre.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 11 Apr 2016 09:02:43 -0500
+Subject: [PATCH v4 4/5] Documentation: DT: vdma: update binding doc for
+ AXI CDMA
+In-Reply-To: <1460006985-14805-5-git-send-email-appanad@xilinx.com>
+References: <1460006985-14805-1-git-send-email-appanad@xilinx.com>
+ <1460006985-14805-5-git-send-email-appanad@xilinx.com>
+Message-ID: <20160411140243.GA827@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/08/2016 01:31 AM, Stephen Boyd wrote:
-> On 04/03, Neil Armstrong wrote:
->> On 04/02/2016 02:50 AM, Stephen Boyd wrote:
+On Thu, Apr 07, 2016 at 10:59:44AM +0530, Kedareswara rao Appana wrote:
+> This patch updates the device-tree binding doc for
+> adding support for AXI CDMA.
 > 
-> Ok. I was hoping that we could make simple-mfd look to see if
-> there's a syscon and then attach it to the parent device, but it
-> seems that simple-mfd is not actually a driver and it might not
-> even make a parent device for the children nodes?
+> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> ---
+> Changes for v4:
+> ---> None.
+> Changes for v3:
+> ---> Removed CDMA DT example from the patch as suggested by the Rob.
+> Changes for v2:
+> ---> Modified commit message as suggested by Vinod.
+> ---> Moved the patch to forward in the series as suggested by vinod.
 > 
+>  Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
 
-It seems so, I will look at the device hierarchy next week.
-Syscon is only used by these syscon_node_to_regmap() or similar calls, and they are the only APIs available.
-
-This call is at least used by clk-mtk, nxp and at91 clocks, is there a plan for these to change to another API ?
-
-Neil
+Acked-by: Rob Herring <robh@kernel.org>
