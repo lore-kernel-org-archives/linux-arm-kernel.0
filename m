@@ -1,11 +1,10 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 11 Apr 2016 07:51:12 +0000 (UTC)
-Subject: No subject
-Message-ID: <alpine.DEB.2.02.1604110749570.4726@utopia.booyaka.com>
+Date: Mon, 11 Apr 2016 07:52:06 +0000 (UTC)
+Subject: OMAP baseline test results for v4.6-rc3
+Message-ID: <alpine.DEB.2.02.1604110751510.4726@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP baseline test results for v4.6-rc3
 
 Here are some basic OMAP test results for Linux v4.6-rc3.
 Logs and other details at:
