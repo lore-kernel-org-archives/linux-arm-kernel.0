@@ -1,156 +1,146 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 11 Apr 2016 10:55:18 +0100
-Subject: [RFC PATCH 2/2] ARM64: arch_timer: Work around QorIQ Erratum
- A-009971
-In-Reply-To: <1460341353-15619-3-git-send-email-oss@buserror.net>
-References: <1460341353-15619-1-git-send-email-oss@buserror.net>
- <1460341353-15619-3-git-send-email-oss@buserror.net>
-Message-ID: <570B7486.3080204@arm.com>
+From: puck.chen@hisilicon.com (Chen Feng)
+Date: Mon, 11 Apr 2016 17:59:42 +0800
+Subject: [PATCH 1/2] arm64: mem-model: add flatmem model for arm64
+In-Reply-To: <CAKv+Gu9aqR=E3TmbPDFEUC+Q13bAJTU5wVTTHkOr6aX6BZ1OVA@mail.gmail.com>
+References: <1459844572-53069-1-git-send-email-puck.chen@hisilicon.com>
+ <20160407142148.GI5657@arm.com> <570B10B2.2000000@hisilicon.com>
+ <CAKv+Gu8iQ0NzLFWHy9Ggyv+jL-BqJ3x-KaRD1SZ1mU6yU3c7UQ@mail.gmail.com>
+ <570B5875.20804@hisilicon.com>
+ <CAKv+Gu9aqR=E3TmbPDFEUC+Q13bAJTU5wVTTHkOr6aX6BZ1OVA@mail.gmail.com>
+Message-ID: <570B758E.7070005@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/16 03:22, Scott Wood wrote:
-> From: Priyanka Jain <priyanka.jain@nxp.com>
+Hi Ard,
+
+On 2016/4/11 16:00, Ard Biesheuvel wrote:
+> On 11 April 2016 at 09:55, Chen Feng <puck.chen@hisilicon.com> wrote:
+>> Hi Ard,
+>>
+>> On 2016/4/11 15:35, Ard Biesheuvel wrote:
+>>> On 11 April 2016 at 04:49, Chen Feng <puck.chen@hisilicon.com> wrote:
+>>>> Hi will,
+>>>> Thanks for review.
+>>>>
+>>>> On 2016/4/7 22:21, Will Deacon wrote:
+>>>>> On Tue, Apr 05, 2016 at 04:22:51PM +0800, Chen Feng wrote:
+>>>>>> We can reduce the memory allocated at mem-map
+>>>>>> by flatmem.
+>>>>>>
+>>>>>> currently, the default memory-model in arm64 is
+>>>>>> sparse memory. The mem-map array is not freed in
+>>>>>> this scene. If the physical address is too long,
+>>>>>> it will reserved too much memory for the mem-map
+>>>>>> array.
+>>>>>
+>>>>> Can you elaborate a bit more on this, please? We use the vmemmap, so any
+>>>>> spaces between memory banks only burns up virtual space. What exactly is
+>>>>> the problem you're seeing that makes you want to use flatmem (which is
+>>>>> probably unsuitable for the majority of arm64 machines).
+>>>>>
+>>>> The root cause we want to use flat-mem is the mam_map alloced in sparse-mem
+>>>> is not freed.
+>>>>
+>>>> take a look at here:
+>>>> arm64/mm/init.c
+>>>> void __init mem_init(void)
+>>>> {
+>>>> #ifndef CONFIG_SPARSEMEM_VMEMMAP
+>>>>         free_unused_memmap();
+>>>> #endif
+>>>> }
+>>>>
+>>>> Memory layout (3GB)
+>>>>
+>>>>  0             1.5G    2G             3.5G            4G
+>>>>  |              |      |               |              |
+>>>>  +--------------+------+---------------+--------------+
+>>>>  |    MEM       | hole |     MEM       |   IO (regs)  |
+>>>>  +--------------+------+---------------+--------------+
+>>>>
+>>>>
+>>>> Memory layout (4GB)
+>>>>
+>>>>  0                                    3.5G            4G    4.5G
+>>>>  |                                     |              |       |
+>>>>  +-------------------------------------+--------------+-------+
+>>>>  |                   MEM               |   IO (regs)  |  MEM  |
+>>>>  +-------------------------------------+--------------+-------+
+>>>>
+>>>> Currently, the sparse memory section is 1GB.
+>>>>
+>>>> 3GB ddr: the 1.5 ~2G and 3.5 ~ 4G are holes.
+>>>> 3GB ddr: the 3.5 ~ 4G and 4.5 ~ 5G are holes.
+>>>>
+>>>> This will alloc 1G/4K * (struct page) memory for mem_map array.
+>>>>
+>>>
+>>> No, this is incorrect. Sparsemem vmemmap only allocates struct pages
+>>> for memory regions that are actually populated.
+>>>
+>>> For instance, on the Foundation model with 4 GB of memory, you may see
+>>> something like this in the boot log
+>>>
+>>> [    0.000000]     vmemmap : 0xffffffbdc0000000 - 0xffffffbfc0000000
+>>> (     8 GB maximum)
+>>> [    0.000000]               0xffffffbdc0000000 - 0xffffffbde2000000
+>>> (   544 MB actual)
+>>>
+>>> but in reality, only the following regions have been allocated
+>>>
+>>> ---[ vmemmap start ]---
+>>> 0xffffffbdc0000000-0xffffffbdc2000000          32M       RW NX SHD AF
+>>>       BLK UXN MEM/NORMAL
+>>> 0xffffffbde0000000-0xffffffbde2000000          32M       RW NX SHD AF
+>>>       BLK UXN MEM/NORMAL
+>>> ---[ vmemmap end ]---
+>>>
+>>> so only 64 MB is used to back 4 GB of RAM with struct pages, which is
+>>> minimal. Moving to flatmem will not reduce the memory footprint at
+>>> all.
+>>
+>> Yes,but the populate is section, which is 1GB. Take a look at the above
+>> memory layout.
+>>
+>> The section 1G ~ 2G is a section. But 1.5G ~ 2G is a hole.
+>>
+>> The section 3G ~ 4G is a section. But 3.5G ~ 4G is a hole.
+>>>>  0             1.5G    2G             3.5G            4G
+>>>>  |              |      |               |              |
+>>>>  +--------------+------+---------------+--------------+
+>>>>  |    MEM       | hole |     MEM       |   IO (regs)  |
+>>>>  +--------------+------+---------------+--------------+
+>> The hole in 1.5G ~ 2G is also allocated mem-map array. And also with the 3.5G ~ 4G.
+>>
 > 
-> Erratum A-009971 says that it is possible for the timer value register
-> to be written incorrectly, resulting in "an incorrect and potentially
-> very long timeout".  The workaround is to read the timer count
-> immediately before and after writing the timer value register, and
-> repeat if the counter reads don't match.
+> No, it is not. It may be covered by a section, but that does not mean
+> sparsemem vmemmap will actually allocate backing for it. The
+> granularity used by sparsemem vmemmap on a 4k pages kernel is 128 MB,
+> due to the fact that the backing is performed at PMD granularity.
 > 
-> This erratum can be found on LS2080A.
+> Please, could you share the contents of the vmemmap section in
+> /sys/kernel/debug/kernel_page_tables of your system running with
+> sparsemem vmemmap enabled? You will need to set CONFIG_ARM64_PTDUMP=y
+>
+
+Please see the pg-tables below.
+
+
+With sparse and vmemmap enable.
+
+---[ vmemmap start ]---
+0xffffffbdc0200000-0xffffffbdc4800000          70M     RW NX SHD AF    UXN MEM/NORMAL
+---[ vmemmap end ]---
+
+
+The board is 4GB, and the memap is 70MB
+1G memory --- 14MB mem_map array.
+So the 4GB has 5 sections, which used 5 * 14MB memory.
+
+
+
+
+
+
+> .
 > 
-> Signed-off-by: Priyanka Jain <priyanka.jain@nxp.com>
-> [scottwood: cleanup and fixes]
-> Signed-off-by: Scott Wood <oss@buserror.net>
-> ---
->  .../devicetree/bindings/arm/arch_timer.txt         |  5 ++++
->  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi     |  1 +
->  arch/arm64/include/asm/arch_timer.h                | 27 ++++++++++++++++++++--
->  drivers/clocksource/arm_arch_timer.c               |  3 +++
->  4 files changed, 34 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
-> index 7117fbd..ab4d3b1 100644
-> --- a/Documentation/devicetree/bindings/arm/arch_timer.txt
-> +++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
-> @@ -29,6 +29,11 @@ to deliver its interrupts via SPIs.
->    QorIQ erratum A-008585, which says reading the timer is unreliable
->    unless the same value is returned by back-to-back reads.
->  
-> +- fsl,erratum-a009971 : A boolean property. Indicates the presence of
-> +  QorIQ erratum A-009971, which says writing the timer value register
-> +  is unreliable unless timer count reads before and after the timer write
-> +  return the same value.
-> +
->  ** Optional properties:
->  
->  - arm,cpu-registers-not-fw-configured : Firmware does not initialize
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-> index 0270ccf..529e441 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-> @@ -172,6 +172,7 @@
->  			     <1 11 0x8>, /* Virtual PPI, active-low */
->  			     <1 10 0x8>; /* Hypervisor PPI, active-low */
->  		fsl,erratum-a008585;
-> +		fsl,erratum-a009971;
->  	};
->  
->  	pmu {
-> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-> index 9367ee3..1867e60 100644
-> --- a/arch/arm64/include/asm/arch_timer.h
-> +++ b/arch/arm64/include/asm/arch_timer.h
-> @@ -28,6 +28,7 @@
->  #include <clocksource/arm_arch_timer.h>
->  
->  extern bool arm_arch_timer_reread;
-> +extern bool arm_arch_timer_rewrite;
-
-Just as for the other bug, please implement this as a static key.
-
->  
->  /* QorIQ errata workarounds */
->  #define ARCH_TIMER_REREAD(reg) ({ \
-> @@ -52,6 +53,20 @@ extern bool arm_arch_timer_reread;
->  	_val; \
->  })
->  
-> +#define ARCH_TIMER_TVAL_REWRITE(pv, val) do { \
-> +	u64 _cnt_old, _cnt_new; \
-> +	int _timeout = 200; \
-> +	do { \
-> +		asm volatile("mrs %0, cntvct_el0;" \
-> +			     "msr cnt" pv "_tval_el0, %2;" \
-> +			     "mrs %1, cntvct_el0" \
-> +			     : "=&r" (_cnt_old), "=r" (_cnt_new) \
-> +			     : "r" (val)); \
-> +		_timeout--; \
-> +	} while (_cnt_old != _cnt_new && _timeout); \
-> +	WARN_ON_ONCE(!_timeout); \
-> +} while (0)
-> +
-
-Given how many times you've written that loop, I'm sure you can have a
-preprocessor macro that will do the right thing.
-
->  /*
->   * These register accessors are marked inline so the compiler can
->   * nicely work out which register we want, and chuck away the rest of
-> @@ -66,7 +81,11 @@ void arch_timer_reg_write_cp15(int access, enum arch_timer_reg reg, u32 val)
->  			asm volatile("msr cntp_ctl_el0,  %0" : : "r" (val));
->  			break;
->  		case ARCH_TIMER_REG_TVAL:
-> -			asm volatile("msr cntp_tval_el0, %0" : : "r" (val));
-> +			if (arm_arch_timer_rewrite)
-> +				ARCH_TIMER_TVAL_REWRITE("p", val);
-> +			else
-> +				asm volatile("msr cntp_tval_el0, %0" : :
-> +					     "r" (val));
->  			break;
->  		}
->  	} else if (access == ARCH_TIMER_VIRT_ACCESS) {
-> @@ -75,7 +94,11 @@ void arch_timer_reg_write_cp15(int access, enum arch_timer_reg reg, u32 val)
->  			asm volatile("msr cntv_ctl_el0,  %0" : : "r" (val));
->  			break;
->  		case ARCH_TIMER_REG_TVAL:
-> -			asm volatile("msr cntv_tval_el0, %0" : : "r" (val));
-> +			if (arm_arch_timer_rewrite)
-> +				ARCH_TIMER_TVAL_REWRITE("v", val);
-> +			else
-> +				asm volatile("msr cntv_tval_el0, %0" : :
-> +					     "r" (val));
->  			break;
->  		}
->  	}
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 5ed7c7f..82b32cb 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -81,6 +81,7 @@ static bool arch_timer_mem_use_virtual;
->  
->  bool arm_arch_timer_reread; /* QorIQ erratum A-008585 */
->  EXPORT_SYMBOL(arm_arch_timer_reread);
-> +bool arm_arch_timer_rewrite; /* QorIQ erratum A-009971 */
->  
->  /*
->   * Architected system timer support.
-> @@ -767,6 +768,8 @@ static void __init arch_timer_of_init(struct device_node *np)
->  	arch_timer_c3stop = !of_property_read_bool(np, "always-on");
->  	arm_arch_timer_reread =
->  		of_property_read_bool(np, "fsl,erratum-a008585");
-> +	arm_arch_timer_rewrite =
-> +		of_property_read_bool(np, "fsl,erratum-a009971");
->  
->  	/*
->  	 * If we cannot rely on firmware initializing the timer registers then
-> 
-
-This also requires handling in KVM.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
