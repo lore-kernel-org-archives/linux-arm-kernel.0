@@ -1,141 +1,40 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Mon, 11 Apr 2016 13:20:43 -0500
-Subject: [PATCH] ARM: OMAP3: Fix imprecise external abort for off mode on
- 36xx
-In-Reply-To: <20160407231604.GP16484@atomide.com>
-References: <1455140107-3328-1-git-send-email-tony@atomide.com>
- <5706C062.4040803@ti.com> <20160407231604.GP16484@atomide.com>
-Message-ID: <570BEAFB.6000409@ti.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 11 Apr 2016 12:23:18 -0700
+Subject: [PATCH RFC 2/5] net: phy: sun8i-h3-ephy: Add driver for Allwinner
+ H3 Ethernet PHY
+In-Reply-To: <1459786954-12649-3-git-send-email-wens@csie.org>
+References: <1459786954-12649-1-git-send-email-wens@csie.org>
+ <1459786954-12649-3-git-send-email-wens@csie.org>
+Message-ID: <570BF9A6.2040109@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
-On 04/07/2016 06:16 PM, Tony Lindgren wrote:
-> * Dave Gerlach <d-gerlach@ti.com> [160407 13:18]:
->>
->> I have a series to convert omap3 PM code to using generic SRAM driver but
->> when testing I see an external abort on BBXM off mode resume very similar to
->> this that seems to be timing related caused by using generic SRAM driver to
->> re-copy PM code rather than omap3_sram_restore_context.
->>
->> By tracing the resume path I believe the abort is caused by
->> omap3_intc_resume_idle in pm34xx.c, which writes to two registers in the
->> INTC. Removing this call makes the abort unreproducible in my experiments
->> and changing the writes to reads causes a bus lock, so I'm pretty confident
->> it's coming from this call attempting to write to an idled INTC.
->>
->> Advisory 1.106 in DM3730 Silicon Errata Document [1] describes an issue with
->> "MPU Leaves MSTANDBY State Before IDLEREQ of Interrupt Controller is
->> Released" which sounds like a very similar failure situation to what we are
->> seeing even though the timing of INTC access is a bit further from WFI exit
->> than it describes. Perhaps there are more conditions where it can occur.
->> Pushed my WIP branch for SRAM series that shows the same failure here [2].
->
-> Interesting, I think you may have something with the errata 1.106.. And
-> looks like we also need still errata 1.62 handled also on 36xx in the
-> same pdf. And need to disable intc autoidle early at least for HS omaps
-> as save_secure_ram context supposedly also can do WFI.
->
-> Maybe something like the following would make sense? It seems to work
-> here without external aborts with your test branch on dm3730, and boots
-> fine on omap3430 hs (n900).
->
-> Or do you have some better ideas for a fix?
+On 04/04/16 09:22, Chen-Yu Tsai wrote:
+> The Allwinner H3 SoC incorporates an Ethernet PHY. This is enabled and
+> configured through a memory mapped hardware register.
+> 
+> This same register also configures the MAC interface mode and TX clock
+> source. Also covered by the register, but not supported in this driver,
+> are TX/RX clock delay chains and inverters, and an RMII module.
 
-I can also confirm that this fixes the external abort, I can not cause 
-it with your attached patch.
+This is not really a PHY driver, more a driver for a special piece of
+hardware responsible for properly configuring a more standard integrated
+PHY which is then driven via standard MDIO accesses, right?
 
-I would be ok with the solution you have proposed and I was unable to 
-come up with anything better while trying to debug the issue originally.
+The intention to make this driver re-usable is fine, but still makes me
+wonder if it should not be put in a file which is linked into the
+Ethernet MAC driver, and utilized by this one in a way that may be more
+"ad-hoc" than what you are proposing here.
 
-We still need the call to omap3_intc_resume_idle because the intc 
-restore context only gets called on resume from off mode. Perhaps we 
-only need to call omap3_intc_resume_idle when coming back from non-off 
-modes, otherwise let the context restore handle the reconfig of the INTC 
-idle/sysconfig registers?
+One thing that is not obvious here, is how is the device parenting done?
+Are we able to associate a phy_device to this SUN8I_H3_EPHY platform
+device here?
 
-Regards,
-Dave
-
-
->
-> Regards,
->
-> Tony
->
-> 8< ------------------------
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Thu, 7 Apr 2016 16:06:35 -0700
-> Subject: [PATCH] ARM: OMAP3: Fix external abort on 36xx waking from off mode
->   idle
->
-> Depending on the timings affected by .config options, we may get
-> external aborts with 36xx. These seem to be caused by the following:
->
-> - omap3 errata 1.62 "MPU Cannot Exit from Standby" says we need to
->    disable disable intc autoidle before WFI
->
-> - dm3730 errata 1.106 "MPU Leaves MSTANDBY State Before IDLEREQ of
->    Interrupt Controller is Released" says we need to wait before
->    accessing intc
->
-> Looks like we're currently disabling intc autoidle after we save
-> the intc context. And then we attempt to re-enable intc autoidle
-> after we restore intc context.
->
-> This means we're trying to restore intc autoidle twice, and it
-> occasionally fails as the intc restore may take a while for
-> things to get configured?
->
-> So we should either completely leave out omap3_intc_resume_idle()
-> assuming that the context restore really also enables the intc
-> autoidle.
->
-> Or we can disable intc autoidle before saving context, and then
-> reenable intc autoidle only after the context restore. This pairs
-> the calls, can we can call omap3_intc_resume_idle() later to
-> allow some time for intc to settle down.
->
-> Note that supposedly save_secure_ram() also can cause a WFI
-> in the secure ram code, so we need to disable intc autoidle
-> early. There's some information about that in the old thread
-> "[PATCH 09/13] OMAP3: PM: Apply errata i540 before save
-> secure ram".
->
-> --- a/arch/arm/mach-omap2/pm34xx.c
-> +++ b/arch/arm/mach-omap2/pm34xx.c
-> @@ -303,6 +303,8 @@ void omap_sram_idle(void)
->   		omap2_gpio_prepare_for_idle(per_going_off);
->   	}
->
-> +	omap3_intc_prepare_idle();
-> +
->   	/* CORE */
->   	if (core_next_state < PWRDM_POWER_ON) {
->   		if (core_next_state == PWRDM_POWER_OFF) {
-> @@ -314,8 +316,6 @@ void omap_sram_idle(void)
->   	/* Configure PMIC signaling for I2C4 or sys_off_mode */
->   	omap3_vc_set_pmic_signaling(core_next_state);
->
-> -	omap3_intc_prepare_idle();
-> -
->   	/*
->   	 * On EMU/HS devices ROM code restores a SRDC value
->   	 * from scratchpad which has automatic self refresh on timeout
-> @@ -358,13 +358,14 @@ void omap_sram_idle(void)
->   			omap2_sms_restore_context();
->   		}
->   	}
-> -	omap3_intc_resume_idle();
->
->   	pwrdm_post_transition(NULL);
->
->   	/* PER */
->   	if (per_next_state < PWRDM_POWER_ON)
->   		omap2_gpio_resume_after_idle();
-> +
-> +	omap3_intc_resume_idle();
->   }
->
->   static void omap3_pm_idle(void)
->
+Another thing is that the Ethernet MAC driver is fully aware of when
+putting an Ethernet PHY into suspend, shutdown, or fully functional
+power state should occur, if you have a separate platform driver here
+which does not listen for such kinds of events (hint: none are generated
+right now), then you cannot implement a working power state interface
+between the MAC, SHIM and PHY here, even though you would want that.
+-- 
+Florian
