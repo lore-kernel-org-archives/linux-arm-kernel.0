@@ -1,48 +1,33 @@
-From: Alexey.Brodkin@synopsys.com (Alexey Brodkin)
-Date: Mon, 11 Apr 2016 17:31:47 +0000
-Subject: [PATCH v2 02/30] Include generic parity.h in some
- architectures' bitops.h
-In-Reply-To: <1459932086-6394-1-git-send-email-zengzhaoxiu@163.com>
-References: <57033DBB.6060600@gmail.com>
- <1459932086-6394-1-git-send-email-zengzhaoxiu@163.com>
-Message-ID: <1460395905.5119.43.camel@synopsys.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 11 Apr 2016 10:40:59 -0700
+Subject: [PATCH 00/30] ARM: OMAP2+: hwmod module clock type support
+In-Reply-To: <1460362761-4842-1-git-send-email-t-kristo@ti.com>
+References: <1460362761-4842-1-git-send-email-t-kristo@ti.com>
+Message-ID: <20160411173518.GA5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi?Zhaoxiu,
+Hi,
 
-On Wed, 2016-04-06 at 16:41 +0800, zengzhaoxiu at 163.com wrote:
-> From: Zhaoxiu Zeng <zhaoxiu.zeng@gmail.com>
-> 
-> Use the generic version
-> 
-> Signed-off-by: Zhaoxiu Zeng <zhaoxiu.zeng@gmail.com>
-> ---
-> ?arch/arc/include/asm/bitops.h??????| 1 +
-> ?arch/arm/include/asm/bitops.h??????| 1 +
-> ?arch/arm64/include/asm/bitops.h????| 1 +
-> ?arch/avr32/include/asm/bitops.h????| 1 +
-> ?arch/c6x/include/asm/bitops.h??????| 1 +
-> ?arch/cris/include/asm/bitops.h?????| 1 +
-> ?arch/frv/include/asm/bitops.h??????| 1 +
-> ?arch/h8300/include/asm/bitops.h????| 1 +
-> ?arch/hexagon/include/asm/bitops.h??| 1 +
-> ?arch/m32r/include/asm/bitops.h?????| 1 +
-> ?arch/m68k/include/asm/bitops.h?????| 1 +
-> ?arch/metag/include/asm/bitops.h????| 1 +
-> ?arch/mn10300/include/asm/bitops.h??| 1 +
-> ?arch/openrisc/include/asm/bitops.h | 1 +
-> ?arch/parisc/include/asm/bitops.h???| 1 +
-> ?arch/s390/include/asm/bitops.h?????| 1 +
-> ?arch/sh/include/asm/bitops.h???????| 1 +
-> ?arch/xtensa/include/asm/bitops.h???| 1 +
-> ?18 files changed, 18 insertions(+)
+Nice to see this moving along :)
 
-Could you please include a changelog below your commit message?
-Otherwise it's barely possible to understand what that v2 improves/fixes.
+* Tero Kristo <t-kristo@ti.com> [160411 01:20]:
+>
+> The ordering on this set is kind of tricky to avoid any boot issues,
+> and it still currently causes a boot breakage between the DTS data
+> introduction and removal of hwmod data; this generates duplicate
+> entries for clocks which is prone to cause issues (both DT and hwmod
+> have the same entries in place under the hwmod data is removed.) I
+> didn't quite figure out a good way to avoid this, and could use some
+> guidance here. Shall we squash the DT + hwmod data patches together?
+> This avoids the boot breakage but creates pretty large patches. Also,
+> AMx3xx data needs to be grouped together as part of their data is
+> re-used commonly by both SoCs.
 
-Also it makes sense to send at least cover letter to all people mentioned
-at least in one patch of the series. That gives an idea what this series
-does and in particular why patch I'm mentioned in is required.
+How about use clocks from dts if clocks property is defined? Otherwise
+fall back to the old static data. Then drop the static data later on
+with follow up patches.
 
--Alexey
+Regards,
+
+Tony
