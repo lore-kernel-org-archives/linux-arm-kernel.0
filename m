@@ -1,62 +1,56 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 11 Apr 2016 13:19:28 +0200
-Subject: [PATCH] arm64: acpi: add a Kconfig option to prefer ACPI boot over DT
-Message-ID: <1460373568-4374-1-git-send-email-ard.biesheuvel@linaro.org>
+From: qiuxishi@huawei.com (Xishi Qiu)
+Date: Mon, 11 Apr 2016 19:08:38 +0800
+Subject: [PATCH 2/2] arm64: mm: make pfn always valid with flat memory
+In-Reply-To: <1459844572-53069-2-git-send-email-puck.chen@hisilicon.com>
+References: <1459844572-53069-1-git-send-email-puck.chen@hisilicon.com>
+ <1459844572-53069-2-git-send-email-puck.chen@hisilicon.com>
+Message-ID: <570B85B6.8000805@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If both ACPI and DT platform descriptions are available, and the
-kernel was configured at build time to support both flavours, the
-default policy in absence of a acpi=[off|force] kernel command line
-parameter is to prefer DT over ACPI.
+On 2016/4/5 16:22, Chen Feng wrote:
 
-This adds an option to invert that default policy, and prefer ACPI
-over DT instead. Note that this policy is still superseded by the
-value of the acpi= command line parameter.
+> Make the pfn always valid when using flat memory.
+> If the reserved memory is not align to memblock-size,
+> there will be holes in zone.
+> 
+> This patch makes the memory in buddy always in the
+> array of mem-map.
+> 
+> Signed-off-by: Chen Feng <puck.chen@hisilicon.com>
+> Signed-off-by: Fu Jun <oliver.fu@hisilicon.com>
+> ---
+>  arch/arm64/mm/init.c | 7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index ea989d8..0e1d5b7 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -306,7 +306,8 @@ static void __init free_unused_memmap(void)
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/Kconfig       | 13 +++++++++++++
- arch/arm64/kernel/acpi.c |  3 ++-
- 2 files changed, 15 insertions(+), 1 deletion(-)
+How about let free_unused_memmap() support for CONFIG_SPARSEMEM_VMEMMAP?
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 4f436220384f..f3aef40ad0ac 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -918,6 +918,19 @@ config DMI
- 	  However, even with this option, the resultant kernel should
- 	  continue to boot on existing non-UEFI platforms.
- 
-+config PREFER_ACPI_OVER_DT
-+	bool "Prefer booting via ACPI if both ACPI and DT are available"
-+	depends on ACPI
-+	help
-+	  If both ACPI and DT platform descriptions are available, and the
-+	  kernel was configured at build time to support both flavours, the
-+	  default policy in absence of a acpi=[off|force] kernel command line
-+	  parameter is to prefer DT over ACPI.
-+
-+	  This option inverts that default policy, by preferring ACPI over DT
-+	  instead. Note that this default policy is still superseded by the
-+	  value of the acpi= command line parameter.
-+
- endmenu
- 
- menu "Userspace binary formats"
-diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-index d1ce8e2f98b9..50ac056fb1fd 100644
---- a/arch/arm64/kernel/acpi.c
-+++ b/arch/arm64/kernel/acpi.c
-@@ -188,7 +188,8 @@ void __init acpi_boot_table_init(void)
- 	 *   and ACPI has not been force enabled (acpi=force)
- 	 */
- 	if (param_acpi_off ||
--	    (!param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
-+	    (!IS_ENABLED(CONFIG_PREFER_ACPI_OVER_DT) &&
-+	     !param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
- 		return;
- 
- 	/*
--- 
-2.5.0
+Thanks,
+Xishi Qiu
+
+>  	struct memblock_region *reg;
+>  
+>  	for_each_memblock(memory, reg) {
+> -		start = __phys_to_pfn(reg->base);
+> +		start = round_down(__phys_to_pfn(reg->base),
+> +				   MAX_ORDER_NR_PAGES);
+>  
+>  #ifdef CONFIG_SPARSEMEM
+>  		/*
+> @@ -327,8 +328,8 @@ static void __init free_unused_memmap(void)
+>  		 * memmap entries are valid from the bank end aligned to
+>  		 * MAX_ORDER_NR_PAGES.
+>  		 */
+> -		prev_end = ALIGN(__phys_to_pfn(reg->base + reg->size),
+> -				 MAX_ORDER_NR_PAGES);
+> +		prev_end = round_up(__phys_to_pfn(reg->base + reg->size),
+> +				    MAX_ORDER_NR_PAGES);
+>  	}
+>  
+>  #ifdef CONFIG_SPARSEMEM
