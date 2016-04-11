@@ -1,15 +1,25 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 11 Apr 2016 12:57:52 +0900
-Subject: [PATCH v9 14/20] ARM: dts: Add bus nodes using VDD_MIF for Exynos4x12
+Date: Mon, 11 Apr 2016 12:57:53 +0900
+Subject: [PATCH v9 15/20] ARM: dts: Add bus nodes using VDD_INT for Exynos4x12
 In-Reply-To: <1460347078-15175-1-git-send-email-cw00.choi@samsung.com>
 References: <1460347078-15175-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <1460347078-15175-15-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1460347078-15175-16-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the bus nodes using VDD_MIF for Exynos4x12 SoC.
-Exynos4x12 has the following AXI buses to translate data
-between DRAM and DMC/ACP/C2C.
+This patch adds the bus nodes using VDD_INT for Exynos4x12 SoC.
+Exynos4x12 has the following AXI buses to translate data between
+DRAM and sub-blocks.
+
+Following list specifies the detailed relation between DRAM and sub-blocks:
+- ACLK100 clock for PERIL/PERIR/MFC(PCLK)
+- ACLK160 clock for CAM/TV/LCD
+: The minimum clock of ACLK160 should be over 160MHz.
+  When drop the clock under 160MHz, show the broken image.
+- ACLK133 clock for FSYS
+- GDL clock for LEFTBUS
+- GDR clock for RIGHTBUS
+- SCLK_MFC clock for MFC
 
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
@@ -17,43 +27,67 @@ Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 Tested-by: Markus Reichl <m.reichl@fivetechno.de>
 Tested-by: Anand Moon <linux.amoon@gmail.com>
 ---
- arch/arm/boot/dts/exynos4x12.dtsi | 68 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 68 insertions(+)
+ arch/arm/boot/dts/exynos4x12.dtsi | 106 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 106 insertions(+)
 
 diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
-index 84a23f962946..99a0f4ca3d47 100644
+index 99a0f4ca3d47..e5173107ed44 100644
 --- a/arch/arm/boot/dts/exynos4x12.dtsi
 +++ b/arch/arm/boot/dts/exynos4x12.dtsi
-@@ -281,6 +281,74 @@
- 		clocks = <&clock CLK_SMMU_LITE1>, <&clock CLK_FIMC_LITE1>;
- 		#iommu-cells = <0>;
+@@ -349,6 +349,112 @@
+ 			opp-hz = /bits/ 64 <267000000>;
+ 		};
  	};
 +
-+	bus_dmc: bus_dmc {
++	bus_leftbus: bus_leftbus {
 +		compatible = "samsung,exynos-bus";
-+		clocks = <&clock CLK_DIV_DMC>;
++		clocks = <&clock CLK_DIV_GDL>;
 +		clock-names = "bus";
-+		operating-points-v2 = <&bus_dmc_opp_table>;
++		operating-points-v2 = <&bus_leftbus_opp_table>;
 +		status = "disabled";
 +	};
 +
-+	bus_acp: bus_acp {
++	bus_rightbus: bus_rightbus {
 +		compatible = "samsung,exynos-bus";
-+		clocks = <&clock CLK_DIV_ACP>;
++		clocks = <&clock CLK_DIV_GDR>;
 +		clock-names = "bus";
-+		operating-points-v2 = <&bus_acp_opp_table>;
++		operating-points-v2 = <&bus_leftbus_opp_table>;
 +		status = "disabled";
 +	};
 +
-+	bus_c2c: bus_c2c {
++	bus_display: bus_display {
 +		compatible = "samsung,exynos-bus";
-+		clocks = <&clock CLK_DIV_C2C>;
++		clocks = <&clock CLK_ACLK160>;
 +		clock-names = "bus";
-+		operating-points-v2 = <&bus_dmc_opp_table>;
++		operating-points-v2 = <&bus_display_opp_table>;
 +		status = "disabled";
 +	};
 +
-+	bus_dmc_opp_table: opp_table1 {
++	bus_fsys: bus_fsys {
++		compatible = "samsung,exynos-bus";
++		clocks = <&clock CLK_ACLK133>;
++		clock-names = "bus";
++		operating-points-v2 = <&bus_fsys_opp_table>;
++		status = "disabled";
++	};
++
++	bus_peri: bus_peri {
++		compatible = "samsung,exynos-bus";
++		clocks = <&clock CLK_ACLK100>;
++		clock-names = "bus";
++		operating-points-v2 = <&bus_peri_opp_table>;
++		status = "disabled";
++	};
++
++	bus_mfc: bus_mfc {
++		compatible = "samsung,exynos-bus";
++		clocks = <&clock CLK_SCLK_MFC>;
++		clock-names = "bus";
++		operating-points-v2 = <&bus_leftbus_opp_table>;
++		status = "disabled";
++	};
++
++	bus_leftbus_opp_table: opp_table3 {
 +		compatible = "operating-points-v2";
 +		opp-shared;
 +
@@ -63,23 +97,31 @@ index 84a23f962946..99a0f4ca3d47 100644
 +		};
 +		opp at 134000000 {
 +			opp-hz = /bits/ 64 <134000000>;
-+			opp-microvolt = <900000>;
++			opp-microvolt = <925000>;
 +		};
 +		opp at 160000000 {
 +			opp-hz = /bits/ 64 <160000000>;
-+			opp-microvolt = <900000>;
-+		};
-+		opp at 267000000 {
-+			opp-hz = /bits/ 64 <267000000>;
 +			opp-microvolt = <950000>;
 +		};
-+		opp at 400000000 {
-+			opp-hz = /bits/ 64 <400000000>;
-+			opp-microvolt = <1050000>;
++		opp at 200000000 {
++			opp-hz = /bits/ 64 <200000000>;
++			opp-microvolt = <1000000>;
 +		};
 +	};
 +
-+	bus_acp_opp_table: opp_table2 {
++	bus_display_opp_table: opp_table4 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp at 160000000 {
++			opp-hz = /bits/ 64 <160000000>;
++		};
++		opp at 200000000 {
++			opp-hz = /bits/ 64 <200000000>;
++		};
++	};
++
++	bus_fsys_opp_table: opp_table5 {
 +		compatible = "operating-points-v2";
 +		opp-shared;
 +
@@ -89,11 +131,17 @@ index 84a23f962946..99a0f4ca3d47 100644
 +		opp at 134000000 {
 +			opp-hz = /bits/ 64 <134000000>;
 +		};
-+		opp at 160000000 {
-+			opp-hz = /bits/ 64 <160000000>;
++	};
++
++	bus_peri_opp_table: opp_table6 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp at 50000000 {
++			opp-hz = /bits/ 64 <50000000>;
 +		};
-+		opp at 267000000 {
-+			opp-hz = /bits/ 64 <267000000>;
++		opp at 100000000 {
++			opp-hz = /bits/ 64 <100000000>;
 +		};
 +	};
  };
