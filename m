@@ -1,116 +1,55 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Mon, 11 Apr 2016 15:34:18 -0700
-Subject: [PATCH 1/2] PCI: iproc: Support DT property for ignoring aborts
- when probing
-In-Reply-To: <570C24B3.4080104@broadcom.com>
-References: <1460238624-2086-1-git-send-email-zajec5@gmail.com>
- <79DC79A7-D4CE-4983-B1C5-CBD2E9CBBFB9@gmail.com>
- <4768648c-841b-490d-a752-f31cba545f74@broadcom.com>
- <570C1D47.7010102@gmail.com>
- <ccabf53c-c035-be4b-a016-389bb7531557@broadcom.com>
- <570C24B3.4080104@broadcom.com>
-Message-ID: <18045be8-9ee3-7644-6fbb-d352e107d111@broadcom.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 12 Apr 2016 00:42:45 +0200
+Subject: [PATCH v5 00/46] pwm: add support for atomic update
+In-Reply-To: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20160412004245.715db791@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Thierry,
 
+On Wed, 30 Mar 2016 22:03:23 +0200
+Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
 
-On 4/11/2016 3:26 PM, Scott Branden wrote:
-> One Comment below
->
-> On 16-04-11 03:24 PM, Ray Jui wrote:
->>
->>
->> On 4/11/2016 2:55 PM, Florian Fainelli wrote:
->>> On 11/04/16 13:06, Ray Jui wrote:
->>>>
->>>>
->>>> On 4/10/2016 6:43 PM, Florian Fainelli wrote:
->>>>> On April 9, 2016 2:50:23 PM PDT, "Rafa? Mi?ecki" <zajec5@gmail.com>
->>>>> wrote:
->>>>>> Some devices (e.g. Northstar ones) may have bridges that forward
->>>>>> harmless errors to the ARM core. In such case we need an option to
->>>>>> add a handler ignoring them.
->>>>>>
->>>>>> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
->>>>>> ---
->>>>>
->>>>>> +- brcm,pcie-hook-abort-handler: During PCI bus probing (device
->>>>>> enumeration)
->>>>>> +  there can be errors that are expected and harmless. Unfortunately
->>>>>> some bridges
->>>>>> +  can't be configured to ignore them and they forward them to the
->>>>>> ARM
->>>>>> core
->>>>>> +  triggering die().
->>>>>> +  This property should be set in such case, it will make driver add
->>>>>> its own
->>>>>> +  handler ignoring such errors.
->>>>>
->>>>> The property is named after the function that allows you to catch
->>>>> abort handlers, whereas you should be describing the HW here.
->>>>> Something like brcm,bridge-error-forward or a better name even would
->>>>> be preferable.
->>>>>
->>>>>> +#ifdef CONFIG_ARM
->>>>>> +static int iproc_pcie_abort_handler(unsigned long addr, unsigned int
->>>>>> fsr,
->>>>>> +                    struct pt_regs *regs)
->>>>>> +{
->>>>>> +    if (fsr == 0x1406)
->>>>>> +        return 0;
->>>>>> +
->>>>>> +    return 1;
->>>>>
->>>>> As you later noted this prevents this driver from being a module now.
->>>>> Since the expectation is that either a fixed bootloader or a platform
->>>>> should enot produce these data aborts, or allow them to be ignored,
->>>>> why not just put this code back where it belongs in the machine
->>>>> specific file which kills many birds with the same stone:
->>>>>
->>>>
->>>> I assume the module compile issue can be simply fixed by exporting
->>>> symbol of "hook_fault_code"?
->>>
->>> I do not think it is desireable for this symbol to be exported in the
->>> first place, also last I looked, this was a one time registration thing,
->>> you cannot undo the hook you installed, but everything can be fixed.
->>>
->>
->> Okay.
->>
->>>>
->>>> I believe ARM64 based NS2 that uses the same iProc PCIe driver might
->>>> also need something like this (I'm still waiting for Jon Mason to give
->>>> me some more information on the NS2 errors that he saw, which is likely
->>>> related to this). I assume there will be something similar to the ARM
->>>> specific "hook_fault_code" for ARM64, but then ARM64 does not have any
->>>> "mach" specific directory. Where can this type of hook be installed for
->>>> ARM64 based platforms if not in the PCIe driver?
->>>
->>> OK, that is a fair point, then maybe have a two stage process, where we
->>> make sure that the part that installs the hook is always available and
->>> built-into the kernel, but let the iProc PCIe driver remain a module?
->>>
->>
->> I guess we are sort of stuck on this. If "hook_fault_code" is not
->> supposed to be used by any driver compiled as module like you described,
->> then yes, I agree, I don't see how we can leave this in the iProc PCIe
->> driver.
->>
-> Why does thie PCI driver need to be compiled as module though?  Why
-> can't we limit it to being linked in the kernel?
->
-> Regards,
-> Scott
+> Hello,
+> 
+> This series adds support for atomic PWM update, or IOW, the capability
+> to update all the parameters of a PWM device (enabled/disabled, period,
+> duty and polarity) in one go.
+> 
+> It also adds support for initial PWM state retrieval (or hardware readout),
+> which should allow smooth handover between the bootloader and Linux. For
+> example, critical PWM users (like critical regulators controlled by a PWM)
+> can query the current PWM state, and adapt the PWM config without having
+> to disable/enable the PWM, or abruptly change the period/dutycyle/polarity
+> config.
+> 
+> Thierry, I hope this version meets your expectations, if that's not the
+> case, could you let me know quickly so I can adjust the implementation
+> accordingly (I'd really like to get most of those changes in 4.7).
 
-There are minor benefits allowing this driver to be compiled as module, 
-although in our use case (Cygnus and NS2), we always compile this driver 
-as statically linked in the kernel. I'm not sure if NS/BCMA has any use 
-case that requires this driver to be a module.
+Still haven't had a clear feedback from your side on this series (you
+commented on a few details, but nothing on the general approach). Could
+you please have at a quick look at it, and let me know if I should
+adjust the implementation?
 
-In fact, being able to compile this driver as a module and loaded after 
-kernel init process is done just helped to confirm this imprecise abort 
-issue to be PCIe specific, :)
+Note that I plan to send a new version  addressing comments made by
+other maintainers/developers by the end of the week. In the meantime,
+could you have a look at the first set of patches (patch 1 to 4 are
+completely independent), and apply them if you're happy with it.
 
-Ray
+As you can see, I now have a lot of patches. This helps in showing the
+big picture, but also annoys people when I send this 50+ patchset. So,
+if you don't mind, I'd like to drop the changes touching PWM user
+drivers (to make them use the atomic API) until we get the other parts
+applied.
+
+Thanks,
+
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
