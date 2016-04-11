@@ -1,63 +1,48 @@
-From: akurz@blala.de (Alexander Kurz)
-Date: Mon, 11 Apr 2016 18:13:16 +0200 (CEST)
-Subject: [PATCH] ARM: mach-imx: sdhci-esdhc-imx: initialize DMA mask
-In-Reply-To: <570B780E.7090801@intel.com>
-References: <1460362846-2906-1-git-send-email-akurz@blala.de>
- <20160411083510.GN10108@pengutronix.de> <570B780E.7090801@intel.com>
-Message-ID: <alpine.DEB.2.00.1604111803080.6072@blala.de>
+From: Alexey.Brodkin@synopsys.com (Alexey Brodkin)
+Date: Mon, 11 Apr 2016 17:31:47 +0000
+Subject: [PATCH v2 02/30] Include generic parity.h in some
+ architectures' bitops.h
+In-Reply-To: <1459932086-6394-1-git-send-email-zengzhaoxiu@163.com>
+References: <57033DBB.6060600@gmail.com>
+ <1459932086-6394-1-git-send-email-zengzhaoxiu@163.com>
+Message-ID: <1460395905.5119.43.camel@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Adrian,
-On Mon, 11 Apr 2016, Adrian Hunter wrote:
+Hi?Zhaoxiu,
 
-> On 11/04/16 11:35, Uwe Kleine-K?nig wrote:
-> > Hello,
-> > 
-> > I added the people involved in 7b91369b4655 to Cc.
-> > 
-> > On Mon, Apr 11, 2016 at 10:20:46AM +0200, Alexander Kurz wrote:
-> >> With commit 7b91369b DMA access got disabled for device drivers with zero
+On Wed, 2016-04-06 at 16:41 +0800, zengzhaoxiu at 163.com wrote:
+> From: Zhaoxiu Zeng <zhaoxiu.zeng@gmail.com>
 > 
-> Is that because dma_set_mask_and_coherent() fails?
-right, dma_set_mask_and_coherent() fails, thats the only reason for
-this patch. This popped up on a Kindle3 (IMX35 with eMMC based root fs).
+> Use the generic version
+> 
+> Signed-off-by: Zhaoxiu Zeng <zhaoxiu.zeng@gmail.com>
+> ---
+> ?arch/arc/include/asm/bitops.h??????| 1 +
+> ?arch/arm/include/asm/bitops.h??????| 1 +
+> ?arch/arm64/include/asm/bitops.h????| 1 +
+> ?arch/avr32/include/asm/bitops.h????| 1 +
+> ?arch/c6x/include/asm/bitops.h??????| 1 +
+> ?arch/cris/include/asm/bitops.h?????| 1 +
+> ?arch/frv/include/asm/bitops.h??????| 1 +
+> ?arch/h8300/include/asm/bitops.h????| 1 +
+> ?arch/hexagon/include/asm/bitops.h??| 1 +
+> ?arch/m32r/include/asm/bitops.h?????| 1 +
+> ?arch/m68k/include/asm/bitops.h?????| 1 +
+> ?arch/metag/include/asm/bitops.h????| 1 +
+> ?arch/mn10300/include/asm/bitops.h??| 1 +
+> ?arch/openrisc/include/asm/bitops.h | 1 +
+> ?arch/parisc/include/asm/bitops.h???| 1 +
+> ?arch/s390/include/asm/bitops.h?????| 1 +
+> ?arch/sh/include/asm/bitops.h???????| 1 +
+> ?arch/xtensa/include/asm/bitops.h???| 1 +
+> ?18 files changed, 18 insertions(+)
 
-Sorry for the checkpatch / improper commit citation issue.
+Could you please include a changelog below your commit message?
+Otherwise it's barely possible to understand what that v2 improves/fixes.
 
-> 
-> > 
-> > Please reference commits like:
-> > 
-> > 	With commit 7b91369b4655 ("mmc: sdhci: Set DMA mask when adding
-> > 	host") DMA access ...
-> > 
-> > 
-> >> DMA mask property. sdhci-esdhc-imx got blocked from DMA access by this.
-> >> Hence: initialize the dma mask to enable access again.
-> >>
-> >> Signed-off-by: Alexander Kurz <akurz@blala.de>
-> >> ---
-> >>  arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c | 5 +++--
-> >>  1 file changed, 3 insertions(+), 2 deletions(-)
-> >>
-> >> diff --git a/arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c b/arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c
-> >> index a5edd7d..3d039ef 100644
-> >> --- a/arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c
-> >> +++ b/arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c
-> >> @@ -71,6 +71,7 @@ struct platform_device *__init imx_add_sdhci_esdhc_imx(
-> >>  	if (!pdata)
-> >>  		pdata = &default_esdhc_pdata;
-> >>  
-> >> -	return imx_add_platform_device(data->devid, data->id, res,
-> >> -			ARRAY_SIZE(res), pdata, sizeof(*pdata));
-> >> +	return imx_add_platform_device_dmamask(data->devid, data->id, res,
-> >> +			ARRAY_SIZE(res), pdata, sizeof(*pdata),
-> >> +			DMA_BIT_MASK(32));
-> >>  }
-> >> -- 
-> >> 2.1.4
-> >>
-> >>
-> > 
-> 
+Also it makes sense to send at least cover letter to all people mentioned
+at least in one patch of the series. That gives an idea what this series
+does and in particular why patch I'm mentioned in is required.
+
+-Alexey
