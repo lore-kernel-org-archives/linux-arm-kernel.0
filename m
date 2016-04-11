@@ -1,59 +1,21 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 11 Apr 2016 12:25:19 -0700
-Subject: [PATCH RFC 5/5] ARM: dts: sun8i: Enable Ethernet controller on
- the Orange PI PC
-In-Reply-To: <1459786954-12649-6-git-send-email-wens@csie.org>
-References: <1459786954-12649-1-git-send-email-wens@csie.org>
- <1459786954-12649-6-git-send-email-wens@csie.org>
-Message-ID: <570BFA1F.2040601@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 11 Apr 2016 12:40:54 -0700
+Subject: [PATCH 0/8] ARM: dts: fixes for DT warnings on OMAP2+ platforms
+In-Reply-To: <1459782973-21201-1-git-send-email-t-kristo@ti.com>
+References: <1459782973-21201-1-git-send-email-t-kristo@ti.com>
+Message-ID: <20160411194053.GC5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/04/16 09:22, Chen-Yu Tsai wrote:
-> The Orange PI PC uses the H3's internal Ethernet PHY with the EMAC
-> Ethernet controller.
+* Tero Kristo <t-kristo@ti.com> [160404 08:17]:
+> Hi,
 > 
-> Set a proper address for the PHY and enable the EMAC.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
-> 
-> This patch depends on "ARM: dts: sun8i-h3: Add Ethernet controller device",
-> which uses an binding still in development.
-> 
-> Do not merge.
-> 
-> ---
->  arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-> index daf50b9a6657..f01e10df812a 100644
-> --- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-> +++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-> @@ -102,6 +102,20 @@
->  	status = "okay";
->  };
->  
-> +&ephy {
-> +	allwinner,ephy-addr = <0x1>;
-> +};
-> +
-> +&emac {
-> +	phy = <&phy1>;
-> +	phy-mode = "mii";
-> +	status = "okay";
-> +
-> +	phy1: ethernet-phy at 1 {
-> +		reg = <1>;
-> +	};
-> +};
+> This set fixes the clock node related warnings for OMAP2+ platforms
+> that are going to be introduced with the new version of DTC that
+> does stricter checks on DT structure. Basically, the address component
+> is currently missing on the node names that have a reg properly, which
+> is illegal.
 
-As commented in patch 1, the fact that you have to put the Ethernet PHY
-address twice here is not really a good thing, because they cannot be
-dissociated from eath other, I would rather have a standard Ethernet PHY
-DT node represent the desired PHY address, and have your glue/SHIM
-SUN8I_H3_EMAC driver scan the Device Tree to know what address to
-program for the Ethernet PHY.
--- 
-Florian
+Applying into omap-for-v4.7/dt thanks.
+
+Tony
