@@ -1,38 +1,36 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 11 Apr 2016 21:51:26 +0200
-Subject: [PATCH] ARM: pxa: activate pinctrl for device-tree machines
-In-Reply-To: <CACRpkdYnv6nVQEdErcmKuwUJ-yinrUUGaG_jkKVDsscXGdMugQ@mail.gmail.com>
- (Linus Walleij's message of "Sun, 3 Apr 2016 21:13:44 +0200")
-References: <1459623362-18324-1-git-send-email-robert.jarzmik@free.fr>
- <CACRpkdYnv6nVQEdErcmKuwUJ-yinrUUGaG_jkKVDsscXGdMugQ@mail.gmail.com>
-Message-ID: <87oa9fudoh.fsf@belgarion.home>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 11 Apr 2016 21:55:57 +0200
+Subject: [PATCH v9 00/20] PM / devferq: Add generic exynos bus frequency
+ driver and new passive governor
+In-Reply-To: <570B218E.5000908@samsung.com>
+References: <1460347078-15175-1-git-send-email-cw00.choi@samsung.com>
+ <570B218E.5000908@samsung.com>
+Message-ID: <20160411195557.GA6426@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij <linus.walleij@linaro.org> writes:
+On Mon, Apr 11, 2016 at 01:01:18PM +0900, Chanwoo Choi wrote:
+> Dear Myungjoo and Krzysztof,
+> 
+> This patch-set already get the acked-by or signed-off-by tag
+> from Exynos SoC and DEVFREQ maintainer except for patch10.
+> 
+> If there is no comment, could you pick this patch-set?
 
-> On Sat, Apr 2, 2016 at 8:56 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
->
->> Pincontrol is not yet ready for all PXA platforms.
->> For example, a legacy platform, if PINCTRL was activated, will fail its
->> calls to gpio_request() or gpio_direction_output(), as the pinctrl
->> driver might not be available, such as for pxa25x and pxa3xx.
->>
->> As a step forward, activate pincontrol for all device-tree available
->> machines, ie. pxa27x device-tree based and pxa3xx device-tree based.
->>
->> If it appears later that pincontrol is also required for legacy
->> platforms and if the mfp->pinctrl conversion can be achieved, then
->> PINCTRL will be activated for the whole PXA architecture.
->>
->> Cc: Linus Walleij <linus.walleij@linaro.org>
->> Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
->> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
->
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Thanks, queued to pxa/for-next.
+I cannot find any description of dependencies between the patches so I
+assume the obvious one: DTS patches do not depend on anything. This
+means that:
+1. driver/devfreq related changes (including dt-bindings documentation)
+   go to Myungjoo,
+2. I can pick DTS changes.
 
-Cheers.
+But first I would like to see the bindings documentation beeing applied
+by someone as a proof that there won't be more development in DTS in
+these series. There is no sense of picking DTS if after comments from
+Rob, you will rework them, right?
 
--- 
-Robert
+Anyway I see Rob's questions. For these bindings I think you should get
+DT-guys ack first.
+
+Best regards,
+Krzysztof
