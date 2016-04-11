@@ -1,184 +1,89 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 11 Apr 2016 14:11:59 +0100
-Subject: [RFC PATCH 28/45] KVM: arm/arm64: vgic-new: Add GICv3 SGI system
- register trap handler
-In-Reply-To: <20160331120755.GE4126@cbox>
-References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
- <1458871508-17279-29-git-send-email-andre.przywara@arm.com>
- <20160331120755.GE4126@cbox>
-Message-ID: <570BA29F.4050505@arm.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 11 Apr 2016 08:15:24 -0500
+Subject: next-20160401+: ARM: DRA7: linux-next regression: mm/slab:
+ clean-up kmem_cache_node setup
+In-Reply-To: <20160411020203.GA25211@js1304-P5Q-DELUXE>
+References: <570816F8.9070301@ti.com>
+ <20160411020203.GA25211@js1304-P5Q-DELUXE>
+Message-ID: <570BA36C.9030600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 31/03/16 13:07, Christoffer Dall wrote:
-> On Fri, Mar 25, 2016 at 02:04:51AM +0000, Andre Przywara wrote:
->> In contrast to GICv2 SGIs in a GICv3 implementation are not triggered
->> by a MMIO write, but with a system register write. KVM knows about
->> that register already, we just need to implement the handler and wire
->> it up to the core KVM/ARM code.
+On 04/10/2016 09:02 PM, Joonsoo Kim wrote:
+> On Fri, Apr 08, 2016 at 03:39:20PM -0500, Nishanth Menon wrote:
+>> Hi,
 >>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->>  include/kvm/vgic/vgic.h       |   8 ++++
->>  virt/kvm/arm/vgic/vgic_mmio.c | 101 ++++++++++++++++++++++++++++++++++++++++++
->>  2 files changed, 109 insertions(+)
+>> http://marc.info/?l=linux-omap&m=146014314115625&w=2 series works with
+>> v4.6-rc2 kernel, however, it fails with linux-next for suspend-to-ram
+>> (mem) on BeagleBoard-X15
 >>
->> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
->> index a8262c7..ab5fcc7 100644
->> --- a/include/kvm/vgic/vgic.h
->> +++ b/include/kvm/vgic/vgic.h
->> @@ -202,6 +202,14 @@ bool kvm_vcpu_has_pending_irqs(struct kvm_vcpu *vcpu);
->>  void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
->>  void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
->>  
->> +#ifdef CONFIG_KVM_ARM_VGIC_V3
->> +void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
->> +#else
->> +static inline void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
->> +{
->> +}
->> +#endif
->> +
->>  /**
->>   * kvm_vgic_get_max_vcpus - Get the maximum number of VCPUs allowed by HW
->>   *
->> diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
->> index 44fdba5..7eb6b93 100644
->> --- a/virt/kvm/arm/vgic/vgic_mmio.c
->> +++ b/virt/kvm/arm/vgic/vgic_mmio.c
->> @@ -1139,4 +1139,105 @@ int vgic_register_redist_regions(struct kvm *kvm, gpa_t redist_base_address)
->>  
->>  	return ret;
->>  }
->> +
->> +/*
->> + * Compare a given affinity (level 1-3 and a level 0 mask, from the SGI
->> + * generation register ICC_SGI1R_EL1) with a given VCPU.
->> + * If the VCPU's MPIDR matches, return the level0 affinity, otherwise
->> + * return -1.
->> + */
->> +static int match_mpidr(u64 sgi_aff, u16 sgi_cpu_mask, struct kvm_vcpu *vcpu)
->> +{
->> +	unsigned long affinity;
->> +	int level0;
->> +
->> +	/*
->> +	 * Split the current VCPU's MPIDR into affinity level 0 and the
->> +	 * rest as this is what we have to compare against.
->> +	 */
->> +	affinity = kvm_vcpu_get_mpidr_aff(vcpu);
->> +	level0 = MPIDR_AFFINITY_LEVEL(affinity, 0);
->> +	affinity &= ~MPIDR_LEVEL_MASK;
->> +
->> +	/* bail out if the upper three levels don't match */
->> +	if (sgi_aff != affinity)
->> +		return -1;
->> +
->> +	/* Is this VCPU's bit set in the mask ? */
->> +	if (!(sgi_cpu_mask & BIT(level0)))
->> +		return -1;
->> +
->> +	return level0;
->> +}
->> +
->> +#define SGI_AFFINITY_LEVEL(reg, level) \
->> +	((((reg) & ICC_SGI1R_AFFINITY_## level ##_MASK) \
->> +	>> ICC_SGI1R_AFFINITY_## level ##_SHIFT) << MPIDR_LEVEL_SHIFT(level))
-> 
-> wholy crap?  What is this?  Yikes, this is already in the kernel.  Oh
-> well, I'm not going to try to understand it again then.
-
-This is to isolate a certain SGI affinity encoding, which uses a
-different bitmasking than the MPIDR. Plus we use the existing defines
-here, which looks a bit more complicated than it actually is: basically
-just masking and shifting.
-I added a comment.
-
-Cheers,
-Andre.
-
->> +
->> +/**
->> + * vgic_v3_dispatch_sgi - handle SGI requests from VCPUs
->> + * @vcpu: The VCPU requesting a SGI
->> + * @reg: The value written into the ICC_SGI1R_EL1 register by that VCPU
->> + *
->> + * With GICv3 (and ARE=1) CPUs trigger SGIs by writing to a system register.
->> + * This will trap in sys_regs.c and call this function.
->> + * This ICC_SGI1R_EL1 register contains the upper three affinity levels of the
->> + * target processors as well as a bitmask of 16 Aff0 CPUs.
->> + * If the interrupt routing mode bit is not set, we iterate over all VCPUs to
->> + * check for matching ones. If this bit is set, we signal all, but not the
->> + * calling VCPU.
->> + */
->> +void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
->> +{
->> +	struct kvm *kvm = vcpu->kvm;
->> +	struct kvm_vcpu *c_vcpu;
->> +	u16 target_cpus;
->> +	u64 mpidr;
->> +	int sgi, c;
->> +	int vcpu_id = vcpu->vcpu_id;
->> +	bool broadcast;
->> +
->> +	sgi = (reg & ICC_SGI1R_SGI_ID_MASK) >> ICC_SGI1R_SGI_ID_SHIFT;
->> +	broadcast = reg & BIT(ICC_SGI1R_IRQ_ROUTING_MODE_BIT);
->> +	target_cpus = (reg & ICC_SGI1R_TARGET_LIST_MASK) >> ICC_SGI1R_TARGET_LIST_SHIFT;
->> +	mpidr = SGI_AFFINITY_LEVEL(reg, 3);
->> +	mpidr |= SGI_AFFINITY_LEVEL(reg, 2);
->> +	mpidr |= SGI_AFFINITY_LEVEL(reg, 1);
->> +
->> +	/*
->> +	 * We iterate over all VCPUs to find the MPIDRs matching the request.
->> +	 * If we have handled one CPU, we clear it's bit to detect early
-> 
-> s/it's/its/
-> 
->> +	 * if we are already finished. This avoids iterating through all
->> +	 * VCPUs when most of the times we just signal a single VCPU.
->> +	 */
->> +	kvm_for_each_vcpu(c, c_vcpu, kvm) {
->> +		struct vgic_irq *irq;
->> +
->> +		/* Exit early if we have dealt with all requested CPUs */
->> +		if (!broadcast && target_cpus == 0)
->> +			break;
->> +
->> +		/* Don't signal the calling VCPU */
->> +		if (broadcast && c == vcpu_id)
->> +			continue;
->> +
->> +		if (!broadcast) {
->> +			int level0;
->> +
->> +			level0 = match_mpidr(mpidr, target_cpus, c_vcpu);
->> +			if (level0 == -1)
->> +				continue;
->> +
->> +			/* remove this matching VCPU from the mask */
->> +			target_cpus &= ~BIT(level0);
->> +		}
->> +
->> +		irq = vgic_get_irq(vcpu->kvm, c_vcpu, sgi);
->> +
->> +		spin_lock(&irq->irq_lock);
->> +		irq->pending = true;
->> +
->> +		vgic_queue_irq(vcpu->kvm, irq);
->> +	}
-> 
-> eventually I suspect we should implement a linear time 'give me a vcpu
-> based on this mpidr' lookup function, but this should be fine for now.
-> 
->> +}
->>  #endif
->> -- 
->> 2.7.3
+>> next-20160327 - good
+>> next-20160329 - good
+>> next-20160330 - Fails to boot - I2C crashes
+>> next-20160331-  Fails to boot - USB crashes
+>> next-20160401 -> bad
+>> next-20160408 -> bad
 >>
->> --
->> To unsubscribe from this list: send the line "unsubscribe kvm" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> Bisect log of next-20160408 vs v4.6-rc2 ->
+>> http://pastebin.ubuntu.com/15697856/
+>>
+>> # first bad commit: [2b629704a2b6a5b239f23750e5517a9d8c3a4e8c]
+>> mm/slab: clean-up kmem_cache_node setup
+>>
 > 
+> Hello,
+> 
+> I made a mistake on that patch. Could you try to test below one on
+> top of it.
+> 
+> Thanks.
+
+
+Thanks for the fix
+http://pastebin.ubuntu.com/15758542/ -> things are back to working now.
+
+> 
+> --------->8----------------
+> From d3af3cc409527e9be6beb62ea395cde67f3c5029 Mon Sep 17 00:00:00 2001
+> From: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+> Date: Mon, 11 Apr 2016 10:48:29 +0900
+> Subject: [PATCH] mm/slab: clean-up kmem_cache_node setup-fix
+> 
+> After calling free_block(), we need to re-calculate array_cache's
+> avail counter. Fix it.
+> 
+> And, it's better to free objects in shared array when it is
+> really necessary. Check it before calling free_block().
+> 
+> Signed-off-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+
+please feel free to add:
+
+Tested-by: Nishanth Menon <nm@ti.com>
+
+> ---
+>  mm/slab.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/mm/slab.c b/mm/slab.c
+> index fcd5fbb..27cb390 100644
+> --- a/mm/slab.c
+> +++ b/mm/slab.c
+> @@ -927,9 +927,10 @@ static int setup_kmem_cache_node(struct kmem_cache *cachep,
+>  
+>  	n = get_node(cachep, node);
+>  	spin_lock_irq(&n->list_lock);
+> -	if (n->shared) {
+> +	if (n->shared && force_change) {
+>  		free_block(cachep, n->shared->entry,
+>  				n->shared->avail, node, &list);
+> +		n->shared->avail = 0;
+>  	}
+>  
+>  	if (!n->shared || force_change) {
+> 
+
+
+-- 
+Regards,
+Nishanth Menon
