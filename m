@@ -1,114 +1,52 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 11 Apr 2016 14:00:02 +0100
-Subject: [RFC PATCH 24/45] KVM: arm/arm64: vgic-new: Add GICv3 CTLR, IIDR,
- TYPER handlers
-In-Reply-To: <20160331115319.GD4126@cbox>
-References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
- <1458871508-17279-25-git-send-email-andre.przywara@arm.com>
- <20160331115319.GD4126@cbox>
-Message-ID: <570B9FD2.80907@arm.com>
+From: ashoks@broadcom.com (Ashok Kumar)
+Date: Mon, 11 Apr 2016 06:02:15 -0700
+Subject: [PATCH v4 0/6] arm64: perf: Broadcom Vulcan PMU support
+Message-ID: <1460379741-1181-1-git-send-email-ashoks@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Cleaned up event naming convention as per ARM ARM.
 
-On 31/03/16 12:53, Christoffer Dall wrote:
-> On Fri, Mar 25, 2016 at 02:04:47AM +0000, Andre Przywara wrote:
->> As in the GICv2 emulation we handle those three registers in one
->> function.
->>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ---
->>  virt/kvm/arm/vgic/vgic.h      |  2 ++
->>  virt/kvm/arm/vgic/vgic_mmio.c | 38 ++++++++++++++++++++++++++++++++++++--
->>  2 files changed, 38 insertions(+), 2 deletions(-)
->>
->> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
->> index 4b8952a..0db1abe 100644
->> --- a/virt/kvm/arm/vgic/vgic.h
->> +++ b/virt/kvm/arm/vgic/vgic.h
->> @@ -19,6 +19,8 @@
->>  #define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
->>  #define IMPLEMENTER_ARM		0x43b
->>  
->> +#define INTERRUPT_ID_BITS_SPIS	10
->> +
->>  struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
->>  			      u32 intid);
->>  bool vgic_queue_irq(struct kvm *kvm, struct vgic_irq *irq);
->> diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
->> index 2d10c06..13e101f 100644
->> --- a/virt/kvm/arm/vgic/vgic_mmio.c
->> +++ b/virt/kvm/arm/vgic/vgic_mmio.c
->> @@ -606,7 +606,29 @@ static int vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
->>  				  struct kvm_io_device *this,
->>  				  gpa_t addr, int len, void *val)
->>  {
->> -	/* TODO: implement */
->> +	struct vgic_io_device *iodev = container_of(this,
->> +						    struct vgic_io_device, dev);
->> +	u32 value = 0;
->> +
->> +	switch ((addr - iodev->base_addr) & ~3) {
->> +	case GICD_CTLR:
->> +		if (vcpu->kvm->arch.vgic.enabled)
->> +		       value |=	GICD_CTLR_ENABLE_SS_G1;
->> +		value |= GICD_CTLR_ARE_NS | GICD_CTLR_DS;
->> +		break;
->> +	case GICD_TYPER:
->> +		value = vcpu->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
->> +		value = (value >> 5) - 1;
->> +		value |= (INTERRUPT_ID_BITS_SPIS - 1) << 19;
->> +		break;
->> +	case GICD_IIDR:
->> +		value = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
->> +		break;
->> +	default:
->> +		return 0;
->> +	}
->> +
->> +	write_mask32(value, addr & 3, len, val);
->>  	return 0;
->>  }
->>  
->> @@ -614,7 +636,19 @@ static int vgic_mmio_write_v3_misc(struct kvm_vcpu *vcpu,
->>  				   struct kvm_io_device *this,
->>  				   gpa_t addr, int len, const void *val)
->>  {
->> -	/* TODO: implement */
->> +	struct vgic_io_device *iodev = container_of(this,
->> +						    struct vgic_io_device, dev);
->> +	bool enabled;
->> +
->> +	/* These are not the bits you are looking for ... */
-> 
-> haha, nice.  But I don't understand what this case is?
+Added macros for complete ARMv8 recommended implementation defined events.
 
-Of the 16 bytes this region covers (CTLR, TYPER, IIDR) only the first
-byte is writeable, the rest is WI.
-I am afraid I have to replace the cool quote with something more
-meaningful ...
+Common architectural and micro-architectural events which are exported to /sys
+are now filtered using PMCEIDn_EL0
 
->> +	if (addr - iodev->base_addr > 0)
->> +		return 0;
->> +
->> +	/* We only care about the enable bit, all other bits are WI. */
->> +	enabled = *(u8*)val & GICD_CTLR_ENABLE_SS_G1;
->> +
->> +	vcpu->kvm->arch.vgic.enabled = enabled;
-> 
-> I think some of the comments from the v2 side apply here as well.
+Added support for Broadcom Vulcan PMU.
 
-Agreed.
+changes since v3 [3]:
+ * Changed the order of patchset to match devicetree submission guidelines.
+ * Rebased on 4.6-rc3
 
-Cheers,
-Andre.
+changes since v2 [2]:
+ * Changed event filtering mechanism to use is_visible function pointer
+   of attribute_group instead of copying to a new events attribute 
+   structure as per Mark's review comments.
 
->> +
->>  	return 0;
->>  }
->>  
->> -- 
->> 2.7.3
->>
-> 
+changes since v1 [1]:
+ Incorporated the following review comments from Will.
+ * cleaned up event naming convention as per ARM ARM
+ * Filtered common events based on PMCEIDn_EL0
+ * Removed exposing implementation defined events to /sys.
+
+[1] http://www.spinics.net/lists/arm-kernel/msg490954.html
+[2] http://www.spinics.net/lists/arm-kernel/msg492439.html
+[3] http://www.spinics.net/lists/arm-kernel/msg492941.html
+
+Ashok Kumar (6):
+  Documentation: arm64: pmu: Add Broadcom Vulcan PMU binding
+  arm64: dts: Add Broadcom Vulcan PMU in dts
+  arm64/perf: Changed events naming as per ARM ARM
+  arm64/perf: Define complete ARMv8 recommended implementation defined
+    events
+  arm64/perf: Filter common events based on PMCEIDn_EL0
+  arm64/perf: Add Broadcom Vulcan PMU support
+
+ Documentation/devicetree/bindings/arm/pmu.txt |   3 +-
+ arch/arm64/boot/dts/broadcom/vulcan.dtsi      |   2 +-
+ arch/arm64/kernel/perf_event.c                | 517 ++++++++++++++++++--------
+ include/linux/perf/arm_pmu.h                  |   2 +
+ 4 files changed, 359 insertions(+), 165 deletions(-)
+
+-- 
+2.1.0
