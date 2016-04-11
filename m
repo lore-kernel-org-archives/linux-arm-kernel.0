@@ -1,51 +1,39 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sun, 10 Apr 2016 18:43:52 -0700
-Subject: [PATCH 1/2] PCI: iproc: Support DT property for ignoring aborts
- when probing
-In-Reply-To: <1460238624-2086-1-git-send-email-zajec5@gmail.com>
-References: <1460238624-2086-1-git-send-email-zajec5@gmail.com>
-Message-ID: <79DC79A7-D4CE-4983-B1C5-CBD2E9CBBFB9@gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 11 Apr 2016 10:52:48 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v4.6
+Message-ID: <cover.1460339328.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On April 9, 2016 2:50:23 PM PDT, "Rafa? Mi?ecki" <zajec5@gmail.com> wrote:
->Some devices (e.g. Northstar ones) may have bridges that forward
->harmless errors to the ARM core. In such case we need an option to
->add a handler ignoring them.
->
->Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
->---
+Hi Olof, Hi Kevin, Hi Arnd,
 
->+- brcm,pcie-hook-abort-handler: During PCI bus probing (device
->enumeration)
->+  there can be errors that are expected and harmless. Unfortunately
->some bridges
->+  can't be configured to ignore them and they forward them to the ARM
->core
->+  triggering die().
->+  This property should be set in such case, it will make driver add
->its own
->+  handler ignoring such errors.
+Please consider these Renesas ARM based SoC fixes for v4.6.
 
-The property is named after the function that allows you to catch abort handlers, whereas you should be describing the HW here. Something like brcm,bridge-error-forward or a better name even would be preferable.
 
->+#ifdef CONFIG_ARM
->+static int iproc_pcie_abort_handler(unsigned long addr, unsigned int
->fsr,
->+				    struct pt_regs *regs)
->+{
->+	if (fsr == 0x1406)
->+		return 0;
->+
->+	return 1;
+Allow serial to work once again on the Porter board (Revision B) which
+does not have the oscillator in question mounted.
 
-As you later noted this prevents this driver from being a module now. Since the expectation is that either a fixed bootloader or a platform should enot produce these data aborts, or allow them to be ignored, why not just put this code back where it belongs in the machine specific file which kills many birds with the same stone:
 
-- code is ways built-in, and hook_fault_code is installed prior to PCIe loading (function is marked with __init)
-- platforms which do not need that, just do not install it for that specific code
-- it is clear which platforms need it and which do not, yet the driver remains agnostic
+The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 
-NB: there could be other platforms some day needing that which also propagate the error differently, forcing you to add more and more of these codes in the PCIe driver.
+  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
 
--- 
-Florian
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes-for-v4.6
+
+for you to fetch changes up to e885767418bff0c591cc1e45babdd25d91b4a795:
+
+  Revert "ARM: dts: porter: Enable SCIF_CLK frequency and pins" (2016-04-08 15:56:28 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Fixes for v4.6
+
+* Revert "ARM: dts: porter: Enable SCIF_CLK frequency and pins"
+
+----------------------------------------------------------------
+Sjoerd Simons (1):
+      Revert "ARM: dts: porter: Enable SCIF_CLK frequency and pins"
+
+ arch/arm/boot/dts/r8a7791-porter.dts | 13 -------------
+ 1 file changed, 13 deletions(-)
