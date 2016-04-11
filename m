@@ -1,87 +1,55 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Mon, 11 Apr 2016 13:06:09 -0700
-Subject: [PATCH 1/2] PCI: iproc: Support DT property for ignoring aborts
- when probing
-In-Reply-To: <79DC79A7-D4CE-4983-B1C5-CBD2E9CBBFB9@gmail.com>
-References: <1460238624-2086-1-git-send-email-zajec5@gmail.com>
- <79DC79A7-D4CE-4983-B1C5-CBD2E9CBBFB9@gmail.com>
-Message-ID: <4768648c-841b-490d-a752-f31cba545f74@broadcom.com>
+From: cwchoi00@gmail.com (Chanwoo Choi)
+Date: Tue, 12 Apr 2016 05:15:01 +0900
+Subject: [PATCH v9 00/20] PM / devferq: Add generic exynos bus frequency
+ driver and new passive governor
+In-Reply-To: <20160411195557.GA6426@kozik-lap>
+References: <1460347078-15175-1-git-send-email-cw00.choi@samsung.com>
+ <570B218E.5000908@samsung.com> <20160411195557.GA6426@kozik-lap>
+Message-ID: <CAGTfZH3AVbo6w9KDVNNCs+JMi=+-CA0oL6pQ+3jcOFihtKaK3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Krzysztof,
 
-
-On 4/10/2016 6:43 PM, Florian Fainelli wrote:
-> On April 9, 2016 2:50:23 PM PDT, "Rafa? Mi?ecki" <zajec5@gmail.com> wrote:
->> Some devices (e.g. Northstar ones) may have bridges that forward
->> harmless errors to the ARM core. In such case we need an option to
->> add a handler ignoring them.
+On Tue, Apr 12, 2016 at 4:55 AM, Krzysztof Kozlowski
+<k.kozlowski@samsung.com> wrote:
+> On Mon, Apr 11, 2016 at 01:01:18PM +0900, Chanwoo Choi wrote:
+>> Dear Myungjoo and Krzysztof,
 >>
->> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
->> ---
+>> This patch-set already get the acked-by or signed-off-by tag
+>> from Exynos SoC and DEVFREQ maintainer except for patch10.
+>>
+>> If there is no comment, could you pick this patch-set?
 >
->> +- brcm,pcie-hook-abort-handler: During PCI bus probing (device
->> enumeration)
->> +  there can be errors that are expected and harmless. Unfortunately
->> some bridges
->> +  can't be configured to ignore them and they forward them to the ARM
->> core
->> +  triggering die().
->> +  This property should be set in such case, it will make driver add
->> its own
->> +  handler ignoring such errors.
->
-> The property is named after the function that allows you to catch abort handlers, whereas you should be describing the HW here. Something like brcm,bridge-error-forward or a better name even would be preferable.
->
->> +#ifdef CONFIG_ARM
->> +static int iproc_pcie_abort_handler(unsigned long addr, unsigned int
->> fsr,
->> +				    struct pt_regs *regs)
->> +{
->> +	if (fsr == 0x1406)
->> +		return 0;
->> +
->> +	return 1;
->
-> As you later noted this prevents this driver from being a module now. Since the expectation is that either a fixed bootloader or a platform should enot produce these data aborts, or allow them to be ignored, why not just put this code back where it belongs in the machine specific file which kills many birds with the same stone:
->
+> I cannot find any description of dependencies between the patches so I
+> assume the obvious one: DTS patches do not depend on anything. This
+> means that:
+> 1. driver/devfreq related changes (including dt-bindings documentation)
+>    go to Myungjoo,
+> 2. I can pick DTS changes.
 
-I assume the module compile issue can be simply fixed by exporting 
-symbol of "hook_fault_code"?
-
-I believe ARM64 based NS2 that uses the same iProc PCIe driver might 
-also need something like this (I'm still waiting for Jon Mason to give 
-me some more information on the NS2 errors that he saw, which is likely 
-related to this). I assume there will be something similar to the ARM 
-specific "hook_fault_code" for ARM64, but then ARM64 does not have any 
-"mach" specific directory. Where can this type of hook be installed for 
-ARM64 based platforms if not in the PCIe driver?
-
-> - code is ways built-in, and hook_fault_code is installed prior to PCIe loading (function is marked with __init)
-> - platforms which do not need that, just do not install it for that specific code
-> - it is clear which platforms need it and which do not, yet the driver remains agnostic
-
-It's actually unclear to me which iProc platforms need this.
-- We know NS needs it
-- Someone mentioned NSP does not need this? But where does the 
-information come from? Do we have similar PCIe connection configuration 
-on NSP as NS?
-- I cannot confirm whether Cygnus needs this or not since we do not have 
-similar board configurations on Cygnus (on Cygnus each host is always 
-connected to a single device). I can check with the ASIC team, but that 
-will be a very lengthy process and I'm not sure when I can get the 
-answer we need (and yes I do work at Broadcom, :))
-- Jon Mason reported similar abort issues on NS2 when an externally 
-connected, multi function device is used. I'm still waiting for him to 
-send me the error log and see if it's the same type of data abort.
+Yes.
 
 >
-> NB: there could be other platforms some day needing that which also propagate the error differently, forcing you to add more and more of these codes in the PCIe driver.
+> But first I would like to see the bindings documentation beeing applied
+> by someone as a proof that there won't be more development in DTS in
+> these series. There is no sense of picking DTS if after comments from
+> Rob, you will rework them, right?
+
+I already discussed the Rob's question on December, last year on
+patchset[1]. But, after that, I didn't receive the any reply from him.
+[1] https://lkml.org/lkml/2015/12/10/943
+
+So, I thought that there is no comment.  But, today, he give some
+question after 4 months.
+
+But I'll again reply to Rob's question.
+
 >
+> Anyway I see Rob's questions. For these bindings I think you should get
+> DT-guys ack first.
 
-Yes, at this point, we are unsure whether the same or different code is 
-used among different platforms.
+OK.
 
-Thanks,
-
-Ray
+Best Regards,
+Chanwoo Choi
