@@ -1,74 +1,110 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 12 Apr 2016 09:38:09 +0800
-Subject: [PATCH v2 4/4] ACPI: PCI: Add generic PCI host controller
-In-Reply-To: <1460414707-19153-5-git-send-email-jchandra@broadcom.com>
-Message-ID: <201604120947.xqHH8wsY%fengguang.wu@intel.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 12 Apr 2016 09:38:46 +0800
+Subject: [PATCH RFC 1/5] net: phy: sun8i-h3-ephy: Add bindings for
+ Allwinner H3 Ethernet PHY
+In-Reply-To: <570BF9B0.2090602@gmail.com>
+References: <1459786954-12649-1-git-send-email-wens@csie.org>
+ <1459786954-12649-2-git-send-email-wens@csie.org> <570BF9B0.2090602@gmail.com>
+Message-ID: <CAGb2v662vHfYox2Ff9Mm=sXq4UHg92SQe2ihnKY9Aa4X9yss4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jayachandran,
+On Tue, Apr 12, 2016 at 3:23 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> On 04/04/16 09:22, Chen-Yu Tsai wrote:
+>> The Allwinner H3 SoC incorporates an Ethernet PHY. This is enabled and
+>> configured through a memory mapped hardware register.
+>>
+>> This same register also configures the MAC interface mode and TX clock
+>> source. Also covered by the register, but not supported in these bindings,
+>> are TX/RX clock delay chains and inverters, and an RMII module.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>  .../bindings/net/allwinner,sun8i-h3-ephy.txt       | 44 ++++++++++++++++++++++
+>>  1 file changed, 44 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/net/allwinner,sun8i-h3-ephy.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/net/allwinner,sun8i-h3-ephy.txt b/Documentation/devicetree/bindings/net/allwinner,sun8i-h3-ephy.txt
+>> new file mode 100644
+>> index 000000000000..146f227e6d88
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/net/allwinner,sun8i-h3-ephy.txt
+>> @@ -0,0 +1,44 @@
+>> +* Allwinner H3 E(thernet) PHY
+>> +
+>> +The Allwinner H3 integrates an MII ethernet PHY. As with external PHYs,
+>> +before it can be configured over the MDIO bus and used, certain hardware
+>> +features must be configured, such as the PHY address and LED polarity.
+>
+> Is the internal PHY address really configurable? Not that there is
+> anything wrong with it, this is good.
 
-[auto build test ERROR on pci/next]
-[also build test ERROR on v4.6-rc3 next-20160411]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+It is. Things that are configured or provided to a discrete PHY are routed
+to registers in the SoC, things such as PHY address, clocks, resets.
 
-url:    https://github.com/0day-ci/linux/commits/Jayachandran-C/ACPI-based-PCI-host-driver-with-generic-ECAM/20160412-064853
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git next
-config: arm64-allyesconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+>> +The PHY must also be powered on and brought out of reset.
+>> +
+>> +This is accomplished with regulators and pull-up/downs for external PHYs.
+>> +For this internal PHY, a hardware register is programmed.
+>> +
+>> +The same hardware register also contains clock and interface controls
+>> +for the MAC. This is also present in earlier SoCs, and is covered by
+>> +"allwinner,sun7i-a20-gmac-clk". The controls in the H3 are slightly
+>> +different due to the inclusion of what appears to be an RMII-MII
+>> +bridge.
+>> +
+>> +Required properties:
+>> +- compatible: should be "allwinner,sun8i-h3-ephy"
+>> +- reg: address and length of the register set for the device
+>> +- clocks: A phandle to the reference clock for this device
+>> +- resets: A phandle to the reset control for this device
+>> +
+>> +Ethernet PHY related properties:
+>> +- allwinner,ephy-addr: the MDIO bus address the PHY should respond to.
+>> +                    If this is not set, the external PHY is used, and
+>> +                    everything else in this section is ignored.
+>
+> So we are going to put the same value here, and in the actual Ethernet
+> PHY device tree node that should be hanging off the EMAC/MDIO bus
+> controller, this is confusing and error prone.
 
-All errors (new ones prefixed by >>):
+Yes, that would be an issue when writing the DTS.
+>
+>> +- allwinner,leds-active-low: LEDs are active low. Without this, LEDs are
+>> +                          active high.
+>> +
+>> +Ethernet MAC clock related properties:
+>> +- #clock-cells: should be 0
+>> +- clock-output-names: "mac_tx"
+>> +
+>> +Example:
+>> +
+>> +ethernet-phy at 01c00030 {
+>> +     compatible = "allwinner,sun8i-h3-ephy";
+>> +     reg = <0x01c00030 0x4>;
+>
+> Looking at this register space this looks more like an internal PHY SHIM
+> that is needed to be configured before the internal PHY can be access,
+> not a proper Ethernet PHY per-se, see replies in aptch 2.
+>
+> Should not this block be a second cell associated with the Ethernet MAC
+> block? One or the other are not going to be very useful without
+> knowledge of each other.
 
->> drivers/xen/pci.c:31:25: fatal error: asm/pci_x86.h: No such file or directory
-    #include <asm/pci_x86.h>
-                            ^
-   compilation terminated.
+True. However the lower half of the same register also controls the
+MAC interface mode and TX clock source and delays. This we had a clock
+driver that was used in conjuction with stmmac on earlier SoCs. I was
+hoping to keep that model with the newer EMAC. At the time it was
+argued that what seemed like a clock should be handled by a clock
+driver, instead of just a "syscon". If this is reaching too far to
+handle this new use case, I will happily just provide patches to merge
+this into the MAC.
 
-vim +31 drivers/xen/pci.c
+I would like to know how to deal with things like a PHY requiring
+some sort of shim driver, be it an internal one, or an external mfd
+chip that happens to have an Ethernet PHY included? How do we tie
+this into the PHY node under the MDIO bus?
 
-e28c31a9 Weidong Han           2010-10-27  15   * Place - Suite 330, Boston, MA 02111-1307 USA.
-e28c31a9 Weidong Han           2010-10-27  16   *
-e28c31a9 Weidong Han           2010-10-27  17   * Author: Weidong Han <weidong.han@intel.com>
-e28c31a9 Weidong Han           2010-10-27  18   */
-e28c31a9 Weidong Han           2010-10-27  19  
-e28c31a9 Weidong Han           2010-10-27  20  #include <linux/pci.h>
-55e901fc Jan Beulich           2011-09-22  21  #include <linux/acpi.h>
-0b97b03d Ross Lagerwall        2015-04-09  22  #include <linux/pci-acpi.h>
-e28c31a9 Weidong Han           2010-10-27  23  #include <xen/xen.h>
-e28c31a9 Weidong Han           2010-10-27  24  #include <xen/interface/physdev.h>
-e28c31a9 Weidong Han           2010-10-27  25  #include <xen/interface/xen.h>
-e28c31a9 Weidong Han           2010-10-27  26  
-e28c31a9 Weidong Han           2010-10-27  27  #include <asm/xen/hypervisor.h>
-e28c31a9 Weidong Han           2010-10-27  28  #include <asm/xen/hypercall.h>
-e28c31a9 Weidong Han           2010-10-27  29  #include "../pci/pci.h"
-b7ef4a6d Ben Hutchings         2013-12-31  30  #ifdef CONFIG_PCI_MMCONFIG
-8deb3eb1 Konrad Rzeszutek Wilk 2013-10-25 @31  #include <asm/pci_x86.h>
-b7ef4a6d Ben Hutchings         2013-12-31  32  #endif
-e28c31a9 Weidong Han           2010-10-27  33  
-55e901fc Jan Beulich           2011-09-22  34  static bool __read_mostly pci_seg_supported = true;
-55e901fc Jan Beulich           2011-09-22  35  
-e28c31a9 Weidong Han           2010-10-27  36  static int xen_add_device(struct device *dev)
-e28c31a9 Weidong Han           2010-10-27  37  {
-e28c31a9 Weidong Han           2010-10-27  38  	int r;
-e28c31a9 Weidong Han           2010-10-27  39  	struct pci_dev *pci_dev = to_pci_dev(dev);
 
-:::::: The code at line 31 was first introduced by commit
-:::::: 8deb3eb1461e4cb136c88d03ec5a6729ccf2f933 xen/mcfg: Call PHYSDEVOP_pci_mmcfg_reserved for MCFG areas.
-
-:::::: TO: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-:::::: CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 49553 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160412/ae837dc6/attachment-0001.obj>
+Regards
+ChenYu
