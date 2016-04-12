@@ -1,79 +1,75 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 12 Apr 2016 15:11:56 +0200
-Subject: [PATCH 15/17] kvm: arm64: Get rid of fake page table levels
-In-Reply-To: <570CF21D.8000600@arm.com>
-References: <1459787177-12767-1-git-send-email-suzuki.poulose@arm.com>
- <1459787177-12767-16-git-send-email-suzuki.poulose@arm.com>
- <20160408150523.GX8961@cbox> <570BB5C9.8040509@arm.com>
- <20160412121414.GA3039@cbox> <570CF21D.8000600@arm.com>
-Message-ID: <20160412131156.GH3039@cbox>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Tue, 12 Apr 2016 21:14:07 +0800
+Subject: [PATCH v2 14/16] arm64: dts: hikey: Add hi655x pmic dts node
+In-Reply-To: <20160404051653.GU17806@rob-hp-laptop>
+References: <1459589383-16914-1-git-send-email-guodong.xu@linaro.org>
+ <1459589383-16914-15-git-send-email-guodong.xu@linaro.org>
+ <20160404051653.GU17806@rob-hp-laptop>
+Message-ID: <CAFGCpxyhcQEO_t+K+XSeLLL+qky8YDQbb3ewdfYY5Y=FxRy_sw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 12, 2016 at 02:03:25PM +0100, Suzuki K Poulose wrote:
-> On 12/04/16 13:14, Christoffer Dall wrote:
-> >On Mon, Apr 11, 2016 at 03:33:45PM +0100, Suzuki K Poulose wrote:
-> >>On 08/04/16 16:05, Christoffer Dall wrote:
-> >>>On Mon, Apr 04, 2016 at 05:26:15PM +0100, Suzuki K Poulose wrote:
-> >>
-> 
-> >>>>-#if PGDIR_SHIFT > KVM_PHYS_SHIFT
-> >>>>-#define PTRS_PER_S2_PGD_SHIFT	0
-> >>>>-#else
-> >>>>-#define PTRS_PER_S2_PGD_SHIFT	(KVM_PHYS_SHIFT - PGDIR_SHIFT)
-> >>>>-#endif
-> >>>>-#define PTRS_PER_S2_PGD		(1 << PTRS_PER_S2_PGD_SHIFT)
-> >>>>+#define STAGE2_PGTABLE_LEVELS		ARM64_HW_PGTABLE_LEVELS(KVM_PHYS_SHIFT - 4)
-> >>>>
-> >>>>  /*
-> >>>>- * If we are concatenating first level stage-2 page tables, we would have less
-> >>>>- * than or equal to 16 pointers in the fake PGD, because that's what the
-> >>>>- * architecture allows.  In this case, (4 - CONFIG_PGTABLE_LEVELS)
-> >>>>- * represents the first level for the host, and we add 1 to go to the next
-> >>>>- * level (which uses contatenation) for the stage-2 tables.
-> >
-> >just noticed: s/contatenation/concatenation/
-> 
-> Thanks for catching that. Will fix it.
-> 
-> >>>which case this should be reworded to just state the assumptions and why
-> >>>this is a good assumption.
-> >>>
-> >>>(If my assumptions are wrong here, then there are also weird cases where
-> >>>the host does huge pages at the PMD level and we don't.  Not sure I can
-> >>>see the full ramifications of that.)
-> >>
-> >>I am sorry, I didn't get your point about the PMD level.
-> >>
-> >
-> >Right, I expressed that terribly, and I may have gotten myself confused
-> >when writing that.
-> >
-> >My concern is this: if the number of levels between the host and stage-2
-> >are different, and the host uses huge pmd mappings (either THP or huge
-> >tlb fs), then do we always do the right thing for stage-2 tables, even
-> >if we support the case with more levels in Stage-2 than on the host?
-> 
-> Yes. We are safe with PMD (level 2). In the worst case we will have a 2level
-> page table at host and say 4 at stage2. In either case, we have a PMD level
-> (which in host is folded to PGD) and both will use section mapping at level 2
-> for huge pmd. Also pmd_huge() doesn't care if the PMD is folded or not. So,
-> we are fine with that. I hope that answers your question.
-> 
+On 4 April 2016 at 13:16, Rob Herring <robh@kernel.org> wrote:
+> On Sat, Apr 02, 2016 at 05:29:41PM +0800, Guodong Xu wrote:
+>> From: Chen Feng <puck.chen@hisilicon.com>
+>>
+>> Add the mfd hi655x dts node and regulator support on
+>> hi6220 platform.
+>>
+>> Signed-off-by: Chen Feng <puck.chen@hisilicon.com>
+>> Signed-off-by: Fei Wang <w.f@huawei.com>
+>> Signed-off-by: Xinwei Kong <kong.kongxinwei@hisilicon.com>
+>> Reviewed-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+>> Reviewed-by: Guodong Xu <guodong.xu@linaro.org>
+>> ---
+>>  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 87 ++++++++++++++++++++++++++
+>>  1 file changed, 87 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+>> index 28bc646..a6dffa8 100644
+>> --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+>> +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+>> @@ -6,6 +6,7 @@
+>>   */
+>>
+>>  /dts-v1/;
+>> +#include <dt-bindings/gpio/gpio.h>
+>>
+>>  #include "hi6220.dtsi"
+>>  #include "hikey-gpio.dtsi"
+>> @@ -104,6 +105,92 @@
+>>                       default-state = "off";
+>>               };
+>>       };
+>> +
+>> +     pmic: pmic at f8000000 {
+>> +             compatible = "hisilicon,hi655x-pmic";
+>> +             reg = <0x0 0xf8000000 0x0 0x1000>;
+>> +             interrupt-controller;
+>> +             #interrupt-cells = <2>;
+>> +             pmic-gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
+>> +             status = "okay";
+>> +
+>> +             regulators {
+>> +                     ldo2: LDO2 at a21 {
+>
+> @a21 is not a unit address. Please drop these.
 
-It does, thanks for enumerating the cases for me.
+Will change these to
+ +                     ldo2: LDO2 {
+...
+ +                     ldo7: LDO7 {
+...
 
-> >
-> >Thanks for trying to parse my crytptic and potentially nonsensical
-> >questions.
-> 
-> No no, they make absolute sense. I had gone through these questions myself initially
-> when I wrote the series, so its good to share them :-).
-> 
-> Btw, I have rebased my series to kvmarm and have addressed the comments. I will post
-> them after a round of testing.
-> 
+Thanks for review, Rob.
 
-Great, thanks!
+-Guodong
 
--Christoffer
+>
+>> +                             regulator-name = "LDO2_2V8";
+>> +                             regulator-min-microvolt = <2500000>;
+>> +                             regulator-max-microvolt = <3200000>;
+>> +                             regulator-enable-ramp-delay = <120>;
+>> +                     };
+>> +
+>> +                     ldo7: LDO7 at a26 {
