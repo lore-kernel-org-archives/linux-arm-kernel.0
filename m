@@ -1,58 +1,40 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 12 Apr 2016 08:54:16 -0500
-Subject: [PATCH v2 1/2] dt/bindings: Add bindings for hisilicon random
- number generator
-In-Reply-To: <570C4C52.4020902@huawei.com>
-References: <1460017397-30996-1-git-send-email-wangkefeng.wang@huawei.com>
- <1460017397-30996-2-git-send-email-wangkefeng.wang@huawei.com>
- <20160411144306.GA24637@rob-hp-laptop> <570C4C52.4020902@huawei.com>
-Message-ID: <CAL_JsqJv57nX7a89OR8U1=m+MLQKJBCOeuORPWXwGRx_P9XXBQ@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 12 Apr 2016 16:55:28 +0300
+Subject: [PATCH 00/30] ARM: OMAP2+: hwmod module clock type support
+In-Reply-To: <20160411173518.GA5995@atomide.com>
+References: <1460362761-4842-1-git-send-email-t-kristo@ti.com>
+ <20160411173518.GA5995@atomide.com>
+Message-ID: <570CFE50.5010709@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 11, 2016 at 8:16 PM, Kefeng Wang <wangkefeng.wang@huawei.com> wrote:
+On 04/11/2016 08:40 PM, Tony Lindgren wrote:
+> Hi,
 >
+> Nice to see this moving along :)
 >
-> On 2016/4/11 22:43, Rob Herring wrote:
->> On Thu, Apr 07, 2016 at 04:23:16PM +0800, Kefeng Wang wrote:
->>> Document the devicetree bindings for the random number generator found
->>> on Hisilicon Hip04 and Hip05 soc.
->>>
->>> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
->>> ---
->>>  Documentation/devicetree/bindings/rng/hisi-rng.txt | 12 ++++++++++++
->>>  1 file changed, 12 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/rng/hisi-rng.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/rng/hisi-rng.txt b/Documentation/devicetree/bindings/rng/hisi-rng.txt
->>> new file mode 100644
->>> index 0000000..72efcc1
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/rng/hisi-rng.txt
->>> @@ -0,0 +1,12 @@
->>> +Hisilicon Random Number Generator
->>> +
->>> +Required properties:
->>> +- compatible : Should be "hisilicon,rng"
->>> +- reg : Offset and length of the register set of this block
->>> +
->>> +Example:
->>> +
->>> +rng at d1010000 {
->>> +    compatible = "hisilicon,rng";
+> * Tero Kristo <t-kristo@ti.com> [160411 01:20]:
 >>
->> This still needs SoC specific compatible strings.
+>> The ordering on this set is kind of tricky to avoid any boot issues,
+>> and it still currently causes a boot breakage between the DTS data
+>> introduction and removal of hwmod data; this generates duplicate
+>> entries for clocks which is prone to cause issues (both DT and hwmod
+>> have the same entries in place under the hwmod data is removed.) I
+>> didn't quite figure out a good way to avoid this, and could use some
+>> guidance here. Shall we squash the DT + hwmod data patches together?
+>> This avoids the boot breakage but creates pretty large patches. Also,
+>> AMx3xx data needs to be grouped together as part of their data is
+>> re-used commonly by both SoCs.
 >
-> It is used by Hip04/Hip05 at lease, but for new SoC, like Hip06, it maybe different,
-> using single Soc prefix is not proper, how about hisilicon,rng-v1, or add two compatible
-> hisilicon,hip04-rng and hisilicon,hip05-rng? What's your option?
+> How about use clocks from dts if clocks property is defined? Otherwise
+> fall back to the old static data. Then drop the static data later on
+> with follow up patches.
 
-It is perfectly fine to include hisilicon,hip04-rng string for hip05
-and later if the block is the same. You should still have both strings
-(the original and current SoC) in case there is some issue or
-difference found.
+The underlying issue is the hardcoded names of hwmod clocks within hwmod 
+data. I think I figured out a fix for this, I am adding a few patches to 
+this series to lookup main_clk based on the hwmod name itself. This 
+allows re-directing the main_clk to the DT module clock in case one is 
+available for the hwmod. The bisect issues seem to be gone with this 
+also, I need to cleanup the patches a bit and re-post.
 
-Unless there is a real IP version defined, you should avoid made up
-version numbers.
-
-Rob
+-Tero
