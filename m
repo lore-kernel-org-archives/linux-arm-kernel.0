@@ -1,71 +1,116 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 12 Apr 2016 13:42:55 +0300
-Subject: [PATCH] ARM: omap2: am437x: rollback to use omap3_gptimer_timer_init()
-Message-ID: <1460457775-23850-1-git-send-email-grygorii.strashko@ti.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 12 Apr 2016 12:53:14 +0200
+Subject: [RESEND 09/11] pwm: sti: Add PWM Capture call-back
+In-Reply-To: <1456932729-9667-10-git-send-email-lee.jones@linaro.org>
+References: <1456932729-9667-1-git-send-email-lee.jones@linaro.org>
+ <1456932729-9667-10-git-send-email-lee.jones@linaro.org>
+Message-ID: <20160412105314.GE18882@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit 55ee7017ee31 ("arm: omap2: board-generic: use
-omap4_local_timer_init for AM437x") unintentionally changes the
-clocksource devices for AM437x from OMAP GP Timer to SyncTimer32K.
+On Wed, Mar 02, 2016 at 03:32:07PM +0000, Lee Jones wrote:
+> Once a PWM Capture has been initiated, the capture call
+> enables a rising edge detection IRQ, then waits.  Once each
+> of the 3 phase changes have been recorded the thread then
+> wakes.  The remaining part of the call carries out the
+> relevant calculations and passes back a formatted string to
+> the caller.
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/pwm/pwm-sti.c | 72 +++++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 72 insertions(+)
+> 
+> diff --git a/drivers/pwm/pwm-sti.c b/drivers/pwm/pwm-sti.c
+> index 82a69e4..8de9b4a 100644
+> --- a/drivers/pwm/pwm-sti.c
+> +++ b/drivers/pwm/pwm-sti.c
+> @@ -309,7 +309,79 @@ static void sti_pwm_free(struct pwm_chip *chip, struct pwm_device *pwm)
+>  	clear_bit(pwm->hwpwm, &pc->configured);
+>  }
+>  
+> +static int sti_pwm_capture(struct pwm_chip *chip, struct pwm_device *pwm,
+> +			   int channel, char *buf)
+> +{
+> +	struct sti_pwm_chip *pc = to_sti_pwmchip(chip);
+> +	struct sti_pwm_compat_data *cdata = pc->cdata;
+> +	struct sti_cpt_data *d = pc->cpt_data[channel];
+> +	struct device *dev = pc->dev;
+> +	unsigned int f, dc;
+> +	unsigned int high, low;
+> +	bool level;
+> +	int ret;
+> +
+> +	if (channel > cdata->cpt_num_chan - 1) {
+> +		dev_err(dev, "Channel %d is not valid\n", channel);
+> +		return -EINVAL;
+> +	}
+> +
+> +	mutex_lock(&d->lock);
 
-Unfortunately, the SyncTimer32K is starving from frequency deviation
-as mentioned in commit 5b5c01359152 ("ARM: OMAP2+: AM43x: Use gptimer
-as clocksource") and, as reported by Franklin [1], even its monotonic
-nature is under question (most probably there is a HW issue, but it's
-still under investigation).
+Should this perhaps reuse the struct pwm_device's ->lock?
 
-Taking into account above facts It's reasonable to rollback to the use
-of omap3_gptimer_timer_init().
+> +
+> +	/* Prepare capture measurement */
+> +	d->index = 0;
+> +	regmap_write(pc->regmap, PWM_CPT_EDGE(channel), CPT_EDGE_RISING);
+> +	regmap_field_write(pc->pwm_cpt_int_en, BIT(channel));
+> +	ret = wait_event_interruptible_timeout(d->wait, d->index > 1, HZ);
 
-[1] http://www.spinics.net/lists/linux-omap/msg127425.html
-Cc: Felipe Balbi <balbi@kernel.org>
-Cc: Lokesh Vutla <lokeshvutla@ti.com>
-Reported-by: Cooper Jr., Franklin <fcooper@ti.com>
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
- arch/arm/mach-omap2/board-generic.c | 2 +-
- arch/arm/mach-omap2/timer.c         | 7 +++++--
- 2 files changed, 6 insertions(+), 3 deletions(-)
+The timeout here should make sure callers don't hang forever. But maybe
+you can still make sure that when the PWM gets disabled the wait queue
+is woken and perhaps return an appropriate error code to let users know
+that the operation was interrupted.
 
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index bab814d..60f5e83 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -306,7 +306,7 @@ DT_MACHINE_START(AM43_DT, "Generic AM43 (Flattened Device Tree)")
- 	.init_late	= am43xx_init_late,
- 	.init_irq	= omap_gic_of_init,
- 	.init_machine	= omap_generic_init,
--	.init_time	= omap4_local_timer_init,
-+	.init_time	= omap3_gptimer_timer_init,
- 	.dt_compat	= am43_boards_compat,
- 	.restart	= omap44xx_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index 6261e93..7cc055c 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -500,16 +500,19 @@ void __init omap3_secure_sync32k_timer_init(void)
- }
- #endif /* CONFIG_ARCH_OMAP3 */
- 
--#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX)
-+#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX) || \
-+	defined(CONFIG_SOC_AM43XX)
- void __init omap3_gptimer_timer_init(void)
- {
- 	__omap_sync32k_timer_init(2, "timer_sys_ck", NULL,
- 			1, "timer_sys_ck", "ti,timer-alwon", true);
-+	if (of_have_populated_dt())
-+		clocksource_probe();
- }
- #endif
- 
- #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5) ||		\
--	defined(CONFIG_SOC_DRA7XX) || defined(CONFIG_SOC_AM43XX)
-+	defined(CONFIG_SOC_DRA7XX)
- static void __init omap4_sync32k_timer_init(void)
- {
- 	__omap_sync32k_timer_init(1, "timer_32k_ck", "ti,timer-alwon",
--- 
-2.8.1
+Also, how about letting callers choose the value of the timeout? In some
+cases they may be interested in long-running signals. In other cases the
+whole second timeout may be much too long.
+
+> +
+> +	/*
+> +	 * In case we woke up for another reason than completion
+> +	 * make sure to disable the capture.
+> +	 */
+> +	regmap_write(pc->regmap, PWM_CPT_EDGE(channel), CPT_EDGE_DISABLED);
+
+The comment here is slightly confusing because it implies that disabling
+the capture should be done conditionally, whereas it is always disabled.
+
+> +
+> +	if (ret == -ERESTARTSYS)
+> +		goto out;
+> +
+> +	switch (d->index) {
+> +	case 0:
+> +	case 1:
+> +		/*
+> +		 * Getting here could mean :
+> +		 *  - input signal is constant of less than 1Hz
+> +		 *  - there is no input signal at all
+> +		 *
+> +		 * In such case the frequency is rounded down to 0
+> +		 * level of the supposed constant signal is reported
+> +		 * using duty cycle min and max values.
+> +		 */
+> +		level = gpio_get_value(d->gpio);
+> +
+> +		ret = sprintf(buf, "0:%u\n", level ? CPT_DC_MAX : 0);
+> +		break;
+> +	case 2:
+> +		/* We have evertying we need */
+> +		high = d->snapshot[1] - d->snapshot[0];
+> +		low  = d->snapshot[2] - d->snapshot[1];
+> +
+> +		/* Calculate frequency in Hz */
+> +		f = clk_get_rate(pc->cpt_clk) / (1 * (high + low));
+
+The multiplication by 1 is unnecessary.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160412/41c37334/attachment.sig>
