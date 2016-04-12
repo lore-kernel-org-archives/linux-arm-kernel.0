@@ -1,62 +1,50 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 12 Apr 2016 10:34:02 +0100
-Subject: [PATCH v2 13/13] ARM: dts: db600c: add support to magnetometer
-In-Reply-To: <1460453642-5809-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1460453642-5809-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1460453642-5809-14-git-send-email-srinivas.kandagatla@linaro.org>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Tue, 12 Apr 2016 17:43:23 +0800
+Subject: [PATCH v3 04/16] arm64: dts: Add Hi6220 gpio configuration nodes
+In-Reply-To: <CACRpkdZNTJB_Jn01AwhwHf77yk-Cb_yzj4ty6N1b6wbHmfoevA@mail.gmail.com>
+References: <1459862860-9775-1-git-send-email-guodong.xu@linaro.org>
+ <1459862860-9775-5-git-send-email-guodong.xu@linaro.org>
+ <CACRpkdZNTJB_Jn01AwhwHf77yk-Cb_yzj4ty6N1b6wbHmfoevA@mail.gmail.com>
+Message-ID: <CAFGCpxz+ZZE-NT11+2GEoKX4dhmju+4zxG04Nt-gPGqR8kwy7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support to on board LIS3MDLTR magnetometer.
+On 8 April 2016 at 20:19, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Tue, Apr 5, 2016 at 3:27 PM, Guodong Xu <guodong.xu@linaro.org> wrote:
+>
+>> From: Zhong Kaihua <zhongkaihua@huawei.com>
+>>
+>> Add Hi6220 gpio configuration nodes
+>>
+>> Signed-off-by: Zhong Kaihua <zhongkaihua@huawei.com>
+>> Signed-off-by: Kong Xinwei <kong.kongxinwei@hisilicon.com>
+>>
+>
+> I asked you to remove this blank line.
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- arch/arm/boot/dts/qcom-apq8064-arrow-db600c-pins.dtsi |  8 ++++++++
- arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts       | 13 +++++++++++++
- 2 files changed, 21 insertions(+)
+will fix.
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064-arrow-db600c-pins.dtsi b/arch/arm/boot/dts/qcom-apq8064-arrow-db600c-pins.dtsi
-index 3b55bb9..a3efb97 100644
---- a/arch/arm/boot/dts/qcom-apq8064-arrow-db600c-pins.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064-arrow-db600c-pins.dtsi
-@@ -31,6 +31,14 @@
- 			output-low;
- 		};
- 	};
-+
-+	magneto_pins: magneto-pins {
-+		mux {
-+			pins = "gpio31", "gpio48";
-+			function = "gpio";
-+			bias-disable;
-+		};
-+	};
- };
- 
- &pm8921_mpps {
-diff --git a/arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts b/arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts
-index 34bb415..e01b27e 100644
---- a/arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts
-+++ b/arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts
-@@ -153,6 +153,19 @@
- 				/* On Low speed expansion and Sensors */
- 				label = "LS-I2C0";
- 				status = "okay";
-+				lis3mdl_mag at 1e {
-+					compatible = "st,lis3mdl-magn";
-+					reg = <0x1e>;
-+					vdd-supply = <&vcc3v3>;
-+					vddio-supply = <&pm8921_s4>;
-+					pinctrl-names = "default";
-+					pinctrl-0 = <&magneto_pins>;
-+					interrupt-parent = <&tlmm_pinmux>;
-+
-+					st,drdy-int-pin = <2>;
-+					interrupts = <48 IRQ_TYPE_EDGE_RISING>, /* DRDY line */
-+						     <31 IRQ_TYPE_EDGE_RISING>; /* INT */
-+				};
- 			};
- 		};
- 
--- 
-2.5.0
+>
+>> Acked-by: Rob Herring <robh@kernel.org>
+>> Signed-off-by: Wei Xu <xuwei5@hisilicon.com>
+>
+> (...)
+>> +++ b/arch/arm64/boot/dts/hisilicon/hikey-gpio.dtsi
+>> @@ -0,0 +1,607 @@
+>> +/ {
+>> +       gpio_rstout_n:gpio_rstout_n {
+>> +               gpios;
+>> +       };
+>
+> I also asked about either explaining or removing this.
+>
+> Did my mail arrive?
+
+It arrived. My mistake, sorry, i missed. I will remove this file. And
+send a new version.
+
+-Guodong
+
+>
+> Yours,
+> Linus Walleij
