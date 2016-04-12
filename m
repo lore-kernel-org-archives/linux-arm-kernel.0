@@ -1,46 +1,67 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 12 Apr 2016 10:09:17 -0600
-Subject: [PATCH] coresight: etm4x: modify q_support type
-In-Reply-To: <1460451517-171713-1-git-send-email-lipengcheng8@huawei.com>
-References: <1460451517-171713-1-git-send-email-lipengcheng8@huawei.com>
-Message-ID: <CANLsYkw=EHhGjr_NTBgvoui8Rxv2pFfNmz7im0h2v_diO-qarA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 12 Apr 2016 09:30:56 -0700
+Subject: Nokia N900 retention mode in v4.6, camera buttons fun
+In-Reply-To: <20160412123013.GA12296@amd>
+References: <20160407174019.GM16484@atomide.com> <20160407194828.GA13338@amd>
+ <20160407213229.GO16484@atomide.com> <20160407230150.GA16552@amd>
+ <20160407234134.GQ16484@atomide.com> <20160411093023.GC11814@amd>
+ <20160411094130.GA5753@amd> <20160411211026.GH5995@atomide.com>
+ <20160412121658.GA32486@amd> <20160412123013.GA12296@amd>
+Message-ID: <20160412163055.GP5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 April 2016 at 02:58, lipengcheng <lipengcheng8@huawei.com> wrote:
-> Because this operation exceed the range of boolean, so we should
-> modify q_support to unit32 bit.
-> drvdata->q_support = BMVAL(etmidr0, 15, 16)
->
-> Signed-off-by: Li Pengcheng <lipengcheng8@huawei.com>
-> Signed-off-by: Li Zhong <lizhong11@hisilicon.com>
-> ---
->  drivers/hwtracing/coresight/coresight-etm4x.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/hwtracing/coresight/coresight-etm4x.h b/drivers/hwtracing/coresight/coresight-etm4x.h
-> index c341002..305b29a 100644
-> --- a/drivers/hwtracing/coresight/coresight-etm4x.h
-> +++ b/drivers/hwtracing/coresight/coresight-etm4x.h
-> @@ -330,7 +330,7 @@ struct etmv4_drvdata {
->         u32                             ccctlr;
->         bool                            trcbb;
->         u32                             bb_ctrl;
-> -       bool                            q_support;
-> +       u32                             q_support;
+* Pavel Machek <pavel@ucw.cz> [160412 05:31]:
+> Hi!
+> 
+> > > > Ok, it works now. I was doing tests in daylight so it was poorly
+> > > > visible. The right part of keyboard stays lit (but that's expected
+> > > > AFAICT), but the left part blinks.
+> > > 
+> > > During idle, both should go off and are doing so for me. Both LEDs off
+> > > indicates off mode, left LED off is for retention mode. So you still
+> > > have something blocking off mode, maybe check:
+> > > 
+> > > echo 1 > /sys/kernel/debug/pm_debug/enable_off_mode
+> > 
+> > What is the power difference between retention and off? I'm now down
+> > to cca 25mA, which should be around 50 hours standby time. Not ideal,
+> > but should be usable.
 
-Unfortunately this patch doesn't apply on my side.  Please rebase on
-my next tree [1], branch "next".
+The 25mA sounds way too big to me even for retention mode, some
+devices must be still on.
 
-Thanks,
-Mathieu
+The off mode makes a huge difference for standby time, it should cut
+down the total power consumption to something like 10+ mW with modem
+enabled. Aproximately the breakdown is roughly: 900 uW for omap, 5 mW
+for memory and 5 or more for the modem. Sorry I don't know the exact
+numbers for the modem. But with 37xx torpedo, mainline kernel is
+already getting very close to the 900 uW + 5 mW numbers for the CPU
+module during idle measured from the ina219 shunt on the torpedo devkit.
 
-[1]. https://git.linaro.org/kernel/coresight.git
+> > In the meantime, I found what is causing the rention mode to break for
+> > me: CONFIG_HSI (aka wireless modem support). With HSI off, it seems to work.
+> > 
+> > I still get problems with the camera button, in config similar to
+> > defconfig.  For some reason, I'm even getting (autorepeating) ^@ on
+> > console. As long as I hold camera button down, I even get it into off
+> > mode for brief period.
+> 
+> Ok, if I turn off CONFIG_KEYBOARD_GPIO, I get it into off
+> mode... once per screen blank, for about a second. (Does CONFIG_KEYBOARD_GPIO also cause
+> problems for you?)
+> 
+> Any idea why it enters off mode only once after each screenblank?
 
+After disabling CONFIG_PROVE_LOCKING, loading the LCD modules, and
+blanking the screen, my n900 hits off mode just fine about once
+a second. Sounds like you still have some extra devices enabled
+causing it.
 
->         u32                             vinst_ctrl;
->         u32                             viiectlr;
->         u32                             vissctlr;
-> --
-> 1.8.3.2
->
+With LCD enabled, both LEDs are on contantly. I think we should
+be able to hit retention in that state, at least n950 is doing it
+with the Nokia kernel.
+
+Regards,
+
+Tony
