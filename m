@@ -1,78 +1,116 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 12 Apr 2016 10:33:52 +0100
-Subject: [PATCH v2 03/13] ARM: dts: apq8064: add gsbi7 i2c support
+Date: Tue, 12 Apr 2016 10:33:56 +0100
+Subject: [PATCH v2 07/13] ARM: dts: db600c: add usb support
 In-Reply-To: <1460453642-5809-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1460453642-5809-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1460453642-5809-4-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1460453642-5809-8-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support to gsbi7 i2c which is used in some of the new
-boards.
+This patch adds usb host and otg support on board with required
+regulators.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 ---
- arch/arm/boot/dts/qcom-apq8064-pins.dtsi | 25 +++++++++++++++++++++++++
- arch/arm/boot/dts/qcom-apq8064.dtsi      | 13 +++++++++++++
- 2 files changed, 38 insertions(+)
+ arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts | 64 +++++++++++++++++++++++++
+ 1 file changed, 64 insertions(+)
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064-pins.dtsi b/arch/arm/boot/dts/qcom-apq8064-pins.dtsi
-index 8bb5e5f..4102a98 100644
---- a/arch/arm/boot/dts/qcom-apq8064-pins.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064-pins.dtsi
-@@ -219,4 +219,29 @@
- 			function = "gsbi7";
- 		};
- 	};
+diff --git a/arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts b/arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts
+index d921424..2c563df 100644
+--- a/arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts
++++ b/arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts
+@@ -58,6 +58,12 @@
+ 					bias-pull-down;
+ 				};
+ 
++				s3 {
++					regulator-min-microvolt = <1000000>;
++					regulator-max-microvolt = <1400000>;
++					qcom,switch-mode-frequency = <4800000>;
++				};
 +
-+	i2c7_pins: i2c7 {
-+		mux {
-+			pins = "gpio84", "gpio85";
-+			function = "gsbi7";
-+		};
+ 				s4 {
+ 					regulator-min-microvolt	= <1800000>;
+ 					regulator-max-microvolt	= <1800000>;
+@@ -72,6 +78,18 @@
+ 					qcom,switch-mode-frequency = <3200000>;
+ 				 };
+ 
++				l3 {
++					regulator-min-microvolt = <3050000>;
++					regulator-max-microvolt = <3300000>;
++					bias-pull-down;
++				};
 +
-+		pinconf {
-+			pins = "gpio84", "gpio85";
-+			drive-strength = <16>;
-+			bias-disable;
-+		};
-+	};
++				l4 {
++					regulator-min-microvolt = <1000000>;
++					regulator-max-microvolt = <1800000>;
++					bias-pull-down;
++				};
 +
-+	i2c7_pins_sleep: i2c7_pins_sleep {
-+		mux {
-+			pins = "gpio84", "gpio85";
-+			function = "gpio";
-+		};
-+		pinconf {
-+			pins = "gpio84", "gpio85";
-+			drive-strength = <2>;
-+			bias-disable = <0>;
-+		};
-+	};
- };
-diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index 81b4290..f064f59 100644
---- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -417,6 +417,19 @@
- 				clock-names = "core", "iface";
- 				status = "disabled";
+ 				l5 {
+ 					regulator-min-microvolt = <2750000>;
+ 					regulator-max-microvolt = <3000000>;
+@@ -85,6 +103,12 @@
+ 					regulator-max-microvolt = <2950000>;
+ 					bias-pull-down;
+ 				};
++
++				l23 {
++					regulator-min-microvolt = <1700000>;
++					regulator-max-microvolt = <1900000>;
++					bias-pull-down;
++				};
  			};
-+
-+			gsbi7_i2c: i2c at 16680000 {
-+				compatible = "qcom,i2c-qup-v1.1.1";
-+				pinctrl-0 = <&i2c7_pins>;
-+				pinctrl-1 = <&i2c7_pins_sleep>;
-+				pinctrl-names = "default", "sleep";
-+				reg = <0x16680000 0x1000>;
-+				interrupts = <GIC_SPI 159 IRQ_TYPE_NONE>;
-+				clocks = <&gcc GSBI7_QUP_CLK>,
-+					 <&gcc GSBI7_H_CLK>;
-+				clock-names = "core", "iface";
-+				status = "disabled";
-+			};
  		};
  
- 		rng at 1a500000 {
+@@ -111,6 +135,46 @@
+ 			};
+ 		};
+ 
++		/* OTG */
++		phy at 12500000 {
++			status		= "okay";
++			dr_mode		= "peripheral";
++			vddcx-supply	= <&pm8921_s3>;
++			v3p3-supply	= <&pm8921_l3>;
++			v1p8-supply	= <&pm8921_l4>;
++		};
++
++		phy at 12520000 {
++			status		= "okay";
++			vddcx-supply	= <&pm8921_s3>;
++			v3p3-supply	= <&pm8921_l3>;
++			v1p8-supply	= <&pm8921_l23>;
++		};
++
++		phy at 12530000 {
++			status		= "okay";
++			vddcx-supply	= <&pm8921_s3>;
++			v3p3-supply	= <&pm8921_l3>;
++			v1p8-supply	= <&pm8921_l23>;
++		};
++
++		gadget at 12500000 {
++			status = "okay";
++		};
++
++		/* OTG */
++		usb at 12500000 {
++			status = "okay";
++		};
++
++		usb at 12520000 {
++			status = "okay";
++		};
++
++		usb at 12530000 {
++			status = "okay";
++		};
++
+ 		amba {
+ 			/* eMMC */
+ 			sdcc at 12400000 {
 -- 
 2.5.0
