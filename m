@@ -1,76 +1,124 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 12 Apr 2016 14:25:05 +0100
-Subject: [RFC 0/1] ARM: mm: cache shareability tweak
-In-Reply-To: <1460448880-5677-1-git-send-email-t-kristo@ti.com>
-References: <1460448880-5677-1-git-send-email-t-kristo@ti.com>
-Message-ID: <20160412132505.GG28057@leverpostej>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 12 Apr 2016 15:26:44 +0200
+Subject: [PATCH v5 15/46] pwm: introduce the pwm_state concept
+In-Reply-To: <20160412131118.GQ18882@ulmo.ba.sec>
+References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1459368249-13241-16-git-send-email-boris.brezillon@free-electrons.com>
+ <20160412114904.GM18882@ulmo.ba.sec>
+ <20160412141718.5fe4cf24@bbrezillon>
+ <20160412122141.GP18882@ulmo.ba.sec>
+ <20160412144508.2ee181fe@bbrezillon>
+ <20160412131118.GQ18882@ulmo.ba.sec>
+Message-ID: <20160412152644.45ff517a@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 12, 2016 at 11:14:39AM +0300, Tero Kristo wrote:
-> Hi,
+On Tue, 12 Apr 2016 15:11:18 +0200
+Thierry Reding <thierry.reding@gmail.com> wrote:
+
+> On Tue, Apr 12, 2016 at 02:45:08PM +0200, Boris Brezillon wrote:
+> > On Tue, 12 Apr 2016 14:21:41 +0200
+> > Thierry Reding <thierry.reding@gmail.com> wrote:
+> > 
+> > > On Tue, Apr 12, 2016 at 02:17:18PM +0200, Boris Brezillon wrote:
+> > > > On Tue, 12 Apr 2016 13:49:04 +0200
+> > > > Thierry Reding <thierry.reding@gmail.com> wrote:
+> > > > 
+> > > > > On Wed, Mar 30, 2016 at 10:03:38PM +0200, Boris Brezillon wrote:
+> > > > > > The PWM state, represented by its period, duty_cycle and polarity,
+> > > > > > is currently directly stored in the PWM device.
+> > > > > > Declare a pwm_state structure embedding those field so that we can later
+> > > > > > use this struct to atomically update all the PWM parameters at once.
+> > > > > > 
+> > > > > > All pwm_get_xxx() helpers are now implemented as wrappers around
+> > > > > > pwm_get_state().
+> > > > > > 
+> > > > > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > > > > > ---
+> > > > > >  drivers/pwm/core.c  |  8 ++++----
+> > > > > >  include/linux/pwm.h | 54 +++++++++++++++++++++++++++++++++++++++++------------
+> > > > > >  2 files changed, 46 insertions(+), 16 deletions(-)
+> > > > > > 
+> > > > > > diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+> > > > > > index 6433059..f3f91e7 100644
+> > > > > > --- a/drivers/pwm/core.c
+> > > > > > +++ b/drivers/pwm/core.c
+> > > > > > @@ -268,7 +268,7 @@ int pwmchip_add_with_polarity(struct pwm_chip *chip,
+> > > > > >  		pwm->chip = chip;
+> > > > > >  		pwm->pwm = chip->base + i;
+> > > > > >  		pwm->hwpwm = i;
+> > > > > > -		pwm->polarity = polarity;
+> > > > > > +		pwm->state.polarity = polarity;
+> > > > > 
+> > > > > Would this not more correctly be assigned to pwm->args.polarity? After
+> > > > > all this is setting up the "initial" state, much like DT or the lookup
+> > > > > tables would for duty cycle and period.
+> > > > 
+> > > > Yes, I wasn't sure about the pwm_add_with_polarity() meaning. To me,
+> > > > all the reference info should be extracted from DT, PWM lookup table or
+> > > > driver specific ->request() implementation, but I can definitely
+> > > > initialize the args.polarity here too.
+> > > > 
+> > > > Should I keep the pwm->state.polarity assignment (to set the initial
+> > > > polarity when the driver does not support hardware readout)?
+> > > 
+> > > Wouldn't this work automatically as part of the pwm_apply_args() helper
+> > > if we extended it with this setting?
+> > 
+> > Well, as you explained in you answer to patch 5, pwm_apply_args()
+> > should be called on a per-request basis (each time a PWM device is
+> > requested), while the initial polarity setting should only be applied
+> > when registering the PWM chip (and its devices). After that, the
+> > framework takes care of keeping the PWM state in sync with the hardware
+> > state.
+> > 
+> > Let's take a real (though a bit unusual) example. Say you have a single
+> > PWM device referenced by two different users. Only one user can be
+> > enabled at a time, but each of them has its own reference config
+> > (different polarity, different period).
+> > 
+> > User1 calls pwm_get() and applies its own polarity and period. Then
+> > user1 is unregistered and release the PWM device, leaving the polarity
+> > and period untouched.
+> > 
+> > User2 is registered and request the same PWM device, but user2 is
+> > smarter and tries to extract the current PWM state before adapting the
+> > config according to pwm_args. If you just reset pwm->state.polarity
+> > each time pwm_apply_args() is called (and you suggested to call it as
+> > part of the request procedure), then this means the PWM state is no
+> > longer in sync with the hardware state.
 > 
-> This RFC patch attempts to implement support for specifying cache
-> shareability setting via kernel cmdline. This is required at least
-> for TI keystone2 generation SoCs, where DMA masters are snooping on
-> the cache maintenance messages to maintain coherency. Currently we
-> are carrying an internal hack that modifies the macros via #ifdefs,
-> this is obviously bad as the same kernel image can only work with
-> keystone2 (or at least might be causing problems with other SoCs.)
+> In that case neither will be the period or duty cycle. Essentially this
+> gets us back to square one where we need to decide how to handle current
+> state vs. initial arguments.
 
-The de-facto semantics (which we should codify) for dma-coherent with
-ARMv7 is that a device makes accesses which are coherent with Normal,
-Inner Shareable, Inner Write-Back, Outer Write-Back.
+That's not true. Now we clearly differentiate the reference config
+(content of pwm_args which is only a subset of what you'll find in
+pwm_state) and the PWM state (represented by pwm_state).
 
-In arch/arm/boot/dts/keystone.dtsi I see that /soc/usb at 2680000 has a
-dma-coherent flag. Is that device coherent today with upstream? Or is
-that misleading currently?
+We should be safe as long as we keep those 2 elements as 2 orthogonal
+concepts:
+- pwm_args is supposed to give some hint to the PWM user to help him
+  configure it's PWM appropriately
+- pwm_state is here to reflect the real PWM state, and apply new
+  configs
 
-If the device isn't coherent with that, then dma-coherent isn't strictly
-true (and should go), and we need additional properties to correctly
-describe this case.
-
-> It would be very much preferred to replace this hardcoded
-> implementation with a runtime solution.
 > 
-> Some obvious holes in this implementation:
-> 
-> 1) during execution of arch/arm/kernel/head.S, the tweaked MMU shareability
->    settings are not in place. However, I am not too sure how much that
->    matters, as I am not sure what is mapped at this point. Kernel image
->    mapping should not matter at least, as we typically should not be doing
->    any DMA transfers from the kernel image.
+> But I don't think this is really going to be an issue because this is
+> all moot until we've moved over to the atomic API, at which point this
+> is all going to go away anyway.
 
-Strictly speaking, changing the shareability can result in a loss of
-coherency, even if all accesses are made by the same CPU. See
-"Mismatched memory attributes" in section A3.5.7 of the ARMv7-AR
-Reference Manual (ARM DDI 0406C.c).
+As stated in my answer to patch 5, I think I misunderstood your
+suggestion. pwm_apply_args() is supposed to adjust the PWM config to
+match the period and polarity specified in pwm_args, right?
 
-It's not just DMA that matters. I believe we may have page tables as
-part of the kernel image, for instance, and those need to be accessed
-with consistent attributes by the MMU when doing page table walks.
+If that's the case, my question is, should we really call this function
+each time a new user requests a PWM instead of letting those users call
+the function on-demand (not all users want to adapt the current PWM
+config to the pwm_args, some may just want to apply a completely new
+config).
 
-You can avoid issues so long as you have appropriate cache maintenance,
-but that's both expensive (all memory previously mapped must be
-Clean+Invalidated by VA) and painful (as you can't reliably use any of
-said memory until after the maintenance).
-
->    I would like some comments on this, if handling during head.S
->    should be fixed also, how can this be done? Some hack under
->    compressed/keystone-head.S?
-
-If you need to do this, you need consistent attributes from the outset,
-or you need to disable the MMU, perform cache maintenance, and re-enter
-the kernel.
-
-> 2) the cmdline parameter could be something more descriptive
-> 
-> 3) The single RFC patch should probably be split up a bit
-
-4) It isn't possible to use dma-coherent to describe this without
-   weakening the semantics so as to be meaningless in general. So if we
-   go for this approach we need a mechanism to accurately describe the
-   coherency guarantees of masters in the system beyond a boolean.
-
-Thanks,
-Mark.
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
