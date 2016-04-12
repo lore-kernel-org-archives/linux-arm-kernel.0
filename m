@@ -1,61 +1,76 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 12 Apr 2016 15:21:31 +0200
-Subject: [RFC PATCH 45/45] KVM: arm/arm64: vgic-new: enable build
-In-Reply-To: <570BB86E.2000208@arm.com>
-References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
- <1458871508-17279-46-git-send-email-andre.przywara@arm.com>
- <20160331181850.GI4126@cbox> <570BB86E.2000208@arm.com>
-Message-ID: <20160412132131.GK3039@cbox>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 12 Apr 2016 14:25:05 +0100
+Subject: [RFC 0/1] ARM: mm: cache shareability tweak
+In-Reply-To: <1460448880-5677-1-git-send-email-t-kristo@ti.com>
+References: <1460448880-5677-1-git-send-email-t-kristo@ti.com>
+Message-ID: <20160412132505.GG28057@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 11, 2016 at 03:45:02PM +0100, Andre Przywara wrote:
+On Tue, Apr 12, 2016 at 11:14:39AM +0300, Tero Kristo wrote:
 > Hi,
 > 
-> On 31/03/16 19:18, Christoffer Dall wrote:
-> > On Fri, Mar 25, 2016 at 02:05:08AM +0000, Andre Przywara wrote:
-> >> Now that the new VGIC implementation has reached feature parity with
-> >> the old one, add the new files to the build system and add a Kconfig
-> >> option to switch between the two versions.
-> >> We set the default to the new version to get maximum test coverage,
-> >> in case people experience problems they can switch back to the old
-> >> behaviour if needed.
-> >>
-> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> >> ---
-> >>  arch/arm/kvm/Kconfig    |  7 +++++++
-> >>  arch/arm/kvm/Makefile   | 10 ++++++++++
-> >>  arch/arm64/kvm/Kconfig  |  7 +++++++
-> >>  arch/arm64/kvm/Makefile | 10 ++++++++++
-> >>  4 files changed, 34 insertions(+)
-> >>
-> >> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-> >> index 95a0005..02abfff 100644
-> >> --- a/arch/arm/kvm/Kconfig
-> >> +++ b/arch/arm/kvm/Kconfig
-> >> @@ -46,6 +46,13 @@ config KVM_ARM_HOST
-> >>  	---help---
-> >>  	  Provides host support for ARM processors.
-> >>  
-> >> +config KVM_NEW_VGIC
-> >> +	bool "New VGIC implementation"
-> >> +	depends on KVM
-> >> +	default y
-> >> +	---help---
-> >> +	  uses the new VGIC implementation
-> >> +
-> > 
-> > I had imagined we'd name it in the reverse, so the option would have
-> > been CONFIG_KVM_VGIC_LEGACY, but I guess the net effect should be the
-> > same, assuming most people just go with the default anyway.
-> 
-> I think originally the assumption was to make the old VGIC the default
-> in the beginning, but that changed later. By that time I considered it
-> too tedious to change all patches in this regard, so I just kept the old
-> symbol and semantic in.
-> Shouldn't matter, really, I guess there are arguments for both ways.
-> 
+> This RFC patch attempts to implement support for specifying cache
+> shareability setting via kernel cmdline. This is required at least
+> for TI keystone2 generation SoCs, where DMA masters are snooping on
+> the cache maintenance messages to maintain coherency. Currently we
+> are carrying an internal hack that modifies the macros via #ifdefs,
+> this is obviously bad as the same kernel image can only work with
+> keystone2 (or at least might be causing problems with other SoCs.)
 
-Agreed, shouldn't matter.
+The de-facto semantics (which we should codify) for dma-coherent with
+ARMv7 is that a device makes accesses which are coherent with Normal,
+Inner Shareable, Inner Write-Back, Outer Write-Back.
 
--Christoffer
+In arch/arm/boot/dts/keystone.dtsi I see that /soc/usb at 2680000 has a
+dma-coherent flag. Is that device coherent today with upstream? Or is
+that misleading currently?
+
+If the device isn't coherent with that, then dma-coherent isn't strictly
+true (and should go), and we need additional properties to correctly
+describe this case.
+
+> It would be very much preferred to replace this hardcoded
+> implementation with a runtime solution.
+> 
+> Some obvious holes in this implementation:
+> 
+> 1) during execution of arch/arm/kernel/head.S, the tweaked MMU shareability
+>    settings are not in place. However, I am not too sure how much that
+>    matters, as I am not sure what is mapped at this point. Kernel image
+>    mapping should not matter at least, as we typically should not be doing
+>    any DMA transfers from the kernel image.
+
+Strictly speaking, changing the shareability can result in a loss of
+coherency, even if all accesses are made by the same CPU. See
+"Mismatched memory attributes" in section A3.5.7 of the ARMv7-AR
+Reference Manual (ARM DDI 0406C.c).
+
+It's not just DMA that matters. I believe we may have page tables as
+part of the kernel image, for instance, and those need to be accessed
+with consistent attributes by the MMU when doing page table walks.
+
+You can avoid issues so long as you have appropriate cache maintenance,
+but that's both expensive (all memory previously mapped must be
+Clean+Invalidated by VA) and painful (as you can't reliably use any of
+said memory until after the maintenance).
+
+>    I would like some comments on this, if handling during head.S
+>    should be fixed also, how can this be done? Some hack under
+>    compressed/keystone-head.S?
+
+If you need to do this, you need consistent attributes from the outset,
+or you need to disable the MMU, perform cache maintenance, and re-enter
+the kernel.
+
+> 2) the cmdline parameter could be something more descriptive
+> 
+> 3) The single RFC patch should probably be split up a bit
+
+4) It isn't possible to use dma-coherent to describe this without
+   weakening the semantics so as to be meaningless in general. So if we
+   go for this approach we need a mechanism to accurately describe the
+   coherency guarantees of masters in the system beyond a boolean.
+
+Thanks,
+Mark.
