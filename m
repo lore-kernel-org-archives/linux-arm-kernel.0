@@ -1,85 +1,79 @@
-From: roy.lists@gmail.com (Roy Franz)
-Date: Mon, 11 Apr 2016 16:53:56 -0700
-Subject: [PATCH] arm64: acpi: add a Kconfig option to prefer ACPI boot
- over DT
-In-Reply-To: <20160411120134.GA6724@xora-mmax.xora.org.uk>
-References: <1460373568-4374-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160411120134.GA6724@xora-mmax.xora.org.uk>
-Message-ID: <CAK-u0Q=Z4FDPhitnw5qOQLbvwgwZDyqU5SFT8SEkf=dd=OMUJA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 11 Apr 2016 17:01:51 -0700
+Subject: [PATCH] ARM: OMAP3: Fix imprecise external abort for off mode on
+ 36xx
+In-Reply-To: <570C3040.3030001@ti.com>
+References: <1455140107-3328-1-git-send-email-tony@atomide.com>
+ <5706C062.4040803@ti.com> <20160407231604.GP16484@atomide.com>
+ <570BEAFB.6000409@ti.com> <20160411211339.GI5995@atomide.com>
+ <570C3040.3030001@ti.com>
+Message-ID: <20160412000151.GK5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 11, 2016 at 5:01 AM, Graeme Gregory
-<graeme.gregory@linaro.org> wrote:
-> On Mon, Apr 11, 2016 at 01:19:28PM +0200, Ard Biesheuvel wrote:
->> If both ACPI and DT platform descriptions are available, and the
->> kernel was configured at build time to support both flavours, the
->> default policy in absence of a acpi=[off|force] kernel command line
->> parameter is to prefer DT over ACPI.
->>
->> This adds an option to invert that default policy, and prefer ACPI
->> over DT instead. Note that this policy is still superseded by the
->> value of the acpi= command line parameter.
->>
->
-> Looks sane to me
->
-> Reviewed-by: Graeme Gregory <graeme.gregory@linaro.org>
->
-> G
->
-Reviewed-by: Roy Franz <roy.franz@hpe.com>
+* Dave Gerlach <d-gerlach@ti.com> [160411 16:17]:
+> On 04/11/2016 04:13 PM, Tony Lindgren wrote:
+> >> We still need the call to omap3_intc_resume_idle because the intc restore
+> >> context only gets called on resume from off mode. Perhaps we only need to
+> >> call omap3_intc_resume_idle when coming back from non-off modes, otherwise
+> >> let the context restore handle the reconfig of the INTC idle/sysconfig
+> >> registers?
+> > 
+> > OK. Did you actually test by commenting out omap3_intc_resume_idle()?
+> > 
+> > Yeah sounds like we can optimize out the restore there for non-off
+> > modes.
+> 
+> Yes I removed it entirely for testing, and I also tried something like this for
+> a possible workable solution (without your patch applied):
+> 
+> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+> index fcf975eb5e9d..8d39b44ba3a3 100644
+> --- a/arch/arm/mach-omap2/pm34xx.c
+> +++ b/arch/arm/mach-omap2/pm34xx.c
+> @@ -268,7 +268,6 @@ void omap_sram_idle(void)
+>         int per_next_state = PWRDM_POWER_ON;
+>         int core_next_state = PWRDM_POWER_ON;
+>         int per_going_off;
+> -       int core_prev_state;
+>         u32 sdrc_pwr = 0;
+> 
+>         mpu_next_state = pwrdm_read_next_pwrst(mpu_pwrdm);
+> @@ -348,17 +347,16 @@ void omap_sram_idle(void)
+>                 sdrc_write_reg(sdrc_pwr, SDRC_POWER);
+> 
+>         /* CORE */
+> -       if (core_next_state < PWRDM_POWER_ON) {
+> -               core_prev_state = pwrdm_read_prev_pwrst(core_pwrdm);
+> -               if (core_prev_state == PWRDM_POWER_OFF) {
+> +       if (core_next_state < PWRDM_POWER_ON &&
+> +           pwrdm_read_prev_pwrst(core_pwrdm) == PWRDM_POWER_OFF) {
+>                         omap3_core_restore_context();
+>                         omap3_cm_restore_context();
+>                         omap3_push_sram_idle();
+>                         omap3_push_sram_secure_idle();
+>                         omap2_sms_restore_context();
+> -               }
+> -       }
+> -       omap3_intc_resume_idle();
+> +       } else
+> +               omap3_intc_resume_idle();
+> +
+> 
+>         pwrdm_post_transition(NULL);
+> 
+> 
 
+OK yeah that works for me.
 
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/Kconfig       | 13 +++++++++++++
->>  arch/arm64/kernel/acpi.c |  3 ++-
->>  2 files changed, 15 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 4f436220384f..f3aef40ad0ac 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -918,6 +918,19 @@ config DMI
->>         However, even with this option, the resultant kernel should
->>         continue to boot on existing non-UEFI platforms.
->>
->> +config PREFER_ACPI_OVER_DT
->> +     bool "Prefer booting via ACPI if both ACPI and DT are available"
->> +     depends on ACPI
->> +     help
->> +       If both ACPI and DT platform descriptions are available, and the
->> +       kernel was configured at build time to support both flavours, the
->> +       default policy in absence of a acpi=[off|force] kernel command line
->> +       parameter is to prefer DT over ACPI.
->> +
->> +       This option inverts that default policy, by preferring ACPI over DT
->> +       instead. Note that this default policy is still superseded by the
->> +       value of the acpi= command line parameter.
->> +
->>  endmenu
->>
->>  menu "Userspace binary formats"
->> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
->> index d1ce8e2f98b9..50ac056fb1fd 100644
->> --- a/arch/arm64/kernel/acpi.c
->> +++ b/arch/arm64/kernel/acpi.c
->> @@ -188,7 +188,8 @@ void __init acpi_boot_table_init(void)
->>        *   and ACPI has not been force enabled (acpi=force)
->>        */
->>       if (param_acpi_off ||
->> -         (!param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
->> +         (!IS_ENABLED(CONFIG_PREFER_ACPI_OVER_DT) &&
->> +          !param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
->>               return;
->>
->>       /*
->> --
->> 2.5.0
->>
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Can you post a proper patch with few minor changes:
+
+- Add a comment to the code somewhere saying that for off mode,
+  omap3_core_restore_context() also restores intc and we don't
+  need to omap3_intc_resume_idle().
+
+- Add the brackets to the one line else statement for checkpatch.
+
+Cheers,
+
+Tony
