@@ -1,137 +1,144 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 12 Apr 2016 16:09:53 +0200
-Subject: [PATCH v6] drivers: amba: properly handle devices with power domains
-In-Reply-To: <570D017E.7060105@samsung.com>
-References: <570D017E.7060105@samsung.com>
-Message-ID: <1460470193-24928-1-git-send-email-m.szyprowski@samsung.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 12 Apr 2016 16:13:01 +0200
+Subject: [PATCH v5 15/46] pwm: introduce the pwm_state concept
+In-Reply-To: <20160412140546.GS18882@ulmo.ba.sec>
+References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1459368249-13241-16-git-send-email-boris.brezillon@free-electrons.com>
+ <20160412114904.GM18882@ulmo.ba.sec>
+ <20160412141718.5fe4cf24@bbrezillon>
+ <20160412122141.GP18882@ulmo.ba.sec>
+ <20160412144508.2ee181fe@bbrezillon>
+ <20160412131118.GQ18882@ulmo.ba.sec>
+ <20160412152644.45ff517a@bbrezillon>
+ <20160412140546.GS18882@ulmo.ba.sec>
+Message-ID: <20160412161301.30b0dc4f@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To read pid/cid registers, the probed device need to be properly turned on.
-When it is inside a power domain, the bus code should ensure that the
-given power domain is enabled before trying to access device's registers.
-However in some cases power domain (or clocks) might not be yet available.
-Returning EPROBE_DEFER is not a solution in such case, because callers
-don't handle this special error code. Instead such devices are added to the
-special list and their registration is retried in late_initcall, when
-hopefully all resources are available.
+On Tue, 12 Apr 2016 16:05:46 +0200
+Thierry Reding <thierry.reding@gmail.com> wrote:
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- drivers/amba/bus.c | 78 +++++++++++++++++++++++++++++++++++++++++++++++-------
- 1 file changed, 68 insertions(+), 10 deletions(-)
+> On Tue, Apr 12, 2016 at 03:26:44PM +0200, Boris Brezillon wrote:
+> > On Tue, 12 Apr 2016 15:11:18 +0200
+> > Thierry Reding <thierry.reding@gmail.com> wrote:
+> > 
+> > > On Tue, Apr 12, 2016 at 02:45:08PM +0200, Boris Brezillon wrote:
+> > > > On Tue, 12 Apr 2016 14:21:41 +0200
+> > > > Thierry Reding <thierry.reding@gmail.com> wrote:
+> > > > 
+> > > > > On Tue, Apr 12, 2016 at 02:17:18PM +0200, Boris Brezillon wrote:
+> > > > > > On Tue, 12 Apr 2016 13:49:04 +0200
+> > > > > > Thierry Reding <thierry.reding@gmail.com> wrote:
+> > > > > > 
+> > > > > > > On Wed, Mar 30, 2016 at 10:03:38PM +0200, Boris Brezillon wrote:
+> > > > > > > > The PWM state, represented by its period, duty_cycle and polarity,
+> > > > > > > > is currently directly stored in the PWM device.
+> > > > > > > > Declare a pwm_state structure embedding those field so that we can later
+> > > > > > > > use this struct to atomically update all the PWM parameters at once.
+> > > > > > > > 
+> > > > > > > > All pwm_get_xxx() helpers are now implemented as wrappers around
+> > > > > > > > pwm_get_state().
+> > > > > > > > 
+> > > > > > > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > > > > > > > ---
+> > > > > > > >  drivers/pwm/core.c  |  8 ++++----
+> > > > > > > >  include/linux/pwm.h | 54 +++++++++++++++++++++++++++++++++++++++++------------
+> > > > > > > >  2 files changed, 46 insertions(+), 16 deletions(-)
+> > > > > > > > 
+> > > > > > > > diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+> > > > > > > > index 6433059..f3f91e7 100644
+> > > > > > > > --- a/drivers/pwm/core.c
+> > > > > > > > +++ b/drivers/pwm/core.c
+> > > > > > > > @@ -268,7 +268,7 @@ int pwmchip_add_with_polarity(struct pwm_chip *chip,
+> > > > > > > >  		pwm->chip = chip;
+> > > > > > > >  		pwm->pwm = chip->base + i;
+> > > > > > > >  		pwm->hwpwm = i;
+> > > > > > > > -		pwm->polarity = polarity;
+> > > > > > > > +		pwm->state.polarity = polarity;
+> > > > > > > 
+> > > > > > > Would this not more correctly be assigned to pwm->args.polarity? After
+> > > > > > > all this is setting up the "initial" state, much like DT or the lookup
+> > > > > > > tables would for duty cycle and period.
+> > > > > > 
+> > > > > > Yes, I wasn't sure about the pwm_add_with_polarity() meaning. To me,
+> > > > > > all the reference info should be extracted from DT, PWM lookup table or
+> > > > > > driver specific ->request() implementation, but I can definitely
+> > > > > > initialize the args.polarity here too.
+> > > > > > 
+> > > > > > Should I keep the pwm->state.polarity assignment (to set the initial
+> > > > > > polarity when the driver does not support hardware readout)?
+> > > > > 
+> > > > > Wouldn't this work automatically as part of the pwm_apply_args() helper
+> > > > > if we extended it with this setting?
+> > > > 
+> > > > Well, as you explained in you answer to patch 5, pwm_apply_args()
+> > > > should be called on a per-request basis (each time a PWM device is
+> > > > requested), while the initial polarity setting should only be applied
+> > > > when registering the PWM chip (and its devices). After that, the
+> > > > framework takes care of keeping the PWM state in sync with the hardware
+> > > > state.
+> > > > 
+> > > > Let's take a real (though a bit unusual) example. Say you have a single
+> > > > PWM device referenced by two different users. Only one user can be
+> > > > enabled at a time, but each of them has its own reference config
+> > > > (different polarity, different period).
+> > > > 
+> > > > User1 calls pwm_get() and applies its own polarity and period. Then
+> > > > user1 is unregistered and release the PWM device, leaving the polarity
+> > > > and period untouched.
+> > > > 
+> > > > User2 is registered and request the same PWM device, but user2 is
+> > > > smarter and tries to extract the current PWM state before adapting the
+> > > > config according to pwm_args. If you just reset pwm->state.polarity
+> > > > each time pwm_apply_args() is called (and you suggested to call it as
+> > > > part of the request procedure), then this means the PWM state is no
+> > > > longer in sync with the hardware state.
+> > > 
+> > > In that case neither will be the period or duty cycle. Essentially this
+> > > gets us back to square one where we need to decide how to handle current
+> > > state vs. initial arguments.
+> > 
+> > That's not true. Now we clearly differentiate the reference config
+> > (content of pwm_args which is only a subset of what you'll find in
+> > pwm_state) and the PWM state (represented by pwm_state).
+> > 
+> > We should be safe as long as we keep those 2 elements as 2 orthogonal
+> > concepts:
+> > - pwm_args is supposed to give some hint to the PWM user to help him
+> >   configure it's PWM appropriately
+> > - pwm_state is here to reflect the real PWM state, and apply new
+> >   configs
+> > 
+> > > 
+> > > But I don't think this is really going to be an issue because this is
+> > > all moot until we've moved over to the atomic API, at which point this
+> > > is all going to go away anyway.
+> > 
+> > As stated in my answer to patch 5, I think I misunderstood your
+> > suggestion. pwm_apply_args() is supposed to adjust the PWM config to
+> > match the period and polarity specified in pwm_args, right?
+> > 
+> > If that's the case, my question is, should we really call this function
+> > each time a new user requests a PWM instead of letting those users call
+> > the function on-demand (not all users want to adapt the current PWM
+> > config to the pwm_args, some may just want to apply a completely new
+> > config).
+> 
+> I think we're still talking past each other. I didn't mean for this to
+> be a proper part of the API. Like you said the struct pwm_args doesn't
+> contain enough data to construct a complete state and apply it.
+> 
+> What I was suggesting is to factor out the individual calls to the
+> various pwm_set_*() functions into a single call. So we wouldn't be
+> changing semantics, just refactoring to make it easier to get rid of
+> again in one of the subsequent patches.
+> 
+> That is, pwm_apply_args() would go away again within this very series,
+> at the same point that you're currently removing the pwm_set_*() calls.
 
-diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-index f0099360039e..f0b711bb0372 100644
---- a/drivers/amba/bus.c
-+++ b/drivers/amba/bus.c
-@@ -336,16 +336,7 @@ static void amba_device_release(struct device *dev)
- 	kfree(d);
- }
- 
--/**
-- *	amba_device_add - add a previously allocated AMBA device structure
-- *	@dev: AMBA device allocated by amba_device_alloc
-- *	@parent: resource parent for this devices resources
-- *
-- *	Claim the resource, and read the device cell ID if not already
-- *	initialized.  Register the AMBA device with the Linux device
-- *	manager.
-- */
--int amba_device_add(struct amba_device *dev, struct resource *parent)
-+static int amba_device_try_add(struct amba_device *dev, struct resource *parent)
- {
- 	u32 size;
- 	void __iomem *tmp;
-@@ -373,6 +364,12 @@ int amba_device_add(struct amba_device *dev, struct resource *parent)
- 		goto err_release;
- 	}
- 
-+	ret = dev_pm_domain_attach(&dev->dev, true);
-+	if (ret == -EPROBE_DEFER) {
-+		iounmap(tmp);
-+		goto err_release;
-+	}
-+
- 	ret = amba_get_enable_pclk(dev);
- 	if (ret == 0) {
- 		u32 pid, cid;
-@@ -398,6 +395,7 @@ int amba_device_add(struct amba_device *dev, struct resource *parent)
- 	}
- 
- 	iounmap(tmp);
-+	dev_pm_domain_detach(&dev->dev, true);
- 
- 	if (ret)
- 		goto err_release;
-@@ -421,8 +419,68 @@ int amba_device_add(struct amba_device *dev, struct resource *parent)
-  err_out:
- 	return ret;
- }
-+
-+/*
-+ * Registration of AMBA device require reading its pid and cid registers.
-+ * To do this, the device must be turned on (if it is a part of power domain)
-+ * and have clocks enabled. However in some cases those resources might not be
-+ * yet available. Returning EPROBE_DEFER is not a solution in such case,
-+ * because callers don't handle this special error code. Instead such devices
-+ * are added to the special list and their registration is retried in
-+ * late_initcall, when hopefully all resources are available.
-+ */
-+struct deferred_device {
-+	struct amba_device *dev;
-+	struct resource *parent;
-+	struct list_head node;
-+};
-+
-+static LIST_HEAD(deferred_devices);
-+
-+/**
-+ *	amba_device_add - add a previously allocated AMBA device structure
-+ *	@dev: AMBA device allocated by amba_device_alloc
-+ *	@parent: resource parent for this devices resources
-+ *
-+ *	Claim the resource, and read the device cell ID if not already
-+ *	initialized.  Register the AMBA device with the Linux device
-+ *	manager.
-+ */
-+int amba_device_add(struct amba_device *dev, struct resource *parent)
-+{
-+	int ret = amba_device_try_add(dev, parent);
-+
-+	if (ret == -EPROBE_DEFER) {
-+		struct deferred_device *ddev;
-+
-+		ddev = kmalloc(sizeof(*ddev), GFP_KERNEL);
-+		ddev->dev = dev;
-+		ddev->parent = parent;
-+		list_add_tail(&ddev->node, &deferred_devices);
-+		ret = 0;
-+	}
-+	return ret;
-+}
- EXPORT_SYMBOL_GPL(amba_device_add);
- 
-+static int __init amba_deferred_device_init(void)
-+{
-+	struct deferred_device *ddev, *tmp;
-+
-+	list_for_each_entry_safe(ddev, tmp, &deferred_devices, node) {
-+		int ret = amba_device_try_add(ddev->dev, ddev->parent);
-+
-+		if (ret == -EPROBE_DEFER)
-+			continue;
-+
-+		list_del_init(&ddev->node);
-+		kfree(ddev);
-+	}
-+
-+	return 0;
-+}
-+late_initcall(amba_deferred_device_init);
-+
- static struct amba_device *
- amba_aphb_device_add(struct device *parent, const char *name,
- 		     resource_size_t base, size_t size, int irq1, int irq2,
+Okay, eventually got it :).
+
 -- 
-1.9.2
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
