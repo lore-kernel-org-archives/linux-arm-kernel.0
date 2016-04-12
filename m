@@ -1,41 +1,33 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 12 Apr 2016 04:00:10 +0200
-Subject: [PATCH v1 1/2] dt-bindings: modify document of Rockchip power
- domains
-In-Reply-To: <21140203.EjVS0MZtuq@phil>
-References: <1458285444-31129-1-git-send-email-zhangqing@rock-chips.com>
- <7hshznsqs4.fsf@baylibre.com> <21140203.EjVS0MZtuq@phil>
-Message-ID: <1560475.Omi7ovI7oB@phil>
+Date: Tue, 12 Apr 2016 04:23:14 +0200
+Subject: [PATCH v2 1/5] PM / AVS: rockchip-io: make io-domains a child of
+ the GRF
+In-Reply-To: <1459432126-6395-2-git-send-email-heiko@sntech.de>
+References: <1459432126-6395-1-git-send-email-heiko@sntech.de>
+ <1459432126-6395-2-git-send-email-heiko@sntech.de>
+Message-ID: <3991738.xMQYlxyb28@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+Hi Rafael,
 
-Am Freitag, 18. M?rz 2016, 23:16:55 schrieb Heiko Stuebner:
-> Am Freitag, 18. M?rz 2016, 09:18:51 schrieb Kevin Hilman:
-> > Elaine Zhang <zhangqing@rock-chips.com> writes:
-> > > Add qos example for power domain which found on Rockchip SoCs.
-> > > These qos register description in TRMs
-> > > (rk3036, rk3228, rk3288, rk3366, rk3368, rk3399) looks the same.
-> > 
-> > This should describe in more detail what "qos" is in this context.  At
-> > first glance, it's just a range of registers that lose context that need
-> > to be saved/restored.
+Am Donnerstag, 31. M?rz 2016, 15:48:42 schrieb Heiko Stuebner:
+> IO-domain handling is part of the general register files, so should live
+> under the grf directly. This change allows the grf to be a simple-mfd and
+> the io-domains fetching the syscon regmap from that parent-node.
 > 
-> I guess that should be something like
+> The old binding is of course preserved, though deprecated.
 > 
-> ---- 8< ----
-> Rockchip SoCs contain quality of service (qos) blocks managing priority,
-> bandwidth, etc of the connection of each domain to the interconnect.
-> These blocks loose state when their domain gets disabled and therefore
-> need to be saved when disabling and restored when enabling a power-domain.
-> 
-> These qos blocks also are similar over all currently available Rockchip
-> SoCs.
-> ---- 8< ----
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Acked-by: Kevin Hilman <khilman@baylibre.com>
+> Tested-by: David Wu <david.wu@rock-chips.com>
 
-does this look sane to you in terms of description, or do we need something 
-more?
+could you look into picking up this patch 1/5 please?
+
+The others are to much interwined into other devicetree changes, so I'll 
+apply them for 4.8, but it would be nice if you could pick up this one for 
+4.7 so the code change becomes available at 4.8-rc1
 
 
+Thanks
 Heiko
