@@ -1,40 +1,143 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 12 Apr 2016 12:31:45 +0200
-Subject: [PATCH v5 30/46] regulator: pwm: retrieve correct voltage
-In-Reply-To: <20160412100938.GA14664@sirena.org.uk>
-References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
- <1459368249-13241-31-git-send-email-boris.brezillon@free-electrons.com>
- <20160330212410.GX2350@sirena.org.uk>
- <20160407235431.788dc24a@bbrezillon>
- <20160412044203.GW3351@sirena.org.uk>
- <20160412103722.0bfe1d4d@bbrezillon>
- <20160412100938.GA14664@sirena.org.uk>
-Message-ID: <20160412123145.092b2c1e@bbrezillon>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 12 Apr 2016 12:35:21 +0200
+Subject: [RESEND 08/11] pwm: sti: Add support for PWM Capture IRQs
+In-Reply-To: <1456932729-9667-9-git-send-email-lee.jones@linaro.org>
+References: <1456932729-9667-1-git-send-email-lee.jones@linaro.org>
+ <1456932729-9667-9-git-send-email-lee.jones@linaro.org>
+Message-ID: <20160412103521.GD18882@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 12 Apr 2016 11:09:38 +0100
-Mark Brown <broonie@kernel.org> wrote:
+On Wed, Mar 02, 2016 at 03:32:06PM +0000, Lee Jones wrote:
+[...]
+> diff --git a/drivers/pwm/pwm-sti.c b/drivers/pwm/pwm-sti.c
+[...]
+> +static irqreturn_t sti_pwm_interrupt(int irq, void *data)
+> +{
+> +	struct sti_pwm_chip *pc = data;
+> +	struct device *dev = pc->dev;
+> +	struct sti_cpt_data *d;
+> +	int channel;
+> +	int cpt_int_stat;
+> +	int reg;
+> +	int ret = IRQ_NONE;
+> +
+> +	ret = regmap_field_read(pc->pwm_cpt_int_stat, &cpt_int_stat);
+> +	if (ret)
+> +		return ret;
+> +
+> +	while (cpt_int_stat) {
+> +		channel = ffs(cpt_int_stat) - 1;
+> +
+> +		d = pc->cpt_data[channel];
+> +
+> +		/*
+> +		 * Capture input:
+> +		 *    _______                   _______
+> +		 *   |       |                 |       |
+> +		 * __|       |_________________|       |________
+> +		 *   ^0      ^1                ^2
+> +		 *
+> +		 * Capture start by the first available rising edge
+> +		 * When a capture event occurs, capture value (CPT_VALx)
+> +		 * is stored, index incremented, capture edge changed.
+> +		 *
+> +		 * After the capture, if the index > 1, we have collected
+> +		 * the necessary data so we signal the thread waiting for it
+> +		 * and disable the capture by setting capture edge to none
+> +		 *
+> +		 */
 
-> On Tue, Apr 12, 2016 at 10:37:22AM +0200, Boris Brezillon wrote:
-> > Mark Brown <broonie@kernel.org> wrote:
-> > > On Thu, Apr 07, 2016 at 11:54:31PM +0200, Boris Brezillon wrote:
-> 
-> > > I'm not sure there's a strong one, we don't really use the class device
-> > > for anything, but without doing a full audit I couldn't guarantee that.
-> 
-> > At first glance I don't see any problem (even the rdev_err/info/...()
-> > functions do not use dev_err/info/...()). The patch will be part of v6
-> > (unless you want me to send it independently).
-> 
-> I'd rather it didn't get sucked into this series since it seems that
-> it's getting delayed indefinitely - I can apply it to the regulator tree
-> and create a tag that can be pulled into other trees as needed if things
-> do get applied.
+How do you deal with the situation where someone will stop the PWM
+signal half-way in? That is, suppose you've got events for the first and
+second snapshots (0 and 1) and then someone stops the PWM and the event
+for snapshot 2 never happens, how does the code recover?
 
-Done.
+> +
+> +		regmap_read(pc->regmap,
+> +			    PWM_CPT_VAL(channel), &d->snapshot[d->index]);
+> +
+> +		switch (d->index) {
+> +		case 0:
+> +		case 1:
+> +			regmap_read(pc->regmap, PWM_CPT_EDGE(channel), &reg);
+> +			reg ^= PWM_CPT_EDGE_MASK;
+> +			regmap_write(pc->regmap, PWM_CPT_EDGE(channel), reg);
+> +
+> +			d->index++;
+> +			break;
+> +		case 2:
+> +			regmap_write(pc->regmap,
+> +				     PWM_CPT_EDGE(channel), CPT_EDGE_DISABLED);
+> +			wake_up(&d->wait);
+> +			break;
+> +		default:
+> +			dev_err(dev, "Internal error\n");
+> +		}
+> +
+> +		clear_bit(channel, (unsigned long int *)&cpt_int_stat);
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+clear_bit() is a little unusual to use on regular data types, as
+evidenced by the need for the goofy cast here.
+
+> +
+> +		ret = IRQ_HANDLED;
+> +	}
+> +
+> +	/* Just ACK everything */
+> +	regmap_write(pc->regmap, PWM_INT_ACK, PWM_INT_ACK_MASK);
+> +
+> +	return ret;
+> +}
+> +
+>  static int sti_pwm_probe_dt(struct sti_pwm_chip *pc)
+>  {
+>  	struct device *dev = pc->dev;
+> @@ -354,6 +425,11 @@ static int sti_pwm_probe_dt(struct sti_pwm_chip *pc)
+>  	if (IS_ERR(pc->pwm_cpt_int_en))
+>  		return PTR_ERR(pc->pwm_cpt_int_en);
+>  
+> +	pc->pwm_cpt_int_stat = devm_regmap_field_alloc(dev, pc->regmap,
+> +						reg_fields[PWM_CPT_INT_STAT]);
+> +	if (IS_ERR(pc->pwm_cpt_int_stat))
+> +		return PTR_ERR(pc->pwm_cpt_int_stat);
+> +
+>  	return 0;
+>  }
+>  
+> @@ -371,7 +447,7 @@ static int sti_pwm_probe(struct platform_device *pdev)
+>  	struct sti_pwm_chip *pc;
+>  	struct resource *res;
+>  	unsigned int chan;
+> -	int ret;
+> +	int ret, irq;
+>  
+>  	pc = devm_kzalloc(dev, sizeof(*pc), GFP_KERNEL);
+>  	if (!pc)
+> @@ -392,6 +468,19 @@ static int sti_pwm_probe(struct platform_device *pdev)
+>  	if (IS_ERR(pc->regmap))
+>  		return PTR_ERR(pc->regmap);
+>  
+> +	irq = platform_get_irq(pdev, 0);
+> +	if (irq < 0) {
+> +		dev_err(&pdev->dev, "Failed to obtain IRQ\n");
+> +		return -ENODEV;
+> +	}
+
+I think you need to propagate the return value of platform_get_irq()
+here.
+
+> +
+> +	ret = devm_request_irq(&pdev->dev, irq, sti_pwm_interrupt,
+> +			       0, pdev->name, (void *) pc);
+
+No need for the explicit cast to void *.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160412/53a2b6d2/attachment.sig>
