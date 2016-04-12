@@ -1,58 +1,69 @@
-From: jcm@jonmasters.org (Jon Masters)
-Date: Tue, 12 Apr 2016 00:26:25 -0400
-Subject: [PATCH v2 2/4] PCI: Provide common functions for ECAM mapping
-In-Reply-To: <570C4034.20105@caviumnetworks.com>
-References: <1460414707-19153-1-git-send-email-jchandra@broadcom.com>
- <1460414707-19153-3-git-send-email-jchandra@broadcom.com>
- <570C4034.20105@caviumnetworks.com>
-Message-ID: <570C78F1.4090701@jonmasters.org>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 11 Apr 2016 23:43:11 -0500
+Subject: [PATCH v2 2/3] drivers: pci: host-generic: claim bus resources
+ on PCI_PROBE_ONLY set-ups
+In-Reply-To: <1456843449-19393-3-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1456843449-19393-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1456843449-19393-3-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20160412044311.GB11361@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David, JC,
+Hi Lorenzo,
 
-On 04/11/2016 08:24 PM, David Daney wrote:
-
-> Tested-by: David Daney <david.daney@cavium.com>
-
-On ThunderX (please let me know the silicon pass specifics off-list)?
-I'm planning to give this series a test run also on some other ARMv8
-hardware and will prod a few of the other vendors to do so.
-
->>   drivers/pci/ecam.c   | 130
->>   drivers/pci/ecam.h   |  58 +++++++++++++++++++++++
+On Tue, Mar 01, 2016 at 02:44:08PM +0000, Lorenzo Pieralisi wrote:
+> The PCI host generic driver does not reassign bus resources on systems
+> that require the BARs set-up to be immutable (ie PCI_PROBE_ONLY) since
+> that would trigger system failures. Nonetheless, PCI bus resources
+> allocated to PCI bridge and devices must be claimed in order to be
+> validated and inserted in the kernel resource tree, but the current
+> driver omits the resources claiming and relies on arch specific kludges
+> to prevent probing failure (ie preventing resources enablement on
+> PCI_PROBE_ONLY systems).
 > 
-> I wonder if these files should go in drivers/pci/host ...  I understand
-> that you still have to use them from drivers/pci/acpi though.
+> This patch adds code to the PCI host generic driver that correctly
+> claims bus resources upon probe on systems that are required to
+> prevent reassignment after bus enumeration, so that the allocated
+> resources can be enabled successfully upon PCI device drivers probing,
+> without resorting to arch back-ends workarounds.
 > 
-> I will let others opine on this, but could you put the contents of
-> ecam.h into include/linux/pci.h along with the  pci_generic_config_*()
-> declarations?
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: David Daney <david.daney@cavium.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> ---
+>  drivers/pci/host/pci-host-generic.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
 > 
-> If you did that, the contents of ecam.c could  go into
-> drivers/pci/access.c...
+> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+> index 1652bc7..e529825 100644
+> --- a/drivers/pci/host/pci-host-generic.c
+> +++ b/drivers/pci/host/pci-host-generic.c
+> @@ -252,7 +252,10 @@ static int gen_pci_probe(struct platform_device *pdev)
+>  
+>  	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
+>  
+> -	if (!pci_has_flag(PCI_PROBE_ONLY)) {
+> +
+> +	if (pci_has_flag(PCI_PROBE_ONLY)) {
+> +		pci_bus_claim_resources(bus);
+> +	} else {
+>  		pci_bus_size_bridges(bus);
+>  		pci_bus_assign_resources(bus);
+>  
 
-Quoting Bjorn's original reply to the previous series:
+The next patch removes the arm and arm64 pcibios_enable_device()
+implementations, which implies that arm and arm64 only need the generic
+version, which simply calls pci_enable_resources().  That assumes r->parent
+is set.
 
-> Some of the code that moved to drivers/acpi/pci_mcfg.c is not
-> really ACPI-specific, and could potentially be used for non-ACPI
-> bridges that support ECAM.  I'd like to see that sort of code
-> moved to a new file like drivers/pci/ecam.c.
+After this patch, we'll call pci_bus_claim_resources() for the
+PCI_PROBE_ONLY case, and that sets r->parent for all the resources.
 
-So my guess is that this is the reasoning behind JC's file layout.
+Where does r->parent get set in the non-PCI_PROBE_ONLY case?  Obviously
+that path *works*, because you're not changing anything there.  I'd just
+like to have a hint that makes this change more obvious.
 
-I'm curious what Lorenzo's take on things is currently. I assume this
-series is now to be the official coordinated version of this effort for
-upstream, following the advice of Bjorn previously, but I would like to
-know if everyone is behind this plan. I've (previously) requested a
-Linaro LEG meeting this week (part of our bootarch working group) to
-specifically discuss the status of PCI upstreaming in order to get the
-different vendors together to ensure every single one of them is
-tracking the correct latest effort and doing what is needed to test/aid,
-hence my ask. If this is now plan A, I'll make sure everyone is aligned
-behind it and start pinging people individually for testing.
-
-Jon.
-
--- 
-Computer Architect
+Bjorn
