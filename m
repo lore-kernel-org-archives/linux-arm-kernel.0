@@ -1,32 +1,29 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 12 Apr 2016 11:09:34 +0530
-Subject: [PATCH v6 0/3] thermal: mediatek: Add cpu dynamic power cooling
- model.
-In-Reply-To: <1460438685.14875.3.camel@mtksdaap41>
-References: <1450272556-29770-1-git-send-email-dawei.chien@mediatek.com>
- <20151217015231.GC3496@ubuntu>
- <1458017620.30412.3.camel@mtksdaap41>
- <20160315061709.GC13831@vireshk-mac-ubuntu>
- <1458623586.674.2.camel@mtksdaap41>
- <1460428370.25776.6.camel@mtksdaap41>
- <20160412051103.GN16238@vireshk-i7>
- <1460438685.14875.3.camel@mtksdaap41>
-Message-ID: <20160412053934.GU16238@vireshk-i7>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 12 Apr 2016 07:43:13 +0200
+Subject: [PATCH v6 01/10] clocksource: arm_arch_timer: Gather KVM
+ specific information in a structure
+In-Reply-To: <1460388780-914-2-git-send-email-julien.grall@arm.com>
+References: <1460388780-914-1-git-send-email-julien.grall@arm.com>
+ <1460388780-914-2-git-send-email-julien.grall@arm.com>
+Message-ID: <20160412054313.GA16636@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12-04-16, 13:24, dawei chien wrote:
-> Please refer to following for my resending, thank you.
+On Mon, Apr 11, 2016 at 04:32:51PM +0100, Julien Grall wrote:
+> Introduce a structure which are filled up by the arch timer driver and
+> used by the virtual timer in KVM.
 > 
-> https://lkml.org/lkml/2016/3/15/101
-> https://patchwork.kernel.org/patch/8586131/
-> https://patchwork.kernel.org/patch/8586111/
-> https://patchwork.kernel.org/patch/8586081/
+> The first member of this structure will be the timecounter. More members
+> will be added later.
+> 
+> A stub for the new helper isn't introduced because KVM requires the arch
+> timer for both ARM64 and ARM32.
+> 
+> The function arch_timer_get_timecounter is kept for the time being and
+> will be dropped in a subsequent patch.
+> 
+> Signed-off-by: Julien Grall <julien.grall@arm.com>
+> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+> 
 
-Oh, you were continuously sending new ping requests on the old thread.
-You should have used the new thread instead :)
-
-Anyway, I have pinged Rafael over the new thread now.
-
--- 
-viresh
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
