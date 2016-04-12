@@ -1,78 +1,66 @@
-From: andy.yan@rock-chips.com (Andy Yan)
-Date: Tue, 12 Apr 2016 17:27:27 +0800
-Subject: [PATCH v7 2/4] power: reset: add reboot mode driver
-In-Reply-To: <57045F9D.1000502@samsung.com>
-References: <1459304304-9713-1-git-send-email-andy.yan@rock-chips.com>
- <1459304443-9811-1-git-send-email-andy.yan@rock-chips.com>
- <56FB49B3.2040505@samsung.com> <57045D6B.2080907@rock-chips.com>
- <57045F9D.1000502@samsung.com>
-Message-ID: <570CBF7F.9090300@rock-chips.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Tue, 12 Apr 2016 10:33:49 +0100
+Subject: [PATCH v2 00/13] ARM: dts: Add DB600c support.
+Message-ID: <1460453642-5809-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof:
+Hi Andy,
 
-On 2016?04?06? 09:00, Krzysztof Kozlowski wrote:
-> On 06.04.2016 09:50, Andy Yan wrote:
->
-> (...)
->
->>>> +            return -ENOMEM;
->>>> +
->>>> +        info->mode = kstrdup_const(prop->name + len, GFP_KERNEL);
->>>> +        if (of_property_read_u32(np, prop->name, &info->magic)) {
->>>> +            dev_err(dev, "reboot mode %s without magic number\n",
->>>> +                info->mode);
->>>> +            devm_kfree(dev, info);
->>>> +            continue;
->>>> +        }
->>>> +        list_add_tail(&info->list, &reboot->head);
->>>> +    }
->>>> +    of_node_put(np);
->>> If you of_node_put() here, there is no sense in getting it before. I
->>> mentioned of_node_get() only because I am not sure about life-cycle of
->>> nodes in case of DT overlays and you are storing the pointer to string
->>> from DT.
->>>
->>> The doubts I have are concerning only the case of freeing nodes from
->>> overlay.
->>>
->>> I don't know if of_node_get() is needed but of_node_get()+of_node_put()
->>> seems useless.
->>
->>   I am also not sure about it. Maybe just drop of_node_get/put ?
-> OK, let's drop both get() and put().
->
-> (...)
->
->>>> +
->>>> +static const struct of_device_id syscon_reboot_mode_of_match[] = {
->>>> +    { .compatible = "syscon-reboot-mode" },
->>>> +    {}
->>>> +};
->>>> +
->>>> +static struct platform_driver syscon_reboot_mode_driver = {
->>>> +    .probe = syscon_reboot_mode_probe,
->>> Cleanup needed. What will happen after device unbind? Memory will be
->>> released (devm-*()) but reboot notifier won't thus leading to OOPS on
->>> reboot.
->>      From the kernel_restart_prepare function, the reboot notifier will
->> be called before device_shutdown. Is there any other case the device
->> unbind before reboot notifier
->> called?
-> This is a regular module platform driver so unbind can happen any time
-> initiated by user, either by unbind command or by module removal. User
-> can then re-bind device or not - probably does not matter. Anyway after
-> such first unbind, the restart will kaboom instead of do a restart.
+This patchset adds support to DB600c which is based on APQ8064.
 
-     I just need to do clean up in remove?
-> Beside that, you always should clean up, regardless of restart or not.
-> If you do not want unbind (thus no need of cleanup) then forbid it by
-> making it a non-module with suppressed bind.
->
-> Best regards,
-> Krzysztof
->
->
->
->
+With this patchset, except spi I was able to test all the below features
+on this board on top of v4.6-rc3.
+1> i2c
+2> spi
+3> sd/mmc with card detect
+4> eMMC
+5> USB
+6> SATA
+7> on board Ethernet based on PCIE.
+8> user and activity leds.
+9> on board Magnetometer
+
+This patchset also has a fix to i2c/spi pinctrls which was not set correctly
+in my previous apq8064 patches, I have verified this patchset with eeprom and
+sensors on the board, you might want to take that patch in next rc.
+
+Changes since v1:
+	- renamed the dts and compatible strings according to the discussion.
+	- fixed/renamed led labels as suggeste by Rob, Nico and others.
+	- Added Acks for Bjorn
+	- Added Magnetometer support.
+	- Split the pinconfs to seperate file as suggested by Bjorn
+	- Remove activity leds default triggers, as it was not clear
+	 which trigger was correct according to 96boards specs.
+	 Can be added once we fix that.
+
+Thanks,
+srini
+
+Srinivas Kandagatla (13):
+  ARM: dts: apq8064: fix the pinctrls for i2c and spi
+  ARM: dts: apq8064: add support to gsbi1 uart
+  ARM: dts: apq8064: add gsbi7 i2c support
+  ARM: dts: db600c: add board support with serial
+  ARM: dts: db600c: add pmic regulator supplies
+  ARM: dts: db600c: Add eMMC and SD card support
+  ARM: dts: db600c: add usb support
+  ARM: dts: db600c: add pcie support
+  ARM: dts: db600c: add on board sata support.
+  ARM: dts: db600c: Add on board leds support
+  ARM: dts: db600c: add i2c support
+  ARM: dts: db600c: add spi support
+  ARM: dts: db600c: add support to magnetometer
+
+ arch/arm/boot/dts/Makefile                         |   1 +
+ .../boot/dts/qcom-apq8064-arrow-db600c-pins.dtsi   |  52 +++
+ arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts    | 349 +++++++++++++++++++++
+ arch/arm/boot/dts/qcom-apq8064-pins.dtsi           |  39 +++
+ arch/arm/boot/dts/qcom-apq8064.dtsi                |  41 ++-
+ 5 files changed, 476 insertions(+), 6 deletions(-)
+ create mode 100644 arch/arm/boot/dts/qcom-apq8064-arrow-db600c-pins.dtsi
+ create mode 100644 arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts
+
+-- 
+2.5.0
