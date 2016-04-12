@@ -1,93 +1,91 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 12 Apr 2016 10:33:55 +0100
-Subject: [PATCH v2 06/13] ARM: dts: db600c: Add eMMC and SD card support
+Date: Tue, 12 Apr 2016 10:33:57 +0100
+Subject: [PATCH v2 08/13] ARM: dts: db600c: add pcie support
 In-Reply-To: <1460453642-5809-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1460453642-5809-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1460453642-5809-7-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1460453642-5809-9-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds eMMC and SD card support with card detect and adding
-required regulators.
+This patch adds pcie and regulators required to get on board ATL1C
+ethernet working.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 ---
- .../boot/dts/qcom-apq8064-arrow-db600c-pins.dtsi   |  9 ++++++
- arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts    | 34 ++++++++++++++++++++++
- 2 files changed, 43 insertions(+)
- create mode 100644 arch/arm/boot/dts/qcom-apq8064-arrow-db600c-pins.dtsi
+ .../boot/dts/qcom-apq8064-arrow-db600c-pins.dtsi   | 12 +++++++++++
+ arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts    | 24 ++++++++++++++++++++++
+ 2 files changed, 36 insertions(+)
 
 diff --git a/arch/arm/boot/dts/qcom-apq8064-arrow-db600c-pins.dtsi b/arch/arm/boot/dts/qcom-apq8064-arrow-db600c-pins.dtsi
-new file mode 100644
-index 0000000..7339919
---- /dev/null
+index 7339919..0610f00 100644
+--- a/arch/arm/boot/dts/qcom-apq8064-arrow-db600c-pins.dtsi
 +++ b/arch/arm/boot/dts/qcom-apq8064-arrow-db600c-pins.dtsi
-@@ -0,0 +1,9 @@
-+&tlmm_pinmux {
-+	card_detect: card-detect {
+@@ -6,4 +6,16 @@
+ 			bias-disable;
+ 		};
+ 	};
++
++	pcie_pins: pcie-pinmux {
 +		mux {
-+			pins = "gpio26";
++			pins = "gpio27";
 +			function = "gpio";
++		};
++		conf {
++			pins = "gpio27";
++			drive-strength = <12>;
 +			bias-disable;
 +		};
 +	};
-+};
+ };
 diff --git a/arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts b/arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts
-index 6695b00..d921424 100644
+index 2c563df..4f2218c 100644
 --- a/arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts
 +++ b/arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts
-@@ -1,4 +1,6 @@
- #include "qcom-apq8064-v2.0.dtsi"
-+#include "qcom-apq8064-arrow-db600c-pins.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
- 
- / {
- 	model = "Arrow Electronics, APQ8064 DB600c";
-@@ -69,6 +71,20 @@
- 					regulator-max-microvolt = <1300000>;
- 					qcom,switch-mode-frequency = <3200000>;
- 				 };
-+
-+				l5 {
-+					regulator-min-microvolt = <2750000>;
-+					regulator-max-microvolt = <3000000>;
-+					bias-pull-down;
-+					regulator-boot-on;
-+					regulator-always-on;
-+				};
-+
-+				l6 {
-+					regulator-min-microvolt = <2950000>;
-+					regulator-max-microvolt = <2950000>;
-+					bias-pull-down;
-+				};
- 			};
- 		};
- 
-@@ -94,5 +110,23 @@
- 				pinctrl-0 = <&gsbi7_uart_2pins>;
- 			};
+@@ -21,6 +21,16 @@
+ 			regulator-type = "voltage";
+ 			regulator-boot-on;
  		};
 +
-+		amba {
-+			/* eMMC */
-+			sdcc at 12400000 {
-+				status = "okay";
-+				vmmc-supply = <&pm8921_l5>;
-+				vqmmc-supply = <&pm8921_s4>;
-+			};
-+
-+			/* External micro SD card */
-+			sdcc at 12180000 {
-+				status = "okay";
-+				vmmc-supply = <&pm8921_l6>;
-+				pinctrl-names	= "default";
-+				pinctrl-0	= <&card_detect>;
-+				cd-gpios	= <&tlmm_pinmux 26 GPIO_ACTIVE_HIGH>;
-+			};
++		/* on board fixed 3.3v supply */
++		vcc3v3: vcc3v3 {
++			compatible = "regulator-fixed";
++			regulator-name = "VCC3V3";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-always-on;
 +		};
++
  	};
- };
+ 
+ 	soc {
+@@ -109,6 +119,10 @@
+ 					regulator-max-microvolt = <1900000>;
+ 					bias-pull-down;
+ 				};
++
++				lvs6 {
++					bias-pull-down;
++				};
+ 			};
+ 		};
+ 
+@@ -135,6 +149,16 @@
+ 			};
+ 		};
+ 
++		pci at 1b500000 {
++			status = "okay";
++			vdda-supply = <&pm8921_s3>;
++			vdda_phy-supply = <&pm8921_lvs6>;
++			vdda_refclk-supply = <&vcc3v3>;
++			pinctrl-0 = <&pcie_pins>;
++			pinctrl-names = "default";
++			perst-gpio = <&tlmm_pinmux 27 GPIO_ACTIVE_LOW>;
++		};
++
+ 		/* OTG */
+ 		phy at 12500000 {
+ 			status		= "okay";
 -- 
 2.5.0
