@@ -1,80 +1,257 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 12 Apr 2016 18:23:15 +0100
-Subject: [PATCH] ACPI / ARM64: Remove EXPERT dependency for ACPI on ARM64
-In-Reply-To: <1459360718-24125-1-git-send-email-broonie@kernel.org>
-References: <1459360718-24125-1-git-send-email-broonie@kernel.org>
-Message-ID: <20160412172315.GH8066@e104818-lin.cambridge.arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 12 Apr 2016 19:26:06 +0200
+Subject: [RFC PATCH 12/45] KVM: arm/arm64: vgic-new: Add MMIO handling
+ framework
+In-Reply-To: <570D1A98.9000300@arm.com>
+References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
+ <1458871508-17279-13-git-send-email-andre.przywara@arm.com>
+ <20160331090824.GR4126@cbox> <570B8221.3050506@arm.com>
+ <20160412125035.GD3039@cbox> <570D1A98.9000300@arm.com>
+Message-ID: <20160412172606.GN3039@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 30, 2016 at 10:58:38AM -0700, Mark Brown wrote:
-> When ACPI was originally merged for arm64 it had only been tested on
-> emulators and not on real physical platforms and no platforms were
-> relying on it.  This meant that there were concerns that there might be
-> serious issues attempting to use it on practical systems so it had a
-> dependency on EXPERT added to warn people that it was in an early stage
-> of development with very little practical testing.  Since then things
-> have moved on a bit.  We have seen people testing on real hardware and
-> now have people starting to produce some platforms (the most prominent
-> being the 96boards Cello) which only have ACPI support and which build
-> and run to some useful extent with mainline.
+On Tue, Apr 12, 2016 at 04:56:08PM +0100, Marc Zyngier wrote:
+> On 12/04/16 13:50, Christoffer Dall wrote:
+> > On Mon, Apr 11, 2016 at 11:53:21AM +0100, Andre Przywara wrote:
+> >> Hi Christoffer,
+> >>
+> >> On 31/03/16 10:08, Christoffer Dall wrote:
+> >>> Hi Andre,
+> >>>
+> >>> [cc'ing Paolo here for his thoughts on the KVM IO bus framework]
+> >>>
+> >>> On Fri, Mar 25, 2016 at 02:04:35AM +0000, Andre Przywara wrote:
+> >>>> We register each register group of the distributor and redistributors
+> >>>> as separate regions of the kvm-io-bus framework. This way calls get
+> >>>> directly handed over to the actual handler.
+> >>>> This puts a lot more regions into kvm-io-bus than what we use at the
+> >>>> moment on other architectures, so we will probably need to revisit the
+> >>>> implementation of the framework later to be more efficient.
+> >>>
+> >>> Looking more carefully at the KVM IO bus stuff, it looks like it is
+> >>> indeed designed to be a *per device* thing you register, not a *per
+> >>> register* thing.
+> >>>
+> >>> My comments to Vladimir's bug report notwithstanding, there's still a
+> >>> choice here to:
+> >>>
+> >>> 1) Expand/modify the KVM IO bus framework to take an arbitrary number of devices
+> >>>
+> >>> 2) Build a KVM architectureal generic framework on top of the IO bus
+> >>> framework to handle individual register regions.
+> >>>
+> >>> 3) Stick with what we had before, do not modify the KVM IO bus stuff,
+> >>> and handle the individual register region business locally within the
+> >>> arm/vgic code.
+> >>>
+> >>>
+> >>>>
+> >>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> >>>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> >>>> ---
+> >>>>  include/kvm/vgic/vgic.h       |   9 ++
+> >>>>  virt/kvm/arm/vgic/vgic_mmio.c | 194 ++++++++++++++++++++++++++++++++++++++++++
+> >>>>  virt/kvm/arm/vgic/vgic_mmio.h |  47 ++++++++++
+> >>>>  3 files changed, 250 insertions(+)
+> >>>>  create mode 100644 virt/kvm/arm/vgic/vgic_mmio.c
+> >>>>  create mode 100644 virt/kvm/arm/vgic/vgic_mmio.h
+> >>>>
+> >>>> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+> >>>> index 2ce9b4a..a8262c7 100644
+> >>>> --- a/include/kvm/vgic/vgic.h
+> >>>> +++ b/include/kvm/vgic/vgic.h
+> >>>> @@ -106,6 +106,12 @@ struct vgic_irq {
+> >>>>  	enum vgic_irq_config config;	/* Level or edge */
+> >>>>  };
+> >>>>  
+> >>>> +struct vgic_io_device {
+> >>>> +	gpa_t base_addr;
+> >>>> +	struct kvm_vcpu *redist_vcpu;
+> >>>> +	struct kvm_io_device dev;
+> >>>> +};
+> >>>> +
+> >>>>  struct vgic_dist {
+> >>>>  	bool			in_kernel;
+> >>>>  	bool			ready;
+> >>>> @@ -132,6 +138,9 @@ struct vgic_dist {
+> >>>>  	u32			enabled;
+> >>>>  
+> >>>>  	struct vgic_irq		*spis;
+> >>>> +
+> >>>> +	struct vgic_io_device	*dist_iodevs;
+> >>>> +	struct vgic_io_device	*redist_iodevs;
+> >>>>  };
+> >>>>  
+> >>>>  struct vgic_v2_cpu_if {
+> >>>> diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
+> >>>> new file mode 100644
+> >>>> index 0000000..26c46e7
+> >>>> --- /dev/null
+> >>>> +++ b/virt/kvm/arm/vgic/vgic_mmio.c
+> >>>> @@ -0,0 +1,194 @@
+> >>>> +/*
+> >>>> + * VGIC MMIO handling functions
+> >>>> + *
+> >>>> + * This program is free software; you can redistribute it and/or modify
+> >>>> + * it under the terms of the GNU General Public License version 2 as
+> >>>> + * published by the Free Software Foundation.
+> >>>> + *
+> >>>> + * This program is distributed in the hope that it will be useful,
+> >>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> >>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> >>>> + * GNU General Public License for more details.
+> >>>> + */
+> >>>> +
+> >>>> +#include <linux/kvm.h>
+> >>>> +#include <linux/kvm_host.h>
+> >>>> +#include <kvm/iodev.h>
+> >>>> +#include <kvm/vgic/vgic.h>
+> >>>> +#include <linux/bitops.h>
+> >>>> +#include <linux/irqchip/arm-gic.h>
+> >>>> +
+> >>>> +#include "vgic.h"
+> >>>> +#include "vgic_mmio.h"
+> >>>> +
+> >>>> +void write_mask32(u32 value, int offset, int len, void *val)
+> >>>> +{
+> >>>> +	value = cpu_to_le32(value) >> (offset * 8);
+> >>>> +	memcpy(val, &value, len);
+> >>>> +}
+> >>>> +
+> >>>> +u32 mask32(u32 origvalue, int offset, int len, const void *val)
+> >>>> +{
+> >>>> +	origvalue &= ~((BIT_ULL(len) - 1) << (offset * 8));
+> >>>> +	memcpy((char *)&origvalue + (offset * 8), val, len);
+> >>>> +	return origvalue;
+> >>>> +}
+> >>>> +
+> >>>> +#ifdef CONFIG_KVM_ARM_VGIC_V3
+> >>>> +void write_mask64(u64 value, int offset, int len, void *val)
+> >>>> +{
+> >>>> +	value = cpu_to_le64(value) >> (offset * 8);
+> >>>> +	memcpy(val, &value, len);
+> >>>> +}
+> >>>> +
+> >>>> +/* FIXME: I am clearly misguided here, there must be some saner way ... */
+> >>>
+> >>> I'm confuses in general.  Can you explain what these mask functions do
+> >>> overall at some higher level?
+> >>
+> >> They do what you already guessed: take care about masking and endianness.
+> >>
+> >>> I also keep having a feeling that mixing endianness stuff into the
+> >>> emulation code itself is the wrong way to go about it.
+> >>
+> >> I agree.
+> >>
+> >>>  The emulation
+> >>> code should just deal with register values of varying length and the
+> >>> interface to the VGIC should abstract all endianness nonsense for us,
+> >>> but I also think I've lost this argument some time in the past.  Sigh.
+> > 
+> > I tend to agree with this.  Who did you loose this argument against and
+> > do you have a pointer?
+> > 
+> >>>
+> >>> But, is the maximum read/write unit for any MMIO access not a 64-bit
+> >>> value?  So why can't we let the VGIC emulation code simply take/return a
+> >>> u64 which is then masked off/morphed into the right endianness outside
+> >>> the VGIC code?
+> >>
+> >> The main problem is that the interface for kvm_io_bus is (int len, void
+> >> *val).
+> > 
+> > That could be solved by always just doing a (u64) conversion on the
+> > caller/receiver side.  E.g.
+> > 
+> > int vgic_handle_mmio_access(..., int len, void *val, bool is_write)
+> > {
+> > 	u64 data;
+> > 
+> > 	if (unsupported_vgic_len(len))
+> > 		return -ENXIO;
+> > 
+> > 	if (is_write)
+> > 		data = mmio_read_buf(val, len);
+> > 
+> > 	// data is now just some data of some lenght in a typed register
+> > 
+> > 	call_range_handler(vcpu, &data, len, ...);
+> > 
+> > 	if (!is_write)
+> > 		mmio_write_buf(val, len, data);
+> > }
+> > 
+> > (and share the mmio_ functions in a header file between mmio.c and
+> > consumers of the packed data).
+> > 
+> > The idea would be that the gic is just emulation code in C, which can be
+> > compiled to some endianness, and we really don't care about how it's
+> > physically stored in memory.
+> > 
+> > 
+> > 
+> >> And since the guest's MMIO access can be of different length, we need to
+> >> take care of this in any case (since we need to know how many IRQs we
+> >> need to update). So we cannot get rid of the length parameter.
+> > 
+> > no we cannot, but we can use a typed pointer instead of a void pointer
+> > everywhere in the vgic code, since the max access we're going to support
+> > is 64 bits.
+> > 
+> >> I guess what we could do is to either:
+> >> a) Declare the VGIC as purely little endian (which it really is, AFAIK).
+> >> We care about the necessary endianness conversion in mmio.c before
+> >> invoking the kvm_io_bus framework. But that means that we need to deal
+> >> with the _host's_ endianness in the VGIC emulation.
+> >> I think this is very close to what we currently do.    OR
+> >> b) Declare our VGIC emulation as always using the host's endianess. We
+> >> wouldn't need to care about endianness in the VGIC code anymore (is that
+> >> actually true?) We convert the MMIO traps (which are little endian
+> >> always) into the host's endianness before passing it on to kvm-io-bus.
+> >>
+> >> I just see that this probably adds more to the confusion, oh well...
+> > 
+> > No, it doesn't add anymore confusion.  I think option (b) is what we
+> > should do, unless it's not possible for some reason that I fail to
+> > realize at this very moment.
+> > 
+> > If all your pointers in the vgic emulation code are always typed, then I
+> > don't see why you'd have to worry about endianness anywhere?
+> > 
+> > The only place we should worry about endianness is the
+> > vcpu_data_guest_to_host() and vcpu_data_host_to_guest() functions.
+> > Doing it anywhere else as well is an indication that we're doing
+> > something wrong.
 > 
-> This is not to say that ACPI support or support for these systems is
-> completely done, there are still areas being worked on such as PCI, but
-> at this point it seems that we can be reasonably sure that ACPI will be
-> viable for use on ARM64 and that the already merged support works for
-> the cases it handles.  For the AMD Seattle based platforms support
-> outside of PCI has been fairly complete in mainline a few releases now.
+> That seems sensible to me. This should define a frontier where the
+> access to the GIC is always expected in LE mode, but we implement the
+> GIC using the host endianness. We have to make sure that no data
+> structure gets passed outside of this interface (and that includes
+> userspace access).
+
+I think userspace accesses are fine.  That's another external interface
+where you can handle whatever endianness conversion there.
+
 > 
-> This is also not to say that we don't have vendors working with ACPI who
-> are trying do things that we would not consider optimal but it does not
-> appear that the EXPERT dependency is having a substantial impact on
-> these vendors.
+> This works fine for MMIO, but I'm more worried of memory-based
+> interfaces that we get with GICv3 and the ITS, specially with migration.
+> Property table is fine (byte access), but pending table can be slightly
+> more tricky (bit position in words). And then we get to the ITS tables,
+> which need a standard representation. Maybe it is too early for that,
+> but it is worth keeping it in mind.
 > 
-> Given all this it seems that at this point the EXPERT dependency mainly
-> creates inconvenience for users with systems that are doing the right
-> thing and gets in the way of including the ACPI code in the testing that
-> people are doing on mainline.  Removing it should help our ongoing
-> testing cover those platforms with only ACPI support and help ensure
-> that when ACPI code is merged any problems it causes for other users are
-> more easily discovered.
-> 
-> Signed-off-by: Mark Brown <broonie@kernel.org>
+I didn't consider the visible-to-guest in-memory data structures.  We
+should define anything that would be affected by endianness strictly,
+but I still think we're limited to dealing with endianness in (1) the
+MMIO interface, (2) userspace access, (3) flushing the in-kernel cache
+to memory data structures.
 
-I'm fine with dropping the EXPERT dependency (of course, not a cc
-stable). While arm64 ACPI is not "done" yet (nor is DT; there are
-important ongoing developments like PCIe, IORT), I think the core arm64
-ACPI support passed the EXPERT stage. I also don't think a default y
-would imply any maintainer endorsement; vendors targeting ACPI are
-already doing this for various reasons (distro requirement, certain ACPI
-features like RAS). But, hopefully, it will encourage more vendors to
-start upstreaming their ACPI-related patches.
+That's much better than every time we fix some part of the emulation
+code, it touches some magic endianness function/trick, and you have to
+follow a trail a mile long to figure out all the conversions and whether
+it's right or not.  At least I have found this very hard in the past.
 
-However, building ACPI by default on arm64 doesn't mean that we can
-ignore potential misuses like PRP0001+_DSD blindly following DT
-(mis)concepts, breaking compatibility with older/newer firmware (this
-goes in both directions) or using ACPI for SoCs where it is clearly not
-suitable (e.g. non-SBSA). Such patches should be NAK'ed accordingly.
-
-> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-> index 82b96ee8624c..bf5dc1ac3446 100644
-> --- a/drivers/acpi/Kconfig
-> +++ b/drivers/acpi/Kconfig
-> @@ -5,7 +5,7 @@
->  menuconfig ACPI
->  	bool "ACPI (Advanced Configuration and Power Interface) Support"
->  	depends on !IA64_HP_SIM
-> -	depends on IA64 || X86 || (ARM64 && EXPERT)
-> +	depends on IA64 || X86 || ARM64
->  	depends on PCI
->  	select PNP
->  	default y
-
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-
-That said, I'd like to see an opinion from the arm-soc maintainers since
-they were active on the original arm64 ACPI threads introducing this
-dependency (and I think they have the right to veto ;)).
-
--- 
-Catalin
+Thanks,
+-Christoffer
