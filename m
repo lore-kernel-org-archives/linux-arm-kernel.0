@@ -1,133 +1,124 @@
-From: han.xu@nxp.com (Han Xu)
-Date: Tue, 12 Apr 2016 22:39:08 +0000
-Subject: [PATCH RESEND] gpmi-nand: Handle ECC Errors in erased pages
-In-Reply-To: <20160411092916.793d5abd@bbrezillon>
-References: <1456059126-25469-1-git-send-email-mpa@pengutronix.de>
- <20160224145750.21050def@bbrezillon>
- <3992227.rRuQ67A3ma@galactica>,<20160411092916.793d5abd@bbrezillon>
-Message-ID: <DB5PR0401MB1845DD983AF9195311DEB20F97950@DB5PR0401MB1845.eurprd04.prod.outlook.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Tue, 12 Apr 2016 17:45:14 -0500
+Subject: [PATCH 2/7] ARM: dts: skeleton: add unit name to memory node
+In-Reply-To: <CAGhQ9VyQYeKrpPD-YhWjysvHmYaKssCO7xsU9MyRvFivEym=Hw@mail.gmail.com>
+References: <1459290646-3592-1-git-send-email-manabian@gmail.com>
+ <1459290646-3592-3-git-send-email-manabian@gmail.com>
+ <20160330110611.GB25354@leverpostej>
+ <56FBCF70.80006@mentor.com> <20160330134155.GC25354@leverpostej>
+ <CAGhQ9VykiwMWaw3xcJdg2CahNFt+sp7tFC5O8VwA=-_=UoJ8kA@mail.gmail.com>
+ <20160330170645.GA13690@leverpostej>
+ <CAGhQ9Vykn=G+cmVuBCAA_ATTz4XNEPeUWYbZRb5NsrVBOjaS-A@mail.gmail.com>
+ <20160331103800.GC26532@leverpostej>
+ <CAGhQ9Vy8TKPxPdYF-wXbCo_LZkBsSsficEG8wCn1bCbS9JN+vg@mail.gmail.com>
+ <CAGhQ9VyQYeKrpPD-YhWjysvHmYaKssCO7xsU9MyRvFivEym=Hw@mail.gmail.com>
+Message-ID: <CAL_JsqK7Fwk0CTW420=NFja5Asq22ckanWZGWp0G7Wo4rS9gkQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-________________________________________
-From: Boris Brezillon <boris.brezillon@free-electrons.com>
-Sent: Monday, April 11, 2016 1:29 AM
-To: Markus Pargmann
-Cc: Han Xu; David Woodhouse; Fabio Estevam; linux-mtd at lists.infradead.org; kernel at pengutronix.de; Huang Shijie; Brian Norris; linux-arm-kernel at lists.infradead.org
-Subject: Re: [PATCH RESEND] gpmi-nand: Handle ECC Errors in erased pages
-
-On Mon, 11 Apr 2016 08:34:35 +0200
-Markus Pargmann <mpa@pengutronix.de> wrote:
-
-> Hi Boris,
+On Thu, Mar 31, 2016 at 11:34 AM, Joachim  Eastwood <manabian@gmail.com> wrote:
+> On 31 March 2016 at 17:21, Joachim  Eastwood <manabian@gmail.com> wrote:
+>> On 31 March 2016 at 12:38, Mark Rutland <mark.rutland@arm.com> wrote:
+>>> On Wed, Mar 30, 2016 at 10:45:06PM +0200, Joachim Eastwood wrote:
+>>>> On 30 March 2016 at 19:06, Mark Rutland <mark.rutland@arm.com> wrote:
+>>>> > On Wed, Mar 30, 2016 at 06:15:35PM +0200, Joachim Eastwood wrote:
+>>>> >> I used the following script to check for the memory node in all built dtb's.
+>>>> >>   make ARCH=arm CONFIG_OF_ALL_DTBS=y dtbs
+>>>> >>   for i in $(ls arch/arm/boot/dts/*.dtb); do
+>>>> >>          m=$(scripts/dtc/dtc -I dtb -O dts $i | grep -m1 'memory.*{')
+>>>> >>          if [ -z "$m" ]; then
+>>>> >>                  echo "Missing memory node in $i"
+>>>> >>           fi
+>>>> >>   done
+>>>> >>
+>>>> >> So it should be pretty safe to just remove the memory node entry in
+>>>> >> the skeleton files. Unless I have missed something with the script
+>>>> >> above.
+>>>> >
+>>>> > The above might match reserved-memory nodes; it might be better to check
+>>>> > for 'device_type\s*=\s*"memory"'.
+>>>>
+>>>> I did check the output of the grep and it looks good. But there are
+>>>> indeed DTs that are missing the 'device_type = "memory"' parameter.
+>>>> Actually; _a lot_ or 438 of 741 to be exact. ugh...
+>>>>
+>>>> I guess all those should be fixed up before we can remove the memory
+>>>> node from skeleton. :/
+>>>
+>>> Ouch, yes. :(
+>>>
+>>> That said, the cahnges don't need to be an atomic operation. We could
+>>> start adding device_type = "memory" to dts immediately (in as whatever
+>>> size batches maintainers are happy with), as a duplicate device_type
+>>> shouldn't be problematic.
+>>
+>> Yes, that is true.
+>>
+>>
+>>> When we hit critical mass, we could then remove the skeleton memory
+>>> nodes, fixing up any remaining fallout.
+>>>
+>>> As for the mechanical changes, it sounds like we need coccinelle for DT.
+>>>
+>>> That, or a laptop, a long flight, and a gin and tonic.
+>>
+>> :-)
+>>
+>> I'll see if I can cook up something with awk.
 >
-> On Wednesday 24 February 2016 14:57:50 Boris Brezillon wrote:
-> > Hi Markus,
-> >
-> > On Sun, 21 Feb 2016 13:52:06 +0100
-> > Markus Pargmann <mpa@pengutronix.de> wrote:
-> >
-> > > ECC is only calculated for written pages. As erased pages are not
-> > > actively written the ECC is always invalid. For this purpose the
-> > > Hardware BCH unit is able to check for erased pages and does not raise
-> > > an ECC error in this case. This behaviour can be influenced using the
-> > > BCH_MODE register which sets the number of allowed bitflips in an erased
-> > > page. Unfortunately the unit is not capable of fixing the bitflips in
-> > > memory.
-> > >
-> > > To avoid complete software checks for erased pages, we can simply check
-> > > buffers with uncorrectable ECC errors because we know that any erased
-> > > page with errors is uncorrectable by the BCH unit.
-> > >
-> > > This patch adds the generic nand_check_erased_ecc_chunk() to gpmi-nand
-> > > to correct erased pages. To have the valid data in the buffer before
-> > > using them, this patch moves the read_page_swap_end() call before the
-> > > ECC status checking for-loop.
-> > >
-> > > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > > ---
-> > >  drivers/mtd/nand/gpmi-nand/gpmi-nand.c | 49 ++++++++++++++++++++++++++++++----
-> > >  1 file changed, 44 insertions(+), 5 deletions(-)
-> > >
-> > > diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> > > index 235ddcb58f39..ce5a21252102 100644
-> > > --- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> > > +++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-> > > @@ -1035,14 +1035,58 @@ static int gpmi_ecc_read_page(struct mtd_info *mtd, struct nand_chip *chip,
-> > >   /* Loop over status bytes, accumulating ECC status. */
-> > >   status = auxiliary_virt + nfc_geo->auxiliary_status_offset;
-> > >
-> > > + read_page_swap_end(this, buf, nfc_geo->payload_size,
-> > > +                    this->payload_virt, this->payload_phys,
-> > > +                    nfc_geo->payload_size,
-> > > +                    payload_virt, payload_phys);
-> > > +
-> > >   for (i = 0; i < nfc_geo->ecc_chunk_count; i++, status++) {
-> > >           if ((*status == STATUS_GOOD) || (*status == STATUS_ERASED))
-> > >                   continue;
-> > >
-> > >           if (*status == STATUS_UNCORRECTABLE) {
-> > > +                 int flips;
-> > > +
-> > > +                 /*
-> > > +                  * The ECC hardware has an uncorrectable ECC status
-> > > +                  * code in case we have bitflips in an erased page. As
-> > > +                  * nothing was written into this subpage the ECC is
-> > > +                  * obviously wrong and we can not trust it. We assume
-> > > +                  * at this point that we are reading an erased page and
-> > > +                  * try to correct the bitflips in buffer up to
-> > > +                  * ecc_strength bitflips. If this is a page with random
-> > > +                  * data, we exceed this number of bitflips and have a
-> > > +                  * ECC failure. Otherwise we use the corrected buffer.
-> > > +                  */
-> > > +                 if (i == 0) {
-> > > +                         /* The first block includes metadata */
-> > > +                         flips = nand_check_erased_ecc_chunk(
-> > > +                                         buf + i * nfc_geo->ecc_chunk_size,
-> > > +                                         nfc_geo->ecc_chunk_size,
-> > > +                                         NULL, 0,
-> > > +                                         auxiliary_virt,
-> > > +                                         nfc_geo->metadata_size,
-> > > +                                         nfc_geo->ecc_strength);
-> > > +                 } else {
-> > > +                         flips = nand_check_erased_ecc_chunk(
-> > > +                                         buf + i * nfc_geo->ecc_chunk_size,
-> > > +                                         nfc_geo->ecc_chunk_size,
-> > > +                                         NULL, 0,
-> > > +                                         NULL, 0,
-> > > +                                         nfc_geo->ecc_strength);
-> > > +                 }
-> >
-> > You're not checking ECC bytes. I know it's a bit more complicated to
-> > implement, but as Brian stated several times, you should always check
-> > ECC bytes along with data bytes when testing for an erased chunk.
-> >
-> > Indeed, it might appear that the user really programmed ff on the page,
-> > and in this case you don't want to consider the page as erased.
-> > In this case, the ECC bytes will be different from ff, and you'll
-> > be able to identify it by checking those ECC bytes.
+> Something like this should do it:
+> #!/usr/bin/gawk -f
+> # find arch/arm/boot/dts/ -type f -name *.dts* | xargs
+> ./mem_node_add_dev_type.awk -i inplace
+> BEGIN { go = 0 }
+> /[^-]memory ?{/ { go = 1; idx = 0; device_type = 0 }
 >
-> Thanks for the feedback. Talking with a coworker about this we may have found a
-> better approach to this that is less complicated to implement. The hardware
-> unit allows us to set a bitflip threshold for erased pages. The ECC unit
-> creates an ECC error only if the number of bitflips exceeds this threshold, but
-> it does not correct these. So the idea is to change the patch so that we set
-> pages, that are signaled by the ECC as erased, to 0xff completely without
-> checking. So the ECC will do all the work and we completely trust in its
-> abilities to do it correctly.
+> go == 1 {
+>         buf[idx++] = $0
+>         if ($0 ~ /device_type/)
+>                 device_type = 1
+>
+>         if ($0 ~ /};/) {
+>                 print buf[0]
+>
+>                 if (!device_type) {
+>                         buf[0] = buf[1]
+>                         gsub(/[^\t]*/, "", buf[0])
+>                         buf[0] = buf[0] "device_type = \"memory\";"
+>                 } else {
+>                         delete buf[0]
+>                 }
+>
+>                 for (i in buf)
+>                         print buf[i]
+>                 delete buf
+>
+>                 go = 0
+>                 device_type = 0
+>         }
+>         next
+> }
+>
+> { print }
+>
+> Gives me: 249 files changed, 249 insertions(+), 1 deletion(-) on v4.6-rc1.
+>
+> Running the my check script after this reveals that 83 DTs lack the
+> device_type parameter, but these seem to also lack the memory node as
+> well. Wonder why my script didn't pick up the missing memory node in
+> those... I also doubt that the memory node is set by the boot loader
+> in some of these boards.
 
-Sounds good.
+I don't think this script is right. It will not work if the memory
+node is spread across dtsi files. You would need to compiler
+everything to dtb and then back to a flat dts file before running thru
+this script.
 
-some new platforms with new gpmi controller could check the count of 0 bits in page,
-refer to my patch https://patchwork.ozlabs.org/patch/587124/
+I don't see the rest of the series in -next. Is that going to happen soon?
 
-But for all legacy platforms, IMO, considering bitflip is rare case, set threshold to 0 and
-only check the uncorrectable branch and then correct data sounds better. Setting threshold
-and correcting all erased page may highly impact the performance.
+Rob
 
---
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+>
+>
+> regards,
+> Joachim Eastwood
