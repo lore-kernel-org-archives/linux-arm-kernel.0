@@ -1,161 +1,475 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 12 Apr 2016 17:06:49 +0300
-Subject: [RFC 0/1] ARM: mm: cache shareability tweak
-In-Reply-To: <20160412132505.GG28057@leverpostej>
-References: <1460448880-5677-1-git-send-email-t-kristo@ti.com>
- <20160412132505.GG28057@leverpostej>
-Message-ID: <570D00F9.4070406@ti.com>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Tue, 12 Apr 2016 17:06:59 +0300
+Subject: [PATCH v2] ARM: dts: imx6: Add dts for Embest MarS Board
+In-Reply-To: <1460420743-30883-1-git-send-email-sergio.prado@e-labworks.com>
+References: <1460420743-30883-1-git-send-email-sergio.prado@e-labworks.com>
+Message-ID: <570D0103.3080807@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/12/2016 04:25 PM, Mark Rutland wrote:
-> On Tue, Apr 12, 2016 at 11:14:39AM +0300, Tero Kristo wrote:
->> Hi,
->>
->> This RFC patch attempts to implement support for specifying cache
->> shareability setting via kernel cmdline. This is required at least
->> for TI keystone2 generation SoCs, where DMA masters are snooping on
->> the cache maintenance messages to maintain coherency. Currently we
->> are carrying an internal hack that modifies the macros via #ifdefs,
->> this is obviously bad as the same kernel image can only work with
->> keystone2 (or at least might be causing problems with other SoCs.)
->
-> The de-facto semantics (which we should codify) for dma-coherent with
-> ARMv7 is that a device makes accesses which are coherent with Normal,
-> Inner Shareable, Inner Write-Back, Outer Write-Back.
->
-> In arch/arm/boot/dts/keystone.dtsi I see that /soc/usb at 2680000 has a
-> dma-coherent flag. Is that device coherent today with upstream? Or is
-> that misleading currently?
+Hi Sergio,
 
-Good question, Murali, can you comment on this? What peripherals are 
-actually requiring the DMA coherency on K2?
+On 12.04.2016 03:25, Sergio Prado wrote:
+> Embest MarS Board [1] is a multi-core platform based on Freescale i.MX6
+> Cortex-A9 Dual Core, running up to 1GHz with 1 GB of RAM, 4GB of eMMC
+> and with a 4MB SPI flash.
+> 
+> [1] http://www.embest-tech.com/shop/star/marsboard.html
+> 
+> Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
+> ---
+> 
+> Changes v1 -> v2:
+> - Makefile entry added.
+> 
+> ---
+>  arch/arm/boot/dts/Makefile            |   1 +
+>  arch/arm/boot/dts/imx6q-marsboard.dts | 411 ++++++++++++++++++++++++++++++++++
+>  2 files changed, 412 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx6q-marsboard.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 95c1923ce6fa..04b87ea75f2f 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -346,6 +346,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+>  	imx6q-gw552x.dtb \
+>  	imx6q-hummingboard.dtb \
+>  	imx6q-icore-rqs.dtb \
+> +	imx6q-marsboard.dtb \
+>  	imx6q-nitrogen6x.dtb \
+>  	imx6q-nitrogen6_max.dtb \
+>  	imx6q-novena.dtb \
+> diff --git a/arch/arm/boot/dts/imx6q-marsboard.dts b/arch/arm/boot/dts/imx6q-marsboard.dts
+> new file mode 100644
+> index 000000000000..96b8736b90f8
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6q-marsboard.dts
+> @@ -0,0 +1,411 @@
+> +/*
+> + * Copyright (C) 2016 Sergio Prado (sergio.prado at e-labworks.com)
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License
+> + *     version 2 as published by the Free Software Foundation.
+> + *
+> + *     This file is distributed in the hope that it will be useful
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +#include "imx6q.dtsi"
+> +#include <dt-bindings/gpio/gpio.h>
+> +
+> +/ {
+> +	model = "Embest MarS Board i.MX6Dual";
+> +	compatible = "embest,imx6q-marsboard", "fsl,imx6dl";
+> +
+> +	memory {
+> +		reg = <0x10000000 0x40000000>;
+> +	};
+> +
+> +	regulators {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		reg_3p3v: regulator at 1 {
+> +			compatible = "regulator-fixed";
+> +			reg = <1>;
+> +			regulator-name = "3P3V";
+> +			regulator-min-microvolt = <3300000>;
+> +			regulator-max-microvolt = <3300000>;
+> +		};
+> +
+> +		reg_usb_otg_vbus: regulator at 2 {
+> +			compatible = "regulator-fixed";
+> +			reg = <2>;
+> +			regulator-name = "usb_otg_vbus";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +			gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
+> +		};
+> +	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_led>;
+> +
+> +		led at 1 {
 
->
-> If the device isn't coherent with that, then dma-coherent isn't strictly
-> true (and should go), and we need additional properties to correctly
-> describe this case.
->
->> It would be very much preferred to replace this hardcoded
->> implementation with a runtime solution.
->>
->> Some obvious holes in this implementation:
->>
->> 1) during execution of arch/arm/kernel/head.S, the tweaked MMU shareability
->>     settings are not in place. However, I am not too sure how much that
->>     matters, as I am not sure what is mapped at this point. Kernel image
->>     mapping should not matter at least, as we typically should not be doing
->>     any DMA transfers from the kernel image.
->
-> Strictly speaking, changing the shareability can result in a loss of
-> coherency, even if all accesses are made by the same CPU. See
-> "Mismatched memory attributes" in section A3.5.7 of the ARMv7-AR
-> Reference Manual (ARM DDI 0406C.c).
+the outcome of one recent discussion is that a unit-address component of
+the name is used only if there is a reg property, which is not the case
+here.
 
-Basically we are not attempting to change shareability in-the-fly, but 
-instead configure a different shareability value that is going to be 
-used always.
+> +			label = "imx6:green:user1";
+> +			gpios = <&gpio5 2 GPIO_ACTIVE_LOW>;
+> +			default-state = "off";
+> +			linux,default-trigger = "heartbeat";
+> +		};
+> +
+> +		led at 2 {
 
->
-> It's not just DMA that matters. I believe we may have page tables as
-> part of the kernel image, for instance, and those need to be accessed
-> with consistent attributes by the MMU when doing page table walks.
->
-> You can avoid issues so long as you have appropriate cache maintenance,
-> but that's both expensive (all memory previously mapped must be
-> Clean+Invalidated by VA) and painful (as you can't reliably use any of
-> said memory until after the maintenance).
+Same as above.
 
-The hack we have internally just maps all the DMA pages as outer 
-shareable. I think maybe adding the original hack might help 
-understanding the issue, so added inline in the end as reference. We 
-just attempt to change the shareability value from 3 (the current) to 2.
+> +			label = "imx6:green:user2";
+> +			gpios = <&gpio3 28 GPIO_ACTIVE_LOW>;
+> +			default-state = "off";
+> +		};
+> +	};
+> +};
+> +
+> +&uart1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart1>;
+> +	status = "okay";
+> +};
+> +
+> +&uart2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart2>;
+> +	status = "okay";
+> +};
+> +
+> +&uart3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart3>;
+> +	status = "okay";
+> +};
+> +
+> +&uart4 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart4>;
+> +	status = "okay";
+> +};
+> +
+> +&uart5 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart5>;
+> +	status = "okay";
+> +};
+> +
+> +&fec {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_enet>;
+> +	phy-mode = "rgmii";
+> +	phy-reset-gpios = <&gpio3 31 GPIO_ACTIVE_HIGH>;
+> +	status = "okay";
+> +};
+> +
+> +&usdhc2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usdhc2>;
+> +	vmmc-supply = <&reg_3p3v>;
+> +	cd-gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
+> +	wp-gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
+> +	status = "okay";
+> +};
+> +
+> +&usdhc3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usdhc3>;
+> +	vmmc-supply = <&reg_3p3v>;
+> +	non-removable;
+> +	status = "okay";
+> +};
+> +
+> +&i2c1 {
+> +	clock-frequency = <100000>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_i2c1>;
+> +	status = "okay";
+> +};
+> +
+> +&i2c2 {
+> +	clock-frequency = <100000>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_i2c2>;
+> +	status = "okay";
+> +};
+> +
+> +&i2c3 {
+> +	clock-frequency = <100000>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_i2c3>;
+> +	status = "okay";
+> +};
+> +
+> +&ecspi1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_ecspi1>;
+> +	cs-gpios = <&gpio2 30 GPIO_ACTIVE_LOW>;
+> +	fsl,spi-num-chipselects = <1>;
+> +	status = "okay";
+> +
+> +	m25p80 at 0 {
+> +		compatible = "microchip,sst25vf016b";
+> +		spi-max-frequency = <20000000>;
+> +		reg = <0>;
+> +	};
+> +};
+> +
+> +&pwm1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_pwm1>;
+> +	status = "okay";
+> +};
+> +
+> +&pwm2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_pwm2>;
+> +	status = "okay";
+> +};
+> +
+> +&pwm3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_pwm3>;
+> +	status = "okay";
+> +};
+> +
+> +&pwm4 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_pwm4>;
+> +	status = "okay";
+> +};
+> +
+> +&usbh1 {
+> +	dr_mode = "host";
+> +	disable-over-current;
+> +	status = "okay";
+> +};
+> +
+> +&usbotg {
+> +	vbus-supply = <&reg_usb_otg_vbus>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usbotg>;
+> +	dr_mode = "otg";
+> +	disable-over-current;
+> +	status = "okay";
+> +};
+> +
+> +&hdmi {
+> +	ddc-i2c-bus = <&i2c2>;
+> +	status = "okay";
+> +};
+> +
+> +&audmux {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_audmux>;
+> +	status = "okay";
+> +};
+> +
+> +&iomuxc {
+> +	imx6-riotboard {
 
->
->>     I would like some comments on this, if handling during head.S
->>     should be fixed also, how can this be done? Some hack under
->>     compressed/keystone-head.S?
->
-> If you need to do this, you need consistent attributes from the outset,
-> or you need to disable the MMU, perform cache maintenance, and re-enter
-> the kernel.
->
->> 2) the cmdline parameter could be something more descriptive
->>
->> 3) The single RFC patch should probably be split up a bit
->
-> 4) It isn't possible to use dma-coherent to describe this without
->     weakening the semantics so as to be meaningless in general. So if we
->     go for this approach we need a mechanism to accurately describe the
->     coherency guarantees of masters in the system beyond a boolean.
->
-> Thanks,
-> Mark.
->
+Copy pasted board name?
 
+> +		pinctrl_uart1: uart1grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_CSI0_DAT10__UART1_TX_DATA	0x1b0b1
+> +				MX6QDL_PAD_CSI0_DAT11__UART1_RX_DATA	0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_uart2: uart2grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_EIM_D26__UART2_TX_DATA	0x1b0b1
+> +				MX6QDL_PAD_EIM_D27__UART2_RX_DATA	0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_uart3: uart3grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_EIM_D24__UART3_TX_DATA	0x1b0b1
+> +				MX6QDL_PAD_EIM_D25__UART3_RX_DATA	0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_uart4: uart4grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_KEY_COL0__UART4_TX_DATA	0x1b0b1
+> +				MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA	0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_uart5: uart5grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_KEY_COL1__UART5_TX_DATA	0x1b0b1
+> +				MX6QDL_PAD_KEY_ROW1__UART5_RX_DATA	0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_enet: enetgrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
+> +				MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
+> +				MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x1b0b0
+> +				MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b0b0
+> +				MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b0b0
+> +				MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b0b0
+> +				MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x1b0b0
+> +				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x1b0b0
+> +				/* AR8035 CLK_25M --> ENET_REF_CLK (V22) */
+> +				MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x0a0b1
+> +				/* AR8035 pin strapping: IO voltage: pull up */
+> +				MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0
+> +				/* AR8035 pin strapping: PHYADDR#0: pull down */
+> +				MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x130b0
+> +				/* AR8035 pin strapping: PHYADDR#1: pull down */
+> +				MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x130b0
+> +				/* AR8035 pin strapping: MODE#1: pull up */
+> +				MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b0b0
+> +				/* AR8035 pin strapping: MODE#3: pull up */
+> +				MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b0b0
+> +				/* AR8035 pin strapping: MODE#0: pull down */
+> +				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x130b0
+> +				/* GPIO16 -> AR8035 25MHz */
+> +				MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x4001b0a8
+> +				/* RGMII_nRST */
+> +				MX6QDL_PAD_EIM_D31__GPIO3_IO31		0x130b0
+> +				/* AR8035 interrupt */
+> +				MX6QDL_PAD_ENET_TX_EN__GPIO1_IO28	0x180b0
+> +			>;
+> +		};
+> +
+> +		pinctrl_led: ledgrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_EIM_A25__GPIO5_IO02		0x1b0b1	/* LED0 */
+> +				MX6QDL_PAD_EIM_D28__GPIO3_IO28		0x1b0b1	/* LED1 */
+> +			>;
+> +		};
+> +
+> +		pinctrl_usdhc2: usdhc2grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD2_CMD__SD2_CMD		0x17059
+> +				MX6QDL_PAD_SD2_CLK__SD2_CLK		0x10059
+> +				MX6QDL_PAD_SD2_DAT0__SD2_DATA0		0x17059
+> +				MX6QDL_PAD_SD2_DAT1__SD2_DATA1		0x17059
+> +				MX6QDL_PAD_SD2_DAT2__SD2_DATA2		0x17059
+> +				MX6QDL_PAD_SD2_DAT3__SD2_DATA3		0x17059
+> +				MX6QDL_PAD_GPIO_4__GPIO1_IO04		0x1b0b0	/* CD */
+> +				MX6QDL_PAD_GPIO_2__GPIO1_IO02		0x1f0b0	/* WP */
+> +			>;
+> +		};
+> +
+> +		pinctrl_usdhc3: usdhc3grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD3_CMD__SD3_CMD		0x17009
+> +				MX6QDL_PAD_SD3_CLK__SD3_CLK		0x10009
+> +				MX6QDL_PAD_SD3_DAT0__SD3_DATA0		0x17009
+> +				MX6QDL_PAD_SD3_DAT1__SD3_DATA1		0x17009
+> +				MX6QDL_PAD_SD3_DAT2__SD3_DATA2		0x17009
+> +				MX6QDL_PAD_SD3_DAT3__SD3_DATA3		0x17009
+> +				MX6QDL_PAD_SD3_RST__SD3_RESET		0x17009
+> +			>;
+> +		};
+> +
+> +		pinctrl_i2c1: i2c1grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_CSI0_DAT8__I2C1_SDA		0x4001b8b1
+> +				MX6QDL_PAD_CSI0_DAT9__I2C1_SCL		0x4001b8b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_i2c2: i2c2grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_KEY_COL3__I2C2_SCL		0x4001b8b1
+> +				MX6QDL_PAD_KEY_ROW3__I2C2_SDA		0x4001b8b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_i2c3: i2c3grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_GPIO_5__I2C3_SCL		0x4001b8b1
+> +				MX6QDL_PAD_GPIO_6__I2C3_SDA		0x4001b8b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_ecspi1: ecspi1grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_EIM_D16__ECSPI1_SCLK		0x100b1
+> +				MX6QDL_PAD_EIM_D17__ECSPI1_MISO		0x100b1
+> +				MX6QDL_PAD_EIM_D18__ECSPI1_MOSI		0x100b1
+> +				MX6QDL_PAD_EIM_EB2__GPIO2_IO30		0x000b1	/* CS0 */
+> +			>;
+> +		};
+> +
+> +		pinctrl_pwm1: pwm1grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_DISP0_DAT8__PWM1_OUT		0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_pwm2: pwm2grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_DISP0_DAT9__PWM2_OUT		0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_pwm3: pwm3grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD1_DAT1__PWM3_OUT		0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_pwm4: pwm4grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD1_CMD__PWM4_OUT		0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_usbotg: usbotggrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID	0x17059
+> +				MX6QDL_PAD_EIM_D21__USB_OTG_OC		0x1b0b0
+> +				MX6QDL_PAD_EIM_D22__GPIO3_IO22		0x000b0	/* USB OTG POWER ENABLE */
+> +			>;
+> +		};
+> +
+> +		pinctrl_audmux: audmuxgrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_CSI0_DAT7__AUD3_RXD		0x130b0
+> +				MX6QDL_PAD_CSI0_DAT4__AUD3_TXC		0x130b0
+> +				MX6QDL_PAD_CSI0_DAT5__AUD3_TXD		0x110b0
+> +				MX6QDL_PAD_CSI0_DAT6__AUD3_TXFS		0x130b0
+> +				MX6QDL_PAD_GPIO_0__CCM_CLKO1		0x130b0	/* CAM_MCLK */
+> +			>;
+> +		};
+> +	};
+> +};
+> 
 
-diff --git a/arch/arm/include/asm/pgtable-3level-hwdef.h 
-b/arch/arm/include/asm/pgtable-3level-hwdef.h
-index f8f1cff..62adf21 100644
---- a/arch/arm/include/asm/pgtable-3level-hwdef.h
-+++ b/arch/arm/include/asm/pgtable-3level-hwdef.h
-@@ -44,7 +44,11 @@
-  #define PMD_SECT_CACHEABLE	(_AT(pmdval_t, 1) << 3)
-  #define PMD_SECT_USER		(_AT(pmdval_t, 1) << 6)		/* AP[1] */
-  #define PMD_SECT_AP2		(_AT(pmdval_t, 1) << 7)		/* read only */
-+#ifdef CONFIG_KEYSTONE2_DMA_COHERENT
-+#define PMD_SECT_S		(_AT(pmdval_t, 2) << 8)
-+#else
-  #define PMD_SECT_S		(_AT(pmdval_t, 3) << 8)
-+#endif
-  #define PMD_SECT_AF		(_AT(pmdval_t, 1) << 10)
-  #define PMD_SECT_nG		(_AT(pmdval_t, 1) << 11)
-  #define PMD_SECT_PXN		(_AT(pmdval_t, 1) << 53)
-@@ -73,7 +77,12 @@
-  #define PTE_BUFFERABLE		(_AT(pteval_t, 1) << 2)		/* AttrIndx[0] */
-  #define PTE_CACHEABLE		(_AT(pteval_t, 1) << 3)		/* AttrIndx[1] */
-  #define PTE_AP2			(_AT(pteval_t, 1) << 7)		/* AP[2] */
-+#ifdef CONFIG_KEYSTONE2_DMA_COHERENT
-+/* SH[1:0], outer shareable */
-+#define PTE_EXT_SHARED		(_AT(pteval_t, 2) << 8)
-+#else
-  #define PTE_EXT_SHARED		(_AT(pteval_t, 3) << 8)		/* SH[1:0], inner 
-shareable */
-+#endif
-  #define PTE_EXT_AF		(_AT(pteval_t, 1) << 10)	/* Access Flag */
-  #define PTE_EXT_NG		(_AT(pteval_t, 1) << 11)	/* nG */
-  #define PTE_EXT_PXN		(_AT(pteval_t, 1) << 53)	/* PXN */
-diff --git a/arch/arm/include/asm/pgtable-3level.h 
-b/arch/arm/include/asm/pgtable-3level.h
-index a745a2a..b4090b1 100644
---- a/arch/arm/include/asm/pgtable-3level.h
-+++ b/arch/arm/include/asm/pgtable-3level.h
-@@ -78,7 +78,12 @@
-  #define L_PTE_VALID		(_AT(pteval_t, 1) << 0)		/* Valid */
-  #define L_PTE_PRESENT		(_AT(pteval_t, 3) << 0)		/* Present */
-  #define L_PTE_USER		(_AT(pteval_t, 1) << 6)		/* AP[1] */
-+#ifdef CONFIG_KEYSTONE2_DMA_COHERENT
-+/* SH[1:0], outer shareable */
-+#define L_PTE_SHARED		(_AT(pteval_t, 2) << 8)
-+#else
-  #define L_PTE_SHARED		(_AT(pteval_t, 3) << 8)		/* SH[1:0], inner 
-shareable */
-+#endif
-  #define L_PTE_YOUNG		(_AT(pteval_t, 1) << 10)	/* AF */
-  #define L_PTE_XN		(_AT(pteval_t, 1) << 54)	/* XN */
-  #define L_PTE_DIRTY		(_AT(pteval_t, 1) << 55)
-diff --git a/arch/arm/mach-keystone/Kconfig b/arch/arm/mach-keystone/Kconfig
-index ea955f6db..558385e 100644
---- a/arch/arm/mach-keystone/Kconfig
-+++ b/arch/arm/mach-keystone/Kconfig
-@@ -11,6 +11,10 @@ config ARCH_KEYSTONE
-  	select ZONE_DMA if ARM_LPAE
-  	select MIGHT_HAVE_PCI
-  	select PCI_DOMAINS if PCI
-+	select KEYSTONE2_DMA_COHERENT
-  	help
-  	  Support for boards based on the Texas Instruments Keystone family of
-  	  SoCs.
-+
-+config KEYSTONE2_DMA_COHERENT
-+	bool
+--
+With best wishes,
+Vladimir
