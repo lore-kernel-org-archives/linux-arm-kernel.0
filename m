@@ -1,77 +1,46 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Tue, 12 Apr 2016 17:40:49 +0800
-Subject: [PATCH v2 06/16] arm64: dts: add Hi6220 spi configuration nodes
-In-Reply-To: <20160404051638.GR17806@rob-hp-laptop>
-References: <1459589383-16914-1-git-send-email-guodong.xu@linaro.org>
- <1459589383-16914-7-git-send-email-guodong.xu@linaro.org>
- <20160404051638.GR17806@rob-hp-laptop>
-Message-ID: <CAFGCpxw_89GBUsMW4HCbeRgH+H_tQy5ZuD1wPmgpLFXNfeHBxA@mail.gmail.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Tue, 12 Apr 2016 12:59:14 +0300
+Subject: [PATCH] ARM: mach-imx: sdhci-esdhc-imx: initialize DMA mask
+In-Reply-To: <20160412084048.GM19428@n2100.arm.linux.org.uk>
+References: <1460362846-2906-1-git-send-email-akurz@blala.de>
+ <20160411083510.GN10108@pengutronix.de> <570B780E.7090801@intel.com>
+ <alpine.DEB.2.00.1604111803080.6072@blala.de> <570C902E.7090607@intel.com>
+ <20160412084048.GM19428@n2100.arm.linux.org.uk>
+Message-ID: <570CC6F2.4090301@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 April 2016 at 13:16, Rob Herring <robh@kernel.org> wrote:
-> On Sat, Apr 02, 2016 at 05:29:33PM +0800, Guodong Xu wrote:
->> From: Zhong Kaihua <zhongkaihua@huawei.com>
+On 12/04/16 11:40, Russell King - ARM Linux wrote:
+> On Tue, Apr 12, 2016 at 09:05:34AM +0300, Adrian Hunter wrote:
+>> On 11/04/16 19:13, Alexander Kurz wrote:
+>>> Hi Adrian,
+>>> On Mon, 11 Apr 2016, Adrian Hunter wrote:
+>>>
+>>>> On 11/04/16 11:35, Uwe Kleine-K?nig wrote:
+>>>>> Hello,
+>>>>>
+>>>>> I added the people involved in 7b91369b4655 to Cc.
+>>>>>
+>>>>> On Mon, Apr 11, 2016 at 10:20:46AM +0200, Alexander Kurz wrote:
+>>>>>> With commit 7b91369b DMA access got disabled for device drivers with zero
+>>>>
+>>>> Is that because dma_set_mask_and_coherent() fails?
+>>> right, dma_set_mask_and_coherent() fails, thats the only reason for
+>>> this patch. This popped up on a Kindle3 (IMX35 with eMMC based root fs).
 >>
->> Add Hi6220 spi configuration nodes
->>
->> Signed-off-by: Zhong Kaihua <zhongkaihua@huawei.com>
->> Signed-off-by: Wei Xu <xuwei5@hisilicon.com>
->> ---
->>  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts   |  1 +
->>  arch/arm64/boot/dts/hisilicon/hi6220.dtsi        | 15 +++++++++++++++
->>  arch/arm64/boot/dts/hisilicon/hikey-pinctrl.dtsi | 21 +++++++++++++++++++++
->>  3 files changed, 37 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
->> index 985a2ad..5c9ee31 100644
->> --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
->> +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
->> @@ -20,6 +20,7 @@
->>               serial1 = &uart1; /* BT UART */
->>               serial2 = &uart2; /* LS Expansion UART0 */
->>               serial3 = &uart3; /* LS Expansion UART1 */
->> +             spi0 = &spi_0;
->
-> You shouldn't really need an alias for SPI.
+>> Arnd, Alexandre : Why should dma_set_mask_and_coherent() fail in this case
+>> when DMA apparently doesn't need a dma_mask anyway?
+> 
+> What do you mean "doesn't need a dma_mask" ?  DMA _always_ requires a
+> DMA mask.  The DMA mask defines how many address bits are capable of
+> being used on the bus.
+> 
+> If there's no DMA mask, then there's no usable address bits, and so
+> the device is not DMA capable.  Hence, dma_set_mask_and_coherent()
+> will fail because its not possible to negotiate a non-zero number of
+> address bits.
+> 
 
-Will remove it.
-
->
->>       };
->>
->>       chosen {
->> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
->> index e96cc3c..dcca83b 100644
->> --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
->> +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
->> @@ -585,5 +585,20 @@
->>                       clock-names = "apb_pclk";
->>                       status = "ok";
->>               };
->> +
->> +             spi_0: spi at f7106000 {
->> +                     compatible = "arm,pl022", "arm,primecell";
->> +                     reg = <0x0 0xf7106000 0x0 0x1000>;
->> +                     interrupts = <0 50 4>;
->> +                     bus-id = <0>;
->> +                     enable-dma = <0>;
->> +                     clocks = <&sys_ctrl HI6220_SPI_CLK>;
->> +                     clock-names = "apb_pclk";
->> +                     pinctrl-names = "default";
->> +                     pinctrl-0 = <&spi0_pmx_func &spi0_cfg_func>;
->> +                     num-cs = <1>;
->> +                     cs-gpios = <&gpio6 2 0>;
->> +                     status = "ok";
->
-> You only need an ok to override a disabled status, so I think you can
-> drop this. Or disable by default and let boards override it if that
-> makes sense.
-
-Thanks. I will modify this to "disabled", and enable it in board dts:
-hi6220-hikey.dts
-
--Guodong
-
->
-> Rob
+The point is, now we valid dma_set_mask_and_coherent(), DMA will stop
+working for any other SDHCI device that hasn't allocated dev.dma_mask.  Is
+that OK?
