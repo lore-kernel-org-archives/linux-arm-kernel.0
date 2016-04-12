@@ -1,64 +1,84 @@
 From: guodong.xu@linaro.org (Guodong Xu)
-Date: Wed, 13 Apr 2016 07:55:45 +0800
-Subject: [PATCH v4 09/16] arm64: dts: Add hi6220 usb node
+Date: Wed, 13 Apr 2016 07:55:48 +0800
+Subject: [PATCH v4 12/16] arm64: dts: hi6220: add pinctrl for uarts and enable
+ them
 In-Reply-To: <1460505352-13157-1-git-send-email-guodong.xu@linaro.org>
 References: <1460505352-13157-1-git-send-email-guodong.xu@linaro.org>
-Message-ID: <1460505352-13157-10-git-send-email-guodong.xu@linaro.org>
+Message-ID: <1460505352-13157-13-git-send-email-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Zhangfei Gao <zhangfei.gao@linaro.org>
+Add pinctrl for uart2 uart3 and uart4. Enable uart1 uart2 and uart3.
 
-Add USB nodes for Hi6220
-
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-Signed-off-by: Wei Xu <xuwei5@hisilicon.com>
-Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
 ---
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 32 +++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 12 ++++++++++++
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi      |  9 +++++++++
+ 2 files changed, 21 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-index 4fc0347..4d1d31f 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -615,5 +615,37 @@
- 			pinctrl-0 = <&i2c2_pmx_func &i2c2_cfg_func>;
- 			status = "disabled";
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+index 3dbf51b..30c92bd 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
++++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+@@ -53,6 +53,18 @@
+ 		i2c1: i2c at f7101000 {
+ 			status = "ok";
  		};
 +
-+		fixed_5v_hub: regulator at 0 {
-+			compatible = "regulator-fixed";
-+			regulator-name = "fixed_5v_hub";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			regulator-boot-on;
-+			gpio = <&gpio0 7 0>;
-+			regulator-always-on;
++		uart1: uart at f7111000 {
++			status = "ok";
 +		};
 +
-+		usb_phy: usbphy {
-+			compatible = "hisilicon,hi6220-usb-phy";
-+			#phy-cells = <0>;
-+			phy-supply = <&fixed_5v_hub>;
-+			hisilicon,peripheral-syscon = <&sys_ctrl>;
++		uart2: uart at f7112000 {
++			status = "ok";
 +		};
 +
-+		usb: usb at f72c0000 {
-+			compatible = "hisilicon,hi6220-usb";
-+			reg = <0x0 0xf72c0000 0x0 0x40000>;
-+			phys = <&usb_phy>;
-+			phy-names = "usb2-phy";
-+			clocks = <&sys_ctrl HI6220_USBOTG_HCLK>;
-+			clock-names = "otg";
-+			dr_mode = "otg";
-+			g-use-dma;
-+			g-rx-fifo-size = <512>;
-+			g-np-tx-fifo-size = <128>;
-+			g-tx-fifo-size = <128 128 128 128 128 128>;
-+			interrupts = <0 77 0x4>;
++		uart3: uart at f7113000 {
++			status = "ok";
 +		};
  	};
  };
+ 
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+index 3a665ef..e8bb81f 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+@@ -266,6 +266,8 @@
+ 			clocks = <&sys_ctrl HI6220_UART1_PCLK>,
+ 				 <&sys_ctrl HI6220_UART1_PCLK>;
+ 			clock-names = "uartclk", "apb_pclk";
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart1_pmx_func &uart1_cfg_func1 &uart1_cfg_func2>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -276,6 +278,8 @@
+ 			clocks = <&sys_ctrl HI6220_UART2_PCLK>,
+ 				 <&sys_ctrl HI6220_UART2_PCLK>;
+ 			clock-names = "uartclk", "apb_pclk";
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart2_pmx_func &uart2_cfg_func>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -286,6 +290,9 @@
+ 			clocks = <&sys_ctrl HI6220_UART3_PCLK>,
+ 				 <&sys_ctrl HI6220_UART3_PCLK>;
+ 			clock-names = "uartclk", "apb_pclk";
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart3_pmx_func &uart3_cfg_func>;
++			status = "disabled";
+ 		};
+ 
+ 		uart4: uart at f7114000 {
+@@ -295,6 +302,8 @@
+ 			clocks = <&sys_ctrl HI6220_UART4_PCLK>,
+ 				 <&sys_ctrl HI6220_UART4_PCLK>;
+ 			clock-names = "uartclk", "apb_pclk";
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart4_pmx_func &uart4_cfg_func>;
+ 			status = "disabled";
+ 		};
+ 
 -- 
 1.9.1
