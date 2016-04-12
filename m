@@ -1,38 +1,138 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Tue, 12 Apr 2016 14:57:24 +0100
-Subject: [PATCH v2 0/4] STi DT updates
-Message-ID: <1460469448-9065-1-git-send-email-peter.griffin@linaro.org>
+Date: Tue, 12 Apr 2016 14:57:25 +0100
+Subject: [PATCH v2 1/4] ARM: DT: STiH407: Add UART RTS/CTS pin configuration
+In-Reply-To: <1460469448-9065-1-git-send-email-peter.griffin@linaro.org>
+References: <1460469448-9065-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1460469448-9065-2-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime / Patrice / Srini,
+Add pinctrl definitions of UART RTS/CTS pins.
 
-This series adds some more alternate pin configurations which were missing
-upstream, the DT config for SSC12, and also a DT node for the at24c256 eeprom
-to better describe the hardware on the I2C bus.
+Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+---
+ arch/arm/boot/dts/stih407-pinctrl.dtsi | 73 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 73 insertions(+)
 
-As at23c256 can now be accessed via nvmem framework it will allow stmmac driver to
-be updated to obtain MAC address directlry from the eeprom.
-
-regards,
-
-Peter.
-
-Changes in v2:
-  - Add better patch description for 'STiH407: Add DT node for at24c256 eeprom'
-    (Lee)
-  - Rebase on v4.6-rc3 (Peter)
-
-Peter Griffin (4):
-  ARM: DT: STiH407: Add UART RTS/CTS pin configuration
-  ARM: DT: STiH407: Add i2c12 pin definition
-  ARM: DT: STiH407: Add node for i2c12 controller
-  ARM: STi: DT: STiH407: Add DT node for at24c256 eeprom
-
- arch/arm/boot/dts/stih407-family.dtsi  | 13 ++++++
- arch/arm/boot/dts/stih407-pinctrl.dtsi | 82 ++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/stihxxx-b2120.dtsi   |  9 ++++
- 3 files changed, 104 insertions(+)
-
+diff --git a/arch/arm/boot/dts/stih407-pinctrl.dtsi b/arch/arm/boot/dts/stih407-pinctrl.dtsi
+index a538ae5..87e75bf 100644
+--- a/arch/arm/boot/dts/stih407-pinctrl.dtsi
++++ b/arch/arm/boot/dts/stih407-pinctrl.dtsi
+@@ -149,7 +149,20 @@
+ 						rx = <&pio3 5 ALT1 IN>;
+ 					};
+ 				};
++
++				pinctrl_sbc_serial0_rts: sbc_serial0_rts {
++					st,pins {
++						rts = <&pio3 7 ALT1 OUT>;
++					};
++				};
++
++				pinctrl_sbc_serial0_cts: sbc_serial0_cts {
++					st,pins {
++						cts = <&pio3 6 ALT1 IN>;
++					};
++				};
+ 			};
++
+ 			/* SBC_ASC1 - UART11 */
+ 			sbc_serial1 {
+ 				pinctrl_sbc_serial1: sbc_serial1-0 {
+@@ -158,6 +171,18 @@
+ 						rx = <&pio2 7 ALT3 IN>;
+ 					};
+ 				};
++
++				pinctrl_sbc_serial1_rts: sbc_serial1_rts {
++					st,pins {
++						rts = <&pio3 1 ALT3 OUT>;
++					};
++				};
++
++				pinctrl_sbc_serial1_cts: sbc_serial1_cts {
++					st,pins {
++						cts = <&pio3 0 ALT3 IN>;
++					};
++				};
+ 			};
+ 
+ 			i2c10 {
+@@ -478,6 +503,18 @@
+ 						rx = <&pio15 1 ALT1 IN>;
+ 					};
+ 				};
++
++				pinctrl_serial0_rts: serial0_rts {
++					st,pins {
++						rts = <&pio17 3 ALT1 OUT>;
++					};
++				};
++
++				pinctrl_serial0_cts: serial0_cts {
++					st,pins {
++						cts = <&pio17 2 ALT1 IN>;
++					};
++				};
+ 			};
+ 
+ 			mmc1 {
+@@ -495,6 +532,18 @@
+ 						sd_wp = <&pio19 1 ALT6 IN>;
+ 					};
+ 				};
++
++				pinctrl_serial1_rts: serial1_rts {
++					st,pins {
++						rts = <&pio16 3 ALT1 OUT>;
++					};
++				};
++
++				pinctrl_serial1_cts: serial1_cts {
++					st,pins {
++						cts = <&pio16 2 ALT1 IN>;
++					};
++				};
+ 			};
+ 
+ 
+@@ -505,6 +554,18 @@
+ 						scl = <&pio10 5 ALT2 BIDIR>;
+ 					};
+ 				};
++
++				pinctrl_serial2_rts: serial2_rts {
++					st,pins {
++						rts = <&pio15 3 ALT1 OUT>;
++					};
++				};
++
++				pinctrl_serial2_cts: serial2_cts {
++					st,pins {
++						cts = <&pio15 2 ALT1 IN>;
++					};
++				};
+ 			};
+ 
+ 			i2c1 {
+@@ -1074,6 +1135,18 @@
+ 						rx = <&pio31 4 ALT1 IN>;
+ 					};
+ 				};
++
++				pinctrl_serial3_rts: serial3_rts {
++					st,pins {
++						rts = <&pio31 6 ALT1 OUT>;
++					};
++				};
++
++				pinctrl_serial3_cts: serial3_cts {
++					st,pins {
++						cts = <&pio31 5 ALT1 IN>;
++					};
++				};
+ 			};
+ 		};
+ 
 -- 
 1.9.1
