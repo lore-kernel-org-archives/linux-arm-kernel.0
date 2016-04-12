@@ -1,51 +1,26 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 12 Apr 2016 16:49:11 +0200
-Subject: [PATCH v6] drivers: amba: properly handle devices with power
- domains
-In-Reply-To: <1460470193-24928-1-git-send-email-m.szyprowski@samsung.com>
-References: <570D017E.7060105@samsung.com>
- <1460470193-24928-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CAPDyKFqhaLUzzVtSosRQgd1p=QquwHpXEkV9BdgHrBs1nLiLMw@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 12 Apr 2016 09:58:19 -0500
+Subject: [PATCH 00/30] ARM: OMAP2+: hwmod module clock type support
+In-Reply-To: <1460362761-4842-1-git-send-email-t-kristo@ti.com>
+References: <1460362761-4842-1-git-send-email-t-kristo@ti.com>
+Message-ID: <20160412145819.GA25032@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+On Mon, Apr 11, 2016 at 11:18:51AM +0300, Tero Kristo wrote:
+> Hi,
+> 
+> This series transfers the hwmod clkctrl handling from the hwmod core
+> under clock driver, the data is also transferred from hwmod data to
+> devicetree. Done for most of the OMAP2+ platforms, except OMAP2 / OMAP3,
+> where work is still under progress.
 
->
-> +static int __init amba_deferred_device_init(void)
-> +{
-> +       struct deferred_device *ddev, *tmp;
-> +
-> +       list_for_each_entry_safe(ddev, tmp, &deferred_devices, node) {
-> +               int ret = amba_device_try_add(ddev->dev, ddev->parent);
-> +
-> +               if (ret == -EPROBE_DEFER)
-> +                       continue;
+Some high level questions.
 
-What happens with devices that still fails to be added here? Should we
-schedule a periodic work to re-try?
+Why a DT node per clock? We've pretty much decided that is a bad idea 
+in the complex cases. TI chips certainly fall in the complex case.
 
-> +
-> +               list_del_init(&ddev->node);
-> +               kfree(ddev);
-> +       }
-> +
-> +       return 0;
-> +}
-> +late_initcall(amba_deferred_device_init);
-> +
->  static struct amba_device *
->  amba_aphb_device_add(struct device *parent, const char *name,
->                      resource_size_t base, size_t size, int irq1, int irq2,
-> --
-> 1.9.2
->
+You are changing compatible strings and possibly breaking compatibility. 
+Don't do that or justify why.
 
-I assume there are other similar buses like AMBA that needs
-enumeration before it can bind an appropriate driver for its device.
-
-Perhaps that's a good reason to make this new "device add re-try"
-mechanism a generic thing supported by the driver core?
-
-Kind regards
-Uffe
+Rob
