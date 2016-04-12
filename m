@@ -1,41 +1,27 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 12 Apr 2016 16:26:08 +0200
-Subject: [PATCH v5 03/46] backlight: lm3630a_bl: stop messing with the
- pwm->period field
-In-Reply-To: <20160412141613.GI8094@x1>
-References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
- <1459368249-13241-4-git-send-email-boris.brezillon@free-electrons.com>
- <20160412110809.GI18882@ulmo.ba.sec> <20160412141613.GI8094@x1>
-Message-ID: <20160412142608.GB25006@ulmo.ba.sec>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 12 Apr 2016 22:26:54 +0800
+Subject: [PATCH 2/2] ARM: multi_v5_defconfig: Enable recommended options
+ for systemd
+In-Reply-To: <1460462268.2629.27.camel@pengutronix.de>
+References: <1458991706-30109-1-git-send-email-jlu@pengutronix.de>
+ <1458991706-30109-2-git-send-email-jlu@pengutronix.de>
+ <1460462268.2629.27.camel@pengutronix.de>
+Message-ID: <20160412142654.GA24304@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 12, 2016 at 03:16:13PM +0100, Lee Jones wrote:
-> On Tue, 12 Apr 2016, Thierry Reding wrote:
-> 
-> > On Wed, Mar 30, 2016 at 10:03:26PM +0200, Boris Brezillon wrote:
-> > > pwm->period field is not supposed to be changed by PWM users. The only
-> > > ones authorized to change it are the PWM core and PWM drivers.
-> > > 
-> > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > > ---
-> > >  drivers/video/backlight/lm3630a_bl.c | 3 +--
-> > >  1 file changed, 1 insertion(+), 2 deletions(-)
+On Tue, Apr 12, 2016 at 01:57:48PM +0200, Jan L?bbe wrote:
+> On Sa, 2016-03-26 at 12:28 +0100, Jan Luebbe wrote:
+> > Enable FHANDLE, CGROUPS, BLK_DEV_BSG and DEVTMPFS as recommended by
+> > systemd (which also matches the multi_v7 defconfig). Also enable IPV6,
+> > which defaults to 'y' by now.
 > > 
-> > Applied, thanks.
+> > Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
 > 
-> Applied?
+> Shawn, you've already applied 1/2. Do you have any concerns or comments
+> regarding this one?
 
-You didn't specifically Ack this one, but I presumed that since the
-change is essentially the same as for pwm-backlight, and this is another
-prerequisite for the remainder of the series it should go in through the
-PWM tree as well.
+I thought that Arnd's request and Sascha's ACK only applies to 1/2.
+Just applied 2/2 as well.  @Arnd, let me know if I shouldn't.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160412/bf31114a/attachment.sig>
+Shawn
