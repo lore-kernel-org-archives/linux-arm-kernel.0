@@ -1,46 +1,88 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Tue, 12 Apr 2016 12:59:14 +0300
-Subject: [PATCH] ARM: mach-imx: sdhci-esdhc-imx: initialize DMA mask
-In-Reply-To: <20160412084048.GM19428@n2100.arm.linux.org.uk>
-References: <1460362846-2906-1-git-send-email-akurz@blala.de>
- <20160411083510.GN10108@pengutronix.de> <570B780E.7090801@intel.com>
- <alpine.DEB.2.00.1604111803080.6072@blala.de> <570C902E.7090607@intel.com>
- <20160412084048.GM19428@n2100.arm.linux.org.uk>
-Message-ID: <570CC6F2.4090301@intel.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 12 Apr 2016 12:08:45 +0200
+Subject: [RESEND 01/11] pwm: Add PWM Capture support
+In-Reply-To: <1456932729-9667-2-git-send-email-lee.jones@linaro.org>
+References: <1456932729-9667-1-git-send-email-lee.jones@linaro.org>
+ <1456932729-9667-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <20160412100845.GA18882@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/16 11:40, Russell King - ARM Linux wrote:
-> On Tue, Apr 12, 2016 at 09:05:34AM +0300, Adrian Hunter wrote:
->> On 11/04/16 19:13, Alexander Kurz wrote:
->>> Hi Adrian,
->>> On Mon, 11 Apr 2016, Adrian Hunter wrote:
->>>
->>>> On 11/04/16 11:35, Uwe Kleine-K?nig wrote:
->>>>> Hello,
->>>>>
->>>>> I added the people involved in 7b91369b4655 to Cc.
->>>>>
->>>>> On Mon, Apr 11, 2016 at 10:20:46AM +0200, Alexander Kurz wrote:
->>>>>> With commit 7b91369b DMA access got disabled for device drivers with zero
->>>>
->>>> Is that because dma_set_mask_and_coherent() fails?
->>> right, dma_set_mask_and_coherent() fails, thats the only reason for
->>> this patch. This popped up on a Kindle3 (IMX35 with eMMC based root fs).
->>
->> Arnd, Alexandre : Why should dma_set_mask_and_coherent() fail in this case
->> when DMA apparently doesn't need a dma_mask anyway?
+On Wed, Mar 02, 2016 at 03:31:59PM +0000, Lee Jones wrote:
+> Supply a PWM Capture call-back Op in order to pass back
+> information obtained by running analysis on PWM a signal.
+> This would normally (at least during testing) be called from
+> the Sysfs routines with a view to printing out PWM Capture
+> data which has been encoded into a string.
 > 
-> What do you mean "doesn't need a dma_mask" ?  DMA _always_ requires a
-> DMA mask.  The DMA mask defines how many address bits are capable of
-> being used on the bus.
-> 
-> If there's no DMA mask, then there's no usable address bits, and so
-> the device is not DMA capable.  Hence, dma_set_mask_and_coherent()
-> will fail because its not possible to negotiate a non-zero number of
-> address bits.
-> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/pwm/core.c  | 26 ++++++++++++++++++++++++++
+>  include/linux/pwm.h | 13 +++++++++++++
+>  2 files changed, 39 insertions(+)
 
-The point is, now we valid dma_set_mask_and_coherent(), DMA will stop
-working for any other SDHCI device that hasn't allocated dev.dma_mask.  Is
-that OK?
+Overall I like the concept of introducing this capture functionality.
+
+However I have a couple of questions, see below.
+
+> diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+> index d24ca5f..8f4a8a9 100644
+> --- a/drivers/pwm/core.c
+> +++ b/drivers/pwm/core.c
+> @@ -494,6 +494,32 @@ unlock:
+>  EXPORT_SYMBOL_GPL(pwm_set_polarity);
+>  
+>  /**
+> + * pwm_capture() - capture and report a PWM signal
+> + * @pwm: PWM device
+> + * @channel: PWM capture channel to use
+> + * @buf: buffer to place output message into
+> + *
+> + * Returns: 0 on success or a negative error code on failure.
+> + */
+> +int pwm_capture(struct pwm_device *pwm, int channel, char *buf)
+
+This public interface seems to be targetted specifically at sysfs. As
+such I'm not sure if there is reason to make it public, since the code
+is unlikely to ever be called by other users in the kernel.
+
+Do you think it would be possible to make the interface more generic by
+passing back some form of structure containing the capture result? That
+way users within the kernel could use the result without having to go
+and parse a string filled in by the driver. It would also be easy to
+implement sysfs support on top of that. Another advantage is that there
+would be a standard result structure rather than a free-form string
+filled by drivers that can't be controlled.
+
+What kind of result does the STi hardware return? Looking at the driver
+later in the series it seems to support triggering interrupts on rising
+and falling edges and capture some running counter at these events. If
+the frequency of the counter increment is known, these numbers should
+allow us to determine both the period and duty cycle of the PWM signal
+in nanoseconds. Would it be possible to rewrite this function and the
+driver patch to something like this:
+
+	int pwm_capture(struct pwm_device *pwm, struct pwm_capture *result);
+
+Where
+
+	struct pwm_capture {
+		unsigned int period;
+		unsigned int duty_cycle;
+	};
+
+?
+
+Another thing I noticed is that the code here seems to be confusing
+channels and devices. In the PWM subsystem a struct pwm_device
+represents a single channel. Allowing the channel to be specified is
+redundant at best, and confusing at worst.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160412/d4916185/attachment.sig>
