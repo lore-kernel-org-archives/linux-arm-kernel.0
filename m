@@ -1,46 +1,87 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 12 Apr 2016 09:40:48 +0100
-Subject: [PATCH] ARM: mach-imx: sdhci-esdhc-imx: initialize DMA mask
-In-Reply-To: <570C902E.7090607@intel.com>
-References: <1460362846-2906-1-git-send-email-akurz@blala.de>
- <20160411083510.GN10108@pengutronix.de>
- <570B780E.7090801@intel.com>
- <alpine.DEB.2.00.1604111803080.6072@blala.de>
- <570C902E.7090607@intel.com>
-Message-ID: <20160412084048.GM19428@n2100.arm.linux.org.uk>
+From: finley.xiao@rock-chips.com (Finlye Xiao)
+Date: Tue, 12 Apr 2016 16:43:39 +0800
+Subject: [PATCH v2] clk: Add clk_composite_set_rate_and_parent
+In-Reply-To: <1460339652-63498-1-git-send-email-finley.xiao@rock-chips.com>
+References: <1460339652-63498-1-git-send-email-finley.xiao@rock-chips.com>
+Message-ID: <1460450619-1118-1-git-send-email-finley.xiao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 12, 2016 at 09:05:34AM +0300, Adrian Hunter wrote:
-> On 11/04/16 19:13, Alexander Kurz wrote:
-> > Hi Adrian,
-> > On Mon, 11 Apr 2016, Adrian Hunter wrote:
-> > 
-> >> On 11/04/16 11:35, Uwe Kleine-K?nig wrote:
-> >>> Hello,
-> >>>
-> >>> I added the people involved in 7b91369b4655 to Cc.
-> >>>
-> >>> On Mon, Apr 11, 2016 at 10:20:46AM +0200, Alexander Kurz wrote:
-> >>>> With commit 7b91369b DMA access got disabled for device drivers with zero
-> >>
-> >> Is that because dma_set_mask_and_coherent() fails?
-> > right, dma_set_mask_and_coherent() fails, thats the only reason for
-> > this patch. This popped up on a Kindle3 (IMX35 with eMMC based root fs).
-> 
-> Arnd, Alexandre : Why should dma_set_mask_and_coherent() fail in this case
-> when DMA apparently doesn't need a dma_mask anyway?
+From: Finley Xiao <finley.xiao@rock-chips.com>
 
-What do you mean "doesn't need a dma_mask" ?  DMA _always_ requires a
-DMA mask.  The DMA mask defines how many address bits are capable of
-being used on the bus.
+When changing the clock-rate, currently a new parent is set first and a
+divider adapted thereafter. This may result in the clock-rate overflowing
+its target rate for a short time if the new parent has a higher rate than
+the old parent.
 
-If there's no DMA mask, then there's no usable address bits, and so
-the device is not DMA capable.  Hence, dma_set_mask_and_coherent()
-will fail because its not possible to negotiate a non-zero number of
-address bits.
+While this often doesn't produce negative effects, it can affect components
+in a voltage-scaling environment, like the GPU on the rk3399 socs, where
+the voltage than simply is to low for the temporarily to high clock rate.
 
+For general clock hirarchies this may need more extensive adaptions to
+the common clock-framework, but at least for composite clocks having
+both parent and rate settings it is easy to create a short-term solution to
+make sure the clock-rate does not overflow the target.
+
+Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+---
+v1->v2:
+- change the commit message
+
+ drivers/clk/clk-composite.c | 33 +++++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
+
+diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
+index 1f903e1f8..4d4b5ab 100644
+--- a/drivers/clk/clk-composite.c
++++ b/drivers/clk/clk-composite.c
+@@ -151,6 +151,33 @@ static int clk_composite_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	return rate_ops->set_rate(rate_hw, rate, parent_rate);
+ }
+ 
++static int clk_composite_set_rate_and_parent(struct clk_hw *hw,
++					     unsigned long rate,
++					     unsigned long parent_rate,
++					     u8 index)
++{
++	struct clk_composite *composite = to_clk_composite(hw);
++	const struct clk_ops *rate_ops = composite->rate_ops;
++	const struct clk_ops *mux_ops = composite->mux_ops;
++	struct clk_hw *rate_hw = composite->rate_hw;
++	struct clk_hw *mux_hw = composite->mux_hw;
++	unsigned long temp_rate;
++
++	__clk_hw_set_clk(rate_hw, hw);
++	__clk_hw_set_clk(mux_hw, hw);
++
++	temp_rate = rate_ops->recalc_rate(rate_hw, parent_rate);
++	if (temp_rate > rate) {
++		rate_ops->set_rate(rate_hw, rate, parent_rate);
++		mux_ops->set_parent(mux_hw, index);
++	} else {
++		mux_ops->set_parent(mux_hw, index);
++		rate_ops->set_rate(rate_hw, rate, parent_rate);
++	}
++
++	return 0;
++}
++
+ static int clk_composite_is_enabled(struct clk_hw *hw)
+ {
+ 	struct clk_composite *composite = to_clk_composite(hw);
+@@ -250,6 +277,12 @@ struct clk *clk_register_composite(struct device *dev, const char *name,
+ 		composite->rate_ops = rate_ops;
+ 	}
+ 
++	if (mux_hw && mux_ops && rate_hw && rate_ops) {
++		if (mux_ops->set_parent && rate_ops->set_rate)
++			clk_composite_ops->set_rate_and_parent =
++			clk_composite_set_rate_and_parent;
++	}
++
+ 	if (gate_hw && gate_ops) {
+ 		if (!gate_ops->is_enabled || !gate_ops->enable ||
+ 		    !gate_ops->disable) {
 -- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
