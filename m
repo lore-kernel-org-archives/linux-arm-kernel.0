@@ -1,36 +1,34 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 12 Apr 2016 16:01:02 +0200
-Subject: [PATCH] arm64: defconfig: Enable PL330 DMA controller
-In-Reply-To: <1460465458-23533-1-git-send-email-alim.akhtar@samsung.com>
-References: <1460465458-23533-1-git-send-email-alim.akhtar@samsung.com>
-Message-ID: <570CFF9E.3010404@samsung.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 12 Apr 2016 09:03:38 -0500
+Subject: [PATCH] Axi-usb: Add support for 64-bit addressing.
+In-Reply-To: <1460360506-14692-1-git-send-email-navam@xilinx.com>
+References: <1460360506-14692-1-git-send-email-navam@xilinx.com>
+Message-ID: <20160412140338.GA19311@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/12/2016 02:50 PM, Alim Akhtar wrote:
-> This patch enables PL330 DMA controller found on exynos7 SoCs.
+On Mon, Apr 11, 2016 at 01:11:46PM +0530, Nava kishore Manne wrote:
+> This patch updates the driver to support 64-bit DMA
+> addressing.
 > 
-> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+> Signed-off-by: Nava kishore Manne <navam@xilinx.com>
 > ---
->  arch/arm64/configs/defconfig |    1 +
->  1 file changed, 1 insertion(+)
+>  .../devicetree/bindings/usb/udc-xilinx.txt         |  3 +-
+>  drivers/usb/gadget/udc/udc-xilinx.c                | 38 ++++++++++++++++++++--
+>  2 files changed, 37 insertions(+), 4 deletions(-)
 > 
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index f705051..60e5886 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -230,6 +230,7 @@ CONFIG_RTC_DRV_SUN6I=y
->  CONFIG_RTC_DRV_XGENE=y
->  CONFIG_DMADEVICES=y
->  CONFIG_QCOM_BAM_DMA=y
-> +CONFIG_PL330_DMA=y
->  CONFIG_TEGRA20_APB_DMA=y
->  CONFIG_RCAR_DMAC=y
->  CONFIG_VFIO=y
+> diff --git a/Documentation/devicetree/bindings/usb/udc-xilinx.txt b/Documentation/devicetree/bindings/usb/udc-xilinx.txt
+> index 47b4e39..d417872 100644
+> --- a/Documentation/devicetree/bindings/usb/udc-xilinx.txt
+> +++ b/Documentation/devicetree/bindings/usb/udc-xilinx.txt
+> @@ -7,12 +7,13 @@ Required properties:
+>  - interrupts		: Should contain single irq line of USB2 device
+>  			  controller
+>  - xlnx,has-builtin-dma	: if DMA is included
+> -
+> +- xlnx,addrwidth       : Should be the dma addressing size in bits(ex: 40 bits).
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Now this property shows up in a 2nd device. Now I'm more convinced this 
+is the wrong approach and should use dma-ranges.
 
-If there are no objections, I can take it through samsung-soc tree.
-
-Best regards,
-Krzysztof
+Rob
