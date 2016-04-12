@@ -1,108 +1,54 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 12 Apr 2016 16:48:10 +0100
-Subject: [PATCH v2 2/3] drivers: pci: host-generic: claim bus resources
- on PCI_PROBE_ONLY set-ups
-In-Reply-To: <20160412044311.GB11361@localhost>
-References: <1456843449-19393-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1456843449-19393-3-git-send-email-lorenzo.pieralisi@arm.com>
- <20160412044311.GB11361@localhost>
-Message-ID: <20160412154810.GA32109@red-moon>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Tue, 12 Apr 2016 21:04:28 +0530
+Subject: [PATCH V2 1/5] iommu/msm: Add DT adaptation
+In-Reply-To: <20160411134728.GA21468@rob-hp-laptop>
+References: <1459952975-1250-1-git-send-email-sricharan@codeaurora.org>
+ <1459952975-1250-2-git-send-email-sricharan@codeaurora.org>
+ <20160411134728.GA21468@rob-hp-laptop>
+Message-ID: <00a101d194d0$d22edcd0$768c9670$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 11, 2016 at 11:43:11PM -0500, Bjorn Helgaas wrote:
-> Hi Lorenzo,
+Hi Rob,
+ 
+> On Wed, Apr 06, 2016 at 07:59:31PM +0530, Sricharan R wrote:
+> > The driver currently works based on platform data. Remove this and add
+> > support for DT. A single master can have multiple ports connected to
+> > more than one iommu.
+> >
+> > 	  	      master
+> >         	        |
+> > 	                |
+> > 	                |
+> > 	   ------------------------
+> >            |  			  |
+> > 	IOMMU0			IOMMU1
 > 
-> On Tue, Mar 01, 2016 at 02:44:08PM +0000, Lorenzo Pieralisi wrote:
-> > The PCI host generic driver does not reassign bus resources on systems
-> > that require the BARs set-up to be immutable (ie PCI_PROBE_ONLY) since
-> > that would trigger system failures. Nonetheless, PCI bus resources
-> > allocated to PCI bridge and devices must be claimed in order to be
-> > validated and inserted in the kernel resource tree, but the current
-> > driver omits the resources claiming and relies on arch specific kludges
-> > to prevent probing failure (ie preventing resources enablement on
-> > PCI_PROBE_ONLY systems).
-> > 
-> > This patch adds code to the PCI host generic driver that correctly
-> > claims bus resources upon probe on systems that are required to
-> > prevent reassignment after bus enumeration, so that the allocated
-> > resources can be enabled successfully upon PCI device drivers probing,
-> > without resorting to arch back-ends workarounds.
-> > 
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Acked-by: Will Deacon <will.deacon@arm.com>
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Cc: David Daney <david.daney@cavium.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Bjorn Helgaas <bhelgaas@google.com>
-> > ---
-> >  drivers/pci/host/pci-host-generic.c | 5 ++++-
-> >  1 file changed, 4 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
-> > index 1652bc7..e529825 100644
-> > --- a/drivers/pci/host/pci-host-generic.c
-> > +++ b/drivers/pci/host/pci-host-generic.c
-> > @@ -252,7 +252,10 @@ static int gen_pci_probe(struct platform_device *pdev)
-> >  
-> >  	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
-> >  
-> > -	if (!pci_has_flag(PCI_PROBE_ONLY)) {
+> You've got mixtures of tabs and spaces here. Either fully use leading tabs
+or
+> use spaces everywhere.
+   Ok, will change this properly.
+
+> 
+> >            |			  |
+> >       ctx0   ctx1	     ctx0   ctx1
+> >
+> 
+> It is preferred to split bindings to separate patch.
+   Ok, will split it.
+
+> > +The QCOM IOMMU is an implementation compatible with the ARM VMSA
+> > +short descriptor page tables. It provides address translation for bus
+> > +masters outside of the CPU, each connected to the IOMMU through a
+> port called micro-TLB.
 > > +
-> > +	if (pci_has_flag(PCI_PROBE_ONLY)) {
-> > +		pci_bus_claim_resources(bus);
-> > +	} else {
-> >  		pci_bus_size_bridges(bus);
-> >  		pci_bus_assign_resources(bus);
-> >  
+> > +Required Properties:
+> > +
+> > +  - compatible: Must contain "qcom,iommu-v0".
 > 
-> The next patch removes the arm and arm64 pcibios_enable_device()
-> implementations, which implies that arm and arm64 only need the generic
-> version, which simply calls pci_enable_resources().  That assumes r->parent
-> is set.
+> You need SoC specific compatible strings in addition.
 > 
-> After this patch, we'll call pci_bus_claim_resources() for the
-> PCI_PROBE_ONLY case, and that sets r->parent for all the resources.
-> 
-> Where does r->parent get set in the non-PCI_PROBE_ONLY case?  Obviously
-> that path *works*, because you're not changing anything there.  I'd just
-> like to have a hint that makes this change more obvious.
+ Ok, will add it.
 
-On all ARM/ARM64 PCI controllers drivers I am aware of (apart from the
-kvmtool PCI host controller which does require PCI_PROBE_ONLY, so we need
-this patch), resources are always reassigned and the core code reassigning
-them takes care of assigning their parent pointers too, to answer your
-question.
-
-As for this patch series, given that:
-
-commit (in -next) 903589ca7165 ("ARM: 8554/1: kernel: pci: remove
-pci=firmware command line parameter handling") removes the PCI_PROBE_ONLY
-handling from the (ARM) command line, the PCI host generic becomes the
-last ARM/ARM64 host controller that requires PCI_PROBE_ONLY to function
-(depending on DT settings).
-
-The idea behind adding pci_bus_claim_resources (patch 1) to core code
-was that it could be reused by other arches too, I do not have evidence
-though, I have to prove it, so I'd rather squash patch 1 into this one
-and make the code claiming resources local to the PCI host generic,
-I can't add a generic PCI core API just for one host controller
-(IMHO we should add an API that allows us to claim bus resources and
-realloc the ones for which claiming fail - which may mean releasing
-bridges resources and realloc/resize them - code is in the kernel already
-I have to write that API).
-
-The code claiming resources on x86, IA64 and PowerPC looks extremely
-similar but it has to be proven that a generic function has a chance
-to work, so patch 1 is not really justified at present.
-
-If you have no objections I will squash patch 1 into this one (moving
-the respective code in PCI host generic driver), and I would not merge
-this series till the commit above in -next gets in the kernel (which
-makes sure that PCI_PROBE_ONLY can't be set on the command line, that's
-fundamental to this series, at least on ARM, on ARM64 DT is the only way
-PCI_PROBE_ONLY can be set and only on host controllers that check the
-chosen node property - ie PCI host generic, that we are patching).
-
-Thanks,
-Lorenzo
+Regards,
+  Sricharan
