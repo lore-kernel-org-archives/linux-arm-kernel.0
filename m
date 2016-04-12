@@ -1,17 +1,18 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 12 Apr 2016 14:05:38 -0700
-Subject: [PATCH 3/3] ARM: dts: am43xx: add support for clkout1 clock
-In-Reply-To: <1458158097-21137-4-git-send-email-t-kristo@ti.com>
-References: <1458158097-21137-1-git-send-email-t-kristo@ti.com>
- <1458158097-21137-4-git-send-email-t-kristo@ti.com>
-Message-ID: <20160412210538.GB5995@atomide.com>
+Date: Tue, 12 Apr 2016 14:07:47 -0700
+Subject: [PATCH v3 2/3] ARM: DTS: da850/am4372/am33xx: Use generic node
+ name for ehrpwm
+In-Reply-To: <1458263723-25770-3-git-send-email-fcooper@ti.com>
+References: <1458263723-25770-1-git-send-email-fcooper@ti.com>
+ <1458263723-25770-3-git-send-email-fcooper@ti.com>
+Message-ID: <20160412210746.GC5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [160316 12:55]:
-> clkout1 clock node and its generation tree was missing. Add this based
-> on the data on TRM and PRCM functional spec.
+* Franklin S Cooper Jr <fcooper@ti.com> [160317 18:16]:
+> When possible generic node names should be used. So change the node name
+> from ehrpwm to pwm.
 
-Can I pick this one separately?
+Picking this patch into omap-for-v4.7/dt thanks.
 
 Tony
