@@ -1,107 +1,108 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 12 Apr 2016 16:52:38 -0700
-Subject: [GIT PULL] ARM: SoC fixes
-Message-ID: <20160412235238.GA23006@localhost>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Wed, 13 Apr 2016 07:55:36 +0800
+Subject: [PATCH v4 00/16] DTS for hi6220 and HiKey
+Message-ID: <1460505352-13157-1-git-send-email-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+This patchset include dts changes for hi6220 SoC and HiKey board. These
+patches apply well one by one on top of next-20160401. All tested on HiKey
+and pass.
 
-The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+To avoid merge conflicts with patches already ack'ed by maintainers,
+I picked all hi6220/hikey dts related patches into this single patchset.
+And they passed the tests on HiKey.
 
-  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+Patch 1~3 are from hi6220 cpuidle support. It has been reviewed and
+ack'ed in maillist.
+[PATCH v2 RESEND 0/4] arm64: Hi6220: enable CPU idle states:
+http://archive.arm.linux.org.uk/lurker/message/20160121.105346.7d3b0470.en.html
 
-are available in the git repository at:
+Patch 4 is for hi6220 gpio.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-fixes
+Patch 5 is for pinctl.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Acked-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 
-for you to fetch changes up to 0b24f7a8d6e0d17bcf24433ce5827841a05b5b46:
+Patch 6 is for spi configuration.
 
-  Merge tag 'mvebu-fixes-4.6-1' of git://git.infradead.org/linux-mvebu into fixes (2016-04-12 12:35:07 -0700)
+Patch 7 adds hi6220 i2c nodes, and
+patch 8 enables them for hikey board usage.
 
-----------------------------------------------------------------
-ARM: SoC fixes
+Patch 9 adds add hi6220 usb node. It has been sent to maillist.
+[PATCH] arm64: dts: add hi6220 usb node
+http://thread.gmane.org/gmane.linux.drivers.devicetree/146062
+http://thread.gmane.org/gmane.linux.drivers.devicetree/144335/focus=134022
+Acked-by: Rob Herring <robh@kernel.org>
 
-A batch of fixes for -rc4, for various platforms. Nothing really
-substantial and worth pointing out in particular; small fixes for various
-bugs, see shortlog for details.
+Patch 10 and 11 are from hi6220 mailbox support. It has been reviewed and
+ack'ed in maillist.
+[PATCH v7 RESEND 0/4] mailbox: hisilicon: add Hi6220 mailbox driver
+http://thread.gmane.org/gmane.linux.kernel/2152759/focus=2152768
+Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
+Acked-by: Wei Xu <xuwei5@hisilicon.com>
+Patch 13 adds gpio LEDs device nodes.
 
-----------------------------------------------------------------
-Arnd Bergmann (1):
-      bus: mvebu-mbus: use %pa to print phys_addr_t
+Patch 14 adds hi655x pmic dts node and regulator support.
+[PATCH v8 5/5] arm64: dts: hisilicon: Add hi655x pmic dts node
+http://thread.gmane.org/gmane.linux.kernel/2151688
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
-Carlo Caione (2):
-      ARM: dts: amlogic: Split pinctrl device for Meson8 / Meson8b
-      documentation: Fix pinctrl documentation for Meson8 / Meson8b
+Patch 15 adds dwmmc nodes description for hi6220. It refers to two LDO's
+which are defined above.
+Patch 16 adds wifi device node (TI's wl1835) for HiKey board.
 
-Jayachandran C (1):
-      arm64: dts: vulcan: Update PCI ranges
+v4:
+- remove hikey-gpio.dtsi
+- disable spi0 by default and let boards override it
+- remove LDOs unit address
+- fix style problems after review
 
-Jon Hunter (1):
-      ARM: OMAP: Correct interrupt type for ARM TWD
+v3:
+- update patch 2 sp804 clocks and clock-names
+- add Acked-by into commits where applies.
 
-Kevin Hilman (1):
-      Merge tag 'meson8-dt-fix' of https://github.com/carlocaione/linux-meson into fixes
+v2:
+- picked hi655x pmic dts node.
+- removed dw_mmc resets property, as it is still under review.
+- add 'non-removable' into dw_mmc2 for wifi
 
-Kunihiko Hayashi (1):
-      bus: uniphier-system-bus: fix condition of overlap check
+Chen Feng (1):
+  arm64: dts: hikey: Add hi655x pmic dts node
 
-Linus Walleij (2):
-      ARM: u8500_defconfig: turn on the Synaptics RMI4 driver
-      ARM: sa1100: remove references to the defunct handhelds.org
+Guodong Xu (4):
+  arm64: dts: hikey: enable i2c0 and i2c1 for working with mezzanine
+    boards
+  arm64: dts: hi6220: add pinctrl for uarts and enable them
+  arm64: dts: add LED nodes for hi6220-hikey
+  arm64: dts: add wifi nodes support for hi6220-hikey
 
-Lokesh Vutla (2):
-      ARM: OMAP2+: hwmod: Fix updating of sysconfig register
-      ARM: dts: AM43x-epos: Fix clk parent for synctimer
+Leo Yan (5):
+  arm64: dts: Reserve memory regions for hi6220
+  arm64: dts: add sp804 timer node for Hi6220
+  arm64: dts: enable idle states for Hi6220
+  arm64: dts: add mailbox node for Hi6220
+  arm64: dts: add Hi6220's stub clock node
 
-Masahiro Yamada (1):
-      ARM: uniphier: drop weird sizeof()
+Xinwei Kong (2):
+  arm64: dts: add all hi6220 i2c nodes
+  arm64: dts: add dwmmc nodes for hi6220
 
-Nishanth Menon (1):
-      ARM: OMAP2: Fix up interconnect barrier initialization for DRA7
+Zhangfei Gao (1):
+  arm64: dts: Add hi6220 usb node
 
-Olof Johansson (3):
-      Merge tag 'omap-for-v4.6/fixes-rc1' of git://git.kernel.org/.../tmlind/linux-omap into fixes
-      Merge tag 'pxa-fixes-v4.6' of https://github.com/rjarzmik/linux into fixes
-      Merge tag 'mvebu-fixes-4.6-1' of git://git.infradead.org/linux-mvebu into fixes
+Zhong Kaihua (3):
+  arm64: dts: Add Hi6220 gpio configuration nodes
+  arm64: dts: add Hi6220 pinctrl configuration nodes
+  arm64: dts: add Hi6220 spi configuration nodes
 
-Patrick Uiterwijk (1):
-      ARM: mvebu: Correct unit address for linksys
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts   | 200 ++++++-
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi        | 563 ++++++++++++++++++
+ arch/arm64/boot/dts/hisilicon/hikey-pinctrl.dtsi | 705 +++++++++++++++++++++++
+ include/dt-bindings/pinctrl/hisi.h               |  59 ++
+ 4 files changed, 1522 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/hisilicon/hikey-pinctrl.dtsi
+ create mode 100644 include/dt-bindings/pinctrl/hisi.h
 
-Robert Jarzmik (1):
-      ARM: pxa: fix the number of DMA requestor lines
-
-Tero Kristo (1):
-      ARM: dts: am43xx: fix edma memcpy channel allocation
-
-Tony Lindgren (2):
-      ARM: OMAP2+: Use srst_udelay for USB on dm814x
-      Merge tag 'for-v4.6-rc/omap-fixes-a' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v4.6/fixes
-
-Vishal Mahaveer (1):
-      ARM: DRA722: Add ID detect for Silicon Rev 2.0
-
-Yegor Yefremov (1):
-      ARM: dts: am335x-baltos-ir5221: fix cpsw_emac0 link type
-
- .../devicetree/bindings/pinctrl/meson,pinctrl.txt  | 38 +++------------
- arch/arm/boot/dts/am335x-baltos-ir5221.dts         |  5 +-
- arch/arm/boot/dts/am4372.dtsi                      |  2 +-
- arch/arm/boot/dts/am43x-epos-evm.dts               |  5 ++
- arch/arm/boot/dts/armada-385-linksys.dtsi          |  2 +-
- arch/arm/boot/dts/meson8.dtsi                      | 57 ++++++++++++----------
- arch/arm/boot/dts/meson8b.dtsi                     | 12 ++++-
- arch/arm/boot/dts/omap4.dtsi                       |  2 +-
- arch/arm/configs/u8500_defconfig                   |  3 ++
- arch/arm/mach-omap2/id.c                           |  4 +-
- arch/arm/mach-omap2/io.c                           |  1 +
- arch/arm/mach-omap2/omap_hwmod.c                   |  8 +--
- arch/arm/mach-omap2/omap_hwmod_81xx_data.c         |  2 +
- arch/arm/mach-omap2/soc.h                          |  1 +
- arch/arm/mach-pxa/devices.c                        |  1 +
- arch/arm/mach-sa1100/Kconfig                       | 10 +---
- arch/arm/mach-uniphier/platsmp.c                   |  2 +-
- arch/arm64/boot/dts/broadcom/vulcan.dtsi           | 15 +++---
- drivers/bus/mvebu-mbus.c                           |  2 +-
- drivers/bus/uniphier-system-bus.c                  |  2 +-
- 20 files changed, 89 insertions(+), 85 deletions(-)
+-- 
+1.9.1
