@@ -1,32 +1,52 @@
-From: lipengcheng8@huawei.com (lipengcheng)
-Date: Tue, 12 Apr 2016 16:58:37 +0800
-Subject: [PATCH] coresight: etm4x: modify q_support type
-Message-ID: <1460451517-171713-1-git-send-email-lipengcheng8@huawei.com>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Tue, 12 Apr 2016 11:04:24 +0200
+Subject: [PATCH v5 1/3] Documentation: devicetree: add Freescale SCC bindings
+Message-ID: <1460451866-12821-1-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because this operation exceed the range of boolean, so we should
-modify q_support to unit32 bit.
-drvdata->q_support = BMVAL(etmidr0, 15, 16)
+Add documentation for the Freescale Security Controller (SCC)
+found on i.MX25 SoCs.
 
-Signed-off-by: Li Pengcheng <lipengcheng8@huawei.com>
-Signed-off-by: Li Zhong <lizhong11@hisilicon.com>
+Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- drivers/hwtracing/coresight/coresight-etm4x.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.h b/drivers/hwtracing/coresight/coresight-etm4x.h
-index c341002..305b29a 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.h
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.h
-@@ -330,7 +330,7 @@ struct etmv4_drvdata {
- 	u32				ccctlr;
- 	bool				trcbb;
- 	u32				bb_ctrl;
--	bool				q_support;
-+	u32				q_support;
- 	u32				vinst_ctrl;
- 	u32				viiectlr;
- 	u32				vissctlr;
+Changes in v2:
+
+  - add clocks to required properties
+  - add Acked-by
+
+ .../devicetree/bindings/crypto/fsl-imx-scc.txt      | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/crypto/fsl-imx-scc.txt
+
+diff --git a/Documentation/devicetree/bindings/crypto/fsl-imx-scc.txt b/Documentation/devicetree/bindings/crypto/fsl-imx-scc.txt
+new file mode 100644
+index 000000000000..7aad448e8a36
+--- /dev/null
++++ b/Documentation/devicetree/bindings/crypto/fsl-imx-scc.txt
+@@ -0,0 +1,21 @@
++Freescale Security Controller (SCC)
++
++Required properties:
++- compatible : Should be "fsl,imx25-scc".
++- reg : Should contain register location and length.
++- interrupts : Should contain interrupt numbers for SCM IRQ and SMN IRQ.
++- interrupt-names : Should specify the names "scm" and "smn" for the
++		    SCM IRQ and SMN IRQ.
++- clocks: Should contain the clock driving the SCC core.
++- clock-names: Should be set to "ipg".
++
++Example:
++
++	scc: crypto at 53fac000 {
++		compatible = "fsl,imx25-scc";
++		reg = <0x53fac000 0x4000>;
++		clocks = <&clks 111>;
++		clock-names = "ipg";
++		interrupts = <49>, <50>;
++		interrupt-names = "scm", "smn";
++	};
 -- 
-1.8.3.2
+2.7.0
