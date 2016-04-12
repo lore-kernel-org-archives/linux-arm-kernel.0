@@ -1,27 +1,28 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 12 Apr 2016 22:26:54 +0800
-Subject: [PATCH 2/2] ARM: multi_v5_defconfig: Enable recommended options
- for systemd
-In-Reply-To: <1460462268.2629.27.camel@pengutronix.de>
-References: <1458991706-30109-1-git-send-email-jlu@pengutronix.de>
- <1458991706-30109-2-git-send-email-jlu@pengutronix.de>
- <1460462268.2629.27.camel@pengutronix.de>
-Message-ID: <20160412142654.GA24304@tiger>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 12 Apr 2016 16:35:01 +0200
+Subject: [RESPIN v2 6/6] ARM: dts: change SROM node compatible from generic
+ to model specific
+In-Reply-To: <1460360548-32127-7-git-send-email-pankaj.dubey@samsung.com>
+References: <1460360548-32127-1-git-send-email-pankaj.dubey@samsung.com>
+ <1460360548-32127-7-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <570D0795.3070504@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 12, 2016 at 01:57:48PM +0200, Jan L?bbe wrote:
-> On Sa, 2016-03-26 at 12:28 +0100, Jan Luebbe wrote:
-> > Enable FHANDLE, CGROUPS, BLK_DEV_BSG and DEVTMPFS as recommended by
-> > systemd (which also matches the multi_v7 defconfig). Also enable IPV6,
-> > which defaults to 'y' by now.
-> > 
-> > Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
+On 04/11/2016 09:42 AM, Pankaj Dubey wrote:
+> This patch changes SROM nodes compatible from generic to model specific
+> to match with binding documentation. Also updating property
+> "samsung,srom-page-mode" as it is not defined as bool instead of int
 > 
-> Shawn, you've already applied 1/2. Do you have any concerns or comments
-> regarding this one?
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos4.dtsi            | 4 ++--
+>  arch/arm/boot/dts/exynos5.dtsi            | 4 ++--
+>  arch/arm/boot/dts/exynos5410-smdk5410.dts | 2 +-
+>  arch/arm/boot/dts/exynos5410.dtsi         | 4 ++--
+>  4 files changed, 7 insertions(+), 7 deletions(-)
 
-I thought that Arnd's request and Sascha's ACK only applies to 1/2.
-Just applied 2/2 as well.  @Arnd, let me know if I shouldn't.
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-Shawn
+Best regards,
+Krzysztof
