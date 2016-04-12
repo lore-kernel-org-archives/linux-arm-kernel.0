@@ -1,17 +1,18 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 12 Apr 2016 12:33:59 -0700
-Subject: [GIT PULL] pxa fixes for v4.6
-In-Reply-To: <87vb40us9h.fsf@belgarion.home>
-References: <87vb40us9h.fsf@belgarion.home>
-Message-ID: <20160412193359.GC5588@localhost>
+Date: Tue, 12 Apr 2016 12:35:28 -0700
+Subject: [GIT PULL] ARM: mvebu: fixes for v4.6 (#1)
+In-Reply-To: <87r3ehjp8u.fsf@free-electrons.com>
+References: <87r3ehjp8u.fsf@free-electrons.com>
+Message-ID: <20160412193528.GE5588@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 02, 2016 at 02:09:14PM +0200, Robert Jarzmik wrote:
-> Hello Arnd, Kevin, Olof,
+On Thu, Apr 07, 2016 at 10:35:45AM -0700, Gregory CLEMENT wrote:
+> Hi,
 > 
-> Please consider this pull request for pxa fixes for 4.6, made of 1 trivial
-> fix.
+> Here is the first pull request for fixes for mvebu for v4.6.
+> 
+> Gregory
 > 
 > The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 > 
@@ -19,17 +20,17 @@ On Sat, Apr 02, 2016 at 02:09:14PM +0200, Robert Jarzmik wrote:
 > 
 > are available in the git repository at:
 > 
->   https://github.com/rjarzmik/linux.git tags/pxa-fixes-v4.6
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.6-1
 > 
-> for you to fetch changes up to 4c35430ad18f5a034302cb90e559ede5a27f93b9:
+> for you to fetch changes up to 199831c77c50e6913e893b6bc268ba9f4a9a2bf8:
 > 
->   ARM: pxa: fix the number of DMA requestor lines (2016-03-29 20:59:18 +0200)
+>   ARM: mvebu: Correct unit address for linksys (2016-03-30 11:58:48 +0200)
 > 
 > ----------------------------------------------------------------
-> ARM: pxa: fixes for v4.6
+> mvebu fixes for 4.6 (part 1)
 > 
-> There is only a single fix for dma requestor lines initial
-> setup, triggered by dmaengine previous fix.
+> - fix USB adress register for Linksys Armada 388 based boards
+> - fix build warning in mvebu-mbus
 
 Merged, thanks.
 
