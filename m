@@ -1,33 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 12 Apr 2016 14:13:23 -0700
-Subject: [PATCH 1/2] ARM: dts: Add support for dra72-evm rev C (ES2.0)
-In-Reply-To: <1458859969-14298-2-git-send-email-nm@ti.com>
-References: <1458859969-14298-1-git-send-email-nm@ti.com>
- <1458859969-14298-2-git-send-email-nm@ti.com>
-Message-ID: <20160412211322.GE5995@atomide.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 12 Apr 2016 23:13:56 +0200
+Subject: [PATCH v3] i2c: mediatek: i2c multi transfer optimization
+In-Reply-To: <1457375031-3769-1-git-send-email-liguo.zhang@mediatek.com>
+References: <1457375031-3769-1-git-send-email-liguo.zhang@mediatek.com>
+Message-ID: <20160412211355.GA1526@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [160324 15:53]:
-> DRA72-EVM now has an upgrade to Rev C with ES2.0 silicon. As part of
-> this change, a few updates were factored in that were software
-> incompatible with previous board in few areas:
-> - We now use DP83867 ethernet phy instead of older DP838865 which fails
->   in certain usecases.
-> - Two ethernet ports now instead of the single one in rev B.
-> - polarities changed for certain pcf gpios
-> - Due to SoC phy current requirements, VDDA supplies are split between
->  ldo5 and ldo2 (ldo2 was previously unused). NOTE: DSS (VDDA_VIDEO) is
->  still supplied by ldo5.
+Hi,
+
+thanks for the submission!
+
+On Tue, Mar 08, 2016 at 02:23:51AM +0800, Liguo Zhang wrote:
+> Signal complete() in the i2c irq handler after one transfer done,
+> and then wait_for_completion_timeout() will return, this procedure
+> may cost much time, so only signal complete() when the entire
+> transaction has been completed, it will reduce the entire transaction
+> time.
 > 
-> NOTE: It does not make much sense to spin off a new board compatible
-> flag since there is no real benefit for the same.
+> Signed-off-by: Liguo Zhang <liguo.zhang@mediatek.com>
 
-I guess that can always be added later on if needed.
+I wonder. You have less context switches, yes. On the other hand, you
+likely have bigger interrupt latency because you do more stuff in the
+interrupt handler. Is it really a gain in the end?
 
-Can you please repost this against current omap-for-v4.7/dt as it
-no longer applies?
+Regards,
 
-Thanks,
+   Wolfram
 
-Tony
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160412/d949e8c7/attachment.sig>
