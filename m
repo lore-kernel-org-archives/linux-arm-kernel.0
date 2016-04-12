@@ -1,44 +1,22 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 12 Apr 2016 14:15:08 -0700
-Subject: [PATCH V2] ARM: dts: AM572x-IDK Initial Support
-In-Reply-To: <20160328211015.GA28249@rob-hp-laptop>
-References: <1459182909-23502-1-git-send-email-nm@ti.com>
- <20160328211015.GA28249@rob-hp-laptop>
-Message-ID: <20160412211508.GF5995@atomide.com>
+Date: Tue, 12 Apr 2016 14:17:03 -0700
+Subject: [PATCH] ARM: dts: am335x-baltos-ir5221: use dedicated RTS/CTS
+ signals
+In-Reply-To: <1459246088-17768-1-git-send-email-yegorslists@googlemail.com>
+References: <1459246088-17768-1-git-send-email-yegorslists@googlemail.com>
+Message-ID: <20160412211703.GG5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rob Herring <robh@kernel.org> [160328 14:11]:
-> On Mon, Mar 28, 2016 at 11:35:09AM -0500, Nishanth Menon wrote:
-> > From: Schuyler Patton <spatton@ti.com>
-> > 
-> > The AM572x-IDK board is a board based on TI's AM5728 SOC
-> > which has a dual core 1.5GHz A15 processor. This board is a
-> > development platform for the Industrial market with:
-> > - 2GB of DDR3L
-> > - Dual 1Gbps Ethernet
-> > - HDMI,
-> > - PRU-ICSS
-> > - uSD
-> > - 16GB eMMC
-> > - CAN
-> > - RS-485
-> > - PCIe
-> > - USB3.0
-> > - Video Input Port
-> > - Industrial IO port and expansion connector
-> > 
-> > The link to the data sheet and TRM can be found here:
-> > 
-> > http://www.ti.com/product/AM5728
-> > 
-> > This patch creates a common dtsi file that will provide a common board
-> > dtsi file to define the nodes that are common to AM57xx (including the
-> > upcoming AM5718) IDK boards.
-> > 
-> > Initial support is only for basic peripherals
+* yegorslists at googlemail.com <yegorslists@googlemail.com> [160329 03:10]:
+> From: Yegor Yefremov <yegorslists@googlemail.com>
 > 
-> Acked-by: Rob Herring <robh@kernel.org>
+> Before "tty: Add software emulated RS485 support for 8250" patch Baltos devices
+> relied on MCTRL_GPIO framework to handle both modem signals and RS485 mode.
+> 
+> With emulated RS485 support for 8250 we can now use these pins as dedicated
+> RTS/CTS signals taking advantage of hardware flow control etc. when operating
+> in RS232 mode.
 
 Applying into omap-for-v4.7/dt thanks.
 
