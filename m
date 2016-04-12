@@ -1,49 +1,47 @@
 From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
-Date: Tue, 12 Apr 2016 17:12:56 -0500
-Subject: [PATCH 1/6] EDAC, altera: Check parent status for Arria10 EDAC block
+Date: Tue, 12 Apr 2016 17:12:57 -0500
+Subject: [PATCH 2/6] EDAC, altera: Move IRQ function declaration
 In-Reply-To: <1460499181-23080-1-git-send-email-tthayer@opensource.altera.com>
 References: <1460499181-23080-1-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <1460499181-23080-2-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <1460499181-23080-3-git-send-email-tthayer@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thor Thayer <tthayer@opensource.altera.com>
 
-In preparation for the Arria10 ECC modules, check the status
-of the parent in the device tree to ensure the block is enabled.
-Skip if no parent phandle is set in the device tree.
+In preparation for additional memory module ECCs, the
+IRQ declaration is being made available to everyone.
+Move it outside of the OCRAM only area.
 
 Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
 ---
- drivers/edac/altera_edac.c |    9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/edac/altera_edac.c |    7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/edac/altera_edac.c b/drivers/edac/altera_edac.c
-index 11775dc..c3e040d 100644
+index c3e040d..226e650 100644
 --- a/drivers/edac/altera_edac.c
 +++ b/drivers/edac/altera_edac.c
-@@ -1115,6 +1115,7 @@ static int altr_edac_a10_device_add(struct altr_arria10_edac *edac,
- 	struct resource res;
- 	int edac_idx;
- 	int rc = 0;
-+	struct device_node *parent;
- 	const struct edac_device_prv_data *prv;
- 	/* Get matching node and check for valid result */
- 	const struct of_device_id *pdev_id =
-@@ -1127,6 +1128,14 @@ static int altr_edac_a10_device_add(struct altr_arria10_edac *edac,
- 	if (IS_ERR_OR_NULL(prv))
- 		return -ENODEV;
+@@ -848,6 +848,10 @@ static struct platform_driver altr_edac_device_driver = {
+ };
+ module_platform_driver(altr_edac_device_driver);
  
-+	/* If there is a parent parameter, exit if it is not available. */
-+	parent = of_parse_phandle(np, "parent", 0);
-+	if (parent && !of_device_is_available(parent)) {
-+		of_node_put(parent);
-+		return -ENODEV;
-+	}
-+	of_node_put(parent);
++/********************* Arria10 Function Declarations *********************/
++static irqreturn_t altr_edac_a10_ecc_irq(struct altr_edac_device_dev *dci,
++					 bool sberr);
 +
- 	if (!devres_open_group(edac->dev, altr_edac_a10_device_add, GFP_KERNEL))
- 		return -ENOMEM;
+ /*********************** OCRAM EDAC Device Functions *********************/
  
+ #ifdef CONFIG_EDAC_ALTERA_OCRAM
+@@ -902,9 +906,6 @@ const struct edac_device_prv_data ocramecc_data = {
+ 	.inject_fops = &altr_edac_device_inject_fops,
+ };
+ 
+-static irqreturn_t altr_edac_a10_ecc_irq(struct altr_edac_device_dev *dci,
+-					 bool sberr);
+-
+ const struct edac_device_prv_data a10_ocramecc_data = {
+ 	.setup = altr_check_ecc_deps,
+ 	.ce_clear_mask = ALTR_A10_ECC_SERRPENA,
 -- 
 1.7.9.5
