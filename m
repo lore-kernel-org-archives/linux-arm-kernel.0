@@ -1,34 +1,33 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 12 Apr 2016 14:10:46 -0700
-Subject: [PATCH v2 1/2] ARM: dts: am335x: Add initial support for ICEv2
- board
-In-Reply-To: <56F265EC.5050208@ti.com>
-References: <1458704054-18152-1-git-send-email-lokeshvutla@ti.com>
- <1458704054-18152-2-git-send-email-lokeshvutla@ti.com>
- <56F265EC.5050208@ti.com>
-Message-ID: <20160412211045.GD5995@atomide.com>
+Date: Tue, 12 Apr 2016 14:13:23 -0700
+Subject: [PATCH 1/2] ARM: dts: Add support for dra72-evm rev C (ES2.0)
+In-Reply-To: <1458859969-14298-2-git-send-email-nm@ti.com>
+References: <1458859969-14298-1-git-send-email-nm@ti.com>
+ <1458859969-14298-2-git-send-email-nm@ti.com>
+Message-ID: <20160412211322.GE5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grygorii Strashko <grygorii.strashko@ti.com> [160323 02:47]:
-> On 03/23/2016 05:34 AM, Lokesh Vutla wrote:
-> >TI's Industrial Communication Engine EVM is a low cost hardware mainly
-> >developed for industrial communication type applications using serial
-> >or Ethernet based interfaces. This platform features TI's AM3359 with
-> >800MHz single core Cortex-A8 processor, 256MB DDR3, 64MB SPI flash,
-> >8MB NOR Flash, mmc, usb, can, dual Ethernet ports.
-> >
-> >For more information, look at HW user guide[1], Data manual[2].
-> >
-> >Just add basic support for the moment.
-> >
-> >[1] http://processors.wiki.ti.com/index.php/AM335x_Industrial_Communication_Engine_EVM_Rev2_1_HW_User_Guide
-> >[2] http://www.ti.com/lit/ds/symlink/am3359.pdf
-> >
-> >Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+* Nishanth Menon <nm@ti.com> [160324 15:53]:
+> DRA72-EVM now has an upgrade to Rev C with ES2.0 silicon. As part of
+> this change, a few updates were factored in that were software
+> incompatible with previous board in few areas:
+> - We now use DP83867 ethernet phy instead of older DP838865 which fails
+>   in certain usecases.
+> - Two ethernet ports now instead of the single one in rev B.
+> - polarities changed for certain pcf gpios
+> - Due to SoC phy current requirements, VDDA supplies are split between
+>  ldo5 and ldo2 (ldo2 was previously unused). NOTE: DSS (VDDA_VIDEO) is
+>  still supplied by ldo5.
 > 
-> Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> NOTE: It does not make much sense to spin off a new board compatible
+> flag since there is no real benefit for the same.
 
-Applying this patch into omap-for-v4.7/dt thanks.
+I guess that can always be added later on if needed.
+
+Can you please repost this against current omap-for-v4.7/dt as it
+no longer applies?
+
+Thanks,
 
 Tony
