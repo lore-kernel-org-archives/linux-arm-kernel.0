@@ -1,47 +1,35 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 12 Apr 2016 12:33:22 -0700
-Subject: [GIT PULL] omap fixes against v4.6-rc1
-In-Reply-To: <20160401160115.GM9329@atomide.com>
-References: <20160401160115.GM9329@atomide.com>
-Message-ID: <20160412193322.GB5588@localhost>
+Date: Tue, 12 Apr 2016 12:33:59 -0700
+Subject: [GIT PULL] pxa fixes for v4.6
+In-Reply-To: <87vb40us9h.fsf@belgarion.home>
+References: <87vb40us9h.fsf@belgarion.home>
+Message-ID: <20160412193359.GC5588@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 01, 2016 at 09:01:15AM -0700, Tony Lindgren wrote:
+On Sat, Apr 02, 2016 at 02:09:14PM +0200, Robert Jarzmik wrote:
+> Hello Arnd, Kevin, Olof,
+> 
+> Please consider this pull request for pxa fixes for 4.6, made of 1 trivial
+> fix.
+> 
 > The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 > 
 >   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.6/fixes-rc1
+>   https://github.com/rjarzmik/linux.git tags/pxa-fixes-v4.6
 > 
-> for you to fetch changes up to 6f40fed1c911f218e1e189a404b26ef19effabb5:
+> for you to fetch changes up to 4c35430ad18f5a034302cb90e559ede5a27f93b9:
 > 
->   ARM: dts: am335x-baltos-ir5221: fix cpsw_emac0 link type (2016-03-30 14:33:22 -0700)
+>   ARM: pxa: fix the number of DMA requestor lines (2016-03-29 20:59:18 +0200)
 > 
 > ----------------------------------------------------------------
-> Fixes for omaps against v4.6-rc1. Mostly minor fixes for the newer
-> SoCs with few board fixes and a fix for a long time hwmod bug:
+> ARM: pxa: fixes for v4.6
 > 
-> - Fix cpsw_emac0 link type for baltos-ir5221
-> 
-> - Fix interrupt type for TWD
-> 
-> - Fix edma memcpy channel allocation for am43x
-> 
-> - Fix am43x-epos sycntimer32k by using the correct assigned clock
-> 
-> - Fix interconnect barrier for dra7
-> 
-> - Fix a long time hwmod bug for updating sysconfig register properly
-> 
-> - Fix flakey booting on dm814x where USB reset needs a delay
-> 
-> And there is one minor change that is not strictly a fix, but is
-> good to have for proper hardware detection:
-> 
-> - Detect dra7 silicon revision 2.0 properly
+> There is only a single fix for dma requestor lines initial
+> setup, triggered by dmaengine previous fix.
 
 Merged, thanks.
 
