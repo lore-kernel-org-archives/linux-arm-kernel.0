@@ -1,65 +1,240 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 12 Apr 2016 14:21:41 +0200
-Subject: [PATCH v5 15/46] pwm: introduce the pwm_state concept
-In-Reply-To: <20160412141718.5fe4cf24@bbrezillon>
-References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
- <1459368249-13241-16-git-send-email-boris.brezillon@free-electrons.com>
- <20160412114904.GM18882@ulmo.ba.sec>
- <20160412141718.5fe4cf24@bbrezillon>
-Message-ID: <20160412122141.GP18882@ulmo.ba.sec>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 12 Apr 2016 14:25:41 +0200
+Subject: [RFC PATCH 09/45] KVM: arm/arm64: vgic-new: Add GICv2 IRQ
+ sync/flush
+In-Reply-To: <570B8D11.20404@arm.com>
+References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
+ <1458871508-17279-10-git-send-email-andre.przywara@arm.com>
+ <20160331094715.GA20251@cbox> <570B8D11.20404@arm.com>
+Message-ID: <20160412122541.GC3039@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 12, 2016 at 02:17:18PM +0200, Boris Brezillon wrote:
-> On Tue, 12 Apr 2016 13:49:04 +0200
-> Thierry Reding <thierry.reding@gmail.com> wrote:
-> 
-> > On Wed, Mar 30, 2016 at 10:03:38PM +0200, Boris Brezillon wrote:
-> > > The PWM state, represented by its period, duty_cycle and polarity,
-> > > is currently directly stored in the PWM device.
-> > > Declare a pwm_state structure embedding those field so that we can later
-> > > use this struct to atomically update all the PWM parameters at once.
-> > > 
-> > > All pwm_get_xxx() helpers are now implemented as wrappers around
-> > > pwm_get_state().
-> > > 
-> > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > > ---
-> > >  drivers/pwm/core.c  |  8 ++++----
-> > >  include/linux/pwm.h | 54 +++++++++++++++++++++++++++++++++++++++++------------
-> > >  2 files changed, 46 insertions(+), 16 deletions(-)
-> > > 
-> > > diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-> > > index 6433059..f3f91e7 100644
-> > > --- a/drivers/pwm/core.c
-> > > +++ b/drivers/pwm/core.c
-> > > @@ -268,7 +268,7 @@ int pwmchip_add_with_polarity(struct pwm_chip *chip,
-> > >  		pwm->chip = chip;
-> > >  		pwm->pwm = chip->base + i;
-> > >  		pwm->hwpwm = i;
-> > > -		pwm->polarity = polarity;
-> > > +		pwm->state.polarity = polarity;
+On Mon, Apr 11, 2016 at 12:40:01PM +0100, Andre Przywara wrote:
+> On 31/03/16 10:47, Christoffer Dall wrote:
+> > On Fri, Mar 25, 2016 at 02:04:32AM +0000, Andre Przywara wrote:
+> >> From: Marc Zyngier <marc.zyngier@arm.com>
+> >>
+> >> Implement the functionality for syncing IRQs between our emulation
+> >> and the list registers, which represent the guest's view of IRQs.
+> >> This is done in kvm_vgic_flush_hwstate and kvm_vgic_sync_hwstate,
+> >> which gets called on guest entry and exit.
+> >>
+> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> >> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> >> ---
+> >>  include/kvm/vgic/vgic.h     |   4 +
+> >>  virt/kvm/arm/vgic/vgic-v2.c | 161 ++++++++++++++++++++++++++++++++++
+> >>  virt/kvm/arm/vgic/vgic.c    | 204 ++++++++++++++++++++++++++++++++++++++++++++
+> >>  virt/kvm/arm/vgic/vgic.h    |   4 +
+> >>  4 files changed, 373 insertions(+)
+> >>
+> >> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+> >> index f32b284..986f23f 100644
+> >> --- a/include/kvm/vgic/vgic.h
+> >> +++ b/include/kvm/vgic/vgic.h
+> >> @@ -187,6 +187,10 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+> >>  #define vgic_valid_spi(k,i)	(((i) >= VGIC_NR_PRIVATE_IRQS) && \
+> >>  			((i) < (k)->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS))
+> >>  
+> >> +bool kvm_vcpu_has_pending_irqs(struct kvm_vcpu *vcpu);
+> >> +void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
+> >> +void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
+> >> +
+> >>  /**
+> >>   * kvm_vgic_get_max_vcpus - Get the maximum number of VCPUs allowed by HW
+> >>   *
+> >> diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+> >> index 0bf6f27..1cec423 100644
+> >> --- a/virt/kvm/arm/vgic/vgic-v2.c
+> >> +++ b/virt/kvm/arm/vgic/vgic-v2.c
+> >> @@ -14,11 +14,172 @@
+> >>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> >>   */
+> >>  
+> >> +#include <linux/irqchip/arm-gic.h>
+> >>  #include <linux/kvm.h>
+> >>  #include <linux/kvm_host.h>
+> >>  
+> >>  #include "vgic.h"
+> >>  
+> >> +/*
+> >> + * Call this function to convert a u64 value to an unsigned long * bitmask
+> >> + * in a way that works on both 32-bit and 64-bit LE and BE platforms.
+> >> + *
+> >> + * Warning: Calling this function may modify *val.
+> >> + */
+> >> +static unsigned long *u64_to_bitmask(u64 *val)
+> >> +{
+> >> +#if defined(CONFIG_CPU_BIG_ENDIAN) && BITS_PER_LONG == 32
+> >> +	*val = (*val >> 32) | (*val << 32);
+> >> +#endif
+> >> +	return (unsigned long *)val;
+> >> +}
+> >> +
+> >> +void vgic_v2_process_maintenance(struct kvm_vcpu *vcpu)
+> >> +{
+> >> +	struct vgic_v2_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v2;
+> >> +
+> >> +	if (cpuif->vgic_misr & GICH_MISR_EOI) {
+> >> +		u64 eisr = cpuif->vgic_eisr;
+> >> +		unsigned long *eisr_bmap = u64_to_bitmask(&eisr);
+> >> +		int lr;
+> >> +
+> >> +		for_each_set_bit(lr, eisr_bmap, vcpu->arch.vgic_cpu.nr_lr) {
+> >> +			struct vgic_irq *irq;
+> >> +			u32 intid = cpuif->vgic_lr[lr] & GICH_LR_VIRTUALID;
+> >> +
+> >> +			irq = vgic_get_irq(vcpu->kvm, vcpu, intid);
+> >> +
+> >> +			WARN_ON(irq->config == VGIC_CONFIG_EDGE);
+> >> +			WARN_ON(cpuif->vgic_lr[lr] & GICH_LR_STATE);
+> >> +
+> >> +			kvm_notify_acked_irq(vcpu->kvm, 0,
+> >> +					     intid - VGIC_NR_PRIVATE_IRQS);
+> >> +
+> >> +			cpuif->vgic_lr[lr] &= ~GICH_LR_STATE; /* Useful?? */
+> >> +			cpuif->vgic_elrsr |= 1ULL << lr;
+> >> +		}
+> >> +	}
+> >> +
+> >> +	/* check and disable underflow maintenance IRQ */
+> >> +	cpuif->vgic_hcr &= ~GICH_HCR_UIE;
+> >> +
+> >> +	/*
+> >> +	 * In the next iterations of the vcpu loop, if we sync the
+> >> +	 * vgic state after flushing it, but before entering the guest
+> >> +	 * (this happens for pending signals and vmid rollovers), then
+> >> +	 * make sure we don't pick up any old maintenance interrupts
+> >> +	 * here.
+> >> +	 */
+> >> +	cpuif->vgic_eisr = 0;
+> >> +}
+> >> +
+> >> +void vgic_v2_set_underflow(struct kvm_vcpu *vcpu)
+> >> +{
+> >> +	struct vgic_v2_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v2;
+> >> +
+> >> +	cpuif->vgic_hcr |= GICH_HCR_UIE;
+> >> +}
+> >> +
+> >> +/*
+> >> + * transfer the content of the LRs back into the corresponding ap_list:
+> >> + * - active bit is transferred as is
+> >> + * - pending bit is
+> >> + *   - transferred as is in case of edge sensitive IRQs
+> >> + *   - set to the line-level (resample time) for level sensitive IRQs
+> >> + */
+> >> +void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
+> >> +{
+> >> +	struct vgic_v2_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v2;
+> >> +	int lr;
+> >> +
+> >> +	for (lr = 0; lr < vcpu->arch.vgic_cpu.used_lrs; lr++) {
+> >> +		u32 val = cpuif->vgic_lr[lr];
+> >> +		u32 intid = val & GICH_LR_VIRTUALID;
+> >> +		struct vgic_irq *irq;
+> >> +
+> >> +		irq = vgic_get_irq(vcpu->kvm, vcpu, intid);
+> >> +
+> >> +		spin_lock(&irq->irq_lock);
+> >> +
+> >> +		/* Always preserve the active bit */
+> >> +		irq->active = !!(val & GICH_LR_ACTIVE_BIT);
+> >> +
+> >> +		/* Edge is the only case where we preserve the pending bit */
+> >> +		if (irq->config == VGIC_CONFIG_EDGE &&
+> >> +		    (val & GICH_LR_PENDING_BIT)) {
+> >> +			irq->pending = true;
+> >> +
+> >> +			if (intid < VGIC_NR_SGIS) {
+> >> +				u32 cpuid = val & GICH_LR_PHYSID_CPUID;
+> >> +
+> >> +				cpuid >>= GICH_LR_PHYSID_CPUID_SHIFT;
+> >> +				irq->source |= (1 << cpuid);
+> >> +			}
+> >> +		}
+> >> +
+> >> +		/* Clear soft pending state when level IRQs have been acked */
+> >> +		if (irq->config == VGIC_CONFIG_LEVEL &&
+> >> +		    !(val & GICH_LR_PENDING_BIT)) {
+> >> +			irq->soft_pending = false;
+> >> +			irq->pending = irq->line_level;
+> >> +		}
+> >> +
+> >> +		spin_unlock(&irq->irq_lock);
+> >> +	}
+> >> +}
+> >> +
+> >> +/*
+> >> + * Populates the particular LR with the state of a given IRQ:
+> >> + * - for an edge sensitive IRQ the pending state is reset in the struct
+> >> + * - for a level sensitive IRQ the pending state value is unchanged;
+> >> + *   it will be resampled on deactivation
+> >> + *
+> >> + * If irq is not NULL, the irq_lock must be hold already by the caller.
+> >> + * If irq is NULL, the respective LR gets cleared.
+> >> + */
+> >> +void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
+> >> +{
+> >> +	u32 val;
+> >> +
+> >> +	if (!irq) {
+> >> +		val = 0;
+> >> +		goto out;
+> >> +	}
+> >> +
+> >> +	val = irq->intid;
+> >> +
+> >> +	if (irq->pending) {
+> >> +		val |= GICH_LR_PENDING_BIT;
+> >> +
+> >> +		if (irq->config == VGIC_CONFIG_EDGE)
+> >> +			irq->pending = false;
+> >> +
+> >> +		if (irq->intid < VGIC_NR_SGIS) {
+> >> +			u32 src = ffs(irq->source);
+> >> +
+> >> +			BUG_ON(!src);
+> >> +			val |= (src - 1) << GICH_LR_PHYSID_CPUID_SHIFT;
+> >> +			irq->source &= ~(1 << (src - 1));
+> >> +			if (irq->source)
+> >> +				irq->pending = true;
+> >> +		}
+> >> +	}
+> >> +
+> >> +	if (irq->active)
+> >> +		val |= GICH_LR_ACTIVE_BIT;
+> >> +
+> >> +	if (irq->hw) {
+> >> +		val |= GICH_LR_HW;
+> >> +		val |= irq->hwintid << GICH_LR_PHYSID_CPUID_SHIFT;
+> >> +	} else {
+> >> +		if (irq->config == VGIC_CONFIG_LEVEL)
+> >> +			val |= GICH_LR_EOI;
+> >> +	}
 > > 
-> > Would this not more correctly be assigned to pwm->args.polarity? After
-> > all this is setting up the "initial" state, much like DT or the lookup
-> > tables would for duty cycle and period.
+> > shouldn't we start writing the priority here (and in the GICv3 version)?
+> > 
+> > (which has the fun consequence of having to compare priorities against
+> > the virtual priority filter in PATCH 11).
 > 
-> Yes, I wasn't sure about the pwm_add_with_polarity() meaning. To me,
-> all the reference info should be extracted from DT, PWM lookup table or
-> driver specific ->request() implementation, but I can definitely
-> initialize the args.polarity here too.
+> This is probably true.
 > 
-> Should I keep the pwm->state.polarity assignment (to set the initial
-> polarity when the driver does not support hardware readout)?
+> I just feel I am getting overwhelmed with the change requests, can one
+> of you (Marc, Christoffer) fix this? Just use the existing code base, I
+> can rebase any change into the new tree.
 
-Wouldn't this work automatically as part of the pwm_apply_args() helper
-if we extended it with this setting?
+Sure, I'll send patches based on your next iteration of this series.
+Can you add a TODO: Christoffer to implement this here?
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160412/eb3ffe88/attachment.sig>
+> 
+> The priority field in the v2 LR is only 5 bits long, is that covered by
+> the virtual priority filter you mentioned?
+> 
+Not sure what you're asking, but I think we can deal with this once I
+send my patches and you review them ;)
+
+-Christoffer
