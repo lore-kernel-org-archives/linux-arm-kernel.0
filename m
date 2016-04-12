@@ -1,28 +1,52 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 12 Apr 2016 16:35:01 +0200
-Subject: [RESPIN v2 6/6] ARM: dts: change SROM node compatible from generic
- to model specific
-In-Reply-To: <1460360548-32127-7-git-send-email-pankaj.dubey@samsung.com>
-References: <1460360548-32127-1-git-send-email-pankaj.dubey@samsung.com>
- <1460360548-32127-7-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <570D0795.3070504@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 12 Apr 2016 15:44:35 +0100
+Subject: [PATCH 1/2] arm64: mem-model: add flatmem model for arm64
+In-Reply-To: <20160411104013.GG15729@arm.com>
+References: <1459844572-53069-1-git-send-email-puck.chen@hisilicon.com>
+ <20160407142148.GI5657@arm.com> <570B10B2.2000000@hisilicon.com>
+ <CAKv+Gu8iQ0NzLFWHy9Ggyv+jL-BqJ3x-KaRD1SZ1mU6yU3c7UQ@mail.gmail.com>
+ <570B5875.20804@hisilicon.com>
+ <CAKv+Gu9aqR=E3TmbPDFEUC+Q13bAJTU5wVTTHkOr6aX6BZ1OVA@mail.gmail.com>
+ <570B758E.7070005@hisilicon.com>
+ <CAKv+Gu-cWWUi6fCiveqaZRVhGCpEasCLEs7wq6t+C-x65g4cgQ@mail.gmail.com>
+ <20160411104013.GG15729@arm.com>
+Message-ID: <20160412144434.GE8066@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/11/2016 09:42 AM, Pankaj Dubey wrote:
-> This patch changes SROM nodes compatible from generic to model specific
-> to match with binding documentation. Also updating property
-> "samsung,srom-page-mode" as it is not defined as bool instead of int
+On Mon, Apr 11, 2016 at 11:40:13AM +0100, Will Deacon wrote:
+> On Mon, Apr 11, 2016 at 12:31:53PM +0200, Ard Biesheuvel wrote:
+> > On 11 April 2016 at 11:59, Chen Feng <puck.chen@hisilicon.com> wrote:
+> > > Please see the pg-tables below.
+> > >
+> > >
+> > > With sparse and vmemmap enable.
+> > >
+> > > ---[ vmemmap start ]---
+> > > 0xffffffbdc0200000-0xffffffbdc4800000          70M     RW NX SHD AF    UXN MEM/NORMAL
+> > > ---[ vmemmap end ]---
+> > >
+> > 
+> > OK, I see what you mean now. Sorry for taking so long to catch up.
+> > 
+> > > The board is 4GB, and the memap is 70MB
+> > > 1G memory --- 14MB mem_map array.
+> > 
+> > No, this is incorrect. 1 GB corresponds with 16 MB worth of struct
+> > pages assuming sizeof(struct page) == 64
+> > 
+> > So you are losing 6 MB to rounding here, which I agree is significant.
+> > I wonder if it makes sense to use a lower value for SECTION_SIZE_BITS
+> > on 4k pages kernels, but perhaps we're better off asking the opinion
+> > of the other cc'ees.
 > 
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos4.dtsi            | 4 ++--
->  arch/arm/boot/dts/exynos5.dtsi            | 4 ++--
->  arch/arm/boot/dts/exynos5410-smdk5410.dts | 2 +-
->  arch/arm/boot/dts/exynos5410.dtsi         | 4 ++--
->  4 files changed, 7 insertions(+), 7 deletions(-)
+> You need to be really careful making SECTION_SIZE_BITS smaller because
+> it has a direct correlation on the use of page->flags and you can end up
+> running out of bits fairly easily.
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+With SPARSEMEM_VMEMMAP, SECTION_SIZE_BITS no longer affect the page
+flags since we no longer need to encode the section number in
+page->flags.
 
-Best regards,
-Krzysztof
+-- 
+Catalin
