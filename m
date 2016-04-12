@@ -1,37 +1,29 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 12 Apr 2016 03:20:04 +0200
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable new Rockchip
- display-controller drivers
-In-Reply-To: <10307860.X4SVE35FiH@phil>
-References: <10307860.X4SVE35FiH@phil>
-Message-ID: <4195825.sRqdISUi1R@phil>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 12 Apr 2016 09:35:59 +0800
+Subject: [PATCH] clk: imx: vf610: fix whitespace in vf610-clock.h
+Message-ID: <1460424959-14207-1-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Three types of display controller-drivers where added recently. The
-Analogix Displayport variant and Designware MIPI DSI used for example
-on the rk3288 as well as the Innosilicon HDMI controller used on the
-rk3036.
+There is whitespace in VF610_CLK_OCOTP line.  Fix it.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Signed-off-by: Shawn Guo <shawnguo@kernel.org>
 ---
- arch/arm/configs/multi_v7_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+ include/dt-bindings/clock/vf610-clock.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 66d15ed..b4489e0 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -532,7 +532,10 @@ CONFIG_DRM_EXYNOS_DSI=y
- CONFIG_DRM_EXYNOS_FIMD=y
- CONFIG_DRM_EXYNOS_HDMI=y
- CONFIG_DRM_ROCKCHIP=m
-+CONFIG_ROCKCHIP_ANALOGIX_DP=m
- CONFIG_ROCKCHIP_DW_HDMI=m
-+CONFIG_ROCKCHIP_DW_MIPI_DSI=m
-+CONFIG_ROCKCHIP_INNO_HDMI=m
- CONFIG_DRM_RCAR_DU=m
- CONFIG_DRM_RCAR_HDMI=y
- CONFIG_DRM_RCAR_LVDS=y
+diff --git a/include/dt-bindings/clock/vf610-clock.h b/include/dt-bindings/clock/vf610-clock.h
+index dc5e1790d8cb..45997750c8a0 100644
+--- a/include/dt-bindings/clock/vf610-clock.h
++++ b/include/dt-bindings/clock/vf610-clock.h
+@@ -194,7 +194,7 @@
+ #define VF610_PLL7_BYPASS		181
+ #define VF610_CLK_SNVS			182
+ #define VF610_CLK_DAP			183
+-#define VF610_CLK_OCOTP         184
++#define VF610_CLK_OCOTP			184
+ #define VF610_CLK_DDRMC			185
+ #define VF610_CLK_WKPU			186
+ #define VF610_CLK_TCON0			187
 -- 
-2.6.4
+1.9.1
