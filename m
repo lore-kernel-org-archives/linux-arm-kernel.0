@@ -1,38 +1,46 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 12 Apr 2016 10:37:22 +0200
-Subject: [PATCH v5 30/46] regulator: pwm: retrieve correct voltage
-In-Reply-To: <20160412044203.GW3351@sirena.org.uk>
-References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
- <1459368249-13241-31-git-send-email-boris.brezillon@free-electrons.com>
- <20160330212410.GX2350@sirena.org.uk>
- <20160407235431.788dc24a@bbrezillon>
- <20160412044203.GW3351@sirena.org.uk>
-Message-ID: <20160412103722.0bfe1d4d@bbrezillon>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 12 Apr 2016 09:40:48 +0100
+Subject: [PATCH] ARM: mach-imx: sdhci-esdhc-imx: initialize DMA mask
+In-Reply-To: <570C902E.7090607@intel.com>
+References: <1460362846-2906-1-git-send-email-akurz@blala.de>
+ <20160411083510.GN10108@pengutronix.de>
+ <570B780E.7090801@intel.com>
+ <alpine.DEB.2.00.1604111803080.6072@blala.de>
+ <570C902E.7090607@intel.com>
+Message-ID: <20160412084048.GM19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On Tue, 12 Apr 2016 05:42:03 +0100
-Mark Brown <broonie@kernel.org> wrote:
-
-> On Thu, Apr 07, 2016 at 11:54:31PM +0200, Boris Brezillon wrote:
+On Tue, Apr 12, 2016 at 09:05:34AM +0300, Adrian Hunter wrote:
+> On 11/04/16 19:13, Alexander Kurz wrote:
+> > Hi Adrian,
+> > On Mon, 11 Apr 2016, Adrian Hunter wrote:
+> > 
+> >> On 11/04/16 11:35, Uwe Kleine-K?nig wrote:
+> >>> Hello,
+> >>>
+> >>> I added the people involved in 7b91369b4655 to Cc.
+> >>>
+> >>> On Mon, Apr 11, 2016 at 10:20:46AM +0200, Alexander Kurz wrote:
+> >>>> With commit 7b91369b DMA access got disabled for device drivers with zero
+> >>
+> >> Is that because dma_set_mask_and_coherent() fails?
+> > right, dma_set_mask_and_coherent() fails, thats the only reason for
+> > this patch. This popped up on a Kindle3 (IMX35 with eMMC based root fs).
 > 
-> > Is there any reason for calling set_machine_constraints() after
-> > device_register() in regulator_register()?
-> 
-> I'm not sure there's a strong one, we don't really use the class device
-> for anything, but without doing a full audit I couldn't guarantee that.
+> Arnd, Alexandre : Why should dma_set_mask_and_coherent() fail in this case
+> when DMA apparently doesn't need a dma_mask anyway?
 
-At first glance I don't see any problem (even the rdev_err/info/...()
-functions do not use dev_err/info/...()). The patch will be part of v6
-(unless you want me to send it independently).
+What do you mean "doesn't need a dma_mask" ?  DMA _always_ requires a
+DMA mask.  The DMA mask defines how many address bits are capable of
+being used on the bus.
 
-Thanks,
-
-Boris
+If there's no DMA mask, then there's no usable address bits, and so
+the device is not DMA capable.  Hence, dma_set_mask_and_coherent()
+will fail because its not possible to negotiate a non-zero number of
+address bits.
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
