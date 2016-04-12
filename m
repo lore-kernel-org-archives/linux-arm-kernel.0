@@ -1,75 +1,90 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 12 Apr 2016 16:09:02 +0200
-Subject: [PATCH v5 RESEND 4/5] ARM: amba: Move reading of periphid to
- amba_match()
-In-Reply-To: <CAPDyKFpjTOhmG69x=EP=jje76C1ijjh0m_N8PrJ3yxqRq3HFiw@mail.gmail.com>
-References: <1455101250-11327-1-git-send-email-m.szyprowski@samsung.com>
- <1455101250-11327-5-git-send-email-m.szyprowski@samsung.com>
- <20160215175250.GJ10826@n2100.arm.linux.org.uk> <56C426C4.7040907@samsung.com>
- <20160217200828.GH19428@n2100.arm.linux.org.uk>
- <CAPDyKFph8O+P9F124R859+OqY7B0YXCm=oOGxviyOo6tkNPQzQ@mail.gmail.com>
- <CAPDyKFpjTOhmG69x=EP=jje76C1ijjh0m_N8PrJ3yxqRq3HFiw@mail.gmail.com>
-Message-ID: <570D017E.7060105@samsung.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 12 Apr 2016 16:09:11 +0200
+Subject: [PATCH] arm64: acpi: add acpi=on cmdline option to prefer ACPI boot
+ over DT
+Message-ID: <1460470151-19479-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+If both ACPI and DT platform descriptions are available, and the
+kernel was configured at build time to support both flavours, the
+default policy is to prefer DT over ACPI, and preferring ACPI over
+DT while still allowing DT as a fallback is not possible.
 
-On 2016-04-12 13:39, Ulf Hansson wrote:
-> - trimmed cc list
->
-> On 2 March 2016 at 11:16, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> On 17 February 2016 at 21:08, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->>> On Wed, Feb 17, 2016 at 08:52:36AM +0100, Marek Szyprowski wrote:
->>>> Then the only solution right now I see is to get back to v1:
->>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/388199.html
->>>> which at least handles correctly device registration when power domain
->>>> driver is available.
->>> ... and which has the ability to break platforms if the PM domain is
->>> not already available.
->>>
->>> What's wrong with the patch in the link above _combined_ with a patch
->>> which addresses the concern I have with that patch: build a list of
->>> the failed-to-register devices, and retry them later - maybe from a
->>> late_initcall(), or a similar mechanism?
->> This will improve the robustness of the device registration process,
->> but I wonder if it's really worth the efforts of complicating the amba
->> device registration code.
->>
->> The problem I see with such approach, is to know *when* shall we retry
->> to register the devices.
->>
->> We will rely on the PM domain driver to be probed, as to have the
->> corresponding OF genpd provider registered, else the device
->> registration will continue to fail.
->> Now, I don't think there are PM domain drivers as removable modules
->> (yet), but in such cases a late_initcall won't help much.
->>
->>> My view is the risk to existing systems is _too_ high to apply either
->>> this patch, or the patch you link to above, and I refuse to play the
->>> "lets apply it and see if we break anything" lottery with this.
->> I agree!
->>
->> Although I think with some adjustments, perhaps we can move forward with v1?
->>
->> The adjustments I think is needed:
->> Instead of propagating the error code from dev_pm_domain_attach(),
->> let's print a debug message and continue the device registration.
->> In that way, we shouldn't introduce regressions for cases where the OF
->> genpd provider hasn't yet been registered, but the issue Marek is
->> trying to solve for Exynos should be fixed.
->>
->> What do you think?
->>
-> Ping. Any news on this? Would be nice if we could agree on a way forward.
+Since some enterprise features (such as RAS) depend on ACPI, it may
+be desirable for, e.g., distro installers to prefer ACPI boot but
+fall back to DT rather than failing completely if no ACPI tables are
+available.
 
-I'm sorry for the lack of any update for quite a long time, but I was 
-terribly
-busy with some internal stuff. I will send v6 in a few minutes based on the
-late_initcall idea from Russell.
+So introduce the 'acpi=on' kernel command line parameter for arm64,
+which signifies that ACPI should be used if available, and DT should
+only be used as a fallback.
 
-Best regards
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ Documentation/kernel-parameters.txt | 6 ++++--
+ arch/arm64/kernel/acpi.c            | 8 ++++++--
+ 2 files changed, 10 insertions(+), 4 deletions(-)
+
+diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+index ecc74fa4bfde..748129c85f35 100644
+--- a/Documentation/kernel-parameters.txt
++++ b/Documentation/kernel-parameters.txt
+@@ -167,16 +167,18 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+ 
+ 	acpi=		[HW,ACPI,X86,ARM64]
+ 			Advanced Configuration and Power Interface
+-			Format: { force | off | strict | noirq | rsdt |
++			Format: { force | on | off | strict | noirq | rsdt |
+ 				  copy_dsdt }
+ 			force -- enable ACPI if default was off
++			on -- enable ACPI but allow fallback to DT [arm64]
+ 			off -- disable ACPI if default was on
+ 			noirq -- do not use ACPI for IRQ routing
+ 			strict -- Be less tolerant of platforms that are not
+ 				strictly ACPI specification compliant.
+ 			rsdt -- prefer RSDT over (default) XSDT
+ 			copy_dsdt -- copy DSDT to memory
+-			For ARM64, ONLY "acpi=off" or "acpi=force" are available
++			For ARM64, ONLY "acpi=off", "acpi=on" or "acpi=force"
++			are available
+ 
+ 			See also Documentation/power/runtime_pm.txt, pci=noacpi
+ 
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+index d1ce8e2f98b9..60d728620a1b 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -42,6 +42,7 @@ int acpi_pci_disabled = 1;	/* skip ACPI PCI scan and IRQ initialization */
+ EXPORT_SYMBOL(acpi_pci_disabled);
+ 
+ static bool param_acpi_off __initdata;
++static bool param_acpi_on __initdata;
+ static bool param_acpi_force __initdata;
+ 
+ static int __init parse_acpi(char *arg)
+@@ -52,6 +53,8 @@ static int __init parse_acpi(char *arg)
+ 	/* "acpi=off" disables both ACPI table parsing and interpreter */
+ 	if (strcmp(arg, "off") == 0)
+ 		param_acpi_off = true;
++	else if (strcmp(arg, "on") == 0) /* prefer ACPI over DT */
++		param_acpi_on = true;
+ 	else if (strcmp(arg, "force") == 0) /* force ACPI to be enabled */
+ 		param_acpi_force = true;
+ 	else
+@@ -185,10 +188,11 @@ void __init acpi_boot_table_init(void)
+ 	 * Enable ACPI instead of device tree unless
+ 	 * - ACPI has been disabled explicitly (acpi=off), or
+ 	 * - the device tree is not empty (it has more than just a /chosen node)
+-	 *   and ACPI has not been force enabled (acpi=force)
++	 *   and ACPI has not been [force] enabled (acpi=on|force)
+ 	 */
+ 	if (param_acpi_off ||
+-	    (!param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
++	    (!param_acpi_on && !param_acpi_force &&
++	     of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
+ 		return;
+ 
+ 	/*
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+2.5.0
