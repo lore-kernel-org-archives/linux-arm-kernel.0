@@ -1,73 +1,80 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 12 Apr 2016 14:03:25 +0100
-Subject: [PATCH 15/17] kvm: arm64: Get rid of fake page table levels
-In-Reply-To: <20160412121414.GA3039@cbox>
-References: <1459787177-12767-1-git-send-email-suzuki.poulose@arm.com>
- <1459787177-12767-16-git-send-email-suzuki.poulose@arm.com>
- <20160408150523.GX8961@cbox> <570BB5C9.8040509@arm.com>
- <20160412121414.GA3039@cbox>
-Message-ID: <570CF21D.8000600@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 12 Apr 2016 15:05:44 +0200
+Subject: [PATCH] ARM: dts: ux500: configure the accelerometers open drain
+Message-ID: <1460466344-17516-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/16 13:14, Christoffer Dall wrote:
-> On Mon, Apr 11, 2016 at 03:33:45PM +0100, Suzuki K Poulose wrote:
->> On 08/04/16 16:05, Christoffer Dall wrote:
->>> On Mon, Apr 04, 2016 at 05:26:15PM +0100, Suzuki K Poulose wrote:
->>
+Configure the two accelerometers sharing GPIO line 82 as:
 
->>>> -#if PGDIR_SHIFT > KVM_PHYS_SHIFT
->>>> -#define PTRS_PER_S2_PGD_SHIFT	0
->>>> -#else
->>>> -#define PTRS_PER_S2_PGD_SHIFT	(KVM_PHYS_SHIFT - PGDIR_SHIFT)
->>>> -#endif
->>>> -#define PTRS_PER_S2_PGD		(1 << PTRS_PER_S2_PGD_SHIFT)
->>>> +#define STAGE2_PGTABLE_LEVELS		ARM64_HW_PGTABLE_LEVELS(KVM_PHYS_SHIFT - 4)
->>>>
->>>>   /*
->>>> - * If we are concatenating first level stage-2 page tables, we would have less
->>>> - * than or equal to 16 pointers in the fake PGD, because that's what the
->>>> - * architecture allows.  In this case, (4 - CONFIG_PGTABLE_LEVELS)
->>>> - * represents the first level for the host, and we add 1 to go to the next
->>>> - * level (which uses contatenation) for the stage-2 tables.
->
-> just noticed: s/contatenation/concatenation/
+- Open drain so that they can share the same interrupt line.
 
-Thanks for catching that. Will fix it.
+Configure the corresponding interrupt pin:
 
->>> which case this should be reworded to just state the assumptions and why
->>> this is a good assumption.
->>>
->>> (If my assumptions are wrong here, then there are also weird cases where
->>> the host does huge pages at the PMD level and we don't.  Not sure I can
->>> see the full ramifications of that.)
->>
->> I am sorry, I didn't get your point about the PMD level.
->>
->
-> Right, I expressed that terribly, and I may have gotten myself confused
-> when writing that.
->
-> My concern is this: if the number of levels between the host and stage-2
-> are different, and the host uses huge pmd mappings (either THP or huge
-> tlb fs), then do we always do the right thing for stage-2 tables, even
-> if we support the case with more levels in Stage-2 than on the host?
+- Trigger on the falling edge since open drain implies that we
+  do not actively drive the line high, but we will actively drive
+  it low to generate interrupts and then it moves from high to low
+  i.e. a falling edge.
 
-Yes. We are safe with PMD (level 2). In the worst case we will have a 2level
-page table at host and say 4 at stage2. In either case, we have a PMD level
-(which in host is folded to PGD) and both will use section mapping at level 2
-for huge pmd. Also pmd_huge() doesn't care if the PMD is folded or not. So,
-we are fine with that. I hope that answers your question.
+- Pulled up so the line will be biased to high unless an IRQ
+  is active on any device on the line, and thus it goes high
+  again after the interrupt is deasserted.
 
->
-> Thanks for trying to parse my crytptic and potentially nonsensical
-> questions.
+Cc: linux-iio at vger.kernel.org
+Cc: Jonathan Cameron <jic23@cam.ac.uk>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/boot/dts/ste-href-tvk1281618.dtsi | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
 
-No no, they make absolute sense. I had gone through these questions myself initially
-when I wrote the series, so its good to share them :-).
-
-Btw, I have rebased my series to kvmarm and have addressed the comments. I will post
-them after a round of testing.
-
-Cheers
-Suzuki
+diff --git a/arch/arm/boot/dts/ste-href-tvk1281618.dtsi b/arch/arm/boot/dts/ste-href-tvk1281618.dtsi
+index 55f9d0cc90f3..4e94a4197b18 100644
+--- a/arch/arm/boot/dts/ste-href-tvk1281618.dtsi
++++ b/arch/arm/boot/dts/ste-href-tvk1281618.dtsi
+@@ -93,14 +93,15 @@
+ 				/* Accelerometer */
+ 				compatible = "st,lsm303dlh-accel";
+ 				st,drdy-int-pin = <1>;
++				int-pin-open-drain;
+ 				reg = <0x18>;
+ 				vdd-supply = <&ab8500_ldo_aux1_reg>;
+ 				vddio-supply = <&db8500_vsmps2_reg>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&accel_tvk_mode>;
+ 				interrupt-parent = <&gpio2>;
+-				interrupts = <18 IRQ_TYPE_EDGE_RISING>,
+-					     <19 IRQ_TYPE_EDGE_RISING>;
++				interrupts = <18 IRQ_TYPE_EDGE_FALLING>,
++					     <19 IRQ_TYPE_EDGE_FALLING>;
+ 			};
+ 			lsm303dlh at 1e {
+ 				/*
+@@ -118,14 +119,15 @@
+ 				/* Accelerometer */
+ 				compatible = "st,lis331dl-accel";
+ 				st,drdy-int-pin = <1>;
++				int-pin-open-drain;
+ 				reg = <0x1c>;
+ 				vdd-supply = <&ab8500_ldo_aux1_reg>;
+ 				vddio-supply = <&db8500_vsmps2_reg>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&accel_tvk_mode>;
+ 				interrupt-parent = <&gpio2>;
+-				interrupts = <18 IRQ_TYPE_EDGE_RISING>,
+-					     <19 IRQ_TYPE_EDGE_RISING>;
++				interrupts = <18 IRQ_TYPE_EDGE_FALLING>,
++					     <19 IRQ_TYPE_EDGE_FALLING>;
+ 			};
+ 			ak8974 at 0f {
+ 				/* Magnetometer */
+@@ -216,7 +218,7 @@
+ 					/* Accelerometer interrupt lines 1 & 2 */
+ 					tvk_cfg {
+ 						pins = "GPIO82_C1", "GPIO83_D3";
+-						ste,config = <&gpio_in_pd>;
++						ste,config = <&gpio_in_pu>;
+ 					};
+ 				};
+ 			};
+-- 
+2.4.3
