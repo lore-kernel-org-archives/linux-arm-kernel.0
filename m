@@ -1,34 +1,61 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 12 Apr 2016 19:30:32 +0200
-Subject: [PATCH v2 0/6] serial: imx: handshaking fixes and improvments
-In-Reply-To: <20160412121759.GG26941@ibawizard.net>
-References: <1458825865-7434-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20160411160128.GD26941@ibawizard.net>
- <20160412074622.GQ10108@pengutronix.de>
- <20160412094846.GF26941@ibawizard.net>
- <20160412105856.GR10108@pengutronix.de>
- <20160412121759.GG26941@ibawizard.net>
-Message-ID: <20160412173032.GS10108@pengutronix.de>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 12 Apr 2016 11:54:37 -0600
+Subject: [PATCH V2 00/15] coresight: tmc: make driver usable by Perf 
+Message-ID: <1460483692-25061-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 12, 2016 at 02:17:59PM +0200, Petr ?tetiar wrote:
-> Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [2016-04-12 12:58:56]:
-> 
-> > ok, so UFCR_DCEDTE is set and UCR3_DSR controls the DTR output as
-> > intended. What is connected to the respective pin?
-> > MX6QDL_PAD_EIM_D25__UART1_DSR_B I think is the one.
-> 
-> It's routed out to Apalis SoM pin 120, which is then connected via 22R
-> resistor and through SN65C3243DBR RS-232 line driver to header which I use as
-> debug/serial console.
+This patchset makes the TMC driver usable from Perf by way of the
+recently added AUX area functionality.
 
-Then I guess the problem is that the rs232-partner asserts the imx6's
-DSR in reply to the imx6 asserting DTR?
+The first 12 patches remodel the driver so that the functionality
+is compartmented enough to be used as building blocks when interfacing
+with the Perf subsystem.
 
-Best regards
-Uwe
+Patch 13 and 14 implement the AUX area API, taking heavily on the existing
+ETB10 implementation.
+
+Finally patch 15 allows the TMC to be used as a link rather than a sink,
+something that is required when dealing with an ETF component.
+
+Best regards,
+Mathieu
+
+Changes for V2:
+- Renamed functions tmc_read_prepare/unprepare_etf() to 
+  tmc_read_prepare/unprepare_etb().
+- Consolidated return points in functions tmc_enable_etf/etr_sink().
+- Re-wrote allocation schemed in functions tmc_enable_etf/etr_sink().
+- Fixed description typos in patch 7/15.
+- Fixed problem with linksink devices when disabling a path in patch 15/15.
+
+Mathieu Poirier (15):
+  coresight: tmc: modifying naming convention
+  coresight: tmc: waiting for TMCReady bit before programming
+  coresight: tmc: re-implementing tmc_read_prepare/unprepare() functions
+  coresight: tmc: introducing new header file
+  coresight: tmc: splitting driver in ETB/ETF and ETR components
+  coresight: tmc: making prepare/unprepare functions generic
+  coresight: tmc: allocating memory when needed
+  coresight: tmc: getting the right read_count on tmc_open()
+  coresight: tmc: adding mode of operation for link/sinks
+  coresight: tmc: dump system memory content only when needed
+  coresight: tmc: make sysFS and Perf mode mutually exclusive
+  coresight: tmc: keep track of memory width
+  coresight: tmc: implementing TMC-ETF AUX space API
+  coresight: tmc: implementing TMC-ETR AUX space API
+  coresight: configuring ETF in FIFO mode when acting as link
+
+ drivers/hwtracing/coresight/Makefile            |   4 +-
+ drivers/hwtracing/coresight/coresight-tmc-etf.c | 611 ++++++++++++++++++++++++
+ drivers/hwtracing/coresight/coresight-tmc-etr.c | 467 ++++++++++++++++++
+ drivers/hwtracing/coresight/coresight-tmc.c     | 450 ++---------------
+ drivers/hwtracing/coresight/coresight-tmc.h     | 166 +++++++
+ drivers/hwtracing/coresight/coresight.c         |  32 +-
+ 6 files changed, 1312 insertions(+), 418 deletions(-)
+ create mode 100644 drivers/hwtracing/coresight/coresight-tmc-etf.c
+ create mode 100644 drivers/hwtracing/coresight/coresight-tmc-etr.c
+ create mode 100644 drivers/hwtracing/coresight/coresight-tmc.h
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+2.5.0
