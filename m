@@ -1,28 +1,55 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Tue, 12 Apr 2016 18:20:58 +0530
-Subject: [PATCH] arm64: defconfig: Enable PL330 DMA controller
-Message-ID: <1460465458-23533-1-git-send-email-alim.akhtar@samsung.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 12 Apr 2016 14:51:40 +0200
+Subject: [PATCH] tty/serial: atmel: fix hardware handshake selection
+Message-ID: <1460465500-25396-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables PL330 DMA controller found on exynos7 SoCs.
+Commit 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management when
+hardware handshake is enabled") actually allowed to enable hardware
+handshaking.
+Before, the CRTSCTS flags was silently ignored.
 
-Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+As the DMA controller can't drive RTS (as explain in the commit message).
+Ensure that hardware flow control stays disabled when DMA is used and FIFOs
+are not available.
+
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm64/configs/defconfig |    1 +
- 1 file changed, 1 insertion(+)
+ drivers/tty/serial/atmel_serial.c | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index f705051..60e5886 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -230,6 +230,7 @@ CONFIG_RTC_DRV_SUN6I=y
- CONFIG_RTC_DRV_XGENE=y
- CONFIG_DMADEVICES=y
- CONFIG_QCOM_BAM_DMA=y
-+CONFIG_PL330_DMA=y
- CONFIG_TEGRA20_APB_DMA=y
- CONFIG_RCAR_DMAC=y
- CONFIG_VFIO=y
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index d9439e6ab719..954941dd8124 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -274,6 +274,13 @@ static bool atmel_use_dma_rx(struct uart_port *port)
+ 	return atmel_port->use_dma_rx;
+ }
+ 
++static bool atmel_use_fifo(struct uart_port *port)
++{
++	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
++
++	return atmel_port->fifo_size;
++}
++
+ static unsigned int atmel_get_lines_status(struct uart_port *port)
+ {
+ 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+@@ -2090,7 +2097,12 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
+ 		mode |= ATMEL_US_USMODE_RS485;
+ 	} else if (termios->c_cflag & CRTSCTS) {
+ 		/* RS232 with hardware handshake (RTS/CTS) */
+-		mode |= ATMEL_US_USMODE_HWHS;
++		if (atmel_use_dma_rx(port) && !atmel_use_fifo(port)) {
++			dev_info(port->dev, "not enabling hardware flow control because DMA is used");
++			termios->c_cflag &= ~CRTSCTS;
++		} else {
++			mode |= ATMEL_US_USMODE_HWHS;
++		}
+ 	} else {
+ 		/* RS232 without hadware handshake */
+ 		mode |= ATMEL_US_USMODE_NORMAL;
 -- 
-1.7.10.4
+2.8.0.rc3
