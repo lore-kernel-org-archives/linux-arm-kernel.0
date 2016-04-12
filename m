@@ -1,51 +1,109 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 12 Apr 2016 10:33:58 +0100
-Subject: [PATCH v2 09/13] ARM: dts: db600c: add on board sata support.
+Date: Tue, 12 Apr 2016 10:33:59 +0100
+Subject: [PATCH v2 10/13] ARM: dts: db600c: Add on board leds support
 In-Reply-To: <1460453642-5809-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1460453642-5809-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1460453642-5809-10-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1460453642-5809-11-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables sata and regulators required to get on board sata
-working.
+This patch adds support to 4 user leds, wlan and bt led on board.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 ---
- arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ .../boot/dts/qcom-apq8064-arrow-db600c-pins.dtsi   | 23 +++++++++++
+ arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts    | 47 ++++++++++++++++++++++
+ 2 files changed, 70 insertions(+)
 
+diff --git a/arch/arm/boot/dts/qcom-apq8064-arrow-db600c-pins.dtsi b/arch/arm/boot/dts/qcom-apq8064-arrow-db600c-pins.dtsi
+index 0610f00..3b55bb9 100644
+--- a/arch/arm/boot/dts/qcom-apq8064-arrow-db600c-pins.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8064-arrow-db600c-pins.dtsi
+@@ -18,4 +18,27 @@
+ 			bias-disable;
+ 		};
+ 	};
++
++	user_leds: user-leds {
++		mux {
++			pins = "gpio3", "gpio7", "gpio10", "gpio11";
++			function = "gpio";
++		};
++
++		conf {
++			pins = "gpio3", "gpio7", "gpio10", "gpio11";
++			function = "gpio";
++			output-low;
++		};
++	};
++};
++
++&pm8921_mpps {
++	mpp_leds: mpp-leds {
++		pinconf {
++			pins = "mpp7", "mpp8";
++			function = "digital";
++			output-low;
++		};
++	};
+ };
 diff --git a/arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts b/arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts
-index 4f2218c..6f97ddc 100644
+index 6f97ddc..8c18a4b 100644
 --- a/arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts
 +++ b/arch/arm/boot/dts/qcom-apq8064-arrow-db600c.dts
-@@ -123,6 +123,10 @@
- 				lvs6 {
- 					bias-pull-down;
- 				};
-+
-+				lvs7 {
-+					bias-pull-down;
-+				};
+@@ -153,6 +153,53 @@
  			};
  		};
  
-@@ -159,6 +163,15 @@
- 			perst-gpio = <&tlmm_pinmux 27 GPIO_ACTIVE_LOW>;
- 		};
- 
-+		phy at 1b400000 {
-+			status = "okay";
++		leds {
++			pinctrl-names = "default";
++			pinctrl-0 = <&user_leds>, <&mpp_leds>;
++
++			compatible = "gpio-leds";
++
++			user-led0 {
++				label = "user0-led";
++				gpios = <&tlmm_pinmux 3 GPIO_ACTIVE_HIGH>;
++				linux,default-trigger = "heartbeat";
++				default-state = "off";
++			};
++
++			user-led1 {
++				label = "user1-led";
++				gpios = <&tlmm_pinmux 7 GPIO_ACTIVE_HIGH>;
++				linux,default-trigger = "mmc0";
++				default-state = "off";
++			};
++
++			user-led2 {
++				label = "user2-led";
++				gpios = <&tlmm_pinmux 10 GPIO_ACTIVE_HIGH>;
++				linux,default-trigger = "mmc1";
++				default-state = "off";
++			};
++
++			user-led3 {
++				label = "user3-led";
++				gpios = <&tlmm_pinmux 11 GPIO_ACTIVE_HIGH>;
++				linux,default-trigger = "none";
++				default-state = "off";
++			};
++
++			wifi-led {
++				label = "WiFi-led";
++				gpios = <&pm8921_mpps 7 GPIO_ACTIVE_HIGH>;
++				default-state = "off";
++			};
++
++			bt-led {
++				label = "BT-led";
++				gpios = <&pm8921_mpps 8 GPIO_ACTIVE_HIGH>;
++				default-state = "off";
++			};
 +		};
 +
-+		sata at 29000000 {
-+			status	= "okay";
-+			target-supply	= <&pm8921_lvs7>;
-+		};
-+
- 		/* OTG */
- 		phy at 12500000 {
- 			status		= "okay";
+ 		pci at 1b500000 {
+ 			status = "okay";
+ 			vdda-supply = <&pm8921_s3>;
 -- 
 2.5.0
