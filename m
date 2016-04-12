@@ -1,475 +1,75 @@
-From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Tue, 12 Apr 2016 17:06:59 +0300
-Subject: [PATCH v2] ARM: dts: imx6: Add dts for Embest MarS Board
-In-Reply-To: <1460420743-30883-1-git-send-email-sergio.prado@e-labworks.com>
-References: <1460420743-30883-1-git-send-email-sergio.prado@e-labworks.com>
-Message-ID: <570D0103.3080807@mentor.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 12 Apr 2016 16:09:02 +0200
+Subject: [PATCH v5 RESEND 4/5] ARM: amba: Move reading of periphid to
+ amba_match()
+In-Reply-To: <CAPDyKFpjTOhmG69x=EP=jje76C1ijjh0m_N8PrJ3yxqRq3HFiw@mail.gmail.com>
+References: <1455101250-11327-1-git-send-email-m.szyprowski@samsung.com>
+ <1455101250-11327-5-git-send-email-m.szyprowski@samsung.com>
+ <20160215175250.GJ10826@n2100.arm.linux.org.uk> <56C426C4.7040907@samsung.com>
+ <20160217200828.GH19428@n2100.arm.linux.org.uk>
+ <CAPDyKFph8O+P9F124R859+OqY7B0YXCm=oOGxviyOo6tkNPQzQ@mail.gmail.com>
+ <CAPDyKFpjTOhmG69x=EP=jje76C1ijjh0m_N8PrJ3yxqRq3HFiw@mail.gmail.com>
+Message-ID: <570D017E.7060105@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergio,
+Hi Ulf,
 
-On 12.04.2016 03:25, Sergio Prado wrote:
-> Embest MarS Board [1] is a multi-core platform based on Freescale i.MX6
-> Cortex-A9 Dual Core, running up to 1GHz with 1 GB of RAM, 4GB of eMMC
-> and with a 4MB SPI flash.
-> 
-> [1] http://www.embest-tech.com/shop/star/marsboard.html
-> 
-> Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
-> ---
-> 
-> Changes v1 -> v2:
-> - Makefile entry added.
-> 
-> ---
->  arch/arm/boot/dts/Makefile            |   1 +
->  arch/arm/boot/dts/imx6q-marsboard.dts | 411 ++++++++++++++++++++++++++++++++++
->  2 files changed, 412 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx6q-marsboard.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 95c1923ce6fa..04b87ea75f2f 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -346,6 +346,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
->  	imx6q-gw552x.dtb \
->  	imx6q-hummingboard.dtb \
->  	imx6q-icore-rqs.dtb \
-> +	imx6q-marsboard.dtb \
->  	imx6q-nitrogen6x.dtb \
->  	imx6q-nitrogen6_max.dtb \
->  	imx6q-novena.dtb \
-> diff --git a/arch/arm/boot/dts/imx6q-marsboard.dts b/arch/arm/boot/dts/imx6q-marsboard.dts
-> new file mode 100644
-> index 000000000000..96b8736b90f8
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6q-marsboard.dts
-> @@ -0,0 +1,411 @@
-> +/*
-> + * Copyright (C) 2016 Sergio Prado (sergio.prado at e-labworks.com)
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License
-> + *     version 2 as published by the Free Software Foundation.
-> + *
-> + *     This file is distributed in the hope that it will be useful
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +#include "imx6q.dtsi"
-> +#include <dt-bindings/gpio/gpio.h>
-> +
-> +/ {
-> +	model = "Embest MarS Board i.MX6Dual";
-> +	compatible = "embest,imx6q-marsboard", "fsl,imx6dl";
-> +
-> +	memory {
-> +		reg = <0x10000000 0x40000000>;
-> +	};
-> +
-> +	regulators {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		reg_3p3v: regulator at 1 {
-> +			compatible = "regulator-fixed";
-> +			reg = <1>;
-> +			regulator-name = "3P3V";
-> +			regulator-min-microvolt = <3300000>;
-> +			regulator-max-microvolt = <3300000>;
-> +		};
-> +
-> +		reg_usb_otg_vbus: regulator at 2 {
-> +			compatible = "regulator-fixed";
-> +			reg = <2>;
-> +			regulator-name = "usb_otg_vbus";
-> +			regulator-min-microvolt = <5000000>;
-> +			regulator-max-microvolt = <5000000>;
-> +			gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
-> +		};
-> +	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_led>;
-> +
-> +		led at 1 {
+On 2016-04-12 13:39, Ulf Hansson wrote:
+> - trimmed cc list
+>
+> On 2 March 2016 at 11:16, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> On 17 February 2016 at 21:08, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>>> On Wed, Feb 17, 2016 at 08:52:36AM +0100, Marek Szyprowski wrote:
+>>>> Then the only solution right now I see is to get back to v1:
+>>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/388199.html
+>>>> which at least handles correctly device registration when power domain
+>>>> driver is available.
+>>> ... and which has the ability to break platforms if the PM domain is
+>>> not already available.
+>>>
+>>> What's wrong with the patch in the link above _combined_ with a patch
+>>> which addresses the concern I have with that patch: build a list of
+>>> the failed-to-register devices, and retry them later - maybe from a
+>>> late_initcall(), or a similar mechanism?
+>> This will improve the robustness of the device registration process,
+>> but I wonder if it's really worth the efforts of complicating the amba
+>> device registration code.
+>>
+>> The problem I see with such approach, is to know *when* shall we retry
+>> to register the devices.
+>>
+>> We will rely on the PM domain driver to be probed, as to have the
+>> corresponding OF genpd provider registered, else the device
+>> registration will continue to fail.
+>> Now, I don't think there are PM domain drivers as removable modules
+>> (yet), but in such cases a late_initcall won't help much.
+>>
+>>> My view is the risk to existing systems is _too_ high to apply either
+>>> this patch, or the patch you link to above, and I refuse to play the
+>>> "lets apply it and see if we break anything" lottery with this.
+>> I agree!
+>>
+>> Although I think with some adjustments, perhaps we can move forward with v1?
+>>
+>> The adjustments I think is needed:
+>> Instead of propagating the error code from dev_pm_domain_attach(),
+>> let's print a debug message and continue the device registration.
+>> In that way, we shouldn't introduce regressions for cases where the OF
+>> genpd provider hasn't yet been registered, but the issue Marek is
+>> trying to solve for Exynos should be fixed.
+>>
+>> What do you think?
+>>
+> Ping. Any news on this? Would be nice if we could agree on a way forward.
 
-the outcome of one recent discussion is that a unit-address component of
-the name is used only if there is a reg property, which is not the case
-here.
+I'm sorry for the lack of any update for quite a long time, but I was 
+terribly
+busy with some internal stuff. I will send v6 in a few minutes based on the
+late_initcall idea from Russell.
 
-> +			label = "imx6:green:user1";
-> +			gpios = <&gpio5 2 GPIO_ACTIVE_LOW>;
-> +			default-state = "off";
-> +			linux,default-trigger = "heartbeat";
-> +		};
-> +
-> +		led at 2 {
-
-Same as above.
-
-> +			label = "imx6:green:user2";
-> +			gpios = <&gpio3 28 GPIO_ACTIVE_LOW>;
-> +			default-state = "off";
-> +		};
-> +	};
-> +};
-> +
-> +&uart1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart1>;
-> +	status = "okay";
-> +};
-> +
-> +&uart2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart2>;
-> +	status = "okay";
-> +};
-> +
-> +&uart3 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart3>;
-> +	status = "okay";
-> +};
-> +
-> +&uart4 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart4>;
-> +	status = "okay";
-> +};
-> +
-> +&uart5 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart5>;
-> +	status = "okay";
-> +};
-> +
-> +&fec {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_enet>;
-> +	phy-mode = "rgmii";
-> +	phy-reset-gpios = <&gpio3 31 GPIO_ACTIVE_HIGH>;
-> +	status = "okay";
-> +};
-> +
-> +&usdhc2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_usdhc2>;
-> +	vmmc-supply = <&reg_3p3v>;
-> +	cd-gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
-> +	wp-gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
-> +	status = "okay";
-> +};
-> +
-> +&usdhc3 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_usdhc3>;
-> +	vmmc-supply = <&reg_3p3v>;
-> +	non-removable;
-> +	status = "okay";
-> +};
-> +
-> +&i2c1 {
-> +	clock-frequency = <100000>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c1>;
-> +	status = "okay";
-> +};
-> +
-> +&i2c2 {
-> +	clock-frequency = <100000>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c2>;
-> +	status = "okay";
-> +};
-> +
-> +&i2c3 {
-> +	clock-frequency = <100000>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_i2c3>;
-> +	status = "okay";
-> +};
-> +
-> +&ecspi1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_ecspi1>;
-> +	cs-gpios = <&gpio2 30 GPIO_ACTIVE_LOW>;
-> +	fsl,spi-num-chipselects = <1>;
-> +	status = "okay";
-> +
-> +	m25p80 at 0 {
-> +		compatible = "microchip,sst25vf016b";
-> +		spi-max-frequency = <20000000>;
-> +		reg = <0>;
-> +	};
-> +};
-> +
-> +&pwm1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_pwm1>;
-> +	status = "okay";
-> +};
-> +
-> +&pwm2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_pwm2>;
-> +	status = "okay";
-> +};
-> +
-> +&pwm3 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_pwm3>;
-> +	status = "okay";
-> +};
-> +
-> +&pwm4 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_pwm4>;
-> +	status = "okay";
-> +};
-> +
-> +&usbh1 {
-> +	dr_mode = "host";
-> +	disable-over-current;
-> +	status = "okay";
-> +};
-> +
-> +&usbotg {
-> +	vbus-supply = <&reg_usb_otg_vbus>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_usbotg>;
-> +	dr_mode = "otg";
-> +	disable-over-current;
-> +	status = "okay";
-> +};
-> +
-> +&hdmi {
-> +	ddc-i2c-bus = <&i2c2>;
-> +	status = "okay";
-> +};
-> +
-> +&audmux {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_audmux>;
-> +	status = "okay";
-> +};
-> +
-> +&iomuxc {
-> +	imx6-riotboard {
-
-Copy pasted board name?
-
-> +		pinctrl_uart1: uart1grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_CSI0_DAT10__UART1_TX_DATA	0x1b0b1
-> +				MX6QDL_PAD_CSI0_DAT11__UART1_RX_DATA	0x1b0b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_uart2: uart2grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_EIM_D26__UART2_TX_DATA	0x1b0b1
-> +				MX6QDL_PAD_EIM_D27__UART2_RX_DATA	0x1b0b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_uart3: uart3grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_EIM_D24__UART3_TX_DATA	0x1b0b1
-> +				MX6QDL_PAD_EIM_D25__UART3_RX_DATA	0x1b0b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_uart4: uart4grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_KEY_COL0__UART4_TX_DATA	0x1b0b1
-> +				MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA	0x1b0b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_uart5: uart5grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_KEY_COL1__UART5_TX_DATA	0x1b0b1
-> +				MX6QDL_PAD_KEY_ROW1__UART5_RX_DATA	0x1b0b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_enet: enetgrp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
-> +				MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
-> +				MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x1b0b0
-> +				MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b0b0
-> +				MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b0b0
-> +				MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b0b0
-> +				MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x1b0b0
-> +				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x1b0b0
-> +				/* AR8035 CLK_25M --> ENET_REF_CLK (V22) */
-> +				MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x0a0b1
-> +				/* AR8035 pin strapping: IO voltage: pull up */
-> +				MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0
-> +				/* AR8035 pin strapping: PHYADDR#0: pull down */
-> +				MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x130b0
-> +				/* AR8035 pin strapping: PHYADDR#1: pull down */
-> +				MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x130b0
-> +				/* AR8035 pin strapping: MODE#1: pull up */
-> +				MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b0b0
-> +				/* AR8035 pin strapping: MODE#3: pull up */
-> +				MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b0b0
-> +				/* AR8035 pin strapping: MODE#0: pull down */
-> +				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x130b0
-> +				/* GPIO16 -> AR8035 25MHz */
-> +				MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x4001b0a8
-> +				/* RGMII_nRST */
-> +				MX6QDL_PAD_EIM_D31__GPIO3_IO31		0x130b0
-> +				/* AR8035 interrupt */
-> +				MX6QDL_PAD_ENET_TX_EN__GPIO1_IO28	0x180b0
-> +			>;
-> +		};
-> +
-> +		pinctrl_led: ledgrp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_EIM_A25__GPIO5_IO02		0x1b0b1	/* LED0 */
-> +				MX6QDL_PAD_EIM_D28__GPIO3_IO28		0x1b0b1	/* LED1 */
-> +			>;
-> +		};
-> +
-> +		pinctrl_usdhc2: usdhc2grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_SD2_CMD__SD2_CMD		0x17059
-> +				MX6QDL_PAD_SD2_CLK__SD2_CLK		0x10059
-> +				MX6QDL_PAD_SD2_DAT0__SD2_DATA0		0x17059
-> +				MX6QDL_PAD_SD2_DAT1__SD2_DATA1		0x17059
-> +				MX6QDL_PAD_SD2_DAT2__SD2_DATA2		0x17059
-> +				MX6QDL_PAD_SD2_DAT3__SD2_DATA3		0x17059
-> +				MX6QDL_PAD_GPIO_4__GPIO1_IO04		0x1b0b0	/* CD */
-> +				MX6QDL_PAD_GPIO_2__GPIO1_IO02		0x1f0b0	/* WP */
-> +			>;
-> +		};
-> +
-> +		pinctrl_usdhc3: usdhc3grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_SD3_CMD__SD3_CMD		0x17009
-> +				MX6QDL_PAD_SD3_CLK__SD3_CLK		0x10009
-> +				MX6QDL_PAD_SD3_DAT0__SD3_DATA0		0x17009
-> +				MX6QDL_PAD_SD3_DAT1__SD3_DATA1		0x17009
-> +				MX6QDL_PAD_SD3_DAT2__SD3_DATA2		0x17009
-> +				MX6QDL_PAD_SD3_DAT3__SD3_DATA3		0x17009
-> +				MX6QDL_PAD_SD3_RST__SD3_RESET		0x17009
-> +			>;
-> +		};
-> +
-> +		pinctrl_i2c1: i2c1grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_CSI0_DAT8__I2C1_SDA		0x4001b8b1
-> +				MX6QDL_PAD_CSI0_DAT9__I2C1_SCL		0x4001b8b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_i2c2: i2c2grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_KEY_COL3__I2C2_SCL		0x4001b8b1
-> +				MX6QDL_PAD_KEY_ROW3__I2C2_SDA		0x4001b8b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_i2c3: i2c3grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_GPIO_5__I2C3_SCL		0x4001b8b1
-> +				MX6QDL_PAD_GPIO_6__I2C3_SDA		0x4001b8b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_ecspi1: ecspi1grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_EIM_D16__ECSPI1_SCLK		0x100b1
-> +				MX6QDL_PAD_EIM_D17__ECSPI1_MISO		0x100b1
-> +				MX6QDL_PAD_EIM_D18__ECSPI1_MOSI		0x100b1
-> +				MX6QDL_PAD_EIM_EB2__GPIO2_IO30		0x000b1	/* CS0 */
-> +			>;
-> +		};
-> +
-> +		pinctrl_pwm1: pwm1grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_DISP0_DAT8__PWM1_OUT		0x1b0b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_pwm2: pwm2grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_DISP0_DAT9__PWM2_OUT		0x1b0b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_pwm3: pwm3grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_SD1_DAT1__PWM3_OUT		0x1b0b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_pwm4: pwm4grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_SD1_CMD__PWM4_OUT		0x1b0b1
-> +			>;
-> +		};
-> +
-> +		pinctrl_usbotg: usbotggrp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID	0x17059
-> +				MX6QDL_PAD_EIM_D21__USB_OTG_OC		0x1b0b0
-> +				MX6QDL_PAD_EIM_D22__GPIO3_IO22		0x000b0	/* USB OTG POWER ENABLE */
-> +			>;
-> +		};
-> +
-> +		pinctrl_audmux: audmuxgrp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_CSI0_DAT7__AUD3_RXD		0x130b0
-> +				MX6QDL_PAD_CSI0_DAT4__AUD3_TXC		0x130b0
-> +				MX6QDL_PAD_CSI0_DAT5__AUD3_TXD		0x110b0
-> +				MX6QDL_PAD_CSI0_DAT6__AUD3_TXFS		0x130b0
-> +				MX6QDL_PAD_GPIO_0__CCM_CLKO1		0x130b0	/* CAM_MCLK */
-> +			>;
-> +		};
-> +	};
-> +};
-> 
-
---
-With best wishes,
-Vladimir
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
