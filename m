@@ -1,48 +1,143 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 12 Apr 2016 12:56:09 +0200
-Subject: [RESEND 10/11] pwm: sti: Enable PWM Capture
-In-Reply-To: <1456932729-9667-11-git-send-email-lee.jones@linaro.org>
-References: <1456932729-9667-1-git-send-email-lee.jones@linaro.org>
- <1456932729-9667-11-git-send-email-lee.jones@linaro.org>
-Message-ID: <20160412105609.GF18882@ulmo.ba.sec>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 12 Apr 2016 12:59:03 +0200
+Subject: [PATCH 7/7] ARM: dts: Add support of Bus frequency using VDD_INT
+ for exynos5422-odroidxu3
+In-Reply-To: <1460091646-28701-8-git-send-email-cw00.choi@samsung.com>
+References: <1460091646-28701-1-git-send-email-cw00.choi@samsung.com>
+ <1460091646-28701-8-git-send-email-cw00.choi@samsung.com>
+Message-ID: <570CD4F7.6000700@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 02, 2016 at 03:32:08PM +0000, Lee Jones wrote:
-> Once all functionality is in place, we provide the means to
-> enable PWM Capture.  Here we are simply obtaining the
-> associated regmap and twiddling the relevant enable register
-> bits.
+On 04/08/2016 07:00 AM, Chanwoo Choi wrote:
+> This patch adds the bus device tree nodes for INT (Internal) block
+> to enable the AMBA bus frequency scaling and add the NoC (Network on Chip)
+> Probe Device Tree node to measure the bandwidht for AMBA AXI bus.
 > 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> The WCORE bus bus is parent device in INT block using VDD_INT.
+> 
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 > ---
->  drivers/pwm/pwm-sti.c | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
+>  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 99 ++++++++++++++++++++++
+>  1 file changed, 99 insertions(+)
 > 
-> diff --git a/drivers/pwm/pwm-sti.c b/drivers/pwm/pwm-sti.c
-> index 8de9b4a..93cf20e 100644
-> --- a/drivers/pwm/pwm-sti.c
-> +++ b/drivers/pwm/pwm-sti.c
-> @@ -279,6 +279,13 @@ static int sti_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
->  				pwm->hwpwm);
->  			goto out;
->  		}
+> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+> index 1bd507bfa750..2a74abe6fc5d 100644
+> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+> @@ -361,6 +361,22 @@
+>  	cap-sd-highspeed;
+>  };
+>  
+> +&nocp_mem0_0 {
+> +	status = "okay";
+> +};
 > +
-> +		ret = regmap_field_write(pc->pwm_cpt_en, 1);
-> +		if (ret) {
-> +			dev_err(dev, "failed to enable PWM capture:%d\n",
-> +				pwm->hwpwm);
-> +			goto out;
-> +		}
+> +&nocp_mem0_1 {
+> +	status = "okay";
+> +};
+> +
+> +&nocp_mem0_2 {
+> +	status = "okay";
+> +};
+> +
+> +&nocp_mem0_3 {
+> +	status = "okay";
+> +};
+> +
+>  &pinctrl_0 {
+>  	hdmi_hpd_irq: hdmi-hpd-irq {
+>  		samsung,pins = "gpx3-7";
+> @@ -432,3 +448,86 @@
+>  	vdd33-supply = <&ldo9_reg>;
+>  	vdd10-supply = <&ldo11_reg>;
+>  };
+> +
+> +&bus_wcore {
+> +	devfreq-events = <&nocp_mem0_0>, <&nocp_mem0_1>,
+> +			<&nocp_mem0_2>, <&nocp_mem0_3>;
+> +	vdd-supply = <&buck3_reg>;
+> +	exynos,saturation-ratio = <100>;
+> +	status = "okay";
+> +};
+> +
+> +&bus_noc {
+> +	devfreq = <&bus_wcore>;
+> +	status = "okay";
+> +};
+> +
+> +&bus_fsys_apb {
+> +	devfreq = <&bus_wcore>;
+> +	status = "okay";
+> +};
+> +
+> +&bus_fsys {
+> +	devfreq = <&bus_wcore>;
+> +	status = "okay";
+> +};
+> +
+> +&bus_fsys2 {
+> +	devfreq = <&bus_wcore>;
+> +	status = "okay";
+> +};
+> +
+> +&bus_mfc {
+> +	devfreq = <&bus_wcore>;
+> +	status = "okay";
+> +};
+> +
+> +&bus_gen {
+> +	devfreq = <&bus_wcore>;
+> +	status = "okay";
+> +};
+> +
+> +&bus_peri {
+> +	devfreq = <&bus_wcore>;
+> +	status = "okay";
+> +};
+> +
+> +&bus_g2d {
+> +	devfreq = <&bus_wcore>;
+> +	status = "okay";
+> +};
+> +
+> +&bus_g2d_acp {
+> +	devfreq = <&bus_wcore>;
+> +	status = "okay";
+> +};
+> +
+> +&bus_jpeg {
+> +	devfreq = <&bus_wcore>;
+> +	status = "okay";
+> +};
+> +
+> +&bus_jpeg_apb {
+> +	devfreq = <&bus_wcore>;
+> +	status = "okay";
+> +};
+> +
+> +&bus_disp1_fimd {
+> +	devfreq = <&bus_wcore>;
+> +	status = "okay";
+> +};
+> +
+> +&bus_disp1 {
+> +	devfreq = <&bus_wcore>;
+> +	status = "okay";
+> +};
+> +
+> +&bus_gscl_scaler {
+> +	devfreq = <&bus_wcore>;
+> +	status = "okay";
+> +};
+> +
+> +&bus_mscl {
+> +	devfreq = <&bus_wcore>;
+> +	status = "okay";
+> +};
 
-Should this perhaps be part of the driver's ->capture() implementation?
-It seems redundant to have this logic enabled if we may never use it.
+Could you put the bus nodes in alphabetical order, both between them and
+in relation to others (so before &clock_audss)? Let's keep the file ordered.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160412/2e44a93e/attachment.sig>
+Best regards,
+Krzysztof
