@@ -1,80 +1,60 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 12 Apr 2016 15:05:44 +0200
-Subject: [PATCH] ARM: dts: ux500: configure the accelerometers open drain
-Message-ID: <1460466344-17516-1-git-send-email-linus.walleij@linaro.org>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 12 Apr 2016 15:06:27 +0200
+Subject: [PATCH v5 05/46] pwm: introduce the pwm_args concept
+In-Reply-To: <20160412113912.GK18882@ulmo.ba.sec>
+References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1459368249-13241-6-git-send-email-boris.brezillon@free-electrons.com>
+ <20160412113912.GK18882@ulmo.ba.sec>
+Message-ID: <20160412150627.7084665d@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Configure the two accelerometers sharing GPIO line 82 as:
+On Tue, 12 Apr 2016 13:39:12 +0200
+Thierry Reding <thierry.reding@gmail.com> wrote:
 
-- Open drain so that they can share the same interrupt line.
+> On Wed, Mar 30, 2016 at 10:03:28PM +0200, Boris Brezillon wrote:
+> > Currently the PWM core mixes the current PWM state with the per-platform
+> > reference config (specified through the PWM lookup table, DT definition or
+> > directly hardcoded in PWM drivers).
+> > 
+> > Create a pwm_args struct to store this reference config, so that PWM users
+> > can differentiate the current config from the reference one.
+> > 
+> > Patch all places where pwm->args should be initialized. We keep the
+> > pwm_set_polarity/period() calls until all PWM users are patched to
+> > use pwm_args instead of pwm_get_period/polarity().
+> 
+> Perhaps a helper would be useful? Something like:
+> 
+> 	static inline void
+> 	pwm_apply_args(struct pwm_device *pwm, const struct pwm_args *args)
+> 	{
+> 		pwm_set_duty_cycle(pwm, args->duty_cycle);
+> 		pwm_set_period(pwm, args->period);
+> 	}
+> 
+> ? That would make it slightly easier to get rid of it again after all
+> clients have been converted.
+> 
+> With the exception of pwm-clps711x all of these args are set at of_xlate
+> time (for DT) or from the lookup table in pwm_get() (for non-DT), so it
+> might even be possible to move this call to the core, so that removal of
+> it will be a one-liner.
 
-Configure the corresponding interrupt pin:
+Okay, I think I misunderstood your suggestion. I thought you wanted
+this helper to set the reference config, but you actually want to apply
+a new state based on the PWM reference values.
 
-- Trigger on the falling edge since open drain implies that we
-  do not actively drive the line high, but we will actively drive
-  it low to generate interrupts and then it moves from high to low
-  i.e. a falling edge.
+Except that pwm_args does not contain all the required information to
+apply a full config (args->duty_cycle and args->enable do not exist).
 
-- Pulled up so the line will be biased to high unless an IRQ
-  is active on any device on the line, and thus it goes high
-  again after the interrupt is deasserted.
+This being said, in my v6 I moved the content of
+pwm_regulator_adjust_pwm_config() (patch 27) into a generic helper
+(pwm_adjust_config()). This helper is doing pretty much what you're
+suggesting here (but again, I'm not sure I correctly understood your
+suggestion :-/).
 
-Cc: linux-iio at vger.kernel.org
-Cc: Jonathan Cameron <jic23@cam.ac.uk>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/ste-href-tvk1281618.dtsi | 12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/boot/dts/ste-href-tvk1281618.dtsi b/arch/arm/boot/dts/ste-href-tvk1281618.dtsi
-index 55f9d0cc90f3..4e94a4197b18 100644
---- a/arch/arm/boot/dts/ste-href-tvk1281618.dtsi
-+++ b/arch/arm/boot/dts/ste-href-tvk1281618.dtsi
-@@ -93,14 +93,15 @@
- 				/* Accelerometer */
- 				compatible = "st,lsm303dlh-accel";
- 				st,drdy-int-pin = <1>;
-+				int-pin-open-drain;
- 				reg = <0x18>;
- 				vdd-supply = <&ab8500_ldo_aux1_reg>;
- 				vddio-supply = <&db8500_vsmps2_reg>;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&accel_tvk_mode>;
- 				interrupt-parent = <&gpio2>;
--				interrupts = <18 IRQ_TYPE_EDGE_RISING>,
--					     <19 IRQ_TYPE_EDGE_RISING>;
-+				interrupts = <18 IRQ_TYPE_EDGE_FALLING>,
-+					     <19 IRQ_TYPE_EDGE_FALLING>;
- 			};
- 			lsm303dlh at 1e {
- 				/*
-@@ -118,14 +119,15 @@
- 				/* Accelerometer */
- 				compatible = "st,lis331dl-accel";
- 				st,drdy-int-pin = <1>;
-+				int-pin-open-drain;
- 				reg = <0x1c>;
- 				vdd-supply = <&ab8500_ldo_aux1_reg>;
- 				vddio-supply = <&db8500_vsmps2_reg>;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&accel_tvk_mode>;
- 				interrupt-parent = <&gpio2>;
--				interrupts = <18 IRQ_TYPE_EDGE_RISING>,
--					     <19 IRQ_TYPE_EDGE_RISING>;
-+				interrupts = <18 IRQ_TYPE_EDGE_FALLING>,
-+					     <19 IRQ_TYPE_EDGE_FALLING>;
- 			};
- 			ak8974 at 0f {
- 				/* Magnetometer */
-@@ -216,7 +218,7 @@
- 					/* Accelerometer interrupt lines 1 & 2 */
- 					tvk_cfg {
- 						pins = "GPIO82_C1", "GPIO83_D3";
--						ste,config = <&gpio_in_pd>;
-+						ste,config = <&gpio_in_pu>;
- 					};
- 				};
- 			};
 -- 
-2.4.3
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
