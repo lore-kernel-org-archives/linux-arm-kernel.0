@@ -1,29 +1,19 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 12 Apr 2016 07:44:47 +0200
-Subject: [PATCH v6 10/10] clocksource: arm_arch_timer: Remove
- arch_timer_get_timecounter
-In-Reply-To: <1460388780-914-11-git-send-email-julien.grall@arm.com>
-References: <1460388780-914-1-git-send-email-julien.grall@arm.com>
- <1460388780-914-11-git-send-email-julien.grall@arm.com>
-Message-ID: <20160412054447.GC16636@linaro.org>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 12 Apr 2016 13:46:45 +0800
+Subject: [PATCH v2 1/4] ARM: dts: imx6sx: Fix SAI DMA index
+In-Reply-To: <1459554737-19684-1-git-send-email-festevam@gmail.com>
+References: <1459554737-19684-1-git-send-email-festevam@gmail.com>
+Message-ID: <20160412054645.GA23166@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 11, 2016 at 04:33:00PM +0100, Julien Grall wrote:
-> The only call of arch_timer_get_timecounter (in KVM) has been removed.
+On Fri, Apr 01, 2016 at 08:52:14PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
 > 
-> Signed-off-by: Julien Grall <julien.grall@arm.com>
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+> According to sdma_peripheral_type in include/linux/platform_data/dma-imx.h
+> IMX_DMATYPE_SAI corresponds to index 24, so fix it accordingly.
 > 
-> ---
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> 
->     Changes in v4:
->         - Add Christoffer's acked-by
-> 
->     Changes in v3:
->         - Patch added
-> ---
+> Suggested-by: Zidan Wang <zidan.wang@nxp.com>
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Applied all, thanks.
