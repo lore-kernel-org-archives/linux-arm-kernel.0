@@ -1,55 +1,19 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Mon, 11 Apr 2016 17:34:34 -0700
-Subject: [PATCH v2 3/4] PCI: generic, thunder: update to use generic ECAM
- API
-In-Reply-To: <1460414707-19153-4-git-send-email-jchandra@broadcom.com>
-References: <1460414707-19153-1-git-send-email-jchandra@broadcom.com>
- <1460414707-19153-4-git-send-email-jchandra@broadcom.com>
-Message-ID: <570C429A.6090006@caviumnetworks.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 12 Apr 2016 08:47:42 +0800
+Subject: [PATCH v5] ARM: dts: imx: add Boundary Devices Nitrogen6_SoloX
+ board
+In-Reply-To: <1460408496-21164-1-git-send-email-gary.bisson@boundarydevices.com>
+References: <1460037168-23292-1-git-send-email-gary.bisson@boundarydevices.com>
+ <1460408496-21164-1-git-send-email-gary.bisson@boundarydevices.com>
+Message-ID: <20160412004742.GB15949@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/11/2016 03:45 PM, Jayachandran C wrote:
-> Use functions provided by drivers/pci/ecam.h for mapping the config
-> space in drivers/pci/host/pci-host-common.c, and update its users to
-> use 'struct pci_config_window' and 'struct pci_generic_ecam_ops'
->
-> The changes are mostly to use 'struct pci_config_window' in place of
-> 'struct gen_pci'. Some of the fields of gen_pci were only used
-> temporarily and can be eliminated by using local variables or function
-> arguments, these are not carried over to struct pci_config_window.
->
-> pci-thunder-ecam.c and pci-thunder-pem.c are the only users of the
-> pci_host_common_probe function and the gen_pci structure, these have
-> been updated to use the new API as well.
->
-> The patch does not introduce any functional changes other than a very
-> minor one: with the new code, on 64-bit platforms, we do just a single
-> ioremap for the whole config space.
->
-> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+On Mon, Apr 11, 2016 at 11:01:36PM +0200, Gary Bisson wrote:
+> Based on i.MX6 SoloX with 1GB of RAM.
+> 
+> https://boundarydevices.com/product/nit6_solox-imx6/
+> 
+> Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
 
-Tested-by: David Daney <david.daney@cavium.com>
-
-However, ...
-
-> ---
->   drivers/pci/ecam.h                  |   5 ++
->   drivers/pci/host/Kconfig            |   1 +
->   drivers/pci/host/pci-host-common.c  | 121 ++++++++++++++++--------------------
->   drivers/pci/host/pci-host-common.h  |  47 --------------
->   drivers/pci/host/pci-host-generic.c |  50 +++------------
->   drivers/pci/host/pci-thunder-ecam.c |  37 +++--------
->   drivers/pci/host/pci-thunder-pem.c  |  53 +++++-----------
-
-... The patch conflicts with a bug-fix patch I just sent to 
-pci-thunder-pem.c, so there will be a race to see who gets in first.
-
-Also, I don't know if it would make sense to split out the pci-thunder-* 
-changes to a separate patch.
-
-
->   7 files changed, 93 insertions(+), 221 deletions(-)
->   delete mode 100644 drivers/pci/host/pci-host-common.h
->
-[...]
+Applied, thanks.
