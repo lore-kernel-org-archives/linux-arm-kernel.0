@@ -1,76 +1,132 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 12 Apr 2016 15:15:03 +0200
-Subject: [PATCH v5 05/46] pwm: introduce the pwm_args concept
-In-Reply-To: <20160412150627.7084665d@bbrezillon>
-References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
- <1459368249-13241-6-git-send-email-boris.brezillon@free-electrons.com>
- <20160412113912.GK18882@ulmo.ba.sec>
- <20160412150627.7084665d@bbrezillon>
-Message-ID: <20160412131503.GR18882@ulmo.ba.sec>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 12 Apr 2016 15:18:51 +0200
+Subject: [RFC PATCH 20/45] KVM: arm/arm64: vgic-new: Add TARGET registers
+ handlers
+In-Reply-To: <570B9430.2040305@arm.com>
+References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
+ <1458871508-17279-21-git-send-email-andre.przywara@arm.com>
+ <20160331113126.GZ4126@cbox> <570B9430.2040305@arm.com>
+Message-ID: <20160412131851.GI3039@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 12, 2016 at 03:06:27PM +0200, Boris Brezillon wrote:
-> On Tue, 12 Apr 2016 13:39:12 +0200
-> Thierry Reding <thierry.reding@gmail.com> wrote:
-> 
-> > On Wed, Mar 30, 2016 at 10:03:28PM +0200, Boris Brezillon wrote:
-> > > Currently the PWM core mixes the current PWM state with the per-platform
-> > > reference config (specified through the PWM lookup table, DT definition or
-> > > directly hardcoded in PWM drivers).
-> > > 
-> > > Create a pwm_args struct to store this reference config, so that PWM users
-> > > can differentiate the current config from the reference one.
-> > > 
-> > > Patch all places where pwm->args should be initialized. We keep the
-> > > pwm_set_polarity/period() calls until all PWM users are patched to
-> > > use pwm_args instead of pwm_get_period/polarity().
+On Mon, Apr 11, 2016 at 01:10:24PM +0100, Andre Przywara wrote:
+> On 31/03/16 12:31, Christoffer Dall wrote:
+> > On Fri, Mar 25, 2016 at 02:04:43AM +0000, Andre Przywara wrote:
+> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> >> ---
+> >>  virt/kvm/arm/vgic/vgic_mmio.c | 43 ++++++++++++++++++++++++++++++++++++++++++-
+> >>  1 file changed, 42 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
+> >> index 76657ce..cde153f 100644
+> >> --- a/virt/kvm/arm/vgic/vgic_mmio.c
+> >> +++ b/virt/kvm/arm/vgic/vgic_mmio.c
+> >> @@ -471,6 +471,47 @@ static int vgic_mmio_write_config(struct kvm_vcpu *vcpu,
+> >>  	return 0;
+> >>  }
+> >>  
+> >> +static int vgic_mmio_read_target(struct kvm_vcpu *vcpu,
+> >> +				 struct kvm_io_device *this,
+> >> +				 gpa_t addr, int len, void *val)
+> >> +{
+> >> +	struct vgic_io_device *iodev = container_of(this,
+> >> +						    struct vgic_io_device, dev);
+> >> +	u32 intid = (addr - iodev->base_addr);
+> >> +	int i;
+> >> +
+> >> +	if (iodev->redist_vcpu)
+> >> +		vcpu = iodev->redist_vcpu;
+> >> +
+> >> +	for (i = 0; i < len; i++) {
+> >> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+> >> +
+> >> +		((u8 *)val)[i] = irq->targets;
+> >> +	}
+> >> +
+> >> +	return 0;
+> >> +}
+> >> +
+> >> +static int vgic_mmio_write_target(struct kvm_vcpu *vcpu,
+> >> +				  struct kvm_io_device *this,
+> >> +				  gpa_t addr, int len, const void *val)
+> >> +{
+> >> +	struct vgic_io_device *iodev = container_of(this,
+> >> +						    struct vgic_io_device, dev);
+> >> +	u32 intid = (addr - iodev->base_addr);
+> >> +	int i;
+> >> +
+> >> +	/* GICD_ITARGETSR[0-7] are read-only */
+> >> +	if (intid < VGIC_NR_PRIVATE_IRQS)
+> >> +		return 0;
+> >> +
+> >> +	for (i = 0; i < len; i++)
+> >> +		vgic_v2_irq_change_affinity(vcpu->kvm, intid + i,
+> >> +					    ((u8 *)val)[i]);
+> >> +
+> >> +	return 0;
+> >> +}
+> >> +
 > > 
-> > Perhaps a helper would be useful? Something like:
-> > 
-> > 	static inline void
-> > 	pwm_apply_args(struct pwm_device *pwm, const struct pwm_args *args)
-> > 	{
-> > 		pwm_set_duty_cycle(pwm, args->duty_cycle);
-> > 		pwm_set_period(pwm, args->period);
-> > 	}
-> > 
-> > ? That would make it slightly easier to get rid of it again after all
-> > clients have been converted.
-> > 
-> > With the exception of pwm-clps711x all of these args are set at of_xlate
-> > time (for DT) or from the lookup table in pwm_get() (for non-DT), so it
-> > might even be possible to move this call to the core, so that removal of
-> > it will be a one-liner.
+> > these functions are v2 specific but are in a generic file and are not
+> > named anything specific to v2?
 > 
-> Okay, I think I misunderstood your suggestion. I thought you wanted
-> this helper to set the reference config, but you actually want to apply
-> a new state based on the PWM reference values.
-> 
-> Except that pwm_args does not contain all the required information to
-> apply a full config (args->duty_cycle and args->enable do not exist).
-> 
-> This being said, in my v6 I moved the content of
-> pwm_regulator_adjust_pwm_config() (patch 27) into a generic helper
-> (pwm_adjust_config()). This helper is doing pretty much what you're
-> suggesting here (but again, I'm not sure I correctly understood your
-> suggestion :-/).
+> Well, technically the target register is still defined for the GICv3
+> distributor, but just RES0 if affinity routing is enabled.
 
-I'm not suggesting that pwm_apply_args() apply any state. I think we
-both agreed earlier that the initial state (represented by pwm_args) was
-never to be automatically applied.
+Shouldn't we support that then (or do we do this already via a call to
+a RAZ handle function in the register table instead)?
 
-What I was suggesting is that we move all the calls to pwm_set_period()
-and pwm_set_duty_cycle() into a central location to make it easier to
-remove them later in the series. This is really only temporary, so I
-don't mind if we leave the calls sprinkled all over the place. At least
-that way I hope we'll avoid confusion about what we're talking about =)
+> But I can of course easily add a _v2_ in here.
+> 
+> While I look at the function, it makes me wonder if the abstraction for
+> the affinity change call is actually correct at all. In contrast to the
+> other vgic_v<n>_* functions this one is about the _emulated_ VGIC model,
+> not the hardware GIC version.
+> Also we actually only have this one user here, the other call is about
+> initializing the affinity setting, for which this function is really
+> overkill.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160412/dc4900ae/attachment.sig>
+How is it overkill?  In that it takes locks which are not necessary?
+
+> So what about we move the content of the change_affinity function in
+> here (same for the v3 case later), and tackle the init case separately
+> (which is trivial)?
+
+I don't think there's much to gain in moving the code into the function,
+on the contrary, but you could move the function into this file and make
+it static.
+
+So, you're saying that the current _vX_ functions we have denote the
+hardware version, not the emulated version, so that would be wrong to do
+here?
+
+In that case, I think we should just add a comment at the top of this
+function saying it deals with GICv2 stuff only.  That, or forget I ever
+said anything here.
+
+Thanks,
+-Christoffer
+
+> 
+> > 
+> >>  struct vgic_register_region vgic_v2_dist_registers[] = {
+> >>  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
+> >>  		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12),
+> >> @@ -491,7 +532,7 @@ struct vgic_register_region vgic_v2_dist_registers[] = {
+> >>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PRI,
+> >>  		vgic_mmio_read_priority, vgic_mmio_write_priority, 8),
+> >>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_TARGET,
+> >> -		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 8),
+> >> +		vgic_mmio_read_target, vgic_mmio_write_target, 8),
+> >>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_CONFIG,
+> >>  		vgic_mmio_read_config, vgic_mmio_write_config, 2),
+> >>  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SOFTINT,
+> >> -- 
+> >> 2.7.3
+> >>
+> >> --
+> >> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> >> the body of a message to majordomo at vger.kernel.org
+> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > 
