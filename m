@@ -1,111 +1,49 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 12 Apr 2016 09:37:50 -0700
-Subject: [PATCH v2 0/3] ARM: OMAP3: Fix McBSP2/3 hwmod setup for sidetone
-In-Reply-To: <570CC54E.6020703@ti.com>
-References: <alpine.DEB.2.02.1603191937430.6629@utopia.booyaka.com>
- <56EFB794.5010505@ti.com>
- <alpine.DEB.2.02.1603211743200.31059@utopia.booyaka.com>
- <56FE407E.9030803@ti.com> <20160402001753.GR9329@atomide.com>
- <57026205.6020105@ti.com> <20160404151200.GA4652@atomide.com>
- <5703BA6B.1080208@ti.com> <20160411212845.GJ5995@atomide.com>
- <570CC54E.6020703@ti.com>
-Message-ID: <20160412163750.GR5995@atomide.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 12 Apr 2016 17:44:13 +0100
+Subject: [PATCH v2 2/4] PCI: Provide common functions for ECAM mapping
+In-Reply-To: <570C78F1.4090701@jonmasters.org>
+References: <1460414707-19153-1-git-send-email-jchandra@broadcom.com>
+ <1460414707-19153-3-git-send-email-jchandra@broadcom.com>
+ <570C4034.20105@caviumnetworks.com>
+ <570C78F1.4090701@jonmasters.org>
+Message-ID: <20160412164413.GA32297@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [160412 02:53]:
-> Tony,
-> 
-> On 04/12/16 00:28, Tony Lindgren wrote:
-> >>> Then for the long term solution using
-> >>> PM runtime to block gating of the clock while sidetone is active is
-> >>> the way to go it seems.
-> >>
-> >> Hrm, I think one of the main issue is that with pm_runtime we can not block
-> >> the clock gating, this is why legacy code uses enable_st_clock(), which will
-> >> call omap2_clk_deny_idle() or omap2_clk_allow_idle().
-> > 
-> > I see. I think Tero wanted to export omap2_clk_allow_idle() and
-> > omap2_clk_deny_idle() for drivers to use. That should get discussed in
-> > the linux-clk list, probably best to use the pdata callbacks until
-> > the clock idling issue has been discussed.
-> 
-> It is already exported, used by the arch/arm/mach-omap2/mcbsp.c file.
+On Tue, Apr 12, 2016 at 12:26:25AM -0400, Jon Masters wrote:
 
-Oh but not with EXPORT_SYMBOL so not usable except for built-in code.
-Probably best to keep it that way IMO..
+[...]
 
-> Why not to remove the callback for legacy also and handle it in the driver? It
-> is less ugly in my opinion.
-> Going via the pdata callback is just going to cement the current setup.
+> Quoting Bjorn's original reply to the previous series:
+> 
+> > Some of the code that moved to drivers/acpi/pci_mcfg.c is not
+> > really ACPI-specific, and could potentially be used for non-ACPI
+> > bridges that support ECAM.  I'd like to see that sort of code
+> > moved to a new file like drivers/pci/ecam.c.
+> 
+> So my guess is that this is the reasoning behind JC's file layout.
+> 
+> I'm curious what Lorenzo's take on things is currently. I assume this
+> series is now to be the official coordinated version of this effort for
+> upstream, following the advice of Bjorn previously, but I would like to
+> know if everyone is behind this plan. I've (previously) requested a
+> Linaro LEG meeting this week (part of our bootarch working group) to
+> specifically discuss the status of PCI upstreaming in order to get the
+> different vendors together to ensure every single one of them is
+> tracking the correct latest effort and doing what is needed to test/aid,
+> hence my ask. If this is now plan A, I'll make sure everyone is aligned
+> behind it and start pinging people individually for testing.
 
-Sure, maybe you can have a piece of built-in driver code to do that?
+My take is that JC's aim is to get this four patch series reviewed and
+merged (which is *not* sufficient to get ACPI PCI to work fully on ARM64
+- see cover letter - the remaining patches in his branch are not
+fixes, it is code that is required to get things to work, these 4
+patches stand alone are not sufficient but I understand he wants to get
+them reviewed following feedback on the lists) so that we can make
+progress on ACPI PCI on ARM64.
 
-> I have drafted out something which would be needed if we separate the McBSP-ST
-> from the McBSP driver. It is not pretty...
-> 
-> In the new omap3-mcbsp-st.h:
-> 
-> struct omap3_mcbspst;
-> 
-> struct omap_st_to_mcbsp_data {
-> 	bool (*is_enabled)(struct omap_st_to_mcbsp_data *st_data);
-> 	bool (*enable)(struct omap_st_to_mcbsp_data *st_data);
-> 	bool (*disable)(struct omap_st_to_mcbsp_data *st_data);
-> 	struct omap3_mcbspst *st_priv;
-> };
-> 
-> In the current omap-mcbsp.h:
-> 
-> #include <omap3-mcbsp-st.h>
-> ...
-> struct omap_mcbsp_to_st_data {
-> 	bool (*is_enabled)(struct omap_mcbsp_to_st_data *mcbsp_data);
-> 	bool (*iclk_idle)(struct omap_mcbsp_to_st_data *mcbsp_data, bool allow);
-> 	bool (*enable)(struct omap_mcbsp_to_st_data *mcbsp_data);
-> 	bool (*disable)(struct omap_mcbsp_to_st_data *mcbsp_data);
-> 	struct omap_mcbsp *mcbsp_priv;
-> };
-> 
-> #ifdef CONFIG_SND_SOC_OMAP3_MCBSPST
-> struct omap_mcbsp_to_st_data *omap_mcbsp_st_register(
-> 						struct platform_device *pdev, /* McBSP pdev! probably? */
-> 						struct omap_st_to_mcbsp_data *st_data);
-> int omap_mcbsp_st_unregister(struct omap_st_to_mcbsp_data *st_data);
-> #else
-> static inline int omap_mcbsp_st_register(struct platform_device *pdev,
-> 					 struct omap_st_to_mcbsp_data *st_data)
-> {
-> 	return -ENODEV;
-> }
-> static inline int omap_mcbsp_st_unregister(struct omap_st_to_mcbsp_data *st_data)
-> {
-> 	return 0;
-> }
-> #endif
-> 
-> Since the ST would be separate driver, it should create the needed ALSA
-> controls as well, probably I need to pass something else here and there.
-> But, in this setup it would be possible to remove the ST driver while the
-> McBSP and the sound card is up, which means we must be able to remove
-> kcontrols runtime, probably there is a way, but not sure about this.
-> 
-> There will be issues like this we have not prepared for I'm sure if we do
-> dramatic change to the simple implementation we have right now.
+I will comment on the patches as soon as I have time to review
+them, I certainly would like to understand what we have to do with the
+rest of the code though (provided this series is good to go) see above.
 
-Best to stick to incremental improvments I think..
-
-> I have reasonably clean patches (6 of them) on top of this three which would
-> remove the arch code for the iclk handling and implements it in the mcbsp
-> driver w/o changing the architecture of the McBSP driver itself. Both DT and
-> legacy boot works. The only part I was not happy about the one where I looked
-> up the mcbsp2/3_ick, but I think I have found much cleaner way to do it
-> (meaning that the code will not look hackish at all).
-> If you want to see, I can make this change and I can send the whole thing as
-> RFC and continue the discussion around that?
-
-Sure, especially if that helps with splitting up the modules too.
-
-Regards,
-
-Tony
+Lorenzo
