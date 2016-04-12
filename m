@@ -1,29 +1,42 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 12 Apr 2016 16:20:12 +0200
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable CPUFreq governors as
- modules
-In-Reply-To: <1460142130-31822-2-git-send-email-javier@osg.samsung.com>
-References: <1460142130-31822-1-git-send-email-javier@osg.samsung.com>
- <1460142130-31822-2-git-send-email-javier@osg.samsung.com>
-Message-ID: <CAJKOXPePp9S9y=vrOf+H0Vu_vD_AZ0VN+MUTBQWyZRF3PowRNw@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 12 Apr 2016 16:25:09 +0200
+Subject: [PATCH v5 02/46] backlight: pwm_bl: remove useless call to
+ pwm_set_period()
+In-Reply-To: <20160412141653.GJ8094@x1>
+References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1459368249-13241-3-git-send-email-boris.brezillon@free-electrons.com>
+ <20160412110350.GH18882@ulmo.ba.sec> <20160412141653.GJ8094@x1>
+Message-ID: <20160412142509.GA25006@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 8, 2016 at 9:02 PM, Javier Martinez Canillas
-<javier@osg.samsung.com> wrote:
-> Currently only the ondemand and performance CPUFreq policy governors are
-> enabled in multi_v7 defconfig. But the other governors are also useful
-> for some cases, enable them to allow users change the default if needed.
->
-> The options are enabled as module to keep the kernel image size minimal.
->
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->
-> ---
->
->  arch/arm/configs/multi_v7_defconfig | 4 ++++
->  1 file changed, 4 insertions(+)
+On Tue, Apr 12, 2016 at 03:16:53PM +0100, Lee Jones wrote:
+> On Tue, 12 Apr 2016, Thierry Reding wrote:
+> 
+> > On Wed, Mar 30, 2016 at 10:03:25PM +0200, Boris Brezillon wrote:
+> > > The PWM period will be set when calling pwm_config. Remove this useless
+> > > call to pwm_set_period(), which might mess up with the internal PWM state.
+> > > 
+> > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > > Acked-by: Lee Jones <lee.jones@linaro.org>
+> > > ---
+> > >  drivers/video/backlight/pwm_bl.c | 4 +---
+> > >  1 file changed, 1 insertion(+), 3 deletions(-)
+> > 
+> > Applied, thanks.
+> 
+> Applied?
 
-Applied, thanks.
+You Acked it, so I assumed you were fine with me taking it through the
+PWM tree to take care of the dependencies.
 
-Krzysztof
+Did I assume wrongly?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160412/9025c97c/attachment.sig>
