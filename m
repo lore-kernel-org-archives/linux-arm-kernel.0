@@ -1,45 +1,58 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 12 Apr 2016 10:59:59 +0800
-Subject: [PATCH] arm: dts: imx6q-ba16: Disable pwm2 by default
-In-Reply-To: <1459545570-16390-1-git-send-email-akshay.bhat@timesys.com>
-References: <1459545570-16390-1-git-send-email-akshay.bhat@timesys.com>
-Message-ID: <20160412025959.GE15949@tiger>
+From: jcm@jonmasters.org (Jon Masters)
+Date: Tue, 12 Apr 2016 00:26:25 -0400
+Subject: [PATCH v2 2/4] PCI: Provide common functions for ECAM mapping
+In-Reply-To: <570C4034.20105@caviumnetworks.com>
+References: <1460414707-19153-1-git-send-email-jchandra@broadcom.com>
+ <1460414707-19153-3-git-send-email-jchandra@broadcom.com>
+ <570C4034.20105@caviumnetworks.com>
+Message-ID: <570C78F1.4090701@jonmasters.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 01, 2016 at 05:19:30PM -0400, Akshay Bhat wrote:
-> From: Justin Waters <justin.waters@timesys.com>
-> 
-> pwm2 is provided on the BA16 Q7 module, but is not used on any
-> of the current configurations. However, future platforms may
-> utilize this device, so we are simply disabling the node rather
-> than removing it completely.
-> 
-> Signed-off-by: Justin Waters <justin.waters@timeys.com>
-> Signed-off-by: Akshay Bhat <akshay.bhat@timesys.com>
+Hi David, JC,
 
-Changed the lowercase 'arm' to 'ARM' in subject and applied the patch.
+On 04/11/2016 08:24 PM, David Daney wrote:
 
-Shawn
+> Tested-by: David Daney <david.daney@cavium.com>
 
-> ---
->  arch/arm/boot/dts/imx6q-ba16.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+On ThunderX (please let me know the silicon pass specifics off-list)?
+I'm planning to give this series a test run also on some other ARMv8
+hardware and will prod a few of the other vendors to do so.
+
+>>   drivers/pci/ecam.c   | 130
+>>   drivers/pci/ecam.h   |  58 +++++++++++++++++++++++
 > 
-> diff --git a/arch/arm/boot/dts/imx6q-ba16.dtsi b/arch/arm/boot/dts/imx6q-ba16.dtsi
-> index fcc7b50..3f33a2a 100644
-> --- a/arch/arm/boot/dts/imx6q-ba16.dtsi
-> +++ b/arch/arm/boot/dts/imx6q-ba16.dtsi
-> @@ -337,7 +337,7 @@
->  &pwm2 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_pwm2>;
-> -	status = "okay";
-> +	status = "disabled";
->  };
->  
->  &sata {
-> -- 
-> 2.8.0
+> I wonder if these files should go in drivers/pci/host ...  I understand
+> that you still have to use them from drivers/pci/acpi though.
 > 
+> I will let others opine on this, but could you put the contents of
+> ecam.h into include/linux/pci.h along with the  pci_generic_config_*()
+> declarations?
 > 
+> If you did that, the contents of ecam.c could  go into
+> drivers/pci/access.c...
+
+Quoting Bjorn's original reply to the previous series:
+
+> Some of the code that moved to drivers/acpi/pci_mcfg.c is not
+> really ACPI-specific, and could potentially be used for non-ACPI
+> bridges that support ECAM.  I'd like to see that sort of code
+> moved to a new file like drivers/pci/ecam.c.
+
+So my guess is that this is the reasoning behind JC's file layout.
+
+I'm curious what Lorenzo's take on things is currently. I assume this
+series is now to be the official coordinated version of this effort for
+upstream, following the advice of Bjorn previously, but I would like to
+know if everyone is behind this plan. I've (previously) requested a
+Linaro LEG meeting this week (part of our bootarch working group) to
+specifically discuss the status of PCI upstreaming in order to get the
+different vendors together to ensure every single one of them is
+tracking the correct latest effort and doing what is needed to test/aid,
+hence my ask. If this is now plan A, I'll make sure everyone is aligned
+behind it and start pinging people individually for testing.
+
+Jon.
+
+-- 
+Computer Architect
