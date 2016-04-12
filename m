@@ -1,37 +1,45 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 12 Apr 2016 23:13:56 +0200
-Subject: [PATCH v3] i2c: mediatek: i2c multi transfer optimization
-In-Reply-To: <1457375031-3769-1-git-send-email-liguo.zhang@mediatek.com>
-References: <1457375031-3769-1-git-send-email-liguo.zhang@mediatek.com>
-Message-ID: <20160412211355.GA1526@katana>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 12 Apr 2016 14:15:08 -0700
+Subject: [PATCH V2] ARM: dts: AM572x-IDK Initial Support
+In-Reply-To: <20160328211015.GA28249@rob-hp-laptop>
+References: <1459182909-23502-1-git-send-email-nm@ti.com>
+ <20160328211015.GA28249@rob-hp-laptop>
+Message-ID: <20160412211508.GF5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-thanks for the submission!
-
-On Tue, Mar 08, 2016 at 02:23:51AM +0800, Liguo Zhang wrote:
-> Signal complete() in the i2c irq handler after one transfer done,
-> and then wait_for_completion_timeout() will return, this procedure
-> may cost much time, so only signal complete() when the entire
-> transaction has been completed, it will reduce the entire transaction
-> time.
+* Rob Herring <robh@kernel.org> [160328 14:11]:
+> On Mon, Mar 28, 2016 at 11:35:09AM -0500, Nishanth Menon wrote:
+> > From: Schuyler Patton <spatton@ti.com>
+> > 
+> > The AM572x-IDK board is a board based on TI's AM5728 SOC
+> > which has a dual core 1.5GHz A15 processor. This board is a
+> > development platform for the Industrial market with:
+> > - 2GB of DDR3L
+> > - Dual 1Gbps Ethernet
+> > - HDMI,
+> > - PRU-ICSS
+> > - uSD
+> > - 16GB eMMC
+> > - CAN
+> > - RS-485
+> > - PCIe
+> > - USB3.0
+> > - Video Input Port
+> > - Industrial IO port and expansion connector
+> > 
+> > The link to the data sheet and TRM can be found here:
+> > 
+> > http://www.ti.com/product/AM5728
+> > 
+> > This patch creates a common dtsi file that will provide a common board
+> > dtsi file to define the nodes that are common to AM57xx (including the
+> > upcoming AM5718) IDK boards.
+> > 
+> > Initial support is only for basic peripherals
 > 
-> Signed-off-by: Liguo Zhang <liguo.zhang@mediatek.com>
+> Acked-by: Rob Herring <robh@kernel.org>
 
-I wonder. You have less context switches, yes. On the other hand, you
-likely have bigger interrupt latency because you do more stuff in the
-interrupt handler. Is it really a gain in the end?
+Applying into omap-for-v4.7/dt thanks.
 
-Regards,
-
-   Wolfram
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160412/d949e8c7/attachment.sig>
+Tony
