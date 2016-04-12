@@ -1,26 +1,23 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 12 Apr 2016 14:22:37 -0700
-Subject: [PATCH 1/5] devicetree: bindings: Add vendor prefix for
- Amazon.com, Inc.
-In-Reply-To: <20160401170110.GA8364@rob-hp-laptop>
-References: <1459279707-17611-1-git-send-email-contact@paulk.fr>
- <1459279707-17611-3-git-send-email-contact@paulk.fr>
- <20160401170110.GA8364@rob-hp-laptop>
-Message-ID: <20160412212236.GI5995@atomide.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 12 Apr 2016 23:38:48 +0200
+Subject: [PATCH 1/2] i2c: rk3x: add support for rk3228
+In-Reply-To: <1457924955-29996-1-git-send-email-ykk@rock-chips.com>
+References: <1457924955-29996-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <20160412213848.GE1526@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rob Herring <robh@kernel.org> [160401 10:02]:
-> On Tue, Mar 29, 2016 at 09:28:23PM +0200, Paul Kocialkowski wrote:
-> > This adds the amazon vendor prefix for Amazon.com, Inc.
-> > 
-> > Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
-> > ---
-> >  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
-> >  1 file changed, 1 insertion(+)
+On Mon, Mar 14, 2016 at 11:09:15AM +0800, Yakir Yang wrote:
+> Enable the I2C core for this SoC.
 > 
-> Acked-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
 
-Applying this whole series into omap-for-v4.7/dt thanks.
+Applied to for-current, thanks!
 
-Tony
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160412/da8bfff3/attachment.sig>
