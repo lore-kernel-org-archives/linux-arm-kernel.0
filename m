@@ -1,45 +1,36 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 12 Apr 2016 12:29:00 +0530
-Subject: [PATCH] ARM: davinci: only use NVMEM when available
-In-Reply-To: <1458077705-408437-1-git-send-email-arnd@arndb.de>
-References: <1458077705-408437-1-git-send-email-arnd@arndb.de>
-Message-ID: <570C9CB4.9090409@ti.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 12 Apr 2016 09:23:33 +0200
+Subject: [PATCH v9 01/20] PM / devfreq: exynos: Add generic exynos bus
+ frequency driver
+In-Reply-To: <1460347078-15175-2-git-send-email-cw00.choi@samsung.com>
+References: <1460347078-15175-1-git-send-email-cw00.choi@samsung.com>
+ <1460347078-15175-2-git-send-email-cw00.choi@samsung.com>
+Message-ID: <570CA275.6000903@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 16 March 2016 03:04 AM, Arnd Bergmann wrote:
-> The davinci platform contains code that calls into the nvmem
-> subsystem, but that might be a loadable module, causing a
-> link error:
+On 04/11/2016 05:57 AM, Chanwoo Choi wrote:
+> This patch adds the generic exynos bus frequency driver for AMBA AXI bus
+> of sub-blocks in exynos SoC with DEVFREQ framework. The Samsung Exynos SoC
+> have the common architecture for bus between DRAM and sub-blocks in SoC.
+> This driver can support the generic bus frequency driver for Exynos SoCs.
 > 
-> arch/arm/mach-davinci/built-in.o: In function `davinci_get_mac_addr':
-> :(.text+0x1088): undefined reference to `nvmem_device_read'
-> arch/arm/mach-davinci/built-in.o: In function `read_factory_config':
-> :(.text+0x214c): undefined reference to `nvmem_device_read'
+> In devicetree, Each bus block has a bus clock, regulator, operation-point
+> and devfreq-event devices which measure the utilization of each bus block.
 > 
-> Also, when NVMEM is completely disabled, the functions fail with
-> nonobvious error messages.
-> 
-> This ensures we only call the API functions when the code is actually
-> reachable from the board file, and otherwise prints a unique log
-> message.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: bec3c11bad0e ("misc: at24: replace memory_accessor with nvmem_device_read")
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> [m.reichl and linux.amoon: Tested it on exynos4412-odroidu3 board]
+> Tested-by: Markus Reichl <m.reichl@fivetechno.de>
+> Tested-by: Anand Moon <linux.amoon@gmail.com>
+> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
 > ---
-> 
-> Hi Greg,
-> 
-> The commit that introduced this is currently in the char-misc tree,
-> please apply this fixup on top if you haven't already sent it to Linus.
+>  drivers/devfreq/Kconfig      |  15 ++
+>  drivers/devfreq/Makefile     |   1 +
+>  drivers/devfreq/exynos-bus.c | 443 +++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 459 insertions(+)
+>  create mode 100644 drivers/devfreq/exynos-bus.c
 
-I don't see this patch in Linus's tree still. I can send this fixup
-through ARM-SoC since its all touching mach-davinci anyway. Let me know.
+Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-> 
->  arch/arm/mach-davinci/board-mityomapl138.c | 5 +++++
->  arch/arm/mach-davinci/common.c             | 5 +++++
->  2 files changed, 10 insertions(+)
-
-Regards,
-Sekhar
+Best regards,
+Krzysztof
