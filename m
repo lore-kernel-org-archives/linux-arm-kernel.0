@@ -1,116 +1,75 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 12 Apr 2016 14:55:19 +0200
-Subject: [RFC PATCH 14/45] KVM: arm/arm64: vgic-new: Add CTLR, TYPER and
- IIDR handlers
-In-Reply-To: <570B892D.7070308@arm.com>
-References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
- <1458871508-17279-15-git-send-email-andre.przywara@arm.com>
- <20160331092727.GT4126@cbox> <570B892D.7070308@arm.com>
-Message-ID: <20160412125519.GF3039@cbox>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 12 Apr 2016 14:55:11 +0200
+Subject: [PATCH v5 05/46] pwm: introduce the pwm_args concept
+In-Reply-To: <20160412122029.GO18882@ulmo.ba.sec>
+References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1459368249-13241-6-git-send-email-boris.brezillon@free-electrons.com>
+ <20160412113912.GK18882@ulmo.ba.sec>
+ <20160412140412.42704302@bbrezillon>
+ <20160412122029.GO18882@ulmo.ba.sec>
+Message-ID: <20160412145511.2f13d24f@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 11, 2016 at 12:23:25PM +0100, Andre Przywara wrote:
-> On 31/03/16 10:27, Christoffer Dall wrote:
-> > On Fri, Mar 25, 2016 at 02:04:37AM +0000, Andre Przywara wrote:
-> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> >> ---
-> >>  virt/kvm/arm/vgic/vgic.h      |  3 +++
-> >>  virt/kvm/arm/vgic/vgic_mmio.c | 49 ++++++++++++++++++++++++++++++++++++++++++-
-> >>  2 files changed, 51 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> >> index a462e2b..57aea8f 100644
-> >> --- a/virt/kvm/arm/vgic/vgic.h
-> >> +++ b/virt/kvm/arm/vgic/vgic.h
-> >> @@ -16,6 +16,9 @@
-> >>  #ifndef __KVM_ARM_VGIC_NEW_H__
-> >>  #define __KVM_ARM_VGIC_NEW_H__
-> >>  
-> >> +#define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
-> >> +#define IMPLEMENTER_ARM		0x43b
-> >> +
-> >>  struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
-> >>  			      u32 intid);
-> >>  bool vgic_queue_irq(struct kvm *kvm, struct vgic_irq *irq);
-> >> diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
-> >> index e1fd17f..e62366e 100644
-> >> --- a/virt/kvm/arm/vgic/vgic_mmio.c
-> >> +++ b/virt/kvm/arm/vgic/vgic_mmio.c
-> >> @@ -82,9 +82,56 @@ static int vgic_mmio_write_nyi(struct kvm_vcpu *vcpu,
-> >>  	return 0;
-> >>  }
-> >>  
-> >> +static int vgic_mmio_read_v2_misc(struct kvm_vcpu *vcpu,
-> >> +				  struct kvm_io_device *this,
-> >> +				  gpa_t addr, int len, void *val)
-> >> +{
-> >> +	struct vgic_io_device *iodev = container_of(this,
-> >> +						    struct vgic_io_device, dev);
-> >> +	u32 value;
-> >> +
-> >> +	switch ((addr - iodev->base_addr) & ~3) {
-> >> +	case 0x0:
-> >> +		value = vcpu->kvm->arch.vgic.enabled ? GICD_ENABLE : 0;
-> >> +		break;
-> >> +	case 0x4:
-> >> +		value = vcpu->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
-> >> +		value = (value >> 5) - 1;
-> >> +		value |= (atomic_read(&vcpu->kvm->online_vcpus) - 1) << 5;
-> >> +		break;
-> >> +	case 0x8:
-> >> +		value = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
-> >> +		break;
-> >> +	default:
-> >> +		return 0;
-> >> +	}
-> >> +
-> >> +	write_mask32(value, addr & 3, len, val);
-> >> +	return 0;
-> >> +}
-> >> +
-> >> +static int vgic_mmio_write_v2_misc(struct kvm_vcpu *vcpu,
-> >> +				   struct kvm_io_device *this,
-> >> +				   gpa_t addr, int len, const void *val)
-> >> +{
-> >> +	struct vgic_io_device *iodev = container_of(this,
-> >> +						    struct vgic_io_device, dev);
-> >> +	/*
-> >> +	 * GICD_TYPER and GICD_IIDR are read-only, the upper three bytes of
-> >> +	 * GICD_CTLR are reserved.
-> >> +	 */
-> >> +	if (addr - iodev->base_addr >= 1)
-> >> +		return 0;
-> >> +
-> >> +	vcpu->kvm->arch.vgic.enabled = (*(u32 *)val) ? true : false;
-> >> +	/* TODO: is there anything to trigger at this point? */
+On Tue, 12 Apr 2016 14:20:29 +0200
+Thierry Reding <thierry.reding@gmail.com> wrote:
+
+> On Tue, Apr 12, 2016 at 02:04:12PM +0200, Boris Brezillon wrote:
+> > On Tue, 12 Apr 2016 13:39:12 +0200
+> > Thierry Reding <thierry.reding@gmail.com> wrote:
 > > 
-> > I guess we should actually check if the vgic is enabled in PATH 11, and
-> > we should kick all VCPUs (or at least those with something pending) if
-> > we went from disabled to enabled?
+> > > On Wed, Mar 30, 2016 at 10:03:28PM +0200, Boris Brezillon wrote:
+> > > > Currently the PWM core mixes the current PWM state with the per-platform
+> > > > reference config (specified through the PWM lookup table, DT definition or
+> > > > directly hardcoded in PWM drivers).
+> > > > 
+> > > > Create a pwm_args struct to store this reference config, so that PWM users
+> > > > can differentiate the current config from the reference one.
+> > > > 
+> > > > Patch all places where pwm->args should be initialized. We keep the
+> > > > pwm_set_polarity/period() calls until all PWM users are patched to
+> > > > use pwm_args instead of pwm_get_period/polarity().
+> > > 
+> > > Perhaps a helper would be useful? Something like:
+> > > 
+> > > 	static inline void
+> > > 	pwm_apply_args(struct pwm_device *pwm, const struct pwm_args *args)
+> > > 	{
+> > > 		pwm_set_duty_cycle(pwm, args->duty_cycle);
+> > > 		pwm_set_period(pwm, args->period);
+> > > 	}
+> > > 
+> > > ? That would make it slightly easier to get rid of it again after all
+> > > clients have been converted.
 > > 
-> > We should probably also check this in the sync function...
+> > Sure. I'll add this helper.
 > > 
-> > Or do we enforce this enabled bool somewhere else that I missed?
+> > > 
+> > > With the exception of pwm-clps711x all of these args are set at of_xlate
+> > > time (for DT) or from the lookup table in pwm_get() (for non-DT), so it
+> > > might even be possible to move this call to the core, so that removal of
+> > > it will be a one-liner.
+> > 
+> > Not sure I get that one. Some drivers are implementing their own
+> > ->of_xlate() method, how would you get rid of this pwm_apply_args() in
+> > those custom implementations?
 > 
-> Good point, I guess in the moment we just rely upon the VGIC being
-> enabled very early and never getting disabled.
-> So I will introduce checks in kvm_vgic_vcpu_pending_irq and the flush
-> function (which is called before entering the guest, I guess this is
-> what you meant with the "sync function"?), also kick all (?) VCPUs here
-> in case we enable the GIC.
+> I was proposing to have pwm_apply_args() called from the core.
+> of_pwm_get() is where ->of_xlate() is called from, and the lookup table
+> arguments would be applied in pwm_get(). Taking into account clps711x,
+> which sets the arguments in ->request() it might be possible to simply
+> call pwm_apply_args() from pwm_device_request(), since that's also
+> called by all other request functions, even the legacy ones.
+> 
+> That said, the amount of code to modify isn't that large, so I'm fine if
+> you want to keep sprinkling the calls across multiple files, especially
+> since it's temporary.
 
-I'm not sure what I meant by the sync function, perhaps I meant queue
-function really (I usually don't have troubles telling sync/flush
-apart).
+No, I'm fine addressing that, but I just don't get where you'd get the
+pwm_args to apply. Do you suggest to pass 'struct pwm_args *' to the
+->of_xlate() and ->request() methods?
 
-In any case, dealing with the enabled setting has consequences pretty
-much all over I think.
-
-Side question: Can you EOI an active interrupt even if you disabled the
-VGIC?  I think the spec only says that the enabled bit prevents the GIC
-from forwarding pending interrupts to the CPU interface or something
-like that?
-
-Thanks,
--Christoffer
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
