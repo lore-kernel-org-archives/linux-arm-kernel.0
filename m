@@ -1,89 +1,142 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Tue, 12 Apr 2016 23:03:41 +0900
-Subject: [PATCH 1/2] arm64: mem-model: add flatmem model for arm64
-In-Reply-To: <570B10B2.2000000@hisilicon.com>
-References: <1459844572-53069-1-git-send-email-puck.chen@hisilicon.com>
- <20160407142148.GI5657@arm.com> <570B10B2.2000000@hisilicon.com>
-Message-ID: <BB685A51-165C-424C-8359-58F7F3E379B7@gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 12 Apr 2016 16:05:46 +0200
+Subject: [PATCH v5 15/46] pwm: introduce the pwm_state concept
+In-Reply-To: <20160412152644.45ff517a@bbrezillon>
+References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1459368249-13241-16-git-send-email-boris.brezillon@free-electrons.com>
+ <20160412114904.GM18882@ulmo.ba.sec>
+ <20160412141718.5fe4cf24@bbrezillon>
+ <20160412122141.GP18882@ulmo.ba.sec>
+ <20160412144508.2ee181fe@bbrezillon>
+ <20160412131118.GQ18882@ulmo.ba.sec>
+ <20160412152644.45ff517a@bbrezillon>
+Message-ID: <20160412140546.GS18882@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Apr 11, 2016, at 11:49 AM, Chen Feng wrote:
+On Tue, Apr 12, 2016 at 03:26:44PM +0200, Boris Brezillon wrote:
+> On Tue, 12 Apr 2016 15:11:18 +0200
+> Thierry Reding <thierry.reding@gmail.com> wrote:
+> 
+> > On Tue, Apr 12, 2016 at 02:45:08PM +0200, Boris Brezillon wrote:
+> > > On Tue, 12 Apr 2016 14:21:41 +0200
+> > > Thierry Reding <thierry.reding@gmail.com> wrote:
+> > > 
+> > > > On Tue, Apr 12, 2016 at 02:17:18PM +0200, Boris Brezillon wrote:
+> > > > > On Tue, 12 Apr 2016 13:49:04 +0200
+> > > > > Thierry Reding <thierry.reding@gmail.com> wrote:
+> > > > > 
+> > > > > > On Wed, Mar 30, 2016 at 10:03:38PM +0200, Boris Brezillon wrote:
+> > > > > > > The PWM state, represented by its period, duty_cycle and polarity,
+> > > > > > > is currently directly stored in the PWM device.
+> > > > > > > Declare a pwm_state structure embedding those field so that we can later
+> > > > > > > use this struct to atomically update all the PWM parameters at once.
+> > > > > > > 
+> > > > > > > All pwm_get_xxx() helpers are now implemented as wrappers around
+> > > > > > > pwm_get_state().
+> > > > > > > 
+> > > > > > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > > > > > > ---
+> > > > > > >  drivers/pwm/core.c  |  8 ++++----
+> > > > > > >  include/linux/pwm.h | 54 +++++++++++++++++++++++++++++++++++++++++------------
+> > > > > > >  2 files changed, 46 insertions(+), 16 deletions(-)
+> > > > > > > 
+> > > > > > > diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+> > > > > > > index 6433059..f3f91e7 100644
+> > > > > > > --- a/drivers/pwm/core.c
+> > > > > > > +++ b/drivers/pwm/core.c
+> > > > > > > @@ -268,7 +268,7 @@ int pwmchip_add_with_polarity(struct pwm_chip *chip,
+> > > > > > >  		pwm->chip = chip;
+> > > > > > >  		pwm->pwm = chip->base + i;
+> > > > > > >  		pwm->hwpwm = i;
+> > > > > > > -		pwm->polarity = polarity;
+> > > > > > > +		pwm->state.polarity = polarity;
+> > > > > > 
+> > > > > > Would this not more correctly be assigned to pwm->args.polarity? After
+> > > > > > all this is setting up the "initial" state, much like DT or the lookup
+> > > > > > tables would for duty cycle and period.
+> > > > > 
+> > > > > Yes, I wasn't sure about the pwm_add_with_polarity() meaning. To me,
+> > > > > all the reference info should be extracted from DT, PWM lookup table or
+> > > > > driver specific ->request() implementation, but I can definitely
+> > > > > initialize the args.polarity here too.
+> > > > > 
+> > > > > Should I keep the pwm->state.polarity assignment (to set the initial
+> > > > > polarity when the driver does not support hardware readout)?
+> > > > 
+> > > > Wouldn't this work automatically as part of the pwm_apply_args() helper
+> > > > if we extended it with this setting?
+> > > 
+> > > Well, as you explained in you answer to patch 5, pwm_apply_args()
+> > > should be called on a per-request basis (each time a PWM device is
+> > > requested), while the initial polarity setting should only be applied
+> > > when registering the PWM chip (and its devices). After that, the
+> > > framework takes care of keeping the PWM state in sync with the hardware
+> > > state.
+> > > 
+> > > Let's take a real (though a bit unusual) example. Say you have a single
+> > > PWM device referenced by two different users. Only one user can be
+> > > enabled at a time, but each of them has its own reference config
+> > > (different polarity, different period).
+> > > 
+> > > User1 calls pwm_get() and applies its own polarity and period. Then
+> > > user1 is unregistered and release the PWM device, leaving the polarity
+> > > and period untouched.
+> > > 
+> > > User2 is registered and request the same PWM device, but user2 is
+> > > smarter and tries to extract the current PWM state before adapting the
+> > > config according to pwm_args. If you just reset pwm->state.polarity
+> > > each time pwm_apply_args() is called (and you suggested to call it as
+> > > part of the request procedure), then this means the PWM state is no
+> > > longer in sync with the hardware state.
+> > 
+> > In that case neither will be the period or duty cycle. Essentially this
+> > gets us back to square one where we need to decide how to handle current
+> > state vs. initial arguments.
+> 
+> That's not true. Now we clearly differentiate the reference config
+> (content of pwm_args which is only a subset of what you'll find in
+> pwm_state) and the PWM state (represented by pwm_state).
+> 
+> We should be safe as long as we keep those 2 elements as 2 orthogonal
+> concepts:
+> - pwm_args is supposed to give some hint to the PWM user to help him
+>   configure it's PWM appropriately
+> - pwm_state is here to reflect the real PWM state, and apply new
+>   configs
+> 
+> > 
+> > But I don't think this is really going to be an issue because this is
+> > all moot until we've moved over to the atomic API, at which point this
+> > is all going to go away anyway.
+> 
+> As stated in my answer to patch 5, I think I misunderstood your
+> suggestion. pwm_apply_args() is supposed to adjust the PWM config to
+> match the period and polarity specified in pwm_args, right?
+> 
+> If that's the case, my question is, should we really call this function
+> each time a new user requests a PWM instead of letting those users call
+> the function on-demand (not all users want to adapt the current PWM
+> config to the pwm_args, some may just want to apply a completely new
+> config).
 
-Dear Chen,
+I think we're still talking past each other. I didn't mean for this to
+be a proper part of the API. Like you said the struct pwm_args doesn't
+contain enough data to construct a complete state and apply it.
 
-> Hi will,
-> Thanks for review.
-> 
-> On 2016/4/7 22:21, Will Deacon wrote:
->> On Tue, Apr 05, 2016 at 04:22:51PM +0800, Chen Feng wrote:
->>> We can reduce the memory allocated at mem-map
->>> by flatmem.
->>> 
->>> currently, the default memory-model in arm64 is
->>> sparse memory. The mem-map array is not freed in
->>> this scene. If the physical address is too long,
->>> it will reserved too much memory for the mem-map
->>> array.
->> 
->> Can you elaborate a bit more on this, please? We use the vmemmap, so any
->> spaces between memory banks only burns up virtual space. What exactly is
->> the problem you're seeing that makes you want to use flatmem (which is
->> probably unsuitable for the majority of arm64 machines).
->> 
-> The root cause we want to use flat-mem is the mam_map alloced in sparse-mem
-> is not freed.
-> 
-> take a look at here:
-> arm64/mm/init.c
-> void __init mem_init(void)
-> {
-> #ifndef CONFIG_SPARSEMEM_VMEMMAP
-> 	free_unused_memmap();
-> #endif
-> }
-> 
-> Memory layout (3GB)
-> 
-> 0             1.5G    2G             3.5G            4G
-> |              |      |               |              |
-> +--------------+------+---------------+--------------+
-> |    MEM       | hole |     MEM       |   IO (regs)  |
-> +--------------+------+---------------+--------------+
-> 
-> 
-> Memory layout (4GB)
-> 
-> 0                                    3.5G            4G    4.5G
-> |                                     |              |       |
-> +-------------------------------------+--------------+-------+
-> |                   MEM               |   IO (regs)  |  MEM  |
-> +-------------------------------------+--------------+-------+
-> 
-> Currently, the sparse memory section is 1GB.
-> 
-> 3GB ddr: the 1.5 ~2G and 3.5 ~ 4G are holes.
-> 3GB ddr: the 3.5 ~ 4G and 4.5 ~ 5G are holes.
-> 
-> This will alloc 1G/4K * (struct page) memory for mem_map array.
-> 
-> We want to use flat-mem to reduce the alloced mem_map.
-> 
-> I don't know why you tell us the flatmem is unsuitable for the
-> majority of arm64 machines. Can tell us the reason of it?
-> 
-> And we are not going to limit the memdel in arm64, we just want to
-> make the flat-mem is an optional item in arm64.
+What I was suggesting is to factor out the individual calls to the
+various pwm_set_*() functions into a single call. So we wouldn't be
+changing semantics, just refactoring to make it easier to get rid of
+again in one of the subsequent patches.
 
-I've experienced the same problem and considered the ideas mentioned
-in this thread: flatmem and small SECTION_SIZE_BITS. However, I was
-reluctant to post any patch since the issue is highly related to memory
-map design document, [1], saying 1GB aligned RAM. The majority of arm64
-platforms might follow the information although it is not spec. IOW,
-a machine I've played was at least unusual *at that time*, so I didn't
-consider upstream work.
+That is, pwm_apply_args() would go away again within this very series,
+at the same point that you're currently removing the pwm_set_*() calls.
 
-[1] http://infocenter.arm.com/help/topic/com.arm.doc.den0001c/DEN0001C_principles_of_arm_memory_maps.pdf  
-
-Best Regards
-Jungseok Lee
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160412/acca7c4c/attachment.sig>
