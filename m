@@ -1,44 +1,26 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 12 Apr 2016 13:22:46 +0200
-Subject: [PATCH v5 04/46] pwm: get rid of pwm->lock
-In-Reply-To: <1459368249-13241-5-git-send-email-boris.brezillon@free-electrons.com>
-References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
- <1459368249-13241-5-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20160412112246.GJ18882@ulmo.ba.sec>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 12 Apr 2016 13:25:10 +0200
+Subject: [PATCH 5/7] clk: samsung: exynos542x: Add the clock id for ACLK
+In-Reply-To: <1460091646-28701-6-git-send-email-cw00.choi@samsung.com>
+References: <1460091646-28701-1-git-send-email-cw00.choi@samsung.com>
+ <1460091646-28701-6-git-send-email-cw00.choi@samsung.com>
+Message-ID: <570CDB16.2050001@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 30, 2016 at 10:03:27PM +0200, Boris Brezillon wrote:
-> PWM devices are not protected against concurrent accesses. The lock in
-> pwm_device might let PWM users think it is, but it's actually only
-> protecting the enabled state.
+On 04/08/2016 07:00 AM, Chanwoo Choi wrote:
+> This patch adds the clock id for ACLK clock which is source clock of AMBA AXI
+> Bus. This clock should be handled in Bus frequency scaling driver.
 > 
-> Removing this lock should be fine as long as all PWM users are aware that
-> accesses to the PWM device have to be serialized, which seems to be the
-> case for all of them except the sysfs interface.
-> Patch the sysfs code by adding a lock to the pwm_export struct and making
-> sure it's taken for all accesses to the exported PWM device.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 > ---
->  drivers/pwm/core.c  | 19 ++++--------------
->  drivers/pwm/sysfs.c | 57 ++++++++++++++++++++++++++++++++++++++++++-----------
->  include/linux/pwm.h |  2 --
->  3 files changed, 50 insertions(+), 28 deletions(-)
+>  drivers/clk/samsung/clk-exynos5420.c | 85 +++++++++++++++++++++++-------------
+>  1 file changed, 55 insertions(+), 30 deletions(-)
 
-This is a little overzealous. Only accesses that can cause races need to
-be protected by the lock. All of the *_show() callbacks don't modify the
-PWM device in any way, so there is no need to protect them against
-concurrent accesses.
+The IDs itself look good but you are not adding only clock ID. You are
+changing all of them from NULL-flags to CLK_SET_RATE_PARENT. This should
+be explained in the commit message why you need it. Probably it should
+be also in separate commit.
 
-I've dropped the changes when applying.
-
-Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160412/ad8efca5/attachment.sig>
+Best regards,
+Krzysztof
