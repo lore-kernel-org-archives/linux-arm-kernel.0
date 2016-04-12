@@ -1,52 +1,124 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 12 Apr 2016 15:44:35 +0100
-Subject: [PATCH 1/2] arm64: mem-model: add flatmem model for arm64
-In-Reply-To: <20160411104013.GG15729@arm.com>
-References: <1459844572-53069-1-git-send-email-puck.chen@hisilicon.com>
- <20160407142148.GI5657@arm.com> <570B10B2.2000000@hisilicon.com>
- <CAKv+Gu8iQ0NzLFWHy9Ggyv+jL-BqJ3x-KaRD1SZ1mU6yU3c7UQ@mail.gmail.com>
- <570B5875.20804@hisilicon.com>
- <CAKv+Gu9aqR=E3TmbPDFEUC+Q13bAJTU5wVTTHkOr6aX6BZ1OVA@mail.gmail.com>
- <570B758E.7070005@hisilicon.com>
- <CAKv+Gu-cWWUi6fCiveqaZRVhGCpEasCLEs7wq6t+C-x65g4cgQ@mail.gmail.com>
- <20160411104013.GG15729@arm.com>
-Message-ID: <20160412144434.GE8066@e104818-lin.cambridge.arm.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 12 Apr 2016 15:46:01 +0100
+Subject: [PATCH 2/2] arm64: vhe: Verify CPU Exception Levels
+In-Reply-To: <1460472361-28419-1-git-send-email-suzuki.poulose@arm.com>
+References: <1460472361-28419-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1460472361-28419-2-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 11, 2016 at 11:40:13AM +0100, Will Deacon wrote:
-> On Mon, Apr 11, 2016 at 12:31:53PM +0200, Ard Biesheuvel wrote:
-> > On 11 April 2016 at 11:59, Chen Feng <puck.chen@hisilicon.com> wrote:
-> > > Please see the pg-tables below.
-> > >
-> > >
-> > > With sparse and vmemmap enable.
-> > >
-> > > ---[ vmemmap start ]---
-> > > 0xffffffbdc0200000-0xffffffbdc4800000          70M     RW NX SHD AF    UXN MEM/NORMAL
-> > > ---[ vmemmap end ]---
-> > >
-> > 
-> > OK, I see what you mean now. Sorry for taking so long to catch up.
-> > 
-> > > The board is 4GB, and the memap is 70MB
-> > > 1G memory --- 14MB mem_map array.
-> > 
-> > No, this is incorrect. 1 GB corresponds with 16 MB worth of struct
-> > pages assuming sizeof(struct page) == 64
-> > 
-> > So you are losing 6 MB to rounding here, which I agree is significant.
-> > I wonder if it makes sense to use a lower value for SECTION_SIZE_BITS
-> > on 4k pages kernels, but perhaps we're better off asking the opinion
-> > of the other cc'ees.
-> 
-> You need to be really careful making SECTION_SIZE_BITS smaller because
-> it has a direct correlation on the use of page->flags and you can end up
-> running out of bits fairly easily.
+With a VHE capable CPU, kernel can run at EL2 and is a decided at early
+boot. If some of the CPUs didn't start it EL2 or doesn't have VHE, we
+could have CPUs running at different exception levels, all in the same
+kernel! This patch adds an early check for the secondary CPUs to detect
+such situations.
 
-With SPARSEMEM_VMEMMAP, SECTION_SIZE_BITS no longer affect the page
-flags since we no longer need to encode the section number in
-page->flags.
+For each non-boot CPU add a sanity check to make sure we don't have
+different run levels w.r.t the boot CPU. We save the information on
+whether the boot CPU is running in hyp mode or not and ensure the
+remaining CPUs match it.
 
+Applies on 4.6-rc3.
+
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ arch/arm64/include/asm/virt.h  |   14 ++++++++++++++
+ arch/arm64/kernel/cpufeature.c |    1 +
+ arch/arm64/kernel/smp.c        |   33 +++++++++++++++++++++++++++++++++
+ 3 files changed, 48 insertions(+)
+
+diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+index 9f22dd6..b346d76 100644
+--- a/arch/arm64/include/asm/virt.h
++++ b/arch/arm64/include/asm/virt.h
+@@ -60,6 +60,20 @@ static inline bool is_kernel_in_hyp_mode(void)
+ 	return el == CurrentEL_EL2;
+ }
+ 
++#ifdef CONFIG_ARM64_VHE
++
++extern bool boot_cpu_hyp_mode;
++static inline bool is_boot_cpu_in_hyp_mode(void)
++{
++	return boot_cpu_hyp_mode;
++}
++
++extern void verify_cpu_run_el(void);
++
++#else
++static inline void verify_cpu_run_el(void) {}
++#endif
++
+ /* The section containing the hypervisor text */
+ extern char __hyp_text_start[];
+ extern char __hyp_text_end[];
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 943f514..91088de 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -908,6 +908,7 @@ static u64 __raw_read_system_reg(u32 sys_id)
+  */
+ static void check_early_cpu_features(void)
+ {
++	verify_cpu_run_el();
+ 	verify_cpu_asid_bits();
+ }
+ 
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index b2d5f4e..6825225 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -75,6 +75,38 @@ enum ipi_msg_type {
+ 	IPI_WAKEUP
+ };
+ 
++#ifdef CONFIG_ARM64_VHE
++
++/* Whether the boot CPU is running in HYP mode or not*/
++bool boot_cpu_hyp_mode;
++
++static inline void save_boot_cpu_run_el(void)
++{
++	boot_cpu_hyp_mode = is_kernel_in_hyp_mode();
++}
++
++/*
++ * Verify that a secondary CPU is running the kernel at the same
++ * EL as that of the boot CPU.
++ */
++void verify_cpu_run_el(void)
++{
++	bool in_el2 = is_kernel_in_hyp_mode();
++	bool boot_cpu_el2 = is_boot_cpu_in_hyp_mode();
++
++	if (in_el2 ^ boot_cpu_el2) {
++		pr_crit("CPU%d: mismatched Exception Level(EL%d) with boot CPU(EL%d)\n",
++					smp_processor_id(),
++					in_el2 ? 2 : 1,
++					boot_cpu_el2 ? 2 : 1);
++		cpu_panic_kernel();
++	}
++}
++
++#else
++static inline void save_boot_cpu_run_el(void) {}
++#endif
++
+ #ifdef CONFIG_HOTPLUG_CPU
+ static int op_cpu_kill(unsigned int cpu);
+ #else
+@@ -401,6 +433,7 @@ void __init smp_cpus_done(unsigned int max_cpus)
+ void __init smp_prepare_boot_cpu(void)
+ {
+ 	cpuinfo_store_boot_cpu();
++	save_boot_cpu_run_el();
+ 	set_my_cpu_offset(per_cpu_offset(smp_processor_id()));
+ }
+ 
 -- 
-Catalin
+1.7.9.5
