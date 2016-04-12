@@ -1,262 +1,274 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 12 Apr 2016 11:54:41 -0600
-Subject: [PATCH V2 04/15] coresight: tmc: introducing new header file
+Date: Tue, 12 Apr 2016 11:54:43 -0600
+Subject: [PATCH V2 06/15] coresight: tmc: making prepare/unprepare functions
+ generic
 In-Reply-To: <1460483692-25061-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1460483692-25061-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1460483692-25061-5-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1460483692-25061-7-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The amount of #define, enumeration and structure definition
-is big enough to justify moving them to a new header file.
+Dealing with HW related matters in tmc_read_prepare/unprepare
+becomes convoluted when many cases need to be handled distinctively.
+
+As such moving processing related to HW setup to individual driver
+files and keep the core driver generic.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-tmc.c | 102 +----------------------
- drivers/hwtracing/coresight/coresight-tmc.h | 122 ++++++++++++++++++++++++++++
- 2 files changed, 123 insertions(+), 101 deletions(-)
- create mode 100644 drivers/hwtracing/coresight/coresight-tmc.h
+ drivers/hwtracing/coresight/coresight-tmc-etf.c | 62 ++++++++++++++++++++++++-
+ drivers/hwtracing/coresight/coresight-tmc-etr.c | 42 ++++++++++++++++-
+ drivers/hwtracing/coresight/coresight-tmc.c     | 55 +++++-----------------
+ drivers/hwtracing/coresight/coresight-tmc.h     |  8 ++--
+ 4 files changed, 117 insertions(+), 50 deletions(-)
 
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+index 467d19221f7b..4b8f39bd478b 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+@@ -71,7 +71,7 @@ static void tmc_etb_dump_hw(struct tmc_drvdata *drvdata)
+ 	}
+ }
+ 
+-void tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
++static void tmc_etb_disable_hw(struct tmc_drvdata *drvdata)
+ {
+ 	CS_UNLOCK(drvdata->base);
+ 
+@@ -202,3 +202,63 @@ const struct coresight_ops tmc_etf_cs_ops = {
+ 	.sink_ops	= &tmc_etf_sink_ops,
+ 	.link_ops	= &tmc_etf_link_ops,
+ };
++
++int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
++{
++	enum tmc_mode mode;
++	int ret = 0;
++	unsigned long flags;
++
++	/* config types are set a boot time and never change */
++	if (drvdata->config_type != TMC_CONFIG_TYPE_ETB &&
++	    drvdata->config_type != TMC_CONFIG_TYPE_ETF)
++		return -EINVAL;
++
++	spin_lock_irqsave(&drvdata->spinlock, flags);
++
++	/* There is no point in reading a TMC in HW FIFO mode */
++	mode = readl_relaxed(drvdata->base + TMC_MODE);
++	if (mode != TMC_MODE_CIRCULAR_BUFFER) {
++		ret = -EINVAL;
++		goto out;
++	}
++
++	/* Disable the TMC if need be */
++	if (drvdata->enable)
++		tmc_etb_disable_hw(drvdata);
++
++	drvdata->reading = true;
++out:
++	spin_unlock_irqrestore(&drvdata->spinlock, flags);
++
++	return ret;
++}
++
++int tmc_read_unprepare_etb(struct tmc_drvdata *drvdata)
++{
++	enum tmc_mode mode;
++	unsigned long flags;
++
++	/* config types are set a boot time and never change */
++	if (drvdata->config_type != TMC_CONFIG_TYPE_ETB &&
++	    drvdata->config_type != TMC_CONFIG_TYPE_ETF)
++		return -EINVAL;
++
++	spin_lock_irqsave(&drvdata->spinlock, flags);
++
++	/* There is no point in reading a TMC in HW FIFO mode */
++	mode = readl_relaxed(drvdata->base + TMC_MODE);
++	if (mode != TMC_MODE_CIRCULAR_BUFFER) {
++		spin_unlock_irqrestore(&drvdata->spinlock, flags);
++		return -EINVAL;
++	}
++
++	/* Re-enable the TMC if need be */
++	if (drvdata->enable)
++		tmc_etb_enable_hw(drvdata);
++
++	drvdata->reading = false;
++	spin_unlock_irqrestore(&drvdata->spinlock, flags);
++
++	return 0;
++}
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+index 910d6f3b7d26..495540e9064d 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+@@ -70,7 +70,7 @@ static void tmc_etr_dump_hw(struct tmc_drvdata *drvdata)
+ 		drvdata->buf = drvdata->vaddr;
+ }
+ 
+-void tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
++static void tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
+ {
+ 	CS_UNLOCK(drvdata->base);
+ 
+@@ -126,3 +126,43 @@ static const struct coresight_ops_sink tmc_etr_sink_ops = {
+ const struct coresight_ops tmc_etr_cs_ops = {
+ 	.sink_ops	= &tmc_etr_sink_ops,
+ };
++
++int tmc_read_prepare_etr(struct tmc_drvdata *drvdata)
++{
++	unsigned long flags;
++
++	/* config types are set a boot time and never change */
++	if (drvdata->config_type != TMC_CONFIG_TYPE_ETR)
++		return -EINVAL;
++
++	spin_lock_irqsave(&drvdata->spinlock, flags);
++
++	/* Disable the TMC if need be */
++	if (drvdata->enable)
++		tmc_etr_disable_hw(drvdata);
++
++	drvdata->reading = true;
++	spin_unlock_irqrestore(&drvdata->spinlock, flags);
++
++	return 0;
++}
++
++int tmc_read_unprepare_etr(struct tmc_drvdata *drvdata)
++{
++	unsigned long flags;
++
++	/* config types are set a boot time and never change */
++	if (drvdata->config_type != TMC_CONFIG_TYPE_ETR)
++		return -EINVAL;
++
++	spin_lock_irqsave(&drvdata->spinlock, flags);
++
++	/* RE-enable the TMC if need be */
++	if (drvdata->enable)
++		tmc_etr_enable_hw(drvdata);
++
++	drvdata->reading = false;
++	spin_unlock_irqrestore(&drvdata->spinlock, flags);
++
++	return 0;
++}
 diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index d211aeec49f8..01a7ce2974f7 100644
+index 67b3cd299782..f7e385f18e5f 100644
 --- a/drivers/hwtracing/coresight/coresight-tmc.c
 +++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -30,107 +30,7 @@
- #include <linux/amba/bus.h>
- 
- #include "coresight-priv.h"
--
--#define TMC_RSZ			0x004
--#define TMC_STS			0x00c
--#define TMC_RRD			0x010
--#define TMC_RRP			0x014
--#define TMC_RWP			0x018
--#define TMC_TRG			0x01c
--#define TMC_CTL			0x020
--#define TMC_RWD			0x024
--#define TMC_MODE		0x028
--#define TMC_LBUFLEVEL		0x02c
--#define TMC_CBUFLEVEL		0x030
--#define TMC_BUFWM		0x034
--#define TMC_RRPHI		0x038
--#define TMC_RWPHI		0x03c
--#define TMC_AXICTL		0x110
--#define TMC_DBALO		0x118
--#define TMC_DBAHI		0x11c
--#define TMC_FFSR		0x300
--#define TMC_FFCR		0x304
--#define TMC_PSCR		0x308
--#define TMC_ITMISCOP0		0xee0
--#define TMC_ITTRFLIN		0xee8
--#define TMC_ITATBDATA0		0xeec
--#define TMC_ITATBCTR2		0xef0
--#define TMC_ITATBCTR1		0xef4
--#define TMC_ITATBCTR0		0xef8
--
--/* register description */
--/* TMC_CTL - 0x020 */
--#define TMC_CTL_CAPT_EN		BIT(0)
--/* TMC_STS - 0x00C */
--#define TMC_STS_TRIGGERED	BIT(1)
--/* TMC_AXICTL - 0x110 */
--#define TMC_AXICTL_PROT_CTL_B0	BIT(0)
--#define TMC_AXICTL_PROT_CTL_B1	BIT(1)
--#define TMC_AXICTL_SCT_GAT_MODE	BIT(7)
--#define TMC_AXICTL_WR_BURST_LEN 0xF00
--/* TMC_FFCR - 0x304 */
--#define TMC_FFCR_EN_FMT		BIT(0)
--#define TMC_FFCR_EN_TI		BIT(1)
--#define TMC_FFCR_FON_FLIN	BIT(4)
--#define TMC_FFCR_FON_TRIG_EVT	BIT(5)
--#define TMC_FFCR_FLUSHMAN	BIT(6)
--#define TMC_FFCR_TRIGON_TRIGIN	BIT(8)
--#define TMC_FFCR_STOP_ON_FLUSH	BIT(12)
--
--#define TMC_STS_TMCREADY_BIT	2
--#define TMC_FFCR_FLUSHMAN_BIT	6
--
--enum tmc_config_type {
--	TMC_CONFIG_TYPE_ETB,
--	TMC_CONFIG_TYPE_ETR,
--	TMC_CONFIG_TYPE_ETF,
--};
--
--enum tmc_mode {
--	TMC_MODE_CIRCULAR_BUFFER,
--	TMC_MODE_SOFTWARE_FIFO,
--	TMC_MODE_HARDWARE_FIFO,
--};
--
--enum tmc_mem_intf_width {
--	TMC_MEM_INTF_WIDTH_32BITS	= 0x2,
--	TMC_MEM_INTF_WIDTH_64BITS	= 0x3,
--	TMC_MEM_INTF_WIDTH_128BITS	= 0x4,
--	TMC_MEM_INTF_WIDTH_256BITS	= 0x5,
--};
--
--/**
-- * struct tmc_drvdata - specifics associated to an TMC component
-- * @base:	memory mapped base address for this component.
-- * @dev:	the device entity associated to this component.
-- * @csdev:	component vitals needed by the framework.
-- * @miscdev:	specifics to handle "/dev/xyz.tmc" entry.
-- * @spinlock:	only one at a time pls.
-- * @read_count:	manages preparation of buffer for reading.
-- * @buf:	area of memory where trace data get sent.
-- * @paddr:	DMA start location in RAM.
-- * @vaddr:	virtual representation of @paddr.
-- * @size:	@buf size.
-- * @enable:	this TMC is being used.
-- * @config_type: TMC variant, must be of type @tmc_config_type.
-- * @trigger_cntr: amount of words to store after a trigger.
-- */
--struct tmc_drvdata {
--	void __iomem		*base;
--	struct device		*dev;
--	struct coresight_device	*csdev;
--	struct miscdevice	miscdev;
--	spinlock_t		spinlock;
--	int			read_count;
--	bool			reading;
--	char			*buf;
--	dma_addr_t		paddr;
--	void			*vaddr;
--	u32			size;
--	bool			enable;
--	enum tmc_config_type	config_type;
--	u32			trigger_cntr;
--};
-+#include "coresight-tmc.h"
- 
- static void tmc_wait_for_tmcready(struct tmc_drvdata *drvdata)
+@@ -76,76 +76,43 @@ void tmc_disable_hw(struct tmc_drvdata *drvdata)
+ static int tmc_read_prepare(struct tmc_drvdata *drvdata)
  {
+ 	int ret = 0;
+-	unsigned long flags;
+-	enum tmc_mode mode;
+-
+-	spin_lock_irqsave(&drvdata->spinlock, flags);
+-	if (!drvdata->enable)
+-		goto out;
+ 
+ 	switch (drvdata->config_type) {
+ 	case TMC_CONFIG_TYPE_ETB:
+-		tmc_etb_disable_hw(drvdata);
+-		break;
+ 	case TMC_CONFIG_TYPE_ETF:
+-		/* There is no point in reading a TMC in HW FIFO mode */
+-		mode = readl_relaxed(drvdata->base + TMC_MODE);
+-		if (mode != TMC_MODE_CIRCULAR_BUFFER) {
+-			ret = -EINVAL;
+-			goto err;
+-		}
+-
+-		tmc_etb_disable_hw(drvdata);
++		ret = tmc_read_prepare_etb(drvdata);
+ 		break;
+ 	case TMC_CONFIG_TYPE_ETR:
+-		tmc_etr_disable_hw(drvdata);
++		ret = tmc_read_prepare_etr(drvdata);
+ 		break;
+ 	default:
+ 		ret = -EINVAL;
+-		goto err;
+ 	}
+ 
+-out:
+-	drvdata->reading = true;
+-	dev_info(drvdata->dev, "TMC read start\n");
+-err:
+-	spin_unlock_irqrestore(&drvdata->spinlock, flags);
++	if (!ret)
++		dev_info(drvdata->dev, "TMC read start\n");
++
+ 	return ret;
+ }
+ 
+ static void tmc_read_unprepare(struct tmc_drvdata *drvdata)
+ {
+-	unsigned long flags;
+-	enum tmc_mode mode;
+-
+-	spin_lock_irqsave(&drvdata->spinlock, flags);
+-	if (!drvdata->enable)
+-		goto out;
++	int ret = 0;
+ 
+ 	switch (drvdata->config_type) {
+ 	case TMC_CONFIG_TYPE_ETB:
+-		tmc_etb_enable_hw(drvdata);
+-		break;
+ 	case TMC_CONFIG_TYPE_ETF:
+-		/* Make sure we don't re-enable a TMC in HW FIFO mode */
+-		mode = readl_relaxed(drvdata->base + TMC_MODE);
+-		if (mode != TMC_MODE_CIRCULAR_BUFFER)
+-			goto err;
+-
+-		tmc_etb_enable_hw(drvdata);
++		ret = tmc_read_unprepare_etb(drvdata);
+ 		break;
+ 	case TMC_CONFIG_TYPE_ETR:
+-		tmc_etr_disable_hw(drvdata);
++		ret = tmc_read_unprepare_etr(drvdata);
+ 		break;
+ 	default:
+-		goto err;
++		ret = -EINVAL;
+ 	}
+ 
+-out:
+-	drvdata->reading = false;
+-	dev_info(drvdata->dev, "TMC read end\n");
+-err:
+-	spin_unlock_irqrestore(&drvdata->spinlock, flags);
++	if (!ret)
++		dev_info(drvdata->dev, "TMC read end\n");
+ }
+ 
+ static int tmc_open(struct inode *inode, struct file *file)
 diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
-new file mode 100644
-index 000000000000..2d7d52747b4e
---- /dev/null
+index b99d4dfc1d0b..80096fa75326 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc.h
 +++ b/drivers/hwtracing/coresight/coresight-tmc.h
-@@ -0,0 +1,122 @@
-+/*
-+ * Copyright(C) 2015 Linaro Limited. All rights reserved.
-+ * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published by
-+ * the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#ifndef _CORESIGHT_TMC_H
-+#define _CORESIGHT_TMC_H
-+
-+#define TMC_RSZ			0x004
-+#define TMC_STS			0x00c
-+#define TMC_RRD			0x010
-+#define TMC_RRP			0x014
-+#define TMC_RWP			0x018
-+#define TMC_TRG			0x01c
-+#define TMC_CTL			0x020
-+#define TMC_RWD			0x024
-+#define TMC_MODE		0x028
-+#define TMC_LBUFLEVEL		0x02c
-+#define TMC_CBUFLEVEL		0x030
-+#define TMC_BUFWM		0x034
-+#define TMC_RRPHI		0x038
-+#define TMC_RWPHI		0x03c
-+#define TMC_AXICTL		0x110
-+#define TMC_DBALO		0x118
-+#define TMC_DBAHI		0x11c
-+#define TMC_FFSR		0x300
-+#define TMC_FFCR		0x304
-+#define TMC_PSCR		0x308
-+#define TMC_ITMISCOP0		0xee0
-+#define TMC_ITTRFLIN		0xee8
-+#define TMC_ITATBDATA0		0xeec
-+#define TMC_ITATBCTR2		0xef0
-+#define TMC_ITATBCTR1		0xef4
-+#define TMC_ITATBCTR0		0xef8
-+
-+/* register description */
-+/* TMC_CTL - 0x020 */
-+#define TMC_CTL_CAPT_EN		BIT(0)
-+/* TMC_STS - 0x00C */
-+#define TMC_STS_TRIGGERED	BIT(1)
-+/* TMC_AXICTL - 0x110 */
-+#define TMC_AXICTL_PROT_CTL_B0	BIT(0)
-+#define TMC_AXICTL_PROT_CTL_B1	BIT(1)
-+#define TMC_AXICTL_SCT_GAT_MODE	BIT(7)
-+#define TMC_AXICTL_WR_BURST_LEN 0xF00
-+/* TMC_FFCR - 0x304 */
-+#define TMC_FFCR_EN_FMT		BIT(0)
-+#define TMC_FFCR_EN_TI		BIT(1)
-+#define TMC_FFCR_FON_FLIN	BIT(4)
-+#define TMC_FFCR_FON_TRIG_EVT	BIT(5)
-+#define TMC_FFCR_FLUSHMAN	BIT(6)
-+#define TMC_FFCR_TRIGON_TRIGIN	BIT(8)
-+#define TMC_FFCR_STOP_ON_FLUSH	BIT(12)
-+
-+#define TMC_STS_TMCREADY_BIT	2
-+#define TMC_FFCR_FLUSHMAN_BIT	6
-+
-+enum tmc_config_type {
-+	TMC_CONFIG_TYPE_ETB,
-+	TMC_CONFIG_TYPE_ETR,
-+	TMC_CONFIG_TYPE_ETF,
-+};
-+
-+enum tmc_mode {
-+	TMC_MODE_CIRCULAR_BUFFER,
-+	TMC_MODE_SOFTWARE_FIFO,
-+	TMC_MODE_HARDWARE_FIFO,
-+};
-+
-+enum tmc_mem_intf_width {
-+	TMC_MEM_INTF_WIDTH_32BITS	= 0x2,
-+	TMC_MEM_INTF_WIDTH_64BITS	= 0x3,
-+	TMC_MEM_INTF_WIDTH_128BITS	= 0x4,
-+	TMC_MEM_INTF_WIDTH_256BITS	= 0x5,
-+};
-+
-+/**
-+ * struct tmc_drvdata - specifics associated to an TMC component
-+ * @base:	memory mapped base address for this component.
-+ * @dev:	the device entity associated to this component.
-+ * @csdev:	component vitals needed by the framework.
-+ * @miscdev:	specifics to handle "/dev/xyz.tmc" entry.
-+ * @spinlock:	only one at a time pls.
-+ * @read_count:	manages preparation of buffer for reading.
-+ * @buf:	area of memory where trace data get sent.
-+ * @paddr:	DMA start location in RAM.
-+ * @vaddr:	virtual representation of @paddr.
-+ * @size:	@buf size.
-+ * @enable:	this TMC is being used.
-+ * @config_type: TMC variant, must be of type @tmc_config_type.
-+ * @trigger_cntr: amount of words to store after a trigger.
-+ */
-+struct tmc_drvdata {
-+	void __iomem		*base;
-+	struct device		*dev;
-+	struct coresight_device	*csdev;
-+	struct miscdevice	miscdev;
-+	spinlock_t		spinlock;
-+	int			read_count;
-+	bool			reading;
-+	char			*buf;
-+	dma_addr_t		paddr;
-+	void __iomem		*vaddr;
-+	u32			size;
-+	bool			enable;
-+	enum tmc_config_type	config_type;
-+	u32			trigger_cntr;
-+};
-+
-+#endif
+@@ -128,13 +128,13 @@ void tmc_enable_hw(struct tmc_drvdata *drvdata);
+ void tmc_disable_hw(struct tmc_drvdata *drvdata);
+ 
+ /* ETB/ETF functions */
+-void tmc_etb_enable_hw(struct tmc_drvdata *drvdata);
+-void tmc_etb_disable_hw(struct tmc_drvdata *drvdata);
++int tmc_read_prepare_etb(struct tmc_drvdata *drvdata);
++int tmc_read_unprepare_etb(struct tmc_drvdata *drvdata);
+ extern const struct coresight_ops tmc_etb_cs_ops;
+ extern const struct coresight_ops tmc_etf_cs_ops;
+ 
+ /* ETR functions */
+-void tmc_etr_enable_hw(struct tmc_drvdata *drvdata);
+-void tmc_etr_disable_hw(struct tmc_drvdata *drvdata);
++int tmc_read_prepare_etr(struct tmc_drvdata *drvdata);
++int tmc_read_unprepare_etr(struct tmc_drvdata *drvdata);
+ extern const struct coresight_ops tmc_etr_cs_ops;
+ #endif
 -- 
 2.5.0
