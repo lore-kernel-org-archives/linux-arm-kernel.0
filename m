@@ -1,90 +1,137 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 12 Apr 2016 16:09:11 +0200
-Subject: [PATCH] arm64: acpi: add acpi=on cmdline option to prefer ACPI boot
- over DT
-Message-ID: <1460470151-19479-1-git-send-email-ard.biesheuvel@linaro.org>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 12 Apr 2016 16:09:53 +0200
+Subject: [PATCH v6] drivers: amba: properly handle devices with power domains
+In-Reply-To: <570D017E.7060105@samsung.com>
+References: <570D017E.7060105@samsung.com>
+Message-ID: <1460470193-24928-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If both ACPI and DT platform descriptions are available, and the
-kernel was configured at build time to support both flavours, the
-default policy is to prefer DT over ACPI, and preferring ACPI over
-DT while still allowing DT as a fallback is not possible.
+To read pid/cid registers, the probed device need to be properly turned on.
+When it is inside a power domain, the bus code should ensure that the
+given power domain is enabled before trying to access device's registers.
+However in some cases power domain (or clocks) might not be yet available.
+Returning EPROBE_DEFER is not a solution in such case, because callers
+don't handle this special error code. Instead such devices are added to the
+special list and their registration is retried in late_initcall, when
+hopefully all resources are available.
 
-Since some enterprise features (such as RAS) depend on ACPI, it may
-be desirable for, e.g., distro installers to prefer ACPI boot but
-fall back to DT rather than failing completely if no ACPI tables are
-available.
-
-So introduce the 'acpi=on' kernel command line parameter for arm64,
-which signifies that ACPI should be used if available, and DT should
-only be used as a fallback.
-
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- Documentation/kernel-parameters.txt | 6 ++++--
- arch/arm64/kernel/acpi.c            | 8 ++++++--
- 2 files changed, 10 insertions(+), 4 deletions(-)
+ drivers/amba/bus.c | 78 +++++++++++++++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 68 insertions(+), 10 deletions(-)
 
-diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
-index ecc74fa4bfde..748129c85f35 100644
---- a/Documentation/kernel-parameters.txt
-+++ b/Documentation/kernel-parameters.txt
-@@ -167,16 +167,18 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
+index f0099360039e..f0b711bb0372 100644
+--- a/drivers/amba/bus.c
++++ b/drivers/amba/bus.c
+@@ -336,16 +336,7 @@ static void amba_device_release(struct device *dev)
+ 	kfree(d);
+ }
  
- 	acpi=		[HW,ACPI,X86,ARM64]
- 			Advanced Configuration and Power Interface
--			Format: { force | off | strict | noirq | rsdt |
-+			Format: { force | on | off | strict | noirq | rsdt |
- 				  copy_dsdt }
- 			force -- enable ACPI if default was off
-+			on -- enable ACPI but allow fallback to DT [arm64]
- 			off -- disable ACPI if default was on
- 			noirq -- do not use ACPI for IRQ routing
- 			strict -- Be less tolerant of platforms that are not
- 				strictly ACPI specification compliant.
- 			rsdt -- prefer RSDT over (default) XSDT
- 			copy_dsdt -- copy DSDT to memory
--			For ARM64, ONLY "acpi=off" or "acpi=force" are available
-+			For ARM64, ONLY "acpi=off", "acpi=on" or "acpi=force"
-+			are available
+-/**
+- *	amba_device_add - add a previously allocated AMBA device structure
+- *	@dev: AMBA device allocated by amba_device_alloc
+- *	@parent: resource parent for this devices resources
+- *
+- *	Claim the resource, and read the device cell ID if not already
+- *	initialized.  Register the AMBA device with the Linux device
+- *	manager.
+- */
+-int amba_device_add(struct amba_device *dev, struct resource *parent)
++static int amba_device_try_add(struct amba_device *dev, struct resource *parent)
+ {
+ 	u32 size;
+ 	void __iomem *tmp;
+@@ -373,6 +364,12 @@ int amba_device_add(struct amba_device *dev, struct resource *parent)
+ 		goto err_release;
+ 	}
  
- 			See also Documentation/power/runtime_pm.txt, pci=noacpi
++	ret = dev_pm_domain_attach(&dev->dev, true);
++	if (ret == -EPROBE_DEFER) {
++		iounmap(tmp);
++		goto err_release;
++	}
++
+ 	ret = amba_get_enable_pclk(dev);
+ 	if (ret == 0) {
+ 		u32 pid, cid;
+@@ -398,6 +395,7 @@ int amba_device_add(struct amba_device *dev, struct resource *parent)
+ 	}
  
-diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-index d1ce8e2f98b9..60d728620a1b 100644
---- a/arch/arm64/kernel/acpi.c
-+++ b/arch/arm64/kernel/acpi.c
-@@ -42,6 +42,7 @@ int acpi_pci_disabled = 1;	/* skip ACPI PCI scan and IRQ initialization */
- EXPORT_SYMBOL(acpi_pci_disabled);
+ 	iounmap(tmp);
++	dev_pm_domain_detach(&dev->dev, true);
  
- static bool param_acpi_off __initdata;
-+static bool param_acpi_on __initdata;
- static bool param_acpi_force __initdata;
+ 	if (ret)
+ 		goto err_release;
+@@ -421,8 +419,68 @@ int amba_device_add(struct amba_device *dev, struct resource *parent)
+  err_out:
+ 	return ret;
+ }
++
++/*
++ * Registration of AMBA device require reading its pid and cid registers.
++ * To do this, the device must be turned on (if it is a part of power domain)
++ * and have clocks enabled. However in some cases those resources might not be
++ * yet available. Returning EPROBE_DEFER is not a solution in such case,
++ * because callers don't handle this special error code. Instead such devices
++ * are added to the special list and their registration is retried in
++ * late_initcall, when hopefully all resources are available.
++ */
++struct deferred_device {
++	struct amba_device *dev;
++	struct resource *parent;
++	struct list_head node;
++};
++
++static LIST_HEAD(deferred_devices);
++
++/**
++ *	amba_device_add - add a previously allocated AMBA device structure
++ *	@dev: AMBA device allocated by amba_device_alloc
++ *	@parent: resource parent for this devices resources
++ *
++ *	Claim the resource, and read the device cell ID if not already
++ *	initialized.  Register the AMBA device with the Linux device
++ *	manager.
++ */
++int amba_device_add(struct amba_device *dev, struct resource *parent)
++{
++	int ret = amba_device_try_add(dev, parent);
++
++	if (ret == -EPROBE_DEFER) {
++		struct deferred_device *ddev;
++
++		ddev = kmalloc(sizeof(*ddev), GFP_KERNEL);
++		ddev->dev = dev;
++		ddev->parent = parent;
++		list_add_tail(&ddev->node, &deferred_devices);
++		ret = 0;
++	}
++	return ret;
++}
+ EXPORT_SYMBOL_GPL(amba_device_add);
  
- static int __init parse_acpi(char *arg)
-@@ -52,6 +53,8 @@ static int __init parse_acpi(char *arg)
- 	/* "acpi=off" disables both ACPI table parsing and interpreter */
- 	if (strcmp(arg, "off") == 0)
- 		param_acpi_off = true;
-+	else if (strcmp(arg, "on") == 0) /* prefer ACPI over DT */
-+		param_acpi_on = true;
- 	else if (strcmp(arg, "force") == 0) /* force ACPI to be enabled */
- 		param_acpi_force = true;
- 	else
-@@ -185,10 +188,11 @@ void __init acpi_boot_table_init(void)
- 	 * Enable ACPI instead of device tree unless
- 	 * - ACPI has been disabled explicitly (acpi=off), or
- 	 * - the device tree is not empty (it has more than just a /chosen node)
--	 *   and ACPI has not been force enabled (acpi=force)
-+	 *   and ACPI has not been [force] enabled (acpi=on|force)
- 	 */
- 	if (param_acpi_off ||
--	    (!param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
-+	    (!param_acpi_on && !param_acpi_force &&
-+	     of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
- 		return;
- 
- 	/*
++static int __init amba_deferred_device_init(void)
++{
++	struct deferred_device *ddev, *tmp;
++
++	list_for_each_entry_safe(ddev, tmp, &deferred_devices, node) {
++		int ret = amba_device_try_add(ddev->dev, ddev->parent);
++
++		if (ret == -EPROBE_DEFER)
++			continue;
++
++		list_del_init(&ddev->node);
++		kfree(ddev);
++	}
++
++	return 0;
++}
++late_initcall(amba_deferred_device_init);
++
+ static struct amba_device *
+ amba_aphb_device_add(struct device *parent, const char *name,
+ 		     resource_size_t base, size_t size, int irq1, int irq2,
 -- 
-2.5.0
+1.9.2
