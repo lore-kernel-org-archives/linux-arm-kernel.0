@@ -1,63 +1,32 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Tue, 12 Apr 2016 09:16:02 +0800
-Subject: [PATCH v2 1/2] dt/bindings: Add bindings for hisilicon random
- number generator
-In-Reply-To: <20160411144306.GA24637@rob-hp-laptop>
-References: <1460017397-30996-1-git-send-email-wangkefeng.wang@huawei.com>
- <1460017397-30996-2-git-send-email-wangkefeng.wang@huawei.com>
- <20160411144306.GA24637@rob-hp-laptop>
-Message-ID: <570C4C52.4020902@huawei.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 12 Apr 2016 03:18:39 +0200
+Subject: [PATCH 1/2] ARM: multi_v7_defconfig: Enable Rockchip displayport phy
+Message-ID: <10307860.X4SVE35FiH@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The displayport phy controls the output of the Analogix displayport
+controller on Rockchip SoCs and is therefore one component to enable
+veyron devices to use their internal display.
 
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+to be applied directly to arm-soc
 
-On 2016/4/11 22:43, Rob Herring wrote:
-> On Thu, Apr 07, 2016 at 04:23:16PM +0800, Kefeng Wang wrote:
->> Document the devicetree bindings for the random number generator found
->> on Hisilicon Hip04 and Hip05 soc.
->>
->> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
->> ---
->>  Documentation/devicetree/bindings/rng/hisi-rng.txt | 12 ++++++++++++
->>  1 file changed, 12 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/rng/hisi-rng.txt
->>
->> diff --git a/Documentation/devicetree/bindings/rng/hisi-rng.txt b/Documentation/devicetree/bindings/rng/hisi-rng.txt
->> new file mode 100644
->> index 0000000..72efcc1
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/rng/hisi-rng.txt
->> @@ -0,0 +1,12 @@
->> +Hisilicon Random Number Generator
->> +
->> +Required properties:
->> +- compatible : Should be "hisilicon,rng"
->> +- reg : Offset and length of the register set of this block
->> +
->> +Example:
->> +
->> +rng at d1010000 {
->> +	compatible = "hisilicon,rng";
-> 
-> This still needs SoC specific compatible strings.
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-It is used by Hip04/Hip05 at lease, but for new SoC, like Hip06, it maybe different,
-using single Soc prefix is not proper, how about hisilicon,rng-v1, or add two compatible
-hisilicon,hip04-rng and hisilicon,hip05-rng? What's your option?
-
-Thanks.
-
-> 
->> +	reg = <0xd1010000 0x100>;
->> +};
->> -- 
->> 2.6.0.GIT
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe devicetree" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> .
-> 
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 2823490..66d15ed 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -790,6 +790,7 @@ CONFIG_OMAP_USB2=y
+ CONFIG_TI_PIPE3=y
+ CONFIG_PHY_BERLIN_USB=y
+ CONFIG_PHY_BERLIN_SATA=y
++CONFIG_PHY_ROCKCHIP_DP=m
+ CONFIG_PHY_ROCKCHIP_USB=m
+ CONFIG_PHY_QCOM_APQ8064_SATA=m
+ CONFIG_PHY_MIPHY28LP=y
+-- 
+2.6.4
