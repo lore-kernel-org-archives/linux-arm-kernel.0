@@ -1,75 +1,40 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 12 Apr 2016 12:29:26 +0200
-Subject: [RESEND 07/11] pwm: sti: Initialise PWM Capture channel data
-In-Reply-To: <1456932729-9667-8-git-send-email-lee.jones@linaro.org>
-References: <1456932729-9667-1-git-send-email-lee.jones@linaro.org>
- <1456932729-9667-8-git-send-email-lee.jones@linaro.org>
-Message-ID: <20160412102926.GC18882@ulmo.ba.sec>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 12 Apr 2016 12:31:45 +0200
+Subject: [PATCH v5 30/46] regulator: pwm: retrieve correct voltage
+In-Reply-To: <20160412100938.GA14664@sirena.org.uk>
+References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1459368249-13241-31-git-send-email-boris.brezillon@free-electrons.com>
+ <20160330212410.GX2350@sirena.org.uk>
+ <20160407235431.788dc24a@bbrezillon>
+ <20160412044203.GW3351@sirena.org.uk>
+ <20160412103722.0bfe1d4d@bbrezillon>
+ <20160412100938.GA14664@sirena.org.uk>
+Message-ID: <20160412123145.092b2c1e@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 02, 2016 at 03:32:05PM +0000, Lee Jones wrote:
-[...]
-> +struct sti_cpt_data {
-> +	u32 snapshot[3];
-> +	int index;
-> +	int gpio;
+On Tue, 12 Apr 2016 11:09:38 +0100
+Mark Brown <broonie@kernel.org> wrote:
 
-On a side-note, this should probably use struct gpio_desc * instead of
-an integer along with the gpiod_*() APIs for the GPIO handling.
+> On Tue, Apr 12, 2016 at 10:37:22AM +0200, Boris Brezillon wrote:
+> > Mark Brown <broonie@kernel.org> wrote:
+> > > On Thu, Apr 07, 2016 at 11:54:31PM +0200, Boris Brezillon wrote:
+> 
+> > > I'm not sure there's a strong one, we don't really use the class device
+> > > for anything, but without doing a full audit I couldn't guarantee that.
+> 
+> > At first glance I don't see any problem (even the rdev_err/info/...()
+> > functions do not use dev_err/info/...()). The patch will be part of v6
+> > (unless you want me to send it independently).
+> 
+> I'd rather it didn't get sucked into this series since it seems that
+> it's getting delayed indefinitely - I can apply it to the regulator tree
+> and create a tag that can be pulled into other trees as needed if things
+> do get applied.
 
-> +	struct mutex lock;
-> +	wait_queue_head_t wait;
-> +};
-> +
->  struct sti_pwm_compat_data {
->  	const struct reg_field *reg_fields;
-> -	unsigned int num_chan;
-> +	unsigned int pwm_num_chan;
-> +	unsigned int cpt_num_chan;
->  	unsigned int max_pwm_cnt;
->  	unsigned int max_prescale;
->  };
-> @@ -77,6 +90,7 @@ struct sti_pwm_chip {
->  	struct clk *cpt_clk;
->  	struct regmap *regmap;
->  	struct sti_pwm_compat_data *cdata;
-> +	struct sti_cpt_data *cpt_data[STI_MAX_CPT_CHANS];
+Done.
 
-The PWM subsystem allows chip-specific data to be associated with each
-PWM device. I'd prefer if the driver used it rather than homebrew some-
-thing similar. See pwm_set_chip_data() and pwm_get_chip_data().
-
-> @@ -389,6 +411,19 @@ static int sti_pwm_probe(struct platform_device *pdev)
->  	if (ret)
->  		return ret;
->  
-> +	for (chan = 0; chan < cdata->cpt_num_chan; chan++) {
-> +		struct sti_cpt_data *data;
-> +
-> +		data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
-> +		if (!data)
-> +			return -ENOMEM;
-> +
-> +		init_waitqueue_head(&data->wait);
-> +		mutex_init(&data->lock);
-> +		data->gpio = of_get_named_gpio(np, "capture-gpios", chan);
-> +		pc->cpt_data[chan] = data;
-
-Converting to per-PWM data should be as simple as turning this last line
-into:
-
-	pwm_set_chip_data(pc->chip.pwms[chan], data);
-
-Also I don't see any cleanup for this data in the driver. The memory for
-the per-PWM data should be freed by devm_*() infrastructure, but how
-will the GPIO be released?
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160412/43bda11f/attachment.sig>
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
