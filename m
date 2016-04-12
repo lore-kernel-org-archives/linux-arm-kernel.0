@@ -1,99 +1,58 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue, 12 Apr 2016 09:52:54 -0400
-Subject: exynos5800 based peach-pi boot is broken with v4.6-rc-1
-In-Reply-To: <CAD=FV=VoxVU5YOGt72g7egotS7-2bVNWz80PM6y=1O+PzYdudA@mail.gmail.com>
-References: <570CE2A1.904@samsung.com>
- <CAD=FV=VoxVU5YOGt72g7egotS7-2bVNWz80PM6y=1O+PzYdudA@mail.gmail.com>
-Message-ID: <570CFDB6.5090507@osg.samsung.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 12 Apr 2016 08:54:16 -0500
+Subject: [PATCH v2 1/2] dt/bindings: Add bindings for hisilicon random
+ number generator
+In-Reply-To: <570C4C52.4020902@huawei.com>
+References: <1460017397-30996-1-git-send-email-wangkefeng.wang@huawei.com>
+ <1460017397-30996-2-git-send-email-wangkefeng.wang@huawei.com>
+ <20160411144306.GA24637@rob-hp-laptop> <570C4C52.4020902@huawei.com>
+Message-ID: <CAL_JsqJv57nX7a89OR8U1=m+MLQKJBCOeuORPWXwGRx_P9XXBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Doug,
-
-On 04/12/2016 09:39 AM, Doug Anderson wrote:
-> Alim,
-> 
-> On Tue, Apr 12, 2016 at 4:57 AM, Alim Akhtar <alim.akhtar@samsung.com> wrote:
->> Hi All,
->> I can't boot Peach-pi (exynos5800) with v4.6-rc-1, board hangs while booting
->> with below boot hang-task.
->> I have not git-bisected yet, will do that, but AFAIR it was booting fine
->> with v4.5.
->> Any idea?
->>
->> =======
->> [    3.682786]  mmcblk1: p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12
->> [   36.001343] random: nonblocking pool is initialized
->> [  240.086291] INFO: task swapper/0:1 blocked for more than 120 seconds.
->> [  240.091271]       Not tainted 4.6.0-rc1 #1
->> [  240.095324] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables
->> this message.
->> [  240.103153] swapper/0       D c07247cc     0     1      0 0x00000000
->> [  240.109480] [<c07247cc>] (__schedule) from [<c0724ca0>]
->> (schedule+0x40/0xac)
->> [  240.116517] [<c0724ca0>] (schedule) from [<c0724f04>]
->> (schedule_preempt_disabled+0x14/0x20)
->> [  240.124846] [<c0724f04>] (schedule_preempt_disabled) from [<c0727704>]
->> (__mutex_lock_slowpath+0x1b4/0x418)
->> [  240.134474] [<c0727704>] (__mutex_lock_slowpath) from [<c0727974>]
->> (mutex_lock+0xc/0x24)
->> [  240.142544] [<c0727974>] (mutex_lock) from [<c05a1678>]
->> (cros_ec_cmd_xfer+0x18/0xe8)
->> [  240.150262] [<c05a1678>] (cros_ec_cmd_xfer) from [<c05a087c>]
->> (get_lightbar_version+0x34/0xb8)
->> [  240.158849] [<c05a087c>] (get_lightbar_version) from [<c05a092c>]
->> (cros_ec_lightbar_attrs_are_visible+0x2c/0x38)
->> [  240.169000] [<c05a092c>] (cros_ec_lightbar_attrs_are_visible) from
->> [<c024ca58>] (internal_create_group+0xb4/0x2d4)
->> [  240.179323] [<c024ca58>] (internal_create_group) from [<c024cda4>]
->> (sysfs_create_groups+0x48/0xc8)
->> [  240.188260] [<c024cda4>] (sysfs_create_groups) from [<c0431c6c>]
->> (device_add+0x258/0x528)
->> [  240.196413] [<c0431c6c>] (device_add) from [<c059fc90>]
->> (ec_device_probe+0x12c/0x14c)
->> [  240.204223] [<c059fc90>] (ec_device_probe) from [<c0435c90>]
->> (platform_drv_probe+0x50/0xa0)
->> [  240.212549] [<c0435c90>] (platform_drv_probe) from [<c04344b0>]
->> (driver_probe_device+0x200/0x2ac)
->> [  240.221397] [<c04344b0>] (driver_probe_device) from [<c0434600>]
->> (__driver_attach+0xa4/0xa8)
->> [  240.229811] [<c0434600>] (__driver_attach) from [<c0432b90>]
->> (bus_for_each_dev+0x54/0x88)
->> [  240.237966] [<c0432b90>] (bus_for_each_dev) from [<c0433b00>]
->> (bus_add_driver+0x174/0x1fc)
->> [  240.246206] [<c0433b00>] (bus_add_driver) from [<c0434e00>]
->> (driver_register+0x78/0xf4)
->> [  240.254188] [<c0434e00>] (driver_register) from [<c0b22dcc>]
->> (cros_ec_dev_init+0x88/0xd0)
->> [  240.262344] [<c0b22dcc>] (cros_ec_dev_init) from [<c0101774>]
->> (do_one_initcall+0x90/0x1d4)
->> [  240.270587] [<c0101774>] (do_one_initcall) from [<c0b00d98>]
->> (kernel_init_freeable+0x14c/0x1f4)
->> [  240.279259] [<c0b00d98>] (kernel_init_freeable) from [<c0723cb4>]
->> (kernel_init+0x8/0x114)
->> [  240.287416] [<c0723cb4>] (kernel_init) from [<c0107e38>]
->> (ret_from_fork+0x14/0x3c)
->> [  240.294961] INFO: task kworker/3:1:78 blocked for more than 120 seconds.
->> [  240.301637]       Not tainted 4.6.0-rc1 #1
-> 
-> I haven't dug, but it wouldn't surprise me if you found the same issue
-> Heiko did.  Can you see if
-> <https://patchwork.kernel.org/patch/8617941/> helps you?
+On Mon, Apr 11, 2016 at 8:16 PM, Kefeng Wang <wangkefeng.wang@huawei.com> wrote:
 >
+>
+> On 2016/4/11 22:43, Rob Herring wrote:
+>> On Thu, Apr 07, 2016 at 04:23:16PM +0800, Kefeng Wang wrote:
+>>> Document the devicetree bindings for the random number generator found
+>>> on Hisilicon Hip04 and Hip05 soc.
+>>>
+>>> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+>>> ---
+>>>  Documentation/devicetree/bindings/rng/hisi-rng.txt | 12 ++++++++++++
+>>>  1 file changed, 12 insertions(+)
+>>>  create mode 100644 Documentation/devicetree/bindings/rng/hisi-rng.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/rng/hisi-rng.txt b/Documentation/devicetree/bindings/rng/hisi-rng.txt
+>>> new file mode 100644
+>>> index 0000000..72efcc1
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/rng/hisi-rng.txt
+>>> @@ -0,0 +1,12 @@
+>>> +Hisilicon Random Number Generator
+>>> +
+>>> +Required properties:
+>>> +- compatible : Should be "hisilicon,rng"
+>>> +- reg : Offset and length of the register set of this block
+>>> +
+>>> +Example:
+>>> +
+>>> +rng at d1010000 {
+>>> +    compatible = "hisilicon,rng";
+>>
+>> This still needs SoC specific compatible strings.
+>
+> It is used by Hip04/Hip05 at lease, but for new SoC, like Hip06, it maybe different,
+> using single Soc prefix is not proper, how about hisilicon,rng-v1, or add two compatible
+> hisilicon,hip04-rng and hisilicon,hip05-rng? What's your option?
 
-That's correct, I can confirm that I needed Heiko's fix to boot v4.6-rc1 on
-my Peach Pi a few weeks ago. I don't have my machine at hand now to test but
-that fix made it to -rc3 so I would suggest using that tag instead of -rc1.
- 
-> -Doug
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+It is perfectly fine to include hisilicon,hip04-rng string for hip05
+and later if the block is the same. You should still have both strings
+(the original and current SoC) in case there is some issue or
+difference found.
 
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Unless there is a real IP version defined, you should avoid made up
+version numbers.
+
+Rob
