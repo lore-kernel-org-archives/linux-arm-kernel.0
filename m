@@ -1,63 +1,201 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 12 Apr 2016 17:31:08 +0200
-Subject: [PATCH v8 0/2]  Fix dma mapping when the cache is coherent
-Message-ID: <1460475070-29058-1-git-send-email-gregory.clement@free-electrons.com>
+Date: Tue, 12 Apr 2016 17:31:10 +0200
+Subject: [PATCH v8 2/2] ARM: dma-mapping: Fix the coherent case when iommu is
+ used
+In-Reply-To: <1460475070-29058-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1460475070-29058-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1460475070-29058-3-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+When doing dma allocation with IOMMU the __iommu_alloc_atomic() was
+used even when the system was coherent. However, this function
+allocates from a non-cacheable pool, which is fine when the device is
+not cache coherent but won't work as expected in the device is cache
+coherent. Indeed, the CPU and device must access the memory using the
+same cacheability attributes.
 
-These two patches fixes the dma mapping functions when the system is
-cache coherent. The first one allows to fix an issue we have on Armada
-375/38x with the PL310 that's why it is tagged for stable too.
+Moreover when the devices are coherent, the mmap call must not change
+the pg_prot flags in the vma struct. The arm_coherent_iommu_mmap_attrs
+has been updated in the same way that it was done for the arm_dma_mmap
+in commit 55af8a91640d ("ARM: 8387/1: arm/mm/dma-mapping.c: Add
+arm_coherent_dma_mmap").
 
-Thanks,
+Suggested-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/mm/dma-mapping.c | 86 +++++++++++++++++++++++++++++++++++------------
+ 1 file changed, 65 insertions(+), 21 deletions(-)
 
-Gregory
-
-PS: the mailing list was missing in the recipient list of the v7. It
-was a mistake and I realized it only now. If needed I can repost it
-with the few exchange we had with Russell King.
-
-
-Changelog
-v7 -> v8:
- - Use a flag instead of a boolean for checking the coherency. It
-   improve the readability of the code. Suggested by Russell King.
- - Consider that when coherency is set, it's for both L1 and L2 caches
- - Use the arm_dma_alloc_args struct to pass the coherency status when
-   possible. Suggested by Rabin Vincent
- - Remove the Tested-by flag from Marcin because of the modifications
-   around the L1 cache management in this series.
-
-v6 -> v7:
- - Renamed is coherent by l2_coherent as suggested by Russell
-
-v5 -> v6:
- - Rebased on v4.6-rc1
-
-v4 -> v5
- - Keep the dmac_* function outside the !is_coherent case.
-
-v3 -> v4:
- - Rebased on v4.3-rc1
- - Fix conflict with commit "21caf3a765b0 ARM: 8398/1: arm DMA: Fix
-   allocation from CMA for coherent DMA"
-
-v2 -> v3:
-
- - Fix comments in patch 1 as suggested by Catalin.
- - Fix build issues in patch 2 (by using the multi_v7_defconfig +
-   CONFIG_ROCKCHIP_IOMMU).
- - Add the arm_coherent_iommu_mmap_attrs function.
-
-
-Gregory CLEMENT (2):
-  ARM: dma-mapping: Don't use outer_flush_range when the L2C is coherent
-  ARM: dma-mapping: Fix the coherent case when iommu is used
-
- arch/arm/mm/dma-mapping.c | 144 +++++++++++++++++++++++++++++++++-------------
- 1 file changed, 105 insertions(+), 39 deletions(-)
-
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 97beffb8a687..bc7bbef264de 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -1487,13 +1487,16 @@ static struct page **__iommu_get_pages(void *cpu_addr, struct dma_attrs *attrs)
+ 	return NULL;
+ }
+ 
+-static void *__iommu_alloc_atomic(struct device *dev, size_t size,
+-				  dma_addr_t *handle)
++static void *__iommu_alloc_simple(struct device *dev, size_t size, gfp_t gfp,
++				  dma_addr_t *handle, int coherent_flag)
+ {
+ 	struct page *page;
+ 	void *addr;
+ 
+-	addr = __alloc_from_pool(size, &page);
++	if (coherent_flag  == COHERENT)
++		addr = __alloc_simple_buffer(dev, size, gfp, &page);
++	else
++		addr = __alloc_from_pool(size, &page);
+ 	if (!addr)
+ 		return NULL;
+ 
+@@ -1509,14 +1512,18 @@ err_mapping:
+ }
+ 
+ static void __iommu_free_atomic(struct device *dev, void *cpu_addr,
+-				dma_addr_t handle, size_t size)
++			dma_addr_t handle, size_t size, int coherent_flag)
+ {
+ 	__iommu_remove_mapping(dev, handle, size);
+-	__free_from_pool(cpu_addr, size);
++	if (coherent_flag == COHERENT)
++		__dma_free_buffer(virt_to_page(cpu_addr), size);
++	else
++		__free_from_pool(cpu_addr, size);
+ }
+ 
+-static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
+-	    dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs)
++static void *__arm_iommu_alloc_attrs(struct device *dev, size_t size,
++	    dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs,
++	    int coherent_flag)
+ {
+ 	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL);
+ 	struct page **pages;
+@@ -1525,8 +1532,9 @@ static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
+ 	*handle = DMA_ERROR_CODE;
+ 	size = PAGE_ALIGN(size);
+ 
+-	if (!gfpflags_allow_blocking(gfp))
+-		return __iommu_alloc_atomic(dev, size, handle);
++	if (coherent_flag  == COHERENT || !gfpflags_allow_blocking(gfp))
++		return __iommu_alloc_simple(dev, size, gfp, handle,
++					    coherent_flag);
+ 
+ 	/*
+ 	 * Following is a work-around (a.k.a. hack) to prevent pages
+@@ -1537,8 +1545,7 @@ static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
+ 	 */
+ 	gfp &= ~(__GFP_COMP);
+ 
+-	/* For now always consider we are in a non-coherent case */
+-	pages = __iommu_alloc_buffer(dev, size, gfp, attrs, NORMAL);
++	pages = __iommu_alloc_buffer(dev, size, gfp, attrs, coherent_flag);
+ 	if (!pages)
+ 		return NULL;
+ 
+@@ -1563,7 +1570,19 @@ err_buffer:
+ 	return NULL;
+ }
+ 
+-static int arm_iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
++static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
++		    dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs)
++{
++	return __arm_iommu_alloc_attrs(dev, size, handle, gfp, attrs, NORMAL);
++}
++
++static void *arm_coherent_iommu_alloc_attrs(struct device *dev, size_t size,
++		    dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs)
++{
++	return __arm_iommu_alloc_attrs(dev, size, handle, gfp, attrs, COHERENT);
++}
++
++static int __arm_iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
+ 		    void *cpu_addr, dma_addr_t dma_addr, size_t size,
+ 		    struct dma_attrs *attrs)
+ {
+@@ -1573,8 +1592,6 @@ static int arm_iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
+ 	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
+ 	unsigned long off = vma->vm_pgoff;
+ 
+-	vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot);
+-
+ 	if (!pages)
+ 		return -ENXIO;
+ 
+@@ -1595,19 +1612,34 @@ static int arm_iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
+ 
+ 	return 0;
+ }
++static int arm_iommu_mmap_attrs(struct device *dev,
++		struct vm_area_struct *vma, void *cpu_addr,
++		dma_addr_t dma_addr, size_t size, struct dma_attrs *attrs)
++{
++	vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot);
++
++	return __arm_iommu_mmap_attrs(dev, vma, cpu_addr, dma_addr, size, attrs);
++}
++
++static int arm_coherent_iommu_mmap_attrs(struct device *dev,
++		struct vm_area_struct *vma, void *cpu_addr,
++		dma_addr_t dma_addr, size_t size, struct dma_attrs *attrs)
++{
++	return __arm_iommu_mmap_attrs(dev, vma, cpu_addr, dma_addr, size, attrs);
++}
+ 
+ /*
+  * free a page as defined by the above mapping.
+  * Must not be called with IRQs disabled.
+  */
+-void arm_iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
+-			  dma_addr_t handle, struct dma_attrs *attrs)
++void __arm_iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
++	dma_addr_t handle, struct dma_attrs *attrs, int coherent_flag)
+ {
+ 	struct page **pages;
+ 	size = PAGE_ALIGN(size);
+ 
+-	if (__in_atomic_pool(cpu_addr, size)) {
+-		__iommu_free_atomic(dev, cpu_addr, handle, size);
++	if (coherent_flag == COHERENT || __in_atomic_pool(cpu_addr, size)) {
++		__iommu_free_atomic(dev, cpu_addr, handle, size, coherent_flag);
+ 		return;
+ 	}
+ 
+@@ -1626,6 +1658,18 @@ void arm_iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
+ 	__iommu_free_buffer(dev, pages, size, attrs);
+ }
+ 
++void arm_iommu_free_attrs(struct device *dev, size_t size,
++		    void *cpu_addr, dma_addr_t handle, struct dma_attrs *attrs)
++{
++	__arm_iommu_free_attrs(dev, size, cpu_addr, handle, attrs, NORMAL);
++}
++
++void arm_coherent_iommu_free_attrs(struct device *dev, size_t size,
++		    void *cpu_addr, dma_addr_t handle, struct dma_attrs *attrs)
++{
++	__arm_iommu_free_attrs(dev, size, cpu_addr, handle, attrs, COHERENT);
++}
++
+ static int arm_iommu_get_sgtable(struct device *dev, struct sg_table *sgt,
+ 				 void *cpu_addr, dma_addr_t dma_addr,
+ 				 size_t size, struct dma_attrs *attrs)
+@@ -2032,9 +2076,9 @@ struct dma_map_ops iommu_ops = {
+ };
+ 
+ struct dma_map_ops iommu_coherent_ops = {
+-	.alloc		= arm_iommu_alloc_attrs,
+-	.free		= arm_iommu_free_attrs,
+-	.mmap		= arm_iommu_mmap_attrs,
++	.alloc		= arm_coherent_iommu_alloc_attrs,
++	.free		= arm_coherent_iommu_free_attrs,
++	.mmap		= arm_coherent_iommu_mmap_attrs,
+ 	.get_sgtable	= arm_iommu_get_sgtable,
+ 
+ 	.map_page	= arm_coherent_iommu_map_page,
 -- 
 2.5.0
