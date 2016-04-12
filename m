@@ -1,58 +1,48 @@
-From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Tue, 12 Apr 2016 21:25:04 +0900
-Subject: [PATCH] ARM: mach-imx: sdhci-esdhc-imx: initialize DMA mask
-In-Reply-To: <570CC6F2.4090301@intel.com>
-References: <1460362846-2906-1-git-send-email-akurz@blala.de>
- <20160411083510.GN10108@pengutronix.de> <570B780E.7090801@intel.com>
- <alpine.DEB.2.00.1604111803080.6072@blala.de> <570C902E.7090607@intel.com>
- <20160412084048.GM19428@n2100.arm.linux.org.uk> <570CC6F2.4090301@intel.com>
-Message-ID: <570CE920.4040204@nvidia.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 12 Apr 2016 14:30:13 +0200
+Subject: Nokia N900 retention mode in v4.6, camera buttons fun
+In-Reply-To: <20160412121658.GA32486@amd>
+References: <20160405205137.GA10196@amd> <20160407174019.GM16484@atomide.com>
+ <20160407194828.GA13338@amd> <20160407213229.GO16484@atomide.com>
+ <20160407230150.GA16552@amd> <20160407234134.GQ16484@atomide.com>
+ <20160411093023.GC11814@amd> <20160411094130.GA5753@amd>
+ <20160411211026.GH5995@atomide.com> <20160412121658.GA32486@amd>
+Message-ID: <20160412123013.GA12296@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi!
 
+> > > Ok, it works now. I was doing tests in daylight so it was poorly
+> > > visible. The right part of keyboard stays lit (but that's expected
+> > > AFAICT), but the left part blinks.
+> > 
+> > During idle, both should go off and are doing so for me. Both LEDs off
+> > indicates off mode, left LED off is for retention mode. So you still
+> > have something blocking off mode, maybe check:
+> > 
+> > echo 1 > /sys/kernel/debug/pm_debug/enable_off_mode
+> 
+> What is the power difference between retention and off? I'm now down
+> to cca 25mA, which should be around 50 hours standby time. Not ideal,
+> but should be usable.
+> 
+> In the meantime, I found what is causing the rention mode to break for
+> me: CONFIG_HSI (aka wireless modem support). With HSI off, it seems to work.
+> 
+> I still get problems with the camera button, in config similar to
+> defconfig.  For some reason, I'm even getting (autorepeating) ^@ on
+> console. As long as I hold camera button down, I even get it into off
+> mode for brief period.
 
-On 04/12/2016 06:59 PM, Adrian Hunter wrote:
-> On 12/04/16 11:40, Russell King - ARM Linux wrote:
->> On Tue, Apr 12, 2016 at 09:05:34AM +0300, Adrian Hunter wrote:
->>> On 11/04/16 19:13, Alexander Kurz wrote:
->>>> Hi Adrian,
->>>> On Mon, 11 Apr 2016, Adrian Hunter wrote:
->>>>
->>>>> On 11/04/16 11:35, Uwe Kleine-K?nig wrote:
->>>>>> Hello,
->>>>>>
->>>>>> I added the people involved in 7b91369b4655 to Cc.
->>>>>>
->>>>>> On Mon, Apr 11, 2016 at 10:20:46AM +0200, Alexander Kurz wrote:
->>>>>>> With commit 7b91369b DMA access got disabled for device drivers with zero
->>>>>
->>>>> Is that because dma_set_mask_and_coherent() fails?
->>>> right, dma_set_mask_and_coherent() fails, thats the only reason for
->>>> this patch. This popped up on a Kindle3 (IMX35 with eMMC based root fs).
->>>
->>> Arnd, Alexandre : Why should dma_set_mask_and_coherent() fail in this case
->>> when DMA apparently doesn't need a dma_mask anyway?
->>
->> What do you mean "doesn't need a dma_mask" ?  DMA _always_ requires a
->> DMA mask.  The DMA mask defines how many address bits are capable of
->> being used on the bus.
->>
->> If there's no DMA mask, then there's no usable address bits, and so
->> the device is not DMA capable.  Hence, dma_set_mask_and_coherent()
->> will fail because its not possible to negotiate a non-zero number of
->> address bits.
->>
->
-> The point is, now we valid dma_set_mask_and_coherent(), DMA will stop
-> working for any other SDHCI device that hasn't allocated dev.dma_mask.  Is
-> that OK?
+Ok, if I turn off CONFIG_KEYBOARD_GPIO, I get it into off
+mode... once per screen blank, for about a second. (Does CONFIG_KEYBOARD_GPIO also cause
+problems for you?)
 
-Clearly these devices need to be fixed. If we want to give them a grace 
-period, we could also (temporarily) not propagate the return value of 
-dma_set_mask_and_coherent() and limit ourselves to emitting a big 
-warning about the inconsistency of having SDHCI_USE_SDMA/SDHCI_USE_ADMA 
-in the host flags while not setting a dma mask.
+Any idea why it enters off mode only once after each screenblank?
 
-But in the past, how prompt have people been to react to such warnings 
-vs. their device not working as expected?
+Best regards,
+								Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
