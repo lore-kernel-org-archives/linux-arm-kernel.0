@@ -1,102 +1,79 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 12 Apr 2016 15:11:18 +0200
-Subject: [PATCH v5 15/46] pwm: introduce the pwm_state concept
-In-Reply-To: <20160412144508.2ee181fe@bbrezillon>
-References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
- <1459368249-13241-16-git-send-email-boris.brezillon@free-electrons.com>
- <20160412114904.GM18882@ulmo.ba.sec>
- <20160412141718.5fe4cf24@bbrezillon>
- <20160412122141.GP18882@ulmo.ba.sec>
- <20160412144508.2ee181fe@bbrezillon>
-Message-ID: <20160412131118.GQ18882@ulmo.ba.sec>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 12 Apr 2016 15:11:56 +0200
+Subject: [PATCH 15/17] kvm: arm64: Get rid of fake page table levels
+In-Reply-To: <570CF21D.8000600@arm.com>
+References: <1459787177-12767-1-git-send-email-suzuki.poulose@arm.com>
+ <1459787177-12767-16-git-send-email-suzuki.poulose@arm.com>
+ <20160408150523.GX8961@cbox> <570BB5C9.8040509@arm.com>
+ <20160412121414.GA3039@cbox> <570CF21D.8000600@arm.com>
+Message-ID: <20160412131156.GH3039@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 12, 2016 at 02:45:08PM +0200, Boris Brezillon wrote:
-> On Tue, 12 Apr 2016 14:21:41 +0200
-> Thierry Reding <thierry.reding@gmail.com> wrote:
+On Tue, Apr 12, 2016 at 02:03:25PM +0100, Suzuki K Poulose wrote:
+> On 12/04/16 13:14, Christoffer Dall wrote:
+> >On Mon, Apr 11, 2016 at 03:33:45PM +0100, Suzuki K Poulose wrote:
+> >>On 08/04/16 16:05, Christoffer Dall wrote:
+> >>>On Mon, Apr 04, 2016 at 05:26:15PM +0100, Suzuki K Poulose wrote:
+> >>
 > 
-> > On Tue, Apr 12, 2016 at 02:17:18PM +0200, Boris Brezillon wrote:
-> > > On Tue, 12 Apr 2016 13:49:04 +0200
-> > > Thierry Reding <thierry.reding@gmail.com> wrote:
-> > > 
-> > > > On Wed, Mar 30, 2016 at 10:03:38PM +0200, Boris Brezillon wrote:
-> > > > > The PWM state, represented by its period, duty_cycle and polarity,
-> > > > > is currently directly stored in the PWM device.
-> > > > > Declare a pwm_state structure embedding those field so that we can later
-> > > > > use this struct to atomically update all the PWM parameters at once.
-> > > > > 
-> > > > > All pwm_get_xxx() helpers are now implemented as wrappers around
-> > > > > pwm_get_state().
-> > > > > 
-> > > > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > > > > ---
-> > > > >  drivers/pwm/core.c  |  8 ++++----
-> > > > >  include/linux/pwm.h | 54 +++++++++++++++++++++++++++++++++++++++++------------
-> > > > >  2 files changed, 46 insertions(+), 16 deletions(-)
-> > > > > 
-> > > > > diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-> > > > > index 6433059..f3f91e7 100644
-> > > > > --- a/drivers/pwm/core.c
-> > > > > +++ b/drivers/pwm/core.c
-> > > > > @@ -268,7 +268,7 @@ int pwmchip_add_with_polarity(struct pwm_chip *chip,
-> > > > >  		pwm->chip = chip;
-> > > > >  		pwm->pwm = chip->base + i;
-> > > > >  		pwm->hwpwm = i;
-> > > > > -		pwm->polarity = polarity;
-> > > > > +		pwm->state.polarity = polarity;
-> > > > 
-> > > > Would this not more correctly be assigned to pwm->args.polarity? After
-> > > > all this is setting up the "initial" state, much like DT or the lookup
-> > > > tables would for duty cycle and period.
-> > > 
-> > > Yes, I wasn't sure about the pwm_add_with_polarity() meaning. To me,
-> > > all the reference info should be extracted from DT, PWM lookup table or
-> > > driver specific ->request() implementation, but I can definitely
-> > > initialize the args.polarity here too.
-> > > 
-> > > Should I keep the pwm->state.polarity assignment (to set the initial
-> > > polarity when the driver does not support hardware readout)?
-> > 
-> > Wouldn't this work automatically as part of the pwm_apply_args() helper
-> > if we extended it with this setting?
+> >>>>-#if PGDIR_SHIFT > KVM_PHYS_SHIFT
+> >>>>-#define PTRS_PER_S2_PGD_SHIFT	0
+> >>>>-#else
+> >>>>-#define PTRS_PER_S2_PGD_SHIFT	(KVM_PHYS_SHIFT - PGDIR_SHIFT)
+> >>>>-#endif
+> >>>>-#define PTRS_PER_S2_PGD		(1 << PTRS_PER_S2_PGD_SHIFT)
+> >>>>+#define STAGE2_PGTABLE_LEVELS		ARM64_HW_PGTABLE_LEVELS(KVM_PHYS_SHIFT - 4)
+> >>>>
+> >>>>  /*
+> >>>>- * If we are concatenating first level stage-2 page tables, we would have less
+> >>>>- * than or equal to 16 pointers in the fake PGD, because that's what the
+> >>>>- * architecture allows.  In this case, (4 - CONFIG_PGTABLE_LEVELS)
+> >>>>- * represents the first level for the host, and we add 1 to go to the next
+> >>>>- * level (which uses contatenation) for the stage-2 tables.
+> >
+> >just noticed: s/contatenation/concatenation/
 > 
-> Well, as you explained in you answer to patch 5, pwm_apply_args()
-> should be called on a per-request basis (each time a PWM device is
-> requested), while the initial polarity setting should only be applied
-> when registering the PWM chip (and its devices). After that, the
-> framework takes care of keeping the PWM state in sync with the hardware
-> state.
+> Thanks for catching that. Will fix it.
 > 
-> Let's take a real (though a bit unusual) example. Say you have a single
-> PWM device referenced by two different users. Only one user can be
-> enabled at a time, but each of them has its own reference config
-> (different polarity, different period).
+> >>>which case this should be reworded to just state the assumptions and why
+> >>>this is a good assumption.
+> >>>
+> >>>(If my assumptions are wrong here, then there are also weird cases where
+> >>>the host does huge pages at the PMD level and we don't.  Not sure I can
+> >>>see the full ramifications of that.)
+> >>
+> >>I am sorry, I didn't get your point about the PMD level.
+> >>
+> >
+> >Right, I expressed that terribly, and I may have gotten myself confused
+> >when writing that.
+> >
+> >My concern is this: if the number of levels between the host and stage-2
+> >are different, and the host uses huge pmd mappings (either THP or huge
+> >tlb fs), then do we always do the right thing for stage-2 tables, even
+> >if we support the case with more levels in Stage-2 than on the host?
 > 
-> User1 calls pwm_get() and applies its own polarity and period. Then
-> user1 is unregistered and release the PWM device, leaving the polarity
-> and period untouched.
+> Yes. We are safe with PMD (level 2). In the worst case we will have a 2level
+> page table at host and say 4 at stage2. In either case, we have a PMD level
+> (which in host is folded to PGD) and both will use section mapping at level 2
+> for huge pmd. Also pmd_huge() doesn't care if the PMD is folded or not. So,
+> we are fine with that. I hope that answers your question.
 > 
-> User2 is registered and request the same PWM device, but user2 is
-> smarter and tries to extract the current PWM state before adapting the
-> config according to pwm_args. If you just reset pwm->state.polarity
-> each time pwm_apply_args() is called (and you suggested to call it as
-> part of the request procedure), then this means the PWM state is no
-> longer in sync with the hardware state.
 
-In that case neither will be the period or duty cycle. Essentially this
-gets us back to square one where we need to decide how to handle current
-state vs. initial arguments.
+It does, thanks for enumerating the cases for me.
 
-But I don't think this is really going to be an issue because this is
-all moot until we've moved over to the atomic API, at which point this
-is all going to go away anyway.
+> >
+> >Thanks for trying to parse my crytptic and potentially nonsensical
+> >questions.
+> 
+> No no, they make absolute sense. I had gone through these questions myself initially
+> when I wrote the series, so its good to share them :-).
+> 
+> Btw, I have rebased my series to kvmarm and have addressed the comments. I will post
+> them after a round of testing.
+> 
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160412/288c26ca/attachment-0001.sig>
+Great, thanks!
+
+-Christoffer
