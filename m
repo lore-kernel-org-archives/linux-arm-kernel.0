@@ -1,34 +1,61 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 12 Apr 2016 15:19:58 +0200
-Subject: [PATCH] arm64: acpi: add a Kconfig option to prefer ACPI boot
- over DT
-In-Reply-To: <20160412130751.GA8066@e104818-lin.cambridge.arm.com>
-References: <1460373568-4374-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160412130751.GA8066@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu-XYoyRkfMtdSARW0mf5dbztWbjM7hps4yBS6O1hKfRqg@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 12 Apr 2016 15:21:31 +0200
+Subject: [RFC PATCH 45/45] KVM: arm/arm64: vgic-new: enable build
+In-Reply-To: <570BB86E.2000208@arm.com>
+References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
+ <1458871508-17279-46-git-send-email-andre.przywara@arm.com>
+ <20160331181850.GI4126@cbox> <570BB86E.2000208@arm.com>
+Message-ID: <20160412132131.GK3039@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 April 2016 at 15:07, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Mon, Apr 11, 2016 at 01:19:28PM +0200, Ard Biesheuvel wrote:
->> If both ACPI and DT platform descriptions are available, and the
->> kernel was configured at build time to support both flavours, the
->> default policy in absence of a acpi=[off|force] kernel command line
->> parameter is to prefer DT over ACPI.
->>
->> This adds an option to invert that default policy, and prefer ACPI
->> over DT instead. Note that this policy is still superseded by the
->> value of the acpi= command line parameter.
->
-> Why do we need another method to specify an ACPI boot? I thought those
-> vendors going for ACPI wouldn't be bothered with DT anyway.
->
-> I'm not keen on having kernel builds with different behavior in respect
-> of whether ACPI or DT is preferred.
->
+On Mon, Apr 11, 2016 at 03:45:02PM +0100, Andre Przywara wrote:
+> Hi,
+> 
+> On 31/03/16 19:18, Christoffer Dall wrote:
+> > On Fri, Mar 25, 2016 at 02:05:08AM +0000, Andre Przywara wrote:
+> >> Now that the new VGIC implementation has reached feature parity with
+> >> the old one, add the new files to the build system and add a Kconfig
+> >> option to switch between the two versions.
+> >> We set the default to the new version to get maximum test coverage,
+> >> in case people experience problems they can switch back to the old
+> >> behaviour if needed.
+> >>
+> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> >> ---
+> >>  arch/arm/kvm/Kconfig    |  7 +++++++
+> >>  arch/arm/kvm/Makefile   | 10 ++++++++++
+> >>  arch/arm64/kvm/Kconfig  |  7 +++++++
+> >>  arch/arm64/kvm/Makefile | 10 ++++++++++
+> >>  4 files changed, 34 insertions(+)
+> >>
+> >> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+> >> index 95a0005..02abfff 100644
+> >> --- a/arch/arm/kvm/Kconfig
+> >> +++ b/arch/arm/kvm/Kconfig
+> >> @@ -46,6 +46,13 @@ config KVM_ARM_HOST
+> >>  	---help---
+> >>  	  Provides host support for ARM processors.
+> >>  
+> >> +config KVM_NEW_VGIC
+> >> +	bool "New VGIC implementation"
+> >> +	depends on KVM
+> >> +	default y
+> >> +	---help---
+> >> +	  uses the new VGIC implementation
+> >> +
+> > 
+> > I had imagined we'd name it in the reverse, so the option would have
+> > been CONFIG_KVM_VGIC_LEGACY, but I guess the net effect should be the
+> > same, assuming most people just go with the default anyway.
+> 
+> I think originally the assumption was to make the old VGIC the default
+> in the beginning, but that changed later. By that time I considered it
+> too tedious to change all patches in this regard, so I just kept the old
+> symbol and semantic in.
+> Shouldn't matter, really, I guess there are arguments for both ways.
+> 
 
-How about adding support for acpi=on then? Currently, we only have
-acpi=off or acpi=force, and there is no way (i.e., for a distro
-installer) to boot via ACPI if it can but fall back to DT otherwise.
-Some enterprise features (like RAS) depend on ACPI boot so it may
-simply preferred but not mandated in some cases.
+Agreed, shouldn't matter.
+
+-Christoffer
