@@ -1,66 +1,110 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 12 Apr 2016 09:30:56 -0700
-Subject: Nokia N900 retention mode in v4.6, camera buttons fun
-In-Reply-To: <20160412123013.GA12296@amd>
-References: <20160407174019.GM16484@atomide.com> <20160407194828.GA13338@amd>
- <20160407213229.GO16484@atomide.com> <20160407230150.GA16552@amd>
- <20160407234134.GQ16484@atomide.com> <20160411093023.GC11814@amd>
- <20160411094130.GA5753@amd> <20160411211026.GH5995@atomide.com>
- <20160412121658.GA32486@amd> <20160412123013.GA12296@amd>
-Message-ID: <20160412163055.GP5995@atomide.com>
+Date: Tue, 12 Apr 2016 09:37:50 -0700
+Subject: [PATCH v2 0/3] ARM: OMAP3: Fix McBSP2/3 hwmod setup for sidetone
+In-Reply-To: <570CC54E.6020703@ti.com>
+References: <alpine.DEB.2.02.1603191937430.6629@utopia.booyaka.com>
+ <56EFB794.5010505@ti.com>
+ <alpine.DEB.2.02.1603211743200.31059@utopia.booyaka.com>
+ <56FE407E.9030803@ti.com> <20160402001753.GR9329@atomide.com>
+ <57026205.6020105@ti.com> <20160404151200.GA4652@atomide.com>
+ <5703BA6B.1080208@ti.com> <20160411212845.GJ5995@atomide.com>
+ <570CC54E.6020703@ti.com>
+Message-ID: <20160412163750.GR5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pavel Machek <pavel@ucw.cz> [160412 05:31]:
-> Hi!
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [160412 02:53]:
+> Tony,
 > 
-> > > > Ok, it works now. I was doing tests in daylight so it was poorly
-> > > > visible. The right part of keyboard stays lit (but that's expected
-> > > > AFAICT), but the left part blinks.
-> > > 
-> > > During idle, both should go off and are doing so for me. Both LEDs off
-> > > indicates off mode, left LED off is for retention mode. So you still
-> > > have something blocking off mode, maybe check:
-> > > 
-> > > echo 1 > /sys/kernel/debug/pm_debug/enable_off_mode
+> On 04/12/16 00:28, Tony Lindgren wrote:
+> >>> Then for the long term solution using
+> >>> PM runtime to block gating of the clock while sidetone is active is
+> >>> the way to go it seems.
+> >>
+> >> Hrm, I think one of the main issue is that with pm_runtime we can not block
+> >> the clock gating, this is why legacy code uses enable_st_clock(), which will
+> >> call omap2_clk_deny_idle() or omap2_clk_allow_idle().
 > > 
-> > What is the power difference between retention and off? I'm now down
-> > to cca 25mA, which should be around 50 hours standby time. Not ideal,
-> > but should be usable.
-
-The 25mA sounds way too big to me even for retention mode, some
-devices must be still on.
-
-The off mode makes a huge difference for standby time, it should cut
-down the total power consumption to something like 10+ mW with modem
-enabled. Aproximately the breakdown is roughly: 900 uW for omap, 5 mW
-for memory and 5 or more for the modem. Sorry I don't know the exact
-numbers for the modem. But with 37xx torpedo, mainline kernel is
-already getting very close to the 900 uW + 5 mW numbers for the CPU
-module during idle measured from the ina219 shunt on the torpedo devkit.
-
-> > In the meantime, I found what is causing the rention mode to break for
-> > me: CONFIG_HSI (aka wireless modem support). With HSI off, it seems to work.
-> > 
-> > I still get problems with the camera button, in config similar to
-> > defconfig.  For some reason, I'm even getting (autorepeating) ^@ on
-> > console. As long as I hold camera button down, I even get it into off
-> > mode for brief period.
+> > I see. I think Tero wanted to export omap2_clk_allow_idle() and
+> > omap2_clk_deny_idle() for drivers to use. That should get discussed in
+> > the linux-clk list, probably best to use the pdata callbacks until
+> > the clock idling issue has been discussed.
 > 
-> Ok, if I turn off CONFIG_KEYBOARD_GPIO, I get it into off
-> mode... once per screen blank, for about a second. (Does CONFIG_KEYBOARD_GPIO also cause
-> problems for you?)
+> It is already exported, used by the arch/arm/mach-omap2/mcbsp.c file.
+
+Oh but not with EXPORT_SYMBOL so not usable except for built-in code.
+Probably best to keep it that way IMO..
+
+> Why not to remove the callback for legacy also and handle it in the driver? It
+> is less ugly in my opinion.
+> Going via the pdata callback is just going to cement the current setup.
+
+Sure, maybe you can have a piece of built-in driver code to do that?
+
+> I have drafted out something which would be needed if we separate the McBSP-ST
+> from the McBSP driver. It is not pretty...
 > 
-> Any idea why it enters off mode only once after each screenblank?
+> In the new omap3-mcbsp-st.h:
+> 
+> struct omap3_mcbspst;
+> 
+> struct omap_st_to_mcbsp_data {
+> 	bool (*is_enabled)(struct omap_st_to_mcbsp_data *st_data);
+> 	bool (*enable)(struct omap_st_to_mcbsp_data *st_data);
+> 	bool (*disable)(struct omap_st_to_mcbsp_data *st_data);
+> 	struct omap3_mcbspst *st_priv;
+> };
+> 
+> In the current omap-mcbsp.h:
+> 
+> #include <omap3-mcbsp-st.h>
+> ...
+> struct omap_mcbsp_to_st_data {
+> 	bool (*is_enabled)(struct omap_mcbsp_to_st_data *mcbsp_data);
+> 	bool (*iclk_idle)(struct omap_mcbsp_to_st_data *mcbsp_data, bool allow);
+> 	bool (*enable)(struct omap_mcbsp_to_st_data *mcbsp_data);
+> 	bool (*disable)(struct omap_mcbsp_to_st_data *mcbsp_data);
+> 	struct omap_mcbsp *mcbsp_priv;
+> };
+> 
+> #ifdef CONFIG_SND_SOC_OMAP3_MCBSPST
+> struct omap_mcbsp_to_st_data *omap_mcbsp_st_register(
+> 						struct platform_device *pdev, /* McBSP pdev! probably? */
+> 						struct omap_st_to_mcbsp_data *st_data);
+> int omap_mcbsp_st_unregister(struct omap_st_to_mcbsp_data *st_data);
+> #else
+> static inline int omap_mcbsp_st_register(struct platform_device *pdev,
+> 					 struct omap_st_to_mcbsp_data *st_data)
+> {
+> 	return -ENODEV;
+> }
+> static inline int omap_mcbsp_st_unregister(struct omap_st_to_mcbsp_data *st_data)
+> {
+> 	return 0;
+> }
+> #endif
+> 
+> Since the ST would be separate driver, it should create the needed ALSA
+> controls as well, probably I need to pass something else here and there.
+> But, in this setup it would be possible to remove the ST driver while the
+> McBSP and the sound card is up, which means we must be able to remove
+> kcontrols runtime, probably there is a way, but not sure about this.
+> 
+> There will be issues like this we have not prepared for I'm sure if we do
+> dramatic change to the simple implementation we have right now.
 
-After disabling CONFIG_PROVE_LOCKING, loading the LCD modules, and
-blanking the screen, my n900 hits off mode just fine about once
-a second. Sounds like you still have some extra devices enabled
-causing it.
+Best to stick to incremental improvments I think..
 
-With LCD enabled, both LEDs are on contantly. I think we should
-be able to hit retention in that state, at least n950 is doing it
-with the Nokia kernel.
+> I have reasonably clean patches (6 of them) on top of this three which would
+> remove the arch code for the iclk handling and implements it in the mcbsp
+> driver w/o changing the architecture of the McBSP driver itself. Both DT and
+> legacy boot works. The only part I was not happy about the one where I looked
+> up the mcbsp2/3_ick, but I think I have found much cleaner way to do it
+> (meaning that the code will not look hackish at all).
+> If you want to see, I can make this change and I can send the whole thing as
+> RFC and continue the discussion around that?
+
+Sure, especially if that helps with splitting up the modules too.
 
 Regards,
 
