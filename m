@@ -1,40 +1,44 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 12 Apr 2016 13:18:27 +0200
-Subject: [PATCH v7 2/4] power: reset: add reboot mode driver
-In-Reply-To: <570CBF7F.9090300@rock-chips.com>
-References: <1459304304-9713-1-git-send-email-andy.yan@rock-chips.com>
- <1459304443-9811-1-git-send-email-andy.yan@rock-chips.com>
- <56FB49B3.2040505@samsung.com> <57045D6B.2080907@rock-chips.com>
- <57045F9D.1000502@samsung.com> <570CBF7F.9090300@rock-chips.com>
-Message-ID: <570CD983.9090202@samsung.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 12 Apr 2016 13:22:46 +0200
+Subject: [PATCH v5 04/46] pwm: get rid of pwm->lock
+In-Reply-To: <1459368249-13241-5-git-send-email-boris.brezillon@free-electrons.com>
+References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1459368249-13241-5-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20160412112246.GJ18882@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/12/2016 11:27 AM, Andy Yan wrote:
->>>>> +
->>>>> +static const struct of_device_id syscon_reboot_mode_of_match[] = {
->>>>> +    { .compatible = "syscon-reboot-mode" },
->>>>> +    {}
->>>>> +};
->>>>> +
->>>>> +static struct platform_driver syscon_reboot_mode_driver = {
->>>>> +    .probe = syscon_reboot_mode_probe,
->>>> Cleanup needed. What will happen after device unbind? Memory will be
->>>> released (devm-*()) but reboot notifier won't thus leading to OOPS on
->>>> reboot.
->>>      From the kernel_restart_prepare function, the reboot notifier will
->>> be called before device_shutdown. Is there any other case the device
->>> unbind before reboot notifier
->>> called?
->> This is a regular module platform driver so unbind can happen any time
->> initiated by user, either by unbind command or by module removal. User
->> can then re-bind device or not - probably does not matter. Anyway after
->> such first unbind, the restart will kaboom instead of do a restart.
+On Wed, Mar 30, 2016 at 10:03:27PM +0200, Boris Brezillon wrote:
+> PWM devices are not protected against concurrent accesses. The lock in
+> pwm_device might let PWM users think it is, but it's actually only
+> protecting the enabled state.
 > 
->     I just need to do clean up in remove?
+> Removing this lock should be fine as long as all PWM users are aware that
+> accesses to the PWM device have to be serialized, which seems to be the
+> case for all of them except the sysfs interface.
+> Patch the sysfs code by adding a lock to the pwm_export struct and making
+> sure it's taken for all accesses to the exported PWM device.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+>  drivers/pwm/core.c  | 19 ++++--------------
+>  drivers/pwm/sysfs.c | 57 ++++++++++++++++++++++++++++++++++++++++++-----------
+>  include/linux/pwm.h |  2 --
+>  3 files changed, 50 insertions(+), 28 deletions(-)
 
-Yes, you need to clean up everything in remove() callback (in a reversed
-order).
+This is a little overzealous. Only accesses that can cause races need to
+be protected by the lock. All of the *_show() callbacks don't modify the
+PWM device in any way, so there is no need to protect them against
+concurrent accesses.
 
-Best regards,
-Krzysztof
+I've dropped the changes when applying.
+
+Thanks,
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160412/ad8efca5/attachment.sig>
