@@ -1,223 +1,86 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 12 Apr 2016 11:54:51 -0600
-Subject: [PATCH V2 14/15] coresight: tmc: implementing TMC-ETR AUX space API
+Date: Tue, 12 Apr 2016 11:54:52 -0600
+Subject: [PATCH V2 15/15] coresight: configuring ETF in FIFO mode when acting
+ as link
 In-Reply-To: <1460483692-25061-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1460483692-25061-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1460483692-25061-15-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1460483692-25061-16-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implement the AUX area interfaces required to
-use the TMC (configured as an ETR) from the Perf sub-system.
-
-The heuristic is heavily borrowed from the ETB10 and TMC-ETF
-implementation.
+When part of a path but not identified as a sink, the EFT has to
+be configured as a link and placed in HW FIFO mode.  As such when
+enabling a path, call the right configuration function based on
+the role the ETF if playing in this trace run.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-tmc-etf.c |   6 +-
- drivers/hwtracing/coresight/coresight-tmc-etr.c | 142 ++++++++++++++++++++++++
- drivers/hwtracing/coresight/coresight-tmc.h     |   3 +
- 3 files changed, 148 insertions(+), 3 deletions(-)
+ drivers/hwtracing/coresight/coresight.c | 32 ++++++++++++++++++++++++++++----
+ 1 file changed, 28 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-index fff175d4020d..6a449e2ddf5f 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-@@ -378,9 +378,9 @@ static unsigned long tmc_reset_etf_buffer(struct coresight_device *csdev,
- 	return size;
- }
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index 2ea5961092c1..bba9f3d653c9 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -257,15 +257,27 @@ static void coresight_disable_source(struct coresight_device *csdev)
  
--static void tmc_update_etf_buffer(struct coresight_device *csdev,
--				  struct perf_output_handle *handle,
--				  void *sink_config)
-+void tmc_update_etf_buffer(struct coresight_device *csdev,
-+			   struct perf_output_handle *handle,
-+			   void *sink_config)
+ void coresight_disable_path(struct list_head *path)
  {
- 	int i, cur;
- 	u32 *buf_ptr;
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-index 04fc63d85696..bf12a6854a5f 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-@@ -15,11 +15,30 @@
-  * this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
++	u32 type;
+ 	struct coresight_node *nd;
+ 	struct coresight_device *csdev, *parent, *child;
  
-+#include <linux/circ_buf.h>
- #include <linux/coresight.h>
- #include <linux/dma-mapping.h>
-+#include <linux/slab.h>
-+
- #include "coresight-priv.h"
- #include "coresight-tmc.h"
+ 	list_for_each_entry(nd, path, link) {
+ 		csdev = nd->csdev;
++		type = csdev->type;
  
-+/**
-+ * struct cs_etr_buffer - keep track of a recording session' specifics
-+ * @tmc:	generic portion of the TMC buffers
-+ * @paddr:	the physical address of a DMA'able contiguous memory area
-+ * @vaddr:	the virtual address associated to @paddr
-+ * @size:	how much memory we have, starting at @paddr
-+ * @dev:	the device @vaddr has been tied to
-+ */
-+struct cs_etr_buffers {
-+	struct cs_tmc_buffers	tmc;
-+	dma_addr_t		paddr;
-+	void __iomem		*vaddr;
-+	u32			size;
-+	struct device		*dev;
-+};
-+
- void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
- {
- 	u32 axictl;
-@@ -235,9 +254,132 @@ static void tmc_disable_etr_sink(struct coresight_device *csdev)
- 	dev_info(drvdata->dev, "TMC-ETR disabled\n");
- }
- 
-+static void *tmc_alloc_etr_buffer(struct coresight_device *csdev, int cpu,
-+				  void **pages, int nr_pages, bool overwrite)
-+{
-+	int node;
-+	struct cs_etr_buffers *buf;
-+	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-+
-+	if (cpu == -1)
-+		cpu = smp_processor_id();
-+	node = cpu_to_node(cpu);
-+
-+	/* Allocate memory structure for interaction with Perf */
-+	buf = kzalloc_node(sizeof(struct cs_etr_buffers), GFP_KERNEL, node);
-+	if (!buf)
-+		return NULL;
-+
-+	buf->dev = drvdata->dev;
-+	buf->size = drvdata->size;
-+	buf->vaddr = dma_alloc_coherent(buf->dev, buf->size,
-+					&buf->paddr, GFP_KERNEL);
-+	if (!buf->vaddr) {
-+		kfree(buf);
-+		return NULL;
-+	}
-+
-+	buf->tmc.snapshot = overwrite;
-+	buf->tmc.nr_pages = nr_pages;
-+	buf->tmc.data_pages = pages;
-+
-+	return buf;
-+}
-+
-+static void tmc_free_etr_buffer(void *config)
-+{
-+	struct cs_etr_buffers *buf = config;
-+
-+	dma_free_coherent(buf->dev, buf->size, buf->vaddr, buf->paddr);
-+	kfree(buf);
-+}
-+
-+static int tmc_set_etr_buffer(struct coresight_device *csdev,
-+			      struct perf_output_handle *handle,
-+			      void *sink_config)
-+{
-+	int ret = 0;
-+	unsigned long head;
-+	struct cs_etr_buffers *buf = sink_config;
-+	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-+
-+	/* wrap head around to the amount of space we have */
-+	head = handle->head & ((buf->tmc.nr_pages << PAGE_SHIFT) - 1);
-+
-+	/* find the page to write to */
-+	buf->tmc.cur = head / PAGE_SIZE;
-+
-+	/* and offset within that page */
-+	buf->tmc.offset = head % PAGE_SIZE;
-+
-+	local_set(&buf->tmc.data_size, 0);
-+
-+	/* Tell the HW where to put the trace data */
-+	drvdata->vaddr = buf->vaddr;
-+	drvdata->paddr = buf->paddr;
-+	memset(drvdata->vaddr, 0, drvdata->size);
-+
-+	return ret;
-+}
-+
-+static unsigned long tmc_reset_etr_buffer(struct coresight_device *csdev,
-+					  struct perf_output_handle *handle,
-+					  void *sink_config, bool *lost)
-+{
-+	unsigned long size = 0;
-+	struct cs_etr_buffers *buf = sink_config;
-+	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-+
-+	if (buf) {
+-		switch (csdev->type) {
 +		/*
-+		 * In snapshot mode ->data_size holds the new address of the
-+		 * ring buffer's head.  The size itself is the whole address
-+		 * range since we want the latest information.
++		 * ETF devices are tricky... They can be a link or a sink,
++		 * depending on how they are configured.  If an ETF has been
++		 * "activated" it will be configured as a sink, otherwise
++		 * go ahead with the link configuration.
 +		 */
-+		if (buf->tmc.snapshot) {
-+			size = buf->tmc.nr_pages << PAGE_SHIFT;
-+			handle->head = local_xchg(&buf->tmc.data_size, size);
-+		}
++		if (type == CORESIGHT_DEV_TYPE_LINKSINK)
++			type = (csdev == coresight_get_sink(path)) ?
++						CORESIGHT_DEV_TYPE_SINK :
++						CORESIGHT_DEV_TYPE_LINK;
++
++		switch (type) {
+ 		case CORESIGHT_DEV_TYPE_SINK:
+-		case CORESIGHT_DEV_TYPE_LINKSINK:
+ 			coresight_disable_sink(csdev);
+ 			break;
+ 		case CORESIGHT_DEV_TYPE_SOURCE:
+@@ -286,15 +298,27 @@ int coresight_enable_path(struct list_head *path, u32 mode)
+ {
+ 
+ 	int ret = 0;
++	u32 type;
+ 	struct coresight_node *nd;
+ 	struct coresight_device *csdev, *parent, *child;
+ 
+ 	list_for_each_entry_reverse(nd, path, link) {
+ 		csdev = nd->csdev;
++		type = csdev->type;
 +
 +		/*
-+		 * Tell the tracer PMU how much we got in this run and if
-+		 * something went wrong along the way.  Nobody else can use
-+		 * this cs_etr_buffers instance until we are done.  As such
-+		 * resetting parameters here and squaring off with the ring
-+		 * buffer API in the tracer PMU is fine.
++		 * ETF devices are tricky... They can be a link or a sink,
++		 * depending on how they are configured.  If an ETF has been
++		 * "activated" it will be configured as a sink, otherwise
++		 * go ahead with the link configuration.
 +		 */
-+		*lost = !!local_xchg(&buf->tmc.lost, 0);
-+		size = local_xchg(&buf->tmc.data_size, 0);
-+	}
-+
-+	/* Get ready for another run */
-+	drvdata->vaddr = NULL;
-+	drvdata->paddr = 0;
-+
-+	return size;
-+}
-+
-+static void tmc_update_etr_buffer(struct coresight_device *csdev,
-+				  struct perf_output_handle *handle,
-+				  void *sink_config)
-+{
-+	struct cs_etr_buffers *buf = sink_config;
-+
-+	/*
-+	 * An ETR configured to work in contiguous memory mode works the same
-+	 * was as an ETB or ETF.
-+	 */
-+	tmc_update_etf_buffer(csdev, handle, &buf->tmc);
-+}
-+
- static const struct coresight_ops_sink tmc_etr_sink_ops = {
- 	.enable		= tmc_enable_etr_sink,
- 	.disable	= tmc_disable_etr_sink,
-+	.alloc_buffer	= tmc_alloc_etr_buffer,
-+	.free_buffer	= tmc_free_etr_buffer,
-+	.set_buffer	= tmc_set_etr_buffer,
-+	.reset_buffer	= tmc_reset_etr_buffer,
-+	.update_buffer	= tmc_update_etr_buffer,
- };
++		if (type == CORESIGHT_DEV_TYPE_LINKSINK)
++			type = (csdev == coresight_get_sink(path)) ?
++						CORESIGHT_DEV_TYPE_SINK :
++						CORESIGHT_DEV_TYPE_LINK;
  
- const struct coresight_ops tmc_etr_cs_ops = {
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
-index 62d568195e8e..8f4ab9b511f2 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.h
-+++ b/drivers/hwtracing/coresight/coresight-tmc.h
-@@ -153,6 +153,9 @@ void tmc_disable_hw(struct tmc_drvdata *drvdata);
- /* ETB/ETF functions */
- int tmc_read_prepare_etb(struct tmc_drvdata *drvdata);
- int tmc_read_unprepare_etb(struct tmc_drvdata *drvdata);
-+void tmc_update_etf_buffer(struct coresight_device *csdev,
-+			   struct perf_output_handle *handle,
-+			   void *sink_config);
- extern const struct coresight_ops tmc_etb_cs_ops;
- extern const struct coresight_ops tmc_etf_cs_ops;
- 
+-		switch (csdev->type) {
++		switch (type) {
+ 		case CORESIGHT_DEV_TYPE_SINK:
+-		case CORESIGHT_DEV_TYPE_LINKSINK:
+ 			ret = coresight_enable_sink(csdev, mode);
+ 			if (ret)
+ 				goto err;
 -- 
 2.5.0
