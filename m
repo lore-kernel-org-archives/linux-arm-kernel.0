@@ -1,54 +1,30 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Tue, 12 Apr 2016 16:37:23 +0530
-Subject: [PATCH] clk: samsung: exynos7: Enable clocks for CMU_CCORE and
- CMU_FSYS0 blocks
-Message-ID: <1460459243-27120-1-git-send-email-alim.akhtar@samsung.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 12 Apr 2016 13:08:09 +0200
+Subject: [PATCH v5 03/46] backlight: lm3630a_bl: stop messing with the
+ pwm->period field
+In-Reply-To: <1459368249-13241-4-git-send-email-boris.brezillon@free-electrons.com>
+References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1459368249-13241-4-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20160412110809.GI18882@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables clocks for CMU_CCORE and CMU_FSYS0 blocks. This is
-required before accessing registers of these blocks.
+On Wed, Mar 30, 2016 at 10:03:26PM +0200, Boris Brezillon wrote:
+> pwm->period field is not supposed to be changed by PWM users. The only
+> ones authorized to change it are the PWM core and PWM drivers.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+>  drivers/video/backlight/lm3630a_bl.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
 
-Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
----
- drivers/clk/samsung/clk-exynos7.c |    9 +++++++++
- 1 file changed, 9 insertions(+)
+Applied, thanks.
 
-diff --git a/drivers/clk/samsung/clk-exynos7.c b/drivers/clk/samsung/clk-exynos7.c
-index ad68d46..7013aa7 100644
---- a/drivers/clk/samsung/clk-exynos7.c
-+++ b/drivers/clk/samsung/clk-exynos7.c
-@@ -8,6 +8,7 @@
-  *
- */
- 
-+#include <linux/clk.h>
- #include <linux/clk-provider.h>
- #include <linux/of.h>
- 
-@@ -205,7 +206,11 @@ static struct samsung_cmu_info topc_cmu_info __initdata = {
- 
- static void __init exynos7_clk_topc_init(struct device_node *np)
- {
-+	struct clk *clk;
-+
- 	samsung_cmu_register_one(np, &topc_cmu_info);
-+	clk = __clk_lookup("aclk_ccore_133");
-+	clk_prepare_enable(clk);
- }
- 
- CLK_OF_DECLARE(exynos7_clk_topc, "samsung,exynos7-clock-topc",
-@@ -573,7 +578,11 @@ static struct samsung_cmu_info top1_cmu_info __initdata = {
- 
- static void __init exynos7_clk_top1_init(struct device_node *np)
- {
-+	struct clk *clk;
-+
- 	samsung_cmu_register_one(np, &top1_cmu_info);
-+	clk = __clk_lookup("aclk_fsys0_200");
-+	clk_prepare_enable(clk);
- }
- 
- CLK_OF_DECLARE(exynos7_clk_top1, "samsung,exynos7-clock-top1",
--- 
-1.7.10.4
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160412/d03ae890/attachment-0001.sig>
