@@ -1,63 +1,34 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 12 Apr 2016 10:14:31 +0200
-Subject: [PATCH 3/7] ARM: dts: Add NoC Probe dt node for Exynos542x SoC
-In-Reply-To: <1460091646-28701-4-git-send-email-cw00.choi@samsung.com>
-References: <1460091646-28701-1-git-send-email-cw00.choi@samsung.com>
- <1460091646-28701-4-git-send-email-cw00.choi@samsung.com>
-Message-ID: <570CAE67.4020001@samsung.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 12 Apr 2016 11:14:39 +0300
+Subject: [RFC 0/1] ARM: mm: cache shareability tweak
+Message-ID: <1460448880-5677-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/08/2016 07:00 AM, Chanwoo Choi wrote:
-> This patch adds the NoCP (Network on Chip Probe) Device Tree node
-> to measure the bandwidth of memory and g3d in Exynos542x SoC.
-> 
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos5420.dtsi | 36 ++++++++++++++++++++++++++++++++++++
->  1 file changed, 36 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-> index 7b99cb58d82d..d80f3b66f017 100644
-> --- a/arch/arm/boot/dts/exynos5420.dtsi
-> +++ b/arch/arm/boot/dts/exynos5420.dtsi
-> @@ -294,6 +294,42 @@
->  		};
->  	};
->  
-> +	nocp_mem0_0: nocp_mem0_0 at 10CA1000 {
+Hi,
 
-The node name should describe general class of device, so:
+This RFC patch attempts to implement support for specifying cache
+shareability setting via kernel cmdline. This is required at least
+for TI keystone2 generation SoCs, where DMA masters are snooping on
+the cache maintenance messages to maintain coherency. Currently we
+are carrying an internal hack that modifies the macros via #ifdefs,
+this is obviously bad as the same kernel image can only work with
+keystone2 (or at least might be causing problems with other SoCs.)
+It would be very much preferred to replace this hardcoded
+implementation with a runtime solution.
 
-	nocp_mem0_0: nocp at 10CA1000 {
-		...
-	}
-?
+Some obvious holes in this implementation:
 
-> +		compatible = "samsung,exynos5420-nocp";
-> +		reg = <0x10CA1000 0x200>;
-> +		status = "disabled";
-> +	};
-> +
-> +	nocp_mem0_1: nocp_mem0_1 at 10CA1400 {
-> +		compatible = "samsung,exynos5420-nocp";
-> +		reg = <0x10CA1400 0x200>;
-> +		status = "disabled";
-> +	};
-> +
-> +	nocp_mem0_2: nocp_mem0_2 at 10CA1800 {
+1) during execution of arch/arm/kernel/head.S, the tweaked MMU shareability
+   settings are not in place. However, I am not too sure how much that
+   matters, as I am not sure what is mapped at this point. Kernel image
+   mapping should not matter at least, as we typically should not be doing
+   any DMA transfers from the kernel image. I would like some comments on
+   this, if handling during head.S should be fixed also, how can this be
+   done? Some hack under compressed/keystone-head.S?
 
-Shouldn't it be nocp_mem1_0?
+2) the cmdline parameter could be something more descriptive
 
-> +		compatible = "samsung,exynos5420-nocp";
-> +		reg = <0x10CA1800 0x200>;
-> +		status = "disabled";
-> +	};
-> +
-> +	nocp_mem0_3: nocp_mem0_3 at 10CA1C00 {
+3) The single RFC patch should probably be split up a bit
 
-Shouldn't it be nocp_mem1_1?
-
-
-Best regards,
-Krzysztof
+- Tero
