@@ -1,46 +1,80 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 12 Apr 2016 09:42:19 -0700
-Subject: [PATCH 00/30] ARM: OMAP2+: hwmod module clock type support
-In-Reply-To: <570CFE50.5010709@ti.com>
-References: <1460362761-4842-1-git-send-email-t-kristo@ti.com>
- <20160411173518.GA5995@atomide.com> <570CFE50.5010709@ti.com>
-Message-ID: <20160412164219.GS5995@atomide.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 12 Apr 2016 18:23:15 +0100
+Subject: [PATCH] ACPI / ARM64: Remove EXPERT dependency for ACPI on ARM64
+In-Reply-To: <1459360718-24125-1-git-send-email-broonie@kernel.org>
+References: <1459360718-24125-1-git-send-email-broonie@kernel.org>
+Message-ID: <20160412172315.GH8066@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [160412 06:56]:
-> On 04/11/2016 08:40 PM, Tony Lindgren wrote:
-> >Hi,
-> >
-> >Nice to see this moving along :)
-> >
-> >* Tero Kristo <t-kristo@ti.com> [160411 01:20]:
-> >>
-> >>The ordering on this set is kind of tricky to avoid any boot issues,
-> >>and it still currently causes a boot breakage between the DTS data
-> >>introduction and removal of hwmod data; this generates duplicate
-> >>entries for clocks which is prone to cause issues (both DT and hwmod
-> >>have the same entries in place under the hwmod data is removed.) I
-> >>didn't quite figure out a good way to avoid this, and could use some
-> >>guidance here. Shall we squash the DT + hwmod data patches together?
-> >>This avoids the boot breakage but creates pretty large patches. Also,
-> >>AMx3xx data needs to be grouped together as part of their data is
-> >>re-used commonly by both SoCs.
-> >
-> >How about use clocks from dts if clocks property is defined? Otherwise
-> >fall back to the old static data. Then drop the static data later on
-> >with follow up patches.
+On Wed, Mar 30, 2016 at 10:58:38AM -0700, Mark Brown wrote:
+> When ACPI was originally merged for arm64 it had only been tested on
+> emulators and not on real physical platforms and no platforms were
+> relying on it.  This meant that there were concerns that there might be
+> serious issues attempting to use it on practical systems so it had a
+> dependency on EXPERT added to warn people that it was in an early stage
+> of development with very little practical testing.  Since then things
+> have moved on a bit.  We have seen people testing on real hardware and
+> now have people starting to produce some platforms (the most prominent
+> being the 96boards Cello) which only have ACPI support and which build
+> and run to some useful extent with mainline.
 > 
-> The underlying issue is the hardcoded names of hwmod clocks within hwmod
-> data. I think I figured out a fix for this, I am adding a few patches to
-> this series to lookup main_clk based on the hwmod name itself. This allows
-> re-directing the main_clk to the DT module clock in case one is available
-> for the hwmod. The bisect issues seem to be gone with this also, I need to
-> cleanup the patches a bit and re-post.
+> This is not to say that ACPI support or support for these systems is
+> completely done, there are still areas being worked on such as PCI, but
+> at this point it seems that we can be reasonably sure that ACPI will be
+> viable for use on ARM64 and that the already merged support works for
+> the cases it handles.  For the AMD Seattle based platforms support
+> outside of PCI has been fairly complete in mainline a few releases now.
+> 
+> This is also not to say that we don't have vendors working with ACPI who
+> are trying do things that we would not consider optimal but it does not
+> appear that the EXPERT dependency is having a substantial impact on
+> these vendors.
+> 
+> Given all this it seems that at this point the EXPERT dependency mainly
+> creates inconvenience for users with systems that are doing the right
+> thing and gets in the way of including the ACPI code in the testing that
+> people are doing on mainline.  Removing it should help our ongoing
+> testing cover those platforms with only ACPI support and help ensure
+> that when ACPI code is merged any problems it causes for other users are
+> more easily discovered.
+> 
+> Signed-off-by: Mark Brown <broonie@kernel.org>
 
-OK yes generated names sounds like a good solution to support the
-old way of doing things.
+I'm fine with dropping the EXPERT dependency (of course, not a cc
+stable). While arm64 ACPI is not "done" yet (nor is DT; there are
+important ongoing developments like PCIe, IORT), I think the core arm64
+ACPI support passed the EXPERT stage. I also don't think a default y
+would imply any maintainer endorsement; vendors targeting ACPI are
+already doing this for various reasons (distro requirement, certain ACPI
+features like RAS). But, hopefully, it will encourage more vendors to
+start upstreaming their ACPI-related patches.
 
-Regards,
+However, building ACPI by default on arm64 doesn't mean that we can
+ignore potential misuses like PRP0001+_DSD blindly following DT
+(mis)concepts, breaking compatibility with older/newer firmware (this
+goes in both directions) or using ACPI for SoCs where it is clearly not
+suitable (e.g. non-SBSA). Such patches should be NAK'ed accordingly.
 
-Tony
+> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+> index 82b96ee8624c..bf5dc1ac3446 100644
+> --- a/drivers/acpi/Kconfig
+> +++ b/drivers/acpi/Kconfig
+> @@ -5,7 +5,7 @@
+>  menuconfig ACPI
+>  	bool "ACPI (Advanced Configuration and Power Interface) Support"
+>  	depends on !IA64_HP_SIM
+> -	depends on IA64 || X86 || (ARM64 && EXPERT)
+> +	depends on IA64 || X86 || ARM64
+>  	depends on PCI
+>  	select PNP
+>  	default y
+
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+
+That said, I'd like to see an opinion from the arm-soc maintainers since
+they were active on the original arm64 ACPI threads introducing this
+dependency (and I think they have the right to veto ;)).
+
+-- 
+Catalin
