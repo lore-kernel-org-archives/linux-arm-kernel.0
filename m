@@ -1,19 +1,22 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 12 Apr 2016 08:47:42 +0800
-Subject: [PATCH v5] ARM: dts: imx: add Boundary Devices Nitrogen6_SoloX
- board
-In-Reply-To: <1460408496-21164-1-git-send-email-gary.bisson@boundarydevices.com>
-References: <1460037168-23292-1-git-send-email-gary.bisson@boundarydevices.com>
- <1460408496-21164-1-git-send-email-gary.bisson@boundarydevices.com>
-Message-ID: <20160412004742.GB15949@tiger>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 11 Apr 2016 22:04:07 -0300
+Subject: [PATCH v2] ARM: dts: imx6: Add dts for Embest MarS Board
+In-Reply-To: <1460420743-30883-1-git-send-email-sergio.prado@e-labworks.com>
+References: <1460420743-30883-1-git-send-email-sergio.prado@e-labworks.com>
+Message-ID: <CAOMZO5D80VWGad7Lz+Crp8on5xLJzHDXL88FBh7x8d4Mc2XKww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 11, 2016 at 11:01:36PM +0200, Gary Bisson wrote:
-> Based on i.MX6 SoloX with 1GB of RAM.
-> 
-> https://boundarydevices.com/product/nit6_solox-imx6/
-> 
-> Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
+Hi Sergio,
 
-Applied, thanks.
+On Mon, Apr 11, 2016 at 9:25 PM, Sergio Prado
+<sergio.prado@e-labworks.com> wrote:
+> Embest MarS Board [1] is a multi-core platform based on Freescale i.MX6
+> Cortex-A9 Dual Core, running up to 1GHz with 1 GB of RAM, 4GB of eMMC
+> and with a 4MB SPI flash.
+>
+> [1] http://www.embest-tech.com/shop/star/marsboard.html
+>
+> Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
+
+Can't the Mars board re-use arch/arm/boot/dts/imx6dl-riotboard.dts ?
