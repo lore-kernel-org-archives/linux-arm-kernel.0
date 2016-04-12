@@ -1,36 +1,65 @@
-From: zengzhaoxiu@163.com (zengzhaoxiu at 163.com)
-Date: Tue, 12 Apr 2016 15:30:35 +0800
-Subject: [PATCH] mtd: nand: s3c2410: fix bug in s3c2410_nand_correct_data()
-In-Reply-To: <20160411094901.74e68f91@bbrezillon>
-References: <20160411094901.74e68f91@bbrezillon>
-Message-ID: <1460446235-987-1-git-send-email-zengzhaoxiu@163.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Tue, 12 Apr 2016 09:39:25 +0200
+Subject: [PATCH V4 0/7] Introduce ACPI world to ITS irqchip
+In-Reply-To: <1459759975-24097-1-git-send-email-tn@semihalf.com>
+References: <1459759975-24097-1-git-send-email-tn@semihalf.com>
+Message-ID: <570CA62D.6080508@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Zhaoxiu Zeng <zhaoxiu.zeng@gmail.com>
+Hi Marc, Bjorn, Rafael,
 
-If there is only one bit difference in the ECC, the function should return 1.
-The result of "diff0 & ~(1<<fls(diff0))" is equal to diff0, so the function
-actually returns -1.
+Can you please have a look at this series? Thanks in advance.
 
-Signed-off-by: Zhaoxiu Zeng <zhaoxiu.zeng@gmail.com>
----
- drivers/mtd/nand/s3c2410.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Tomasz
 
-diff --git a/drivers/mtd/nand/s3c2410.c b/drivers/mtd/nand/s3c2410.c
-index 9c9397b..86ffb73 100644
---- a/drivers/mtd/nand/s3c2410.c
-+++ b/drivers/mtd/nand/s3c2410.c
-@@ -542,7 +542,8 @@ static int s3c2410_nand_correct_data(struct mtd_info *mtd, u_char *dat,
- 	diff0 |= (diff1 << 8);
- 	diff0 |= (diff2 << 16);
- 
--	if ((diff0 & ~(1<<fls(diff0))) == 0)
-+	/* equal to "(diff0 & ~(1 << __ffs(diff0)))" */
-+	if ((diff0 & (diff0 - 1)) == 0)
- 		return 1;
- 
- 	return -1;
--- 
-2.5.0
+
+On 04.04.2016 10:52, Tomasz Nowicki wrote:
+> The following git branch contains submitted patches along with
+> the useful patches from the test point of view (mainly ACPI ARM64 PCI support).
+> https://github.com/semihalf-nowicki-tomasz/linux.git (its-acpi-v4)
+>
+> Series has been tested on Cavium ThunderX and Qualcomm QDF2xxx server.
+>
+> v3 -> v4
+> - rebased against v4.5
+> - add ACPI support for IRQ domain handling on a per-device basis
+> - reorder domain setup step
+> - improve error handling
+> - code style improvements
+>
+> v2 -> v3
+> - rebased on top of 4.4
+> - fixes and improvements for redistributor init via GICC structures
+> - fixes as per kbuild reports
+>
+> v1 -> v2
+> - rebased on top of 4.4-rc4
+> - use pci_msi_domain_get_msi_rid for requester ID to device ID translation
+>
+> Tomasz Nowicki (7):
+>    acpi, pci: Setup MSI domain on a per-devices basis.
+>    irqchip, GICv3, ITS: Cleanup for ITS domain initialization.
+>    irqchip, GICv3, ITS: Refator ITS DT init code to prepare for ACPI.
+>    ARM64, ACPI, PCI: I/O Remapping Table (IORT) initial support.
+>    irqchip, gicv3, its: Probe ITS in the ACPI way.
+>    its, pci, msi: Factor out code that might be reused for ACPI.
+>    acpi, gicv3, its: Use MADT ITS subtable to do PCI/MSI domain
+>      initialization.
+>
+>   drivers/acpi/Kconfig                     |   3 +
+>   drivers/acpi/Makefile                    |   1 +
+>   drivers/acpi/iort.c                      | 335 +++++++++++++++++++++++++++++++
+>   drivers/irqchip/Kconfig                  |   1 +
+>   drivers/irqchip/irq-gic-v3-its-pci-msi.c |  87 ++++++--
+>   drivers/irqchip/irq-gic-v3-its.c         | 188 ++++++++++++-----
+>   drivers/irqchip/irq-gic-v3.c             |   7 +-
+>   drivers/pci/msi.c                        |  10 +-
+>   drivers/pci/pci-acpi.c                   |  77 +++++++
+>   include/linux/iort.h                     |  31 +++
+>   include/linux/irqchip/arm-gic-v3.h       |   2 +-
+>   include/linux/pci.h                      |  11 +
+>   12 files changed, 678 insertions(+), 75 deletions(-)
+>   create mode 100644 drivers/acpi/iort.c
+>   create mode 100644 include/linux/iort.h
+>
