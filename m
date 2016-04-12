@@ -1,111 +1,34 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 12 Apr 2016 15:20:07 +0200
-Subject: [RFC PATCH 24/45] KVM: arm/arm64: vgic-new: Add GICv3 CTLR,
- IIDR, TYPER handlers
-In-Reply-To: <570B9FD2.80907@arm.com>
-References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
- <1458871508-17279-25-git-send-email-andre.przywara@arm.com>
- <20160331115319.GD4126@cbox> <570B9FD2.80907@arm.com>
-Message-ID: <20160412132007.GJ3039@cbox>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 12 Apr 2016 15:19:58 +0200
+Subject: [PATCH] arm64: acpi: add a Kconfig option to prefer ACPI boot
+ over DT
+In-Reply-To: <20160412130751.GA8066@e104818-lin.cambridge.arm.com>
+References: <1460373568-4374-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20160412130751.GA8066@e104818-lin.cambridge.arm.com>
+Message-ID: <CAKv+Gu-XYoyRkfMtdSARW0mf5dbztWbjM7hps4yBS6O1hKfRqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 11, 2016 at 02:00:02PM +0100, Andre Przywara wrote:
-> Hi,
-> 
-> On 31/03/16 12:53, Christoffer Dall wrote:
-> > On Fri, Mar 25, 2016 at 02:04:47AM +0000, Andre Przywara wrote:
-> >> As in the GICv2 emulation we handle those three registers in one
-> >> function.
-> >>
-> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> >> ---
-> >>  virt/kvm/arm/vgic/vgic.h      |  2 ++
-> >>  virt/kvm/arm/vgic/vgic_mmio.c | 38 ++++++++++++++++++++++++++++++++++++--
-> >>  2 files changed, 38 insertions(+), 2 deletions(-)
-> >>
-> >> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> >> index 4b8952a..0db1abe 100644
-> >> --- a/virt/kvm/arm/vgic/vgic.h
-> >> +++ b/virt/kvm/arm/vgic/vgic.h
-> >> @@ -19,6 +19,8 @@
-> >>  #define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
-> >>  #define IMPLEMENTER_ARM		0x43b
-> >>  
-> >> +#define INTERRUPT_ID_BITS_SPIS	10
-> >> +
-> >>  struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
-> >>  			      u32 intid);
-> >>  bool vgic_queue_irq(struct kvm *kvm, struct vgic_irq *irq);
-> >> diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
-> >> index 2d10c06..13e101f 100644
-> >> --- a/virt/kvm/arm/vgic/vgic_mmio.c
-> >> +++ b/virt/kvm/arm/vgic/vgic_mmio.c
-> >> @@ -606,7 +606,29 @@ static int vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
-> >>  				  struct kvm_io_device *this,
-> >>  				  gpa_t addr, int len, void *val)
-> >>  {
-> >> -	/* TODO: implement */
-> >> +	struct vgic_io_device *iodev = container_of(this,
-> >> +						    struct vgic_io_device, dev);
-> >> +	u32 value = 0;
-> >> +
-> >> +	switch ((addr - iodev->base_addr) & ~3) {
-> >> +	case GICD_CTLR:
-> >> +		if (vcpu->kvm->arch.vgic.enabled)
-> >> +		       value |=	GICD_CTLR_ENABLE_SS_G1;
-> >> +		value |= GICD_CTLR_ARE_NS | GICD_CTLR_DS;
-> >> +		break;
-> >> +	case GICD_TYPER:
-> >> +		value = vcpu->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
-> >> +		value = (value >> 5) - 1;
-> >> +		value |= (INTERRUPT_ID_BITS_SPIS - 1) << 19;
-> >> +		break;
-> >> +	case GICD_IIDR:
-> >> +		value = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
-> >> +		break;
-> >> +	default:
-> >> +		return 0;
-> >> +	}
-> >> +
-> >> +	write_mask32(value, addr & 3, len, val);
-> >>  	return 0;
-> >>  }
-> >>  
-> >> @@ -614,7 +636,19 @@ static int vgic_mmio_write_v3_misc(struct kvm_vcpu *vcpu,
-> >>  				   struct kvm_io_device *this,
-> >>  				   gpa_t addr, int len, const void *val)
-> >>  {
-> >> -	/* TODO: implement */
-> >> +	struct vgic_io_device *iodev = container_of(this,
-> >> +						    struct vgic_io_device, dev);
-> >> +	bool enabled;
-> >> +
-> >> +	/* These are not the bits you are looking for ... */
-> > 
-> > haha, nice.  But I don't understand what this case is?
-> 
-> Of the 16 bytes this region covers (CTLR, TYPER, IIDR) only the first
-> byte is writeable, the rest is WI.
-> I am afraid I have to replace the cool quote with something more
-> meaningful ...
-> 
+On 12 April 2016 at 15:07, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Mon, Apr 11, 2016 at 01:19:28PM +0200, Ard Biesheuvel wrote:
+>> If both ACPI and DT platform descriptions are available, and the
+>> kernel was configured at build time to support both flavours, the
+>> default policy in absence of a acpi=[off|force] kernel command line
+>> parameter is to prefer DT over ACPI.
+>>
+>> This adds an option to invert that default policy, and prefer ACPI
+>> over DT instead. Note that this policy is still superseded by the
+>> value of the acpi= command line parameter.
+>
+> Why do we need another method to specify an ACPI boot? I thought those
+> vendors going for ACPI wouldn't be bothered with DT anyway.
+>
+> I'm not keen on having kernel builds with different behavior in respect
+> of whether ACPI or DT is preferred.
+>
 
-You can maintain the fun quote and supplement it with a boring
-explanation.
-
-> >> +	if (addr - iodev->base_addr > 0)
-> >> +		return 0;
-> >> +
-> >> +	/* We only care about the enable bit, all other bits are WI. */
-> >> +	enabled = *(u8*)val & GICD_CTLR_ENABLE_SS_G1;
-> >> +
-> >> +	vcpu->kvm->arch.vgic.enabled = enabled;
-> > 
-> > I think some of the comments from the v2 side apply here as well.
-> 
-> Agreed.
-> 
-
-Thanks,
--Christoffer
+How about adding support for acpi=on then? Currently, we only have
+acpi=off or acpi=force, and there is no way (i.e., for a distro
+installer) to boot via ACPI if it can but fall back to DT otherwise.
+Some enterprise features (like RAS) depend on ACPI boot so it may
+simply preferred but not mandated in some cases.
