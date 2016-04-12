@@ -1,49 +1,46 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 12 Apr 2016 17:44:13 +0100
-Subject: [PATCH v2 2/4] PCI: Provide common functions for ECAM mapping
-In-Reply-To: <570C78F1.4090701@jonmasters.org>
-References: <1460414707-19153-1-git-send-email-jchandra@broadcom.com>
- <1460414707-19153-3-git-send-email-jchandra@broadcom.com>
- <570C4034.20105@caviumnetworks.com>
- <570C78F1.4090701@jonmasters.org>
-Message-ID: <20160412164413.GA32297@red-moon>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 12 Apr 2016 09:42:19 -0700
+Subject: [PATCH 00/30] ARM: OMAP2+: hwmod module clock type support
+In-Reply-To: <570CFE50.5010709@ti.com>
+References: <1460362761-4842-1-git-send-email-t-kristo@ti.com>
+ <20160411173518.GA5995@atomide.com> <570CFE50.5010709@ti.com>
+Message-ID: <20160412164219.GS5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 12, 2016 at 12:26:25AM -0400, Jon Masters wrote:
-
-[...]
-
-> Quoting Bjorn's original reply to the previous series:
+* Tero Kristo <t-kristo@ti.com> [160412 06:56]:
+> On 04/11/2016 08:40 PM, Tony Lindgren wrote:
+> >Hi,
+> >
+> >Nice to see this moving along :)
+> >
+> >* Tero Kristo <t-kristo@ti.com> [160411 01:20]:
+> >>
+> >>The ordering on this set is kind of tricky to avoid any boot issues,
+> >>and it still currently causes a boot breakage between the DTS data
+> >>introduction and removal of hwmod data; this generates duplicate
+> >>entries for clocks which is prone to cause issues (both DT and hwmod
+> >>have the same entries in place under the hwmod data is removed.) I
+> >>didn't quite figure out a good way to avoid this, and could use some
+> >>guidance here. Shall we squash the DT + hwmod data patches together?
+> >>This avoids the boot breakage but creates pretty large patches. Also,
+> >>AMx3xx data needs to be grouped together as part of their data is
+> >>re-used commonly by both SoCs.
+> >
+> >How about use clocks from dts if clocks property is defined? Otherwise
+> >fall back to the old static data. Then drop the static data later on
+> >with follow up patches.
 > 
-> > Some of the code that moved to drivers/acpi/pci_mcfg.c is not
-> > really ACPI-specific, and could potentially be used for non-ACPI
-> > bridges that support ECAM.  I'd like to see that sort of code
-> > moved to a new file like drivers/pci/ecam.c.
-> 
-> So my guess is that this is the reasoning behind JC's file layout.
-> 
-> I'm curious what Lorenzo's take on things is currently. I assume this
-> series is now to be the official coordinated version of this effort for
-> upstream, following the advice of Bjorn previously, but I would like to
-> know if everyone is behind this plan. I've (previously) requested a
-> Linaro LEG meeting this week (part of our bootarch working group) to
-> specifically discuss the status of PCI upstreaming in order to get the
-> different vendors together to ensure every single one of them is
-> tracking the correct latest effort and doing what is needed to test/aid,
-> hence my ask. If this is now plan A, I'll make sure everyone is aligned
-> behind it and start pinging people individually for testing.
+> The underlying issue is the hardcoded names of hwmod clocks within hwmod
+> data. I think I figured out a fix for this, I am adding a few patches to
+> this series to lookup main_clk based on the hwmod name itself. This allows
+> re-directing the main_clk to the DT module clock in case one is available
+> for the hwmod. The bisect issues seem to be gone with this also, I need to
+> cleanup the patches a bit and re-post.
 
-My take is that JC's aim is to get this four patch series reviewed and
-merged (which is *not* sufficient to get ACPI PCI to work fully on ARM64
-- see cover letter - the remaining patches in his branch are not
-fixes, it is code that is required to get things to work, these 4
-patches stand alone are not sufficient but I understand he wants to get
-them reviewed following feedback on the lists) so that we can make
-progress on ACPI PCI on ARM64.
+OK yes generated names sounds like a good solution to support the
+old way of doing things.
 
-I will comment on the patches as soon as I have time to review
-them, I certainly would like to understand what we have to do with the
-rest of the code though (provided this series is good to go) see above.
+Regards,
 
-Lorenzo
+Tony
