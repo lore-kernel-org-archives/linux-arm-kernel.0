@@ -1,50 +1,55 @@
 From: ddaney@caviumnetworks.com (David Daney)
-Date: Mon, 11 Apr 2016 17:24:20 -0700
-Subject: [PATCH v2 2/4] PCI: Provide common functions for ECAM mapping
-In-Reply-To: <1460414707-19153-3-git-send-email-jchandra@broadcom.com>
+Date: Mon, 11 Apr 2016 17:34:34 -0700
+Subject: [PATCH v2 3/4] PCI: generic, thunder: update to use generic ECAM
+ API
+In-Reply-To: <1460414707-19153-4-git-send-email-jchandra@broadcom.com>
 References: <1460414707-19153-1-git-send-email-jchandra@broadcom.com>
- <1460414707-19153-3-git-send-email-jchandra@broadcom.com>
-Message-ID: <570C4034.20105@caviumnetworks.com>
+ <1460414707-19153-4-git-send-email-jchandra@broadcom.com>
+Message-ID: <570C429A.6090006@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 04/11/2016 03:45 PM, Jayachandran C wrote:
-> Add config option PCI_GENERIC_ECAM and file drivers/pci/ecam.c to
-> provide generic functions for accessing memory mapped PCI config space.
+> Use functions provided by drivers/pci/ecam.h for mapping the config
+> space in drivers/pci/host/pci-host-common.c, and update its users to
+> use 'struct pci_config_window' and 'struct pci_generic_ecam_ops'
 >
-> The API is defined in drivers/pci/ecam.h and is written to replace the
-> API in drivers/pci/host/pci-host-common.h. The file defines a new
-> 'struct pci_config_window' to hold the information related to a PCI
-> config area and its mapping. This structure is expected to be used as
-> sysdata for controllers that have ECAM based mapping.
+> The changes are mostly to use 'struct pci_config_window' in place of
+> 'struct gen_pci'. Some of the fields of gen_pci were only used
+> temporarily and can be eliminated by using local variables or function
+> arguments, these are not carried over to struct pci_config_window.
 >
-> Helper functions are provided to setup the mapping, free the mapping
-> and to implement the map_bus method in 'struct pci_ops'
+> pci-thunder-ecam.c and pci-thunder-pem.c are the only users of the
+> pci_host_common_probe function and the gen_pci structure, these have
+> been updated to use the new API as well.
+>
+> The patch does not introduce any functional changes other than a very
+> minor one: with the new code, on 64-bit platforms, we do just a single
+> ioremap for the whole config space.
 >
 > Signed-off-by: Jayachandran C <jchandra@broadcom.com>
 
 Tested-by: David Daney <david.daney@cavium.com>
 
+However, ...
 
 > ---
->   drivers/pci/Kconfig  |   3 ++
->   drivers/pci/Makefile |   2 +
->   drivers/pci/ecam.c   | 130 +++++++++++++++++++++++++++++++++++++++++++++++++++
->   drivers/pci/ecam.h   |  58 +++++++++++++++++++++++
+>   drivers/pci/ecam.h                  |   5 ++
+>   drivers/pci/host/Kconfig            |   1 +
+>   drivers/pci/host/pci-host-common.c  | 121 ++++++++++++++++--------------------
+>   drivers/pci/host/pci-host-common.h  |  47 --------------
+>   drivers/pci/host/pci-host-generic.c |  50 +++------------
+>   drivers/pci/host/pci-thunder-ecam.c |  37 +++--------
+>   drivers/pci/host/pci-thunder-pem.c  |  53 +++++-----------
 
-I wonder if these files should go in drivers/pci/host ...  I understand 
-that you still have to use them from drivers/pci/acpi though.
+... The patch conflicts with a bug-fix patch I just sent to 
+pci-thunder-pem.c, so there will be a race to see who gets in first.
 
-I will let others opine on this, but could you put the contents of 
-ecam.h into include/linux/pci.h along with the  pci_generic_config_*() 
-declarations?
-
-If you did that, the contents of ecam.c could  go into 
-drivers/pci/access.c...
+Also, I don't know if it would make sense to split out the pci-thunder-* 
+changes to a separate patch.
 
 
->   4 files changed, 193 insertions(+)
->   create mode 100644 drivers/pci/ecam.c
->   create mode 100644 drivers/pci/ecam.h
+>   7 files changed, 93 insertions(+), 221 deletions(-)
+>   delete mode 100644 drivers/pci/host/pci-host-common.h
 >
 [...]
