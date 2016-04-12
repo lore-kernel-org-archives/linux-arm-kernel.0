@@ -1,23 +1,26 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 12 Apr 2016 14:17:03 -0700
-Subject: [PATCH] ARM: dts: am335x-baltos-ir5221: use dedicated RTS/CTS
- signals
-In-Reply-To: <1459246088-17768-1-git-send-email-yegorslists@googlemail.com>
-References: <1459246088-17768-1-git-send-email-yegorslists@googlemail.com>
-Message-ID: <20160412211703.GG5995@atomide.com>
+Date: Tue, 12 Apr 2016 14:22:37 -0700
+Subject: [PATCH 1/5] devicetree: bindings: Add vendor prefix for
+ Amazon.com, Inc.
+In-Reply-To: <20160401170110.GA8364@rob-hp-laptop>
+References: <1459279707-17611-1-git-send-email-contact@paulk.fr>
+ <1459279707-17611-3-git-send-email-contact@paulk.fr>
+ <20160401170110.GA8364@rob-hp-laptop>
+Message-ID: <20160412212236.GI5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* yegorslists at googlemail.com <yegorslists@googlemail.com> [160329 03:10]:
-> From: Yegor Yefremov <yegorslists@googlemail.com>
+* Rob Herring <robh@kernel.org> [160401 10:02]:
+> On Tue, Mar 29, 2016 at 09:28:23PM +0200, Paul Kocialkowski wrote:
+> > This adds the amazon vendor prefix for Amazon.com, Inc.
+> > 
+> > Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+> > ---
+> >  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+> >  1 file changed, 1 insertion(+)
 > 
-> Before "tty: Add software emulated RS485 support for 8250" patch Baltos devices
-> relied on MCTRL_GPIO framework to handle both modem signals and RS485 mode.
-> 
-> With emulated RS485 support for 8250 we can now use these pins as dedicated
-> RTS/CTS signals taking advantage of hardware flow control etc. when operating
-> in RS232 mode.
+> Acked-by: Rob Herring <robh@kernel.org>
 
-Applying into omap-for-v4.7/dt thanks.
+Applying this whole series into omap-for-v4.7/dt thanks.
 
 Tony
