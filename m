@@ -1,42 +1,45 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 12 Apr 2016 08:27:17 +0100
-Subject: [PATCH v2 0/5] mailbox: A few fixes due for the v4.6 -rcs
-In-Reply-To: <1458744223-12164-1-git-send-email-lee.jones@linaro.org>
-References: <1458744223-12164-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20160412072717.GG8094@x1>
+Date: Tue, 12 Apr 2016 08:28:49 +0100
+Subject: [RESEND 00/11] pwm: Add support for PWM Capture
+In-Reply-To: <1456932729-9667-1-git-send-email-lee.jones@linaro.org>
+References: <1456932729-9667-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20160412072849.GH8094@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 23 Mar 2016, Lee Jones wrote:
+On Wed, 02 Mar 2016, Lee Jones wrote:
 
-> Hi Jassi,
-> 
-> Resending these with patches 1 and 2 merged, as requested.
+> The first part of this set extends the current PWM API to allow external
+> code to request a PWM Capture.  Subsequent patches then make use of the
+> new API by providing a userspace offering via /sysfs.  The final part of
+> the set supplies PWM Capture functionality into the already existing STi
+> PWM driver.
+>  
+> This patch-set has been tested end to end via /sysfs.
 
-Jassi,
+Hopefully you still have this set in your inbox.
 
-Not heard anything from you in quite some time now.
+Please let me know if you wish me to resend it.
 
-> Kind regards,
-> Lee
+> Lee Jones (11):
+>   pwm: Add PWM Capture support
+>   pwm: sysfs: Add PWM Capture support
+>   pwm: sti: Reorganise register names in preparation for new
+>     functionality
+>   pwm: sti: Only request clock rate when you need to
+>   pwm: sti: Supply PWM Capture register addresses and bit locations
+>   pwm: sti: Supply PWM Capture clock handling
+>   pwm: sti: Initialise PWM Capture channel data
+>   pwm: sti: Add support for PWM Capture IRQs
+>   pwm: sti: Add PWM Capture call-back
+>   pwm: sti: Enable PWM Capture
+>   pwm: sti: Take the opportunity to conduct a little house keeping
 > 
-> v1 => v2:
->   - Patch 2 merged into patch 
->   - No functional changes
-> 
-> Lee Jones (5):
->   ARM: STi: stih407-family: Add nodes for Mailbox
->   ARM: STi: DT: STiH407: Enable Mailbox testing facility
->   mailbox: mailbox-test: Use more consistent format for calling
->     copy_from_user()
->   mailbox: mailbox-test: Prevent memory leak
->   mailbox: Stop using ENOSYS for anything other than unimplemented
->     syscalls
-> 
->  arch/arm/boot/dts/stih407-family.dtsi | 39 +++++++++++++++++++++++++++++++++++
->  drivers/mailbox/mailbox-test.c        | 16 +++++++-------
->  drivers/mailbox/mailbox.c             |  4 ++--
->  3 files changed, 50 insertions(+), 9 deletions(-)
+>  drivers/pwm/core.c    |  26 ++++
+>  drivers/pwm/pwm-sti.c | 384 ++++++++++++++++++++++++++++++++++++++++++--------
+>  drivers/pwm/sysfs.c   |  28 ++++
+>  include/linux/pwm.h   |  13 ++
+>  4 files changed, 392 insertions(+), 59 deletions(-)
 > 
 
 -- 
