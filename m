@@ -1,41 +1,70 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 13 Apr 2016 15:04:13 -0700
-Subject: [PATCH v5 6/7] ARM: STiH407: Add nodes for RemoteProc
-In-Reply-To: <1452602781-22424-7-git-send-email-lee.jones@linaro.org>
-References: <1452602781-22424-1-git-send-email-lee.jones@linaro.org>
- <1452602781-22424-7-git-send-email-lee.jones@linaro.org>
-Message-ID: <CAOesGMj1zAgr+urvJHUu9=-P5RR5d9Ko6bUpXKTUcwkXMeYydg@mail.gmail.com>
+From: jcm@jonmasters.org (Jon Masters)
+Date: Wed, 13 Apr 2016 18:17:48 -0400
+Subject: X-Gene: Unhandled fault: synchronous external abort in
+ pci_generic_config_read32
+In-Reply-To: <570E49AB.1090509@arm.com>
+References: <20150724224258.GA23990@google.com>
+ <CADaLNDmYZ=8XQt82W_H74QaOiX3UwkVxkE1_EWRgzhkG1boebw@mail.gmail.com>
+ <CAErSpo549xfAnx62quCqGHh3DNay5Lfb6EhEG+4EXooEuueQFQ@mail.gmail.com>
+ <CADaLNDn95H=g73DKWRsrB4SuWcf+-8mkepbwb_DC-sFsVkrk6g@mail.gmail.com>
+ <20150728212944.GA12958@google.com>
+ <CAPKp9ub7KDCvK_hhJWR4LfFGqBkYGtD2Pb8cLsd_7bQ4bK3j2w@mail.gmail.com>
+ <20160413132101.GA22699@localhost> <570E49AB.1090509@arm.com>
+Message-ID: <570EC58C.8070705@jonmasters.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 04/13/2016 09:29 AM, Sudeep Holla wrote:
+> 
+> 
+> On 13/04/16 14:21, Bjorn Helgaas wrote:
+>> On Wed, Apr 13, 2016 at 10:58:18AM +0100, Sudeep Holla wrote:
+>>> Hi,
+>>>
+>>> (sorry for replying on the old thread, but I found it could be related
+>>> to the issue
+>>> I have now)
+>>>
+>>> On Tue, Jul 28, 2015 at 10:29 PM, Bjorn Helgaas <bhelgaas@google.com>
+>>> wrote:
+> 
+> [...]
+> 
+>>>>>
+>>>>> Our latest U-Boot is 1.15.15, but U-Boot 1.15.12 is already a good
+>>>>> version to use. Are you running any PCIe traffic test when the error
+>>>>> happens?
+>>>>
+>>>> Nope, the machine was either idle or running a reboot test; no PCIe
+>>>> stress
+>>>> test or anything.
+>>>>
+>>>
+>>> Was there any conclusion on this ?
+>>> I am having similar issue[1] on my Juno with sky2 PCIe driver during
+>>> reboot.
+>>
+>> We found that the unhandled faults occurred when using an extender
+>> card.  After removing the extender card, we didn't see the faults any
+>> more.
+>>
+> 
+> Thanks for the response. It's not related then, I saw report referencing
+> reboot tests and hence linked them together. Sorry for the noise.
 
-On Tue, Jan 12, 2016 at 4:46 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  arch/arm/boot/dts/stih407-family.dtsi | 40 +++++++++++++++++++++++++++++++++++
->  1 file changed, 40 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-> index 1e4e01925..15c20b6 100644
-> --- a/arch/arm/boot/dts/stih407-family.dtsi
-> +++ b/arch/arm/boot/dts/stih407-family.dtsi
-> @@ -650,5 +650,45 @@
->                         mbox-name       = "st231_audio_video";
->                         status          = "okay";
->                 };
-> +
-> +               st231_gp0: st231-gp0 at 40000000 {
+For the record, I've had success with this cable on X-Gene:
 
-These node names seem odd. Should probably be more generic
-"remoteproc at 40000000".
+http://www.amazon.com/PCI-E-Riser-Flexible-Ribbon-Extension/dp/B00H8VVD00?ie=UTF8&psc=1&redirect=true&ref_=oh_aui_search_detailpage
 
-> +                       compatible      = "st,st231-rproc";
-> +                       reg             = <0x40000000 0x01000000>;
+But it's hit or miss. The only public platform where I've been reliably
+able to use an extender cable so far is AMD Seattle. On that platform,
+the PCIe IP is so rock solid that I can talk to very funky PCIe IP I've
+implemented myself in a FPGA (and I can see link quality is fine too).
 
-This isn't what the binding says, it uses a memory region instead.
+There's one other non-public platform so far where PCIe extenders work
+without a single hitch as well, and a number where more work is needed.
 
+Jon.
 
-
--Olof
+-- 
+Computer Architect
