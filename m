@@ -1,40 +1,34 @@
-From: lipengcheng8@huawei.com (lipengcheng)
-Date: Wed, 13 Apr 2016 17:09:15 +0800
-Subject: [PATCH] coresight: no need to do the forced type conversion
-Message-ID: <1460538555-138517-1-git-send-email-lipengcheng8@huawei.com>
+From: ynezz@true.cz (Petr =?iso-8859-2?Q?=A9tetiar?=)
+Date: Wed, 13 Apr 2016 11:13:36 +0200
+Subject: [PATCH v2 0/6] serial: imx: handshaking fixes and improvments
+In-Reply-To: <20160412173032.GS10108@pengutronix.de>
+References: <1458825865-7434-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20160411160128.GD26941@ibawizard.net>
+ <20160412074622.GQ10108@pengutronix.de>
+ <20160412094846.GF26941@ibawizard.net>
+ <20160412105856.GR10108@pengutronix.de>
+ <20160412121759.GG26941@ibawizard.net>
+ <20160412173032.GS10108@pengutronix.de>
+Message-ID: <20160413091336.GH26941@ibawizard.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-activated and enable are already unsigned type,
-no need to change them to unsigned.
+Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [2016-04-12 19:30:32]:
 
-Signed-off-by: Li Pengcheng <lipengcheng8@huawei.com>
-Signed-off-by: Li Zhong <lizhong11@hisilicon.com>
----
- drivers/hwtracing/coresight/coresight.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+> On Tue, Apr 12, 2016 at 02:17:59PM +0200, Petr ?tetiar wrote:
+> > Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [2016-04-12 12:58:56]:
+> > 
+> > > ok, so UFCR_DCEDTE is set and UCR3_DSR controls the DTR output as
+> > > intended. What is connected to the respective pin?
+> > > MX6QDL_PAD_EIM_D25__UART1_DSR_B I think is the one.
+> > 
+> > It's routed out to Apalis SoM pin 120, which is then connected via 22R
+> > resistor and through SN65C3243DBR RS-232 line driver to header which I use as
+> > debug/serial console.
+> 
+> Then I guess the problem is that the rs232-partner asserts the imx6's
+> DSR in reply to the imx6 asserting DTR?
 
-diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
-index bba9f3d..617574a 100644
---- a/drivers/hwtracing/coresight/coresight.c
-+++ b/drivers/hwtracing/coresight/coresight.c
-@@ -538,7 +538,7 @@ static ssize_t enable_sink_show(struct device *dev,
- {
- 	struct coresight_device *csdev = to_coresight_device(dev);
- 
--	return scnprintf(buf, PAGE_SIZE, "%u\n", (unsigned)csdev->activated);
-+	return scnprintf(buf, PAGE_SIZE, "%u\n", csdev->activated);
- }
- 
- static ssize_t enable_sink_store(struct device *dev,
-@@ -568,7 +568,7 @@ static ssize_t enable_source_show(struct device *dev,
- {
- 	struct coresight_device *csdev = to_coresight_device(dev);
- 
--	return scnprintf(buf, PAGE_SIZE, "%u\n", (unsigned)csdev->enable);
-+	return scnprintf(buf, PAGE_SIZE, "%u\n", csdev->enable);
- }
- 
- static ssize_t enable_source_store(struct device *dev,
--- 
-1.8.3.2
+Yes, that's correct.
+
+-- ynezz
