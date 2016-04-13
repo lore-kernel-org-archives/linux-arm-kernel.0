@@ -1,51 +1,52 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 13 Apr 2016 15:46:57 +0100
-Subject: [PATCH] iommu/arm-smmu: Don't allocate resources for bypass domains
-In-Reply-To: <5703A289.30308@linaro.org>
-References: <1459527597-10740-1-git-send-email-will.deacon@arm.com>
- <570397F4.8080504@arm.com> <5703A289.30308@linaro.org>
-Message-ID: <491c885f61c509d959b04cfb63676bd07e481dea.1460558667.git.robin.murphy@arm.com>
+From: akshay.bhat@timesys.com (Akshay Bhat)
+Date: Wed, 13 Apr 2016 10:48:14 -0400
+Subject: [PATCH v4 3/3] ARM: imx6: Fix procedure to switch the parent of
+ LDB_DI_CLK
+In-Reply-To: <1459353746.2505.86.camel@pengutronix.de>
+References: <1456476714-11351-1-git-send-email-p.zabel@pengutronix.de>
+ <1456476714-11351-4-git-send-email-p.zabel@pengutronix.de>
+ <56D60C90.7080703@timesys.com> <1459353746.2505.86.camel@pengutronix.de>
+Message-ID: <570E5C2E.7050402@timesys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Until we get fully plumbed into of_iommu_configure, our default
-IOMMU_DOMAIN_DMA domains just bypass translation. Since we achieve that
-by leaving the stream table entries set to bypass instead of pointing at
-a translation context, the context bank we allocate for the domain is
-completely wasted. Context banks are typically a rather limited
-resource, so don't hog ones we don't need.
+Hi Philipp,
 
-Reported-by: Eric Auger <eric.auger@linaro.org>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/iommu/arm-smmu.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+On 03/30/2016 12:02 PM, Philipp Zabel wrote:
+> Hi Akshay,
+>
+> Am Dienstag, den 01.03.2016, 16:41 -0500 schrieb Akshay Bhat:
+> [...]
+>>> +		/*
+>>> +		 * It is unclear whether the procedure works for switching from
+>>> +		 * pll3_usb_otg to any other parent than pll5_video_div
+>>> +		 */
+>>> +		if (sel[i][0] > 3 && sel[i][0] != (sel[i][3] | 4)) {
+>>> +			pr_err("ccm: ldb_di%d_sel workaround only for top mux\n",
+>>> +			       i);
+>>> +			sel[i][3] = sel[i][2] = sel[i][1] = sel[i][0];
+>>> +			continue;
+>>> +		}
+>>
+>> EB821 doesn't mention the above restriction. My understanding was as
+>> long as the clock source you are switching from/to is disabled it should
+>> be ok to do so. Maybe someone from Freescale can comment?
+>
+> Maybe. If the only issue was that all input clocks have to be disabled,
+> I don't understand why the intermediate steps 3 -> 7 -> 4 -> 0 are
+> necessary though. See below for an explanation why I felt I have no idea
+> how to properly switch from 4 to 1, for example. Maybe this is indeed
+> not a problem at all and this condition can just be dropped. Do you have
+> a way to test this?
+>
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 5158feb..7c39ac4 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -826,6 +826,12 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
- 	if (smmu_domain->smmu)
- 		goto out_unlock;
- 
-+	/* We're bypassing these SIDs, so don't allocate an actual context */
-+	if (domain->type == IOMMU_DOMAIN_DMA) {
-+		smmu_domain->smmu = smmu;
-+		goto out_unlock;
-+	}
-+
- 	/*
- 	 * Mapping the requested stage onto what we support is surprisingly
- 	 * complicated, mainly because the spec allows S1+S2 SMMUs without
-@@ -948,7 +954,7 @@ static void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
- 	void __iomem *cb_base;
- 	int irq;
- 
--	if (!smmu)
-+	if (!smmu || domain->type == IOMMU_DOMAIN_DMA)
- 		return;
- 
- 	/*
--- 
-2.7.3.dirty
+I do not have a way of reliably recreating the issue (happens only on 
+few boards and even on those boards it is highly intermittent and seems 
+to depend on factors like temperature, timing etc.). So I am hesitant to 
+rely on any collected test data to suggest if the intermediate steps are 
+not required. I understand the errata is rather lacking on why the 
+intermediate steps are required but I feel at this point it is best to 
+follow the workaround suggested by Freescale/NXP.
+
+Thanks,
+Akshay
