@@ -1,31 +1,34 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Wed, 13 Apr 2016 16:22:03 +0530
-Subject: [PATCH] ARM: dts: keystone: Add aliases for SPI nodes
-Message-ID: <1460544723-32647-1-git-send-email-vigneshr@ti.com>
+From: mbrugger@suse.com (Matthias Brugger)
+Date: Wed, 13 Apr 2016 12:30:56 +0200
+Subject: [PATCH 6/6] Revert "staging: fsl-mc: Do not allow building as a
+ module"
+In-Reply-To: <1460543456-11345-1-git-send-email-mbrugger@suse.com>
+References: <1460543456-11345-1-git-send-email-mbrugger@suse.com>
+Message-ID: <1460543456-11345-7-git-send-email-mbrugger@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add aliases for SPI nodes, this is required to probe the SPI devices in
-U-Boot.
+From: Matthias Brugger <matthias.bgg@gmail.com>
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
+This reverts commit <dfb11fe2281c> ("staging: fsl-mc: Do not allow building as a module")
+
+Signed-off-by: Matthias Brugger <mbrugger@suse.com>
 ---
- arch/arm/boot/dts/keystone.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/staging/fsl-mc/bus/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
-index 3f272826f537..94d4e45138ce 100644
---- a/arch/arm/boot/dts/keystone.dtsi
-+++ b/arch/arm/boot/dts/keystone.dtsi
-@@ -20,6 +20,9 @@
+diff --git a/drivers/staging/fsl-mc/bus/Kconfig b/drivers/staging/fsl-mc/bus/Kconfig
+index 1f95933..c498ac6 100644
+--- a/drivers/staging/fsl-mc/bus/Kconfig
++++ b/drivers/staging/fsl-mc/bus/Kconfig
+@@ -7,7 +7,7 @@
+ #
  
- 	aliases {
- 		serial0	= &uart0;
-+		spi0 = &spi0;
-+		spi1 = &spi1;
-+		spi2 = &spi2;
- 	};
- 
- 	memory {
+ config FSL_MC_BUS
+-	bool "Freescale Management Complex (MC) bus driver"
++	tristate "Freescale Management Complex (MC) bus driver"
+ 	depends on OF && ARM64
+ 	select GENERIC_MSI_IRQ_DOMAIN
+ 	help
 -- 
-2.8.1
+2.6.6
