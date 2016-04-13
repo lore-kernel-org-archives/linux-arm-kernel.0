@@ -1,46 +1,42 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 13 Apr 2016 06:25:53 +0100
-Subject: [PATCH] ACPI / ARM64: Remove EXPERT dependency for ACPI on ARM64
-In-Reply-To: <20160412172315.GH8066@e104818-lin.cambridge.arm.com>
-References: <1459360718-24125-1-git-send-email-broonie@kernel.org>
- <20160412172315.GH8066@e104818-lin.cambridge.arm.com>
-Message-ID: <20160413052553.GF14664@sirena.org.uk>
+From: sr@denx.de (Stefan Roese)
+Date: Wed, 13 Apr 2016 07:30:15 +0200
+Subject: [PATCH v3] spi: orion.c: Add direct access mode
+In-Reply-To: <20160412192736.GC14664@sirena.org.uk>
+References: <1460030811-13787-1-git-send-email-sr@denx.de>
+ <20160411105740.GB3351@sirena.org.uk> <570CDF5F.9070106@denx.de>
+ <20160412192736.GC14664@sirena.org.uk>
+Message-ID: <570DD967.8010703@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 12, 2016 at 06:23:15PM +0100, Catalin Marinas wrote:
+On 12.04.2016 21:27, Mark Brown wrote:
+> On Tue, Apr 12, 2016 at 01:43:27PM +0200, Stefan Roese wrote:
+>> On 11.04.2016 12:57, Mark Brown wrote:
+>>> On Thu, Apr 07, 2016 at 02:06:51PM +0200, Stefan Roese wrote:
 
-> I'm fine with dropping the EXPERT dependency (of course, not a cc
-> stable). While arm64 ACPI is not "done" yet (nor is DT; there are
-> important ongoing developments like PCIe, IORT), I think the core arm64
-> ACPI support passed the EXPERT stage. I also don't think a default y
-> would imply any maintainer endorsement; vendors targeting ACPI are
-> already doing this for various reasons (distro requirement, certain ACPI
+<snip>
 
-So you're OK with the current patch?
+>>>> +               spi->direct_access[cs].vaddr = devm_ioremap_resource(&pdev->dev,
+>>>> +                                                                    r);
+>>>> +               if (IS_ERR(spi->direct_access[cs].vaddr)) {
+>
+>>> I seem to be missing where we configure the hardware to connect the
+>>> windows to the chip selects.  We just seem to map the windows but never
+>>> otherwise interact with the hardware.
+>
+>> The connection between the CS and the window is done in the DT. All
+>> is now implemented as Arnd has suggested:
+>
+> Writing something in the DT won't magically configure anything in the
+> hardware which is (as I said) the bit I'm missing.
 
-> features like RAS). But, hopefully, it will encourage more vendors to
-> start upstreaming their ACPI-related patches.
+The MBus driver (drivers/bus/mvebu-mbus.c) takes care of the MBus
+window mapping. This is done, if the board dts files has one (or
+multiple) entries for the SPI device(s) added to the 'ranges'
+property of the 'soc' node.
 
-Yes, and also help include ACPI systems in the work we're doing testing
-things upstream.
+This is the common method to map such windows. So no new code and
+no new bindings are needed for this to work.
 
-> However, building ACPI by default on arm64 doesn't mean that we can
-> ignore potential misuses like PRP0001+_DSD blindly following DT
-> (mis)concepts, breaking compatibility with older/newer firmware (this
-> goes in both directions) or using ACPI for SoCs where it is clearly not
-> suitable (e.g. non-SBSA). Such patches should be NAK'ed accordingly.
-
-Yes, I'm very concerned about some of the activity I'm seeing there
-myself - it does seem likely that we're going to have to extend ACPI for
-arm64 SoCs simply because things like SBSA are so bare bones but we need
-to pay attention to what's going on there to promote best practices and
-try to get people producing firmwares that make well thought through
-decisions regarding their ACPI usage.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160413/cd774a02/attachment.sig>
+Thanks,
+Stefan
