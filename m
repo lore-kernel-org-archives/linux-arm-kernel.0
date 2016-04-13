@@ -1,63 +1,40 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 13 Apr 2016 10:05:40 +0100
-Subject: [PATCH] arm64/sunxi: 4.6-rc1: Add dependency on generic irq chip
-In-Reply-To: <20160412191149.GC4174@localhost>
-References: <1459245786-11905-1-git-send-email-suzuki.poulose@arm.com>
- <20160412191149.GC4174@localhost>
-Message-ID: <570E0BE4.2080007@arm.com>
+From: lipengcheng8@huawei.com (lipengcheng)
+Date: Wed, 13 Apr 2016 17:09:15 +0800
+Subject: [PATCH] coresight: no need to do the forced type conversion
+Message-ID: <1460538555-138517-1-git-send-email-lipengcheng8@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/16 20:11, Olof Johansson wrote:
-> On Tue, Mar 29, 2016 at 11:03:06AM +0100, Suzuki K Poulose wrote:
->> Commit ce3dd55b99b1 ("arm64: Introduce Allwinner SoC config option"),
->> added support for ARCH_SUNXI on arm64, but failed to select
->> GENERIC_IRQ_CHIP, which is required for drivers/irqchip/irq-sunxi-nmi.c
->> and causes build failures like :
->>
->>    UPD     include/generated/compile.h
->>    CC      init/version.o
->>    LD      init/built-in.o
->> drivers/built-in.o: In function `sunxi_sc_nmi_set_type':
->> drivers/irqchip/irq-sunxi-nmi.c:114: undefined reference to `irq_setup_alt_chip'
->> drivers/built-in.o: In function `irq_domain_add_linear':
->> include/linux/irqdomain.h:253: undefined reference to `irq_generic_chip_ops'
->> include/linux/irqdomain.h:253: undefined reference to `irq_generic_chip_ops'
->> drivers/built-in.o: In function `sunxi_sc_nmi_irq_init':
->> drivers/irqchip/irq-sunxi-nmi.c:146: undefined reference to `irq_alloc_domain_generic_chips'
->> drivers/irqchip/irq-sunxi-nmi.c:161: undefined reference to `irq_get_domain_generic_chip'
->> drivers/irqchip/irq-sunxi-nmi.c:170: undefined reference to `irq_gc_mask_clr_bit'
->> drivers/irqchip/irq-sunxi-nmi.c:171: undefined reference to `irq_gc_mask_set_bit'
->> drivers/irqchip/irq-sunxi-nmi.c:172: undefined reference to `irq_gc_ack_set_bit'
->> drivers/irqchip/irq-sunxi-nmi.c:170: undefined reference to `irq_gc_mask_clr_bit'
->>
->> Fixes: commit ce3dd55b99b1 ("arm64: Introduce Allwinner SoC config option")
->> Cc: Andre Przywara <andre.przywara@arm.com>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->
-> It'd be nice to have a silent Kconfig entry that selects from ARCH_SUNXI that
-> sets this dependency, instead of having it from the architecture code. This
-> pushes down the dependency to the right level.
+activated and enable are already unsigned type,
+no need to change them to unsigned.
 
-Do you mean something like :
-config ARCH_SUNXI
-  	...
-	select SUNXI_PLATFORM
+Signed-off-by: Li Pengcheng <lipengcheng8@huawei.com>
+Signed-off-by: Li Zhong <lizhong11@hisilicon.com>
+---
+ drivers/hwtracing/coresight/coresight.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-And have
-
-config SUNXI_PLATFORM
-	select SUNXI_DEPENDENCY_1
-	select SUNXI_DEPENDENCY_2
-
-where SUNXI_PLATFORM drives the dependencies for both ARM and ARM64 ?
-
-If so, where would you like SUNXI_PLATFORM to reside ? drivers/platform ?
-Also, AFAIK, the arm64 port doesn't have the full support for the required
-bits for SUNXI yet, which could be handled in the common place with ( && !ARM64).
-
-Andre, please feel free to correct my assessment above.
-
-
-Thanks
-Suzuki
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index bba9f3d..617574a 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -538,7 +538,7 @@ static ssize_t enable_sink_show(struct device *dev,
+ {
+ 	struct coresight_device *csdev = to_coresight_device(dev);
+ 
+-	return scnprintf(buf, PAGE_SIZE, "%u\n", (unsigned)csdev->activated);
++	return scnprintf(buf, PAGE_SIZE, "%u\n", csdev->activated);
+ }
+ 
+ static ssize_t enable_sink_store(struct device *dev,
+@@ -568,7 +568,7 @@ static ssize_t enable_source_show(struct device *dev,
+ {
+ 	struct coresight_device *csdev = to_coresight_device(dev);
+ 
+-	return scnprintf(buf, PAGE_SIZE, "%u\n", (unsigned)csdev->enable);
++	return scnprintf(buf, PAGE_SIZE, "%u\n", csdev->enable);
+ }
+ 
+ static ssize_t enable_source_store(struct device *dev,
+-- 
+1.8.3.2
