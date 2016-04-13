@@ -1,121 +1,70 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 13 Apr 2016 17:22:29 +0200
-Subject: [RESEND 09/11] pwm: sti: Add PWM Capture call-back
-In-Reply-To: <20160413102554.GQ8094@x1>
-References: <1456932729-9667-1-git-send-email-lee.jones@linaro.org>
- <1456932729-9667-10-git-send-email-lee.jones@linaro.org>
- <20160412105314.GE18882@ulmo.ba.sec> <20160413102554.GQ8094@x1>
-Message-ID: <20160413152229.GC29509@ulmo.ba.sec>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 13 Apr 2016 16:23:06 +0100
+Subject: [PATCH V4 4/7] ARM64, ACPI, PCI: I/O Remapping Table (IORT)
+ initial support.
+In-Reply-To: <1459759975-24097-5-git-send-email-tn@semihalf.com>
+References: <1459759975-24097-1-git-send-email-tn@semihalf.com>
+ <1459759975-24097-5-git-send-email-tn@semihalf.com>
+Message-ID: <570E645A.9010600@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 13, 2016 at 11:25:54AM +0100, Lee Jones wrote:
-> On Tue, 12 Apr 2016, Thierry Reding wrote:
+On 04/04/16 09:52, Tomasz Nowicki wrote:
+> IORT shows representation of IO topology for ARM based systems.
+> It describes how various components are connected together on
+> parent-child basis e.g. PCI RC -> SMMU -> ITS. Also see IORT spec.
 > 
-> > On Wed, Mar 02, 2016 at 03:32:07PM +0000, Lee Jones wrote:
-> > > Once a PWM Capture has been initiated, the capture call
-> > > enables a rising edge detection IRQ, then waits.  Once each
-> > > of the 3 phase changes have been recorded the thread then
-> > > wakes.  The remaining part of the call carries out the
-> > > relevant calculations and passes back a formatted string to
-> > > the caller.
-> > > 
-> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > > ---
-> > >  drivers/pwm/pwm-sti.c | 72 +++++++++++++++++++++++++++++++++++++++++++++++++++
-> > >  1 file changed, 72 insertions(+)
-> > > 
-> > > diff --git a/drivers/pwm/pwm-sti.c b/drivers/pwm/pwm-sti.c
-> > > index 82a69e4..8de9b4a 100644
-> > > --- a/drivers/pwm/pwm-sti.c
-> > > +++ b/drivers/pwm/pwm-sti.c
-> > > @@ -309,7 +309,79 @@ static void sti_pwm_free(struct pwm_chip *chip, struct pwm_device *pwm)
-> > >  	clear_bit(pwm->hwpwm, &pc->configured);
-> > >  }
-> > >  
-> > > +static int sti_pwm_capture(struct pwm_chip *chip, struct pwm_device *pwm,
-> > > +			   int channel, char *buf)
-> > > +{
-> > > +	struct sti_pwm_chip *pc = to_sti_pwmchip(chip);
-> > > +	struct sti_pwm_compat_data *cdata = pc->cdata;
-> > > +	struct sti_cpt_data *d = pc->cpt_data[channel];
-> > > +	struct device *dev = pc->dev;
-> > > +	unsigned int f, dc;
-> > > +	unsigned int high, low;
-> > > +	bool level;
-> > > +	int ret;
-> > > +
-> > > +	if (channel > cdata->cpt_num_chan - 1) {
-> > > +		dev_err(dev, "Channel %d is not valid\n", channel);
-> > > +		return -EINVAL;
-> > > +	}
-> > > +
-> > > +	mutex_lock(&d->lock);
-> > 
-> > Should this perhaps reuse the struct pwm_device's ->lock?
+> Initial support allows to:
+> - register ITS MSI chip along with ITS translation ID and domain token
+> - deregister ITS MSI chip based on ITS translation ID
+> - find registered domain token based on ITS translation ID
+> - map MSI RID based on PCI device and requester ID
+> - find domain token based on PCI device and requester ID
+> 
+> To: Rafael J. Wysocki <rjw@rjwysocki.net>
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> ---
+>  drivers/acpi/Kconfig    |   3 +
+>  drivers/acpi/Makefile   |   1 +
+>  drivers/acpi/iort.c     | 335 ++++++++++++++++++++++++++++++++++++++++++++++++
+>  drivers/irqchip/Kconfig |   1 +
+>  include/linux/iort.h    |  31 +++++
+>  5 files changed, 371 insertions(+)
+>  create mode 100644 drivers/acpi/iort.c
+>  create mode 100644 include/linux/iort.h
+> 
 
-That was actually a stupid suggestion by me, because that lock is being
-removed in an unrelated patch series.
+[...]
 
-> > > +	/* Prepare capture measurement */
-> > > +	d->index = 0;
-> > > +	regmap_write(pc->regmap, PWM_CPT_EDGE(channel), CPT_EDGE_RISING);
-> > > +	regmap_field_write(pc->pwm_cpt_int_en, BIT(channel));
-> > > +	ret = wait_event_interruptible_timeout(d->wait, d->index > 1, HZ);
-> > 
-> > The timeout here should make sure callers don't hang forever. But maybe
-> > you can still make sure that when the PWM gets disabled the wait queue
-> > is woken and perhaps return an appropriate error code to let users know
-> > that the operation was interrupted.
-> 
-> Sure.  I'll look into that.
-> 
-> > Also, how about letting callers choose the value of the timeout? In some
-> > cases they may be interested in long-running signals. In other cases the
-> > whole second timeout may be much too long.
-> 
-> I'm not opposed to it.  How do you suggest we do that?
+> +static acpi_status
+> +iort_find_dev_callback(struct acpi_iort_node *node, void *context)
+> +{
+> +	struct acpi_iort_root_complex *pci_rc;
+> +	struct device *dev = context;
+> +	struct pci_bus *bus;
+> +
+> +	switch (node->type) {
+> +	case ACPI_IORT_NODE_PCI_ROOT_COMPLEX:
+> +		bus = to_pci_bus(dev);
+> +		pci_rc = (struct acpi_iort_root_complex *)node->node_data;
+> +
+> +		/*
+> +		 * It is assumed that PCI segment numbers maps one-to-one
+> +		 * with root complexes. Each segment number can represent only
+> +		 * one root complex.
+> +		 */
+> +		if (pci_rc->pci_segment_number == pci_domain_nr(bus))
+> +			return AE_OK;
 
-The easiest would probably be to add an unsigned long timeout parameter
-to the pwm_capture() function and ->capture() callbacks.
+What guarantees that this is ever valid? As far as I know, pci_domain_nr
+is completely arbitrary, and depends both on the probe order and the
+phase of the moon. If you want this to be reliable, you need to allocate
+the domain number from pci_segment_number.
 
-But thinking about this further I'm wondering if it might not be easier
-and more flexible to move the timeout completely outside of this code
-and into callers. I suspect that the most simple way to do that would be
-to add a completion to struct pwm_capture that callers can use to wait
-for completion of a capture. This would make the whole process
-asynchronous and allow interesting things like making the sysfs capture
-file pollable, for example.
+I must be missing something. Care to shed some light on this?
 
-> > > +	/*
-> > > +	 * In case we woke up for another reason than completion
-> > > +	 * make sure to disable the capture.
-> > > +	 */
-> > > +	regmap_write(pc->regmap, PWM_CPT_EDGE(channel), CPT_EDGE_DISABLED);
-> > 
-> > The comment here is slightly confusing because it implies that disabling
-> > the capture should be done conditionally, whereas it is always disabled.
-> 
-> Not really.  We do it unconditionally for reason explained.
-> 
-> It says:
-> 
->   "disable the capture just in case X happens"
-> 
-> rather than
-> 
->   "disable the capture if X happens".
-> 
-> Perhaps the language is too subtle.  I can reword for clarity.
+Thanks,
 
-I'd be okay with just dropping the comment altogether, it seems rather
-obvious to me. But clarifying is okay with me, too.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160413/82f89061/attachment.sig>
+	M.
+-- 
+Jazz is not dead. It just smells funny...
