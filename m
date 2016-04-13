@@ -1,26 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 13 Apr 2016 11:43:38 -0700
-Subject: [GIT PULL] at91: soc for 4.7 #1
-In-Reply-To: <20160413181905.GE7765@piout.net>
-References: <1459267558-16328-1-git-send-email-nicolas.ferre@atmel.com>
- <20160413170051.GA19945@localhost>
- <20160413181905.GE7765@piout.net>
-Message-ID: <20160413184338.GK19945@localhost>
+Date: Wed, 13 Apr 2016 11:46:02 -0700
+Subject: [GIT PULL] Qualcomm Fixes for v4.6-rc2
+In-Reply-To: <1459651508-5160-1-git-send-email-andy.gross@linaro.org>
+References: <1459651508-5160-1-git-send-email-andy.gross@linaro.org>
+Message-ID: <20160413184602.GL19945@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 13, 2016 at 08:19:05PM +0200, Alexandre Belloni wrote:
-> Hi,
+On Sat, Apr 02, 2016 at 09:45:08PM -0500, Andy Gross wrote:
+> The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 > 
-> On 13/04/2016 at 10:00:51 -0700, Olof Johansson wrote :
-> > Note that your GPG key has expired, you might want to take care of that.
-> > 
-> > 
+>   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
 > 
-> I think he did for the previous release, you may want to refresh your
-> keys.
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-fixes-for-4.6-rc2
+> 
+> for you to fetch changes up to 10c0f0e92f019ab8d0c17da3696e35b0eef4ec16:
+> 
+>   Revert "dts: msm8974: Add dma channels for blsp2_i2c1 node" (2016-04-02 21:27:36 -0500)
+> 
+> ----------------------------------------------------------------
+> Qualcomm Fixes for v4.6-rc2
+> 
+> * Revert BAM usage on MSM8974 boards
 
-Ack, you're right.
+Hi, on future pull requests please elaborate on why this is needed in the pull
+request. It's there in the patch but it's worth bubbling it up so it makes it
+into the merge too.
+
+I'll merge these as soon as the current fixes pull request has been merged --
+no need to respin.
 
 
 -Olof
