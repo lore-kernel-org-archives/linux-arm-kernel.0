@@ -1,49 +1,60 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 13 Apr 2016 12:11:08 -0700
-Subject: [GIT PULL] Qualcomm Driver Updates for v4.7
-In-Reply-To: <20160413184134.GJ19945@localhost>
-References: <1459540776-7056-1-git-send-email-andy.gross@linaro.org>
- <20160413181002.GH19945@localhost>
- <20160413182156.GE14441@codeaurora.org>
- <20160413184134.GJ19945@localhost>
-Message-ID: <20160413191108.GF14441@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 13 Apr 2016 12:30:04 -0700
+Subject: [PATCH] ARM: OMAP3: Fix external abort on 36xx waking from off
+ mode idle
+In-Reply-To: <1460475837-1984-1-git-send-email-d-gerlach@ti.com>
+References: <1460475837-1984-1-git-send-email-d-gerlach@ti.com>
+Message-ID: <20160413193003.GW5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/13, Olof Johansson wrote:
-> On Wed, Apr 13, 2016 at 11:21:56AM -0700, Stephen Boyd wrote:
-> > That was part of the original series[1]. Splitting up patches
-> > into topic branches is problematic here it seems.
-> > 
-> > [1] http://lkml.kernel.org/r/1448485478-21699-3-git-send-email-sboyd at codeaurora.org
-> 
-> The HAVE.* options are usually expected to be set through selects, not
-> necessarily driven by a user choosing them. So I think adding a select here is
-> the right way to do it.
-> 
-> HAVE.* options are usually used for dependencies for the user-exposed options.
-> I.e. only ask if you want arch timers if HAVE_ARM_ARCH_TIMERS is set, etc.
-> 
+* Dave Gerlach <d-gerlach@ti.com> [160412 08:45]:
+> --- a/arch/arm/mach-omap2/pm34xx.c
+> +++ b/arch/arm/mach-omap2/pm34xx.c
+> @@ -268,7 +268,6 @@ void omap_sram_idle(void)
+>  	int per_next_state = PWRDM_POWER_ON;
+>  	int core_next_state = PWRDM_POWER_ON;
+>  	int per_going_off;
+> -	int core_prev_state;
+>  	u32 sdrc_pwr = 0;
+>  
+>  	mpu_next_state = pwrdm_read_next_pwrst(mpu_pwrdm);
+> @@ -348,17 +347,21 @@ void omap_sram_idle(void)
+>  		sdrc_write_reg(sdrc_pwr, SDRC_POWER);
+>  
+>  	/* CORE */
+> -	if (core_next_state < PWRDM_POWER_ON) {
+> -		core_prev_state = pwrdm_read_prev_pwrst(core_pwrdm);
+> -		if (core_prev_state == PWRDM_POWER_OFF) {
+> -			omap3_core_restore_context();
+> -			omap3_cm_restore_context();
+> -			omap3_push_sram_idle();
+> -			omap3_push_sram_secure_idle();
+> -			omap2_sms_restore_context();
+> -		}
+> +	if (core_next_state < PWRDM_POWER_ON &&
+> +	    pwrdm_read_prev_pwrst(core_pwrdm) == PWRDM_POWER_OFF) {
+> +		omap3_core_restore_context();
+> +		omap3_cm_restore_context();
+> +		omap3_push_sram_idle();
+> +		omap3_push_sram_secure_idle();
+> +		omap2_sms_restore_context();
+> +	} else {
+> +		/*
+> +		 * In off-mode resume path above, omap3_core_restore_context
+> +		 * also handles the INTC autoidle restore done here so limit
+> +		 * this to non-off mode resume paths so we don't do it twice.
+> +		 */
+> +		omap3_intc_resume_idle();
+>  	}
+> -	omap3_intc_resume_idle();
+>  
+>  	pwrdm_post_transition(NULL);
 
-Agreed. Perhaps the name is bad? I don't know the history of the
-Kconfig, but HAVE_ARM_ARCH_TIMER is a user visible option, so
-selecting it in Kconfig language doesn't make much sense to me.
-Some other platforms are following the same design where it's
-part of the defconfig while others are selecting it from Kconfig.
-Mass confusion has set in.
+Can you please repost against v4.7-rc? This does not apply as
+mainline still uses omap3_sram_restore_context(). Should be
+retested again with your patches applied on top of this fix.
 
-If we want to change the design to be selected by all platforms
-then we'll need to make HAVE_ARM_ARCH_TIMER into a hidden Kconfig
-option so that users can't turn it off. In fact, we may want to
-just obliterate the Kconfig entirely and have users select
-ARM_ARCH_TIMER directly. Everything is multi-platform now, right?
-If so then GENERIC_CLOCKEVENTS is selected all the time on CPU_V7
-and the CPU_V7 dependency is not helping much.
+Regards,
 
-Honestly, I view these clocksource selects as the only blocker in
-the effort to get rid of machine type Kconfigs. Maybe that isn't
-a good goal though.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Tony
