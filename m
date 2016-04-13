@@ -1,144 +1,32 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 13 Apr 2016 10:26:22 +0100
-Subject: [PATCH] arm64: mm: Enhance Virtual kernel memory layout
-In-Reply-To: <1460533772-13314-1-git-send-email-wangkefeng.wang@huawei.com>
-References: <1460533772-13314-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <570E10BE.3050107@arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 13 Apr 2016 17:29:25 +0800
+Subject: [GIT PULL] ARM: i.MX fixes for 4.6
+Message-ID: <20160413092924.GO28903@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 
-On 13/04/16 08:49, Kefeng Wang wrote:
-> 1) Show kernel excetion vector region and bss segment information.
+  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
 
-Nit: exception
+are available in the git repository at:
 
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.6
 
-> 2) Only show modules and PCI I/O with corresponding config enabled.
-> 3) Each line with single pr_cont, or lead to anomalous print in dmesg.
+for you to fetch changes up to fc26fe9c3869f02dd9dc54ff3a45c6d9d4bbbdfa:
 
-This commit message is a little confusing, it doesn't mention that this is to do
-with the dump of the kernel memory layout during boot. I presume the motivation
-is the missing time stamps when built with CONFIG_PRINTK_TIME.
+  ARM: mach-imx: sdhci-esdhc-imx: initialize DMA mask (2016-04-13 16:41:56 +0800)
 
-Why add an entry for the vectors? They live in the text section, so this memory
-is already covered. Adding it like this means the list is out of order.
+----------------------------------------------------------------
+The i.MX fixes for 4.6:
+ - The sdhci-esdhc-imx DMA support is broken due to commit 7b91369b4655
+   ("mmc: sdhci: Set DMA mask when adding host").  It requires device's
+   dma_mask be set up properly to get DMA work.  The fixing patch
+   initializes the DMA mask to enable the access again.
 
-It is probably better to put the splitting of pr_cont() into one per line in a
-separate patch to adding new rows.
+----------------------------------------------------------------
+Alexander Kurz (1):
+      ARM: mach-imx: sdhci-esdhc-imx: initialize DMA mask
 
-
-> ---
-> With this patch,
-> 
-> [    0.000000] Virtual kernel memory layout:
-> [    0.000000]      vector : 0xffffff8008084800 - 0xffffff8008084f80   (     1 KB)
-> [    0.000000]     modules : 0xffffff8000000000 - 0xffffff8008000000   (   128 MB)
-> [    0.000000]     vmalloc : 0xffffff8008000000 - 0xffffffbdbfff0000   (   246 GB)
-> [    0.000000]       .text : 0xffffff8008080000 - 0xffffff8008753000   (  6988 KB)
-> [    0.000000]     .rodata : 0xffffff8008753000 - 0xffffff8008a3a000   (  2972 KB)
-> [    0.000000]       .init : 0xffffff8008a3a000 - 0xffffff8008b06000   (   816 KB)
-> [    0.000000]       .data : 0xffffff8008b06000 - 0xffffff8008ba2400   (   625 KB)
-> [    0.000000]        .bss : 0xffffff8008ba2400 - 0xffffff8008bdf738   (   245 KB)
-> [    0.000000]     vmemmap : 0xffffffbdc0000000 - 0xffffffbfc0000000   (     8 GB maximum)
-> [    0.000000]               0xffffffbdc0000000 - 0xffffffbdc8000000   (   128 MB actual)
-> [    0.000000]     fixed   : 0xffffffbffe7fd000 - 0xffffffbffec00000   (  4108 KB)
-> [    0.000000]     PCI I/O : 0xffffffbffee00000 - 0xffffffbfffe00000   (    16 MB)
-> [    0.000000]     memory  : 0xffffffc000000000 - 0xffffffc200000000   (  8192 MB)
-> 
-> Before,
-> 
-> [    0.000000] Virtual kernel memory layout:
-> [    0.000000]     modules : 0xffffff8000000000 - 0xffffff8008000000   (   128 MB)
-> [    0.000000]     vmalloc : 0xffffff8008000000 - 0xffffffbdbfff0000   (   246 GB)
-> [    0.000000]       .text : 0xffffff8008080000 - 0xffffff8008753000   (  6988 KB)
->     .rodata : 0xffffff8008753000 - 0xffffff8008a3a000   (  2972 KB)
->       .init : 0xffffff8008a3a000 - 0xffffff8008b06000   (   816 KB)
->       .data : 0xffffff8008b06000 - 0xffffff8008ba2400   (   625 KB)
-> [    0.000000]     vmemmap : 0xffffffbdc0000000 - 0xffffffbfc0000000   (     8 GB maximum)
->               0xffffffbdc0000000 - 0xffffffbdc8000000   (   128 MB actual)
-> [    0.000000]     fixed   : 0xffffffbffe7fd000 - 0xffffffbffec00000   (  4108 KB)
-> [    0.000000]     PCI I/O : 0xffffffbffee00000 - 0xffffffbfffe00000   (    16 MB)
-> [    0.000000]     memory  : 0xffffffc000000000 - 0xffffffc200000000   (  8192 MB)
-> 
->  arch/arm64/mm/init.c | 32 +++++++++++++++++++++-----------
->  1 file changed, 21 insertions(+), 11 deletions(-)
-> 
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index ea989d8..c6bcaa7 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -345,6 +345,9 @@ static void __init free_unused_memmap(void)
->   */
->  void __init mem_init(void)
->  {
-> +	/* kernel exception vectors, 16 entries and each one with 128bytes */
-> +	extern char vectors[];
-> +
->  	swiotlb_init(1);
->  
->  	set_max_mapnr(pfn_to_page(max_pfn) - mem_map);
-> @@ -363,34 +366,41 @@ void __init mem_init(void)
->  #define MLK_ROUNDUP(b, t) b, t, DIV_ROUND_UP(((t) - (b)), SZ_1K)
->  
->  	pr_notice("Virtual kernel memory layout:\n");
-> +	pr_cont("     vector : 0x%p - 0x%p   (%6ld KB)\n",
-> +		MLK(vectors, vectors + 0x780));
-
-0x780? Shouldn't this be 0x800, or better SZ_2K?
-
-
->  #ifdef CONFIG_KASAN
->  	pr_cont("    kasan   : 0x%16lx - 0x%16lx   (%6ld GB)\n",
->  		MLG(KASAN_SHADOW_START, KASAN_SHADOW_END));
->  #endif
-> +#ifdef CONFIG_MODULES
->  	pr_cont("    modules : 0x%16lx - 0x%16lx   (%6ld MB)\n",
->  		MLM(MODULES_VADDR, MODULES_END));
-> +#endif
->  	pr_cont("    vmalloc : 0x%16lx - 0x%16lx   (%6ld GB)\n",
->  		MLG(VMALLOC_START, VMALLOC_END));
-> -	pr_cont("      .text : 0x%p" " - 0x%p" "   (%6ld KB)\n"
-> -		"    .rodata : 0x%p" " - 0x%p" "   (%6ld KB)\n"
-> -		"      .init : 0x%p" " - 0x%p" "   (%6ld KB)\n"
-> -		"      .data : 0x%p" " - 0x%p" "   (%6ld KB)\n",
-> -		MLK_ROUNDUP(_text, __start_rodata),
-> -		MLK_ROUNDUP(__start_rodata, _etext),
-> -		MLK_ROUNDUP(__init_begin, __init_end),
-> +	pr_cont("      .text : 0x%p" " - 0x%p" "   (%6ld KB)\n",
-> +		MLK_ROUNDUP(_text, __start_rodata));
-> +	pr_cont("    .rodata : 0x%p" " - 0x%p" "   (%6ld KB)\n",
-> +		MLK_ROUNDUP(__start_rodata, _etext));
-> +	pr_cont("      .init : 0x%p" " - 0x%p" "   (%6ld KB)\n",
-> +		MLK_ROUNDUP(__init_begin, __init_end));
-> +	pr_cont("      .data : 0x%p" " - 0x%p" "   (%6ld KB)\n",
->  		MLK_ROUNDUP(_sdata, _edata));
-> +	pr_cont("       .bss : 0x%p" " - 0x%p" "   (%6ld KB)\n",
-> +		MLK_ROUNDUP(__bss_start, __bss_stop));
->  #ifdef CONFIG_SPARSEMEM_VMEMMAP
-> -	pr_cont("    vmemmap : 0x%16lx - 0x%16lx   (%6ld GB maximum)\n"
-> -		"              0x%16lx - 0x%16lx   (%6ld MB actual)\n",
-> -		MLG(VMEMMAP_START,
-> -		    VMEMMAP_START + VMEMMAP_SIZE),
-> +	pr_cont("    vmemmap : 0x%16lx - 0x%16lx   (%6ld GB maximum)\n",
-> +		MLG(VMEMMAP_START, VMEMMAP_START + VMEMMAP_SIZE));
-> +	pr_cont("              0x%16lx - 0x%16lx   (%6ld MB actual)\n",
->  		MLM((unsigned long)phys_to_page(memblock_start_of_DRAM()),
->  		    (unsigned long)virt_to_page(high_memory)));
->  #endif
->  	pr_cont("    fixed   : 0x%16lx - 0x%16lx   (%6ld KB)\n",
->  		MLK(FIXADDR_START, FIXADDR_TOP));
-> +#ifdef CONFIG_PCI
->  	pr_cont("    PCI I/O : 0x%16lx - 0x%16lx   (%6ld MB)\n",
->  		MLM(PCI_IO_START, PCI_IO_END));
-> +#endif
->  	pr_cont("    memory  : 0x%16lx - 0x%16lx   (%6ld MB)\n",
->  		MLM(__phys_to_virt(memblock_start_of_DRAM()),
->  		    (unsigned long)high_memory));
-> 
-
-
-Thanks,
-
-James
+ arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
