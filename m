@@ -1,42 +1,21 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 13 Apr 2016 16:32:49 +0200
-Subject: [PATCH v4 3/5] clk: mvebu: new driver for Armada AP806 system
- controller
-In-Reply-To: <20160402012731.GE18567@codeaurora.org>
-References: <1459070777-18049-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1459070777-18049-4-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160402012731.GE18567@codeaurora.org>
-Message-ID: <20160413163249.157e3a77@free-electrons.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 13 Apr 2016 09:33:18 -0500
+Subject: [PATCH v4 1/6] Documentation: arm64: pmu: Add Broadcom Vulcan
+ PMU binding
+In-Reply-To: <1460379741-1181-2-git-send-email-ashoks@broadcom.com>
+References: <1460379741-1181-1-git-send-email-ashoks@broadcom.com>
+ <1460379741-1181-2-git-send-email-ashoks@broadcom.com>
+Message-ID: <20160413143318.GA13923@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Fri, 1 Apr 2016 18:27:31 -0700, Stephen Boyd wrote:
-
-> > +#include <linux/kernel.h>
-> > +#include <linux/clk.h>
+On Mon, Apr 11, 2016 at 06:02:16AM -0700, Ashok Kumar wrote:
+> Document the compatible string for Broadcom Vulcan PMU.
+> Also arranged the list in alphabetical order.
 > 
-> Is this used?
+> Signed-off-by: Ashok Kumar <ashoks@broadcom.com>
+> ---
+>  Documentation/devicetree/bindings/arm/pmu.txt | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 
-No, fixed!
-
-> > +#include <linux/clk-provider.h>
-> > +#include <linux/io.h>
-> 
-> Is this used?
-
-Ditto!
-
-> > +static void __init ap806_syscon_clk_init(struct device_node *np)
-> 
-> Can this be a platform driver instead?
-
-I've moved to a platform driver, and it seems to work fine. Will be in
-v5. Thanks for the review!
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Acked-by: Rob Herring <robh@kernel.org>
