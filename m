@@ -1,69 +1,35 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Wed, 13 Apr 2016 13:58:02 +0800
-Subject: [PATCH v2 1/2] dt/bindings: Add bindings for hisilicon random
- number generator
-In-Reply-To: <CAL_JsqJv57nX7a89OR8U1=m+MLQKJBCOeuORPWXwGRx_P9XXBQ@mail.gmail.com>
-References: <1460017397-30996-1-git-send-email-wangkefeng.wang@huawei.com>
- <1460017397-30996-2-git-send-email-wangkefeng.wang@huawei.com>
- <20160411144306.GA24637@rob-hp-laptop> <570C4C52.4020902@huawei.com>
- <CAL_JsqJv57nX7a89OR8U1=m+MLQKJBCOeuORPWXwGRx_P9XXBQ@mail.gmail.com>
-Message-ID: <570DDFEA.4090103@huawei.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 13 Apr 2016 06:59:46 +0100
+Subject: [PATCH v3] spi: orion.c: Add direct access mode
+In-Reply-To: <570DD967.8010703@denx.de>
+References: <1460030811-13787-1-git-send-email-sr@denx.de>
+ <20160411105740.GB3351@sirena.org.uk> <570CDF5F.9070106@denx.de>
+ <20160412192736.GC14664@sirena.org.uk> <570DD967.8010703@denx.de>
+Message-ID: <20160413055946.GH14664@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Apr 13, 2016 at 07:30:15AM +0200, Stefan Roese wrote:
+> On 12.04.2016 21:27, Mark Brown wrote:
 
+> >Writing something in the DT won't magically configure anything in the
+> >hardware which is (as I said) the bit I'm missing.
 
-On 2016/4/12 21:54, Rob Herring wrote:
-> On Mon, Apr 11, 2016 at 8:16 PM, Kefeng Wang <wangkefeng.wang@huawei.com> wrote:
->>
->>
->> On 2016/4/11 22:43, Rob Herring wrote:
->>> On Thu, Apr 07, 2016 at 04:23:16PM +0800, Kefeng Wang wrote:
->>>> Document the devicetree bindings for the random number generator found
->>>> on Hisilicon Hip04 and Hip05 soc.
->>>>
->>>> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
->>>> ---
->>>>  Documentation/devicetree/bindings/rng/hisi-rng.txt | 12 ++++++++++++
->>>>  1 file changed, 12 insertions(+)
->>>>  create mode 100644 Documentation/devicetree/bindings/rng/hisi-rng.txt
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/rng/hisi-rng.txt b/Documentation/devicetree/bindings/rng/hisi-rng.txt
->>>> new file mode 100644
->>>> index 0000000..72efcc1
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/rng/hisi-rng.txt
->>>> @@ -0,0 +1,12 @@
->>>> +Hisilicon Random Number Generator
->>>> +
->>>> +Required properties:
->>>> +- compatible : Should be "hisilicon,rng"
->>>> +- reg : Offset and length of the register set of this block
->>>> +
->>>> +Example:
->>>> +
->>>> +rng at d1010000 {
->>>> +    compatible = "hisilicon,rng";
->>>
->>> This still needs SoC specific compatible strings.
->>
->> It is used by Hip04/Hip05 at lease, but for new SoC, like Hip06, it maybe different,
->> using single Soc prefix is not proper, how about hisilicon,rng-v1, or add two compatible
->> hisilicon,hip04-rng and hisilicon,hip05-rng? What's your option?
-> 
-> It is perfectly fine to include hisilicon,hip04-rng string for hip05
-> and later if the block is the same. You should still have both strings
-> (the original and current SoC) in case there is some issue or
-> difference found.
-> 
-> Unless there is a real IP version defined, you should avoid made up
-> version numbers.
-> 
+> The MBus driver (drivers/bus/mvebu-mbus.c) takes care of the MBus
+> window mapping. This is done, if the board dts files has one (or
+> multiple) entries for the SPI device(s) added to the 'ranges'
+> property of the 'soc' node.
 
-Ok, will add both of them in v4, thanks.
-
-
-> Rob
-> 
-> .
-> 
+I'm still unclear how mapping the windows in results in connecting the
+windows to the SPI block.  It also seems like we need to document what
+the meaning of the reg properties of the device is, it's all very well
+saying that there's a generic MBus binding but we still need to say how
+the device will interpret the MBus windows that it has (assuming they
+are configured to specific hardware functions transparently).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160413/999ec302/attachment.sig>
