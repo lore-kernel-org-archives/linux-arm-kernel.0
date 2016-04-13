@@ -1,60 +1,67 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 13 Apr 2016 12:30:04 -0700
-Subject: [PATCH] ARM: OMAP3: Fix external abort on 36xx waking from off
- mode idle
-In-Reply-To: <1460475837-1984-1-git-send-email-d-gerlach@ti.com>
-References: <1460475837-1984-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <20160413193003.GW5995@atomide.com>
+From: yang.shi@linaro.org (Shi, Yang)
+Date: Wed, 13 Apr 2016 12:31:53 -0700
+Subject: SMMU problem found on LS2085A with 4.6-rc3
+Message-ID: <570E9EA9.2070903@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Gerlach <d-gerlach@ti.com> [160412 08:45]:
-> --- a/arch/arm/mach-omap2/pm34xx.c
-> +++ b/arch/arm/mach-omap2/pm34xx.c
-> @@ -268,7 +268,6 @@ void omap_sram_idle(void)
->  	int per_next_state = PWRDM_POWER_ON;
->  	int core_next_state = PWRDM_POWER_ON;
->  	int per_going_off;
-> -	int core_prev_state;
->  	u32 sdrc_pwr = 0;
->  
->  	mpu_next_state = pwrdm_read_next_pwrst(mpu_pwrdm);
-> @@ -348,17 +347,21 @@ void omap_sram_idle(void)
->  		sdrc_write_reg(sdrc_pwr, SDRC_POWER);
->  
->  	/* CORE */
-> -	if (core_next_state < PWRDM_POWER_ON) {
-> -		core_prev_state = pwrdm_read_prev_pwrst(core_pwrdm);
-> -		if (core_prev_state == PWRDM_POWER_OFF) {
-> -			omap3_core_restore_context();
-> -			omap3_cm_restore_context();
-> -			omap3_push_sram_idle();
-> -			omap3_push_sram_secure_idle();
-> -			omap2_sms_restore_context();
-> -		}
-> +	if (core_next_state < PWRDM_POWER_ON &&
-> +	    pwrdm_read_prev_pwrst(core_pwrdm) == PWRDM_POWER_OFF) {
-> +		omap3_core_restore_context();
-> +		omap3_cm_restore_context();
-> +		omap3_push_sram_idle();
-> +		omap3_push_sram_secure_idle();
-> +		omap2_sms_restore_context();
-> +	} else {
-> +		/*
-> +		 * In off-mode resume path above, omap3_core_restore_context
-> +		 * also handles the INTC autoidle restore done here so limit
-> +		 * this to non-off mode resume paths so we don't do it twice.
-> +		 */
-> +		omap3_intc_resume_idle();
->  	}
-> -	omap3_intc_resume_idle();
->  
->  	pwrdm_post_transition(NULL);
+Hi Will & Robin,
 
-Can you please repost against v4.7-rc? This does not apply as
-mainline still uses omap3_sram_restore_context(). Should be
-retested again with your patches applied on top of this fix.
+I just ran some quick test on my LS2085A board, which has 8 Cortex A57 
+cores, with 4.6-rc3 kernel, but I found a regression issue with SMMU.
 
-Regards,
+SMMU driver reports:
 
-Tony
+arm_smmu_global_fault: 297974 callbacks suppressed
+arm_smmu_global_fault: 298561 callbacks suppressed
+arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008, 
+GFSYNR1 0x00000300, GFSYNR2 0x00000000
+arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008, 
+GFSYNR1 0x00000300, GFSYNR2 0x00000000
+arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008, 
+GFSYNR1 0x00000300, GFSYNR2 0x00000000
+arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008, 
+GFSYNR1 0x00000300, GFSYNR2 0x00000000
+arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008, 
+GFSYNR1 0x00000300, GFSYNR2 0x00000000
+arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008, 
+GFSYNR1 0x00000300, GFSYNR2 0x00000000
+arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008, 
+GFSYNR1 0x00000300, GFSYNR2 0x00000000
+arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008, 
+GFSYNR1 0x00000300, GFSYNR2 0x00000000
+arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008, 
+GFSYNR1 0x00000300, GFSYNR2 0x00000000
+arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008, 
+GFSYNR1 0x00000300, GFSYNR2 0x00000000
+arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
+arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
+arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
+arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
+arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
+arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
+arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
+arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
+arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
+arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
+
+
+But, it is good with 4.5 kernel. I found the below commit causes it:
+
+commit 9adb95949a343dac53b1cd81dc973b5f815c88d4
+Author: Robin Murphy <robin.murphy@arm.com>
+Date:   Tue Jan 26 18:06:36 2016 +0000
+
+     iommu/arm-smmu: Support DMA-API domains
+
+     With DMA mapping ops provided by the iommu-dma code, only a minimal
+     contribution from the IOMMU driver is needed to create a suitable
+     DMA-API domain for them to use. Implement this for the ARM SMMUs.
+
+     Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+     Signed-off-by: Will Deacon <will.deacon@arm.com>
+
+Any idea?
+
+Thanks,
+Yang
