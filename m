@@ -1,39 +1,31 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 13 Apr 2016 08:36:21 +0100
-Subject: [RFC PATCH 1/2] ARM/ARM64: arch_timer: Work around QorIQ Erratum
- A-008585
-In-Reply-To: <1460526107.32510.138.camel@buserror.net>
-References: <1460341353-15619-1-git-send-email-oss@buserror.net>
- <1460341353-15619-2-git-send-email-oss@buserror.net>
- <570B73CF.6070502@arm.com> <1460440128.32510.106.camel@buserror.net>
- <570CBAC5.8070406@arm.com> <1460526107.32510.138.camel@buserror.net>
-Message-ID: <570DF6F5.3000107@arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 13 Apr 2016 09:42:15 +0200
+Subject: [PATCH 04/12] mtd: nand: brcm: rely on generic DT parsing done
+ in nand_scan_ident()
+In-Reply-To: <20160412223111.GA21705@localhost>
+References: <1459515272-31011-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1459515272-31011-5-git-send-email-boris.brezillon@free-electrons.com>
+ <20160412223111.GA21705@localhost>
+Message-ID: <20160413094215.5f317588@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/04/16 06:41, Scott Wood wrote:
+On Tue, 12 Apr 2016 15:31:11 -0700
+Brian Norris <computersforpeace@gmail.com> wrote:
 
-[...]
-
-> If the underlying representation is CompareValue, as the above suggests, then
-> it makes sense that only tval would be affected, since the underlying problem
-> is the counter.  The counter needs to be read in order to read or write tval. 
->  cval accesses the underlying representation directly, and the bad SoC clock
-> logic doesn't have a chance to interfere.
+> On Fri, Apr 01, 2016 at 02:54:24PM +0200, Boris Brezillon wrote:
+> > The core now takes care of parsing generic DT properties in
+> > nand_scan_ident() when nand_set_flash_node() has been called.
+> > Rely on this initialization instead of calling of_get_nand_xxx()
+> > manually.
+> > 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 > 
->> So I'd be really surprised if TVAL was buggy and CVAL was not (why would
->> loop around programming TVAL if you could hit CVAL and be correct?).
-> 
-> Switching to cval would be great, if everyone's OK with it.  We'd still need
-> the loop on the counter.
+> Acked-by: Brian Norris <computersforpeace@gmail.com>
 
-Please only do that on the workaround path. I don't want sane platforms
-to have to read the counter just to be able to program CVAL, as the core
-code is only going to provide you with the delta that should be
-programmed in TVAL.
+Applied.
 
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
