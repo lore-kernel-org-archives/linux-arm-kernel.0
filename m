@@ -1,123 +1,39 @@
-From: glider@google.com (Alexander Potapenko)
-Date: Wed, 13 Apr 2016 18:35:50 +0200
-Subject: [PATCH v1] arm64: allow building with kcov coverage on ARM64
-In-Reply-To: <570E6FF3.5000104@arm.com>
-References: <57cb1b66d85b85eadea28ef3304a62b1327ded45.1459432254.git.glider@google.com>
- <20160331142908.GG26532@leverpostej>
- <CAG_fn=V+e=+-svWOCUirOy4SvBNgJR5JWCFDU3uE3aKwz9ihvw@mail.gmail.com>
- <20160331160052.GA26393@leverpostej>
- <CAG_fn=Vgvuaoz_jUNcyxvFdu4LpyO55AWmTzGvCVhOYoaX9y7Q@mail.gmail.com>
- <20160331171434.GC26393@leverpostej>
- <CAG_fn=UGRMM-dJYNO3RF5zcC5p=x-+5yvk+KqU5aRbAH9p+pHw@mail.gmail.com>
- <CACT4Y+Y_zb0LmcXys6HF=Y_5Y+vaJmwyL_kps2p6je7p2dQPVg@mail.gmail.com>
- <CAG_fn=Xe5r3qveX356gUZWmt29Bw0XUrg5KHEbaRdJm=tDYLkw@mail.gmail.com>
- <570E6FF3.5000104@arm.com>
-Message-ID: <CAG_fn=VbAtmPuzPQPCtSGkkQrGKjciz6AAmNz+VTAdXszWSrLg@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 13 Apr 2016 17:35:09 +0100
+Subject: [PATCH v7 16/16] arm64: hibernate: Prevent resume from a different
+ kernel version
+In-Reply-To: <CAKv+Gu-3iATexGcGCdqvvWsEya64iMpLKcDhSh-d70MfmV3ZwA@mail.gmail.com>
+References: <1459529620-22150-1-git-send-email-james.morse@arm.com>	<1459529620-22150-17-git-send-email-james.morse@arm.com>
+ <CAKv+Gu-3iATexGcGCdqvvWsEya64iMpLKcDhSh-d70MfmV3ZwA@mail.gmail.com>
+Message-ID: <570E753D.4030508@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+Hi Ard,
 
-On Wed, Apr 13, 2016 at 6:12 PM, James Morse <james.morse@arm.com> wrote:
-> Hi Alex,
->
-> On 12/04/16 12:17, Alexander Potapenko wrote:
->> I also wonder if we can, say, land the change to arch/arm64/Kconfig
->> separately from makefile changes that improve the precision or fix
->> certain build configurations.
->
-> (I'm not sure what you mean by precision)
->
-> It depends which build configurations get broken, for example the first build I
-> tried doesn't boot.
->
-> I tested the Kconfig change, and added 'KCOV_INSTRUMENT := n' to kvm's two
-> Makefiles[0].
->
-> defconfig+KCOV boots fine, and I can start a guest, but if I build with
-> defconfig+KCOV+STACK_TRACER, I get a kernel that fails to boot. It boils down to
-> a loop between ftrace and kcov, I will send a patch.
->
->
-> It looks like syzkaller is the only user of this data, and it doesn't appear to
-> support arm64:
->> 2016/04/13 15:42:55 failed to create instance: qemu stopped:
->> "kvm" accelerator not found.
->> No accelerator found!
-syzcaller is able to work with bare-metal Android devices using ADB,
-but those are usually running ancient kernels.
-Looks like It's time for me to start cross-compiling and testing an
-arm64 kernel on a QEMU, so I'll try that out and update the patch.
+On 10/04/16 13:16, Ard Biesheuvel wrote:
+> On 1 April 2016 at 18:53, James Morse <james.morse@arm.com> wrote:
+>> Resuming using a different kernel version is fragile, while there are
+>> sufficient details in the hibernate arch-header to perform the restore,
+>> changes in the boot process can have a long-lasting impact on the system.
+>> In particular, if the EFI stub causes more runtime services memory to be
+>> allocated,
+> 
+> Actually, the UEFI stub does not allocate any runtime service code or
+> data memory, that is all done by the firmware itself before even
+> invoking the kernel or the stub. The allocations performed by the stub
+> are for the command line, the UEFI memory map, the kernel image and
+> optionally an initrd, none if which have any significance to the
+> firmware itself, so allocating runtime services memory for them does
+> not make a lot of sense.
 
-> This happens because syzkaller expects to be able to use 'qemu-system-x86_64':
->> [pid  3670] execve("/usr/bin/qemu-system-x86_64", ["qemu-system-x86_64",
->> "-hda", "/foo.img", "-snapshot", "-m", "1024", "-net", "nic", "-net",
->> "user,host=10.0.2.10,hostfwd=tcp:"..., "-nographic", "-enable-kvm", "-numa",
->> "node,nodeid=0,cpus=0-1", "-numa", "node,nodeid=1,cpus=2-3", ...],
->
-> qemu-system-x86_64 is installed and works fine, it just doesn't have the
-> expected hardware acceleration...
->
-> My approximation of your qemu command for arm64 may be useful[1], but I'm not
-> able to hack the go source to fix it!
->
->
->
-> Thanks,
->
-> James
->
->
->
-> [0]
-> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-> index 122cff482ac4..7d111f06bbf3 100644
-> --- a/arch/arm64/kvm/Makefile
-> +++ b/arch/arm64/kvm/Makefile
-> @@ -9,6 +9,10 @@ CFLAGS_mmu.o := -I.
->  KVM=../../../virt/kvm
->  ARM=../../../arch/arm/kvm
->
-> +# Code built here may run at EL2, in which case __sanitizer_cov_trace_pc() will
-> +# not be callable. For now, disable the instrumentation.
-> +KCOV_INSTRUMENT := n
-> +
->  obj-$(CONFIG_KVM_ARM_HOST) += kvm.o
->  obj-$(CONFIG_KVM_ARM_HOST) += hyp/
->
-> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
-> index 778d0effa2af..1150f8664c85 100644
-> --- a/arch/arm64/kvm/hyp/Makefile
-> +++ b/arch/arm64/kvm/hyp/Makefile
-> @@ -20,3 +20,4 @@ obj-$(CONFIG_KVM_ARM_HOST) += s2-setup.o
->  GCOV_PROFILE   := n
->  KASAN_SANITIZE := n
->  UBSAN_SANITIZE := n
-> +KCOV_INSTRUMENT := n
->
->
-> [1]
-> qemu-system-aarch64 -enable-kvm
->   -cpu host -m 1024 -M virt -nographic
->   -kernel ./syzkaller/Image
->   -append "console=ttyAMA0,115200 root=/dev/vda"
->   -drive format=raw,file=/foo.img,media=disk,if=none,cache=writeback,id=root
->   -device virtio-blk-device,drive=root
->   -netdev user,host=10.0.2.10,hostfwd=tcp::23505-:22,id=unet
->   -device virtio-net-device,netdev=unet
->
->
+Thanks for putting me straight on this. I got these weird failures when
+hibernate/restoring over your kaslr series, I mistakenly believed the addition
+of locate_protocol/get_random was causing some extra initialisation. In
+hindsight it was probably the kernels new ability to use the memory below the
+kernel.
 
 
+Thanks,
 
--- 
-Alexander Potapenko
-Software Engineer
-
-Google Germany GmbH
-Erika-Mann-Stra?e, 33
-80636 M?nchen
-
-Gesch?ftsf?hrer: Matthew Scott Sucherman, Paul Terence Manicle
-Registergericht und -nummer: Hamburg, HRB 86891
-Sitz der Gesellschaft: Hamburg
+James
