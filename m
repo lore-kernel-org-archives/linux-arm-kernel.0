@@ -1,44 +1,33 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Wed, 13 Apr 2016 13:20:57 +0530
-Subject: [GIT PULL] Mailbox fixes for v4.6-rc
-Message-ID: <CABb+yY3Avcx9BzwYLi1vH8kmmfMBQ=jiqS0WOQSEGo=gNyvfjQ@mail.gmail.com>
+From: songjun.wu@atmel.com (Songjun Wu)
+Date: Wed, 13 Apr 2016 15:44:18 +0800
+Subject: [PATCH 0/2] [media] atmel-isc: add driver for Atmel ISC
+Message-ID: <1460533460-32336-1-git-send-email-songjun.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+The Image Sensor Controller driver includes two parts.
+1) Driver code to implement the ISC function.
+2) Device tree binding documentation, it describes how
+   to add the ISC in device tree.
 
-The following changes since commit 3c9688876ace9ca4cd8630e5fbba8bb28235990a:
 
-  Revert "ib_srpt: Convert to percpu_ida tag allocation" (2016-04-07
-18:16:20 -0700)
+Songjun Wu (2):
+  [media] atmel-isc: add the Image Sensor Controller code
+  [media] atmel-isc: DT binding for Image Sensor Controller driver
 
-are available in the git repository at:
+ .../devicetree/bindings/media/atmel-isc.txt        |   84 ++
+ drivers/media/platform/Kconfig                     |    1 +
+ drivers/media/platform/Makefile                    |    2 +
+ drivers/media/platform/atmel/Kconfig               |    9 +
+ drivers/media/platform/atmel/Makefile              |    3 +
+ drivers/media/platform/atmel/atmel-isc-regs.h      |  280 ++++
+ drivers/media/platform/atmel/atmel-isc.c           | 1537 ++++++++++++++++++++
+ 7 files changed, 1916 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/atmel-isc.txt
+ create mode 100644 drivers/media/platform/atmel/Kconfig
+ create mode 100644 drivers/media/platform/atmel/Makefile
+ create mode 100644 drivers/media/platform/atmel/atmel-isc-regs.h
+ create mode 100644 drivers/media/platform/atmel/atmel-isc.c
 
-  git://git.linaro.org/landing-teams/working/fujitsu/integration.git
-mailbox-devel
-
-for you to fetch changes up to 0c44d7896cbf9156b8bb10da4f665005622235ae:
-
-  mailbox: Stop using ENOSYS for anything other than unimplemented
-syscalls (2016-04-12 13:28:32 +0530)
-
-----------------------------------------------------------------
- * Misc fixes
-    mailbox-test driver : prevent memory leak and another cosmetic change
-    mailbox : change the returned error code
-    Xgene driver : return -ENOMEM instead of PTR_ERR for failed devm_kzalloc
-
-----------------------------------------------------------------
-Axel Lin (1):
-      mailbox: xgene-slimpro: Fix wrong test for devm_kzalloc
-
-Lee Jones (3):
-      mailbox: mailbox-test: Use more consistent format for calling
-copy_from_user()
-      mailbox: mailbox-test: Prevent memory leak
-      mailbox: Stop using ENOSYS for anything other than unimplemented syscalls
-
- drivers/mailbox/mailbox-test.c          | 16 +++++++++-------
- drivers/mailbox/mailbox-xgene-slimpro.c |  4 ++--
- drivers/mailbox/mailbox.c               |  4 ++--
- 3 files changed, 13 insertions(+), 11 deletions(-)
+-- 
+2.7.4
