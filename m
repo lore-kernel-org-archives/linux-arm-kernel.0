@@ -1,111 +1,166 @@
-From: songjun.wu@atmel.com (Songjun Wu)
-Date: Wed, 13 Apr 2016 15:44:20 +0800
-Subject: [PATCH 2/2] [media] atmel-isc: DT binding for Image Sensor Controller
- driver
-In-Reply-To: <1460533460-32336-1-git-send-email-songjun.wu@atmel.com>
-References: <1460533460-32336-1-git-send-email-songjun.wu@atmel.com>
-Message-ID: <1460533460-32336-3-git-send-email-songjun.wu@atmel.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Wed, 13 Apr 2016 07:57:37 +0000
+Subject: [PATCH v2] PCI: designware: move remaining rc setup code to
+ dw_pcie_setup_rc()
+In-Reply-To: <00a901d19548$90bffc20$b23ff460$@com>
+References: <1458128433-3020-1-git-send-email-jszhang@marvell.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ED40E52@lhreml503-mbs>
+ <20160407103734.55e72da7@xhacker>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ED43F95@lhreml503-mbs>
+ <20160407163443.291fbd49@xhacker>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ED44208@lhreml503-mbs>
+ <20160407140551.GA2648@localhost>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ED45C38@lhreml503-mbs>
+ <20160408160145.GA10565@localhost>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ED4B88D@lhreml503-mbs>
+ <00a901d19548$90bffc20$b23ff460$@com>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1ED4F10E@lhreml503-mbs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DT binding documentation for ISC driver.
+Hi Jingoo
 
-Signed-off-by: Songjun Wu <songjun.wu@atmel.com>
----
+> -----Original Message-----
+> From: Jingoo Han [mailto:jingoohan1 at gmail.com]
+> Sent: 13 April 2016 06:52
+> To: Gabriele Paoloni; 'Bjorn Helgaas'
+> Cc: 'Jisheng Zhang'; pratyush.anand at gmail.com; bhelgaas at google.com;
+> linux-pci at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; 'Jingoo Han'
+> Subject: Re: [PATCH v2] PCI: designware: move remaining rc setup code
+> to dw_pcie_setup_rc()
+> 
+> On Tuesday, April 12, 2016 6:44 PM, Gabriele Paoloni wrote:
+> >
+> > Hi Bjorn
+> >
+> > [...]
+> >
+> > > > >
+> > > > > What's the hisi plan for resuming after suspend-to-RAM?  How
+> does
+> > > the
+> > > > > RC get reprogrammed after it loses all its state?
+> > > >
+> > > > PM is not part of the driver yet. This is planned for near
+> > > > future release so haven't made such considerations yet
+> > > > >
+> > > > > What would break if hisi did call dw_pcie_setup_rc()?  I know
+> you
+> > > said
+> > > > > it would overwrite what the bootloader already did, which is
+> true.
+> > > >
+> > > > I am try to figure this out now with our HW team.
+> > > >
+> > > > >
+> > > > > But hisi does call dw_pcie_host_init(), so it reads pp->mem
+> (which
+> > > > > determines pp->mem_base) and pp->lanes from the DT.  Other
+> drivers
+> > > > > then call dw_pcie_setup_rc() which programs the RC based on
+> > > > > pp->mem_base and pp->lanes.  So hisi assumes UEFI programmed
+> the RC
+> > > to
+> > > > > match the DT, while the other drivers read the DT and program
+> the
+> > > RC
+> > > > > to match.  The latter seems more robust because it enforces the
+> > > > > consistency rather than relying on it.
+> > > >
+> > > > Yes I agree with you, however we have preferred to move RC config
+> to
+> > > > BIOS to have a single driver to support multiple versions of the
+> > > > same SoC.
+> > >
+> > > I think there are two reasonable approaches:
+> > >
+> > >   1) A single generic driver that doesn't have any knowledge about
+> the
+> > >   chipset registers; it uses run-time firmware interfaces to manage
+> > >   the bridge.  The ACPI pci_root.c driver is the best example so
+> far
+> > >   and works very well.  It supports basically all x86 and ia64
+> > >   chipsets and requires no kernel work for new ones.
+> > >
+> > >   2) Native drivers specific to each chipset.  These may get
+> > >   configuration information from DT, but they do their own
+> > >   register-level programming of the device without run-time help
+> from
+> > >   firmware.
+> > >
+> > > I think hisi is a native driver because it uses hip05/hip06
+> registers
+> > > to check link state and perform config operations.  And apparently
+> you
+> > > rely on the ATU, BAR, class, and link width programming currently
+> done
+> > > in dw_pcie_host_init().  But you want to rely on pre-boot firmware
+> to
+> > > set up the link.  That doesn't make sense to me -- if the driver
+> wants
+> > > to twiddle the registers, it should know how to do it all.  I don't
+> > > see how you can reasonably manage this half-way approach.
+> > >
+> > > > The patch I proposed above does the same job as the original
+> patch
+> > > > proposed by Jisheng and also allows hisi driver to call the moved
+> > > > code.
+> > > >
+> > > > Do you see anything wrong with it?
+> > >
+> > > Only that it makes the structure more complicated and we haven't
+> > > identified a corresponding benefit yet.
+> >
+> > Finally I have checked that assigning .host_init function pointer
+> > in our driver to call dw_pcie_setup_rc() will not affect the values
+> > already set by BIOS.
+> >
+> > Also I agree with you that a hybrid approach is not ideal.
+> 
+> I also agree with Bjorn's opinion.
+> As far as I know, two approaches are reasonable.
+> 
+> In the case of using UEFI, how about using 'pci-host-generic.c'?
+> You may consult with Linaro guys for this issue.
 
- .../devicetree/bindings/media/atmel-isc.txt        | 84 ++++++++++++++++++++++
- 1 file changed, 84 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/media/atmel-isc.txt
+Many thanks for your suggestion, I'll take it into account for next
+releases
 
-diff --git a/Documentation/devicetree/bindings/media/atmel-isc.txt b/Documentation/devicetree/bindings/media/atmel-isc.txt
-new file mode 100644
-index 0000000..449f05f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/media/atmel-isc.txt
-@@ -0,0 +1,84 @@
-+Atmel Image Sensor Controller (ISC)
-+----------------------------------------------
-+
-+Required properties:
-+- compatible
-+	Must be "atmel,sama5d2-isc"
-+- reg
-+	Physical base address and length of the registers set for the device;
-+- interrupts
-+  Should contain IRQ line for the ISI;
-+- clocks
-+	List of clock specifiers, corresponding to entries in
-+	the clock-names property;
-+	Please refer to clock-bindings.txt.
-+- clock-names
-+	Required elements: "hclock", "ispck".
-+- pinctrl-names, pinctrl-0
-+	Please refer to pinctrl-bindings.txt.
-+- clk_in_isc
-+	ISC internal clock node, it includes the isc_ispck and isc_mck.
-+	Please refer to clock-bindings.txt.
-+- atmel,sensor-preferred
-+	Sensor is preferred to process image (1-preferred, 0-not).
-+	The default value is 1.
-+
-+ISC supports a single port node with parallel bus. It should contain one
-+'port' child node with child 'endpoint' node. Please refer to the bindings
-+defined in Documentation/devicetree/bindings/media/video-interfaces.txt.
-+
-+Example:
-+isc: isc at f0008000 {
-+	compatible = "atmel,sama5d2-isc";
-+	reg = <0xf0008000 0x4000>;
-+	interrupts = <46 IRQ_TYPE_LEVEL_HIGH 5>;
-+	clocks = <&isc_clk>, <&isc_ispck>;
-+	clock-names = "hclock", "ispck";
-+	atmel,sensor-preferred = <1>;
-+
-+	port {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		isc_0: endpoint at 0 {
-+			remote-endpoint = <&ov7740_0>;
-+			hsync-active = <1>;
-+			vsync-active = <0>;
-+			pclk-sample = <1>;
-+		};
-+	};
-+
-+	clk_in_isc {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		isc_ispck: isc_ispck {
-+			#clock-cells = <0>;
-+			reg = <0>;
-+			clocks = <&isc_clk>, <&iscck>;
-+		};
-+
-+		isc_mck: isc_mck {
-+			#clock-cells = <0>;
-+			reg = <1>;
-+			clocks = <&isc_clk>, <&iscck>, <&isc_gclk>;
-+		};
-+	};
-+};
-+
-+i2c1: i2c at fc028000 {
-+	ov7740: camera at 0x21 {
-+	compatible = "ovti,ov7740";
-+	reg = <0x21>;
-+
-+	clocks = <&isc_mck>;
-+	clock-names = "xvclk";
-+	assigned-clocks = <&isc_mck>;
-+	assigned-clock-rates = <24000000>;
-+
-+	port {
-+		ov7740_0: endpoint {
-+			remote-endpoint = <&isc_0>;
-+		};
-+	};
-+};
--- 
-2.7.4
+> Good luck.
+> 
+> Best regards,
+> Jingoo Han
+> 
+> >
+> > So I will update the driver to call dw_pcie_setup_rc() from
+> > .host_init and ask the BIOS team to update the firmware for next
+> > releases (the driver will be backward compatible anyway).
+> >
+> > Also during my investigation I have noticed that in
+> dw_pcie_setup_rc()
+> > http://lxr.free-electrons.com/source/drivers/pci/host/pcie-
+> designware.c#L762
+> >
+> > we use pp->mem_base rather than pp->mem_bus_addr to setup
+> > memory base and memory limit in the Type1 header...I think this
+> > is wrong right?
+> > Also I do not see why this code is needed at all since we overwrite
+> > this register when we call pci_bus_assign_resources(bus) that
+> > will end up in calling pci_setup_bridge() and then
+> > pci_setup_bridge_mmio()...?
+
+Do you have any comment on this issue above?
+
+> >
+> > Many Thanks
+> >
+> > Gab
+> >
+> > >
+> > > Bjorn
+> > > --
+> > > To unsubscribe from this list: send the line "unsubscribe linux-
+> pci" in
+> > > the body of a message to majordomo at vger.kernel.org
+> > > More majordomo info at  http://vger.kernel.org/majordomo-info.html
