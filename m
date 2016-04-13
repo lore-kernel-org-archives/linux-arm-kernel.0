@@ -1,46 +1,159 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 13 Apr 2016 18:01:48 +0800
-Subject: [PATCH v6 05/10] irqchip/gic-v3: Prefix all pr_* messages by
- "GICv3: "
-In-Reply-To: <1460388780-914-6-git-send-email-julien.grall@arm.com>
-References: <1460388780-914-1-git-send-email-julien.grall@arm.com>
- <1460388780-914-6-git-send-email-julien.grall@arm.com>
-Message-ID: <570E190C.8020203@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 13 Apr 2016 11:05:21 +0100
+Subject: [RESEND 08/11] pwm: sti: Add support for PWM Capture IRQs
+In-Reply-To: <20160412103521.GD18882@ulmo.ba.sec>
+References: <1456932729-9667-1-git-send-email-lee.jones@linaro.org>
+ <1456932729-9667-9-git-send-email-lee.jones@linaro.org>
+ <20160412103521.GD18882@ulmo.ba.sec>
+Message-ID: <20160413100521.GP8094@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/4/11 23:32, Julien Grall wrote:
-> Currently, most of the pr_* messages in the GICv3 driver don't have a
-> prefix.  Add one to make clear where the messages come from.
->
-> Signed-off-by: Julien Grall <julien.grall@arm.com>
->
-> ---
->      Changes in v6:
->          - Patch added
-> ---
->   drivers/irqchip/irq-gic-v3.c | 2 ++
->   1 file changed, 2 insertions(+)
->
-> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-> index 5b7d3c2..6dc6f03 100644
-> --- a/drivers/irqchip/irq-gic-v3.c
-> +++ b/drivers/irqchip/irq-gic-v3.c
-> @@ -15,6 +15,8 @@
->    * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->    */
->
-> +#define pr_fmt(fmt)	"GICv3: " fmt
+On Tue, 12 Apr 2016, Thierry Reding wrote:
 
-I don't think this patch is needed, as GICv3 and GICv2 will
-not be probed at the same time, did I miss something?
+> On Wed, Mar 02, 2016 at 03:32:06PM +0000, Lee Jones wrote:
+> [...]
+> > diff --git a/drivers/pwm/pwm-sti.c b/drivers/pwm/pwm-sti.c
+> [...]
+> > +static irqreturn_t sti_pwm_interrupt(int irq, void *data)
+> > +{
+> > +	struct sti_pwm_chip *pc = data;
+> > +	struct device *dev = pc->dev;
+> > +	struct sti_cpt_data *d;
+> > +	int channel;
+> > +	int cpt_int_stat;
+> > +	int reg;
+> > +	int ret = IRQ_NONE;
+> > +
+> > +	ret = regmap_field_read(pc->pwm_cpt_int_stat, &cpt_int_stat);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	while (cpt_int_stat) {
+> > +		channel = ffs(cpt_int_stat) - 1;
+> > +
+> > +		d = pc->cpt_data[channel];
+> > +
+> > +		/*
+> > +		 * Capture input:
+> > +		 *    _______                   _______
+> > +		 *   |       |                 |       |
+> > +		 * __|       |_________________|       |________
+> > +		 *   ^0      ^1                ^2
+> > +		 *
+> > +		 * Capture start by the first available rising edge
+> > +		 * When a capture event occurs, capture value (CPT_VALx)
+> > +		 * is stored, index incremented, capture edge changed.
+> > +		 *
+> > +		 * After the capture, if the index > 1, we have collected
+> > +		 * the necessary data so we signal the thread waiting for it
+> > +		 * and disable the capture by setting capture edge to none
+> > +		 *
+> > +		 */
+> 
+> How do you deal with the situation where someone will stop the PWM
+> signal half-way in? That is, suppose you've got events for the first and
+> second snapshots (0 and 1) and then someone stops the PWM and the event
+> for snapshot 2 never happens, how does the code recover?
 
-Further more, there are prefixes in pr_fmt in this
-patch using GIC:, with your patch added, it will print:
+The 'wait' will timeout and the cycle will be reset.
 
-GIV3: GIC: .....
+> > +
+> > +		regmap_read(pc->regmap,
+> > +			    PWM_CPT_VAL(channel), &d->snapshot[d->index]);
+> > +
+> > +		switch (d->index) {
+> > +		case 0:
+> > +		case 1:
+> > +			regmap_read(pc->regmap, PWM_CPT_EDGE(channel), &reg);
+> > +			reg ^= PWM_CPT_EDGE_MASK;
+> > +			regmap_write(pc->regmap, PWM_CPT_EDGE(channel), reg);
+> > +
+> > +			d->index++;
+> > +			break;
+> > +		case 2:
+> > +			regmap_write(pc->regmap,
+> > +				     PWM_CPT_EDGE(channel), CPT_EDGE_DISABLED);
+> > +			wake_up(&d->wait);
+> > +			break;
+> > +		default:
+> > +			dev_err(dev, "Internal error\n");
+> > +		}
+> > +
+> > +		clear_bit(channel, (unsigned long int *)&cpt_int_stat);
+> 
+> clear_bit() is a little unusual to use on regular data types, as
+> evidenced by the need for the goofy cast here.
 
-which is not a good idea.
+It's just a bit neater (and provides locking) than manually bit
+twiddling using bitwise operators.  What do you suggest?
 
-Thanks
-Hanjun
+> > +
+> > +		ret = IRQ_HANDLED;
+> > +	}
+> > +
+> > +	/* Just ACK everything */
+> > +	regmap_write(pc->regmap, PWM_INT_ACK, PWM_INT_ACK_MASK);
+> > +
+> > +	return ret;
+> > +}
+> > +
+> >  static int sti_pwm_probe_dt(struct sti_pwm_chip *pc)
+> >  {
+> >  	struct device *dev = pc->dev;
+> > @@ -354,6 +425,11 @@ static int sti_pwm_probe_dt(struct sti_pwm_chip *pc)
+> >  	if (IS_ERR(pc->pwm_cpt_int_en))
+> >  		return PTR_ERR(pc->pwm_cpt_int_en);
+> >  
+> > +	pc->pwm_cpt_int_stat = devm_regmap_field_alloc(dev, pc->regmap,
+> > +						reg_fields[PWM_CPT_INT_STAT]);
+> > +	if (IS_ERR(pc->pwm_cpt_int_stat))
+> > +		return PTR_ERR(pc->pwm_cpt_int_stat);
+> > +
+> >  	return 0;
+> >  }
+> >  
+> > @@ -371,7 +447,7 @@ static int sti_pwm_probe(struct platform_device *pdev)
+> >  	struct sti_pwm_chip *pc;
+> >  	struct resource *res;
+> >  	unsigned int chan;
+> > -	int ret;
+> > +	int ret, irq;
+> >  
+> >  	pc = devm_kzalloc(dev, sizeof(*pc), GFP_KERNEL);
+> >  	if (!pc)
+> > @@ -392,6 +468,19 @@ static int sti_pwm_probe(struct platform_device *pdev)
+> >  	if (IS_ERR(pc->regmap))
+> >  		return PTR_ERR(pc->regmap);
+> >  
+> > +	irq = platform_get_irq(pdev, 0);
+> > +	if (irq < 0) {
+> > +		dev_err(&pdev->dev, "Failed to obtain IRQ\n");
+> > +		return -ENODEV;
+> > +	}
+> 
+> I think you need to propagate the return value of platform_get_irq()
+> here.
+
+Yes, could do.  Although, I think we could go either way:
+
+$ git grep -A5 platform_get_irq | grep "return ret\|return irq" | wc -l
+176
+$ git grep -A5 platform_get_irq | grep "return -EINVAL\|-ENODEV\|-ENXIO" | wc -l
+256
+
+Happy to change it though.
+
+> > +
+> > +	ret = devm_request_irq(&pdev->dev, irq, sti_pwm_interrupt,
+> > +			       0, pdev->name, (void *) pc);
+> 
+> No need for the explicit cast to void *.
+
+You're right.  Will drop it.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
