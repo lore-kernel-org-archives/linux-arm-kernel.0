@@ -1,32 +1,33 @@
 From: mbrugger@suse.com (Matthias Brugger)
-Date: Wed, 13 Apr 2016 12:30:51 +0200
-Subject: [PATCH 1/6] of/irq: Export of_msi_get_domain
+Date: Wed, 13 Apr 2016 12:30:52 +0200
+Subject: [PATCH 2/6] base: Export platform_msi_create_irq_domain
 In-Reply-To: <1460543456-11345-1-git-send-email-mbrugger@suse.com>
 References: <1460543456-11345-1-git-send-email-mbrugger@suse.com>
-Message-ID: <1460543456-11345-2-git-send-email-mbrugger@suse.com>
+Message-ID: <1460543456-11345-3-git-send-email-mbrugger@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Matthias Brugger <matthias.bgg@gmail.com>
 
-Export of_mis_get_domain to enable it for users from outside.
+Export platform_msi_create_irq_domain to make it useable from within
+modules.
 
 Signed-off-by: Matthias Brugger <mbrugger@suse.com>
 ---
- drivers/of/irq.c | 1 +
+ drivers/base/platform-msi.c | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/drivers/of/irq.c b/drivers/of/irq.c
-index e7bfc17..9f8cd6a 100644
---- a/drivers/of/irq.c
-+++ b/drivers/of/irq.c
-@@ -750,6 +750,7 @@ struct irq_domain *of_msi_get_domain(struct device *dev,
+diff --git a/drivers/base/platform-msi.c b/drivers/base/platform-msi.c
+index 279e539..9ae0443 100644
+--- a/drivers/base/platform-msi.c
++++ b/drivers/base/platform-msi.c
+@@ -200,6 +200,7 @@ struct irq_domain *platform_msi_create_irq_domain(struct fwnode_handle *fwnode,
  
- 	return NULL;
+ 	return domain;
  }
-+EXPORT_SYMBOL_GPL(of_msi_get_domain);
++EXPORT_SYMBOL_GPL(platform_msi_create_irq_domain);
  
- /**
-  * of_msi_configure - Set the msi_domain field of a device
+ static struct platform_msi_priv_data *
+ platform_msi_alloc_priv_data(struct device *dev, unsigned int nvec,
 -- 
 2.6.6
