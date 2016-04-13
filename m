@@ -1,54 +1,186 @@
-From: emil.l.velikov@gmail.com (Emil Velikov)
-Date: Wed, 13 Apr 2016 12:54:20 +0100
-Subject: [PATCH v8 10/10] MAINTAINERS: Add maintainer for hisilicon DRM
- driver
-In-Reply-To: <1460364943-76135-11-git-send-email-xinliang.liu@linaro.org>
-References: <1460364943-76135-1-git-send-email-xinliang.liu@linaro.org>
- <1460364943-76135-11-git-send-email-xinliang.liu@linaro.org>
-Message-ID: <CACvgo53zwoid+dWNRAX=iwAvO50Eg3k13+1mJtQcTjKVQJebQA@mail.gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 13 Apr 2016 14:57:28 +0300
+Subject: [PATCH v2 0/3] ARM: OMAP3: Fix McBSP2/3 hwmod setup for sidetone
+In-Reply-To: <20160412163750.GR5995@atomide.com>
+References: <alpine.DEB.2.02.1603191937430.6629@utopia.booyaka.com>
+ <56EFB794.5010505@ti.com>
+ <alpine.DEB.2.02.1603211743200.31059@utopia.booyaka.com>
+ <56FE407E.9030803@ti.com> <20160402001753.GR9329@atomide.com>
+ <57026205.6020105@ti.com> <20160404151200.GA4652@atomide.com>
+ <5703BA6B.1080208@ti.com> <20160411212845.GJ5995@atomide.com>
+ <570CC54E.6020703@ti.com> <20160412163750.GR5995@atomide.com>
+Message-ID: <570E3428.5020804@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Xinliang,
+On 04/12/16 19:37, Tony Lindgren wrote:
+> * Peter Ujfalusi <peter.ujfalusi@ti.com> [160412 02:53]:
+>> Tony,
+>>
+>> On 04/12/16 00:28, Tony Lindgren wrote:
+>>>>> Then for the long term solution using
+>>>>> PM runtime to block gating of the clock while sidetone is active is
+>>>>> the way to go it seems.
+>>>>
+>>>> Hrm, I think one of the main issue is that with pm_runtime we can not block
+>>>> the clock gating, this is why legacy code uses enable_st_clock(), which will
+>>>> call omap2_clk_deny_idle() or omap2_clk_allow_idle().
+>>>
+>>> I see. I think Tero wanted to export omap2_clk_allow_idle() and
+>>> omap2_clk_deny_idle() for drivers to use. That should get discussed in
+>>> the linux-clk list, probably best to use the pdata callbacks until
+>>> the clock idling issue has been discussed.
+>>
+>> It is already exported, used by the arch/arm/mach-omap2/mcbsp.c file.
+> 
+> Oh but not with EXPORT_SYMBOL so not usable except for built-in code.
+> Probably best to keep it that way IMO..
 
-On 11 April 2016 at 09:55, Xinliang Liu <xinliang.liu@linaro.org> wrote:
-> Add maintainer and reviewer for hisilicon DRM driver.
->
-> v8: None.
-> v7: None.
-> v6: None.
-> v5: None.
-> v4:
-> - Add Chen Feng <puck.chen@hisilicon.com> as Designated reviewer.
-> v3: First version.
->
-> Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
-> ---
->  MAINTAINERS | 10 ++++++++++
->  1 file changed, 10 insertions(+)
->
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 61a323a6b2cf..a2ef58860689 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -3840,6 +3840,16 @@ S:       Maintained
->  F:     drivers/gpu/drm/gma500
->  F:     include/drm/gma500*
->
-> +DRM DRIVERS FOR HISILICON
-> +M:     Xinliang Liu <z.liuxinliang@hisilicon.com>
-> +R:     Xinwei Kong <kong.kongxinwei@hisilicon.com>
-> +R:     Chen Feng <puck.chen@hisilicon.com>
-> +L:     dri-devel at lists.freedesktop.org
-> +T:     git git://github.com/xin3liang/linux.git
-> +S:     Maintained
-> +F:     drivers/gpu/drm/hisilicon
-> +F:     Documentation/devicetree/bindings/display/hisilicon
-Nit: Can you add append '/' on these two lines.
+It is up to Tero if he want to keep omap2_clk_allow/deny_idle() only be usable
+for built in code. It is there just because of OMAP3 McBSP2/3 sidetone support
+on the other hand. It is a fair assumption that it could be used by the driver.
 
-As mentioned in commit 144308139cdce95e9c6cff3cc0ef12242181665f
+>> Why not to remove the callback for legacy also and handle it in the driver? It
+>> is less ugly in my opinion.
+>> Going via the pdata callback is just going to cement the current setup.
+> 
+> Sure, maybe you can have a piece of built-in driver code to do that?
 
-"It's clearer to have patterns marked as directories."
+You mean something like:
+int omap3_mcbsp23_ick_for_sidetone_force(struct clk *clk, bool force_on)
+{
+	if (!clk)
+		return 0;
 
-Thanks
-Emil
+	if (force_on)
+		return omap2_clk_deny_idle(clk);
+	else
+		return omap2_clk_allow_idle(clk);
+}
+EXPORT_SYMBOL(omap3_mcbsp23_ick_for_sidetone_force);
+
+Looks similarly hackish as with the pdata callback, but if I were to choose,
+the pdata callback might be a bit more polite hack if we do not look at how we
+will have the pdata crafted for DT boot.
+
+>> I have drafted out something which would be needed if we separate the McBSP-ST
+>> from the McBSP driver. It is not pretty...
+>>
+>> In the new omap3-mcbsp-st.h:
+>>
+>> struct omap3_mcbspst;
+>>
+>> struct omap_st_to_mcbsp_data {
+>> 	bool (*is_enabled)(struct omap_st_to_mcbsp_data *st_data);
+>> 	bool (*enable)(struct omap_st_to_mcbsp_data *st_data);
+>> 	bool (*disable)(struct omap_st_to_mcbsp_data *st_data);
+>> 	struct omap3_mcbspst *st_priv;
+>> };
+>>
+>> In the current omap-mcbsp.h:
+>>
+>> #include <omap3-mcbsp-st.h>
+>> ...
+>> struct omap_mcbsp_to_st_data {
+>> 	bool (*is_enabled)(struct omap_mcbsp_to_st_data *mcbsp_data);
+>> 	bool (*iclk_idle)(struct omap_mcbsp_to_st_data *mcbsp_data, bool allow);
+>> 	bool (*enable)(struct omap_mcbsp_to_st_data *mcbsp_data);
+>> 	bool (*disable)(struct omap_mcbsp_to_st_data *mcbsp_data);
+>> 	struct omap_mcbsp *mcbsp_priv;
+>> };
+>>
+>> #ifdef CONFIG_SND_SOC_OMAP3_MCBSPST
+>> struct omap_mcbsp_to_st_data *omap_mcbsp_st_register(
+>> 						struct platform_device *pdev, /* McBSP pdev! probably? */
+>> 						struct omap_st_to_mcbsp_data *st_data);
+>> int omap_mcbsp_st_unregister(struct omap_st_to_mcbsp_data *st_data);
+>> #else
+>> static inline int omap_mcbsp_st_register(struct platform_device *pdev,
+>> 					 struct omap_st_to_mcbsp_data *st_data)
+>> {
+>> 	return -ENODEV;
+>> }
+>> static inline int omap_mcbsp_st_unregister(struct omap_st_to_mcbsp_data *st_data)
+>> {
+>> 	return 0;
+>> }
+>> #endif
+>>
+>> Since the ST would be separate driver, it should create the needed ALSA
+>> controls as well, probably I need to pass something else here and there.
+>> But, in this setup it would be possible to remove the ST driver while the
+>> McBSP and the sound card is up, which means we must be able to remove
+>> kcontrols runtime, probably there is a way, but not sure about this.
+>>
+>> There will be issues like this we have not prepared for I'm sure if we do
+>> dramatic change to the simple implementation we have right now.
+> 
+> Best to stick to incremental improvments I think..
+
+If we were to split the McBSP driver into half - not literally as the ST
+support has small amount of code right now, we would consider all possibility
+to not introduce regression and keep things working along the way. There will
+be a point were the code need to be shuffled..
+
+>> I have reasonably clean patches (6 of them) on top of this three which would
+>> remove the arch code for the iclk handling and implements it in the mcbsp
+>> driver w/o changing the architecture of the McBSP driver itself. Both DT and
+>> legacy boot works. The only part I was not happy about the one where I looked
+>> up the mcbsp2/3_ick, but I think I have found much cleaner way to do it
+>> (meaning that the code will not look hackish at all).
+>> If you want to see, I can make this change and I can send the whole thing as
+>> RFC and continue the discussion around that?
+> 
+> Sure, especially if that helps with splitting up the modules too.
+
+To start with the hwmod data is wrong for mcbsp2/3 mcbsp2/3_sidetone:
+static struct omap_hwmod omap3xxx_mcbsp2_hwmod = {
+	.name		= "mcbsp2",
+	.class		= &omap3xxx_mcbsp_hwmod_class,
+	.mpu_irqs	= omap3xxx_mcbsp2_irqs,
+	.sdma_reqs	= omap2_mcbsp2_sdma_reqs,
+	.main_clk	= "mcbsp2_fck",
+	.prcm		= {
+		.omap2 = {
+			.prcm_reg_id = 1,
+			.module_bit = OMAP3430_EN_MCBSP2_SHIFT,
+			.module_offs = OMAP3430_PER_MOD,
+			.idlest_reg_id = 1,
+			.idlest_idle_bit = OMAP3430_ST_MCBSP2_SHIFT,
+		},
+	},
+	.opt_clks	= mcbsp234_opt_clks,
+	.opt_clks_cnt	= ARRAY_SIZE(mcbsp234_opt_clks),
+	.dev_attr	= &omap34xx_mcbsp2_dev_attr,
+};
+
+static struct omap_hwmod omap3xxx_mcbsp2_sidetone_hwmod = {
+	.name		= "mcbsp2_sidetone",
+	.class		= &omap3xxx_mcbsp_sidetone_hwmod_class,
+	.mpu_irqs	= omap3xxx_mcbsp2_sidetone_irqs,
+	.main_clk	= "mcbsp2_fck",
+	.prcm		= {
+		.omap2 = {
+			.prcm_reg_id = 1,
+			 .module_bit = OMAP3430_EN_MCBSP2_SHIFT,
+			.module_offs = OMAP3430_PER_MOD,
+			.idlest_reg_id = 1,
+			.idlest_idle_bit = OMAP3430_ST_MCBSP2_SHIFT,
+		},
+	},
+};
+
+The McBSP2_ST main_clk is mcbsp2_ick, not mcbsp2_fck (ch 21.3.2.2.6 in
+OMAP36xx TRM).
+The sidetone should not have prcm section at all as it does not have control
+over it's clocks in that level. Giving the same PRCM registers and bits for
+both McBSP and it's sidetone is wrong. What should be expected if McBSP is
+enabled and we disable the ST via pm_runtime? Will the hwmod toggle bits in
+PRCM? If it does, the McBSP will looses it's clocks...
+
+While the McBSP and ST regions are different, the ST is part of the McBSP from
+PRCM point of view so not sure how this could be worked around with separated
+drivers.
+
+-- 
+P?ter
