@@ -1,41 +1,37 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 13 Apr 2016 15:15:31 -0700
-Subject: [PATCH v3 2/4] arm64: defconfig: enable ARCH_LG1K
-In-Reply-To: <1460375687-2375-3-git-send-email-chanho.min@lge.com>
+Date: Wed, 13 Apr 2016 15:16:53 -0700
+Subject: [PATCH v3 3/4] arm64: dts: Add dts files for LG Electronics's
+ lg1312 SoC
+In-Reply-To: <1460375687-2375-4-git-send-email-chanho.min@lge.com>
 References: <1460375687-2375-1-git-send-email-chanho.min@lge.com>
- <1460375687-2375-3-git-send-email-chanho.min@lge.com>
-Message-ID: <20160413221531.GB19945@localhost>
+ <1460375687-2375-4-git-send-email-chanho.min@lge.com>
+Message-ID: <20160413221653.GC19945@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 11, 2016 at 08:54:45PM +0900, Chanho Min wrote:
-> Enable building LG1K support in the defconfig.
+On Mon, Apr 11, 2016 at 08:54:46PM +0900, Chanho Min wrote:
+> Add initial dtsi file to support lg1312 SoC which based on
+> Cortex-A53. Also add dts file to support lg1312 reference board
+> which based on lg1312 SoC.
 > 
 > Signed-off-by: Chanho Min <chanho.min@lge.com>
 > ---
 > Changes for v2:
-> 	- None
-> Changes for v3:
-> 	- None
-> ---
->  arch/arm64/configs/defconfig |    1 +
->  1 file changed, 1 insertion(+)
+> 	- remove self-defined macro.
+> 	- change root node's #size-cells to <2>.
+> 	- remove bootargs property.
+> 	- update psci support to the arm,psci-0.2.
+> 	- put fixed-clock property under the root node.
+> 	- add stdout-path property.
+> 	- update the GICC reg length to 0x2000
+> 	- add the GICH and GICV interface.
+> 	- change pmu compatible property to arm,coretex-a53-pmu.
+> 	- remove clock-frequency property from timer.
 > 
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index 86581f7..14dbe27 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -49,6 +49,7 @@ CONFIG_ARCH_UNIPHIER=y
->  CONFIG_ARCH_VEXPRESS=y
->  CONFIG_ARCH_XGENE=y
->  CONFIG_ARCH_ZYNQMP=y
-> +CONFIG_ARCH_LG1K=y
->  CONFIG_PCI=y
->  CONFIG_PCI_MSI=y
->  CONFIG_PCI_IOV=y
+> Changes for v3:
+> 	- change the order of arm,psci-0.2 and arm,psci
 
-Applied, again with inserting it in the right place (since it moves when the
-Kconfig entry moves).
+Applied.
 
 
 -Olof
