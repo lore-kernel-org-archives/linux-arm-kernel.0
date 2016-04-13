@@ -1,51 +1,71 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 13 Apr 2016 21:55:14 +0200
-Subject: [PATCH 31/47] ARM: dts: r8a7794: Reference both DMA controllers
- in SCIFA nodes
-In-Reply-To: <CAOesGMgBBmUvoWdb35vcq0UAJNkMk5LD6-ERWDAaSKWEpGwu9A@mail.gmail.com>
-References: <cover.1459732726.git.horms+renesas@verge.net.au>
- <65c295f4b305330162795b0cc2508a207ed23a98.1459732726.git.horms+renesas@verge.net.au>
- <CAOesGMgBBmUvoWdb35vcq0UAJNkMk5LD6-ERWDAaSKWEpGwu9A@mail.gmail.com>
-Message-ID: <CAMuHMdUUz-0EhgogpHGV-yE6htbwvAjuoAm2+DtDLa3xiG1XkA@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 13 Apr 2016 12:49:19 -0700
+Subject: [PATCH 2/4] irqchip: bcm2836: Drop smp_set_ops on arm64 builds
+In-Reply-To: <201604082243.52300.arnd@arndb.de>
+References: <1459827858-3871-1-git-send-email-eric@anholt.net>
+ <1459827858-3871-3-git-send-email-eric@anholt.net>
+ <201604082243.52300.arnd@arndb.de>
+Message-ID: <878u0hwaps.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+Arnd Bergmann <arnd@arndb.de> writes:
 
-On Wed, Apr 13, 2016 at 9:48 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Sun, Apr 3, 2016 at 6:23 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
->> diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
->> index eacb2b291361..4256557ca041 100644
->> --- a/arch/arm/boot/dts/r8a7794.dtsi
->> +++ b/arch/arm/boot/dts/r8a7794.dtsi
->> @@ -296,8 +296,9 @@
->>                 interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
->>                 clocks = <&mstp2_clks R8A7794_CLK_SCIFA0>;
->>                 clock-names = "fck";
->> -               dmas = <&dmac0 0x21>, <&dmac0 0x22>;
->> -               dma-names = "tx", "rx";
->> +               dmas = <&dmac0 0x21>, <&dmac0 0x22>,
->> +                      <&dmac1 0x21>, <&dmac1 0x22>;
->> +               dma-names = "tx", "rx", "tx", "rx";
->>                 power-domains = <&cpg_clocks>;
->>                 status = "disabled";
->>         };
+> On Tuesday 05 April 2016, Eric Anholt wrote:
+>> For arm64, the bootloader will instead be implementing the spin-table
+>> enable method.
+>> 
+>> Signed-off-by: Eric Anholt <eric@anholt.net>
+>> ---
+>>  drivers/irqchip/irq-bcm2836.c | 6 +++++-
+>>  1 file changed, 5 insertions(+), 1 deletion(-)
+>> 
+>> diff --git a/drivers/irqchip/irq-bcm2836.c b/drivers/irqchip/irq-bcm2836.c
+>> index 233ccdd..4ae9f76 100644
+>> --- a/drivers/irqchip/irq-bcm2836.c
+>> +++ b/drivers/irqchip/irq-bcm2836.c
+>> @@ -223,6 +223,7 @@ static struct notifier_block bcm2836_arm_irqchip_cpu_notifier = {
+>>  	.priority = 100,
+>>  };
+>>  
+>> +#ifdef ARM
+>>  int __init bcm2836_smp_boot_secondary(unsigned int cpu,
+>>  				      struct task_struct *idle)
+>>  {
+>> @@ -238,7 +239,7 @@ int __init bcm2836_smp_boot_secondary(unsigned int cpu,
+>>  static const struct smp_operations bcm2836_smp_ops __initconst = {
+>>  	.smp_boot_secondary	= bcm2836_smp_boot_secondary,
+>>  };
+>> -
+>> +#endif
+>>  #endif
+>>  
+>>  static const struct irq_domain_ops bcm2836_arm_irqchip_intc_ops = {
+>> @@ -256,8 +257,11 @@ bcm2836_arm_irqchip_smp_init(void)
+>>  	register_cpu_notifier(&bcm2836_arm_irqchip_cpu_notifier);
+>>  
+>>  	set_smp_cross_call(bcm2836_arm_irqchip_send_ipi);
+>> +
+>> +#ifdef ARM
+>>  	smp_set_ops(&bcm2836_smp_ops);
+>>  #endif
+>> +#endif
+>>  }
 >
-> The names are no longer unique. So a get_<foo>_by_name() function no
-> longer can work as expected.
+> I'd suggest instead using CPU_METHOD_OF_DECLARE and moving the SMP code
+> to arch/arm/mach-bcm/platsmp-bcm2835.c. It doesn't really belong in the
+> irqchip code.
 
-That's intentional, and a relic of how dma_request_slave_channel_compat()
-works: if e.g. the first "tx" channel can't be gotten (e.g. because
-the referenced
-DMAC instance ran out of channels), it will try the next one.
+I think because of DT ABI (sigh) we're stuck with the current
+implementation.
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+FWIW, I had started with the SMP bits in a platsmp.c, but moved it into
+the irqchip because that was so much simpler than reaching over into the
+irqchip node to map its registers.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160413/714a26ec/attachment.sig>
