@@ -1,98 +1,36 @@
-From: Tirumalesh.Chalamarla@caviumnetworks.com (Chalamarla, Tirumalesh)
-Date: Wed, 13 Apr 2016 21:16:14 +0000
-Subject: [PATCH 2/7] iommu/arm-smmu: Convert ThunderX workaround to new
- method
-In-Reply-To: <98b8079ee3ede4427b045214a60ba77f1cb3552c.1460391217.git.robin.murphy@arm.com>
-References: <cover.1460391217.git.robin.murphy@arm.com>
- <98b8079ee3ede4427b045214a60ba77f1cb3552c.1460391217.git.robin.murphy@arm.com>
-Message-ID: <6BD36166-69D0-498D-A021-870AD5698FE5@caviumnetworks.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 13 Apr 2016 13:49:19 -0700
+Subject: [GIT PULL] Renesas ARM Based SoC Simple PM Bus Updates for v4.7
+In-Reply-To: <cover.1459732818.git.horms+renesas@verge.net.au>
+References: <cover.1459732818.git.horms+renesas@verge.net.au>
+Message-ID: <20160413204919.GT19945@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-
-
-
-On 4/13/16, 10:12 AM, "Robin Murphy" <robin.murphy@arm.com> wrote:
-
->With a framework for implementation-specific funtionality in place, the
->currently-FDT-dependent ThunderX workaround gets to be the first user.
->
->Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->---
-> drivers/iommu/arm-smmu.c | 27 ++++++++++++++-------------
-> 1 file changed, 14 insertions(+), 13 deletions(-)
->
->diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
->index 2d5f357..d8bc20a 100644
->--- a/drivers/iommu/arm-smmu.c
->+++ b/drivers/iommu/arm-smmu.c
->@@ -280,6 +280,7 @@ enum arm_smmu_arch_version {
+On Mon, Apr 04, 2016 at 10:23:30AM +0900, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> enum arm_smmu_implementation {
-> 	GENERIC_SMMU,
->+	CAVIUM_SMMUV2,
-> };
+> Please consider these Renesas ARM based SoC Simple PM bus updates for v4.7.
 > 
-> struct arm_smmu_smr {
->@@ -1686,6 +1687,17 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
-> 	}
-> 	dev_notice(smmu->dev, "\t%u context banks (%u stage-2 only)\n",
-> 		   smmu->num_context_banks, smmu->num_s2_context_banks);
->+	/*
->+	 * Cavium CN88xx erratum #27704.
->+	 * Ensure ASID and VMID allocation is unique across all SMMUs in
->+	 * the system.
->+	 */
->+	if (smmu->model == CAVIUM_SMMUV2) {
->+		smmu->cavium_id_base =
->+			atomic_add_return(smmu->num_context_banks,
->+					  &cavium_smmu_context_count);
->+		smmu->cavium_id_base -= smmu->num_context_banks;
->+	}
 > 
-> 	/* ID2 */
-> 	id = readl_relaxed(gr0_base + ARM_SMMU_GR0_ID2);
->@@ -1750,6 +1762,7 @@ static struct arm_smmu_match_data name = { .version = ver, .model = imp }
+> The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 > 
-> ARM_SMMU_MATCH_DATA(smmu_generic_v1, ARM_SMMU_V1, GENERIC_SMMU);
-> ARM_SMMU_MATCH_DATA(smmu_generic_v2, ARM_SMMU_V2, GENERIC_SMMU);
->+ARM_SMMU_MATCH_DATA(cavium_smmuv2, ARM_SMMU_V2, CAVIUM_SMMUV2);
+>   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
 > 
-> static const struct of_device_id arm_smmu_of_match[] = {
-> 	{ .compatible = "arm,smmu-v1", .data = &smmu_generic_v1 },
->@@ -1757,7 +1770,7 @@ static const struct of_device_id arm_smmu_of_match[] = {
-> 	{ .compatible = "arm,mmu-400", .data = &smmu_generic_v1 },
-> 	{ .compatible = "arm,mmu-401", .data = &smmu_generic_v1 },
-> 	{ .compatible = "arm,mmu-500", .data = &smmu_generic_v2 },
->-	{ .compatible = "cavium,smmu-v2", .data = &smmu_generic_v2 },
->+	{ .compatible = "cavium,smmu-v2", .data = &cavium_smmuv2 },
-> 	{ },
-> };
-> MODULE_DEVICE_TABLE(of, arm_smmu_of_match);
->@@ -1871,18 +1884,6 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
-> 		}
-> 	}
+> are available in the git repository at:
 > 
->-	/*
->-	 * Cavium CN88xx erratum #27704.
->-	 * Ensure ASID and VMID allocation is unique across all SMMUs in
->-	 * the system.
->-	 */
->-	if (of_device_is_compatible(dev->of_node, "cavium,smmu-v2")) {
->-		smmu->cavium_id_base =
->-			atomic_add_return(smmu->num_context_banks,
->-					  &cavium_smmu_context_count);
->-		smmu->cavium_id_base -= smmu->num_context_banks;
->-	}
->-
-> 	INIT_LIST_HEAD(&smmu->list);
-> 	spin_lock(&arm_smmu_devices_lock);
-> 	list_add(&smmu->list, &arm_smmu_devices);
->-- 
->2.7.3.dirty
-This looks fine too.
-Acked-by: Tirumalesh Chalamarla<tchalamarla@caviumnetworks.com>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-simple-pm-bus-for-v4.7
+> 
+> for you to fetch changes up to 41feae79f2621d9fcea1437d4a2f29dc731fdbb0:
+> 
+>   bus: simple-pm-bus: Use ARCH_RENESAS (2016-03-28 09:05:58 +0900)
+> 
+> ----------------------------------------------------------------
+> Renesas ARM Based SoC Simple PM Bus Updates for v4.7
+> 
+> * Use ARCH_RENESAS in Kconfig
 
->
+Merged into next/drivers. Thanks.
+
+
+-Olof
