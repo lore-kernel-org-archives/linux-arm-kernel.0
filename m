@@ -1,17 +1,17 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 13 Apr 2016 14:41:13 -0700
-Subject: [PATCH v2 2/2] ARM: omap2plus_defconfig: Enable GPIO_TPIC2810
-In-Reply-To: <1458704054-18152-3-git-send-email-lokeshvutla@ti.com>
-References: <1458704054-18152-1-git-send-email-lokeshvutla@ti.com>
- <1458704054-18152-3-git-send-email-lokeshvutla@ti.com>
-Message-ID: <20160413214113.GG5995@atomide.com>
+Date: Wed, 13 Apr 2016 14:42:37 -0700
+Subject: [PATCH 2/2] ARM: omap2plus_defconfig: Enable DP83867 support
+In-Reply-To: <1458859969-14298-3-git-send-email-nm@ti.com>
+References: <1458859969-14298-1-git-send-email-nm@ti.com>
+ <1458859969-14298-3-git-send-email-nm@ti.com>
+Message-ID: <20160413214237.GH5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Lokesh Vutla <lokeshvutla@ti.com> [160322 20:38]:
-> Enable the TI TPIC2810 8-Bit LED Driver with I2C Interface. This is used
-> in AM335x ICEv2 Boards.
+* Nishanth Menon <nm@ti.com> [160324 15:53]:
+> Enable DP83867 Ethernet phy for supporting networking on DRA72-EVM rev C
+> (SR2.0).
 
-Applying into omap-for-v4.6/defconfig thanks.
+Applying into omap-for-v4.7/defconfig thanks.
 
 Tony
