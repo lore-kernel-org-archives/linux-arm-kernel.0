@@ -1,354 +1,265 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 13 Apr 2016 14:24:58 +0200
-Subject: [PATCH] ARM: socfpga: dts: Add samtec VIN|ING board
-Message-ID: <1460550298-9533-1-git-send-email-marex@denx.de>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 13 Apr 2016 14:31:43 +0200
+Subject: [PATCH 02/12] mtd: nand: atmel: rely on generic DT parsing done
+ in nand_scan_ident()
+In-Reply-To: <1459515272-31011-3-git-send-email-boris.brezillon@free-electrons.com>
+References: <1459515272-31011-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1459515272-31011-3-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20160413143143.6c4b7de8@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for board based on the popular Altera Cyclone V SoC.
-This board has the following properties:
- - 1 GiB of DRAM
- - 1 Gigabit ethernet
- - 1 USB gadget port
- - 1 USB host port with an on-board hub
- - 2 QSPI NORs connected to the Cadence QSPI core
- - Multiple I2C EEPROMs and one I2C temperature sensor
+On Fri,  1 Apr 2016 14:54:22 +0200
+Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
----
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts | 310 +++++++++++++++++++++
- 2 files changed, 311 insertions(+)
- create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts
+> The core now takes care of parsing generic DT properties in
+> nand_scan_ident() when nand_set_flash_node() has been called.
+> Rely on this initialization instead of calling of_get_nand_xxx()
+> manually.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 13428b0..4d09f19 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -620,6 +620,7 @@ dtb-$(CONFIG_ARCH_SOCFPGA) += \
- 	socfpga_cyclone5_de0_sockit.dtb \
- 	socfpga_cyclone5_sockit.dtb \
- 	socfpga_cyclone5_socrates.dtb \
-+	socfpga_cyclone5_vining_fpga.dtb \
- 	socfpga_vt.dtb
- dtb-$(CONFIG_ARCH_SPEAR13XX) += \
- 	spear1310-evb.dtb \
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts b/arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts
-new file mode 100644
-index 0000000..a3601e4
---- /dev/null
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts
-@@ -0,0 +1,310 @@
-+/*
-+ *  Copyright (C) 2015 Marek Vasut <marex@denx.de>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of
-+ *     the License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ *     You should have received a copy of the GNU General Public
-+ *     License along with this file; if not, write to the Free
-+ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
-+ *     MA 02110-1301 USA
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#include "socfpga_cyclone5.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+
-+/ {
-+	model = "samtec VIN|ING FPGA";
-+	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200";
-+	};
-+
-+	memory {
-+		name = "memory";
-+		device_type = "memory";
-+		reg = <0x0 0x40000000>; /* 1GB */
-+	};
-+
-+	aliases {
-+		/*
-+		 * This allow the ethaddr uboot environment variable contents
-+		 * to be added to the gmac1 device tree blob.
-+		 */
-+		ethernet0 = &gmac1;
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		hps_led0 {
-+			label = "hps:green:led0";	/* ALIVE_LED_GR */
-+			gpios = <&portb 19 0>;	/* HPS_GPIO48 */
-+			linux,default-trigger = "heartbeat";
-+		};
-+
-+		hps_led1 {
-+			label = "hps:red:led0";		/* ALIVE_LED_RD */
-+			gpios = <&portb 24 0>;	/* HPS_GPIO53 */
-+			linux,default-trigger = "none";
-+		};
-+
-+		hps_led2 {
-+			label = "hps:green:led1";	/* LINK2HOST_LED_GR */
-+			gpios = <&portb 25 0>;	/* HPS_GPIO54 */
-+			linux,default-trigger = "heartbeat";
-+		};
-+
-+		hps_led3 {
-+			label = "hps:red:led1";		/* LINK2HOST_LED_RD */
-+			gpios = <&portc 7 0>;	/* HPS_GPIO65 */
-+			linux,default-trigger = "none";
-+		};
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+
-+		hps_temp0 {
-+			label = "BTN_0";			/* TEMP_OS */
-+			gpios = <&portc 18 GPIO_ACTIVE_LOW>;	/* HPS_GPIO60 */
-+			linux,code = <BTN_0>;
-+		};
-+
-+		hps_hkey0 {
-+			label = "BTN_1";			/* DIS_PWR */
-+			gpios = <&portc 19 GPIO_ACTIVE_LOW>;	/* HPS_GPIO61 */
-+			linux,code = <BTN_1>;
-+		};
-+
-+		hps_hkey1 {
-+			label = "hps_hkey1";			/* POWER_DOWN */
-+			gpios = <&portc 20 GPIO_ACTIVE_LOW>;	/* HPS_GPIO62 */
-+			linux,code = <KEY_POWER>;
-+		};
-+	};
-+
-+	regulator-usb-nrst {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb_nrst";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&portb 5 GPIO_ACTIVE_HIGH>;
-+		startup-delay-us = <70000>;
-+		enable-active-high;
-+		regulator-always-on;
-+	};
-+};
-+
-+&gmac1 {
-+	status = "okay";
-+	phy-mode = "rgmii";
-+
-+	snps,reset-gpio = <&porta 0 GPIO_ACTIVE_LOW>;
-+	snps,reset-active-low;
-+	snps,reset-delays-us = <10000 10000 10000>;
-+
-+	mdio0 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "snps,dwmac-mdio";
-+		phy1: ethernet-phy at 1 {
-+			reg = <1>;
-+			rxd0-skew-ps = <0>;
-+			rxd1-skew-ps = <0>;
-+			rxd2-skew-ps = <0>;
-+			rxd3-skew-ps = <0>;
-+			txen-skew-ps = <0>;
-+			txc-skew-ps = <2600>;
-+			rxdv-skew-ps = <0>;
-+			rxc-skew-ps = <2000>;
-+		};
-+	};
-+};
-+
-+&gpio0 {	/* GPIO 0..29 */
-+	status = "okay";
-+};
-+
-+&gpio1 {	/* GPIO 30..57 */
-+	status = "okay";
-+};
-+
-+&gpio2 {	/* GPIO 58..66 (HLGPI 0..13 at offset 13) */
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+
-+	gpio: pca9557 at 1f {
-+		compatible = "nxp,pca9557";
-+		reg = <0x1f>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+	};
-+
-+	temp: lm75 at 48 {
-+		compatible = "lm75";
-+		reg = <0x48>;
-+	};
-+
-+	at24 at 50 {
-+		compatible = "at24,24c01";
-+		pagesize = <8>;
-+		reg = <0x50>;
-+	};
-+
-+	i2cswitch at 70 {
-+		compatible = "nxp,pca9548";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0x70>;
-+
-+		i2c at 0 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0>;
-+			eeprom at 51 {
-+				compatible = "at,24c01";
-+				pagesize = <8>;
-+				reg = <0x51>;
-+			};
-+		};
-+
-+		i2c at 1 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <1>;
-+			eeprom at 51 {
-+				compatible = "at,24c01";
-+				pagesize = <8>;
-+				reg = <0x51>;
-+			};
-+		};
-+
-+		i2c at 2 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <2>;
-+			eeprom at 51 {
-+				compatible = "at,24c01";
-+				pagesize = <8>;
-+				reg = <0x51>;
-+			};
-+		};
-+
-+		i2c at 3 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <3>;
-+			eeprom at 51 {
-+				compatible = "at,24c01";
-+				pagesize = <8>;
-+				reg = <0x51>;
-+			};
-+		};
-+
-+		i2c at 4 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <4>;
-+			eeprom at 51 {
-+				compatible = "at,24c01";
-+				pagesize = <8>;
-+				reg = <0x51>;
-+			};
-+		};
-+
-+		i2c at 5 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <5>;
-+			eeprom at 51 {
-+				compatible = "at,24c01";
-+				pagesize = <8>;
-+				reg = <0x51>;
-+			};
-+		};
-+
-+		i2c at 6 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <6>;
-+			eeprom at 51 {
-+				compatible = "at,24c01";
-+				pagesize = <8>;
-+				reg = <0x51>;
-+			};
-+		};
-+
-+		i2c at 7 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <7>;
-+			eeprom at 51 {
-+				compatible = "at,24c01";
-+				pagesize = <8>;
-+				reg = <0x51>;
-+			};
-+		};
-+	};
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+	clock-frequency = <100000>;
-+
-+	at24 at 50 {
-+		compatible = "at24,24c02";
-+		pagesize = <8>;
-+		reg = <0x50>;
-+	};
-+};
-+
-+&usb0 {
-+	dr_mode = "host";
-+	status = "okay";
-+};
-+
-+&usb1 {
-+	dr_mode = "peripheral";
-+	status = "okay";
-+};
+Tested on sama5d4ek.
+
+Tested-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+
+> ---
+>  drivers/mtd/nand/atmel_nand.c | 133 +++++++++++++++++++++++-------------------
+>  1 file changed, 73 insertions(+), 60 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+> index 0b5da72..5e716f2 100644
+> --- a/drivers/mtd/nand/atmel_nand.c
+> +++ b/drivers/mtd/nand/atmel_nand.c
+> @@ -36,7 +36,6 @@
+>  #include <linux/of.h>
+>  #include <linux/of_device.h>
+>  #include <linux/of_gpio.h>
+> -#include <linux/of_mtd.h>
+>  #include <linux/mtd/mtd.h>
+>  #include <linux/mtd/nand.h>
+>  #include <linux/mtd/partitions.h>
+> @@ -434,14 +433,13 @@ err_buf:
+>  static void atmel_read_buf(struct mtd_info *mtd, u8 *buf, int len)
+>  {
+>  	struct nand_chip *chip = mtd_to_nand(mtd);
+> -	struct atmel_nand_host *host = nand_get_controller_data(chip);
+>  
+>  	if (use_dma && len > mtd->oobsize)
+>  		/* only use DMA for bigger than oob size: better performances */
+>  		if (atmel_nand_dma_op(mtd, buf, len, 1) == 0)
+>  			return;
+>  
+> -	if (host->board.bus_width_16)
+> +	if (chip->options & NAND_BUSWIDTH_16)
+>  		atmel_read_buf16(mtd, buf, len);
+>  	else
+>  		atmel_read_buf8(mtd, buf, len);
+> @@ -450,14 +448,13 @@ static void atmel_read_buf(struct mtd_info *mtd, u8 *buf, int len)
+>  static void atmel_write_buf(struct mtd_info *mtd, const u8 *buf, int len)
+>  {
+>  	struct nand_chip *chip = mtd_to_nand(mtd);
+> -	struct atmel_nand_host *host = nand_get_controller_data(chip);
+>  
+>  	if (use_dma && len > mtd->oobsize)
+>  		/* only use DMA for bigger than oob size: better performances */
+>  		if (atmel_nand_dma_op(mtd, (void *)buf, len, 0) == 0)
+>  			return;
+>  
+> -	if (host->board.bus_width_16)
+> +	if (chip->options & NAND_BUSWIDTH_16)
+>  		atmel_write_buf16(mtd, buf, len);
+>  	else
+>  		atmel_write_buf8(mtd, buf, len);
+> @@ -1507,58 +1504,17 @@ static void atmel_nand_hwctl(struct mtd_info *mtd, int mode)
+>  		ecc_writel(host->ecc, CR, ATMEL_ECC_RST);
+>  }
+>  
+> -static int atmel_of_init_port(struct atmel_nand_host *host,
+> -			      struct device_node *np)
+> +static int atmel_of_init_ecc(struct atmel_nand_host *host,
+> +			     struct device_node *np)
+>  {
+> -	u32 val;
+>  	u32 offset[2];
+> -	int ecc_mode;
+> -	struct atmel_nand_data *board = &host->board;
+> -	enum of_gpio_flags flags = 0;
+> -
+> -	host->caps = (struct atmel_nand_caps *)
+> -		of_device_get_match_data(host->dev);
+> -
+> -	if (of_property_read_u32(np, "atmel,nand-addr-offset", &val) == 0) {
+> -		if (val >= 32) {
+> -			dev_err(host->dev, "invalid addr-offset %u\n", val);
+> -			return -EINVAL;
+> -		}
+> -		board->ale = val;
+> -	}
+> -
+> -	if (of_property_read_u32(np, "atmel,nand-cmd-offset", &val) == 0) {
+> -		if (val >= 32) {
+> -			dev_err(host->dev, "invalid cmd-offset %u\n", val);
+> -			return -EINVAL;
+> -		}
+> -		board->cle = val;
+> -	}
+> -
+> -	ecc_mode = of_get_nand_ecc_mode(np);
+> -
+> -	board->ecc_mode = ecc_mode < 0 ? NAND_ECC_SOFT : ecc_mode;
+> -
+> -	board->on_flash_bbt = of_get_nand_on_flash_bbt(np);
+> -
+> -	board->has_dma = of_property_read_bool(np, "atmel,nand-has-dma");
+> -
+> -	if (of_get_nand_bus_width(np) == 16)
+> -		board->bus_width_16 = 1;
+> -
+> -	board->rdy_pin = of_get_gpio_flags(np, 0, &flags);
+> -	board->rdy_pin_active_low = (flags == OF_GPIO_ACTIVE_LOW);
+> -
+> -	board->enable_pin = of_get_gpio(np, 1);
+> -	board->det_pin = of_get_gpio(np, 2);
+> +	u32 val;
+>  
+>  	host->has_pmecc = of_property_read_bool(np, "atmel,has-pmecc");
+>  
+> -	/* load the nfc driver if there is */
+> -	of_platform_populate(np, NULL, NULL, host->dev);
+> -
+> -	if (!(board->ecc_mode == NAND_ECC_HW) || !host->has_pmecc)
+> -		return 0;	/* Not using PMECC */
+> +	/* Not using PMECC */
+> +	if (!(host->nand_chip.ecc.mode == NAND_ECC_HW) || !host->has_pmecc)
+> +		return 0;
+>  
+>  	/* use PMECC, get correction capability, sector size and lookup
+>  	 * table offset.
+> @@ -1599,16 +1555,64 @@ static int atmel_of_init_port(struct atmel_nand_host *host,
+>  		/* Will build a lookup table and initialize the offset later */
+>  		return 0;
+>  	}
+> +
+>  	if (!offset[0] && !offset[1]) {
+>  		dev_err(host->dev, "Invalid PMECC lookup table offset\n");
+>  		return -EINVAL;
+>  	}
+> +
+>  	host->pmecc_lookup_table_offset_512 = offset[0];
+>  	host->pmecc_lookup_table_offset_1024 = offset[1];
+>  
+>  	return 0;
+>  }
+>  
+> +static int atmel_of_init_port(struct atmel_nand_host *host,
+> +			      struct device_node *np)
+> +{
+> +	u32 val;
+> +	struct atmel_nand_data *board = &host->board;
+> +	enum of_gpio_flags flags = 0;
+> +
+> +	host->caps = (struct atmel_nand_caps *)
+> +		of_device_get_match_data(host->dev);
+> +
+> +	if (of_property_read_u32(np, "atmel,nand-addr-offset", &val) == 0) {
+> +		if (val >= 32) {
+> +			dev_err(host->dev, "invalid addr-offset %u\n", val);
+> +			return -EINVAL;
+> +		}
+> +		board->ale = val;
+> +	}
+> +
+> +	if (of_property_read_u32(np, "atmel,nand-cmd-offset", &val) == 0) {
+> +		if (val >= 32) {
+> +			dev_err(host->dev, "invalid cmd-offset %u\n", val);
+> +			return -EINVAL;
+> +		}
+> +		board->cle = val;
+> +	}
+> +
+> +	board->has_dma = of_property_read_bool(np, "atmel,nand-has-dma");
+> +
+> +	board->rdy_pin = of_get_gpio_flags(np, 0, &flags);
+> +	board->rdy_pin_active_low = (flags == OF_GPIO_ACTIVE_LOW);
+> +
+> +	board->enable_pin = of_get_gpio(np, 1);
+> +	board->det_pin = of_get_gpio(np, 2);
+> +
+> +	/* load the nfc driver if there is */
+> +	of_platform_populate(np, NULL, NULL, host->dev);
+> +
+> +	/*
+> +	 * Initialize ECC mode to NAND_ECC_SOFT so that we have a correct value
+> +	 * even if the nand-ecc-mode property is not defined.
+> +	 */
+> +	host->nand_chip.ecc.mode = NAND_ECC_SOFT;
+> +
+> +	return 0;
+> +}
+> +
+>  static int atmel_hw_nand_init_params(struct platform_device *pdev,
+>  					 struct atmel_nand_host *host)
+>  {
+> @@ -2150,6 +2154,11 @@ static int atmel_nand_probe(struct platform_device *pdev)
+>  	} else {
+>  		memcpy(&host->board, dev_get_platdata(&pdev->dev),
+>  		       sizeof(struct atmel_nand_data));
+> +		nand_chip->ecc.mode = host->board.ecc_mode;
+> +
+> +		/* 16-bit bus width */
+> +		if (host->board.bus_width_16)
+> +			nand_chip->options |= NAND_BUSWIDTH_16;
+>  	}
+>  
+>  	 /* link the private data structures */
+> @@ -2191,11 +2200,8 @@ static int atmel_nand_probe(struct platform_device *pdev)
+>  		nand_chip->cmd_ctrl = atmel_nand_cmd_ctrl;
+>  	}
+>  
+> -	nand_chip->ecc.mode = host->board.ecc_mode;
+>  	nand_chip->chip_delay = 40;		/* 40us command delay time */
+>  
+> -	if (host->board.bus_width_16)	/* 16-bit bus width */
+> -		nand_chip->options |= NAND_BUSWIDTH_16;
+>  
+>  	nand_chip->read_buf = atmel_read_buf;
+>  	nand_chip->write_buf = atmel_write_buf;
+> @@ -2228,11 +2234,6 @@ static int atmel_nand_probe(struct platform_device *pdev)
+>  		}
+>  	}
+>  
+> -	if (host->board.on_flash_bbt || on_flash_bbt) {
+> -		dev_info(&pdev->dev, "Use On Flash BBT\n");
+> -		nand_chip->bbt_options |= NAND_BBT_USE_FLASH;
+> -	}
+> -
+>  	if (!host->board.has_dma)
+>  		use_dma = 0;
+>  
+> @@ -2259,6 +2260,18 @@ static int atmel_nand_probe(struct platform_device *pdev)
+>  		goto err_scan_ident;
+>  	}
+>  
+> +	if (host->board.on_flash_bbt || on_flash_bbt)
+> +		nand_chip->bbt_options |= NAND_BBT_USE_FLASH;
+> +
+> +	if (nand_chip->bbt_options & NAND_BBT_USE_FLASH)
+> +		dev_info(&pdev->dev, "Use On Flash BBT\n");
+> +
+> +	if (IS_ENABLED(CONFIG_OF) && pdev->dev.of_node) {
+> +		res = atmel_of_init_ecc(host, pdev->dev.of_node);
+> +		if (res)
+> +			goto err_hw_ecc;
+> +	}
+> +
+>  	if (nand_chip->ecc.mode == NAND_ECC_HW) {
+>  		if (host->has_pmecc)
+>  			res = atmel_pmecc_nand_init_params(pdev, host);
+
+
+
 -- 
-2.7.0
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
