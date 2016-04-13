@@ -1,91 +1,115 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 13 Apr 2016 17:16:12 +0200
-Subject: [RESEND 08/11] pwm: sti: Add support for PWM Capture IRQs
-In-Reply-To: <20160413100521.GP8094@x1>
+Date: Wed, 13 Apr 2016 17:22:29 +0200
+Subject: [RESEND 09/11] pwm: sti: Add PWM Capture call-back
+In-Reply-To: <20160413102554.GQ8094@x1>
 References: <1456932729-9667-1-git-send-email-lee.jones@linaro.org>
- <1456932729-9667-9-git-send-email-lee.jones@linaro.org>
- <20160412103521.GD18882@ulmo.ba.sec> <20160413100521.GP8094@x1>
-Message-ID: <20160413151612.GB29509@ulmo.ba.sec>
+ <1456932729-9667-10-git-send-email-lee.jones@linaro.org>
+ <20160412105314.GE18882@ulmo.ba.sec> <20160413102554.GQ8094@x1>
+Message-ID: <20160413152229.GC29509@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 13, 2016 at 11:05:21AM +0100, Lee Jones wrote:
+On Wed, Apr 13, 2016 at 11:25:54AM +0100, Lee Jones wrote:
 > On Tue, 12 Apr 2016, Thierry Reding wrote:
 > 
-> > On Wed, Mar 02, 2016 at 03:32:06PM +0000, Lee Jones wrote:
-> > [...]
+> > On Wed, Mar 02, 2016 at 03:32:07PM +0000, Lee Jones wrote:
+> > > Once a PWM Capture has been initiated, the capture call
+> > > enables a rising edge detection IRQ, then waits.  Once each
+> > > of the 3 phase changes have been recorded the thread then
+> > > wakes.  The remaining part of the call carries out the
+> > > relevant calculations and passes back a formatted string to
+> > > the caller.
+> > > 
+> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > > ---
+> > >  drivers/pwm/pwm-sti.c | 72 +++++++++++++++++++++++++++++++++++++++++++++++++++
+> > >  1 file changed, 72 insertions(+)
+> > > 
 > > > diff --git a/drivers/pwm/pwm-sti.c b/drivers/pwm/pwm-sti.c
-[...]
-> > > +
-> > > +		regmap_read(pc->regmap,
-> > > +			    PWM_CPT_VAL(channel), &d->snapshot[d->index]);
-> > > +
-> > > +		switch (d->index) {
-> > > +		case 0:
-> > > +		case 1:
-> > > +			regmap_read(pc->regmap, PWM_CPT_EDGE(channel), &reg);
-> > > +			reg ^= PWM_CPT_EDGE_MASK;
-> > > +			regmap_write(pc->regmap, PWM_CPT_EDGE(channel), reg);
-> > > +
-> > > +			d->index++;
-> > > +			break;
-> > > +		case 2:
-> > > +			regmap_write(pc->regmap,
-> > > +				     PWM_CPT_EDGE(channel), CPT_EDGE_DISABLED);
-> > > +			wake_up(&d->wait);
-> > > +			break;
-> > > +		default:
-> > > +			dev_err(dev, "Internal error\n");
-> > > +		}
-> > > +
-> > > +		clear_bit(channel, (unsigned long int *)&cpt_int_stat);
-> > 
-> > clear_bit() is a little unusual to use on regular data types, as
-> > evidenced by the need for the goofy cast here.
-> 
-> It's just a bit neater (and provides locking) than manually bit
-> twiddling using bitwise operators.  What do you suggest?
-
-I think the cast indicates that you're mixing unrelated interfaces. Also
-looking at patch 9/11 it seems like you'll need extra locking to protect
-against concurrent accesses in the interrupt handler and the ->capture()
-implementation anyway, so might as well use that lock for this access.
-
-> > > @@ -371,7 +447,7 @@ static int sti_pwm_probe(struct platform_device *pdev)
-> > >  	struct sti_pwm_chip *pc;
-> > >  	struct resource *res;
-> > >  	unsigned int chan;
-> > > -	int ret;
-> > > +	int ret, irq;
+> > > index 82a69e4..8de9b4a 100644
+> > > --- a/drivers/pwm/pwm-sti.c
+> > > +++ b/drivers/pwm/pwm-sti.c
+> > > @@ -309,7 +309,79 @@ static void sti_pwm_free(struct pwm_chip *chip, struct pwm_device *pwm)
+> > >  	clear_bit(pwm->hwpwm, &pc->configured);
+> > >  }
 > > >  
-> > >  	pc = devm_kzalloc(dev, sizeof(*pc), GFP_KERNEL);
-> > >  	if (!pc)
-> > > @@ -392,6 +468,19 @@ static int sti_pwm_probe(struct platform_device *pdev)
-> > >  	if (IS_ERR(pc->regmap))
-> > >  		return PTR_ERR(pc->regmap);
-> > >  
-> > > +	irq = platform_get_irq(pdev, 0);
-> > > +	if (irq < 0) {
-> > > +		dev_err(&pdev->dev, "Failed to obtain IRQ\n");
-> > > +		return -ENODEV;
+> > > +static int sti_pwm_capture(struct pwm_chip *chip, struct pwm_device *pwm,
+> > > +			   int channel, char *buf)
+> > > +{
+> > > +	struct sti_pwm_chip *pc = to_sti_pwmchip(chip);
+> > > +	struct sti_pwm_compat_data *cdata = pc->cdata;
+> > > +	struct sti_cpt_data *d = pc->cpt_data[channel];
+> > > +	struct device *dev = pc->dev;
+> > > +	unsigned int f, dc;
+> > > +	unsigned int high, low;
+> > > +	bool level;
+> > > +	int ret;
+> > > +
+> > > +	if (channel > cdata->cpt_num_chan - 1) {
+> > > +		dev_err(dev, "Channel %d is not valid\n", channel);
+> > > +		return -EINVAL;
 > > > +	}
+> > > +
+> > > +	mutex_lock(&d->lock);
 > > 
-> > I think you need to propagate the return value of platform_get_irq()
-> > here.
-> 
-> Yes, could do.  Although, I think we could go either way:
-> 
-> $ git grep -A5 platform_get_irq | grep "return ret\|return irq" | wc -l
-> 176
-> $ git grep -A5 platform_get_irq | grep "return -EINVAL\|-ENODEV\|-ENXIO" | wc -l
-> 256
-> 
-> Happy to change it though.
+> > Should this perhaps reuse the struct pwm_device's ->lock?
 
-I think all the latter are really wrong. Looking at the implementation
-of platform_get_irq() there are a number of error codes that it can
-return (-EPROBE_DEFER amongst them), so collapsing them all into an
--EINVAL, -ENODEV or -ENXIO is very wrong.
+That was actually a stupid suggestion by me, because that lock is being
+removed in an unrelated patch series.
+
+> > > +	/* Prepare capture measurement */
+> > > +	d->index = 0;
+> > > +	regmap_write(pc->regmap, PWM_CPT_EDGE(channel), CPT_EDGE_RISING);
+> > > +	regmap_field_write(pc->pwm_cpt_int_en, BIT(channel));
+> > > +	ret = wait_event_interruptible_timeout(d->wait, d->index > 1, HZ);
+> > 
+> > The timeout here should make sure callers don't hang forever. But maybe
+> > you can still make sure that when the PWM gets disabled the wait queue
+> > is woken and perhaps return an appropriate error code to let users know
+> > that the operation was interrupted.
+> 
+> Sure.  I'll look into that.
+> 
+> > Also, how about letting callers choose the value of the timeout? In some
+> > cases they may be interested in long-running signals. In other cases the
+> > whole second timeout may be much too long.
+> 
+> I'm not opposed to it.  How do you suggest we do that?
+
+The easiest would probably be to add an unsigned long timeout parameter
+to the pwm_capture() function and ->capture() callbacks.
+
+But thinking about this further I'm wondering if it might not be easier
+and more flexible to move the timeout completely outside of this code
+and into callers. I suspect that the most simple way to do that would be
+to add a completion to struct pwm_capture that callers can use to wait
+for completion of a capture. This would make the whole process
+asynchronous and allow interesting things like making the sysfs capture
+file pollable, for example.
+
+> > > +	/*
+> > > +	 * In case we woke up for another reason than completion
+> > > +	 * make sure to disable the capture.
+> > > +	 */
+> > > +	regmap_write(pc->regmap, PWM_CPT_EDGE(channel), CPT_EDGE_DISABLED);
+> > 
+> > The comment here is slightly confusing because it implies that disabling
+> > the capture should be done conditionally, whereas it is always disabled.
+> 
+> Not really.  We do it unconditionally for reason explained.
+> 
+> It says:
+> 
+>   "disable the capture just in case X happens"
+> 
+> rather than
+> 
+>   "disable the capture if X happens".
+> 
+> Perhaps the language is too subtle.  I can reword for clarity.
+
+I'd be okay with just dropping the comment altogether, it seems rather
+obvious to me. But clarifying is okay with me, too.
 
 Thierry
 -------------- next part --------------
@@ -94,4 +118,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160413/f76e36c9/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160413/82f89061/attachment.sig>
