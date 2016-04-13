@@ -1,47 +1,59 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 13 Apr 2016 12:48:04 -0700
-Subject: [PATCH 31/47] ARM: dts: r8a7794: Reference both DMA controllers
- in SCIFA nodes
-In-Reply-To: <65c295f4b305330162795b0cc2508a207ed23a98.1459732726.git.horms+renesas@verge.net.au>
-References: <cover.1459732726.git.horms+renesas@verge.net.au>
- <65c295f4b305330162795b0cc2508a207ed23a98.1459732726.git.horms+renesas@verge.net.au>
-Message-ID: <CAOesGMgBBmUvoWdb35vcq0UAJNkMk5LD6-ERWDAaSKWEpGwu9A@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 13 Apr 2016 21:50:22 +0200
+Subject: [PATCH 2/2] ARM: shmobile: timer: Drop support for Cortex A8
+In-Reply-To: <CAOesGMi5cwiGqj-m78X4sbpqj+_aRNXDahs-XpaggK8=fNhRKg@mail.gmail.com>
+References: <cover.1459732456.git.horms+renesas@verge.net.au>
+ <cd89841fc6dbb6dc11aa113769f39dcd30be720f.1459732456.git.horms+renesas@verge.net.au>
+ <CAOesGMi5cwiGqj-m78X4sbpqj+_aRNXDahs-XpaggK8=fNhRKg@mail.gmail.com>
+Message-ID: <CAMuHMdWKq-PpsnDiij=nPK1zcxtwU88-YHVYYStFj_Ok2=tdVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Olof,
 
-Commenting on this random patch in the series, but I'm guessing the
-same applies for others.
+On Wed, Apr 13, 2016 at 9:41 PM, Olof Johansson <olof@lixom.net> wrote:
+> On Sun, Apr 3, 2016 at 6:22 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
+>> From: Geert Uytterhoeven <geert+renesas@glider.be>
+>>
+>> Commit edf4100906044225 ("ARM: shmobile: sh7372 dtsi: Remove Legacy
+>> file") removed the DTS for the last shmobile SoC with a Cortex A8 CPU
+>> core (sh7372 aka SH-Mobile AP4).
+>>
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>> ---
+>>  arch/arm/mach-shmobile/timer.c | 4 +---
+>>  1 file changed, 1 insertion(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-shmobile/timer.c b/arch/arm/mach-shmobile/timer.c
+>> index 67d79f9c6bad..1fc7759feab1 100644
+>> --- a/arch/arm/mach-shmobile/timer.c
+>> +++ b/arch/arm/mach-shmobile/timer.c
+>> @@ -54,9 +54,7 @@ void __init shmobile_init_delay(void)
+>>                 if (!of_property_read_u32(np, "clock-frequency", &freq))
+>>                         max_freq = max(max_freq, freq);
+>>
+>> -               if (of_device_is_compatible(np, "arm,cortex-a8")) {
+>> -                       div = 2;
+>> -               } else if (of_device_is_compatible(np, "arm,cortex-a9")) {
+>> +               if (of_device_is_compatible(np, "arm,cortex-a9")) {
+>>                         div = 1;
+>>                 } else if (of_device_is_compatible(np, "arm,cortex-a7") ||
+>>                          of_device_is_compatible(np, "arm,cortex-a15")) {
+>
+> This setting of div doesn't make much sense now. It's always 1. This
+> function seems more complicated than it has to be...
 
-First, I think it's somewhat silly to split this up into 31 patches
-instead of just doing one. But it's not bad enough that it really
-matters.
+Yes, there are definitely more areas for improvement in this organic piece of
+code...
 
-My bigger concern is:
+Gr{oetje,eeting}s,
 
+                        Geert
 
-On Sun, Apr 3, 2016 at 6:23 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
-> diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-> index eacb2b291361..4256557ca041 100644
-> --- a/arch/arm/boot/dts/r8a7794.dtsi
-> +++ b/arch/arm/boot/dts/r8a7794.dtsi
-> @@ -296,8 +296,9 @@
->                 interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
->                 clocks = <&mstp2_clks R8A7794_CLK_SCIFA0>;
->                 clock-names = "fck";
-> -               dmas = <&dmac0 0x21>, <&dmac0 0x22>;
-> -               dma-names = "tx", "rx";
-> +               dmas = <&dmac0 0x21>, <&dmac0 0x22>,
-> +                      <&dmac1 0x21>, <&dmac1 0x22>;
-> +               dma-names = "tx", "rx", "tx", "rx";
->                 power-domains = <&cpg_clocks>;
->                 status = "disabled";
->         };
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-The names are no longer unique. So a get_<foo>_by_name() function no
-longer can work as expected.
-
-This should be fixed.
-
--Olof
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
