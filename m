@@ -1,41 +1,59 @@
-From: stano@meduna.org (Stanislav Meduna)
-Date: Thu, 14 Apr 2016 00:18:52 +0200
-Subject: i.MX53 + MC34708 working setup?
-Message-ID: <570EC5CC.2020606@meduna.org>
+From: david@lechnology.com (David Lechner)
+Date: Wed, 13 Apr 2016 17:19:12 -0500
+Subject: [PATCH] ARM: davinci: da8xx-usb: remove deprecated properties from
+ MUSB config
+Message-ID: <1460585952-31301-1-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This is the same as commit c1b3b058469e ("ARM: DaVinci USB: removed
+deprecated properties from MUSB config") applied to usb-da8xx.c.
 
-before I start digging deeper: anyone got the MC34708 PMIC
-touchscreen driver working on an i.MX53 board (I am
-using a custom board with a TQMa53 module)?
+The following properties of the musb_hdrc_config structure
+are deprecated and no longer required/used by the MUSB driver:
 
-First: the mc13783-ts input driver does not support the
-device tree so after changing to module_platform_driver_probe
-somewhere in 3.10 it is not going to get started. For now
-I reverted this driver to a 3.9 version to get back
-the module_init/exit.
+.dyn_fifo
+.soft_con
+.dma
+.dma_channels
+.eps_bits
 
-This resulted in this driver starting and trying to do
-mc13xxx_adc_do_conversion every time the touchscreen is
-touched, so here the interrupts are processed as expected.
-mc13xxx_adc_do_conversion however times out in
-wait_for_completion_interruptible_timeout.
+Signed-off-by: David Lechner <david@lechnology.com>
+---
+ arch/arm/mach-davinci/usb-da8xx.c | 17 -----------------
+ 1 file changed, 17 deletions(-)
 
-Trying to bluntly revert this code to 3.9 as well did not work,
-so I am not sure whether the code is the problem or the
-device tree which was changed for imx53-tqma53.dtsi as well
-(for example the 3.9 lists
-  interrupts = <6 8>; /* PDATA_DATA6, low active */
-whereas the 4.4 has <6 4> high active).
-
-I am using a 4.4 kernel with some ported TQ patches, none
-of them touching the PMIC.
-
-If anyone has this setup (i.MX53 + MC34708, recent kernel)
-working, I would appreciate a pointer to the code.
-
-Thanks
+diff --git a/arch/arm/mach-davinci/usb-da8xx.c b/arch/arm/mach-davinci/usb-da8xx.c
+index 0cab01f..a786c7b 100644
+--- a/arch/arm/mach-davinci/usb-da8xx.c
++++ b/arch/arm/mach-davinci/usb-da8xx.c
+@@ -17,27 +17,10 @@
+ 
+ #if IS_ENABLED(CONFIG_USB_MUSB_HDRC)
+ 
+-static struct musb_hdrc_eps_bits musb_eps[] = {
+-	{ "ep1_tx", 8, },
+-	{ "ep1_rx", 8, },
+-	{ "ep2_tx", 8, },
+-	{ "ep2_rx", 8, },
+-	{ "ep3_tx", 5, },
+-	{ "ep3_rx", 5, },
+-	{ "ep4_tx", 5, },
+-	{ "ep4_rx", 5, },
+-};
+-
+ static struct musb_hdrc_config musb_config = {
+ 	.multipoint	= true,
+-	.dyn_fifo	= true,
+-	.soft_con	= true,
+-	.dma		= true,
+-
+ 	.num_eps	= 5,
+-	.dma_channels	= 8,
+ 	.ram_bits	= 10,
+-	.eps_bits	= musb_eps,
+ };
+ 
+ static struct musb_hdrc_platform_data usb_data = {
 -- 
-                                 Stano
+1.9.1
