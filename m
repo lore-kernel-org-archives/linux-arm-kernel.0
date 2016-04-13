@@ -1,51 +1,33 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 13 Apr 2016 14:17:05 -0700
-Subject: [GIT PULL] ARM RealView device tree files
-In-Reply-To: <CACRpkdZ1eEC+iDKdRhgXPGKTuoyNCo-bgk1ii62RoqR03_JUtQ@mail.gmail.com>
-References: <CACRpkdZ1eEC+iDKdRhgXPGKTuoyNCo-bgk1ii62RoqR03_JUtQ@mail.gmail.com>
-Message-ID: <20160413211705.GV19945@localhost>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 13 Apr 2016 14:30:56 -0700
+Subject: [PATCH 0/3] ARM: OMAP: DRA7: Updates for power domain data
+In-Reply-To: <1459461515-5192-1-git-send-email-nm@ti.com>
+References: <1459461515-5192-1-git-send-email-nm@ti.com>
+Message-ID: <20160413213055.GE5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 04, 2016 at 11:09:13AM +0200, Linus Walleij wrote:
-> Hi ARM SoC folks,
+* Nishanth Menon <nm@ti.com> [160331 15:01]:
+> First level updates for power domain data, in line with the latest
+> AM57xx and DRA7 TRMs.
 > 
-> here is a set of ARM RealView device tree files that only use
-> existing bindings and with all new or controversial stuff stripped
-> out.
+> NOTE: follow on patches are pending for the following:
 > 
-> This needs to get into linux-next and get some rotation.
+> a) wakeupgen is somehow messedup again and mpu pd no
+> longer goes to low power mode. I am looking into that.
+> http://pastebin.ubuntu.com/15571519/ gets past that story - but I see
+> mpu_pwrdm stuck in ON though..
 > 
-> Please pull them to some DTS branch.
+> b) beagleboard-X15 does require the following patch
+> https://patchwork.kernel.org/patch/8718431/
 > 
-> Yours,
-> Linus Walleij
+> c) We do have yet another major TRM update to only allow ON and OFF
+> for all power domains other than core and MPU (MPU still will support
+> CSWR) - I am still waiting for TRM update to take place before we can
+> actually post upstream.
 > 
-> The following changes since commit 9735a22799b9214d17d3c231fe377fc852f042e9:
-> 
->   Linux 4.6-rc2 (2016-04-03 09:09:40 -0500)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-> tags/versatile-dts-1
-> 
-> for you to fetch changes up to dfc8a117388786ab3cfdf0880a09abd05c4e0a4d:
-> 
->   ARM: dts: realview: DT support for the PBA8 and PBX-A9 (2016-04-04
-> 10:58:05 +0200)
-> 
-> ----------------------------------------------------------------
-> Versatile DTS changes, baseline for the v4.7 series:
-> - Add CLCD panel nodes to PB1176 and PB11MPCore
-> - Add a DT binding blurb for the Versatile IB2 syscon
-> - Add DTS files for the (QEMU supported) RealView EB
->   boards in all variants.
-> - Add DTS files for the (QEMU supported) RealView PBA8
->   and PBX-A9 board variants.
+> BeagleBoard-X15 test log: http://pastebin.ubuntu.com/15571570/
 
+Applying into omap-for-v4.7/soc thanks.
 
-Merged, thanks!
-
-
--Olof
+Tony
