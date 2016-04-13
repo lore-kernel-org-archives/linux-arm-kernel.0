@@ -1,186 +1,178 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 13 Apr 2016 14:57:28 +0300
-Subject: [PATCH v2 0/3] ARM: OMAP3: Fix McBSP2/3 hwmod setup for sidetone
-In-Reply-To: <20160412163750.GR5995@atomide.com>
-References: <alpine.DEB.2.02.1603191937430.6629@utopia.booyaka.com>
- <56EFB794.5010505@ti.com>
- <alpine.DEB.2.02.1603211743200.31059@utopia.booyaka.com>
- <56FE407E.9030803@ti.com> <20160402001753.GR9329@atomide.com>
- <57026205.6020105@ti.com> <20160404151200.GA4652@atomide.com>
- <5703BA6B.1080208@ti.com> <20160411212845.GJ5995@atomide.com>
- <570CC54E.6020703@ti.com> <20160412163750.GR5995@atomide.com>
-Message-ID: <570E3428.5020804@ti.com>
+From: tiffany.lin@mediatek.com (Tiffany Lin)
+Date: Wed, 13 Apr 2016 20:01:48 +0800
+Subject: [PATCH 0/7] Add MT8173 Video Decoder Driver
+Message-ID: <1460548915-17536-1-git-send-email-tiffany.lin@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/12/16 19:37, Tony Lindgren wrote:
-> * Peter Ujfalusi <peter.ujfalusi@ti.com> [160412 02:53]:
->> Tony,
->>
->> On 04/12/16 00:28, Tony Lindgren wrote:
->>>>> Then for the long term solution using
->>>>> PM runtime to block gating of the clock while sidetone is active is
->>>>> the way to go it seems.
->>>>
->>>> Hrm, I think one of the main issue is that with pm_runtime we can not block
->>>> the clock gating, this is why legacy code uses enable_st_clock(), which will
->>>> call omap2_clk_deny_idle() or omap2_clk_allow_idle().
->>>
->>> I see. I think Tero wanted to export omap2_clk_allow_idle() and
->>> omap2_clk_deny_idle() for drivers to use. That should get discussed in
->>> the linux-clk list, probably best to use the pdata callbacks until
->>> the clock idling issue has been discussed.
->>
->> It is already exported, used by the arch/arm/mach-omap2/mcbsp.c file.
-> 
-> Oh but not with EXPORT_SYMBOL so not usable except for built-in code.
-> Probably best to keep it that way IMO..
+==============
+ Introduction
+==============
 
-It is up to Tero if he want to keep omap2_clk_allow/deny_idle() only be usable
-for built in code. It is there just because of OMAP3 McBSP2/3 sidetone support
-on the other hand. It is a fair assumption that it could be used by the driver.
+The purpose of this series is to add the driver for video codec hw embedded in the Mediatek's MT8173 SoCs.
+Mediatek Video Codec is able to handle video decoding of in a range of formats.
 
->> Why not to remove the callback for legacy also and handle it in the driver? It
->> is less ugly in my opinion.
->> Going via the pdata callback is just going to cement the current setup.
-> 
-> Sure, maybe you can have a piece of built-in driver code to do that?
+This patch series add Mediatek block format V4L2_PIX_FMT_MT21, the decoder driver will decoded bitstream to
+V4L2_PIX_FMT_MT21 format.
 
-You mean something like:
-int omap3_mcbsp23_ick_for_sidetone_force(struct clk *clk, bool force_on)
-{
-	if (!clk)
-		return 0;
+This patch series rely on MTK VPU driver in patch series "Add MT8173 Video Encoder Driver and VPU Driver"[1]
+and patch "CHROMIUM: v4l: Add V4L2_PIX_FMT_VP9 definition"[2] for VP9 support.
+Mediatek Video Decoder driver rely on VPU driver to load, communicate with VPU.
 
-	if (force_on)
-		return omap2_clk_deny_idle(clk);
-	else
-		return omap2_clk_allow_idle(clk);
-}
-EXPORT_SYMBOL(omap3_mcbsp23_ick_for_sidetone_force);
+Internally the driver uses videobuf2 framework and MTK IOMMU and MTK SMI both have been merged in v4.6-rc1.
 
-Looks similarly hackish as with the pdata callback, but if I were to choose,
-the pdata callback might be a bit more polite hack if we do not look at how we
-will have the pdata crafted for DT boot.
+[1]https://patchwork.linuxtv.org/patch/33734/
+[2]https://chromium-review.googlesource.com/#/c/245241/
 
->> I have drafted out something which would be needed if we separate the McBSP-ST
->> from the McBSP driver. It is not pretty...
->>
->> In the new omap3-mcbsp-st.h:
->>
->> struct omap3_mcbspst;
->>
->> struct omap_st_to_mcbsp_data {
->> 	bool (*is_enabled)(struct omap_st_to_mcbsp_data *st_data);
->> 	bool (*enable)(struct omap_st_to_mcbsp_data *st_data);
->> 	bool (*disable)(struct omap_st_to_mcbsp_data *st_data);
->> 	struct omap3_mcbspst *st_priv;
->> };
->>
->> In the current omap-mcbsp.h:
->>
->> #include <omap3-mcbsp-st.h>
->> ...
->> struct omap_mcbsp_to_st_data {
->> 	bool (*is_enabled)(struct omap_mcbsp_to_st_data *mcbsp_data);
->> 	bool (*iclk_idle)(struct omap_mcbsp_to_st_data *mcbsp_data, bool allow);
->> 	bool (*enable)(struct omap_mcbsp_to_st_data *mcbsp_data);
->> 	bool (*disable)(struct omap_mcbsp_to_st_data *mcbsp_data);
->> 	struct omap_mcbsp *mcbsp_priv;
->> };
->>
->> #ifdef CONFIG_SND_SOC_OMAP3_MCBSPST
->> struct omap_mcbsp_to_st_data *omap_mcbsp_st_register(
->> 						struct platform_device *pdev, /* McBSP pdev! probably? */
->> 						struct omap_st_to_mcbsp_data *st_data);
->> int omap_mcbsp_st_unregister(struct omap_st_to_mcbsp_data *st_data);
->> #else
->> static inline int omap_mcbsp_st_register(struct platform_device *pdev,
->> 					 struct omap_st_to_mcbsp_data *st_data)
->> {
->> 	return -ENODEV;
->> }
->> static inline int omap_mcbsp_st_unregister(struct omap_st_to_mcbsp_data *st_data)
->> {
->> 	return 0;
->> }
->> #endif
->>
->> Since the ST would be separate driver, it should create the needed ALSA
->> controls as well, probably I need to pass something else here and there.
->> But, in this setup it would be possible to remove the ST driver while the
->> McBSP and the sound card is up, which means we must be able to remove
->> kcontrols runtime, probably there is a way, but not sure about this.
->>
->> There will be issues like this we have not prepared for I'm sure if we do
->> dramatic change to the simple implementation we have right now.
-> 
-> Best to stick to incremental improvments I think..
+==================
+ Device interface
+==================
 
-If we were to split the McBSP driver into half - not literally as the ST
-support has small amount of code right now, we would consider all possibility
-to not introduce regression and keep things working along the way. There will
-be a point were the code need to be shuffled..
+In principle the driver bases on v4l2 memory-to-memory framework:
+it provides a single video node and each opened file handle gets its own private context with separate
+buffer queues. Each context consist of 2 buffer queues: OUTPUT (for source buffers, i.e. bitstream)
+and CAPTURE (for destination buffers, i.e. decoded video frames).
+OUTPUT and CAPTURE buffer could be MMAP or DMABUF memory type.
+VIDIOC_G_CTRL and VIDIOC_G_EXT_CTRLS return V4L2_CID_MIN_BUFFERS_FOR_CAPTURE only when dirver in MTK_STATE_HEADER
+state, or it will return EAGAIN.
+Driver do not support subscribe event for control 'User Controls' for now.
+And it default support export DMABUF for other display drivers.
 
->> I have reasonably clean patches (6 of them) on top of this three which would
->> remove the arch code for the iclk handling and implements it in the mcbsp
->> driver w/o changing the architecture of the McBSP driver itself. Both DT and
->> legacy boot works. The only part I was not happy about the one where I looked
->> up the mcbsp2/3_ick, but I think I have found much cleaner way to do it
->> (meaning that the code will not look hackish at all).
->> If you want to see, I can make this change and I can send the whole thing as
->> RFC and continue the discussion around that?
-> 
-> Sure, especially if that helps with splitting up the modules too.
+v4l2-compliance test output:
+localhost Encode # ./v4l2-compliance -d /dev/video0
+Driver Info:
+        Driver name   : mtk-vcodec-dec
+        Card type     : platform:mt8173
+        Bus info      : platform:mt8173
+        Driver version: 4.4.0
+        Capabilities  : 0x84204000
+                Video Memory-to-Memory Multiplanar
+                Streaming
+                Extended Pix Format
+                Device Capabilities
+        Device Caps   : 0x04204000
+                Video Memory-to-Memory Multiplanar
+                Streaming
+                Extended Pix Format
 
-To start with the hwmod data is wrong for mcbsp2/3 mcbsp2/3_sidetone:
-static struct omap_hwmod omap3xxx_mcbsp2_hwmod = {
-	.name		= "mcbsp2",
-	.class		= &omap3xxx_mcbsp_hwmod_class,
-	.mpu_irqs	= omap3xxx_mcbsp2_irqs,
-	.sdma_reqs	= omap2_mcbsp2_sdma_reqs,
-	.main_clk	= "mcbsp2_fck",
-	.prcm		= {
-		.omap2 = {
-			.prcm_reg_id = 1,
-			.module_bit = OMAP3430_EN_MCBSP2_SHIFT,
-			.module_offs = OMAP3430_PER_MOD,
-			.idlest_reg_id = 1,
-			.idlest_idle_bit = OMAP3430_ST_MCBSP2_SHIFT,
-		},
-	},
-	.opt_clks	= mcbsp234_opt_clks,
-	.opt_clks_cnt	= ARRAY_SIZE(mcbsp234_opt_clks),
-	.dev_attr	= &omap34xx_mcbsp2_dev_attr,
-};
+Compliance test for device /dev/video0 (not using libv4l2):
 
-static struct omap_hwmod omap3xxx_mcbsp2_sidetone_hwmod = {
-	.name		= "mcbsp2_sidetone",
-	.class		= &omap3xxx_mcbsp_sidetone_hwmod_class,
-	.mpu_irqs	= omap3xxx_mcbsp2_sidetone_irqs,
-	.main_clk	= "mcbsp2_fck",
-	.prcm		= {
-		.omap2 = {
-			.prcm_reg_id = 1,
-			 .module_bit = OMAP3430_EN_MCBSP2_SHIFT,
-			.module_offs = OMAP3430_PER_MOD,
-			.idlest_reg_id = 1,
-			.idlest_idle_bit = OMAP3430_ST_MCBSP2_SHIFT,
-		},
-	},
-};
+Required ioctls:
+        test VIDIOC_QUERYCAP: OK
 
-The McBSP2_ST main_clk is mcbsp2_ick, not mcbsp2_fck (ch 21.3.2.2.6 in
-OMAP36xx TRM).
-The sidetone should not have prcm section at all as it does not have control
-over it's clocks in that level. Giving the same PRCM registers and bits for
-both McBSP and it's sidetone is wrong. What should be expected if McBSP is
-enabled and we disable the ST via pm_runtime? Will the hwmod toggle bits in
-PRCM? If it does, the McBSP will looses it's clocks...
+Allow for multiple opens:
+        test second video open: OK
+        test VIDIOC_QUERYCAP: OK
+        test VIDIOC_G/S_PRIORITY: OK
 
-While the McBSP and ST regions are different, the ST is part of the McBSP from
-PRCM point of view so not sure how this could be worked around with separated
-drivers.
+Debug ioctls:
+        test VIDIOC_DBG_G/S_REGISTER: OK (Not Supported)
+        test VIDIOC_LOG_STATUS: OK (Not Supported)
+
+Input ioctls:
+        test VIDIOC_G/S_TUNER/ENUM_FREQ_BANDS: OK (Not Supported)
+        test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
+        test VIDIOC_S_HW_FREQ_SEEK: OK (Not Supported)
+        test VIDIOC_ENUMAUDIO: OK (Not Supported)
+        test VIDIOC_G/S/ENUMINPUT: OK (Not Supported)
+        test VIDIOC_G/S_AUDIO: OK (Not Supported)
+        Inputs: 0 Audio Inputs: 0 Tuners: 0
+
+Output ioctls:
+        test VIDIOC_G/S_MODULATOR: OK (Not Supported)
+        test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
+        test VIDIOC_ENUMAUDOUT: OK (Not Supported)
+        test VIDIOC_G/S/ENUMOUTPUT: OK (Not Supported)
+        test VIDIOC_G/S_AUDOUT: OK (Not Supported)
+        Outputs: 0 Audio Outputs: 0 Modulators: 0
+
+Input/Output configuration ioctls:
+        test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
+        test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
+        test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
+        test VIDIOC_G/S_EDID: OK (Not Supported)
+
+        Control ioctls:
+                test VIDIOC_QUERYCTRL/MENU: OK
+                fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-controls.cpp(357): g_ctrl returned an error (11)
+                test VIDIOC_G/S_CTRL: FAIL
+                fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-controls.cpp(579): g_ext_ctrls returned an error (11)
+                test VIDIOC_G/S/TRY_EXT_CTRLS: FAIL
+                fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-controls.cpp(721): subscribe event for control 'User Controls' failed
+                test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: FAIL
+                test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
+                Standard Controls: 2 Private Controls: 0
+
+        Format ioctls:
+                test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
+                test VIDIOC_G/S_PARM: OK (Not Supported)
+                test VIDIOC_G_FBUF: OK (Not Supported)
+                fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-formats.cpp(405): expected EINVAL, but got 11 when getting format for buftype 9
+                test VIDIOC_G_FMT: FAIL
+                test VIDIOC_TRY_FMT: OK (Not Supported)
+                test VIDIOC_S_FMT: OK (Not Supported)
+                test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
+
+        Codec ioctls:
+                test VIDIOC_(TRY_)ENCODER_CMD: OK (Not Supported)
+                test VIDIOC_G_ENC_INDEX: OK (Not Supported)
+                test VIDIOC_(TRY_)DECODER_CMD: OK (Not Supported)
+
+        Buffer ioctls:
+                test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
+                fail: ../../../v4l-utils-1.6.0/utils/v4l2-compliance/v4l2-test-buffers.cpp(500): q.has_expbuf(node)
+                test VIDIOC_EXPBUF: FAIL
+
+
+Total: 38, Succeeded: 33, Failed: 5, Warnings: 0
+
+
+Daniel Kurtz (1):
+  [media]: v4l: add Mediatek MT21 video block format
+
+Tiffany Lin (6):
+  dt-bindings: Add a binding for Mediatek Video Decoder
+  [Media] vcodec: mediatek: Add Mediatek V4L2 Video Decoder Driver
+  [media] vcodec: mediatek: Add Mediatek H264 Video Decoder Driver
+  [media] vcodec: mediatek: Add Mediatek VP8 Video Decoder Driver
+  [media] vcodec: mediatek: Add Mediatek VP9 Video Decoder Driver
+  arm64: dts: mediatek: Add Video Encoder for MT8173
+
+ .../devicetree/bindings/media/mediatek-vcodec.txt  |   50 +-
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |   38 +
+ drivers/media/platform/mtk-vcodec/Makefile         |   15 +-
+ drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c | 1429 ++++++++++++++++++++
+ drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.h |   81 ++
+ .../media/platform/mtk-vcodec/mtk_vcodec_dec_drv.c |  469 +++++++
+ .../media/platform/mtk-vcodec/mtk_vcodec_dec_pm.c  |  153 +++
+ .../media/platform/mtk-vcodec/mtk_vcodec_dec_pm.h  |   28 +
+ drivers/media/platform/mtk-vcodec/mtk_vcodec_drv.h |   98 +-
+ .../media/platform/mtk-vcodec/vdec/vdec_h264_if.c  |  487 +++++++
+ .../media/platform/mtk-vcodec/vdec/vdec_vp8_if.c   |  630 +++++++++
+ .../media/platform/mtk-vcodec/vdec/vdec_vp9_if.c   | 1108 +++++++++++++++
+ drivers/media/platform/mtk-vcodec/vdec_drv_base.h  |   56 +
+ drivers/media/platform/mtk-vcodec/vdec_drv_if.c    |  123 ++
+ drivers/media/platform/mtk-vcodec/vdec_drv_if.h    |   93 ++
+ drivers/media/platform/mtk-vcodec/vdec_ipi_msg.h   |  100 ++
+ drivers/media/platform/mtk-vcodec/vdec_vpu_if.c    |  164 +++
+ drivers/media/platform/mtk-vcodec/vdec_vpu_if.h    |   60 +
+ include/uapi/drm/drm_fourcc.h                      |    1 +
+ include/uapi/linux/videodev2.h                     |    2 +
+ 20 files changed, 5160 insertions(+), 25 deletions(-)
+ create mode 100644 drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
+ create mode 100644 drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.h
+ create mode 100644 drivers/media/platform/mtk-vcodec/mtk_vcodec_dec_drv.c
+ create mode 100644 drivers/media/platform/mtk-vcodec/mtk_vcodec_dec_pm.c
+ create mode 100644 drivers/media/platform/mtk-vcodec/mtk_vcodec_dec_pm.h
+ create mode 100644 drivers/media/platform/mtk-vcodec/vdec/vdec_h264_if.c
+ create mode 100644 drivers/media/platform/mtk-vcodec/vdec/vdec_vp8_if.c
+ create mode 100644 drivers/media/platform/mtk-vcodec/vdec/vdec_vp9_if.c
+ create mode 100644 drivers/media/platform/mtk-vcodec/vdec_drv_base.h
+ create mode 100644 drivers/media/platform/mtk-vcodec/vdec_drv_if.c
+ create mode 100644 drivers/media/platform/mtk-vcodec/vdec_drv_if.h
+ create mode 100644 drivers/media/platform/mtk-vcodec/vdec_ipi_msg.h
+ create mode 100644 drivers/media/platform/mtk-vcodec/vdec_vpu_if.c
+ create mode 100644 drivers/media/platform/mtk-vcodec/vdec_vpu_if.h
 
 -- 
-P?ter
+1.7.9.5
