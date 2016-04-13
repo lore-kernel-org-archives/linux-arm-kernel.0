@@ -1,55 +1,79 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 13 Apr 2016 14:29:15 +0100
-Subject: X-Gene: Unhandled fault: synchronous external abort in
- pci_generic_config_read32
-In-Reply-To: <20160413132101.GA22699@localhost>
-References: <20150724224258.GA23990@google.com>
- <CADaLNDmYZ=8XQt82W_H74QaOiX3UwkVxkE1_EWRgzhkG1boebw@mail.gmail.com>
- <CAErSpo549xfAnx62quCqGHh3DNay5Lfb6EhEG+4EXooEuueQFQ@mail.gmail.com>
- <CADaLNDn95H=g73DKWRsrB4SuWcf+-8mkepbwb_DC-sFsVkrk6g@mail.gmail.com>
- <20150728212944.GA12958@google.com>
- <CAPKp9ub7KDCvK_hhJWR4LfFGqBkYGtD2Pb8cLsd_7bQ4bK3j2w@mail.gmail.com>
- <20160413132101.GA22699@localhost>
-Message-ID: <570E49AB.1090509@arm.com>
+From: niklas.soderlund@ragnatech.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
+Date: Wed, 13 Apr 2016 15:29:17 +0200
+Subject: [PATCH v5 3/9] dma-mapping: add dma_{map,unmap}_resource
+In-Reply-To: <20160321152601.GA11674@infradead.org>
+References: <1457404974-1800-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+ <20160311125846.GF1111@bigcity.dyn.berto.se>
+ <20160315082254.GE9136@infradead.org> <3286525.zPAGiD4Xk2@avalon>
+ <20160321152601.GA11674@infradead.org>
+Message-ID: <20160413132916.GC19650@bigcity.dyn.berto.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Christoph,
 
+On 2016-03-21 08:26:01 -0700, Christoph Hellwig wrote:
+> On Thu, Mar 17, 2016 at 01:33:51PM +0200, Laurent Pinchart wrote:
+> > The good news is that, given that no code uses this new API at the moment, 
+> > there isn't much to audit. The patch series implements the resource mapping 
+> > for arch/arm only, and makes use of it in the rcar-dmac driver only. Would you 
+> > like anything audited else than the arch/arm dma mapping implementation, the 
+> > rcar-dmac driver and the code that then deals with the dma addresses (I'm 
+> > thinking about the IOMMU subsystem and the ipmmu-vmsa driver in particular) ?
+> 
+> Yes, it would be good to do an audit of all the ARM dma_ops as well
+> as generic code like drivers/base/dma-*.c, lib/dma-debug.c and
+> include/linux/dma-*.h
 
-On 13/04/16 14:21, Bjorn Helgaas wrote:
-> On Wed, Apr 13, 2016 at 10:58:18AM +0100, Sudeep Holla wrote:
->> Hi,
->>
->> (sorry for replying on the old thread, but I found it could be related
->> to the issue
->> I have now)
->>
->> On Tue, Jul 28, 2015 at 10:29 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+I have now done an audit to the best of my abilities, thanks to Laurent 
+for pointing me in the right direction. And from what I can tell we are 
+good.
 
-[...]
+* drivers/dma/sh/rcar-dmac.c
+  Once the phys_addr_t is mapped to a dma_addr_t using 
+  dma_map_resource() it is only used to check that the transfere do not 
+  cross 4GB boundaries and then only directly written to HW registers.
 
->>>>
->>>> Our latest U-Boot is 1.15.15, but U-Boot 1.15.12 is already a good
->>>> version to use. Are you running any PCIe traffic test when the error
->>>> happens?
->>>
->>> Nope, the machine was either idle or running a reboot test; no PCIe stress
->>> test or anything.
->>>
->>
->> Was there any conclusion on this ?
->> I am having similar issue[1] on my Juno with sky2 PCIe driver during reboot.
->
-> We found that the unhandled faults occurred when using an extender
-> card.  After removing the extender card, we didn't see the faults any
-> more.
->
+* drivers/iommu/iommu.c
+  - iommu_map()
+    Check that it's align to min page size or return -EINVAL then calls
+    domain->ops->map()
 
-Thanks for the response. It's not related then, I saw report referencing
-reboot tests and hence linked them together. Sorry for the noise.
+* drivers/iommu/ipmmu-vmsa.c
+  - ipmmu_map()
+    No logic only calls domain->ops->map()
+
+* drivers/iommu/io-pgtable-arm.c
+  - arm_lpae_map()
+    No logic only calls __arm_lpae_map()
+  - __arm_lpae_map()
+    No logic only calls arm_lpae_init_pte()
+  - arm_lpae_init_pte()
+    Used to get a pte:
+      pte |= pfn_to_iopte(paddr >> data->pg_shift, data);
+
+* drivers/iommu/io-pgtable-arm-v7s.c
+  - arm_v7s_map()
+    No logic only calls __arm_v7s_map()
+  - __arm_v7s_map()
+    No logic only calls arm_v7s_init_pte()
+  - arm_v7s_init_pte
+    Used to get a pte:
+      pte |= paddr & ARM_V7S_LVL_MASK(lvl);
+
+* ARM dma-mapping
+  - dma_unmap_*
+    Only valid unmap is dma_unmap_resource() all others are an invalid 
+    use case.
+  - dma_sync_single_*
+    Invalid use case, memmory that is mapped is device memmory
+  - dma_common_mmap() and dma_mmap_attrs()
+    Invalid use case
+  - dma_common_get_sgtable() and dma_get_sgtable_attrs()
+    Invalid use case, only for dma_alloc_* allocated memory,
+  - dma_mapping_error()
+    OK
 
 -- 
 Regards,
-Sudeep
-
->> [1] http://marc.info/?l=linux-netdev&m=146046999701956&w=2
+Niklas S?derlund
