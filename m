@@ -1,39 +1,51 @@
-From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
-Date: Wed, 13 Apr 2016 16:32:36 -0300
-Subject: [PATCH] [media] exynos-gsc: remove an always false condition
-Message-ID: <26a7ed9c18193dc7a3dfba33e3c711822f4bdd29.1460575950.git.mchehab@osg.samsung.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 13 Apr 2016 22:36:21 +0300
+Subject: [PATCH] ARM: dts: silk: add DU pins
+In-Reply-To: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
+References: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
+Message-ID: <2415333.mtLdVEoB2G@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As reported by smatch:
-drivers/media/platform/exynos-gsc/gsc-core.c:1073 gsc_probe() warn: impossible condition '(gsc->id < 0) => (0-65535 < 0)'
-drivers/media/platform/exynos-gsc/gsc-core.c: In function 'gsc_probe':
-drivers/media/platform/exynos-gsc/gsc-core.c:1073:51: warning: comparison is always false due to limited range of data type [-Wtype-limits]
-  if (gsc->id >= drv_data->num_entities || gsc->id < 0) {
-                                                   ^
+Add the (previously omitted) DU pin data to the SILK board's device tree.
 
-gsc->id is an u16, so it can never be a negative number. So,
-remove the always false condition.
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Fixes: c1ac057173ba "[media] exynos-gsc: remove non-device-tree init code"
-Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
 ---
- drivers/media/platform/exynos-gsc/gsc-core.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+This patch is against the 'renesas-devel-20160411-v4.6-rc3' tag of Simon
+Horman's 'renesas.git' repo. It depends on the R8A7794 DU PFC driver patch
+just posted for the pins to be configured...
 
-diff --git a/drivers/media/platform/exynos-gsc/gsc-core.c b/drivers/media/platform/exynos-gsc/gsc-core.c
-index 032a423fb892..c595723f5031 100644
---- a/drivers/media/platform/exynos-gsc/gsc-core.c
-+++ b/drivers/media/platform/exynos-gsc/gsc-core.c
-@@ -1070,7 +1070,7 @@ static int gsc_probe(struct platform_device *pdev)
- 		return -ENOMEM;
+ arch/arm/boot/dts/r8a7794-silk.dts |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+Index: renesas/arch/arm/boot/dts/r8a7794-silk.dts
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7794-silk.dts
++++ renesas/arch/arm/boot/dts/r8a7794-silk.dts
+@@ -183,6 +183,16 @@
+ 		groups = "usb1";
+ 		function = "usb1";
+ 	};
++
++	du0_pins: du0 {
++		groups = "du0_rgb888", "du0_sync", "du0_disp", "du0_clk0_out";
++		function = "du0";
++	};
++
++	du1_pins: du1 {
++		groups = "du1_rgb666", "du1_sync", "du1_disp", "du1_clk0_out";
++		function = "du1";
++	};
+ };
  
- 	gsc->id = of_alias_get_id(pdev->dev.of_node, "gsc");
--	if (gsc->id >= drv_data->num_entities || gsc->id < 0) {
-+	if (gsc->id >= drv_data->num_entities) {
- 		dev_err(dev, "Invalid platform device id: %d\n", gsc->id);
- 		return -EINVAL;
- 	}
--- 
-2.5.5
+ &scif2 {
+@@ -360,6 +370,8 @@
+ };
+ 
+ &du {
++	pinctrl-0 = <&du0_pins &du1_pins>;
++	pinctrl-names = "default";
+ 	status = "okay";
+ 
+ 	clocks = <&mstp7_clks R8A7794_CLK_DU0>,
