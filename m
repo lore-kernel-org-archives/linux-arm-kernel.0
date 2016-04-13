@@ -1,34 +1,67 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 13 Apr 2016 14:07:21 -0700
-Subject: [PATCH v3] arm: omap2: remove redundant multiplatform checks
-In-Reply-To: <20160406191433.GF16484@atomide.com>
-References: <201604060526.ouhQYqrT%fengguang.wu@intel.com>
- <1459895738-6546-1-git-send-email-jonas.rabenstein@studium.uni-erlangen.de>
- <1459930448-32638-1-git-send-email-ve92mose@stud.informatik.uni-erlangen.de>
- <5704CC9F.6010502@ti.com> <20160406191433.GF16484@atomide.com>
-Message-ID: <20160413210720.GC5995@atomide.com>
+From: jerin.jacob@caviumnetworks.com (Jerin Jacob)
+Date: Thu, 14 Apr 2016 02:40:56 +0530
+Subject: [PATCH v2] arm64: pci: add support for pci_mmap_page_range
+Message-ID: <1460581856-12380-1-git-send-email-jerin.jacob@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [160406 12:16]:
-> * Lokesh Vutla <lokeshvutla@ti.com> [160406 01:50]:
-> > +Tony
-> > 
-> > On Wednesday 06 April 2016 01:44 PM, Jonas Rabenstein wrote:
-> > > From: Jonas Rabenstein <jonas.rabenstein@studium.uni-erlangen.de>
-> > > 
-> > > The directory arch/arm/mach-omap2 is only selected for compilation if
-> > > CONFIG_ARCH_OMAP2PLUS is selected. CONFIG_ARCH_OMAP2PLUS itself is a
-> > > silent option and all machines selecting this option are multiplatform
-> > > devices. As a consequence checks for CONFIG_ARCH_MULTIPLATFORM as well
-> > > as CONFIG_ARCH_OMAP2PLUS within that directory are superfluous and can
-> > > be removed.
-> > 
-> > Reviewed-by: Lokesh Vutla <lokeshvutla@ti.com>
-> 
-> Yeah nice if we can remove the legacy multi SoC options. I'll take
-> a closer look within few days as I'm still at ELC.
+Certain X11 servers and user space network drivers frameworks
+need PCI mmaped /sys/bus/pci/devices/B:D:F/resourceX file to
+access PCI bar address space from user space.
 
-Applying into omap-for-v4.7/soc thanks.
+Signed-off-by: Jerin Jacob <jerin.jacob@caviumnetworks.com>
+---
+Changes in v2:
+  - Rebased to 4.6.0-rc3.
+  - Tested and verified the change on Thunderx and xgene1 arm64 platforms
 
-Tony
+ arch/arm64/include/asm/pci.h |  6 ++++++
+ arch/arm64/kernel/pci.c      | 20 ++++++++++++++++++++
+ 2 files changed, 26 insertions(+)
+
+diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
+index b9a7ba9..9d7e460 100644
+--- a/arch/arm64/include/asm/pci.h
++++ b/arch/arm64/include/asm/pci.h
+@@ -37,5 +37,11 @@ static inline int pci_proc_domain(struct pci_bus *bus)
+ }
+ #endif  /* CONFIG_PCI */
+ 
++#define HAVE_PCI_MMAP
++
++extern int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
++	enum pci_mmap_state mmap_state, int write_combine);
++
++
+ #endif  /* __KERNEL__ */
+ #endif  /* __ASM_PCI_H */
+diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+index c72de66..be7ddf1 100644
+--- a/arch/arm64/kernel/pci.c
++++ b/arch/arm64/kernel/pci.c
+@@ -82,3 +82,23 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+ 	return NULL;
+ }
+ #endif
++
++int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
++		enum pci_mmap_state mmap_state, int write_combine)
++{
++	/*
++	* I/O space can be accessed via normal processor loads and stores on
++	* this platform but for now we elect not to do this and portable
++	* drivers should not do this anyway.
++	*/
++	if (mmap_state == pci_mmap_io)
++		return -EINVAL;
++
++	if (write_combine)
++		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
++	else
++		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
++
++	return remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
++	       vma->vm_end - vma->vm_start, vma->vm_page_prot);
++}
+-- 
+2.1.0
