@@ -1,37 +1,98 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 13 Apr 2016 17:18:06 -0400
-Subject: [PATCH V4 4/7] ARM64, ACPI, PCI: I/O Remapping Table (IORT)
- initial support.
-In-Reply-To: <570E6B2C.3060700@arm.com>
-References: <1459759975-24097-1-git-send-email-tn@semihalf.com>
- <1459759975-24097-5-git-send-email-tn@semihalf.com>
- <570E645A.9010600@arm.com> <570E6794.4080409@semihalf.com>
- <570E6B2C.3060700@arm.com>
-Message-ID: <570EB78E.4060705@codeaurora.org>
+From: Tirumalesh.Chalamarla@caviumnetworks.com (Chalamarla, Tirumalesh)
+Date: Wed, 13 Apr 2016 21:16:14 +0000
+Subject: [PATCH 2/7] iommu/arm-smmu: Convert ThunderX workaround to new
+ method
+In-Reply-To: <98b8079ee3ede4427b045214a60ba77f1cb3552c.1460391217.git.robin.murphy@arm.com>
+References: <cover.1460391217.git.robin.murphy@arm.com>
+ <98b8079ee3ede4427b045214a60ba77f1cb3552c.1460391217.git.robin.murphy@arm.com>
+Message-ID: <6BD36166-69D0-498D-A021-870AD5698FE5@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/13/2016 11:52 AM, Marc Zyngier wrote:
->> > Sure. Please see:
->> > http://infocenter.arm.com/help/topic/com.arm.doc.den0049a/DEN0049A_IO_Remapping_Table.pdf
->> > 3.1.1.5 PCI root complex node
->> > PCI Segment number -> The PCI segment number, as in MCFG and as
->> > returned by _SEG in the namespace.
->> > 
->> > So IORT spec states that pci_segment_number corresponds to the segment 
->> > number from MCFG table and _SEG method. Here is my patch which makes 
->> > sure pci_domain_nr(bus) is set properly:
->> > https://lkml.org/lkml/2016/2/16/418
-> Lovely. So this series is actually dependent on the PCI one. I guess we
-> need to solve that one first, because IORT seems pretty pointless if we
-> don't have PCI support. What's the plan?
 
-Would it be OK to split the PCI specific section of the patch and continue
-review? PCI is a user of the IORT table. Not the other way around. 
 
-We shouldn't need a two way dependency. 
 
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+
+
+On 4/13/16, 10:12 AM, "Robin Murphy" <robin.murphy@arm.com> wrote:
+
+>With a framework for implementation-specific funtionality in place, the
+>currently-FDT-dependent ThunderX workaround gets to be the first user.
+>
+>Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>---
+> drivers/iommu/arm-smmu.c | 27 ++++++++++++++-------------
+> 1 file changed, 14 insertions(+), 13 deletions(-)
+>
+>diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>index 2d5f357..d8bc20a 100644
+>--- a/drivers/iommu/arm-smmu.c
+>+++ b/drivers/iommu/arm-smmu.c
+>@@ -280,6 +280,7 @@ enum arm_smmu_arch_version {
+> 
+> enum arm_smmu_implementation {
+> 	GENERIC_SMMU,
+>+	CAVIUM_SMMUV2,
+> };
+> 
+> struct arm_smmu_smr {
+>@@ -1686,6 +1687,17 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
+> 	}
+> 	dev_notice(smmu->dev, "\t%u context banks (%u stage-2 only)\n",
+> 		   smmu->num_context_banks, smmu->num_s2_context_banks);
+>+	/*
+>+	 * Cavium CN88xx erratum #27704.
+>+	 * Ensure ASID and VMID allocation is unique across all SMMUs in
+>+	 * the system.
+>+	 */
+>+	if (smmu->model == CAVIUM_SMMUV2) {
+>+		smmu->cavium_id_base =
+>+			atomic_add_return(smmu->num_context_banks,
+>+					  &cavium_smmu_context_count);
+>+		smmu->cavium_id_base -= smmu->num_context_banks;
+>+	}
+> 
+> 	/* ID2 */
+> 	id = readl_relaxed(gr0_base + ARM_SMMU_GR0_ID2);
+>@@ -1750,6 +1762,7 @@ static struct arm_smmu_match_data name = { .version = ver, .model = imp }
+> 
+> ARM_SMMU_MATCH_DATA(smmu_generic_v1, ARM_SMMU_V1, GENERIC_SMMU);
+> ARM_SMMU_MATCH_DATA(smmu_generic_v2, ARM_SMMU_V2, GENERIC_SMMU);
+>+ARM_SMMU_MATCH_DATA(cavium_smmuv2, ARM_SMMU_V2, CAVIUM_SMMUV2);
+> 
+> static const struct of_device_id arm_smmu_of_match[] = {
+> 	{ .compatible = "arm,smmu-v1", .data = &smmu_generic_v1 },
+>@@ -1757,7 +1770,7 @@ static const struct of_device_id arm_smmu_of_match[] = {
+> 	{ .compatible = "arm,mmu-400", .data = &smmu_generic_v1 },
+> 	{ .compatible = "arm,mmu-401", .data = &smmu_generic_v1 },
+> 	{ .compatible = "arm,mmu-500", .data = &smmu_generic_v2 },
+>-	{ .compatible = "cavium,smmu-v2", .data = &smmu_generic_v2 },
+>+	{ .compatible = "cavium,smmu-v2", .data = &cavium_smmuv2 },
+> 	{ },
+> };
+> MODULE_DEVICE_TABLE(of, arm_smmu_of_match);
+>@@ -1871,18 +1884,6 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+> 		}
+> 	}
+> 
+>-	/*
+>-	 * Cavium CN88xx erratum #27704.
+>-	 * Ensure ASID and VMID allocation is unique across all SMMUs in
+>-	 * the system.
+>-	 */
+>-	if (of_device_is_compatible(dev->of_node, "cavium,smmu-v2")) {
+>-		smmu->cavium_id_base =
+>-			atomic_add_return(smmu->num_context_banks,
+>-					  &cavium_smmu_context_count);
+>-		smmu->cavium_id_base -= smmu->num_context_banks;
+>-	}
+>-
+> 	INIT_LIST_HEAD(&smmu->list);
+> 	spin_lock(&arm_smmu_devices_lock);
+> 	list_add(&smmu->list, &arm_smmu_devices);
+>-- 
+>2.7.3.dirty
+This looks fine too.
+Acked-by: Tirumalesh Chalamarla<tchalamarla@caviumnetworks.com>
+
+>
