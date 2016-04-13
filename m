@@ -1,119 +1,151 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 13 Apr 2016 18:13:03 +0100
-Subject: [PATCH 7/7] iommu/arm-smmu: Support SMMUv1 64KB supplement
+Date: Wed, 13 Apr 2016 18:13:01 +0100
+Subject: [PATCH 5/7] iommu/arm-smmu: Tidy up 64-bit/atomic I/O accesses
 In-Reply-To: <cover.1460391217.git.robin.murphy@arm.com>
 References: <cover.1460391217.git.robin.murphy@arm.com>
-Message-ID: <119e74a022bf9ee11a2b787233af731e16d75995.1460391217.git.robin.murphy@arm.com>
+Message-ID: <b6e08204cb539be8dacab0a7fdb36f3d2b2a2bd8.1460391217.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 64KB Translation Granule Supplement to the SMMUv1 architecture
-allows an SMMUv1 implementation to support 64KB pages for stage 2
-translations, using a constrained VMSAv8 descriptor format limited
-to 40-bit addresses. Now that we can freely mix and match context
-formats, we can actually handle having 4KB pages via an AArch32
-context but 64KB pages via an AArch64 context, so plumb it in.
+With {read,write}q_relaxed now able to fall back to the common
+nonatomic-hi-lo helper, make use of that so that we don't have to
+open-code our own. In the process, also convert the other remaining
+split accesses, and repurpose the custom accessor to smooth out the
+couple of troublesome instances where we really want to avoid
+nonatomic writes (and a 64-bit access is unnecessary in the 32-bit
+context formats we would use on a 32-bit CPU).
 
-It is assumed that any implementations will have hardware capabilities
-matching the format constraints, thus obviating the need for excessive
-sanity-checking; this is the case for MMU-401, the only ARM Ltd.
-implementation.
+This paves the way for getting rid of some of the assumptions currently
+baked into the driver which make it really awkward to use 32-bit context
+formats with SMMUv2 under a 64-bit kernel.
 
-CC: Eric Auger <eric.auger@linaro.org>
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- drivers/iommu/arm-smmu.c | 22 ++++++++++++++--------
- 1 file changed, 14 insertions(+), 8 deletions(-)
+ drivers/iommu/arm-smmu.c | 48 +++++++++++++++++++-----------------------------
+ 1 file changed, 19 insertions(+), 29 deletions(-)
 
 diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 1d4285f..00aa948 100644
+index 085fc8d..acff332 100644
 --- a/drivers/iommu/arm-smmu.c
 +++ b/drivers/iommu/arm-smmu.c
-@@ -277,7 +277,8 @@ MODULE_PARM_DESC(disable_bypass,
- 	"Disable bypass streams such that incoming transactions from devices that are not attached to an iommu domain will report an abort back to the device and will not be allowed to pass through the SMMU.");
+@@ -34,6 +34,7 @@
+ #include <linux/err.h>
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
++#include <linux/io-64-nonatomic-hi-lo.h>
+ #include <linux/iommu.h>
+ #include <linux/iopoll.h>
+ #include <linux/module.h>
+@@ -71,16 +72,15 @@
+ 		((smmu->options & ARM_SMMU_OPT_SECURE_CFG_ACCESS)	\
+ 			? 0x400 : 0))
  
- enum arm_smmu_arch_version {
--	ARM_SMMU_V1 = 1,
-+	ARM_SMMU_V1,
-+	ARM_SMMU_V1_64K,
- 	ARM_SMMU_V2,
- };
++/*
++ * Some 64-bit registers only make sense to write atomically, but in such
++ * cases all the data relevant to AArch32 formats lies within the lower word,
++ * therefore this actually makes more sense than it might first appear.
++ */
+ #ifdef CONFIG_64BIT
+-#define smmu_writeq	writeq_relaxed
++#define smmu_write_atomic_lq		writeq_relaxed
+ #else
+-#define smmu_writeq(reg64, addr)				\
+-	do {							\
+-		u64 __val = (reg64);				\
+-		void __iomem *__addr = (addr);			\
+-		writel_relaxed(__val >> 32, __addr + 4);	\
+-		writel_relaxed(__val, __addr);			\
+-	} while (0)
++#define smmu_write_atomic_lq		writel_relaxed
+ #endif
  
-@@ -769,7 +770,7 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
+ /* Configuration registers */
+@@ -211,11 +211,9 @@
+ #define ARM_SMMU_CB_TTBCR		0x30
+ #define ARM_SMMU_CB_S1_MAIR0		0x38
+ #define ARM_SMMU_CB_S1_MAIR1		0x3c
+-#define ARM_SMMU_CB_PAR_LO		0x50
+-#define ARM_SMMU_CB_PAR_HI		0x54
++#define ARM_SMMU_CB_PAR			0x50
+ #define ARM_SMMU_CB_FSR			0x58
+-#define ARM_SMMU_CB_FAR_LO		0x60
+-#define ARM_SMMU_CB_FAR_HI		0x64
++#define ARM_SMMU_CB_FAR			0x60
+ #define ARM_SMMU_CB_FSYNR0		0x68
+ #define ARM_SMMU_CB_S1_TLBIVA		0x600
+ #define ARM_SMMU_CB_S1_TLBIASID		0x610
+@@ -645,7 +643,7 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
+ 			      ARM_SMMU_CB_S2_TLBIIPAS2;
+ 		iova >>= 12;
+ 		do {
+-			writeq_relaxed(iova, reg);
++			smmu_write_atomic_lq(iova, reg);
+ 			iova += granule >> 12;
+ 		} while (size -= granule);
+ #endif
+@@ -664,7 +662,7 @@ static struct iommu_gather_ops arm_smmu_gather_ops = {
+ static irqreturn_t arm_smmu_context_fault(int irq, void *dev)
+ {
+ 	int flags, ret;
+-	u32 fsr, far, fsynr, resume;
++	u32 fsr, fsynr, resume;
+ 	unsigned long iova;
+ 	struct iommu_domain *domain = dev;
+ 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+@@ -686,13 +684,7 @@ static irqreturn_t arm_smmu_context_fault(int irq, void *dev)
+ 	fsynr = readl_relaxed(cb_base + ARM_SMMU_CB_FSYNR0);
+ 	flags = fsynr & FSYNR0_WNR ? IOMMU_FAULT_WRITE : IOMMU_FAULT_READ;
  
- 	/* CBAR */
- 	reg = cfg->cbar;
--	if (smmu->version == ARM_SMMU_V1)
-+	if (smmu->version < ARM_SMMU_V2)
- 		reg |= cfg->irptndx << CBAR_IRPTNDX_SHIFT;
+-	far = readl_relaxed(cb_base + ARM_SMMU_CB_FAR_LO);
+-	iova = far;
+-#ifdef CONFIG_64BIT
+-	far = readl_relaxed(cb_base + ARM_SMMU_CB_FAR_HI);
+-	iova |= ((unsigned long)far << 32);
+-#endif
+-
++	iova = readq_relaxed(cb_base + ARM_SMMU_CB_FAR);
+ 	if (!report_iommu_fault(domain, smmu->dev, iova, flags)) {
+ 		ret = IRQ_HANDLED;
+ 		resume = RESUME_RETRY;
+@@ -788,14 +780,14 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
+ 		reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[0];
  
- 	/*
-@@ -942,7 +943,7 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
- 		goto out_unlock;
+ 		reg64 |= ((u64)ARM_SMMU_CB_ASID(smmu, cfg)) << TTBRn_ASID_SHIFT;
+-		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR0);
++		writeq_relaxed(reg64, cb_base + ARM_SMMU_CB_TTBR0);
  
- 	cfg->cbndx = ret;
--	if (smmu->version == ARM_SMMU_V1) {
-+	if (smmu->version < ARM_SMMU_V2) {
- 		cfg->irptndx = atomic_inc_return(&smmu->irptndx);
- 		cfg->irptndx %= smmu->num_context_irqs;
+ 		reg64 = pgtbl_cfg->arm_lpae_s1_cfg.ttbr[1];
+ 		reg64 |= ((u64)ARM_SMMU_CB_ASID(smmu, cfg)) << TTBRn_ASID_SHIFT;
+-		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR1);
++		writeq_relaxed(reg64, cb_base + ARM_SMMU_CB_TTBR1);
  	} else {
-@@ -1627,7 +1628,8 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
- 	bool cttw_dt, cttw_reg;
- 
- 	dev_notice(smmu->dev, "probing hardware configuration...\n");
--	dev_notice(smmu->dev, "SMMUv%d with:\n", smmu->version);
-+	dev_notice(smmu->dev, "SMMUv%d with:\n",
-+			smmu->version == ARM_SMMU_V2 ? 2 : 1);
- 
- 	/* ID0 */
- 	id = readl_relaxed(gr0_base + ARM_SMMU_GR0_ID0);
-@@ -1659,7 +1661,8 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
- 		return -ENODEV;
+ 		reg64 = pgtbl_cfg->arm_lpae_s2_cfg.vttbr;
+-		smmu_writeq(reg64, cb_base + ARM_SMMU_CB_TTBR0);
++		writeq_relaxed(reg64, cb_base + ARM_SMMU_CB_TTBR0);
  	}
  
--	if ((id & ID0_S1TS) && ((smmu->version == 1) || !(id & ID0_ATOSNS))) {
-+	if ((id & ID0_S1TS) &&
-+		((smmu->version < ARM_SMMU_V2) || !(id & ID0_ATOSNS))) {
- 		smmu->features |= ARM_SMMU_FEAT_TRANS_OPS;
- 		dev_notice(smmu->dev, "\taddress translation ops\n");
+ 	/* TTBCR */
+@@ -1263,8 +1255,8 @@ static phys_addr_t arm_smmu_iova_to_phys_hard(struct iommu_domain *domain,
+ 	/* ATS1 registers can only be written atomically */
+ 	va = iova & ~0xfffUL;
+ 	if (smmu->version == ARM_SMMU_V2)
+-		smmu_writeq(va, cb_base + ARM_SMMU_CB_ATS1PR);
+-	else
++		smmu_write_atomic_lq(va, cb_base + ARM_SMMU_CB_ATS1PR);
++	else /* Register is only 32-bit in v1 */
+ 		writel_relaxed(va, cb_base + ARM_SMMU_CB_ATS1PR);
+ 
+ 	if (readl_poll_timeout_atomic(cb_base + ARM_SMMU_CB_ATSR, tmp,
+@@ -1275,9 +1267,7 @@ static phys_addr_t arm_smmu_iova_to_phys_hard(struct iommu_domain *domain,
+ 		return ops->iova_to_phys(ops, iova);
  	}
-@@ -1774,8 +1777,10 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
- 		dev_warn(smmu->dev,
- 			 "failed to set DMA mask for table walker\n");
  
--	if (smmu->version == ARM_SMMU_V1) {
-+	if (smmu->version < ARM_SMMU_V2) {
- 		smmu->va_size = smmu->ipa_size;
-+		if (smmu->version == ARM_SMMU_V1_64K)
-+			smmu->features |= ARM_SMMU_FEAT_FMT_AARCH64_64K;
- 	} else {
- 		size = (id >> ID2_UBS_SHIFT) & ID2_UBS_MASK;
- 		smmu->va_size = arm_smmu_id_size_to_bits(size);
-@@ -1827,6 +1832,7 @@ static struct arm_smmu_match_data name = { .version = ver, .model = imp }
- 
- ARM_SMMU_MATCH_DATA(smmu_generic_v1, ARM_SMMU_V1, GENERIC_SMMU);
- ARM_SMMU_MATCH_DATA(smmu_generic_v2, ARM_SMMU_V2, GENERIC_SMMU);
-+ARM_SMMU_MATCH_DATA(arm_mmu401, ARM_SMMU_V1_64K, GENERIC_SMMU);
- ARM_SMMU_MATCH_DATA(arm_mmu500, ARM_SMMU_V2, ARM_MMU500);
- ARM_SMMU_MATCH_DATA(cavium_smmuv2, ARM_SMMU_V2, CAVIUM_SMMUV2);
- 
-@@ -1834,7 +1840,7 @@ static const struct of_device_id arm_smmu_of_match[] = {
- 	{ .compatible = "arm,smmu-v1", .data = &smmu_generic_v1 },
- 	{ .compatible = "arm,smmu-v2", .data = &smmu_generic_v2 },
- 	{ .compatible = "arm,mmu-400", .data = &smmu_generic_v1 },
--	{ .compatible = "arm,mmu-401", .data = &smmu_generic_v1 },
-+	{ .compatible = "arm,mmu-401", .data = &arm_mmu401 },
- 	{ .compatible = "arm,mmu-500", .data = &arm_mmu500 },
- 	{ .compatible = "cavium,smmu-v2", .data = &cavium_smmuv2 },
- 	{ },
-@@ -1928,7 +1934,7 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
- 
- 	parse_driver_options(smmu);
- 
--	if (smmu->version > ARM_SMMU_V1 &&
-+	if (smmu->version == ARM_SMMU_V2 &&
- 	    smmu->num_context_banks != smmu->num_context_irqs) {
- 		dev_err(dev,
- 			"found only %d context interrupt(s) but %d required\n",
+-	phys = readl_relaxed(cb_base + ARM_SMMU_CB_PAR_LO);
+-	phys |= ((u64)readl_relaxed(cb_base + ARM_SMMU_CB_PAR_HI)) << 32;
+-
++	phys = readq_relaxed(cb_base + ARM_SMMU_CB_PAR);
+ 	if (phys & CB_PAR_F) {
+ 		dev_err(dev, "translation fault!\n");
+ 		dev_err(dev, "PAR = 0x%llx\n", phys);
 -- 
 2.7.3.dirty
