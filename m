@@ -1,119 +1,45 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 13 Apr 2016 10:40:50 +0100
-Subject: [RESEND 02/11] pwm: sysfs: Add PWM Capture support
-In-Reply-To: <20160412101550.GB18882@ulmo.ba.sec>
-References: <1456932729-9667-1-git-send-email-lee.jones@linaro.org>
- <1456932729-9667-3-git-send-email-lee.jones@linaro.org>
- <20160412101550.GB18882@ulmo.ba.sec>
-Message-ID: <20160413094050.GO8094@x1>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 13 Apr 2016 11:45:14 +0200
+Subject: [PULL] drm: atmel-hlcdc: various improvements
+Message-ID: <20160413114514.710e85b3@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 12 Apr 2016, Thierry Reding wrote:
+Hi,
 
-> On Wed, Mar 02, 2016 at 03:32:00PM +0000, Lee Jones wrote:
-> > Allow a user to read PWM Capture results from /sysfs. First,
-> > the user must tell PWM Capture which channel they wish to
-> > read from:
-> > 
-> >   $ echo 2 > $PWMCHIP/capture
-> > 
-> > To start a capture and read the result, simply read the file:
-> > 
-> >   $ cat $PWMCHIP/capture
-> > 
-> > The output format is left to the device.
-> > 
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  drivers/pwm/sysfs.c | 28 ++++++++++++++++++++++++++++
-> >  1 file changed, 28 insertions(+)
-> > 
-> > diff --git a/drivers/pwm/sysfs.c b/drivers/pwm/sysfs.c
-> > index 9c90886..3572ef4 100644
-> > --- a/drivers/pwm/sysfs.c
-> > +++ b/drivers/pwm/sysfs.c
-> > @@ -23,6 +23,8 @@
-> >  #include <linux/kdev_t.h>
-> >  #include <linux/pwm.h>
-> >  
-> > +static int capture_channel;
-> 
-> Can't do that, this is very racy because it isn't protected by any lock.
-> Fortunately I don't think the global variable is at all necessary. See
-> below.
-> 
-> > +
-> >  struct pwm_export {
-> >  	struct device child;
-> >  	struct pwm_device *pwm;
-> > @@ -167,16 +169,42 @@ static ssize_t polarity_store(struct device *child,
-> >  	return ret ? : size;
-> >  }
-> >  
-> > +static ssize_t capture_show(struct device *child,
-> > +			    struct device_attribute *attr,
-> > +			    char *buf)
-> > +{
-> > +	struct pwm_device *pwm = child_to_pwm_device(child);
-> > +
-> > +	return pwm_capture(pwm, capture_channel, buf);
-> > +}
-> > +
-> > +static ssize_t capture_store(struct device *child,
-> > +			     struct device_attribute *attr,
-> > +			     const char *buf, size_t size)
-> > +{
-> > +	int val, ret;
-> > +
-> > +	ret = kstrtoint(buf, 0, &val);
-> > +	if (ret)
-> > +		return ret;
-> > +
-> > +	capture_channel = val;
-> > +
-> > +	return size;
-> > +}
-> > +
-> >  static DEVICE_ATTR_RW(period);
-> >  static DEVICE_ATTR_RW(duty_cycle);
-> >  static DEVICE_ATTR_RW(enable);
-> >  static DEVICE_ATTR_RW(polarity);
-> > +static DEVICE_ATTR_RW(capture);
-> 
-> These are all per-PWM attributes and the specific PWM device that they
-> are associated with can be retrieved using child_to_pwm_device(child)
-> (see the other attributes' implementation for examples). So I don't
-> think the capture attribute needs to be writable at all. You already
-> implement capture_show() in almost the right way, and if you drop the
-> channel parameter from pwm_capture() as I suggested in my reply to patch
-> 1/11 this should resolve itself automatically.
-> 
-> Of course capture_show() would become slightly more beefy if we return a
-> standard result structure rather than leave it up to the drivers to fill
-> out the sysfs string. The good thing is that it will be common code and
-> therefore the sysfs interface would return the same format regardless of
-> the driver.
-> 
-> Perhaps something like
-> 
-> 	struct pwm_device *pwm = child_to_pwm_device(child);
-> 	struct pwm_capture result;
-> 
-> 	err = pwm_capture(pwm, &result);
-> 	if (err < 0)
-> 		return err;
-> 
-> 	return sprintf(buf, "%u %u\n", result.duty_cycle, result.period);
-> 	
-> would work?
+Here is a pull request containing several improvement and cleanup patches
+for the atmel-hlcdc driver to be applied on drm-next (targeting 4.7).
 
-Same reply as 1/11.  Now I know that we should be treating each of our
-channels, as *completely* separate devices, I think this method seems
-reasonable.
+Best Regards,
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Boris
+
+The following changes since commit c1cc68ae84bcce64e63d81b3531296728d407a16:
+
+  drm: atmel-hlcdc: add a ->cleanup_fb() operation (2016-04-13 10:49:13 +0200)
+
+are available in the git repository at:
+
+  https://github.com/bbrezillon/linux-at91.git cba06c6
+
+for you to fetch changes up to cba06c65983250d991b87eeade86b089c6bf2bc4:
+
+  drm: atmel-hlcdc: route DMA accesses through AHB interfaces (2016-04-13 10:49:18 +0200)
+
+----------------------------------------------------------------
+Boris Brezillon (8):
+      drm: atmel-hlcdc: support asynchronous atomic commit operations
+      drm: atmel-hlcdc: fix connector and encoder types
+      drm: atmel-hlcdc: remove leftovers from atomic mode setting migration
+      drm: atmel-hlcdc: support extended timing ranges on sama5d4 and sama5d2
+      drm: atmel-hlcdc: move output mode selection in CRTC implementation
+      drm: atmel-hlcdc: rework the output code to support drm bridges
+      drm: atmel-hlcdc: check display mode validity in crtc->mode_fixup()
+      drm: atmel-hlcdc: route DMA accesses through AHB interfaces
+
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c   | 158 +++++++++++++-
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c     | 123 ++++++++++-
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.h     |  15 ++
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c | 249 ++++++++++-------------
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c  |  43 +++-
+ 5 files changed, 432 insertions(+), 156 deletions(-)
