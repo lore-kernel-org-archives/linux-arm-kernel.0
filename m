@@ -1,21 +1,41 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Wed, 13 Apr 2016 07:32:15 -0500
-Subject: [PATCH 1/6] of/irq: Export of_msi_get_domain
-In-Reply-To: <1460543456-11345-2-git-send-email-mbrugger@suse.com>
-References: <1460543456-11345-1-git-send-email-mbrugger@suse.com>
- <1460543456-11345-2-git-send-email-mbrugger@suse.com>
-Message-ID: <CAL_JsqJ9fc8SOG9Gb_gcuSH0NT6HEy8P1O2kSSxV1y3+3a3N1g@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 13 Apr 2016 13:37:46 +0100
+Subject: [PATCH] arm64: mm: Add trace_irqflags annotations to
+ do_debug_exception()
+In-Reply-To: <20160329150650.GE6745@arm.com>
+References: <1458580446-32474-1-git-send-email-james.morse@arm.com>
+ <20160329150650.GE6745@arm.com>
+Message-ID: <570E3D9A.4090402@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 13, 2016 at 5:30 AM, Matthias Brugger <mbrugger@suse.com> wrote:
-> From: Matthias Brugger <matthias.bgg@gmail.com>
->
-> Export of_mis_get_domain to enable it for users from outside.
->
-> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
-> ---
->  drivers/of/irq.c | 1 +
->  1 file changed, 1 insertion(+)
+On 29/03/16 16:06, Will Deacon wrote:
+> On Mon, Mar 21, 2016 at 05:14:06PM +0000, James Morse wrote:
+>> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+>> index 44e56de23f79..d8b9c1da2630 100644
+>> --- a/arch/arm64/mm/fault.c
+>> +++ b/arch/arm64/mm/fault.c
+>> @@ -548,20 +548,33 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
+>>  {
+>>  	const struct fault_info *inf = debug_fault_info + DBG_ESR_EVT(esr);
+>>  	struct siginfo info;
+>> +	int rv;
+>>  
+>> -	if (!inf->fn(addr, esr, regs))
+>> -		return 1;
+>> +	/*
+>> +	 * If we came in from el0_dbg, we disabled irqs. From el1_dbg,
+>> +	 * we need to test pstate.
+>> +	 */
+>> +	if (user_mode(regs) || !(regs->pstate & PSR_I_BIT))
+>> +		trace_hardirqs_off();
+> 
+> Can you use interrupts_enabled(regs) for this?
 
-Acked-by: Rob Herring <robh@kernel.org>
+Yes! That would be better. I can also remove the user_mode() check which was due
+to paranoia and miss-understanding.
+
+
+Thanks,
+
+James
