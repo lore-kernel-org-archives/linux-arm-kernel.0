@@ -1,34 +1,59 @@
-From: ynezz@true.cz (Petr =?iso-8859-2?Q?=A9tetiar?=)
-Date: Wed, 13 Apr 2016 11:13:36 +0200
-Subject: [PATCH v2 0/6] serial: imx: handshaking fixes and improvments
-In-Reply-To: <20160412173032.GS10108@pengutronix.de>
-References: <1458825865-7434-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20160411160128.GD26941@ibawizard.net>
- <20160412074622.GQ10108@pengutronix.de>
- <20160412094846.GF26941@ibawizard.net>
- <20160412105856.GR10108@pengutronix.de>
- <20160412121759.GG26941@ibawizard.net>
- <20160412173032.GS10108@pengutronix.de>
-Message-ID: <20160413091336.GH26941@ibawizard.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 13 Apr 2016 09:16:45 +0000 (UTC)
+Subject: [GIT PULL] ARM: OMAP2+: clockdomain: another fix for v4.6-rc
+Message-ID: <alpine.DEB.2.02.1604130916040.9379@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [2016-04-12 19:30:32]:
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA256
 
-> On Tue, Apr 12, 2016 at 02:17:59PM +0200, Petr ?tetiar wrote:
-> > Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [2016-04-12 12:58:56]:
-> > 
-> > > ok, so UFCR_DCEDTE is set and UCR3_DSR controls the DTR output as
-> > > intended. What is connected to the respective pin?
-> > > MX6QDL_PAD_EIM_D25__UART1_DSR_B I think is the one.
-> > 
-> > It's routed out to Apalis SoM pin 120, which is then connected via 22R
-> > resistor and through SN65C3243DBR RS-232 line driver to header which I use as
-> > debug/serial console.
-> 
-> Then I guess the problem is that the rs232-partner asserts the imx6's
-> DSR in reply to the imx6 asserting DTR?
+Hi Tony
 
-Yes, that's correct.
+The following changes since commit 3ca4a238106dedc285193ee47f494a6584b6fd2f:
 
--- ynezz
+  ARM: OMAP2+: hwmod: Fix updating of sysconfig register (2016-03-26 23:08:55 -0600)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v4.6-rc/omap-fixes-b
+
+for you to fetch changes up to 1cbabcb9807e31e87ef3a12af76ea025ceb582d3:
+
+  ARM: DRA7: clockdomain: Implement timer workaround for errata i874 (2016-04-10 11:43:57 -0600)
+
+- ----------------------------------------------------------------
+ARM: OMAP2+: clockdomain: another fix for v4.6-rc
+
+For DRA7xx platforms, add a workaround for missed timer interrupts
+that appears to be due to an integration bug (erratum i874)
+
+Basic build, boot, and PM test logs are available here:
+
+http://www.pwsan.com/omap/testlogs/omap-fixes-b-for-v4.6-rc/20160413020850/
+
+(The DRA7xx board here has not yet been added into the testbed.)
+
+- ----------------------------------------------------------------
+Keerthy (1):
+      ARM: DRA7: clockdomain: Implement timer workaround for errata i874
+
+ arch/arm/mach-omap2/clockdomains7xx_data.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v2
+
+iQIcBAEBCAAGBQJXDg48AAoJEMePsQ0LvSpLj50P/1kFXG6VQJBmSjXSR6MIjCwG
+c42jiLw2NfnBJTm/kprvBeHl6YUsEK0Cn3wZ/N2Ng8VmIDJtCfC+UGs1CPO7gRrC
+roxpUypwvOcSBuQfjaspBb0lsh/gV6yyI3p+EusUwTn/oqfbh4Oxi3gpmsU89s5Q
+Ae1dm/Rtigyh6KZ5IKY9Kxv6tV4J4CAP60TUc417ASZxUN9u8z9Dec2XtN44ChFa
+yG13EhcIXo8hMD+g7i9tN3amog3qRnAXPiJY8YQAnGV/gKGER6Rhq71FwkIyFD4a
+g5oUBRmO5r2uyPBPGRgBV5aRt5LkNJ/v18z/f3wxA0GVI4bVW0VitIxQc/DhDqmh
+EnhVTeFmA96vLAQYZG8udWxjiiF0EUri6cU/p/q9QkWJiWNQFwDMThllLWOhMLoM
+h5P8kWAFolF33mS5gfFplwsD1WG5QrrHdGYnOaVIqYmLMEcTpLNkIBjnc/kydTqr
+QDU2earV14q+26jL5SIkbFYZRotOYvdiFHZwLcz4ZOlHQr9akTAZtRQd0IOZa/XI
+DXtaKJDvRdbSm0EjkdIINRifLWD0XOy9hFhse30tZAh0pWNo586RNtJ1p20MnXOC
+L2BUgrTSDeCuzGN0vpmbFkgXfzY8jtXt3/rJNUPZSrwPEgvQzf9xiolm/x1NFMEH
+ahHZ9xEDAwKFXrOMgE5k
+=wgYv
+-----END PGP SIGNATURE-----
