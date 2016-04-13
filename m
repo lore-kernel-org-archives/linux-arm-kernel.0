@@ -1,61 +1,46 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 12 Apr 2016 22:21:29 -0700
-Subject: [PATCH v3 1/9] ARM: imx: clk-vf610: fix DCU clock tree
-In-Reply-To: <20160412013820.GC15949@tiger>
-References: <1459834121-25997-1-git-send-email-stefan@agner.ch>
- <1459834121-25997-2-git-send-email-stefan@agner.ch>
- <20160412013820.GC15949@tiger>
-Message-ID: <17d56bd14159ec73dc1c07af15587de9@agner.ch>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 13 Apr 2016 06:25:53 +0100
+Subject: [PATCH] ACPI / ARM64: Remove EXPERT dependency for ACPI on ARM64
+In-Reply-To: <20160412172315.GH8066@e104818-lin.cambridge.arm.com>
+References: <1459360718-24125-1-git-send-email-broonie@kernel.org>
+ <20160412172315.GH8066@e104818-lin.cambridge.arm.com>
+Message-ID: <20160413052553.GF14664@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-04-11 18:38, Shawn Guo wrote:
-> On Mon, Apr 04, 2016 at 10:28:33PM -0700, Stefan Agner wrote:
->> Similar to an earlier fix for the SAI clocks, the DCU clock hierarchy
->> mixes the bus clock with the display controllers pixel clock. Tests
->> have shown that the gates in CCM_CCGR3/9 registers do not control
->> the DCU pixel clock, but only the register access clock (bus clock).
->>
->> Fix this by defining the parent clock of VF610_CLK_DCUx to be the bus
->> clock (ipg_bus).
->>
->> Since the clock has not been used far, there are no further changes
->> needed.
->>
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> 
-> Applied 1 and 2, with updating subject prefix to be 'clk: imx: vf610: '
+On Tue, Apr 12, 2016 at 06:23:15PM +0100, Catalin Marinas wrote:
 
-Thanks Shawn. Applied 3~6 in my FSL DCU tree. I guess 7~9 should go
-through your tree as well?
+> I'm fine with dropping the EXPERT dependency (of course, not a cc
+> stable). While arm64 ACPI is not "done" yet (nor is DT; there are
+> important ongoing developments like PCIe, IORT), I think the core arm64
+> ACPI support passed the EXPERT stage. I also don't think a default y
+> would imply any maintainer endorsement; vendors targeting ACPI are
+> already doing this for various reasons (distro requirement, certain ACPI
 
---
-Stefan
+So you're OK with the current patch?
 
+> features like RAS). But, hopefully, it will encourage more vendors to
+> start upstreaming their ACPI-related patches.
 
->> ---
->>  drivers/clk/imx/clk-vf610.c | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/clk/imx/clk-vf610.c b/drivers/clk/imx/clk-vf610.c
->> index 0a94d96..426fde2 100644
->> --- a/drivers/clk/imx/clk-vf610.c
->> +++ b/drivers/clk/imx/clk-vf610.c
->> @@ -321,11 +321,11 @@ static void __init vf610_clocks_init(struct device_node *ccm_node)
->>  	clk[VF610_CLK_DCU0_SEL] = imx_clk_mux("dcu0_sel", CCM_CSCMR1, 28, 1, dcu_sels, 2);
->>  	clk[VF610_CLK_DCU0_EN] = imx_clk_gate("dcu0_en", "dcu0_sel", CCM_CSCDR3, 19);
->>  	clk[VF610_CLK_DCU0_DIV] = imx_clk_divider("dcu0_div", "dcu0_en", CCM_CSCDR3, 16, 3);
->> -	clk[VF610_CLK_DCU0] = imx_clk_gate2("dcu0", "dcu0_div", CCM_CCGR3, CCM_CCGRx_CGn(8));
->> +	clk[VF610_CLK_DCU0] = imx_clk_gate2("dcu0", "ipg_bus", CCM_CCGR3, CCM_CCGRx_CGn(8));
->>  	clk[VF610_CLK_DCU1_SEL] = imx_clk_mux("dcu1_sel", CCM_CSCMR1, 29, 1, dcu_sels, 2);
->>  	clk[VF610_CLK_DCU1_EN] = imx_clk_gate("dcu1_en", "dcu1_sel", CCM_CSCDR3, 23);
->>  	clk[VF610_CLK_DCU1_DIV] = imx_clk_divider("dcu1_div", "dcu1_en", CCM_CSCDR3, 20, 3);
->> -	clk[VF610_CLK_DCU1] = imx_clk_gate2("dcu1", "dcu1_div", CCM_CCGR9, CCM_CCGRx_CGn(8));
->> +	clk[VF610_CLK_DCU1] = imx_clk_gate2("dcu1", "ipg_bus", CCM_CCGR9, CCM_CCGRx_CGn(8));
->>
->>  	clk[VF610_CLK_ESAI_SEL] = imx_clk_mux("esai_sel", CCM_CSCMR1, 20, 2, esai_sels, 4);
->>  	clk[VF610_CLK_ESAI_EN] = imx_clk_gate("esai_en", "esai_sel", CCM_CSCDR2, 30);
->> --
->> 2.7.4
->>
->>
+Yes, and also help include ACPI systems in the work we're doing testing
+things upstream.
+
+> However, building ACPI by default on arm64 doesn't mean that we can
+> ignore potential misuses like PRP0001+_DSD blindly following DT
+> (mis)concepts, breaking compatibility with older/newer firmware (this
+> goes in both directions) or using ACPI for SoCs where it is clearly not
+> suitable (e.g. non-SBSA). Such patches should be NAK'ed accordingly.
+
+Yes, I'm very concerned about some of the activity I'm seeing there
+myself - it does seem likely that we're going to have to extend ACPI for
+arm64 SoCs simply because things like SBSA are so bare bones but we need
+to pay attention to what's going on there to promote best practices and
+try to get people producing firmwares that make well thought through
+decisions regarding their ACPI usage.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160413/cd774a02/attachment.sig>
