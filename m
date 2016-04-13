@@ -1,62 +1,60 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 13 Apr 2016 19:24:18 +0200
-Subject: [RFC PATCH 00/45] KVM: arm/arm64: Rework virtual GIC emulation
-In-Reply-To: <570E6EDC.5070209@arm.com>
-References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
- <20160331183019.GK4126@cbox> <570E6EDC.5070209@arm.com>
-Message-ID: <20160413172418.GA21653@cbox>
+From: hongzhou.yang@mediatek.com (Hongzhou Yang)
+Date: Wed, 13 Apr 2016 10:30:03 -0700
+Subject: [PATCH v2] pinctrl: mediatek: correct debounce time unit in
+ mtk_gpio_set_debounce
+In-Reply-To: <1459580269-64531-1-git-send-email-yingjoe.chen@mediatek.com>
+References: <1459580269-64531-1-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <1460568603.16516.0.camel@mussux00>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 13, 2016 at 05:07:56PM +0100, Andr? Przywara wrote:
-> On 31/03/16 19:30, Christoffer Dall wrote:
-> > On Fri, Mar 25, 2016 at 02:04:23AM +0000, Andre Przywara wrote:
-> >> This series is a joint effort to re-implement KVM's GIC emulation.
-> >>
-> >> While the current implementation is centered around providing
-> >> efficient MMIO emulation, the hot path for most guests is actually
-> >> the guest entry and exit, which currently is rather costly.
-> >> Also the existing emulation has a global distributor lock, which
-> >> quickly becomes a bottleneck once the number of VCPUs increases.
-> >> Additionally the emulation was originally designed for GICv2, adding
-> >> GICv3 ITS emulation support to this proved to be rather painful.
-> >> Last, but not least the existing code became less and less
-> >> maintainable, with many special cases handled explicitly.
-> >>
-> >> The new implementation is build around a struct vgic_irq data data
-> >> structure, which holds all information about a virtual interrupt.
-> >> Interruts which should be injected are hold in a per-VCPU list, this
-> >> make the entry/exit path much more efficient. Also the new structure
-> >> allows to have more fine grained locking - per IRQ and per VCPU -
-> >> getting rid of the global distributor lock.
-> >> As a result of the new design ITS emulation fits in more nicely, the
-> >> respective code will be provided as a follow-up series.
-> >>
-> >> This series implements the same feature set as the existing emulation,
-> >> as a goodie we now implement priorities correctly.
-> >> To allow an easy transition with good test coverage, but still maintain
-> >> stability, both implementations live side by side, selectable via a
-> >> Kconfig option. The default is the new implementation.
-> >> If this code proves to be reliable, we will later remove the current
-> >> implementation with an extra patch set.
-> >>
-> >> Please have a look at the series, review it and give the code some
-> >> serious testing (and possibly debugging). All feedback is appreciated.
-> >>
-> > 
-> > Hmph, starting a guest a couple of times and running hackbench inside
-> > the guest actually gave me (twice) the following error:
-> > 
-> > NMI watchdog: BUG: soft lockup - CPU#0 stuck for 23s! [kworker/0:0:4]
+On Sat, 2016-04-02 at 14:57 +0800, Yingjoe Chen wrote:
+> The debounce time unit for gpio_chip.set_debounce is us but
+> mtk_gpio_set_debounce regard it as ms.
+> Fix this by correct debounce time array dbnc_arr so it can find correct
+> debounce setting. Debounce time for first debounce setting is 500us,
+> correct this as well.
 > 
-> On the host or in the guest?
-
-In the guest.
-
-> Can you reproduce it easily? If yes, can you add some lock debugging to
-> see if we are stuck in a spinlock?
+> While I'm at it, also change the debounce time array name to
+> "debounce_time" for readability.
 > 
+> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
 
-I'll do this when you've posted a new version. Sound ok?
+Acked-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
 
--Christoffer
+> ---
+> This was based on v4.6-rc1
+> Change since v1:
+> - Improve commit message.
+> - Change dbnc_arr name to debounce_time
+> ---
+>  drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 9 +++++----
+>  1 file changed, 5 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> index 2bbe6f7..6ab8c3c 100644
+> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> @@ -1004,7 +1004,8 @@ static int mtk_gpio_set_debounce(struct gpio_chip *chip, unsigned offset,
+>  	struct mtk_pinctrl *pctl = dev_get_drvdata(chip->parent);
+>  	int eint_num, virq, eint_offset;
+>  	unsigned int set_offset, bit, clr_bit, clr_offset, rst, i, unmask, dbnc;
+> -	static const unsigned int dbnc_arr[] = {0 , 1, 16, 32, 64, 128, 256};
+> +	static const unsigned int debounce_time[] = {500, 1000, 16000, 32000, 64000,
+> +						128000, 256000};
+>  	const struct mtk_desc_pin *pin;
+>  	struct irq_data *d;
+>  
+> @@ -1022,9 +1023,9 @@ static int mtk_gpio_set_debounce(struct gpio_chip *chip, unsigned offset,
+>  	if (!mtk_eint_can_en_debounce(pctl, eint_num))
+>  		return -ENOSYS;
+>  
+> -	dbnc = ARRAY_SIZE(dbnc_arr);
+> -	for (i = 0; i < ARRAY_SIZE(dbnc_arr); i++) {
+> -		if (debounce <= dbnc_arr[i]) {
+> +	dbnc = ARRAY_SIZE(debounce_time);
+> +	for (i = 0; i < ARRAY_SIZE(debounce_time); i++) {
+> +		if (debounce <= debounce_time[i]) {
+>  			dbnc = i;
+>  			break;
+>  		}
