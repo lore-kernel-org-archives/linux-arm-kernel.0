@@ -1,40 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 13 Apr 2016 12:32:43 -0700
-Subject: [GIT PULL] ARM: OMAP2+: clockdomain: another fix for
- v4.6-rcync-mailbox><next-undeleted><enter-command>set editor='vim'
-In-Reply-To: <alpine.DEB.2.02.1604130916040.9379@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1604130916040.9379@utopia.booyaka.com>
-Message-ID: <20160413193243.GY5995@atomide.com>
+From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
+Date: Wed, 13 Apr 2016 16:32:36 -0300
+Subject: [PATCH] [media] exynos-gsc: remove an always false condition
+Message-ID: <26a7ed9c18193dc7a3dfba33e3c711822f4bdd29.1460575950.git.mchehab@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [160413 02:17]:
-> Hi Tony
-> 
-> The following changes since commit 3ca4a238106dedc285193ee47f494a6584b6fd2f:
-> 
->   ARM: OMAP2+: hwmod: Fix updating of sysconfig register (2016-03-26 23:08:55 -0600)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v4.6-rc/omap-fixes-b
-> 
-> for you to fetch changes up to 1cbabcb9807e31e87ef3a12af76ea025ceb582d3:
-> 
->   ARM: DRA7: clockdomain: Implement timer workaround for errata i874 (2016-04-10 11:43:57 -0600)
-> 
-> ----------------------------------------------------------------
-> ARM: OMAP2+: clockdomain: another fix for v4.6-rc
-> 
-> For DRA7xx platforms, add a workaround for missed timer interrupts
-> that appears to be due to an integration bug (erratum i874)
-> 
-> Basic build, boot, and PM test logs are available here:
-> 
-> http://www.pwsan.com/omap/testlogs/omap-fixes-b-for-v4.6-rc/20160413020850/
-> 
-> (The DRA7xx board here has not yet been added into the testbed.)
+As reported by smatch:
+drivers/media/platform/exynos-gsc/gsc-core.c:1073 gsc_probe() warn: impossible condition '(gsc->id < 0) => (0-65535 < 0)'
+drivers/media/platform/exynos-gsc/gsc-core.c: In function 'gsc_probe':
+drivers/media/platform/exynos-gsc/gsc-core.c:1073:51: warning: comparison is always false due to limited range of data type [-Wtype-limits]
+  if (gsc->id >= drv_data->num_entities || gsc->id < 0) {
+                                                   ^
 
-Pulling into omap-for-v4.6/fixes thanks.
+gsc->id is an u16, so it can never be a negative number. So,
+remove the always false condition.
 
-Tony
+Fixes: c1ac057173ba "[media] exynos-gsc: remove non-device-tree init code"
+Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+---
+ drivers/media/platform/exynos-gsc/gsc-core.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/media/platform/exynos-gsc/gsc-core.c b/drivers/media/platform/exynos-gsc/gsc-core.c
+index 032a423fb892..c595723f5031 100644
+--- a/drivers/media/platform/exynos-gsc/gsc-core.c
++++ b/drivers/media/platform/exynos-gsc/gsc-core.c
+@@ -1070,7 +1070,7 @@ static int gsc_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 
+ 	gsc->id = of_alias_get_id(pdev->dev.of_node, "gsc");
+-	if (gsc->id >= drv_data->num_entities || gsc->id < 0) {
++	if (gsc->id >= drv_data->num_entities) {
+ 		dev_err(dev, "Invalid platform device id: %d\n", gsc->id);
+ 		return -EINVAL;
+ 	}
+-- 
+2.5.5
