@@ -1,67 +1,40 @@
-From: yang.shi@linaro.org (Shi, Yang)
-Date: Wed, 13 Apr 2016 12:31:53 -0700
-Subject: SMMU problem found on LS2085A with 4.6-rc3
-Message-ID: <570E9EA9.2070903@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 13 Apr 2016 12:32:43 -0700
+Subject: [GIT PULL] ARM: OMAP2+: clockdomain: another fix for
+ v4.6-rcync-mailbox><next-undeleted><enter-command>set editor='vim'
+In-Reply-To: <alpine.DEB.2.02.1604130916040.9379@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1604130916040.9379@utopia.booyaka.com>
+Message-ID: <20160413193243.GY5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will & Robin,
+* Paul Walmsley <paul@pwsan.com> [160413 02:17]:
+> Hi Tony
+> 
+> The following changes since commit 3ca4a238106dedc285193ee47f494a6584b6fd2f:
+> 
+>   ARM: OMAP2+: hwmod: Fix updating of sysconfig register (2016-03-26 23:08:55 -0600)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v4.6-rc/omap-fixes-b
+> 
+> for you to fetch changes up to 1cbabcb9807e31e87ef3a12af76ea025ceb582d3:
+> 
+>   ARM: DRA7: clockdomain: Implement timer workaround for errata i874 (2016-04-10 11:43:57 -0600)
+> 
+> ----------------------------------------------------------------
+> ARM: OMAP2+: clockdomain: another fix for v4.6-rc
+> 
+> For DRA7xx platforms, add a workaround for missed timer interrupts
+> that appears to be due to an integration bug (erratum i874)
+> 
+> Basic build, boot, and PM test logs are available here:
+> 
+> http://www.pwsan.com/omap/testlogs/omap-fixes-b-for-v4.6-rc/20160413020850/
+> 
+> (The DRA7xx board here has not yet been added into the testbed.)
 
-I just ran some quick test on my LS2085A board, which has 8 Cortex A57 
-cores, with 4.6-rc3 kernel, but I found a regression issue with SMMU.
+Pulling into omap-for-v4.6/fixes thanks.
 
-SMMU driver reports:
-
-arm_smmu_global_fault: 297974 callbacks suppressed
-arm_smmu_global_fault: 298561 callbacks suppressed
-arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008, 
-GFSYNR1 0x00000300, GFSYNR2 0x00000000
-arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008, 
-GFSYNR1 0x00000300, GFSYNR2 0x00000000
-arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008, 
-GFSYNR1 0x00000300, GFSYNR2 0x00000000
-arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008, 
-GFSYNR1 0x00000300, GFSYNR2 0x00000000
-arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008, 
-GFSYNR1 0x00000300, GFSYNR2 0x00000000
-arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008, 
-GFSYNR1 0x00000300, GFSYNR2 0x00000000
-arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008, 
-GFSYNR1 0x00000300, GFSYNR2 0x00000000
-arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008, 
-GFSYNR1 0x00000300, GFSYNR2 0x00000000
-arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008, 
-GFSYNR1 0x00000300, GFSYNR2 0x00000000
-arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008, 
-GFSYNR1 0x00000300, GFSYNR2 0x00000000
-arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
-arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
-arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
-arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
-arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
-arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
-arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
-arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
-arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
-arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
-
-
-But, it is good with 4.5 kernel. I found the below commit causes it:
-
-commit 9adb95949a343dac53b1cd81dc973b5f815c88d4
-Author: Robin Murphy <robin.murphy@arm.com>
-Date:   Tue Jan 26 18:06:36 2016 +0000
-
-     iommu/arm-smmu: Support DMA-API domains
-
-     With DMA mapping ops provided by the iommu-dma code, only a minimal
-     contribution from the IOMMU driver is needed to create a suitable
-     DMA-API domain for them to use. Implement this for the ARM SMMUs.
-
-     Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-     Signed-off-by: Will Deacon <will.deacon@arm.com>
-
-Any idea?
-
-Thanks,
-Yang
+Tony
