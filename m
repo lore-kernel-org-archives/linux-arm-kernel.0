@@ -1,79 +1,45 @@
-From: niklas.soderlund@ragnatech.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
-Date: Wed, 13 Apr 2016 15:29:17 +0200
-Subject: [PATCH v5 3/9] dma-mapping: add dma_{map,unmap}_resource
-In-Reply-To: <20160321152601.GA11674@infradead.org>
-References: <1457404974-1800-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <20160311125846.GF1111@bigcity.dyn.berto.se>
- <20160315082254.GE9136@infradead.org> <3286525.zPAGiD4Xk2@avalon>
- <20160321152601.GA11674@infradead.org>
-Message-ID: <20160413132916.GC19650@bigcity.dyn.berto.se>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 13 Apr 2016 19:01:21 +0530
+Subject: [PATCH v2 2/2] phy: phy-mt65xx-usb3: add support for mt2701
+ platform
+In-Reply-To: <1460360490-18606-2-git-send-email-chunfeng.yun@mediatek.com>
+References: <1460360490-18606-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1460360490-18606-2-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <570E4A29.3030103@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoph,
+Hi,
 
-On 2016-03-21 08:26:01 -0700, Christoph Hellwig wrote:
-> On Thu, Mar 17, 2016 at 01:33:51PM +0200, Laurent Pinchart wrote:
-> > The good news is that, given that no code uses this new API at the moment, 
-> > there isn't much to audit. The patch series implements the resource mapping 
-> > for arch/arm only, and makes use of it in the rcar-dmac driver only. Would you 
-> > like anything audited else than the arch/arm dma mapping implementation, the 
-> > rcar-dmac driver and the code that then deals with the dma addresses (I'm 
-> > thinking about the IOMMU subsystem and the ipmmu-vmsa driver in particular) ?
+On Monday 11 April 2016 01:11 PM, Chunfeng Yun wrote:
+> A new compatible string, "mediatek,mt2701-u3phy", is added.
 > 
-> Yes, it would be good to do an audit of all the ARM dma_ops as well
-> as generic code like drivers/base/dma-*.c, lib/dma-debug.c and
-> include/linux/dma-*.h
+> Some register settings to avoid RX sensitivity level degradation
+> which may arise on mt8173 platform are separated from other
+> platforms.
+> 
+> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> ---
+>  drivers/phy/Kconfig           |    5 ++-
+>  drivers/phy/phy-mt65xx-usb3.c |   77 ++++++++++++++++++++++++++++-------------
+>  2 files changed, 54 insertions(+), 28 deletions(-)
+> 
+> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> index 26566db..3037f28 100644
+> --- a/drivers/phy/Kconfig
+> +++ b/drivers/phy/Kconfig
+> @@ -218,9 +218,8 @@ config PHY_MT65XX_USB3
+>  	depends on ARCH_MEDIATEK && OF
+>  	select GENERIC_PHY
+>  	help
+> -	  Say 'Y' here to add support for Mediatek USB3.0 PHY driver
+> -	  for mt65xx SoCs. it supports two usb2.0 ports and
+> -	  one usb3.0 port.
+> +	  Say 'Y' here to add support for Mediatek USB3.0 PHY driver,
+> +	  it supports multiple usb2.0 and usb3.0 ports.
 
-I have now done an audit to the best of my abilities, thanks to Laurent 
-for pointing me in the right direction. And from what I can tell we are 
-good.
+Do you mean this PHY driver support both USB2 and USB3? Then it's not really a
+USB3 PHY driver right?
 
-* drivers/dma/sh/rcar-dmac.c
-  Once the phys_addr_t is mapped to a dma_addr_t using 
-  dma_map_resource() it is only used to check that the transfere do not 
-  cross 4GB boundaries and then only directly written to HW registers.
-
-* drivers/iommu/iommu.c
-  - iommu_map()
-    Check that it's align to min page size or return -EINVAL then calls
-    domain->ops->map()
-
-* drivers/iommu/ipmmu-vmsa.c
-  - ipmmu_map()
-    No logic only calls domain->ops->map()
-
-* drivers/iommu/io-pgtable-arm.c
-  - arm_lpae_map()
-    No logic only calls __arm_lpae_map()
-  - __arm_lpae_map()
-    No logic only calls arm_lpae_init_pte()
-  - arm_lpae_init_pte()
-    Used to get a pte:
-      pte |= pfn_to_iopte(paddr >> data->pg_shift, data);
-
-* drivers/iommu/io-pgtable-arm-v7s.c
-  - arm_v7s_map()
-    No logic only calls __arm_v7s_map()
-  - __arm_v7s_map()
-    No logic only calls arm_v7s_init_pte()
-  - arm_v7s_init_pte
-    Used to get a pte:
-      pte |= paddr & ARM_V7S_LVL_MASK(lvl);
-
-* ARM dma-mapping
-  - dma_unmap_*
-    Only valid unmap is dma_unmap_resource() all others are an invalid 
-    use case.
-  - dma_sync_single_*
-    Invalid use case, memmory that is mapped is device memmory
-  - dma_common_mmap() and dma_mmap_attrs()
-    Invalid use case
-  - dma_common_get_sgtable() and dma_get_sgtable_attrs()
-    Invalid use case, only for dma_alloc_* allocated memory,
-  - dma_mapping_error()
-    OK
-
--- 
-Regards,
-Niklas S?derlund
+Thanks
+Kishon
