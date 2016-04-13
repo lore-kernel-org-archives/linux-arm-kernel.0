@@ -1,163 +1,86 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed, 13 Apr 2016 08:51:25 -0700
-Subject: [PATCH] PCI: imx6: Implement reset sequence for i.MX6+
-Message-ID: <1460562685-15168-1-git-send-email-asmirnov@spaceflightindustries.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 13 Apr 2016 16:52:12 +0100
+Subject: [PATCH V4 4/7] ARM64, ACPI, PCI: I/O Remapping Table (IORT)
+ initial support.
+In-Reply-To: <570E6794.4080409@semihalf.com>
+References: <1459759975-24097-1-git-send-email-tn@semihalf.com>
+ <1459759975-24097-5-git-send-email-tn@semihalf.com>
+ <570E645A.9010600@arm.com> <570E6794.4080409@semihalf.com>
+Message-ID: <570E6B2C.3060700@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I.MX6+ has a dedicated bit for reseting PCIe core, which should be used
-instead of a regular reset sequence since using the latter will hang the
-SoC.
+On 13/04/16 16:36, Tomasz Nowicki wrote:
+> On 13.04.2016 17:23, Marc Zyngier wrote:
+>> On 04/04/16 09:52, Tomasz Nowicki wrote:
+>>> IORT shows representation of IO topology for ARM based systems.
+>>> It describes how various components are connected together on
+>>> parent-child basis e.g. PCI RC -> SMMU -> ITS. Also see IORT spec.
+>>>
+>>> Initial support allows to:
+>>> - register ITS MSI chip along with ITS translation ID and domain token
+>>> - deregister ITS MSI chip based on ITS translation ID
+>>> - find registered domain token based on ITS translation ID
+>>> - map MSI RID based on PCI device and requester ID
+>>> - find domain token based on PCI device and requester ID
+>>>
+>>> To: Rafael J. Wysocki <rjw@rjwysocki.net>
+>>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>>> ---
+>>>   drivers/acpi/Kconfig    |   3 +
+>>>   drivers/acpi/Makefile   |   1 +
+>>>   drivers/acpi/iort.c     | 335 ++++++++++++++++++++++++++++++++++++++++++++++++
+>>>   drivers/irqchip/Kconfig |   1 +
+>>>   include/linux/iort.h    |  31 +++++
+>>>   5 files changed, 371 insertions(+)
+>>>   create mode 100644 drivers/acpi/iort.c
+>>>   create mode 100644 include/linux/iort.h
+>>>
+>>
+>> [...]
+>>
+>>> +static acpi_status
+>>> +iort_find_dev_callback(struct acpi_iort_node *node, void *context)
+>>> +{
+>>> +	struct acpi_iort_root_complex *pci_rc;
+>>> +	struct device *dev = context;
+>>> +	struct pci_bus *bus;
+>>> +
+>>> +	switch (node->type) {
+>>> +	case ACPI_IORT_NODE_PCI_ROOT_COMPLEX:
+>>> +		bus = to_pci_bus(dev);
+>>> +		pci_rc = (struct acpi_iort_root_complex *)node->node_data;
+>>> +
+>>> +		/*
+>>> +		 * It is assumed that PCI segment numbers maps one-to-one
+>>> +		 * with root complexes. Each segment number can represent only
+>>> +		 * one root complex.
+>>> +		 */
+>>> +		if (pci_rc->pci_segment_number == pci_domain_nr(bus))
+>>> +			return AE_OK;
+>>
+>> What guarantees that this is ever valid? As far as I know, pci_domain_nr
+>> is completely arbitrary, and depends both on the probe order and the
+>> phase of the moon. If you want this to be reliable, you need to allocate
+>> the domain number from pci_segment_number.
+>>
+>> I must be missing something. Care to shed some light on this?
+>>
+> Sure. Please see:
+> http://infocenter.arm.com/help/topic/com.arm.doc.den0049a/DEN0049A_IO_Remapping_Table.pdf
+> 3.1.1.5 PCI root complex node
+> PCI Segment number -> The PCI segment number, as in MCFG and as
+> returned by _SEG in the namespace.
+> 
+> So IORT spec states that pci_segment_number corresponds to the segment 
+> number from MCFG table and _SEG method. Here is my patch which makes 
+> sure pci_domain_nr(bus) is set properly:
+> https://lkml.org/lkml/2016/2/16/418
 
-This commit is based on c34068d48273e24d392d9a49a38be807954420ed from
-http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git
+Lovely. So this series is actually dependent on the PCI one. I guess we
+need to solve that one first, because IORT seems pretty pointless if we
+don't have PCI support. What's the plan?
 
-Signed-off-by: Andrey Smirnov <asmirnov@spaceflightindustries.com>
----
- arch/arm/boot/dts/imx6qp.dtsi               |  3 ++
- drivers/pci/host/pci-imx6.c                 | 82 +++++++++++++++++++----------
- include/linux/mfd/syscon/imx6q-iomuxc-gpr.h |  1 +
- 3 files changed, 58 insertions(+), 28 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx6qp.dtsi b/arch/arm/boot/dts/imx6qp.dtsi
-index 1ada714..886dbf2 100644
---- a/arch/arm/boot/dts/imx6qp.dtsi
-+++ b/arch/arm/boot/dts/imx6qp.dtsi
-@@ -82,5 +82,8 @@
- 				      "ldb_di0", "ldb_di1", "prg";
- 		};
- 
-+		pcie: pcie at 0x01000000 {
-+			compatible = "fsl,imx6qp-pcie", "snps,dw-pcie";
-+		};
- 	};
- };
-diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-index eb5a275..99f5cac 100644
---- a/drivers/pci/host/pci-imx6.c
-+++ b/drivers/pci/host/pci-imx6.c
-@@ -85,6 +85,14 @@ struct imx6_pcie {
- #define PHY_RX_OVRD_IN_LO_RX_DATA_EN (1 << 5)
- #define PHY_RX_OVRD_IN_LO_RX_PLL_EN (1 << 3)
- 
-+static inline bool is_imx6qp_pcie(struct imx6_pcie *imx6_pcie)
-+{
-+	struct pcie_port *pp = &imx6_pcie->pp;
-+	struct device_node *np = pp->dev->of_node;
-+
-+	return of_device_is_compatible(np, "fsl,imx6qp-pcie");
-+}
-+
- static int pcie_phy_poll_ack(void __iomem *dbi_base, int exp_val)
- {
- 	u32 val;
-@@ -236,35 +244,44 @@ static int imx6_pcie_assert_core_reset(struct pcie_port *pp)
- 	struct imx6_pcie *imx6_pcie = to_imx6_pcie(pp);
- 	u32 val, gpr1, gpr12;
- 
--	/*
--	 * If the bootloader already enabled the link we need some special
--	 * handling to get the core back into a state where it is safe to
--	 * touch it for configuration.  As there is no dedicated reset signal
--	 * wired up for MX6QDL, we need to manually force LTSSM into "detect"
--	 * state before completely disabling LTSSM, which is a prerequisite
--	 * for core configuration.
--	 *
--	 * If both LTSSM_ENABLE and REF_SSP_ENABLE are active we have a strong
--	 * indication that the bootloader activated the link.
--	 */
--	regmap_read(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1, &gpr1);
--	regmap_read(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12, &gpr12);
--
--	if ((gpr1 & IMX6Q_GPR1_PCIE_REF_CLK_EN) &&
--	    (gpr12 & IMX6Q_GPR12_PCIE_CTL_2)) {
--		val = readl(pp->dbi_base + PCIE_PL_PFLR);
--		val &= ~PCIE_PL_PFLR_LINK_STATE_MASK;
--		val |= PCIE_PL_PFLR_FORCE_LINK;
--		writel(val, pp->dbi_base + PCIE_PL_PFLR);
--
--		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
--				IMX6Q_GPR12_PCIE_CTL_2, 0 << 10);
--	}
-+	if (is_imx6qp_pcie(imx6_pcie)) {
-+		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
-+				   IMX6Q_GPR1_PCIE_SW_RST,
-+				   IMX6Q_GPR1_PCIE_SW_RST);
-+	} else {
-+		/*
-+		 * If the bootloader already enabled the link we need
-+		 * some special handling to get the core back into a
-+		 * state where it is safe to touch it for
-+		 * configuration.  As there is no dedicated reset
-+		 * signal wired up for MX6QDL, we need to manually
-+		 * force LTSSM into "detect" state before completely
-+		 * disabling LTSSM, which is a prerequisite for core
-+		 * configuration.
-+		 *
-+		 * If both LTSSM_ENABLE and REF_SSP_ENABLE are active
-+		 * we have a strong indication that the bootloader
-+		 * activated the link.
-+		 */
-+		regmap_read(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1, &gpr1);
-+		regmap_read(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12, &gpr12);
-+
-+		if ((gpr1 & IMX6Q_GPR1_PCIE_REF_CLK_EN) &&
-+		    (gpr12 & IMX6Q_GPR12_PCIE_CTL_2)) {
-+			val = readl(pp->dbi_base + PCIE_PL_PFLR);
-+			val &= ~PCIE_PL_PFLR_LINK_STATE_MASK;
-+			val |= PCIE_PL_PFLR_FORCE_LINK;
-+			writel(val, pp->dbi_base + PCIE_PL_PFLR);
-+
-+			regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
-+					   IMX6Q_GPR12_PCIE_CTL_2, 0 << 10);
-+		}
- 
--	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
--			IMX6Q_GPR1_PCIE_TEST_PD, 1 << 18);
--	regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
--			IMX6Q_GPR1_PCIE_REF_CLK_EN, 0 << 16);
-+		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
-+				   IMX6Q_GPR1_PCIE_TEST_PD, 1 << 18);
-+		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
-+				   IMX6Q_GPR1_PCIE_REF_CLK_EN, 0 << 16);
-+	}
- 
- 	return 0;
- }
-@@ -314,6 +331,14 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
- 		msleep(100);
- 		gpiod_set_value_cansleep(imx6_pcie->reset_gpio, 1);
- 	}
-+
-+	if (is_imx6qp_pcie(imx6_pcie)) {
-+		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
-+				   IMX6Q_GPR1_PCIE_SW_RST, 0);
-+
-+		usleep_range(200, 500);
-+	}
-+
- 	return 0;
- 
- err_pcie:
-@@ -616,6 +641,7 @@ static void imx6_pcie_shutdown(struct platform_device *pdev)
- 
- static const struct of_device_id imx6_pcie_of_match[] = {
- 	{ .compatible = "fsl,imx6q-pcie", },
-+	{ .compatible = "fsl,imx6qp-pcie", },
- 	{},
- };
- MODULE_DEVICE_TABLE(of, imx6_pcie_of_match);
-diff --git a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-index 238c8db..5b08e3c 100644
---- a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-+++ b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-@@ -95,6 +95,7 @@
- #define IMX6Q_GPR0_DMAREQ_MUX_SEL0_IOMUX	BIT(0)
- 
- #define IMX6Q_GPR1_PCIE_REQ_MASK		(0x3 << 30)
-+#define IMX6Q_GPR1_PCIE_SW_RST			BIT(29)
- #define IMX6Q_GPR1_PCIE_EXIT_L1			BIT(28)
- #define IMX6Q_GPR1_PCIE_RDY_L23			BIT(27)
- #define IMX6Q_GPR1_PCIE_ENTER_L1		BIT(26)
+	M.
 -- 
-2.5.5
+Jazz is not dead. It just smells funny...
