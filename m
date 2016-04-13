@@ -1,59 +1,140 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 13 Apr 2016 13:23:28 -0700
-Subject: [GIT PULL] Renesas ARM Based SoC Drivers Updates for v4.7
-In-Reply-To: <CAMuHMdUbNcbLdQYG037MiDRAe1dr7ohRK625vb16oM8W19WEFw@mail.gmail.com>
-References: <cover.1459732456.git.horms+renesas@verge.net.au>
- <20160413194354.GQ19945@localhost>
- <CAMuHMdUbNcbLdQYG037MiDRAe1dr7ohRK625vb16oM8W19WEFw@mail.gmail.com>
-Message-ID: <20160413202328.GS19945@localhost>
+From: dave.long@linaro.org (David Long)
+Date: Wed, 13 Apr 2016 16:23:57 -0400
+Subject: [BUG] arm64 kprobe: Allow probing at rodata
+In-Reply-To: <570659E7.3040408@huawei.com>
+References: <570659E7.3040408@huawei.com>
+Message-ID: <570EAADD.3050805@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 13, 2016 at 09:57:39PM +0200, Geert Uytterhoeven wrote:
-> Hi Olof,
-> 
-> On Wed, Apr 13, 2016 at 9:43 PM, Olof Johansson <olof@lixom.net> wrote:
-> > On Mon, Apr 04, 2016 at 10:22:56AM +0900, Simon Horman wrote:
-> >> Please consider these Renesas ARM based SoC drivers updates for v4.7.
-> >>
-> >>
-> >> The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
-> >>
-> >>   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
-> >>
-> >> are available in the git repository at:
-> >>
-> >>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-drivers-for-v4.7
-> >>
-> >> for you to fetch changes up to cd89841fc6dbb6dc11aa113769f39dcd30be720f:
-> >>
-> >>   ARM: shmobile: timer: Drop support for Cortex A8 (2016-03-28 09:01:31 +0900)
-> >>
-> >> ----------------------------------------------------------------
-> >> Renesas ARM Based SoC Drivers Updates for v4.7
-> >>
-> >> Loop delay calculation updates:
-> >> * Remove check for no longer supported Cortex A8 cores
-> >> * Correct short calculation of delay
-> >>
-> >> ----------------------------------------------------------------
-> >> Geert Uytterhoeven (2):
-> >>       ARM: shmobile: timer: Fix preset_lpj leading to too short delays
-> >>       ARM: shmobile: timer: Drop support for Cortex A8
-> >
-> > I don't understand your naming. THis isn't driver code, this is SoC code.
-> >
-> > Anyway, I replied to the drop-A8 patch, the resulting function doesn't make
-> > much sense once that code path is removed (div is always 1). Seems like this
-> > should be cleaned up in other ways instead.
-> >
-> > So, not merging this branch for now since I think it should be revisited.
-> 
-> The reason these are small separate patches is because especially the
-> first one may be backported to stable, as it's a real bug fix.
+On 04/07/2016 09:00 AM, Wangnan (F) wrote:
+> Hi,
+>
+> When testing kprobe v12 we find a bug
+>
+> # echo 'p:kprobes/mykprobe1 ftrace_enable_fops' >
+> /sys/kernel/debug/tracing/kprobe_events
+> # echo 1 > /sys/kernel/debug/tracing/events/kprobes/mykprobe1/enable
+>
+> Unable to handle kernel paging request at virtual address d42003f0
+> pgd = ffffffc009f64000
+> [d42003f0] *pgd=0000000000000000, *pud=0000000000000000
+> Internal error: Oops: 94000005 [#1] SMP
+> Modules linked in:
+> ...
+>
+> ftrace_enable_fops resides in rodata section, kprobe should not
+> allow user to put probe point on it.
+>
+> It seems arm64 intentionally puts rodata between _stext and _etext in
+> arch/arm64/kernel/vmlinux.lds.S, so I think we should introduce a symbol
+> before rodata and extra verification in kprobe on arm64.
+>
+> Thank you.
+>
+> Full output:
+>
+> # echo 'p:kprobes/mykprobe1 ftrace_enable_fops' >
+> /sys/kernel/debug/tracing/kprobe_events
+> # echo 1 > /sys/kernel/debug/tracing/events/kprobes/mykprobe1/enable
+>
+> Unable to handle kernel paging request at virtual address d42003f0
+> pgd = ffffffc009f64000
+> [d42003f0] *pgd=0000000000000000, *pud=0000000000000000
+> Internal error: Oops: 94000005 [#1] SMP
+> Modules linked in:
+> CPU: 0 PID: 99 Comm: sh Not tainted 4.5.0+ #105
+> Hardware name: linux,dummy-virt (DT)
+> task: ffffffc009fdc800 ti: ffffffc009ff4000 task.ti: ffffffc009ff4000
+> PC is at module_put+0x38/0x218
+> LR is at __fput+0xd4/0x1f4
+> pc : [<ffffffc000121760>] lr : [<ffffffc0001d4c14>] pstate: 20000145
+> sp : ffffffc009ff7db0
+> x29: ffffffc009ff7db0 x28: ffffffc009ff4000
+> x27: ffffffc00053c000 x26: 0000000000000018
+> x25: ffffffc00a01c610 x24: ffffffc0755a4f60
+> x23: ffffffc075569500 x22: ffffffc0001d4c14
+> x21: ffffffc0755a4f60 x20: 0000000000000008
+> x19: 00000000d4200080 x18: 0000007ffdfbc7f0
+> x17: 0000007fa78e3340 x16: ffffffc0001f4b84
+> x15: 0000007fa796b598 x14: 000000000000024e
+> x13: 000000001b670000 x12: 0000000000000008
+> x11: 0101010101010101 x10: ffffffc000fbdc88
+> x9 : 0000000000000001 x8 : 0000000000001ffe
+> x7 : ffffffc009fdcfc8 x6 : 0000000000000015
+> x5 : 0000000000000000 x4 : 0000000000000000
+> x3 : 0000000000000001 x2 : 0000000000000000
+> x1 : ffffffc009ff4000 x0 : 0000000000000001
+>
+> Process sh (pid: 99, stack limit = 0xffffffc009ff4020)
+> Stack: (0xffffffc009ff7db0 to 0xffffffc009ff8000)
+> 7da0:                                   ffffffc009ff7df0 ffffffc0001d4c14
+> 7dc0: ffffffc00a01c600 0000000000000008 ffffffc0755a4f60 ffffffc0795f4c60
+> 7de0: ffffffc075569500 ffffffc0755a4f60 ffffffc009ff7e50 ffffffc0001d4da8
+> 7e00: ffffffc00a01c600 ffffffc009fdce68 ffffffc009fdc800 ffffffc0006614b0
+> 7e20: ffffffc0009b3000 0000000000000015 000000000000011e 0000000000000000
+> 7e40: 0000000000000058 0000000000000000 ffffffc009ff7e70 ffffffc0000ba5e0
+> 7e60: 0000000000000000 ffffffc0001f4ca8 ffffffc009ff7eb0 ffffffc00008929c
+> 7e80: 0000000000000004 ffffffc009ff4000 ffffffffffffffff 0000007fa78e336c
+> 7ea0: 0000000020000000 0000000000000015 0000000000000000 ffffffc000085a9c
+> 7ec0: 0000000000000000 000000001b679560 0000000000000001 0000000000000001
+> 7ee0: 0000000000000000 0000000000000000 000000001b67c970 0000000000000000
+> 7f00: 0000000000000010 fefefefefefefefe 0000000000000018 fefefeff1a65ff30
+> 7f20: 7f7f7f7f7f7f7f7f 0101010101010101 0000000000000008 000000001b670000
+> 7f40: 0000000000000000 0000007fa796b598 00000000004aeb48 0000007fa78e3340
+> 7f60: 0000007ffdfbc7f0 000000000000000b 000000001b679560 000000001b67c890
+> 7f80: 0000000000000000 0000000000000000 0000000000000000 0000000000000002
+> 7fa0: 000000001b679468 000000001b679430 000000000047edf0 0000007ffdfbca10
+> 7fc0: 000000000042f770 0000007ffdfbca10 0000007fa78e336c 0000000020000000
+> 7fe0: 000000000000000b 0000000000000018 0000000000000000 0000000000000000
+> Call trace:
+> Exception stack(0xffffffc009ff7bf0 to 0xffffffc009ff7d10)
+> 7be0:                                   0000000000000000 0000000000000008
+> 7c00: ffffffc009ff7db0 ffffffc000121760 ffffffc00a01c600 0000000000000015
+> 7c20: ffffffc009ff7c50 ffffffc0000e7540 ffffffc0005319a8 ffffffc009fdc800
+> 7c40: 0000000000000001 ffffffc0016a8000 ffffffc009ff7c90 ffffffc0000e73a4
+> 7c60: ffffffc009ff7ca0 ffffffc0000e9e38 ffffffc009ff7ca0 ffffffc0000e9f70
+> 7c80: 000000000000024d ffffffc009fdcf90 0000000000000001 ffffffc009ff4000
+> 7ca0: 0000000000000000 0000000000000001 0000000000000000 0000000000000000
+> 7cc0: 0000000000000015 ffffffc009fdcfc8 0000000000001ffe 0000000000000001
+> 7ce0: ffffffc000fbdc88 0101010101010101 0000000000000008 000000001b670000
+> 7d00: 000000000000024e 0000007fa796b598
+> [<ffffffc000121760>] module_put+0x38/0x218
+> [<ffffffc0001d4c14>] __fput+0xd4/0x1f4
+> [<ffffffc0001d4da8>] ____fput+0x20/0x2c
+> [<ffffffc0000ba5e0>] task_work_run+0xb8/0xec
+> [<ffffffc00008929c>] do_notify_resume+0x5c/0x70
+> [<ffffffc000085a9c>] work_pending+0x10/0x14
+> Code: d5384101 b9401820 11000400 b9001820 (b9437263)
+> ---[ end trace adc71e553dfc48ff ]---
+> note: sh[99] exited with preempt_count 1
+>
 
-Ok, so then the second shouldn't just remove cortex-a8, but rework the function
-(yet again).
+Thanks for the bug report.  Symbols already exist bracketing rodata.  I 
+have made the following change and it seems to achieve the desired 
+affect. Unless I hear objections I will add this to the v12 changes when 
+I post them (soon):
 
+diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
+index 13d3333..6b6ec28 100644
+--- a/arch/arm64/kernel/kprobes.c
++++ b/arch/arm64/kernel/kprobes.c
+@@ -81,12 +81,17 @@ static void __kprobes arch_simulate_insn(struct 
+kprobe *p, struct pt_regs *regs)
+  int __kprobes arch_prepare_kprobe(struct kprobe *p)
+  {
+         unsigned long probe_addr = (unsigned long)p->addr;
++       extern char __start_rodata[];
++       extern char __end_rodata[];
 
--Olof
+         /* copy instruction */
+         p->opcode = le32_to_cpu(*p->addr);
+
+         if (in_exception_text(probe_addr))
+                 return -EINVAL;
++       if (probe_addr >= (unsigned long) __start_rodata &&
++               probe_addr <= (unsigned long) __end_rodata)
++                       return -EINVAL;
+
+         /* decode instruction */
+         switch (arm_kprobe_decode_insn(p->addr, &p->ainsn)) {
