@@ -1,95 +1,354 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 13 Apr 2016 20:16:37 +0800
-Subject: [PATCH] i2c: designware-platdrv: get fast/std speed scl
- high/low count from DT
-In-Reply-To: <CAHp75VcHNdAUeob2iR6U1HbUQzEccdjPy8ffuG4mB_=ZX7EokQ@mail.gmail.com>
-References: <1459927680-5480-1-git-send-email-jszhang@marvell.com>
- <CAHp75VcHNdAUeob2iR6U1HbUQzEccdjPy8ffuG4mB_=ZX7EokQ@mail.gmail.com>
-Message-ID: <20160413201637.284a3673@xhacker>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 13 Apr 2016 14:24:58 +0200
+Subject: [PATCH] ARM: socfpga: dts: Add samtec VIN|ING board
+Message-ID: <1460550298-9533-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andy,
+Add support for board based on the popular Altera Cyclone V SoC.
+This board has the following properties:
+ - 1 GiB of DRAM
+ - 1 Gigabit ethernet
+ - 1 USB gadget port
+ - 1 USB host port with an on-board hub
+ - 2 QSPI NORs connected to the Cadence QSPI core
+ - Multiple I2C EEPROMs and one I2C temperature sensor
 
-On Thu, 7 Apr 2016 21:05:35 +0300 Andy Shevchenko  wrote:
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
+---
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts | 310 +++++++++++++++++++++
+ 2 files changed, 311 insertions(+)
+ create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts
 
-> On Wed, Apr 6, 2016 at 10:28 AM, Jisheng Zhang <jszhang@marvell.com> wrote:
-> > Sometimes, it's convenient to define the scl's high/low count directly,
-> > e.g HW people would do some measurement then directly give out the
-> > optimum counts. Previously, we solved the sda falling time and scl
-> > falling time by i2c_dw_scl_hcnt() and i2c_dw_scl_lcnt(), then put them
-> > into dt, but what we really care isn't the sda/scl falling time.
-> >
-> > From another side, the dw_i2c_acpi_configure() on ACPI platform also
-> > get hcnt/lcnt values rather than the sda/scl falling time from ACPI
-> > method, we want similar feature for DT platforms.
-> >  
-> 
-> Instead of duplicating some words maybe better to explicitly define
-> two groups of parameters and one which supersedes the other.
-
-I'm sorry, I can't catch your meaning. Could you please kindly give more
-details? Or examples of "two groups of parameters"
-
-Thanks,
-Jisheng
-
-> 
-> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> > ---
-> >  Documentation/devicetree/bindings/i2c/i2c-designware.txt | 16 ++++++++++++++++
-> >  drivers/i2c/busses/i2c-designware-platdrv.c              |  8 ++++++++
-> >  2 files changed, 24 insertions(+)
-> >
-> > diff --git a/Documentation/devicetree/bindings/i2c/i2c-designware.txt b/Documentation/devicetree/bindings/i2c/i2c-designware.txt
-> > index fee26dc..05176fbf 100644
-> > --- a/Documentation/devicetree/bindings/i2c/i2c-designware.txt
-> > +++ b/Documentation/devicetree/bindings/i2c/i2c-designware.txt
-> > @@ -20,6 +20,22 @@ Optional properties :
-> >   - i2c-sda-falling-time-ns : should contain the SDA falling time in nanoseconds.
-> >     This value which is by default 300ns is used to compute the tHIGH period.
-> >
-> > + - i2c-ss-scl-high-count : should contain the standard speed i2c clock SCL high
-> > +   count. If defined, the i2c-scl-falling-time-ns and i2c-sda-falling-time-ns
-> > +   will be ignored.
-> > +
-> > + - i2c-ss-scl-low-count : should contain the standard speed i2c clock SCL low
-> > +   count. If defined, the i2c-scl-falling-time-ns and i2c-sda-falling-time-ns
-> > +   will be ignored.
-> > +
-> > + - i2c-fs-scl-high-count : should contain the fast speed i2c clock SCL high
-> > +   count. If defined, the i2c-scl-falling-time-ns and i2c-sda-falling-time-ns
-> > +   will be ignored.
-> > +
-> > + - i2c-fs-scl-low-count : should contain the fast speed i2c clock SCL low
-> > +   count. If defined, the i2c-scl-falling-time-ns and i2c-sda-falling-time-ns
-> > +   will be ignored.
-> > +
-> >  Example :
-> >
-> >         i2c at f0000 {
-> > diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
-> > index d656657..8739a60 100644
-> > --- a/drivers/i2c/busses/i2c-designware-platdrv.c
-> > +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
-> > @@ -188,6 +188,14 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
-> >                                          &dev->scl_falling_time);
-> >                 device_property_read_u32(&pdev->dev, "clock-frequency",
-> >                                          &clk_freq);
-> > +               device_property_read_u16(&pdev->dev, "i2c-ss-scl-high-count",
-> > +                                        &dev->ss_hcnt);
-> > +               device_property_read_u16(&pdev->dev, "i2c-ss-scl-low-count",
-> > +                                        &dev->ss_lcnt);
-> > +               device_property_read_u16(&pdev->dev, "i2c-fs-scl-high-count",
-> > +                                        &dev->fs_hcnt);
-> > +               device_property_read_u16(&pdev->dev, "i2c-fs-scl-low-count",
-> > +                                        &dev->fs_lcnt);
-> >         }
-> >
-> >         if (has_acpi_companion(&pdev->dev))
-> > --
-> > 2.8.0.rc3
-> >  
-> 
-> 
-> 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 13428b0..4d09f19 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -620,6 +620,7 @@ dtb-$(CONFIG_ARCH_SOCFPGA) += \
+ 	socfpga_cyclone5_de0_sockit.dtb \
+ 	socfpga_cyclone5_sockit.dtb \
+ 	socfpga_cyclone5_socrates.dtb \
++	socfpga_cyclone5_vining_fpga.dtb \
+ 	socfpga_vt.dtb
+ dtb-$(CONFIG_ARCH_SPEAR13XX) += \
+ 	spear1310-evb.dtb \
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts b/arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts
+new file mode 100644
+index 0000000..a3601e4
+--- /dev/null
++++ b/arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts
+@@ -0,0 +1,310 @@
++/*
++ *  Copyright (C) 2015 Marek Vasut <marex@denx.de>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of
++ *     the License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *     You should have received a copy of the GNU General Public
++ *     License along with this file; if not, write to the Free
++ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
++ *     MA 02110-1301 USA
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include "socfpga_cyclone5.dtsi"
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++
++/ {
++	model = "samtec VIN|ING FPGA";
++	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
++
++	chosen {
++		bootargs = "console=ttyS0,115200";
++	};
++
++	memory {
++		name = "memory";
++		device_type = "memory";
++		reg = <0x0 0x40000000>; /* 1GB */
++	};
++
++	aliases {
++		/*
++		 * This allow the ethaddr uboot environment variable contents
++		 * to be added to the gmac1 device tree blob.
++		 */
++		ethernet0 = &gmac1;
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		hps_led0 {
++			label = "hps:green:led0";	/* ALIVE_LED_GR */
++			gpios = <&portb 19 0>;	/* HPS_GPIO48 */
++			linux,default-trigger = "heartbeat";
++		};
++
++		hps_led1 {
++			label = "hps:red:led0";		/* ALIVE_LED_RD */
++			gpios = <&portb 24 0>;	/* HPS_GPIO53 */
++			linux,default-trigger = "none";
++		};
++
++		hps_led2 {
++			label = "hps:green:led1";	/* LINK2HOST_LED_GR */
++			gpios = <&portb 25 0>;	/* HPS_GPIO54 */
++			linux,default-trigger = "heartbeat";
++		};
++
++		hps_led3 {
++			label = "hps:red:led1";		/* LINK2HOST_LED_RD */
++			gpios = <&portc 7 0>;	/* HPS_GPIO65 */
++			linux,default-trigger = "none";
++		};
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++
++		hps_temp0 {
++			label = "BTN_0";			/* TEMP_OS */
++			gpios = <&portc 18 GPIO_ACTIVE_LOW>;	/* HPS_GPIO60 */
++			linux,code = <BTN_0>;
++		};
++
++		hps_hkey0 {
++			label = "BTN_1";			/* DIS_PWR */
++			gpios = <&portc 19 GPIO_ACTIVE_LOW>;	/* HPS_GPIO61 */
++			linux,code = <BTN_1>;
++		};
++
++		hps_hkey1 {
++			label = "hps_hkey1";			/* POWER_DOWN */
++			gpios = <&portc 20 GPIO_ACTIVE_LOW>;	/* HPS_GPIO62 */
++			linux,code = <KEY_POWER>;
++		};
++	};
++
++	regulator-usb-nrst {
++		compatible = "regulator-fixed";
++		regulator-name = "usb_nrst";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&portb 5 GPIO_ACTIVE_HIGH>;
++		startup-delay-us = <70000>;
++		enable-active-high;
++		regulator-always-on;
++	};
++};
++
++&gmac1 {
++	status = "okay";
++	phy-mode = "rgmii";
++
++	snps,reset-gpio = <&porta 0 GPIO_ACTIVE_LOW>;
++	snps,reset-active-low;
++	snps,reset-delays-us = <10000 10000 10000>;
++
++	mdio0 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "snps,dwmac-mdio";
++		phy1: ethernet-phy at 1 {
++			reg = <1>;
++			rxd0-skew-ps = <0>;
++			rxd1-skew-ps = <0>;
++			rxd2-skew-ps = <0>;
++			rxd3-skew-ps = <0>;
++			txen-skew-ps = <0>;
++			txc-skew-ps = <2600>;
++			rxdv-skew-ps = <0>;
++			rxc-skew-ps = <2000>;
++		};
++	};
++};
++
++&gpio0 {	/* GPIO 0..29 */
++	status = "okay";
++};
++
++&gpio1 {	/* GPIO 30..57 */
++	status = "okay";
++};
++
++&gpio2 {	/* GPIO 58..66 (HLGPI 0..13 at offset 13) */
++	status = "okay";
++};
++
++&i2c0 {
++	status = "okay";
++
++	gpio: pca9557 at 1f {
++		compatible = "nxp,pca9557";
++		reg = <0x1f>;
++		gpio-controller;
++		#gpio-cells = <2>;
++	};
++
++	temp: lm75 at 48 {
++		compatible = "lm75";
++		reg = <0x48>;
++	};
++
++	at24 at 50 {
++		compatible = "at24,24c01";
++		pagesize = <8>;
++		reg = <0x50>;
++	};
++
++	i2cswitch at 70 {
++		compatible = "nxp,pca9548";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0x70>;
++
++		i2c at 0 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0>;
++			eeprom at 51 {
++				compatible = "at,24c01";
++				pagesize = <8>;
++				reg = <0x51>;
++			};
++		};
++
++		i2c at 1 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <1>;
++			eeprom at 51 {
++				compatible = "at,24c01";
++				pagesize = <8>;
++				reg = <0x51>;
++			};
++		};
++
++		i2c at 2 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <2>;
++			eeprom at 51 {
++				compatible = "at,24c01";
++				pagesize = <8>;
++				reg = <0x51>;
++			};
++		};
++
++		i2c at 3 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <3>;
++			eeprom at 51 {
++				compatible = "at,24c01";
++				pagesize = <8>;
++				reg = <0x51>;
++			};
++		};
++
++		i2c at 4 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <4>;
++			eeprom at 51 {
++				compatible = "at,24c01";
++				pagesize = <8>;
++				reg = <0x51>;
++			};
++		};
++
++		i2c at 5 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <5>;
++			eeprom at 51 {
++				compatible = "at,24c01";
++				pagesize = <8>;
++				reg = <0x51>;
++			};
++		};
++
++		i2c at 6 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <6>;
++			eeprom at 51 {
++				compatible = "at,24c01";
++				pagesize = <8>;
++				reg = <0x51>;
++			};
++		};
++
++		i2c at 7 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <7>;
++			eeprom at 51 {
++				compatible = "at,24c01";
++				pagesize = <8>;
++				reg = <0x51>;
++			};
++		};
++	};
++};
++
++&i2c1 {
++	status = "okay";
++	clock-frequency = <100000>;
++
++	at24 at 50 {
++		compatible = "at24,24c02";
++		pagesize = <8>;
++		reg = <0x50>;
++	};
++};
++
++&usb0 {
++	dr_mode = "host";
++	status = "okay";
++};
++
++&usb1 {
++	dr_mode = "peripheral";
++	status = "okay";
++};
+-- 
+2.7.0
