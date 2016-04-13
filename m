@@ -1,50 +1,38 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 13 Apr 2016 15:19:01 +0200
-Subject: [PATCH RESEND 1/2] pinctrl: ns2: add pinmux driver support for
- Broadcom NS2 SoC
-In-Reply-To: <1459264932-27884-2-git-send-email-yendapally.reddy@broadcom.com>
-References: <1459264932-27884-1-git-send-email-yendapally.reddy@broadcom.com>
- <1459264932-27884-2-git-send-email-yendapally.reddy@broadcom.com>
-Message-ID: <CACRpkdY8R91_j4+A_CFzrZdp1zj10SBthL2yyoSxUDJnVBs8NA@mail.gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 13 Apr 2016 14:20:37 +0100
+Subject: [PATCH] arm64/sunxi: 4.6-rc1: Add dependency on generic irq chip
+In-Reply-To: <CAL_Jsq+_2byE=Bd7cs_ULCnsWobKW3QQ+6XE8LVEqmu=R-ur8A@mail.gmail.com>
+References: <1459245786-11905-1-git-send-email-suzuki.poulose@arm.com>
+ <20160412191149.GC4174@localhost> <570E0BE4.2080007@arm.com>
+ <CAL_Jsq+_2byE=Bd7cs_ULCnsWobKW3QQ+6XE8LVEqmu=R-ur8A@mail.gmail.com>
+Message-ID: <570E47A5.3060807@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 29, 2016 at 5:22 PM, Yendapally Reddy Dhananjaya Reddy
-<yendapally.reddy@broadcom.com> wrote:
+On 13/04/16 14:17, Rob Herring wrote:
+> On Wed, Apr 13, 2016 at 4:05 AM, Suzuki K Poulose
+> <Suzuki.Poulose@arm.com> wrote:
+>> On 12/04/16 20:11, Olof Johansson wrote:
+>>>
+>>> On Tue, Mar 29, 2016 at 11:03:06AM +0100, Suzuki K Poulose wrote:
 
-> This adds the initial support of the Broadcom NS2 pinmux driver
+>> Do you mean something like :
+>> config ARCH_SUNXI
+>>          ...
+>>          select SUNXI_PLATFORM
+>>
+>> And have
+>>
+>> config SUNXI_PLATFORM
+>>          select SUNXI_DEPENDENCY_1
+>>          select SUNXI_DEPENDENCY_2
+>>
+>> where SUNXI_PLATFORM drives the dependencies for both ARM and ARM64 ?
 >
-> Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
-> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+> No, I believe what Olof is saying is make the kconfig symbol for the
+> irqchip (irq-sunxi-nmi) select it. If there is not a kconfig symbol
+> already for it because you just use ARCH_SUNXI directly, then add it.
 
-Sorry for slow replies. :(
+Ok, makes sense. Thanks, will respin it.
 
-This mostly looks good. Some small things needs fixing:
-
-> +config PINCTRL_NS2_MUX
-> +       bool "Broadcom Northstar2 pinmux driver"
-
-This is a bool driver, yet it uses MODULE* macros at the end of the file.
-Check the recent commits from Paul Gortmaker cleaning this up.
-Just a git log -p --author=Gortmaker in the main kernel tree will quickly
-give you an idea of what you have to do.
-
-
-> +static const unsigned int gpio_0_1_pins[] = {24, 25};
-> +static const unsigned int pwm_0_pins[] = {24};
-> +static const unsigned int pwm_1_pins[] = {25};
-
-So either the same pins are used for GPIO or PWM.
-And this pattern persists.
-
-Do you have a brewing GPIO driver for this block as well?
-Is it a separate front-end calling to pinctrl using the
-pinctrl_gpio_* calls or do you plan to patch it into this
-driver?
-
-This is more of a question.
-
-Apart from this it looks good.
-
-Yours,
-Linus Walleij
+Suzuki
