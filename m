@@ -1,48 +1,47 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 13 Apr 2016 09:42:59 -0600
-Subject: [PATCH] coresight: no need to do the forced type conversion
-In-Reply-To: <1460538555-138517-1-git-send-email-lipengcheng8@huawei.com>
-References: <1460538555-138517-1-git-send-email-lipengcheng8@huawei.com>
-Message-ID: <CANLsYkx658vqSRQKAspTfbuf73Hu14L16zrW4bdXMDewmpeStg@mail.gmail.com>
+Date: Wed, 13 Apr 2016 09:43:25 -0600
+Subject: [PATCH] coresight: etm4x: modify q_support type
+In-Reply-To: <1460533238-120289-1-git-send-email-lipengcheng8@huawei.com>
+References: <1460533238-120289-1-git-send-email-lipengcheng8@huawei.com>
+Message-ID: <CANLsYkw-cTGqEqjG6wi0PSJZSNkvXiJBxmw_WJ1vpVS5FZjk7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 April 2016 at 03:09, lipengcheng <lipengcheng8@huawei.com> wrote:
-> activated and enable are already unsigned type,
-> no need to change them to unsigned.
+On 13 April 2016 at 01:40, lipengcheng <lipengcheng8@huawei.com> wrote:
+> Because this operation exceed the range of boolean,
+> so we should modify q_support to unit8 bit.
+> drvdata->q_support = BMVAL(etmidr0, 15, 16)
 >
 > Signed-off-by: Li Pengcheng <lipengcheng8@huawei.com>
 > Signed-off-by: Li Zhong <lizhong11@hisilicon.com>
 > ---
->  drivers/hwtracing/coresight/coresight.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  drivers/hwtracing/coresight/coresight-etm4x.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
-> index bba9f3d..617574a 100644
-> --- a/drivers/hwtracing/coresight/coresight.c
-> +++ b/drivers/hwtracing/coresight/coresight.c
-> @@ -538,7 +538,7 @@ static ssize_t enable_sink_show(struct device *dev,
->  {
->         struct coresight_device *csdev = to_coresight_device(dev);
->
-> -       return scnprintf(buf, PAGE_SIZE, "%u\n", (unsigned)csdev->activated);
-> +       return scnprintf(buf, PAGE_SIZE, "%u\n", csdev->activated);
->  }
->
->  static ssize_t enable_sink_store(struct device *dev,
-> @@ -568,7 +568,7 @@ static ssize_t enable_source_show(struct device *dev,
->  {
->         struct coresight_device *csdev = to_coresight_device(dev);
->
-> -       return scnprintf(buf, PAGE_SIZE, "%u\n", (unsigned)csdev->enable);
-> +       return scnprintf(buf, PAGE_SIZE, "%u\n", csdev->enable);
->  }
+> diff --git a/drivers/hwtracing/coresight/coresight-etm4x.h b/drivers/hwtracing/coresight/coresight-etm4x.h
+> index a291d4c..5359c51 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm4x.h
+> +++ b/drivers/hwtracing/coresight/coresight-etm4x.h
+> @@ -372,6 +372,7 @@ struct etmv4_drvdata {
+>         u8                              ccitmin;
+>         u8                              s_ex_level;
+>         u8                              ns_ex_level;
+> +       u8                              q_support;
+>         bool                            sticky_enable;
+>         bool                            boot_enable;
+>         bool                            os_unlock;
+> @@ -380,7 +381,6 @@ struct etmv4_drvdata {
+>         bool                            trccond;
+>         bool                            retstack;
+>         bool                            trccci;
+> -       bool                            q_support;
+>         bool                            trc_error;
+>         bool                            syncpr;
+>         bool                            stallctl;
 
 Applied - thanks.
 Mathieu
 
->
->  static ssize_t enable_source_store(struct device *dev,
 > --
 > 1.8.3.2
 >
