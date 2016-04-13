@@ -1,44 +1,65 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 13 Apr 2016 13:16:46 +0200
-Subject: [PATCH v2 0/6] serial: imx: handshaking fixes and improvments
-In-Reply-To: <20160413091336.GH26941@ibawizard.net>
-References: <1458825865-7434-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20160411160128.GD26941@ibawizard.net>
- <20160412074622.GQ10108@pengutronix.de>
- <20160412094846.GF26941@ibawizard.net>
- <20160412105856.GR10108@pengutronix.de>
- <20160412121759.GG26941@ibawizard.net>
- <20160412173032.GS10108@pengutronix.de>
- <20160413091336.GH26941@ibawizard.net>
-Message-ID: <20160413111646.GC10108@pengutronix.de>
+From: mbrugger@suse.com (Matthias Brugger)
+Date: Wed, 13 Apr 2016 13:23:24 +0200
+Subject: [PATCH 4/6] staging: fsl-mc: Use platform_msi_* infrastructure
+In-Reply-To: <570E25DD.9070106@arm.com>
+References: <1460543456-11345-1-git-send-email-mbrugger@suse.com>
+ <1460543456-11345-5-git-send-email-mbrugger@suse.com>
+ <570E25DD.9070106@arm.com>
+Message-ID: <570E2C2C.6090900@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 13, 2016 at 11:13:36AM +0200, Petr ?tetiar wrote:
-> Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [2016-04-12 19:30:32]:
-> 
-> > On Tue, Apr 12, 2016 at 02:17:59PM +0200, Petr ?tetiar wrote:
-> > > Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [2016-04-12 12:58:56]:
-> > > 
-> > > > ok, so UFCR_DCEDTE is set and UCR3_DSR controls the DTR output as
-> > > > intended. What is connected to the respective pin?
-> > > > MX6QDL_PAD_EIM_D25__UART1_DSR_B I think is the one.
-> > > 
-> > > It's routed out to Apalis SoM pin 120, which is then connected via 22R
-> > > resistor and through SN65C3243DBR RS-232 line driver to header which I use as
-> > > debug/serial console.
-> > 
-> > Then I guess the problem is that the rs232-partner asserts the imx6's
-> > DSR in reply to the imx6 asserting DTR?
-> 
-> Yes, that's correct.
 
-OK, that fits nicely in my picture. So we only have to wait until Greg
-happily picks up the fixes (i.e. patches 1 up to 4).
 
-Best regards
-Uwe
+On 13/04/16 12:56, Marc Zyngier wrote:
+> On 13/04/16 11:30, Matthias Brugger wrote:
+>> From: Matthias Brugger <matthias.bgg@gmail.com>
+>>
+>> The fsl-mc driver can't be build as a module because it uses msi_*
+>> functions directly. Port the driver to use the platform_msi_*
+>> infrastructure instead, to allow it to be build as a module.
+>>
+>> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+>> ---
+>>   .../staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c |   5 +-
+>>   drivers/staging/fsl-mc/bus/mc-allocator.c          |   9 +-
+>>   drivers/staging/fsl-mc/bus/mc-msi.c                | 169 +--------------------
+>>   drivers/staging/fsl-mc/include/mc-sys.h            |   3 +
+>>   4 files changed, 14 insertions(+), 172 deletions(-)
+>>
+>> diff --git a/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c b/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
+>> index 720e2b0..0eecb7e 100644
+>> --- a/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
+>> +++ b/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
+>> @@ -25,7 +25,6 @@ static struct irq_chip its_msi_irq_chip = {
+>>   	.irq_mask = irq_chip_mask_parent,
+>>   	.irq_unmask = irq_chip_unmask_parent,
+>>   	.irq_eoi = irq_chip_eoi_parent,
+>> -	.irq_set_affinity = msi_domain_set_affinity
+>>   };
+>>
+>>   static int its_fsl_mc_msi_prepare(struct irq_domain *msi_domain,
+>> @@ -86,7 +85,7 @@ int __init its_fsl_mc_msi_init(void)
+>>   			continue;
+>>   		}
+>>
+>> -		mc_msi_domain = fsl_mc_msi_create_irq_domain(
+>> +		mc_msi_domain = platform_msi_create_irq_domain(
+>>   						 of_node_to_fwnode(np),
+>>   						 &its_fsl_mc_msi_domain_info,
+>>   						 parent);
+>
+> What? We are already creating a platform MSI domain for the ITS. How is
+> that going to work? If you want to convert this set of drivers to
+> platform ITS, fine. But you can't randomly hack in the ITS code and pray
+> for things not to fall apart.
+>
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+ From what I see, the difference between irq-gic-v3-its-fsl-mc-msi and 
+the irq-gic-v3-its-platform-msi is the way ITS specific DeviceID is 
+created in msi_prepare.
+
+German, is there a reason why you use the ICID read from the DPRC as dev_id?
+
+Regards,
+Matthias
