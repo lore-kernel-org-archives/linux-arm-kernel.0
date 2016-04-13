@@ -1,20 +1,15 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 13 Apr 2016 10:13:08 -0700
-Subject: [GIT PULL] at91: dt for 4.7 #1
-In-Reply-To: <1459267629-16376-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1459267629-16376-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20160413171308.GB19945@localhost>
+Date: Wed, 13 Apr 2016 10:16:51 -0700
+Subject: [GIT PULL] gxbb: ARM64 changes for 4.7
+In-Reply-To: <CAOQ7t2bEOM8A=6vRjXJGKof3xbtFxHj8zYCgSfOkoORy-fEGbQ@mail.gmail.com>
+References: <CAOQ7t2bEOM8A=6vRjXJGKof3xbtFxHj8zYCgSfOkoORy-fEGbQ@mail.gmail.com>
+Message-ID: <20160413171651.GC19945@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 29, 2016 at 06:07:09PM +0200, Nicolas Ferre wrote:
-> Arnd, Olof, Kevin,
-> 
-> Here again, some little update on the DT front. Nothing big nor surprising.
-> As for the "soc" PR, it's not urgent and I can rebase this one as well if needed.
-> More material will certainly stack on this later for 4.7...
-> 
-> Thanks, bye,
+On Wed, Mar 30, 2016 at 09:56:35PM +0200, Carlo Caione wrote:
+> Hi,
+> simple defconfig change to enable the ARM64 Amlogic boards.
 > 
 > The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 > 
@@ -22,18 +17,17 @@ On Tue, Mar 29, 2016 at 06:07:09PM +0200, Nicolas Ferre wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-dt
+>   https://github.com/carlocaione/linux-meson tags/gxbb-arm64
 > 
-> for you to fetch changes up to fd718627b31dfccc1875320a1e63bfc654ca4dc4:
+> for you to fetch changes up to 97d8eb16aa84eb48466f34c3ec0f492f34b85a04:
 > 
->   ARM: dts: at91: sama5d2: add LCD controller (2016-03-29 16:32:33 +0200)
+>   arm64: defconfig: enable basic boot for Amlogic meson (2016-03-30
+> 19:50:47 +0200)
 > 
 > ----------------------------------------------------------------
-> First DT batch for 4.7, additions for sama5d2 SoC:
-> - chipid node to identify the SoC
-> - SFR node (Special Function Registers)
-> - LCD controller's node
+> Update defconfig to have basic boot for the Amlogic meson boards.
 
 Merged, thanks.
+
 
 -Olof
