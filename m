@@ -1,39 +1,99 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 13 Apr 2016 17:35:09 +0100
-Subject: [PATCH v7 16/16] arm64: hibernate: Prevent resume from a different
- kernel version
-In-Reply-To: <CAKv+Gu-3iATexGcGCdqvvWsEya64iMpLKcDhSh-d70MfmV3ZwA@mail.gmail.com>
-References: <1459529620-22150-1-git-send-email-james.morse@arm.com>	<1459529620-22150-17-git-send-email-james.morse@arm.com>
- <CAKv+Gu-3iATexGcGCdqvvWsEya64iMpLKcDhSh-d70MfmV3ZwA@mail.gmail.com>
-Message-ID: <570E753D.4030508@arm.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 13 Apr 2016 18:50:33 +0200
+Subject: [PATCH] iio: mxs-lradc: Move binding document out of staging as
+ well
+In-Reply-To: 20160411194204.GA17762@rob-hp-laptop
+Message-ID: <570E78D9.7080902@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+Hi,
 
-On 10/04/16 13:16, Ard Biesheuvel wrote:
-> On 1 April 2016 at 18:53, James Morse <james.morse@arm.com> wrote:
->> Resuming using a different kernel version is fragile, while there are
->> sufficient details in the hibernate arch-header to perform the restore,
->> changes in the boot process can have a long-lasting impact on the system.
->> In particular, if the EFI stub causes more runtime services memory to be
->> allocated,
+[added Fabio, Marek and linux-arm-kernel]
+
+> On Sun, Apr 10, 2016 at 01:03:18PM +0000, Harald Geyer wrote:
+> > commit f836c45922446df872250a12dd08e48978aceb2f moved mxs-lradc driver
+> > out of staging. However the binding document was left in the old place.
 > 
-> Actually, the UEFI stub does not allocate any runtime service code or
-> data memory, that is all done by the firmware itself before even
-> invoking the kernel or the stub. The allocations performed by the stub
-> are for the command line, the UEFI memory map, the kernel image and
-> optionally an initrd, none if which have any significance to the
-> firmware itself, so allocating runtime services memory for them does
-> not make a lot of sense.
+> A move out of staging should probably imply a review. Though we don't 
+> have clear rules around that for bindings.
+>
+> >  
+> > Signed-off-by: Harald Geyer <harald@ccbib.org>
+> > ---
+> >  .../devicetree/bindings/iio/adc/mxs-lradc.txt      | 47 ++++++++++++++++++++++
+> >  .../bindings/staging/iio/adc/mxs-lradc.txt         | 47 ----------------------
+> >  2 files changed, 47 insertions(+), 47 deletions(-)
+> >  create mode 100644 Documentation/devicetree/bindings/iio/adc/mxs-lradc.txt
+> >  delete mode 100644 Documentation/devicetree/bindings/staging/iio/adc/mxs-lradc.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/iio/adc/mxs-lradc.txt b/Documentation/devicetree/bindings/iio/adc/mxs-lradc.txt
+> > new file mode 100644
+> > index 0000000..555fb11
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/iio/adc/mxs-lradc.txt
+> > @@ -0,0 +1,47 @@
+> > +* Freescale MXS LRADC device driver
+> > +
+> > +Required properties:
+> > +- compatible: Should be "fsl,imx23-lradc" for i.MX23 SoC and "fsl,imx28-lradc"
+> > +              for i.MX28 SoC
+> > +- reg: Address and length of the register set for the device
+> > +- interrupts: Should contain the LRADC interrupts
+> > +
+> > +Optional properties:
+> > +- fsl,lradc-touchscreen-wires: Number of wires used to connect the touchscreen
+> > +                               to LRADC. Valid value is either 4 or 5. If this
+> > +                               property is not present, then the touchscreen is
+> > +                               disabled. 5 wires is valid for i.MX28 SoC only.
+>
+> Standard touchscreen property?
 
-Thanks for putting me straight on this. I got these weird failures when
-hibernate/restoring over your kaslr series, I mistakenly believed the addition
-of locate_protocol/get_random was causing some extra initialisation. In
-hindsight it was probably the kernels new ability to use the memory below the
-kernel.
+There is a similiar one in input/touchscreen/ti-tsc-adc.txt with the name ti,wires.
+But i'm not sure about the others.
 
+Stefan
 
-Thanks,
-
-James
+> 
+> > +- fsl,ave-ctrl: number of samples per direction to calculate an average value.
+> > +                Allowed value is 1 ... 32, default is 4
+> > +- fsl,ave-delay: delay between consecutive samples. Allowed value is
+> > +                 2 ... 2048. It is used if 'fsl,ave-ctrl' > 1, counts at
+> > +                 2 kHz and its default is 2 (= 1 ms)
+>
+> ditto.
+> 
+> If not, it should have units.
+>
+> > +- fsl,settling: delay between plate switch to next sample. Allowed value is
+> > +                1 ... 2047. It counts at 2 kHz and its default is
+> > +                10 (= 5 ms)
+>
+> ditto.
+>
+> > +
+> > +Example for i.MX23 SoC:
+> > +
+> > +	lradc at 80050000 {
+> > +		compatible = "fsl,imx23-lradc";
+> > +		reg = <0x80050000 0x2000>;
+> > +		interrupts = <36 37 38 39 40 41 42 43 44>;
+> > +		status = "okay";
+> > +		fsl,lradc-touchscreen-wires = <4>;
+> > +		fsl,ave-ctrl = <4>;
+> > +		fsl,ave-delay = <2>;
+> > +		fsl,settling = <10>;
+> > +	};
+> > +
+> > +Example for i.MX28 SoC:
+> > +
+> > +	lradc at 80050000 {
+> > +		compatible = "fsl,imx28-lradc";
+> > +		reg = <0x80050000 0x2000>;
+> > +		interrupts = <10 14 15 16 17 18 19 20 21 22 23 24 25>;
+> > +		status = "okay";
+> > +		fsl,lradc-touchscreen-wires = <5>;
+> > +		fsl,ave-ctrl = <4>;
+> > +		fsl,ave-delay = <2>;
+> > +		fsl,settling = <10>;
+> > +	};
