@@ -1,164 +1,119 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 13 Apr 2016 11:36:00 +0200
-Subject: [PATCH v7 2/2] drivers: amba: properly handle devices with power
- domains
-In-Reply-To: <1460540160-18762-1-git-send-email-m.szyprowski@samsung.com>
-References: <1460540160-18762-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1460540160-18762-3-git-send-email-m.szyprowski@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 13 Apr 2016 10:40:50 +0100
+Subject: [RESEND 02/11] pwm: sysfs: Add PWM Capture support
+In-Reply-To: <20160412101550.GB18882@ulmo.ba.sec>
+References: <1456932729-9667-1-git-send-email-lee.jones@linaro.org>
+ <1456932729-9667-3-git-send-email-lee.jones@linaro.org>
+ <20160412101550.GB18882@ulmo.ba.sec>
+Message-ID: <20160413094050.GO8094@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To read pid/cid registers, the probed device need to be properly turned on.
-When it is inside a power domain, the bus code should ensure that the
-given power domain is enabled before trying to access device's registers.
-However in some cases power domain (or clocks) might not be yet available.
-Returning EPROBE_DEFER is not a solution in such case, because callers
-don't handle this special error code. Instead such devices are added to the
-special list and their registration is retried in late_initcall, when
-hopefully all resources are available.
+On Tue, 12 Apr 2016, Thierry Reding wrote:
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- drivers/amba/bus.c | 106 ++++++++++++++++++++++++++++++++++++++++++++++++-----
- 1 file changed, 96 insertions(+), 10 deletions(-)
+> On Wed, Mar 02, 2016 at 03:32:00PM +0000, Lee Jones wrote:
+> > Allow a user to read PWM Capture results from /sysfs. First,
+> > the user must tell PWM Capture which channel they wish to
+> > read from:
+> > 
+> >   $ echo 2 > $PWMCHIP/capture
+> > 
+> > To start a capture and read the result, simply read the file:
+> > 
+> >   $ cat $PWMCHIP/capture
+> > 
+> > The output format is left to the device.
+> > 
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  drivers/pwm/sysfs.c | 28 ++++++++++++++++++++++++++++
+> >  1 file changed, 28 insertions(+)
+> > 
+> > diff --git a/drivers/pwm/sysfs.c b/drivers/pwm/sysfs.c
+> > index 9c90886..3572ef4 100644
+> > --- a/drivers/pwm/sysfs.c
+> > +++ b/drivers/pwm/sysfs.c
+> > @@ -23,6 +23,8 @@
+> >  #include <linux/kdev_t.h>
+> >  #include <linux/pwm.h>
+> >  
+> > +static int capture_channel;
+> 
+> Can't do that, this is very racy because it isn't protected by any lock.
+> Fortunately I don't think the global variable is at all necessary. See
+> below.
+> 
+> > +
+> >  struct pwm_export {
+> >  	struct device child;
+> >  	struct pwm_device *pwm;
+> > @@ -167,16 +169,42 @@ static ssize_t polarity_store(struct device *child,
+> >  	return ret ? : size;
+> >  }
+> >  
+> > +static ssize_t capture_show(struct device *child,
+> > +			    struct device_attribute *attr,
+> > +			    char *buf)
+> > +{
+> > +	struct pwm_device *pwm = child_to_pwm_device(child);
+> > +
+> > +	return pwm_capture(pwm, capture_channel, buf);
+> > +}
+> > +
+> > +static ssize_t capture_store(struct device *child,
+> > +			     struct device_attribute *attr,
+> > +			     const char *buf, size_t size)
+> > +{
+> > +	int val, ret;
+> > +
+> > +	ret = kstrtoint(buf, 0, &val);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	capture_channel = val;
+> > +
+> > +	return size;
+> > +}
+> > +
+> >  static DEVICE_ATTR_RW(period);
+> >  static DEVICE_ATTR_RW(duty_cycle);
+> >  static DEVICE_ATTR_RW(enable);
+> >  static DEVICE_ATTR_RW(polarity);
+> > +static DEVICE_ATTR_RW(capture);
+> 
+> These are all per-PWM attributes and the specific PWM device that they
+> are associated with can be retrieved using child_to_pwm_device(child)
+> (see the other attributes' implementation for examples). So I don't
+> think the capture attribute needs to be writable at all. You already
+> implement capture_show() in almost the right way, and if you drop the
+> channel parameter from pwm_capture() as I suggested in my reply to patch
+> 1/11 this should resolve itself automatically.
+> 
+> Of course capture_show() would become slightly more beefy if we return a
+> standard result structure rather than leave it up to the drivers to fill
+> out the sysfs string. The good thing is that it will be common code and
+> therefore the sysfs interface would return the same format regardless of
+> the driver.
+> 
+> Perhaps something like
+> 
+> 	struct pwm_device *pwm = child_to_pwm_device(child);
+> 	struct pwm_capture result;
+> 
+> 	err = pwm_capture(pwm, &result);
+> 	if (err < 0)
+> 		return err;
+> 
+> 	return sprintf(buf, "%u %u\n", result.duty_cycle, result.period);
+> 	
+> would work?
 
-diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-index f0099360039e..3329262007f9 100644
---- a/drivers/amba/bus.c
-+++ b/drivers/amba/bus.c
-@@ -336,16 +336,7 @@ static void amba_device_release(struct device *dev)
- 	kfree(d);
- }
- 
--/**
-- *	amba_device_add - add a previously allocated AMBA device structure
-- *	@dev: AMBA device allocated by amba_device_alloc
-- *	@parent: resource parent for this devices resources
-- *
-- *	Claim the resource, and read the device cell ID if not already
-- *	initialized.  Register the AMBA device with the Linux device
-- *	manager.
-- */
--int amba_device_add(struct amba_device *dev, struct resource *parent)
-+static int amba_device_try_add(struct amba_device *dev, struct resource *parent)
- {
- 	u32 size;
- 	void __iomem *tmp;
-@@ -373,6 +364,12 @@ int amba_device_add(struct amba_device *dev, struct resource *parent)
- 		goto err_release;
- 	}
- 
-+	ret = dev_pm_domain_attach(&dev->dev, true);
-+	if (ret == -EPROBE_DEFER) {
-+		iounmap(tmp);
-+		goto err_release;
-+	}
-+
- 	ret = amba_get_enable_pclk(dev);
- 	if (ret == 0) {
- 		u32 pid, cid;
-@@ -398,6 +395,7 @@ int amba_device_add(struct amba_device *dev, struct resource *parent)
- 	}
- 
- 	iounmap(tmp);
-+	dev_pm_domain_detach(&dev->dev, true);
- 
- 	if (ret)
- 		goto err_release;
-@@ -421,6 +419,94 @@ int amba_device_add(struct amba_device *dev, struct resource *parent)
-  err_out:
- 	return ret;
- }
-+
-+/*
-+ * Registration of AMBA device require reading its pid and cid registers.
-+ * To do this, the device must be turned on (if it is a part of power domain)
-+ * and have clocks enabled. However in some cases those resources might not be
-+ * yet available. Returning EPROBE_DEFER is not a solution in such case,
-+ * because callers don't handle this special error code. Instead such devices
-+ * are added to the special list and their registration is retried from
-+ * deferred probe notifier, when hopefully all resources are available.
-+ */
-+struct deferred_device {
-+	struct amba_device *dev;
-+	struct resource *parent;
-+	struct list_head node;
-+};
-+
-+static LIST_HEAD(deferred_devices);
-+static DEFINE_MUTEX(deferred_devices_lock);
-+
-+static int amba_deferred_probe_notifier(struct notifier_block *nb,
-+			      unsigned long action, void *data);
-+static struct notifier_block amba_deferred_probe_nb = {
-+	.notifier_call = amba_deferred_probe_notifier,
-+};
-+
-+static int amba_deferred_probe_notifier(struct notifier_block *nb,
-+			      unsigned long action, void *data)
-+{
-+	struct deferred_device *ddev, *tmp;
-+
-+	mutex_lock(&deferred_devices_lock);
-+
-+	list_for_each_entry_safe(ddev, tmp, &deferred_devices, node) {
-+		int ret = amba_device_try_add(ddev->dev, ddev->parent);
-+
-+		if (ret == -EPROBE_DEFER)
-+			continue;
-+
-+		list_del_init(&ddev->node);
-+		kfree(ddev);
-+	}
-+
-+	if (list_empty(&deferred_devices))
-+		deferred_probe_unregister_notifier(&amba_deferred_probe_nb);
-+
-+	mutex_unlock(&deferred_devices_lock);
-+
-+	return NOTIFY_DONE;
-+}
-+
-+/**
-+ *	amba_device_add - add a previously allocated AMBA device structure
-+ *	@dev: AMBA device allocated by amba_device_alloc
-+ *	@parent: resource parent for this devices resources
-+ *
-+ *	Claim the resource, and read the device cell ID if not already
-+ *	initialized.  Register the AMBA device with the Linux device
-+ *	manager.
-+ */
-+int amba_device_add(struct amba_device *dev, struct resource *parent)
-+{
-+	int ret = amba_device_try_add(dev, parent);
-+
-+	if (ret == -EPROBE_DEFER) {
-+		struct deferred_device *ddev;
-+
-+		ddev = kmalloc(sizeof(*ddev), GFP_KERNEL);
-+		if (!ddev)
-+			return -ENOMEM;
-+
-+		ddev->dev = dev;
-+		ddev->parent = parent;
-+		ret = 0;
-+
-+		mutex_lock(&deferred_devices_lock);
-+
-+		if (list_empty(&deferred_devices))
-+			ret = deferred_probe_register_notifier(
-+						&amba_deferred_probe_nb);
-+		if (ret == 0)
-+			list_add_tail(&ddev->node, &deferred_devices);
-+		else
-+			kfree(ddev);
-+
-+		mutex_unlock(&deferred_devices_lock);
-+	}
-+	return ret;
-+}
- EXPORT_SYMBOL_GPL(amba_device_add);
- 
- static struct amba_device *
+Same reply as 1/11.  Now I know that we should be treating each of our
+channels, as *completely* separate devices, I think this method seems
+reasonable.
+
 -- 
-1.9.2
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
