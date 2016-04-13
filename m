@@ -1,52 +1,105 @@
-From: akshay.bhat@timesys.com (Akshay Bhat)
-Date: Wed, 13 Apr 2016 10:48:14 -0400
-Subject: [PATCH v4 3/3] ARM: imx6: Fix procedure to switch the parent of
- LDB_DI_CLK
-In-Reply-To: <1459353746.2505.86.camel@pengutronix.de>
-References: <1456476714-11351-1-git-send-email-p.zabel@pengutronix.de>
- <1456476714-11351-4-git-send-email-p.zabel@pengutronix.de>
- <56D60C90.7080703@timesys.com> <1459353746.2505.86.camel@pengutronix.de>
-Message-ID: <570E5C2E.7050402@timesys.com>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Wed, 13 Apr 2016 11:48:22 -0300
+Subject: [PATCH 10/12] mtd: nand: pxa3xx: rely on generic DT parsing done
+ in nand_scan_ident()
+In-Reply-To: <1459515272-31011-11-git-send-email-boris.brezillon@free-electrons.com>
+References: <1459515272-31011-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1459515272-31011-11-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20160413144822.GA1065@laptop.cereza>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+On 01 Apr 02:54 PM, Boris Brezillon wrote:
+> The core now takes care of parsing generic DT properties in
+> nand_scan_ident() when nand_set_flash_node() has been called.
+> Rely on this initialization instead of calling of_get_nand_xxx()
+> manually.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-On 03/30/2016 12:02 PM, Philipp Zabel wrote:
-> Hi Akshay,
->
-> Am Dienstag, den 01.03.2016, 16:41 -0500 schrieb Akshay Bhat:
-> [...]
->>> +		/*
->>> +		 * It is unclear whether the procedure works for switching from
->>> +		 * pll3_usb_otg to any other parent than pll5_video_div
->>> +		 */
->>> +		if (sel[i][0] > 3 && sel[i][0] != (sel[i][3] | 4)) {
->>> +			pr_err("ccm: ldb_di%d_sel workaround only for top mux\n",
->>> +			       i);
->>> +			sel[i][3] = sel[i][2] = sel[i][1] = sel[i][0];
->>> +			continue;
->>> +		}
->>
->> EB821 doesn't mention the above restriction. My understanding was as
->> long as the clock source you are switching from/to is disabled it should
->> be ok to do so. Maybe someone from Freescale can comment?
->
-> Maybe. If the only issue was that all input clocks have to be disabled,
-> I don't understand why the intermediate steps 3 -> 7 -> 4 -> 0 are
-> necessary though. See below for an explanation why I felt I have no idea
-> how to properly switch from 4 to 1, for example. Maybe this is indeed
-> not a problem at all and this condition can just be dropped. Do you have
-> a way to test this?
->
-
-I do not have a way of reliably recreating the issue (happens only on 
-few boards and even on those boards it is highly intermittent and seems 
-to depend on factors like temperature, timing etc.). So I am hesitant to 
-rely on any collected test data to suggest if the intermediate steps are 
-not required. I understand the errata is rather lacking on why the 
-intermediate steps are required but I feel at this point it is best to 
-follow the workaround suggested by Freescale/NXP.
+Acked-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
 
 Thanks,
-Akshay
+
+> ---
+>  drivers/mtd/nand/pxa3xx_nand.c | 28 +++++++++++-----------------
+>  1 file changed, 11 insertions(+), 17 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+> index d650885..38d26ab 100644
+> --- a/drivers/mtd/nand/pxa3xx_nand.c
+> +++ b/drivers/mtd/nand/pxa3xx_nand.c
+> @@ -29,7 +29,6 @@
+>  #include <linux/slab.h>
+>  #include <linux/of.h>
+>  #include <linux/of_device.h>
+> -#include <linux/of_mtd.h>
+>  #include <linux/platform_data/mtd-nand-pxa3xx.h>
+>  
+>  #define	CHIP_DELAY_TIMEOUT	msecs_to_jiffies(200)
+> @@ -1651,6 +1650,12 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
+>  	if (info->variant == PXA3XX_NAND_VARIANT_ARMADA370)
+>  		nand_writel(info, NDECCCTRL, 0x0);
+>  
+> +	if (pdata->flash_bbt)
+> +		chip->bbt_options |= NAND_BBT_USE_FLASH;
+> +
+> +	chip->ecc.strength = pdata->ecc_strength;
+> +	chip->ecc.size = pdata->ecc_step_size;
+> +
+>  	if (nand_scan_ident(mtd, 1, NULL))
+>  		return -ENODEV;
+>  
+> @@ -1663,13 +1668,12 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
+>  		}
+>  	}
+>  
+> -	if (pdata->flash_bbt) {
+> +	if (chip->bbt_options & NAND_BBT_USE_FLASH) {
+>  		/*
+>  		 * We'll use a bad block table stored in-flash and don't
+>  		 * allow writing the bad block marker to the flash.
+>  		 */
+> -		chip->bbt_options |= NAND_BBT_USE_FLASH |
+> -				     NAND_BBT_NO_OOB_BBM;
+> +		chip->bbt_options |= NAND_BBT_NO_OOB_BBM;
+>  		chip->bbt_td = &bbt_main_descr;
+>  		chip->bbt_md = &bbt_mirror_descr;
+>  	}
+> @@ -1689,10 +1693,9 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
+>  		}
+>  	}
+>  
+> -	if (pdata->ecc_strength && pdata->ecc_step_size) {
+> -		ecc_strength = pdata->ecc_strength;
+> -		ecc_step = pdata->ecc_step_size;
+> -	} else {
+> +	ecc_strength = chip->ecc.strength;
+> +	ecc_step = chip->ecc.size;
+> +	if (!ecc_strength || !ecc_step) {
+>  		ecc_strength = chip->ecc_strength_ds;
+>  		ecc_step = chip->ecc_step_ds;
+>  	}
+> @@ -1903,15 +1906,6 @@ static int pxa3xx_nand_probe_dt(struct platform_device *pdev)
+>  	if (of_get_property(np, "marvell,nand-keep-config", NULL))
+>  		pdata->keep_config = 1;
+>  	of_property_read_u32(np, "num-cs", &pdata->num_cs);
+> -	pdata->flash_bbt = of_get_nand_on_flash_bbt(np);
+> -
+> -	pdata->ecc_strength = of_get_nand_ecc_strength(np);
+> -	if (pdata->ecc_strength < 0)
+> -		pdata->ecc_strength = 0;
+> -
+> -	pdata->ecc_step_size = of_get_nand_ecc_step_size(np);
+> -	if (pdata->ecc_step_size < 0)
+> -		pdata->ecc_step_size = 0;
+>  
+>  	pdev->dev.platform_data = pdata;
+>  
+> -- 
+> 2.5.0
+> 
+
+-- 
+Ezequiel Garcia, VanguardiaSur
+www.vanguardiasur.com.ar
