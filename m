@@ -1,39 +1,21 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 13 Apr 2016 12:13:41 +0200
-Subject: arm: soc fixes for v4.6
-Message-ID: <570E1BD5.4090305@gmail.com>
+From: yao.yuan@freescale.com (Yuan Yao)
+Date: Wed, 13 Apr 2016 18:08:25 +0800
+Subject: [PATCH v2 0/2] arm64: dts: ls1043a: add the DTS node for QSPI support
+Message-ID: <1460542107-45807-1-git-send-email-yao.yuan@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+From: Yuan Yao <yao.yuan@nxp.com>
 
-Please merge the following fix to end the boot regression for v4.6.
+Yuan Yao (2):
+  Documentation: fsl-quadspi: Add fsl, ls1043a-qspi compatible string
+	Changed in v2: Remove unused property.
+  arm64: dts: ls1043a: add the DTS node for QSPI support
 
-Thanks,
-Matthias
+ Documentation/devicetree/bindings/mtd/fsl-quadspi.txt |  3 ++-
+ arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts     | 13 +++++++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi        | 14 ++++++++++++++
+ 3 files changed, 29 insertions(+), 1 deletion(-)
 
----
-
-The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
-
-   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
-
-are available in the git repository at:
-
-   https://github.com/mbgg/linux-mediatek.git tags/v4.6-soc-fixes
-
-for you to fetch changes up to d9c9f3b809d2bb0356f013e88d10730eafab5346:
-
-   Revert "soc: mediatek: SCPSYS: Fix double enabling of regulators" 
-(2016-04-13 11:55:08 +0200)
-
-----------------------------------------------------------------
-- fix boot error reverting commit cc8ed76938b5
-("soc: mediatek: SCPSYS: Fix double enabling of regulators")
-
-----------------------------------------------------------------
-James Liao (1):
-       Revert "soc: mediatek: SCPSYS: Fix double enabling of regulators"
-
-  drivers/soc/mediatek/mtk-scpsys.c | 11 ++++++-----
-  1 file changed, 6 insertions(+), 5 deletions(-)
+-- 
+2.1.0.27.g96db324
