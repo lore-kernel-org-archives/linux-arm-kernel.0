@@ -1,47 +1,46 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 13 Apr 2016 09:43:25 -0600
-Subject: [PATCH] coresight: etm4x: modify q_support type
-In-Reply-To: <1460533238-120289-1-git-send-email-lipengcheng8@huawei.com>
-References: <1460533238-120289-1-git-send-email-lipengcheng8@huawei.com>
-Message-ID: <CANLsYkw-cTGqEqjG6wi0PSJZSNkvXiJBxmw_WJ1vpVS5FZjk7Q@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 13 Apr 2016 08:43:29 -0700
+Subject: [PATCH] pinctrl: pinctrl-single: Fix
+ pcs_parse_bits_in_pinctrl_entry to use __ffs than ffs
+In-Reply-To: <1460530865-29085-1-git-send-email-j-keerthy@ti.com>
+References: <1460530865-29085-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <20160413154328.GR5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 April 2016 at 01:40, lipengcheng <lipengcheng8@huawei.com> wrote:
-> Because this operation exceed the range of boolean,
-> so we should modify q_support to unit8 bit.
-> drvdata->q_support = BMVAL(etmidr0, 15, 16)
->
-> Signed-off-by: Li Pengcheng <lipengcheng8@huawei.com>
-> Signed-off-by: Li Zhong <lizhong11@hisilicon.com>
-> ---
->  drivers/hwtracing/coresight/coresight-etm4x.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/hwtracing/coresight/coresight-etm4x.h b/drivers/hwtracing/coresight/coresight-etm4x.h
-> index a291d4c..5359c51 100644
-> --- a/drivers/hwtracing/coresight/coresight-etm4x.h
-> +++ b/drivers/hwtracing/coresight/coresight-etm4x.h
-> @@ -372,6 +372,7 @@ struct etmv4_drvdata {
->         u8                              ccitmin;
->         u8                              s_ex_level;
->         u8                              ns_ex_level;
-> +       u8                              q_support;
->         bool                            sticky_enable;
->         bool                            boot_enable;
->         bool                            os_unlock;
-> @@ -380,7 +381,6 @@ struct etmv4_drvdata {
->         bool                            trccond;
->         bool                            retstack;
->         bool                            trccci;
-> -       bool                            q_support;
->         bool                            trc_error;
->         bool                            syncpr;
->         bool                            stallctl;
+* Keerthy <j-keerthy@ti.com> [160413 00:03]:
+> pcs_parse_bits_in_pinctrl_entry uses ffs which gives bit indices
+> ranging from 1 to MAX. This leads to a corner case where we try to request
+> the pin number = MAX and fails.
+> 
+> bit_pos value is being calculted using ffs. pin_num_from_lsb uses
+> bit_pos value. pins array is populated with:
+> 
+> pin + pin_num_from_lsb.
+> 
+> The above is 1 more than usual bit indices as bit_pos uses ffs to compute
+> first set bit. Hence the last of the pins array is populated with the MAX
+> value and not MAX - 1 which causes error when we call pin_request.
 
-Applied - thanks.
-Mathieu
+Hmm that sounds like a bug to me, just one comment below.
 
-> --
-> 1.8.3.2
->
+> --- a/drivers/pinctrl/pinctrl-single.c
+> +++ b/drivers/pinctrl/pinctrl-single.c
+> @@ -1323,9 +1323,9 @@ static int pcs_parse_bits_in_pinctrl_entry(struct pcs_device *pcs,
+>  
+>  		/* Parse pins in each row from LSB */
+>  		while (mask) {
+> -			bit_pos = ffs(mask);
+> +			bit_pos = __ffs(mask);
+>  			pin_num_from_lsb = bit_pos / pcs->bits_per_pin;
+> -			mask_pos = ((pcs->fmask) << (bit_pos - 1));
+> +			mask_pos = ((pcs->fmask) << bit_pos);
+>  			val_pos = val & mask_pos;
+>  			submask = mask & mask_pos;
+
+Can you please also change the pcs->fshift = ffs(pcs->fmask) - 1 to
+use __ffs to avoid confusion?
+
+Regards,
+
+Tony
