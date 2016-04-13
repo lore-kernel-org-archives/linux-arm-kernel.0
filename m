@@ -1,23 +1,23 @@
-From: david@lechnology.com (David Lechner)
-Date: Wed, 13 Apr 2016 17:30:25 -0500
-Subject: [PATCH 0/3] More small davinci device tree fixes
-Message-ID: <1460586628-25152-1-git-send-email-david@lechnology.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 13 Apr 2016 15:24:52 -0700
+Subject: [PATCH 1/2] ARM: multi_v7_defconfig: Enable Rockchip displayport
+ phy
+In-Reply-To: <10307860.X4SVE35FiH@phil>
+References: <10307860.X4SVE35FiH@phil>
+Message-ID: <20160413222452.GF19945@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here is another set of small davinci device tree fixes.
+On Tue, Apr 12, 2016 at 03:18:39AM +0200, Heiko Stuebner wrote:
+> The displayport phy controls the output of the Analogix displayport
+> controller on Rockchip SoCs and is therefore one component to enable
+> veyron devices to use their internal display.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+> to be applied directly to arm-soc
 
-Tested working on LEGO MINDSTORMS EV3.
+Applied, thanks.
 
-David Lechner (3):
-  ARM: davinci: add spi0 to da850 device tree
-  ARM: davinci: disable mdio and eth0 in da850.dtsi
-  ARM: davinci: da850: There are 101 interrupts.
 
- arch/arm/boot/dts/da850-enbw-cmc.dts |  6 ++++++
- arch/arm/boot/dts/da850.dtsi         | 14 +++++++++++++-
- arch/arm/mach-davinci/da8xx-dt.c     |  1 +
- 3 files changed, 20 insertions(+), 1 deletion(-)
-
--- 
-1.9.1
+-Olof
