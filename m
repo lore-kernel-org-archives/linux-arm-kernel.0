@@ -1,71 +1,103 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 13 Apr 2016 14:31:31 +0300
-Subject: [PATCH] clk: samsung: exynos7: Enable clocks for CMU_CCORE and
- CMU_FSYS0 blocks
-In-Reply-To: <570E2123.1000107@samsung.com>
-References: <1460459243-27120-1-git-send-email-alim.akhtar@samsung.com>
- <CA+Ln22G0b1O9HHyePg60Q2uZnGT_a3J1LMU0o3+CpPoLCTbksA@mail.gmail.com>
- <570E2123.1000107@samsung.com>
-Message-ID: <CA+Ln22Gf+aXnOzj-qYeNq5-MO8b+tjxrp0KPtG7Q2ceStk4ERA@mail.gmail.com>
+From: sr@denx.de (Stefan Roese)
+Date: Wed, 13 Apr 2016 13:40:00 +0200
+Subject: [PATCH v3] spi: orion.c: Add direct access mode
+In-Reply-To: <20160413055946.GH14664@sirena.org.uk>
+References: <1460030811-13787-1-git-send-email-sr@denx.de>
+ <20160411105740.GB3351@sirena.org.uk> <570CDF5F.9070106@denx.de>
+ <20160412192736.GC14664@sirena.org.uk> <570DD967.8010703@denx.de>
+ <20160413055946.GH14664@sirena.org.uk>
+Message-ID: <570E3010.10309@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-04-13 13:36 GMT+03:00 Sylwester Nawrocki <s.nawrocki@samsung.com>:
-> On 04/13/2016 08:26 AM, Tomasz Figa wrote:
->>> > @@ -205,7 +206,11 @@ static struct samsung_cmu_info topc_cmu_info __initdata = {
->>> >
->>> >  static void __init exynos7_clk_topc_init(struct device_node *np)
->>> >  {
->>> > +       struct clk *clk;
->>> > +
->>> >         samsung_cmu_register_one(np, &topc_cmu_info);
->>> > +       clk = __clk_lookup("aclk_ccore_133");
->>> > +       clk_prepare_enable(clk);
->>
->> Shouldn't this be rather done before calling
->> samsung_cmu_register_one()? I don't remember exactly, but wouldn't
->> clock registration trigger reading back current (mux, div) values from
->> registers?
->>
->> Also, do we have any guarantees on order of initialization of
->> particular CMUs? I believe this will happen in order of DT nodes and
->> so would be not any kind of guarantee at all.
->
-> If these clocks need to be kept enabled perhaps it's better to just set
-> CLK_IS_CRITICAL flag for them? Patches adding this flag are already in
-> clk-next branch in the clk git tree. This way the clocks would get
-> enabled within the clk_register() call.
->
+On 13.04.2016 07:59, Mark Brown wrote:
+> On Wed, Apr 13, 2016 at 07:30:15AM +0200, Stefan Roese wrote:
+>> On 12.04.2016 21:27, Mark Brown wrote:
+> 
+>>> Writing something in the DT won't magically configure anything in the
+>>> hardware which is (as I said) the bit I'm missing.
+> 
+>> The MBus driver (drivers/bus/mvebu-mbus.c) takes care of the MBus
+>> window mapping. This is done, if the board dts files has one (or
+>> multiple) entries for the SPI device(s) added to the 'ranges'
+>> property of the 'soc' node.
+> 
+> I'm still unclear how mapping the windows in results in connecting the
+> windows to the SPI block.
 
-Oh, I didn't know about this. Sounds like a good idea. :)
+This is a hardware (SoC) specific mapping. For example the
+Armada XP lists in "Table 6: CPU Interface Mbus Decoding Units IDs
+and Attributes" of its Functional Specification Manual, that the
+SPI controller has the "Target Unit ID" 0x1. And that "Attributes[7:0]"
+need to get configured to these values for the SPI controller
+SPI chip-selects:
 
-> The CMU registration order is enforced by listing input clocks to each
-> CMU in DT.
+0x5E = SPI0 CS1 request
+0x9E = SPI0 CS2 request
+0xDE = SPI0 CS3 request
+0x1F = SPI0 CS4 request
+0x5F = SPI0 CS5 request
+0x9F = SPI0 CS6 request
+0xDF = SPI0 CS7 request
+0x1A = SPI1 CS0 request
+0x5A = SPI1 CS1 request
+0x9A = SPI1 CS2 request
+0xDA = SPI1 CS3 request
+0x1B = SPI1 CS4 request
+0x5B = SPI1 CS5 request
+0x9B = SPI1 CS6 request
+0xDB = SPI1 CS7 request
 
-Ah, right, I recall now, I even reviewed relevant patch. Thanks for
-refreshing my memory.
+Because of this, I've added these values to the Armada XP-370
+dtsi file:
 
-> However, I wouldn't be concerned much about it in context
-> of this patch. We are enabling here clocks which belong to same CMU.
-> samsung_cmu_register_one() needs to be called first for subsequent
-> __clk_lookup() calls to work.
+ 		spi0: spi at 10600 {
+-			reg = <MBUS_ID(0xf0, 0x01) 0x10600 0x28>;
++			reg = <MBUS_ID(0xf0, 0x01) 0x10600 0x28	/* control */
++			       MBUS_ID(0x01, 0x1e) 0 0x100000	/* CS0 */
++			       MBUS_ID(0x01, 0x5e) 0 0x100000	/* CS1 */
++			       MBUS_ID(0x01, 0x9e) 0 0x100000	/* CS2 */
++			       MBUS_ID(0x01, 0xde) 0 0x100000	/* CS3 */
++			       MBUS_ID(0x01, 0x1f) 0 0x100000	/* CS4 */
++			       MBUS_ID(0x01, 0x5f) 0 0x100000	/* CS5 */
++			       MBUS_ID(0x01, 0x9f) 0 0x100000	/* CS6 */
++			       MBUS_ID(0x01, 0xdf) 0 0x100000>;	/* CS7 */
 
-I thought a clock from another CMU has to be enabled for the CPU to be
-able to access the CMU being registered.
+...
 
->
-> Perhaps related bits need to be set manually in CMU registers before
-> registering a clock provider for the CMU, to fulfil the requirements.
->
-> Anyway, summary of the $subject patch seems not precise enough:
->
-> "This patch enables clocks for CMU_CCORE and CMU_FSYS0 blocks. This is
-> required before accessing registers of these blocks."
->
-> We need to enable selected clocks (i.e. access the CMU's registers)
-> before accessing this CMU's registers?
+ 		spi1: spi at 10680 {
+-			reg = <MBUS_ID(0xf0, 0x01) 0x10680 0x28>;
++			reg = <MBUS_ID(0xf0, 0x01) 0x10680 0x28	/* control */
++			       MBUS_ID(0x01, 0x1a) 0 0x100000	/* CS0 */
++			       MBUS_ID(0x01, 0x5a) 0 0x100000	/* CS1 */
++			       MBUS_ID(0x01, 0x9a) 0 0x100000	/* CS2 */
++			       MBUS_ID(0x01, 0xda) 0 0x100000	/* CS3 */
++			       MBUS_ID(0x01, 0x1b) 0 0x100000	/* CS4 */
++			       MBUS_ID(0x01, 0x5b) 0 0x100000	/* CS5 */
++			       MBUS_ID(0x01, 0x9b) 0 0x100000	/* CS6 */
++			       MBUS_ID(0x01, 0xdb) 0 0x100000>;	/* CS7 */
 
-Yeah, maybe the explanation could be a bit more precise.
+The first value of the MBUS_ID macro representing the
+'target' from the manual and the 2nd one the 'attribute'.
+These 'target' and 'attribute' values may vary between
+different Marvell SoCs.
 
-Best regards,
-Tomasz
+Please take a look at
+Documentation/devicetree/bindings/bus/mvebu-mbus.txt
+as this describes the mbus driver and its bindings and
+usage quite good.
+
+>  It also seems like we need to document what
+> the meaning of the reg properties of the device is, it's all very well
+> saying that there's a generic MBus binding but we still need to say how
+> the device will interpret the MBus windows that it has (assuming they
+> are configured to specific hardware functions transparently).
+
+Should I add something to the bindings documentation of
+the orion-spi driver? With an example of how this direct mode
+can is enabled on a specific board for e.g. SPI0-DEV1? Or what do
+you think is missing in the mbus bindings documentation I
+mentioned above?
+
+Thanks,
+Stefan
