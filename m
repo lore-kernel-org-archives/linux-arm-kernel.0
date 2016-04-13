@@ -1,60 +1,28 @@
-From: hongzhou.yang@mediatek.com (Hongzhou Yang)
-Date: Wed, 13 Apr 2016 10:30:03 -0700
-Subject: [PATCH v2] pinctrl: mediatek: correct debounce time unit in
- mtk_gpio_set_debounce
-In-Reply-To: <1459580269-64531-1-git-send-email-yingjoe.chen@mediatek.com>
-References: <1459580269-64531-1-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <1460568603.16516.0.camel@mussux00>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 13 Apr 2016 10:35:19 -0700
+Subject: [PATCH 0/4] Few more updates for NS2 DT
+In-Reply-To: <1459236454-26285-1-git-send-email-anup.patel@broadcom.com>
+References: <1459236454-26285-1-git-send-email-anup.patel@broadcom.com>
+Message-ID: <570E8357.4000303@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2016-04-02 at 14:57 +0800, Yingjoe Chen wrote:
-> The debounce time unit for gpio_chip.set_debounce is us but
-> mtk_gpio_set_debounce regard it as ms.
-> Fix this by correct debounce time array dbnc_arr so it can find correct
-> debounce setting. Debounce time for first debounce setting is 500us,
-> correct this as well.
+On 29/03/16 00:27, Anup Patel wrote:
+> This patchset primarily adds more PL330 and PL022 DT nodes for
+> NS2 SVK. It also moves clock DT nodes to separate file to be
+> consistent with other Broadcom SoCs DT files.
 > 
-> While I'm at it, also change the debounce time array name to
-> "debounce_time" for readability.
+> The patchset is based on v4.6-rc1 tag and is available in ns2_dt3_v1
+> branch of https://github.com/Broadcom/arm64-linux.git
 > 
-> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+> All patches have been tested on Broadcom NS2 SVK.
+> 
+> Anup Patel (4):
+>   arm64: dts: Add ARM PL330 DMA DT node for NS2
+>   arm64: dts: Add maintenance interrupt for GIC in NS2 DT
+>   arm64: dts: Move NS2 clock DT nodes to separate DT file
+>   arm64: dts: Add ARM PL022 SPI DT nodes for NS2
 
-Acked-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
-
-> ---
-> This was based on v4.6-rc1
-> Change since v1:
-> - Improve commit message.
-> - Change dbnc_arr name to debounce_time
-> ---
->  drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 9 +++++----
->  1 file changed, 5 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> index 2bbe6f7..6ab8c3c 100644
-> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> @@ -1004,7 +1004,8 @@ static int mtk_gpio_set_debounce(struct gpio_chip *chip, unsigned offset,
->  	struct mtk_pinctrl *pctl = dev_get_drvdata(chip->parent);
->  	int eint_num, virq, eint_offset;
->  	unsigned int set_offset, bit, clr_bit, clr_offset, rst, i, unmask, dbnc;
-> -	static const unsigned int dbnc_arr[] = {0 , 1, 16, 32, 64, 128, 256};
-> +	static const unsigned int debounce_time[] = {500, 1000, 16000, 32000, 64000,
-> +						128000, 256000};
->  	const struct mtk_desc_pin *pin;
->  	struct irq_data *d;
->  
-> @@ -1022,9 +1023,9 @@ static int mtk_gpio_set_debounce(struct gpio_chip *chip, unsigned offset,
->  	if (!mtk_eint_can_en_debounce(pctl, eint_num))
->  		return -ENOSYS;
->  
-> -	dbnc = ARRAY_SIZE(dbnc_arr);
-> -	for (i = 0; i < ARRAY_SIZE(dbnc_arr); i++) {
-> -		if (debounce <= dbnc_arr[i]) {
-> +	dbnc = ARRAY_SIZE(debounce_time);
-> +	for (i = 0; i < ARRAY_SIZE(debounce_time); i++) {
-> +		if (debounce <= debounce_time[i]) {
->  			dbnc = i;
->  			break;
->  		}
+Series applied to devicetree-arm64/next, thanks!
+-- 
+Florian
