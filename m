@@ -1,16 +1,16 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 13 Apr 2016 12:14:42 -0700
-Subject: [GIT PULL] Renesas ARM64 Based SoC DT Updates for v4.7
-In-Reply-To: <cover.1459731817.git.horms+renesas@verge.net.au>
-References: <cover.1459731817.git.horms+renesas@verge.net.au>
-Message-ID: <20160413191442.GN19945@localhost>
+Date: Wed, 13 Apr 2016 12:13:26 -0700
+Subject: [GIT PULL] Renesas ARM64 Based SoC Cleanup for v4.7
+In-Reply-To: <cover.1459731706.git.horms+renesas@verge.net.au>
+References: <cover.1459731706.git.horms+renesas@verge.net.au>
+Message-ID: <20160413191326.GM19945@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 04, 2016 at 10:22:20AM +0900, Simon Horman wrote:
+On Mon, Apr 04, 2016 at 10:22:07AM +0900, Simon Horman wrote:
 > Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> Please consider these Renesas ARM64 based SoC DT updates for v4.7.
+> Please consider these Renesas ARM64 based SoC cleanup for v4.7.
 > 
 > 
 > The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
@@ -19,19 +19,17 @@ On Mon, Apr 04, 2016 at 10:22:20AM +0900, Simon Horman wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt-for-v4.7
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-cleanup-for-v4.7
 > 
-> for you to fetch changes up to 81ae0ac31bb90baef10850fdfdc2a9f72f36aa6f:
+> for you to fetch changes up to fa3d2aede8bf9dd69e9309230169b5ec1cc234e4:
 > 
->   arm64: dts: r8a7795: Use USB3.0 fallback compatibility string (2016-03-28 08:52:47 +0900)
+>   arm64: dts: salvator-x: use generic pinctrl properties (2016-03-28 08:50:52 +0900)
 > 
 > ----------------------------------------------------------------
-> Renesas ARM64 Based SoC DT Updates for v4.7
+> Renesas ARM64 Based SoC Cleanup for v4.7
 > 
-> * Use USB3.0 fallback compatibility string in DT for r8a7795 SoC
-> * Add CAN support to DT for r8a7795 SoC
+> * Use generic pinctrl properties in DT for salvator-x board
 
-Merged, thanks!
-
+Merged into next/dt64. Thanks.
 
 -Olof
