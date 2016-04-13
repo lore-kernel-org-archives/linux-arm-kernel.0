@@ -1,127 +1,34 @@
-From: stuart.yoder@nxp.com (Stuart Yoder)
-Date: Wed, 13 Apr 2016 16:05:17 -0500
-Subject: [PATCH 1/2 v2] Documentation: fsl-mc: binding updates for MSIs, ranges,
- PHYs
-Message-ID: <1460581517-32107-1-git-send-email-stuart.yoder@nxp.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 13 Apr 2016 14:07:21 -0700
+Subject: [PATCH v3] arm: omap2: remove redundant multiplatform checks
+In-Reply-To: <20160406191433.GF16484@atomide.com>
+References: <201604060526.ouhQYqrT%fengguang.wu@intel.com>
+ <1459895738-6546-1-git-send-email-jonas.rabenstein@studium.uni-erlangen.de>
+ <1459930448-32638-1-git-send-email-ve92mose@stud.informatik.uni-erlangen.de>
+ <5704CC9F.6010502@ti.com> <20160406191433.GF16484@atomide.com>
+Message-ID: <20160413210720.GC5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stuart Yoder <stuart.yoder@freescale.com>
+* Tony Lindgren <tony@atomide.com> [160406 12:16]:
+> * Lokesh Vutla <lokeshvutla@ti.com> [160406 01:50]:
+> > +Tony
+> > 
+> > On Wednesday 06 April 2016 01:44 PM, Jonas Rabenstein wrote:
+> > > From: Jonas Rabenstein <jonas.rabenstein@studium.uni-erlangen.de>
+> > > 
+> > > The directory arch/arm/mach-omap2 is only selected for compilation if
+> > > CONFIG_ARCH_OMAP2PLUS is selected. CONFIG_ARCH_OMAP2PLUS itself is a
+> > > silent option and all machines selecting this option are multiplatform
+> > > devices. As a consequence checks for CONFIG_ARCH_MULTIPLATFORM as well
+> > > as CONFIG_ARCH_OMAP2PLUS within that directory are superfluous and can
+> > > be removed.
+> > 
+> > Reviewed-by: Lokesh Vutla <lokeshvutla@ti.com>
+> 
+> Yeah nice if we can remove the legacy multi SoC options. I'll take
+> a closer look within few days as I'm still at ELC.
 
--The Freescale Management Complex and all associated objects
- use message interrupts, and thus an msi-parent is required.
+Applying into omap-for-v4.7/soc thanks.
 
--Define a ranges property to specify the mapping between
- the MC address space and the system address space.
-
--The fsl-mc node may optionally have dpmac sub-nodes that describe
- the relationship between the Ethernet MACs which belong to the MC
- and the Ethernet PHYs on the system board.
-
-Signed-off-by: Stuart Yoder <stuart.yoder@nxp.com>
-Acked-by: J. German Rivera <German.Rivera@nxp.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
--v2: added Rob's ack
-
- .../devicetree/bindings/misc/fsl,qoriq-mc.txt      | 81 +++++++++++++++++++++-
- 1 file changed, 80 insertions(+), 1 deletion(-)
-
-diff --git a/Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt b/Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
-index c7a26ca..6611a7c 100644
---- a/Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
-+++ b/Documentation/devicetree/bindings/misc/fsl,qoriq-mc.txt
-@@ -30,11 +30,90 @@ Required properties:
-                         region may not be present in some scenarios, such
-                         as in the device tree presented to a virtual machine.
- 
-+    - msi-parent
-+        Value type: <phandle>
-+        Definition: Must be present and point to the MSI controller node
-+                    handling message interrupts for the MC.
-+
-+    - ranges
-+        Value type: <prop-encoded-array>
-+        Definition: A standard property.  Defines the mapping between the child
-+                    MC address space and the parent system address space.
-+
-+                    The MC address space is defined by 3 components:
-+                       <region type> <offset hi> <offset lo>
-+
-+                    Valid values for region type are
-+                       0x0 - MC portals
-+                       0x1 - QBMAN portals
-+
-+    - #address-cells
-+        Value type: <u32>
-+        Definition: Must be 3.  (see definition in 'ranges' property)
-+
-+    - #size-cells
-+        Value type: <u32>
-+        Definition: Must be 1.
-+
-+Sub-nodes:
-+
-+        The fsl-mc node may optionally have dpmac sub-nodes that describe
-+        the relationship between the Ethernet MACs which belong to the MC
-+        and the Ethernet PHYs on the system board.
-+
-+        The dpmac nodes must be under a node named "dpmacs" which contains
-+        the following properties:
-+
-+            - #address-cells
-+              Value type: <u32>
-+              Definition: Must be present if dpmac sub-nodes are defined and must
-+                          have a value of 1.
-+
-+            - #size-cells
-+              Value type: <u32>
-+              Definition: Must be present if dpmac sub-nodes are defined and must
-+                          have a value of 0.
-+
-+        These nodes must have the following properties:
-+
-+            - compatible
-+              Value type: <string>
-+              Definition: Must be "fsl,qoriq-mc-dpmac".
-+
-+            - reg
-+              Value type: <prop-encoded-array>
-+              Definition: Specifies the id of the dpmac.
-+
-+            - phy-handle
-+              Value type: <phandle>
-+              Definition: Specifies the phandle to the PHY device node associated
-+                          with the this dpmac.
-+
- Example:
- 
-         fsl_mc: fsl-mc at 80c000000 {
-                 compatible = "fsl,qoriq-mc";
-                 reg = <0x00000008 0x0c000000 0 0x40>,    /* MC portal base */
-                       <0x00000000 0x08340000 0 0x40000>; /* MC control reg */
--        };
-+                msi-parent = <&its>;
-+                #address-cells = <3>;
-+                #size-cells = <1>;
-+
-+                /*
-+                 * Region type 0x0 - MC portals
-+                 * Region type 0x1 - QBMAN portals
-+                 */
-+                ranges = <0x0 0x0 0x0 0x8 0x0c000000 0x4000000
-+                          0x1 0x0 0x0 0x8 0x18000000 0x8000000>;
- 
-+                dpmacs {
-+                    #address-cells = <1>;
-+                    #size-cells = <0>;
-+
-+                    dpmac at 1 {
-+                        compatible = "fsl,qoriq-mc-dpmac";
-+                        reg = <1>;
-+                        phy-handle = <&mdio0_phy0>;
-+                    }
-+                }
-+        };
--- 
-1.9.0
+Tony
