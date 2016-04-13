@@ -1,118 +1,91 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 13 Apr 2016 19:28:20 +0530
-Subject: [PATCH v2 1/5] phy: Rename phy-brcmstb-sata driver to
- phy-brcm-sata driver
-In-Reply-To: <1459140510-5317-2-git-send-email-anup.patel@broadcom.com>
-References: <1459140510-5317-1-git-send-email-anup.patel@broadcom.com>
- <1459140510-5317-2-git-send-email-anup.patel@broadcom.com>
-Message-ID: <570E507C.4040306@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 13 Apr 2016 14:59:29 +0100
+Subject: [PATCH] arm64: acpi: add a Kconfig option to prefer ACPI boot
+ over DT
+In-Reply-To: <CAK-u0QmB7QWBTosbhqVeFXF5ZRjt9UM9h-8wcV+LvXvg1yPkwg@mail.gmail.com>
+References: <1460373568-4374-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20160412130751.GA8066@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu-XYoyRkfMtdSARW0mf5dbztWbjM7hps4yBS6O1hKfRqg@mail.gmail.com>
+ <20160412133555.GD8066@e104818-lin.cambridge.arm.com>
+ <CAK-u0QmB7QWBTosbhqVeFXF5ZRjt9UM9h-8wcV+LvXvg1yPkwg@mail.gmail.com>
+Message-ID: <20160413135929.GB15182@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Monday 28 March 2016 10:18 AM, Anup Patel wrote:
-> Currently, we have a common SATA3 PHY driver for all Broadcom
-> STB SoCs. This driver can be extended and re-used for Broadcom
-> iProc SoCs having same SATA3 PHY.
+On Tue, Apr 12, 2016 at 12:41:23PM -0700, Roy Franz (HPE) wrote:
+> On Tue, Apr 12, 2016 at 6:35 AM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > On Tue, Apr 12, 2016 at 03:19:58PM +0200, Ard Biesheuvel wrote:
+> >> On 12 April 2016 at 15:07, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> >> > On Mon, Apr 11, 2016 at 01:19:28PM +0200, Ard Biesheuvel wrote:
+> >> >> If both ACPI and DT platform descriptions are available, and the
+> >> >> kernel was configured at build time to support both flavours, the
+> >> >> default policy in absence of a acpi=[off|force] kernel command line
+> >> >> parameter is to prefer DT over ACPI.
+> >> >>
+> >> >> This adds an option to invert that default policy, and prefer ACPI
+> >> >> over DT instead. Note that this policy is still superseded by the
+> >> >> value of the acpi= command line parameter.
+> >> >
+> >> > Why do we need another method to specify an ACPI boot? I thought those
+> >> > vendors going for ACPI wouldn't be bothered with DT anyway.
+> >> >
+> >> > I'm not keen on having kernel builds with different behavior in respect
+> >> > of whether ACPI or DT is preferred.
+> >>
+> >> How about adding support for acpi=on then? Currently, we only have
+> >> acpi=off or acpi=force, and there is no way (i.e., for a distro
+> >> installer) to boot via ACPI if it can but fall back to DT otherwise.
+> >> Some enterprise features (like RAS) depend on ACPI boot so it may
+> >> simply preferred but not mandated in some cases.
+> >
+> > Since this is a distro preference, I would rather have an acpi=on
+> > option.
 > 
-> This patch renames existing Broadcom STB SATA3 PHY driver to
-> common Broadcom SATA3 PHY driver to share this PHY driver across
-> Broadcom SoCs.
-> 
-> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-> ---
->  drivers/phy/Kconfig                                 | 18 +++++++++---------
->  drivers/phy/Makefile                                |  2 +-
->  drivers/phy/{phy-brcmstb-sata.c => phy-brcm-sata.c} |  8 ++++----
->  3 files changed, 14 insertions(+), 14 deletions(-)
->  rename drivers/phy/{phy-brcmstb-sata.c => phy-brcm-sata.c} (97%)
-> 
-> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-> index 26566db..c0187a7 100644
-> --- a/drivers/phy/Kconfig
-> +++ b/drivers/phy/Kconfig
-> @@ -403,15 +403,6 @@ config PHY_TUSB1210
->  	help
->  	  Support for TI TUSB1210 USB ULPI PHY.
->  
-> -config PHY_BRCMSTB_SATA
-> -	tristate "Broadcom STB SATA PHY driver"
-> -	depends on ARCH_BRCMSTB || BMIPS_GENERIC
-> -	depends on OF
-> -	select GENERIC_PHY
-> -	help
-> -	  Enable this to support the SATA3 PHY on 28nm or 40nm Broadcom STB SoCs.
-> -	  Likely useful only with CONFIG_SATA_BRCMSTB enabled.
-> -
->  config PHY_CYGNUS_PCIE
->  	tristate "Broadcom Cygnus PCIe PHY driver"
->  	depends on OF && (ARCH_BCM_CYGNUS || COMPILE_TEST)
-> @@ -421,4 +412,13 @@ config PHY_CYGNUS_PCIE
->  	  Enable this to support the Broadcom Cygnus PCIe PHY.
->  	  If unsure, say N.
->  
-> +config PHY_BRCM_SATA
+> While this is a 'distro preference', I think it is somewhat ugly for
+> this to be configured on the commandline.   We (HPE) don't support DT,
+> and I don't think that is likely to change. While we control the
+> firmware for our main internal platform, and don't provide a DT there,
+> we also do development and testing on other platforms where the
+> firmware may provide a DT, but we never want to use it.  This requires
+> developers/users to specify "acpi=force" on the command-line to boot
+> in a supported manner.
 
-changing config name should be done with utmost care as it might break
-oldconfig users.
-Has this been fixed in all the defconfigs where it is included?
+You wrongly assume that everyone wants ACPI by generalising "we" (HPE)
+to "developers/users".
 
-Thanks
-Kishon
+In an ideal world where both ACPI and DT (if provided by firmware) are
+equally supported, such option wouldn't be much of an issue. But we are
+not there yet with some platforms having ACPI in an experimental state
+or relying on distro-only kernel patches. This means that a _mainline_
+kernel configured with such ACPI default on option would require an
+explicit acpi=off on the command line to boot with DT. Since you don't
+always know which kernel you'd run, you pretty much end up with an acpi=
+option on the command line permanently.
 
-> +	tristate "Broadcom SATA PHY driver"
-> +	depends on ARCH_BRCMSTB || ARCH_BCM_IPROC || BMIPS_GENERIC || COMPILE_TEST
-> +	depends on OF
-> +	select GENERIC_PHY
-> +	default ARCH_BCM_IPROC
-> +	help
-> +	  Enable this to support the Broadcom SATA PHY.
-> +	  If unsure, say N.
->  endmenu
-> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
-> index 24596a9..596fae9 100644
-> --- a/drivers/phy/Makefile
-> +++ b/drivers/phy/Makefile
-> @@ -49,6 +49,6 @@ obj-$(CONFIG_PHY_QCOM_UFS) 	+= phy-qcom-ufs.o
->  obj-$(CONFIG_PHY_QCOM_UFS) 	+= phy-qcom-ufs-qmp-20nm.o
->  obj-$(CONFIG_PHY_QCOM_UFS) 	+= phy-qcom-ufs-qmp-14nm.o
->  obj-$(CONFIG_PHY_TUSB1210)		+= phy-tusb1210.o
-> -obj-$(CONFIG_PHY_BRCMSTB_SATA)		+= phy-brcmstb-sata.o
->  obj-$(CONFIG_PHY_PISTACHIO_USB)		+= phy-pistachio-usb.o
->  obj-$(CONFIG_PHY_CYGNUS_PCIE)		+= phy-bcm-cygnus-pcie.o
-> +obj-$(CONFIG_PHY_BRCM_SATA)		+= phy-brcm-sata.o
-> diff --git a/drivers/phy/phy-brcmstb-sata.c b/drivers/phy/phy-brcm-sata.c
-> similarity index 97%
-> rename from drivers/phy/phy-brcmstb-sata.c
-> rename to drivers/phy/phy-brcm-sata.c
-> index a23172f..c97b9d6 100644
-> --- a/drivers/phy/phy-brcmstb-sata.c
-> +++ b/drivers/phy/phy-brcm-sata.c
-> @@ -1,7 +1,7 @@
->  /*
->   * Broadcom SATA3 AHCI Controller PHY Driver
->   *
-> - * Copyright ? 2009-2015 Broadcom Corporation
-> + * Copyright (C) 2016 Broadcom
->   *
->   * This program is free software; you can redistribute it and/or modify
->   * it under the terms of the GNU General Public License as published by
-> @@ -238,13 +238,13 @@ static struct platform_driver brcm_sata_phy_driver = {
->  	.probe	= brcm_sata_phy_probe,
->  	.driver	= {
->  		.of_match_table	= brcm_sata_phy_of_match,
-> -		.name		= "brcmstb-sata-phy",
-> +		.name		= "brcm-sata-phy",
->  	}
->  };
->  module_platform_driver(brcm_sata_phy_driver);
->  
-> -MODULE_DESCRIPTION("Broadcom STB SATA PHY driver");
-> +MODULE_DESCRIPTION("Broadcom SATA PHY driver");
->  MODULE_LICENSE("GPL");
->  MODULE_AUTHOR("Marc Carino");
->  MODULE_AUTHOR("Brian Norris");
-> -MODULE_ALIAS("platform:phy-brcmstb-sata");
-> +MODULE_ALIAS("platform:phy-brcm-sata");
-> 
+Maybe those vendors providing both ACPI and DT have a good reason like
+ACPI support not ready.
+
+> I would much rather be able to configure the kernel to prefer (or even
+> unconditionally require) ACPI to boot, as this will be the normal,
+> default, and only supported way to boot for our platform, and I expect
+> this to also be the case in much of the enterprise space.
+
+I really don't care about which platform recommends ACPI or DT. What I
+care about is not having to enable certain config option depending on
+which platform you target as this leads to config fragmentation (think
+of single Image). I much prefer a clear kernel policy on whether ACPI or
+DT is used if both are provided by firmware and we've already made that
+call - DT takes precedence.
+
+> Since I don't think it is possible to build an arm64 kernel with only
+> ACPI, and no DT support, I think a kconfig option to select the
+> preferred HW description to be used is the better solution.
+
+The (multi-platform, single Image) kernel is not in a position to assess
+whether ACPI or DT is in a better state for a given SoC. We should leave
+this "ACPI preferred" choice to the code running before the kernel by
+simply providing only ACPI tables.
+
+-- 
+Catalin
