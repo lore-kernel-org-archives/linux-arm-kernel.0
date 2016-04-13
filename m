@@ -1,54 +1,184 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 13 Apr 2016 17:18:11 +0100
-Subject: [PATCH v2] sunxi-irq: Fix Kconfig dependency on GENERIC_IRQ_CHIP
-In-Reply-To: <1460563167-18517-1-git-send-email-suzuki.poulose@arm.com>
-References: <1460563167-18517-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <570E7143.4030206@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 13 Apr 2016 17:29:10 +0100
+Subject: [PATCH v2] iommu/dma: Finish optimising higher-order allocations
+In-Reply-To: <89763f6b1ac684c3d8712e38760bec55b7885e3b.1460048991.git.robin.murphy@arm.com>
+References: <89763f6b1ac684c3d8712e38760bec55b7885e3b.1460048991.git.robin.murphy@arm.com>
+Message-ID: <3e4572cb0a175061c1c4b436e3806ba9d7b9f199.1460563676.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/04/16 16:59, Suzuki K Poulose wrote:
-> The sunxi-nmi and sun4i irq chips are selected by ARCH_SUNXI on both arm
-> and arm64 (recently added). However on arm64, we don't explicitly select
-> GENERIC_IRQ_CHIP which is required by the sunxi-nmi irq chip driver and
-> causes build breaks on 4.6-rc1 :
-> 
->   UPD     include/generated/compile.h
->   CC      init/version.o
->   LD      init/built-in.o
-> drivers/built-in.o: In function `sunxi_sc_nmi_set_type':
-> drivers/irqchip/irq-sunxi-nmi.c:114: undefined reference to `irq_setup_alt_chip'
-> drivers/built-in.o: In function `irq_domain_add_linear':
-> include/linux/irqdomain.h:253: undefined reference to `irq_generic_chip_ops'
-> include/linux/irqdomain.h:253: undefined reference to `irq_generic_chip_ops'
-> drivers/built-in.o: In function `sunxi_sc_nmi_irq_init':
-> drivers/irqchip/irq-sunxi-nmi.c:146: undefined reference to `irq_alloc_domain_generic_chips'
-> drivers/irqchip/irq-sunxi-nmi.c:161: undefined reference to `irq_get_domain_generic_chip'
-> drivers/irqchip/irq-sunxi-nmi.c:170: undefined reference to `irq_gc_mask_clr_bit'
-> drivers/irqchip/irq-sunxi-nmi.c:171: undefined reference to `irq_gc_mask_set_bit'
-> drivers/irqchip/irq-sunxi-nmi.c:172: undefined reference to `irq_gc_ack_set_bit'
-> drivers/irqchip/irq-sunxi-nmi.c:170: undefined reference to `irq_gc_mask_clr_bit'
-> 
-> This patch fixes the dependency by introducing a separate Kconfig
-> symbol for sunxi irqchips which does the proper dependency selections.
-> 
-> Build tested on arm and arm64.
-> 
-> Fixes: commit ce3dd55b99b1 ("arm64: Introduce Allwinner SoC config option")
-> Suggested-by: Olof Johansson <olof@lixom.net>
-> Cc: Andre Przywara <andre.przywara@arm.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Chen-Yu Tsai <wens@csie.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Now that we know exactly which page sizes our caller wants to use in the
+given domain, we can restrict higher-order allocation attempts to just
+those sizes, if any, and avoid wasting any time or effort on other sizes
+which offer no benefit. In the same vein, this also lets us accommodate
+a minimum order greater than 0 for special cases.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
 
-	M.
+Just throwing this out as a quick solo update as I'm still expecting
+discussion on the rest of the series.
+
+Since v1:
+- Rearrange things so that all allocations happen within the loop,
+  and always get split as appropriate.
+- Rename a bunch of things to make more sense.
+- Got rid of a fair amount of the gratuitous bit-twiddling.
+
+ arch/arm64/mm/dma-mapping.c |  4 +--
+ drivers/iommu/dma-iommu.c   | 60 +++++++++++++++++++++++++++++----------------
+ include/linux/dma-iommu.h   |  4 +--
+ 3 files changed, 43 insertions(+), 25 deletions(-)
+
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index 5d36907..41d19a0 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -562,8 +562,8 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
+ 		struct page **pages;
+ 		pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, coherent);
+ 
+-		pages = iommu_dma_alloc(dev, iosize, gfp, ioprot, handle,
+-					flush_page);
++		pages = iommu_dma_alloc(dev, iosize, gfp, attrs, ioprot,
++					handle, flush_page);
+ 		if (!pages)
+ 			return NULL;
+ 
+diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+index 6edc852..c67713f 100644
+--- a/drivers/iommu/dma-iommu.c
++++ b/drivers/iommu/dma-iommu.c
+@@ -190,11 +190,15 @@ static void __iommu_dma_free_pages(struct page **pages, int count)
+ 	kvfree(pages);
+ }
+ 
+-static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp)
++static struct page **__iommu_dma_alloc_pages(unsigned int count,
++		unsigned long order_mask, gfp_t gfp)
+ {
+ 	struct page **pages;
+ 	unsigned int i = 0, array_size = count * sizeof(*pages);
+-	unsigned int order = MAX_ORDER;
++
++	order_mask &= (2U << MAX_ORDER) - 1;
++	if (!order_mask)
++		return NULL;
+ 
+ 	if (array_size <= PAGE_SIZE)
+ 		pages = kzalloc(array_size, GFP_KERNEL);
+@@ -208,36 +212,38 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp)
+ 
+ 	while (count) {
+ 		struct page *page = NULL;
+-		int j;
++		unsigned int order_size;
+ 
+ 		/*
+ 		 * Higher-order allocations are a convenience rather
+ 		 * than a necessity, hence using __GFP_NORETRY until
+-		 * falling back to single-page allocations.
++		 * falling back to minimum-order allocations.
+ 		 */
+-		for (order = min_t(unsigned int, order, __fls(count));
+-		     order > 0; order--) {
+-			page = alloc_pages(gfp | __GFP_NORETRY, order);
++		for (order_mask &= (2U << __fls(count)) - 1;
++		     order_mask; order_mask &= ~order_size) {
++			unsigned int order = __fls(order_mask);
++
++			order_size = 1U << order;
++			page = alloc_pages((order_mask - order_size) ?
++					   gfp | __GFP_NORETRY : gfp, order);
+ 			if (!page)
+ 				continue;
+-			if (PageCompound(page)) {
+-				if (!split_huge_page(page))
+-					break;
+-				__free_pages(page, order);
+-			} else {
++			if (!order)
++				break;
++			if (!PageCompound(page)) {
+ 				split_page(page, order);
+ 				break;
++			} else if (!split_huge_page(page)) {
++				break;
+ 			}
++			__free_pages(page, order);
+ 		}
+-		if (!page)
+-			page = alloc_page(gfp);
+ 		if (!page) {
+ 			__iommu_dma_free_pages(pages, i);
+ 			return NULL;
+ 		}
+-		j = 1 << order;
+-		count -= j;
+-		while (j--)
++		count -= order_size;
++		while (order_size--)
+ 			pages[i++] = page++;
+ 	}
+ 	return pages;
+@@ -267,6 +273,7 @@ void iommu_dma_free(struct device *dev, struct page **pages, size_t size,
+  *	 attached to an iommu_dma_domain
+  * @size: Size of buffer in bytes
+  * @gfp: Allocation flags
++ * @attrs: DMA attributes for this allocation
+  * @prot: IOMMU mapping flags
+  * @handle: Out argument for allocated DMA handle
+  * @flush_page: Arch callback which must ensure PAGE_SIZE bytes from the
+@@ -278,8 +285,8 @@ void iommu_dma_free(struct device *dev, struct page **pages, size_t size,
+  * Return: Array of struct page pointers describing the buffer,
+  *	   or NULL on failure.
+  */
+-struct page **iommu_dma_alloc(struct device *dev, size_t size,
+-		gfp_t gfp, int prot, dma_addr_t *handle,
++struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
++		struct dma_attrs *attrs, int prot, dma_addr_t *handle,
+ 		void (*flush_page)(struct device *, const void *, phys_addr_t))
+ {
+ 	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
+@@ -288,11 +295,22 @@ struct page **iommu_dma_alloc(struct device *dev, size_t size,
+ 	struct page **pages;
+ 	struct sg_table sgt;
+ 	dma_addr_t dma_addr;
+-	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
++	unsigned int count, min_size, alloc_sizes = domain->pgsize_bitmap;
+ 
+ 	*handle = DMA_ERROR_CODE;
+ 
+-	pages = __iommu_dma_alloc_pages(count, gfp);
++	min_size = alloc_sizes & -alloc_sizes;
++	if (min_size < PAGE_SIZE) {
++		min_size = PAGE_SIZE;
++		alloc_sizes |= PAGE_SIZE;
++	} else {
++		size = ALIGN(size, min_size);
++	}
++	if (dma_get_attr(DMA_ATTR_ALLOC_SINGLE_PAGES, attrs))
++		alloc_sizes = min_size;
++
++	count = PAGE_ALIGN(size) >> PAGE_SHIFT;
++	pages = __iommu_dma_alloc_pages(count, alloc_sizes >> PAGE_SHIFT, gfp);
+ 	if (!pages)
+ 		return NULL;
+ 
+diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
+index fc48103..8443bbb 100644
+--- a/include/linux/dma-iommu.h
++++ b/include/linux/dma-iommu.h
+@@ -38,8 +38,8 @@ int dma_direction_to_prot(enum dma_data_direction dir, bool coherent);
+  * These implement the bulk of the relevant DMA mapping callbacks, but require
+  * the arch code to take care of attributes and cache maintenance
+  */
+-struct page **iommu_dma_alloc(struct device *dev, size_t size,
+-		gfp_t gfp, int prot, dma_addr_t *handle,
++struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
++		struct dma_attrs *attrs, int prot, dma_addr_t *handle,
+ 		void (*flush_page)(struct device *, const void *, phys_addr_t));
+ void iommu_dma_free(struct device *dev, struct page **pages, size_t size,
+ 		dma_addr_t *handle);
 -- 
-Jazz is not dead. It just smells funny...
+2.7.3.dirty
