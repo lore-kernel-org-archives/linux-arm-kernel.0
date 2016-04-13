@@ -1,107 +1,28 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 13 Apr 2016 13:40:00 +0100
-Subject: [PATCH v2] arm64: mm: Add trace_irqflags annotations to
- do_debug_exception()
-Message-ID: <1460551200-14138-1-git-send-email-james.morse@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 13 Apr 2016 13:49:07 +0100
+Subject: [PATCH] ACPI / ARM64: Remove EXPERT dependency for ACPI on ARM64
+In-Reply-To: <20160413085139.GA15182@e104818-lin.cambridge.arm.com>
+References: <1459360718-24125-1-git-send-email-broonie@kernel.org>
+ <20160412172315.GH8066@e104818-lin.cambridge.arm.com>
+ <20160413052553.GF14664@sirena.org.uk>
+ <20160413085139.GA15182@e104818-lin.cambridge.arm.com>
+Message-ID: <20160413124907.GQ14664@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With CONFIG_PROVE_LOCKING, CONFIG_DEBUG_LOCKDEP and CONFIG_TRACE_IRQFLAGS
-enabled, lockdep will compare current->hardirqs_enabled with the flags from
-local_irq_save().
+On Wed, Apr 13, 2016 at 09:51:39AM +0100, Catalin Marinas wrote:
+> On Wed, Apr 13, 2016 at 06:25:53AM +0100, Mark Brown wrote:
 
-When a debug exception occurs, interrupts are disabled in entry.S, but
-lockdep isn't told, resulting in:
-DEBUG_LOCKS_WARN_ON(current->hardirqs_enabled)
-------------[ cut here ]------------
-WARNING: at ../kernel/locking/lockdep.c:3523
-Modules linked in:
-CPU: 3 PID: 1752 Comm: perf Not tainted 4.5.0-rc4+ #2204
-Hardware name: ARM Juno development board (r1) (DT)
-task: ffffffc974868000 ti: ffffffc975f40000 task.ti: ffffffc975f40000
-PC is at check_flags.part.35+0x17c/0x184
-LR is at check_flags.part.35+0x17c/0x184
-pc : [<ffffff80080fc93c>] lr : [<ffffff80080fc93c>] pstate: 600003c5
-[...]
----[ end trace 74631f9305ef5020 ]---
-Call trace:
-[<ffffff80080fc93c>] check_flags.part.35+0x17c/0x184
-[<ffffff80080ffe30>] lock_acquire+0xa8/0xc4
-[<ffffff8008093038>] breakpoint_handler+0x118/0x288
-[<ffffff8008082434>] do_debug_exception+0x3c/0xa8
-[<ffffff80080854b4>] el1_dbg+0x18/0x6c
-[<ffffff80081e82f4>] do_filp_open+0x64/0xdc
-[<ffffff80081d6e60>] do_sys_open+0x140/0x204
-[<ffffff80081d6f58>] SyS_openat+0x10/0x18
-[<ffffff8008085d30>] el0_svc_naked+0x24/0x28
-possible reason: unannotated irqs-off.
-irq event stamp: 65857
-hardirqs last  enabled at (65857): [<ffffff80081fb1c0>] lookup_mnt+0xf4/0x1b4
-hardirqs last disabled at (65856): [<ffffff80081fb188>] lookup_mnt+0xbc/0x1b4
-softirqs last  enabled at (65790): [<ffffff80080bdca4>] __do_softirq+0x1f8/0x290
-softirqs last disabled at (65757): [<ffffff80080be038>] irq_exit+0x9c/0xd0
+> > So you're OK with the current patch?
 
-This patch adds the annotations to do_debug_exception(), while trying not
-to call trace_hardirqs_off() if el1_dbg() interrupted a task that already
-had irqs disabled.
+> Yes, I posted an ack in the previous reply (with a note that Will and
+> the arm-soc maintainers still have a right to veto this change).
 
-Signed-off-by: James Morse <james.morse@arm.com>
----
-Since v1:
- * Removed user_regs() check,
- * Switched to interrupts_enabled().
-
-
- arch/arm64/mm/fault.c | 33 +++++++++++++++++++++++----------
- 1 file changed, 23 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 95df28bc875f..c12e96753de9 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -555,20 +555,33 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
- {
- 	const struct fault_info *inf = debug_fault_info + DBG_ESR_EVT(esr);
- 	struct siginfo info;
-+	int rv;
- 
--	if (!inf->fn(addr, esr, regs))
--		return 1;
-+	/*
-+	 * Tell lockdep we disabled irqs in entry.S. Do nothing if they were
-+	 * already disabled to preserve the last enabled/disabled addresses.
-+	 */
-+	if (interrupts_enabled(regs))
-+		trace_hardirqs_off();
- 
--	pr_alert("Unhandled debug exception: %s (0x%08x) at 0x%016lx\n",
--		 inf->name, esr, addr);
-+	if (!inf->fn(addr, esr, regs)) {
-+		rv = 1;
-+	} else {
-+		pr_alert("Unhandled debug exception: %s (0x%08x) at 0x%016lx\n",
-+			 inf->name, esr, addr);
-+
-+		info.si_signo = inf->sig;
-+		info.si_errno = 0;
-+		info.si_code  = inf->code;
-+		info.si_addr  = (void __user *)addr;
-+		arm64_notify_die("", regs, &info, 0);
-+		rv = 0;
-+	}
- 
--	info.si_signo = inf->sig;
--	info.si_errno = 0;
--	info.si_code  = inf->code;
--	info.si_addr  = (void __user *)addr;
--	arm64_notify_die("", regs, &info, 0);
-+	if (interrupts_enabled(regs))
-+		trace_hardirqs_on();
- 
--	return 0;
-+	return rv;
- }
- 
- #ifdef CONFIG_ARM64_PAN
--- 
-2.8.0.rc3
+Oh, sorry - I missed that somehow.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160413/0ab7cd83/attachment.sig>
