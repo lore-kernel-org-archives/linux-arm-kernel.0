@@ -1,70 +1,41 @@
-From: jcm@jonmasters.org (Jon Masters)
-Date: Wed, 13 Apr 2016 18:17:48 -0400
-Subject: X-Gene: Unhandled fault: synchronous external abort in
- pci_generic_config_read32
-In-Reply-To: <570E49AB.1090509@arm.com>
-References: <20150724224258.GA23990@google.com>
- <CADaLNDmYZ=8XQt82W_H74QaOiX3UwkVxkE1_EWRgzhkG1boebw@mail.gmail.com>
- <CAErSpo549xfAnx62quCqGHh3DNay5Lfb6EhEG+4EXooEuueQFQ@mail.gmail.com>
- <CADaLNDn95H=g73DKWRsrB4SuWcf+-8mkepbwb_DC-sFsVkrk6g@mail.gmail.com>
- <20150728212944.GA12958@google.com>
- <CAPKp9ub7KDCvK_hhJWR4LfFGqBkYGtD2Pb8cLsd_7bQ4bK3j2w@mail.gmail.com>
- <20160413132101.GA22699@localhost> <570E49AB.1090509@arm.com>
-Message-ID: <570EC58C.8070705@jonmasters.org>
+From: stano@meduna.org (Stanislav Meduna)
+Date: Thu, 14 Apr 2016 00:18:52 +0200
+Subject: i.MX53 + MC34708 working setup?
+Message-ID: <570EC5CC.2020606@meduna.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/13/2016 09:29 AM, Sudeep Holla wrote:
-> 
-> 
-> On 13/04/16 14:21, Bjorn Helgaas wrote:
->> On Wed, Apr 13, 2016 at 10:58:18AM +0100, Sudeep Holla wrote:
->>> Hi,
->>>
->>> (sorry for replying on the old thread, but I found it could be related
->>> to the issue
->>> I have now)
->>>
->>> On Tue, Jul 28, 2015 at 10:29 PM, Bjorn Helgaas <bhelgaas@google.com>
->>> wrote:
-> 
-> [...]
-> 
->>>>>
->>>>> Our latest U-Boot is 1.15.15, but U-Boot 1.15.12 is already a good
->>>>> version to use. Are you running any PCIe traffic test when the error
->>>>> happens?
->>>>
->>>> Nope, the machine was either idle or running a reboot test; no PCIe
->>>> stress
->>>> test or anything.
->>>>
->>>
->>> Was there any conclusion on this ?
->>> I am having similar issue[1] on my Juno with sky2 PCIe driver during
->>> reboot.
->>
->> We found that the unhandled faults occurred when using an extender
->> card.  After removing the extender card, we didn't see the faults any
->> more.
->>
-> 
-> Thanks for the response. It's not related then, I saw report referencing
-> reboot tests and hence linked them together. Sorry for the noise.
+Hi,
 
-For the record, I've had success with this cable on X-Gene:
+before I start digging deeper: anyone got the MC34708 PMIC
+touchscreen driver working on an i.MX53 board (I am
+using a custom board with a TQMa53 module)?
 
-http://www.amazon.com/PCI-E-Riser-Flexible-Ribbon-Extension/dp/B00H8VVD00?ie=UTF8&psc=1&redirect=true&ref_=oh_aui_search_detailpage
+First: the mc13783-ts input driver does not support the
+device tree so after changing to module_platform_driver_probe
+somewhere in 3.10 it is not going to get started. For now
+I reverted this driver to a 3.9 version to get back
+the module_init/exit.
 
-But it's hit or miss. The only public platform where I've been reliably
-able to use an extender cable so far is AMD Seattle. On that platform,
-the PCIe IP is so rock solid that I can talk to very funky PCIe IP I've
-implemented myself in a FPGA (and I can see link quality is fine too).
+This resulted in this driver starting and trying to do
+mc13xxx_adc_do_conversion every time the touchscreen is
+touched, so here the interrupts are processed as expected.
+mc13xxx_adc_do_conversion however times out in
+wait_for_completion_interruptible_timeout.
 
-There's one other non-public platform so far where PCIe extenders work
-without a single hitch as well, and a number where more work is needed.
+Trying to bluntly revert this code to 3.9 as well did not work,
+so I am not sure whether the code is the problem or the
+device tree which was changed for imx53-tqma53.dtsi as well
+(for example the 3.9 lists
+  interrupts = <6 8>; /* PDATA_DATA6, low active */
+whereas the 4.4 has <6 4> high active).
 
-Jon.
+I am using a 4.4 kernel with some ported TQ patches, none
+of them touching the PMIC.
 
+If anyone has this setup (i.MX53 + MC34708, recent kernel)
+working, I would appreciate a pointer to the code.
+
+Thanks
 -- 
-Computer Architect
+                                 Stano
