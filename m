@@ -1,65 +1,100 @@
-From: mbrugger@suse.com (Matthias Brugger)
-Date: Wed, 13 Apr 2016 13:23:24 +0200
-Subject: [PATCH 4/6] staging: fsl-mc: Use platform_msi_* infrastructure
-In-Reply-To: <570E25DD.9070106@arm.com>
-References: <1460543456-11345-1-git-send-email-mbrugger@suse.com>
- <1460543456-11345-5-git-send-email-mbrugger@suse.com>
- <570E25DD.9070106@arm.com>
-Message-ID: <570E2C2C.6090900@suse.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 13 Apr 2016 19:24:54 +0800
+Subject: [PATCH 3/6] ARM: PSCI: Register with kernel restart handler
+In-Reply-To: <20160413110519.GE32018@leverpostej>
+References: <1460120039-2497-1-git-send-email-linux@roeck-us.net>
+ <1460120039-2497-4-git-send-email-linux@roeck-us.net>
+ <20160413110519.GE32018@leverpostej>
+Message-ID: <20160413192454.778c3df4@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dear Mark,
 
+On Wed, 13 Apr 2016 12:05:19 +0100 Mark Rutland wrote:
 
-On 13/04/16 12:56, Marc Zyngier wrote:
-> On 13/04/16 11:30, Matthias Brugger wrote:
->> From: Matthias Brugger <matthias.bgg@gmail.com>
->>
->> The fsl-mc driver can't be build as a module because it uses msi_*
->> functions directly. Port the driver to use the platform_msi_*
->> infrastructure instead, to allow it to be build as a module.
->>
->> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
->> ---
->>   .../staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c |   5 +-
->>   drivers/staging/fsl-mc/bus/mc-allocator.c          |   9 +-
->>   drivers/staging/fsl-mc/bus/mc-msi.c                | 169 +--------------------
->>   drivers/staging/fsl-mc/include/mc-sys.h            |   3 +
->>   4 files changed, 14 insertions(+), 172 deletions(-)
->>
->> diff --git a/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c b/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
->> index 720e2b0..0eecb7e 100644
->> --- a/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
->> +++ b/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
->> @@ -25,7 +25,6 @@ static struct irq_chip its_msi_irq_chip = {
->>   	.irq_mask = irq_chip_mask_parent,
->>   	.irq_unmask = irq_chip_unmask_parent,
->>   	.irq_eoi = irq_chip_eoi_parent,
->> -	.irq_set_affinity = msi_domain_set_affinity
->>   };
->>
->>   static int its_fsl_mc_msi_prepare(struct irq_domain *msi_domain,
->> @@ -86,7 +85,7 @@ int __init its_fsl_mc_msi_init(void)
->>   			continue;
->>   		}
->>
->> -		mc_msi_domain = fsl_mc_msi_create_irq_domain(
->> +		mc_msi_domain = platform_msi_create_irq_domain(
->>   						 of_node_to_fwnode(np),
->>   						 &its_fsl_mc_msi_domain_info,
->>   						 parent);
->
-> What? We are already creating a platform MSI domain for the ITS. How is
-> that going to work? If you want to convert this set of drivers to
-> platform ITS, fine. But you can't randomly hack in the ITS code and pray
-> for things not to fall apart.
->
+> On Fri, Apr 08, 2016 at 05:53:56AM -0700, Guenter Roeck wrote:
+> > Register with kernel restart handler instead of setting arm_pm_restart
+> > directly. This enables support for replacing the PSCI restart handler
+> > with a different handler if necessary for a specific board.
+> > 
+> > Select a priority of 129 to indicate a higher than default priority, but
+> > keep it as low as possible since PSCI reset is known to fail on some
+> > boards.  
+> 
+> For reference, which boards?
+> 
+> It's unfortunate that that a PSCI 0.2+ implementation would be lacking a
+> working SYSTEM_RESET implementation, and it's certainly a mistake to
+> discourage.
 
- From what I see, the difference between irq-gic-v3-its-fsl-mc-msi and 
-the irq-gic-v3-its-platform-msi is the way ITS specific DeviceID is 
-created in msi_prepare.
+I may understand the case: on some platforms, the only reset way is
+to trigger the wdt, for various reason the underly firmware isn't
+convenient to touch the wdt.
 
-German, is there a reason why you use the ICID read from the DPRC as dev_id?
+But I'd like 127 or lower for the default priority for the above case, because
+various wdt reset_handler priority is 128.
 
-Regards,
-Matthias
+Thanks,
+Jisheng
+
+> 
+> > Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> > ---
+> > It might make sense to introduce a restart-priority property for devicetree
+> > based configurations, but I am not sure if this would be acceptable.  
+> 
+> From the DT side, I'm not keen on properties for priorities. They're
+> incredibly fragile and don't really encode a HW property.
+> 
+> A better option would be to have a property to describe how the PSCI
+> implementation is broken (e.g. broken-system-reset), and not register
+> the handler at all in that case.
+> 
+> Thanks,
+> Mark.
+> 
+> >  drivers/firmware/psci.c | 11 +++++++++--
+> >  1 file changed, 9 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+> > index 11bfee8b79a9..99fab3ac3fd5 100644
+> > --- a/drivers/firmware/psci.c
+> > +++ b/drivers/firmware/psci.c
+> > @@ -231,11 +231,18 @@ static int get_set_conduit_method(struct device_node *np)
+> >  	return 0;
+> >  }
+> >  
+> > -static void psci_sys_reset(enum reboot_mode reboot_mode, const char *cmd)
+> > +static int psci_sys_reset(struct notifier_block *np, unsigned long action,
+> > +			  void *data)
+> >  {
+> >  	invoke_psci_fn(PSCI_0_2_FN_SYSTEM_RESET, 0, 0, 0);
+> > +	return NOTIFY_DONE;
+> >  }
+> >  
+> > +static struct notifier_block psci_sys_reset_nb = {
+> > +	.notifier_call = psci_sys_reset,
+> > +	.priority = 129,
+> > +};
+> > +
+> >  static void psci_sys_poweroff(void)
+> >  {
+> >  	invoke_psci_fn(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
+> > @@ -461,7 +468,7 @@ static void __init psci_0_2_set_functions(void)
+> >  
+> >  	psci_ops.migrate_info_type = psci_migrate_info_type;
+> >  
+> > -	arm_pm_restart = psci_sys_reset;
+> > +	register_restart_handler(&psci_sys_reset_nb);
+> >  
+> >  	pm_power_off = psci_sys_poweroff;
+> >  }
+> > -- 
+> > 2.5.0
+> >   
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
