@@ -1,32 +1,27 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 13 Apr 2016 17:29:25 +0800
-Subject: [GIT PULL] ARM: i.MX fixes for 4.6
-Message-ID: <20160413092924.GO28903@tiger>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 13 Apr 2016 11:32:58 +0200
+Subject: [RESEND PATCH 0/2] pinctrl: mediatek: add pinctrl/GPIO/EINT
+ driver for mt2701
+In-Reply-To: <1460531264-4405-1-git-send-email-biao.huang@mediatek.com>
+References: <1460531264-4405-1-git-send-email-biao.huang@mediatek.com>
+Message-ID: <570E124A.9090505@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 
-  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
 
-are available in the git repository at:
+On 13/04/16 09:07, Biao Huang wrote:
+> Biao Huang (1):
+>    arm: dts: Add pinctrl/GPIO/EINT node for mt2701
+>
+> Erin Lo (1):
+>    ARM: mediatek: Add MT2701 config options for mediatek SoCs.
+>
+>   arch/arm/boot/dts/mt2701.dtsi  |   19 +++++++++++++++++++
+>   arch/arm/mach-mediatek/Kconfig |    4 ++++
+>   2 files changed, 23 insertions(+)
+>
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.6
+Applied to v4.6-next/[dts,kconfig].
 
-for you to fetch changes up to fc26fe9c3869f02dd9dc54ff3a45c6d9d4bbbdfa:
-
-  ARM: mach-imx: sdhci-esdhc-imx: initialize DMA mask (2016-04-13 16:41:56 +0800)
-
-----------------------------------------------------------------
-The i.MX fixes for 4.6:
- - The sdhci-esdhc-imx DMA support is broken due to commit 7b91369b4655
-   ("mmc: sdhci: Set DMA mask when adding host").  It requires device's
-   dma_mask be set up properly to get DMA work.  The fixing patch
-   initializes the DMA mask to enable the access again.
-
-----------------------------------------------------------------
-Alexander Kurz (1):
-      ARM: mach-imx: sdhci-esdhc-imx: initialize DMA mask
-
- arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+Thanks.
