@@ -1,33 +1,31 @@
 From: mbrugger@suse.com (Matthias Brugger)
-Date: Wed, 13 Apr 2016 12:30:55 +0200
-Subject: [PATCH 5/6] staging: fsl-mc: Clean up of irq_chip callbacks
+Date: Wed, 13 Apr 2016 12:30:53 +0200
+Subject: [PATCH 3/6] genirq/msi: Export msi_get_domain_info
 In-Reply-To: <1460543456-11345-1-git-send-email-mbrugger@suse.com>
 References: <1460543456-11345-1-git-send-email-mbrugger@suse.com>
-Message-ID: <1460543456-11345-6-git-send-email-mbrugger@suse.com>
+Message-ID: <1460543456-11345-4-git-send-email-mbrugger@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-platform_msi_create_irq_domain already sets the irq_chip callbacks accordingly.
-We don't need to define them explicitly in the driver.
+From: Matthias Brugger <matthias.bgg@gmail.com>
+
+Allow modules to call msi_get_domain_info.
 
 Signed-off-by: Matthias Brugger <mbrugger@suse.com>
 ---
- drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c | 3 ---
- 1 file changed, 3 deletions(-)
+ kernel/irq/msi.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c b/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
-index 0eecb7e..c787090 100644
---- a/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
-+++ b/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
-@@ -22,9 +22,6 @@
+diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
+index 38e89ce..9b0ba4a 100644
+--- a/kernel/irq/msi.c
++++ b/kernel/irq/msi.c
+@@ -400,5 +400,6 @@ struct msi_domain_info *msi_get_domain_info(struct irq_domain *domain)
+ {
+ 	return (struct msi_domain_info *)domain->host_data;
+ }
++EXPORT_SYMBOL_GPL(msi_get_domain_info);
  
- static struct irq_chip its_msi_irq_chip = {
- 	.name = "fsl-mc-bus-msi",
--	.irq_mask = irq_chip_mask_parent,
--	.irq_unmask = irq_chip_unmask_parent,
--	.irq_eoi = irq_chip_eoi_parent,
- };
- 
- static int its_fsl_mc_msi_prepare(struct irq_domain *msi_domain,
+ #endif /* CONFIG_GENERIC_MSI_IRQ_DOMAIN */
 -- 
 2.6.6
