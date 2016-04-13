@@ -1,28 +1,127 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 13 Apr 2016 10:35:19 -0700
-Subject: [PATCH 0/4] Few more updates for NS2 DT
-In-Reply-To: <1459236454-26285-1-git-send-email-anup.patel@broadcom.com>
-References: <1459236454-26285-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <570E8357.4000303@gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 13 Apr 2016 18:49:59 +0100
+Subject: [PATCH 15/17] kvm: arm64: Get rid of fake page table levels
+In-Reply-To: <20160412121414.GA3039@cbox>
+References: <1459787177-12767-1-git-send-email-suzuki.poulose@arm.com>
+ <1459787177-12767-16-git-send-email-suzuki.poulose@arm.com>
+ <20160408150523.GX8961@cbox> <570BB5C9.8040509@arm.com>
+ <20160412121414.GA3039@cbox>
+Message-ID: <570E86C7.1020606@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/03/16 00:27, Anup Patel wrote:
-> This patchset primarily adds more PL330 and PL022 DT nodes for
-> NS2 SVK. It also moves clock DT nodes to separate file to be
-> consistent with other Broadcom SoCs DT files.
-> 
-> The patchset is based on v4.6-rc1 tag and is available in ns2_dt3_v1
-> branch of https://github.com/Broadcom/arm64-linux.git
-> 
-> All patches have been tested on Broadcom NS2 SVK.
-> 
-> Anup Patel (4):
->   arm64: dts: Add ARM PL330 DMA DT node for NS2
->   arm64: dts: Add maintenance interrupt for GIC in NS2 DT
->   arm64: dts: Move NS2 clock DT nodes to separate DT file
->   arm64: dts: Add ARM PL022 SPI DT nodes for NS2
+On 12/04/16 13:14, Christoffer Dall wrote:
+> On Mon, Apr 11, 2016 at 03:33:45PM +0100, Suzuki K Poulose wrote:
+>> On 08/04/16 16:05, Christoffer Dall wrote:
+>>> On Mon, Apr 04, 2016 at 05:26:15PM +0100, Suzuki K Poulose wrote:
+>>
+>>>> diff --git a/arch/arm64/include/asm/stage2_pgtable.h b/arch/arm64/include/asm/stage2_pgtable.h
+>>>> index 751227d..139b4db 100644
+>>>> --- a/arch/arm64/include/asm/stage2_pgtable.h
+>>>> +++ b/arch/arm64/include/asm/stage2_pgtable.h
+>>>> @@ -22,32 +22,55 @@
+>>>>   #include <asm/pgtable.h>
+>>>>
+>>>>   /*
+>>>> - * In the case where PGDIR_SHIFT is larger than KVM_PHYS_SHIFT, we can address
+>>>> - * the entire IPA input range with a single pgd entry, and we would only need
+>>>> - * one pgd entry.  Note that in this case, the pgd is actually not used by
+>>>> - * the MMU for Stage-2 translations, but is merely a fake pgd used as a data
+>>>> - * structure for the kernel pgtable macros to work.
+>>>> + * The hardware mandates concatenation of upto 16 tables at stage2 entry level.
+>>>
+>>> s/upto/up to/
+>>>
+>>>> + * Now, the minimum number of bits resolved at any level is (PAGE_SHIFT - 3),
+>>>> + * or in other words log2(PTRS_PER_PTE). On arm64, the smallest PAGE_SIZE
+>>>
+>>> not sure the log2 comment helps here.
+>>
+>> OK, will address both the above comments.
+>>
+>>>
+>>>> + * supported is 4k, which means (PAGE_SHIFT - 3) > 4 holds for all page sizes.
+>>>> + * This implies, the total number of page table levels at stage2 expected
+>>>> + * by the hardware is actually the number of levels required for (KVM_PHYS_SHIFT - 4)
+>>>> + * in normal translations(e.g, stage-1), since we cannot have another level in
+>>>> + * the range (KVM_PHYS_SHIFT, KVM_PHYS_SHIFT - 4).
+>>>
+>>> Is it not a design decision to always choose the maximum number of
+>>> concatinated initial-level stage2 tables (with the constraint that
+>>> there's a minimum number required)?
+>>
 
-Series applied to devicetree-arm64/next, thanks!
--- 
-Florian
+I have changed the above comment to :
+
+/*
+  * The hardware supports concatenation of up to 16 tables at stage2 entry level
+  * and we use the feature whenever possible.
+  *
+  * Now, the minimum number of bits resolved at any level is (PAGE_SHIFT - 3).
+  * On arm64, the smallest PAGE_SIZE supported is 4k, which means
+  *             (PAGE_SHIFT - 3) > 4 holds for all page sizes.
+  * This implies, the total number of page table levels at stage2 expected
+  * by the hardware is actually the number of levels required for (KVM_PHYS_SHIFT - 4)
+  * in normal translations(e.g, stage1), since we cannot have another level in
+  * the range (KVM_PHYS_SHIFT, KVM_PHYS_SHIFT - 4).
+  */
+
+
+
+>>>> + * At the moment, we do not support a combination of guest IPA and host VA_BITS
+>>>> + * where
+>>>> + *       STAGE2_PGTABLE_LEVELS > CONFIG_PGTABLE_LEVELS
+>>>
+>>> can you change this comment to reverse the statement to avoid someone
+>>> seeing this as a constraint, when in fact it's a negative invariant?
+>>>
+>>> So the case we don't support is a sufficiently larger IPA space compared
+>>> to the host VA space such that the above happens?  (Since at the same
+>>> IPA space size as host VA space size, the stage-2 levels will always be
+>>> less than or equal to the host levels.)
+>>
+>> Correct.
+>>
+>>>
+>>> I don't see how that would ever work with userspace either so I think
+>>> this is a safe assumption and not something that ever needs fixing.  In
+>>
+>> For e.g, we can perfectly run a guest with 40bit IPA under a host with 16K+36bit
+>> VA. The moment we go above 40bit IPA, we could trigger the conditions above.
+>> I think it is perfectly fine for the guest to choose higher IPA width, and place
+>> its memory well above as long as the qemu/lkvm doesn't exhaust its VA. I just
+>> tried booting a VM with memory at 0x70_0000_0000 on a 16K+36bitVA host and it
+>> boots perfectly fine.
+>>
+>
+> Right, I was thinking about it as providing more than 36bits of *memory*
+> not address space in this case, so you're right, it is at least a
+> theoretically possible case.
+>
+
+I have reworded the comment as follows:
+/*
+  * With all the supported VA_BITs and 40bit guest IPA, the following condition
+  * is always true:
+  *
+  *       CONFIG_PGTABLE_LEVELS >= STAGE2_PGTABLE_LEVELS
+  *
+  * We base our stage-2 page table walker helpers on this assumption and
+  * fall back to using the host version of the helper wherever possible.
+  * i.e, if a particular level is not folded (e.g, PUD) at stage2, we fall back
+  * to using the host version, since it is guaranteed it is not folded at host.
+  *
+  * If the condition breaks in the future, we can rearrange the host level
+  * definitions and reuse them for stage2. Till then...
+  */
+#if STAGE2_PGTABLE_LEVELS > CONFIG_PGTABLE_LEVELS
+#error "Unsupported combination of guest IPA and host VA_BITS."
+#endif
+
+---
+
+Please let me know your comments.
+
+
+Cheers
+Suzuki
