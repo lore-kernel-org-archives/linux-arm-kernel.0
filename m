@@ -1,184 +1,66 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 13 Apr 2016 17:29:10 +0100
-Subject: [PATCH v2] iommu/dma: Finish optimising higher-order allocations
-In-Reply-To: <89763f6b1ac684c3d8712e38760bec55b7885e3b.1460048991.git.robin.murphy@arm.com>
-References: <89763f6b1ac684c3d8712e38760bec55b7885e3b.1460048991.git.robin.murphy@arm.com>
-Message-ID: <3e4572cb0a175061c1c4b436e3806ba9d7b9f199.1460563676.git.robin.murphy@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 13 Apr 2016 17:31:50 +0100
+Subject: [PATCH v7 17/16] arm64: hibernate: Refuse to hibernate if the boot
+ cpu is offline
+In-Reply-To: <1459529620-22150-1-git-send-email-james.morse@arm.com>
+Message-ID: <1460565110-26341-1-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we know exactly which page sizes our caller wants to use in the
-given domain, we can restrict higher-order allocation attempts to just
-those sizes, if any, and avoid wasting any time or effort on other sizes
-which offer no benefit. In the same vein, this also lets us accommodate
-a minimum order greater than 0 for special cases.
+It is important to hibernate/resume on the same CPU, otherwise we may
+change the cpu order or restore a big cpu's register state on a little
+cpu.
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+We know cpu 0 is the cpu the firmware booted us on last time, refuse to
+hibernate if it has been hotplugged out. Follow x86's example by registering
+a pm notifier that is called before processes are frozen and devices are
+stopped.
+
+Signed-off-by: James Morse <james.morse@arm.com>
 ---
+ arch/arm64/kernel/hibernate.c | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-Just throwing this out as a quick solo update as I'm still expecting
-discussion on the rest of the series.
-
-Since v1:
-- Rearrange things so that all allocations happen within the loop,
-  and always get split as appropriate.
-- Rename a bunch of things to make more sense.
-- Got rid of a fair amount of the gratuitous bit-twiddling.
-
- arch/arm64/mm/dma-mapping.c |  4 +--
- drivers/iommu/dma-iommu.c   | 60 +++++++++++++++++++++++++++++----------------
- include/linux/dma-iommu.h   |  4 +--
- 3 files changed, 43 insertions(+), 25 deletions(-)
-
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index 5d36907..41d19a0 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -562,8 +562,8 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
- 		struct page **pages;
- 		pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, coherent);
- 
--		pages = iommu_dma_alloc(dev, iosize, gfp, ioprot, handle,
--					flush_page);
-+		pages = iommu_dma_alloc(dev, iosize, gfp, attrs, ioprot,
-+					handle, flush_page);
- 		if (!pages)
- 			return NULL;
- 
-diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-index 6edc852..c67713f 100644
---- a/drivers/iommu/dma-iommu.c
-+++ b/drivers/iommu/dma-iommu.c
-@@ -190,11 +190,15 @@ static void __iommu_dma_free_pages(struct page **pages, int count)
- 	kvfree(pages);
+diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
+index 486315249f2a..1ef4bf2207a5 100644
+--- a/arch/arm64/kernel/hibernate.c
++++ b/arch/arm64/kernel/hibernate.c
+@@ -17,6 +17,7 @@
+ #define pr_fmt(x) "hibernate: " x
+ #include <linux/kvm_host.h>
+ #include <linux/mm.h>
++#include <linux/notifier.h>
+ #include <linux/pm.h>
+ #include <linux/sched.h>
+ #include <linux/suspend.h>
+@@ -476,3 +477,28 @@ int swsusp_arch_resume(void)
+ out:
+ 	return rc;
  }
- 
--static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp)
-+static struct page **__iommu_dma_alloc_pages(unsigned int count,
-+		unsigned long order_mask, gfp_t gfp)
- {
- 	struct page **pages;
- 	unsigned int i = 0, array_size = count * sizeof(*pages);
--	unsigned int order = MAX_ORDER;
 +
-+	order_mask &= (2U << MAX_ORDER) - 1;
-+	if (!order_mask)
-+		return NULL;
- 
- 	if (array_size <= PAGE_SIZE)
- 		pages = kzalloc(array_size, GFP_KERNEL);
-@@ -208,36 +212,38 @@ static struct page **__iommu_dma_alloc_pages(unsigned int count, gfp_t gfp)
- 
- 	while (count) {
- 		struct page *page = NULL;
--		int j;
-+		unsigned int order_size;
- 
- 		/*
- 		 * Higher-order allocations are a convenience rather
- 		 * than a necessity, hence using __GFP_NORETRY until
--		 * falling back to single-page allocations.
-+		 * falling back to minimum-order allocations.
- 		 */
--		for (order = min_t(unsigned int, order, __fls(count));
--		     order > 0; order--) {
--			page = alloc_pages(gfp | __GFP_NORETRY, order);
-+		for (order_mask &= (2U << __fls(count)) - 1;
-+		     order_mask; order_mask &= ~order_size) {
-+			unsigned int order = __fls(order_mask);
-+
-+			order_size = 1U << order;
-+			page = alloc_pages((order_mask - order_size) ?
-+					   gfp | __GFP_NORETRY : gfp, order);
- 			if (!page)
- 				continue;
--			if (PageCompound(page)) {
--				if (!split_huge_page(page))
--					break;
--				__free_pages(page, order);
--			} else {
-+			if (!order)
-+				break;
-+			if (!PageCompound(page)) {
- 				split_page(page, order);
- 				break;
-+			} else if (!split_huge_page(page)) {
-+				break;
- 			}
-+			__free_pages(page, order);
- 		}
--		if (!page)
--			page = alloc_page(gfp);
- 		if (!page) {
- 			__iommu_dma_free_pages(pages, i);
- 			return NULL;
- 		}
--		j = 1 << order;
--		count -= j;
--		while (j--)
-+		count -= order_size;
-+		while (order_size--)
- 			pages[i++] = page++;
- 	}
- 	return pages;
-@@ -267,6 +273,7 @@ void iommu_dma_free(struct device *dev, struct page **pages, size_t size,
-  *	 attached to an iommu_dma_domain
-  * @size: Size of buffer in bytes
-  * @gfp: Allocation flags
-+ * @attrs: DMA attributes for this allocation
-  * @prot: IOMMU mapping flags
-  * @handle: Out argument for allocated DMA handle
-  * @flush_page: Arch callback which must ensure PAGE_SIZE bytes from the
-@@ -278,8 +285,8 @@ void iommu_dma_free(struct device *dev, struct page **pages, size_t size,
-  * Return: Array of struct page pointers describing the buffer,
-  *	   or NULL on failure.
-  */
--struct page **iommu_dma_alloc(struct device *dev, size_t size,
--		gfp_t gfp, int prot, dma_addr_t *handle,
-+struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
-+		struct dma_attrs *attrs, int prot, dma_addr_t *handle,
- 		void (*flush_page)(struct device *, const void *, phys_addr_t))
- {
- 	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
-@@ -288,11 +295,22 @@ struct page **iommu_dma_alloc(struct device *dev, size_t size,
- 	struct page **pages;
- 	struct sg_table sgt;
- 	dma_addr_t dma_addr;
--	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
-+	unsigned int count, min_size, alloc_sizes = domain->pgsize_bitmap;
- 
- 	*handle = DMA_ERROR_CODE;
- 
--	pages = __iommu_dma_alloc_pages(count, gfp);
-+	min_size = alloc_sizes & -alloc_sizes;
-+	if (min_size < PAGE_SIZE) {
-+		min_size = PAGE_SIZE;
-+		alloc_sizes |= PAGE_SIZE;
-+	} else {
-+		size = ALIGN(size, min_size);
++static int check_boot_cpu_online_pm_callback(struct notifier_block *nb,
++					     unsigned long action, void *ptr)
++{
++	if (action == PM_HIBERNATION_PREPARE &&
++	     cpumask_first(cpu_online_mask) != 0) {
++		pr_warn("CPU0 is offline.\n");
++		return notifier_from_errno(-ENODEV);
 +	}
-+	if (dma_get_attr(DMA_ATTR_ALLOC_SINGLE_PAGES, attrs))
-+		alloc_sizes = min_size;
 +
-+	count = PAGE_ALIGN(size) >> PAGE_SHIFT;
-+	pages = __iommu_dma_alloc_pages(count, alloc_sizes >> PAGE_SHIFT, gfp);
- 	if (!pages)
- 		return NULL;
- 
-diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
-index fc48103..8443bbb 100644
---- a/include/linux/dma-iommu.h
-+++ b/include/linux/dma-iommu.h
-@@ -38,8 +38,8 @@ int dma_direction_to_prot(enum dma_data_direction dir, bool coherent);
-  * These implement the bulk of the relevant DMA mapping callbacks, but require
-  * the arch code to take care of attributes and cache maintenance
-  */
--struct page **iommu_dma_alloc(struct device *dev, size_t size,
--		gfp_t gfp, int prot, dma_addr_t *handle,
-+struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
-+		struct dma_attrs *attrs, int prot, dma_addr_t *handle,
- 		void (*flush_page)(struct device *, const void *, phys_addr_t));
- void iommu_dma_free(struct device *dev, struct page **pages, size_t size,
- 		dma_addr_t *handle);
++	return NOTIFY_OK;
++}
++
++static int __init check_boot_cpu_online_init(void)
++{
++	/*
++	 * Set this pm_notifier callback with a lower priority than
++	 * cpu_hotplug_pm_callback, so that cpu_hotplug_pm_callback will be
++	 * called earlier to disable cpu hotplug before the cpu online check.
++	 */
++	pm_notifier(check_boot_cpu_online_pm_callback, -INT_MAX);
++
++	return 0;
++}
++core_initcall(check_boot_cpu_online_init);
 -- 
-2.7.3.dirty
+2.8.0.rc3
