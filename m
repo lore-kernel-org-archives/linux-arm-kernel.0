@@ -1,81 +1,129 @@
-From: stuart.yoder@nxp.com (Stuart Yoder)
-Date: Wed, 13 Apr 2016 14:57:17 +0000
-Subject: [PATCH 4/6] staging: fsl-mc: Use platform_msi_* infrastructure
-In-Reply-To: <570E2C2C.6090900@suse.com>
-References: <1460543456-11345-1-git-send-email-mbrugger@suse.com>
- <1460543456-11345-5-git-send-email-mbrugger@suse.com>
- <570E25DD.9070106@arm.com> <570E2C2C.6090900@suse.com>
-Message-ID: <HE1PR04MB1641695115F9C31A4A620CBB8D960@HE1PR04MB1641.eurprd04.prod.outlook.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 13 Apr 2016 16:01:22 +0100
+Subject: [PATCH] arm64: Implement ptep_set_access_flags() for hardware AF/DBM
+Message-ID: <1460559682-31267-1-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+When hardware updates of the access and dirty states are enabled, the
+default ptep_set_access_flags() implementation based on calling
+set_pte_at() directly is potentially racy. This triggers the "racy dirty
+state clearing" warning in set_pte_at() because an existing writable PTE
+is overridden with a clean entry.
 
+There are two main scenarios for this situation:
 
-> -----Original Message-----
-> From: Matthias Brugger [mailto:mbrugger at suse.com]
-> Sent: Wednesday, April 13, 2016 6:23 AM
-> To: Marc Zyngier <marc.zyngier@arm.com>; gregkh at linuxfoundation.org; robh+dt at kernel.org;
-> frowand.list at gmail.com; grant.likely at linaro.org; German.Rivera at freescale.com;
-> jiang.liu at linux.intel.com; tglx at linutronix.de
-> Cc: treding at nvidia.com; Stuart Yoder <stuart.yoder@nxp.com>; jroedel at suse.de; agraf at suse.de;
-> bp at suse.de; matthias.bgg at gmail.com; bhaktipriya96 at gmail.com; linux-kernel at vger.kernel.org;
-> devicetree at vger.kernel.org; devel at driverdev.osuosl.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 4/6] staging: fsl-mc: Use platform_msi_* infrastructure
-> 
-> 
-> 
-> On 13/04/16 12:56, Marc Zyngier wrote:
-> > On 13/04/16 11:30, Matthias Brugger wrote:
-> >> From: Matthias Brugger <matthias.bgg@gmail.com>
-> >>
-> >> The fsl-mc driver can't be build as a module because it uses msi_*
-> >> functions directly. Port the driver to use the platform_msi_*
-> >> infrastructure instead, to allow it to be build as a module.
-> >>
-> >> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
-> >> ---
-> >>   .../staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c |   5 +-
-> >>   drivers/staging/fsl-mc/bus/mc-allocator.c          |   9 +-
-> >>   drivers/staging/fsl-mc/bus/mc-msi.c                | 169 +--------------------
-> >>   drivers/staging/fsl-mc/include/mc-sys.h            |   3 +
-> >>   4 files changed, 14 insertions(+), 172 deletions(-)
-> >>
-> >> diff --git a/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c b/drivers/staging/fsl-
-> mc/bus/irq-gic-v3-its-fsl-mc-msi.c
-> >> index 720e2b0..0eecb7e 100644
-> >> --- a/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
-> >> +++ b/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
-> >> @@ -25,7 +25,6 @@ static struct irq_chip its_msi_irq_chip = {
-> >>   	.irq_mask = irq_chip_mask_parent,
-> >>   	.irq_unmask = irq_chip_unmask_parent,
-> >>   	.irq_eoi = irq_chip_eoi_parent,
-> >> -	.irq_set_affinity = msi_domain_set_affinity
-> >>   };
-> >>
-> >>   static int its_fsl_mc_msi_prepare(struct irq_domain *msi_domain,
-> >> @@ -86,7 +85,7 @@ int __init its_fsl_mc_msi_init(void)
-> >>   			continue;
-> >>   		}
-> >>
-> >> -		mc_msi_domain = fsl_mc_msi_create_irq_domain(
-> >> +		mc_msi_domain = platform_msi_create_irq_domain(
-> >>   						 of_node_to_fwnode(np),
-> >>   						 &its_fsl_mc_msi_domain_info,
-> >>   						 parent);
-> >
-> > What? We are already creating a platform MSI domain for the ITS. How is
-> > that going to work? If you want to convert this set of drivers to
-> > platform ITS, fine. But you can't randomly hack in the ITS code and pray
-> > for things not to fall apart.
-> >
-> 
->  From what I see, the difference between irq-gic-v3-its-fsl-mc-msi and
-> the irq-gic-v3-its-platform-msi is the way ITS specific DeviceID is
-> created in msi_prepare.
-> 
-> German, is there a reason why you use the ICID read from the DPRC as dev_id?
+1. The CPU getting an access fault does not support hardware updates of
+   the access/dirty flags. However, a different agent in the system
+   (e.g. SMMU) can do this, therefore overriding a writable entry with a
+   clean one could potentially lose the automatically updated dirty
+   status
 
-Because it _is_ the dev_id at the hardware level.  There is an fsl-mc bus
-specific mechanism to get that id...it's not in the device tree.
+2. A more complex situation is possible when all CPUs support hardware
+   AF/DBM:
 
-Stuart
+   a) Initial state: shareable + writable vma and pte_none(pte)
+   b) Read fault taken by two threads of the same process on different
+      CPUs
+   c) CPU0 takes the mmap_sem and proceeds to handling the fault. It
+      eventually reaches do_set_pte() which sets a writable + clean pte.
+      CPU0 releases the mmap_sem
+   d) CPU1 acquires the mmap_sem and proceeds to handle_pte_fault(). The
+      pte entry it reads is present, writable and clean and it continues
+      to pte_mkyoung()
+   e) CPU1 calls ptep_set_access_flags()
+
+   If between (d) and (e) the hardware (another CPU) updates the dirty
+   state (clears PTE_RDONLY), CPU1 will override the PTR_RDONLY bit
+   marking the entry clean again.
+
+This patch implements an arm64-specific ptep_set_access_flags() function
+to perform an atomic update of the PTE flags.
+
+Fixes: 2f4b829c625e ("arm64: Add support for hardware updates of the access and dirty pte bits")
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Reported-by: Ming Lei <tom.leiming@gmail.com>
+Tested-by: Julien Grall <julien.grall@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: <stable@vger.kernel.org> # 4.3+
+---
+ arch/arm64/include/asm/pgtable.h |  5 ++++
+ arch/arm64/mm/fault.c            | 49 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 54 insertions(+)
+
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 989fef16d461..12ecc1f398d0 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -526,6 +526,11 @@ static inline pmd_t pmd_modify(pmd_t pmd, pgprot_t newprot)
+ }
+ 
+ #ifdef CONFIG_ARM64_HW_AFDBM
++#define __HAVE_ARCH_PTEP_SET_ACCESS_FLAGS
++extern int ptep_set_access_flags(struct vm_area_struct *vma,
++				 unsigned long address, pte_t *ptep,
++				 pte_t entry, int dirty);
++
+ /*
+  * Atomic pte/pmd modifications.
+  */
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 95df28bc875f..639083f901cd 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -81,6 +81,55 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
+ 	printk("\n");
+ }
+ 
++#ifdef CONFIG_ARM64_HW_AFDBM
++/*
++ * It only sets the access flags (dirty, accessed), as well as write
++ * permission, and only to a more permissive setting. This function needs to
++ * cope with hardware update of the accessed/dirty state by other agents in
++ * the system. It can safely skip the __sync_icache_dcache() call as in
++ * set_pte_at() since the PTE is never changed from no-exec to exec by this
++ * function.
++ * It returns whether the PTE actually changed.
++ */
++int ptep_set_access_flags(struct vm_area_struct *vma,
++			  unsigned long address, pte_t *ptep,
++			  pte_t entry, int dirty)
++{
++	pteval_t old_pteval;
++	unsigned int tmp;
++
++	if (pte_same(*ptep, entry))
++		return 0;
++
++	/* only preserve the access flags and write permission */
++	pte_val(entry) &= PTE_AF | PTE_WRITE | PTE_DIRTY;
++
++	/*
++	 * PTE_RDONLY is cleared by default in the asm below, so set it in
++	 * back if necessary (read-only or clean PTE).
++	 */
++	if (!pte_write(entry) || !dirty)
++		pte_val(entry) |= PTE_RDONLY;
++
++	/*
++	 * Setting the flags must be done atomically to avoid racing with the
++	 * hardware update of the access/dirty state.
++	 */
++	asm volatile("//	ptep_set_access_flags\n"
++	"	prfm	pstl1strm, %2\n"
++	"1:	ldxr	%0, %2\n"
++	"	and	%0, %0, %3		// clear PTE_RDONLY\n"
++	"	orr	%0, %0, %4		// set flags\n"
++	"	stxr	%w1, %0, %2\n"
++	"	cbnz	%w1, 1b\n"
++	: "=&r" (old_pteval), "=&r" (tmp), "+Q" (pte_val(*ptep))
++	: "L" (~PTE_RDONLY), "r" (pte_val(entry)));
++
++	flush_tlb_fix_spurious_fault(vma, address);
++	return 1;
++}
++#endif
++
+ /*
+  * The kernel tried to access some page that wasn't present.
+  */
