@@ -1,42 +1,41 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Wed, 13 Apr 2016 13:05:02 -0700
-Subject: [PATCH v2 1/2] clk: bcm2835: Fix compiler warnings on 64-bit builds
-Message-ID: <1460577903-32192-1-git-send-email-eric@anholt.net>
+Date: Wed, 13 Apr 2016 13:05:03 -0700
+Subject: [PATCH v2 2/2] clk: bcm2835: Fix PLL poweron
+In-Reply-To: <1460577903-32192-1-git-send-email-eric@anholt.net>
+References: <1460577903-32192-1-git-send-email-eric@anholt.net>
+Message-ID: <1460577903-32192-2-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+In poweroff, we set the reset bit and the power down bit, but only
+managed to unset the reset bit for poweron.  This meant that if HDMI
+did -EPROBE_DEFER after it had grabbed its clocks, we'd power down the
+PLLH (that had been on at boot time) and never recover.
+
 Signed-off-by: Eric Anholt <eric@anholt.net>
+Fixes: 41691b8862e2 ("clk: bcm2835: Add support for programming the audio domain clocks")
+Cc: stable at vger.kernel.org
 ---
 
-v2: no change
- drivers/clk/bcm/clk-bcm2835.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+v2: add fixes tag
+
+ drivers/clk/bcm/clk-bcm2835.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
 diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-index 4c0f1b504e2f..87616ded5bbe 100644
+index 87616ded5bbe..7a7970865c2d 100644
 --- a/drivers/clk/bcm/clk-bcm2835.c
 +++ b/drivers/clk/bcm/clk-bcm2835.c
-@@ -400,17 +400,17 @@ struct bcm2835_pll_ana_bits {
- static const struct bcm2835_pll_ana_bits bcm2835_ana_default = {
- 	.mask0 = 0,
- 	.set0 = 0,
--	.mask1 = ~(A2W_PLL_KI_MASK | A2W_PLL_KP_MASK),
-+	.mask1 = (u32)~(A2W_PLL_KI_MASK | A2W_PLL_KP_MASK),
- 	.set1 = (2 << A2W_PLL_KI_SHIFT) | (8 << A2W_PLL_KP_SHIFT),
--	.mask3 = ~A2W_PLL_KA_MASK,
-+	.mask3 = (u32)~A2W_PLL_KA_MASK,
- 	.set3 = (2 << A2W_PLL_KA_SHIFT),
- 	.fb_prediv_mask = BIT(14),
- };
+@@ -554,6 +554,10 @@ static int bcm2835_pll_on(struct clk_hw *hw)
+ 	const struct bcm2835_pll_data *data = pll->data;
+ 	ktime_t timeout;
  
- static const struct bcm2835_pll_ana_bits bcm2835_ana_pllh = {
--	.mask0 = ~(A2W_PLLH_KA_MASK | A2W_PLLH_KI_LOW_MASK),
-+	.mask0 = (u32)~(A2W_PLLH_KA_MASK | A2W_PLLH_KI_LOW_MASK),
- 	.set0 = (2 << A2W_PLLH_KA_SHIFT) | (2 << A2W_PLLH_KI_LOW_SHIFT),
--	.mask1 = ~(A2W_PLLH_KI_HIGH_MASK | A2W_PLLH_KP_MASK),
-+	.mask1 = (u32)~(A2W_PLLH_KI_HIGH_MASK | A2W_PLLH_KP_MASK),
- 	.set1 = (6 << A2W_PLLH_KP_SHIFT),
- 	.mask3 = 0,
- 	.set3 = 0,
++	cprman_write(cprman, data->a2w_ctrl_reg,
++		     cprman_read(cprman, data->a2w_ctrl_reg) &
++		     ~A2W_PLL_CTRL_PWRDN);
++
+ 	/* Take the PLL out of reset. */
+ 	cprman_write(cprman, data->cm_ctrl_reg,
+ 		     cprman_read(cprman, data->cm_ctrl_reg) & ~CM_PLL_ANARST);
 -- 
 2.8.0.rc3
