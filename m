@@ -1,62 +1,42 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 13 Apr 2016 21:57:39 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC Drivers Updates for v4.7
-In-Reply-To: <20160413194354.GQ19945@localhost>
-References: <cover.1459732456.git.horms+renesas@verge.net.au>
- <20160413194354.GQ19945@localhost>
-Message-ID: <CAMuHMdUbNcbLdQYG037MiDRAe1dr7ohRK625vb16oM8W19WEFw@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 13 Apr 2016 13:05:02 -0700
+Subject: [PATCH v2 1/2] clk: bcm2835: Fix compiler warnings on 64-bit builds
+Message-ID: <1460577903-32192-1-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+Signed-off-by: Eric Anholt <eric@anholt.net>
+---
 
-On Wed, Apr 13, 2016 at 9:43 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Mon, Apr 04, 2016 at 10:22:56AM +0900, Simon Horman wrote:
->> Please consider these Renesas ARM based SoC drivers updates for v4.7.
->>
->>
->> The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
->>
->>   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
->>
->> are available in the git repository at:
->>
->>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-drivers-for-v4.7
->>
->> for you to fetch changes up to cd89841fc6dbb6dc11aa113769f39dcd30be720f:
->>
->>   ARM: shmobile: timer: Drop support for Cortex A8 (2016-03-28 09:01:31 +0900)
->>
->> ----------------------------------------------------------------
->> Renesas ARM Based SoC Drivers Updates for v4.7
->>
->> Loop delay calculation updates:
->> * Remove check for no longer supported Cortex A8 cores
->> * Correct short calculation of delay
->>
->> ----------------------------------------------------------------
->> Geert Uytterhoeven (2):
->>       ARM: shmobile: timer: Fix preset_lpj leading to too short delays
->>       ARM: shmobile: timer: Drop support for Cortex A8
->
-> I don't understand your naming. THis isn't driver code, this is SoC code.
->
-> Anyway, I replied to the drop-A8 patch, the resulting function doesn't make
-> much sense once that code path is removed (div is always 1). Seems like this
-> should be cleaned up in other ways instead.
->
-> So, not merging this branch for now since I think it should be revisited.
+v2: no change
+ drivers/clk/bcm/clk-bcm2835.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-The reason these are small separate patches is because especially the
-first one may be backported to stable, as it's a real bug fix.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
+index 4c0f1b504e2f..87616ded5bbe 100644
+--- a/drivers/clk/bcm/clk-bcm2835.c
++++ b/drivers/clk/bcm/clk-bcm2835.c
+@@ -400,17 +400,17 @@ struct bcm2835_pll_ana_bits {
+ static const struct bcm2835_pll_ana_bits bcm2835_ana_default = {
+ 	.mask0 = 0,
+ 	.set0 = 0,
+-	.mask1 = ~(A2W_PLL_KI_MASK | A2W_PLL_KP_MASK),
++	.mask1 = (u32)~(A2W_PLL_KI_MASK | A2W_PLL_KP_MASK),
+ 	.set1 = (2 << A2W_PLL_KI_SHIFT) | (8 << A2W_PLL_KP_SHIFT),
+-	.mask3 = ~A2W_PLL_KA_MASK,
++	.mask3 = (u32)~A2W_PLL_KA_MASK,
+ 	.set3 = (2 << A2W_PLL_KA_SHIFT),
+ 	.fb_prediv_mask = BIT(14),
+ };
+ 
+ static const struct bcm2835_pll_ana_bits bcm2835_ana_pllh = {
+-	.mask0 = ~(A2W_PLLH_KA_MASK | A2W_PLLH_KI_LOW_MASK),
++	.mask0 = (u32)~(A2W_PLLH_KA_MASK | A2W_PLLH_KI_LOW_MASK),
+ 	.set0 = (2 << A2W_PLLH_KA_SHIFT) | (2 << A2W_PLLH_KI_LOW_SHIFT),
+-	.mask1 = ~(A2W_PLLH_KI_HIGH_MASK | A2W_PLLH_KP_MASK),
++	.mask1 = (u32)~(A2W_PLLH_KI_HIGH_MASK | A2W_PLLH_KP_MASK),
+ 	.set1 = (6 << A2W_PLLH_KP_SHIFT),
+ 	.mask3 = 0,
+ 	.set3 = 0,
+-- 
+2.8.0.rc3
