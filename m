@@ -1,85 +1,53 @@
-From: emil.l.velikov@gmail.com (Emil Velikov)
-Date: Wed, 13 Apr 2016 13:15:00 +0100
-Subject: [PATCH v8 02/10] drm/hisilicon: Add hisilicon kirin drm master
- driver
-In-Reply-To: <1460364943-76135-3-git-send-email-xinliang.liu@linaro.org>
-References: <1460364943-76135-1-git-send-email-xinliang.liu@linaro.org>
- <1460364943-76135-3-git-send-email-xinliang.liu@linaro.org>
-Message-ID: <CACvgo50dggEbwzEZLUvtErzrxOr3B1gECyyehLQZkoE5oXfNmA@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 13 Apr 2016 20:11:47 +0800
+Subject: [PATCH] i2c: designware-platdrv: get fast/std speed scl
+ high/low count from DT
+In-Reply-To: <20160407175759.GO32257@rob-hp-laptop>
+References: <1459927680-5480-1-git-send-email-jszhang@marvell.com>
+ <20160407175759.GO32257@rob-hp-laptop>
+Message-ID: <20160413201147.5621a17c@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Xinliang,
+Dear Rob,
 
-On 11 April 2016 at 09:55, Xinliang Liu <xinliang.liu@linaro.org> wrote:
+On Thu, 7 Apr 2016 12:57:59 -0500 Rob Herring wrote:
 
-> +static int kirin_drm_connectors_register(struct drm_device *dev)
-> +{
-> +       struct drm_connector *connector;
-> +       struct drm_connector *failed_connector;
-> +       int ret;
-> +
-> +       mutex_lock(&dev->mode_config.mutex);
-> +       drm_for_each_connector(connector, dev) {
-> +               ret = drm_connector_register(connector);
-> +               if (ret) {
-> +                       failed_connector = connector;
-> +                       goto err;
-> +               }
-> +       }
-> +       mutex_unlock(&dev->mode_config.mutex);
-> +
-> +       return 0;
-> +
-> +err:
-> +       drm_for_each_connector(connector, dev) {
-> +               if (failed_connector == connector)
-> +                       break;
-> +               drm_connector_unregister(connector);
-> +       }
-> +       mutex_unlock(&dev->mode_config.mutex);
-> +
-> +       return ret;
-> +}
-> +
-Iirc we have new drm_connector_{un,}register_all() helpers.You might
-want to use it once they are in (i.e. not sure what your base is and
-if they have landed yet).
+> On Wed, Apr 06, 2016 at 03:28:00PM +0800, Jisheng Zhang wrote:
+> > Sometimes, it's convenient to define the scl's high/low count directly,
+> > e.g HW people would do some measurement then directly give out the
+> > optimum counts. Previously, we solved the sda falling time and scl
+> > falling time by i2c_dw_scl_hcnt() and i2c_dw_scl_lcnt(), then put them
+> > into dt, but what we really care isn't the sda/scl falling time.  
+> 
+> This is just so you can put specific clock count instead of converting 
+> from nanoseconds with standard properties or you gain some additional 
+> control of the timing. If only the former, then I prefer we stick with 
+> the common properties.
+
+To be honest, both. Let me show how I gain additional control of the timing
+with this patch while I can't do this w/o it.
+
+I want the similar high percent of SCL high for both standard-mode and
+fast-mode. Before this patch, this is not achievable because the parameters
+to cal the hcnt/lcnt via i2c_dw_scl_hcnt() and i2c_dw_scl_lcnt() are different
+for standard-mode and fast-mode.
+
+Thanks,
+Jisheng
 
 
-> +static struct device_node *kirin_get_remote_node(struct device_node *np)
-> +{
-> +       struct device_node *endpoint, *remote;
-> +
-> +       /* get the first endpoint, in our case only one remote node
-> +        * is connected to display controller.
-> +        */
-> +       endpoint = of_graph_get_next_endpoint(np, NULL);
-> +       if (!endpoint) {
-> +               DRM_ERROR("no valid endpoint node\n");
-> +               return ERR_PTR(-ENODEV);
-> +       }
-> +       of_node_put(endpoint);
-> +
-> +       remote = of_graph_get_remote_port_parent(endpoint);
-> +       if (!remote) {
-> +               DRM_ERROR("no valid remote node\n");
-> +               return ERR_PTR(-ENODEV);
-> +       }
-> +       of_node_put(remote);
-> +
-> +       if (!of_device_is_available(remote)) {
-> +               DRM_ERROR("not available for remote node\n");
-> +               return ERR_PTR(-ENODEV);
-> +       }
-> +
-This seems like a common pattern in many platform DRM drivers. Yet
-some tend to differ in subtle ways - I'm leaning that they might be
-bugs, but one cannot be too sure.
 
-A friendly request:
-Can you please follow up by adding a helper and removing the
-duplication thoughout ?
-
-Thanks
-Emil
+> 
+> > From another side, the dw_i2c_acpi_configure() on ACPI platform also
+> > get hcnt/lcnt values rather than the sda/scl falling time from ACPI
+> > method, we want similar feature for DT platforms.  
+> 
+> That's nice, but not really a reason IMO.
+> 
+> > 
+> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> > ---
+> >  Documentation/devicetree/bindings/i2c/i2c-designware.txt | 16 ++++++++++++++++
+> >  drivers/i2c/busses/i2c-designware-platdrv.c              |  8 ++++++++
+> >  2 files changed, 24 insertions(+)  
