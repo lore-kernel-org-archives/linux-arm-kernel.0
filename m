@@ -1,20 +1,22 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 13 Apr 2016 14:11:32 -0700
-Subject: [GIT PULL] Versatile cleanups
-In-Reply-To: <CACRpkdYcBgOOuQd9rf+DEXnqhG9Yuif_ir_xOozLXQpuToD-Fg@mail.gmail.com>
-References: <CACRpkdYcBgOOuQd9rf+DEXnqhG9Yuif_ir_xOozLXQpuToD-Fg@mail.gmail.com>
-Message-ID: <20160413211132.GU19945@localhost>
+Date: Wed, 13 Apr 2016 14:17:05 -0700
+Subject: [GIT PULL] ARM RealView device tree files
+In-Reply-To: <CACRpkdZ1eEC+iDKdRhgXPGKTuoyNCo-bgk1ii62RoqR03_JUtQ@mail.gmail.com>
+References: <CACRpkdZ1eEC+iDKdRhgXPGKTuoyNCo-bgk1ii62RoqR03_JUtQ@mail.gmail.com>
+Message-ID: <20160413211705.GV19945@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 04, 2016 at 11:06:31AM +0200, Linus Walleij wrote:
+On Mon, Apr 04, 2016 at 11:09:13AM +0200, Linus Walleij wrote:
 > Hi ARM SoC folks,
 > 
-> here are some Versatile cleanups that missed the last merge window.
-> Please merge them on some cleanup branch for the v4.7 series.
+> here is a set of ARM RealView device tree files that only use
+> existing bindings and with all new or controversial stuff stripped
+> out.
 > 
-> I might send more cleanups on top, I just don't want more stuff lying
-> around and not getting upstream.
+> This needs to get into linux-next and get some rotation.
+> 
+> Please pull them to some DTS branch.
 > 
 > Yours,
 > Linus Walleij
@@ -26,18 +28,24 @@ On Mon, Apr 04, 2016 at 11:06:31AM +0200, Linus Walleij wrote:
 > are available in the git repository at:
 > 
 >   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-> tags/versatile-cleanup-1
+> tags/versatile-dts-1
 > 
-> for you to fetch changes up to 7fbbe38aa11816ef15844238e8eb3164b887d265:
+> for you to fetch changes up to dfc8a117388786ab3cfdf0880a09abd05c4e0a4d:
 > 
->   ARM: realview: hide unused 'pmu_device' object (2016-04-04 10:58:47 +0200)
+>   ARM: dts: realview: DT support for the PBA8 and PBX-A9 (2016-04-04
+> 10:58:05 +0200)
 > 
 > ----------------------------------------------------------------
-> Versatile cleanups for the v4.7 series:
-> - Dynamically detect and print HBI numbers in SoC sysfs
-> - Hide the unused "pmu_device"
+> Versatile DTS changes, baseline for the v4.7 series:
+> - Add CLCD panel nodes to PB1176 and PB11MPCore
+> - Add a DT binding blurb for the Versatile IB2 syscon
+> - Add DTS files for the (QEMU supported) RealView EB
+>   boards in all variants.
+> - Add DTS files for the (QEMU supported) RealView PBA8
+>   and PBX-A9 board variants.
 
-Merged, thanks.
+
+Merged, thanks!
 
 
 -Olof
