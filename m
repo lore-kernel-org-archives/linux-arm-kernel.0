@@ -1,85 +1,54 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Wed, 13 Apr 2016 17:24:14 +0530
-Subject: [PATCH] clk: samsung: exynos7: Enable clocks for CMU_CCORE and
- CMU_FSYS0 blocks
-In-Reply-To: <CA+Ln22Gf+aXnOzj-qYeNq5-MO8b+tjxrp0KPtG7Q2ceStk4ERA@mail.gmail.com>
-References: <1460459243-27120-1-git-send-email-alim.akhtar@samsung.com>
- <CA+Ln22G0b1O9HHyePg60Q2uZnGT_a3J1LMU0o3+CpPoLCTbksA@mail.gmail.com>
- <570E2123.1000107@samsung.com>
- <CA+Ln22Gf+aXnOzj-qYeNq5-MO8b+tjxrp0KPtG7Q2ceStk4ERA@mail.gmail.com>
-Message-ID: <570E3366.2030809@samsung.com>
+From: emil.l.velikov@gmail.com (Emil Velikov)
+Date: Wed, 13 Apr 2016 12:54:20 +0100
+Subject: [PATCH v8 10/10] MAINTAINERS: Add maintainer for hisilicon DRM
+ driver
+In-Reply-To: <1460364943-76135-11-git-send-email-xinliang.liu@linaro.org>
+References: <1460364943-76135-1-git-send-email-xinliang.liu@linaro.org>
+ <1460364943-76135-11-git-send-email-xinliang.liu@linaro.org>
+Message-ID: <CACvgo53zwoid+dWNRAX=iwAvO50Eg3k13+1mJtQcTjKVQJebQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Hi Xinliang,
 
-On 04/13/2016 05:01 PM, Tomasz Figa wrote:
-> 2016-04-13 13:36 GMT+03:00 Sylwester Nawrocki <s.nawrocki@samsung.com>:
->> On 04/13/2016 08:26 AM, Tomasz Figa wrote:
->>>>> @@ -205,7 +206,11 @@ static struct samsung_cmu_info topc_cmu_info __initdata = {
->>>>>
->>>>>   static void __init exynos7_clk_topc_init(struct device_node *np)
->>>>>   {
->>>>> +       struct clk *clk;
->>>>> +
->>>>>          samsung_cmu_register_one(np, &topc_cmu_info);
->>>>> +       clk = __clk_lookup("aclk_ccore_133");
->>>>> +       clk_prepare_enable(clk);
->>>
->>> Shouldn't this be rather done before calling
->>> samsung_cmu_register_one()? I don't remember exactly, but wouldn't
->>> clock registration trigger reading back current (mux, div) values from
->>> registers?
->>>
->>> Also, do we have any guarantees on order of initialization of
->>> particular CMUs? I believe this will happen in order of DT nodes and
->>> so would be not any kind of guarantee at all.
->>
->> If these clocks need to be kept enabled perhaps it's better to just set
->> CLK_IS_CRITICAL flag for them? Patches adding this flag are already in
->> clk-next branch in the clk git tree. This way the clocks would get
->> enabled within the clk_register() call.
->>
+On 11 April 2016 at 09:55, Xinliang Liu <xinliang.liu@linaro.org> wrote:
+> Add maintainer and reviewer for hisilicon DRM driver.
 >
-> Oh, I didn't know about this. Sounds like a good idea. :)
+> v8: None.
+> v7: None.
+> v6: None.
+> v5: None.
+> v4:
+> - Add Chen Feng <puck.chen@hisilicon.com> as Designated reviewer.
+> v3: First version.
 >
+> Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
+> ---
+>  MAINTAINERS | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+>
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 61a323a6b2cf..a2ef58860689 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -3840,6 +3840,16 @@ S:       Maintained
+>  F:     drivers/gpu/drm/gma500
+>  F:     include/drm/gma500*
+>
+> +DRM DRIVERS FOR HISILICON
+> +M:     Xinliang Liu <z.liuxinliang@hisilicon.com>
+> +R:     Xinwei Kong <kong.kongxinwei@hisilicon.com>
+> +R:     Chen Feng <puck.chen@hisilicon.com>
+> +L:     dri-devel at lists.freedesktop.org
+> +T:     git git://github.com/xin3liang/linux.git
+> +S:     Maintained
+> +F:     drivers/gpu/drm/hisilicon
+> +F:     Documentation/devicetree/bindings/display/hisilicon
+Nit: Can you add append '/' on these two lines.
 
-I was not aware of this flag, Thanks for pointing this out.
-This flag indeed solves my problem.
-These clocks should not be gated since the CMU block using this clock 
-for SFR access.
-Please ignore the $SUBJECT patch, I will send a new patch which uses
-CLK_IS_CRITICAL flag instead.
+As mentioned in commit 144308139cdce95e9c6cff3cc0ef12242181665f
 
->> The CMU registration order is enforced by listing input clocks to each
->> CMU in DT.
->
-> Ah, right, I recall now, I even reviewed relevant patch. Thanks for
-> refreshing my memory.
->
->> However, I wouldn't be concerned much about it in context
->> of this patch. We are enabling here clocks which belong to same CMU.
->> samsung_cmu_register_one() needs to be called first for subsequent
->> __clk_lookup() calls to work.
->
-> I thought a clock from another CMU has to be enabled for the CPU to be
-> able to access the CMU being registered.
->
->>
->> Perhaps related bits need to be set manually in CMU registers before
->> registering a clock provider for the CMU, to fulfil the requirements.
->>
->> Anyway, summary of the $subject patch seems not precise enough:
->>
->> "This patch enables clocks for CMU_CCORE and CMU_FSYS0 blocks. This is
->> required before accessing registers of these blocks."
->>
->> We need to enable selected clocks (i.e. access the CMU's registers)
->> before accessing this CMU's registers?
->
-> Yeah, maybe the explanation could be a bit more precise.
->
-> Best regards,
-> Tomasz
->
->
+"It's clearer to have patterns marked as directories."
+
+Thanks
+Emil
