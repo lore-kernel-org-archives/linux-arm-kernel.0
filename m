@@ -1,65 +1,118 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 13 Apr 2016 15:22:44 +0200
-Subject: [PATCH 3/6] ARM: PSCI: Register with kernel restart handler
-In-Reply-To: <570E4550.5000207@roeck-us.net>
-References: <1460120039-2497-1-git-send-email-linux@roeck-us.net>
- <1460120039-2497-4-git-send-email-linux@roeck-us.net>
- <20160413110519.GE32018@leverpostej>
- <570E4550.5000207@roeck-us.net>
-Message-ID: <CAMuHMdU+vj4HDTLdXngUsTjF-Ki-HtbhoRU6mV7UKCz-BhFAtQ@mail.gmail.com>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Wed, 13 Apr 2016 16:23:45 +0300
+Subject: [PATCH] i2c: designware-platdrv: get fast/std speed scl
+ high/low count from DT
+In-Reply-To: <20160413201637.284a3673@xhacker>
+References: <1459927680-5480-1-git-send-email-jszhang@marvell.com>
+ <CAHp75VcHNdAUeob2iR6U1HbUQzEccdjPy8ffuG4mB_=ZX7EokQ@mail.gmail.com>
+ <20160413201637.284a3673@xhacker>
+Message-ID: <1460553825.6620.134.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 13, 2016 at 3:10 PM, Guenter Roeck <linux@roeck-us.net> wrote:
-> On 04/13/2016 04:05 AM, Mark Rutland wrote:
->> On Fri, Apr 08, 2016 at 05:53:56AM -0700, Guenter Roeck wrote:
->>>
->>> Register with kernel restart handler instead of setting arm_pm_restart
->>> directly. This enables support for replacing the PSCI restart handler
->>> with a different handler if necessary for a specific board.
->>>
->>> Select a priority of 129 to indicate a higher than default priority, but
->>> keep it as low as possible since PSCI reset is known to fail on some
->>> boards.
->>
->> For reference, which boards?
->>
-> Salvator-X, reported by Geert Uytterhoeven. Wolfram Sang also reported
-> that it is broken on a board he is using, but I don't recall if it is
-> the same board.
+On Wed, 2016-04-13 at 20:16 +0800, Jisheng Zhang wrote:
+> Dear Andy,
+> 
+> On Thu, 7 Apr 2016 21:05:35 +0300 Andy Shevchenko??wrote:
+> 
+> > 
+> > On Wed, Apr 6, 2016 at 10:28 AM, Jisheng Zhang <jszhang@marvell.com>
+> > wrote:
+> > > 
+> > > Sometimes, it's convenient to define the scl's high/low count
+> > > directly,
+> > > e.g HW people would do some measurement then directly give out the
+> > > optimum counts. Previously, we solved the sda falling time and scl
+> > > falling time by i2c_dw_scl_hcnt() and i2c_dw_scl_lcnt(), then put
+> > > them
+> > > into dt, but what we really care isn't the sda/scl falling time.
+> > > 
+> > > From another side, the dw_i2c_acpi_configure() on ACPI platform
+> > > also
+> > > get hcnt/lcnt values rather than the sda/scl falling time from
+> > > ACPI
+> > > method, we want similar feature for DT platforms.
+> > > ?
+> > Instead of duplicating some words maybe better to explicitly define
+> > two groups of parameters and one which supersedes the other.
+> I'm sorry, I can't catch your meaning. Could you please kindly give
+> more
+> details? Or examples of "two groups of parameters"
 
-Yes it is.
 
->> It's unfortunate that that a PSCI 0.2+ implementation would be lacking a
->> working SYSTEM_RESET implementation, and it's certainly a mistake to
->> discourage.
->>
->>> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
->>> ---
->>> It might make sense to introduce a restart-priority property for
->>> devicetree
->>> based configurations, but I am not sure if this would be acceptable.
->>
->>> From the DT side, I'm not keen on properties for priorities. They're
->> incredibly fragile and don't really encode a HW property.
->>
-> Depends. It is a convenient means to say "primary restart method" or
-> "may be broken".
+> --- + - i2c-ss-scl-high-count : should contain the standard speed i2c
+> > > clock SCL high
+> > > +???count. 
 
-The issue is supposed to be fixed in a more recent firmware, which I still have
-to try.
 
-DT indeed isn't the right place to work around this. What we need is a
-blacklist of bad firmware versions...
-Or Perfect Firmware from Day One on (like Perfect DT from Day One ;-)
+> > > If defined, the i2c-scl-falling-time-ns and i2c-sda-falling-time-
+> > > ns
+> > > +???will be ignored.
 
-Gr{oetje,eeting}s,
+I'm referring to the above sentence. Something like
 
-                        Geert
+There are two groups of values identifying i2c timings:
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+1. i2c-scl-falling-time-ns and i2c-sda-falling-time-ns
+2. *-[hl]cnt
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+The second group of parameters supersedes the first one.
+
+
+> > > +
+> > > + - i2c-ss-scl-low-count : should contain the standard speed i2c
+> > > clock SCL low
+> > > +???count. If defined, the i2c-scl-falling-time-ns and i2c-sda-
+> > > falling-time-ns
+> > > +???will be ignored.
+> > > +
+> > > + - i2c-fs-scl-high-count : should contain the fast speed i2c
+> > > clock SCL high
+> > > +???count. If defined, the i2c-scl-falling-time-ns and i2c-sda-
+> > > falling-time-ns
+> > > +???will be ignored.
+> > > +
+> > > + - i2c-fs-scl-low-count : should contain the fast speed i2c clock
+> > > SCL low
+> > > +???count. If defined, the i2c-scl-falling-time-ns and i2c-sda-
+> > > falling-time-ns
+> > > +???will be ignored.
+> > > +
+> > > ?Example :
+> > > 
+> > > ????????i2c at f0000 {
+> > > diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c
+> > > b/drivers/i2c/busses/i2c-designware-platdrv.c
+> > > index d656657..8739a60 100644
+> > > --- a/drivers/i2c/busses/i2c-designware-platdrv.c
+> > > +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
+> > > @@ -188,6 +188,14 @@ static int dw_i2c_plat_probe(struct
+> > > platform_device *pdev)
+> > > ?????????????????????????????????????????&dev->scl_falling_time);
+> > > ????????????????device_property_read_u32(&pdev->dev, "clock-
+> > > frequency",
+> > > ?????????????????????????????????????????&clk_freq);
+> > > +???????????????device_property_read_u16(&pdev->dev, "i2c-ss-scl-
+> > > high-count",
+> > > +????????????????????????????????????????&dev->ss_hcnt);
+> > > +???????????????device_property_read_u16(&pdev->dev, "i2c-ss-scl-
+> > > low-count",
+> > > +????????????????????????????????????????&dev->ss_lcnt);
+> > > +???????????????device_property_read_u16(&pdev->dev, "i2c-fs-scl-
+> > > high-count",
+> > > +????????????????????????????????????????&dev->fs_hcnt);
+> > > +???????????????device_property_read_u16(&pdev->dev, "i2c-fs-scl-
+> > > low-count",
+> > > +????????????????????????????????????????&dev->fs_lcnt);
+> > > ????????}
+> > > 
+> > > ????????if (has_acpi_companion(&pdev->dev))
+> > > --
+> > > 2.8.0.rc3
+> > > ?
+> > 
+> > 
+
+-- 
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
