@@ -1,20 +1,57 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 13 Apr 2016 09:38:42 +0800
-Subject: [PATCH] ARM: mach-imx: sdhci-esdhc-imx: initialize DMA mask
-In-Reply-To: <1460362846-2906-1-git-send-email-akurz@blala.de>
-References: <1460362846-2906-1-git-send-email-akurz@blala.de>
-Message-ID: <20160413013842.GB28903@tiger>
+Date: Wed, 13 Apr 2016 09:53:13 +0800
+Subject: [PATCH] dts/ls1043a-rdb: add the DTS for DSPI support
+In-Reply-To: <1456897935-40507-1-git-send-email-B56489@freescale.com>
+References: <1456897935-40507-1-git-send-email-B56489@freescale.com>
+Message-ID: <20160413015313.GC28903@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 11, 2016 at 10:20:46AM +0200, Alexander Kurz wrote:
-> With commit 7b91369b DMA access got disabled for device drivers with zero
-> DMA mask property. sdhci-esdhc-imx got blocked from DMA access by this.
-> Hence: initialize the dma mask to enable access again.
+On Wed, Mar 02, 2016 at 01:52:15PM +0800, Yunhui Cui wrote:
+> This patch adds dts nodes for DSPI on LS1043A-RDB.
 > 
-> Signed-off-by: Alexander Kurz <akurz@blala.de>
+> Signed-off-by: Yunhui Cui <B56489@freescale.com>
+> Signed-off-by: Yuan Yao <yao.yuan@nxp.com>
 
-I fixed up the commit log per comments from Uwe and Sergei, and then
-applied the patch as a fix for v4.6-rc.
+The patch subject prefix should be like 'arm64: dts: ls1043a-rdb: '.  I
+fixed it up and applied the patch.
 
 Shawn
+
+> ---
+>  arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+> index ce23557..f895fc0 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+> @@ -107,6 +107,19 @@
+>  		};
+>  };
+>  
+> +&dspi0 {
+> +	bus-num = <0>;
+> +	status = "okay";
+> +
+> +	flash at 0 {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		compatible = "n25q128a13", "jedec,spi-nor";  /* 16MB */
+> +		reg = <0>;
+> +		spi-max-frequency = <1000000>; /* input clock */
+> +	};
+> +};
+> +
+>  &duart0 {
+>  	status = "okay";
+>  };
+> -- 
+> 2.1.0.27.g96db324
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
