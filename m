@@ -1,62 +1,54 @@
 From: tiffany.lin@mediatek.com (Tiffany Lin)
-Date: Wed, 13 Apr 2016 20:01:52 +0800
-Subject: [PATCH 4/7] [media] vcodec: mediatek: Add Mediatek H264 Video Decoder
+Date: Wed, 13 Apr 2016 20:01:54 +0800
+Subject: [PATCH 6/7] [media] vcodec: mediatek: Add Mediatek VP9 Video Decoder
  Driver
-In-Reply-To: <1460548915-17536-4-git-send-email-tiffany.lin@mediatek.com>
+In-Reply-To: <1460548915-17536-6-git-send-email-tiffany.lin@mediatek.com>
 References: <1460548915-17536-1-git-send-email-tiffany.lin@mediatek.com>
  <1460548915-17536-2-git-send-email-tiffany.lin@mediatek.com>
  <1460548915-17536-3-git-send-email-tiffany.lin@mediatek.com>
  <1460548915-17536-4-git-send-email-tiffany.lin@mediatek.com>
-Message-ID: <1460548915-17536-5-git-send-email-tiffany.lin@mediatek.com>
+ <1460548915-17536-5-git-send-email-tiffany.lin@mediatek.com>
+ <1460548915-17536-6-git-send-email-tiffany.lin@mediatek.com>
+Message-ID: <1460548915-17536-7-git-send-email-tiffany.lin@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add h264 driver for MT8173
+Add vp9 decoder driver for MT8173
 
-Signed-off-by: PC Chen <pc.chen@mediatek.com>
 Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
 ---
- drivers/media/platform/mtk-vcodec/Makefile         |    5 +-
- .../media/platform/mtk-vcodec/vdec/vdec_h264_if.c  |  487 ++++++++++++++++++++
- drivers/media/platform/mtk-vcodec/vdec_drv_if.c    |    4 +
- drivers/media/platform/mtk-vcodec/vdec_ipi_msg.h   |   28 +-
- drivers/media/platform/mtk-vcodec/vdec_vpu_if.c    |  164 +++++++
- drivers/media/platform/mtk-vcodec/vdec_vpu_if.h    |   60 +++
- 6 files changed, 739 insertions(+), 9 deletions(-)
- create mode 100644 drivers/media/platform/mtk-vcodec/vdec/vdec_h264_if.c
- create mode 100644 drivers/media/platform/mtk-vcodec/vdec_vpu_if.c
- create mode 100644 drivers/media/platform/mtk-vcodec/vdec_vpu_if.h
+ drivers/media/platform/mtk-vcodec/Makefile         |    1 +
+ .../media/platform/mtk-vcodec/vdec/vdec_vp9_if.c   | 1108 ++++++++++++++++++++
+ drivers/media/platform/mtk-vcodec/vdec_drv_if.c    |    3 +
+ 3 files changed, 1112 insertions(+)
+ create mode 100644 drivers/media/platform/mtk-vcodec/vdec/vdec_vp9_if.c
 
 diff --git a/drivers/media/platform/mtk-vcodec/Makefile b/drivers/media/platform/mtk-vcodec/Makefile
-index 4c8ed2f..58243ed 100644
+index 7743c81..852d969 100644
 --- a/drivers/media/platform/mtk-vcodec/Makefile
 +++ b/drivers/media/platform/mtk-vcodec/Makefile
-@@ -1,11 +1,12 @@
+@@ -5,6 +5,7 @@ obj-$(CONFIG_VIDEO_MEDIATEK_VCODEC) += mtk-vcodec-dec.o \
  
--
- obj-$(CONFIG_VIDEO_MEDIATEK_VCODEC) += mtk-vcodec-dec.o \
- 				       mtk-vcodec-enc.o \
- 				       mtk-vcodec-common.o
- 
--mtk-vcodec-dec-y := mtk_vcodec_dec_drv.o \
-+mtk-vcodec-dec-y := vdec/vdec_h264_if.o \
-+		mtk_vcodec_dec_drv.o \
+ mtk-vcodec-dec-y := vdec/vdec_h264_if.o \
+ 		vdec/vdec_vp8_if.o \
++		vdec/vdec_vp9_if.o \
+ 		mtk_vcodec_dec_drv.o \
  		vdec_drv_if.o \
-+		vdec_vpu_if.o \
- 		mtk_vcodec_dec.o \
- 		mtk_vcodec_dec_pm.o \
- 
-diff --git a/drivers/media/platform/mtk-vcodec/vdec/vdec_h264_if.c b/drivers/media/platform/mtk-vcodec/vdec/vdec_h264_if.c
+ 		vdec_vpu_if.o \
+diff --git a/drivers/media/platform/mtk-vcodec/vdec/vdec_vp9_if.c b/drivers/media/platform/mtk-vcodec/vdec/vdec_vp9_if.c
 new file mode 100644
-index 0000000..9762bbf
+index 0000000..6d0fb68
 --- /dev/null
-+++ b/drivers/media/platform/mtk-vcodec/vdec/vdec_h264_if.c
-@@ -0,0 +1,487 @@
++++ b/drivers/media/platform/mtk-vcodec/vdec/vdec_vp9_if.c
+@@ -0,0 +1,1108 @@
 +/*
 + * Copyright (c) 2016 MediaTek Inc.
-+ * Author: PC Chen <pc.chen@mediatek.com>
++ * Author: Daniel Hsiao <daniel.hsiao@mediatek.com>
++ *             Kai-Sean Yang <kai-sean.yang@mediatek.com>
++ *		  Tiffany Lin <tiffany.lin@mediatek.com>
 + *
-+ * This program is free software; you can redistribute it and/or modify
++ * This program is free software; you can redistribute it and/or
++ * modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + *
@@ -66,789 +58,1117 @@ index 0000000..9762bbf
 + * GNU General Public License for more details.
 + */
 +
-+#include <linux/module.h>
++#include <linux/fs.h>
 +#include <linux/slab.h>
++#include <linux/syscalls.h>
++#include <linux/delay.h>
++#include <linux/time.h>
 +
 +#include "mtk_vcodec_intr.h"
-+#include "vdec_vpu_if.h"
 +#include "vdec_drv_base.h"
++#include "vdec_vpu_if.h"
 +
-+#define NON_IDR_SLICE				0x01
-+#define IDR_SLICE				0x05
-+#define H264_PPS				0x08
++#define VP9_SUPER_FRAME_BS_SZ 64
 +
-+#define BUF_PREDICTION_SZ			(32 * 1024)
-+#define BUF_PP_SZ				(30 * 4096)
-+#define BUF_LD_SZ				(15 * 4096)
++#define REFS_PER_FRAME 3
++#define REF_FRAMES_LOG2 3
++#define REF_FRAMES (1 << REF_FRAMES_LOG2)
++#define VP9_MAX_FRM_BUFF_NUM (9 + 0)
++#define VP9_MAX_FRM_BUFF_NODE_NUM (9 + 9)
 +
-+#define MB_UNIT_SZ				16
-+#define HW_MB_STORE_SZ				64
 +
-+#define H264_MAX_FB_NUM				17
-+#define HDR_PARSING_BUF_SZ			1024
-+#define NAL_TYPE(value)				((value) & 0x1F)
-+
-+/**
-+ * struct h264_fb - h264 decode frame buffer information
-+ * @vdec_fb_va  : virtual address of struct vdec_fb
-+ * @y_fb_dma    : dma address of Y frame buffer
-+ * @c_fb_dma    : dma address of C frame buffer
-+ * @poc         : picture order count of frame buffer
-+ * @reserved    : for 8 bytes alignment
-+ */
-+struct h264_fb {
-+	uint64_t vdec_fb_va;
-+	uint64_t y_fb_dma;
-+	uint64_t c_fb_dma;
-+	int32_t poc;
-+	uint32_t reserved;
++struct vdec_vp9_frm_hdr {
++	unsigned int width;
++	unsigned int height;
++	unsigned char show_frame;
++	unsigned char resolution_changed;
 +};
 +
-+/**
-+ * struct h264_ring_fb_list - ring frame buffer list
-+ * @fb_list   : frame buffer arrary
-+ * @read_idx  : read index
-+ * @write_idx : write index
-+ * @count     : buffer count in list
-+ */
-+struct h264_ring_fb_list {
-+	struct h264_fb fb_list[H264_MAX_FB_NUM];
-+	unsigned int read_idx;
-+	unsigned int write_idx;
-+	unsigned int count;
-+	unsigned int reserved;
++struct vdec_vp9_work_buf {
++	unsigned int frmbuf_width;
++	unsigned int frmbuf_height;
++	struct mtk_vcodec_mem seg_id_buf;
++	struct mtk_vcodec_mem tile_buf;
++	struct mtk_vcodec_mem count_tbl_buf;
++	struct mtk_vcodec_mem prob_tbl_buf;
++	struct mtk_vcodec_mem mv_buf;
++	struct vdec_fb sf_ref_buf[VP9_MAX_FRM_BUFF_NUM-1];
 +};
 +
-+/**
-+ * struct vdec_h264_dec_info - decode information
-+ * @dpb_sz		: decoding picture buffer size
-+ * @resolution_changed  : resoltion change happen
-+ * @realloc_mv_buf	: flag to notify driver to re-allocate mv buffer
-+ * @reserved		: for 8 bytes alignment
-+ * @bs_dma		: Input bit-stream buffer dma address
-+ * @y_fb_dma		: Y frame buffer dma address
-+ * @c_fb_dma		: C frame buffer dma address
-+ * @vdec_fb_va		: VDEC frame buffer struct virtual address
-+ */
-+struct vdec_h264_dec_info {
-+	uint32_t dpb_sz;
-+	uint32_t resolution_changed;
-+	uint32_t realloc_mv_buf;
-+	uint32_t reserved;
-+	uint64_t bs_dma;
-+	uint64_t y_fb_dma;
-+	uint64_t c_fb_dma;
-+	uint64_t vdec_fb_va;
++struct vp9_input_ctx {
++	unsigned long v_fifo_sa;
++	unsigned long v_fifo_ea;
++	unsigned long p_fifo_sa;
++	unsigned long p_fifo_ea;
++	unsigned long v_frm_sa;
++	unsigned long v_frm_ea;
++	unsigned long p_frm_sa;
++	unsigned long p_frm_end;
++	unsigned int frm_sz;
++	unsigned int uncompress_sz;
 +};
 +
-+/**
-+ * struct vdec_h264_vsi - shared memory for decode information exchange
-+ *                        between VPU and Host.
-+ *                        The memory is allocated by VPU and mapping to Host
-+ *                        in vpu_dec_init()
-+ * @hdr_buf     : Header parsing buffer
-+ * @ppl_buf_dma : HW working buffer ppl dma address
-+ * @mv_buf_dma  : HW working buffer mv dma address
-+ * @list_free   : free frame buffer ring list
-+ * @list_disp   : display frame buffer ring list
-+ * @dec		: decode information
-+ * @pic		: picture information
-+ * @crop        : crop information
-+ */
-+struct vdec_h264_vsi {
-+	unsigned char hdr_buf[HDR_PARSING_BUF_SZ];
-+	uint64_t ppl_buf_dma;
-+	uint64_t mv_buf_dma[H264_MAX_FB_NUM];
-+	struct h264_ring_fb_list list_free;
-+	struct h264_ring_fb_list list_disp;
-+	struct vdec_h264_dec_info dec;
-+	struct vdec_pic_info pic;
-+	struct v4l2_rect crop;
++struct vp9_dram_buf {
++	unsigned long va;
++	unsigned long pa;
++	unsigned int sz;
++	unsigned int vpua;
 +};
 +
-+/**
-+ * struct vdec_h264_inst - h264 decoder instance
-+ * @num_nalu : how many nalus be decoded
-+ * @ctx      : point to mtk_vcodec_ctx
-+ * @ppl_buf  : HW working buffer for ppl
-+ * @mv_buf   : HW working buffer for mv
-+ * @vpu      : VPU instance
-+ * @vsi      : VPU shared information
++struct vp9_fb_info {
++	struct vdec_fb *fb;
++	struct vp9_dram_buf y_buf;
++	struct vp9_dram_buf c_buf;
++	struct vp9_dram_buf ufo_len_y;
++	struct vp9_dram_buf ufo_len_c;
++	unsigned int y_width;
++	unsigned int y_height;
++	unsigned int y_crop_width;
++	unsigned int y_crop_height;
++
++	unsigned int c_width;
++	unsigned int c_height;
++	unsigned int c_crop_width;
++	unsigned int c_crop_height;
++
++	unsigned int frm_num;
++};
++
++struct vp9_ref_cnt_buf {
++	struct vp9_fb_info buf;
++	unsigned int ref_cnt;
++};
++
++struct vp9_scale_factors {
++	int x_scale_fp;
++	int y_scale_fp;
++	int x_step_q4;
++	int y_step_q4;
++	unsigned int ref_scaling_en;
++};
++
++struct vp9_ref_buf {
++	struct vp9_fb_info *buf;
++	struct vp9_scale_factors scale_factors;
++	unsigned int idx;
++};
++
++struct vp9_sf_ref_fb {
++	struct vdec_fb fb;
++	int used;
++	int idx;
++};
++
++
++/*
++ * struct vdec_vp9_vsi - shared buffer between host and VPU driver
 + */
-+struct vdec_h264_inst {
-+	unsigned int num_nalu;
-+	struct mtk_vcodec_ctx *ctx;
-+	struct mtk_vcodec_mem ppl_buf;
-+	struct mtk_vcodec_mem mv_buf[H264_MAX_FB_NUM];
++struct vdec_vp9_vsi {
++	unsigned char sf_bs_buf[VP9_SUPER_FRAME_BS_SZ];
++	struct vp9_sf_ref_fb sf_ref_fb[VP9_MAX_FRM_BUFF_NUM-1];
++	int sf_next_ref_fb_idx;
++	unsigned int sf_frm_cnt;
++	unsigned int sf_frm_offset[VP9_MAX_FRM_BUFF_NUM-1];
++	unsigned int sf_frm_sz[VP9_MAX_FRM_BUFF_NUM-1];
++	unsigned int sf_frm_idx;
++	unsigned int sf_init;
++	struct vdec_fb fb;
++	struct mtk_vcodec_mem bs;
++	struct vdec_fb cur_fb;
++	unsigned int pic_w;
++	unsigned int pic_h;
++	unsigned int buf_w;
++	unsigned int buf_h;
++	unsigned int buf_sz_y_bs;
++	unsigned int buf_sz_c_bs;
++	unsigned int buf_len_sz_y;
++	unsigned int buf_len_sz_c;
++	unsigned int profile;
++	unsigned int show_frm;
++	unsigned int show_exist;
++	unsigned int frm_to_show;
++	unsigned int refresh_frm_flags;
++	unsigned int resolution_changed;
++
++	struct vp9_input_ctx input_ctx;
++	struct vp9_ref_cnt_buf frm_bufs[VP9_MAX_FRM_BUFF_NUM];
++	int ref_frm_map[REF_FRAMES];
++	unsigned int new_fb_idx;
++	unsigned int frm_num;
++	struct vp9_dram_buf seg_id_buf;
++	struct vp9_dram_buf tile_buf;
++	struct vp9_dram_buf count_tbl_buf;
++	struct vp9_dram_buf prob_tbl_buf;
++	struct vp9_dram_buf mv_buf;
++	struct vp9_ref_buf frm_refs[REFS_PER_FRAME];
++
++};
++
++struct vdec_vp9_inst {
++	struct vdec_vp9_work_buf work_buf;
++	struct vdec_vp9_frm_hdr frm_hdr;
++	struct vdec_fb_node dec_fb[VP9_MAX_FRM_BUFF_NODE_NUM];
++	struct list_head available_fb_node_list;
++	struct list_head fb_use_list;
++	struct list_head fb_free_list;
++	struct list_head fb_disp_list;
++	struct vdec_fb *cur_fb;
++	unsigned int frm_cnt;
++	unsigned int total_frm_cnt;
++	void *ctx;
 +	struct vdec_vpu_inst vpu;
-+	struct vdec_h264_vsi *vsi;
++	struct vdec_vp9_vsi *vsi;
++	unsigned int show_reg;
++	struct file *log;
++	struct mtk_vcodec_mem mem;
 +};
 +
-+static unsigned int get_mv_buf_size(unsigned int width, unsigned int height)
++static int vp9_setup_buf(struct vdec_vp9_inst *inst)
 +{
-+	return HW_MB_STORE_SZ * (width/MB_UNIT_SZ) * (height/MB_UNIT_SZ);
-+}
++	struct vdec_vp9_vsi *vsi = inst->vpu.vsi;
 +
-+static int alloc_mv_buf(struct vdec_h264_inst *inst, struct vdec_pic_info *pic)
-+{
-+	int i;
-+	int err;
-+	struct mtk_vcodec_mem *mem = NULL;
-+	unsigned int buf_sz;
++	vsi->mv_buf.va = (unsigned long)inst->work_buf.mv_buf.va;
++	vsi->mv_buf.pa = (unsigned long)inst->work_buf.mv_buf.dma_addr;
++	vsi->mv_buf.sz = (unsigned long)inst->work_buf.mv_buf.size;
 +
-+	buf_sz = get_mv_buf_size(pic->buf_w, pic->buf_h);
++	if ((vsi->mv_buf.va == 0) || (vsi->mv_buf.pa == 0) ||
++		(vsi->mv_buf.sz == 0))
++		return -EINVAL;
 +
-+	for (i = 0; i < H264_MAX_FB_NUM; i++) {
-+		mem = &inst->mv_buf[i];
-+		if (mem->va)
-+			mtk_vcodec_mem_free(inst->ctx, mem);
-+		mem->size = buf_sz;
-+		err = mtk_vcodec_mem_alloc(inst->ctx, mem);
-+		if (err) {
-+			mtk_vcodec_err(inst, "failed to allocate mv buf");
-+			return -ENOMEM;
-+		}
-+		inst->vsi->mv_buf_dma[i] = mem->dma_addr;
-+	}
-+
++	mtk_vcodec_debug(inst, "VP9_MV_BUF_Addr: 0x%lX (0x%lX)",
++		     vsi->mv_buf.va, vsi->mv_buf.pa);
 +	return 0;
 +}
 +
-+static void free_all_working_buf(struct vdec_h264_inst *inst)
++static bool vp9_is_sf_ref_fb(struct vdec_vp9_inst *inst, struct vdec_fb *fb)
 +{
 +	int i;
-+	struct mtk_vcodec_mem *mem = NULL;
++	struct vdec_vp9_vsi *vsi = inst->vsi;
++
++	for (i = 0; i < VP9_MAX_FRM_BUFF_NUM - 1; i++) {
++		if (fb == &vsi->sf_ref_fb[i].fb)
++			break;
++	}
++
++	if (i == VP9_MAX_FRM_BUFF_NUM - 1)
++		return false;
++
++	return true;
++}
++
++static struct vdec_fb *vp9_rm_from_fb_use_list(struct vdec_vp9_inst
++					*inst, void *addr)
++{
++	struct vdec_fb *fb;
++	struct vdec_fb_node *node;
++
++	list_for_each_entry(node, &inst->fb_use_list, list) {
++		fb = (struct vdec_fb *)node->fb;
++		if (fb->base_y.va == addr) {
++			list_move_tail(&node->list,
++				       &inst->available_fb_node_list);
++			break;
++		}
++	}
++
++	return fb;
++}
++
++static bool vp9_add_to_fb_free_list(struct vdec_vp9_inst *inst,
++			     struct vdec_fb *fb)
++{
++	struct vdec_fb_node *node;
++
++	if (fb) {
++		node = list_first_entry_or_null(&inst->available_fb_node_list,
++					struct vdec_fb_node, list);
++		if (node) {
++			node->fb = fb;
++			list_move_tail(&node->list, &inst->fb_free_list);
++		} else
++			mtk_vcodec_debug(inst, "No free fb node");
++	}
++
++	return true;
++}
++
++static bool vp9_free_sf_ref_fb(struct vdec_vp9_inst *inst, struct vdec_fb *fb)
++{
++	struct vp9_sf_ref_fb *sf_ref_fb =
++		container_of(fb, struct vp9_sf_ref_fb, fb);
++
++	sf_ref_fb->used = 0;
++
++	return true;
++}
++
++static void vp9_ref_cnt_fb(struct vdec_vp9_inst *inst, int *idx,
++			   int new_idx)
++{
++	struct vdec_vp9_vsi *vsi = inst->vsi;
++	int ref_idx = *idx;
++
++	if (ref_idx >= 0 && vsi->frm_bufs[ref_idx].ref_cnt > 0) {
++		vsi->frm_bufs[ref_idx].ref_cnt--;
++
++		if (vsi->frm_bufs[ref_idx].ref_cnt == 0) {
++			if (!vp9_is_sf_ref_fb(inst,
++					      vsi->frm_bufs[ref_idx].buf.fb)) {
++				struct vdec_fb *fb;
++
++				fb = vp9_rm_from_fb_use_list(inst,
++				     vsi->frm_bufs[ref_idx].buf.fb->base_y.va);
++				vp9_add_to_fb_free_list(inst, fb);
++			} else
++				vp9_free_sf_ref_fb(
++					inst, vsi->frm_bufs[ref_idx].buf.fb);
++		}
++	}
++
++	*idx = new_idx;
++	vsi->frm_bufs[new_idx].ref_cnt++;
++}
++
++static void vp9_free_all_sf_ref_fb(struct vdec_vp9_inst *inst)
++{
++	int i;
++	struct vdec_vp9_vsi *vsi = inst->vsi;
++
++	for (i = 0; i < VP9_MAX_FRM_BUFF_NUM - 1; i++) {
++		if (inst->work_buf.sf_ref_buf[i].base_y.va) {
++			mtk_vcodec_mem_free(inst->ctx,
++				    &inst->work_buf.sf_ref_buf[i].base_y);
++			mtk_vcodec_mem_free(inst->ctx,
++				    &inst->work_buf.sf_ref_buf[i].base_c);
++			vsi->sf_ref_fb[i].used = 0;
++		}
++	}
++}
++
++static int vp9_get_sf_ref_fb(struct vdec_vp9_inst *inst)
++{
++	int i;
++	struct mtk_vcodec_mem *mem;
++	struct vdec_vp9_vsi *vsi = inst->vsi;
++	struct vdec_fb *fb_dst_ptr, *fb_src_ptr;
++
++	for (i = 0; i < VP9_MAX_FRM_BUFF_NUM - 1; i++) {
++		if (inst->work_buf.sf_ref_buf[i].base_y.va &&
++		    vsi->sf_ref_fb[i].used == 0) {
++			return i;
++		}
++	}
++
++	for (i = 0; i < VP9_MAX_FRM_BUFF_NUM - 1; i++) {
++		if (inst->work_buf.sf_ref_buf[i].base_y.va == NULL)
++			break;
++	}
++
++	if (i == VP9_MAX_FRM_BUFF_NUM - 1) {
++		mtk_vcodec_err(inst, "List Full");
++		return -1;
++	}
++
++	mem = &inst->work_buf.sf_ref_buf[i].base_y;
++	mem->size = vsi->buf_sz_y_bs +
++		    vsi->buf_len_sz_y;
++
++	if ((inst->frm_hdr.width > 4096) ||
++		(inst->frm_hdr.height > 2304)) {
++		mtk_vcodec_err(inst, "Invalid w/h %d/%d",
++			inst->frm_hdr.width,
++			inst->frm_hdr.height);
++		return -1;
++	}
++
++	if (mtk_vcodec_mem_alloc(inst->ctx, mem)) {
++		mtk_vcodec_err(inst, "Cannot allocate sf_ref_buf y_buf");
++		return -1;
++	}
++
++	mtk_vcodec_debug(inst, "allocate sf_ref_buf y_buf = 0x%lx, %d",
++			mem->size,
++			inst->work_buf.frmbuf_width *
++			inst->work_buf.frmbuf_height);
++
++	fb_dst_ptr = &vsi->sf_ref_fb[i].fb;
++	fb_src_ptr = &inst->work_buf.sf_ref_buf[i];
++	fb_dst_ptr->base_y.va = fb_src_ptr->base_y.va;
++	fb_dst_ptr->base_y.dma_addr = fb_src_ptr->base_y.dma_addr;
++	fb_dst_ptr->base_y.size = fb_src_ptr->base_y.size;
++
++	mem = &inst->work_buf.sf_ref_buf[i].base_c;
++	mem->size = vsi->buf_sz_c_bs +
++		    vsi->buf_len_sz_c;
++
++	if (mtk_vcodec_mem_alloc(inst->ctx, mem)) {
++		mtk_vcodec_err(inst, "Cannot allocate sf_ref_buf c_buf");
++		return -1;
++	}
++
++	mtk_vcodec_debug(inst, "allocate sf_ref_buf c_buf = 0x%lx, %d",
++			mem->size,
++			inst->work_buf.frmbuf_width *
++			inst->work_buf.frmbuf_height / 2);
++
++	fb_dst_ptr->base_c.va = fb_src_ptr->base_c.va;
++	fb_dst_ptr->base_c.dma_addr = fb_src_ptr->base_c.dma_addr;
++	fb_dst_ptr->base_c.size = fb_src_ptr->base_c.size;
++
++	vsi->sf_ref_fb[i].used = 0;
++	vsi->sf_ref_fb[i].idx = i;
++
++	return i;
++}
++
++bool vp9_realloc_work_buf(struct vdec_vp9_inst *inst)
++{
++	struct vdec_vp9_vsi *vsi = inst->vsi;
++	int result;
++	struct mtk_vcodec_mem *mem;
++
++	inst->frm_hdr.width = vsi->pic_w;
++	inst->frm_hdr.height = vsi->pic_h;
++	inst->work_buf.frmbuf_width = vsi->buf_w;
++	inst->work_buf.frmbuf_height = vsi->buf_h;
++
++	mtk_vcodec_debug(inst, "BUF CHG(%d): w/h/sb_w/sb_h=%d/%d/%d/%d",
++		     inst->frm_hdr.resolution_changed,
++		     inst->frm_hdr.width,
++		     inst->frm_hdr.height,
++		     inst->work_buf.frmbuf_width,
++		     inst->work_buf.frmbuf_height);
++
++	if ((inst->frm_hdr.width > 4096) ||
++		(inst->frm_hdr.height > 2304)) {
++		mtk_vcodec_err(inst, "Invalid w/h %d/%d",
++			inst->frm_hdr.width,
++			inst->frm_hdr.height);
++		return false;
++	}
++
++	mem = &inst->work_buf.mv_buf;
++	/* Free First */
++	if (mem->va)
++		mtk_vcodec_mem_free(inst->ctx, mem);
++	/* Alloc Later */
++	mem->size = ((inst->work_buf.frmbuf_width / 64) *
++		    (inst->work_buf.frmbuf_height / 64) + 2) * 36 * 16;
++
++	result = mtk_vcodec_mem_alloc(inst->ctx, mem);
++	if (result) {
++		mtk_vcodec_err(inst, "Cannot allocate mv_buf");
++		return false;
++	}
++	/* Set the va again */
++	vsi->mv_buf.va = (unsigned long)inst->work_buf.mv_buf.va;
++	vsi->mv_buf.pa = (unsigned long)inst->work_buf.mv_buf.dma_addr;
++	vsi->mv_buf.sz = (unsigned long)inst->work_buf.mv_buf.size;
++
++	vp9_free_all_sf_ref_fb(inst);
++	vsi->sf_next_ref_fb_idx = vp9_get_sf_ref_fb(inst);
++	result = vp9_setup_buf(inst);
++	if (result) {
++		mtk_vcodec_err(inst, "Cannot vp9_setup_buf");
++		return false;
++	}
++
++	inst->frm_hdr.resolution_changed = true;
++
++	return true;
++}
++
++static bool vp9_add_to_fb_disp_list(struct vdec_vp9_inst *inst,
++			     struct vdec_fb *fb)
++{
++	struct vdec_fb_node *node;
++
++	if (!fb)
++		return false;
++
++	node = list_first_entry_or_null(&inst->available_fb_node_list,
++					struct vdec_fb_node, list);
++	if (node) {
++		node->fb = fb;
++		list_move_tail(&node->list, &inst->fb_disp_list);
++	} else {
++		mtk_vcodec_debug(inst, "List Full");
++		return false;
++	}
++
++	mtk_vcodec_debug_leave(inst);
++
++	return true;
++}
++
++static void vp9_swap_frm_bufs(struct vdec_vp9_inst *inst)
++{
++	struct vdec_vp9_vsi *vsi = inst->vsi;
++	struct vp9_fb_info *frm_to_show;
++	int ref_index = 0, mask;
++
++	for (mask = vsi->refresh_frm_flags; mask; mask >>= 1) {
++		if (mask & 1)
++			vp9_ref_cnt_fb(inst, &vsi->ref_frm_map[ref_index],
++				       vsi->new_fb_idx);
++		++ref_index;
++	}
++
++	frm_to_show = &vsi->frm_bufs[vsi->new_fb_idx].buf;
++	vsi->frm_bufs[vsi->new_fb_idx].ref_cnt--;
++
++	if (frm_to_show->fb != inst->cur_fb) {
++		if ((frm_to_show->fb != NULL) &&
++			(inst->cur_fb->base_y.size >=
++				frm_to_show->fb->base_y.size)) {
++			memcpy((void *)inst->cur_fb->base_y.va,
++				(void *)frm_to_show->fb->base_y.va,
++				inst->work_buf.frmbuf_width *
++				inst->work_buf.frmbuf_height);
++			memcpy((void *)inst->cur_fb->base_c.va,
++				(void *)frm_to_show->fb->base_c.va,
++				inst->work_buf.frmbuf_width *
++				inst->work_buf.frmbuf_height / 2);
++		} else {
++			mtk_vcodec_debug(inst,
++				"inst->cur_fb->base_y.size=%lx, frm_to_show->fb.base_y.size=%lx",
++				inst->cur_fb->base_y.size,
++				frm_to_show->fb->base_y.size);
++		}
++		if (!vp9_is_sf_ref_fb(inst, inst->cur_fb)) {
++			if (inst->frm_hdr.show_frame)
++				vp9_add_to_fb_disp_list(inst, inst->cur_fb);
++		}
++	} else {
++		if (!vp9_is_sf_ref_fb(inst, inst->cur_fb)) {
++			if (inst->frm_hdr.show_frame)
++				vp9_add_to_fb_disp_list(inst, frm_to_show->fb);
++		}
++	}
++
++	if (vsi->frm_bufs[vsi->new_fb_idx].ref_cnt == 0) {
++		if (!vp9_is_sf_ref_fb(
++			inst, vsi->frm_bufs[vsi->new_fb_idx].buf.fb)) {
++			struct vdec_fb *fb;
++
++			fb = vp9_rm_from_fb_use_list(inst,
++			     vsi->frm_bufs[vsi->new_fb_idx].buf.fb->base_y.va);
++
++			vp9_add_to_fb_free_list(inst, fb);
++		} else
++			vp9_free_sf_ref_fb(
++				inst, vsi->frm_bufs[vsi->new_fb_idx].buf.fb);
++	}
++
++	if (vsi->sf_frm_cnt > 0 && vsi->sf_frm_idx != vsi->sf_frm_cnt - 1)
++		vsi->sf_next_ref_fb_idx = vp9_get_sf_ref_fb(inst);
++}
++
++static bool vp9_wait_dec_end(struct vdec_vp9_inst *inst)
++{
++	struct mtk_vcodec_ctx *ctx = inst->ctx;
++	unsigned int irq_status;
++
++	mtk_vcodec_wait_for_done_ctx(inst->ctx,
++						MTK_INST_IRQ_RECEIVED,
++						WAIT_INTR_TIMEOUT_MS);
++
++	irq_status = ctx->irq_status;
++	mtk_vcodec_debug(inst, "isr return %x", irq_status);
++
++	if (irq_status & 0x10000)
++		return true;
++	else
++		return false;
++}
++
++struct vdec_vp9_inst *vp9_alloc_inst(void *ctx)
++{
++	int result;
++	struct mtk_vcodec_mem mem;
++	struct vdec_vp9_inst *inst;
++
++	mem.size = sizeof(struct vdec_vp9_inst) * 2;
++	result = mtk_vcodec_mem_alloc(ctx, &mem);
++	if (result)
++		return NULL;
++
++	inst = mem.va;
++	inst->mem = mem;
++
++	return inst;
++}
++
++void vp9_free_handle(struct vdec_vp9_inst *inst)
++{
++	struct mtk_vcodec_mem mem;
++
++	mem = inst->mem;
++	if (mem.va)
++		mtk_vcodec_mem_free(inst->ctx, &mem);
++}
++
++bool vp9_init_proc(struct vdec_vp9_inst *inst,
++		   struct vdec_pic_info *pic_info)
++{
++	struct vdec_vp9_vsi *vsi = inst->vsi;
++
++	pic_info->pic_w = vsi->pic_w;
++	pic_info->pic_h = vsi->pic_h;
++	pic_info->buf_w = vsi->buf_w;
++	pic_info->buf_h = vsi->buf_h;
++
++	mtk_vcodec_debug(inst,
++			"(PicW,PicH,BufW,BufH) = (%d,%d,%d,%d) profile=%d",
++			pic_info->pic_w, pic_info->pic_h,
++			pic_info->buf_w, pic_info->buf_h, vsi->profile);
++
++	inst->frm_hdr.width = vsi->pic_w;
++	inst->frm_hdr.height = vsi->pic_h;
++	inst->work_buf.frmbuf_width = vsi->buf_w;
++	inst->work_buf.frmbuf_height = vsi->buf_h;
++
++	/* ----> HW limitation */
++	if ((inst->frm_hdr.width > 4096) ||
++		(inst->frm_hdr.height > 2304)) {
++		mtk_vcodec_err(inst, "Invalid w/h %d/%d",
++			inst->frm_hdr.width,
++			inst->frm_hdr.height);
++		return false;
++	}
++
++	if (vsi->profile > 0) {
++		mtk_vcodec_err(inst, "vp9_dec DO NOT support profile(%d) > 0",
++			     vsi->profile);
++		return false;
++	}
++	if ((inst->work_buf.frmbuf_width > 4096) ||
++	    (inst->work_buf.frmbuf_height > 2304)) {
++		mtk_vcodec_err(inst, "vp9_dec DO NOT support (W,H) = (%d,%d)",
++			     inst->work_buf.frmbuf_width,
++			     inst->work_buf.frmbuf_height);
++		return false;
++	}
++	/* <---- HW limitation */
++
++	return true;
++}
++
++bool vp9_check_proc(struct vdec_vp9_inst *inst)
++{
++	struct vdec_vp9_vsi *vsi = inst->vsi;
++	bool ret = false;
 +
 +	mtk_vcodec_debug_enter(inst);
 +
-+	inst->vsi->ppl_buf_dma = 0;
-+	mem = &inst->ppl_buf;
++	if (vsi->show_exist) {
++		vp9_swap_frm_bufs(inst);
++		mtk_vcodec_debug(inst, "Decode Ok @%d (show_exist)",
++				 vsi->frm_num);
++		vsi->frm_num++;
++		return true;
++	}
++
++	ret = vp9_wait_dec_end(inst);
++	if (!ret) {
++		mtk_vcodec_err(inst, "Decode NG, Decode Timeout @[%d]",
++			       vsi->frm_num);
++		return false;
++	}
++
++	if (vpu_dec_end(&inst->vpu)) {
++		mtk_vcodec_err(inst, "vp9_dec_vpu_end failed");
++		return false;
++	}
++
++	vp9_swap_frm_bufs(inst);
++	mtk_vcodec_debug(inst, "Decode Ok @%d (%d/%d)", vsi->frm_num,
++		     inst->frm_hdr.width, inst->frm_hdr.height);
++
++	vsi->frm_num++;
++
++	mtk_vcodec_debug_leave(inst);
++
++	return true;
++}
++
++bool vp9_is_last_sub_frm(struct vdec_vp9_inst *inst)
++{
++	struct vdec_vp9_vsi *vsi = inst->vsi;
++
++	if (vsi->sf_frm_cnt <= 0 || vsi->sf_frm_idx == vsi->sf_frm_cnt)
++		return true;
++
++	return false;
++}
++
++struct vdec_fb *vp9_rm_from_fb_disp_list(struct vdec_vp9_inst
++		*inst)
++{
++	struct vdec_fb_node *node;
++	struct vdec_fb *fb = NULL;
++
++	node = list_first_entry_or_null(&inst->fb_disp_list,
++					struct vdec_fb_node, list);
++	if (node) {
++		fb = (struct vdec_fb *)node->fb;
++		fb->status |= FB_ST_DISPLAY;
++		list_move_tail(&node->list, &inst->available_fb_node_list);
++		mtk_vcodec_debug(inst, "[FB] get disp fb %p st=%d",
++				 node->fb, fb->status);
++	} else
++		mtk_vcodec_debug(inst, "[FB] there is no disp fb");
++
++	return fb;
++}
++
++bool vp9_add_to_fb_use_list(struct vdec_vp9_inst *inst,
++			    struct vdec_fb *fb)
++{
++	struct vdec_fb_node *node;
++
++	if (!fb)
++		return false;
++
++	node = list_first_entry_or_null(&inst->available_fb_node_list,
++					struct vdec_fb_node, list);
++	if (node) {
++		node->fb = fb;
++		list_move_tail(&node->list, &inst->fb_use_list);
++	} else {
++		mtk_vcodec_debug(inst, "No free fb node");
++		return false;
++	}
++
++	mtk_vcodec_debug_leave(inst);
++
++	return true;
++}
++
++struct vdec_fb *vp9_rm_from_fb_free_list(struct vdec_vp9_inst
++		*inst)
++{
++	struct vdec_fb_node *node;
++	struct vdec_fb *fb = NULL;
++
++	node = list_first_entry_or_null(&inst->fb_free_list,
++					struct vdec_fb_node, list);
++	if (node) {
++		fb = (struct vdec_fb *)node->fb;
++		fb->status |= FB_ST_FREE;
++		list_move_tail(&node->list, &inst->available_fb_node_list);
++		mtk_vcodec_debug(inst, "[FB] get free fb %p st=%d",
++				 node->fb, fb->status);
++	} else
++		mtk_vcodec_debug(inst, "[FB] there is no free fb");
++
++	mtk_vcodec_debug_leave(inst);
++
++	return fb;
++}
++
++bool vp9_fb_use_list_to_fb_free_list(struct vdec_vp9_inst *inst)
++{
++	struct vdec_fb_node *node, *tmp;
++
++	list_for_each_entry_safe(node, tmp, &inst->fb_use_list, list)
++		list_move_tail(&node->list, &inst->fb_free_list);
++
++	mtk_vcodec_debug_leave(inst);
++	return true;
++}
++
++void vp9_reset(struct vdec_vp9_inst *inst)
++{
++	vp9_fb_use_list_to_fb_free_list(inst);
++
++	vp9_free_all_sf_ref_fb(inst);
++	inst->vsi->sf_next_ref_fb_idx = vp9_get_sf_ref_fb(inst);
++
++	if (vpu_dec_reset(&inst->vpu))
++		mtk_vcodec_debug(inst, "vp9_dec_vpu_reset failed");
++
++	if (vp9_setup_buf(inst))
++		mtk_vcodec_debug(inst, "vp9_setup_buf failed");
++}
++
++static void init_list(struct vdec_vp9_inst *inst)
++{
++	int i;
++
++	INIT_LIST_HEAD(&inst->available_fb_node_list);
++	INIT_LIST_HEAD(&inst->fb_use_list);
++	INIT_LIST_HEAD(&inst->fb_free_list);
++	INIT_LIST_HEAD(&inst->fb_disp_list);
++
++	for (i = 0; i < VP9_MAX_FRM_BUFF_NODE_NUM; i++) {
++		INIT_LIST_HEAD(&inst->dec_fb[i].list);
++		inst->dec_fb[i].fb = NULL;
++		list_add_tail(&inst->dec_fb[i].list,
++			      &inst->available_fb_node_list);
++	}
++}
++
++static void get_pic_info(struct vdec_vp9_inst *inst, struct vdec_pic_info *pic)
++{
++
++	pic->y_bs_sz = inst->vsi->buf_sz_y_bs;
++	pic->c_bs_sz = inst->vsi->buf_sz_c_bs;
++	pic->y_len_sz = inst->vsi->buf_len_sz_y;
++	pic->c_len_sz = inst->vsi->buf_len_sz_c;
++
++	pic->pic_w = inst->frm_hdr.width;
++	pic->pic_h = inst->frm_hdr.height;
++	pic->buf_w = inst->work_buf.frmbuf_width;
++	pic->buf_h = inst->work_buf.frmbuf_height;
++
++	mtk_vcodec_debug(inst, "pic(%d, %d), buf(%d, %d)",
++		 pic->pic_w, pic->pic_h, pic->buf_w, pic->buf_h);
++	mtk_vcodec_debug(inst, "Y(%d, %d), C(%d, %d)", pic->y_bs_sz,
++		 pic->y_len_sz, pic->c_bs_sz, pic->c_len_sz);
++}
++
++static void get_disp_fb(struct vdec_vp9_inst *inst, struct vdec_fb **out_fb)
++{
++	mtk_vcodec_debug_enter(inst);
++
++	*out_fb = vp9_rm_from_fb_disp_list(inst);
++	if (*out_fb)
++		(*out_fb)->status |= FB_ST_DISPLAY;
++}
++
++static void get_free_fb(struct vdec_vp9_inst *inst, struct vdec_fb **out_fb)
++{
++	struct vdec_fb_node *node;
++	struct vdec_fb *fb = NULL;
++
++	node = list_first_entry_or_null(&inst->fb_free_list,
++					struct vdec_fb_node, list);
++	if (node) {
++		list_move_tail(&node->list, &inst->available_fb_node_list);
++		fb = (struct vdec_fb *)node->fb;
++		fb->status |= FB_ST_FREE;
++		mtk_vcodec_debug(inst, "[FB] get free fb %p st=%d",
++				 node->fb, fb->status);
++	} else {
++		fb = NULL;
++		mtk_vcodec_debug(inst, "[FB] there is no free fb");
++	}
++
++	*out_fb = fb;
++}
++
++static int vdec_vp9_deinit(unsigned long h_vdec)
++{
++	struct vdec_vp9_inst *inst = (struct vdec_vp9_inst *)h_vdec;
++	struct mtk_vcodec_mem *mem;
++	int ret = 0;
++
++	mtk_vcodec_debug_enter(inst);
++
++	if (vpu_dec_deinit(&inst->vpu)) {
++		mtk_vcodec_err(inst, "[E]vpu_dec_deinit");
++		ret = -EINVAL;
++	}
++
++	mem = &inst->work_buf.mv_buf;
 +	if (mem->va)
 +		mtk_vcodec_mem_free(inst->ctx, mem);
 +
-+	for (i = 0; i < H264_MAX_FB_NUM; i++) {
-+		inst->vsi->mv_buf_dma[i] = 0;
-+		mem = &inst->mv_buf[i];
-+		if (mem->va)
-+			mtk_vcodec_mem_free(inst->ctx, mem);
-+	}
++	vp9_free_all_sf_ref_fb(inst);
++	vp9_free_handle(inst);
++
++	mtk_vcodec_debug_leave(inst);
++
++	return ret;
 +}
 +
-+static int allocate_working_buf(struct vdec_h264_inst *inst)
++static int vdec_vp9_init(struct mtk_vcodec_ctx *ctx, unsigned long *h_vdec)
 +{
-+	int err = 0;
++	struct vdec_vp9_inst *inst;
 +
-+	inst->ppl_buf.size = BUF_PREDICTION_SZ + BUF_PP_SZ + BUF_LD_SZ;
-+	err = mtk_vcodec_mem_alloc(inst->ctx, &inst->ppl_buf);
-+	if (err) {
-+		mtk_vcodec_err(inst, "failed to allocate ppl buf");
-+		return -ENOMEM;
-+	}
-+
-+	inst->vsi->ppl_buf_dma = inst->ppl_buf.dma_addr;
-+	return 0;
-+}
-+
-+static void put_fb_to_free(struct vdec_h264_inst *inst, struct vdec_fb *fb)
-+{
-+	struct h264_ring_fb_list *list;
-+
-+	if (fb) {
-+		list = &inst->vsi->list_free;
-+		if (list->count == H264_MAX_FB_NUM) {
-+			mtk_vcodec_err(inst, "[FB] put fb free_list full");
-+			return;
-+		}
-+
-+		mtk_vcodec_debug(inst, "[FB] put fb into free_list @(%p, %llx)",
-+				 fb->base_y.va, (u64)fb->base_y.dma_addr);
-+
-+		list->fb_list[list->write_idx].vdec_fb_va = (u64)fb;
-+		list->write_idx = (list->write_idx == H264_MAX_FB_NUM - 1) ?
-+				  0 : list->write_idx + 1;
-+		list->count++;
-+	}
-+}
-+
-+static void get_pic_info(struct vdec_h264_inst *inst,
-+			 struct vdec_pic_info *pic)
-+{
-+	pic->pic_w = inst->vsi->pic.pic_w;
-+	pic->pic_h = inst->vsi->pic.pic_h;
-+	pic->buf_w = inst->vsi->pic.buf_w;
-+	pic->buf_h = inst->vsi->pic.buf_h;
-+	pic->y_bs_sz = inst->vsi->pic.y_bs_sz;
-+	pic->c_bs_sz = inst->vsi->pic.c_bs_sz;
-+	pic->y_len_sz = inst->vsi->pic.y_len_sz;
-+	pic->c_len_sz = inst->vsi->pic.c_len_sz;
-+
-+	mtk_vcodec_debug(inst, "pic(%d, %d), buf(%d, %d)",
-+			 pic->pic_w, pic->pic_h, pic->buf_w, pic->buf_h);
-+	mtk_vcodec_debug(inst, "Y(%d, %d), C(%d, %d)", pic->y_bs_sz,
-+			 pic->y_len_sz, pic->c_bs_sz, pic->c_len_sz);
-+}
-+
-+static void get_crop_info(struct vdec_h264_inst *inst, struct v4l2_crop *cr)
-+{
-+	cr->c.left	= inst->vsi->crop.left;
-+	cr->c.top	= inst->vsi->crop.top;
-+	cr->c.width	= inst->vsi->crop.width;
-+	cr->c.height	= inst->vsi->crop.height;
-+	mtk_vcodec_debug(inst, "l=%d, t=%d, w=%d, h=%d",
-+			 cr->c.left, cr->c.top, cr->c.width, cr->c.height);
-+}
-+
-+static void get_dpb_size(struct vdec_h264_inst *inst, unsigned int *dpb_sz)
-+{
-+	*dpb_sz = inst->vsi->dec.dpb_sz;
-+	mtk_vcodec_debug(inst, "sz=%d", *dpb_sz);
-+}
-+
-+static int vdec_h264_init(struct mtk_vcodec_ctx *ctx, unsigned long *h_vdec)
-+{
-+	struct vdec_h264_inst *inst = NULL;
-+	int err;
-+
-+	inst = kzalloc(sizeof(*inst), GFP_KERNEL);
++	inst = vp9_alloc_inst(ctx);
 +	if (!inst)
 +		return -ENOMEM;
 +
++	inst->frm_cnt = 0;
++	inst->total_frm_cnt = 0;
 +	inst->ctx = ctx;
 +
-+	inst->vpu.id = IPI_VDEC_H264;
++	inst->vpu.id = IPI_VDEC_VP9;
 +	inst->vpu.dev = ctx->dev->vpu_plat_dev;
 +	inst->vpu.ctx = ctx;
 +	inst->vpu.handler = vpu_dec_ipi_handler;
 +
-+	err = vpu_dec_init(&inst->vpu);
-+	if (err) {
-+		mtk_vcodec_err(inst, "vdec_h264 init err=%d", err);
-+		goto error_free_inst;
++	if (vpu_dec_init(&inst->vpu)) {
++		mtk_vcodec_err(inst, "[E]vp9_dec_vpu_init - %d",
++						inst->vpu.inst_addr);
++		goto err_deinit_inst;
 +	}
 +
-+	inst->vsi = (struct vdec_h264_vsi *)inst->vpu.vsi;
-+	err = allocate_working_buf(inst);
-+	if (err)
-+		goto error_free_inst;
++	inst->vsi = (struct vdec_vp9_vsi *)inst->vpu.vsi;
++	init_list(inst);
 +
-+	mtk_vcodec_debug(inst, "H264 Instance >> %p", inst);
-+
-+	*h_vdec = (unsigned long)inst;
++	(*h_vdec) = (unsigned long)inst;
 +	return 0;
 +
-+error_free_inst:
-+	kfree(inst);
++err_deinit_inst:
++	vp9_free_handle(inst);
 +
-+	return err;
++	return -EINVAL;
 +}
 +
-+static int vdec_h264_deinit(unsigned long h_vdec)
++static int vdec_vp9_decode(unsigned long h_vdec, struct mtk_vcodec_mem *bs,
++		   struct vdec_fb *fb, bool *res_chg)
 +{
-+	struct vdec_h264_inst *inst = (struct vdec_h264_inst *)h_vdec;
++	int ret = 0;
++	struct vdec_vp9_inst *inst = (struct vdec_vp9_inst *)h_vdec;
++	struct vdec_vp9_frm_hdr *frm_hdr = &inst->frm_hdr;
++	struct vdec_vp9_vsi *vsi = inst->vsi;
++	unsigned int data[3];
++	int i;
 +
 +	mtk_vcodec_debug_enter(inst);
 +
-+	vpu_dec_deinit(&inst->vpu);
-+	free_all_working_buf(inst);
++	*res_chg = false;
 +
-+	kfree(inst);
-+	return 0;
-+}
++	if ((bs == NULL) && (fb == NULL)) {
++		mtk_vcodec_debug(inst, "[EOS]");
++		vp9_reset(inst);
++		return ret;
++	}
 +
-+static int find_start_code(unsigned char *data, unsigned int data_sz)
-+{
-+	if (data_sz >= 3 && data[0] == 0 && data[1] == 0 && data[2] == 1)
-+		return 3;
++	if (bs != NULL)
++		mtk_vcodec_debug(inst, "Input BS Size = %ld", bs->size);
 +
-+	if (data_sz >= 4 && data[0] == 0 && data[1] == 0 && data[2] == 0 &&
-+	    data[3] == 1)
-+		return 4;
++	memcpy((void *)inst + sizeof(*inst), (void *)inst,
++	       sizeof(*inst));
 +
-+	return -1;
-+}
++	while (1) {
++		struct vdec_fb *cur_fb;
 +
-+static int vdec_h264_decode(unsigned long h_vdec, struct mtk_vcodec_mem *bs,
-+			    struct vdec_fb *fb, bool *res_chg)
-+{
-+	struct vdec_h264_inst *inst = (struct vdec_h264_inst *)h_vdec;
-+	struct vdec_vpu_inst *vpu = &inst->vpu;
-+	int idx = 0;
-+	int err = 0;
-+	unsigned int nal_start;
-+	unsigned int nal_type;
-+	unsigned char *buf;
-+	unsigned int buf_sz;
-+	unsigned int data[2];
-+	uint64_t vdec_fb_va;
-+	uint64_t y_fb_dma;
-+	uint64_t c_fb_dma;
++		frm_hdr->resolution_changed = false;
 +
-+	y_fb_dma = fb ? (u64)fb->base_y.dma_addr : 0;
-+	c_fb_dma = fb ? (u64)fb->base_c.dma_addr : 0;
++		data[0] = *((unsigned int *)bs->va);
++		data[1] = *((unsigned int *)(bs->va + 4));
++		data[2] = *((unsigned int *)(bs->va + 8));
 +
-+	vdec_fb_va = (u64)fb;
++		vsi->bs = *bs;
 +
-+	mtk_vcodec_debug(inst, "+ [%d] FB y_dma=%llx c_dma=%llx va=%p",
-+			 inst->num_nalu, y_fb_dma, c_fb_dma, fb);
++		if (fb)
++			vsi->fb = *fb;
 +
-+	/* bs NULL means flush decoder */
-+	if (bs == NULL)
-+		return vpu_dec_reset(vpu);
++		if (!vsi->sf_init) {
++			unsigned int sf_bs_sz;
++			unsigned int sf_bs_off;
++			unsigned char *sf_bs_src;
++			unsigned char *sf_bs_dst;
 +
-+	buf = (unsigned char *)bs->va;
-+	buf_sz = bs->size;
-+	idx = find_start_code(buf, buf_sz);
-+	if (idx < 0)
-+		goto err_free_fb_out;
++			sf_bs_sz = bs->size > VP9_SUPER_FRAME_BS_SZ ?
++				VP9_SUPER_FRAME_BS_SZ : bs->size;
++			sf_bs_off = VP9_SUPER_FRAME_BS_SZ - sf_bs_sz;
++			sf_bs_src = bs->va + bs->size - sf_bs_sz;
++			sf_bs_dst = vsi->sf_bs_buf + sf_bs_off;
++			memcpy(sf_bs_dst, sf_bs_src, sf_bs_sz);
++		} else {
++			if ((vsi->sf_frm_cnt > 0) &&
++				(vsi->sf_frm_idx < vsi->sf_frm_cnt)) {
++				unsigned int idx = vsi->sf_frm_idx;
 +
-+	nal_start = buf[idx];
-+	nal_type = NAL_TYPE(buf[idx]);
-+	mtk_vcodec_debug(inst, "\n + NALU[%d] type %d +\n", inst->num_nalu,
-+			 nal_type);
-+
-+	if (nal_type == H264_PPS) {
-+		if (buf_sz > HDR_PARSING_BUF_SZ) {
-+			err = -EILSEQ;
-+			goto err_free_fb_out;
++				memcpy((void *)vsi->input_ctx.v_frm_sa,
++					   (void *)(vsi->input_ctx.v_frm_sa +
++					   vsi->sf_frm_offset[idx]),
++					   vsi->sf_frm_sz[idx]);
++			}
 +		}
-+		buf_sz -= idx;
-+		memcpy(inst->vsi->hdr_buf, buf + idx, buf_sz);
-+	}
-+
-+	inst->vsi->dec.bs_dma = (uint64_t)bs->dma_addr;
-+	inst->vsi->dec.y_fb_dma = y_fb_dma;
-+	inst->vsi->dec.c_fb_dma = c_fb_dma;
-+	inst->vsi->dec.vdec_fb_va = vdec_fb_va;
-+
-+	data[0] = buf_sz;
-+	data[1] = nal_start;
-+	err = vpu_dec_start(vpu, data, 2);
-+	if (err)
-+		goto err_free_fb_out;
-+
-+	*res_chg = inst->vsi->dec.resolution_changed;
-+	if (*res_chg) {
-+		struct vdec_pic_info pic;
-+
-+		mtk_vcodec_debug(inst, "- resolution changed -");
-+		get_pic_info(inst, &pic);
-+
-+		if (inst->vsi->dec.realloc_mv_buf) {
-+			err = alloc_mv_buf(inst, &pic);
-+			if (err)
-+				goto err_free_fb_out;
++		ret = vpu_dec_start(&inst->vpu, data, 3);
++		if (ret) {
++			mtk_vcodec_err(inst, "vpu_dec_start failed");
++			ret = -EINVAL;
++			goto DECODE_ERROR;
 +		}
++
++		if (vsi->resolution_changed) {
++			if (!vp9_realloc_work_buf(inst)) {
++				ret = -EINVAL;
++				goto DECODE_ERROR;
++			}
++		}
++
++		if (vsi->sf_frm_cnt > 0) {
++			cur_fb = &vsi->sf_ref_fb[vsi->sf_next_ref_fb_idx].fb;
++
++			if (vsi->sf_frm_idx < vsi->sf_frm_cnt)
++				inst->cur_fb = cur_fb;
++			else
++				inst->cur_fb = fb;
++		} else {
++			inst->cur_fb = fb;
++		}
++
++		vsi->frm_bufs[vsi->new_fb_idx].buf.fb = inst->cur_fb;
++		if (!vp9_is_sf_ref_fb(inst, inst->cur_fb))
++			vp9_add_to_fb_use_list(inst, inst->cur_fb);
++
++		mtk_vcodec_debug(inst, "[#pic %d]", vsi->frm_num);
++
++		/* the same as VP9_SKIP_FRAME */
++		inst->frm_hdr.show_frame = vsi->show_frm;
++
++		if (vsi->show_exist)
++			mtk_vcodec_debug(inst,
++				"drv->new_fb_idx=%d, drv->frm_to_show=%d",
++				vsi->new_fb_idx, vsi->frm_to_show);
++
++		if (vsi->show_exist && (vsi->frm_to_show <
++					VP9_MAX_FRM_BUFF_NUM)) {
++			mtk_vcodec_debug(inst,
++				"Skip Decode drv->new_fb_idx=%d, drv->frm_to_show=%d",
++				vsi->new_fb_idx, vsi->frm_to_show);
++			vp9_ref_cnt_fb(inst, &vsi->new_fb_idx,
++							vsi->frm_to_show);
++			ret = -EINVAL;
++			goto DECODE_ERROR;
++		}
++
++		/* VPU assign the buffer pointer in its address space,
++		  * reassign here
++		  */
++		for (i = 0; i < REFS_PER_FRAME; i++) {
++			unsigned int idx = vsi->frm_refs[i].idx;
++
++			vsi->frm_refs[i].buf = &vsi->frm_bufs[idx].buf;
++		}
++
++		if (frm_hdr->resolution_changed) {
++			unsigned int width = inst->frm_hdr.width;
++			unsigned int height = inst->frm_hdr.height;
++			unsigned int frmbuf_width =
++				inst->work_buf.frmbuf_width;
++			unsigned int frmbuf_height =
++				inst->work_buf.frmbuf_height;
++			struct mtk_vcodec_mem tmp_buf =	inst->work_buf.mv_buf;
++			struct vp9_dram_buf tmp_buf2 = vsi->mv_buf;
++			struct vdec_fb tmp_buf3 =
++				inst->work_buf.sf_ref_buf[0];
++
++			memcpy((void *)inst, (void *)inst + sizeof(*inst),
++			       sizeof(*inst));
++
++			inst->frm_hdr.width = width;
++			inst->frm_hdr.height = height;
++			inst->work_buf.frmbuf_width = frmbuf_width;
++			inst->work_buf.frmbuf_height = frmbuf_height;
++			inst->work_buf.mv_buf = tmp_buf;
++			inst->vsi->mv_buf = tmp_buf2;
++			inst->work_buf.sf_ref_buf[0] = tmp_buf3;
++
++			*res_chg = true;
++			mtk_vcodec_debug(inst, "VDEC_ST_RESOLUTION_CHANGED");
++			vp9_add_to_fb_free_list(inst, fb);
++			ret = 0;
++			goto DECODE_ERROR;
++		}
++
++		if (vp9_check_proc(inst) != true) {
++			mtk_vcodec_err(inst, "vp9_check_proc");
++			ret = -EINVAL;
++			goto DECODE_ERROR;
++		}
++
++		inst->total_frm_cnt++;
++		if (vp9_is_last_sub_frm(inst))
++			break;
++
++		/* for resolution change backup */
++		memcpy((void *)inst + sizeof(*inst), (void *)inst,
++		       sizeof(*inst));
 +	}
++	inst->frm_cnt++;
 +
-+	if (nal_type == NON_IDR_SLICE || nal_type == IDR_SLICE) {
-+		/* wait decoder done interrupt */
-+		err = mtk_vcodec_wait_for_done_ctx(inst->ctx,
-+						   MTK_INST_IRQ_RECEIVED,
-+						   WAIT_INTR_TIMEOUT_MS);
-+		if (err)
-+			goto err_free_fb_out;
++	mtk_vcodec_debug_leave(inst);
 +
-+		vpu_dec_end(vpu);
-+	}
++DECODE_ERROR:
++	if (ret < 0)
++		vp9_add_to_fb_free_list(inst, fb);
 +
-+	mtk_vcodec_debug(inst, "\n - NALU[%d] type=%d -\n", inst->num_nalu,
-+			 nal_type);
-+	inst->num_nalu++;
-+	return 0;
++	mtk_vcodec_debug_leave(inst);
 +
-+err_free_fb_out:
-+	put_fb_to_free(inst, fb);
-+	mtk_vcodec_err(inst, "\n - NALU[%d] err=%d -\n", inst->num_nalu, err);
-+	return err;
++	return ret;
 +}
 +
-+static void vdec_h264_get_fb(struct vdec_h264_inst *inst,
-+			     struct h264_ring_fb_list *list,
-+			     bool disp_list, struct vdec_fb **out_fb)
++static void get_crop_info(struct vdec_vp9_inst *inst, struct v4l2_crop *cr)
 +{
-+	unsigned long vdec_fb_va;
-+	struct vdec_fb *fb;
-+
-+	if (list->count == 0) {
-+		mtk_vcodec_debug(inst, "[FB] there is no %s fb",
-+				 disp_list ? "disp" : "free");
-+		*out_fb = NULL;
-+		return;
-+	}
-+
-+	vdec_fb_va = (unsigned long)list->fb_list[list->read_idx].vdec_fb_va;
-+	fb = (struct vdec_fb *)vdec_fb_va;
-+	if (disp_list)
-+		fb->status |= FB_ST_DISPLAY;
-+	else
-+		fb->status |= FB_ST_FREE;
-+
-+	*out_fb = fb;
-+	mtk_vcodec_debug(inst, "[FB] get %s fb st=%d poc=%d %llx",
-+			 disp_list ? "disp" : "free",
-+			 fb->status, list->fb_list[list->read_idx].poc,
-+			 list->fb_list[list->read_idx].vdec_fb_va);
-+
-+	list->read_idx = (list->read_idx == H264_MAX_FB_NUM - 1) ?
-+			 0 : list->read_idx + 1;
-+	list->count--;
++	cr->c.left = 0;
++	cr->c.top = 0;
++	cr->c.width = inst->frm_hdr.width;
++	cr->c.height = inst->frm_hdr.height;
++	mtk_vcodec_debug(inst, "get crop info l=%d, t=%d, w=%d, h=%d\n",
++			 cr->c.left, cr->c.top, cr->c.width, cr->c.height);
 +}
 +
-+static int vdec_h264_get_param(unsigned long h_vdec,
-+			       enum vdec_get_param_type type, void *out)
++static int vdec_vp9_get_param(unsigned long h_vdec,
++			enum vdec_get_param_type type, void *out)
 +{
-+	struct vdec_h264_inst *inst = (struct vdec_h264_inst *)h_vdec;
++	struct vdec_vp9_inst *inst = (struct vdec_vp9_inst *)h_vdec;
++	int ret = 0;
 +
 +	switch (type) {
 +	case GET_PARAM_DISP_FRAME_BUFFER:
-+		vdec_h264_get_fb(inst, &inst->vsi->list_disp, true, out);
++		get_disp_fb(inst, out);
 +		break;
-+
 +	case GET_PARAM_FREE_FRAME_BUFFER:
-+		vdec_h264_get_fb(inst, &inst->vsi->list_free, false, out);
++		get_free_fb(inst, out);
 +		break;
-+
 +	case GET_PARAM_PIC_INFO:
 +		get_pic_info(inst, out);
 +		break;
-+
 +	case GET_PARAM_DPB_SIZE:
-+		get_dpb_size(inst, out);
++		*((unsigned int *)out) = 9;
 +		break;
-+
 +	case GET_PARAM_CROP_INFO:
 +		get_crop_info(inst, out);
 +		break;
-+
 +	default:
-+		mtk_vcodec_err(inst, "invalid get parameter type=%d", type);
-+		return -EINVAL;
++		mtk_vcodec_err(inst, "not support type %d", type);
++		ret = -EINVAL;
++		break;
 +	}
 +
-+	return 0;
++	return ret;
 +}
 +
-+static struct vdec_common_if vdec_h264_if = {
-+	vdec_h264_init,
-+	vdec_h264_decode,
-+	vdec_h264_get_param,
-+	vdec_h264_deinit,
++static struct vdec_common_if vdec_vp9_if = {
++	vdec_vp9_init,
++	vdec_vp9_decode,
++	vdec_vp9_get_param,
++	vdec_vp9_deinit,
 +};
 +
-+struct vdec_common_if *get_h264_dec_comm_if(void)
++struct vdec_common_if *get_vp9_dec_comm_if(void)
 +{
-+	return &vdec_h264_if;
++	return &vdec_vp9_if;
 +}
 diff --git a/drivers/media/platform/mtk-vcodec/vdec_drv_if.c b/drivers/media/platform/mtk-vcodec/vdec_drv_if.c
-index 1d12719..576920c 100644
+index 6e2f065..f5781d7 100644
 --- a/drivers/media/platform/mtk-vcodec/vdec_drv_if.c
 +++ b/drivers/media/platform/mtk-vcodec/vdec_drv_if.c
-@@ -24,12 +24,16 @@
- #include "mtk_vcodec_util.h"
- #include "mtk_vpu.h"
+@@ -26,6 +26,7 @@
  
-+struct vdec_common_if *get_h264_dec_comm_if(void);
-+
+ struct vdec_common_if *get_h264_dec_comm_if(void);
+ struct vdec_common_if *get_vp8_dec_comm_if(void);
++struct vdec_common_if *get_vp9_dec_comm_if(void);
+ 
  int vdec_if_init(struct mtk_vcodec_ctx *ctx, unsigned int fourcc)
  {
- 	int ret = 0;
- 
- 	switch (fourcc) {
- 	case V4L2_PIX_FMT_H264:
-+		ctx->dec_if = get_h264_dec_comm_if();
-+		break;
- 	case V4L2_PIX_FMT_VP8:
+@@ -39,6 +40,8 @@ int vdec_if_init(struct mtk_vcodec_ctx *ctx, unsigned int fourcc)
+ 		ctx->dec_if = get_vp8_dec_comm_if();
+ 		break;
  	case V4L2_PIX_FMT_VP9:
++		ctx->dec_if = get_vp9_dec_comm_if();
++		break;
  	default:
-diff --git a/drivers/media/platform/mtk-vcodec/vdec_ipi_msg.h b/drivers/media/platform/mtk-vcodec/vdec_ipi_msg.h
-index 937192c..131928b 100644
---- a/drivers/media/platform/mtk-vcodec/vdec_ipi_msg.h
-+++ b/drivers/media/platform/mtk-vcodec/vdec_ipi_msg.h
-@@ -54,7 +54,7 @@ struct vdec_ap_ipi_cmd {
- struct vdec_vpu_ipi_ack {
- 	uint32_t msg_id;
- 	int32_t status;
--	uint64_t vdec_inst;
-+	uint64_t ap_inst_addr;
- };
- 
- /**
-@@ -66,20 +66,34 @@ struct vdec_vpu_ipi_ack {
- struct vdec_ap_ipi_init {
- 	uint32_t msg_id;
- 	uint32_t reserved;
--	uint64_t vdec_inst;
-+	uint64_t ap_inst_addr;
- };
- 
- /**
-- * struct vdec_vpu_ipi_init_ack - for VPU_IPIMSG_DEC_INIT_ACK
-- * @msg_id        : VPU_IPIMSG_DEC_INIT_ACK
-- * @status        : VPU exeuction result
-- * @vdec_inst     : AP video decoder instance address
-+ * struct vdec_ap_ipi_dec_start - for AP_IPIMSG_DEC_START
-+ * @msg_id        : AP_IPIMSG_DEC_START
-  * @vpu_inst_addr : VPU decoder instance address
-+ * @data          : Header info
-+ * @reserved      : Reserved field
-+ */
-+struct vdec_ap_ipi_dec_start {
-+	uint32_t msg_id;
-+	uint32_t vpu_inst_addr;
-+	uint32_t data[3];
-+	uint32_t reserved;
-+};
-+
-+/**
-+ * struct vdec_vpu_ipi_init_ack - for VPU_IPIMSG_DEC_INIT_ACK
-+ * @msg_id		: VPU_IPIMSG_DEC_INIT_ACK
-+ * @status		: VPU exeuction result
-+ * @ap_inst_addr	: AP vcodec_vpu_inst instance address
-+ * @vpu_inst_addr	: VPU decoder instance address
-  */
- struct vdec_vpu_ipi_init_ack {
- 	uint32_t msg_id;
- 	int32_t status;
--	uint64_t vdec_inst;
-+	uint64_t ap_inst_addr;
- 	uint32_t vpu_inst_addr;
- };
- 
-diff --git a/drivers/media/platform/mtk-vcodec/vdec_vpu_if.c b/drivers/media/platform/mtk-vcodec/vdec_vpu_if.c
-new file mode 100644
-index 0000000..33b96db
---- /dev/null
-+++ b/drivers/media/platform/mtk-vcodec/vdec_vpu_if.c
-@@ -0,0 +1,164 @@
-+/*
-+ * Copyright (c) 2016 MediaTek Inc.
-+ * Author: PC Chen <pc.chen@mediatek.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include "mtk_vcodec_drv.h"
-+#include "mtk_vcodec_util.h"
-+#include "vdec_ipi_msg.h"
-+#include "vdec_vpu_if.h"
-+
-+static void handle_init_ack_msg(struct vdec_vpu_ipi_init_ack *msg)
-+{
-+	struct vdec_vpu_inst *vpu = (struct vdec_vpu_inst *)msg->ap_inst_addr;
-+
-+	mtk_vcodec_debug(vpu, "+ ap_inst_addr = 0x%llx", msg->ap_inst_addr);
-+
-+	/* mapping VPU address to kernel virtual address */
-+	vpu->vsi = vpu_mapping_dm_addr(vpu->dev, msg->vpu_inst_addr);
-+	vpu->inst_addr = msg->vpu_inst_addr;
-+
-+	mtk_vcodec_debug(vpu, "- vpu_inst_addr = 0x%x", vpu->inst_addr);
-+}
-+
-+/*
-+ * This function runs in interrupt context and it means there's a IPI MSG
-+ * from VPU.
-+ */
-+void vpu_dec_ipi_handler(void *data, unsigned int len, void *priv)
-+{
-+	struct vdec_vpu_ipi_ack *msg = data;
-+	struct vdec_vpu_inst *vpu = (struct vdec_vpu_inst *)msg->ap_inst_addr;
-+
-+	mtk_vcodec_debug(vpu, "+ id=%X", msg->msg_id);
-+
-+	vpu->failure = msg->status;
-+
-+	if (msg->status == 0) {
-+		switch (msg->msg_id) {
-+		case VPU_IPIMSG_DEC_INIT_ACK:
-+			handle_init_ack_msg(data);
-+			break;
-+
-+		case VPU_IPIMSG_DEC_START_ACK:
-+		case VPU_IPIMSG_DEC_END_ACK:
-+		case VPU_IPIMSG_DEC_DEINIT_ACK:
-+		case VPU_IPIMSG_DEC_RESET_ACK:
-+			break;
-+
-+		default:
-+			mtk_vcodec_err(vpu, "invalid msg=%X", msg->msg_id);
-+			break;
-+		}
-+	}
-+
-+	mtk_vcodec_debug(vpu, "- id=%X", msg->msg_id);
-+	vpu->signaled = 1;
-+}
-+
-+static int vcodec_vpu_send_msg(struct vdec_vpu_inst *vpu, void *msg, int len)
-+{
-+	int err;
-+
-+	mtk_vcodec_debug(vpu, "id=%X", *(unsigned int *)msg);
-+
-+	vpu->failure = 0;
-+	vpu->signaled = 0;
-+
-+	err = vpu_ipi_send(vpu->dev, vpu->id, msg, len);
-+	if (err) {
-+		mtk_vcodec_err(vpu, "vpu_ipi_send fail status=%d", err);
-+		return err;
-+	}
-+
-+	return vpu->failure;
-+}
-+
-+static int vcodec_send_ap_ipi(struct vdec_vpu_inst *vpu, unsigned int msg_id)
-+{
-+	struct vdec_ap_ipi_cmd msg;
-+	int err = 0;
-+
-+	mtk_vcodec_debug(vpu, "+ id=%X", msg_id);
-+
-+	memset(&msg, 0, sizeof(msg));
-+	msg.msg_id = msg_id;
-+	msg.vpu_inst_addr = vpu->inst_addr;
-+
-+	err = vcodec_vpu_send_msg(vpu, &msg, sizeof(msg));
-+	mtk_vcodec_debug(vpu, "- id=%X ret=%d", msg_id, err);
-+	return err;
-+}
-+
-+int vpu_dec_init(struct vdec_vpu_inst *vpu)
-+{
-+	struct vdec_ap_ipi_init msg;
-+	int err;
-+
-+	mtk_vcodec_debug_enter(vpu);
-+
-+	init_waitqueue_head(&vpu->wq);
-+	vpu->signaled = 0;
-+	vpu->failure = 0;
-+
-+	err = vpu_ipi_register(vpu->dev, vpu->id, vpu->handler, NULL, NULL);
-+	if (err != 0) {
-+		mtk_vcodec_err(vpu, "vpu_ipi_register fail status=%d", err);
-+		return err;
-+	}
-+
-+	memset(&msg, 0, sizeof(msg));
-+	msg.msg_id = AP_IPIMSG_DEC_INIT;
-+	msg.ap_inst_addr = (unsigned long)vpu;
-+
-+	mtk_vcodec_debug(vpu, "vdec_inst=%p", vpu);
-+
-+	err = vcodec_vpu_send_msg(vpu, (void *)&msg, sizeof(msg));
-+	mtk_vcodec_debug(vpu, "- ret=%d", err);
-+	return err;
-+}
-+
-+int vpu_dec_start(struct vdec_vpu_inst *vpu, unsigned int *data,
-+		  unsigned int length)
-+{
-+	struct vdec_ap_ipi_dec_start msg;
-+	int i;
-+	int err = 0;
-+
-+	mtk_vcodec_debug_enter(vpu);
-+
-+	memset(&msg, 0, sizeof(msg));
-+	msg.msg_id = AP_IPIMSG_DEC_START;
-+	msg.vpu_inst_addr = vpu->inst_addr;
-+
-+	for (i = 0; i < length; i++)
-+		msg.data[i] = data[i];
-+
-+	err = vcodec_vpu_send_msg(vpu, (void *)&msg, sizeof(msg));
-+	mtk_vcodec_debug(vpu, "- ret=%d", err);
-+	return err;
-+}
-+
-+int vpu_dec_end(struct vdec_vpu_inst *vpu)
-+{
-+	return vcodec_send_ap_ipi(vpu, AP_IPIMSG_DEC_END);
-+}
-+
-+int vpu_dec_deinit(struct vdec_vpu_inst *vpu)
-+{
-+	return vcodec_send_ap_ipi(vpu, AP_IPIMSG_DEC_DEINIT);
-+}
-+
-+int vpu_dec_reset(struct vdec_vpu_inst *vpu)
-+{
-+	return vcodec_send_ap_ipi(vpu, AP_IPIMSG_DEC_RESET);
-+}
-diff --git a/drivers/media/platform/mtk-vcodec/vdec_vpu_if.h b/drivers/media/platform/mtk-vcodec/vdec_vpu_if.h
-new file mode 100644
-index 0000000..c16cd75
---- /dev/null
-+++ b/drivers/media/platform/mtk-vcodec/vdec_vpu_if.h
-@@ -0,0 +1,60 @@
-+/*
-+ * Copyright (c) 2016 MediaTek Inc.
-+ * Author: PC Chen <pc.chen@mediatek.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef _VDEC_VPU_IF_H_
-+#define _VDEC_VPU_IF_H_
-+
-+#include "mtk_vpu.h"
-+
-+/**
-+ * struct vdec_vpu_inst - VPU instance for video codec
-+ * @dev	        : platform device of VPU
-+ * @inst_addr	: VPU decoder instance addr
-+ * @signaled    : 1 - Host has received ack message from VPU, 0 - not recevie
-+ * @failure     : VPU execution result status
-+ * @wq          : Wait queue to wait VPU message ack
-+ */
-+struct vdec_vpu_inst {
-+	enum ipi_id id;
-+	void *vsi;
-+	int failure;
-+	unsigned int inst_addr;
-+	unsigned int signaled;
-+	struct mtk_vcodec_ctx *ctx;
-+	struct platform_device *dev;
-+	wait_queue_head_t wq;
-+	ipi_handler_t handler;
-+};
-+
-+/*
-+ * Note these functions are not thread-safe for the same decoder instance.
-+ * the reason is |signaled|. In vdec_vpu_wait_ack,
-+ * wait_event_interruptible_timeout waits |signaled| to be 1.
-+ * Suppose wait_event_interruptible_timeout returns and the execution has not
-+ * reached line 127. If another thread calls vpu_dec_end,
-+ * |signaled| will be 1 and wait_event_interruptible_timeout will return
-+ *  immediately. We enusure thread-safe to add mtk_vdec_lock()/unlock() in
-+ * vdec_drv_if.c
-+ *
-+ */
-+
-+int vpu_dec_init(struct vdec_vpu_inst *vpu);
-+int vpu_dec_start(struct vdec_vpu_inst *vpu, unsigned int *data,
-+		  unsigned int length);
-+int vpu_dec_end(struct vdec_vpu_inst *vpu);
-+int vpu_dec_deinit(struct vdec_vpu_inst *vpu);
-+int vpu_dec_reset(struct vdec_vpu_inst *vpu);
-+void vpu_dec_ipi_handler(void *data, unsigned int len, void *priv);
-+
-+#endif
+ 		return -EINVAL;
+ 	}
 -- 
 1.7.9.5
