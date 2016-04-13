@@ -1,109 +1,79 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 13 Apr 2016 17:30:04 +0200
-Subject: [PATCH v4 5/5] clk: mvebu: new driver for Armada CP110 system
- controller
-In-Reply-To: <20160402012541.GB18567@codeaurora.org>
-References: <1459070777-18049-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1459070777-18049-6-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160402012541.GB18567@codeaurora.org>
-Message-ID: <20160413173004.026e587e@free-electrons.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Wed, 13 Apr 2016 17:36:52 +0200
+Subject: [PATCH V4 4/7] ARM64, ACPI, PCI: I/O Remapping Table (IORT)
+ initial support.
+In-Reply-To: <570E645A.9010600@arm.com>
+References: <1459759975-24097-1-git-send-email-tn@semihalf.com>
+ <1459759975-24097-5-git-send-email-tn@semihalf.com>
+ <570E645A.9010600@arm.com>
+Message-ID: <570E6794.4080409@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 13.04.2016 17:23, Marc Zyngier wrote:
+> On 04/04/16 09:52, Tomasz Nowicki wrote:
+>> IORT shows representation of IO topology for ARM based systems.
+>> It describes how various components are connected together on
+>> parent-child basis e.g. PCI RC -> SMMU -> ITS. Also see IORT spec.
+>>
+>> Initial support allows to:
+>> - register ITS MSI chip along with ITS translation ID and domain token
+>> - deregister ITS MSI chip based on ITS translation ID
+>> - find registered domain token based on ITS translation ID
+>> - map MSI RID based on PCI device and requester ID
+>> - find domain token based on PCI device and requester ID
+>>
+>> To: Rafael J. Wysocki <rjw@rjwysocki.net>
+>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>> ---
+>>   drivers/acpi/Kconfig    |   3 +
+>>   drivers/acpi/Makefile   |   1 +
+>>   drivers/acpi/iort.c     | 335 ++++++++++++++++++++++++++++++++++++++++++++++++
+>>   drivers/irqchip/Kconfig |   1 +
+>>   include/linux/iort.h    |  31 +++++
+>>   5 files changed, 371 insertions(+)
+>>   create mode 100644 drivers/acpi/iort.c
+>>   create mode 100644 include/linux/iort.h
+>>
+>
+> [...]
+>
+>> +static acpi_status
+>> +iort_find_dev_callback(struct acpi_iort_node *node, void *context)
+>> +{
+>> +	struct acpi_iort_root_complex *pci_rc;
+>> +	struct device *dev = context;
+>> +	struct pci_bus *bus;
+>> +
+>> +	switch (node->type) {
+>> +	case ACPI_IORT_NODE_PCI_ROOT_COMPLEX:
+>> +		bus = to_pci_bus(dev);
+>> +		pci_rc = (struct acpi_iort_root_complex *)node->node_data;
+>> +
+>> +		/*
+>> +		 * It is assumed that PCI segment numbers maps one-to-one
+>> +		 * with root complexes. Each segment number can represent only
+>> +		 * one root complex.
+>> +		 */
+>> +		if (pci_rc->pci_segment_number == pci_domain_nr(bus))
+>> +			return AE_OK;
+>
+> What guarantees that this is ever valid? As far as I know, pci_domain_nr
+> is completely arbitrary, and depends both on the probe order and the
+> phase of the moon. If you want this to be reliable, you need to allocate
+> the domain number from pci_segment_number.
+>
+> I must be missing something. Care to shed some light on this?
+>
+Sure. Please see:
+http://infocenter.arm.com/help/topic/com.arm.doc.den0049a/DEN0049A_IO_Remapping_Table.pdf
+3.1.1.5 PCI root complex node
+PCI Segment number -> The PCI segment number, as in MCFG and as
+returned by _SEG in the namespace.
 
-On Fri, 1 Apr 2016 18:25:41 -0700, Stephen Boyd wrote:
+So IORT spec states that pci_segment_number corresponds to the segment 
+number from MCFG table and _SEG method. Here is my patch which makes 
+sure pci_domain_nr(bus) is set properly:
+https://lkml.org/lkml/2016/2/16/418
 
-> > +#include <linux/kernel.h>
-> > +#include <linux/clk.h>
-> 
-> What's this for?
-> 
-> > +#include <linux/clk-provider.h>
-> > +#include <linux/io.h>
-> 
-> What's this for?
-
-Both removed.
-
-> > +static int cp110_gate_enable(struct clk_hw *hw)
-> > +{
-> > +	struct cp110_gate_clk *gate =
-> > +		container_of(hw, struct cp110_gate_clk, hw);
-> 
-> Consider a macro to make this fit on one line.
-
-Done!
-
-> > +	init.name = name;
-> > +	init.ops = &cp110_gate_ops;
-> > +	init.flags = CLK_IS_BASIC;
-> 
-> No basic please.
-
-Fixed!
-
-
-> > +static void __init cp110_syscon_clk_init(struct device_node *np)
-> 
-> Any reason this can't be a platform driver?
-
-Changed to be a platform driver.
-
-> > +{
-> > +	struct regmap *regmap;
-> > +	const char *name, *apll_name, *core_name, *eip_name, *nand_name;
-> > +	u32 nand_clk_ctrl;
-> > +	int clkidx = 0, i;
-> > +
-> > +	regmap = syscon_node_to_regmap(np);
-> 
-> Isn't this the only driver for the node? Why not just make the
-> regmap ourselves in the driver here?
-
-It is for now. However, I expect that we will probably have sub-nodes
-for various other devices whose registers belong to this system
-controller. More specifically, there are some pin-muxing registers in
-there. Using the syscon facility entirely automates the creation of the
-regmap, and makes it easily accessible to other devices who might want
-to poke into some of the system controller registers.
-
-> > +	/*
-> > +	 * Register core clocks
-> > +	 */
-> 
-> Ok. Not really useful comment.
-
-Removed!
-
-
-> > +        /* NAND can be either APLL/2.5 or core clock */
-> > +	of_property_read_string_index(np, "core-clock-output-names",
-> > +				      4, &nand_name);
-> > +        if (nand_clk_ctrl & NF_CLOCK_SEL_400_MASK)
-> > +                cp110_clks[4] =
-> 
-> Weird indentation here. Please use tabs throughout.
-
-Yeah, seems like I copy/pasted or something. Fixed to use tabs.
-
-> > +	of_clk_add_provider(np, cp110_of_clk_get, &cp110_clk_data);
-> 
-> What if this fails?
-
-Error checking added everywhere. There are numerous other clk drivers
-that don't do error checking, so I did the same, especially since a
-failure to register a clock is most likely going to be fatal to the
-system booting. No clock -> no UART, no UART -> the system doesn't boot
-up to userspace.
-
-But fair enough, I've added error checking in the ->probe() function
-(of both the AP806 and CP110 clk drivers).
-
-Thanks again for the review!
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Tomasz
