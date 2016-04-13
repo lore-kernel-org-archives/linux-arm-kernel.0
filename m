@@ -1,24 +1,36 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Wed, 13 Apr 2016 09:23:41 +0800
-Subject: [PATCH 2/2] ARM: dts: rockchip: add i2c nodes RK3228 SoCs
-In-Reply-To: <20160412213912.GF1526@katana>
-References: <1457924955-29996-1-git-send-email-ykk@rock-chips.com>
- <1457925102-30476-1-git-send-email-ykk@rock-chips.com>
- <20160412213912.GF1526@katana>
-Message-ID: <570D9F9D.6000109@rock-chips.com>
+From: ttnguyen@apm.com (Tai Nguyen)
+Date: Tue, 12 Apr 2016 18:22:24 -0700
+Subject: [PATCH v2 1/4] MAINTAINERS: Add entry for APM X-Gene SoC PMU driver
+In-Reply-To: <1460510547-17611-1-git-send-email-ttnguyen@apm.com>
+References: <1460510547-17611-1-git-send-email-ttnguyen@apm.com>
+Message-ID: <1460510547-17611-2-git-send-email-ttnguyen@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+MAINTAINERS: Add entry for APM X-Gene SoC PMU driver
 
-On 04/13/2016 05:39 AM, Wolfram Sang wrote:
-> On Mon, Mar 14, 2016 at 11:11:42AM +0800, Yakir Yang wrote:
->> This patch add the i2c dt nodes for rk3228 SoCs.
->>
->> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> This needs to go via arm-soc.
->
+Signed-off-by: Tai Nguyen <ttnguyen@apm.com>
+---
+ MAINTAINERS | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Could you pick up this patch, it's helpful to add rk3228 HDMI support  :-)
-
-- Yakir
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 4978dc1..e2da90c 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -8593,6 +8593,13 @@ L:	linux-scsi at vger.kernel.org
+ S:	Supported
+ F:	drivers/scsi/pm8001/
+ 
++PMU-XGENE
++APPLIED MICRO (APM) X-GENE SOC PMU
++M:     Tai Nguyen <ttnguyen@apm.com>
++S:     Supported
++F:     drivers/perf/xgene_pmu.c
++F:     Documentation/devicetree/bindings/perf/apm-xgene-pmu.txt
++
+ POSIX CLOCKS and TIMERS
+ M:	Thomas Gleixner <tglx@linutronix.de>
+ L:	linux-kernel at vger.kernel.org
+-- 
+1.9.1
