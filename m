@@ -1,36 +1,43 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 13 Apr 2016 13:49:19 -0700
-Subject: [GIT PULL] Renesas ARM Based SoC Simple PM Bus Updates for v4.7
-In-Reply-To: <cover.1459732818.git.horms+renesas@verge.net.au>
-References: <cover.1459732818.git.horms+renesas@verge.net.au>
-Message-ID: <20160413204919.GT19945@localhost>
+Date: Wed, 13 Apr 2016 14:11:32 -0700
+Subject: [GIT PULL] Versatile cleanups
+In-Reply-To: <CACRpkdYcBgOOuQd9rf+DEXnqhG9Yuif_ir_xOozLXQpuToD-Fg@mail.gmail.com>
+References: <CACRpkdYcBgOOuQd9rf+DEXnqhG9Yuif_ir_xOozLXQpuToD-Fg@mail.gmail.com>
+Message-ID: <20160413211132.GU19945@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 04, 2016 at 10:23:30AM +0900, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Mon, Apr 04, 2016 at 11:06:31AM +0200, Linus Walleij wrote:
+> Hi ARM SoC folks,
 > 
-> Please consider these Renesas ARM based SoC Simple PM bus updates for v4.7.
+> here are some Versatile cleanups that missed the last merge window.
+> Please merge them on some cleanup branch for the v4.7 series.
 > 
+> I might send more cleanups on top, I just don't want more stuff lying
+> around and not getting upstream.
 > 
-> The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+> Yours,
+> Linus Walleij
 > 
->   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+> The following changes since commit 9735a22799b9214d17d3c231fe377fc852f042e9:
+> 
+>   Linux 4.6-rc2 (2016-04-03 09:09:40 -0500)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-simple-pm-bus-for-v4.7
+>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
+> tags/versatile-cleanup-1
 > 
-> for you to fetch changes up to 41feae79f2621d9fcea1437d4a2f29dc731fdbb0:
+> for you to fetch changes up to 7fbbe38aa11816ef15844238e8eb3164b887d265:
 > 
->   bus: simple-pm-bus: Use ARCH_RENESAS (2016-03-28 09:05:58 +0900)
+>   ARM: realview: hide unused 'pmu_device' object (2016-04-04 10:58:47 +0200)
 > 
 > ----------------------------------------------------------------
-> Renesas ARM Based SoC Simple PM Bus Updates for v4.7
-> 
-> * Use ARCH_RENESAS in Kconfig
+> Versatile cleanups for the v4.7 series:
+> - Dynamically detect and print HBI numbers in SoC sysfs
+> - Hide the unused "pmu_device"
 
-Merged into next/drivers. Thanks.
+Merged, thanks.
 
 
 -Olof
