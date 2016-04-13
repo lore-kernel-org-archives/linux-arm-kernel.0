@@ -1,67 +1,107 @@
-From: jerin.jacob@caviumnetworks.com (Jerin Jacob)
-Date: Thu, 14 Apr 2016 02:40:56 +0530
-Subject: [PATCH v2] arm64: pci: add support for pci_mmap_page_range
-Message-ID: <1460581856-12380-1-git-send-email-jerin.jacob@caviumnetworks.com>
+From: Tirumalesh.Chalamarla@caviumnetworks.com (Chalamarla, Tirumalesh)
+Date: Wed, 13 Apr 2016 21:15:43 +0000
+Subject: [PATCH 1/7] iommu/arm-smmu: Differentiate specific implementations
+In-Reply-To: <cc1789284c5efa05514231fa3dede9d1d5f2df18.1460391217.git.robin.murphy@arm.com>
+References: <cover.1460391217.git.robin.murphy@arm.com>
+ <cc1789284c5efa05514231fa3dede9d1d5f2df18.1460391217.git.robin.murphy@arm.com>
+Message-ID: <72EE55A5-F162-43F8-AE81-0393FDEA435B@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Certain X11 servers and user space network drivers frameworks
-need PCI mmaped /sys/bus/pci/devices/B:D:F/resourceX file to
-access PCI bar address space from user space.
 
-Signed-off-by: Jerin Jacob <jerin.jacob@caviumnetworks.com>
----
-Changes in v2:
-  - Rebased to 4.6.0-rc3.
-  - Tested and verified the change on Thunderx and xgene1 arm64 platforms
 
- arch/arm64/include/asm/pci.h |  6 ++++++
- arch/arm64/kernel/pci.c      | 20 ++++++++++++++++++++
- 2 files changed, 26 insertions(+)
 
-diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
-index b9a7ba9..9d7e460 100644
---- a/arch/arm64/include/asm/pci.h
-+++ b/arch/arm64/include/asm/pci.h
-@@ -37,5 +37,11 @@ static inline int pci_proc_domain(struct pci_bus *bus)
- }
- #endif  /* CONFIG_PCI */
- 
-+#define HAVE_PCI_MMAP
-+
-+extern int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
-+	enum pci_mmap_state mmap_state, int write_combine);
-+
-+
- #endif  /* __KERNEL__ */
- #endif  /* __ASM_PCI_H */
-diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-index c72de66..be7ddf1 100644
---- a/arch/arm64/kernel/pci.c
-+++ b/arch/arm64/kernel/pci.c
-@@ -82,3 +82,23 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
- 	return NULL;
- }
- #endif
-+
-+int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
-+		enum pci_mmap_state mmap_state, int write_combine)
-+{
-+	/*
-+	* I/O space can be accessed via normal processor loads and stores on
-+	* this platform but for now we elect not to do this and portable
-+	* drivers should not do this anyway.
-+	*/
-+	if (mmap_state == pci_mmap_io)
-+		return -EINVAL;
-+
-+	if (write_combine)
-+		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
-+	else
-+		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-+
-+	return remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
-+	       vma->vm_end - vma->vm_start, vma->vm_page_prot);
-+}
--- 
-2.1.0
+
+
+On 4/13/16, 10:12 AM, "Robin Murphy" <robin.murphy@arm.com> wrote:
+
+>As the inevitable reality of implementation-specific errata workarounds
+>begin to accrue alongside our integration quirk handling, it's about
+>time the driver had a decent way of keeping track. Extend the per-SMMU
+>data so we can identify specific implementations in an efficient and
+>firmware-agnostic manner.
+>
+>Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>---
+> drivers/iommu/arm-smmu.c | 33 ++++++++++++++++++++++++++-------
+> 1 file changed, 26 insertions(+), 7 deletions(-)
+>
+>diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>index e933679..2d5f357 100644
+>--- a/drivers/iommu/arm-smmu.c
+>+++ b/drivers/iommu/arm-smmu.c
+>@@ -278,6 +278,10 @@ enum arm_smmu_arch_version {
+> 	ARM_SMMU_V2,
+> };
+> 
+>+enum arm_smmu_implementation {
+>+	GENERIC_SMMU,
+>+};
+>+
+> struct arm_smmu_smr {
+> 	u8				idx;
+> 	u16				mask;
+>@@ -315,6 +319,7 @@ struct arm_smmu_device {
+> #define ARM_SMMU_OPT_SECURE_CFG_ACCESS (1 << 0)
+> 	u32				options;
+> 	enum arm_smmu_arch_version	version;
+>+	enum arm_smmu_implementation	model;
+> 
+> 	u32				num_context_banks;
+> 	u32				num_s2_context_banks;
+>@@ -1735,13 +1740,24 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
+> 	return 0;
+> }
+> 
+>+struct arm_smmu_match_data {
+>+	enum arm_smmu_arch_version version;
+>+	enum arm_smmu_implementation model;
+>+};
+>+
+>+#define ARM_SMMU_MATCH_DATA(name, ver, imp)	\
+>+static struct arm_smmu_match_data name = { .version = ver, .model = imp }
+>+
+>+ARM_SMMU_MATCH_DATA(smmu_generic_v1, ARM_SMMU_V1, GENERIC_SMMU);
+>+ARM_SMMU_MATCH_DATA(smmu_generic_v2, ARM_SMMU_V2, GENERIC_SMMU);
+>+
+> static const struct of_device_id arm_smmu_of_match[] = {
+>-	{ .compatible = "arm,smmu-v1", .data = (void *)ARM_SMMU_V1 },
+>-	{ .compatible = "arm,smmu-v2", .data = (void *)ARM_SMMU_V2 },
+>-	{ .compatible = "arm,mmu-400", .data = (void *)ARM_SMMU_V1 },
+>-	{ .compatible = "arm,mmu-401", .data = (void *)ARM_SMMU_V1 },
+>-	{ .compatible = "arm,mmu-500", .data = (void *)ARM_SMMU_V2 },
+>-	{ .compatible = "cavium,smmu-v2", .data = (void *)ARM_SMMU_V2 },
+>+	{ .compatible = "arm,smmu-v1", .data = &smmu_generic_v1 },
+>+	{ .compatible = "arm,smmu-v2", .data = &smmu_generic_v2 },
+>+	{ .compatible = "arm,mmu-400", .data = &smmu_generic_v1 },
+>+	{ .compatible = "arm,mmu-401", .data = &smmu_generic_v1 },
+>+	{ .compatible = "arm,mmu-500", .data = &smmu_generic_v2 },
+>+	{ .compatible = "cavium,smmu-v2", .data = &smmu_generic_v2 },
+> 	{ },
+> };
+> MODULE_DEVICE_TABLE(of, arm_smmu_of_match);
+>@@ -1749,6 +1765,7 @@ MODULE_DEVICE_TABLE(of, arm_smmu_of_match);
+> static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+> {
+> 	const struct of_device_id *of_id;
+>+	const struct arm_smmu_match_data *data;
+> 	struct resource *res;
+> 	struct arm_smmu_device *smmu;
+> 	struct device *dev = &pdev->dev;
+>@@ -1764,7 +1781,9 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+> 	smmu->dev = dev;
+> 
+> 	of_id = of_match_node(arm_smmu_of_match, dev->of_node);
+>-	smmu->version = (enum arm_smmu_arch_version)of_id->data;
+>+	data = of_id->data;
+>+	smmu->version = data->version;
+>+	smmu->model = data->model;
+> 
+> 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> 	smmu->base = devm_ioremap_resource(dev, res);
+>-- 
+>2.7.3.dirty
+Looks good to me. 
+
+Acked-by: Tirumalesh Chalamarla<tchalamarla@caviumnetworks.com>
+>
