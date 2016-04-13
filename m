@@ -1,47 +1,142 @@
 From: ttnguyen@apm.com (Tai Nguyen)
-Date: Tue, 12 Apr 2016 18:22:23 -0700
-Subject: [PATCH v2 0/4] perf: Add APM X-Gene SoC Performance Monitoring Unit
- driver
-Message-ID: <1460510547-17611-1-git-send-email-ttnguyen@apm.com>
+Date: Tue, 12 Apr 2016 18:22:25 -0700
+Subject: [PATCH v2 2/4] Documentation: Add documentation for APM X-Gene SoC
+ PMU DTS binding
+In-Reply-To: <1460510547-17611-1-git-send-email-ttnguyen@apm.com>
+References: <1460510547-17611-1-git-send-email-ttnguyen@apm.com>
+Message-ID: <1460510547-17611-3-git-send-email-ttnguyen@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In addition to the X-Gene ARM CPU performance monitoring unit (PMU), there
-are PMU for the SoC system devices such as L3 cache(s), I/O bridge(s),
-memory controller bridges and memory. These PMU devices are loosely
-architected to follow the same model as the PMU for ARM cores.
+Documentation: Add documentation for APM X-Gene SoC PMU DTS binding
 
 Signed-off-by: Tai Nguyen <ttnguyen@apm.com>
-
-v2:
- * Use bitmask for event asignned counter mask pmu_dev->cntr_assign_mask
- * Remove unnecessary spinlocks in perf add/del operations
- * Remove unnecessary condition checks
- * Enforce CPU assignment to one CPU for perf operarations
- * Set the task_ctx_nr to perf_invalid_context for perf driver
- * Remove irrelevant pt_rregs
- * Change perf sysfs attributes to be fixed instead of dynamic
- * Fix checking for an ACPI companion device instead of EFI enable
- * Add documentation for config/config1 fields format and perf tool example
-
 ---
-Tai Nguyen (4):
-  MAINTAINERS: Add entry for APM X-Gene SoC PMU driver
-  Documentation: Add documentation for APM X-Gene SoC PMU DTS binding
-  perf: xgene: Add APM X-Gene SoC Performance Monitoring Unit driver
-  arm64: dts: apm: Add APM X-Gene SoC PMU DTS entries
-
- .../devicetree/bindings/perf/apm-xgene-pmu.txt     |  116 ++
- Documentation/perf/xgene-pmu.txt                   |   48 +
- MAINTAINERS                                        |    7 +
- arch/arm64/boot/dts/apm/apm-storm.dtsi             |   60 +
- drivers/perf/Kconfig                               |    7 +
- drivers/perf/Makefile                              |    1 +
- drivers/perf/xgene_pmu.c                           | 1414 ++++++++++++++++++++
- 7 files changed, 1653 insertions(+)
+ .../devicetree/bindings/perf/apm-xgene-pmu.txt     | 116 +++++++++++++++++++++
+ 1 file changed, 116 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/perf/apm-xgene-pmu.txt
- create mode 100644 Documentation/perf/xgene-pmu.txt
- create mode 100644 drivers/perf/xgene_pmu.c
 
+diff --git a/Documentation/devicetree/bindings/perf/apm-xgene-pmu.txt b/Documentation/devicetree/bindings/perf/apm-xgene-pmu.txt
+new file mode 100644
+index 0000000..40dfd4e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/perf/apm-xgene-pmu.txt
+@@ -0,0 +1,116 @@
++* APM X-Gene SoC PMU bindings
++
++This is APM X-Gene SoC PMU (Performance Monitoring Unit) module.
++The following PMU devices are supported:
++
++  L3C			- L3 cache controller
++  IOB			- IO bridge
++  MCB			- Memory controller bridge
++  MC			- Memory controller
++
++The following section describes the SoC PMU DT node binding.
++
++Required properties:
++- compatible		: Shall be "apm,xgene-pmu" for revision 1 or
++                          "apm,xgene-pmu-v2" for revision 2.
++- regmap-csw		: Regmap of the CPU switch fabric (CSW) resource.
++- regmap-mcba		: Regmap of the MCB-A (memory bridge) resource.
++- regmap-mcbb		: Regmap of the MCB-B (memory bridge) resource.
++- reg			: First resource shall be the CPU bus PMU resource.
++- interrupts            : Interrupt-specifier for PMU IRQ.
++
++Required properties for L3C subnode:
++- compatible		: Shall be "apm,xgene-pmu-l3c".
++- reg			: First resource shall be the L3C PMU resource.
++- index			: Instance number of the L3C PMU.
++
++Required properties for IOB subnode:
++- compatible		: Shall be "apm,xgene-pmu-iob".
++- reg			: First resource shall be the IOB PMU resource.
++- index			: Instance number of the IOB PMU.
++
++Required properties for MCB subnode:
++- compatible		: Shall be "apm,xgene-pmu-mcb".
++- reg			: First resource shall be the MCB PMU resource.
++- index			: Instance number of the MCB PMU.
++
++Required properties for MC subnode:
++- compatible		: Shall be "apm,xgene-pmu-mc".
++- reg			: First resource shall be the MC PMU resource.
++- index			: Instance number of the MC PMU.
++
++Example:
++	csw: csw at 7e200000 {
++		compatible = "apm,xgene-csw", "syscon";
++		reg = <0x0 0x7e200000 0x0 0x1000>;
++	};
++
++	mcba: mcba at 7e700000 {
++		compatible = "apm,xgene-mcb", "syscon";
++		reg = <0x0 0x7e700000 0x0 0x1000>;
++	};
++
++	mcbb: mcbb at 7e720000 {
++		compatible = "apm,xgene-mcb", "syscon";
++		reg = <0x0 0x7e720000 0x0 0x1000>;
++	};
++
++	pmu: pmu at 78810000 {
++		compatible = "apm,xgene-pmu-v2";
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++		regmap-csw = <&csw>;
++		regmap-mcba = <&mcba>;
++		regmap-mcbb = <&mcbb>;
++		reg = <0x0 0x78810000 0x0 0x1000>;
++		interrupts = <0x0 0x22 0x4>;
++
++		pmul3c at 7e610000 {
++			compatible = "apm,xgene-pmu-l3c";
++			reg = <0x0 0x7e610000 0x0 0x1000>;
++			index = <0>;
++		};
++
++		pmuiob at 7e940000 {
++			compatible = "apm,xgene-pmu-iob";
++			reg = <0x0 0x7e940000 0x0 0x1000>;
++			index = <0>;
++		};
++
++		pmucmcb at 7e710000 {
++			compatible = "apm,xgene-pmu-mcb";
++			reg = <0x0 0x7e710000 0x0 0x1000>;
++			index = <0>;
++		};
++
++		pmucmcb at 7e730000 {
++			compatible = "apm,xgene-pmu-mcb";
++			reg = <0x0 0x7e730000 0x0 0x1000>;
++			index = <1>;
++		};
++
++		pmucmc at 7e810000 {
++			compatible = "apm,xgene-pmu-mc";
++			reg = <0x0 0x7e810000 0x0 0x1000>;
++			index = <0>;
++		};
++
++		pmucmc at 7e850000 {
++			compatible = "apm,xgene-pmu-mc";
++			reg = <0x0 0x7e850000 0x0 0x1000>;
++			index = <1>;
++		};
++
++		pmucmc at 7e890000 {
++			compatible = "apm,xgene-pmu-mc";
++			reg = <0x0 0x7e890000 0x0 0x1000>;
++			index = <2>;
++		};
++
++		pmucmc at 7e8d0000 {
++			compatible = "apm,xgene-pmu-mc";
++			reg = <0x0 0x7e8d0000 0x0 0x1000>;
++			index = <3>;
++		};
++	};
 -- 
 1.9.1
