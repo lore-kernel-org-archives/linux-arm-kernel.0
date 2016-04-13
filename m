@@ -1,35 +1,68 @@
 From: yao.yuan@freescale.com (Yuan Yao)
-Date: Wed, 13 Apr 2016 18:08:26 +0800
-Subject: [PATCH v2 1/2] Documentation: fsl-quadspi: Add fsl,
- ls1043a-qspi compatible string
+Date: Wed, 13 Apr 2016 18:08:27 +0800
+Subject: [PATCH v2 2/2] arm64: dts: ls1043a: add the DTS node for QSPI support
 In-Reply-To: <1460542107-45807-1-git-send-email-yao.yuan@freescale.com>
 References: <1460542107-45807-1-git-send-email-yao.yuan@freescale.com>
-Message-ID: <1460542107-45807-2-git-send-email-yao.yuan@freescale.com>
+Message-ID: <1460542107-45807-3-git-send-email-yao.yuan@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Yuan Yao <yao.yuan@nxp.com>
 
-new compatible string: "fsl,ls1043a-qspi".
-
 Signed-off-by: Yuan Yao <yao.yuan@nxp.com>
 ---
- Documentation/devicetree/bindings/mtd/fsl-quadspi.txt | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Changed in v2:
+	Remove unused property.
+---
+ arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts | 13 +++++++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi    | 14 ++++++++++++++
+ 2 files changed, 27 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt b/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt
-index 0333ec8..c34aa6f 100644
---- a/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt
-+++ b/Documentation/devicetree/bindings/mtd/fsl-quadspi.txt
-@@ -5,7 +5,8 @@ Required properties:
- 		 "fsl,imx7d-qspi", "fsl,imx6ul-qspi",
- 		 "fsl,ls1021a-qspi"
- 		 or
--		 "fsl,ls2080a-qspi" followed by "fsl,ls1021a-qspi"
-+		 "fsl,ls2080a-qspi" followed by "fsl,ls1021a-qspi",
-+		 "fsl,ls1043a-qspi" followed by "fsl,ls1021a-qspi"
-   - reg : the first contains the register location and length,
-           the second contains the memory mapping address and length
-   - reg-names: Should contain the reg names "QuadSPI" and "QuadSPI-memory"
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
+index 80688ac..9d3e9fe 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
+@@ -166,3 +166,16 @@
+ &lpuart0 {
+ 	status = "okay";
+ };
++
++&qspi {
++	bus-num = <0>;
++	status = "okay";
++
++	qflash0: s25fl128s at 0 {
++		compatible = "spansion,m25p80";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		spi-max-frequency = <20000000>;
++		reg = <0>;
++	};
++};
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+index be72bf5..e70b7f2 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+@@ -171,6 +171,20 @@
+ 			interrupts = <0 43 0x4>;
+ 		};
+ 
++		qspi: quadspi at 1550000 {
++			compatible = "fsl,ls1043a-qspi", "fsl,ls1021a-qspi";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x0 0x1550000 0x0 0x10000>,
++				<0x0 0x40000000 0x0 0x4000000>;
++			reg-names = "QuadSPI", "QuadSPI-memory";
++			interrupts = <0 99 0x4>;
++			clock-names = "qspi_en", "qspi";
++			clocks = <&clockgen 4 0>, <&clockgen 4 0>;
++			big-endian;
++			status = "disabled";
++		};
++
+ 		esdhc: esdhc at 1560000 {
+ 			compatible = "fsl,ls1043a-esdhc", "fsl,esdhc";
+ 			reg = <0x0 0x1560000 0x0 0x10000>;
 -- 
 2.1.0.27.g96db324
