@@ -1,71 +1,62 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed, 13 Apr 2016 12:49:19 -0700
-Subject: [PATCH 2/4] irqchip: bcm2836: Drop smp_set_ops on arm64 builds
-In-Reply-To: <201604082243.52300.arnd@arndb.de>
-References: <1459827858-3871-1-git-send-email-eric@anholt.net>
- <1459827858-3871-3-git-send-email-eric@anholt.net>
- <201604082243.52300.arnd@arndb.de>
-Message-ID: <878u0hwaps.fsf@eliezer.anholt.net>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 13 Apr 2016 21:57:39 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC Drivers Updates for v4.7
+In-Reply-To: <20160413194354.GQ19945@localhost>
+References: <cover.1459732456.git.horms+renesas@verge.net.au>
+ <20160413194354.GQ19945@localhost>
+Message-ID: <CAMuHMdUbNcbLdQYG037MiDRAe1dr7ohRK625vb16oM8W19WEFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+Hi Olof,
 
-> On Tuesday 05 April 2016, Eric Anholt wrote:
->> For arm64, the bootloader will instead be implementing the spin-table
->> enable method.
->> 
->> Signed-off-by: Eric Anholt <eric@anholt.net>
->> ---
->>  drivers/irqchip/irq-bcm2836.c | 6 +++++-
->>  1 file changed, 5 insertions(+), 1 deletion(-)
->> 
->> diff --git a/drivers/irqchip/irq-bcm2836.c b/drivers/irqchip/irq-bcm2836.c
->> index 233ccdd..4ae9f76 100644
->> --- a/drivers/irqchip/irq-bcm2836.c
->> +++ b/drivers/irqchip/irq-bcm2836.c
->> @@ -223,6 +223,7 @@ static struct notifier_block bcm2836_arm_irqchip_cpu_notifier = {
->>  	.priority = 100,
->>  };
->>  
->> +#ifdef ARM
->>  int __init bcm2836_smp_boot_secondary(unsigned int cpu,
->>  				      struct task_struct *idle)
->>  {
->> @@ -238,7 +239,7 @@ int __init bcm2836_smp_boot_secondary(unsigned int cpu,
->>  static const struct smp_operations bcm2836_smp_ops __initconst = {
->>  	.smp_boot_secondary	= bcm2836_smp_boot_secondary,
->>  };
->> -
->> +#endif
->>  #endif
->>  
->>  static const struct irq_domain_ops bcm2836_arm_irqchip_intc_ops = {
->> @@ -256,8 +257,11 @@ bcm2836_arm_irqchip_smp_init(void)
->>  	register_cpu_notifier(&bcm2836_arm_irqchip_cpu_notifier);
->>  
->>  	set_smp_cross_call(bcm2836_arm_irqchip_send_ipi);
->> +
->> +#ifdef ARM
->>  	smp_set_ops(&bcm2836_smp_ops);
->>  #endif
->> +#endif
->>  }
+On Wed, Apr 13, 2016 at 9:43 PM, Olof Johansson <olof@lixom.net> wrote:
+> On Mon, Apr 04, 2016 at 10:22:56AM +0900, Simon Horman wrote:
+>> Please consider these Renesas ARM based SoC drivers updates for v4.7.
+>>
+>>
+>> The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+>>
+>>   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-drivers-for-v4.7
+>>
+>> for you to fetch changes up to cd89841fc6dbb6dc11aa113769f39dcd30be720f:
+>>
+>>   ARM: shmobile: timer: Drop support for Cortex A8 (2016-03-28 09:01:31 +0900)
+>>
+>> ----------------------------------------------------------------
+>> Renesas ARM Based SoC Drivers Updates for v4.7
+>>
+>> Loop delay calculation updates:
+>> * Remove check for no longer supported Cortex A8 cores
+>> * Correct short calculation of delay
+>>
+>> ----------------------------------------------------------------
+>> Geert Uytterhoeven (2):
+>>       ARM: shmobile: timer: Fix preset_lpj leading to too short delays
+>>       ARM: shmobile: timer: Drop support for Cortex A8
 >
-> I'd suggest instead using CPU_METHOD_OF_DECLARE and moving the SMP code
-> to arch/arm/mach-bcm/platsmp-bcm2835.c. It doesn't really belong in the
-> irqchip code.
+> I don't understand your naming. THis isn't driver code, this is SoC code.
+>
+> Anyway, I replied to the drop-A8 patch, the resulting function doesn't make
+> much sense once that code path is removed (div is always 1). Seems like this
+> should be cleaned up in other ways instead.
+>
+> So, not merging this branch for now since I think it should be revisited.
 
-I think because of DT ABI (sigh) we're stuck with the current
-implementation.
+The reason these are small separate patches is because especially the
+first one may be backported to stable, as it's a real bug fix.
 
-FWIW, I had started with the SMP bits in a platsmp.c, but moved it into
-the irqchip because that was so much simpler than reaching over into the
-irqchip node to map its registers.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160413/714a26ec/attachment.sig>
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
