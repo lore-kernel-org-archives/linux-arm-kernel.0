@@ -1,166 +1,58 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Wed, 13 Apr 2016 07:57:37 +0000
-Subject: [PATCH v2] PCI: designware: move remaining rc setup code to
- dw_pcie_setup_rc()
-In-Reply-To: <00a901d19548$90bffc20$b23ff460$@com>
-References: <1458128433-3020-1-git-send-email-jszhang@marvell.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ED40E52@lhreml503-mbs>
- <20160407103734.55e72da7@xhacker>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ED43F95@lhreml503-mbs>
- <20160407163443.291fbd49@xhacker>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ED44208@lhreml503-mbs>
- <20160407140551.GA2648@localhost>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ED45C38@lhreml503-mbs>
- <20160408160145.GA10565@localhost>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ED4B88D@lhreml503-mbs>
- <00a901d19548$90bffc20$b23ff460$@com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1ED4F10E@lhreml503-mbs>
+From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
+Date: Wed, 13 Apr 2016 09:59:00 +0200
+Subject: [PATCH 2/5] regulator: st-flashss: Add a regulator driver for
+ flashss vsense.
+In-Reply-To: <20160413061514.GI14664@sirena.org.uk>
+References: <1460474204-5351-1-git-send-email-peter.griffin@linaro.org>
+ <1460474204-5351-3-git-send-email-peter.griffin@linaro.org>
+ <20160413061514.GI14664@sirena.org.uk>
+Message-ID: <570DFC44.8060408@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jingoo
+On 4/13/2016 8:15 AM, Mark Brown wrote:
+>> >+static void st_get_satinize_powerup_voltage(struct st_vsense *vsense)
+>> >+{
+>> >+	void __iomem *ioaddr = vsense->ioaddr;
+>> >+	u32 value = readl_relaxed(ioaddr);
+>> >+
+>> >+	dev_dbg(vsense->dev, "Initial start-up value: (0x%08x)\n", value);
+>> >+
+>> >+	/* Sanitize voltage values forcing what is provided from start-up */
+>> >+	if (value & TOP_VSENSE_CONFIG_LATCHED_PSW_EMMC)
+>> >+		value |= TOP_VSENSE_CONFIG_REG_PSW_EMMC;
+>> >+	else
+>> >+		value &= ~TOP_VSENSE_CONFIG_REG_PSW_EMMC;
+>> >+
+>> >+	if (value & TOP_VSENSE_CONFIG_LATCHED_PSW_NAND)
+>> >+		value |= TOP_VSENSE_CONFIG_REG_PSW_NAND;
+>> >+	else
+>> >+		value &= ~TOP_VSENSE_CONFIG_REG_PSW_NAND;
+>> >+
+>> >+	if (value & TOP_VSENSE_CONFIG_LATCHED_PSW_SPI)
+>> >+		value |= TOP_VSENSE_CONFIG_REG_PSW_SPI;
+>> >+	else
+>> >+		value &= ~TOP_VSENSE_CONFIG_REG_PSW_SPI;
+> This looks like a very complicated way of writing
+>
+> 	value &= TOP_VSENSE_CONFIG_LATCHED_PSW_SPI |
+> 		TOP_VSENSE_CONFIG_LATCHED_PSW_NAND |
+> 		TOP_VSENSE_CONFIG_REG_PSW_EMMC
+>
+> or am I missing something?  Why do we need to do this anyway, it's very
+> surprsing?
+>
 
-> -----Original Message-----
-> From: Jingoo Han [mailto:jingoohan1 at gmail.com]
-> Sent: 13 April 2016 06:52
-> To: Gabriele Paoloni; 'Bjorn Helgaas'
-> Cc: 'Jisheng Zhang'; pratyush.anand at gmail.com; bhelgaas at google.com;
-> linux-pci at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; 'Jingoo Han'
-> Subject: Re: [PATCH v2] PCI: designware: move remaining rc setup code
-> to dw_pcie_setup_rc()
-> 
-> On Tuesday, April 12, 2016 6:44 PM, Gabriele Paoloni wrote:
-> >
-> > Hi Bjorn
-> >
-> > [...]
-> >
-> > > > >
-> > > > > What's the hisi plan for resuming after suspend-to-RAM?  How
-> does
-> > > the
-> > > > > RC get reprogrammed after it loses all its state?
-> > > >
-> > > > PM is not part of the driver yet. This is planned for near
-> > > > future release so haven't made such considerations yet
-> > > > >
-> > > > > What would break if hisi did call dw_pcie_setup_rc()?  I know
-> you
-> > > said
-> > > > > it would overwrite what the bootloader already did, which is
-> true.
-> > > >
-> > > > I am try to figure this out now with our HW team.
-> > > >
-> > > > >
-> > > > > But hisi does call dw_pcie_host_init(), so it reads pp->mem
-> (which
-> > > > > determines pp->mem_base) and pp->lanes from the DT.  Other
-> drivers
-> > > > > then call dw_pcie_setup_rc() which programs the RC based on
-> > > > > pp->mem_base and pp->lanes.  So hisi assumes UEFI programmed
-> the RC
-> > > to
-> > > > > match the DT, while the other drivers read the DT and program
-> the
-> > > RC
-> > > > > to match.  The latter seems more robust because it enforces the
-> > > > > consistency rather than relying on it.
-> > > >
-> > > > Yes I agree with you, however we have preferred to move RC config
-> to
-> > > > BIOS to have a single driver to support multiple versions of the
-> > > > same SoC.
-> > >
-> > > I think there are two reasonable approaches:
-> > >
-> > >   1) A single generic driver that doesn't have any knowledge about
-> the
-> > >   chipset registers; it uses run-time firmware interfaces to manage
-> > >   the bridge.  The ACPI pci_root.c driver is the best example so
-> far
-> > >   and works very well.  It supports basically all x86 and ia64
-> > >   chipsets and requires no kernel work for new ones.
-> > >
-> > >   2) Native drivers specific to each chipset.  These may get
-> > >   configuration information from DT, but they do their own
-> > >   register-level programming of the device without run-time help
-> from
-> > >   firmware.
-> > >
-> > > I think hisi is a native driver because it uses hip05/hip06
-> registers
-> > > to check link state and perform config operations.  And apparently
-> you
-> > > rely on the ATU, BAR, class, and link width programming currently
-> done
-> > > in dw_pcie_host_init().  But you want to rely on pre-boot firmware
-> to
-> > > set up the link.  That doesn't make sense to me -- if the driver
-> wants
-> > > to twiddle the registers, it should know how to do it all.  I don't
-> > > see how you can reasonably manage this half-way approach.
-> > >
-> > > > The patch I proposed above does the same job as the original
-> patch
-> > > > proposed by Jisheng and also allows hisi driver to call the moved
-> > > > code.
-> > > >
-> > > > Do you see anything wrong with it?
-> > >
-> > > Only that it makes the structure more complicated and we haven't
-> > > identified a corresponding benefit yet.
-> >
-> > Finally I have checked that assigning .host_init function pointer
-> > in our driver to call dw_pcie_setup_rc() will not affect the values
-> > already set by BIOS.
-> >
-> > Also I agree with you that a hybrid approach is not ideal.
-> 
-> I also agree with Bjorn's opinion.
-> As far as I know, two approaches are reasonable.
-> 
-> In the case of using UEFI, how about using 'pci-host-generic.c'?
-> You may consult with Linaro guys for this issue.
+This functions is to sanitize the vsense voltages when the regulator
+is probed and in some circumstances the reset value of this register
+does not reflect the hw status/config. For example, by default, after
+the reset, the bit 0 is set so the EMMC, inside the flash subsystem,
+is supposed to operate at 3v3. But the latched bit 24 can be 0 on
+a platform where it is actually set at 1v8.
+So the bit 0 must be reset to keep this coherent and to allow MMC
+framework to properly setup the Vdd when the framework starts.
 
-Many thanks for your suggestion, I'll take it into account for next
-releases
+Hoping this can help.
 
-> Good luck.
-> 
-> Best regards,
-> Jingoo Han
-> 
-> >
-> > So I will update the driver to call dw_pcie_setup_rc() from
-> > .host_init and ask the BIOS team to update the firmware for next
-> > releases (the driver will be backward compatible anyway).
-> >
-> > Also during my investigation I have noticed that in
-> dw_pcie_setup_rc()
-> > http://lxr.free-electrons.com/source/drivers/pci/host/pcie-
-> designware.c#L762
-> >
-> > we use pp->mem_base rather than pp->mem_bus_addr to setup
-> > memory base and memory limit in the Type1 header...I think this
-> > is wrong right?
-> > Also I do not see why this code is needed at all since we overwrite
-> > this register when we call pci_bus_assign_resources(bus) that
-> > will end up in calling pci_setup_bridge() and then
-> > pci_setup_bridge_mmio()...?
-
-Do you have any comment on this issue above?
-
-> >
-> > Many Thanks
-> >
-> > Gab
-> >
-> > >
-> > > Bjorn
-> > > --
-> > > To unsubscribe from this list: send the line "unsubscribe linux-
-> pci" in
-> > > the body of a message to majordomo at vger.kernel.org
-> > > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Regards
+peppe
