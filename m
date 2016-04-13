@@ -1,48 +1,44 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 13 Apr 2016 12:16:26 +0100
-Subject: [PATCH 2/2] arm64: vhe: Verify CPU Exception Levels
-In-Reply-To: <20160413111424.GA17696@cbox>
-References: <1460472361-28419-1-git-send-email-suzuki.poulose@arm.com>
- <1460472361-28419-2-git-send-email-suzuki.poulose@arm.com>
- <20160413111424.GA17696@cbox>
-Message-ID: <570E2A8A.5050504@arm.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 13 Apr 2016 13:16:46 +0200
+Subject: [PATCH v2 0/6] serial: imx: handshaking fixes and improvments
+In-Reply-To: <20160413091336.GH26941@ibawizard.net>
+References: <1458825865-7434-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20160411160128.GD26941@ibawizard.net>
+ <20160412074622.GQ10108@pengutronix.de>
+ <20160412094846.GF26941@ibawizard.net>
+ <20160412105856.GR10108@pengutronix.de>
+ <20160412121759.GG26941@ibawizard.net>
+ <20160412173032.GS10108@pengutronix.de>
+ <20160413091336.GH26941@ibawizard.net>
+Message-ID: <20160413111646.GC10108@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/04/16 12:14, Christoffer Dall wrote:
-> On Tue, Apr 12, 2016 at 03:46:01PM +0100, Suzuki K Poulose wrote:
->> With a VHE capable CPU, kernel can run at EL2 and is a decided at early
->> boot. If some of the CPUs didn't start it EL2 or doesn't have VHE, we
->> could have CPUs running at different exception levels, all in the same
->> kernel! This patch adds an early check for the secondary CPUs to detect
->> such situations.
->>
->> For each non-boot CPU add a sanity check to make sure we don't have
->> different run levels w.r.t the boot CPU. We save the information on
->> whether the boot CPU is running in hyp mode or not and ensure the
->> remaining CPUs match it.
->>
->> Applies on 4.6-rc3.
+On Wed, Apr 13, 2016 at 11:13:36AM +0200, Petr ?tetiar wrote:
+> Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [2016-04-12 19:30:32]:
+> 
+> > On Tue, Apr 12, 2016 at 02:17:59PM +0200, Petr ?tetiar wrote:
+> > > Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> [2016-04-12 12:58:56]:
+> > > 
+> > > > ok, so UFCR_DCEDTE is set and UCR3_DSR controls the DTR output as
+> > > > intended. What is connected to the respective pin?
+> > > > MX6QDL_PAD_EIM_D25__UART1_DSR_B I think is the one.
+> > > 
+> > > It's routed out to Apalis SoM pin 120, which is then connected via 22R
+> > > resistor and through SN65C3243DBR RS-232 line driver to header which I use as
+> > > debug/serial console.
+> > 
+> > Then I guess the problem is that the rs232-partner asserts the imx6's
+> > DSR in reply to the imx6 asserting DTR?
+> 
+> Yes, that's correct.
 
->> +#ifdef CONFIG_ARM64_VHE
->> +
->> +extern bool boot_cpu_hyp_mode;
->> +static inline bool is_boot_cpu_in_hyp_mode(void)
->> +{
->> +	return boot_cpu_hyp_mode;
->> +}
->
-> would it make sense to move this to smp.c to avoid exporting
-> boot_cpu_hyp_mode?
+OK, that fits nicely in my picture. So we only have to wait until Greg
+happily picks up the fixes (i.e. patches 1 up to 4).
 
-Sure, we can.
+Best regards
+Uwe
 
->
-> Note that boot_cpu_hyp_mode is never set without CONFIG_SMP, but that
-> shouldn't matter I suppose.
-
-Right. The check will be invoked only by the secondary CPUs. I will
-respin it.
-
-Cheers
-Suzuki
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
