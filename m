@@ -1,56 +1,82 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed, 13 Apr 2016 13:28:41 -0700
-Subject: [PATCH v2 2/4] irqchip: bcm2836: Drop smp_set_ops on arm64 builds
-In-Reply-To: <1460579323-8099-1-git-send-email-eric@anholt.net>
-References: <1460579323-8099-1-git-send-email-eric@anholt.net>
-Message-ID: <1460579323-8099-2-git-send-email-eric@anholt.net>
+From: stuart.yoder@nxp.com (Stuart Yoder)
+Date: Wed, 13 Apr 2016 20:39:32 +0000
+Subject: [PATCH 2/2] arm64: dts: ls2080a: fsl-mc dt node updates
+In-Reply-To: <20160413055019.GK28903@tiger>
+References: <1459544080-28598-1-git-send-email-stuart.yoder@nxp.com>
+ <20160413055019.GK28903@tiger>
+Message-ID: <HE1PR04MB1641EB3DD445D3AF3F524C3D8D960@HE1PR04MB1641.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For arm64, the bootloader will instead be implementing the spin-table
-enable method.
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
----
 
-v2: add ack, fix #ifdef
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawnguo at kernel.org]
+> Sent: Wednesday, April 13, 2016 12:50 AM
+> To: Stuart Yoder <stuart.yoder@nxp.com>
+> Cc: devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; mark.rutland at arm.com;
+> german.rivera at freescale.com; linux-kernel at vger.kernel.org; robh+dt at kernel.org; Yang-Leo Li
+> <leoyang.li@nxp.com>
+> Subject: Re: [PATCH 2/2] arm64: dts: ls2080a: fsl-mc dt node updates
+> 
+> On Fri, Apr 01, 2016 at 03:54:40PM -0500, Stuart Yoder wrote:
+> > From: Stuart Yoder <stuart.yoder@nxp.com>
+> >
+> > updates to the fsl-mc node for full functionality:
+> >    -msi-parent is needed for interrupt support
+> >    -ranges is needed to enable the bus driver to translate bus addresses
+> >    -dpmac nodes provide a basis for relating dpmac objects to PHYs
+> >
+> > Signed-off-by: Stuart Yoder <stuart.yoder@nxp.com>
+> > ---
+> >  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi |   87 ++++++++++++++++++++++++
+> >  1 file changed, 87 insertions(+)
+> >
+> > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-
+> ls2080a.dtsi
+> > index 9d746c6..449c635 100644
+> > --- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> > @@ -265,6 +265,93 @@
+> >  			compatible = "fsl,qoriq-mc";
+> >  			reg = <0x00000008 0x0c000000 0 0x40>,	 /* MC portal base */
+> >  			      <0x00000000 0x08340000 0 0x40000>; /* MC control reg */
+> > +			msi-parent = <&its>;
+> > +			#address-cells = <3>;
+> > +			#size-cells = <1>;
+> > +
+> > +			/*
+> > +			 * Region type 0x0 - MC portals
+> > +			 * Region type 0x1 - QBMAN portals
+> > +			 */
+> > +			ranges = <0x0 0x0 0x0 0x8 0x0c000000 0x4000000
+> > +				  0x1 0x0 0x0 0x8 0x18000000 0x8000000>;
+> > +
+> > +			/*
+> > +			 * Define the maximum number of MACs present on the SoC.
+> > +			 * They won't necessarily be all probed, since the
+> > +			 * Data Path Layout file and the MC firmware can put
+> > +			 * fewer actual DPMAC objects on the MC bus.
+> > +			 */
+> > +			dpmacs {
+> > +				#address-cells = <1>;
+> > +				#size-cells = <0>;
+> > +
+> > +				dpmac1: dpmac at 1 {
+> > +					compatible = "fsl,qoriq-mc-dpmac";
+> 
+> I did not see how this compatible is used by kernel driver.
 
- drivers/irqchip/irq-bcm2836.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+There is no driver yet, but it will be coming soon.  But, does
+it matter?  Device trees should be describing hardware
+without regards to some specific kernel use of a node or 
+property.
 
-diff --git a/drivers/irqchip/irq-bcm2836.c b/drivers/irqchip/irq-bcm2836.c
-index 233ccddbdb41..6b61c68b87ae 100644
---- a/drivers/irqchip/irq-bcm2836.c
-+++ b/drivers/irqchip/irq-bcm2836.c
-@@ -223,6 +223,7 @@ static struct notifier_block bcm2836_arm_irqchip_cpu_notifier = {
- 	.priority = 100,
- };
- 
-+#ifdef CONFIG_ARM
- int __init bcm2836_smp_boot_secondary(unsigned int cpu,
- 				      struct task_struct *idle)
- {
-@@ -238,7 +239,7 @@ int __init bcm2836_smp_boot_secondary(unsigned int cpu,
- static const struct smp_operations bcm2836_smp_ops __initconst = {
- 	.smp_boot_secondary	= bcm2836_smp_boot_secondary,
- };
--
-+#endif
- #endif
- 
- static const struct irq_domain_ops bcm2836_arm_irqchip_intc_ops = {
-@@ -256,8 +257,11 @@ bcm2836_arm_irqchip_smp_init(void)
- 	register_cpu_notifier(&bcm2836_arm_irqchip_cpu_notifier);
- 
- 	set_smp_cross_call(bcm2836_arm_irqchip_send_ipi);
-+
-+#ifdef CONFIG_ARM
- 	smp_set_ops(&bcm2836_smp_ops);
- #endif
-+#endif
- }
- 
- /*
--- 
-2.8.0.rc3
+> > +					reg = <1>;
+> > +				};
+> 
+> Please have a newline between nodes.
+
+Ok, will do.
+
+Stuart
