@@ -1,16 +1,15 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 13 Apr 2016 15:15:07 -0700
-Subject: [PATCH v3 1/4] arm64: add Kconfig entry for LG1K SoC family
-In-Reply-To: <1460375687-2375-2-git-send-email-chanho.min@lge.com>
+Date: Wed, 13 Apr 2016 15:15:31 -0700
+Subject: [PATCH v3 2/4] arm64: defconfig: enable ARCH_LG1K
+In-Reply-To: <1460375687-2375-3-git-send-email-chanho.min@lge.com>
 References: <1460375687-2375-1-git-send-email-chanho.min@lge.com>
- <1460375687-2375-2-git-send-email-chanho.min@lge.com>
-Message-ID: <20160413221507.GA19945@localhost>
+ <1460375687-2375-3-git-send-email-chanho.min@lge.com>
+Message-ID: <20160413221531.GB19945@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 11, 2016 at 08:54:44PM +0900, Chanho Min wrote:
-> This patch introduces ARCH_LG1K to enable LG Electronics's LG1K SoC
-> family in Kconfig.
+On Mon, Apr 11, 2016 at 08:54:45PM +0900, Chanho Min wrote:
+> Enable building LG1K support in the defconfig.
 > 
 > Signed-off-by: Chanho Min <chanho.min@lge.com>
 > ---
@@ -19,26 +18,24 @@ On Mon, Apr 11, 2016 at 08:54:44PM +0900, Chanho Min wrote:
 > Changes for v3:
 > 	- None
 > ---
->  arch/arm64/Kconfig.platforms |    4 ++++
->  1 file changed, 4 insertions(+)
+>  arch/arm64/configs/defconfig |    1 +
+>  1 file changed, 1 insertion(+)
 > 
-> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-> index 21074f6..b002bba 100644
-> --- a/arch/arm64/Kconfig.platforms
-> +++ b/arch/arm64/Kconfig.platforms
-> @@ -141,4 +141,8 @@ config ARCH_ZYNQMP
->  	help
->  	  This enables support for Xilinx ZynqMP Family
->  
-> +config ARCH_LG1K
-> +	bool "LG Electronics LG1K SoC Family"
-> +	help
-> +	  This enables support for LG Electronics LG1K SoC Family
->  endmenu
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index 86581f7..14dbe27 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -49,6 +49,7 @@ CONFIG_ARCH_UNIPHIER=y
+>  CONFIG_ARCH_VEXPRESS=y
+>  CONFIG_ARCH_XGENE=y
+>  CONFIG_ARCH_ZYNQMP=y
+> +CONFIG_ARCH_LG1K=y
+>  CONFIG_PCI=y
+>  CONFIG_PCI_MSI=y
+>  CONFIG_PCI_IOV=y
 
-Did you see that the list of machine entries here are listed alphabetically?
-They are, and you're appending out of order here. I've moved it for you but
-please pay attention to these kind of things.
+Applied, again with inserting it in the right place (since it moves when the
+Kconfig entry moves).
 
 
 -Olof
