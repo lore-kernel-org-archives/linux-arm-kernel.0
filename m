@@ -1,48 +1,59 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 13 Apr 2016 12:48:31 -0700
-Subject: [GIT PULL] Renesas ARM Based SoC DT Updates for v4.7
-In-Reply-To: <cover.1459732726.git.horms+renesas@verge.net.au>
-References: <cover.1459732726.git.horms+renesas@verge.net.au>
-Message-ID: <20160413194831.GR19945@localhost>
+Date: Wed, 13 Apr 2016 13:23:28 -0700
+Subject: [GIT PULL] Renesas ARM Based SoC Drivers Updates for v4.7
+In-Reply-To: <CAMuHMdUbNcbLdQYG037MiDRAe1dr7ohRK625vb16oM8W19WEFw@mail.gmail.com>
+References: <cover.1459732456.git.horms+renesas@verge.net.au>
+ <20160413194354.GQ19945@localhost>
+ <CAMuHMdUbNcbLdQYG037MiDRAe1dr7ohRK625vb16oM8W19WEFw@mail.gmail.com>
+Message-ID: <20160413202328.GS19945@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 04, 2016 at 10:23:15AM +0900, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Wed, Apr 13, 2016 at 09:57:39PM +0200, Geert Uytterhoeven wrote:
+> Hi Olof,
 > 
-> Please consider these Renesas ARM based SoC DT updates for v4.7.
+> On Wed, Apr 13, 2016 at 9:43 PM, Olof Johansson <olof@lixom.net> wrote:
+> > On Mon, Apr 04, 2016 at 10:22:56AM +0900, Simon Horman wrote:
+> >> Please consider these Renesas ARM based SoC drivers updates for v4.7.
+> >>
+> >>
+> >> The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+> >>
+> >>   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+> >>
+> >> are available in the git repository at:
+> >>
+> >>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-drivers-for-v4.7
+> >>
+> >> for you to fetch changes up to cd89841fc6dbb6dc11aa113769f39dcd30be720f:
+> >>
+> >>   ARM: shmobile: timer: Drop support for Cortex A8 (2016-03-28 09:01:31 +0900)
+> >>
+> >> ----------------------------------------------------------------
+> >> Renesas ARM Based SoC Drivers Updates for v4.7
+> >>
+> >> Loop delay calculation updates:
+> >> * Remove check for no longer supported Cortex A8 cores
+> >> * Correct short calculation of delay
+> >>
+> >> ----------------------------------------------------------------
+> >> Geert Uytterhoeven (2):
+> >>       ARM: shmobile: timer: Fix preset_lpj leading to too short delays
+> >>       ARM: shmobile: timer: Drop support for Cortex A8
+> >
+> > I don't understand your naming. THis isn't driver code, this is SoC code.
+> >
+> > Anyway, I replied to the drop-A8 patch, the resulting function doesn't make
+> > much sense once that code path is removed (div is always 1). Seems like this
+> > should be cleaned up in other ways instead.
+> >
+> > So, not merging this branch for now since I think it should be revisited.
 > 
-> 
-> The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
-> 
->   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-for-v4.7
-> 
-> for you to fetch changes up to 64abfd0a89ae1c7e0edcc6744198842e706c0b52:
-> 
->   ARM: dts: r8a7791: Use USB3.0 fallback compatibility string (2016-03-28 09:03:37 +0900)
-> 
-> ----------------------------------------------------------------
-> Renesas ARM Based SoC DT Updates for v4.7
-> 
-> * Correct interrupt type for ARM TWD in DT of r8a7779 and sh73a0 SoCs
-> * Add IIC support to DT of r8a7794 SoC
-> * Add CAN support to DT of r8a7793 and r8a7794 SoCs
-> * Add SCIF2 support to r8a7790 device tree
-> * Reference both DMA controllers in MMCIF, SDHI, QSPI HSCIF, SFIFA, SCIFB
->   and IIC nodes of r8a7790, r8a7791 r8a7793 and r8a7794 SoCs.
-> * Use CAN, JPU and USB3.0 fallback compatibility string
->   in DT of r8a7791 and r8a7790 SoCs
+> The reason these are small separate patches is because especially the
+> first one may be backported to stable, as it's a real bug fix.
 
-Hi,
-
-I had comments on the DMA controller additions, see reply on the specific
-patch.
-
-Branch not merged at this time.
+Ok, so then the second shouldn't just remove cortex-a8, but rework the function
+(yet again).
 
 
 -Olof
