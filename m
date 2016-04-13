@@ -1,34 +1,56 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 13 Apr 2016 13:05:10 -0300
-Subject: [PATCH] PCI: imx6: Implement reset sequence for i.MX6+
-In-Reply-To: <1460562685-15168-1-git-send-email-asmirnov@spaceflightindustries.com>
-References: <1460562685-15168-1-git-send-email-asmirnov@spaceflightindustries.com>
-Message-ID: <CAOMZO5Bppic3N+wmYWCOc1nFNPLF4TADTTx41V-mqpgce5EXLQ@mail.gmail.com>
+From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
+Date: Wed, 13 Apr 2016 17:07:56 +0100
+Subject: [RFC PATCH 00/45] KVM: arm/arm64: Rework virtual GIC emulation
+In-Reply-To: <20160331183019.GK4126@cbox>
+References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
+ <20160331183019.GK4126@cbox>
+Message-ID: <570E6EDC.5070209@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrey,
+On 31/03/16 19:30, Christoffer Dall wrote:
+> On Fri, Mar 25, 2016 at 02:04:23AM +0000, Andre Przywara wrote:
+>> This series is a joint effort to re-implement KVM's GIC emulation.
+>>
+>> While the current implementation is centered around providing
+>> efficient MMIO emulation, the hot path for most guests is actually
+>> the guest entry and exit, which currently is rather costly.
+>> Also the existing emulation has a global distributor lock, which
+>> quickly becomes a bottleneck once the number of VCPUs increases.
+>> Additionally the emulation was originally designed for GICv2, adding
+>> GICv3 ITS emulation support to this proved to be rather painful.
+>> Last, but not least the existing code became less and less
+>> maintainable, with many special cases handled explicitly.
+>>
+>> The new implementation is build around a struct vgic_irq data data
+>> structure, which holds all information about a virtual interrupt.
+>> Interruts which should be injected are hold in a per-VCPU list, this
+>> make the entry/exit path much more efficient. Also the new structure
+>> allows to have more fine grained locking - per IRQ and per VCPU -
+>> getting rid of the global distributor lock.
+>> As a result of the new design ITS emulation fits in more nicely, the
+>> respective code will be provided as a follow-up series.
+>>
+>> This series implements the same feature set as the existing emulation,
+>> as a goodie we now implement priorities correctly.
+>> To allow an easy transition with good test coverage, but still maintain
+>> stability, both implementations live side by side, selectable via a
+>> Kconfig option. The default is the new implementation.
+>> If this code proves to be reliable, we will later remove the current
+>> implementation with an extra patch set.
+>>
+>> Please have a look at the series, review it and give the code some
+>> serious testing (and possibly debugging). All feedback is appreciated.
+>>
+> 
+> Hmph, starting a guest a couple of times and running hackbench inside
+> the guest actually gave me (twice) the following error:
+> 
+> NMI watchdog: BUG: soft lockup - CPU#0 stuck for 23s! [kworker/0:0:4]
 
-On Wed, Apr 13, 2016 at 12:51 PM, Andrey Smirnov
-<andrew.smirnov@gmail.com> wrote:
-> I.MX6+ has a dedicated bit for reseting PCIe core, which should be used
-> instead of a regular reset sequence since using the latter will hang the
-> SoC.
->
-> This commit is based on c34068d48273e24d392d9a49a38be807954420ed from
-> http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git
->
-> Signed-off-by: Andrey Smirnov <asmirnov@spaceflightindustries.com>
-> ---
->  arch/arm/boot/dts/imx6qp.dtsi               |  3 ++
+On the host or in the guest?
+Can you reproduce it easily? If yes, can you add some lock debugging to
+see if we are stuck in a spinlock?
 
-Please put the ARM change into a separate patch.
-
->  static const struct of_device_id imx6_pcie_of_match[] = {
->         { .compatible = "fsl,imx6q-pcie", },
-> +       { .compatible = "fsl,imx6qp-pcie", },
-
-Please base your patch against
-https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/log/?h=pci/host-imx6
-
-,as there is mx6sx support now in this branch.
+Cheers,
+Andre.
