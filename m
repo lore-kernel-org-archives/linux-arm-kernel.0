@@ -1,29 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 14 Apr 2016 09:48:49 +0100
-Subject: [Question] refcount of DT node
-In-Reply-To: <CAK7LNATFUW2KXUpFas6C_SJ0C7Qb1DWU0njLg-FCYciK2U6Oag@mail.gmail.com>
-References: <CAK7LNATFUW2KXUpFas6C_SJ0C7Qb1DWU0njLg-FCYciK2U6Oag@mail.gmail.com>
-Message-ID: <20160414084849.GT19428@n2100.arm.linux.org.uk>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 14 Apr 2016 10:52:43 +0200
+Subject: [PATCH 3/6] ARM: PSCI: Register with kernel restart handler
+In-Reply-To: <20160414004223.GA18564@roeck-us.net>
+References: <1460120039-2497-1-git-send-email-linux@roeck-us.net>
+ <1460120039-2497-4-git-send-email-linux@roeck-us.net>
+ <20160413110519.GE32018@leverpostej>
+ <570E4550.5000207@roeck-us.net>
+ <CAMuHMdU+vj4HDTLdXngUsTjF-Ki-HtbhoRU6mV7UKCz-BhFAtQ@mail.gmail.com>
+ <20160414004223.GA18564@roeck-us.net>
+Message-ID: <20160414085242.GB1533@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 14, 2016 at 04:47:57PM +0900, Masahiro Yamada wrote:
-> Hi experts.
+
+> That makes things quite tricky. Best I can think of is a series of boolean
+> devicetree properties, such as
 > 
-> My understanding of refcount of DT node is poor.
+> 	broken-reset-handler
+> 	last-resort-restart-handler
+> 	secondary-restart-handler
+> 	default-restart-handler
+> 	primary-restart-handler
+> 
+> which ends up being quite similar to the 'restart-priority' property. I'll
+> do this as follow-up patch, though
 
-The message from DT people is... don't worry about DT node refcounting.
-Do whatever you want with it, they don't care whether you have correct
-refcounting or not.
+Please CC me on this. I wanted to tackle this problem as well today. My
+findings/conclusions so far:
 
-The background behind that is that I've tried to fix the refcounting,
-and even had the coccinelle people generate some stuff to work on this
-issue, but DT people's attitude towards it is "don't bother".
+* There is one driver bringing 'priority' directly to DT already: gpio-restart
 
-So yes, people may get it wrong, but it seems it's something that DT
-people want ignored.
+* Watchdog priorities are board dependant
 
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+* Having the priorities clear at boot-time is safer than configuring them
+  at run-time
+
+* The linux scheme (0-255) shouldn't be enforced in DT
+
+So, I wondered about a "priority" binding which just states "the higher,
+the more important". Then any OS can decide what to do with it. In the
+Linux case, this could be: sort them and give them priority 256 -
+position_in_sorted_list.
+
+Opinions?
+
+> - I do not see the point holding up the series for this, and it is
+> really a separate problem.
+
+Ack.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160414/86dea876/attachment-0001.sig>
