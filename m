@@ -1,241 +1,123 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 14 Apr 2016 11:22:46 +0100
-Subject: [PATCH V2 2/9] ras: acpi/apei: cper: generic error data entry v3
- per ACPI 6.1
-In-Reply-To: <1459955578-24602-3-git-send-email-tbaicar@codeaurora.org>
-References: <1459955578-24602-1-git-send-email-tbaicar@codeaurora.org>
- <1459955578-24602-3-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <570F6F76.3060804@arm.com>
+From: pantelis.antoniou@konsulko.com (Pantelis Antoniou)
+Date: Thu, 14 Apr 2016 13:40:30 +0300
+Subject: [Question] refcount of DT node
+In-Reply-To: <20160414101053.GC10273@leverpostej>
+References: <CAK7LNATFUW2KXUpFas6C_SJ0C7Qb1DWU0njLg-FCYciK2U6Oag@mail.gmail.com>
+ <20160414101053.GC10273@leverpostej>
+Message-ID: <EF5FABC1-E74B-4154-8F20-A21DC6E01AB5@konsulko.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/16 16:12, Tyler Baicar wrote:
-> Currently when a RAS error is reported it is not timestamped.
-> The ACPI 6.1 spec adds the timestamp field to the generic error
-> data entry v3 structure. The timestamp of when the firmware
-> generated the error is now being reported.
->
-> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-> Signed-off-by: Richard Ruigrok <rruigrok@codeaurora.org>
-> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
-> ---
->   drivers/acpi/apei/ghes.c    |  35 ++++++++++++--
->   drivers/firmware/efi/cper.c | 111 +++++++++++++++++++++++++++++++++++++-------
->   2 files changed, 126 insertions(+), 20 deletions(-)
->
-> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-> index 9b0543e..a6848706 100644
-> --- a/drivers/acpi/apei/ghes.c
-> +++ b/drivers/acpi/apei/ghes.c
-> @@ -419,7 +419,15 @@ static void ghes_handle_memory_failure(struct acpi_hest_generic_data *gdata, int
->   	int flags = -1;
->   	int sec_sev = ghes_severity(gdata->error_severity);
->   	struct cper_sec_mem_err *mem_err;
-> -	mem_err = (struct cper_sec_mem_err *)(gdata + 1);
-> +	struct acpi_hest_generic_data_v300 *gdata_v3 = NULL;
-> +
-> +	if ((gdata->revision >> 8) >= 0x03)
+Hi Mark,
 
-Could we please make that a macro ? We seem to be using the check everywhere.
+> On Apr 14, 2016, at 13:10 , Mark Rutland <mark.rutland@arm.com> wrote:
+> 
+> On Thu, Apr 14, 2016 at 04:47:57PM +0900, Masahiro Yamada wrote:
+>> Hi experts.
+>> 
+>> My understanding of refcount of DT node is poor.
+>> Please help me understand it correctly.
+>> 
+>> Sorry if I am asking stupid questions.
+>> 
+>> 
+>> [1] Does this reference count exist for Overlay?
+>>    Is a node freed when its refcount becomes zero?
+> 
+> I'm not familiar with the way that overlays are intended to work, but
+> generally this is true, and I believe the same applies.
+> 
+> Pantelis, please correct me if I am wrong on that front.
+> 
 
-> +		gdata_v3 = (struct acpi_hest_generic_data_v300 *)gdata;
-> +
-> +	if (gdata_v3)
-> +		mem_err = (struct cper_sec_mem_err *)(gdata_v3 + 1);
-> +	else
-> +		mem_err = (struct cper_sec_mem_err *)(gdata + 1);
->
->   	if (!(mem_err->validation_bits & CPER_MEM_VALID_PA))
->   		return;
-> @@ -449,14 +457,27 @@ static void ghes_do_proc(struct ghes *ghes,
->   {
->   	int sev, sec_sev;
->   	struct acpi_hest_generic_data *gdata;
-> +	struct acpi_hest_generic_data_v300 *gdata_v3 = NULL;
-> +	uuid_le sec_type;
->
->   	sev = ghes_severity(estatus->error_severity);
->   	apei_estatus_for_each_section(estatus, gdata) {
->   		sec_sev = ghes_severity(gdata->error_severity);
-> -		if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
-> +		sec_type = *(uuid_le *)gdata->section_type;
-> +
-> +		if ((gdata->revision >> 8) >= 0x03)
-> +			gdata_v3 = (struct acpi_hest_generic_data_v300 *)gdata;
-> +
-> +		if (!uuid_le_cmp(sec_type,
->   				 CPER_SEC_PLATFORM_MEM)) {
->   			struct cper_sec_mem_err *mem_err;
-> -			mem_err = (struct cper_sec_mem_err *)(gdata+1);
-> +
-> +			if (gdata_v3)
-> +				mem_err = (struct cper_sec_mem_err *)
-> +					  (gdata_v3 + 1);
-> +			else
-> +				mem_err = (struct cper_sec_mem_err *)
-> +					  (gdata + 1);
->   			ghes_edac_report_mem_error(ghes, sev, mem_err);
->
->   			arch_apei_report_mem_error(sev, mem_err);
-> @@ -466,7 +487,13 @@ static void ghes_do_proc(struct ghes *ghes,
->   		else if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
->   				      CPER_SEC_PCIE)) {
->   			struct cper_sec_pcie *pcie_err;
-> -			pcie_err = (struct cper_sec_pcie *)(gdata+1);
-> +
-> +			if (gdata_v3)
-> +				pcie_err = (struct cper_sec_pcie *)
-> +					   (gdata_v3 + 1);
-> +			else
-> +				pcie_err = (struct cper_sec_pcie *)
-> +					   (gdata + 1);
->   			if (sev == GHES_SEV_RECOVERABLE &&
->   			    sec_sev == GHES_SEV_RECOVERABLE &&
->   			    pcie_err->validation_bits & CPER_PCIE_VALID_DEVICE_ID &&
-> diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
-> index d425374..23f62962 100644
-> --- a/drivers/firmware/efi/cper.c
-> +++ b/drivers/firmware/efi/cper.c
-> @@ -32,6 +32,8 @@
->   #include <linux/acpi.h>
->   #include <linux/pci.h>
->   #include <linux/aer.h>
-> +#include <linux/printk.h>
-> +#include <linux/bcd.h>
->
->   #define INDENT_SP	" "
->
-> @@ -392,6 +394,10 @@ static void cper_estatus_print_section(
->   	uuid_le *sec_type = (uuid_le *)gdata->section_type;
->   	__u16 severity;
->   	char newpfx[64];
-> +	struct acpi_hest_generic_data_v300 *gdata_v3 = NULL;
-> +
-> +	if ((gdata->revision >> 8) >= 0x03)
-> +		gdata_v3 = (struct acpi_hest_generic_data_v300 *)gdata;
->
->   	severity = gdata->error_severity;
->   	printk("%s""Error %d, type: %s\n", pfx, sec_no,
-> @@ -403,14 +409,24 @@ static void cper_estatus_print_section(
->
->   	snprintf(newpfx, sizeof(newpfx), "%s%s", pfx, INDENT_SP);
->   	if (!uuid_le_cmp(*sec_type, CPER_SEC_PROC_GENERIC)) {
-> -		struct cper_sec_proc_generic *proc_err = (void *)(gdata + 1);
-> +		struct cper_sec_proc_generic *proc_err;
-> +
-> +		if (gdata_v3)
-> +			proc_err = (void *)(gdata_v3 + 1);
-> +		else
-> +			proc_err = (void *)(gdata + 1);
->   		printk("%s""section_type: general processor error\n", newpfx);
->   		if (gdata->error_data_length >= sizeof(*proc_err))
->   			cper_print_proc_generic(newpfx, proc_err);
->   		else
->   			goto err_section_too_small;
->   	} else if (!uuid_le_cmp(*sec_type, CPER_SEC_PLATFORM_MEM)) {
-> -		struct cper_sec_mem_err *mem_err = (void *)(gdata + 1);
-> +		struct cper_sec_mem_err *mem_err;
-> +
-> +		if (gdata_v3)
-> +			mem_err = (void *)(gdata_v3 + 1);
-> +		else
-> +			mem_err = (void *)(gdata + 1);
->   		printk("%s""section_type: memory error\n", newpfx);
->   		if (gdata->error_data_length >=
->   		    sizeof(struct cper_sec_mem_err_old))
-> @@ -419,7 +435,12 @@ static void cper_estatus_print_section(
->   		else
->   			goto err_section_too_small;
->   	} else if (!uuid_le_cmp(*sec_type, CPER_SEC_PCIE)) {
-> -		struct cper_sec_pcie *pcie = (void *)(gdata + 1);
-> +		struct cper_sec_pcie *pcie;
-> +
-> +		if (gdata_v3)
-> +			pcie = (void *)(gdata_v3 + 1);
-> +		else
-> +			pcie = (void *)(gdata + 1);
+Yes, if the refcount goes to zero everything is released.
+No that doesn?t always imply freeing memory.
 
+>> [2] When of_node_put() should be called,
+>>     or should not be called?
+>> 
+>> 
+>> Shouldn't of_node_put() be called
+>> when we are still referencing to any of its properties?
+>> 
+>> For example,  cpu_read_enable_method()
+>> in arch/arm64/kernel/cpu_ops.c
+>> returns a pointer to the property value
+>> instead of creating a copy of it.
+>> 
+>> In this case, of_node_put() should not be called
+>> because we are still referencing the DT property
+>> (in other words, referencing to the DT node indirectly).
+>> 
+>> Am I right?
+> 
+> Yes, the node should not be freed while its data is referred to.
+> 
+> We are leaking a ref there, though, as we no longer refer to that data
+> after cpu_read_ops().
+> 
+> Fixing that will require some restructuring. We don't expect a CPU node
+> to need to disappear, so while it's currently not strictly correct the
+> code shouldn't lead to any adverse behaviour.
+> 
 
-The only use of the gdata_v3 above cases is to get the payload(or error_record).
-So instead of spilling these checks all over could we use something like :
+So let me explain a bit.
 
-#define acpi_hest_generic_data_version(gdata) \
-	(gdata->revision >> 8)
+Due to historical reasons by default nodes and property contents are not dynamically
+allocated, they are merely being pointed at in the binary blob that was passed on
+during boot.
 
-static inline void *
-acpi_hest_generic_data_payload(struct acpi_hest_generic_data *gdata)
-{
-	return acpi_hest_generic_data_version(gdata) >= 3 ?
-		((struct acpi_hest_generic_data_v300 *)(gdata)) + 1 :
-		gdata + 1;
-}
+This all takes place in __unflatten_device_tree and there is an allocator argument for
+allocating the device_node & properties structures. The content pointers of those structures
+are directly pointing in the binary blob.
 
-And then do :
+Early in the boot process the allocator used is not the standard kmalloc allocator; this does
+not support freeing the structures at all.
 
-	void *payload = acpi_hest_generic_data_payload(gdata);
+Dynamic DT instead kmalloc?s everything; this is marked by using the node flag OF_DYNAMIC.
 
+So when a node is released a check is performed whether OF_DYNAMIC is set.
 
->   		printk("%s""section_type: PCIe error\n", newpfx);
->   		if (gdata->error_data_length >= sizeof(*pcie))
->   			cper_print_pcie(newpfx, pcie, gdata);
-> @@ -434,10 +455,38 @@ err_section_too_small:
->   	pr_err(FW_WARN "error section length is too small\n");
->   }
->
-> +static void cper_estatus_print_section_v300(const char *pfx,
-> +	const struct acpi_hest_generic_data_v300 *gdata, int sec_no)
-> +{
-> +	__u8 hour, min, sec, day, mon, year, century, *timestamp;
-> +
-> +	if (gdata->validation_bits & ACPI_HEST_GEN_VALID_TIMESTAMP) {
-> +		timestamp = (__u8 *)&(gdata->time_stamp);
-> +		memcpy(&sec, timestamp, 1);
-> +		memcpy(&min, timestamp + 1, 1);
-> +		memcpy(&hour, timestamp + 2, 1);
-> +		memcpy(&day, timestamp + 4, 1);
-> +		memcpy(&mon, timestamp + 5, 1);
-> +		memcpy(&year, timestamp + 6, 1);
-> +		memcpy(&century, timestamp + 7, 1);
-> +		printk("%stime: ", pfx);
-> +		printk("%7s", 0x01 & *(timestamp + 3) ? "precise" : "");
-> +		printk(" %02d:%02d:%02d %02d%02d-%02d-%02d\n",
-> +			bcd2bin(hour), bcd2bin(min), bcd2bin(sec),
-> +			bcd2bin(century), bcd2bin(year), bcd2bin(mon),
-> +			bcd2bin(day));
-> +	}
-> +
-> +	cper_estatus_print_section(pfx,
-> +				   (const struct acpi_hest_generic_data *)gdata,
-> +				   sec_no);
-> +}
+There is an additional complication with properties. Since DT property methods (like of_get_property)
+return a pointer to property value it is generally not safe to free a property. So when a property
+is removed (but the node still exists) it is placed on the node?s deadprops list which may reside
+until the node is released.
 
+Hope this makes things clearer.
 
-Wouldn't it be better do the v3 header check from cper_erstatus_print_section() and call out
-to cper_erstatus_print_section_v300() ? That way, we can leave the callers unaffected,
-even for future changes.
+>> [3] Is the following code correct?
+>> 
+>>   np = of_find_compatible_node(NULL, NULL,"foo-node");
+>>   of_node_put(np);
+>>   ret = of_address_to_resource(np, 0, &res);
+>>   if (ret) {
+>>            pr_err("failed to get resource\n");
+>>            return ret;
+>>   }
+>> 
+>> Actually I wrote the code above, and it was applied.
+>> 
+>> But, the node is still referenced while of_address_to_resource() is being run.
+>> 
+>> So the correct code should be as follows?
+>> 
+>>   np = of_find_compatible_node(NULL, NULL,"foo-node");
+>>   ret = of_address_to_resource(np, 0, &res);
+>>   of_node_put(np);
+>>   if (ret) {
+>>            pr_err("failed to get resource\n");
+>>            return ret;
+>>   }
+> 
+> It is correctly balanced, yes.
+> 
+> If you don't need to keep the node for future use, this is fine.
+> 
 
+The second code fragment is the correct one.
 
-> +	if (gdata_v3) {
-> +		while (data_len >= sizeof(*gdata_v3)) {
-> +			gedata_len = gdata_v3->error_data_length;
-> +			cper_estatus_print_section_v300(newpfx, gdata_v3,
-> +							sec_no);
-> +			data_len -= gedata_len + sizeof(*gdata_v3);
-> +			gdata_v3 = (void *)(gdata_v3 + 1) + gedata_len;
-> +			sec_no++;
-> +		}
-> +	} else {
-> +		while (data_len >= sizeof(*gdata)) {
-> +			gedata_len = gdata->error_data_length;
-> +			cper_estatus_print_section(newpfx, gdata, sec_no);
-> +			data_len -= gedata_len + sizeof(*gdata);
-> +			gdata = (void *)(gdata + 1) + gedata_len;
-> +			sec_no++;
-> +		}
+> Mark.
 
-With the change mentioned above and storing the sizeof(), we could make this
-hunk a bit more cleaner.
+Regards
 
-
-Suzuki
+? Pantelis
