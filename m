@@ -1,42 +1,73 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Thu, 14 Apr 2016 10:12:52 +0530
-Subject: [PATCH] clk: samsung: exynos7: Don't gate CMU_{CCORE,
- FSYS0} blocks clock
-Message-ID: <1460608972-13878-1-git-send-email-alim.akhtar@samsung.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 14 Apr 2016 06:52:53 +0200
+Subject: [PATCH v2 1/2] dt-bindings: modify document of Rockchip power
+ domains
+In-Reply-To: <1460599856-4224-2-git-send-email-zhangqing@rock-chips.com>
+References: <1460599856-4224-1-git-send-email-zhangqing@rock-chips.com>
+ <1460599856-4224-2-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <21803486.DAfo7MBcca@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds CLK_IS_CRITICAL flag to ACLK_CCORE_133 and ACLK_FSYS0_200
-clocks. These clocks are critical for accessing CMU_CCORE and CMU_FSYS0
-blocks registers. Let these clocks to be enabled all the time.
+Hi Elaine,
 
-Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
----
- drivers/clk/samsung/clk-exynos7.c |    5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+Am Donnerstag, 14. April 2016, 10:10:55 schrieb Elaine Zhang:
+> Add qos example for power domain which found on Rockchip SoCs.
+> These qos register description in TRMs
+> (rk3036, rk3228, rk3288, rk3366, rk3368, rk3399) looks the same.
+> 
+> Changes in v2:
+> 	No Changes.
 
-diff --git a/drivers/clk/samsung/clk-exynos7.c b/drivers/clk/samsung/clk-exynos7.c
-index ad68d46..03a82da 100644
---- a/drivers/clk/samsung/clk-exynos7.c
-+++ b/drivers/clk/samsung/clk-exynos7.c
-@@ -146,7 +146,7 @@ static struct samsung_pll_rate_table pll1460x_24mhz_tbl[] __initdata = {
- 
- static struct samsung_gate_clock topc_gate_clks[] __initdata = {
- 	GATE(ACLK_CCORE_133, "aclk_ccore_133", "dout_aclk_ccore_133",
--		ENABLE_ACLK_TOPC0, 4, 0, 0),
-+		ENABLE_ACLK_TOPC0, 4, CLK_IS_CRITICAL, 0),
- 
- 	GATE(ACLK_MSCL_532, "aclk_mscl_532", "dout_aclk_mscl_532",
- 		ENABLE_ACLK_TOPC1, 20, 0, 0),
-@@ -539,7 +539,8 @@ static struct samsung_gate_clock top1_gate_clks[] __initdata = {
- 		ENABLE_SCLK_TOP1_FSYS11, 12, CLK_SET_RATE_PARENT, 0),
- 
- 	GATE(CLK_ACLK_FSYS0_200, "aclk_fsys0_200", "dout_aclk_fsys0_200",
--		ENABLE_ACLK_TOP13, 28, CLK_SET_RATE_PARENT, 0),
-+		ENABLE_ACLK_TOP13, 28, CLK_SET_RATE_PARENT |
-+		CLK_IS_CRITICAL, 0),
- 	GATE(CLK_ACLK_FSYS1_200, "aclk_fsys1_200", "dout_aclk_fsys1_200",
- 		ENABLE_ACLK_TOP13, 24, CLK_SET_RATE_PARENT, 0),
- 
--- 
-1.7.10.4
+Changelogs please below the "---" below your Signed-off-by and not as part of 
+the commit message.
+
+Also could please check if a commit message like
+
+---- 8< ----
+Rockchip SoCs contain quality of service (qos) blocks managing priority, 
+bandwidth, etc of the connection of each domain to the interconnect.
+These blocks loose state when their domain gets disabled and therefore
+need to be saved when disabling and restored when enabling a power-domain.
+
+These qos blocks also are similar over all currently available Rockchip 
+SoCs.
+---- 8< ----
+
+works for you? [See replies to your v1 series]
+
+> 
+> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+> ---
+
+[changelog here]
+
+>  Documentation/devicetree/bindings/soc/rockchip/power_domain.txt | 8
+> ++++++++ 1 file changed, 8 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
+> b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt index
+> 98085c888d65..6c571a40cd31 100644
+> --- a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
+> +++ b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
+> @@ -21,6 +21,13 @@ Required properties for power domain sub nodes:
+>  - clocks (optional): phandles to clocks which need to be enabled while
+> power domain switches state.
+> 
+> +Qos Example:
+> +
+> +	qos_gpu: qos_gpu at ffaf0000 {
+> +		compatible ="syscon";
+> +		reg = <0x0 0xffaf0000 0x0 0x20>;
+> +	};
+> +
+>  Example:
+> 
+>  	power: power-controller {
+> @@ -32,6 +39,7 @@ Example:
+>  		pd_gpu {
+>  			reg = <RK3288_PD_GPU>;
+>  			clocks = <&cru ACLK_GPU>;
+> +			pm_qos = <&qos_gpu>;
+>  		};
+>  	};
