@@ -1,62 +1,72 @@
-From: xinliang.liu@linaro.org (Xinliang Liu)
-Date: Thu, 14 Apr 2016 14:46:03 +0800
-Subject: [PATCH v8 10/10] MAINTAINERS: Add maintainer for hisilicon DRM
- driver
-In-Reply-To: <CACvgo53zwoid+dWNRAX=iwAvO50Eg3k13+1mJtQcTjKVQJebQA@mail.gmail.com>
-References: <1460364943-76135-1-git-send-email-xinliang.liu@linaro.org>
- <1460364943-76135-11-git-send-email-xinliang.liu@linaro.org>
- <CACvgo53zwoid+dWNRAX=iwAvO50Eg3k13+1mJtQcTjKVQJebQA@mail.gmail.com>
-Message-ID: <CAGd==07vOOQpusTXVDDaw5=7CTguiw4kCFqbWU9pKUQn+gF9Bg@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu, 14 Apr 2016 08:54:40 +0200
+Subject: [PATCH 0/3] ARM: OXNAS pull request for 4.7
+In-Reply-To: <20160413175404.GF19945@localhost>
+References: <1459521689-13962-1-git-send-email-narmstrong@baylibre.com>
+ <20160413175404.GF19945@localhost>
+Message-ID: <570F3EB0.50509@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 April 2016 at 19:54, Emil Velikov <emil.l.velikov@gmail.com> wrote:
-> Hi Xinliang,
->
-> On 11 April 2016 at 09:55, Xinliang Liu <xinliang.liu@linaro.org> wrote:
->> Add maintainer and reviewer for hisilicon DRM driver.
+On 04/13/2016 07:54 PM, Olof Johansson wrote:
+> On Fri, Apr 01, 2016 at 04:41:29PM +0200, Neil Armstrong wrote:
+>> This is the ARM pull request for the OXNAS platform.
+>> It also includes one-line change into irq-versatile-fpga.
 >>
->> v8: None.
->> v7: None.
->> v6: None.
->> v5: None.
->> v4:
->> - Add Chen Feng <puck.chen@hisilicon.com> as Designated reviewer.
->> v3: First version.
+>> The following changes since commit 1e6d88ccf41c7ef2d6c99aa5e7fb9215aa0e5423:
 >>
->> Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
->> ---
->>  MAINTAINERS | 10 ++++++++++
->>  1 file changed, 10 insertions(+)
+>>   Merge tag 'nios2-v4.6-rc2' of git://git.kernel.org/pub/scm/linux/kernel/git/lftan/nios2 (2016-03-30 20:40:42 -0500)
 >>
->> diff --git a/MAINTAINERS b/MAINTAINERS
->> index 61a323a6b2cf..a2ef58860689 100644
->> --- a/MAINTAINERS
->> +++ b/MAINTAINERS
->> @@ -3840,6 +3840,16 @@ S:       Maintained
->>  F:     drivers/gpu/drm/gma500
->>  F:     include/drm/gma500*
+>> are available in the git repository at:
 >>
->> +DRM DRIVERS FOR HISILICON
->> +M:     Xinliang Liu <z.liuxinliang@hisilicon.com>
->> +R:     Xinwei Kong <kong.kongxinwei@hisilicon.com>
->> +R:     Chen Feng <puck.chen@hisilicon.com>
->> +L:     dri-devel at lists.freedesktop.org
->> +T:     git git://github.com/xin3liang/linux.git
->> +S:     Maintained
->> +F:     drivers/gpu/drm/hisilicon
->> +F:     Documentation/devicetree/bindings/display/hisilicon
-> Nit: Can you add append '/' on these two lines.
->
-> As mentioned in commit 144308139cdce95e9c6cff3cc0ef12242181665f
->
-> "It's clearer to have patterns marked as directories."
+>>   https://github.com/superna9999/linux.git tags/ox810se-arm
+>>
+>> for you to fetch changes up to b4f122cdd148696e0d8c5f815ac48c5b9ed9de3f:
+>>
+>>   MAINTAINERS: add maintainer entry for ARM/OXNAS platform (2016-04-01 15:51:54 +0200)
+>>
+>> ----------------------------------------------------------------
+>> ARM: Add OXNAS Platform Support
+>>
+>> Changes since original v3 patchset :
+>> - Get rid of PLX Technology
+>>
+>> v3 patchset : http://lkml.kernel.org/r/1458838215-23314-1-git-send-email-narmstrong at baylibre.com
 
-Sure Emil, I will fix this. Thanks to notice me this.
+Hi Olof,
+> Hi Neil,
+> 
+> This branch seems to start from an arbitrary point and not an -rc. We want
+> branches only starting at -rc releases, please.
+OK, I wasn't aware of this point, I'll send back from an -rc release.
+
+> 
+> For a new platform like this, while patch volume is low, it might be easier to
+> just submit patches that we apply directly.
+Sure, Arnd asked me to submit a pull request instead.
+
+> 
+> Some further questions: We usually try to add mach directories per vendor so we
+> don't get large number of them. Would it make sense to call it something else
+> than OxNAS here? I saw some patches posted referring to PLX instead of Oxford
+> Semi as well. What's up with that?
+This is a rather complex situation, OxNas is the SoC family, and AFAIK only two SoCs
+from Oxford Semiconductor, which was bought by Avago which is now Broadcom, are only
+in well known NAS products and sticks (OX810 and OX820).
+Here OxNas makes far more sense than Oxsemi, and matches the other drivers with the
+oxnas naming.
+
+> 
+> There's an overall lack of documentation of the platform in the initial patches
+> as well. An overview of it, maybe with links to product information, etc, is
+> useful.
+
+Do you mean in the oxnas platform bindings ?
+
+> 
+> 
+> -Olof
+> 
 
 Thanks,
--xinliang
-
->
-> Thanks
-> Emil
+Neil
