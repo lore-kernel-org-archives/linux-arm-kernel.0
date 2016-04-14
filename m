@@ -1,171 +1,177 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 14 Apr 2016 14:21:00 +0100
-Subject: [PATCH v2 12/17] kvm-arm: Add explicit hyp page table modifiers
+Date: Thu, 14 Apr 2016 14:21:04 +0100
+Subject: [PATCH v2 16/17] kvm-arm: Cleanup stage2 pgd handling
 In-Reply-To: <1460640065-27658-1-git-send-email-suzuki.poulose@arm.com>
 References: <1460640065-27658-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1460640065-27658-13-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1460640065-27658-17-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have common routines to modify hyp and stage2 page tables
-based on the 'kvm' parameter. For a smoother transition to
-using separate routines for each, duplicate the routines
-and modify the copy to work on hyp.
+Now that we don't have any fake page table levels for arm64,
+cleanup the common code to get rid of the dead code.
 
-Marks the forked routines with _hyp_ and gets rid of the
-kvm parameter which is no longer needed and is NULL for hyp.
-Also, gets rid of calls to kvm_tlb_flush_by_vmid_ipa() calls
-from the hyp versions. Uses explicit host page table accessors
-instead of the kvm_* page table helpers.
-
-Suggested-by: Christoffer Dall <christoffer.dall@linaro.org>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+
 ---
 Changes since V1:
- - Remove flush_dcache for !device_pfns in unmap_hyp_ptes()
- - Remove huge pmd/pud checks in unmap_hyp_p.ds, since we don't
-   use huge mappings
- - Add a comment in unmap_hyp_range() on why we don't invalidate
-   TLBs.
+ - Un-inline kvm_alloc_hwpgd(), kvm_get_hwpgd_size()
 ---
- arch/arm/kvm/mmu.c |  104 +++++++++++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 99 insertions(+), 5 deletions(-)
+ arch/arm/include/asm/kvm_mmu.h   |   19 -------------------
+ arch/arm/kvm/arm.c               |    2 +-
+ arch/arm/kvm/mmu.c               |   37 ++++++-------------------------------
+ arch/arm64/include/asm/kvm_mmu.h |   18 ------------------
+ 4 files changed, 7 insertions(+), 69 deletions(-)
 
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 50aa901..f8b7920 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -146,25 +146,6 @@ static inline bool kvm_page_empty(void *ptr)
+ #define hyp_pmd_table_empty(pmdp) kvm_page_empty(pmdp)
+ #define hyp_pud_table_empty(pudp) (0)
+ 
+-static inline void *kvm_get_hwpgd(struct kvm *kvm)
+-{
+-	return kvm->arch.pgd;
+-}
+-
+-static inline unsigned int kvm_get_hwpgd_size(void)
+-{
+-	return PTRS_PER_S2_PGD * sizeof(pgd_t);
+-}
+-
+-static inline pgd_t *kvm_setup_fake_pgd(pgd_t *hwpgd)
+-{
+-	return hwpgd;
+-}
+-
+-static inline void kvm_free_fake_pgd(pgd_t *pgd)
+-{
+-}
+-
+ struct kvm;
+ 
+ #define kvm_flush_dcache_to_poc(a,l)	__cpuc_flush_dcache_area((a), (l))
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index dded1b7..be4b639 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -448,7 +448,7 @@ static void update_vttbr(struct kvm *kvm)
+ 	kvm_next_vmid &= (1 << kvm_vmid_bits) - 1;
+ 
+ 	/* update vttbr to be used with the new vmid */
+-	pgd_phys = virt_to_phys(kvm_get_hwpgd(kvm));
++	pgd_phys = virt_to_phys(kvm->arch.pgd);
+ 	BUG_ON(pgd_phys & ~VTTBR_BADDR_MASK);
+ 	vmid = ((u64)(kvm->arch.vmid) << VTTBR_VMID_SHIFT) & VTTBR_VMID_MASK(kvm_vmid_bits);
+ 	kvm->arch.vttbr = pgd_phys | vmid;
 diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index f93f717..af526f6 100644
+index d3fa96e..42eefab 100644
 --- a/arch/arm/kvm/mmu.c
 +++ b/arch/arm/kvm/mmu.c
-@@ -388,6 +388,100 @@ static void stage2_flush_vm(struct kvm *kvm)
- 	srcu_read_unlock(&kvm->srcu, idx);
+@@ -43,6 +43,7 @@ static unsigned long hyp_idmap_start;
+ static unsigned long hyp_idmap_end;
+ static phys_addr_t hyp_idmap_vector;
+ 
++#define S2_PGD_SIZE	(PTRS_PER_S2_PGD * sizeof(pgd_t))
+ #define hyp_pgd_order get_order(PTRS_PER_PGD * sizeof(pgd_t))
+ 
+ #define KVM_S2PTE_FLAG_IS_IOMAP		(1UL << 0)
+@@ -736,20 +737,6 @@ int create_hyp_io_mappings(void *from, void *to, phys_addr_t phys_addr)
+ 				     __phys_to_pfn(phys_addr), PAGE_HYP_DEVICE);
  }
  
-+static void clear_hyp_pgd_entry(pgd_t *pgd)
-+{
-+	pud_t *pud_table __maybe_unused = pud_offset(pgd, 0UL);
-+	pgd_clear(pgd);
-+	pud_free(NULL, pud_table);
-+	put_page(virt_to_page(pgd));
-+}
-+
-+static void clear_hyp_pud_entry(pud_t *pud)
-+{
-+	pmd_t *pmd_table __maybe_unused = pmd_offset(pud, 0);
-+	VM_BUG_ON(pud_huge(*pud));
-+	pud_clear(pud);
-+	pmd_free(NULL, pmd_table);
-+	put_page(virt_to_page(pud));
-+}
-+
-+static void clear_hyp_pmd_entry(pmd_t *pmd)
-+{
-+	pte_t *pte_table = pte_offset_kernel(pmd, 0);
-+	VM_BUG_ON(pmd_thp_or_huge(*pmd));
-+	pmd_clear(pmd);
-+	pte_free_kernel(NULL, pte_table);
-+	put_page(virt_to_page(pmd));
-+}
-+
-+static void unmap_hyp_ptes(pmd_t *pmd, phys_addr_t addr, phys_addr_t end)
-+{
-+	pte_t *pte, *start_pte;
-+
-+	start_pte = pte = pte_offset_kernel(pmd, addr);
-+	do {
-+		if (!pte_none(*pte)) {
-+			kvm_set_pte(pte, __pte(0));
-+			put_page(virt_to_page(pte));
-+		}
-+	} while (pte++, addr += PAGE_SIZE, addr != end);
-+
-+	if (hyp_pte_table_empty(start_pte))
-+		clear_hyp_pmd_entry(pmd);
-+}
-+
-+static void unmap_hyp_pmds(pud_t *pud, phys_addr_t addr, phys_addr_t end)
-+{
-+	phys_addr_t next;
-+	pmd_t *pmd, *start_pmd;
-+
-+	start_pmd = pmd = pmd_offset(pud, addr);
-+	do {
-+		next = pmd_addr_end(addr, end);
-+		/* Hyp doesn't use huge pmds */
-+		if (!pmd_none(*pmd))
-+			unmap_hyp_ptes(pmd, addr, next);
-+	} while (pmd++, addr = next, addr != end);
-+
-+	if (hyp_pmd_table_empty(start_pmd))
-+		clear_hyp_pud_entry(pud);
-+}
-+
-+static void unmap_hyp_puds(pgd_t *pgd, phys_addr_t addr, phys_addr_t end)
-+{
-+	phys_addr_t next;
-+	pud_t *pud, *start_pud;
-+
-+	start_pud = pud = pud_offset(pgd, addr);
-+	do {
-+		next = pud_addr_end(addr, end);
-+		/* Hyp doesn't use huge puds */
-+		if (!pud_none(*pud))
-+			unmap_hyp_pmds(pud, addr, next);
-+	} while (pud++, addr = next, addr != end);
-+
-+	if (hyp_pud_table_empty(start_pud))
-+		clear_hyp_pgd_entry(pgd);
-+}
-+
-+static void unmap_hyp_range(pgd_t *pgdp, phys_addr_t start, u64 size)
-+{
-+	pgd_t *pgd;
-+	phys_addr_t addr = start, end = start + size;
-+	phys_addr_t next;
-+
-+	/*
-+	 * We don't unmap anything from HYP, except at the hyp tear down.
-+	 * Hence, we don't have to invalidate the TLBs here.
-+	 */
-+	pgd = pgdp + pgd_index(addr);
-+	do {
-+		next = pgd_addr_end(addr, end);
-+		if (!pgd_none(*pgd))
-+			unmap_hyp_puds(pgd, addr, next);
-+	} while (pgd++, addr = next, addr != end);
-+}
-+
+-/* Free the HW pgd, one page@a time */
+-static void kvm_free_hwpgd(void *hwpgd)
+-{
+-	free_pages_exact(hwpgd, kvm_get_hwpgd_size());
+-}
+-
+-/* Allocate the HW PGD, making sure that each page gets its own refcount */
+-static void *kvm_alloc_hwpgd(void)
+-{
+-	unsigned int size = kvm_get_hwpgd_size();
+-
+-	return alloc_pages_exact(size, GFP_KERNEL | __GFP_ZERO);
+-}
+-
  /**
-  * free_boot_hyp_pgd - free HYP boot page tables
-  *
-@@ -398,14 +492,14 @@ void free_boot_hyp_pgd(void)
- 	mutex_lock(&kvm_hyp_pgd_mutex);
+  * kvm_alloc_stage2_pgd - allocate level-1 table for stage-2 translation.
+  * @kvm:	The KVM struct pointer for the VM.
+@@ -764,29 +751,17 @@ static void *kvm_alloc_hwpgd(void)
+ int kvm_alloc_stage2_pgd(struct kvm *kvm)
+ {
+ 	pgd_t *pgd;
+-	void *hwpgd;
  
- 	if (boot_hyp_pgd) {
--		unmap_range(NULL, boot_hyp_pgd, hyp_idmap_start, PAGE_SIZE);
--		unmap_range(NULL, boot_hyp_pgd, TRAMPOLINE_VA, PAGE_SIZE);
-+		unmap_hyp_range(boot_hyp_pgd, hyp_idmap_start, PAGE_SIZE);
-+		unmap_hyp_range(boot_hyp_pgd, TRAMPOLINE_VA, PAGE_SIZE);
- 		free_pages((unsigned long)boot_hyp_pgd, hyp_pgd_order);
- 		boot_hyp_pgd = NULL;
+ 	if (kvm->arch.pgd != NULL) {
+ 		kvm_err("kvm_arch already initialized?\n");
+ 		return -EINVAL;
  	}
  
- 	if (hyp_pgd)
--		unmap_range(NULL, hyp_pgd, TRAMPOLINE_VA, PAGE_SIZE);
-+		unmap_hyp_range(hyp_pgd, TRAMPOLINE_VA, PAGE_SIZE);
+-	hwpgd = kvm_alloc_hwpgd();
+-	if (!hwpgd)
++	/* Allocate the HW PGD, making sure that each page gets its own refcount */
++	pgd = alloc_pages_exact(S2_PGD_SIZE, GFP_KERNEL | __GFP_ZERO);
++	if (!pgd)
+ 		return -ENOMEM;
  
- 	mutex_unlock(&kvm_hyp_pgd_mutex);
+-	/*
+-	 * When the kernel uses more levels of page tables than the
+-	 * guest, we allocate a fake PGD and pre-populate it to point
+-	 * to the next-level page table, which will be the real
+-	 * initial page table pointed to by the VTTBR.
+-	 */
+-	pgd = kvm_setup_fake_pgd(hwpgd);
+-	if (IS_ERR(pgd)) {
+-		kvm_free_hwpgd(hwpgd);
+-		return PTR_ERR(pgd);
+-	}
+-
+ 	kvm_clean_pgd(pgd);
+ 	kvm->arch.pgd = pgd;
+ 	return 0;
+@@ -874,8 +849,8 @@ void kvm_free_stage2_pgd(struct kvm *kvm)
+ 		return;
+ 
+ 	unmap_stage2_range(kvm, 0, KVM_PHYS_SIZE);
+-	kvm_free_hwpgd(kvm_get_hwpgd(kvm));
+-	kvm_free_fake_pgd(kvm->arch.pgd);
++	/* Free the HW pgd, one page at a time */
++	free_pages_exact(kvm->arch.pgd, S2_PGD_SIZE);
+ 	kvm->arch.pgd = NULL;
  }
-@@ -430,9 +524,9 @@ void free_hyp_pgds(void)
  
- 	if (hyp_pgd) {
- 		for (addr = PAGE_OFFSET; virt_addr_valid(addr); addr += PGDIR_SIZE)
--			unmap_range(NULL, hyp_pgd, KERN_TO_HYP(addr), PGDIR_SIZE);
-+			unmap_hyp_range(hyp_pgd, KERN_TO_HYP(addr), PGDIR_SIZE);
- 		for (addr = VMALLOC_START; is_vmalloc_addr((void*)addr); addr += PGDIR_SIZE)
--			unmap_range(NULL, hyp_pgd, KERN_TO_HYP(addr), PGDIR_SIZE);
-+			unmap_hyp_range(hyp_pgd, KERN_TO_HYP(addr), PGDIR_SIZE);
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index e3fee0a..249c4fc 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -141,24 +141,6 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
+ 	return (pmd_val(*pmd) & PMD_S2_RDWR) == PMD_S2_RDONLY;
+ }
  
- 		free_pages((unsigned long)hyp_pgd, hyp_pgd_order);
- 		hyp_pgd = NULL;
+-static inline void *kvm_get_hwpgd(struct kvm *kvm)
+-{
+-	return kvm->arch.pgd;
+-}
+-
+-static inline unsigned int kvm_get_hwpgd_size(void)
+-{
+-	return PTRS_PER_S2_PGD * sizeof(pgd_t);
+-}
+-
+-static inline pgd_t *kvm_setup_fake_pgd(pgd_t *hwpgd)
+-{
+-	return hwpgd;
+-}
+-
+-static inline void kvm_free_fake_pgd(pgd_t *pgd)
+-{
+-}
+ static inline bool kvm_page_empty(void *ptr)
+ {
+ 	struct page *ptr_page = virt_to_page(ptr);
 -- 
 1.7.9.5
