@@ -1,35 +1,24 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 14 Apr 2016 09:49:18 +0200
-Subject: [PATCH v4 4/5] dt-bindings: arm: add DT binding for Marvell
- CP110 system controller
-In-Reply-To: <20160413180122.4f997a9a@free-electrons.com>
-References: <1459070777-18049-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1459070777-18049-5-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160328194756.GA28967@rob-hp-laptop>
- <20160413180122.4f997a9a@free-electrons.com>
-Message-ID: <20160414094918.6f65e5cf@free-electrons.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 14 Apr 2016 09:50:56 +0200
+Subject: [PATCH] clk: samsung: exynos7: Don't gate CMU_{CCORE,
+ FSYS0} blocks clock
+In-Reply-To: <1460608972-13878-1-git-send-email-alim.akhtar@samsung.com>
+References: <1460608972-13878-1-git-send-email-alim.akhtar@samsung.com>
+Message-ID: <570F4BE0.1010102@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 04/14/2016 06:42 AM, Alim Akhtar wrote:
+> This patch adds CLK_IS_CRITICAL flag to ACLK_CCORE_133 and ACLK_FSYS0_200
+> clocks. These clocks are critical for accessing CMU_CCORE and CMU_FSYS0
+> blocks registers. Let these clocks to be enabled all the time.
+> 
+> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+> ---
+>  drivers/clk/samsung/clk-exynos7.c |    5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
 
-On Wed, 13 Apr 2016 18:01:22 +0200, Thomas Petazzoni wrote:
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-> In fact, the more I think of it, the less I find encoding the clock
-> output names in the DT to be useful for such a driver. For generic
-> clock drivers, it makes complete sense, but here the driver is really
-> tied to the specific system controller of that SoC, so the clock names
-> will not change.
-
-My bad: there will be two instances of the CP110 system controller, one
-for the master CP110 and one for the slave CP110. So having the
-possibility of setting the clock names in the DT is actually a good
-thing, so I'll keep it.
-
-Thanks!
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Best regards,
+Krzysztof
