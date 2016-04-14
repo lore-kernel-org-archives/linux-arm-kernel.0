@@ -1,136 +1,39 @@
-From: brian.starkey@arm.com (Brian Starkey)
-Date: Thu, 14 Apr 2016 10:52:26 +0100
-Subject: [PATCH v2] ARM: arm64: dts: Add expansion bus to VExpress and Juno
-Message-ID: <1460627546-24230-1-git-send-email-brian.starkey@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 14 Apr 2016 10:59:57 +0100
+Subject: [Question] refcount of DT node
+In-Reply-To: <20160414084849.GT19428@n2100.arm.linux.org.uk>
+References: <CAK7LNATFUW2KXUpFas6C_SJ0C7Qb1DWU0njLg-FCYciK2U6Oag@mail.gmail.com>
+ <20160414084849.GT19428@n2100.arm.linux.org.uk>
+Message-ID: <20160414095957.GB10273@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The VExpress and Juno development platforms have an external expansion
-bus which can be used for additional hardware (e.g. LogicTile Express
-daughterboards).
-Add this bus to all VExpress CoreTile and Juno device-trees.
+On Thu, Apr 14, 2016 at 09:48:49AM +0100, Russell King - ARM Linux wrote:
+> On Thu, Apr 14, 2016 at 04:47:57PM +0900, Masahiro Yamada wrote:
+> > Hi experts.
+> > 
+> > My understanding of refcount of DT node is poor.
+> 
+> The message from DT people is... don't worry about DT node refcounting.
+> Do whatever you want with it, they don't care whether you have correct
+> refcounting or not.
+> 
+> The background behind that is that I've tried to fix the refcounting,
+> and even had the coccinelle people generate some stuff to work on this
+> issue, but DT people's attitude towards it is "don't bother".
+> 
+> So yes, people may get it wrong, but it seems it's something that DT
+> people want ignored.
 
-On VExpress, the bus is described for a CoreTile occupying site 1.
+I'm not sure that's quite fair; the last discussion I recall about this
+ended up concluding that we need a better API, rather than papering over
+problems.
 
-Signed-off-by: Brian Starkey <brian.starkey@arm.com>
-Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
----
+That said, there isn't much obvious progress on that front.
 
-Only change from v1 is rewording of the commit message as suggested
-by Liviu.
+Frank, Pantelis, Rob, were there any conclusions on this from ELC, or is
+this something that needs someone to propose something?
 
- arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts |   13 +++++++++++++
- arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts  |   13 +++++++++++++
- arch/arm/boot/dts/vexpress-v2p-ca5s.dts     |   13 +++++++++++++
- arch/arm/boot/dts/vexpress-v2p-ca9.dts      |   13 +++++++++++++
- arch/arm64/boot/dts/arm/juno-base.dtsi      |   10 ++++++++++
- 5 files changed, 62 insertions(+)
+Mark.
 
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
-index 9420053..ec7539b 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
-@@ -280,4 +280,17 @@
- 
- 		/include/ "vexpress-v2m-rs1.dtsi"
- 	};
-+
-+	site2: hsb at 40000000 {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0 0x40000000 0x3fef0000>;
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 3>;
-+		interrupt-map = <0 0 &gic 0 36 4>,
-+				<0 1 &gic 0 37 4>,
-+				<0 2 &gic 0 38 4>,
-+				<0 3 &gic 0 39 4>;
-+	};
- };
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-index 17f63f7..a339b0c 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-@@ -638,4 +638,17 @@
- 
- 		/include/ "vexpress-v2m-rs1.dtsi"
- 	};
-+
-+	site2: hsb at 40000000 {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0 0x40000000 0x3fef0000>;
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 3>;
-+		interrupt-map = <0 0 &gic 0 36 4>,
-+				<0 1 &gic 0 37 4>,
-+				<0 2 &gic 0 38 4>,
-+				<0 3 &gic 0 39 4>;
-+	};
- };
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
-index d2709b7..76a9ccb 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
-@@ -250,4 +250,17 @@
- 
- 		/include/ "vexpress-v2m-rs1.dtsi"
- 	};
-+
-+	site2: hsb at 40000000 {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0x40000000 0x40000000>;
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 3>;
-+		interrupt-map = <0 0 &gic 0 36 4>,
-+				<0 1 &gic 0 37 4>,
-+				<0 2 &gic 0 38 4>,
-+				<0 3 &gic 0 39 4>;
-+	};
- };
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-index d949fac..edac212 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-@@ -359,4 +359,17 @@
- 
- 		/include/ "vexpress-v2m.dtsi"
- 	};
-+
-+	site2: hsb at e0000000 {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0xe0000000 0x20000000>;
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 3>;
-+		interrupt-map = <0 0 &gic 0 36 4>,
-+				<0 1 &gic 0 37 4>,
-+				<0 2 &gic 0 38 4>,
-+				<0 3 &gic 0 39 4>;
-+	};
- };
-diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
-index 68ccc39..dee2386 100644
---- a/arch/arm64/boot/dts/arm/juno-base.dtsi
-+++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
-@@ -272,3 +272,13 @@
- 
- 		/include/ "juno-motherboard.dtsi"
- 	};
-+
-+	site2: tlx at 60000000 {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0 0x60000000 0x10000000>;
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 0>;
-+		interrupt-map = <0 0 &gic 0 0 0 168 IRQ_TYPE_LEVEL_HIGH>;
-+	};
--- 
-1.7.9.5
+[1] http://permalink.gmane.org/gmane.linux.drivers.devicetree/153777
