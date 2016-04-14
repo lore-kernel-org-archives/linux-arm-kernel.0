@@ -1,40 +1,47 @@
 From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Thu, 14 Apr 2016 15:01:51 +0530
-Subject: [PATCH v5 03/11] thermal: qcom: tsens-8974: Add support for 8974
+Date: Thu, 14 Apr 2016 15:01:54 +0530
+Subject: [PATCH v5 06/11] thermal: qcom: tsens-8996: Add support for 8996
  family of SoCs
 In-Reply-To: <1460626319-14516-1-git-send-email-rnayak@codeaurora.org>
 References: <1460626319-14516-1-git-send-email-rnayak@codeaurora.org>
-Message-ID: <1460626319-14516-4-git-send-email-rnayak@codeaurora.org>
+Message-ID: <1460626319-14516-7-git-send-email-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add .calibrate support for 8974 family as part of tsens_ops.
+The TSENS controller in 8996 family of SoCs is capable of converting the
+ADC code outputs to real temperature values (in decidegree Celsius).
+It can also be programmed to provide raw ADC code, but the secure software
+on 8996 programs it to provide real temperatures and also does the needed
+calibrations.
 
-Based on the original code by Siddartha Mohanadoss and Stephen Boyd.
+We check the valid bit to ensure valid data is read by the AHB master.
+And the spec recommends the below algorithm to read data 3 consecutive
+times, which takes care of the worst case delay taken to propogate the
+updated data to the register.
 
 Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
 ---
- drivers/thermal/qcom/Makefile     |   2 +-
- drivers/thermal/qcom/tsens-8974.c | 244 ++++++++++++++++++++++++++++++++++++++
- drivers/thermal/qcom/tsens.c      |   1 +
- drivers/thermal/qcom/tsens.h      |   2 +-
- 4 files changed, 247 insertions(+), 2 deletions(-)
- create mode 100644 drivers/thermal/qcom/tsens-8974.c
+ drivers/thermal/qcom/Makefile     |  2 +-
+ drivers/thermal/qcom/tsens-8996.c | 82 +++++++++++++++++++++++++++++++++++++++
+ drivers/thermal/qcom/tsens.c      |  3 ++
+ drivers/thermal/qcom/tsens.h      |  2 +-
+ 4 files changed, 87 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/thermal/qcom/tsens-8996.c
 
 diff --git a/drivers/thermal/qcom/Makefile b/drivers/thermal/qcom/Makefile
-index 05c98e4..a471100 100644
+index f3cefd1..2cc2193 100644
 --- a/drivers/thermal/qcom/Makefile
 +++ b/drivers/thermal/qcom/Makefile
 @@ -1,2 +1,2 @@
  obj-$(CONFIG_QCOM_TSENS)	+= qcom_tsens.o
--qcom_tsens-y			+= tsens.o tsens-common.o tsens-8916.o
-+qcom_tsens-y			+= tsens.o tsens-common.o tsens-8916.o tsens-8974.o
-diff --git a/drivers/thermal/qcom/tsens-8974.c b/drivers/thermal/qcom/tsens-8974.c
+-qcom_tsens-y			+= tsens.o tsens-common.o tsens-8916.o tsens-8974.o tsens-8960.o
++qcom_tsens-y			+= tsens.o tsens-common.o tsens-8916.o tsens-8974.o tsens-8960.o tsens-8996.o
+diff --git a/drivers/thermal/qcom/tsens-8996.c b/drivers/thermal/qcom/tsens-8996.c
 new file mode 100644
-index 0000000..da3ca4c
+index 0000000..3d70aa0
 --- /dev/null
-+++ b/drivers/thermal/qcom/tsens-8974.c
-@@ -0,0 +1,244 @@
++++ b/drivers/thermal/qcom/tsens-8996.c
+@@ -0,0 +1,82 @@
 +/*
 + * Copyright (c) 2015, The Linux Foundation. All rights reserved.
 + *
@@ -50,257 +57,97 @@ index 0000000..da3ca4c
 + */
 +
 +#include <linux/platform_device.h>
++#include <linux/regmap.h>
 +#include "tsens.h"
 +
-+/* eeprom layout data for 8974 */
-+#define BASE1_MASK		0xff
-+#define S0_P1_MASK		0x3f00
-+#define S1_P1_MASK		0xfc000
-+#define S2_P1_MASK		0x3f00000
-+#define S3_P1_MASK		0xfc000000
-+#define S4_P1_MASK		0x3f
-+#define S5_P1_MASK		0xfc0
-+#define S6_P1_MASK		0x3f000
-+#define S7_P1_MASK		0xfc0000
-+#define S8_P1_MASK		0x3f000000
-+#define S8_P1_MASK_BKP		0x3f
-+#define S9_P1_MASK		0x3f
-+#define S9_P1_MASK_BKP		0xfc0
-+#define S10_P1_MASK		0xfc0
-+#define S10_P1_MASK_BKP		0x3f000
-+#define CAL_SEL_0_1		0xc0000000
-+#define CAL_SEL_2		0x40000000
-+#define CAL_SEL_SHIFT		30
-+#define CAL_SEL_SHIFT_2		28
++#define STATUS_OFFSET	0x10a0
++#define LAST_TEMP_MASK	0xfff
++#define STATUS_VALID_BIT	BIT(21)
++#define CODE_SIGN_BIT		BIT(11)
 +
-+#define S0_P1_SHIFT		8
-+#define S1_P1_SHIFT		14
-+#define S2_P1_SHIFT		20
-+#define S3_P1_SHIFT		26
-+#define S5_P1_SHIFT		6
-+#define S6_P1_SHIFT		12
-+#define S7_P1_SHIFT		18
-+#define S8_P1_SHIFT		24
-+#define S9_P1_BKP_SHIFT		6
-+#define S10_P1_SHIFT		6
-+#define S10_P1_BKP_SHIFT	12
-+
-+#define BASE2_SHIFT		12
-+#define BASE2_BKP_SHIFT		18
-+#define S0_P2_SHIFT		20
-+#define S0_P2_BKP_SHIFT		26
-+#define S1_P2_SHIFT		26
-+#define S2_P2_BKP_SHIFT		6
-+#define S3_P2_SHIFT		6
-+#define S3_P2_BKP_SHIFT		12
-+#define S4_P2_SHIFT		12
-+#define S4_P2_BKP_SHIFT		18
-+#define S5_P2_SHIFT		18
-+#define S5_P2_BKP_SHIFT		24
-+#define S6_P2_SHIFT		24
-+#define S7_P2_BKP_SHIFT		6
-+#define S8_P2_SHIFT		6
-+#define S8_P2_BKP_SHIFT		12
-+#define S9_P2_SHIFT		12
-+#define S9_P2_BKP_SHIFT		18
-+#define S10_P2_SHIFT		18
-+#define S10_P2_BKP_SHIFT	24
-+
-+#define BASE2_MASK		0xff000
-+#define BASE2_BKP_MASK		0xfc0000
-+#define S0_P2_MASK		0x3f00000
-+#define S0_P2_BKP_MASK		0xfc000000
-+#define S1_P2_MASK		0xfc000000
-+#define S1_P2_BKP_MASK		0x3f
-+#define S2_P2_MASK		0x3f
-+#define S2_P2_BKP_MASK		0xfc0
-+#define S3_P2_MASK		0xfc0
-+#define S3_P2_BKP_MASK		0x3f000
-+#define S4_P2_MASK		0x3f000
-+#define S4_P2_BKP_MASK		0xfc0000
-+#define S5_P2_MASK		0xfc0000
-+#define S5_P2_BKP_MASK		0x3f000000
-+#define S6_P2_MASK		0x3f000000
-+#define S6_P2_BKP_MASK		0x3f
-+#define S7_P2_MASK		0x3f
-+#define S7_P2_BKP_MASK		0xfc0
-+#define S8_P2_MASK		0xfc0
-+#define S8_P2_BKP_MASK		0x3f000
-+#define S9_P2_MASK		0x3f000
-+#define S9_P2_BKP_MASK		0xfc0000
-+#define S10_P2_MASK		0xfc0000
-+#define S10_P2_BKP_MASK		0x3f000000
-+
-+#define BKP_SEL			0x3
-+#define BKP_REDUN_SEL		0xe0000000
-+#define BKP_REDUN_SHIFT		29
-+
-+#define BIT_APPEND		0x3
-+
-+static int calibrate_8974(struct tsens_device *tmdev)
++static int get_temp_8996(struct tsens_device *tmdev, int id, int *temp)
 +{
-+	int base1 = 0, base2 = 0, i;
-+	u32 p1[11], p2[11];
-+	int mode = 0;
-+	u32 *calib, *bkp;
-+	u32 calib_redun_sel;
++	struct tsens_sensor *s = &tmdev->sensor[id];
++	u32 code;
++	unsigned int sensor_addr;
++	int last_temp = 0, last_temp2 = 0, last_temp3 = 0, ret;
 +
-+	calib = (u32 *)qfprom_read(tmdev->dev, "calib");
-+	if (IS_ERR(calib))
-+		return PTR_ERR(calib);
++	sensor_addr = STATUS_OFFSET + s->hw_id * 4;
++	ret = regmap_read(tmdev->map, sensor_addr, &code);
++	if (ret)
++		return ret;
++	last_temp = code & LAST_TEMP_MASK;
++	if (code & STATUS_VALID_BIT)
++		goto done;
 +
-+	bkp = (u32 *)qfprom_read(tmdev->dev, "calib_backup");
-+	if (IS_ERR(bkp))
-+		return PTR_ERR(bkp);
++	/* Try a second time */
++	ret = regmap_read(tmdev->map, sensor_addr, &code);
++	if (ret)
++		return ret;
++	if (code & STATUS_VALID_BIT) {
++		last_temp = code & LAST_TEMP_MASK;
++		goto done;
++	} else
++		last_temp2 = code & LAST_TEMP_MASK;
 +
-+	calib_redun_sel =  bkp[1] & BKP_REDUN_SEL;
-+	calib_redun_sel >>= BKP_REDUN_SHIFT;
++	/* Try a third/last time */
++	ret = regmap_read(tmdev->map, sensor_addr, &code);
++	if (ret)
++		return ret;
++	if (code & STATUS_VALID_BIT) {
++		last_temp = code & LAST_TEMP_MASK;
++		goto done;
++	} else
++		last_temp3 = code & LAST_TEMP_MASK;
 +
-+	if (calib_redun_sel == BKP_SEL) {
-+		mode = (calib[4] & CAL_SEL_0_1) >> CAL_SEL_SHIFT;
-+		mode |= (calib[5] & CAL_SEL_2) >> CAL_SEL_SHIFT_2;
++	if (last_temp == last_temp2)
++		last_temp = last_temp2;
++	else if (last_temp2 == last_temp3)
++		last_temp = last_temp3;
++done:
++	/* Code sign bit is the sign extension for a negative value */
++	if (last_temp & CODE_SIGN_BIT)
++		last_temp |= ~CODE_SIGN_BIT;
 +
-+		switch (mode) {
-+		case TWO_PT_CALIB:
-+			base2 = (bkp[2] & BASE2_BKP_MASK) >> BASE2_BKP_SHIFT;
-+			p2[0] = (bkp[2] & S0_P2_BKP_MASK) >> S0_P2_BKP_SHIFT;
-+			p2[1] = (bkp[3] & S1_P2_BKP_MASK);
-+			p2[2] = (bkp[3] & S2_P2_BKP_MASK) >> S2_P2_BKP_SHIFT;
-+			p2[3] = (bkp[3] & S3_P2_BKP_MASK) >> S3_P2_BKP_SHIFT;
-+			p2[4] = (bkp[3] & S4_P2_BKP_MASK) >> S4_P2_BKP_SHIFT;
-+			p2[5] = (calib[4] & S5_P2_BKP_MASK) >> S5_P2_BKP_SHIFT;
-+			p2[6] = (calib[5] & S6_P2_BKP_MASK);
-+			p2[7] = (calib[5] & S7_P2_BKP_MASK) >> S7_P2_BKP_SHIFT;
-+			p2[8] = (calib[5] & S8_P2_BKP_MASK) >> S8_P2_BKP_SHIFT;
-+			p2[9] = (calib[5] & S9_P2_BKP_MASK) >> S9_P2_BKP_SHIFT;
-+			p2[10] = (calib[5] & S10_P2_BKP_MASK) >> S10_P2_BKP_SHIFT;
-+			/* Fall through */
-+		case ONE_PT_CALIB:
-+		case ONE_PT_CALIB2:
-+			base1 = bkp[0] & BASE1_MASK;
-+			p1[0] = (bkp[0] & S0_P1_MASK) >> S0_P1_SHIFT;
-+			p1[1] = (bkp[0] & S1_P1_MASK) >> S1_P1_SHIFT;
-+			p1[2] = (bkp[0] & S2_P1_MASK) >> S2_P1_SHIFT;
-+			p1[3] = (bkp[0] & S3_P1_MASK) >> S3_P1_SHIFT;
-+			p1[4] = (bkp[1] & S4_P1_MASK);
-+			p1[5] = (bkp[1] & S5_P1_MASK) >> S5_P1_SHIFT;
-+			p1[6] = (bkp[1] & S6_P1_MASK) >> S6_P1_SHIFT;
-+			p1[7] = (bkp[1] & S7_P1_MASK) >> S7_P1_SHIFT;
-+			p1[8] = (bkp[2] & S8_P1_MASK_BKP) >> S8_P1_SHIFT;
-+			p1[9] = (bkp[2] & S9_P1_MASK_BKP) >> S9_P1_BKP_SHIFT;
-+			p1[10] = (bkp[2] & S10_P1_MASK_BKP) >> S10_P1_BKP_SHIFT;
-+			break;
-+		}
-+	} else {
-+		mode = (calib[1] & CAL_SEL_0_1) >> CAL_SEL_SHIFT;
-+		mode |= (calib[3] & CAL_SEL_2) >> CAL_SEL_SHIFT_2;
-+
-+		switch (mode) {
-+		case TWO_PT_CALIB:
-+			base2 = (calib[2] & BASE2_MASK) >> BASE2_SHIFT;
-+			p2[0] = (calib[2] & S0_P2_MASK) >> S0_P2_SHIFT;
-+			p2[1] = (calib[2] & S1_P2_MASK) >> S1_P2_SHIFT;
-+			p2[2] = (calib[3] & S2_P2_MASK);
-+			p2[3] = (calib[3] & S3_P2_MASK) >> S3_P2_SHIFT;
-+			p2[4] = (calib[3] & S4_P2_MASK) >> S4_P2_SHIFT;
-+			p2[5] = (calib[3] & S5_P2_MASK) >> S5_P2_SHIFT;
-+			p2[6] = (calib[3] & S6_P2_MASK) >> S6_P2_SHIFT;
-+			p2[7] = (calib[4] & S7_P2_MASK);
-+			p2[8] = (calib[4] & S8_P2_MASK) >> S8_P2_SHIFT;
-+			p2[9] = (calib[4] & S9_P2_MASK) >> S9_P2_SHIFT;
-+			p2[10] = (calib[4] & S10_P2_MASK) >> S10_P2_SHIFT;
-+			/* Fall through */
-+		case ONE_PT_CALIB:
-+		case ONE_PT_CALIB2:
-+			base1 = calib[0] & BASE1_MASK;
-+			p1[0] = (calib[0] & S0_P1_MASK) >> S0_P1_SHIFT;
-+			p1[1] = (calib[0] & S1_P1_MASK) >> S1_P1_SHIFT;
-+			p1[2] = (calib[0] & S2_P1_MASK) >> S2_P1_SHIFT;
-+			p1[3] = (calib[0] & S3_P1_MASK) >> S3_P1_SHIFT;
-+			p1[4] = (calib[1] & S4_P1_MASK);
-+			p1[5] = (calib[1] & S5_P1_MASK) >> S5_P1_SHIFT;
-+			p1[6] = (calib[1] & S6_P1_MASK) >> S6_P1_SHIFT;
-+			p1[7] = (calib[1] & S7_P1_MASK) >> S7_P1_SHIFT;
-+			p1[8] = (calib[1] & S8_P1_MASK) >> S8_P1_SHIFT;
-+			p1[9] = (calib[2] & S9_P1_MASK);
-+			p1[10] = (calib[2] & S10_P1_MASK) >> S10_P1_SHIFT;
-+			break;
-+		}
-+	}
-+
-+	switch (mode) {
-+	case ONE_PT_CALIB:
-+		for (i = 0; i < tmdev->num_sensors; i++)
-+			p1[i] += (base1 << 2) | BIT_APPEND;
-+		break;
-+	case TWO_PT_CALIB:
-+		for (i = 0; i < tmdev->num_sensors; i++) {
-+			p2[i] += base2;
-+			p2[i] <<= 2;
-+			p2[i] |= BIT_APPEND;
-+		}
-+		/* Fall through */
-+	case ONE_PT_CALIB2:
-+		for (i = 0; i < tmdev->num_sensors; i++) {
-+			p1[i] += base1;
-+			p1[i] <<= 2;
-+			p1[i] |= BIT_APPEND;
-+		}
-+		break;
-+	default:
-+		for (i = 0; i < tmdev->num_sensors; i++)
-+			p2[i] = 780;
-+		p1[0] = 502;
-+		p1[1] = 509;
-+		p1[2] = 503;
-+		p1[3] = 509;
-+		p1[4] = 505;
-+		p1[5] = 509;
-+		p1[6] = 507;
-+		p1[7] = 510;
-+		p1[8] = 508;
-+		p1[9] = 509;
-+		p1[10] = 508;
-+		break;
-+	}
-+
-+	compute_intercept_slope(tmdev, p1, p2, mode);
++	/* Temperatures are in deciCelicius */
++	*temp = last_temp * 100;
 +
 +	return 0;
 +}
 +
-+const struct tsens_ops ops_8974 = {
++const struct tsens_ops ops_8996 = {
 +	.init		= init_common,
-+	.calibrate	= calibrate_8974,
-+	.get_temp	= get_temp_common,
++	.get_temp	= get_temp_8996,
 +};
 +
-+const struct tsens_data data_8974 = {
-+	.num_sensors	= 11,
-+	.ops		= &ops_8974,
++const struct tsens_data data_8996 = {
++	.num_sensors	= 13,
++	.ops		= &ops_8996,
 +};
 diff --git a/drivers/thermal/qcom/tsens.c b/drivers/thermal/qcom/tsens.c
-index c11d2e4..99f3a6a 100644
+index 096f64d..9ebe020 100644
 --- a/drivers/thermal/qcom/tsens.c
 +++ b/drivers/thermal/qcom/tsens.c
-@@ -68,6 +68,7 @@ static const struct of_device_id tsens_table[] = {
- 		.data = &data_8916,
+@@ -69,6 +69,9 @@ static const struct of_device_id tsens_table[] = {
  	}, {
  		.compatible = "qcom,msm8974-tsens",
-+		.data = &data_8974,
+ 		.data = &data_8974,
++	}, {
++		.compatible = "qcom,msm8996-tsens",
++		.data = &data_8996,
  	},
  	{}
  };
 diff --git a/drivers/thermal/qcom/tsens.h b/drivers/thermal/qcom/tsens.h
-index 0ecf979..d4cfb5f 100644
+index 146d4f1..4a12df2 100644
 --- a/drivers/thermal/qcom/tsens.h
 +++ b/drivers/thermal/qcom/tsens.h
 @@ -87,6 +87,6 @@ void compute_intercept_slope(struct tsens_device *, u32 *, u32 *, u32);
  int init_common(struct tsens_device *);
  int get_temp_common(struct tsens_device *, int, int *);
  
--extern const struct tsens_data data_8916;
-+extern const struct tsens_data data_8916, data_8974;
+-extern const struct tsens_data data_8916, data_8974, data_8960;
++extern const struct tsens_data data_8916, data_8974, data_8960, data_8996;
  
  #endif /* __QCOM_TSENS_H__ */
 -- 
