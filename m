@@ -1,131 +1,38 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Thu, 14 Apr 2016 15:01:59 +0530
-Subject: [PATCH v5 11/11] arm64: dts: msm8996: Add thermal zones,
- tsens and qfprom nodes
-In-Reply-To: <1460626319-14516-1-git-send-email-rnayak@codeaurora.org>
-References: <1460626319-14516-1-git-send-email-rnayak@codeaurora.org>
-Message-ID: <1460626319-14516-12-git-send-email-rnayak@codeaurora.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 14 Apr 2016 11:39:45 +0200
+Subject: [PATCH v5 00/10] Support for Cortex-M Prototyping System
+In-Reply-To: <570F593D.6040809@arm.com>
+References: <1459519381-34441-1-git-send-email-vladimir.murzin@arm.com>
+ <570F593D.6040809@arm.com>
+Message-ID: <20160414093945.GA15250@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add thermal zones, tsens and qfprom nodes
+On Thu, Apr 14, 2016 at 09:47:57AM +0100, Vladimir Murzin wrote:
+> Hi,
+> 
+> On 01/04/16 15:02, Vladimir Murzin wrote:
+> > Hi,
+> > 
+> > This patch series provides the basic support for running ucLinux on V2M-MPS2
+> > platform.
+> > 
+> > With these patches applied ucLinux can be run on both HW and FVP models
+> > with Cortex-M3/M4/M7 configurations.
+> 
+> Any objection to get it merged?
+> 
+> Sudeep Holla noticed that there is merge conflict against linux-next
+> with PIC32 uart (Makefile and serial_core.h), so should I provide
+> conflict resolution or do rebase on someone's branch?
+> 
+> Anyway, I'd be glad to know how it should be processed further?
 
-Cc: Andy Gross <agross@codeaurora.org>
-Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
----
- arch/arm64/boot/dts/qcom/msm8996.dtsi | 92 +++++++++++++++++++++++++++++++++++
- 1 file changed, 92 insertions(+)
+This patchset should go through the arm-soc tree. Any conflicts resulting
+from a merge *after* your patchset is in the arm-soc tree is no longer your
+problem.
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-index 0506fb8..4b36929 100644
---- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-@@ -97,6 +97,92 @@
- 		};
- 	};
- 
-+	thermal-zones {
-+		cpu-thermal0 {
-+			polling-delay-passive = <250>;
-+			polling-delay = <1000>;
-+
-+			thermal-sensors = <&tsens0 3>;
-+
-+			trips {
-+				cpu_alert0: trip at 0 {
-+					temperature = <75000>;
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
-+
-+				cpu_crit0: trip at 1 {
-+					temperature = <110000>;
-+					hysteresis = <2000>;
-+					type = "critical";
-+				};
-+			};
-+		};
-+
-+		cpu-thermal1 {
-+			polling-delay-passive = <250>;
-+			polling-delay = <1000>;
-+
-+			thermal-sensors = <&tsens0 5>;
-+
-+			trips {
-+				cpu_alert1: trip at 0 {
-+					temperature = <75000>;
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
-+
-+				cpu_crit1: trip at 1 {
-+					temperature = <110000>;
-+					hysteresis = <2000>;
-+					type = "critical";
-+				};
-+			};
-+		};
-+
-+		cpu-thermal2 {
-+			polling-delay-passive = <250>;
-+			polling-delay = <1000>;
-+
-+			thermal-sensors = <&tsens0 8>;
-+
-+			trips {
-+				cpu_alert2: trip at 0 {
-+					temperature = <75000>;
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
-+
-+				cpu_crit2: trip at 1 {
-+					temperature = <110000>;
-+					hysteresis = <2000>;
-+					type = "critical";
-+				};
-+			};
-+		};
-+
-+		cpu-thermal3 {
-+			polling-delay-passive = <250>;
-+			polling-delay = <1000>;
-+
-+			thermal-sensors = <&tsens0 10>;
-+
-+			trips {
-+				cpu_alert3: trip at 0 {
-+					temperature = <75000>;
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
-+
-+				cpu_crit3: trip at 1 {
-+					temperature = <110000>;
-+					hysteresis = <2000>;
-+					type = "critical";
-+				};
-+			};
-+		};
-+	};
-+
- 	timer {
- 		compatible = "arm,armv8-timer";
- 		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-@@ -151,6 +237,12 @@
- 			reg = <0x300000 0x90000>;
- 		};
- 
-+		tsens0: thermal-sensor at 4a8000 {
-+			compatible = "qcom,msm8996-tsens";
-+			reg = <0x4a8000 0x2000>;
-+			#thermal-sensor-cells = <1>;
-+		};
-+
- 		blsp2_uart1: serial at 75b0000 {
- 			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
- 			reg = <0x75b0000 0x1000>;
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
+So IOW, if your patchset applies to arm-soc and Arnd is ok to pick it, then
+everything is fine.
+
+  -- Daniel
