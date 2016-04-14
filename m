@@ -1,115 +1,47 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 14 Apr 2016 18:11:33 +0100
-Subject: [PATCH V2 03/15] coresight: tmc: re-implementing
- tmc_read_prepare/unprepare() functions
-In-Reply-To: <1460483692-25061-4-git-send-email-mathieu.poirier@linaro.org>
-References: <1460483692-25061-1-git-send-email-mathieu.poirier@linaro.org>
- <1460483692-25061-4-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <570FCF45.8010809@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 14 Apr 2016 19:12:14 +0200
+Subject: [GIT PULL v2] ARM: mvebu: defconfig for v4.7 (#1)
+Message-ID: <87mvowyv0x.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/16 18:54, Mathieu Poirier wrote:
-> In their current implementation the tmc_read_prepare/unprepare()
-> are a lump of if/else that is difficult to read.  This patch is
-> alleviating that by using a switch statement.  The latter also
-> allows for a better control on the error path.
->
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> ---
->   drivers/hwtracing/coresight/coresight-tmc.c | 56 ++++++++++++++++++-----------
->   1 file changed, 36 insertions(+), 20 deletions(-)
->
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-> index 66fa7736d12f..d211aeec49f8 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc.c
-> +++ b/drivers/hwtracing/coresight/coresight-tmc.c
-> @@ -431,7 +431,7 @@ static const struct coresight_ops tmc_etf_cs_ops = {
->
->   static int tmc_read_prepare(struct tmc_drvdata *drvdata)
->   {
-> -	int ret;
-> +	int ret = 0;
->   	unsigned long flags;
->   	enum tmc_mode mode;
->
-> @@ -439,25 +439,31 @@ static int tmc_read_prepare(struct tmc_drvdata *drvdata)
->   	if (!drvdata->enable)
->   		goto out;
->
-> -	if (drvdata->config_type == TMC_CONFIG_TYPE_ETB) {
-> +	switch (drvdata->config_type) {
-> +	case TMC_CONFIG_TYPE_ETB:
->   		tmc_etb_disable_hw(drvdata);
-> -	} else if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
-> -		tmc_etr_disable_hw(drvdata);
-> -	} else {
-> +		break;
-> +	case TMC_CONFIG_TYPE_ETF:
-> +		/* There is no point in reading a TMC in HW FIFO mode */
->   		mode = readl_relaxed(drvdata->base + TMC_MODE);
-> -		if (mode == TMC_MODE_CIRCULAR_BUFFER) {
-> -			tmc_etb_disable_hw(drvdata);
-> -		} else {
-> -			ret = -ENODEV;
-> +		if (mode != TMC_MODE_CIRCULAR_BUFFER) {
-> +			ret = -EINVAL;
->   			goto err;
->   		}
+Hi,
 
-Nit. If you move the TMC_CONFIG_TYPE_ETB here, you could fall through from TYPE_ETF: i.e,
-		/* Fall through to ETB mode */
-	case TMC_CONFIG_TYPE_ETB:
-> +
-> +		tmc_etb_disable_hw(drvdata);
-> +		break;
+Here is the first pull request for defconfig for mvebu for v4.7 but in
+in his second version after having fixed the patch title.
 
+Gregory
 
+The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 
-> +	case TMC_CONFIG_TYPE_ETR:
-> +		tmc_etr_disable_hw(drvdata);
-> +		break;
-> +	default:
-> +		ret = -EINVAL;
-> +		goto err;
->   	}
-> +
+  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
 
+are available in the git repository at:
 
->   	return ret;
-> @@ -472,20 +478,30 @@ static void tmc_read_unprepare(struct tmc_drvdata *drvdata)
->   	if (!drvdata->enable)
->   		goto out;
->
-> -	if (drvdata->config_type == TMC_CONFIG_TYPE_ETB) {
-> +	switch (drvdata->config_type) {
-> +	case TMC_CONFIG_TYPE_ETB:
->   		tmc_etb_enable_hw(drvdata);
-> -	} else if (drvdata->config_type == TMC_CONFIG_TYPE_ETR) {
-> -		tmc_etr_enable_hw(drvdata);
-> -	} else {
-> +		break;
-> +	case TMC_CONFIG_TYPE_ETF:
-> +		/* Make sure we don't re-enable a TMC in HW FIFO mode */
->   		mode = readl_relaxed(drvdata->base + TMC_MODE);
-> -		if (mode == TMC_MODE_CIRCULAR_BUFFER)
-> -			tmc_etb_enable_hw(drvdata);
-> +		if (mode != TMC_MODE_CIRCULAR_BUFFER)
-> +			goto err;
-> +
-> +		tmc_etb_enable_hw(drvdata);
-> +		break;
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-defconfig-4.7-1
 
-Same as above.
+for you to fetch changes up to 23d2af622de748bf57d31a4125d06d183c29e908:
 
-> +	case TMC_CONFIG_TYPE_ETR:
-> +		tmc_etr_disable_hw(drvdata);
-> +		break;
-> +	default:
-> +		goto err;
->   	}
-> +
+  ARM: mvebu_v5_defconfig: Switching to the new Marvell's cryptographic engine driver (2016-04-14 18:57:19 +0200)
 
-Otherwise,
+----------------------------------------------------------------
+mvebu defconfig for 4.7 (part 1)
 
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+- Use the new cryto engine(mv_cesa) in the mvebu and multi-arm
+  defcongig files
+- Attach mvebu_*_defconfig to the mvebu maintainers
+
+----------------------------------------------------------------
+Romain Perier (3):
+      ARM: mvebu_v7_defconfig: Enabling the new Marvell's cryptographic engine driver
+      ARM: multi_v7_defconfig: Enabling the new Marvell's cryptographic engine driver
+      ARM: mvebu_v5_defconfig: Switching to the new Marvell's cryptographic engine driver
+
+Thomas Petazzoni (1):
+      MAINTAINERS: attach arch/arm/configs/mvebu_*_defconfig to relevant maintainers
+
+ MAINTAINERS                         | 2 +-
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ arch/arm/configs/mvebu_v5_defconfig | 2 +-
+ arch/arm/configs/mvebu_v7_defconfig | 1 +
+ 4 files changed, 4 insertions(+), 2 deletions(-)
