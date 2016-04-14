@@ -1,42 +1,79 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 14 Apr 2016 21:17:36 +0200
-Subject: [PATCH v5 16/24] ARM: explicitly apply PWM config extracted from
- pwm_args
+Date: Thu, 14 Apr 2016 21:17:25 +0200
+Subject: [PATCH v5 05/24] input: misc: max77693: use pwm_get_args() where
+ appropriate
 In-Reply-To: <1460661464-11216-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1460661464-11216-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1460661464-11216-17-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1460661464-11216-6-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Call pwm_apply_args() just after requesting the PWM device so that the
-polarity and period are initialized according to the information provided
-in pwm_args.
+The PWM framework has clarified the concept of reference PWM config
+(the platform dependent config retrieved from the DT or the PWM
+lookup table) and real PWM state.
 
-This is an intermediate state, and pwm_apply_args() should be dropped as
-soon as the atomic PWM infrastructure is in place and the driver makes
-use of it.
+Use pwm_get_args() when the PWM user wants to retrieve this reference
+config and not the current state.
+
+This is part of the rework allowing the PWM framework to support
+hardware readout and expose real PWM state even when the PWM has
+just been requested (before the user calls pwm_config/enable/disable()).
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- arch/arm/mach-s3c24xx/mach-rx1950.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/input/misc/max77693-haptic.c | 17 ++++++++++++++---
+ 1 file changed, 14 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-s3c24xx/mach-rx1950.c b/arch/arm/mach-s3c24xx/mach-rx1950.c
-index 774c982..25a139b 100644
---- a/arch/arm/mach-s3c24xx/mach-rx1950.c
-+++ b/arch/arm/mach-s3c24xx/mach-rx1950.c
-@@ -496,6 +496,12 @@ static int rx1950_backlight_init(struct device *dev)
- 		return PTR_ERR(lcd_pwm);
+diff --git a/drivers/input/misc/max77693-haptic.c b/drivers/input/misc/max77693-haptic.c
+index 6d96bff..29ddeb7 100644
+--- a/drivers/input/misc/max77693-haptic.c
++++ b/drivers/input/misc/max77693-haptic.c
+@@ -70,10 +70,13 @@ struct max77693_haptic {
+ 
+ static int max77693_haptic_set_duty_cycle(struct max77693_haptic *haptic)
+ {
+-	int delta = (haptic->pwm_dev->period + haptic->pwm_duty) / 2;
++	struct pwm_args pargs;
++	int delta;
+ 	int error;
+ 
+-	error = pwm_config(haptic->pwm_dev, delta, haptic->pwm_dev->period);
++	pwm_get_args(haptic->pwm_dev, &pargs);
++	delta = (pargs.period + haptic->pwm_duty) / 2;
++	error = pwm_config(haptic->pwm_dev, delta, pargs.period);
+ 	if (error) {
+ 		dev_err(haptic->dev, "failed to configure pwm: %d\n", error);
+ 		return error;
+@@ -234,6 +237,7 @@ static int max77693_haptic_play_effect(struct input_dev *dev, void *data,
+ 				       struct ff_effect *effect)
+ {
+ 	struct max77693_haptic *haptic = input_get_drvdata(dev);
++	struct pwm_args pargs;
+ 	u64 period_mag_multi;
+ 
+ 	haptic->magnitude = effect->u.rumble.strong_magnitude;
+@@ -245,7 +249,8 @@ static int max77693_haptic_play_effect(struct input_dev *dev, void *data,
+ 	 * The formula to convert magnitude to pwm_duty as follows:
+ 	 * - pwm_duty = (magnitude * pwm_period) / MAX_MAGNITUDE(0xFFFF)
+ 	 */
+-	period_mag_multi = (u64)haptic->pwm_dev->period * haptic->magnitude;
++	pwm_get_args(haptic->pwm_dev, &pargs);
++	period_mag_multi = (u64)pargs.period * haptic->magnitude;
+ 	haptic->pwm_duty = (unsigned int)(period_mag_multi >>
+ 						MAX_MAGNITUDE_SHIFT);
+ 
+@@ -329,6 +334,12 @@ static int max77693_haptic_probe(struct platform_device *pdev)
+ 		return PTR_ERR(haptic->pwm_dev);
  	}
  
 +	/*
-+	 * FIXME: pwm_apply_args() should be removed when switching to
-+	 * the atomic PWM API.
++	 * FIXME: pwm_apply_args() should be removed when switching to the
++	 * atomic PWM API.
 +	 */
-+	pwm_apply_args(lcd_pwm);
++	pwm_apply_args(haptic->pwm_dev);
 +
- 	rx1950_lcd_power(1);
- 	rx1950_bl_power(1);
- 
+ 	haptic->motor_reg = devm_regulator_get(&pdev->dev, "haptic");
+ 	if (IS_ERR(haptic->motor_reg)) {
+ 		dev_err(&pdev->dev, "failed to get regulator\n");
 -- 
 2.5.0
