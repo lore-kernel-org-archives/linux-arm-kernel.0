@@ -1,47 +1,51 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 14 Apr 2016 15:23:45 +0100
-Subject: [PATCH v2 08/17] kvm-arm: arm: Introduce hyp page table empty
- checks
-In-Reply-To: <1460640065-27658-9-git-send-email-suzuki.poulose@arm.com>
-References: <1460640065-27658-1-git-send-email-suzuki.poulose@arm.com>
- <1460640065-27658-9-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <570FA7F1.7090403@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 14 Apr 2016 16:25:28 +0200
+Subject: [PATCH 2/2] pci: host: new driver for Marvell Armada 7K/8K PCIe
+ controller
+In-Reply-To: <20160411175651.5f32a990@free-electrons.com>
+References: <1459071058-18328-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1459071058-18328-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160327140348.GA19498@lunn.ch>
+ <20160411175651.5f32a990@free-electrons.com>
+Message-ID: <20160414162528.678be5b7@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/04/16 14:20, Suzuki K Poulose wrote:
-> Introduce hyp_pxx_table_empty helpers for checking whether
-> a given table entry is empty. This will be used explicitly
-> once we switch to explicit routines for hyp page table walk.
-> 
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm/include/asm/kvm_mmu.h |    4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-> index 7d207b4..901c1ea 100644
-> --- a/arch/arm/include/asm/kvm_mmu.h
-> +++ b/arch/arm/include/asm/kvm_mmu.h
-> @@ -162,6 +162,10 @@ static inline bool kvm_page_empty(void *ptr)
->  #define kvm_pmd_table_empty(kvm, pmdp) kvm_page_empty(pmdp)
->  #define kvm_pud_table_empty(kvm, pudp) (0)
->  
-> +#define hyp_pte_table_empty(ptep) kvm_page_empty(ptep)
-> +#define hyp_pmd_table_empty(pmdp) kvm_page_empty(pmdp)
-> +#define hyp_pud_table_empty(pudp) (0)
-> +
->  static inline void *kvm_get_hwpgd(struct kvm *kvm)
->  {
->  	return kvm->arch.pgd;
-> 
+Hello,
 
-Same remarks as the previous patch, but nonetheless:
+On Mon, 11 Apr 2016 17:56:51 +0200, Thomas Petazzoni wrote:
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> > > +	struct pcie_port *pp = arg;
+> > > +	struct armada8k_pcie *pcie = to_armada8k_pcie(pp);
+> > > +	void __iomem *base = pcie->base;
+> > > +	u32 val;
+> > > +
+> > > +	val = readl(base + PCIE_GLOBAL_INT_CAUSE1_REG);
+> > > +	writel(val, base + PCIE_GLOBAL_INT_CAUSE1_REG);
+> > > +
+> > > +	return IRQ_HANDLED;
+> > 
+> > Maybe a comment as to why you are just throwing them away.
+> 
+> I'll have a look into this.
 
-	M.
+Enabling the INT A-D interrupts is needed for the PCI device drivers to
+receive interrupts from their respective PCI devices. But then, once
+you enable the INT A-D interrupts, they are also latched into the PCIe
+controller, so if you don't acknowledge them in the PCIe controller
+level, at the first interrupt coming from a PCI device, the system
+hangs. I've added a comment in the driver about this.
+
+> Is this needed? The clocks are registered in of_clk_init(), i.e at
+> time_init() time. This is way before the device drivers get probed, no?
+
+The clock drivers are now regular platform drivers, so I'll add the
+EPROBE_DEFER handling logic.
+
+Thanks!
+
+Thomas
 -- 
-Jazz is not dead. It just smells funny...
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
