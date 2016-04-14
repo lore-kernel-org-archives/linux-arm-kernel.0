@@ -1,69 +1,29 @@
-From: j.anaszewski@samsung.com (Jacek Anaszewski)
-Date: Thu, 14 Apr 2016 10:57:15 +0200
-Subject: [PATCH v2 3/3] leds: gpio: Support the "panic-indicator" firmware
- property
-In-Reply-To: <1460570899-24642-4-git-send-email-ezequiel@vanguardiasur.com.ar>
-References: <1460570899-24642-1-git-send-email-ezequiel@vanguardiasur.com.ar>
- <1460570899-24642-4-git-send-email-ezequiel@vanguardiasur.com.ar>
-Message-ID: <570F5B6B.3000702@samsung.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 14 Apr 2016 09:57:07 +0100
+Subject: [LINUX PATCH v2 1/3] spi: Added dummy_cycle entry in the
+ spi_transfer structure.
+In-Reply-To: <570F4F9F.3090605@atmel.com>
+References: <1460039969-9835-1-git-send-email-lakshmis@xilinx.com>
+ <57067694.8030806@atmel.com>
+ <4FF8F58FAA9D5D4193D4E554E4352C5902C720DE@XAP-PVEXMBX02.xlnx.xilinx.com>
+ <570F4F9F.3090605@atmel.com>
+Message-ID: <20160414085707.GE18024@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ezequiel,
+On Thu, Apr 14, 2016 at 10:06:55AM +0200, Cyrille Pitchen wrote:
 
-It would be good to update also leds-gpio bindings,
-of course in a separate patch:
+> I understand but you propose to patch both the SPI layer and the m25p80 driver
+> to introduce some support which is already provided by the "spi_flash_read"
+> hook: struct spi_flash_read_message has already a "dummy_bytes" field.
+> IMHO, it looks redundant.
 
-Documentation/devicetree/bindings/leds/leds-gpio.txt
-
-Thanks,
-Jacek Anaszewski
-
-On 04/13/2016 08:08 PM, Ezequiel Garcia wrote:
-> Calling a GPIO LEDs is quite likely to work even if the kernel
-> has paniced, so they are ideal to blink in this situation.
-> This commit adds support for the new "panic-indicator"
-> firmware property, allowing to mark a given LED to blink on
-> a kernel panic.
->
-> Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
-> ---
->   drivers/leds/leds-gpio.c | 4 ++++
->   include/linux/leds.h     | 1 +
->   2 files changed, 5 insertions(+)
->
-> diff --git a/drivers/leds/leds-gpio.c b/drivers/leds/leds-gpio.c
-> index 61143f55597e..8229f063b483 100644
-> --- a/drivers/leds/leds-gpio.c
-> +++ b/drivers/leds/leds-gpio.c
-> @@ -127,6 +127,8 @@ static int create_gpio_led(const struct gpio_led *template,
->   	led_dat->cdev.brightness = state ? LED_FULL : LED_OFF;
->   	if (!template->retain_state_suspended)
->   		led_dat->cdev.flags |= LED_CORE_SUSPENDRESUME;
-> +	if (template->panic_indicator)
-> +		led_dat->cdev.flags |= LED_PANIC_INDICATOR;
->
->   	ret = gpiod_direction_output(led_dat->gpiod, state);
->   	if (ret < 0)
-> @@ -200,6 +202,8 @@ static struct gpio_leds_priv *gpio_leds_create(struct platform_device *pdev)
->
->   		if (fwnode_property_present(child, "retain-state-suspended"))
->   			led.retain_state_suspended = 1;
-> +		if (fwnode_property_present(child, "panic-indicator"))
-> +			led.panic_indicator = 1;
->
->   		ret = create_gpio_led(&led, &priv->leds[priv->num_leds],
->   				      dev, NULL);
-> diff --git a/include/linux/leds.h b/include/linux/leds.h
-> index 49adf9c6e326..1067fb5f9296 100644
-> --- a/include/linux/leds.h
-> +++ b/include/linux/leds.h
-> @@ -359,6 +359,7 @@ struct gpio_led {
->   	unsigned 	gpio;
->   	unsigned	active_low : 1;
->   	unsigned	retain_state_suspended : 1;
-> +	unsigned	panic_indicator : 1;
->   	unsigned	default_state : 2;
->   	/* default_state should be one of LEDS_GPIO_DEFSTATE_(ON|OFF|KEEP) */
->   	struct gpio_desc *gpiod;
->
+My understanding is that this is intended for dummy bits rather than
+dummy bytes.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160414/2ec0064a/attachment.sig>
