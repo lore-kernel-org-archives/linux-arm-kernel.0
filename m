@@ -1,109 +1,136 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Thu, 14 Apr 2016 19:17:49 +0930
-Subject: [PATCH 9/9] arm/configs: Add aspeed defconfig
-In-Reply-To: <1460627269-21721-1-git-send-email-joel@jms.id.au>
-References: <1460627269-21721-1-git-send-email-joel@jms.id.au>
-Message-ID: <1460627269-21721-10-git-send-email-joel@jms.id.au>
+From: brian.starkey@arm.com (Brian Starkey)
+Date: Thu, 14 Apr 2016 10:52:26 +0100
+Subject: [PATCH v2] ARM: arm64: dts: Add expansion bus to VExpress and Juno
+Message-ID: <1460627546-24230-1-git-send-email-brian.starkey@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Joel Stanley <joel@jms.id.au>
----
- arch/arm/configs/aspeed_defconfig | 86 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 86 insertions(+)
- create mode 100644 arch/arm/configs/aspeed_defconfig
+The VExpress and Juno development platforms have an external expansion
+bus which can be used for additional hardware (e.g. LogicTile Express
+daughterboards).
+Add this bus to all VExpress CoreTile and Juno device-trees.
 
-diff --git a/arch/arm/configs/aspeed_defconfig b/arch/arm/configs/aspeed_defconfig
-new file mode 100644
-index 000000000000..eb6f413dac50
---- /dev/null
-+++ b/arch/arm/configs/aspeed_defconfig
-@@ -0,0 +1,86 @@
-+CONFIG_KERNEL_XZ=y
-+CONFIG_SYSVIPC=y
-+CONFIG_USELIB=y
-+CONFIG_IRQ_DOMAIN_DEBUG=y
-+CONFIG_NO_HZ_IDLE=y
-+CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_LOG_BUF_SHIFT=14
-+CONFIG_CGROUPS=y
-+CONFIG_BLK_DEV_INITRD=y
-+# CONFIG_RD_BZIP2 is not set
-+# CONFIG_RD_LZMA is not set
-+# CONFIG_RD_LZO is not set
-+# CONFIG_RD_LZ4 is not set
-+CONFIG_CC_OPTIMIZE_FOR_SIZE=y
-+CONFIG_BPF_SYSCALL=y
-+# CONFIG_SHMEM is not set
-+# CONFIG_AIO is not set
-+CONFIG_EMBEDDED=y
-+# CONFIG_COMPAT_BRK is not set
-+CONFIG_SLAB=y
-+CONFIG_CC_STACKPROTECTOR_STRONG=y
-+CONFIG_MODULES=y
-+CONFIG_MODULE_UNLOAD=y
-+# CONFIG_BLOCK is not set
-+# CONFIG_ARCH_MULTI_V7 is not set
-+CONFIG_ARCH_ASPEED=y
-+CONFIG_MACH_OPP_PALMETTO_BMC=y
-+CONFIG_DEBUG_RODATA=y
-+CONFIG_AEABI=y
-+CONFIG_UACCESS_WITH_MEMCPY=y
-+CONFIG_SECCOMP=y
-+# CONFIG_ATAGS is not set
-+CONFIG_ZBOOT_ROM_TEXT=0x0
-+CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_ARM_ATAG_DTB_COMPAT=y
-+CONFIG_KEXEC=y
-+# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
-+# CONFIG_PREVENT_FIRMWARE_BUILD is not set
-+# CONFIG_INPUT is not set
-+# CONFIG_SERIO is not set
-+# CONFIG_VT is not set
-+# CONFIG_LEGACY_PTYS is not set
-+# CONFIG_DEVKMEM is not set
-+CONFIG_SERIAL_8250=y
-+# CONFIG_SERIAL_8250_DEPRECATED_OPTIONS is not set
-+CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_8250_NR_UARTS=6
-+CONFIG_SERIAL_8250_RUNTIME_UARTS=6
-+CONFIG_SERIAL_8250_EXTENDED=y
-+CONFIG_SERIAL_8250_SHARE_IRQ=y
-+CONFIG_SERIAL_OF_PLATFORM=y
-+# CONFIG_HW_RANDOM is not set
-+# CONFIG_USB_SUPPORT is not set
-+# CONFIG_IOMMU_SUPPORT is not set
-+CONFIG_FIRMWARE_MEMMAP=y
-+CONFIG_FANOTIFY=y
-+CONFIG_PRINTK_TIME=y
-+CONFIG_DYNAMIC_DEBUG=y
-+CONFIG_STRIP_ASM_SYMS=y
-+CONFIG_PAGE_POISONING=y
-+CONFIG_DEBUG_KMEMLEAK=y
-+CONFIG_DEBUG_SHIRQ=y
-+CONFIG_LOCKUP_DETECTOR=y
-+CONFIG_WQ_WATCHDOG=y
-+# CONFIG_SCHED_DEBUG is not set
-+CONFIG_SCHED_STACK_END_CHECK=y
-+CONFIG_DEBUG_RT_MUTEXES=y
-+CONFIG_DEBUG_WW_MUTEX_SLOWPATH=y
-+# CONFIG_FTRACE is not set
-+CONFIG_MEMTEST=y
-+CONFIG_UBSAN=y
-+CONFIG_DEBUG_USER=y
-+CONFIG_DEBUG_LL=y
-+CONFIG_DEBUG_LL_UART_8250=y
-+CONFIG_DEBUG_UART_PHYS=0x1e784000
-+CONFIG_DEBUG_UART_VIRT=0xe8784000
-+CONFIG_EARLY_PRINTK=y
-+CONFIG_DEBUG_SET_MODULE_RONX=y
-+# CONFIG_XZ_DEC_X86 is not set
-+# CONFIG_XZ_DEC_POWERPC is not set
-+# CONFIG_XZ_DEC_IA64 is not set
-+# CONFIG_XZ_DEC_SPARC is not set
+On VExpress, the bus is described for a CoreTile occupying site 1.
+
+Signed-off-by: Brian Starkey <brian.starkey@arm.com>
+Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
+---
+
+Only change from v1 is rewording of the commit message as suggested
+by Liviu.
+
+ arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts |   13 +++++++++++++
+ arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts  |   13 +++++++++++++
+ arch/arm/boot/dts/vexpress-v2p-ca5s.dts     |   13 +++++++++++++
+ arch/arm/boot/dts/vexpress-v2p-ca9.dts      |   13 +++++++++++++
+ arch/arm64/boot/dts/arm/juno-base.dtsi      |   10 ++++++++++
+ 5 files changed, 62 insertions(+)
+
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
+index 9420053..ec7539b 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
+@@ -280,4 +280,17 @@
+ 
+ 		/include/ "vexpress-v2m-rs1.dtsi"
+ 	};
++
++	site2: hsb at 40000000 {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0 0x40000000 0x3fef0000>;
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0 3>;
++		interrupt-map = <0 0 &gic 0 36 4>,
++				<0 1 &gic 0 37 4>,
++				<0 2 &gic 0 38 4>,
++				<0 3 &gic 0 39 4>;
++	};
+ };
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+index 17f63f7..a339b0c 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+@@ -638,4 +638,17 @@
+ 
+ 		/include/ "vexpress-v2m-rs1.dtsi"
+ 	};
++
++	site2: hsb at 40000000 {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0 0x40000000 0x3fef0000>;
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0 3>;
++		interrupt-map = <0 0 &gic 0 36 4>,
++				<0 1 &gic 0 37 4>,
++				<0 2 &gic 0 38 4>,
++				<0 3 &gic 0 39 4>;
++	};
+ };
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+index d2709b7..76a9ccb 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+@@ -250,4 +250,17 @@
+ 
+ 		/include/ "vexpress-v2m-rs1.dtsi"
+ 	};
++
++	site2: hsb at 40000000 {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0x40000000 0x40000000>;
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0 3>;
++		interrupt-map = <0 0 &gic 0 36 4>,
++				<0 1 &gic 0 37 4>,
++				<0 2 &gic 0 38 4>,
++				<0 3 &gic 0 39 4>;
++	};
+ };
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+index d949fac..edac212 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+@@ -359,4 +359,17 @@
+ 
+ 		/include/ "vexpress-v2m.dtsi"
+ 	};
++
++	site2: hsb at e0000000 {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0xe0000000 0x20000000>;
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0 3>;
++		interrupt-map = <0 0 &gic 0 36 4>,
++				<0 1 &gic 0 37 4>,
++				<0 2 &gic 0 38 4>,
++				<0 3 &gic 0 39 4>;
++	};
+ };
+diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+index 68ccc39..dee2386 100644
+--- a/arch/arm64/boot/dts/arm/juno-base.dtsi
++++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+@@ -272,3 +272,13 @@
+ 
+ 		/include/ "juno-motherboard.dtsi"
+ 	};
++
++	site2: tlx at 60000000 {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0 0x60000000 0x10000000>;
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0 0>;
++		interrupt-map = <0 0 &gic 0 0 0 168 IRQ_TYPE_LEVEL_HIGH>;
++	};
 -- 
-2.7.4
+1.7.9.5
