@@ -1,228 +1,82 @@
 From: geoff@infradead.org (Geoff Levand)
 Date: Thu, 14 Apr 2016 21:21:37 +0000
-Subject: [PATCH v16 18/20] arm64: kdump: add kdump support
+Subject: [PATCH v16 16/20] arm64: limit memory regions based on DT property,
+ usable-memory
 In-Reply-To: <cover.1460668521.git.geoff@infradead.org>
 References: <cover.1460668521.git.geoff@infradead.org>
-Message-ID: <a03c78bd76a21634da1ae3ccab5097ae0bfd173d.1460668521.git.geoff@infradead.org>
+Message-ID: <9001c7d079ccc488b19579d6896993ac60087a9b.1460668521.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-On crash dump kernel, all the information about primary kernel's system
-memory (core image) is available in elf core header.
-The primary kernel will set aside this header with reserve_elfcorehdr()
-at boot time and inform crash dump kernel of its location via a new
-device-tree property, "linux,elfcorehdr".
+Crash dump kernel will be run with a limited range of memory as System
+RAM.
 
-Please note that all other architectures use traditional "elfcorehdr="
-kernel parameter for this purpose.
-
-Then crash dump kernel will access the primary kernel's memory with
-copy_oldmem_page(), which reads one page by ioremap'ing it since it does
-not reside in linear mapping on crash dump kernel.
-
-We also need our own elfcorehdr_read() here since the header is placed
-within crash dump kernel's usable memory.
+On arm64, we will use a device-tree property under /chosen,
+   linux,usable-memory = <BASE SIZE>
+in order for primary kernel either on uefi or non-uefi (device tree only)
+system to hand over the information about usable memory region to crash
+dump kernel. This property will supercede entries in uefi memory map table
+and "memory" nodes in a device tree.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- arch/arm64/Kconfig             | 11 +++++++
- arch/arm64/kernel/Makefile     |  1 +
- arch/arm64/kernel/crash_dump.c | 71 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/mm/init.c           | 54 ++++++++++++++++++++++++++++++++
- 4 files changed, 137 insertions(+)
- create mode 100644 arch/arm64/kernel/crash_dump.c
+ arch/arm64/mm/init.c | 38 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index b3c5a99..44cd8cb 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -628,6 +628,17 @@ config KEXEC
- 	  but it is independent of the system firmware.   And like a reboot
- 	  you can start any kernel with it, not just Linux.
- 
-+config CRASH_DUMP
-+	bool "Build kdump crash kernel"
-+	help
-+	  Generate crash dump after being started by kexec. This should
-+	  be normally only set in special crash dump kernels which are
-+	  loaded in the main kernel with kexec-tools into a specially
-+	  reserved region and then later executed after a crash by
-+	  kdump/kexec.
-+
-+	  For more details see Documentation/kdump/kdump.txt
-+
- config XEN_DOM0
- 	def_bool y
- 	depends on XEN
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index edcc681..6b60534 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -47,6 +47,7 @@ arm64-obj-$(CONFIG_PARAVIRT)		+= paravirt.o
- arm64-obj-$(CONFIG_RANDOMIZE_BASE)	+= kaslr.o
- arm64-obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o	\
- 					   cpu-reset.o
-+arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
- 
- obj-y					+= $(arm64-obj-y) vdso/
- obj-m					+= $(arm64-obj-m)
-diff --git a/arch/arm64/kernel/crash_dump.c b/arch/arm64/kernel/crash_dump.c
-new file mode 100644
-index 0000000..2dc54d1
---- /dev/null
-+++ b/arch/arm64/kernel/crash_dump.c
-@@ -0,0 +1,71 @@
-+/*
-+ * Routines for doing kexec-based kdump
-+ *
-+ * Copyright (C) 2014 Linaro Limited
-+ * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/crash_dump.h>
-+#include <linux/errno.h>
-+#include <linux/io.h>
-+#include <linux/memblock.h>
-+#include <linux/uaccess.h>
-+#include <asm/memory.h>
-+
-+/**
-+ * copy_oldmem_page() - copy one page from old kernel memory
-+ * @pfn: page frame number to be copied
-+ * @buf: buffer where the copied page is placed
-+ * @csize: number of bytes to copy
-+ * @offset: offset in bytes into the page
-+ * @userbuf: if set, @buf is in a user address space
-+ *
-+ * This function copies one page from old kernel memory into buffer pointed by
-+ * @buf. If @buf is in userspace, set @userbuf to %1. Returns number of bytes
-+ * copied or negative error in case of failure.
-+ */
-+ssize_t copy_oldmem_page(unsigned long pfn, char *buf,
-+			 size_t csize, unsigned long offset,
-+			 int userbuf)
-+{
-+	void *vaddr;
-+
-+	if (!csize)
-+		return 0;
-+
-+	vaddr = ioremap_cache(__pfn_to_phys(pfn), PAGE_SIZE);
-+	if (!vaddr)
-+		return -ENOMEM;
-+
-+	if (userbuf) {
-+		if (copy_to_user(buf, vaddr + offset, csize)) {
-+			iounmap(vaddr);
-+			return -EFAULT;
-+		}
-+	} else {
-+		memcpy(buf, vaddr + offset, csize);
-+	}
-+
-+	iounmap(vaddr);
-+
-+	return csize;
-+}
-+
-+/**
-+ * elfcorehdr_read - read from ELF core header
-+ * @buf: buffer where the data is placed
-+ * @csize: number of bytes to read
-+ * @ppos: address in the memory
-+ *
-+ * This function reads @count bytes from elf core header which exists
-+ * on crash dump kernel's memory.
-+ */
-+ssize_t elfcorehdr_read(char *buf, size_t count, u64 *ppos)
-+{
-+	memcpy(buf, phys_to_virt((phys_addr_t)*ppos), count);
-+	return count;
-+}
 diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index cfdc7c4..5cdaba1 100644
+index 3589d78..cfdc7c4 100644
 --- a/arch/arm64/mm/init.c
 +++ b/arch/arm64/mm/init.c
-@@ -35,6 +35,7 @@
- #include <linux/efi.h>
- #include <linux/swiotlb.h>
- #include <linux/kexec.h>
-+#include <linux/crash_dump.h>
- 
- #include <asm/boot.h>
- #include <asm/fixmap.h>
-@@ -133,6 +134,57 @@ static void __init reserve_crashkernel(void)
+@@ -224,10 +224,48 @@ static int __init early_mem(char *p)
  }
- #endif /* CONFIG_KEXEC_CORE */
+ early_param("mem", early_mem);
  
-+#ifdef CONFIG_CRASH_DUMP
-+static int __init early_init_dt_scan_elfcorehdr(unsigned long node,
++static int __init early_init_dt_scan_usablemem(unsigned long node,
 +		const char *uname, int depth, void *data)
 +{
++	struct memblock_region *usablemem = (struct memblock_region *)data;
 +	const __be32 *reg;
 +	int len;
++
++	usablemem->size = 0;
 +
 +	if (depth != 1 || strcmp(uname, "chosen") != 0)
 +		return 0;
 +
-+	reg = of_get_flat_dt_prop(node, "linux,elfcorehdr", &len);
++	reg = of_get_flat_dt_prop(node, "linux,usable-memory", &len);
 +	if (!reg || (len < (dt_root_addr_cells + dt_root_size_cells)))
 +		return 1;
 +
-+	elfcorehdr_addr = dt_mem_next_cell(dt_root_addr_cells, &reg);
-+	elfcorehdr_size = dt_mem_next_cell(dt_root_size_cells, &reg);
++	usablemem->base = dt_mem_next_cell(dt_root_addr_cells, &reg);
++	usablemem->size = dt_mem_next_cell(dt_root_size_cells, &reg);
 +
 +	return 1;
 +}
 +
-+/*
-+ * reserve_elfcorehdr() - reserves memory for elf core header
-+ *
-+ * This function reserves elf core header given in "elfcorehdr=" kernel
-+ * command line parameter. This region contains all the information about
-+ * primary kernel's core image and is used by a dump capture kernel to
-+ * access the system memory on primary kernel.
-+ */
-+static void __init reserve_elfcorehdr(void)
++static void __init fdt_enforce_memory_region(void)
 +{
-+	of_scan_flat_dt(early_init_dt_scan_elfcorehdr, NULL);
++	struct memblock_region reg;
 +
-+	if (!elfcorehdr_size)
-+		return;
++	of_scan_flat_dt(early_init_dt_scan_usablemem, &reg);
 +
-+	if (memblock_is_region_reserved(elfcorehdr_addr, elfcorehdr_size)) {
-+		pr_warn("elfcorehdr is overlapped\n");
-+		return;
++	if (reg.size) {
++		memblock_remove(0, PAGE_ALIGN(reg.base));
++		memblock_remove(round_down(reg.base + reg.size, PAGE_SIZE),
++				ULLONG_MAX);
 +	}
-+
-+	memblock_reserve(elfcorehdr_addr, elfcorehdr_size);
-+
-+	pr_info("Reserving %lldKB of memory@0x%llx for elfcorehdr\n",
-+		elfcorehdr_size >> 10, elfcorehdr_addr);
 +}
-+#else
-+static void __init reserve_elfcorehdr(void)
-+{
-+	;
-+}
-+#endif /* CONFIG_CRASH_DUMP */
- /*
-  * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
-  * currently assumes that for memory starting above 4G, 32-bit devices will
-@@ -333,6 +385,8 @@ void __init arm64_memblock_init(void)
- 
- 	reserve_crashkernel();
- 
-+	reserve_elfcorehdr();
 +
- 	early_init_fdt_scan_reserved_mem();
+ void __init arm64_memblock_init(void)
+ {
+ 	const s64 linear_region_size = -(s64)PAGE_OFFSET;
  
- 	/* 4GB maximum for 32-bit only capable devices */
++	/* Handle linux,usable-memory property */
++	fdt_enforce_memory_region();
++
+ 	/*
+ 	 * Ensure that the linear region takes up exactly half of the kernel
+ 	 * virtual address space. This way, we can distinguish a linear address
 -- 
 2.5.0
