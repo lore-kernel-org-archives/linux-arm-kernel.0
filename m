@@ -1,48 +1,46 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 14 Apr 2016 09:29:20 +1000
-Subject: linux-next: manual merge of the mvebu tree with the arm-soc tree
-Message-ID: <20160414092920.41fb4ebe@canb.auug.org.au>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 14 Apr 2016 08:12:46 +0800
+Subject: [GIT PULL] Renesas ARM Based SoC Cleanup for v4.7
+In-Reply-To: <20160413191645.GO19945@localhost>
+References: <cover.1459731908.git.horms+renesas@verge.net.au>
+ <20160413191645.GO19945@localhost>
+Message-ID: <20160414001245.GA14004@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Wed, Apr 13, 2016 at 12:16:45PM -0700, Olof Johansson wrote:
+> On Mon, Apr 04, 2016 at 10:22:33AM +0900, Simon Horman wrote:
+> > Hi Olof, Hi Kevin, Hi Arnd,
+> > 
+> > Please consider these Renesas ARM based SoC cleanup for v4.7.
+> > 
+> > 
+> > The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+> > 
+> >   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-cleanup-for-v4.7
+> > 
+> > for you to fetch changes up to 000025cfbb9e8bafd0a1fa84d8d83526d24bde42:
+> > 
+> >   ARM: dts: sh73a0: Remove unnecessary clock-output-names properties (2016-03-28 08:56:11 +0900)
+> > 
+> > ----------------------------------------------------------------
+> > Renesas ARM Based SoC Cleanup for v4.7
+> > 
+> > * Remove unnecessary clock-output-names properties from DT
+> > * Use generic pinctrl properties in DT
+> 
+> Hi,
+> 
+> Ok, so this is the second cleanup-labelled branch from you. I'm OK with these
+> being split out, but we normally don't merge dt changes in the cleanup branch,
+> we group them with other DT changes. So I've merged this into next/dt.
+> 
+> If you want to separate out dt cleanups, I'm OK with that. Just don't mix
+> DT and non-DT cleanups in those branches in the future, so I can still choose
+> to merge into next/dt.
 
-Today's linux-next merge of the mvebu tree got a conflict in:
-
-  arch/arm/configs/multi_v7_defconfig
-
-between commit:
-
-  6d54fb8a08a7 ("ARM: multi_v7_defconfig: Enable ST's HW Random Number Generator")
-
-from the arm-soc tree and commit:
-
-  fe767240934f ("ARM: configs: Enabling the new Marvell's cryptographic engine driver for multi_v7_defconfig")
-
-from the mvebu tree.
-
-I fixed it up (see below) and can carry the fix as necessary. This
-is now fixed as far as linux-next is concerned, but any non trivial
-conflicts should be mentioned to your upstream maintainer when your tree
-is submitted for merging.  You may also want to consider cooperating
-with the maintainer of the conflicting tree to minimise any particularly
-complex conflicts.
-
--- 
-Cheers,
-Stephen Rothwell
-
-diff --cc arch/arm/configs/multi_v7_defconfig
-index 811b41823baa,392e970b60c7..000000000000
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@@ -837,8 -829,7 +837,9 @@@ CONFIG_LOCKUP_DETECTOR=
-  CONFIG_CRYPTO_DEV_TEGRA_AES=y
-  CONFIG_CPUFREQ_DT=y
-  CONFIG_KEYSTONE_IRQ=y
- +CONFIG_HW_RANDOM=y
- +CONFIG_HW_RANDOM_ST=y
-+ CONFIG_CRYPTO_DEV_MARVELL_CESA=m
-  CONFIG_CRYPTO_DEV_SUN4I_SS=m
-  CONFIG_CRYPTO_DEV_ROCKCHIP=m
-  CONFIG_ARM_CRYPTO=y
+Thanks, understood.
