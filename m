@@ -1,73 +1,107 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 14 Apr 2016 14:21:05 +0100
-Subject: [PATCH v2 17/17] arm64: kvm: Add support for 16K pages
+Date: Thu, 14 Apr 2016 14:20:53 +0100
+Subject: [PATCH v2 05/17] kvm-arm: Replace kvm_pmd_huge with pmd_thp_or_huge
 In-Reply-To: <1460640065-27658-1-git-send-email-suzuki.poulose@arm.com>
 References: <1460640065-27658-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1460640065-27658-18-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1460640065-27658-6-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we can handle stage-2 page tables independent
-of the host page table levels, wire up the 16K page
-support.
+Both arm and arm64 now provides a helper, pmd_thp_or_huge()
+to check if the given pmd represents a huge page. Use that
+instead of our own custom check.
 
+Suggested-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/kvm_arm.h |   13 +++++++++++--
- arch/arm64/kvm/Kconfig           |    1 -
- 2 files changed, 11 insertions(+), 3 deletions(-)
+ arch/arm/kvm/mmu.c |   17 ++++++++---------
+ 1 file changed, 8 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 1281d98..c6cbb36 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -114,6 +114,7 @@
- #define VTCR_EL2_PS_MASK	TCR_EL2_PS_MASK
- #define VTCR_EL2_TG0_MASK	TCR_TG0_MASK
- #define VTCR_EL2_TG0_4K		TCR_TG0_4K
-+#define VTCR_EL2_TG0_16K	TCR_TG0_16K
- #define VTCR_EL2_TG0_64K	TCR_TG0_64K
- #define VTCR_EL2_SH0_MASK	TCR_SH0_MASK
- #define VTCR_EL2_SH0_INNER	TCR_SH0_INNER
-@@ -139,7 +140,7 @@
-  * (see hyp-init.S).
-  *
-  * Note that when using 4K pages, we concatenate two first level page tables
-- * together.
-+ * together. With 16K pages, we concatenate 16 first level page tables.
-  *
-  * The magic numbers used for VTTBR_X in this patch can be found in Tables
-  * D4-23 and D4-25 in ARM DDI 0487A.b.
-@@ -157,7 +158,15 @@
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 774d00b..7837f0a 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -45,7 +45,6 @@ static phys_addr_t hyp_idmap_vector;
+ 
+ #define hyp_pgd_order get_order(PTRS_PER_PGD * sizeof(pgd_t))
+ 
+-#define kvm_pmd_huge(_x)	(pmd_huge(_x) || pmd_trans_huge(_x))
+ #define kvm_pud_huge(_x)	pud_huge(_x)
+ 
+ #define KVM_S2PTE_FLAG_IS_IOMAP		(1UL << 0)
+@@ -115,7 +114,7 @@ static bool kvm_is_device_pfn(unsigned long pfn)
   */
- #define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_64K | VTCR_EL2_SL0_LVL1)
- #define VTTBR_X_TGRAN_MAGIC		38
--#else
-+#elif defined(CONFIG_ARM64_16K_PAGES)
-+/*
-+ * Stage2 translation configuration:
-+ * 16kB pages (TG0 = 2)
-+ * 2 level page tables (SL = 1)
-+ */
-+#define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_16K | VTCR_EL2_SL0_LVL1)
-+#define VTTBR_X_TGRAN_MAGIC		42
-+#else	/* 4K */
- /*
-  * Stage2 translation configuration:
-  * 4kB pages (TG0 = 0)
-diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-index de7450d..aa2e34e 100644
---- a/arch/arm64/kvm/Kconfig
-+++ b/arch/arm64/kvm/Kconfig
-@@ -22,7 +22,6 @@ config KVM_ARM_VGIC_V3
- config KVM
- 	bool "Kernel-based Virtual Machine (KVM) support"
- 	depends on OF
--	depends on !ARM64_16K_PAGES
- 	select MMU_NOTIFIER
- 	select PREEMPT_NOTIFIERS
- 	select ANON_INODES
+ static void stage2_dissolve_pmd(struct kvm *kvm, phys_addr_t addr, pmd_t *pmd)
+ {
+-	if (!kvm_pmd_huge(*pmd))
++	if (!pmd_thp_or_huge(*pmd))
+ 		return;
+ 
+ 	pmd_clear(pmd);
+@@ -177,7 +176,7 @@ static void clear_pud_entry(struct kvm *kvm, pud_t *pud, phys_addr_t addr)
+ static void clear_pmd_entry(struct kvm *kvm, pmd_t *pmd, phys_addr_t addr)
+ {
+ 	pte_t *pte_table = pte_offset_kernel(pmd, 0);
+-	VM_BUG_ON(kvm_pmd_huge(*pmd));
++	VM_BUG_ON(pmd_thp_or_huge(*pmd));
+ 	pmd_clear(pmd);
+ 	kvm_tlb_flush_vmid_ipa(kvm, addr);
+ 	pte_free_kernel(NULL, pte_table);
+@@ -240,7 +239,7 @@ static void unmap_pmds(struct kvm *kvm, pud_t *pud,
+ 	do {
+ 		next = kvm_pmd_addr_end(addr, end);
+ 		if (!pmd_none(*pmd)) {
+-			if (kvm_pmd_huge(*pmd)) {
++			if (pmd_thp_or_huge(*pmd)) {
+ 				pmd_t old_pmd = *pmd;
+ 
+ 				pmd_clear(pmd);
+@@ -326,7 +325,7 @@ static void stage2_flush_pmds(struct kvm *kvm, pud_t *pud,
+ 	do {
+ 		next = kvm_pmd_addr_end(addr, end);
+ 		if (!pmd_none(*pmd)) {
+-			if (kvm_pmd_huge(*pmd))
++			if (pmd_thp_or_huge(*pmd))
+ 				kvm_flush_dcache_pmd(*pmd);
+ 			else
+ 				stage2_flush_ptes(kvm, pmd, addr, next);
+@@ -1050,7 +1049,7 @@ static void stage2_wp_pmds(pud_t *pud, phys_addr_t addr, phys_addr_t end)
+ 	do {
+ 		next = kvm_pmd_addr_end(addr, end);
+ 		if (!pmd_none(*pmd)) {
+-			if (kvm_pmd_huge(*pmd)) {
++			if (pmd_thp_or_huge(*pmd)) {
+ 				if (!kvm_s2pmd_readonly(pmd))
+ 					kvm_set_s2pmd_readonly(pmd);
+ 			} else {
+@@ -1331,7 +1330,7 @@ static void handle_access_fault(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa)
+ 	if (!pmd || pmd_none(*pmd))	/* Nothing there */
+ 		goto out;
+ 
+-	if (kvm_pmd_huge(*pmd)) {	/* THP, HugeTLB */
++	if (pmd_thp_or_huge(*pmd)) {	/* THP, HugeTLB */
+ 		*pmd = pmd_mkyoung(*pmd);
+ 		pfn = pmd_pfn(*pmd);
+ 		pfn_valid = true;
+@@ -1555,7 +1554,7 @@ static int kvm_age_hva_handler(struct kvm *kvm, gpa_t gpa, void *data)
+ 	if (!pmd || pmd_none(*pmd))	/* Nothing there */
+ 		return 0;
+ 
+-	if (kvm_pmd_huge(*pmd)) {	/* THP, HugeTLB */
++	if (pmd_thp_or_huge(*pmd)) {	/* THP, HugeTLB */
+ 		if (pmd_young(*pmd)) {
+ 			*pmd = pmd_mkold(*pmd);
+ 			return 1;
+@@ -1585,7 +1584,7 @@ static int kvm_test_age_hva_handler(struct kvm *kvm, gpa_t gpa, void *data)
+ 	if (!pmd || pmd_none(*pmd))	/* Nothing there */
+ 		return 0;
+ 
+-	if (kvm_pmd_huge(*pmd))		/* THP, HugeTLB */
++	if (pmd_thp_or_huge(*pmd))		/* THP, HugeTLB */
+ 		return pmd_young(*pmd);
+ 
+ 	pte = pte_offset_kernel(pmd, gpa);
 -- 
 1.7.9.5
