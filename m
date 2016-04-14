@@ -1,181 +1,74 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 14 Apr 2016 21:17:21 +0200
-Subject: [PATCH v5 01/24] pwm: introduce the pwm_args concept
+Date: Thu, 14 Apr 2016 21:17:23 +0200
+Subject: [PATCH v5 03/24] clk: pwm: use pwm_get_args() where appropriate
 In-Reply-To: <1460661464-11216-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1460661464-11216-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1460661464-11216-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1460661464-11216-4-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the PWM core mixes the current PWM state with the per-platform
-reference config (specified through the PWM lookup table, DT definition or
-directly hardcoded in PWM drivers).
+The PWM framework has clarified the concept of reference PWM config
+(the platform dependent config retrieved from the DT or the PWM
+lookup table) and real PWM state.
 
-Create a pwm_args struct to store this reference config, so that PWM users
-can differentiate the current config from the reference one.
+Use pwm_get_args() when the PWM user wants to retrieve this reference
+config and not the current state.
 
-Patch all places where pwm->args should be initialized. We keep the
-pwm_set_polarity/period() calls until all PWM users are patched to
-use pwm_args instead of pwm_get_period/polarity().
+This is part of the rework allowing the PWM framework to support
+hardware readout and expose real PWM state even when the PWM has
+just been requested (before the user calls pwm_config/enable/disable()).
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/pwm/core.c         | 22 +++++++++++++++-------
- drivers/pwm/pwm-clps711x.c |  2 +-
- drivers/pwm/pwm-pxa.c      |  2 +-
- include/linux/pwm.h        | 32 ++++++++++++++++++++++++++++++++
- 4 files changed, 49 insertions(+), 9 deletions(-)
+ drivers/clk/clk-pwm.c | 17 ++++++++++++-----
+ 1 file changed, 12 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-index 7c330ff..ac89529 100644
---- a/drivers/pwm/core.c
-+++ b/drivers/pwm/core.c
-@@ -128,6 +128,14 @@ static int pwm_device_request(struct pwm_device *pwm, const char *label)
- 	set_bit(PWMF_REQUESTED, &pwm->flags);
- 	pwm->label = label;
+diff --git a/drivers/clk/clk-pwm.c b/drivers/clk/clk-pwm.c
+index 8830458..1630a1f 100644
+--- a/drivers/clk/clk-pwm.c
++++ b/drivers/clk/clk-pwm.c
+@@ -59,6 +59,7 @@ static int clk_pwm_probe(struct platform_device *pdev)
+ 	struct clk_init_data init;
+ 	struct clk_pwm *clk_pwm;
+ 	struct pwm_device *pwm;
++	struct pwm_args pargs;
+ 	const char *clk_name;
+ 	struct clk *clk;
+ 	int ret;
+@@ -71,22 +72,28 @@ static int clk_pwm_probe(struct platform_device *pdev)
+ 	if (IS_ERR(pwm))
+ 		return PTR_ERR(pwm);
  
+-	if (!pwm->period) {
++	pwm_get_args(pwm, &pargs);
++	if (!pargs.period) {
+ 		dev_err(&pdev->dev, "invalid PWM period\n");
+ 		return -EINVAL;
+ 	}
+ 
+ 	if (of_property_read_u32(node, "clock-frequency", &clk_pwm->fixed_rate))
+-		clk_pwm->fixed_rate = NSEC_PER_SEC / pwm->period;
++		clk_pwm->fixed_rate = NSEC_PER_SEC / pargs.period;
+ 
+-	if (pwm->period != NSEC_PER_SEC / clk_pwm->fixed_rate &&
+-	    pwm->period != DIV_ROUND_UP(NSEC_PER_SEC, clk_pwm->fixed_rate)) {
++	if (pargs.period != NSEC_PER_SEC / clk_pwm->fixed_rate &&
++	    pargs.period != DIV_ROUND_UP(NSEC_PER_SEC, clk_pwm->fixed_rate)) {
+ 		dev_err(&pdev->dev,
+ 			"clock-frequency does not match PWM period\n");
+ 		return -EINVAL;
+ 	}
+ 
+-	ret = pwm_config(pwm, (pwm->period + 1) >> 1, pwm->period);
 +	/*
-+	 * FIXME: this should be removed as soon as all PWM users are
-+	 * properly making use of pwm_args to initialize the PWM device.
-+	 * If we don't get rid of it, then PWM state and hardware can be
-+	 * desynchronized.
++	 * FIXME: pwm_apply_args() should be removed when switching to the
++	 * atomic PWM API.
 +	 */
 +	pwm_apply_args(pwm);
-+
- 	return 0;
- }
++	ret = pwm_config(pwm, (pargs.period + 1) >> 1, pargs.period);
+ 	if (ret < 0)
+ 		return ret;
  
-@@ -146,12 +154,12 @@ of_pwm_xlate_with_flags(struct pwm_chip *pc, const struct of_phandle_args *args)
- 	if (IS_ERR(pwm))
- 		return pwm;
- 
--	pwm_set_period(pwm, args->args[1]);
-+	pwm->args.period = args->args[1];
- 
- 	if (args->args[2] & PWM_POLARITY_INVERTED)
--		pwm_set_polarity(pwm, PWM_POLARITY_INVERSED);
-+		pwm->args.polarity = PWM_POLARITY_INVERSED;
- 	else
--		pwm_set_polarity(pwm, PWM_POLARITY_NORMAL);
-+		pwm->args.polarity = PWM_POLARITY_NORMAL;
- 
- 	return pwm;
- }
-@@ -172,7 +180,7 @@ of_pwm_simple_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
- 	if (IS_ERR(pwm))
- 		return pwm;
- 
--	pwm_set_period(pwm, args->args[1]);
-+	pwm->args.period = args->args[1];
- 
- 	return pwm;
- }
-@@ -736,13 +744,13 @@ struct pwm_device *pwm_get(struct device *dev, const char *con_id)
- 	if (!chip)
- 		goto out;
- 
-+	pwm->args.period = chosen->period;
-+	pwm->args.polarity = chosen->polarity;
-+
- 	pwm = pwm_request_from_chip(chip, chosen->index, con_id ?: dev_id);
- 	if (IS_ERR(pwm))
- 		goto out;
- 
--	pwm_set_period(pwm, chosen->period);
--	pwm_set_polarity(pwm, chosen->polarity);
--
- out:
- 	mutex_unlock(&pwm_lookup_lock);
- 	return pwm;
-diff --git a/drivers/pwm/pwm-clps711x.c b/drivers/pwm/pwm-clps711x.c
-index a80c108..7d33542 100644
---- a/drivers/pwm/pwm-clps711x.c
-+++ b/drivers/pwm/pwm-clps711x.c
-@@ -60,7 +60,7 @@ static int clps711x_pwm_request(struct pwm_chip *chip, struct pwm_device *pwm)
- 		return -EINVAL;
- 
- 	/* Store constant period value */
--	pwm_set_period(pwm, DIV_ROUND_CLOSEST(NSEC_PER_SEC, freq));
-+	pwm->args.period = DIV_ROUND_CLOSEST(NSEC_PER_SEC, freq);
- 
- 	return 0;
- }
-diff --git a/drivers/pwm/pwm-pxa.c b/drivers/pwm/pwm-pxa.c
-index cb2f702..58b709f 100644
---- a/drivers/pwm/pwm-pxa.c
-+++ b/drivers/pwm/pwm-pxa.c
-@@ -160,7 +160,7 @@ pxa_pwm_of_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
- 	if (IS_ERR(pwm))
- 		return pwm;
- 
--	pwm_set_period(pwm, args->args[0]);
-+	pwm->args.period = args->args[0];
- 
- 	return pwm;
- }
-diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-index 6555f01..c8859b7 100644
---- a/include/linux/pwm.h
-+++ b/include/linux/pwm.h
-@@ -74,6 +74,23 @@ enum pwm_polarity {
- 	PWM_POLARITY_INVERSED,
- };
- 
-+/**
-+ * struct pwm_args - PWM arguments
-+ * @period: reference period
-+ * @polarity: reference polarity
-+ *
-+ * This structure describes board-dependent arguments attached to a PWM
-+ * device. Those arguments are usually retrieved from the PWM lookup table or
-+ * DT definition.
-+ * This should not be confused with the PWM state: PWM args don't represent
-+ * the current PWM state, but the configuration the PWM user plans to use
-+ * on this PWM device.
-+ */
-+struct pwm_args {
-+	unsigned int period;
-+	enum pwm_polarity polarity;
-+};
-+
- enum {
- 	PWMF_REQUESTED = 1 << 0,
- 	PWMF_ENABLED = 1 << 1,
-@@ -91,6 +108,7 @@ enum {
-  * @period: period of the PWM signal (in nanoseconds)
-  * @duty_cycle: duty cycle of the PWM signal (in nanoseconds)
-  * @polarity: polarity of the PWM signal
-+ * @args: PWM arguments
-  */
- struct pwm_device {
- 	const char *label;
-@@ -103,6 +121,8 @@ struct pwm_device {
- 	unsigned int period;
- 	unsigned int duty_cycle;
- 	enum pwm_polarity polarity;
-+
-+	struct pwm_args args;
- };
- 
- static inline bool pwm_is_enabled(const struct pwm_device *pwm)
-@@ -142,6 +162,18 @@ static inline enum pwm_polarity pwm_get_polarity(const struct pwm_device *pwm)
- 	return pwm ? pwm->polarity : PWM_POLARITY_NORMAL;
- }
- 
-+static inline void pwm_get_args(const struct pwm_device *pwm,
-+				struct pwm_args *args)
-+{
-+	*args = pwm->args;
-+}
-+
-+static inline void pwm_apply_args(struct pwm_device *pwm)
-+{
-+	pwm_set_period(pwm, pwm->args.period);
-+	pwm_set_polarity(pwm, pwm->args.polarity);
-+}
-+
- /**
-  * struct pwm_ops - PWM controller operations
-  * @request: optional hook for requesting a PWM
 -- 
 2.5.0
