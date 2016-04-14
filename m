@@ -1,46 +1,67 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 14 Apr 2016 17:46:43 +0100
-Subject: [PATCH v2 2/3] devicetree: leds: Introduce "panic-indicator"
- optional property
-In-Reply-To: <1460570899-24642-3-git-send-email-ezequiel@vanguardiasur.com.ar>
-References: <1460570899-24642-1-git-send-email-ezequiel@vanguardiasur.com.ar>
- <1460570899-24642-3-git-send-email-ezequiel@vanguardiasur.com.ar>
-Message-ID: <570FC973.2040708@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 14 Apr 2016 17:46:54 +0100
+Subject: [PATCH] arm64: acpi: add a Kconfig option to prefer ACPI boot
+ over DT
+In-Reply-To: <570E7FFE.6050007@hpe.com>
+References: <1460373568-4374-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20160412130751.GA8066@e104818-lin.cambridge.arm.com>
+ <CAKv+Gu-XYoyRkfMtdSARW0mf5dbztWbjM7hps4yBS6O1hKfRqg@mail.gmail.com>
+ <20160412133555.GD8066@e104818-lin.cambridge.arm.com>
+ <CAK-u0QmB7QWBTosbhqVeFXF5ZRjt9UM9h-8wcV+LvXvg1yPkwg@mail.gmail.com>
+ <20160413135929.GB15182@e104818-lin.cambridge.arm.com>
+ <570E7FFE.6050007@hpe.com>
+Message-ID: <20160414164653.GE15182@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ezequiel,
+On Wed, Apr 13, 2016 at 10:21:02AM -0700, Roy Franz wrote:
+> On 04/13/2016 06:59 AM, Catalin Marinas wrote:
+> >On Tue, Apr 12, 2016 at 12:41:23PM -0700, Roy Franz (HPE) wrote:
+> >>While this is a 'distro preference', I think it is somewhat ugly for
+> >>this to be configured on the commandline.   We (HPE) don't support DT,
+> >>and I don't think that is likely to change. While we control the
+> >>firmware for our main internal platform, and don't provide a DT there,
+> >>we also do development and testing on other platforms where the
+> >>firmware may provide a DT, but we never want to use it.  This requires
+> >>developers/users to specify "acpi=force" on the command-line to boot
+> >>in a supported manner.
+> >
+> >You wrongly assume that everyone wants ACPI by generalising "we" (HPE)
+> >to "developers/users".
+> 
+> This is not what I am assuming or thinking.  I think that a large enough set
+> of arm64 developers and users care primarily/only about ACPI,
+> and would benefit from not having to have an "acpi=xx" on the command-line
+> forevermore.
 
-On 13/04/16 19:08, Ezequiel Garcia wrote:
-> It's desirable to specify which LEDs are to be blinked on a kernel
-> panic. Therefore, introduce a devicetree boolean property to mark
-> which LEDs should be treated this way, if possible.
->
-> Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
-> ---
->   Documentation/devicetree/bindings/leds/common.txt | 3 +++
->   1 file changed, 3 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/leds/common.txt b/Documentation/devicetree/bindings/leds/common.txt
-> index 68419843e32f..7b646a7808ce 100644
-> --- a/Documentation/devicetree/bindings/leds/common.txt
-> +++ b/Documentation/devicetree/bindings/leds/common.txt
-> @@ -37,6 +37,9 @@ Optional properties for child nodes:
->                        property is mandatory for the LEDs in the non-flash modes
->                        (e.g. torch or indicator).
->
-> +- panic-indicator : This properties specifies that the LED should be used,
+That's to the detriment of those wanting to use DT on such platforms and
+would have to pass "acpi=off" (because I don't believe in different
+kernel images/configurations for different platforms).
 
-s/properties/property/
+You may argue that no-one wants to use DT if the firmware also provides
+ACPI. As we currently stand, there are two main camps on ARM:
 
-Maybe phrasing it as "should also be used" might make the intention a 
-bit clearer, as well.
+1. The DT one, unlikely to ever bother with ACPI for their platforms
+   (e.g. mobile). This camp never cares about DT vs ACPI preference
+   because their firmware would never provide the latter
 
-Robin.
+2. The ACPI early adopters. Of these, there are two sub-categories:
+   a) those who care about mainline Linux and provide a DT (in addition
+      to ACPI) with their firmware as the more mature solution
+   b) those who only run distro kernels with tons of patches and think
+      that ACPI on ARM is ready, the last thing to solve being the boot
+      priority
 
-> +		    if at all possible, as a panic indicator.
-> +
->   Required properties for flash LED child nodes:
->   - flash-max-microamp : Maximum flash LED supply current in microamperes.
->   - flash-max-timeout-us : Maximum timeout in microseconds after which the flash
->
+As maintainer, I only care about (1) and (2.a). When ACPI on ARM will be
+mature enough and more feature-rich than DT (e.g. RAS features), we can
+revisit the ACPI vs DT boot priority, potentially making a switch
+without any additional config options. Who knows, maybe at that point no
+firmware will provide both DT and ACPI and we won't need to do anything
+in the kernel.
+
+But in the meantime, from a _mainline_ perspective, DT is considered the
+recommended/better supported option and the boot preference should only
+be overridden by users explicitly via command line arguments.
+
+-- 
+Catalin
