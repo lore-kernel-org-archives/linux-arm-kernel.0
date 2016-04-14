@@ -1,47 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 14 Apr 2016 22:04:36 +0200
-Subject: [GIT PULL] Nomadik DTS changes for v4.7
-Message-ID: <CACRpkdbMtUfnSKZHj4D3h+ChKq+V8hqVvNYSShvekAiMLk6tDA@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 14 Apr 2016 22:18:18 +0200
+Subject: [PATCH v2 1/2] dt-bindings: pci: add DT binding for Marvell
+ Armada 7K/8K PCIe controller
+In-Reply-To: <20160414174046.GA25285@rob-hp-laptop>
+References: <1460648177-31473-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1460648177-31473-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160414174046.GA25285@rob-hp-laptop>
+Message-ID: <20160414221818.4726e6c4@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC folks,
+Hello,
 
-here are a few Nomadik DTS edits for v4.7:
-- Activate the accelerometer on NHK15
-- Some DMA support
+On Thu, 14 Apr 2016 12:40:46 -0500, Rob Herring wrote:
 
-As it also says in the signed tag.
+> I already acked the last version, did something change?
 
-Please pull it in!
+>From the cover letter:
 
-Yours,
-Linus Walleij
+"""
+Changes since v1:
 
-The following changes since commit 9735a22799b9214d17d3c231fe377fc852f042e9:
+ - Change the DT binding to take only one clock, since in fact all
+   PCIe lane clocks are child of the PCIe main clock, so there is no
+   need for the PCIe controllers to take a reference to both.
 
-  Linux 4.6-rc2 (2016-04-03 09:09:40 -0500)
+[...]
 
-are available in the git repository at:
+Rob: due to the change to the DT binding (even though minimal), I have
+not kept your Acked-by. So if it still stands despite the DT binding
+change, could you send it again? Thanks!
+"""
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
-tags/nomadik-dts-v4.7
+> Acked-by: Rob Herring <rob@kernel.org>
 
-for you to fetch changes up to a22d7768860aedcd9c4011075c4d3bc1eaaddd63:
+Thanks!
 
-  ARM: dts: nomadik: add DMA engine and some channels (2016-04-14
-21:47:10 +0200)
-
-----------------------------------------------------------------
-Nomadik DTS changes for v4.7:
-- Add accelerometer for NHK15
-- Add DMA engine definitions and UART channels
-
-----------------------------------------------------------------
-Linus Walleij (2):
-      ARM: dts: nomadik: add accelerometer IRQ and pin setting
-      ARM: dts: nomadik: add DMA engine and some channels
-
- arch/arm/boot/dts/ste-nomadik-nhk15.dts    | 13 +++++++++-
- arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 38 ++++++++++++++++++++++++++++++
- 2 files changed, 50 insertions(+), 1 deletion(-)
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
