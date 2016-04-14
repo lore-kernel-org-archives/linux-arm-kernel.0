@@ -1,45 +1,42 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 14 Apr 2016 13:05:39 +0200
-Subject: [PATCH v5 01/46] pwm: rcar: make use of pwm_is_enabled()
-In-Reply-To: <20160412110152.GG18882@ulmo.ba.sec>
-References: <1459368249-13241-1-git-send-email-boris.brezillon@free-electrons.com>
- <1459368249-13241-2-git-send-email-boris.brezillon@free-electrons.com>
- <20160412110152.GG18882@ulmo.ba.sec>
-Message-ID: <20160414130539.272166b0@bbrezillon>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 14 Apr 2016 14:07:49 +0300
+Subject: [PATCHv2 00/28] ARM: OMAP2+: hwmod module clock type support
+Message-ID: <1460632097-25727-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry
+Hi,
 
-On Tue, 12 Apr 2016 13:01:52 +0200
-Thierry Reding <thierry.reding@gmail.com> wrote:
+v2 contains following changes in comparison to v1:
 
-> On Wed, Mar 30, 2016 at 10:03:24PM +0200, Boris Brezillon wrote:
-> > Commit 5c31252c4a86 ("pwm: Add the pwm_is_enabled() helper") introduced a
-> > new function to test whether a PWM device is enabled or not without
-> > manipulating PWM internal fields.
-> > Hiding this is necessary if we want to smoothly move to the atomic PWM
-> > config approach without impacting PWM drivers.
-> > Fix this driver to use pwm_is_enabled() instead of directly accessing the
-> > ->flags field.
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > ---
-> >  drivers/pwm/pwm-rcar.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> Applied, thanks.
+- Patch ordering changed a bit, clk/ti, mach-omap2, dts patches are now
+  mostly grouped together, with the exception of the introduction of
+  clock helper API, which is needed by everything else. Please note
+  that the ordering must be preserved between mach-omap2/clk-driver/dts
+  to avoid boot problems.
+- Dropped hwmod data removal patches for now, this allows booting with
+  either new or old DTS data.
+- Fixed a typo in the hwmod clock driver timeout handling, the comparison
+  for timeout against ktime_us_delta was wrong causing too short
+  timeouts, this was apparent with cpuidle enabled on OMAP4
+- Added patch #6 to fetch hwmod main clock based on the hwmod name itself,
+  if found, ignore main_clk / clkctrl setup for the hwmod
+- Added patch #7 to fix issue in omap2 timer caused by patch #6, with
+  dynamic parsing of main clock, the hwmod must be setup before attempting
+  to access main_clk.
 
-I'd like to rebase my atomic series on top of pwm/for-next but I don't
-see the 4 patches you said you applied. Did you forget to push
-your local branch, or did you decide to revert them based on Lee's
-comments?
+Boot tested on am335x-evm, am335x-evmsk, am3517-evm, am37x-evm, am437x-sk,
+am437x-gp-evm, am57xx-evm, omap3-beagle-xm, omap3-beagle, am335x-boneblack,
+am335x-bone, omap3-crane, dra72x-ev, dra7xx-evm, ldp3430, omap4-panda-es,
+omap4-panda, omap2430-sdp, omap3430-sdp, omap4-sdp-es23plus, omap5-uevm.
 
-Regards,
+Suspend-resume tested on omap3-beagle, omap4-panda-es.
 
-Boris
+Cpuidle tested on omap4-panda-es. For some reason cpuidle is not functional
+for me on omap3-beagle, even on plain 4.6-rc2.
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Branch pushed at:
+tree: https://github.com/t-kristo/linux-pm.git
+branch: 4.6-rc2-hwmod-clks-v2
+
+-Tero
