@@ -1,9 +1,9 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 14 Apr 2016 21:17:27 +0200
-Subject: [PATCH v5 07/24] regulator: pwm: use pwm_get_args() where appropriate
+Date: Thu, 14 Apr 2016 21:17:26 +0200
+Subject: [PATCH v5 06/24] leds: pwm: use pwm_get_args() where appropriate
 In-Reply-To: <1460661464-11216-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1460661464-11216-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1460661464-11216-8-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1460661464-11216-7-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,65 +19,39 @@ hardware readout and expose real PWM state even when the PWM has
 just been requested (before the user calls pwm_config/enable/disable()).
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Acked-by: Jacek Anaszewski <j.anaszewski@samsung.com>
 ---
- drivers/regulator/pwm-regulator.c | 20 ++++++++++++++------
- 1 file changed, 14 insertions(+), 6 deletions(-)
+ drivers/leds/leds-pwm.c | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
-index 4689d62..ffdb895 100644
---- a/drivers/regulator/pwm-regulator.c
-+++ b/drivers/regulator/pwm-regulator.c
-@@ -59,16 +59,16 @@ static int pwm_regulator_set_voltage_sel(struct regulator_dev *rdev,
- 					 unsigned selector)
+diff --git a/drivers/leds/leds-pwm.c b/drivers/leds/leds-pwm.c
+index 4783bac..a9145aa 100644
+--- a/drivers/leds/leds-pwm.c
++++ b/drivers/leds/leds-pwm.c
+@@ -91,6 +91,7 @@ static int led_pwm_add(struct device *dev, struct led_pwm_priv *priv,
+ 		       struct led_pwm *led, struct device_node *child)
  {
- 	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
--	unsigned int pwm_reg_period;
+ 	struct led_pwm_data *led_data = &priv->leds[priv->num_leds];
 +	struct pwm_args pargs;
- 	int dutycycle;
  	int ret;
  
--	pwm_reg_period = pwm_get_period(drvdata->pwm);
-+	pwm_get_args(drvdata->pwm, &pargs);
+ 	led_data->active_low = led->active_low;
+@@ -117,7 +118,15 @@ static int led_pwm_add(struct device *dev, struct led_pwm_priv *priv,
+ 	else
+ 		led_data->cdev.brightness_set_blocking = led_pwm_set_blocking;
  
--	dutycycle = (pwm_reg_period *
-+	dutycycle = (pargs.period *
- 		    drvdata->duty_cycle_table[selector].dutycycle) / 100;
- 
--	ret = pwm_config(drvdata->pwm, dutycycle, pwm_reg_period);
-+	ret = pwm_config(drvdata->pwm, dutycycle, pargs.period);
- 	if (ret) {
- 		dev_err(&rdev->dev, "Failed to configure PWM\n");
- 		return ret;
-@@ -138,13 +138,15 @@ static int pwm_regulator_set_voltage(struct regulator_dev *rdev,
- {
- 	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
- 	unsigned int ramp_delay = rdev->constraints->ramp_delay;
--	unsigned int period = pwm_get_period(drvdata->pwm);
-+	struct pwm_args pargs;
- 	int duty_cycle;
- 	int ret;
- 
-+	pwm_get_args(drvdata->pwm, &pargs);
- 	duty_cycle = pwm_voltage_to_duty_cycle_percentage(rdev, min_uV);
- 
--	ret = pwm_config(drvdata->pwm, (period / 100) * duty_cycle, period);
-+	ret = pwm_config(drvdata->pwm, (pargs.period / 100) * duty_cycle,
-+			 pargs.period);
- 	if (ret) {
- 		dev_err(&rdev->dev, "Failed to configure PWM\n");
- 		return ret;
-@@ -281,6 +283,12 @@ static int pwm_regulator_probe(struct platform_device *pdev)
- 		return PTR_ERR(drvdata->pwm);
- 	}
- 
+-	led_data->period = pwm_get_period(led_data->pwm);
 +	/*
 +	 * FIXME: pwm_apply_args() should be removed when switching to the
 +	 * atomic PWM API.
 +	 */
-+	pwm_apply_args(drvdata->pwm);
++	pwm_apply_args(led_data->pwm);
 +
- 	regulator = devm_regulator_register(&pdev->dev,
- 					    &drvdata->desc, &config);
- 	if (IS_ERR(regulator)) {
++	pwm_get_args(led_data->pwm, &pargs);
++
++	led_data->period = pargs.period;
+ 	if (!led_data->period && (led->pwm_period_ns > 0))
+ 		led_data->period = led->pwm_period_ns;
+ 
 -- 
 2.5.0
