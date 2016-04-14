@@ -1,132 +1,135 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 14 Apr 2016 14:18:01 +0200
-Subject: [PATCH 15/17] kvm: arm64: Get rid of fake page table levels
-In-Reply-To: <570E86C7.1020606@arm.com>
-References: <1459787177-12767-1-git-send-email-suzuki.poulose@arm.com>
- <1459787177-12767-16-git-send-email-suzuki.poulose@arm.com>
- <20160408150523.GX8961@cbox> <570BB5C9.8040509@arm.com>
- <20160412121414.GA3039@cbox> <570E86C7.1020606@arm.com>
-Message-ID: <20160414121801.GJ30804@cbox>
+Date: Thu, 14 Apr 2016 14:19:47 +0200
+Subject: [PATCH v2 2/2] arm64: vhe: Verify CPU Exception Levels
+In-Reply-To: <1460554893-26120-1-git-send-email-suzuki.poulose@arm.com>
+References: <1460472361-28419-2-git-send-email-suzuki.poulose@arm.com>
+ <1460554893-26120-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20160414121947.GK30804@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 13, 2016 at 06:49:59PM +0100, Suzuki K Poulose wrote:
-> On 12/04/16 13:14, Christoffer Dall wrote:
-> >On Mon, Apr 11, 2016 at 03:33:45PM +0100, Suzuki K Poulose wrote:
-> >>On 08/04/16 16:05, Christoffer Dall wrote:
-> >>>On Mon, Apr 04, 2016 at 05:26:15PM +0100, Suzuki K Poulose wrote:
-> >>
-> >>>>diff --git a/arch/arm64/include/asm/stage2_pgtable.h b/arch/arm64/include/asm/stage2_pgtable.h
-> >>>>index 751227d..139b4db 100644
-> >>>>--- a/arch/arm64/include/asm/stage2_pgtable.h
-> >>>>+++ b/arch/arm64/include/asm/stage2_pgtable.h
-> >>>>@@ -22,32 +22,55 @@
-> >>>>  #include <asm/pgtable.h>
-> >>>>
-> >>>>  /*
-> >>>>- * In the case where PGDIR_SHIFT is larger than KVM_PHYS_SHIFT, we can address
-> >>>>- * the entire IPA input range with a single pgd entry, and we would only need
-> >>>>- * one pgd entry.  Note that in this case, the pgd is actually not used by
-> >>>>- * the MMU for Stage-2 translations, but is merely a fake pgd used as a data
-> >>>>- * structure for the kernel pgtable macros to work.
-> >>>>+ * The hardware mandates concatenation of upto 16 tables at stage2 entry level.
-> >>>
-> >>>s/upto/up to/
-> >>>
-> >>>>+ * Now, the minimum number of bits resolved at any level is (PAGE_SHIFT - 3),
-> >>>>+ * or in other words log2(PTRS_PER_PTE). On arm64, the smallest PAGE_SIZE
-> >>>
-> >>>not sure the log2 comment helps here.
-> >>
-> >>OK, will address both the above comments.
-> >>
-> >>>
-> >>>>+ * supported is 4k, which means (PAGE_SHIFT - 3) > 4 holds for all page sizes.
-> >>>>+ * This implies, the total number of page table levels at stage2 expected
-> >>>>+ * by the hardware is actually the number of levels required for (KVM_PHYS_SHIFT - 4)
-> >>>>+ * in normal translations(e.g, stage-1), since we cannot have another level in
-> >>>>+ * the range (KVM_PHYS_SHIFT, KVM_PHYS_SHIFT - 4).
-> >>>
-> >>>Is it not a design decision to always choose the maximum number of
-> >>>concatinated initial-level stage2 tables (with the constraint that
-> >>>there's a minimum number required)?
-> >>
+On Wed, Apr 13, 2016 at 02:41:33PM +0100, Suzuki K Poulose wrote:
+> With a VHE capable CPU, kernel can run at EL2 and is a decided at early
+> boot. If some of the CPUs didn't start it EL2 or doesn't have VHE, we
+> could have CPUs running at different exception levels, all in the same
+> kernel! This patch adds an early check for the secondary CPUs to detect
+> such situations.
 > 
-> I have changed the above comment to :
+> For each non-boot CPU add a sanity check to make sure we don't have
+> different run levels w.r.t the boot CPU. We save the information on
+> whether the boot CPU is running in hyp mode or not and ensure the
+> remaining CPUs match it.
 > 
-> /*
->  * The hardware supports concatenation of up to 16 tables at stage2 entry level
->  * and we use the feature whenever possible.
->  *
->  * Now, the minimum number of bits resolved at any level is (PAGE_SHIFT - 3).
->  * On arm64, the smallest PAGE_SIZE supported is 4k, which means
->  *             (PAGE_SHIFT - 3) > 4 holds for all page sizes.
->  * This implies, the total number of page table levels at stage2 expected
->  * by the hardware is actually the number of levels required for (KVM_PHYS_SHIFT - 4)
->  * in normal translations(e.g, stage1), since we cannot have another level in
->  * the range (KVM_PHYS_SHIFT, KVM_PHYS_SHIFT - 4).
->  */
+> Applies on 4.6-rc3.
 > 
-> 
-
-Looks great.
-
-> 
-> >>>>+ * At the moment, we do not support a combination of guest IPA and host VA_BITS
-> >>>>+ * where
-> >>>>+ *       STAGE2_PGTABLE_LEVELS > CONFIG_PGTABLE_LEVELS
-> >>>
-> >>>can you change this comment to reverse the statement to avoid someone
-> >>>seeing this as a constraint, when in fact it's a negative invariant?
-> >>>
-> >>>So the case we don't support is a sufficiently larger IPA space compared
-> >>>to the host VA space such that the above happens?  (Since at the same
-> >>>IPA space size as host VA space size, the stage-2 levels will always be
-> >>>less than or equal to the host levels.)
-> >>
-> >>Correct.
-> >>
-> >>>
-> >>>I don't see how that would ever work with userspace either so I think
-> >>>this is a safe assumption and not something that ever needs fixing.  In
-> >>
-> >>For e.g, we can perfectly run a guest with 40bit IPA under a host with 16K+36bit
-> >>VA. The moment we go above 40bit IPA, we could trigger the conditions above.
-> >>I think it is perfectly fine for the guest to choose higher IPA width, and place
-> >>its memory well above as long as the qemu/lkvm doesn't exhaust its VA. I just
-> >>tried booting a VM with memory at 0x70_0000_0000 on a 16K+36bitVA host and it
-> >>boots perfectly fine.
-> >>
-> >
-> >Right, I was thinking about it as providing more than 36bits of *memory*
-> >not address space in this case, so you're right, it is at least a
-> >theoretically possible case.
-> >
-> 
-> I have reworded the comment as follows:
-> /*
->  * With all the supported VA_BITs and 40bit guest IPA, the following condition
->  * is always true:
->  *
->  *       CONFIG_PGTABLE_LEVELS >= STAGE2_PGTABLE_LEVELS
->  *
->  * We base our stage-2 page table walker helpers on this assumption and
->  * fall back to using the host version of the helper wherever possible.
->  * i.e, if a particular level is not folded (e.g, PUD) at stage2, we fall back
->  * to using the host version, since it is guaranteed it is not folded at host.
->  *
->  * If the condition breaks in the future, we can rearrange the host level
->  * definitions and reuse them for stage2. Till then...
->  */
-> #if STAGE2_PGTABLE_LEVELS > CONFIG_PGTABLE_LEVELS
-> #error "Unsupported combination of guest IPA and host VA_BITS."
-> #endif
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 > 
 > ---
+> Changes since v1
+>   - Move is_boot_cpu_in_hyp_mode() to smp.c
+> ---
+>  arch/arm64/include/asm/virt.h  |    6 ++++++
+>  arch/arm64/kernel/cpufeature.c |    1 +
+>  arch/arm64/kernel/smp.c        |   38 ++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 45 insertions(+)
 > 
-> Please let me know your comments.
-> 
-> 
-Looks good, thanks for the cleanup!
+> diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+> index 9f22dd6..a5c2b48 100644
+> --- a/arch/arm64/include/asm/virt.h
+> +++ b/arch/arm64/include/asm/virt.h
+> @@ -60,6 +60,12 @@ static inline bool is_kernel_in_hyp_mode(void)
+>  	return el == CurrentEL_EL2;
+>  }
+>  
+> +#ifdef CONFIG_ARM64_VHE
+> +extern void verify_cpu_run_el(void);
+> +#else
+> +static inline void verify_cpu_run_el(void) {}
+> +#endif
+> +
+>  /* The section containing the hypervisor text */
+>  extern char __hyp_text_start[];
+>  extern char __hyp_text_end[];
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index 943f514..91088de 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -908,6 +908,7 @@ static u64 __raw_read_system_reg(u32 sys_id)
+>   */
+>  static void check_early_cpu_features(void)
+>  {
+> +	verify_cpu_run_el();
+>  	verify_cpu_asid_bits();
+>  }
+>  
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index b2d5f4e..e97af155 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -75,6 +75,43 @@ enum ipi_msg_type {
+>  	IPI_WAKEUP
+>  };
+>  
+> +#ifdef CONFIG_ARM64_VHE
+> +
+> +/* Whether the boot CPU is running in HYP mode or not*/
+> +bool boot_cpu_hyp_mode;
 
--Christoffer
+you can make this static now.
+
+> +
+> +static inline void save_boot_cpu_run_el(void)
+> +{
+> +	boot_cpu_hyp_mode = is_kernel_in_hyp_mode();
+> +}
+> +
+> +static inline bool is_boot_cpu_in_hyp_mode(void)
+> +{
+> +	return boot_cpu_hyp_mode;
+> +}
+> +
+> +/*
+> + * Verify that a secondary CPU is running the kernel at the same
+> + * EL as that of the boot CPU.
+> + */
+> +void verify_cpu_run_el(void)
+> +{
+> +	bool in_el2 = is_kernel_in_hyp_mode();
+> +	bool boot_cpu_el2 = is_boot_cpu_in_hyp_mode();
+> +
+> +	if (in_el2 ^ boot_cpu_el2) {
+> +		pr_crit("CPU%d: mismatched Exception Level(EL%d) with boot CPU(EL%d)\n",
+> +					smp_processor_id(),
+> +					in_el2 ? 2 : 1,
+> +					boot_cpu_el2 ? 2 : 1);
+> +		cpu_panic_kernel();
+> +	}
+> +}
+> +
+> +#else
+> +static inline void save_boot_cpu_run_el(void) {}
+> +#endif
+> +
+>  #ifdef CONFIG_HOTPLUG_CPU
+>  static int op_cpu_kill(unsigned int cpu);
+>  #else
+> @@ -401,6 +438,7 @@ void __init smp_cpus_done(unsigned int max_cpus)
+>  void __init smp_prepare_boot_cpu(void)
+>  {
+>  	cpuinfo_store_boot_cpu();
+> +	save_boot_cpu_run_el();
+>  	set_my_cpu_offset(per_cpu_offset(smp_processor_id()));
+>  }
+>  
+> -- 
+> 1.7.9.5
+> 
+
+Otherwise,
+
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
