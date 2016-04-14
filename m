@@ -1,61 +1,78 @@
 From: jamesjj.liao@mediatek.com (James Liao)
-Date: Thu, 14 Apr 2016 16:16:57 +0800
-Subject: [PATCH v6 2/4] soc: mediatek: Init MT8173 scpsys driver earlier
-In-Reply-To: <1460621819-695-1-git-send-email-jamesjj.liao@mediatek.com>
-References: <1460621819-695-1-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <1460621819-695-3-git-send-email-jamesjj.liao@mediatek.com>
+Date: Thu, 14 Apr 2016 16:11:46 +0800
+Subject: [PATCH v7 1/9] clk: mediatek: Refine the makefile to support multiple
+ clock drivers
+In-Reply-To: <1460621514-65191-1-git-send-email-jamesjj.liao@mediatek.com>
+References: <1460621514-65191-1-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <1460621514-65191-2-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some power domain comsumers may init before module_init.
-So the power domain provider (scpsys) need to be initialized
-earlier too.
+Add a Kconfig to define clock configuration for each SoC, and
+modify the Makefile to build drivers that only selected in config.
 
-Take an example for our IOMMU (M4U) and SMI. SMI is a bridge
-between IOMMU and multimedia HW. SMI is responsible to
-enable/disable iommu and help transfer data for each multimedia
-HW. Both of them have to wait until the power and clocks are
-enabled.
-
-So scpsys driver should be initialized before SMI, and SMI should
-be initialized before IOMMU, and then init IOMMU consumers
-(display/vdec/venc/camera etc.).
-
-IOMMU is subsys_init by default. So we need to init scpsys driver
-before subsys_init.
-
+Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
 Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-Reviewed-by: Kevin Hilman <khilman@baylibre.com>
+Tested-by: John Crispin <blogic@openwrt.org>
 ---
- drivers/soc/mediatek/mtk-scpsys.c | 19 ++++++++++++++++++-
- 1 file changed, 18 insertions(+), 1 deletion(-)
+ drivers/clk/Kconfig           |  1 +
+ drivers/clk/mediatek/Kconfig  | 23 +++++++++++++++++++++++
+ drivers/clk/mediatek/Makefile |  6 +++---
+ 3 files changed, 27 insertions(+), 3 deletions(-)
+ create mode 100644 drivers/clk/mediatek/Kconfig
 
-diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-index 5870a24..00c0adb 100644
---- a/drivers/soc/mediatek/mtk-scpsys.c
-+++ b/drivers/soc/mediatek/mtk-scpsys.c
-@@ -617,4 +617,21 @@ static struct platform_driver scpsys_drv = {
- 		.of_match_table = of_match_ptr(of_scpsys_match_tbl),
- 	},
- };
--builtin_platform_driver(scpsys_drv);
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index 16f7d33..d94302e 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -199,6 +199,7 @@ config COMMON_CLK_PXA
+ 
+ source "drivers/clk/bcm/Kconfig"
+ source "drivers/clk/hisilicon/Kconfig"
++source "drivers/clk/mediatek/Kconfig"
+ source "drivers/clk/mvebu/Kconfig"
+ source "drivers/clk/qcom/Kconfig"
+ source "drivers/clk/samsung/Kconfig"
+diff --git a/drivers/clk/mediatek/Kconfig b/drivers/clk/mediatek/Kconfig
+new file mode 100644
+index 0000000..dc224e6
+--- /dev/null
++++ b/drivers/clk/mediatek/Kconfig
+@@ -0,0 +1,23 @@
++#
++# MediaTek SoC drivers
++#
++config COMMON_CLK_MEDIATEK
++	bool
++	---help---
++	  Mediatek SoCs' clock support.
 +
-+static int __init scpsys_drv_init(void)
-+{
-+	return platform_driver_register(&scpsys_drv);
-+}
++config COMMON_CLK_MT8135
++	bool "Clock driver for Mediatek MT8135"
++	depends on COMMON_CLK
++	select COMMON_CLK_MEDIATEK
++	default ARCH_MEDIATEK
++	---help---
++	  This driver supports Mediatek MT8135 clocks.
 +
-+/*
-+ * There are some Mediatek drivers which depend on the power domain driver need
-+ * to probe in earlier initcall levels. So scpsys driver also need to probe
-+ * earlier.
-+ *
-+ * IOMMU(M4U) and SMI drivers for example. SMI is a bridge between IOMMU and
-+ * multimedia HW. IOMMU depends on SMI, and SMI is a power domain consumer,
-+ * so the proper probe sequence should be scpsys -> SMI -> IOMMU driver.
-+ * IOMMU drivers are initialized during subsys_init by default, so we need to
-+ * move SMI and scpsys drivers to subsys_init or earlier init levels.
-+ */
-+subsys_initcall(scpsys_drv_init);
++config COMMON_CLK_MT8173
++	bool "Clock driver for Mediatek MT8173"
++	depends on COMMON_CLK
++	select COMMON_CLK_MEDIATEK
++	default ARCH_MEDIATEK
++	---help---
++	  This driver supports Mediatek MT8173 clocks.
+diff --git a/drivers/clk/mediatek/Makefile b/drivers/clk/mediatek/Makefile
+index 95fdfac..32e7222 100644
+--- a/drivers/clk/mediatek/Makefile
++++ b/drivers/clk/mediatek/Makefile
+@@ -1,4 +1,4 @@
+-obj-y += clk-mtk.o clk-pll.o clk-gate.o clk-apmixed.o
++obj-$(CONFIG_COMMON_CLK_MEDIATEK) += clk-mtk.o clk-pll.o clk-gate.o clk-apmixed.o
+ obj-$(CONFIG_RESET_CONTROLLER) += reset.o
+-obj-y += clk-mt8135.o
+-obj-y += clk-mt8173.o
++obj-$(CONFIG_COMMON_CLK_MT8135) += clk-mt8135.o
++obj-$(CONFIG_COMMON_CLK_MT8173) += clk-mt8173.o
 -- 
 1.9.1
