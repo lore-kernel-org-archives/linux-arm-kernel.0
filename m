@@ -1,27 +1,66 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 14 Apr 2016 06:56:08 +0200
-Subject: [PATCH v1] clk: Add clk_composite_set_rate_and_parent
-In-Reply-To: <20160414004331.GK14441@codeaurora.org>
-References: <1460339652-63498-1-git-send-email-finley.xiao@rock-chips.com>
- <3986787.PS6VzOpSAJ@phil> <20160414004331.GK14441@codeaurora.org>
-Message-ID: <4176514.rpsd1Fqbyv@diego>
+From: j-keerthy@ti.com (Keerthy)
+Date: Thu, 14 Apr 2016 10:29:16 +0530
+Subject: [PATCH v2] pinctrl: pinctrl-single: Fix
+ pcs_parse_bits_in_pinctrl_entry to use __ffs than ffs
+Message-ID: <1460609956-26539-1-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 13. April 2016, 17:43:31 schrieb Stephen Boyd:
-> On 04/12, Heiko Stuebner wrote:
-> > I remember having clocks not overflow their target rate came up in some
-> > ELC
-> > talk last week (probably in Stephens Qualcomm-kernel-talk) and a general
-> > solution might need some changes closer to the core.
-> 
-> Yep. It's on the list. Hopefully coordinated clk rate changes
-> will help here. Composite clks are sort of already coordinated
-> rates in a minor form though.
+pcs_parse_bits_in_pinctrl_entry uses ffs which gives bit indices
+ranging from 1 to MAX. This leads to a corner case where we try to request
+the pin number = MAX and fails.
 
-Which is why I hope we can land this (meaning v2 from tuesday) in the 
-meantime, as it fixes an issue we're seeing on the rk3399 and shouldn't affect 
-any part of the core clock-framework ;-) .
+bit_pos value is being calculted using ffs. pin_num_from_lsb uses
+bit_pos value. pins array is populated with:
 
+pin + pin_num_from_lsb.
 
-Heiko
+The above is 1 more than usual bit indices as bit_pos uses ffs to compute
+first set bit. Hence the last of the pins array is populated with the MAX
+value and not MAX - 1 which causes error when we call pin_request.
+
+mask_pos is rightly calculated as ((pcs->fmask) << (bit_pos - 1))
+Consequently val_pos and submask are correct.
+
+Hence use __ffs which gives (ffs(x) - 1) as the first bit set.
+
+fixes: 4e7e8017a8 ("pinctrl: pinctrl-single: enhance to configure multiple pins of different modules")
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+---
+
+Changes in v2:
+
+  * Changed pcs->fshift to use __ffs instead of ffs to be consistent.
+
+Boot tesed on da850-evm and checked the pinctrl sysfs nodes.
+
+ drivers/pinctrl/pinctrl-single.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
+index fb126d5..cf9bafa 100644
+--- a/drivers/pinctrl/pinctrl-single.c
++++ b/drivers/pinctrl/pinctrl-single.c
+@@ -1280,9 +1280,9 @@ static int pcs_parse_bits_in_pinctrl_entry(struct pcs_device *pcs,
+ 
+ 		/* Parse pins in each row from LSB */
+ 		while (mask) {
+-			bit_pos = ffs(mask);
++			bit_pos = __ffs(mask);
+ 			pin_num_from_lsb = bit_pos / pcs->bits_per_pin;
+-			mask_pos = ((pcs->fmask) << (bit_pos - 1));
++			mask_pos = ((pcs->fmask) << bit_pos);
+ 			val_pos = val & mask_pos;
+ 			submask = mask & mask_pos;
+ 
+@@ -1852,7 +1852,7 @@ static int pcs_probe(struct platform_device *pdev)
+ 	ret = of_property_read_u32(np, "pinctrl-single,function-mask",
+ 				   &pcs->fmask);
+ 	if (!ret) {
+-		pcs->fshift = ffs(pcs->fmask) - 1;
++		pcs->fshift = __ffs(pcs->fmask);
+ 		pcs->fmax = pcs->fmask >> pcs->fshift;
+ 	} else {
+ 		/* If mask property doesn't exist, function mux is invalid. */
+-- 
+1.9.1
