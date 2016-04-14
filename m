@@ -1,78 +1,61 @@
 From: jamesjj.liao@mediatek.com (James Liao)
-Date: Thu, 14 Apr 2016 16:11:46 +0800
-Subject: [PATCH v7 1/9] clk: mediatek: Refine the makefile to support multiple
- clock drivers
-In-Reply-To: <1460621514-65191-1-git-send-email-jamesjj.liao@mediatek.com>
-References: <1460621514-65191-1-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <1460621514-65191-2-git-send-email-jamesjj.liao@mediatek.com>
+Date: Thu, 14 Apr 2016 16:16:55 +0800
+Subject: [PATCH v6 0/4] Mediatek MT2701 SCPSYS power domain support 
+Message-ID: <1460621819-695-1-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a Kconfig to define clock configuration for each SoC, and
-modify the Makefile to build drivers that only selected in config.
+This series is based on v4.6-rc1 and adds scpsys power domain support
+for Mediatek MT2701.
 
-Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
-Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-Tested-by: John Crispin <blogic@openwrt.org>
----
- drivers/clk/Kconfig           |  1 +
- drivers/clk/mediatek/Kconfig  | 23 +++++++++++++++++++++++
- drivers/clk/mediatek/Makefile |  6 +++---
- 3 files changed, 27 insertions(+), 3 deletions(-)
- create mode 100644 drivers/clk/mediatek/Kconfig
+To share the code between MT2701 and MT8173, this patchset also refined
+original mtk-scpsys.c to separate common codes and platform codes, so
+that mtk-scpsys.c can support new SoCs more easily.
 
-diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index 16f7d33..d94302e 100644
---- a/drivers/clk/Kconfig
-+++ b/drivers/clk/Kconfig
-@@ -199,6 +199,7 @@ config COMMON_CLK_PXA
- 
- source "drivers/clk/bcm/Kconfig"
- source "drivers/clk/hisilicon/Kconfig"
-+source "drivers/clk/mediatek/Kconfig"
- source "drivers/clk/mvebu/Kconfig"
- source "drivers/clk/qcom/Kconfig"
- source "drivers/clk/samsung/Kconfig"
-diff --git a/drivers/clk/mediatek/Kconfig b/drivers/clk/mediatek/Kconfig
-new file mode 100644
-index 0000000..dc224e6
---- /dev/null
-+++ b/drivers/clk/mediatek/Kconfig
-@@ -0,0 +1,23 @@
-+#
-+# MediaTek SoC drivers
-+#
-+config COMMON_CLK_MEDIATEK
-+	bool
-+	---help---
-+	  Mediatek SoCs' clock support.
-+
-+config COMMON_CLK_MT8135
-+	bool "Clock driver for Mediatek MT8135"
-+	depends on COMMON_CLK
-+	select COMMON_CLK_MEDIATEK
-+	default ARCH_MEDIATEK
-+	---help---
-+	  This driver supports Mediatek MT8135 clocks.
-+
-+config COMMON_CLK_MT8173
-+	bool "Clock driver for Mediatek MT8173"
-+	depends on COMMON_CLK
-+	select COMMON_CLK_MEDIATEK
-+	default ARCH_MEDIATEK
-+	---help---
-+	  This driver supports Mediatek MT8173 clocks.
-diff --git a/drivers/clk/mediatek/Makefile b/drivers/clk/mediatek/Makefile
-index 95fdfac..32e7222 100644
---- a/drivers/clk/mediatek/Makefile
-+++ b/drivers/clk/mediatek/Makefile
-@@ -1,4 +1,4 @@
--obj-y += clk-mtk.o clk-pll.o clk-gate.o clk-apmixed.o
-+obj-$(CONFIG_COMMON_CLK_MEDIATEK) += clk-mtk.o clk-pll.o clk-gate.o clk-apmixed.o
- obj-$(CONFIG_RESET_CONTROLLER) += reset.o
--obj-y += clk-mt8135.o
--obj-y += clk-mt8173.o
-+obj-$(CONFIG_COMMON_CLK_MT8135) += clk-mt8135.o
-+obj-$(CONFIG_COMMON_CLK_MT8173) += clk-mt8173.o
--- 
+MT8173 and MT2701 scpsys init level are now subsys_init. Please refer to [1]
+to see discussion details.
+
+changes since v5:
+- Rebase to v4.6-rc1.
+- Add dependent clocks for MFG, ISP, ETH and HIF power domains.
+- Add "ethif" as a dependent clock in scpsys dt-binding document.
+
+changes since v4:
+- Rebase to v4.5-rc4.
+- Remove mtk-scpsys.h and Merge its code into mtk-scpsys.c.
+- Add names for every controlling registers and bits.
+- Include dt-bindings headers at the beginning of mtk-scpsys.c.
+- Sort compatible string in dt-binding documents.
+
+changes since v3:
+- Implement MT8173 and MT2701 scpsys drivers in a signle file.
+- Remove naming of registers that can't be shared among SoCs.
+
+changes since v2:
+- Rebase to mbgg/linux-mediatek v4.4-next/soc [1].
+- Remove MTK_SCPSYS_MT8173 and MTK_SCPSYS_MT2701.
+- Modify scpsys dt-binding document to support MT2701.
+
+changes since v1:
+- Make MTK_SCPSYS in Kconfig invisible from users.
+- Add comments for changing scpsys init level to subsys_init.
+
+[1] http://lists.infradead.org/pipermail/linux-mediatek/2015-December/003416.html
+
+James Liao (2):
+  soc: mediatek: Refine scpsys to support multiple platform
+  soc: mediatek: Init MT8173 scpsys driver earlier
+
+Shunli Wang (2):
+  soc: mediatek: Add MT2701 power dt-bindings
+  soc: mediatek: Add MT2701 scpsys driver
+
+ .../devicetree/bindings/soc/mediatek/scpsys.txt    |  12 +-
+ drivers/soc/mediatek/Kconfig                       |   2 +-
+ drivers/soc/mediatek/mtk-scpsys.c                  | 497 +++++++++++++++------
+ include/dt-bindings/power/mt2701-power.h           |  27 ++
+ 4 files changed, 387 insertions(+), 151 deletions(-)
+ create mode 100644 include/dt-bindings/power/mt2701-power.h
+
+--
 1.9.1
