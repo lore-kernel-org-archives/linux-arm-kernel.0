@@ -1,26 +1,48 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 14 Apr 2016 14:29:22 +0100
-Subject: [PATCH v2 00/17] kvm-arm: Add stage2 page table walker
-In-Reply-To: <1460640065-27658-1-git-send-email-suzuki.poulose@arm.com>
-References: <1460640065-27658-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <570F9B32.9090106@arm.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 14 Apr 2016 16:32:38 +0300
+Subject: [PATCH] ARM: dts: imx: ventana: add RS485 txen gpio support
+In-Reply-To: <1460639949-26392-1-git-send-email-tharvey@gateworks.com>
+References: <1460639949-26392-1-git-send-email-tharvey@gateworks.com>
+Message-ID: <20160414133237.GE2092@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/04/16 14:20, Suzuki K Poulose wrote:
-> This series adds support for stage2 page table helpers and makes
-> the core kvm-arm MMU code make use of it. At the moment we assume
-> that the host/hyp and the stage2 page tables have same number of
-> levels and hence use the host level accessors (except for some
-> hooks, e.g kvm_p.d_addr_end) and shares the routines for unmapping
-> the page table ranges.
+Hi Tim,
 
-> The tree is available at :
->        git://linux-arm.org/linux-skp.git kvm-stage2/v2
+On Thu, Apr 14, 2016 at 06:19:09AM -0700, Tim Harvey wrote:
+> The GW52xx/GW53xx/GW54xx have an on-board RS485 transceiver for half-duplex
+> RS485 using uart1. The active-high TXEN is GPIO7__IO1 which we can configure
+> as the rts-gpio as long as we specify it as active-low to invert the polarity
+> managed by mctrl_gpio helpers. This allows for RS485 to be used from
+> userspace by setting flags to SER_RS485_RTS_ON_SEND in the serial_rs485
+> struct when using the TIOCGRS485 ioctl.
 
-Please note that the tree above contains one additional patch on top of kvmarm/master :
-commit	91ad0db16a42a7d3("arm64/sunxi: 4.6-rc1: Add dependency on generic irq chip"),
-which is there to fix a build break with ARCH_SUNXI selected on 4.6-rc1.
+Do you use http://article.gmane.org/gmane.linux.ports.arm.kernel/482641 for 
+that?
 
-Thanks
-Suzuki
+> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+> ---
+>  arch/arm/boot/dts/imx6qdl-gw52xx.dtsi | 3 +++
+>  arch/arm/boot/dts/imx6qdl-gw53xx.dtsi | 3 +++
+>  arch/arm/boot/dts/imx6qdl-gw54xx.dtsi | 3 +++
+>  3 files changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
+> index 8cccc4a..50d6039 100644
+> --- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
+> @@ -315,6 +315,8 @@
+>  &uart1 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_uart1>;
+> +	fsl,uart-has-rtscts;
+> +	rts-gpio = <&gpio7 1 GPIO_ACTIVE_LOW>;
+
+See http://marc.info/?l=linux-serial&m=146063601520851&w=2.
+
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
