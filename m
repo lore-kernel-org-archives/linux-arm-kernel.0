@@ -1,42 +1,212 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 14 Apr 2016 21:17:34 +0200
-Subject: [PATCH v5 14/24] input: misc: pwm-beeper: explicitly apply PWM config
- extracted from pwm_args
+Date: Thu, 14 Apr 2016 21:17:43 +0200
+Subject: [PATCH v5 23/24] pwm: switch to the atomic API
 In-Reply-To: <1460661464-11216-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1460661464-11216-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1460661464-11216-15-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1460661464-11216-24-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Call pwm_apply_args() just after requesting the PWM device so that the
-polarity and period are initialized according to the information provided
-in pwm_args.
-
-This is an intermediate state, and pwm_apply_args() should be dropped as
-soon as the atomic PWM infrastructure is in place and the driver makes
-use of it.
+Replace legacy pwm_get/set_xxx() and pwm_config/enable/disable() calls
+by pwm_get/apply_state().
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/input/misc/pwm-beeper.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/pwm/core.c  |  5 ++++-
+ drivers/pwm/sysfs.c | 61 +++++++++++++++++++++++++++++++----------------------
+ 2 files changed, 40 insertions(+), 26 deletions(-)
 
-diff --git a/drivers/input/misc/pwm-beeper.c b/drivers/input/misc/pwm-beeper.c
-index f2261ab..8d71332 100644
---- a/drivers/input/misc/pwm-beeper.c
-+++ b/drivers/input/misc/pwm-beeper.c
-@@ -87,6 +87,12 @@ static int pwm_beeper_probe(struct platform_device *pdev)
- 		goto err_free;
- 	}
+diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+index 112a696..aefffcf 100644
+--- a/drivers/pwm/core.c
++++ b/drivers/pwm/core.c
+@@ -947,13 +947,16 @@ static void pwm_dbg_show(struct pwm_chip *chip, struct seq_file *s)
  
-+	/*
-+	 * FIXME: pwm_apply_args() should be removed when switching to
-+	 * the atomic PWM API.
-+	 */
-+	pwm_apply_args(beeper->pwm);
+ 	for (i = 0; i < chip->npwm; i++) {
+ 		struct pwm_device *pwm = &chip->pwms[i];
++		struct pwm_state state;
 +
- 	beeper->input = input_allocate_device();
- 	if (!beeper->input) {
- 		dev_err(&pdev->dev, "Failed to allocate input device\n");
++		pwm_get_state(pwm, &state);
+ 
+ 		seq_printf(s, " pwm-%-3d (%-20.20s):", i, pwm->label);
+ 
+ 		if (test_bit(PWMF_REQUESTED, &pwm->flags))
+ 			seq_puts(s, " requested");
+ 
+-		if (pwm_is_enabled(pwm))
++		if (state.enabled)
+ 			seq_puts(s, " enabled");
+ 
+ 		seq_puts(s, "\n");
+diff --git a/drivers/pwm/sysfs.c b/drivers/pwm/sysfs.c
+index ab28c89..40daf1c 100644
+--- a/drivers/pwm/sysfs.c
++++ b/drivers/pwm/sysfs.c
+@@ -47,13 +47,13 @@ static ssize_t period_show(struct device *child,
+ {
+ 	struct pwm_export *export = child_to_pwm_export(child);
+ 	const struct pwm_device *pwm = export->pwm;
+-	unsigned int period;
++	struct pwm_state state;
+ 
+ 	mutex_lock(&export->lock);
+-	period = pwm_get_period(pwm);
++	pwm_get_state(pwm, &state);
+ 	mutex_unlock(&export->lock);
+ 
+-	return sprintf(buf, "%u\n", period);
++	return sprintf(buf, "%u\n", state.period);
+ }
+ 
+ static ssize_t period_store(struct device *child,
+@@ -62,6 +62,7 @@ static ssize_t period_store(struct device *child,
+ {
+ 	struct pwm_export *export = child_to_pwm_export(child);
+ 	struct pwm_device *pwm = export->pwm;
++	struct pwm_state state;
+ 	unsigned int val;
+ 	int ret;
+ 
+@@ -70,7 +71,9 @@ static ssize_t period_store(struct device *child,
+ 		return ret;
+ 
+ 	mutex_lock(&export->lock);
+-	ret = pwm_config(pwm, pwm_get_duty_cycle(pwm), val);
++	pwm_get_state(pwm, &state);
++	state.period = val;
++	ret = pwm_apply_state(pwm, &state);
+ 	mutex_unlock(&export->lock);
+ 
+ 	return ret ? : size;
+@@ -82,13 +85,13 @@ static ssize_t duty_cycle_show(struct device *child,
+ {
+ 	struct pwm_export *export = child_to_pwm_export(child);
+ 	const struct pwm_device *pwm = export->pwm;
+-	unsigned int duty;
++	struct pwm_state state;
+ 
+ 	mutex_lock(&export->lock);
+-	duty = pwm_get_duty_cycle(pwm);
++	pwm_get_state(pwm, &state);
+ 	mutex_unlock(&export->lock);
+ 
+-	return sprintf(buf, "%u\n", duty);
++	return sprintf(buf, "%u\n", state.duty_cycle);
+ }
+ 
+ static ssize_t duty_cycle_store(struct device *child,
+@@ -97,6 +100,7 @@ static ssize_t duty_cycle_store(struct device *child,
+ {
+ 	struct pwm_export *export = child_to_pwm_export(child);
+ 	struct pwm_device *pwm = export->pwm;
++	struct pwm_state state;
+ 	unsigned int val;
+ 	int ret;
+ 
+@@ -105,7 +109,9 @@ static ssize_t duty_cycle_store(struct device *child,
+ 		return ret;
+ 
+ 	mutex_lock(&export->lock);
+-	ret = pwm_config(pwm, val, pwm_get_period(pwm));
++	pwm_get_state(pwm, &state);
++	state.duty_cycle = val;
++	ret = pwm_apply_state(pwm, &state);
+ 	mutex_unlock(&export->lock);
+ 
+ 	return ret ? : size;
+@@ -117,13 +123,13 @@ static ssize_t enable_show(struct device *child,
+ {
+ 	struct pwm_export *export = child_to_pwm_export(child);
+ 	const struct pwm_device *pwm = export->pwm;
+-	bool enabled;
++	struct pwm_state state;
+ 
+ 	mutex_lock(&export->lock);
+-	enabled = pwm_is_enabled(pwm);
++	pwm_get_state(pwm, &state);
+ 	mutex_unlock(&export->lock);
+ 
+-	return sprintf(buf, "%d\n", enabled);
++	return sprintf(buf, "%d\n", state.enabled);
+ }
+ 
+ static ssize_t enable_store(struct device *child,
+@@ -132,24 +138,20 @@ static ssize_t enable_store(struct device *child,
+ {
+ 	struct pwm_export *export = child_to_pwm_export(child);
+ 	struct pwm_device *pwm = export->pwm;
++	struct pwm_state state;
+ 	int val, ret;
+ 
+ 	ret = kstrtoint(buf, 0, &val);
+ 	if (ret)
+ 		return ret;
+ 
++	if (val != 0 && val != 1)
++		return -EINVAL;
++
+ 	mutex_lock(&export->lock);
+-	switch (val) {
+-	case 0:
+-		pwm_disable(pwm);
+-		break;
+-	case 1:
+-		ret = pwm_enable(pwm);
+-		break;
+-	default:
+-		ret = -EINVAL;
+-		break;
+-	}
++	pwm_get_state(pwm, &state);
++	state.enabled = val;
++	ret = pwm_apply_state(pwm, &state);
+ 	mutex_unlock(&export->lock);
+ 
+ 	return ret ? : size;
+@@ -162,9 +164,13 @@ static ssize_t polarity_show(struct device *child,
+ 	struct pwm_export *export = child_to_pwm_export(child);
+ 	const struct pwm_device *pwm = export->pwm;
+ 	const char *polarity = "unknown";
++	struct pwm_state state;
+ 
+ 	mutex_lock(&export->lock);
+-	switch (pwm_get_polarity(pwm)) {
++	pwm_get_state(pwm, &state);
++	mutex_unlock(&export->lock);
++
++	switch (state.polarity) {
+ 	case PWM_POLARITY_NORMAL:
+ 		polarity = "normal";
+ 		break;
+@@ -173,7 +179,6 @@ static ssize_t polarity_show(struct device *child,
+ 		polarity = "inversed";
+ 		break;
+ 	}
+-	mutex_unlock(&export->lock);
+ 
+ 	return sprintf(buf, "%s\n", polarity);
+ }
+@@ -185,6 +190,7 @@ static ssize_t polarity_store(struct device *child,
+ 	struct pwm_export *export = child_to_pwm_export(child);
+ 	struct pwm_device *pwm = export->pwm;
+ 	enum pwm_polarity polarity;
++	struct pwm_state state;
+ 	int ret;
+ 
+ 	if (sysfs_streq(buf, "normal"))
+@@ -195,7 +201,12 @@ static ssize_t polarity_store(struct device *child,
+ 		return -EINVAL;
+ 
+ 	mutex_lock(&export->lock);
+-	ret = pwm_set_polarity(pwm, polarity);
++	pwm_get_state(pwm, &state);
++	state.polarity = polarity;
++	if (state.enabled)
++		ret = -EBUSY;
++	else
++		ret = pwm_apply_state(pwm, &state);
+ 	mutex_unlock(&export->lock);
+ 
+ 	return ret ? : size;
 -- 
 2.5.0
