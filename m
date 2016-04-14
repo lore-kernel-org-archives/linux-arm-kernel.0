@@ -1,46 +1,86 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 14 Apr 2016 15:13:49 +0200
-Subject: [PATCH v6 14/14] arm64: hibernate: Prevent resume from a
- different kernel version
-In-Reply-To: <570F9160.30408@arm.com>
-References: <1456766423-1554-1-git-send-email-james.morse@arm.com>
- <1456766423-1554-15-git-send-email-james.morse@arm.com>
- <20160410114938.GB30188@xo-6d-61-c0.localdomain>
- <570F9160.30408@arm.com>
-Message-ID: <20160414131349.GA15106@amd>
+From: tharvey@gateworks.com (Tim Harvey)
+Date: Thu, 14 Apr 2016 06:19:09 -0700
+Subject: [PATCH] ARM: dts: imx: ventana: add RS485 txen gpio support
+Message-ID: <1460639949-26392-1-git-send-email-tharvey@gateworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+The GW52xx/GW53xx/GW54xx have an on-board RS485 transceiver for half-duplex
+RS485 using uart1. The active-high TXEN is GPIO7__IO1 which we can configure
+as the rts-gpio as long as we specify it as active-low to invert the polarity
+managed by mctrl_gpio helpers. This allows for RS485 to be used from
+userspace by setting flags to SER_RS485_RTS_ON_SEND in the serial_rs485
+struct when using the TIOCGRS485 ioctl.
 
-> >> Signed-off-by: James Morse <james.morse@arm.com>
-> > 
-> > Better solution would be to store the current bits _and_ UTS version. Then bump UTS_VERSION
-> > every time Linux behaviour changes w.r.t. EFI. For a while, it would change a lot, but then
-> > it should stabilize, as the port stabilizes
-> 
-> If we want to support resuming with a different kernel version. Patch 13 (of
-> this series) does this, it has 'HIBERNATE_VERSION', which we would have to
-> increase every time an incompatible change is made, but I'm worried that its a
-> constant game of catch-up to work out which changes are compatible. The first
-> sign a user gets that this isn't supported, (who reads the changelog?), is when
-> it fails to resume, and they loose any data that was written to the hibernate image.
-> 
+Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+---
+ arch/arm/boot/dts/imx6qdl-gw52xx.dtsi | 3 +++
+ arch/arm/boot/dts/imx6qdl-gw53xx.dtsi | 3 +++
+ arch/arm/boot/dts/imx6qdl-gw54xx.dtsi | 3 +++
+ 3 files changed, 9 insertions(+)
 
-> What does restoring with a different kernel version get used for? (I agree its a
-> neat trick!) I can see it would be useful on laptops, where the distribution can
-> upgrade the kernel and the user can still use hibernate before they reboot. But
-> the distribution can switch this value to be just the kernel version if they are
-> willing to test hibernate/resume over any updates they make.
-
-Well, it is way too easy to forget that you've updated your kernel,
-and then hibernate. I've been burned more than once. 
-
-And for example updating from 4.4.1 to 4.4.2 to 4.4.3 to... should be
-very safe, and pretty important for distribution users.
-
-Best regards,
-								Pavel
+diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
+index 8cccc4a..50d6039 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
+@@ -315,6 +315,8 @@
+ &uart1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart1>;
++	fsl,uart-has-rtscts;
++	rts-gpio = <&gpio7 1 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
+ 
+@@ -493,6 +495,7 @@
+ 			fsl,pins = <
+ 				MX6QDL_PAD_SD3_DAT7__UART1_TX_DATA	0x1b0b1
+ 				MX6QDL_PAD_SD3_DAT6__UART1_RX_DATA	0x1b0b1
++				MX6QDL_PAD_SD3_DAT4__GPIO7_IO01		0x4001b0b1 /* TEN */
+ 			>;
+ 		};
+ 
+diff --git a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
+index 5f700cc..60b0ae9 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
+@@ -312,6 +312,8 @@
+ &uart1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart1>;
++	fsl,uart-has-rtscts;
++	rts-gpio = <&gpio7 1 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
+ 
+@@ -482,6 +484,7 @@
+ 			fsl,pins = <
+ 				MX6QDL_PAD_SD3_DAT7__UART1_TX_DATA	0x1b0b1
+ 				MX6QDL_PAD_SD3_DAT6__UART1_RX_DATA	0x1b0b1
++				MX6QDL_PAD_SD3_DAT4__GPIO7_IO01		0x4001b0b1 /* TEN */
+ 			>;
+ 		};
+ 
+diff --git a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+index d19b4cc..c217ecc 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+@@ -414,6 +414,8 @@
+ &uart1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart1>;
++	fsl,uart-has-rtscts;
++	rts-gpio = <&gpio7 1 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
+ 
+@@ -603,6 +605,7 @@
+ 			fsl,pins = <
+ 				MX6QDL_PAD_SD3_DAT7__UART1_TX_DATA	0x1b0b1
+ 				MX6QDL_PAD_SD3_DAT6__UART1_RX_DATA	0x1b0b1
++				MX6QDL_PAD_SD3_DAT4__GPIO7_IO01		0x4001b0b1 /* TEN */
+ 			>;
+ 		};
+ 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.9.1
