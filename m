@@ -1,30 +1,41 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 14 Apr 2016 11:05:17 +0200
-Subject: [PATCH] [media] exynos-gsc: remove an always false condition
-In-Reply-To: <26a7ed9c18193dc7a3dfba33e3c711822f4bdd29.1460575950.git.mchehab@osg.samsung.com>
-References: <26a7ed9c18193dc7a3dfba33e3c711822f4bdd29.1460575950.git.mchehab@osg.samsung.com>
-Message-ID: <570F5D4D.9040207@samsung.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 14 Apr 2016 11:07:54 +0200
+Subject: [next] Failing Odroid XU3 boot due to missing MMC device
+In-Reply-To: <20160414084530.GS19428@n2100.arm.linux.org.uk>
+References: <570F5380.7010103@samsung.com> <570F5550.5010708@fivetechno.de>
+ <20160414084530.GS19428@n2100.arm.linux.org.uk>
+Message-ID: <570F5DEA.1060908@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/13/2016 09:32 PM, Mauro Carvalho Chehab wrote:
-> As reported by smatch:
-> drivers/media/platform/exynos-gsc/gsc-core.c:1073 gsc_probe() warn: impossible condition '(gsc->id < 0) => (0-65535 < 0)'
-> drivers/media/platform/exynos-gsc/gsc-core.c: In function 'gsc_probe':
-> drivers/media/platform/exynos-gsc/gsc-core.c:1073:51: warning: comparison is always false due to limited range of data type [-Wtype-limits]
->   if (gsc->id >= drv_data->num_entities || gsc->id < 0) {
->                                                    ^
+On 04/14/2016 10:45 AM, Russell King - ARM Linux wrote:
+> On Thu, Apr 14, 2016 at 10:31:12AM +0200, Markus Reichl wrote:
+>> Hi Krzysztof,
+>>
+>> yes, observed this with linux-next from yesterday 13.
+>>
+>> I boot from eMMC.
+>> Device numbering of eMMC and SD are exchanged now.
+>>
+>> I solved the boot problem by changing the rootdev in U-Boot env
+>> from /dev/mmcblk0p2 to /dev/mmcblk1p2.
+>>
+>> Changed /etc/fdisk, too, to mount /dev/mmcblk1p1 to /boot.     
 > 
-> gsc->id is an u16, so it can never be a negative number. So,
-> remove the always false condition.
+> You really should mount by partition uuid - supplying something like:
 > 
-> Fixes: c1ac057173ba "[media] exynos-gsc: remove non-device-tree init code"
-> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+> 	root=PARTUUID=f3ae567e-02
+> 
+> on the kernel command line.  This makes the mounting of rootfs
+> independent of which device carries the filesystem.
+> 
+> If you're not using an initramfs, the kernel prints the partuuid
+> values if it doesn't find the rootfs.  I don't know how to get the
+> partuuids without going through that process, sorry.
 
-Thanks for fixing this.
-Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Markus, Russell,
 
--- 
-Regards,
-Sylwester
+Thanks, I'll switch to UUID.
+
+Best regards,
+Krzysztof
