@@ -1,56 +1,54 @@
-From: chunfeng.yun@mediatek.com (chunfeng yun)
-Date: Thu, 14 Apr 2016 09:58:49 +0800
-Subject: [PATCH v2 2/2] phy: phy-mt65xx-usb3: add support for mt2701
- platform
-In-Reply-To: <570E4A29.3030103@ti.com>
-References: <1460360490-18606-1-git-send-email-chunfeng.yun@mediatek.com>
- <1460360490-18606-2-git-send-email-chunfeng.yun@mediatek.com>
- <570E4A29.3030103@ti.com>
-Message-ID: <1460599129.5156.12.camel@mhfsdcap03>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 14 Apr 2016 10:04:50 +0800
+Subject: [PATCH RFC 2/5] net: phy: sun8i-h3-ephy: Add driver for Allwinner
+ H3 Ethernet PHY
+In-Reply-To: <570BF9A6.2040109@gmail.com>
+References: <1459786954-12649-1-git-send-email-wens@csie.org>
+ <1459786954-12649-3-git-send-email-wens@csie.org> <570BF9A6.2040109@gmail.com>
+Message-ID: <CAGb2v65-V3Mt_aPJNdfEH6VFySGc_cBhqgbE_VR5tsBtPvVjfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Apr 12, 2016 at 3:23 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> On 04/04/16 09:22, Chen-Yu Tsai wrote:
+>> The Allwinner H3 SoC incorporates an Ethernet PHY. This is enabled and
+>> configured through a memory mapped hardware register.
+>>
+>> This same register also configures the MAC interface mode and TX clock
+>> source. Also covered by the register, but not supported in this driver,
+>> are TX/RX clock delay chains and inverters, and an RMII module.
+>
+> This is not really a PHY driver, more a driver for a special piece of
+> hardware responsible for properly configuring a more standard integrated
+> PHY which is then driven via standard MDIO accesses, right?
+>
+> The intention to make this driver re-usable is fine, but still makes me
+> wonder if it should not be put in a file which is linked into the
+> Ethernet MAC driver, and utilized by this one in a way that may be more
+> "ad-hoc" than what you are proposing here.
+>
+> One thing that is not obvious here, is how is the device parenting done?
+> Are we able to associate a phy_device to this SUN8I_H3_EPHY platform
+> device here?
 
-On Wed, 2016-04-13 at 19:01 +0530, Kishon Vijay Abraham I wrote:
-> Hi,
-> 
-> On Monday 11 April 2016 01:11 PM, Chunfeng Yun wrote:
-> > A new compatible string, "mediatek,mt2701-u3phy", is added.
-> > 
-> > Some register settings to avoid RX sensitivity level degradation
-> > which may arise on mt8173 platform are separated from other
-> > platforms.
-> > 
-> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> > ---
-> >  drivers/phy/Kconfig           |    5 ++-
-> >  drivers/phy/phy-mt65xx-usb3.c |   77 ++++++++++++++++++++++++++++-------------
-> >  2 files changed, 54 insertions(+), 28 deletions(-)
-> > 
-> > diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-> > index 26566db..3037f28 100644
-> > --- a/drivers/phy/Kconfig
-> > +++ b/drivers/phy/Kconfig
-> > @@ -218,9 +218,8 @@ config PHY_MT65XX_USB3
-> >  	depends on ARCH_MEDIATEK && OF
-> >  	select GENERIC_PHY
-> >  	help
-> > -	  Say 'Y' here to add support for Mediatek USB3.0 PHY driver
-> > -	  for mt65xx SoCs. it supports two usb2.0 ports and
-> > -	  one usb3.0 port.
-> > +	  Say 'Y' here to add support for Mediatek USB3.0 PHY driver,
-> > +	  it supports multiple usb2.0 and usb3.0 ports.
-> 
-> Do you mean this PHY driver support both USB2 and USB3? Then it's not really a
-> USB3 PHY driver right?
-> 
-Sorry for my unclear description.
+AFAIK you can't tie a platform device to an MDIO bus and phy_device.
+I looked around for any examples and found none.
 
-It supports USB3 PHY, and each USB3 PHY in fact includes a USB2 PHY and
-a SuperSpeed PHY.
+We're going to run into a similar issue with an MFD device later on.
+The X-Powers AC200 is a I2C based combo chip which includes an Ethernet
+PHY.
 
-Thanks a lot
+> Another thing is that the Ethernet MAC driver is fully aware of when
+> putting an Ethernet PHY into suspend, shutdown, or fully functional
+> power state should occur, if you have a separate platform driver here
+> which does not listen for such kinds of events (hint: none are generated
+> right now), then you cannot implement a working power state interface
+> between the MAC, SHIM and PHY here, even though you would want that.
 
-> Thanks
-> Kishon
+For this particular piece of hardware it would be possible to move the
+code into the MAC driver itself. For the AC200, not so much. Using the
+generic PHY framework to do power up / down would be a possibility.
+
+
+Regards
+ChenYu
