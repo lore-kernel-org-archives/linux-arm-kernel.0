@@ -1,22 +1,21 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 14 Apr 2016 11:13:11 -0500
-Subject: [PATCH v4 1/2] dt/bindings: Add bindings for hisilicon random
- number generator
-In-Reply-To: <1460542288-25941-2-git-send-email-wangkefeng.wang@huawei.com>
-References: <1460542288-25941-1-git-send-email-wangkefeng.wang@huawei.com>
- <1460542288-25941-2-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <20160414161311.GA10817@rob-hp-laptop>
+Date: Thu, 14 Apr 2016 11:15:03 -0500
+Subject: [PATCH 2/7] dt-bindings: Add a binding for Mediatek Video Decoder
+In-Reply-To: <1460548915-17536-3-git-send-email-tiffany.lin@mediatek.com>
+References: <1460548915-17536-1-git-send-email-tiffany.lin@mediatek.com>
+ <1460548915-17536-2-git-send-email-tiffany.lin@mediatek.com>
+ <1460548915-17536-3-git-send-email-tiffany.lin@mediatek.com>
+Message-ID: <20160414161503.GA11394@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 13, 2016 at 06:11:27PM +0800, Kefeng Wang wrote:
-> Document the devicetree bindings for the random number generator found
-> on Hisilicon Hip04 and Hip05 soc.
+On Wed, Apr 13, 2016 at 08:01:50PM +0800, Tiffany Lin wrote:
+> Add a DT binding documentation of Video Decoder for the
+> MT8173 SoC from Mediatek.
 > 
-> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+> Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
 > ---
->  Documentation/devicetree/bindings/rng/hisi-rng.txt | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/rng/hisi-rng.txt
+>  .../devicetree/bindings/media/mediatek-vcodec.txt  |   50 ++++++++++++++++++--
+>  1 file changed, 46 insertions(+), 4 deletions(-)
 
 Acked-by: Rob Herring <rob@kernel.org>
