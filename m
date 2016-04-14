@@ -1,57 +1,42 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 14 Apr 2016 21:17:28 +0200
-Subject: [PATCH v5 08/24] fbdev: ssd1307fb: use pwm_get_args() where
- appropriate
+Date: Thu, 14 Apr 2016 21:17:36 +0200
+Subject: [PATCH v5 16/24] ARM: explicitly apply PWM config extracted from
+ pwm_args
 In-Reply-To: <1460661464-11216-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1460661464-11216-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1460661464-11216-9-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1460661464-11216-17-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PWM framework has clarified the concept of reference PWM config
-(the platform dependent config retrieved from the DT or the PWM
-lookup table) and real PWM state.
+Call pwm_apply_args() just after requesting the PWM device so that the
+polarity and period are initialized according to the information provided
+in pwm_args.
 
-Use pwm_get_args() when the PWM user wants to retrieve this reference
-config and not the current state.
-
-This is part of the rework allowing the PWM framework to support
-hardware readout and expose real PWM state even when the PWM has
-just been requested (before the user calls pwm_config/enable/disable()).
+This is an intermediate state, and pwm_apply_args() should be dropped as
+soon as the atomic PWM infrastructure is in place and the driver makes
+use of it.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/video/fbdev/ssd1307fb.c | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+ arch/arm/mach-s3c24xx/mach-rx1950.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/video/fbdev/ssd1307fb.c b/drivers/video/fbdev/ssd1307fb.c
-index fa34808..652f688 100644
---- a/drivers/video/fbdev/ssd1307fb.c
-+++ b/drivers/video/fbdev/ssd1307fb.c
-@@ -286,6 +286,7 @@ static int ssd1307fb_init(struct ssd1307fb_par *par)
- {
- 	int ret;
- 	u32 precharge, dclk, com_invdir, compins;
-+	struct pwm_args pargs;
+diff --git a/arch/arm/mach-s3c24xx/mach-rx1950.c b/arch/arm/mach-s3c24xx/mach-rx1950.c
+index 774c982..25a139b 100644
+--- a/arch/arm/mach-s3c24xx/mach-rx1950.c
++++ b/arch/arm/mach-s3c24xx/mach-rx1950.c
+@@ -496,6 +496,12 @@ static int rx1950_backlight_init(struct device *dev)
+ 		return PTR_ERR(lcd_pwm);
+ 	}
  
- 	if (par->device_info->need_pwm) {
- 		par->pwm = pwm_get(&par->client->dev, NULL);
-@@ -294,7 +295,15 @@ static int ssd1307fb_init(struct ssd1307fb_par *par)
- 			return PTR_ERR(par->pwm);
- 		}
++	/*
++	 * FIXME: pwm_apply_args() should be removed when switching to
++	 * the atomic PWM API.
++	 */
++	pwm_apply_args(lcd_pwm);
++
+ 	rx1950_lcd_power(1);
+ 	rx1950_bl_power(1);
  
--		par->pwm_period = pwm_get_period(par->pwm);
-+		/*
-+		 * FIXME: pwm_apply_args() should be removed when switching to
-+		 * the atomic PWM API.
-+		 */
-+		pwm_apply_args(par->pwm);
-+
-+		pwm_get_args(par->pwm, &pargs);
-+
-+		par->pwm_period = pargs.period;
- 		/* Enable the PWM */
- 		pwm_config(par->pwm, par->pwm_period / 2, par->pwm_period);
- 		pwm_enable(par->pwm);
 -- 
 2.5.0
