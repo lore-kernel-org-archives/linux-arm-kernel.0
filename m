@@ -1,75 +1,98 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 14 Apr 2016 10:15:00 +0100
-Subject: [PATCH v2] sunxi-irq: Fix Kconfig dependency on GENERIC_IRQ_CHIP
-In-Reply-To: <570F5B5B.90302@arm.com>
-References: <1460563167-18517-1-git-send-email-suzuki.poulose@arm.com>
- <20160413200735.GC4005@lukather> <570F5932.2020809@arm.com>
- <570F5B5B.90302@arm.com>
-Message-ID: <570F5F94.1090602@arm.com>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Thu, 14 Apr 2016 15:01:48 +0530
+Subject: [PATCH v5 00/11] qcom: Add support for TSENS driver
+Message-ID: <1460626319-14516-1-git-send-email-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Current set of patches apply on 4.6-rc3. nvmem apis are currently
+broken and hence need to pull in the fixes for it as proposed here [1]
 
-On 14/04/16 09:56, Suzuki K Poulose wrote:
-> On 14/04/16 09:47, Suzuki K Poulose wrote:
->> On 13/04/16 21:07, Maxime Ripard wrote:
->>> Hi,
->>>
->>> On Wed, Apr 13, 2016 at 04:59:27PM +0100, Suzuki K Poulose wrote:
->>>> The sunxi-nmi and sun4i irq chips are selected by ARCH_SUNXI on both
->>>> arm
->>>> and arm64 (recently added). However on arm64, we don't explicitly
->>>> select
->>>> GENERIC_IRQ_CHIP which is required by the sunxi-nmi irq chip driver and
->>>> causes build breaks on 4.6-rc1 :
->>
->>>> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
->>>> index b03cfcb..c9626f4 100644
->>>> --- a/drivers/irqchip/Makefile
->>>> +++ b/drivers/irqchip/Makefile
->>>> @@ -19,8 +19,8 @@ obj-$(CONFIG_CLPS711X_IRQCHIP)        +=
->>>> irq-clps711x.o
->>>>   obj-$(CONFIG_OR1K_PIC)            += irq-or1k-pic.o
->>>>   obj-$(CONFIG_ORION_IRQCHIP)        += irq-orion.o
->>>>   obj-$(CONFIG_OMAP_IRQCHIP)        += irq-omap-intc.o
->>>> -obj-$(CONFIG_ARCH_SUNXI)        += irq-sun4i.o
->>>> -obj-$(CONFIG_ARCH_SUNXI)        += irq-sunxi-nmi.o
->>>> +obj-$(CONFIG_SUNXI_IRQCHIP)        += irq-sun4i.o
->>>> +obj-$(CONFIG_SUNXI_IRQCHIP)        += irq-sunxi-nmi.o
->>>
->>> Those are two different drivers, that should be selected by different
->>> SoCs (MACH_SUN4I and MACH_SUN5I for the former, SUN6I, SUN7I and SUN8I
->>> for the latter)
+Changes since v4:
+* dropped qcom,tsens-slopes binding, used coefficients instead
+* dropped qcom,sensor-id binding
+* Added support for msm8996 family
+* Other minor review fixes from v4
 
-But actually they aren't at the moment - and this is a post-rc1 fix, so
-I'd prefer to not introduce this right now.
+Changes since v3:
+* Dropped 'clk: qcom: create virtual child device for TSENS' which
+is picked up by Stephen
+* Updated GCC bindings with optional TSENS properties
 
-I can bake a proper patch for 4.7 which separates the two, if people
-want this change.
+Changes since v2:
+* Minor review fixes from Stephen/Punit and rebase on 4.3-rc4
 
->> OK. I had thought about that, but wasn't sure who needs what. So went
->> with
->> what existed already. I can respin it.
+Changes since v1:
+* Created virtual tsens device from gcc driver for 8960,
+with DT having a single node for gcc and tsens
+* Minor fixes with rebasing on 4.3-rc1
 
-I would rather not do this right now.
-Maxime, can't we just go with this patch? That seems like the proper fix
-for this part of the release cycle to me.
+Changes since RFC:
+* Added support for 8916 and 8084
+* Based off the latest nvmem framework patches [1]
+* Minor review fixes for comments mostly from Lina
 
-> As a follow up question, what does the arm64 port need ? just sunxi-nmi
-> ? or both ?
+This is an attempt to have a single TSENS driver for
+the different versions of the TSENS IP that exist, on
+different qcom msm/apq SoCs'
+Support is added for msm8916, msm8960, msm8974 and msm8996 families.
 
-Currently none of them, frankly.
-irq-sun4i will definitely not be needed, and I don't see the NMI
-controller documented in the manual (which does not mean too much, though).
+A lot of the work is based of original code from Stephen Boyd
+and Siddartha Mohanadoss. I have also picked some of what
+Narendran Rajan did in his attempt to upstream the support
+for 8960 family. I could not keep the original authorship on
+any of the patches because I ended up moving the code around
+quite a bit in an effort to have a single driver for the
+various devices. I would be glad to change the authorship
+for any of the patches if needed.
 
-So my hunch is that we may need the nmi driver in the future, but then
-we can still enable it once we merge the respective DT node or add
-support for a peripheral that needs it.
+[1] https://lkml.org/lkml/2016/4/13/654
 
-Cheers,
-Andre.
+Rajendra Nayak (11):
+  thermal: qcom: tsens: Add a skeletal TSENS drivers
+  thermal: qcom: tsens-8916: Add support for 8916 family of SoCs
+  thermal: qcom: tsens-8974: Add support for 8974 family of SoCs
+  thermal: core: export apis to get slope and offset
+  thermal: qcom: tsens-8960: Add support for 8960 family of SoCs
+  thermal: qcom: tsens-8996: Add support for 8996 family of SoCs
+  arm: dts: msm8974: Add thermal zones, tsens and qfprom nodes
+  arm: dts: apq8064: Add thermal zones, tsens and qfprom nodes
+  arm: dts: apq8084: Add thermal zones, tsens and qfprom nodes
+  arm64: dts: msm8916: Add thermal zones, tsens and qfprom nodes
+  arm64: dts: msm8996: Add thermal zones, tsens and qfprom nodes
 
-> I would be happy if someone who has better understanding of the
-> dependencies can fix
-> it up, rather than me trying to figure out all the dependencies.
+ .../devicetree/bindings/clock/qcom,gcc.txt         |  18 ++
+ .../devicetree/bindings/thermal/qcom-tsens.txt     |  21 ++
+ arch/arm/boot/dts/qcom-apq8064.dtsi                | 103 ++++++++
+ arch/arm/boot/dts/qcom-apq8084.dtsi                | 103 ++++++++
+ arch/arm/boot/dts/qcom-msm8974.dtsi                | 103 ++++++++
+ arch/arm64/boot/dts/qcom/msm8916.dtsi              |  64 +++++
+ arch/arm64/boot/dts/qcom/msm8996.dtsi              |  92 +++++++
+ drivers/thermal/Kconfig                            |   5 +
+ drivers/thermal/Makefile                           |   1 +
+ drivers/thermal/qcom/Kconfig                       |  11 +
+ drivers/thermal/qcom/Makefile                      |   2 +
+ drivers/thermal/qcom/tsens-8916.c                  | 113 ++++++++
+ drivers/thermal/qcom/tsens-8960.c                  | 293 +++++++++++++++++++++
+ drivers/thermal/qcom/tsens-8974.c                  | 244 +++++++++++++++++
+ drivers/thermal/qcom/tsens-8996.c                  |  82 ++++++
+ drivers/thermal/qcom/tsens-common.c                | 135 ++++++++++
+ drivers/thermal/qcom/tsens.c                       | 207 +++++++++++++++
+ drivers/thermal/qcom/tsens.h                       |  92 +++++++
+ drivers/thermal/thermal_core.c                     |  16 ++
+ include/linux/thermal.h                            |   8 +
+ 20 files changed, 1713 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/qcom-tsens.txt
+ create mode 100644 drivers/thermal/qcom/Kconfig
+ create mode 100644 drivers/thermal/qcom/Makefile
+ create mode 100644 drivers/thermal/qcom/tsens-8916.c
+ create mode 100644 drivers/thermal/qcom/tsens-8960.c
+ create mode 100644 drivers/thermal/qcom/tsens-8974.c
+ create mode 100644 drivers/thermal/qcom/tsens-8996.c
+ create mode 100644 drivers/thermal/qcom/tsens-common.c
+ create mode 100644 drivers/thermal/qcom/tsens.c
+ create mode 100644 drivers/thermal/qcom/tsens.h
+
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
