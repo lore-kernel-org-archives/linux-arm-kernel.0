@@ -1,47 +1,43 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 14 Apr 2016 19:12:14 +0200
-Subject: [GIT PULL v2] ARM: mvebu: defconfig for v4.7 (#1)
-Message-ID: <87mvowyv0x.fsf@free-electrons.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 14 Apr 2016 12:12:15 -0500
+Subject: [PATCH 2/2] ARM: dts: dra7x: Support QSPI MODE-0 operation at
+ 64MHz
+In-Reply-To: <1460629101-24309-3-git-send-email-vigneshr@ti.com>
+References: <1460629101-24309-1-git-send-email-vigneshr@ti.com>
+ <1460629101-24309-3-git-send-email-vigneshr@ti.com>
+Message-ID: <20160414171215.GA9860@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Apr 14, 2016 at 03:48:21PM +0530, Vignesh R wrote:
+> According to Data Manual(SPRS915P) of AM57x, TI QSPI controller on
+> DRA74(rev 1.1+)/DRA72 EVM can support up to 64MHz in MODE-0, whereas
+> MODE-3 is limited to 48MHz. Hence, switch to MODE-0 for better
+> throughput.
+> 
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> ---
+>  Documentation/devicetree/bindings/spi/ti_qspi.txt | 7 +++++++
+>  arch/arm/boot/dts/dra7-evm.dts                    | 6 ++----
+>  arch/arm/boot/dts/dra72-evm.dts                   | 6 ++----
+>  3 files changed, 11 insertions(+), 8 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/spi/ti_qspi.txt b/Documentation/devicetree/bindings/spi/ti_qspi.txt
+> index cc8304aa64ac..50b14f6b53a3 100644
+> --- a/Documentation/devicetree/bindings/spi/ti_qspi.txt
+> +++ b/Documentation/devicetree/bindings/spi/ti_qspi.txt
+> @@ -19,6 +19,13 @@ Optional properties:
+>  - syscon-chipselects: Handle to system control region contains QSPI
+>  		      chipselect register and offset of that register.
+>  
+> +NOTE: TI QSPI controller requires different pinmux and IODelay
+> +paramaters for Mode-0 and Mode-3 operations, which needs to be set up by
+> +the bootloader (U-Boot). Default configuration only supports Mode-0
+> +operation. Hence, "spi-cpol" and "spi-cpha" DT properties cannot be
+> +specified in the slave nodes of TI QSPI controller without appropriate
+> +modification to bootloader.
 
-Here is the first pull request for defconfig for mvebu for v4.7 but in
-in his second version after having fixed the patch title.
+But these properties are properties of what the slave device supports, 
+right? I don't see how you can change them based on the controller.
 
-Gregory
-
-The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
-
-  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-defconfig-4.7-1
-
-for you to fetch changes up to 23d2af622de748bf57d31a4125d06d183c29e908:
-
-  ARM: mvebu_v5_defconfig: Switching to the new Marvell's cryptographic engine driver (2016-04-14 18:57:19 +0200)
-
-----------------------------------------------------------------
-mvebu defconfig for 4.7 (part 1)
-
-- Use the new cryto engine(mv_cesa) in the mvebu and multi-arm
-  defcongig files
-- Attach mvebu_*_defconfig to the mvebu maintainers
-
-----------------------------------------------------------------
-Romain Perier (3):
-      ARM: mvebu_v7_defconfig: Enabling the new Marvell's cryptographic engine driver
-      ARM: multi_v7_defconfig: Enabling the new Marvell's cryptographic engine driver
-      ARM: mvebu_v5_defconfig: Switching to the new Marvell's cryptographic engine driver
-
-Thomas Petazzoni (1):
-      MAINTAINERS: attach arch/arm/configs/mvebu_*_defconfig to relevant maintainers
-
- MAINTAINERS                         | 2 +-
- arch/arm/configs/multi_v7_defconfig | 1 +
- arch/arm/configs/mvebu_v5_defconfig | 2 +-
- arch/arm/configs/mvebu_v7_defconfig | 1 +
- 4 files changed, 4 insertions(+), 2 deletions(-)
+Rob
