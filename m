@@ -1,28 +1,91 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 14 Apr 2016 18:49:11 +0100
-Subject: [PATCH 4/5] arm64: Verify CPU errata work arounds on hotplugged
- CPU
-In-Reply-To: <20160414173948.GO4584@arm.com>
-References: <1459941854-5190-1-git-send-email-suzuki.poulose@arm.com>
- <1459941854-5190-5-git-send-email-suzuki.poulose@arm.com>
- <20160414173948.GO4584@arm.com>
-Message-ID: <570FD817.5050704@arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 14 Apr 2016 11:02:15 -0700
+Subject: [PATCH] ACPI / ARM64: Remove EXPERT dependency for ACPI on ARM64
+In-Reply-To: <20160412172315.GH8066@e104818-lin.cambridge.arm.com>
+References: <1459360718-24125-1-git-send-email-broonie@kernel.org>
+ <20160412172315.GH8066@e104818-lin.cambridge.arm.com>
+Message-ID: <CAOesGMgULvTmzG-kGjWwntbgoRxpTTc2f72Yoj0H4DArGsLAEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/04/16 18:39, Will Deacon wrote:
-> On Wed, Apr 06, 2016 at 12:24:13PM +0100, Suzuki K Poulose wrote:
->> CPU Errata work arounds are detected and applied to the
->> kernel code at boot time and the data is then freed up.
->> If a new hotplugged CPU requires a work around which
->> was not applied at boot time, there is nothing we can
->> do but simply fail the booting.
+On Tue, Apr 12, 2016 at 10:23 AM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Wed, Mar 30, 2016 at 10:58:38AM -0700, Mark Brown wrote:
+>> When ACPI was originally merged for arm64 it had only been tested on
+>> emulators and not on real physical platforms and no platforms were
+>> relying on it.  This meant that there were concerns that there might be
+>> serious issues attempting to use it on practical systems so it had a
+>> dependency on EXPERT added to warn people that it was in an early stage
+>> of development with very little practical testing.  Since then things
+>> have moved on a bit.  We have seen people testing on real hardware and
+>> now have people starting to produce some platforms (the most prominent
+>> being the 96boards Cello) which only have ACPI support and which build
+>> and run to some useful extent with mainline.
+>>
+>> This is not to say that ACPI support or support for these systems is
+>> completely done, there are still areas being worked on such as PCI, but
+>> at this point it seems that we can be reasonably sure that ACPI will be
+>> viable for use on ARM64 and that the already merged support works for
+>> the cases it handles.  For the AMD Seattle based platforms support
+>> outside of PCI has been fairly complete in mainline a few releases now.
+>>
+>> This is also not to say that we don't have vendors working with ACPI who
+>> are trying do things that we would not consider optimal but it does not
+>> appear that the EXPERT dependency is having a substantial impact on
+>> these vendors.
+>>
+>> Given all this it seems that at this point the EXPERT dependency mainly
+>> creates inconvenience for users with systems that are doing the right
+>> thing and gets in the way of including the ACPI code in the testing that
+>> people are doing on mainline.  Removing it should help our ongoing
+>> testing cover those platforms with only ACPI support and help ensure
+>> that when ACPI code is merged any problems it causes for other users are
+>> more easily discovered.
+>>
+>> Signed-off-by: Mark Brown <broonie@kernel.org>
 >
-> Hmm, wouldn't it be better not to free the alternative text for errata
-> workarounds instead?
+> I'm fine with dropping the EXPERT dependency (of course, not a cc
+> stable). While arm64 ACPI is not "done" yet (nor is DT; there are
+> important ongoing developments like PCIe, IORT), I think the core arm64
+> ACPI support passed the EXPERT stage. I also don't think a default y
+> would imply any maintainer endorsement; vendors targeting ACPI are
+> already doing this for various reasons (distro requirement, certain ACPI
+> features like RAS). But, hopefully, it will encourage more vendors to
+> start upstreaming their ACPI-related patches.
+>
+> However, building ACPI by default on arm64 doesn't mean that we can
+> ignore potential misuses like PRP0001+_DSD blindly following DT
+> (mis)concepts, breaking compatibility with older/newer firmware (this
+> goes in both directions) or using ACPI for SoCs where it is clearly not
+> suitable (e.g. non-SBSA). Such patches should be NAK'ed accordingly.
+>
+>> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+>> index 82b96ee8624c..bf5dc1ac3446 100644
+>> --- a/drivers/acpi/Kconfig
+>> +++ b/drivers/acpi/Kconfig
+>> @@ -5,7 +5,7 @@
+>>  menuconfig ACPI
+>>       bool "ACPI (Advanced Configuration and Power Interface) Support"
+>>       depends on !IA64_HP_SIM
+>> -     depends on IA64 || X86 || (ARM64 && EXPERT)
+>> +     depends on IA64 || X86 || ARM64
+>>       depends on PCI
+>>       select PNP
+>>       default y
+>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+>
+> That said, I'd like to see an opinion from the arm-soc maintainers since
+> they were active on the original arm64 ACPI threads introducing this
+> dependency (and I think they have the right to veto ;)).
 
-We could. I don't have a strong opinion. If there are no objections, I could
-adopt it.
+Switch the default from y to n on ARM64 (or default !ARM64) and I'll
+be happy to ack it.
 
-Cheers
-Suzuki
+Mostly because it doesn't make sense for people building their own
+configs for embedded systems to get it turned on by default. Anyone
+running on a server is likely to clone an existing distro config in
+the first place.
+
+
+-Olof
