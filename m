@@ -1,118 +1,387 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 14 Apr 2016 14:10:17 +0900
-Subject: [PATCH v8 02/20] PM / devfreq: exynos: Add documentation for
- generic exynos bus frequency driver
-In-Reply-To: <CAGTfZH2u69aSyCFuq+v1eHh7iNeSU3WP4Wh+Qx_af6-o0LozNw@mail.gmail.com>
-References: <1460089509-16260-1-git-send-email-cw00.choi@samsung.com>
- <1460089509-16260-3-git-send-email-cw00.choi@samsung.com>
- <20160411154012.GA24665@rob-hp-laptop>
- <CAGTfZH2u69aSyCFuq+v1eHh7iNeSU3WP4Wh+Qx_af6-o0LozNw@mail.gmail.com>
-Message-ID: <570F2639.9070809@samsung.com>
+From: songjun.wu@atmel.com (Wu, Songjun)
+Date: Thu, 14 Apr 2016 13:44:27 +0800
+Subject: [PATCH 1/2] [media] atmel-isc: add the Image Sensor Controller
+ code
+In-Reply-To: <201604132310.zvahkw1X%fengguang.wu@intel.com>
+References: <201604132310.zvahkw1X%fengguang.wu@intel.com>
+Message-ID: <570F2E3B.1090600@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+The option 'CONFIG_COMMON_CLK=y' is needed to add to '.config'.
+But I do not validate, '.config' will be generated automatically and 
+overwritten when it is changed.
 
-On 2016? 04? 12? 05:25, Chanwoo Choi wrote:
-> Hi Rob,
-> 
-> On Tue, Apr 12, 2016 at 12:40 AM, Rob Herring <robh@kernel.org> wrote:
->> On Fri, Apr 08, 2016 at 01:24:51PM +0900, Chanwoo Choi wrote:
->>> This patch adds the documentation for generic exynos bus frequency
->>> driver.
->>>
->>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->>> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
->>> ---
->>>  .../devicetree/bindings/devfreq/exynos-bus.txt     | 95 ++++++++++++++++++++++
->>>  1 file changed, 95 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/devfreq/exynos-bus.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/devfreq/exynos-bus.txt b/Documentation/devicetree/bindings/devfreq/exynos-bus.txt
->>> new file mode 100644
->>> index 000000000000..78171b918e3f
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/devfreq/exynos-bus.txt
->>> @@ -0,0 +1,95 @@
->>> +* Generic Exynos Bus frequency device
->>> +
->>> +The Samsung Exynos SoC has many buses for data transfer between DRAM
->>> +and sub-blocks in SoC. Most Exynos SoCs share the common architecture
->>> +for buses. Generally, each bus of Exynos SoC includes a source clock
->>> +and a power line, which are able to change the clock frequency
->>> +of the bus in runtime. To monitor the usage of each bus in runtime,
->>> +the driver uses the PPMU (Platform Performance Monitoring Unit), which
->>> +is able to measure the current load of sub-blocks.
->>> +
->>> +There are a little different composition among Exynos SoC because each Exynos
->>> +SoC has different sub-blocks. Therefore, shch difference should be specified
->>> +in devicetree file instead of each device driver. In result, this driver
->>> +is able to support the bus frequency for all Exynos SoCs.
->>
->> I still have issues with this whole series. The DT hierarchy represents
->> buses. You are describing buses here and control of them. I would expect
->> to see some hierarchy, but there is none. What this looks like is you
->> are adding nodes based on what fits the current driver.
-> 
-> I already replied[1] about your same question on v2 patchset four 4 months ago.
-> [1] https://lkml.org/lkml/2015/12/10/943
-> 
-> I attach the your question and my reply history as following:
-> ---------------------------------------------------------------------
-> [ Discussion between you and me on v2 patchset[1] ]
->>>>
->>>> This still has the same problem as before. I would expect that the bus
->>>> hierarchy in the dts match the hierarchy here. You just have flat nodes
->>>> in the example below. So all IP blocks affected by frequency scaling
->>>> should be under the bus node defining the OPPs. Something like this:
->>>
->>> The each bus of sub-block has not h/w dependency among sub-blocks
->>> and has the owned source clock / OPP table. Just they share the same
->>> power line. So, I think that flat nodes in the example below is not problem.
->>
->> I'm talking about the peripherals not described here. Is the ISP block
->> not a child of the bus_isp node? Same for the display controller block
->> and bus_lcd0. And so on.
-> 
->>From the H/W point of view, ISP block is really not included in ISP's
-> AXI bus (bus_isp).
-> Just, the bus_isp connect to between ISP block and DRAM.
-> ---------------------------------------------------------------------
-
-I'm considering about your comment about hierarchy.
-
-But, I think it is not appropriate.
-there is no perfect paired set between sub-block and dvfs driver for AMBA bus.
-
-For example about Exynos5420's JPEG IP,
-There are two JPEG IPs in the Exynos5420. But two JPEG IPs
-use the same source clock for AMBA AXI line to transfer
-data between DRAM and JPEG as following:
-
-(AXI master)               (AXI slave)
-JPEG_0 --|-----(AXI)-----|
-         |               |---- DRAM
-JPEG_1 --|-----(AXI)-----|
-
-Two AMBA buses use the same source clock. So, only one dvfs driver
-should handle the source clock for AXI bus.
-               
-Also,
-two JPEG use the same AMBA APB line to configure the register of JPEG IP
-as following:
-
-(APB slave)                 (APB master)
-JPEG_0 --|-----(APB)-----|
-         |               |---- CPU
-JPEG_1 --|-----(APB)-----|
-
-The JPEG_0/1 could not be included in both AXI and APB in Device Tree.
-
-Additionally, the I2C/SPI/PCI and etc use the APB bus
-for communication between each controller and CPU.
-
-I'll expect your reply.
-
-Best Regards,
-Chanwoo Choi
+On 4/14/2016 00:01, kbuild test robot wrote:
+> Hi Songjun,
+>
+> [auto build test ERROR on linuxtv-media/master]
+> [also build test ERROR on v4.6-rc3 next-20160413]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+>
+> url:    https://github.com/0day-ci/linux/commits/Songjun-Wu/atmel-isc-add-driver-for-Atmel-ISC/20160413-155337
+> base:   git://linuxtv.org/media_tree.git master
+> config: powerpc-allyesconfig (attached as .config)
+> reproduce:
+>          wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+>          chmod +x ~/bin/make.cross
+>          # save the attached .config to linux build tree
+>          make.cross ARCH=powerpc
+>
+> All errors (new ones prefixed by >>):
+>
+>                      from include/linux/of.h:21,
+>                      from drivers/media/platform/atmel/atmel-isc.c:27:
+>     drivers/media/platform/atmel/atmel-isc.c: In function 'isc_clk_enable':
+>     include/linux/kernel.h:824:48: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+>       const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+>                                                     ^
+>     drivers/media/platform/atmel/atmel-isc.c:55:24: note: in expansion of macro 'container_of'
+>      #define to_isc_clk(hw) container_of(hw, struct isc_clk, hw)
+>                             ^
+>     drivers/media/platform/atmel/atmel-isc.c:247:28: note: in expansion of macro 'to_isc_clk'
+>       struct isc_clk *isc_clk = to_isc_clk(hw);
+>                                 ^
+>     include/linux/kernel.h:824:48: note: (near initialization for 'isc_clk')
+>       const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+>                                                     ^
+>     drivers/media/platform/atmel/atmel-isc.c:55:24: note: in expansion of macro 'container_of'
+>      #define to_isc_clk(hw) container_of(hw, struct isc_clk, hw)
+>                             ^
+>     drivers/media/platform/atmel/atmel-isc.c:247:28: note: in expansion of macro 'to_isc_clk'
+>       struct isc_clk *isc_clk = to_isc_clk(hw);
+>                                 ^
+>     drivers/media/platform/atmel/atmel-isc.c: In function 'isc_clk_disable':
+>     include/linux/kernel.h:824:48: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+>       const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+>                                                     ^
+>     drivers/media/platform/atmel/atmel-isc.c:55:24: note: in expansion of macro 'container_of'
+>      #define to_isc_clk(hw) container_of(hw, struct isc_clk, hw)
+>                             ^
+>     drivers/media/platform/atmel/atmel-isc.c:280:28: note: in expansion of macro 'to_isc_clk'
+>       struct isc_clk *isc_clk = to_isc_clk(hw);
+>                                 ^
+>     include/linux/kernel.h:824:48: note: (near initialization for 'isc_clk')
+>       const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+>                                                     ^
+>     drivers/media/platform/atmel/atmel-isc.c:55:24: note: in expansion of macro 'container_of'
+>      #define to_isc_clk(hw) container_of(hw, struct isc_clk, hw)
+>                             ^
+>     drivers/media/platform/atmel/atmel-isc.c:280:28: note: in expansion of macro 'to_isc_clk'
+>       struct isc_clk *isc_clk = to_isc_clk(hw);
+>                                 ^
+>     drivers/media/platform/atmel/atmel-isc.c: In function 'isc_clk_is_enabled':
+>     include/linux/kernel.h:824:48: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+>       const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+>                                                     ^
+>     drivers/media/platform/atmel/atmel-isc.c:55:24: note: in expansion of macro 'container_of'
+>      #define to_isc_clk(hw) container_of(hw, struct isc_clk, hw)
+>                             ^
+>     drivers/media/platform/atmel/atmel-isc.c:295:28: note: in expansion of macro 'to_isc_clk'
+>       struct isc_clk *isc_clk = to_isc_clk(hw);
+>                                 ^
+>     include/linux/kernel.h:824:48: note: (near initialization for 'isc_clk')
+>       const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+>                                                     ^
+>     drivers/media/platform/atmel/atmel-isc.c:55:24: note: in expansion of macro 'container_of'
+>      #define to_isc_clk(hw) container_of(hw, struct isc_clk, hw)
+>                             ^
+>     drivers/media/platform/atmel/atmel-isc.c:295:28: note: in expansion of macro 'to_isc_clk'
+>       struct isc_clk *isc_clk = to_isc_clk(hw);
+>                                 ^
+>     drivers/media/platform/atmel/atmel-isc.c: In function 'isc_clk_recalc_rate':
+>     include/linux/kernel.h:824:48: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+>       const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+>                                                     ^
+>     drivers/media/platform/atmel/atmel-isc.c:55:24: note: in expansion of macro 'container_of'
+>      #define to_isc_clk(hw) container_of(hw, struct isc_clk, hw)
+>                             ^
+>     drivers/media/platform/atmel/atmel-isc.c:309:28: note: in expansion of macro 'to_isc_clk'
+>       struct isc_clk *isc_clk = to_isc_clk(hw);
+>                                 ^
+>     include/linux/kernel.h:824:48: note: (near initialization for 'isc_clk')
+>       const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+>                                                     ^
+>     drivers/media/platform/atmel/atmel-isc.c:55:24: note: in expansion of macro 'container_of'
+>      #define to_isc_clk(hw) container_of(hw, struct isc_clk, hw)
+>                             ^
+>     drivers/media/platform/atmel/atmel-isc.c:309:28: note: in expansion of macro 'to_isc_clk'
+>       struct isc_clk *isc_clk = to_isc_clk(hw);
+>                                 ^
+>     drivers/media/platform/atmel/atmel-isc.c: At top level:
+>     drivers/media/platform/atmel/atmel-isc.c:315:14: warning: 'struct clk_rate_request' declared inside parameter list
+>            struct clk_rate_request *req)
+>                   ^
+>     drivers/media/platform/atmel/atmel-isc.c:315:14: warning: its scope is only this definition or declaration, which is probably not what you want
+>     drivers/media/platform/atmel/atmel-isc.c: In function 'isc_clk_determine_rate':
+>     drivers/media/platform/atmel/atmel-isc.c:324:18: error: implicit declaration of function 'clk_hw_get_num_parents' [-Werror=implicit-function-declaration]
+>       for (i = 0; i < clk_hw_get_num_parents(hw); i++) {
+>                       ^
+>     drivers/media/platform/atmel/atmel-isc.c:325:12: error: implicit declaration of function 'clk_hw_get_parent_by_index' [-Werror=implicit-function-declaration]
+>        parent = clk_hw_get_parent_by_index(hw, i);
+>                 ^
+>     drivers/media/platform/atmel/atmel-isc.c:325:10: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
+>        parent = clk_hw_get_parent_by_index(hw, i);
+>               ^
+>     drivers/media/platform/atmel/atmel-isc.c:329:17: error: implicit declaration of function 'clk_hw_get_rate' [-Werror=implicit-function-declaration]
+>        parent_rate = clk_hw_get_rate(parent);
+>                      ^
+>     In file included from include/linux/list.h:8:0,
+>                      from include/linux/kobject.h:20,
+>                      from include/linux/of.h:21,
+>                      from drivers/media/platform/atmel/atmel-isc.c:27:
+>>> drivers/media/platform/atmel/atmel-isc.c:335:22: error: dereferencing pointer to incomplete type 'struct clk_rate_request'
+>         tmp_diff = abs(req->rate - tmp_rate);
+>                           ^
+>     include/linux/kernel.h:222:38: note: in definition of macro '__abs_choose_expr'
+>       __builtin_types_compatible_p(typeof(x),   signed type) || \
+>                                           ^
+>     drivers/media/platform/atmel/atmel-isc.c:335:15: note: in expansion of macro 'abs'
+>         tmp_diff = abs(req->rate - tmp_rate);
+>                    ^
+>     include/linux/kernel.h:216:3: error: first argument to '__builtin_choose_expr' not a constant
+>        __builtin_choose_expr(     \
+>        ^
+>     include/linux/kernel.h:224:54: note: in definition of macro '__abs_choose_expr'
+>       ({ signed type __x = (x); __x < 0 ? -__x : __x; }), other)
+>                                                           ^
+>     include/linux/kernel.h:212:3: note: in expansion of macro '__abs_choose_expr'
+>        __abs_choose_expr(x, long,    \
+>        ^
+>     include/linux/kernel.h:213:3: note: in expansion of macro '__abs_choose_expr'
+>        __abs_choose_expr(x, int,    \
+>        ^
+>     include/linux/kernel.h:214:3: note: in expansion of macro '__abs_choose_expr'
+>        __abs_choose_expr(x, short,    \
+>        ^
+>     include/linux/kernel.h:215:3: note: in expansion of macro '__abs_choose_expr'
+>        __abs_choose_expr(x, char,    \
+>        ^
+>     drivers/media/platform/atmel/atmel-isc.c:335:15: note: in expansion of macro 'abs'
+>         tmp_diff = abs(req->rate - tmp_rate);
+>                    ^
+>     include/linux/kernel.h:221:43: error: first argument to '__builtin_choose_expr' not a constant
+>      #define __abs_choose_expr(x, type, other) __builtin_choose_expr( \
+>                                                ^
+>     include/linux/kernel.h:224:54: note: in definition of macro '__abs_choose_expr'
+>       ({ signed type __x = (x); __x < 0 ? -__x : __x; }), other)
+>                                                           ^
+>     include/linux/kernel.h:212:3: note: in expansion of macro '__abs_choose_expr'
+>        __abs_choose_expr(x, long,    \
+>        ^
+>     include/linux/kernel.h:213:3: note: in expansion of macro '__abs_choose_expr'
+>        __abs_choose_expr(x, int,    \
+>        ^
+>     include/linux/kernel.h:214:3: note: in expansion of macro '__abs_choose_expr'
+>        __abs_choose_expr(x, short,    \
+>        ^
+>     include/linux/kernel.h:215:3: note: in expansion of macro '__abs_choose_expr'
+>        __abs_choose_expr(x, char,    \
+>        ^
+>     drivers/media/platform/atmel/atmel-isc.c:335:15: note: in expansion of macro 'abs'
+>         tmp_diff = abs(req->rate - tmp_rate);
+>                    ^
+>     include/linux/kernel.h:221:43: error: first argument to '__builtin_choose_expr' not a constant
+>      #define __abs_choose_expr(x, type, other) __builtin_choose_expr( \
+>                                                ^
+>     include/linux/kernel.h:224:54: note: in definition of macro '__abs_choose_expr'
+>       ({ signed type __x = (x); __x < 0 ? -__x : __x; }), other)
+>                                                           ^
+>     include/linux/kernel.h:212:3: note: in expansion of macro '__abs_choose_expr'
+>        __abs_choose_expr(x, long,    \
+>        ^
+>     include/linux/kernel.h:213:3: note: in expansion of macro '__abs_choose_expr'
+>        __abs_choose_expr(x, int,    \
+>        ^
+>     include/linux/kernel.h:214:3: note: in expansion of macro '__abs_choose_expr'
+>        __abs_choose_expr(x, short,    \
+>        ^
+>     drivers/media/platform/atmel/atmel-isc.c:335:15: note: in expansion of macro 'abs'
+>         tmp_diff = abs(req->rate - tmp_rate);
+>                    ^
+>     include/linux/kernel.h:221:43: error: first argument to '__builtin_choose_expr' not a constant
+>      #define __abs_choose_expr(x, type, other) __builtin_choose_expr( \
+>                                                ^
+>     include/linux/kernel.h:224:54: note: in definition of macro '__abs_choose_expr'
+>       ({ signed type __x = (x); __x < 0 ? -__x : __x; }), other)
+>                                                           ^
+>     include/linux/kernel.h:212:3: note: in expansion of macro '__abs_choose_expr'
+>        __abs_choose_expr(x, long,    \
+>        ^
+>     include/linux/kernel.h:213:3: note: in expansion of macro '__abs_choose_expr'
+>        __abs_choose_expr(x, int,    \
+>        ^
+>     drivers/media/platform/atmel/atmel-isc.c:335:15: note: in expansion of macro 'abs'
+>         tmp_diff = abs(req->rate - tmp_rate);
+>                    ^
+>     include/linux/kernel.h:221:43: error: first argument to '__builtin_choose_expr' not a constant
+>      #define __abs_choose_expr(x, type, other) __builtin_choose_expr( \
+>                                                ^
+>     include/linux/kernel.h:224:54: note: in definition of macro '__abs_choose_expr'
+>       ({ signed type __x = (x); __x < 0 ? -__x : __x; }), other)
+>                                                           ^
+>     include/linux/kernel.h:212:3: note: in expansion of macro '__abs_choose_expr'
+>        __abs_choose_expr(x, long,    \
+>        ^
+>     drivers/media/platform/atmel/atmel-isc.c:335:15: note: in expansion of macro 'abs'
+>         tmp_diff = abs(req->rate - tmp_rate);
+>                    ^
+>     include/linux/kernel.h:221:43: error: first argument to '__builtin_choose_expr' not a constant
+>      #define __abs_choose_expr(x, type, other) __builtin_choose_expr( \
+>                                                ^
+>     include/linux/kernel.h:211:16: note: in expansion of macro '__abs_choose_expr'
+>      #define abs(x) __abs_choose_expr(x, long long,    \
+>                     ^
+>     drivers/media/platform/atmel/atmel-isc.c:335:15: note: in expansion of macro 'abs'
+>         tmp_diff = abs(req->rate - tmp_rate);
+>                    ^
+>     In file included from include/linux/printk.h:277:0,
+>                      from include/linux/kernel.h:13,
+>                      from include/linux/list.h:8,
+>                      from include/linux/kobject.h:20,
+>                      from include/linux/of.h:21,
+>                      from drivers/media/platform/atmel/atmel-isc.c:27:
+>>> drivers/media/platform/atmel/atmel-isc.c:354:4: error: implicit declaration of function '__clk_get_name' [-Werror=implicit-function-declaration]
+>         __clk_get_name((req->best_parent_hw)->clk),
+>         ^
+>     include/linux/dynamic_debug.h:79:10: note: in definition of macro 'dynamic_pr_debug'
+>             ##__VA_ARGS__);  \
+>               ^
+>     drivers/media/platform/atmel/atmel-isc.c:352:2: note: in expansion of macro 'pr_debug'
+>       pr_debug("ISC CLK: %s, best_rate = %ld, parent clk: %s @ %ld\n",
+>       ^
+>     In file included from include/linux/list.h:8:0,
+>                      from include/linux/kobject.h:20,
+>                      from include/linux/of.h:21,
+>                      from drivers/media/platform/atmel/atmel-isc.c:27:
+>     drivers/media/platform/atmel/atmel-isc.c: In function 'isc_clk_set_parent':
+>     include/linux/kernel.h:824:48: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+>       const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+>                                                     ^
+>     drivers/media/platform/atmel/atmel-isc.c:55:24: note: in expansion of macro 'container_of'
+>      #define to_isc_clk(hw) container_of(hw, struct isc_clk, hw)
+>                             ^
+>     drivers/media/platform/atmel/atmel-isc.c:367:28: note: in expansion of macro 'to_isc_clk'
+>       struct isc_clk *isc_clk = to_isc_clk(hw);
+>                                 ^
+>     include/linux/kernel.h:824:48: note: (near initialization for 'isc_clk')
+>       const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+>                                                     ^
+>     drivers/media/platform/atmel/atmel-isc.c:55:24: note: in expansion of macro 'container_of'
+>      #define to_isc_clk(hw) container_of(hw, struct isc_clk, hw)
+>                             ^
+>     drivers/media/platform/atmel/atmel-isc.c:367:28: note: in expansion of macro 'to_isc_clk'
+>       struct isc_clk *isc_clk = to_isc_clk(hw);
+>                                 ^
+>     drivers/media/platform/atmel/atmel-isc.c: In function 'isc_clk_get_parent':
+>     include/linux/kernel.h:824:48: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+>       const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+>                                                     ^
+>     drivers/media/platform/atmel/atmel-isc.c:55:24: note: in expansion of macro 'container_of'
+>      #define to_isc_clk(hw) container_of(hw, struct isc_clk, hw)
+>                             ^
+>     drivers/media/platform/atmel/atmel-isc.c:379:28: note: in expansion of macro 'to_isc_clk'
+>       struct isc_clk *isc_clk = to_isc_clk(hw);
+>                                 ^
+>     include/linux/kernel.h:824:48: note: (near initialization for 'isc_clk')
+>       const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+>                                                     ^
+>     drivers/media/platform/atmel/atmel-isc.c:55:24: note: in expansion of macro 'container_of'
+>      #define to_isc_clk(hw) container_of(hw, struct isc_clk, hw)
+>                             ^
+>     drivers/media/platform/atmel/atmel-isc.c:379:28: note: in expansion of macro 'to_isc_clk'
+>       struct isc_clk *isc_clk = to_isc_clk(hw);
+>                                 ^
+>     drivers/media/platform/atmel/atmel-isc.c: In function 'isc_clk_set_rate':
+>     include/linux/kernel.h:824:48: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+>       const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+>                                                     ^
+>     drivers/media/platform/atmel/atmel-isc.c:55:24: note: in expansion of macro 'container_of'
+>      #define to_isc_clk(hw) container_of(hw, struct isc_clk, hw)
+>                             ^
+>     drivers/media/platform/atmel/atmel-isc.c:388:28: note: in expansion of macro 'to_isc_clk'
+>       struct isc_clk *isc_clk = to_isc_clk(hw);
+>                                 ^
+>     include/linux/kernel.h:824:48: note: (near initialization for 'isc_clk')
+>       const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+>                                                     ^
+>     drivers/media/platform/atmel/atmel-isc.c:55:24: note: in expansion of macro 'container_of'
+>      #define to_isc_clk(hw) container_of(hw, struct isc_clk, hw)
+>                             ^
+>     drivers/media/platform/atmel/atmel-isc.c:388:28: note: in expansion of macro 'to_isc_clk'
+>       struct isc_clk *isc_clk = to_isc_clk(hw);
+>                                 ^
+>     drivers/media/platform/atmel/atmel-isc.c: At top level:
+>     drivers/media/platform/atmel/atmel-isc.c:403:21: error: variable 'isc_clk_ops' has initializer but incomplete type
+>      static const struct clk_ops isc_clk_ops = {
+>                          ^
+>     drivers/media/platform/atmel/atmel-isc.c:404:2: error: unknown field 'enable' specified in initializer
+>       .enable  = isc_clk_enable,
+>       ^
+>     drivers/media/platform/atmel/atmel-isc.c:404:13: warning: excess elements in struct initializer
+>       .enable  = isc_clk_enable,
+>                  ^
+>     drivers/media/platform/atmel/atmel-isc.c:404:13: note: (near initialization for 'isc_clk_ops')
+>     drivers/media/platform/atmel/atmel-isc.c:405:2: error: unknown field 'disable' specified in initializer
+>       .disable = isc_clk_disable,
+>       ^
+>     drivers/media/platform/atmel/atmel-isc.c:405:13: warning: excess elements in struct initializer
+>       .disable = isc_clk_disable,
+>                  ^
+>     drivers/media/platform/atmel/atmel-isc.c:405:13: note: (near initialization for 'isc_clk_ops')
+>     drivers/media/platform/atmel/atmel-isc.c:406:2: error: unknown field 'is_enabled' specified in initializer
+>       .is_enabled = isc_clk_is_enabled,
+>       ^
+>     drivers/media/platform/atmel/atmel-isc.c:406:16: warning: excess elements in struct initializer
+>       .is_enabled = isc_clk_is_enabled,
+>                     ^
+>     drivers/media/platform/atmel/atmel-isc.c:406:16: note: (near initialization for 'isc_clk_ops')
+>     drivers/media/platform/atmel/atmel-isc.c:407:2: error: unknown field 'recalc_rate' specified in initializer
+>       .recalc_rate = isc_clk_recalc_rate,
+>       ^
+>     drivers/media/platform/atmel/atmel-isc.c:407:17: warning: excess elements in struct initializer
+>       .recalc_rate = isc_clk_recalc_rate,
+>                      ^
+>
+> vim +335 drivers/media/platform/atmel/atmel-isc.c
+>
+>     323	
+>     324		for (i = 0; i < clk_hw_get_num_parents(hw); i++) {
+>     325			parent = clk_hw_get_parent_by_index(hw, i);
+>     326			if (!parent)
+>     327				continue;
+>     328	
+>   > 329			parent_rate = clk_hw_get_rate(parent);
+>     330			if (!parent_rate)
+>     331				continue;
+>     332	
+>     333			for (div = 1; div < ISC_CLK_MAX_DIV + 2; div++) {
+>     334				tmp_rate = DIV_ROUND_CLOSEST(parent_rate, div);
+>   > 335				tmp_diff = abs(req->rate - tmp_rate);
+>     336	
+>     337				if (best_diff < 0 || best_diff > tmp_diff) {
+>     338					best_rate = tmp_rate;
+>     339					best_diff = tmp_diff;
+>     340					req->best_parent_rate = parent_rate;
+>     341					req->best_parent_hw = parent;
+>     342				}
+>     343	
+>     344				if (!best_diff || tmp_rate < req->rate)
+>     345					break;
+>     346			}
+>     347	
+>     348			if (!best_diff)
+>     349				break;
+>     350		}
+>     351	
+>     352		pr_debug("ISC CLK: %s, best_rate = %ld, parent clk: %s @ %ld\n",
+>     353			 __func__, best_rate,
+>   > 354			 __clk_get_name((req->best_parent_hw)->clk),
+>     355			 req->best_parent_rate);
+>     356	
+>     357		if (best_rate < 0)
+>
+> ---
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+>
