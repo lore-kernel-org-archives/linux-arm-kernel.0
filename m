@@ -1,35 +1,45 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 14 Apr 2016 14:07:58 +0300
-Subject: [PATCHv2 09/28] ARM: AM33xx: fix module_wait_ready without clkctrl
- register
+Date: Thu, 14 Apr 2016 14:07:56 +0300
+Subject: [PATCHv2 07/28] ARM: OMAP2+: timer: change order of hwmod data
+ handling
 In-Reply-To: <1460632097-25727-1-git-send-email-t-kristo@ti.com>
 References: <1460632097-25727-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1460632097-25727-10-git-send-email-t-kristo@ti.com>
+Message-ID: <1460632097-25727-8-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the module has no clkctrl register defined, module_wait_ready should
-not try to access this. This can potentially cause an illegal register
-access, and result in bad idle reporting also.
+With the introduction of hwmod module clocks, the name of the hwmod
+main clk may not be available before hwmod setup, as hwmod setup
+may lookup the main clock dynamically based on the hwmod name.
+Thus, change the order of hwmod setup and main clock handling for
+the timer code, to make sure the main clock is going to be
+available.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/mach-omap2/cm33xx.c |    3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/mach-omap2/timer.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-omap2/cm33xx.c b/arch/arm/mach-omap2/cm33xx.c
-index 7b181f9..c073fb5 100644
---- a/arch/arm/mach-omap2/cm33xx.c
-+++ b/arch/arm/mach-omap2/cm33xx.c
-@@ -220,6 +220,9 @@ static int am33xx_cm_wait_module_ready(u8 part, s16 inst, u16 clkctrl_offs,
- {
- 	int i = 0;
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index 08e08db..77fb4e1 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -290,6 +290,8 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+ 	if (!timer->io_base)
+ 		return -ENXIO;
  
-+	if (!clkctrl_offs)
-+		return 0;
++	omap_hwmod_setup_one(oh_name);
 +
- 	omap_test_timeout(_is_module_ready(inst, clkctrl_offs),
- 			  MAX_MODULE_READY_TIME, i);
+ 	/* After the dmtimer is using hwmod these clocks won't be needed */
+ 	timer->fclk = ti_clk_get(omap_hwmod_get_main_clk(oh));
+ 	if (IS_ERR(timer->fclk))
+@@ -304,7 +306,6 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+ 
+ 	clk_put(src);
+ 
+-	omap_hwmod_setup_one(oh_name);
+ 	omap_hwmod_enable(oh);
+ 	__omap_dm_timer_init_regs(timer);
  
 -- 
 1.7.9.5
