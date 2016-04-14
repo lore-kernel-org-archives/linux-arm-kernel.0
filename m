@@ -1,36 +1,33 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 14 Apr 2016 12:25:40 -0700
-Subject: [PATCH v5 00/10] Support for Cortex-M Prototyping System
-In-Reply-To: <570F593D.6040809@arm.com>
-References: <1459519381-34441-1-git-send-email-vladimir.murzin@arm.com>
- <570F593D.6040809@arm.com>
-Message-ID: <20160414192540.GD20512@kroah.com>
+From: david@lechnology.com (David Lechner)
+Date: Thu, 14 Apr 2016 14:26:19 -0500
+Subject: [PATCH 0/2] da8xx clocks (was part of "da8xx USB clocks")
+In-Reply-To: <1460661217-7389-1-git-send-email-david@lechnology.com>
+References: <1460661217-7389-1-git-send-email-david@lechnology.com>
+Message-ID: <570FEEDB.7000109@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 14, 2016 at 09:47:57AM +0100, Vladimir Murzin wrote:
-> Hi,
-> 
-> On 01/04/16 15:02, Vladimir Murzin wrote:
-> > Hi,
-> > 
-> > This patch series provides the basic support for running ucLinux on V2M-MPS2
-> > platform.
-> > 
-> > With these patches applied ucLinux can be run on both HW and FVP models
-> > with Cortex-M3/M4/M7 configurations.
-> 
-> Any objection to get it merged?
-> 
-> Sudeep Holla noticed that there is merge conflict against linux-next
-> with PIC32 uart (Makefile and serial_core.h), so should I provide
-> conflict resolution or do rebase on someone's branch?
-> 
-> Anyway, I'd be glad to know how it should be processed further?
+On 04/14/2016 02:13 PM, David Lechner wrote:
+> I have separated these patches from the "da8xx USB clocks" series since that
+> series no longer depends on the clock init being moved.
+>
+> Tested working on the linux-davinci/master branch with LEGO MINDSTORMS EV3.
+>
+> David Lechner (2):
+>    ARM: davinci: Move clock init after ioremap.
+>    ARM: davinci: da850: use clk->set_parent for async3
+>
+>   arch/arm/mach-davinci/clock.c  |  2 +-
+>   arch/arm/mach-davinci/common.c |  6 ---
+>   arch/arm/mach-davinci/da830.c  |  2 +
+>   arch/arm/mach-davinci/da850.c  | 90 ++++++++++++++++++++----------------------
+>   arch/arm/mach-davinci/dm355.c  |  1 +
+>   arch/arm/mach-davinci/dm365.c  |  1 +
+>   arch/arm/mach-davinci/dm644x.c |  1 +
+>   arch/arm/mach-davinci/dm646x.c |  1 +
+>   8 files changed, 49 insertions(+), 55 deletions(-)
+>
 
-I have no objection to the tty/serial changes, so if this all goes
-through the arm-soc tree, that's fine with me.
-
-thanks,
-
-greg k-h
+Hmm... I was just reviewing my previous emails and you said that you 
+have already applied these two patches, but they don't seem to have made 
+it into the linux-davinci/master branch with the others.
