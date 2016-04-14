@@ -1,46 +1,69 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 14 Apr 2016 09:56:59 +0100
-Subject: [PATCH v2] sunxi-irq: Fix Kconfig dependency on GENERIC_IRQ_CHIP
-In-Reply-To: <570F5932.2020809@arm.com>
-References: <1460563167-18517-1-git-send-email-suzuki.poulose@arm.com>
- <20160413200735.GC4005@lukather> <570F5932.2020809@arm.com>
-Message-ID: <570F5B5B.90302@arm.com>
+From: j.anaszewski@samsung.com (Jacek Anaszewski)
+Date: Thu, 14 Apr 2016 10:57:15 +0200
+Subject: [PATCH v2 3/3] leds: gpio: Support the "panic-indicator" firmware
+ property
+In-Reply-To: <1460570899-24642-4-git-send-email-ezequiel@vanguardiasur.com.ar>
+References: <1460570899-24642-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+ <1460570899-24642-4-git-send-email-ezequiel@vanguardiasur.com.ar>
+Message-ID: <570F5B6B.3000702@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/04/16 09:47, Suzuki K Poulose wrote:
-> On 13/04/16 21:07, Maxime Ripard wrote:
->> Hi,
->>
->> On Wed, Apr 13, 2016 at 04:59:27PM +0100, Suzuki K Poulose wrote:
->>> The sunxi-nmi and sun4i irq chips are selected by ARCH_SUNXI on both arm
->>> and arm64 (recently added). However on arm64, we don't explicitly select
->>> GENERIC_IRQ_CHIP which is required by the sunxi-nmi irq chip driver and
->>> causes build breaks on 4.6-rc1 :
->
->>> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
->>> index b03cfcb..c9626f4 100644
->>> --- a/drivers/irqchip/Makefile
->>> +++ b/drivers/irqchip/Makefile
->>> @@ -19,8 +19,8 @@ obj-$(CONFIG_CLPS711X_IRQCHIP)        += irq-clps711x.o
->>>   obj-$(CONFIG_OR1K_PIC)            += irq-or1k-pic.o
->>>   obj-$(CONFIG_ORION_IRQCHIP)        += irq-orion.o
->>>   obj-$(CONFIG_OMAP_IRQCHIP)        += irq-omap-intc.o
->>> -obj-$(CONFIG_ARCH_SUNXI)        += irq-sun4i.o
->>> -obj-$(CONFIG_ARCH_SUNXI)        += irq-sunxi-nmi.o
->>> +obj-$(CONFIG_SUNXI_IRQCHIP)        += irq-sun4i.o
->>> +obj-$(CONFIG_SUNXI_IRQCHIP)        += irq-sunxi-nmi.o
->>
->> Those are two different drivers, that should be selected by different
->> SoCs (MACH_SUN4I and MACH_SUN5I for the former, SUN6I, SUN7I and SUN8I
->> for the latter)
->
-> OK. I had thought about that, but wasn't sure who needs what. So went with
-> what existed already. I can respin it.
+Hi Ezequiel,
 
-As a follow up question, what does the arm64 port need ? just sunxi-nmi ? or both ?
-I would be happy if someone who has better understanding of the dependencies can fix
-it up, rather than me trying to figure out all the dependencies.
+It would be good to update also leds-gpio bindings,
+of course in a separate patch:
 
-Cheers
-Suzuki
+Documentation/devicetree/bindings/leds/leds-gpio.txt
+
+Thanks,
+Jacek Anaszewski
+
+On 04/13/2016 08:08 PM, Ezequiel Garcia wrote:
+> Calling a GPIO LEDs is quite likely to work even if the kernel
+> has paniced, so they are ideal to blink in this situation.
+> This commit adds support for the new "panic-indicator"
+> firmware property, allowing to mark a given LED to blink on
+> a kernel panic.
+>
+> Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
+> ---
+>   drivers/leds/leds-gpio.c | 4 ++++
+>   include/linux/leds.h     | 1 +
+>   2 files changed, 5 insertions(+)
+>
+> diff --git a/drivers/leds/leds-gpio.c b/drivers/leds/leds-gpio.c
+> index 61143f55597e..8229f063b483 100644
+> --- a/drivers/leds/leds-gpio.c
+> +++ b/drivers/leds/leds-gpio.c
+> @@ -127,6 +127,8 @@ static int create_gpio_led(const struct gpio_led *template,
+>   	led_dat->cdev.brightness = state ? LED_FULL : LED_OFF;
+>   	if (!template->retain_state_suspended)
+>   		led_dat->cdev.flags |= LED_CORE_SUSPENDRESUME;
+> +	if (template->panic_indicator)
+> +		led_dat->cdev.flags |= LED_PANIC_INDICATOR;
+>
+>   	ret = gpiod_direction_output(led_dat->gpiod, state);
+>   	if (ret < 0)
+> @@ -200,6 +202,8 @@ static struct gpio_leds_priv *gpio_leds_create(struct platform_device *pdev)
+>
+>   		if (fwnode_property_present(child, "retain-state-suspended"))
+>   			led.retain_state_suspended = 1;
+> +		if (fwnode_property_present(child, "panic-indicator"))
+> +			led.panic_indicator = 1;
+>
+>   		ret = create_gpio_led(&led, &priv->leds[priv->num_leds],
+>   				      dev, NULL);
+> diff --git a/include/linux/leds.h b/include/linux/leds.h
+> index 49adf9c6e326..1067fb5f9296 100644
+> --- a/include/linux/leds.h
+> +++ b/include/linux/leds.h
+> @@ -359,6 +359,7 @@ struct gpio_led {
+>   	unsigned 	gpio;
+>   	unsigned	active_low : 1;
+>   	unsigned	retain_state_suspended : 1;
+> +	unsigned	panic_indicator : 1;
+>   	unsigned	default_state : 2;
+>   	/* default_state should be one of LEDS_GPIO_DEFSTATE_(ON|OFF|KEEP) */
+>   	struct gpio_desc *gpiod;
+>
