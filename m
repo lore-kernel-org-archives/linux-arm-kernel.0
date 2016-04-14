@@ -1,23 +1,38 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 13 Apr 2016 17:43:31 -0700
-Subject: [PATCH v1] clk: Add clk_composite_set_rate_and_parent
-In-Reply-To: <3986787.PS6VzOpSAJ@phil>
-References: <1460339652-63498-1-git-send-email-finley.xiao@rock-chips.com>
- <3986787.PS6VzOpSAJ@phil>
-Message-ID: <20160414004331.GK14441@codeaurora.org>
+From: yang.shi@linaro.org (Yang Shi)
+Date: Wed, 13 Apr 2016 17:54:12 -0700
+Subject: [PATCH] arm64: Kconfig: make SCHED_MC and SCHED_SMT depend on SMP
+Message-ID: <1460595252-2330-1-git-send-email-yang.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/12, Heiko Stuebner wrote:
-> 
-> I remember having clocks not overflow their target rate came up in some ELC 
-> talk last week (probably in Stephens Qualcomm-kernel-talk) and a general 
-> solution might need some changes closer to the core.
+SCHED_MC and SCHED_SMT are pointless when SMP is disabled.
+Although SMP is rarely disabled for ARM64, it looks more consistent to have
+such depend in Kconfig.
 
-Yep. It's on the list. Hopefully coordinated clk rate changes
-will help here. Composite clks are sort of already coordinated
-rates in a minor form though.
+Signed-off-by: Yang Shi <yang.shi@linaro.org>
+---
+ arch/arm64/Kconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 4f43622..e5de825 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -521,6 +521,7 @@ config CPU_BIG_ENDIAN
+ 
+ config SCHED_MC
+ 	bool "Multi-core scheduler support"
++	depends on SMP
+ 	help
+ 	  Multi-core scheduler support improves the CPU scheduler's decision
+ 	  making when dealing with multi-core CPU chips at a cost of slightly
+@@ -528,6 +529,7 @@ config SCHED_MC
+ 
+ config SCHED_SMT
+ 	bool "SMT scheduler support"
++	depends on SMP
+ 	help
+ 	  Improves the CPU scheduler's decision making when dealing with
+ 	  MultiThreading at a cost of slightly increased overhead in some
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.0.2
