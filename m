@@ -1,30 +1,39 @@
-From: slemieux.tyco@gmail.com (slemieux.tyco at gmail.com)
-Date: Thu, 14 Apr 2016 08:20:37 -0400
-Subject: [PATCH 3/3] arm: dts: phy3250: enable ssp0
-In-Reply-To: <1460636437-21764-1-git-send-email-slemieux.tyco@gmail.com>
-References: <1460636437-21764-1-git-send-email-slemieux.tyco@gmail.com>
-Message-ID: <1460636437-21764-4-git-send-email-slemieux.tyco@gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 14 Apr 2016 13:54:50 +0100
+Subject: [PATCH v2 2/2] arm64: vhe: Verify CPU Exception Levels
+In-Reply-To: <20160414121947.GK30804@cbox>
+References: <1460472361-28419-2-git-send-email-suzuki.poulose@arm.com>
+ <1460554893-26120-1-git-send-email-suzuki.poulose@arm.com>
+ <20160414121947.GK30804@cbox>
+Message-ID: <570F931A.7020103@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sylvain Lemieux <slemieux@tycoint.com>
+On 14/04/16 13:19, Christoffer Dall wrote:
+> On Wed, Apr 13, 2016 at 02:41:33PM +0100, Suzuki K Poulose wrote:
 
-Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
----
- arch/arm/boot/dts/phy3250.dts | 1 +
- 1 file changed, 1 insertion(+)
+>> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+>> index b2d5f4e..e97af155 100644
+>> --- a/arch/arm64/kernel/smp.c
+>> +++ b/arch/arm64/kernel/smp.c
+>> @@ -75,6 +75,43 @@ enum ipi_msg_type {
+>>   	IPI_WAKEUP
+>>   };
+>>
+>> +#ifdef CONFIG_ARM64_VHE
+>> +
+>> +/* Whether the boot CPU is running in HYP mode or not*/
+>> +bool boot_cpu_hyp_mode;
+>
+> you can make this static now.
 
-diff --git a/arch/arm/boot/dts/phy3250.dts b/arch/arm/boot/dts/phy3250.dts
-index a00d7ce..26e070f 100644
---- a/arch/arm/boot/dts/phy3250.dts
-+++ b/arch/arm/boot/dts/phy3250.dts
-@@ -146,6 +146,7 @@
- 				#size-cells = <0>;
- 				num-cs = <1>;
- 				cs-gpios = <&gpio 3 5 0>;
-+				status = "okay";
- 
- 				eeprom: at25 at 0 {
- 					pl022,interface = <0>;
--- 
-1.8.3.1
+Ah ! Good catch.
+
+
+>
+> Otherwise,
+>
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+
+Thanks
+Suzuki
