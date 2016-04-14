@@ -1,74 +1,56 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Wed, 13 Apr 2016 20:52:28 -0500
-Subject: [PATCH] ARM: OMAP3: Fix external abort on 36xx waking from off
- mode idle
-In-Reply-To: <20160413193003.GW5995@atomide.com>
-References: <1460475837-1984-1-git-send-email-d-gerlach@ti.com>
- <20160413193003.GW5995@atomide.com>
-Message-ID: <570EF7DC.1010504@ti.com>
+From: chunfeng.yun@mediatek.com (chunfeng yun)
+Date: Thu, 14 Apr 2016 09:58:49 +0800
+Subject: [PATCH v2 2/2] phy: phy-mt65xx-usb3: add support for mt2701
+ platform
+In-Reply-To: <570E4A29.3030103@ti.com>
+References: <1460360490-18606-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1460360490-18606-2-git-send-email-chunfeng.yun@mediatek.com>
+ <570E4A29.3030103@ti.com>
+Message-ID: <1460599129.5156.12.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/13/2016 02:30 PM, Tony Lindgren wrote:
-> * Dave Gerlach <d-gerlach@ti.com> [160412 08:45]:
->> --- a/arch/arm/mach-omap2/pm34xx.c
->> +++ b/arch/arm/mach-omap2/pm34xx.c
->> @@ -268,7 +268,6 @@ void omap_sram_idle(void)
->>  	int per_next_state = PWRDM_POWER_ON;
->>  	int core_next_state = PWRDM_POWER_ON;
->>  	int per_going_off;
->> -	int core_prev_state;
->>  	u32 sdrc_pwr = 0;
->>  
->>  	mpu_next_state = pwrdm_read_next_pwrst(mpu_pwrdm);
->> @@ -348,17 +347,21 @@ void omap_sram_idle(void)
->>  		sdrc_write_reg(sdrc_pwr, SDRC_POWER);
->>  
->>  	/* CORE */
->> -	if (core_next_state < PWRDM_POWER_ON) {
->> -		core_prev_state = pwrdm_read_prev_pwrst(core_pwrdm);
->> -		if (core_prev_state == PWRDM_POWER_OFF) {
->> -			omap3_core_restore_context();
->> -			omap3_cm_restore_context();
->> -			omap3_push_sram_idle();
->> -			omap3_push_sram_secure_idle();
->> -			omap2_sms_restore_context();
->> -		}
->> +	if (core_next_state < PWRDM_POWER_ON &&
->> +	    pwrdm_read_prev_pwrst(core_pwrdm) == PWRDM_POWER_OFF) {
->> +		omap3_core_restore_context();
->> +		omap3_cm_restore_context();
->> +		omap3_push_sram_idle();
->> +		omap3_push_sram_secure_idle();
->> +		omap2_sms_restore_context();
->> +	} else {
->> +		/*
->> +		 * In off-mode resume path above, omap3_core_restore_context
->> +		 * also handles the INTC autoidle restore done here so limit
->> +		 * this to non-off mode resume paths so we don't do it twice.
->> +		 */
->> +		omap3_intc_resume_idle();
->>  	}
->> -	omap3_intc_resume_idle();
->>  
->>  	pwrdm_post_transition(NULL);
-> 
-> Can you please repost against v4.7-rc? This does not apply as
-> mainline still uses omap3_sram_restore_context(). Should be
-> retested again with your patches applied on top of this fix.
-> 
+Hi,
 
-Whoops, complete oversight on my part, retested and reported here:
-https://patchwork.kernel.org/patch/8830421/
-
-Tests showed the exact same behavior, no abort with or without patch, with my
-sram series on top there was also no abort, but if I remove the fix patch the
-abort comes back.
-
-Regards,
-Dave
-
-> Regards,
+On Wed, 2016-04-13 at 19:01 +0530, Kishon Vijay Abraham I wrote:
+> Hi,
 > 
-> Tony
+> On Monday 11 April 2016 01:11 PM, Chunfeng Yun wrote:
+> > A new compatible string, "mediatek,mt2701-u3phy", is added.
+> > 
+> > Some register settings to avoid RX sensitivity level degradation
+> > which may arise on mt8173 platform are separated from other
+> > platforms.
+> > 
+> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> > ---
+> >  drivers/phy/Kconfig           |    5 ++-
+> >  drivers/phy/phy-mt65xx-usb3.c |   77 ++++++++++++++++++++++++++++-------------
+> >  2 files changed, 54 insertions(+), 28 deletions(-)
+> > 
+> > diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> > index 26566db..3037f28 100644
+> > --- a/drivers/phy/Kconfig
+> > +++ b/drivers/phy/Kconfig
+> > @@ -218,9 +218,8 @@ config PHY_MT65XX_USB3
+> >  	depends on ARCH_MEDIATEK && OF
+> >  	select GENERIC_PHY
+> >  	help
+> > -	  Say 'Y' here to add support for Mediatek USB3.0 PHY driver
+> > -	  for mt65xx SoCs. it supports two usb2.0 ports and
+> > -	  one usb3.0 port.
+> > +	  Say 'Y' here to add support for Mediatek USB3.0 PHY driver,
+> > +	  it supports multiple usb2.0 and usb3.0 ports.
 > 
+> Do you mean this PHY driver support both USB2 and USB3? Then it's not really a
+> USB3 PHY driver right?
+> 
+Sorry for my unclear description.
+
+It supports USB3 PHY, and each USB3 PHY in fact includes a USB2 PHY and
+a SuperSpeed PHY.
+
+Thanks a lot
+
+> Thanks
+> Kishon
