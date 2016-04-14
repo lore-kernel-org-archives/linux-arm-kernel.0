@@ -1,41 +1,62 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 14 Apr 2016 15:28:17 +0900
-Subject: [PATCH 5/7] clk: samsung: exynos542x: Add the clock id for ACLK
-In-Reply-To: <CA+Ln22EFdspBdHwWar65UZ-uFxq4c9+RPhNCJjgKp9idvDvM5A@mail.gmail.com>
-References: <1460091646-28701-1-git-send-email-cw00.choi@samsung.com>
- <1460091646-28701-6-git-send-email-cw00.choi@samsung.com>
- <570CDB16.2050001@samsung.com>
- <CA+Ln22EFdspBdHwWar65UZ-uFxq4c9+RPhNCJjgKp9idvDvM5A@mail.gmail.com>
-Message-ID: <570F3881.9000100@samsung.com>
+From: xinliang.liu@linaro.org (Xinliang Liu)
+Date: Thu, 14 Apr 2016 14:46:03 +0800
+Subject: [PATCH v8 10/10] MAINTAINERS: Add maintainer for hisilicon DRM
+ driver
+In-Reply-To: <CACvgo53zwoid+dWNRAX=iwAvO50Eg3k13+1mJtQcTjKVQJebQA@mail.gmail.com>
+References: <1460364943-76135-1-git-send-email-xinliang.liu@linaro.org>
+ <1460364943-76135-11-git-send-email-xinliang.liu@linaro.org>
+ <CACvgo53zwoid+dWNRAX=iwAvO50Eg3k13+1mJtQcTjKVQJebQA@mail.gmail.com>
+Message-ID: <CAGd==07vOOQpusTXVDDaw5=7CTguiw4kCFqbWU9pKUQn+gF9Bg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz and Krzysztof,
-
-On 2016? 04? 13? 15:20, Tomasz Figa wrote:
-> 2016-04-12 14:25 GMT+03:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
->> On 04/08/2016 07:00 AM, Chanwoo Choi wrote:
->>> This patch adds the clock id for ACLK clock which is source clock of AMBA AXI
->>> Bus. This clock should be handled in Bus frequency scaling driver.
->>>
->>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->>> ---
->>>  drivers/clk/samsung/clk-exynos5420.c | 85 +++++++++++++++++++++++-------------
->>>  1 file changed, 55 insertions(+), 30 deletions(-)
+On 13 April 2016 at 19:54, Emil Velikov <emil.l.velikov@gmail.com> wrote:
+> Hi Xinliang,
+>
+> On 11 April 2016 at 09:55, Xinliang Liu <xinliang.liu@linaro.org> wrote:
+>> Add maintainer and reviewer for hisilicon DRM driver.
 >>
->> The IDs itself look good but you are not adding only clock ID. You are
->> changing all of them from NULL-flags to CLK_SET_RATE_PARENT. This should
->> be explained in the commit message why you need it. Probably it should
->> be also in separate commit.
-> 
-> +1. And CLK_SET_RATE_PARENT for a clock which has a mux as its parent
-> is a bit suspicious, so I'd like to know the rationale for each single
-> clock with CLK_SET_RATE_PARENT being added.
+>> v8: None.
+>> v7: None.
+>> v6: None.
+>> v5: None.
+>> v4:
+>> - Add Chen Feng <puck.chen@hisilicon.com> as Designated reviewer.
+>> v3: First version.
+>>
+>> Signed-off-by: Xinliang Liu <xinliang.liu@linaro.org>
+>> ---
+>>  MAINTAINERS | 10 ++++++++++
+>>  1 file changed, 10 insertions(+)
+>>
+>> diff --git a/MAINTAINERS b/MAINTAINERS
+>> index 61a323a6b2cf..a2ef58860689 100644
+>> --- a/MAINTAINERS
+>> +++ b/MAINTAINERS
+>> @@ -3840,6 +3840,16 @@ S:       Maintained
+>>  F:     drivers/gpu/drm/gma500
+>>  F:     include/drm/gma500*
+>>
+>> +DRM DRIVERS FOR HISILICON
+>> +M:     Xinliang Liu <z.liuxinliang@hisilicon.com>
+>> +R:     Xinwei Kong <kong.kongxinwei@hisilicon.com>
+>> +R:     Chen Feng <puck.chen@hisilicon.com>
+>> +L:     dri-devel at lists.freedesktop.org
+>> +T:     git git://github.com/xin3liang/linux.git
+>> +S:     Maintained
+>> +F:     drivers/gpu/drm/hisilicon
+>> +F:     Documentation/devicetree/bindings/display/hisilicon
+> Nit: Can you add append '/' on these two lines.
+>
+> As mentioned in commit 144308139cdce95e9c6cff3cc0ef12242181665f
+>
+> "It's clearer to have patterns marked as directories."
 
-This patch don't need the CLK_SET_RATE_PARENT flag. As Tomasz's comment,
-the mux of divider's parent don't need this flag. Sorry for confusion.
+Sure Emil, I will fix this. Thanks to notice me this.
 
-I'll drop the CLK_SET_RATE_PARENT flag.
+Thanks,
+-xinliang
 
-Best Regards,
-Chanwoo Choi
+>
+> Thanks
+> Emil
