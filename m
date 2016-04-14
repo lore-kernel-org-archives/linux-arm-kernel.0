@@ -1,39 +1,32 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 14 Apr 2016 17:47:27 +0100
-Subject: [PATCH v3 3/7] arm64: Add helpers for detecting AArch32 support
- at EL0
-In-Reply-To: <570FC950.1070904@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 14 Apr 2016 17:47:44 +0100
+Subject: [PATCH v3 6/7] arm64: Add a wrapper for personality() syscall
+In-Reply-To: <20160414164446.GI4584@arm.com>
 References: <1459445255-15653-1-git-send-email-suzuki.poulose@arm.com>
- <1459445255-15653-4-git-send-email-suzuki.poulose@arm.com>
- <20160414163933.GG4584@arm.com> <570FC950.1070904@arm.com>
-Message-ID: <20160414164727.GK4584@arm.com>
+ <1459445255-15653-7-git-send-email-suzuki.poulose@arm.com>
+ <20160414164446.GI4584@arm.com>
+Message-ID: <570FC9B0.50201@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 14, 2016 at 05:46:08PM +0100, Suzuki K Poulose wrote:
-> On 14/04/16 17:39, Will Deacon wrote:
-> >On Thu, Mar 31, 2016 at 06:27:31PM +0100, Suzuki K Poulose wrote:
-> >>Adds a helper to extract the support for AArch32 at EL0
-> >>
-> >>Tested-by: Yury Norov <ynorov@caviumnetworks.com>
-> >>Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> 
-> >>+static inline bool id_aa64pfr0_32bit_el0(u64 pfr0)
-> >>+{
-> >>+	u32 val = cpuid_feature_extract_unsigned_field(pfr0, ID_AA64PFR0_EL0_SHIFT);
-> >>+
-> >>+	return val == ID_AA64PFR0_EL0_32BIT_64BIT;
-> >
-> >Should this be >=? What are the rules for this register?
-> 
-> This feature value is kind of "FTR_EXACT" where, we don't know what the relationship
-> of the values are. Here is the list of possible values :
-> 
-> 0001	EL0 can be executed in AArch64 state only.
-> 0010	EL0 can be executed in either AArch64 or AArch32 state.
-> 
-> All the other values are reserved. So I believe "==" is better check.
+On 14/04/16 17:44, Will Deacon wrote:
+> On Thu, Mar 31, 2016 at 06:27:34PM +0100, Suzuki K Poulose wrote:
+>> In order to prevent setting PER_LINUX32 on systems without
+>> 32bit EL0 support, add a wrapper for personality() syscall.
+>>
 
-Yeah, and thinking about it some more, that makes sense. Thanks.
+>>   /*
+>>    * Wrappers to pass the pt_regs argument.
+>>    */
+>>   asmlinkage long sys_rt_sigreturn_wrapper(void);
+>>   #define sys_rt_sigreturn	sys_rt_sigreturn_wrapper
+>> +#define sys_personality		sys_arm64_personality
+>
+> You can merge this in with the subsequent patch, since it doesn't do
+> anything on its own.
+>
 
-Will
+OK, I kept it separate because we were in effect modifying the syscall table
+contents. I can merge it.
+
+Suzuki
