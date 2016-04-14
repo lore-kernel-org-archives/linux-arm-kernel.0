@@ -1,75 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 14 Apr 2016 09:02:30 -0700
-Subject: [PATCH v2]  pinctrl: pinctrl-single: Fix
- pcs_parse_bits_in_pinctrl_entry to use __ffs than ffs
-In-Reply-To: <1460609956-26539-1-git-send-email-j-keerthy@ti.com>
-References: <1460609956-26539-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <20160414160229.GK5995@atomide.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 14 Apr 2016 18:03:48 +0200
+Subject: [PATCH v2 00/17] kvm-arm: Add stage2 page table walker
+In-Reply-To: <570F9B32.9090106@arm.com>
+References: <1460640065-27658-1-git-send-email-suzuki.poulose@arm.com>
+ <570F9B32.9090106@arm.com>
+Message-ID: <20160414160348.GQ30804@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Keerthy <j-keerthy@ti.com> [160413 22:00]:
-> pcs_parse_bits_in_pinctrl_entry uses ffs which gives bit indices
-> ranging from 1 to MAX. This leads to a corner case where we try to request
-> the pin number = MAX and fails.
+On Thu, Apr 14, 2016 at 02:29:22PM +0100, Suzuki K Poulose wrote:
+> On 14/04/16 14:20, Suzuki K Poulose wrote:
+> >This series adds support for stage2 page table helpers and makes
+> >the core kvm-arm MMU code make use of it. At the moment we assume
+> >that the host/hyp and the stage2 page tables have same number of
+> >levels and hence use the host level accessors (except for some
+> >hooks, e.g kvm_p.d_addr_end) and shares the routines for unmapping
+> >the page table ranges.
 > 
-> bit_pos value is being calculted using ffs. pin_num_from_lsb uses
-> bit_pos value. pins array is populated with:
+> >The tree is available at :
+> >       git://linux-arm.org/linux-skp.git kvm-stage2/v2
 > 
-> pin + pin_num_from_lsb.
+> Please note that the tree above contains one additional patch on top of kvmarm/master :
+> commit	91ad0db16a42a7d3("arm64/sunxi: 4.6-rc1: Add dependency on generic irq chip"),
+> which is there to fix a build break with ARCH_SUNXI selected on 4.6-rc1.
 > 
-> The above is 1 more than usual bit indices as bit_pos uses ffs to compute
-> first set bit. Hence the last of the pins array is populated with the MAX
-> value and not MAX - 1 which causes error when we call pin_request.
->
-> mask_pos is rightly calculated as ((pcs->fmask) << (bit_pos - 1))
-> Consequently val_pos and submask are correct.
-> 
-> Hence use __ffs which gives (ffs(x) - 1) as the first bit set.
-> 
-> fixes: 4e7e8017a8 ("pinctrl: pinctrl-single: enhance to configure multiple pins of different modules")
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
-> ---
-> 
-> Changes in v2:
-> 
->   * Changed pcs->fshift to use __ffs instead of ffs to be consistent.
+ok, but I can just build/test this without ARCH_SUNXI and pick the
+remains of this series only for kvmarm/next, as far as I can tell,
+right?
 
-Thanks for updating it, looks good to me and still works here:
-
-Acked-by: Tony Lindgren <tony@atomide.com>
+Marc, seems like you're happy with this series as well?
 
 
-> Boot tesed on da850-evm and checked the pinctrl sysfs nodes.
-> 
->  drivers/pinctrl/pinctrl-single.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
-> index fb126d5..cf9bafa 100644
-> --- a/drivers/pinctrl/pinctrl-single.c
-> +++ b/drivers/pinctrl/pinctrl-single.c
-> @@ -1280,9 +1280,9 @@ static int pcs_parse_bits_in_pinctrl_entry(struct pcs_device *pcs,
->  
->  		/* Parse pins in each row from LSB */
->  		while (mask) {
-> -			bit_pos = ffs(mask);
-> +			bit_pos = __ffs(mask);
->  			pin_num_from_lsb = bit_pos / pcs->bits_per_pin;
-> -			mask_pos = ((pcs->fmask) << (bit_pos - 1));
-> +			mask_pos = ((pcs->fmask) << bit_pos);
->  			val_pos = val & mask_pos;
->  			submask = mask & mask_pos;
->  
-> @@ -1852,7 +1852,7 @@ static int pcs_probe(struct platform_device *pdev)
->  	ret = of_property_read_u32(np, "pinctrl-single,function-mask",
->  				   &pcs->fmask);
->  	if (!ret) {
-> -		pcs->fshift = ffs(pcs->fmask) - 1;
-> +		pcs->fshift = __ffs(pcs->fmask);
->  		pcs->fmax = pcs->fmask >> pcs->fshift;
->  	} else {
->  		/* If mask property doesn't exist, function mux is invalid. */
-> -- 
-> 1.9.1
-> 
+Will/Catalin:
+How do we attack this for the arm64 specific parts?
+
+Do you want to ack this patches and I queue this as a whole or do you
+want to apply patches 1, 2, and 3 and provide me a stable branch that I
+can base this on?
+
+Thanks,
+-Christoffer
