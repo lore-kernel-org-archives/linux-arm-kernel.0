@@ -1,46 +1,53 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Thu, 14 Apr 2016 20:14:28 +0200
-Subject: [PATCH] clk: sunxi: Accept a greater rate when setting a parent
- clock
-In-Reply-To: <20160414172400.GR4005@lukather>
-References: <20160310081658.B749246B@mail.free-electrons.com>
- <20160321072546.GT30977@lukather>
- <20160321092549.4e6245e4f02839e29aeb86a9@free.fr>
- <56FC3BEB.8030106@elopez.com.ar> <20160414172400.GR4005@lukather>
-Message-ID: <20160414201428.0c89d3b943db543c3ab08740@free.fr>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Thu, 14 Apr 2016 20:23:26 +0200
+Subject: [PATCH] dmaengine: pxa: handle bus errors
+In-Reply-To: <20160413135324.GQ2274@localhost> (Vinod Koul's message of "Wed,
+ 13 Apr 2016 19:23:24 +0530")
+References: <1459200744-13245-1-git-send-email-robert.jarzmik@free.fr>
+ <20160413135324.GQ2274@localhost>
+Message-ID: <87k2k0t5gh.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 14 Apr 2016 19:24:00 +0200
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+Vinod Koul <vinod.koul@intel.com> writes:
 
-> > >> That being said, we had a similar discussion for SPI around a month
-> > >> ago where we wanted a rate strictly lower than the requested one. I
-> > >> guess it's time to add a flag to tell how you want to round.
-> > > 
-> > > You are right, I just removed half of the constraint, but I still wonder
-> > > why does this sequence introduced by the commit 862b728387aef3a37
-> > > (clk: sunxi: factors: automatic reparenting support) do
-> > > 	"provide the fastest rate <= rate"
-> > > instead of
-> > > 	"provide the closest rate" ?
-> > > 
-> > > Emilio?
-> > 
-> > Overclocking components is usually not a good default in my opinion. I
-> > don't recall at the moment if there was some other justification apart
-> > from playing it safe.
-> 
-> Yeah, I'd agree, it should be the exception rather than the norm. In
-> some cases that are very timings sensitive (audio or video), we
-> probably want to enforce something as close as possible to the
-> expected rate, even if it trips above the rate.
-> 
-> For all the other, I'd prefer to keep the current behaviour.
+> On Mon, Mar 28, 2016 at 11:32:24PM +0200, Robert Jarzmik wrote:
+>> In the current state, upon bus error the driver will spin endlessly,
+>> relaunching the last tx, which will fail again and again :
+>>  - a bus error happens
+>>  - pxad_chan_handler() is called
+>>  - as PXA_DCSR_STOPSTATE is true, the last non-terminated transaction is
+>>    lauched, which is the one triggering the bus error, as it didn't
+>>    terminate
+>>  - moreover, the STOP interrupt fires a new, as the STOPIRQEN is still
+>>    active
+>> 
+>> Break this logic by stopping the automatic relaunch of a dma channel
+>> upon a bus error, even if there are still pending issued requests on it.
+>> 
+>> As dma_cookie_status() seems unable to return DMA_ERROR in its current
+>> form, ie. there seems no way to mark a DMA_ERROR on a per-async-tx
+>> basis, it is chosen in this patch to remember on the channel which
+>> transaction failed, and report it in pxad_tx_status().
+>> 
+>> It's a bit misleading because if T1, T2, T3 and T4 were queued, and T1
+>> was completed while T2 causes a bus error, the status of T3 and T4 will
+>> be reported as DMA_IN_PROGRESS, while the channel is actually stopped.
+>
+> No it is not misleading. The subsequent descriptor can be submitted and
+> continued. But yes you are right on the error reporting part, that is
+> something we need to add.
+Ok, fair enough.
 
-OK, then, as I have no solution for this clock, there will be no audio
-44.1KHz from the H3...
+> So what exactly are you trying to fix/achive here?
+Euh you mean the first chapter about the "endless spin" is not clear ?
+This is what I'm trying to fix, the unstoppable endless relauch of a descriptor
+doomed to make the same bus error over and over again.
 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+For the record, I saw this corner case by programming an address hole as
+destination address ... not very clever I know :)
+
+Cheers.
+
+--
+Robert
