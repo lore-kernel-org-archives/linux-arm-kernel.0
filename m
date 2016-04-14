@@ -1,75 +1,57 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Thu, 14 Apr 2016 21:21:38 +0000
-Subject: [PATCH v16 20/20] arm64: kdump: update a kernel doc
-In-Reply-To: <cover.1460668521.git.geoff@infradead.org>
-References: <cover.1460668521.git.geoff@infradead.org>
-Message-ID: <e13a046f0d7c011e3665fadf5cd68754d3efcb5e.1460668521.git.geoff@infradead.org>
+From: akurz@blala.de (Alexander Kurz)
+Date: Thu, 14 Apr 2016 23:30:49 +0200
+Subject: [PATCH 1/2] ARM: dts: imx35: restore existing used clock enumeration
+Message-ID: <1460669450-11729-1-git-send-email-akurz@blala.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+A new element got inserted into enum mx35_clks with commit 3713e3f5e927
+("clk: imx35: define two clocks for rtc"). This insertion shifted most
+nummerical clock assignments to a new nummerical value which in turn
+rendered most hardcoded nummeric values in imx35.dtsi incorrect.
 
-This patch adds arch specific descriptions about kdump usage on arm64
-to kdump.txt.
+Restore the existing order by moving the newly introduced clock to the
+end of the enum. Update the dts documentation accordingly.
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Signed-off-by: Alexander Kurz <akurz@blala.de>
 ---
- Documentation/kdump/kdump.txt | 15 ++++++++++++++-
- 1 file changed, 14 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/clock/imx35-clock.txt | 1 +
+ drivers/clk/imx/clk-imx35.c                             | 4 ++--
+ 2 files changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
-index bc4bd5a..acc4d98 100644
---- a/Documentation/kdump/kdump.txt
-+++ b/Documentation/kdump/kdump.txt
-@@ -18,7 +18,7 @@ memory image to a dump file on the local disk, or across the network to
- a remote system.
+diff --git a/Documentation/devicetree/bindings/clock/imx35-clock.txt b/Documentation/devicetree/bindings/clock/imx35-clock.txt
+index a703564..f497832 100644
+--- a/Documentation/devicetree/bindings/clock/imx35-clock.txt
++++ b/Documentation/devicetree/bindings/clock/imx35-clock.txt
+@@ -94,6 +94,7 @@ clocks and IDs.
+ 	csi_sel			79
+ 	iim_gate		80
+ 	gpu2d_gate		81
++	ckli_gate		82
  
- Kdump and kexec are currently supported on the x86, x86_64, ppc64, ia64,
--s390x and arm architectures.
-+s390x, arm and arm64 architectures.
+ Examples:
  
- When the system kernel boots, it reserves a small section of memory for
- the dump-capture kernel. This ensures that ongoing Direct Memory Access
-@@ -249,6 +249,12 @@ Dump-capture kernel config options (Arch Dependent, arm)
+diff --git a/drivers/clk/imx/clk-imx35.c b/drivers/clk/imx/clk-imx35.c
+index a71d24c..b0978d3 100644
+--- a/drivers/clk/imx/clk-imx35.c
++++ b/drivers/clk/imx/clk-imx35.c
+@@ -66,7 +66,7 @@ static const char *std_sel[] = {"ppll", "arm"};
+ static const char *ipg_per_sel[] = {"ahb_per_div", "arm_per_div"};
  
-     AUTO_ZRELADDR=y
+ enum mx35_clks {
+-	ckih, ckil, mpll, ppll, mpll_075, arm, hsp, hsp_div, hsp_sel, ahb, ipg,
++	ckih, mpll, ppll, mpll_075, arm, hsp, hsp_div, hsp_sel, ahb, ipg,
+ 	arm_per_div, ahb_per_div, ipg_per, uart_sel, uart_div, esdhc_sel,
+ 	esdhc1_div, esdhc2_div, esdhc3_div, spdif_sel, spdif_div_pre,
+ 	spdif_div_post, ssi_sel, ssi1_div_pre, ssi1_div_post, ssi2_div_pre,
+@@ -79,7 +79,7 @@ enum mx35_clks {
+ 	rtc_gate, rtic_gate, scc_gate, sdma_gate, spba_gate, spdif_gate,
+ 	ssi1_gate, ssi2_gate, uart1_gate, uart2_gate, uart3_gate, usbotg_gate,
+ 	wdog_gate, max_gate, admux_gate, csi_gate, csi_div, csi_sel, iim_gate,
+-	gpu2d_gate, clk_max
++	gpu2d_gate, ckil, clk_max
+ };
  
-+Dump-capture kernel config options (Arch Dependent, arm64)
-+----------------------------------------------------------
-+
-+1) Currently, kvm will not be enabled on the dump-capture kernel even
-+   if it is configured.
-+
- Extended crashkernel syntax
- ===========================
- 
-@@ -312,6 +318,8 @@ Boot into System Kernel
-    any space below the alignment point may be overwritten by the dump-capture kernel,
-    which means it is possible that the vmcore is not that precise as expected.
- 
-+   On arm64, use "crashkernel=Y[@X]".  Note that the start address of
-+   the kernel, X if explicitly specified, must be aligned to 2MiB (0x200000).
- 
- Load the Dump-capture Kernel
- ============================
-@@ -334,6 +342,8 @@ For s390x:
- 	- Use image or bzImage
- For arm:
- 	- Use zImage
-+For arm64:
-+	- Use vmlinux or Image
- 
- If you are using a uncompressed vmlinux image then use following command
- to load dump-capture kernel.
-@@ -377,6 +387,9 @@ For s390x:
- For arm:
- 	"1 maxcpus=1 reset_devices"
- 
-+For arm64:
-+	"1 maxcpus=1 reset_devices"
-+
- Notes on loading the dump-capture kernel:
- 
- * By default, the ELF headers are stored in ELF64 format to support
+ static struct clk *clk[clk_max];
 -- 
-2.5.0
+2.1.4
