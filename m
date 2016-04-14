@@ -1,131 +1,264 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 14 Apr 2016 18:25:40 +0100
-Subject: [RFC PATCH 08/11] drivers: acpi: iort: enhance mapping API
+Date: Thu, 14 Apr 2016 18:25:38 +0100
+Subject: [RFC PATCH 06/11] drivers: iommu: make of_xlate() interface DT
+ agnostic
 In-Reply-To: <1460654743-7896-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1460654743-7896-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1460654743-7896-9-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1460654743-7896-7-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current IORT API works only for mappings that have the GIC ITS
-as a sink node and does not allow mapping components other than
-PCI root complexes.
+On systems booting with ACPI, the IOMMU drivers require the same
+kind of id mapping carried out with a DT tree through the of_xlate()
+API in order to map devices identifiers to IOMMU ones.
 
-This patch enhances the IORT API to allow any mapping permitted by
-the IORT specifications, inclusive of IORT translations for named
-components.
+On ACPI systems, since DT nodes are not present (ie struct
+device.of_node == NULL), to identify the device requiring the translation
+the struct device_node (and the structure used to pass translation
+information - struct of_phandle_args - that contains a struct device_node)
+cannot be used, so a generic translation structure to be used for IOMMU
+mapping should be defined, based on the firmware agnostic fwnode_handle
+type.
 
-Based on prior work by Hanjun Guo <hanjun.guo@linaro.org>.
+This patch mechanically refactors/renames the of_xlate API to make
+it DT agnostic, by declaring a new type (struct iommu_fwspec), that
+allows the kernel to pass a device identifier (fwnode - which can
+represent either a DT node or an IOMMU FW node) and by changing the
+of_xlate signature so that it does not take anymore the DT specific
+of_phandle_args argument and replaces it with the DT agnostic
+iommu_fwspec one.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Matthias Brugger <matthias.bgg@gmail.com>
+Cc: Will Deacon <will.deacon@arm.com>
 Cc: Hanjun Guo <hanjun.guo@linaro.org>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Cc: Robin Murphy <robin.murphy@arm.com>
 Cc: Tomasz Nowicki <tn@semihalf.com>
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Cc: Joerg Roedel <joro@8bytes.org>
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/acpi/iort.c | 59 +++++++++++++++++++++++++++++++++++++++++++++++------
- 1 file changed, 53 insertions(+), 6 deletions(-)
+ drivers/iommu/arm-smmu.c     | 12 +++++++-----
+ drivers/iommu/exynos-iommu.c | 11 +++++++----
+ drivers/iommu/mtk_iommu.c    | 13 ++++++++-----
+ drivers/iommu/of_iommu.c     | 20 ++++++++++++++++++--
+ include/linux/iommu.h        | 24 ++++++++++++++++++++----
+ 5 files changed, 60 insertions(+), 20 deletions(-)
 
-diff --git a/drivers/acpi/iort.c b/drivers/acpi/iort.c
-index 080888a..2b5ce65 100644
---- a/drivers/acpi/iort.c
-+++ b/drivers/acpi/iort.c
-@@ -182,15 +182,61 @@ iort_scan_node(enum acpi_iort_node_type type,
- 	return NULL;
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 6c42770..84bcff7 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1440,18 +1440,20 @@ out_unlock:
+ 	return ret;
  }
  
-+static struct acpi_iort_node *
-+iort_find_parent_node(struct acpi_iort_node *node, u8 type)
+-static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
++static int arm_smmu_fw_xlate(struct device *dev, struct iommu_fwspec *args)
+ {
+ 	struct arm_smmu_device *smmu;
+-	struct platform_device *smmu_pdev;
++	struct platform_device *smmu_pdev = NULL;
++
++	if (is_of_node(args->fwnode))
++		smmu_pdev = of_find_device_by_node(to_of_node(args->fwnode));
+ 
+-	smmu_pdev = of_find_device_by_node(args->np);
+ 	if (!smmu_pdev)
+ 		return -ENODEV;
+ 
+ 	smmu = platform_get_drvdata(smmu_pdev);
+ 
+-	return arm_smmu_add_dev_streamid(smmu, dev, args->args[0]);
++	return arm_smmu_add_dev_streamid(smmu, dev, args->param[0]);
+ }
+ 
+ static struct iommu_ops arm_smmu_ops = {
+@@ -1468,7 +1470,7 @@ static struct iommu_ops arm_smmu_ops = {
+ 	.device_group		= arm_smmu_device_group,
+ 	.domain_get_attr	= arm_smmu_domain_get_attr,
+ 	.domain_set_attr	= arm_smmu_domain_set_attr,
+-	.of_xlate		= arm_smmu_of_xlate,
++	.fw_xlate		= arm_smmu_fw_xlate,
+ 	.pgsize_bitmap		= -1UL, /* Restricted during device attach */
+ };
+ 
+diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+index 5ecc86c..84ff5bb 100644
+--- a/drivers/iommu/exynos-iommu.c
++++ b/drivers/iommu/exynos-iommu.c
+@@ -1250,13 +1250,16 @@ static void exynos_iommu_remove_device(struct device *dev)
+ 	iommu_group_remove_device(dev);
+ }
+ 
+-static int exynos_iommu_of_xlate(struct device *dev,
+-				 struct of_phandle_args *spec)
++static int exynos_iommu_fw_xlate(struct device *dev,
++				 struct iommu_fwspec *args)
+ {
+ 	struct exynos_iommu_owner *owner = dev->archdata.iommu;
+-	struct platform_device *sysmmu = of_find_device_by_node(spec->np);
++	struct platform_device *sysmmu = NULL;
+ 	struct sysmmu_drvdata *data;
+ 
++	if (is_of_node(args->fwnode))
++		sysmmu = of_find_device_by_node(to_of_node(args->fwnode));
++
+ 	if (!sysmmu)
+ 		return -ENODEV;
+ 
+@@ -1290,7 +1293,7 @@ static struct iommu_ops exynos_iommu_ops = {
+ 	.add_device = exynos_iommu_add_device,
+ 	.remove_device = exynos_iommu_remove_device,
+ 	.pgsize_bitmap = SECT_SIZE | LPAGE_SIZE | SPAGE_SIZE,
+-	.of_xlate = exynos_iommu_of_xlate,
++	.fw_xlate = exynos_iommu_fw_xlate,
+ };
+ 
+ static bool init_done;
+diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
+index 929a66a..e08dc0a 100644
+--- a/drivers/iommu/mtk_iommu.c
++++ b/drivers/iommu/mtk_iommu.c
+@@ -436,20 +436,23 @@ static struct iommu_group *mtk_iommu_device_group(struct device *dev)
+ 	return data->m4u_group;
+ }
+ 
+-static int mtk_iommu_of_xlate(struct device *dev, struct of_phandle_args *args)
++static int mtk_iommu_fw_xlate(struct device *dev, struct iommu_fwspec *args)
+ {
+ 	struct mtk_iommu_client_priv *head, *priv, *next;
+ 	struct platform_device *m4updev;
+ 
+-	if (args->args_count != 1) {
++	if (!is_of_node(args->fwnode))
++		return -ENODEV;
++
++	if (args->param_count != 1) {
+ 		dev_err(dev, "invalid #iommu-cells(%d) property for IOMMU\n",
+-			args->args_count);
++			args->param_count);
+ 		return -EINVAL;
+ 	}
+ 
+ 	if (!dev->archdata.iommu) {
+ 		/* Get the m4u device */
+-		m4updev = of_find_device_by_node(args->np);
++		m4updev = of_find_device_by_node(to_of_node(args->fwnode));
+ 		of_node_put(args->np);
+ 		if (WARN_ON(!m4updev))
+ 			return -EINVAL;
+@@ -469,7 +472,7 @@ static int mtk_iommu_of_xlate(struct device *dev, struct of_phandle_args *args)
+ 	if (!priv)
+ 		goto err_free_mem;
+ 
+-	priv->mtk_m4u_id = args->args[0];
++	priv->mtk_m4u_id = args->param[0];
+ 	list_add_tail(&priv->client, &head->client);
+ 
+ 	return 0;
+diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+index 910826c..331dd78 100644
+--- a/drivers/iommu/of_iommu.c
++++ b/drivers/iommu/of_iommu.c
+@@ -135,6 +135,18 @@ struct iommu_ops *of_iommu_get_ops(struct device_node *np)
+ 	return ops;
+ }
+ 
++static void of_phandle_args_to_fwspec(struct of_phandle_args *iommu_data,
++				      struct iommu_fwspec *fwspec)
 +{
-+	struct acpi_iort_id_mapping *id;
++	int i;
 +
-+	if (!node || !node->mapping_offset || !node->mapping_count)
-+		return NULL;
++	fwspec->fwnode = iommu_data->np ? &iommu_data->np->fwnode : NULL;
++	fwspec->param_count = iommu_data->args_count;
 +
-+	id = ACPI_ADD_PTR(struct acpi_iort_id_mapping, node,
-+			  node->mapping_offset);
-+
-+	if (!id->output_reference) {
-+		pr_err(FW_BUG "[node %p type %d] ID map has NULL parent reference\n",
-+		       node, node->type);
-+		return NULL;
-+	}
-+
-+	node = ACPI_ADD_PTR(struct acpi_iort_node, iort_table,
-+			    id->output_reference);
-+
-+	return node->type == type ? node : NULL;
++	for (i = 0; i < iommu_data->args_count; i++)
++		fwspec->param[i] = iommu_data->args[i];
 +}
 +
- static acpi_status
- iort_find_dev_callback(struct acpi_iort_node *node, void *context)
+ static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
  {
--	struct acpi_iort_root_complex *pci_rc;
- 	struct device *dev = context;
--	struct pci_bus *bus;
- 
- 	switch (node->type) {
--	case ACPI_IORT_NODE_PCI_ROOT_COMPLEX:
-+	case ACPI_IORT_NODE_NAMED_COMPONENT: {
-+		struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
-+		struct acpi_iort_named_component *ncomp;
-+		struct acpi_device *adev = to_acpi_device_node(dev->fwnode);
-+
-+		if (!adev)
-+			break;
-+
-+		ncomp = (struct acpi_iort_named_component *)node->node_data;
-+
-+		if (ACPI_FAILURE(acpi_get_name(adev->handle,
-+					       ACPI_FULL_PATHNAME, &buffer))) {
-+			pr_warn("Can't get device full path name\n");
-+			break;
-+		}
-+
-+		if (!strcmp(ncomp->device_name, (char *)buffer.pointer))
-+			return AE_OK;
-+
-+		break;
-+	}
-+
-+	case ACPI_IORT_NODE_PCI_ROOT_COMPLEX: {
-+		struct acpi_iort_root_complex *pci_rc;
-+		struct pci_bus *bus;
-+
- 		bus = to_pci_bus(dev);
- 		pci_rc = (struct acpi_iort_root_complex *)node->node_data;
- 
-@@ -204,20 +250,21 @@ iort_find_dev_callback(struct acpi_iort_node *node, void *context)
- 
- 		break;
- 	}
-+	}
- 
- 	return AE_NOT_FOUND;
- }
- 
- static struct acpi_iort_node *
- iort_dev_map_rid(struct acpi_iort_node *node, u32 rid_in,
--			    u32 *rid_out)
-+			    u32 *rid_out, u8 type)
+ 	struct of_phandle_args *iommu_spec = data;
+@@ -148,6 +160,7 @@ struct iommu_ops *of_iommu_configure(struct device *dev,
+ 				     struct device_node *master_np)
  {
+ 	struct of_phandle_args iommu_spec;
++	struct iommu_fwspec fwspec;
+ 	struct device_node *np = NULL;
+ 	struct iommu_ops *ops = NULL;
+ 	int idx = 0;
+@@ -170,8 +183,9 @@ struct iommu_ops *of_iommu_configure(struct device *dev,
  
- 	if (!node)
- 		goto out;
+ 		iommu_spec.np = np;
+ 		iommu_spec.args_count = 1;
++		of_phandle_args_to_fwspec(&iommu_spec, &fwspec);
+ 		ops = of_iommu_get_ops(np);
+-		if (!ops || !ops->of_xlate || ops->of_xlate(dev, &iommu_spec))
++		if (!ops || !ops->fw_xlate || ops->fw_xlate(dev, &fwspec))
+ 			goto err_put_node;
  
- 	/* Go upstream */
--	while (node->type != ACPI_IORT_NODE_ITS_GROUP) {
-+	while (node->type != type) {
- 		struct acpi_iort_id_mapping *id;
- 		int i, found = 0;
+ 		of_node_put(np);
+@@ -189,7 +203,9 @@ struct iommu_ops *of_iommu_configure(struct device *dev,
+ 		np = iommu_spec.np;
+ 		ops = of_iommu_get_ops(np);
  
-@@ -283,7 +330,7 @@ iort_its_find_node_and_map_rid(struct pci_dev *pdev, u32 req_id, u32 *dev_id)
- 		return NULL;
- 	}
+-		if (!ops || !ops->of_xlate || ops->of_xlate(dev, &iommu_spec))
++		of_phandle_args_to_fwspec(&iommu_spec, &fwspec);
++
++		if (!ops || !ops->fw_xlate || ops->fw_xlate(dev, &fwspec))
+ 			goto err_put_node;
  
--	return iort_dev_map_rid(node, req_id, dev_id);
-+	return iort_dev_map_rid(node, req_id, dev_id, ACPI_IORT_NODE_ITS_GROUP);
- }
+ 		of_node_put(np);
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index 0bba25e..5184d81 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -85,6 +85,24 @@ struct iommu_domain {
+ 	void *iova_cookie;
+ };
  
- /**
++#define IOMMU_MAP_SPEC_PARAMS 16
++
++/**
++ * struct iommu_fwspec - generic IOMMU specifier structure
++ *
++ * @fwnode:		Pointer to a firmware-specific descriptor
++ * @param_count:	Number of device-specific parameters
++ * @param:		Device-specific parameters
++ *
++ * This structure, directly modeled after of_phandle_args, is used to
++ * pass a device-specific description of an IOMMU mapping.
++ */
++struct iommu_fwspec {
++	struct fwnode_handle *fwnode;
++	int param_count;
++	u32 param[IOMMU_MAP_SPEC_PARAMS];
++};
++
+ enum iommu_cap {
+ 	IOMMU_CAP_CACHE_COHERENCY,	/* IOMMU can enforce cache coherent DMA
+ 					   transactions */
+@@ -155,7 +173,7 @@ struct iommu_dm_region {
+  * @domain_window_disable: Disable a particular window for a domain
+  * @domain_set_windows: Set the number of windows for a domain
+  * @domain_get_windows: Return the number of windows for a domain
+- * @of_xlate: add OF master IDs to iommu grouping
++ * @fw_xlate: add FW master IDs to iommu grouping
+  * @pgsize_bitmap: bitmap of supported page sizes
+  * @priv: per-instance data private to the iommu driver
+  */
+@@ -196,9 +214,7 @@ struct iommu_ops {
+ 	/* Get the number of windows per domain */
+ 	u32 (*domain_get_windows)(struct iommu_domain *domain);
+ 
+-#ifdef CONFIG_OF_IOMMU
+-	int (*of_xlate)(struct device *dev, struct of_phandle_args *args);
+-#endif
++	int (*fw_xlate)(struct device *dev, struct iommu_fwspec *args);
+ 
+ 	unsigned long pgsize_bitmap;
+ 	void *priv;
 -- 
 2.6.4
