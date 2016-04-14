@@ -1,60 +1,60 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 14 Apr 2016 12:02:55 -0500
-Subject: [Question] refcount of DT node
-In-Reply-To: <06E9E2D3-4627-4970-ABBB-34B5ED620709@konsulko.com>
-References: <CAK7LNATFUW2KXUpFas6C_SJ0C7Qb1DWU0njLg-FCYciK2U6Oag@mail.gmail.com>
- <20160414084849.GT19428@n2100.arm.linux.org.uk>
- <20160414095957.GB10273@leverpostej>
- <06E9E2D3-4627-4970-ABBB-34B5ED620709@konsulko.com>
-Message-ID: <20160414170255.GA26137@rob-hp-laptop>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 14 Apr 2016 18:04:33 +0100
+Subject: [RFC PATCH] arm64: defconfig: add config fragment for Freescale
+ SoCs
+In-Reply-To: <1460643685-13670-1-git-send-email-stuart.yoder@nxp.com>
+References: <1460643685-13670-1-git-send-email-stuart.yoder@nxp.com>
+Message-ID: <20160414170433.GF15182@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 14, 2016 at 01:02:56PM +0300, Pantelis Antoniou wrote:
-> Hi Mark,
-> 
-> > On Apr 14, 2016, at 12:59 , Mark Rutland <mark.rutland@arm.com> wrote:
-> > 
-> > On Thu, Apr 14, 2016 at 09:48:49AM +0100, Russell King - ARM Linux wrote:
-> >> On Thu, Apr 14, 2016 at 04:47:57PM +0900, Masahiro Yamada wrote:
-> >>> Hi experts.
-> >>> 
-> >>> My understanding of refcount of DT node is poor.
-> >> 
-> >> The message from DT people is... don't worry about DT node refcounting.
-> >> Do whatever you want with it, they don't care whether you have correct
-> >> refcounting or not.
-> >> 
-> >> The background behind that is that I've tried to fix the refcounting,
-> >> and even had the coccinelle people generate some stuff to work on this
-> >> issue, but DT people's attitude towards it is "don't bother".
-> >> 
-> >> So yes, people may get it wrong, but it seems it's something that DT
-> >> people want ignored.
-> > 
-> > I'm not sure that's quite fair; the last discussion I recall about this
-> > ended up concluding that we need a better API, rather than papering over
-> > problems.
-> > 
-> > That said, there isn't much obvious progress on that front.
-> > 
-> > Frank, Pantelis, Rob, were there any conclusions on this from ELC, or is
-> > this something that needs someone to propose something?
-> > 
-> 
-> Frank mentioned that he wants a new API. I have some ideas about it too.
-> 
-> My take is that drivers should never do reference counting, we have to figure
-> out a way for DT access using copy semantics or locks.
+On Thu, Apr 14, 2016 at 09:21:25AM -0500, Stuart Yoder wrote:
+> Add a config fragment enabling a reasonably useful set of
+> devices and options for Freescale ARM v8 SoCs.
 
-Generally yes, but I think there may be exceptions. I think the locking 
-is too fine grained for what we need. For almost all users, I think we 
-only need locking at the overlay or changeset level. The only other user 
-I am aware of is PSeries (IIRC) and they only need reference counting 
-for a few things like memory and cpu. I would handle those cases 
-explicitly. But that is going to require someone familar with PSeries to 
-work on. I suppose we could separate overlays from the OF_DYNAMIC 
-dependency (or just the ref counting part of it) and then OF_DYNAMIC 
-goes back to PPC only.
+A gentle NAK ;).
 
-Rob
+> I realize that we are trying to avoid the defconfig hell in arch/arm with 100+
+> defconfigs, but the single defconfig in arch/arm64 has some problems too.
+
+Can we address these problems in defconfig?
+
+> I think what we want with arch/arm64/config are some reasonable in-kernel
+> defconfigs/fragments with built-in drivers for convenience.
+
+A hard requirement for arm64 is single Image and having all SoCs in
+defconfig is a good way to regularly test this.
+
+I am aware that at some point the defconfig size will get too big but
+that's when (ideally before) we should put effort into building more
+stuff as loadable modules.
+
+> The proposal is to allow a chip vendor 1 vendor-specific kconfig fragment
+> to cover all their chips, allowing them to _override_ the default config
+> options in defconfig.  One specific issue we have is that due to the ls2080a
+> physical address map, the combination of 4KB pages and 39-bit VA does not
+> allow us to see all our DDR.  And, thus we need CONFIG_ARM64_VA_BITS_48=y.
+
+And I'm fine to add this to defconfig. We had a case for Seattle needing
+48-bit VA but we eventually decoupled the number of levels for idmap and
+swapper. If it can't be addressed in a similar way on ls2080a, we may
+need to increase the VA space to 48-bit.
+
+> Allowing us to have a freescale.config gives us the flexibility of
+> adding Freescale specific options without having to keep this in
+> some other external repo.  It also keeps vendor specific clutter
+> out of the base defconfig.  With the number of new armv8 chips 
+> coming out the single defconfig is going to produce increasingly
+> large kernels, since all drivers are built-in.
+
+As I said, for the time being please add all the sane the options to
+defconfig. I want to be able to build a defconfig and run on all
+supported SoCs.
+
+> +CONFIG_STAGING=y
+
+Well, apart from this. You should put effort in getting the required
+drivers out of staging.
+
+-- 
+Catalin
