@@ -1,58 +1,38 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 14 Apr 2016 10:52:43 +0200
-Subject: [PATCH 3/6] ARM: PSCI: Register with kernel restart handler
-In-Reply-To: <20160414004223.GA18564@roeck-us.net>
-References: <1460120039-2497-1-git-send-email-linux@roeck-us.net>
- <1460120039-2497-4-git-send-email-linux@roeck-us.net>
- <20160413110519.GE32018@leverpostej>
- <570E4550.5000207@roeck-us.net>
- <CAMuHMdU+vj4HDTLdXngUsTjF-Ki-HtbhoRU6mV7UKCz-BhFAtQ@mail.gmail.com>
- <20160414004223.GA18564@roeck-us.net>
-Message-ID: <20160414085242.GB1533@katana>
+From: m.reichl@fivetechno.de (Markus Reichl)
+Date: Thu, 14 Apr 2016 10:54:54 +0200
+Subject: [next] Failing Odroid XU3 boot due to missing MMC device
+In-Reply-To: <20160414084530.GS19428@n2100.arm.linux.org.uk>
+References: <570F5380.7010103@samsung.com> <570F5550.5010708@fivetechno.de>
+ <20160414084530.GS19428@n2100.arm.linux.org.uk>
+Message-ID: <570F5ADE.1010500@fivetechno.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> That makes things quite tricky. Best I can think of is a series of boolean
-> devicetree properties, such as
+Am 14.04.2016 um 10:45 schrieb Russell King - ARM Linux:
+> On Thu, Apr 14, 2016 at 10:31:12AM +0200, Markus Reichl wrote:
+>> Hi Krzysztof,
+>>
+>> yes, observed this with linux-next from yesterday 13.
+>>
+>> I boot from eMMC.
+>> Device numbering of eMMC and SD are exchanged now.
+>>
+>> I solved the boot problem by changing the rootdev in U-Boot env
+>> from /dev/mmcblk0p2 to /dev/mmcblk1p2.
+>>
+>> Changed /etc/fdisk, too, to mount /dev/mmcblk1p1 to /boot.     
 > 
-> 	broken-reset-handler
-> 	last-resort-restart-handler
-> 	secondary-restart-handler
-> 	default-restart-handler
-> 	primary-restart-handler
+> You really should mount by partition uuid - supplying something like:
 > 
-> which ends up being quite similar to the 'restart-priority' property. I'll
-> do this as follow-up patch, though
+> 	root=PARTUUID=f3ae567e-02
+> 
+> on the kernel command line.  This makes the mounting of rootfs
+> independent of which device carries the filesystem.
+> 
+> If you're not using an initramfs, the kernel prints the partuuid
+> values if it doesn't find the rootfs.  I don't know how to get the
+> partuuids without going through that process, sorry.
 
-Please CC me on this. I wanted to tackle this problem as well today. My
-findings/conclusions so far:
+lsblk --output PARTUUID
 
-* There is one driver bringing 'priority' directly to DT already: gpio-restart
-
-* Watchdog priorities are board dependant
-
-* Having the priorities clear at boot-time is safer than configuring them
-  at run-time
-
-* The linux scheme (0-255) shouldn't be enforced in DT
-
-So, I wondered about a "priority" binding which just states "the higher,
-the more important". Then any OS can decide what to do with it. In the
-Linux case, this could be: sort them and give them priority 256 -
-position_in_sorted_list.
-
-Opinions?
-
-> - I do not see the point holding up the series for this, and it is
-> really a separate problem.
-
-Ack.
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160414/86dea876/attachment-0001.sig>
+> 
