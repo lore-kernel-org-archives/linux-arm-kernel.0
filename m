@@ -1,42 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 14 Apr 2016 08:33:45 -0700
-Subject: [PATCH V2] ARM: OMAP3: Fix external abort on 36xx waking from
- off mode idle
-In-Reply-To: <1460598588-28468-1-git-send-email-d-gerlach@ti.com>
-References: <1460598588-28468-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <20160414153345.GJ5995@atomide.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 14 Apr 2016 17:33:29 +0200
+Subject: [PATCH v5 1/5] clk: unconditionally recurse into clk/mvebu/
+In-Reply-To: <1460648013-31320-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1460648013-31320-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1460648013-31320-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Gerlach <d-gerlach@ti.com> [160413 18:51]:
-> Depending on timing during the resume path from off mode on 36xx, we may
-> see external aborts. These seem to be caused by the following:
-> 
-> - OMAP3 Advisory 1.62 "MPU Cannot Exit from Standby" says we need to
->   disable disable intc autoidle before WFI
-> 
-> - DM3730 Advisory 1.106 "MPU Leaves MSTANDBY State Before IDLEREQ of
->   Interrupt Controller is Released" says we need to wait before
->   accessing intc
-> 
-> omap3_intc_resume_idle restores the intc autoidle for all resume paths,
-> however in the resume path from off mode only it is also being restored
-> by omap_intc_restore_context before this call to omap3_intc_resume_idle
-> happens. The second restore of the intc autoidle in this path is what
-> appears to be causing the external abort so for the off mode resume path
-> let's rely on omap_intc_restore_context to restore intc autoidle, and
-> for all other paths let omap3_intc_resume_idle handle it as it is now.
-> 
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> ---
-> v1->v2:
->   - Rebased on v4.6-rc1
->   - Tested with and without patch and no abort seen on v4.6-rc1
->   - Series at [1] that v1 was based on alone on v4.6-rc1 sees abort,
->     if series is applied on this patch abort goes away
+The drivers/clk/mvebu directory is only being built when
+CONFIG_PLAT_ORION=y. As we are going to support additional mvebu
+platforms in drivers/clk/mvebu, which don't have CONFIG_PLAT_ORION=y,
+we need to recurse into this directory regardless of the value of
+CONFIG_PLAT_ORION.
 
-Thanks for updating it, applying into omap-for-v4.6/fixes.
+Since all files in drivers/clk/mvebu/ are already conditionally
+compiled depending on various Kconfig options, we can recurse
+unconditionally into drivers/clk/mvebu without any other change.
 
-Regards,
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/clk/Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Tony
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index 46869d69..f9ad66e 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -61,7 +61,7 @@ obj-$(CONFIG_ARCH_MEDIATEK)		+= mediatek/
+ ifeq ($(CONFIG_COMMON_CLK), y)
+ obj-$(CONFIG_ARCH_MMP)			+= mmp/
+ endif
+-obj-$(CONFIG_PLAT_ORION)		+= mvebu/
++obj-y					+= mvebu/
+ obj-$(CONFIG_ARCH_MESON)		+= meson/
+ obj-$(CONFIG_ARCH_MXS)			+= mxs/
+ obj-$(CONFIG_MACH_PISTACHIO)		+= pistachio/
+-- 
+2.6.4
