@@ -1,51 +1,85 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 14 Apr 2016 14:20:55 +0100
-Subject: [PATCH v2 07/17] kvm-arm: arm32: Introduce stage2 page table helpers
+Date: Thu, 14 Apr 2016 14:20:57 +0100
+Subject: [PATCH v2 09/17] kvm-arm: arm64: Introduce stage2 page table helpers
 In-Reply-To: <1460640065-27658-1-git-send-email-suzuki.poulose@arm.com>
 References: <1460640065-27658-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1460640065-27658-8-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1460640065-27658-10-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the page table helpers for walking the stage2 pagetable
-for arm. Since both hyp and stage2 have the same number of levels,
-as that of the host we reuse the host helpers.
-
-The exceptions are the p.d_addr_end routines which have to deal
-with IPA > 32bit, hence we use the open coded version of their host helpers
-which supports 64bit.
+Introduce stage2 page table helpers for arm64. With the fake
+page table level still in place, the stage2 table has the same
+number of levels as that of the host (and hyp), so they all
+fallback to the host version.
 
 Cc: Marc Zyngier <marc.zyngier@arm.com>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
 Changes since v1:
-  - Drop mm (which is always NULL) parameter to stage2_p.d_xxx. Pass NULL
-    explicitly to the host helpers.
+      - Drop mm (which is always NULL) parameter to stage2_p.d_xxx. Pass NULL
+        explicitly to the host helpers.
 ---
- arch/arm/include/asm/kvm_mmu.h        |    1 +
- arch/arm/include/asm/stage2_pgtable.h |   59 +++++++++++++++++++++++++++++++++
- 2 files changed, 60 insertions(+)
- create mode 100644 arch/arm/include/asm/stage2_pgtable.h
+ arch/arm64/include/asm/kvm_mmu.h        |   29 +----------
+ arch/arm64/include/asm/stage2_pgtable.h |   86 +++++++++++++++++++++++++++++++
+ 2 files changed, 88 insertions(+), 27 deletions(-)
+ create mode 100644 arch/arm64/include/asm/stage2_pgtable.h
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index c2b2b27..7d207b4 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -47,6 +47,7 @@
- #include <linux/highmem.h>
- #include <asm/cacheflush.h>
- #include <asm/pgalloc.h>
-+#include <asm/stage2_pgtable.h>
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 9a3409f..e3f53e3 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -91,6 +91,8 @@ alternative_endif
+ #define KVM_PHYS_SIZE	(1UL << KVM_PHYS_SHIFT)
+ #define KVM_PHYS_MASK	(KVM_PHYS_SIZE - 1UL)
  
++#include <asm/stage2_pgtable.h>
++
  int create_hyp_mappings(void *from, void *to);
  int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
-diff --git a/arch/arm/include/asm/stage2_pgtable.h b/arch/arm/include/asm/stage2_pgtable.h
+ void free_boot_hyp_pgd(void);
+@@ -156,35 +158,8 @@ static inline bool kvm_s2pmd_readonly(pmd_t *pmd)
+ #define kvm_pud_addr_end(addr, end)	pud_addr_end(addr, end)
+ #define kvm_pmd_addr_end(addr, end)	pmd_addr_end(addr, end)
+ 
+-/*
+- * In the case where PGDIR_SHIFT is larger than KVM_PHYS_SHIFT, we can address
+- * the entire IPA input range with a single pgd entry, and we would only need
+- * one pgd entry.  Note that in this case, the pgd is actually not used by
+- * the MMU for Stage-2 translations, but is merely a fake pgd used as a data
+- * structure for the kernel pgtable macros to work.
+- */
+-#if PGDIR_SHIFT > KVM_PHYS_SHIFT
+-#define PTRS_PER_S2_PGD_SHIFT	0
+-#else
+-#define PTRS_PER_S2_PGD_SHIFT	(KVM_PHYS_SHIFT - PGDIR_SHIFT)
+-#endif
+-#define PTRS_PER_S2_PGD		(1 << PTRS_PER_S2_PGD_SHIFT)
+-
+ #define kvm_pgd_index(addr)	(((addr) >> PGDIR_SHIFT) & (PTRS_PER_S2_PGD - 1))
+ 
+-/*
+- * If we are concatenating first level stage-2 page tables, we would have less
+- * than or equal to 16 pointers in the fake PGD, because that's what the
+- * architecture allows.  In this case, (4 - CONFIG_PGTABLE_LEVELS)
+- * represents the first level for the host, and we add 1 to go to the next
+- * level (which uses contatenation) for the stage-2 tables.
+- */
+-#if PTRS_PER_S2_PGD <= 16
+-#define KVM_PREALLOC_LEVEL	(4 - CONFIG_PGTABLE_LEVELS + 1)
+-#else
+-#define KVM_PREALLOC_LEVEL	(0)
+-#endif
+-
+ static inline void *kvm_get_hwpgd(struct kvm *kvm)
+ {
+ 	pgd_t *pgd = kvm->arch.pgd;
+diff --git a/arch/arm64/include/asm/stage2_pgtable.h b/arch/arm64/include/asm/stage2_pgtable.h
 new file mode 100644
-index 0000000..5b61196
+index 0000000..0ec218f
 --- /dev/null
-+++ b/arch/arm/include/asm/stage2_pgtable.h
-@@ -0,0 +1,59 @@
++++ b/arch/arm64/include/asm/stage2_pgtable.h
+@@ -0,0 +1,86 @@
 +/*
 + * Copyright (C) 2016 - ARM Ltd
 + *
@@ -64,46 +98,73 @@ index 0000000..5b61196
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#ifndef __ARM_S2_PGTABLE_H_
-+#define __ARM_S2_PGTABLE_H_
++#ifndef __ARM64_S2_PGTABLE_H_
++#define __ARM64_S2_PGTABLE_H_
 +
-+#define stage2_pgd_none(pgd)			pgd_none(pgd)
-+#define stage2_pgd_clear(pgd)			pgd_clear(pgd)
-+#define stage2_pgd_present(pgd)			pgd_present(pgd)
-+#define stage2_pgd_populate(pgd, pud)		pgd_populate(NULL, pgd, pud)
-+#define stage2_pud_offset(pgd, address)		pud_offset(pgd, address)
-+#define stage2_pud_free(pud)			pud_free(NULL, pud)
++#include <asm/pgtable.h>
 +
-+#define stage2_pud_none(pud)			pud_none(pud)
-+#define stage2_pud_clear(pud)			pud_clear(pud)
-+#define stage2_pud_present(pud)			pud_present(pud)
-+#define stage2_pud_populate(pud, pmd)		pud_populate(NULL, pud, pmd)
-+#define stage2_pmd_offset(pud, address)		pmd_offset(pud, address)
-+#define stage2_pmd_free(pmd)			pmd_free(NULL, pmd)
++/*
++ * In the case where PGDIR_SHIFT is larger than KVM_PHYS_SHIFT, we can address
++ * the entire IPA input range with a single pgd entry, and we would only need
++ * one pgd entry.  Note that in this case, the pgd is actually not used by
++ * the MMU for Stage-2 translations, but is merely a fake pgd used as a data
++ * structure for the kernel pgtable macros to work.
++ */
++#if PGDIR_SHIFT > KVM_PHYS_SHIFT
++#define PTRS_PER_S2_PGD_SHIFT	0
++#else
++#define PTRS_PER_S2_PGD_SHIFT	(KVM_PHYS_SHIFT - PGDIR_SHIFT)
++#endif
++#define PTRS_PER_S2_PGD		(1 << PTRS_PER_S2_PGD_SHIFT)
 +
-+#define stage2_pud_huge(pud)			pud_huge(pud)
++/*
++ * If we are concatenating first level stage-2 page tables, we would have less
++ * than or equal to 16 pointers in the fake PGD, because that's what the
++ * architecture allows.  In this case, (4 - CONFIG_PGTABLE_LEVELS)
++ * represents the first level for the host, and we add 1 to go to the next
++ * level (which uses contatenation) for the stage-2 tables.
++ */
++#if PTRS_PER_S2_PGD <= 16
++#define KVM_PREALLOC_LEVEL	(4 - CONFIG_PGTABLE_LEVELS + 1)
++#else
++#define KVM_PREALLOC_LEVEL	(0)
++#endif
 +
-+/* Open coded p*d_addr_end that can deal with 64bit addresses */
-+static inline phys_addr_t stage2_pgd_addr_end(phys_addr_t addr, phys_addr_t end)
-+{
-+	phys_addr_t boundary = (addr + PGDIR_SIZE) & PGDIR_MASK;
-+	return (boundary - 1 < end - 1) ? boundary : end;
-+}
++#define stage2_pgd_none(pgd)				pgd_none(pgd)
++#define stage2_pgd_clear(pgd)				pgd_clear(pgd)
++#define stage2_pgd_present(pgd)				pgd_present(pgd)
++#define stage2_pgd_populate(pgd, pud)			pgd_populate(NULL, pgd, pud)
++#define stage2_pud_offset(pgd, address)			pud_offset(pgd, address)
++#define stage2_pud_free(pud)				pud_free(NULL, pud)
 +
-+#define stage2_pud_addr_end(addr, end)		(end)
++#define stage2_pud_none(pud)				pud_none(pud)
++#define stage2_pud_clear(pud)				pud_clear(pud)
++#define stage2_pud_present(pud)				pud_present(pud)
++#define stage2_pud_populate(pud, pmd)			pud_populate(NULL, pud, pmd)
++#define stage2_pmd_offset(pud, address)			pmd_offset(pud, address)
++#define stage2_pmd_free(pmd)				pmd_free(NULL, pmd)
 +
-+static inline phys_addr_t stage2_pmd_addr_end(phys_addr_t addr, phys_addr_t end)
-+{
-+	phys_addr_t boundary = (addr + PMD_SIZE) & PMD_MASK;
-+	return (boundary - 1 < end - 1) ? boundary : end;
-+}
++#define stage2_pud_huge(pud)				pud_huge(pud)
 +
-+#define stage2_pgd_index(addr)				pgd_index(addr)
++#define stage2_pgd_addr_end(address, end)		pgd_addr_end(address, end)
++#define stage2_pud_addr_end(address, end)		pud_addr_end(address, end)
++#define stage2_pmd_addr_end(address, end)		pmd_addr_end(address, end)
 +
 +#define stage2_pte_table_empty(ptep)			kvm_page_empty(ptep)
-+#define stage2_pmd_table_empty(pmdp)			kvm_page_empty(pmdp)
-+#define stage2_pud_table_empty(pudp)			0
++#ifdef __PGTABLE_PMD_FOLDED
++#define stage2_pmd_table_empty(pmdp)			(0)
++#else
++#define stage2_pmd_table_empty(pmdp)			((KVM_PREALLOC_LEVEL < 2) && kvm_page_empty(pmdp))
++#endif
 +
-+#endif	/* __ARM_S2_PGTABLE_H_ */
++#ifdef __PGTABLE_PUD_FOLDED
++#define stage2_pud_table_empty(pudp)			(0)
++#else
++#define stage2_pud_table_empty(pudp)			((KVM_PREALLOC_LEVEL < 1) && kvm_page_empty(pudp))
++#endif
++
++#define stage2_pgd_index(addr)				(((addr) >> PGDIR_SHIFT) & (PTRS_PER_S2_PGD - 1))
++
++#endif	/* __ARM64_S2_PGTABLE_H_ */
 -- 
 1.7.9.5
