@@ -1,86 +1,71 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Thu, 14 Apr 2016 06:19:09 -0700
-Subject: [PATCH] ARM: dts: imx: ventana: add RS485 txen gpio support
-Message-ID: <1460639949-26392-1-git-send-email-tharvey@gateworks.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 14 Apr 2016 14:20:50 +0100
+Subject: [PATCH v2 02/17] arm64: Cleanup VTCR_EL2 and VTTBR field values
+In-Reply-To: <1460640065-27658-1-git-send-email-suzuki.poulose@arm.com>
+References: <1460640065-27658-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1460640065-27658-3-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GW52xx/GW53xx/GW54xx have an on-board RS485 transceiver for half-duplex
-RS485 using uart1. The active-high TXEN is GPIO7__IO1 which we can configure
-as the rts-gpio as long as we specify it as active-low to invert the polarity
-managed by mctrl_gpio helpers. This allows for RS485 to be used from
-userspace by setting flags to SER_RS485_RTS_ON_SEND in the serial_rs485
-struct when using the TIOCGRS485 ioctl.
+We share most of the bits for VTCR_EL2 for different page sizes,
+except for the TG0 value and the entry level value. This patch
+makes the definitions a bit more cleaner to reflect this fact.
 
-Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+Also cleans up the VTTBR_X calculation. No functional changes.
+
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm/boot/dts/imx6qdl-gw52xx.dtsi | 3 +++
- arch/arm/boot/dts/imx6qdl-gw53xx.dtsi | 3 +++
- arch/arm/boot/dts/imx6qdl-gw54xx.dtsi | 3 +++
- 3 files changed, 9 insertions(+)
+ arch/arm64/include/asm/kvm_arm.h |   22 ++++++++++++----------
+ 1 file changed, 12 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-index 8cccc4a..50d6039 100644
---- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-@@ -315,6 +315,8 @@
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart1>;
-+	fsl,uart-has-rtscts;
-+	rts-gpio = <&gpio7 1 GPIO_ACTIVE_LOW>;
- 	status = "okay";
- };
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index a46b39f..1281d98 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -144,30 +144,32 @@
+  * The magic numbers used for VTTBR_X in this patch can be found in Tables
+  * D4-23 and D4-25 in ARM DDI 0487A.b.
+  */
++
++#define VTCR_EL2_T0SZ_IPA	VTCR_EL2_T0SZ_40B
++#define VTCR_EL2_COMMON_BITS	(VTCR_EL2_SH0_INNER | VTCR_EL2_ORGN0_WBWA | \
++				 VTCR_EL2_IRGN0_WBWA | VTCR_EL2_RES1)
++
+ #ifdef CONFIG_ARM64_64K_PAGES
+ /*
+  * Stage2 translation configuration:
+- * 40bits input  (T0SZ = 24)
+  * 64kB pages (TG0 = 1)
+  * 2 level page tables (SL = 1)
+  */
+-#define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_64K | VTCR_EL2_SH0_INNER | \
+-				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
+-				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_RES1)
+-#define VTTBR_X		(38 - VTCR_EL2_T0SZ_40B)
++#define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_64K | VTCR_EL2_SL0_LVL1)
++#define VTTBR_X_TGRAN_MAGIC		38
+ #else
+ /*
+  * Stage2 translation configuration:
+- * 40bits input  (T0SZ = 24)
+  * 4kB pages (TG0 = 0)
+  * 3 level page tables (SL = 1)
+  */
+-#define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_4K | VTCR_EL2_SH0_INNER | \
+-				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
+-				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_RES1)
+-#define VTTBR_X		(37 - VTCR_EL2_T0SZ_40B)
++#define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_4K | VTCR_EL2_SL0_LVL1)
++#define VTTBR_X_TGRAN_MAGIC		37
+ #endif
  
-@@ -493,6 +495,7 @@
- 			fsl,pins = <
- 				MX6QDL_PAD_SD3_DAT7__UART1_TX_DATA	0x1b0b1
- 				MX6QDL_PAD_SD3_DAT6__UART1_RX_DATA	0x1b0b1
-+				MX6QDL_PAD_SD3_DAT4__GPIO7_IO01		0x4001b0b1 /* TEN */
- 			>;
- 		};
- 
-diff --git a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-index 5f700cc..60b0ae9 100644
---- a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-@@ -312,6 +312,8 @@
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart1>;
-+	fsl,uart-has-rtscts;
-+	rts-gpio = <&gpio7 1 GPIO_ACTIVE_LOW>;
- 	status = "okay";
- };
- 
-@@ -482,6 +484,7 @@
- 			fsl,pins = <
- 				MX6QDL_PAD_SD3_DAT7__UART1_TX_DATA	0x1b0b1
- 				MX6QDL_PAD_SD3_DAT6__UART1_RX_DATA	0x1b0b1
-+				MX6QDL_PAD_SD3_DAT4__GPIO7_IO01		0x4001b0b1 /* TEN */
- 			>;
- 		};
- 
-diff --git a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-index d19b4cc..c217ecc 100644
---- a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-@@ -414,6 +414,8 @@
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart1>;
-+	fsl,uart-has-rtscts;
-+	rts-gpio = <&gpio7 1 GPIO_ACTIVE_LOW>;
- 	status = "okay";
- };
- 
-@@ -603,6 +605,7 @@
- 			fsl,pins = <
- 				MX6QDL_PAD_SD3_DAT7__UART1_TX_DATA	0x1b0b1
- 				MX6QDL_PAD_SD3_DAT6__UART1_RX_DATA	0x1b0b1
-+				MX6QDL_PAD_SD3_DAT4__GPIO7_IO01		0x4001b0b1 /* TEN */
- 			>;
- 		};
- 
++#define VTCR_EL2_FLAGS			(VTCR_EL2_COMMON_BITS | VTCR_EL2_TGRAN_FLAGS)
++#define VTTBR_X				(VTTBR_X_TGRAN_MAGIC - VTCR_EL2_T0SZ_IPA)
++
+ #define VTTBR_BADDR_SHIFT (VTTBR_X - 1)
+ #define VTTBR_BADDR_MASK  (((UL(1) << (PHYS_MASK_SHIFT - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
+ #define VTTBR_VMID_SHIFT  (UL(48))
 -- 
-1.9.1
+1.7.9.5
