@@ -1,59 +1,64 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu, 14 Apr 2016 14:13:18 +0200
-Subject: [PATCH 0/5] serial: Add Generic Serial Device Tree Bindings
-Message-ID: <1460636003-3011-1-git-send-email-geert+renesas@glider.be>
+Date: Thu, 14 Apr 2016 14:13:23 +0200
+Subject: [PATCH 5/5] serial: sirf: Use generic uart-has-rtscts DT property
+In-Reply-To: <1460636003-3011-1-git-send-email-geert+renesas@glider.be>
+References: <1460636003-3011-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1460636003-3011-6-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	Hi all,
+Convert the SiRF UART driver from using the vendor-specific
+"sirf,uart-has-rtscts" to the generic "uart-has-rtscts" DT property, as
+documented by the Generic Serial DT Bindings.
 
-This patch series, against next-20160414, introduces Generic Serial
-Device Tree Bindings, and converts drivers using vendor-specific DT
-properties to the generic properies where appropriate.
+The old vendor-specific property is still recognized by the driver for
+backwards compatibility, but deprecated.
 
-The Generic Serial Device Tree Bindings document a set of generic
-properties for describing UARTs in a device tree:
-  1. The GPIO modem control properties are currently duplicated across
-     hardware-specific binding documentation,
-  2. The property for dedicated RTS/CTS hardware flow control lines is
-     already supported by several drivers, albeit with a vendor-specific
-     prefix, hence make it generic.
-Whether these generic properties apply to a particular device still
-depends on the DT bindings of the actual device.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ Documentation/devicetree/bindings/serial/sirf-uart.txt | 8 ++++----
+ drivers/tty/serial/sirfsoc_uart.c                      | 3 ++-
+ 2 files changed, 6 insertions(+), 5 deletions(-)
 
-The old (deprecated) vendor-specific properties are still supported by
-the drivers for backwards compatibility.  Actual DTS files are to be
-updated later, after this series has been integrated into mainline.
-
-Thanks for your comments!
-
-Geert Uytterhoeven (5):
-  doc: DT: Add Generic Serial Device Tree Bindings
-  serial: imx: Use generic uart-has-rtscts DT property
-  serial: mxs-auart: Use generic uart-has-rtscts DT property
-  serial: sirf: Introduce helper variable struct device_node *np
-  serial: sirf: Use generic uart-has-rtscts DT property
-
- .../devicetree/bindings/serial/fsl-imx-uart.txt    |  4 +-
- .../devicetree/bindings/serial/fsl-mxs-auart.txt   |  2 +-
- .../devicetree/bindings/serial/serial.txt          | 61 ++++++++++++++++++++++
- .../devicetree/bindings/serial/sirf-uart.txt       |  8 +--
- drivers/tty/serial/imx.c                           |  3 +-
- drivers/tty/serial/mxs-auart.c                     |  3 +-
- drivers/tty/serial/sirfsoc_uart.c                  | 39 +++++++-------
- 7 files changed, 91 insertions(+), 29 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/serial/serial.txt
-
+diff --git a/Documentation/devicetree/bindings/serial/sirf-uart.txt b/Documentation/devicetree/bindings/serial/sirf-uart.txt
+index 67e2a0aeb0429572..1e48bbbeecc6dd27 100644
+--- a/Documentation/devicetree/bindings/serial/sirf-uart.txt
++++ b/Documentation/devicetree/bindings/serial/sirf-uart.txt
+@@ -9,9 +9,9 @@ Required properties:
+ - clocks : Should contain uart clock number
+ 
+ Optional properties:
+-- sirf,uart-has-rtscts: we have hardware flow controller pins in hardware
+-- rts-gpios: RTS pin for USP-based UART if sirf,uart-has-rtscts is true
+-- cts-gpios: CTS pin for USP-based UART if sirf,uart-has-rtscts is true
++- uart-has-rtscts: we have hardware flow controller pins in hardware
++- rts-gpios: RTS pin for USP-based UART if uart-has-rtscts is true
++- cts-gpios: CTS pin for USP-based UART if uart-has-rtscts is true
+ 
+ Example:
+ 
+@@ -28,7 +28,7 @@ On the board-specific dts, we can put rts-gpios and cts-gpios like
+ 
+ usp at b0090000 {
+ 	compatible = "sirf,prima2-usp-uart";
+-	sirf,uart-has-rtscts;
++	uart-has-rtscts;
+ 	rts-gpios = <&gpio 15 0>;
+ 	cts-gpios = <&gpio 46 0>;
+ };
+diff --git a/drivers/tty/serial/sirfsoc_uart.c b/drivers/tty/serial/sirfsoc_uart.c
+index 1d1c0b9857ff6900..b186c9c4f850cc16 100644
+--- a/drivers/tty/serial/sirfsoc_uart.c
++++ b/drivers/tty/serial/sirfsoc_uart.c
+@@ -1293,7 +1293,8 @@ static int sirfsoc_uart_probe(struct platform_device *pdev)
+ 	sirfport->uart_reg = (struct sirfsoc_uart_register *)match->data;
+ 
+ 	sirfport->hw_flow_ctrl =
+-		of_property_read_bool(np, "sirf,uart-has-rtscts");
++		of_property_read_bool(np, "uart-has-rtscts") ||
++		of_property_read_bool(np, "sirf,uart-has-rtscts") /* deprecated */;
+ 	if (of_device_is_compatible(np, "sirf,prima2-uart") ||
+ 		of_device_is_compatible(np, "sirf,atlas7-uart"))
+ 		sirfport->uart_reg->uart_type = SIRF_REAL_UART;
 -- 
 1.9.1
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
