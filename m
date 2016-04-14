@@ -1,96 +1,110 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 14 Apr 2016 22:37:07 +0300
-Subject: [PATCH v2 0/3] ARM: OMAP3: Fix McBSP2/3 hwmod setup for sidetone
-In-Reply-To: <20160414165514.GL5995@atomide.com>
-References: <20160402001753.GR9329@atomide.com> <57026205.6020105@ti.com>
- <20160404151200.GA4652@atomide.com> <5703BA6B.1080208@ti.com>
- <20160411212845.GJ5995@atomide.com> <570CC54E.6020703@ti.com>
- <20160412163750.GR5995@atomide.com> <570E3428.5020804@ti.com>
- <20160413152829.GQ5995@atomide.com> <570F4804.4050006@ti.com>
- <20160414165514.GL5995@atomide.com>
-Message-ID: <570FF163.1050603@ti.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Thu, 14 Apr 2016 20:42:38 +0100
+Subject: [PATCH] ARM: provide improved virt_to_idmap() functionality
+Message-ID: <E1aqn9y-00012K-8h@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/14/2016 07:55 PM, Tony Lindgren wrote:
-> * Peter Ujfalusi <peter.ujfalusi@ti.com> [160414 00:35]:
->> On 04/13/16 18:28, Tony Lindgren wrote:
->>>
->>> You could just create the sidetone child device manually on probe in the
->>> driver as needed. That way you'd have two devices to do the PM runtime
->>> on. I think that was Paul's main concern as they are separate modules.
->>
->> You mean that not to have separate compatible for the McBSP module's Sidetone
->> core?
->> If yes, then it is a valid thing to remove the hwmod data for the sidetone,
->> like I did in this series.
-> 
-> No, I meant keep the sidetone hwmod, it really is there in the hardware.
+For kexec, we need more functionality from the IDMAP system.  We need to
+be able to convert physical addresses to their identity mappped versions
+as well as virtual addresses.
 
-Hrm, the Sidetone is there, yes. It is part of the McBSP module and the hwmod
-for the sidetone is not correct. From hwmod (or PRCM) point of view there is
-no sidetone module, there is only McBSP module which consist of McBSP core and
-Sidetone core.
+Convert the existing arch_virt_to_idmap() to deal with physical
+addresses instead.
 
-> I meant only probe the sidetone in the McBSP probe so you have two
-> struct dev and two hwmod entries in the McBSP driver. I don't know if
-> this actually makes things easier or not though.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+Obviously, this is for Keystone 2 Kexec with its weird physical memory
+layout.
 
-But the hwmod for the sidetone is wrong, there should not have been hwmod for
-the sidetone to start with.
+ arch/arm/include/asm/memory.h     | 27 ++++++++++++++++++++++-----
+ arch/arm/mach-keystone/keystone.c |  7 +------
+ arch/arm/mm/idmap.c               |  2 +-
+ 3 files changed, 24 insertions(+), 12 deletions(-)
 
->>> It still leaves the chance of bugs with flush of posted writes. But might
->>> make things easier to deal with in small steps?
->>
->> The only 'benefit' I see with separated driver for McBSP core and Sidetone
->> core is that the register writes will happen to the cores in separate drivers.
->>
->> If the McBSP driver creates the device for the sidetone driver, then passing
->> the needed callbacks and data to it is going to be cleaner. Registering back
->> the callbacks to McBSP is what need to be figured out, so it is simple and
->> clean. Either with a callback to McBSP to set the ST callbacks or have the
->> callback struct used by ST via pdata to have places for the ST to McBSP
->> callbacks and when the driver loads it is going to set up those.
-> 
-> OK yeah makes sense to me.
-> 
->> If I remove the prcm section for the ST hwmod:
->> [   87.784820] omap_hwmod: mcbsp2_sidetone: _wait_target_ready failed: -22
->> [   87.784851] omap-mcbsp 49022000.mcbsp: use pm_runtime_put_sync_suspend() in
->> driver?
->>
->> When first try to use the audio.
->> So the hwmod code at least was checking the idlest bit.
-> 
-> Yes the module is really there for sidetone, and it really has hardware
-> registers :)
-
-Yes it has registers, but it has no prcm level existence, it is part of McBSP
-module. I guess when the OMAP3 was designed the HW people did not wanted to
-create new version of the McBSP core for McBSP2/3 so they attached a new core
-to the McBSP cores with different targets, etc, but w/o external dependency.
-
->> OK. I will go with the assumption that the sidetone hwmod can be removed (as
->> it is not correct) and rework my current series to use pdata callback for the
->> iclk autogate allow/deny. With this set the ST will be operational in legacy
->> and DT boot.
-> 
-> Sorry, no I did not want to drop the sidetone hwmod, I was just trying to
-> come up with ideas on how to make the driver changes easier. It sounds like
-> you already figured out the driver changes part though with two drivers.
-
-If I need to keep the sidetone hwmod around I don't see how it can be done in
-a safe and clean way. It is part of McBSP module, it is accessible only if the
-McBSP module is enabled, you can not enable the Sidetone alone you need to go
-and enable the McBSP module. I don't think it is a good idea to let two
-separate hwmods to poke around the same PRCM bits. Have not checked, but I
-don't think we have refcounting for the PRCM register bits.
-
-I have things working w/o the two drivers with pdata callback both in legacy
-and DT case and it is pretty neat looking, thanks for the suggestion! I'm
-still figuring out the needed amount of callbacks from McBSP to ST and from ST
-to McBSP. We for sure going to need enable_stage1,2 probably three as well.
-But this crossing driver boundaries needs a bit more time to figure out.
-
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 9427fd632552..59c93a224d14 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -288,19 +288,36 @@ static inline void *phys_to_virt(phys_addr_t x)
+ #define __va(x)			((void *)__phys_to_virt((phys_addr_t)(x)))
+ #define pfn_to_kaddr(pfn)	__va((phys_addr_t)(pfn) << PAGE_SHIFT)
+ 
+-extern unsigned long (*arch_virt_to_idmap)(unsigned long x);
++extern long long arch_phys_to_idmap_offset;
+ 
+ /*
+  * These are for systems that have a hardware interconnect supported alias of
+  * physical memory for idmap purposes.  Most cases should leave these
+  * untouched.  Note: this can only return addresses less than 4GiB.
+  */
++static inline unsigned long phys_to_idmap(phys_addr_t addr)
++{
++	if (IS_ENABLED(CONFIG_MMU) && arch_phys_to_idmap_offset) {
++		addr += arch_phys_to_idmap_offset;
++		if (addr > (u32)~0)
++			addr = (u32)~0;
++	}
++	return addr;
++}
++
++static inline phys_addr_t idmap_to_phys(unsigned long idmap)
++{
++	phys_addr_t addr = idmap;
++
++	if (IS_ENABLED(CONFIG_MMU) && arch_phys_to_idmap_offset)
++		addr -= arch_phys_to_idmap_offset;
++
++	return addr;
++}
++
+ static inline unsigned long __virt_to_idmap(unsigned long x)
+ {
+-	if (IS_ENABLED(CONFIG_MMU) && arch_virt_to_idmap)
+-		return arch_virt_to_idmap(x);
+-	else
+-		return __virt_to_phys(x);
++	return phys_to_idmap(__virt_to_phys(x));
+ }
+ 
+ #define virt_to_idmap(x)	__virt_to_idmap((unsigned long)(x))
+diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
+index e6b9cb1e6709..a33a296b00dc 100644
+--- a/arch/arm/mach-keystone/keystone.c
++++ b/arch/arm/mach-keystone/keystone.c
+@@ -63,11 +63,6 @@ static void __init keystone_init(void)
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+-static unsigned long keystone_virt_to_idmap(unsigned long x)
+-{
+-	return (phys_addr_t)(x) - CONFIG_PAGE_OFFSET + KEYSTONE_LOW_PHYS_START;
+-}
+-
+ static long long __init keystone_pv_fixup(void)
+ {
+ 	long long offset;
+@@ -91,7 +86,7 @@ static long long __init keystone_pv_fixup(void)
+ 	offset = KEYSTONE_HIGH_PHYS_START - KEYSTONE_LOW_PHYS_START;
+ 
+ 	/* Populate the arch idmap hook */
+-	arch_virt_to_idmap = keystone_virt_to_idmap;
++	arch_phys_to_idmap_offset = -offset;
+ 
+ 	return offset;
+ }
+diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
+index bd274a05b8ff..c1a48f88764e 100644
+--- a/arch/arm/mm/idmap.c
++++ b/arch/arm/mm/idmap.c
+@@ -15,7 +15,7 @@
+  * page tables.
+  */
+ pgd_t *idmap_pgd;
+-unsigned long (*arch_virt_to_idmap)(unsigned long x);
++long long arch_phys_to_idmap_offset;
+ 
+ #ifdef CONFIG_ARM_LPAE
+ static void idmap_add_pmd(pud_t *pud, unsigned long addr, unsigned long end,
 -- 
-P?ter
+2.1.0
