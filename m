@@ -1,70 +1,80 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Thu, 14 Apr 2016 08:43:55 +0530
-Subject: [PATCH v2 1/5] phy: Rename phy-brcmstb-sata driver to
- phy-brcm-sata driver
-In-Reply-To: <570E507C.4040306@ti.com>
-References: <1459140510-5317-1-git-send-email-anup.patel@broadcom.com>
- <1459140510-5317-2-git-send-email-anup.patel@broadcom.com>
- <570E507C.4040306@ti.com>
-Message-ID: <CAALAos_4MVsc0A9fCTgqCgBBU4p4rCqzhJ3zPJs=jzJMqtekGA@mail.gmail.com>
+From: bamvor.zhangjian@huawei.com (Zhangjian (Bamvor))
+Date: Thu, 14 Apr 2016 11:20:29 +0800
+Subject: [PATCH 10/25] arm64: rename COMPAT to AARCH32_EL0 in Kconfig
+In-Reply-To: <1459894127-17698-11-git-send-email-ynorov@caviumnetworks.com>
+References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+ <1459894127-17698-11-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <570F0C7D.8000004@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+Hi, yury
 
-On Wed, Apr 13, 2016 at 7:28 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> Hi,
+I suggest we enable AARCH32_EL0 by default explicitly. I am not sure
+if it should be a dedicated commit. I am ok if you merge my commit, add
+
+Reviewed-by: Bamvor Jian Zhang <bamvor.zhangjian@huawei.com>
+
+commit 926ad48847c9fbc665285c49ff823666e145a083
+Author: Bamvor Jian Zhang <bamvor.zhangjian@huawei.com>
+Date:   Wed Apr 6 17:59:03 2016 +0800
+
+     arm64: enable aarch32 application by default
+
+     After introduce the AARCH32_EL0. The aarch32 application is disabled
+     by default which was enabled by default. And the aarch32 application
+     could not run on these kernels consequently.
+
+     This commit enable it in Kconfig explicitly.
+
+     Signed-off-by: Bamvor Jian Zhang <bamvor.zhangjian@huawei.com>
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 19d8e31..3b543c7 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -934,6 +934,7 @@ config AARCH32_EL0
+         select HAVE_UID16
+         select OLD_SIGSUSPEND3
+         select COMPAT_OLD_SIGACTION
++       default y
+         help
+           This option enables support for a 32-bit EL0 running under a 64-bit
+           kernel at EL1. AArch32-specific components such as system calls,
+
+
+On 2016/4/6 6:08, Yury Norov wrote:
+> From: Andrew Pinski <apinski@cavium.com>
 >
-> On Monday 28 March 2016 10:18 AM, Anup Patel wrote:
->> Currently, we have a common SATA3 PHY driver for all Broadcom
->> STB SoCs. This driver can be extended and re-used for Broadcom
->> iProc SoCs having same SATA3 PHY.
->>
->> This patch renames existing Broadcom STB SATA3 PHY driver to
->> common Broadcom SATA3 PHY driver to share this PHY driver across
->> Broadcom SoCs.
->>
->> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
->> ---
->>  drivers/phy/Kconfig                                 | 18 +++++++++---------
->>  drivers/phy/Makefile                                |  2 +-
->>  drivers/phy/{phy-brcmstb-sata.c => phy-brcm-sata.c} |  8 ++++----
->>  3 files changed, 14 insertions(+), 14 deletions(-)
->>  rename drivers/phy/{phy-brcmstb-sata.c => phy-brcm-sata.c} (97%)
->>
->> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
->> index 26566db..c0187a7 100644
->> --- a/drivers/phy/Kconfig
->> +++ b/drivers/phy/Kconfig
->> @@ -403,15 +403,6 @@ config PHY_TUSB1210
->>       help
->>         Support for TI TUSB1210 USB ULPI PHY.
->>
->> -config PHY_BRCMSTB_SATA
->> -     tristate "Broadcom STB SATA PHY driver"
->> -     depends on ARCH_BRCMSTB || BMIPS_GENERIC
->> -     depends on OF
->> -     select GENERIC_PHY
->> -     help
->> -       Enable this to support the SATA3 PHY on 28nm or 40nm Broadcom STB SoCs.
->> -       Likely useful only with CONFIG_SATA_BRCMSTB enabled.
->> -
->>  config PHY_CYGNUS_PCIE
->>       tristate "Broadcom Cygnus PCIe PHY driver"
->>       depends on OF && (ARCH_BCM_CYGNUS || COMPILE_TEST)
->> @@ -421,4 +412,13 @@ config PHY_CYGNUS_PCIE
->>         Enable this to support the Broadcom Cygnus PCIe PHY.
->>         If unsure, say N.
->>
->> +config PHY_BRCM_SATA
+> In this patchset  ILP32 ABI support is added. Additionally to AARCH32,
+> which is binary-compatible with ARM, ILP32 is (mostly) ABI-compatible.
 >
-> changing config name should be done with utmost care as it might break
-> oldconfig users.
-> Has this been fixed in all the defconfigs where it is included?
-
-None of the existing defconfigs have PHY_BRCMSTB_SATA enabled. In fact,
-no other Kconfig option currently selects PHY_BRCMSTB_SATA. I think we
-are safe here.
-
-Regards,
-Anup
+>  From now, AARCH32_EL0 (former COMPAT) config option means the support of
+> AARCH32 userspace, ARM64_ILP32 - support of ILP32 ABI (see next patches),
+> and COMPAT indicates that one of them, or both, is enabled.
+>
+> Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
+> Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+> Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
+> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+> Reviewed-by: David Daney <ddaney@caviumnetworks.com>
+> ---
+>   arch/arm64/Kconfig | 4 ++++
+>   1 file changed, 4 insertions(+)
+>
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 4f43622..f923687 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -925,6 +925,10 @@ menu "Userspace binary formats"
+>   source "fs/Kconfig.binfmt"
+>
+>   config COMPAT
+> +	def_bool y
+> +	depends on AARCH32_EL0
+> +
+> +config AARCH32_EL0
+>   	bool "Kernel support for 32-bit EL0"
+>   	depends on ARM64_4K_PAGES || EXPERT
+>   	select COMPAT_BINFMT_ELF
+>
