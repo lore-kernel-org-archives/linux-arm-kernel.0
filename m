@@ -1,359 +1,472 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 14 Apr 2016 14:15:06 +0200
-Subject: [RFC PATCH 06/45] KVM: arm/arm64: vgic-new: Implement virtual
- IRQ injection
-In-Reply-To: <570F769A.7040104@arm.com>
-References: <1458871508-17279-1-git-send-email-andre.przywara@arm.com>
- <1458871508-17279-7-git-send-email-andre.przywara@arm.com>
- <20160329211650.GF4126@cbox> <5703F5D7.5060803@arm.com>
- <20160406142358.GA26026@cbox> <570F769A.7040104@arm.com>
-Message-ID: <20160414121506.GI30804@cbox>
+From: garlic.tseng@mediatek.com (Garlic Tseng)
+Date: Thu, 14 Apr 2016 20:14:30 +0800
+Subject: [alsa-devel] [RFC PATCH v2 5/5] ASoC: mediatek: Add mt2701-cs42448
+ driver and config option.
+In-Reply-To: <1460636070-37426-1-git-send-email-garlic.tseng@mediatek.com>
+References: <1460636070-37426-1-git-send-email-garlic.tseng@mediatek.com>
+Message-ID: <1460636070-37426-6-git-send-email-garlic.tseng@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 14, 2016 at 11:53:14AM +0100, Andre Przywara wrote:
-> Hej,
-> 
-> On 06/04/16 15:23, Christoffer Dall wrote:
-> > On Tue, Apr 05, 2016 at 06:28:55PM +0100, Andre Przywara wrote:
-> >> Hi,
-> >>
-> >> On 29/03/16 22:16, Christoffer Dall wrote:
-> >>> On Fri, Mar 25, 2016 at 02:04:29AM +0000, Andre Przywara wrote:
-> >>>> From: Christoffer Dall <christoffer.dall@linaro.org>
-> >>>>
-> >>>> Provide a vgic_queue_irq() function which decides whether a given
-> >>>> IRQ needs to be queued to a VCPU's ap_list.
-> >>>> This should be called whenever an IRQ became pending or got enabled,
-> >>>
-> >>> becomes pending or enabled,
-> >>>
-> >>>> either as a result of userspace injection, from in-kernel emulated
-> >>>> devices like the architected timer or from MMIO accesses to the
-> >>>> distributor emulation.
-> >>>> Also provides the necessary functions to allow userland to inject an
-> >>>> IRQ to a guest.
-> >>>
-> >>> Since this is the first code that starts using our locking mechanism, we
-> >>> add some (hopefully) clear documentation of our locking strategy and
-> >>> requirements along with this patch.
-> >>>
-> >>>> [Andre: refactor out vgic_queue_irq()]
-> >>>>
-> >>>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> >>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> >>>> ---
-> >>>>  include/kvm/vgic/vgic.h  |   3 +
-> >>>>  virt/kvm/arm/vgic/vgic.c | 181 +++++++++++++++++++++++++++++++++++++++++++++++
-> >>>>  virt/kvm/arm/vgic/vgic.h |   1 +
-> >>>>  3 files changed, 185 insertions(+)
-> >>>>
-> >>>> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-> >>>> index 659f8b1..f32b284 100644
-> >>>> --- a/include/kvm/vgic/vgic.h
-> >>>> +++ b/include/kvm/vgic/vgic.h
-> >>>> @@ -178,6 +178,9 @@ struct vgic_cpu {
-> >>>>  	struct list_head ap_list_head;
-> >>>>  };
-> >>>>  
-> >>>> +int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
-> >>>> +			bool level);
-> >>>> +
-> >>>>  #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
-> >>>>  #define vgic_initialized(k)	(false)
-> >>>>  #define vgic_ready(k)		((k)->arch.vgic.ready)
-> >>>> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-> >>>> index 8e34916..a95aabc 100644
-> >>>> --- a/virt/kvm/arm/vgic/vgic.c
-> >>>> +++ b/virt/kvm/arm/vgic/vgic.c
-> >>>> @@ -19,8 +19,25 @@
-> >>>>  
-> >>>>  #include "vgic.h"
-> >>>>  
-> >>>> +#define CREATE_TRACE_POINTS
-> >>>> +#include "../trace.h"
-> >>>> +
-> >>>>  struct vgic_global kvm_vgic_global_state;
-> >>>>  
-> >>>> +/*
-> >>>> + * Locking order is always:
-> >>>> + *   vgic_cpu->ap_list_lock
-> >>>> + *     vgic_irq->irq_lock
-> >>>> + *
-> >>>> + * (that is, always take the ap_list_lock before the struct vgic_irq lock).
-> >>>> + *
-> >>>> + * When taking more than one ap_list_lock at the same time, always take the
-> >>>> + * lowest numbered VCPU's ap_list_lock first, so:
-> >>>> + *   vcpuX->vcpu_id < vcpuY->vcpu_id:
-> >>>> + *     spin_lock(vcpuX->arch.vgic_cpu.ap_list_lock);
-> >>>> + *     spin_lock(vcpuY->arch.vgic_cpu.ap_list_lock);
-> >>>> + */
-> >>>> +
-> >>>>  struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
-> >>>>  			      u32 intid)
-> >>>>  {
-> >>>> @@ -39,3 +56,167 @@ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
-> >>>>  	WARN(1, "Looking up struct vgic_irq for reserved INTID");
-> >>>>  	return NULL;
-> >>>>  }
-> >>>> +
-> >>>> +/**
-> >>>> + * kvm_vgic_target_oracle - compute the target vcpu for an irq
-> >>>> + *
-> >>>> + * @irq:	The irq to route. Must be already locked.
-> >>
-> >>                                   ^^^^^^^^^^^^^^^^^^^^^^
-> >>
-> >>>> + *
-> >>>> + * Based on the current state of the interrupt (enabled, pending,
-> >>>> + * active, vcpu and target_vcpu), compute the next vcpu this should be
-> >>>> + * given to. Return NULL if this shouldn't be injected at all.
-> >>>> + */
-> >>>> +static struct kvm_vcpu *vgic_target_oracle(struct vgic_irq *irq)
-> >>>> +{
-> >>>> +	/* If the interrupt is active, it must stay on the current vcpu */
-> >>>> +	if (irq->active)
-> >>>> +		return irq->vcpu;
-> >>>
-> >>> we are not taking a lock here.  What are the locking expectations?  If
-> >>> the expectarions are that the IRQ is locked when calling this function,
-> >>> can we have a BIG FAT COMMENT saying that then?
-> >>
-> >> Do you mean really BIG FAT or is the above sufficient? (I guess not).
-> >> I will make it more prominent.
-> > 
-> > well, maybe it doesn't have to be BIG FAT.  But I did miss the existing
-> > comment.  I think it would be preferred to have a separate paragraph
-> > explaining the locking expectaions, but perhaps I'm just
-> > being stupid.
-> 
-> Fixed - not you being stupid - which you clearly aren't, so nothing to
-> fix here; but the insufficient comment ;-)
-> 
-> >>
-> >>> It seems to me that we are somehow expecting irq->active and irq->vcpu
-> >>> to be in sync, but that's not necessarily the case if the IRQ is not
-> >>> locked.
-> >>>
-> >>>> +
-> >>>> +	/* If enabled and pending, it can migrate to a new one */
-> >>>
-> >>> I think this comment should be rewritten to:
-> >>>
-> >>> If the IRQ is not active but enabled and pending, we should direct it to
-> >>> its configured target VCPU.
-> >>>
-> >>>> +	if (irq->enabled && irq->pending)
-> >>>> +		return irq->target_vcpu;
-> >>>> +
-> >>>> +	/* Otherwise, it is considered idle */
-> >>>
-> >>> not sure what idle means here, I suggest something like:
-> >>>
-> >>> If neither active nor pending and enabled, then this IRQ should not be
-> >>> queued to any VCPU.
-> >>>
-> >>>> +	return NULL;
-> >>>> +}
-> >>>> +
-> >>>> +/*
-> >>>> + * Only valid injection if changing level for level-triggered IRQs or for a
-> >>>> + * rising edge.
-> >>>> + */
-> >>>> +static bool vgic_validate_injection(struct vgic_irq *irq, bool level)
-> >>>> +{
-> >>>> +	switch (irq->config) {
-> >>>> +	case VGIC_CONFIG_LEVEL:
-> >>>> +		return irq->line_level != level;
-> >>>> +	case VGIC_CONFIG_EDGE:
-> >>>> +		return level;
-> >>>> +	default:
-> >>>> +		BUG();
-> >>>
-> >>> is the default case there for making the compiler happy or can we just
-> >>> get rid of it?
-> >>
-> >> Just removing it was fine (for GCC 5.3.0, at least).
-> >>
-> >>>> +	}
-> >>>> +}
-> >>>> +
-> >>>> +/*
-> >>>> + * Check whether an IRQ needs to (and can) be queued to a VCPU's ap list.
-> >>>> + * Do the queuing if necessary, taking the right locks in the right order.
-> >>>> + * Returns true when the IRQ was queued, false otherwise.
-> >>>> + *
-> >>>> + * Needs to be entered with the IRQ lock already held, but will return
-> >>>> + * with all locks dropped.
-> >>>> + */
-> >>>> +bool vgic_queue_irq(struct kvm *kvm, struct vgic_irq *irq)
-> >>>
-> >>> should we name this vgic_try_queue_irq_locked ?
-> >>
-> >> Mmh, since it (re-)tries quite hard I am not sure _try_ would be
-> >> misleading. Basically it queues the IRQ whenever possible and/or
-> >> sensible. Having _unlock in it like you suggested in another reply makes
-> >> more sense, I think.
-> > 
-> > agreed
-> > 
-> >>
-> >>>> +{
-> >>>> +	struct kvm_vcpu *vcpu = vgic_target_oracle(irq);
-> >>>
-> >>> should we have something like BUG_ON(!spin_is_locked(irq->irq_lock));
-> >>> here?
-> >>>
-> >>> Not sure if there's some bug checking here which is only emitted if a
-> >>> user select CONFIG_CHECK_SOME_LOCKING_THINGS that we could use...?
-> >>
-> >> There is CONFIG_DEBUG_SPINLOCK, but I couldn't find some conditional
-> >> debug macro suitable for the purpose. I defined one now for the file
-> >> only (since we have quite some users here).
-> >>
-> >>>> +
-> >>>> +	if (irq->vcpu || !(irq->pending && irq->enabled) || !vcpu) {
-> >>>> +		/*
-> >>>> +		 * If this IRQ is already on a VCPU's ap_list, then it
-> >>>> +		 * cannot be moved or modified and there is no more work for
-> >>>> +		 * us to do.
-> >>>> +		 *
-> >>>> +		 * Otherwise, if the irq is not pending and enabled, it does
-> >>>> +		 * not need to be inserted into an ap_list and there is also
-> >>>> +		 * no more work for us to do.
-> >>>> +		 */
-> >>>
-> >>> is the !vcpu check here not redundant because if you ever get to
-> >>> evaluating it, then irq->vcpu is null, and pending and enabled are set,
-> >>> which means the oracle couldn't have returned null, could it?
-> >>
-> >> In this case vcpu is always irq->target_vcpu, if I did the math
-> >> correctly. So can this be NULL?
-> >> Even if this is correct reasoning, I wonder if we optimize something
-> >> prematurely here and rely on the current implementation of
-> >> vgic_target_oracle(). I think the check for "!vcpu" is here to avoid a
-> >> NULL pointer deference below (in the first spin_lock after the retry:
-> >> label), so I'd rather keep this explicit check in here.
-> > 
-> > I'm really not a fan of building the correctness of one of the most
-> > crucial parts of our code based on "let's add a few extra checks which
-> > may not be necessary, just in case" kind of logic.
-> > 
-> > So let's be clear on why we have an if-statement here exactly:
-> > 
-> > As the comment says, if we can't move the IRQ, because it's already
-> > assigned to somebody or if this IRQ is not pending or active, then it's
-> > shouldn't be queued.
-> > 
-> > So the simple and all-encompassing check here is simply:
-> > 
-> > 	if (irq->vcpu || !vcpu) {
-> > 		spin_unlock(&irq->irq_lock);
-> > 		return false;
-> > 	}
-> > 
-> > The only requirement for this to be correct is that the MMIO handler for
-> > ISACTIVER to both set the active bit and the irq->vcpu pointer (and put
-> > it on the AP list), without calling this function...).  That was my
-> > quesiton below.
-> > 
-> > Because if that's not the case, you could end up here with irq->active
-> > set, but irq->vcpu == NULL and !(pending && enabled) and you'd error
-> > out, which means you would have to check explicitly for the active state
-> > here as well, but I think that just becomes too messy.
-> > 
-> > So, just change this to what I propose and we can deal with the active
-> > state MMIO handler separately.
-> 
-> I agree that setting the active state via MMIO is a mess in general and
-> stuffing this case into this function here gets hairy.
-> I am tempted to not support it in the first version, I guess it never
-> really worked reliably before ...
+Add machine driver and config option for MT2701.
 
-I'm pretty sure it did, because we ran into migration breaking when this
-wasn't supported for the save/restore userspace interface.
+Signed-off-by: Garlic Tseng <garlic.tseng@mediatek.com>
+---
+ sound/soc/mediatek/Kconfig                 |  21 ++
+ sound/soc/mediatek/Makefile                |   3 +
+ sound/soc/mediatek/mt2701/Makefile         |  20 ++
+ sound/soc/mediatek/mt2701/mt2701-cs42448.c | 376 +++++++++++++++++++++++++++++
+ 4 files changed, 420 insertions(+)
+ create mode 100644 sound/soc/mediatek/mt2701/Makefile
+ create mode 100644 sound/soc/mediatek/mt2701/mt2701-cs42448.c
 
-> 
-> At the moment I am trying to code this explicitly into the SACTIVER
-> handler and it's messy, too (because of the corner cases).
-> Let's see how this will look like ...
-
-ok.
-
-If you want, you can focus on getting a new version out, and I can take
-a stab at the SACTIVER together with the priority stuff.  OTOH, if you
-already have something, then it may be worth following through with
-that.
-
-> 
-> >>
-> >>> that would also explain why we don't have to re-check the same
-> >>> conditions below...
-> >>>
-> >>> or am I getting this wrong, because you could also have someone
-> >>> explicitly setting the IRQ to active via trapped MMIO, in which case we
-> >>> should be able to queue it without it being pending && enabled, which
-> >>> would indicate that it's the other way around, you should only evaluate
-> >>> !vcpu and kup the !(pending && enabled) part....?
-> >>
-> >> You lost me here, which hints at the fragility of this optimization ;-)
-> >>
-> >>>> +		spin_unlock(&irq->irq_lock);
-> >>>> +		return false;
-> >>>> +	}
-> >>>> +
-> >>>> +	/*
-> >>>> +	 * We must unlock the irq lock to take the ap_list_lock where
-> >>>> +	 * we are going to insert this new pending interrupt.
-> >>>> +	 */
-> >>>> +	spin_unlock(&irq->irq_lock);
-> >>>> +
-> >>>> +	/* someone can do stuff here, which we re-check below */
-> >>>> +retry:
-> >>>> +	spin_lock(&vcpu->arch.vgic_cpu.ap_list_lock);
-> >>>> +	spin_lock(&irq->irq_lock);
-> >>>> +
-> >>>> +	/*
-> >>>> +	 * Did something change behind our backs?
-> >>>> +	 *
-> >>>> +	 * There are two cases:
-> >>>> +	 * 1) The irq became pending or active behind our backs and/or
-> >>>> +	 *    the irq->vcpu field was set correspondingly when putting
-> >>>> +	 *    the irq on an ap_list. Then drop the locks and return.
-> >>>> +	 * 2) Someone changed the affinity on this irq behind our
-> >>>> +	 *    backs and we are now holding the wrong ap_list_lock.
-> >>>> +	 *    Then drop the locks and try the new VCPU.
-> >>>> +	 */
-> >>>> +	if (irq->vcpu || !(irq->pending && irq->enabled)) {
-> >>>
-> >>> here I'm concerned about the active state again.
-> >>
-> >> Mmmh, can you elaborate and sketch a case where the active state would
-> >> cause trouble? This check is just here to avoid iterating on a no longer
-> >> pending or enabled IRQ. I wonder if an active IRQ can really sneak into
-> >> this function here in the first place?
-> > 
-> > After having gone through the series I think we should deal with
-> > the active state queing directly in the vgic_mmio_write_sactive()
-> > function.
-> > 
-> > But I still prefer to move the retry label to the very top of this
-> > function, and simplify these two statemtns to the condition I suggested:
-> > 
-> > 	if (unlinkely(irq->vcpu || vcpu != vgic_target_oracle(irq)))
-> > 		goto retry;
-> > 
-> > The cost is that we perform a few additional checks at runtime in the
-> > case where the IRQ was migrated while we released a lock (rare), but I
-> > think it simplifies the code.
-> 
-> OK, I made this change. Also the shorter check after asking the oracle
-> above.
-> This should also better work in the case where target_vcpu is NULL
-> (because either no bit in TARGETSR is set or a non-existent MPIDR has
-> been written into IROUTER).
-> 
-right.
-
-Thanks,
--Christoffer
+diff --git a/sound/soc/mediatek/Kconfig b/sound/soc/mediatek/Kconfig
+index f7e789e..b190322 100644
+--- a/sound/soc/mediatek/Kconfig
++++ b/sound/soc/mediatek/Kconfig
+@@ -48,3 +48,24 @@ config SND_SOC_MT8173_RT5650_RT5676
+ 	  with the RT5650 and RT5676 codecs.
+ 	  Select Y if you have such device.
+ 	  If unsure select "N".
++
++config SND_SOC_MT2701
++	bool "SND_SOC_MT2701"
++	depends on SND_SOC_MEDIATEK
++	select SND_SOC_CS42XX8_I2C
++	help
++	  This adds ASoC driver for Mediatek MT2701 boards
++	  with the CS42448 codecs.
++	  Select Y if you have such device.
++	  If unsure select "N".
++
++config SND_SOC_MT2701_CS42448
++	bool "SND_SOC_MT2701_CS42448"
++	depends on SND_SOC_MT2701
++	select SND_SOC_CS42XX8_I2C
++	help
++	  This adds ASoC driver for Mediatek MT2701 boards
++	  with the CS42448 codecs.
++	  Select Y if you have such device.
++	  If unsure select "N".
++
+diff --git a/sound/soc/mediatek/Makefile b/sound/soc/mediatek/Makefile
+index 5048165..60387ca 100644
+--- a/sound/soc/mediatek/Makefile
++++ b/sound/soc/mediatek/Makefile
+@@ -3,3 +3,6 @@ obj-$(CONFIG_SND_SOC_MT8173_MAX98090) += mt8173/
+ obj-$(CONFIG_SND_SOC_MT8173_RT5650_RT5676) += mt8173/
+ obj-$(CONFIG_SND_SOC_MT8173_RT5650_RT5514) += mt8173/
+ obj-$(CONFIG_SND_SOC_MT8173_RT5650) += mt8173/
++
++# 2701 Machine support
++obj-$(CONFIG_SND_SOC_MT2701_CS42448) += mt2701/
+diff --git a/sound/soc/mediatek/mt2701/Makefile b/sound/soc/mediatek/mt2701/Makefile
+new file mode 100644
+index 0000000..9f27653
+--- /dev/null
++++ b/sound/soc/mediatek/mt2701/Makefile
+@@ -0,0 +1,20 @@
++#
++# Copyright (C) 2015 MediaTek Inc.
++#
++# This program is free software: you can redistribute it and/or modify
++# it under the terms of the GNU General Public License version 2 as
++# published by the Free Software Foundation.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++# GNU General Public License for more details.
++#
++
++# platform driver
++obj-$(CONFIG_SND_SOC_MT2701) += mtk2701-afe-pcm.o
++obj-$(CONFIG_SND_SOC_MT2701) += mtk2701-irq.o
++obj-$(CONFIG_SND_SOC_MT2701) += mtk2701-afe-clock-ctrl.o
++
++# machine driver
++obj-$(CONFIG_SND_SOC_MT2701_CS42448) += mt2701-cs42448.o
+diff --git a/sound/soc/mediatek/mt2701/mt2701-cs42448.c b/sound/soc/mediatek/mt2701/mt2701-cs42448.c
+new file mode 100644
+index 0000000..426f677
+--- /dev/null
++++ b/sound/soc/mediatek/mt2701/mt2701-cs42448.c
+@@ -0,0 +1,376 @@
++/*
++ * mt2701-cs42448.c  --  MT2701 CS42448 ALSA SoC machine driver
++ *
++ * Copyright (c) 2016 MediaTek Inc.
++ * Author: Ir Lian <ir.lian@mediatek.com>
++ *              Garlic Tseng <garlic.tseng@mediatek.com>
++ *
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/module.h>
++#include <sound/soc.h>
++#include <linux/delay.h>
++#include <linux/gpio.h>
++#include <linux/pinctrl/consumer.h>
++#include <linux/of_gpio.h>
++
++#include "mtk2701-afe-common.h"
++
++struct mt2701_cs42448_private {
++	int i2s1_in_mux;
++	int i2s1_in_mux_gpio_sel_1;
++	int i2s1_in_mux_gpio_sel_2;
++};
++
++static const char * const i2sin_mux_switch_text[] = {
++	"ADC_SDOUT2",
++	"ADC_SDOUT3",
++	"I2S_IN_1",
++	"I2S_IN_2",
++};
++
++static const struct soc_enum i2sin_mux_enum =
++	SOC_ENUM_SINGLE_EXT(4, i2sin_mux_switch_text);
++
++static int mt2701_cs42448_i2sin1_mux_get(struct snd_kcontrol *kcontrol,
++					 struct snd_ctl_elem_value *ucontrol)
++{
++	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
++	struct mt2701_cs42448_private *priv = snd_soc_card_get_drvdata(card);
++
++	ucontrol->value.integer.value[0] = priv->i2s1_in_mux;
++	return 0;
++}
++
++static int mt2701_cs42448_i2sin1_mux_set(struct snd_kcontrol *kcontrol,
++					 struct snd_ctl_elem_value *ucontrol)
++{
++	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
++	struct mt2701_cs42448_private *priv = snd_soc_card_get_drvdata(card);
++
++	if (ucontrol->value.integer.value[0] == priv->i2s1_in_mux)
++		return 0;
++
++	switch (ucontrol->value.integer.value[0]) {
++	case 0:
++		gpio_set_value(priv->i2s1_in_mux_gpio_sel_1, 0);
++		gpio_set_value(priv->i2s1_in_mux_gpio_sel_2, 0);
++		break;
++	case 1:
++		gpio_set_value(priv->i2s1_in_mux_gpio_sel_1, 1);
++		gpio_set_value(priv->i2s1_in_mux_gpio_sel_2, 0);
++		break;
++	case 2:
++		gpio_set_value(priv->i2s1_in_mux_gpio_sel_1, 0);
++		gpio_set_value(priv->i2s1_in_mux_gpio_sel_2, 1);
++		break;
++	case 3:
++		gpio_set_value(priv->i2s1_in_mux_gpio_sel_1, 1);
++		gpio_set_value(priv->i2s1_in_mux_gpio_sel_2, 1);
++		break;
++	default:
++		dev_warn(card->dev, "%s invalid setting\n", __func__);
++	}
++
++	priv->i2s1_in_mux = ucontrol->value.integer.value[0];
++	return 0;
++}
++
++static const struct snd_soc_dapm_widget
++			mt2701_cs42448_asoc_card_dapm_widgets[] = {
++	SND_SOC_DAPM_LINE("Line Out Jack", NULL),
++	SND_SOC_DAPM_MIC("AMIC", NULL),
++	SND_SOC_DAPM_LINE("Tuner In", NULL),
++	SND_SOC_DAPM_LINE("Satellite Tuner In", NULL),
++	SND_SOC_DAPM_LINE("AUX In", NULL),
++};
++
++static const struct snd_kcontrol_new mt2701_cs42448_controls[] = {
++	SOC_DAPM_PIN_SWITCH("Line Out Jack"),
++	SOC_DAPM_PIN_SWITCH("AMIC"),
++	SOC_DAPM_PIN_SWITCH("Tuner In"),
++	SOC_DAPM_PIN_SWITCH("Satellite Tuner In"),
++	SOC_DAPM_PIN_SWITCH("AUX In"),
++	SOC_ENUM_EXT("I2SIN1_MUX_Switch", i2sin_mux_enum,
++		     mt2701_cs42448_i2sin1_mux_get,
++		     mt2701_cs42448_i2sin1_mux_set),
++};
++
++static const unsigned int mt2701_cs42448_sampling_rates[] = {48000};
++
++static struct snd_pcm_hw_constraint_list mt2701_cs42448_constraints_rates = {
++		.count = ARRAY_SIZE(mt2701_cs42448_sampling_rates),
++		.list = mt2701_cs42448_sampling_rates,
++		.mask = 0,
++};
++
++static int mt2701_cs42448_fe_ops_startup(struct snd_pcm_substream *substream)
++{
++	int err;
++
++	err = snd_pcm_hw_constraint_list(substream->runtime, 0,
++					 SNDRV_PCM_HW_PARAM_RATE,
++					 &mt2701_cs42448_constraints_rates);
++	if (err < 0) {
++		dev_err(substream->pcm->card->dev, /*better way to get device?*/
++			"%s snd_pcm_hw_constraint_list failed: 0x%x\n",
++			__func__, err);
++		return err;
++	}
++	return 0;
++}
++
++static struct snd_soc_ops mt2701_cs42448_fe_ops = {
++	.startup = mt2701_cs42448_fe_ops_startup,
++};
++
++static int mt2701_cs42448_be_ops_hw_params(struct snd_pcm_substream *substream,
++					   struct snd_pcm_hw_params *params)
++{
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
++	struct snd_soc_dai *codec_dai = rtd->codec_dai;
++	/* codec slave, mt2701 master */
++	unsigned int fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS
++			    | SND_SOC_DAIFMT_CONT;
++	unsigned int mclk_rate;
++	unsigned int rate = params_rate(params);
++	unsigned int div_mclk_to_bck = rate > 192000 ? 2 : 4;
++	unsigned int div_bck_to_lrck = 64;
++
++	mclk_rate = rate * div_bck_to_lrck * div_mclk_to_bck;
++
++	/* mt2701 mclk */
++	snd_soc_dai_set_sysclk(cpu_dai, 0, mclk_rate, SND_SOC_CLOCK_OUT);
++	/* mt2701 bck */
++	snd_soc_dai_set_clkdiv(cpu_dai, DIV_ID_MCLK_TO_BCK, div_mclk_to_bck);
++	/* mt2701 lrck */
++	snd_soc_dai_set_clkdiv(cpu_dai, DIV_ID_BCK_TO_LRCK, div_bck_to_lrck);
++	/* mt2701 master */
++	snd_soc_dai_set_fmt(cpu_dai, fmt);
++
++	/* codec mclk */
++	snd_soc_dai_set_sysclk(codec_dai, 0, mclk_rate, SND_SOC_CLOCK_IN);
++	/* codec slave */
++	snd_soc_dai_set_fmt(codec_dai, fmt);
++	return 0;
++}
++
++static struct snd_soc_ops mt2701_cs42448_be_ops = {
++	.hw_params = mt2701_cs42448_be_ops_hw_params
++};
++
++static struct snd_soc_dai_link mt2701_cs42448_dai_links[] = {
++	/*FE*/
++	{
++		.name = "mt2701-cs42448-pcm0",
++		.stream_name = "mt2701-cs42448-pcm0",
++		.cpu_dai_name = "PCM0",
++		.codec_name = "snd-soc-dummy",
++		.codec_dai_name = "snd-soc-dummy-dai",
++		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS
++			 | SND_SOC_DAIFMT_GATED,
++		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
++			    SND_SOC_DPCM_TRIGGER_POST},
++		.ops = &mt2701_cs42448_fe_ops,
++		.dynamic = 1,
++		.dpcm_playback = 1,
++		.dpcm_capture = 1,
++	},
++	{
++		.name = "mt2701-cs42448-multi-ch-out",
++		.stream_name = "mt2701-cs42448-multi-ch-out",
++		.cpu_dai_name = "PCM_multi",
++		.codec_name = "snd-soc-dummy",
++		.codec_dai_name = "snd-soc-dummy-dai",
++		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS
++			 | SND_SOC_DAIFMT_GATED,
++		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
++			    SND_SOC_DPCM_TRIGGER_POST},
++		.ops = &mt2701_cs42448_fe_ops,
++		.dynamic = 1,
++		.dpcm_playback = 1,
++	},
++	{
++		.name = "mt2701-cs42448-pcm1-data-UL",
++		.stream_name = "mt2701-cs42448-pcm1-data-UL",
++		.cpu_dai_name = "PCM1",
++		.codec_name = "snd-soc-dummy",
++		.codec_dai_name = "snd-soc-dummy-dai",
++		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS
++			 | SND_SOC_DAIFMT_GATED,
++		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
++			    SND_SOC_DPCM_TRIGGER_POST},
++		.ops = &mt2701_cs42448_fe_ops,
++		.dynamic = 1,
++		.dpcm_capture = 1,
++	},
++	/*BE*/
++	{
++		.name = "mt2701-cs42448-I2S0",
++		.cpu_dai_name = "I2S0",
++		.no_pcm = 1,
++		.codec_dai_name = "cs42448",
++		.codec_name = "cs42xx8.2-0048",
++		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS
++			 | SND_SOC_DAIFMT_GATED,
++		.ops = &mt2701_cs42448_be_ops,
++		.dpcm_playback = 1,
++		.dpcm_capture = 1,
++	},
++	{
++		.name = "mt2701-cs42448-I2S1",
++		.cpu_dai_name = "I2S1",
++		.no_pcm = 1,
++		.codec_dai_name = "cs42448",
++		.codec_name = "cs42xx8.2-0048",
++		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS
++			 | SND_SOC_DAIFMT_GATED,
++		.ops = &mt2701_cs42448_be_ops,
++		.dpcm_playback = 1,
++		.dpcm_capture = 1,
++	},
++	{
++		.name = "mt2701-cs42448-I2S2",
++		.cpu_dai_name = "I2S2",
++		.no_pcm = 1,
++		.codec_dai_name = "cs42448",
++		.codec_name = "cs42xx8.2-0048",
++		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS
++			 | SND_SOC_DAIFMT_GATED,
++		.ops = &mt2701_cs42448_be_ops,
++		.dpcm_playback = 1,
++		.dpcm_capture = 1,
++	},
++	{
++		.name = "mt2701-cs42448-I2S3",
++		.cpu_dai_name = "I2S3",
++		.no_pcm = 1,
++		.codec_dai_name = "cs42448",
++		.codec_name = "cs42xx8.2-0048",
++		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_CBS_CFS
++			 | SND_SOC_DAIFMT_GATED,
++		.ops = &mt2701_cs42448_be_ops,
++		.dpcm_playback = 1,
++		.dpcm_capture = 1,
++	},
++};
++
++static struct snd_soc_card mt2701_cs42448_soc_card = {
++	.name = "mt2701-cs42448",
++	.dai_link = mt2701_cs42448_dai_links,
++	.num_links = ARRAY_SIZE(mt2701_cs42448_dai_links),
++	.controls = mt2701_cs42448_controls,
++	.num_controls = ARRAY_SIZE(mt2701_cs42448_controls),
++	.dapm_widgets = mt2701_cs42448_asoc_card_dapm_widgets,
++	.num_dapm_widgets = ARRAY_SIZE(mt2701_cs42448_asoc_card_dapm_widgets),
++};
++
++static int mt2701_cs42448_machine_probe(struct platform_device *pdev)
++{
++	struct snd_soc_card *card = &mt2701_cs42448_soc_card;
++	int ret;
++	int i;
++	struct device_node *platform_node;
++	struct mt2701_cs42448_private *priv =
++		devm_kzalloc(&pdev->dev, sizeof(struct mt2701_cs42448_private),
++			     GFP_KERNEL);
++	struct device *dev = &pdev->dev;
++
++	if (!priv)
++		return -ENOMEM;
++
++	platform_node = of_parse_phandle(pdev->dev.of_node,
++					 "mediatek,platform", 0);
++	if (!platform_node) {
++		dev_err(&pdev->dev, "Property 'platform' missing or invalid\n");
++		return -EINVAL;
++	}
++	for (i = 0; i < card->num_links; i++) {
++		if (mt2701_cs42448_dai_links[i].platform_name)
++			continue;
++		mt2701_cs42448_dai_links[i].platform_of_node = platform_node;
++	}
++
++	card->dev = dev;
++
++	ret = snd_soc_of_parse_audio_routing(card, "audio-routing");
++	if (ret) {
++		dev_err(&pdev->dev, "failed to parse audio-routing: %d\n", ret);
++		return ret;
++	}
++
++	priv->i2s1_in_mux_gpio_sel_1 =
++		of_get_named_gpio(dev->of_node, "i2s1-in-sel-gpio1", 0);
++	if (gpio_is_valid(priv->i2s1_in_mux_gpio_sel_1)) {
++		ret = devm_gpio_request(dev, priv->i2s1_in_mux_gpio_sel_1,
++					"i2s1_in_mux_gpio_sel_1");
++		if (ret)
++			dev_warn(&pdev->dev, "%s devm_gpio_request fail %d\n",
++				 __func__, ret);
++		gpio_direction_output(priv->i2s1_in_mux_gpio_sel_1, 0);
++	}
++
++	priv->i2s1_in_mux_gpio_sel_2 =
++		of_get_named_gpio(dev->of_node, "i2s1-in-sel-gpio2", 0);
++	if (gpio_is_valid(priv->i2s1_in_mux_gpio_sel_2)) {
++		ret = devm_gpio_request(dev, priv->i2s1_in_mux_gpio_sel_2,
++					"i2s1_in_mux_gpio_sel_2");
++		if (ret)
++			dev_warn(&pdev->dev, "%s devm_gpio_request fail2 %d\n",
++				 __func__, ret);
++		gpio_direction_output(priv->i2s1_in_mux_gpio_sel_2, 0);
++	}
++	snd_soc_card_set_drvdata(card, priv);
++
++	ret = snd_soc_register_card(card);
++
++	if (ret)
++		dev_err(&pdev->dev, "%s snd_soc_register_card fail %d\n",
++			__func__, ret);
++	return ret;
++}
++
++static int mt2701_cs42448_machine_remove(struct platform_device *pdev)
++{
++	struct snd_soc_card *card = platform_get_drvdata(pdev);
++
++	devm_kfree(&pdev->dev, snd_soc_card_get_drvdata(card));
++	return snd_soc_unregister_card(card);
++}
++
++#ifdef CONFIG_OF
++static const struct of_device_id mt2701_cs42448_machine_dt_match[] = {
++	{.compatible = "mediatek,mt2701-cs42448-machine",},
++	{}
++};
++#endif
++
++static struct platform_driver mt2701_cs42448_machine = {
++	.driver = {
++		.name = "mt2701-cs42448",
++		.owner = THIS_MODULE,
++		   #ifdef CONFIG_OF
++		   .of_match_table = mt2701_cs42448_machine_dt_match,
++		   #endif
++	},
++	.probe = mt2701_cs42448_machine_probe,
++	.remove = mt2701_cs42448_machine_remove
++};
++
++module_platform_driver(mt2701_cs42448_machine);
++
++/* Module information */
++MODULE_DESCRIPTION("MT2701 CS42448 ALSA SoC machine driver");
++MODULE_AUTHOR("Ir Lian <ir.lian@mediatek.com>");
++MODULE_LICENSE("GPL v2");
++MODULE_ALIAS("mt2701 cs42448 soc card");
+-- 
+1.9.1
