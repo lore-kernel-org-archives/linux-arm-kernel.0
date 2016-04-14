@@ -1,37 +1,56 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 14 Apr 2016 11:05:49 +0100
-Subject: [PATCH v2 2/4] PCI: Provide common functions for ECAM mapping
-In-Reply-To: <570F30D4.2030102@jonmasters.org>
-References: <1460414707-19153-1-git-send-email-jchandra@broadcom.com>
- <1460414707-19153-3-git-send-email-jchandra@broadcom.com>
- <570C4034.20105@caviumnetworks.com>
- <570C78F1.4090701@jonmasters.org> <20160412164413.GA32297@red-moon>
- <570F30D4.2030102@jonmasters.org>
-Message-ID: <20160414100549.GC24733@red-moon>
+From: pantelis.antoniou@konsulko.com (Pantelis Antoniou)
+Date: Thu, 14 Apr 2016 13:02:56 +0300
+Subject: [Question] refcount of DT node
+In-Reply-To: <20160414095957.GB10273@leverpostej>
+References: <CAK7LNATFUW2KXUpFas6C_SJ0C7Qb1DWU0njLg-FCYciK2U6Oag@mail.gmail.com>
+ <20160414084849.GT19428@n2100.arm.linux.org.uk>
+ <20160414095957.GB10273@leverpostej>
+Message-ID: <06E9E2D3-4627-4970-ABBB-34B5ED620709@konsulko.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 14, 2016 at 01:55:32AM -0400, Jon Masters wrote:
+Hi Mark,
 
-[...]
-
-> > I will comment on the patches as soon as I have time to review
-> > them, I certainly would like to understand what we have to do with the
-> > rest of the code though (provided this series is good to go) see above.
+> On Apr 14, 2016, at 12:59 , Mark Rutland <mark.rutland@arm.com> wrote:
 > 
-> Right. That's my reason for asking. I'd like to know who is driving (I
-> believe that to be Lorenzo) and what the path forward is, and whether we
-> need to get additional support from anyone else. There's a multi-vendor
-> meeting in the morning where I'm going to summarize the current state of
-> these patches and I would like to know (soon) what the plan is so that
-> we can get everyone on deck to help out at least with testing (most have
-> tested the previous set, but we need public acks happening).
+> On Thu, Apr 14, 2016 at 09:48:49AM +0100, Russell King - ARM Linux wrote:
+>> On Thu, Apr 14, 2016 at 04:47:57PM +0900, Masahiro Yamada wrote:
+>>> Hi experts.
+>>> 
+>>> My understanding of refcount of DT node is poor.
+>> 
+>> The message from DT people is... don't worry about DT node refcounting.
+>> Do whatever you want with it, they don't care whether you have correct
+>> refcounting or not.
+>> 
+>> The background behind that is that I've tried to fix the refcounting,
+>> and even had the coccinelle people generate some stuff to work on this
+>> issue, but DT people's attitude towards it is "don't bother".
+>> 
+>> So yes, people may get it wrong, but it seems it's something that DT
+>> people want ignored.
+> 
+> I'm not sure that's quite fair; the last discussion I recall about this
+> ended up concluding that we need a better API, rather than papering over
+> problems.
+> 
+> That said, there isn't much obvious progress on that front.
+> 
+> Frank, Pantelis, Rob, were there any conclusions on this from ELC, or is
+> this something that needs someone to propose something?
+> 
 
-Testing always helps, this code needs reviewing from PCI and ACPI
-standpoints, what we can do is review this series and repost the whole
-thing when we agree the ECAM refactoring this series is implementing
-is the right way to go and it is a step in that direction, with no
-generic MCFG support in the kernel ACPI PCI on ARM64 can't be
-implemented so I would start from that.
+Frank mentioned that he wants a new API. I have some ideas about it too.
 
-Lorenzo
+My take is that drivers should never do reference counting, we have to figure
+out a way for DT access using copy semantics or locks.
+
+References would still be required for core DT code, but that?s a sane subset.
+
+> Mark.
+> 
+> [1] http://permalink.gmane.org/gmane.linux.drivers.devicetree/153777
+
+Regards
+
+? Pantelis
