@@ -1,79 +1,66 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 14 Apr 2016 21:17:25 +0200
-Subject: [PATCH v5 05/24] input: misc: max77693: use pwm_get_args() where
- appropriate
+Date: Thu, 14 Apr 2016 21:17:37 +0200
+Subject: [PATCH v5 17/24] pwm: keep PWM state in sync with hardware state
 In-Reply-To: <1460661464-11216-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1460661464-11216-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1460661464-11216-6-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1460661464-11216-18-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PWM framework has clarified the concept of reference PWM config
-(the platform dependent config retrieved from the DT or the PWM
-lookup table) and real PWM state.
+Before the introduction of pwm_args, the core was resetting the PWM period
+and polarity states to the reference values (those provided through the
+DT, a PWM lookup table or hardcoded in the driver).
 
-Use pwm_get_args() when the PWM user wants to retrieve this reference
-config and not the current state.
+Now that all PWM users are correctly using pwm_args to configure their
+PWM device, we can safely remove the pwm_apply_args() call in
+pwm_device_request().
 
-This is part of the rework allowing the PWM framework to support
-hardware readout and expose real PWM state even when the PWM has
-just been requested (before the user calls pwm_config/enable/disable()).
+We can also get rid of the pwm_set_period() call done in
+pwm_apply_args(), because PWM users are now directly using pargs->period
+instead of pwm_get_period(). By doing that we avoid messing with the
+current PWM period.
+
+The only remaining bit in pwm_apply_args() is the initial polarity
+setting, and it should go away when all PWM users have been patched to
+use the atomic API (with this API the polarity will be set along with
+other PWM arguments when configuring the PWM).
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/input/misc/max77693-haptic.c | 17 ++++++++++++++---
- 1 file changed, 14 insertions(+), 3 deletions(-)
+ drivers/pwm/core.c  | 8 --------
+ include/linux/pwm.h | 1 -
+ 2 files changed, 9 deletions(-)
 
-diff --git a/drivers/input/misc/max77693-haptic.c b/drivers/input/misc/max77693-haptic.c
-index 6d96bff..29ddeb7 100644
---- a/drivers/input/misc/max77693-haptic.c
-+++ b/drivers/input/misc/max77693-haptic.c
-@@ -70,10 +70,13 @@ struct max77693_haptic {
+diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+index ac89529..26c3cf5 100644
+--- a/drivers/pwm/core.c
++++ b/drivers/pwm/core.c
+@@ -128,14 +128,6 @@ static int pwm_device_request(struct pwm_device *pwm, const char *label)
+ 	set_bit(PWMF_REQUESTED, &pwm->flags);
+ 	pwm->label = label;
  
- static int max77693_haptic_set_duty_cycle(struct max77693_haptic *haptic)
+-	/*
+-	 * FIXME: this should be removed as soon as all PWM users are
+-	 * properly making use of pwm_args to initialize the PWM device.
+-	 * If we don't get rid of it, then PWM state and hardware can be
+-	 * desynchronized.
+-	 */
+-	pwm_apply_args(pwm);
+-
+ 	return 0;
+ }
+ 
+diff --git a/include/linux/pwm.h b/include/linux/pwm.h
+index c8859b7..2f500a5 100644
+--- a/include/linux/pwm.h
++++ b/include/linux/pwm.h
+@@ -170,7 +170,6 @@ static inline void pwm_get_args(const struct pwm_device *pwm,
+ 
+ static inline void pwm_apply_args(struct pwm_device *pwm)
  {
--	int delta = (haptic->pwm_dev->period + haptic->pwm_duty) / 2;
-+	struct pwm_args pargs;
-+	int delta;
- 	int error;
+-	pwm_set_period(pwm, pwm->args.period);
+ 	pwm_set_polarity(pwm, pwm->args.polarity);
+ }
  
--	error = pwm_config(haptic->pwm_dev, delta, haptic->pwm_dev->period);
-+	pwm_get_args(haptic->pwm_dev, &pargs);
-+	delta = (pargs.period + haptic->pwm_duty) / 2;
-+	error = pwm_config(haptic->pwm_dev, delta, pargs.period);
- 	if (error) {
- 		dev_err(haptic->dev, "failed to configure pwm: %d\n", error);
- 		return error;
-@@ -234,6 +237,7 @@ static int max77693_haptic_play_effect(struct input_dev *dev, void *data,
- 				       struct ff_effect *effect)
- {
- 	struct max77693_haptic *haptic = input_get_drvdata(dev);
-+	struct pwm_args pargs;
- 	u64 period_mag_multi;
- 
- 	haptic->magnitude = effect->u.rumble.strong_magnitude;
-@@ -245,7 +249,8 @@ static int max77693_haptic_play_effect(struct input_dev *dev, void *data,
- 	 * The formula to convert magnitude to pwm_duty as follows:
- 	 * - pwm_duty = (magnitude * pwm_period) / MAX_MAGNITUDE(0xFFFF)
- 	 */
--	period_mag_multi = (u64)haptic->pwm_dev->period * haptic->magnitude;
-+	pwm_get_args(haptic->pwm_dev, &pargs);
-+	period_mag_multi = (u64)pargs.period * haptic->magnitude;
- 	haptic->pwm_duty = (unsigned int)(period_mag_multi >>
- 						MAX_MAGNITUDE_SHIFT);
- 
-@@ -329,6 +334,12 @@ static int max77693_haptic_probe(struct platform_device *pdev)
- 		return PTR_ERR(haptic->pwm_dev);
- 	}
- 
-+	/*
-+	 * FIXME: pwm_apply_args() should be removed when switching to the
-+	 * atomic PWM API.
-+	 */
-+	pwm_apply_args(haptic->pwm_dev);
-+
- 	haptic->motor_reg = devm_regulator_get(&pdev->dev, "haptic");
- 	if (IS_ERR(haptic->motor_reg)) {
- 		dev_err(&pdev->dev, "failed to get regulator\n");
 -- 
 2.5.0
