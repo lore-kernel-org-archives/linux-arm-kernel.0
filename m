@@ -1,222 +1,109 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Thu, 14 Apr 2016 19:17:47 +0930
-Subject: [PATCH 7/9] arm/dts: Add aspeed device trees
+Date: Thu, 14 Apr 2016 19:17:49 +0930
+Subject: [PATCH 9/9] arm/configs: Add aspeed defconfig
 In-Reply-To: <1460627269-21721-1-git-send-email-joel@jms.id.au>
 References: <1460627269-21721-1-git-send-email-joel@jms.id.au>
-Message-ID: <1460627269-21721-8-git-send-email-joel@jms.id.au>
+Message-ID: <1460627269-21721-10-git-send-email-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A common device tree, and a board specific dts for the Palmetto
-OpenPower developemnt machine which was used for testing.
-
 Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- arch/arm/boot/dts/Makefile                    |   3 +
- arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts |  21 ++++
- arch/arm/boot/dts/ast2400.dtsi                | 152 ++++++++++++++++++++++++++
- 3 files changed, 176 insertions(+)
- create mode 100644 arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
- create mode 100644 arch/arm/boot/dts/ast2400.dtsi
+ arch/arm/configs/aspeed_defconfig | 86 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 86 insertions(+)
+ create mode 100644 arch/arm/configs/aspeed_defconfig
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 95c1923ce6fa..0600a7f58e8a 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -839,6 +839,9 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += \
- 	mt8127-moose.dtb \
- 	mt8135-evbp1.dtb
- dtb-$(CONFIG_ARCH_ZX) += zx296702-ad1.dtb
-+dtb-$(CONFIG_ARCH_ASPEED) += aspeed-bmc-opp-palmetto.dtb \
-+	aspeed-bmc-opp-barreleye.dtb \
-+	aspeed-bmc-opp-firestone.dtb
- endif
- 
- dtstree		:= $(srctree)/$(src)
-diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
+diff --git a/arch/arm/configs/aspeed_defconfig b/arch/arm/configs/aspeed_defconfig
 new file mode 100644
-index 000000000000..5caa7a1b55d2
+index 000000000000..eb6f413dac50
 --- /dev/null
-+++ b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-@@ -0,0 +1,21 @@
-+/dts-v1/;
-+
-+#include "ast2400.dtsi"
-+
-+/ {
-+	model = "Palmetto BMC";
-+	compatible = "tyan,palmetto-bmc", "aspeed,ast2400";
-+
-+	chosen {
-+		stdout-path = &uart5;
-+		bootargs = "console=ttyS4,38400";
-+	};
-+
-+	memory {
-+		reg = < 0x40000000 0x10000000 >;
-+	};
-+};
-+
-+&uart5 {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/ast2400.dtsi b/arch/arm/boot/dts/ast2400.dtsi
-new file mode 100644
-index 000000000000..6d22ad837fe4
---- /dev/null
-+++ b/arch/arm/boot/dts/ast2400.dtsi
-@@ -0,0 +1,152 @@
-+#include "skeleton.dtsi"
-+
-+/ {
-+	model = "Aspeed BMC";
-+	compatible = "aspeed,ast2400";
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	interrupt-parent = <&vic>;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			compatible = "arm,arm926ej-s";
-+			device_type = "cpu";
-+			reg = <0>;
-+		};
-+	};
-+
-+	aliases {
-+		serial0 = &uart1;
-+		serial1 = &uart2;
-+		serial2 = &uart3;
-+		serial3 = &uart4;
-+		serial4 = &uart5;
-+		serial5 = &uart6;
-+	};
-+
-+	clocks {
-+		clk_clkin: clk_clkin {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <48000000>;
-+		};
-+
-+	};
-+
-+	ahb {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		vic: interrupt-controller at 1e6c0080 {
-+			compatible = "aspeed,ast2400-vic";
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+			valid-sources = <0xffffffff 0x0007ffff>;
-+			reg = <0x1e6c0080 0x80>;
-+		};
-+
-+		apb {
-+			compatible = "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+
-+			clk_hpll: clk_hpll at 1e6e2070 {
-+				#clock-cells = <0>;
-+				compatible = "aspeed,ast2400-hpll-clock";
-+				reg = <0x1e6e2070 0x4>;
-+				clocks = <&clk_clkin>;
-+			};
-+
-+			clk_apb: clk_apb at 1e6e2008 {
-+				#clock-cells = <0>;
-+				compatible = "aspeed,ast2400-apb-clock";
-+				reg = <0x1e6e2008 0x4>;
-+				clocks = <&clk_hpll>;
-+			};
-+
-+			sram at 1e720000 {
-+				compatible = "mmio-sram";
-+				reg = <0x1e720000 0x8000>;	// 32K
-+			};
-+
-+			timer: timer at 1e782000 {
-+				compatible = "aspeed,ast2400-timer";
-+				reg = <0x1e782000 0x90>;
-+				// The moxart_timer driver registers only one
-+				// interrupt and assumes it's for timer 1
-+				//interrupts = <16 17 18 35 36 37 38 39>;
-+				interrupts = <16>;
-+				clocks = <&clk_apb>;
-+			};
-+
-+			uart1: serial at 1e783000 {
-+				compatible = "ns16550a";
-+				reg = <0x1e783000 0x1000>;
-+				reg-shift = <2>;
-+				interrupts = <9>;
-+				clock-frequency = <1843200>;
-+				no-loopback-test;
-+				status = "disabled";
-+			};
-+
-+			uart2: serial at 1e78d000 {
-+				compatible = "ns16550a";
-+				reg = <0x1e78d000 0x1000>;
-+				reg-shift = <2>;
-+				interrupts = <32>;
-+				clock-frequency = <1843200>;
-+				no-loopback-test;
-+				status = "disabled";
-+			};
-+
-+			uart3: serial at 1e78e000 {
-+				compatible = "ns16550a";
-+				reg = <0x1e78e000 0x1000>;
-+				reg-shift = <2>;
-+				interrupts = <33>;
-+				clock-frequency = <1843200>;
-+				no-loopback-test;
-+				status = "disabled";
-+			};
-+
-+			uart4: serial at 1e78f000 {
-+				compatible = "ns16550a";
-+				reg = <0x1e78f000 0x1000>;
-+				reg-shift = <2>;
-+				interrupts = <34>;
-+				clock-frequency = <1843200>;
-+				current-speed = <115200>;
-+				no-loopback-test;
-+				status = "disabled";
-+			};
-+
-+			uart5: serial at 1e784000 {
-+				compatible = "ns16550a";
-+				reg = <0x1e784000 0x1000>;
-+				reg-shift = <2>;
-+				interrupts = <10>;
-+				clock-frequency = <1843200>;
-+				current-speed = <38400>;
-+				no-loopback-test;
-+				status = "disabled";
-+			};
-+
-+			uart6: serial at 1e787000 {
-+				compatible = "ns16550a";
-+				reg = <0x1e787000 0x1000>;
-+				reg-shift = <2>;
-+				interrupts = <10>;
-+				clock-frequency = <1843200>;
-+				current-speed = <38400>;
-+				no-loopback-test;
-+				status = "disabled";
-+			};
-+		};
-+	};
-+};
++++ b/arch/arm/configs/aspeed_defconfig
+@@ -0,0 +1,86 @@
++CONFIG_KERNEL_XZ=y
++CONFIG_SYSVIPC=y
++CONFIG_USELIB=y
++CONFIG_IRQ_DOMAIN_DEBUG=y
++CONFIG_NO_HZ_IDLE=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_LOG_BUF_SHIFT=14
++CONFIG_CGROUPS=y
++CONFIG_BLK_DEV_INITRD=y
++# CONFIG_RD_BZIP2 is not set
++# CONFIG_RD_LZMA is not set
++# CONFIG_RD_LZO is not set
++# CONFIG_RD_LZ4 is not set
++CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++CONFIG_BPF_SYSCALL=y
++# CONFIG_SHMEM is not set
++# CONFIG_AIO is not set
++CONFIG_EMBEDDED=y
++# CONFIG_COMPAT_BRK is not set
++CONFIG_SLAB=y
++CONFIG_CC_STACKPROTECTOR_STRONG=y
++CONFIG_MODULES=y
++CONFIG_MODULE_UNLOAD=y
++# CONFIG_BLOCK is not set
++# CONFIG_ARCH_MULTI_V7 is not set
++CONFIG_ARCH_ASPEED=y
++CONFIG_MACH_OPP_PALMETTO_BMC=y
++CONFIG_DEBUG_RODATA=y
++CONFIG_AEABI=y
++CONFIG_UACCESS_WITH_MEMCPY=y
++CONFIG_SECCOMP=y
++# CONFIG_ATAGS is not set
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ZBOOT_ROM_BSS=0x0
++CONFIG_ARM_APPENDED_DTB=y
++CONFIG_ARM_ATAG_DTB_COMPAT=y
++CONFIG_KEXEC=y
++# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++# CONFIG_PREVENT_FIRMWARE_BUILD is not set
++# CONFIG_INPUT is not set
++# CONFIG_SERIO is not set
++# CONFIG_VT is not set
++# CONFIG_LEGACY_PTYS is not set
++# CONFIG_DEVKMEM is not set
++CONFIG_SERIAL_8250=y
++# CONFIG_SERIAL_8250_DEPRECATED_OPTIONS is not set
++CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_8250_NR_UARTS=6
++CONFIG_SERIAL_8250_RUNTIME_UARTS=6
++CONFIG_SERIAL_8250_EXTENDED=y
++CONFIG_SERIAL_8250_SHARE_IRQ=y
++CONFIG_SERIAL_OF_PLATFORM=y
++# CONFIG_HW_RANDOM is not set
++# CONFIG_USB_SUPPORT is not set
++# CONFIG_IOMMU_SUPPORT is not set
++CONFIG_FIRMWARE_MEMMAP=y
++CONFIG_FANOTIFY=y
++CONFIG_PRINTK_TIME=y
++CONFIG_DYNAMIC_DEBUG=y
++CONFIG_STRIP_ASM_SYMS=y
++CONFIG_PAGE_POISONING=y
++CONFIG_DEBUG_KMEMLEAK=y
++CONFIG_DEBUG_SHIRQ=y
++CONFIG_LOCKUP_DETECTOR=y
++CONFIG_WQ_WATCHDOG=y
++# CONFIG_SCHED_DEBUG is not set
++CONFIG_SCHED_STACK_END_CHECK=y
++CONFIG_DEBUG_RT_MUTEXES=y
++CONFIG_DEBUG_WW_MUTEX_SLOWPATH=y
++# CONFIG_FTRACE is not set
++CONFIG_MEMTEST=y
++CONFIG_UBSAN=y
++CONFIG_DEBUG_USER=y
++CONFIG_DEBUG_LL=y
++CONFIG_DEBUG_LL_UART_8250=y
++CONFIG_DEBUG_UART_PHYS=0x1e784000
++CONFIG_DEBUG_UART_VIRT=0xe8784000
++CONFIG_EARLY_PRINTK=y
++CONFIG_DEBUG_SET_MODULE_RONX=y
++# CONFIG_XZ_DEC_X86 is not set
++# CONFIG_XZ_DEC_POWERPC is not set
++# CONFIG_XZ_DEC_IA64 is not set
++# CONFIG_XZ_DEC_SPARC is not set
 -- 
 2.7.4
