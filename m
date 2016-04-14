@@ -1,39 +1,64 @@
-From: brian.starkey@arm.com (Brian Starkey)
-Date: Thu, 14 Apr 2016 16:39:19 +0100
-Subject: [PATCH v3 2/2] arm64: dts: Add expansion bus to Juno
-In-Reply-To: <1460648359-7310-1-git-send-email-brian.starkey@arm.com>
-References: <1460648359-7310-1-git-send-email-brian.starkey@arm.com>
-Message-ID: <1460648359-7310-2-git-send-email-brian.starkey@arm.com>
+From: jchandra@broadcom.com (Jayachandran C)
+Date: Thu, 14 Apr 2016 21:10:00 +0530
+Subject: [PATCH v2 2/4] PCI: Provide common functions for ECAM mapping
+In-Reply-To: <570C4034.20105@caviumnetworks.com>
+References: <1460414707-19153-1-git-send-email-jchandra@broadcom.com>
+ <1460414707-19153-3-git-send-email-jchandra@broadcom.com>
+ <570C4034.20105@caviumnetworks.com>
+Message-ID: <CAKc_7PWp-NJz52KJyHnqSFMW4gsyS17yb01v_p02XWmdUkeTdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Juno development platform has an external expansion bus which can
-be used for additional hardware (e.g. LogicTile Express daughterboards).
-Add this bus to the Juno base device-tree.
+On Tue, Apr 12, 2016 at 5:54 AM, David Daney <ddaney@caviumnetworks.com> wrote:
+> On 04/11/2016 03:45 PM, Jayachandran C wrote:
+>>
+>> Add config option PCI_GENERIC_ECAM and file drivers/pci/ecam.c to
+>> provide generic functions for accessing memory mapped PCI config space.
+>>
+>> The API is defined in drivers/pci/ecam.h and is written to replace the
+>> API in drivers/pci/host/pci-host-common.h. The file defines a new
+>> 'struct pci_config_window' to hold the information related to a PCI
+>> config area and its mapping. This structure is expected to be used as
+>> sysdata for controllers that have ECAM based mapping.
+>>
+>> Helper functions are provided to setup the mapping, free the mapping
+>> and to implement the map_bus method in 'struct pci_ops'
+>>
+>> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+>
+> Tested-by: David Daney <david.daney@cavium.com>
 
-Signed-off-by: Brian Starkey <brian.starkey@arm.com>
-Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
----
- arch/arm64/boot/dts/arm/juno-base.dtsi |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+I have updated the git tree (https://github.com/jchandra-brcm/linux/)
+with a branch arm64-acpi-pci-v3 . The branch has a new patch to use
+thunder ECAM ops in case of Cavium ThunderX platform when doing
+generic ACPI PCI initialization.
 
-diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
-index 68ccc39..dee2386 100644
---- a/arch/arm64/boot/dts/arm/juno-base.dtsi
-+++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
-@@ -272,3 +272,13 @@
- 
- 		/include/ "juno-motherboard.dtsi"
- 	};
-+
-+	site2: tlx at 60000000 {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0 0x60000000 0x10000000>;
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 0>;
-+		interrupt-map = <0 0 &gic 0 0 0 168 IRQ_TYPE_LEVEL_HIGH>;
-+	};
--- 
-1.7.9.5
+I am hoping that the controllers that have "ECAM with quirks" can
+use this mechanism for sharing the quirks between OF and ACPI.
+
+If you have some time to review the patch and see it works for you,
+then I can post it with the v3 of this patchset.
+
+>> ---
+>>   drivers/pci/Kconfig  |   3 ++
+>>   drivers/pci/Makefile |   2 +
+>>   drivers/pci/ecam.c   | 130
+>> +++++++++++++++++++++++++++++++++++++++++++++++++++
+>>   drivers/pci/ecam.h   |  58 +++++++++++++++++++++++
+>
+>
+> I wonder if these files should go in drivers/pci/host ...  I understand that
+> you still have to use them from drivers/pci/acpi though.
+>
+> I will let others opine on this, but could you put the contents of ecam.h
+> into include/linux/pci.h along with the  pci_generic_config_*()
+> declarations?
+>
+> If you did that, the contents of ecam.c could  go into
+> drivers/pci/access.c...
+
+Earlier discussion seems to indicated that separate ecam.c/h was
+preferred. But I agree that it may be small enough to be merged.
+
+Thanks,
+JC.
