@@ -1,49 +1,24 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 14 Apr 2016 19:38:55 +0100
-Subject: [Question] refcount of DT node
-In-Reply-To: <20160414095957.GB10273@leverpostej>
-References: <CAK7LNATFUW2KXUpFas6C_SJ0C7Qb1DWU0njLg-FCYciK2U6Oag@mail.gmail.com>
- <20160414084849.GT19428@n2100.arm.linux.org.uk>
- <20160414095957.GB10273@leverpostej>
-Message-ID: <20160414183855.GU19428@n2100.arm.linux.org.uk>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 14 Apr 2016 20:39:23 +0200
+Subject: [PATCH v5 1/2] i2c: rk3x: switch to i2c generic dt parsing
+In-Reply-To: <1458147438-62387-2-git-send-email-david.wu@rock-chips.com>
+References: <1458147438-62387-1-git-send-email-david.wu@rock-chips.com>
+ <1458147438-62387-2-git-send-email-david.wu@rock-chips.com>
+Message-ID: <20160414183922.GA2338@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 14, 2016 at 10:59:57AM +0100, Mark Rutland wrote:
-> On Thu, Apr 14, 2016 at 09:48:49AM +0100, Russell King - ARM Linux wrote:
-> > On Thu, Apr 14, 2016 at 04:47:57PM +0900, Masahiro Yamada wrote:
-> > > Hi experts.
-> > > 
-> > > My understanding of refcount of DT node is poor.
-> > 
-> > The message from DT people is... don't worry about DT node refcounting.
-> > Do whatever you want with it, they don't care whether you have correct
-> > refcounting or not.
-> > 
-> > The background behind that is that I've tried to fix the refcounting,
-> > and even had the coccinelle people generate some stuff to work on this
-> > issue, but DT people's attitude towards it is "don't bother".
-> > 
-> > So yes, people may get it wrong, but it seems it's something that DT
-> > people want ignored.
+On Thu, Mar 17, 2016 at 12:57:17AM +0800, David Wu wrote:
+> Switch to the new generic functions: i2c_parse_fw_timings().
 > 
-> I'm not sure that's quite fair; the last discussion I recall about this
-> ended up concluding that we need a better API, rather than papering over
-> problems.
+> Signed-off-by: David Wu <david.wu@rock-chips.com>
 
-Sorry, but I started out trying to get the of_node_put() stuff
-correct, and sparked Julia into doing coccinelle patches, and I
-was told by Rob that we shouldn't care about of_node_put() being
-wrong, and the feeling is as I stated it: DT folk don't care
-enough to fix the existing places, even though a great many can
-be sorted via the coccinelle approach.
+Yay, what a nice diffstat :) Applied to for-next, thanks!
 
-Their stance is not something I agree with - if we have something,
-it should be correct, even if it's not what we would ultimately
-desire, _or_ it should be removed.  This half-way house that we
-have today is total madness to me.
-
--- 
-RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160414/083d1b98/attachment.sig>
