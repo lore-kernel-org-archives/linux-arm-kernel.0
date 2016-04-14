@@ -1,32 +1,41 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 14 Apr 2016 14:51:39 -0700
-Subject: [PATCH v7 1/2] drivers: base: add support for registering
- notifier about deferred probe
-In-Reply-To: <20160414213322.GW19428@n2100.arm.linux.org.uk>
-References: <1460540160-18762-1-git-send-email-m.szyprowski@samsung.com>
- <1460540160-18762-2-git-send-email-m.szyprowski@samsung.com>
- <20160413141254.GB12749@kroah.com> <570F4886.20203@samsung.com>
- <20160414211745.GA27692@kroah.com>
- <20160414213322.GW19428@n2100.arm.linux.org.uk>
-Message-ID: <20160414215139.GA11535@kroah.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 14 Apr 2016 23:15:22 +0100
+Subject: [PATCH 0/2] ARM: keystone: Enable CPU hotplug
+In-Reply-To: <20160405113325.GF19428@n2100.arm.linux.org.uk>
+References: <1459794543-4822-1-git-send-email-j-keerthy@ti.com>
+ <57031F5F.3020300@oracle.com>
+ <20160405113325.GF19428@n2100.arm.linux.org.uk>
+Message-ID: <20160414221522.GX19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 14, 2016 at 10:33:22PM +0100, Russell King - ARM Linux wrote:
-> The problem that's being addressed here is that there's no way at the
-> moment to know when the drivers on a different bus (namely the platform
-> bus) have probed and are providing the clock and power domain resources
-> necessary to be able to read these identifying values.
-> 
-> I guess if you don't like a notifier, the other alternative is to
-> setup a delayed workqueue and have the workqueue repeatedly attempt
-> to register the devices until they all succeed.  That's not
-> particularly nice, because we'd be wasting CPU cycles running
-> that workqueue for no reason until all the devices get registered.
+On Tue, Apr 05, 2016 at 12:33:25PM +0100, Russell King - ARM Linux wrote:
+> Now... if we could get the damn CPU fan under control, I might be
+> able to stand leaving the board powered on for longer, instead of
+> reaching for the power plug at the earliest possibility!
 
-I like that idea, it handles the issue of this crazy hardware where it
-belongs, in that bus subsystem :)
+This evening, I've received a complaint about the noise of the fan,
+which can be heard throughout the house.
 
-thanks,
+PLEASE can we sort something out about this damned fan?  I know that
+there's a PWM control of it, so let's get it more under control.  If
+no one is interested in writing a driver for it, then please supply
+me with the information so that I can sort this out, and stop it
+being so annoying.
 
-greg k-h
+Like I've said above, right now the board doesn't stay on for very
+long, and it's actually a very big _demotivator_ to powering the
+board on.
+
+This board is also *never* going anywhere near my boot farm because
+it's just too damned noisy to be powered up during the night, even
+if we do get the fan more under control once the kernel is running.
+
+If that's not enough to get some help with this, I'll instead snip
+the fan wire and solder a resistor in series with the fan to slow
+the damned thing down to reduce the noise level.
+
+-- 
+RMK's Patch system: http://www.arm.linux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
