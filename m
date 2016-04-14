@@ -1,43 +1,73 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 14 Apr 2016 14:20:54 +0100
-Subject: [PATCH v2 06/17] kvm-arm: Remove kvm_pud_huge()
+Date: Thu, 14 Apr 2016 14:21:05 +0100
+Subject: [PATCH v2 17/17] arm64: kvm: Add support for 16K pages
 In-Reply-To: <1460640065-27658-1-git-send-email-suzuki.poulose@arm.com>
 References: <1460640065-27658-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1460640065-27658-7-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1460640065-27658-18-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Get rid of kvm_pud_huge() which falls back to pud_huge. Use
-pud_huge instead.
+Now that we can handle stage-2 page tables independent
+of the host page table levels, wire up the 16K page
+support.
 
 Cc: Marc Zyngier <marc.zyngier@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm/kvm/mmu.c |    4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ arch/arm64/include/asm/kvm_arm.h |   13 +++++++++++--
+ arch/arm64/kvm/Kconfig           |    1 -
+ 2 files changed, 11 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 7837f0a..d0c0ee9 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -45,8 +45,6 @@ static phys_addr_t hyp_idmap_vector;
- 
- #define hyp_pgd_order get_order(PTRS_PER_PGD * sizeof(pgd_t))
- 
--#define kvm_pud_huge(_x)	pud_huge(_x)
--
- #define KVM_S2PTE_FLAG_IS_IOMAP		(1UL << 0)
- #define KVM_S2_FLAG_LOGGING_ACTIVE	(1UL << 1)
- 
-@@ -1077,7 +1075,7 @@ static void  stage2_wp_puds(pgd_t *pgd, phys_addr_t addr, phys_addr_t end)
- 		next = kvm_pud_addr_end(addr, end);
- 		if (!pud_none(*pud)) {
- 			/* TODO:PUD not supported, revisit later if supported */
--			BUG_ON(kvm_pud_huge(*pud));
-+			BUG_ON(pud_huge(*pud));
- 			stage2_wp_pmds(pud, addr, next);
- 		}
- 	} while (pud++, addr = next, addr != end);
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index 1281d98..c6cbb36 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -114,6 +114,7 @@
+ #define VTCR_EL2_PS_MASK	TCR_EL2_PS_MASK
+ #define VTCR_EL2_TG0_MASK	TCR_TG0_MASK
+ #define VTCR_EL2_TG0_4K		TCR_TG0_4K
++#define VTCR_EL2_TG0_16K	TCR_TG0_16K
+ #define VTCR_EL2_TG0_64K	TCR_TG0_64K
+ #define VTCR_EL2_SH0_MASK	TCR_SH0_MASK
+ #define VTCR_EL2_SH0_INNER	TCR_SH0_INNER
+@@ -139,7 +140,7 @@
+  * (see hyp-init.S).
+  *
+  * Note that when using 4K pages, we concatenate two first level page tables
+- * together.
++ * together. With 16K pages, we concatenate 16 first level page tables.
+  *
+  * The magic numbers used for VTTBR_X in this patch can be found in Tables
+  * D4-23 and D4-25 in ARM DDI 0487A.b.
+@@ -157,7 +158,15 @@
+  */
+ #define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_64K | VTCR_EL2_SL0_LVL1)
+ #define VTTBR_X_TGRAN_MAGIC		38
+-#else
++#elif defined(CONFIG_ARM64_16K_PAGES)
++/*
++ * Stage2 translation configuration:
++ * 16kB pages (TG0 = 2)
++ * 2 level page tables (SL = 1)
++ */
++#define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_16K | VTCR_EL2_SL0_LVL1)
++#define VTTBR_X_TGRAN_MAGIC		42
++#else	/* 4K */
+ /*
+  * Stage2 translation configuration:
+  * 4kB pages (TG0 = 0)
+diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+index de7450d..aa2e34e 100644
+--- a/arch/arm64/kvm/Kconfig
++++ b/arch/arm64/kvm/Kconfig
+@@ -22,7 +22,6 @@ config KVM_ARM_VGIC_V3
+ config KVM
+ 	bool "Kernel-based Virtual Machine (KVM) support"
+ 	depends on OF
+-	depends on !ARM64_16K_PAGES
+ 	select MMU_NOTIFIER
+ 	select PREEMPT_NOTIFIERS
+ 	select ANON_INODES
 -- 
 1.7.9.5
