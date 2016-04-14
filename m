@@ -1,120 +1,51 @@
-From: brian.starkey@arm.com (Brian Starkey)
-Date: Thu, 14 Apr 2016 16:39:18 +0100
-Subject: [PATCH v3 1/2] ARM: dts: Add expansion bus to VExpress
-Message-ID: <1460648359-7310-1-git-send-email-brian.starkey@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 14 Apr 2016 16:48:40 +0100
+Subject: [PATCH v4 0/2] ARM64: Enable SP805 WDT support for FSL LS2080A
+In-Reply-To: <1451296884-7932-1-git-send-email-bhupesh.sharma@freescale.com>
+References: <1451296884-7932-1-git-send-email-bhupesh.sharma@freescale.com>
+Message-ID: <570FBBD8.4030704@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The VExpress development platform has an external expansion bus which
-can be used for additional hardware (e.g. LogicTile Express
-daughterboards).
-Add this bus to the VExpress CoreTile device-trees.
+Hi Bhupesh,
 
-The bus is described for a CoreTile occupying site 1.
+On 28/12/15 10:01, Bhupesh Sharma wrote:
+> Hi Arnd, Kevin, Olof
+> 
+> This is the v4 of patchset which adds the support for SP805 WDT on FSL LS2080A
+> and also adds the missing documentation of SP805 WDT device-tree bindings.
+> 
+> Rebased against arm-soc/next/dt
+> 
+> Changes since v3:
+> (v3 can be viewed here: https://www.mail-archive.com/devicetree at vger.kernel.org/msg97249.html)
+> - Added Rob's Acked-by for patch 1/2.
+> - Sending to 'arm at kernel.org' list and also cc'ed Shawn Guo
+> 
+> Changes since v2:
+> (v2 can be viewed here: http://permalink.gmane.org/gmane.linux.ports.arm.kernel/463141)
+> - Addressed Rob's comments regarding the second mandatory CLK source's
+>   (WDOGCLK) name in the bindings.
+> 
+> Changes since v1:
+> (v1 can be viewed here: http://www.spinics.net/lists/devicetree/msg102487.html)
+> 
+> - Addressed Rob and Mark's comments regarding the mandatory CLK sources
+> - Removed interrupt property from the bindings for now (as discussed
+>   with Mark on IRC) till Will's patch proceeds further and enables
+>   handling the WDOG interrupts for each core connected to the same PPI
+>   line (http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/391616.html)
 
-Signed-off-by: Brian Starkey <brian.starkey@arm.com>
-Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
----
+Will just pointed me to this series. I've recently posted a set of
+patches that should be able to deal with the quirkiness of your HW with
+regards to PPIs:
 
-Changes since v2:
- - Split into ARM and arm64 patches (Sudeep)
+http://thread.gmane.org/gmane.linux.drivers.devicetree/163464
 
-Changes since v1:
- - Reword commit message (Liviu)
+Could you please let me know if this works for you?
 
- arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts |   13 +++++++++++++
- arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts  |   13 +++++++++++++
- arch/arm/boot/dts/vexpress-v2p-ca5s.dts     |   13 +++++++++++++
- arch/arm/boot/dts/vexpress-v2p-ca9.dts      |   13 +++++++++++++
- 4 files changed, 52 insertions(+)
+Thanks,
 
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
-index 9420053..ec7539b 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
-@@ -280,4 +280,17 @@
- 
- 		/include/ "vexpress-v2m-rs1.dtsi"
- 	};
-+
-+	site2: hsb at 40000000 {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0 0x40000000 0x3fef0000>;
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 3>;
-+		interrupt-map = <0 0 &gic 0 36 4>,
-+				<0 1 &gic 0 37 4>,
-+				<0 2 &gic 0 38 4>,
-+				<0 3 &gic 0 39 4>;
-+	};
- };
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-index 17f63f7..a339b0c 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-@@ -638,4 +638,17 @@
- 
- 		/include/ "vexpress-v2m-rs1.dtsi"
- 	};
-+
-+	site2: hsb at 40000000 {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0 0x40000000 0x3fef0000>;
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 3>;
-+		interrupt-map = <0 0 &gic 0 36 4>,
-+				<0 1 &gic 0 37 4>,
-+				<0 2 &gic 0 38 4>,
-+				<0 3 &gic 0 39 4>;
-+	};
- };
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
-index d2709b7..76a9ccb 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
-@@ -250,4 +250,17 @@
- 
- 		/include/ "vexpress-v2m-rs1.dtsi"
- 	};
-+
-+	site2: hsb at 40000000 {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0x40000000 0x40000000>;
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 3>;
-+		interrupt-map = <0 0 &gic 0 36 4>,
-+				<0 1 &gic 0 37 4>,
-+				<0 2 &gic 0 38 4>,
-+				<0 3 &gic 0 39 4>;
-+	};
- };
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-index d949fac..edac212 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
-@@ -359,4 +359,17 @@
- 
- 		/include/ "vexpress-v2m.dtsi"
- 	};
-+
-+	site2: hsb at e0000000 {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0xe0000000 0x20000000>;
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 3>;
-+		interrupt-map = <0 0 &gic 0 36 4>,
-+				<0 1 &gic 0 37 4>,
-+				<0 2 &gic 0 38 4>,
-+				<0 3 &gic 0 39 4>;
-+	};
- };
+	M.
 -- 
-1.7.9.5
+Jazz is not dead. It just smells funny...
