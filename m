@@ -1,38 +1,44 @@
-From: yang.shi@linaro.org (Yang Shi)
-Date: Wed, 13 Apr 2016 17:54:12 -0700
-Subject: [PATCH] arm64: Kconfig: make SCHED_MC and SCHED_SMT depend on SMP
-Message-ID: <1460595252-2330-1-git-send-email-yang.shi@linaro.org>
+From: chunfeng.yun@mediatek.com (chunfeng yun)
+Date: Thu, 14 Apr 2016 09:43:16 +0800
+Subject: [PATCH v2 1/2] dt-bindings: phy-mt65xx-usb: add support for
+ mt2701 platform
+In-Reply-To: <570E18B3.2000101@gmail.com>
+References: <1460360490-18606-1-git-send-email-chunfeng.yun@mediatek.com>
+ <570E18B3.2000101@gmail.com>
+Message-ID: <1460598196.5156.0.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SCHED_MC and SCHED_SMT are pointless when SMP is disabled.
-Although SMP is rarely disabled for ARM64, it looks more consistent to have
-such depend in Kconfig.
+Hi,
 
-Signed-off-by: Yang Shi <yang.shi@linaro.org>
----
- arch/arm64/Kconfig | 2 ++
- 1 file changed, 2 insertions(+)
+On Wed, 2016-04-13 at 12:00 +0200, Matthias Brugger wrote:
+> 
+> On 11/04/16 09:41, Chunfeng Yun wrote:
+> > A new compatible string, "mediatek,mt2701-u3phy", is added.
+> >
+> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> > ---
+> >   .../devicetree/bindings/phy/phy-mt65xx-usb.txt     |    4 +++-
+> >   1 file changed, 3 insertions(+), 1 deletion(-)
+> >
+> 
+> Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+> 
+Thanks
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 4f43622..e5de825 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -521,6 +521,7 @@ config CPU_BIG_ENDIAN
- 
- config SCHED_MC
- 	bool "Multi-core scheduler support"
-+	depends on SMP
- 	help
- 	  Multi-core scheduler support improves the CPU scheduler's decision
- 	  making when dealing with multi-core CPU chips at a cost of slightly
-@@ -528,6 +529,7 @@ config SCHED_MC
- 
- config SCHED_SMT
- 	bool "SMT scheduler support"
-+	depends on SMP
- 	help
- 	  Improves the CPU scheduler's decision making when dealing with
- 	  MultiThreading at a cost of slightly increased overhead in some
--- 
-2.0.2
+> > diff --git a/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt b/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
+> > index 00100cf..33a2b1e 100644
+> > --- a/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
+> > +++ b/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
+> > @@ -4,7 +4,9 @@ mt65xx USB3.0 PHY binding
+> >   This binding describes a usb3.0 phy for mt65xx platforms of Medaitek SoC.
+> >
+> >   Required properties (controller (parent) node):
+> > - - compatible	: should be "mediatek,mt8173-u3phy"
+> > + - compatible	: should be one of
+> > +		  "mediatek,mt2701-u3phy"
+> > +		  "mediatek,mt8173-u3phy"
+> >    - reg		: offset and length of register for phy, exclude port's
+> >   		  register.
+> >    - clocks	: a list of phandle + clock-specifier pairs, one for each
+> >
