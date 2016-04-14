@@ -1,223 +1,142 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Thu, 14 Apr 2016 19:17:44 +0930
-Subject: [PATCH 4/9] clocksource/moxart: Generalise timer for use on other socs
+Date: Thu, 14 Apr 2016 19:17:46 +0930
+Subject: [PATCH 6/9] drivers/clk: Add Aspeed clock driver
 In-Reply-To: <1460627269-21721-1-git-send-email-joel@jms.id.au>
 References: <1460627269-21721-1-git-send-email-joel@jms.id.au>
-Message-ID: <1460627269-21721-5-git-send-email-joel@jms.id.au>
+Message-ID: <1460627269-21721-7-git-send-email-joel@jms.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The moxart timer IP is shared with another soc made by Aspeed.
-Generalise the registers that differ so the same driver can be used for
-both.
-
-As we now depend on CLKSRC_MMIO, create a Kconfig symbol for the driver
-so we can express this dependency.
+A simple driver to create fixed rate clock devices for the host pll and
+peripheral clock.
 
 Signed-off-by: Joel Stanley <joel@jms.id.au>
 ---
- .../bindings/timer/moxa,moxart-timer.txt           |  4 +-
- drivers/clocksource/Kconfig                        |  6 ++
- drivers/clocksource/Makefile                       |  2 +-
- drivers/clocksource/moxart_timer.c                 | 90 +++++++++++++++++-----
- 4 files changed, 79 insertions(+), 23 deletions(-)
+ drivers/clk/Makefile     |   1 +
+ drivers/clk/clk-aspeed.c | 106 +++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 107 insertions(+)
+ create mode 100644 drivers/clk/clk-aspeed.c
 
-diff --git a/Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt b/Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt
-index da2d510cae47..4569757142f8 100644
---- a/Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt
-+++ b/Documentation/devicetree/bindings/timer/moxa,moxart-timer.txt
-@@ -2,7 +2,9 @@ MOXA ART timer
- 
- Required properties:
- 
--- compatible : Must be "moxa,moxart-timer"
-+- compatible : Must be one of
-+     - "moxa,moxart-timer"
-+     - "aspeed,ast2400-timer"
- - reg : Should contain registers location and length
- - interrupts : Should contain the timer interrupt number
- - clocks : Should contain phandle for the clock that drives the counter
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index c346be650892..b14ac4db6961 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -411,4 +411,10 @@ config CLKSRC_ST_LPC
- 	  Enable this option to use the Low Power controller timer
- 	  as clocksource.
- 
-+config MOXART_TIMER
-+	def_bool ARCH_MOXART || ARCH_ASPEED
-+	depends on ARM && OF
-+	select CLKSRC_OF
-+	select CLKSRC_MMIO
-+
- endmenu
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index dc2b8997f6e6..14fe8172c174 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -22,7 +22,7 @@ obj-$(CONFIG_ORION_TIMER)	+= time-orion.o
- obj-$(CONFIG_ARCH_BCM2835)	+= bcm2835_timer.o
- obj-$(CONFIG_ARCH_CLPS711X)	+= clps711x-timer.o
- obj-$(CONFIG_ARCH_ATLAS7)	+= timer-atlas7.o
--obj-$(CONFIG_ARCH_MOXART)	+= moxart_timer.o
-+obj-$(CONFIG_MOXART_TIMER)	+= moxart_timer.o
- obj-$(CONFIG_ARCH_MXS)		+= mxs_timer.o
- obj-$(CONFIG_CLKSRC_PXA)	+= pxa_timer.o
- obj-$(CONFIG_ARCH_PRIMA2)	+= timer-prima2.o
-diff --git a/drivers/clocksource/moxart_timer.c b/drivers/clocksource/moxart_timer.c
-index 19857af651c1..47ecef0725bd 100644
---- a/drivers/clocksource/moxart_timer.c
-+++ b/drivers/clocksource/moxart_timer.c
-@@ -36,45 +36,66 @@
- #define TIMER_INTR_MASK		0x38
- 
- /*
-- * TIMER_CR flags:
-+ * Moxart TIMER_CR flags:
-  *
-  * TIMEREG_CR_*_CLOCK	0: PCLK, 1: EXT1CLK
-  * TIMEREG_CR_*_INT	overflow interrupt enable bit
-  */
--#define TIMEREG_CR_1_ENABLE	BIT(0)
--#define TIMEREG_CR_1_CLOCK	BIT(1)
--#define TIMEREG_CR_1_INT	BIT(2)
--#define TIMEREG_CR_2_ENABLE	BIT(3)
--#define TIMEREG_CR_2_CLOCK	BIT(4)
--#define TIMEREG_CR_2_INT	BIT(5)
--#define TIMEREG_CR_3_ENABLE	BIT(6)
--#define TIMEREG_CR_3_CLOCK	BIT(7)
--#define TIMEREG_CR_3_INT	BIT(8)
--#define TIMEREG_CR_COUNT_UP	BIT(9)
--
--#define TIMER1_ENABLE		(TIMEREG_CR_2_ENABLE | TIMEREG_CR_1_ENABLE)
--#define TIMER1_DISABLE		(TIMEREG_CR_2_ENABLE)
-+#define MOXART_CR_1_ENABLE	BIT(0)
-+#define MOXART_CR_1_CLOCK	BIT(1)
-+#define MOXART_CR_1_INT		BIT(2)
-+#define MOXART_CR_2_ENABLE	BIT(3)
-+#define MOXART_CR_2_CLOCK	BIT(4)
-+#define MOXART_CR_2_INT		BIT(5)
-+#define MOXART_CR_3_ENABLE	BIT(6)
-+#define MOXART_CR_3_CLOCK	BIT(7)
-+#define MOXART_CR_3_INT		BIT(8)
-+#define MOXART_CR_COUNT_UP	BIT(9)
-+
-+#define MOXART_TIMER1_ENABLE	(MOXART_CR_2_ENABLE | MOXART_CR_1_ENABLE)
-+#define MOXART_TIMER1_DISABLE	(MOXART_CR_2_ENABLE)
-+
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index 46869d696e4d..b375d10a9423 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -84,3 +84,4 @@ obj-$(CONFIG_X86)			+= x86/
+ obj-$(CONFIG_ARCH_ZX)			+= zte/
+ obj-$(CONFIG_ARCH_ZYNQ)			+= zynq/
+ obj-$(CONFIG_H8300)		+= h8300/
++obj-$(CONFIG_ARCH_ASPEED)		+= clk-aspeed.o
+diff --git a/drivers/clk/clk-aspeed.c b/drivers/clk/clk-aspeed.c
+new file mode 100644
+index 000000000000..46e3e62b7420
+--- /dev/null
++++ b/drivers/clk/clk-aspeed.c
+@@ -0,0 +1,106 @@
 +/*
-+ * The ASpeed variant of the IP block has a different layout
-+ * for the control register
++ * Copyright 2016 IBM Corporation
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version
++ * 2 of the License, or (at your option) any later version.
 + */
-+#define ASPEED_CR_1_ENABLE	BIT(0)
-+#define ASPEED_CR_1_CLOCK	BIT(1)
-+#define ASPEED_CR_1_INT		BIT(2)
-+#define ASPEED_CR_2_ENABLE	BIT(4)
-+#define ASPEED_CR_2_CLOCK	BIT(5)
-+#define ASPEED_CR_2_INT		BIT(6)
-+#define ASPEED_CR_3_ENABLE	BIT(8)
-+#define ASPEED_CR_3_CLOCK	BIT(9)
-+#define ASPEED_CR_3_INT		BIT(10)
 +
-+#define ASPEED_TIMER1_ENABLE	(ASPEED_CR_2_ENABLE | ASPEED_CR_1_ENABLE)
-+#define ASPEED_TIMER1_DISABLE	(ASPEED_CR_2_ENABLE)
- 
- static void __iomem *base;
- static unsigned int clock_count_per_tick;
-+static unsigned int t1_disable_val, t1_enable_val;
- 
- static int moxart_shutdown(struct clock_event_device *evt)
- {
--	writel(TIMER1_DISABLE, base + TIMER_CR);
-+	writel(t1_disable_val, base + TIMER_CR);
- 	return 0;
- }
- 
- static int moxart_set_oneshot(struct clock_event_device *evt)
- {
--	writel(TIMER1_DISABLE, base + TIMER_CR);
-+	writel(t1_disable_val, base + TIMER_CR);
- 	writel(~0, base + TIMER1_BASE + REG_LOAD);
- 	return 0;
- }
- 
- static int moxart_set_periodic(struct clock_event_device *evt)
- {
-+	writel(t1_disable_val, base + TIMER_CR);
- 	writel(clock_count_per_tick, base + TIMER1_BASE + REG_LOAD);
--	writel(TIMER1_ENABLE, base + TIMER_CR);
-+	writel(0, base + TIMER1_BASE + REG_MATCH1);
-+	writel(t1_enable_val, base + TIMER_CR);
++#include <linux/clk.h>
++#include <linux/clk-provider.h>
++#include <linux/io.h>
++#include <linux/of_address.h>
++#include <linux/clkdev.h>
 +
- 	return 0;
- }
- 
-@@ -83,12 +104,12 @@ static int moxart_clkevt_next_event(unsigned long cycles,
- {
- 	u32 u;
- 
--	writel(TIMER1_DISABLE, base + TIMER_CR);
-+	writel(t1_disable_val, base + TIMER_CR);
- 
- 	u = readl(base + TIMER1_BASE + REG_COUNT) - cycles;
- 	writel(u, base + TIMER1_BASE + REG_MATCH1);
- 
--	writel(TIMER1_ENABLE, base + TIMER_CR);
-+	writel(t1_enable_val, base + TIMER_CR);
- 
- 	return 0;
- }
-@@ -119,7 +140,7 @@ static struct irqaction moxart_timer_irq = {
- 	.dev_id		= &moxart_clockevent,
- };
- 
--static void __init moxart_timer_init(struct device_node *node)
-+static void __init __moxart_timer_init(struct device_node *node)
- {
- 	int ret, irq;
- 	unsigned long pclk;
-@@ -150,8 +171,19 @@ static void __init moxart_timer_init(struct device_node *node)
- 
- 	clock_count_per_tick = DIV_ROUND_CLOSEST(pclk, HZ);
- 
-+	/* Clear match registers */
-+	writel(0, base + TIMER1_BASE + REG_MATCH1);
-+	writel(0, base + TIMER1_BASE + REG_MATCH2);
-+	writel(0, base + TIMER2_BASE + REG_MATCH1);
-+	writel(0, base + TIMER2_BASE + REG_MATCH2);
-+
-+	/* Start timer 2 rolling as our main wall clock source, keep timer 1
-+	 * disabled
-+	 */
-+	writel(0, base + TIMER_CR);
- 	writel(~0, base + TIMER2_BASE + REG_LOAD);
--	writel(TIMEREG_CR_2_ENABLE, base + TIMER_CR);
-+	writel(t1_disable_val, base + TIMER_CR);
-+
- 
- 	moxart_clockevent.cpumask = cpumask_of(0);
- 	moxart_clockevent.irq = irq;
-@@ -165,4 +197,20 @@ static void __init moxart_timer_init(struct device_node *node)
- 	clockevents_config_and_register(&moxart_clockevent, pclk,
- 					0x4, 0xfffffffe);
- }
-+
-+static void __init moxart_timer_init(struct device_node *node)
++static void __init aspeed_of_hpll_clk_init(struct device_node *node)
 +{
-+	t1_enable_val = MOXART_TIMER1_ENABLE;
-+	t1_disable_val = MOXART_TIMER1_DISABLE;
-+	__moxart_timer_init(node);
-+}
++	struct clk *clk, *clkin_clk;
++	void __iomem *base;
++	int reg, rate, clkin;
++	const char *name = node->name;
++	const char *parent_name;
++	const int rates[][4] = {
++		{384, 360, 336, 408},
++		{400, 375, 350, 425},
++	};
 +
-+static void __init aspeed_timer_init(struct device_node *node)
++	of_property_read_string(node, "clock-output-names", &name);
++	parent_name = of_clk_get_parent_name(node, 0);
++
++	base = of_iomap(node, 0);
++	if (!base) {
++		pr_err("%s: of_iomap failed\n", node->full_name);
++		return;
++	}
++	reg = readl(base) >> 8 & 0x2;
++	iounmap(base);
++
++	clkin_clk = of_clk_get(node, 0);
++	if (IS_ERR(clkin_clk)) {
++		pr_err("%s: of_clk_get failed\n", node->full_name);
++		return;
++	}
++
++	clkin = clk_get_rate(clkin_clk);
++
++	if (clkin == 48000000 || clkin == 24000000)
++		rate = rates[0][reg] * 1000000;
++	else if (clkin == 25000000)
++		rate = rates[1][reg] * 1000000;
++	else {
++		pr_err("%s: unknown clkin frequency %dHz\n",
++				node->full_name, clkin);
++		BUG();
++	}
++
++	clk = clk_register_fixed_rate(NULL, name, parent_name, 0, rate);
++	if (IS_ERR(clk)) {
++		pr_err("%s: failed to register clock\n", node->full_name);
++		return;
++	}
++
++	clk_register_clkdev(clk, NULL, name);
++	of_clk_add_provider(node, of_clk_src_simple_get, clk);
++}
++CLK_OF_DECLARE(aspeed_hpll_clock, "aspeed,ast2400-hpll-clock",
++	       aspeed_of_hpll_clk_init);
++
++static void __init aspeed_of_apb_clk_init(struct device_node *node)
 +{
-+	t1_enable_val = ASPEED_TIMER1_ENABLE;
-+	t1_disable_val = ASPEED_TIMER1_DISABLE;
-+	__moxart_timer_init(node);
-+}
++	struct clk *clk, *pll_clk;
++	void __iomem *base;
++	int reg, rate;
++	const char *name = node->name;
++	const char *parent_name;
 +
- CLOCKSOURCE_OF_DECLARE(moxart, "moxa,moxart-timer", moxart_timer_init);
-+CLOCKSOURCE_OF_DECLARE(aspeed, "aspeed,ast2400-timer", aspeed_timer_init);
++	of_property_read_string(node, "clock-output-names", &name);
++	parent_name = of_clk_get_parent_name(node, 0);
++
++	base = of_iomap(node, 0);
++	if (!base) {
++		pr_err("%s: of_iomap failed\n", node->full_name);
++		return;
++	}
++	reg = readl(base) >> 23 & 0x3;
++	iounmap(base);
++
++	pll_clk = of_clk_get(node, 0);
++	if (IS_ERR(pll_clk)) {
++		pr_err("%s: of_clk_get failed\n", node->full_name);
++		return;
++	}
++
++	rate = clk_get_rate(pll_clk) / (2 + 2 * reg);
++
++	clk = clk_register_fixed_rate(NULL, name, parent_name, 0, rate);
++	if (IS_ERR(clk)) {
++		pr_err("%s: failed to register clock\n", node->full_name);
++		return;
++	}
++
++	clk_register_clkdev(clk, NULL, name);
++	of_clk_add_provider(node, of_clk_src_simple_get, clk);
++}
++CLK_OF_DECLARE(aspeed_apb_clock, "aspeed,ast2400-apb-clock",
++	       aspeed_of_apb_clk_init);
 -- 
 2.7.4
