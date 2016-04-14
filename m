@@ -1,65 +1,97 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 14 Apr 2016 12:22:59 -0500
-Subject: [PATCH 2/5] serial: imx: Use generic uart-has-rtscts DT property
-In-Reply-To: <1460636003-3011-3-git-send-email-geert+renesas@glider.be>
-References: <1460636003-3011-1-git-send-email-geert+renesas@glider.be>
- <1460636003-3011-3-git-send-email-geert+renesas@glider.be>
-Message-ID: <20160414172259.GA16348@rob-hp-laptop>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 14 Apr 2016 18:25:35 +0100
+Subject: [RFC PATCH 03/11] drivers: iommu: add FWNODE_IOMMU fwnode type
+In-Reply-To: <1460654743-7896-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1460654743-7896-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1460654743-7896-4-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 14, 2016 at 02:13:20PM +0200, Geert Uytterhoeven wrote:
-> Convert the Freescale IMX UART driver from using the vendor-specific
-> "fsl,uart-has-rtscts" to the generic "uart-has-rtscts" DT property, as
-> documented by the Generic Serial DT Bindings.
-> 
-> The old vendor-specific property is still recognized by the driver for
-> backwards compatibility, but deprecated.
+On systems booting with a device tree, every struct device is
+associated with a struct device_node, that represents its DT
+representation. The device node can be used in generic kernel
+contexts (eg IRQ translation, IOMMU streamid mapping), to
+retrieve the properties associated with the device and carry
+out kernel operation accordingly. Owing to the 1:1 relationship
+between the device and its device_node, the device_node can also
+be used as a look-up token for the device (eg looking up a device
+through its device_node), to retrieve the device in kernel paths
+where the device_node is available.
 
-You should update the dts files as well.
+On systems booting with ACPI, the same abstraction provided by
+the device_node is required to provide:
 
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
->  Documentation/devicetree/bindings/serial/fsl-imx-uart.txt | 4 ++--
->  drivers/tty/serial/imx.c                                  | 3 ++-
->  2 files changed, 4 insertions(+), 3 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/serial/fsl-imx-uart.txt b/Documentation/devicetree/bindings/serial/fsl-imx-uart.txt
-> index ed94c217c98d18a6..1e82802d8e322db5 100644
-> --- a/Documentation/devicetree/bindings/serial/fsl-imx-uart.txt
-> +++ b/Documentation/devicetree/bindings/serial/fsl-imx-uart.txt
-> @@ -6,7 +6,7 @@ Required properties:
->  - interrupts : Should contain uart interrupt
->  
->  Optional properties:
-> -- fsl,uart-has-rtscts : Indicate the uart has rts and cts
-> +- uart-has-rtscts : Indicate the uart has rts and cts
->  - fsl,irda-mode : Indicate the uart supports irda mode
->  - fsl,dte-mode : Indicate the uart works in DTE mode. The uart works
->                    in DCE mode by default.
-> @@ -24,6 +24,6 @@ uart1: serial at 73fbc000 {
->  	compatible = "fsl,imx51-uart", "fsl,imx21-uart";
->  	reg = <0x73fbc000 0x4000>;
->  	interrupts = <31>;
-> -	fsl,uart-has-rtscts;
-> +	uart-has-rtscts;
->  	fsl,dte-mode;
->  };
-> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-> index 231e7d5caf6c1845..9fc09d3de1e2428b 100644
-> --- a/drivers/tty/serial/imx.c
-> +++ b/drivers/tty/serial/imx.c
-> @@ -1927,7 +1927,8 @@ static int serial_imx_probe_dt(struct imx_port *sport,
->  	}
->  	sport->port.line = ret;
->  
-> -	if (of_get_property(np, "fsl,uart-has-rtscts", NULL))
-> +	if (of_get_property(np, "uart-has-rtscts", NULL) ||
-> +	    of_get_property(np, "fsl,uart-has-rtscts", NULL) /* deprecated */)
->  		sport->have_rtscts = 1;
->  
->  	if (of_get_property(np, "fsl,dte-mode", NULL))
-> -- 
-> 1.9.1
-> 
+- Look-up functionality
+- Identify the device in kernel functions that must be firmware
+  agnostic (eg IOMMU of_xlate() callbacks)
+
+Therefore, mirroring the approach implemented in the IRQ domain
+kernel layer, this patch adds an additional fwnode type FWNODE_IOMMU.
+
+This patch also implements a glue kernel layer that allows to
+allocate/free FWNODE_IOMMU fwnode_handle structures and associate
+them with IOMMU devices.
+
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Joerg Roedel <joro@8bytes.org>
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+---
+ include/linux/fwnode.h |  1 +
+ include/linux/iommu.h  | 25 +++++++++++++++++++++++++
+ 2 files changed, 26 insertions(+)
+
+diff --git a/include/linux/fwnode.h b/include/linux/fwnode.h
+index 8516717..6e10050 100644
+--- a/include/linux/fwnode.h
++++ b/include/linux/fwnode.h
+@@ -19,6 +19,7 @@ enum fwnode_type {
+ 	FWNODE_ACPI_DATA,
+ 	FWNODE_PDATA,
+ 	FWNODE_IRQCHIP,
++	FWNODE_IOMMU,
+ };
+ 
+ struct fwnode_handle {
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index a5c539f..0bba25e 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -37,6 +37,7 @@ struct bus_type;
+ struct device;
+ struct iommu_domain;
+ struct notifier_block;
++struct fwnode_handle;
+ 
+ /* iommu fault flags */
+ #define IOMMU_FAULT_READ	0x0
+@@ -542,4 +543,28 @@ static inline void iommu_device_unlink(struct device *dev, struct device *link)
+ 
+ #endif /* CONFIG_IOMMU_API */
+ 
++/* IOMMU fwnode handling */
++static inline bool is_fwnode_iommu(struct fwnode_handle *fwnode)
++{
++	return fwnode && fwnode->type == FWNODE_IOMMU;
++}
++
++static inline struct fwnode_handle *iommu_alloc_fwnode(void)
++{
++	struct fwnode_handle *fwnode;
++
++	fwnode = kzalloc(sizeof(struct fwnode_handle), GFP_KERNEL);
++	fwnode->type = FWNODE_IOMMU;
++
++	return fwnode;
++}
++
++static inline void iommu_free_fwnode(struct fwnode_handle *fwnode)
++{
++	if (WARN_ON(!is_fwnode_iommu(fwnode)))
++		return;
++
++	kfree(fwnode);
++}
++
+ #endif /* __LINUX_IOMMU_H */
+-- 
+2.6.4
