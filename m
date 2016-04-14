@@ -1,66 +1,118 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Thu, 14 Apr 2016 10:29:16 +0530
-Subject: [PATCH v2] pinctrl: pinctrl-single: Fix
- pcs_parse_bits_in_pinctrl_entry to use __ffs than ffs
-Message-ID: <1460609956-26539-1-git-send-email-j-keerthy@ti.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 14 Apr 2016 14:10:17 +0900
+Subject: [PATCH v8 02/20] PM / devfreq: exynos: Add documentation for
+ generic exynos bus frequency driver
+In-Reply-To: <CAGTfZH2u69aSyCFuq+v1eHh7iNeSU3WP4Wh+Qx_af6-o0LozNw@mail.gmail.com>
+References: <1460089509-16260-1-git-send-email-cw00.choi@samsung.com>
+ <1460089509-16260-3-git-send-email-cw00.choi@samsung.com>
+ <20160411154012.GA24665@rob-hp-laptop>
+ <CAGTfZH2u69aSyCFuq+v1eHh7iNeSU3WP4Wh+Qx_af6-o0LozNw@mail.gmail.com>
+Message-ID: <570F2639.9070809@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pcs_parse_bits_in_pinctrl_entry uses ffs which gives bit indices
-ranging from 1 to MAX. This leads to a corner case where we try to request
-the pin number = MAX and fails.
+Hi Rob,
 
-bit_pos value is being calculted using ffs. pin_num_from_lsb uses
-bit_pos value. pins array is populated with:
+On 2016? 04? 12? 05:25, Chanwoo Choi wrote:
+> Hi Rob,
+> 
+> On Tue, Apr 12, 2016 at 12:40 AM, Rob Herring <robh@kernel.org> wrote:
+>> On Fri, Apr 08, 2016 at 01:24:51PM +0900, Chanwoo Choi wrote:
+>>> This patch adds the documentation for generic exynos bus frequency
+>>> driver.
+>>>
+>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+>>> ---
+>>>  .../devicetree/bindings/devfreq/exynos-bus.txt     | 95 ++++++++++++++++++++++
+>>>  1 file changed, 95 insertions(+)
+>>>  create mode 100644 Documentation/devicetree/bindings/devfreq/exynos-bus.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/devfreq/exynos-bus.txt b/Documentation/devicetree/bindings/devfreq/exynos-bus.txt
+>>> new file mode 100644
+>>> index 000000000000..78171b918e3f
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/devfreq/exynos-bus.txt
+>>> @@ -0,0 +1,95 @@
+>>> +* Generic Exynos Bus frequency device
+>>> +
+>>> +The Samsung Exynos SoC has many buses for data transfer between DRAM
+>>> +and sub-blocks in SoC. Most Exynos SoCs share the common architecture
+>>> +for buses. Generally, each bus of Exynos SoC includes a source clock
+>>> +and a power line, which are able to change the clock frequency
+>>> +of the bus in runtime. To monitor the usage of each bus in runtime,
+>>> +the driver uses the PPMU (Platform Performance Monitoring Unit), which
+>>> +is able to measure the current load of sub-blocks.
+>>> +
+>>> +There are a little different composition among Exynos SoC because each Exynos
+>>> +SoC has different sub-blocks. Therefore, shch difference should be specified
+>>> +in devicetree file instead of each device driver. In result, this driver
+>>> +is able to support the bus frequency for all Exynos SoCs.
+>>
+>> I still have issues with this whole series. The DT hierarchy represents
+>> buses. You are describing buses here and control of them. I would expect
+>> to see some hierarchy, but there is none. What this looks like is you
+>> are adding nodes based on what fits the current driver.
+> 
+> I already replied[1] about your same question on v2 patchset four 4 months ago.
+> [1] https://lkml.org/lkml/2015/12/10/943
+> 
+> I attach the your question and my reply history as following:
+> ---------------------------------------------------------------------
+> [ Discussion between you and me on v2 patchset[1] ]
+>>>>
+>>>> This still has the same problem as before. I would expect that the bus
+>>>> hierarchy in the dts match the hierarchy here. You just have flat nodes
+>>>> in the example below. So all IP blocks affected by frequency scaling
+>>>> should be under the bus node defining the OPPs. Something like this:
+>>>
+>>> The each bus of sub-block has not h/w dependency among sub-blocks
+>>> and has the owned source clock / OPP table. Just they share the same
+>>> power line. So, I think that flat nodes in the example below is not problem.
+>>
+>> I'm talking about the peripherals not described here. Is the ISP block
+>> not a child of the bus_isp node? Same for the display controller block
+>> and bus_lcd0. And so on.
+> 
+>>From the H/W point of view, ISP block is really not included in ISP's
+> AXI bus (bus_isp).
+> Just, the bus_isp connect to between ISP block and DRAM.
+> ---------------------------------------------------------------------
 
-pin + pin_num_from_lsb.
+I'm considering about your comment about hierarchy.
 
-The above is 1 more than usual bit indices as bit_pos uses ffs to compute
-first set bit. Hence the last of the pins array is populated with the MAX
-value and not MAX - 1 which causes error when we call pin_request.
+But, I think it is not appropriate.
+there is no perfect paired set between sub-block and dvfs driver for AMBA bus.
 
-mask_pos is rightly calculated as ((pcs->fmask) << (bit_pos - 1))
-Consequently val_pos and submask are correct.
+For example about Exynos5420's JPEG IP,
+There are two JPEG IPs in the Exynos5420. But two JPEG IPs
+use the same source clock for AMBA AXI line to transfer
+data between DRAM and JPEG as following:
 
-Hence use __ffs which gives (ffs(x) - 1) as the first bit set.
+(AXI master)               (AXI slave)
+JPEG_0 --|-----(AXI)-----|
+         |               |---- DRAM
+JPEG_1 --|-----(AXI)-----|
 
-fixes: 4e7e8017a8 ("pinctrl: pinctrl-single: enhance to configure multiple pins of different modules")
-Signed-off-by: Keerthy <j-keerthy@ti.com>
----
+Two AMBA buses use the same source clock. So, only one dvfs driver
+should handle the source clock for AXI bus.
+               
+Also,
+two JPEG use the same AMBA APB line to configure the register of JPEG IP
+as following:
 
-Changes in v2:
+(APB slave)                 (APB master)
+JPEG_0 --|-----(APB)-----|
+         |               |---- CPU
+JPEG_1 --|-----(APB)-----|
 
-  * Changed pcs->fshift to use __ffs instead of ffs to be consistent.
+The JPEG_0/1 could not be included in both AXI and APB in Device Tree.
 
-Boot tesed on da850-evm and checked the pinctrl sysfs nodes.
+Additionally, the I2C/SPI/PCI and etc use the APB bus
+for communication between each controller and CPU.
 
- drivers/pinctrl/pinctrl-single.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+I'll expect your reply.
 
-diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
-index fb126d5..cf9bafa 100644
---- a/drivers/pinctrl/pinctrl-single.c
-+++ b/drivers/pinctrl/pinctrl-single.c
-@@ -1280,9 +1280,9 @@ static int pcs_parse_bits_in_pinctrl_entry(struct pcs_device *pcs,
- 
- 		/* Parse pins in each row from LSB */
- 		while (mask) {
--			bit_pos = ffs(mask);
-+			bit_pos = __ffs(mask);
- 			pin_num_from_lsb = bit_pos / pcs->bits_per_pin;
--			mask_pos = ((pcs->fmask) << (bit_pos - 1));
-+			mask_pos = ((pcs->fmask) << bit_pos);
- 			val_pos = val & mask_pos;
- 			submask = mask & mask_pos;
- 
-@@ -1852,7 +1852,7 @@ static int pcs_probe(struct platform_device *pdev)
- 	ret = of_property_read_u32(np, "pinctrl-single,function-mask",
- 				   &pcs->fmask);
- 	if (!ret) {
--		pcs->fshift = ffs(pcs->fmask) - 1;
-+		pcs->fshift = __ffs(pcs->fmask);
- 		pcs->fmax = pcs->fmask >> pcs->fshift;
- 	} else {
- 		/* If mask property doesn't exist, function mux is invalid. */
--- 
-1.9.1
+Best Regards,
+Chanwoo Choi
