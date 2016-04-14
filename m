@@ -1,48 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 14 Apr 2016 17:32:36 +0100
-Subject: [PATCH v2 2/4] arm64: move early boot code to the .init segment
-In-Reply-To: <1459352589-28721-3-git-send-email-ard.biesheuvel@linaro.org>
-References: <1459352589-28721-1-git-send-email-ard.biesheuvel@linaro.org>
- <1459352589-28721-3-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160414163235.GE4584@arm.com>
+From: yang.shi@linaro.org (Shi, Yang)
+Date: Thu, 14 Apr 2016 09:33:07 -0700
+Subject: [PATCH] arm64: Kconfig: make SCHED_MC and SCHED_SMT depend on SMP
+In-Reply-To: <20160414084727.GA23207@arm.com>
+References: <1460595252-2330-1-git-send-email-yang.shi@linaro.org>
+ <20160414084727.GA23207@arm.com>
+Message-ID: <570FC643.3090805@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+On 4/14/2016 1:47 AM, Will Deacon wrote:
+> On Wed, Apr 13, 2016 at 05:54:12PM -0700, Yang Shi wrote:
+>> SCHED_MC and SCHED_SMT are pointless when SMP is disabled.
+>> Although SMP is rarely disabled for ARM64, it looks more consistent to have
+>> such depend in Kconfig.
+>
+> You can't disable CONFIG_SMP for arm64 -- we select it unconditionally
+> in the kconfig.
 
-On Wed, Mar 30, 2016 at 05:43:07PM +0200, Ard Biesheuvel wrote:
-> Apart from the arm64/linux and EFI header data structures, there is nothing
-> in the .head.text section that must reside at the beginning of the Image.
-> So let's move it to the .init section where it belongs.
-> 
-> Note that this involves some minor tweaking of the EFI header, primarily
-> because the address of 'stext' no longer coincides with the start of the
-> .text section. It also requires a couple of relocated symbol references
-> to be slightly rewritten or their definition moved to the linker script.
+Thanks Will. I didn't realize ARM64 has SMP selected unconditionally, it 
+looks the patch is pointless.
 
-[...]
+A follow-up question, I know ARM64 has no UP implementation now, it 
+sounds make sense to have SMP select unconditionally, however, it might 
+be more flexible to have SMP like x86 and other architectures. And, it 
+may also help to find more bugs when !SMP.
 
->  ENTRY(stext)
->  	bl	preserve_boot_args
->  	bl	el2_setup			// Drop to EL1, w20=cpu_boot_mode
-> @@ -223,12 +224,12 @@ ENTRY(stext)
->  	 * the TCR will have been set.
->  	 */
->  	ldr	x27, 0f				// address to jump to after
-> -						// MMU has been enabled
-> +	neg	x27, x27			// MMU has been enabled
->  	adr_l	lr, __enable_mmu		// return (PIC) address
->  	b	__cpu_setup			// initialise processor
->  ENDPROC(stext)
->  	.align	3
-> -0:	.quad	__mmap_switched - (_head - TEXT_OFFSET) + KIMAGE_VADDR
-> +0:	.quad	(_text - TEXT_OFFSET) - __mmap_switched - KIMAGE_VADDR
+Thanks,
+Yang
 
-I'm struggling to understand why you need to change this. Furthermore,
-it looks like the gas docs for expressions require that addition/subtraction
-can only be performed on arguments that are in the same section, so
-this feels pretty rickety.
-
-What's the problem you're solving here?
-
-Will
+>
+> Will
+>
