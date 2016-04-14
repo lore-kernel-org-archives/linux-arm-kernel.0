@@ -1,21 +1,127 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 14 Apr 2016 14:09:08 +0200
-Subject: [PATCH] pinctrl: pxa: add pxa25x architecture
-In-Reply-To: <1460317191-17026-1-git-send-email-robert.jarzmik@free.fr>
-References: <1460317191-17026-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <CACRpkdazUxs2W+X6iy13Hz8Ov3JXyoBFnKjd9=k_2Fp9ctU7NQ@mail.gmail.com>
+From: steve.capper@arm.com (Steve Capper)
+Date: Thu, 14 Apr 2016 13:09:30 +0100
+Subject: [PATCH v16 1/6] efi: ARM/arm64: ignore DT memory nodes instead
+ of removing them
+In-Reply-To: <CAKv+Gu_aed0N9hiopY_=9P_y1rZ8ou6ofuHKdkXJnY=v1Gzh_w@mail.gmail.com>
+References: <1460155828-8690-1-git-send-email-ddaney.cavm@gmail.com>
+ <1460155828-8690-2-git-send-email-ddaney.cavm@gmail.com>
+ <20160414110210.GA11788@e103986-lin>
+ <CAKv+Gu_aed0N9hiopY_=9P_y1rZ8ou6ofuHKdkXJnY=v1Gzh_w@mail.gmail.com>
+Message-ID: <20160414120929.GA15967@e103986-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 10, 2016 at 9:39 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+On Thu, Apr 14, 2016 at 01:10:35PM +0200, Ard Biesheuvel wrote:
+> On 14 April 2016 at 13:02, Steve Capper <steve.capper@arm.com> wrote:
+> > On Fri, Apr 08, 2016 at 03:50:23PM -0700, David Daney wrote:
+> >> From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >>
+> >> There are two problems with the UEFI stub DT memory node removal
+> >> routine:
+> >> - it deletes nodes as it traverses the tree, which happens to work
+> >>   but is not supported, as deletion invalidates the node iterator;
+> >> - deleting memory nodes entirely may discard annotations in the form
+> >>   of additional properties on the nodes.
+> >>
+> >> Since the discovery of DT memory nodes occurs strictly before the
+> >> UEFI init sequence, we can simply clear the memblock memory table
+> >> before parsing the UEFI memory map. This way, it is no longer
+> >> necessary to remove the nodes, so we can remove that logic from the
+> >> stub as well.
+> >>
+> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> Signed-off-by: David Daney <david.daney@cavium.com>
+> >> ---
+> >>  drivers/firmware/efi/arm-init.c    |  8 ++++++++
+> >>  drivers/firmware/efi/libstub/fdt.c | 24 +-----------------------
+> >>  2 files changed, 9 insertions(+), 23 deletions(-)
+> >>
+> >> diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
+> >> index aa1f743..5d6945b 100644
+> >> --- a/drivers/firmware/efi/arm-init.c
+> >> +++ b/drivers/firmware/efi/arm-init.c
+> >> @@ -143,6 +143,14 @@ static __init void reserve_regions(void)
+> >>       if (efi_enabled(EFI_DBG))
+> >>               pr_info("Processing EFI memory map:\n");
+> >>
+> >> +     /*
+> >> +      * Discard memblocks discovered so far: if there are any at this
+> >> +      * point, they originate from memory nodes in the DT, and UEFI
+> >> +      * uses its own memory map instead.
+> >> +      */
+> >> +     memblock_dump_all();
+> >> +     memblock_remove(0, ULLONG_MAX);
+> >> +
+> >
+> > Does this change need to be applied to any other architectures given
+> > that deletion code has been removed from libstub below?
+> >
+> 
+> The 'generic' libstub code below is only used by ARM, so we're safe
+> here in that regard.
 
-> Add the pxa25x architecture, which is a pxa2xx with 85 pins. The
-> registers spacing, and pins logic is common to pxa2xx, only the pins and
-> their alternate function are specific to pxa25x.
->
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Thanks Ard,
+In that case, FWIW:
+Acked-by: Steve Capper <steve.capper@arm.com>
 
-Patch applied.
+Cheers,
+-- 
+Steve
 
-Yours,
-Linus Walleij
+> 
+> 
+> >>       for_each_efi_memory_desc(&memmap, md) {
+> >>               paddr = md->phys_addr;
+> >>               npages = md->num_pages;
+> >> diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
+> >> index 6dba78a..e58abfa 100644
+> >> --- a/drivers/firmware/efi/libstub/fdt.c
+> >> +++ b/drivers/firmware/efi/libstub/fdt.c
+> >> @@ -24,7 +24,7 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
+> >>                       unsigned long map_size, unsigned long desc_size,
+> >>                       u32 desc_ver)
+> >>  {
+> >> -     int node, prev, num_rsv;
+> >> +     int node, num_rsv;
+> >>       int status;
+> >>       u32 fdt_val32;
+> >>       u64 fdt_val64;
+> >> @@ -54,28 +54,6 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
+> >>               goto fdt_set_fail;
+> >>
+> >>       /*
+> >> -      * Delete any memory nodes present. We must delete nodes which
+> >> -      * early_init_dt_scan_memory may try to use.
+> >> -      */
+> >> -     prev = 0;
+> >> -     for (;;) {
+> >> -             const char *type;
+> >> -             int len;
+> >> -
+> >> -             node = fdt_next_node(fdt, prev, NULL);
+> >> -             if (node < 0)
+> >> -                     break;
+> >> -
+> >> -             type = fdt_getprop(fdt, node, "device_type", &len);
+> >> -             if (type && strncmp(type, "memory", len) == 0) {
+> >> -                     fdt_del_node(fdt, node);
+> >> -                     continue;
+> >> -             }
+> >> -
+> >> -             prev = node;
+> >> -     }
+> >> -
+> >> -     /*
+> >>        * Delete all memory reserve map entries. When booting via UEFI,
+> >>        * kernel will use the UEFI memory map to find reserved regions.
+> >>        */
+> >> --
+> >> 1.8.3.1
+> >>
+> >>
+> >> _______________________________________________
+> >> linux-arm-kernel mailing list
+> >> linux-arm-kernel at lists.infradead.org
+> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >>
+> 
