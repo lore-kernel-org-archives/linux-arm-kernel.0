@@ -1,190 +1,116 @@
 From: jamesjj.liao@mediatek.com (James Liao)
-Date: Thu, 14 Apr 2016 16:11:53 +0800
-Subject: [PATCH v7 8/9] clk: mediatek: Add config options for MT2701 subsystem
- clocks
+Date: Thu, 14 Apr 2016 16:11:50 +0800
+Subject: [PATCH v7 5/9] reset: mediatek: Add MT2701 reset controller
+ dt-binding file
 In-Reply-To: <1460621514-65191-1-git-send-email-jamesjj.liao@mediatek.com>
 References: <1460621514-65191-1-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <1460621514-65191-9-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <1460621514-65191-6-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MT2701 subsystem clocks are optional and should be enabled only if
-their subsystem drivers are ready to control these clocks.
+From: Shunli Wang <shunli.wang@mediatek.com>
 
+Dt-binding file about reset controller is used to provide
+kinds of definition, which is referenced by dts file and
+IC-specified reset controller driver code.
+
+Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
 Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+Tested-by: John Crispin <blogic@openwrt.org>
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 ---
- drivers/clk/mediatek/Kconfig      | 44 ++++++++++++++++++++++++++++++++++++++-
- drivers/clk/mediatek/clk-mt2701.c | 36 ++++++++++++++++++++++++++++++++
- 2 files changed, 79 insertions(+), 1 deletion(-)
+ include/dt-bindings/reset/mt2701-resets.h | 83 +++++++++++++++++++++++++++++++
+ 1 file changed, 83 insertions(+)
+ create mode 100644 include/dt-bindings/reset/mt2701-resets.h
 
-diff --git a/drivers/clk/mediatek/Kconfig b/drivers/clk/mediatek/Kconfig
-index 1e56000..5aa6204 100644
---- a/drivers/clk/mediatek/Kconfig
-+++ b/drivers/clk/mediatek/Kconfig
-@@ -12,7 +12,49 @@ config COMMON_CLK_MT2701
- 	select COMMON_CLK_MEDIATEK
- 	default ARCH_MEDIATEK
- 	---help---
--	  This driver supports Mediatek MT2701 clocks.
-+	  This driver supports Mediatek MT2701 basic clocks.
+diff --git a/include/dt-bindings/reset/mt2701-resets.h b/include/dt-bindings/reset/mt2701-resets.h
+new file mode 100644
+index 0000000..aaf0305
+--- /dev/null
++++ b/include/dt-bindings/reset/mt2701-resets.h
+@@ -0,0 +1,83 @@
++/*
++ * Copyright (c) 2015 MediaTek, Shunli Wang <shunli.wang@mediatek.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
-+config COMMON_CLK_MT2701_MMSYS
-+	bool "Clock driver for Mediatek MT2701 mmsys"
-+	depends on COMMON_CLK
-+	select COMMON_CLK_MT2701
-+	---help---
-+	  This driver supports Mediatek MT2701 mmsys clocks.
++#ifndef _DT_BINDINGS_RESET_CONTROLLER_MT2701
++#define _DT_BINDINGS_RESET_CONTROLLER_MT2701
 +
-+config COMMON_CLK_MT2701_IMGSYS
-+	bool "Clock driver for Mediatek MT2701 imgsys"
-+	depends on COMMON_CLK
-+	select COMMON_CLK_MT2701
-+	---help---
-+	  This driver supports Mediatek MT2701 imgsys clocks.
++/* INFRACFG resets */
++#define MT2701_INFRA_EMI_REG_RST		0
++#define MT2701_INFRA_DRAMC0_A0_RST		1
++#define MT2701_INFRA_FHCTL_RST			2
++#define MT2701_INFRA_APCIRQ_EINT_RST		3
++#define MT2701_INFRA_APXGPT_RST			4
++#define MT2701_INFRA_SCPSYS_RST			5
++#define MT2701_INFRA_KP_RST			6
++#define MT2701_INFRA_PMIC_WRAP_RST		7
++#define MT2701_INFRA_MIPI_RST			8
++#define MT2701_INFRA_IRRX_RST			9
++#define MT2701_INFRA_CEC_RST			10
++#define MT2701_INFRA_EMI_RST			32
++#define MT2701_INFRA_DRAMC0_RST			34
++#define MT2701_INFRA_TRNG_RST			37
++#define MT2701_INFRA_SYSIRQ_RST			38
 +
-+config COMMON_CLK_MT2701_VDECSYS
-+	bool "Clock driver for Mediatek MT2701 vdecsys"
-+	depends on COMMON_CLK
-+	select COMMON_CLK_MT2701
-+	---help---
-+	  This driver supports Mediatek MT2701 vdecsys clocks.
++/*  PERICFG resets */
++#define MT2701_PERI_UART0_SW_RST		0
++#define MT2701_PERI_UART1_SW_RST		1
++#define MT2701_PERI_UART2_SW_RST		2
++#define MT2701_PERI_UART3_SW_RST		3
++#define MT2701_PERI_GCPU_SW_RST			5
++#define MT2701_PERI_BTIF_SW_RST			6
++#define MT2701_PERI_PWM_SW_RST			8
++#define MT2701_PERI_AUXADC_SW_RST		10
++#define MT2701_PERI_DMA_SW_RST			11
++#define MT2701_PERI_NFI_SW_RST			14
++#define MT2701_PERI_NLI_SW_RST			15
++#define MT2701_PERI_THERM_SW_RST		16
++#define MT2701_PERI_MSDC2_SW_RST		17
++#define MT2701_PERI_MSDC0_SW_RST		19
++#define MT2701_PERI_MSDC1_SW_RST		20
++#define MT2701_PERI_I2C0_SW_RST			22
++#define MT2701_PERI_I2C1_SW_RST			23
++#define MT2701_PERI_I2C2_SW_RST			24
++#define MT2701_PERI_I2C3_SW_RST			25
++#define MT2701_PERI_USB_SW_RST			28
++#define MT2701_PERI_ETH_SW_RST			29
++#define MT2701_PERI_SPI0_SW_RST			33
 +
-+config COMMON_CLK_MT2701_HIFSYS
-+	bool "Clock driver for Mediatek MT2701 hifsys"
-+	depends on COMMON_CLK
-+	select COMMON_CLK_MT2701
-+	---help---
-+	  This driver supports Mediatek MT2701 hifsys clocks.
++/* TOPRGU resets */
++#define MT2701_TOPRGU_INFRA_RST			0
++#define MT2701_TOPRGU_MM_RST			1
++#define MT2701_TOPRGU_MFG_RST			2
++#define MT2701_TOPRGU_ETHDMA_RST		3
++#define MT2701_TOPRGU_VDEC_RST			4
++#define MT2701_TOPRGU_VENC_IMG_RST		5
++#define MT2701_TOPRGU_DDRPHY_RST		6
++#define MT2701_TOPRGU_MD_RST			7
++#define MT2701_TOPRGU_INFRA_AO_RST		8
++#define MT2701_TOPRGU_CONN_RST			9
++#define MT2701_TOPRGU_APMIXED_RST		10
++#define MT2701_TOPRGU_HIFSYS_RST		11
++#define MT2701_TOPRGU_CONN_MCU_RST		12
++#define MT2701_TOPRGU_BDP_DISP_RST		13
 +
-+config COMMON_CLK_MT2701_ETHSYS
-+	bool "Clock driver for Mediatek MT2701 ethsys"
-+	depends on COMMON_CLK
-+	select COMMON_CLK_MT2701
-+	---help---
-+	  This driver supports Mediatek MT2701 ethsys clocks.
++/* HIFSYS resets */
++#define MT2701_HIFSYS_UHOST0_RST		3
++#define MT2701_HIFSYS_UHOST1_RST		4
++#define MT2701_HIFSYS_UPHY0_RST			21
++#define MT2701_HIFSYS_UPHY1_RST			22
++#define MT2701_HIFSYS_PCIE0_RST			24
++#define MT2701_HIFSYS_PCIE1_RST			25
++#define MT2701_HIFSYS_PCIE2_RST			26
 +
-+config COMMON_CLK_MT2701_BDPSYS
-+	bool "Clock driver for Mediatek MT2701 bdpsys"
-+	depends on COMMON_CLK
-+	select COMMON_CLK_MT2701
-+	---help---
-+	  This driver supports Mediatek MT2701 bdpsys clocks.
- 
- config COMMON_CLK_MT8135
- 	bool "Clock driver for Mediatek MT8135"
-diff --git a/drivers/clk/mediatek/clk-mt2701.c b/drivers/clk/mediatek/clk-mt2701.c
-index 90294e7..68869ff 100644
---- a/drivers/clk/mediatek/clk-mt2701.c
-+++ b/drivers/clk/mediatek/clk-mt2701.c
-@@ -908,6 +908,8 @@ static void __init mtk_pericfg_init(struct device_node *node)
- }
- CLK_OF_DECLARE(mtk_pericfg, "mediatek,mt2701-pericfg", mtk_pericfg_init);
- 
-+#ifdef CONFIG_COMMON_CLK_MT2701_MMSYS
-+
- static const struct mtk_gate_regs disp0_cg_regs __initconst = {
- 	.set_ofs = 0x0104,
- 	.clr_ofs = 0x0108,
-@@ -991,6 +993,10 @@ static void __init mtk_mmsys_init(struct device_node *node)
- 			__func__, r);
- }
- 
-+#endif /* CONFIG_COMMON_CLK_MT2701_MMSYS */
-+
-+#ifdef CONFIG_COMMON_CLK_MT2701_IMGSYS
-+
- static const struct mtk_gate_regs img_cg_regs __initconst = {
- 	.set_ofs = 0x0004,
- 	.clr_ofs = 0x0008,
-@@ -1031,6 +1037,10 @@ static void __init mtk_imgsys_init(struct device_node *node)
- 			__func__, r);
- }
- 
-+#endif /* CONFIG_COMMON_CLK_MT2701_IMGSYS */
-+
-+#ifdef CONFIG_COMMON_CLK_MT2701_VDECSYS
-+
- static const struct mtk_gate_regs vdec0_cg_regs __initconst = {
- 	.set_ofs = 0x0000,
- 	.clr_ofs = 0x0004,
-@@ -1082,6 +1092,10 @@ static void __init mtk_vdecsys_init(struct device_node *node)
- 			__func__, r);
- }
- 
-+#endif /* CONFIG_COMMON_CLK_MT2701_VDECSYS */
-+
-+#ifdef CONFIG_COMMON_CLK_MT2701_HIFSYS
-+
- static const struct mtk_gate_regs hif_cg_regs __initconst = {
- 	.sta_ofs = 0x0008,
- };
-@@ -1121,6 +1135,10 @@ static void __init mtk_hifsys_init(struct device_node *node)
- 	mtk_register_reset_controller(node, 1, 0x34);
- }
- 
-+#endif /* CONFIG_COMMON_CLK_MT2701_HIFSYS */
-+
-+#ifdef CONFIG_COMMON_CLK_MT2701_ETHSYS
-+
- static const struct mtk_gate_regs eth_cg_regs __initconst = {
- 	.sta_ofs = 0x0030,
- };
-@@ -1161,6 +1179,10 @@ static void __init mtk_ethsys_init(struct device_node *node)
- 			__func__, r);
- }
- 
-+#endif /* CONFIG_COMMON_CLK_MT2701_ETHSYS */
-+
-+#ifdef CONFIG_COMMON_CLK_MT2701_BDPSYS
-+
- static const struct mtk_gate_regs bdp0_cg_regs __initconst = {
- 	.set_ofs = 0x0104,
- 	.clr_ofs = 0x0108,
-@@ -1259,6 +1281,8 @@ static void __init mtk_bdpsys_init(struct device_node *node)
- 			__func__, r);
- }
- 
-+#endif /* CONFIG_COMMON_CLK_MT2701_BDPSYS */
-+
- #define MT8590_PLL_FMAX		(2000 * MHZ)
- #define CON0_MT8590_RST_BAR	BIT(27)
- 
-@@ -1333,24 +1357,36 @@ CLK_OF_DECLARE(mtk_apmixedsys, "mediatek,mt2701-apmixedsys",
- 
- static const struct of_device_id of_clk_match_tbl[] = {
- 	{
-+#ifdef CONFIG_COMMON_CLK_MT2701_MMSYS
- 		.compatible = "mediatek,mt2701-mmsys",
- 		.data = mtk_mmsys_init,
- 	}, {
-+#endif
-+#ifdef CONFIG_COMMON_CLK_MT2701_IMGSYS
- 		.compatible = "mediatek,mt2701-imgsys",
- 		.data = mtk_imgsys_init,
- 	}, {
-+#endif
-+#ifdef CONFIG_COMMON_CLK_MT2701_VDECSYS
- 		.compatible = "mediatek,mt2701-vdecsys",
- 		.data = mtk_vdecsys_init,
- 	}, {
-+#endif
-+#ifdef CONFIG_COMMON_CLK_MT2701_HIFSYS
- 		.compatible = "mediatek,mt2701-hifsys",
- 		.data = mtk_hifsys_init,
- 	}, {
-+#endif
-+#ifdef CONFIG_COMMON_CLK_MT2701_ETHSYS
- 		.compatible = "mediatek,mt2701-ethsys",
- 		.data = mtk_ethsys_init,
- 	}, {
-+#endif
-+#ifdef CONFIG_COMMON_CLK_MT2701_BDPSYS
- 		.compatible = "mediatek,mt2701-bdpsys",
- 		.data = mtk_bdpsys_init,
- 	}, {
-+#endif
- 		/* sentinel */
- 	}
- };
++#endif  /* _DT_BINDINGS_RESET_CONTROLLER_MT2701 */
 -- 
 1.9.1
