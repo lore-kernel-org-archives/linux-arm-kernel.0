@@ -1,26 +1,50 @@
 From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Thu, 14 Apr 2016 14:20:18 +0800
-Subject: [RESEND PATCH v2 0/2] rockchip: power-domain: support qos save and
- restore
-Message-ID: <1460614820-18865-1-git-send-email-zhangqing@rock-chips.com>
+Date: Thu, 14 Apr 2016 14:20:19 +0800
+Subject: [PATCH v2 1/2] dt-bindings: modify document of Rockchip power domains
+In-Reply-To: <1460614820-18865-1-git-send-email-zhangqing@rock-chips.com>
+References: <1460614820-18865-1-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <1460614820-18865-2-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add qos document in dt-bingings.
-modify power domain driver to support qos save and restore.
+Rockchip Socs contain quality of service (qos) blocks managing priority, 
+bandwidth, etc of the connection of each domain to the interconnect.
+These blocks loose state when their domain gets disabled and therefore
+need to be saved when disabling and restored when enabling a power-domain.
 
-Changes in v2:
-[PATCH V2 1/2]: fix up the commit message.
-[PATCH V2 2/2]: add some error handling.
-		fix up the define and request space for qos_regmap and qos_save_regs. 
+These qos blocks also are similar over all currently available Rockchip 
+SoCs.
 
-Elaine Zhang (2):
-  dt-bindings: modify document of Rockchip power domains
-  rockchip: power-domain: support qos save and restore
+Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+---
+ Documentation/devicetree/bindings/soc/rockchip/power_domain.txt | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
- .../bindings/soc/rockchip/power_domain.txt         |   8 ++
- drivers/soc/rockchip/pm_domains.c                  | 104 ++++++++++++++++++++-
- 2 files changed, 109 insertions(+), 3 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
+index 98085c888d65..6c571a40cd31 100644
+--- a/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
++++ b/Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
+@@ -21,6 +21,13 @@ Required properties for power domain sub nodes:
+ - clocks (optional): phandles to clocks which need to be enabled while power domain
+ 	switches state.
+ 
++Qos Example:
++
++	qos_gpu: qos_gpu at ffaf0000 {
++		compatible ="syscon";
++		reg = <0x0 0xffaf0000 0x0 0x20>;
++	};
++
+ Example:
+ 
+ 	power: power-controller {
+@@ -32,6 +39,7 @@ Example:
+ 		pd_gpu {
+ 			reg = <RK3288_PD_GPU>;
+ 			clocks = <&cru ACLK_GPU>;
++			pm_qos = <&qos_gpu>;
+ 		};
+ 	};
+ 
 -- 
 1.9.1
