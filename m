@@ -1,34 +1,85 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 14 Apr 2016 18:08:10 +0530
-Subject: [PATCH v3 09/16] phy: da8xx-usb: new driver for DA8xx SoC USB PHY
-In-Reply-To: <570EA6EC.1040001@lechnology.com>
-References: <1458863503-31121-1-git-send-email-david@lechnology.com>
- <1458863503-31121-10-git-send-email-david@lechnology.com>
- <570E4796.7070005@ti.com> <570EA6EC.1040001@lechnology.com>
-Message-ID: <570F8F32.8050302@ti.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Thu, 14 Apr 2016 20:39:34 +0800
+Subject: [alsa-devel] [RFC PATCH v2 5/5] ASoC: mediatek: Add
+ mt2701-cs42448 driver and config option.
+In-Reply-To: <1460636070-37426-6-git-send-email-garlic.tseng@mediatek.com>
+References: <1460636070-37426-1-git-send-email-garlic.tseng@mediatek.com>
+ <1460636070-37426-6-git-send-email-garlic.tseng@mediatek.com>
+Message-ID: <1460637574.13240.19.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thursday 14 April 2016 01:37 AM, David Lechner wrote:
-> On 04/13/2016 08:20 AM, Kishon Vijay Abraham I wrote:
->>
->> Don't prefer export symbols from PHY driver. That'll create unnecessary
->> dependencies between the controller and the PHY.
->>
->> To see how to fix it, please see my comment for the previous version of your
->> patch.
->>
->> Thanks
->> Kishon
->>
+On Thu, 2016-04-14 at 20:14 +0800, Garlic Tseng wrote:
+> Add machine driver and config option for MT2701.
 > 
+> Signed-off-by: Garlic Tseng <garlic.tseng@mediatek.com>
+> ---
+>  sound/soc/mediatek/Kconfig                 |  21 ++
+>  sound/soc/mediatek/Makefile                |   3 +
+>  sound/soc/mediatek/mt2701/Makefile         |  20 ++
+>  sound/soc/mediatek/mt2701/mt2701-cs42448.c | 376 +++++++++++++++++++++++++++++
+>  4 files changed, 420 insertions(+)
+>  create mode 100644 sound/soc/mediatek/mt2701/Makefile
+>  create mode 100644 sound/soc/mediatek/mt2701/mt2701-cs42448.c
 > 
-> What is the proper way to give you credit for the changes you suggested?
+> diff --git a/sound/soc/mediatek/Kconfig b/sound/soc/mediatek/Kconfig
+> index f7e789e..b190322 100644
+> --- a/sound/soc/mediatek/Kconfig
+> +++ b/sound/soc/mediatek/Kconfig
+> @@ -48,3 +48,24 @@ config SND_SOC_MT8173_RT5650_RT5676
+>  	  with the RT5650 and RT5676 codecs.
+>  	  Select Y if you have such device.
+>  	  If unsure select "N".
+> +
+> +config SND_SOC_MT2701
 
-Suggested-by: is commonly used. But if this patch goes via linux-phy tree, I'll
-also add my Signed-off-by ;-)
+It seems we need different driver for different soc. So after this
+patch, SND_SOC_MEDIATEK only select driver for mt8173. Maybe it should
+be renamed to SND_SOC_MT8173 to reflect this.
 
-Thanks
-Kishon
+> +	bool "SND_SOC_MT2701"
+
+
+Please check other config in this file and have a proper config prompt
+here.
+
+Can we support module like mt8173?
+
+> +	depends on SND_SOC_MEDIATEK
+> +	select SND_SOC_CS42XX8_I2C
+> +	help
+> +	  This adds ASoC driver for Mediatek MT2701 boards
+> +	  with the CS42448 codecs.
+> +	  Select Y if you have such device.
+> +	  If unsure select "N".
+
+
+Based on the Makefile, this is platform driver for mt2701. This should
+not depends on codec. Please update the help message and select.
+
+> +
+> +config SND_SOC_MT2701_CS42448
+> +	bool "SND_SOC_MT2701_CS42448"
+> +	depends on SND_SOC_MT2701
+> +	select SND_SOC_CS42XX8_I2C
+> +	help
+> +	  This adds ASoC driver for Mediatek MT2701 boards
+> +	  with the CS42448 codecs.
+> +	  Select Y if you have such device.
+> +	  If unsure select "N".
+> +
+> diff --git a/sound/soc/mediatek/Makefile b/sound/soc/mediatek/Makefile
+> index 5048165..60387ca 100644
+> --- a/sound/soc/mediatek/Makefile
+> +++ b/sound/soc/mediatek/Makefile
+> @@ -3,3 +3,6 @@ obj-$(CONFIG_SND_SOC_MT8173_MAX98090) += mt8173/
+>  obj-$(CONFIG_SND_SOC_MT8173_RT5650_RT5676) += mt8173/
+>  obj-$(CONFIG_SND_SOC_MT8173_RT5650_RT5514) += mt8173/
+>  obj-$(CONFIG_SND_SOC_MT8173_RT5650) += mt8173/
+> +
+> +# 2701 Machine support
+> +obj-$(CONFIG_SND_SOC_MT2701_CS42448) += mt2701/
+
+Sorting, please put mt2701 before mt8173.
+
+Joe.C
