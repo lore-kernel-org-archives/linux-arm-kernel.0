@@ -1,33 +1,22 @@
-From: yang.shi@linaro.org (Shi, Yang)
-Date: Thu, 14 Apr 2016 09:33:07 -0700
-Subject: [PATCH] arm64: Kconfig: make SCHED_MC and SCHED_SMT depend on SMP
-In-Reply-To: <20160414084727.GA23207@arm.com>
-References: <1460595252-2330-1-git-send-email-yang.shi@linaro.org>
- <20160414084727.GA23207@arm.com>
-Message-ID: <570FC643.3090805@linaro.org>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 14 Apr 2016 11:33:57 -0500
+Subject: [PATCH v2 2/3] devicetree: leds: Introduce "panic-indicator"
+ optional property
+In-Reply-To: <1460570899-24642-3-git-send-email-ezequiel@vanguardiasur.com.ar>
+References: <1460570899-24642-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+ <1460570899-24642-3-git-send-email-ezequiel@vanguardiasur.com.ar>
+Message-ID: <20160414163357.GA21964@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/14/2016 1:47 AM, Will Deacon wrote:
-> On Wed, Apr 13, 2016 at 05:54:12PM -0700, Yang Shi wrote:
->> SCHED_MC and SCHED_SMT are pointless when SMP is disabled.
->> Although SMP is rarely disabled for ARM64, it looks more consistent to have
->> such depend in Kconfig.
->
-> You can't disable CONFIG_SMP for arm64 -- we select it unconditionally
-> in the kconfig.
+On Wed, Apr 13, 2016 at 03:08:18PM -0300, Ezequiel Garcia wrote:
+> It's desirable to specify which LEDs are to be blinked on a kernel
+> panic. Therefore, introduce a devicetree boolean property to mark
+> which LEDs should be treated this way, if possible.
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
+> ---
+>  Documentation/devicetree/bindings/leds/common.txt | 3 +++
+>  1 file changed, 3 insertions(+)
 
-Thanks Will. I didn't realize ARM64 has SMP selected unconditionally, it 
-looks the patch is pointless.
-
-A follow-up question, I know ARM64 has no UP implementation now, it 
-sounds make sense to have SMP select unconditionally, however, it might 
-be more flexible to have SMP like x86 and other architectures. And, it 
-may also help to find more bugs when !SMP.
-
-Thanks,
-Yang
-
->
-> Will
->
+Acked-by: Rob Herring <rob@kernel.org>
