@@ -1,56 +1,64 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 14 Apr 2016 17:33:28 +0200
-Subject: [PATCH v5 0/5] clk: mvebu: clock drivers for Marvell Armada 7K/8K
-Message-ID: <1460648013-31320-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Thu, 14 Apr 2016 17:33:30 +0200
+Subject: [PATCH v5 2/5] dt-bindings: arm: add DT binding for Marvell AP806
+ system controller
+In-Reply-To: <1460648013-31320-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1460648013-31320-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1460648013-31320-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This commit adds the Device Tree binding documentation for the system
+controller found in Marvell AP806 HW block, which is one of the core
+HW blocks of the 64-bits Marvell Armada 7K/8K family.
 
-Here is the fifth version of the clock drivers for Armada 7K/8K. The
-first two patches have already been applied by Stephen Boyd, but I'm
-still including them for completeness.
-
-Changes since v4:
-
- - Remove the gatable-clock-indices from the CP110 driver, use "none"
-   when a given bit does not provide a clock. Suggested by Rob
-   Herring.
-
- - Update the gatable clock tree with the latest technical information
-   received.
-
- - Turn the clock drivers into proper platform drivers. Suggested by
-   Stephen Boyd.
-
- - Remove useless headers include from the clock drivers. Suggested by
-   Stephen Boyd.
-
- - Add proper handling in the clock driver ->probe() function.
-
-Thanks!
-
-Thomas
-
-Thomas Petazzoni (5):
-  clk: unconditionally recurse into clk/mvebu/
-  dt-bindings: arm: add DT binding for Marvell AP806 system controller
-  clk: mvebu: new driver for Armada AP806 system controller
-  dt-bindings: arm: add DT binding for Marvell CP110 system controller
-  clk: mvebu: new driver for Armada CP110 system controller
-
- .../arm/marvell/ap806-system-controller.txt        |  35 ++
- .../arm/marvell/cp110-system-controller0.txt       |  83 +++++
- drivers/clk/Makefile                               |   2 +-
- drivers/clk/mvebu/Kconfig                          |   6 +
- drivers/clk/mvebu/Makefile                         |   2 +
- drivers/clk/mvebu/ap806-system-controller.c        | 168 +++++++++
- drivers/clk/mvebu/cp110-system-controller.c        | 399 +++++++++++++++++++++
- 7 files changed, 694 insertions(+), 1 deletion(-)
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ .../arm/marvell/ap806-system-controller.txt        | 35 ++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
- create mode 100644 Documentation/devicetree/bindings/arm/marvell/cp110-system-controller0.txt
- create mode 100644 drivers/clk/mvebu/ap806-system-controller.c
- create mode 100644 drivers/clk/mvebu/cp110-system-controller.c
 
+diff --git a/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt b/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
+new file mode 100644
+index 0000000..8968371
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/marvell/ap806-system-controller.txt
+@@ -0,0 +1,35 @@
++Marvell Armada AP806 System Controller
++======================================
++
++The AP806 is one of the two core HW blocks of the Marvell Armada 7K/8K
++SoCs. It contains a system controller, which provides a number
++registers giving access to numerous features: clocks, pin-muxing and
++many other SoC configuration items. This DT binding allows to describe
++this system controller.
++
++The Device Tree node representing the AP806 system controller provides
++a number of clocks:
++
++ - 0: clock of CPU cluster 0
++ - 1: clock of CPU cluster 1
++ - 2: fixed PLL at 1200 Mhz
++ - 3: MSS clock, derived from the fixed PLL
++
++Required properties:
++
++ - compatible: must be:
++     "marvell,ap806-system-controller", "syscon"
++ - reg: register area of the AP806 system controller
++ - #clock-cells: must be set to 1
++ - clock-output-names: must be defined to:
++    "ap-cpu-cluster-0", "ap-cpu-cluster-1", "ap-fixed", "ap-mss"
++
++Example:
++
++	syscon: system-controller at 6f4000 {
++		compatible = "marvell,ap806-system-controller", "syscon";
++		#clock-cells = <1>;
++		clock-output-names = "ap-cpu-cluster-0", "ap-cpu-cluster-1",
++				     "ap-fixed", "ap-mss";
++		reg = <0x6f4000 0x1000>;
++	};
 -- 
 2.6.4
