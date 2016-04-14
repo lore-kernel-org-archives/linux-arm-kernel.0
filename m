@@ -1,116 +1,47 @@
-From: yang.shi@linaro.org (Shi, Yang)
-Date: Thu, 14 Apr 2016 16:07:25 -0700
-Subject: SMMU problem found on LS2085A with 4.6-rc3
-In-Reply-To: <570F8739.1060508@arm.com>
-References: <570E9EA9.2070903@linaro.org> <570F8739.1060508@arm.com>
-Message-ID: <571022AD.1060909@linaro.org>
+From: santosh.shilimkar@oracle.com (santosh shilimkar)
+Date: Thu, 14 Apr 2016 16:19:19 -0700
+Subject: [PATCH 0/2] ARM: keystone: Enable CPU hotplug
+In-Reply-To: <20160414221522.GX19428@n2100.arm.linux.org.uk>
+References: <1459794543-4822-1-git-send-email-j-keerthy@ti.com>
+ <57031F5F.3020300@oracle.com> <20160405113325.GF19428@n2100.arm.linux.org.uk>
+ <20160414221522.GX19428@n2100.arm.linux.org.uk>
+Message-ID: <57102577.8020905@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
-
-On 4/14/2016 5:04 AM, Robin Murphy wrote:
-> Hi Yang,
+On 4/14/2016 3:15 PM, Russell King - ARM Linux wrote:
+> On Tue, Apr 05, 2016 at 12:33:25PM +0100, Russell King - ARM Linux wrote:
+>> Now... if we could get the damn CPU fan under control, I might be
+>> able to stand leaving the board powered on for longer, instead of
+>> reaching for the power plug at the earliest possibility!
 >
-> On 13/04/16 20:31, Shi, Yang wrote:
->> Hi Will & Robin,
->>
->> I just ran some quick test on my LS2085A board, which has 8 Cortex A57
->> cores, with 4.6-rc3 kernel, but I found a regression issue with SMMU.
->>
->> SMMU driver reports:
->>
->> arm_smmu_global_fault: 297974 callbacks suppressed
->> arm_smmu_global_fault: 298561 callbacks suppressed
->> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
->> GFSYNR1 0x00000300, GFSYNR2 0x00000000
->> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
->> GFSYNR1 0x00000300, GFSYNR2 0x00000000
->> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
->> GFSYNR1 0x00000300, GFSYNR2 0x00000000
->> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
->> GFSYNR1 0x00000300, GFSYNR2 0x00000000
->> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
->> GFSYNR1 0x00000300, GFSYNR2 0x00000000
->> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
->> GFSYNR1 0x00000300, GFSYNR2 0x00000000
->> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
->> GFSYNR1 0x00000300, GFSYNR2 0x00000000
->> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
->> GFSYNR1 0x00000300, GFSYNR2 0x00000000
->> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
->> GFSYNR1 0x00000300, GFSYNR2 0x00000000
->> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
->> GFSYNR1 0x00000300, GFSYNR2 0x00000000
->> arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
->> arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
->> arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
->> arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
->> arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
->> arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
->> arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
->> arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
->> arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
->> arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
+> This evening, I've received a complaint about the noise of the fan,
+> which can be heard throughout the house.
 >
-> That's a stream match conflict fault, so you've somehow got two devices
-> using the same stream ID attached to different domains, and at least one
-> of them is trying to do DMA.
+:-) Fan is noisy.
+
+> PLEASE can we sort something out about this damned fan?  I know that
+> there's a PWM control of it, so let's get it more under control.  If
+> no one is interested in writing a driver for it, then please supply
+> me with the information so that I can sort this out, and stop it
+> being so annoying.
 >
->> But, it is good with 4.5 kernel. I found the below commit causes it:
->>
->> commit 9adb95949a343dac53b1cd81dc973b5f815c88d4
->> Author: Robin Murphy <robin.murphy@arm.com>
->> Date:   Tue Jan 26 18:06:36 2016 +0000
->>
->>      iommu/arm-smmu: Support DMA-API domains
->>
->>      With DMA mapping ops provided by the iommu-dma code, only a minimal
->>      contribution from the IOMMU driver is needed to create a suitable
->>      DMA-API domain for them to use. Implement this for the ARM SMMUs.
->>
->>      Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->>      Signed-off-by: Will Deacon <will.deacon@arm.com>
->>
->> Any idea?
+Am not sure if this fan is wired to PWM controller though.
+
+> Like I've said above, right now the board doesn't stay on for very
+> long, and it's actually a very big _demotivator_ to powering the
+> board on.
 >
-> My first guess would be the same thing as [1] - does that patch help?
-
-No, it can't cease the fault.
-
+> This board is also *never* going anywhere near my boot farm because
+> it's just too damned noisy to be powered up during the night, even
+> if we do get the fan more under control once the kernel is running.
 >
-> Beyond that, what does your DT look like? The one in mainline has one
-> token mmu-masters property which isn't even valid, so nothing ever gets
-
-Mine has mmu-masters property too, but removing it doesn't solve the 
-problem.
-
-Thanks,
-Yang
+> If that's not enough to get some help with this, I'll instead snip
+> the fan wire and solder a resistor in series with the fan to slow
+> the damned thing down to reduce the noise level.
+>
+You should do that. I have less hope of other options.
 
 
-> attached to the SMMU - indeed I've happily booted -rc3 on an LS2085A
-> earlier this week - so there's clearly something going on there.
->
-> More generally, I'd note that the mmu-masters binding will never fully
-> work on this board - you can get the platform devices to cooperate by
-> programming the assorted ICID registers to ensure they present unique
-> stream IDs, but PCI devices cannot work at all because there's no way to
-> make the stream IDs coming out of the root complex be equal to the PCI
-> RID in the way it relies on. In that sense, any regression here is quite
-> likely just a shift from "subtly not working" to "loudly and obnoxiously
-> not working". Conversely, those reasons have also proved it a really
-> useful platform for implementing and testing the iommu-map binding[2]
-> (with an awful hack in the PCI driver to program the lookup table
-> suitably) :D
->
-> Robin.
->
-> [1]:http://thread.gmane.org/gmane.linux.kernel.iommu/12810
-> [2]:http://thread.gmane.org/gmane.linux.kernel.iommu/12454
->
->>
->> Thanks,
->> Yang
->>
->
+Regards,
+Santosh
