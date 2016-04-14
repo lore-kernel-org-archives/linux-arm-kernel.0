@@ -1,71 +1,43 @@
-From: jchandra@broadcom.com (Jayachandran C)
-Date: Thu, 14 Apr 2016 19:45:43 +0530
-Subject: [PATCH v2 3/4] PCI: generic,
- thunder: update to use generic ECAM API
-In-Reply-To: <570C429A.6090006@caviumnetworks.com>
-References: <1460414707-19153-1-git-send-email-jchandra@broadcom.com>
- <1460414707-19153-4-git-send-email-jchandra@broadcom.com>
- <570C429A.6090006@caviumnetworks.com>
-Message-ID: <CAKc_7PXdVYmm5LEUzCttagf9b4O9R--3OO1+u1CXTjGgi-K_rw@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 14 Apr 2016 17:17:37 +0300
+Subject: [PATCH 0/2] [media] atmel-isc: add driver for Atmel ISC
+In-Reply-To: <1460533460-32336-1-git-send-email-songjun.wu@atmel.com>
+References: <1460533460-32336-1-git-send-email-songjun.wu@atmel.com>
+Message-ID: <3857132.BKDS7IHZFq@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Hello Songjun,
 
-On Tue, Apr 12, 2016 at 6:04 AM, David Daney <ddaney@caviumnetworks.com> wrote:
-> On 04/11/2016 03:45 PM, Jayachandran C wrote:
->>
->> Use functions provided by drivers/pci/ecam.h for mapping the config
->> space in drivers/pci/host/pci-host-common.c, and update its users to
->> use 'struct pci_config_window' and 'struct pci_generic_ecam_ops'
->>
->> The changes are mostly to use 'struct pci_config_window' in place of
->> 'struct gen_pci'. Some of the fields of gen_pci were only used
->> temporarily and can be eliminated by using local variables or function
->> arguments, these are not carried over to struct pci_config_window.
->>
->> pci-thunder-ecam.c and pci-thunder-pem.c are the only users of the
->> pci_host_common_probe function and the gen_pci structure, these have
->> been updated to use the new API as well.
->>
->> The patch does not introduce any functional changes other than a very
->> minor one: with the new code, on 64-bit platforms, we do just a single
->> ioremap for the whole config space.
->>
->> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
->
->
-> Tested-by: David Daney <david.daney@cavium.com>
+On Wednesday 13 Apr 2016 15:44:18 Songjun Wu wrote:
+> The Image Sensor Controller driver includes two parts.
+> 1) Driver code to implement the ISC function.
+> 2) Device tree binding documentation, it describes how
+>    to add the ISC in device tree.
+> 
+> 
+> Songjun Wu (2):
+>   [media] atmel-isc: add the Image Sensor Controller code
+>   [media] atmel-isc: DT binding for Image Sensor Controller driver
 
-Thanks.
+I can't see the second patch in the linux-media mailing list archives, could 
+you please resend it ?
 
-> However, ...
->
->> ---
->>   drivers/pci/ecam.h                  |   5 ++
->>   drivers/pci/host/Kconfig            |   1 +
->>   drivers/pci/host/pci-host-common.c  | 121
->> ++++++++++++++++--------------------
->>   drivers/pci/host/pci-host-common.h  |  47 --------------
->>   drivers/pci/host/pci-host-generic.c |  50 +++------------
->>   drivers/pci/host/pci-thunder-ecam.c |  37 +++--------
->>   drivers/pci/host/pci-thunder-pem.c  |  53 +++++-----------
->
->
-> ... The patch conflicts with a bug-fix patch I just sent to
-> pci-thunder-pem.c, so there will be a race to see who gets in first.
+>  .../devicetree/bindings/media/atmel-isc.txt        |   84 ++
+>  drivers/media/platform/Kconfig                     |    1 +
+>  drivers/media/platform/Makefile                    |    2 +
+>  drivers/media/platform/atmel/Kconfig               |    9 +
+>  drivers/media/platform/atmel/Makefile              |    3 +
+>  drivers/media/platform/atmel/atmel-isc-regs.h      |  280 ++++
+>  drivers/media/platform/atmel/atmel-isc.c           | 1537 ++++++++++++++++
+>  7 files changed, 1916 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/atmel-isc.txt
+>  create mode 100644 drivers/media/platform/atmel/Kconfig
+>  create mode 100644 drivers/media/platform/atmel/Makefile
+>  create mode 100644 drivers/media/platform/atmel/atmel-isc-regs.h
+>  create mode 100644 drivers/media/platform/atmel/atmel-isc.c
 
-I would expect this patchset to take more time than the bugfix.
-I will update the patches when the fix is queued to -next.
+-- 
+Regards,
 
-> Also, I don't know if it would make sense to split out the pci-thunder-*
-> changes to a separate patch.
-
-In this case, I think splitting the pci-thunder-* will make it more
-complex than just switching everything to ecam.h in one go.
-
-If the patch needs to be split, I can move some of the simplification
-that was done to gen_pci structure and pci-host-common to a separate
-patch.
-
-JC.
+Laurent Pinchart
