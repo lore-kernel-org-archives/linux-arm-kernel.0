@@ -1,48 +1,39 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 14 Apr 2016 16:32:38 +0300
-Subject: [PATCH] ARM: dts: imx: ventana: add RS485 txen gpio support
-In-Reply-To: <1460639949-26392-1-git-send-email-tharvey@gateworks.com>
-References: <1460639949-26392-1-git-send-email-tharvey@gateworks.com>
-Message-ID: <20160414133237.GE2092@tarshish>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 14 Apr 2016 15:33:45 +0200
+Subject: [PATCH 1/2] dt-bindings: pci: add DT binding for Marvell Armada
+ 7K/8K PCIe controller
+In-Reply-To: <5192758.5yjNn0Uus9@wuerfel>
+References: <1459071058-18328-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1459071058-18328-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <5192758.5yjNn0Uus9@wuerfel>
+Message-ID: <20160414153345.31b04824@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tim,
+Arnd,
 
-On Thu, Apr 14, 2016 at 06:19:09AM -0700, Tim Harvey wrote:
-> The GW52xx/GW53xx/GW54xx have an on-board RS485 transceiver for half-duplex
-> RS485 using uart1. The active-high TXEN is GPIO7__IO1 which we can configure
-> as the rts-gpio as long as we specify it as active-low to invert the polarity
-> managed by mctrl_gpio helpers. This allows for RS485 to be used from
-> userspace by setting flags to SER_RS485_RTS_ON_SEND in the serial_rs485
-> struct when using the TIOCGRS485 ioctl.
-
-Do you use http://article.gmane.org/gmane.linux.ports.arm.kernel/482641 for 
-that?
-
-> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
-> ---
->  arch/arm/boot/dts/imx6qdl-gw52xx.dtsi | 3 +++
->  arch/arm/boot/dts/imx6qdl-gw53xx.dtsi | 3 +++
->  arch/arm/boot/dts/imx6qdl-gw54xx.dtsi | 3 +++
->  3 files changed, 9 insertions(+)
+On Mon, 28 Mar 2016 23:18:02 +0200, Arnd Bergmann wrote:
+> On Sunday 27 March 2016 11:30:57 Thomas Petazzoni wrote:
+> > +               ranges = <0x81000000 0 0xf9000000 0  0xf9000000 0 0x10000       /* downstream I/O */
+> > +                         0x82000000 0 0xf6000000 0  0xf6000000 0 0xf00000>;    /* non-prefetchable memory */
+> > 
 > 
-> diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-> index 8cccc4a..50d6039 100644
-> --- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-> @@ -315,6 +315,8 @@
->  &uart1 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_uart1>;
-> +	fsl,uart-has-rtscts;
-> +	rts-gpio = <&gpio7 1 GPIO_ACTIVE_LOW>;
+> No 64-bit (prefetchable) MMIO area? Is this a hardware limitation,
+> or did you just forget to add it?
 
-See http://marc.info/?l=linux-serial&m=146063601520851&w=2.
+I don't have enough technical documentation at the moment to answer the
+question. Would it be possible to merge this as-is, and update it later
+on when we have enough information about 64-bit MMIO area support? It
+does not affect this new DT binding, since it's purely related to the
+standard PCI binding.
 
-baruch
+Would this be OK? I'd prefer to have PCI supported with just the 32
+bits non-prefetchable memory rather than no PCI supported at all.
 
+Thanks a lot!
+
+Thomas
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
