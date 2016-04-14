@@ -1,38 +1,70 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 14 Apr 2016 14:20:52 +0100
-Subject: [PATCH v2 04/17] arm64: Introduce pmd_thp_or_huge
-In-Reply-To: <1460640065-27658-1-git-send-email-suzuki.poulose@arm.com>
-References: <1460640065-27658-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1460640065-27658-5-git-send-email-suzuki.poulose@arm.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 14 Apr 2016 06:21:06 -0700
+Subject: [PATCH 3/6] ARM: PSCI: Register with kernel restart handler
+In-Reply-To: <20160414085242.GB1533@katana>
+References: <1460120039-2497-1-git-send-email-linux@roeck-us.net>
+ <1460120039-2497-4-git-send-email-linux@roeck-us.net>
+ <20160413110519.GE32018@leverpostej> <570E4550.5000207@roeck-us.net>
+ <CAMuHMdU+vj4HDTLdXngUsTjF-Ki-HtbhoRU6mV7UKCz-BhFAtQ@mail.gmail.com>
+ <20160414004223.GA18564@roeck-us.net> <20160414085242.GB1533@katana>
+Message-ID: <570F9942.30608@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a helper to determine if a given pmd represents a huge page
-either by hugetlb or thp, as we have for arm. This will be used
-by KVM MMU code.
+On 04/14/2016 01:52 AM, Wolfram Sang wrote:
+>
+>> That makes things quite tricky. Best I can think of is a series of boolean
+>> devicetree properties, such as
+>>
+>> 	broken-reset-handler
+>> 	last-resort-restart-handler
+>> 	secondary-restart-handler
+>> 	default-restart-handler
+>> 	primary-restart-handler
+>>
+>> which ends up being quite similar to the 'restart-priority' property. I'll
+>> do this as follow-up patch, though
+>
+> Please CC me on this. I wanted to tackle this problem as well today. My
 
-Suggested-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Steve Capper <steve.capper@linaro.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- arch/arm64/include/asm/pgtable.h |    2 ++
- 1 file changed, 2 insertions(+)
+Sure.
 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 989fef1..dda4aa9 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -290,6 +290,8 @@ static inline pgprot_t mk_sect_prot(pgprot_t prot)
- #define pmd_mkyoung(pmd)	pte_pmd(pte_mkyoung(pmd_pte(pmd)))
- #define pmd_mknotpresent(pmd)	(__pmd(pmd_val(pmd) & ~PMD_TYPE_MASK))
- 
-+#define pmd_thp_or_huge(pmd)	(pmd_huge(pmd) || pmd_trans_huge(pmd))
-+
- #define __HAVE_ARCH_PMD_WRITE
- #define pmd_write(pmd)		pte_write(pmd_pte(pmd))
- 
--- 
-1.7.9.5
+> findings/conclusions so far:
+>
+> * There is one driver bringing 'priority' directly to DT already: gpio-restart
+>
+Correct.
+
+> * Watchdog priorities are board dependant
+>
+> * Having the priorities clear at boot-time is safer than configuring them
+>    at run-time
+>
+Correct.
+
+> * The linux scheme (0-255) shouldn't be enforced in DT
+>
+> So, I wondered about a "priority" binding which just states "the higher,
+> the more important". Then any OS can decide what to do with it. In the
+> Linux case, this could be: sort them and give them priority 256 -
+> position_in_sorted_list.
+>
+
+"the higher, the more important" makes sense to me. We don't have to
+enforce the linux scheme, though that happens to be the same (the priority
+argument in the notifier block takes an int, so it would not even be
+necessary to adjust it unless someone specifies 0xffffffff).
+
+> Opinions?
+>
+I am fine either way - boolean properties or numbers, with a personal
+preference for numbers as more flexible. Whatever is acceptable for
+the community is fine with me.
+
+Guenter
+
+>> - I do not see the point holding up the series for this, and it is
+>> really a separate problem.
+>
+> Ack.
+>
