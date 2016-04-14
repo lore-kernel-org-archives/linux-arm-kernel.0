@@ -1,42 +1,67 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 14 Apr 2016 17:10:16 +0100
-Subject: [PATCH v2 00/17] kvm-arm: Add stage2 page table walker
-In-Reply-To: <20160414160348.GQ30804@cbox>
-References: <1460640065-27658-1-git-send-email-suzuki.poulose@arm.com>
- <570F9B32.9090106@arm.com> <20160414160348.GQ30804@cbox>
-Message-ID: <570FC0E8.9030204@arm.com>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Thu, 14 Apr 2016 09:10:44 -0700
+Subject: [Question] refcount of DT node
+In-Reply-To: <06E9E2D3-4627-4970-ABBB-34B5ED620709@konsulko.com>
+References: <CAK7LNATFUW2KXUpFas6C_SJ0C7Qb1DWU0njLg-FCYciK2U6Oag@mail.gmail.com>
+ <20160414084849.GT19428@n2100.arm.linux.org.uk>
+ <20160414095957.GB10273@leverpostej>
+ <06E9E2D3-4627-4970-ABBB-34B5ED620709@konsulko.com>
+Message-ID: <570FC104.80808@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/04/16 17:03, Christoffer Dall wrote:
-> On Thu, Apr 14, 2016 at 02:29:22PM +0100, Suzuki K Poulose wrote:
->> On 14/04/16 14:20, Suzuki K Poulose wrote:
->>> This series adds support for stage2 page table helpers and makes
->>> the core kvm-arm MMU code make use of it. At the moment we assume
->>> that the host/hyp and the stage2 page tables have same number of
->>> levels and hence use the host level accessors (except for some
->>> hooks, e.g kvm_p.d_addr_end) and shares the routines for unmapping
->>> the page table ranges.
+On 4/14/2016 3:02 AM, Pantelis Antoniou wrote:
+> Hi Mark,
+> 
+>> On Apr 14, 2016, at 12:59 , Mark Rutland <mark.rutland@arm.com> wrote:
 >>
->>> The tree is available at :
->>>       git://linux-arm.org/linux-skp.git kvm-stage2/v2
+>> On Thu, Apr 14, 2016 at 09:48:49AM +0100, Russell King - ARM Linux wrote:
+>>> On Thu, Apr 14, 2016 at 04:47:57PM +0900, Masahiro Yamada wrote:
+>>>> Hi experts.
+>>>>
+>>>> My understanding of refcount of DT node is poor.
+>>>
+>>> The message from DT people is... don't worry about DT node refcounting.
+>>> Do whatever you want with it, they don't care whether you have correct
+>>> refcounting or not.
+>>>
+>>> The background behind that is that I've tried to fix the refcounting,
+>>> and even had the coccinelle people generate some stuff to work on this
+>>> issue, but DT people's attitude towards it is "don't bother".
+>>>
+>>> So yes, people may get it wrong, but it seems it's something that DT
+>>> people want ignored.
 >>
->> Please note that the tree above contains one additional patch on top of kvmarm/master :
->> commit	91ad0db16a42a7d3("arm64/sunxi: 4.6-rc1: Add dependency on generic irq chip"),
->> which is there to fix a build break with ARCH_SUNXI selected on 4.6-rc1.
+>> I'm not sure that's quite fair; the last discussion I recall about this
+>> ended up concluding that we need a better API, rather than papering over
+>> problems.
 >>
-> ok, but I can just build/test this without ARCH_SUNXI and pick the
-> remains of this series only for kvmarm/next, as far as I can tell,
-> right?
+>> That said, there isn't much obvious progress on that front.
+>>
+>> Frank, Pantelis, Rob, were there any conclusions on this from ELC, or is
+>> this something that needs someone to propose something?
+>>
+> 
+> Frank mentioned that he wants a new API. I have some ideas about it too.
+> 
+> My take is that drivers should never do reference counting, we have to figure
+> out a way for DT access using copy semantics or locks.
+> 
+> References would still be required for core DT code, but that?s a sane subset.
 
-Yup.
+Yes.  Nothing concrete about implementation was decided at ELC, but this issue
+is on my todo list.
 
-> Marc, seems like you're happy with this series as well?
+-Frank
 
-Very. I'm still going through the last patches, but so far it looks great.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> 
+>> Mark.
+>>
+>> [1] http://permalink.gmane.org/gmane.linux.drivers.devicetree/153777
+> 
+> Regards
+> 
+> ? Pantelis
+> 
+> .
+> 
