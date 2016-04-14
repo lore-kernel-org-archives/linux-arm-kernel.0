@@ -1,133 +1,106 @@
-From: david@lechnology.com (David Lechner)
-Date: Thu, 14 Apr 2016 14:13:35 -0500
-Subject: [PATCH 1/2] ARM: davinci: Move clock init after ioremap.
-In-Reply-To: <1460661217-7389-1-git-send-email-david@lechnology.com>
-References: <1460661217-7389-1-git-send-email-david@lechnology.com>
-Message-ID: <1460661217-7389-2-git-send-email-david@lechnology.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 14 Apr 2016 21:17:22 +0200
+Subject: [PATCH v5 02/24] pwm: use pwm_get/set_xxx() helpers where appropriate
+In-Reply-To: <1460661464-11216-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1460661464-11216-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1460661464-11216-3-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some clocks (such as the USB PHY clocks in DA8xx) will need to use iomem.
-The davinci_common_init() function must be called before the ioremap, so
-the clock init is now split out as separate function.
+Use pwm_get/set_xxx() helpers instead of directly accessing the pwm->xxx
+field. Doing that will ease adaptation of the PWM framework to support
+atomic update.
 
-Signed-off-by: David Lechner <david@lechnology.com>
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
+Patch generated with the following coccinelle script:
 
-v4 changes:
+--->8---
+virtual patch
 
-* no longer wrapping davinci_clk_init() since it does not return an error.
+@@
+struct pwm_device *p;
+expression e;
+@@
+(
+-(p)->polarity = e;
++pwm_set_polarity(p, e);
+|
+-(p)->polarity
++pwm_get_polarity(p)
+|
+-(p)->period = e;
++pwm_set_period(p, e);
+|
+-(p)->period
++pwm_get_period(p)
+|
+-(p)->duty_cycle = e;
++pwm_set_duty_cycle(p, e);
+|
+-(p)->duty_cycle
++pwm_get_duty_cycle(p)
+)
+--->8---
+---
+ drivers/pwm/pwm-crc.c          | 2 +-
+ drivers/pwm/pwm-lpc18xx-sct.c  | 2 +-
+ drivers/pwm/pwm-omap-dmtimer.c | 2 +-
+ drivers/pwm/pwm-sun4i.c        | 3 ++-
+ 4 files changed, 5 insertions(+), 4 deletions(-)
 
-
- arch/arm/mach-davinci/clock.c  | 2 +-
- arch/arm/mach-davinci/common.c | 6 ------
- arch/arm/mach-davinci/da830.c  | 2 ++
- arch/arm/mach-davinci/da850.c  | 2 ++
- arch/arm/mach-davinci/dm355.c  | 1 +
- arch/arm/mach-davinci/dm365.c  | 1 +
- arch/arm/mach-davinci/dm644x.c | 1 +
- arch/arm/mach-davinci/dm646x.c | 1 +
- 8 files changed, 9 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/clock.c b/arch/arm/mach-davinci/clock.c
-index 34b4f9f..df42c93 100644
---- a/arch/arm/mach-davinci/clock.c
-+++ b/arch/arm/mach-davinci/clock.c
-@@ -577,7 +577,7 @@ EXPORT_SYMBOL(davinci_set_pllrate);
-  * than that used by default in <soc>.c file. The reference clock rate
-  * should be updated early in the boot process; ideally soon after the
-  * clock tree has been initialized once with the default reference clock
-- * rate (davinci_common_init()).
-+ * rate (davinci_clk_init()).
-  *
-  * Returns 0 on success, error otherwise.
-  */
-diff --git a/arch/arm/mach-davinci/common.c b/arch/arm/mach-davinci/common.c
-index 742133b..049025f 100644
---- a/arch/arm/mach-davinci/common.c
-+++ b/arch/arm/mach-davinci/common.c
-@@ -108,12 +108,6 @@ void __init davinci_common_init(struct davinci_soc_info *soc_info)
- 	if (ret < 0)
- 		goto err;
+diff --git a/drivers/pwm/pwm-crc.c b/drivers/pwm/pwm-crc.c
+index 7101c70..bd0ebd0 100644
+--- a/drivers/pwm/pwm-crc.c
++++ b/drivers/pwm/pwm-crc.c
+@@ -75,7 +75,7 @@ static int crc_pwm_config(struct pwm_chip *c, struct pwm_device *pwm,
+ 		return -EINVAL;
+ 	}
  
--	if (davinci_soc_info.cpu_clks) {
--		ret = davinci_clk_init(davinci_soc_info.cpu_clks);
--
--		if (ret != 0)
--			goto err;
--	}
+-	if (pwm->period != period_ns) {
++	if (pwm_get_period(pwm) != period_ns) {
+ 		int clk_div;
  
- 	return;
+ 		/* changing the clk divisor, need to disable fisrt */
+diff --git a/drivers/pwm/pwm-lpc18xx-sct.c b/drivers/pwm/pwm-lpc18xx-sct.c
+index 9861fed..19dc64c 100644
+--- a/drivers/pwm/pwm-lpc18xx-sct.c
++++ b/drivers/pwm/pwm-lpc18xx-sct.c
+@@ -249,7 +249,7 @@ static int lpc18xx_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 			   LPC18XX_PWM_EVSTATEMSK(lpc18xx_data->duty_event),
+ 			   LPC18XX_PWM_EVSTATEMSK_ALL);
  
-diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
-index 7187e7f..426fd74 100644
---- a/arch/arm/mach-davinci/da830.c
-+++ b/arch/arm/mach-davinci/da830.c
-@@ -1214,4 +1214,6 @@ void __init da830_init(void)
+-	if (pwm->polarity == PWM_POLARITY_NORMAL) {
++	if (pwm_get_polarity(pwm) == PWM_POLARITY_NORMAL) {
+ 		set_event = lpc18xx_pwm->period_event;
+ 		clear_event = lpc18xx_data->duty_event;
+ 		res_action = LPC18XX_PWM_RES_SET;
+diff --git a/drivers/pwm/pwm-omap-dmtimer.c b/drivers/pwm/pwm-omap-dmtimer.c
+index b7e6ecb..3e95090 100644
+--- a/drivers/pwm/pwm-omap-dmtimer.c
++++ b/drivers/pwm/pwm-omap-dmtimer.c
+@@ -192,7 +192,7 @@ static int pwm_omap_dmtimer_config(struct pwm_chip *chip,
+ 		load_value, load_value,	match_value, match_value);
  
- 	da8xx_syscfg0_base = ioremap(DA8XX_SYSCFG0_BASE, SZ_4K);
- 	WARN(!da8xx_syscfg0_base, "Unable to map syscfg0 module");
-+
-+	davinci_clk_init(davinci_soc_info_da830.cpu_clks);
- }
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index 97d8779..1f85bbc 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -1346,4 +1346,6 @@ void __init da850_init(void)
- 	v = __raw_readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP3_REG));
- 	v &= ~CFGCHIP3_PLL1_MASTER_LOCK;
- 	__raw_writel(v, DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP3_REG));
-+
-+	davinci_clk_init(davinci_soc_info_da850.cpu_clks);
- }
-diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
-index a0ecf49..5a19cca 100644
---- a/arch/arm/mach-davinci/dm355.c
-+++ b/arch/arm/mach-davinci/dm355.c
-@@ -1052,6 +1052,7 @@ void __init dm355_init(void)
- {
- 	davinci_common_init(&davinci_soc_info_dm355);
- 	davinci_map_sysmod();
-+	davinci_clk_init(davinci_soc_info_dm355.cpu_clks);
- }
+ 	omap->pdata->set_pwm(omap->dm_timer,
+-			      pwm->polarity == PWM_POLARITY_INVERSED,
++			      pwm_get_polarity(pwm) == PWM_POLARITY_INVERSED,
+ 			      true,
+ 			      PWM_OMAP_DMTIMER_TRIGGER_OVERFLOW_AND_COMPARE);
  
- int __init dm355_init_video(struct vpfe_config *vpfe_cfg,
-diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
-index 384d367..8aa004b 100644
---- a/arch/arm/mach-davinci/dm365.c
-+++ b/arch/arm/mach-davinci/dm365.c
-@@ -1176,6 +1176,7 @@ void __init dm365_init(void)
- {
- 	davinci_common_init(&davinci_soc_info_dm365);
- 	davinci_map_sysmod();
-+	davinci_clk_init(davinci_soc_info_dm365.cpu_clks);
- }
+diff --git a/drivers/pwm/pwm-sun4i.c b/drivers/pwm/pwm-sun4i.c
+index 67af9f6..03a99a5 100644
+--- a/drivers/pwm/pwm-sun4i.c
++++ b/drivers/pwm/pwm-sun4i.c
+@@ -354,7 +354,8 @@ static int sun4i_pwm_probe(struct platform_device *pdev)
+ 	val = sun4i_pwm_readl(pwm, PWM_CTRL_REG);
+ 	for (i = 0; i < pwm->chip.npwm; i++)
+ 		if (!(val & BIT_CH(PWM_ACT_STATE, i)))
+-			pwm->chip.pwms[i].polarity = PWM_POLARITY_INVERSED;
++			pwm_set_polarity(&pwm->chip.pwms[i],
++					 PWM_POLARITY_INVERSED);
+ 	clk_disable_unprepare(pwm->clk);
  
- static struct resource dm365_vpss_resources[] = {
-diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
-index b4b3a8b..0afa279 100644
---- a/arch/arm/mach-davinci/dm644x.c
-+++ b/arch/arm/mach-davinci/dm644x.c
-@@ -932,6 +932,7 @@ void __init dm644x_init(void)
- {
- 	davinci_common_init(&davinci_soc_info_dm644x);
- 	davinci_map_sysmod();
-+	davinci_clk_init(davinci_soc_info_dm644x.cpu_clks);
- }
- 
- int __init dm644x_init_video(struct vpfe_config *vpfe_cfg,
-diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
-index a43db0f..da21353 100644
---- a/arch/arm/mach-davinci/dm646x.c
-+++ b/arch/arm/mach-davinci/dm646x.c
-@@ -956,6 +956,7 @@ void __init dm646x_init(void)
- {
- 	davinci_common_init(&davinci_soc_info_dm646x);
- 	davinci_map_sysmod();
-+	davinci_clk_init(davinci_soc_info_dm646x.cpu_clks);
- }
- 
- static int __init dm646x_init_devices(void)
+ 	return 0;
 -- 
-1.9.1
+2.5.0
