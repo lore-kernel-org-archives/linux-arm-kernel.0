@@ -1,130 +1,96 @@
-From: yunhui.cui@nxp.com (Yunhui Cui)
-Date: Thu, 14 Apr 2016 03:45:33 +0000
-Subject: [PATCH v3 4/4] mtd: spi-nor: Disable Micron flash HW protection
-In-Reply-To: <A765B125120D1346A63912DDE6D8B6310BF6B498@NTXXIAMBX02.xacn.micron.com>
-References: <A765B125120D1346A63912DDE6D8B6310BF699D2@NTXXIAMBX02.xacn.micron.com>
- <DB5PR0401MB1912D5517CD6394B7EEE136A948C0@DB5PR0401MB1912.eurprd04.prod.outlook.com>
- <A765B125120D1346A63912DDE6D8B6310BF6B498@NTXXIAMBX02.xacn.micron.com>
-Message-ID: <DB5PR0401MB1912374AA10D354B6D28837A94970@DB5PR0401MB1912.eurprd04.prod.outlook.com>
+From: B56489@freescale.com (Yunhui Cui)
+Date: Thu, 14 Apr 2016 11:50:47 +0800
+Subject: [PATCH 1/9] mtd:fsl-quadspi:use the property fields of SPI-NOR
+In-Reply-To: <1460605855-6689-1-git-send-email-B56489@freescale.com>
+References: <1460605855-6689-1-git-send-email-B56489@freescale.com>
+Message-ID: <1460605855-6689-2-git-send-email-B56489@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+We can get the read/write/erase opcode from the spi nor framework
+directly. This patch uses the information stored in the SPI-NOR to
+remove the hardcode in the fsl_qspi_init_lut().
 
-I will send another patch set to replace this patch set. This patch set need not be reviewed more, Many thanks! 
+Signed-off-by: Yunhui Cui <B56489@freescale.com>
+Signed-off-by: Yunhui Cui <yunhui.cui@nxp.com>
+---
+ drivers/mtd/spi-nor/fsl-quadspi.c | 40 ++++++++++++---------------------------
+ 1 file changed, 12 insertions(+), 28 deletions(-)
 
-Thanks
-Yunhui
-
------Original Message-----
-From: Bean Huo ??? (beanhuo) [mailto:beanhuo at micron.com] 
-Sent: Monday, March 21, 2016 10:56 AM
-To: Yunhui Cui; Yunhui Cui
-Cc: linux-mtd at lists.infradead.org; dwmw2 at infradead.org; computersforpeace at gmail.com; han.xu at freescale.com; linux-kernel at vger.kernel.org; linux-mtd at lists.infradead.org; linux-arm-kernel at lists.infradead.org; Yao Yuan
-Subject: RE: [PATCH v3 4/4] mtd: spi-nor: Disable Micron flash HW protection
-
-Hi, Yunhai
-You mean that EVCR.bit7 cannot clear(enable quad mode) if not write SR.bit7 to 0?
-They don't have any connection each other.
-
-> -----Original Message-----
-> From: Yunhui Cui [mailto:yunhui.cui at nxp.com]
-> Sent: Friday, March 18, 2016 6:09 PM
-> To: Bean Huo ??? (beanhuo); Yunhui Cui
-> Cc: linux-mtd at lists.infradead.org; dwmw2 at infradead.org; 
-> computersforpeace at gmail.com; han.xu at freescale.com; 
-> linux-kernel at vger.kernel.org; linux-mtd at lists.infradead.org; 
-> linux-arm-kernel at lists.infradead.org; Yao Yuan
-> Subject: RE: [PATCH v3 4/4] mtd: spi-nor: Disable Micron flash HW 
-> protection
-> 
-> Hi Bean,
-> 
-> Thanks for your suggestions very much.
-> Yes, the flash N25Q128A status register write enable/disable bit is 
-> disable in initial state.
-> But, This patch aims to clear status registerV bit[7](write 
-> enable/disable bit) to 0, which enables the bit.
-> Frankly speaking, I also don't want to add this patch.
-> The reason for this is that clear status register bit[7] to 0 is a 
-> must to set quad mode to Enhanced Volatile Configuration Register 
-> using command SPINOR_OP_WD_EVCR. Otherwise it will output "Micron EVCR 
-> Quad bit not clear" in spi-nor.c I looked up the datasheet, but I 
-> really don't find out any connection between status register 
-> bit[7](write enable/disable bit) equals 0 and seting quad mode to Enhanced Volatile Configuration Register.
-> 
-> Just as I want to send the issue to Micron team , could you give me 
-> some solutions ?
-> 
-> 
-> Thanks
-> Yunhui
-> 
-> -----Original Message-----
-> From: Bean Huo ??? (beanhuo) [mailto:beanhuo at micron.com]
-> Sent: Thursday, March 03, 2016 9:39 PM
-> To: Yunhui Cui
-> Cc: linux-mtd at lists.infradead.org; dwmw2 at infradead.org; 
-> computersforpeace at gmail.com; han.xu at freescale.com; 
-> linux-kernel at vger.kernel.org; linux-mtd at lists.infradead.org; 
-> linux-arm-kernel at lists.infradead.org; Yao Yuan; Yunhui Cui
-> Subject: Re: [PATCH v3 4/4] mtd: spi-nor: Disable Micron flash HW 
-> protection
-> 
-> > From: Yunhui Cui <B56489@freescale.com>
-> > To: <dwmw2@infradead.org>, <computersforpeace@gmail.com>,
-> > 	<han.xu@freescale.com>
-> > Cc: <linux-kernel@vger.kernel.org>, <linux-mtd@lists.infradead.org>,
-> > 	<linux-arm-kernel@lists.infradead.org>, <yao.yuan@nxp.com>, Yunhui 
-> > Cui
-> > 	<yunhui.cui@nxp.com>
-> > Subject: [PATCH v3 4/4] mtd: spi-nor: Disable Micron flash HW
-> > 	protection
-> > Message-ID:
-> <1456988044-37061-4-git-send-email-B56489@freescale.com>
-> > Content-Type: text/plain
-> >
-> > From: Yunhui Cui <yunhui.cui@nxp.com>
-> >
-> > For Micron family ,The status register write enable/disable bit, 
-> > provides hardware data protection for the device.
-> > When the enable/disable bit is set to 1, the status register 
-> > nonvolatile bits become read-only and the WRITE STATUS REGISTER 
-> > operation will not execute.
-> >
-> > Signed-off-by: Yunhui Cui <yunhui.cui@nxp.com>
-> > ---
-> >  drivers/mtd/spi-nor/spi-nor.c | 9 +++++++++
-> >  1 file changed, 9 insertions(+)
-> >
-> > diff --git a/drivers/mtd/spi-nor/spi-nor.c 
-> > b/drivers/mtd/spi-nor/spi-nor.c index ed0c19c..917f814 100644
-> > --- a/drivers/mtd/spi-nor/spi-nor.c
-> > +++ b/drivers/mtd/spi-nor/spi-nor.c
-> > @@ -39,6 +39,7 @@
-> >
-> >  #define SPI_NOR_MAX_ID_LEN	6
-> >  #define SPI_NOR_MAX_ADDR_WIDTH	4
-> > +#define SPI_NOR_MICRON_WRITE_ENABLE	0x7f
-> >
-> >  struct flash_info {
-> >  	char		*name;
-> > @@ -1238,6 +1239,14 @@ int spi_nor_scan(struct spi_nor *nor, const 
-> > char *name, enum read_mode mode)
-> >  		write_sr(nor, 0);
-> >  	}
-> >
-> > +	if (JEDEC_MFR(info) == SNOR_MFR_MICRON) {
-> > +		ret = read_sr(nor);
-> > +		ret &= SPI_NOR_MICRON_WRITE_ENABLE;
-> > +
-> For Micron the status register write enable/disable bit, its 
-> default/factory value is disable.
-> Can here first check ,then program?
-> > +		write_enable(nor);
-> > +		write_sr(nor, ret);
-> > +	}
-> > +
-> >  	if (!mtd->name)
-> >  		mtd->name = dev_name(dev);
-> >  	mtd->priv = nor;
+diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c b/drivers/mtd/spi-nor/fsl-quadspi.c
+index 9ab2b51..517ffe2 100644
+--- a/drivers/mtd/spi-nor/fsl-quadspi.c
++++ b/drivers/mtd/spi-nor/fsl-quadspi.c
+@@ -373,9 +373,13 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+ 	void __iomem *base = q->iobase;
+ 	int rxfifo = q->devtype_data->rxfifo;
+ 	u32 lut_base;
+-	u8 cmd, addrlen, dummy;
+ 	int i;
+ 
++	struct spi_nor *nor = &q->nor[0];
++	u8 addrlen = (nor->addr_width == 3) ? ADDR24BIT : ADDR32BIT;
++	u8 read_op = nor->read_opcode;
++	u8 read_dm = nor->read_dummy;
++
+ 	fsl_qspi_unlock_lut(q);
+ 
+ 	/* Clear all the LUT table */
+@@ -385,20 +389,10 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+ 	/* Quad Read */
+ 	lut_base = SEQID_QUAD_READ * 4;
+ 
+-	if (q->nor_size <= SZ_16M) {
+-		cmd = SPINOR_OP_READ_1_1_4;
+-		addrlen = ADDR24BIT;
+-		dummy = 8;
+-	} else {
+-		/* use the 4-byte address */
+-		cmd = SPINOR_OP_READ_1_1_4;
+-		addrlen = ADDR32BIT;
+-		dummy = 8;
+-	}
+-
+-	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
++	qspi_writel(q, LUT0(CMD, PAD1, read_op) | LUT1(ADDR, PAD1, addrlen),
+ 			base + QUADSPI_LUT(lut_base));
+-	qspi_writel(q, LUT0(DUMMY, PAD1, dummy) | LUT1(FSL_READ, PAD4, rxfifo),
++	qspi_writel(q, LUT0(DUMMY, PAD1, read_dm) |
++		    LUT1(FSL_READ, PAD4, rxfifo),
+ 			base + QUADSPI_LUT(lut_base + 1));
+ 
+ 	/* Write enable */
+@@ -409,16 +403,8 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+ 	/* Page Program */
+ 	lut_base = SEQID_PP * 4;
+ 
+-	if (q->nor_size <= SZ_16M) {
+-		cmd = SPINOR_OP_PP;
+-		addrlen = ADDR24BIT;
+-	} else {
+-		/* use the 4-byte address */
+-		cmd = SPINOR_OP_PP;
+-		addrlen = ADDR32BIT;
+-	}
+-
+-	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
++	qspi_writel(q, LUT0(CMD, PAD1, nor->program_opcode) |
++		    LUT1(ADDR, PAD1, addrlen),
+ 			base + QUADSPI_LUT(lut_base));
+ 	qspi_writel(q, LUT0(FSL_WRITE, PAD1, 0),
+ 			base + QUADSPI_LUT(lut_base + 1));
+@@ -432,10 +418,8 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+ 	/* Erase a sector */
+ 	lut_base = SEQID_SE * 4;
+ 
+-	cmd = q->nor[0].erase_opcode;
+-	addrlen = q->nor_size <= SZ_16M ? ADDR24BIT : ADDR32BIT;
+-
+-	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
++	qspi_writel(q, LUT0(CMD, PAD1, nor->erase_opcode) |
++		    LUT1(ADDR, PAD1, addrlen),
+ 			base + QUADSPI_LUT(lut_base));
+ 
+ 	/* Erase the whole chip */
+-- 
+2.1.0.27.g96db324
