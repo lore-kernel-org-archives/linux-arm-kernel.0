@@ -1,44 +1,72 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 14 Apr 2016 08:22:06 -0400
-Subject: [PATCH] ARM: multi_v7_defconfig: enable Denali NAND controller
-In-Reply-To: <1460620464-15896-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1460620464-15896-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <570F8B6E.7040303@osg.samsung.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 14 Apr 2016 18:02:15 +0530
+Subject: [PATCH v2 06/11] phy: da8xx-usb: new driver for DA8XX SoC USB PHY
+In-Reply-To: <570EB143.4060309@lechnology.com>
+References: <1458181615-27782-1-git-send-email-david@lechnology.com>
+ <1458181615-27782-7-git-send-email-david@lechnology.com>
+ <56FE74AC.6080303@ti.com> <570EB143.4060309@lechnology.com>
+Message-ID: <570F8DCF.2000402@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Masahiro,
+Hi,
 
-On 04/14/2016 03:54 AM, Masahiro Yamada wrote:
-> This NAND controller device is used on UniPhier SoCs (and I know
-> it is also used on SoC FPGA).
+On Thursday 14 April 2016 02:21 AM, David Lechner wrote:
+> On 04/01/2016 08:16 AM, Kishon Vijay Abraham I wrote:
 > 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
+>>> +EXPORT_SYMBOL_GPL(da8xx_usb20_phy_set_mode);
+>>
+>> Don't prefer export symbols from PHY driver. That'll create unnecessary
+>> dependencies between the controller and the PHY.
+>>
+>> I think it'll be better to create a new attribute and use it?
+>>
 > 
->  arch/arm/configs/multi_v7_defconfig | 1 +
->  1 file changed, 1 insertion(+)
+> Just having an attribute that keeps track of state does not work. I need a
+> callback to poke registers. Would this be acceptable instead?
 > 
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 2823490..ef1d642 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -183,6 +183,7 @@ CONFIG_MTD_CMDLINE_PARTS=y
->  CONFIG_MTD_BLOCK=y
->  CONFIG_MTD_M25P80=y
->  CONFIG_MTD_NAND=y
-> +CONFIG_MTD_NAND_DENALI_DT=y
->  CONFIG_MTD_NAND_ATMEL=y
->  CONFIG_MTD_NAND_BRCMNAND=y
->  CONFIG_MTD_NAND_VF610_NFC=y
+> -----8<------
+> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+> index e7e574d..a13c7e4 100644
+> --- a/drivers/phy/phy-core.c
+> +++ b/drivers/phy/phy-core.c
+> @@ -342,6 +342,36 @@ int phy_power_off(struct phy *phy)
+>  }
+>  EXPORT_SYMBOL_GPL(phy_power_off);
 > 
+> +int phy_get_mode(struct phy *phy, enum phy_mode *mode)
+> +{
+> +       int ret;
+> +
+> +       if (!phy || !phy->ops->get_mode)
+> +               return 0;
+> +
+> +       mutex_lock(&phy->mutex);
+> +       ret = phy->ops->get_mode(phy, mode);
+> +       mutex_unlock(&phy->mutex);
+> +
+> +       return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(phy_get_mode);
 
-Patch looks good to me.
+'ops' for get_mode doesn't make much sense.
+> +
+> +int phy_set_mode(struct phy *phy, enum phy_mode mode)
+> +{
+> +       int ret;
+> +
+> +       if (!phy || !phy->ops->set_mode)
+> +               return 0;
+> +
+> +       mutex_lock(&phy->mutex);
+> +       ret = phy->ops->set_mode(phy, mode);
+> +       mutex_unlock(&phy->mutex);
+> +
+> +       return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(phy_set_mode);
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+this should be fine.
 
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Thanks
+Kishon
