@@ -1,56 +1,35 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 14 Apr 2016 13:36:19 -0700
-Subject: [GIT PULL] omap fixes for v4.6-rc cycle
-Message-ID: <20160414203619.GR5973@atomide.com>
+Date: Thu, 14 Apr 2016 13:44:53 -0700
+Subject: [PATCH V2] ARM: dts: Add support for dra72-evm rev C (SR2.0)
+In-Reply-To: <1460655958-4639-1-git-send-email-nm@ti.com>
+References: <1460655958-4639-1-git-send-email-nm@ti.com>
+Message-ID: <20160414204452.GO5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 19e831b272e6db5884be085be66e44da975c73a9:
+* Nishanth Menon <nm@ti.com> [160414 10:47]:
+> DRA72-EVM now has an upgrade to Rev C with SR2.0 silicon. As part of
+> this change, a few updates were factored in that were software
+> incompatible with previous board in few areas:
+> - We now use DP83867 ethernet phy instead of older DP838865 which fails
+>   in certain use cases.
+> - Two Ethernet ports now instead of the single one in rev B.
+> - polarities changed for certain pcf gpios
+> - Due to SoC phy current requirements, VDDA supplies are split between
+>  ldo3 and ldo2 (ldo2 was previously unused). NOTE: DSS (VDDA_VIDEO) is
+>  still supplied by ldo5, HDMI is now supplied by LDO2 instead of using
+>  LDO3.
+> 
+> NOTE: It does not make much sense to spin off a new board compatible
+> flag since there is no real benefit for the same.
+> 
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+> Updates in v2:
+>  - minor fixes + rebase to
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap.git
+>   omap-for-v4.7/dt   4cb53a2308a9 ARM: dts: omap3-beagle: Provide NAND ready pin
 
-  Merge branch 'fixes-rc2' into omap-for-v4.6/fixes (2016-04-08 09:18:00 -0700)
+Thanks for updating this, applying into omap-for-v4.7/dt.
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.6/fixes-rc3
-
-for you to fetch changes up to 1560d15861769c23fd981e2d60dc7fd790b21e1e:
-
-  ARM: OMAP3: Fix external abort on 36xx waking from off mode idle (2016-04-14 08:27:30 -0700)
-
-----------------------------------------------------------------
-Fixes for omaps for v4.6-rc cycle:
-
-- Clockdomain fix for dra7 timer interrupts
-
-- Two fixes for GPMC EDMA binding, I missed the need for a merge with
-  GPMC changes and EDMA changes
-
-- Fix beagle-x15 eSATA by dropping misconfigured extcon_usb1
-
-- Fix occasional external aborts on 36xx with PM that we've been
-  chasing for past few months. It turned out to be duplicate restore
-  of INTC registers that can in some cases cause us to hit erratum 1.106.
-
-----------------------------------------------------------------
-Dave Gerlach (1):
-      ARM: OMAP3: Fix external abort on 36xx waking from off mode idle
-
-Franklin S Cooper Jr (2):
-      ARM: dts: am33xx: Fix GPMC dma properties
-      ARM: dts: am437x: Fix GPMC dma properties
-
-Keerthy (1):
-      ARM: DRA7: clockdomain: Implement timer workaround for errata i874
-
-Roger Quadros (1):
-      ARM: dts: am57xx-beagle-x15: remove extcon_usb1
-
-Tony Lindgren (1):
-      Merge tag 'for-v4.6-rc/omap-fixes-b' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v4.6/fixes
-
- arch/arm/boot/dts/am33xx.dtsi              |  2 +-
- arch/arm/boot/dts/am4372.dtsi              |  2 +-
- arch/arm/boot/dts/am57xx-beagle-x15.dts    | 17 -----------------
- arch/arm/mach-omap2/clockdomains7xx_data.c |  2 +-
- arch/arm/mach-omap2/pm34xx.c               | 23 +++++++++++++----------
- 5 files changed, 16 insertions(+), 30 deletions(-)
+Tony
