@@ -1,48 +1,34 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 14 Apr 2016 20:53:33 +0800
-Subject: [PATCH 3/4] i2c: designware-pcidrv: enable RuntimePM before
- registering to the core
+Date: Thu, 14 Apr 2016 20:53:32 +0800
+Subject: [PATCH 2/4] i2c: designware-platdrv: fix unbalanced clk enable and
+ prepare
 In-Reply-To: <1460638414-5987-1-git-send-email-jszhang@marvell.com>
 References: <1460638414-5987-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1460638414-5987-4-git-send-email-jszhang@marvell.com>
+Message-ID: <1460638414-5987-3-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As pointed out by commit 36d48fb5766a ("i2c: designware-platdrv: enable
-RuntimePM before registering to the core"), "The core may register
-clients attached to this master which may use funtionality from the
-master", so enable RuntimePM before registering to the core.
+If i2c_dw_probe() fail, we should call i2c_dw_plat_prepare_clk() to
+disable and unprepare the clk, otherwise the clk enable and prepare
+is left unbalanced.
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
- drivers/i2c/busses/i2c-designware-pcidrv.c | 11 +++++++----
- 1 file changed, 7 insertions(+), 4 deletions(-)
+ drivers/i2c/busses/i2c-designware-platdrv.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/i2c/busses/i2c-designware-pcidrv.c b/drivers/i2c/busses/i2c-designware-pcidrv.c
-index 7368be0..41a01a7 100644
---- a/drivers/i2c/busses/i2c-designware-pcidrv.c
-+++ b/drivers/i2c/busses/i2c-designware-pcidrv.c
-@@ -248,14 +248,17 @@ static int i2c_dw_pci_probe(struct pci_dev *pdev,
- 	ACPI_COMPANION_SET(&adap->dev, ACPI_COMPANION(&pdev->dev));
- 	adap->nr = controller->bus_num;
+diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
+index 00f9e99..1488cea 100644
+--- a/drivers/i2c/busses/i2c-designware-platdrv.c
++++ b/drivers/i2c/busses/i2c-designware-platdrv.c
+@@ -268,6 +268,8 @@ rpm_disable:
+ 		pm_runtime_put_noidle(&pdev->dev);
+ 	}
  
-+	pm_runtime_set_autosuspend_delay(&pdev->dev, 1000);
-+	pm_runtime_use_autosuspend(&pdev->dev);
-+	pm_runtime_allow(&pdev->dev);
++	i2c_dw_plat_prepare_clk(dev, false);
 +
- 	r = i2c_dw_probe(dev);
--	if (r)
-+	if (r) {
-+		pm_runtime_forbid(&pdev->dev);
- 		return r;
-+	}
- 
--	pm_runtime_set_autosuspend_delay(&pdev->dev, 1000);
--	pm_runtime_use_autosuspend(&pdev->dev);
- 	pm_runtime_put_autosuspend(&pdev->dev);
--	pm_runtime_allow(&pdev->dev);
- 
- 	return 0;
+ 	return r;
  }
+ 
 -- 
 2.8.0.rc3
