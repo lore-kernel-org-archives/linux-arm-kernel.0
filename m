@@ -1,102 +1,138 @@
 From: geoff@infradead.org (Geoff Levand)
-Date: Thu, 14 Apr 2016 21:21:36 +0000
-Subject: [PATCH v16 02/20] arm64: Cleanup SCTLR flags
+Date: Thu, 14 Apr 2016 21:21:37 +0000
+Subject: [PATCH v16 15/20] arm64: kdump: reserve memory for crash dump kernel
 In-Reply-To: <cover.1460668521.git.geoff@infradead.org>
 References: <cover.1460668521.git.geoff@infradead.org>
-Message-ID: <be7f33adbbe78dc3bcfc821eb395a6af9a7dda34.1460668521.git.geoff@infradead.org>
+Message-ID: <467c511e5242786f44ded0b6e16f75e8d1c7a9e3.1460668521.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We currently have macros defining flags for the arm64 sctlr registers in
-both kvm_arm.h and sysreg.h.  To clean things up and simplify move the
-definitions of the SCTLR_EL2 flags from kvm_arm.h to sysreg.h, rename any
-SCTLR_EL1 or SCTLR_EL2 flags that are common to both registers to be
-SCTLR_ELx, with 'x' indicating a common flag, and fixup all files to
-include the proper header or to use the new macro names.
+From: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-Signed-off-by: Geoff Levand <geoff@infradead.org>
-[Restored pgtable-hwdef.h include]
-Signed-off-by: James Morse <james.morse@arm.com>
+On the startup of primary kernel, the memory region used by crash dump
+kernel must be specified by "crashkernel=" kernel parameter.
+reserve_crashkernel() will allocate and reserve the region for later use.
+
+User space tools, like kexec-tools, will be able to find that region marked
+as "Crash kernel" in /proc/iomem.
+
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Signed-off-by: Mark Salter <msalter@redhat.com>
+Signed-off-by: Pratyush Anand <panand@redhat.com>
 ---
- arch/arm64/include/asm/kvm_arm.h | 11 -----------
- arch/arm64/include/asm/sysreg.h  | 19 +++++++++++++++----
- arch/arm64/kvm/hyp-init.S        |  5 +++--
- 3 files changed, 18 insertions(+), 17 deletions(-)
+ arch/arm64/kernel/setup.c |  7 +++++-
+ arch/arm64/mm/init.c      | 60 +++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 66 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 4150fd8..763762e 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -84,17 +84,6 @@
- #define HCR_INT_OVERRIDE   (HCR_FMO | HCR_IMO)
- #define HCR_HOST_VHE_FLAGS (HCR_RW | HCR_TGE | HCR_E2H)
- 
--/* Hyp System Control Register (SCTLR_EL2) bits */
--#define SCTLR_EL2_EE	(1 << 25)
--#define SCTLR_EL2_WXN	(1 << 19)
--#define SCTLR_EL2_I	(1 << 12)
--#define SCTLR_EL2_SA	(1 << 3)
--#define SCTLR_EL2_C	(1 << 2)
--#define SCTLR_EL2_A	(1 << 1)
--#define SCTLR_EL2_M	1
--#define SCTLR_EL2_FLAGS	(SCTLR_EL2_M | SCTLR_EL2_A | SCTLR_EL2_C |	\
--			 SCTLR_EL2_SA | SCTLR_EL2_I)
--
- /* TCR_EL2 Registers bits */
- #define TCR_EL2_RES1	((1 << 31) | (1 << 23))
- #define TCR_EL2_TBI	(1 << 20)
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 1287416..b3ee6f1 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -86,10 +86,21 @@
- #define SET_PSTATE_UAO(x) __inst_arm(0xd5000000 | REG_PSTATE_UAO_IMM |\
- 				     (!!x)<<8 | 0x1f)
- 
--/* SCTLR_EL1 */
--#define SCTLR_EL1_CP15BEN	(0x1 << 5)
--#define SCTLR_EL1_SED		(0x1 << 8)
--#define SCTLR_EL1_SPAN		(0x1 << 23)
-+/* Common SCTLR_ELx flags. */
-+#define SCTLR_ELx_EE    (1 << 25)
-+#define SCTLR_ELx_I	(1 << 12)
-+#define SCTLR_ELx_SA	(1 << 3)
-+#define SCTLR_ELx_C	(1 << 2)
-+#define SCTLR_ELx_A	(1 << 1)
-+#define SCTLR_ELx_M	1
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 9dc6776..b23a524 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -31,7 +31,6 @@
+ #include <linux/screen_info.h>
+ #include <linux/init.h>
+ #include <linux/kexec.h>
+-#include <linux/crash_dump.h>
+ #include <linux/root_dev.h>
+ #include <linux/cpu.h>
+ #include <linux/interrupt.h>
+@@ -222,6 +221,12 @@ static void __init request_standard_resources(void)
+ 		    kernel_data.end <= res->end)
+ 			request_resource(res, &kernel_data);
+ 	}
 +
-+#define SCTLR_ELx_FLAGS	(SCTLR_ELx_M | SCTLR_ELx_A | SCTLR_ELx_C | \
-+			 SCTLR_ELx_SA | SCTLR_ELx_I)
++#ifdef CONFIG_KEXEC_CORE
++	/* User space tools will find "Crash kernel" region in /proc/iomem. */
++	if (crashk_res.end)
++		insert_resource(&iomem_resource, &crashk_res);
++#endif
+ }
+ 
+ #ifdef CONFIG_BLK_DEV_INITRD
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index ea989d8..3589d78 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -34,6 +34,7 @@
+ #include <linux/dma-contiguous.h>
+ #include <linux/efi.h>
+ #include <linux/swiotlb.h>
++#include <linux/kexec.h>
+ 
+ #include <asm/boot.h>
+ #include <asm/fixmap.h>
+@@ -75,6 +76,63 @@ static int __init early_initrd(char *p)
+ early_param("initrd", early_initrd);
+ #endif
+ 
++#ifdef CONFIG_KEXEC_CORE
++/*
++ * reserve_crashkernel() - reserves memory for crash kernel
++ *
++ * This function reserves memory area given in "crashkernel=" kernel command
++ * line parameter. The memory reserved is used by dump capture kernel when
++ * primary kernel is crashing.
++ */
++static void __init reserve_crashkernel(void)
++{
++	unsigned long long crash_size = 0, crash_base = 0;
++	int ret;
 +
-+/* SCTLR_EL1 specific flags. */
-+#define SCTLR_EL1_SPAN		(1 << 23)
-+#define SCTLR_EL1_SED		(1 << 8)
-+#define SCTLR_EL1_CP15BEN	(1 << 5)
++	ret = parse_crashkernel(boot_command_line, memblock_phys_mem_size(),
++				&crash_size, &crash_base);
++	if (ret)
++		return;
++
++	if (crash_base == 0) {
++		crash_base = memblock_find_in_range(0,
++				MEMBLOCK_ALLOC_ACCESSIBLE, crash_size, 1 << 21);
++		if (crash_base == 0) {
++			pr_warn("Unable to allocate crashkernel (size:%llx)\n",
++				crash_size);
++			return;
++		}
++		memblock_reserve(crash_base, crash_size);
++
++	} else {
++		/* User specifies base address explicitly. */
++		if (!memblock_is_region_memory(crash_base, crash_size) ||
++			memblock_is_region_reserved(crash_base, crash_size)) {
++			pr_warn("crashkernel has wrong address or size\n");
++			return;
++		}
++
++		if (crash_base & ((1 << 21) - 1)) {
++			pr_warn("crashkernel base address is not 2MB aligned\n");
++			return;
++		}
++
++		memblock_reserve(crash_base, crash_size);
++	}
++
++	pr_info("Reserving %lldMB of memory@%lldMB for crashkernel\n",
++		crash_size >> 20, crash_base >> 20);
++
++	crashk_res.start = crash_base;
++	crashk_res.end = crash_base + crash_size - 1;
++}
++#else
++static void __init reserve_crashkernel(void)
++{
++	;
++}
++#endif /* CONFIG_KEXEC_CORE */
++
+ /*
+  * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
+  * currently assumes that for memory starting above 4G, 32-bit devices will
+@@ -235,6 +293,8 @@ void __init arm64_memblock_init(void)
+ 	}
+ #endif
  
++	reserve_crashkernel();
++
+ 	early_init_fdt_scan_reserved_mem();
  
- /* id_aa64isar0 */
-diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-index 7d8747c..5ce1b47 100644
---- a/arch/arm64/kvm/hyp-init.S
-+++ b/arch/arm64/kvm/hyp-init.S
-@@ -21,6 +21,7 @@
- #include <asm/kvm_arm.h>
- #include <asm/kvm_mmu.h>
- #include <asm/pgtable-hwdef.h>
-+#include <asm/sysreg.h>
- 
- 	.text
- 	.pushsection	.hyp.idmap.text, "ax"
-@@ -103,8 +104,8 @@ __do_hyp_init:
- 	dsb	sy
- 
- 	mrs	x4, sctlr_el2
--	and	x4, x4, #SCTLR_EL2_EE	// preserve endianness of EL2
--	ldr	x5, =SCTLR_EL2_FLAGS
-+	and	x4, x4, #SCTLR_ELx_EE	// preserve endianness of EL2
-+	ldr	x5, =SCTLR_ELx_FLAGS
- 	orr	x4, x4, x5
- 	msr	sctlr_el2, x4
- 	isb
+ 	/* 4GB maximum for 32-bit only capable devices */
 -- 
 2.5.0
