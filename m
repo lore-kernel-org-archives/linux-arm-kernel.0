@@ -1,31 +1,50 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 14 Apr 2016 15:48:24 +0000
-Subject: [PATCH RFT 0/5] iio: mxs-lradc: fix leak and implement PM ops
-Message-ID: <1460648909-2657-1-git-send-email-stefan.wahren@i2se.com>
+Date: Thu, 14 Apr 2016 15:48:25 +0000
+Subject: [PATCH RFT 1/5] iio: mxs-lradc: fix memory leak
+In-Reply-To: <1460648909-2657-1-git-send-email-stefan.wahren@i2se.com>
+References: <1460648909-2657-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1460648909-2657-2-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series fix a memory leak and implements suspend/resume
-support for mxs-lradc.
+After successful touchscreen registration the input device was
+never freed. So fix this issue by using devm_input_allocate_device().
 
-Patch 1: fix the memory leak
-Patch 2-4: refactor mxs-lradc in order to prepare PM implementation
-Patch 5: implement suspend/resume support
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+---
+ drivers/iio/adc/mxs-lradc.c |    8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
-These patches has been tested with i.MX23 and i.MX28 but without
-a touchscreen. I added only a bogus touchscreen in devicetree.
-
-It would be nice if someone with a real touchscreen could test it.
-
-Stefan Wahren (5):
-  iio: mxs-lradc: fix memory leak
-  iio: mxs-lradc: move TS config into suitable function
-  iio: mxs-lradc: move STMP reset out of ADC init
-  iio: mxs-lradc: disable only mapped channels in mxs_lradc_hw_stop
-  iio: mxs-lradc: implement suspend/resume support
-
- drivers/iio/adc/mxs-lradc.c |  116 ++++++++++++++++++++++++++++++-------------
- 1 file changed, 82 insertions(+), 34 deletions(-)
-
+diff --git a/drivers/iio/adc/mxs-lradc.c b/drivers/iio/adc/mxs-lradc.c
+index 33051b8..0576953 100644
+--- a/drivers/iio/adc/mxs-lradc.c
++++ b/drivers/iio/adc/mxs-lradc.c
+@@ -1109,12 +1109,11 @@ static int mxs_lradc_ts_register(struct mxs_lradc *lradc)
+ {
+ 	struct input_dev *input;
+ 	struct device *dev = lradc->dev;
+-	int ret;
+ 
+ 	if (!lradc->use_touchscreen)
+ 		return 0;
+ 
+-	input = input_allocate_device();
++	input = devm_input_allocate_device(dev);
+ 	if (!input)
+ 		return -ENOMEM;
+ 
+@@ -1134,11 +1133,8 @@ static int mxs_lradc_ts_register(struct mxs_lradc *lradc)
+ 
+ 	lradc->ts_input = input;
+ 	input_set_drvdata(input, lradc);
+-	ret = input_register_device(input);
+-	if (ret)
+-		input_free_device(lradc->ts_input);
+ 
+-	return ret;
++	return input_register_device(input);
+ }
+ 
+ static void mxs_lradc_ts_unregister(struct mxs_lradc *lradc)
 -- 
 1.7.9.5
