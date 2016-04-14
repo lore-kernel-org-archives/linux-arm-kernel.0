@@ -1,41 +1,87 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 14 Apr 2016 14:08:10 +0300
-Subject: [PATCHv2 21/28] clk: ti: am33xx: fix timer3/6 init time setup for
- module clocks
+Date: Thu, 14 Apr 2016 14:08:11 +0300
+Subject: [PATCHv2 22/28] dt-bindings: clk: ti: Document module clock type
 In-Reply-To: <1460632097-25727-1-git-send-email-t-kristo@ti.com>
 References: <1460632097-25727-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1460632097-25727-22-git-send-email-t-kristo@ti.com>
+Message-ID: <1460632097-25727-23-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-timer*_fck are going to be renamed as timer*_mod_ck:s. Fix the init
-time configuration of timer3/timer6 to take this into account, and
-lookup for the module clock in case the lookup for fck fails.
+Document the new TI module clock type, which is intended to replace the
+internal clock control handling within omap_hwmod. Module clock is
+effectively a gate clock controlling both interface and functional
+clocks for a single hardware IP block.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/clk/ti/clk-33xx.c |    6 ++++++
- 1 file changed, 6 insertions(+)
+ .../devicetree/bindings/clock/ti/module.txt        |   59 ++++++++++++++++++++
+ 1 file changed, 59 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/ti/module.txt
 
-diff --git a/drivers/clk/ti/clk-33xx.c b/drivers/clk/ti/clk-33xx.c
-index 43847bc..2343a22 100644
---- a/drivers/clk/ti/clk-33xx.c
-+++ b/drivers/clk/ti/clk-33xx.c
-@@ -66,9 +66,15 @@ int __init am33xx_dt_clk_init(void)
- 
- 	clk1 = ti_clk_get("sys_clkin_ck");
- 	clk2 = ti_clk_get("timer3_fck");
-+	if (IS_ERR(clk2))
-+		clk2 = ti_clk_get("timer3_mod_ck");
+diff --git a/Documentation/devicetree/bindings/clock/ti/module.txt b/Documentation/devicetree/bindings/clock/ti/module.txt
+new file mode 100644
+index 0000000..0329667
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/ti/module.txt
+@@ -0,0 +1,59 @@
++Binding for Texas Instruments module clock.
 +
- 	clk_set_parent(clk2, clk1);
- 
- 	clk2 = ti_clk_get("timer6_fck");
-+	if (IS_ERR(clk2))
-+		clk2 = ti_clk_get("timer6_mod_ck");
++Binding status: Unstable - ABI compatibility may be broken in the future
 +
- 	clk_set_parent(clk2, clk1);
- 	/*
- 	 * The On-Chip 32K RC Osc clock is not an accurate clock-source as per
++This binding uses the common clock binding[1]. This clock is
++quite much similar to the basic gate-clock [2], however, internally
++it controls an OMAP module clock, which effectively handles
++both interface and functional clocks for a single module. In some
++cases, support for mux clock [3] is composited to the same clock node,
++currently only needed for proper support of timer module clocks.
++
++[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
++[2] Documentation/devicetree/bindings/clock/ti/gate.txt
++[3] Documentation/devicetree/bindings/clock/ti/mux.txt
++
++Required properties:
++- compatible : shall be one of:
++  "ti,omap4-mod-clock" - basic module clock, no gating supported
++  "ti,omap4-hw-mod-clock" - module clock with hardware gating support
++  "ti,omap4-sw-mod-clock" - module clock with software forced gating support
++  "ti,omap4-sw-no-idlest-mod-clock" - module clock with software forced gating
++				      support, misses idlest
++  "ti,omap4-mux-mod-clock" - composite clock with mux and module clocks, no
++			     gating supported
++  "ti,omap4-hw-mux-mod-clock" - composite clock with mux and module clocks,
++				with hardware gating
++  "ti,omap4-sw-mux-mod-clock" - composite clock with mux and module clocks,
++				with software forced gating
++
++- #clock-cells : from common clock binding; shall be set to 0
++- clocks : link to phandle of parent clock(s)
++- reg : offset for register controlling adjustable gate and optional mux
++
++Optional properties:
++- ti,bit-shift : bit shift for programming the clock mux, only needed for
++		 the nodes of the mux variant
++
++Examples:
++	timer6_mod_ck: timer6_mod_ck {
++		#clock-cells = <0>;
++		compatible = "ti,omap4-sw-mux-mod-clock";
++		reg = <0x0570>;
++		clocks = <&syc_clk_div_ck>, <&sys_32k_ck>;
++		ti,bit-shift = <24>;
++	};
++
++	i2c1_mod_ck: i2c1_mod_ck {
++		#clock-cells = <0>;
++		compatible = "ti,omap4-sw-mod-clock";
++		reg = <0x14a0>;
++		clocks = <&func_96m_fclk>;
++	};
++
++	hsi_mod_ck: hsi_mod_ck {
++		#clock-cells = <0>;
++		compatible = "ti,omap4-hw-mod-clock";
++		reg = <0x1338>;
++		clocks = <&hsi_fck>;
++	};
 -- 
 1.7.9.5
