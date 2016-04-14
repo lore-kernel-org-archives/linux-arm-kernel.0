@@ -1,71 +1,91 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 14 Apr 2016 14:20:50 +0100
-Subject: [PATCH v2 02/17] arm64: Cleanup VTCR_EL2 and VTTBR field values
-In-Reply-To: <1460640065-27658-1-git-send-email-suzuki.poulose@arm.com>
-References: <1460640065-27658-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1460640065-27658-3-git-send-email-suzuki.poulose@arm.com>
+Date: Thu, 14 Apr 2016 14:20:48 +0100
+Subject: [PATCH v2 00/17] kvm-arm: Add stage2 page table walker
+Message-ID: <1460640065-27658-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We share most of the bits for VTCR_EL2 for different page sizes,
-except for the TG0 value and the entry level value. This patch
-makes the definitions a bit more cleaner to reflect this fact.
+This series adds support for stage2 page table helpers and makes
+the core kvm-arm MMU code make use of it. At the moment we assume
+that the host/hyp and the stage2 page tables have same number of
+levels and hence use the host level accessors (except for some
+hooks, e.g kvm_p.d_addr_end) and shares the routines for unmapping
+the page table ranges.
 
-Also cleans up the VTTBR_X calculation. No functional changes.
+On arm32, the only change w.r.t the page tables is dealing
+with > 32bit physical addresses.
 
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- arch/arm64/include/asm/kvm_arm.h |   22 ++++++++++++----------
- 1 file changed, 12 insertions(+), 10 deletions(-)
+However on arm64, the hardware supports concatenation of tables (upto 16)
+at the entry level, which could affect :
+ 1) number of entries in the PGD table (upto 16 * PTRS_PER_PTE)
+ 2) number of page table levels (reduced number of page table levels).
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index a46b39f..1281d98 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -144,30 +144,32 @@
-  * The magic numbers used for VTTBR_X in this patch can be found in Tables
-  * D4-23 and D4-25 in ARM DDI 0487A.b.
-  */
-+
-+#define VTCR_EL2_T0SZ_IPA	VTCR_EL2_T0SZ_40B
-+#define VTCR_EL2_COMMON_BITS	(VTCR_EL2_SH0_INNER | VTCR_EL2_ORGN0_WBWA | \
-+				 VTCR_EL2_IRGN0_WBWA | VTCR_EL2_RES1)
-+
- #ifdef CONFIG_ARM64_64K_PAGES
- /*
-  * Stage2 translation configuration:
-- * 40bits input  (T0SZ = 24)
-  * 64kB pages (TG0 = 1)
-  * 2 level page tables (SL = 1)
-  */
--#define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_64K | VTCR_EL2_SH0_INNER | \
--				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
--				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_RES1)
--#define VTTBR_X		(38 - VTCR_EL2_T0SZ_40B)
-+#define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_64K | VTCR_EL2_SL0_LVL1)
-+#define VTTBR_X_TGRAN_MAGIC		38
- #else
- /*
-  * Stage2 translation configuration:
-- * 40bits input  (T0SZ = 24)
-  * 4kB pages (TG0 = 0)
-  * 3 level page tables (SL = 1)
-  */
--#define VTCR_EL2_FLAGS		(VTCR_EL2_TG0_4K | VTCR_EL2_SH0_INNER | \
--				 VTCR_EL2_ORGN0_WBWA | VTCR_EL2_IRGN0_WBWA | \
--				 VTCR_EL2_SL0_LVL1 | VTCR_EL2_RES1)
--#define VTTBR_X		(37 - VTCR_EL2_T0SZ_40B)
-+#define VTCR_EL2_TGRAN_FLAGS		(VTCR_EL2_TG0_4K | VTCR_EL2_SL0_LVL1)
-+#define VTTBR_X_TGRAN_MAGIC		37
- #endif
- 
-+#define VTCR_EL2_FLAGS			(VTCR_EL2_COMMON_BITS | VTCR_EL2_TGRAN_FLAGS)
-+#define VTTBR_X				(VTTBR_X_TGRAN_MAGIC - VTCR_EL2_T0SZ_IPA)
-+
- #define VTTBR_BADDR_SHIFT (VTTBR_X - 1)
- #define VTTBR_BADDR_MASK  (((UL(1) << (PHYS_MASK_SHIFT - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
- #define VTTBR_VMID_SHIFT  (UL(48))
+Also depending on the VA_BITS for the host kernel, the number of page table
+levels for both host and stage2(40bit IPA) could differ. At present, we insert
+(upto) one fake software page table(as the hardware is not aware of it and is
+only used by the OS to walk the table) level to bring the number of levels to
+that of the host/hyp table. However, with 16K + 48bit, and 40bit IPA, we could
+end up in 2 fake levels, which complicates the code.
+
+This series introduces explicit stage2 page table helpers and also defines
+separate set of routines for unmapping hyp and stage2 tables.
+
+On arm64 stage2 page table helpers are defined based on the number of levels
+required to map the IPA bits. See patch 15 for more details.
+
+Tested on TC2 (arm32), Fast models(with VHE, with 36bit PARange) and real hardwares.
+
+The tree is available at :
+      git://linux-arm.org/linux-skp.git kvm-stage2/v2
+
+Changes since V1:
+ * Rebased to kvmarm/master
+ * Cleaned up hyp page table modifiers (hyp check, tlb flush), added comments
+ * For stage2_ drop the (always NULL) mm parameter.
+ * Better commentary
+
+Changes since RFC:
+ * Rebased to rc2
+ * Use explicit routines for modifying the hyp/stage2 page tables
+ * Add pmd_thp_or_huge() for arm64 and use that for KVM
+ * Reuse TCR_EL definitions
+
+Suzuki K Poulose (17):
+  arm64: Reuse TCR field definitions for EL1 and EL2
+  arm64: Cleanup VTCR_EL2 and VTTBR field values
+  kvm arm: Move fake PGD handling to arch specific files
+  arm64: Introduce pmd_thp_or_huge
+  kvm-arm: Replace kvm_pmd_huge with pmd_thp_or_huge
+  kvm-arm: Remove kvm_pud_huge()
+  kvm-arm: arm32: Introduce stage2 page table helpers
+  kvm-arm: arm: Introduce hyp page table empty checks
+  kvm-arm: arm64: Introduce stage2 page table helpers
+  kvm-arm: arm64: Introduce hyp page table empty checks
+  kvm-arm: Use explicit stage2 helper routines
+  kvm-arm: Add explicit hyp page table modifiers
+  kvm-arm: Add stage2 page table modifiers
+  kvm-arm: Cleanup kvm_* wrappers
+  kvm: arm64: Get rid of fake page table levels
+  kvm-arm: Cleanup stage2 pgd handling
+  arm64: kvm: Add support for 16K pages
+
+ arch/arm/include/asm/kvm_mmu.h                |   35 +--
+ arch/arm/include/asm/stage2_pgtable.h         |   59 +++++
+ arch/arm/kvm/arm.c                            |    2 +-
+ arch/arm/kvm/mmu.c                            |  347 +++++++++++++------------
+ arch/arm64/include/asm/kvm_arm.h              |   83 +++---
+ arch/arm64/include/asm/kvm_mmu.h              |   84 +-----
+ arch/arm64/include/asm/pgtable-hwdef.h        |   80 ++++--
+ arch/arm64/include/asm/pgtable.h              |    2 +
+ arch/arm64/include/asm/stage2_pgtable-nopmd.h |   42 +++
+ arch/arm64/include/asm/stage2_pgtable-nopud.h |   39 +++
+ arch/arm64/include/asm/stage2_pgtable.h       |  139 ++++++++++
+ arch/arm64/kvm/Kconfig                        |    1 -
+ 12 files changed, 586 insertions(+), 327 deletions(-)
+ create mode 100644 arch/arm/include/asm/stage2_pgtable.h
+ create mode 100644 arch/arm64/include/asm/stage2_pgtable-nopmd.h
+ create mode 100644 arch/arm64/include/asm/stage2_pgtable-nopud.h
+ create mode 100644 arch/arm64/include/asm/stage2_pgtable.h
+
 -- 
 1.7.9.5
