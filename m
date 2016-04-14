@@ -1,29 +1,28 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 14 Apr 2016 19:56:08 +0100
-Subject: [PATCH] ACPI / ARM64: Remove EXPERT dependency for ACPI on ARM64
-In-Reply-To: <CAOesGMiqpm1TjiOpCv+kYp60FrhRhs3Leomv5KyySk8k15YFNw@mail.gmail.com>
-References: <1459360718-24125-1-git-send-email-broonie@kernel.org>
- <20160412172315.GH8066@e104818-lin.cambridge.arm.com>
- <CAOesGMgULvTmzG-kGjWwntbgoRxpTTc2f72Yoj0H4DArGsLAEw@mail.gmail.com>
- <20160414182520.GA8663@sirena.org.uk>
- <CAOesGMiqpm1TjiOpCv+kYp60FrhRhs3Leomv5KyySk8k15YFNw@mail.gmail.com>
-Message-ID: <20160414185608.GB8663@sirena.org.uk>
+From: david@lechnology.com (David Lechner)
+Date: Thu, 14 Apr 2016 14:13:34 -0500
+Subject: [PATCH 0/2] da8xx clocks (was part of "da8xx USB clocks")
+Message-ID: <1460661217-7389-1-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 14, 2016 at 11:49:11AM -0700, Olof Johansson wrote:
+I have separated these patches from the "da8xx USB clocks" series since that
+series no longer depends on the clock init being moved.
 
-> So, to clarify: a follow-up patch (to arm at kernel.org) to turn on ACPI
-> in arm64 defconfig, and a respin of this patch to change the default.
+Tested working on the linux-davinci/master branch with LEGO MINDSTORMS EV3.
 
-Yes.  Well, I actually had and additional patch to change the default to
-be y only for x86 and IA-64 separately to this one remove the EXPERT
-dependency but that's just bikeshedding.  Will send tomorrow unless
-there's other comments.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160414/234f4630/attachment.sig>
+David Lechner (2):
+  ARM: davinci: Move clock init after ioremap.
+  ARM: davinci: da850: use clk->set_parent for async3
+
+ arch/arm/mach-davinci/clock.c  |  2 +-
+ arch/arm/mach-davinci/common.c |  6 ---
+ arch/arm/mach-davinci/da830.c  |  2 +
+ arch/arm/mach-davinci/da850.c  | 90 ++++++++++++++++++++----------------------
+ arch/arm/mach-davinci/dm355.c  |  1 +
+ arch/arm/mach-davinci/dm365.c  |  1 +
+ arch/arm/mach-davinci/dm644x.c |  1 +
+ arch/arm/mach-davinci/dm646x.c |  1 +
+ 8 files changed, 49 insertions(+), 55 deletions(-)
+
+-- 
+1.9.1
