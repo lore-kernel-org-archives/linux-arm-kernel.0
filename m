@@ -1,35 +1,35 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 14 Apr 2016 17:38:33 +0200
-Subject: [PATCH v2 4/4] arm64: dts: marvell: enable one PCIe interface on
- Armada 7040-DB
+Date: Thu, 14 Apr 2016 17:38:30 +0200
+Subject: [PATCH v2 1/4] arm64: marvell: enable AP806 and CP110 syscon driver
 In-Reply-To: <1460648313-31642-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1460648313-31642-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1460648313-31642-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1460648313-31642-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit enables one PCIe interface on Armada 7040-DB, now that
-PCIe support for this SoC has been enabled.
+The Marvell Armada 7K/8K support needs the AP806 and CP110 syscon
+drivers to be enabled, as they provide amongst other things, the main
+clocks for those platforms.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm64/boot/dts/marvell/armada-7040-db.dts | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm64/Kconfig.platforms | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-7040-db.dts b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-index 064a251..33ba5dc 100644
---- a/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-@@ -89,4 +89,10 @@
- 			};
- 		};
- 	};
-+
-+	cp110-master {
-+		pcie at f2640000 {
-+			status = "okay";
-+		};
-+	};
- };
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index efa77c1..60f4bb5 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -64,8 +64,8 @@ config ARCH_MESON
+ 
+ config ARCH_MVEBU
+ 	bool "Marvell EBU SoC Family"
+-	select ARMADA_AP806_CORE_CLK
+-	select ARMADA_AP806_RING_CLK
++	select ARMADA_AP806_SYSCON
++	select ARMADA_CP110_SYSCON
+ 	select MVEBU_ODMI
+ 	help
+ 	  This enables support for Marvell EBU familly, including:
 -- 
 2.6.4
