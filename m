@@ -1,68 +1,68 @@
-From: jcm@jonmasters.org (Jon Masters)
-Date: Thu, 14 Apr 2016 01:55:32 -0400
-Subject: [PATCH v2 2/4] PCI: Provide common functions for ECAM mapping
-In-Reply-To: <20160412164413.GA32297@red-moon>
-References: <1460414707-19153-1-git-send-email-jchandra@broadcom.com>
- <1460414707-19153-3-git-send-email-jchandra@broadcom.com>
- <570C4034.20105@caviumnetworks.com> <570C78F1.4090701@jonmasters.org>
- <20160412164413.GA32297@red-moon>
-Message-ID: <570F30D4.2030102@jonmasters.org>
+From: tiffany.lin@mediatek.com (tiffany lin)
+Date: Thu, 14 Apr 2016 14:13:41 +0800
+Subject: [PATCH 1/7] [media]: v4l: add Mediatek MT21 video block format
+In-Reply-To: <1460557416.18956.3.camel@gmail.com>
+References: <1460548915-17536-1-git-send-email-tiffany.lin@mediatek.com>
+ <1460548915-17536-2-git-send-email-tiffany.lin@mediatek.com>
+ <1460557416.18956.3.camel@gmail.com>
+Message-ID: <1460614421.30214.2.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/12/2016 12:44 PM, Lorenzo Pieralisi wrote:
-> On Tue, Apr 12, 2016 at 12:26:25AM -0400, Jon Masters wrote:
+Hi 
+On Wed, 2016-04-13 at 10:23 -0400, Nicolas Dufresne wrote:
+> Le mercredi 13 avril 2016 ? 20:01 +0800, Tiffany Lin a ?crit :
+> > From: Daniel Kurtz <djkurtz@chromium.org>
+> > 
+> > Mediatek video format is YVU8_420_2PLANE_PACK8_PROGRESSIVE.
+> > 
+> > Create V4L2_PIX_FMT_MT21 and DRM_FORMAT_MT21 to be consistent with
+> > V4L2_PIX_FMT_NV12 notation.
+> > 
+> > Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
+> > ---
+> >  include/uapi/drm/drm_fourcc.h  |    1 +
+> >  include/uapi/linux/videodev2.h |    2 ++
 > 
-> [...]
+> Might be better to split this patch.
+Got it, will split to two patch in next version.
+
 > 
->> Quoting Bjorn's original reply to the previous series:
->>
->>> Some of the code that moved to drivers/acpi/pci_mcfg.c is not
->>> really ACPI-specific, and could potentially be used for non-ACPI
->>> bridges that support ECAM.  I'd like to see that sort of code
->>> moved to a new file like drivers/pci/ecam.c.
->>
->> So my guess is that this is the reasoning behind JC's file layout.
->>
->> I'm curious what Lorenzo's take on things is currently. I assume this
->> series is now to be the official coordinated version of this effort for
->> upstream, following the advice of Bjorn previously, but I would like to
->> know if everyone is behind this plan. I've (previously) requested a
->> Linaro LEG meeting this week (part of our bootarch working group) to
->> specifically discuss the status of PCI upstreaming in order to get the
->> different vendors together to ensure every single one of them is
->> tracking the correct latest effort and doing what is needed to test/aid,
->> hence my ask. If this is now plan A, I'll make sure everyone is aligned
->> behind it and start pinging people individually for testing.
+> >  2 files changed, 3 insertions(+)
+> > 
+> > diff --git a/include/uapi/drm/drm_fourcc.h b/include/uapi/drm/drm_fourcc.h
+> > index 0b69a77..a193905 100644
+> > --- a/include/uapi/drm/drm_fourcc.h
+> > +++ b/include/uapi/drm/drm_fourcc.h
+> > @@ -116,6 +116,7 @@
+> >  #define DRM_FORMAT_NV24		fourcc_code('N', 'V', '2', '4') /* non-subsampled Cr:Cb plane */
+> >  #define DRM_FORMAT_NV42		fourcc_code('N', 'V', '4', '2') /* non-subsampled Cb:Cr plane */
+> >  
+> > +#define DRM_FORMAT_MT21		fourcc_code('M', 'T', '2', '1') /* Mediatek Block Mode */
 > 
-> My take is that JC's aim is to get this four patch series reviewed and
-> merged
+> Please document the tiling format, don't just add a define here.
+Got it, will add documentation in next version.
 
-Indeed, I see that's probably the goal, and why not :)
+> 
+> >  /*
+> >   * 3 plane YCbCr
+> >   * index 0: Y plane, [7:0] Y
+> > diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
+> > index d0acd26..e9e3276 100644
+> > --- a/include/uapi/linux/videodev2.h
+> > +++ b/include/uapi/linux/videodev2.h
+> > @@ -527,6 +527,8 @@ struct v4l2_pix_format {
+> >  #define V4L2_PIX_FMT_HM12    v4l2_fourcc('H', 'M', '1', '2') /*  8  YUV 4:2:0 16x16 macroblocks */
+> >  #define V4L2_PIX_FMT_M420    v4l2_fourcc('M', '4', '2', '0') /* 12  YUV 4:2:0 2 lines y, 1 line uv interleaved */
+> >  
+> > +#define V4L2_PIX_FMT_MT21    v4l2_fourcc('M', 'T', '2', '1') /* Mediatek Block Mode  */
+> > +
+> 
+> Same. On Linux Media side, there is docbook documentation where you can
+> explain in detail.
+Got it, will add documentation in next version.
 
-> (which is *not* sufficient to get ACPI PCI to work fully on ARM64
-> - see cover letter - the remaining patches in his branch are not
-> fixes, it is code that is required to get things to work, these 4
-> patches stand alone are not sufficient but I understand he wants to get
-> them reviewed following feedback on the lists) so that we can make
-> progress on ACPI PCI on ARM64.
-
-Agreed. I went through the branch and the 11 patches there, reacquainted
-myself with what's what. So what we have now is 4 patches here plus a
-few others that in total replace v5 of your previous mmconfig patches in
-functionality. The question is what happens with the rest (of JC's
-branch let's say) - do they get sent out now too?
-
-> I will comment on the patches as soon as I have time to review
-> them, I certainly would like to understand what we have to do with the
-> rest of the code though (provided this series is good to go) see above.
-
-Right. That's my reason for asking. I'd like to know who is driving (I
-believe that to be Lorenzo) and what the path forward is, and whether we
-need to get additional support from anyone else. There's a multi-vendor
-meeting in the morning where I'm going to summarize the current state of
-these patches and I would like to know (soon) what the plan is so that
-we can get everyone on deck to help out at least with testing (most have
-tested the previous set, but we need public acks happening).
-
-Jon.
+> 
+> >  /* two planes -- one Y, one Cr + Cb interleaved  */
+> >  #define V4L2_PIX_FMT_NV12    v4l2_fourcc('N', 'V', '1', '2') /* 12  Y/CbCr 4:2:0  */
+> >  #define V4L2_PIX_FMT_NV21    v4l2_fourcc('N', 'V', '2', '1') /* 12  Y/CrCb 4:2:0  */
