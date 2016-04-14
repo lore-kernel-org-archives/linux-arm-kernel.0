@@ -1,75 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 14 Apr 2016 17:46:17 +0100
-Subject: [PATCH v3 5/9] efi/arm64: libstub: make screen_info accessible
- to the UEFI stub
-In-Reply-To: <1459526735-24936-6-git-send-email-ard.biesheuvel@linaro.org>
-References: <1459526735-24936-1-git-send-email-ard.biesheuvel@linaro.org>
- <1459526735-24936-6-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20160414164617.GJ4584@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 14 Apr 2016 17:46:43 +0100
+Subject: [PATCH v2 2/3] devicetree: leds: Introduce "panic-indicator"
+ optional property
+In-Reply-To: <1460570899-24642-3-git-send-email-ezequiel@vanguardiasur.com.ar>
+References: <1460570899-24642-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+ <1460570899-24642-3-git-send-email-ezequiel@vanguardiasur.com.ar>
+Message-ID: <570FC973.2040708@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 01, 2016 at 06:05:31PM +0200, Ard Biesheuvel wrote:
-> Unlike on 32-bit ARM, where we need to pass the stub's version of struct
-> screen_info to the kernel proper via a configuration table, on 64-bit ARM
-> it simply involves making the core kernel's copy of struct screen_info
-> visible to the stub by exposing an __efistub_ alias for it.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Hi Ezequiel,
+
+On 13/04/16 19:08, Ezequiel Garcia wrote:
+> It's desirable to specify which LEDs are to be blinked on a kernel
+> panic. Therefore, introduce a devicetree boolean property to mark
+> which LEDs should be treated this way, if possible.
+>
+> Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
 > ---
->  arch/arm64/include/asm/efi.h | 3 +++
->  arch/arm64/kernel/efi.c      | 3 +++
->  arch/arm64/kernel/image.h    | 1 +
->  3 files changed, 7 insertions(+)
+>   Documentation/devicetree/bindings/leds/common.txt | 3 +++
+>   1 file changed, 3 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/leds/common.txt b/Documentation/devicetree/bindings/leds/common.txt
+> index 68419843e32f..7b646a7808ce 100644
+> --- a/Documentation/devicetree/bindings/leds/common.txt
+> +++ b/Documentation/devicetree/bindings/leds/common.txt
+> @@ -37,6 +37,9 @@ Optional properties for child nodes:
+>                        property is mandatory for the LEDs in the non-flash modes
+>                        (e.g. torch or indicator).
+>
+> +- panic-indicator : This properties specifies that the LED should be used,
 
-Since I assume this will all go via the EFI tree:
+s/properties/property/
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Maybe phrasing it as "should also be used" might make the intention a 
+bit clearer, as well.
 
-for this patch.
+Robin.
 
-Will
-
-> diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
-> index bb26f2205973..ed6c85d3a583 100644
-> --- a/arch/arm64/include/asm/efi.h
-> +++ b/arch/arm64/include/asm/efi.h
-> @@ -54,6 +54,9 @@ int efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md);
->  #define __efi_call_early(f, ...)	f(__VA_ARGS__)
->  #define efi_is_64bit()			(true)
->  
-> +#define alloc_screen_info(x...)		&screen_info
-> +#define free_screen_info(x...)
+> +		    if at all possible, as a panic indicator.
 > +
->  #define EFI_ALLOC_ALIGN		SZ_64K
->  
->  /*
-> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> index b6abc852f2a1..6f4b3ea359db 100644
-> --- a/arch/arm64/kernel/efi.c
-> +++ b/arch/arm64/kernel/efi.c
-> @@ -17,6 +17,9 @@
->  
->  #include <asm/efi.h>
->  
-> +/* we will fill this structure from the stub, so don't put it in .bss */
-> +struct screen_info screen_info __section(.data);
-> +
->  int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md)
->  {
->  	pteval_t prot_val;
-> diff --git a/arch/arm64/kernel/image.h b/arch/arm64/kernel/image.h
-> index 5e360ce88f10..1428849aece8 100644
-> --- a/arch/arm64/kernel/image.h
-> +++ b/arch/arm64/kernel/image.h
-> @@ -112,6 +112,7 @@ __efistub___memset		= KALLSYMS_HIDE(__pi_memset);
->  __efistub__text			= KALLSYMS_HIDE(_text);
->  __efistub__end			= KALLSYMS_HIDE(_end);
->  __efistub__edata		= KALLSYMS_HIDE(_edata);
-> +__efistub_screen_info		= KALLSYMS_HIDE(screen_info);
->  
->  #endif
->  
-> -- 
-> 2.5.0
-> 
+>   Required properties for flash LED child nodes:
+>   - flash-max-microamp : Maximum flash LED supply current in microamperes.
+>   - flash-max-timeout-us : Maximum timeout in microseconds after which the flash
+>
