@@ -1,61 +1,91 @@
 From: B56489@freescale.com (Yunhui Cui)
-Date: Thu, 14 Apr 2016 11:50:49 +0800
-Subject: [PATCH 3/9] mtd: spi-nor: fsl-quadspi: add fast-read mode support
+Date: Thu, 14 Apr 2016 11:50:51 +0800
+Subject: [PATCH 5/9] mtd: spi-nor: fsl-quadspi:Support qspi for ls2080a
 In-Reply-To: <1460605855-6689-1-git-send-email-B56489@freescale.com>
 References: <1460605855-6689-1-git-send-email-B56489@freescale.com>
-Message-ID: <1460605855-6689-4-git-send-email-B56489@freescale.com>
+Message-ID: <1460605855-6689-6-git-send-email-B56489@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yunhui Cui <yunhui.cui@nxp.com>
+There is a hardware feature that qspi_amba_base is added
+internally by SOC design on ls2080a. So as to software, the driver
+need support to the feature.
 
-The qspi driver add generic fast-read mode for different
-flash venders. There are some different board flash work on
-different mode, such fast-read, quad-mode.
-
+Signed-off-by: Yunhui Cui <B56489@freescale.com>
 Signed-off-by: Yunhui Cui <yunhui.cui@nxp.com>
 ---
- drivers/mtd/spi-nor/fsl-quadspi.c | 21 ++++++++++++++++-----
- 1 file changed, 16 insertions(+), 5 deletions(-)
+ drivers/mtd/spi-nor/fsl-quadspi.c | 24 ++++++++++++++++++++++--
+ 1 file changed, 22 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c b/drivers/mtd/spi-nor/fsl-quadspi.c
-index 9861290..09adaa4 100644
+index 16ebabbd..5d9d192 100644
 --- a/drivers/mtd/spi-nor/fsl-quadspi.c
 +++ b/drivers/mtd/spi-nor/fsl-quadspi.c
-@@ -389,11 +389,21 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
- 	/* Read */
- 	lut_base = SEQID_READ * 4;
+@@ -41,6 +41,8 @@
+ #define QUADSPI_QUIRK_TKT253890		(1 << 2)
+ /* Controller cannot wake up from wait mode, TKT245618 */
+ #define QUADSPI_QUIRK_TKT245618         (1 << 3)
++/* QSPI_AMBA_BASE is internally added by SOC design */
++#define QUADSPI_AMBA_BASE_INTERNAL	(0x10000)
  
--	qspi_writel(q, LUT0(CMD, PAD1, read_op) | LUT1(ADDR, PAD1, addrlen),
--			base + QUADSPI_LUT(lut_base));
--	qspi_writel(q, LUT0(DUMMY, PAD1, read_dm) |
--		    LUT1(FSL_READ, PAD4, rxfifo),
--			base + QUADSPI_LUT(lut_base + 1));
-+	if (nor->flash_read == SPI_NOR_FAST) {
-+		qspi_writel(q, LUT0(CMD, PAD1, read_op) |
-+			    LUT1(ADDR, PAD1, addrlen),
-+				base + QUADSPI_LUT(lut_base));
-+		qspi_writel(q,  LUT0(DUMMY, PAD1, read_dm) |
-+			    LUT1(FSL_READ, PAD1, rxfifo),
-+				base + QUADSPI_LUT(lut_base + 1));
-+	} else if (nor->flash_read == SPI_NOR_QUAD) {
-+		qspi_writel(q, LUT0(CMD, PAD1, read_op) |
-+			    LUT1(ADDR, PAD1, addrlen),
-+				base + QUADSPI_LUT(lut_base));
-+		qspi_writel(q, LUT0(DUMMY, PAD1, read_dm) |
-+			    LUT1(FSL_READ, PAD4, rxfifo),
-+				base + QUADSPI_LUT(lut_base + 1));
-+	}
+ /* The registers */
+ #define QUADSPI_MCR			0x00
+@@ -217,6 +219,7 @@ enum fsl_qspi_devtype {
+ 	FSL_QUADSPI_IMX7D,
+ 	FSL_QUADSPI_IMX6UL,
+ 	FSL_QUADSPI_LS1021A,
++	FSL_QUADSPI_LS2080A,
+ };
  
- 	/* Write enable */
- 	lut_base = SEQID_WREN * 4;
-@@ -468,6 +478,7 @@ static int fsl_qspi_get_seqid(struct fsl_qspi *q, u8 cmd)
- {
- 	switch (cmd) {
- 	case SPINOR_OP_READ_1_1_4:
-+	case SPINOR_OP_READ_FAST:
- 		return SEQID_READ;
- 	case SPINOR_OP_WREN:
- 		return SEQID_WREN;
+ struct fsl_qspi_devtype_data {
+@@ -270,6 +273,14 @@ static struct fsl_qspi_devtype_data ls1021a_data = {
+ 	.driver_data = 0,
+ };
+ 
++static struct fsl_qspi_devtype_data ls2080a_data = {
++	.devtype = FSL_QUADSPI_LS2080A,
++	.rxfifo = 128,
++	.txfifo = 64,
++	.ahb_buf_size = 1024,
++	.driver_data = QUADSPI_AMBA_BASE_INTERNAL,
++};
++
+ #define FSL_QSPI_MAX_CHIP	4
+ struct fsl_qspi {
+ 	struct spi_nor nor[FSL_QSPI_MAX_CHIP];
+@@ -312,6 +323,11 @@ static inline int needs_wakeup_wait_mode(struct fsl_qspi *q)
+ 	return q->devtype_data->driver_data & QUADSPI_QUIRK_TKT245618;
+ }
+ 
++static inline int has_added_amba_base_internal(struct fsl_qspi *q)
++{
++	return q->devtype_data->driver_data & QUADSPI_AMBA_BASE_INTERNAL;
++}
++
+ /*
+  * R/W functions for big- or little-endian registers:
+  * The qSPI controller's endian is independent of the CPU core's endian.
+@@ -558,8 +574,11 @@ fsl_qspi_runcmd(struct fsl_qspi *q, u8 cmd, unsigned int addr, int len)
+ 	/* save the reg */
+ 	reg = qspi_readl(q, base + QUADSPI_MCR);
+ 
+-	qspi_writel(q, q->memmap_phy + q->chip_base_addr + addr,
+-			base + QUADSPI_SFAR);
++	if (has_added_amba_base_internal(q))
++		qspi_writel(q, q->chip_base_addr + addr, base + QUADSPI_SFAR);
++	else
++		qspi_writel(q, q->memmap_phy + q->chip_base_addr + addr,
++			    base + QUADSPI_SFAR);
+ 	qspi_writel(q, QUADSPI_RBCT_WMRK_MASK | QUADSPI_RBCT_RXBRD_USEIPS,
+ 			base + QUADSPI_RBCT);
+ 	qspi_writel(q, reg | QUADSPI_MCR_CLR_RXF_MASK, base + QUADSPI_MCR);
+@@ -849,6 +868,7 @@ static const struct of_device_id fsl_qspi_dt_ids[] = {
+ 	{ .compatible = "fsl,imx7d-qspi", .data = (void *)&imx7d_data, },
+ 	{ .compatible = "fsl,imx6ul-qspi", .data = (void *)&imx6ul_data, },
+ 	{ .compatible = "fsl,ls1021a-qspi", .data = (void *)&ls1021a_data, },
++	{ .compatible = "fsl,ls2080a-qspi", .data = (void *)&ls2080a_data, },
+ 	{ /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, fsl_qspi_dt_ids);
 -- 
 2.1.0.27.g96db324
