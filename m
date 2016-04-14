@@ -1,139 +1,65 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 14 Apr 2016 18:25:32 +0100
-Subject: [RFC PATCH 00/11] ACPI IORT ARM SMMU support
-Message-ID: <1460654743-7896-1-git-send-email-lorenzo.pieralisi@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 14 Apr 2016 12:22:59 -0500
+Subject: [PATCH 2/5] serial: imx: Use generic uart-has-rtscts DT property
+In-Reply-To: <1460636003-3011-3-git-send-email-geert+renesas@glider.be>
+References: <1460636003-3011-1-git-send-email-geert+renesas@glider.be>
+ <1460636003-3011-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <20160414172259.GA16348@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ACPI IORT table provides information that allows instantiating
-ARM SMMU devices and carrying out id mappings between components on
-ARM based systems (devices, IOMMUs, interrupt controllers).
+On Thu, Apr 14, 2016 at 02:13:20PM +0200, Geert Uytterhoeven wrote:
+> Convert the Freescale IMX UART driver from using the vendor-specific
+> "fsl,uart-has-rtscts" to the generic "uart-has-rtscts" DT property, as
+> documented by the Generic Serial DT Bindings.
+> 
+> The old vendor-specific property is still recognized by the driver for
+> backwards compatibility, but deprecated.
 
-http://infocenter.arm.com/help/topic/com.arm.doc.den0049b/DEN0049B_IO_Remapping_Table.pdf
+You should update the dts files as well.
 
-Building on basic IORT support, available through this posting:
-
-https://marc.info/?l=linux-acpi&m=145976009630179&w=2
-
-this patchset enables ARM SMMU support on ACPI systems.
-
-Most of the code is aimed at building the required generic ACPI
-infrastructure to create and enable IOMMU components and to bring
-the IOMMU infrastructure for ACPI on par with DT, which is going to
-make ARM SMMUv3 and future IOMMU components easier to integrate.
-
-PATCH [1] fixes a warning caused by a missing forward structure
-          declaration.
-
-PATCH [2] provides IORT support for registering IOMMU components.
-
-PATCH [3] adds a FWNODE_IOMMU type to the struct fwnode_handle type.
-          It is required to attach a fwnode identifier to platform
-          devices allocated/detected through IORT tables entries;
-          IOMMU devices have to have an identifier to look them up
-          eg IOMMU core layer carrying out id translation. This can be
-          done through a fwnode_handle (ie IOMMU platform devices created
-          out of IORT tables are not ACPI devices hence they can't be
-          allocated as such, otherwise they would have a fwnode_handle of
-          type FWNODE_ACPI). This patch requires discussion and it is key
-          to the RFC.
-
-PATCH [4] makes use of the ACPI early probing API to add a linker script
-          section for probing devices via IORT ACPI kernel code.
-
-PATCH [5] refactors the ARM SMMU driver so that the init functions are
-          split in a way that groups together code that probes through DT
-          and code that carries out HW registers FW agnostic probing, in
-          preparation for adding the ACPI probing path.
-
-PATCH [6] makes the of_xlate() interface for IOMMUs DT agnostic by
-          changing its API and making it work on ACPI systems too
-          through the introduction of a generic IOMMU FW translation
-          specifier.
-
-PATCH [7] implements ARM SMMU streamid mapping based on the previously
-          introduced infrastructure.
-
-PATCH [8] enhances IORT kernel code to implement the full set of mappings
-          allowed through the ACPI IORT table.
-
-PATCH [9] implements the of_dma_configure() API in ACPI world -
-          acpi_dma_configure() - and patches PCI and ACPI core code to start
-          making use of it.
-
-PATCH [10] implements and enables code for probing the ARM SMMU with ACPI,
-           building on top of the previously introduced generic infrastructure.
-
-PATCH [11] is a mechanical conversion of IRQ domain infrastructure to
-           generalize its translation capabilities for other kernel
-           subsystems, and it is there to prove that the approach taken
-           to implement IOMMU translation in a DT agnostic way would lead
-           to structure data duplication that may be deemed unnecessary
-           and can therefore be avoided.
-
-This patchset is built on top and depends on these two patch series:
-
-R.Murphy "Generic DT bindings for PCI and ARM SMMU"
-https://marc.info/?l=linux-arm-kernel&m=145675372917701&w=2
-
-T.Nowicki "Introduce ACPI world to ITS irqchip"
-https://marc.info/?l=linux-acpi&m=145976009630179&w=2
-
-Tested on Juno-r2 board with both DT and ACPI probing paths.
-
-Lorenzo Pieralisi (11):
-  drivers: acpi: iort: fix struct pci_dev compiler warnings
-  drivers: acpi: iort: add support for IOMMU registration
-  drivers: iommu: add FWNODE_IOMMU fwnode type
-  drivers: acpi: iort: introduce linker section for IORT entries probing
-  drivers: iommu: arm-smmu: split probe functions into DT/generic
-    portions
-  drivers: iommu: make of_xlate() interface DT agnostic
-  drivers: iommu: arm-smmu: allow ACPI based streamid translation
-  drivers: acpi: iort: enhance mapping API
-  drivers: acpi: implement acpi_dma_configure
-  drivers: iommu: arm-smmu: implement ACPI probing
-  drivers: irqchip: make struct irq_fwspec generic
-
- Documentation/IRQ-domain.txt         |   2 +-
- arch/arm/mach-exynos/suspend.c       |   6 +-
- arch/arm/mach-imx/gpc.c              |   6 +-
- arch/arm/mach-omap2/omap-wakeupgen.c |   6 +-
- drivers/acpi/glue.c                  |   4 +-
- drivers/acpi/gsi.c                   |   2 +-
- drivers/acpi/iort.c                  | 188 ++++++++++++++++++-
- drivers/acpi/scan.c                  |  29 +++
- drivers/gpio/gpio-xgene-sb.c         |   8 +-
- drivers/iommu/arm-smmu.c             | 346 ++++++++++++++++++++++++++++++-----
- drivers/iommu/exynos-iommu.c         |  11 +-
- drivers/iommu/mtk_iommu.c            |  13 +-
- drivers/iommu/of_iommu.c             |   8 +-
- drivers/irqchip/irq-alpine-msi.c     |   2 +-
- drivers/irqchip/irq-crossbar.c       |   6 +-
- drivers/irqchip/irq-gic-v2m.c        |   2 +-
- drivers/irqchip/irq-gic-v3-its.c     |   2 +-
- drivers/irqchip/irq-gic-v3.c         |   4 +-
- drivers/irqchip/irq-gic.c            |   4 +-
- drivers/irqchip/irq-imx-gpcv2.c      |   6 +-
- drivers/irqchip/irq-mbigen.c         |   4 +-
- drivers/irqchip/irq-mips-gic.c       |   2 +-
- drivers/irqchip/irq-mtk-sysirq.c     |   6 +-
- drivers/irqchip/irq-mvebu-odmi.c     |   2 +-
- drivers/irqchip/irq-nvic.c           |   4 +-
- drivers/irqchip/irq-tegra.c          |   6 +-
- drivers/irqchip/irq-vf610-mscm-ir.c  |   6 +-
- drivers/of/base.c                    |  24 +++
- drivers/pci/probe.c                  |   3 +-
- include/acpi/acpi_bus.h              |   2 +
- include/asm-generic/vmlinux.lds.h    |   1 +
- include/linux/acpi.h                 |   5 +
- include/linux/fwnode.h               |  21 +++
- include/linux/iommu.h                |  31 +++-
- include/linux/iort.h                 |  18 ++
- include/linux/irqdomain.h            |  22 +--
- include/linux/of.h                   |   7 +
- kernel/irq/irqdomain.c               |  17 +-
- 38 files changed, 692 insertions(+), 144 deletions(-)
-
--- 
-2.6.4
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+>  Documentation/devicetree/bindings/serial/fsl-imx-uart.txt | 4 ++--
+>  drivers/tty/serial/imx.c                                  | 3 ++-
+>  2 files changed, 4 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/serial/fsl-imx-uart.txt b/Documentation/devicetree/bindings/serial/fsl-imx-uart.txt
+> index ed94c217c98d18a6..1e82802d8e322db5 100644
+> --- a/Documentation/devicetree/bindings/serial/fsl-imx-uart.txt
+> +++ b/Documentation/devicetree/bindings/serial/fsl-imx-uart.txt
+> @@ -6,7 +6,7 @@ Required properties:
+>  - interrupts : Should contain uart interrupt
+>  
+>  Optional properties:
+> -- fsl,uart-has-rtscts : Indicate the uart has rts and cts
+> +- uart-has-rtscts : Indicate the uart has rts and cts
+>  - fsl,irda-mode : Indicate the uart supports irda mode
+>  - fsl,dte-mode : Indicate the uart works in DTE mode. The uart works
+>                    in DCE mode by default.
+> @@ -24,6 +24,6 @@ uart1: serial at 73fbc000 {
+>  	compatible = "fsl,imx51-uart", "fsl,imx21-uart";
+>  	reg = <0x73fbc000 0x4000>;
+>  	interrupts = <31>;
+> -	fsl,uart-has-rtscts;
+> +	uart-has-rtscts;
+>  	fsl,dte-mode;
+>  };
+> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+> index 231e7d5caf6c1845..9fc09d3de1e2428b 100644
+> --- a/drivers/tty/serial/imx.c
+> +++ b/drivers/tty/serial/imx.c
+> @@ -1927,7 +1927,8 @@ static int serial_imx_probe_dt(struct imx_port *sport,
+>  	}
+>  	sport->port.line = ret;
+>  
+> -	if (of_get_property(np, "fsl,uart-has-rtscts", NULL))
+> +	if (of_get_property(np, "uart-has-rtscts", NULL) ||
+> +	    of_get_property(np, "fsl,uart-has-rtscts", NULL) /* deprecated */)
+>  		sport->have_rtscts = 1;
+>  
+>  	if (of_get_property(np, "fsl,dte-mode", NULL))
+> -- 
+> 1.9.1
+> 
