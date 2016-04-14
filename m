@@ -1,41 +1,53 @@
-From: atomlin@redhat.com (Aaron Tomlin)
-Date: Thu, 14 Apr 2016 16:19:33 +0100
-Subject: [PATCH v5 2/4] nmi_backtrace: do a local dump_stack() instead of
- a self-NMI
-In-Reply-To: <1459877208-15119-3-git-send-email-cmetcalf@mellanox.com>
-References: <1459877208-15119-1-git-send-email-cmetcalf@mellanox.com>
- <1459877208-15119-3-git-send-email-cmetcalf@mellanox.com>
-Message-ID: <20160414151933.GF20425@atomlin.usersys.redhat.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Thu, 14 Apr 2016 17:23:04 +0200
+Subject: [LINUX PATCH v2 1/3] spi: Added dummy_cycle entry in the
+ spi_transfer structure.
+In-Reply-To: <20160414085707.GE18024@sirena.org.uk>
+References: <1460039969-9835-1-git-send-email-lakshmis@xilinx.com>
+ <57067694.8030806@atmel.com>
+ <4FF8F58FAA9D5D4193D4E554E4352C5902C720DE@XAP-PVEXMBX02.xlnx.xilinx.com>
+ <570F4F9F.3090605@atmel.com> <20160414085707.GE18024@sirena.org.uk>
+Message-ID: <570FB5D8.90807@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2016-04-05 13:26 -0400, Chris Metcalf wrote:
-> Currently on arm there is code that checks whether it should call
-> dump_stack() explicitly, to avoid trying to raise an NMI when the
-> current context is not preemptible by the backtrace IPI.  Similarly,
-> the forthcoming arch/tile support uses an IPI mechanism that does
-> not support generating an NMI to self.
+Le 14/04/2016 10:57, Mark Brown a ?crit :
+> On Thu, Apr 14, 2016 at 10:06:55AM +0200, Cyrille Pitchen wrote:
 > 
-> Accordingly, move the code that guards this case into the generic
-> mechanism, and invoke it unconditionally whenever we want a
-> backtrace of the current cpu.  It seems plausible that in all cases,
-> dump_stack() will generate better information than generating a
-> stack from the NMI handler.  The register state will be missing,
-> but that state is likely not particularly helpful in any case.
+>> I understand but you propose to patch both the SPI layer and the m25p80 driver
+>> to introduce some support which is already provided by the "spi_flash_read"
+>> hook: struct spi_flash_read_message has already a "dummy_bytes" field.
+>> IMHO, it looks redundant.
 > 
-> Or, if we think it is helpful, we should be capturing and emitting
-> the current register state in all cases when regs == NULL is passed
-> to nmi_cpu_backtrace().
+> My understanding is that this is intended for dummy bits rather than
+> dummy bytes.
 > 
-> Signed-off-by: Chris Metcalf <cmetcalf@mellanox.com>
-> ---
->  arch/arm/kernel/smp.c | 9 ---------
->  lib/nmi_backtrace.c   | 9 +++++++++
->  2 files changed, 9 insertions(+), 9 deletions(-)
 
-Thanks Chris.
+dummy_bits == (dummy_bytes * 8) and
+dummy_cycles == ((dummy_bytes * 8) / addr_nbits)
 
-Acked-by: Aaron Tomlin <atomlin@redhat.com>
+witch addr_nbits in {1, 2, 4}
 
--- 
-Aaron Tomlin
+the struct_flash_read_message has both dummy_bytes and addr_nbits members.
+
+The spi-nor framework seems to always provide a multiple of 8 for dummy *bits*.
+I guess because the m25p80 driver only supports such number of dummy bits but
+also because all SPI memories can be configured so their number of dummy cycles keeps the byte alignment for the data to follow.
+
+It still allows to use less than 8 dummy *cycles*, for instance the factory
+settings for Macronix Quad SPI memories are:
+- 4 dummy cycles for Fast Read 1-2-2 (hence 8 dummy bits)
+- 6 dummy cycles for Fast Read x-4-4 (hence 24 dummy bits)
+
+AFAIK, only Micron QSPI memories could be configured so the number of dummy
+cycles doesn't result in a multiple of 8 bits but theirs are not the
+recommanded timings provided by the datasheet.
+
+Micron factory settings are:
+- 10 dummy cycles for Fast Read x-4-4 (hence 40 dummy bits)
+- 8 dummy cycles for other Fast Reads.
+
+
+Best regards,
+
+Cyrille
