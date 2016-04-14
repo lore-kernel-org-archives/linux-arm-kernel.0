@@ -1,64 +1,120 @@
-From: jchandra@broadcom.com (Jayachandran C)
-Date: Thu, 14 Apr 2016 21:10:00 +0530
-Subject: [PATCH v2 2/4] PCI: Provide common functions for ECAM mapping
-In-Reply-To: <570C4034.20105@caviumnetworks.com>
-References: <1460414707-19153-1-git-send-email-jchandra@broadcom.com>
- <1460414707-19153-3-git-send-email-jchandra@broadcom.com>
- <570C4034.20105@caviumnetworks.com>
-Message-ID: <CAKc_7PWp-NJz52KJyHnqSFMW4gsyS17yb01v_p02XWmdUkeTdA@mail.gmail.com>
+From: brian.starkey@arm.com (Brian Starkey)
+Date: Thu, 14 Apr 2016 16:39:18 +0100
+Subject: [PATCH v3 1/2] ARM: dts: Add expansion bus to VExpress
+Message-ID: <1460648359-7310-1-git-send-email-brian.starkey@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 12, 2016 at 5:54 AM, David Daney <ddaney@caviumnetworks.com> wrote:
-> On 04/11/2016 03:45 PM, Jayachandran C wrote:
->>
->> Add config option PCI_GENERIC_ECAM and file drivers/pci/ecam.c to
->> provide generic functions for accessing memory mapped PCI config space.
->>
->> The API is defined in drivers/pci/ecam.h and is written to replace the
->> API in drivers/pci/host/pci-host-common.h. The file defines a new
->> 'struct pci_config_window' to hold the information related to a PCI
->> config area and its mapping. This structure is expected to be used as
->> sysdata for controllers that have ECAM based mapping.
->>
->> Helper functions are provided to setup the mapping, free the mapping
->> and to implement the map_bus method in 'struct pci_ops'
->>
->> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
->
-> Tested-by: David Daney <david.daney@cavium.com>
+The VExpress development platform has an external expansion bus which
+can be used for additional hardware (e.g. LogicTile Express
+daughterboards).
+Add this bus to the VExpress CoreTile device-trees.
 
-I have updated the git tree (https://github.com/jchandra-brcm/linux/)
-with a branch arm64-acpi-pci-v3 . The branch has a new patch to use
-thunder ECAM ops in case of Cavium ThunderX platform when doing
-generic ACPI PCI initialization.
+The bus is described for a CoreTile occupying site 1.
 
-I am hoping that the controllers that have "ECAM with quirks" can
-use this mechanism for sharing the quirks between OF and ACPI.
+Signed-off-by: Brian Starkey <brian.starkey@arm.com>
+Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
+---
 
-If you have some time to review the patch and see it works for you,
-then I can post it with the v3 of this patchset.
+Changes since v2:
+ - Split into ARM and arm64 patches (Sudeep)
 
->> ---
->>   drivers/pci/Kconfig  |   3 ++
->>   drivers/pci/Makefile |   2 +
->>   drivers/pci/ecam.c   | 130
->> +++++++++++++++++++++++++++++++++++++++++++++++++++
->>   drivers/pci/ecam.h   |  58 +++++++++++++++++++++++
->
->
-> I wonder if these files should go in drivers/pci/host ...  I understand that
-> you still have to use them from drivers/pci/acpi though.
->
-> I will let others opine on this, but could you put the contents of ecam.h
-> into include/linux/pci.h along with the  pci_generic_config_*()
-> declarations?
->
-> If you did that, the contents of ecam.c could  go into
-> drivers/pci/access.c...
+Changes since v1:
+ - Reword commit message (Liviu)
 
-Earlier discussion seems to indicated that separate ecam.c/h was
-preferred. But I agree that it may be small enough to be merged.
+ arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts |   13 +++++++++++++
+ arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts  |   13 +++++++++++++
+ arch/arm/boot/dts/vexpress-v2p-ca5s.dts     |   13 +++++++++++++
+ arch/arm/boot/dts/vexpress-v2p-ca9.dts      |   13 +++++++++++++
+ 4 files changed, 52 insertions(+)
 
-Thanks,
-JC.
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
+index 9420053..ec7539b 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
+@@ -280,4 +280,17 @@
+ 
+ 		/include/ "vexpress-v2m-rs1.dtsi"
+ 	};
++
++	site2: hsb at 40000000 {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0 0x40000000 0x3fef0000>;
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0 3>;
++		interrupt-map = <0 0 &gic 0 36 4>,
++				<0 1 &gic 0 37 4>,
++				<0 2 &gic 0 38 4>,
++				<0 3 &gic 0 39 4>;
++	};
+ };
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+index 17f63f7..a339b0c 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+@@ -638,4 +638,17 @@
+ 
+ 		/include/ "vexpress-v2m-rs1.dtsi"
+ 	};
++
++	site2: hsb at 40000000 {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0 0x40000000 0x3fef0000>;
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0 3>;
++		interrupt-map = <0 0 &gic 0 36 4>,
++				<0 1 &gic 0 37 4>,
++				<0 2 &gic 0 38 4>,
++				<0 3 &gic 0 39 4>;
++	};
+ };
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+index d2709b7..76a9ccb 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+@@ -250,4 +250,17 @@
+ 
+ 		/include/ "vexpress-v2m-rs1.dtsi"
+ 	};
++
++	site2: hsb at 40000000 {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0x40000000 0x40000000>;
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0 3>;
++		interrupt-map = <0 0 &gic 0 36 4>,
++				<0 1 &gic 0 37 4>,
++				<0 2 &gic 0 38 4>,
++				<0 3 &gic 0 39 4>;
++	};
+ };
+diff --git a/arch/arm/boot/dts/vexpress-v2p-ca9.dts b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+index d949fac..edac212 100644
+--- a/arch/arm/boot/dts/vexpress-v2p-ca9.dts
++++ b/arch/arm/boot/dts/vexpress-v2p-ca9.dts
+@@ -359,4 +359,17 @@
+ 
+ 		/include/ "vexpress-v2m.dtsi"
+ 	};
++
++	site2: hsb at e0000000 {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0xe0000000 0x20000000>;
++		#interrupt-cells = <1>;
++		interrupt-map-mask = <0 3>;
++		interrupt-map = <0 0 &gic 0 36 4>,
++				<0 1 &gic 0 37 4>,
++				<0 2 &gic 0 38 4>,
++				<0 3 &gic 0 39 4>;
++	};
+ };
+-- 
+1.7.9.5
