@@ -1,46 +1,53 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 14 Apr 2016 09:36:38 +0200
-Subject: [PATCH v7 1/2] drivers: base: add support for registering notifier
- about deferred probe
-In-Reply-To: <20160413141254.GB12749@kroah.com>
-References: <1460540160-18762-1-git-send-email-m.szyprowski@samsung.com>
- <1460540160-18762-2-git-send-email-m.szyprowski@samsung.com>
- <20160413141254.GB12749@kroah.com>
-Message-ID: <570F4886.20203@samsung.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 14 Apr 2016 08:36:38 +0100
+Subject: [PATCH V4 4/7] ARM64, ACPI, PCI: I/O Remapping Table (IORT)
+ initial support.
+In-Reply-To: <570F44CD.7090605@semihalf.com>
+References: <1459759975-24097-1-git-send-email-tn@semihalf.com>
+ <1459759975-24097-5-git-send-email-tn@semihalf.com>
+ <570E645A.9010600@arm.com> <570E6794.4080409@semihalf.com>
+ <570E6B2C.3060700@arm.com> <570EB78E.4060705@codeaurora.org>
+ <570F44CD.7090605@semihalf.com>
+Message-ID: <570F4886.70405@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On 2016-04-13 16:12, Greg Kroah-Hartman wrote:
-> On Wed, Apr 13, 2016 at 11:35:59AM +0200, Marek Szyprowski wrote:
->> This patch adds code which allow other subsystems get a notification
->> when deferred probe has been triggered. This way one can retry some
->> actions, which earlier failed with -EPROBE_DEFER error code.
+On 14/04/16 08:20, Tomasz Nowicki wrote:
+> On 13.04.2016 23:18, Sinan Kaya wrote:
+>> On 4/13/2016 11:52 AM, Marc Zyngier wrote:
+>>>>> Sure. Please see:
+>>>>> http://infocenter.arm.com/help/topic/com.arm.doc.den0049a/DEN0049A_IO_Remapping_Table.pdf
+>>>>> 3.1.1.5 PCI root complex node
+>>>>> PCI Segment number -> The PCI segment number, as in MCFG and as
+>>>>> returned by _SEG in the namespace.
+>>>>>
+>>>>> So IORT spec states that pci_segment_number corresponds to the segment
+>>>>> number from MCFG table and _SEG method. Here is my patch which makes
+>>>>> sure pci_domain_nr(bus) is set properly:
+>>>>> https://lkml.org/lkml/2016/2/16/418
+>>> Lovely. So this series is actually dependent on the PCI one. I guess we
+>>> need to solve that one first, because IORT seems pretty pointless if we
+>>> don't have PCI support. What's the plan?
 >>
->> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Why would some other subsystem want/care about this?  You aren't telling
-> them what device was deferred, and you don't need to as the bus itself
-> already knows this information as it did the deferring!
->
-> confused,
+>> Would it be OK to split the PCI specific section of the patch and continue
+>> review? PCI is a user of the IORT table. Not the other way around.
+> 
+> I need to disagree. What would be the use case for patches w/o "PCI part" ?
 
-This notifier is just to let others that the deferred probe has happened and
-it is a good time to retry operation, which earlier failed due to missing
-resources (i.e. power domains, clocks). Such case is with registering AMBA
-device (not the driver!). During AMBA device registration, bus code has 
-to read
-some device's registers to get its device CID/PID. To do this, device's 
-clocks
-and power domain has to be turned on. Those however might not be available
-that time. With this notifier, AMBA bus code is able to retry device
-registration, which earlier failed due to missing clocks or power domain.
+Quite. PCI (as a subsystem) doesn't need IORT at all, thank you very
+much. GIC (implementing MSI) and SMMU (implementing DMA) do, by virtue
+of RID/SID/DID being translated all over the place.
 
-This CID/PID reading has to be done during device registration time because
-of the already deployed userspace ABI. CID/PID values are reported to
-userspace, which might rely on them to load proper driver modules.
+So by the look of it, the dependency chain is GIC+SMMU->IORT->PCI.
 
-Best regards
+The GIC changes here are pretty mechanical, and not that interesting.
+The stuff that needs sorting quickly is PCI, because all this work is
+pointless if we don't have it.
+
+At the risk of sounding like a stuck record: What's the plan?
+
+Thanks,
+
+	M.
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Jazz is not dead. It just smells funny...
