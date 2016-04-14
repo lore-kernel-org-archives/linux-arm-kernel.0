@@ -1,41 +1,75 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 14 Apr 2016 11:07:54 +0200
-Subject: [next] Failing Odroid XU3 boot due to missing MMC device
-In-Reply-To: <20160414084530.GS19428@n2100.arm.linux.org.uk>
-References: <570F5380.7010103@samsung.com> <570F5550.5010708@fivetechno.de>
- <20160414084530.GS19428@n2100.arm.linux.org.uk>
-Message-ID: <570F5DEA.1060908@samsung.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 14 Apr 2016 10:15:00 +0100
+Subject: [PATCH v2] sunxi-irq: Fix Kconfig dependency on GENERIC_IRQ_CHIP
+In-Reply-To: <570F5B5B.90302@arm.com>
+References: <1460563167-18517-1-git-send-email-suzuki.poulose@arm.com>
+ <20160413200735.GC4005@lukather> <570F5932.2020809@arm.com>
+ <570F5B5B.90302@arm.com>
+Message-ID: <570F5F94.1090602@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/14/2016 10:45 AM, Russell King - ARM Linux wrote:
-> On Thu, Apr 14, 2016 at 10:31:12AM +0200, Markus Reichl wrote:
->> Hi Krzysztof,
->>
->> yes, observed this with linux-next from yesterday 13.
->>
->> I boot from eMMC.
->> Device numbering of eMMC and SD are exchanged now.
->>
->> I solved the boot problem by changing the rootdev in U-Boot env
->> from /dev/mmcblk0p2 to /dev/mmcblk1p2.
->>
->> Changed /etc/fdisk, too, to mount /dev/mmcblk1p1 to /boot.     
-> 
-> You really should mount by partition uuid - supplying something like:
-> 
-> 	root=PARTUUID=f3ae567e-02
-> 
-> on the kernel command line.  This makes the mounting of rootfs
-> independent of which device carries the filesystem.
-> 
-> If you're not using an initramfs, the kernel prints the partuuid
-> values if it doesn't find the rootfs.  I don't know how to get the
-> partuuids without going through that process, sorry.
+Hi,
 
-Markus, Russell,
+On 14/04/16 09:56, Suzuki K Poulose wrote:
+> On 14/04/16 09:47, Suzuki K Poulose wrote:
+>> On 13/04/16 21:07, Maxime Ripard wrote:
+>>> Hi,
+>>>
+>>> On Wed, Apr 13, 2016 at 04:59:27PM +0100, Suzuki K Poulose wrote:
+>>>> The sunxi-nmi and sun4i irq chips are selected by ARCH_SUNXI on both
+>>>> arm
+>>>> and arm64 (recently added). However on arm64, we don't explicitly
+>>>> select
+>>>> GENERIC_IRQ_CHIP which is required by the sunxi-nmi irq chip driver and
+>>>> causes build breaks on 4.6-rc1 :
+>>
+>>>> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+>>>> index b03cfcb..c9626f4 100644
+>>>> --- a/drivers/irqchip/Makefile
+>>>> +++ b/drivers/irqchip/Makefile
+>>>> @@ -19,8 +19,8 @@ obj-$(CONFIG_CLPS711X_IRQCHIP)        +=
+>>>> irq-clps711x.o
+>>>>   obj-$(CONFIG_OR1K_PIC)            += irq-or1k-pic.o
+>>>>   obj-$(CONFIG_ORION_IRQCHIP)        += irq-orion.o
+>>>>   obj-$(CONFIG_OMAP_IRQCHIP)        += irq-omap-intc.o
+>>>> -obj-$(CONFIG_ARCH_SUNXI)        += irq-sun4i.o
+>>>> -obj-$(CONFIG_ARCH_SUNXI)        += irq-sunxi-nmi.o
+>>>> +obj-$(CONFIG_SUNXI_IRQCHIP)        += irq-sun4i.o
+>>>> +obj-$(CONFIG_SUNXI_IRQCHIP)        += irq-sunxi-nmi.o
+>>>
+>>> Those are two different drivers, that should be selected by different
+>>> SoCs (MACH_SUN4I and MACH_SUN5I for the former, SUN6I, SUN7I and SUN8I
+>>> for the latter)
 
-Thanks, I'll switch to UUID.
+But actually they aren't at the moment - and this is a post-rc1 fix, so
+I'd prefer to not introduce this right now.
 
-Best regards,
-Krzysztof
+I can bake a proper patch for 4.7 which separates the two, if people
+want this change.
+
+>> OK. I had thought about that, but wasn't sure who needs what. So went
+>> with
+>> what existed already. I can respin it.
+
+I would rather not do this right now.
+Maxime, can't we just go with this patch? That seems like the proper fix
+for this part of the release cycle to me.
+
+> As a follow up question, what does the arm64 port need ? just sunxi-nmi
+> ? or both ?
+
+Currently none of them, frankly.
+irq-sun4i will definitely not be needed, and I don't see the NMI
+controller documented in the manual (which does not mean too much, though).
+
+So my hunch is that we may need the nmi driver in the future, but then
+we can still enable it once we merge the respective DT node or add
+support for a peripheral that needs it.
+
+Cheers,
+Andre.
+
+> I would be happy if someone who has better understanding of the
+> dependencies can fix
+> it up, rather than me trying to figure out all the dependencies.
