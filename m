@@ -1,212 +1,87 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 14 Apr 2016 21:17:43 +0200
-Subject: [PATCH v5 23/24] pwm: switch to the atomic API
+Date: Thu, 14 Apr 2016 21:17:40 +0200
+Subject: [PATCH v5 20/24] pwm: add the PWM initial state retrieval infra
 In-Reply-To: <1460661464-11216-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1460661464-11216-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1460661464-11216-24-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1460661464-11216-21-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace legacy pwm_get/set_xxx() and pwm_config/enable/disable() calls
-by pwm_get/apply_state().
+Add a ->get_state() function to the pwm_ops struct to let PWM drivers
+initialize the PWM state attached to a PWM device.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/pwm/core.c  |  5 ++++-
- drivers/pwm/sysfs.c | 61 +++++++++++++++++++++++++++++++----------------------
- 2 files changed, 40 insertions(+), 26 deletions(-)
+ drivers/pwm/core.c  |  3 +++
+ include/linux/pwm.h | 28 ++++++++++++++++++++++++++++
+ 2 files changed, 31 insertions(+)
 
 diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-index 112a696..aefffcf 100644
+index c2759bc..0e7f687 100644
 --- a/drivers/pwm/core.c
 +++ b/drivers/pwm/core.c
-@@ -947,13 +947,16 @@ static void pwm_dbg_show(struct pwm_chip *chip, struct seq_file *s)
+@@ -270,6 +270,9 @@ int pwmchip_add_with_polarity(struct pwm_chip *chip,
+ 		pwm->hwpwm = i;
+ 		pwm->state.polarity = polarity;
  
- 	for (i = 0; i < chip->npwm; i++) {
- 		struct pwm_device *pwm = &chip->pwms[i];
-+		struct pwm_state state;
++		if (chip->ops->get_state)
++			chip->ops->get_state(chip, pwm, &pwm->state);
 +
-+		pwm_get_state(pwm, &state);
- 
- 		seq_printf(s, " pwm-%-3d (%-20.20s):", i, pwm->label);
- 
- 		if (test_bit(PWMF_REQUESTED, &pwm->flags))
- 			seq_puts(s, " requested");
- 
--		if (pwm_is_enabled(pwm))
-+		if (state.enabled)
- 			seq_puts(s, " enabled");
- 
- 		seq_puts(s, "\n");
-diff --git a/drivers/pwm/sysfs.c b/drivers/pwm/sysfs.c
-index ab28c89..40daf1c 100644
---- a/drivers/pwm/sysfs.c
-+++ b/drivers/pwm/sysfs.c
-@@ -47,13 +47,13 @@ static ssize_t period_show(struct device *child,
- {
- 	struct pwm_export *export = child_to_pwm_export(child);
- 	const struct pwm_device *pwm = export->pwm;
--	unsigned int period;
-+	struct pwm_state state;
- 
- 	mutex_lock(&export->lock);
--	period = pwm_get_period(pwm);
-+	pwm_get_state(pwm, &state);
- 	mutex_unlock(&export->lock);
- 
--	return sprintf(buf, "%u\n", period);
-+	return sprintf(buf, "%u\n", state.period);
- }
- 
- static ssize_t period_store(struct device *child,
-@@ -62,6 +62,7 @@ static ssize_t period_store(struct device *child,
- {
- 	struct pwm_export *export = child_to_pwm_export(child);
- 	struct pwm_device *pwm = export->pwm;
-+	struct pwm_state state;
- 	unsigned int val;
- 	int ret;
- 
-@@ -70,7 +71,9 @@ static ssize_t period_store(struct device *child,
- 		return ret;
- 
- 	mutex_lock(&export->lock);
--	ret = pwm_config(pwm, pwm_get_duty_cycle(pwm), val);
-+	pwm_get_state(pwm, &state);
-+	state.period = val;
-+	ret = pwm_apply_state(pwm, &state);
- 	mutex_unlock(&export->lock);
- 
- 	return ret ? : size;
-@@ -82,13 +85,13 @@ static ssize_t duty_cycle_show(struct device *child,
- {
- 	struct pwm_export *export = child_to_pwm_export(child);
- 	const struct pwm_device *pwm = export->pwm;
--	unsigned int duty;
-+	struct pwm_state state;
- 
- 	mutex_lock(&export->lock);
--	duty = pwm_get_duty_cycle(pwm);
-+	pwm_get_state(pwm, &state);
- 	mutex_unlock(&export->lock);
- 
--	return sprintf(buf, "%u\n", duty);
-+	return sprintf(buf, "%u\n", state.duty_cycle);
- }
- 
- static ssize_t duty_cycle_store(struct device *child,
-@@ -97,6 +100,7 @@ static ssize_t duty_cycle_store(struct device *child,
- {
- 	struct pwm_export *export = child_to_pwm_export(child);
- 	struct pwm_device *pwm = export->pwm;
-+	struct pwm_state state;
- 	unsigned int val;
- 	int ret;
- 
-@@ -105,7 +109,9 @@ static ssize_t duty_cycle_store(struct device *child,
- 		return ret;
- 
- 	mutex_lock(&export->lock);
--	ret = pwm_config(pwm, val, pwm_get_period(pwm));
-+	pwm_get_state(pwm, &state);
-+	state.duty_cycle = val;
-+	ret = pwm_apply_state(pwm, &state);
- 	mutex_unlock(&export->lock);
- 
- 	return ret ? : size;
-@@ -117,13 +123,13 @@ static ssize_t enable_show(struct device *child,
- {
- 	struct pwm_export *export = child_to_pwm_export(child);
- 	const struct pwm_device *pwm = export->pwm;
--	bool enabled;
-+	struct pwm_state state;
- 
- 	mutex_lock(&export->lock);
--	enabled = pwm_is_enabled(pwm);
-+	pwm_get_state(pwm, &state);
- 	mutex_unlock(&export->lock);
- 
--	return sprintf(buf, "%d\n", enabled);
-+	return sprintf(buf, "%d\n", state.enabled);
- }
- 
- static ssize_t enable_store(struct device *child,
-@@ -132,24 +138,20 @@ static ssize_t enable_store(struct device *child,
- {
- 	struct pwm_export *export = child_to_pwm_export(child);
- 	struct pwm_device *pwm = export->pwm;
-+	struct pwm_state state;
- 	int val, ret;
- 
- 	ret = kstrtoint(buf, 0, &val);
- 	if (ret)
- 		return ret;
- 
-+	if (val != 0 && val != 1)
-+		return -EINVAL;
-+
- 	mutex_lock(&export->lock);
--	switch (val) {
--	case 0:
--		pwm_disable(pwm);
--		break;
--	case 1:
--		ret = pwm_enable(pwm);
--		break;
--	default:
--		ret = -EINVAL;
--		break;
--	}
-+	pwm_get_state(pwm, &state);
-+	state.enabled = val;
-+	ret = pwm_apply_state(pwm, &state);
- 	mutex_unlock(&export->lock);
- 
- 	return ret ? : size;
-@@ -162,9 +164,13 @@ static ssize_t polarity_show(struct device *child,
- 	struct pwm_export *export = child_to_pwm_export(child);
- 	const struct pwm_device *pwm = export->pwm;
- 	const char *polarity = "unknown";
-+	struct pwm_state state;
- 
- 	mutex_lock(&export->lock);
--	switch (pwm_get_polarity(pwm)) {
-+	pwm_get_state(pwm, &state);
-+	mutex_unlock(&export->lock);
-+
-+	switch (state.polarity) {
- 	case PWM_POLARITY_NORMAL:
- 		polarity = "normal";
- 		break;
-@@ -173,7 +179,6 @@ static ssize_t polarity_show(struct device *child,
- 		polarity = "inversed";
- 		break;
+ 		radix_tree_insert(&pwm_tree, pwm->pwm, pwm);
  	}
--	mutex_unlock(&export->lock);
  
- 	return sprintf(buf, "%s\n", polarity);
+diff --git a/include/linux/pwm.h b/include/linux/pwm.h
+index 7bfeacf..73ca679 100644
+--- a/include/linux/pwm.h
++++ b/include/linux/pwm.h
+@@ -205,6 +205,29 @@ static inline void pwm_get_args(const struct pwm_device *pwm,
+ 
+ static inline void pwm_apply_args(struct pwm_device *pwm)
+ {
++	/*
++	 * PWM users calling pwm_apply_args() expect to have a fresh config
++	 * where the polarity and period are set according to pwm_args info.
++	 * The problem is, polarity can only be changed when the PWM is
++	 * disabled.
++	 *
++	 * PWM drivers supporting hardware readout may declare the PWM device
++	 * as enabled, and prevent polarity setting, which changes from the
++	 * existing behavior, where all PWM devices are declared as disabled
++	 * at startup (even if they are actually enabled), thus authorizing
++	 * polarity setting.
++	 *
++	 * Instead of setting ->enabled to false, we call pwm_disable()
++	 * before pwm_set_polarity() to ensure that everything is configured
++	 * as expected, and the PWM is really disabled when the user request
++	 * it.
++	 *
++	 * Note that PWM users requiring a smooth handover between the
++	 * bootloader and the kernel (like critical regulators controlled by
++	 * PWM devices) will have to switch to the atomic API and avoid calling
++	 * pwm_apply_args().
++	 */
++	pwm_disable(pwm);
+ 	pwm_set_polarity(pwm, pwm->args.polarity);
  }
-@@ -185,6 +190,7 @@ static ssize_t polarity_store(struct device *child,
- 	struct pwm_export *export = child_to_pwm_export(child);
- 	struct pwm_device *pwm = export->pwm;
- 	enum pwm_polarity polarity;
-+	struct pwm_state state;
- 	int ret;
  
- 	if (sysfs_streq(buf, "normal"))
-@@ -195,7 +201,12 @@ static ssize_t polarity_store(struct device *child,
- 		return -EINVAL;
- 
- 	mutex_lock(&export->lock);
--	ret = pwm_set_polarity(pwm, polarity);
-+	pwm_get_state(pwm, &state);
-+	state.polarity = polarity;
-+	if (state.enabled)
-+		ret = -EBUSY;
-+	else
-+		ret = pwm_apply_state(pwm, &state);
- 	mutex_unlock(&export->lock);
- 
- 	return ret ? : size;
+@@ -216,6 +239,9 @@ static inline void pwm_apply_args(struct pwm_device *pwm)
+  * @set_polarity: configure the polarity of this PWM
+  * @enable: enable PWM output toggling
+  * @disable: disable PWM output toggling
++ * @get_state: get the current PWM state. This function is only
++ *	       called once per PWM device when the PWM chip is
++ *	       registered.
+  * @dbg_show: optional routine to show contents in debugfs
+  * @owner: helps prevent removal of modules exporting active PWMs
+  */
+@@ -228,6 +254,8 @@ struct pwm_ops {
+ 			    enum pwm_polarity polarity);
+ 	int (*enable)(struct pwm_chip *chip, struct pwm_device *pwm);
+ 	void (*disable)(struct pwm_chip *chip, struct pwm_device *pwm);
++	void (*get_state)(struct pwm_chip *chip, struct pwm_device *pwm,
++			  struct pwm_state *state);
+ #ifdef CONFIG_DEBUG_FS
+ 	void (*dbg_show)(struct pwm_chip *chip, struct seq_file *s);
+ #endif
 -- 
 2.5.0
