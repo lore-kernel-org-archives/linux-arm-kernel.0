@@ -1,104 +1,35 @@
-From: xinliang.liu@linaro.org (Xinliang Liu)
-Date: Thu, 14 Apr 2016 15:04:10 +0800
-Subject: [PATCH v8 02/10] drm/hisilicon: Add hisilicon kirin drm master
- driver
-In-Reply-To: <CACvgo50dggEbwzEZLUvtErzrxOr3B1gECyyehLQZkoE5oXfNmA@mail.gmail.com>
-References: <1460364943-76135-1-git-send-email-xinliang.liu@linaro.org>
- <1460364943-76135-3-git-send-email-xinliang.liu@linaro.org>
- <CACvgo50dggEbwzEZLUvtErzrxOr3B1gECyyehLQZkoE5oXfNmA@mail.gmail.com>
-Message-ID: <CAGd==07i=uC9KmfWGrPwTVumAkHsK7GCPGYS6Fm2pX3VMTS7EQ@mail.gmail.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Thu, 14 Apr 2016 09:20:45 +0200
+Subject: [PATCH V4 4/7] ARM64, ACPI, PCI: I/O Remapping Table (IORT)
+ initial support.
+In-Reply-To: <570EB78E.4060705@codeaurora.org>
+References: <1459759975-24097-1-git-send-email-tn@semihalf.com>
+ <1459759975-24097-5-git-send-email-tn@semihalf.com>
+ <570E645A.9010600@arm.com> <570E6794.4080409@semihalf.com>
+ <570E6B2C.3060700@arm.com> <570EB78E.4060705@codeaurora.org>
+Message-ID: <570F44CD.7090605@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Emil,
-
-On 13 April 2016 at 20:15, Emil Velikov <emil.l.velikov@gmail.com> wrote:
-> Hi Xinliang,
+On 13.04.2016 23:18, Sinan Kaya wrote:
+> On 4/13/2016 11:52 AM, Marc Zyngier wrote:
+>>>> Sure. Please see:
+>>>> http://infocenter.arm.com/help/topic/com.arm.doc.den0049a/DEN0049A_IO_Remapping_Table.pdf
+>>>> 3.1.1.5 PCI root complex node
+>>>> PCI Segment number -> The PCI segment number, as in MCFG and as
+>>>> returned by _SEG in the namespace.
+>>>>
+>>>> So IORT spec states that pci_segment_number corresponds to the segment
+>>>> number from MCFG table and _SEG method. Here is my patch which makes
+>>>> sure pci_domain_nr(bus) is set properly:
+>>>> https://lkml.org/lkml/2016/2/16/418
+>> Lovely. So this series is actually dependent on the PCI one. I guess we
+>> need to solve that one first, because IORT seems pretty pointless if we
+>> don't have PCI support. What's the plan?
 >
-> On 11 April 2016 at 09:55, Xinliang Liu <xinliang.liu@linaro.org> wrote:
->
->> +static int kirin_drm_connectors_register(struct drm_device *dev)
->> +{
->> +       struct drm_connector *connector;
->> +       struct drm_connector *failed_connector;
->> +       int ret;
->> +
->> +       mutex_lock(&dev->mode_config.mutex);
->> +       drm_for_each_connector(connector, dev) {
->> +               ret = drm_connector_register(connector);
->> +               if (ret) {
->> +                       failed_connector = connector;
->> +                       goto err;
->> +               }
->> +       }
->> +       mutex_unlock(&dev->mode_config.mutex);
->> +
->> +       return 0;
->> +
->> +err:
->> +       drm_for_each_connector(connector, dev) {
->> +               if (failed_connector == connector)
->> +                       break;
->> +               drm_connector_unregister(connector);
->> +       }
->> +       mutex_unlock(&dev->mode_config.mutex);
->> +
->> +       return ret;
->> +}
->> +
-> Iirc we have new drm_connector_{un,}register_all() helpers.You might
-> want to use it once they are in (i.e. not sure what your base is and
-> if they have landed yet).
+> Would it be OK to split the PCI specific section of the patch and continue
+> review? PCI is a user of the IORT table. Not the other way around.
 
-I can't find these drm_connector_{un,}register_all() helpers in latest
-tag v4.6-rc3.
+I need to disagree. What would be the use case for patches w/o "PCI part" ?
 
->
->
->> +static struct device_node *kirin_get_remote_node(struct device_node *np)
->> +{
->> +       struct device_node *endpoint, *remote;
->> +
->> +       /* get the first endpoint, in our case only one remote node
->> +        * is connected to display controller.
->> +        */
->> +       endpoint = of_graph_get_next_endpoint(np, NULL);
->> +       if (!endpoint) {
->> +               DRM_ERROR("no valid endpoint node\n");
->> +               return ERR_PTR(-ENODEV);
->> +       }
->> +       of_node_put(endpoint);
->> +
->> +       remote = of_graph_get_remote_port_parent(endpoint);
->> +       if (!remote) {
->> +               DRM_ERROR("no valid remote node\n");
->> +               return ERR_PTR(-ENODEV);
->> +       }
->> +       of_node_put(remote);
->> +
->> +       if (!of_device_is_available(remote)) {
->> +               DRM_ERROR("not available for remote node\n");
->> +               return ERR_PTR(-ENODEV);
->> +       }
->> +
-> This seems like a common pattern in many platform DRM drivers. Yet
-> some tend to differ in subtle ways - I'm leaning that they might be
-> bugs, but one cannot be too sure.
->
-> A friendly request:
-> Can you please follow up by adding a helper and removing the
-> duplication thoughout ?
-
-Yes, I will create another patch set for this. I think I need to
-figure out other drivers requirements.
-Maybe, I need to add one more parameter for this helper. That's
-endpoint index to get which endpoint remote node.
-I will follow up this.
-
-Thanks,
--xinliang
-
-
->
-> Thanks
-> Emil
+Tomasz
