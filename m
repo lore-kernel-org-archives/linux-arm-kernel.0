@@ -1,50 +1,83 @@
-From: chunfeng.yun@mediatek.com (chunfeng yun)
-Date: Thu, 14 Apr 2016 09:45:17 +0800
-Subject: [PATCH v2 1/2] dt-bindings: phy-mt65xx-usb: add support for
- mt2701 platform
-In-Reply-To: <570E48EA.4030907@ti.com>
-References: <1460360490-18606-1-git-send-email-chunfeng.yun@mediatek.com>
- <570E48EA.4030907@ti.com>
-Message-ID: <1460598317.5156.2.camel@mhfsdcap03>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Wed, 13 Apr 2016 20:49:48 -0500
+Subject: [PATCH V2] ARM: OMAP3: Fix external abort on 36xx waking from off
+ mode idle
+Message-ID: <1460598588-28468-1-git-send-email-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Depending on timing during the resume path from off mode on 36xx, we may
+see external aborts. These seem to be caused by the following:
 
-On Wed, 2016-04-13 at 18:56 +0530, Kishon Vijay Abraham I wrote:
-> Hi,
-> 
-> On Monday 11 April 2016 01:11 PM, Chunfeng Yun wrote:
-> > A new compatible string, "mediatek,mt2701-u3phy", is added.
-> 
-> how about changing the commit log to something like below?
-> Add a new compatible string for "mt2701"
-> 
-OK
+- OMAP3 Advisory 1.62 "MPU Cannot Exit from Standby" says we need to
+  disable disable intc autoidle before WFI
 
-thanks
+- DM3730 Advisory 1.106 "MPU Leaves MSTANDBY State Before IDLEREQ of
+  Interrupt Controller is Released" says we need to wait before
+  accessing intc
 
-> Thanks
-> Kishon
-> > 
-> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> > ---
-> >  .../devicetree/bindings/phy/phy-mt65xx-usb.txt     |    4 +++-
-> >  1 file changed, 3 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt b/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
-> > index 00100cf..33a2b1e 100644
-> > --- a/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
-> > +++ b/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
-> > @@ -4,7 +4,9 @@ mt65xx USB3.0 PHY binding
-> >  This binding describes a usb3.0 phy for mt65xx platforms of Medaitek SoC.
-> >  
-> >  Required properties (controller (parent) node):
-> > - - compatible	: should be "mediatek,mt8173-u3phy"
-> > + - compatible	: should be one of
-> > +		  "mediatek,mt2701-u3phy"
-> > +		  "mediatek,mt8173-u3phy"
-> >   - reg		: offset and length of register for phy, exclude port's
-> >  		  register.
-> >   - clocks	: a list of phandle + clock-specifier pairs, one for each
-> > 
+omap3_intc_resume_idle restores the intc autoidle for all resume paths,
+however in the resume path from off mode only it is also being restored
+by omap_intc_restore_context before this call to omap3_intc_resume_idle
+happens. The second restore of the intc autoidle in this path is what
+appears to be causing the external abort so for the off mode resume path
+let's rely on omap_intc_restore_context to restore intc autoidle, and
+for all other paths let omap3_intc_resume_idle handle it as it is now.
+
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
+v1->v2:
+  - Rebased on v4.6-rc1
+  - Tested with and without patch and no abort seen on v4.6-rc1
+  - Series at [1] that v1 was based on alone on v4.6-rc1 sees abort,
+    if series is applied on this patch abort goes away
+
+[1] https://github.com/dgerlach/linux-pm/tree/beagle-sram-wip-v4.6-rc1
+
+ arch/arm/mach-omap2/pm34xx.c | 23 +++++++++++++----------
+ 1 file changed, 13 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 2dbd3785ee6f..d44e0e2f1106 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -198,7 +198,6 @@ void omap_sram_idle(void)
+ 	int per_next_state = PWRDM_POWER_ON;
+ 	int core_next_state = PWRDM_POWER_ON;
+ 	int per_going_off;
+-	int core_prev_state;
+ 	u32 sdrc_pwr = 0;
+ 
+ 	mpu_next_state = pwrdm_read_next_pwrst(mpu_pwrdm);
+@@ -278,16 +277,20 @@ void omap_sram_idle(void)
+ 		sdrc_write_reg(sdrc_pwr, SDRC_POWER);
+ 
+ 	/* CORE */
+-	if (core_next_state < PWRDM_POWER_ON) {
+-		core_prev_state = pwrdm_read_prev_pwrst(core_pwrdm);
+-		if (core_prev_state == PWRDM_POWER_OFF) {
+-			omap3_core_restore_context();
+-			omap3_cm_restore_context();
+-			omap3_sram_restore_context();
+-			omap2_sms_restore_context();
+-		}
++	if (core_next_state < PWRDM_POWER_ON &&
++	    pwrdm_read_prev_pwrst(core_pwrdm) == PWRDM_POWER_OFF) {
++		omap3_core_restore_context();
++		omap3_cm_restore_context();
++		omap3_sram_restore_context();
++		omap2_sms_restore_context();
++	} else {
++		/*
++		 * In off-mode resume path above, omap3_core_restore_context
++		 * also handles the INTC autoidle restore done here so limit
++		 * this to non-off mode resume paths so we don't do it twice.
++		 */
++		omap3_intc_resume_idle();
+ 	}
+-	omap3_intc_resume_idle();
+ 
+ 	pwrdm_post_transition(NULL);
+ 
+-- 
+2.7.3
