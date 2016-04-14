@@ -1,86 +1,46 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Thu, 14 Apr 2016 13:13:08 +0000
-Subject: [PATCH v2] PCI: designware: move remaining rc setup code to
- dw_pcie_setup_rc()
-In-Reply-To: <CAHM4w1kKmbkWoeMzKXgu+wMW+O2e5=wFe=WrKn_HLcFv4s_Qcg@mail.gmail.com>
-References: <1458128433-3020-1-git-send-email-jszhang@marvell.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ED40E52@lhreml503-mbs>
- <20160407103734.55e72da7@xhacker>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ED43F95@lhreml503-mbs>
- <20160407163443.291fbd49@xhacker>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ED44208@lhreml503-mbs>
- <20160407140551.GA2648@localhost>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ED45C38@lhreml503-mbs>
- <20160408160145.GA10565@localhost>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ED4B88D@lhreml503-mbs>
- <00a901d19548$90bffc20$b23ff460$@com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ED4F10E@lhreml503-mbs>
- <000001d19644$356355a0$a02a00e0$@com>
- <CAHM4w1kKmbkWoeMzKXgu+wMW+O2e5=wFe=WrKn_HLcFv4s_Qcg@mail.gmail.com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1ED51AD0@lhreml503-mbs>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 14 Apr 2016 15:13:49 +0200
+Subject: [PATCH v6 14/14] arm64: hibernate: Prevent resume from a
+ different kernel version
+In-Reply-To: <570F9160.30408@arm.com>
+References: <1456766423-1554-1-git-send-email-james.morse@arm.com>
+ <1456766423-1554-15-git-send-email-james.morse@arm.com>
+ <20160410114938.GB30188@xo-6d-61-c0.localdomain>
+ <570F9160.30408@arm.com>
+Message-ID: <20160414131349.GA15106@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pratyush 
+Hi!
 
-thanks for you reply 
+> >> Signed-off-by: James Morse <james.morse@arm.com>
+> > 
+> > Better solution would be to store the current bits _and_ UTS version. Then bump UTS_VERSION
+> > every time Linux behaviour changes w.r.t. EFI. For a while, it would change a lot, but then
+> > it should stabilize, as the port stabilizes
+> 
+> If we want to support resuming with a different kernel version. Patch 13 (of
+> this series) does this, it has 'HIBERNATE_VERSION', which we would have to
+> increase every time an incompatible change is made, but I'm worried that its a
+> constant game of catch-up to work out which changes are compatible. The first
+> sign a user gets that this isn't supported, (who reads the changelog?), is when
+> it fails to resume, and they loose any data that was written to the hibernate image.
+> 
 
-> -----Original Message-----
-> From: Pratyush Anand [mailto:pratyush.anand at gmail.com]
-> Sent: 14 April 2016 14:08
-> To: Jingoo Han; Gabriele Paoloni
-> Cc: Bjorn Helgaas; Jisheng Zhang; Bjorn Helgaas; linux-
-> pci at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH v2] PCI: designware: move remaining rc setup code
-> to dw_pcie_setup_rc()
-> 
-> Hi Gabriele,
-> 
-> On Thu, Apr 14, 2016 at 5:22 PM, Jingoo Han <jingoohan1@gmail.com>
-> wrote:
-> > On Wednesday, April 13, 2016 4:58 PM, Gabriele Paoloni wrote:
-> >>
-> >> Hi Jingoo
-> >>
-> >> On 13 April 2016 06:52, Jingoo Han wrote:
-> >> > On Tuesday, April 12, 2016 6:44 PM, Gabriele Paoloni wrote:
-> 
-> [...]
-> 
-> >> > > So I will update the driver to call dw_pcie_setup_rc() from
-> >> > > .host_init and ask the BIOS team to update the firmware for next
-> >> > > releases (the driver will be backward compatible anyway).
-> >> > >
-> >> > > Also during my investigation I have noticed that in
-> >> > dw_pcie_setup_rc()
-> >> > > http://lxr.free-electrons.com/source/drivers/pci/host/pcie-
-> >> > designware.c#L762
-> >> > >
-> >> > > we use pp->mem_base rather than pp->mem_bus_addr to setup
-> >> > > memory base and memory limit in the Type1 header...I think this
-> >> > > is wrong right?
-> 
-> Yes. RC's "memory base" and "memory limit" should be governed by PCI
-> addresses and not CPU addresses. So, it should use pp->mem_bus_addr.
-> 
-> >> > > Also I do not see why this code is needed at all since we
-> overwrite
-> >> > > this register when we call pci_bus_assign_resources(bus) that
-> >> > > will end up in calling pci_setup_bridge() and then
-> >> > > pci_setup_bridge_mmio()...?
-> >>
-> >> Do you have any comment on this issue above?
-> 
-> Probably thats why things are working.
-> Thanks for finding it. I think, /* setup memory base, memory limit */
-> hunk can be removed from dw_pcie_setup_rc.
+> What does restoring with a different kernel version get used for? (I agree its a
+> neat trick!) I can see it would be useful on laptops, where the distribution can
+> upgrade the kernel and the user can still use hibernate before they reboot. But
+> the distribution can switch this value to be just the kernel version if they are
+> willing to test hibernate/resume over any updates they make.
 
-Great, I'll send out a patch to remove this
+Well, it is way too easy to forget that you've updated your kernel,
+and then hibernate. I've been burned more than once. 
 
-Thanks
+And for example updating from 4.4.1 to 4.4.2 to 4.4.3 to... should be
+very safe, and pretty important for distribution users.
 
-Gab
-
-> 
-> ~Pratyush
+Best regards,
+								Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
