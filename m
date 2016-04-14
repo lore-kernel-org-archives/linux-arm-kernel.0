@@ -1,35 +1,113 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 14 Apr 2016 17:35:38 +0100
-Subject: [PATCH] arm64: Kconfig: make SCHED_MC and SCHED_SMT depend on SMP
-In-Reply-To: <570FC643.3090805@linaro.org>
-References: <1460595252-2330-1-git-send-email-yang.shi@linaro.org>
- <20160414084727.GA23207@arm.com> <570FC643.3090805@linaro.org>
-Message-ID: <20160414163538.GF4584@arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 14 Apr 2016 19:39:11 +0300
+Subject: [PATCH v5 00/12] ARM/arm64: dts: rcar: Add SYSC PM domains
+In-Reply-To: <1460558692-10414-1-git-send-email-geert+renesas@glider.be>
+References: <1460558692-10414-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <69568188.pxFZj2OQEq@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 14, 2016 at 09:33:07AM -0700, Shi, Yang wrote:
-> On 4/14/2016 1:47 AM, Will Deacon wrote:
-> >On Wed, Apr 13, 2016 at 05:54:12PM -0700, Yang Shi wrote:
-> >>SCHED_MC and SCHED_SMT are pointless when SMP is disabled.
-> >>Although SMP is rarely disabled for ARM64, it looks more consistent to have
-> >>such depend in Kconfig.
-> >
-> >You can't disable CONFIG_SMP for arm64 -- we select it unconditionally
-> >in the kconfig.
-> 
-> Thanks Will. I didn't realize ARM64 has SMP selected unconditionally, it
-> looks the patch is pointless.
-> 
-> A follow-up question, I know ARM64 has no UP implementation now, it sounds
-> make sense to have SMP select unconditionally, however, it might be more
-> flexible to have SMP like x86 and other architectures. And, it may also help
-> to find more bugs when !SMP.
+Hi Geert,
 
-Well, an SMP kernel would still work on a UP implementation, so I don't
-really see the point in carrying a whole load of barely tested #ifdef
-code. Top that off with the fact that we still need shareable memory for
-coherent DMA and we still need barrier instructions for the page table
-walker, and it's really diminishing returns.
+Thank you for the patches.
 
-Will
+For the whole series,
+
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+On Wednesday 13 Apr 2016 16:44:40 Geert Uytterhoeven wrote:
+> 	Hi Simon, Magnus,
+> 
+> This patch series adds the R-Car System Controller to the DTS files for
+> the various Renesas R-Car SoCs, and hooks up devices to their respective
+> PM domains.
+> 
+> This is a dependency for the enablement of DU and VSP on R-Car H3, as
+> on this SoC the VSPs are located in a PM Domain.
+> 
+> This series contains 2 parts:
+>   1. Patches 1-6 add device node for the System Controllers, and hook
+>      up CPU cores and L2 caches/SCUs to their respective PM Domains,
+>   2. Patches 7-12 hook up devices to the SYSC "always-on" PM Domain, for
+>      a more consistent device-power-area description in DT.
+> 
+> As "[PATCH v5 00/11] soc: renesas: Add R-Car SYSC PM Domain Support"
+> merged the two initialization phases again, the issues in v4 caused by
+> excessive deferred probing are gone, and both parts are now safe to
+> apply.
+> 
+> Changes compared to v4:
+>   - Add Acked-by,
+>   - Remove "power-domains" property again from the sysc nodes, as the
+>     System Controller theirselves are not part of the Clock Domains.
+> 
+> Changes compared to v3:
+>   - Add power-domains properties to the sysc nodes, to refer to the
+>     SoC's Clock Domains,
+>   - Extract using the SYSC "always-on" PM Domain on R-Car H3 into its
+>     own patch,
+>   - Add patches to use the SYSC "always-on" PM Domain on R-Car H1 and
+>     R-Car Gen2,
+>   - Update for recently added can0, can1, pciec0, and pciec1 device
+>     nodes on R-Car H3.
+> 
+> Changes compared to v2:
+>   - Move power area hierarchy from DT to C (cfr. DT bindings for Renesas
+>     CPG/MSSR), and switch to "#power-domain-cells = <1>",
+>   - Drop fallback compatibility strings, as the bindings are
+>     SoC-specific,
+>   - Add an "always-on" power area on R-Car H3.
+> 
+> Changes compared to v1:
+>   - Add R-Car H3 (r8a7795) support,
+>   - Use "renesas,<type>-sysc" instead of "renesas,sysc-<type>",
+>   - Add fallback compatibility strings for R-Car Gen2 and Gen3.
+> 
+> Dependencies:
+>   - renesas-devel-20160411-v4.6-rc3
+>   - clk-renesas-for-v4.7
+>   - "[PATCH v2 0/4] clk: renesas: R-Car SYSC PM Domain Preparation",
+>   - "[PATCH v5 0/7] PM / Domains: Add DT bindings for the R-Car System
+>     Controller",
+>   - "[PATCH v5 00/11] soc: renesas: Add R-Car SYSC PM Domain Support".
+> Note that these are hard dependencies: adding SYSC PM Domains to DTS
+> files without driver support will cause breakage!
+> 
+> For your convenience, I've pushed this, incl. all dependencies, to the
+> topic/rcar-sysc-pd-v5 branch of
+> git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git.
+> Integration with renesas-drivers-2016-04-12-v4.6-rc3 is available in the
+> topic/gen3-latest branch.
+> 
+> This has been tested on r8a7779/marzen, r8a7790/lager, r8a7791/koelsch,
+> r8a7794/alt, and r8a7795/salvator-x.
+> 
+> Thanks for applying!
+> 
+> Geert Uytterhoeven (12):
+>   ARM: dts: r8a7779: Add SYSC PM Domains
+>   ARM: dts: r8a7790: Add SYSC PM Domains
+>   ARM: dts: r8a7791: Add SYSC PM Domains
+>   ARM: dts: r8a7793: Add SYSC PM Domains
+>   ARM: dts: r8a7794: Add SYSC PM Domains
+>   arm64: dts: r8a7795: Add SYSC PM Domains
+>   ARM: dts: r8a7779: Use SYSC "always-on" PM Domain
+>   ARM: dts: r8a7790: Use SYSC "always-on" PM Domain
+>   ARM: dts: r8a7791: Use SYSC "always-on" PM Domain
+>   ARM: dts: r8a7793: Use SYSC "always-on" PM Domain
+>   ARM: dts: r8a7794: Use SYSC "always-on" PM Domain
+>   arm64: dts: r8a7795: Use SYSC "always-on" PM Domain
+> 
+>  arch/arm/boot/dts/r8a7779.dtsi           |  54 ++++++-----
+>  arch/arm/boot/dts/r8a7790.dtsi           | 155
+> ++++++++++++++++-------------- arch/arm/boot/dts/r8a7791.dtsi           |
+> 156 ++++++++++++++++--------------- arch/arm/boot/dts/r8a7793.dtsi         
+>  | 105 +++++++++++---------- arch/arm/boot/dts/r8a7794.dtsi           | 116
+> ++++++++++++----------- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 123
+> +++++++++++++----------- 6 files changed, 389 insertions(+), 320
+> deletions(-)
+
+-- 
+Regards,
+
+Laurent Pinchart
