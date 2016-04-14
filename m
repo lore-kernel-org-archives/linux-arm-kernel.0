@@ -1,105 +1,176 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 14 Apr 2016 10:04:13 -0500
-Subject: [PATCH v5 1/2] Documentation: DT: dma: Add Xilinx zynqmp dma
- device tree binding documentation
-In-Reply-To: <1460524609-8722-1-git-send-email-appanad@xilinx.com>
-References: <1460524609-8722-1-git-send-email-appanad@xilinx.com>
-Message-ID: <20160414150413.GA24644@rob-hp-laptop>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 14 Apr 2016 17:06:52 +0200
+Subject: [PATCH v2 12/17] kvm-arm: Add explicit hyp page table modifiers
+In-Reply-To: <1460640065-27658-13-git-send-email-suzuki.poulose@arm.com>
+References: <1460640065-27658-1-git-send-email-suzuki.poulose@arm.com>
+ <1460640065-27658-13-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20160414150652.GO30804@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 13, 2016 at 10:46:48AM +0530, Kedareswara rao Appana wrote:
-> Device-tree binding documentation for Xilinx zynqmp dma engine used in
-> Zynq UltraScale+ MPSoC.
+On Thu, Apr 14, 2016 at 02:21:00PM +0100, Suzuki K Poulose wrote:
+> We have common routines to modify hyp and stage2 page tables
+> based on the 'kvm' parameter. For a smoother transition to
+> using separate routines for each, duplicate the routines
+> and modify the copy to work on hyp.
 > 
-> Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
-> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> Marks the forked routines with _hyp_ and gets rid of the
+> kvm parameter which is no longer needed and is NULL for hyp.
+> Also, gets rid of calls to kvm_tlb_flush_by_vmid_ipa() calls
+> from the hyp versions. Uses explicit host page table accessors
+> instead of the kvm_* page table helpers.
+> 
+> Suggested-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 > ---
-> Changes in v5:
-> - Use dma-coherent flag for coherent transfers as suggested by rob.
-> - Removed unnecessary properties from binding doc as suggested by Rob.
-> Changes in v4:
-> - None
-> Changes in v3:
-> - None
-> Changes in v2:
-> - None.
+> Changes since V1:
+>  - Remove flush_dcache for !device_pfns in unmap_hyp_ptes()
+>  - Remove huge pmd/pud checks in unmap_hyp_p.ds, since we don't
+>    use huge mappings
+>  - Add a comment in unmap_hyp_range() on why we don't invalidate
+>    TLBs.
+> ---
+>  arch/arm/kvm/mmu.c |  104 +++++++++++++++++++++++++++++++++++++++++++++++++---
+>  1 file changed, 99 insertions(+), 5 deletions(-)
 > 
->  .../devicetree/bindings/dma/xilinx/zynqmp_dma.txt  | 50 ++++++++++++++++++++++
->  1 file changed, 50 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
-> new file mode 100644
-> index 0000000..4ad0aea40
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
-> @@ -0,0 +1,50 @@
-> +Xilinx ZynqMP DMA engine, it does support memory to memory transfers,
-> +memory to device and device to memory transfers. It also has flow
-> +control and rate control support for slave/peripheral dma access.
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index f93f717..af526f6 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -388,6 +388,100 @@ static void stage2_flush_vm(struct kvm *kvm)
+>  	srcu_read_unlock(&kvm->srcu, idx);
+>  }
+>  
+> +static void clear_hyp_pgd_entry(pgd_t *pgd)
+> +{
+> +	pud_t *pud_table __maybe_unused = pud_offset(pgd, 0UL);
+> +	pgd_clear(pgd);
+> +	pud_free(NULL, pud_table);
+> +	put_page(virt_to_page(pgd));
+> +}
 > +
-> +Required properties:
-> +- compatible		: Should be "xlnx,zynqmp-dma-1.0"
-> +- reg			: Memory map for gdma/adma module access.
-> +- interrupt-parent	: Interrupt controller the interrupt is routed through
-> +- interrupts		: Should contain DMA channel interrupt.
-> +- xlnx,bus-width	: Axi buswidth in bits. Should contain 128 or 64
-> +- clock-names		: List of input clocks "clk_main", "clk_apb"
-> +			  (see clock bindings for details)
+> +static void clear_hyp_pud_entry(pud_t *pud)
+> +{
+> +	pmd_t *pmd_table __maybe_unused = pmd_offset(pud, 0);
+> +	VM_BUG_ON(pud_huge(*pud));
+> +	pud_clear(pud);
+> +	pmd_free(NULL, pmd_table);
+> +	put_page(virt_to_page(pud));
+> +}
 > +
-> +Optional properties:
-> +- xlnx,include-sg	: Indicates the controller to operate in simple or
-> +			  scatter gather dma mode
-> +- xlnx,ratectrl		: Scheduling interval in terms of clock cycles for
-> +			  source AXI transaction
-> +- xlnx,overfetch	: Tells whether the channel is allowed to over
-> +			  fetch the data
-> +- xlnx,src-issue	: Number of AXI outstanding transactions on source side
-> +- xlnx,desc-axi-cache	: AXI cache bits to be used for descriptor fetch
-> +- xlnx,src-axi-cache	: AXI cache bits to be used for data read
-> +- xlnx,dst-axi-cache	: AXI cache bits to be used for data write
-
-Shouldn't you be able to derive these values from whether dma-coherent 
-is set. To put it another way, allowing setting both allows for lots of 
-broken combinations.
-
-> +- xlnx,src-burst-len	: AXI length for data read. Support only power of
-> +			  2 values.
-> +- xlnx,dst-burst-len	: AXI length for data write. Support only power of
-> +			  2 values.
-
-What unit? Seems to be beats from the example. I would suggest bytes 
-instead.
-
-> +- dma-coherent		: Present if dma operations are coherent.
+> +static void clear_hyp_pmd_entry(pmd_t *pmd)
+> +{
+> +	pte_t *pte_table = pte_offset_kernel(pmd, 0);
+> +	VM_BUG_ON(pmd_thp_or_huge(*pmd));
+> +	pmd_clear(pmd);
+> +	pte_free_kernel(NULL, pte_table);
+> +	put_page(virt_to_page(pmd));
+> +}
 > +
-> +Example:
-> +++++++++
-> +fpd_dma_chan1: dma at FD500000 {
-
-lowercase address.
-
-> +	compatible = "xlnx,zynqmp-dma-1.0";
-> +	reg = <0x0 0xFD500000 0x1000>;
-> +	interrupt-parent = <&gic>;
-> +	interrupts = <0 117 4>;
-> +	clock-names = "clk_main", "clk_apb";
-> +	xlnx,bus-width = <128>;
-> +	xlnx,include-sg;
-> +	xlnx,overfetch;
-> +	dma-coherent;
-> +	xlnx,ratectrl = <0>;
-> +	xlnx,src-issue = <16>;
-> +	xlnx,desc-axi-cache = <0xFF>;
-> +	xlnx,src-axi-cache = <0xFF>;
-> +	xlnx,dst-axi-cache = <0xFF>;
-
-Last I checked, AXI only has 4 cache bits.
-
-> +	xlnx,src-burst-len = <4>;
-> +	xlnx,dst-burst-len = <4>;
-> +};
+> +static void unmap_hyp_ptes(pmd_t *pmd, phys_addr_t addr, phys_addr_t end)
+> +{
+> +	pte_t *pte, *start_pte;
+> +
+> +	start_pte = pte = pte_offset_kernel(pmd, addr);
+> +	do {
+> +		if (!pte_none(*pte)) {
+> +			kvm_set_pte(pte, __pte(0));
+> +			put_page(virt_to_page(pte));
+> +		}
+> +	} while (pte++, addr += PAGE_SIZE, addr != end);
+> +
+> +	if (hyp_pte_table_empty(start_pte))
+> +		clear_hyp_pmd_entry(pmd);
+> +}
+> +
+> +static void unmap_hyp_pmds(pud_t *pud, phys_addr_t addr, phys_addr_t end)
+> +{
+> +	phys_addr_t next;
+> +	pmd_t *pmd, *start_pmd;
+> +
+> +	start_pmd = pmd = pmd_offset(pud, addr);
+> +	do {
+> +		next = pmd_addr_end(addr, end);
+> +		/* Hyp doesn't use huge pmds */
+> +		if (!pmd_none(*pmd))
+> +			unmap_hyp_ptes(pmd, addr, next);
+> +	} while (pmd++, addr = next, addr != end);
+> +
+> +	if (hyp_pmd_table_empty(start_pmd))
+> +		clear_hyp_pud_entry(pud);
+> +}
+> +
+> +static void unmap_hyp_puds(pgd_t *pgd, phys_addr_t addr, phys_addr_t end)
+> +{
+> +	phys_addr_t next;
+> +	pud_t *pud, *start_pud;
+> +
+> +	start_pud = pud = pud_offset(pgd, addr);
+> +	do {
+> +		next = pud_addr_end(addr, end);
+> +		/* Hyp doesn't use huge puds */
+> +		if (!pud_none(*pud))
+> +			unmap_hyp_pmds(pud, addr, next);
+> +	} while (pud++, addr = next, addr != end);
+> +
+> +	if (hyp_pud_table_empty(start_pud))
+> +		clear_hyp_pgd_entry(pgd);
+> +}
+> +
+> +static void unmap_hyp_range(pgd_t *pgdp, phys_addr_t start, u64 size)
+> +{
+> +	pgd_t *pgd;
+> +	phys_addr_t addr = start, end = start + size;
+> +	phys_addr_t next;
+> +
+> +	/*
+> +	 * We don't unmap anything from HYP, except at the hyp tear down.
+> +	 * Hence, we don't have to invalidate the TLBs here.
+> +	 */
+> +	pgd = pgdp + pgd_index(addr);
+> +	do {
+> +		next = pgd_addr_end(addr, end);
+> +		if (!pgd_none(*pgd))
+> +			unmap_hyp_puds(pgd, addr, next);
+> +	} while (pgd++, addr = next, addr != end);
+> +}
+> +
+>  /**
+>   * free_boot_hyp_pgd - free HYP boot page tables
+>   *
+> @@ -398,14 +492,14 @@ void free_boot_hyp_pgd(void)
+>  	mutex_lock(&kvm_hyp_pgd_mutex);
+>  
+>  	if (boot_hyp_pgd) {
+> -		unmap_range(NULL, boot_hyp_pgd, hyp_idmap_start, PAGE_SIZE);
+> -		unmap_range(NULL, boot_hyp_pgd, TRAMPOLINE_VA, PAGE_SIZE);
+> +		unmap_hyp_range(boot_hyp_pgd, hyp_idmap_start, PAGE_SIZE);
+> +		unmap_hyp_range(boot_hyp_pgd, TRAMPOLINE_VA, PAGE_SIZE);
+>  		free_pages((unsigned long)boot_hyp_pgd, hyp_pgd_order);
+>  		boot_hyp_pgd = NULL;
+>  	}
+>  
+>  	if (hyp_pgd)
+> -		unmap_range(NULL, hyp_pgd, TRAMPOLINE_VA, PAGE_SIZE);
+> +		unmap_hyp_range(hyp_pgd, TRAMPOLINE_VA, PAGE_SIZE);
+>  
+>  	mutex_unlock(&kvm_hyp_pgd_mutex);
+>  }
+> @@ -430,9 +524,9 @@ void free_hyp_pgds(void)
+>  
+>  	if (hyp_pgd) {
+>  		for (addr = PAGE_OFFSET; virt_addr_valid(addr); addr += PGDIR_SIZE)
+> -			unmap_range(NULL, hyp_pgd, KERN_TO_HYP(addr), PGDIR_SIZE);
+> +			unmap_hyp_range(hyp_pgd, KERN_TO_HYP(addr), PGDIR_SIZE);
+>  		for (addr = VMALLOC_START; is_vmalloc_addr((void*)addr); addr += PGDIR_SIZE)
+> -			unmap_range(NULL, hyp_pgd, KERN_TO_HYP(addr), PGDIR_SIZE);
+> +			unmap_hyp_range(hyp_pgd, KERN_TO_HYP(addr), PGDIR_SIZE);
+>  
+>  		free_pages((unsigned long)hyp_pgd, hyp_pgd_order);
+>  		hyp_pgd = NULL;
 > -- 
-> 2.1.2
+> 1.7.9.5
 > 
+
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
