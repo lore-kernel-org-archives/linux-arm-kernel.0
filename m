@@ -1,43 +1,212 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Fri, 15 Apr 2016 14:19:39 -0400
-Subject: [PATCH V6 00/13] Support for generic ACPI based PCI host
- controller
-In-Reply-To: <1460740008-19489-1-git-send-email-tn@semihalf.com>
-References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
-Message-ID: <571130BB.9030508@redhat.com>
+From: martinayotte@gmail.com (Martin Ayotte)
+Date: Fri, 15 Apr 2016 14:20:06 -0400
+Subject: [PATCH v1 1/1] add missing UARTs pins for AllWinner H3 DTS + add new
+ I2C entries for AllWinner H3 DTS
+Message-ID: <CAKQ8Bth3tAe4SNiRENUPjjLKUU3cfs+1Y16Qas_QYm9JYYeyoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15/2016 01:06 PM, Tomasz Nowicki wrote:
-> From the functionality point of view this series might be split into the
-> following logic parts:
-> 1. Necessary fixes as the preparation for using driver on ARM64.
-> 2. New ECAM API and update for users of the pci-host-common API
-> 3. Use new MCFG interface and implement generic ACPI based PCI host controller driver.
-> 4. Enable above driver on ARM64
-> 
-> Patches has been built on top of 4.6-rc2 and can be found here:
-> git at github.com:semihalf-nowicki-tomasz/linux.git (pci-acpi-v6)
-> 
-> This has been tested on Cavium ThunderX server. Any help in reviewing and
-> testing is very appreciated.
-> 
-> v5 -> v6
-> - dropped idea of x86 MMCONFIG code refactoring
-> - integrated JC's patches which introduce new ECAM API:
->   https://lkml.org/lkml/2016/4/11/907
->   git: https://github.com/jchandra-brcm/linux/ (arm64-acpi-pci-v3)
-> - integrated Sinan's fix for releasing IO resources, see patch [06/13]
-> - added ACPI support for ThunderX ECAM and PEM drivers
-> - rebased to 4.6-rc2
+Hi everyone,
 
-JC: can you explicitly confirm that you're ok with letting Tomasz drive
-this? We would like to see one driver. Either that is Tomasz, or
-Lorenzo, or it is you. But we need to have one overall cooordinated
-effort to get this enablement into upstream as quickly as possible.
+This patch is submit to provide endusers access to additional UARTs on
+AllWinner H3 SoC along with I2C ports.
 
-Some of the Enterprise folks are going to otherwise end up in a very
-nasty situation of supporting the previous non-upstream patches for many
-years, which is absolutely something we want to avoid...
+Regards,
+Martin.
+---
+ arch/arm/boot/dts/sun8i-h3-orangepi-2.dts  | 36 ++++++++++++++
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 36 ++++++++++++++
+ arch/arm/boot/dts/sun8i-h3.dtsi            | 75 ++++++++++++++++++++++++++++++
+ 3 files changed, 147 insertions(+)
 
-Jon.
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
+b/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
+index f93f5d1..f0b9823 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
+@@ -176,6 +176,42 @@
+     status = "okay";
+ };
+
++&uart1 {
++    pinctrl-names = "default";
++    pinctrl-0 = <&uart1_pins_a>;
++    status = "okay";
++};
++
++&uart2 {
++    pinctrl-names = "default";
++    pinctrl-0 = <&uart2_pins_a>;
++    status = "okay";
++};
++
++&uart3 {
++    pinctrl-names = "default";
++    pinctrl-0 = <&uart3_pins_a>;
++    status = "okay";
++};
++
++&i2c0 {
++    pinctrl-names = "default";
++    pinctrl-0 = <&i2c0_pins_a>;
++    status = "okay";
++};
++
++&i2c1 {
++    pinctrl-names = "default";
++    pinctrl-0 = <&i2c1_pins_a>;
++    status = "okay";
++};
++
++&i2c2 {
++    pinctrl-names = "default";
++    pinctrl-0 = <&i2c2_pins_a>;
++    status = "okay";
++};
++
+ &usb1_vbus_pin_a {
+     allwinner,pins = "PG13";
+ };
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+index daf50b9a6..6994349 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+@@ -161,6 +161,42 @@
+     status = "okay";
+ };
+
++&uart1 {
++    pinctrl-names = "default";
++    pinctrl-0 = <&uart1_pins_a>;
++    status = "okay";
++};
++
++&uart2 {
++    pinctrl-names = "default";
++    pinctrl-0 = <&uart2_pins_a>;
++    status = "okay";
++};
++
++&uart3 {
++    pinctrl-names = "default";
++    pinctrl-0 = <&uart3_pins_a>;
++    status = "okay";
++};
++
++&i2c0 {
++    pinctrl-names = "default";
++    pinctrl-0 = <&i2c0_pins_a>;
++    status = "okay";
++};
++
++&i2c1 {
++    pinctrl-names = "default";
++    pinctrl-0 = <&i2c1_pins_a>;
++    status = "okay";
++};
++
++&i2c2 {
++    pinctrl-names = "default";
++    pinctrl-0 = <&i2c2_pins_a>;
++    status = "okay";
++};
++
+ &usbphy {
+     /* USB VBUS is always on */
+     status = "okay";
+diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+index 4a4926b..c947360d 100644
+--- a/arch/arm/boot/dts/sun8i-h3.dtsi
++++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+@@ -508,6 +508,48 @@
+                 allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+             };
+
++            uart1_pins_a: uart1 at 0 {
++                allwinner,pins = "PG6", "PG7";
++                allwinner,function = "uart1";
++                allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++                allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++            };
++
++            uart2_pins_a: uart2 at 0 {
++                allwinner,pins = "PA0", "PA1";
++                allwinner,function = "uart2";
++                allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++                allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++            };
++
++            uart3_pins_a: uart3 at 0 {
++                allwinner,pins = "PA13", "PA14";
++                allwinner,function = "uart3";
++                allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++                allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++            };
++
++            i2c0_pins_a: i2c0 at 0 {
++                allwinner,pins = "PA11", "PA12";
++                allwinner,function = "i2c0";
++                allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++                allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++            };
++
++            i2c1_pins_a: i2c1 at 0 {
++                allwinner,pins = "PA18", "PA19";
++                allwinner,function = "i2c1";
++                allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++                allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++            };
++
++            i2c2_pins_a: i2c2 at 0 {
++                allwinner,pins = "PE12", "PE13";
++                allwinner,function = "i2c2";
++                allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++                allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++            };
++
+             mmc0_pins_a: mmc0 at 0 {
+                 allwinner,pins = "PF0", "PF1", "PF2", "PF3",
+                          "PF4", "PF5";
+@@ -626,6 +668,39 @@
+             status = "disabled";
+         };
+
++        i2c0: i2c at 01c2ac00 {
++            compatible = "allwinner,sun6i-a31-i2c";
++            reg = <0x01c2ac00 0x400>;
++            interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
++            clocks = <&bus_gates 96>;
++            resets = <&apb2_rst 0>;
++            status = "disabled";
++            #address-cells = <1>;
++            #size-cells = <0>;
++        };
++
++        i2c1: i2c at 01c2b000 {
++            compatible = "allwinner,sun6i-a31-i2c";
++            reg = <0x01c2b000 0x400>;
++            interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
++            clocks = <&bus_gates 97>;
++            resets = <&apb2_rst 1>;
++            status = "disabled";
++            #address-cells = <1>;
++            #size-cells = <0>;
++        };
++
++        i2c2: i2c at 01c2b400 {
++            compatible = "allwinner,sun6i-a31-i2c";
++            reg = <0x01c2b400 0x400>;
++            interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
++            clocks = <&bus_gates 98>;
++            resets = <&apb2_rst 2>;
++            status = "disabled";
++            #address-cells = <1>;
++            #size-cells = <0>;
++        };
++
+         gic: interrupt-controller at 01c81000 {
+             compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
+             reg = <0x01c81000 0x1000>,
+-- 
+2.7.4
