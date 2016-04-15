@@ -1,67 +1,65 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Fri, 15 Apr 2016 10:02:33 +0800
-Subject: [PATCH v6 3/4] soc: mediatek: Add MT2701 power dt-bindings
-In-Reply-To: <1460631381.13240.3.camel@mtksdaap41>
-References: <1460621819-695-1-git-send-email-jamesjj.liao@mediatek.com>
- <1460621819-695-4-git-send-email-jamesjj.liao@mediatek.com>
- <1460631381.13240.3.camel@mtksdaap41>
-Message-ID: <1460685753.7028.5.camel@mtksdaap41>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 14 Apr 2016 19:42:35 -0700
+Subject: [PATCH v2 4/6] ARM: Register with kernel restart handler
+In-Reply-To: <1460688157-6551-1-git-send-email-linux@roeck-us.net>
+References: <1460688157-6551-1-git-send-email-linux@roeck-us.net>
+Message-ID: <1460688157-6551-5-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yingjoe,
+By making use of the kernel restart handler, board specific restart
+handlers can be prioritized amongst available mechanisms for a particular
+board or system.
 
-On Thu, 2016-04-14 at 18:56 +0800, Yingjoe Chen wrote:
-> On Thu, 2016-04-14 at 16:16 +0800, James Liao wrote:
-> > From: Shunli Wang <shunli.wang@mediatek.com>
-> > 
-> > Add power dt-bindings for MT2701.
-> > 
-> > Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
-> > Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-> > Acked-by: Rob Herring <robh@kernel.org>
-> > Reviewed-by: Kevin Hilman <khilman@baylibre.com>
-> > ---
-> >  .../devicetree/bindings/soc/mediatek/scpsys.txt    | 12 ++++++----
-> >  include/dt-bindings/power/mt2701-power.h           | 27 ++++++++++++++++++++++
-> >  2 files changed, 34 insertions(+), 5 deletions(-)
-> >  create mode 100644 include/dt-bindings/power/mt2701-power.h
-> > 
-> > diff --git a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-> > index e8f15e3..ebb3144 100644
-> > --- a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-> > +++ b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-> > @@ -9,17 +9,19 @@ domain control.
-> >  
-> >  The driver implements the Generic PM domain bindings described in
-> >  power/power_domain.txt. It provides the power domains defined in
-> > -include/dt-bindings/power/mt8173-power.h.
-> > +include/dt-bindings/power/mt8173-power.h and mt2701-power.h.
-> >  
-> >  Required properties:
-> > -- compatible: Must be "mediatek,mt8173-scpsys"
-> > +- compatible: Should be one of:
-> > +	- "mediatek,mt2701-scpsys"
-> > +	- "mediatek,mt8173-scpsys"
-> >  - #power-domain-cells: Must be 1
-> >  - reg: Address range of the SCPSYS unit
-> >  - infracfg: must contain a phandle to the infracfg controller
-> >  - clock, clock-names: clocks according to the common clock binding.
-> > -                      The clocks needed "mm", "mfg", "venc" and "venc_lt".
-> > -		      These are the clocks which hardware needs to be enabled
-> > -		      before enabling certain power domains.
-> > +                      The clocks needed "mm", "mfg", "venc", "venc_lt" and
-> > +                      "ethif". These are the clocks which hardware needs to be
-> > +                      enabled before enabling certain power domains.
-> 
-> 
-> Clock ethif only exist on mt2701 so it is not required on mt8173.
+Select the default priority of 128 to indicate that the restart callback
+in the machine description is the default restart mechanism.
 
-You are right. Each SoC needs different clock for each power domain.
-Here list all subsystems of available SoCs.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+---
+v2: Rebased to v4.6-rc3, added Reviewed/by/Acked-by tags
 
+ arch/arm/kernel/setup.c | 20 ++++++++++++++++++--
+ 1 file changed, 18 insertions(+), 2 deletions(-)
 
-
-Best regards,
-
-James
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index a28fce0bdbbe..735e6a2ce216 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -1004,6 +1004,20 @@ void __init hyp_mode_check(void)
+ #endif
+ }
+ 
++static void (*__arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
++
++static int arm_restart(struct notifier_block *nb, unsigned long action,
++		       void *data)
++{
++	__arm_pm_restart(action, data);
++	return NOTIFY_DONE;
++}
++
++static struct notifier_block arm_restart_nb = {
++	.notifier_call = arm_restart,
++	.priority = 128,
++};
++
+ void __init setup_arch(char **cmdline_p)
+ {
+ 	const struct machine_desc *mdesc;
+@@ -1046,8 +1060,10 @@ void __init setup_arch(char **cmdline_p)
+ 	paging_init(mdesc);
+ 	request_standard_resources(mdesc);
+ 
+-	if (mdesc->restart)
+-		arm_pm_restart = mdesc->restart;
++	if (mdesc->restart) {
++		__arm_pm_restart = mdesc->restart;
++		register_restart_handler(&arm_restart_nb);
++	}
+ 
+ 	unflatten_device_tree();
+ 
+-- 
+2.5.0
