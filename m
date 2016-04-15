@@ -1,38 +1,21 @@
-From: david@lechnology.com (David Lechner)
-Date: Fri, 15 Apr 2016 16:20:51 -0500
-Subject: [PATCH 1/3] ARM: DTS: da850: add node for spi0
-In-Reply-To: <31522.1460751389@turing-police.cc.vt.edu>
-References: <1460586628-25152-1-git-send-email-david@lechnology.com>
- <1460586628-25152-2-git-send-email-david@lechnology.com>
- <5710C176.3040304@ti.com> <57111433.6080402@lechnology.com>
- <31522.1460751389@turing-police.cc.vt.edu>
-Message-ID: <57115B33.90509@lechnology.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 15 Apr 2016 23:21:53 +0200
+Subject: [PATCH v2 2/5] ARM: dts: rockchip: make rk3288-grf a simple-mfd
+In-Reply-To: <1459432126-6395-3-git-send-email-heiko@sntech.de>
+References: <1459432126-6395-1-git-send-email-heiko@sntech.de>
+ <1459432126-6395-3-git-send-email-heiko@sntech.de>
+Message-ID: <2780445.ZUVl1WxXtY@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15/2016 03:16 PM, Valdis.Kletnieks at vt.edu wrote:
-> On Fri, 15 Apr 2016 11:17:55 -0500, David Lechner said:
->
->> I omitted this on purpose. For my use case, I am using the SPI as
->> write-only,
->
-> So your SPI accesses are fire-and-forget, and nothing ever comes back?
+Am Donnerstag, 31. M?rz 2016, 15:48:43 schrieb Heiko Stuebner:
+> Similar to the pmu, the general register files contain a lot of different
+> setting bits grouped into general registers, but also some somewhat special
+> entities like the controls for some phy-blocks or the io-voltage control.
+> To be able to move these blocks under the grf node where they actually
+> belong, make it a simple-mfd.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-Yes.
-
-> Seems a very dangerous way to design the use case, with no feedback if
-> something suddenly goes pear-shaped...
-
-You should tell Sitronix. This is how their display controllers work.
-
->
-> Or do you have ways to verify the status via some method other than SPI?
->
-
-Nope.
-
-
-
-I'm working with LEGO MINDSTORMS EV3, a mass-produced robotics system. 
-It is what it is. And I have a logic analyzer for when things go 
-pear-shaped. ;-)
+I've picked this patch into my dts32 branch for v4.7, as I need it as base for 
+some other change as well.
