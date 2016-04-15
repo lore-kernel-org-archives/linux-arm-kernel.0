@@ -1,72 +1,60 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 14 Apr 2016 19:42:33 -0700
-Subject: [PATCH v2 2/6] ARM: xen: Register with kernel restart handler
+Date: Thu, 14 Apr 2016 19:42:37 -0700
+Subject: [PATCH v2 6/6] ARM: Remove arm_pm_restart
 In-Reply-To: <1460688157-6551-1-git-send-email-linux@roeck-us.net>
 References: <1460688157-6551-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1460688157-6551-3-git-send-email-linux@roeck-us.net>
+Message-ID: <1460688157-6551-7-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register with kernel restart handler instead of setting arm_pm_restart
-directly.
-
-Select a high priority of 192 to ensure that default restart handlers
-are replaced if Xen is running.
+All users of arm_pm_restart have been converted to use the kernel restart
+handler.
 
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 ---
 v2: Rebased to v4.6-rc3, added Reviewed/by/Acked-by tags
 
- arch/arm/xen/enlighten.c | 13 +++++++++++--
- 1 file changed, 11 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/system_misc.h | 1 -
+ arch/arm/kernel/reboot.c           | 6 +-----
+ 2 files changed, 1 insertion(+), 6 deletions(-)
 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 75cd7345c654..76a1d12fd27e 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -27,6 +27,7 @@
- #include <linux/cpu.h>
- #include <linux/console.h>
- #include <linux/pvclock_gtod.h>
-+#include <linux/reboot.h>
- #include <linux/time64.h>
- #include <linux/timekeeping.h>
- #include <linux/timekeeper_internal.h>
-@@ -193,14 +194,22 @@ after_register_vcpu_info:
- 	put_cpu();
- }
+diff --git a/arch/arm/include/asm/system_misc.h b/arch/arm/include/asm/system_misc.h
+index a3d61ad984af..6c952538f1e8 100644
+--- a/arch/arm/include/asm/system_misc.h
++++ b/arch/arm/include/asm/system_misc.h
+@@ -11,7 +11,6 @@
+ extern void cpu_init(void);
  
--static void xen_restart(enum reboot_mode reboot_mode, const char *cmd)
-+static int xen_restart(struct notifier_block *nb, unsigned long action,
-+		       void *data)
- {
- 	struct sched_shutdown r = { .reason = SHUTDOWN_reboot };
- 	int rc;
- 	rc = HYPERVISOR_sched_op(SCHEDOP_shutdown, &r);
- 	BUG_ON(rc);
-+
-+	return NOTIFY_DONE;
- }
+ void soft_restart(unsigned long);
+-extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
+ extern void (*arm_pm_idle)(void);
  
-+static struct notifier_block xen_restart_nb = {
-+	.notifier_call = xen_restart,
-+	.priority = 192,
-+};
-+
- static void xen_power_off(void)
- {
- 	struct sched_shutdown r = { .reason = SHUTDOWN_poweroff };
-@@ -370,7 +379,7 @@ static int __init xen_pm_init(void)
- 		return -ENODEV;
+ #define UDBG_UNDEFINED	(1 << 0)
+diff --git a/arch/arm/kernel/reboot.c b/arch/arm/kernel/reboot.c
+index 71a2ff9ec490..4785c39ee3eb 100644
+--- a/arch/arm/kernel/reboot.c
++++ b/arch/arm/kernel/reboot.c
+@@ -20,7 +20,6 @@ typedef void (*phys_reset_t)(unsigned long);
+ /*
+  * Function pointers to optional machine specific functions
+  */
+-void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
+ void (*pm_power_off)(void);
+ EXPORT_SYMBOL(pm_power_off);
  
- 	pm_power_off = xen_power_off;
--	arm_pm_restart = xen_restart;
-+	register_restart_handler(&xen_restart_nb);
- 	if (!xen_initial_domain()) {
- 		struct timespec64 ts;
- 		xen_read_wallclock(&ts);
+@@ -140,10 +139,7 @@ void machine_restart(char *cmd)
+ 	local_irq_disable();
+ 	smp_send_stop();
+ 
+-	if (arm_pm_restart)
+-		arm_pm_restart(reboot_mode, cmd);
+-	else
+-		do_kernel_restart(cmd);
++	do_kernel_restart(cmd);
+ 
+ 	/* Give a grace period for failure to restart of 1s */
+ 	mdelay(1000);
 -- 
 2.5.0
