@@ -1,33 +1,32 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Fri, 15 Apr 2016 18:07:22 +0530
-Subject: [PATCH] clk: samsung: exynos7: Don't gate CMU_{CCORE,
- FSYS0} blocks clock
-In-Reply-To: <570F4BE0.1010102@samsung.com>
-References: <1460608972-13878-1-git-send-email-alim.akhtar@samsung.com>
- <570F4BE0.1010102@samsung.com>
-Message-ID: <5710E082.2050303@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 15 Apr 2016 13:39:41 +0100
+Subject: [RESEND 07/11] pwm: sti: Initialise PWM Capture channel data
+In-Reply-To: <20160412102926.GC18882@ulmo.ba.sec>
+References: <1456932729-9667-1-git-send-email-lee.jones@linaro.org>
+ <1456932729-9667-8-git-send-email-lee.jones@linaro.org>
+ <20160412102926.GC18882@ulmo.ba.sec>
+Message-ID: <20160415123941.GD3589@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, 12 Apr 2016, Thierry Reding wrote:
 
+> On Wed, Mar 02, 2016 at 03:32:05PM +0000, Lee Jones wrote:
+> [...]
+> > +struct sti_cpt_data {
+> > +	u32 snapshot[3];
+> > +	int index;
+> > +	int gpio;
+> 
+> On a side-note, this should probably use struct gpio_desc * instead of
+> an integer along with the gpiod_*() APIs for the GPIO handling.
 
-On 04/14/2016 01:20 PM, Krzysztof Kozlowski wrote:
-> On 04/14/2016 06:42 AM, Alim Akhtar wrote:
->> This patch adds CLK_IS_CRITICAL flag to ACLK_CCORE_133 and ACLK_FSYS0_200
->> clocks. These clocks are critical for accessing CMU_CCORE and CMU_FSYS0
->> blocks registers. Let these clocks to be enabled all the time.
->>
->> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
->> ---
->>   drivers/clk/samsung/clk-exynos7.c |    5 +++--
->>   1 file changed, 3 insertions(+), 2 deletions(-)
->
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->
-Thanks Krzysztof,
-Sylwester, do you have any concern here?
+Why would you need to do that?
 
-> Best regards,
-> Krzysztof
->
->
+of_get_named_gpio() does all that for you.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
