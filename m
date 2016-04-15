@@ -1,33 +1,57 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 15 Apr 2016 12:12:21 +0200
-Subject: [PATCH RFT 3/5] iio: mxs-lradc: move STMP reset out of ADC init
-In-Reply-To: <201604150848.44242.jbe@pengutronix.de>
-References: <1460648909-2657-1-git-send-email-stefan.wahren@i2se.com>
- <1460648909-2657-4-git-send-email-stefan.wahren@i2se.com>
- <201604150848.44242.jbe@pengutronix.de>
-Message-ID: <5710BE85.10403@denx.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 15 Apr 2016 12:07:55 +0100
+Subject: [PATCH] arm64: fix invalidation of wrong __early_cpu_boot_status
+ cacheline
+In-Reply-To: <5710C449.3050900@arm.com>
+References: <1460715081-16542-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20160415102017.GA8021@leverpostej> <5710C449.3050900@arm.com>
+Message-ID: <20160415110755.GA32635@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15/2016 08:48 AM, Juergen Borleis wrote:
-> Hi Stefan,
+On Fri, Apr 15, 2016 at 11:36:57AM +0100, Suzuki K. Poulose wrote:
+> On 15/04/16 11:20, Mark Rutland wrote:
+> >On Fri, Apr 15, 2016 at 12:11:21PM +0200, Ard Biesheuvel wrote:
+> >>In head.S, the str_l macro, which takes a source register, a symbol name
+> >>and a temp register, is used to store a status value to the variable
+> >>__early_cpu_boot_status. Subsequently, the value of the temp register is
+> >>reused to invalidate any cachelines covering this variable.
+> >>
+> >>However, since str_l resolves to
+> >>
+> >>       adrp    \tmp, \sym
+> >>       str     \src, [\tmp, :lo12:\sym]
+> >>
+> >>the temp register never actually holds the address of the variable but
+> >>only of the 4 KB window that covers it, and reusing it leads to the
+> >>wrong cacheline being invalidated. So instead, take the address
+> >>explicitly before doing the store, and reuse that value to perform
+> >>the cache invalidation.
+> >>
+> >>Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >>---
+> >>
+> >>This deserves a cc stable, since the macro is always invoked for each CPU
+> >>at boot.
+> >
+> >Sounds good, also:
+> >
+> >Fixes: bb9052744f4b7ae1 ("arm64: Handle early CPU boot failures")
 > 
-> On Thursday 14 April 2016 17:48:27 Stefan Wahren wrote:
->> This patch moves the STMP reset out of ADC init function
->> in order to make it never fail. This is also necessary
->> for PM ops.
-> 
-> What do you mean with "make it never fail"?
+> This first appeared in 4.6-rc1, so I don't think we need to Cc stable.
 
-He wants to make the function invoke only functions which don't return
-error value. Not a great wording, but the patch makes it clear.
+Indeed. I'll add the Fixes line though, for reference.
 
->> [...]
+> The initial patch was using adr_l as in this fix.
 > 
-> jb
-> 
+> Catalin, was there a specific reason for that change ? I remember you mentioning
+> something about it.
 
+I think it was just code reduction.
+
+I'll queue the fix for 4.6-rc.
+
+Thanks.
 
 -- 
-Best regards,
-Marek Vasut
+Catalin
