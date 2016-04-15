@@ -1,196 +1,124 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 15 Apr 2016 18:44:19 +0100
-Subject: SMMU problem found on LS2085A with 4.6-rc3
-In-Reply-To: <571122A3.80909@linaro.org>
-References: <570E9EA9.2070903@linaro.org> <570F8739.1060508@arm.com>
- <571022AD.1060909@linaro.org> <5710DED6.3010008@arm.com>
- <571122A3.80909@linaro.org>
-Message-ID: <57112873.5030903@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 15 Apr 2016 18:47:17 +0100
+Subject: [PATCH v3] ARM64: ACPI: Update documentation for latest
+ specification version
+In-Reply-To: <5711199E.9010508@linaro.org>
+References: <1459210002-3387-1-git-send-email-al.stone@linaro.org>
+ <20160415143719.GA8798@red-moon> <5711199E.9010508@linaro.org>
+Message-ID: <20160415174716.GB10014@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/04/16 18:19, Shi, Yang wrote:
-> On 4/15/2016 5:30 AM, Robin Murphy wrote:
->> On 15/04/16 00:07, Shi, Yang wrote:
->>> Hi Robin,
->>>
->>> On 4/14/2016 5:04 AM, Robin Murphy wrote:
->>>> Hi Yang,
->>>>
->>>> On 13/04/16 20:31, Shi, Yang wrote:
->>>>> Hi Will & Robin,
->>>>>
->>>>> I just ran some quick test on my LS2085A board, which has 8 Cortex A57
->>>>> cores, with 4.6-rc3 kernel, but I found a regression issue with SMMU.
->>>>>
->>>>> SMMU driver reports:
->>>>>
->>>>> arm_smmu_global_fault: 297974 callbacks suppressed
->>>>> arm_smmu_global_fault: 298561 callbacks suppressed
->>>>> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
->>>>> GFSYNR1 0x00000300, GFSYNR2 0x00000000
->>>>> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
->>>>> GFSYNR1 0x00000300, GFSYNR2 0x00000000
->>>>> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
->>>>> GFSYNR1 0x00000300, GFSYNR2 0x00000000
->>>>> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
->>>>> GFSYNR1 0x00000300, GFSYNR2 0x00000000
->>>>> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
->>>>> GFSYNR1 0x00000300, GFSYNR2 0x00000000
->>>>> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
->>>>> GFSYNR1 0x00000300, GFSYNR2 0x00000000
->>>>> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
->>>>> GFSYNR1 0x00000300, GFSYNR2 0x00000000
->>>>> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
->>>>> GFSYNR1 0x00000300, GFSYNR2 0x00000000
->>>>> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
->>>>> GFSYNR1 0x00000300, GFSYNR2 0x00000000
->>>>> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
->>>>> GFSYNR1 0x00000300, GFSYNR2 0x00000000
->>>>> arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
->>>>> arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
->>>>> arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
->>>>> arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
->>>>> arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
->>>>> arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
->>>>> arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
->>>>> arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
->>>>> arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
->>>>> arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
->>>>
->>>> That's a stream match conflict fault, so you've somehow got two devices
->>>> using the same stream ID attached to different domains, and at least
->>>> one
->>>> of them is trying to do DMA.
->>>>
->>>>> But, it is good with 4.5 kernel. I found the below commit causes it:
->>>>>
->>>>> commit 9adb95949a343dac53b1cd81dc973b5f815c88d4
->>>>> Author: Robin Murphy <robin.murphy@arm.com>
->>>>> Date:   Tue Jan 26 18:06:36 2016 +0000
->>>>>
->>>>>      iommu/arm-smmu: Support DMA-API domains
->>>>>
->>>>>      With DMA mapping ops provided by the iommu-dma code, only a
->>>>> minimal
->>>>>      contribution from the IOMMU driver is needed to create a suitable
->>>>>      DMA-API domain for them to use. Implement this for the ARM SMMUs.
->>>>>
->>>>>      Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->>>>>      Signed-off-by: Will Deacon <will.deacon@arm.com>
->>>>>
->>>>> Any idea?
->>>>
->>>> My first guess would be the same thing as [1] - does that patch help?
->>>
->>> No, it can't cease the fault.
->>>
->>>>
->>>> Beyond that, what does your DT look like? The one in mainline has one
->>>> token mmu-masters property which isn't even valid, so nothing ever gets
->>>
->>> Mine has mmu-masters property too, but removing it doesn't solve the
->>> problem.
->>
->> OK, now things really stop making sense. Without the mmu-masters
->> property the SMMU driver will do nothing but probe the SMMU device
->> itself. Therefore I can only assume the bootloader magic for the
->> Freescale vendor kernel must be rewriting your DT (our board always just
->> says "fdt_fixup_smmu: WARNING: no SMMU node found" despite the mainline
->> DT containing the SMMU, so I'm not sure exactly what it's looking for).
->> Can you see what it's done via /sys/fimware/fdt (or
->> /sys/firmware/devicetree/base/ if you can face hunting down phandles
->> manually)? As a further sanity check, what do you see in
->> /sys/kernel/iommu_groups/*/devices/ and do they differ between the two
->> kernels?
->
-> With the mmu-masters property, the fsl-mc will be added into group 2,
-> please see the below dmesg log:
->
-> iommu: Adding device 3600000.pcie to group 0
-> iommu: Adding device 3700000.pcie to group 1
-> iommu: Adding device 80c000000.fsl-mc to group 2
->
-> fsl-mc won't be there if mmu-masters property is removed.
->
-> But, it looks there are multiple devices in iommu_groups 3:
->
-> root at ls2085a_rdb-4:~# cat /sys/kernel/iommu_groups/3/devices/0000\:0
-> 0000:00:00.0/ 0000:01:00.0/ 0000:01:00.1/
->
-> It is group 2 if mmu-masters property is removed.
->
-> I have one Intel e1000 NIC on my PCIe bus, both 0000:01:00.0 and
-> 0000:01:00.1 is for the NIC.
->
-> Is this behavior expected?
+On Fri, Apr 15, 2016 at 10:41:02AM -0600, Al Stone wrote:
+> On 04/15/2016 08:37 AM, Lorenzo Pieralisi wrote:
+> > Hi Al,
+> > 
+> > On Mon, Mar 28, 2016 at 06:06:42PM -0600, Al Stone wrote:
+> >> The ACPI 6.1 specification was recently released at the end of January
+> >> 2016, but the arm64 kernel documentation for the use of ACPI was written
+> >> for the 5.1 version of the spec.  There were significant additions to the
+> >> spec that had not yet been mentioned -- for example, the 6.0 mechanisms
+> >> added to make it easier to define processors and low power idle states,
+> >> as well as the 6.1 addition allowing regular interrupts (not just from
+> >> GPIO) be used to signal ACPI general purpose events.
+> >>
+> >> This patch reflects going back through and examining the specs in detail
+> >> and updating content appropriately.  Whilst there, a few odds and ends of
+> >> typos were caught as well.  This brings the documentation up to date with
+> >> ACPI 6.1 for arm64.
+> >>
+> >> Changes for v3:
+> >>    -- Clarify use of _LPI/_RDI (Vikas Sajjan)
+> >>    -- Whitespace cleanup as pointed out by checkpatch
+> >>
+> >> Changes for v2:
+> >>    -- Clean up white space (Harb Abdulhahmid)
+> >>    -- Clarification on _CCA usage (Harb Abdulhamid)
+> >>    -- IORT moved to required from recommended (Hanjun Guo)
+> >>    -- Clarify IORT description (Hanjun Guo)
+> >>
+> >> Signed-off-by: Al Stone <al.stone@linaro.org>
+> >> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> >> Cc: Will Deacon <will.deacon@arm.com>
+> >> Cc: Jonathan Corbet <corbet@lwn.net>
+> >> ---
+> >>  Documentation/arm64/acpi_object_usage.txt | 446 ++++++++++++++++++++++--------
+> >>  Documentation/arm64/arm-acpi.txt          |  28 +-
+> >>  2 files changed, 357 insertions(+), 117 deletions(-)
+> > 
+> > I went through this patch twice and before posting my review comments
+> > I have some questions to _ASK ;-):
+> > 
+> > -  Do we really need acpi_object_usage.txt to list all possible ACPI
+> >    methods in the ACPI specs ("Use as needed") and update them as the
+> >    specs evolve ?
+> >    IMO that's what the ACPI specs are for and that's what AML developers
+> >    will refer to, I do not see the point in listing all methods in that
+> >    file (can't it become an ARM addendum to the ACPI specs at least to
+> >    deprecate methods/tables that are obsolete in ARM's world) ?
+> 
+> The original intent was to provide guidance to those unfamiliar with ACPI,
+> and in particular provide some details on what usage makes sense on ARM.
+> In writing it, the objective was that arm-acpi.txt be primarily an overall
+> view, but that acpi_object_usage.txt answered specific questions about
+> specific objects, which we got asked about frequently since APCI was very
+> new on ARM at the time.  That being said, however, it is possible that
+> acpi_object_usage.txt has outlived its usefulness, as those that need to
+> have become familiar with ACPI.
+> 
+> It doesn't help in the ACPI specs since the idea was to try to document
+> recommended Linux-specific usage, which may or may not be OS-agnostic, but
+> would at least be in the open to encourage common usage.
 
-Yup - since the root complex doesn't support ACS, the IOMMU API puts all 
-the devices behind it (in this case the NIC and the bridge itself) in 
-the same group, because otherwise it might be possible for two devices 
-assigned to different guests to DMA directly to each other without going 
-through the IOMMU.
+Understood, the point I wanted to make is that adding a list of methods
+in acpi_object_usage.txt ("Use as needed") is not necessarily additional
+information, you can add a pointer at ACPI specs (for that specific
+purpose - as I said there are parts of the patch that add additional
+information Linux related) for that purpose instead of having to list
+all of them in acpi_object_usage.txt again.
 
->> Secondly, the stream match conflict can only occur if the SMRs are
->> actually programmed. Since with Will's fix for the conflicts Eric saw we
->> should attach to the default domain without touching the initial bypass
->> entries in the SMRs, I'm at a loss to see how you could still get into
->> this state with that patch applied.
->
-> I mixed up the patch, with Will's fix applied, the issue is gone away.
+> > -  How do we keep acpi_object_usage.txt in sync with ACPI specs from now
+> >    onwards ? Is that what we really want/need ?
+> > 
+> > -  How do we keep arm-acpi.txt in sync with kernel supported ARM64 ACPI
+> >    features (if - given that this document is part of the Linux kernel docs -
+> >    its aim is to describe what bits of ACPI are supported on arm64 (?)) ?
+> 
+> Well, maintenance will be necessary as new spec revisions come out, just like
+> any other part of the kernel code.  I don't see anything unique about these
+> documents versus any other; is there something else in the question that I'm
+> not seeing?
 
-Phew, that's a relief! Would you be happy to give a Tested-by on that patch?
+No, see above.
+
+> I guess I just assumed that since I wrote these, I'd be responsible
+> for keeping them up to date.  If you're volunteering to do so, I would
+> not object :-).
+
+I asked because it is kernel documentation and it has to be reviewed
+as such, some updates I found them necessary, adding a list of new
+ACPI methods that came up with ACPI 6.1, maybe, but that's already
+in the specs, so I question why they should be listed in that file,
+unless there is something kernel people really have to know, I will
+comment on the specific methods.
+
+> > So, agreed with fixing the typos, agreed with arm-acpi.txt (and with
+> > updating it) which describes how the ARM64 kernel is using ACPI
+> > methods/tables, but acpi_object_usage.txt and in particular describing
+> > in there what methods are _useful_ and what are not, honestly I think we
+> > should ask ourselves what that file is really meant to be.
+> > 
+> > Happy to send my review comments as a follow-up since overall the patch
+> > is OK, I wanted to ask the basic questions above first.
+> > 
+> > Thanks,
+> > Lorenzo
+> > [snip...]
+> 
+> Does that help clarify?
+
+Yes, I will send my few minor remarks next week and ACK accordingly, it was
+just for me to understand, as I mentioned.
 
 Thanks,
-Robin.
-
->
-> Thanks,
-> Yang
->
->>
->> As the transactions provoking the fault are apparently instruction
->> fetches on a 00xx stream ID, which I've not seen before, my first guess
->> would be it's something to do with the management complex (which I can't
->> get to work with the staging driver due to firmware incompatibility),
->> but then looking at the general lack of connection to the DMA API within
->> that driver, maybe not?
->>
->> Robin.
->>
->>>
->>> Thanks,
->>> Yang
->>>
->>>
->>>> attached to the SMMU - indeed I've happily booted -rc3 on an LS2085A
->>>> earlier this week - so there's clearly something going on there.
->>>>
->>>> More generally, I'd note that the mmu-masters binding will never fully
->>>> work on this board - you can get the platform devices to cooperate by
->>>> programming the assorted ICID registers to ensure they present unique
->>>> stream IDs, but PCI devices cannot work at all because there's no
->>>> way to
->>>> make the stream IDs coming out of the root complex be equal to the PCI
->>>> RID in the way it relies on. In that sense, any regression here is
->>>> quite
->>>> likely just a shift from "subtly not working" to "loudly and
->>>> obnoxiously
->>>> not working". Conversely, those reasons have also proved it a really
->>>> useful platform for implementing and testing the iommu-map binding[2]
->>>> (with an awful hack in the PCI driver to program the lookup table
->>>> suitably) :D
->>>>
->>>> Robin.
->>>>
->>>> [1]:http://thread.gmane.org/gmane.linux.kernel.iommu/12810
->>>> [2]:http://thread.gmane.org/gmane.linux.kernel.iommu/12454
->>>>
->>>>>
->>>>> Thanks,
->>>>> Yang
->>>>>
->>>>
->>>
->>
->
+Lorenzo
