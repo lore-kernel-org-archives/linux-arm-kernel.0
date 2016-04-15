@@ -1,162 +1,145 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Fri, 15 Apr 2016 19:06:46 +0200
-Subject: [PATCH V6 11/13] pci,
- acpi: Match PCI config space accessors against platfrom specific
- quirks.
+Date: Fri, 15 Apr 2016 19:06:47 +0200
+Subject: [PATCH V6 12/13] pci,
+ pci-thunder-ecam: Add ACPI support for ThunderX ECAM.
 In-Reply-To: <1460740008-19489-1-git-send-email-tn@semihalf.com>
 References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
-Message-ID: <1460740008-19489-12-git-send-email-tn@semihalf.com>
+Message-ID: <1460740008-19489-13-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some platforms may not be fully compliant with generic set of PCI config
-accessors. For these cases we implement the way to overwrite accessors
-set prior to PCI buses enumeration. Algorithm traverses available quirk
-list, matches against <DMI ID (optional), domain, bus number> tuple and
-an extra match call and returns corresponding PCI config ops.
-All quirks can be defined using:
-DECLARE_ACPI_MCFG_FIXUP() macro and kept self contained. Example:
+Passes 1.x miss PCI enhanced allocation (EA) header for fixed-BARs,
+thus these passes should use Cavium-specific config access functions
+that synthesize the missing EA capabilities.
 
-/* Additional DMI platform identification (optional) */
-static const struct dmi_system_id foo_dmi[] = {
-        {
-                .ident = "<Platform ident string>",
-                .matches = {
-                        DMI_MATCH(DMI_SYS_VENDOR, "<system vendor>"),
-                        DMI_MATCH(DMI_PRODUCT_NAME, "<product name>"),
-                        DMI_MATCH(DMI_PRODUCT_VERSION, "product version"),
-                },
-        },
-        { }
-};
-
-/* Custom PCI config ops */
-static struct pci_generic_ecam_ops foo_pci_ops = {
-	.bus_shift	= 24,
-	.pci_ops = {
-		.map_bus = pci_mcfg_dev_base,
-		.read = foo_ecam_config_read,
-		.write = foo_ecam_config_write,
-	}
-};
-
-static int foo_match(struct pci_mcfg_fixup *fixup, struct acpi_pci_root *root)
-{
-	if (additional platform identification)
-	        return true;
-	return false;
-}
-
-DECLARE_ACPI_MCFG_FIXUP(foo_dmi, foo_init, &foo_root_ops, <domain_nr>, <bus_nr>);
+We already have DT driver which addresses errata requirements and
+allows to use special PCI config accessors. Currently this driver uses
+compatible = "cavium,pci-host-thunder-ecam" to mach against the errata.
+For ACPI case we need explicit errata number and corresponding
+DECLARE_ACPI_MCFG_FIXUP fixup code.
 
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
 ---
- drivers/acpi/pci_gen_host.c       | 30 +++++++++++++++++++++++++++++-
- include/asm-generic/vmlinux.lds.h |  7 +++++++
- include/linux/pci-acpi.h          | 18 ++++++++++++++++++
- 3 files changed, 54 insertions(+), 1 deletion(-)
+ arch/arm64/Kconfig                  | 14 ++++++++++++++
+ arch/arm64/include/asm/cpufeature.h |  3 ++-
+ arch/arm64/kernel/cpu_errata.c      |  8 ++++++++
+ drivers/pci/host/pci-thunder-ecam.c | 35 +++++++++++++++++++++++++++++++++++
+ 4 files changed, 59 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/acpi/pci_gen_host.c b/drivers/acpi/pci_gen_host.c
-index fd360b5..e55dfca 100644
---- a/drivers/acpi/pci_gen_host.c
-+++ b/drivers/acpi/pci_gen_host.c
-@@ -11,6 +11,8 @@
-  * You should have received a copy of the GNU General Public License
-  * version 2 (GPLv2) along with this source code.
-  */
-+
-+#include <linux/dmi.h>
- #include <linux/kernel.h>
- #include <linux/pci.h>
- #include <linux/pci-acpi.h>
-@@ -54,6 +56,32 @@ static struct mcfg_entry *pci_mcfg_lookup(u16 seg, u8 bus_start)
- 	return NULL;
- }
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 1bded87..b7614b8 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -445,6 +445,20 @@ config CAVIUM_ERRATUM_27456
  
-+extern struct pci_cfg_fixup __start_acpi_mcfg_fixups[];
-+extern struct pci_cfg_fixup __end_acpi_mcfg_fixups[];
-+
-+static struct pci_generic_ecam_ops *pci_acpi_get_ops(struct acpi_pci_root *root)
-+{
-+	int bus_num = root->secondary.start;
-+	int domain = root->segment;
-+	struct pci_cfg_fixup *f;
-+
-+	/*
-+	 * Match against platform specific quirks and return corresponding
-+	 * CAM ops.
-+	 *
-+	 * First match against PCI topology <domain:bus> then use DMI or
-+	 * custom match handler.
-+	 */
-+	for (f = __start_acpi_mcfg_fixups; f < __end_acpi_mcfg_fixups; f++) {
-+		if ((f->domain == domain || f->domain == PCI_MCFG_DOMAIN_ANY) &&
-+		    (f->bus_num == bus_num || f->bus_num == PCI_MCFG_BUS_ANY) &&
-+		    (f->system ? dmi_check_system(f->system) : 1) &&
-+		    (f->match ? f->match(f, root) : 1))
-+			return f->ops;
-+	}
-+	/* No quirks, use ECAM */
-+	return &pci_generic_ecam_default_ops;
-+}
+ 	  If unsure, say Y.
  
- /*
-  * Lookup the bus range for the domain in MCFG, and set up config space
-@@ -95,7 +123,7 @@ static int pci_acpi_setup_ecam_mapping(struct acpi_pci_root *root,
++config CAVIUM_ERRATUM_24575
++	bool "Cavium erratum 24575: Enhanced Allocation (EA) emualaion"
++	default y
++	help
++	  Enable workaround for erratum 24575.
++
++	  Early versions of the Cavium Thunder CN88XX processor are missing
++	  Enhanced Allocation (EA) capabilities for the fixed BAR addresses used
++	  by the on-SoC hardware blocks. The erratum adds config access
++	  functions that synthesize the missing EA capabilities for versions
++	  that are missing that information.
++
++	  If unsure, say Y.
++
+ endmenu
+ 
+ 
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index b9b6494..a78364e 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -35,8 +35,9 @@
+ #define ARM64_ALT_PAN_NOT_UAO			10
+ #define ARM64_HAS_VIRT_HOST_EXTN		11
+ #define ARM64_WORKAROUND_CAVIUM_27456		12
++#define ARM64_WORKAROUND_CAVIUM_24575		13
+ 
+-#define ARM64_NCAPS				13
++#define ARM64_NCAPS				14
+ 
+ #ifndef __ASSEMBLY__
+ 
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index 06afd04..89c13d7 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -97,6 +97,14 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 			   (1 << MIDR_VARIANT_SHIFT) | 1),
+ 	},
+ #endif
++#ifdef CONFIG_CAVIUM_ERRATUM_24575
++	{
++	/* Cavium ThunderX, pass 1.x */
++		.desc = "Cavium erratum 24575",
++		.capability = ARM64_WORKAROUND_CAVIUM_24575,
++		MIDR_RANGE(MIDR_THUNDERX, 0x00, 0x01),
++	},
++#endif
+ 	{
  	}
- 
- 	cfg = pci_generic_ecam_create(&root->device->dev, addr, bus_start,
--				      bus_end, &pci_generic_ecam_default_ops);
-+				      bus_end, pci_acpi_get_ops(root));
- 	if (IS_ERR(cfg)) {
- 		err = PTR_ERR(cfg);
- 		pr_err("%04x:%02x-%02x error %d mapping CAM\n", seg,
-diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
-index 339125b..c53b6b7 100644
---- a/include/asm-generic/vmlinux.lds.h
-+++ b/include/asm-generic/vmlinux.lds.h
-@@ -298,6 +298,13 @@
- 		VMLINUX_SYMBOL(__end_pci_fixups_suspend_late) = .;	\
- 	}								\
- 									\
-+	/* ACPI MCFG quirks */						\
-+	.acpi_fixup        : AT(ADDR(.acpi_fixup) - LOAD_OFFSET) {	\
-+		VMLINUX_SYMBOL(__start_acpi_mcfg_fixups) = .;		\
-+		*(.acpi_fixup_mcfg)					\
-+		VMLINUX_SYMBOL(__end_acpi_mcfg_fixups) = .;		\
-+	}								\
-+									\
- 	/* Built-in firmware blobs */					\
- 	.builtin_fw        : AT(ADDR(.builtin_fw) - LOAD_OFFSET) {	\
- 		VMLINUX_SYMBOL(__start_builtin_fw) = .;			\
-diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
-index a72e22d..9545988 100644
---- a/include/linux/pci-acpi.h
-+++ b/include/linux/pci-acpi.h
-@@ -71,6 +71,24 @@ struct acpi_pci_root_ops {
- 	int (*prepare_resources)(struct acpi_pci_root_info *info);
  };
+diff --git a/drivers/pci/host/pci-thunder-ecam.c b/drivers/pci/host/pci-thunder-ecam.c
+index f67c6d7..01de697 100644
+--- a/drivers/pci/host/pci-thunder-ecam.c
++++ b/drivers/pci/host/pci-thunder-ecam.c
+@@ -11,10 +11,14 @@
+ #include <linux/ioport.h>
+ #include <linux/of_pci.h>
+ #include <linux/of.h>
++#include <linux/pci-acpi.h>
+ #include <linux/platform_device.h>
  
-+struct pci_cfg_fixup {
-+	const struct dmi_system_id *system;
-+	bool (*match)(struct pci_cfg_fixup *, struct acpi_pci_root *);
-+	struct pci_generic_ecam_ops *ops;
-+	int domain;
-+	int bus_num;
-+};
++#include <asm/virt.h>
 +
-+#define PCI_MCFG_DOMAIN_ANY	-1
-+#define PCI_MCFG_BUS_ANY	-1
+ #include "../ecam.h"
+ 
 +
-+/* Designate a routine to fix up buggy MCFG */
-+#define DECLARE_ACPI_MCFG_FIXUP(system, match, ops, dom, bus)		\
-+	static const struct pci_cfg_fixup __mcfg_fixup_##system##dom##bus\
-+	 __used	__attribute__((__section__(".acpi_fixup_mcfg"),		\
-+				aligned((sizeof(void *))))) =		\
-+	{ system, match, ops, dom, bus };
+ static void set_val(u32 v, int where, int size, u32 *val)
+ {
+ 	int shift = (where & 3) * 8;
+@@ -376,5 +380,36 @@ static struct platform_driver thunder_ecam_driver = {
+ };
+ module_platform_driver(thunder_ecam_driver);
+ 
++#ifdef CONFIG_ACPI
 +
- extern int acpi_pci_probe_root_resources(struct acpi_pci_root_info *info);
- extern struct pci_bus *acpi_pci_root_create(struct acpi_pci_root *root,
- 					    struct acpi_pci_root_ops *ops,
++static bool needs_cavium_erratum_24575(struct pci_cfg_fixup *fixup,
++				      struct acpi_pci_root *root)
++{
++	/*
++	 * We must match errata code and be hypervisor, quirk does not apply
++	 * for virtual machines.
++	 */
++	return cpus_have_cap(ARM64_WORKAROUND_CAVIUM_24575) &&
++	       is_hyp_mode_available();
++}
++
++DECLARE_ACPI_MCFG_FIXUP(NULL, needs_cavium_erratum_24575, &pci_thunder_ecam_ops,
++			0, PCI_MCFG_BUS_ANY);
++DECLARE_ACPI_MCFG_FIXUP(NULL, needs_cavium_erratum_24575, &pci_thunder_ecam_ops,
++			1, PCI_MCFG_BUS_ANY);
++DECLARE_ACPI_MCFG_FIXUP(NULL, needs_cavium_erratum_24575, &pci_thunder_ecam_ops,
++			2, PCI_MCFG_BUS_ANY);
++DECLARE_ACPI_MCFG_FIXUP(NULL, needs_cavium_erratum_24575, &pci_thunder_ecam_ops,
++			3, PCI_MCFG_BUS_ANY);
++DECLARE_ACPI_MCFG_FIXUP(NULL, needs_cavium_erratum_24575, &pci_thunder_ecam_ops,
++			10, PCI_MCFG_BUS_ANY);
++DECLARE_ACPI_MCFG_FIXUP(NULL, needs_cavium_erratum_24575, &pci_thunder_ecam_ops,
++			11, PCI_MCFG_BUS_ANY);
++DECLARE_ACPI_MCFG_FIXUP(NULL, needs_cavium_erratum_24575, &pci_thunder_ecam_ops,
++			12, PCI_MCFG_BUS_ANY);
++DECLARE_ACPI_MCFG_FIXUP(NULL, needs_cavium_erratum_24575, &pci_thunder_ecam_ops,
++			13, PCI_MCFG_BUS_ANY);
++#endif
++
+ MODULE_DESCRIPTION("Thunder ECAM PCI host driver");
+ MODULE_LICENSE("GPL v2");
 -- 
 1.9.1
