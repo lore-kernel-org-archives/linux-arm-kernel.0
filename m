@@ -1,33 +1,55 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 15 Apr 2016 08:53:41 +0100
-Subject: [PATCH 1/3] ACPI / ARM64: Don't enable ACPI by default on ARM64
-Message-ID: <1460706823-16566-1-git-send-email-broonie@kernel.org>
+From: akurz@blala.de (Alexander Kurz)
+Date: Fri, 15 Apr 2016 09:54:20 +0200
+Subject: [PATCH] ARM: dts: i.MX3x: add keypad port devicetree nodes
+Message-ID: <1460706860-16786-1-git-send-email-akurz@blala.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If ACPI is selectable it is enabled by default.  This is a good choice
-for architectures where the overwhelming majority of systems use ACPI
-like x86 and IA-64 but is less clear for architectures where it's less
-common like ARM64.  Change the default selection so that it's only done
-explicitly on those architectures where ACPI is universally used.
+Add the Keypad Port (KPP) devicetree nodes for IMX31 and IMX35 SOC.
 
-Signed-off-by: Mark Brown <broonie@kernel.org>
+Signed-off-by: Alexander Kurz <akurz@blala.de>
 ---
- drivers/acpi/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/imx31.dtsi | 8 ++++++++
+ arch/arm/boot/dts/imx35.dtsi | 8 ++++++++
+ 2 files changed, 16 insertions(+)
 
-diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-index 82b96ee8624c..2fcf87a6d270 100644
---- a/drivers/acpi/Kconfig
-+++ b/drivers/acpi/Kconfig
-@@ -8,7 +8,7 @@ menuconfig ACPI
- 	depends on IA64 || X86 || (ARM64 && EXPERT)
- 	depends on PCI
- 	select PNP
--	default y
-+	default y if (IA64 || X86)
- 	help
- 	  Advanced Configuration and Power Interface (ACPI) support for 
- 	  Linux requires an ACPI-compliant platform (hardware/firmware),
+diff --git a/arch/arm/boot/dts/imx31.dtsi b/arch/arm/boot/dts/imx31.dtsi
+index 5fdb222..1ce7ae9 100644
+--- a/arch/arm/boot/dts/imx31.dtsi
++++ b/arch/arm/boot/dts/imx31.dtsi
+@@ -69,6 +69,14 @@
+ 				status = "disabled";
+ 			};
+ 
++			kpp: kpp at 43fa8000 {
++				compatible = "fsl,imx31-kpp", "fsl,imx21-kpp";
++				reg = <0x43fa8000 0x4000>;
++				interrupts = <24>;
++				clocks = <&clks 46>;
++				status = "disabled";
++			};
++
+ 			uart4: serial at 43fb0000 {
+ 				compatible = "fsl,imx31-uart", "fsl,imx21-uart";
+ 				reg = <0x43fb0000 0x4000>;
+diff --git a/arch/arm/boot/dts/imx35.dtsi b/arch/arm/boot/dts/imx35.dtsi
+index 14e1320..490b7b4 100644
+--- a/arch/arm/boot/dts/imx35.dtsi
++++ b/arch/arm/boot/dts/imx35.dtsi
+@@ -137,6 +137,14 @@
+ 				status = "disabled";
+ 			};
+ 
++			kpp: kpp at 43fa8000 {
++				compatible = "fsl,imx35-kpp", "fsl,imx21-kpp";
++				reg = <0x43fa8000 0x4000>;
++				interrupts = <24>;
++				clocks = <&clks 56>;
++				status = "disabled";
++			};
++
+ 			iomuxc: iomuxc at 43fac000 {
+ 				compatible = "fsl,imx35-iomuxc";
+ 				reg = <0x43fac000 0x4000>;
 -- 
-2.8.0.rc3
+2.1.4
