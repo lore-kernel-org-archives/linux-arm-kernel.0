@@ -1,28 +1,23 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 15 Apr 2016 11:05:54 +0200
-Subject: [PATCH v2 6/8] clk: samsung: exynos542x: Add the clock id for ACLK
-In-Reply-To: <1460701975-24178-7-git-send-email-cw00.choi@samsung.com>
-References: <1460701975-24178-1-git-send-email-cw00.choi@samsung.com>
- <1460701975-24178-7-git-send-email-cw00.choi@samsung.com>
-Message-ID: <5710AEF2.3040800@samsung.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Fri, 15 Apr 2016 17:04:55 +0800
+Subject: [PATCH 3/3] arm64: defconfig: Enable ACPI
+In-Reply-To: <1460706823-16566-3-git-send-email-broonie@kernel.org>
+References: <1460706823-16566-1-git-send-email-broonie@kernel.org>
+ <1460706823-16566-3-git-send-email-broonie@kernel.org>
+Message-ID: <5710AEB7.4050108@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15/2016 08:32 AM, Chanwoo Choi wrote:
-> This patch adds the clock id for ACLK clock which is source clock of AMBA AXI
-> Bus. This clock should be handled in Bus frequency scaling driver.
-> 
-> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Tested-by: Markus Reichl <m.reichl@fivetechno.de>
-> Tested-by: Anand Moon <linux.amoon@gmail.com>
-> ---
->  drivers/clk/samsung/clk-exynos5420.c | 77 ++++++++++++++++++++++--------------
->  1 file changed, 47 insertions(+), 30 deletions(-)
-> 
+On 2016/4/15 15:53, Mark Brown wrote:
+> Enable ACPI by default to support testing of ACPI only systems and
+> ensure that defconfig will boot on anything, for arm64 this is not done
+> in Kconfig since a very large proportion of arm64 systems have no ACPI
+> at all.
+>
+> Signed-off-by: Mark Brown <broonie@kernel.org>
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-Best regards,
-Krzysztof
+Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
+
+Thanks
+Hanjun
