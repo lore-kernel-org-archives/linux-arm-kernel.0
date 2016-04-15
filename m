@@ -1,215 +1,103 @@
-From: martinayotte@gmail.com (Martin Ayotte)
-Date: Fri, 15 Apr 2016 13:11:08 -0400
-Subject: [PATCH v1 1/1] add missing UARTs pins for AllWinner H3 DTS + add new
- I2C entries for AllWinner H3 DTS
-Message-ID: <8673D89D449742EAB9F6EBD05655A295@GirolesWin7>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 15 Apr 2016 18:11:13 +0100
+Subject: [PATCH 02/45] KVM: arm/arm64: Fix MMIO emulation data handling
+In-Reply-To: <1460740316-8755-1-git-send-email-andre.przywara@arm.com>
+References: <1460740316-8755-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <1460740316-8755-3-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
-This patch is submit to provide endusers access to additional UARTs on
-AllWinner H3 SoC along with I2C ports.
+When the kernel was handling a guest MMIO read access internally, we
+need to copy the emulation result into the run->mmio structure in order
+for the kvm_handle_mmio_return() function to pick it up and inject the
+	result back into the guest.
 
-Regards,
-Martin.
+Currently the only user of kvm_io_bus for ARM is the VGIC, which did
+this copying itself, so this was not causing issues so far.
+
+But with the upcoming new vgic implementation we need this done
+properly.
+
+Update the kvm_handle_mmio_return description and cleanup the code to
+only perform a single copying when needed.
+
+Code and commit message inspired by Andre Przywara.
+
+Reported-by: Andre Przywara <andre.przywara@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/boot/dts/sun8i-h3-orangepi-2.dts  | 36 ++++++++++++++
- arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 36 ++++++++++++++
- arch/arm/boot/dts/sun8i-h3.dtsi            | 75
-++++++++++++++++++++++++++++++
- 3 files changed, 147 insertions(+)
+ arch/arm/kvm/mmio.c | 14 +++++++-------
+ virt/kvm/arm/vgic.c |  7 -------
+ 2 files changed, 7 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
-b/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
-index f93f5d1..f0b9823 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
-@@ -176,6 +176,42 @@
- 	status = "okay";
- };
+diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
+index 0f6600f..0158e9e 100644
+--- a/arch/arm/kvm/mmio.c
++++ b/arch/arm/kvm/mmio.c
+@@ -87,11 +87,10 @@ static unsigned long mmio_read_buf(char *buf, unsigned int len)
  
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart1_pins_a>;
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart2_pins_a>;
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart3_pins_a>;
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins_a>;
-+	status = "okay";
-+};
-+
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_pins_a>;
-+	status = "okay";
-+};
-+
- &usb1_vbus_pin_a {
- 	allwinner,pins = "PG13";
- };
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-index daf50b9a6..6994349 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-@@ -161,6 +161,42 @@
- 	status = "okay";
- };
+ /**
+  * kvm_handle_mmio_return -- Handle MMIO loads after user space emulation
++ *			     or in-kernel IO emulation
++ *
+  * @vcpu: The VCPU pointer
+  * @run:  The VCPU run struct containing the mmio data
+- *
+- * This should only be called after returning from userspace for MMIO load
+- * emulation.
+  */
+ int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ {
+@@ -206,18 +205,19 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 	run->mmio.is_write	= is_write;
+ 	run->mmio.phys_addr	= fault_ipa;
+ 	run->mmio.len		= len;
+-	if (is_write)
+-		memcpy(run->mmio.data, data_buf, len);
  
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart1_pins_a>;
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart2_pins_a>;
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart3_pins_a>;
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins_a>;
-+	status = "okay";
-+};
-+
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_pins_a>;
-+	status = "okay";
-+};
-+
- &usbphy {
- 	/* USB VBUS is always on */
- 	status = "okay";
-diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi
-b/arch/arm/boot/dts/sun8i-h3.dtsi
-index 4a4926b..c947360d 100644
---- a/arch/arm/boot/dts/sun8i-h3.dtsi
-+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -508,6 +508,48 @@
- 				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
- 			};
+ 	if (!ret) {
+ 		/* We handled the access successfully in the kernel. */
++		if (!is_write)
++			memcpy(run->mmio.data, data_buf, len);
+ 		vcpu->stat.mmio_exit_kernel++;
+ 		kvm_handle_mmio_return(vcpu, run);
+ 		return 1;
+-	} else {
+-		vcpu->stat.mmio_exit_user++;
+ 	}
  
-+			uart1_pins_a: uart1 at 0 {
-+				allwinner,pins = "PG6", "PG7";
-+				allwinner,function = "uart1";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			uart2_pins_a: uart2 at 0 {
-+				allwinner,pins = "PA0", "PA1";
-+				allwinner,function = "uart2";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			uart3_pins_a: uart3 at 0 {
-+				allwinner,pins = "PA13", "PA14";
-+				allwinner,function = "uart3";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			i2c0_pins_a: i2c0 at 0 {
-+				allwinner,pins = "PA11", "PA12";
-+				allwinner,function = "i2c0";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			i2c1_pins_a: i2c1 at 0 {
-+				allwinner,pins = "PA18", "PA19";
-+				allwinner,function = "i2c1";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			i2c2_pins_a: i2c2 at 0 {
-+				allwinner,pins = "PE12", "PE13";
-+				allwinner,function = "i2c2";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
- 			mmc0_pins_a: mmc0 at 0 {
- 				allwinner,pins = "PF0", "PF1", "PF2", "PF3",
- 						 "PF4", "PF5";
-@@ -626,6 +668,39 @@
- 			status = "disabled";
- 		};
++	if (is_write)
++		memcpy(run->mmio.data, data_buf, len);
++	vcpu->stat.mmio_exit_user++;
+ 	run->exit_reason	= KVM_EXIT_MMIO;
+ 	return 0;
+ }
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 5efc298..e70cee4 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -820,7 +820,6 @@ static int vgic_handle_mmio_access(struct kvm_vcpu *vcpu,
+ 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+ 	struct vgic_io_device *iodev = container_of(this,
+ 						    struct vgic_io_device, dev);
+-	struct kvm_run *run = vcpu->run;
+ 	const struct vgic_io_range *range;
+ 	struct kvm_exit_mmio mmio;
+ 	bool updated_state;
+@@ -849,12 +848,6 @@ static int vgic_handle_mmio_access(struct kvm_vcpu *vcpu,
+ 		updated_state = false;
+ 	}
+ 	spin_unlock(&dist->lock);
+-	run->mmio.is_write	= is_write;
+-	run->mmio.len		= len;
+-	run->mmio.phys_addr	= addr;
+-	memcpy(run->mmio.data, val, len);
+-
+-	kvm_handle_mmio_return(vcpu, run);
  
-+		i2c0: i2c at 01c2ac00 {
-+			compatible = "allwinner,sun6i-a31-i2c";
-+			reg = <0x01c2ac00 0x400>;
-+			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&bus_gates 96>;
-+			resets = <&apb2_rst 0>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		i2c1: i2c at 01c2b000 {
-+			compatible = "allwinner,sun6i-a31-i2c";
-+			reg = <0x01c2b000 0x400>;
-+			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&bus_gates 97>;
-+			resets = <&apb2_rst 1>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		i2c2: i2c at 01c2b400 {
-+			compatible = "allwinner,sun6i-a31-i2c";
-+			reg = <0x01c2b400 0x400>;
-+			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&bus_gates 98>;
-+			resets = <&apb2_rst 2>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
- 		gic: interrupt-controller at 01c81000 {
- 			compatible = "arm,cortex-a7-gic",
-"arm,cortex-a15-gic";
- 			reg = <0x01c81000 0x1000>,
+ 	if (updated_state)
+ 		vgic_kick_vcpus(vcpu->kvm);
 -- 
-2.7.4
+2.7.3
