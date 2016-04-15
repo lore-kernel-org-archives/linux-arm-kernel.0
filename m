@@ -1,80 +1,83 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 15 Apr 2016 18:11:24 +0100
-Subject: [PATCH 13/45] KVM: arm/arm64: vgic-new: Export register access
- interface
+Date: Fri, 15 Apr 2016 18:11:32 +0100
+Subject: [PATCH 21/45] KVM: arm/arm64: vgic-new: Add SGIR register handler
 In-Reply-To: <1460740316-8755-1-git-send-email-andre.przywara@arm.com>
 References: <1460740316-8755-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1460740316-8755-14-git-send-email-andre.przywara@arm.com>
+Message-ID: <1460740316-8755-22-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Userland can access the emulated GIC to save and restore its state
-for initialization or migration purposes.
-The kvm_io_bus API requires an absolute gpa, which does not fit the
-KVM_DEV_ARM_VGIC_GRP_DIST_REGS user API, that only provides relative
-offsets. So we explicitly iterate our register list to connect
-userland to the VGIC.
-
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Eric Auger <eric.auger@linaro.org>
----
- virt/kvm/arm/vgic/vgic.h      |  2 ++
- virt/kvm/arm/vgic/vgic_mmio.c | 30 ++++++++++++++++++++++++++++++
- 2 files changed, 32 insertions(+)
 
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 0c92cda..8f5d50a 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -28,6 +28,8 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu);
- void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr);
- void vgic_v2_clear_lr(struct kvm_vcpu *vcpu, int lr);
- void vgic_v2_set_underflow(struct kvm_vcpu *vcpu);
-+int vgic_v2_dist_access(struct kvm_vcpu *vcpu, bool is_write,
-+			int offset, int len, void *val);
- 
- #ifdef CONFIG_KVM_ARM_VGIC_V3
- void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu);
+Changelog RFC..v1:
+- silently return on illegal TargetListFilter value (=3)
+---
+ virt/kvm/arm/vgic/vgic_mmio.c | 46 ++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 45 insertions(+), 1 deletion(-)
+
 diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
-index b70a274..21c78a7 100644
+index b2f329a..83641b3 100644
 --- a/virt/kvm/arm/vgic/vgic_mmio.c
 +++ b/virt/kvm/arm/vgic/vgic_mmio.c
-@@ -178,6 +178,36 @@ static int dispatch_mmio_write(struct kvm_vcpu *vcpu,
- 	return region->ops.write(vcpu, dev, addr, len, val);
+@@ -580,6 +580,50 @@ static int vgic_mmio_write_target(struct kvm_vcpu *vcpu,
+ 	return 0;
  }
  
-+/*
-+ * When userland tries to access the VGIC register handlers, we need to
-+ * create a usable struct vgic_io_device to be passed to the handlers.
-+ */
-+static int vgic_device_mmio_access(struct kvm_vcpu *vcpu,
-+				   struct vgic_register_region *regions,
-+				   int nr_regions, bool is_write,
-+				   int offset, int len, void *val)
++static int vgic_mmio_write_sgir(struct kvm_vcpu *source_vcpu,
++				struct kvm_io_device *dev,
++				gpa_t addr, int len, const void *val)
 +{
-+	struct vgic_io_device dev = {
-+		.base_addr = 0,
-+		.redist_vcpu = vcpu,
-+	};
++	int nr_vcpus = atomic_read(&source_vcpu->kvm->online_vcpus);
++	u32 value = *(u32 *)val;
++	int intid = value & 0xf;
++	int targets = (value >> 16) & 0xff;
++	int mode = (value >> 24) & 0x03;
++	int c;
++	struct kvm_vcpu *vcpu;
 +
-+	if (is_write)
-+		return dispatch_mmio_write(vcpu, regions, nr_regions,
-+					   &dev.dev, offset, len, val);
-+	else
-+		return dispatch_mmio_read(vcpu, regions, nr_regions,
-+					  &dev.dev, offset, len, val);
++	switch (mode) {
++	case 0x0:		/* as specified by targets */
++		break;
++	case 0x1:
++		targets = (1U << nr_vcpus) - 1;			/* all, ... */
++		targets &= ~(1U << source_vcpu->vcpu_id);	/* but self */
++		break;
++	case 0x2:		/* this very vCPU only */
++		targets = (1U << source_vcpu->vcpu_id);
++		break;
++	case 0x3:		/* reserved */
++		return 0;
++	}
++
++	kvm_for_each_vcpu(c, vcpu, source_vcpu->kvm) {
++		struct vgic_irq *irq;
++
++		if (!(targets & (1U << c)))
++			continue;
++
++		irq = vgic_get_irq(source_vcpu->kvm, vcpu, intid);
++
++		spin_lock(&irq->irq_lock);
++		irq->pending = true;
++		irq->source |= 1U << source_vcpu->vcpu_id;
++
++		vgic_queue_irq_unlock(source_vcpu->kvm, irq);
++	}
++
++	return 0;
 +}
 +
-+int vgic_v2_dist_access(struct kvm_vcpu *vcpu, bool is_write,
-+			int offset, int len, void *val)
-+{
-+	return vgic_device_mmio_access(vcpu, vgic_v2_dist_registers,
-+				       ARRAY_SIZE(vgic_v2_dist_registers),
-+				       is_write, offset, len, val);
-+}
-+
- int vgic_mmio_read_v2dist(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
- 			  gpa_t addr, int len, void *val)
- {
+ struct vgic_register_region vgic_v2_dist_registers[] = {
+ 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
+ 		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12),
+@@ -604,7 +648,7 @@ struct vgic_register_region vgic_v2_dist_registers[] = {
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_CONFIG,
+ 		vgic_mmio_read_config, vgic_mmio_write_config, 2),
+ 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SOFTINT,
+-		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 4),
++		vgic_mmio_read_raz, vgic_mmio_write_sgir, 4),
+ 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SGI_PENDING_CLEAR,
+ 		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 16),
+ 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SGI_PENDING_SET,
 -- 
 2.7.3
