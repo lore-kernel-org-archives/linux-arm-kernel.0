@@ -1,75 +1,20 @@
-From: roy.lists@gmail.com (Roy Franz (HPE))
-Date: Fri, 15 Apr 2016 09:19:42 -0700
-Subject: [PATCH 2/3] ACPI / ARM64: Remove EXPERT dependency for ACPI on
- ARM64
-In-Reply-To: <1460706823-16566-2-git-send-email-broonie@kernel.org>
-References: <1460706823-16566-1-git-send-email-broonie@kernel.org>
- <1460706823-16566-2-git-send-email-broonie@kernel.org>
-Message-ID: <CAK-u0Q=nbNmFrzPG=bYPhJ_rifDD6_hVxARhz3X9qnEZJ4rvfA@mail.gmail.com>
+From: david@lechnology.com (David Lechner)
+Date: Fri, 15 Apr 2016 11:21:04 -0500
+Subject: [PATCH 0/2] da8xx clocks (was part of "da8xx USB clocks")
+In-Reply-To: <57108BFA.4080509@ti.com>
+References: <1460661217-7389-1-git-send-email-david@lechnology.com>
+ <570FEEDB.7000109@lechnology.com> <57108BFA.4080509@ti.com>
+Message-ID: <571114F0.7020504@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 15, 2016 at 12:53 AM, Mark Brown <broonie@kernel.org> wrote:
-> When ACPI was originally merged for arm64 it had only been tested on
-> emulators and not on real physical platforms and no platforms were
-> relying on it.  This meant that there were concerns that there might be
-> serious issues attempting to use it on practical systems so it had a
-> dependency on EXPERT added to warn people that it was in an early stage
-> of development with very little practical testing.  Since then things
-> have moved on a bit.  We have seen people testing on real hardware and
-> now have people starting to produce some platforms (the most prominent
-> being the 96boards Cello) which only have ACPI support and which build
-> and run to some useful extent with mainline.
->
-> This is not to say that ACPI support or support for these systems is
-> completely done, there are still areas being worked on such as PCI, but
-> at this point it seems that we can be reasonably sure that ACPI will be
-> viable for use on ARM64 and that the already merged support works for
-> the cases it handles.  For the AMD Seattle based platforms support
-> outside of PCI has been fairly complete in mainline a few releases now.
->
-> This is also not to say that we don't have vendors working with ACPI who
-> are trying do things that we would not consider optimal but it does not
-> appear that the EXPERT dependency is having a substantial impact on
-> these vendors.
->
-> Given all this it seems that at this point the EXPERT dependency mainly
-> creates inconvenience for users with systems that are doing the right
-> thing and gets in the way of including the ACPI code in the testing that
-> people are doing on mainline.  Removing it should help our ongoing
-> testing cover those platforms with only ACPI support and help ensure
-> that when ACPI code is merged any problems it causes for other users are
-> more easily discovered.
->
-> Signed-off-by: Mark Brown <broonie@kernel.org>
-> Acked-by: Graeme Gregory <graeme.gregory@linaro.org>
-> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Reviewed-by: Al Stone <ahs3@redhat.com>
-> Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+On 04/15/2016 01:36 AM, Sekhar Nori wrote:
 
-Acked-by: Roy Franz <roy.franz@hpe.com>
-> ---
->  drivers/acpi/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-> index 2fcf87a6d270..fa0d319283e3 100644
-> --- a/drivers/acpi/Kconfig
-> +++ b/drivers/acpi/Kconfig
-> @@ -5,7 +5,7 @@
->  menuconfig ACPI
->         bool "ACPI (Advanced Configuration and Power Interface) Support"
->         depends on !IA64_HP_SIM
-> -       depends on IA64 || X86 || (ARM64 && EXPERT)
-> +       depends on IA64 || X86 || ARM64
->         depends on PCI
->         select PNP
->         default y if (IA64 || X86)
-> --
-> 2.8.0.rc3
+> No, I had commented about removing the new clk init function you had
+> introduced so I was waiting for that to be addressed. I was okay with
+> the second patch in this series, but did not push it to master branch as
+> it depends on clk init movement and breaks boot if applied independently.
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+Got it. The second patch disappeared when I rebased, so it threw me off.
