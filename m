@@ -1,177 +1,196 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 15 Apr 2016 18:11:47 +0100
-Subject: [PATCH 36/45] KVM: arm/arm64: vgic-new: Add GICH_VMCR accessors
-In-Reply-To: <1460740316-8755-1-git-send-email-andre.przywara@arm.com>
-References: <1460740316-8755-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1460740316-8755-37-git-send-email-andre.przywara@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 15 Apr 2016 18:44:19 +0100
+Subject: SMMU problem found on LS2085A with 4.6-rc3
+In-Reply-To: <571122A3.80909@linaro.org>
+References: <570E9EA9.2070903@linaro.org> <570F8739.1060508@arm.com>
+ <571022AD.1060909@linaro.org> <5710DED6.3010008@arm.com>
+ <571122A3.80909@linaro.org>
+Message-ID: <57112873.5030903@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- include/kvm/vgic/vgic.h     |  7 +++++++
- virt/kvm/arm/vgic/vgic-v2.c | 29 +++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic-v3.c | 22 ++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic.c    | 16 ++++++++++++++++
- virt/kvm/arm/vgic/vgic.h    | 18 ++++++++++++++++++
- 5 files changed, 92 insertions(+)
+On 15/04/16 18:19, Shi, Yang wrote:
+> On 4/15/2016 5:30 AM, Robin Murphy wrote:
+>> On 15/04/16 00:07, Shi, Yang wrote:
+>>> Hi Robin,
+>>>
+>>> On 4/14/2016 5:04 AM, Robin Murphy wrote:
+>>>> Hi Yang,
+>>>>
+>>>> On 13/04/16 20:31, Shi, Yang wrote:
+>>>>> Hi Will & Robin,
+>>>>>
+>>>>> I just ran some quick test on my LS2085A board, which has 8 Cortex A57
+>>>>> cores, with 4.6-rc3 kernel, but I found a regression issue with SMMU.
+>>>>>
+>>>>> SMMU driver reports:
+>>>>>
+>>>>> arm_smmu_global_fault: 297974 callbacks suppressed
+>>>>> arm_smmu_global_fault: 298561 callbacks suppressed
+>>>>> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
+>>>>> GFSYNR1 0x00000300, GFSYNR2 0x00000000
+>>>>> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
+>>>>> GFSYNR1 0x00000300, GFSYNR2 0x00000000
+>>>>> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
+>>>>> GFSYNR1 0x00000300, GFSYNR2 0x00000000
+>>>>> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
+>>>>> GFSYNR1 0x00000300, GFSYNR2 0x00000000
+>>>>> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
+>>>>> GFSYNR1 0x00000300, GFSYNR2 0x00000000
+>>>>> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
+>>>>> GFSYNR1 0x00000300, GFSYNR2 0x00000000
+>>>>> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
+>>>>> GFSYNR1 0x00000300, GFSYNR2 0x00000000
+>>>>> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
+>>>>> GFSYNR1 0x00000300, GFSYNR2 0x00000000
+>>>>> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
+>>>>> GFSYNR1 0x00000300, GFSYNR2 0x00000000
+>>>>> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
+>>>>> GFSYNR1 0x00000300, GFSYNR2 0x00000000
+>>>>> arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
+>>>>> arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
+>>>>> arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
+>>>>> arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
+>>>>> arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
+>>>>> arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
+>>>>> arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
+>>>>> arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
+>>>>> arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
+>>>>> arm-smmu 5000000.iommu: Unexpected global fault, this could be serious
+>>>>
+>>>> That's a stream match conflict fault, so you've somehow got two devices
+>>>> using the same stream ID attached to different domains, and at least
+>>>> one
+>>>> of them is trying to do DMA.
+>>>>
+>>>>> But, it is good with 4.5 kernel. I found the below commit causes it:
+>>>>>
+>>>>> commit 9adb95949a343dac53b1cd81dc973b5f815c88d4
+>>>>> Author: Robin Murphy <robin.murphy@arm.com>
+>>>>> Date:   Tue Jan 26 18:06:36 2016 +0000
+>>>>>
+>>>>>      iommu/arm-smmu: Support DMA-API domains
+>>>>>
+>>>>>      With DMA mapping ops provided by the iommu-dma code, only a
+>>>>> minimal
+>>>>>      contribution from the IOMMU driver is needed to create a suitable
+>>>>>      DMA-API domain for them to use. Implement this for the ARM SMMUs.
+>>>>>
+>>>>>      Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>>>>>      Signed-off-by: Will Deacon <will.deacon@arm.com>
+>>>>>
+>>>>> Any idea?
+>>>>
+>>>> My first guess would be the same thing as [1] - does that patch help?
+>>>
+>>> No, it can't cease the fault.
+>>>
+>>>>
+>>>> Beyond that, what does your DT look like? The one in mainline has one
+>>>> token mmu-masters property which isn't even valid, so nothing ever gets
+>>>
+>>> Mine has mmu-masters property too, but removing it doesn't solve the
+>>> problem.
+>>
+>> OK, now things really stop making sense. Without the mmu-masters
+>> property the SMMU driver will do nothing but probe the SMMU device
+>> itself. Therefore I can only assume the bootloader magic for the
+>> Freescale vendor kernel must be rewriting your DT (our board always just
+>> says "fdt_fixup_smmu: WARNING: no SMMU node found" despite the mainline
+>> DT containing the SMMU, so I'm not sure exactly what it's looking for).
+>> Can you see what it's done via /sys/fimware/fdt (or
+>> /sys/firmware/devicetree/base/ if you can face hunting down phandles
+>> manually)? As a further sanity check, what do you see in
+>> /sys/kernel/iommu_groups/*/devices/ and do they differ between the two
+>> kernels?
+>
+> With the mmu-masters property, the fsl-mc will be added into group 2,
+> please see the below dmesg log:
+>
+> iommu: Adding device 3600000.pcie to group 0
+> iommu: Adding device 3700000.pcie to group 1
+> iommu: Adding device 80c000000.fsl-mc to group 2
+>
+> fsl-mc won't be there if mmu-masters property is removed.
+>
+> But, it looks there are multiple devices in iommu_groups 3:
+>
+> root at ls2085a_rdb-4:~# cat /sys/kernel/iommu_groups/3/devices/0000\:0
+> 0000:00:00.0/ 0000:01:00.0/ 0000:01:00.1/
+>
+> It is group 2 if mmu-masters property is removed.
+>
+> I have one Intel e1000 NIC on my PCIe bus, both 0000:01:00.0 and
+> 0000:01:00.1 is for the NIC.
+>
+> Is this behavior expected?
 
-diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-index e536d1d..910721a2 100644
---- a/include/kvm/vgic/vgic.h
-+++ b/include/kvm/vgic/vgic.h
-@@ -167,6 +167,13 @@ struct vgic_v3_cpu_if {
- #endif
- };
- 
-+struct vgic_vmcr {
-+	u32	ctlr;
-+	u32	abpr;
-+	u32	bpr;
-+	u32	pmr;
-+};
-+
- struct vgic_cpu {
- 	/* CPU vif control registers for world switch */
- 	union {
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index 43c19fb..904f142 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -173,3 +173,32 @@ void vgic_v2_clear_lr(struct kvm_vcpu *vcpu, int lr)
- {
- 	vcpu->arch.vgic_cpu.vgic_v2.vgic_lr[lr] = 0;
- }
-+
-+void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
-+{
-+	u32 vmcr;
-+
-+	vmcr  = (vmcrp->ctlr << GICH_VMCR_CTRL_SHIFT) & GICH_VMCR_CTRL_MASK;
-+	vmcr |= (vmcrp->abpr << GICH_VMCR_ALIAS_BINPOINT_SHIFT) &
-+		GICH_VMCR_ALIAS_BINPOINT_MASK;
-+	vmcr |= (vmcrp->bpr << GICH_VMCR_BINPOINT_SHIFT) &
-+		GICH_VMCR_BINPOINT_MASK;
-+	vmcr |= (vmcrp->pmr << GICH_VMCR_PRIMASK_SHIFT) &
-+		GICH_VMCR_PRIMASK_MASK;
-+
-+	vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr = vmcr;
-+}
-+
-+void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
-+{
-+	u32 vmcr = vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr;
-+
-+	vmcrp->ctlr = (vmcr & GICH_VMCR_CTRL_MASK) >>
-+			GICH_VMCR_CTRL_SHIFT;
-+	vmcrp->abpr = (vmcr & GICH_VMCR_ALIAS_BINPOINT_MASK) >>
-+			GICH_VMCR_ALIAS_BINPOINT_SHIFT;
-+	vmcrp->bpr  = (vmcr & GICH_VMCR_BINPOINT_MASK) >>
-+			GICH_VMCR_BINPOINT_SHIFT;
-+	vmcrp->pmr  = (vmcr & GICH_VMCR_PRIMASK_MASK) >>
-+			GICH_VMCR_PRIMASK_SHIFT;
-+}
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 6343d8fd..7ba5110 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -165,3 +165,25 @@ void vgic_v3_clear_lr(struct kvm_vcpu *vcpu, int lr)
- {
- 	vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[lr] = 0;
- }
-+
-+void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
-+{
-+	u32 vmcr;
-+
-+	vmcr  = (vmcrp->ctlr << ICH_VMCR_CTLR_SHIFT) & ICH_VMCR_CTLR_MASK;
-+	vmcr |= (vmcrp->abpr << ICH_VMCR_BPR1_SHIFT) & ICH_VMCR_BPR1_MASK;
-+	vmcr |= (vmcrp->bpr << ICH_VMCR_BPR0_SHIFT) & ICH_VMCR_BPR0_MASK;
-+	vmcr |= (vmcrp->pmr << ICH_VMCR_PMR_SHIFT) & ICH_VMCR_PMR_MASK;
-+
-+	vcpu->arch.vgic_cpu.vgic_v3.vgic_vmcr = vmcr;
-+}
-+
-+void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
-+{
-+	u32 vmcr = vcpu->arch.vgic_cpu.vgic_v3.vgic_vmcr;
-+
-+	vmcrp->ctlr = (vmcr & ICH_VMCR_CTLR_MASK) >> ICH_VMCR_CTLR_SHIFT;
-+	vmcrp->abpr = (vmcr & ICH_VMCR_BPR1_MASK) >> ICH_VMCR_BPR1_SHIFT;
-+	vmcrp->bpr  = (vmcr & ICH_VMCR_BPR0_MASK) >> ICH_VMCR_BPR0_SHIFT;
-+	vmcrp->pmr  = (vmcr & ICH_VMCR_PMR_MASK) >> ICH_VMCR_PMR_SHIFT;
-+}
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index b1dd8d1..2110d95 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -428,6 +428,22 @@ static inline void vgic_set_underflow(struct kvm_vcpu *vcpu)
- 		vgic_v3_set_underflow(vcpu);
- }
- 
-+void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
-+{
-+	if (kvm_vgic_global_state.type == VGIC_V2)
-+		vgic_v2_set_vmcr(vcpu, vmcr);
-+	else
-+		vgic_v3_set_vmcr(vcpu, vmcr);
-+}
-+
-+void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
-+{
-+	if (kvm_vgic_global_state.type == VGIC_V2)
-+		vgic_v2_get_vmcr(vcpu, vmcr);
-+	else
-+		vgic_v3_get_vmcr(vcpu, vmcr);
-+}
-+
- static int compute_ap_list_depth(struct kvm_vcpu *vcpu)
- {
- 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 6ca69d3..ba4866f 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -39,6 +39,8 @@ void vgic_v2_set_underflow(struct kvm_vcpu *vcpu);
- int vgic_v2_dist_access(struct kvm_vcpu *vcpu, bool is_write,
- 			int offset, int len, void *val);
- int vgic_v2_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr);
-+void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
-+void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
- 
- #ifdef CONFIG_KVM_ARM_VGIC_V3
- void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu);
-@@ -50,6 +52,8 @@ int vgic_v3_dist_access(struct kvm_vcpu *vcpu, bool is_write,
- 			int offset, int len, void *val);
- int vgic_v3_redist_access(struct kvm_vcpu *vcpu, bool is_write,
- 			  int offset, int len, void *val);
-+void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
-+void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
- #else
- static inline void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
- {
-@@ -83,8 +87,22 @@ static inline int vgic_v3_redist_access(struct kvm_vcpu *vcpu, bool is_write,
- {
- 	return -ENXIO;
- }
-+
-+static inline
-+void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
-+{
-+}
-+
-+static inline
-+void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
-+{
-+}
-+
- #endif
- 
-+void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
-+void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
-+
- void kvm_register_vgic_device(unsigned long type);
- 
- #endif
--- 
-2.7.3
+Yup - since the root complex doesn't support ACS, the IOMMU API puts all 
+the devices behind it (in this case the NIC and the bridge itself) in 
+the same group, because otherwise it might be possible for two devices 
+assigned to different guests to DMA directly to each other without going 
+through the IOMMU.
+
+>> Secondly, the stream match conflict can only occur if the SMRs are
+>> actually programmed. Since with Will's fix for the conflicts Eric saw we
+>> should attach to the default domain without touching the initial bypass
+>> entries in the SMRs, I'm at a loss to see how you could still get into
+>> this state with that patch applied.
+>
+> I mixed up the patch, with Will's fix applied, the issue is gone away.
+
+Phew, that's a relief! Would you be happy to give a Tested-by on that patch?
+
+Thanks,
+Robin.
+
+>
+> Thanks,
+> Yang
+>
+>>
+>> As the transactions provoking the fault are apparently instruction
+>> fetches on a 00xx stream ID, which I've not seen before, my first guess
+>> would be it's something to do with the management complex (which I can't
+>> get to work with the staging driver due to firmware incompatibility),
+>> but then looking at the general lack of connection to the DMA API within
+>> that driver, maybe not?
+>>
+>> Robin.
+>>
+>>>
+>>> Thanks,
+>>> Yang
+>>>
+>>>
+>>>> attached to the SMMU - indeed I've happily booted -rc3 on an LS2085A
+>>>> earlier this week - so there's clearly something going on there.
+>>>>
+>>>> More generally, I'd note that the mmu-masters binding will never fully
+>>>> work on this board - you can get the platform devices to cooperate by
+>>>> programming the assorted ICID registers to ensure they present unique
+>>>> stream IDs, but PCI devices cannot work at all because there's no
+>>>> way to
+>>>> make the stream IDs coming out of the root complex be equal to the PCI
+>>>> RID in the way it relies on. In that sense, any regression here is
+>>>> quite
+>>>> likely just a shift from "subtly not working" to "loudly and
+>>>> obnoxiously
+>>>> not working". Conversely, those reasons have also proved it a really
+>>>> useful platform for implementing and testing the iommu-map binding[2]
+>>>> (with an awful hack in the PCI driver to program the lookup table
+>>>> suitably) :D
+>>>>
+>>>> Robin.
+>>>>
+>>>> [1]:http://thread.gmane.org/gmane.linux.kernel.iommu/12810
+>>>> [2]:http://thread.gmane.org/gmane.linux.kernel.iommu/12454
+>>>>
+>>>>>
+>>>>> Thanks,
+>>>>> Yang
+>>>>>
+>>>>
+>>>
+>>
+>
