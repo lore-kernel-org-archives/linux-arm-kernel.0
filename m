@@ -1,123 +1,47 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 15 Apr 2016 18:11:27 +0100
-Subject: [PATCH 16/45] KVM: arm/arm64: vgic-new: Add PENDING registers handlers
+Date: Fri, 15 Apr 2016 18:11:14 +0100
+Subject: [PATCH 03/45] KVM: arm/arm64: pmu: abstract access to number of SPIs
 In-Reply-To: <1460740316-8755-1-git-send-email-andre.przywara@arm.com>
 References: <1460740316-8755-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1460740316-8755-17-git-send-email-andre.przywara@arm.com>
+Message-ID: <1460740316-8755-4-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Currently the PMU uses a member of the struct vgic_dist directly,
+which not only breaks abstraction, but will fail with the new VGIC.
+Abstract this access in the VGIC header file.
+
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-
-Changelog RFC..v1:
-- remove IRQ lock from read handler
-- remove TODO from clear pending handler
 ---
- virt/kvm/arm/vgic/vgic_mmio.c | 84 +++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 82 insertions(+), 2 deletions(-)
+ include/kvm/arm_vgic.h | 2 ++
+ virt/kvm/arm/pmu.c     | 2 +-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
-index b9850eb..7010b15 100644
---- a/virt/kvm/arm/vgic/vgic_mmio.c
-+++ b/virt/kvm/arm/vgic/vgic_mmio.c
-@@ -214,6 +214,86 @@ static int vgic_mmio_write_cenable(struct kvm_vcpu *vcpu,
- 	return 0;
- }
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 452bb85..472d556 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -347,6 +347,8 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
+ #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
+ #define vgic_initialized(k)	(!!((k)->arch.vgic.nr_cpus))
+ #define vgic_ready(k)		((k)->arch.vgic.ready)
++#define vgic_valid_spi(k,i)	(((i) >= VGIC_NR_PRIVATE_IRQS) && \
++				 ((i) < (k)->arch.vgic.nr_irqs))
  
-+static int vgic_mmio_read_pending(struct kvm_vcpu *vcpu,
-+				  struct kvm_io_device *dev,
-+				  gpa_t addr, int len, void *val)
-+{
-+	struct vgic_io_device *iodev = container_of(dev,
-+						    struct vgic_io_device, dev);
-+	u32 intid = (addr & 0x7f) * 8;
-+	u32 value = 0;
-+	int i;
-+
-+	if (iodev->redist_vcpu)
-+		vcpu = iodev->redist_vcpu;
-+
-+	/* Loop over all IRQs affected by this read */
-+	for (i = 0; i < len * 8; i++) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-+
-+		if (irq->pending)
-+			value |= (1U << i);
-+	}
-+
-+	write_mask32(value, addr & 3, len, val);
-+	return 0;
-+}
-+
-+static int vgic_mmio_write_spending(struct kvm_vcpu *vcpu,
-+				    struct kvm_io_device *dev,
-+				    gpa_t addr, int len, const void *val)
-+{
-+	struct vgic_io_device *iodev = container_of(dev,
-+						    struct vgic_io_device, dev);
-+	u32 intid = (addr & 0x7f) * 8;
-+	int i;
-+
-+	if (iodev->redist_vcpu)
-+		vcpu = iodev->redist_vcpu;
-+
-+	for_each_set_bit(i, val, len * 8) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-+
-+		spin_lock(&irq->irq_lock);
-+		irq->pending = true;
-+		if (irq->config == VGIC_CONFIG_LEVEL)
-+			irq->soft_pending = true;
-+
-+		vgic_queue_irq_unlock(vcpu->kvm, irq);
-+	}
-+
-+	return 0;
-+}
-+
-+static int vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
-+				    struct kvm_io_device *dev,
-+				    gpa_t addr, int len, const void *val)
-+{
-+	struct vgic_io_device *iodev = container_of(dev,
-+						    struct vgic_io_device, dev);
-+	u32 intid = (addr & 0x7f) * 8;
-+	int i;
-+
-+	if (iodev->redist_vcpu)
-+		vcpu = iodev->redist_vcpu;
-+
-+	for_each_set_bit(i, val, len * 8) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-+
-+		spin_lock(&irq->irq_lock);
-+
-+		if (irq->config == VGIC_CONFIG_LEVEL) {
-+			irq->soft_pending = false;
-+			irq->pending = irq->line_level;
-+		} else {
-+			irq->pending = false;
-+		}
-+
-+		spin_unlock(&irq->irq_lock);
-+	}
-+	return 0;
-+}
-+
- struct vgic_register_region vgic_v2_dist_registers[] = {
- 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
- 		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12),
-@@ -224,9 +304,9 @@ struct vgic_register_region vgic_v2_dist_registers[] = {
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_CLEAR,
- 		vgic_mmio_read_enable, vgic_mmio_write_cenable, 1),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_SET,
--		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 1),
-+		vgic_mmio_read_pending, vgic_mmio_write_spending, 1),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_CLEAR,
--		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 1),
-+		vgic_mmio_read_pending, vgic_mmio_write_cpending, 1),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_SET,
- 		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 1),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_CLEAR,
+ int vgic_v2_probe(struct device_node *vgic_node,
+ 		  const struct vgic_ops **ops,
+diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+index b5754c6..0b2c1fa 100644
+--- a/virt/kvm/arm/pmu.c
++++ b/virt/kvm/arm/pmu.c
+@@ -476,7 +476,7 @@ int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
+ 		 * the interrupt number is the same for all vcpus, while as an
+ 		 * SPI it must be a separate number per vcpu.
+ 		 */
+-		if (irq < VGIC_NR_SGIS || irq >= vcpu->kvm->arch.vgic.nr_irqs ||
++		if (irq < VGIC_NR_SGIS || !vgic_valid_spi(vcpu->kvm, irq) ||
+ 		    !irq_is_valid(vcpu->kvm, irq, irq < VGIC_NR_PRIVATE_IRQS))
+ 			return -EINVAL;
+ 
 -- 
 2.7.3
