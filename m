@@ -1,19 +1,43 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 15 Apr 2016 10:48:11 -0700
-Subject: [PATCH 1/3] ACPI / ARM64: Don't enable ACPI by default on ARM64
-In-Reply-To: <1460706823-16566-1-git-send-email-broonie@kernel.org>
-References: <1460706823-16566-1-git-send-email-broonie@kernel.org>
-Message-ID: <CAOesGMj5h9VtB+vArUEB4PzQavAgkUg0q19XL7ZVrVKNcwty9g@mail.gmail.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Fri, 15 Apr 2016 14:19:39 -0400
+Subject: [PATCH V6 00/13] Support for generic ACPI based PCI host
+ controller
+In-Reply-To: <1460740008-19489-1-git-send-email-tn@semihalf.com>
+References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
+Message-ID: <571130BB.9030508@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 15, 2016 at 12:53 AM, Mark Brown <broonie@kernel.org> wrote:
-> If ACPI is selectable it is enabled by default.  This is a good choice
-> for architectures where the overwhelming majority of systems use ACPI
-> like x86 and IA-64 but is less clear for architectures where it's less
-> common like ARM64.  Change the default selection so that it's only done
-> explicitly on those architectures where ACPI is universally used.
->
-> Signed-off-by: Mark Brown <broonie@kernel.org>
+On 04/15/2016 01:06 PM, Tomasz Nowicki wrote:
+> From the functionality point of view this series might be split into the
+> following logic parts:
+> 1. Necessary fixes as the preparation for using driver on ARM64.
+> 2. New ECAM API and update for users of the pci-host-common API
+> 3. Use new MCFG interface and implement generic ACPI based PCI host controller driver.
+> 4. Enable above driver on ARM64
+> 
+> Patches has been built on top of 4.6-rc2 and can be found here:
+> git at github.com:semihalf-nowicki-tomasz/linux.git (pci-acpi-v6)
+> 
+> This has been tested on Cavium ThunderX server. Any help in reviewing and
+> testing is very appreciated.
+> 
+> v5 -> v6
+> - dropped idea of x86 MMCONFIG code refactoring
+> - integrated JC's patches which introduce new ECAM API:
+>   https://lkml.org/lkml/2016/4/11/907
+>   git: https://github.com/jchandra-brcm/linux/ (arm64-acpi-pci-v3)
+> - integrated Sinan's fix for releasing IO resources, see patch [06/13]
+> - added ACPI support for ThunderX ECAM and PEM drivers
+> - rebased to 4.6-rc2
 
-Acked-by: Olof Johansson <olof@lixom.net>
+JC: can you explicitly confirm that you're ok with letting Tomasz drive
+this? We would like to see one driver. Either that is Tomasz, or
+Lorenzo, or it is you. But we need to have one overall cooordinated
+effort to get this enablement into upstream as quickly as possible.
+
+Some of the Enterprise folks are going to otherwise end up in a very
+nasty situation of supporting the previous non-upstream patches for many
+years, which is absolutely something we want to avoid...
+
+Jon.
