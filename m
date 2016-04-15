@@ -1,109 +1,95 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 15 Apr 2016 11:14:00 -0500
-Subject: [RFC PATCH 09/11] drivers: acpi: implement acpi_dma_configure
-In-Reply-To: <1460654743-7896-10-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1460654743-7896-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1460654743-7896-10-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20160415161400.GC7973@localhost>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 15 Apr 2016 10:15:17 -0600
+Subject: [PATCH V2 04/15] coresight: tmc: introducing new header file
+In-Reply-To: <571111E8.2000804@arm.com>
+References: <1460483692-25061-1-git-send-email-mathieu.poirier@linaro.org>
+ <1460483692-25061-5-git-send-email-mathieu.poirier@linaro.org>
+ <570FD473.9090007@arm.com>
+ <CANLsYkzQuF=Y7O7T41HHHGHiFNtpj+cUd8W9paAYh=dqm0MJXg@mail.gmail.com>
+ <571111E8.2000804@arm.com>
+Message-ID: <CANLsYkxL1c=RioUsT+1U49fcf=fGFFFedFTyOP20tuTxg3a15A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 14, 2016 at 06:25:41PM +0100, Lorenzo Pieralisi wrote:
-> On DT based systems, the of_dma_configure() API implements DMA configuration
-> for a given device. On ACPI systems an API equivalent to of_dma_configure()
-> is missing which implies that it is currently not possible to set-up DMA
-> operations for devices through the ACPI generic kernel layer.
-> 
-> This patch fills the gap by introducing acpi_dma_configure/deconfigure()
-> calls, that carry out IOMMU configuration through IORT (on systems where
-> it is present) and call arch_setup_dma_ops(...) with the retrieved
-> parameters.
-> 
-> The DMA range size passed to arch_setup_dma_ops() is sized according
-> to the device coherent_dma_mask (starting at address 0x0), mirroring the
-> DT probing path behaviour when a dma-ranges property is not provided
-> for the device being probed; this changes the current arch_setup_dma_ops()
-> call parameters in the ACPI probing case, but since arch_setup_dma_ops()
-> is a NOP on all architectures but ARM/ARM64 this patch does not change
-> the current kernel behaviour on them.
-> 
-> This patch updates ACPI and PCI core code to use the newly introduced
-> acpi_dma_configure function, providing the same functionality
-> as of_dma_configure on ARM systems and leaving behaviour unchanged
-> for all other arches.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> Cc: Tomasz Nowicki <tn@semihalf.com>
-> Cc: Joerg Roedel <joro@8bytes.org>
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+On 15 April 2016 at 10:08, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+> On 15/04/16 17:03, Mathieu Poirier wrote:
+>>
+>> On 14 April 2016 at 11:33, Suzuki K Poulose <Suzuki.Poulose@arm.com>
+>> wrote:
+>>>
+>>> On 12/04/16 18:54, Mathieu Poirier wrote:
+>>>>
+>>>>
+>>>> The amount of #define, enumeration and structure definition
+>>>> is big enough to justify moving them to a new header file.
+>>>>
+>>>
+>>>
+>>>> +/* TMC_STS - 0x00C */
+>>>> +#define TMC_STS_TRIGGERED      BIT(1)
+>>>
+>>>
+>>>
+>>> ...
+>>>
+>>>> +#define TMC_AXICTL_WR_BURST_LEN 0xF00
+>>>
+>>>
+>>>
+>>> Nit: The value above signifies, 16 data transfers per burst.
+>>> So ideally it would be good to rename it to reflect that. say,
+>>>
+>>> TMC_AXICTL_WR_BURST_16
+>>
+>>
+>> Will do.  But I'll have to do this in a separate patch then the
+>> grouping of STS_ and FFCR_ defines you're referring to below since it
+>> will also require changes to the .c files.
+>
+>
+> Yes, I don't expect this change to be part of the patch. Separate patch
+> is fine.
+>
+>>
+>>>
+>>>
+>>>
+>>>> +/* TMC_FFCR - 0x304 */
+>>>> +#define TMC_FFCR_EN_FMT                BIT(0)
+>>>> +#define TMC_FFCR_EN_TI         BIT(1)
+>>>> +#define TMC_FFCR_FON_FLIN      BIT(4)
+>>>> +#define TMC_FFCR_FON_TRIG_EVT  BIT(5)
+>>>> +#define TMC_FFCR_FLUSHMAN      BIT(6)
+>>>> +#define TMC_FFCR_TRIGON_TRIGIN BIT(8)
+>>>> +#define TMC_FFCR_STOP_ON_FLUSH BIT(12)
+>>>> +
+>>>> +#define TMC_STS_TMCREADY_BIT   2
+>>>
+>>>
+>>>
+>>>> +#define TMC_FFCR_FLUSHMAN_BIT  6
+>>>
+>>>
+>>>
+>>> nit: It would be nice to group the STS_ and FFCR_ bits together.
+>>> Also I see that the defintion for
+>>> TMC_STS_FULL is added in a completely unrelated patch (TMC-ETF AUX SPACE
+>>> patch ?). It would be good to add it either here or in a different patch.
+>>
+>>
+>> TMC_STS_FULL is not added here because at this point it is not used by
+>> the code - it is only added later when it is useful.
+>
+>
+> I agree. But the patch which introduces the definition doesn't deal with
+> TMC_STS_ at all either.
 
-There's only a tiny PCI change in this series, so I assume somebody
-else will merge all this.  Here's my ack for the PCI part:
+Patch 13/15 is using the TMC_STS_FULL define on line 147.  Am I
+missing your point?
 
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>	# for drivers/pci/probe.c change
-
-One question on use of pci_for_each_dma_alias() below.
-
-> +static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
-> +{
-> +	u32 *rid = data;
-> +
-> +	*rid = alias;
-> +	return 0;
-> +}
-> +
-> +/**
-> + * iort_iommu_configure - Set-up IOMMU configuration for a device.
-> + *
-> + * @dev: device that requires IOMMU set-up
-> + *
-> + * Returns: iommu_ops pointer on configuration success
-> + *          NULL on configuration failure
-> + */
-> +struct iommu_ops *iort_iommu_configure(struct device *dev)
-> +{
-> +	struct acpi_iort_node *node, *parent;
-> +	struct iommu_ops *ops = NULL;
-> +	struct iommu_fwspec fwspec;
-> +	struct iort_iommu_node *iommu_node;
-> +	u32 rid = 0, devid = 0;
-> +
-> +	if (dev_is_pci(dev)) {
-> +		struct pci_bus *bus = to_pci_dev(dev)->bus;
-> +
-> +		pci_for_each_dma_alias(to_pci_dev(dev), __get_pci_rid,
-> +				       &rid);
-
-You end up with only the last DMA alias in "rid".  Is it really true
-that you only need to call iort_dev_map_rid() for one of the aliases?
-
-> +		node = iort_scan_node(ACPI_IORT_NODE_PCI_ROOT_COMPLEX,
-> +				      iort_find_dev_callback, &bus->dev);
-> +	} else
-> +		node = iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
-> +				      iort_find_dev_callback, dev);
-> +
-> +	if (!node)
-> +		return NULL;
-> +
-> +	iort_dev_map_rid(node, rid, &devid, ACPI_IORT_NODE_SMMU);
-> +
-> +	parent = iort_find_parent_node(node, ACPI_IORT_NODE_SMMU);
-> +
-> +	if (!parent)
-> +		return NULL;
-> +
-> +	iommu_node = iort_iommu_get_node(parent);
-> +	ops = iommu_node->ops;
-> +
-> +	fwspec.fwnode = iommu_node->fwnode;
-> +	fwspec.param_count = 1;
-> +	fwspec.param[0] = devid;
-> +
-> +	if (!ops || !ops->fw_xlate || ops->fw_xlate(dev, &fwspec))
-> +		return NULL;
-> +
-> +	return ops;
-> +}
+>Thats why I said, either here or in a different
+> patch
+> than what is there. May be you could club the change above and the STS_FULL
+> into a new single patch. Its not mandatory though.
+>
+> Suzuki
