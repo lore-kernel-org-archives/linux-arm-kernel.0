@@ -1,74 +1,46 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 15 Apr 2016 14:52:10 +0200
-Subject: [PATCH] tty/serial: atmel: fix hardware handshake selection
-In-Reply-To: <1460465500-25396-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1460465500-25396-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <5710E3FA.6040203@atmel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 15 Apr 2016 13:55:12 +0100
+Subject: [PATCH 1/5] arm64: cpufeature: Add scope for capability check
+In-Reply-To: <570FD7C2.9030305@arm.com>
+References: <1459941854-5190-1-git-send-email-suzuki.poulose@arm.com>
+ <1459941854-5190-2-git-send-email-suzuki.poulose@arm.com>
+ <20160414173809.GN4584@arm.com> <570FD7C2.9030305@arm.com>
+Message-ID: <20160415125511.GF22906@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 12/04/2016 14:51, Alexandre Belloni a ?crit :
-> Commit 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management when
-> hardware handshake is enabled") actually allowed to enable hardware
-> handshaking.
-> Before, the CRTSCTS flags was silently ignored.
+On Thu, Apr 14, 2016 at 06:47:46PM +0100, Suzuki K Poulose wrote:
+> On 14/04/16 18:38, Will Deacon wrote:
+> >Hi Suzuki,
+> >
+> >On Wed, Apr 06, 2016 at 12:24:10PM +0100, Suzuki K Poulose wrote:
+> >>Add scope parameter to the arm64_cpu_capabilities::matches(),
+> >>so that this can be reused for checking the capability on a
+> >>given CPU vs the system wide. By default, the system uses
+> >>'system' wide values for setting the CPU_HWCAPs and ELF_HWCAPs.
 > 
-> As the DMA controller can't drive RTS (as explain in the commit message).
-> Ensure that hardware flow control stays disabled when DMA is used and FIFOs
-> are not available.
+> >>  static bool __maybe_unused
+> >>-is_affected_midr_range(const struct arm64_cpu_capabilities *entry)
+> >>+is_affected_midr_range(const struct arm64_cpu_capabilities *entry, int __unused)
+> >
+> >Maybe it would be better to WARN if somebody passes SCOPE_SYSTEM, rather
+> >than silently treat it as per-cpu?
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Should we worry about errata's which may not necessarily depend on per CPU or
+> a local capability (GIC) ?
 
-Yes, I agree with the fix:
+Why would they be calling is_affected_midr_range?
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> If not, we could add a WARN after passing down LOCAL
+> scope for errata.
 
-We can also add the following tags:
+But if we don't care about errata that aren't local, then why would we warn
+on LOCAL?
 
-Fixes: 1cf6e8fc8341 ("tty/serial: at91: fix RTS line management when
-hardware handshake is enabled")
-Cc: stable <stable@vger.kernel.org> # v4.0+
+> Right now we always do SCOPE_SYSTEM from update_cpu_capabilities(), even for
+> cpu_errata table. There is no specific reason for that.
 
-Bye,
+I'm totally confused. Can you define SCOPE_SYSTEM and SCOPE_LOCAL for me,
+please?
 
-> ---
->  drivers/tty/serial/atmel_serial.c | 14 +++++++++++++-
->  1 file changed, 13 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index d9439e6ab719..954941dd8124 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -274,6 +274,13 @@ static bool atmel_use_dma_rx(struct uart_port *port)
->  	return atmel_port->use_dma_rx;
->  }
->  
-> +static bool atmel_use_fifo(struct uart_port *port)
-> +{
-> +	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
-> +
-> +	return atmel_port->fifo_size;
-> +}
-> +
->  static unsigned int atmel_get_lines_status(struct uart_port *port)
->  {
->  	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
-> @@ -2090,7 +2097,12 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
->  		mode |= ATMEL_US_USMODE_RS485;
->  	} else if (termios->c_cflag & CRTSCTS) {
->  		/* RS232 with hardware handshake (RTS/CTS) */
-> -		mode |= ATMEL_US_USMODE_HWHS;
-> +		if (atmel_use_dma_rx(port) && !atmel_use_fifo(port)) {
-> +			dev_info(port->dev, "not enabling hardware flow control because DMA is used");
-> +			termios->c_cflag &= ~CRTSCTS;
-> +		} else {
-> +			mode |= ATMEL_US_USMODE_HWHS;
-> +		}
->  	} else {
->  		/* RS232 without hadware handshake */
->  		mode |= ATMEL_US_USMODE_NORMAL;
-> 
-
-
--- 
-Nicolas Ferre
+Will
