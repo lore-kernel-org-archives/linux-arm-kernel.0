@@ -1,32 +1,38 @@
-From: david.wu@rock-chips.com (David.Wu)
-Date: Fri, 15 Apr 2016 20:12:03 +0800
-Subject: [PATCH v5 2/2] i2c: rk3x: add i2c support for rk3399 soc
-In-Reply-To: <2530516.Iqqf6HUmr5@diego>
-References: <1458147438-62387-1-git-send-email-david.wu@rock-chips.com>
- <1458147438-62387-3-git-send-email-david.wu@rock-chips.com>
- <20160414184848.GB2338@katana> <2530516.Iqqf6HUmr5@diego>
-Message-ID: <5710DA93.1020708@rock-chips.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 15 Apr 2016 17:44:46 +0530
+Subject: [GIT PULL 1/3] DaVinci cleanups for v4.7
+Message-ID: <1460722488-5921-1-git-send-email-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 
-? 2016/4/15 15:31, Heiko St?bner ??:
-> David,
->
-> Am Donnerstag, 14. April 2016, 20:48:48 schrieb Wolfram Sang:
->>> + - input-clk-rate : frequency rate of function clock used(in Hz). If
->>> omitted, +	the default clock rate is used. It is just used at rk3399 soc.
->> Why is this needed? Why don't we simply use the default or calculate the
->> best value somehow?
-> if you need to _get_ the clock-rate, clk_get_rate is the abvious choice and if
-> you need to _set_ some specific rate, I guess it should be done via the
-> assigned-clocks mechanism in the devicetree - see veyron dts files that already
-> do this for some other parts.
+  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
 
-Okay, i will try it, thank you.
+are available in the git repository at:
 
->
->
->
->
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.7/cleanup
+
+for you to fetch changes up to 9a7f2fc8408fdc0e3b417f670c17ed70d5d1c114:
+
+  ARM: davinci: use IRQCHIP_DECLARE for cp_intc (2016-04-14 12:09:50 +0530)
+
+----------------------------------------------------------------
+DaVinci cleanups for v4.7. It includes
+removal of some unused macros and data-
+-structures and use of helper macros to
+reduce code.
+
+----------------------------------------------------------------
+David Lechner (3):
+      ARM: davinci: simplify call to of populate
+      ARM: davinci: remove unused DA8XX_NUM_UARTS
+      ARM: davinci: use IRQCHIP_DECLARE for cp_intc
+
+Petr Kulhavy (1):
+      ARM: DaVinci USB: removed deprecated properties from MUSB config
+
+ arch/arm/mach-davinci/cp_intc.c  |  3 +++
+ arch/arm/mach-davinci/da8xx-dt.c | 17 +----------------
+ arch/arm/mach-davinci/usb.c      | 16 ----------------
+ 3 files changed, 4 insertions(+), 32 deletions(-)
