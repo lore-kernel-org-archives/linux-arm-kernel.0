@@ -1,127 +1,49 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 15 Apr 2016 18:11:56 +0100
-Subject: [PATCH 45/45] KVM: arm/arm64: vgic-new: enable build
-In-Reply-To: <1460740316-8755-1-git-send-email-andre.przywara@arm.com>
-References: <1460740316-8755-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1460740316-8755-46-git-send-email-andre.przywara@arm.com>
+From: aisheng.dong@nxp.com (Dong Aisheng)
+Date: Sat, 16 Apr 2016 01:29:44 +0800
+Subject: [PATCH 20/23] mmc: sdhci-esdhc-imx: fix strobe DLL lock wrong clock
+ issue
+In-Reply-To: <1460741387-23815-1-git-send-email-aisheng.dong@nxp.com>
+References: <1460741387-23815-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1460741387-23815-21-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the new VGIC implementation has reached feature parity with
-the old one, add the new files to the build system and add a Kconfig
-option to switch between the two versions.
-We set the default to the new version to get maximum test coverage,
-in case people experience problems they can switch back to the old
-behaviour if needed.
+When enable DDR, the clock factor definition is changed.
+e.g. original 200Mhz will become 100Mhz one MIX_CTRL_DDREN bit is set
+So we need to update the clock setting then the strobe dll can lock
+the correct clock rate.
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Additionally we also need disable the clock before locking strobe dll.
+
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
- arch/arm/kvm/Kconfig          |  7 +++++++
- arch/arm/kvm/Makefile         | 10 ++++++++++
- arch/arm64/kvm/Kconfig        |  7 +++++++
- arch/arm64/kvm/Makefile       | 10 ++++++++++
- virt/kvm/arm/hyp/vgic-v2-sr.c |  5 +++++
- 5 files changed, 39 insertions(+)
+ drivers/mmc/host/sdhci-esdhc-imx.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-index 95a0005..02abfff 100644
---- a/arch/arm/kvm/Kconfig
-+++ b/arch/arm/kvm/Kconfig
-@@ -46,6 +46,13 @@ config KVM_ARM_HOST
- 	---help---
- 	  Provides host support for ARM processors.
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index 07b1144..3ff213f 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -852,6 +852,11 @@ static void esdhc_set_strobe_dll(struct sdhci_host *host)
+ 	u32 v;
  
-+config KVM_NEW_VGIC
-+	bool "New VGIC implementation"
-+	depends on KVM
-+	default y
-+	---help---
-+	  uses the new VGIC implementation
+ 	if (host->mmc->actual_clock > ESDHC_STROBE_DLL_CLK_FREQ) {
++		/* disable clock before enabling strobe dll */
++		writel(readl(host->ioaddr + ESDHC_VENDOR_SPEC) &
++		       (~ESDHC_VENDOR_SPEC_FRC_SDCLK_ON),
++		       host->ioaddr + ESDHC_VENDOR_SPEC);
 +
- source drivers/vhost/Kconfig
- 
- endif # VIRTUALIZATION
-diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
-index eb1bf43..aa7d724 100644
---- a/arch/arm/kvm/Makefile
-+++ b/arch/arm/kvm/Makefile
-@@ -21,7 +21,17 @@ obj-$(CONFIG_KVM_ARM_HOST) += hyp/
- obj-y += kvm-arm.o init.o interrupts.o
- obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
- obj-y += coproc.o coproc_a15.o coproc_a7.o mmio.o psci.o perf.o
-+
-+ifeq ($(CONFIG_KVM_NEW_VGIC),y)
-+obj-y += $(KVM)/arm/vgic/vgic.o
-+obj-y += $(KVM)/arm/vgic/vgic_init.o
-+obj-y += $(KVM)/arm/vgic/vgic_irqfd.o
-+obj-y += $(KVM)/arm/vgic/vgic-v2.o
-+obj-y += $(KVM)/arm/vgic/vgic_mmio.o
-+obj-y += $(KVM)/arm/vgic/vgic_kvm_device.o
-+else
- obj-y += $(KVM)/arm/vgic.o
- obj-y += $(KVM)/arm/vgic-v2.o
- obj-y += $(KVM)/arm/vgic-v2-emul.o
-+endif
- obj-y += $(KVM)/arm/arch_timer.o
-diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-index de7450d..3f0e1ce 100644
---- a/arch/arm64/kvm/Kconfig
-+++ b/arch/arm64/kvm/Kconfig
-@@ -55,6 +55,13 @@ config KVM_ARM_PMU
- 	  Adds support for a virtual Performance Monitoring Unit (PMU) in
- 	  virtual machines.
- 
-+config KVM_NEW_VGIC
-+	bool "New VGIC implementation"
-+	depends on KVM
-+	default y
-+        ---help---
-+          uses the new VGIC implementation
-+
- source drivers/vhost/Kconfig
- 
- endif # VIRTUALIZATION
-diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-index 122cff4..2f5d431 100644
---- a/arch/arm64/kvm/Makefile
-+++ b/arch/arm64/kvm/Makefile
-@@ -20,10 +20,20 @@ kvm-$(CONFIG_KVM_ARM_HOST) += emulate.o inject_fault.o regmap.o
- kvm-$(CONFIG_KVM_ARM_HOST) += hyp.o hyp-init.o handle_exit.o
- kvm-$(CONFIG_KVM_ARM_HOST) += guest.o debug.o reset.o sys_regs.o sys_regs_generic_v8.o
- 
-+ifeq ($(CONFIG_KVM_NEW_VGIC),y)
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic_init.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic_irqfd.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-v2.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-v3.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic_mmio.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic_kvm_device.o
-+else
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v2.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v2-emul.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3-emul.o
-+endif
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
- kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
-diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
-index caac41f..a3f12b3 100644
---- a/virt/kvm/arm/hyp/vgic-v2-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
-@@ -21,7 +21,12 @@
- 
- #include <asm/kvm_hyp.h>
- 
-+#ifdef CONFIG_KVM_NEW_VGIC
-+extern struct vgic_global kvm_vgic_global_state;
-+#define vgic_v2_params kvm_vgic_global_state
-+#else
- extern struct vgic_params vgic_v2_params;
-+#endif
- 
- static void __hyp_text save_maint_int_state(struct kvm_vcpu *vcpu,
- 					    void __iomem *base)
+ 		/* force a reset on strobe dll */
+ 		writel(ESDHC_STROBE_DLL_CTRL_RESET,
+ 			host->ioaddr + ESDHC_STROBE_DLL_CTRL);
+@@ -913,6 +918,8 @@ static void esdhc_set_uhs_signaling(struct sdhci_host *host, unsigned timing)
+ 		m |= ESDHC_MIX_CTRL_DDREN | ESDHC_MIX_CTRL_HS400_EN;
+ 		writel(m, host->ioaddr + ESDHC_MIX_CTRL);
+ 		imx_data->is_ddr = 1;
++		/* update clock after enable DDR for strobe DLL lock */
++		host->ops->set_clock(host, host->clock);
+ 		esdhc_set_strobe_dll(host);
+ 		break;
+ 	}
 -- 
-2.7.3
+1.9.1
