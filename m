@@ -1,63 +1,72 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 14 Apr 2016 19:42:34 -0700
-Subject: [PATCH v2 3/6] ARM: PSCI: Register with kernel restart handler
+Date: Thu, 14 Apr 2016 19:42:33 -0700
+Subject: [PATCH v2 2/6] ARM: xen: Register with kernel restart handler
 In-Reply-To: <1460688157-6551-1-git-send-email-linux@roeck-us.net>
 References: <1460688157-6551-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1460688157-6551-4-git-send-email-linux@roeck-us.net>
+Message-ID: <1460688157-6551-3-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Register with kernel restart handler instead of setting arm_pm_restart
-directly. This enables support for replacing the PSCI restart handler
-with a different handler if necessary for a specific board.
+directly.
 
-Select a priority of 129 to indicate a higher than default priority, but
-keep it as low as possible since PSCI reset is known to fail on some
-boards.
+Select a high priority of 192 to ensure that default restart handlers
+are replaced if Xen is running.
 
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-Tested-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 ---
-v2: Rebased to v4.6-rc3, added Reviewed/by/Acked-by/Tested-by tags
-    Variable name change: np -> nb
+v2: Rebased to v4.6-rc3, added Reviewed/by/Acked-by tags
 
- drivers/firmware/psci.c | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+ arch/arm/xen/enlighten.c | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index 11bfee8b79a9..a0f71480f145 100644
---- a/drivers/firmware/psci.c
-+++ b/drivers/firmware/psci.c
-@@ -231,11 +231,18 @@ static int get_set_conduit_method(struct device_node *np)
- 	return 0;
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index 75cd7345c654..76a1d12fd27e 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -27,6 +27,7 @@
+ #include <linux/cpu.h>
+ #include <linux/console.h>
+ #include <linux/pvclock_gtod.h>
++#include <linux/reboot.h>
+ #include <linux/time64.h>
+ #include <linux/timekeeping.h>
+ #include <linux/timekeeper_internal.h>
+@@ -193,14 +194,22 @@ after_register_vcpu_info:
+ 	put_cpu();
  }
  
--static void psci_sys_reset(enum reboot_mode reboot_mode, const char *cmd)
-+static int psci_sys_reset(struct notifier_block *nb, unsigned long action,
-+			  void *data)
+-static void xen_restart(enum reboot_mode reboot_mode, const char *cmd)
++static int xen_restart(struct notifier_block *nb, unsigned long action,
++		       void *data)
  {
- 	invoke_psci_fn(PSCI_0_2_FN_SYSTEM_RESET, 0, 0, 0);
+ 	struct sched_shutdown r = { .reason = SHUTDOWN_reboot };
+ 	int rc;
+ 	rc = HYPERVISOR_sched_op(SCHEDOP_shutdown, &r);
+ 	BUG_ON(rc);
++
 +	return NOTIFY_DONE;
  }
  
-+static struct notifier_block psci_sys_reset_nb = {
-+	.notifier_call = psci_sys_reset,
-+	.priority = 129,
++static struct notifier_block xen_restart_nb = {
++	.notifier_call = xen_restart,
++	.priority = 192,
 +};
 +
- static void psci_sys_poweroff(void)
+ static void xen_power_off(void)
  {
- 	invoke_psci_fn(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
-@@ -461,7 +468,7 @@ static void __init psci_0_2_set_functions(void)
+ 	struct sched_shutdown r = { .reason = SHUTDOWN_poweroff };
+@@ -370,7 +379,7 @@ static int __init xen_pm_init(void)
+ 		return -ENODEV;
  
- 	psci_ops.migrate_info_type = psci_migrate_info_type;
- 
--	arm_pm_restart = psci_sys_reset;
-+	register_restart_handler(&psci_sys_reset_nb);
- 
- 	pm_power_off = psci_sys_poweroff;
- }
+ 	pm_power_off = xen_power_off;
+-	arm_pm_restart = xen_restart;
++	register_restart_handler(&xen_restart_nb);
+ 	if (!xen_initial_domain()) {
+ 		struct timespec64 ts;
+ 		xen_read_wallclock(&ts);
 -- 
 2.5.0
