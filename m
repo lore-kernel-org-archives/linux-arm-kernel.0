@@ -1,107 +1,88 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 15 Apr 2016 18:51:01 +0100
-Subject: [GIT PULL] ARM: vexpress: Updates for v4.7
-Message-ID: <57112A05.3070709@arm.com>
+From: yang.shi@linaro.org (Shi, Yang)
+Date: Fri, 15 Apr 2016 10:53:47 -0700
+Subject: [PATCH] iommu/arm-smmu: Fix stream-match conflict with
+ IOMMU_DOMAIN_DMA
+In-Reply-To: <5711043C.5040308@linaro.org>
+References: <1459527597-10740-1-git-send-email-will.deacon@arm.com>
+ <5711043C.5040308@linaro.org>
+Message-ID: <57112AAB.6050209@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM-SoC team,
+On 4/15/2016 8:09 AM, Eric Auger wrote:
+> Hi Will,
+> On 04/01/2016 06:19 PM, Will Deacon wrote:
+>> Commit cbf8277ef456 ("iommu/arm-smmu: Treat IOMMU_DOMAIN_DMA as bypass
+>> for now") ignores requests to attach a device to the default domain
+>> since, without IOMMU-basked DMA ops available everywhere, the default
+>> domain will just lead to unexpected transaction faults being reported.
+>>
+>> Unfortunately, the way this was implemented on SMMUv2 causes a
+>> regression with VFIO PCI device passthrough under KVM on AMD Seattle.
+>> On this system, the host controller device is associated with both a
+>> pci_dev *and* a platform_device, and can therefore end up with duplicate
+>> SMR entries, resulting in a stream-match conflict at runtime.
+>>
+>> This patch amends the original fix so that attaching to IOMMU_DOMAIN_DMA
+>> is rejected even before configuring the SMRs. This restores the old
+>> behaviour for now, but we'll need to look at handing host controllers
+>> specially when we come to supporting the default domain fully.
+>>
+> Tested-by: Eric Auger <eric.auger@linaro.org>
 
-This time addition of support for Cortex-M based MPS2 system is
-the main highlight. I could not split the patches into platform,
-driver and DT because it's newly added and have Kconfig/Makefile
-dependency.
+Tested on my LS2085A board too.
 
-Please pull !
+Tested-by: Yang Shi <yang.shi@linaro.org>
 
---
 Regards,
-Sudeep
+Yang
 
-
-The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
-
-   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
-
-are available in the git repository at:
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git 
-tags/vexpress-for-v4.7/updates
-
-for you to fetch changes up to d6c4382919935e8354640d994d90f928096da96c:
-
-   ARM: dts: vexpress: Add external expansion bus to DT (2016-04-15 
-17:27:55 +0100)
-
-----------------------------------------------------------------
-ARMv7 Vexpress updates and fixes for v4.7
-
-1. Basic support for ARM Versatile Express Cortex-M Prototyping System
-    (V2M-MPS2). ucLinux can be now run on both the hardware and FVP
-    models with Cortex-M3/M4/M7 configurations (Vladimir Murzin)
-
-2. Support for external expansion bus useful for additional hardware
-    e.g. LogicTile Express daughterboards (Brian Starkey)
-
-3. Fix for device node name unit-address presence/absence warnings
-    enabled in recently update DTC (Sudeep Holla)
-
-----------------------------------------------------------------
-Brian Starkey (1):
-       ARM: dts: vexpress: Add external expansion bus to DT
-
-Sudeep Holla (1):
-       ARM: dts: vexpress: fix node name unit-address presence warnings
-
-Vladimir Murzin (10):
-       dt-bindings: document the MPS2 timer bindings
-       clockevents/drivers: add MPS2 Timer driver
-       dt-bindings: document the MPS2 UART bindings
-       serial: mps2-uart: add MPS2 UART driver
-       serial: mps2-uart: add support for early console
-       ARM: vexpress/mps2: introduce MPS2 platform
-       ARM: configs: add MPS2 defconfig
-       ARM: dts: introduce MPS2 AN385/AN386
-       ARM: dts: introduce MPS2 AN399/AN400
-       MAINTAINERS: Update ARM Versatile Express platform entry
-
-  .../devicetree/bindings/serial/arm,mps2-uart.txt   |  19 +
-  .../devicetree/bindings/timer/arm,mps2-timer.txt   |  28 +
-  MAINTAINERS                                        |   1 +
-  arch/arm/Kconfig                                   |  12 +
-  arch/arm/Makefile                                  |   1 +
-  arch/arm/boot/dts/Makefile                         |   3 +
-  arch/arm/boot/dts/mps2-an385.dts                   |  92 +++
-  arch/arm/boot/dts/mps2-an399.dts                   |  92 +++
-  arch/arm/boot/dts/mps2.dtsi                        | 241 ++++++++
-  arch/arm/boot/dts/vexpress-v2m-rs1.dtsi            |  44 +-
-  arch/arm/boot/dts/vexpress-v2m.dtsi                |  44 +-
-  arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts        |  47 +-
-  arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts         |  57 +-
-  arch/arm/boot/dts/vexpress-v2p-ca5s.dts            |  37 +-
-  arch/arm/boot/dts/vexpress-v2p-ca9.dts             |  41 +-
-  arch/arm/configs/mps2_defconfig                    | 109 ++++
-  arch/arm/mach-vexpress/Makefile                    |   4 +-
-  arch/arm/mach-vexpress/Makefile.boot               |   3 +
-  arch/arm/mach-vexpress/v2m-mps2.c                  |  21 +
-  drivers/clocksource/Kconfig                        |   6 +
-  drivers/clocksource/Makefile                       |   1 +
-  drivers/clocksource/mps2-timer.c                   | 275 +++++++++
-  drivers/tty/serial/Kconfig                         |  13 +
-  drivers/tty/serial/Makefile                        |   1 +
-  drivers/tty/serial/mps2-uart.c                     | 625 
-+++++++++++++++++++++
-  include/uapi/linux/serial_core.h                   |   3 +
-  26 files changed, 1710 insertions(+), 110 deletions(-)
-  create mode 100644 
-Documentation/devicetree/bindings/serial/arm,mps2-uart.txt
-  create mode 100644 
-Documentation/devicetree/bindings/timer/arm,mps2-timer.txt
-  create mode 100644 arch/arm/boot/dts/mps2-an385.dts
-  create mode 100644 arch/arm/boot/dts/mps2-an399.dts
-  create mode 100644 arch/arm/boot/dts/mps2.dtsi
-  create mode 100644 arch/arm/configs/mps2_defconfig
-  create mode 100644 arch/arm/mach-vexpress/Makefile.boot
-  create mode 100644 arch/arm/mach-vexpress/v2m-mps2.c
-  create mode 100644 drivers/clocksource/mps2-timer.c
-  create mode 100644 drivers/tty/serial/mps2-uart.c
+>
+> Best Regards
+>
+> Eric
+>> Reported-by: Eric Auger <eric.auger@linaro.org>
+>> Signed-off-by: Will Deacon <will.deacon@arm.com>
+>> ---
+>>   drivers/iommu/arm-smmu.c | 14 ++++++++------
+>>   1 file changed, 8 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>> index e933679a3266..2f186d22477f 100644
+>> --- a/drivers/iommu/arm-smmu.c
+>> +++ b/drivers/iommu/arm-smmu.c
+>> @@ -1098,18 +1098,20 @@ static int arm_smmu_domain_add_master(struct arm_smmu_domain *smmu_domain,
+>>   	struct arm_smmu_device *smmu = smmu_domain->smmu;
+>>   	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
+>>
+>> -	/* Devices in an IOMMU group may already be configured */
+>> -	ret = arm_smmu_master_configure_smrs(smmu, cfg);
+>> -	if (ret)
+>> -		return ret == -EEXIST ? 0 : ret;
+>> -
+>>   	/*
+>>   	 * FIXME: This won't be needed once we have IOMMU-backed DMA ops
+>> -	 * for all devices behind the SMMU.
+>> +	 * for all devices behind the SMMU. Note that we need to take
+>> +	 * care configuring SMRs for devices both a platform_device and
+>> +	 * and a PCI device (i.e. a PCI host controller)
+>>   	 */
+>>   	if (smmu_domain->domain.type == IOMMU_DOMAIN_DMA)
+>>   		return 0;
+>>
+>> +	/* Devices in an IOMMU group may already be configured */
+>> +	ret = arm_smmu_master_configure_smrs(smmu, cfg);
+>> +	if (ret)
+>> +		return ret == -EEXIST ? 0 : ret;
+>> +
+>>   	for (i = 0; i < cfg->num_streamids; ++i) {
+>>   		u32 idx, s2cr;
+>>
+>>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
