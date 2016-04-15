@@ -1,25 +1,27 @@
-From: corbet@lwn.net (Jonathan Corbet)
-Date: Fri, 15 Apr 2016 15:35:51 -0600
-Subject: [PATCH v3] ARM64: ACPI: Update documentation for latest
- specification version
-In-Reply-To: <1459210002-3387-1-git-send-email-al.stone@linaro.org>
-References: <1459210002-3387-1-git-send-email-al.stone@linaro.org>
-Message-ID: <20160415153551.4054d360@lwn.net>
+From: bp@alien8.de (Borislav Petkov)
+Date: Fri, 15 Apr 2016 23:46:18 +0200
+Subject: [PATCH] Add EDAC peripheral init functions & Ethernet EDAC.
+In-Reply-To: <5711087A.8050501@opensource.altera.com>
+References: <1460499181-23080-1-git-send-email-tthayer@opensource.altera.com>
+ <20160414143501.GA25212@rob-hp-laptop>
+ <20160415064042.330406ab.m.chehab@samsung.com>
+ <5711087A.8050501@opensource.altera.com>
+Message-ID: <20160415214618.GB4545@cz.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 28 Mar 2016 18:06:42 -0600
-Al Stone <al.stone@linaro.org> wrote:
+On Fri, Apr 15, 2016 at 10:27:54AM -0500, Thor Thayer wrote:
+> I'll update this patch to only count errors.
 
-> This patch reflects going back through and examining the specs in detail
-> and updating content appropriately.  Whilst there, a few odds and ends of
-> typos were caught as well.  This brings the documentation up to date with
-> ACPI 6.1 for arm64.
+... and also think about what that counting is going to bring. If it is
+only going to be there to show how many network errors happened and we
+can't do anything about it except stare at that number, then adding all
+that code is probably waste of time an electrons...
 
-So I'll happily pull this into the docs tree if that seems like the right
-place for it.  I'd really like to see an ack or two first, though, since
-I'm not really in a position to review it properly myself.
+I'm just sayin'.
 
-Thanks,
+-- 
+Regards/Gruss,
+    Boris.
 
-jon
+ECO tip #101: Trim your mails when you reply. Srsly.
