@@ -1,155 +1,113 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 15 Apr 2016 18:11:41 +0100
-Subject: [PATCH 30/45] KVM: arm/arm64: vgic-new: vgic_kvm_device:
- KVM_DEV_ARM_VGIC_GRP_NR_IRQS
+Date: Fri, 15 Apr 2016 18:11:55 +0100
+Subject: [PATCH 44/45] KVM: arm/arm64: vgic-new: implement mapped IRQ handling
 In-Reply-To: <1460740316-8755-1-git-send-email-andre.przywara@arm.com>
 References: <1460740316-8755-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1460740316-8755-31-git-send-email-andre.przywara@arm.com>
+Message-ID: <1460740316-8755-45-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Auger <eric.auger@linaro.org>
+We now store the mapped hardware IRQ number in our struct, so we
+don't need the irq_phys_map for the new VGIC.
+Implement the hardware IRQ mapping on top of the reworked arch
+timer interface.
 
-This patch implements the KVM_DEV_ARM_VGIC_GRP_NR_IRQS group. This
-modality is supported by both VGIC V2 and V3 KVM device as will be
-other groups, hence the introduction of common helpers.
-
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- virt/kvm/arm/vgic/vgic_kvm_device.c | 83 +++++++++++++++++++++++++++++++++++--
- 1 file changed, 79 insertions(+), 4 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic_kvm_device.c b/virt/kvm/arm/vgic/vgic_kvm_device.c
-index 7c665f9..c96549b 100644
---- a/virt/kvm/arm/vgic/vgic_kvm_device.c
-+++ b/virt/kvm/arm/vgic/vgic_kvm_device.c
-@@ -15,9 +15,69 @@
-  */
+Changelog RFC..v1:
+- adapt to new arch_timer mapped IRQ interface
+- implement inject_mapped_irq() as a macro (since it is identical to
+  the "un-mapped" IRQ implementation)
+---
+ include/kvm/vgic/vgic.h  |  6 ++++++
+ virt/kvm/arm/vgic/vgic.c | 47 +++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 53 insertions(+)
+
+diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+index 6e5e6d7..eff6626 100644
+--- a/include/kvm/vgic/vgic.h
++++ b/include/kvm/vgic/vgic.h
+@@ -209,6 +209,12 @@ int kvm_vgic_hyp_init(void);
+ 
+ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+ 			bool level);
++/* TODO: for compatibility with the old VGIC's timer implementation */
++#define kvm_vgic_inject_mapped_irq kvm_vgic_inject_irq
++
++int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, u32 virt_irq, u32 phys_irq);
++int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq);
++bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
+ 
+ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
+ 
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index f8252d4..15fd146 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -17,6 +17,8 @@
+ #include <linux/kvm.h>
  #include <linux/kvm_host.h>
- #include <kvm/vgic/vgic.h>
-+#include <linux/uaccess.h>
-+#include "vgic.h"
+ #include <linux/list_sort.h>
++#include <linux/irq.h>
++#include <linux/interrupt.h>
  
- /* common helpers */
+ #include "vgic.h"
  
-+static int vgic_set_common_attr(struct kvm_device *dev,
-+				struct kvm_device_attr *attr)
-+{
-+	switch (attr->group) {
-+	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
-+		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-+		u32 val;
-+		int ret = 0;
+@@ -296,6 +298,39 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+ 
+ 	vcpu = kvm_get_vcpu(kvm, cpuid);
+ 	vgic_update_irq_pending(kvm, vcpu, intid, level);
 +
-+		if (get_user(val, uaddr))
-+			return -EFAULT;
-+
-+		/*
-+		 * We require:
-+		 * - at least 32 SPIs on top of the 16 SGIs and 16 PPIs
-+		 * - at most 1024 interrupts
-+		 * - a multiple of 32 interrupts
-+		 */
-+		if (val < (VGIC_NR_PRIVATE_IRQS + 32) ||
-+		    val > VGIC_MAX_RESERVED ||
-+		    (val & 31))
-+			return -EINVAL;
-+
-+		mutex_lock(&dev->kvm->lock);
-+
-+		if (vgic_ready(dev->kvm) || dev->kvm->arch.vgic.nr_spis)
-+			ret = -EBUSY;
-+		else
-+			dev->kvm->arch.vgic.nr_spis =
-+				val - VGIC_NR_PRIVATE_IRQS;
-+
-+		mutex_unlock(&dev->kvm->lock);
-+
-+		return ret;
-+	}
-+	}
-+
-+	return -ENXIO;
++	return 0;
 +}
 +
-+static int vgic_get_common_attr(struct kvm_device *dev,
-+				struct kvm_device_attr *attr)
++int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, u32 virt_irq, u32 phys_irq)
 +{
-+	int r = -ENXIO;
++	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
 +
-+	switch (attr->group) {
-+	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
-+		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
++	BUG_ON(!irq);
 +
-+		r = put_user(dev->kvm->arch.vgic.nr_spis +
-+			     VGIC_NR_PRIVATE_IRQS, uaddr);
-+		break;
-+	}
-+	}
++	spin_lock(&irq->irq_lock);
 +
-+	return r;
++	irq->hw = true;
++	irq->hwintid = phys_irq;
++
++	spin_unlock(&irq->irq_lock);
++
++	return 0;
 +}
 +
- static int vgic_create(struct kvm_device *dev, u32 type)
- {
- 	return kvm_vgic_create(dev->kvm, type);
-@@ -49,18 +109,29 @@ void kvm_register_vgic_device(unsigned long type)
- static int vgic_v2_set_attr(struct kvm_device *dev,
- 			    struct kvm_device_attr *attr)
- {
--	return -ENXIO;
-+	int ret;
++int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq)
++{
++	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
 +
-+	ret = vgic_set_common_attr(dev, attr);
-+	return ret;
++	BUG_ON(!irq);
 +
- }
- 
- static int vgic_v2_get_attr(struct kvm_device *dev,
- 			    struct kvm_device_attr *attr)
- {
--	return -ENXIO;
-+	int ret;
++	spin_lock(&irq->irq_lock);
 +
-+	ret = vgic_get_common_attr(dev, attr);
-+	return ret;
++	irq->hw = false;
++	irq->hwintid = 0;
++
++	spin_unlock(&irq->irq_lock);
++
+ 	return 0;
  }
  
- static int vgic_v2_has_attr(struct kvm_device *dev,
- 			    struct kvm_device_attr *attr)
- {
-+	switch (attr->group) {
-+	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
-+		return 0;
-+	}
- 	return -ENXIO;
+@@ -568,3 +603,15 @@ void vgic_kick_vcpus(struct kvm *kvm)
+ 			kvm_vcpu_kick(vcpu);
+ 	}
  }
- 
-@@ -80,18 +151,22 @@ struct kvm_device_ops kvm_arm_vgic_v2_ops = {
- static int vgic_v3_set_attr(struct kvm_device *dev,
- 			    struct kvm_device_attr *attr)
- {
--	return -ENXIO;
-+	return vgic_set_common_attr(dev, attr);
- }
- 
- static int vgic_v3_get_attr(struct kvm_device *dev,
- 			    struct kvm_device_attr *attr)
- {
--	return -ENXIO;
-+	return vgic_get_common_attr(dev, attr);
- }
- 
- static int vgic_v3_has_attr(struct kvm_device *dev,
- 			    struct kvm_device_attr *attr)
- {
-+	switch (attr->group) {
-+	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
-+		return 0;
-+	}
- 	return -ENXIO;
- }
- 
++
++bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq)
++{
++	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
++	bool map_is_active;
++
++	spin_lock(&irq->irq_lock);
++	map_is_active = irq->hw && irq->active;
++	spin_unlock(&irq->irq_lock);
++
++	return map_is_active;
++}
 -- 
 2.7.3
