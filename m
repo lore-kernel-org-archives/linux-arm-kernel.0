@@ -1,103 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 15 Apr 2016 15:03:58 +0100
-Subject: [PATCH v16 1/6] efi: ARM/arm64: ignore DT memory nodes instead
- of removing them
-In-Reply-To: <1460155828-8690-2-git-send-email-ddaney.cavm@gmail.com>
-References: <1460155828-8690-1-git-send-email-ddaney.cavm@gmail.com>
- <1460155828-8690-2-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <20160415140357.GK22906@arm.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 15 Apr 2016 15:04:01 +0100
+Subject: [PATCH 1/7] KVM: arm/arm64: remove unneeded map parameter for
+ vgic_update_irq_pending()
+In-Reply-To: <1460729047-6346-1-git-send-email-andre.przywara@arm.com>
+References: <1460729047-6346-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <1460729047-6346-2-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 08, 2016 at 03:50:23PM -0700, David Daney wrote:
-> From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> 
-> There are two problems with the UEFI stub DT memory node removal
-> routine:
-> - it deletes nodes as it traverses the tree, which happens to work
->   but is not supported, as deletion invalidates the node iterator;
-> - deleting memory nodes entirely may discard annotations in the form
->   of additional properties on the nodes.
-> 
-> Since the discovery of DT memory nodes occurs strictly before the
-> UEFI init sequence, we can simply clear the memblock memory table
-> before parsing the UEFI memory map. This way, it is no longer
-> necessary to remove the nodes, so we can remove that logic from the
-> stub as well.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Signed-off-by: David Daney <david.daney@cavium.com>
-> ---
->  drivers/firmware/efi/arm-init.c    |  8 ++++++++
->  drivers/firmware/efi/libstub/fdt.c | 24 +-----------------------
->  2 files changed, 9 insertions(+), 23 deletions(-)
+We actually don't use the irq_phys_map parameter in
+vgic_update_irq_pending(), so let's just remove it.
 
-Matt, are you ok with me taking this through the arm64 tree? (since the
-NUMA patches depend on it). If so, please can I have your ack?
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ virt/kvm/arm/vgic.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-Will
-
-> diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
-> index aa1f743..5d6945b 100644
-> --- a/drivers/firmware/efi/arm-init.c
-> +++ b/drivers/firmware/efi/arm-init.c
-> @@ -143,6 +143,14 @@ static __init void reserve_regions(void)
->  	if (efi_enabled(EFI_DBG))
->  		pr_info("Processing EFI memory map:\n");
->  
-> +	/*
-> +	 * Discard memblocks discovered so far: if there are any at this
-> +	 * point, they originate from memory nodes in the DT, and UEFI
-> +	 * uses its own memory map instead.
-> +	 */
-> +	memblock_dump_all();
-> +	memblock_remove(0, ULLONG_MAX);
-> +
->  	for_each_efi_memory_desc(&memmap, md) {
->  		paddr = md->phys_addr;
->  		npages = md->num_pages;
-> diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
-> index 6dba78a..e58abfa 100644
-> --- a/drivers/firmware/efi/libstub/fdt.c
-> +++ b/drivers/firmware/efi/libstub/fdt.c
-> @@ -24,7 +24,7 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
->  			unsigned long map_size, unsigned long desc_size,
->  			u32 desc_ver)
->  {
-> -	int node, prev, num_rsv;
-> +	int node, num_rsv;
->  	int status;
->  	u32 fdt_val32;
->  	u64 fdt_val64;
-> @@ -54,28 +54,6 @@ efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
->  		goto fdt_set_fail;
->  
->  	/*
-> -	 * Delete any memory nodes present. We must delete nodes which
-> -	 * early_init_dt_scan_memory may try to use.
-> -	 */
-> -	prev = 0;
-> -	for (;;) {
-> -		const char *type;
-> -		int len;
-> -
-> -		node = fdt_next_node(fdt, prev, NULL);
-> -		if (node < 0)
-> -			break;
-> -
-> -		type = fdt_getprop(fdt, node, "device_type", &len);
-> -		if (type && strncmp(type, "memory", len) == 0) {
-> -			fdt_del_node(fdt, node);
-> -			continue;
-> -		}
-> -
-> -		prev = node;
-> -	}
-> -
-> -	/*
->  	 * Delete all memory reserve map entries. When booting via UEFI,
->  	 * kernel will use the UEFI memory map to find reserved regions.
->  	 */
-> -- 
-> 1.8.3.1
-> 
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 00429b3..7282881 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1522,7 +1522,6 @@ static int vgic_validate_injection(struct kvm_vcpu *vcpu, int irq, int level)
+ }
+ 
+ static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
+-				   struct irq_phys_map *map,
+ 				   unsigned int irq_num, bool level)
+ {
+ 	struct vgic_dist *dist = &kvm->arch.vgic;
+@@ -1661,7 +1660,7 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
+ 	if (map)
+ 		return -EINVAL;
+ 
+-	return vgic_update_irq_pending(kvm, cpuid, NULL, irq_num, level);
++	return vgic_update_irq_pending(kvm, cpuid, irq_num, level);
+ }
+ 
+ /**
+@@ -1687,7 +1686,7 @@ int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid,
+ 	if (ret)
+ 		return ret;
+ 
+-	return vgic_update_irq_pending(kvm, cpuid, map, map->virt_irq, level);
++	return vgic_update_irq_pending(kvm, cpuid, map->virt_irq, level);
+ }
+ 
+ static irqreturn_t vgic_maintenance_handler(int irq, void *data)
+-- 
+2.7.3
