@@ -1,19 +1,19 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 15 Apr 2016 15:56:12 +0530
-Subject: [PATCH 3/3] ARM: DTS: da850: There are 101 interrupts.
-In-Reply-To: <1460586628-25152-4-git-send-email-david@lechnology.com>
-References: <1460586628-25152-1-git-send-email-david@lechnology.com>
- <1460586628-25152-4-git-send-email-david@lechnology.com>
-Message-ID: <5710C1C4.5000102@ti.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 15 Apr 2016 19:30:45 +0900
+Subject: [PATCH 0/2] arm64: dts: uniphier: UniPhier DT updates for Linux
+ 4.7-rc1
+Message-ID: <1460716247-28049-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 14 April 2016 04:00 AM, David Lechner wrote:
-> Fix off by one error in da850 device tree.
-> 
-> Signed-off-by: David Lechner <david@lechnology.com>
 
-Looks good to me.
+Masahiro Yamada (2):
+  arm64: dts: uniphier: fix I2C nodes of PH1-LD20
+  arm64: dts: uniphier: change release address of spin-table
 
-Regards,
-Sekhar
+ .../boot/dts/socionext/uniphier-ph1-ld20-ref.dts   |  1 -
+ .../boot/dts/socionext/uniphier-ph1-ld20.dtsi      | 28 +++++++---------------
+ 2 files changed, 9 insertions(+), 20 deletions(-)
+
+-- 
+1.9.1
