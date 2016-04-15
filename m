@@ -1,5 +1,5 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Fri, 15 Apr 2016 15:08:18 +0100
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 15 Apr 2016 15:08:38 +0100
 Subject: [PATCH v16 1/6] efi: ARM/arm64: ignore DT memory nodes instead
  of removing them
 In-Reply-To: <CAKv+Gu_7m0FH5CHLOEPu8uwUKOVMLANGYMd8pvqvp7r+q2Mk4g@mail.gmail.com>
@@ -7,11 +7,11 @@ References: <1460155828-8690-1-git-send-email-ddaney.cavm@gmail.com>
  <1460155828-8690-2-git-send-email-ddaney.cavm@gmail.com>
  <20160415140357.GK22906@arm.com>
  <CAKv+Gu_7m0FH5CHLOEPu8uwUKOVMLANGYMd8pvqvp7r+q2Mk4g@mail.gmail.com>
-Message-ID: <20160415140818.GT2829@codeblueprint.co.uk>
+Message-ID: <20160415140838.GL22906@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 15 Apr, at 04:06:08PM, Ard Biesheuvel wrote:
+On Fri, Apr 15, 2016 at 04:06:08PM +0200, Ard Biesheuvel wrote:
 > On 15 April 2016 at 16:03, Will Deacon <will.deacon@arm.com> wrote:
 > > On Fri, Apr 08, 2016 at 03:50:23PM -0700, David Daney wrote:
 > >> From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
@@ -44,6 +44,6 @@ On Fri, 15 Apr, at 04:06:08PM, Ard Biesheuvel wrote:
 > 
 > http://www.gossamer-threads.com/lists/linux/kernel/2390242
 
-Heh, you beat me to it!
+Brill, thanks. Looks like it got dropped by accident for the latest posting.
 
-Will, go ahead and take this through the arm64 tree.
+Will
