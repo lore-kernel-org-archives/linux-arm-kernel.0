@@ -1,111 +1,32 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 15 Apr 2016 18:11:35 +0100
-Subject: [PATCH 24/45] KVM: arm/arm64: vgic-new: Add GICv3 CTLR, IIDR,
- TYPER handlers
-In-Reply-To: <1460740316-8755-1-git-send-email-andre.przywara@arm.com>
-References: <1460740316-8755-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1460740316-8755-25-git-send-email-andre.przywara@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 15 Apr 2016 18:41:17 +0100
+Subject: [PATCH V2 03/15] coresight: tmc: re-implementing
+ tmc_read_prepare/unprepare() functions
+In-Reply-To: <CANLsYkzm+=Aec+bXp7htTwr6O3ObSjaQJmSUTjgr608gH7Abhg@mail.gmail.com>
+References: <1460483692-25061-1-git-send-email-mathieu.poirier@linaro.org>
+ <1460483692-25061-4-git-send-email-mathieu.poirier@linaro.org>
+ <570FCF45.8010809@arm.com>
+ <CANLsYkzm+=Aec+bXp7htTwr6O3ObSjaQJmSUTjgr608gH7Abhg@mail.gmail.com>
+Message-ID: <571127BD.5030107@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As in the GICv2 emulation we handle those three registers in one
-function.
+On 15/04/16 16:40, Mathieu Poirier wrote:
+> On 14 April 2016 at 11:11, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>>
+>> Nit. If you move the TMC_CONFIG_TYPE_ETB here, you could fall through from
+>> TYPE_ETF: i.e,
+>
+> Yes, that's what the end result look like [1].  I will refactor to
+> make the transition cleaner.
+>
+> [1]. https://git.linaro.org/kernel/coresight.git/blob/refs/heads/next:/drivers/hwtracing/coresight/coresight-tmc.c#l76
 
-Changelog RFC..v1:
-- kick VCPUs if distributor gets enabled
----
- virt/kvm/arm/vgic/vgic.h      |  2 ++
- virt/kvm/arm/vgic/vgic_mmio.c | 56 ++++++++++++++++++++++++++++++++++++++++++-
- 2 files changed, 57 insertions(+), 1 deletion(-)
+Ok, no need to refactor here then.
 
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index ccae13e..83b342c 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -19,6 +19,8 @@
- #define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
- #define IMPLEMENTER_ARM		0x43b
- 
-+#define INTERRUPT_ID_BITS_SPIS	10
-+
- #define vgic_irq_is_sgi(intid) ((intid) < VGIC_NR_SGIS)
- 
- struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
-diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
-index 4a31d60..a87bbca 100644
---- a/virt/kvm/arm/vgic/vgic_mmio.c
-+++ b/virt/kvm/arm/vgic/vgic_mmio.c
-@@ -686,6 +686,60 @@ static int vgic_mmio_write_sgipends(struct kvm_vcpu *vcpu,
- 	return 0;
- }
- 
-+/*****************************/
-+/* GICv3 emulation functions */
-+/*****************************/
-+#ifdef CONFIG_KVM_ARM_VGIC_V3
-+
-+static int vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
-+				  struct kvm_io_device *dev,
-+				  gpa_t addr, int len, void *val)
-+{
-+	u32 value = 0;
-+
-+	switch (addr & 0x0c) {
-+	case GICD_CTLR:
-+		if (vcpu->kvm->arch.vgic.enabled)
-+		       value |=	GICD_CTLR_ENABLE_SS_G1;
-+		value |= GICD_CTLR_ARE_NS | GICD_CTLR_DS;
-+		break;
-+	case GICD_TYPER:
-+		value = vcpu->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
-+		value = (value >> 5) - 1;
-+		value |= (INTERRUPT_ID_BITS_SPIS - 1) << 19;
-+		break;
-+	case GICD_IIDR:
-+		value = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
-+		break;
-+	default:
-+		return 0;
-+	}
-+
-+	write_mask32(value, addr & 3, len, val);
-+	return 0;
-+}
-+
-+static int vgic_mmio_write_v3_misc(struct kvm_vcpu *vcpu,
-+				   struct kvm_io_device *dev,
-+				   gpa_t addr, int len, const void *val)
-+{
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+	bool was_enabled = dist->enabled;
-+
-+	/* Of the whole region only the first byte is actually writeable. */
-+	if ((addr & 0x0f) > 0)
-+		return 0;
-+
-+	/* We only care about the enable bit, all other bits are WI. */
-+	dist->enabled = *(u8*)val & GICD_CTLR_ENABLE_SS_G1;
-+
-+	if (!was_enabled && dist->enabled)
-+		vgic_kick_vcpus(vcpu->kvm);
-+
-+	return 0;
-+}
-+
-+
- /*
-  * The GICv3 per-IRQ registers are split to control PPIs and SGIs in the
-  * redistributors, while SPIs are covered by registers in the distributor
-@@ -734,7 +788,7 @@ struct vgic_register_region vgic_v2_dist_registers[] = {
- #ifdef CONFIG_KVM_ARM_VGIC_V3
- struct vgic_register_region vgic_v3_dist_registers[] = {
- 	REGISTER_DESC_WITH_LENGTH(GICD_CTLR,
--		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 16),
-+		vgic_mmio_read_v3_misc, vgic_mmio_write_v3_misc, 16),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IGROUPR,
- 		vgic_mmio_read_rao, vgic_mmio_write_wi, 1),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_ISENABLER,
--- 
-2.7.3
+>>
+>> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+
+Cheers
+Suzuki
