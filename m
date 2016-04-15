@@ -1,60 +1,76 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 15 Apr 2016 14:05:21 +0100
-Subject: [PATCH] iommu/arm-smmu: Don't allocate resources for bypass
- domains
-In-Reply-To: <491c885f61c509d959b04cfb63676bd07e481dea.1460558667.git.robin.murphy@arm.com>
-References: <1459527597-10740-1-git-send-email-will.deacon@arm.com>
- <570397F4.8080504@arm.com> <5703A289.30308@linaro.org>
- <491c885f61c509d959b04cfb63676bd07e481dea.1460558667.git.robin.murphy@arm.com>
-Message-ID: <20160415130520.GH22906@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 15 Apr 2016 14:05:49 +0100
+Subject: [PATCH 2/2] arm64: dts: uniphier: change release address of
+ spin-table
+In-Reply-To: <1460716247-28049-3-git-send-email-yamada.masahiro@socionext.com>
+References: <1460716247-28049-1-git-send-email-yamada.masahiro@socionext.com>
+ <1460716247-28049-3-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20160415130549.GB8021@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 13, 2016 at 03:46:57PM +0100, Robin Murphy wrote:
-> Until we get fully plumbed into of_iommu_configure, our default
-> IOMMU_DOMAIN_DMA domains just bypass translation. Since we achieve that
-> by leaving the stream table entries set to bypass instead of pointing at
-> a translation context, the context bank we allocate for the domain is
-> completely wasted. Context banks are typically a rather limited
-> resource, so don't hog ones we don't need.
+On Fri, Apr 15, 2016 at 07:30:47PM +0900, Masahiro Yamada wrote:
+> The 8-byte register located at 0x59801200 on this SoC is dedicated
+> for waking up secondary CPUs.  We can use it and save normal memory.
 
-Eric, does this resolve your remaining passthrough regressions when applied
-on top of my patch?
+Generally, it is not safe to use MMIO registers to back spin-table. The
+kernel maps the spin table location with cacheable attributes, so there
+may be speculative accesses to any registes in the same (64K) page, and
+a writeback may be larger than the 8-byte register width (which the
+device might not accept, triggering an SError).
 
-Will
+Given that, I do not think this is a good idea.
 
-> Reported-by: Eric Auger <eric.auger@linaro.org>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->  drivers/iommu/arm-smmu.c | 8 +++++++-
->  1 file changed, 7 insertions(+), 1 deletion(-)
+Thanks,
+Mark.
+
 > 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 5158feb..7c39ac4 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -826,6 +826,12 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
->  	if (smmu_domain->smmu)
->  		goto out_unlock;
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+> 
+>  arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi
+> index 651c9d9..f73b09e 100644
+> --- a/arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi
+> +++ b/arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi
+> @@ -77,7 +77,7 @@
+>  			compatible = "arm,cortex-a72", "arm,armv8";
+>  			reg = <0 0x000>;
+>  			enable-method = "spin-table";
+> -			cpu-release-addr = <0 0x80000100>;
+> +			cpu-release-addr = <0 0x59801200>;
+>  		};
 >  
-> +	/* We're bypassing these SIDs, so don't allocate an actual context */
-> +	if (domain->type == IOMMU_DOMAIN_DMA) {
-> +		smmu_domain->smmu = smmu;
-> +		goto out_unlock;
-> +	}
-> +
->  	/*
->  	 * Mapping the requested stage onto what we support is surprisingly
->  	 * complicated, mainly because the spec allows S1+S2 SMMUs without
-> @@ -948,7 +954,7 @@ static void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
->  	void __iomem *cb_base;
->  	int irq;
+>  		cpu1: cpu at 1 {
+> @@ -85,7 +85,7 @@
+>  			compatible = "arm,cortex-a72", "arm,armv8";
+>  			reg = <0 0x001>;
+>  			enable-method = "spin-table";
+> -			cpu-release-addr = <0 0x80000100>;
+> +			cpu-release-addr = <0 0x59801200>;
+>  		};
 >  
-> -	if (!smmu)
-> +	if (!smmu || domain->type == IOMMU_DOMAIN_DMA)
->  		return;
+>  		cpu2: cpu at 100 {
+> @@ -93,7 +93,7 @@
+>  			compatible = "arm,cortex-a53", "arm,armv8";
+>  			reg = <0 0x100>;
+>  			enable-method = "spin-table";
+> -			cpu-release-addr = <0 0x80000100>;
+> +			cpu-release-addr = <0 0x59801200>;
+>  		};
 >  
->  	/*
+>  		cpu3: cpu at 101 {
+> @@ -101,7 +101,7 @@
+>  			compatible = "arm,cortex-a53", "arm,armv8";
+>  			reg = <0 0x101>;
+>  			enable-method = "spin-table";
+> -			cpu-release-addr = <0 0x80000100>;
+> +			cpu-release-addr = <0 0x59801200>;
+>  		};
+>  	};
+>  
 > -- 
-> 2.7.3.dirty
+> 1.9.1
 > 
