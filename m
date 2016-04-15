@@ -1,118 +1,160 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 15 Apr 2016 18:11:26 +0100
-Subject: [PATCH 15/45] KVM: arm/arm64: vgic-new: Add ENABLE registers handlers
+Date: Fri, 15 Apr 2016 18:11:39 +0100
+Subject: [PATCH 28/45] KVM: arm/arm64: vgic-new: Add GICv3 SGI system register
+ trap handler
 In-Reply-To: <1460740316-8755-1-git-send-email-andre.przywara@arm.com>
 References: <1460740316-8755-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1460740316-8755-16-git-send-email-andre.przywara@arm.com>
+Message-ID: <1460740316-8755-29-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+In contrast to GICv2 SGIs in a GICv3 implementation are not triggered
+by a MMIO write, but with a system register write. KVM knows about
+that register already, we just need to implement the handler and wire
+it up to the core KVM/ARM code.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 
 Changelog RFC..v1:
-- use lower bits of address to determine IRQ number
-- remove TODO, confirmed to be fine
+- add comment about SGI_AFFINITY_LEVEL macro
 ---
- virt/kvm/arm/vgic/vgic_mmio.c | 80 +++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 78 insertions(+), 2 deletions(-)
+ include/kvm/vgic/vgic.h       |   8 ++++
+ virt/kvm/arm/vgic/vgic_mmio.c | 106 ++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 114 insertions(+)
 
+diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+index f331469..6139e11 100644
+--- a/include/kvm/vgic/vgic.h
++++ b/include/kvm/vgic/vgic.h
+@@ -205,6 +205,14 @@ bool kvm_vcpu_has_pending_irqs(struct kvm_vcpu *vcpu);
+ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
+ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
+ 
++#ifdef CONFIG_KVM_ARM_VGIC_V3
++void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
++#else
++static inline void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
++{
++}
++#endif
++
+ /**
+  * kvm_vgic_get_max_vcpus - Get the maximum number of VCPUs allowed by HW
+  *
 diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
-index 8ef1902..b9850eb 100644
+index 3f03101..fd95f3d 100644
 --- a/virt/kvm/arm/vgic/vgic_mmio.c
 +++ b/virt/kvm/arm/vgic/vgic_mmio.c
-@@ -138,15 +138,91 @@ static int vgic_mmio_write_v2_misc(struct kvm_vcpu *vcpu,
- 	return 0;
- }
+@@ -1268,4 +1268,110 @@ int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
  
+ 	return ret;
+ }
++
 +/*
-+ * Read accesses to both GICD_ICENABLER and GICD_ISENABLER return the value
-+ * of the enabled bit, so there is only one function for both here.
++ * Compare a given affinity (level 1-3 and a level 0 mask, from the SGI
++ * generation register ICC_SGI1R_EL1) with a given VCPU.
++ * If the VCPU's MPIDR matches, return the level0 affinity, otherwise
++ * return -1.
 + */
-+static int vgic_mmio_read_enable(struct kvm_vcpu *vcpu,
-+				 struct kvm_io_device *dev,
-+				 gpa_t addr, int len, void *val)
++static int match_mpidr(u64 sgi_aff, u16 sgi_cpu_mask, struct kvm_vcpu *vcpu)
 +{
-+	struct vgic_io_device *iodev = container_of(dev,
-+						    struct vgic_io_device, dev);
-+	u32 intid = (addr & 0x7f) * 8;
-+	u32 value = 0;
-+	int i;
++	unsigned long affinity;
++	int level0;
 +
-+	if (iodev->redist_vcpu)
-+		vcpu = iodev->redist_vcpu;
++	/*
++	 * Split the current VCPU's MPIDR into affinity level 0 and the
++	 * rest as this is what we have to compare against.
++	 */
++	affinity = kvm_vcpu_get_mpidr_aff(vcpu);
++	level0 = MPIDR_AFFINITY_LEVEL(affinity, 0);
++	affinity &= ~MPIDR_LEVEL_MASK;
 +
-+	/* Loop over all IRQs affected by this read */
-+	for (i = 0; i < len * 8; i++) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
++	/* bail out if the upper three levels don't match */
++	if (sgi_aff != affinity)
++		return -1;
 +
-+		if (irq->enabled)
-+			value |= (1U << i);
-+	}
++	/* Is this VCPU's bit set in the mask ? */
++	if (!(sgi_cpu_mask & BIT(level0)))
++		return -1;
 +
-+	write_mask32(value, addr & 3, len, val);
-+	return 0;
++	return level0;
 +}
 +
-+static int vgic_mmio_write_senable(struct kvm_vcpu *vcpu,
-+				   struct kvm_io_device *dev,
-+				   gpa_t addr, int len, const void *val)
++/*
++ * The ICC_SGI* registers encode the affinity differently from the MPIDR,
++ * so provide a wrapper to use the existing defines to isolate a certain
++ * affinity level.
++ */
++#define SGI_AFFINITY_LEVEL(reg, level) \
++	((((reg) & ICC_SGI1R_AFFINITY_## level ##_MASK) \
++	>> ICC_SGI1R_AFFINITY_## level ##_SHIFT) << MPIDR_LEVEL_SHIFT(level))
++
++/**
++ * vgic_v3_dispatch_sgi - handle SGI requests from VCPUs
++ * @vcpu: The VCPU requesting a SGI
++ * @reg: The value written into the ICC_SGI1R_EL1 register by that VCPU
++ *
++ * With GICv3 (and ARE=1) CPUs trigger SGIs by writing to a system register.
++ * This will trap in sys_regs.c and call this function.
++ * This ICC_SGI1R_EL1 register contains the upper three affinity levels of the
++ * target processors as well as a bitmask of 16 Aff0 CPUs.
++ * If the interrupt routing mode bit is not set, we iterate over all VCPUs to
++ * check for matching ones. If this bit is set, we signal all, but not the
++ * calling VCPU.
++ */
++void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
 +{
-+	struct vgic_io_device *iodev = container_of(dev,
-+						    struct vgic_io_device, dev);
-+	u32 intid = (addr & 0x7f) * 8;
-+	int i;
++	struct kvm *kvm = vcpu->kvm;
++	struct kvm_vcpu *c_vcpu;
++	u16 target_cpus;
++	u64 mpidr;
++	int sgi, c;
++	int vcpu_id = vcpu->vcpu_id;
++	bool broadcast;
 +
-+	if (iodev->redist_vcpu)
-+		vcpu = iodev->redist_vcpu;
++	sgi = (reg & ICC_SGI1R_SGI_ID_MASK) >> ICC_SGI1R_SGI_ID_SHIFT;
++	broadcast = reg & BIT(ICC_SGI1R_IRQ_ROUTING_MODE_BIT);
++	target_cpus = (reg & ICC_SGI1R_TARGET_LIST_MASK) >> ICC_SGI1R_TARGET_LIST_SHIFT;
++	mpidr = SGI_AFFINITY_LEVEL(reg, 3);
++	mpidr |= SGI_AFFINITY_LEVEL(reg, 2);
++	mpidr |= SGI_AFFINITY_LEVEL(reg, 1);
 +
-+	for_each_set_bit(i, val, len * 8) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
++	/*
++	 * We iterate over all VCPUs to find the MPIDRs matching the request.
++	 * If we have handled one CPU, we clear its bit to detect early
++	 * if we are already finished. This avoids iterating through all
++	 * VCPUs when most of the times we just signal a single VCPU.
++	 */
++	kvm_for_each_vcpu(c, c_vcpu, kvm) {
++		struct vgic_irq *irq;
++
++		/* Exit early if we have dealt with all requested CPUs */
++		if (!broadcast && target_cpus == 0)
++			break;
++
++		/* Don't signal the calling VCPU */
++		if (broadcast && c == vcpu_id)
++			continue;
++
++		if (!broadcast) {
++			int level0;
++
++			level0 = match_mpidr(mpidr, target_cpus, c_vcpu);
++			if (level0 == -1)
++				continue;
++
++			/* remove this matching VCPU from the mask */
++			target_cpus &= ~BIT(level0);
++		}
++
++		irq = vgic_get_irq(vcpu->kvm, c_vcpu, sgi);
 +
 +		spin_lock(&irq->irq_lock);
-+		irq->enabled = true;
++		irq->pending = true;
++
 +		vgic_queue_irq_unlock(vcpu->kvm, irq);
 +	}
-+
-+	return 0;
 +}
-+
-+static int vgic_mmio_write_cenable(struct kvm_vcpu *vcpu,
-+				   struct kvm_io_device *dev,
-+				   gpa_t addr, int len, const void *val)
-+{
-+	struct vgic_io_device *iodev = container_of(dev,
-+						    struct vgic_io_device, dev);
-+	u32 intid = (addr & 0x7f) * 8;
-+	int i;
-+
-+	if (iodev->redist_vcpu)
-+		vcpu = iodev->redist_vcpu;
-+
-+	for_each_set_bit(i, val, len * 8) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-+
-+		spin_lock(&irq->irq_lock);
-+
-+		irq->enabled = false;
-+
-+		spin_unlock(&irq->irq_lock);
-+	}
-+	return 0;
-+}
-+
- struct vgic_register_region vgic_v2_dist_registers[] = {
- 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
- 		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_IGROUP,
- 		vgic_mmio_read_rao, vgic_mmio_write_wi, 1),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_SET,
--		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 1),
-+		vgic_mmio_read_enable, vgic_mmio_write_senable, 1),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_CLEAR,
--		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 1),
-+		vgic_mmio_read_enable, vgic_mmio_write_cenable, 1),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_SET,
- 		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 1),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_CLEAR,
+ #endif
 -- 
 2.7.3
