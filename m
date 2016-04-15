@@ -1,40 +1,54 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 15 Apr 2016 10:44:37 -0700
-Subject: [PATCH] regulator: qcom_spmi: Always return a selector when asked
-In-Reply-To: <5710BFE7.9060802@codeaurora.org>
-References: <1459389470-29365-1-git-send-email-stephen.boyd@linaro.org>
- <1459389470-29365-3-git-send-email-stephen.boyd@linaro.org>
- <1459389470-29365-3-git-send-email-stephen.boyd@linaro.org>
-Message-ID: <1460742277-2838-1-git-send-email-sboyd@codeaurora.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 15 Apr 2016 10:48:50 -0700
+Subject: [PATCH 2/3] ACPI / ARM64: Remove EXPERT dependency for ACPI on
+ ARM64
+In-Reply-To: <1460706823-16566-2-git-send-email-broonie@kernel.org>
+References: <1460706823-16566-1-git-send-email-broonie@kernel.org>
+ <1460706823-16566-2-git-send-email-broonie@kernel.org>
+Message-ID: <CAOesGMg5E4bcwQgt4+9JkLwmcZ_sj9sCE8ya50MEDQiizN-YUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I had a thinko in spmi_regulator_select_voltage_same_range() when
-converting it to return selectors via the function's return value
-instead of by modifying a pointer argument. I only tested
-multi-range regulators so this passed through testing. Fix it by
-returning the selector here.
+On Fri, Apr 15, 2016 at 12:53 AM, Mark Brown <broonie@kernel.org> wrote:
+> When ACPI was originally merged for arm64 it had only been tested on
+> emulators and not on real physical platforms and no platforms were
+> relying on it.  This meant that there were concerns that there might be
+> serious issues attempting to use it on practical systems so it had a
+> dependency on EXPERT added to warn people that it was in an early stage
+> of development with very little practical testing.  Since then things
+> have moved on a bit.  We have seen people testing on real hardware and
+> now have people starting to produce some platforms (the most prominent
+> being the 96boards Cello) which only have ACPI support and which build
+> and run to some useful extent with mainline.
+>
+> This is not to say that ACPI support or support for these systems is
+> completely done, there are still areas being worked on such as PCI, but
+> at this point it seems that we can be reasonably sure that ACPI will be
+> viable for use on ARM64 and that the already merged support works for
+> the cases it handles.  For the AMD Seattle based platforms support
+> outside of PCI has been fairly complete in mainline a few releases now.
+>
+> This is also not to say that we don't have vendors working with ACPI who
+> are trying do things that we would not consider optimal but it does not
+> appear that the EXPERT dependency is having a substantial impact on
+> these vendors.
+>
+> Given all this it seems that at this point the EXPERT dependency mainly
+> creates inconvenience for users with systems that are doing the right
+> thing and gets in the way of including the ACPI code in the testing that
+> people are doing on mainline.  Removing it should help our ongoing
+> testing cover those platforms with only ACPI support and help ensure
+> that when ACPI code is merged any problems it causes for other users are
+> more easily discovered.
+>
+> Signed-off-by: Mark Brown <broonie@kernel.org>
+> Acked-by: Graeme Gregory <graeme.gregory@linaro.org>
+> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Reviewed-by: Al Stone <ahs3@redhat.com>
+> Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
-Fixes: 1b5b19689278 ("regulator: qcom_spmi: Only use selector based regulator ops")
-Reported-by: Rajendra Nayak <rnayak@codeaurora.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/regulator/qcom_spmi-regulator.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Acked-by: Olof Johansson <olof@lixom.net>
 
-diff --git a/drivers/regulator/qcom_spmi-regulator.c b/drivers/regulator/qcom_spmi-regulator.c
-index f502f2cc65d8..84cce21e98cd 100644
---- a/drivers/regulator/qcom_spmi-regulator.c
-+++ b/drivers/regulator/qcom_spmi-regulator.c
-@@ -692,7 +692,7 @@ static int spmi_regulator_select_voltage_same_range(struct spmi_regulator *vreg,
- 	if (selector >= vreg->set_points->n_voltages)
- 		goto different_range;
- 
--	return 0;
-+	return selector;
- 
- different_range:
- 	return spmi_regulator_select_voltage(vreg, min_uV, max_uV);
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+
+-Olof
