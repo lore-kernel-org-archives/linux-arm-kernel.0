@@ -1,67 +1,92 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 16 Apr 2016 04:41:45 +0800
-Subject: [PATCH V6 01/13] pci, acpi, x86, ia64: Move ACPI host bridge
- device companion assignment to core code.
-In-Reply-To: <1460740008-19489-2-git-send-email-tn@semihalf.com>
-Message-ID: <201604160430.P8zNe8Vl%fengguang.wu@intel.com>
+From: sstabellini@kernel.org (Stefano Stabellini)
+Date: Fri, 15 Apr 2016 14:10:02 -0700 (PDT)
+Subject: [PATCH v2 2/6] ARM: xen: Register with kernel restart handler
+In-Reply-To: <20160415193544.GA2005@roeck-us.net>
+References: <1460688157-6551-1-git-send-email-linux@roeck-us.net>
+ <1460688157-6551-3-git-send-email-linux@roeck-us.net>
+ <alpine.DEB.2.10.1604151122090.3433@sstabellini-ThinkPad-X260>
+ <20160415193544.GA2005@roeck-us.net>
+Message-ID: <alpine.DEB.2.10.1604151409440.3433@sstabellini-ThinkPad-X260>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+On Fri, 15 Apr 2016, Guenter Roeck wrote:
+> On Fri, Apr 15, 2016 at 11:22:36AM -0700, Stefano Stabellini wrote:
+> > On Thu, 14 Apr 2016, Guenter Roeck wrote:
+> > > Register with kernel restart handler instead of setting arm_pm_restart
+> > > directly.
+> > > 
+> > > Select a high priority of 192 to ensure that default restart handlers
+> > > are replaced if Xen is running.
+> > > 
+> > > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > > Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> > > Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > > Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> > 
+> > Thanks. I assume this is going to go in via Russell or Catalin's tree
+> > with the rest of your series?
+> > 
+> I would suggest Russell, if he is willing to pick it up, since it mostly
+> affects arm.
 
-[auto build test ERROR on pci/next]
-[also build test ERROR on v4.6-rc3 next-20160415]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+I am happy with that. In that case I'll remove this patch from my queue
+not to have duplicates.
 
-url:    https://github.com/0day-ci/linux/commits/Tomasz-Nowicki/Support-for-generic-ACPI-based-PCI-host-controller/20160416-011935
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git next
-config: ia64-allmodconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=ia64 
 
-All errors (new ones prefixed by >>):
-
-   drivers/pci/hotplug/sgi_hotplug.c: In function 'enable_slot':
->> drivers/pci/hotplug/sgi_hotplug.c:412:61: error: 'struct pci_controller' has no member named 'companion'
-      phandle = acpi_device_handle(PCI_CONTROLLER(slot->pci_bus)->companion);
-                                                                ^
-   drivers/pci/hotplug/sgi_hotplug.c: In function 'disable_slot':
-   drivers/pci/hotplug/sgi_hotplug.c:491:32: error: 'struct pci_controller' has no member named 'companion'
-      PCI_CONTROLLER(slot->pci_bus)->companion) {
-                                   ^
-   drivers/pci/hotplug/sgi_hotplug.c:500:61: error: 'struct pci_controller' has no member named 'companion'
-      phandle = acpi_device_handle(PCI_CONTROLLER(slot->pci_bus)->companion);
-                                                                ^
-
-vim +412 drivers/pci/hotplug/sgi_hotplug.c
-
-3e643e77 John Keller       2007-01-30  406  		struct acpi_device *pdevice;
-3e643e77 John Keller       2007-01-30  407  		acpi_handle phandle;
-3e643e77 John Keller       2007-01-30  408  		acpi_handle chandle = NULL;
-3e643e77 John Keller       2007-01-30  409  		acpi_handle rethandle;
-3e643e77 John Keller       2007-01-30  410  		acpi_status ret;
-3e643e77 John Keller       2007-01-30  411  
-7b199811 Rafael J. Wysocki 2013-11-11 @412  		phandle = acpi_device_handle(PCI_CONTROLLER(slot->pci_bus)->companion);
-3e643e77 John Keller       2007-01-30  413  
-3e643e77 John Keller       2007-01-30  414  		if (acpi_bus_get_device(phandle, &pdevice)) {
-227f0647 Ryan Desfosses    2014-04-18  415  			dev_dbg(&slot->pci_bus->self->dev, "no parent device, assuming NULL\n");
-
-:::::: The code at line 412 was first introduced by commit
-:::::: 7b1998116bbb2f3e5dd6cb9a8ee6db479b0b50a9 ACPI / driver core: Store an ACPI device pointer in struct acpi_dev_node
-
-:::::: TO: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-:::::: CC: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 43194 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160416/624e773d/attachment-0001.obj>
+> 
+> > 
+> > > v2: Rebased to v4.6-rc3, added Reviewed/by/Acked-by tags
+> > > 
+> > >  arch/arm/xen/enlighten.c | 13 +++++++++++--
+> > >  1 file changed, 11 insertions(+), 2 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> > > index 75cd7345c654..76a1d12fd27e 100644
+> > > --- a/arch/arm/xen/enlighten.c
+> > > +++ b/arch/arm/xen/enlighten.c
+> > > @@ -27,6 +27,7 @@
+> > >  #include <linux/cpu.h>
+> > >  #include <linux/console.h>
+> > >  #include <linux/pvclock_gtod.h>
+> > > +#include <linux/reboot.h>
+> > >  #include <linux/time64.h>
+> > >  #include <linux/timekeeping.h>
+> > >  #include <linux/timekeeper_internal.h>
+> > > @@ -193,14 +194,22 @@ after_register_vcpu_info:
+> > >  	put_cpu();
+> > >  }
+> > >  
+> > > -static void xen_restart(enum reboot_mode reboot_mode, const char *cmd)
+> > > +static int xen_restart(struct notifier_block *nb, unsigned long action,
+> > > +		       void *data)
+> > >  {
+> > >  	struct sched_shutdown r = { .reason = SHUTDOWN_reboot };
+> > >  	int rc;
+> > >  	rc = HYPERVISOR_sched_op(SCHEDOP_shutdown, &r);
+> > >  	BUG_ON(rc);
+> > > +
+> > > +	return NOTIFY_DONE;
+> > >  }
+> > >  
+> > > +static struct notifier_block xen_restart_nb = {
+> > > +	.notifier_call = xen_restart,
+> > > +	.priority = 192,
+> > > +};
+> > > +
+> > >  static void xen_power_off(void)
+> > >  {
+> > >  	struct sched_shutdown r = { .reason = SHUTDOWN_poweroff };
+> > > @@ -370,7 +379,7 @@ static int __init xen_pm_init(void)
+> > >  		return -ENODEV;
+> > >  
+> > >  	pm_power_off = xen_power_off;
+> > > -	arm_pm_restart = xen_restart;
+> > > +	register_restart_handler(&xen_restart_nb);
+> > >  	if (!xen_initial_domain()) {
+> > >  		struct timespec64 ts;
+> > >  		xen_read_wallclock(&ts);
+> > > -- 
+> > > 2.5.0
+> > > 
+> 
