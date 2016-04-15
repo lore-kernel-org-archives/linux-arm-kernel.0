@@ -1,89 +1,129 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 15 Apr 2016 18:11:36 +0100
-Subject: [PATCH 25/45] KVM: arm/arm64: vgic-new: Add GICv3 redistributor IIDR,
- TYPER handlers
-In-Reply-To: <1460740316-8755-1-git-send-email-andre.przywara@arm.com>
-References: <1460740316-8755-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1460740316-8755-26-git-send-email-andre.przywara@arm.com>
+From: aisheng.dong@nxp.com (Dong Aisheng)
+Date: Sat, 16 Apr 2016 01:29:45 +0800
+Subject: [PATCH 21/23] mmc: sdhci-esdhc-imx: factor out hw related
+ intialization into function
+In-Reply-To: <1460741387-23815-1-git-send-email-aisheng.dong@nxp.com>
+References: <1460741387-23815-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1460741387-23815-22-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The redistributor TYPER tells the OS about the associated MPIDR,
-also the LAST bit is crucial to determine the number of redistributors.
+Factor out hw related intialization into a separate function which
+has two benifits:
+1) concentrate hw related intialization at one place
+2) ease the hw state restore after resume by simply
+calling this function
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
- virt/kvm/arm/vgic/vgic_mmio.c | 50 +++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 48 insertions(+), 2 deletions(-)
+ drivers/mmc/host/sdhci-esdhc-imx.c | 76 +++++++++++++++++++++-----------------
+ 1 file changed, 42 insertions(+), 34 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
-index a87bbca..7d275a7 100644
---- a/virt/kvm/arm/vgic/vgic_mmio.c
-+++ b/virt/kvm/arm/vgic/vgic_mmio.c
-@@ -739,6 +739,52 @@ static int vgic_mmio_write_v3_misc(struct kvm_vcpu *vcpu,
- 	return 0;
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index 3ff213f..95f3632 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -978,6 +978,44 @@ static const struct sdhci_pltfm_data sdhci_esdhc_imx_pdata = {
+ 	.ops = &sdhci_esdhc_ops,
+ };
+ 
++static void sdhci_esdhc_imx_hwinit(struct sdhci_host *host)
++{
++	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++	struct pltfm_imx_data *imx_data = sdhci_pltfm_priv(pltfm_host);
++
++	if (esdhc_is_usdhc(imx_data)) {
++		/*
++		 * The imx6q ROM code will change the default watermark
++		 * level setting to something insane.  Change it back here.
++		 */
++		writel(0x10401040, host->ioaddr + ESDHC_WTMK_LVL);
++
++		/*
++		 * ROM code will change the bit burst_length_enable setting
++		 * to zero if this usdhc is choosed to boot system. Change
++		 * it back here, otherwise it will impact the performance a
++		 * lot. This bit is used to enable/disable the burst length
++		 * for the external AHB2AXI bridge, it's usefully especially
++		 * for INCR transfer because without burst length indicator,
++		 * the AHB2AXI bridge does not know the burst length in
++		 * advance. And without burst length indicator, AHB INCR
++		 * transfer can only be converted to singles on the AXI side.
++		 */
++		writel(readl(host->ioaddr + SDHCI_HOST_CONTROL)
++			| ESDHC_BURST_LEN_EN_INCR,
++			host->ioaddr + SDHCI_HOST_CONTROL);
++		/*
++		* errata ESDHC_FLAG_ERR004536 fix for MX6Q TO1.2 and MX6DL
++		* TO1.1, it's harmless for MX6SL
++		*/
++		writel(readl(host->ioaddr + 0x6c) | BIT(7),
++			host->ioaddr + 0x6c);
++
++		/* disable DLL_CTRL delay line settings */
++		writel(0x0, host->ioaddr + ESDHC_DLL_CTRL);
++	}
++}
++
+ #ifdef CONFIG_OF
+ static int
+ sdhci_esdhc_imx_probe_dt(struct platform_device *pdev,
+@@ -1175,43 +1213,13 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
+ 		host->quirks |= SDHCI_QUIRK_NO_MULTIBLOCK
+ 			| SDHCI_QUIRK_BROKEN_ADMA;
+ 
+-	/*
+-	 * The imx6q ROM code will change the default watermark level setting
+-	 * to something insane.  Change it back here.
+-	 */
+-	if (esdhc_is_usdhc(imx_data)) {
+-		writel(0x10401040, host->ioaddr + ESDHC_WTMK_LVL);
++	sdhci_esdhc_imx_hwinit(host);
+ 
++	if (esdhc_is_usdhc(imx_data)) {
+ 		host->quirks2 |= SDHCI_QUIRK2_PRESET_VALUE_BROKEN;
+ 		host->mmc->caps |= MMC_CAP_1_8V_DDR;
+-
+-		/*
+-		 * ROM code will change the bit burst_length_enable setting
+-		 * to zero if this usdhc is choosed to boot system. Change
+-		 * it back here, otherwise it will impact the performance a
+-		 * lot. This bit is used to enable/disable the burst length
+-		 * for the external AHB2AXI bridge, it's usefully especially
+-		 * for INCR transfer because without burst length indicator,
+-		 * the AHB2AXI bridge does not know the burst length in
+-		 * advance. And without burst length indicator, AHB INCR
+-		 * transfer can only be converted to singles on the AXI side.
+-		 */
+-		writel(readl(host->ioaddr + SDHCI_HOST_CONTROL)
+-			| ESDHC_BURST_LEN_EN_INCR,
+-			host->ioaddr + SDHCI_HOST_CONTROL);
+-
+ 		if (!(imx_data->socdata->flags & ESDHC_FLAG_HS200))
+ 			host->quirks2 |= SDHCI_QUIRK2_BROKEN_HS200;
+-
+-		/*
+-		* errata ESDHC_FLAG_ERR004536 fix for MX6Q TO1.2 and MX6DL
+-		* TO1.1, it's harmless for MX6SL
+-		*/
+-		writel(readl(host->ioaddr + 0x6c) | BIT(7),
+-			host->ioaddr + 0x6c);
+-
+-		/* disable DLL_CTRL delay line settings */
+-		writel(0x0, host->ioaddr + ESDHC_DLL_CTRL);
+ 	}
+ 
+ 	if (imx_data->socdata->flags & ESDHC_FLAG_MAN_TUNING)
+@@ -1289,8 +1297,8 @@ static int sdhci_esdhc_resume(struct device *dev)
+ {
+ 	struct sdhci_host *host = dev_get_drvdata(dev);
+ 
+-	/* restore watermark setting in case it's lost in low power mode */
+-	writel(0x10401040, host->ioaddr + ESDHC_WTMK_LVL);
++	/* reinitialize hw state in case it's lost in low power mode */
++	sdhci_esdhc_imx_hwinit(host);
+ 
+ 	return sdhci_pltfm_resume(dev);
  }
- 
-+/*
-+ * We use a compressed version of the MPIDR (all 32 bits in one 32-bit word)
-+ * when we store the target MPIDR written by the guest.
-+ */
-+static u32 compress_mpidr(unsigned long mpidr)
-+{
-+	u32 ret;
-+
-+	ret = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-+	ret |= MPIDR_AFFINITY_LEVEL(mpidr, 1) << 8;
-+	ret |= MPIDR_AFFINITY_LEVEL(mpidr, 2) << 16;
-+	ret |= MPIDR_AFFINITY_LEVEL(mpidr, 3) << 24;
-+
-+	return ret;
-+}
-+
-+static int vgic_mmio_read_v3r_typer(struct kvm_vcpu *vcpu,
-+				    struct kvm_io_device *dev,
-+				    gpa_t addr, int len, void *val)
-+{
-+	struct vgic_io_device *iodev = container_of(dev,
-+						    struct vgic_io_device, dev);
-+	unsigned long mpidr = kvm_vcpu_get_mpidr_aff(iodev->redist_vcpu);
-+	int target_vcpu_id = iodev->redist_vcpu->vcpu_id;
-+	u64 value;
-+
-+	value = (u64)compress_mpidr(mpidr) << 32;
-+	value |= ((target_vcpu_id & 0xffff) << 8);
-+	if (target_vcpu_id == atomic_read(&vcpu->kvm->online_vcpus) - 1)
-+		value |= GICR_TYPER_LAST;
-+
-+	write_mask64(value, addr & 7, len, val);
-+	return 0;
-+}
-+
-+static int vgic_mmio_read_v3r_iidr(struct kvm_vcpu *vcpu,
-+				   struct kvm_io_device *dev,
-+				   gpa_t addr, int len, void *val)
-+{
-+	write_mask32((PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0),
-+		     addr & 3, len, val);
-+
-+	return 0;
-+}
-+
-+#endif
- 
- /*
-  * The GICv3 per-IRQ registers are split to control PPIs and SGIs in the
-@@ -821,9 +867,9 @@ struct vgic_register_region vgic_v3_redist_registers[] = {
- 	REGISTER_DESC_WITH_LENGTH(GICR_CTLR,
- 		vgic_mmio_read_raz, vgic_mmio_write_wi, 4),
- 	REGISTER_DESC_WITH_LENGTH(GICR_IIDR,
--		vgic_mmio_read_nyi, vgic_mmio_write_wi, 4),
-+		vgic_mmio_read_v3r_iidr, vgic_mmio_write_wi, 4),
- 	REGISTER_DESC_WITH_LENGTH(GICR_TYPER,
--		vgic_mmio_read_nyi, vgic_mmio_write_wi, 8),
-+		vgic_mmio_read_v3r_typer, vgic_mmio_write_wi, 8),
- 	REGISTER_DESC_WITH_LENGTH(GICR_PROPBASER,
- 		vgic_mmio_read_raz, vgic_mmio_write_wi, 8),
- 	REGISTER_DESC_WITH_LENGTH(GICR_PENDBASER,
 -- 
-2.7.3
+1.9.1
