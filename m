@@ -1,389 +1,220 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 15 Apr 2016 18:11:51 +0100
-Subject: [PATCH 40/45] KVM: arm/arm64: vgic-new: vgic_init: implement vgic_init
-In-Reply-To: <1460740316-8755-1-git-send-email-andre.przywara@arm.com>
-References: <1460740316-8755-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1460740316-8755-41-git-send-email-andre.przywara@arm.com>
+From: yang.shi@linaro.org (Shi, Yang)
+Date: Fri, 15 Apr 2016 10:55:14 -0700
+Subject: SMMU problem found on LS2085A with 4.6-rc3
+In-Reply-To: <57112873.5030903@arm.com>
+References: <570E9EA9.2070903@linaro.org> <570F8739.1060508@arm.com>
+ <571022AD.1060909@linaro.org> <5710DED6.3010008@arm.com>
+ <571122A3.80909@linaro.org> <57112873.5030903@arm.com>
+Message-ID: <57112B02.6020402@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Auger <eric.auger@linaro.org>
+On 4/15/2016 10:44 AM, Robin Murphy wrote:
+> On 15/04/16 18:19, Shi, Yang wrote:
+>> On 4/15/2016 5:30 AM, Robin Murphy wrote:
+>>> On 15/04/16 00:07, Shi, Yang wrote:
+>>>> Hi Robin,
+>>>>
+>>>> On 4/14/2016 5:04 AM, Robin Murphy wrote:
+>>>>> Hi Yang,
+>>>>>
+>>>>> On 13/04/16 20:31, Shi, Yang wrote:
+>>>>>> Hi Will & Robin,
+>>>>>>
+>>>>>> I just ran some quick test on my LS2085A board, which has 8 Cortex
+>>>>>> A57
+>>>>>> cores, with 4.6-rc3 kernel, but I found a regression issue with SMMU.
+>>>>>>
+>>>>>> SMMU driver reports:
+>>>>>>
+>>>>>> arm_smmu_global_fault: 297974 callbacks suppressed
+>>>>>> arm_smmu_global_fault: 298561 callbacks suppressed
+>>>>>> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
+>>>>>> GFSYNR1 0x00000300, GFSYNR2 0x00000000
+>>>>>> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
+>>>>>> GFSYNR1 0x00000300, GFSYNR2 0x00000000
+>>>>>> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
+>>>>>> GFSYNR1 0x00000300, GFSYNR2 0x00000000
+>>>>>> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
+>>>>>> GFSYNR1 0x00000300, GFSYNR2 0x00000000
+>>>>>> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
+>>>>>> GFSYNR1 0x00000300, GFSYNR2 0x00000000
+>>>>>> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
+>>>>>> GFSYNR1 0x00000300, GFSYNR2 0x00000000
+>>>>>> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
+>>>>>> GFSYNR1 0x00000300, GFSYNR2 0x00000000
+>>>>>> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
+>>>>>> GFSYNR1 0x00000300, GFSYNR2 0x00000000
+>>>>>> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
+>>>>>> GFSYNR1 0x00000300, GFSYNR2 0x00000000
+>>>>>> arm-smmu 5000000.iommu:         GFSR 0x80000004, GFSYNR0 0x00000008,
+>>>>>> GFSYNR1 0x00000300, GFSYNR2 0x00000000
+>>>>>> arm-smmu 5000000.iommu: Unexpected global fault, this could be
+>>>>>> serious
+>>>>>> arm-smmu 5000000.iommu: Unexpected global fault, this could be
+>>>>>> serious
+>>>>>> arm-smmu 5000000.iommu: Unexpected global fault, this could be
+>>>>>> serious
+>>>>>> arm-smmu 5000000.iommu: Unexpected global fault, this could be
+>>>>>> serious
+>>>>>> arm-smmu 5000000.iommu: Unexpected global fault, this could be
+>>>>>> serious
+>>>>>> arm-smmu 5000000.iommu: Unexpected global fault, this could be
+>>>>>> serious
+>>>>>> arm-smmu 5000000.iommu: Unexpected global fault, this could be
+>>>>>> serious
+>>>>>> arm-smmu 5000000.iommu: Unexpected global fault, this could be
+>>>>>> serious
+>>>>>> arm-smmu 5000000.iommu: Unexpected global fault, this could be
+>>>>>> serious
+>>>>>> arm-smmu 5000000.iommu: Unexpected global fault, this could be
+>>>>>> serious
+>>>>>
+>>>>> That's a stream match conflict fault, so you've somehow got two
+>>>>> devices
+>>>>> using the same stream ID attached to different domains, and at least
+>>>>> one
+>>>>> of them is trying to do DMA.
+>>>>>
+>>>>>> But, it is good with 4.5 kernel. I found the below commit causes it:
+>>>>>>
+>>>>>> commit 9adb95949a343dac53b1cd81dc973b5f815c88d4
+>>>>>> Author: Robin Murphy <robin.murphy@arm.com>
+>>>>>> Date:   Tue Jan 26 18:06:36 2016 +0000
+>>>>>>
+>>>>>>      iommu/arm-smmu: Support DMA-API domains
+>>>>>>
+>>>>>>      With DMA mapping ops provided by the iommu-dma code, only a
+>>>>>> minimal
+>>>>>>      contribution from the IOMMU driver is needed to create a
+>>>>>> suitable
+>>>>>>      DMA-API domain for them to use. Implement this for the ARM
+>>>>>> SMMUs.
+>>>>>>
+>>>>>>      Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>>>>>>      Signed-off-by: Will Deacon <will.deacon@arm.com>
+>>>>>>
+>>>>>> Any idea?
+>>>>>
+>>>>> My first guess would be the same thing as [1] - does that patch help?
+>>>>
+>>>> No, it can't cease the fault.
+>>>>
+>>>>>
+>>>>> Beyond that, what does your DT look like? The one in mainline has one
+>>>>> token mmu-masters property which isn't even valid, so nothing ever
+>>>>> gets
+>>>>
+>>>> Mine has mmu-masters property too, but removing it doesn't solve the
+>>>> problem.
+>>>
+>>> OK, now things really stop making sense. Without the mmu-masters
+>>> property the SMMU driver will do nothing but probe the SMMU device
+>>> itself. Therefore I can only assume the bootloader magic for the
+>>> Freescale vendor kernel must be rewriting your DT (our board always just
+>>> says "fdt_fixup_smmu: WARNING: no SMMU node found" despite the mainline
+>>> DT containing the SMMU, so I'm not sure exactly what it's looking for).
+>>> Can you see what it's done via /sys/fimware/fdt (or
+>>> /sys/firmware/devicetree/base/ if you can face hunting down phandles
+>>> manually)? As a further sanity check, what do you see in
+>>> /sys/kernel/iommu_groups/*/devices/ and do they differ between the two
+>>> kernels?
+>>
+>> With the mmu-masters property, the fsl-mc will be added into group 2,
+>> please see the below dmesg log:
+>>
+>> iommu: Adding device 3600000.pcie to group 0
+>> iommu: Adding device 3700000.pcie to group 1
+>> iommu: Adding device 80c000000.fsl-mc to group 2
+>>
+>> fsl-mc won't be there if mmu-masters property is removed.
+>>
+>> But, it looks there are multiple devices in iommu_groups 3:
+>>
+>> root at ls2085a_rdb-4:~# cat /sys/kernel/iommu_groups/3/devices/0000\:0
+>> 0000:00:00.0/ 0000:01:00.0/ 0000:01:00.1/
+>>
+>> It is group 2 if mmu-masters property is removed.
+>>
+>> I have one Intel e1000 NIC on my PCIe bus, both 0000:01:00.0 and
+>> 0000:01:00.1 is for the NIC.
+>>
+>> Is this behavior expected?
+>
+> Yup - since the root complex doesn't support ACS, the IOMMU API puts all
+> the devices behind it (in this case the NIC and the bridge itself) in
+> the same group, because otherwise it might be possible for two devices
+> assigned to different guests to DMA directly to each other without going
+> through the IOMMU.
+>
+>>> Secondly, the stream match conflict can only occur if the SMRs are
+>>> actually programmed. Since with Will's fix for the conflicts Eric saw we
+>>> should attach to the default domain without touching the initial bypass
+>>> entries in the SMRs, I'm at a loss to see how you could still get into
+>>> this state with that patch applied.
+>>
+>> I mixed up the patch, with Will's fix applied, the issue is gone away.
+>
+> Phew, that's a relief! Would you be happy to give a Tested-by on that
+> patch?
 
-This patch allocates and initializes the data structures used
-to model the vgic distributor and virtual cpu interfaces. At that
-stage the number of IRQs and number of virtual CPUs is frozen.
+Sure, just added by Tested-by to that patch. Thanks for your help.
 
-The following early_init functions are kept since they are called from
-arm.c. However they may disappear in subsequent patches since
-they are void.
+Regards,
+Yang
 
-vgic_[v2|v3]_enable still is stubbed at this stage.
-
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-
-Changelog RFC..v1:
-- initialize v2/v3 default CPU affinities explicitly
----
- include/kvm/vgic/vgic.h       |   7 +-
- virt/kvm/arm/vgic/vgic-v2.c   |   5 +
- virt/kvm/arm/vgic/vgic-v3.c   |   5 +
- virt/kvm/arm/vgic/vgic.c      |   5 +
- virt/kvm/arm/vgic/vgic.h      |   8 ++
- virt/kvm/arm/vgic/vgic_init.c | 213 ++++++++++++++++++++++++++++++++++++++++++
- 6 files changed, 242 insertions(+), 1 deletion(-)
-
-diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-index 2bea557..3566393 100644
---- a/include/kvm/vgic/vgic.h
-+++ b/include/kvm/vgic/vgic.h
-@@ -115,6 +115,7 @@ struct vgic_io_device {
- struct vgic_dist {
- 	bool			in_kernel;
- 	bool			ready;
-+	bool			initialized;
- 
- 	/* vGIC model the kernel emulates for the guest (GICv2 or GICv3) */
- 	u32			vgic_model;
-@@ -198,7 +199,11 @@ struct vgic_cpu {
- };
- 
- int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
-+void kvm_vgic_early_init(struct kvm *kvm);
- int kvm_vgic_create(struct kvm *kvm, u32 type);
-+void kvm_vgic_destroy(struct kvm *kvm);
-+void kvm_vgic_vcpu_early_init(struct kvm_vcpu *vcpu);
-+void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu);
- int kvm_vgic_hyp_init(void);
- 
- int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
-@@ -207,7 +212,7 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
- int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
- 
- #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
--#define vgic_initialized(k)	(false)
-+#define vgic_initialized(k)	((k)->arch.vgic.initialized)
- #define vgic_ready(k)		((k)->arch.vgic.ready)
- #define vgic_valid_spi(k,i)	(((i) >= VGIC_NR_PRIVATE_IRQS) && \
- 			((i) < (k)->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS))
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index 3c3d3a0..47875a2 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -208,6 +208,11 @@ void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
- 			GICH_VMCR_PRIMASK_SHIFT;
- }
- 
-+/* not yet implemented */
-+void vgic_v2_enable(struct kvm_vcpu *vcpu)
-+{
-+}
-+
- /**
-  * vgic_v2_probe - probe for a GICv2 compatible interrupt controller in DT
-  * @node:	pointer to the DT node
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 6e93d8f..97cf901 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -196,6 +196,11 @@ void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
- 	vmcrp->pmr  = (vmcr & ICH_VMCR_PMR_MASK) >> ICH_VMCR_PMR_SHIFT;
- }
- 
-+/* not yet implemented */
-+void vgic_v3_enable(struct kvm_vcpu *vcpu)
-+{
-+}
-+
- /**
-  * vgic_v3_probe - probe for a GICv3 compatible interrupt controller in DT
-  * @node:	pointer to the DT node
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index 2110d95..f8252d4 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -288,6 +288,11 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
- 			bool level)
- {
- 	struct kvm_vcpu *vcpu;
-+	int ret;
-+
-+	ret = vgic_lazy_init(kvm);
-+	if (ret)
-+		return ret;
- 
- 	vcpu = kvm_get_vcpu(kvm, cpuid);
- 	vgic_update_irq_pending(kvm, vcpu, intid, level);
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 0f55d21..fbfc7b9 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -41,6 +41,7 @@ int vgic_v2_dist_access(struct kvm_vcpu *vcpu, bool is_write,
- int vgic_v2_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr);
- void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
- void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
-+void vgic_v2_enable(struct kvm_vcpu *vcpu);
- int vgic_v2_probe(struct device_node *vgic_node);
- 
- #ifdef CONFIG_KVM_ARM_VGIC_V3
-@@ -55,6 +56,7 @@ int vgic_v3_redist_access(struct kvm_vcpu *vcpu, bool is_write,
- 			  int offset, int len, void *val);
- void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
- void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
-+void vgic_v3_enable(struct kvm_vcpu *vcpu);
- int vgic_v3_probe(struct device_node *vgic_node);
- #else
- static inline void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
-@@ -100,6 +102,10 @@ void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
- {
- }
- 
-+static inline void vgic_v3_enable(struct kvm_vcpu *vcpu)
-+{
-+}
-+
- static inline int vgic_v3_probe(struct device_node *vgic_node)
- {
- 	return -ENODEV;
-@@ -109,6 +115,8 @@ static inline int vgic_v3_probe(struct device_node *vgic_node)
- void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
- void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
- 
-+int vgic_lazy_init(struct kvm *kvm);
-+int vgic_init(struct kvm *kvm);
- void kvm_register_vgic_device(unsigned long type);
- 
- #endif
-diff --git a/virt/kvm/arm/vgic/vgic_init.c b/virt/kvm/arm/vgic/vgic_init.c
-index 80bf283..ecc1f6c 100644
---- a/virt/kvm/arm/vgic/vgic_init.c
-+++ b/virt/kvm/arm/vgic/vgic_init.c
-@@ -24,6 +24,42 @@
- #include <asm/kvm_mmu.h>
- #include "vgic.h"
- 
-+/*
-+ * Initialization rules: there are multiple stages to the vgic
-+ * initialization, both for the distributor and the CPU interfaces.
-+ *
-+ * Distributor:
-+ *
-+ * - kvm_vgic_early_init(): initialization of static data that doesn't
-+ *   depend on any sizing information or emulation type. No allocation
-+ *   is allowed there.
-+ *
-+ * - vgic_init(): allocation and initialization of the generic data
-+ *   structures that depend on sizing information (number of CPUs,
-+ *   number of interrupts). Also initializes the vcpu specific data
-+ *   structures. Can be executed lazily for GICv2.
-+ *
-+ * CPU Interface:
-+ *
-+ * - kvm_vgic_cpu_early_init(): initialization of static data that
-+ *   doesn't depend on any sizing information or emulation type. No
-+ *   allocation is allowed there.
-+ */
-+
-+/* EARLY INIT */
-+
-+/*
-+ * Those 2 functions should not be needed anymore but they
-+ * still are called from arm.c
-+ */
-+void kvm_vgic_early_init(struct kvm *kvm)
-+{
-+}
-+
-+void kvm_vgic_vcpu_early_init(struct kvm_vcpu *vcpu)
-+{
-+}
-+
- /* CREATION */
- 
- /**
-@@ -108,6 +144,183 @@ out:
- 	return ret;
- }
- 
-+/* INIT/DESTROY */
-+
-+/**
-+ * kvm_vgic_dist_init: initialize the dist data structures
-+ * @kvm: kvm struct pointer
-+ * @nr_spis: number of spis, frozen by caller
-+ */
-+int kvm_vgic_dist_init(struct kvm *kvm, unsigned int nr_spis)
-+{
-+	struct vgic_dist *dist = &kvm->arch.vgic;
-+	struct kvm_vcpu *vcpu0 = kvm_get_vcpu(kvm, 0);
-+	int i;
-+
-+	dist->spis = kcalloc(nr_spis, sizeof(struct vgic_irq), GFP_KERNEL);
-+	if (!dist->spis)
-+		return  -ENOMEM;
-+
-+	/*
-+	 * In following code we do not take the irq struct lock since
-+	 * no other action on irq structs can happen while the VGIC is
-+	 * not initialized yet:
-+	 * injection requires (VGICV3) or does (VGIC2) initialization.
-+	 * MMIO access triggers init.
-+	 */
-+	for (i = 0; i < nr_spis; i++) {
-+		struct vgic_irq *irq = &dist->spis[i];
-+
-+		irq->intid = i + VGIC_NR_PRIVATE_IRQS;
-+		INIT_LIST_HEAD(&irq->ap_list);
-+		spin_lock_init(&irq->irq_lock);
-+		irq->vcpu = NULL;
-+		irq->target_vcpu = vcpu0;
-+		if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V2)
-+			irq->targets = 0;
-+		else
-+			irq->mpidr = 0;
-+	}
-+	return 0;
-+}
-+
-+/**
-+ * kvm_vgic_vcpu_init: initialize the vcpu data structures and
-+ * enable the VCPU interface
-+ * @kvm: kvm struct pointer
-+ */
-+void kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
-+{
-+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-+	int i;
-+
-+	INIT_LIST_HEAD(&vgic_cpu->ap_list_head);
-+	spin_lock_init(&vgic_cpu->ap_list_lock);
-+
-+	/*
-+	 * Enable and configure all SGIs to be edge-triggered and
-+	 * configure all PPIs as level-triggered.
-+	 */
-+	for (i = 0; i < VGIC_NR_PRIVATE_IRQS; i++) {
-+		struct vgic_irq *irq = &vgic_cpu->private_irqs[i];
-+
-+		INIT_LIST_HEAD(&irq->ap_list);
-+		spin_lock_init(&irq->irq_lock);
-+		irq->intid = i;
-+		irq->vcpu = NULL;
-+		irq->target_vcpu = vcpu;
-+		irq->targets = 1U << vcpu->vcpu_id;
-+		if (vgic_irq_is_sgi(i)) {
-+			/* SGIs */
-+			irq->enabled = 1;
-+			irq->config = VGIC_CONFIG_EDGE;
-+		} else {
-+			/* PPIs */
-+			irq->config = VGIC_CONFIG_LEVEL;
-+		}
-+	}
-+	if (kvm_vgic_global_state.type == VGIC_V2)
-+		vgic_v2_enable(vcpu);
-+	else
-+		vgic_v3_enable(vcpu);
-+}
-+
-+/*
-+ * vgic_init: allocates and initializes dist and vcpu data structures
-+ * depending on two dimensioning parameters:
-+ * - the number of spis
-+ * - the number of vcpus
-+ * The function is generally called when nr_spis has been explicitly set
-+ * by the guest through the KVM DEVICE API. If not nr_spis is set to 256.
-+ * Completion can be tested by vgic_initialized
-+ * Must be called with kvm->lock held!
-+ */
-+int vgic_init(struct kvm *kvm)
-+{
-+	struct vgic_dist *dist = &kvm->arch.vgic;
-+	struct kvm_vcpu *vcpu;
-+	int ret = 0, i;
-+
-+	if (vgic_initialized(kvm))
-+		return 0;
-+
-+	/* freeze the number of spis */
-+	if (!dist->nr_spis)
-+		dist->nr_spis = VGIC_NR_IRQS_LEGACY - VGIC_NR_PRIVATE_IRQS;
-+
-+	ret = kvm_vgic_dist_init(kvm, dist->nr_spis);
-+	if (ret)
-+		goto out;
-+
-+	kvm_for_each_vcpu(i, vcpu, kvm)
-+		kvm_vgic_vcpu_init(vcpu);
-+
-+	dist->initialized = true;
-+out:
-+	return ret;
-+}
-+
-+static void kvm_vgic_dist_destroy(struct kvm *kvm)
-+{
-+	struct vgic_dist *dist = &kvm->arch.vgic;
-+
-+	mutex_lock(&kvm->lock);
-+
-+	dist->ready = false;
-+	dist->initialized = false;
-+
-+	kfree(dist->spis);
-+	kfree(dist->redist_iodevs);
-+	dist->nr_spis = 0;
-+
-+	mutex_unlock(&kvm->lock);
-+}
-+
-+void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
-+{
-+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-+
-+	INIT_LIST_HEAD(&vgic_cpu->ap_list_head);
-+}
-+
-+void kvm_vgic_destroy(struct kvm *kvm)
-+{
-+	struct kvm_vcpu *vcpu;
-+	int i;
-+
-+	kvm_vgic_dist_destroy(kvm);
-+
-+	kvm_for_each_vcpu(i, vcpu, kvm)
-+		kvm_vgic_vcpu_destroy(vcpu);
-+}
-+
-+/**
-+ * Lazy init only is allowed if the GIC exposed to the guest is a GICV2.
-+ * GICV3 must be explicitly initialized by the guest using the
-+ * KVM_DEV_ARM_VGIC_GRP_CTRL KVM_DEVICE group
-+ */
-+int vgic_lazy_init(struct kvm *kvm)
-+{
-+	int ret = 0;
-+
-+	if (unlikely(!vgic_initialized(kvm))) {
-+		/*
-+		 * We only provide the automatic initialization of the VGIC
-+		 * for the legacy case of a GICv2. Any other type must
-+		 * be explicitly initialized once setup with the respective
-+		 * KVM device call.
-+		 */
-+		if (kvm->arch.vgic.vgic_model != KVM_DEV_TYPE_ARM_VGIC_V2)
-+			return -EBUSY;
-+
-+		mutex_lock(&kvm->lock);
-+		ret = vgic_init(kvm);
-+		mutex_unlock(&kvm->lock);
-+	}
-+
-+	return ret;
-+}
-+
- /* GENERIC PROBE */
- 
- static void vgic_init_maintenance_interrupt(void *info)
--- 
-2.7.3
+>
+> Thanks,
+> Robin.
+>
+>>
+>> Thanks,
+>> Yang
+>>
+>>>
+>>> As the transactions provoking the fault are apparently instruction
+>>> fetches on a 00xx stream ID, which I've not seen before, my first guess
+>>> would be it's something to do with the management complex (which I can't
+>>> get to work with the staging driver due to firmware incompatibility),
+>>> but then looking at the general lack of connection to the DMA API within
+>>> that driver, maybe not?
+>>>
+>>> Robin.
+>>>
+>>>>
+>>>> Thanks,
+>>>> Yang
+>>>>
+>>>>
+>>>>> attached to the SMMU - indeed I've happily booted -rc3 on an LS2085A
+>>>>> earlier this week - so there's clearly something going on there.
+>>>>>
+>>>>> More generally, I'd note that the mmu-masters binding will never fully
+>>>>> work on this board - you can get the platform devices to cooperate by
+>>>>> programming the assorted ICID registers to ensure they present unique
+>>>>> stream IDs, but PCI devices cannot work at all because there's no
+>>>>> way to
+>>>>> make the stream IDs coming out of the root complex be equal to the PCI
+>>>>> RID in the way it relies on. In that sense, any regression here is
+>>>>> quite
+>>>>> likely just a shift from "subtly not working" to "loudly and
+>>>>> obnoxiously
+>>>>> not working". Conversely, those reasons have also proved it a really
+>>>>> useful platform for implementing and testing the iommu-map binding[2]
+>>>>> (with an awful hack in the PCI driver to program the lookup table
+>>>>> suitably) :D
+>>>>>
+>>>>> Robin.
+>>>>>
+>>>>> [1]:http://thread.gmane.org/gmane.linux.kernel.iommu/12810
+>>>>> [2]:http://thread.gmane.org/gmane.linux.kernel.iommu/12454
+>>>>>
+>>>>>>
+>>>>>> Thanks,
+>>>>>> Yang
+>>>>>>
+>>>>>
+>>>>
+>>>
+>>
+>
