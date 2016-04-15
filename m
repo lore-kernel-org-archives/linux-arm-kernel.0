@@ -1,27 +1,23 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 15 Apr 2016 11:26:02 +0100
-Subject: [PATCH 3/6] regulator: rk808: Make rk808 generic, rename
- rk808-regulator.c
-In-Reply-To: <1460711790-22646-4-git-send-email-w.egorov@phytec.de>
-References: <1460711790-22646-1-git-send-email-w.egorov@phytec.de>
- <1460711790-22646-4-git-send-email-w.egorov@phytec.de>
-Message-ID: <20160415102602.GE3217@sirena.org.uk>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 15 Apr 2016 15:55:47 +0530
+Subject: [PATCH 2/3] ARM: DTS: da850: disable mdio and eth0 by default
+In-Reply-To: <1460586628-25152-3-git-send-email-david@lechnology.com>
+References: <1460586628-25152-1-git-send-email-david@lechnology.com>
+ <1460586628-25152-3-git-send-email-david@lechnology.com>
+Message-ID: <5710C1AB.4040707@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 15, 2016 at 11:16:27AM +0200, Wadim Egorov wrote:
+On Thursday 14 April 2016 04:00 AM, David Lechner wrote:
+> All other devices are disabled by default and not all boards will use
+> these devices, so these should be disabled too.
+> 
+> da850-evm.dtb already had status = "okay" for these devices.
+> da850-enbw-cmc.dts did not, so they were added.
+> 
+> Signed-off-by: David Lechner <david@lechnology.com>
 
-> This patch just renames the rk808 driver so we can reuse this driver
-> to add more regulator devices from the RK8XX PMIC family later.
+Looks good to me.
 
-We normally manage to cope fine without renaming things - it's quite
-common to have drivers that were initially named after one part
-supporting multiple parts, avoiding the rename makes things like
-backports easier and avoids needing git log --follow and so on.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160415/169ef42d/attachment.sig>
+Thanks,
+Sekhar
