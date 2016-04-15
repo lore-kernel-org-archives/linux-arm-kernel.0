@@ -1,17 +1,16 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 15 Apr 2016 15:04:02 +0100
-Subject: [PATCH 2/7] KVM: arm/arm64: directly pass virtual IRQ number on
- injecting mapped IRQ
+Date: Fri, 15 Apr 2016 15:04:03 +0100
+Subject: [PATCH 3/7] KVM: arm/arm64: directly pass virtual IRQ number on
+ kvm_vgic_map_is_active()
 In-Reply-To: <1460729047-6346-1-git-send-email-andre.przywara@arm.com>
 References: <1460729047-6346-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1460729047-6346-3-git-send-email-andre.przywara@arm.com>
+Message-ID: <1460729047-6346-4-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we want to inject a hardware mapped IRQ into a guest, we actually
-only need the virtual IRQ number from the irq_phys_map.
-So let's pass this number directly from the arch timer to the VGIC
-to avoid using the map as a parameter.
+For getting the active state of a mapped IRQ, we actually only need
+the virtual IRQ number, not the pointer to the mapping entry.
+Pass the virtual IRQ number from the arch timer to the VGIC directly.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
@@ -21,61 +20,56 @@ Signed-off-by: Andre Przywara <andre.przywara@arm.com>
  3 files changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 281caf8..c4574da 100644
+index c4574da..5a34adc 100644
 --- a/include/kvm/arm_vgic.h
 +++ b/include/kvm/arm_vgic.h
-@@ -341,7 +341,7 @@ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
- int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
- 			bool level);
- int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid,
--			       struct irq_phys_map *map, bool level);
-+			       unsigned int virt_irq, bool level);
- void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
- int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
+@@ -347,7 +347,7 @@ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
  struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
+ 					   int virt_irq, int irq);
+ int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, struct irq_phys_map *map);
+-bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, struct irq_phys_map *map);
++bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
+ 
+ #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
+ #define vgic_initialized(k)	(!!((k)->arch.vgic.nr_cpus))
 diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index a9ad4fe..eb56f1e 100644
+index eb56f1e..793465b 100644
 --- a/virt/kvm/arm/arch_timer.c
 +++ b/virt/kvm/arm/arch_timer.c
-@@ -140,7 +140,7 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level)
- 	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer->map->virt_irq,
- 				   timer->irq.level);
- 	ret = kvm_vgic_inject_mapped_irq(vcpu->kvm, vcpu->vcpu_id,
--					 timer->map,
-+					 timer->map->virt_irq,
- 					 timer->irq.level);
- 	WARN_ON(ret);
- }
+@@ -246,7 +246,7 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
+ 	* to ensure that hardware interrupts from the timer triggers a guest
+ 	* exit.
+ 	*/
+-	if (timer->irq.level || kvm_vgic_map_is_active(vcpu, timer->map))
++	if (timer->irq.level || kvm_vgic_map_is_active(vcpu, timer->map->virt_irq))
+ 		phys_active = true;
+ 	else
+ 		phys_active = false;
 diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 7282881..9937d41 100644
+index 9937d41..6911327 100644
 --- a/virt/kvm/arm/vgic.c
 +++ b/virt/kvm/arm/vgic.c
-@@ -1667,7 +1667,7 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
-  * kvm_vgic_inject_mapped_irq - Inject a physically mapped IRQ to the vgic
-  * @kvm:     The VM structure pointer
-  * @cpuid:   The CPU for PPIs
-- * @map:     Pointer to a irq_phys_map structure describing the mapping
-+ * @virt_irq: The virtual IRQ to be injected
-  * @level:   Edge-triggered:  true:  to trigger the interrupt
-  *			      false: to ignore the call
-  *	     Level-sensitive  true:  raise the input signal
-@@ -1678,7 +1678,7 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
-  * being HIGH and 0 being LOW and all devices being active-HIGH.
-  */
- int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid,
--			       struct irq_phys_map *map, bool level)
-+			       unsigned int virt_irq, bool level)
- {
- 	int ret;
- 
-@@ -1686,7 +1686,7 @@ int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid,
- 	if (ret)
- 		return ret;
- 
--	return vgic_update_irq_pending(kvm, cpuid, map->virt_irq, level);
-+	return vgic_update_irq_pending(kvm, cpuid, virt_irq, level);
+@@ -1103,18 +1103,18 @@ static bool dist_active_irq(struct kvm_vcpu *vcpu)
+ 	return test_bit(vcpu->vcpu_id, dist->irq_active_on_cpu);
  }
  
- static irqreturn_t vgic_maintenance_handler(int irq, void *data)
+-bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, struct irq_phys_map *map)
++bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq)
+ {
+ 	int i;
+ 
+ 	for (i = 0; i < vcpu->arch.vgic_cpu.nr_lr; i++) {
+ 		struct vgic_lr vlr = vgic_get_lr(vcpu, i);
+ 
+-		if (vlr.irq == map->virt_irq && vlr.state & LR_STATE_ACTIVE)
++		if (vlr.irq == virt_irq && vlr.state & LR_STATE_ACTIVE)
+ 			return true;
+ 	}
+ 
+-	return vgic_irq_is_active(vcpu, map->virt_irq);
++	return vgic_irq_is_active(vcpu, virt_irq);
+ }
+ 
+ /*
 -- 
 2.7.3
