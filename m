@@ -1,40 +1,72 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 15 Apr 2016 22:13:55 +0900
-Subject: [PATCH 2/2] arm64: dts: uniphier: change release address of
- spin-table
-In-Reply-To: <20160415130549.GB8021@leverpostej>
-References: <1460716247-28049-1-git-send-email-yamada.masahiro@socionext.com>
- <1460716247-28049-3-git-send-email-yamada.masahiro@socionext.com>
- <20160415130549.GB8021@leverpostej>
-Message-ID: <CAK7LNARNUMkD79h-uG_EhRFr4gE2pDM8w57EddOMbt-mO0xc8A@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 15 Apr 2016 21:13:44 +0800
+Subject: [PATCH v6 2/2] dmaengine: Add Xilinx zynqmp dma engine driver
+ support
+In-Reply-To: <1460710374-25077-2-git-send-email-appanad@xilinx.com>
+Message-ID: <201604152147.64N7fOV7%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark.
+Hi Kedareswara,
 
-2016-04-15 22:05 GMT+09:00 Mark Rutland <mark.rutland@arm.com>:
-> On Fri, Apr 15, 2016 at 07:30:47PM +0900, Masahiro Yamada wrote:
->> The 8-byte register located at 0x59801200 on this SoC is dedicated
->> for waking up secondary CPUs.  We can use it and save normal memory.
->
-> Generally, it is not safe to use MMIO registers to back spin-table. The
-> kernel maps the spin table location with cacheable attributes, so there
-> may be speculative accesses to any registes in the same (64K) page, and
-> a writeback may be larger than the 8-byte register width (which the
-> device might not accept, triggering an SError).
->
-> Given that, I do not think this is a good idea.
+[auto build test WARNING on robh/for-next]
+[also build test WARNING on v4.6-rc3 next-20160415]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-I did not know this.  Thanks for your advice!
+url:    https://github.com/0day-ci/linux/commits/Kedareswara-rao-Appana/Documentation-DT-dma-Add-Xilinx-zynqmp-dma-device-tree-binding-documentation/20160415-165623
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
+config: sparc64-allmodconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=sparc64 
 
+All warnings (new ones prefixed by >>):
 
-Arnd, Olof
+   drivers/dma/xilinx/zynqmp_dma.c: In function 'zynqmp_dma_config_sg_ll_desc':
+>> drivers/dma/xilinx/zynqmp_dma.c:371:9: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+           ((dma_addr_t)sdesc - (dma_addr_t)chan->desc_pool_v);
+            ^
+   drivers/dma/xilinx/zynqmp_dma.c:371:29: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+           ((dma_addr_t)sdesc - (dma_addr_t)chan->desc_pool_v);
+                                ^
 
-Please drop this patch.
-(I think 1/2 is still OK.)
+vim +371 drivers/dma/xilinx/zynqmp_dma.c
 
+   355					   struct zynqmp_dma_desc_ll *prev)
+   356	{
+   357		struct zynqmp_dma_desc_ll *ddesc = sdesc + 1;
+   358	
+   359		sdesc->size = ddesc->size = len;
+   360		sdesc->addr = src;
+   361		ddesc->addr = dst;
+   362	
+   363		sdesc->ctrl = ddesc->ctrl = ZYNQMP_DMA_DESC_CTRL_SIZE_256;
+   364		if (chan->is_dmacoherent) {
+   365			sdesc->ctrl |= ZYNQMP_DMA_DESC_CTRL_COHRNT;
+   366			ddesc->ctrl |= ZYNQMP_DMA_DESC_CTRL_COHRNT;
+   367		}
+   368	
+   369		if (prev) {
+   370			dma_addr_t addr = chan->desc_pool_p +
+ > 371				    ((dma_addr_t)sdesc - (dma_addr_t)chan->desc_pool_v);
+   372			ddesc = prev + 1;
+   373			prev->nxtdscraddr = addr;
+   374			ddesc->nxtdscraddr = addr + ZYNQMP_DMA_DESC_SIZE(chan);
+   375		}
+   376	}
+   377	
+   378	/**
+   379	 * zynqmp_dma_init - Initialize the channel
 
-
--- 
-Best Regards
-Masahiro Yamada
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 45798 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160415/01ab2406/attachment-0001.obj>
