@@ -1,125 +1,34 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 15 Apr 2016 17:31:58 +0100
-Subject: [RFC PATCH 09/11] drivers: acpi: implement acpi_dma_configure
-In-Reply-To: <20160415161400.GC7973@localhost>
-References: <1460654743-7896-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1460654743-7896-10-git-send-email-lorenzo.pieralisi@arm.com>
- <20160415161400.GC7973@localhost>
-Message-ID: <5711177E.2000509@arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 15 Apr 2016 18:34:18 +0200
+Subject: [PATCH] clk: samsung: exynos7: Don't gate CMU_{CCORE,
+ FSYS0} blocks clock
+In-Reply-To: <5710E082.2050303@samsung.com>
+References: <1460608972-13878-1-git-send-email-alim.akhtar@samsung.com>
+ <570F4BE0.1010102@samsung.com> <5710E082.2050303@samsung.com>
+Message-ID: <5711180A.8030809@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+On 04/15/2016 02:37 PM, Alim Akhtar wrote:
+> On 04/14/2016 01:20 PM, Krzysztof Kozlowski wrote:
+>> > On 04/14/2016 06:42 AM, Alim Akhtar wrote:
+>>> >> This patch adds CLK_IS_CRITICAL flag to ACLK_CCORE_133 and ACLK_FSYS0_200
+>>> >> clocks. These clocks are critical for accessing CMU_CCORE and CMU_FSYS0
+>>> >> blocks registers. Let these clocks to be enabled all the time.
+>>> >>
+>>> >> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+>>> >> ---
+>>> >>   drivers/clk/samsung/clk-exynos7.c |    5 +++--
+>>> >>   1 file changed, 3 insertions(+), 2 deletions(-)
+>> >
+>> > Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> >
+> Thanks Krzysztof,
+> Sylwester, do you have any concern here?
 
-On 15/04/16 17:14, Bjorn Helgaas wrote:
-> On Thu, Apr 14, 2016 at 06:25:41PM +0100, Lorenzo Pieralisi wrote:
->> On DT based systems, the of_dma_configure() API implements DMA configuration
->> for a given device. On ACPI systems an API equivalent to of_dma_configure()
->> is missing which implies that it is currently not possible to set-up DMA
->> operations for devices through the ACPI generic kernel layer.
->>
->> This patch fills the gap by introducing acpi_dma_configure/deconfigure()
->> calls, that carry out IOMMU configuration through IORT (on systems where
->> it is present) and call arch_setup_dma_ops(...) with the retrieved
->> parameters.
->>
->> The DMA range size passed to arch_setup_dma_ops() is sized according
->> to the device coherent_dma_mask (starting at address 0x0), mirroring the
->> DT probing path behaviour when a dma-ranges property is not provided
->> for the device being probed; this changes the current arch_setup_dma_ops()
->> call parameters in the ACPI probing case, but since arch_setup_dma_ops()
->> is a NOP on all architectures but ARM/ARM64 this patch does not change
->> the current kernel behaviour on them.
->>
->> This patch updates ACPI and PCI core code to use the newly introduced
->> acpi_dma_configure function, providing the same functionality
->> as of_dma_configure on ARM systems and leaving behaviour unchanged
->> for all other arches.
->>
->> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Cc: Bjorn Helgaas <bhelgaas@google.com>
->> Cc: Robin Murphy <robin.murphy@arm.com>
->> Cc: Tomasz Nowicki <tn@semihalf.com>
->> Cc: Joerg Roedel <joro@8bytes.org>
->> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
->
-> There's only a tiny PCI change in this series, so I assume somebody
-> else will merge all this.  Here's my ack for the PCI part:
->
-> Acked-by: Bjorn Helgaas <bhelgaas@google.com>	# for drivers/pci/probe.c change
->
-> One question on use of pci_for_each_dma_alias() below.
->
->> +static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
->> +{
->> +	u32 *rid = data;
->> +
->> +	*rid = alias;
->> +	return 0;
->> +}
->> +
->> +/**
->> + * iort_iommu_configure - Set-up IOMMU configuration for a device.
->> + *
->> + * @dev: device that requires IOMMU set-up
->> + *
->> + * Returns: iommu_ops pointer on configuration success
->> + *          NULL on configuration failure
->> + */
->> +struct iommu_ops *iort_iommu_configure(struct device *dev)
->> +{
->> +	struct acpi_iort_node *node, *parent;
->> +	struct iommu_ops *ops = NULL;
->> +	struct iommu_fwspec fwspec;
->> +	struct iort_iommu_node *iommu_node;
->> +	u32 rid = 0, devid = 0;
->> +
->> +	if (dev_is_pci(dev)) {
->> +		struct pci_bus *bus = to_pci_dev(dev)->bus;
->> +
->> +		pci_for_each_dma_alias(to_pci_dev(dev), __get_pci_rid,
->> +				       &rid);
->
-> You end up with only the last DMA alias in "rid".  Is it really true
-> that you only need to call iort_dev_map_rid() for one of the aliases?
+I'm fine with the patch, if it fixes all the issues for you.
+I will apply it and will likely send it upstream after v4.7-rc1 release.
 
-Indeed - all we care about is what things look like by the time they 
-come out of the root complex on their way to the the IOMMU, so whatever 
-intermediate aliasing _within_ the PCI bus might happen along the way 
-doesn't actually matter.
-
-Robin.
-
->> +		node = iort_scan_node(ACPI_IORT_NODE_PCI_ROOT_COMPLEX,
->> +				      iort_find_dev_callback, &bus->dev);
->> +	} else
->> +		node = iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
->> +				      iort_find_dev_callback, dev);
->> +
->> +	if (!node)
->> +		return NULL;
->> +
->> +	iort_dev_map_rid(node, rid, &devid, ACPI_IORT_NODE_SMMU);
->> +
->> +	parent = iort_find_parent_node(node, ACPI_IORT_NODE_SMMU);
->> +
->> +	if (!parent)
->> +		return NULL;
->> +
->> +	iommu_node = iort_iommu_get_node(parent);
->> +	ops = iommu_node->ops;
->> +
->> +	fwspec.fwnode = iommu_node->fwnode;
->> +	fwspec.param_count = 1;
->> +	fwspec.param[0] = devid;
->> +
->> +	if (!ops || !ops->fw_xlate || ops->fw_xlate(dev, &fwspec))
->> +		return NULL;
->> +
->> +	return ops;
->> +}
-> _______________________________________________
-> iommu mailing list
-> iommu at lists.linux-foundation.org
-> https://lists.linuxfoundation.org/mailman/listinfo/iommu
->
+-- 
+Regards,
+Sylwester
