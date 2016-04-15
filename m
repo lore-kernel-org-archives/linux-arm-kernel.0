@@ -1,27 +1,26 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 15 Apr 2016 15:39:36 -0700
-Subject: [PATCH v3 04/19] clk: sunxi: Add TCON channel1 clock
-In-Reply-To: <1458751122-23976-5-git-send-email-maxime.ripard@free-electrons.com>
-References: <1458751122-23976-1-git-send-email-maxime.ripard@free-electrons.com>
- <1458751122-23976-5-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20160415223936.GU14441@codeaurora.org>
+Date: Fri, 15 Apr 2016 15:41:39 -0700
+Subject: [GIT PULL] i.MX clock fixes for 4.6
+In-Reply-To: <20160413073249.GN28903@tiger>
+References: <20160413073249.GN28903@tiger>
+Message-ID: <20160415224139.GV14441@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/23, Maxime Ripard wrote:
-> The TCON is a controller generating the timings to output videos signals,
-> acting like both a CRTC and an encoder.
+On 04/13, Shawn Guo wrote:
+> The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 > 
-> It has two channels depending on the output, each channel being driven by
-> its own clock (and own clock controller).
+>   Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
 > 
-> Add a driver for the channel 1 clock.
+> are available in the git repository at:
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Acked-by: Rob Herring <robh@kernel.org>
-> ---
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-clk-fixes-4.6
+> 
+> for you to fetch changes up to 7196c52c9377df0175b510ff5896bda524f7345e:
+> 
+>   clk: imx6q: fix typo in CAN clock definition (2016-04-13 15:27:15 +0800)
 
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+Thanks pulled into clk-fixes.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
