@@ -1,19 +1,17 @@
 From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Fri, 15 Apr 2016 22:34:23 +0800
-Subject: [PATCH v5 1/3] Documentation: devicetree: add Freescale SCC
- bindings
-In-Reply-To: <1460451866-12821-1-git-send-email-s.trumtrar@pengutronix.de>
-References: <1460451866-12821-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <20160415143423.GE733@gondor.apana.org.au>
+Date: Fri, 15 Apr 2016 22:36:01 +0800
+Subject: [PATCH v4 0/2] Add Hisilicon Random Number Generator(RNG) support
+In-Reply-To: <1460542288-25941-1-git-send-email-wangkefeng.wang@huawei.com>
+References: <1460542288-25941-1-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <20160415143600.GG733@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 12, 2016 at 11:04:24AM +0200, Steffen Trumtrar wrote:
-> Add documentation for the Freescale Security Controller (SCC)
-> found on i.MX25 SoCs.
-> 
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> Acked-by: Rob Herring <robh@kernel.org>
+On Wed, Apr 13, 2016 at 06:11:26PM +0800, Kefeng Wang wrote:
+> Changes since v3:
+> - Compatible name "hisilicon,hip04-rng" and  "hisilicon,hip05-rng" are used,
+>   suggested by Robe Herring
+> - Add reviewed-by from Mathieu Poirier
 
 All applied.
 -- 
