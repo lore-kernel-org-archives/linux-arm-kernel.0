@@ -1,35 +1,52 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 15 Apr 2016 14:00:34 +0530
-Subject: [PATCH] MAINTAINERS: fix stale TI DaVinci entries
-Message-ID: <1460709034-13189-1-git-send-email-nsekhar@ti.com>
+From: henryc.chen@mediatek.com (Henry Chen)
+Date: Fri, 15 Apr 2016 16:30:30 +0800
+Subject: [PATCH v3 2/2] dt-bindings: ARM: Mediatek: add interrupt as required
+ properties to the mt6397/mt6323 doc
+In-Reply-To: <1460709030-23820-1-git-send-email-henryc.chen@mediatek.com>
+References: <1460709030-23820-1-git-send-email-henryc.chen@mediatek.com>
+Message-ID: <1460709030-23820-2-git-send-email-henryc.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix stale git tree entry. Patchwork project has
-not been updated since TI DaVinci lost its
-dedicated mailing list. Remove that entry.
+MT6397/MT6323 have one interrupt line connected to the main SoC.
+Interrupt should be required feature of pmic, each sub module also
+need it to complete their function or error detect, add it as
+required properties on dts file.
 
-Update mailing list to point to LAKML.
-
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
 ---
- MAINTAINERS | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/mfd/mt6397.txt | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 03e00c7c88eb..c0155f40909a 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -10148,8 +10148,8 @@ F:	arch/arm/mach-s3c24xx/bast-irq.c
- TI DAVINCI MACHINE SUPPORT
- M:	Sekhar Nori <nsekhar@ti.com>
- M:	Kevin Hilman <khilman@kernel.org>
--T:	git git://gitorious.org/linux-davinci/linux-davinci.git
--Q:	http://patchwork.kernel.org/project/linux-davinci/list/
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git
- S:	Supported
- F:	arch/arm/mach-davinci/
- F:	drivers/i2c/busses/i2c-davinci.c
+diff --git a/Documentation/devicetree/bindings/mfd/mt6397.txt b/Documentation/devicetree/bindings/mfd/mt6397.txt
+index 949c85f..a96529e 100644
+--- a/Documentation/devicetree/bindings/mfd/mt6397.txt
++++ b/Documentation/devicetree/bindings/mfd/mt6397.txt
+@@ -15,7 +15,13 @@ Documentation/devicetree/bindings/soc/pwrap.txt
+ This document describes the binding for MFD device and its sub module.
+ 
+ Required properties:
+-compatible: "mediatek,mt6397" or "mediatek,mt6323"
++- compatible: "mediatek,mt6397" or "mediatek,mt6323"
++- interrupts: mt6323/mt6397 have one interrupt line connecteded to the main SoC
++- interrupt-parent: The parent interrupt controller
++- interrupt-controller : marks the device node as an interrupt controller
++- #interrupt-cells: the number of cells to describe an IRQ, this should be 2.
++  The first cell is the IRQ number.
++  The second cell is the flags, encoded as the trigger masks from
+ 
+ Optional subnodes:
+ 
+@@ -43,6 +49,10 @@ Example:
+ 
+ 		pmic {
+ 			compatible = "mediatek,mt6397";
++			interrupt-parent = <&pio>;
++			interrupts = <11 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
+ 
+ 			codec: mt6397codec {
+ 				compatible = "mediatek,mt6397-codec";
 -- 
-2.6.3
+1.8.1.1.dirty
