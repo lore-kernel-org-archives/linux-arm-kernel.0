@@ -1,83 +1,40 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 15 Apr 2016 18:11:53 +0100
-Subject: [PATCH 42/45] KVM: arm/arm64: vgic-new: Add vgic_v2/v3_enable
-In-Reply-To: <1460740316-8755-1-git-send-email-andre.przywara@arm.com>
-References: <1460740316-8755-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1460740316-8755-43-git-send-email-andre.przywara@arm.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 15 Apr 2016 10:44:37 -0700
+Subject: [PATCH] regulator: qcom_spmi: Always return a selector when asked
+In-Reply-To: <5710BFE7.9060802@codeaurora.org>
+References: <1459389470-29365-1-git-send-email-stephen.boyd@linaro.org>
+ <1459389470-29365-3-git-send-email-stephen.boyd@linaro.org>
+ <1459389470-29365-3-git-send-email-stephen.boyd@linaro.org>
+Message-ID: <1460742277-2838-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Auger <eric.auger@linaro.org>
+I had a thinko in spmi_regulator_select_voltage_same_range() when
+converting it to return selectors via the function's return value
+instead of by modifying a pointer argument. I only tested
+multi-range regulators so this passed through testing. Fix it by
+returning the selector here.
 
-Enable the VGIC operation by properly initialising the registers
-in the hypervisor GIC interface.
-
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Fixes: 1b5b19689278 ("regulator: qcom_spmi: Only use selector based regulator ops")
+Reported-by: Rajendra Nayak <rnayak@codeaurora.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- virt/kvm/arm/vgic/vgic-v2.c | 11 ++++++++++-
- virt/kvm/arm/vgic/vgic-v3.c | 23 ++++++++++++++++++++++-
- 2 files changed, 32 insertions(+), 2 deletions(-)
+ drivers/regulator/qcom_spmi-regulator.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index ad2b3be..cbef1af 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -208,9 +208,18 @@ void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
- 			GICH_VMCR_PRIMASK_SHIFT;
- }
+diff --git a/drivers/regulator/qcom_spmi-regulator.c b/drivers/regulator/qcom_spmi-regulator.c
+index f502f2cc65d8..84cce21e98cd 100644
+--- a/drivers/regulator/qcom_spmi-regulator.c
++++ b/drivers/regulator/qcom_spmi-regulator.c
+@@ -692,7 +692,7 @@ static int spmi_regulator_select_voltage_same_range(struct spmi_regulator *vreg,
+ 	if (selector >= vreg->set_points->n_voltages)
+ 		goto different_range;
  
--/* not yet implemented */
- void vgic_v2_enable(struct kvm_vcpu *vcpu)
- {
-+	/*
-+	 * By forcing VMCR to zero, the GIC will restore the binary
-+	 * points to their reset values. Anything else resets to zero
-+	 * anyway.
-+	 */
-+	vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr = 0;
-+	vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr = ~0;
-+
-+	/* Get the show on the road... */
-+	vcpu->arch.vgic_cpu.vgic_v2.vgic_hcr = GICH_HCR_EN;
- }
+-	return 0;
++	return selector;
  
- int vgic_v2_map_resources(struct kvm *kvm)
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index bd868e2..b6dfee4 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -196,9 +196,30 @@ void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
- 	vmcrp->pmr  = (vmcr & ICH_VMCR_PMR_MASK) >> ICH_VMCR_PMR_SHIFT;
- }
- 
--/* not yet implemented */
- void vgic_v3_enable(struct kvm_vcpu *vcpu)
- {
-+	struct vgic_v3_cpu_if *vgic_v3 = &vcpu->arch.vgic_cpu.vgic_v3;
-+
-+	/*
-+	 * By forcing VMCR to zero, the GIC will restore the binary
-+	 * points to their reset values. Anything else resets to zero
-+	 * anyway.
-+	 */
-+	vgic_v3->vgic_vmcr = 0;
-+	vgic_v3->vgic_elrsr = ~0;
-+
-+	/*
-+	 * If we are emulating a GICv3, we do it in an non-GICv2-compatible
-+	 * way, so we force SRE to 1 to demonstrate this to the guest.
-+	 * This goes with the spec allowing the value to be RAO/WI.
-+	 */
-+	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
-+		vgic_v3->vgic_sre = ICC_SRE_EL1_SRE;
-+	else
-+		vgic_v3->vgic_sre = 0;
-+
-+	/* Get the show on the road... */
-+	vgic_v3->vgic_hcr = ICH_HCR_EN;
- }
- 
- int vgic_v3_map_resources(struct kvm *kvm)
+ different_range:
+ 	return spmi_regulator_select_voltage(vreg, min_uV, max_uV);
 -- 
-2.7.3
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
