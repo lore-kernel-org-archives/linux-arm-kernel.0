@@ -1,190 +1,86 @@
-From: rrichter@caviumnetworks.com (Robert Richter)
-Date: Fri, 15 Apr 2016 21:30:05 +0200
-Subject: [PATCH v5] irqchip, gicv3-its,
- numa: Enable workaround for Cavium thunderx erratum 23144
-Message-ID: <1460748606-28390-1-git-send-email-rrichter@caviumnetworks.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 15 Apr 2016 12:35:44 -0700
+Subject: [PATCH v2 2/6] ARM: xen: Register with kernel restart handler
+In-Reply-To: <alpine.DEB.2.10.1604151122090.3433@sstabellini-ThinkPad-X260>
+References: <1460688157-6551-1-git-send-email-linux@roeck-us.net>
+ <1460688157-6551-3-git-send-email-linux@roeck-us.net>
+ <alpine.DEB.2.10.1604151122090.3433@sstabellini-ThinkPad-X260>
+Message-ID: <20160415193544.GA2005@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+On Fri, Apr 15, 2016 at 11:22:36AM -0700, Stefano Stabellini wrote:
+> On Thu, 14 Apr 2016, Guenter Roeck wrote:
+> > Register with kernel restart handler instead of setting arm_pm_restart
+> > directly.
+> > 
+> > Select a high priority of 192 to ensure that default restart handlers
+> > are replaced if Xen is running.
+> > 
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> > Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> 
+> Thanks. I assume this is going to go in via Russell or Catalin's tree
+> with the rest of your series?
+> 
+I would suggest Russell, if he is willing to pick it up, since it mostly
+affects arm.
 
-The erratum fixes the hang of ITS SYNC command by avoiding inter node
-io and collections/cpu mapping on thunderx dual-socket platform.
+Guenter
 
-This fix is only applicable for Cavium's ThunderX dual-socket platform.
-
-This is based on NUMA v16 series.
-Message-Id: <1460155828-8690-1-git-send-email-ddaney.cavm@gmail.com>
-
-v5 (by Robert Richter):
-fixed use of cpumask_of_node() only for (node >= 0)
-minor style fixes
-
-v4:
-updated silicon-errata.txt
-updated as per Robert Richter review comment.
-
-v3:
-updatated as per Marc Zyngier's review comments.
-http://www.spinics.net/lists/arm-kernel/msg443462.html
-
-v2:
-updatated as per Marc Zyngier's review comments.
-
-Reviewed-by: Robert Richter <rrichter@cavium.com>
-Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
-Signed-off-by: Robert Richter <rrichter@cavium.com>
----
- Documentation/arm64/silicon-errata.txt |  1 +
- arch/arm64/Kconfig                     |  9 +++++++
- drivers/irqchip/irq-gic-v3-its.c       | 49 ++++++++++++++++++++++++++++++++--
- 3 files changed, 57 insertions(+), 2 deletions(-)
-
-diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-index ba4b6acfc545..ab19e709d05e 100644
---- a/Documentation/arm64/silicon-errata.txt
-+++ b/Documentation/arm64/silicon-errata.txt
-@@ -55,5 +55,6 @@ stable kernels.
- | ARM            | Cortex-A57      | #834220         | ARM64_ERRATUM_834220    |
- |                |                 |                 |                         |
- | Cavium         | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375    |
-+| Cavium         | ThunderX ITS    | #23144          | CAVIUM_ERRATUM_23144    |
- | Cavium         | ThunderX GICv3  | #23154          | CAVIUM_ERRATUM_23154    |
- | Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456    |
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index a578080ae7a0..40efc0e29d62 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -426,6 +426,15 @@ config CAVIUM_ERRATUM_22375
- 
- 	  If unsure, say Y.
- 
-+config CAVIUM_ERRATUM_23144
-+	bool "Cavium erratum 23144: ITS SYNC hang on dual socket system"
-+	depends on NUMA
-+	default y
-+	help
-+	  ITS SYNC command hang for cross node io and collections/cpu mapping.
-+
-+	  If unsure, say Y.
-+
- config CAVIUM_ERRATUM_23154
- 	bool "Cavium erratum 23154: Access to ICC_IAR1_EL1 is not sync'ed"
- 	default y
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 39261798c59f..75f258fbf1d0 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -41,6 +41,7 @@
- 
- #define ITS_FLAGS_CMDQ_NEEDS_FLUSHING		(1ULL << 0)
- #define ITS_FLAGS_WORKAROUND_CAVIUM_22375	(1ULL << 1)
-+#define ITS_FLAGS_WORKAROUND_CAVIUM_23144	(1ULL << 2)
- 
- #define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING	(1 << 0)
- 
-@@ -74,6 +75,7 @@ struct its_node {
- 	struct list_head	its_device_list;
- 	u64			flags;
- 	u32			ite_size;
-+	int			numa_node;
- };
- 
- #define ITS_ITT_ALIGN		SZ_256
-@@ -605,11 +607,23 @@ static void its_unmask_irq(struct irq_data *d)
- static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
- 			    bool force)
- {
--	unsigned int cpu = cpumask_any_and(mask_val, cpu_online_mask);
-+	unsigned int cpu;
-+	const struct cpumask *cpu_mask = cpu_online_mask;
- 	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
- 	struct its_collection *target_col;
- 	u32 id = its_get_event_id(d);
- 
-+       /* lpi cannot be routed to a redistributor that is on a foreign node */
-+	if (its_dev->its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_23144) {
-+		if (its_dev->its->numa_node >= 0) {
-+			cpu_mask = cpumask_of_node(its_dev->its->numa_node);
-+			if (!cpumask_intersects(mask_val, cpu_mask))
-+				return -EINVAL;
-+		}
-+	}
-+
-+	cpu = cpumask_any_and(mask_val, cpu_mask);
-+
- 	if (cpu >= nr_cpu_ids)
- 		return -EINVAL;
- 
-@@ -1090,6 +1104,16 @@ static void its_cpu_init_collection(void)
- 	list_for_each_entry(its, &its_nodes, entry) {
- 		u64 target;
- 
-+		/* avoid cross node collections and its mapping */
-+		if (its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_23144) {
-+			struct device_node *cpu_node;
-+
-+			cpu_node = of_get_cpu_node(cpu, NULL);
-+			if (its->numa_node != NUMA_NO_NODE &&
-+				its->numa_node != of_node_to_nid(cpu_node))
-+				continue;
-+		}
-+
- 		/*
- 		 * We now have to bind each collection to its target
- 		 * redistributor.
-@@ -1317,9 +1341,14 @@ static void its_irq_domain_activate(struct irq_domain *domain,
- {
- 	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
- 	u32 event = its_get_event_id(d);
-+	const struct cpumask *cpu_mask = cpu_online_mask;
-+
-+	/* get the cpu_mask of local node */
-+	if (its_dev->its->numa_node >= 0)
-+		cpu_mask = cpumask_of_node(its_dev->its->numa_node);
- 
- 	/* Bind the LPI to the first possible CPU */
--	its_dev->event_map.col_map[event] = cpumask_first(cpu_online_mask);
-+	its_dev->event_map.col_map[event] = cpumask_first(cpu_mask);
- 
- 	/* Map the GIC IRQ and event to the device */
- 	its_send_mapvi(its_dev, d->hwirq, event);
-@@ -1409,6 +1438,13 @@ static void __maybe_unused its_enable_quirk_cavium_22375(void *data)
- 	its->flags |= ITS_FLAGS_WORKAROUND_CAVIUM_22375;
- }
- 
-+static void __maybe_unused its_enable_quirk_cavium_23144(void *data)
-+{
-+	struct its_node *its = data;
-+
-+	its->flags |= ITS_FLAGS_WORKAROUND_CAVIUM_23144;
-+}
-+
- static const struct gic_quirk its_quirks[] = {
- #ifdef CONFIG_CAVIUM_ERRATUM_22375
- 	{
-@@ -1418,6 +1454,14 @@ static const struct gic_quirk its_quirks[] = {
- 		.init	= its_enable_quirk_cavium_22375,
- 	},
- #endif
-+#ifdef CONFIG_CAVIUM_ERRATUM_23144
-+	{
-+		.desc	= "ITS: Cavium erratum 23144",
-+		.iidr	= 0xa100034c,	/* ThunderX pass 1.x */
-+		.mask	= 0xffff0fff,
-+		.init	= its_enable_quirk_cavium_23144,
-+	},
-+#endif
- 	{
- 	}
- };
-@@ -1480,6 +1524,7 @@ static int __init its_probe(struct device_node *node,
- 	its->base = its_base;
- 	its->phys_base = res.start;
- 	its->ite_size = ((readl_relaxed(its_base + GITS_TYPER) >> 4) & 0xf) + 1;
-+	its->numa_node = of_node_to_nid(node);
- 
- 	its->cmd_base = kzalloc(ITS_CMD_QUEUE_SZ, GFP_KERNEL);
- 	if (!its->cmd_base) {
--- 
-2.7.0.rc3
+> 
+> > v2: Rebased to v4.6-rc3, added Reviewed/by/Acked-by tags
+> > 
+> >  arch/arm/xen/enlighten.c | 13 +++++++++++--
+> >  1 file changed, 11 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> > index 75cd7345c654..76a1d12fd27e 100644
+> > --- a/arch/arm/xen/enlighten.c
+> > +++ b/arch/arm/xen/enlighten.c
+> > @@ -27,6 +27,7 @@
+> >  #include <linux/cpu.h>
+> >  #include <linux/console.h>
+> >  #include <linux/pvclock_gtod.h>
+> > +#include <linux/reboot.h>
+> >  #include <linux/time64.h>
+> >  #include <linux/timekeeping.h>
+> >  #include <linux/timekeeper_internal.h>
+> > @@ -193,14 +194,22 @@ after_register_vcpu_info:
+> >  	put_cpu();
+> >  }
+> >  
+> > -static void xen_restart(enum reboot_mode reboot_mode, const char *cmd)
+> > +static int xen_restart(struct notifier_block *nb, unsigned long action,
+> > +		       void *data)
+> >  {
+> >  	struct sched_shutdown r = { .reason = SHUTDOWN_reboot };
+> >  	int rc;
+> >  	rc = HYPERVISOR_sched_op(SCHEDOP_shutdown, &r);
+> >  	BUG_ON(rc);
+> > +
+> > +	return NOTIFY_DONE;
+> >  }
+> >  
+> > +static struct notifier_block xen_restart_nb = {
+> > +	.notifier_call = xen_restart,
+> > +	.priority = 192,
+> > +};
+> > +
+> >  static void xen_power_off(void)
+> >  {
+> >  	struct sched_shutdown r = { .reason = SHUTDOWN_poweroff };
+> > @@ -370,7 +379,7 @@ static int __init xen_pm_init(void)
+> >  		return -ENODEV;
+> >  
+> >  	pm_power_off = xen_power_off;
+> > -	arm_pm_restart = xen_restart;
+> > +	register_restart_handler(&xen_restart_nb);
+> >  	if (!xen_initial_domain()) {
+> >  		struct timespec64 ts;
+> >  		xen_read_wallclock(&ts);
+> > -- 
+> > 2.5.0
+> > 
