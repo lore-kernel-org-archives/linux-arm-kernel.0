@@ -1,108 +1,44 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 15 Apr 2016 11:39:06 +0200
-Subject: [PATCH RESEND] gpmi-nand: Handle ECC Errors in erased pages
-In-Reply-To: <33206452.D8BR53ndXi@adelgunde>
-References: <1456059126-25469-1-git-send-email-mpa@pengutronix.de>
- <7168760.YSQBa3GsdA@adelgunde> <20160415103508.5f6bc8c8@bbrezillon>
- <33206452.D8BR53ndXi@adelgunde>
-Message-ID: <20160415113906.7f971cec@bbrezillon>
+From: m.chehab@samsung.com (Mauro Carvalho Chehab)
+Date: Fri, 15 Apr 2016 06:40:42 -0300
+Subject: [PATCH] Add EDAC peripheral init functions & Ethernet EDAC.
+In-Reply-To: <20160414143501.GA25212@rob-hp-laptop>
+References: <1460499181-23080-1-git-send-email-tthayer@opensource.altera.com>
+ <20160414143501.GA25212@rob-hp-laptop>
+Message-ID: <20160415064042.330406ab.m.chehab@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Markus,
+Em Thu, 14 Apr 2016 09:35:01 -0500
+Rob Herring <robh@kernel.org> escreveu:
 
-On Fri, 15 Apr 2016 11:35:07 +0200
-Markus Pargmann <mpa@pengutronix.de> wrote:
-
-> Hi Boris,
+> On Tue, Apr 12, 2016 at 05:12:55PM -0500, tthayer at opensource.altera.com wrote:
+> > This patch set adds the memory initialization functions for Altera's
+> > Arria10 peripherals, the first of which is the Ethernet EDAC. The
+> > first 3 patches add the memory initialization functionality. The
+> > last 3 patches add Ethernet EDAC support.  
 > 
-> On Friday 15 April 2016 10:35:08 Boris Brezillon wrote:
-> > Hi Markus,
-> > 
-> > On Fri, 15 Apr 2016 09:55:45 +0200
-> > Markus Pargmann <mpa@pengutronix.de> wrote:
-> > 
-> > > On Wednesday 13 April 2016 00:51:55 Boris Brezillon wrote:
-> > > > On Tue, 12 Apr 2016 22:39:08 +0000
-> > > > Han Xu <han.xu@nxp.com> wrote:
-> > > > 
-> > > > > > Thanks for the feedback. Talking with a coworker about this we may have found a
-> > > > > > better approach to this that is less complicated to implement. The hardware
-> > > > > > unit allows us to set a bitflip threshold for erased pages. The ECC unit
-> > > > > > creates an ECC error only if the number of bitflips exceeds this threshold, but
-> > > > > > it does not correct these. So the idea is to change the patch so that we set
-> > > > > > pages, that are signaled by the ECC as erased, to 0xff completely without
-> > > > > > checking. So the ECC will do all the work and we completely trust in its
-> > > > > > abilities to do it correctly.
-> > > > > 
-> > > > > Sounds good.
-> > > > > 
-> > > > > some new platforms with new gpmi controller could check the count of 0 bits in page,
-> > > > > refer to my patch https://patchwork.ozlabs.org/patch/587124/
-> > > > > 
-> > > > > But for all legacy platforms, IMO, considering bitflip is rare case, set threshold to 0 and
-> > > > > only check the uncorrectable branch and then correct data sounds better. Setting threshold
-> > > > > and correcting all erased page may highly impact the performance.
-> > > > 
-> > > > Indeed, bitflips in erased pages is not so common, and penalizing the
-> > > > likely case (erased pages without any bitflips) doesn't look like a good
-> > > > idea in the end.
-> > > 
-> > > Are erased pages really read that often?
-> > 
-> > Yes, it's not unusual to have those "empty pages?" checks (added Artem
-> > and Richard to get a confirmation). AFAIR, UBIFS check for empty pages
-> > in its journal heads after an unclean unmount (which happens quite
-> > often) to make sure there's no corruption.
-> > 
-> > > I am not sure how UBI handles
-> > > this, does it read every page before writing?
-> > 
-> > Nope, or maybe it does when you activate some extra checks.
-> > 
-> > > 
-> > > > 
-> > > > You can still implement this check in software. You can have a look at
-> > > > nand_check_erased_ecc_chunk() [1] if you need an example, but you'll
-> > > > have to adapt it because your controller does not guarantees that ECC
-> > > > bits for a given chunk are byte aligned :-/
-> > > 
-> > > Yes I used this function in the patch. The issue is that I am not quite
-> > > sure yet where to find the raw ECC data (without rereading the page).
-> > > The reference manual is not extremely clear about that, ecc data may be
-> > > in the 'auxilliary data' but I am not sure that it really is available
-> > > somewhere.
-> > 
-> > AFAIR (and I'm not sure since it was a long time ago), you don't have
-> > direct access to ECC bytes with the GPMI engine. If that's the case,
-> > you'll have to read the ECC bytes manually (moving the page pointer
-> > using ->cmdfunc(NAND_CMD_RNDOUT, column, -1)), which is a pain with
-> > this engine, because ECC bytes are not guaranteed to be byte aligned
-> > (see gpmi ->read_page_raw() implementation).
-> > Once you've retrieved ECC bytes (or bits in this case), for each ECC
-> > chunk, you can use the nand_check_erased_ecc_chunk() function (just make
-> > sure you're padding the last ECC byte of each chunk with ones so that
-> > bitflips cannot be reported on this section).
-> 
-> Thanks for the information. So I understand that this approach is the
-> preferred one to avoid any performance issues for normal operation.
-> 
-> I actually won't be able to fix this patch accordingly for some time. If
-> anyone else needs this earlier, feel free to implement it.
+> The ethernet part seems a bit strange to me to put under EDAC as EDAC 
+> is primarily memory controller ECC (and caches to some extent). Also you 
+> would not halt the system in case of an UC, but rather just drop the 
+> frame. This would need to be part of the ethernet driver in that case.
+>  
+> Of course, given that ethernet frames already have a CRC, ECC of the 
+> FIFO seems a bit redundant.
 
-I just did [1] (it applies on top of your patch), but maybe you
-can test it (I don't have any imx platforms right now) ;).
+Actually, EDAC was conceived to be a way to report hardware errors, and,
+although the main use case is for memory and CPU errors, there are a few
+drivers that report errors at PCI bus. So, I don't see much problems using
+it to report other hardware errors, like the ones associated with the
+Ethernet hardware.
 
-If these changes work, feel free to squash them into your previous
-patch.
+That's said, things like Ethernet frame errors are better handled via the
+network drivers. I would report via EDAC only errors associated with the
+Ethernet hardware that would cause the hardware to malfunction.
 
-Thanks,
-
-Boris
-
-[1]http://code.bulix.org/bq6yyh-96549
+Btw, an UC error won't cause the system to halt, except if a UC memory
+error happens and the EDAC core is loaded with an special modprobe
+parameter (edac_mc_panic_on_ue = 1).
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Thanks,
+Mauro
