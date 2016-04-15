@@ -1,40 +1,25 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Fri, 15 Apr 2016 17:03:14 +0800
-Subject: [PATCH 1/3] ACPI / ARM64: Don't enable ACPI by default on ARM64
-In-Reply-To: <1460706823-16566-1-git-send-email-broonie@kernel.org>
-References: <1460706823-16566-1-git-send-email-broonie@kernel.org>
-Message-ID: <5710AE52.2070608@huawei.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 15 Apr 2016 11:04:52 +0200
+Subject: [PATCH v2 4/8] ARM: dts: Add NoC Probe dt node for Exynos542x SoC
+In-Reply-To: <1460701975-24178-5-git-send-email-cw00.choi@samsung.com>
+References: <1460701975-24178-1-git-send-email-cw00.choi@samsung.com>
+ <1460701975-24178-5-git-send-email-cw00.choi@samsung.com>
+Message-ID: <5710AEB4.3050008@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/4/15 15:53, Mark Brown wrote:
-> If ACPI is selectable it is enabled by default.  This is a good choice
-> for architectures where the overwhelming majority of systems use ACPI
-> like x86 and IA-64 but is less clear for architectures where it's less
-> common like ARM64.  Change the default selection so that it's only done
-> explicitly on those architectures where ACPI is universally used.
->
-> Signed-off-by: Mark Brown <broonie@kernel.org>
+On 04/15/2016 08:32 AM, Chanwoo Choi wrote:
+> This patch adds the NoCP (Network on Chip Probe) Device Tree node
+> to measure the bandwidth of memory and g3d in Exynos542x SoC.
+> 
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Tested-by: Markus Reichl <m.reichl@fivetechno.de>
+> Tested-by: Anand Moon <linux.amoon@gmail.com>
 > ---
->  drivers/acpi/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-> index 82b96ee8624c..2fcf87a6d270 100644
-> --- a/drivers/acpi/Kconfig
-> +++ b/drivers/acpi/Kconfig
-> @@ -8,7 +8,7 @@ menuconfig ACPI
->  	depends on IA64 || X86 || (ARM64 && EXPERT)
->  	depends on PCI
->  	select PNP
-> -	default y
-> +	default y if (IA64 || X86)
->  	help
->  	  Advanced Configuration and Power Interface (ACPI) support for 
->  	  Linux requires an ACPI-compliant platform (hardware/firmware),
+>  arch/arm/boot/dts/exynos5420.dtsi | 36 ++++++++++++++++++++++++++++++++++++
+>  1 file changed, 36 insertions(+)
 
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
-
-Thanks
-Hanjun
+Best regards,
+Krzysztof
