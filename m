@@ -1,75 +1,109 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 15 Apr 2016 10:10:57 -0600
-Subject: [PATCH V2 12/15] coresight: tmc: keep track of memory width
-In-Reply-To: <570F7CD0.30500@arm.com>
-References: <1460483692-25061-1-git-send-email-mathieu.poirier@linaro.org>
- <1460483692-25061-13-git-send-email-mathieu.poirier@linaro.org>
- <570F7CD0.30500@arm.com>
-Message-ID: <CANLsYkyzCFVhdt8kmSYaH=HarfJZ3OUU4UnS6XsmhFs10HhHXA@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 15 Apr 2016 11:14:00 -0500
+Subject: [RFC PATCH 09/11] drivers: acpi: implement acpi_dma_configure
+In-Reply-To: <1460654743-7896-10-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1460654743-7896-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1460654743-7896-10-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20160415161400.GC7973@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 April 2016 at 05:19, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
-> On 12/04/16 18:54, Mathieu Poirier wrote:
->>
->> Accessing the HW configuration register each time the memory
->> width is needed simply doesn't make sense.  It is much more
->> efficient to read the value once and keep a reference for
->> later use.
->>
->> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->> ---
->>   drivers/hwtracing/coresight/coresight-tmc-etf.c | 8 +++-----
->>   drivers/hwtracing/coresight/coresight-tmc.c     | 1 +
->>   drivers/hwtracing/coresight/coresight-tmc.h     | 2 ++
->>   3 files changed, 6 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c
->> b/drivers/hwtracing/coresight/coresight-tmc-etf.c
->> index 50d32e8ef4ea..a440784e3b27 100644
->> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
->> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
->> @@ -41,18 +41,16 @@ void tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
->>
->>   static void tmc_etb_dump_hw(struct tmc_drvdata *drvdata)
->>   {
->> -       enum tmc_mem_intf_width memwidth;
->>         u8 memwords;
->>         char *bufp;
->>         u32 read_data;
->>         int i;
->>
->> -       memwidth = BMVAL(readl_relaxed(drvdata->base + CORESIGHT_DEVID),
->> 8, 10);
->> -       if (memwidth == TMC_MEM_INTF_WIDTH_32BITS)
->> +       if (drvdata->memwidth == TMC_MEM_INTF_WIDTH_32BITS)
->>                 memwords = 1;
->> -       else if (memwidth == TMC_MEM_INTF_WIDTH_64BITS)
->> +       else if (drvdata->memwidth == TMC_MEM_INTF_WIDTH_64BITS)
->>                 memwords = 2;
->> -       else if (memwidth == TMC_MEM_INTF_WIDTH_128BITS)
->> +       else if (drvdata->memwidth == TMC_MEM_INTF_WIDTH_128BITS)
->>                 memwords = 4;
->
->
->
->>   struct tmc_drvdata {
->> @@ -118,6 +119,7 @@ struct tmc_drvdata {
->>         u32                     size;
->>         local_t                 mode;
->>         enum tmc_config_type    config_type;
->> +       enum tmc_mem_intf_width memwidth;
->
->
-> Could we not store the converted memwords here, instead of the enum value
-> here
-> and convert it every time we access it ?
+On Thu, Apr 14, 2016 at 06:25:41PM +0100, Lorenzo Pieralisi wrote:
+> On DT based systems, the of_dma_configure() API implements DMA configuration
+> for a given device. On ACPI systems an API equivalent to of_dma_configure()
+> is missing which implies that it is currently not possible to set-up DMA
+> operations for devices through the ACPI generic kernel layer.
+> 
+> This patch fills the gap by introducing acpi_dma_configure/deconfigure()
+> calls, that carry out IOMMU configuration through IORT (on systems where
+> it is present) and call arch_setup_dma_ops(...) with the retrieved
+> parameters.
+> 
+> The DMA range size passed to arch_setup_dma_ops() is sized according
+> to the device coherent_dma_mask (starting at address 0x0), mirroring the
+> DT probing path behaviour when a dma-ranges property is not provided
+> for the device being probed; this changes the current arch_setup_dma_ops()
+> call parameters in the ACPI probing case, but since arch_setup_dma_ops()
+> is a NOP on all architectures but ARM/ARM64 this patch does not change
+> the current kernel behaviour on them.
+> 
+> This patch updates ACPI and PCI core code to use the newly introduced
+> acpi_dma_configure function, providing the same functionality
+> as of_dma_configure on ARM systems and leaving behaviour unchanged
+> for all other arches.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> Cc: Tomasz Nowicki <tn@semihalf.com>
+> Cc: Joerg Roedel <joro@8bytes.org>
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
 
-Sure, I can fix that.
+There's only a tiny PCI change in this series, so I assume somebody
+else will merge all this.  Here's my ack for the PCI part:
 
-Thanks for the review,
-Mathieu
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>	# for drivers/pci/probe.c change
 
->
-> Cheers
-> Suzuki
+One question on use of pci_for_each_dma_alias() below.
+
+> +static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
+> +{
+> +	u32 *rid = data;
+> +
+> +	*rid = alias;
+> +	return 0;
+> +}
+> +
+> +/**
+> + * iort_iommu_configure - Set-up IOMMU configuration for a device.
+> + *
+> + * @dev: device that requires IOMMU set-up
+> + *
+> + * Returns: iommu_ops pointer on configuration success
+> + *          NULL on configuration failure
+> + */
+> +struct iommu_ops *iort_iommu_configure(struct device *dev)
+> +{
+> +	struct acpi_iort_node *node, *parent;
+> +	struct iommu_ops *ops = NULL;
+> +	struct iommu_fwspec fwspec;
+> +	struct iort_iommu_node *iommu_node;
+> +	u32 rid = 0, devid = 0;
+> +
+> +	if (dev_is_pci(dev)) {
+> +		struct pci_bus *bus = to_pci_dev(dev)->bus;
+> +
+> +		pci_for_each_dma_alias(to_pci_dev(dev), __get_pci_rid,
+> +				       &rid);
+
+You end up with only the last DMA alias in "rid".  Is it really true
+that you only need to call iort_dev_map_rid() for one of the aliases?
+
+> +		node = iort_scan_node(ACPI_IORT_NODE_PCI_ROOT_COMPLEX,
+> +				      iort_find_dev_callback, &bus->dev);
+> +	} else
+> +		node = iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
+> +				      iort_find_dev_callback, dev);
+> +
+> +	if (!node)
+> +		return NULL;
+> +
+> +	iort_dev_map_rid(node, rid, &devid, ACPI_IORT_NODE_SMMU);
+> +
+> +	parent = iort_find_parent_node(node, ACPI_IORT_NODE_SMMU);
+> +
+> +	if (!parent)
+> +		return NULL;
+> +
+> +	iommu_node = iort_iommu_get_node(parent);
+> +	ops = iommu_node->ops;
+> +
+> +	fwspec.fwnode = iommu_node->fwnode;
+> +	fwspec.param_count = 1;
+> +	fwspec.param[0] = devid;
+> +
+> +	if (!ops || !ops->fw_xlate || ops->fw_xlate(dev, &fwspec))
+> +		return NULL;
+> +
+> +	return ops;
+> +}
