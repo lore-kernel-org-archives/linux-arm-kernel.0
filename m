@@ -1,46 +1,60 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 15 Apr 2016 13:55:12 +0100
-Subject: [PATCH 1/5] arm64: cpufeature: Add scope for capability check
-In-Reply-To: <570FD7C2.9030305@arm.com>
-References: <1459941854-5190-1-git-send-email-suzuki.poulose@arm.com>
- <1459941854-5190-2-git-send-email-suzuki.poulose@arm.com>
- <20160414173809.GN4584@arm.com> <570FD7C2.9030305@arm.com>
-Message-ID: <20160415125511.GF22906@arm.com>
+Date: Fri, 15 Apr 2016 14:05:21 +0100
+Subject: [PATCH] iommu/arm-smmu: Don't allocate resources for bypass
+ domains
+In-Reply-To: <491c885f61c509d959b04cfb63676bd07e481dea.1460558667.git.robin.murphy@arm.com>
+References: <1459527597-10740-1-git-send-email-will.deacon@arm.com>
+ <570397F4.8080504@arm.com> <5703A289.30308@linaro.org>
+ <491c885f61c509d959b04cfb63676bd07e481dea.1460558667.git.robin.murphy@arm.com>
+Message-ID: <20160415130520.GH22906@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 14, 2016 at 06:47:46PM +0100, Suzuki K Poulose wrote:
-> On 14/04/16 18:38, Will Deacon wrote:
-> >Hi Suzuki,
-> >
-> >On Wed, Apr 06, 2016 at 12:24:10PM +0100, Suzuki K Poulose wrote:
-> >>Add scope parameter to the arm64_cpu_capabilities::matches(),
-> >>so that this can be reused for checking the capability on a
-> >>given CPU vs the system wide. By default, the system uses
-> >>'system' wide values for setting the CPU_HWCAPs and ELF_HWCAPs.
-> 
-> >>  static bool __maybe_unused
-> >>-is_affected_midr_range(const struct arm64_cpu_capabilities *entry)
-> >>+is_affected_midr_range(const struct arm64_cpu_capabilities *entry, int __unused)
-> >
-> >Maybe it would be better to WARN if somebody passes SCOPE_SYSTEM, rather
-> >than silently treat it as per-cpu?
-> 
-> Should we worry about errata's which may not necessarily depend on per CPU or
-> a local capability (GIC) ?
+On Wed, Apr 13, 2016 at 03:46:57PM +0100, Robin Murphy wrote:
+> Until we get fully plumbed into of_iommu_configure, our default
+> IOMMU_DOMAIN_DMA domains just bypass translation. Since we achieve that
+> by leaving the stream table entries set to bypass instead of pointing at
+> a translation context, the context bank we allocate for the domain is
+> completely wasted. Context banks are typically a rather limited
+> resource, so don't hog ones we don't need.
 
-Why would they be calling is_affected_midr_range?
-
-> If not, we could add a WARN after passing down LOCAL
-> scope for errata.
-
-But if we don't care about errata that aren't local, then why would we warn
-on LOCAL?
-
-> Right now we always do SCOPE_SYSTEM from update_cpu_capabilities(), even for
-> cpu_errata table. There is no specific reason for that.
-
-I'm totally confused. Can you define SCOPE_SYSTEM and SCOPE_LOCAL for me,
-please?
+Eric, does this resolve your remaining passthrough regressions when applied
+on top of my patch?
 
 Will
+
+> Reported-by: Eric Auger <eric.auger@linaro.org>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  drivers/iommu/arm-smmu.c | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index 5158feb..7c39ac4 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -826,6 +826,12 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
+>  	if (smmu_domain->smmu)
+>  		goto out_unlock;
+>  
+> +	/* We're bypassing these SIDs, so don't allocate an actual context */
+> +	if (domain->type == IOMMU_DOMAIN_DMA) {
+> +		smmu_domain->smmu = smmu;
+> +		goto out_unlock;
+> +	}
+> +
+>  	/*
+>  	 * Mapping the requested stage onto what we support is surprisingly
+>  	 * complicated, mainly because the spec allows S1+S2 SMMUs without
+> @@ -948,7 +954,7 @@ static void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
+>  	void __iomem *cb_base;
+>  	int irq;
+>  
+> -	if (!smmu)
+> +	if (!smmu || domain->type == IOMMU_DOMAIN_DMA)
+>  		return;
+>  
+>  	/*
+> -- 
+> 2.7.3.dirty
+> 
