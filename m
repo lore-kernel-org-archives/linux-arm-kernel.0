@@ -1,107 +1,125 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Fri, 15 Apr 2016 17:19:39 +0100
-Subject: [PATCH] arm64: dts: Add L2 cache topology to Hi6220
-In-Reply-To: <1456464514-24380-1-git-send-email-leo.yan@linaro.org>
-References: <1456464514-24380-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <5711149B.8000805@hisilicon.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 15 Apr 2016 17:31:58 +0100
+Subject: [RFC PATCH 09/11] drivers: acpi: implement acpi_dma_configure
+In-Reply-To: <20160415161400.GC7973@localhost>
+References: <1460654743-7896-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1460654743-7896-10-git-send-email-lorenzo.pieralisi@arm.com>
+ <20160415161400.GC7973@localhost>
+Message-ID: <5711177E.2000509@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Leo,
+Hi Bjorn,
 
-On 26/02/2016 05:28, Leo Yan wrote:
-> This patch adds the L2 cache topology on Hi6220. Hi6220 has two
-> clusters, every cluster has 512KiB L2 cache (32KiB x 16 ways).
-> 
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> ---
+On 15/04/16 17:14, Bjorn Helgaas wrote:
+> On Thu, Apr 14, 2016 at 06:25:41PM +0100, Lorenzo Pieralisi wrote:
+>> On DT based systems, the of_dma_configure() API implements DMA configuration
+>> for a given device. On ACPI systems an API equivalent to of_dma_configure()
+>> is missing which implies that it is currently not possible to set-up DMA
+>> operations for devices through the ACPI generic kernel layer.
+>>
+>> This patch fills the gap by introducing acpi_dma_configure/deconfigure()
+>> calls, that carry out IOMMU configuration through IORT (on systems where
+>> it is present) and call arch_setup_dma_ops(...) with the retrieved
+>> parameters.
+>>
+>> The DMA range size passed to arch_setup_dma_ops() is sized according
+>> to the device coherent_dma_mask (starting at address 0x0), mirroring the
+>> DT probing path behaviour when a dma-ranges property is not provided
+>> for the device being probed; this changes the current arch_setup_dma_ops()
+>> call parameters in the ACPI probing case, but since arch_setup_dma_ops()
+>> is a NOP on all architectures but ARM/ARM64 this patch does not change
+>> the current kernel behaviour on them.
+>>
+>> This patch updates ACPI and PCI core code to use the newly introduced
+>> acpi_dma_configure function, providing the same functionality
+>> as of_dma_configure on ARM systems and leaving behaviour unchanged
+>> for all other arches.
+>>
+>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Cc: Bjorn Helgaas <bhelgaas@google.com>
+>> Cc: Robin Murphy <robin.murphy@arm.com>
+>> Cc: Tomasz Nowicki <tn@semihalf.com>
+>> Cc: Joerg Roedel <joro@8bytes.org>
+>> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+>
+> There's only a tiny PCI change in this series, so I assume somebody
+> else will merge all this.  Here's my ack for the PCI part:
+>
+> Acked-by: Bjorn Helgaas <bhelgaas@google.com>	# for drivers/pci/probe.c change
+>
+> One question on use of pci_for_each_dma_alias() below.
+>
+>> +static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
+>> +{
+>> +	u32 *rid = data;
+>> +
+>> +	*rid = alias;
+>> +	return 0;
+>> +}
+>> +
+>> +/**
+>> + * iort_iommu_configure - Set-up IOMMU configuration for a device.
+>> + *
+>> + * @dev: device that requires IOMMU set-up
+>> + *
+>> + * Returns: iommu_ops pointer on configuration success
+>> + *          NULL on configuration failure
+>> + */
+>> +struct iommu_ops *iort_iommu_configure(struct device *dev)
+>> +{
+>> +	struct acpi_iort_node *node, *parent;
+>> +	struct iommu_ops *ops = NULL;
+>> +	struct iommu_fwspec fwspec;
+>> +	struct iort_iommu_node *iommu_node;
+>> +	u32 rid = 0, devid = 0;
+>> +
+>> +	if (dev_is_pci(dev)) {
+>> +		struct pci_bus *bus = to_pci_dev(dev)->bus;
+>> +
+>> +		pci_for_each_dma_alias(to_pci_dev(dev), __get_pci_rid,
+>> +				       &rid);
+>
+> You end up with only the last DMA alias in "rid".  Is it really true
+> that you only need to call iort_dev_map_rid() for one of the aliases?
 
-Applied.
-Thanks!
+Indeed - all we care about is what things look like by the time they 
+come out of the root complex on their way to the the IOMMU, so whatever 
+intermediate aliasing _within_ the PCI bus might happen along the way 
+doesn't actually matter.
 
-Best Regards,
-Wei
+Robin.
 
->  arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> index d8b963c..1746d50 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> @@ -82,6 +82,7 @@
->  			device_type = "cpu";
->  			reg = <0x0 0x0>;
->  			enable-method = "psci";
-> +			next-level-cache = <&CLUSTER0_L2>;
->  			clocks = <&stub_clock 0>;
->  			operating-points-v2 = <&cpu_opp_table>;
->  			cooling-min-level = <4>;
-> @@ -96,6 +97,7 @@
->  			device_type = "cpu";
->  			reg = <0x0 0x1>;
->  			enable-method = "psci";
-> +			next-level-cache = <&CLUSTER0_L2>;
->  			operating-points-v2 = <&cpu_opp_table>;
->  			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
->  		};
-> @@ -105,6 +107,7 @@
->  			device_type = "cpu";
->  			reg = <0x0 0x2>;
->  			enable-method = "psci";
-> +			next-level-cache = <&CLUSTER0_L2>;
->  			operating-points-v2 = <&cpu_opp_table>;
->  			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
->  		};
-> @@ -114,6 +117,7 @@
->  			device_type = "cpu";
->  			reg = <0x0 0x3>;
->  			enable-method = "psci";
-> +			next-level-cache = <&CLUSTER0_L2>;
->  			operating-points-v2 = <&cpu_opp_table>;
->  			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
->  		};
-> @@ -123,6 +127,7 @@
->  			device_type = "cpu";
->  			reg = <0x0 0x100>;
->  			enable-method = "psci";
-> +			next-level-cache = <&CLUSTER1_L2>;
->  			operating-points-v2 = <&cpu_opp_table>;
->  			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
->  		};
-> @@ -132,6 +137,7 @@
->  			device_type = "cpu";
->  			reg = <0x0 0x101>;
->  			enable-method = "psci";
-> +			next-level-cache = <&CLUSTER1_L2>;
->  			operating-points-v2 = <&cpu_opp_table>;
->  			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
->  		};
-> @@ -141,6 +147,7 @@
->  			device_type = "cpu";
->  			reg = <0x0 0x102>;
->  			enable-method = "psci";
-> +			next-level-cache = <&CLUSTER1_L2>;
->  			operating-points-v2 = <&cpu_opp_table>;
->  			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
->  		};
-> @@ -150,9 +157,18 @@
->  			device_type = "cpu";
->  			reg = <0x0 0x103>;
->  			enable-method = "psci";
-> +			next-level-cache = <&CLUSTER1_L2>;
->  			operating-points-v2 = <&cpu_opp_table>;
->  			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
->  		};
-> +
-> +		CLUSTER0_L2: l2-cache0 {
-> +			compatible = "cache";
-> +		};
-> +
-> +		CLUSTER1_L2: l2-cache1 {
-> +			compatible = "cache";
-> +		};
->  	};
->  
->  	cpu_opp_table: cpu_opp_table {
-> 
+>> +		node = iort_scan_node(ACPI_IORT_NODE_PCI_ROOT_COMPLEX,
+>> +				      iort_find_dev_callback, &bus->dev);
+>> +	} else
+>> +		node = iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
+>> +				      iort_find_dev_callback, dev);
+>> +
+>> +	if (!node)
+>> +		return NULL;
+>> +
+>> +	iort_dev_map_rid(node, rid, &devid, ACPI_IORT_NODE_SMMU);
+>> +
+>> +	parent = iort_find_parent_node(node, ACPI_IORT_NODE_SMMU);
+>> +
+>> +	if (!parent)
+>> +		return NULL;
+>> +
+>> +	iommu_node = iort_iommu_get_node(parent);
+>> +	ops = iommu_node->ops;
+>> +
+>> +	fwspec.fwnode = iommu_node->fwnode;
+>> +	fwspec.param_count = 1;
+>> +	fwspec.param[0] = devid;
+>> +
+>> +	if (!ops || !ops->fw_xlate || ops->fw_xlate(dev, &fwspec))
+>> +		return NULL;
+>> +
+>> +	return ops;
+>> +}
+> _______________________________________________
+> iommu mailing list
+> iommu at lists.linux-foundation.org
+> https://lists.linuxfoundation.org/mailman/listinfo/iommu
+>
