@@ -1,46 +1,56 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 15 Apr 2016 11:27:51 +0200
-Subject: [PATCH v2] pinctrl: pinctrl-single: Fix
- pcs_parse_bits_in_pinctrl_entry to use __ffs than ffs
-In-Reply-To: <1460609956-26539-1-git-send-email-j-keerthy@ti.com>
-References: <1460609956-26539-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <CACRpkdZxY3FNti37HfuwS7KT9K+pA=REr_G=hEQRi-D3=CHUpQ@mail.gmail.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Fri, 15 Apr 2016 10:30:54 +0100
+Subject: [PATCH v5 00/10] Support for Cortex-M Prototyping System
+In-Reply-To: <5710ABC4.5070505@arm.com>
+References: <1459519381-34441-1-git-send-email-vladimir.murzin@arm.com>
+ <570F593D.6040809@arm.com> <20160414192540.GD20512@kroah.com>
+ <5710ABC4.5070505@arm.com>
+Message-ID: <5710B4CE.4060405@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 14, 2016 at 6:59 AM, Keerthy <j-keerthy@ti.com> wrote:
+On 15/04/16 09:52, Sudeep Holla wrote:
+> 
+> 
+> On 14/04/16 20:25, Greg KH wrote:
+>> On Thu, Apr 14, 2016 at 09:47:57AM +0100, Vladimir Murzin wrote:
+>>> Hi,
+>>>
+>>> On 01/04/16 15:02, Vladimir Murzin wrote:
+>>>> Hi,
+>>>>
+>>>> This patch series provides the basic support for running ucLinux on
+>>>> V2M-MPS2
+>>>> platform.
+>>>>
+>>>> With these patches applied ucLinux can be run on both HW and FVP models
+>>>> with Cortex-M3/M4/M7 configurations.
+>>>
+>>> Any objection to get it merged?
+>>>
+>>> Sudeep Holla noticed that there is merge conflict against linux-next
+>>> with PIC32 uart (Makefile and serial_core.h), so should I provide
+>>> conflict resolution or do rebase on someone's branch?
+>>>
+>>> Anyway, I'd be glad to know how it should be processed further?
+>>
+>> I have no objection to the tty/serial changes, so if this all goes
+>> through the arm-soc tree, that's fine with me.
+>>
+> 
+> Thanks Greg, can I take this as Ack ? arm-soc guys might expect to see
+> that tag :)
+> 
+> Hi Vladimir,
+> 
+> I have pulled this series into
+> git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git
+> for-next/armv7-vexpress-updates
+> 
+> I will stick Greg's tag when it comes.
+> 
 
-> pcs_parse_bits_in_pinctrl_entry uses ffs which gives bit indices
-> ranging from 1 to MAX. This leads to a corner case where we try to request
-> the pin number = MAX and fails.
->
-> bit_pos value is being calculted using ffs. pin_num_from_lsb uses
-> bit_pos value. pins array is populated with:
->
-> pin + pin_num_from_lsb.
->
-> The above is 1 more than usual bit indices as bit_pos uses ffs to compute
-> first set bit. Hence the last of the pins array is populated with the MAX
-> value and not MAX - 1 which causes error when we call pin_request.
->
-> mask_pos is rightly calculated as ((pcs->fmask) << (bit_pos - 1))
-> Consequently val_pos and submask are correct.
->
-> Hence use __ffs which gives (ffs(x) - 1) as the first bit set.
->
-> fixes: 4e7e8017a8 ("pinctrl: pinctrl-single: enhance to configure multiple pins of different modules")
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
-> ---
->
-> Changes in v2:
->
->   * Changed pcs->fshift to use __ffs instead of ffs to be consistent.
->
-> Boot tesed on da850-evm and checked the pinctrl sysfs nodes.
+Everything looks fine! Thanks everyone for making it happen!
 
-Patch applied for fixes with Tony's ACK.
-
-Should it also be tagged for stable?
-
-Yours,
-Linus Walleij
+Cheers
+Vladimir
