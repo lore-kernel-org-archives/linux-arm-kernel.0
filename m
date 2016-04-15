@@ -1,142 +1,272 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Fri, 15 Apr 2016 19:06:40 +0200
-Subject: [PATCH V6 05/13] acpi,
- pci: Support IO resources when parsing PCI host bridge resources.
+Date: Fri, 15 Apr 2016 19:06:42 +0200
+Subject: [PATCH V6 07/13] PCI: Provide common functions for ECAM mapping
 In-Reply-To: <1460740008-19489-1-git-send-email-tn@semihalf.com>
 References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
-Message-ID: <1460740008-19489-6-git-send-email-tn@semihalf.com>
+Message-ID: <1460740008-19489-8-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Platforms that have memory mapped IO port (such as ARM64) need special
-handling for PCI I/O resources. For host bridge's resource probing case
-these resources need to be fixed up with pci_register_io_range/pci_remap_iospace etc.
+From: Jayachandran C <jchandra@broadcom.com>
 
-Furthermore, the same I/O resources need to be released after hotplug
-removal so that it can be re-added back by the pci_remap_iospace
-function during insertion. Therefore we implement new pci_unmap_iospace call
-which unmaps I/O space as the symmetry to pci_remap_iospace.
+Add config option PCI_GENERIC_ECAM and file drivers/pci/ecam.c to
+provide generic functions for accessing memory mapped PCI config space.
+
+The API is defined in drivers/pci/ecam.h and is written to replace the
+API in drivers/pci/host/pci-host-common.h. The file defines a new
+'struct pci_config_window' to hold the information related to a PCI
+config area and its mapping. This structure is expected to be used as
+sysdata for controllers that have ECAM based mapping.
+
+Helper functions are provided to setup the mapping, free the mapping
+and to implement the map_bus method in 'struct pci_ops'
 
 Signed-off-by: Jayachandran C <jchandra@broadcom.com>
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
 ---
- drivers/acpi/pci_root.c | 33 +++++++++++++++++++++++++++++++++
- drivers/pci/pci.c       | 24 ++++++++++++++++++++++++
- include/linux/pci.h     |  1 +
- 3 files changed, 58 insertions(+)
+ drivers/pci/Kconfig  |   3 ++
+ drivers/pci/Makefile |   2 +
+ drivers/pci/ecam.c   | 137 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/pci/ecam.h   |  61 +++++++++++++++++++++++
+ 4 files changed, 203 insertions(+)
+ create mode 100644 drivers/pci/ecam.c
+ create mode 100644 drivers/pci/ecam.h
 
-diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
-index d9a70c4..815b6ca 100644
---- a/drivers/acpi/pci_root.c
-+++ b/drivers/acpi/pci_root.c
-@@ -742,6 +742,34 @@ next:
- 			resource_list_add_tail(entry, resources);
- 	}
- }
-+static void acpi_pci_root_remap_iospace(struct resource_entry *entry)
-+{
-+#ifdef PCI_IOBASE
-+	struct resource *res = entry->res;
-+	resource_size_t cpu_addr = res->start;
-+	resource_size_t pci_addr = cpu_addr - entry->offset;
-+	resource_size_t length = resource_size(res);
-+	unsigned long port;
-+
-+	if (pci_register_io_range(cpu_addr, length))
-+		goto err;
-+
-+	port = pci_address_to_pio(cpu_addr);
-+	if (port == (unsigned long)-1)
-+		goto err;
-+
-+	res->start = port;
-+	res->end = port + length - 1;
-+	entry->offset = port - pci_addr;
-+
-+	if (pci_remap_iospace(res, cpu_addr) < 0)
-+		goto err;
-+	pr_info("Remapped I/O %pa to %pR\n", &cpu_addr, res);
-+	return;
-+err:
-+	res->flags |= IORESOURCE_DISABLED;
-+#endif
-+}
+diff --git a/drivers/pci/Kconfig b/drivers/pci/Kconfig
+index 209292e..e930d62 100644
+--- a/drivers/pci/Kconfig
++++ b/drivers/pci/Kconfig
+@@ -83,6 +83,9 @@ config HT_IRQ
+ config PCI_ATS
+ 	bool
  
- int acpi_pci_probe_root_resources(struct acpi_pci_root_info *info)
- {
-@@ -763,6 +791,9 @@ int acpi_pci_probe_root_resources(struct acpi_pci_root_info *info)
- 			"no IO and memory resources present in _CRS\n");
- 	else {
- 		resource_list_for_each_entry_safe(entry, tmp, list) {
-+			if (entry->res->flags & IORESOURCE_IO)
-+				acpi_pci_root_remap_iospace(entry);
++config PCI_GENERIC_ECAM
++	bool
 +
- 			if (entry->res->flags & IORESOURCE_DISABLED)
- 				resource_list_destroy_entry(entry);
- 			else
-@@ -834,6 +865,8 @@ static void acpi_pci_root_release_info(struct pci_host_bridge *bridge)
+ config PCI_IOV
+ 	bool "PCI IOV support"
+ 	depends on PCI
+diff --git a/drivers/pci/Makefile b/drivers/pci/Makefile
+index 2154092..810aec8 100644
+--- a/drivers/pci/Makefile
++++ b/drivers/pci/Makefile
+@@ -55,6 +55,8 @@ obj-$(CONFIG_PCI_SYSCALL) += syscall.o
  
- 	resource_list_for_each_entry(entry, &bridge->windows) {
- 		res = entry->res;
-+		if (res->flags & IORESOURCE_IO)
-+			pci_unmap_iospace(res);
- 		if (res->parent &&
- 		    (res->flags & (IORESOURCE_MEM | IORESOURCE_IO)))
- 			release_resource(res);
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index 89e9996..c0f8a4e 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -26,6 +26,7 @@
- #include <linux/device.h>
- #include <linux/pm_runtime.h>
- #include <linux/pci_hotplug.h>
-+#include <linux/vmalloc.h>
- #include <asm/setup.h>
- #include <linux/aer.h>
- #include "pci.h"
-@@ -3168,6 +3169,29 @@ int __weak pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
- #endif
- }
+ obj-$(CONFIG_PCI_STUB) += pci-stub.o
  
-+/**
-+ *	pci_unmap_iospace - Unmap the memory mapped I/O space
-+ *	@res: resource to be unmapped
++obj-$(CONFIG_PCI_GENERIC_ECAM) += ecam.o
++
+ obj-$(CONFIG_XEN_PCIDEV_FRONTEND) += xen-pcifront.o
+ 
+ obj-$(CONFIG_OF) += of.o
+diff --git a/drivers/pci/ecam.c b/drivers/pci/ecam.c
+new file mode 100644
+index 0000000..ff04c01
+--- /dev/null
++++ b/drivers/pci/ecam.c
+@@ -0,0 +1,137 @@
++/*
++ * Copyright 2016 Broadcom
 + *
-+ *	Unmap the CPU virtual address @res from virtual address space.
-+ *	Only architectures that have memory mapped IO functions defined
-+ *	(and the PCI_IOBASE value defined) should call this function.
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, version 2, as
++ * published by the Free Software Foundation (the "GPL").
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License version 2 (GPLv2) for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * version 2 (GPLv2) along with this source code.
 + */
-+void  pci_unmap_iospace(struct resource *res)
-+{
-+#if defined(PCI_IOBASE) && defined(CONFIG_MMU)
-+	unsigned long vaddr = (unsigned long)PCI_IOBASE + res->start;
 +
-+	unmap_kernel_range(vaddr, resource_size(res));
-+#else
-+	/*
-+	 * This architecture does not have memory mapped I/O space,
-+	 * so this function should never be called.
-+	 */
-+	WARN_ONCE(1, "This architecture does not support memory mapped I/O\n");
-+#endif
++#include <linux/device.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/pci.h>
++#include <linux/slab.h>
++
++#include "ecam.h"
++
++/*
++ * On 64 bit systems, we do a single ioremap for the whole config space
++ * since we have enough virtual address range available. On 32 bit, do an
++ * ioremap per bus.
++ */
++static const bool per_bus_mapping = !config_enabled(CONFIG_64BIT);
++
++/*
++ * Create a PCI config space window
++ *  - reserve mem region
++ *  - alloc struct pci_config_window with space for all mappings
++ *  - ioremap the config space
++ */
++struct pci_config_window *pci_generic_ecam_create(struct device *dev,
++				phys_addr_t addr, u8 bus_start, u8 bus_end,
++				struct pci_generic_ecam_ops *ops)
++{
++	struct pci_config_window *cfg;
++	unsigned int bus_shift, bus_range, bsz, mapsz;
++	int i, nidx;
++	int err = -ENOMEM;
++
++	if (bus_end < bus_start)
++		return ERR_PTR(-EINVAL);
++
++	bus_shift = ops->bus_shift;
++	bus_range = bus_end - bus_start + 1;
++	bsz = 1 << bus_shift;
++	nidx = per_bus_mapping ? bus_range : 1;
++	mapsz = per_bus_mapping ? bsz : bus_range * bsz;
++	cfg = kzalloc(sizeof(*cfg) + nidx * sizeof(cfg->win[0]), GFP_KERNEL);
++	if (!cfg)
++		return ERR_PTR(-ENOMEM);
++
++	cfg->bus_start = bus_start;
++	cfg->bus_end = bus_end;
++	cfg->ops = ops;
++
++	if (!request_mem_region(addr, bus_range * bsz, "Configuration Space"))
++		goto err_exit;
++
++	/* cfgaddr has to be set after request_mem_region */
++	cfg->cfgaddr = addr;
++
++	for (i = 0; i < nidx; i++) {
++		cfg->win[i] = ioremap(addr + i * mapsz, mapsz);
++		if (!cfg->win[i])
++			goto err_exit;
++	}
++
++	if (cfg->ops->init) {
++		err = cfg->ops->init(dev, cfg);
++		if (err)
++			goto err_exit;
++	}
++	return cfg;
++
++err_exit:
++	pci_generic_ecam_free(cfg);
++	return ERR_PTR(err);
 +}
 +
- static void __pci_set_master(struct pci_dev *dev, bool enable)
- {
- 	u16 old_cmd, cmd;
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index c28adb4..df1f33d 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -1168,6 +1168,7 @@ int pci_register_io_range(phys_addr_t addr, resource_size_t size);
- unsigned long pci_address_to_pio(phys_addr_t addr);
- phys_addr_t pci_pio_to_address(unsigned long pio);
- int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr);
-+void pci_unmap_iospace(struct resource *res);
- 
- static inline pci_bus_addr_t pci_bus_address(struct pci_dev *pdev, int bar)
- {
++/*
++ * Free a config space mapping
++ */
++void pci_generic_ecam_free(struct pci_config_window *cfg)
++{
++	unsigned int bus_range;
++	int i, nidx;
++
++	bus_range = cfg->bus_end - cfg->bus_start + 1;
++	nidx = per_bus_mapping ? bus_range : 1;
++	for (i = 0; i < nidx; i++)
++		if (cfg->win[i])
++			iounmap(cfg->win[i]);
++	if (cfg->cfgaddr)
++		release_mem_region(cfg->cfgaddr,
++				   bus_range << cfg->ops->bus_shift);
++	kfree(cfg);
++}
++
++/*
++ * Function to implement the pci_ops ->map_bus method
++ */
++void __iomem *pci_generic_ecam_map_bus(struct pci_bus *bus, unsigned int devfn,
++				       int where)
++{
++	struct pci_config_window *cfg = bus->sysdata;
++	unsigned int devfn_shift = cfg->ops->bus_shift - 8;
++	unsigned int busn = bus->number;
++	void __iomem *base;
++
++	if (busn < cfg->bus_start || busn > cfg->bus_end)
++		return NULL;
++
++	busn -= cfg->bus_start;
++	if (per_bus_mapping)
++		base = cfg->win[busn];
++	else
++		base = cfg->win[0] + (busn << cfg->ops->bus_shift);
++	return base + (devfn << devfn_shift) + where;
++}
++
++/* default ECAM ops */
++struct pci_generic_ecam_ops pci_generic_ecam_default_ops = {
++	.bus_shift	= 20,
++	.pci_ops		= {
++		.map_bus	= pci_generic_ecam_map_bus,
++		.read		= pci_generic_config_read,
++		.write		= pci_generic_config_write,
++	}
++};
+diff --git a/drivers/pci/ecam.h b/drivers/pci/ecam.h
+new file mode 100644
+index 0000000..34c0aba
+--- /dev/null
++++ b/drivers/pci/ecam.h
+@@ -0,0 +1,61 @@
++/*
++ * Copyright 2016 Broadcom
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, version 2, as
++ * published by the Free Software Foundation (the "GPL").
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License version 2 (GPLv2) for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * version 2 (GPLv2) along with this source code.
++ */
++#ifndef DRIVERS_PCI_ECAM_H
++#define DRIVERS_PCI_ECAM_H
++
++#include <linux/kernel.h>
++#include <linux/platform_device.h>
++
++/*
++ * struct to hold pci ops and bus shift of the config window
++ * for a PCI controller.
++ */
++struct pci_config_window;
++struct pci_generic_ecam_ops {
++	unsigned int			bus_shift;
++	struct pci_ops			pci_ops;
++	int				(*init)(struct device *,
++						struct pci_config_window *);
++};
++
++/*
++ * struct to hold the mappings of a config space window. This
++ * will be allocated with enough entries in win[] to hold all
++ * the mappings for the bus range.
++ */
++struct pci_config_window {
++	phys_addr_t			cfgaddr;
++	u16				domain;
++	u8				bus_start;
++	u8				bus_end;
++	void				*priv;
++	struct pci_generic_ecam_ops	*ops;
++	void __iomem			*win[0];
++};
++
++/* create and free for pci_config_window */
++struct pci_config_window *pci_generic_ecam_create(struct device *dev,
++				phys_addr_t addr, u8 bus_start, u8 bus_end,
++				struct pci_generic_ecam_ops *ops);
++void pci_generic_ecam_free(struct pci_config_window *cfg);
++
++/* map_bus when ->sysdata is an instance of pci_config_window */
++void __iomem *pci_generic_ecam_map_bus(struct pci_bus *bus, unsigned int devfn,
++				       int where);
++/* default ECAM ops, bus shift 20, generic read and write */
++extern struct pci_generic_ecam_ops pci_generic_ecam_default_ops;
++
++#endif
 -- 
 1.9.1
