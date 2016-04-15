@@ -1,57 +1,59 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 15 Apr 2016 12:07:55 +0100
-Subject: [PATCH] arm64: fix invalidation of wrong __early_cpu_boot_status
- cacheline
-In-Reply-To: <5710C449.3050900@arm.com>
-References: <1460715081-16542-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160415102017.GA8021@leverpostej> <5710C449.3050900@arm.com>
-Message-ID: <20160415110755.GA32635@e104818-lin.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 15 Apr 2016 12:37:06 +0100
+Subject: [PATCH] arm64: Reduce verbosity on SMP CPU stop
+In-Reply-To: <1460715876-10780-1-git-send-email-jglauber@cavium.com>
+References: <1460715876-10780-1-git-send-email-jglauber@cavium.com>
+Message-ID: <20160415113706.GE22906@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 15, 2016 at 11:36:57AM +0100, Suzuki K. Poulose wrote:
-> On 15/04/16 11:20, Mark Rutland wrote:
-> >On Fri, Apr 15, 2016 at 12:11:21PM +0200, Ard Biesheuvel wrote:
-> >>In head.S, the str_l macro, which takes a source register, a symbol name
-> >>and a temp register, is used to store a status value to the variable
-> >>__early_cpu_boot_status. Subsequently, the value of the temp register is
-> >>reused to invalidate any cachelines covering this variable.
-> >>
-> >>However, since str_l resolves to
-> >>
-> >>       adrp    \tmp, \sym
-> >>       str     \src, [\tmp, :lo12:\sym]
-> >>
-> >>the temp register never actually holds the address of the variable but
-> >>only of the 4 KB window that covers it, and reusing it leads to the
-> >>wrong cacheline being invalidated. So instead, take the address
-> >>explicitly before doing the store, and reuse that value to perform
-> >>the cache invalidation.
-> >>
-> >>Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >>---
-> >>
-> >>This deserves a cc stable, since the macro is always invoked for each CPU
-> >>at boot.
-> >
-> >Sounds good, also:
-> >
-> >Fixes: bb9052744f4b7ae1 ("arm64: Handle early CPU boot failures")
+On Fri, Apr 15, 2016 at 12:24:36PM +0200, Jan Glauber wrote:
+> When CPUs are stopped during an abnormal operation like panic
+> for each CPU a line is printed and the stack trace is dumped.
 > 
-> This first appeared in 4.6-rc1, so I don't think we need to Cc stable.
-
-Indeed. I'll add the Fixes line though, for reference.
-
-> The initial patch was using adr_l as in this fix.
+> This information is only interesting for the aborting CPU
+> and on systems with many CPUs it only makes it harder to
+> debug if after the aborting CPU the log is flooded with data
+> about all other CPUs too.
 > 
-> Catalin, was there a specific reason for that change ? I remember you mentioning
-> something about it.
+> Therefore remove the stack dump and printk of other CPUs
+> and only print a single line that the other CPUs are going to be
+> stopped.
+> 
+> Signed-off-by: Jan Glauber <jglauber@cavium.com>
+> ---
+>  arch/arm64/kernel/smp.c | 11 +++--------
+>  1 file changed, 3 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index b2d5f4e..e6c2eb1 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -770,14 +770,6 @@ static DEFINE_RAW_SPINLOCK(stop_lock);
+>   */
+>  static void ipi_cpu_stop(unsigned int cpu)
+>  {
+> -	if (system_state == SYSTEM_BOOTING ||
+> -	    system_state == SYSTEM_RUNNING) {
+> -		raw_spin_lock(&stop_lock);
+> -		pr_crit("CPU%u: stopping\n", cpu);
+> -		dump_stack();
+> -		raw_spin_unlock(&stop_lock);
+> -	}
+> -
+>  	set_cpu_online(cpu, false);
+>  
+>  	local_irq_disable();
+> @@ -872,6 +864,9 @@ void smp_send_stop(void)
+>  		cpumask_copy(&mask, cpu_online_mask);
+>  		cpumask_clear_cpu(smp_processor_id(), &mask);
+>  
+> +		if (system_state == SYSTEM_BOOTING ||
+> +		    system_state == SYSTEM_RUNNING)
+> +			pr_crit("SMP: stopping secondary CPUs\n");
 
-I think it was just code reduction.
+You can remove stop_lock altogether now, right? I also wonder whether
+it would be worth printing out which CPUs are still online in the case where
+we fail to stop all the secondaries?
 
-I'll queue the fix for 4.6-rc.
-
-Thanks.
-
--- 
-Catalin
+Will
