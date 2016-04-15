@@ -1,75 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 15 Apr 2016 14:09:53 +0100
-Subject: [PATCH v2] arm64: pci: add support for pci_mmap_page_range
-In-Reply-To: <1460581856-12380-1-git-send-email-jerin.jacob@caviumnetworks.com>
-References: <1460581856-12380-1-git-send-email-jerin.jacob@caviumnetworks.com>
-Message-ID: <20160415130953.GI22906@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 15 Apr 2016 14:11:46 +0100
+Subject: [RESEND 07/11] pwm: sti: Initialise PWM Capture channel data
+In-Reply-To: <20160412102926.GC18882@ulmo.ba.sec>
+References: <1456932729-9667-1-git-send-email-lee.jones@linaro.org>
+ <1456932729-9667-8-git-send-email-lee.jones@linaro.org>
+ <20160412102926.GC18882@ulmo.ba.sec>
+Message-ID: <20160415131146.GE3589@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 14, 2016 at 02:40:56AM +0530, Jerin Jacob wrote:
-> Certain X11 servers and user space network drivers frameworks
-> need PCI mmaped /sys/bus/pci/devices/B:D:F/resourceX file to
-> access PCI bar address space from user space.
+On Tue, 12 Apr 2016, Thierry Reding wrote:
+> On Wed, Mar 02, 2016 at 03:32:05PM +0000, Lee Jones wrote:
+> [...]
+> > +struct sti_cpt_data {
+> > +	u32 snapshot[3];
+> > +	int index;
+> > +	int gpio;
+
+[...]
+
+> > +
+> > +		init_waitqueue_head(&data->wait);
+> > +		mutex_init(&data->lock);
+> > +		data->gpio = of_get_named_gpio(np, "capture-gpios", chan);
+> > +		pc->cpt_data[chan] = data;
 > 
-> Signed-off-by: Jerin Jacob <jerin.jacob@caviumnetworks.com>
-> ---
-> Changes in v2:
->   - Rebased to 4.6.0-rc3.
->   - Tested and verified the change on Thunderx and xgene1 arm64 platforms
+> Converting to per-PWM data should be as simple as turning this last line
+> into:
 > 
->  arch/arm64/include/asm/pci.h |  6 ++++++
->  arch/arm64/kernel/pci.c      | 20 ++++++++++++++++++++
->  2 files changed, 26 insertions(+)
+> 	pwm_set_chip_data(pc->chip.pwms[chan], data);
 > 
-> diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
-> index b9a7ba9..9d7e460 100644
-> --- a/arch/arm64/include/asm/pci.h
-> +++ b/arch/arm64/include/asm/pci.h
-> @@ -37,5 +37,11 @@ static inline int pci_proc_domain(struct pci_bus *bus)
->  }
->  #endif  /* CONFIG_PCI */
->  
-> +#define HAVE_PCI_MMAP
+> Also I don't see any cleanup for this data in the driver. The memory for
+> the per-PWM data should be freed by devm_*() infrastructure, but how
+> will the GPIO be released?
 
-By defining this symbol, we also get lumbered with the legacy /proc
-interface, which I'd be keen to avoid exposing until we have people
-explicitly asking for it.
+There is no reason to release a GPIO.
 
-Any chance you could expose only the /sysfs interface on arm64?
-
-> +
-> +extern int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
-> +	enum pci_mmap_state mmap_state, int write_combine);
-> +
-> +
->  #endif  /* __KERNEL__ */
->  #endif  /* __ASM_PCI_H */
-> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-> index c72de66..be7ddf1 100644
-> --- a/arch/arm64/kernel/pci.c
-> +++ b/arch/arm64/kernel/pci.c
-> @@ -82,3 +82,23 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
->  	return NULL;
->  }
->  #endif
-> +
-> +int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
-> +		enum pci_mmap_state mmap_state, int write_combine)
-> +{
-> +	/*
-> +	* I/O space can be accessed via normal processor loads and stores on
-> +	* this platform but for now we elect not to do this and portable
-> +	* drivers should not do this anyway.
-> +	*/
-> +	if (mmap_state == pci_mmap_io)
-> +		return -EINVAL;
-> +
-> +	if (write_combine)
-> +		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
-> +	else
-> +		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-
-For consistency with ioremap, this should be pgprot_device.
-
-Will
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
