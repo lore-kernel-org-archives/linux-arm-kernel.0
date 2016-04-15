@@ -1,67 +1,73 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 15 Apr 2016 16:42:03 +0200
-Subject: [GIT PULL 3/3] arm64: tegra: Changes for v4.7-rc1
-In-Reply-To: <1460731323-31001-1-git-send-email-thierry.reding@gmail.com>
-References: <1460731323-31001-1-git-send-email-thierry.reding@gmail.com>
-Message-ID: <1460731323-31001-3-git-send-email-thierry.reding@gmail.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Fri, 15 Apr 2016 22:42:09 +0800
+Subject: [PATCH v6 3/4] soc: mediatek: Add MT2701 power dt-bindings
+In-Reply-To: <1460685753.7028.5.camel@mtksdaap41>
+References: <1460621819-695-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1460621819-695-4-git-send-email-jamesjj.liao@mediatek.com>
+ <1460631381.13240.3.camel@mtksdaap41> <1460685753.7028.5.camel@mtksdaap41>
+Message-ID: <1460731329.19786.4.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC maintainers,
+On Fri, 2016-04-15 at 10:02 +0800, James Liao wrote:
+> Hi Yingjoe,
+> 
+> On Thu, 2016-04-14 at 18:56 +0800, Yingjoe Chen wrote:
+> > On Thu, 2016-04-14 at 16:16 +0800, James Liao wrote:
+> > > From: Shunli Wang <shunli.wang@mediatek.com>
+> > > 
+> > > Add power dt-bindings for MT2701.
+> > > 
+> > > Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
+> > > Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> > > Acked-by: Rob Herring <robh@kernel.org>
+> > > Reviewed-by: Kevin Hilman <khilman@baylibre.com>
+> > > ---
+> > >  .../devicetree/bindings/soc/mediatek/scpsys.txt    | 12 ++++++----
+> > >  include/dt-bindings/power/mt2701-power.h           | 27 ++++++++++++++++++++++
+> > >  2 files changed, 34 insertions(+), 5 deletions(-)
+> > >  create mode 100644 include/dt-bindings/power/mt2701-power.h
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+> > > index e8f15e3..ebb3144 100644
+> > > --- a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+> > > +++ b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+> > > @@ -9,17 +9,19 @@ domain control.
+> > >  
+> > >  The driver implements the Generic PM domain bindings described in
+> > >  power/power_domain.txt. It provides the power domains defined in
+> > > -include/dt-bindings/power/mt8173-power.h.
+> > > +include/dt-bindings/power/mt8173-power.h and mt2701-power.h.
+> > >  
+> > >  Required properties:
+> > > -- compatible: Must be "mediatek,mt8173-scpsys"
+> > > +- compatible: Should be one of:
+> > > +	- "mediatek,mt2701-scpsys"
+> > > +	- "mediatek,mt8173-scpsys"
+> > >  - #power-domain-cells: Must be 1
+> > >  - reg: Address range of the SCPSYS unit
+> > >  - infracfg: must contain a phandle to the infracfg controller
+> > >  - clock, clock-names: clocks according to the common clock binding.
+> > > -                      The clocks needed "mm", "mfg", "venc" and "venc_lt".
+> > > -		      These are the clocks which hardware needs to be enabled
+> > > -		      before enabling certain power domains.
+> > > +                      The clocks needed "mm", "mfg", "venc", "venc_lt" and
+> > > +                      "ethif". These are the clocks which hardware needs to be
+> > > +                      enabled before enabling certain power domains.
+> > 
+> > 
+> > Clock ethif only exist on mt2701 so it is not required on mt8173.
+> 
+> You are right. Each SoC needs different clock for each power domain.
+> Here list all subsystems of available SoCs.
 
-The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+Binding should list required clocks for each specific platform. How
+about this:
 
-  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+- clock, clock-names: clocks according to the common clock binding.
+		      These are the clocks which hardware needs to be
+                      enabled before enabling certain power domains.
+  	Required clocks for mt2701: "mm", "mfg", "ethif"
+	Required clocks for mt8173: "mm", "mfg", "venc", "venc_lt"
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.7-arm64
-
-for you to fetch changes up to 8d53957c66e5cc0f1e8d33807800271d0f4fa009:
-
-  arm64: tegra: Enable cros-ec and charger on Smaug (2016-04-15 15:36:38 +0200)
-
-Thanks,
-Thierry
-
-----------------------------------------------------------------
-arm64: tegra: Changes for v4.7-rc1
-
-A couple of cleanups and fixes to various device trees, enable power and
-volume keys on Jetson TX1, use stdout-path to define the serial port (so
-it doesn't have to be specified on the kernel command-line) and add
-Google Pixel C (a.k.a. Smaug) support.
-
-----------------------------------------------------------------
-Jon Hunter (3):
-      arm64: tegra: Add support for Google Pixel C
-      arm64: tegra: Remove unused #power-domain-cells property
-      arm64: tegra: Add stdout-path for various boards
-
-Laxman Dewangan (1):
-      arm64: tegra: Enable power and volume keys on Jetson TX1
-
-Rhyland Klein (3):
-      arm64: tegra: Add gpio-keys nodes for Smaug
-      arm64: tegra: Add pinmux for Smaug board
-      arm64: tegra: Enable cros-ec and charger on Smaug
-
-Sudeep Holla (1):
-      arm64: tegra: Replace legacy *,wakeup property with wakeup-source
-
-Thierry Reding (2):
-      arm64: tegra: Remove 0, prefix from unit-addresses
-      arm64: tegra: Fix copy/paste typo in several DTS includes
-
- arch/arm64/boot/dts/nvidia/Makefile            |    1 +
- arch/arm64/boot/dts/nvidia/tegra132-norrin.dts |   55 +-
- arch/arm64/boot/dts/nvidia/tegra132.dtsi       |  120 +-
- arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi |    8 +-
- arch/arm64/boot/dts/nvidia/tegra210-p2530.dtsi |   14 +-
- arch/arm64/boot/dts/nvidia/tegra210-p2571.dts  |    2 +-
- arch/arm64/boot/dts/nvidia/tegra210-p2595.dtsi |    2 +-
- arch/arm64/boot/dts/nvidia/tegra210-p2597.dtsi |   30 +-
- arch/arm64/boot/dts/nvidia/tegra210-smaug.dts  | 1424 ++++++++++++++++++++++++
- arch/arm64/boot/dts/nvidia/tegra210.dtsi       |  122 +-
- 10 files changed, 1617 insertions(+), 161 deletions(-)
- create mode 100644 arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
+Joe.C
