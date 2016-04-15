@@ -1,41 +1,82 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 15 Apr 2016 17:44:48 +0530
-Subject: [GIT PULL 3/3] DaVinci DT updates for v4.7
-In-Reply-To: <1460722488-5921-1-git-send-email-nsekhar@ti.com>
-References: <1460722488-5921-1-git-send-email-nsekhar@ti.com>
-Message-ID: <1460722488-5921-3-git-send-email-nsekhar@ti.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 15 Apr 2016 14:17:58 +0200
+Subject: [PATCH v5 2/2] i2c: rk3x: add i2c support for rk3399 soc
+In-Reply-To: <1458147438-62387-3-git-send-email-david.wu@rock-chips.com>
+References: <1458147438-62387-1-git-send-email-david.wu@rock-chips.com>
+ <1458147438-62387-3-git-send-email-david.wu@rock-chips.com>
+Message-ID: <4971788.LeT208jGID@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
+Hi David,
 
-  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
+Am Donnerstag, 17. M?rz 2016, 00:57:18 schrieb David Wu:
+> From: David Wu <wdc@rock-chips.com>
+> 
+> - new method to caculate i2c timings for rk3399:
+>   There was an timing issue about "repeated start" time at the I2C
+>   controller of version0, controller appears to drop SDA at .875x (7/8)
+>   programmed clk high. On version 1 of the controller, the rule(.875x)
+>   isn't enough to meet tSU;STA
+>   requirements on 100k's Standard-mode. To resolve this issue,
+>   sda_update_config, start_setup_config and stop_setup_config for I2C
+>   timing information are added, new rules are designed to calculate
+>   the timing information at new v1.
+> - pclk and function clk are separated at rk3399.
+> - support i2c highspeed mode: 1.7MHz for rk3399
+> 
+> Signed-off-by: David Wu <david.wu@rock-chips.com>
 
-are available in the git repository at:
+[...]
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.7/dt
+> @@ -83,11 +88,34 @@ enum rk3x_i2c_state {
+>  	STATE_STOP
+>  };
+> 
+> +struct rk3x_i2c;
+> +
+> +/**
+> + * struct rk3x_i2c_calced_timings:
+> + * @div_low: Divider output for low
+> + * @div_high: Divider output for high
+> + * @sda_update_cfg: Used to config sda change state when scl is low,
+> + * used to adjust setup/hold time
+> + * @stp_sta_cfg: Start setup config for setup start time and hold start
+> time + * @stp_sto_cfg: Stop setup config for setup stop time
+> + */
+> +struct rk3x_i2c_calced_timings {
+> +	unsigned long div_low;
+> +	unsigned long div_high;
+> +	unsigned int sda_update_cfg;
+> +	unsigned int stp_sta_cfg;
+> +	unsigned int stp_sto_cfg;
+> +};
+> +
+>  /**
+>   * @grf_offset: offset inside the grf regmap for setting the i2c type
+>   */
+>  struct rk3x_i2c_soc_data {
+>  	int grf_offset;
+> +
+> +	int (*clk_init)(struct rk3x_i2c *, unsigned long *);
+> +	int (*calc_timings)(unsigned long, struct i2c_timings *,
+> +			    struct rk3x_i2c_calced_timings *);
+>  };
+> 
+>  struct rk3x_i2c {
+> @@ -97,11 +125,13 @@ struct rk3x_i2c {
+> 
+>  	/* Hardware resources */
+>  	void __iomem *regs;
+> -	struct clk *clk;
+> +	struct clk *pclk; /* APB clock */
+> +	struct clk *clk; /* Func clk for rk3399 or Func & APB clks for others */
+>  	struct notifier_block clk_rate_nb;
 
-for you to fetch changes up to 6c8f73592203b8611c6ba5d4c670c82a059ecf27:
+please use regular kernel-doc for the struct elements (aka @pclk: something) 
+like some of the other fields already have.
 
-  ARM: davinci: da8xx-dt: add OF_DEV_AUXDATA entry for i2c1 (2016-04-14 11:41:04 +0530)
+I can't spot anything else, but also don't know enough about i2c itself :-)
 
-----------------------------------------------------------------
-Device-Tree updates for DaVinci. This
-contains some clean-up and fixes of
-device-tree data and addition of i2c1
-node for DA850.
 
-----------------------------------------------------------------
-David Lechner (1):
-      ARM: dts: davinci: use proper address after @
-
-Petr Kulhavy (3):
-      ARM: DTS: da850: fix missing #gpio-cells in gpio node
-      ARM: DTS: da850: add node for i2c1
-      ARM: davinci: da8xx-dt: add OF_DEV_AUXDATA entry for i2c1
-
- arch/arm/boot/dts/da850-enbw-cmc.dts |  8 ++---
- arch/arm/boot/dts/da850-evm.dts      | 26 +++++++-------
- arch/arm/boot/dts/da850.dtsi         | 67 ++++++++++++++++++++++--------------
- arch/arm/mach-davinci/da8xx-dt.c     |  1 +
- 4 files changed, 59 insertions(+), 43 deletions(-)
+Heiko
