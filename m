@@ -1,43 +1,40 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 15 Apr 2016 14:11:46 +0100
-Subject: [RESEND 07/11] pwm: sti: Initialise PWM Capture channel data
-In-Reply-To: <20160412102926.GC18882@ulmo.ba.sec>
-References: <1456932729-9667-1-git-send-email-lee.jones@linaro.org>
- <1456932729-9667-8-git-send-email-lee.jones@linaro.org>
- <20160412102926.GC18882@ulmo.ba.sec>
-Message-ID: <20160415131146.GE3589@x1>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 15 Apr 2016 22:13:55 +0900
+Subject: [PATCH 2/2] arm64: dts: uniphier: change release address of
+ spin-table
+In-Reply-To: <20160415130549.GB8021@leverpostej>
+References: <1460716247-28049-1-git-send-email-yamada.masahiro@socionext.com>
+ <1460716247-28049-3-git-send-email-yamada.masahiro@socionext.com>
+ <20160415130549.GB8021@leverpostej>
+Message-ID: <CAK7LNARNUMkD79h-uG_EhRFr4gE2pDM8w57EddOMbt-mO0xc8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 12 Apr 2016, Thierry Reding wrote:
-> On Wed, Mar 02, 2016 at 03:32:05PM +0000, Lee Jones wrote:
-> [...]
-> > +struct sti_cpt_data {
-> > +	u32 snapshot[3];
-> > +	int index;
-> > +	int gpio;
+Hi Mark.
 
-[...]
+2016-04-15 22:05 GMT+09:00 Mark Rutland <mark.rutland@arm.com>:
+> On Fri, Apr 15, 2016 at 07:30:47PM +0900, Masahiro Yamada wrote:
+>> The 8-byte register located at 0x59801200 on this SoC is dedicated
+>> for waking up secondary CPUs.  We can use it and save normal memory.
+>
+> Generally, it is not safe to use MMIO registers to back spin-table. The
+> kernel maps the spin table location with cacheable attributes, so there
+> may be speculative accesses to any registes in the same (64K) page, and
+> a writeback may be larger than the 8-byte register width (which the
+> device might not accept, triggering an SError).
+>
+> Given that, I do not think this is a good idea.
 
-> > +
-> > +		init_waitqueue_head(&data->wait);
-> > +		mutex_init(&data->lock);
-> > +		data->gpio = of_get_named_gpio(np, "capture-gpios", chan);
-> > +		pc->cpt_data[chan] = data;
-> 
-> Converting to per-PWM data should be as simple as turning this last line
-> into:
-> 
-> 	pwm_set_chip_data(pc->chip.pwms[chan], data);
-> 
-> Also I don't see any cleanup for this data in the driver. The memory for
-> the per-PWM data should be freed by devm_*() infrastructure, but how
-> will the GPIO be released?
+I did not know this.  Thanks for your advice!
 
-There is no reason to release a GPIO.
+
+Arnd, Olof
+
+Please drop this patch.
+(I think 1/2 is still OK.)
+
+
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Best Regards
+Masahiro Yamada
