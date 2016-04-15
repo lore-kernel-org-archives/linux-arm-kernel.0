@@ -1,32 +1,24 @@
-From: stanislav.meduna@nxtcontrol.com (Stanislav Meduna)
-Date: Fri, 15 Apr 2016 18:17:45 +0200
-Subject: i.MX53 restart via watchdog does not work
-Message-ID: <57111429.6040802@nxtcontrol.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 15 Apr 2016 17:18:03 +0100
+Subject: [PATCH V2 04/15] coresight: tmc: introducing new header file
+In-Reply-To: <CANLsYkxL1c=RioUsT+1U49fcf=fGFFFedFTyOP20tuTxg3a15A@mail.gmail.com>
+References: <1460483692-25061-1-git-send-email-mathieu.poirier@linaro.org>
+ <1460483692-25061-5-git-send-email-mathieu.poirier@linaro.org>
+ <570FD473.9090007@arm.com>
+ <CANLsYkzQuF=Y7O7T41HHHGHiFNtpj+cUd8W9paAYh=dqm0MJXg@mail.gmail.com>
+ <571111E8.2000804@arm.com>
+ <CANLsYkxL1c=RioUsT+1U49fcf=fGFFFedFTyOP20tuTxg3a15A@mail.gmail.com>
+Message-ID: <5711143B.1020700@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 15/04/16 17:15, Mathieu Poirier wrote:
+> On 15 April 2016 at 10:08, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+>> On 15/04/16 17:03, Mathieu Poirier wrote:
+>> I agree. But the patch which introduces the definition doesn't deal with
+>> TMC_STS_ at all either.
+>
+> Patch 13/15 is using the TMC_STS_FULL define on line 147.  Am I
+> missing your point?
 
-I am using an TQMa53 board, which expects to be resetted
-by watchdog circuit. In older kernels ths was done in
-by mxc_restart defined in arch/arm/mach-imx/system.c
-and initialized and wired in mach-imx53.c.
-
-Current kernels however do not use this and the mach-imx53.c
-does not set .restart. I am getting
-  imx2-wdt 53f98000.wdog: Device shutdown: Expect reboot!
-  reboot: Restarting system
-and the system just hangs there.
-
-What is the correct way to accomplish this? I can of course
-try to merge the old code back, but I expect there is
-a reason why it was removed. Is writing the restart function
-where I get and enable the clock, get an I/O mapping and
-write the watchdog registers the correct approach?
-Or should this be controlled by the device tree? Are there
-maybe some patches flying (I was not able to google
-anything relevant)?
-
-Thanks
--- 
-                                Stano
+Ah, sorry, didn't see that TMC_STS_FULL was used there. Ignore my comments.
