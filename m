@@ -1,191 +1,132 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 15 Apr 2016 14:08:43 +0800
-Subject: [PATCH] i2c: designware-platdrv: implement bus recovery
-In-Reply-To: <20160414143916.GY1714@lahna.fi.intel.com>
-References: <1460642696-1858-1-git-send-email-jszhang@marvell.com>
- <20160414143916.GY1714@lahna.fi.intel.com>
-Message-ID: <20160415140843.4a1e5d0f@xhacker>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Fri, 15 Apr 2016 15:32:53 +0900
+Subject: [PATCH v2 6/8] clk: samsung: exynos542x: Add the clock id for ACLK
+In-Reply-To: <1460701975-24178-1-git-send-email-cw00.choi@samsung.com>
+References: <1460701975-24178-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1460701975-24178-7-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Mika,
+This patch adds the clock id for ACLK clock which is source clock of AMBA AXI
+Bus. This clock should be handled in Bus frequency scaling driver.
 
-On Thu, 14 Apr 2016 17:39:16 +0300 Mika Westerberg wrote:
+Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Cc: Tomasz Figa <tomasz.figa@gmail.com>
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Tested-by: Markus Reichl <m.reichl@fivetechno.de>
+Tested-by: Anand Moon <linux.amoon@gmail.com>
+---
+ drivers/clk/samsung/clk-exynos5420.c | 77 ++++++++++++++++++++++--------------
+ 1 file changed, 47 insertions(+), 30 deletions(-)
 
-> On Thu, Apr 14, 2016 at 10:04:56PM +0800, Jisheng Zhang wrote:
-> > Implement bus recovery methods for i2c designware so we can recover
-> > from situations where SCL/SDA are stuck low.
-> > 
-> > The recovery method is similar as i2c-imx: "config the i2c pinctrl to
-> > gpio mode by calling pinctrl sleep set function, and then use GPIO to
-> > emulate the i2c protocol to send nine dummy clock to recover i2c
-> > device. After recovery, set i2c pinctrl to default group setting.
-> > 
-> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> > ---
-> > depends on runtime pm patches
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2016-April/422202.html
-> >  .../devicetree/bindings/i2c/i2c-designware.txt     | 12 ++++++
-> >  drivers/i2c/busses/i2c-designware-core.c           |  6 ++-
-> >  drivers/i2c/busses/i2c-designware-core.h           |  4 ++
-> >  drivers/i2c/busses/i2c-designware-platdrv.c        | 50 ++++++++++++++++++++++
-> >  4 files changed, 71 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/i2c/i2c-designware.txt b/Documentation/devicetree/bindings/i2c/i2c-designware.txt
-> > index fee26dc..51a55c6 100644
-> > --- a/Documentation/devicetree/bindings/i2c/i2c-designware.txt
-> > +++ b/Documentation/devicetree/bindings/i2c/i2c-designware.txt
-> > @@ -20,6 +20,13 @@ Optional properties :
-> >   - i2c-sda-falling-time-ns : should contain the SDA falling time in nanoseconds.
-> >     This value which is by default 300ns is used to compute the tHIGH period.
-> >  
-> > + - scl-gpios: specify the gpio related to SCL pin
-> > +
-> > + - sda-gpios: specify the gpio related to SDA pin
-> > +
-> > + - pinctrl: add extra pinctrl to configure i2c pins to gpio function for i2c
-> > +   bus recovery, call it "gpio" state
-> > +
-> >  Example :
-> >  
-> >  	i2c at f0000 {
-> > @@ -42,4 +49,9 @@ Example :
-> >  		i2c-sda-hold-time-ns = <300>;
-> >  		i2c-sda-falling-time-ns = <300>;
-> >  		i2c-scl-falling-time-ns = <300>;
-> > +		pinctrl-names = "default", "gpio";
-> > +		pinctrl-0 = <&pinctrl_i2c1_default>;
-> > +		pinctrl-1 = <&pinctrl_i2c1_gpio>;
-> > +		scl-gpios = <&porta 26 GPIO_ACTIVE_HIGH>;
-> > +		sda-gpios = <&porta 27 GPIO_ACTIVE_HIGH>;
-> >  	};
-> > diff --git a/drivers/i2c/busses/i2c-designware-core.c b/drivers/i2c/busses/i2c-designware-core.c
-> > index 4255eaa..be40de1 100644
-> > --- a/drivers/i2c/busses/i2c-designware-core.c
-> > +++ b/drivers/i2c/busses/i2c-designware-core.c
-> > @@ -399,7 +399,10 @@ static int i2c_dw_wait_bus_not_busy(struct dw_i2c_dev *dev)
-> >  	while (dw_readl(dev, DW_IC_STATUS) & DW_IC_STATUS_ACTIVITY) {
-> >  		if (timeout <= 0) {
-> >  			dev_warn(dev->dev, "timeout waiting for bus ready\n");
-> > -			return -ETIMEDOUT;
-> > +			i2c_recover_bus(&dev->adapter);
-> > +			if (dw_readl(dev, DW_IC_STATUS)
-> > +					& DW_IC_STATUS_ACTIVITY)
-> > +				return -ETIMEDOUT;
-> >  		}
-> >  		timeout--;
-> >  		usleep_range(1000, 1100);
-> > @@ -665,6 +668,7 @@ i2c_dw_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
-> >  	/* wait for tx to complete */
-> >  	if (!wait_for_completion_timeout(&dev->cmd_complete, HZ)) {
-> >  		dev_err(dev->dev, "controller timed out\n");
-> > +		i2c_recover_bus(&dev->adapter);
-> >  		/* i2c_dw_init implicitly disables the adapter */
-> >  		i2c_dw_init(dev);
-> >  		ret = -ETIMEDOUT;
-> > diff --git a/drivers/i2c/busses/i2c-designware-core.h b/drivers/i2c/busses/i2c-designware-core.h
-> > index cd409e7..26c84ee 100644
-> > --- a/drivers/i2c/busses/i2c-designware-core.h
-> > +++ b/drivers/i2c/busses/i2c-designware-core.h
-> > @@ -104,6 +104,10 @@ struct dw_i2c_dev {
-> >  	u16			fs_lcnt;
-> >  	int			(*acquire_lock)(struct dw_i2c_dev *dev);
-> >  	void			(*release_lock)(struct dw_i2c_dev *dev);
-> > +	struct i2c_bus_recovery_info rinfo;
-> > +	struct pinctrl		*pinctrl;
-> > +	struct pinctrl_state	*pinctrl_pins_default;
-> > +	struct pinctrl_state	*pinctrl_pins_gpio;
-> >  	bool			pm_runtime_disabled;
-> >  };
-> >  
-> > diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
-> > index 1488cea..62bded9 100644
-> > --- a/drivers/i2c/busses/i2c-designware-platdrv.c
-> > +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
-> > @@ -33,6 +33,7 @@
-> >  #include <linux/err.h>
-> >  #include <linux/interrupt.h>
-> >  #include <linux/of.h>
-> > +#include <linux/of_gpio.h>
-> >  #include <linux/platform_device.h>
-> >  #include <linux/pm.h>
-> >  #include <linux/pm_runtime.h>
-> > @@ -148,6 +149,49 @@ static int i2c_dw_plat_prepare_clk(struct dw_i2c_dev *i_dev, bool prepare)
-> >  	return 0;
-> >  }
-> >  
-> > +static void i2c_dw_plat_prepare_recovery(struct i2c_adapter *adap)
-> > +{
-> > +	struct dw_i2c_dev *dev = i2c_get_adapdata(adap);
-> > +
-> > +	pinctrl_select_state(dev->pinctrl, dev->pinctrl_pins_gpio);
-> > +}
-> > +
-> > +static void i2c_dw_plat_unprepare_recovery(struct i2c_adapter *adap)
-> > +{
-> > +	struct dw_i2c_dev *dev = i2c_get_adapdata(adap);
-> > +
-> > +	pinctrl_select_state(dev->pinctrl, dev->pinctrl_pins_default);
-> > +}
-> > +
-> > +static void i2c_dw_plat_init_recovery_info(struct dw_i2c_dev *dev,
-> > +					   struct platform_device *pdev)
-> > +{
-> > +	struct i2c_bus_recovery_info *rinfo = &dev->rinfo;
-> > +
-> > +	dev->pinctrl_pins_default = pinctrl_lookup_state(dev->pinctrl,
-> > +			PINCTRL_STATE_DEFAULT);
-> > +	dev->pinctrl_pins_gpio = pinctrl_lookup_state(dev->pinctrl,
-> > +			"gpio");
-> > +	rinfo->sda_gpio = of_get_named_gpio(pdev->dev.of_node, "sda-gpios", 0);
-> > +	rinfo->scl_gpio = of_get_named_gpio(pdev->dev.of_node, "scl-gpios", 0);
-> > +
-> > +	if (!gpio_is_valid(rinfo->sda_gpio) ||
-> > +	    !gpio_is_valid(rinfo->scl_gpio) ||
-> > +	    IS_ERR(dev->pinctrl_pins_default) ||
-> > +	    IS_ERR(dev->pinctrl_pins_gpio)) {
-> > +		dev_dbg(&pdev->dev, "recovery information incomplete\n");
-> > +		return;
-
-For ACPI, we should return here, right?
-
-> > +	}
-> > +
-> > +	dev_dbg(&pdev->dev, "using scl-gpio %d and sda-gpio %d for recovery\n",
-> > +		rinfo->sda_gpio, rinfo->scl_gpio);
-> > +
-> > +	rinfo->prepare_recovery = i2c_dw_plat_prepare_recovery;
-> > +	rinfo->unprepare_recovery = i2c_dw_plat_unprepare_recovery;
-> > +	rinfo->recover_bus = i2c_generic_gpio_recovery;  
-> 
-> This whole thing is DT specific and I don't see how we can do the same
-> for ACPI. Should it be enabled only when the controller was enumerated
-> from DT?
-
-Per my understanding, for ACPI, the pinctrl_pins_default, pinctrl_pins_gpio,
-sda_gpio and scl_gpio will be invalid or err, so we won't setup rinfo
-at all. However, I have no acpi platform which have i2c designware to double
-confirm.
-
-> 
-> > +	dev->adapter.bus_recovery_info = rinfo;
-> > +}
-> > +
-> >  static int dw_i2c_plat_probe(struct platform_device *pdev)
-> >  {
-> >  	struct dw_i2c_platform_data *pdata = dev_get_platdata(&pdev->dev);
-> > @@ -165,6 +209,12 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
-> >  	if (!dev)
-> >  		return -ENOMEM;
-> >  
-> > +	dev->pinctrl = devm_pinctrl_get(&pdev->dev);
-> > +	if (IS_ERR(dev->pinctrl))
-> > +		return PTR_ERR(dev->pinctrl);
-> > +
-> > +	i2c_dw_plat_init_recovery_info(dev, pdev);
-> > +
-> >  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> >  	dev->base = devm_ioremap_resource(&pdev->dev, mem);
-> >  	if (IS_ERR(dev->base))
-> > -- 
-> > 2.8.0.rc3  
+diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+index be03ed0fcb6b..92382cef9f90 100644
+--- a/drivers/clk/samsung/clk-exynos5420.c
++++ b/drivers/clk/samsung/clk-exynos5420.c
+@@ -554,8 +554,8 @@ static struct samsung_mux_clock exynos5800_mux_clks[] __initdata = {
+ };
+ 
+ static struct samsung_div_clock exynos5800_div_clks[] __initdata = {
+-	DIV(0, "dout_aclk400_wcore", "mout_aclk400_wcore", DIV_TOP0, 16, 3),
+-
++	DIV(CLK_DOUT_ACLK400_WCORE, "dout_aclk400_wcore",
++			"mout_aclk400_wcore", DIV_TOP0, 16, 3),
+ 	DIV(0, "dout_aclk550_cam", "mout_aclk550_cam",
+ 				DIV_TOP8, 16, 3),
+ 	DIV(0, "dout_aclkfl1_550_cam", "mout_aclkfl1_550_cam",
+@@ -607,8 +607,8 @@ static struct samsung_mux_clock exynos5420_mux_clks[] __initdata = {
+ };
+ 
+ static struct samsung_div_clock exynos5420_div_clks[] __initdata = {
+-	DIV(0, "dout_aclk400_wcore", "mout_aclk400_wcore_bpll",
+-			DIV_TOP0, 16, 3),
++	DIV(CLK_DOUT_ACLK400_WCORE, "dout_aclk400_wcore",
++			"mout_aclk400_wcore_bpll", DIV_TOP0, 16, 3),
+ };
+ 
+ static struct samsung_mux_clock exynos5x_mux_clks[] __initdata = {
+@@ -785,31 +785,47 @@ static struct samsung_div_clock exynos5x_div_clks[] __initdata = {
+ 	DIV(0, "div_kfc", "mout_kfc", DIV_KFC0, 0, 3),
+ 	DIV(0, "sclk_kpll", "mout_kpll", DIV_KFC0, 24, 3),
+ 
+-	DIV(0, "dout_aclk400_isp", "mout_aclk400_isp", DIV_TOP0, 0, 3),
+-	DIV(0, "dout_aclk400_mscl", "mout_aclk400_mscl", DIV_TOP0, 4, 3),
+-	DIV(0, "dout_aclk200", "mout_aclk200", DIV_TOP0, 8, 3),
+-	DIV(0, "dout_aclk200_fsys2", "mout_aclk200_fsys2", DIV_TOP0, 12, 3),
+-	DIV(0, "dout_aclk100_noc", "mout_aclk100_noc", DIV_TOP0, 20, 3),
+-	DIV(0, "dout_pclk200_fsys", "mout_pclk200_fsys", DIV_TOP0, 24, 3),
+-	DIV(0, "dout_aclk200_fsys", "mout_aclk200_fsys", DIV_TOP0, 28, 3),
+-
+-	DIV(0, "dout_aclk333_432_gscl", "mout_aclk333_432_gscl",
+-			DIV_TOP1, 0, 3),
+-	DIV(0, "dout_aclk333_432_isp", "mout_aclk333_432_isp",
+-			DIV_TOP1, 4, 3),
+-	DIV(0, "dout_aclk66", "mout_aclk66", DIV_TOP1, 8, 6),
+-	DIV(0, "dout_aclk333_432_isp0", "mout_aclk333_432_isp0",
+-			DIV_TOP1, 16, 3),
+-	DIV(0, "dout_aclk266", "mout_aclk266", DIV_TOP1, 20, 3),
+-	DIV(0, "dout_aclk166", "mout_aclk166", DIV_TOP1, 24, 3),
+-	DIV(0, "dout_aclk333", "mout_aclk333", DIV_TOP1, 28, 3),
+-
+-	DIV(0, "dout_aclk333_g2d", "mout_aclk333_g2d", DIV_TOP2, 8, 3),
+-	DIV(0, "dout_aclk266_g2d", "mout_aclk266_g2d", DIV_TOP2, 12, 3),
+-	DIV(0, "dout_aclk_g3d", "mout_aclk_g3d", DIV_TOP2, 16, 3),
+-	DIV(0, "dout_aclk300_jpeg", "mout_aclk300_jpeg", DIV_TOP2, 20, 3),
+-	DIV(0, "dout_aclk300_disp1", "mout_aclk300_disp1", DIV_TOP2, 24, 3),
+-	DIV(0, "dout_aclk300_gscl", "mout_aclk300_gscl", DIV_TOP2, 28, 3),
++	DIV(CLK_DOUT_ACLK400_ISP, "dout_aclk400_isp", "mout_aclk400_isp",
++			DIV_TOP0, 0, 3),
++	DIV(CLK_DOUT_ACLK400_MSCL, "dout_aclk400_mscl", "mout_aclk400_mscl",
++			DIV_TOP0, 4, 3),
++	DIV(CLK_DOUT_ACLK200, "dout_aclk200", "mout_aclk200",
++			DIV_TOP0, 8, 3),
++	DIV(CLK_DOUT_ACLK200_FSYS2, "dout_aclk200_fsys2", "mout_aclk200_fsys2",
++			DIV_TOP0, 12, 3),
++	DIV(CLK_DOUT_ACLK100_NOC, "dout_aclk100_noc", "mout_aclk100_noc",
++			DIV_TOP0, 20, 3),
++	DIV(CLK_DOUT_PCLK200_FSYS, "dout_pclk200_fsys", "mout_pclk200_fsys",
++			DIV_TOP0, 24, 3),
++	DIV(CLK_DOUT_ACLK200_FSYS, "dout_aclk200_fsys", "mout_aclk200_fsys",
++			DIV_TOP0, 28, 3),
++	DIV(CLK_DOUT_ACLK333_432_GSCL, "dout_aclk333_432_gscl",
++			"mout_aclk333_432_gscl", DIV_TOP1, 0, 3),
++	DIV(CLK_DOUT_ACLK333_432_ISP, "dout_aclk333_432_isp",
++			"mout_aclk333_432_isp", DIV_TOP1, 4, 3),
++	DIV(CLK_DOUT_ACLK66, "dout_aclk66", "mout_aclk66",
++			DIV_TOP1, 8, 6),
++	DIV(CLK_DOUT_ACLK333_432_ISP0, "dout_aclk333_432_isp0",
++			"mout_aclk333_432_isp0", DIV_TOP1, 16, 3),
++	DIV(CLK_DOUT_ACLK266, "dout_aclk266", "mout_aclk266",
++			DIV_TOP1, 20, 3),
++	DIV(CLK_DOUT_ACLK166, "dout_aclk166", "mout_aclk166",
++			DIV_TOP1, 24, 3),
++	DIV(CLK_DOUT_ACLK333, "dout_aclk333", "mout_aclk333",
++			DIV_TOP1, 28, 3),
++
++	DIV(CLK_DOUT_ACLK333_G2D, "dout_aclk333_g2d", "mout_aclk333_g2d",
++			DIV_TOP2, 8, 3),
++	DIV(CLK_DOUT_ACLK266_G2D, "dout_aclk266_g2d", "mout_aclk266_g2d",
++			DIV_TOP2, 12, 3),
++	DIV(CLK_DOUT_ACLK_G3D, "dout_aclk_g3d", "mout_aclk_g3d", DIV_TOP2,
++			16, 3),
++	DIV(CLK_DOUT_ACLK300_JPEG, "dout_aclk300_jpeg", "mout_aclk300_jpeg",
++			DIV_TOP2, 20, 3),
++	DIV(CLK_DOUT_ACLK300_DISP1, "dout_aclk300_disp1",
++			"mout_aclk300_disp1", DIV_TOP2, 24, 3),
++	DIV(CLK_DOUT_ACLK300_GSCL, "dout_aclk300_gscl", "mout_aclk300_gscl",
++			DIV_TOP2, 28, 3),
+ 
+ 	/* DISP1 Block */
+ 	DIV(0, "dout_fimd1", "mout_fimd1_final", DIV_DISP10, 0, 4),
+@@ -817,7 +833,8 @@ static struct samsung_div_clock exynos5x_div_clks[] __initdata = {
+ 	DIV(0, "dout_dp1", "mout_dp1", DIV_DISP10, 24, 4),
+ 	DIV(CLK_DOUT_PIXEL, "dout_hdmi_pixel", "mout_pixel", DIV_DISP10, 28, 4),
+ 	DIV(0, "dout_disp1_blk", "aclk200_disp1", DIV2_RATIO0, 16, 2),
+-	DIV(0, "dout_aclk400_disp1", "mout_aclk400_disp1", DIV_TOP2, 4, 3),
++	DIV(CLK_DOUT_ACLK400_DISP1, "dout_aclk400_disp1",
++			"mout_aclk400_disp1", DIV_TOP2, 4, 3),
+ 
+ 	/* Audio Block */
+ 	DIV(0, "dout_maudio0", "mout_maudio0", DIV_MAU, 20, 4),
+-- 
+1.9.1
