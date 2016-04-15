@@ -1,92 +1,38 @@
-From: sstabellini@kernel.org (Stefano Stabellini)
-Date: Fri, 15 Apr 2016 14:10:02 -0700 (PDT)
-Subject: [PATCH v2 2/6] ARM: xen: Register with kernel restart handler
-In-Reply-To: <20160415193544.GA2005@roeck-us.net>
-References: <1460688157-6551-1-git-send-email-linux@roeck-us.net>
- <1460688157-6551-3-git-send-email-linux@roeck-us.net>
- <alpine.DEB.2.10.1604151122090.3433@sstabellini-ThinkPad-X260>
- <20160415193544.GA2005@roeck-us.net>
-Message-ID: <alpine.DEB.2.10.1604151409440.3433@sstabellini-ThinkPad-X260>
+From: david@lechnology.com (David Lechner)
+Date: Fri, 15 Apr 2016 16:20:51 -0500
+Subject: [PATCH 1/3] ARM: DTS: da850: add node for spi0
+In-Reply-To: <31522.1460751389@turing-police.cc.vt.edu>
+References: <1460586628-25152-1-git-send-email-david@lechnology.com>
+ <1460586628-25152-2-git-send-email-david@lechnology.com>
+ <5710C176.3040304@ti.com> <57111433.6080402@lechnology.com>
+ <31522.1460751389@turing-police.cc.vt.edu>
+Message-ID: <57115B33.90509@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 15 Apr 2016, Guenter Roeck wrote:
-> On Fri, Apr 15, 2016 at 11:22:36AM -0700, Stefano Stabellini wrote:
-> > On Thu, 14 Apr 2016, Guenter Roeck wrote:
-> > > Register with kernel restart handler instead of setting arm_pm_restart
-> > > directly.
-> > > 
-> > > Select a high priority of 192 to ensure that default restart handlers
-> > > are replaced if Xen is running.
-> > > 
-> > > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > > Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> > > Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > > Signed-off-by: Guenter Roeck <linux@roeck-us.net>
-> > 
-> > Thanks. I assume this is going to go in via Russell or Catalin's tree
-> > with the rest of your series?
-> > 
-> I would suggest Russell, if he is willing to pick it up, since it mostly
-> affects arm.
+On 04/15/2016 03:16 PM, Valdis.Kletnieks at vt.edu wrote:
+> On Fri, 15 Apr 2016 11:17:55 -0500, David Lechner said:
+>
+>> I omitted this on purpose. For my use case, I am using the SPI as
+>> write-only,
+>
+> So your SPI accesses are fire-and-forget, and nothing ever comes back?
 
-I am happy with that. In that case I'll remove this patch from my queue
-not to have duplicates.
+Yes.
+
+> Seems a very dangerous way to design the use case, with no feedback if
+> something suddenly goes pear-shaped...
+
+You should tell Sitronix. This is how their display controllers work.
+
+>
+> Or do you have ways to verify the status via some method other than SPI?
+>
+
+Nope.
 
 
-> 
-> > 
-> > > v2: Rebased to v4.6-rc3, added Reviewed/by/Acked-by tags
-> > > 
-> > >  arch/arm/xen/enlighten.c | 13 +++++++++++--
-> > >  1 file changed, 11 insertions(+), 2 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> > > index 75cd7345c654..76a1d12fd27e 100644
-> > > --- a/arch/arm/xen/enlighten.c
-> > > +++ b/arch/arm/xen/enlighten.c
-> > > @@ -27,6 +27,7 @@
-> > >  #include <linux/cpu.h>
-> > >  #include <linux/console.h>
-> > >  #include <linux/pvclock_gtod.h>
-> > > +#include <linux/reboot.h>
-> > >  #include <linux/time64.h>
-> > >  #include <linux/timekeeping.h>
-> > >  #include <linux/timekeeper_internal.h>
-> > > @@ -193,14 +194,22 @@ after_register_vcpu_info:
-> > >  	put_cpu();
-> > >  }
-> > >  
-> > > -static void xen_restart(enum reboot_mode reboot_mode, const char *cmd)
-> > > +static int xen_restart(struct notifier_block *nb, unsigned long action,
-> > > +		       void *data)
-> > >  {
-> > >  	struct sched_shutdown r = { .reason = SHUTDOWN_reboot };
-> > >  	int rc;
-> > >  	rc = HYPERVISOR_sched_op(SCHEDOP_shutdown, &r);
-> > >  	BUG_ON(rc);
-> > > +
-> > > +	return NOTIFY_DONE;
-> > >  }
-> > >  
-> > > +static struct notifier_block xen_restart_nb = {
-> > > +	.notifier_call = xen_restart,
-> > > +	.priority = 192,
-> > > +};
-> > > +
-> > >  static void xen_power_off(void)
-> > >  {
-> > >  	struct sched_shutdown r = { .reason = SHUTDOWN_poweroff };
-> > > @@ -370,7 +379,7 @@ static int __init xen_pm_init(void)
-> > >  		return -ENODEV;
-> > >  
-> > >  	pm_power_off = xen_power_off;
-> > > -	arm_pm_restart = xen_restart;
-> > > +	register_restart_handler(&xen_restart_nb);
-> > >  	if (!xen_initial_domain()) {
-> > >  		struct timespec64 ts;
-> > >  		xen_read_wallclock(&ts);
-> > > -- 
-> > > 2.5.0
-> > > 
-> 
+
+I'm working with LEGO MINDSTORMS EV3, a mass-produced robotics system. 
+It is what it is. And I have a logic analyzer for when things go 
+pear-shaped. ;-)
