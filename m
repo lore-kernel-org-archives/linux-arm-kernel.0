@@ -1,68 +1,210 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 15 Apr 2016 09:55:45 +0200
-Subject: [PATCH RESEND] gpmi-nand: Handle ECC Errors in erased pages
-In-Reply-To: <20160413005155.03cb7bc6@bbrezillon>
-References: <1456059126-25469-1-git-send-email-mpa@pengutronix.de>
- <DB5PR0401MB1845DD983AF9195311DEB20F97950@DB5PR0401MB1845.eurprd04.prod.outlook.com>
- <20160413005155.03cb7bc6@bbrezillon>
-Message-ID: <7168760.YSQBa3GsdA@adelgunde>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 15 Apr 2016 09:57:53 +0200
+Subject: [PATCH v2 2/4] arm64: move early boot code to the .init segment
+In-Reply-To: <CAKv+Gu_4dK_2yR6gru2r6GJ4zTshg8mkjBxU9DZzaM8yio+=jg@mail.gmail.com>
+References: <1459352589-28721-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1459352589-28721-3-git-send-email-ard.biesheuvel@linaro.org>
+ <20160414163235.GE4584@arm.com>
+ <CAKv+Gu_4dK_2yR6gru2r6GJ4zTshg8mkjBxU9DZzaM8yio+=jg@mail.gmail.com>
+Message-ID: <57109F01.8010408@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 April 2016 00:51:55 Boris Brezillon wrote:
-> On Tue, 12 Apr 2016 22:39:08 +0000
-> Han Xu <han.xu@nxp.com> wrote:
+
+
+On 04/14/2016 06:39 PM, Ard Biesheuvel wrote:
+> On 14 April 2016 at 18:32, Will Deacon <will.deacon@arm.com> wrote:
+>> Hi Ard,
+>>
+>> On Wed, Mar 30, 2016 at 05:43:07PM +0200, Ard Biesheuvel wrote:
+>>> Apart from the arm64/linux and EFI header data structures, there is nothing
+>>> in the .head.text section that must reside at the beginning of the Image.
+>>> So let's move it to the .init section where it belongs.
+>>>
+>>> Note that this involves some minor tweaking of the EFI header, primarily
+>>> because the address of 'stext' no longer coincides with the start of the
+>>> .text section. It also requires a couple of relocated symbol references
+>>> to be slightly rewritten or their definition moved to the linker script.
+>>
+>> [...]
+>>
+>>>  ENTRY(stext)
+>>>       bl      preserve_boot_args
+>>>       bl      el2_setup                       // Drop to EL1, w20=cpu_boot_mode
+>>> @@ -223,12 +224,12 @@ ENTRY(stext)
+>>>        * the TCR will have been set.
+>>>        */
+>>>       ldr     x27, 0f                         // address to jump to after
+>>> -                                             // MMU has been enabled
+>>> +     neg     x27, x27                        // MMU has been enabled
+>>>       adr_l   lr, __enable_mmu                // return (PIC) address
+>>>       b       __cpu_setup                     // initialise processor
+>>>  ENDPROC(stext)
+>>>       .align  3
+>>> -0:   .quad   __mmap_switched - (_head - TEXT_OFFSET) + KIMAGE_VADDR
+>>> +0:   .quad   (_text - TEXT_OFFSET) - __mmap_switched - KIMAGE_VADDR
+>>
+>> I'm struggling to understand why you need to change this. Furthermore,
+>> it looks like the gas docs for expressions require that addition/subtraction
+>> can only be performed on arguments that are in the same section, so
+>> this feels pretty rickety.
+>>
+>> What's the problem you're solving here?
+>>
 > 
-> > > Thanks for the feedback. Talking with a coworker about this we may have found a
-> > > better approach to this that is less complicated to implement. The hardware
-> > > unit allows us to set a bitflip threshold for erased pages. The ECC unit
-> > > creates an ECC error only if the number of bitflips exceeds this threshold, but
-> > > it does not correct these. So the idea is to change the patch so that we set
-> > > pages, that are signaled by the ECC as erased, to 0xff completely without
-> > > checking. So the ECC will do all the work and we completely trust in its
-> > > abilities to do it correctly.
-> > 
-> > Sounds good.
-> > 
-> > some new platforms with new gpmi controller could check the count of 0 bits in page,
-> > refer to my patch https://patchwork.ozlabs.org/patch/587124/
-> > 
-> > But for all legacy platforms, IMO, considering bitflip is rare case, set threshold to 0 and
-> > only check the uncorrectable branch and then correct data sounds better. Setting threshold
-> > and correcting all erased page may highly impact the performance.
+> The problem is that this function is no longer in the same section as
+> _head aka _text, so the latter can only appear in the reloc expression
+> as a positive term, and the remaining ones will all be combined into
+> the addend.
 > 
-> Indeed, bitflips in erased pages is not so common, and penalizing the
-> likely case (erased pages without any bitflips) doesn't look like a good
-> idea in the end.
 
-Are erased pages really read that often? I am not sure how UBI handles
-this, does it read every page before writing?
+Alternatively, if you prefer, we could move the relocation processing
+out of __mmap_switched() and run the code from the ID map, while
+accessing the relocations via the virtual mapping. That way, all the
+dodgy arithmetic (which actually doesn't look as dodgy anymore) is
+confined to #ifdef CONFIG_RELOCATABLE sections. Something like
 
-> 
-> You can still implement this check in software. You can have a look at
-> nand_check_erased_ecc_chunk() [1] if you need an example, but you'll
-> have to adapt it because your controller does not guarantees that ECC
-> bits for a given chunk are byte aligned :-/
-
-Yes I used this function in the patch. The issue is that I am not quite
-sure yet where to find the raw ECC data (without rereading the page).
-The reference manual is not extremely clear about that, ecc data may be
-in the 'auxilliary data' but I am not sure that it really is available
-somewhere.
-
-Best Regards,
-
-Markus
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160415/4a32d055/attachment.sig>
+------8<--------
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 4203d5f257bc..f9eeb1936c38 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -222,13 +222,11 @@ ENTRY(stext)
+ 	 * On return, the CPU will be ready for the MMU to be turned on and
+ 	 * the TCR will have been set.
+ 	 */
+-	ldr	x27, 0f				// address to jump to after
++	adr_l	x27, __relocate_kernel		// address to jump to after
+ 						// MMU has been enabled
+ 	adr_l	lr, __enable_mmu		// return (PIC) address
+ 	b	__cpu_setup			// initialise processor
+ ENDPROC(stext)
+-	.align	3
+-0:	.quad	__mmap_switched - (_head - TEXT_OFFSET) + KIMAGE_VADDR
+ 
+ /*
+  * Preserve the arguments passed by the bootloader in x0 .. x3
+@@ -437,44 +435,6 @@ __mmap_switched:
+ 	bl	__pi_memset
+ 	dsb	ishst				// Make zero page visible to PTW
+ 
+-#ifdef CONFIG_RELOCATABLE
+-
+-	/*
+-	 * Iterate over each entry in the relocation table, and apply the
+-	 * relocations in place.
+-	 */
+-	adr_l	x8, __dynsym_start		// start of symbol table
+-	adr_l	x9, __reloc_start		// start of reloc table
+-	adr_l	x10, __reloc_end		// end of reloc table
+-
+-0:	cmp	x9, x10
+-	b.hs	2f
+-	ldp	x11, x12, [x9], #24
+-	ldr	x13, [x9, #-8]
+-	cmp	w12, #R_AARCH64_RELATIVE
+-	b.ne	1f
+-	add	x13, x13, x23			// relocate
+-	str	x13, [x11, x23]
+-	b	0b
+-
+-1:	cmp	w12, #R_AARCH64_ABS64
+-	b.ne	0b
+-	add	x12, x12, x12, lsl #1		// symtab offset: 24x top word
+-	add	x12, x8, x12, lsr #(32 - 3)	// ... shifted into bottom word
+-	ldrsh	w14, [x12, #6]			// Elf64_Sym::st_shndx
+-	ldr	x15, [x12, #8]			// Elf64_Sym::st_value
+-	cmp	w14, #-0xf			// SHN_ABS (0xfff1) ?
+-	add	x14, x15, x23			// relocate
+-	csel	x15, x14, x15, ne
+-	add	x15, x13, x15
+-	str	x15, [x11, x23]
+-	b	0b
+-
+-2:	adr_l	x8, kimage_vaddr		// make relocated kimage_vaddr
+-	dc	cvac, x8			// value visible to secondaries
+-	dsb	sy				// with MMU off
+-#endif
+-
+ 	adr_l	sp, initial_sp, x4
+ 	mov	x4, sp
+ 	and	x4, x4, #~(THREAD_SIZE - 1)
+@@ -795,7 +755,6 @@ __enable_mmu:
+ 	ic	iallu				// flush instructions fetched
+ 	dsb	nsh				// via old mapping
+ 	isb
+-	add	x27, x27, x23			// relocated __mmap_switched
+ #endif
+ 	br	x27
+ ENDPROC(__enable_mmu)
+@@ -808,3 +767,50 @@ __no_granule_support:
+ 	wfi
+ 	b 1b
+ ENDPROC(__no_granule_support)
++
++__relocate_kernel:
++#ifdef CONFIG_RELOCATABLE
++	/*
++	 * Iterate over each entry in the relocation table, and apply the
++	 * relocations in place.
++	 */
++	ldr	w8, =__dynsym_start_offset	// offset to symbol table
++	ldr	w9, =__reloc_start_offset	// offset to reloc table
++	ldr	w10, =__reloc_end_offset	// offset to end of reloc table
++
++	ldr	x11, =KIMAGE_VADDR		// default virtual offset
++	add	x11, x11, x23			// actual virtual offset
++	add	x8, x8, x11			// __va(.dynsym)
++	add	x9, x9, x11			// __va(.reloc)
++	add	x10, x10, x11			// __va(.reloc) + sizeof(.reloc)
++
++0:	cmp	x9, x10
++	b.hs	2f
++	ldp	x11, x12, [x9], #24
++	ldr	x13, [x9, #-8]
++	cmp	w12, #R_AARCH64_RELATIVE
++	b.ne	1f
++	add	x13, x13, x23			// relocate
++	str	x13, [x11, x23]
++	b	0b
++
++1:	cmp	w12, #R_AARCH64_ABS64
++	b.ne	0b
++	add	x12, x12, x12, lsl #1		// symtab offset: 24x top word
++	add	x12, x8, x12, lsr #(32 - 3)	// ... shifted into bottom word
++	ldrsh	w14, [x12, #6]			// Elf64_Sym::st_shndx
++	ldr	x15, [x12, #8]			// Elf64_Sym::st_value
++	cmp	w14, #-0xf			// SHN_ABS (0xfff1) ?
++	add	x14, x15, x23			// relocate
++	csel	x15, x14, x15, ne
++	add	x15, x13, x15
++	str	x15, [x11, x23]
++	b	0b
++
++2:	ldr	x8, =kimage_vaddr		// make relocated kimage_vaddr
++	dc	cvac, x8			// value visible to secondaries
++	dsb	sy				// with MMU off
++#endif
++	ldr	x8, =__mmap_switched
++	br	x8
++ENDPROC(__relocate_kernel)
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 5a1939a74ff3..e9278013d5d2 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -154,12 +154,12 @@ SECTIONS
+ 		*(.altinstr_replacement)
+ 	}
+ 	.rela : ALIGN(8) {
+-		__reloc_start = .;
++		__reloc_start_offset = ABSOLUTE(. - KIMAGE_VADDR);
+ 		*(.rela .rela*)
+-		__reloc_end = .;
++		__reloc_end_offset = ABSOLUTE(. - KIMAGE_VADDR);
+ 	}
+ 	.dynsym : ALIGN(8) {
+-		__dynsym_start = .;
++		__dynsym_start_offset = ABSOLUTE(. - KIMAGE_VADDR);
+ 		*(.dynsym)
+ 	}
+ 	.dynstr : {
