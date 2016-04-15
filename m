@@ -1,45 +1,34 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Fri, 15 Apr 2016 09:23:42 -0700
-Subject: [PATCH v5 00/10] Support for Cortex-M Prototyping System
-In-Reply-To: <5710ABC4.5070505@arm.com>
-References: <1459519381-34441-1-git-send-email-vladimir.murzin@arm.com>
- <570F593D.6040809@arm.com> <20160414192540.GD20512@kroah.com>
- <5710ABC4.5070505@arm.com>
-Message-ID: <20160415162342.GC25094@kroah.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 15 Apr 2016 18:24:06 +0200
+Subject: [PATCH 3/6] regulator: rk808: Make rk808 generic, rename
+ rk808-regulator.c
+In-Reply-To: <20160415102602.GE3217@sirena.org.uk>
+References: <1460711790-22646-1-git-send-email-w.egorov@phytec.de>
+ <1460711790-22646-4-git-send-email-w.egorov@phytec.de>
+ <20160415102602.GE3217@sirena.org.uk>
+Message-ID: <20160415162406.GD25196@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 15, 2016 at 09:52:20AM +0100, Sudeep Holla wrote:
+On 15/04/2016 at 11:26:02 +0100, Mark Brown wrote :
+> On Fri, Apr 15, 2016 at 11:16:27AM +0200, Wadim Egorov wrote:
 > 
+> > This patch just renames the rk808 driver so we can reuse this driver
+> > to add more regulator devices from the RK8XX PMIC family later.
 > 
-> On 14/04/16 20:25, Greg KH wrote:
-> > On Thu, Apr 14, 2016 at 09:47:57AM +0100, Vladimir Murzin wrote:
-> > > Hi,
-> > > 
-> > > On 01/04/16 15:02, Vladimir Murzin wrote:
-> > > > Hi,
-> > > > 
-> > > > This patch series provides the basic support for running ucLinux on V2M-MPS2
-> > > > platform.
-> > > > 
-> > > > With these patches applied ucLinux can be run on both HW and FVP models
-> > > > with Cortex-M3/M4/M7 configurations.
-> > > 
-> > > Any objection to get it merged?
-> > > 
-> > > Sudeep Holla noticed that there is merge conflict against linux-next
-> > > with PIC32 uart (Makefile and serial_core.h), so should I provide
-> > > conflict resolution or do rebase on someone's branch?
-> > > 
-> > > Anyway, I'd be glad to know how it should be processed further?
-> > 
-> > I have no objection to the tty/serial changes, so if this all goes
-> > through the arm-soc tree, that's fine with me.
-> > 
-> 
-> Thanks Greg, can I take this as Ack ? arm-soc guys might expect to see
-> that tag :)
+> We normally manage to cope fine without renaming things - it's quite
+> common to have drivers that were initially named after one part
+> supporting multiple parts, avoiding the rename makes things like
+> backports easier and avoids needing git log --follow and so on.
 
-Sorry, yes:
+I agree with that and I will also add that probably at some point in
+time a new part may appear with a name matching rk8xx but may not be
+compatible with the rk8xx driver and that is when the real mess starts.
 
-	Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Finally, renaming the config options and the modules is not nice for the
+user.
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
