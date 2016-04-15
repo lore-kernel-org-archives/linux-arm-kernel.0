@@ -1,79 +1,50 @@
-From: sstabellini@kernel.org (Stefano Stabellini)
-Date: Fri, 15 Apr 2016 11:22:36 -0700 (PDT)
-Subject: [PATCH v2 2/6] ARM: xen: Register with kernel restart handler
-In-Reply-To: <1460688157-6551-3-git-send-email-linux@roeck-us.net>
-References: <1460688157-6551-1-git-send-email-linux@roeck-us.net>
- <1460688157-6551-3-git-send-email-linux@roeck-us.net>
-Message-ID: <alpine.DEB.2.10.1604151122090.3433@sstabellini-ThinkPad-X260>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 15 Apr 2016 13:29:14 -0500
+Subject: [RFC PATCH 09/11] drivers: acpi: implement acpi_dma_configure
+In-Reply-To: <1460654743-7896-10-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1460654743-7896-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1460654743-7896-10-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <CAOZdJXXtZq6uyE+5sseX7M_6Kq8wFG+37qd5TNSusKj=0gd8zA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 14 Apr 2016, Guenter Roeck wrote:
-> Register with kernel restart handler instead of setting arm_pm_restart
-> directly.
-> 
-> Select a high priority of 192 to ensure that default restart handlers
-> are replaced if Xen is running.
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
-
-Thanks. I assume this is going to go in via Russell or Catalin's tree
-with the rest of your series?
-
-
-> v2: Rebased to v4.6-rc3, added Reviewed/by/Acked-by tags
-> 
->  arch/arm/xen/enlighten.c | 13 +++++++++++--
->  1 file changed, 11 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> index 75cd7345c654..76a1d12fd27e 100644
-> --- a/arch/arm/xen/enlighten.c
-> +++ b/arch/arm/xen/enlighten.c
-> @@ -27,6 +27,7 @@
->  #include <linux/cpu.h>
->  #include <linux/console.h>
->  #include <linux/pvclock_gtod.h>
-> +#include <linux/reboot.h>
->  #include <linux/time64.h>
->  #include <linux/timekeeping.h>
->  #include <linux/timekeeper_internal.h>
-> @@ -193,14 +194,22 @@ after_register_vcpu_info:
->  	put_cpu();
->  }
->  
-> -static void xen_restart(enum reboot_mode reboot_mode, const char *cmd)
-> +static int xen_restart(struct notifier_block *nb, unsigned long action,
-> +		       void *data)
->  {
->  	struct sched_shutdown r = { .reason = SHUTDOWN_reboot };
->  	int rc;
->  	rc = HYPERVISOR_sched_op(SCHEDOP_shutdown, &r);
->  	BUG_ON(rc);
+On Thu, Apr 14, 2016 at 12:25 PM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> +void acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
+> +{
+> +       struct iommu_ops *iommu;
 > +
-> +	return NOTIFY_DONE;
->  }
->  
-> +static struct notifier_block xen_restart_nb = {
-> +	.notifier_call = xen_restart,
-> +	.priority = 192,
-> +};
+> +       iommu = iort_iommu_configure(dev);
 > +
->  static void xen_power_off(void)
->  {
->  	struct sched_shutdown r = { .reason = SHUTDOWN_poweroff };
-> @@ -370,7 +379,7 @@ static int __init xen_pm_init(void)
->  		return -ENODEV;
->  
->  	pm_power_off = xen_power_off;
-> -	arm_pm_restart = xen_restart;
-> +	register_restart_handler(&xen_restart_nb);
->  	if (!xen_initial_domain()) {
->  		struct timespec64 ts;
->  		xen_read_wallclock(&ts);
-> -- 
-> 2.5.0
-> 
+> +       /*
+> +        * Assume dma valid range starts at 0 and covers the whole
+> +        * coherent_dma_mask.
+> +        */
+> +       arch_setup_dma_ops(dev, 0, dev->coherent_dma_mask + 1, iommu,
+> +                          attr == DEV_DMA_COHERENT);
+> +}
+
+I have a network driver that is impacted by this code, so thank you
+for posting this. (See
+https://www.mail-archive.com/netdev at vger.kernel.org/msg106249.html).
+
+One one SOC, the driver needs to set the mask to 32 bits.  On another
+SOC, it needs to set it to 64 bits.  On device tree, the driver will
+use dma-ranges.
+
+In your patches, where is coherent_dma_mask initialized?  I found this
+code in add_smmu_platform_device(), but I think this is setting the
+mask for the IOMMU driver, not the individual devices.  Either way, I
+don't understand where the correct value is going to be overridden.
+
++       /*
++        * Set default dma mask value for the table walker,
++        * to be overridden on probing with correct value.
++        */
++       *pdev->dev.dma_mask = DMA_BIT_MASK(32);
++       pdev->dev.coherent_dma_mask = *pdev->dev.dma_mask;
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
