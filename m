@@ -1,352 +1,155 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 15 Apr 2016 18:11:23 +0100
-Subject: [PATCH 12/45] KVM: arm/arm64: vgic-new: Add MMIO handling framework
+Date: Fri, 15 Apr 2016 18:11:41 +0100
+Subject: [PATCH 30/45] KVM: arm/arm64: vgic-new: vgic_kvm_device:
+ KVM_DEV_ARM_VGIC_GRP_NR_IRQS
 In-Reply-To: <1460740316-8755-1-git-send-email-andre.przywara@arm.com>
 References: <1460740316-8755-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1460740316-8755-13-git-send-email-andre.przywara@arm.com>
+Message-ID: <1460740316-8755-31-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We register a kvm_io_bus device for the distributor and dispatch
-the calls to the actual register handler at runtime.
-Ideally we would register each register group directly with the
-kvm_io_bus framework, but currently we run into the limit of 1000
-devices pretty quickly (with GICv3), so we use this approach here, at
-least for the time being.
+From: Eric Auger <eric.auger@linaro.org>
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+This patch implements the KVM_DEV_ARM_VGIC_GRP_NR_IRQS group. This
+modality is supported by both VGIC V2 and V3 KVM device as will be
+other groups, hence the introduction of common helpers.
+
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
-
-Changelog RFC..v1:
-- rework MMIO dispatching to use only one kvm_io_bus device
-- document purpose of register region macros
-- rename "this" parameter to "dev"
-- change IGROUPR to be RAO (returning 1 => Group1 IRQs)
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- include/kvm/vgic/vgic.h       |   9 ++
- virt/kvm/arm/vgic/vgic_mmio.c | 226 ++++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic_mmio.h |  53 ++++++++++
- 3 files changed, 288 insertions(+)
- create mode 100644 virt/kvm/arm/vgic/vgic_mmio.c
- create mode 100644 virt/kvm/arm/vgic/vgic_mmio.h
+ virt/kvm/arm/vgic/vgic_kvm_device.c | 83 +++++++++++++++++++++++++++++++++++--
+ 1 file changed, 79 insertions(+), 4 deletions(-)
 
-diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-index 664004f..f331469 100644
---- a/include/kvm/vgic/vgic.h
-+++ b/include/kvm/vgic/vgic.h
-@@ -106,6 +106,12 @@ struct vgic_irq {
- 	enum vgic_irq_config config;	/* Level or edge */
- };
- 
-+struct vgic_io_device {
-+	gpa_t base_addr;
-+	struct kvm_vcpu *redist_vcpu;
-+	struct kvm_io_device dev;
-+};
-+
- struct vgic_dist {
- 	bool			in_kernel;
- 	bool			ready;
-@@ -132,6 +138,9 @@ struct vgic_dist {
- 	u32			enabled;
- 
- 	struct vgic_irq		*spis;
-+
-+	struct vgic_io_device	dist_iodev;
-+	struct vgic_io_device	*redist_iodevs;
- };
- 
- struct vgic_v2_cpu_if {
-diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
-new file mode 100644
-index 0000000..b70a274
---- /dev/null
-+++ b/virt/kvm/arm/vgic/vgic_mmio.c
-@@ -0,0 +1,226 @@
-+/*
-+ * VGIC MMIO handling functions
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/kvm.h>
-+#include <linux/kvm_host.h>
-+#include <kvm/iodev.h>
-+#include <kvm/vgic/vgic.h>
-+#include <linux/bitops.h>
-+#include <linux/irqchip/arm-gic.h>
-+
+diff --git a/virt/kvm/arm/vgic/vgic_kvm_device.c b/virt/kvm/arm/vgic/vgic_kvm_device.c
+index 7c665f9..c96549b 100644
+--- a/virt/kvm/arm/vgic/vgic_kvm_device.c
++++ b/virt/kvm/arm/vgic/vgic_kvm_device.c
+@@ -15,9 +15,69 @@
+  */
+ #include <linux/kvm_host.h>
+ #include <kvm/vgic/vgic.h>
++#include <linux/uaccess.h>
 +#include "vgic.h"
-+#include "vgic_mmio.h"
-+
-+void write_mask32(u32 value, int offset, int len, void *val)
+ 
+ /* common helpers */
+ 
++static int vgic_set_common_attr(struct kvm_device *dev,
++				struct kvm_device_attr *attr)
 +{
-+	value = cpu_to_le32(value) >> (offset * 8);
-+	memcpy(val, &value, len);
-+}
++	switch (attr->group) {
++	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
++		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
++		u32 val;
++		int ret = 0;
 +
-+u32 mask32(u32 origvalue, int offset, int len, const void *val)
-+{
-+	origvalue &= ~((BIT_ULL(len) - 1) << (offset * 8));
-+	memcpy((char *)&origvalue + (offset * 8), val, len);
-+	return origvalue;
-+}
++		if (get_user(val, uaddr))
++			return -EFAULT;
 +
-+#ifdef CONFIG_KVM_ARM_VGIC_V3
-+void write_mask64(u64 value, int offset, int len, void *val)
-+{
-+	value = cpu_to_le64(value) >> (offset * 8);
-+	memcpy(val, &value, len);
-+}
++		/*
++		 * We require:
++		 * - at least 32 SPIs on top of the 16 SGIs and 16 PPIs
++		 * - at most 1024 interrupts
++		 * - a multiple of 32 interrupts
++		 */
++		if (val < (VGIC_NR_PRIVATE_IRQS + 32) ||
++		    val > VGIC_MAX_RESERVED ||
++		    (val & 31))
++			return -EINVAL;
 +
-+/* FIXME: I am clearly misguided here, there must be some saner way ... */
-+u64 mask64(u64 origvalue, int offset, int len, const void *val)
-+{
-+	origvalue &= ~((BIT_ULL(len) - 1) << (offset * 8));
-+	memcpy((char *)&origvalue + (offset * 8), val, len);
-+	return origvalue;
-+}
-+#endif
++		mutex_lock(&dev->kvm->lock);
 +
-+int vgic_mmio_read_raz(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
-+		       gpa_t addr, int len, void *val)
-+{
-+	memset(val, 0, len);
++		if (vgic_ready(dev->kvm) || dev->kvm->arch.vgic.nr_spis)
++			ret = -EBUSY;
++		else
++			dev->kvm->arch.vgic.nr_spis =
++				val - VGIC_NR_PRIVATE_IRQS;
 +
-+	return 0;
-+}
++		mutex_unlock(&dev->kvm->lock);
 +
-+int vgic_mmio_read_rao(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
-+		       gpa_t addr, int len, void *val)
-+{
-+	memset(val, 0xff, len);
-+
-+	return 0;
-+}
-+
-+int vgic_mmio_write_wi(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
-+		       gpa_t addr, int len, const void *val)
-+{
-+	return 0;
-+}
-+
-+static int vgic_mmio_read_nyi(struct kvm_vcpu *vcpu,
-+			      struct kvm_io_device *dev,
-+			      gpa_t addr, int len, void *val)
-+{
-+	pr_warn("KVM: handling unimplemented VGIC MMIO read: VCPU %d, address: 0x%llx\n",
-+		vcpu->vcpu_id, (unsigned long long)addr);
-+	return 0;
-+}
-+
-+static int vgic_mmio_write_nyi(struct kvm_vcpu *vcpu,
-+			       struct kvm_io_device *dev,
-+			       gpa_t addr, int len, const void *val)
-+{
-+	pr_warn("KVM: handling unimplemented VGIC MMIO write: VCPU %d, address: 0x%llx\n",
-+		vcpu->vcpu_id, (unsigned long long)addr);
-+	return 0;
-+}
-+
-+struct vgic_register_region vgic_v2_dist_registers[] = {
-+	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
-+		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 12),
-+	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_IGROUP,
-+		vgic_mmio_read_rao, vgic_mmio_write_wi, 1),
-+	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_SET,
-+		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 1),
-+	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_CLEAR,
-+		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 1),
-+	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_SET,
-+		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 1),
-+	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_CLEAR,
-+		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 1),
-+	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_SET,
-+		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 1),
-+	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_CLEAR,
-+		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 1),
-+	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PRI,
-+		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 8),
-+	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_TARGET,
-+		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 8),
-+	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_CONFIG,
-+		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 8),
-+	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SOFTINT,
-+		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 4),
-+	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SGI_PENDING_CLEAR,
-+		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 16),
-+	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SGI_PENDING_SET,
-+		vgic_mmio_read_nyi, vgic_mmio_write_nyi, 16),
-+};
-+
-+/* Find the proper register handler entry given a certain address offset. */
-+static struct vgic_register_region *
-+vgic_find_mmio_region(struct vgic_register_region *region, int nr_regions,
-+		      int offset)
-+{
-+	int i;
-+
-+	for (i = 0; i < nr_regions; i++) {
-+		int reg_size = region[i].len;
-+
-+		if (!reg_size)
-+			reg_size = (region[i].bits_per_irq * 1024) / 8;
-+
-+		if ((offset < region[i].reg_offset) ||
-+		    (offset >= region[i].reg_offset + reg_size))
-+			continue;
-+
-+		return region + i;
++		return ret;
++	}
 +	}
 +
-+	return NULL;
++	return -ENXIO;
 +}
 +
-+static int dispatch_mmio_read(struct kvm_vcpu *vcpu,
-+			      struct vgic_register_region *regions,
-+			      int nr_regions, struct kvm_io_device *dev,
-+			      gpa_t addr, int len, void *val)
++static int vgic_get_common_attr(struct kvm_device *dev,
++				struct kvm_device_attr *attr)
 +{
-+	struct vgic_io_device *iodev = container_of(dev,
-+						    struct vgic_io_device, dev);
-+	struct vgic_register_region *region;
++	int r = -ENXIO;
 +
-+	region = vgic_find_mmio_region(regions, nr_regions,
-+				       addr - iodev->base_addr);
-+	if (!region)
-+		return -EOPNOTSUPP;
++	switch (attr->group) {
++	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
++		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
 +
-+	return region->ops.read(vcpu, dev, addr, len, val);
-+}
-+
-+static int dispatch_mmio_write(struct kvm_vcpu *vcpu,
-+			       struct vgic_register_region *regions,
-+			       int nr_regions, struct kvm_io_device *dev,
-+			       gpa_t addr, int len, const void *val)
-+{
-+	struct vgic_io_device *iodev = container_of(dev,
-+						    struct vgic_io_device, dev);
-+	struct vgic_register_region *region;
-+
-+	region = vgic_find_mmio_region(regions, nr_regions,
-+				       addr - iodev->base_addr);
-+	if (!region)
-+		return -EOPNOTSUPP;
-+
-+	return region->ops.write(vcpu, dev, addr, len, val);
-+}
-+
-+int vgic_mmio_read_v2dist(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
-+			  gpa_t addr, int len, void *val)
-+{
-+	return dispatch_mmio_read(vcpu, vgic_v2_dist_registers,
-+				  ARRAY_SIZE(vgic_v2_dist_registers), dev,
-+				  addr, len, val);
-+}
-+
-+int vgic_mmio_write_v2dist(struct kvm_vcpu *vcpu, struct kvm_io_device *dev,
-+			   gpa_t addr, int len, const void *val)
-+{
-+	return dispatch_mmio_write(vcpu, vgic_v2_dist_registers,
-+				   ARRAY_SIZE(vgic_v2_dist_registers), dev,
-+				   addr, len, val);
-+}
-+
-+struct kvm_io_device_ops kvm_io_v2dist_ops = {
-+	.read = vgic_mmio_read_v2dist,
-+	.write = vgic_mmio_write_v2dist,
-+};
-+
-+int vgic_register_dist_iodev(struct kvm *kvm, gpa_t dist_base_address,
-+			     enum vgic_type type)
-+{
-+	struct vgic_io_device *io_device = &kvm->arch.vgic.dist_iodev;
-+	int ret = 0;
-+	int len;
-+
-+	switch (type) {
-+	case VGIC_V2:
-+		kvm_iodevice_init(&io_device->dev, &kvm_io_v2dist_ops);
-+		len = SZ_4K;
++		r = put_user(dev->kvm->arch.vgic.nr_spis +
++			     VGIC_NR_PRIVATE_IRQS, uaddr);
 +		break;
-+	default:
-+		BUG_ON(1);
++	}
 +	}
 +
-+	io_device->base_addr = dist_base_address;
-+
-+	mutex_lock(&kvm->slots_lock);
-+	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, dist_base_address,
-+				      len, &io_device->dev);
-+	mutex_unlock(&kvm->slots_lock);
-+
-+	return ret;
++	return r;
 +}
-diff --git a/virt/kvm/arm/vgic/vgic_mmio.h b/virt/kvm/arm/vgic/vgic_mmio.h
-new file mode 100644
-index 0000000..9b17e1b
---- /dev/null
-+++ b/virt/kvm/arm/vgic/vgic_mmio.h
-@@ -0,0 +1,53 @@
-+/*
-+ * Copyright (C) 2015, 2016 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __KVM_ARM_VGIC_MMIO_H__
-+#define __KVM_ARM_VGIC_MMIO_H__
 +
-+struct vgic_register_region {
-+	int reg_offset;
-+	int len;
-+	int bits_per_irq;
-+	struct kvm_io_device_ops ops;
-+};
+ static int vgic_create(struct kvm_device *dev, u32 type)
+ {
+ 	return kvm_vgic_create(dev->kvm, type);
+@@ -49,18 +109,29 @@ void kvm_register_vgic_device(unsigned long type)
+ static int vgic_v2_set_attr(struct kvm_device *dev,
+ 			    struct kvm_device_attr *attr)
+ {
+-	return -ENXIO;
++	int ret;
 +
-+/*
-+ * Some VGIC registers store per-IRQ information, with a different number
-+ * of bits per IRQ. For those registers this macro is used.
-+ * The _WITH_LENGTH version instantiates registers with a fixed length
-+ * and is mutually exclusive with the _PER_IRQ version.
-+ */
-+#define REGISTER_DESC_WITH_BITS_PER_IRQ(name, read_ops, write_ops, bpi) \
-+	{.reg_offset = name, .bits_per_irq = bpi, .len = 0, \
-+	 .ops.read = read_ops, .ops.write = write_ops}
-+#define REGISTER_DESC_WITH_LENGTH(name, read_ops, write_ops, length) \
-+	{.reg_offset = name, .bits_per_irq = 0, .len = length, \
-+	 .ops.read = read_ops, .ops.write = write_ops}
++	ret = vgic_set_common_attr(dev, attr);
++	return ret;
 +
-+int vgic_mmio_read_raz(struct kvm_vcpu *vcpu, struct kvm_io_device *this,
-+		       gpa_t addr, int len, void *val);
-+int vgic_mmio_write_wi(struct kvm_vcpu *vcpu, struct kvm_io_device *this,
-+		       gpa_t addr, int len, const void *val);
-+int kvm_vgic_register_mmio_region(struct kvm *kvm, struct kvm_vcpu *vcpu,
-+				  struct vgic_register_region *reg_desc,
-+				  struct vgic_io_device *region,
-+				  int nr_irqs, bool offset_private);
+ }
+ 
+ static int vgic_v2_get_attr(struct kvm_device *dev,
+ 			    struct kvm_device_attr *attr)
+ {
+-	return -ENXIO;
++	int ret;
 +
-+void write_mask32(u32 value, int offset, int len, void *val);
-+void write_mask64(u64 value, int offset, int len, void *val);
-+u32 mask32(u32 origvalue, int offset, int len, const void *val);
-+u64 mask64(u64 origvalue, int offset, int len, const void *val);
-+
-+#endif
++	ret = vgic_get_common_attr(dev, attr);
++	return ret;
+ }
+ 
+ static int vgic_v2_has_attr(struct kvm_device *dev,
+ 			    struct kvm_device_attr *attr)
+ {
++	switch (attr->group) {
++	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
++		return 0;
++	}
+ 	return -ENXIO;
+ }
+ 
+@@ -80,18 +151,22 @@ struct kvm_device_ops kvm_arm_vgic_v2_ops = {
+ static int vgic_v3_set_attr(struct kvm_device *dev,
+ 			    struct kvm_device_attr *attr)
+ {
+-	return -ENXIO;
++	return vgic_set_common_attr(dev, attr);
+ }
+ 
+ static int vgic_v3_get_attr(struct kvm_device *dev,
+ 			    struct kvm_device_attr *attr)
+ {
+-	return -ENXIO;
++	return vgic_get_common_attr(dev, attr);
+ }
+ 
+ static int vgic_v3_has_attr(struct kvm_device *dev,
+ 			    struct kvm_device_attr *attr)
+ {
++	switch (attr->group) {
++	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
++		return 0;
++	}
+ 	return -ENXIO;
+ }
+ 
 -- 
 2.7.3
