@@ -1,38 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 15 Apr 2016 16:17:04 +0100
-Subject: [PATCH v2 04/17] arm64: Introduce pmd_thp_or_huge
-In-Reply-To: <1460640065-27658-5-git-send-email-suzuki.poulose@arm.com>
-References: <1460640065-27658-1-git-send-email-suzuki.poulose@arm.com>
- <1460640065-27658-5-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20160415151703.GP22906@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 15 Apr 2016 08:22:16 -0700
+Subject: [PATCH v2] pinctrl: pinctrl-single: Fix
+ pcs_parse_bits_in_pinctrl_entry to use __ffs than ffs
+In-Reply-To: <CACRpkdZxY3FNti37HfuwS7KT9K+pA=REr_G=hEQRi-D3=CHUpQ@mail.gmail.com>
+References: <1460609956-26539-1-git-send-email-j-keerthy@ti.com>
+ <CACRpkdZxY3FNti37HfuwS7KT9K+pA=REr_G=hEQRi-D3=CHUpQ@mail.gmail.com>
+Message-ID: <20160415152215.GR5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 14, 2016 at 02:20:52PM +0100, Suzuki K Poulose wrote:
-> Add a helper to determine if a given pmd represents a huge page
-> either by hugetlb or thp, as we have for arm. This will be used
-> by KVM MMU code.
+* Linus Walleij <linus.walleij@linaro.org> [160415 02:29]:
+> On Thu, Apr 14, 2016 at 6:59 AM, Keerthy <j-keerthy@ti.com> wrote:
 > 
-> Suggested-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Steve Capper <steve.capper@linaro.org>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm64/include/asm/pgtable.h |    2 ++
->  1 file changed, 2 insertions(+)
+> > pcs_parse_bits_in_pinctrl_entry uses ffs which gives bit indices
+> > ranging from 1 to MAX. This leads to a corner case where we try to request
+> > the pin number = MAX and fails.
+> >
+> > bit_pos value is being calculted using ffs. pin_num_from_lsb uses
+> > bit_pos value. pins array is populated with:
+> >
+> > pin + pin_num_from_lsb.
+> >
+> > The above is 1 more than usual bit indices as bit_pos uses ffs to compute
+> > first set bit. Hence the last of the pins array is populated with the MAX
+> > value and not MAX - 1 which causes error when we call pin_request.
+> >
+> > mask_pos is rightly calculated as ((pcs->fmask) << (bit_pos - 1))
+> > Consequently val_pos and submask are correct.
+> >
+> > Hence use __ffs which gives (ffs(x) - 1) as the first bit set.
+> >
+> > fixes: 4e7e8017a8 ("pinctrl: pinctrl-single: enhance to configure multiple pins of different modules")
+> > Signed-off-by: Keerthy <j-keerthy@ti.com>
+> > ---
+> >
+> > Changes in v2:
+> >
+> >   * Changed pcs->fshift to use __ffs instead of ffs to be consistent.
+> >
+> > Boot tesed on da850-evm and checked the pinctrl sysfs nodes.
 > 
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index 989fef1..dda4aa9 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -290,6 +290,8 @@ static inline pgprot_t mk_sect_prot(pgprot_t prot)
->  #define pmd_mkyoung(pmd)	pte_pmd(pte_mkyoung(pmd_pte(pmd)))
->  #define pmd_mknotpresent(pmd)	(__pmd(pmd_val(pmd) & ~PMD_TYPE_MASK))
->  
-> +#define pmd_thp_or_huge(pmd)	(pmd_huge(pmd) || pmd_trans_huge(pmd))
+> Patch applied for fixes with Tony's ACK.
+> 
+> Should it also be tagged for stable?
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Probably a good idea, I can see somebody pulling hair out because
+of this in various product trees.
 
-Will
+Regards,
+
+Tony
