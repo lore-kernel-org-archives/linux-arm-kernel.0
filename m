@@ -1,39 +1,19 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 15 Apr 2016 10:37:26 +0200
-Subject: [PATCH v2 1/8] PM / devfreq: event: Add new Exynos NoC probe
- driver
-In-Reply-To: <1460701975-24178-2-git-send-email-cw00.choi@samsung.com>
-References: <1460701975-24178-1-git-send-email-cw00.choi@samsung.com>
- <1460701975-24178-2-git-send-email-cw00.choi@samsung.com>
-Message-ID: <5710A846.1020304@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 15 Apr 2016 09:42:26 +0100
+Subject: [PATCH 3/3] arm64: defconfig: Enable ACPI
+In-Reply-To: <1460706823-16566-3-git-send-email-broonie@kernel.org>
+References: <1460706823-16566-1-git-send-email-broonie@kernel.org>
+ <1460706823-16566-3-git-send-email-broonie@kernel.org>
+Message-ID: <20160415084226.GH15182@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/15/2016 08:32 AM, Chanwoo Choi wrote:
-> This patch adds NoC (Network on Chip) Probe driver which provides
-> the primitive values to get the performance data. The packets that the Network
-> on Chip (NoC) probes detects are transported over the network infrastructure.
-> Exynos542x bus has multiple NoC probes to provide bandwidth information about
-> behavior of the SoC that you can use while analyzing system performance.
+On Fri, Apr 15, 2016 at 08:53:43AM +0100, Mark Brown wrote:
+> Enable ACPI by default to support testing of ACPI only systems and
+> ensure that defconfig will boot on anything, for arm64 this is not done
+> in Kconfig since a very large proportion of arm64 systems have no ACPI
+> at all.
 > 
-> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Tested-by: Markus Reichl <m.reichl@fivetechno.de>
-> Tested-by: Anand Moon <linux.amoon@gmail.com>
-> ---
->  .../bindings/devfreq/event/exynos-nocp.txt         |  26 ++
->  drivers/devfreq/event/Kconfig                      |   8 +
->  drivers/devfreq/event/Makefile                     |   2 +
->  drivers/devfreq/event/exynos-nocp.c                | 304 +++++++++++++++++++++
->  drivers/devfreq/event/exynos-nocp.h                |  78 ++++++
->  5 files changed, 418 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/devfreq/event/exynos-nocp.txt
->  create mode 100644 drivers/devfreq/event/exynos-nocp.c
->  create mode 100644 drivers/devfreq/event/exynos-nocp.h
-> 
+> Signed-off-by: Mark Brown <broonie@kernel.org>
 
-Looks good now.
-
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
-Best regards,
-Krzysztof
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
