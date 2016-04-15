@@ -1,50 +1,31 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Fri, 15 Apr 2016 13:29:14 -0500
-Subject: [RFC PATCH 09/11] drivers: acpi: implement acpi_dma_configure
-In-Reply-To: <1460654743-7896-10-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1460654743-7896-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1460654743-7896-10-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <CAOZdJXXtZq6uyE+5sseX7M_6Kq8wFG+37qd5TNSusKj=0gd8zA@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 15 Apr 2016 19:58:46 +0200
+Subject: [PATCH v5 2/2] i2c: rk3x: add i2c support for rk3399 soc
+In-Reply-To: <5710DA28.6010104@rock-chips.com>
+References: <1458147438-62387-1-git-send-email-david.wu@rock-chips.com>
+ <1458147438-62387-3-git-send-email-david.wu@rock-chips.com>
+ <20160414184848.GB2338@katana> <5710DA28.6010104@rock-chips.com>
+Message-ID: <20160415175846.GA1533@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 14, 2016 at 12:25 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> +void acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
-> +{
-> +       struct iommu_ops *iommu;
-> +
-> +       iommu = iort_iommu_configure(dev);
-> +
-> +       /*
-> +        * Assume dma valid range starts at 0 and covers the whole
-> +        * coherent_dma_mask.
-> +        */
-> +       arch_setup_dma_ops(dev, 0, dev->coherent_dma_mask + 1, iommu,
-> +                          attr == DEV_DMA_COHERENT);
-> +}
+> The default frequency rate of function clock is 50M Hz, it can match
+> F/S mode, but HS mode not. If use default rate 50M to get 1.7M
+> scl-frequency rate , we could not get accurately 1.7M frequecy rate.
+> The input-clk-rate is more higher, we get more accurately
+> scl-frequency rate,  as 200M is a suitable input-clk-rate.
+> 
+> If 200M was used for F/S mode, it would increase power consumption, so
+> add a option that could be configured from DT.
 
-I have a network driver that is impacted by this code, so thank you
-for posting this. (See
-https://www.mail-archive.com/netdev at vger.kernel.org/msg106249.html).
+If I understand you correctly, couldn't you use clk_set_rate() depending
+on the desired scl frequency which is already described in DT as
+clock-frequency?
 
-One one SOC, the driver needs to set the mask to 32 bits.  On another
-SOC, it needs to set it to 64 bits.  On device tree, the driver will
-use dma-ranges.
-
-In your patches, where is coherent_dma_mask initialized?  I found this
-code in add_smmu_platform_device(), but I think this is setting the
-mask for the IOMMU driver, not the individual devices.  Either way, I
-don't understand where the correct value is going to be overridden.
-
-+       /*
-+        * Set default dma mask value for the table walker,
-+        * to be overridden on probing with correct value.
-+        */
-+       *pdev->dev.dma_mask = DMA_BIT_MASK(32);
-+       pdev->dev.coherent_dma_mask = *pdev->dev.dma_mask;
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160415/4b1078f2/attachment.sig>
