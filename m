@@ -1,103 +1,122 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Fri, 15 Apr 2016 19:06:38 +0200
-Subject: [PATCH V6 03/13] x86,
- ia64: Include acpi_pci_{add|remove}_bus to the default
- pcibios_{add|remove}_bus implementation.
+Date: Fri, 15 Apr 2016 19:06:37 +0200
+Subject: [PATCH V6 02/13] pci,
+ acpi: Provide generic way to assign bus domain number.
 In-Reply-To: <1460740008-19489-1-git-send-email-tn@semihalf.com>
 References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
-Message-ID: <1460740008-19489-4-git-send-email-tn@semihalf.com>
+Message-ID: <1460740008-19489-3-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-x86 and ia64 are the only arches that implement pcibios_{add|remove}_bus hooks
-and implement them in the same way. Moreover ARM64 is going to do the same.
-So it seems that acpi_pci_{add|remove}_bus is generic enough to be default
-option for pcibios_{add|remove}_bus hooks. Also, it is always safe to run
-acpi_pci_{add|remove}_bus as they have empty stubs for !ACPI case and
-return if ACPI has been switched off in run time.
+As we now have valid PCI host bridge device reference we can
+introduce code that is going to find its bus domain number using
+ACPI _SEG method.
 
-After all we can remove x86 and ia64 pcibios_{add|remove}_bus
-implementation.
+Note that _SEG method is optional, therefore _SEG absence means
+that all PCI buses belong to domain 0.
+
+While at it, for the sake of code clarity we put ACPI and DT domain
+assign methods into the corresponding helpers.
 
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Reviewed-by: Liviu Dudau <Liviu.Dudau@arm.com>
+Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+Tested-by: Jeremy Linton <jeremy.linton@arm.com>
 Tested-by: Duc Dang <dhdang@apm.com>
 Tested-by: Dongdong Liu <liudongdong3@huawei.com>
 Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
 Tested-by: Graeme Gregory <graeme.gregory@linaro.org>
 Tested-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- arch/ia64/pci/pci.c   | 10 ----------
- arch/x86/pci/common.c | 10 ----------
- drivers/pci/probe.c   |  3 +++
- 3 files changed, 3 insertions(+), 20 deletions(-)
+ drivers/acpi/pci_root.c  | 18 ++++++++++++++++++
+ drivers/pci/pci.c        | 11 +++++++++--
+ include/linux/pci-acpi.h |  2 ++
+ 3 files changed, 29 insertions(+), 2 deletions(-)
 
-diff --git a/arch/ia64/pci/pci.c b/arch/ia64/pci/pci.c
-index 978d6af..be4c9ef 100644
---- a/arch/ia64/pci/pci.c
-+++ b/arch/ia64/pci/pci.c
-@@ -358,16 +358,6 @@ void pcibios_fixup_bus(struct pci_bus *b)
- 	platform_pci_fixup_bus(b);
+diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
+index 4581e0e..d9a70c4 100644
+--- a/drivers/acpi/pci_root.c
++++ b/drivers/acpi/pci_root.c
+@@ -419,6 +419,24 @@ out:
  }
+ EXPORT_SYMBOL(acpi_pci_osc_control_set);
  
--void pcibios_add_bus(struct pci_bus *bus)
--{
--	acpi_pci_add_bus(bus);
--}
--
--void pcibios_remove_bus(struct pci_bus *bus)
--{
--	acpi_pci_remove_bus(bus);
--}
--
- void pcibios_set_master (struct pci_dev *dev)
++int acpi_pci_bus_domain_nr(struct device *parent)
++{
++	struct acpi_device *acpi_dev = to_acpi_device(parent);
++	unsigned long long segment = 0;
++	acpi_status status;
++
++	/*
++	 * If _SEG method does not exist, following ACPI spec (6.5.6)
++	 * all PCI buses belong to domain 0.
++	 */
++	status = acpi_evaluate_integer(acpi_dev->handle, METHOD_NAME__SEG, NULL,
++				       &segment);
++	if (ACPI_FAILURE(status) && status != AE_NOT_FOUND)
++		dev_err(&acpi_dev->dev, "can't evaluate _SEG\n");
++
++	return segment;
++}
++
+ static void negotiate_os_control(struct acpi_pci_root *root, int *no_aspm)
  {
- 	/* No special bus mastering setup handling */
-diff --git a/arch/x86/pci/common.c b/arch/x86/pci/common.c
-index 381a43c..7763a84 100644
---- a/arch/x86/pci/common.c
-+++ b/arch/x86/pci/common.c
-@@ -170,16 +170,6 @@ void pcibios_fixup_bus(struct pci_bus *b)
- 		pcibios_fixup_device_resources(dev);
- }
- 
--void pcibios_add_bus(struct pci_bus *bus)
--{
--	acpi_pci_add_bus(bus);
--}
--
--void pcibios_remove_bus(struct pci_bus *bus)
--{
--	acpi_pci_remove_bus(bus);
--}
--
- /*
-  * Only use DMI information to set this if nothing was passed
-  * on the kernel command line (which was parsed earlier).
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 8087297..ef569e8 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -12,6 +12,7 @@
- #include <linux/slab.h>
- #include <linux/module.h>
- #include <linux/cpumask.h>
+ 	u32 support, control, requested;
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index 25e0327..1a74e87 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -19,6 +19,7 @@
+ #include <linux/spinlock.h>
+ #include <linux/string.h>
+ #include <linux/log2.h>
 +#include <linux/pci-acpi.h>
  #include <linux/pci-aspm.h>
- #include <linux/aer.h>
- #include <linux/acpi.h>
-@@ -2101,10 +2102,12 @@ int __weak pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
- 
- void __weak pcibios_add_bus(struct pci_bus *bus)
- {
-+	acpi_pci_add_bus(bus);
+ #include <linux/pm_wakeup.h>
+ #include <linux/interrupt.h>
+@@ -4779,7 +4780,7 @@ int pci_get_new_domain_nr(void)
  }
  
- void __weak pcibios_remove_bus(struct pci_bus *bus)
+ #ifdef CONFIG_PCI_DOMAINS_GENERIC
+-void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
++static int of_pci_bus_domain_nr(struct device *parent)
  {
-+	acpi_pci_remove_bus(bus);
- }
+ 	static int use_dt_domains = -1;
+ 	int domain = -1;
+@@ -4823,7 +4824,13 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+ 		domain = -1;
+ 	}
  
- struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+-	bus->domain_nr = domain;
++	return domain;
++}
++
++void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
++{
++	bus->domain_nr = acpi_disabled ? of_pci_bus_domain_nr(parent) :
++					 acpi_pci_bus_domain_nr(parent);
+ }
+ #endif
+ #endif
+diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
+index 89ab057..a72e22d 100644
+--- a/include/linux/pci-acpi.h
++++ b/include/linux/pci-acpi.h
+@@ -22,6 +22,7 @@ static inline acpi_status pci_acpi_remove_pm_notifier(struct acpi_device *dev)
+ {
+ 	return acpi_remove_pm_notifier(dev);
+ }
++extern int acpi_pci_bus_domain_nr(struct device *parent);
+ extern phys_addr_t acpi_pci_root_get_mcfg_addr(acpi_handle handle);
+ 
+ static inline acpi_handle acpi_find_root_bridge_handle(struct pci_dev *pdev)
+@@ -109,6 +110,7 @@ extern const u8 pci_acpi_dsm_uuid[];
+ #else	/* CONFIG_ACPI */
+ static inline void acpi_pci_add_bus(struct pci_bus *bus) { }
+ static inline void acpi_pci_remove_bus(struct pci_bus *bus) { }
++static inline int acpi_pci_bus_domain_nr(struct device *parent) { return -1; }
+ #endif	/* CONFIG_ACPI */
+ 
+ #ifdef CONFIG_ACPI_APEI
 -- 
 1.9.1
