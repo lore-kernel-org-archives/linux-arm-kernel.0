@@ -1,75 +1,59 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Sat, 16 Apr 2016 17:27:33 +0200
-Subject: [PATCH v8 0/2] Fix dma mapping when the cache is coherent
-In-Reply-To: <1460475070-29058-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1460475070-29058-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <CAPv3WKe2S1qbSByOgUABRcnTVoW-ad1guSSNsmPuFWJ8-W5sOg@mail.gmail.com>
+From: jchandra@broadcom.com (Jayachandran C)
+Date: Sat, 16 Apr 2016 21:01:28 +0530
+Subject: [PATCH V6 00/13] Support for generic ACPI based PCI host
+ controller
+In-Reply-To: <571130BB.9030508@redhat.com>
+References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
+ <571130BB.9030508@redhat.com>
+Message-ID: <CAKc_7PVC6O4oh+bTmpLQRrhHrqGbaKB2hynecKOLmc5fBc-VVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+On Fri, Apr 15, 2016 at 11:49 PM, Jon Masters <jcm@redhat.com> wrote:
+> On 04/15/2016 01:06 PM, Tomasz Nowicki wrote:
+>> From the functionality point of view this series might be split into the
+>> following logic parts:
+>> 1. Necessary fixes as the preparation for using driver on ARM64.
+>> 2. New ECAM API and update for users of the pci-host-common API
+>> 3. Use new MCFG interface and implement generic ACPI based PCI host controller driver.
+>> 4. Enable above driver on ARM64
+>>
+>> Patches has been built on top of 4.6-rc2 and can be found here:
+>> git at github.com:semihalf-nowicki-tomasz/linux.git (pci-acpi-v6)
+>>
+>> This has been tested on Cavium ThunderX server. Any help in reviewing and
+>> testing is very appreciated.
+>>
+>> v5 -> v6
+>> - dropped idea of x86 MMCONFIG code refactoring
+>> - integrated JC's patches which introduce new ECAM API:
+>>   https://lkml.org/lkml/2016/4/11/907
+>>   git: https://github.com/jchandra-brcm/linux/ (arm64-acpi-pci-v3)
+>> - integrated Sinan's fix for releasing IO resources, see patch [06/13]
+>> - added ACPI support for ThunderX ECAM and PEM drivers
+>> - rebased to 4.6-rc2
+>
+> JC: can you explicitly confirm that you're ok with letting Tomasz drive
+> this? We would like to see one driver. Either that is Tomasz, or
+> Lorenzo, or it is you. But we need to have one overall cooordinated
+> effort to get this enablement into upstream as quickly as possible.
 
-You can re-add my tested-by. Hang is no longer a problem with your
-patch during my test of neta.
+I have been concentrating on the ECAM code and ECAM based ACPI
+host controller, the rest of the code is from Tomasz original patchset.
 
-Best regards,
-Marcin
+I am not happy with the way the ACPI quirk handling is done in Tomasz's
+current patchset. I believe that it has to be done in a separate patchset
+with another set of discussions. It introduces additional complexity and
+mixing that discussion with the ECAM one will not help in making progress.
 
-2016-04-12 17:31 GMT+02:00 Gregory CLEMENT <gregory.clement@free-electrons.com>:
-> Hi,
->
-> These two patches fixes the dma mapping functions when the system is
-> cache coherent. The first one allows to fix an issue we have on Armada
-> 375/38x with the PL310 that's why it is tagged for stable too.
->
-> Thanks,
->
-> Gregory
->
-> PS: the mailing list was missing in the recipient list of the v7. It
-> was a mistake and I realized it only now. If needed I can repost it
-> with the few exchange we had with Russell King.
->
->
-> Changelog
-> v7 -> v8:
->  - Use a flag instead of a boolean for checking the coherency. It
->    improve the readability of the code. Suggested by Russell King.
->  - Consider that when coherency is set, it's for both L1 and L2 caches
->  - Use the arm_dma_alloc_args struct to pass the coherency status when
->    possible. Suggested by Rabin Vincent
->  - Remove the Tested-by flag from Marcin because of the modifications
->    around the L1 cache management in this series.
->
-> v6 -> v7:
->  - Renamed is coherent by l2_coherent as suggested by Russell
->
-> v5 -> v6:
->  - Rebased on v4.6-rc1
->
-> v4 -> v5
->  - Keep the dmac_* function outside the !is_coherent case.
->
-> v3 -> v4:
->  - Rebased on v4.3-rc1
->  - Fix conflict with commit "21caf3a765b0 ARM: 8398/1: arm DMA: Fix
->    allocation from CMA for coherent DMA"
->
-> v2 -> v3:
->
->  - Fix comments in patch 1 as suggested by Catalin.
->  - Fix build issues in patch 2 (by using the multi_v7_defconfig +
->    CONFIG_ROCKCHIP_IOMMU).
->  - Add the arm_coherent_iommu_mmap_attrs function.
->
->
-> Gregory CLEMENT (2):
->   ARM: dma-mapping: Don't use outer_flush_range when the L2C is coherent
->   ARM: dma-mapping: Fix the coherent case when iommu is used
->
->  arch/arm/mm/dma-mapping.c | 144 +++++++++++++++++++++++++++++++++-------------
->  1 file changed, 105 insertions(+), 39 deletions(-)
->
-> --
-> 2.5.0
->
+I hope things will be clearer when more maintainers chime in. When
+there is clarity on if the ECAM split is fine, I think we can look at how
+to drive the whole patchset forward, otherwise we are back to square one.
+
+> Some of the Enterprise folks are going to otherwise end up in a very
+> nasty situation of supporting the previous non-upstream patches for many
+> years, which is absolutely something we want to avoid...
+
+Not having ACPI/PCI support upstream is a huge problem for us too...
+
+JC.
