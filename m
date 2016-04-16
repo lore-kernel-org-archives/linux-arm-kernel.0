@@ -1,7 +1,7 @@
 From: xuwei5@hisilicon.com (Wei Xu)
-Date: Sat, 16 Apr 2016 12:07:05 +0100
-Subject: [GIT PULL]Hisilicon Hi6220 SoC and Hikey board DT updates for 4.7
-Message-ID: <57121CD9.4010606@hisilicon.com>
+Date: Sat, 16 Apr 2016 12:16:05 +0100
+Subject: [GIT PULL]Hisilicon ARM64 Hi6220 SoC defconfig updates for 4.7
+Message-ID: <57121EF5.3060302@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -21,71 +21,30 @@ The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 
 are available in the git repository at:
 
-  git://github.com/hisilicon/linux-hisi.git tags/hi6220-dt-for-4.7
+  git://github.com/hisilicon/linux-hisi.git tags/hi6220-config-for-4.7
 
-for you to fetch changes up to 6485160396fcec2fa8a0acfa7c8c090f020db694:
+for you to fetch changes up to fd2112eb018daf053fccec785c8dc319be760499:
 
-  arm64: dts: Add L2 cache topology to Hi6220 (2016-04-15 17:04:15 +0100)
-
-----------------------------------------------------------------
-ARM64: DT: Hisilicon Hi6220 soc and hikey board updates for 4.7
-
-- Reserve memory regions for Hi6220
-- Add sp804 timer node for Hi6220
-- Add cpu and cluster level's low power state for Hi6220
-- Add gpio configuration nodes for Hi6220
-- Add pinctrl configuration nodes for Hi6220
-- Add spi related nodes for Hi6220
-- Add i2c nodes for Hi6220
-- Add i2c nodes to work with mezzanine boards
-- Add usb nodes for Hi6220
-- Add mailobx node for Hi6220
-- Add SRAM node and stub clock node for Hi6220
-- Add pinctrl nodes for uarts and enable them
-- Add LED nodes for hi6220-hikey board
-- Add hi655x pmic node for Hi6220
-- Add dwmmc nodes for Hi6220
-- Add wifi nodes support for Hi6220-Hikey board
-- Register thermal sensor for Hi6220
-- Register Hi6220's thermal zone for power allocator
-- Add L2 cache topology for Hi6220
+  arm64: defconfig: enable configs for WLAN and TI WL1835 as modules (2016-04-15 17:36:52 +0100)
 
 ----------------------------------------------------------------
-Chen Feng (1):
-      arm64: dts: hikey: Add hi655x pmic dts node
+ARM64: Hi6220: configure updates for 4.7
 
-Guodong Xu (4):
-      arm64: dts: hikey: enable i2c0 and i2c1 for working with mezzanine boards
-      arm64: dts: hi6220: add pinctrl for uarts and enable them
-      arm64: dts: add LED nodes for hi6220-hikey
-      arm64: dts: add wifi nodes support for hi6220-hikey
+- Enable Hi655x PMIC and regulator
+- Enable Hi6220 I2C, USB, MMC, mailbox and reset
+- Enable PINCTRL_SINGLE and LEDS_GPIO
+- Enable SPI_SPIDEV as module
+- Enable several common USB-Ethernet dongles
+- Enable configs for WLAN and TI WL1835 as modules
 
-Leo Yan (8):
-      arm64: dts: Reserve memory regions for hi6220
-      arm64: dts: add sp804 timer node for Hi6220
-      arm64: dts: enable idle states for Hi6220
-      arm64: dts: add mailbox node for Hi6220
-      arm64: dts: add Hi6220's stub clock node
-      arm64: dts: register Hi6220's thermal sensor
-      arm64: dts: register Hi6220's thermal zone for power allocator
-      arm64: dts: Add L2 cache topology to Hi6220
+----------------------------------------------------------------
+Akira Tsukamoto (1):
+      arm64: defconfig: enable several common USB network adapters
 
-Xinwei Kong (2):
-      arm64: dts: add all hi6220 i2c nodes
-      arm64: dts: add dwmmc nodes for hi6220
+Guodong Xu (3):
+      arm64: defconfig: Enable devices for Hi6220 and 96boards HiKey
+      arm64: defconfig: add CONFIG_SPI_SPIDEV as module
+      arm64: defconfig: enable configs for WLAN and TI WL1835 as modules
 
-Zhangfei Gao (1):
-      arm64: dts: Add hi6220 usb node
-
-Zhong Kaihua (3):
-      arm64: dts: Add Hi6220 gpio configuration nodes
-      arm64: dts: add Hi6220 pinctrl configuration nodes
-      arm64: dts: add Hi6220 spi configuration nodes
-
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts   | 200 ++++++-
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi        | 623 ++++++++++++++++++++
- arch/arm64/boot/dts/hisilicon/hikey-pinctrl.dtsi | 705 +++++++++++++++++++++++
- include/dt-bindings/pinctrl/hisi.h               |  59 ++
- 4 files changed, 1582 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm64/boot/dts/hisilicon/hikey-pinctrl.dtsi
- create mode 100644 include/dt-bindings/pinctrl/hisi.h
+ arch/arm64/configs/defconfig | 30 ++++++++++++++++++++++++++++--
+ 1 file changed, 28 insertions(+), 2 deletions(-)
