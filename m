@@ -1,28 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 16 Apr 2016 22:06:50 +0200
-Subject: [PATCH v3] spi: orion.c: Add direct access mode
-In-Reply-To: <1460030811-13787-1-git-send-email-sr@denx.de>
-References: <1460030811-13787-1-git-send-email-sr@denx.de>
-Message-ID: <10734204.V6uBDOOZ6M@wuerfel>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Sat, 16 Apr 2016 13:46:14 -0700
+Subject: [PATCH v2] bus: brcmstb_gisb: Rework dependencies
+Message-ID: <1460839575-16869-1-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 07 April 2016 14:06:51 Stefan Roese wrote:
-> v3:
-> - Used static MBus windows again, as suggested by Arnd
-> - No new DT bindings needed for this. The MBus windows need to be
->   configured in the 'reg' property of the SPI controller. This is
->   done in a separate patch for the Armada platforms.
-> - The direct mapping is configured and enable by adding the
->   specific MBus entry to the 'ranges' property of the 'soc' node
->   in the board dts file.
+Do not have the machine Kconfig entry point need to select
+BRCMSTB_GISB_ARB, instead, just let it be default ARCH_BRCMSTB which is
+a better way to deal with this. While at it, also make it default
+BMIPS_GENERIC so the legacy MIPS-based STB platforms can benefit from
+the same thing.
 
-The new approach looks good to me, thanks!
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+Changes in v2:
 
-As Mark pointed out, you still need to document the fact that
-the SPI controller can now have additional entries in its 'reg'
-property, and it would be nice to reference the mbus binding
-from the spi controller binding as a help for people that
-want to enable the direct mode.
+- put conditional on the same line, do not use two default lines
 
-	Arnd
+ arch/arm/mach-bcm/Kconfig | 1 -
+ drivers/bus/Kconfig       | 1 +
+ 2 files changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+index b95ea1135ef9..68ab6412392a 100644
+--- a/arch/arm/mach-bcm/Kconfig
++++ b/arch/arm/mach-bcm/Kconfig
+@@ -173,7 +173,6 @@ config ARCH_BRCMSTB
+ 	select ARM_GIC
+ 	select ARM_ERRATA_798181 if SMP
+ 	select HAVE_ARM_ARCH_TIMER
+-	select BRCMSTB_GISB_ARB
+ 	select BRCMSTB_L2_IRQ
+ 	select BCM7120_L2_IRQ
+ 	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
+diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+index d4a3a3133da5..8807495e0efd 100644
+--- a/drivers/bus/Kconfig
++++ b/drivers/bus/Kconfig
+@@ -58,6 +58,7 @@ config ARM_CCN
+ config BRCMSTB_GISB_ARB
+ 	bool "Broadcom STB GISB bus arbiter"
+ 	depends on ARM || MIPS
++	default ARCH_BRCMSTB || BMIPS_GENERIC
+ 	help
+ 	  Driver for the Broadcom Set Top Box System-on-a-chip internal bus
+ 	  arbiter. This driver provides timeout and target abort error handling
+-- 
+2.5.0
