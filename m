@@ -1,30 +1,29 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 15 Apr 2016 17:27:03 -0700
-Subject: [PATCH 2/3] clk: ti: amx3xx: limit the maximum frequency of
- DPLLs based on spec
-In-Reply-To: <1458158097-21137-3-git-send-email-t-kristo@ti.com>
-References: <1458158097-21137-1-git-send-email-t-kristo@ti.com>
- <1458158097-21137-3-git-send-email-t-kristo@ti.com>
-Message-ID: <20160416002703.GH26353@codeaurora.org>
+Date: Fri, 15 Apr 2016 17:31:28 -0700
+Subject: [PATCH v3 1/9] ARM: imx: clk-vf610: fix DCU clock tree
+In-Reply-To: <1459834121-25997-2-git-send-email-stefan@agner.ch>
+References: <1459834121-25997-1-git-send-email-stefan@agner.ch>
+ <1459834121-25997-2-git-send-email-stefan@agner.ch>
+Message-ID: <20160416003128.GJ26353@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/16, Tero Kristo wrote:
-> AM33xx/AM43xx devices use the same DPLL IP blocks, which only support
-> maximum rate of 1GHz [1] for the default and 2GHz for the low-jitter type
-> DPLLs [2]. Reflect this limitation in the DPLL init code by adding the
-> max-rate parameter based on the DPLL types.
+On 04/04, Stefan Agner wrote:
+> Similar to an earlier fix for the SAI clocks, the DCU clock hierarchy
+> mixes the bus clock with the display controllers pixel clock. Tests
+> have shown that the gates in CCM_CCGR3/9 registers do not control
+> the DCU pixel clock, but only the register access clock (bus clock).
 > 
-> [1] Functional, integration & test specification for GS70 ADPLLS, Rev 1.0-01
-> [2] Functional, integration & test specification for GS70 ADPLLLJ, Rev 0.8-02
+> Fix this by defining the parent clock of VF610_CLK_DCUx to be the bus
+> clock (ipg_bus).
 > 
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> Cc: Nishanth Menon <nm@ti.com>
-> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> Cc: Lokesh Vutla <lokeshvutla@ti.com>
+> Since the clock has not been used far, there are no further changes
+> needed.
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 > ---
 
-Applied to clk-next
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
