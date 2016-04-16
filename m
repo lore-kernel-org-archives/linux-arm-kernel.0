@@ -1,25 +1,40 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 15 Apr 2016 17:17:55 -0700
-Subject: [PATCH v2 2/2] clk: bcm2835: Fix PLL poweron
-In-Reply-To: <1460577903-32192-2-git-send-email-eric@anholt.net>
-References: <1460577903-32192-1-git-send-email-eric@anholt.net>
- <1460577903-32192-2-git-send-email-eric@anholt.net>
-Message-ID: <20160416001755.GE26353@codeaurora.org>
+Date: Fri, 15 Apr 2016 17:23:35 -0700
+Subject: [PATCH 2/3] clk: ti: amx3xx: limit the maximum frequency of
+ DPLLs based on spec
+In-Reply-To: <570E40D1.7030205@ti.com>
+References: <1458158097-21137-1-git-send-email-t-kristo@ti.com>
+ <1458158097-21137-3-git-send-email-t-kristo@ti.com>
+ <20160401192839.GW18567@codeaurora.org> <570E40D1.7030205@ti.com>
+Message-ID: <20160416002335.GF26353@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/13, Eric Anholt wrote:
-> In poweroff, we set the reset bit and the power down bit, but only
-> managed to unset the reset bit for poweron.  This meant that if HDMI
-> did -EPROBE_DEFER after it had grabbed its clocks, we'd power down the
-> PLLH (that had been on at boot time) and never recover.
+On 04/13, Tero Kristo wrote:
+> On 04/01/2016 10:28 PM, Stephen Boyd wrote:
+> >On 03/16, Tero Kristo wrote:
+> >>AM33xx/AM43xx devices use the same DPLL IP blocks, which only support
+> >>maximum rate of 1GHz [1] for the default and 2GHz for the low-jitter type
+> >>DPLLs [2]. Reflect this limitation in the DPLL init code by adding the
+> >>max-rate parameter based on the DPLL types.
+> >>
+> >>[1] Functional, integration & test specification for GS70 ADPLLS, Rev 1.0-01
+> >>[2] Functional, integration & test specification for GS70 ADPLLLJ, Rev 0.8-02
+> >>
+> >>Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> >>Cc: Nishanth Menon <nm@ti.com>
+> >>Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> >>Cc: Lokesh Vutla <lokeshvutla@ti.com>
+> >>---
+> >
+> >Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+> >
+> >Or I can apply these two targeting 4.7 if you like.
 > 
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> Fixes: 41691b8862e2 ("clk: bcm2835: Add support for programming the audio domain clocks")
-> Cc: stable at vger.kernel.org
-> ---
+> Yea I am fine with this. Want to pick up the old patch from Grygorii also?
+> 
 
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+Ok let me find these two!
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
