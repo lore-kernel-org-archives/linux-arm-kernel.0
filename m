@@ -1,373 +1,213 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 16 Apr 2016 20:24:07 +0100
-Subject: [PATCH v2 5/5] iio: gyro: bmg160: use regmap to retrieve struct
- device
-In-Reply-To: <63dd9227f9a7e56f7e03f8963e798e6d7d8bb70f.1460314070.git.amsfield22@gmail.com>
-References: <cover.1460314070.git.amsfield22@gmail.com>
- <63dd9227f9a7e56f7e03f8963e798e6d7d8bb70f.1460314070.git.amsfield22@gmail.com>
-Message-ID: <57129157.3080603@kernel.org>
+From: david@lechnology.com (David Lechner)
+Date: Sat, 16 Apr 2016 14:31:27 -0500
+Subject: [PATCH 2/2] ARM: davinci: da850: use clk->set_parent for async3
+In-Reply-To: <1460661217-7389-3-git-send-email-david@lechnology.com>
+References: <1460661217-7389-1-git-send-email-david@lechnology.com>
+ <1460661217-7389-3-git-send-email-david@lechnology.com>
+Message-ID: <5712930F.7000902@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/04/16 20:08, Alison Schofield wrote:
-> Driver includes struct regmap and struct device in its global data.
-> Remove the struct device and use regmap API to retrieve device info.
-> 
-> Patch created using Coccinelle plus manual edits.
-> 
-> Signed-off-by: Alison Schofield <amsfield22@gmail.com>
-Cc'd Srinivas
-
-Actually I'm curious as to why linux-arm-kernel and linux-samsung-soc are cc'd?
-Not terribly relevant lists...
+On 04/14/2016 02:13 PM, David Lechner wrote:
+> The da850 family of processors has an async3 clock domain that can be
+> muxed to either pll0_sysclk2 or pll1_sysclk2. Now that the davinci clocks
+> have a set_parent callback, we can use this to control the async3 mux
+> instead of a stand-alone function.
+>
+> This adds a new async3_clk and sets the appropriate child clocks. The
+> default is use to pll1_sysclk2 since it is not affected by processor
+> frequency scaling.
+>
+> Signed-off-by: David Lechner <david@lechnology.com>
 > ---
->  drivers/iio/gyro/bmg160_core.c | 86 +++++++++++++++++++++---------------------
->  1 file changed, 44 insertions(+), 42 deletions(-)
-> 
-> diff --git a/drivers/iio/gyro/bmg160_core.c b/drivers/iio/gyro/bmg160_core.c
-> index 2493bb1..b2b1071 100644
-> --- a/drivers/iio/gyro/bmg160_core.c
-> +++ b/drivers/iio/gyro/bmg160_core.c
-> @@ -95,7 +95,6 @@
->  #define BMG160_AUTO_SUSPEND_DELAY_MS	2000
->  
->  struct bmg160_data {
-> -	struct device *dev;
->  	struct regmap *regmap;
->  	struct iio_trigger *dready_trig;
->  	struct iio_trigger *motion_trig;
-> @@ -137,11 +136,12 @@ static const struct {
->  
->  static int bmg160_set_mode(struct bmg160_data *data, u8 mode)
->  {
-> +	struct device *dev = regmap_get_device(data->regmap);
->  	int ret;
->  
->  	ret = regmap_write(data->regmap, BMG160_REG_PMU_LPW, mode);
->  	if (ret < 0) {
-> -		dev_err(data->dev, "Error writing reg_pmu_lpw\n");
-> +		dev_err(dev, "Error writing reg_pmu_lpw\n");
->  		return ret;
->  	}
->  
-> @@ -162,6 +162,7 @@ static int bmg160_convert_freq_to_bit(int val)
->  
->  static int bmg160_set_bw(struct bmg160_data *data, int val)
->  {
-> +	struct device *dev = regmap_get_device(data->regmap);
->  	int ret;
->  	int bw_bits;
->  
-> @@ -171,7 +172,7 @@ static int bmg160_set_bw(struct bmg160_data *data, int val)
->  
->  	ret = regmap_write(data->regmap, BMG160_REG_PMU_BW, bw_bits);
->  	if (ret < 0) {
-> -		dev_err(data->dev, "Error writing reg_pmu_bw\n");
-> +		dev_err(dev, "Error writing reg_pmu_bw\n");
->  		return ret;
->  	}
->  
-> @@ -182,18 +183,19 @@ static int bmg160_set_bw(struct bmg160_data *data, int val)
->  
->  static int bmg160_chip_init(struct bmg160_data *data)
->  {
-> +	struct device *dev = regmap_get_device(data->regmap);
->  	int ret;
->  	unsigned int val;
->  
->  	ret = regmap_read(data->regmap, BMG160_REG_CHIP_ID, &val);
->  	if (ret < 0) {
-> -		dev_err(data->dev, "Error reading reg_chip_id\n");
-> +		dev_err(dev, "Error reading reg_chip_id\n");
->  		return ret;
->  	}
->  
-> -	dev_dbg(data->dev, "Chip Id %x\n", val);
-> +	dev_dbg(dev, "Chip Id %x\n", val);
->  	if (val != BMG160_CHIP_ID_VAL) {
-> -		dev_err(data->dev, "invalid chip %x\n", val);
-> +		dev_err(dev, "invalid chip %x\n", val);
->  		return -ENODEV;
->  	}
->  
-> @@ -212,14 +214,14 @@ static int bmg160_chip_init(struct bmg160_data *data)
->  	/* Set Default Range */
->  	ret = regmap_write(data->regmap, BMG160_REG_RANGE, BMG160_RANGE_500DPS);
->  	if (ret < 0) {
-> -		dev_err(data->dev, "Error writing reg_range\n");
-> +		dev_err(dev, "Error writing reg_range\n");
->  		return ret;
->  	}
->  	data->dps_range = BMG160_RANGE_500DPS;
->  
->  	ret = regmap_read(data->regmap, BMG160_REG_SLOPE_THRES, &val);
->  	if (ret < 0) {
-> -		dev_err(data->dev, "Error reading reg_slope_thres\n");
-> +		dev_err(dev, "Error reading reg_slope_thres\n");
->  		return ret;
->  	}
->  	data->slope_thres = val;
-> @@ -228,7 +230,7 @@ static int bmg160_chip_init(struct bmg160_data *data)
->  	ret = regmap_update_bits(data->regmap, BMG160_REG_INT_EN_1,
->  				 BMG160_INT1_BIT_OD, 0);
->  	if (ret < 0) {
-> -		dev_err(data->dev, "Error updating bits in reg_int_en_1\n");
-> +		dev_err(dev, "Error updating bits in reg_int_en_1\n");
->  		return ret;
->  	}
->  
-> @@ -236,7 +238,7 @@ static int bmg160_chip_init(struct bmg160_data *data)
->  			   BMG160_INT_MODE_LATCH_INT |
->  			   BMG160_INT_MODE_LATCH_RESET);
->  	if (ret < 0) {
-> -		dev_err(data->dev,
-> +		dev_err(dev,
->  			"Error writing reg_motion_intr\n");
->  		return ret;
->  	}
-> @@ -247,20 +249,21 @@ static int bmg160_chip_init(struct bmg160_data *data)
->  static int bmg160_set_power_state(struct bmg160_data *data, bool on)
->  {
->  #ifdef CONFIG_PM
-> +	struct device *dev = regmap_get_device(data->regmap);
->  	int ret;
->  
->  	if (on)
-> -		ret = pm_runtime_get_sync(data->dev);
-> +		ret = pm_runtime_get_sync(dev);
->  	else {
-> -		pm_runtime_mark_last_busy(data->dev);
-> -		ret = pm_runtime_put_autosuspend(data->dev);
-> +		pm_runtime_mark_last_busy(dev);
-> +		ret = pm_runtime_put_autosuspend(dev);
->  	}
->  
->  	if (ret < 0) {
-> -		dev_err(data->dev,
-> -			"Failed: bmg160_set_power_state for %d\n", on);
-> +		dev_err(dev, "Failed: bmg160_set_power_state for %d\n", on);
+>
+> v4 changes:
+>
+> * Fixed strict checkpatch complaint about {} in if/else
+>
+>
+>   arch/arm/mach-davinci/da850.c | 82 ++++++++++++++++++-------------------------
+>   1 file changed, 34 insertions(+), 48 deletions(-)
+>
+> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+> index 1f85bbc..ace7433 100644
+> --- a/arch/arm/mach-davinci/da850.c
+> +++ b/arch/arm/mach-davinci/da850.c
+> @@ -34,9 +34,6 @@
+>   #include "clock.h"
+>   #include "mux.h"
+>
+> -/* SoC specific clock flags */
+> -#define DA850_CLK_ASYNC3	BIT(16)
+> -
+>   #define DA850_PLL1_BASE		0x01e1a000
+>   #define DA850_TIMER64P2_BASE	0x01f0c000
+>   #define DA850_TIMER64P3_BASE	0x01f0d000
+> @@ -161,6 +158,33 @@ static struct clk pll1_sysclk3 = {
+>   	.div_reg	= PLLDIV3,
+>   };
+>
+> +static int da850_async3_set_parent(struct clk *clk, struct clk *parent)
+> +{
+> +	u32 val;
 > +
->  		if (on)
-> -			pm_runtime_put_noidle(data->dev);
-> +			pm_runtime_put_noidle(dev);
->  
->  		return ret;
->  	}
-> @@ -272,6 +275,7 @@ static int bmg160_set_power_state(struct bmg160_data *data, bool on)
->  static int bmg160_setup_any_motion_interrupt(struct bmg160_data *data,
->  					     bool status)
->  {
-> +	struct device *dev = regmap_get_device(data->regmap);
->  	int ret;
->  
->  	/* Enable/Disable INT_MAP0 mapping */
-> @@ -279,7 +283,7 @@ static int bmg160_setup_any_motion_interrupt(struct bmg160_data *data,
->  				 BMG160_INT_MAP_0_BIT_ANY,
->  				 (status ? BMG160_INT_MAP_0_BIT_ANY : 0));
->  	if (ret < 0) {
-> -		dev_err(data->dev, "Error updating bits reg_int_map0\n");
-> +		dev_err(dev, "Error updating bits reg_int_map0\n");
->  		return ret;
->  	}
->  
-> @@ -289,8 +293,7 @@ static int bmg160_setup_any_motion_interrupt(struct bmg160_data *data,
->  		ret = regmap_write(data->regmap, BMG160_REG_SLOPE_THRES,
->  				   data->slope_thres);
->  		if (ret < 0) {
-> -			dev_err(data->dev,
-> -				"Error writing reg_slope_thres\n");
-> +			dev_err(dev, "Error writing reg_slope_thres\n");
->  			return ret;
->  		}
->  
-> @@ -298,8 +301,7 @@ static int bmg160_setup_any_motion_interrupt(struct bmg160_data *data,
->  				   BMG160_INT_MOTION_X | BMG160_INT_MOTION_Y |
->  				   BMG160_INT_MOTION_Z);
->  		if (ret < 0) {
-> -			dev_err(data->dev,
-> -				"Error writing reg_motion_intr\n");
-> +			dev_err(dev, "Error writing reg_motion_intr\n");
->  			return ret;
->  		}
->  
-> @@ -314,8 +316,7 @@ static int bmg160_setup_any_motion_interrupt(struct bmg160_data *data,
->  					   BMG160_INT_MODE_LATCH_INT |
->  					   BMG160_INT_MODE_LATCH_RESET);
->  			if (ret < 0) {
-> -				dev_err(data->dev,
-> -					"Error writing reg_rst_latch\n");
-> +				dev_err(dev, "Error writing reg_rst_latch\n");
->  				return ret;
->  			}
->  		}
-> @@ -328,7 +329,7 @@ static int bmg160_setup_any_motion_interrupt(struct bmg160_data *data,
->  	}
->  
->  	if (ret < 0) {
-> -		dev_err(data->dev, "Error writing reg_int_en0\n");
-> +		dev_err(dev, "Error writing reg_int_en0\n");
->  		return ret;
->  	}
->  
-> @@ -338,6 +339,7 @@ static int bmg160_setup_any_motion_interrupt(struct bmg160_data *data,
->  static int bmg160_setup_new_data_interrupt(struct bmg160_data *data,
->  					   bool status)
->  {
-> +	struct device *dev = regmap_get_device(data->regmap);
->  	int ret;
->  
->  	/* Enable/Disable INT_MAP1 mapping */
-> @@ -345,7 +347,7 @@ static int bmg160_setup_new_data_interrupt(struct bmg160_data *data,
->  				 BMG160_INT_MAP_1_BIT_NEW_DATA,
->  				 (status ? BMG160_INT_MAP_1_BIT_NEW_DATA : 0));
->  	if (ret < 0) {
-> -		dev_err(data->dev, "Error updating bits in reg_int_map1\n");
-> +		dev_err(dev, "Error updating bits in reg_int_map1\n");
->  		return ret;
->  	}
->  
-> @@ -354,9 +356,8 @@ static int bmg160_setup_new_data_interrupt(struct bmg160_data *data,
->  				   BMG160_INT_MODE_NON_LATCH_INT |
->  				   BMG160_INT_MODE_LATCH_RESET);
->  		if (ret < 0) {
-> -			dev_err(data->dev,
-> -				"Error writing reg_rst_latch\n");
-> -				return ret;
-> +			dev_err(dev, "Error writing reg_rst_latch\n");
-> +			return ret;
->  		}
->  
->  		ret = regmap_write(data->regmap, BMG160_REG_INT_EN_0,
-> @@ -368,16 +369,15 @@ static int bmg160_setup_new_data_interrupt(struct bmg160_data *data,
->  				   BMG160_INT_MODE_LATCH_INT |
->  				   BMG160_INT_MODE_LATCH_RESET);
->  		if (ret < 0) {
-> -			dev_err(data->dev,
-> -				"Error writing reg_rst_latch\n");
-> -				return ret;
-> +			dev_err(dev, "Error writing reg_rst_latch\n");
-> +			return ret;
->  		}
->  
->  		ret = regmap_write(data->regmap, BMG160_REG_INT_EN_0, 0);
->  	}
->  
->  	if (ret < 0) {
-> -		dev_err(data->dev, "Error writing reg_int_en0\n");
-> +		dev_err(dev, "Error writing reg_int_en0\n");
->  		return ret;
->  	}
->  
-> @@ -400,6 +400,7 @@ static int bmg160_get_bw(struct bmg160_data *data, int *val)
->  
->  static int bmg160_set_scale(struct bmg160_data *data, int val)
->  {
-> +	struct device *dev = regmap_get_device(data->regmap);
->  	int ret, i;
->  
->  	for (i = 0; i < ARRAY_SIZE(bmg160_scale_table); ++i) {
-> @@ -407,8 +408,7 @@ static int bmg160_set_scale(struct bmg160_data *data, int val)
->  			ret = regmap_write(data->regmap, BMG160_REG_RANGE,
->  					   bmg160_scale_table[i].dps_range);
->  			if (ret < 0) {
-> -				dev_err(data->dev,
-> -					"Error writing reg_range\n");
-> +				dev_err(dev, "Error writing reg_range\n");
->  				return ret;
->  			}
->  			data->dps_range = bmg160_scale_table[i].dps_range;
-> @@ -421,6 +421,7 @@ static int bmg160_set_scale(struct bmg160_data *data, int val)
->  
->  static int bmg160_get_temp(struct bmg160_data *data, int *val)
->  {
-> +	struct device *dev = regmap_get_device(data->regmap);
->  	int ret;
->  	unsigned int raw_val;
->  
-> @@ -433,7 +434,7 @@ static int bmg160_get_temp(struct bmg160_data *data, int *val)
->  
->  	ret = regmap_read(data->regmap, BMG160_REG_TEMP, &raw_val);
->  	if (ret < 0) {
-> -		dev_err(data->dev, "Error reading reg_temp\n");
-> +		dev_err(dev, "Error reading reg_temp\n");
->  		bmg160_set_power_state(data, false);
->  		mutex_unlock(&data->mutex);
->  		return ret;
-> @@ -450,6 +451,7 @@ static int bmg160_get_temp(struct bmg160_data *data, int *val)
->  
->  static int bmg160_get_axis(struct bmg160_data *data, int axis, int *val)
->  {
-> +	struct device *dev = regmap_get_device(data->regmap);
->  	int ret;
->  	unsigned int raw_val;
->  
-> @@ -463,7 +465,7 @@ static int bmg160_get_axis(struct bmg160_data *data, int axis, int *val)
->  	ret = regmap_bulk_read(data->regmap, BMG160_AXIS_TO_REG(axis), &raw_val,
->  			       2);
->  	if (ret < 0) {
-> -		dev_err(data->dev, "Error reading axis %d\n", axis);
-> +		dev_err(dev, "Error reading axis %d\n", axis);
->  		bmg160_set_power_state(data, false);
->  		mutex_unlock(&data->mutex);
->  		return ret;
-> @@ -793,6 +795,7 @@ static int bmg160_trig_try_reen(struct iio_trigger *trig)
->  {
->  	struct iio_dev *indio_dev = iio_trigger_get_drvdata(trig);
->  	struct bmg160_data *data = iio_priv(indio_dev);
-> +	struct device *dev = regmap_get_device(data->regmap);
->  	int ret;
->  
->  	/* new data interrupts don't need ack */
-> @@ -804,7 +807,7 @@ static int bmg160_trig_try_reen(struct iio_trigger *trig)
->  			   BMG160_INT_MODE_LATCH_INT |
->  			   BMG160_INT_MODE_LATCH_RESET);
->  	if (ret < 0) {
-> -		dev_err(data->dev, "Error writing reg_rst_latch\n");
-> +		dev_err(dev, "Error writing reg_rst_latch\n");
->  		return ret;
->  	}
->  
-> @@ -864,13 +867,14 @@ static irqreturn_t bmg160_event_handler(int irq, void *private)
->  {
->  	struct iio_dev *indio_dev = private;
->  	struct bmg160_data *data = iio_priv(indio_dev);
-> +	struct device *dev = regmap_get_device(data->regmap);
->  	int ret;
->  	int dir;
->  	unsigned int val;
->  
->  	ret = regmap_read(data->regmap, BMG160_REG_INT_STATUS_2, &val);
->  	if (ret < 0) {
-> -		dev_err(data->dev, "Error reading reg_int_status2\n");
-> +		dev_err(dev, "Error reading reg_int_status2\n");
->  		goto ack_intr_status;
->  	}
->  
-> @@ -907,8 +911,7 @@ ack_intr_status:
->  				   BMG160_INT_MODE_LATCH_INT |
->  				   BMG160_INT_MODE_LATCH_RESET);
->  		if (ret < 0)
-> -			dev_err(data->dev,
-> -				"Error writing reg_rst_latch\n");
-> +			dev_err(dev, "Error writing reg_rst_latch\n");
->  	}
->  
->  	return IRQ_HANDLED;
-> @@ -976,7 +979,6 @@ int bmg160_core_probe(struct device *dev, struct regmap *regmap, int irq,
->  
->  	data = iio_priv(indio_dev);
->  	dev_set_drvdata(dev, indio_dev);
-> -	data->dev = dev;
->  	data->irq = irq;
->  	data->regmap = regmap;
->  
-> @@ -1139,7 +1141,7 @@ static int bmg160_runtime_suspend(struct device *dev)
->  
->  	ret = bmg160_set_mode(data, BMG160_MODE_SUSPEND);
->  	if (ret < 0) {
-> -		dev_err(data->dev, "set mode failed\n");
-> +		dev_err(dev, "set mode failed\n");
->  		return -EAGAIN;
->  	}
->  
-> 
+> +	val = readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP3_REG));
+> +
+> +	/* Set the USB 1.1 PHY clock mux based on the parent clock. */
+
+I seem to have regressed here since the last revision, this is supposed 
+to read:
+
+	/* Set the async3 clock domain mux based on the parent clock. */
+
+Although now that I am looking at it again, it doesn't really add 
+anything useful and could be omitted altogether.
+
+> +	if (parent == &pll0_sysclk2) {
+> +		val &= ~CFGCHIP3_ASYNC3_CLKSRC;
+> +	} else if (parent == &pll1_sysclk2) {
+> +		val |= CFGCHIP3_ASYNC3_CLKSRC;
+> +	} else {
+> +		pr_err("Bad parent on async3 clock mux\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	writel(val, DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP3_REG));
+> +
+> +	return 0;
+> +}
+> +
+> +static struct clk async3_clk = {
+> +	.name		= "async3",
+> +	.parent		= &pll1_sysclk2,
+> +	.set_parent	= da850_async3_set_parent,
+> +};
+> +
+>   static struct clk i2c0_clk = {
+>   	.name		= "i2c0",
+>   	.parent		= &pll0_aux_clk,
+> @@ -234,18 +258,16 @@ static struct clk uart0_clk = {
+>
+>   static struct clk uart1_clk = {
+>   	.name		= "uart1",
+> -	.parent		= &pll0_sysclk2,
+> +	.parent		= &async3_clk,
+>   	.lpsc		= DA8XX_LPSC1_UART1,
+>   	.gpsc		= 1,
+> -	.flags		= DA850_CLK_ASYNC3,
+>   };
+>
+>   static struct clk uart2_clk = {
+>   	.name		= "uart2",
+> -	.parent		= &pll0_sysclk2,
+> +	.parent		= &async3_clk,
+>   	.lpsc		= DA8XX_LPSC1_UART2,
+>   	.gpsc		= 1,
+> -	.flags		= DA850_CLK_ASYNC3,
+>   };
+>
+>   static struct clk aintc_clk = {
+> @@ -300,10 +322,9 @@ static struct clk emac_clk = {
+>
+>   static struct clk mcasp_clk = {
+>   	.name		= "mcasp",
+> -	.parent		= &pll0_sysclk2,
+> +	.parent		= &async3_clk,
+>   	.lpsc		= DA8XX_LPSC1_McASP0,
+>   	.gpsc		= 1,
+> -	.flags		= DA850_CLK_ASYNC3,
+>   };
+>
+>   static struct clk lcdc_clk = {
+> @@ -355,10 +376,9 @@ static struct clk spi0_clk = {
+>
+>   static struct clk spi1_clk = {
+>   	.name		= "spi1",
+> -	.parent		= &pll0_sysclk2,
+> +	.parent		= &async3_clk,
+>   	.lpsc		= DA8XX_LPSC1_SPI1,
+>   	.gpsc		= 1,
+> -	.flags		= DA850_CLK_ASYNC3,
+>   };
+>
+>   static struct clk vpif_clk = {
+> @@ -386,10 +406,9 @@ static struct clk dsp_clk = {
+>
+>   static struct clk ehrpwm_clk = {
+>   	.name		= "ehrpwm",
+> -	.parent		= &pll0_sysclk2,
+> +	.parent		= &async3_clk,
+>   	.lpsc		= DA8XX_LPSC1_PWM,
+>   	.gpsc		= 1,
+> -	.flags		= DA850_CLK_ASYNC3,
+>   };
+>
+>   #define DA8XX_EHRPWM_TBCLKSYNC	BIT(12)
+> @@ -421,10 +440,9 @@ static struct clk ehrpwm_tbclk = {
+>
+>   static struct clk ecap_clk = {
+>   	.name		= "ecap",
+> -	.parent		= &pll0_sysclk2,
+> +	.parent		= &async3_clk,
+>   	.lpsc		= DA8XX_LPSC1_ECAP,
+>   	.gpsc		= 1,
+> -	.flags		= DA850_CLK_ASYNC3,
+>   };
+>
+>   static struct clk_lookup da850_clks[] = {
+> @@ -442,6 +460,7 @@ static struct clk_lookup da850_clks[] = {
+>   	CLK(NULL,		"pll1_aux",	&pll1_aux_clk),
+>   	CLK(NULL,		"pll1_sysclk2",	&pll1_sysclk2),
+>   	CLK(NULL,		"pll1_sysclk3",	&pll1_sysclk3),
+> +	CLK(NULL,		"async3",	&async3_clk),
+>   	CLK("i2c_davinci.1",	NULL,		&i2c0_clk),
+>   	CLK(NULL,		"timer0",	&timerp64_0_clk),
+>   	CLK("davinci-wdt",	NULL,		&timerp64_1_clk),
+> @@ -909,30 +928,6 @@ static struct davinci_timer_info da850_timer_info = {
+>   	.clocksource_id	= T0_TOP,
+>   };
+>
+> -static void da850_set_async3_src(int pllnum)
+> -{
+> -	struct clk *clk, *newparent = pllnum ? &pll1_sysclk2 : &pll0_sysclk2;
+> -	struct clk_lookup *c;
+> -	unsigned int v;
+> -	int ret;
+> -
+> -	for (c = da850_clks; c->clk; c++) {
+> -		clk = c->clk;
+> -		if (clk->flags & DA850_CLK_ASYNC3) {
+> -			ret = clk_set_parent(clk, newparent);
+> -			WARN(ret, "DA850: unable to re-parent clock %s",
+> -								clk->name);
+> -		}
+> -       }
+> -
+> -	v = __raw_readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP3_REG));
+> -	if (pllnum)
+> -		v |= CFGCHIP3_ASYNC3_CLKSRC;
+> -	else
+> -		v &= ~CFGCHIP3_ASYNC3_CLKSRC;
+> -	__raw_writel(v, DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP3_REG));
+> -}
+> -
+>   #ifdef CONFIG_CPU_FREQ
+>   /*
+>    * Notes:
+> @@ -1328,15 +1323,6 @@ void __init da850_init(void)
+>   	if (WARN(!da8xx_syscfg1_base, "Unable to map syscfg1 module"))
+>   		return;
+>
+> -	/*
+> -	 * Move the clock source of Async3 domain to PLL1 SYSCLK2.
+> -	 * This helps keeping the peripherals on this domain insulated
+> -	 * from CPU frequency changes caused by DVFS. The firmware sets
+> -	 * both PLL0 and PLL1 to the same frequency so, there should not
+> -	 * be any noticeable change even in non-DVFS use cases.
+> -	 */
+> -	da850_set_async3_src(1);
+> -
+>   	/* Unlock writing to PLL0 registers */
+>   	v = __raw_readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP0_REG));
+>   	v &= ~CFGCHIP0_PLL_MASTER_LOCK;
+>
