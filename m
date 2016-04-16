@@ -1,37 +1,40 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sun, 17 Apr 2016 00:02:54 +0900
-Subject: [Question] refcount of DT node
-In-Reply-To: <20160414183855.GU19428@n2100.arm.linux.org.uk>
-References: <CAK7LNATFUW2KXUpFas6C_SJ0C7Qb1DWU0njLg-FCYciK2U6Oag@mail.gmail.com>
- <20160414084849.GT19428@n2100.arm.linux.org.uk>
- <20160414095957.GB10273@leverpostej>
- <20160414183855.GU19428@n2100.arm.linux.org.uk>
-Message-ID: <CAK7LNAQiw4VT5Cs1KzXg_K6r8QjiPd8o9xo_oaix0DOXYosK=g@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 16 Apr 2016 18:11:44 +0300
+Subject: [PATCH 1/3] ACPI / ARM64: Don't enable ACPI by default on ARM64
+In-Reply-To: <1460706823-16566-1-git-send-email-broonie@kernel.org>
+References: <1460706823-16566-1-git-send-email-broonie@kernel.org>
+Message-ID: <57125630.9080305@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi experts.
+Hello.
 
+On 4/15/2016 10:53 AM, Mark Brown wrote:
 
-2016-04-15 3:38 GMT+09:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-
+> If ACPI is selectable it is enabled by default.  This is a good choice
+> for architectures where the overwhelming majority of systems use ACPI
+> like x86 and IA-64 but is less clear for architectures where it's less
+> common like ARM64.  Change the default selection so that it's only done
+> explicitly on those architectures where ACPI is universally used.
 >
-> Their stance is not something I agree with - if we have something,
-> it should be correct, even if it's not what we would ultimately
-> desire, _or_ it should be removed.  This half-way house that we
-> have today is total madness to me.
+> Signed-off-by: Mark Brown <broonie@kernel.org>
+> ---
+>   drivers/acpi/Kconfig | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+> index 82b96ee8624c..2fcf87a6d270 100644
+> --- a/drivers/acpi/Kconfig
+> +++ b/drivers/acpi/Kconfig
+> @@ -8,7 +8,7 @@ menuconfig ACPI
+>   	depends on IA64 || X86 || (ARM64 && EXPERT)
+>   	depends on PCI
+>   	select PNP
+> -	default y
+> +	default y if (IA64 || X86)
 
-I agree with Russell here.
+    Parens not needed.
 
-I am comfortable to do my best in the given API at this point
-(and also happy to adjust my drivers when a new API is supported in the future).
+[...]
 
-So, the answers from DT people are really helpful for me to write correct code.
-
-Thank you everyone!
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+MBR, Sergei
