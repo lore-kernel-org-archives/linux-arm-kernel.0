@@ -1,40 +1,75 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 16 Apr 2016 18:11:44 +0300
-Subject: [PATCH 1/3] ACPI / ARM64: Don't enable ACPI by default on ARM64
-In-Reply-To: <1460706823-16566-1-git-send-email-broonie@kernel.org>
-References: <1460706823-16566-1-git-send-email-broonie@kernel.org>
-Message-ID: <57125630.9080305@cogentembedded.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Sat, 16 Apr 2016 17:27:33 +0200
+Subject: [PATCH v8 0/2] Fix dma mapping when the cache is coherent
+In-Reply-To: <1460475070-29058-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1460475070-29058-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <CAPv3WKe2S1qbSByOgUABRcnTVoW-ad1guSSNsmPuFWJ8-W5sOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Gregory,
 
-On 4/15/2016 10:53 AM, Mark Brown wrote:
+You can re-add my tested-by. Hang is no longer a problem with your
+patch during my test of neta.
 
-> If ACPI is selectable it is enabled by default.  This is a good choice
-> for architectures where the overwhelming majority of systems use ACPI
-> like x86 and IA-64 but is less clear for architectures where it's less
-> common like ARM64.  Change the default selection so that it's only done
-> explicitly on those architectures where ACPI is universally used.
+Best regards,
+Marcin
+
+2016-04-12 17:31 GMT+02:00 Gregory CLEMENT <gregory.clement@free-electrons.com>:
+> Hi,
 >
-> Signed-off-by: Mark Brown <broonie@kernel.org>
-> ---
->   drivers/acpi/Kconfig | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
+> These two patches fixes the dma mapping functions when the system is
+> cache coherent. The first one allows to fix an issue we have on Armada
+> 375/38x with the PL310 that's why it is tagged for stable too.
 >
-> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-> index 82b96ee8624c..2fcf87a6d270 100644
-> --- a/drivers/acpi/Kconfig
-> +++ b/drivers/acpi/Kconfig
-> @@ -8,7 +8,7 @@ menuconfig ACPI
->   	depends on IA64 || X86 || (ARM64 && EXPERT)
->   	depends on PCI
->   	select PNP
-> -	default y
-> +	default y if (IA64 || X86)
-
-    Parens not needed.
-
-[...]
-
-MBR, Sergei
+> Thanks,
+>
+> Gregory
+>
+> PS: the mailing list was missing in the recipient list of the v7. It
+> was a mistake and I realized it only now. If needed I can repost it
+> with the few exchange we had with Russell King.
+>
+>
+> Changelog
+> v7 -> v8:
+>  - Use a flag instead of a boolean for checking the coherency. It
+>    improve the readability of the code. Suggested by Russell King.
+>  - Consider that when coherency is set, it's for both L1 and L2 caches
+>  - Use the arm_dma_alloc_args struct to pass the coherency status when
+>    possible. Suggested by Rabin Vincent
+>  - Remove the Tested-by flag from Marcin because of the modifications
+>    around the L1 cache management in this series.
+>
+> v6 -> v7:
+>  - Renamed is coherent by l2_coherent as suggested by Russell
+>
+> v5 -> v6:
+>  - Rebased on v4.6-rc1
+>
+> v4 -> v5
+>  - Keep the dmac_* function outside the !is_coherent case.
+>
+> v3 -> v4:
+>  - Rebased on v4.3-rc1
+>  - Fix conflict with commit "21caf3a765b0 ARM: 8398/1: arm DMA: Fix
+>    allocation from CMA for coherent DMA"
+>
+> v2 -> v3:
+>
+>  - Fix comments in patch 1 as suggested by Catalin.
+>  - Fix build issues in patch 2 (by using the multi_v7_defconfig +
+>    CONFIG_ROCKCHIP_IOMMU).
+>  - Add the arm_coherent_iommu_mmap_attrs function.
+>
+>
+> Gregory CLEMENT (2):
+>   ARM: dma-mapping: Don't use outer_flush_range when the L2C is coherent
+>   ARM: dma-mapping: Fix the coherent case when iommu is used
+>
+>  arch/arm/mm/dma-mapping.c | 144 +++++++++++++++++++++++++++++++++-------------
+>  1 file changed, 105 insertions(+), 39 deletions(-)
+>
+> --
+> 2.5.0
+>
