@@ -1,51 +1,29 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Sat, 16 Apr 2016 10:48:34 +0530
-Subject: [PATCH] dmaengine: pxa: handle bus errors
-In-Reply-To: <87k2k0t5gh.fsf@belgarion.home>
-References: <1459200744-13245-1-git-send-email-robert.jarzmik@free.fr>
- <20160413135324.GQ2274@localhost> <87k2k0t5gh.fsf@belgarion.home>
-Message-ID: <20160416051834.GY2274@localhost>
+From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
+Date: Sat, 16 Apr 2016 09:20:28 +0300
+Subject: [PATCH] ARM: dts: omap3: Fix ISP syscon register offset
+Message-ID: <1460787628-17316-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 14, 2016 at 08:23:26PM +0200, Robert Jarzmik wrote:
-> Vinod Koul <vinod.koul@intel.com> writes:
-> 
-> > On Mon, Mar 28, 2016 at 11:32:24PM +0200, Robert Jarzmik wrote:
-> >> In the current state, upon bus error the driver will spin endlessly,
-> >> relaunching the last tx, which will fail again and again :
-> >>  - a bus error happens
-> >>  - pxad_chan_handler() is called
-> >>  - as PXA_DCSR_STOPSTATE is true, the last non-terminated transaction is
-> >>    lauched, which is the one triggering the bus error, as it didn't
-> >>    terminate
-> >>  - moreover, the STOP interrupt fires a new, as the STOPIRQEN is still
-> >>    active
-> >> 
-> >> Break this logic by stopping the automatic relaunch of a dma channel
-> >> upon a bus error, even if there are still pending issued requests on it.
-> >> 
-> >> As dma_cookie_status() seems unable to return DMA_ERROR in its current
-> >> form, ie. there seems no way to mark a DMA_ERROR on a per-async-tx
-> >> basis, it is chosen in this patch to remember on the channel which
-> >> transaction failed, and report it in pxad_tx_status().
-> >> 
-> >> It's a bit misleading because if T1, T2, T3 and T4 were queued, and T1
-> >> was completed while T2 causes a bus error, the status of T3 and T4 will
-> >> be reported as DMA_IN_PROGRESS, while the channel is actually stopped.
-> >
-> > No it is not misleading. The subsequent descriptor can be submitted and
-> > continued. But yes you are right on the error reporting part, that is
-> > something we need to add.
-> Ok, fair enough.
-> 
-> > So what exactly are you trying to fix/achive here?
-> Euh you mean the first chapter about the "endless spin" is not clear ?
-> This is what I'm trying to fix, the unstoppable endless relauch of a descriptor
-> doomed to make the same bus error over and over again.
+According to the TRM, SCM CONTROL_CSIRXFE register is on offset 0x6c
 
-Okay so IIUC the patch here essential stops all transfers and abort the
-channel, right?
+Signed-off-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
+---
+ arch/arm/boot/dts/omap34xx.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/arch/arm/boot/dts/omap34xx.dtsi b/arch/arm/boot/dts/omap34xx.dtsi
+index 5cdba1f..e446562 100644
+--- a/arch/arm/boot/dts/omap34xx.dtsi
++++ b/arch/arm/boot/dts/omap34xx.dtsi
+@@ -46,7 +46,7 @@
+ 			       0x480bd800 0x017c>;
+ 			interrupts = <24>;
+ 			iommus = <&mmu_isp>;
+-			syscon = <&scm_conf 0xdc>;
++			syscon = <&scm_conf 0x6c>;
+ 			ti,phy-type = <OMAP3ISP_PHY_TYPE_COMPLEX_IO>;
+ 			#clock-cells = <1>;
+ 			ports {
 -- 
-~Vinod
+1.9.1
