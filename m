@@ -1,40 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 16 Apr 2016 09:43:40 +0200
-Subject: [PATCH] pci: xgene: Add ECAM fixups
-In-Reply-To: <CADaLNDkCtUgFyX5tVgeM9grdHSQvpTHaq7qXk2WZ1tTbrP7OGA@mail.gmail.com>
-References: <1455068984-22210-1-git-send-email-dhdang@apm.com>
- <2994764.UGKJE3zfLx@wuerfel>
- <CADaLNDkCtUgFyX5tVgeM9grdHSQvpTHaq7qXk2WZ1tTbrP7OGA@mail.gmail.com>
-Message-ID: <6597458.plyKBtcpp4@wuerfel>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 16 Apr 2016 10:09:19 +0200
+Subject: [PATCH] dmaengine: pxa: handle bus errors
+In-Reply-To: <20160416051834.GY2274@localhost> (Vinod Koul's message of "Sat,
+ 16 Apr 2016 10:48:34 +0530")
+References: <1459200744-13245-1-git-send-email-robert.jarzmik@free.fr>
+ <20160413135324.GQ2274@localhost> <87k2k0t5gh.fsf@belgarion.home>
+ <20160416051834.GY2274@localhost>
+Message-ID: <87d1pqt1ow.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 15 April 2016 14:30:56 Duc Dang wrote:
-> On Wed, Feb 10, 2016 at 6:28 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Tuesday 09 February 2016 17:49:44 Duc Dang wrote:
-> >> X-Gene PCIe controller does not fully support ECAM.
-> >> This patch adds required ECAM fixup to allow X-Gene
-> >> PCIe controller to be functional in ACPI boot mode.
-> >>
-> >> This patch is based on the original work of
-> >> Mark Salter <msalter@redhat.com> and depends on
-> >> Tomasz's PCIe ACPI series:
-> >> https://lkml.org/lkml/2016/2/4/646
-> >>
-> >> Signed-off-by: Duc Dang <dhdang@apm.com>
-> >> ---
-> >
-> > This really has nothing to do with the PCI host device driver, please
-> > keep it in a separate file in drivers/acpi/.
-> 
-> Hi Arnd,
-> 
-> With Tomasz latest PCIe ACPI series
-> (https://lkml.org/lkml/2016/4/15/594), do you think it still better to
-> keep the ACPI ECAM fixup code in a separate file in drivers/acpi
-> directory?
+Vinod Koul <vinod.koul@intel.com> writes:
 
-Yes, I made the same comment for the cavium PCI workaround in that
-series.
+> On Thu, Apr 14, 2016 at 08:23:26PM +0200, Robert Jarzmik wrote:
+>> Vinod Koul <vinod.koul@intel.com> writes:
+>> 
+>> > So what exactly are you trying to fix/achive here?
+>> Euh you mean the first chapter about the "endless spin" is not clear ?
+>> This is what I'm trying to fix, the unstoppable endless relauch of a descriptor
+>> doomed to make the same bus error over and over again.
+>
+> Okay so IIUC the patch here essential stops all transfers and abort the
+> channel, right?
+That's exactly it, yes, abort the channel, stop all the transfers.
 
-	Arnd
+Cheers.
+
+-- 
+Robert
