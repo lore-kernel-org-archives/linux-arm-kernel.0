@@ -1,64 +1,38 @@
 From: david@lechnology.com (David Lechner)
-Date: Sat, 16 Apr 2016 12:00:19 -0500
-Subject: [PATCH v2 3/4] ARM: davinci: disable mdio and eth0 in da850.dtsi
+Date: Sat, 16 Apr 2016 12:00:18 -0500
+Subject: [PATCH v2 2/4] ARM: davinci: Add spi0 lookup to da8xx-dt for clock
+ matching
 In-Reply-To: <1460826020-1256-1-git-send-email-david@lechnology.com>
 References: <1460826020-1256-1-git-send-email-david@lechnology.com>
-Message-ID: <1460826020-1256-4-git-send-email-david@lechnology.com>
+Message-ID: <1460826020-1256-3-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All other devices are disabled by default and not all boards will use
-these devices, so these should be disabled too..
-
-da850-evm.dtb already had status = "okay" for these devices.
-da850-enbw-cmc.dts did not, so they were added.
+This is needed to match the device-tree node for spi0 to the
+non-device-tree clock.
 
 Signed-off-by: David Lechner <david@lechnology.com>
 Tested-by: Kevin Hilman <khilman@baylibre.com>
 ---
 
-no change
+code portion of previous "ARM: davinci: add spi0 to da850 device tree" patch.
 
- arch/arm/boot/dts/da850-enbw-cmc.dts | 6 ++++++
- arch/arm/boot/dts/da850.dtsi         | 2 ++
- 2 files changed, 8 insertions(+)
+no change.
 
-diff --git a/arch/arm/boot/dts/da850-enbw-cmc.dts b/arch/arm/boot/dts/da850-enbw-cmc.dts
-index 101d1a1..14dff3e 100644
---- a/arch/arm/boot/dts/da850-enbw-cmc.dts
-+++ b/arch/arm/boot/dts/da850-enbw-cmc.dts
-@@ -26,6 +26,12 @@
- 		serial2: serial at 10d000 {
- 			status = "okay";
- 		};
-+		mdio: mdio at 224000 {
-+			status = "okay";
-+		};
-+		eth0: ethernet at 220000 {
-+			status = "okay";
-+		};
- 	};
- };
- 
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 8880d57..26fc0812 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -330,6 +330,7 @@
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			reg = <0x224000 0x1000>;
-+			status = "disabled";
- 		};
- 		eth0: ethernet at 220000 {
- 			compatible = "ti,davinci-dm6467-emac";
-@@ -344,6 +345,7 @@
- 					35
- 					36
- 					>;
-+			status = "disabled";
- 		};
- 		gpio: gpio at 226000 {
- 			compatible = "ti,dm6441-gpio";
+ arch/arm/mach-davinci/da8xx-dt.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+index 64f3887..754f478 100644
+--- a/arch/arm/mach-davinci/da8xx-dt.c
++++ b/arch/arm/mach-davinci/da8xx-dt.c
+@@ -28,6 +28,7 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f06000, "ecap", NULL),
+ 	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f07000, "ecap", NULL),
+ 	OF_DEV_AUXDATA("ti,da850-ecap", 0x01f08000, "ecap", NULL),
++	OF_DEV_AUXDATA("ti,da830-spi", 0x01c41000, "spi_davinci.0", NULL),
+ 	OF_DEV_AUXDATA("ti,da830-spi", 0x01f0e000, "spi_davinci.1", NULL),
+ 	OF_DEV_AUXDATA("ns16550a", 0x01c42000, "serial8250.0", NULL),
+ 	OF_DEV_AUXDATA("ns16550a", 0x01d0c000, "serial8250.1", NULL),
 -- 
 1.9.1
