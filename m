@@ -1,167 +1,152 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sun, 17 Apr 2016 02:49:40 +0900
-Subject: [Question] reset controlling
-Message-ID: <CAK7LNATcVwx1q0Nb2WMSpqW3LcoRkZx3RgpMjmbt2EmffJnFvg@mail.gmail.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Sat, 16 Apr 2016 11:30:10 -0700
+Subject: [PATCH V6 00/13] Support for generic ACPI based PCI host
+ controller
+In-Reply-To: <1460740008-19489-1-git-send-email-tn@semihalf.com>
+References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
+Message-ID: <CADaLNDm0+aQexz643H5=jhc86jFbQO-zqT+9VoHyF5QMKqmRkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi.
-
-
-I have wondered how to handle reset signals for my SoCs.
-
-
-
-I notice reset controllers are less supported in Linux than clock controllers.
-
-
-
-I grepped "clk_register" and "reset_controller_register".
-
-I know this does not give us the precise number of
-clk/reset providers, but I think it is enough for a rough estimate.
-
-masahiro at grover:~/workspace/linux$ git grep clk_register | wc
-   3520   18014  308516
-masahiro at grover:~/workspace/linux$ git grep reset_controller_register | wc
-     31     107    2462
-
-
-Looks like we support 100 times as many clock providers as
-reset providers.
-
-In other words, 99% of SoCs support clock controllers,
-but not reset controllers.
-
-But, I think most of hardware blocks
-have reset signals as well as clocks.
-At least, it is true on my SoCs.
-
-
-Similar tendency for consumers.
-
-I grepped "clk_get" and "reset_control_get".
-
-
-masahiro at grover:~/workspace/linux$ git grep clk_get | wc
-   3362   16486  256820
-masahiro at grover:~/workspace/linux$ git grep reset_control_get | wc
-    142     732   12481
-
-
-Most of drivers support controlling clock signals,
-but do not care about reset signals.
-
-
-
-So, how can we explain this fact?
-
-What are recommended strategies for reset signals?
-
-I came up with some options as follows:
-
-
-[1] Reset signals should be de-asserted in a firmware (boot-loader)
-    for all the hardware blocks.  Linux kernel need not touch them at all.
-
-[2] We should really make effort to support more reset drivers,
-    like we do for clock drivers.
-
-[3] We can (ab)use clock-gate drivers for controlling reset signals.
-
-
-
-At first, I chose [3] for my SoCs
-with the analogy clk_enable/clk_disable to
-reset_control_deassert/reset_control_assert.
-(and also because the reset sub-system does not support tree-topology
-or enable-count.)
-
-Reset signals are sometimes cascaded.
-For example, the UART blocks on my SoCs have a reset for the whole of
-UART blocks
-besides per-channel reset signals.
-
-                     |---(UART ch0 reset)---> UART0
-                     |
-----(UART reset)-----|---(UART ch1 reset)---> UART1
-                     |
-                     |---(UART ch2 reset)---> UART2
-
-I found this works well with clk-gate drivers.
-Even reset_control_reset() can be implemented
-with clk_disable() followed by clk_enable().
-
-
-
-Having said that, I hesitate to distort my device trees.
-
-In order to make a reset signal look like a clock,
-we need to describe DT as follows
-
-clkrstctrl: clkrstctrl {
-        compatible = "foo-clock-and-reset-controller";
-        #clock-cells = <1>;
-}
-
-uart {
-         clock-names = "clock", "reset";
-         clocks = <&clkctrl 0>, <&rstctrl 0>;
-}
-
-
-instead of
-
-
-clkctrl: clkctrl {
-        compatible = "foo-clock-controller";
-        #clock-cells = <1>;
-}
-
-rstctrl: rstctrl {
-        compatible = "foo-reset-controller";
-        #reset-cells = <1>;
-}
-
-uart {
-         clocks = <&clkctrl 0>;
-         resets = <&rstctrl 0>;
-}
-
-
-
-The first DT fragment seems weird if we consider the concept of device tree;
-as a hardware description language, DT should reflect the hardware
-representation.  Clocks and resets are different things.
-So, DT should not be compromised by the fact that reset driver support
-is poor in Linux.
-
-
-
-
-Next, I thought about [2].
-It should not be so hard to implement a reset provider.
-
-But, as I mentioned above, most of drivers handle clocks,
-but not resets.
-
-Is it worthwhile to patch drivers around
-with reset_control_get_optional()?
-Hmm...
-
-
-
-
-[1] would be the easiest and I think makes sense to some extent
-because controlling clock signals seems enough from the
-power-management perspective.
-
-
-
-Any idea?
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+On Fri, Apr 15, 2016 at 10:06 AM, Tomasz Nowicki <tn@semihalf.com> wrote:
+> From the functionality point of view this series might be split into the
+> following logic parts:
+> 1. Necessary fixes as the preparation for using driver on ARM64.
+> 2. New ECAM API and update for users of the pci-host-common API
+> 3. Use new MCFG interface and implement generic ACPI based PCI host controller driver.
+> 4. Enable above driver on ARM64
+>
+> Patches has been built on top of 4.6-rc2 and can be found here:
+> git at github.com:semihalf-nowicki-tomasz/linux.git (pci-acpi-v6)
+>
+> This has been tested on Cavium ThunderX server. Any help in reviewing and
+> testing is very appreciated.
+
+Hi Tomasz,
+
+I changed X-Gene ECAM fixup code to follow the new ECAM APIs and my
+X-Gene PCIe on Mustang board works fine with this series.
+
+Thanks and regards,
+Duc Dang.
+>
+> v5 -> v6
+> - dropped idea of x86 MMCONFIG code refactoring
+> - integrated JC's patches which introduce new ECAM API:
+>   https://lkml.org/lkml/2016/4/11/907
+>   git: https://github.com/jchandra-brcm/linux/ (arm64-acpi-pci-v3)
+> - integrated Sinan's fix for releasing IO resources, see patch [06/13]
+> - added ACPI support for ThunderX ECAM and PEM drivers
+> - rebased to 4.6-rc2
+>
+> v4 -> v5
+> - dropped MCFG refactoring group patches 1-6 from series v4 and integrated Jayachandran's patch
+>   https://patchwork.ozlabs.org/patch/575525/
+> - rewrite PCI legacy IRQs allocation
+> - squashed two patches 11 and 12 from series v4, fixed bisection issue
+> - changelog improvements
+> - rebased to 4.5-rc3
+>
+> v3 -> v4
+> - dropped Jiang's fix http://lkml.iu.edu/hypermail/linux/kernel/1601.1/04318.html
+> - added Lorenzo's fix patch 19/24
+> - ACPI PCI bus domain number assigning cleanup
+> - changed resource management, we now claim and reassign resources
+> - improvements for applying quirks
+> - dropped Matthew's http://www.spinics.net/lists/linux-pci/msg45950.html dependency
+> - rebased to 4.5-rc1
+>
+> v2 -> v3
+> - fix legacy IRQ assigning and IO ports registration
+> - remove reference to arch specific companion device for ia64
+> - move ACPI PCI host controller driver to pci_root.c
+> - drop generic domain assignment for x86 and ia64 as I am not
+>   able to run all necessary test variants
+> - drop patch which cleaned legacy IRQ assignment since it belongs to
+>   Mathew's series:
+>   https://patchwork.ozlabs.org/patch/557504/
+> - extend MCFG quirk code
+> - rebased to 4.4
+>
+> v1 -> v2
+> - moved non-arch specific piece of code to dirver/acpi/ directory
+> - fixed IO resource handling
+> - introduced PCI config accessors quirks matching
+> - moved ACPI_COMPANION_SET to generic code
+>
+> v1 - https://lkml.org/lkml/2015/10/27/504
+> v2 - https://lkml.org/lkml/2015/12/16/246
+> v3 - http://lkml.iu.edu/hypermail/linux/kernel/1601.1/04308.html
+> v4 - https://lkml.org/lkml/2016/2/4/646
+> v5 - https://lkml.org/lkml/2016/2/16/426
+>
+> Jayachandran C (2):
+>   PCI: Provide common functions for ECAM mapping
+>   PCI: generic, thunder: update to use generic ECAM API
+>
+> Tomasz Nowicki (11):
+>   pci, acpi, x86, ia64: Move ACPI host bridge device companion
+>     assignment to core code.
+>   pci, acpi: Provide generic way to assign bus domain number.
+>   x86, ia64: Include acpi_pci_{add|remove}_bus to the default
+>     pcibios_{add|remove}_bus implementation.
+>   pci, of: Move the PCI I/O space management to PCI core code.
+>   acpi, pci: Support IO resources when parsing PCI host bridge
+>     resources.
+>   arm64, pci, acpi: ACPI support for legacy IRQs parsing and
+>     consolidation with DT code.
+>   pci, acpi: Support for ACPI based generic PCI host controller
+>   arm64, pci, acpi: Start using ACPI based PCI host controller driver
+>     for ARM64.
+>   pci, acpi: Match PCI config space accessors against platfrom specific
+>     quirks.
+>   pci, pci-thunder-ecam: Add ACPI support for ThunderX ECAM.
+>   pci, pci-thunder-pem: Add ACPI support for ThunderX PEM.
+>
+>  arch/arm64/Kconfig                  |  15 +++
+>  arch/arm64/include/asm/cpufeature.h |   3 +-
+>  arch/arm64/kernel/cpu_errata.c      |   8 ++
+>  arch/arm64/kernel/pci.c             |  35 ++---
+>  arch/ia64/hp/common/sba_iommu.c     |   2 +-
+>  arch/ia64/include/asm/pci.h         |   1 -
+>  arch/ia64/pci/pci.c                 |  26 ----
+>  arch/ia64/sn/kernel/io_acpi_init.c  |   4 +-
+>  arch/x86/include/asm/pci.h          |   3 -
+>  arch/x86/pci/acpi.c                 |  17 ---
+>  arch/x86/pci/common.c               |  10 --
+>  drivers/acpi/Kconfig                |   8 ++
+>  drivers/acpi/Makefile               |   1 +
+>  drivers/acpi/bus.c                  |   1 +
+>  drivers/acpi/pci_gen_host.c         | 259 ++++++++++++++++++++++++++++++++++++
+>  drivers/acpi/pci_root.c             |  58 +++++++-
+>  drivers/of/address.c                | 116 +---------------
+>  drivers/pci/Kconfig                 |   3 +
+>  drivers/pci/Makefile                |   2 +
+>  drivers/pci/ecam.c                  | 137 +++++++++++++++++++
+>  drivers/pci/ecam.h                  |  66 +++++++++
+>  drivers/pci/host/Kconfig            |   1 +
+>  drivers/pci/host/pci-host-common.c  | 119 ++++++++---------
+>  drivers/pci/host/pci-host-common.h  |  47 -------
+>  drivers/pci/host/pci-host-generic.c |  52 ++------
+>  drivers/pci/host/pci-thunder-ecam.c |  70 ++++++----
+>  drivers/pci/host/pci-thunder-pem.c  | 215 ++++++++++++++++++++++--------
+>  drivers/pci/pci.c                   | 150 ++++++++++++++++++++-
+>  drivers/pci/probe.c                 |   5 +
+>  include/asm-generic/vmlinux.lds.h   |   7 +
+>  include/linux/of_address.h          |   9 --
+>  include/linux/pci-acpi.h            |  20 +++
+>  include/linux/pci.h                 |  12 ++
+>  33 files changed, 1029 insertions(+), 453 deletions(-)
+>  create mode 100644 drivers/acpi/pci_gen_host.c
+>  create mode 100644 drivers/pci/ecam.c
+>  create mode 100644 drivers/pci/ecam.h
+>  delete mode 100644 drivers/pci/host/pci-host-common.h
+>
+> --
+> 1.9.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
