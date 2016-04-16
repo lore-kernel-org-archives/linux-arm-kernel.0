@@ -1,47 +1,40 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 16 Apr 2016 09:31:59 +0200
-Subject: [PATCH V6 08/13] PCI: generic,
- thunder: update to use generic ECAM API
-In-Reply-To: <CAKc_7PWFacFJZA2JpfM4RcRFVj0jyUE73HhhvmX0cKm07JGupg@mail.gmail.com>
-References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
- <5110401.mGEq6IVFz2@wuerfel>
- <CAKc_7PWFacFJZA2JpfM4RcRFVj0jyUE73HhhvmX0cKm07JGupg@mail.gmail.com>
-Message-ID: <4240660.NqlPcXaV7N@wuerfel>
+Date: Sat, 16 Apr 2016 09:43:40 +0200
+Subject: [PATCH] pci: xgene: Add ECAM fixups
+In-Reply-To: <CADaLNDkCtUgFyX5tVgeM9grdHSQvpTHaq7qXk2WZ1tTbrP7OGA@mail.gmail.com>
+References: <1455068984-22210-1-git-send-email-dhdang@apm.com>
+ <2994764.UGKJE3zfLx@wuerfel>
+ <CADaLNDkCtUgFyX5tVgeM9grdHSQvpTHaq7qXk2WZ1tTbrP7OGA@mail.gmail.com>
+Message-ID: <6597458.plyKBtcpp4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 16 April 2016 12:50:13 Jayachandran C wrote:
+On Friday 15 April 2016 14:30:56 Duc Dang wrote:
+> On Wed, Feb 10, 2016 at 6:28 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Tuesday 09 February 2016 17:49:44 Duc Dang wrote:
+> >> X-Gene PCIe controller does not fully support ECAM.
+> >> This patch adds required ECAM fixup to allow X-Gene
+> >> PCIe controller to be functional in ACPI boot mode.
+> >>
+> >> This patch is based on the original work of
+> >> Mark Salter <msalter@redhat.com> and depends on
+> >> Tomasz's PCIe ACPI series:
+> >> https://lkml.org/lkml/2016/2/4/646
+> >>
+> >> Signed-off-by: Duc Dang <dhdang@apm.com>
+> >> ---
 > >
-> > I still think it would be better to keep the loadable PCI host drivers
-> > separate from the ACPI PCI infrastructure. There are a number of
-> > simplifications that we want to do to the DT based drivers in the long
-> > run, so it's better if that code is not shared at this level. Abstracting
-> > out the ECAM code is fine, but at that point you should be able to just
-> > call it from the ACPI layer.
+> > This really has nothing to do with the PCI host device driver, please
+> > keep it in a separate file in drivers/acpi/.
 > 
-> The issue is not with this patch (in my opinion). This patch is just
-> re-arranging how thunder specific data is maintained. Earlier it was
-> a container_of gen_pci, now it is ->priv of pci_config_window.
+> Hi Arnd,
 > 
-> I can see the issue in patches 12 and 13 of this patchset which adds
-> ACPI fixups into the thunder OF driver.
+> With Tomasz latest PCIe ACPI series
+> (https://lkml.org/lkml/2016/4/15/594), do you think it still better to
+> keep the ACPI ECAM fixup code in a separate file in drivers/acpi
+> directory?
 
-Right, I commented on this one, because it seems to rearrange the code
-in order to do the later one.
-
-> The simple approach when doing modular PCI drivers would be to make
-> pci-thunder-*.c like pci-host-common.c, to be compiled in if configured.
-> The fie will contain all the Thunder quirks and can export
-> pci_thunder_ecam_ops.
-
-I would argue that we should not export anything from drivers/pci/host,
-those should really be standalone drivers that do not interact with other
-subsystems.
-
-How much code would you need to duplicate from thunder-ecam to have
-the same functionality available in ACPI? My expectation is that it's
-not really that much more compared to the code you need for sharing
-a single implementation, but you get a lower complexity here, which
-makes it easier to understand and to rework.
+Yes, I made the same comment for the cavium PCI workaround in that
+series.
 
 	Arnd
