@@ -1,46 +1,51 @@
-From: liguo.zhang@mediatek.com (liguo zhang)
-Date: Sat, 16 Apr 2016 12:21:01 +0800
-Subject: [PATCH v3] i2c: mediatek: i2c multi transfer optimization
-In-Reply-To: <20160412211355.GA1526@katana>
-References: <1457375031-3769-1-git-send-email-liguo.zhang@mediatek.com>
- <20160412211355.GA1526@katana>
-Message-ID: <1460780461.29864.34.camel@mhfsdcap03>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Sat, 16 Apr 2016 10:48:34 +0530
+Subject: [PATCH] dmaengine: pxa: handle bus errors
+In-Reply-To: <87k2k0t5gh.fsf@belgarion.home>
+References: <1459200744-13245-1-git-send-email-robert.jarzmik@free.fr>
+ <20160413135324.GQ2274@localhost> <87k2k0t5gh.fsf@belgarion.home>
+Message-ID: <20160416051834.GY2274@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-04-12 at 23:13 +0200, Wolfram Sang wrote:
-> Hi,
+On Thu, Apr 14, 2016 at 08:23:26PM +0200, Robert Jarzmik wrote:
+> Vinod Koul <vinod.koul@intel.com> writes:
 > 
-> thanks for the submission!
+> > On Mon, Mar 28, 2016 at 11:32:24PM +0200, Robert Jarzmik wrote:
+> >> In the current state, upon bus error the driver will spin endlessly,
+> >> relaunching the last tx, which will fail again and again :
+> >>  - a bus error happens
+> >>  - pxad_chan_handler() is called
+> >>  - as PXA_DCSR_STOPSTATE is true, the last non-terminated transaction is
+> >>    lauched, which is the one triggering the bus error, as it didn't
+> >>    terminate
+> >>  - moreover, the STOP interrupt fires a new, as the STOPIRQEN is still
+> >>    active
+> >> 
+> >> Break this logic by stopping the automatic relaunch of a dma channel
+> >> upon a bus error, even if there are still pending issued requests on it.
+> >> 
+> >> As dma_cookie_status() seems unable to return DMA_ERROR in its current
+> >> form, ie. there seems no way to mark a DMA_ERROR on a per-async-tx
+> >> basis, it is chosen in this patch to remember on the channel which
+> >> transaction failed, and report it in pxad_tx_status().
+> >> 
+> >> It's a bit misleading because if T1, T2, T3 and T4 were queued, and T1
+> >> was completed while T2 causes a bus error, the status of T3 and T4 will
+> >> be reported as DMA_IN_PROGRESS, while the channel is actually stopped.
+> >
+> > No it is not misleading. The subsequent descriptor can be submitted and
+> > continued. But yes you are right on the error reporting part, that is
+> > something we need to add.
+> Ok, fair enough.
 > 
-> On Tue, Mar 08, 2016 at 02:23:51AM +0800, Liguo Zhang wrote:
-> > Signal complete() in the i2c irq handler after one transfer done,
-> > and then wait_for_completion_timeout() will return, this procedure
-> > may cost much time, so only signal complete() when the entire
-> > transaction has been completed, it will reduce the entire transaction
-> > time.
-> > 
-> > Signed-off-by: Liguo Zhang <liguo.zhang@mediatek.com>
-> 
-> I wonder. You have less context switches, yes. On the other hand, you
-> likely have bigger interrupt latency because you do more stuff in the
-> interrupt handler. Is it really a gain in the end?
-> 
+> > So what exactly are you trying to fix/achive here?
+> Euh you mean the first chapter about the "endless spin" is not clear ?
+> This is what I'm trying to fix, the unstoppable endless relauch of a descriptor
+> doomed to make the same bus error over and over again.
 
-When doing i2c multi transfer(first i2c write then i2c read, and not
-using the MTK i2c WRRD mode) repeatedly in our stress test, we found the
-procedure(complete()-->wait_for_completion_timeout()) may cost much
-time, and it will affect the following i2c transfer. In our stress test,
-It will affect the i2c read transfer, the value from the i2c read is not
-right.
-So when doing i2c multi transfer, the first is i2c write,then i2c read,
-we will use the MTK i2c WRRD mode to do i2c multi transfer in the
-previous patch.
-But If i2c multi transfer has at least three transfer, we can't use the
-MTK i2c WRRD mode, this patch may be important. Now we have not already
-seen the i2c multi transfer scenario, which has at least three transfer.
+Okay so IIUC the patch here essential stops all transfers and abort the
+channel, right?
 
-> Regards,
-> 
->    Wolfram
-> 
+-- 
+~Vinod
