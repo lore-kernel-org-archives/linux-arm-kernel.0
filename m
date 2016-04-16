@@ -1,53 +1,27 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sat, 16 Apr 2016 02:49:14 +0200
-Subject: [PATCH] ARM: dts: rockchip: move rk3288 edp phy under the GRF
-Message-ID: <1640976.sZtsTTlDpl@diego>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 15 Apr 2016 18:00:53 -0700
+Subject: [PATCH 1/2] clk: imx: do not sleep if IRQ's are still disabled
+In-Reply-To: <1454107764-19876-1-git-send-email-stefan@agner.ch>
+References: <1454107764-19876-1-git-send-email-stefan@agner.ch>
+Message-ID: <20160416010052.GR26353@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The edp-phy control is a part of the General Register Files and
-with a recent patch in 4.6 the phy driver can now also handle this
-correctly, so move the dts node under the GRF as well.
+On 01/29, Stefan Agner wrote:
+> If a clock gets enabled early during boot time, it can lead to a PLL
+> startup. The wait_lock function makes sure that the PLL is really
+> stareted up before it gets used. However, the function sleeps which
+> leads to scheduling and an error:
+> bad: scheduling from the idle thread!
+> ...
+> 
+> Use udelay in case IRQ's are still disabled.
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm/boot/dts/rk3288.dtsi | 17 ++++++++---------
- 1 file changed, 8 insertions(+), 9 deletions(-)
+This is really old. Shawn, are you picking these up? I'm removing
+these from my queue for now.
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 180eb97..9068189 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -201,15 +201,6 @@
- 		#clock-cells = <0>;
- 	};
- 
--	edp_phy: edp-phy {
--		compatible = "rockchip,rk3288-dp-phy";
--		clocks = <&cru SCLK_EDP_24M>;
--		clock-names = "24m";
--		rockchip,grf = <&grf>;
--		#phy-cells = <0>;
--		status = "disabled";
--	};
--
- 	timer {
- 		compatible = "arm,armv7-timer";
- 		arm,cpu-registers-not-fw-configured;
-@@ -756,6 +747,14 @@
- 	grf: syscon at ff770000 {
- 		compatible = "rockchip,rk3288-grf", "syscon", "simple-mfd";
- 		reg = <0xff770000 0x1000>;
-+
-+		edp_phy: edp-phy {
-+			compatible = "rockchip,rk3288-dp-phy";
-+			clocks = <&cru SCLK_EDP_24M>;
-+			clock-names = "24m";
-+			#phy-cells = <0>;
-+			status = "disabled";
-+		};
- 	};
- 
- 	wdt: watchdog at ff800000 {
 -- 
-2.7.0
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
