@@ -1,93 +1,41 @@
-From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
-Date: Sun, 17 Apr 2016 17:29:23 +0300
-Subject: [PATCH v1] ARM: dts: omap3-n900: Specify peripherals LDO regulators
- initial mode
-In-Reply-To: <20160417122933.GA8093@earth>
-References: <20160417122933.GA8093@earth>
-Message-ID: <1460903363-2197-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 17 Apr 2016 17:24:12 +0200
+Subject: [PATCH 2/3] ARM: pxa: add pxa25x device-tree support
+In-Reply-To: <1460316600-15978-2-git-send-email-robert.jarzmik@free.fr>
+References: <1460316600-15978-1-git-send-email-robert.jarzmik@free.fr>
+ <1460316600-15978-2-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <5954693.SgGqqDgWJO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without that, regulators are left in the mode last set by the bootloader or
-by the kernel the device was rebooted from. This leads to various problems,
-like non-working peripherals.
+On Sunday 10 April 2016 21:29:59 Robert Jarzmik wrote:
+> +
+> +DT_MACHINE_START(PXA_DT, "Marvell PXA3xx (Device Tree Support)")
+> +       .map_io         = pxa3xx_map_io,
+> +       .init_irq       = pxa3xx_dt_init_irq,
+> +       .handle_irq     = pxa3xx_handle_irq,
+> +       .restart        = pxa_restart,
+> +       .dt_compat      = pxa3xx_dt_board_compat,
+> +MACHINE_END
+> 
 
-Signed-off-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
----
- arch/arm/boot/dts/omap3-n900.dts | 9 +++++++++
- 1 file changed, 9 insertions(+)
+Nothing wrong with your series, it's a straightforward continuation of what
+you have for the other platforms, but I have a few comments on the method
+overall, and it might be good if you could work on improving those next,
+basically eliminating most of the machine descriptor contents in the long
+run:
 
-diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
-index b3c26a9..d9e2d9c 100644
---- a/arch/arm/boot/dts/omap3-n900.dts
-+++ b/arch/arm/boot/dts/omap3-n900.dts
-@@ -329,6 +329,7 @@
- 	regulator-name = "V28";
- 	regulator-min-microvolt = <2800000>;
- 	regulator-max-microvolt = <2800000>;
-+	regulator-initial-mode = <0x0e>; /* RES_STATE_ACTIVE */
- 	regulator-always-on; /* due to battery cover sensor */
- };
- 
-@@ -336,30 +337,35 @@
- 	regulator-name = "VCSI";
- 	regulator-min-microvolt = <1800000>;
- 	regulator-max-microvolt = <1800000>;
-+	regulator-initial-mode = <0x0e>; /* RES_STATE_ACTIVE */
- };
- 
- &vaux3 {
- 	regulator-name = "VMMC2_30";
- 	regulator-min-microvolt = <2800000>;
- 	regulator-max-microvolt = <3000000>;
-+	regulator-initial-mode = <0x0e>; /* RES_STATE_ACTIVE */
- };
- 
- &vaux4 {
- 	regulator-name = "VCAM_ANA_28";
- 	regulator-min-microvolt = <2800000>;
- 	regulator-max-microvolt = <2800000>;
-+	regulator-initial-mode = <0x0e>; /* RES_STATE_ACTIVE */
- };
- 
- &vmmc1 {
- 	regulator-name = "VMMC1";
- 	regulator-min-microvolt = <1850000>;
- 	regulator-max-microvolt = <3150000>;
-+	regulator-initial-mode = <0x0e>; /* RES_STATE_ACTIVE */
- };
- 
- &vmmc2 {
- 	regulator-name = "V28_A";
- 	regulator-min-microvolt = <2800000>;
- 	regulator-max-microvolt = <3000000>;
-+	regulator-initial-mode = <0x0e>; /* RES_STATE_ACTIVE */
- 	regulator-always-on; /* due VIO leak to AIC34 VDDs */
- };
- 
-@@ -367,6 +373,7 @@
- 	regulator-name = "VPLL";
- 	regulator-min-microvolt = <1800000>;
- 	regulator-max-microvolt = <1800000>;
-+	regulator-initial-mode = <0x0e>; /* RES_STATE_ACTIVE */
- 	regulator-always-on;
- };
- 
-@@ -374,6 +381,7 @@
- 	regulator-name = "VSDI_CSI";
- 	regulator-min-microvolt = <1800000>;
- 	regulator-max-microvolt = <1800000>;
-+	regulator-initial-mode = <0x0e>; /* RES_STATE_ACTIVE */
- 	regulator-always-on;
- };
- 
-@@ -381,6 +389,7 @@
- 	regulator-name = "VMMC2_IO_18";
- 	regulator-min-microvolt = <1800000>;
- 	regulator-max-microvolt = <1800000>;
-+	regulator-initial-mode = <0x0e>; /* RES_STATE_ACTIVE */
- };
- 
- &vio {
--- 
-1.9.1
+- It would be nice not to call map_io() at all and instead ensure that all
+  drivers that have DT bindings use ioremap. The main reason for this is
+  that relying on the hardwired mapping makes it easy to get things wrong
+  in the bindings, by leaving out required memory ranges.
+
+- The init_irq()/handle_irq() callbacks can probably be replaced with
+  a IRQCHIP_DECLARE() statement per irqchip variant, which then goes
+  on to initialize the controller and set the handler.
+
+- The restart method is the least important here, but I guess we can
+  convert that into a driver, or use an existing one from DT, like
+  drivers/power/reset/gpio-restart.c
+
+	Arnd
