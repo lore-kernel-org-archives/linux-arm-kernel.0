@@ -1,79 +1,62 @@
 From: kristofer.s.martinez@gmail.com (Martinez Kristofer)
-Date: Sun, 17 Apr 2016 17:10:42 +0800
-Subject: [RFC PATCH] arm64: defconfig: add config fragment for Freescale
- SoCs
-In-Reply-To: <20160414170433.GF15182@e104818-lin.cambridge.arm.com>
-References: <1460643685-13670-1-git-send-email-stuart.yoder@nxp.com>
- <20160414170433.GF15182@e104818-lin.cambridge.arm.com>
-Message-ID: <CABtop_F_SkKm6H-mtpK-GHDA3PBg_RTfw=CJeewV-LLEN0SHzA@mail.gmail.com>
+Date: Sun, 17 Apr 2016 17:23:31 +0800
+Subject: [PATCH V6 00/13] Support for generic ACPI based PCI host
+ controller
+In-Reply-To: <571130BB.9030508@redhat.com>
+References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
+ <571130BB.9030508@redhat.com>
+Message-ID: <CABtop_ExTJ=esXga5f+zT2AV0Vj49zsDVgxegLfW7R4sc+Nmzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 15, 2016 at 1:04 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Thu, Apr 14, 2016 at 09:21:25AM -0500, Stuart Yoder wrote:
->> Add a config fragment enabling a reasonably useful set of
->> devices and options for Freescale ARM v8 SoCs.
+On Sat, Apr 16, 2016 at 2:19 AM, Jon Masters <jcm@redhat.com> wrote:
+> On 04/15/2016 01:06 PM, Tomasz Nowicki wrote:
+>> From the functionality point of view this series might be split into the
+>> following logic parts:
+>> 1. Necessary fixes as the preparation for using driver on ARM64.
+>> 2. New ECAM API and update for users of the pci-host-common API
+>> 3. Use new MCFG interface and implement generic ACPI based PCI host controller driver.
+>> 4. Enable above driver on ARM64
+>>
+>> Patches has been built on top of 4.6-rc2 and can be found here:
+>> git at github.com:semihalf-nowicki-tomasz/linux.git (pci-acpi-v6)
+>>
+>> This has been tested on Cavium ThunderX server. Any help in reviewing and
+>> testing is very appreciated.
+>>
+>> v5 -> v6
+>> - dropped idea of x86 MMCONFIG code refactoring
+>> - integrated JC's patches which introduce new ECAM API:
+>>   https://lkml.org/lkml/2016/4/11/907
+>>   git: https://github.com/jchandra-brcm/linux/ (arm64-acpi-pci-v3)
+>> - integrated Sinan's fix for releasing IO resources, see patch [06/13]
+>> - added ACPI support for ThunderX ECAM and PEM drivers
+>> - rebased to 4.6-rc2
 >
-> A gentle NAK ;).
+> JC: can you explicitly confirm that you're ok with letting Tomasz drive
+> this? We would like to see one driver. Either that is Tomasz, or
+> Lorenzo, or it is you. But we need to have one overall cooordinated
+> effort to get this enablement into upstream as quickly as possible.
 >
->> I realize that we are trying to avoid the defconfig hell in arch/arm with 100+
->> defconfigs, but the single defconfig in arch/arm64 has some problems too.
+> Some of the Enterprise folks are going to otherwise end up in a very
+> nasty situation of supporting the previous non-upstream patches for many
+> years, which is absolutely something we want to avoid...
 >
-> Can we address these problems in defconfig?
->
->> I think what we want with arch/arm64/config are some reasonable in-kernel
->> defconfigs/fragments with built-in drivers for convenience.
->
-> A hard requirement for arm64 is single Image and having all SoCs in
-> defconfig is a good way to regularly test this.
->
-> I am aware that at some point the defconfig size will get too big but
-> that's when (ideally before) we should put effort into building more
-> stuff as loadable modules.
->
->> The proposal is to allow a chip vendor 1 vendor-specific kconfig fragment
->> to cover all their chips, allowing them to _override_ the default config
->> options in defconfig.  One specific issue we have is that due to the ls2080a
->> physical address map, the combination of 4KB pages and 39-bit VA does not
->> allow us to see all our DDR.  And, thus we need CONFIG_ARM64_VA_BITS_48=y.
->
-> And I'm fine to add this to defconfig. We had a case for Seattle needing
-> 48-bit VA but we eventually decoupled the number of levels for idmap and
-> swapper. If it can't be addressed in a similar way on ls2080a, we may
-> need to increase the VA space to 48-bit.
->
-
-Here my suggestion is 48-bit VA will be depended on the CONFIG_ACPI,
-IOW, if CONFIG_ACPI
-is seleceted, then CONFIG_ARM64_VA_BITS_48 will be selected too.
-The premise is ACPI will be used in larger VA space segment as it did
-in Server area.
-Stuart, does your ls2080a need to be configured with ACPI?
+Indeed, we need only one driver for this. But given there're already
+others except this
+one exist, and I believe no one want to give up their efforts. Also I
+think it's not exactly the
+same feauture provided by those drivers, so can we make some trade-off
+to combine
+those drivers into one and add the Signed-off-by for all the anthors?
+One agreement for all of us is to upstream the ACPI PCI for ARM64 asap!
 
 M.K.
 
 >
->> Allowing us to have a freescale.config gives us the flexibility of
->> adding Freescale specific options without having to keep this in
->> some other external repo.  It also keeps vendor specific clutter
->> out of the base defconfig.  With the number of new armv8 chips
->> coming out the single defconfig is going to produce increasingly
->> large kernels, since all drivers are built-in.
->
-> As I said, for the time being please add all the sane the options to
-> defconfig. I want to be able to build a defconfig and run on all
-> supported SoCs.
->
->> +CONFIG_STAGING=y
->
-> Well, apart from this. You should put effort in getting the required
-> drivers out of staging.
+> Jon.
 >
 > --
-> Catalin
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
