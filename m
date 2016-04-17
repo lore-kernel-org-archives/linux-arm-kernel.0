@@ -1,69 +1,41 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Sun, 17 Apr 2016 15:34:21 +0200
-Subject: [PATCH v2 2/2] i2c: exynos5: Fix possible ABBA deadlock by
- keeping I2C clock prepared
-In-Reply-To: <1460855693-28225-2-git-send-email-javier@osg.samsung.com>
-References: <1460855693-28225-1-git-send-email-javier@osg.samsung.com>
- <1460855693-28225-2-git-send-email-javier@osg.samsung.com>
-Message-ID: <20160417133421.GC3620@kozik-lap>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 17 Apr 2016 16:02:13 +0200
+Subject: [PATCH 1/2] PCI: iproc: Support DT property for ignoring aborts
+ when probing
+In-Reply-To: <79DC79A7-D4CE-4983-B1C5-CBD2E9CBBFB9@gmail.com>
+References: <1460238624-2086-1-git-send-email-zajec5@gmail.com>
+ <79DC79A7-D4CE-4983-B1C5-CBD2E9CBBFB9@gmail.com>
+Message-ID: <5420659.scnjID7ZLn@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 16, 2016 at 09:14:53PM -0400, Javier Martinez Canillas wrote:
-> The exynos5 I2C controller driver always prepares and enables a clock
-> before using it and then disables unprepares it when the clock is not
-> used anymore.
+On Sunday 10 April 2016 18:43:52 Florian Fainelli wrote:
+> >+#ifdef CONFIG_ARM
+> >+static int iproc_pcie_abort_handler(unsigned long addr, unsigned int
+> >fsr,
+> >+                                  struct pt_regs *regs)
+> >+{
+> >+      if (fsr == 0x1406)
+> >+              return 0;
+> >+
+> >+      return 1;
 > 
-> But this can cause a possible ABBA deadlock in some scenarios since a
-> driver that uses regmap to access its I2C registers, will first grab
-> the regmap lock and then the I2C xfer function will grab the prepare
-> lock when preparing the I2C clock. But since the clock driver also
-> uses regmap for I2C accesses, preparing a clock will first grab the
-> prepare lock and then the regmap lock when using the regmap API.
+> As you later noted this prevents this driver from being a module now. Since the expectation is that either a fixed bootloader or a platform should enot produce these data aborts, or allow them to be ignored, why not just put this code back where it belongs in the machine specific file which kills many birds with the same stone:
 > 
-> An example of this happens on the Exynos5422 Odroid XU4 board where a
-> s2mps11 PMIC is used and both the s2mps11 regulators and clk drivers
-> share the same I2C regmap.
+> - code is ways built-in, and hook_fault_code is installed prior to PCIe loading (function is marked with __init)
+> - platforms which do not need that, just do not install it for that specific code
+> - it is clear which platforms need it and which do not, yet the driver remains agnostic
 > 
-> The possible deadlock is reported by the kernel lockdep:
+> NB: there could be other platforms some day needing that which also propagate the error differently, forcing you to add more and more of these codes in the PCIe driver.
 > 
->   Possible unsafe locking scenario:
-> 
->         CPU0                    CPU1
->         ----                    ----
->    lock(sec_core:428:(regmap)->lock);
->                                 lock(prepare_lock);
->                                 lock(sec_core:428:(regmap)->lock);
->    lock(prepare_lock);
-> 
->   *** DEADLOCK ***
-> 
-> Fix it by leaving the code prepared on probe and use {en,dis}able in
-> the I2C transfer function.
-> 
-> This patch is similar to commit 34e81ad5f0b6 ("i2c: s3c2410: fix ABBA
-> deadlock by keeping clock prepared") that fixes the same bug in other
-> driver for an I2C controller found in Samsung SoCs.
-> 
-> Reported-by: Anand Moon <linux.amoon@gmail.com>
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> Reviewed-by: Anand Moon <linux.amoon@gmail.com>
-> Tested-by: Anand Moon <linux.amoon@gmail.com>
-> 
-> ---
-> 
-> Changes in v2:
-> - Add Anand Moon's Reviewed and Tested by tags.
-> - Unprepare the clock on suspend. Suggested by Krzysztof Kozlowski.
-> 
->  drivers/i2c/busses/i2c-exynos5.c | 14 +++++++++++---
->  1 file changed, 11 insertions(+), 3 deletions(-)
 
+I think ideally the driver should be able to access some of its internal
+registers to figure out what really happened, but the handler above doesn't
+do that, it just silently ignores *any* errors based on the fsr.
 
+Could one of you check the datasheets for the iproc PCI hardware to
+see if there are any error handling registers we may want to use to
+further drill down on what went wrong and whether it is safe to ignore
+the CPU fault?
 
-Hi,
-
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
-Best regards,
-Krzysztof
+	Arnd
