@@ -1,96 +1,67 @@
-From: dmitry.torokhov@gmail.com (Torokhov)
-Date: Sun, 17 Apr 2016 05:19:12 -0700
-Subject: [PATCH RFT 2/5] iio: mxs-lradc: move TS config into suitable
- function
-In-Reply-To: <571361DD.1090001@kernel.org>
-References: <1460648909-2657-1-git-send-email-stefan.wahren@i2se.com>
- <1460648909-2657-3-git-send-email-stefan.wahren@i2se.com>
- <570FF737.4050606@denx.de> <571361DD.1090001@kernel.org>
-Message-ID: <20160417121912.GA33215@dtor-ws>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Sun, 17 Apr 2016 14:29:33 +0200
+Subject: [PATCH] ARM: dts: omap3-n900: Specify peripherals LDO regulators
+ initial mode
+In-Reply-To: <571329B0.9060503@gmail.com>
+References: <1460788643-18590-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
+ <20160417000536.GA1124@earth> <571329B0.9060503@gmail.com>
+Message-ID: <20160417122933.GA8093@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 17, 2016 at 11:13:49AM +0100, Jonathan Cameron wrote:
-> On 14/04/16 21:01, Marek Vasut wrote:
-> > On 04/14/2016 05:48 PM, Stefan Wahren wrote:
-> >> This patch moves the touchscreen type configuration into
-> >> a more suitable function. Btw this simplifies PM ops later.
+Hi,
+
+On Sun, Apr 17, 2016 at 09:14:08AM +0300, Ivaylo Dimitrov wrote:
+> On 17.04.2016 03:05, Sebastian Reichel wrote:
+> >On Sat, Apr 16, 2016 at 09:37:23AM +0300, Ivaylo Dimitrov wrote:
+> >>Without that, regulators are left in the mode last set by the bootloader or
+> >>by the kernel the device was rebooted from. This leads to various problems
+> >>like non-working peripherals.
 > >>
-> >> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> > 
-> > Looks OK
-> > 
-> > Reviewed-by: Marek Vasut <marex@denx.de>
-> Please do CC Dmitry and linux-input on any patches 'touching' the
-> touchscreen parts of the driver.  I'm happy this one is simple
-> enough to apply anyway, but best to make sure everyone is in the
-> loop.
-
-FWIW:
-
-Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-
-> 
-> Something a little odd happened when applying the patch.  Automerging
-> failed so I did it by hand. Not sure what had changed!
-> 
-> Anyhow, please sanity check I haven't messed it up.
-> 
-> Applied to the togreg branch of iio.git - initially pushed out as
-> testing for the autobuilders to play with it.
-> 
-> Thanks,
-> 
-> 
-> Jonathan
-> > 
-> >> ---
-> >>  drivers/iio/adc/mxs-lradc.c |   21 +++++++++++----------
-> >>  1 file changed, 11 insertions(+), 10 deletions(-)
+> >>Signed-off-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
+> >>---
+> >>  arch/arm/boot/dts/omap3-n900.dts | 9 +++++++++
+> >>  1 file changed, 9 insertions(+)
 > >>
-> >> diff --git a/drivers/iio/adc/mxs-lradc.c b/drivers/iio/adc/mxs-lradc.c
-> >> index 0576953..7118fca 100644
-> >> --- a/drivers/iio/adc/mxs-lradc.c
-> >> +++ b/drivers/iio/adc/mxs-lradc.c
-> >> @@ -686,6 +686,17 @@ static void mxs_lradc_prepare_pressure(struct mxs_lradc *lradc)
-> >>  
-> >>  static void mxs_lradc_enable_touch_detection(struct mxs_lradc *lradc)
-> >>  {
-> >> +	/* Configure the touchscreen type */
-> >> +	if (lradc->soc == IMX28_LRADC) {
-> >> +		mxs_lradc_reg_clear(lradc, LRADC_CTRL0_MX28_TOUCH_SCREEN_TYPE,
-> >> +				    LRADC_CTRL0);
-> >> +
-> >> +		if (lradc->use_touchscreen == MXS_LRADC_TOUCHSCREEN_5WIRE)
-> >> +			mxs_lradc_reg_set(lradc,
-> >> +					  LRADC_CTRL0_MX28_TOUCH_SCREEN_TYPE,
-> >> +					  LRADC_CTRL0);
-> >> +	}
-> >> +
-> >>  	mxs_lradc_setup_touch_detection(lradc);
-> >>  
-> >>  	lradc->cur_plate = LRADC_TOUCH;
-> >> @@ -1491,16 +1502,6 @@ static int mxs_lradc_hw_init(struct mxs_lradc *lradc)
-> >>  	mxs_lradc_reg_wrt(lradc, 0, LRADC_DELAY(2));
-> >>  	mxs_lradc_reg_wrt(lradc, 0, LRADC_DELAY(3));
-> >>  
-> >> -	/* Configure the touchscreen type */
-> >> -	if (lradc->soc == IMX28_LRADC) {
-> >> -		mxs_lradc_reg_clear(lradc, LRADC_CTRL0_MX28_TOUCH_SCREEN_TYPE,
-> >> -				    LRADC_CTRL0);
-> >> -
-> >> -	if (lradc->use_touchscreen == MXS_LRADC_TOUCHSCREEN_5WIRE)
-> >> -		mxs_lradc_reg_set(lradc, LRADC_CTRL0_MX28_TOUCH_SCREEN_TYPE,
-> >> -				  LRADC_CTRL0);
-> >> -	}
-> >> -
-> >>  	/* Start internal temperature sensing. */
-> >>  	mxs_lradc_reg_wrt(lradc, 0, LRADC_CTRL2);
-> >>  
-> >>
-> > 
-> > 
+> >>diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
+> >>index b3c26a9..1bb36e2 100644
+> >>--- a/arch/arm/boot/dts/omap3-n900.dts
+> >>+++ b/arch/arm/boot/dts/omap3-n900.dts
+> >>@@ -329,6 +329,7 @@
+> >>  	regulator-name = "V28";
+> >>  	regulator-min-microvolt = <2800000>;
+> >>  	regulator-max-microvolt = <2800000>;
+> >>+	regulator-initial-mode = <0x0e>;
+> >>  	regulator-always-on; /* due to battery cover sensor */
+> >>  };
+> >
+> >I think this should either get an additional
+> >comment like /* MODE_NORMAL */ or implemented
 > 
+> According to the TRM, this is 'ACTIVE state', but that does not fit in the
+> regulator framework terminology.
 
--- 
-Dmitry
+No problem with using STATE_ACTIVE or any other fitting description. IMHO
+that "active" is misleading for regulators without "always-on/boot-on" tag,
+but that was TI's decision.
+
+> >using a define and a TWL4030_REGULATOR_MODE_NORMAL
+> >constant to keep the *.dts easily readable.
+> 
+> We already have RES_STATE_ACTIVE defined in linux/i2c/twl.h, is there a way
+> to include that in a dts?
+
+Not in its current state. During kernel build the C preprocessor is
+applied on the *.dts files. So the header may only contain
+preprocessor macros (e.g. #define). For that solution something like
+~/src/linux/include/dt-bindings/regulator/maxim,max77802.h should
+be created for the twl regulator.
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160417/5d018411/attachment.sig>
