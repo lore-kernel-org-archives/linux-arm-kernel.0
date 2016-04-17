@@ -1,139 +1,79 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sun, 17 Apr 2016 17:16:58 +0900
-Subject: [Question] reset controlling
-In-Reply-To: <5910310.IeFB0QAt6Q@wuerfel>
-References: <CAK7LNATcVwx1q0Nb2WMSpqW3LcoRkZx3RgpMjmbt2EmffJnFvg@mail.gmail.com>
- <5910310.IeFB0QAt6Q@wuerfel>
-Message-ID: <CAK7LNARJo-xDkkwZ0qA+DaKmQ0SixxGytNSKWBZMZ_N_6eWWow@mail.gmail.com>
+From: kristofer.s.martinez@gmail.com (Martinez Kristofer)
+Date: Sun, 17 Apr 2016 17:10:42 +0800
+Subject: [RFC PATCH] arm64: defconfig: add config fragment for Freescale
+ SoCs
+In-Reply-To: <20160414170433.GF15182@e104818-lin.cambridge.arm.com>
+References: <1460643685-13670-1-git-send-email-stuart.yoder@nxp.com>
+ <20160414170433.GF15182@e104818-lin.cambridge.arm.com>
+Message-ID: <CABtop_F_SkKm6H-mtpK-GHDA3PBg_RTfw=CJeewV-LLEN0SHzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd.
-
-2016-04-17 4:23 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
-
-> Better count the files:
+On Fri, Apr 15, 2016 at 1:04 AM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Thu, Apr 14, 2016 at 09:21:25AM -0500, Stuart Yoder wrote:
+>> Add a config fragment enabling a reasonably useful set of
+>> devices and options for Freescale ARM v8 SoCs.
 >
-> $ git grep -wl clk_register | wc -l
-> 179
+> A gentle NAK ;).
 >
-> $ git grep -wl reset_controller_register | wc -l
-> 25
+>> I realize that we are trying to avoid the defconfig hell in arch/arm with 100+
+>> defconfigs, but the single defconfig in arch/arm64 has some problems too.
 >
-> This is more like seven times as many, which seems about right.
-
-Ah, right.  I exaggerated too much.
-
-
-
->> Reset signals are sometimes cascaded.
->> For example, the UART blocks on my SoCs have a reset for the whole of
->> UART blocks
->> besides per-channel reset signals.
->>
->>                      |---(UART ch0 reset)---> UART0
->>                      |
->> ----(UART reset)-----|---(UART ch1 reset)---> UART1
->>                      |
->>                      |---(UART ch2 reset)---> UART2
->>
->> I found this works well with clk-gate drivers.
->> Even reset_control_reset() can be implemented
->> with clk_disable() followed by clk_enable().
->>
+> Can we address these problems in defconfig?
 >
-> Interesting. My feeling from your description is that this is something
-> that should be added to the reset controller subsystem. It has probably
-> not been a serious issue for anyone else, but it's also likely that you
-> are not the only one that would benefit from having support for nested
-> resets in the API.
-
-I want reset sub-system to support (1) nesting,  (2) enable_count.
-
-To get these two features supported, the reset frame-work
-would be similar implementation to the clock subsystem.
-(In other words, we would duplicate effort
-between clock and reset.)
-
-Moreover, it is very common to control resets and clocks
-from one hardware block.
-
-So, I am looking for some idea that perhaps can unify the clock
-and reset subsystems.
-
-
-I found some SoCs implement reset drivers in drivers/clk.
-
-
-masahiro at grover:~/workspace/linux/drivers/clk$ git grep
-reset_controller_register
-mediatek/reset.c:       ret = reset_controller_register(&data->rcdev);
-mmp/reset.c:    reset_controller_register(&unit->rcdev);
-qcom/common.c:  ret = reset_controller_register(&reset->rcdev);
-rockchip/softrst.c:     ret = reset_controller_register(&softrst->rcdev);
-sirf/clk-atlas7.c:      reset_controller_register(&atlas7_rst_ctlr);
-sunxi/clk-a10-ve.c:     err = reset_controller_register(&reset_data->rcdev);
-sunxi/clk-sun9i-mmc.c:  ret = reset_controller_register(&data->rcdev);
-sunxi/clk-usb.c:        reset_controller_register(&reset_data->rcdev);
-tegra/clk.c:    reset_controller_register(&rst_ctlr);
-
-
-I asked about this in the following thread.
-https://lkml.org/lkml/2015/11/10/724
-
-
-
->> Next, I thought about [2].
->> It should not be so hard to implement a reset provider.
->>
->> But, as I mentioned above, most of drivers handle clocks,
->> but not resets.
->>
->> Is it worthwhile to patch drivers around
->> with reset_control_get_optional()?
->> Hmm...
+>> I think what we want with arch/arm64/config are some reasonable in-kernel
+>> defconfigs/fragments with built-in drivers for convenience.
 >
-> I think it is. All of the 'generic' drivers for devices that are
-> licensed from e.g. designware or ARM will sooner or later get it,
-> and devices that are vendor specific are even easier to change
-> as needed.
+> A hard requirement for arm64 is single Image and having all SoCs in
+> defconfig is a good way to regularly test this.
+>
+> I am aware that at some point the defconfig size will get too big but
+> that's when (ideally before) we should put effort into building more
+> stuff as loadable modules.
+>
+>> The proposal is to allow a chip vendor 1 vendor-specific kconfig fragment
+>> to cover all their chips, allowing them to _override_ the default config
+>> options in defconfig.  One specific issue we have is that due to the ls2080a
+>> physical address map, the combination of 4KB pages and 39-bit VA does not
+>> allow us to see all our DDR.  And, thus we need CONFIG_ARM64_VA_BITS_48=y.
+>
+> And I'm fine to add this to defconfig. We had a case for Seattle needing
+> 48-bit VA but we eventually decoupled the number of levels for idmap and
+> swapper. If it can't be addressed in a similar way on ls2080a, we may
+> need to increase the VA space to 48-bit.
+>
 
-We can do that if needed.
+Here my suggestion is 48-bit VA will be depended on the CONFIG_ACPI,
+IOW, if CONFIG_ACPI
+is seleceted, then CONFIG_ARM64_VA_BITS_48 will be selected too.
+The premise is ACPI will be used in larger VA space segment as it did
+in Server area.
+Stuart, does your ls2080a need to be configured with ACPI?
 
-I guess most of drivers would do similar things;
-call devm_reset_control_get() && reset_control_deassert() in their
-probe methods,
-and reset_control_assert() in their remove methods.
+M.K.
 
-I am wondering if we can do that somewhat automatically,
-like the driver model framework automatically sets the pinctrl state
-to "default"
-(and low-level drivers are still able to change pinctrl state for the case
-where multiple pinctrl states are supported.)
-
-
-Another idea might be,
-we can support "hogging" in DT just for de-asserting reset signals,
-
-
-reset_ctrl: reset_ctrl {
-        .compatible = "foo-reset-controller";
-         #reset-cells = <1>;
-
-         uart_deassert {   /* deassert UART reset automatically */
-                reset-hog;
-                resets = <0>;   /* index for UART reset line */
-                deassert;
-         };
-
-         i2c_deassert {   /* deassert I2C reset automatically */
-                reset-hog;
-                resets = <1>;   /* index for I2C reset line */
-                deassert;
-         };
-};
-
-
--- 
-Best Regards
-Masahiro Yamada
+>
+>> Allowing us to have a freescale.config gives us the flexibility of
+>> adding Freescale specific options without having to keep this in
+>> some other external repo.  It also keeps vendor specific clutter
+>> out of the base defconfig.  With the number of new armv8 chips
+>> coming out the single defconfig is going to produce increasingly
+>> large kernels, since all drivers are built-in.
+>
+> As I said, for the time being please add all the sane the options to
+> defconfig. I want to be able to build a defconfig and run on all
+> supported SoCs.
+>
+>> +CONFIG_STAGING=y
+>
+> Well, apart from this. You should put effort in getting the required
+> drivers out of staging.
+>
+> --
+> Catalin
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
