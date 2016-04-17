@@ -1,62 +1,91 @@
-From: kristofer.s.martinez@gmail.com (Martinez Kristofer)
-Date: Sun, 17 Apr 2016 17:23:31 +0800
-Subject: [PATCH V6 00/13] Support for generic ACPI based PCI host
- controller
-In-Reply-To: <571130BB.9030508@redhat.com>
-References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
- <571130BB.9030508@redhat.com>
-Message-ID: <CABtop_ExTJ=esXga5f+zT2AV0Vj49zsDVgxegLfW7R4sc+Nmzw@mail.gmail.com>
+From: sasha.levin@oracle.com (Sasha Levin)
+Date: Sun, 17 Apr 2016 05:50:40 -0400
+Subject: [added to the 4.1 stable tree] irqchip: omap-intc: Improve IRQ handler
+In-Reply-To: <1460886804-19372-1-git-send-email-sasha.levin@oracle.com>
+References: <1460886804-19372-1-git-send-email-sasha.levin@oracle.com>
+Message-ID: <1460886804-19372-41-git-send-email-sasha.levin@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 16, 2016 at 2:19 AM, Jon Masters <jcm@redhat.com> wrote:
-> On 04/15/2016 01:06 PM, Tomasz Nowicki wrote:
->> From the functionality point of view this series might be split into the
->> following logic parts:
->> 1. Necessary fixes as the preparation for using driver on ARM64.
->> 2. New ECAM API and update for users of the pci-host-common API
->> 3. Use new MCFG interface and implement generic ACPI based PCI host controller driver.
->> 4. Enable above driver on ARM64
->>
->> Patches has been built on top of 4.6-rc2 and can be found here:
->> git at github.com:semihalf-nowicki-tomasz/linux.git (pci-acpi-v6)
->>
->> This has been tested on Cavium ThunderX server. Any help in reviewing and
->> testing is very appreciated.
->>
->> v5 -> v6
->> - dropped idea of x86 MMCONFIG code refactoring
->> - integrated JC's patches which introduce new ECAM API:
->>   https://lkml.org/lkml/2016/4/11/907
->>   git: https://github.com/jchandra-brcm/linux/ (arm64-acpi-pci-v3)
->> - integrated Sinan's fix for releasing IO resources, see patch [06/13]
->> - added ACPI support for ThunderX ECAM and PEM drivers
->> - rebased to 4.6-rc2
->
-> JC: can you explicitly confirm that you're ok with letting Tomasz drive
-> this? We would like to see one driver. Either that is Tomasz, or
-> Lorenzo, or it is you. But we need to have one overall cooordinated
-> effort to get this enablement into upstream as quickly as possible.
->
-> Some of the Enterprise folks are going to otherwise end up in a very
-> nasty situation of supporting the previous non-upstream patches for many
-> years, which is absolutely something we want to avoid...
->
-Indeed, we need only one driver for this. But given there're already
-others except this
-one exist, and I believe no one want to give up their efforts. Also I
-think it's not exactly the
-same feauture provided by those drivers, so can we make some trade-off
-to combine
-those drivers into one and add the Signed-off-by for all the anthors?
-One agreement for all of us is to upstream the ACPI PCI for ARM64 asap!
+From: Felipe Balbi <balbi@ti.com>
 
-M.K.
+This patch has been added to the 4.1 stable tree. If you have any
+objections, please let us know.
 
->
-> Jon.
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+===============
+
+[ Upstream commit 6ed3464897cc825a75218653c710d673282dfcf8 ]
+
+As it turns out the current IRQ number will *always* be available from
+SIR register which renders the reads of PENDING registers as plain
+unnecessary overhead.
+
+In order to catch any situation where SIR reads as zero, we're adding
+a WARN() to turn it into a very verbose error and users actually
+report it.
+
+With this patch average running time of omap_intc_handle_irq() reduced
+from about 28.5us to 19.8us as measured by the kernel function
+profiler.
+
+Tested with BeagleBoneBlack Rev A5C.
+
+Tested-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+Cc: Linux ARM Kernel Mailing List <linux-arm-kernel@lists.infradead.org>
+Link: http://lkml.kernel.org/r/20150720204910.GH5394 at saruman.tx.rr.com
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Sasha Levin <sasha.levin@oracle.com>
+---
+ drivers/irqchip/irq-omap-intc.c | 35 +++++------------------------------
+ 1 file changed, 5 insertions(+), 30 deletions(-)
+
+diff --git a/drivers/irqchip/irq-omap-intc.c b/drivers/irqchip/irq-omap-intc.c
+index a569c6d..e15f107 100644
+--- a/drivers/irqchip/irq-omap-intc.c
++++ b/drivers/irqchip/irq-omap-intc.c
+@@ -331,37 +331,12 @@ static int __init omap_init_irq(u32 base, struct device_node *node)
+ static asmlinkage void __exception_irq_entry
+ omap_intc_handle_irq(struct pt_regs *regs)
+ {
+-	u32 irqnr = 0;
+-	int handled_irq = 0;
+-	int i;
+-
+-	do {
+-		for (i = 0; i < omap_nr_pending; i++) {
+-			irqnr = intc_readl(INTC_PENDING_IRQ0 + (0x20 * i));
+-			if (irqnr)
+-				goto out;
+-		}
+-
+-out:
+-		if (!irqnr)
+-			break;
+-
+-		irqnr = intc_readl(INTC_SIR);
+-		irqnr &= ACTIVEIRQ_MASK;
++	u32 irqnr;
+ 
+-		if (irqnr) {
+-			handle_domain_irq(domain, irqnr, regs);
+-			handled_irq = 1;
+-		}
+-	} while (irqnr);
+-
+-	/*
+-	 * If an irq is masked or deasserted while active, we will
+-	 * keep ending up here with no irq handled. So remove it from
+-	 * the INTC with an ack.
+-	 */
+-	if (!handled_irq)
+-		omap_ack_irq(NULL);
++	irqnr = intc_readl(INTC_SIR);
++	irqnr &= ACTIVEIRQ_MASK;
++	WARN_ONCE(!irqnr, "Spurious IRQ ?\n");
++	handle_domain_irq(domain, irqnr, regs);
+ }
+ 
+ void __init omap3_init_irq(void)
+-- 
+2.5.0
