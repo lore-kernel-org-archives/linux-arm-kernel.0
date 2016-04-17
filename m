@@ -1,51 +1,41 @@
-From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
-Date: Sun, 17 Apr 2016 09:14:08 +0300
-Subject: [PATCH] ARM: dts: omap3-n900: Specify peripherals LDO regulators
- initial mode
-In-Reply-To: <20160417000536.GA1124@earth>
-References: <1460788643-18590-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
- <20160417000536.GA1124@earth>
-Message-ID: <571329B0.9060503@gmail.com>
+From: narkewoody@gmail.com (Woody Wu)
+Date: Sun, 17 Apr 2016 15:52:44 +0800
+Subject: Found a bug in samsung serial tty code
+Message-ID: <CAAsE_ud1FLGt=ufbYu9ppwKfbNVY4j4=Vb9=DMWGdmbpXrokaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
+
+The function s3c24xx_serial_tx_empty() in tty/serial/samsung.c is wrong:
+
+static unsigned int s3c24xx_serial_tx_empty(struct uart_port *port)
+{
+struct s3c24xx_uart_info *info = s3c24xx_port_to_info(port);
+unsigned long ufstat = rd_regl(port, S3C2410_UFSTAT);
+unsigned long ufcon = rd_regl(port, S3C2410_UFCON);
+
+if (ufcon & S3C2410_UFCON_FIFOMODE) {
+if ((ufstat & info->tx_fifomask) != 0 ||
+   (ufstat & info->tx_fifofull))
+return 0;
+
+return 1;
+}
+
+return s3c24xx_serial_txempty_nofifo(port);
+}
+
+In FIFO mode, checking only ufcon is not enough to determine that the
+tx is really done, since there is still bits in shift register.  I
+found this is true at least in S3C2416 UARTs.  I have to remove the
+'return 1' above to fix the bug.   Can anyone give me a confirmation?
+Thanks!
 
 
-On 17.04.2016 03:05, Sebastian Reichel wrote:
-> Hi Ivo,
->
-> On Sat, Apr 16, 2016 at 09:37:23AM +0300, Ivaylo Dimitrov wrote:
->> Without that, regulators are left in the mode last set by the bootloader or
->> by the kernel the device was rebooted from. This leads to various problems
->> like non-working peripherals.
->>
->> Signed-off-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
->> ---
->>   arch/arm/boot/dts/omap3-n900.dts | 9 +++++++++
->>   1 file changed, 9 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
->> index b3c26a9..1bb36e2 100644
->> --- a/arch/arm/boot/dts/omap3-n900.dts
->> +++ b/arch/arm/boot/dts/omap3-n900.dts
->> @@ -329,6 +329,7 @@
->>   	regulator-name = "V28";
->>   	regulator-min-microvolt = <2800000>;
->>   	regulator-max-microvolt = <2800000>;
->> +	regulator-initial-mode = <0x0e>;
->>   	regulator-always-on; /* due to battery cover sensor */
->>   };
->
-> I think this should either get an additional
-> comment like /* MODE_NORMAL */ or implemented
+-- 
+Life is the only flaw in an otherwise perfect nonexistence
+    -- Schopenhauer
 
-According to the TRM, this is 'ACTIVE state', but that does not fit in 
-the regulator framework terminology.
-
-> using a define and a TWL4030_REGULATOR_MODE_NORMAL
-> constant to keep the *.dts easily readable.
-
-We already have RES_STATE_ACTIVE defined in linux/i2c/twl.h, is there a 
-way to include that in a dts?
-
-Ivo
+woody
+public key at http://subkeys.pgp.net:11371 (narkewoody at gmail.com)
