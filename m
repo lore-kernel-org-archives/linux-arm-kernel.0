@@ -1,15 +1,16 @@
 From: sasha.levin@oracle.com (Sasha Levin)
-Date: Sun, 17 Apr 2016 05:50:40 -0400
-Subject: [added to the 4.1 stable tree] irqchip: omap-intc: Improve IRQ handler
-In-Reply-To: <1460886804-19372-1-git-send-email-sasha.levin@oracle.com>
-References: <1460886804-19372-1-git-send-email-sasha.levin@oracle.com>
-Message-ID: <1460886804-19372-41-git-send-email-sasha.levin@oracle.com>
+Date: Sun, 17 Apr 2016 05:59:51 -0400
+Subject: [added to the 3.18 stable tree] irqchip: omap-intc: Improve IRQ
+ handler
+In-Reply-To: <1460887352-20128-1-git-send-email-sasha.levin@oracle.com>
+References: <1460887352-20128-1-git-send-email-sasha.levin@oracle.com>
+Message-ID: <1460887352-20128-6-git-send-email-sasha.levin@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Felipe Balbi <balbi@ti.com>
 
-This patch has been added to the 4.1 stable tree. If you have any
+This patch has been added to the 3.18 stable tree. If you have any
 objections, please let us know.
 
 ===============
@@ -41,7 +42,7 @@ Signed-off-by: Sasha Levin <sasha.levin@oracle.com>
  1 file changed, 5 insertions(+), 30 deletions(-)
 
 diff --git a/drivers/irqchip/irq-omap-intc.c b/drivers/irqchip/irq-omap-intc.c
-index a569c6d..e15f107 100644
+index c03f140..e37490d 100644
 --- a/drivers/irqchip/irq-omap-intc.c
 +++ b/drivers/irqchip/irq-omap-intc.c
 @@ -331,37 +331,12 @@ static int __init omap_init_irq(u32 base, struct device_node *node)
@@ -86,6 +87,6 @@ index a569c6d..e15f107 100644
 +	handle_domain_irq(domain, irqnr, regs);
  }
  
- void __init omap3_init_irq(void)
+ void __init omap2_init_irq(void)
 -- 
 2.5.0
