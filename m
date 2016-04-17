@@ -1,77 +1,23 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 17 Apr 2016 19:55:40 +0200
-Subject: Nokia N900 retention mode in v4.6, camera buttons fun
-In-Reply-To: <20160412163055.GP5995@atomide.com>
-References: <20160407194828.GA13338@amd> <20160407213229.GO16484@atomide.com>
- <20160407230150.GA16552@amd> <20160407234134.GQ16484@atomide.com>
- <20160411093023.GC11814@amd> <20160411094130.GA5753@amd>
- <20160411211026.GH5995@atomide.com> <20160412121658.GA32486@amd>
- <20160412123013.GA12296@amd> <20160412163055.GP5995@atomide.com>
-Message-ID: <20160417175539.GA502@amd>
+From: afd@ti.com (Andrew F. Davis)
+Date: Sun, 17 Apr 2016 13:07:52 -0500
+Subject: [PATCH v2 4/5] iio: health: afe4404: use regmap to retrieve
+ struct device
+In-Reply-To: <57129101.7000503@kernel.org>
+References: <cover.1460314070.git.amsfield22@gmail.com>
+ <2dd23e55fa7c2d16c577146eefd4a84046d2b838.1460314070.git.amsfield22@gmail.com>
+ <57129101.7000503@kernel.org>
+Message-ID: <5713D0F8.20303@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On 04/16/2016 02:22 PM, Jonathan Cameron wrote:
+> On 10/04/16 20:07, Alison Schofield wrote:
+>> Driver includes struct regmap and struct device in its global data.
+>> Remove the struct device and use regmap API to retrieve device info.
+>>
 
-> > > > > Ok, it works now. I was doing tests in daylight so it was poorly
-> > > > > visible. The right part of keyboard stays lit (but that's expected
-> > > > > AFAICT), but the left part blinks.
-> > > > 
-> > > > During idle, both should go off and are doing so for me. Both LEDs off
-> > > > indicates off mode, left LED off is for retention mode. So you still
-> > > > have something blocking off mode, maybe check:
-> > > > 
-> > > > echo 1 > /sys/kernel/debug/pm_debug/enable_off_mode
-> > > 
-> > > What is the power difference between retention and off? I'm now down
-> > > to cca 25mA, which should be around 50 hours standby time. Not ideal,
-> > > but should be usable.
-> 
-> The 25mA sounds way too big to me even for retention mode, some
-> devices must be still on.
+Why? This adds nothing but more code to get dev through some
+container_of trickery when we could just keep a dev pointer in the data
+structure.
 
-Yes, cca 60mW. 
-
-> The off mode makes a huge difference for standby time, it should cut
-> down the total power consumption to something like 10+ mW with modem
-> enabled. Aproximately the breakdown is roughly: 900 uW for omap, 5 mW
-> for memory and 5 or more for the modem. Sorry I don't know the exact
-> numbers for the modem. But with 37xx torpedo, mainline kernel is
-> already getting very close to the 900 uW + 5 mW numbers for the CPU
-> module during idle measured from the ina219 shunt on the torpedo
-> devkit.
-
-CONFIG_HSI breaks power management completely, so power management
-with modem will be another topic.  
-
-> > > In the meantime, I found what is causing the rention mode to break for
-> > > me: CONFIG_HSI (aka wireless modem support). With HSI off, it seems to work.
-> > > 
-> > > I still get problems with the camera button, in config similar to
-> > > defconfig.  For some reason, I'm even getting (autorepeating) ^@ on
-> > > console. As long as I hold camera button down, I even get it into off
-> > > mode for brief period.
-> > 
-> > Ok, if I turn off CONFIG_KEYBOARD_GPIO, I get it into off
-> > mode... once per screen blank, for about a second. (Does CONFIG_KEYBOARD_GPIO also cause
-> > problems for you?)
-> > 
-> > Any idea why it enters off mode only once after each screenblank?
-> 
-> After disabling CONFIG_PROVE_LOCKING, loading the LCD modules, and
-> blanking the screen, my n900 hits off mode just fine about once
-> a second. Sounds like you still have some extra devices enabled
-> causing it.
-
-I checked again... also with vanilla 4.6-rc2 to double check... same effect.
-
-Aha, got it... cat-ing /sys/kernel/debug/pm_debug/count breaks the
-off mode. If I don't do that (tm), it seems to work way better.
-
-Thanks,
-										Pavel
-
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Andrew
