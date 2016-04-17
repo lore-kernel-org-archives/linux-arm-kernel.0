@@ -1,66 +1,129 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 17 Apr 2016 09:25:50 +0800
-Subject: [PATCH 1/2] clk: sunxi: add predivider handling for factors clock
-In-Reply-To: <1460832906-24064-2-git-send-email-vishnupatekar0510@gmail.com>
-Message-ID: <201604170901.pPL2YWTP%fengguang.wu@intel.com>
+From: oss@buserror.net (Scott Wood)
+Date: Sat, 16 Apr 2016 20:32:21 -0500
+Subject: [RFC PATCH 2/2] ARM64: arch_timer: Work around QorIQ Erratum
+ A-009971
+In-Reply-To: <570CB04B.3090406@arm.com>
+References: <1460341353-15619-1-git-send-email-oss@buserror.net>
+ <1460341353-15619-3-git-send-email-oss@buserror.net>
+ <570B7486.3080204@arm.com> <1460440458.32510.110.camel@buserror.net>
+ <570CB04B.3090406@arm.com>
+Message-ID: <1460856741.32510.161.camel@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vishnu,
+On Tue, 2016-04-12 at 09:22 +0100, Marc Zyngier wrote:
+> On 12/04/16 06:54, Scott Wood wrote:
+> > On Mon, 2016-04-11 at 10:55 +0100, Marc Zyngier wrote:
+> > > On 11/04/16 03:22, Scott Wood wrote:
+> > > > @@ -52,6 +53,20 @@ extern bool arm_arch_timer_reread;
+> > > >  	_val; \
+> > > >  })
+> > > >  
+> > > > +#define ARCH_TIMER_TVAL_REWRITE(pv, val) do { \
+> > > > +	u64 _cnt_old, _cnt_new; \
+> > > > +	int _timeout = 200; \
+> > > > +	do { \
+> > > > +		asm volatile("mrs %0, cntvct_el0;" \
+> > > > +			     "msr cnt" pv "_tval_el0, %2;" \
+> > > > +			     "mrs %1, cntvct_el0" \
+> > > > +			     : "=&r" (_cnt_old), "=r" (_cnt_new) \
+> > > > +			     : "r" (val)); \
+> > > > +		_timeout--; \
+> > > > +	} while (_cnt_old != _cnt_new && _timeout); \
+> > > > +	WARN_ON_ONCE(!_timeout); \
+> > > > +} while (0)
+> > > > +
+> > > 
+> > > Given how many times you've written that loop, I'm sure you can have a
+> > > preprocessor macro that will do the right thing.
+> > 
+> > I did use a preprocessor macro.  Are you asking me to consolidate the read
+> > and
+> > write macros?  That seems like it would create a mess that's worse than an
+> > extra instance of a simple loop.
+> 
+> From patch 1:
+> 
+> +static __always_inline
+> +u32 arch_timer_reg_tval_reread(int access, enum arch_timer_reg reg)
+> +{
+> +	u32 val, val_new;
+> +	int timeout = 200;
+> +
+> +	do {
+> +		if (access == ARCH_TIMER_PHYS_ACCESS) {
+> +			asm volatile("mrc p15, 0, %0, c14, c2, 0;"
+> +				     "mrc p15, 0, %1, c14, c2, 0"
+> +				     : "=r" (val), "=r" (val_new));
+> +		} else if (access == ARCH_TIMER_VIRT_ACCESS) {
+> +			asm volatile("mrc p15, 0, %0, c14, c3, 0;"
+> +				     "mrc p15, 0, %1, c14, c3, 0"
+> +				     : "=r" (val), "=r" (val_new));
+> +		}
+> +		timeout--;
+> +	} while (val != val_new && timeout);
+> +
+> +	WARN_ON_ONCE(!timeout);
+> +	return val;
+> +}
+> 
+> [...]
+> 
+> +static __always_inline u64 arch_counter_get_cnt(int opcode, bool reread)
+>  {
+> -	u64 cval;
+> +	u64 val, val_new;
+> +	int timeout = 200;
+> 
+>  	isb();
+> -	asm volatile("mrrc p15, 0, %Q0, %R0, c14" : "=r" (cval));
+> -	return cval;
+> +
+> +	if (reread) {
+> +		do {
+> +			asm volatile("mrrc p15, %2, %Q0, %R0, c14;"
+> +				     "mrrc p15, %2, %Q1, %R1, c14"
+> +				     : "=r" (val), "=r" (val_new)
+> +				     : "i" (opcode));
+> +			timeout--;
+> +		} while (val != val_new && timeout);
+> +
+> +		BUG_ON(!timeout);
+> +	} else {
+> +		asm volatile("mrrc p15, %1, %Q0, %R0, c14" : "=r" (val)
+> +			     : "i" (opcode));
+> +	}
+> +
+> +	return val;
+>  }
+> 
+> [...]
+> 
+> +/* QorIQ errata workarounds */
+> +#define ARCH_TIMER_REREAD(reg) ({ \
+> +	u64 _val_old, _val_new; \
+> +	int _timeout = 200; \
+> +	do { \
+> +		asm volatile("mrs %0, " reg ";" \
+> +			     "mrs %1, " reg \
+> +			     : "=r" (_val_old), "=r" (_val_new)); \
+> +		_timeout--; \
+> +	} while (_val_old != _val_new && _timeout); \
+> +	WARN_ON_ONCE(!_timeout); \
+> +	_val_old; \
+> +})
+> 
+> Do you notice a pattern? You are expressing the same loop in various
+> ways (sometimes in a function, sometimes in a macro). I'm looking for a
+> loop template that encapsulates the read access. You can have a similar
+> macro for writes if you have more than a single instance.
 
-[auto build test ERROR on clk/clk-next]
-[also build test ERROR on v4.6-rc3 next-20160415]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+One that covers arm and arm64?  Where would it go?
 
-url:    https://github.com/0day-ci/linux/commits/Vishnu-Patekar/sunxi-factors-clock-predivider-handling/20160417-025801
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
-config: arm-sunxi_defconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+If you mean one per arch, that's already the case on 64-bit (and you
+complained in response to the write macro, hence my inferring that you wanted
+read and write combined).  Two instances on 32-bit (of a fairly simple loop)
+didn't seem enough to warrant using ugly macros, but I can if you want (with
+the entire asm statement passed as a macro parameter).
 
-Note: the linux-review/Vishnu-Patekar/sunxi-factors-clock-predivider-handling/20160417-025801 HEAD 19bb5fc952754381d9f4f9b2e57a1fa09f467359 builds fine.
-      It only hurts bisectibility.
-
-All errors (new ones prefixed by >>):
-
-   drivers/clk/sunxi/clk-sunxi.c: In function 'sun6i_get_ahb1_factors':
->> drivers/clk/sunxi/clk-sunxi.c:310:9: error: 'struct factors_request' has no member named 'parent_index'
-     if (req->parent_index == SUN6I_AHB1_PARENT_PLL6) {
-            ^
-   drivers/clk/sunxi/clk-sunxi.c: In function 'sun6i_ahb1_recalc':
-   drivers/clk/sunxi/clk-sunxi.c:340:9: error: 'struct factors_request' has no member named 'parent_index'
-     if (req->parent_index == SUN6I_AHB1_PARENT_PLL6)
-            ^
-
-vim +310 drivers/clk/sunxi/clk-sunxi.c
-
-a78bb355 Chen-Yu Tsai 2016-01-25  304  	if (req->parent_rate && req->rate > req->parent_rate)
-a78bb355 Chen-Yu Tsai 2016-01-25  305  		req->rate = req->parent_rate;
-a78bb355 Chen-Yu Tsai 2016-01-25  306  
-a78bb355 Chen-Yu Tsai 2016-01-25  307  	div = DIV_ROUND_UP(req->parent_rate, req->rate);
-a78bb355 Chen-Yu Tsai 2016-01-25  308  
-a78bb355 Chen-Yu Tsai 2016-01-25  309  	/* calculate pre-divider if parent is pll6 */
-a78bb355 Chen-Yu Tsai 2016-01-25 @310  	if (req->parent_index == SUN6I_AHB1_PARENT_PLL6) {
-a78bb355 Chen-Yu Tsai 2016-01-25  311  		if (div < 4)
-a78bb355 Chen-Yu Tsai 2016-01-25  312  			calcp = 0;
-a78bb355 Chen-Yu Tsai 2016-01-25  313  		else if (div / 2 < 4)
-
-:::::: The code at line 310 was first introduced by commit
-:::::: a78bb35552a800949b2bf68f372d3d6ccabdd790 clk: sunxi: rewrite sun6i-a31-ahb1-clk using factors clk with custom recalc
-
-:::::: TO: Chen-Yu Tsai <wens@csie.org>
-:::::: CC: Maxime Ripard <maxime.ripard@free-electrons.com>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 19218 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160417/140effd9/attachment-0001.obj>
+-Scott
