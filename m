@@ -1,186 +1,27 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Sun, 17 Apr 2016 17:54:32 +0200
-Subject: [PATCH 1/2] PCI: iproc: Support DT property for ignoring aborts
- when probing
-In-Reply-To: <570C2A59.4010105@gmail.com>
-References: <1460238624-2086-1-git-send-email-zajec5@gmail.com>
- <79DC79A7-D4CE-4983-B1C5-CBD2E9CBBFB9@gmail.com>
- <4768648c-841b-490d-a752-f31cba545f74@broadcom.com>
- <570C1D47.7010102@gmail.com>
- <ccabf53c-c035-be4b-a016-389bb7531557@broadcom.com>
- <570C24B3.4080104@broadcom.com>
- <18045be8-9ee3-7644-6fbb-d352e107d111@broadcom.com>
- <570C2806.8070700@gmail.com>
- <0464ed02-5d41-f111-b8c1-aa9aa638c872@broadcom.com>
- <570C2A59.4010105@gmail.com>
-Message-ID: <CACna6rx=oHvEF4V2keG93R6nXB9_yRoEFC_Z+PKWTXyiUj0uug@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 17 Apr 2016 18:16:51 +0200
+Subject: [PATCH 1/2] char: PC rtc: replace blacklist with whitelist
+In-Reply-To: <20160410154352.GH5377@piout.net>
+References: <1456912137-1578635-1-git-send-email-arnd@arndb.de>
+ <CAMuHMdU26GkyUYxs3DJOFRB5LTdYCOaGTMUwFMd9YXYhkS1W3g@mail.gmail.com>
+ <20160410154352.GH5377@piout.net>
+Message-ID: <11356549.HIf78Z96bJ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 April 2016 at 00:51, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> On 11/04/16 15:51, Ray Jui wrote:
->> On 4/11/2016 3:41 PM, Florian Fainelli wrote:
->>> On 11/04/16 15:34, Ray Jui wrote:
->>>> On 4/11/2016 3:26 PM, Scott Branden wrote:
->>>>> One Comment below
->>>>>
->>>>> On 16-04-11 03:24 PM, Ray Jui wrote:
->>>>>>
->>>>>>
->>>>>> On 4/11/2016 2:55 PM, Florian Fainelli wrote:
->>>>>>> On 11/04/16 13:06, Ray Jui wrote:
->>>>>>>>
->>>>>>>>
->>>>>>>> On 4/10/2016 6:43 PM, Florian Fainelli wrote:
->>>>>>>>> On April 9, 2016 2:50:23 PM PDT, "Rafa? Mi?ecki" <zajec5@gmail.com>
->>>>>>>>> wrote:
->>>>>>>>>> Some devices (e.g. Northstar ones) may have bridges that forward
->>>>>>>>>> harmless errors to the ARM core. In such case we need an option to
->>>>>>>>>> add a handler ignoring them.
->>>>>>>>>>
->>>>>>>>>> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
->>>>>>>>>> ---
->>>>>>>>>
->>>>>>>>>> +- brcm,pcie-hook-abort-handler: During PCI bus probing (device
->>>>>>>>>> enumeration)
->>>>>>>>>> +  there can be errors that are expected and harmless.
->>>>>>>>>> Unfortunately
->>>>>>>>>> some bridges
->>>>>>>>>> +  can't be configured to ignore them and they forward them to the
->>>>>>>>>> ARM
->>>>>>>>>> core
->>>>>>>>>> +  triggering die().
->>>>>>>>>> +  This property should be set in such case, it will make
->>>>>>>>>> driver add
->>>>>>>>>> its own
->>>>>>>>>> +  handler ignoring such errors.
->>>>>>>>>
->>>>>>>>> The property is named after the function that allows you to catch
->>>>>>>>> abort handlers, whereas you should be describing the HW here.
->>>>>>>>> Something like brcm,bridge-error-forward or a better name even
->>>>>>>>> would
->>>>>>>>> be preferable.
->>>>>>>>>
->>>>>>>>>> +#ifdef CONFIG_ARM
->>>>>>>>>> +static int iproc_pcie_abort_handler(unsigned long addr, unsigned
->>>>>>>>>> int
->>>>>>>>>> fsr,
->>>>>>>>>> +                    struct pt_regs *regs)
->>>>>>>>>> +{
->>>>>>>>>> +    if (fsr == 0x1406)
->>>>>>>>>> +        return 0;
->>>>>>>>>> +
->>>>>>>>>> +    return 1;
->>>>>>>>>
->>>>>>>>> As you later noted this prevents this driver from being a module
->>>>>>>>> now.
->>>>>>>>> Since the expectation is that either a fixed bootloader or a
->>>>>>>>> platform
->>>>>>>>> should enot produce these data aborts, or allow them to be ignored,
->>>>>>>>> why not just put this code back where it belongs in the machine
->>>>>>>>> specific file which kills many birds with the same stone:
->>>>>>>>>
->>>>>>>>
->>>>>>>> I assume the module compile issue can be simply fixed by exporting
->>>>>>>> symbol of "hook_fault_code"?
->>>>>>>
->>>>>>> I do not think it is desireable for this symbol to be exported in the
->>>>>>> first place, also last I looked, this was a one time registration
->>>>>>> thing,
->>>>>>> you cannot undo the hook you installed, but everything can be fixed.
->>>>>>>
->>>>>>
->>>>>> Okay.
->>>>>>
->>>>>>>>
->>>>>>>> I believe ARM64 based NS2 that uses the same iProc PCIe driver might
->>>>>>>> also need something like this (I'm still waiting for Jon Mason to
->>>>>>>> give
->>>>>>>> me some more information on the NS2 errors that he saw, which is
->>>>>>>> likely
->>>>>>>> related to this). I assume there will be something similar to the
->>>>>>>> ARM
->>>>>>>> specific "hook_fault_code" for ARM64, but then ARM64 does not
->>>>>>>> have any
->>>>>>>> "mach" specific directory. Where can this type of hook be installed
->>>>>>>> for
->>>>>>>> ARM64 based platforms if not in the PCIe driver?
->>>>>>>
->>>>>>> OK, that is a fair point, then maybe have a two stage process,
->>>>>>> where we
->>>>>>> make sure that the part that installs the hook is always available
->>>>>>> and
->>>>>>> built-into the kernel, but let the iProc PCIe driver remain a module?
->>>>>>>
->>>>>>
->>>>>> I guess we are sort of stuck on this. If "hook_fault_code" is not
->>>>>> supposed to be used by any driver compiled as module like you
->>>>>> described,
->>>>>> then yes, I agree, I don't see how we can leave this in the iProc PCIe
->>>>>> driver.
->>>>>>
->>>>> Why does thie PCI driver need to be compiled as module though?  Why
->>>>> can't we limit it to being linked in the kernel?
->>>>>
->>>>> Regards,
->>>>> Scott
->>>>
->>>> There are minor benefits allowing this driver to be compiled as module,
->>>> although in our use case (Cygnus and NS2), we always compile this driver
->>>> as statically linked in the kernel. I'm not sure if NS/BCMA has any use
->>>> case that requires this driver to be a module.
->>>>
->>>> In fact, being able to compile this driver as a module and loaded after
->>>> kernel init process is done just helped to confirm this imprecise abort
->>>> issue to be PCIe specific, :)
->>>
->>> For the STB platforms for instance, we actually like to have the PCIE RC
->>> driver as a module (not iproc-pcie, still downstream for now) because it
->>> allows us to put the entire set of EPs and RCs into the lowest power
->>> state (L23 + turning off external regulators) without messing with PCI
->>> bus scanning. In general, it seems like a good practice to allow this
->>> since, that helps with distributions not having to ship gigantic kernels
->>> that need this driver built in, and also helps us with development (when
->>> faults are handled).
->>>
->>> My suggestion about the PCIe-specific hook fault handler is to do
->>> something like this: introduce a iproc-pcie-fault.c file which is
->>> built-into the kernel if PCIE_IPROC=m || PCIE_IPROC=y and have it
->>> contain a function which is hooked at arch_initcall level for instance,
->>> so before module_init.
->>>
->>> Of course, there could be different ways to solve that problem, it just
->>> happens to be one of them.
->>>
->>
->> That sounds good to me.
->>
->> But how is the hook in iproc-pcie-fault.c activated? Still based on a DT
->> property under the iProc PCIe device node or based on a specific
->> architecture dependent config flag (note we do not have any platform
->> specific config flag under ARM64)?
->
-> I would go with something that does:
->
-> if (of_machine_is_compatible("brcm,bcm53012") ||
->     of_machine_is_compatible("brcm.ns2"))
->
-> or something along these lines, as opposed to a boolean flag at the PCIe
-> DT node level, but maybe this is not quite a good understanding of how
-> the HW works.
+On Sunday 10 April 2016 17:43:52 Alexandre Belloni wrote:
+> > >  config RTC
+> > >         tristate "Enhanced Real Time Clock Support (legacy PC RTC driver)"
+> > > -       depends on !PPC && !PARISC && !IA64 && !M68K && !SPARC && !FRV \
+> > > -                       && !ARM && !SUPERH && !S390 && !AVR32 && !BLACKFIN && !UML
+> > > +       depends on ALPHA || M32R || M68K || MIPS || MN10300 || PPC || X86
+> > 
+> > ... so please drop it here.
+> > 
+> 
+> Do you plan to resend that one?
+> 
 
-Is this design acceptable from DT point of view? I was thinking that
-DT is supposed to describe hardware details, it shouldn't be code
-storing list of hardware requiring some workarounds.
+Yes, it's in my queue for resending, together with some other RTC patches.
 
-I guess our iproc-pcie-fault.c could export some symbol that would be
-called if a related DT property is set. But after that it would be
-simply a workaround of non-exported symbol, I guess it's not something
-we want to do.
-
-I also started thinking, what if there will be another driver with
-similar hardware issue and it will need to call hook_fault_code as
-well? There can be only a one handler registered at a time.
-
--- 
-Rafa?
+	Arnd
