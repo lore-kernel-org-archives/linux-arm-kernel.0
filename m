@@ -1,94 +1,55 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sun, 17 Apr 2016 17:39:08 +0200
-Subject: [PATCH v5 13/24] input: misc: max8997: explicitly apply PWM
- config extracted from pwm_args
-In-Reply-To: <20160417124548.GE33215@dtor-ws>
-References: <1460661464-11216-1-git-send-email-boris.brezillon@free-electrons.com>
- <1460661464-11216-14-git-send-email-boris.brezillon@free-electrons.com>
- <20160417124548.GE33215@dtor-ws>
-Message-ID: <20160417173908.3554ddda@bbrezillon>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Sun, 17 Apr 2016 17:43:27 +0200
+Subject: [PATCH 1/2] PCI: iproc: Support DT property for ignoring aborts
+ when probing
+In-Reply-To: <20160411085759.GA7088@leverpostej>
+References: <1460238624-2086-1-git-send-email-zajec5@gmail.com>
+ <20160411085759.GA7088@leverpostej>
+Message-ID: <CACna6rx4LP5n3KHwV4bGc0oeUM-PTS+2m29GCcxg=u1EujRmxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dmitry,
+On 11 April 2016 at 10:57, Mark Rutland <mark.rutland@arm.com> wrote:
+> Please Cc the device tree mailing list (devicetree at vger.kernel.org) when
+> sending device tree patches.
 
-On Sun, 17 Apr 2016 05:45:48 -0700
-Dmitry Torokhov <dmitry.torokhov@gmail.com> wrote:
+Sorry, I'll remember to do that in future.
 
-> On Thu, Apr 14, 2016 at 09:17:33PM +0200, Boris Brezillon wrote:
-> > Call pwm_apply_args() just after requesting the PWM device so that the
-> > polarity and period are initialized according to the information provided
-> > in pwm_args.
-> > 
-> > This is an intermediate state, and pwm_apply_args() should be dropped as
-> > soon as the atomic PWM infrastructure is in place and the driver makes
-> > use of it.
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > ---
-> >  drivers/input/misc/max8997_haptic.c | 6 ++++++
-> >  1 file changed, 6 insertions(+)
-> > 
-> > diff --git a/drivers/input/misc/max8997_haptic.c b/drivers/input/misc/max8997_haptic.c
-> > index a806ba3..bf17f65 100644
-> > --- a/drivers/input/misc/max8997_haptic.c
-> > +++ b/drivers/input/misc/max8997_haptic.c
-> > @@ -304,6 +304,12 @@ static int max8997_haptic_probe(struct platform_device *pdev)
-> >  				error);
-> >  			goto err_free_mem;
-> >  		}
-> > +
-> > +		/*
-> > +		 * FIXME: pwm_apply_args() should be removed when switching to
-> > +		 * the atomic PWM API.
-> > +		 */
-> > +		pwm_apply_args(chip->pwm);
-> 
-> I do not understand. We did not fetch/modify any args, what are we
-> applying and why? Especially since we saying we want to remove this
-> later.
 
-This is part of the process to allow some PWM users to retrieve the
-current PWM state instead of blindly applying a new config. This is
-particularly useful when one want a smooth handover between the
-bootloader and the kernel, and we have a real case here with a critical
-regulator (controlling the DDR voltage) controlled by a PWM device:
-the bootloader setup the PWM to 1.2V, and we want the kernel to
-retrieve the current PWM config and adjust the duty_cycle according to
-the PWM arguments provided by the DT definition.
+> On Sat, Apr 09, 2016 at 11:50:23PM +0200, Rafa? Mi?ecki wrote:
+>> Some devices (e.g. Northstar ones) may have bridges that forward
+>> harmless errors to the ARM core. In such case we need an option to
+>> add a handler ignoring them.
+>>
+>> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+>> ---
+>>  .../devicetree/bindings/pci/brcm,iproc-pcie.txt         |  6 ++++++
+>>  drivers/pci/host/pcie-iproc-platform.c                  |  2 ++
+>>  drivers/pci/host/pcie-iproc.c                           | 17 +++++++++++++++++
+>>  drivers/pci/host/pcie-iproc.h                           |  1 +
+>>  4 files changed, 26 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt b/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
+>> index 01b88f4..c91b20a 100644
+>> --- a/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
+>> +++ b/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
+>> @@ -22,6 +22,12 @@ Optional properties:
+>>
+>>  - brcm,pcie-ob: Some iProc SoCs do not have the outbound address mapping done
+>>  by the ASIC after power on reset. In this case, SW needs to configure it
+>> +- brcm,pcie-hook-abort-handler: During PCI bus probing (device enumeration)
+>> +  there can be errors that are expected and harmless. Unfortunately some bridges
+>> +  can't be configured to ignore them and they forward them to the ARM core
+>> +  triggering die().
+>> +  This property should be set in such case, it will make driver add its own
+>> +  handler ignoring such errors.
+>
+> Rather than describing what the kernel should do, this should describe
+> the property of the hardware (e.g. this should be named something like
+> brcm,spurious-probing-abort).
 
-So, now let's switch to the actual reason for calling pwm_apply_args()
-directly from PWM users code. The operations done in pwm_apply_args()
-were previously done by the core when the user was requesting the PWM.
-Those operations consisted in initializing the PWM period and polarity
-to the values specified in the DT or PWM lookup table (what we call
-pwm_args).
-This is working fine as long as we don't care about the initial PWM
-state, but as explained above, that may no longer be the case. That's
-why we want PWM users to explicitly state that they don't care about the
-initial PWM state and want to apply the default state instead: 
-period = pwm_args.period and polarity = pwm_args.polarity.
-
-Once all PWM users have been patched to explicitly call
-pwm_apply_args(), we'll be able to remove this call from the core
-(patch 17), and let PWM drivers implement ->get_state() to provide
-hardware readout (patch 20).
-
-PWM users that are interested in adjusting existing PWM config to the
-polarity and period specified in pwm_args will be able to do so instead
-of calling pwm_apply_args(). And for those who just don't care about
-initial state, they should just call pwm_apply_state() with the initial
-state they expect instead of pwm_apply_args(), which is only partially
-describing the PWM config (PWM args don't specify whether the PWM
-should be disabled or enabled, and what duty_cycle to use).
-
-Hope this clarifies a bit the situation.
-
-Best Regards,
-
-Boris
+Florian pointed it to me too, I'll use a better property name if we
+decide to go this way. Thanks for your comment.
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Rafa?
