@@ -1,75 +1,78 @@
-From: oss@buserror.net (Scott Wood)
-Date: Sat, 16 Apr 2016 19:58:12 -0500
-Subject: [RFC PATCH 1/2] ARM/ARM64: arch_timer: Work around QorIQ
- Erratum A-008585
-In-Reply-To: <CAL_JsqKh=WPZjc_UkicCpdEOnR5Tz2AhzOSXdYTBLRG2HPGb8w@mail.gmail.com>
-References: <1460341353-15619-1-git-send-email-oss@buserror.net>
- <1460341353-15619-2-git-send-email-oss@buserror.net>
- <CAL_JsqKh=WPZjc_UkicCpdEOnR5Tz2AhzOSXdYTBLRG2HPGb8w@mail.gmail.com>
-Message-ID: <1460854692.32510.148.camel@buserror.net>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Sat, 16 Apr 2016 20:58:49 -0400
+Subject: [PATCH] i2c: exynos5: Fix possible ABBA deadlock by keeping I2C
+ clock prepared
+In-Reply-To: <20160416161147.GA2794@kozik-lap>
+References: <1460757887-18128-1-git-send-email-javier@osg.samsung.com>
+ <20160416161147.GA2794@kozik-lap>
+Message-ID: <5712DFC9.8000402@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-04-13 at 08:22 -0500, Rob Herring wrote:
-> On Sun, Apr 10, 2016 at 9:22 PM, Scott Wood <oss@buserror.net> wrote:
-> > Erratum A-008585 says that the ARM generic timer "has the potential to
-> > contain an erroneous value for a small number of core clock cycles
-> > every time the timer value changes" and that the workaround is to
-> > reread TVAL and count registers until successive reads return the same
-> > value.
-> > 
-> > This erratum can be found on LS1021A (32-bit), LS1043A (64-bit), and
-> > LS2080A (64-bit).
-> > 
-> > This patch is loosely based on work by Priyanka Jain and Bhupesh
-> > Sharma.
-> > 
-> > Signed-off-by: Scott Wood <oss@buserror.net>
-> > ---
-> >  .../devicetree/bindings/arm/arch_timer.txt         |  4 ++
-> >  arch/arm/boot/dts/ls1021a.dtsi                     |  1 +
-> >  arch/arm/include/asm/arch_timer.h                  | 71
-> > +++++++++++++++++++---
-> >  arch/arm/include/asm/vdso_datapage.h               |  1 +
-> >  arch/arm/kernel/vdso.c                             |  1 +
-> >  arch/arm/vdso/vgettimeofday.c                      |  2 +-
-> >  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi     |  1 +
-> >  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi     |  1 +
-> >  arch/arm64/include/asm/arch_timer.h                | 35 ++++++++---
-> >  arch/arm64/include/asm/vdso_datapage.h             |  1 +
-> >  arch/arm64/kernel/asm-offsets.c                    |  1 +
-> >  arch/arm64/kernel/vdso.c                           |  2 +
-> >  arch/arm64/kernel/vdso/gettimeofday.S              | 14 ++++-
-> >  drivers/clocksource/arm_arch_timer.c               |  5 ++
-> >  14 files changed, 121 insertions(+), 19 deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt
-> > b/Documentation/devicetree/bindings/arm/arch_timer.txt
-> > index e774128..7117fbd 100644
-> > --- a/Documentation/devicetree/bindings/arm/arch_timer.txt
-> > +++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
-> > @@ -25,6 +25,10 @@ to deliver its interrupts via SPIs.
-> >  - always-on : a boolean property. If present, the timer is powered
-> > through an
-> >    always-on power domain, therefore it never loses context.
-> > 
-> > +- fsl,erratum-a008585 : A boolean property. Indicates the presence of
-> > +  QorIQ erratum A-008585, which says reading the timer is unreliable
-> > +  unless the same value is returned by back-to-back reads.
+Hello Krzysztof,
+
+Thanks a lot for your feedback.
+
+On 04/16/2016 12:11 PM, Krzysztof Kozlowski wrote:
+> On Fri, Apr 15, 2016 at 06:04:47PM -0400, Javier Martinez Canillas wrote:
+
+[snip]
+
+>>
+>> Fix this by only preparing the clock on probe and {en,dis}able in the
+>> rest of the driver.
+>>
+>> This patch is similar to commit 34e81ad5f0b6 ("i2c: s3c2410: fix ABBA
+>> deadlock by keeping clock prepared") that fixes the same bug in other
+>> driver for an I2C controller found in Samsung SoCs.
 > 
-> Bindings need to go to the DT list.
+> I wish this would be fixed by introducing more granular clock locks
+> (e.g. per controller) instead of implementing another workaround.
+> I think this driver shouldn't care about this deadlock... although I see
+> that this is the simplest solution for now.
+>
 
-Yes, sorry about that.
+Agreed, but that would be a much intrusive core change affecting every single
+platform so I didn't feel brave enough to attempt it :)
 
-> An excellent example of how not having specific compatible strings
-> will bite you latter.
+But regardless of the ABBA deadlock, there are reasons why the clk API is
+split into an {,un}prepare and {en,dis}able functions (e.g: non-atomic vs
+atomic) and it is a common pattern for drivers to prepare the clock(s) on
+setup (i.e: probe), unprepare on driver removal, and just {en,dis}able the
+clock(s) during runtime.
 
-I don't think that would have helped...  Even if it said "arm,cortex-a57
--timer" it would not have identified the problem, because it comes from system
-logic rather than the logic being described.  Even if the SoC name were in
-there, it wouldn't usually tell you if it's the revision with the problem.
+So I believe this patch is good on its own and at least makes the driver more
+consistent with most I2C controller drivers that do the same w.r.t clocks. The
+fact that the deadlock is fixed by this change is just a nice side effect IMHO.
 
-Normally we'd use SVR to detect such errata but I didn't want to add that
-dependency to the common code.
+[snip]
 
--Scott
+>> @@ -810,6 +816,8 @@ static int exynos5_i2c_remove(struct platform_device *pdev)
+>>  
+>>  	i2c_del_adapter(&i2c->adap);
+>>  
+>> +	clk_unprepare(i2c->clk);
+>> +
+>>  	return 0;
+>>  }
+> 
+> Please unprepare the clock when suspending. There is no point of having
+> it prepared in that level.
+>
+
+Yes, I in fact thought the same when writing the patch but was reluctant to
+change the prepared state in suspend because I don't have a way to test the
+S2R path in this board due broken firmware that prevents the cores to enter
+into deep sleep states (I believe is the same issue we faced with CPUidle).
+
+But I'll do the change that you suggested since I agree with you.
+
+> Best regards,
+> Krzysztof
+> 
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
