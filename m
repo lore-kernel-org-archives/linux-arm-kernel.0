@@ -1,41 +1,25 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 17 Apr 2016 16:02:13 +0200
-Subject: [PATCH 1/2] PCI: iproc: Support DT property for ignoring aborts
- when probing
-In-Reply-To: <79DC79A7-D4CE-4983-B1C5-CBD2E9CBBFB9@gmail.com>
-References: <1460238624-2086-1-git-send-email-zajec5@gmail.com>
- <79DC79A7-D4CE-4983-B1C5-CBD2E9CBBFB9@gmail.com>
-Message-ID: <5420659.scnjID7ZLn@wuerfel>
+Date: Sun, 17 Apr 2016 16:09:30 +0200
+Subject: [PATCH] Axi-usb: Add support for 64-bit addressing.
+In-Reply-To: <201604111626.g2x2SCHX%fengguang.wu@intel.com>
+References: <201604111626.g2x2SCHX%fengguang.wu@intel.com>
+Message-ID: <5220051.FEUC6vJBCk@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 10 April 2016 18:43:52 Florian Fainelli wrote:
-> >+#ifdef CONFIG_ARM
-> >+static int iproc_pcie_abort_handler(unsigned long addr, unsigned int
-> >fsr,
-> >+                                  struct pt_regs *regs)
-> >+{
-> >+      if (fsr == 0x1406)
-> >+              return 0;
-> >+
-> >+      return 1;
+On Monday 11 April 2016 16:08:14 kbuild test robot wrote:
 > 
-> As you later noted this prevents this driver from being a module now. Since the expectation is that either a fixed bootloader or a platform should enot produce these data aborts, or allow them to be ignored, why not just put this code back where it belongs in the machine specific file which kills many birds with the same stone:
-> 
-> - code is ways built-in, and hook_fault_code is installed prior to PCIe loading (function is marked with __init)
-> - platforms which do not need that, just do not install it for that specific code
-> - it is clear which platforms need it and which do not, yet the driver remains agnostic
-> 
-> NB: there could be other platforms some day needing that which also propagate the error differently, forcing you to add more and more of these codes in the PCIe driver.
+>    230   * @offset: register offset
+>    231   * @val: data to be written
+>    232   **/
+>    233  static void xudc_write64(void __iomem *addr, u32 offset, u64 val)
+>    234  {
+>    235  #if defined(CONFIG_PHYS_ADDR_T_64BIT)
+>  > 236          writeq(val, addr + offset);
+>    237  #endif
+>    238  }
 > 
 
-I think ideally the driver should be able to access some of its internal
-registers to figure out what really happened, but the handler above doesn't
-do that, it just silently ignores *any* errors based on the fsr.
-
-Could one of you check the datasheets for the iproc PCI hardware to
-see if there are any error handling registers we may want to use to
-further drill down on what went wrong and whether it is safe to ignore
-the CPU fault?
+I think you want lo_hi_writeq() rather than writeq().
 
 	Arnd
