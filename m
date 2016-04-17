@@ -1,47 +1,78 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Sun, 17 Apr 2016 02:05:36 +0200
-Subject: [PATCH] ARM: dts: omap3-n900: Specify peripherals LDO regulators
- initial mode
-In-Reply-To: <1460788643-18590-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
-References: <1460788643-18590-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
-Message-ID: <20160417000536.GA1124@earth>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sun, 17 Apr 2016 00:06:22 +0000 (UTC)
+Subject: [GIT PULL] ARM: OMAP2+: first set of hwmod changes for v4.7
+Message-ID: <alpine.DEB.2.02.1604170005480.13961@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ivo,
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA256
 
-On Sat, Apr 16, 2016 at 09:37:23AM +0300, Ivaylo Dimitrov wrote:
-> Without that, regulators are left in the mode last set by the bootloader or
-> by the kernel the device was rebooted from. This leads to various problems
-> like non-working peripherals.
-> 
-> Signed-off-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
-> ---
->  arch/arm/boot/dts/omap3-n900.dts | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
-> index b3c26a9..1bb36e2 100644
-> --- a/arch/arm/boot/dts/omap3-n900.dts
-> +++ b/arch/arm/boot/dts/omap3-n900.dts
-> @@ -329,6 +329,7 @@
->  	regulator-name = "V28";
->  	regulator-min-microvolt = <2800000>;
->  	regulator-max-microvolt = <2800000>;
-> +	regulator-initial-mode = <0x0e>;
->  	regulator-always-on; /* due to battery cover sensor */
->  };
+Hi Tony
 
-I think this should either get an additional
-comment like /* MODE_NORMAL */ or implemented
-using a define and a TWL4030_REGULATOR_MODE_NORMAL
-constant to keep the *.dts easily readable.
+The following changes since commit 1cbabcb9807e31e87ef3a12af76ea025ceb582d3:
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160417/941df239/attachment.sig>
+  ARM: DRA7: clockdomain: Implement timer workaround for errata i874 (2016-04-10 11:43:57 -0600)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v4.7/omap-hwmod-a
+
+for you to fetch changes up to c20c8f750d9f8f8617f07ee2352d3ff560e66bc2:
+
+  ARM: OMAP2+: hwmod: fix _idle() hwmod state sanity check sequence (2016-04-10 13:20:11 -0600)
+
+- ----------------------------------------------------------------
+ARM: OMAP2+: first set of hwmod changes for v4.7
+
+For the DRA7xx platform, add IP block data for the McASP, PWMSS,
+and GPTimer12 IP blocks.  Add lock and unlock functions for the
+RTC IP blocks on the DRA7xx, AM33xx, and AM43xx devices.  And add
+a fix for the hwmod core for device driver unbind operations for
+IP blocks with hardreset lines.
+
+Basic build, boot, and PM test results are available here:
+
+http://www.pwsan.com/omap/testlogs/omap-hwmod-a-for-v4.7/20160410132119/
+
+Note that the testbed here does not have the DRA7xx board included yet.
+
+- ----------------------------------------------------------------
+Lokesh Vutla (3):
+      ARM: OMAP2+: hwmod: RTC: Add lock and unlock functions
+      ARM: DRA7: RTC: Add lock and unlock functions
+      ARM: AMx3xx: RTC: Add lock and unlock functions
+
+Peter Ujfalusi (1):
+      ARM: DRA7: hwmod: Add data for McASP1/2/4/5/6/7/8
+
+Suman Anna (2):
+      ARM: DRA7: hwmod: Add data for GPTimer 12
+      ARM: OMAP2+: hwmod: fix _idle() hwmod state sanity check sequence
+
+Vignesh R (1):
+      ARM: OMAP2+: DRA7: Add hwmod entries for PWMSS
+
+ arch/arm/mach-omap2/omap_hwmod.c                   |  12 +-
+ arch/arm/mach-omap2/omap_hwmod.h                   |   2 +
+ .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c |   2 +
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c          | 364 ++++++++++++++++++++-
+ arch/arm/mach-omap2/omap_hwmod_reset.c             |  65 ++++
+ 5 files changed, 437 insertions(+), 8 deletions(-)
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v2
+
+iQIcBAEBCAAGBQJXEtNJAAoJEMePsQ0LvSpL89kP/2AY5KsAVaK15LeDxA1a0ZRq
+3dsYeuN/1t5irB8IFI/8190B3LKDkPQLV7aNhUUBO0HrtjhfEWHiGHV5n0BvrpYQ
+YC20C961HKRQkQVbBb1VMLeBVPdaqpkMYs+0DHCVb0c/p4/FJ/PnbJm583jPbnbS
+8DzTNdjkcpL+oKJ8dK71KMbWm5sCLReJFq5aFZ+FICcmd/iWk6XR51jNIHRSt0tl
+p01whhVhcmv85OmWLKSOwtSi+ANqCOw8nARxwA7LvYj5zQ7p/KnKpBFgWvEo0HL1
+pbPkh9hgSE6BddTFHpkOwqvnpvWvHKXPnn90VNye45snoWFPhMetrM8gIEZTChY9
+PznS8ew1l3JA7As6aCu1t6uqVJ8znfhS/fGui/bArZRAJn0nbMj3oMPzqxUckRjh
+7RIAaFGJINdMBcjqe0R9Hdeop5DDS0lgVWqETVW+IKLFMjEWvMOrbRVWk7Ce2Dh7
+S8zo0nE8Se91vQMRM/Ngr1P6fzEEUY9t8fwsOxAbOdeX3uZ4nAhxjOYOmSAYaDgx
+GrOEPWrOn/REw2KPQp93XGTLWL7JGorX++zK8lhHs8AUCumh0nrezYBTO4VjlzEd
+UjVvhO0tiMh/93lk6B7E59BIpVgql0wZ59mt4aFN7RU7blnsNxAQyG6q6ajAw7Rw
+FRtjzA4tOLckGmYDg+Vz
+=KAJc
+-----END PGP SIGNATURE-----
