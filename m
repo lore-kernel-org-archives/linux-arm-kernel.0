@@ -1,38 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 16 Apr 2016 23:48:18 +0200
-Subject: [PATCH] ARM: mach-imx: sdhci-esdhc-imx: initialize DMA mask
-In-Reply-To: <570DFE34.6040206@intel.com>
-References: <1460362846-2906-1-git-send-email-akurz@blala.de>
- <570DA8C3.5030206@nvidia.com> <570DFE34.6040206@intel.com>
-Message-ID: <6297512.2KmasKu6UN@wuerfel>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Sun, 17 Apr 2016 02:05:36 +0200
+Subject: [PATCH] ARM: dts: omap3-n900: Specify peripherals LDO regulators
+ initial mode
+In-Reply-To: <1460788643-18590-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
+References: <1460788643-18590-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
+Message-ID: <20160417000536.GA1124@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 13 April 2016 11:07:16 Adrian Hunter wrote:
-> On 13/04/16 05:02, Alexandre Courbot wrote:
-> > On 04/13/2016 12:31 AM, Russell King - ARM Linux wrote:
-> >> On Tue, Apr 12, 2016 at 09:25:04PM +0900, Alexandre Courbot wrote:
+Hi Ivo,
 
-> > How long it will take for everyone to fix their drivers is another question,
-> > since the device doesn't clearly break, but falls back to a degraded mode
-> > with a warning.
-> > 
+On Sat, Apr 16, 2016 at 09:37:23AM +0300, Ivaylo Dimitrov wrote:
+> Without that, regulators are left in the mode last set by the bootloader or
+> by the kernel the device was rebooted from. This leads to various problems
+> like non-working peripherals.
 > 
-> It looks like DeviceTree, PCI and ACPI enumerated devices always set up a
-> dma_mask.  I guess that just leaves devices enumerated from hard-coded
-> platform data.  I will have a look for any more of those, and also send an
-> email for affected people to check their device setup and drivers.
+> Signed-off-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
+> ---
+>  arch/arm/boot/dts/omap3-n900.dts | 9 +++++++++
+>  1 file changed, 9 insertions(+)
 > 
+> diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
+> index b3c26a9..1bb36e2 100644
+> --- a/arch/arm/boot/dts/omap3-n900.dts
+> +++ b/arch/arm/boot/dts/omap3-n900.dts
+> @@ -329,6 +329,7 @@
+>  	regulator-name = "V28";
+>  	regulator-min-microvolt = <2800000>;
+>  	regulator-max-microvolt = <2800000>;
+> +	regulator-initial-mode = <0x0e>;
+>  	regulator-always-on; /* due to battery cover sensor */
+>  };
 
-I've had a look now too and found only these three device definitions
-for any sdhci variant, everything else is either unused or DT-only:
+I think this should either get an additional
+comment like /* MODE_NORMAL */ or implemented
+using a define and a TWL4030_REGULATOR_MODE_NORMAL
+constant to keep the *.dts easily readable.
 
-arch/arm/mach-dove/common.c:    .name           = "sdhci-dove",
-arch/arm/plat-samsung/devs.c:   .name           = "s3c-sdhci",
-arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c:   imx_sdhci_esdhc_imx_data_entry(MX25, "sdhci-esdhc-imx25", _id, _hwid)
-arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c:   imx_sdhci_esdhc_imx_data_entry(MX35, "sdhci-esdhc-imx35", _id, _hwid)
-
-Out of these, the s3c and dove variants set a 32-bit DMA mask, so as
-far as I can tell, only imx has the problem.
-
-	Arnd
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160417/941df239/attachment.sig>
