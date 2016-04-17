@@ -1,121 +1,66 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Sat, 16 Apr 2016 21:14:53 -0400
-Subject: [PATCH v2 2/2] i2c: exynos5: Fix possible ABBA deadlock by keeping
- I2C clock prepared
-In-Reply-To: <1460855693-28225-1-git-send-email-javier@osg.samsung.com>
-References: <1460855693-28225-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <1460855693-28225-2-git-send-email-javier@osg.samsung.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 17 Apr 2016 09:25:50 +0800
+Subject: [PATCH 1/2] clk: sunxi: add predivider handling for factors clock
+In-Reply-To: <1460832906-24064-2-git-send-email-vishnupatekar0510@gmail.com>
+Message-ID: <201604170901.pPL2YWTP%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The exynos5 I2C controller driver always prepares and enables a clock
-before using it and then disables unprepares it when the clock is not
-used anymore.
+Hi Vishnu,
 
-But this can cause a possible ABBA deadlock in some scenarios since a
-driver that uses regmap to access its I2C registers, will first grab
-the regmap lock and then the I2C xfer function will grab the prepare
-lock when preparing the I2C clock. But since the clock driver also
-uses regmap for I2C accesses, preparing a clock will first grab the
-prepare lock and then the regmap lock when using the regmap API.
+[auto build test ERROR on clk/clk-next]
+[also build test ERROR on v4.6-rc3 next-20160415]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-An example of this happens on the Exynos5422 Odroid XU4 board where a
-s2mps11 PMIC is used and both the s2mps11 regulators and clk drivers
-share the same I2C regmap.
+url:    https://github.com/0day-ci/linux/commits/Vishnu-Patekar/sunxi-factors-clock-predivider-handling/20160417-025801
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
+config: arm-sunxi_defconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-The possible deadlock is reported by the kernel lockdep:
+Note: the linux-review/Vishnu-Patekar/sunxi-factors-clock-predivider-handling/20160417-025801 HEAD 19bb5fc952754381d9f4f9b2e57a1fa09f467359 builds fine.
+      It only hurts bisectibility.
 
-  Possible unsafe locking scenario:
+All errors (new ones prefixed by >>):
 
-        CPU0                    CPU1
-        ----                    ----
-   lock(sec_core:428:(regmap)->lock);
-                                lock(prepare_lock);
-                                lock(sec_core:428:(regmap)->lock);
-   lock(prepare_lock);
+   drivers/clk/sunxi/clk-sunxi.c: In function 'sun6i_get_ahb1_factors':
+>> drivers/clk/sunxi/clk-sunxi.c:310:9: error: 'struct factors_request' has no member named 'parent_index'
+     if (req->parent_index == SUN6I_AHB1_PARENT_PLL6) {
+            ^
+   drivers/clk/sunxi/clk-sunxi.c: In function 'sun6i_ahb1_recalc':
+   drivers/clk/sunxi/clk-sunxi.c:340:9: error: 'struct factors_request' has no member named 'parent_index'
+     if (req->parent_index == SUN6I_AHB1_PARENT_PLL6)
+            ^
 
-  *** DEADLOCK ***
+vim +310 drivers/clk/sunxi/clk-sunxi.c
 
-Fix it by leaving the code prepared on probe and use {en,dis}able in
-the I2C transfer function.
+a78bb355 Chen-Yu Tsai 2016-01-25  304  	if (req->parent_rate && req->rate > req->parent_rate)
+a78bb355 Chen-Yu Tsai 2016-01-25  305  		req->rate = req->parent_rate;
+a78bb355 Chen-Yu Tsai 2016-01-25  306  
+a78bb355 Chen-Yu Tsai 2016-01-25  307  	div = DIV_ROUND_UP(req->parent_rate, req->rate);
+a78bb355 Chen-Yu Tsai 2016-01-25  308  
+a78bb355 Chen-Yu Tsai 2016-01-25  309  	/* calculate pre-divider if parent is pll6 */
+a78bb355 Chen-Yu Tsai 2016-01-25 @310  	if (req->parent_index == SUN6I_AHB1_PARENT_PLL6) {
+a78bb355 Chen-Yu Tsai 2016-01-25  311  		if (div < 4)
+a78bb355 Chen-Yu Tsai 2016-01-25  312  			calcp = 0;
+a78bb355 Chen-Yu Tsai 2016-01-25  313  		else if (div / 2 < 4)
 
-This patch is similar to commit 34e81ad5f0b6 ("i2c: s3c2410: fix ABBA
-deadlock by keeping clock prepared") that fixes the same bug in other
-driver for an I2C controller found in Samsung SoCs.
+:::::: The code at line 310 was first introduced by commit
+:::::: a78bb35552a800949b2bf68f372d3d6ccabdd790 clk: sunxi: rewrite sun6i-a31-ahb1-clk using factors clk with custom recalc
 
-Reported-by: Anand Moon <linux.amoon@gmail.com>
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-Reviewed-by: Anand Moon <linux.amoon@gmail.com>
-Tested-by: Anand Moon <linux.amoon@gmail.com>
+:::::: TO: Chen-Yu Tsai <wens@csie.org>
+:::::: CC: Maxime Ripard <maxime.ripard@free-electrons.com>
 
 ---
-
-Changes in v2:
-- Add Anand Moon's Reviewed and Tested by tags.
-- Unprepare the clock on suspend. Suggested by Krzysztof Kozlowski.
-
- drivers/i2c/busses/i2c-exynos5.c | 14 +++++++++++---
- 1 file changed, 11 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/i2c/busses/i2c-exynos5.c b/drivers/i2c/busses/i2c-exynos5.c
-index ebbcba3de20a..f54ece8fce78 100644
---- a/drivers/i2c/busses/i2c-exynos5.c
-+++ b/drivers/i2c/busses/i2c-exynos5.c
-@@ -671,7 +671,7 @@ static int exynos5_i2c_xfer(struct i2c_adapter *adap,
- 		return -EIO;
- 	}
- 
--	ret = clk_prepare_enable(i2c->clk);
-+	ret = clk_enable(i2c->clk);
- 	if (ret)
- 		return ret;
- 
-@@ -697,7 +697,7 @@ static int exynos5_i2c_xfer(struct i2c_adapter *adap,
- 	}
- 
-  out:
--	clk_disable_unprepare(i2c->clk);
-+	clk_disable(i2c->clk);
- 	return ret;
- }
- 
-@@ -803,6 +803,10 @@ static int exynos5_i2c_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, i2c);
- 
-+	clk_disable(i2c->clk);
-+
-+	return 0;
-+
-  err_clk:
- 	clk_disable_unprepare(i2c->clk);
- 	return ret;
-@@ -814,6 +818,8 @@ static int exynos5_i2c_remove(struct platform_device *pdev)
- 
- 	i2c_del_adapter(&i2c->adap);
- 
-+	clk_unprepare(i2c->clk);
-+
- 	return 0;
- }
- 
-@@ -825,6 +831,8 @@ static int exynos5_i2c_suspend_noirq(struct device *dev)
- 
- 	i2c->suspended = 1;
- 
-+	clk_unprepare(i2c->clk);
-+
- 	return 0;
- }
- 
-@@ -845,7 +853,7 @@ static int exynos5_i2c_resume_noirq(struct device *dev)
- 	}
- 
- 	exynos5_i2c_init(i2c);
--	clk_disable_unprepare(i2c->clk);
-+	clk_disable(i2c->clk);
- 	i2c->suspended = 0;
- 
- 	return 0;
--- 
-2.5.5
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 19218 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160417/140effd9/attachment-0001.obj>
