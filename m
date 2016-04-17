@@ -1,78 +1,57 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Sat, 16 Apr 2016 20:58:49 -0400
-Subject: [PATCH] i2c: exynos5: Fix possible ABBA deadlock by keeping I2C
- clock prepared
-In-Reply-To: <20160416161147.GA2794@kozik-lap>
-References: <1460757887-18128-1-git-send-email-javier@osg.samsung.com>
- <20160416161147.GA2794@kozik-lap>
-Message-ID: <5712DFC9.8000402@osg.samsung.com>
+Date: Sat, 16 Apr 2016 21:14:52 -0400
+Subject: [PATCH v2 1/2] i2c: exynos5: Check clk_prepare_enable() return value
+Message-ID: <1460855693-28225-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+The clk_prepare_enable() function can fail so check the return value
+and propagate the error to the caller in case of a failure.
 
-Thanks a lot for your feedback.
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+---
 
-On 04/16/2016 12:11 PM, Krzysztof Kozlowski wrote:
-> On Fri, Apr 15, 2016 at 06:04:47PM -0400, Javier Martinez Canillas wrote:
+Changes in v2: None
 
-[snip]
+ drivers/i2c/busses/i2c-exynos5.c | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
 
->>
->> Fix this by only preparing the clock on probe and {en,dis}able in the
->> rest of the driver.
->>
->> This patch is similar to commit 34e81ad5f0b6 ("i2c: s3c2410: fix ABBA
->> deadlock by keeping clock prepared") that fixes the same bug in other
->> driver for an I2C controller found in Samsung SoCs.
-> 
-> I wish this would be fixed by introducing more granular clock locks
-> (e.g. per controller) instead of implementing another workaround.
-> I think this driver shouldn't care about this deadlock... although I see
-> that this is the simplest solution for now.
->
-
-Agreed, but that would be a much intrusive core change affecting every single
-platform so I didn't feel brave enough to attempt it :)
-
-But regardless of the ABBA deadlock, there are reasons why the clk API is
-split into an {,un}prepare and {en,dis}able functions (e.g: non-atomic vs
-atomic) and it is a common pattern for drivers to prepare the clock(s) on
-setup (i.e: probe), unprepare on driver removal, and just {en,dis}able the
-clock(s) during runtime.
-
-So I believe this patch is good on its own and at least makes the driver more
-consistent with most I2C controller drivers that do the same w.r.t clocks. The
-fact that the deadlock is fixed by this change is just a nice side effect IMHO.
-
-[snip]
-
->> @@ -810,6 +816,8 @@ static int exynos5_i2c_remove(struct platform_device *pdev)
->>  
->>  	i2c_del_adapter(&i2c->adap);
->>  
->> +	clk_unprepare(i2c->clk);
->> +
->>  	return 0;
->>  }
-> 
-> Please unprepare the clock when suspending. There is no point of having
-> it prepared in that level.
->
-
-Yes, I in fact thought the same when writing the patch but was reluctant to
-change the prepared state in suspend because I don't have a way to test the
-S2R path in this board due broken firmware that prevents the cores to enter
-into deep sleep states (I believe is the same issue we faced with CPUidle).
-
-But I'll do the change that you suggested since I agree with you.
-
-> Best regards,
-> Krzysztof
-> 
-
-Best regards,
+diff --git a/drivers/i2c/busses/i2c-exynos5.c b/drivers/i2c/busses/i2c-exynos5.c
+index b29c7500461a..ebbcba3de20a 100644
+--- a/drivers/i2c/busses/i2c-exynos5.c
++++ b/drivers/i2c/busses/i2c-exynos5.c
+@@ -671,7 +671,9 @@ static int exynos5_i2c_xfer(struct i2c_adapter *adap,
+ 		return -EIO;
+ 	}
+ 
+-	clk_prepare_enable(i2c->clk);
++	ret = clk_prepare_enable(i2c->clk);
++	if (ret)
++		return ret;
+ 
+ 	for (i = 0; i < num; i++, msgs++) {
+ 		stop = (i == num - 1);
+@@ -747,7 +749,9 @@ static int exynos5_i2c_probe(struct platform_device *pdev)
+ 		return -ENOENT;
+ 	}
+ 
+-	clk_prepare_enable(i2c->clk);
++	ret = clk_prepare_enable(i2c->clk);
++	if (ret)
++		return ret;
+ 
+ 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	i2c->regs = devm_ioremap_resource(&pdev->dev, mem);
+@@ -830,7 +834,9 @@ static int exynos5_i2c_resume_noirq(struct device *dev)
+ 	struct exynos5_i2c *i2c = platform_get_drvdata(pdev);
+ 	int ret = 0;
+ 
+-	clk_prepare_enable(i2c->clk);
++	ret = clk_prepare_enable(i2c->clk);
++	if (ret)
++		return ret;
+ 
+ 	ret = exynos5_hsi2c_clock_setup(i2c);
+ 	if (ret) {
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+2.5.5
