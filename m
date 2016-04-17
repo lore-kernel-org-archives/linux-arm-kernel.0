@@ -1,25 +1,93 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 17 Apr 2016 16:09:30 +0200
-Subject: [PATCH] Axi-usb: Add support for 64-bit addressing.
-In-Reply-To: <201604111626.g2x2SCHX%fengguang.wu@intel.com>
-References: <201604111626.g2x2SCHX%fengguang.wu@intel.com>
-Message-ID: <5220051.FEUC6vJBCk@wuerfel>
+From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
+Date: Sun, 17 Apr 2016 17:29:23 +0300
+Subject: [PATCH v1] ARM: dts: omap3-n900: Specify peripherals LDO regulators
+ initial mode
+In-Reply-To: <20160417122933.GA8093@earth>
+References: <20160417122933.GA8093@earth>
+Message-ID: <1460903363-2197-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 11 April 2016 16:08:14 kbuild test robot wrote:
-> 
->    230   * @offset: register offset
->    231   * @val: data to be written
->    232   **/
->    233  static void xudc_write64(void __iomem *addr, u32 offset, u64 val)
->    234  {
->    235  #if defined(CONFIG_PHYS_ADDR_T_64BIT)
->  > 236          writeq(val, addr + offset);
->    237  #endif
->    238  }
-> 
+Without that, regulators are left in the mode last set by the bootloader or
+by the kernel the device was rebooted from. This leads to various problems,
+like non-working peripherals.
 
-I think you want lo_hi_writeq() rather than writeq().
+Signed-off-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
+---
+ arch/arm/boot/dts/omap3-n900.dts | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-	Arnd
+diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
+index b3c26a9..d9e2d9c 100644
+--- a/arch/arm/boot/dts/omap3-n900.dts
++++ b/arch/arm/boot/dts/omap3-n900.dts
+@@ -329,6 +329,7 @@
+ 	regulator-name = "V28";
+ 	regulator-min-microvolt = <2800000>;
+ 	regulator-max-microvolt = <2800000>;
++	regulator-initial-mode = <0x0e>; /* RES_STATE_ACTIVE */
+ 	regulator-always-on; /* due to battery cover sensor */
+ };
+ 
+@@ -336,30 +337,35 @@
+ 	regulator-name = "VCSI";
+ 	regulator-min-microvolt = <1800000>;
+ 	regulator-max-microvolt = <1800000>;
++	regulator-initial-mode = <0x0e>; /* RES_STATE_ACTIVE */
+ };
+ 
+ &vaux3 {
+ 	regulator-name = "VMMC2_30";
+ 	regulator-min-microvolt = <2800000>;
+ 	regulator-max-microvolt = <3000000>;
++	regulator-initial-mode = <0x0e>; /* RES_STATE_ACTIVE */
+ };
+ 
+ &vaux4 {
+ 	regulator-name = "VCAM_ANA_28";
+ 	regulator-min-microvolt = <2800000>;
+ 	regulator-max-microvolt = <2800000>;
++	regulator-initial-mode = <0x0e>; /* RES_STATE_ACTIVE */
+ };
+ 
+ &vmmc1 {
+ 	regulator-name = "VMMC1";
+ 	regulator-min-microvolt = <1850000>;
+ 	regulator-max-microvolt = <3150000>;
++	regulator-initial-mode = <0x0e>; /* RES_STATE_ACTIVE */
+ };
+ 
+ &vmmc2 {
+ 	regulator-name = "V28_A";
+ 	regulator-min-microvolt = <2800000>;
+ 	regulator-max-microvolt = <3000000>;
++	regulator-initial-mode = <0x0e>; /* RES_STATE_ACTIVE */
+ 	regulator-always-on; /* due VIO leak to AIC34 VDDs */
+ };
+ 
+@@ -367,6 +373,7 @@
+ 	regulator-name = "VPLL";
+ 	regulator-min-microvolt = <1800000>;
+ 	regulator-max-microvolt = <1800000>;
++	regulator-initial-mode = <0x0e>; /* RES_STATE_ACTIVE */
+ 	regulator-always-on;
+ };
+ 
+@@ -374,6 +381,7 @@
+ 	regulator-name = "VSDI_CSI";
+ 	regulator-min-microvolt = <1800000>;
+ 	regulator-max-microvolt = <1800000>;
++	regulator-initial-mode = <0x0e>; /* RES_STATE_ACTIVE */
+ 	regulator-always-on;
+ };
+ 
+@@ -381,6 +389,7 @@
+ 	regulator-name = "VMMC2_IO_18";
+ 	regulator-min-microvolt = <1800000>;
+ 	regulator-max-microvolt = <1800000>;
++	regulator-initial-mode = <0x0e>; /* RES_STATE_ACTIVE */
+ };
+ 
+ &vio {
+-- 
+1.9.1
