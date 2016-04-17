@@ -1,514 +1,152 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 18 Apr 2016 00:49:35 +0200
-Subject: [PATCH 2/2] ARM: dts: rockchip: add MiQi board from mqmaker
-In-Reply-To: <1460933375-6718-1-git-send-email-heiko@sntech.de>
-References: <1460933375-6718-1-git-send-email-heiko@sntech.de>
-Message-ID: <1460933375-6718-2-git-send-email-heiko@sntech.de>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Mon, 18 Apr 2016 01:58:09 +0200
+Subject: [PATCH v11 01/17] Xen: ACPI: Hide UART used by Xen
+In-Reply-To: <1460030614-16112-2-git-send-email-zhaoshenglong@huawei.com>
+References: <1460030614-16112-1-git-send-email-zhaoshenglong@huawei.com>
+ <1460030614-16112-2-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <CAJZ5v0gN9S0AKX8SZbbVFOn6ydwCa_7GyxzzJHod8s0xyCXgvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MiQi is a rk3288-based devboard from Shenzen based mqmaker, with a
-footprint the size of a credit card.
+On Thu, Apr 7, 2016 at 2:03 PM, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+>
+> ACPI 6.0 introduces a new table STAO to list the devices which are used
+> by Xen and can't be used by Dom0. On Xen virtual platforms, the physical
+> UART is used by Xen. So here it hides UART from Dom0.
+>
+> CC: "Rafael J. Wysocki" <rjw@rjwysocki.net> (supporter:ACPI)
+> CC: Len Brown <lenb@kernel.org> (supporter:ACPI)
+> CC: linux-acpi at vger.kernel.org (open list:ACPI)
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 
-Main available outside connections are 4 usb ports, hdmi, gigabit
-ethernet and two expansion headers.
+Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm/boot/dts/Makefile        |   1 +
- arch/arm/boot/dts/rk3288-miqi.dts | 472 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 473 insertions(+)
- create mode 100644 arch/arm/boot/dts/rk3288-miqi.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 95c1923..3d54cb5 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -565,6 +565,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
- 	rk3288-evb-rk808.dtb \
- 	rk3288-firefly-beta.dtb \
- 	rk3288-firefly.dtb \
-+	rk3288-miqi.dtb \
- 	rk3288-popmetal.dtb \
- 	rk3288-r89.dtb \
- 	rk3288-rock2-square.dtb \
-diff --git a/arch/arm/boot/dts/rk3288-miqi.dts b/arch/arm/boot/dts/rk3288-miqi.dts
-new file mode 100644
-index 0000000..ada2130
---- /dev/null
-+++ b/arch/arm/boot/dts/rk3288-miqi.dts
-@@ -0,0 +1,472 @@
-+/*
-+ * Copyright (c) 2016 Heiko Stuebner <heiko@sntech.de>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include <dt-bindings/input/input.h>
-+#include "rk3288.dtsi"
-+
-+/ {
-+	model = "mqmaker MiQi";
-+	compatible = "mqmaker,miqi", "rockchip,rk3288";
-+
-+	chosen {
-+		linux,stdout-path = "serial2:115200n8";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0 0x80000000>;
-+	};
-+
-+	ext_gmac: external-gmac-clock {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <125000000>;
-+		clock-output-names = "ext_gmac";
-+	};
-+
-+	io_domains: io-domains {
-+		compatible = "rockchip,rk3288-io-voltage-domain";
-+
-+		audio-supply = <&vcca_33>;
-+		flash0-supply = <&vcc_flash>;
-+		flash1-supply = <&vcc_lan>;
-+		gpio30-supply = <&vcc_io>;
-+		gpio1830-supply = <&vcc_io>;
-+		lcdc-supply = <&vcc_io>;
-+		sdcard-supply = <&vccio_sd>;
-+		wifi-supply = <&vcc_18>;
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		work {
-+			gpios = <&gpio7 4 GPIO_ACTIVE_LOW>;
-+			label = "miqi:green:user";
-+			linux,default-trigger = "default-on";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&led_ctl>;
-+		};
-+	};
-+
-+	vcc_flash: flash-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc_flash";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		vin-supply = <&vcc_io>;
-+	};
-+
-+	vcc_host: usb-host-regulator {
-+		compatible = "regulator-fixed";
-+		enable-active-high;
-+		gpio = <&gpio0 14 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&host_vbus_drv>;
-+		regulator-name = "vcc_host";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+		vin-supply = <&vcc_sys>;
-+	};
-+
-+	vcc_sd: sdmmc-regulator {
-+		compatible = "regulator-fixed";
-+		gpio = <&gpio7 11 GPIO_ACTIVE_LOW>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&sdmmc_pwr>;
-+		regulator-name = "vcc_sd";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		startup-delay-us = <100000>;
-+		vin-supply = <&vcc_io>;
-+	};
-+
-+	vcc_sys: vsys-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc_sys";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+	};
-+};
-+
-+&cpu0 {
-+	cpu0-supply = <&vdd_cpu>;
-+};
-+
-+&emmc {
-+	bus-width = <8>;
-+	cap-mmc-highspeed;
-+	disable-wp;
-+	non-removable;
-+	num-slots = <1>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emmc_clk>, <&emmc_cmd>, <&emmc_pwr>, <&emmc_bus8>;
-+	vmmc-supply = <&vcc_io>;
-+	vqmmc-supply = <&vcc_flash>;
-+	status = "okay";
-+};
-+
-+&gmac {
-+	assigned-clocks = <&cru SCLK_MAC>;
-+	assigned-clock-parents = <&ext_gmac>;
-+	clock_in_out = "input";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&rgmii_pins>, <&phy_rst>, <&phy_pmeb>, <&phy_int>;
-+	phy-supply = <&vcc_lan>;
-+	phy-mode = "rgmii";
-+	snps,reset-active-low;
-+	snps,reset-delays-us = <0 10000 1000000>;
-+	snps,reset-gpio = <&gpio4 8 GPIO_ACTIVE_LOW>;
-+	tx_delay = <0x30>;
-+	rx_delay = <0x10>;
-+	status = "ok";
-+};
-+
-+&hdmi {
-+	ddc-i2c-bus = <&i2c5>;
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	clock-frequency = <400000>;
-+	status = "okay";
-+
-+	vdd_cpu: syr827 at 40 {
-+		compatible = "silergy,syr827";
-+		fcs,suspend-voltage-selector = <1>;
-+		reg = <0x40>;
-+		regulator-name = "vdd_cpu";
-+		regulator-min-microvolt = <850000>;
-+		regulator-max-microvolt = <1350000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+		regulator-enable-ramp-delay = <300>;
-+		regulator-ramp-delay = <8000>;
-+		vin-supply = <&vcc_sys>;
-+	};
-+
-+	vdd_gpu: syr828 at 41 {
-+		compatible = "silergy,syr828";
-+		fcs,suspend-voltage-selector = <1>;
-+		reg = <0x41>;
-+		regulator-name = "vdd_gpu";
-+		regulator-min-microvolt = <850000>;
-+		regulator-max-microvolt = <1350000>;
-+		regulator-always-on;
-+		vin-supply = <&vcc_sys>;
-+	};
-+
-+	hym8563: hym8563 at 51 {
-+		compatible = "haoyu,hym8563";
-+		reg = <0x51>;
-+		#clock-cells = <0>;
-+		clock-frequency = <32768>;
-+		clock-output-names = "xin32k";
-+	};
-+
-+	act8846: act8846 at 5a {
-+		compatible = "active-semi,act8846";
-+		reg = <0x5a>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pmic_vsel>;
-+		system-power-controller;
-+
-+		vp1-supply = <&vcc_sys>;
-+		vp2-supply = <&vcc_sys>;
-+		vp3-supply = <&vcc_sys>;
-+		vp4-supply = <&vcc_sys>;
-+		inl1-supply = <&vcc_sys>;
-+		inl2-supply = <&vcc_sys>;
-+		inl3-supply = <&vcc_20>;
-+
-+		regulators {
-+			vcc_ddr: REG1 {
-+				regulator-name = "vcc_ddr";
-+				regulator-always-on;
-+			};
-+
-+			vcc_io: REG2 {
-+				regulator-name = "vcc_io";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd_log: REG3 {
-+				regulator-name = "vdd_log";
-+				regulator-min-microvolt = <1100000>;
-+				regulator-max-microvolt = <1100000>;
-+				regulator-always-on;
-+			};
-+
-+			vcc_20: REG4 {
-+				regulator-name = "vcc_20";
-+				regulator-min-microvolt = <2000000>;
-+				regulator-max-microvolt = <2000000>;
-+				regulator-always-on;
-+			};
-+
-+			vccio_sd: REG5 {
-+				regulator-name = "vccio_sd";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-always-on;
-+			};
-+
-+			vdd10_lcd: REG6 {
-+				regulator-name = "vdd10_lcd";
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-always-on;
-+			};
-+
-+			vcca_18: REG7 {
-+				regulator-name = "vcca_18";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+			};
-+
-+			vcca_33: REG8 {
-+				regulator-name = "vcca_33";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			vcc_lan: REG9 {
-+				regulator-name = "vcc_lan";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+			};
-+
-+			vdd_10: REG10 {
-+				regulator-name = "vdd_10";
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-always-on;
-+			};
-+
-+			vcc_18: REG11 {
-+				regulator-name = "vcc_18";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+			};
-+
-+			vcc18_lcd: REG12 {
-+				regulator-name = "vcc18_lcd";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+			};
-+		};
-+	};
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+};
-+
-+&i2c2 {
-+	status = "okay";
-+};
-+
-+&i2c4 {
-+	status = "okay";
-+};
-+
-+&i2c5 {
-+	status = "okay";
-+};
-+
-+&pinctrl {
-+	pcfg_output_high: pcfg-output-high {
-+		output-high;
-+	};
-+
-+	pcfg_output_low: pcfg-output-low {
-+		output-low;
-+	};
-+
-+	pcfg_pull_up_drv_12ma: pcfg-pull-up-drv-12ma {
-+		bias-pull-up;
-+		drive-strength = <12>;
-+	};
-+
-+	act8846 {
-+		pmic_int: pmic-int {
-+			rockchip,pins = <0 4 RK_FUNC_GPIO &pcfg_pull_up>;
-+		};
-+
-+		pmic_sleep: pmic-sleep {
-+			rockchip,pins = <0 0 RK_FUNC_GPIO &pcfg_output_low>;
-+		};
-+
-+		pmic_vsel: pmic-vsel {
-+			rockchip,pins = <7 1 RK_FUNC_GPIO &pcfg_output_low>;
-+		};
-+	};
-+
-+	gmac {
-+		phy_int: phy-int {
-+			rockchip,pins = <0 9 RK_FUNC_GPIO &pcfg_pull_up>;
-+		};
-+
-+		phy_pmeb: phy-pmeb {
-+			rockchip,pins = <0 8 RK_FUNC_GPIO &pcfg_pull_up>;
-+		};
-+
-+		phy_rst: phy-rst {
-+			rockchip,pins = <4 8 RK_FUNC_GPIO &pcfg_output_high>;
-+		};
-+	};
-+
-+	leds {
-+		led_ctl: led-ctl {
-+			rockchip,pins = <7 4 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+
-+	sdmmc {
-+		/*
-+		 * Default drive strength isn't enough to achieve even
-+		 * high-speed mode on firefly board so bump up to 12ma.
-+		 */
-+		sdmmc_bus4: sdmmc-bus4 {
-+			rockchip,pins = <6 16 RK_FUNC_1 &pcfg_pull_up_drv_12ma>,
-+					<6 17 RK_FUNC_1 &pcfg_pull_up_drv_12ma>,
-+					<6 18 RK_FUNC_1 &pcfg_pull_up_drv_12ma>,
-+					<6 19 RK_FUNC_1 &pcfg_pull_up_drv_12ma>;
-+		};
-+
-+		sdmmc_clk: sdmmc-clk {
-+			rockchip,pins = <6 20 RK_FUNC_1 &pcfg_pull_none_12ma>;
-+		};
-+
-+		sdmmc_cmd: sdmmc-cmd {
-+			rockchip,pins = <6 21 RK_FUNC_1 &pcfg_pull_up_drv_12ma>;
-+		};
-+
-+		sdmmc_pwr: sdmmc-pwr {
-+			rockchip,pins = <7 11 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+
-+	usb_host {
-+		host_vbus_drv: host-vbus-drv {
-+			rockchip,pins = <0 14 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+};
-+
-+&saradc {
-+	vref-supply = <&vcc_18>;
-+	status = "okay";
-+};
-+
-+&sdmmc {
-+	bus-width = <4>;
-+	cap-mmc-highspeed;
-+	cap-sd-highspeed;
-+	card-detect-delay = <200>;
-+	disable-wp;
-+	num-slots = <1>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sdmmc_clk>, <&sdmmc_cmd>, <&sdmmc_cd>, <&sdmmc_bus4>;
-+	vmmc-supply = <&vcc_sd>;
-+	vqmmc-supply = <&vccio_sd>;
-+	status = "okay";
-+};
-+
-+&tsadc {
-+	rockchip,hw-tshut-mode = <0>;
-+	rockchip,hw-tshut-polarity = <0>;
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	status = "okay";
-+};
-+
-+&usb_host1 {
-+	status = "okay";
-+};
-+
-+&usb_otg {
-+	/*
-+	 * The otg controller is the only system power source,
-+	 * so needs to always stay in device mode.
-+	 */
-+	dr_mode = "peripheral";
-+	status = "okay";
-+};
-+
-+&vopb {
-+	status = "okay";
-+};
-+
-+&vopb_mmu {
-+	status = "okay";
-+};
-+
-+&vopl {
-+	status = "okay";
-+};
-+
-+&vopl_mmu {
-+	status = "okay";
-+};
-+
-+&wdt {
-+	status = "okay";
-+};
--- 
-2.8.0.rc3
+> ---
+>  drivers/acpi/scan.c | 74 +++++++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 74 insertions(+)
+>
+> diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+> index 5f28cf7..cfc73fe 100644
+> --- a/drivers/acpi/scan.c
+> +++ b/drivers/acpi/scan.c
+> @@ -46,6 +46,13 @@ DEFINE_MUTEX(acpi_device_lock);
+>  LIST_HEAD(acpi_wakeup_device_list);
+>  static DEFINE_MUTEX(acpi_hp_context_lock);
+>
+> +/*
+> + * The UART device described by the SPCR table is the only object which needs
+> + * special-casing. Everything else is covered by ACPI namespace paths in STAO
+> + * table.
+> + */
+> +static u64 spcr_uart_addr;
+> +
+>  struct acpi_dep_data {
+>         struct list_head node;
+>         acpi_handle master;
+> @@ -1453,6 +1460,41 @@ static int acpi_add_single_object(struct acpi_device **child,
+>         return 0;
+>  }
+>
+> +static acpi_status acpi_get_resource_memory(struct acpi_resource *ares,
+> +                                           void *context)
+> +{
+> +       struct resource *res = context;
+> +
+> +       if (acpi_dev_resource_memory(ares, res))
+> +               return AE_CTRL_TERMINATE;
+> +
+> +       return AE_OK;
+> +}
+> +
+> +static bool acpi_device_should_be_hidden(acpi_handle handle)
+> +{
+> +       acpi_status status;
+> +       struct resource res;
+> +
+> +       /* Check if it should ignore the UART device */
+> +       if (!(spcr_uart_addr && acpi_has_method(handle, METHOD_NAME__CRS)))
+> +               return false;
+> +
+> +       /*
+> +        * The UART device described in SPCR table is assumed to have only one
+> +        * memory resource present. So we only look for the first one here.
+> +        */
+> +       status = acpi_walk_resources(handle, METHOD_NAME__CRS,
+> +                                    acpi_get_resource_memory, &res);
+> +       if (ACPI_FAILURE(status) || res.start != spcr_uart_addr)
+> +               return false;
+> +
+> +       acpi_handle_info(handle, "The UART device @%pa in SPCR table will be hidden\n",
+> +                        &res.start);
+> +
+> +       return true;
+> +}
+> +
+>  static int acpi_bus_type_and_status(acpi_handle handle, int *type,
+>                                     unsigned long long *sta)
+>  {
+> @@ -1466,6 +1508,9 @@ static int acpi_bus_type_and_status(acpi_handle handle, int *type,
+>         switch (acpi_type) {
+>         case ACPI_TYPE_ANY:             /* for ACPI_ROOT_OBJECT */
+>         case ACPI_TYPE_DEVICE:
+> +               if (acpi_device_should_be_hidden(handle))
+> +                       return -ENODEV;
+> +
+>                 *type = ACPI_BUS_TYPE_DEVICE;
+>                 status = acpi_bus_get_status_handle(handle, sta);
+>                 if (ACPI_FAILURE(status))
+> @@ -1916,9 +1961,24 @@ static int acpi_bus_scan_fixed(void)
+>         return result < 0 ? result : 0;
+>  }
+>
+> +static void __init acpi_get_spcr_uart_addr(void)
+> +{
+> +       acpi_status status;
+> +       struct acpi_table_spcr *spcr_ptr;
+> +
+> +       status = acpi_get_table(ACPI_SIG_SPCR, 0,
+> +                               (struct acpi_table_header **)&spcr_ptr);
+> +       if (ACPI_SUCCESS(status))
+> +               spcr_uart_addr = spcr_ptr->serial_port.address;
+> +       else
+> +               printk(KERN_WARNING PREFIX "STAO table present, but SPCR is missing\n");
+> +}
+> +
+>  int __init acpi_scan_init(void)
+>  {
+>         int result;
+> +       acpi_status status;
+> +       struct acpi_table_stao *stao_ptr;
+>
+>         acpi_pci_root_init();
+>         acpi_pci_link_init();
+> @@ -1934,6 +1994,20 @@ int __init acpi_scan_init(void)
+>
+>         acpi_scan_add_handler(&generic_device_handler);
+>
+> +       /*
+> +        * If there is STAO table, check whether it needs to ignore the UART
+> +        * device in SPCR table.
+> +        */
+> +       status = acpi_get_table(ACPI_SIG_STAO, 0,
+> +                               (struct acpi_table_header **)&stao_ptr);
+> +       if (ACPI_SUCCESS(status)) {
+> +               if (stao_ptr->header.length > sizeof(struct acpi_table_stao))
+> +                       printk(KERN_INFO PREFIX "STAO Name List not yet supported.");
+> +
+> +               if (stao_ptr->ignore_uart)
+> +                       acpi_get_spcr_uart_addr();
+> +       }
+> +
+>         mutex_lock(&acpi_scan_lock);
+>         /*
+>          * Enumerate devices in the ACPI namespace.
+> --
+> 2.0.4
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
