@@ -1,86 +1,36 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 17 Apr 2016 11:13:49 +0100
-Subject: [PATCH RFT 2/5] iio: mxs-lradc: move TS config into suitable
- function
-In-Reply-To: <570FF737.4050606@denx.de>
+Date: Sun, 17 Apr 2016 11:24:04 +0100
+Subject: [PATCH RFT 3/5] iio: mxs-lradc: move STMP reset out of ADC init
+In-Reply-To: <5710BE85.10403@denx.de>
 References: <1460648909-2657-1-git-send-email-stefan.wahren@i2se.com>
- <1460648909-2657-3-git-send-email-stefan.wahren@i2se.com>
- <570FF737.4050606@denx.de>
-Message-ID: <571361DD.1090001@kernel.org>
+ <1460648909-2657-4-git-send-email-stefan.wahren@i2se.com>
+ <201604150848.44242.jbe@pengutronix.de> <5710BE85.10403@denx.de>
+Message-ID: <57136444.2010002@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/04/16 21:01, Marek Vasut wrote:
-> On 04/14/2016 05:48 PM, Stefan Wahren wrote:
->> This patch moves the touchscreen type configuration into
->> a more suitable function. Btw this simplifies PM ops later.
+On 15/04/16 11:12, Marek Vasut wrote:
+> On 04/15/2016 08:48 AM, Juergen Borleis wrote:
+>> Hi Stefan,
 >>
->> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+>> On Thursday 14 April 2016 17:48:27 Stefan Wahren wrote:
+>>> This patch moves the STMP reset out of ADC init function
+>>> in order to make it never fail. This is also necessary
+>>> for PM ops.
+>>
+>> What do you mean with "make it never fail"?
 > 
-> Looks OK
-> 
-> Reviewed-by: Marek Vasut <marex@denx.de>
-Please do CC Dmitry and linux-input on any patches 'touching' the
-touchscreen parts of the driver.  I'm happy this one is simple
-enough to apply anyway, but best to make sure everyone is in the
-loop.
-
-Something a little odd happened when applying the patch.  Automerging
-failed so I did it by hand. Not sure what had changed!
-
-Anyhow, please sanity check I haven't messed it up.
-
-Applied to the togreg branch of iio.git - initially pushed out as
-testing for the autobuilders to play with it.
-
-Thanks,
-
+> He wants to make the function invoke only functions which don't return
+> error value. Not a great wording, but the patch makes it clear.
+I've reworded to make this a little clearer and applied it to the togreg branch
+of iio.git initially pushed out as testing for the autobuilders
+to play with it (also giving time for any more comments on it to come through)
 
 Jonathan
 > 
->> ---
->>  drivers/iio/adc/mxs-lradc.c |   21 +++++++++++----------
->>  1 file changed, 11 insertions(+), 10 deletions(-)
+>>> [...]
 >>
->> diff --git a/drivers/iio/adc/mxs-lradc.c b/drivers/iio/adc/mxs-lradc.c
->> index 0576953..7118fca 100644
->> --- a/drivers/iio/adc/mxs-lradc.c
->> +++ b/drivers/iio/adc/mxs-lradc.c
->> @@ -686,6 +686,17 @@ static void mxs_lradc_prepare_pressure(struct mxs_lradc *lradc)
->>  
->>  static void mxs_lradc_enable_touch_detection(struct mxs_lradc *lradc)
->>  {
->> +	/* Configure the touchscreen type */
->> +	if (lradc->soc == IMX28_LRADC) {
->> +		mxs_lradc_reg_clear(lradc, LRADC_CTRL0_MX28_TOUCH_SCREEN_TYPE,
->> +				    LRADC_CTRL0);
->> +
->> +		if (lradc->use_touchscreen == MXS_LRADC_TOUCHSCREEN_5WIRE)
->> +			mxs_lradc_reg_set(lradc,
->> +					  LRADC_CTRL0_MX28_TOUCH_SCREEN_TYPE,
->> +					  LRADC_CTRL0);
->> +	}
->> +
->>  	mxs_lradc_setup_touch_detection(lradc);
->>  
->>  	lradc->cur_plate = LRADC_TOUCH;
->> @@ -1491,16 +1502,6 @@ static int mxs_lradc_hw_init(struct mxs_lradc *lradc)
->>  	mxs_lradc_reg_wrt(lradc, 0, LRADC_DELAY(2));
->>  	mxs_lradc_reg_wrt(lradc, 0, LRADC_DELAY(3));
->>  
->> -	/* Configure the touchscreen type */
->> -	if (lradc->soc == IMX28_LRADC) {
->> -		mxs_lradc_reg_clear(lradc, LRADC_CTRL0_MX28_TOUCH_SCREEN_TYPE,
->> -				    LRADC_CTRL0);
->> -
->> -	if (lradc->use_touchscreen == MXS_LRADC_TOUCHSCREEN_5WIRE)
->> -		mxs_lradc_reg_set(lradc, LRADC_CTRL0_MX28_TOUCH_SCREEN_TYPE,
->> -				  LRADC_CTRL0);
->> -	}
->> -
->>  	/* Start internal temperature sensing. */
->>  	mxs_lradc_reg_wrt(lradc, 0, LRADC_CTRL2);
->>  
+>> jb
 >>
 > 
 > 
