@@ -1,129 +1,77 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Sun, 17 Apr 2016 19:40:45 +0200
-Subject: [PATCH] KVM: arm/arm64: Handle forward time correction gracefully
-In-Reply-To: <570B93F2.7000905@semihalf.com>
-References: <1459931842-29465-1-git-send-email-marc.zyngier@arm.com>
- <570B93F2.7000905@semihalf.com>
-Message-ID: <5713CA9D.1030801@semihalf.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 17 Apr 2016 19:55:40 +0200
+Subject: Nokia N900 retention mode in v4.6, camera buttons fun
+In-Reply-To: <20160412163055.GP5995@atomide.com>
+References: <20160407194828.GA13338@amd> <20160407213229.GO16484@atomide.com>
+ <20160407230150.GA16552@amd> <20160407234134.GQ16484@atomide.com>
+ <20160411093023.GC11814@amd> <20160411094130.GA5753@amd>
+ <20160411211026.GH5995@atomide.com> <20160412121658.GA32486@amd>
+ <20160412123013.GA12296@amd> <20160412163055.GP5995@atomide.com>
+Message-ID: <20160417175539.GA502@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11.04.2016 14:09, Tomasz Nowicki wrote:
-> On 06.04.2016 10:37, Marc Zyngier wrote:
->> On a host that runs NTP, corrections can have a direct impact on
->> the background timer that we program on the behalf of a vcpu.
->>
->> In particular, NTP performing a forward correction will result in
->> a timer expiring sooner than expected from a guest point of view.
->> Not a big deal, we kick the vcpu anyway.
->>
->> But on wake-up, the vcpu thread is going to perform a check to
->> find out whether or not it should block. And at that point, the
->> timer check is going to say "timer has not expired yet, go back
->> to sleep". This results in the timer event being lost forever.
->>
->> There are multiple ways to handle this. One would be record that
->> the timer has expired and let kvm_cpu_has_pending_timer return
->> true in that case, but that would be fairly invasive. Another is
->> to check for the "short sleep" condition in the hrtimer callback,
->> and restart the timer for the remaining time when the condition
->> is detected.
->>
->> This patch implements the latter, with a bit of refactoring in
->> order to avoid too much code duplication.
->>
->> Reported-by: Alexander Graf <agraf@suse.de>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>   virt/kvm/arm/arch_timer.c | 47
->> +++++++++++++++++++++++++++++++++++++----------
->>   1 file changed, 37 insertions(+), 10 deletions(-)
->>
->> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
->> index a9ad4fe..4d0e77a 100644
->> --- a/virt/kvm/arm/arch_timer.c
->> +++ b/virt/kvm/arm/arch_timer.c
->> @@ -98,10 +98,46 @@ static void kvm_timer_inject_irq_work(struct
->> work_struct *work)
->>       kvm_vcpu_kick(vcpu);
->>   }
->>
->> +static u64 kvm_timer_compute_delta(struct kvm_vcpu *vcpu)
->> +{
->> +    cycle_t cval, now;
->> +
->> +    cval = vcpu->arch.timer_cpu.cntv_cval;
->> +    now = kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
->> +
->> +    if (now < cval) {
->> +        u64 ns;
->> +
->> +        ns = cyclecounter_cyc2ns(timecounter->cc,
->> +                     cval - now,
->> +                     timecounter->mask,
->> +                     &timecounter->frac);
->> +        return ns;
->> +    }
->> +
->> +    return 0;
->> +}
->> +
->>   static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
->>   {
->>       struct arch_timer_cpu *timer;
->> +    struct kvm_vcpu *vcpu;
->> +    u64 ns;
->> +
->>       timer = container_of(hrt, struct arch_timer_cpu, timer);
->> +    vcpu = container_of(timer, struct kvm_vcpu, arch.timer_cpu);
->> +
->> +    /*
->> +     * Check that the timer has really expired from the guest's
->> +     * PoV (NTP on the host may have forced it to expire
->> +     * early). If we should have slept longer, restart it.
->> +     */
->> +    ns = kvm_timer_compute_delta(vcpu);
->> +    if (unlikely(ns)) {
->> +        hrtimer_forward_now(hrt, ns_to_ktime(ns));
->> +        return HRTIMER_RESTART;
->> +    }
->> +
->>       queue_work(wqueue, &timer->expired);
->>       return HRTIMER_NORESTART;
->>   }
->> @@ -176,8 +212,6 @@ static int kvm_timer_update_state(struct kvm_vcpu
->> *vcpu)
->>   void kvm_timer_schedule(struct kvm_vcpu *vcpu)
->>   {
->>       struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
->> -    u64 ns;
->> -    cycle_t cval, now;
->>
->>       BUG_ON(timer_is_armed(timer));
->>
->> @@ -197,14 +231,7 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
->>           return;
->>
->>       /*  The timer has not yet expired, schedule a background timer */
->> -    cval = timer->cntv_cval;
->> -    now = kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
->> -
->> -    ns = cyclecounter_cyc2ns(timecounter->cc,
->> -                 cval - now,
->> -                 timecounter->mask,
->> -                 &timecounter->frac);
->> -    timer_arm(timer, ns);
->> +    timer_arm(timer, kvm_timer_compute_delta(vcpu));
->>   }
->>
->>   void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
->>
->
-> Works for me, thanks Marc!
->
-> Tested-by: Tomasz Nowicki <tn@semihalf.com>
->
+Hi!
 
-FYI: The patch was tested on Cavium ThunderX server.
+> > > > > Ok, it works now. I was doing tests in daylight so it was poorly
+> > > > > visible. The right part of keyboard stays lit (but that's expected
+> > > > > AFAICT), but the left part blinks.
+> > > > 
+> > > > During idle, both should go off and are doing so for me. Both LEDs off
+> > > > indicates off mode, left LED off is for retention mode. So you still
+> > > > have something blocking off mode, maybe check:
+> > > > 
+> > > > echo 1 > /sys/kernel/debug/pm_debug/enable_off_mode
+> > > 
+> > > What is the power difference between retention and off? I'm now down
+> > > to cca 25mA, which should be around 50 hours standby time. Not ideal,
+> > > but should be usable.
+> 
+> The 25mA sounds way too big to me even for retention mode, some
+> devices must be still on.
 
-Tomasz
+Yes, cca 60mW. 
+
+> The off mode makes a huge difference for standby time, it should cut
+> down the total power consumption to something like 10+ mW with modem
+> enabled. Aproximately the breakdown is roughly: 900 uW for omap, 5 mW
+> for memory and 5 or more for the modem. Sorry I don't know the exact
+> numbers for the modem. But with 37xx torpedo, mainline kernel is
+> already getting very close to the 900 uW + 5 mW numbers for the CPU
+> module during idle measured from the ina219 shunt on the torpedo
+> devkit.
+
+CONFIG_HSI breaks power management completely, so power management
+with modem will be another topic.  
+
+> > > In the meantime, I found what is causing the rention mode to break for
+> > > me: CONFIG_HSI (aka wireless modem support). With HSI off, it seems to work.
+> > > 
+> > > I still get problems with the camera button, in config similar to
+> > > defconfig.  For some reason, I'm even getting (autorepeating) ^@ on
+> > > console. As long as I hold camera button down, I even get it into off
+> > > mode for brief period.
+> > 
+> > Ok, if I turn off CONFIG_KEYBOARD_GPIO, I get it into off
+> > mode... once per screen blank, for about a second. (Does CONFIG_KEYBOARD_GPIO also cause
+> > problems for you?)
+> > 
+> > Any idea why it enters off mode only once after each screenblank?
+> 
+> After disabling CONFIG_PROVE_LOCKING, loading the LCD modules, and
+> blanking the screen, my n900 hits off mode just fine about once
+> a second. Sounds like you still have some extra devices enabled
+> causing it.
+
+I checked again... also with vanilla 4.6-rc2 to double check... same effect.
+
+Aha, got it... cat-ing /sys/kernel/debug/pm_debug/count breaks the
+off mode. If I don't do that (tm), it seems to work way better.
+
+Thanks,
+										Pavel
+
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
