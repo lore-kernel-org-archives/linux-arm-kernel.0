@@ -1,43 +1,32 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 18 Apr 2016 08:26:25 +0200
-Subject: [PATCH RFT 2/5] iio: mxs-lradc: move TS config into suitable
- function
-In-Reply-To: <571361DD.1090001@kernel.org>
-References: <1460648909-2657-1-git-send-email-stefan.wahren@i2se.com>
- <1460648909-2657-3-git-send-email-stefan.wahren@i2se.com>
- <570FF737.4050606@denx.de> <571361DD.1090001@kernel.org>
-Message-ID: <57147E11.8020201@i2se.com>
+From: poggi.raph@gmail.com (=?UTF-8?Q?Rapha=C3=ABl_Poggi?=)
+Date: Mon, 18 Apr 2016 08:29:05 +0200
+Subject: atmel-ssc-dai problem with ssc1
+In-Reply-To: <AM4PR02MB12993ACE353BDD05E26E8448BC6A0@AM4PR02MB1299.eurprd02.prod.outlook.com>
+References: <AM4PR02MB12993ACE353BDD05E26E8448BC6A0@AM4PR02MB1299.eurprd02.prod.outlook.com>
+Message-ID: <CACqcpZCe3T7cc8whW8R8XZZ5G0mO0wvfO+V4sedKu0SOL13Erg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 17.04.2016 um 12:13 schrieb Jonathan Cameron:
-> On 14/04/16 21:01, Marek Vasut wrote:
->> On 04/14/2016 05:48 PM, Stefan Wahren wrote:
->>> This patch moves the touchscreen type configuration into
->>> a more suitable function. Btw this simplifies PM ops later.
->>>
->>> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
->> Looks OK
+Hi,
+
+2016-04-17 22:53 GMT+02:00 Peter Rosin <peda@axentia.se>:
+> Rapha?l Poggi wrote:
+>> Hi,
 >>
->> Reviewed-by: Marek Vasut <marex@denx.de>
-> Please do CC Dmitry and linux-input on any patches 'touching' the
-> touchscreen parts of the driver.  I'm happy this one is simple
-> enough to apply anyway, but best to make sure everyone is in the
-> loop.
+>> If I remember correctly, this problem is old, but there is a patch
+>> ([1]) which fix this. Did you try it ?
+>>
+>> [1]: http://lkml.iu.edu/hypermail/linux/kernel/1601.1/04004.html
 >
-> Something a little odd happened when applying the patch.  Automerging
-> failed so I did it by hand. Not sure what had changed!
->
-> Anyhow, please sanity check I haven't messed it up.
+> Not yet, but it looks exactly right. However, I did look in the
+> current linux4sam/linux-4.1-at91 branch and found nothing. I
+> assumed fixes like this would be added to that branch quickly,
+> is that not a correct assumption?
 
-Everything is fine. There was a indention conflict between Ksenija's and
-my patch.
+I don't know, sorry.
 
 >
-> Applied to the togreg branch of iio.git - initially pushed out as
-> testing for the autobuilders to play with it.
+> Thanks for the pointer!
 >
-> Thanks,
->
->
-> Jonathan
+> Cheers,
+> Peter
