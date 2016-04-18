@@ -1,105 +1,71 @@
-From: jan.glauber@caviumnetworks.com (Jan Glauber)
-Date: Mon, 18 Apr 2016 15:17:55 +0200
-Subject: [PATCH v2] arm64: Reduce verbosity on SMP CPU stop
-In-Reply-To: <20160418121930.GH28645@arm.com>
-References: <1460715876-10780-1-git-send-email-jglauber@cavium.com>
- <20160415113706.GE22906@arm.com> <20160418074333.GA16109@hardcore>
- <20160418121930.GH28645@arm.com>
-Message-ID: <20160418131755.GA2826@hardcore>
+From: stuart.yoder@nxp.com (Stuart Yoder)
+Date: Mon, 18 Apr 2016 13:28:21 +0000
+Subject: [RFC PATCH] arm64: defconfig: add config fragment for Freescale
+ SoCs
+In-Reply-To: <CABtop_F_SkKm6H-mtpK-GHDA3PBg_RTfw=CJeewV-LLEN0SHzA@mail.gmail.com>
+References: <1460643685-13670-1-git-send-email-stuart.yoder@nxp.com>
+ <20160414170433.GF15182@e104818-lin.cambridge.arm.com>
+ <CABtop_F_SkKm6H-mtpK-GHDA3PBg_RTfw=CJeewV-LLEN0SHzA@mail.gmail.com>
+Message-ID: <HE1PR04MB16415DC3F35792B50303B3D18D6B0@HE1PR04MB1641.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 18, 2016 at 01:19:31PM +0100, Will Deacon wrote:
-> On Mon, Apr 18, 2016 at 09:43:33AM +0200, Jan Glauber wrote:
-> > On Fri, Apr 15, 2016 at 12:37:06PM +0100, Will Deacon wrote:
-> > > You can remove stop_lock altogether now, right? I also wonder whether
-> > > it would be worth printing out which CPUs are still online in the case where
-> > > we fail to stop all the secondaries?
-> > 
-> > Sorry, I've been a bit offline. Yes, the stop_lock can also be removed. 
-> > 
-> > How about below patch that prints the CPU ids for all CPUs that failed
-> > to stop?
+
+
+> -----Original Message-----
+> From: Martinez Kristofer [mailto:kristofer.s.martinez at gmail.com]
+> Sent: Sunday, April 17, 2016 4:11 AM
+> To: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Stuart Yoder <stuart.yoder@nxp.com>; mark.rutland at arm.com; marc.zyngier at arm.com;
+> will.deacon at arm.com; Yang-Leo Li <leoyang.li@nxp.com>; Scott Wood <scott.wood@nxp.com>; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [RFC PATCH] arm64: defconfig: add config fragment for Freescale SoCs
 > 
-> Yeah, this looks better, thanks. We might want to clear the "stopper"
-> CPU from the mask, but it's hard to really care that much.
-
-Then let's not do it, the fact that "the CPU that executes this code
-is also still online" is not too wrong...
-
-Jan
-
-
-> Will
+> On Fri, Apr 15, 2016 at 1:04 AM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > On Thu, Apr 14, 2016 at 09:21:25AM -0500, Stuart Yoder wrote:
+> >> Add a config fragment enabling a reasonably useful set of
+> >> devices and options for Freescale ARM v8 SoCs.
+> >
+> > A gentle NAK ;).
+> >
+> >> I realize that we are trying to avoid the defconfig hell in arch/arm with 100+
+> >> defconfigs, but the single defconfig in arch/arm64 has some problems too.
+> >
+> > Can we address these problems in defconfig?
+> >
+> >> I think what we want with arch/arm64/config are some reasonable in-kernel
+> >> defconfigs/fragments with built-in drivers for convenience.
+> >
+> > A hard requirement for arm64 is single Image and having all SoCs in
+> > defconfig is a good way to regularly test this.
+> >
+> > I am aware that at some point the defconfig size will get too big but
+> > that's when (ideally before) we should put effort into building more
+> > stuff as loadable modules.
+> >
+> >> The proposal is to allow a chip vendor 1 vendor-specific kconfig fragment
+> >> to cover all their chips, allowing them to _override_ the default config
+> >> options in defconfig.  One specific issue we have is that due to the ls2080a
+> >> physical address map, the combination of 4KB pages and 39-bit VA does not
+> >> allow us to see all our DDR.  And, thus we need CONFIG_ARM64_VA_BITS_48=y.
+> >
+> > And I'm fine to add this to defconfig. We had a case for Seattle needing
+> > 48-bit VA but we eventually decoupled the number of levels for idmap and
+> > swapper. If it can't be addressed in a similar way on ls2080a, we may
+> > need to increase the VA space to 48-bit.
+> >
 > 
-> > 
-> > Jan
-> > 
-> > --------------------------------
-> > 
-> > When CPUs are stopped during an abnormal operation like panic
-> > for each CPU a line is printed and the stack trace is dumped.
-> > 
-> > This information is only interesting for the aborting CPU
-> > and on systems with many CPUs it only makes it harder to
-> > debug if after the aborting CPU the log is flooded with data
-> > about all other CPUs too.
-> > 
-> > Therefore remove the stack dump and printk of other CPUs
-> > and only print a single line that the other CPUs are going to be
-> > stopped and, in case any CPUs remain online list them.
-> > 
-> > Signed-off-by: Jan Glauber <jglauber@cavium.com>
-> > ---
-> >  arch/arm64/kernel/smp.c | 16 +++++-----------
-> >  1 file changed, 5 insertions(+), 11 deletions(-)
-> > 
-> > diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> > index b2d5f4e..29f4e37 100644
-> > --- a/arch/arm64/kernel/smp.c
-> > +++ b/arch/arm64/kernel/smp.c
-> > @@ -763,21 +763,11 @@ void arch_irq_work_raise(void)
-> >  }
-> >  #endif
-> >  
-> > -static DEFINE_RAW_SPINLOCK(stop_lock);
-> > -
-> >  /*
-> >   * ipi_cpu_stop - handle IPI from smp_send_stop()
-> >   */
-> >  static void ipi_cpu_stop(unsigned int cpu)
-> >  {
-> > -	if (system_state == SYSTEM_BOOTING ||
-> > -	    system_state == SYSTEM_RUNNING) {
-> > -		raw_spin_lock(&stop_lock);
-> > -		pr_crit("CPU%u: stopping\n", cpu);
-> > -		dump_stack();
-> > -		raw_spin_unlock(&stop_lock);
-> > -	}
-> > -
-> >  	set_cpu_online(cpu, false);
-> >  
-> >  	local_irq_disable();
-> > @@ -872,6 +862,9 @@ void smp_send_stop(void)
-> >  		cpumask_copy(&mask, cpu_online_mask);
-> >  		cpumask_clear_cpu(smp_processor_id(), &mask);
-> >  
-> > +		if (system_state == SYSTEM_BOOTING ||
-> > +		    system_state == SYSTEM_RUNNING)
-> > +			pr_crit("SMP: stopping secondary CPUs\n");
-> >  		smp_cross_call(&mask, IPI_CPU_STOP);
-> >  	}
-> >  
-> > @@ -881,7 +874,8 @@ void smp_send_stop(void)
-> >  		udelay(1);
-> >  
-> >  	if (num_online_cpus() > 1)
-> > -		pr_warning("SMP: failed to stop secondary CPUs\n");
-> > +		pr_warning("SMP: failed to stop secondary CPUs %*pbl\n",
-> > +			   cpumask_pr_args(cpu_online_mask));
-> >  }
-> >  
-> >  /*
-> > -- 
-> > 1.9.1
-> > 
+> Here my suggestion is 48-bit VA will be depended on the CONFIG_ACPI,
+> IOW, if CONFIG_ACPI
+> is seleceted, then CONFIG_ARM64_VA_BITS_48 will be selected too.
+> The premise is ACPI will be used in larger VA space segment as it did
+> in Server area.
+> Stuart, does your ls2080a need to be configured with ACPI?
+
+No, the ls2080a does not currently use ACPI, but it may (optionally)
+in the future.  For us the issue is simply having enough virtual
+address bits for the kernel's linear mapping to cover 2 discontiguous
+regions of DDR.
+
+Stuart
