@@ -1,46 +1,101 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 18 Apr 2016 14:30:23 +0200
-Subject: [RESPIN v2 0/6] Add support for Exynos SROM Controller driver
-In-Reply-To: <1460360548-32127-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1460360548-32127-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <5714D35F.1070705@samsung.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 18 Apr 2016 14:34:12 +0200
+Subject: [PATCH 1/5] doc: DT: Add Generic Serial Device Tree Bindings
+In-Reply-To: <5792073.qsBJ1LK659@wuerfel>
+References: <1460636003-3011-1-git-send-email-geert+renesas@glider.be>
+ <1460636003-3011-2-git-send-email-geert+renesas@glider.be>
+ <5792073.qsBJ1LK659@wuerfel>
+Message-ID: <CAMuHMdWmHUhhwbYDcmNXuxBRC6n+tp=oX03dBaK2VgL4OA72MQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/11/2016 09:42 AM, Pankaj Dubey wrote:
-> This is second attemp for making in this series. This is a collection of patches
-> already reviewed and merged in maintainer's tree, but could not make it thorugh main linus tree,
-> due to last moment suggestion of proper location of driver should be
-> "drivers/memory" instead of "drivers/soc". I have rebased all the patches
-> and moved into "drivers/memory/samsung". Second time due to some suggestions in binding document.
-> 
-> As this is just a movement without changing actual driver code,
-> I have not removed "Reviewed-By", "Tested-By" or "Acked-By".
-> 
-> To make sure everything is fine, I have again tested it on Exynos5880 based
-> Chromebook for normal boot, S2R functionality and its working fine.
-> 
-> This series has been prepared on top of next-soc branch of Krzysztof's tree.
-> 
-> Changes since RESPIN-v1:
->  - Addressed review comments in srom binding documentation mainly from Rob Herring.
->  - Modified compatibility from "samsung, exynos-srom" to "samsung, exynos4210-srom"
->  - Changed type of optional property "samsung,srom-page-mode" from int to bool
->  - Adjusted exynos-srom driver code for reflecting change in type of above property.
->  - Renamed exynos SROM dt node as "memory-controller" instead of "sromc".
-> 
-> 
-> Pankaj Dubey (5):
->   dt-bindings: EXYNOS: Add exynos-srom device tree binding
->   memory: Add support for Exynos SROM driver
->   MAINTAINERS: Add maintainers entry for drivers/memory/samsung
->   ARM: EXYNOS: Remove SROM related register settings from mach-exynos
->   ARM: dts: change SROM node compatible from generic to model specific
-> 
-> Pavel Fedin (1):
->   memory: samsung: exynos-srom: Add support for bank configuration
+Hi Arnd,
 
-Thanks applied. I plan to send it for v4.7 in second pull-request.
+CC Richard (serial-mctrl-gpio)
+CC Grant (ePAPR successor) and Frank
 
-Best regards,
-Krzysztof
+On Sat, Apr 16, 2016 at 6:30 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 14 April 2016 14:13:19 Geert Uytterhoeven wrote:
+>> Document a set of generic properties for describing UARTs in a
+>> device tree:
+>>   1. The GPIO modem control properties are currently duplicated across
+>>      hardware-specific binding documentation,
+>>   2. The property for dedicated RTS/CTS hardware flow control lines is
+>>      already supported by several drivers, albeit with a vendor-specific
+>>      prefix, hence make it generic.
+>>
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>
+> Originally the ISA 8250 uart binding (from ieee) was used as the
+> template for other uart bindings. How about documenting the parts that
+> are used in 8250-of today (current-speed, clock-frequency,
+> reg-offset, reg-shift, fifo-size, reg-io-width, auto-flow-control)
+> in the same file?
+
+I don't think we have the habit of documenting (duplicating) bindings for ePAPR
+under Documentation/devicetree/bindings/. Perhaps we should?
+
+Apart from that, most of the properties you mention look legacy or overly
+broad too me.
+
+  - current-speed: This is configuration, not a property of the hardware.
+    For the console, this has been deprecated by appending the serial config
+    to chosen/stdout-path (e.g. "serial0:115200n8").
+    For non-consoles, its use is debatable, IMHO.
+    It's users are mostly legacy powerpc and early adaptors of DT on ARM.
+  - clock-frequency: Legacy predating the Common Clock Framework.
+    Any modern SoC uses clock specifiers with clock handles pointing to clock
+    providers.
+  - reg-offset, reg-shift, reg-io-width: These are much broader than serial,
+    and IMHO thus don't belong in
+    Documentation/devicetree/bindings/serial/serial.txt.
+  - auto-flow-control: Looks a bit like a vague version of "uart-has-rtscts".
+    Documentation/devicetree/bindings/serial/8250.txt doesn't make it clear
+    whether this is about hardware capabilities or software configuration.
+    Even the driver doesn't make it clear:
+    #define UART_CAP_AFE    (1 << 11)       /* MCR-based hw flow control */
+    "MCR" could mean RTS/CTS, DSR/DTR, ...
+  - fifo-size: This one could be generic. atmel-usart uses a vendor-specific
+    version "atmel,fifo-size".
+
+I suggest we move forward with my initial set, as I have patches that depend on
+them? We can always add more properties later.
+
+>>  - out1-gpios: Must contain a GPIO specifier, referring to the GPIO pin to be
+>>    used as the UART's OUT1 line.
+>>  - out2-gpios: Must contain a GPIO specifier, referring to the GPIO pin to be
+>>    used as the UART's OUT2 line.
+>
+> I had to look up what OUT1 and OUT2 are, but I still don't see how you'd
+> implement them using a GPIO line: From all I can tell, these are usually
+> internal registers in a hardware uart but they are not assigned to an
+> external line on the standard db9 or even the old db25 connectors. Should
+> we drop these instead?
+
+They're indeed fairly exotic, and they're burried deeply in the ns16550
+datasheet. We do have TIOCM_OUT1 and TIOCM_LOOP in asm-generic/termios.h,
+probably for obscure historical reasons.
+
+If we drop them, I guess they should be removed from the helper code in
+drivers/tty/serial/serial_mctrl_gpio.c, too? There don't seem to be any
+current users.
+
+> On a related note, do you think it would be possible to do a bit-banged
+> uart if we defined gpio lines for rxd and txd?
+
+Sure we can. Whether it would work well is another question ;-)
+Regardless of flow control, byte transmission and reception has hard real-time
+requirements due to the implicit clocking.
+Bit-banging i2c and spi (master) is much easier, as clocking is explicit.
+Even i2c slave is easier, as the slave can stretch cycles.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
