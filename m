@@ -1,315 +1,225 @@
-From: john@metanate.com (John Keeping)
-Date: Mon, 18 Apr 2016 10:25:38 +0100
-Subject: [PATCH] drm/rockchip: get rid of rockchip_drm_crtc_mode_config
-In-Reply-To: <1460948611-32259-1-git-send-email-mark.yao@rock-chips.com>
-References: <1460948611-32259-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <20160418102538.0ed730ca.john@metanate.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 18 Apr 2016 10:28:26 +0100
+Subject: [RFC PATCH 2/2] ARM64: arch_timer: Work around QorIQ Erratum
+ A-009971
+In-Reply-To: <1460856741.32510.161.camel@buserror.net>
+References: <1460341353-15619-1-git-send-email-oss@buserror.net>
+ <1460341353-15619-3-git-send-email-oss@buserror.net>
+ <570B7486.3080204@arm.com> <1460440458.32510.110.camel@buserror.net>
+ <570CB04B.3090406@arm.com> <1460856741.32510.161.camel@buserror.net>
+Message-ID: <5714A8BA.2070209@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On Mon, 18 Apr 2016 11:03:31 +0800, Mark Yao wrote:
-
-> We need to take care of the vop status when use
-> rockchip_drm_crtc_mode_config, if vop is disabled,
-> the function would failed, that is terrible.
+On 17/04/16 02:32, Scott Wood wrote:
+> On Tue, 2016-04-12 at 09:22 +0100, Marc Zyngier wrote:
+>> On 12/04/16 06:54, Scott Wood wrote:
+>>> On Mon, 2016-04-11 at 10:55 +0100, Marc Zyngier wrote:
+>>>> On 11/04/16 03:22, Scott Wood wrote:
+>>>>> @@ -52,6 +53,20 @@ extern bool arm_arch_timer_reread;
+>>>>>  	_val; \
+>>>>>  })
+>>>>>  
+>>>>> +#define ARCH_TIMER_TVAL_REWRITE(pv, val) do { \
+>>>>> +	u64 _cnt_old, _cnt_new; \
+>>>>> +	int _timeout = 200; \
+>>>>> +	do { \
+>>>>> +		asm volatile("mrs %0, cntvct_el0;" \
+>>>>> +			     "msr cnt" pv "_tval_el0, %2;" \
+>>>>> +			     "mrs %1, cntvct_el0" \
+>>>>> +			     : "=&r" (_cnt_old), "=r" (_cnt_new) \
+>>>>> +			     : "r" (val)); \
+>>>>> +		_timeout--; \
+>>>>> +	} while (_cnt_old != _cnt_new && _timeout); \
+>>>>> +	WARN_ON_ONCE(!_timeout); \
+>>>>> +} while (0)
+>>>>> +
+>>>>
+>>>> Given how many times you've written that loop, I'm sure you can have a
+>>>> preprocessor macro that will do the right thing.
+>>>
+>>> I did use a preprocessor macro.  Are you asking me to consolidate the read
+>>> and
+>>> write macros?  That seems like it would create a mess that's worse than an
+>>> extra instance of a simple loop.
+>>
+>> From patch 1:
+>>
+>> +static __always_inline
+>> +u32 arch_timer_reg_tval_reread(int access, enum arch_timer_reg reg)
+>> +{
+>> +	u32 val, val_new;
+>> +	int timeout = 200;
+>> +
+>> +	do {
+>> +		if (access == ARCH_TIMER_PHYS_ACCESS) {
+>> +			asm volatile("mrc p15, 0, %0, c14, c2, 0;"
+>> +				     "mrc p15, 0, %1, c14, c2, 0"
+>> +				     : "=r" (val), "=r" (val_new));
+>> +		} else if (access == ARCH_TIMER_VIRT_ACCESS) {
+>> +			asm volatile("mrc p15, 0, %0, c14, c3, 0;"
+>> +				     "mrc p15, 0, %1, c14, c3, 0"
+>> +				     : "=r" (val), "=r" (val_new));
+>> +		}
+>> +		timeout--;
+>> +	} while (val != val_new && timeout);
+>> +
+>> +	WARN_ON_ONCE(!timeout);
+>> +	return val;
+>> +}
+>>
+>> [...]
+>>
+>> +static __always_inline u64 arch_counter_get_cnt(int opcode, bool reread)
+>>  {
+>> -	u64 cval;
+>> +	u64 val, val_new;
+>> +	int timeout = 200;
+>>
+>>  	isb();
+>> -	asm volatile("mrrc p15, 0, %Q0, %R0, c14" : "=r" (cval));
+>> -	return cval;
+>> +
+>> +	if (reread) {
+>> +		do {
+>> +			asm volatile("mrrc p15, %2, %Q0, %R0, c14;"
+>> +				     "mrrc p15, %2, %Q1, %R1, c14"
+>> +				     : "=r" (val), "=r" (val_new)
+>> +				     : "i" (opcode));
+>> +			timeout--;
+>> +		} while (val != val_new && timeout);
+>> +
+>> +		BUG_ON(!timeout);
+>> +	} else {
+>> +		asm volatile("mrrc p15, %1, %Q0, %R0, c14" : "=r" (val)
+>> +			     : "i" (opcode));
+>> +	}
+>> +
+>> +	return val;
+>>  }
+>>
+>> [...]
+>>
+>> +/* QorIQ errata workarounds */
+>> +#define ARCH_TIMER_REREAD(reg) ({ \
+>> +	u64 _val_old, _val_new; \
+>> +	int _timeout = 200; \
+>> +	do { \
+>> +		asm volatile("mrs %0, " reg ";" \
+>> +			     "mrs %1, " reg \
+>> +			     : "=r" (_val_old), "=r" (_val_new)); \
+>> +		_timeout--; \
+>> +	} while (_val_old != _val_new && _timeout); \
+>> +	WARN_ON_ONCE(!_timeout); \
+>> +	_val_old; \
+>> +})
+>>
+>> Do you notice a pattern? You are expressing the same loop in various
+>> ways (sometimes in a function, sometimes in a macro). I'm looking for a
+>> loop template that encapsulates the read access. You can have a similar
+>> macro for writes if you have more than a single instance.
 > 
-> Save connector type and output mode on drm_display_mode->private_flags
-> at encoder mode_fixup, then we can configure the type and mode safely
-> on crtc mode_set.
+> One that covers arm and arm64?  Where would it go?
 
-Since Rockchip is atomic, shouldn't this be using atomic_check hooks and
-a subclassed crtc_state structure?
+In the common code. Not anywhere else.
 
-> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-> ---
->  drivers/gpu/drm/rockchip/analogix_dp-rockchip.c |   37 +++++++---------
->  drivers/gpu/drm/rockchip/dw-mipi-dsi.c          |   44 ++++++++++---------
->  drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c     |    5 +--
->  drivers/gpu/drm/rockchip/inno_hdmi.c            |    5 +--
->  drivers/gpu/drm/rockchip/rockchip_drm_drv.h     |    2 -
->  drivers/gpu/drm/rockchip/rockchip_drm_vop.c     |   51 +++++++++--------------
->  drivers/gpu/drm/rockchip/rockchip_drm_vop.h     |    6 +++
->  7 files changed, 69 insertions(+), 81 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-> index a1d94d8..0344e52 100644
-> --- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-> +++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-> @@ -97,7 +97,21 @@ rockchip_dp_drm_encoder_mode_fixup(struct drm_encoder *encoder,
->  				   const struct drm_display_mode *mode,
->  				   struct drm_display_mode *adjusted_mode)
->  {
-> -	/* do nothing */
-> +	/*
-> +	 * FIXME(Yakir): driver should configure the CRTC output video
-> +	 * mode with the display information which indicated the monitor
-> +	 * support colorimetry.
-> +	 *
-> +	 * But don't know why the CRTC driver seems could only output the
-> +	 * RGBaaa rightly. For example, if connect the "innolux,n116bge"
-> +	 * eDP screen, EDID would indicated that screen only accepted the
-> +	 * 6bpc mode. But if I configure CRTC to RGB666 output, then eDP
-> +	 * screen would show a blue picture (RGB888 show a green picture).
-> +	 * But if I configure CTRC to RGBaaa, and eDP driver still keep
-> +	 * RGB666 input video mode, then screen would works prefect.
-> +	 */
-> +	adjusted_mode->private_flags = ROCKCHIP_DSP_MODE(eDP, AAAA);
-> +
->  	return true;
->  }
->  
-> @@ -114,27 +128,6 @@ static void rockchip_dp_drm_encoder_enable(struct drm_encoder *encoder)
->  	int ret;
->  	u32 val;
->  
-> -	/*
-> -	 * FIXME(Yakir): driver should configure the CRTC output video
-> -	 * mode with the display information which indicated the monitor
-> -	 * support colorimetry.
-> -	 *
-> -	 * But don't know why the CRTC driver seems could only output the
-> -	 * RGBaaa rightly. For example, if connect the "innolux,n116bge"
-> -	 * eDP screen, EDID would indicated that screen only accepted the
-> -	 * 6bpc mode. But if I configure CRTC to RGB666 output, then eDP
-> -	 * screen would show a blue picture (RGB888 show a green picture).
-> -	 * But if I configure CTRC to RGBaaa, and eDP driver still keep
-> -	 * RGB666 input video mode, then screen would works prefect.
-> -	 */
-> -	ret = rockchip_drm_crtc_mode_config(encoder->crtc,
-> -					    DRM_MODE_CONNECTOR_eDP,
-> -					    ROCKCHIP_OUT_MODE_AAAA);
-> -	if (ret < 0) {
-> -		dev_err(dp->dev, "Could not set crtc mode config (%d)\n", ret);
-> -		return;
-> -	}
-> -
->  	ret = drm_of_encoder_active_endpoint_id(dp->dev->of_node, encoder);
->  	if (ret < 0)
->  		return;
-> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> index 7975158..49c4c72 100644
-> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> @@ -875,11 +875,34 @@ static void dw_mipi_dsi_encoder_disable(struct drm_encoder *encoder)
->  	clk_disable_unprepare(dsi->pclk);
->  }
->  
-> +static bool dw_mipi_dsi_encoder_mode_fixup(struct drm_encoder *encoder,
-> +					const struct drm_display_mode *mode,
-> +					struct drm_display_mode *adjusted_mode)
-> +{
-> +	struct dw_mipi_dsi *dsi = encoder_to_dsi(encoder);
-> +
-> +	switch (dsi->format) {
-> +	case MIPI_DSI_FMT_RGB888:
-> +		adjusted_mode->private_flags = ROCKCHIP_DSP_MODE(DSI, P888);
-> +		break;
-> +	case MIPI_DSI_FMT_RGB666:
-> +		adjusted_mode->private_flags = ROCKCHIP_DSP_MODE(DSI, P666);
-> +		break;
-> +	case MIPI_DSI_FMT_RGB565:
-> +		adjusted_mode->private_flags = ROCKCHIP_DSP_MODE(DSI, P565);
-> +		break;
-> +	default:
-> +		WARN_ON(1);
-> +		return false;
-> +	}
-> +
-> +	return true;
-> +}
-> +
->  static void dw_mipi_dsi_encoder_commit(struct drm_encoder *encoder)
->  {
->  	struct dw_mipi_dsi *dsi = encoder_to_dsi(encoder);
->  	int mux = drm_of_encoder_active_endpoint_id(dsi->dev->of_node, encoder);
-> -	u32 interface_pix_fmt;
->  	u32 val;
->  
->  	if (clk_prepare_enable(dsi->pclk)) {
-> @@ -895,24 +918,6 @@ static void dw_mipi_dsi_encoder_commit(struct drm_encoder *encoder)
->  
->  	clk_disable_unprepare(dsi->pclk);
->  
-> -	switch (dsi->format) {
-> -	case MIPI_DSI_FMT_RGB888:
-> -		interface_pix_fmt = ROCKCHIP_OUT_MODE_P888;
-> -		break;
-> -	case MIPI_DSI_FMT_RGB666:
-> -		interface_pix_fmt = ROCKCHIP_OUT_MODE_P666;
-> -		break;
-> -	case MIPI_DSI_FMT_RGB565:
-> -		interface_pix_fmt = ROCKCHIP_OUT_MODE_P565;
-> -		break;
-> -	default:
-> -		WARN_ON(1);
-> -		return;
-> -	}
-> -
-> -	rockchip_drm_crtc_mode_config(encoder->crtc, DRM_MODE_CONNECTOR_DSI,
-> -				      interface_pix_fmt);
-> -
->  	if (mux)
->  		val = DSI0_SEL_VOP_LIT | (DSI0_SEL_VOP_LIT << 16);
->  	else
-> @@ -924,6 +929,7 @@ static void dw_mipi_dsi_encoder_commit(struct drm_encoder *encoder)
->  
->  static struct drm_encoder_helper_funcs
->  dw_mipi_dsi_encoder_helper_funcs = {
-> +	.mode_fixup = dw_mipi_dsi_encoder_mode_fixup,
->  	.commit = dw_mipi_dsi_encoder_commit,
->  	.mode_set = dw_mipi_dsi_encoder_mode_set,
->  	.disable = dw_mipi_dsi_encoder_disable,
-> diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-> index d5cfef7..a72af30 100644
-> --- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-> +++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-> @@ -186,6 +186,8 @@ dw_hdmi_rockchip_encoder_mode_fixup(struct drm_encoder *encoder,
->  				    const struct drm_display_mode *mode,
->  				    struct drm_display_mode *adj_mode)
->  {
-> +	adj_mode->private_flags = ROCKCHIP_DSP_MODE(HDMIA, AAAA);
-> +
->  	return true;
->  }
->  
-> @@ -201,9 +203,6 @@ static void dw_hdmi_rockchip_encoder_enable(struct drm_encoder *encoder)
->  	u32 val;
->  	int mux;
->  
-> -	rockchip_drm_crtc_mode_config(encoder->crtc, DRM_MODE_CONNECTOR_HDMIA,
-> -				      ROCKCHIP_OUT_MODE_AAAA);
-> -
->  	mux = drm_of_encoder_active_endpoint_id(hdmi->dev->of_node, encoder);
->  	if (mux)
->  		val = HDMI_SEL_VOP_LIT | (HDMI_SEL_VOP_LIT << 16);
-> diff --git a/drivers/gpu/drm/rockchip/inno_hdmi.c b/drivers/gpu/drm/rockchip/inno_hdmi.c
-> index 10d62ff..ef6ad91 100644
-> --- a/drivers/gpu/drm/rockchip/inno_hdmi.c
-> +++ b/drivers/gpu/drm/rockchip/inno_hdmi.c
-> @@ -500,9 +500,6 @@ static void inno_hdmi_encoder_enable(struct drm_encoder *encoder)
->  {
->  	struct inno_hdmi *hdmi = to_inno_hdmi(encoder);
->  
-> -	rockchip_drm_crtc_mode_config(encoder->crtc, DRM_MODE_CONNECTOR_HDMIA,
-> -				      ROCKCHIP_OUT_MODE_P888);
-> -
->  	inno_hdmi_set_pwr_mode(hdmi, NORMAL);
->  }
->  
-> @@ -517,6 +514,8 @@ static bool inno_hdmi_encoder_mode_fixup(struct drm_encoder *encoder,
->  					 const struct drm_display_mode *mode,
->  					 struct drm_display_mode *adj_mode)
->  {
-> +	adj_mode->private_flags = ROCKCHIP_DSP_MODE(HDMIA, P888);
-> +
->  	return true;
->  }
->  
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-> index 00d17d7..683210b 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-> @@ -68,8 +68,6 @@ void rockchip_drm_atomic_work(struct work_struct *work);
->  int rockchip_register_crtc_funcs(struct drm_crtc *crtc,
->  				 const struct rockchip_crtc_funcs *crtc_funcs);
->  void rockchip_unregister_crtc_funcs(struct drm_crtc *crtc);
-> -int rockchip_drm_crtc_mode_config(struct drm_crtc *crtc, int connector_type,
-> -				  int out_mode);
->  int rockchip_drm_dma_attach_device(struct drm_device *drm_dev,
->  				   struct device *dev);
->  void rockchip_drm_dma_detach_device(struct drm_device *drm_dev,
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> index a619f12..1a611cf 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> @@ -818,38 +818,6 @@ static const struct drm_plane_funcs vop_plane_funcs = {
->  	.atomic_destroy_state = vop_atomic_plane_destroy_state,
->  };
->  
-> -int rockchip_drm_crtc_mode_config(struct drm_crtc *crtc,
-> -				  int connector_type,
-> -				  int out_mode)
-> -{
-> -	struct vop *vop = to_vop(crtc);
-> -
-> -	if (WARN_ON(!vop->is_enabled))
-> -		return -EINVAL;
-> -
-> -	switch (connector_type) {
-> -	case DRM_MODE_CONNECTOR_LVDS:
-> -		VOP_CTRL_SET(vop, rgb_en, 1);
-> -		break;
-> -	case DRM_MODE_CONNECTOR_eDP:
-> -		VOP_CTRL_SET(vop, edp_en, 1);
-> -		break;
-> -	case DRM_MODE_CONNECTOR_HDMIA:
-> -		VOP_CTRL_SET(vop, hdmi_en, 1);
-> -		break;
-> -	case DRM_MODE_CONNECTOR_DSI:
-> -		VOP_CTRL_SET(vop, mipi_en, 1);
-> -		break;
-> -	default:
-> -		DRM_ERROR("unsupport connector_type[%d]\n", connector_type);
-> -		return -EINVAL;
-> -	};
-> -	VOP_CTRL_SET(vop, out_mode, out_mode);
-> -
-> -	return 0;
-> -}
-> -EXPORT_SYMBOL_GPL(rockchip_drm_crtc_mode_config);
-> -
->  static int vop_crtc_enable_vblank(struct drm_crtc *crtc)
->  {
->  	struct vop *vop = to_vop(crtc);
-> @@ -943,6 +911,8 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
->  	u16 vact_st = adjusted_mode->vtotal - adjusted_mode->vsync_start;
->  	u16 vact_end = vact_st + vdisplay;
->  	uint32_t val;
-> +	int type = ROCKCHIP_OUT_MODE_TYPE(adjusted_mode->private_flags);
-> +	int out_mode = ROCKCHIP_OUT_MODE(adjusted_mode->private_flags);
->  
->  	vop_enable(crtc);
->  	/*
-> @@ -985,6 +955,23 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
->  	val |= (adjusted_mode->flags & DRM_MODE_FLAG_NHSYNC) ? 0 : 1;
->  	val |= (adjusted_mode->flags & DRM_MODE_FLAG_NVSYNC) ? 0 : (1 << 1);
->  	VOP_CTRL_SET(vop, pin_pol, val);
-> +	switch (type) {
-> +	case DRM_MODE_CONNECTOR_LVDS:
-> +		VOP_CTRL_SET(vop, rgb_en, 1);
-> +		break;
-> +	case DRM_MODE_CONNECTOR_eDP:
-> +		VOP_CTRL_SET(vop, edp_en, 1);
-> +		break;
-> +	case DRM_MODE_CONNECTOR_HDMIA:
-> +		VOP_CTRL_SET(vop, hdmi_en, 1);
-> +		break;
-> +	case DRM_MODE_CONNECTOR_DSI:
-> +		VOP_CTRL_SET(vop, mipi_en, 1);
-> +		break;
-> +	default:
-> +		DRM_ERROR("unsupport connector_type[%d]\n", type);
-> +	}
-> +	VOP_CTRL_SET(vop, out_mode, out_mode);
->  
->  	VOP_CTRL_SET(vop, htotal_pw, (htotal << 16) | hsync_len);
->  	val = hact_st << 16;
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-> index 071ff0b..4c63a66 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-> @@ -183,6 +183,12 @@ struct vop_data {
->  /* for use special outface */
->  #define ROCKCHIP_OUT_MODE_AAAA	15
->  
-> +#define ROCKCHIP_OUT_MODE_TYPE(x)	((x) >> 16)
-> +#define ROCKCHIP_OUT_MODE(x)		((x) & 0xffff)
-> +#define ROCKCHIP_DSP_MODE(type, mode) \
-> +		((DRM_MODE_CONNECTOR_##type << 16) | \
-> +		 (ROCKCHIP_OUT_MODE_##mode & 0xffff))
-> +
->  enum alpha_mode {
->  	ALPHA_STRAIGHT,
->  	ALPHA_INVERSE,
+> If you mean one per arch, that's already the case on 64-bit (and you
+> complained in response to the write macro, hence my inferring that you wanted
+> read and write combined).  Two instances on 32-bit (of a fairly simple loop)
+> didn't seem enough to warrant using ugly macros, but I can if you want (with
+> the entire asm statement passed as a macro parameter).
+
+One issue is that you insist on these loops being inlined. They shouldn't.
+You're going to loop almost forever on this counter, so there is little
+point in saving a branch. Once you've given up on that, you'll find that
+you can write things in a much nicer way. Like this:
+
+<untested>
+diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+index fbe0ca3..55ff1d4 100644
+--- a/arch/arm64/include/asm/arch_timer.h
++++ b/arch/arm64/include/asm/arch_timer.h
+@@ -23,6 +23,7 @@
+ 
+ #include <linux/bug.h>
+ #include <linux/init.h>
++#include <linux/static_key.h>
+ #include <linux/types.h>
+ 
+ #include <clocksource/arm_arch_timer.h>
+@@ -114,16 +115,27 @@ static inline u64 arch_counter_get_cntpct(void)
+ 	return 0;
+ }
+ 
+-static inline u64 arch_counter_get_cntvct(void)
++extern struct static_key_false arch_timer_cntvct_ool_enabled;
++extern u64 arch_counter_get_cntvct_ool(void);
++
++/* Do not call this from outside of the arch_timer driver */
++static inline u64 __arch_counter_get_cntvct(void)
+ {
+ 	u64 cval;
+-
+-	isb();
+ 	asm volatile("mrs %0, cntvct_el0" : "=r" (cval));
+-
+ 	return cval;
+ }
+ 
++static inline u64 arch_counter_get_cntvct(void)
++{
++	if (static_branch_unlikely(&arch_timer_cntvct_ool_enabled)) {
++		return arch_counter_get_cntvct_ool();
++	} else {
++		isb();
++		return __arch_counter_get_cntvct();
++	}
++}
++
+ static inline int arch_timer_arch_init(void)
+ {
+ 	return 0;
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 5152b38..c8a386c 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -79,10 +79,30 @@ static enum ppi_nr arch_timer_uses_ppi = VIRT_PPI;
+ static bool arch_timer_c3stop;
+ static bool arch_timer_mem_use_virtual;
+ 
++DEFINE_STATIC_KEY_FALSE(arch_timer_cntvct_ool_enabled);
++EXPORT_SYMBOL_GPL(arch_timer_cntvct_ool_enabled);
++
+ /*
+  * Architected system timer support.
+  */
+ 
++u64 arch_counter_get_cntvct_ool(void)
++{
++	u64 cval_old, cval_new;
++	int timeout = 200;
++
++	do {
++		isb();
++		cval_old = __arch_counter_get_cntvct();
++		cval_new = __arch_counter_get_cntvct();
++		timeout--;
++	} while (cval_old != cval_new && timeout);
++
++	WARN_ON_ONCE(!timeout);
++	return cval_new;
++}
++EXPORT_SYMBOL_GPL(arch_counter_get_cntvct_ool);
++
+ static __always_inline
+ void arch_timer_reg_write(int access, enum arch_timer_reg reg, u32 val,
+ 			  struct clock_event_device *clk)
+</untested>
+
+32bit and physical counter handling should be pretty obvious.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
