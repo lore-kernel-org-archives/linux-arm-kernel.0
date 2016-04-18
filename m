@@ -1,182 +1,46 @@
 From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Mon, 18 Apr 2016 16:55:33 +0200
-Subject: [PATCH 0/5] add __init attribute
-Message-ID: <1460991338-9845-1-git-send-email-Julia.Lawall@lip6.fr>
+Date: Mon, 18 Apr 2016 16:55:36 +0200
+Subject: [PATCH 3/5] clocksource/drivers/mtk_timer: add __init attribute
+In-Reply-To: <1460991338-9845-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1460991338-9845-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1460991338-9845-4-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Add __init attribute on a function that is only called from other __init
-functions and that is not inlined.
+functions and that is not inlined, at least with gcc version 4.8.4 on an
+x86 machine with allyesconfig.  Currently, the function is put in the
+.text.unlikely segment.  Declaring it as __init will cause it to be put in
+the .init.text and to disappear after initialization.
 
-The complete semantic patch used to detect the need for this change is
-below (http://coccinelle.lip6.fr/).  This semantic patch checks for local
+The result of objdump -x on the function before the change is as follows:
+
+0000000000000000 l     F .text.unlikely 000000000000006f mtk_timer_setup.isra.4
+
+And after the change it is as follows:
+
+0000000000000000 l     F .init.text	000000000000006a mtk_timer_setup.isra.4
+
+Done with the help of Coccinelle.  The semantic patch checks for local
 static non-init functions that are called from an __init function and are
 not called from any other function.
 
-<smpl>
-@initialize:ocaml@
-@@
-
-let itbl = Hashtbl.create 101
-let ltbl = Hashtbl.create 101
-let thefile = ref ""
-
-let hashadd t k =
-  let cell =
-    try Hashtbl.find t k
-    with Not_found ->
-      let cell = ref 0 in
-      Hashtbl.add t k cell;
-      cell in
-  cell := !cell + 1
-
-let hashget t k = try !(Hashtbl.find t k) with Not_found -> 0
-
-let seen  = ref []
-
-@script:ocaml@
-@@
-
-(let file = List.hd (Coccilib.files()) in
-thefile := file;
-let file =
-    try List.hd(List.tl (Str.split (Str.regexp "/linux-next/") file))
-    with _ -> file in
-let ofile = "/var/julia/linux-next/" ^
-      (Filename.chop_extension file) ^ ".o" in
-if not(Sys.file_exists ofile)
-then Coccilib.exit());
-
-Hashtbl.clear itbl;
-Hashtbl.clear ltbl;
-seen := []
-
-@r@
-identifier f;
-@@
-
-__init f(...) { ... }
-
-@script:ocaml@
-f << r.f;
-@@
-
-Hashtbl.add itbl f ()
-
-@s disable optional_attributes@
-identifier f;
-@@
-
-static f(...) { ... }
-
-@script:ocaml@
-f << s.f;
-@@
-
-Hashtbl.add ltbl f ()
-
-@t exists@
-identifier f,g;
-position p;
-@@
-
-__init f(...) { ... when any
-   g@p(...)
-   ... when any
- }
-
-@script:ocaml@
-g << t.g;
-_p << t.p;
-@@
-
-if not (Hashtbl.mem ltbl g) || Hashtbl.mem itbl g
-then Coccilib.include_match false
-
-@ok1 disable optional_attributes exists@
-identifier f,t.g;
-@@
-
-f(...) { ... when any
-   g
-   ... when any
- }
-
-@ok2 disable optional_attributes exists@
-identifier i,j,fld,t.g;
-@@
-
-struct i j = { .fld = g, };
-
-@ok3 disable optional_attributes exists@
-identifier t.g;
-declarer d;
-@@
-
-d(...,g,...);
-
-@ok4 disable optional_attributes exists@
-identifier t.g;
-expression e;
-@@
-
-(
-e(...,g,...)
-|
-e(...,&g,...)
-|
-e = &g
-|
-e = g
-)
-
-@script:ocaml depends on !ok1 && !ok2 && !ok3 && !ok4@
-g << t.g;
-@@
-
-let file = !thefile in
-let file =
-    try List.hd(List.tl (Str.split (Str.regexp "/linux-next/") file))
-    with _ -> file in
-if not(List.mem (g,file) !seen)
-then
-  begin
-    seen := (g,file) :: !seen;
-    let ofile = "/var/julia/linux-next/" ^
-      (Filename.chop_extension file) ^ ".o" in
-    if Sys.file_exists ofile
-    then
-      let l =
-	Common.cmd_to_list
-	  (Printf.sprintf
-	     "objdump -x %s | grep -w %s | grep -w F | grep .text.unlikely"
-	     ofile g) in
-      match l with
-	[] -> Coccilib.include_match false
-      | _ ->
-	  Printf.printf "Info for %s %s\n" file g;
-	  List.iter
-	    (function l -> Printf.printf "%s\n" l)
-	    l;
-	  Printf.printf "\n"; flush stdout
-    else Coccilib.include_match false
-  end
-else Coccilib.include_match false
-
-@depends on !ok1 && !ok2 && !ok3 && !ok4@
-identifier t.g;
-@@
-
-- g
-+__init g
- (...) { ... }
-</smpl>
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
 ---
-
- drivers/clk/clk-qoriq.c         |    3 ++-
  drivers/clocksource/mtk_timer.c |    2 +-
- drivers/ide/cmd640.c            |    2 +-
- drivers/net/arcnet/com90xx.c    |    2 +-
- drivers/tty/rocket.c            |    3 ++-
- 5 files changed, 7 insertions(+), 5 deletions(-)
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
+index d67bc35..7e583f8 100644
+--- a/drivers/clocksource/mtk_timer.c
++++ b/drivers/clocksource/mtk_timer.c
+@@ -152,7 +152,7 @@ static irqreturn_t mtk_timer_interrupt(int irq, void *dev_id)
+ }
+ 
+ static void
+-mtk_timer_setup(struct mtk_clock_event_device *evt, u8 timer, u8 option)
++__init mtk_timer_setup(struct mtk_clock_event_device *evt, u8 timer, u8 option)
+ {
+ 	writel(TIMER_CTRL_CLEAR | TIMER_CTRL_DISABLE,
+ 		evt->gpt_base + TIMER_CTRL_REG(timer));
