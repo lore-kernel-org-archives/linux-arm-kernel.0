@@ -1,43 +1,46 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Mon, 18 Apr 2016 07:12:00 +0300
-Subject: [PATCH] ARM: dts: lpc32xx: set default clock rate of HCLK PLL
-Message-ID: <1460952720-6638-1-git-send-email-vz@mleia.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 18 Apr 2016 14:12:06 +1000
+Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v4.6
+In-Reply-To: <20160411230253.GB1589@verge.net.au>
+References: <cover.1460339328.git.horms+renesas@verge.net.au>
+ <CAMuHMdUwuabK2Ajo5dMWEf014Xvk-1WYz4YBTw1jVScrTKSx0g@mail.gmail.com>
+ <20160411230253.GB1589@verge.net.au>
+Message-ID: <20160418041206.GC3578@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Probably most of NXP LPC32xx boards have 13MHz main oscillator and
-therefore for HCLK PLL and ARM core clock rate default hardware
-setting is 16 * 13MHz = 208MHz, however a user may vary HCLK PLL/ARM
-core rate from 156MHz to about 266MHz for 13MHz clock source.
+Hi Geert, Hi Sjoerd,
 
-The change explicitly defines HCLK PLL output rate to default 208MHz
-to overwrite any settings done by a bootloader, if needed it can be
-redefined in a board DTS file.
+On Tue, Apr 12, 2016 at 08:02:54AM +0900, Simon Horman wrote:
+> On Mon, Apr 11, 2016 at 09:11:19AM +0200, Geert Uytterhoeven wrote:
+> > Hi Simon,
+> > 
+> > On Mon, Apr 11, 2016 at 3:52 AM, Simon Horman
+> > <horms+renesas@verge.net.au> wrote:
+> > > Hi Olof, Hi Kevin, Hi Arnd,
+> > >
+> > > Please consider these Renesas ARM based SoC fixes for v4.6.
+> > >
+> > >
+> > > Allow serial to work once again on the Porter board (Revision B) which
+> > > does not have the oscillator in question mounted.
+> > 
+> > Have you tested this on Porter?
+> 
+> I don't have working access to a porter at this time.
+> 
+> > I believe there's another change to be made for this revert to actually work,
+> > cfr. "[PATCH] ARM: dts: r8a7791: Don't disable referenced optional clocks"
+> > (https://lkml.org/lkml/2016/4/6/350)
+> 
+> Ok, understood.
+> 
+> Could someone verify that?
 
-Acked-by: Sylvain Lemieux <slemieux.tyco@gmail.com>
-Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
----
-The change was discussed on linux-clk mailing list, from that
-times I grab Sylvain's acked-by tag:
+I have added "ARM: dts: r8a7791: Don't disable referenced optional clocks"
+to the fixes-for-v4.6 branch and plan to push it in a fresh renesas-next
+tag a little later today.
 
-  http://www.spinics.net/lists/devicetree/msg116863.html
+I would appreciate any review and/or testing on porter of that branch.
 
- arch/arm/boot/dts/lpc32xx.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/boot/dts/lpc32xx.dtsi b/arch/arm/boot/dts/lpc32xx.dtsi
-index c58d8da..d7b84cd 100644
---- a/arch/arm/boot/dts/lpc32xx.dtsi
-+++ b/arch/arm/boot/dts/lpc32xx.dtsi
-@@ -294,6 +294,9 @@
- 
- 					clocks = <&xtal_32k>, <&xtal>;
- 					clock-names = "xtal_32k", "xtal";
-+
-+					assigned-clocks = <&clk LPC32XX_CLK_HCLK_PLL>;
-+					assigned-clock-rates = <208000000>;
- 				};
- 			};
- 
--- 
-2.1.4
+Thanks!
