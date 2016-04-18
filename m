@@ -1,31 +1,33 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Mon, 18 Apr 2016 04:37:38 +0300
-Subject: [PATCH] ARM: lpc32xx: remove duplicate const on lpc32xx_auxdata_lookup
-Message-ID: <1460943458-27609-1-git-send-email-vz@mleia.com>
+From: shijie.huang@arm.com (Huang Shijie)
+Date: Mon, 18 Apr 2016 09:49:56 +0800
+Subject: [PATCH] arm64: mm: remove the redundant code
+Message-ID: <1460944196-11780-1-git-send-email-shijie.huang@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove redundant duplicate const, which is found by smatch:
+We already re-enable interrupts where necessary in the entry code, so
+there is no need to do it again in do_page fault. This patch removes
+the redundant code.
 
-  arch/arm/mach-lpc32xx/phy3250.c:162:42: warning: duplicate const
-
-Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+Signed-off-by: Huang Shijie <shijie.huang@arm.com>
 ---
- arch/arm/mach-lpc32xx/phy3250.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/mm/fault.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/arch/arm/mach-lpc32xx/phy3250.c b/arch/arm/mach-lpc32xx/phy3250.c
-index b2f9e22..1ae7230 100644
---- a/arch/arm/mach-lpc32xx/phy3250.c
-+++ b/arch/arm/mach-lpc32xx/phy3250.c
-@@ -159,7 +159,7 @@ static struct lpc32xx_mlc_platform_data lpc32xx_mlc_data = {
- 	.dma_filter = pl08x_filter_id,
- };
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 95df28b..bdc193c 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -212,10 +212,6 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
+ 	tsk = current;
+ 	mm  = tsk->mm;
  
--static const struct of_dev_auxdata const lpc32xx_auxdata_lookup[] __initconst = {
-+static const struct of_dev_auxdata lpc32xx_auxdata_lookup[] __initconst = {
- 	OF_DEV_AUXDATA("arm,pl022", 0x20084000, "dev:ssp0", NULL),
- 	OF_DEV_AUXDATA("arm,pl022", 0x2008C000, "dev:ssp1", NULL),
- 	OF_DEV_AUXDATA("arm,pl110", 0x31040000, "dev:clcd", &lpc32xx_clcd_data),
+-	/* Enable interrupts if they were enabled in the parent context. */
+-	if (interrupts_enabled(regs))
+-		local_irq_enable();
+-
+ 	/*
+ 	 * If we're in an interrupt or have no user context, we must not take
+ 	 * the fault.
 -- 
-2.1.4
+2.5.5
