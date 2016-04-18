@@ -1,60 +1,56 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Mon, 18 Apr 2016 15:33:24 +0200
-Subject: [PATCH V6 00/13] Support for generic ACPI based PCI host
- controller
-In-Reply-To: <CAKc_7PVC6O4oh+bTmpLQRrhHrqGbaKB2hynecKOLmc5fBc-VVQ@mail.gmail.com>
-References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
- <571130BB.9030508@redhat.com>
- <CAKc_7PVC6O4oh+bTmpLQRrhHrqGbaKB2hynecKOLmc5fBc-VVQ@mail.gmail.com>
-Message-ID: <5714E224.1030307@semihalf.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 18 Apr 2016 15:39:25 +0200
+Subject: [PATCH v5 03/11] soc: renesas: rcar-sysc: Add DT support for SYSC
+ PM domains
+In-Reply-To: <CAMuHMdW+PboSz-u2dV=rmNFkd4qsEhm-O_4Ewdn_-H62gwq7Ng@mail.gmail.com>
+References: <1460558672-10290-1-git-send-email-geert+renesas@glider.be>
+ <1460558672-10290-4-git-send-email-geert+renesas@glider.be>
+ <CAPDyKFrQtX3-7GodrXV2zp4wHBgbWBOVKyE0XoeWaaxhZ2kUuw@mail.gmail.com>
+ <CAMuHMdW+PboSz-u2dV=rmNFkd4qsEhm-O_4Ewdn_-H62gwq7Ng@mail.gmail.com>
+Message-ID: <CAMuHMdUHPLRrOLO_qio80YHPye1tmrr=Fq9kpDg+Q0aVDycFiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.04.2016 17:31, Jayachandran C wrote:
-> On Fri, Apr 15, 2016 at 11:49 PM, Jon Masters <jcm@redhat.com> wrote:
->> On 04/15/2016 01:06 PM, Tomasz Nowicki wrote:
->>>  From the functionality point of view this series might be split into the
->>> following logic parts:
->>> 1. Necessary fixes as the preparation for using driver on ARM64.
->>> 2. New ECAM API and update for users of the pci-host-common API
->>> 3. Use new MCFG interface and implement generic ACPI based PCI host controller driver.
->>> 4. Enable above driver on ARM64
->>>
->>> Patches has been built on top of 4.6-rc2 and can be found here:
->>> git at github.com:semihalf-nowicki-tomasz/linux.git (pci-acpi-v6)
->>>
->>> This has been tested on Cavium ThunderX server. Any help in reviewing and
->>> testing is very appreciated.
->>>
->>> v5 -> v6
->>> - dropped idea of x86 MMCONFIG code refactoring
->>> - integrated JC's patches which introduce new ECAM API:
->>>    https://lkml.org/lkml/2016/4/11/907
->>>    git: https://github.com/jchandra-brcm/linux/ (arm64-acpi-pci-v3)
->>> - integrated Sinan's fix for releasing IO resources, see patch [06/13]
->>> - added ACPI support for ThunderX ECAM and PEM drivers
->>> - rebased to 4.6-rc2
+Hi Ulf,
+
+On Mon, Apr 18, 2016 at 2:59 PM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> On Mon, Apr 18, 2016 at 2:21 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> [...]
 >>
->> JC: can you explicitly confirm that you're ok with letting Tomasz drive
->> this? We would like to see one driver. Either that is Tomasz, or
->> Lorenzo, or it is you. But we need to have one overall cooordinated
->> effort to get this enablement into upstream as quickly as possible.
+>>> +
+>>> +static bool rcar_sysc_active_wakeup(struct device *dev)
+>>> +{
+>>> +       return true;
+>>
+>> I am interested to know why this is always returning true. Perhaps you
+>> can elaborate a bit on that?
 >
-> I have been concentrating on the ECAM code and ECAM based ACPI
-> host controller, the rest of the code is from Tomasz original patchset.
+> Too many copying from old shmobile PM Domain code?
+> Honestly, I don't know...
 >
-> I am not happy with the way the ACPI quirk handling is done in Tomasz's
-> current patchset. I believe that it has to be done in a separate patchset
-> with another set of discussions. It introduces additional complexity and
-> mixing that discussion with the ECAM one will not help in making progress.
+> Perhaps Rafael still remembers the original rationale, as git history for
+> commit e3e0109138376bb2 ("ARM / shmobile: Support for I/O power domains for
+> SH7372 (v9)") doesn't have it.
+>
+> Google did find: https://lkml.org/lkml/2011/6/30/471
+>
+> Do we still need this at all? I.e. aren't PM Domains containing wake-up
+> devices kept powered automatically during system suspend?
 
-Of course we can split discussion into the two topics:
-1. ECAM based ACPI host controller - patches [1-10]
-2. Quirks handling and examples.
+No they aren't. So for pm-rmobile we do need it.
 
-IMO, it is very helpful for reviewers to go with one unified patch set 
-and see the whole picture. Also, as you can see, quirks handling allows 
-people to test it easily with their servers (not only QEMU but real HW).
+For rcar-sysc it's different: as no PM Domain contains wake-up devices
+(all I/O devices are in the always-on power area), we don't need the callback.
+Will drop it in v6.
 
-Thanks,
-Tomasz
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
