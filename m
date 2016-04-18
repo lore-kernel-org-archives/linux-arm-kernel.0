@@ -1,38 +1,56 @@
-From: lipengcheng8@huawei.com (lipengcheng)
-Date: Mon, 18 Apr 2016 16:41:59 +0800
-Subject: [PATCH] coresight: etm4x: Add DT implementation.
-Message-ID: <1460968919-136371-1-git-send-email-lipengcheng8@huawei.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 18 Apr 2016 09:45:09 +0100
+Subject: [PATCH] arm64: dts: uniphier: add /memreserve/ for spin-table
+ release address
+In-Reply-To: <1460743138-17768-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1460743138-17768-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20160418084508.GA21438@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT implementation for A72 and Atermis board.
+On Sat, Apr 16, 2016 at 02:58:58AM +0900, Masahiro Yamada wrote:
+> As Documentation/arm64/booting.txt says, the cpu-release-addr
+> location should be reserved.
+> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+> 
+>  arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi
+> index 651c9d9..90909d2 100644
+> --- a/arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi
+> +++ b/arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi
+> @@ -42,6 +42,8 @@
+>   *     OTHER DEALINGS IN THE SOFTWARE.
+>   */
+>  
+> +/memreserve/ 0x80000100 0x00000008;
+> +
 
-Signed-off-by: Li Pengcheng <lipengcheng8@huawei.com>
-Signed-off-by: Li Zhong <lizhong11@hisilicon.com>
----
- drivers/hwtracing/coresight/coresight-etm4x.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+Please add a comment above the memreserve to mention what it is
+protecting. That helps to avoid having this cargo-culted to cases where
+it is not needed.
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index 6396b28..76bfad1 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -825,6 +825,16 @@ static struct amba_id etm4_ids[] = {
- 		.mask	= 0x000fffff,
- 		.data	= "ETM 4.0",
- 	},
-+	{       /* ETM 4.0 - A72 board */
-+		.id = 0x000bb95a,
-+		.mask = 0x000fffff,
-+		.data = "ETM 4.0",
-+	},
-+	{       /* ETM 4.0 - Atermis board */
-+		.id = 0x000bb959,
-+		.mask = 0x000fffff,
-+		.data = "ETM 4.0",
-+	},
- 	{ 0, 0},
- };
- 
--- 
-1.8.3.2
+I take it that the code for the spin-table is not in RAM, and does not
+need to be protected similarly?
+
+Assuming so:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
+
+>  / {
+>  	compatible = "socionext,ph1-ld20";
+>  	#address-cells = <2>;
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
