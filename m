@@ -1,34 +1,30 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 18 Apr 2016 10:25:48 +0530
-Subject: [PATCH 2/2] ARM: davinci: da850: use clk->set_parent for async3
-In-Reply-To: <5712930F.7000902@lechnology.com>
-References: <1460661217-7389-1-git-send-email-david@lechnology.com>
- <1460661217-7389-3-git-send-email-david@lechnology.com>
- <5712930F.7000902@lechnology.com>
-Message-ID: <571468D4.3090805@ti.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Mon, 18 Apr 2016 07:11:46 +0200
+Subject: [PATCH v1] ARM: dts: omap3-n900: Specify peripherals LDO
+ regulators initial mode
+In-Reply-To: <1460903363-2197-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
+References: <20160417122933.GA8093@earth>
+ <1460903363-2197-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
+Message-ID: <20160418051146.GA3215@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 17 April 2016 01:01 AM, David Lechner wrote:
+Hi,
 
->> +static int da850_async3_set_parent(struct clk *clk, struct clk *parent)
->> +{
->> +    u32 val;
->> +
->> +    val = readl(DA8XX_SYSCFG0_VIRT(DA8XX_CFGCHIP3_REG));
->> +
->> +    /* Set the USB 1.1 PHY clock mux based on the parent clock. */
+On Sun, Apr 17, 2016 at 05:29:23PM +0300, Ivaylo Dimitrov wrote:
+> Without that, regulators are left in the mode last set by the bootloader or
+> by the kernel the device was rebooted from. This leads to various problems,
+> like non-working peripherals.
 > 
-> I seem to have regressed here since the last revision, this is supposed
-> to read:
-> 
->     /* Set the async3 clock domain mux based on the parent clock. */
-> 
-> Although now that I am looking at it again, it doesn't really add
-> anything useful and could be omitted altogether.
+> Signed-off-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
 
-Agree the comment is redundant. No need resend just for this though. I
-can drop it when applying.
+Reviewed-By: Sebastian Reichel <sre@kernel.org>
 
-Thanks,
-Sekhar
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160418/1b76b54a/attachment.sig>
