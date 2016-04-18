@@ -1,44 +1,39 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Mon, 18 Apr 2016 09:58:04 +0300
-Subject: [PATCH] ARM: mach-imx: sdhci-esdhc-imx: initialize DMA mask
-In-Reply-To: <6297512.2KmasKu6UN@wuerfel>
-References: <1460362846-2906-1-git-send-email-akurz@blala.de>
- <570DA8C3.5030206@nvidia.com> <570DFE34.6040206@intel.com>
- <6297512.2KmasKu6UN@wuerfel>
-Message-ID: <5714857C.9070002@intel.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 18 Apr 2016 09:05:29 +0200
+Subject: [RESEND PATCH] drm/panel: simple-panel: set appropriate mode type
+In-Reply-To: <1460737413-29799-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1430404770-29704-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1460737413-29799-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20160418070529.GA15946@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/04/16 00:48, Arnd Bergmann wrote:
-> On Wednesday 13 April 2016 11:07:16 Adrian Hunter wrote:
->> On 13/04/16 05:02, Alexandre Courbot wrote:
->>> On 04/13/2016 12:31 AM, Russell King - ARM Linux wrote:
->>>> On Tue, Apr 12, 2016 at 09:25:04PM +0900, Alexandre Courbot wrote:
+On Fri, Apr 15, 2016 at 06:23:33PM +0200, Nicolas Ferre wrote:
+> From: Boris Brezillon <boris.brezillon@free-electrons.com>
 > 
->>> How long it will take for everyone to fix their drivers is another question,
->>> since the device doesn't clearly break, but falls back to a degraded mode
->>> with a warning.
->>>
->>
->> It looks like DeviceTree, PCI and ACPI enumerated devices always set up a
->> dma_mask.  I guess that just leaves devices enumerated from hard-coded
->> platform data.  I will have a look for any more of those, and also send an
->> email for affected people to check their device setup and drivers.
->>
+> All modes exposed by simple panels should be tagged as driver defined
+> modes.
+> Moreover, if a panel supports only one mode, this mode is obviously the
+> preferred one.
 > 
-> I've had a look now too and found only these three device definitions
-> for any sdhci variant, everything else is either unused or DT-only:
+> Doing this also fix a problem occurring when a 'video=' parameter is passed
+> on the kernel cmdline. In some cases the user provided mode is preferred
+> over the simple panel ones, which might result in unpredictable behavior.
 > 
-> arch/arm/mach-dove/common.c:    .name           = "sdhci-dove",
-> arch/arm/plat-samsung/devs.c:   .name           = "s3c-sdhci",
-> arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c:   imx_sdhci_esdhc_imx_data_entry(MX25, "sdhci-esdhc-imx25", _id, _hwid)
-> arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c:   imx_sdhci_esdhc_imx_data_entry(MX35, "sdhci-esdhc-imx35", _id, _hwid)
-> 
-> Out of these, the s3c and dove variants set a 32-bit DMA mask, so as
-> far as I can tell, only imx has the problem.
-> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Reviewed-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Tested-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>  drivers/gpu/drm/panel/panel-simple.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
 
-Thanks for looking.
+Applied, thanks.
 
-It looked to me like sdhci-pxav3 devices created by mmp2_add_sdhost() might
-also be candidates.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160418/71ce3ea8/attachment.sig>
