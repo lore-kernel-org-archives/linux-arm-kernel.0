@@ -1,27 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 Apr 2016 16:15:28 +0200
-Subject: [PATCH v2] arm64: pci: add support for pci_mmap_page_range
-In-Reply-To: <20160418140119.GB5639@localhost.localdomain>
-References: <1460581856-12380-1-git-send-email-jerin.jacob@caviumnetworks.com>
- <4265693.nXcsYZd1B2@wuerfel> <20160418140119.GB5639@localhost.localdomain>
-Message-ID: <10832709.SG7ma9Lsjb@wuerfel>
+From: tthayer@opensource.altera.com (Thor Thayer)
+Date: Mon, 18 Apr 2016 09:27:16 -0500
+Subject: [PATCH] Add EDAC peripheral init functions & Ethernet EDAC.
+In-Reply-To: <20160415214618.GB4545@cz.tnic>
+References: <1460499181-23080-1-git-send-email-tthayer@opensource.altera.com>
+ <20160414143501.GA25212@rob-hp-laptop>
+ <20160415064042.330406ab.m.chehab@samsung.com>
+ <5711087A.8050501@opensource.altera.com> <20160415214618.GB4545@cz.tnic>
+Message-ID: <5714EEC4.4060807@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 18 April 2016 19:31:20 Jerin Jacob wrote:
-> Regarding existing user space applications,
-> AFAIK, DPDK has the feature to support both /sysfs and vifo scheme.
-> X11 uses only /sysfs scheme.
-> 
-> IMO, Nothing wrong in providing this feature in arm64 kernel.
-> Except arm64, almost all the major architecture has this support.
+Hi Boris,
 
-My understanding was that it's considered deprecated and only
-supported for backwards compatibility, but now I can't find any
-indication of that in the source code and I don't know if that
-is actually the case.
+On 04/15/2016 04:46 PM, Borislav Petkov wrote:
+> On Fri, Apr 15, 2016 at 10:27:54AM -0500, Thor Thayer wrote:
+>> I'll update this patch to only count errors.
+>
+> ... and also think about what that counting is going to bring. If it is
+> only going to be there to show how many network errors happened and we
+> can't do anything about it except stare at that number, then adding all
+> that code is probably waste of time an electrons...
+>
+> I'm just sayin'.
+>
 
-I agree with Will that we should not expose the procfs interface,
-it's just far too ugly.
+Yes, valid point about the uncorrectable errors.
 
-	Arnd
+We're still getting the single bit correction which makes the entire 
+system more stable and the ability to see both single bit errors 
+corrected and the number of uncorrectable errors is useful from a system 
+point of view.
