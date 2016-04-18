@@ -1,72 +1,66 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 18 Apr 2016 17:09:46 +0200
-Subject: [PATCH 6/8] arm64: don't map TEXT_OFFSET bytes below the kernel if we
- can avoid it
+Date: Mon, 18 Apr 2016 17:09:48 +0200
+Subject: [PATCH 8/8] arm64: kaslr: increase randomization granularity
 In-Reply-To: <1460992188-23295-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1460992188-23295-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1460992188-23295-7-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1460992188-23295-9-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For historical reasons, the kernel Image must be loaded into physical
-memory at a 512 KB offset above a 2 MB aligned base address. The region
-between the base address and the start of the kernel Image has no
-significance to the kernel itself, but it is currently mapped explicitly
-into the early kernel VMA range for all translation granules.
+Currently, our KASLR implementation randomizes the placement of the core
+kernel at 2 MB granularity. This is based on the arm64 kernel boot
+protocol, which mandates that the kernel is loaded TEXT_OFFSET bytes above
+a 2 MB aligned base address. This requirement is a result of the fact that
+the block size used by the early mapping code may be 2 MB at the most (for
+a 4 KB granule kernel)
 
-In some cases (i.e., 4 KB granule), this is unavoidable, due to the 2 MB
-granularity of the early kernel mappings. However, in other cases, e.g.,
-when running with larger page sizes, or in the future, with more granular
-KASLR, there is no reason to map it explicitly like we do currently.
+But we can do better than that: since a KASLR kernel needs to be relocated
+in any case, we can tolerate a physical misalignment as long as the virtual
+misalignment relative to this 2 MB block size is equal in size, and code to
+deal with this is already in place.
 
-So update the logic so that the region is mapped only if that happens as
-a side effect of rounding the start address of the kernel to swapper block
-size, and leave it unmapped otherwise.
+Since we align the kernel segments to 64 KB, let's randomize the physical
+offset at 64 KB granularity as well (unless CONFIG_DEBUG_ALIGN_RODATA is
+enabled). This way, the page table and TLB footprint is not affected.
 
-Since the symbol kernel_img_size now simply resolves to the memory
-footprint of the kernel Image, we can drop its definition from image.h
-and opencode its calculation.
+The higher granularity allows for 5 bits of additional entropy to be used.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/kernel/head.S  | 9 +++++----
- arch/arm64/kernel/image.h | 2 --
- 2 files changed, 5 insertions(+), 6 deletions(-)
+ drivers/firmware/efi/libstub/arm64-stub.c | 15 ++++++++++++---
+ 1 file changed, 12 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index dae9cabaadf5..c5e5edca6897 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -393,12 +393,13 @@ __create_page_tables:
- 	 * Map the kernel image (starting with PHYS_OFFSET).
- 	 */
- 	mov	x0, x26				// swapper_pg_dir
--	mov_q	x5, KIMAGE_VADDR
-+	mov_q	x5, KIMAGE_VADDR + TEXT_OFFSET	// compile time __va(_text)
- 	add	x5, x5, x23			// add KASLR displacement
- 	create_pgd_entry x0, x5, x3, x6
--	ldr	w6, =kernel_img_size
--	add	x6, x6, x5
--	mov	x3, x24				// phys offset
-+	adrp	x6, _end			// runtime __pa(_end)
-+	adrp	x3, _text			// runtime __pa(_text)
-+	sub	x6, x6, x3			// _end - _text
-+	add	x6, x6, x5			// runtime __va(_end)
- 	create_block_map x0, x7, x3, x5, x6
+diff --git a/drivers/firmware/efi/libstub/arm64-stub.c b/drivers/firmware/efi/libstub/arm64-stub.c
+index a90f6459f5c6..eae693eb3e91 100644
+--- a/drivers/firmware/efi/libstub/arm64-stub.c
++++ b/drivers/firmware/efi/libstub/arm64-stub.c
+@@ -81,15 +81,24 @@ efi_status_t handle_kernel_image(efi_system_table_t *sys_table_arg,
  
- 	/*
-diff --git a/arch/arm64/kernel/image.h b/arch/arm64/kernel/image.h
-index 4fd72da646a3..86d444f9c2c1 100644
---- a/arch/arm64/kernel/image.h
-+++ b/arch/arm64/kernel/image.h
-@@ -71,8 +71,6 @@
- 	DEFINE_IMAGE_LE64(_kernel_offset_le, TEXT_OFFSET);	\
- 	DEFINE_IMAGE_LE64(_kernel_flags_le, __HEAD_FLAGS);
+ 	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE) && phys_seed != 0) {
+ 		/*
++		 * If CONFIG_DEBUG_ALIGN_RODATA is not set, produce a
++		 * displacement in the interval [0, MIN_KIMG_ALIGN) that
++		 * is a multiple of the minimal segment alignment (SZ_64K)
++		 */
++		u32 mask = (MIN_KIMG_ALIGN - 1) & ~(SZ_64K - 1);
++		u32 offset = !IS_ENABLED(CONFIG_DEBUG_ALIGN_RODATA) ?
++			     (phys_seed >> 32) & mask : TEXT_OFFSET;
++
++		/*
+ 		 * If KASLR is enabled, and we have some randomness available,
+ 		 * locate the kernel at a randomized offset in physical memory.
+ 		 */
+-		*reserve_size = kernel_memsize + TEXT_OFFSET;
++		*reserve_size = kernel_memsize + offset;
+ 		status = efi_random_alloc(sys_table_arg, *reserve_size,
+ 					  MIN_KIMG_ALIGN, reserve_addr,
+-					  phys_seed);
++					  (u32)phys_seed);
  
--kernel_img_size = _end - (_text - TEXT_OFFSET);
--
- #ifdef CONFIG_EFI
- 
- __efistub_stext_offset = stext - _text;
+-		*image_addr = *reserve_addr + TEXT_OFFSET;
++		*image_addr = *reserve_addr + offset;
+ 	} else {
+ 		/*
+ 		 * Else, try a straight allocation at the preferred offset.
 -- 
 2.5.0
