@@ -1,80 +1,29 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Mon, 18 Apr 2016 09:56:54 +0800
-Subject: [PATCH v6 3/4] soc: mediatek: Add MT2701 power dt-bindings
-In-Reply-To: <1460731329.19786.4.camel@mtksdaap41>
-References: <1460621819-695-1-git-send-email-jamesjj.liao@mediatek.com>
- <1460621819-695-4-git-send-email-jamesjj.liao@mediatek.com>
- <1460631381.13240.3.camel@mtksdaap41> <1460685753.7028.5.camel@mtksdaap41>
- <1460731329.19786.4.camel@mtksdaap41>
-Message-ID: <1460944614.26713.1.camel@mtksdaap41>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 18 Apr 2016 09:58:06 +0800
+Subject: [PATCH 1/2] clk: imx: do not sleep if IRQ's are still disabled
+In-Reply-To: <20160416010052.GR26353@codeaurora.org>
+References: <1454107764-19876-1-git-send-email-stefan@agner.ch>
+ <20160416010052.GR26353@codeaurora.org>
+Message-ID: <20160418015806.GR28903@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yingjoe,
-
-On Fri, 2016-04-15 at 22:42 +0800, Yingjoe Chen wrote:
-> On Fri, 2016-04-15 at 10:02 +0800, James Liao wrote:
-> > On Thu, 2016-04-14 at 18:56 +0800, Yingjoe Chen wrote:
-> > > On Thu, 2016-04-14 at 16:16 +0800, James Liao wrote:
-> > > > From: Shunli Wang <shunli.wang@mediatek.com>
-> > > > 
-> > > > Add power dt-bindings for MT2701.
-> > > > 
-> > > > Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
-> > > > Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-> > > > Acked-by: Rob Herring <robh@kernel.org>
-> > > > Reviewed-by: Kevin Hilman <khilman@baylibre.com>
-> > > > ---
-> > > >  .../devicetree/bindings/soc/mediatek/scpsys.txt    | 12 ++++++----
-> > > >  include/dt-bindings/power/mt2701-power.h           | 27 ++++++++++++++++++++++
-> > > >  2 files changed, 34 insertions(+), 5 deletions(-)
-> > > >  create mode 100644 include/dt-bindings/power/mt2701-power.h
-> > > > 
-> > > > diff --git a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-> > > > index e8f15e3..ebb3144 100644
-> > > > --- a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-> > > > +++ b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-> > > > @@ -9,17 +9,19 @@ domain control.
-> > > >  
-> > > >  The driver implements the Generic PM domain bindings described in
-> > > >  power/power_domain.txt. It provides the power domains defined in
-> > > > -include/dt-bindings/power/mt8173-power.h.
-> > > > +include/dt-bindings/power/mt8173-power.h and mt2701-power.h.
-> > > >  
-> > > >  Required properties:
-> > > > -- compatible: Must be "mediatek,mt8173-scpsys"
-> > > > +- compatible: Should be one of:
-> > > > +	- "mediatek,mt2701-scpsys"
-> > > > +	- "mediatek,mt8173-scpsys"
-> > > >  - #power-domain-cells: Must be 1
-> > > >  - reg: Address range of the SCPSYS unit
-> > > >  - infracfg: must contain a phandle to the infracfg controller
-> > > >  - clock, clock-names: clocks according to the common clock binding.
-> > > > -                      The clocks needed "mm", "mfg", "venc" and "venc_lt".
-> > > > -		      These are the clocks which hardware needs to be enabled
-> > > > -		      before enabling certain power domains.
-> > > > +                      The clocks needed "mm", "mfg", "venc", "venc_lt" and
-> > > > +                      "ethif". These are the clocks which hardware needs to be
-> > > > +                      enabled before enabling certain power domains.
-> > > 
-> > > 
-> > > Clock ethif only exist on mt2701 so it is not required on mt8173.
+On Fri, Apr 15, 2016 at 06:00:53PM -0700, Stephen Boyd wrote:
+> On 01/29, Stefan Agner wrote:
+> > If a clock gets enabled early during boot time, it can lead to a PLL
+> > startup. The wait_lock function makes sure that the PLL is really
+> > stareted up before it gets used. However, the function sleeps which
+> > leads to scheduling and an error:
+> > bad: scheduling from the idle thread!
+> > ...
 > > 
-> > You are right. Each SoC needs different clock for each power domain.
-> > Here list all subsystems of available SoCs.
+> > Use udelay in case IRQ's are still disabled.
+> > 
+> > Signed-off-by: Stefan Agner <stefan@agner.ch>
 > 
-> Binding should list required clocks for each specific platform. How
-> about this:
-> 
-> - clock, clock-names: clocks according to the common clock binding.
-> 		      These are the clocks which hardware needs to be
->                       enabled before enabling certain power domains.
->   	Required clocks for mt2701: "mm", "mfg", "ethif"
-> 	Required clocks for mt8173: "mm", "mfg", "venc", "venc_lt"
+> This is really old. Shawn, are you picking these up? I'm removing
+> these from my queue for now.
 
-OK. I'll follow your suggestion in next patch.
+Yes, I'm picking them up.
 
-
-Best regards,
-
-James
+Shawn
