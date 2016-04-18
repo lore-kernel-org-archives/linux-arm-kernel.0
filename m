@@ -1,153 +1,120 @@
-From: tiffany.lin@mediatek.com (tiffany lin)
-Date: Mon, 18 Apr 2016 13:40:46 +0800
-Subject: [PATCH 3/7] [Media] vcodec: mediatek: Add Mediatek V4L2 Video
- Decoder Driver
-In-Reply-To: <5710FA3A.2030603@xs4all.nl>
-References: <1460548915-17536-1-git-send-email-tiffany.lin@mediatek.com>
- <1460548915-17536-2-git-send-email-tiffany.lin@mediatek.com>
- <1460548915-17536-3-git-send-email-tiffany.lin@mediatek.com>
- <1460548915-17536-4-git-send-email-tiffany.lin@mediatek.com>
- <5710FA3A.2030603@xs4all.nl>
-Message-ID: <1460958046.7861.48.camel@mtksdaap41>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Sun, 17 Apr 2016 22:51:16 -0700
+Subject: [PATCH v2 2/3] PCI: imx6: Implement reset sequence for i.MX6+
+In-Reply-To: <1460958677-10604-1-git-send-email-andrew.smirnov@gmail.com>
+References: <1460958677-10604-1-git-send-email-andrew.smirnov@gmail.com>
+Message-ID: <1460958677-10604-2-git-send-email-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+I.MX6+ has a dedicated bit for reseting PCIe core, which should be used
+instead of a regular reset sequence since using the latter will hang the
+SoC.
 
-snipped.
+This commit is based on c34068d48273e24d392d9a49a38be807954420ed from
+http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git
 
-> > +
-> > +void mtk_vcodec_dec_set_default_params(struct mtk_vcodec_ctx *ctx)
-> > +{
-> > +	struct mtk_q_data *q_data;
-> > +
-> > +	ctx->m2m_ctx->q_lock = &ctx->dev->dev_mutex;
-> > +	ctx->fh.m2m_ctx = ctx->m2m_ctx;
-> > +	ctx->fh.ctrl_handler = &ctx->ctrl_hdl;
-> > +	INIT_WORK(&ctx->decode_work, mtk_vdec_worker);
-> > +
-> > +	q_data = &ctx->q_data[MTK_Q_DATA_SRC];
-> > +	memset(q_data, 0, sizeof(struct mtk_q_data));
-> > +	q_data->visible_width = DFT_CFG_WIDTH;
-> > +	q_data->visible_height = DFT_CFG_HEIGHT;
-> > +	q_data->fmt = &mtk_video_formats[OUT_FMT_IDX];
-> > +	q_data->colorspace = V4L2_COLORSPACE_REC709;
-> > +	q_data->field = V4L2_FIELD_NONE;
-> > +	ctx->q_data[MTK_Q_DATA_DST].sizeimage[0] =
-> > +		DFT_CFG_WIDTH * DFT_CFG_HEIGHT;
-> > +	ctx->q_data[MTK_Q_DATA_DST].bytesperline[0] = 0;
-> > +
-> > +
-> > +	q_data = &ctx->q_data[MTK_Q_DATA_DST];
-> > +	memset(q_data, 0, sizeof(struct mtk_q_data));
-> > +	q_data->visible_width = DFT_CFG_WIDTH;
-> > +	q_data->visible_height = DFT_CFG_HEIGHT;
-> > +	q_data->coded_width = DFT_CFG_WIDTH;
-> > +	q_data->coded_height = DFT_CFG_HEIGHT;
-> > +	q_data->colorspace = V4L2_COLORSPACE_REC709;
-> > +	q_data->field = V4L2_FIELD_NONE;
-> > +
-> > +	q_data->fmt = &mtk_video_formats[CAP_FMT_IDX];
-> > +
-> > +	v4l_bound_align_image(&q_data->coded_width,
-> > +					MTK_VDEC_MIN_W,
-> > +					MTK_VDEC_MAX_W, 4,
-> > +					&q_data->coded_height,
-> > +					MTK_VDEC_MIN_H,
-> > +					MTK_VDEC_MAX_H, 5, 6);
-> > +
-> > +	q_data->sizeimage[0] = q_data->coded_width * q_data->coded_height;
-> > +	q_data->bytesperline[0] = q_data->coded_width;
-> > +	q_data->sizeimage[1] = q_data->sizeimage[0] / 2;
-> > +	q_data->bytesperline[1] = q_data->coded_width;
-> > +
-> > +}
-> > +
-> > +static int vidioc_vdec_streamon(struct file *file, void *priv,
-> > +				enum v4l2_buf_type type)
-> > +{
-> > +	struct mtk_vcodec_ctx *ctx = fh_to_ctx(priv);
-> > +
-> > +	mtk_v4l2_debug(3, "[%d] (%d)", ctx->idx, type);
-> > +
-> > +	return v4l2_m2m_streamon(file, ctx->m2m_ctx, type);
-> > +}
-> > +
-> > +static int vidioc_vdec_streamoff(struct file *file, void *priv,
-> > +				 enum v4l2_buf_type type)
-> > +{
-> > +	struct mtk_vcodec_ctx *ctx = fh_to_ctx(priv);
-> > +
-> > +	mtk_v4l2_debug(3, "[%d] (%d)", ctx->idx, type);
-> > +	return v4l2_m2m_streamoff(file, ctx->m2m_ctx, type);
-> > +}
-> > +
-> > +static int vidioc_vdec_reqbufs(struct file *file, void *priv,
-> > +			       struct v4l2_requestbuffers *reqbufs)
-> > +{
-> > +	struct mtk_vcodec_ctx *ctx = fh_to_ctx(priv);
-> > +	int ret;
-> > +
-> > +	mtk_v4l2_debug(3, "[%d] (%d) count=%d", ctx->idx,
-> > +			 reqbufs->type, reqbufs->count);
-> > +	ret = v4l2_m2m_reqbufs(file, ctx->m2m_ctx, reqbufs);
-> > +
-> > +	return ret;
-> > +}
-> 
-> Please use the v4l2_m2m_ioctl_* helper functions were applicable.
-> 
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+---
 
+Changes since v1:
 
+	- Patchset is rebased against
+          https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/log/?h=pci/host-imx6
 
-snipped.
-> > +static unsigned int fops_vcodec_poll(struct file *file,
-> > +				     struct poll_table_struct *wait)
-> > +{
-> > +	struct mtk_vcodec_ctx *ctx = fh_to_ctx(file->private_data);
-> > +	struct mtk_vcodec_dev *dev = ctx->dev;
-> > +	int ret;
-> > +
-> > +	mutex_lock(&dev->dev_mutex);
-> > +	ret = v4l2_m2m_poll(file, ctx->m2m_ctx, wait);
-> > +	mutex_unlock(&dev->dev_mutex);
-> > +
-> > +	return ret;
-> > +}
-> > +
-> > +static int fops_vcodec_mmap(struct file *file, struct vm_area_struct *vma)
-> > +{
-> > +	struct mtk_vcodec_ctx *ctx = fh_to_ctx(file->private_data);
-> > +
-> > +	return v4l2_m2m_mmap(file, ctx->m2m_ctx, vma);
-> > +}
-> > +
-> > +static const struct v4l2_file_operations mtk_vcodec_fops = {
-> > +	.owner				= THIS_MODULE,
-> > +	.open				= fops_vcodec_open,
-> > +	.release			= fops_vcodec_release,
-> > +	.poll				= fops_vcodec_poll,
-> > +	.unlocked_ioctl			= video_ioctl2,
-> > +	.mmap				= fops_vcodec_mmap,
-> 
-> You should be able to use the v4l2_m2m_fop helper functions for poll and mmap.
-> 
+	- DTS files changes moved into a separate patch
 
-Hi Hans,
+ drivers/pci/host/pci-imx6.c                 | 28 ++++++++++++++++++++++++++--
+ include/linux/mfd/syscon/imx6q-iomuxc-gpr.h |  1 +
+ 2 files changed, 27 insertions(+), 2 deletions(-)
 
-We are plaining to remove m2m framework in th feature, although we think
-it is easy to use and could save a lot of code similar to what m2m
-framework implemented and reduce code size.
-The main reason is that in v4l2_m2m_try_schedule, it required that at
-least one output buffer and one capture buffer to run device_run.
-We want to start device_run without capture buffer queued.
-Is there any suggestion that we could use m2m framework but trigger
-device_run with only output buffer.
-Or we need to remove m2m and write our own implementation.
-
-
-
-snipped.
-
-
-best regards,
-Tiffany
+diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+index c570bbb..834c5b8 100644
+--- a/drivers/pci/host/pci-imx6.c
++++ b/drivers/pci/host/pci-imx6.c
+@@ -33,7 +33,8 @@
+ 
+ enum imx6_pcie_variants {
+ 	IMX6Q,
+-	IMX6SX
++	IMX6SX,
++	IMX6QP,
+ };
+ 
+ struct imx6_pcie {
+@@ -253,6 +254,11 @@ static int imx6_pcie_assert_core_reset(struct pcie_port *pp)
+ 				   IMX6SX_GPR5_PCIE_BTNRST_RESET,
+ 				   IMX6SX_GPR5_PCIE_BTNRST_RESET);
+ 		break;
++	case IMX6QP:
++		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
++				   IMX6Q_GPR1_PCIE_SW_RST,
++				   IMX6Q_GPR1_PCIE_SW_RST);
++		break;
+ 	case IMX6Q:
+ 		/*
+ 		 * If the bootloader already enabled the link we need some special
+@@ -307,6 +313,7 @@ static int imx6_pcie_enable_ref_clk(struct imx6_pcie *imx6_pcie)
+ 		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+ 				   IMX6SX_GPR12_PCIE_TEST_POWERDOWN, 0);
+ 		break;
++	case IMX6QP: 		/* FALLTHROUGH */
+ 	case IMX6Q:
+ 		/* power up core phy and enable ref clock */
+ 		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+@@ -367,9 +374,22 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
+ 		gpiod_set_value_cansleep(imx6_pcie->reset_gpio, 1);
+ 	}
+ 
+-	if (imx6_pcie->variant == IMX6SX)
++	switch (imx6_pcie->variant) {
++	case IMX6SX:
+ 		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR5,
+ 				   IMX6SX_GPR5_PCIE_BTNRST_RESET, 0);
++		break;
++	case IMX6QP:
++		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
++				   IMX6Q_GPR1_PCIE_SW_RST, 0);
++
++		usleep_range(200, 500);
++		break;
++	case IMX6Q:		/* Nothing to do */
++		break;
++	default:
++		BUG();
++	}
+ 
+ 	return 0;
+ 
+@@ -601,6 +621,9 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
+ 	if (of_device_is_compatible(pp->dev->of_node,
+ 				    "fsl,imx6sx-pcie"))
+ 		imx6_pcie->variant = IMX6SX;
++	else if (of_device_is_compatible(pp->dev->of_node,
++					 "fsl,imx6qp-pcie"))
++		imx6_pcie->variant = IMX6QP;
+ 	else
+ 		imx6_pcie->variant = IMX6Q;
+ 
+@@ -697,6 +720,7 @@ static void imx6_pcie_shutdown(struct platform_device *pdev)
+ static const struct of_device_id imx6_pcie_of_match[] = {
+ 	{ .compatible = "fsl,imx6q-pcie", },
+ 	{ .compatible = "fsl,imx6sx-pcie", },
++	{ .compatible = "fsl,imx6qp-pcie", },
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, imx6_pcie_of_match);
+diff --git a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
+index 238c8db..5b08e3c 100644
+--- a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
++++ b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
+@@ -95,6 +95,7 @@
+ #define IMX6Q_GPR0_DMAREQ_MUX_SEL0_IOMUX	BIT(0)
+ 
+ #define IMX6Q_GPR1_PCIE_REQ_MASK		(0x3 << 30)
++#define IMX6Q_GPR1_PCIE_SW_RST			BIT(29)
+ #define IMX6Q_GPR1_PCIE_EXIT_L1			BIT(28)
+ #define IMX6Q_GPR1_PCIE_RDY_L23			BIT(27)
+ #define IMX6Q_GPR1_PCIE_ENTER_L1		BIT(26)
+-- 
+2.5.5
