@@ -1,101 +1,54 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Mon, 18 Apr 2016 17:43:17 +0200
-Subject: [PATCH 1/5] doc: DT: Add Generic Serial Device Tree Bindings
-In-Reply-To: <CAMuHMdWmHUhhwbYDcmNXuxBRC6n+tp=oX03dBaK2VgL4OA72MQ@mail.gmail.com>
-References: <1460636003-3011-1-git-send-email-geert+renesas@glider.be>
- <1460636003-3011-2-git-send-email-geert+renesas@glider.be>
- <5792073.qsBJ1LK659@wuerfel>
- <CAMuHMdWmHUhhwbYDcmNXuxBRC6n+tp=oX03dBaK2VgL4OA72MQ@mail.gmail.com>
-Message-ID: <CACQ1gAhnEuCZbzpyiAcCx_kRhzCBvWAVVaecUdUhvu4vDD0REw@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 18 Apr 2016 17:51:41 +0200
+Subject: [PATCH 3/5] clocksource/drivers/mtk_timer: add __init attribute
+In-Reply-To: <1460991338-9845-4-git-send-email-Julia.Lawall@lip6.fr>
+References: <1460991338-9845-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1460991338-9845-4-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <5715028D.4020300@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-04-18 14:34 GMT+02:00 Geert Uytterhoeven <geert@linux-m68k.org>:
-> Hi Arnd,
+
+
+On 18/04/16 16:55, Julia Lawall wrote:
+> Add __init attribute on a function that is only called from other __init
+> functions and that is not inlined, at least with gcc version 4.8.4 on an
+> x86 machine with allyesconfig.  Currently, the function is put in the
+> .text.unlikely segment.  Declaring it as __init will cause it to be put in
+> the .init.text and to disappear after initialization.
 >
-> CC Richard (serial-mctrl-gpio)
-> CC Grant (ePAPR successor) and Frank
+> The result of objdump -x on the function before the change is as follows:
 >
-> On Sat, Apr 16, 2016 at 6:30 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Thursday 14 April 2016 14:13:19 Geert Uytterhoeven wrote:
->>> Document a set of generic properties for describing UARTs in a
->>> device tree:
->>>   1. The GPIO modem control properties are currently duplicated across
->>>      hardware-specific binding documentation,
->>>   2. The property for dedicated RTS/CTS hardware flow control lines is
->>>      already supported by several drivers, albeit with a vendor-specific
->>>      prefix, hence make it generic.
->>>
->>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->>
->> Originally the ISA 8250 uart binding (from ieee) was used as the
->> template for other uart bindings. How about documenting the parts that
->> are used in 8250-of today (current-speed, clock-frequency,
->> reg-offset, reg-shift, fifo-size, reg-io-width, auto-flow-control)
->> in the same file?
+> 0000000000000000 l     F .text.unlikely 000000000000006f mtk_timer_setup.isra.4
 >
-> I don't think we have the habit of documenting (duplicating) bindings for ePAPR
-> under Documentation/devicetree/bindings/. Perhaps we should?
+> And after the change it is as follows:
 >
-> Apart from that, most of the properties you mention look legacy or overly
-> broad too me.
+> 0000000000000000 l     F .init.text	000000000000006a mtk_timer_setup.isra.4
 >
->   - current-speed: This is configuration, not a property of the hardware.
->     For the console, this has been deprecated by appending the serial config
->     to chosen/stdout-path (e.g. "serial0:115200n8").
->     For non-consoles, its use is debatable, IMHO.
->     It's users are mostly legacy powerpc and early adaptors of DT on ARM.
->   - clock-frequency: Legacy predating the Common Clock Framework.
->     Any modern SoC uses clock specifiers with clock handles pointing to clock
->     providers.
->   - reg-offset, reg-shift, reg-io-width: These are much broader than serial,
->     and IMHO thus don't belong in
->     Documentation/devicetree/bindings/serial/serial.txt.
->   - auto-flow-control: Looks a bit like a vague version of "uart-has-rtscts".
->     Documentation/devicetree/bindings/serial/8250.txt doesn't make it clear
->     whether this is about hardware capabilities or software configuration.
->     Even the driver doesn't make it clear:
->     #define UART_CAP_AFE    (1 << 11)       /* MCR-based hw flow control */
->     "MCR" could mean RTS/CTS, DSR/DTR, ...
->   - fifo-size: This one could be generic. atmel-usart uses a vendor-specific
->     version "atmel,fifo-size".
+> Done with the help of Coccinelle.  The semantic patch checks for local
+> static non-init functions that are called from an __init function and are
+> not called from any other function.
 >
-> I suggest we move forward with my initial set, as I have patches that depend on
-> them? We can always add more properties later.
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 >
->>>  - out1-gpios: Must contain a GPIO specifier, referring to the GPIO pin to be
->>>    used as the UART's OUT1 line.
->>>  - out2-gpios: Must contain a GPIO specifier, referring to the GPIO pin to be
->>>    used as the UART's OUT2 line.
->>
->> I had to look up what OUT1 and OUT2 are, but I still don't see how you'd
->> implement them using a GPIO line: From all I can tell, these are usually
->> internal registers in a hardware uart but they are not assigned to an
->> external line on the standard db9 or even the old db25 connectors. Should
->> we drop these instead?
+
+Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
+
+> ---
+>   drivers/clocksource/mtk_timer.c |    2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> They're indeed fairly exotic, and they're burried deeply in the ns16550
-> datasheet. We do have TIOCM_OUT1 and TIOCM_LOOP in asm-generic/termios.h,
-> probably for obscure historical reasons.
+> diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
+> index d67bc35..7e583f8 100644
+> --- a/drivers/clocksource/mtk_timer.c
+> +++ b/drivers/clocksource/mtk_timer.c
+> @@ -152,7 +152,7 @@ static irqreturn_t mtk_timer_interrupt(int irq, void *dev_id)
+>   }
 >
-> If we drop them, I guess they should be removed from the helper code in
-> drivers/tty/serial/serial_mctrl_gpio.c, too? There don't seem to be any
-> current users.
-I must confess that I don't really know what TIOCM_OUT1&2 are for.
-(I implemented them for completeness)
-But it seems that OUT2 is used in some drivers:
-drivers/tty/serial/omap-serial.c:
-        /*
-         * Most PC uarts need OUT2 raised to enable interrupts.
-         */
-        up->port.mctrl |= TIOCM_OUT2;
+>   static void
+> -mtk_timer_setup(struct mtk_clock_event_device *evt, u8 timer, u8 option)
+> +__init mtk_timer_setup(struct mtk_clock_event_device *evt, u8 timer, u8 option)
+>   {
+>   	writel(TIMER_CTRL_CLEAR | TIMER_CTRL_DISABLE,
+>   		evt->gpt_base + TIMER_CTRL_REG(timer));
 >
->> On a related note, do you think it would be possible to do a bit-banged
->> uart if we defined gpio lines for rxd and txd?
->
-> Sure we can. Whether it would work well is another question ;-)
-> Regardless of flow control, byte transmission and reception has hard real-time
-> requirements due to the implicit clocking.
-> Bit-banging i2c and spi (master) is much easier, as clocking is explicit.
-> Even i2c slave is easier, as the slave can stretch cycles.
-+1
