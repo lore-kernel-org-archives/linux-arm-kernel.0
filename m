@@ -1,32 +1,49 @@
-From: poggi.raph@gmail.com (=?UTF-8?Q?Rapha=C3=ABl_Poggi?=)
-Date: Mon, 18 Apr 2016 08:29:05 +0200
-Subject: atmel-ssc-dai problem with ssc1
-In-Reply-To: <AM4PR02MB12993ACE353BDD05E26E8448BC6A0@AM4PR02MB1299.eurprd02.prod.outlook.com>
-References: <AM4PR02MB12993ACE353BDD05E26E8448BC6A0@AM4PR02MB1299.eurprd02.prod.outlook.com>
-Message-ID: <CACqcpZCe3T7cc8whW8R8XZZ5G0mO0wvfO+V4sedKu0SOL13Erg@mail.gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Mon, 18 Apr 2016 08:36:48 +0200
+Subject: [PATCH RFT 4/5] iio: mxs-lradc: disable only mapped channels in
+ mxs_lradc_hw_stop
+In-Reply-To: <571369AA.8060106@kernel.org>
+References: <1460648909-2657-1-git-send-email-stefan.wahren@i2se.com>
+ <1460648909-2657-5-git-send-email-stefan.wahren@i2se.com>
+ <571369AA.8060106@kernel.org>
+Message-ID: <57148080.4010200@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Jonathan,
 
-2016-04-17 22:53 GMT+02:00 Peter Rosin <peda@axentia.se>:
-> Rapha?l Poggi wrote:
->> Hi,
->>
->> If I remember correctly, this problem is old, but there is a patch
->> ([1]) which fix this. Did you try it ?
->>
->> [1]: http://lkml.iu.edu/hypermail/linux/kernel/1601.1/04004.html
+Am 17.04.2016 um 12:47 schrieb Jonathan Cameron:
+> On 14/04/16 16:48, Stefan Wahren wrote:
+>> Disabling of the touchscreen IRQs is already done in
+>> mxs_lradc_disable_ts. There is no need to disable them in
+>> mxs_lradc_hw_stop again.
+> We could do with a little more documentation in the driver on
+> which bits in this register are doing what.
 >
-> Not yet, but it looks exactly right. However, I did look in the
-> current linux4sam/linux-4.1-at91 branch and found nothing. I
-> assumed fixes like this would be added to that branch quickly,
-> is that not a correct assumption?
+> The disable_ts deals with bits 22-24... 
+> The only other bit I think is ever used by the driver currently is
+> 16 (channel 0).  
+>
+> So whilst this change probably works, I'm not sure of the logic behind it.
+> As far as I can tell your new clear is fine but in reality you could
+> just clear (0x3f << 16) and get the same result (which would be clearer
+> to my mind).
+>
+> The key think here is that we don't support the higher bits on i.mx28
+> yet... Which are for button detection and threshold detection.
+>
+> Have I understood this correctly?
 
-I don't know, sorry.
+Yes, you are. I've have looked to long in the reference manual instead
+of the code.
+I've missed the point that virtual channel 6 and 7 are used in case of a
+connected touchscreen.
+
+I should use the member buffer_vchans for masking the enable IRQs.
+
+Regards
+Stefan
 
 >
-> Thanks for the pointer!
->
-> Cheers,
-> Peter
+> Jonathan
+>  So we only need to care of the
