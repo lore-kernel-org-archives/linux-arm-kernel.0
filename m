@@ -1,59 +1,25 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 18 Apr 2016 09:29:09 -0500
-Subject: [PATCH] Axi-usb: Add support for 64-bit addressing.
-In-Reply-To: <4542055.HvdgVkDRYK@wuerfel>
-References: <1460360506-14692-1-git-send-email-navam@xilinx.com>
- <20160412140338.GA19311@rob-hp-laptop> <4542055.HvdgVkDRYK@wuerfel>
-Message-ID: <20160418142909.GA5608@rob-hp-laptop>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 18 Apr 2016 16:33:22 +0200
+Subject: [PATCH] ARM: mach-imx: sdhci-esdhc-imx: initialize DMA mask
+In-Reply-To: <5714857C.9070002@intel.com>
+References: <1460362846-2906-1-git-send-email-akurz@blala.de>
+ <6297512.2KmasKu6UN@wuerfel> <5714857C.9070002@intel.com>
+Message-ID: <7893683.FFM02uuNdT@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 17, 2016 at 03:14:34PM +0200, Arnd Bergmann wrote:
-> On Tuesday 12 April 2016 09:03:38 Rob Herring wrote:
-> > On Mon, Apr 11, 2016 at 01:11:46PM +0530, Nava kishore Manne wrote:
-> > > This patch updates the driver to support 64-bit DMA
-> > > addressing.
-> > > 
-> > > Signed-off-by: Nava kishore Manne <navam@xilinx.com>
-> > > ---
-> > >  .../devicetree/bindings/usb/udc-xilinx.txt         |  3 +-
-> > >  drivers/usb/gadget/udc/udc-xilinx.c                | 38 ++++++++++++++++++++--
-> > >  2 files changed, 37 insertions(+), 4 deletions(-)
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/usb/udc-xilinx.txt b/Documentation/devicetree/bindings/usb/udc-xilinx.txt
-> > > index 47b4e39..d417872 100644
-> > > --- a/Documentation/devicetree/bindings/usb/udc-xilinx.txt
-> > > +++ b/Documentation/devicetree/bindings/usb/udc-xilinx.txt
-> > > @@ -7,12 +7,13 @@ Required properties:
-> > >  - interrupts         : Should contain single irq line of USB2 device
-> > >                         controller
-> > >  - xlnx,has-builtin-dma       : if DMA is included
-> > > -
-> > > +- xlnx,addrwidth       : Should be the dma addressing size in bits(ex: 40 bits).
-> > 
-> > Now this property shows up in a 2nd device. Now I'm more convinced this 
-> > is the wrong approach and should use dma-ranges.
+On Monday 18 April 2016 09:58:04 Adrian Hunter wrote:
 > 
-> Not necessarily: We need to be careful not to mix up two different things here:
+> Thanks for looking.
 > 
-> * dma-ranges describes the address width of a bus, along with possible offsets.
->   In order to do wider than 32-bit addressing, all upstream busses must be
->   capable of supporting this, and AXI can have either 64-bit or 32-bit addressing.
+> It looked to me like sdhci-pxav3 devices created by mmp2_add_sdhost() might
+> also be candidates.
 > 
-> * A device may have a register set that allows wider DMA. This is normally
->   identified through the 'compatible' property, and you can have all
->   combinations with bus addressing: a device with 32-bit DMA can be connected
->   to a 64-bit AXI bus, and a device with 64-bit DMA can have an upstream parent
->   or grandparent that is limited to 32 bits (or any other width really).
-> 
-> The patch here is almost certainly wrong. For one thing, it never sets the
-> DMA mask to the correct value, and it also infers the presence of the
-> 0x308..0x317 register range from an arbitrary DT property that describes
-> something else (the supported width of the DMA).
 
-Right, you don't need to know the exact bus width for determining the 
-register/descriptor set is 32 or 64 bit addesses. I'm fine with a 
-property for that, but if limiting the actual connected address bits is 
-needed, then dma-ranges should be used.
+Oh, you are right, I missed that.
 
-Rob
+I remember looking at sdhci-pxav2 and not finding any machine defining one,
+but I must have skipped over sdhci-pxav3 failing to realize that this is
+a different one.
+
+	Arnd
