@@ -1,48 +1,58 @@
 From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Mon, 18 Apr 2016 11:09:48 +0800
-Subject: [PATCH v2 3/3] arm64: mm: Restrictive printing for modules and PCI
- I/O in memory layout
-In-Reply-To: <1460948988-7477-1-git-send-email-wangkefeng.wang@huawei.com>
+Date: Mon, 18 Apr 2016 11:09:45 +0800
+Subject: [PATCH v2 0/3] arm64: mm: Enhance Virtual kernel memory layout
+In-Reply-To: <1460533772-13314-1-git-send-email-wangkefeng.wang@huawei.com>
 References: <1460533772-13314-1-git-send-email-wangkefeng.wang@huawei.com>
- <1460948988-7477-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1460948988-7477-4-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <1460948988-7477-1-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The modules and PCI I/O informations in Virtual kernel memory layout
-are inappropriate when corresponding config is not enabled, so don't
-show them then.
+This is a micro enhance for Virtual kernel memory layout. Show bss info,
+add restriction for modules and PCI I/O printing, and make each line with
+single pr_cont().
 
-Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
----
- arch/arm64/mm/init.c | 4 ++++
- 1 file changed, 4 insertions(+)
+With this patchset,
 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index c96fe51..e06a445 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -367,8 +367,10 @@ void __init mem_init(void)
- 	pr_cont("    kasan   : 0x%16lx - 0x%16lx   (%6ld GB)\n",
- 		MLG(KASAN_SHADOW_START, KASAN_SHADOW_END));
- #endif
-+#ifdef CONFIG_MODULES
- 	pr_cont("    modules : 0x%16lx - 0x%16lx   (%6ld MB)\n",
- 		MLM(MODULES_VADDR, MODULES_END));
-+#endif
- 	pr_cont("    vmalloc : 0x%16lx - 0x%16lx   (%6ld GB)\n",
- 		MLG(VMALLOC_START, VMALLOC_END));
- 	pr_cont("      .text : 0x%p" " - 0x%p" "   (%6ld KB)\n",
-@@ -390,8 +392,10 @@ void __init mem_init(void)
- #endif
- 	pr_cont("    fixed   : 0x%16lx - 0x%16lx   (%6ld KB)\n",
- 		MLK(FIXADDR_START, FIXADDR_TOP));
-+#ifdef CONFIG_PCI
- 	pr_cont("    PCI I/O : 0x%16lx - 0x%16lx   (%6ld MB)\n",
- 		MLM(PCI_IO_START, PCI_IO_END));
-+#endif
- 	pr_cont("    memory  : 0x%16lx - 0x%16lx   (%6ld MB)\n",
- 		MLM(__phys_to_virt(memblock_start_of_DRAM()),
- 		    (unsigned long)high_memory));
+[    0.000000] Virtual kernel memory layout:
+[    0.000000]     modules : 0xffffff8000000000 - 0xffffff8008000000   (   128 MB)
+[    0.000000]     vmalloc : 0xffffff8008000000 - 0xffffffbdbfff0000   (   246 GB)
+[    0.000000]       .text : 0xffffff8008080000 - 0xffffff8008755000   (  6996 KB)
+[    0.000000]     .rodata : 0xffffff8008755000 - 0xffffff8008a3d000   (  2976 KB)
+[    0.000000]       .init : 0xffffff8008a3d000 - 0xffffff8008b09000   (   816 KB)
+[    0.000000]       .data : 0xffffff8008b09000 - 0xffffff8008ba6800   (   630 KB)
+[    0.000000]        .bss : 0xffffff8008ba6800 - 0xffffff8008be3738   (   244 KB)
+[    0.000000]     vmemmap : 0xffffffbdc0000000 - 0xffffffbfc0000000   (     8 GB maximum)
+[    0.000000]               0xffffffbdc0000000 - 0xffffffbdc8000000   (   128 MB actual)
+[    0.000000]     fixed   : 0xffffffbffe7fd000 - 0xffffffbffec00000   (  4108 KB)
+[    0.000000]     PCI I/O : 0xffffffbffee00000 - 0xffffffbfffe00000   (    16 MB)
+[    0.000000]     memory  : 0xffffffc000000000 - 0xffffffc200000000   (  8192 MB)
+
+Before,
+
+[    0.000000] Virtual kernel memory layout:
+[    0.000000]     modules : 0xffffff8000000000 - 0xffffff8008000000   (   128 MB)
+[    0.000000]     vmalloc : 0xffffff8008000000 - 0xffffffbdbfff0000   (   246 GB)
+[    0.000000]       .text : 0xffffff8008080000 - 0xffffff8008753000   (  6988 KB)
+    .rodata : 0xffffff8008753000 - 0xffffff8008a3a000   (  2972 KB)
+      .init : 0xffffff8008a3a000 - 0xffffff8008b06000   (   816 KB)
+      .data : 0xffffff8008b06000 - 0xffffff8008ba2400   (   625 KB)
+[    0.000000]     vmemmap : 0xffffffbdc0000000 - 0xffffffbfc0000000   (     8 GB maximum)
+              0xffffffbdc0000000 - 0xffffffbdc8000000   (   128 MB actual)
+[    0.000000]     fixed   : 0xffffffbffe7fd000 - 0xffffffbffec00000   (  4108 KB)
+[    0.000000]     PCI I/O : 0xffffffbffee00000 - 0xffffffbfffe00000   (    16 MB)
+[    0.000000]     memory  : 0xffffffc000000000 - 0xffffffc200000000   (  8192 MB)
+
+Changes since v1:
+- Drop vector info and spilt the patch, suggested by James Morse.
+
+Kefeng Wang (3):
+  arm64: mm: make pr_cont() per line in Virtual kernel memory layout
+  arm64: mm: Show bss segment in kernel memory layout
+  arm64: mm: Restrictive printing for modules and PCI I/O in memory
+    layout
+
+ arch/arm64/mm/init.c | 27 ++++++++++++++++-----------
+ 1 file changed, 16 insertions(+), 11 deletions(-)
+
 -- 
 2.6.0.GIT
