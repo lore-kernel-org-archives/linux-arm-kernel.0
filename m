@@ -1,62 +1,191 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 Apr 2016 13:41:20 +0200
-Subject: [PATCH 1/2] char: PC rtc: replace blacklist with whitelist
-In-Reply-To: <CAMuHMdWQiqNq7-fgn5NONovLQxhOoGD5s-TAYVYZOVRfEs52Zg@mail.gmail.com>
-References: <1456912137-1578635-1-git-send-email-arnd@arndb.de>
- <4192558.Mh1hb3LCLb@wuerfel>
- <CAMuHMdWQiqNq7-fgn5NONovLQxhOoGD5s-TAYVYZOVRfEs52Zg@mail.gmail.com>
-Message-ID: <5528499.2P7TrvXfau@wuerfel>
+From: liudongdong3@huawei.com (liudongdong (C))
+Date: Mon, 18 Apr 2016 19:37:26 +0800
+Subject: [PATCH V6 11/13] pci, acpi: Match PCI config space accessors
+ against platfrom specific quirks.
+In-Reply-To: <1460740008-19489-12-git-send-email-tn@semihalf.com>
+References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
+ <1460740008-19489-12-git-send-email-tn@semihalf.com>
+Message-ID: <5714C6F6.8050600@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 18 April 2016 09:09:55 Geert Uytterhoeven wrote:
-> Hi Arnd,
-> 
-> cc linux-m68k
-> 
-> On Sun, Apr 17, 2016 at 11:37 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Wednesday 02 March 2016 11:22:04 Geert Uytterhoeven wrote:
-> >> On Wed, Mar 2, 2016 at 10:48 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >> > Every new architecture has to add itself to the growing list of those
-> >> > that do not support the legacy PC RTC driver.
-> >> >
-> >> > This replaces the long list of architectures that don't support it
-> >> > with a shorter list of those that do.
-> >> >
-> >> > The list is taken from those architectures that have a non-empty
-> >> > asm/mc146818rtc.h header file and were not explicitly blacklisted.
-> >>
-> >> M68K was blacklisted...
-> >
-> > I never got back to you on this topic, sorry about that. I've fixed
-> > up the patch to leave out m68k now.
-> >
-> > On a semi-related note, I see that m68k is one of the few architectures
-> > still using the (other) genrtc driver. It would be nice to reduce that
-> > list and change m68k to use its own rtc driver (ideally one per
-> 
-> We do have hp_sdc_rtc (HP9000/300; why is that under drivers/input/misc/?),
-> and rtc-msm6242 and rtc-rp5c01 (both for Amiga).
+Hi Tomasz
 
-fwiw, the hp_sdc_rtc driver does not actually implement the RTC ioctls
-(they are there, but commented out).
+I merged my patchset to branch topci-acpi-v6.
+The patchset is used for Hisilicon DO2 PCIe ACPI support.
+I found some compile errors. The log as below.
+drivers/pci/host/pcie-hisi-acpi.c: In function 'hisi_pcie_init':
+drivers/pci/host/pcie-hisi-acpi.c:130:6: error: 'struct acpi_pci_root' has no member named 'sysdata'
+   root->sysdata = reg_base;
 
-The other ones are good, you just have two incompatible ways of doing
-it because the drivers/rtc subsystem is can not be built into the
-kernel at the same time as the old gen_rtc driver for the q40.
+In your PATCH V5, add "sysdata" for strcut acpi_pci_root, but PATCH V6 has not add it.
+In my patch, I used root->sysdata which will be available along read/write accessor.
+I want to know the reason this v6 patchset does not add "sysdata". I need this.
 
-> > platform), but the q40 platform is the only one providing
-> > get_rtc_pll()/set_rtc_pll() for the RTC_PLL_GET/RTC_PLL_SET ioctl
-> > commands.
-> 
-> Do you mean this is a problem?
+diff --git a/include/acpi/acpi_bus.h b/include/acpi/acpi_bus.h
+index 14362a8..0fc6f13 100644
+--- a/include/acpi/acpi_bus.h
++++ b/include/acpi/acpi_bus.h
+@@ -556,6 +556,7 @@ struct acpi_pci_root {
+  	struct pci_bus *bus;
+  	u16 segment;
+  	struct resource secondary;	/* downstream bus range */
++	void *sysdata;
 
-Not a big one, assuming that either nobody actually needs these ioctls
-(very likely), or they don't care about having a single kernel for
-q40 and the other platforms.
+  	u32 osc_support_set;	/* _OSC state of support bits */
+  	u32 osc_control_set;	/* _OSC state of control bits */
 
-The main issue I see is migrating architectures over from gen_rtc to
-rtc-generic over time, but this effort has been going on for at least
-a decade and there is no rush, but it would still be nice.
+Thanks
+Dongdong
 
-	Arnd
+? 2016/4/16 1:06, Tomasz Nowicki ??:
+> Some platforms may not be fully compliant with generic set of PCI config
+> accessors. For these cases we implement the way to overwrite accessors
+> set prior to PCI buses enumeration. Algorithm traverses available quirk
+> list, matches against <DMI ID (optional), domain, bus number> tuple and
+> an extra match call and returns corresponding PCI config ops.
+> All quirks can be defined using:
+> DECLARE_ACPI_MCFG_FIXUP() macro and kept self contained. Example:
+>
+> /* Additional DMI platform identification (optional) */
+> static const struct dmi_system_id foo_dmi[] = {
+>          {
+>                  .ident = "<Platform ident string>",
+>                  .matches = {
+>                          DMI_MATCH(DMI_SYS_VENDOR, "<system vendor>"),
+>                          DMI_MATCH(DMI_PRODUCT_NAME, "<product name>"),
+>                          DMI_MATCH(DMI_PRODUCT_VERSION, "product version"),
+>                  },
+>          },
+>          { }
+> };
+>
+> /* Custom PCI config ops */
+> static struct pci_generic_ecam_ops foo_pci_ops = {
+> 	.bus_shift	= 24,
+> 	.pci_ops = {
+> 		.map_bus = pci_mcfg_dev_base,
+> 		.read = foo_ecam_config_read,
+> 		.write = foo_ecam_config_write,
+> 	}
+> };
+>
+> static int foo_match(struct pci_mcfg_fixup *fixup, struct acpi_pci_root *root)
+> {
+> 	if (additional platform identification)
+> 	        return true;
+> 	return false;
+> }
+>
+> DECLARE_ACPI_MCFG_FIXUP(foo_dmi, foo_init, &foo_root_ops, <domain_nr>, <bus_nr>);
+>
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> ---
+>   drivers/acpi/pci_gen_host.c       | 30 +++++++++++++++++++++++++++++-
+>   include/asm-generic/vmlinux.lds.h |  7 +++++++
+>   include/linux/pci-acpi.h          | 18 ++++++++++++++++++
+>   3 files changed, 54 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/acpi/pci_gen_host.c b/drivers/acpi/pci_gen_host.c
+> index fd360b5..e55dfca 100644
+> --- a/drivers/acpi/pci_gen_host.c
+> +++ b/drivers/acpi/pci_gen_host.c
+> @@ -11,6 +11,8 @@
+>    * You should have received a copy of the GNU General Public License
+>    * version 2 (GPLv2) along with this source code.
+>    */
+> +
+> +#include <linux/dmi.h>
+>   #include <linux/kernel.h>
+>   #include <linux/pci.h>
+>   #include <linux/pci-acpi.h>
+> @@ -54,6 +56,32 @@ static struct mcfg_entry *pci_mcfg_lookup(u16 seg, u8 bus_start)
+>   	return NULL;
+>   }
+>
+> +extern struct pci_cfg_fixup __start_acpi_mcfg_fixups[];
+> +extern struct pci_cfg_fixup __end_acpi_mcfg_fixups[];
+> +
+> +static struct pci_generic_ecam_ops *pci_acpi_get_ops(struct acpi_pci_root *root)
+> +{
+> +	int bus_num = root->secondary.start;
+> +	int domain = root->segment;
+> +	struct pci_cfg_fixup *f;
+> +
+> +	/*
+> +	 * Match against platform specific quirks and return corresponding
+> +	 * CAM ops.
+> +	 *
+> +	 * First match against PCI topology <domain:bus> then use DMI or
+> +	 * custom match handler.
+> +	 */
+> +	for (f = __start_acpi_mcfg_fixups; f < __end_acpi_mcfg_fixups; f++) {
+> +		if ((f->domain == domain || f->domain == PCI_MCFG_DOMAIN_ANY) &&
+> +		    (f->bus_num == bus_num || f->bus_num == PCI_MCFG_BUS_ANY) &&
+> +		    (f->system ? dmi_check_system(f->system) : 1) &&
+> +		    (f->match ? f->match(f, root) : 1))
+> +			return f->ops;
+> +	}
+> +	/* No quirks, use ECAM */
+> +	return &pci_generic_ecam_default_ops;
+> +}
+>
+>   /*
+>    * Lookup the bus range for the domain in MCFG, and set up config space
+> @@ -95,7 +123,7 @@ static int pci_acpi_setup_ecam_mapping(struct acpi_pci_root *root,
+>   	}
+>
+>   	cfg = pci_generic_ecam_create(&root->device->dev, addr, bus_start,
+> -				      bus_end, &pci_generic_ecam_default_ops);
+> +				      bus_end, pci_acpi_get_ops(root));
+>   	if (IS_ERR(cfg)) {
+>   		err = PTR_ERR(cfg);
+>   		pr_err("%04x:%02x-%02x error %d mapping CAM\n", seg,
+> diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+> index 339125b..c53b6b7 100644
+> --- a/include/asm-generic/vmlinux.lds.h
+> +++ b/include/asm-generic/vmlinux.lds.h
+> @@ -298,6 +298,13 @@
+>   		VMLINUX_SYMBOL(__end_pci_fixups_suspend_late) = .;	\
+>   	}								\
+>   									\
+> +	/* ACPI MCFG quirks */						\
+> +	.acpi_fixup        : AT(ADDR(.acpi_fixup) - LOAD_OFFSET) {	\
+> +		VMLINUX_SYMBOL(__start_acpi_mcfg_fixups) = .;		\
+> +		*(.acpi_fixup_mcfg)					\
+> +		VMLINUX_SYMBOL(__end_acpi_mcfg_fixups) = .;		\
+> +	}								\
+> +									\
+>   	/* Built-in firmware blobs */					\
+>   	.builtin_fw        : AT(ADDR(.builtin_fw) - LOAD_OFFSET) {	\
+>   		VMLINUX_SYMBOL(__start_builtin_fw) = .;			\
+> diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
+> index a72e22d..9545988 100644
+> --- a/include/linux/pci-acpi.h
+> +++ b/include/linux/pci-acpi.h
+> @@ -71,6 +71,24 @@ struct acpi_pci_root_ops {
+>   	int (*prepare_resources)(struct acpi_pci_root_info *info);
+>   };
+>
+> +struct pci_cfg_fixup {
+> +	const struct dmi_system_id *system;
+> +	bool (*match)(struct pci_cfg_fixup *, struct acpi_pci_root *);
+> +	struct pci_generic_ecam_ops *ops;
+> +	int domain;
+> +	int bus_num;
+> +};
+> +
+> +#define PCI_MCFG_DOMAIN_ANY	-1
+> +#define PCI_MCFG_BUS_ANY	-1
+> +
+> +/* Designate a routine to fix up buggy MCFG */
+> +#define DECLARE_ACPI_MCFG_FIXUP(system, match, ops, dom, bus)		\
+> +	static const struct pci_cfg_fixup __mcfg_fixup_##system##dom##bus\
+> +	 __used	__attribute__((__section__(".acpi_fixup_mcfg"),		\
+> +				aligned((sizeof(void *))))) =		\
+> +	{ system, match, ops, dom, bus };
+> +
+>   extern int acpi_pci_probe_root_resources(struct acpi_pci_root_info *info);
+>   extern struct pci_bus *acpi_pci_root_create(struct acpi_pci_root *root,
+>   					    struct acpi_pci_root_ops *ops,
+>
