@@ -1,98 +1,68 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 18 Apr 2016 09:09:55 +0200
-Subject: [PATCH 1/2] char: PC rtc: replace blacklist with whitelist
-In-Reply-To: <4192558.Mh1hb3LCLb@wuerfel>
-References: <1456912137-1578635-1-git-send-email-arnd@arndb.de>
- <CAMuHMdU26GkyUYxs3DJOFRB5LTdYCOaGTMUwFMd9YXYhkS1W3g@mail.gmail.com>
- <4192558.Mh1hb3LCLb@wuerfel>
-Message-ID: <CAMuHMdWQiqNq7-fgn5NONovLQxhOoGD5s-TAYVYZOVRfEs52Zg@mail.gmail.com>
+From: chaotian.jing@mediatek.com (Chaotian Jing)
+Date: Mon, 18 Apr 2016 15:13:29 +0800
+Subject: [PATCH] mmc: mediatek: fix request blocked by cancel_delayed_work
+Message-ID: <1460963609-16179-1-git-send-email-chaotian.jing@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+there are 2 points will cause could not call mmc_request_done()
+and eventually cause the caller thread blocked.
 
-cc linux-m68k
+A. if card was busy, cancel_delayed_work() will return false because
+the delay work has not been scheduled, in this case, need put
+mod_delayed_work() in front of msdc_cmd_is_ready()
 
-On Sun, Apr 17, 2016 at 11:37 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 02 March 2016 11:22:04 Geert Uytterhoeven wrote:
->> On Wed, Mar 2, 2016 at 10:48 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > Every new architecture has to add itself to the growing list of those
->> > that do not support the legacy PC RTC driver.
->> >
->> > This replaces the long list of architectures that don't support it
->> > with a shorter list of those that do.
->> >
->> > The list is taken from those architectures that have a non-empty
->> > asm/mc146818rtc.h header file and were not explicitly blacklisted.
->>
->> M68K was blacklisted...
->
-> I never got back to you on this topic, sorry about that. I've fixed
-> up the patch to leave out m68k now.
->
-> On a semi-related note, I see that m68k is one of the few architectures
-> still using the (other) genrtc driver. It would be nice to reduce that
-> list and change m68k to use its own rtc driver (ideally one per
+B. if a request really need more than 5s(Some Sandisk TF card), it will
+use cancel_delayed_work() to cancel itself, and also return false, so use
+in_interrupt() to avoid this case
 
-We do have hp_sdc_rtc (HP9000/300; why is that under drivers/input/misc/?),
-and rtc-msm6242 and rtc-rp5c01 (both for Amiga).
+Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+---
+ drivers/mmc/host/mtk-sd.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-> platform), but the q40 platform is the only one providing
-> get_rtc_pll()/set_rtc_pll() for the RTC_PLL_GET/RTC_PLL_SET ioctl
-> commands.
-
-Do you mean this is a problem?
-
-> If we do this change on top of the other m68k patch I have, the
-> rtc-generic driver should be usable as a full replacement for
-> genrtc.c on m68k and we can remove all the set_rtc_pll/get_rtc_pll
-> handling from genrtc.
->
-> diff --git a/arch/m68k/kernel/time.c b/arch/m68k/kernel/time.c
-> index 773b2187210d..f4781d612c37 100644
-> --- a/arch/m68k/kernel/time.c
-> +++ b/arch/m68k/kernel/time.c
-> @@ -100,7 +100,32 @@ static int rtc_generic_set_time(struct device *dev, struct rtc_time *tm)
->         return 0;
->  }
->
-> +static int rtc_ioctl(struct device *dev, unsigned int cmd, unsigned long arg)
-> +{
-> +       struct rtc_pll_info pll;
-> +       struct rtc_pll_info __user *argp = (void __user *)arg;
-> +
-> +       switch (cmd) {
-> +       case RTC_PLL_GET:
-> +               if (!mach_get_rtc_pll || mach_get_rtc_pll(&pll))
-> +                       return -EINVAL;
-> +               return copy_to_user(argp, &pll, sizeof pll) ? -EFAULT : 0;
-> +
-> +       case RTC_PLL_SET:
-> +               if (!mach_set_rtc_pll)
-> +                       return -EINVAL;
-> +               if (!capable(CAP_SYS_TIME))
-> +                       return -EACCES;
-> +               if (copy_from_user(&pll, argp, sizeof(pll)))
-> +                       return -EFAULT;
-> +               return mach_set_rtc_pll(&pll);
-> +       }
-> +
-> +       return -ENOIOCTLCMD;
-> +}
-> +
->  static const struct rtc_class_ops generic_rtc_ops = {
-> +       .ioctl = rtc_ioctl,
->         .read_time = rtc_generic_get_time,
->         .set_time = rtc_generic_set_time,
->  };
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
+index b17f30d..1511b1b 100644
+--- a/drivers/mmc/host/mtk-sd.c
++++ b/drivers/mmc/host/mtk-sd.c
+@@ -724,7 +724,7 @@ static void msdc_request_done(struct msdc_host *host, struct mmc_request *mrq)
+ 	bool ret;
+ 
+ 	ret = cancel_delayed_work(&host->req_timeout);
+-	if (!ret) {
++	if (!ret && in_interrupt()) {
+ 		/* delay work already running */
+ 		return;
+ 	}
+@@ -824,7 +824,12 @@ static inline bool msdc_cmd_is_ready(struct msdc_host *host,
+ 	}
+ 
+ 	if (mmc_resp_type(cmd) == MMC_RSP_R1B || cmd->data) {
+-		tmo = jiffies + msecs_to_jiffies(20);
++		/*
++		 * 2550ms is from EXT_CSD[248], after switch to hs200,
++		 * using CMD13 to polling card status, it will get response
++		 * of 0x800, but EMMC still pull-low DAT0.
++		 */
++		tmo = jiffies + msecs_to_jiffies(2550);
+ 		/* R1B or with data, should check SDCBUSY */
+ 		while ((readl(host->base + SDC_STS) & SDC_STS_SDCBUSY) &&
+ 				time_before(jiffies, tmo))
+@@ -847,6 +852,7 @@ static void msdc_start_command(struct msdc_host *host,
+ 	WARN_ON(host->cmd);
+ 	host->cmd = cmd;
+ 
++	mod_delayed_work(system_wq, &host->req_timeout, DAT_TIMEOUT);
+ 	if (!msdc_cmd_is_ready(host, mrq, cmd))
+ 		return;
+ 
+@@ -858,7 +864,6 @@ static void msdc_start_command(struct msdc_host *host,
+ 
+ 	cmd->error = 0;
+ 	rawcmd = msdc_cmd_prepare_raw_cmd(host, mrq, cmd);
+-	mod_delayed_work(system_wq, &host->req_timeout, DAT_TIMEOUT);
+ 
+ 	sdr_set_bits(host->base + MSDC_INTEN, cmd_ints_mask);
+ 	writel(cmd->arg, host->base + SDC_ARG);
+-- 
+1.8.1.1.dirty
