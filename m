@@ -1,74 +1,60 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 18 Apr 2016 09:29:14 -0400
-Subject: [PATCH] i2c: exynos5: Fix possible ABBA deadlock by keeping I2C
- clock prepared
-In-Reply-To: <571491AE.30908@samsung.com>
-References: <1460757887-18128-1-git-send-email-javier@osg.samsung.com>
- <571491AE.30908@samsung.com>
-Message-ID: <5714E12A.8090100@osg.samsung.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Mon, 18 Apr 2016 15:33:24 +0200
+Subject: [PATCH V6 00/13] Support for generic ACPI based PCI host
+ controller
+In-Reply-To: <CAKc_7PVC6O4oh+bTmpLQRrhHrqGbaKB2hynecKOLmc5fBc-VVQ@mail.gmail.com>
+References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
+ <571130BB.9030508@redhat.com>
+ <CAKc_7PVC6O4oh+bTmpLQRrhHrqGbaKB2hynecKOLmc5fBc-VVQ@mail.gmail.com>
+Message-ID: <5714E224.1030307@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Marek,
-
-On 04/18/2016 03:50 AM, Marek Szyprowski wrote:
-> Hello,
-> 
-> On 2016-04-16 00:04, Javier Martinez Canillas wrote:
->> The exynos5 I2C controller driver always prepares and enables a clock
->> before using it and then disables unprepares it when the clock is not
->> used anymore.
+On 16.04.2016 17:31, Jayachandran C wrote:
+> On Fri, Apr 15, 2016 at 11:49 PM, Jon Masters <jcm@redhat.com> wrote:
+>> On 04/15/2016 01:06 PM, Tomasz Nowicki wrote:
+>>>  From the functionality point of view this series might be split into the
+>>> following logic parts:
+>>> 1. Necessary fixes as the preparation for using driver on ARM64.
+>>> 2. New ECAM API and update for users of the pci-host-common API
+>>> 3. Use new MCFG interface and implement generic ACPI based PCI host controller driver.
+>>> 4. Enable above driver on ARM64
+>>>
+>>> Patches has been built on top of 4.6-rc2 and can be found here:
+>>> git at github.com:semihalf-nowicki-tomasz/linux.git (pci-acpi-v6)
+>>>
+>>> This has been tested on Cavium ThunderX server. Any help in reviewing and
+>>> testing is very appreciated.
+>>>
+>>> v5 -> v6
+>>> - dropped idea of x86 MMCONFIG code refactoring
+>>> - integrated JC's patches which introduce new ECAM API:
+>>>    https://lkml.org/lkml/2016/4/11/907
+>>>    git: https://github.com/jchandra-brcm/linux/ (arm64-acpi-pci-v3)
+>>> - integrated Sinan's fix for releasing IO resources, see patch [06/13]
+>>> - added ACPI support for ThunderX ECAM and PEM drivers
+>>> - rebased to 4.6-rc2
 >>
->> But this can cause a possible ABBA deadlock in some scenarios since a
->> driver that uses regmap to access its I2C registers, will first grab
->> the regmap lock and then the I2C xfer function will grab the prepare
->> lock when preparing the I2C clock. But since the clock driver also
->> uses regmap for I2C accesses, preparing a clock will first grab the
->> prepare lock and then the regmap lock when using the regmap API.
->>
->> An example of this happens on the Exynos5422 Odroid XU board where a
->> s2mps11 PMIC is used and both the s2mps11 regulators and clk drivers
->> share the same I2C regmap.
->>
->> The possible deadlock is reported by the kernel lockdep:
->>
->>    Possible unsafe locking scenario:
->>
->>          CPU0                    CPU1
->>          ----                    ----
->>     lock(sec_core:428:(regmap)->lock);
->>                                  lock(prepare_lock);
->>                                  lock(sec_core:428:(regmap)->lock);
->>     lock(prepare_lock);
->>
->>    *** DEADLOCK ***
->>
->> Fix this by only preparing the clock on probe and {en,dis}able in the
->> rest of the driver.
->>
->> This patch is similar to commit 34e81ad5f0b6 ("i2c: s3c2410: fix ABBA
->> deadlock by keeping clock prepared") that fixes the same bug in other
->> driver for an I2C controller found in Samsung SoCs.
-> 
-> I'm sorry, but this is not the right approach imho. It is just a workaround
-> applied to specific driver, it also duplicates incorrect clock usage
-> pattern (there is really no point keeping clock prepared all the time).
-> 
-> IMHO this ABBA deadlock should be really fixed in clocks core (probably
-> by removing global prepare mutex and replacing it with per clock
-> controller mutexes). Without a proper patch this issue will hit us again
-> with other i2c controllers or other drivers as well.
+>> JC: can you explicitly confirm that you're ok with letting Tomasz drive
+>> this? We would like to see one driver. Either that is Tomasz, or
+>> Lorenzo, or it is you. But we need to have one overall cooordinated
+>> effort to get this enablement into upstream as quickly as possible.
 >
+> I have been concentrating on the ECAM code and ECAM based ACPI
+> host controller, the rest of the code is from Tomasz original patchset.
+>
+> I am not happy with the way the ACPI quirk handling is done in Tomasz's
+> current patchset. I believe that it has to be done in a separate patchset
+> with another set of discussions. It introduces additional complexity and
+> mixing that discussion with the ECAM one will not help in making progress.
 
-Agreed, Krzysztof mentioned the same before. I'll take a look to the global
-mutex to see how I can make it more fine grained to prevent these deadlocks.
- 
->> Reported-by: Anand Moon <linux.amoon@gmail.com>
->> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->>
+Of course we can split discussion into the two topics:
+1. ECAM based ACPI host controller - patches [1-10]
+2. Quirks handling and examples.
 
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+IMO, it is very helpful for reviewers to go with one unified patch set 
+and see the whole picture. Also, as you can see, quirks handling allows 
+people to test it easily with their servers (not only QEMU but real HW).
+
+Thanks,
+Tomasz
