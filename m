@@ -1,64 +1,37 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 18 Apr 2016 10:58:09 +0100
-Subject: [PATCH] arm64: ni_syscall should be similar to other archs
-In-Reply-To: <1456325699-25849-1-git-send-email-per.hallsmark@windriver.com>
-References: <1456325699-25849-1-git-send-email-per.hallsmark@windriver.com>
-Message-ID: <20160418095808.GB18257@e104818-lin.cambridge.arm.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 18 Apr 2016 12:01:34 +0200
+Subject: [PATCH v2 0/2] clk: Add Oxford Semiconductor OXNAS Clocks support
+Message-ID: <1460973696-5977-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(I forgot about this email, some two months ago)
+This patchset includes support for the standard clocks controller for the
+Oxford Semiconductor OXNAS SoC Family.
 
-On Wed, Feb 24, 2016 at 03:54:59PM +0100, per.hallsmark at windriver.com wrote:
-> From: Per Hallsmark <per.hallsmark@windriver.com>
-> 
-> Today arm64 have it's own variant when a userspace app is doing a
-> non-implemented syscall in that it dumps on console process name,
-> registers and such. This makes a different behaviour on arm64 than
-> on all other archs.
+Changes since v1 clk patchset :
+- Add text to Kconfig
+- Clean indice-clk table
+- Add single struct to have a single kzalloc
 
-Are you hitting a real issue with this? Test apps doing random syscalls?
+v1 clk patchset: http://lkml.kernel.org/r/1459520791-13269-1-git-send-email-narmstrong at baylibre.com
 
-> This patch propose to get inline with other archs.
+It was originally posted part of a platform patchset available here :
+http://lkml.kernel.org/r/1458838215-23314-1-git-send-email-narmstrong at baylibre.com
 
-Well, it's not fully in line, for example on arch/arm we generate a
-SIGILL (and I think we should fix the compat path in the arm64
-do_ni_syscall() to do the same).
+Changes this v3 patchset :
+- Get rid of PLX Technology, replace by Oxford Semiconductor
 
-> If we want to have a note on console, syslog or so when doing a
-> nonimplemented syscall, it would be better to add a variable
-> show_nonimplemented_syscalls and sense on it in the generic
-> kernel/sys_ni.c::sys_ni_syscall() which could dump info (and then
-> it would be generic for all archs). But that is another discussion
-> alltogether, lets first synchronize the archs to behave similar.
+Neil Armstrong (2):
+  clk: Add Oxford Semiconductor OXNAS Standard Clocks
+  dt-bindings: Add Oxford Semiconductor OXNAS Standard Clocks bindings
 
-Or we could have finer grained show_unhandled_signals variable. The user
-visible /proc/sys/debug/exception-trace doesn't say anything about
-signals.
-
-> Signed-off-by: Per Hallsmark <per.hallsmark@windriver.com>
-> ---
->  arch/arm64/kernel/traps.c | 8 --------
->  1 file changed, 8 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-> index cbedd72..980ff63 100644
-> --- a/arch/arm64/kernel/traps.c
-> +++ b/arch/arm64/kernel/traps.c
-> @@ -403,14 +403,6 @@ asmlinkage long do_ni_syscall(struct pt_regs *regs)
->  	}
->  #endif
->  
-> -	if (show_unhandled_signals_ratelimited()) {
-> -		pr_info("%s[%d]: syscall %d\n", current->comm,
-> -			task_pid_nr(current), (int)regs->syscallno);
-> -		dump_instr("", regs);
-> -		if (user_mode(regs))
-> -			__show_regs(regs);
-> -	}
-> -
->  	return sys_ni_syscall();
->  }
+ .../devicetree/bindings/clock/oxnas,stdclk.txt     |  35 ++++
+ drivers/clk/Kconfig                                |   6 +
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/clk-oxnas.c                            | 198 +++++++++++++++++++++
+ 4 files changed, 240 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/oxnas,stdclk.txt
+ create mode 100644 drivers/clk/clk-oxnas.c
 
 -- 
-Catalin
+1.9.1
