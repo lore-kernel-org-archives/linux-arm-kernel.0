@@ -1,55 +1,72 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 18 Apr 2016 10:30:36 +0800
-Subject: [PATCH 2/2] arm64: dts: ls2080a: fsl-mc dt node updates
-In-Reply-To: <20160418020252.GS28903@tiger>
-References: <1459544080-28598-1-git-send-email-stuart.yoder@nxp.com>
- <20160413055019.GK28903@tiger>
- <HE1PR04MB1641EB3DD445D3AF3F524C3D8D960@HE1PR04MB1641.eurprd04.prod.outlook.com>
- <20160418020252.GS28903@tiger>
-Message-ID: <CAJBJ56L5-HXYv=0dHdOm2Fz_ewq0-o=V5nkn4bojLyS7bDB02A@mail.gmail.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Mon, 18 Apr 2016 05:39:11 +0300
+Subject: [PATCH 1/3] arm: dts: lpc32xx: add clock properties to spi nodes
+In-Reply-To: <1460636437-21764-2-git-send-email-slemieux.tyco@gmail.com>
+References: <1460636437-21764-1-git-send-email-slemieux.tyco@gmail.com>
+ <1460636437-21764-2-git-send-email-slemieux.tyco@gmail.com>
+Message-ID: <571448CF.5030104@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 18, 2016 at 10:02 AM, Shawn Guo <shawnguo@kernel.org> wrote:
-> On Wed, Apr 13, 2016 at 08:39:32PM +0000, Stuart Yoder wrote:
->> > > @@ -265,6 +265,93 @@
->> > >                   compatible = "fsl,qoriq-mc";
->> > >                   reg = <0x00000008 0x0c000000 0 0x40>,    /* MC portal base */
->> > >                         <0x00000000 0x08340000 0 0x40000>; /* MC control reg */
->> > > +                 msi-parent = <&its>;
->> > > +                 #address-cells = <3>;
->> > > +                 #size-cells = <1>;
->> > > +
->> > > +                 /*
->> > > +                  * Region type 0x0 - MC portals
->> > > +                  * Region type 0x1 - QBMAN portals
->> > > +                  */
->> > > +                 ranges = <0x0 0x0 0x0 0x8 0x0c000000 0x4000000
->> > > +                           0x1 0x0 0x0 0x8 0x18000000 0x8000000>;
->> > > +
->> > > +                 /*
->> > > +                  * Define the maximum number of MACs present on the SoC.
->> > > +                  * They won't necessarily be all probed, since the
->> > > +                  * Data Path Layout file and the MC firmware can put
->> > > +                  * fewer actual DPMAC objects on the MC bus.
->> > > +                  */
->> > > +                 dpmacs {
->> > > +                         #address-cells = <1>;
->> > > +                         #size-cells = <0>;
->> > > +
->> > > +                         dpmac1: dpmac at 1 {
->> > > +                                 compatible = "fsl,qoriq-mc-dpmac";
->> >
->> > I did not see how this compatible is used by kernel driver.
->>
->> There is no driver yet, but it will be coming soon.  But, does
->> it matter?  Device trees should be describing hardware
->> without regards to some specific kernel use of a node or
->> property.
->
-> We need to at least have the bindings documented before we can accept it
-> in dts files.
+Hi Sylvain,
 
-Ah, sorry.  Missed that the bindings are added by patch 1/2.
+On 14.04.2016 15:20, slemieux.tyco at gmail.com wrote:
+> From: Sylvain Lemieux <slemieux@tycoint.com>
+> 
+> The change adds clock properties to spi peripheral devices,
+> clock ids are taken from dt-bindings/clock/lpc32xx-clock.h
+> 
+> Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
+> ---
+>  arch/arm/boot/dts/lpc32xx.dtsi | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/lpc32xx.dtsi b/arch/arm/boot/dts/lpc32xx.dtsi
+> index c58d8da..0b6a643 100644
+> --- a/arch/arm/boot/dts/lpc32xx.dtsi
+> +++ b/arch/arm/boot/dts/lpc32xx.dtsi
+> @@ -173,6 +173,8 @@
+>  			spi1: spi at 20088000 {
+>  				compatible = "nxp,lpc3220-spi";
+>  				reg = <0x20088000 0x1000>;
+> +				clocks = <&clk LPC32XX_CLK_SPI1>;
+> +				clock-names = "apb_pclk";
 
-Shawn
+I'm not sure that here is a correct clock name, and it looks like it
+is copied from some PrimeCell device node, may be "arm,pl022" SPI.
+
+Reasons to NOT add clock-names property:
+* the name is one in one PrimeCell clock name, which may be confusing,
+* there is no "nxp,lpc3220-spi" SPI controller driver in the mainline,
+* there is no documented description of controller's properties,
+* the controller has only one clock, so I believe "clock-names"
+  is redundant here.
+
+I don't object against adding "clocks" property, but no public driver
+means no testing, unfortunately.
+
+FWIW there was an attempt to add the driver of pretty bad quality,
+and it does not define a "clock-names" property [1].
+
+>  			};
+>  
+>  			ssp1: ssp at 2008c000 {
+> @@ -186,6 +188,8 @@
+>  			spi2: spi at 20090000 {
+>  				compatible = "nxp,lpc3220-spi";
+>  				reg = <0x20090000 0x1000>;
+> +				clocks = <&clk LPC32XX_CLK_SPI2>;
+> +				clock-names = "apb_pclk";
+
+Same as above.
+
+>  			};
+>  
+>  			i2s0: i2s at 20094000 {
+> 
+
+[1] https://lkml.org/lkml/2015/7/12/61
+
+--
+With best wishes,
+Vladimir
