@@ -1,44 +1,29 @@
-From: jerin.jacob@caviumnetworks.com (Jerin Jacob)
-Date: Mon, 18 Apr 2016 23:15:36 +0530
-Subject: [PATCH v2] arm64: pci: add support for pci_mmap_page_range
-In-Reply-To: <20160418154014.GN28645@arm.com>
-References: <1460581856-12380-1-git-send-email-jerin.jacob@caviumnetworks.com>
- <29393988.imklgXkpJX@wuerfel>
- <20160418152126.GA3154@localhost.localdomain>
- <4342694.H5cy8vaG9k@wuerfel> <20160418154014.GN28645@arm.com>
-Message-ID: <20160418174535.GA5664@localhost.localdomain>
+From: nicolas.dufresne@gmail.com (Nicolas Dufresne)
+Date: Mon, 18 Apr 2016 13:48:17 -0400
+Subject: [PATCH 3/7] [Media] vcodec: mediatek: Add Mediatek V4L2 Video
+ Decoder Driver
+In-Reply-To: <1460967754.7861.61.camel@mtksdaap41>
+References: <1460548915-17536-1-git-send-email-tiffany.lin@mediatek.com>
+ <1460548915-17536-2-git-send-email-tiffany.lin@mediatek.com>
+ <1460548915-17536-3-git-send-email-tiffany.lin@mediatek.com>
+ <1460548915-17536-4-git-send-email-tiffany.lin@mediatek.com>
+ <5710FA3A.2030603@xs4all.nl> <1460958046.7861.48.camel@mtksdaap41>
+ <57148D8E.9060601@xs4all.nl> <1460967754.7861.61.camel@mtksdaap41>
+Message-ID: <1461001697.2719.7.camel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 18, 2016 at 04:40:14PM +0100, Will Deacon wrote:
-> On Mon, Apr 18, 2016 at 05:31:14PM +0200, Arnd Bergmann wrote:
-> > On Monday 18 April 2016 20:51:27 Jerin Jacob wrote:
-> > > 
-> > > Why only to disable mmap() serivce in proc/bus/pci/*/*. Why not
-> > > other  services offered though proc/bus/pci/ like config space read,
-> > > /proc/bus/pci/devices etc
-> > > 
-> > > if a given platform not interested in proc fs  then disable through
-> > > CONFIG_PROC_FS in defconfig. I don't understand the logic behind
-> > > disabling partial services that proc fs exposes.
-> > 
-> > Disabling CONFIG_PROC_FS is not really an option for anybody.
-> > 
-> > The config space access may be something we should have disabled,
-> > or it may not be, but I think it's too late to kill that off now,
-> > as that would likely break something.
-> > 
-> > The mmap() support on those files is way uglier than the config
-> > access, so as long as nobody absolutely requires it, we should
-> > not add it to the list of things we can't get rid of again.
-> 
-> Completely agreed. IIRC, there's some unspeakable ioctl() magic to configure
-> the memory type that the BARs are mapped with via the /proc interface and I
-> *really* don't want that on arm64.
+Le lundi 18 avril 2016 ? 16:22 +0800, tiffany lin a ?crit?:
+> > > We are plaining to remove m2m framework in th feature, although
+> we think
+> >?
+> > Remove it for just the decoder driver or both encoder and decoder?
+> >?
+> Remove it from decoder driver.
 
-But do you think introducing a conditional compilation flag or weak
-function or arch specific function to disable pci proc fs mmap support in
-the generic code will be acceptable?
+Did you look at how CODA handle it (drivers/media/platform/coda/coda-
+common.c) ? I don't know any detail, but they do have the same issue
+and use both?v4l2_m2m_fop_poll and?v4l2_m2m_fop_mmap.
 
-> 
-> Will
+cheers,
+Nicolas
