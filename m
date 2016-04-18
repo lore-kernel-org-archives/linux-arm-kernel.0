@@ -1,29 +1,46 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 18 Apr 2016 10:44:25 -0700
-Subject: [PATCH v2 1/2] clk: bcm2835: Fix compiler warnings on 64-bit
- builds
-In-Reply-To: <20160416001744.GD26353@codeaurora.org>
-References: <1460577903-32192-1-git-send-email-eric@anholt.net>
- <20160416001744.GD26353@codeaurora.org>
-Message-ID: <87r3e2n75y.fsf@eliezer.anholt.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 18 Apr 2016 19:46:45 +0200
+Subject: [PATCH v2] arm64: pci: add support for pci_mmap_page_range
+In-Reply-To: <20160418174535.GA5664@localhost.localdomain>
+References: <1460581856-12380-1-git-send-email-jerin.jacob@caviumnetworks.com>
+ <20160418154014.GN28645@arm.com>
+ <20160418174535.GA5664@localhost.localdomain>
+Message-ID: <3812858.NOymQt5HXN@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Boyd <sboyd@codeaurora.org> writes:
+On Monday 18 April 2016 23:15:36 Jerin Jacob wrote:
+> On Mon, Apr 18, 2016 at 04:40:14PM +0100, Will Deacon wrote:
+> > On Mon, Apr 18, 2016 at 05:31:14PM +0200, Arnd Bergmann wrote:
+> > > On Monday 18 April 2016 20:51:27 Jerin Jacob wrote:
+> > > > 
+> > > > Why only to disable mmap() serivce in proc/bus/pci/*/*. Why not
+> > > > other  services offered though proc/bus/pci/ like config space read,
+> > > > /proc/bus/pci/devices etc
+> > > > 
+> > > > if a given platform not interested in proc fs  then disable through
+> > > > CONFIG_PROC_FS in defconfig. I don't understand the logic behind
+> > > > disabling partial services that proc fs exposes.
+> > > 
+> > > Disabling CONFIG_PROC_FS is not really an option for anybody.
+> > > 
+> > > The config space access may be something we should have disabled,
+> > > or it may not be, but I think it's too late to kill that off now,
+> > > as that would likely break something.
+> > > 
+> > > The mmap() support on those files is way uglier than the config
+> > > access, so as long as nobody absolutely requires it, we should
+> > > not add it to the list of things we can't get rid of again.
+> > 
+> > Completely agreed. IIRC, there's some unspeakable ioctl() magic to configure
+> > the memory type that the BARs are mapped with via the /proc interface and I
+> > *really* don't want that on arm64.
+> 
+> But do you think introducing a conditional compilation flag or weak
+> function or arch specific function to disable pci proc fs mmap support in
+> the generic code will be acceptable?
+> 
 
-> On 04/13, Eric Anholt wrote:
->> Signed-off-by: Eric Anholt <eric@anholt.net>
->> ---
->
-> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
->
-> Or can I merge this? It wasn't addressed To: me so who knows.
+Flag yes, weak function no.
 
-Yeah, please merge it.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160418/cea3b85d/attachment.sig>
+	Arnd
