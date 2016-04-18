@@ -1,72 +1,42 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Tue, 19 Apr 2016 02:12:56 +0300
-Subject: [PATCH 0/3] arm: dts: lpc32xx: update ssp / spi nodes
-In-Reply-To: <1461014548.27294.10.camel@localhost>
-References: <1460636437-21764-1-git-send-email-slemieux.tyco@gmail.com>
- <3938626.hTOUROu3U1@wuerfel> <5714664C.7080201@mleia.com>
- <1461014548.27294.10.camel@localhost>
-Message-ID: <571569F8.3030905@mleia.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Mon, 18 Apr 2016 16:20:48 -0700
+Subject: [GIT PULL] arm64: X-Gene platforms DTS changes queued for 4.7 - part1
+Message-ID: <CADaLNDnB=XqSkTb4v_kVv1MkzOKLWjNfXP_+orkn9b8P=Q=NVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylvain,
+Hi Arnd, Olof,
 
-On 19.04.2016 00:22, Sylvain Lemieux wrote:
-> Hi Vladimir and Arnd,
-> 
-> On Mon, 2016-04-18 at 07:45 +0300, Vladimir Zapolskiy wrote:
->> Hi Arnd,
->>
->> On 16.04.2016 22:34, Arnd Bergmann wrote:
->>> On Thursday 14 April 2016 08:20:34 slemieux.tyco at gmail.com wrote:
->>>> From: Sylvain Lemieux <slemieux@tycoint.com>
->>>>
-> ...
->>>>
->>> The patches look fine, but it's unclear what you want to happen with them
->>> as long as the maintainer situation is not resolved. I've seen patches
->>> from Vladimir and you recently, and none from Roland, so I think it would
->>> be good if one or both of you could officially step up to be maintainers
->>> and collect all patches to forward them to arm at kernel.org for inclusion.
->>
->> for v4.5 and v4.6 I collected my own patches from LAKML after review,
->> I started to do it for v4.7, but probably a bit later than desired.
->>
-> Vladimir, would it be possible for you to add my change, after review 
-> is done on LAKML, for the lpc32xx pull request you will do for 4.7?
+This is the first part of DTS changes for X-Gene platforms queued for 4.7.
 
-definitely.
+Regards,
+Duc Dang.
+------
 
-For your information I updated my tree https://github.com/vzapolskiy/linux.git
-recently, for DTS changes you may want to rebase the changeset on top of
-lpc32xx/dt branch.
+The following changes since commit f55532a0c0b8bb6148f4e07853b876ef73bc69ca:
 
-By the way I plan to rename board DTS files to match lpc32*-*.dts pattern,
-but I can postpone doing it until your changes are included.
+  Linux 4.6-rc1 (2016-03-26 16:03:24 -0700)
 
->>> Once we have an agreement on who does this, please send a patch to
->>> update the MAINTAINERS file.
->>
->> I'll send a change on behalf of myself, at this point I don't think that
->> pure lpc32xx maintenance (deliberately here I exclude development!) task
->> takes more than 20 hours per month, which is affordable for me,
->> Sylvain please express your view.
->>
-> I can provide support for pure lpc32xx maintenance task 
-> (I also exclude development); I can free up to 10-15 hours a
-> month for doing testing and patch review.
+are available in the git repository at:
 
-Sounds good, thank you. Do you want to take over maintenance on v4.8
-cycle?
+  https://github.com/AppliedMicro/xgene-next.git tags/xgene-dts-for-v4.7-part1
 
-> Is there any documentation available on the process 
-> to submit a merge request to the mailing list?
-> 
-> ...
+for you to fetch changes up to 01d1b6e543cfdc0f05027686b35d73de73caec10:
 
-As for me I thoroughly observe what other ARM SoC maintainers do, and
-ask questions if something remains uncertain.
+  arm64: dts: apm: Fix compatible string for X-Gene 2 SATA controller
+DTS node (2016-04-14 17:34:22 -0700)
 
---
-With best wishes,
-Vladimir
+----------------------------------------------------------------
+First part of X-Gene DTS changes queued for v4.7.
+
+This patch set only includes a single change to
+fix the compatible string for SATA controllers on
+X-Gene v2 SOC platforms.
+
+----------------------------------------------------------------
+Rameshwar Prasad Sahu (1):
+      arm64: dts: apm: Fix compatible string for X-Gene 2 SATA
+controller DTS node
+
+ arch/arm64/boot/dts/apm/apm-shadowcat.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
