@@ -1,84 +1,41 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Mon, 18 Apr 2016 14:41:09 -0400
-Subject: [PATCH 1/3] arm: dts: lpc32xx: add clock properties to spi nodes
-In-Reply-To: <571448CF.5030104@mleia.com>
-References: <1460636437-21764-1-git-send-email-slemieux.tyco@gmail.com>
- <1460636437-21764-2-git-send-email-slemieux.tyco@gmail.com>
- <571448CF.5030104@mleia.com>
-Message-ID: <1461004869.27294.5.camel@localhost>
+From: yang.shi@linaro.org (Yang Shi)
+Date: Mon, 18 Apr 2016 11:16:14 -0700
+Subject: [PATCH] arm64: Kconfig: remove redundant
+ HAVE_ARCH_TRANSPARENT_HUGEPAGE definition
+Message-ID: <1461003374-5412-1-git-send-email-yang.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir,
+HAVE_ARCH_TRANSPARENT_HUGEPAGE has been defined in arch/Kconfig already,
+the ARM64 version is identical with it and the default value is Y. So remove
+the redundant definition and just select it under CONFIG_ARM64.
 
-On Mon, 2016-04-18 at 05:39 +0300, Vladimir Zapolskiy wrote:
-> Hi Sylvain,
-> 
-> On 14.04.2016 15:20, slemieux.tyco at gmail.com wrote:
-> > From: Sylvain Lemieux <slemieux@tycoint.com>
-> > 
-> > The change adds clock properties to spi peripheral devices,
-> > clock ids are taken from dt-bindings/clock/lpc32xx-clock.h
-> > 
-> > Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
-> > ---
-> >  arch/arm/boot/dts/lpc32xx.dtsi | 4 ++++
-> >  1 file changed, 4 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/lpc32xx.dtsi b/arch/arm/boot/dts/lpc32xx.dtsi
-> > index c58d8da..0b6a643 100644
-> > --- a/arch/arm/boot/dts/lpc32xx.dtsi
-> > +++ b/arch/arm/boot/dts/lpc32xx.dtsi
-> > @@ -173,6 +173,8 @@
-> >  			spi1: spi at 20088000 {
-> >  				compatible = "nxp,lpc3220-spi";
-> >  				reg = <0x20088000 0x1000>;
-> > +				clocks = <&clk LPC32XX_CLK_SPI1>;
-> > +				clock-names = "apb_pclk";
-> 
-> I'm not sure that here is a correct clock name, and it looks like it
-> is copied from some PrimeCell device node, may be "arm,pl022" SPI.
-> 
-> Reasons to NOT add clock-names property:
-> * the name is one in one PrimeCell clock name, which may be confusing,
-> * there is no "nxp,lpc3220-spi" SPI controller driver in the mainline,
-> * there is no documented description of controller's properties,
-> * the controller has only one clock, so I believe "clock-names"
->   is redundant here.
-> 
-I will try without the clock name, and, update the patch accordingly.
+Signed-off-by: Yang Shi <yang.shi@linaro.org>
+---
+ arch/arm64/Kconfig | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-> I don't object against adding "clocks" property, but no public driver
-> means no testing, unfortunately.
-> 
-> FWIW there was an attempt to add the driver of pretty bad quality,
-
-We are currently using our own SPI driver with limited functionality;
-the driver support polling mode only.
-
-We did not submit the driver, because of the limited support.
-
-> and it does not define a "clock-names" property [1].
-> 
-> >  			};
-> >  
-> >  			ssp1: ssp at 2008c000 {
-> > @@ -186,6 +188,8 @@
-> >  			spi2: spi at 20090000 {
-> >  				compatible = "nxp,lpc3220-spi";
-> >  				reg = <0x20090000 0x1000>;
-> > +				clocks = <&clk LPC32XX_CLK_SPI2>;
-> > +				clock-names = "apb_pclk";
-> 
-> Same as above.
-> 
-> >  			};
-> >  
-> >  			i2s0: i2s at 20094000 {
-> > 
-> 
-> [1] https://lkml.org/lkml/2015/7/12/61
-> 
-> --
-> With best wishes,
-> Vladimir
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index e5de825..496c1b4 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -98,6 +98,7 @@ config ARM64
+ 	select SYSCTL_EXCEPTION_TRACE
+ 	select HAVE_CONTEXT_TRACKING
+ 	select HAVE_ARM_SMCCC
++	select HAVE_ARCH_TRANSPARENT_HUGEPAGE
+ 	help
+ 	  ARM 64-bit (AArch64) Linux support.
+ 
+@@ -580,9 +581,6 @@ config SYS_SUPPORTS_HUGETLBFS
+ config ARCH_WANT_HUGE_PMD_SHARE
+ 	def_bool y if ARM64_4K_PAGES || (ARM64_16K_PAGES && !ARM64_VA_BITS_36)
+ 
+-config HAVE_ARCH_TRANSPARENT_HUGEPAGE
+-	def_bool y
+-
+ config ARCH_HAS_CACHE_LINE_SIZE
+ 	def_bool y
+ 
+-- 
+2.0.2
