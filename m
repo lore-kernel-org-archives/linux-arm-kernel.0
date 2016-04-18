@@ -1,55 +1,53 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 18 Apr 2016 14:04:39 +0200
-Subject: [PATCH] ARM: dts: imx: ventana: add RS485 txen gpio support
-In-Reply-To: <CAJ+vNU3-Ht7mVUn+T6n1YmYMwxzAW7X-ryccCZw0U_uNiGv2=A@mail.gmail.com>
-References: <1460639949-26392-1-git-send-email-tharvey@gateworks.com>
- <20160414133237.GE2092@tarshish>
- <CAJ+vNU3-Ht7mVUn+T6n1YmYMwxzAW7X-ryccCZw0U_uNiGv2=A@mail.gmail.com>
-Message-ID: <CAMuHMdWA1Q-UvLyBBaVEqF-x3okzqCnKPcb95Q66sKvKOtbe3g@mail.gmail.com>
+From: irina.tirdea@intel.com (Tirdea, Irina)
+Date: Mon, 18 Apr 2016 12:18:06 +0000
+Subject: [PATCH v2 1/5] iio: accel: bmc150: use regmap to retrieve
+ struct device
+In-Reply-To: <57129064.9050508@kernel.org>
+References: <cover.1460314070.git.amsfield22@gmail.com>
+ <f3cae5dd803486a774248afad096032f3f0546a2.1460314070.git.amsfield22@gmail.com>
+ <57129064.9050508@kernel.org>
+Message-ID: <1F3AC3675D538145B1661F571FE1805F2F260D21@irsmsx105.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 14, 2016 at 4:39 PM, Tim Harvey <tharvey@gateworks.com> wrote:
-> On Thu, Apr 14, 2016 at 6:32 AM, Baruch Siach <baruch@tkos.co.il> wrote:
->> On Thu, Apr 14, 2016 at 06:19:09AM -0700, Tim Harvey wrote:
->>> diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
->>> index 8cccc4a..50d6039 100644
->>> --- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
->>> +++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
->>> @@ -315,6 +315,8 @@
->>>  &uart1 {
->>>       pinctrl-names = "default";
->>>       pinctrl-0 = <&pinctrl_uart1>;
->>> +     fsl,uart-has-rtscts;
->>> +     rts-gpio = <&gpio7 1 GPIO_ACTIVE_LOW>;
->>
->> See http://marc.info/?l=linux-serial&m=146063601520851&w=2.
->
-> Thanks - I didn't see this one yet. I will change the prop and re-submit.
 
-I think it's a bit early to change the property, before the code handling
-the changes has been accepted.
 
-> I'm also not sure if there is a desire to define the prop as
-> 'rts-gpios' or 'rts-gpio' - both are picked up and there are many dts
-> props that use -gpios for a single gpio and I didn't see any
-> devicetree binding documentation for SERIAL_MCTRL_GPIO.
+> -----Original Message-----
+> From: Jonathan Cameron [mailto:jic23 at kernel.org]
+> Sent: 16 April, 2016 22:20
+> To: Alison Schofield
+> Cc: knaack.h at gmx.de; lars at metafoo.de; pmeerw at pmeerw.net; kgene at kernel.org; k.kozlowski at samsung.com; linux-
+> iio at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-samsung-soc at vger.kernel.org;
+> Srinivas Pandruvada; Tirdea, Irina
+> Subject: Re: [PATCH v2 1/5] iio: accel: bmc150: use regmap to retrieve struct device
+> 
+> On 10/04/16 20:05, Alison Schofield wrote:
+> > Driver includes struct regmap and struct device in its global data.
+> > Remove the struct device and use regmap API to retrieve device info.
+> >
+> > Patch created using Coccinelle plus manual edits.
+> >
+> > Signed-off-by: Alison Schofield <amsfield22@gmail.com>
+> I'm happy with this but please do make sure to cc the maintainer / author
+> of drivers if possible (often the email addresses are out of date!)
+> 
+> Srinivas, this is one of yours.  Are you happy with this?
+> I've also cc'd Irina who has worked on this driver recently for any
+> comments.
+> 
 
-Both are picked up by the core GPIO helpers for backwards compatibility.
+Looks good to me.
+Reviewed-by: Irina Tirdea <irina.tirdea@intel.com>
 
-Quoting Documentation/devicetree/bindings/gpio/gpio.txt:
-| GPIO properties should be named "[<name>-]gpios", [...]
-| Also, GPIO properties named "[<name>-]gpio" are valid and old bindings use it,
-| but are only supported for compatibility reasons and should not be used for
-| newer bindings since it has been deprecated.
+Alison, I think bmc150_magn driver qualifies for this change as well
+after Daniel's patches got merged [1].
 
-Gr{oetje,eeting}s,
+Thanks,
+Irina
 
-                        Geert
+[1] https://lkml.org/lkml/2016/4/15/407
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> If no one comments in the meantime I'll probably pick these up sometime
+> in the next week.
+> 
+> Jonathan
