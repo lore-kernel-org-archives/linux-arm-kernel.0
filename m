@@ -1,37 +1,38 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 18 Apr 2016 18:44:48 +0200
-Subject: [PATCH 3/5] clocksource/drivers/mtk_timer: add __init attribute
-In-Reply-To: <1460991338-9845-4-git-send-email-Julia.Lawall@lip6.fr>
-References: <1460991338-9845-1-git-send-email-Julia.Lawall@lip6.fr>
- <1460991338-9845-4-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <20160418164448.GB2820@linaro.org>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 18 Apr 2016 12:52:37 -0400
+Subject: [PATCH] ARM: dts: exynos: Remove unsupported s2mps11 regulator
+ bindings from Exynos5420 boards
+In-Reply-To: <1460965453-5337-1-git-send-email-k.kozlowski@samsung.com>
+References: <1460965453-5337-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <571510D5.3090406@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 18, 2016 at 04:55:36PM +0200, Julia Lawall wrote:
-> Add __init attribute on a function that is only called from other __init
-> functions and that is not inlined, at least with gcc version 4.8.4 on an
-> x86 machine with allyesconfig.  Currently, the function is put in the
-> .text.unlikely segment.  Declaring it as __init will cause it to be put in
-> the .init.text and to disappear after initialization.
+Hello Krzysztof,
+
+On 04/18/2016 03:44 AM, Krzysztof Kozlowski wrote:
+> The bindings like s2mps11,buck6-ramp-enable or s2mps11,buck2-ramp-delay
+> where ignored. They were never parse by s2mps11 regulator driver. Also
+> the values used in these bindings were equal to default reset values of
+> S2MPS11 device. It is safe to remove them.
 > 
-> The result of objdump -x on the function before the change is as follows:
-> 
-> 0000000000000000 l     F .text.unlikely 000000000000006f mtk_timer_setup.isra.4
-> 
-> And after the change it is as follows:
-> 
-> 0000000000000000 l     F .init.text	000000000000006a mtk_timer_setup.isra.4
-> 
-> Done with the help of Coccinelle.  The semantic patch checks for local
-> static non-init functions that are called from an __init function and are
-> not called from any other function.
-> 
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 > ---
 
-Applied for 4.7.
+The patch looks good to me.
 
-Thanks !
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-  -- Daniel
+On a related note, the s5m8767 regulator driver parses similar DT properties
+("s5m8767,pmic-buck-ramp-delay", "s5m8767,pmic-buck2-ramp-enable", etc) that
+are not in Documentation/devicetree/bindings/regulator/samsung,s5m8767.txt.
+
+So those should either be added to the binding doc or removed from the driver
+if are not correct (I don't have documentation for the s5m8767 PMIC but the
+DT properties are not use by any DTS in mainline using the s5m8767 PMIC).
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
