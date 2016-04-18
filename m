@@ -1,74 +1,37 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 18 Apr 2016 17:35:34 +0100
-Subject: [PATCH v2 5/5] arm64: Fix behavior of maxcpus=N
-In-Reply-To: <1460997334-26232-1-git-send-email-suzuki.poulose@arm.com>
-References: <1460997334-26232-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1460997334-26232-6-git-send-email-suzuki.poulose@arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 18 Apr 2016 18:44:48 +0200
+Subject: [PATCH 3/5] clocksource/drivers/mtk_timer: add __init attribute
+In-Reply-To: <1460991338-9845-4-git-send-email-Julia.Lawall@lip6.fr>
+References: <1460991338-9845-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1460991338-9845-4-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <20160418164448.GB2820@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-maxcpu=n sets the number of CPUs activated at boot time to a max of n,
-but allowing the remaining CPUs to be brought up later if the user
-decides to do so. However, on arm64 due to various reasons, we disallowed
-hotplugging CPUs beyond n, by marking them not present. Now that
-we have checks in place to make sure the hotplugged CPUs have compatible
-features with system and requires no new errata, relax the restriction.
+On Mon, Apr 18, 2016 at 04:55:36PM +0200, Julia Lawall wrote:
+> Add __init attribute on a function that is only called from other __init
+> functions and that is not inlined, at least with gcc version 4.8.4 on an
+> x86 machine with allyesconfig.  Currently, the function is put in the
+> .text.unlikely segment.  Declaring it as __init will cause it to be put in
+> the .init.text and to disappear after initialization.
+> 
+> The result of objdump -x on the function before the change is as follows:
+> 
+> 0000000000000000 l     F .text.unlikely 000000000000006f mtk_timer_setup.isra.4
+> 
+> And after the change it is as follows:
+> 
+> 0000000000000000 l     F .init.text	000000000000006a mtk_timer_setup.isra.4
+> 
+> Done with the help of Coccinelle.  The semantic patch checks for local
+> static non-init functions that are called from an __init function and are
+> not called from any other function.
+> 
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+> ---
 
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: James Morse <james.morse@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- arch/arm64/kernel/smp.c |   18 +-----------------
- 1 file changed, 1 insertion(+), 17 deletions(-)
+Applied for 4.7.
 
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index b2d5f4e..fa9dbaa 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -647,33 +647,18 @@ void __init smp_init_cpus(void)
- void __init smp_prepare_cpus(unsigned int max_cpus)
- {
- 	int err;
--	unsigned int cpu, ncores = num_possible_cpus();
-+	unsigned int cpu;
- 
- 	init_cpu_topology();
- 
- 	smp_store_cpu_info(smp_processor_id());
- 
- 	/*
--	 * are we trying to boot more cores than exist?
--	 */
--	if (max_cpus > ncores)
--		max_cpus = ncores;
--
--	/* Don't bother if we're effectively UP */
--	if (max_cpus <= 1)
--		return;
--
--	/*
- 	 * Initialise the present map (which describes the set of CPUs
- 	 * actually populated at the present time) and release the
- 	 * secondaries from the bootloader.
--	 *
--	 * Make sure we online@most (max_cpus - 1) additional CPUs.
- 	 */
--	max_cpus--;
- 	for_each_possible_cpu(cpu) {
--		if (max_cpus == 0)
--			break;
- 
- 		if (cpu == smp_processor_id())
- 			continue;
-@@ -686,7 +671,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
- 			continue;
- 
- 		set_cpu_present(cpu, true);
--		max_cpus--;
- 	}
- }
- 
--- 
-1.7.9.5
+Thanks !
+
+  -- Daniel
