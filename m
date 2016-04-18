@@ -1,66 +1,93 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 18 Apr 2016 17:09:48 +0200
-Subject: [PATCH 8/8] arm64: kaslr: increase randomization granularity
+Date: Mon, 18 Apr 2016 17:09:47 +0200
+Subject: [PATCH 7/8] arm64: relocatable: deal with physically misaligned
+ kernel images
 In-Reply-To: <1460992188-23295-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1460992188-23295-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1460992188-23295-9-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1460992188-23295-8-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, our KASLR implementation randomizes the placement of the core
-kernel at 2 MB granularity. This is based on the arm64 kernel boot
-protocol, which mandates that the kernel is loaded TEXT_OFFSET bytes above
-a 2 MB aligned base address. This requirement is a result of the fact that
-the block size used by the early mapping code may be 2 MB at the most (for
-a 4 KB granule kernel)
+When booting a relocatable kernel image, there is no practical reason
+to refuse an image whose load address is not exactly TEXT_OFFSET bytes
+above a 2 MB aligned base address, as long as the physical and virtual
+misalignment with respect to the swapper block size are equal, and are
+both aligned to THREAD_SIZE.
 
-But we can do better than that: since a KASLR kernel needs to be relocated
-in any case, we can tolerate a physical misalignment as long as the virtual
-misalignment relative to this 2 MB block size is equal in size, and code to
-deal with this is already in place.
+Since the virtual misalignment is under our control when we first enter
+the kernel proper, we can simply choose its value to be equal to the
+physical misalignment.
 
-Since we align the kernel segments to 64 KB, let's randomize the physical
-offset at 64 KB granularity as well (unless CONFIG_DEBUG_ALIGN_RODATA is
-enabled). This way, the page table and TLB footprint is not affected.
-
-The higher granularity allows for 5 bits of additional entropy to be used.
+So treat the misalignment of the physical load address as the initial
+KASLR offset, and fix up the remaining code to deal with that.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/firmware/efi/libstub/arm64-stub.c | 15 ++++++++++++---
- 1 file changed, 12 insertions(+), 3 deletions(-)
+ arch/arm64/kernel/head.S  | 9 ++++++---
+ arch/arm64/kernel/kaslr.c | 6 +++---
+ 2 files changed, 9 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/firmware/efi/libstub/arm64-stub.c b/drivers/firmware/efi/libstub/arm64-stub.c
-index a90f6459f5c6..eae693eb3e91 100644
---- a/drivers/firmware/efi/libstub/arm64-stub.c
-+++ b/drivers/firmware/efi/libstub/arm64-stub.c
-@@ -81,15 +81,24 @@ efi_status_t handle_kernel_image(efi_system_table_t *sys_table_arg,
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index c5e5edca6897..00a32101ab51 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -25,6 +25,7 @@
+ #include <linux/irqchip/arm-gic-v3.h>
  
- 	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE) && phys_seed != 0) {
- 		/*
-+		 * If CONFIG_DEBUG_ALIGN_RODATA is not set, produce a
-+		 * displacement in the interval [0, MIN_KIMG_ALIGN) that
-+		 * is a multiple of the minimal segment alignment (SZ_64K)
-+		 */
-+		u32 mask = (MIN_KIMG_ALIGN - 1) & ~(SZ_64K - 1);
-+		u32 offset = !IS_ENABLED(CONFIG_DEBUG_ALIGN_RODATA) ?
-+			     (phys_seed >> 32) & mask : TEXT_OFFSET;
-+
-+		/*
- 		 * If KASLR is enabled, and we have some randomness available,
- 		 * locate the kernel at a randomized offset in physical memory.
- 		 */
--		*reserve_size = kernel_memsize + TEXT_OFFSET;
-+		*reserve_size = kernel_memsize + offset;
- 		status = efi_random_alloc(sys_table_arg, *reserve_size,
- 					  MIN_KIMG_ALIGN, reserve_addr,
--					  phys_seed);
-+					  (u32)phys_seed);
+ #include <asm/assembler.h>
++#include <asm/boot.h>
+ #include <asm/ptrace.h>
+ #include <asm/asm-offsets.h>
+ #include <asm/cache.h>
+@@ -213,8 +214,8 @@ efi_header_end:
+ ENTRY(stext)
+ 	bl	preserve_boot_args
+ 	bl	el2_setup			// Drop to EL1, w20=cpu_boot_mode
+-	mov	x23, xzr			// KASLR offset, defaults to 0
+ 	adrp	x24, __PHYS_OFFSET
++	and	x23, x24, MIN_KIMG_ALIGN - 1	// KASLR offset, defaults to 0
+ 	bl	set_cpu_boot_mode_flag
+ 	bl	__create_page_tables		// x25=TTBR0, x26=TTBR1
+ 	/*
+@@ -449,11 +450,13 @@ __primary_switched:
+ 	bl	kasan_early_init
+ #endif
+ #ifdef CONFIG_RANDOMIZE_BASE
+-	cbnz	x23, 0f				// already running randomized?
++	tst	x23, ~(MIN_KIMG_ALIGN - 1)	// already running randomized?
++	b.ne	0f
+ 	mov	x0, x21				// pass FDT address in x0
++	mov	x1, x23				// pass modulo offset in x1
+ 	bl	kaslr_early_init		// parse FDT for KASLR options
+ 	cbz	x0, 0f				// KASLR disabled? just proceed
+-	mov	x23, x0				// record KASLR offset
++	orr	x23, x23, x0			// record KASLR offset
+ 	ret	x28				// we must enable KASLR, return
+ 						// to __enable_mmu()
+ 0:
+diff --git a/arch/arm64/kernel/kaslr.c b/arch/arm64/kernel/kaslr.c
+index 582983920054..b05469173ba5 100644
+--- a/arch/arm64/kernel/kaslr.c
++++ b/arch/arm64/kernel/kaslr.c
+@@ -74,7 +74,7 @@ extern void *__init __fixmap_remap_fdt(phys_addr_t dt_phys, int *size,
+  * containing function pointers) to be reinitialized, and zero-initialized
+  * .bss variables will be reset to 0.
+  */
+-u64 __init kaslr_early_init(u64 dt_phys)
++u64 __init kaslr_early_init(u64 dt_phys, u64 modulo_offset)
+ {
+ 	void *fdt;
+ 	u64 seed, offset, mask, module_range;
+@@ -132,8 +132,8 @@ u64 __init kaslr_early_init(u64 dt_phys)
+ 	 * boundary (for 4KB/16KB/64KB granule kernels, respectively). If this
+ 	 * happens, increase the KASLR offset by the size of the kernel image.
+ 	 */
+-	if ((((u64)_text + offset) >> SWAPPER_TABLE_SHIFT) !=
+-	    (((u64)_end + offset) >> SWAPPER_TABLE_SHIFT))
++	if ((((u64)_text + offset + modulo_offset) >> SWAPPER_TABLE_SHIFT) !=
++	    (((u64)_end + offset + modulo_offset) >> SWAPPER_TABLE_SHIFT))
+ 		offset = (offset + (u64)(_end - _text)) & mask;
  
--		*image_addr = *reserve_addr + TEXT_OFFSET;
-+		*image_addr = *reserve_addr + offset;
- 	} else {
- 		/*
- 		 * Else, try a straight allocation at the preferred offset.
+ 	if (IS_ENABLED(CONFIG_KASAN))
 -- 
 2.5.0
