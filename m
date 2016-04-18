@@ -1,41 +1,52 @@
-From: yang.shi@linaro.org (Yang Shi)
-Date: Mon, 18 Apr 2016 11:16:14 -0700
-Subject: [PATCH] arm64: Kconfig: remove redundant
- HAVE_ARCH_TRANSPARENT_HUGEPAGE definition
-Message-ID: <1461003374-5412-1-git-send-email-yang.shi@linaro.org>
+From: slash.tmp@free.fr (Mason)
+Date: Mon, 18 Apr 2016 20:46:18 +0200
+Subject: Problem with 4.6-rc2
+In-Reply-To: <5715279B.9060806@free.fr>
+References: <57150A3D.6020500@free.fr> <57152224.5080003@hurleysoftware.com>
+ <5715279B.9060806@free.fr>
+Message-ID: <57152B7A.1070202@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HAVE_ARCH_TRANSPARENT_HUGEPAGE has been defined in arch/Kconfig already,
-the ARM64 version is identical with it and the default value is Y. So remove
-the redundant definition and just select it under CONFIG_ARM64.
+On 18/04/2016 20:29, Mason wrote:
 
-Signed-off-by: Yang Shi <yang.shi@linaro.org>
----
- arch/arm64/Kconfig | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+> On 18/04/2016 20:06, Peter Hurley wrote:
+> 
+>> On 04/18/2016 09:24 AM, Mason wrote:
+>>
+>>> I'm running into this panic. I will take a closer look tomorrow.
+>>> Any ideas?
+>>
+>> commit 8d2acdb9fc3a544ab0442634531834d6007b5467
+>> Author: Jean Delvare <jdelvare@suse.de>
+>> Date:   Mon Feb 22 09:00:39 2016 +0100
+>>
+>>     serial: 8250: Add hardware dependency to RT288X option
+>>     
+>>     Kconfig option SERIAL_8250_RT288X seems to be only relevant on MIPS
+>>     platforms, so do not present it on other architectures, unless
+>>     build-testing.
+>>     
+>>     Signed-off-by: Jean Delvare <jdelvare@suse.de>
+>>     Cc: Mans Rullgard <mans@mansr.com>
+>>     Cc: Jiri Slaby <jslaby@suse.com>
+>>     Acked-by: John Crispin <blogic@openwrt.org>
+>>     Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>>
+>>
+>> Not sure why Greg picked this up over my objections though
+> 
+> Peter,
+> 
+> Thanks for pointing out the problem.
+> 
+> Greg,
+> 
+> My ARM-based SoC uses this hardware (Palmchip BK-3103) and it
+> now panics on boot.
+> 
+> Can we revert 8d2acdb9fc3a in time for v4.7?
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index e5de825..496c1b4 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -98,6 +98,7 @@ config ARM64
- 	select SYSCTL_EXCEPTION_TRACE
- 	select HAVE_CONTEXT_TRACKING
- 	select HAVE_ARM_SMCCC
-+	select HAVE_ARCH_TRANSPARENT_HUGEPAGE
- 	help
- 	  ARM 64-bit (AArch64) Linux support.
- 
-@@ -580,9 +581,6 @@ config SYS_SUPPORTS_HUGETLBFS
- config ARCH_WANT_HUGE_PMD_SHARE
- 	def_bool y if ARM64_4K_PAGES || (ARM64_16K_PAGES && !ARM64_VA_BITS_36)
- 
--config HAVE_ARCH_TRANSPARENT_HUGEPAGE
--	def_bool y
--
- config ARCH_HAS_CACHE_LINE_SIZE
- 	def_bool y
- 
--- 
-2.0.2
+Errr... I meant v4.6 final.
+
+Regards.
