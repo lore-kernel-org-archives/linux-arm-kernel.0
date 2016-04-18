@@ -1,32 +1,59 @@
-From: tthayer@opensource.altera.com (Thor Thayer)
-Date: Mon, 18 Apr 2016 09:27:16 -0500
-Subject: [PATCH] Add EDAC peripheral init functions & Ethernet EDAC.
-In-Reply-To: <20160415214618.GB4545@cz.tnic>
-References: <1460499181-23080-1-git-send-email-tthayer@opensource.altera.com>
- <20160414143501.GA25212@rob-hp-laptop>
- <20160415064042.330406ab.m.chehab@samsung.com>
- <5711087A.8050501@opensource.altera.com> <20160415214618.GB4545@cz.tnic>
-Message-ID: <5714EEC4.4060807@opensource.altera.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 18 Apr 2016 09:29:09 -0500
+Subject: [PATCH] Axi-usb: Add support for 64-bit addressing.
+In-Reply-To: <4542055.HvdgVkDRYK@wuerfel>
+References: <1460360506-14692-1-git-send-email-navam@xilinx.com>
+ <20160412140338.GA19311@rob-hp-laptop> <4542055.HvdgVkDRYK@wuerfel>
+Message-ID: <20160418142909.GA5608@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+On Sun, Apr 17, 2016 at 03:14:34PM +0200, Arnd Bergmann wrote:
+> On Tuesday 12 April 2016 09:03:38 Rob Herring wrote:
+> > On Mon, Apr 11, 2016 at 01:11:46PM +0530, Nava kishore Manne wrote:
+> > > This patch updates the driver to support 64-bit DMA
+> > > addressing.
+> > > 
+> > > Signed-off-by: Nava kishore Manne <navam@xilinx.com>
+> > > ---
+> > >  .../devicetree/bindings/usb/udc-xilinx.txt         |  3 +-
+> > >  drivers/usb/gadget/udc/udc-xilinx.c                | 38 ++++++++++++++++++++--
+> > >  2 files changed, 37 insertions(+), 4 deletions(-)
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/usb/udc-xilinx.txt b/Documentation/devicetree/bindings/usb/udc-xilinx.txt
+> > > index 47b4e39..d417872 100644
+> > > --- a/Documentation/devicetree/bindings/usb/udc-xilinx.txt
+> > > +++ b/Documentation/devicetree/bindings/usb/udc-xilinx.txt
+> > > @@ -7,12 +7,13 @@ Required properties:
+> > >  - interrupts         : Should contain single irq line of USB2 device
+> > >                         controller
+> > >  - xlnx,has-builtin-dma       : if DMA is included
+> > > -
+> > > +- xlnx,addrwidth       : Should be the dma addressing size in bits(ex: 40 bits).
+> > 
+> > Now this property shows up in a 2nd device. Now I'm more convinced this 
+> > is the wrong approach and should use dma-ranges.
+> 
+> Not necessarily: We need to be careful not to mix up two different things here:
+> 
+> * dma-ranges describes the address width of a bus, along with possible offsets.
+>   In order to do wider than 32-bit addressing, all upstream busses must be
+>   capable of supporting this, and AXI can have either 64-bit or 32-bit addressing.
+> 
+> * A device may have a register set that allows wider DMA. This is normally
+>   identified through the 'compatible' property, and you can have all
+>   combinations with bus addressing: a device with 32-bit DMA can be connected
+>   to a 64-bit AXI bus, and a device with 64-bit DMA can have an upstream parent
+>   or grandparent that is limited to 32 bits (or any other width really).
+> 
+> The patch here is almost certainly wrong. For one thing, it never sets the
+> DMA mask to the correct value, and it also infers the presence of the
+> 0x308..0x317 register range from an arbitrary DT property that describes
+> something else (the supported width of the DMA).
 
-On 04/15/2016 04:46 PM, Borislav Petkov wrote:
-> On Fri, Apr 15, 2016 at 10:27:54AM -0500, Thor Thayer wrote:
->> I'll update this patch to only count errors.
->
-> ... and also think about what that counting is going to bring. If it is
-> only going to be there to show how many network errors happened and we
-> can't do anything about it except stare at that number, then adding all
-> that code is probably waste of time an electrons...
->
-> I'm just sayin'.
->
+Right, you don't need to know the exact bus width for determining the 
+register/descriptor set is 32 or 64 bit addesses. I'm fine with a 
+property for that, but if limiting the actual connected address bits is 
+needed, then dma-ranges should be used.
 
-Yes, valid point about the uncorrectable errors.
-
-We're still getting the single bit correction which makes the entire 
-system more stable and the ability to see both single bit errors 
-corrected and the number of uncorrectable errors is useful from a system 
-point of view.
+Rob
