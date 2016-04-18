@@ -1,118 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 Apr 2016 15:57:42 +0200
-Subject: [PATCH v5] spi: orion.c: Add direct access mode
-In-Reply-To: <5714DA84.2050505@denx.de>
-References: <1460974417-32375-1-git-send-email-sr@denx.de>
- <4248364.c0REkIZjj0@wuerfel> <5714DA84.2050505@denx.de>
-Message-ID: <4509446.OJU128rpNa@wuerfel>
+From: jerin.jacob@caviumnetworks.com (Jerin Jacob)
+Date: Mon, 18 Apr 2016 19:31:20 +0530
+Subject: [PATCH v2] arm64: pci: add support for pci_mmap_page_range
+In-Reply-To: <4265693.nXcsYZd1B2@wuerfel>
+References: <1460581856-12380-1-git-send-email-jerin.jacob@caviumnetworks.com>
+ <20160415130953.GI22906@arm.com> <4265693.nXcsYZd1B2@wuerfel>
+Message-ID: <20160418140119.GB5639@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 18 April 2016 15:00:52 Stefan Roese wrote:
-> On 18.04.2016 13:32, Arnd Bergmann wrote:
-> > On Monday 18 April 2016 12:04:15 Mark Brown wrote:
-> >> On Mon, Apr 18, 2016 at 12:51:55PM +0200, Arnd Bergmann wrote:
-> >>
-> >>> This would be easier if have a conclusive proof that 1MB per CS always enough.
-> >>> Is this something that is guaranteed in the SPI spec or the documentation for
-> >>> this controller?
-> >>
-> >> There's no spec for SPI but if there were it'd be hard to see it
-> >> imposing a limit, one can transfer data as long as the bus is clocked
-> >> (which some things like ADCs and DACs make use of).
-> >>
-> >
-> > I just reread Stefan's patch and realized that I had fundamentally
-> > misunderstood how the transfer is done: I thought the offset inside of
-> > the window was used to address a NOR flash directly, but it seems
-> > it is just used to send arbitrarily long commands.
+On Fri, Apr 15, 2016 at 08:45:20PM +0200, Arnd Bergmann wrote:
+> On Friday 15 April 2016 14:09:53 Will Deacon wrote:
+> > On Thu, Apr 14, 2016 at 02:40:56AM +0530, Jerin Jacob wrote:
+> > > Certain X11 servers and user space network drivers frameworks
+> > > need PCI mmaped /sys/bus/pci/devices/B:D:F/resourceX file to
+> > > access PCI bar address space from user space.
+> > > 
+> > > Signed-off-by: Jerin Jacob <jerin.jacob@caviumnetworks.com>
+> > > ---
+> > > Changes in v2:
+> > >   - Rebased to 4.6.0-rc3.
+> > >   - Tested and verified the change on Thunderx and xgene1 arm64 platforms
+> > > 
+> > >  arch/arm64/include/asm/pci.h |  6 ++++++
+> > >  arch/arm64/kernel/pci.c      | 20 ++++++++++++++++++++
+> > >  2 files changed, 26 insertions(+)
+> > > 
+> > > diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
+> > > index b9a7ba9..9d7e460 100644
+> > > --- a/arch/arm64/include/asm/pci.h
+> > > +++ b/arch/arm64/include/asm/pci.h
+> > > @@ -37,5 +37,11 @@ static inline int pci_proc_domain(struct pci_bus *bus)
+> > >  }
+> > >  #endif  /* CONFIG_PCI */
+> > >  
+> > > +#define HAVE_PCI_MMAP
+> > 
+> > By defining this symbol, we also get lumbered with the legacy /proc
+> > interface, which I'd be keen to avoid exposing until we have people
+> > explicitly asking for it.
+> > 
+> > Any chance you could expose only the /sysfs interface on arm64?
+> > 
 > 
-> Yes. SPI NOR flash support definitely needs some additional patches.
-> To support the address and commands being inserted in the SPI
-> messages via the corresponding registers. Again, this patch is
-> only intended and tested for very "simple" TX messages without any
-> addresses being inserted at all.
+> Do we have an idea how much user space code is affected by this?
+> Maybe it can instead be changed to use VFIO, which is basically
+> the current way to do this.
 
-Ok, so I looked up the datasheet again and understood now that it
-actually does both ways: a) the direct read/write that I had always assumed
-it did with automatic cmd/addr/data generation, and b) the mode where
-you do each write transfer separately as implemented by your patch.
+Yes, after the introduction of vfio-noiommu mode almost all
+uses case can be addressed with vfio. But still their are userspace
+applications uses /sysfs scheme.
 
-Those two modes seem to be wildly different in their needs for address
-space:
+Regarding existing user space applications,
+AFAIK, DPDK has the feature to support both /sysfs and vifo scheme.
+X11 uses only /sysfs scheme.
 
-- For a) we definitely need the mapping to be the same size as the
-  addressable storage of the SPI-NOR (or other device that fits
-  into the cmd/addr/data pattern supported by the hardware)
+IMO, Nothing wrong in providing this feature in arm64 kernel.
+Except arm64, almost all the major architecture has this support.
 
-- For b) the address is ignored and at most 32 bytes are transfered,
-  so whatever the smallest MBUS mapping window size is would certainly
-  be enough.
+Jerin
 
-As a side-note, I see that you use a regular devm_ioremap_resource(),
-which I assume prevents the transfers from ever being more than
-a single 4-byte word, while burst mode with up to 32 bytes likely
-requires a write-combining mapping.
-
-> > This means that the 1MB window is probably a reasonable size (provided
-> > that the (most importantly) the SPI-NOR driver can guarantee that it
-> > never exceeds this).
 > 
-> I have no problem switching from 1MiB to using 0xffffffff in the
-> SPI controller 'reg' node to allow even bigger windows in v6.
-
-How do you decide how much of the window to map though? Using 0xffffffff
-is nice because it better represents what the hardware looks like
-and doesn't limit you from having arbitrarily large mbus windows
-based on your needs, but you'd probably have to try mapping various
-sizes then to find the maximum supported one, or you'd have to do
-some ugly parsing of the parent node ranges.
-
-> > It also means that we are probably better off using the single-window mode
-> > of the SPI controller, where all CS lines share a single mbus window.
-> > The only real difference here is that we can map all endpoints using a
-> > single contiguous window into the CPU address space if we want, or we
-> > can still map them separately on a given board if that results in a nicer
-> > layout.
-> 
-> Frankly, I've just read about this single-window mode for the first
-> time. What I miss here in this mode though, is the configuration of
-> the SPI device (chip-select 0...7) for this direct-mode in the SPI
-> driver. With the currently implemented separate window method, your
-> suggested method is easy: Either is window can be mapped (direct-mode)
-> or not (indirect-mode). With this single-window mode I'm missing the
-> per-device configuration for direct-mode. Or what is your idea on
-> how to configure this access-mode in this case?
-
-It would work the same way, the main difference is that for single-window
-mode all the devices get the same amount of address MBUS address space,
-e.g. 1MB per CS in a contiguous MBUS range, but you can still map
-subsections of it into the CPU, e.g.
-
-
-&mbus {
-	ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000>,   /* internal regs */
-		 <MBUS_ID(0x01, 0x1e) 0x300000 0 0xf1100000 0x200000>, /* CS3+CS4 */
-		 <MBUS_ID(0x01, 0x1d) 0x600000 0 0xf1300000 0x80000>, /* bootrom */
-		 <MBUS_ID(0x01, 0x1e) 0x600000 0 0xf1380000 0x10000>; /* CS6 */
-
-	spi at f0,01,10600 {
-                reg = <MBUS_ID(0xf0, 0x01) 0x10600 0x28>,       /* control */
-                      <MBUS_ID(0x01, 0x1e) 0x000000 0x100000>, /* CS0 */
-                      <MBUS_ID(0x01, 0x1e) 0x100000 0x100000>, /* CS1 */
-                      <MBUS_ID(0x01, 0x1e) 0x200000 0x100000>, /* CS2 */
-                      <MBUS_ID(0x01, 0x1e) 0x300000 0x100000>, /* CS3 */
-                      <MBUS_ID(0x01, 0x1e) 0x400000 0x100000>, /* CS4 */
-                      <MBUS_ID(0x01, 0x1e) 0x500000 0x100000>, /* CS5 */
-                      <MBUS_ID(0x01, 0x1e) 0x600000 0x100000>, /* CS6 */
-                      <MBUS_ID(0x01, 0x1e) 0x700000 0x100000>; /* CS7 */
-	};
-};
-
-In this example, you have to configure the SPI controller to have 1MB per CS
-in single-window mode using the "SPI DecodeMode" and "SPI CS Adress Decode"
-registers. The mbus then contains two mappings, one 2MB window spanning
-CS3 and CS4 in a continuous CPU range, and one 64K window for a device at
-CS6, making it as small as possible to conserve CPU address space.
-
-	Arnd
+> 	Arnd
