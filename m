@@ -1,294 +1,118 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 18 Apr 2016 15:47:25 +0200
-Subject: [PATCH v5 2/4] mmc: meson: Add driver for the SD/MMC host found
- on Amlogic Meson SoCs
-In-Reply-To: <1456596108-1406-3-git-send-email-carlo@caione.org>
-References: <1456596108-1406-1-git-send-email-carlo@caione.org>
- <1456596108-1406-3-git-send-email-carlo@caione.org>
-Message-ID: <CAPDyKFqrmpeRASDhBrY0nqhKGEfKw0B6tuP57xPJO0iKuXVb2A@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 18 Apr 2016 15:57:42 +0200
+Subject: [PATCH v5] spi: orion.c: Add direct access mode
+In-Reply-To: <5714DA84.2050505@denx.de>
+References: <1460974417-32375-1-git-send-email-sr@denx.de>
+ <4248364.c0REkIZjj0@wuerfel> <5714DA84.2050505@denx.de>
+Message-ID: <4509446.OJU128rpNa@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 February 2016 at 19:01, Carlo Caione <carlo@caione.org> wrote:
-> From: Carlo Caione <carlo@endlessm.com>
->
-> Add a driver for the SD/MMC host found on the Amlogic Meson SoCs. This
-> is an MMC controller which provides an interface between the application
-> processor and various memory cards. It supports the SD specification
-> v2.0 and the eMMC specification v4.41.
->
-> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+On Monday 18 April 2016 15:00:52 Stefan Roese wrote:
+> On 18.04.2016 13:32, Arnd Bergmann wrote:
+> > On Monday 18 April 2016 12:04:15 Mark Brown wrote:
+> >> On Mon, Apr 18, 2016 at 12:51:55PM +0200, Arnd Bergmann wrote:
+> >>
+> >>> This would be easier if have a conclusive proof that 1MB per CS always enough.
+> >>> Is this something that is guaranteed in the SPI spec or the documentation for
+> >>> this controller?
+> >>
+> >> There's no spec for SPI but if there were it'd be hard to see it
+> >> imposing a limit, one can transfer data as long as the bus is clocked
+> >> (which some things like ADCs and DACs make use of).
+> >>
+> >
+> > I just reread Stefan's patch and realized that I had fundamentally
+> > misunderstood how the transfer is done: I thought the offset inside of
+> > the window was used to address a NOR flash directly, but it seems
+> > it is just used to send arbitrarily long commands.
+> 
+> Yes. SPI NOR flash support definitely needs some additional patches.
+> To support the address and commands being inserted in the SPI
+> messages via the corresponding registers. Again, this patch is
+> only intended and tested for very "simple" TX messages without any
+> addresses being inserted at all.
 
-Sorry for the delay.
+Ok, so I looked up the datasheet again and understood now that it
+actually does both ways: a) the direct read/write that I had always assumed
+it did with automatic cmd/addr/data generation, and b) the mode where
+you do each write transfer separately as implemented by your patch.
 
-Apparently this slipped through my mmc mail filters, as I think you
-forgotten to post this to linux-mmc.
+Those two modes seem to be wildly different in their needs for address
+space:
 
-[...]
+- For a) we definitely need the mapping to be the same size as the
+  addressable storage of the SPI-NOR (or other device that fits
+  into the cmd/addr/data pattern supported by the hardware)
 
-> +static void meson_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
-> +{
-> +       struct meson_mmc_host *host = mmc_priv(mmc);
-> +       struct mmc_command *cmd = mrq->cmd;
-> +       struct mmc_data *data = mrq->data;
-> +       unsigned long flags;
-> +       int ret;
-> +
-> +       spin_lock_irqsave(&host->lock, flags);
+- For b) the address is ignored and at most 32 bytes are transfered,
+  so whatever the smallest MBUS mapping window size is would certainly
+  be enough.
 
-I would advise you to re-visit the deployment of the locking in this
-driver. It doesn't seem correct.
+As a side-note, I see that you use a regular devm_ioremap_resource(),
+which I assume prevents the transfers from ever being more than
+a single 4-byte word, while burst mode with up to 32 bytes likely
+requires a write-combining mapping.
 
-For example, keeping IRQ disabled while mapping DMA buffers isn't a
-good idea, as it may cause the IRQs to be disabled for quite a while.
+> > This means that the 1MB window is probably a reasonable size (provided
+> > that the (most importantly) the SPI-NOR driver can guarantee that it
+> > never exceeds this).
+> 
+> I have no problem switching from 1MiB to using 0xffffffff in the
+> SPI controller 'reg' node to allow even bigger windows in v6.
 
-> +
-> +       if (host->error) {
-> +               cmd->error = host->error;
-> +               spin_unlock_irqrestore(&host->lock, flags);
-> +               mmc_request_done(mmc, mrq);
-> +               return;
-> +       }
-> +
-> +       if (data) {
-> +               ret = meson_mmc_map_dma(host, data, data->flags);
-> +               if (ret < 0) {
-> +                       dev_err(mmc_dev(mmc), "map DMA failed\n");
-> +                       cmd->error = ret;
-> +                       data->error = ret;
-> +                       spin_unlock_irqrestore(&host->lock, flags);
-> +                       mmc_request_done(mmc, mrq);
-> +                       return;
-> +               }
-> +               writel(sg_dma_address(data->sg), host->base + SDIO_ADDR);
-> +       }
-> +
-> +       host->mrq = mrq;
-> +       meson_mmc_start_cmd(mmc, mrq->cmd);
-> +
-> +       spin_unlock_irqrestore(&host->lock, flags);
-> +
-> +       schedule_delayed_work(&host->timeout_work, host->timeout);
-> +}
-> +
-> +static irqreturn_t meson_mmc_irq(int irq, void *data)
-> +{
-> +       struct meson_mmc_host *host = (void *) data;
-> +       struct mmc_request *mrq = host->mrq;
-> +       u32 irqs;
-> +
-> +       irqs = readl(host->base + SDIO_IRQS);
-> +       if (mrq && (irqs & REG_IRQS_CMD_INT))
-> +               return IRQ_WAKE_THREAD;
+How do you decide how much of the window to map though? Using 0xffffffff
+is nice because it better represents what the hardware looks like
+and doesn't limit you from having arbitrarily large mbus windows
+based on your needs, but you'd probably have to try mapping various
+sizes then to find the maximum supported one, or you'd have to do
+some ugly parsing of the parent node ranges.
 
-As you don't use the IRQF_ONESHOT flag, this hard IRQ handler may be
-invoked while the threaded handler runs.
+> > It also means that we are probably better off using the single-window mode
+> > of the SPI controller, where all CS lines share a single mbus window.
+> > The only real difference here is that we can map all endpoints using a
+> > single contiguous window into the CPU address space if we want, or we
+> > can still map them separately on a given board if that results in a nicer
+> > layout.
+> 
+> Frankly, I've just read about this single-window mode for the first
+> time. What I miss here in this mode though, is the configuration of
+> the SPI device (chip-select 0...7) for this direct-mode in the SPI
+> driver. With the currently implemented separate window method, your
+> suggested method is easy: Either is window can be mapped (direct-mode)
+> or not (indirect-mode). With this single-window mode I'm missing the
+> per-device configuration for direct-mode. Or what is your idea on
+> how to configure this access-mode in this case?
 
-Although, I don't see any protection of the host->mrq pointer etc,
-don't you need that?
+It would work the same way, the main difference is that for single-window
+mode all the devices get the same amount of address MBUS address space,
+e.g. 1MB per CS in a contiguous MBUS range, but you can still map
+subsections of it into the CPU, e.g.
 
-> +
-> +       return IRQ_HANDLED;
-> +}
-> +
-> +void meson_mmc_read_response(struct meson_mmc_host *host)
-> +{
-> +       struct mmc_command *cmd = host->mrq->cmd;
-> +       u32 mult;
-> +       int i, resp[4] = { 0 };
-> +
-> +       mult = readl(host->base + SDIO_MULT);
-> +       mult |= REG_MULT_WR_RD_OUT_IND;
-> +       mult &= ~(REG_MULT_RD_INDEX_M << REG_MULT_RD_INDEX_S);
-> +       writel(mult, host->base + SDIO_MULT);
-> +
-> +       if (cmd->flags & MMC_RSP_136) {
-> +               for (i = 0; i <= 3; i++)
-> +                       resp[3 - i] = readl(host->base + SDIO_ARGU);
-> +               cmd->resp[0] = (resp[0] << 8) | ((resp[1] >> 24) & 0xff);
-> +               cmd->resp[1] = (resp[1] << 8) | ((resp[2] >> 24) & 0xff);
-> +               cmd->resp[2] = (resp[2] << 8) | ((resp[3] >> 24) & 0xff);
-> +               cmd->resp[3] = (resp[3] << 8);
-> +       } else if (cmd->flags & MMC_RSP_PRESENT) {
-> +               cmd->resp[0] = readl(host->base + SDIO_ARGU);
-> +       }
-> +}
-> +
-> +static irqreturn_t meson_mmc_irq_thread(int irq, void *irq_data)
-> +{
-> +       struct meson_mmc_host *host = (void *) irq_data;
-> +       struct mmc_data *data;
-> +       unsigned long flags;
-> +       struct mmc_request *mrq;
-> +       u32 irqs, send;
-> +
-> +       cancel_delayed_work_sync(&host->timeout_work);
-> +       spin_lock_irqsave(&host->lock, flags);
 
-You are disabling IRQs during the entire execution of this threaded
-IRQ handler, that's not a good behaviour as it may be disabled for
-quite a while.
+&mbus {
+	ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000>,   /* internal regs */
+		 <MBUS_ID(0x01, 0x1e) 0x300000 0 0xf1100000 0x200000>, /* CS3+CS4 */
+		 <MBUS_ID(0x01, 0x1d) 0x600000 0 0xf1300000 0x80000>, /* bootrom */
+		 <MBUS_ID(0x01, 0x1e) 0x600000 0 0xf1380000 0x10000>; /* CS6 */
 
-Although, perhaps you do this to avoid needing to protect host->mrq in
-the hard IRQ handler!?
+	spi at f0,01,10600 {
+                reg = <MBUS_ID(0xf0, 0x01) 0x10600 0x28>,       /* control */
+                      <MBUS_ID(0x01, 0x1e) 0x000000 0x100000>, /* CS0 */
+                      <MBUS_ID(0x01, 0x1e) 0x100000 0x100000>, /* CS1 */
+                      <MBUS_ID(0x01, 0x1e) 0x200000 0x100000>, /* CS2 */
+                      <MBUS_ID(0x01, 0x1e) 0x300000 0x100000>, /* CS3 */
+                      <MBUS_ID(0x01, 0x1e) 0x400000 0x100000>, /* CS4 */
+                      <MBUS_ID(0x01, 0x1e) 0x500000 0x100000>, /* CS5 */
+                      <MBUS_ID(0x01, 0x1e) 0x600000 0x100000>, /* CS6 */
+                      <MBUS_ID(0x01, 0x1e) 0x700000 0x100000>; /* CS7 */
+	};
+};
 
-> +
-> +       mrq = host->mrq;
-> +       data = mrq->data;
-> +
-> +       if (!mrq) {
-> +               spin_unlock_irqrestore(&host->lock, flags);
-> +               return IRQ_HANDLED;
-> +       }
-> +
-> +       if (host->cmd_is_stop)
-> +               goto out;
-> +
-> +       irqs = readl(host->base + SDIO_IRQS);
-> +       send = readl(host->base + SDIO_SEND);
-> +
-> +       mrq->cmd->error = 0;
-> +
-> +       if (!data) {
-> +               if (!((irqs & REG_IRQS_RESP_CRC7) ||
-> +                     (send & REG_SEND_RESP_NO_CRC7)))
-> +                       mrq->cmd->error = -EILSEQ;
-> +               else
-> +                       meson_mmc_read_response(host);
-> +       } else {
-> +               if (!((irqs & REG_IRQS_RD_CRC16) ||
-> +                     (irqs & REG_IRQS_WR_CRC16))) {
-> +                       mrq->cmd->error = -EILSEQ;
-> +               } else {
-> +                       data->bytes_xfered = data->blksz * data->blocks;
-> +                       dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
-> +                                    ((data->flags & MMC_DATA_READ) ?
-> +                                    DMA_FROM_DEVICE : DMA_TO_DEVICE));
-> +               }
-> +       }
-> +
-> +       if (mrq->stop) {
-> +               host->cmd_is_stop = true;
-> +               meson_mmc_start_cmd(host->mmc, mrq->stop);
-> +               spin_unlock_irqrestore(&host->lock, flags);
-> +               return IRQ_HANDLED;
-> +       }
-> +
-> +out:
-> +       host->cmd_is_stop = false;
-> +       host->mrq = NULL;
-> +       spin_unlock_irqrestore(&host->lock, flags);
-> +       mmc_request_done(host->mmc, mrq);
-> +
-> +       return IRQ_HANDLED;
-> +}
-> +
+In this example, you have to configure the SPI controller to have 1MB per CS
+in single-window mode using the "SPI DecodeMode" and "SPI CS Adress Decode"
+registers. The mbus then contains two mappings, one 2MB window spanning
+CS3 and CS4 in a continuous CPU range, and one 64K window for a device at
+CS6, making it as small as possible to conserve CPU address space.
 
-[...]
-
-> +static int meson_mmc_probe(struct platform_device *pdev)
-> +{
-> +       struct mmc_host *mmc;
-> +       struct meson_mmc_host *host;
-> +       struct pinctrl *pinctrl;
-> +       struct resource *res;
-> +       int ret, irq;
-> +       u32 port;
-> +
-> +       mmc = mmc_alloc_host(sizeof(struct meson_mmc_host), &pdev->dev);
-> +       if (!mmc) {
-> +               dev_err(&pdev->dev, "mmc alloc host failed\n");
-> +               return -ENOMEM;
-> +       }
-> +
-> +       host = mmc_priv(mmc);
-> +       host->mmc = mmc;
-> +       host->timeout = msecs_to_jiffies(10000);
-> +       host->port = 0;
-> +
-> +       if (!of_property_read_u32(pdev->dev.of_node, "meson,sd-port", &port))
-> +               host->port = port;
-> +
-> +
-> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +       host->base = devm_ioremap_resource(&pdev->dev, res);
-> +       if (IS_ERR(host->base)) {
-> +               ret = PTR_ERR(host->base);
-> +               goto error_free_host;
-> +       }
-> +
-> +       irq = platform_get_irq(pdev, 0);
-> +       ret = devm_request_threaded_irq(&pdev->dev, irq, meson_mmc_irq,
-> +                                       meson_mmc_irq_thread, 0, "meson_mmc",
-
-Is the IRQs level or edge triggered? In other words, will the hard IRQ
-handler miss IRQs if you use IRQF_ONESHOT?
-
-> +                                       host);
-> +       if (ret)
-> +               goto error_free_host;
-> +
-> +       host->clk = devm_clk_get(&pdev->dev, NULL);
-> +       if (IS_ERR(host->clk)) {
-> +               ret = PTR_ERR(host->clk);
-> +               goto error_free_host;
-> +       }
-> +
-> +       ret = clk_prepare_enable(host->clk);
-> +       if (ret) {
-> +               dev_err(&pdev->dev, "Enable clk error %d\n", ret);
-> +               goto error_free_host;
-> +       }
-> +
-> +       /* we do not support scatter lists in hardware */
-> +       mmc->max_segs = 1;
-> +       mmc->max_req_size = SDIO_BOUNCE_REQ_SIZE;
-> +       mmc->max_seg_size = mmc->max_req_size;
-> +       mmc->max_blk_count = 256;
-> +       mmc->max_blk_size = mmc->max_req_size / mmc->max_blk_count;
-> +       mmc->f_min = 300000;
-> +       mmc->f_max = 50000000;
-> +       mmc->caps |= MMC_CAP_4_BIT_DATA;
-> +       mmc->caps |= MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED;
-> +       mmc->caps2 |= MMC_CAP2_NO_SDIO;
-> +       mmc->ocr_avail = MMC_VDD_33_34;
-> +       mmc->ops = &meson_mmc_ops;
-> +
-> +       spin_lock_init(&host->lock);
-> +
-> +       INIT_DELAYED_WORK(&host->timeout_work, meson_mmc_timeout);
-> +
-> +       pinctrl = devm_pinctrl_get(&pdev->dev);
-> +       if (IS_ERR(pinctrl)) {
-> +               ret = PTR_ERR(pinctrl);
-> +               goto error;
-> +       }
-> +
-> +       ret = mmc_of_parse(mmc);
-> +       if (ret)
-> +               goto error;
-> +
-> +       platform_set_drvdata(pdev, mmc);
-> +
-> +       ret = mmc_add_host(mmc);
-> +       if (ret)
-> +               goto error;
-> +
-> +       dev_info(&pdev->dev, "base:0x%p irq:%u port:%u\n",
-> +                host->base, irq, host->port);
-> +
-> +       return 0;
-> +
-> +error:
-> +       clk_disable_unprepare(host->clk);
-> +error_free_host:
-> +       mmc_free_host(mmc);
-> +
-> +       return ret;
-> +}
-> +
-
-[...]
-
-Kind regards
-Uffe
+	Arnd
