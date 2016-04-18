@@ -1,23 +1,44 @@
-From: jonathan@jonmasters.org (Jon Masters)
-Date: Sun, 17 Apr 2016 19:58:03 -0700
-Subject: [PATCH v3] ARM64: ACPI: Update documentation for latest
- specification version
-In-Reply-To: <1459210002-3387-1-git-send-email-al.stone@linaro.org>
-References: <1459210002-3387-1-git-send-email-al.stone@linaro.org>
-Message-ID: <57144D3B.7020802@jonmasters.org>
+From: xuejiancheng@huawei.com (Jiancheng Xue)
+Date: Mon, 18 Apr 2016 10:59:19 +0800
+Subject: [RESEND PATCH v10 2/6] clk: hisilicon: add CRG driver for hi3519
+ soc
+In-Reply-To: <20160416004130.GO26353@codeaurora.org>
+References: <1459411811-12390-1-git-send-email-xuejiancheng@hisilicon.com>
+ <1459411811-12390-3-git-send-email-xuejiancheng@hisilicon.com>
+ <57104449.8090506@huawei.com> <20160416004130.GO26353@codeaurora.org>
+Message-ID: <57144D87.30401@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3/28/16 5:06 PM, Al Stone wrote:
+Hi Stephen,
+   	
+On 2016/4/16 8:41, Stephen Boyd wrote:
+> On 04/15, Jiancheng Xue wrote:
+>> Hi,
+>>
+>> On 2016/3/31 16:10, Jiancheng Xue wrote:
+>>> From: Jiancheng Xue <xuejiancheng@huawei.com>
+>>>
+>>> The CRG(Clock and Reset Generator) block provides clock
+>>> and reset signals for other modules in hi3519 soc.
+>>>
+>>> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
+>>> Acked-by: Rob Herring <robh@kernel.org>
+>>> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+>>> ---
+>> I hope this patchset can be merged through arch/arm tree
+>> The dts binding part has been acked by Rob Herring, and
+>> the reset part has been acked by Philipp Zabel. Could you
+>> help me to ack this whole clk patch? Please also let me
+>> know if this patch still have issues. Thank you very much!
+> 
+> Can I merge it through clk tree and make a stable branch to pull
+> through arm-soc? I assume another patch is coming but it's good
+> to get clarity before then.
+> 
+Yes. It's also OK for me if this patchset can be merged into mainline
+Finally. Then can I send reset controller driver, clock driver and arm-soc
+patches separately?
 
->   For ACPI on arm64, tables also fall into the following categories:
->
-> -       -- Required: DSDT, FADT, GTDT, MADT, MCFG, RSDP, SPCR, XSDT
-> +       -- Required: DSDT, FADT, GTDT, IORT, MADT, MCFG, RSDP, SPCR, XSDT
-
-Nit: IORT will only be required on certain SBSA platforms using e.g. 
-GICv3-ITS and an SMMU. On e.g. level 0 platforms, it remains optional.
-
-Sorry for late comment - just catching up on this thread.
-
-Jon.
+Regards,
+Jiancheng
