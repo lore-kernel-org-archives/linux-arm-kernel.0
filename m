@@ -1,55 +1,76 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 18 Apr 2016 11:53:29 -0500
-Subject: [PATCH 1/5] regulator: st-flashss: Add DT binding documentation
- for flashss regulator.
-In-Reply-To: <1460474204-5351-2-git-send-email-peter.griffin@linaro.org>
-References: <1460474204-5351-1-git-send-email-peter.griffin@linaro.org>
- <1460474204-5351-2-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20160418165329.GA8367@rob-hp-laptop>
+Date: Mon, 18 Apr 2016 12:00:09 -0500
+Subject: [PATCH v2 2/4] Documentation: Add documentation for APM X-Gene
+ SoC PMU DTS binding
+In-Reply-To: <1460510547-17611-3-git-send-email-ttnguyen@apm.com>
+References: <1460510547-17611-1-git-send-email-ttnguyen@apm.com>
+ <1460510547-17611-3-git-send-email-ttnguyen@apm.com>
+Message-ID: <20160418170009.GA15338@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 12, 2016 at 04:16:40PM +0100, Peter Griffin wrote:
-> This patch adds the DT doc for the flashss regulator driver which is
-> found in stih407 based silicon.
+On Tue, Apr 12, 2016 at 06:22:25PM -0700, Tai Nguyen wrote:
+> Documentation: Add documentation for APM X-Gene SoC PMU DTS binding
 > 
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> Signed-off-by: Tai Nguyen <ttnguyen@apm.com>
 > ---
->  .../devicetree/bindings/regulator/st-flashss.txt   | 43 ++++++++++++++++++++++
->  1 file changed, 43 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/regulator/st-flashss.txt
+>  .../devicetree/bindings/perf/apm-xgene-pmu.txt     | 116 +++++++++++++++++++++
+>  1 file changed, 116 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/perf/apm-xgene-pmu.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/regulator/st-flashss.txt b/Documentation/devicetree/bindings/regulator/st-flashss.txt
+> diff --git a/Documentation/devicetree/bindings/perf/apm-xgene-pmu.txt b/Documentation/devicetree/bindings/perf/apm-xgene-pmu.txt
 > new file mode 100644
-> index 0000000..04324d5
+> index 0000000..40dfd4e
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/regulator/st-flashss.txt
-> @@ -0,0 +1,43 @@
-> +ST Voltage regulator for FlashSS vsense
+> +++ b/Documentation/devicetree/bindings/perf/apm-xgene-pmu.txt
+> @@ -0,0 +1,116 @@
+> +* APM X-Gene SoC PMU bindings
 > +
-> +This documents the voltage regulator driver which manages the vsense inside the ST flash
-
-Bindings document h/w, not drivers.
-> +sub-system that is used for configuring MMC, NAND, SPI voltages.
+> +This is APM X-Gene SoC PMU (Performance Monitoring Unit) module.
+> +The following PMU devices are supported:
+> +
+> +  L3C			- L3 cache controller
+> +  IOB			- IO bridge
+> +  MCB			- Memory controller bridge
+> +  MC			- Memory controller
+> +
+> +The following section describes the SoC PMU DT node binding.
 > +
 > +Required properties:
-> +- compatible:		Can be "st,vqmmc", "st,vnand" or "st,vspi" because it is shared
-> +			among these devices inside the ST FlashSS.
-> +- regulator-name:	Regulator name.
-> +- reg:			The vsense top config base address in the flashSS hardware.
+> +- compatible		: Shall be "apm,xgene-pmu" for revision 1 or
+> +                          "apm,xgene-pmu-v2" for revision 2.
+> +- regmap-csw		: Regmap of the CPU switch fabric (CSW) resource.
+> +- regmap-mcba		: Regmap of the MCB-A (memory bridge) resource.
+> +- regmap-mcbb		: Regmap of the MCB-B (memory bridge) resource.
+> +- reg			: First resource shall be the CPU bus PMU resource.
+> +- interrupts            : Interrupt-specifier for PMU IRQ.
 > +
-> +Any property defined as part of the core regulator binding, in
-> +Documentation/devicetree/bindings/regulator/regulator.txt can also be used.
+> +Required properties for L3C subnode:
+> +- compatible		: Shall be "apm,xgene-pmu-l3c".
+> +- reg			: First resource shall be the L3C PMU resource.
+> +- index			: Instance number of the L3C PMU.
 > +
-> +Example:
+> +Required properties for IOB subnode:
+> +- compatible		: Shall be "apm,xgene-pmu-iob".
+> +- reg			: First resource shall be the IOB PMU resource.
+> +- index			: Instance number of the IOB PMU.
 > +
-> +vqmmc_reg: voltage-regulator {
-> +	compatible = "st,vqmmc";
-> +	regulator-name = "vqmmc0";
-> +	/* Control register for the VSENSE Module */
+> +Required properties for MCB subnode:
+> +- compatible		: Shall be "apm,xgene-pmu-mcb".
+> +- reg			: First resource shall be the MCB PMU resource.
+> +- index			: Instance number of the MCB PMU.
+> +
+> +Required properties for MC subnode:
+> +- compatible		: Shall be "apm,xgene-pmu-mc".
+> +- reg			: First resource shall be the MC PMU resource.
+> +- index			: Instance number of the MC PMU.
 
-I'm having a hard time understanding the relationship of FlashSS, VSENSE 
-and the compatible strings. The binding looks suspect to me though. If 
-VSENSE is a module, then I'd expect a compatible string for it.
+Don't use indexes. You probably need phandles to the nodes these are 
+related to.
+
+How many variations of child nodes do you expect to have? 2, 10, 50? You 
+might want to just collapse all this down to a single node and put this 
+information in the driver if it is fixed for each SoC and there's only a 
+handful.
 
 Rob
