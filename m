@@ -1,99 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 Apr 2016 16:05:24 +0200
-Subject: [PATCH 1/5] doc: DT: Add Generic Serial Device Tree Bindings
-In-Reply-To: <CAMuHMdWmHUhhwbYDcmNXuxBRC6n+tp=oX03dBaK2VgL4OA72MQ@mail.gmail.com>
-References: <1460636003-3011-1-git-send-email-geert+renesas@glider.be>
- <5792073.qsBJ1LK659@wuerfel>
- <CAMuHMdWmHUhhwbYDcmNXuxBRC6n+tp=oX03dBaK2VgL4OA72MQ@mail.gmail.com>
-Message-ID: <10322130.q5nmK1X286@wuerfel>
+Date: Mon, 18 Apr 2016 16:15:28 +0200
+Subject: [PATCH v2] arm64: pci: add support for pci_mmap_page_range
+In-Reply-To: <20160418140119.GB5639@localhost.localdomain>
+References: <1460581856-12380-1-git-send-email-jerin.jacob@caviumnetworks.com>
+ <4265693.nXcsYZd1B2@wuerfel> <20160418140119.GB5639@localhost.localdomain>
+Message-ID: <10832709.SG7ma9Lsjb@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 18 April 2016 14:34:12 Geert Uytterhoeven wrote:
-> Hi Arnd,
+On Monday 18 April 2016 19:31:20 Jerin Jacob wrote:
+> Regarding existing user space applications,
+> AFAIK, DPDK has the feature to support both /sysfs and vifo scheme.
+> X11 uses only /sysfs scheme.
 > 
-> CC Richard (serial-mctrl-gpio)
-> CC Grant (ePAPR successor) and Frank
-> 
-> On Sat, Apr 16, 2016 at 6:30 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Thursday 14 April 2016 14:13:19 Geert Uytterhoeven wrote:
-> >> Document a set of generic properties for describing UARTs in a
-> >> device tree:
-> >>   1. The GPIO modem control properties are currently duplicated across
-> >>      hardware-specific binding documentation,
-> >>   2. The property for dedicated RTS/CTS hardware flow control lines is
-> >>      already supported by several drivers, albeit with a vendor-specific
-> >>      prefix, hence make it generic.
-> >>
-> >> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> >
-> > Originally the ISA 8250 uart binding (from ieee) was used as the
-> > template for other uart bindings. How about documenting the parts that
-> > are used in 8250-of today (current-speed, clock-frequency,
-> > reg-offset, reg-shift, fifo-size, reg-io-width, auto-flow-control)
-> > in the same file?
-> 
-> I don't think we have the habit of documenting (duplicating) bindings for ePAPR
-> under Documentation/devicetree/bindings/. Perhaps we should?
-> 
-> Apart from that, most of the properties you mention look legacy or overly
-> broad too me.
-> 
->   - current-speed: This is configuration, not a property of the hardware.
->     For the console, this has been deprecated by appending the serial config
->     to chosen/stdout-path (e.g. "serial0:115200n8").
->     For non-consoles, its use is debatable, IMHO.
->     It's users are mostly legacy powerpc and early adaptors of DT on ARM.
->   - clock-frequency: Legacy predating the Common Clock Framework.
->     Any modern SoC uses clock specifiers with clock handles pointing to clock
->     providers.
+> IMO, Nothing wrong in providing this feature in arm64 kernel.
+> Except arm64, almost all the major architecture has this support.
 
-I think both are still used by IBM Firmware, which does not use the clock
-binding or the linux syntax for passing the speed.
+My understanding was that it's considered deprecated and only
+supported for backwards compatibility, but now I can't find any
+indication of that in the source code and I don't know if that
+is actually the case.
 
->   - reg-offset, reg-shift, reg-io-width: These are much broader than serial,
->     and IMHO thus don't belong in
->     Documentation/devicetree/bindings/serial/serial.txt.
-
-The exact meaning can be explained elsewhere, but I think the binding
-can mention that they are allowed.
-
->   - auto-flow-control: Looks a bit like a vague version of "uart-has-rtscts".
->     Documentation/devicetree/bindings/serial/8250.txt doesn't make it clear
->     whether this is about hardware capabilities or software configuration.
->     Even the driver doesn't make it clear:
->     #define UART_CAP_AFE    (1 << 11)       /* MCR-based hw flow control */
->     "MCR" could mean RTS/CTS, DSR/DTR, ...
->   - fifo-size: This one could be generic. atmel-usart uses a vendor-specific
->     version "atmel,fifo-size".
-> 
-> I suggest we move forward with my initial set, as I have patches that depend on
-> them? We can always add more properties later.
-
-Sounds ok to me.
-
-> >>  - out1-gpios: Must contain a GPIO specifier, referring to the GPIO pin to be
-> >>    used as the UART's OUT1 line.
-> >>  - out2-gpios: Must contain a GPIO specifier, referring to the GPIO pin to be
-> >>    used as the UART's OUT2 line.
-> >
-> > I had to look up what OUT1 and OUT2 are, but I still don't see how you'd
-> > implement them using a GPIO line: From all I can tell, these are usually
-> > internal registers in a hardware uart but they are not assigned to an
-> > external line on the standard db9 or even the old db25 connectors. Should
-> > we drop these instead?
-> 
-> They're indeed fairly exotic, and they're burried deeply in the ns16550
-> datasheet. We do have TIOCM_OUT1 and TIOCM_LOOP in asm-generic/termios.h,
-> probably for obscure historical reasons.
-> 
-> If we drop them, I guess they should be removed from the helper code in
-> drivers/tty/serial/serial_mctrl_gpio.c, too? There don't seem to be any
-> current users.
-
-I think it makes sense for user space to toggle at least TIOCM_OUT1
-through the ioctl and for drivers to implement it correctly. Apparently
-the "Hayes SmartModem" used this for resetting the modem from its
-integrated uart.
+I agree with Will that we should not expose the procfs interface,
+it's just far too ugly.
 
 	Arnd
