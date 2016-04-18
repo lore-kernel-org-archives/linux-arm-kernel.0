@@ -1,59 +1,99 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 18 Apr 2016 16:02:32 +0200
-Subject: [PATCH v5 03/11] soc: renesas: rcar-sysc: Add DT support for SYSC
- PM domains
-In-Reply-To: <CAMuHMdUHPLRrOLO_qio80YHPye1tmrr=Fq9kpDg+Q0aVDycFiA@mail.gmail.com>
-References: <1460558672-10290-1-git-send-email-geert+renesas@glider.be>
- <1460558672-10290-4-git-send-email-geert+renesas@glider.be>
- <CAPDyKFrQtX3-7GodrXV2zp4wHBgbWBOVKyE0XoeWaaxhZ2kUuw@mail.gmail.com>
- <CAMuHMdW+PboSz-u2dV=rmNFkd4qsEhm-O_4Ewdn_-H62gwq7Ng@mail.gmail.com>
- <CAMuHMdUHPLRrOLO_qio80YHPye1tmrr=Fq9kpDg+Q0aVDycFiA@mail.gmail.com>
-Message-ID: <CAPDyKFoNQ1VrheQ4Ak_fu85OswCdV4nmPNky98X7d_FoyMdAzA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 18 Apr 2016 16:05:24 +0200
+Subject: [PATCH 1/5] doc: DT: Add Generic Serial Device Tree Bindings
+In-Reply-To: <CAMuHMdWmHUhhwbYDcmNXuxBRC6n+tp=oX03dBaK2VgL4OA72MQ@mail.gmail.com>
+References: <1460636003-3011-1-git-send-email-geert+renesas@glider.be>
+ <5792073.qsBJ1LK659@wuerfel>
+ <CAMuHMdWmHUhhwbYDcmNXuxBRC6n+tp=oX03dBaK2VgL4OA72MQ@mail.gmail.com>
+Message-ID: <10322130.q5nmK1X286@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 April 2016 at 15:39, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-> Hi Ulf,
->
-> On Mon, Apr 18, 2016 at 2:59 PM, Geert Uytterhoeven
-> <geert@linux-m68k.org> wrote:
->> On Mon, Apr 18, 2016 at 2:21 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->>> [...]
->>>
->>>> +
->>>> +static bool rcar_sysc_active_wakeup(struct device *dev)
->>>> +{
->>>> +       return true;
->>>
->>> I am interested to know why this is always returning true. Perhaps you
->>> can elaborate a bit on that?
->>
->> Too many copying from old shmobile PM Domain code?
->> Honestly, I don't know...
->>
->> Perhaps Rafael still remembers the original rationale, as git history for
->> commit e3e0109138376bb2 ("ARM / shmobile: Support for I/O power domains for
->> SH7372 (v9)") doesn't have it.
->>
->> Google did find: https://lkml.org/lkml/2011/6/30/471
->>
->> Do we still need this at all? I.e. aren't PM Domains containing wake-up
->> devices kept powered automatically during system suspend?
->
-> No they aren't. So for pm-rmobile we do need it.
+On Monday 18 April 2016 14:34:12 Geert Uytterhoeven wrote:
+> Hi Arnd,
+> 
+> CC Richard (serial-mctrl-gpio)
+> CC Grant (ePAPR successor) and Frank
+> 
+> On Sat, Apr 16, 2016 at 6:30 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Thursday 14 April 2016 14:13:19 Geert Uytterhoeven wrote:
+> >> Document a set of generic properties for describing UARTs in a
+> >> device tree:
+> >>   1. The GPIO modem control properties are currently duplicated across
+> >>      hardware-specific binding documentation,
+> >>   2. The property for dedicated RTS/CTS hardware flow control lines is
+> >>      already supported by several drivers, albeit with a vendor-specific
+> >>      prefix, hence make it generic.
+> >>
+> >> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >
+> > Originally the ISA 8250 uart binding (from ieee) was used as the
+> > template for other uart bindings. How about documenting the parts that
+> > are used in 8250-of today (current-speed, clock-frequency,
+> > reg-offset, reg-shift, fifo-size, reg-io-width, auto-flow-control)
+> > in the same file?
+> 
+> I don't think we have the habit of documenting (duplicating) bindings for ePAPR
+> under Documentation/devicetree/bindings/. Perhaps we should?
+> 
+> Apart from that, most of the properties you mention look legacy or overly
+> broad too me.
+> 
+>   - current-speed: This is configuration, not a property of the hardware.
+>     For the console, this has been deprecated by appending the serial config
+>     to chosen/stdout-path (e.g. "serial0:115200n8").
+>     For non-consoles, its use is debatable, IMHO.
+>     It's users are mostly legacy powerpc and early adaptors of DT on ARM.
+>   - clock-frequency: Legacy predating the Common Clock Framework.
+>     Any modern SoC uses clock specifiers with clock handles pointing to clock
+>     providers.
 
-I don't quite understand why genpd should need to treat all devices
-within the same domain exactly the same, it seems suboptimal.
+I think both are still used by IBM Firmware, which does not use the clock
+binding or the linux syntax for passing the speed.
 
-I guess it would be more clever to allow this to be controlled on per
-device basis instead, so let's say from each driver.
+>   - reg-offset, reg-shift, reg-io-width: These are much broader than serial,
+>     and IMHO thus don't belong in
+>     Documentation/devicetree/bindings/serial/serial.txt.
 
->
-> For rcar-sysc it's different: as no PM Domain contains wake-up devices
-> (all I/O devices are in the always-on power area), we don't need the callback.
-> Will drop it in v6.
+The exact meaning can be explained elsewhere, but I think the binding
+can mention that they are allowed.
 
-Okay, great!
+>   - auto-flow-control: Looks a bit like a vague version of "uart-has-rtscts".
+>     Documentation/devicetree/bindings/serial/8250.txt doesn't make it clear
+>     whether this is about hardware capabilities or software configuration.
+>     Even the driver doesn't make it clear:
+>     #define UART_CAP_AFE    (1 << 11)       /* MCR-based hw flow control */
+>     "MCR" could mean RTS/CTS, DSR/DTR, ...
+>   - fifo-size: This one could be generic. atmel-usart uses a vendor-specific
+>     version "atmel,fifo-size".
+> 
+> I suggest we move forward with my initial set, as I have patches that depend on
+> them? We can always add more properties later.
 
-Kind regards
-Uffe
+Sounds ok to me.
+
+> >>  - out1-gpios: Must contain a GPIO specifier, referring to the GPIO pin to be
+> >>    used as the UART's OUT1 line.
+> >>  - out2-gpios: Must contain a GPIO specifier, referring to the GPIO pin to be
+> >>    used as the UART's OUT2 line.
+> >
+> > I had to look up what OUT1 and OUT2 are, but I still don't see how you'd
+> > implement them using a GPIO line: From all I can tell, these are usually
+> > internal registers in a hardware uart but they are not assigned to an
+> > external line on the standard db9 or even the old db25 connectors. Should
+> > we drop these instead?
+> 
+> They're indeed fairly exotic, and they're burried deeply in the ns16550
+> datasheet. We do have TIOCM_OUT1 and TIOCM_LOOP in asm-generic/termios.h,
+> probably for obscure historical reasons.
+> 
+> If we drop them, I guess they should be removed from the helper code in
+> drivers/tty/serial/serial_mctrl_gpio.c, too? There don't seem to be any
+> current users.
+
+I think it makes sense for user space to toggle at least TIOCM_OUT1
+through the ioctl and for drivers to implement it correctly. Apparently
+the "Hayes SmartModem" used this for resetting the modem from its
+integrated uart.
+
+	Arnd
