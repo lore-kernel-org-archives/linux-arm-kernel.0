@@ -1,22 +1,29 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 Apr 2016 16:35:07 +0200
-Subject: [PATCH] Axi-usb: Add support for 64-bit addressing.
-In-Reply-To: <20160418142909.GA5608@rob-hp-laptop>
-References: <1460360506-14692-1-git-send-email-navam@xilinx.com>
- <4542055.HvdgVkDRYK@wuerfel> <20160418142909.GA5608@rob-hp-laptop>
-Message-ID: <4449845.qT8BZnpD4R@wuerfel>
+Date: Mon, 18 Apr 2016 16:38:26 +0200
+Subject: [PATCH V6 00/13] Support for generic ACPI based PCI host
+ controller
+In-Reply-To: <5714E224.1030307@semihalf.com>
+References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
+ <CAKc_7PVC6O4oh+bTmpLQRrhHrqGbaKB2hynecKOLmc5fBc-VVQ@mail.gmail.com>
+ <5714E224.1030307@semihalf.com>
+Message-ID: <4253385.YPSgBqNLfg@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 18 April 2016 09:29:09 Rob Herring wrote:
+On Monday 18 April 2016 15:33:24 Tomasz Nowicki wrote:
 > 
-> Right, you don't need to know the exact bus width for determining the 
-> register/descriptor set is 32 or 64 bit addesses. I'm fine with a 
-> property for that, but if limiting the actual connected address bits is 
-> needed, then dma-ranges should be used.
+> Of course we can split discussion into the two topics:
+> 1. ECAM based ACPI host controller - patches [1-10]
+> 2. Quirks handling and examples.
+> 
+> IMO, it is very helpful for reviewers to go with one unified patch set 
+> and see the whole picture. Also, as you can see, quirks handling allows 
+> people to test it easily with their servers (not only QEMU but real HW).
 
-The other way round: dma-ranges is needed to allow 64-bit addressing,
-the default is to only allow 32-bit addressing (and arm64 has a known
-bug here, it just allows it anyway when it shouldn't).
+I think splitting the two would help tremendously. The regular
+PCI support should just get merged (it should have been completed
+years ago when ACPI for ARM64 was first implemented), while the quirks
+handling contains all ugly nonstandard hacks we have to be careful
+about.
 
 	Arnd
