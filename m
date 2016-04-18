@@ -1,31 +1,38 @@
-From: tthayer@opensource.altera.com (Thor Thayer)
-Date: Mon, 18 Apr 2016 15:25:56 -0500
-Subject: [PATCH] Add EDAC peripheral init functions & Ethernet EDAC.
-In-Reply-To: <20160418200637.GB2057@cz.tnic>
-References: <1460499181-23080-1-git-send-email-tthayer@opensource.altera.com>
- <20160414143501.GA25212@rob-hp-laptop>
- <20160415064042.330406ab.m.chehab@samsung.com>
- <5711087A.8050501@opensource.altera.com> <20160415214618.GB4545@cz.tnic>
- <5714EEC4.4060807@opensource.altera.com> <20160418200227.GA2057@cz.tnic>
- <20160418200637.GB2057@cz.tnic>
-Message-ID: <571542D4.1030409@opensource.altera.com>
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Mon, 18 Apr 2016 14:14:01 -0700
+Subject: [PATCH v4 03/14] acpi, numa: remove duplicate NULL check
+In-Reply-To: <1461014052-30788-1-git-send-email-ddaney.cavm@gmail.com>
+References: <1461014052-30788-1-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1461014052-30788-4-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Hanjun Guo <hanjun.guo@linaro.org>
 
+The argument "header" for acpi_table_print_srat_entry()
+is always checked before the function is called, it's
+duplicate to check it again, remove it.
 
-On 04/18/2016 03:06 PM, Borislav Petkov wrote:
-> On Mon, Apr 18, 2016 at 10:02:27PM +0200, Borislav Petkov wrote:
->>>   the number of uncorrectable errors is useful from a system point of
->>> view.
->
-> I forgot: so altr_edac_a10_ecc_irq() panics on uncorrectable errors. Do we want
-> to do that even for UEs coming from the network...?
->
-> Seems a bit overboard to me...
->
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Signed-off-by: Robert Richter <rrichter@cavium.com>
+Signed-off-by: David Daney <david.daney@cavium.com>
+---
+ drivers/acpi/numa.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
-Yes, as currently submitted, it is overboard and I'll fix this in the 
-next patch submission. In the uncorrectable error case, I plan to just 
-count the error. I'll add a constant flag in the Ethernet module's 
-edac_device_prv_data to determine if the panic should be bypassed.
+diff --git a/drivers/acpi/numa.c b/drivers/acpi/numa.c
+index e34b5d0..2de6068 100644
+--- a/drivers/acpi/numa.c
++++ b/drivers/acpi/numa.c
+@@ -125,9 +125,6 @@ EXPORT_SYMBOL(acpi_map_pxm_to_online_node);
+ static void __init
+ acpi_table_print_srat_entry(struct acpi_subtable_header *header)
+ {
+-	if (!header)
+-		return;
+-
+ 	switch (header->type) {
+ 	case ACPI_SRAT_TYPE_CPU_AFFINITY:
+ 		{
+-- 
+1.7.11.7
