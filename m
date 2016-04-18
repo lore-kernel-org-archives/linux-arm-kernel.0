@@ -1,49 +1,44 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 18 Apr 2016 08:36:48 +0200
-Subject: [PATCH RFT 4/5] iio: mxs-lradc: disable only mapped channels in
- mxs_lradc_hw_stop
-In-Reply-To: <571369AA.8060106@kernel.org>
-References: <1460648909-2657-1-git-send-email-stefan.wahren@i2se.com>
- <1460648909-2657-5-git-send-email-stefan.wahren@i2se.com>
- <571369AA.8060106@kernel.org>
-Message-ID: <57148080.4010200@i2se.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Mon, 18 Apr 2016 09:58:04 +0300
+Subject: [PATCH] ARM: mach-imx: sdhci-esdhc-imx: initialize DMA mask
+In-Reply-To: <6297512.2KmasKu6UN@wuerfel>
+References: <1460362846-2906-1-git-send-email-akurz@blala.de>
+ <570DA8C3.5030206@nvidia.com> <570DFE34.6040206@intel.com>
+ <6297512.2KmasKu6UN@wuerfel>
+Message-ID: <5714857C.9070002@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jonathan,
+On 17/04/16 00:48, Arnd Bergmann wrote:
+> On Wednesday 13 April 2016 11:07:16 Adrian Hunter wrote:
+>> On 13/04/16 05:02, Alexandre Courbot wrote:
+>>> On 04/13/2016 12:31 AM, Russell King - ARM Linux wrote:
+>>>> On Tue, Apr 12, 2016 at 09:25:04PM +0900, Alexandre Courbot wrote:
+> 
+>>> How long it will take for everyone to fix their drivers is another question,
+>>> since the device doesn't clearly break, but falls back to a degraded mode
+>>> with a warning.
+>>>
+>>
+>> It looks like DeviceTree, PCI and ACPI enumerated devices always set up a
+>> dma_mask.  I guess that just leaves devices enumerated from hard-coded
+>> platform data.  I will have a look for any more of those, and also send an
+>> email for affected people to check their device setup and drivers.
+>>
+> 
+> I've had a look now too and found only these three device definitions
+> for any sdhci variant, everything else is either unused or DT-only:
+> 
+> arch/arm/mach-dove/common.c:    .name           = "sdhci-dove",
+> arch/arm/plat-samsung/devs.c:   .name           = "s3c-sdhci",
+> arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c:   imx_sdhci_esdhc_imx_data_entry(MX25, "sdhci-esdhc-imx25", _id, _hwid)
+> arch/arm/mach-imx/devices/platform-sdhci-esdhc-imx.c:   imx_sdhci_esdhc_imx_data_entry(MX35, "sdhci-esdhc-imx35", _id, _hwid)
+> 
+> Out of these, the s3c and dove variants set a 32-bit DMA mask, so as
+> far as I can tell, only imx has the problem.
+> 
 
-Am 17.04.2016 um 12:47 schrieb Jonathan Cameron:
-> On 14/04/16 16:48, Stefan Wahren wrote:
->> Disabling of the touchscreen IRQs is already done in
->> mxs_lradc_disable_ts. There is no need to disable them in
->> mxs_lradc_hw_stop again.
-> We could do with a little more documentation in the driver on
-> which bits in this register are doing what.
->
-> The disable_ts deals with bits 22-24... 
-> The only other bit I think is ever used by the driver currently is
-> 16 (channel 0).  
->
-> So whilst this change probably works, I'm not sure of the logic behind it.
-> As far as I can tell your new clear is fine but in reality you could
-> just clear (0x3f << 16) and get the same result (which would be clearer
-> to my mind).
->
-> The key think here is that we don't support the higher bits on i.mx28
-> yet... Which are for button detection and threshold detection.
->
-> Have I understood this correctly?
+Thanks for looking.
 
-Yes, you are. I've have looked to long in the reference manual instead
-of the code.
-I've missed the point that virtual channel 6 and 7 are used in case of a
-connected touchscreen.
-
-I should use the member buffer_vchans for masking the enable IRQs.
-
-Regards
-Stefan
-
->
-> Jonathan
->  So we only need to care of the
+It looked to me like sdhci-pxav3 devices created by mmp2_add_sdhost() might
+also be candidates.
