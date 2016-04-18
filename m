@@ -1,47 +1,42 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 18 Apr 2016 11:01:57 +0200
-Subject: [PATCH v2 3/3] ARM: dts: imx6qp: Specify imx6qp version of PCIe
- core
-In-Reply-To: <1460958677-10604-3-git-send-email-andrew.smirnov@gmail.com>
-References: <1460958677-10604-1-git-send-email-andrew.smirnov@gmail.com>
- <1460958677-10604-3-git-send-email-andrew.smirnov@gmail.com>
-Message-ID: <1460970117.2331.7.camel@pengutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 18 Apr 2016 10:04:16 +0100
+Subject: [PATCH] arm64: dts: uniphier: add /memreserve/ for spin-table
+ release address
+In-Reply-To: <CAK7LNATtWyZtVWrW3nOYjN=aRvCO1w8Rvr6_JWm3QfMMPhrSAQ@mail.gmail.com>
+References: <1460743138-17768-1-git-send-email-yamada.masahiro@socionext.com>
+ <20160418084508.GA21438@leverpostej>
+ <CAK7LNATtWyZtVWrW3nOYjN=aRvCO1w8Rvr6_JWm3QfMMPhrSAQ@mail.gmail.com>
+Message-ID: <20160418090415.GB21438@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Sonntag, den 17.04.2016, 22:51 -0700 schrieb Andrey Smirnov:
-> I.MX6Quad Plus has a slightly different version of PCIe core than
-> reqular i.MX6Quad.
+On Mon, Apr 18, 2016 at 05:55:14PM +0900, Masahiro Yamada wrote:
+> 2016-04-18 17:45 GMT+09:00 Mark Rutland <mark.rutland@arm.com>:
+> > I take it that the code for the spin-table is not in RAM, and does not
+> > need to be protected similarly?
 > 
-> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+> I use U-Boot to boot Linux for this board.
+> 
+> The code for the spin-table is on SDRAM, and not protected.
+> 
+> I already recognize this problem.
+> 
+> The difficulty for U-Boot is that
+> U-Boot relocates itself to the top of the DRAM.
+> So, it is difficult to predict
+> where the code will be placed.
+> 
+> I will discuss this issue in the U-Boot ML.
 
-Under the assumption that the missing documentation for this compatible
-is added in patch 2/3 in the next revision of this patchset:
+Ok, please do.
 
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+> So, My current solution is pre-fetch the code for the spin-table onto
+> I-cache.
 
-> ---
-> 
-> Changes since v1:
-> 
-> 	- Patchset is rebased against
->           https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/log/?h=pci/host-imx6
-> 
-> 	- DTS files changes moved into a separate patch
-> 
->  arch/arm/boot/dts/imx6qp.dtsi | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6qp.dtsi b/arch/arm/boot/dts/imx6qp.dtsi
-> index 1ada714..886dbf2 100644
-> --- a/arch/arm/boot/dts/imx6qp.dtsi
-> +++ b/arch/arm/boot/dts/imx6qp.dtsi
-> @@ -82,5 +82,8 @@
->  				      "ldb_di0", "ldb_di1", "prg";
->  		};
->  
-> +		pcie: pcie at 0x01000000 {
-> +			compatible = "fsl,imx6qp-pcie", "snps,dw-pcie";
-> +		};
->  	};
->  };
+As you are probably aware, this is incredibly unsafe, and very likely to
+go wrong. Nothing guarantees that (stale) entries remain in the I-cache.
+
+I would very much advise fixing this ASAP.
+
+Thanks,
+Mark.
