@@ -1,74 +1,38 @@
-From: jdelvare@suse.de (Jean Delvare)
-Date: Mon, 18 Apr 2016 21:23:03 +0200
-Subject: Problem with 4.6-rc2
-In-Reply-To: <5715279B.9060806@free.fr>
-References: <57150A3D.6020500@free.fr> <57152224.5080003@hurleysoftware.com>
- <5715279B.9060806@free.fr>
-Message-ID: <20160418212303.29187018@endymion>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 18 Apr 2016 21:28:35 +0200
+Subject: [PATCH 2/2] ARM: multi_v5_defconfig: Enable recommended options
+ for systemd
+In-Reply-To: <20160412142654.GA24304@tiger>
+References: <1458991706-30109-1-git-send-email-jlu@pengutronix.de>
+ <1460462268.2629.27.camel@pengutronix.de> <20160412142654.GA24304@tiger>
+Message-ID: <5243175.i5zkJhBvDK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter, Mason,
-
-On Mon, 18 Apr 2016 20:29:47 +0200, Mason wrote:
-> On 18/04/2016 20:06, Peter Hurley wrote:
-> 
-> > On 04/18/2016 09:24 AM, Mason wrote:
-> >
-> >> I'm running into this panic. I will take a closer look tomorrow.
-> >> Any ideas?
+On Tuesday 12 April 2016 22:26:54 Shawn Guo wrote:
+> On Tue, Apr 12, 2016 at 01:57:48PM +0200, Jan L?bbe wrote:
+> > On Sa, 2016-03-26 at 12:28 +0100, Jan Luebbe wrote:
+> > > Enable FHANDLE, CGROUPS, BLK_DEV_BSG and DEVTMPFS as recommended by
+> > > systemd (which also matches the multi_v7 defconfig). Also enable IPV6,
+> > > which defaults to 'y' by now.
+> > > 
+> > > Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
 > > 
-> > commit 8d2acdb9fc3a544ab0442634531834d6007b5467
-> > Author: Jean Delvare <jdelvare@suse.de>
-> > Date:   Mon Feb 22 09:00:39 2016 +0100
-> > 
-> >     serial: 8250: Add hardware dependency to RT288X option
-> >     
-> >     Kconfig option SERIAL_8250_RT288X seems to be only relevant on MIPS
-> >     platforms, so do not present it on other architectures, unless
-> >     build-testing.
-> >     
-> >     Signed-off-by: Jean Delvare <jdelvare@suse.de>
-> >     Cc: Mans Rullgard <mans@mansr.com>
-> >     Cc: Jiri Slaby <jslaby@suse.com>
-> >     Acked-by: John Crispin <blogic@openwrt.org>
-> >     Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > 
-> > 
-> > Not sure why Greg picked this up over my objections though
-
-Greg applied v1 of my patch. In v2 I added ARCH_TANGO as a possible
-dependency, but Greg did pick the update. Mason, is your target machine
-an ARCH_TANGO machine, or something else?
-
-> Peter,
+> > Shawn, you've already applied 1/2. Do you have any concerns or comments
+> > regarding this one?
 > 
-> Thanks for pointing out the problem.
-
-Mason, did you check if reverting this commit and re-enabling
-SERIAL_8250_RT288X actually solves your problem?
-
-> Greg,
+> I thought that Arnd's request and Sascha's ACK only applies to 1/2.
+> Just applied 2/2 as well.  @Arnd, let me know if I shouldn't.
 > 
-> My ARM-based SoC uses this hardware (Palmchip BK-3103) and it
-> now panics on boot.
 > 
-> Can we revert 8d2acdb9fc3a in time for v4.6?
 
-If not selecting SERIAL_8250_RT288X results in a crash at boot on some
-systems, then reverting my commit is not the proper fix. Even after
-reverting, you can still omit selecting the option, and get the same
-crash. In other words, my commit is not introducing the crash, it must
-have been there lurking before.
+I'd like to see both get picked up into the same branch if the changes are
+for the same platform, sorry if that wasn't clear enough.
 
-Whatever code crashes in this case should be made more robust to
-properly deal with the situation. Or if it is too much work or too ugly
-(not being familiar with the code, I have no idea), then we could
-finally go with Peter's earlier proposal of dropping the
-SERIAL_8250_RT288X option altogether and unconditionally including the
-code in question. In fact I think Peter was supposed to send a patch
-doing exactly that.
+I guess in this case you can argue that the actual changes of 2/2 are
+not imx specific at all, and I'd be fine with picking them up directly,
+but I tend to prefer the defconfig changes to come from one of the subarch
+maintainers just so I don't have to watch too carefully for patches
+on the mailing list.
 
--- 
-Jean Delvare
-SUSE L3 Support
+	Arnd
