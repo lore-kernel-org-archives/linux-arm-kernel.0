@@ -1,31 +1,76 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 Apr 2016 12:26:06 +0200
-Subject: [PATCH] ARM: multi_v7_defconfig: add HLCDC drivers as modules
-In-Reply-To: <5714ADA4.1020800@atmel.com>
-References: <1459347577-15450-1-git-send-email-boris.brezillon@free-electrons.com>
- <5714ADA4.1020800@atmel.com>
-Message-ID: <4216448.KxprUkKsZc@wuerfel>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 18 Apr 2016 11:30:07 +0100
+Subject: [RFC PATCH 09/11] drivers: acpi: implement acpi_dma_configure
+In-Reply-To: <CAOZdJXXtZq6uyE+5sseX7M_6Kq8wFG+37qd5TNSusKj=0gd8zA@mail.gmail.com>
+References: <1460654743-7896-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1460654743-7896-10-git-send-email-lorenzo.pieralisi@arm.com>
+ <CAOZdJXXtZq6uyE+5sseX7M_6Kq8wFG+37qd5TNSusKj=0gd8zA@mail.gmail.com>
+Message-ID: <20160418103007.GC2427@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 18 April 2016 11:49:24 Nicolas Ferre wrote:
-> Le 30/03/2016 16:19, Boris Brezillon a ?crit :
-> > Add the HLCDC drivers to multi_v7_defconfig.
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+On Fri, Apr 15, 2016 at 01:29:14PM -0500, Timur Tabi wrote:
+> On Thu, Apr 14, 2016 at 12:25 PM, Lorenzo Pieralisi
+> <lorenzo.pieralisi@arm.com> wrote:
+> > +void acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
+> > +{
+> > +       struct iommu_ops *iommu;
+> > +
+> > +       iommu = iort_iommu_configure(dev);
+> > +
+> > +       /*
+> > +        * Assume dma valid range starts at 0 and covers the whole
+> > +        * coherent_dma_mask.
+> > +        */
+> > +       arch_setup_dma_ops(dev, 0, dev->coherent_dma_mask + 1, iommu,
+> > +                          attr == DEV_DMA_COHERENT);
+> > +}
 > 
-> If it gives more weight:
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> I have a network driver that is impacted by this code, so thank you
+> for posting this. (See
+> https://www.mail-archive.com/netdev at vger.kernel.org/msg106249.html).
 > 
-> BTW, arm-soc guys, I recall that you prefer patches for this kind of
-> modification to multi_v7_defconfig... do I recall well or do you want us
-> to build a pull-request together with other AT91 defconfig modifications?
+> One one SOC, the driver needs to set the mask to 32 bits.  On another
+> SOC, it needs to set it to 64 bits.  On device tree, the driver will
+> use dma-ranges.
 
-My preference is to get a pull request for related defconfig patches
-combining the ones for your own platform and for the multi_*_defconfig
-files.
+First off I think we agree this patch does not change current behaviour
+as far as the devices default dma_mask are concerned. They are
+initialized in PCI/ACPI core code:
 
-Patches are fine if you only have a small number of changes for a particular
-topic (defconfig or otherwise).
+- pci_setup_device()
+- acpi_create_platform_device()
 
-	Arnd
+As for ACPI DT-dma-ranges equivalent I have to check if I can use
+the _DMA method for that so that we can put in place the same
+mechanism as DT to override the default masks, other than that it is
+up to the drivers to set-up the dma mask accordingly, that's not
+something this patchset is changing anyway.
+
+> In your patches, where is coherent_dma_mask initialized?  I found this
+> code in add_smmu_platform_device(), but I think this is setting the
+> mask for the IOMMU driver, not the individual devices.  Either way, I
+> don't understand where the correct value is going to be overridden.
+
+For the ARM SMMU table walker:
+
+arm_smmu_device_cfg_probe() - dma_set_mask_and_coherent()
+
+For other devices see above.
+
+Thanks,
+Lorenzo
+
+> 
+> +       /*
+> +        * Set default dma mask value for the table walker,
+> +        * to be overridden on probing with correct value.
+> +        */
+> +       *pdev->dev.dma_mask = DMA_BIT_MASK(32);
+> +       pdev->dev.coherent_dma_mask = *pdev->dev.dma_mask;
+> 
+> -- 
+> Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project.
+> 
