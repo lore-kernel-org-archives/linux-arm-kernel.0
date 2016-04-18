@@ -1,39 +1,44 @@
-From: xuwei04@gmail.com (Xu Wei)
-Date: Mon, 18 Apr 2016 16:14:53 +0100
-Subject: [PATCH v2 RESEND 2/4] arm64: Kconfig: select sp804 timer for
- ARCH_HISI
-In-Reply-To: <1453373630-4693-3-git-send-email-leo.yan@linaro.org>
-References: <1453373630-4693-1-git-send-email-leo.yan@linaro.org>
- <1453373630-4693-3-git-send-email-leo.yan@linaro.org>
-Message-ID: <5714F9ED.3020907@gmail.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Mon, 18 Apr 2016 16:17:42 +0100
+Subject: [PATCH v2 0/3] Enable configs for 96boards HiKey and general arm64
+In-Reply-To: <1457654951-29944-1-git-send-email-guodong.xu@linaro.org>
+References: <1457654951-29944-1-git-send-email-guodong.xu@linaro.org>
+Message-ID: <5714FA96.706@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Leo,
+Hi Guodong,
 
-On 21/01/16 10:53, Leo Yan wrote:
-> Select sp804 timer for ARCH_HISI, which is used as broadcast timer.
->
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> ---
->   arch/arm64/Kconfig.platforms | 1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-> index 4043c35..94c410d 100644
-> --- a/arch/arm64/Kconfig.platforms
-> +++ b/arch/arm64/Kconfig.platforms
-> @@ -36,6 +36,7 @@ config ARCH_LAYERSCAPE
->   
->   config ARCH_HISI
->   	bool "Hisilicon SoC Family"
-> +	select ARM_TIMER_SP804
->   	help
->   	  This enables support for Hisilicon ARMv8 SoC family
->   
-Just applied this to the hisilicon soc tree.
-The others have been picked up from Guodong's patch set.
+On 11/03/2016 00:09, Guodong Xu wrote:
+> This patch enables a number of devices currently supported by the Hi6220
+> and 96boards HiKey. These include
+> a) Hi655x PMIC and regulator
+> b) Hi6220 I2C, USB, MMC, mailbox, and reset
+> c) CONFIG_PINCTRL_SINGLE, and CONFIG_LEDS_GPIO
+> 
+> Also added general features required in arm64:
+>  - SPIDEV
+>  - USB network adapters
+
+Applied to the hisilicon soc tree.
 Thanks!
 
 Best Regards,
 Wei
+
+> 
+> v2:
+>  - rebase to next-20160310, CONFIG_MMC_BLOCK_MINORS=16 is already in.
+>  - set CONFIG_I2C_DESIGNWARE_PLATFORM to be build as module
+>  - Add general features for arm64
+> 
+> Akira Tsukamoto (1):
+>   ARM64: defconfig: enable several common USB network adapters
+> 
+> Guodong Xu (2):
+>   arm64: defconfig: Enable devices for Hi6220 and 96boards HiKey
+>   arm64: defconfig: add CONFIG_SPI_SPIDEV as module
+> 
+>  arch/arm64/configs/defconfig | 22 ++++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
+> 
