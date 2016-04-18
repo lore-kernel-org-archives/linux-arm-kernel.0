@@ -1,33 +1,80 @@
-From: shijie.huang@arm.com (Huang Shijie)
-Date: Mon, 18 Apr 2016 09:49:56 +0800
-Subject: [PATCH] arm64: mm: remove the redundant code
-Message-ID: <1460944196-11780-1-git-send-email-shijie.huang@arm.com>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Mon, 18 Apr 2016 09:56:54 +0800
+Subject: [PATCH v6 3/4] soc: mediatek: Add MT2701 power dt-bindings
+In-Reply-To: <1460731329.19786.4.camel@mtksdaap41>
+References: <1460621819-695-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1460621819-695-4-git-send-email-jamesjj.liao@mediatek.com>
+ <1460631381.13240.3.camel@mtksdaap41> <1460685753.7028.5.camel@mtksdaap41>
+ <1460731329.19786.4.camel@mtksdaap41>
+Message-ID: <1460944614.26713.1.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We already re-enable interrupts where necessary in the entry code, so
-there is no need to do it again in do_page fault. This patch removes
-the redundant code.
+Hi Yingjoe,
 
-Signed-off-by: Huang Shijie <shijie.huang@arm.com>
----
- arch/arm64/mm/fault.c | 4 ----
- 1 file changed, 4 deletions(-)
+On Fri, 2016-04-15 at 22:42 +0800, Yingjoe Chen wrote:
+> On Fri, 2016-04-15 at 10:02 +0800, James Liao wrote:
+> > On Thu, 2016-04-14 at 18:56 +0800, Yingjoe Chen wrote:
+> > > On Thu, 2016-04-14 at 16:16 +0800, James Liao wrote:
+> > > > From: Shunli Wang <shunli.wang@mediatek.com>
+> > > > 
+> > > > Add power dt-bindings for MT2701.
+> > > > 
+> > > > Signed-off-by: Shunli Wang <shunli.wang@mediatek.com>
+> > > > Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> > > > Acked-by: Rob Herring <robh@kernel.org>
+> > > > Reviewed-by: Kevin Hilman <khilman@baylibre.com>
+> > > > ---
+> > > >  .../devicetree/bindings/soc/mediatek/scpsys.txt    | 12 ++++++----
+> > > >  include/dt-bindings/power/mt2701-power.h           | 27 ++++++++++++++++++++++
+> > > >  2 files changed, 34 insertions(+), 5 deletions(-)
+> > > >  create mode 100644 include/dt-bindings/power/mt2701-power.h
+> > > > 
+> > > > diff --git a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+> > > > index e8f15e3..ebb3144 100644
+> > > > --- a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+> > > > +++ b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+> > > > @@ -9,17 +9,19 @@ domain control.
+> > > >  
+> > > >  The driver implements the Generic PM domain bindings described in
+> > > >  power/power_domain.txt. It provides the power domains defined in
+> > > > -include/dt-bindings/power/mt8173-power.h.
+> > > > +include/dt-bindings/power/mt8173-power.h and mt2701-power.h.
+> > > >  
+> > > >  Required properties:
+> > > > -- compatible: Must be "mediatek,mt8173-scpsys"
+> > > > +- compatible: Should be one of:
+> > > > +	- "mediatek,mt2701-scpsys"
+> > > > +	- "mediatek,mt8173-scpsys"
+> > > >  - #power-domain-cells: Must be 1
+> > > >  - reg: Address range of the SCPSYS unit
+> > > >  - infracfg: must contain a phandle to the infracfg controller
+> > > >  - clock, clock-names: clocks according to the common clock binding.
+> > > > -                      The clocks needed "mm", "mfg", "venc" and "venc_lt".
+> > > > -		      These are the clocks which hardware needs to be enabled
+> > > > -		      before enabling certain power domains.
+> > > > +                      The clocks needed "mm", "mfg", "venc", "venc_lt" and
+> > > > +                      "ethif". These are the clocks which hardware needs to be
+> > > > +                      enabled before enabling certain power domains.
+> > > 
+> > > 
+> > > Clock ethif only exist on mt2701 so it is not required on mt8173.
+> > 
+> > You are right. Each SoC needs different clock for each power domain.
+> > Here list all subsystems of available SoCs.
+> 
+> Binding should list required clocks for each specific platform. How
+> about this:
+> 
+> - clock, clock-names: clocks according to the common clock binding.
+> 		      These are the clocks which hardware needs to be
+>                       enabled before enabling certain power domains.
+>   	Required clocks for mt2701: "mm", "mfg", "ethif"
+> 	Required clocks for mt8173: "mm", "mfg", "venc", "venc_lt"
 
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 95df28b..bdc193c 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -212,10 +212,6 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
- 	tsk = current;
- 	mm  = tsk->mm;
- 
--	/* Enable interrupts if they were enabled in the parent context. */
--	if (interrupts_enabled(regs))
--		local_irq_enable();
--
- 	/*
- 	 * If we're in an interrupt or have no user context, we must not take
- 	 * the fault.
--- 
-2.5.5
+OK. I'll follow your suggestion in next patch.
+
+
+Best regards,
+
+James
