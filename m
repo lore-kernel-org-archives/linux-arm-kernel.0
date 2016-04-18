@@ -1,31 +1,46 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 18 Apr 2016 10:07:08 +0100
-Subject: [PATCH v3] ARM64: ACPI: Update documentation for latest
- specification version
-In-Reply-To: <57112AC0.2050607@linaro.org>
-References: <1459210002-3387-1-git-send-email-al.stone@linaro.org>
- <20160415143719.GA8798@red-moon> <5711199E.9010508@linaro.org>
- <20160415174716.GB10014@red-moon> <57112AC0.2050607@linaro.org>
-Message-ID: <20160418090708.GA2427@red-moon>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 18 Apr 2016 12:10:56 +0300
+Subject: [PATCH 1/7 RESEND] video: ARM CLCD: runtime check for Versatile
+In-Reply-To: <CACRpkdYAcVy+PA5nXnWjWoLhh0UQm1=WMAzXiJtgcK0TsEa=zA@mail.gmail.com>
+References: <1456221704-5792-1-git-send-email-linus.walleij@linaro.org>
+ <1456221704-5792-2-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdYAcVy+PA5nXnWjWoLhh0UQm1=WMAzXiJtgcK0TsEa=zA@mail.gmail.com>
+Message-ID: <5714A4A0.3090900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 15, 2016 at 11:54:08AM -0600, Al Stone wrote:
 
-[...]
-
-> > Understood, the point I wanted to make is that adding a list of methods
-> > in acpi_object_usage.txt ("Use as needed") is not necessarily additional
-> > information, you can add a pointer at ACPI specs (for that specific
-> > purpose - as I said there are parts of the patch that add additional
-> > information Linux related) for that purpose instead of having to list
-> > all of them in acpi_object_usage.txt again.
+On 15/04/16 14:47, Linus Walleij wrote:
+> On Tue, Feb 23, 2016 at 11:01 AM, Linus Walleij
+> <linus.walleij@linaro.org> wrote:
 > 
-> I see.  That makes sense.  How about I collapse those down with something
-> on the order of "unless otherwise noted, use as needed" and just remove the
-> ones that have no specific info?
+>> The current compile-time check for inversed IENB/CNTL does not
+>> work in multiplatform boots: as soon as versatile is included
+>> in the build, the IENB/CNTL is switched and breaks graphics.
+>> Convert this to a runtime switch.
+>>
+>> Cc: stable at vger.kernel.org
+>> Cc: Rob Herring <robh@kernel.org>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Fixes: a29da136de34 ("ARM: versatile: convert to multi-platform")
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> Tomi can you PLEASE merge this patch which is regressing all
+> the Versatile hardware since commit a29da136de34?
+> 
+> It is not dependent on the rest of the series.
+> 
+> I am coming back to revising the rest of the patches, but
+> this one need to go in.
 
-Agreed, that would also help you avoid keeping track of new specs
-updates that do not necessarily require updates to these docs.
+Sure, queued for 4.6 fixes.
 
-Lorenzo
+ Tomi
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160418/5ddb838d/attachment.sig>
