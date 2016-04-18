@@ -1,63 +1,59 @@
-From: jerin.jacob@caviumnetworks.com (Jerin Jacob)
-Date: Mon, 18 Apr 2016 19:31:20 +0530
-Subject: [PATCH v2] arm64: pci: add support for pci_mmap_page_range
-In-Reply-To: <4265693.nXcsYZd1B2@wuerfel>
-References: <1460581856-12380-1-git-send-email-jerin.jacob@caviumnetworks.com>
- <20160415130953.GI22906@arm.com> <4265693.nXcsYZd1B2@wuerfel>
-Message-ID: <20160418140119.GB5639@localhost.localdomain>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 18 Apr 2016 16:02:32 +0200
+Subject: [PATCH v5 03/11] soc: renesas: rcar-sysc: Add DT support for SYSC
+ PM domains
+In-Reply-To: <CAMuHMdUHPLRrOLO_qio80YHPye1tmrr=Fq9kpDg+Q0aVDycFiA@mail.gmail.com>
+References: <1460558672-10290-1-git-send-email-geert+renesas@glider.be>
+ <1460558672-10290-4-git-send-email-geert+renesas@glider.be>
+ <CAPDyKFrQtX3-7GodrXV2zp4wHBgbWBOVKyE0XoeWaaxhZ2kUuw@mail.gmail.com>
+ <CAMuHMdW+PboSz-u2dV=rmNFkd4qsEhm-O_4Ewdn_-H62gwq7Ng@mail.gmail.com>
+ <CAMuHMdUHPLRrOLO_qio80YHPye1tmrr=Fq9kpDg+Q0aVDycFiA@mail.gmail.com>
+Message-ID: <CAPDyKFoNQ1VrheQ4Ak_fu85OswCdV4nmPNky98X7d_FoyMdAzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 15, 2016 at 08:45:20PM +0200, Arnd Bergmann wrote:
-> On Friday 15 April 2016 14:09:53 Will Deacon wrote:
-> > On Thu, Apr 14, 2016 at 02:40:56AM +0530, Jerin Jacob wrote:
-> > > Certain X11 servers and user space network drivers frameworks
-> > > need PCI mmaped /sys/bus/pci/devices/B:D:F/resourceX file to
-> > > access PCI bar address space from user space.
-> > > 
-> > > Signed-off-by: Jerin Jacob <jerin.jacob@caviumnetworks.com>
-> > > ---
-> > > Changes in v2:
-> > >   - Rebased to 4.6.0-rc3.
-> > >   - Tested and verified the change on Thunderx and xgene1 arm64 platforms
-> > > 
-> > >  arch/arm64/include/asm/pci.h |  6 ++++++
-> > >  arch/arm64/kernel/pci.c      | 20 ++++++++++++++++++++
-> > >  2 files changed, 26 insertions(+)
-> > > 
-> > > diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
-> > > index b9a7ba9..9d7e460 100644
-> > > --- a/arch/arm64/include/asm/pci.h
-> > > +++ b/arch/arm64/include/asm/pci.h
-> > > @@ -37,5 +37,11 @@ static inline int pci_proc_domain(struct pci_bus *bus)
-> > >  }
-> > >  #endif  /* CONFIG_PCI */
-> > >  
-> > > +#define HAVE_PCI_MMAP
-> > 
-> > By defining this symbol, we also get lumbered with the legacy /proc
-> > interface, which I'd be keen to avoid exposing until we have people
-> > explicitly asking for it.
-> > 
-> > Any chance you could expose only the /sysfs interface on arm64?
-> > 
-> 
-> Do we have an idea how much user space code is affected by this?
-> Maybe it can instead be changed to use VFIO, which is basically
-> the current way to do this.
+On 18 April 2016 at 15:39, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> Hi Ulf,
+>
+> On Mon, Apr 18, 2016 at 2:59 PM, Geert Uytterhoeven
+> <geert@linux-m68k.org> wrote:
+>> On Mon, Apr 18, 2016 at 2:21 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>> [...]
+>>>
+>>>> +
+>>>> +static bool rcar_sysc_active_wakeup(struct device *dev)
+>>>> +{
+>>>> +       return true;
+>>>
+>>> I am interested to know why this is always returning true. Perhaps you
+>>> can elaborate a bit on that?
+>>
+>> Too many copying from old shmobile PM Domain code?
+>> Honestly, I don't know...
+>>
+>> Perhaps Rafael still remembers the original rationale, as git history for
+>> commit e3e0109138376bb2 ("ARM / shmobile: Support for I/O power domains for
+>> SH7372 (v9)") doesn't have it.
+>>
+>> Google did find: https://lkml.org/lkml/2011/6/30/471
+>>
+>> Do we still need this at all? I.e. aren't PM Domains containing wake-up
+>> devices kept powered automatically during system suspend?
+>
+> No they aren't. So for pm-rmobile we do need it.
 
-Yes, after the introduction of vfio-noiommu mode almost all
-uses case can be addressed with vfio. But still their are userspace
-applications uses /sysfs scheme.
+I don't quite understand why genpd should need to treat all devices
+within the same domain exactly the same, it seems suboptimal.
 
-Regarding existing user space applications,
-AFAIK, DPDK has the feature to support both /sysfs and vifo scheme.
-X11 uses only /sysfs scheme.
+I guess it would be more clever to allow this to be controlled on per
+device basis instead, so let's say from each driver.
 
-IMO, Nothing wrong in providing this feature in arm64 kernel.
-Except arm64, almost all the major architecture has this support.
+>
+> For rcar-sysc it's different: as no PM Domain contains wake-up devices
+> (all I/O devices are in the always-on power area), we don't need the callback.
+> Will drop it in v6.
 
-Jerin
+Okay, great!
 
-> 
-> 	Arnd
+Kind regards
+Uffe
