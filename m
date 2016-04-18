@@ -1,44 +1,33 @@
-From: xuejiancheng@huawei.com (Jiancheng Xue)
-Date: Mon, 18 Apr 2016 10:59:19 +0800
-Subject: [RESEND PATCH v10 2/6] clk: hisilicon: add CRG driver for hi3519
- soc
-In-Reply-To: <20160416004130.GO26353@codeaurora.org>
-References: <1459411811-12390-1-git-send-email-xuejiancheng@hisilicon.com>
- <1459411811-12390-3-git-send-email-xuejiancheng@hisilicon.com>
- <57104449.8090506@huawei.com> <20160416004130.GO26353@codeaurora.org>
-Message-ID: <57144D87.30401@huawei.com>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Mon, 18 Apr 2016 11:09:47 +0800
+Subject: [PATCH v2 2/3] arm64: mm: Show bss segment in kernel memory layout
+In-Reply-To: <1460948988-7477-1-git-send-email-wangkefeng.wang@huawei.com>
+References: <1460533772-13314-1-git-send-email-wangkefeng.wang@huawei.com>
+ <1460948988-7477-1-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <1460948988-7477-3-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-   	
-On 2016/4/16 8:41, Stephen Boyd wrote:
-> On 04/15, Jiancheng Xue wrote:
->> Hi,
->>
->> On 2016/3/31 16:10, Jiancheng Xue wrote:
->>> From: Jiancheng Xue <xuejiancheng@huawei.com>
->>>
->>> The CRG(Clock and Reset Generator) block provides clock
->>> and reset signals for other modules in hi3519 soc.
->>>
->>> Signed-off-by: Jiancheng Xue <xuejiancheng@huawei.com>
->>> Acked-by: Rob Herring <robh@kernel.org>
->>> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
->>> ---
->> I hope this patchset can be merged through arch/arm tree
->> The dts binding part has been acked by Rob Herring, and
->> the reset part has been acked by Philipp Zabel. Could you
->> help me to ack this whole clk patch? Please also let me
->> know if this patch still have issues. Thank you very much!
-> 
-> Can I merge it through clk tree and make a stable branch to pull
-> through arm-soc? I assume another patch is coming but it's good
-> to get clarity before then.
-> 
-Yes. It's also OK for me if this patchset can be merged into mainline
-Finally. Then can I send reset controller driver, clock driver and arm-soc
-patches separately?
+Show the bss segment information as with text and data in Virtual
+memory kernel layout.
 
-Regards,
-Jiancheng
+Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+---
+ arch/arm64/mm/init.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index ce2e400..c96fe51 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -379,6 +379,8 @@ void __init mem_init(void)
+ 		MLK_ROUNDUP(__init_begin, __init_end));
+ 	pr_cont("      .data : 0x%p" " - 0x%p" "   (%6ld KB)\n",
+ 		MLK_ROUNDUP(_sdata, _edata));
++	pr_cont("       .bss : 0x%p" " - 0x%p" "   (%6ld KB)\n",
++		MLK_ROUNDUP(__bss_start, __bss_stop));
+ #ifdef CONFIG_SPARSEMEM_VMEMMAP
+ 	pr_cont("    vmemmap : 0x%16lx - 0x%16lx   (%6ld GB maximum)\n",
+ 		MLG(VMEMMAP_START, VMEMMAP_START + VMEMMAP_SIZE));
+-- 
+2.6.0.GIT
