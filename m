@@ -1,14 +1,18 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Mon, 18 Apr 2016 11:35:58 +0800
-Subject: [PATCH 6/9] thermal: rockchip: add the notes for better reading
+Date: Mon, 18 Apr 2016 11:36:00 +0800
+Subject: [PATCH 8/9] thermal: rockchip: add the set_trips function
 In-Reply-To: <1460950562-20652-1-git-send-email-wxt@rock-chips.com>
 References: <1460950562-20652-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1460950562-20652-7-git-send-email-wxt@rock-chips.com>
+Message-ID: <1460950562-20652-9-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To update the notes for keeping in mind that quickly in case
-someone re-read this driver in the future.
+Whenever the current temperature is updated, the trip points immediately
+below and above the current temperature are found. A sensor driver
+callback `set_trips' is then called with the temperatures.
+Lastly, The sensor will trigger the hardware high temperature interrupts
+to increase the sampleing rate and throttle frequency to limit the
+temperature rising When performing passive cooling.
 
 Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 Cc: Zhang Rui <rui.zhang@intel.com>
@@ -16,151 +20,128 @@ Cc: Eduardo Valentin <edubezval@gmail.com>
 Cc: Heiko Stuebner <heiko@sntech.de>
 ---
 
- drivers/thermal/rockchip_thermal.c | 74 +++++++++++++++++++++++++++-----------
- 1 file changed, 53 insertions(+), 21 deletions(-)
+ drivers/thermal/rockchip_thermal.c | 39 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
 diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
-index 00c12c0..86a1ab0 100644
+index 86a1ab0..39e2eec 100644
 --- a/drivers/thermal/rockchip_thermal.c
 +++ b/drivers/thermal/rockchip_thermal.c
-@@ -1,7 +1,5 @@
- /*
-- * Copyright (c) 2014, Fuzhou Rockchip Electronics Co., Ltd
-- *
-- * Copyright (c) 2015, Fuzhou Rockchip Electronics Co., Ltd
-+ * Copyright (c) 2014-2016, Fuzhou Rockchip Electronics Co., Ltd
-  * Caesar Wang <wxt@rock-chips.com>
-  *
-  * This program is free software; you can redistribute it and/or modify it
-@@ -75,7 +73,7 @@ enum adc_sort_mode {
- #define SOC_MAX_SENSORS	2
- 
- /**
-- * struct chip_tsadc_table: hold information about chip-specific differences
-+ * struct chip_tsadc_table - hold information about chip-specific differences
-  * @id: conversion table
-  * @length: size of conversion table
-  * @data_mask: mask to apply on data inputs
-@@ -88,6 +86,20 @@ struct chip_tsadc_table {
- 	enum adc_sort_mode mode;
- };
- 
-+/**
-+ * struct rockchip_tsadc_chip - hold the private data of tsadc chip
-+ * @chn_id[SOC_MAX_SENSORS]: the sensor id of chip correspond to the channel
-+ * @chn_num: the channel number of tsadc chip
-+ * @tshut_temp: the hardware-controlled shutdown temperature value
-+ * @tshut_mode: the hardware-controlled shutdown mode (0:CRU 1:GPIO)
-+ * @tshut_polarity: the hardware-controlled active polarity (0:LOW 1:HIGH)
-+ * @initialize: SoC special initialize tsadc controller method
-+ * @irq_ack: clear the interrupt
-+ * @get_temp: get the temperature
-+ * @set_tshut_temp: set the hardware-controlled shutdown temperature
-+ * @set_tshut_mode: set the hardware-controlled shutdown mode
-+ * @table: the chip-specific conversion table
-+ */
- struct rockchip_tsadc_chip {
- 	/* The sensor id of chip correspond to the ADC channel */
- 	int chn_id[SOC_MAX_SENSORS];
-@@ -115,12 +127,32 @@ struct rockchip_tsadc_chip {
- 	struct chip_tsadc_table table;
- };
- 
-+/**
-+ * struct rockchip_thermal_sensor - hold the information of thermal sensor
-+ * @thermal:  pointer to the platform/configuration data
-+ * @tzd: pointer to a thermal zone
-+ * @id: identifier of the thermal sensor
-+ */
- struct rockchip_thermal_sensor {
- 	struct rockchip_thermal_data *thermal;
- 	struct thermal_zone_device *tzd;
- 	int id;
- };
- 
-+/**
-+ * struct rockchip_thermal_data - hold the private data of thermal driver
-+ * @chip: pointer to the platform/configuration data
-+ * @pdev: platform device of thermal
-+ * @reset: the reset controller of tsadc
-+ * @sensors[SOC_MAX_SENSORS]: the thermal sensor
-+ * @clk: the controller clock is divided by the exteral 24MHz
-+ * @pclk: the advanced peripherals bus clock
-+ * @grf: the general register file will be used to do static set by software
-+ * @regs: the base address of tsadc controller
-+ * @tshut_temp: the hardware-controlled shutdown temperature value
-+ * @tshut_mode: the hardware-controlled shutdown mode (0:CRU 1:GPIO)
-+ * @tshut_polarity: the hardware-controlled active polarity (0:LOW 1:HIGH)
-+ */
- struct rockchip_thermal_data {
- 	const struct rockchip_tsadc_chip *chip;
- 	struct platform_device *pdev;
-@@ -160,12 +192,7 @@ struct rockchip_thermal_data {
- #define TSADCV2_AUTO_EN				BIT(0)
- #define TSADCV2_AUTO_SRC_EN(chn)		BIT(4 + (chn))
- #define TSADCV2_AUTO_TSHUT_POLARITY_HIGH	BIT(8)
--/**
-- * TSADCV1_AUTO_Q_SEL_EN:
-- * whether select (1024 - tsadc_q) as output
-- * 1'b0:use tsadc_q as output(temperature-code is rising sequence)
-- * 1'b1:use(1024 - tsadc_q) as output (temperature-code is falling sequence)
-- */
-+
- #define TSADCV3_AUTO_Q_SEL_EN			BIT(1)
- 
- #define TSADCV2_INT_SRC_EN(chn)			BIT(chn)
-@@ -193,18 +220,21 @@ struct rockchip_thermal_data {
- #define GRF_SARADC_TESTBIT_ON			(0x10001 << 2)
- #define GRF_TSADC_TESTBIT_H_ON			(0x10001 << 2)
- 
--struct tsadc_table {
--	u32 code;
--	int temp;
--};
--
- /**
-+ * struct tsadc_table - code to temperature conversion table
-+ * @code: the value of adc channel
-+ * @temp: the temperature
-  * Note:
-- * Code to Temperature mapping of the Temperature sensor is a piece wise linear
-+ * code to temperature mapping of the temperature sensor is a piece wise linear
-  * curve.Any temperature, code faling between to 2 give temperatures can be
-  * linearly interpolated.
-- * Code to Temperature mapping should be updated based on sillcon results.
-+ * Code to Temperature mapping should be updated based on manufacturer results.
-  */
-+struct tsadc_table {
-+	u32 code;
-+	int temp;
-+};
-+
- static const struct tsadc_table rk3228_code_table[] = {
- 	{0, -40000},
- 	{588, -40000},
-@@ -490,6 +520,7 @@ static void rk_tsadcv2_initialize(struct regmap *grf, void __iomem *regs,
- 
- /**
-  * rk_tsadcv3_initialize - initialize TASDC Controller.
-+ *
-  * (1) The tsadc control power sequence.
-  *
-  * (2) Set TSADC_V2_AUTO_PERIOD:
-@@ -568,10 +599,11 @@ static void rk_tsadcv2_control(void __iomem *regs, bool enable)
+@@ -96,6 +96,7 @@ struct chip_tsadc_table {
+  * @initialize: SoC special initialize tsadc controller method
+  * @irq_ack: clear the interrupt
+  * @get_temp: get the temperature
++ * @set_alarm_temp: set the high temperature interrupt
+  * @set_tshut_temp: set the hardware-controlled shutdown temperature
+  * @set_tshut_mode: set the hardware-controlled shutdown mode
+  * @table: the chip-specific conversion table
+@@ -119,6 +120,8 @@ struct rockchip_tsadc_chip {
+ 	/* Per-sensor methods */
+ 	int (*get_temp)(struct chip_tsadc_table table,
+ 			int chn, void __iomem *reg, int *temp);
++	void (*set_alarm_temp)(struct chip_tsadc_table table,
++			       int chn, void __iomem *reg, int temp);
+ 	void (*set_tshut_temp)(struct chip_tsadc_table table,
+ 			       int chn, void __iomem *reg, int temp);
+ 	void (*set_tshut_mode)(int chn, void __iomem *reg, enum tshut_mode m);
+@@ -183,6 +186,7 @@ struct rockchip_thermal_data {
+ #define TSADCV2_INT_EN				0x08
+ #define TSADCV2_INT_PD				0x0c
+ #define TSADCV2_DATA(chn)			(0x20 + (chn) * 0x04)
++#define TSADCV2_COMP_INT(chn)		        (0x30 + (chn) * 0x04)
+ #define TSADCV2_COMP_SHUT(chn)		        (0x40 + (chn) * 0x04)
+ #define TSADCV2_HIGHT_INT_DEBOUNCE		0x60
+ #define TSADCV2_HIGHT_TSHUT_DEBOUNCE		0x64
+@@ -628,6 +632,20 @@ static int rk_tsadcv2_get_temp(struct chip_tsadc_table table,
+ 	return rk_tsadcv2_code_to_temp(table, val, temp);
  }
  
- /**
-- * @rk_tsadcv3_control:
-- * TSADC controller works at auto mode, and some SoCs need set the tsadc_q_sel
-- * bit on TSADCV2_AUTO_CON[1]. The (1024 - tsadc_q) as output adc value if
-- * setting this bit to enable.
-+ * rk_tsadcv3_control - the tsadc controller is enabled or disabled.
-+ *
-+ * NOTE: TSADC controller works@auto mode, and some SoCs need set the
-+ * tsadc_q_sel bit on TSADCV2_AUTO_CON[1]. The (1024 - tsadc_q) as output
-+ * adc value if setting this bit to enable.
-  */
- static void rk_tsadcv3_control(void __iomem *regs, bool enable)
++static void rk_tsadcv2_alarm_temp(struct chip_tsadc_table table,
++				  int chn, void __iomem *regs, int temp)
++{
++	u32 alarm_value, int_en;
++
++	alarm_value = rk_tsadcv2_temp_to_code(table, temp);
++	writel_relaxed(alarm_value & table.data_mask,
++		       regs + TSADCV2_COMP_INT(chn));
++
++	int_en = readl_relaxed(regs + TSADCV2_INT_EN);
++	int_en |= TSADCV2_INT_SRC_EN(chn);
++	writel_relaxed(int_en, regs + TSADCV2_INT_EN);
++}
++
+ static void rk_tsadcv2_tshut_temp(struct chip_tsadc_table table,
+ 				  int chn, void __iomem *regs, int temp)
  {
+@@ -670,6 +688,7 @@ static const struct rockchip_tsadc_chip rk3228_tsadc_data = {
+ 	.irq_ack = rk_tsadcv3_irq_ack,
+ 	.control = rk_tsadcv3_control,
+ 	.get_temp = rk_tsadcv2_get_temp,
++	.set_alarm_temp = rk_tsadcv2_alarm_temp,
+ 	.set_tshut_temp = rk_tsadcv2_tshut_temp,
+ 	.set_tshut_mode = rk_tsadcv2_tshut_mode,
+ 
+@@ -694,6 +713,7 @@ static const struct rockchip_tsadc_chip rk3288_tsadc_data = {
+ 	.irq_ack = rk_tsadcv2_irq_ack,
+ 	.control = rk_tsadcv2_control,
+ 	.get_temp = rk_tsadcv2_get_temp,
++	.set_alarm_temp = rk_tsadcv2_alarm_temp,
+ 	.set_tshut_temp = rk_tsadcv2_tshut_temp,
+ 	.set_tshut_mode = rk_tsadcv2_tshut_mode,
+ 
+@@ -718,6 +738,7 @@ static const struct rockchip_tsadc_chip rk3366_tsadc_data = {
+ 	.irq_ack = rk_tsadcv3_irq_ack,
+ 	.control = rk_tsadcv3_control,
+ 	.get_temp = rk_tsadcv2_get_temp,
++	.set_alarm_temp = rk_tsadcv2_alarm_temp,
+ 	.set_tshut_temp = rk_tsadcv2_tshut_temp,
+ 	.set_tshut_mode = rk_tsadcv2_tshut_mode,
+ 
+@@ -742,6 +763,7 @@ static const struct rockchip_tsadc_chip rk3368_tsadc_data = {
+ 	.irq_ack = rk_tsadcv2_irq_ack,
+ 	.control = rk_tsadcv2_control,
+ 	.get_temp = rk_tsadcv2_get_temp,
++	.set_alarm_temp = rk_tsadcv2_alarm_temp,
+ 	.set_tshut_temp = rk_tsadcv2_tshut_temp,
+ 	.set_tshut_mode = rk_tsadcv2_tshut_mode,
+ 
+@@ -766,6 +788,7 @@ static const struct rockchip_tsadc_chip rk3399_tsadc_data = {
+ 	.irq_ack = rk_tsadcv3_irq_ack,
+ 	.control = rk_tsadcv3_control,
+ 	.get_temp = rk_tsadcv2_get_temp,
++	.set_alarm_temp = rk_tsadcv2_alarm_temp,
+ 	.set_tshut_temp = rk_tsadcv2_tshut_temp,
+ 	.set_tshut_mode = rk_tsadcv2_tshut_mode,
+ 
+@@ -826,6 +849,21 @@ static irqreturn_t rockchip_thermal_alarm_irq_thread(int irq, void *dev)
+ 	return IRQ_HANDLED;
+ }
+ 
++static int rockchip_thermal_set_trips(void *_sensor, int low, int high)
++{
++	struct rockchip_thermal_sensor *sensor = _sensor;
++	struct rockchip_thermal_data *thermal = sensor->thermal;
++	const struct rockchip_tsadc_chip *tsadc = thermal->chip;
++
++	dev_dbg(&thermal->pdev->dev, "%s: sensor %d: low: %d, high %d\n",
++		__func__, sensor->id, low, high);
++
++	tsadc->set_alarm_temp(tsadc->table,
++			      sensor->id, thermal->regs, high);
++
++	return 0;
++}
++
+ static int rockchip_thermal_get_temp(void *_sensor, int *out_temp)
+ {
+ 	struct rockchip_thermal_sensor *sensor = _sensor;
+@@ -843,6 +881,7 @@ static int rockchip_thermal_get_temp(void *_sensor, int *out_temp)
+ 
+ static const struct thermal_zone_of_device_ops rockchip_of_thermal_ops = {
+ 	.get_temp = rockchip_thermal_get_temp,
++	.set_trips = rockchip_thermal_set_trips,
+ };
+ 
+ static int rockchip_configure_from_dt(struct device *dev,
 -- 
 1.9.1
