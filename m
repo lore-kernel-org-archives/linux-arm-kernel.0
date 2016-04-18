@@ -1,50 +1,67 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 18 Apr 2016 10:28:34 +0100
-Subject: [PATCH v4 3/6] arm64: Add helpers for detecting AArch32 support at EL0
+Date: Mon, 18 Apr 2016 10:28:36 +0100
+Subject: [PATCH v4 5/6] arm64: cpufeature: Track 32bit EL0 support
 In-Reply-To: <1460971717-24113-1-git-send-email-suzuki.poulose@arm.com>
 References: <1460971717-24113-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1460971717-24113-4-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1460971717-24113-6-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds a helper to extract the support for AArch32 at EL0
+Add cpu_hwcap bit for keeping track of the support for 32bit EL0.
 
 Tested-by: Yury Norov <ynorov@caviumnetworks.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/cpufeature.h |    7 +++++++
- arch/arm64/include/asm/sysreg.h     |    1 +
- 2 files changed, 8 insertions(+)
+ arch/arm64/include/asm/cpufeature.h |    8 +++++++-
+ arch/arm64/kernel/cpufeature.c      |    9 +++++++++
+ 2 files changed, 16 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index b9b6494..7f64285 100644
+index 7f64285..ca8fb4b 100644
 --- a/arch/arm64/include/asm/cpufeature.h
 +++ b/arch/arm64/include/asm/cpufeature.h
-@@ -170,6 +170,13 @@ static inline bool id_aa64mmfr0_mixed_endian_el0(u64 mmfr0)
- 		cpuid_feature_extract_unsigned_field(mmfr0, ID_AA64MMFR0_BIGENDEL0_SHIFT) == 0x1;
+@@ -35,8 +35,9 @@
+ #define ARM64_ALT_PAN_NOT_UAO			10
+ #define ARM64_HAS_VIRT_HOST_EXTN		11
+ #define ARM64_WORKAROUND_CAVIUM_27456		12
++#define ARM64_HAS_32BIT_EL0			13
+ 
+-#define ARM64_NCAPS				13
++#define ARM64_NCAPS				14
+ 
+ #ifndef __ASSEMBLY__
+ 
+@@ -192,6 +193,11 @@ static inline bool cpu_supports_mixed_endian_el0(void)
+ 	return id_aa64mmfr0_mixed_endian_el0(read_cpuid(ID_AA64MMFR0_EL1));
  }
  
-+static inline bool id_aa64pfr0_32bit_el0(u64 pfr0)
++static inline bool system_supports_32bit_el0(void)
 +{
-+	u32 val = cpuid_feature_extract_unsigned_field(pfr0, ID_AA64PFR0_EL0_SHIFT);
-+
-+	return val == ID_AA64PFR0_EL0_32BIT_64BIT;
++	return cpus_have_cap(ARM64_HAS_32BIT_EL0);
 +}
 +
- void __init setup_cpu_features(void);
+ static inline bool system_supports_mixed_endian_el0(void)
+ {
+ 	return id_aa64mmfr0_mixed_endian_el0(read_system_reg(SYS_ID_AA64MMFR0_EL1));
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index cfc0cfd..4cd8f23 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -733,6 +733,15 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 		.capability = ARM64_HAS_VIRT_HOST_EXTN,
+ 		.matches = runs_at_el2,
+ 	},
++	{
++		.desc = "32-bit EL0 Support",
++		.capability = ARM64_HAS_32BIT_EL0,
++		.matches = has_cpuid_feature,
++		.sys_reg = SYS_ID_AA64PFR0_EL1,
++		.sign = FTR_UNSIGNED,
++		.field_pos = ID_AA64PFR0_EL0_SHIFT,
++		.min_field_value = ID_AA64PFR0_EL0_32BIT_64BIT,
++	},
+ 	{},
+ };
  
- void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 1287416..1a5f602 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -115,6 +115,7 @@
- #define ID_AA64PFR0_ASIMD_SUPPORTED	0x0
- #define ID_AA64PFR0_EL1_64BIT_ONLY	0x1
- #define ID_AA64PFR0_EL0_64BIT_ONLY	0x1
-+#define ID_AA64PFR0_EL0_32BIT_64BIT	0x2
- 
- /* id_aa64mmfr0 */
- #define ID_AA64MMFR0_TGRAN4_SHIFT	28
 -- 
 1.7.9.5
