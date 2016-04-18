@@ -1,24 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 Apr 2016 17:05:26 +0200
-Subject: [PATCH 0/2] ARM: lpc32xx: updates to lpc32xx_defconfig
-In-Reply-To: <1460950283-25053-1-git-send-email-vz@mleia.com>
-References: <1460950283-25053-1-git-send-email-vz@mleia.com>
-Message-ID: <5278209.vnV5mGJPF7@wuerfel>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Mon, 18 Apr 2016 16:08:26 +0100
+Subject: [GIT PULL v2] arm64: hisilicon: config changes for 4.7
+Message-ID: <5714F86A.40001@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 18 April 2016 06:31:21 Vladimir Zapolskiy wrote:
-> The changeset updates lpc32xx_defconfig to match savedefconfig
-> and adds ARM PrimeCell PL175 memory controller driver to a build.
-> 
-> Vladimir Zapolskiy (2):
->   ARM: LPC32xx: defconfig update
->   ARM: LPC32xx: add PL175 memory controller driver to defconfig
-> 
->  arch/arm/configs/lpc32xx_defconfig | 29 +++++++++++------------------
->  1 file changed, 11 insertions(+), 18 deletions(-)
+Hi Arnd, Hi Olof, Hi Kevin,
 
-Looks all good to me. As a reminder: if you want the patches to be
-picked up (rather than reviewed), please send them to arm at kernel.org.
+Please help to pull the following changes.
 
-	Arnd
+I based this pull request on v4.6-rc4 instead of rc1 to avoid the
+duplication that some configurations have been enabled.
+
+Thanks!
+
+Best Regards,
+Wei
+
+---
+
+The following changes since commit c3b46c73264b03000d1e18b22f5caf63332547c9:
+
+  Linux 4.6-rc4 (2016-04-17 19:13:32 -0700)
+
+are available in the git repository at:
+
+  git://github.com/hisilicon/linux-hisi.git tags/hi6220-config-for-4.7v2
+
+for you to fetch changes up to 00e0662b50cde2caa3cb421712a85a300b3de0f0:
+
+  arm64: Kconfig: select sp804 timer for ARCH_HISI (2016-04-18 14:57:02 +0100)
+
+----------------------------------------------------------------
+ARM64: Hi6220: configure updates for 4.7
+
+- Enable Hi655x PMIC and regulator
+- Enable SPI_SPIDEV as module
+- Enable several common USB-Ethernet dongles
+- Enable configs for WLAN and TI WL1835 as modules
+- Enable ARM SP804 for ARCH_HISI
+
+----------------------------------------------------------------
+Akira Tsukamoto (1):
+      arm64: defconfig: enable several common USB network adapters
+
+Guodong Xu (3):
+      arm64: defconfig: Enable devices for Hi6220 and 96boards HiKey
+      arm64: defconfig: add CONFIG_SPI_SPIDEV as module
+      arm64: defconfig: enable configs for WLAN and TI WL1835 as modules
+
+Leo Yan (1):
+      arm64: Kconfig: select sp804 timer for ARCH_HISI
+
+ arch/arm64/Kconfig.platforms |  1 +
+ arch/arm64/configs/defconfig | 21 +++++++++++++++++++--
+ 2 files changed, 20 insertions(+), 2 deletions(-)
