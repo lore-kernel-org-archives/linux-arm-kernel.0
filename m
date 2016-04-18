@@ -1,55 +1,90 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 18 Apr 2016 14:41:21 +0100
-Subject: [PATCH 4/5] arm64: Verify CPU errata work arounds on hotplugged
- CPU
-In-Reply-To: <20160415141242.GM22906@arm.com>
-References: <1459941854-5190-1-git-send-email-suzuki.poulose@arm.com>
- <1459941854-5190-5-git-send-email-suzuki.poulose@arm.com>
- <20160414173948.GO4584@arm.com> <570FD817.5050704@arm.com>
- <5710F653.5070301@arm.com> <20160415141242.GM22906@arm.com>
-Message-ID: <5714E401.1090000@arm.com>
+From: jerin.jacob@caviumnetworks.com (Jerin Jacob)
+Date: Mon, 18 Apr 2016 19:13:57 +0530
+Subject: [PATCH v2] arm64: pci: add support for pci_mmap_page_range
+In-Reply-To: <20160415130953.GI22906@arm.com>
+References: <1460581856-12380-1-git-send-email-jerin.jacob@caviumnetworks.com>
+ <20160415130953.GI22906@arm.com>
+Message-ID: <20160418134356.GA5639@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/04/16 15:12, Will Deacon wrote:
-> On Fri, Apr 15, 2016 at 03:10:27PM +0100, Suzuki K Poulose wrote:
->> On 14/04/16 18:49, Suzuki K Poulose wrote:
->>> On 14/04/16 18:39, Will Deacon wrote:
->>>> On Wed, Apr 06, 2016 at 12:24:13PM +0100, Suzuki K Poulose wrote:
->>>>> CPU Errata work arounds are detected and applied to the
->>>>> kernel code at boot time and the data is then freed up.
->>>>> If a new hotplugged CPU requires a work around which
->>>>> was not applied at boot time, there is nothing we can
->>>>> do but simply fail the booting.
->>>>
->>>> Hmm, wouldn't it be better not to free the alternative text for errata
->>>> workarounds instead?
->>>
->>> We could. I don't have a strong opinion. If there are no objections, I could
->>> adopt it.
->>
->> The alternatives have been merged to .init by :
->>
->> commit 9aa4ec1571da6236 ("arm64: mm: fold alternatives into .init")
->>
->> Mark,
->>
->> Do you have any concerns on applying alternatives for CPUs turned online later ?
->> We have to revert the patch above to get going
->
-> Well, note that I'm only suggesting that we keep the alternatives for
-> CPU errata workarounds.
+On Fri, Apr 15, 2016 at 02:09:53PM +0100, Will Deacon wrote:
+> On Thu, Apr 14, 2016 at 02:40:56AM +0530, Jerin Jacob wrote:
+> > Certain X11 servers and user space network drivers frameworks
+> > need PCI mmaped /sys/bus/pci/devices/B:D:F/resourceX file to
+> > access PCI bar address space from user space.
+> > 
+> > Signed-off-by: Jerin Jacob <jerin.jacob@caviumnetworks.com>
+> > ---
+> > Changes in v2:
+> >   - Rebased to 4.6.0-rc3.
+> >   - Tested and verified the change on Thunderx and xgene1 arm64 platforms
+> > 
+> >  arch/arm64/include/asm/pci.h |  6 ++++++
+> >  arch/arm64/kernel/pci.c      | 20 ++++++++++++++++++++
+> >  2 files changed, 26 insertions(+)
+> > 
+> > diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
+> > index b9a7ba9..9d7e460 100644
+> > --- a/arch/arm64/include/asm/pci.h
+> > +++ b/arch/arm64/include/asm/pci.h
+> > @@ -37,5 +37,11 @@ static inline int pci_proc_domain(struct pci_bus *bus)
+> >  }
+> >  #endif  /* CONFIG_PCI */
+> >  
+> > +#define HAVE_PCI_MMAP
+> 
+> By defining this symbol, we also get lumbered with the legacy /proc
+> interface, which I'd be keen to avoid exposing until we have people
+> explicitly asking for it.
 
-So to confirmt, do you mean for now we could do :
+AFAIK, /proc/bus/pci/* proc entry files will be created irrespective
+of HAVE_PCI_MMAP, But mmap capability added only when HAVE_PCI_MMAP selected.
 
-  - Not release the alternatives for errata work arounds.
-  - And retain the check for new erratas, failing the CPUs.
+> 
+> Any chance you could expose only the /sysfs interface on arm64?
+> 
 
-And in a follow up series,
-
-  - Add support for applying errata work arounds later, as we find
-    a new CPU which requires it
-  - and remove the constraint above ?
+AFAIK, With existing generic code infrastructure its is not possible.
+IMO, Introducing yet another kernel configuration or weak function to disable
+in the /proc/ entries in the generic code may not be a good idea.
 
 
-Suzuki
+> > +
+> > +extern int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
+> > +	enum pci_mmap_state mmap_state, int write_combine);
+> > +
+> > +
+> >  #endif  /* __KERNEL__ */
+> >  #endif  /* __ASM_PCI_H */
+> > diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+> > index c72de66..be7ddf1 100644
+> > --- a/arch/arm64/kernel/pci.c
+> > +++ b/arch/arm64/kernel/pci.c
+> > @@ -82,3 +82,23 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+> >  	return NULL;
+> >  }
+> >  #endif
+> > +
+> > +int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
+> > +		enum pci_mmap_state mmap_state, int write_combine)
+> > +{
+> > +	/*
+> > +	* I/O space can be accessed via normal processor loads and stores on
+> > +	* this platform but for now we elect not to do this and portable
+> > +	* drivers should not do this anyway.
+> > +	*/
+> > +	if (mmap_state == pci_mmap_io)
+> > +		return -EINVAL;
+> > +
+> > +	if (write_combine)
+> > +		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
+> > +	else
+> > +		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+> 
+> For consistency with ioremap, this should be pgprot_device.
+
+Will fix it in v3.
+
+> 
+> Will
