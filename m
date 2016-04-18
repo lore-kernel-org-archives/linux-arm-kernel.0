@@ -1,38 +1,65 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 Apr 2016 21:28:35 +0200
-Subject: [PATCH 2/2] ARM: multi_v5_defconfig: Enable recommended options
- for systemd
-In-Reply-To: <20160412142654.GA24304@tiger>
-References: <1458991706-30109-1-git-send-email-jlu@pengutronix.de>
- <1460462268.2629.27.camel@pengutronix.de> <20160412142654.GA24304@tiger>
-Message-ID: <5243175.i5zkJhBvDK@wuerfel>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Mon, 18 Apr 2016 21:31:54 +0200
+Subject: [PATCH V6 08/13] PCI: generic, thunder: update to use generic
+ ECAM API
+In-Reply-To: <10639671.xGDtp1R8bk@wuerfel>
+References: <1460740008-19489-1-git-send-email-tn@semihalf.com>
+ <CAKc_7PWw5VaPxcOpWbonksx6k4W5fe9yO8wBfigXNRkFAYAYEg@mail.gmail.com>
+ <5714DB37.7000907@semihalf.com> <10639671.xGDtp1R8bk@wuerfel>
+Message-ID: <5715362A.7070701@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 12 April 2016 22:26:54 Shawn Guo wrote:
-> On Tue, Apr 12, 2016 at 01:57:48PM +0200, Jan L?bbe wrote:
-> > On Sa, 2016-03-26 at 12:28 +0100, Jan Luebbe wrote:
-> > > Enable FHANDLE, CGROUPS, BLK_DEV_BSG and DEVTMPFS as recommended by
-> > > systemd (which also matches the multi_v7 defconfig). Also enable IPV6,
-> > > which defaults to 'y' by now.
-> > > 
-> > > Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
-> > 
-> > Shawn, you've already applied 1/2. Do you have any concerns or comments
-> > regarding this one?
-> 
-> I thought that Arnd's request and Sascha's ACK only applies to 1/2.
-> Just applied 2/2 as well.  @Arnd, let me know if I shouldn't.
-> 
-> 
+On 18.04.2016 16:44, Arnd Bergmann wrote:
+> On Monday 18 April 2016 15:03:51 Tomasz Nowicki wrote:
+>> On 16.04.2016 16:36, Jayachandran C wrote:
+>>> On Sat, Apr 16, 2016 at 1:01 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>>> On Saturday 16 April 2016 12:50:13 Jayachandran C wrote:
+>>> The whole pci-thunder-*.c is to support thunder PCI quirks since the
+>>> generic OF is handled by pci-host-common.c and generic ECAM is now
+>>> separated -  duplicating the whole file for ACPI will be bad.
+>>
+>> Yes, it would be too much code duplication. Also, we already know
+>> drivers which need quirks.
+>>
+>> We really need to agree on best approach here. Here are requirements
+>> which came up (please correct me if misunderstood sth):
+>>
+>> Arnd:
+>> 1. Initial DT driver should be standalone [Arnd]
+>> 2. No exported symbols [Arnd]
+>> 3. Duplicate necessary code to ACPI framework.
+>
+> Correct.
+>
+>> JC:
+>> 1. Adding linker section is wrong.
+>> 2. Quirks should be exported (pci_thunder_ecam_ops), then no need for
+>> adding linker section
+>> 3. To much duplication to copy code into the ACPI framework.
+>>
+>> My opinion:
+>> 1. I like linker section because it is easy to maintain and no need to
+>> export symbols.
+>> 2. We need more sophisticated algorithm for matching quirks (DMI is not
+>> enough and not only for ThunderX drivers). Of course I am open to any
+>> new suggestions.
+>
+> Agreed.
+>
+>> 3. To much duplication to copy code into the ACPI framework.
+>>
+>> Thanks in advance for any pointers.
+>
+> Can you be more specific about what code actually would need to
+> be duplicated? Anything besides the config space operations?
+>
 
-I'd like to see both get picked up into the same branch if the changes are
-for the same platform, sorry if that wasn't clear enough.
+Basically the whole content of pci-thunder-ecam.c and pci-thunder-pem.c.
 
-I guess in this case you can argue that the actual changes of 2/2 are
-not imx specific at all, and I'd be fine with picking them up directly,
-but I tend to prefer the defconfig changes to come from one of the subarch
-maintainers just so I don't have to watch too carefully for patches
-on the mailing list.
+pci-thunder-ecam.c contains config space accessors. Similar for 
+pci-thunder-pem.c but it also has extra init call (it is now called 
+thunder_pem_init) which finds and maps related registers.
 
-	Arnd
+Thanks,
+Tomasz
