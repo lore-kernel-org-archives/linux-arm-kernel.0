@@ -1,46 +1,58 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Mon, 18 Apr 2016 13:40:59 +1000
-Subject: [PATCH 31/47] ARM: dts: r8a7794: Reference both DMA controllers
- in SCIFA nodes
-In-Reply-To: <CAMuHMdUUz-0EhgogpHGV-yE6htbwvAjuoAm2+DtDLa3xiG1XkA@mail.gmail.com>
-References: <cover.1459732726.git.horms+renesas@verge.net.au>
- <65c295f4b305330162795b0cc2508a207ed23a98.1459732726.git.horms+renesas@verge.net.au>
- <CAOesGMgBBmUvoWdb35vcq0UAJNkMk5LD6-ERWDAaSKWEpGwu9A@mail.gmail.com>
- <CAMuHMdUUz-0EhgogpHGV-yE6htbwvAjuoAm2+DtDLa3xiG1XkA@mail.gmail.com>
-Message-ID: <20160418034059.GA1966@verge.net.au>
+Date: Mon, 18 Apr 2016 13:55:07 +1000
+Subject: [GIT PULL] Renesas ARM Based SoC Drivers Updates for v4.7
+In-Reply-To: <CAMuHMdWpdzMcCDcBo3jrRbuS9LzZ71A0GbVUR=YE_e4F_9+6hA@mail.gmail.com>
+References: <cover.1459732456.git.horms+renesas@verge.net.au>
+ <20160413194354.GQ19945@localhost>
+ <CAMuHMdUbNcbLdQYG037MiDRAe1dr7ohRK625vb16oM8W19WEFw@mail.gmail.com>
+ <20160413202328.GS19945@localhost>
+ <CAMuHMdXniFngia63Um6LN_5MKrFtJGQPeFFe7=e7Dj6A_X6PTw@mail.gmail.com>
+ <20160415003346.GA31938@verge.net.au>
+ <CAMuHMdWpdzMcCDcBo3jrRbuS9LzZ71A0GbVUR=YE_e4F_9+6hA@mail.gmail.com>
+Message-ID: <20160418035506.GB3578@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 13, 2016 at 09:55:14PM +0200, Geert Uytterhoeven wrote:
-> Hi Olof,
+On Fri, Apr 15, 2016 at 08:35:48AM +0200, Geert Uytterhoeven wrote:
+> Hi Simon,
 > 
-> On Wed, Apr 13, 2016 at 9:48 PM, Olof Johansson <olof@lixom.net> wrote:
-> > On Sun, Apr 3, 2016 at 6:23 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
-> >> diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-> >> index eacb2b291361..4256557ca041 100644
-> >> --- a/arch/arm/boot/dts/r8a7794.dtsi
-> >> +++ b/arch/arm/boot/dts/r8a7794.dtsi
-> >> @@ -296,8 +296,9 @@
-> >>                 interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
-> >>                 clocks = <&mstp2_clks R8A7794_CLK_SCIFA0>;
-> >>                 clock-names = "fck";
-> >> -               dmas = <&dmac0 0x21>, <&dmac0 0x22>;
-> >> -               dma-names = "tx", "rx";
-> >> +               dmas = <&dmac0 0x21>, <&dmac0 0x22>,
-> >> +                      <&dmac1 0x21>, <&dmac1 0x22>;
-> >> +               dma-names = "tx", "rx", "tx", "rx";
-> >>                 power-domains = <&cpg_clocks>;
-> >>                 status = "disabled";
-> >>         };
+> On Fri, Apr 15, 2016 at 2:33 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Thu, Apr 14, 2016 at 10:19:04AM +0200, Geert Uytterhoeven wrote:
+> >> On Wed, Apr 13, 2016 at 10:23 PM, Olof Johansson <olof@lixom.net> wrote:
+> >> > On Wed, Apr 13, 2016 at 09:57:39PM +0200, Geert Uytterhoeven wrote:
+> >> >> On Wed, Apr 13, 2016 at 9:43 PM, Olof Johansson <olof@lixom.net> wrote:
+> >> >> > On Mon, Apr 04, 2016 at 10:22:56AM +0900, Simon Horman wrote:
+> >> >> >> Geert Uytterhoeven (2):
+> >> >> >>       ARM: shmobile: timer: Fix preset_lpj leading to too short delays
+> >> >> >>       ARM: shmobile: timer: Drop support for Cortex A8
+> 
+> >> Simon: I'm a bit surprised to see that "ARM: shmobile: timer: Fix preset_lpj
+> >> leading to too short delays" got postponed to v4.7, while commit 406663ed61c8
+> >> ("ARM: shmobile: defconfig: Do not enable CONFIG_CPU_BPREDICT_DISABLE") is
+> >> already in v4.6-rc1.  The latter makes bad behavior due to too short delays
+> >> more likely to happen.
+> >>
+> >> Sorry for not noticing before.
 > >
-> > The names are no longer unique. So a get_<foo>_by_name() function no
-> > longer can work as expected.
+> > Likewise, sorry for the mix-up.
+> >
+> > I can think of two ways to resolve this, likely there are others:
+> > 1. Submit "ARM: shmobile: timer: Fix preset_lpj leading to too short delays"
+> >    or conversely
+> > 2. Submit a reversion of 406663ed61c8 ("ARM: shmobile: defconfig: Do not
+> >    enable CONFIG_CPU_BPREDICT_DISABLE") as a fix for v4.6.
+> >
+> > Or perhaps it is a problem that can just be ironed out in v4.7.
+> > Let me know what you think.
 > 
-> That's intentional, and a relic of how dma_request_slave_channel_compat()
-> works: if e.g. the first "tx" channel can't be gotten (e.g. because
-> the referenced
-> DMAC instance ran out of channels), it will try the next one.
+> I prefer option 1, i.e. fixing the bug instead of papering over it in
+> the defconfig.
+> Users may not use the defconfig, and have CONFIG_CPU_BPREDICT_DISABLE
+> enabled anyway.
 
-Hi Olof,
+Thanks, that reasoning sounds fine to me.
 
-is the above acceptable to you?
+I plan to re-queue "ARM: shmobile: timer: Fix preset_lpj leading to too
+short delays" in fixes-for-v4.6 and I plan to push that in a revised
+renesas-next tag later today. I would appreciate you double checking that
+all is in order. 
