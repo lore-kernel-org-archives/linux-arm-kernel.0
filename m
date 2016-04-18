@@ -1,29 +1,51 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 18 Apr 2016 09:58:06 +0800
-Subject: [PATCH 1/2] clk: imx: do not sleep if IRQ's are still disabled
-In-Reply-To: <20160416010052.GR26353@codeaurora.org>
-References: <1454107764-19876-1-git-send-email-stefan@agner.ch>
- <20160416010052.GR26353@codeaurora.org>
-Message-ID: <20160418015806.GR28903@tiger>
+Date: Mon, 18 Apr 2016 10:02:52 +0800
+Subject: [PATCH 2/2] arm64: dts: ls2080a: fsl-mc dt node updates
+In-Reply-To: <HE1PR04MB1641EB3DD445D3AF3F524C3D8D960@HE1PR04MB1641.eurprd04.prod.outlook.com>
+References: <1459544080-28598-1-git-send-email-stuart.yoder@nxp.com>
+ <20160413055019.GK28903@tiger>
+ <HE1PR04MB1641EB3DD445D3AF3F524C3D8D960@HE1PR04MB1641.eurprd04.prod.outlook.com>
+Message-ID: <20160418020252.GS28903@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 15, 2016 at 06:00:53PM -0700, Stephen Boyd wrote:
-> On 01/29, Stefan Agner wrote:
-> > If a clock gets enabled early during boot time, it can lead to a PLL
-> > startup. The wait_lock function makes sure that the PLL is really
-> > stareted up before it gets used. However, the function sleeps which
-> > leads to scheduling and an error:
-> > bad: scheduling from the idle thread!
-> > ...
+On Wed, Apr 13, 2016 at 08:39:32PM +0000, Stuart Yoder wrote:
+> > > @@ -265,6 +265,93 @@
+> > >  			compatible = "fsl,qoriq-mc";
+> > >  			reg = <0x00000008 0x0c000000 0 0x40>,	 /* MC portal base */
+> > >  			      <0x00000000 0x08340000 0 0x40000>; /* MC control reg */
+> > > +			msi-parent = <&its>;
+> > > +			#address-cells = <3>;
+> > > +			#size-cells = <1>;
+> > > +
+> > > +			/*
+> > > +			 * Region type 0x0 - MC portals
+> > > +			 * Region type 0x1 - QBMAN portals
+> > > +			 */
+> > > +			ranges = <0x0 0x0 0x0 0x8 0x0c000000 0x4000000
+> > > +				  0x1 0x0 0x0 0x8 0x18000000 0x8000000>;
+> > > +
+> > > +			/*
+> > > +			 * Define the maximum number of MACs present on the SoC.
+> > > +			 * They won't necessarily be all probed, since the
+> > > +			 * Data Path Layout file and the MC firmware can put
+> > > +			 * fewer actual DPMAC objects on the MC bus.
+> > > +			 */
+> > > +			dpmacs {
+> > > +				#address-cells = <1>;
+> > > +				#size-cells = <0>;
+> > > +
+> > > +				dpmac1: dpmac at 1 {
+> > > +					compatible = "fsl,qoriq-mc-dpmac";
 > > 
-> > Use udelay in case IRQ's are still disabled.
-> > 
-> > Signed-off-by: Stefan Agner <stefan@agner.ch>
+> > I did not see how this compatible is used by kernel driver.
 > 
-> This is really old. Shawn, are you picking these up? I'm removing
-> these from my queue for now.
+> There is no driver yet, but it will be coming soon.  But, does
+> it matter?  Device trees should be describing hardware
+> without regards to some specific kernel use of a node or 
+> property.
 
-Yes, I'm picking them up.
+We need to at least have the bindings documented before we can accept it
+in dts files.
 
 Shawn
