@@ -1,136 +1,179 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 18 Apr 2016 09:50:06 +0200
-Subject: [PATCH] i2c: exynos5: Fix possible ABBA deadlock by keeping I2C
- clock prepared
-In-Reply-To: <1460757887-18128-1-git-send-email-javier@osg.samsung.com>
-References: <1460757887-18128-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <571491AE.30908@samsung.com>
+From: tiffany.lin@mediatek.com (tiffany lin)
+Date: Mon, 18 Apr 2016 16:22:34 +0800
+Subject: [PATCH 3/7] [Media] vcodec: mediatek: Add Mediatek V4L2 Video
+ Decoder Driver
+In-Reply-To: <57148D8E.9060601@xs4all.nl>
+References: <1460548915-17536-1-git-send-email-tiffany.lin@mediatek.com>
+ <1460548915-17536-2-git-send-email-tiffany.lin@mediatek.com>
+ <1460548915-17536-3-git-send-email-tiffany.lin@mediatek.com>
+ <1460548915-17536-4-git-send-email-tiffany.lin@mediatek.com>
+ <5710FA3A.2030603@xs4all.nl> <1460958046.7861.48.camel@mtksdaap41>
+ <57148D8E.9060601@xs4all.nl>
+Message-ID: <1460967754.7861.61.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Hans,
 
-On 2016-04-16 00:04, Javier Martinez Canillas wrote:
-> The exynos5 I2C controller driver always prepares and enables a clock
-> before using it and then disables unprepares it when the clock is not
-> used anymore.
->
-> But this can cause a possible ABBA deadlock in some scenarios since a
-> driver that uses regmap to access its I2C registers, will first grab
-> the regmap lock and then the I2C xfer function will grab the prepare
-> lock when preparing the I2C clock. But since the clock driver also
-> uses regmap for I2C accesses, preparing a clock will first grab the
-> prepare lock and then the regmap lock when using the regmap API.
->
-> An example of this happens on the Exynos5422 Odroid XU board where a
-> s2mps11 PMIC is used and both the s2mps11 regulators and clk drivers
-> share the same I2C regmap.
->
-> The possible deadlock is reported by the kernel lockdep:
->
->    Possible unsafe locking scenario:
->
->          CPU0                    CPU1
->          ----                    ----
->     lock(sec_core:428:(regmap)->lock);
->                                  lock(prepare_lock);
->                                  lock(sec_core:428:(regmap)->lock);
->     lock(prepare_lock);
->
->    *** DEADLOCK ***
->
-> Fix this by only preparing the clock on probe and {en,dis}able in the
-> rest of the driver.
->
-> This patch is similar to commit 34e81ad5f0b6 ("i2c: s3c2410: fix ABBA
-> deadlock by keeping clock prepared") that fixes the same bug in other
-> driver for an I2C controller found in Samsung SoCs.
+On Mon, 2016-04-18 at 09:32 +0200, Hans Verkuil wrote:
+> On 04/18/2016 07:40 AM, tiffany lin wrote:
+> > 
+> > snipped.
+> > 
+> >>> +
+> >>> +void mtk_vcodec_dec_set_default_params(struct mtk_vcodec_ctx *ctx)
+> >>> +{
+> >>> +	struct mtk_q_data *q_data;
+> >>> +
+> >>> +	ctx->m2m_ctx->q_lock = &ctx->dev->dev_mutex;
+> >>> +	ctx->fh.m2m_ctx = ctx->m2m_ctx;
+> >>> +	ctx->fh.ctrl_handler = &ctx->ctrl_hdl;
+> >>> +	INIT_WORK(&ctx->decode_work, mtk_vdec_worker);
+> >>> +
+> >>> +	q_data = &ctx->q_data[MTK_Q_DATA_SRC];
+> >>> +	memset(q_data, 0, sizeof(struct mtk_q_data));
+> >>> +	q_data->visible_width = DFT_CFG_WIDTH;
+> >>> +	q_data->visible_height = DFT_CFG_HEIGHT;
+> >>> +	q_data->fmt = &mtk_video_formats[OUT_FMT_IDX];
+> >>> +	q_data->colorspace = V4L2_COLORSPACE_REC709;
+> >>> +	q_data->field = V4L2_FIELD_NONE;
+> >>> +	ctx->q_data[MTK_Q_DATA_DST].sizeimage[0] =
+> >>> +		DFT_CFG_WIDTH * DFT_CFG_HEIGHT;
+> >>> +	ctx->q_data[MTK_Q_DATA_DST].bytesperline[0] = 0;
+> >>> +
+> >>> +
+> >>> +	q_data = &ctx->q_data[MTK_Q_DATA_DST];
+> >>> +	memset(q_data, 0, sizeof(struct mtk_q_data));
+> >>> +	q_data->visible_width = DFT_CFG_WIDTH;
+> >>> +	q_data->visible_height = DFT_CFG_HEIGHT;
+> >>> +	q_data->coded_width = DFT_CFG_WIDTH;
+> >>> +	q_data->coded_height = DFT_CFG_HEIGHT;
+> >>> +	q_data->colorspace = V4L2_COLORSPACE_REC709;
+> >>> +	q_data->field = V4L2_FIELD_NONE;
+> >>> +
+> >>> +	q_data->fmt = &mtk_video_formats[CAP_FMT_IDX];
+> >>> +
+> >>> +	v4l_bound_align_image(&q_data->coded_width,
+> >>> +					MTK_VDEC_MIN_W,
+> >>> +					MTK_VDEC_MAX_W, 4,
+> >>> +					&q_data->coded_height,
+> >>> +					MTK_VDEC_MIN_H,
+> >>> +					MTK_VDEC_MAX_H, 5, 6);
+> >>> +
+> >>> +	q_data->sizeimage[0] = q_data->coded_width * q_data->coded_height;
+> >>> +	q_data->bytesperline[0] = q_data->coded_width;
+> >>> +	q_data->sizeimage[1] = q_data->sizeimage[0] / 2;
+> >>> +	q_data->bytesperline[1] = q_data->coded_width;
+> >>> +
+> >>> +}
+> >>> +
+> >>> +static int vidioc_vdec_streamon(struct file *file, void *priv,
+> >>> +				enum v4l2_buf_type type)
+> >>> +{
+> >>> +	struct mtk_vcodec_ctx *ctx = fh_to_ctx(priv);
+> >>> +
+> >>> +	mtk_v4l2_debug(3, "[%d] (%d)", ctx->idx, type);
+> >>> +
+> >>> +	return v4l2_m2m_streamon(file, ctx->m2m_ctx, type);
+> >>> +}
+> >>> +
+> >>> +static int vidioc_vdec_streamoff(struct file *file, void *priv,
+> >>> +				 enum v4l2_buf_type type)
+> >>> +{
+> >>> +	struct mtk_vcodec_ctx *ctx = fh_to_ctx(priv);
+> >>> +
+> >>> +	mtk_v4l2_debug(3, "[%d] (%d)", ctx->idx, type);
+> >>> +	return v4l2_m2m_streamoff(file, ctx->m2m_ctx, type);
+> >>> +}
+> >>> +
+> >>> +static int vidioc_vdec_reqbufs(struct file *file, void *priv,
+> >>> +			       struct v4l2_requestbuffers *reqbufs)
+> >>> +{
+> >>> +	struct mtk_vcodec_ctx *ctx = fh_to_ctx(priv);
+> >>> +	int ret;
+> >>> +
+> >>> +	mtk_v4l2_debug(3, "[%d] (%d) count=%d", ctx->idx,
+> >>> +			 reqbufs->type, reqbufs->count);
+> >>> +	ret = v4l2_m2m_reqbufs(file, ctx->m2m_ctx, reqbufs);
+> >>> +
+> >>> +	return ret;
+> >>> +}
+> >>
+> >> Please use the v4l2_m2m_ioctl_* helper functions were applicable.
+> >>
+> > 
+> > 
+> > 
+> > snipped.
+> >>> +static unsigned int fops_vcodec_poll(struct file *file,
+> >>> +				     struct poll_table_struct *wait)
+> >>> +{
+> >>> +	struct mtk_vcodec_ctx *ctx = fh_to_ctx(file->private_data);
+> >>> +	struct mtk_vcodec_dev *dev = ctx->dev;
+> >>> +	int ret;
+> >>> +
+> >>> +	mutex_lock(&dev->dev_mutex);
+> >>> +	ret = v4l2_m2m_poll(file, ctx->m2m_ctx, wait);
+> >>> +	mutex_unlock(&dev->dev_mutex);
+> >>> +
+> >>> +	return ret;
+> >>> +}
+> >>> +
+> >>> +static int fops_vcodec_mmap(struct file *file, struct vm_area_struct *vma)
+> >>> +{
+> >>> +	struct mtk_vcodec_ctx *ctx = fh_to_ctx(file->private_data);
+> >>> +
+> >>> +	return v4l2_m2m_mmap(file, ctx->m2m_ctx, vma);
+> >>> +}
+> >>> +
+> >>> +static const struct v4l2_file_operations mtk_vcodec_fops = {
+> >>> +	.owner				= THIS_MODULE,
+> >>> +	.open				= fops_vcodec_open,
+> >>> +	.release			= fops_vcodec_release,
+> >>> +	.poll				= fops_vcodec_poll,
+> >>> +	.unlocked_ioctl			= video_ioctl2,
+> >>> +	.mmap				= fops_vcodec_mmap,
+> >>
+> >> You should be able to use the v4l2_m2m_fop helper functions for poll and mmap.
+> >>
+> > 
+> > Hi Hans,
+> > 
+> > We are plaining to remove m2m framework in th feature, although we think
+> 
+> Remove it for just the decoder driver or both encoder and decoder?
+> 
+Remove it from decoder driver.
 
-I'm sorry, but this is not the right approach imho. It is just a workaround
-applied to specific driver, it also duplicates incorrect clock usage
-pattern (there is really no point keeping clock prepared all the time).
+> > it is easy to use and could save a lot of code similar to what m2m
+> > framework implemented and reduce code size.
+> > The main reason is that in v4l2_m2m_try_schedule, it required that at
+> > least one output buffer and one capture buffer to run device_run.
+> > We want to start device_run without capture buffer queued.
+> 
+> I assume the reason is that you need to get the resolution etc. information
+> from the encoded stream? Without a capture buffer you can't actually decode
+> a frame, but that's probably not what this is about.
+Yes, it could start parsing without waiting CAPTURE ready and get
+CAPTURE buffer from vb2 when it really need it.
 
-IMHO this ABBA deadlock should be really fixed in clocks core (probably
-by removing global prepare mutex and replacing it with per clock
-controller mutexes). Without a proper patch this issue will hit us again
-with other i2c controllers or other drivers as well.
 
-> Reported-by: Anand Moon <linux.amoon@gmail.com>
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->
-> ---
->
->   drivers/i2c/busses/i2c-exynos5.c | 20 +++++++++++++++-----
->   1 file changed, 15 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/i2c/busses/i2c-exynos5.c b/drivers/i2c/busses/i2c-exynos5.c
-> index b29c7500461a..602633747149 100644
-> --- a/drivers/i2c/busses/i2c-exynos5.c
-> +++ b/drivers/i2c/busses/i2c-exynos5.c
-> @@ -671,7 +671,9 @@ static int exynos5_i2c_xfer(struct i2c_adapter *adap,
->   		return -EIO;
->   	}
->   
-> -	clk_prepare_enable(i2c->clk);
-> +	ret = clk_enable(i2c->clk);
-> +	if (ret)
-> +		return ret;
->   
->   	for (i = 0; i < num; i++, msgs++) {
->   		stop = (i == num - 1);
-> @@ -695,7 +697,7 @@ static int exynos5_i2c_xfer(struct i2c_adapter *adap,
->   	}
->   
->    out:
-> -	clk_disable_unprepare(i2c->clk);
-> +	clk_disable(i2c->clk);
->   	return ret;
->   }
->   
-> @@ -799,6 +801,10 @@ static int exynos5_i2c_probe(struct platform_device *pdev)
->   
->   	platform_set_drvdata(pdev, i2c);
->   
-> +	clk_disable(i2c->clk);
-> +
-> +	return 0;
-> +
->    err_clk:
->   	clk_disable_unprepare(i2c->clk);
->   	return ret;
-> @@ -810,6 +816,8 @@ static int exynos5_i2c_remove(struct platform_device *pdev)
->   
->   	i2c_del_adapter(&i2c->adap);
->   
-> +	clk_unprepare(i2c->clk);
-> +
->   	return 0;
->   }
->   
-> @@ -830,16 +838,18 @@ static int exynos5_i2c_resume_noirq(struct device *dev)
->   	struct exynos5_i2c *i2c = platform_get_drvdata(pdev);
->   	int ret = 0;
->   
-> -	clk_prepare_enable(i2c->clk);
-> +	ret = clk_enable(i2c->clk);
-> +	if (ret)
-> +		return ret;
->   
->   	ret = exynos5_hsi2c_clock_setup(i2c);
->   	if (ret) {
-> -		clk_disable_unprepare(i2c->clk);
-> +		clk_disable(i2c->clk);
->   		return ret;
->   	}
->   
->   	exynos5_i2c_init(i2c);
-> -	clk_disable_unprepare(i2c->clk);
-> +	clk_disable(i2c->clk);
->   	i2c->suspended = 0;
->   
->   	return 0;
+> > Is there any suggestion that we could use m2m framework but trigger
+> > device_run with only output buffer.
+> > Or we need to remove m2m and write our own implementation.
+> 
+> I am assuming that not using the m2m framework is for the decoder only and
+> that its purpose is to obtain data about the encoded stream early.
+> 
+yes. it's for decode only.
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+
+> This is something that was discussed with Pawel in the past. I don't have a
+> problem if you do it yourself (without the m2m framework), but it might also
+> be an idea to adapt the framework for this.
+> 
+> Pawel, do you have any thoughts on that?
+> 
+> Regards,
+> 
+> 	Hans
