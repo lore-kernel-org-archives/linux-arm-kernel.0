@@ -1,96 +1,61 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 18 Apr 2016 10:28:37 +0100
-Subject: [PATCH v4 6/6] arm64: compat: Check for AArch32 state
-In-Reply-To: <1460971717-24113-1-git-send-email-suzuki.poulose@arm.com>
-References: <1460971717-24113-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1460971717-24113-7-git-send-email-suzuki.poulose@arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 18 Apr 2016 11:49:24 +0200
+Subject: [PATCH] ARM: multi_v7_defconfig: add HLCDC drivers as modules
+In-Reply-To: <1459347577-15450-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1459347577-15450-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <5714ADA4.1020800@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make sure we have AArch32 state available for running COMPAT
-binaries and also for switching the personality to PER_LINUX32.
+Le 30/03/2016 16:19, Boris Brezillon a ?crit :
+> Add the HLCDC drivers to multi_v7_defconfig.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-[ Added cap bit, checks for HWCAP, personality ]
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-Tested-by: Yury Norov <ynorov@caviumnetworks.com>
----
- arch/arm64/include/asm/elf.h   |    3 ++-
- arch/arm64/kernel/cpufeature.c |    7 +++++--
- arch/arm64/kernel/sys.c        |   10 ++++++++++
- 3 files changed, 17 insertions(+), 3 deletions(-)
+If it gives more weight:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index 24ed037..7a09c48 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -177,7 +177,8 @@ typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_ELF_NGREG];
- 
- /* AArch32 EABI. */
- #define EF_ARM_EABI_MASK		0xff000000
--#define compat_elf_check_arch(x)	(((x)->e_machine == EM_ARM) && \
-+#define compat_elf_check_arch(x)	(system_supports_32bit_el0() && \
-+					 ((x)->e_machine == EM_ARM) && \
- 					 ((x)->e_flags & EF_ARM_EABI_MASK))
- 
- #define compat_start_thread		compat_start_thread
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 4cd8f23..8c46621 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -982,7 +982,8 @@ void verify_local_cpu_capabilities(void)
- 
- 	verify_local_cpu_features(arm64_features);
- 	verify_local_elf_hwcaps(arm64_elf_hwcaps);
--	verify_local_elf_hwcaps(compat_elf_hwcaps);
-+	if (system_supports_32bit_el0())
-+		verify_local_elf_hwcaps(compat_elf_hwcaps);
- }
- 
- static void __init setup_feature_capabilities(void)
-@@ -999,7 +1000,9 @@ void __init setup_cpu_features(void)
- 	/* Set the CPU feature capabilies */
- 	setup_feature_capabilities();
- 	setup_elf_hwcaps(arm64_elf_hwcaps);
--	setup_elf_hwcaps(compat_elf_hwcaps);
-+
-+	if (system_supports_32bit_el0())
-+		setup_elf_hwcaps(compat_elf_hwcaps);
- 
- 	/* Advertise that we have computed the system capabilities */
- 	set_sys_caps_initialised();
-diff --git a/arch/arm64/kernel/sys.c b/arch/arm64/kernel/sys.c
-index 75151aa..26fe8ea 100644
---- a/arch/arm64/kernel/sys.c
-+++ b/arch/arm64/kernel/sys.c
-@@ -25,6 +25,7 @@
- #include <linux/sched.h>
- #include <linux/slab.h>
- #include <linux/syscalls.h>
-+#include <asm/cpufeature.h>
- 
- asmlinkage long sys_mmap(unsigned long addr, unsigned long len,
- 			 unsigned long prot, unsigned long flags,
-@@ -36,11 +37,20 @@ asmlinkage long sys_mmap(unsigned long addr, unsigned long len,
- 	return sys_mmap_pgoff(addr, len, prot, flags, fd, off >> PAGE_SHIFT);
- }
- 
-+SYSCALL_DEFINE1(arm64_personality, unsigned int, personality)
-+{
-+	if (personality(personality) == PER_LINUX32 &&
-+		!system_supports_32bit_el0())
-+		return -EINVAL;
-+	return sys_personality(personality);
-+}
-+
- /*
-  * Wrappers to pass the pt_regs argument.
-  */
- asmlinkage long sys_rt_sigreturn_wrapper(void);
- #define sys_rt_sigreturn	sys_rt_sigreturn_wrapper
-+#define sys_personality		sys_arm64_personality
- 
- #undef __SYSCALL
- #define __SYSCALL(nr, sym)	[nr] = sym,
+BTW, arm-soc guys, I recall that you prefer patches for this kind of
+modification to multi_v7_defconfig... do I recall well or do you want us
+to build a pull-request together with other AT91 defconfig modifications?
+
+Bye,
+
+
+> ---
+>  arch/arm/configs/multi_v7_defconfig | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index 2823490..af1e0c9 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -441,6 +441,7 @@ CONFIG_DIGICOLOR_WATCHDOG=y
+>  CONFIG_MFD_AS3711=y
+>  CONFIG_MFD_AS3722=y
+>  CONFIG_MFD_ATMEL_FLEXCOM=y
+> +CONFIG_MFD_ATMEL_HLCDC=m
+>  CONFIG_MFD_BCM590XX=y
+>  CONFIG_MFD_AXP20X=y
+>  CONFIG_MFD_AXP20X_I2C=m
+> @@ -533,6 +534,7 @@ CONFIG_DRM_EXYNOS_FIMD=y
+>  CONFIG_DRM_EXYNOS_HDMI=y
+>  CONFIG_DRM_ROCKCHIP=m
+>  CONFIG_ROCKCHIP_DW_HDMI=m
+> +CONFIG_DRM_ATMEL_HLCDC=m
+>  CONFIG_DRM_RCAR_DU=m
+>  CONFIG_DRM_RCAR_HDMI=y
+>  CONFIG_DRM_RCAR_LVDS=y
+> @@ -775,6 +777,7 @@ CONFIG_AK8975=y
+>  CONFIG_RASPBERRYPI_POWER=y
+>  CONFIG_PWM=y
+>  CONFIG_PWM_ATMEL=m
+> +CONFIG_PWM_ATMEL_HLCDC_PWM=m
+>  CONFIG_PWM_ATMEL_TCB=m
+>  CONFIG_PWM_FSL_FTM=m
+>  CONFIG_PWM_RENESAS_TPU=y
+> 
+
+
 -- 
-1.7.9.5
+Nicolas Ferre
