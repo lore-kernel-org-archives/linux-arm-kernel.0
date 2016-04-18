@@ -1,29 +1,59 @@
-From: nicolas.dufresne@gmail.com (Nicolas Dufresne)
-Date: Mon, 18 Apr 2016 13:48:17 -0400
-Subject: [PATCH 3/7] [Media] vcodec: mediatek: Add Mediatek V4L2 Video
- Decoder Driver
-In-Reply-To: <1460967754.7861.61.camel@mtksdaap41>
-References: <1460548915-17536-1-git-send-email-tiffany.lin@mediatek.com>
- <1460548915-17536-2-git-send-email-tiffany.lin@mediatek.com>
- <1460548915-17536-3-git-send-email-tiffany.lin@mediatek.com>
- <1460548915-17536-4-git-send-email-tiffany.lin@mediatek.com>
- <5710FA3A.2030603@xs4all.nl> <1460958046.7861.48.camel@mtksdaap41>
- <57148D8E.9060601@xs4all.nl> <1460967754.7861.61.camel@mtksdaap41>
-Message-ID: <1461001697.2719.7.camel@gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 18 Apr 2016 18:57:26 +0100
+Subject: [RFC PATCH] arm64: Fix EL1/EL2 early init inconsistencies with VHE
+Message-ID: <1461002246-25314-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le lundi 18 avril 2016 ? 16:22 +0800, tiffany lin a ?crit?:
-> > > We are plaining to remove m2m framework in th feature, although
-> we think
-> >?
-> > Remove it for just the decoder driver or both encoder and decoder?
-> >?
-> Remove it from decoder driver.
+When using the Virtualisation Host Extensions, EL1 is not used in
+the host and requires no separate configuration.
 
-Did you look at how CODA handle it (drivers/media/platform/coda/coda-
-common.c) ? I don't know any detail, but they do have the same issue
-and use both?v4l2_m2m_fop_poll and?v4l2_m2m_fop_mmap.
+In addition, with VHE enabled, non-hyp-specific EL2 configuration
+that does not need to be done early will be done anyway in
+__cpu_setup via the _EL1 system register aliases.  In particular,
+the layout and definition of CPTR_EL2 are changed by enabling VHE
+so that they resemble CPACR_EL1, so existing code to initialise
+CPTR_EL2 becomes architecturally wrong in this case.
 
-cheers,
-Nicolas
+This patch simply skips the affected initialisation code in the
+non-VHE case.
+
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+---
+
+Note -- not tested yet, and I'm still unclear on whether this is the
+correct architectural approach...
+
+ arch/arm64/kernel/head.S | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 4203d5f..67132c1 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -588,6 +588,15 @@ set_hcr:
+ 	msr	vpidr_el2, x0
+ 	msr	vmpidr_el2, x1
+ 
++	/*
++	 * When VHE is not in use, early init of EL2 and EL1 needs to be
++	 * done here.
++	 * When VHE _is_ in use, EL1 will not be used in the host and
++	 * requires no configuration, and all non-hyp-specific EL2 setup
++	 * will be done via the _EL1 system register aliases in __cpu_setup.
++	 */
++	cbnz	x2, 1f
++
+ 	/* sctlr_el1 */
+ 	mov	x0, #0x0800			// Set/clear RES{1,0} bits
+ CPU_BE(	movk	x0, #0x33d0, lsl #16	)	// Set EE and E0E on BE systems
+@@ -597,6 +606,7 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
+ 	/* Coprocessor traps. */
+ 	mov	x0, #0x33ff
+ 	msr	cptr_el2, x0			// Disable copro. traps to EL2
++1:
+ 
+ #ifdef CONFIG_COMPAT
+ 	msr	hstr_el2, xzr			// Disable CP15 traps to EL2
+-- 
+2.1.4
