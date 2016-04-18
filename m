@@ -1,51 +1,62 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Mon, 18 Apr 2016 13:06:07 +0300
-Subject: [PATCH 2/2] ARM: dts: omap5-cm-t54: fix ldo1_reg and ldo4_reg ranges
-In-Reply-To: <1460973967-25077-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1460973967-25077-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1460973967-25077-2-git-send-email-tomi.valkeinen@ti.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Mon, 18 Apr 2016 12:07:27 +0200
+Subject: [PATCH RESEND] gpmi-nand: Handle ECC Errors in erased pages
+In-Reply-To: <20160415174031.3c088df5@bbrezillon>
+References: <1456059126-25469-1-git-send-email-mpa@pengutronix.de>
+ <AM4PR0401MB1841C82A9BCBFF2C55AA4DC397680@AM4PR0401MB1841.eurprd04.prod.outlook.com>
+ <20160415174031.3c088df5@bbrezillon>
+Message-ID: <12179071.kte6qB1Shv@adelgunde>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ldo4_reg is connected to DSS, and should always be 1.8V. However the The
-dts defines a range of 1.5V-1.8V, which requires somethings to set the
-actual voltage at runtime. Currently we set the voltage in omapdss
-driver.
+On Friday 15 April 2016 17:40:31 Boris Brezillon wrote:
+> On Fri, 15 Apr 2016 15:33:07 +0000
+> Han Xu <han.xu@nxp.com> wrote:
+> 
+> > >
+> > > I just did [1] (it applies on top of your patch), but maybe you
+> > > can test it (I don't have any imx platforms right now) ;).
+> > 
+> > Great, thank you :). I just tested the patch and it works for me. The
+> > erased page bitflips are still detected and fixed. I will send a new
+> > version then.
+> > 
+> > Hi Markus,
+> > 
+> > Could you please share how to verify the patch, in other words, how to reproduce the
+> > UBIFS corruption issue consistently. Thanks.
 
-As the voltage must always be 1.8V, let's just define the range to 1.8V
-so that the driver doesn't need to deal with the voltage. In fact, the
-driver should not touch the voltage, except in the cases where the
-voltage needs to be changed at runtime.
+I used a simple bashscript with 'nandwrite --noecc' that writes a number
+of zeroes in every sub-page. For written pages the ECC will handle the
+flips. For erased pages we can test the algorithm that handles the
+erased page bitflips.
 
-I presume the situation is the same for ldo1_reg, used for CSI, although
-I think it is not currently used in the mainline.
+> 
+> I should really post a new version of the nandflipbits tool [1].
+> That's clearly the easiest solution to verify that your bitflip
+> correction is reliable.
 
-Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
----
- arch/arm/boot/dts/omap5-cm-t54.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Seems really useful.
 
-diff --git a/arch/arm/boot/dts/omap5-cm-t54.dts b/arch/arm/boot/dts/omap5-cm-t54.dts
-index ecc591dc0778..4d87d9c6c86d 100644
---- a/arch/arm/boot/dts/omap5-cm-t54.dts
-+++ b/arch/arm/boot/dts/omap5-cm-t54.dts
-@@ -513,7 +513,7 @@
- 				ldo1_reg: ldo1 {
- 					/* VDDAPHY_CAM: vdda_csiport */
- 					regulator-name = "ldo1";
--					regulator-min-microvolt = <1500000>;
-+					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
- 				};
- 
-@@ -537,7 +537,7 @@
- 				ldo4_reg: ldo4 {
- 					/* VDDAPHY_DISP: vdda_dsiport/hdmi */
- 					regulator-name = "ldo4";
--					regulator-min-microvolt = <1500000>;
-+					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
- 				};
- 
+Best Regards,
+
+Markus
+
+> 
+> 
+> [1]http://lists.infradead.org/pipermail/linux-mtd/2014-November/056634.html
+> 
+> 
+
 -- 
-2.5.0
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160418/b0f1222c/attachment-0001.sig>
