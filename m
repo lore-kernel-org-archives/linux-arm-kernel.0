@@ -1,35 +1,33 @@
-From: brad.mouring@ni.com (Brad Mouring)
-Date: Mon, 18 Apr 2016 16:36:51 -0500
-Subject: [PATCH v2 2/2] Documentation: devicetree: Add PL310 PM bindings
-In-Reply-To: <1461015411-14000-1-git-send-email-brad.mouring@ni.com>
-References: <1456265019-23900-1-git-send-email-brad.mouring@ni.com>
- <1461015411-14000-1-git-send-email-brad.mouring@ni.com>
-Message-ID: <1461015411-14000-3-git-send-email-brad.mouring@ni.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 18 Apr 2016 23:52:42 +0200
+Subject: [PATCH 0/3] arm: dts: lpc32xx: update ssp / spi nodes
+In-Reply-To: <1461014548.27294.10.camel@localhost>
+References: <1460636437-21764-1-git-send-email-slemieux.tyco@gmail.com>
+ <5714664C.7080201@mleia.com> <1461014548.27294.10.camel@localhost>
+Message-ID: <489344042.f8O28rOoB7@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the DT bindings for controlling ARM PL310 Power Control
-settings.
+On Monday 18 April 2016 17:22:28 Sylvain Lemieux wrote:
+> On Mon, 2016-04-18 at 07:45 +0300, Vladimir Zapolskiy wrote:
+> > > Once we have an agreement on who does this, please send a patch to
+> > > update the MAINTAINERS file.
+> > 
+> > I'll send a change on behalf of myself, at this point I don't think that
+> > pure lpc32xx maintenance (deliberately here I exclude development!) task
+> > takes more than 20 hours per month, which is affordable for me,
+> > Sylvain please express your view.
+> > 
+> I can provide support for pure lpc32xx maintenance task 
+> (I also exclude development); I can free up to 10-15 hours a
+> month for doing testing and patch review.
 
-Signed-off-by: Brad Mouring <brad.mouring@ni.com>
----
- Documentation/devicetree/bindings/arm/l2c2x0.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+Thanks both of you!
 
-diff --git a/Documentation/devicetree/bindings/arm/l2c2x0.txt b/Documentation/devicetree/bindings/arm/l2c2x0.txt
-index fe0398c..c1c756e 100644
---- a/Documentation/devicetree/bindings/arm/l2c2x0.txt
-+++ b/Documentation/devicetree/bindings/arm/l2c2x0.txt
-@@ -84,6 +84,10 @@ Optional properties:
- - prefetch-instr : Instruction prefetch. Value: <0> (forcibly disable),
-   <1> (forcibly enable), property absent (retain settings set by
-   firmware)
-+- arm,dynamic-clock-gating : L2 dynamic clock gating. Value: <0> (forcibly
-+  disable), <1> or property absent (forcibly enable)
-+- arm,standby-mode: L2 standby mode enable. Value <0> (forcibly disable),
-+  <1>  or property absent (forcibly enable)
- 
- Example:
- 
--- 
-2.7.3
+> Is there any documentation available on the process 
+> to submit a merge request to the mailing list?
+
+We usually teach people on the fly, but you can watch my ELC
+presentation from last year at https://www.youtube.com/watch?v=msT1O8P6KXQ
+
+	Arnd
