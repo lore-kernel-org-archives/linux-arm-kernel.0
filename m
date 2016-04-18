@@ -1,456 +1,183 @@
-From: srinivas.pandruvada@linux.intel.com (Srinivas Pandruvada)
-Date: Mon, 18 Apr 2016 08:03:31 -0700
-Subject: [PATCH v2 5/5] iio: gyro: bmg160: use regmap to retrieve struct
- device
-In-Reply-To: <57129157.3080603@kernel.org>
-References: <cover.1460314070.git.amsfield22@gmail.com>
- <63dd9227f9a7e56f7e03f8963e798e6d7d8bb70f.1460314070.git.amsfield22@gmail.com>
- <57129157.3080603@kernel.org>
-Message-ID: <1460991811.8946.11.camel@linux.intel.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 18 Apr 2016 17:05:18 +0200
+Subject: [PATCH v5 39/50] mtd: nand: omap2: switch to mtd_ooblayout_ops
+In-Reply-To: <5714F011.5080409@ti.com>
+References: <1459354505-32551-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1459354505-32551-40-git-send-email-boris.brezillon@free-electrons.com>
+ <5714F011.5080409@ti.com>
+Message-ID: <20160418170518.363f732d@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2016-04-16 at 20:24 +0100, Jonathan Cameron wrote:
-> On 10/04/16 20:08, Alison Schofield wrote:
-> > 
-> > Driver includes struct regmap and struct device in its global data.
-> > Remove the struct device and use regmap API to retrieve device
-> > info.
-> > 
-> > Patch created using Coccinelle plus manual edits.
-> > 
-> > Signed-off-by: Alison Schofield <amsfield22@gmail.com>
-Reviewed-by: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+On Mon, 18 Apr 2016 17:32:49 +0300
+Roger Quadros <rogerq@ti.com> wrote:
 
-> Cc'd Srinivas
+> Boris,
 > 
-> Actually I'm curious as to why linux-arm-kernel and linux-samsung-soc 
-> are cc'd?
-> Not terribly relevant lists...
+> On 30/03/16 19:14, Boris Brezillon wrote:
+> > Implementing the mtd_ooblayout_ops interface is the new way of exposing
+> > ECC/OOB layout to MTD users.
 > > 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 > > ---
-> > ?drivers/iio/gyro/bmg160_core.c | 86 +++++++++++++++++++++---------
-> > ------------
-> > ?1 file changed, 44 insertions(+), 42 deletions(-)
+> >  drivers/mtd/nand/omap2.c | 194 +++++++++++++++++++++++++++--------------------
+> >  1 file changed, 113 insertions(+), 81 deletions(-)
 > > 
-> > diff --git a/drivers/iio/gyro/bmg160_core.c
-> > b/drivers/iio/gyro/bmg160_core.c
-> > index 2493bb1..b2b1071 100644
-> > --- a/drivers/iio/gyro/bmg160_core.c
-> > +++ b/drivers/iio/gyro/bmg160_core.c
-> > @@ -95,7 +95,6 @@
-> > ?#define BMG160_AUTO_SUSPEND_DELAY_MS	2000
-> > ?
-> > ?struct bmg160_data {
-> > -	struct device *dev;
-> > ?	struct regmap *regmap;
-> > ?	struct iio_trigger *dready_trig;
-> > ?	struct iio_trigger *motion_trig;
-> > @@ -137,11 +136,12 @@ static const struct {
-> > ?
-> > ?static int bmg160_set_mode(struct bmg160_data *data, u8 mode)
-> > ?{
-> > +	struct device *dev = regmap_get_device(data->regmap);
-> > ?	int ret;
-> > ?
-> > ?	ret = regmap_write(data->regmap, BMG160_REG_PMU_LPW,
-> > mode);
-> > ?	if (ret < 0) {
-> > -		dev_err(data->dev, "Error writing reg_pmu_lpw\n");
-> > +		dev_err(dev, "Error writing reg_pmu_lpw\n");
-> > ?		return ret;
-> > ?	}
-> > ?
-> > @@ -162,6 +162,7 @@ static int bmg160_convert_freq_to_bit(int val)
-> > ?
-> > ?static int bmg160_set_bw(struct bmg160_data *data, int val)
-> > ?{
-> > +	struct device *dev = regmap_get_device(data->regmap);
-> > ?	int ret;
-> > ?	int bw_bits;
-> > ?
-> > @@ -171,7 +172,7 @@ static int bmg160_set_bw(struct bmg160_data
-> > *data, int val)
-> > ?
-> > ?	ret = regmap_write(data->regmap, BMG160_REG_PMU_BW,
-> > bw_bits);
-> > ?	if (ret < 0) {
-> > -		dev_err(data->dev, "Error writing reg_pmu_bw\n");
-> > +		dev_err(dev, "Error writing reg_pmu_bw\n");
-> > ?		return ret;
-> > ?	}
-> > ?
-> > @@ -182,18 +183,19 @@ static int bmg160_set_bw(struct bmg160_data
-> > *data, int val)
-> > ?
-> > ?static int bmg160_chip_init(struct bmg160_data *data)
-> > ?{
-> > +	struct device *dev = regmap_get_device(data->regmap);
-> > ?	int ret;
-> > ?	unsigned int val;
-> > ?
-> > ?	ret = regmap_read(data->regmap, BMG160_REG_CHIP_ID, &val);
-> > ?	if (ret < 0) {
-> > -		dev_err(data->dev, "Error reading reg_chip_id\n");
-> > +		dev_err(dev, "Error reading reg_chip_id\n");
-> > ?		return ret;
-> > ?	}
-> > ?
-> > -	dev_dbg(data->dev, "Chip Id %x\n", val);
-> > +	dev_dbg(dev, "Chip Id %x\n", val);
-> > ?	if (val != BMG160_CHIP_ID_VAL) {
-> > -		dev_err(data->dev, "invalid chip %x\n", val);
-> > +		dev_err(dev, "invalid chip %x\n", val);
-> > ?		return -ENODEV;
-> > ?	}
-> > ?
-> > @@ -212,14 +214,14 @@ static int bmg160_chip_init(struct
-> > bmg160_data *data)
-> > ?	/* Set Default Range */
-> > ?	ret = regmap_write(data->regmap, BMG160_REG_RANGE,
-> > BMG160_RANGE_500DPS);
-> > ?	if (ret < 0) {
-> > -		dev_err(data->dev, "Error writing reg_range\n");
-> > +		dev_err(dev, "Error writing reg_range\n");
-> > ?		return ret;
-> > ?	}
-> > ?	data->dps_range = BMG160_RANGE_500DPS;
-> > ?
-> > ?	ret = regmap_read(data->regmap, BMG160_REG_SLOPE_THRES,
-> > &val);
-> > ?	if (ret < 0) {
-> > -		dev_err(data->dev, "Error reading
-> > reg_slope_thres\n");
-> > +		dev_err(dev, "Error reading reg_slope_thres\n");
-> > ?		return ret;
-> > ?	}
-> > ?	data->slope_thres = val;
-> > @@ -228,7 +230,7 @@ static int bmg160_chip_init(struct bmg160_data
-> > *data)
-> > ?	ret = regmap_update_bits(data->regmap,
-> > BMG160_REG_INT_EN_1,
-> > ?				?BMG160_INT1_BIT_OD, 0);
-> > ?	if (ret < 0) {
-> > -		dev_err(data->dev, "Error updating bits in
-> > reg_int_en_1\n");
-> > +		dev_err(dev, "Error updating bits in
-> > reg_int_en_1\n");
-> > ?		return ret;
-> > ?	}
-> > ?
-> > @@ -236,7 +238,7 @@ static int bmg160_chip_init(struct bmg160_data
-> > *data)
-> > ?			???BMG160_INT_MODE_LATCH_INT |
-> > ?			???BMG160_INT_MODE_LATCH_RESET);
-> > ?	if (ret < 0) {
-> > -		dev_err(data->dev,
-> > +		dev_err(dev,
-> > ?			"Error writing reg_motion_intr\n");
-> > ?		return ret;
-> > ?	}
-> > @@ -247,20 +249,21 @@ static int bmg160_chip_init(struct
-> > bmg160_data *data)
-> > ?static int bmg160_set_power_state(struct bmg160_data *data, bool
-> > on)
-> > ?{
-> > ?#ifdef CONFIG_PM
-> > +	struct device *dev = regmap_get_device(data->regmap);
-> > ?	int ret;
-> > ?
-> > ?	if (on)
-> > -		ret = pm_runtime_get_sync(data->dev);
-> > +		ret = pm_runtime_get_sync(dev);
-> > ?	else {
-> > -		pm_runtime_mark_last_busy(data->dev);
-> > -		ret = pm_runtime_put_autosuspend(data->dev);
-> > +		pm_runtime_mark_last_busy(dev);
-> > +		ret = pm_runtime_put_autosuspend(dev);
-> > ?	}
-> > ?
-> > ?	if (ret < 0) {
-> > -		dev_err(data->dev,
-> > -			"Failed: bmg160_set_power_state for %d\n",
-> > on);
-> > +		dev_err(dev, "Failed: bmg160_set_power_state for
-> > %d\n", on);
-> > +
-> > ?		if (on)
-> > -			pm_runtime_put_noidle(data->dev);
-> > +			pm_runtime_put_noidle(dev);
-> > ?
-> > ?		return ret;
-> > ?	}
-> > @@ -272,6 +275,7 @@ static int bmg160_set_power_state(struct
-> > bmg160_data *data, bool on)
-> > ?static int bmg160_setup_any_motion_interrupt(struct bmg160_data
-> > *data,
-> > ?					?????bool status)
-> > ?{
-> > +	struct device *dev = regmap_get_device(data->regmap);
-> > ?	int ret;
-> > ?
-> > ?	/* Enable/Disable INT_MAP0 mapping */
-> > @@ -279,7 +283,7 @@ static int
-> > bmg160_setup_any_motion_interrupt(struct bmg160_data *data,
-> > ?				?BMG160_INT_MAP_0_BIT_ANY,
-> > ?				?(status ?
-> > BMG160_INT_MAP_0_BIT_ANY : 0));
-> > ?	if (ret < 0) {
-> > -		dev_err(data->dev, "Error updating bits
-> > reg_int_map0\n");
-> > +		dev_err(dev, "Error updating bits
-> > reg_int_map0\n");
-> > ?		return ret;
-> > ?	}
-> > ?
-> > @@ -289,8 +293,7 @@ static int
-> > bmg160_setup_any_motion_interrupt(struct bmg160_data *data,
-> > ?		ret = regmap_write(data->regmap,
-> > BMG160_REG_SLOPE_THRES,
-> > ?				???data->slope_thres);
-> > ?		if (ret < 0) {
-> > -			dev_err(data->dev,
-> > -				"Error writing
-> > reg_slope_thres\n");
-> > +			dev_err(dev, "Error writing
-> > reg_slope_thres\n");
-> > ?			return ret;
-> > ?		}
-> > ?
-> > @@ -298,8 +301,7 @@ static int
-> > bmg160_setup_any_motion_interrupt(struct bmg160_data *data,
-> > ?				???BMG160_INT_MOTION_X |
-> > BMG160_INT_MOTION_Y |
-> > ?				???BMG160_INT_MOTION_Z);
-> > ?		if (ret < 0) {
-> > -			dev_err(data->dev,
-> > -				"Error writing
-> > reg_motion_intr\n");
-> > +			dev_err(dev, "Error writing
-> > reg_motion_intr\n");
-> > ?			return ret;
-> > ?		}
-> > ?
-> > @@ -314,8 +316,7 @@ static int
-> > bmg160_setup_any_motion_interrupt(struct bmg160_data *data,
-> > ?					???BMG160_INT_MODE_LATCH_I
-> > NT |
-> > ?					???BMG160_INT_MODE_LATCH_R
-> > ESET);
-> > ?			if (ret < 0) {
-> > -				dev_err(data->dev,
-> > -					"Error writing
-> > reg_rst_latch\n");
-> > +				dev_err(dev, "Error writing
-> > reg_rst_latch\n");
-> > ?				return ret;
-> > ?			}
-> > ?		}
-> > @@ -328,7 +329,7 @@ static int
-> > bmg160_setup_any_motion_interrupt(struct bmg160_data *data,
-> > ?	}
-> > ?
-> > ?	if (ret < 0) {
-> > -		dev_err(data->dev, "Error writing reg_int_en0\n");
-> > +		dev_err(dev, "Error writing reg_int_en0\n");
-> > ?		return ret;
-> > ?	}
-> > ?
-> > @@ -338,6 +339,7 @@ static int
-> > bmg160_setup_any_motion_interrupt(struct bmg160_data *data,
-> > ?static int bmg160_setup_new_data_interrupt(struct bmg160_data
-> > *data,
-> > ?					???bool status)
-> > ?{
-> > +	struct device *dev = regmap_get_device(data->regmap);
-> > ?	int ret;
-> > ?
-> > ?	/* Enable/Disable INT_MAP1 mapping */
-> > @@ -345,7 +347,7 @@ static int
-> > bmg160_setup_new_data_interrupt(struct bmg160_data *data,
-> > ?				?BMG160_INT_MAP_1_BIT_NEW_DATA,
-> > ?				?(status ?
-> > BMG160_INT_MAP_1_BIT_NEW_DATA : 0));
-> > ?	if (ret < 0) {
-> > -		dev_err(data->dev, "Error updating bits in
-> > reg_int_map1\n");
-> > +		dev_err(dev, "Error updating bits in
-> > reg_int_map1\n");
-> > ?		return ret;
-> > ?	}
-> > ?
-> > @@ -354,9 +356,8 @@ static int
-> > bmg160_setup_new_data_interrupt(struct bmg160_data *data,
-> > ?				???BMG160_INT_MODE_NON_LATCH_INT |
-> > ?				???BMG160_INT_MODE_LATCH_RESET);
-> > ?		if (ret < 0) {
-> > -			dev_err(data->dev,
-> > -				"Error writing reg_rst_latch\n");
-> > -				return ret;
-> > +			dev_err(dev, "Error writing
-> > reg_rst_latch\n");
-> > +			return ret;
-> > ?		}
-> > ?
-> > ?		ret = regmap_write(data->regmap,
-> > BMG160_REG_INT_EN_0,
-> > @@ -368,16 +369,15 @@ static int
-> > bmg160_setup_new_data_interrupt(struct bmg160_data *data,
-> > ?				???BMG160_INT_MODE_LATCH_INT |
-> > ?				???BMG160_INT_MODE_LATCH_RESET);
-> > ?		if (ret < 0) {
-> > -			dev_err(data->dev,
-> > -				"Error writing reg_rst_latch\n");
-> > -				return ret;
-> > +			dev_err(dev, "Error writing
-> > reg_rst_latch\n");
-> > +			return ret;
-> > ?		}
-> > ?
-> > ?		ret = regmap_write(data->regmap,
-> > BMG160_REG_INT_EN_0, 0);
-> > ?	}
-> > ?
-> > ?	if (ret < 0) {
-> > -		dev_err(data->dev, "Error writing reg_int_en0\n");
-> > +		dev_err(dev, "Error writing reg_int_en0\n");
-> > ?		return ret;
-> > ?	}
-> > ?
-> > @@ -400,6 +400,7 @@ static int bmg160_get_bw(struct bmg160_data
-> > *data, int *val)
-> > ?
-> > ?static int bmg160_set_scale(struct bmg160_data *data, int val)
-> > ?{
-> > +	struct device *dev = regmap_get_device(data->regmap);
-> > ?	int ret, i;
-> > ?
-> > ?	for (i = 0; i < ARRAY_SIZE(bmg160_scale_table); ++i) {
-> > @@ -407,8 +408,7 @@ static int bmg160_set_scale(struct bmg160_data
-> > *data, int val)
-> > ?			ret = regmap_write(data->regmap,
-> > BMG160_REG_RANGE,
-> > ?					???bmg160_scale_table[i].d
-> > ps_range);
-> > ?			if (ret < 0) {
-> > -				dev_err(data->dev,
-> > -					"Error writing
-> > reg_range\n");
-> > +				dev_err(dev, "Error writing
-> > reg_range\n");
-> > ?				return ret;
-> > ?			}
-> > ?			data->dps_range =
-> > bmg160_scale_table[i].dps_range;
-> > @@ -421,6 +421,7 @@ static int bmg160_set_scale(struct bmg160_data
-> > *data, int val)
-> > ?
-> > ?static int bmg160_get_temp(struct bmg160_data *data, int *val)
-> > ?{
-> > +	struct device *dev = regmap_get_device(data->regmap);
-> > ?	int ret;
-> > ?	unsigned int raw_val;
-> > ?
-> > @@ -433,7 +434,7 @@ static int bmg160_get_temp(struct bmg160_data
-> > *data, int *val)
-> > ?
-> > ?	ret = regmap_read(data->regmap, BMG160_REG_TEMP,
-> > &raw_val);
-> > ?	if (ret < 0) {
-> > -		dev_err(data->dev, "Error reading reg_temp\n");
-> > +		dev_err(dev, "Error reading reg_temp\n");
-> > ?		bmg160_set_power_state(data, false);
-> > ?		mutex_unlock(&data->mutex);
-> > ?		return ret;
-> > @@ -450,6 +451,7 @@ static int bmg160_get_temp(struct bmg160_data
-> > *data, int *val)
-> > ?
-> > ?static int bmg160_get_axis(struct bmg160_data *data, int axis, int
-> > *val)
-> > ?{
-> > +	struct device *dev = regmap_get_device(data->regmap);
-> > ?	int ret;
-> > ?	unsigned int raw_val;
-> > ?
-> > @@ -463,7 +465,7 @@ static int bmg160_get_axis(struct bmg160_data
-> > *data, int axis, int *val)
-> > ?	ret = regmap_bulk_read(data->regmap,
-> > BMG160_AXIS_TO_REG(axis), &raw_val,
-> > ?			???????2);
-> > ?	if (ret < 0) {
-> > -		dev_err(data->dev, "Error reading axis %d\n",
-> > axis);
-> > +		dev_err(dev, "Error reading axis %d\n", axis);
-> > ?		bmg160_set_power_state(data, false);
-> > ?		mutex_unlock(&data->mutex);
-> > ?		return ret;
-> > @@ -793,6 +795,7 @@ static int bmg160_trig_try_reen(struct
-> > iio_trigger *trig)
-> > ?{
-> > ?	struct iio_dev *indio_dev = iio_trigger_get_drvdata(trig);
-> > ?	struct bmg160_data *data = iio_priv(indio_dev);
-> > +	struct device *dev = regmap_get_device(data->regmap);
-> > ?	int ret;
-> > ?
-> > ?	/* new data interrupts don't need ack */
-> > @@ -804,7 +807,7 @@ static int bmg160_trig_try_reen(struct
-> > iio_trigger *trig)
-> > ?			???BMG160_INT_MODE_LATCH_INT |
-> > ?			???BMG160_INT_MODE_LATCH_RESET);
-> > ?	if (ret < 0) {
-> > -		dev_err(data->dev, "Error writing
-> > reg_rst_latch\n");
-> > +		dev_err(dev, "Error writing reg_rst_latch\n");
-> > ?		return ret;
-> > ?	}
-> > ?
-> > @@ -864,13 +867,14 @@ static irqreturn_t bmg160_event_handler(int
-> > irq, void *private)
-> > ?{
-> > ?	struct iio_dev *indio_dev = private;
-> > ?	struct bmg160_data *data = iio_priv(indio_dev);
-> > +	struct device *dev = regmap_get_device(data->regmap);
-> > ?	int ret;
-> > ?	int dir;
-> > ?	unsigned int val;
-> > ?
-> > ?	ret = regmap_read(data->regmap, BMG160_REG_INT_STATUS_2,
-> > &val);
-> > ?	if (ret < 0) {
-> > -		dev_err(data->dev, "Error reading
-> > reg_int_status2\n");
-> > +		dev_err(dev, "Error reading reg_int_status2\n");
-> > ?		goto ack_intr_status;
-> > ?	}
-> > ?
-> > @@ -907,8 +911,7 @@ ack_intr_status:
-> > ?				???BMG160_INT_MODE_LATCH_INT |
-> > ?				???BMG160_INT_MODE_LATCH_RESET);
-> > ?		if (ret < 0)
-> > -			dev_err(data->dev,
-> > -				"Error writing reg_rst_latch\n");
-> > +			dev_err(dev, "Error writing
-> > reg_rst_latch\n");
-> > ?	}
-> > ?
-> > ?	return IRQ_HANDLED;
-> > @@ -976,7 +979,6 @@ int bmg160_core_probe(struct device *dev,
-> > struct regmap *regmap, int irq,
-> > ?
-> > ?	data = iio_priv(indio_dev);
-> > ?	dev_set_drvdata(dev, indio_dev);
-> > -	data->dev = dev;
-> > ?	data->irq = irq;
-> > ?	data->regmap = regmap;
-> > ?
-> > @@ -1139,7 +1141,7 @@ static int bmg160_runtime_suspend(struct
-> > device *dev)
-> > ?
-> > ?	ret = bmg160_set_mode(data, BMG160_MODE_SUSPEND);
-> > ?	if (ret < 0) {
-> > -		dev_err(data->dev, "set mode failed\n");
-> > +		dev_err(dev, "set mode failed\n");
-> > ?		return -EAGAIN;
-> > ?	}
-> > ?
+> > diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
+> > index 4ebf16b..bca154a 100644
+> > --- a/drivers/mtd/nand/omap2.c
+> > +++ b/drivers/mtd/nand/omap2.c
+> > @@ -169,8 +169,6 @@ struct omap_nand_info {
+> >  	u_char				*buf;
+> >  	int					buf_len;
+> >  	struct gpmc_nand_regs		reg;
+> > -	/* generated at runtime depending on ECC algorithm and layout selected */
+> > -	struct nand_ecclayout		oobinfo;
+> >  	/* fields specific for BCHx_HW ECC scheme */
+> >  	struct device			*elm_dev;
+> >  	struct device_node		*of_node;
+> > @@ -1639,19 +1637,108 @@ static bool omap2_nand_ecc_check(struct omap_nand_info *info,
+> >  	return true;
+> >  }
+> >  
+> > +static int omap_ooblayout_ecc(struct mtd_info *mtd, int section,
+> > +			      struct mtd_oob_region *oobregion)
+> > +{
+> > +	struct nand_chip *chip = mtd_to_nand(mtd);
+> > +	int off = chip->options & NAND_BUSWIDTH_16 ?
+> > +		  BADBLOCK_MARKER_LENGTH : 1;
+> 
+> IMO "off = 1" is valid only for OMAP_ECC_HAM1_CODE_HW and 8-bit NAND.
+> For all other layouts it is always set to BADBLOCK_MARKER_LENGTH.
+
+Indeed.
+
+[...]
+
+> > -	/* all OOB bytes from oobfree->offset till end off OOB are free */
+> > -	ecclayout->oobfree->length = mtd->oobsize - ecclayout->oobfree->offset;
+> >  	/* check if NAND device's OOB is enough to store ECC signatures */
+> > -	if (mtd->oobsize < (ecclayout->eccbytes + BADBLOCK_MARKER_LENGTH)) {
+> > +	min_oobbytes = (oobbytes_per_step *
+> > +			(mtd->writesize / nand_chip->ecc.size)) +
+> > +		       (nand_chip->options & NAND_BUSWIDTH_16 ?
+> > +			BADBLOCK_MARKER_LENGTH : 1);
+> 
+> would it affect this as well?
+
+And here as well.
+
+I've generated a patch (see below) fixing those problems.
+
+> 
+> > +	if (mtd->oobsize < min_oobbytes) {
+> >  		dev_err(&info->pdev->dev,
+> >  			"not enough OOB bytes required = %d, available=%d\n",
+> > -			ecclayout->eccbytes, mtd->oobsize);
+> > +			min_oobbytes, mtd->oobsize);
+> >  		err = -EINVAL;
+> >  		goto return_error;
+> >  	}
 > > 
+> 
+> I will need to test this change with all possible configurations.
+> The number of configurations on OMAP is a bit overwhelming :(.
+
+Sorry about that, but at least now I have someone who can test it :).
+
+Thanks,
+
+Boris
+
+--->8---
+
+diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
+index 9b96f56..07d4039 100644
+--- a/drivers/mtd/nand/omap2.c
++++ b/drivers/mtd/nand/omap2.c
+@@ -1640,9 +1640,13 @@ static bool omap2_nand_ecc_check(struct omap_nand_info *info,
+ static int omap_ooblayout_ecc(struct mtd_info *mtd, int section,
+ 			      struct mtd_oob_region *oobregion)
+ {
+-	struct nand_chip *chip = mtd_to_nand(mtd);
+-	int off = chip->options & NAND_BUSWIDTH_16 ?
+-		  BADBLOCK_MARKER_LENGTH : 1;
++	struct omap_nand_info *info = mtd_to_omap(mtd);
++	struct nand_chip *chip = &info->nand;
++	int off = BADBLOCK_MARKER_LENGTH;
++
++	if (info->ecc_opt == OMAP_ECC_HAM1_CODE_HW &&
++	    !(chip->options & NAND_BUSWIDTH_16))
++		off = 1;
+ 
+ 	if (section)
+ 		return -ERANGE;
+@@ -1656,9 +1660,13 @@ static int omap_ooblayout_ecc(struct mtd_info *mtd, int section,
+ static int omap_ooblayout_free(struct mtd_info *mtd, int section,
+ 			       struct mtd_oob_region *oobregion)
+ {
+-	struct nand_chip *chip = mtd_to_nand(mtd);
+-	int off = chip->options & NAND_BUSWIDTH_16 ?
+-		  BADBLOCK_MARKER_LENGTH : 1;
++	struct omap_nand_info *info = mtd_to_omap(mtd);
++	struct nand_chip *chip = &info->nand;
++	int off = BADBLOCK_MARKER_LENGTH;
++
++	if (info->ecc_opt == OMAP_ECC_HAM1_CODE_HW &&
++	    !(chip->options & NAND_BUSWIDTH_16))
++		off = 1;
+ 
+ 	if (section)
+ 		return -ERANGE;
+@@ -1682,8 +1690,7 @@ static int omap_sw_ooblayout_ecc(struct mtd_info *mtd, int section,
+ 				 struct mtd_oob_region *oobregion)
+ {
+ 	struct nand_chip *chip = mtd_to_nand(mtd);
+-	int off = chip->options & NAND_BUSWIDTH_16 ?
+-		  BADBLOCK_MARKER_LENGTH : 1;
++	int off = BADBLOCK_MARKER_LENGTH;
+ 
+ 	if (section >= chip->ecc.steps)
+ 		return -ERANGE;
+@@ -1702,8 +1709,7 @@ static int omap_sw_ooblayout_free(struct mtd_info *mtd, int section,
+ 				  struct mtd_oob_region *oobregion)
+ {
+ 	struct nand_chip *chip = mtd_to_nand(mtd);
+-	int off = chip->options & NAND_BUSWIDTH_16 ?
+-		  BADBLOCK_MARKER_LENGTH : 1;
++	int off = BADBLOCK_MARKER_LENGTH;
+ 
+ 	if (section)
+ 		return -ERANGE;
+@@ -1737,7 +1743,7 @@ static int omap_nand_probe(struct platform_device *pdev)
+ 	dma_cap_mask_t			mask;
+ 	unsigned			sig;
+ 	struct resource			*res;
+-	int				min_oobbytes;
++	int				min_oobbytes = BADBLOCK_MARKER_LENGTH;
+ 	int				oobbytes_per_step;
+ 
+ 	pdata = dev_get_platdata(&pdev->dev);
+@@ -1921,6 +1927,9 @@ static int omap_nand_probe(struct platform_device *pdev)
+ 		nand_chip->ecc.correct          = omap_correct_data;
+ 		mtd_set_ooblayout(mtd, &omap_ooblayout_ops);
+ 		oobbytes_per_step		= nand_chip->ecc.bytes;
++
++		if (nand_chip->options & NAND_BUSWIDTH_16)
++			min_oobbytes		= 1;
+ 		break;
+ 
+ 	case OMAP_ECC_BCH4_CODE_HW_DETECTION_SW:
+@@ -2038,10 +2047,8 @@ static int omap_nand_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	/* check if NAND device's OOB is enough to store ECC signatures */
+-	min_oobbytes = (oobbytes_per_step *
+-			(mtd->writesize / nand_chip->ecc.size)) +
+-		       (nand_chip->options & NAND_BUSWIDTH_16 ?
+-			BADBLOCK_MARKER_LENGTH : 1);
++	min_oobbytes += (oobbytes_per_step *
++			 (mtd->writesize / nand_chip->ecc.size));
+ 	if (mtd->oobsize < min_oobbytes) {
+ 		dev_err(&info->pdev->dev,
+ 			"not enough OOB bytes required = %d, available=%d\n",
