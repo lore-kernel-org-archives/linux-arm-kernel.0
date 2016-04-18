@@ -1,89 +1,136 @@
-From: jan.glauber@caviumnetworks.com (Jan Glauber)
-Date: Mon, 18 Apr 2016 09:43:33 +0200
-Subject: [PATCH v2] arm64: Reduce verbosity on SMP CPU stop
-In-Reply-To: <20160415113706.GE22906@arm.com>
-References: <1460715876-10780-1-git-send-email-jglauber@cavium.com>
- <20160415113706.GE22906@arm.com>
-Message-ID: <20160418074333.GA16109@hardcore>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 18 Apr 2016 09:50:06 +0200
+Subject: [PATCH] i2c: exynos5: Fix possible ABBA deadlock by keeping I2C
+ clock prepared
+In-Reply-To: <1460757887-18128-1-git-send-email-javier@osg.samsung.com>
+References: <1460757887-18128-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <571491AE.30908@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 15, 2016 at 12:37:06PM +0100, Will Deacon wrote:
-> You can remove stop_lock altogether now, right? I also wonder whether
-> it would be worth printing out which CPUs are still online in the case where
-> we fail to stop all the secondaries?
+Hello,
 
-Sorry, I've been a bit offline. Yes, the stop_lock can also be removed. 
+On 2016-04-16 00:04, Javier Martinez Canillas wrote:
+> The exynos5 I2C controller driver always prepares and enables a clock
+> before using it and then disables unprepares it when the clock is not
+> used anymore.
+>
+> But this can cause a possible ABBA deadlock in some scenarios since a
+> driver that uses regmap to access its I2C registers, will first grab
+> the regmap lock and then the I2C xfer function will grab the prepare
+> lock when preparing the I2C clock. But since the clock driver also
+> uses regmap for I2C accesses, preparing a clock will first grab the
+> prepare lock and then the regmap lock when using the regmap API.
+>
+> An example of this happens on the Exynos5422 Odroid XU board where a
+> s2mps11 PMIC is used and both the s2mps11 regulators and clk drivers
+> share the same I2C regmap.
+>
+> The possible deadlock is reported by the kernel lockdep:
+>
+>    Possible unsafe locking scenario:
+>
+>          CPU0                    CPU1
+>          ----                    ----
+>     lock(sec_core:428:(regmap)->lock);
+>                                  lock(prepare_lock);
+>                                  lock(sec_core:428:(regmap)->lock);
+>     lock(prepare_lock);
+>
+>    *** DEADLOCK ***
+>
+> Fix this by only preparing the clock on probe and {en,dis}able in the
+> rest of the driver.
+>
+> This patch is similar to commit 34e81ad5f0b6 ("i2c: s3c2410: fix ABBA
+> deadlock by keeping clock prepared") that fixes the same bug in other
+> driver for an I2C controller found in Samsung SoCs.
 
-How about below patch that prints the CPU ids for all CPUs that failed
-to stop?
+I'm sorry, but this is not the right approach imho. It is just a workaround
+applied to specific driver, it also duplicates incorrect clock usage
+pattern (there is really no point keeping clock prepared all the time).
 
-Jan
+IMHO this ABBA deadlock should be really fixed in clocks core (probably
+by removing global prepare mutex and replacing it with per clock
+controller mutexes). Without a proper patch this issue will hit us again
+with other i2c controllers or other drivers as well.
 
---------------------------------
+> Reported-by: Anand Moon <linux.amoon@gmail.com>
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>
+> ---
+>
+>   drivers/i2c/busses/i2c-exynos5.c | 20 +++++++++++++++-----
+>   1 file changed, 15 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-exynos5.c b/drivers/i2c/busses/i2c-exynos5.c
+> index b29c7500461a..602633747149 100644
+> --- a/drivers/i2c/busses/i2c-exynos5.c
+> +++ b/drivers/i2c/busses/i2c-exynos5.c
+> @@ -671,7 +671,9 @@ static int exynos5_i2c_xfer(struct i2c_adapter *adap,
+>   		return -EIO;
+>   	}
+>   
+> -	clk_prepare_enable(i2c->clk);
+> +	ret = clk_enable(i2c->clk);
+> +	if (ret)
+> +		return ret;
+>   
+>   	for (i = 0; i < num; i++, msgs++) {
+>   		stop = (i == num - 1);
+> @@ -695,7 +697,7 @@ static int exynos5_i2c_xfer(struct i2c_adapter *adap,
+>   	}
+>   
+>    out:
+> -	clk_disable_unprepare(i2c->clk);
+> +	clk_disable(i2c->clk);
+>   	return ret;
+>   }
+>   
+> @@ -799,6 +801,10 @@ static int exynos5_i2c_probe(struct platform_device *pdev)
+>   
+>   	platform_set_drvdata(pdev, i2c);
+>   
+> +	clk_disable(i2c->clk);
+> +
+> +	return 0;
+> +
+>    err_clk:
+>   	clk_disable_unprepare(i2c->clk);
+>   	return ret;
+> @@ -810,6 +816,8 @@ static int exynos5_i2c_remove(struct platform_device *pdev)
+>   
+>   	i2c_del_adapter(&i2c->adap);
+>   
+> +	clk_unprepare(i2c->clk);
+> +
+>   	return 0;
+>   }
+>   
+> @@ -830,16 +838,18 @@ static int exynos5_i2c_resume_noirq(struct device *dev)
+>   	struct exynos5_i2c *i2c = platform_get_drvdata(pdev);
+>   	int ret = 0;
+>   
+> -	clk_prepare_enable(i2c->clk);
+> +	ret = clk_enable(i2c->clk);
+> +	if (ret)
+> +		return ret;
+>   
+>   	ret = exynos5_hsi2c_clock_setup(i2c);
+>   	if (ret) {
+> -		clk_disable_unprepare(i2c->clk);
+> +		clk_disable(i2c->clk);
+>   		return ret;
+>   	}
+>   
+>   	exynos5_i2c_init(i2c);
+> -	clk_disable_unprepare(i2c->clk);
+> +	clk_disable(i2c->clk);
+>   	i2c->suspended = 0;
+>   
+>   	return 0;
 
-When CPUs are stopped during an abnormal operation like panic
-for each CPU a line is printed and the stack trace is dumped.
-
-This information is only interesting for the aborting CPU
-and on systems with many CPUs it only makes it harder to
-debug if after the aborting CPU the log is flooded with data
-about all other CPUs too.
-
-Therefore remove the stack dump and printk of other CPUs
-and only print a single line that the other CPUs are going to be
-stopped and, in case any CPUs remain online list them.
-
-Signed-off-by: Jan Glauber <jglauber@cavium.com>
----
- arch/arm64/kernel/smp.c | 16 +++++-----------
- 1 file changed, 5 insertions(+), 11 deletions(-)
-
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index b2d5f4e..29f4e37 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -763,21 +763,11 @@ void arch_irq_work_raise(void)
- }
- #endif
- 
--static DEFINE_RAW_SPINLOCK(stop_lock);
--
- /*
-  * ipi_cpu_stop - handle IPI from smp_send_stop()
-  */
- static void ipi_cpu_stop(unsigned int cpu)
- {
--	if (system_state == SYSTEM_BOOTING ||
--	    system_state == SYSTEM_RUNNING) {
--		raw_spin_lock(&stop_lock);
--		pr_crit("CPU%u: stopping\n", cpu);
--		dump_stack();
--		raw_spin_unlock(&stop_lock);
--	}
--
- 	set_cpu_online(cpu, false);
- 
- 	local_irq_disable();
-@@ -872,6 +862,9 @@ void smp_send_stop(void)
- 		cpumask_copy(&mask, cpu_online_mask);
- 		cpumask_clear_cpu(smp_processor_id(), &mask);
- 
-+		if (system_state == SYSTEM_BOOTING ||
-+		    system_state == SYSTEM_RUNNING)
-+			pr_crit("SMP: stopping secondary CPUs\n");
- 		smp_cross_call(&mask, IPI_CPU_STOP);
- 	}
- 
-@@ -881,7 +874,8 @@ void smp_send_stop(void)
- 		udelay(1);
- 
- 	if (num_online_cpus() > 1)
--		pr_warning("SMP: failed to stop secondary CPUs\n");
-+		pr_warning("SMP: failed to stop secondary CPUs %*pbl\n",
-+			   cpumask_pr_args(cpu_online_mask));
- }
- 
- /*
+Best regards
 -- 
-1.9.1
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
