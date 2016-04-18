@@ -1,83 +1,26 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 18 Apr 2016 19:16:02 +0200
-Subject: [PATCH RFT 1/5] iio: mxs-lradc: fix memory leak
-In-Reply-To: <571360A3.3060809@kernel.org>
-References: <1460648909-2657-1-git-send-email-stefan.wahren@i2se.com>
- <1460648909-2657-2-git-send-email-stefan.wahren@i2se.com>
- <570FF70F.3000501@denx.de> <571360A3.3060809@kernel.org>
-Message-ID: <57151652.4020709@denx.de>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 18 Apr 2016 12:16:54 -0500
+Subject: [PATCH 1/2] ARM: dts: imx35: restore existing used clock
+ enumeration
+In-Reply-To: <1460669450-11729-1-git-send-email-akurz@blala.de>
+References: <1460669450-11729-1-git-send-email-akurz@blala.de>
+Message-ID: <20160418171654.GA25910@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/17/2016 12:08 PM, Jonathan Cameron wrote:
-> On 14/04/16 21:01, Marek Vasut wrote:
->> On 04/14/2016 05:48 PM, Stefan Wahren wrote:
->>> After successful touchscreen registration the input device was
->>> never freed. So fix this issue by using devm_input_allocate_device().
->>>
->>> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
->>> ---
->>>  drivers/iio/adc/mxs-lradc.c |    8 ++------
->>>  1 file changed, 2 insertions(+), 6 deletions(-)
->>>
->>> diff --git a/drivers/iio/adc/mxs-lradc.c b/drivers/iio/adc/mxs-lradc.c
->>> index 33051b8..0576953 100644
->>> --- a/drivers/iio/adc/mxs-lradc.c
->>> +++ b/drivers/iio/adc/mxs-lradc.c
->>> @@ -1109,12 +1109,11 @@ static int mxs_lradc_ts_register(struct mxs_lradc *lradc)
->>>  {
->>>  	struct input_dev *input;
->>>  	struct device *dev = lradc->dev;
->>> -	int ret;
->>>  
->>>  	if (!lradc->use_touchscreen)
->>>  		return 0;
->>>  
->>> -	input = input_allocate_device();
->>> +	input = devm_input_allocate_device(dev);
->>>  	if (!input)
->>>  		return -ENOMEM;
->>>  
->>> @@ -1134,11 +1133,8 @@ static int mxs_lradc_ts_register(struct mxs_lradc *lradc)
->>>  
->>>  	lradc->ts_input = input;
->>>  	input_set_drvdata(input, lradc);
->>> -	ret = input_register_device(input);
->>> -	if (ret)
->>> -		input_free_device(lradc->ts_input);
->>>  
->>> -	return ret;
->>> +	return input_register_device(input);
->>>  }
->>>  
->>>  static void mxs_lradc_ts_unregister(struct mxs_lradc *lradc)
->>>
->>
->> Nice find.
->>
->> Looks like at91_adc.c and exynos_adc.c suffer from the exact same issue.
->> The leak looks a bit more severe on exynos even, exynos_adc_ts_init()
->> could use a proper fail path. Do you want to send patches or shall I ?
->>
-> As this has been there a long time I'm not going to rush it in as a fix.
+On Thu, Apr 14, 2016 at 11:30:49PM +0200, Alexander Kurz wrote:
+> A new element got inserted into enum mx35_clks with commit 3713e3f5e927
+> ("clk: imx35: define two clocks for rtc"). This insertion shifted most
+> nummerical clock assignments to a new nummerical value which in turn
+> rendered most hardcoded nummeric values in imx35.dtsi incorrect.
+> 
+> Restore the existing order by moving the newly introduced clock to the
+> end of the enum. Update the dts documentation accordingly.
+> 
+> Signed-off-by: Alexander Kurz <akurz@blala.de>
+> ---
+>  Documentation/devicetree/bindings/clock/imx35-clock.txt | 1 +
+>  drivers/clk/imx/clk-imx35.c                             | 4 ++--
+>  2 files changed, 3 insertions(+), 2 deletions(-)
 
-I did take a proper look today and it seems they do the right thing
-afterall. I checked them with kmemleak too to be sure.
-
-> I suspect no platform is probing and removing it enough to get a significant
-> amount of memory leaked.
-> 
-> Good to clear it up though!
-> 
-> Applied to the togreg branch of iio.git, initially pushed out as testing for
-> the autobuilders to play with it.
-> 
-> Thanks,
-> 
-> Jonathan
-> 
-
-
--- 
-Best regards,
-Marek Vasut
+Acked-by: Rob Herring <robh@kernel.org>
