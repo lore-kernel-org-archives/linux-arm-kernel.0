@@ -1,97 +1,115 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 18 Apr 2016 13:19:31 +0100
-Subject: [PATCH v2] arm64: Reduce verbosity on SMP CPU stop
-In-Reply-To: <20160418074333.GA16109@hardcore>
-References: <1460715876-10780-1-git-send-email-jglauber@cavium.com>
- <20160415113706.GE22906@arm.com> <20160418074333.GA16109@hardcore>
-Message-ID: <20160418121930.GH28645@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 18 Apr 2016 14:21:45 +0200
+Subject: [PATCH v5 03/11] soc: renesas: rcar-sysc: Add DT support for SYSC
+ PM domains
+In-Reply-To: <1460558672-10290-4-git-send-email-geert+renesas@glider.be>
+References: <1460558672-10290-1-git-send-email-geert+renesas@glider.be>
+ <1460558672-10290-4-git-send-email-geert+renesas@glider.be>
+Message-ID: <CAPDyKFrQtX3-7GodrXV2zp4wHBgbWBOVKyE0XoeWaaxhZ2kUuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 18, 2016 at 09:43:33AM +0200, Jan Glauber wrote:
-> On Fri, Apr 15, 2016 at 12:37:06PM +0100, Will Deacon wrote:
-> > You can remove stop_lock altogether now, right? I also wonder whether
-> > it would be worth printing out which CPUs are still online in the case where
-> > we fail to stop all the secondaries?
-> 
-> Sorry, I've been a bit offline. Yes, the stop_lock can also be removed. 
-> 
-> How about below patch that prints the CPU ids for all CPUs that failed
-> to stop?
+[...]
 
-Yeah, this looks better, thanks. We might want to clear the "stopper"
-CPU from the mask, but it's hard to really care that much.
+> +
+> +static bool rcar_sysc_active_wakeup(struct device *dev)
+> +{
+> +       return true;
 
-Will
+I am interested to know why this is always returning true. Perhaps you
+can elaborate a bit on that?
 
-> 
-> Jan
-> 
-> --------------------------------
-> 
-> When CPUs are stopped during an abnormal operation like panic
-> for each CPU a line is printed and the stack trace is dumped.
-> 
-> This information is only interesting for the aborting CPU
-> and on systems with many CPUs it only makes it harder to
-> debug if after the aborting CPU the log is flooded with data
-> about all other CPUs too.
-> 
-> Therefore remove the stack dump and printk of other CPUs
-> and only print a single line that the other CPUs are going to be
-> stopped and, in case any CPUs remain online list them.
-> 
-> Signed-off-by: Jan Glauber <jglauber@cavium.com>
-> ---
->  arch/arm64/kernel/smp.c | 16 +++++-----------
->  1 file changed, 5 insertions(+), 11 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index b2d5f4e..29f4e37 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -763,21 +763,11 @@ void arch_irq_work_raise(void)
->  }
->  #endif
->  
-> -static DEFINE_RAW_SPINLOCK(stop_lock);
-> -
->  /*
->   * ipi_cpu_stop - handle IPI from smp_send_stop()
->   */
->  static void ipi_cpu_stop(unsigned int cpu)
->  {
-> -	if (system_state == SYSTEM_BOOTING ||
-> -	    system_state == SYSTEM_RUNNING) {
-> -		raw_spin_lock(&stop_lock);
-> -		pr_crit("CPU%u: stopping\n", cpu);
-> -		dump_stack();
-> -		raw_spin_unlock(&stop_lock);
-> -	}
-> -
->  	set_cpu_online(cpu, false);
->  
->  	local_irq_disable();
-> @@ -872,6 +862,9 @@ void smp_send_stop(void)
->  		cpumask_copy(&mask, cpu_online_mask);
->  		cpumask_clear_cpu(smp_processor_id(), &mask);
->  
-> +		if (system_state == SYSTEM_BOOTING ||
-> +		    system_state == SYSTEM_RUNNING)
-> +			pr_crit("SMP: stopping secondary CPUs\n");
->  		smp_cross_call(&mask, IPI_CPU_STOP);
->  	}
->  
-> @@ -881,7 +874,8 @@ void smp_send_stop(void)
->  		udelay(1);
->  
->  	if (num_online_cpus() > 1)
-> -		pr_warning("SMP: failed to stop secondary CPUs\n");
-> +		pr_warning("SMP: failed to stop secondary CPUs %*pbl\n",
-> +			   cpumask_pr_args(cpu_online_mask));
->  }
->  
->  /*
-> -- 
-> 1.9.1
-> 
+> +}
+> +
+> +static int rcar_sysc_pd_power_off(struct generic_pm_domain *genpd)
+> +{
+> +       struct rcar_sysc_pd *pd = to_rcar_pd(genpd);
+> +
+> +       pr_debug("%s: %s\n", __func__, genpd->name);
+> +
+> +       if (pd->flags & PD_NO_CR) {
+> +               pr_debug("%s: Cannot control %s\n", __func__, genpd->name);
+> +               return -EBUSY;
+> +       }
+> +
+> +       if (pd->flags & PD_BUSY) {
+> +               pr_debug("%s: %s busy\n", __func__, genpd->name);
+> +               return -EBUSY;
+> +       }
+> +
+> +       return rcar_sysc_power_down(&pd->ch);
+> +}
+> +
+> +static int rcar_sysc_pd_power_on(struct generic_pm_domain *genpd)
+> +{
+> +       struct rcar_sysc_pd *pd = to_rcar_pd(genpd);
+> +
+> +       pr_debug("%s: %s\n", __func__, genpd->name);
+> +
+> +       if (pd->flags & PD_NO_CR) {
+> +               pr_debug("%s: Cannot control %s\n", __func__, genpd->name);
+> +               return 0;
+> +       }
+> +
+> +       return rcar_sysc_power_up(&pd->ch);
+> +}
+> +
+> +static void __init rcar_sysc_pd_setup(struct rcar_sysc_pd *pd)
+> +{
+> +       struct generic_pm_domain *genpd = &pd->genpd;
+> +       const char *name = pd->genpd.name;
+> +       struct dev_power_governor *gov = &simple_qos_governor;
+> +
+> +       if (pd->flags & PD_CPU) {
+> +               /*
+> +                * This domain contains a CPU core and therefore it should
+> +                * only be turned off if the CPU is not in use.
+> +                */
+> +               pr_debug("PM domain %s contains %s\n", name, "CPU");
+> +               pd->flags |= PD_BUSY;
+> +               gov = &pm_domain_always_on_gov;
+> +       } else if (pd->flags & PD_SCU) {
+> +               /*
+> +                * This domain contains an SCU and cache-controller, and
+> +                * therefore it should only be turned off if the CPU cores are
+> +                * not in use.
+> +                */
+> +               pr_debug("PM domain %s contains %s\n", name, "SCU");
+> +               pd->flags |= PD_BUSY;
+> +               gov = &pm_domain_always_on_gov;
+> +       } else if (pd->flags & PD_NO_CR) {
+> +               /*
+> +                * This domain cannot be turned off.
+> +                */
+> +               pd->flags |= PD_BUSY;
+> +               gov = &pm_domain_always_on_gov;
+> +       }
+> +
+> +       pm_genpd_init(genpd, gov, false);
+
+This seems weird. I don't think it correct to initialize genpd and
+then continue with the below changes (assigning callbacks and power up
+the domain).
+
+I would recommend doing this in the reverse order.
+
+> +       genpd->dev_ops.active_wakeup = rcar_sysc_active_wakeup;
+> +       genpd->power_off = rcar_sysc_pd_power_off;
+> +       genpd->power_on = rcar_sysc_pd_power_on;
+> +
+> +       if (pd->flags & (PD_CPU | PD_NO_CR)) {
+> +               /* Skip CPUs (handled by SMP code) and areas without control */
+> +               pr_debug("%s: Not touching %s\n", __func__, genpd->name);
+> +               return;
+> +       }
+> +
+> +       if (!rcar_sysc_power_is_off(&pd->ch)) {
+> +               pr_debug("%s: %s is already powered\n", __func__, genpd->name);
+> +               return;
+> +       }
+> +
+> +       rcar_sysc_power_up(&pd->ch);
+> +}
+
+Kind regards
+Uffe
