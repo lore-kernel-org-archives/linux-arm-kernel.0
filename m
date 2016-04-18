@@ -1,38 +1,31 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Mon, 18 Apr 2016 10:05:16 +0800
-Subject: [PATCH] arm64: mm: Enhance Virtual kernel memory layout
-In-Reply-To: <20160415172047.GA8490@arm.com>
-References: <1460533772-13314-1-git-send-email-wangkefeng.wang@huawei.com>
- <20160415172047.GA8490@arm.com>
-Message-ID: <571440DC.7090809@huawei.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 18 Apr 2016 10:16:06 +0800
+Subject: [PATCH v2 1/2] Documentation: fsl-quadspi: Add fsl, ls1043a-qspi
+ compatible string
+In-Reply-To: <20160414161206.GA9978@rob-hp-laptop>
+References: <1460542107-45807-1-git-send-email-yao.yuan@freescale.com>
+ <1460542107-45807-2-git-send-email-yao.yuan@freescale.com>
+ <20160414161206.GA9978@rob-hp-laptop>
+Message-ID: <20160418021606.GT28903@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Apr 14, 2016 at 11:12:06AM -0500, Rob Herring wrote:
+> On Wed, Apr 13, 2016 at 06:08:26PM +0800, Yuan Yao wrote:
+> > From: Yuan Yao <yao.yuan@nxp.com>
+> > 
+> > new compatible string: "fsl,ls1043a-qspi".
+> > 
+> > Signed-off-by: Yuan Yao <yao.yuan@nxp.com>
+> > ---
+> >  Documentation/devicetree/bindings/mtd/fsl-quadspi.txt | 3 ++-
+> >  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> There's a typo in the compatible string in the subject. Otherwise,
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
 
+Fixed the typo (the space in the middle of compatible string), and
+applied both patches.
 
-On 2016/4/16 1:20, Will Deacon wrote:
-> Hi Kefeng,
-> 
-> On Wed, Apr 13, 2016 at 03:49:32PM +0800, Kefeng Wang wrote:
->> 1) Show kernel excetion vector region and bss segment information.
->> 2) Only show modules and PCI I/O with corresponding config enabled.
->> 3) Each line with single pr_cont, or lead to anomalous print in dmesg.
->>
->> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
->> ---
-> 
-> Can you post a new version of this patch addressing James's feedback,
-> please?
-
-Sorry for the later response, will do it ASAP.
-
-Brs,
-Kefeng
-
-> 
-> Thanks,
-> 
-> Will
-> 
-> .
-> 
+Shawn
