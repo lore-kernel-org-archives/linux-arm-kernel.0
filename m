@@ -1,29 +1,83 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 18 Apr 2016 18:03:11 +0100
-Subject: [PATCH 3/6] regulator: rk808: Make rk808 generic, rename
- rk808-regulator.c
-In-Reply-To: <57148C05.4090900@phytec.de>
-References: <1460711790-22646-1-git-send-email-w.egorov@phytec.de>
- <1460711790-22646-4-git-send-email-w.egorov@phytec.de>
- <20160415102602.GE3217@sirena.org.uk>
- <20160415162406.GD25196@piout.net> <57148C05.4090900@phytec.de>
-Message-ID: <20160418170311.GK3217@sirena.org.uk>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 18 Apr 2016 19:16:02 +0200
+Subject: [PATCH RFT 1/5] iio: mxs-lradc: fix memory leak
+In-Reply-To: <571360A3.3060809@kernel.org>
+References: <1460648909-2657-1-git-send-email-stefan.wahren@i2se.com>
+ <1460648909-2657-2-git-send-email-stefan.wahren@i2se.com>
+ <570FF70F.3000501@denx.de> <571360A3.3060809@kernel.org>
+Message-ID: <57151652.4020709@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 18, 2016 at 09:25:57AM +0200, Wadim Egorov wrote:
+On 04/17/2016 12:08 PM, Jonathan Cameron wrote:
+> On 14/04/16 21:01, Marek Vasut wrote:
+>> On 04/14/2016 05:48 PM, Stefan Wahren wrote:
+>>> After successful touchscreen registration the input device was
+>>> never freed. So fix this issue by using devm_input_allocate_device().
+>>>
+>>> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+>>> ---
+>>>  drivers/iio/adc/mxs-lradc.c |    8 ++------
+>>>  1 file changed, 2 insertions(+), 6 deletions(-)
+>>>
+>>> diff --git a/drivers/iio/adc/mxs-lradc.c b/drivers/iio/adc/mxs-lradc.c
+>>> index 33051b8..0576953 100644
+>>> --- a/drivers/iio/adc/mxs-lradc.c
+>>> +++ b/drivers/iio/adc/mxs-lradc.c
+>>> @@ -1109,12 +1109,11 @@ static int mxs_lradc_ts_register(struct mxs_lradc *lradc)
+>>>  {
+>>>  	struct input_dev *input;
+>>>  	struct device *dev = lradc->dev;
+>>> -	int ret;
+>>>  
+>>>  	if (!lradc->use_touchscreen)
+>>>  		return 0;
+>>>  
+>>> -	input = input_allocate_device();
+>>> +	input = devm_input_allocate_device(dev);
+>>>  	if (!input)
+>>>  		return -ENOMEM;
+>>>  
+>>> @@ -1134,11 +1133,8 @@ static int mxs_lradc_ts_register(struct mxs_lradc *lradc)
+>>>  
+>>>  	lradc->ts_input = input;
+>>>  	input_set_drvdata(input, lradc);
+>>> -	ret = input_register_device(input);
+>>> -	if (ret)
+>>> -		input_free_device(lradc->ts_input);
+>>>  
+>>> -	return ret;
+>>> +	return input_register_device(input);
+>>>  }
+>>>  
+>>>  static void mxs_lradc_ts_unregister(struct mxs_lradc *lradc)
+>>>
+>>
+>> Nice find.
+>>
+>> Looks like at91_adc.c and exynos_adc.c suffer from the exact same issue.
+>> The leak looks a bit more severe on exynos even, exynos_adc_ts_init()
+>> could use a proper fail path. Do you want to send patches or shall I ?
+>>
+> As this has been there a long time I'm not going to rush it in as a fix.
 
-> It seems this topic has been already discussed here [1].
-> So the right solution is just to rename the rk808 struct in rk808.h,
-> don't touch the driver names and config options and naming the
-> additional RK818 PMIC in the Kconfig?
+I did take a proper look today and it seems they do the right thing
+afterall. I checked them with kmemleak too to be sure.
 
-Something like that, yes.  If it's really useful for clarification some
-renaming of code might be useful.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160418/9c7dbacf/attachment-0001.sig>
+> I suspect no platform is probing and removing it enough to get a significant
+> amount of memory leaked.
+> 
+> Good to clear it up though!
+> 
+> Applied to the togreg branch of iio.git, initially pushed out as testing for
+> the autobuilders to play with it.
+> 
+> Thanks,
+> 
+> Jonathan
+> 
+
+
+-- 
+Best regards,
+Marek Vasut
