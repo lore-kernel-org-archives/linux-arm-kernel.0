@@ -1,340 +1,94 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 18 Apr 2016 17:32:49 +0300
-Subject: [PATCH v5 39/50] mtd: nand: omap2: switch to mtd_ooblayout_ops
-In-Reply-To: <1459354505-32551-40-git-send-email-boris.brezillon@free-electrons.com>
-References: <1459354505-32551-1-git-send-email-boris.brezillon@free-electrons.com>
- <1459354505-32551-40-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <5714F011.5080409@ti.com>
+From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
+Date: Mon, 18 Apr 2016 16:34:35 +0200
+Subject: [PATCH v5 2/4] Documentation: Bindings: Add STM32 DWMAC glue
+In-Reply-To: <CAJgp7zxfFRhfNjcE23n+DKD0ffrvH4_sowPjK_-DZAS4ecH5dg@mail.gmail.com>
+References: <1458315428-10081-1-git-send-email-alexandre.torgue@gmail.com>	<1458315428-10081-3-git-send-email-alexandre.torgue@gmail.com>	<CAGb2v65SvVi0cJbaaD9cYrqC3pJ9eumwhTVk11_N7r_nTZhS9g@mail.gmail.com>	<20160321124043.GA26873@rob-hp-laptop>	<CAGhQ9VwS=YwgfeUuK+LzGjy3f9btVGV7bN=TATGHwQs+JW+iGA@mail.gmail.com>
+ <CAJgp7zxfFRhfNjcE23n+DKD0ffrvH4_sowPjK_-DZAS4ecH5dg@mail.gmail.com>
+Message-ID: <5714F07B.3010005@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Boris,
+On 3/22/2016 5:11 PM, Alexandre Torgue wrote:
+> Hi guys,
+>
+> I will fix typo issues (s/vesrion/version and ethernet @).
+>
+> Concerning compatible string. For sure "snps,dwmac-3.50a" string is
+> not used inside glue driver.
+> I perfere to keep it for information but if you really want that I
+> remove it I will not block ;)
+>
+> 2016-03-21 16:36 GMT+01:00 Joachim  Eastwood <manabian@gmail.com>:
+>> On 21 March 2016 at 13:40, Rob Herring <robh@kernel.org> wrote:
+>>> On Sat, Mar 19, 2016 at 12:00:22AM +0800, Chen-Yu Tsai wrote:
+>>>> Hi,
+>>>>
+>>>> On Fri, Mar 18, 2016 at 11:37 PM, Alexandre TORGUE
+>>>> <alexandre.torgue@gmail.com> wrote:
+>>>>> +- clocks: Must contain a phandle for each entry in clock-names.
+>>>>> +- clock-names: Should be "stmmaceth" for the host clock.
+>>>
+> We can remove host clock (stmmac eth) entry here and refer to
+> stmmac.txt binding for common entry
+>
+>>> This doesn't sound like the clock input signal name...
+>>>
+>>>>> +              Should be "tx-clk" for the MAC TX clock.
+>>>>> +              Should be "rx-clk" for the MAC RX clock.
+>>>
+>>> How can other DWMAC blocks not have these clocks? The glue can't really
+>>> add these clocks. It could combine them into one or a new version of
+>>> DWMAC could have a different number of clock inputs. So if there is
+>>> variation here, then some of the bindings are probably wrong. I guess
+>>> the only change I'm suggesting is possibly moving these into common
+>>> binding doc.
+>>
+>> The LPC18xx implementation probably have these clocks as well but the
+>> LPC1850 user manual only documents the main clock. Someone with access
+>> to the IP block doc from Synopsys should be able to check which clocks
+>> the MAC really needs.
+>>
+>> Rockchip bindings have two clocks named "mac_clk_rx" and "mac_clk_tx".
+>> These are probably the same as stm32 needs so maybe use these names
+>> and move them into the main doc and update the rockchip binding.
+>>
+> I think we can use same name. But I have a doubt on moving it in a
+> common bindings (maybe I don't well understood). When you say "common
+> binding file" is it "stmmac.txt" binding ? If yes does it mean that we
+> have to control it inside stmmac driver (no more in glue) ? In this
+> case those clocks will become "required" for stm32 and rockship but
+> not for others chip. It could create confusion?
 
-On 30/03/16 19:14, Boris Brezillon wrote:
-> Implementing the mtd_ooblayout_ops interface is the new way of exposing
-> ECC/OOB layout to MTD users.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
->  drivers/mtd/nand/omap2.c | 194 +++++++++++++++++++++++++++--------------------
->  1 file changed, 113 insertions(+), 81 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
-> index 4ebf16b..bca154a 100644
-> --- a/drivers/mtd/nand/omap2.c
-> +++ b/drivers/mtd/nand/omap2.c
-> @@ -169,8 +169,6 @@ struct omap_nand_info {
->  	u_char				*buf;
->  	int					buf_len;
->  	struct gpmc_nand_regs		reg;
-> -	/* generated at runtime depending on ECC algorithm and layout selected */
-> -	struct nand_ecclayout		oobinfo;
->  	/* fields specific for BCHx_HW ECC scheme */
->  	struct device			*elm_dev;
->  	struct device_node		*of_node;
-> @@ -1639,19 +1637,108 @@ static bool omap2_nand_ecc_check(struct omap_nand_info *info,
->  	return true;
->  }
->  
-> +static int omap_ooblayout_ecc(struct mtd_info *mtd, int section,
-> +			      struct mtd_oob_region *oobregion)
-> +{
-> +	struct nand_chip *chip = mtd_to_nand(mtd);
-> +	int off = chip->options & NAND_BUSWIDTH_16 ?
-> +		  BADBLOCK_MARKER_LENGTH : 1;
+Currently we keep the "host" and "csr" " ptp  "clock from common
+bindings because directly connected to the either MAC core or optional
+internals modules.
+Indeed, also clk_tx_i and clk_rx_i could be treated in the same way.
+but... (my personal view).
+Many platforms, also inside STi, have different clock routing schema,
+so we could relax them giving each glue the way to internally manage
+all (as done nowadays).
+So these clocks can stay inside the glue and documented inside each
+binding doc. Maybe, it could be not so easy to have generic schema
+suitable for all the glues so documenting all inside the same binding
+text file.
+We could try to better name these clocks in each glue. For example, for
+this, although I do not know the clk schema, I can image a single
+rmii_clk (maybe from internal oscillator) that is connected to
+clk_tx_i and clk_rx_i. So it could be useless to pass both. Please
+let me know if I am wrong...
+In case of (G)MII, we should use something like (g)mii_tx_clk,
+(g)mii_rx_clk according to the real connections (if from
+an internal oscillator and not from an ext one connected to the phy).
 
-IMO "off = 1" is valid only for OMAP_ECC_HAM1_CODE_HW and 8-bit NAND.
-For all other layouts it is always set to BADBLOCK_MARKER_LENGTH.
+Regards,
+Peppe
 
-> +
-> +	if (section)
-> +		return -ERANGE;
-> +
-> +	oobregion->offset = off;
-> +	oobregion->length = chip->ecc.total;
-> +
-> +	return 0;
-> +}
-> +
-> +static int omap_ooblayout_free(struct mtd_info *mtd, int section,
-> +			       struct mtd_oob_region *oobregion)
-> +{
-> +	struct nand_chip *chip = mtd_to_nand(mtd);
-> +	int off = chip->options & NAND_BUSWIDTH_16 ?
-> +		  BADBLOCK_MARKER_LENGTH : 1;
 
-ditto.
-
-> +
-> +	if (section)
-> +		return -ERANGE;
-> +
-> +	off += chip->ecc.total;
-> +	if (off >= mtd->oobsize)
-> +		return -ERANGE;
-> +
-> +	oobregion->offset = off;
-> +	oobregion->length = mtd->oobsize - off;
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct mtd_ooblayout_ops omap_ooblayout_ops = {
-> +	.ecc = omap_ooblayout_ecc,
-> +	.free = omap_ooblayout_free,
-> +};
-> +
-> +static int omap_sw_ooblayout_ecc(struct mtd_info *mtd, int section,
-> +				 struct mtd_oob_region *oobregion)
-> +{
-> +	struct nand_chip *chip = mtd_to_nand(mtd);
-> +	int off = chip->options & NAND_BUSWIDTH_16 ?
-> +		  BADBLOCK_MARKER_LENGTH : 1;
-> +
-> +	if (section >= chip->ecc.steps)
-> +		return -ERANGE;
-> +
-> +	/*
-> +	 * When SW correction is employed, one OMAP specific marker byte is
-> +	 * reserved after each ECC step.
-> +	 */
-> +	oobregion->offset = off + (section * (chip->ecc.bytes + 1));
-> +	oobregion->length = chip->ecc.bytes;
-> +
-> +	return 0;
-> +}
-> +
-> +static int omap_sw_ooblayout_free(struct mtd_info *mtd, int section,
-> +				  struct mtd_oob_region *oobregion)
-> +{
-> +	struct nand_chip *chip = mtd_to_nand(mtd);
-> +	int off = chip->options & NAND_BUSWIDTH_16 ?
-> +		  BADBLOCK_MARKER_LENGTH : 1;
-> +
-> +	if (section)
-> +		return -ERANGE;
-> +
-> +	/*
-> +	 * When SW correction is employed, one OMAP specific marker byte is
-> +	 * reserved after each ECC step.
-> +	 */
-> +	off += ((chip->ecc.bytes + 1) * chip->ecc.steps);
-> +	if (off >= mtd->oobsize)
-> +		return -ERANGE;
-> +
-> +	oobregion->offset = off;
-> +	oobregion->length = mtd->oobsize - off;
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct mtd_ooblayout_ops omap_sw_ooblayout_ops = {
-> +	.ecc = omap_sw_ooblayout_ecc,
-> +	.free = omap_sw_ooblayout_free,
-> +};
-> +
->  static int omap_nand_probe(struct platform_device *pdev)
->  {
->  	struct omap_nand_info		*info;
->  	struct omap_nand_platform_data	*pdata;
->  	struct mtd_info			*mtd;
->  	struct nand_chip		*nand_chip;
-> -	struct nand_ecclayout		*ecclayout;
->  	int				err;
-> -	int				i;
->  	dma_cap_mask_t			mask;
->  	unsigned			sig;
-> -	unsigned			oob_index;
->  	struct resource			*res;
-> +	int				min_oobbytes;
-> +	int				oobbytes_per_step;
->  
->  	pdata = dev_get_platdata(&pdev->dev);
->  	if (pdata == NULL) {
-> @@ -1810,7 +1897,7 @@ static int omap_nand_probe(struct platform_device *pdev)
->  
->  	/*
->  	 * Bail out earlier to let NAND_ECC_SOFT code create its own
-> -	 * ecclayout instead of using ours.
-> +	 * ooblayout instead of using ours.
->  	 */
->  	if (info->ecc_opt == OMAP_ECC_HAM1_CODE_SW) {
->  		nand_chip->ecc.mode = NAND_ECC_SOFT;
-> @@ -1818,8 +1905,6 @@ static int omap_nand_probe(struct platform_device *pdev)
->  	}
->  
->  	/* populate MTD interface based on ECC scheme */
-> -	ecclayout		= &info->oobinfo;
-> -	nand_chip->ecc.layout	= ecclayout;
->  	switch (info->ecc_opt) {
->  	case OMAP_ECC_HAM1_CODE_HW:
->  		pr_info("nand: using OMAP_ECC_HAM1_CODE_HW\n");
-> @@ -1830,19 +1915,8 @@ static int omap_nand_probe(struct platform_device *pdev)
->  		nand_chip->ecc.calculate        = omap_calculate_ecc;
->  		nand_chip->ecc.hwctl            = omap_enable_hwecc;
->  		nand_chip->ecc.correct          = omap_correct_data;
-> -		/* define ECC layout */
-> -		ecclayout->eccbytes		= nand_chip->ecc.bytes *
-> -							(mtd->writesize /
-> -							nand_chip->ecc.size);
-> -		if (nand_chip->options & NAND_BUSWIDTH_16)
-> -			oob_index		= BADBLOCK_MARKER_LENGTH;
-> -		else
-> -			oob_index		= 1;
-> -		for (i = 0; i < ecclayout->eccbytes; i++, oob_index++)
-> -			ecclayout->eccpos[i]	= oob_index;
-> -		/* no reserved-marker in ecclayout for this ecc-scheme */
-> -		ecclayout->oobfree->offset	=
-> -				ecclayout->eccpos[ecclayout->eccbytes - 1] + 1;
-> +		mtd_set_ooblayout(mtd, &omap_ooblayout_ops);
-> +		oobbytes_per_step		= nand_chip->ecc.bytes;
->  		break;
->  
->  	case OMAP_ECC_BCH4_CODE_HW_DETECTION_SW:
-> @@ -1854,19 +1928,9 @@ static int omap_nand_probe(struct platform_device *pdev)
->  		nand_chip->ecc.hwctl		= omap_enable_hwecc_bch;
->  		nand_chip->ecc.correct		= nand_bch_correct_data;
->  		nand_chip->ecc.calculate	= omap_calculate_ecc_bch;
-> -		/* define ECC layout */
-> -		ecclayout->eccbytes		= nand_chip->ecc.bytes *
-> -							(mtd->writesize /
-> -							nand_chip->ecc.size);
-> -		oob_index			= BADBLOCK_MARKER_LENGTH;
-> -		for (i = 0; i < ecclayout->eccbytes; i++, oob_index++) {
-> -			ecclayout->eccpos[i] = oob_index;
-> -			if (((i + 1) % nand_chip->ecc.bytes) == 0)
-> -				oob_index++;
-> -		}
-> -		/* include reserved-marker in ecclayout->oobfree calculation */
-> -		ecclayout->oobfree->offset	= 1 +
-> -				ecclayout->eccpos[ecclayout->eccbytes - 1] + 1;
-> +		mtd_set_ooblayout(mtd, &omap_sw_ooblayout_ops);
-> +		/* Reserve one byte for the OMAP marker */
-> +		oobbytes_per_step		= nand_chip->ecc.bytes + 1;
->  		/* software bch library is used for locating errors */
->  		nand_chip->ecc.priv		= nand_bch_init(mtd);
->  		if (!nand_chip->ecc.priv) {
-> @@ -1888,16 +1952,8 @@ static int omap_nand_probe(struct platform_device *pdev)
->  		nand_chip->ecc.calculate	= omap_calculate_ecc_bch;
->  		nand_chip->ecc.read_page	= omap_read_page_bch;
->  		nand_chip->ecc.write_page	= omap_write_page_bch;
-> -		/* define ECC layout */
-> -		ecclayout->eccbytes		= nand_chip->ecc.bytes *
-> -							(mtd->writesize /
-> -							nand_chip->ecc.size);
-> -		oob_index			= BADBLOCK_MARKER_LENGTH;
-> -		for (i = 0; i < ecclayout->eccbytes; i++, oob_index++)
-> -			ecclayout->eccpos[i]	= oob_index;
-> -		/* reserved marker already included in ecclayout->eccbytes */
-> -		ecclayout->oobfree->offset	=
-> -				ecclayout->eccpos[ecclayout->eccbytes - 1] + 1;
-> +		mtd_set_ooblayout(mtd, &omap_ooblayout_ops);
-> +		oobbytes_per_step		= nand_chip->ecc.bytes;
->  
->  		err = elm_config(info->elm_dev, BCH4_ECC,
->  				 mtd->writesize / nand_chip->ecc.size,
-> @@ -1915,19 +1971,9 @@ static int omap_nand_probe(struct platform_device *pdev)
->  		nand_chip->ecc.hwctl		= omap_enable_hwecc_bch;
->  		nand_chip->ecc.correct		= nand_bch_correct_data;
->  		nand_chip->ecc.calculate	= omap_calculate_ecc_bch;
-> -		/* define ECC layout */
-> -		ecclayout->eccbytes		= nand_chip->ecc.bytes *
-> -							(mtd->writesize /
-> -							nand_chip->ecc.size);
-> -		oob_index			= BADBLOCK_MARKER_LENGTH;
-> -		for (i = 0; i < ecclayout->eccbytes; i++, oob_index++) {
-> -			ecclayout->eccpos[i] = oob_index;
-> -			if (((i + 1) % nand_chip->ecc.bytes) == 0)
-> -				oob_index++;
-> -		}
-> -		/* include reserved-marker in ecclayout->oobfree calculation */
-> -		ecclayout->oobfree->offset	= 1 +
-> -				ecclayout->eccpos[ecclayout->eccbytes - 1] + 1;
-> +		mtd_set_ooblayout(mtd, &omap_sw_ooblayout_ops);
-> +		/* Reserve one byte for the OMAP marker */
-> +		oobbytes_per_step		= nand_chip->ecc.bytes + 1;
->  		/* software bch library is used for locating errors */
->  		nand_chip->ecc.priv		= nand_bch_init(mtd);
->  		if (!nand_chip->ecc.priv) {
-> @@ -1949,6 +1995,8 @@ static int omap_nand_probe(struct platform_device *pdev)
->  		nand_chip->ecc.calculate	= omap_calculate_ecc_bch;
->  		nand_chip->ecc.read_page	= omap_read_page_bch;
->  		nand_chip->ecc.write_page	= omap_write_page_bch;
-> +		mtd_set_ooblayout(mtd, &omap_ooblayout_ops);
-> +		oobbytes_per_step		= nand_chip->ecc.bytes;
->  
->  		err = elm_config(info->elm_dev, BCH8_ECC,
->  				 mtd->writesize / nand_chip->ecc.size,
-> @@ -1956,16 +2004,6 @@ static int omap_nand_probe(struct platform_device *pdev)
->  		if (err < 0)
->  			goto return_error;
->  
-> -		/* define ECC layout */
-> -		ecclayout->eccbytes		= nand_chip->ecc.bytes *
-> -							(mtd->writesize /
-> -							nand_chip->ecc.size);
-> -		oob_index			= BADBLOCK_MARKER_LENGTH;
-> -		for (i = 0; i < ecclayout->eccbytes; i++, oob_index++)
-> -			ecclayout->eccpos[i]	= oob_index;
-> -		/* reserved marker already included in ecclayout->eccbytes */
-> -		ecclayout->oobfree->offset	=
-> -				ecclayout->eccpos[ecclayout->eccbytes - 1] + 1;
->  		break;
->  
->  	case OMAP_ECC_BCH16_CODE_HW:
-> @@ -1979,6 +2017,8 @@ static int omap_nand_probe(struct platform_device *pdev)
->  		nand_chip->ecc.calculate	= omap_calculate_ecc_bch;
->  		nand_chip->ecc.read_page	= omap_read_page_bch;
->  		nand_chip->ecc.write_page	= omap_write_page_bch;
-> +		mtd_set_ooblayout(mtd, &omap_ooblayout_ops);
-> +		oobbytes_per_step		= nand_chip->ecc.bytes;
->  
->  		err = elm_config(info->elm_dev, BCH16_ECC,
->  				 mtd->writesize / nand_chip->ecc.size,
-> @@ -1986,16 +2026,6 @@ static int omap_nand_probe(struct platform_device *pdev)
->  		if (err < 0)
->  			goto return_error;
->  
-> -		/* define ECC layout */
-> -		ecclayout->eccbytes		= nand_chip->ecc.bytes *
-> -							(mtd->writesize /
-> -							nand_chip->ecc.size);
-> -		oob_index			= BADBLOCK_MARKER_LENGTH;
-> -		for (i = 0; i < ecclayout->eccbytes; i++, oob_index++)
-> -			ecclayout->eccpos[i]	= oob_index;
-> -		/* reserved marker already included in ecclayout->eccbytes */
-> -		ecclayout->oobfree->offset	=
-> -				ecclayout->eccpos[ecclayout->eccbytes - 1] + 1;
->  		break;
->  	default:
->  		dev_err(&info->pdev->dev, "invalid or unsupported ECC scheme\n");
-> @@ -2003,13 +2033,15 @@ static int omap_nand_probe(struct platform_device *pdev)
->  		goto return_error;
->  	}
->  
-> -	/* all OOB bytes from oobfree->offset till end off OOB are free */
-> -	ecclayout->oobfree->length = mtd->oobsize - ecclayout->oobfree->offset;
->  	/* check if NAND device's OOB is enough to store ECC signatures */
-> -	if (mtd->oobsize < (ecclayout->eccbytes + BADBLOCK_MARKER_LENGTH)) {
-> +	min_oobbytes = (oobbytes_per_step *
-> +			(mtd->writesize / nand_chip->ecc.size)) +
-> +		       (nand_chip->options & NAND_BUSWIDTH_16 ?
-> +			BADBLOCK_MARKER_LENGTH : 1);
-
-would it affect this as well?
-
-> +	if (mtd->oobsize < min_oobbytes) {
->  		dev_err(&info->pdev->dev,
->  			"not enough OOB bytes required = %d, available=%d\n",
-> -			ecclayout->eccbytes, mtd->oobsize);
-> +			min_oobbytes, mtd->oobsize);
->  		err = -EINVAL;
->  		goto return_error;
->  	}
-> 
-
-I will need to test this change with all possible configurations.
-The number of configurations on OMAP is a bit overwhelming :(.
-
-cheers,
--roger
+> Best regards
+>
+> Alex
+>
+>>
+>> regards,
+>> Joachim Eastwood
+>
