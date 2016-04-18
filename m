@@ -1,7 +1,7 @@
 From: dhdang@apm.com (Duc Dang)
-Date: Mon, 18 Apr 2016 16:20:48 -0700
+Date: Mon, 18 Apr 2016 16:24:23 -0700
 Subject: [GIT PULL] arm64: X-Gene platforms DTS changes queued for 4.7 - part1
-Message-ID: <CADaLNDnB=XqSkTb4v_kVv1MkzOKLWjNfXP_+orkn9b8P=Q=NVw@mail.gmail.com>
+Message-ID: <CADaLNDmTBEGSMQKzK+tRNE=-qhRA7d3pqjRUTDRrp6_XStAkaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
