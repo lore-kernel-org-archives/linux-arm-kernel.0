@@ -1,147 +1,225 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Mon, 18 Apr 2016 11:36:00 +0800
-Subject: [PATCH 8/9] thermal: rockchip: add the set_trips function
+Date: Mon, 18 Apr 2016 11:36:01 +0800
+Subject: [PATCH 9/9] arm64: dts: rockchip: move the rk3368 thermal data into
+ rk3368.dtsi
 In-Reply-To: <1460950562-20652-1-git-send-email-wxt@rock-chips.com>
 References: <1460950562-20652-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1460950562-20652-9-git-send-email-wxt@rock-chips.com>
+Message-ID: <1460950562-20652-10-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Whenever the current temperature is updated, the trip points immediately
-below and above the current temperature are found. A sensor driver
-callback `set_trips' is then called with the temperatures.
-Lastly, The sensor will trigger the hardware high temperature interrupts
-to increase the sampleing rate and throttle frequency to limit the
-temperature rising When performing passive cooling.
+In order to be standard to manage for rockchip SoCs,  move the thermal
+data into rk3368 dtsi, we needn't to add a new file for thermal.
+
+Fixes commit f990238f859e
+("arm64: dts: rockchip: Add main thermal info to rk3368.dtsi")
 
 Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 Cc: Zhang Rui <rui.zhang@intel.com>
 Cc: Eduardo Valentin <edubezval@gmail.com>
 Cc: Heiko Stuebner <heiko@sntech.de>
+
 ---
 
- drivers/thermal/rockchip_thermal.c | 39 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+ arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi | 112 -----------------------
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi         |  66 ++++++++++++-
+ 2 files changed, 65 insertions(+), 113 deletions(-)
+ delete mode 100644 arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi
 
-diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
-index 86a1ab0..39e2eec 100644
---- a/drivers/thermal/rockchip_thermal.c
-+++ b/drivers/thermal/rockchip_thermal.c
-@@ -96,6 +96,7 @@ struct chip_tsadc_table {
-  * @initialize: SoC special initialize tsadc controller method
-  * @irq_ack: clear the interrupt
-  * @get_temp: get the temperature
-+ * @set_alarm_temp: set the high temperature interrupt
-  * @set_tshut_temp: set the hardware-controlled shutdown temperature
-  * @set_tshut_mode: set the hardware-controlled shutdown mode
-  * @table: the chip-specific conversion table
-@@ -119,6 +120,8 @@ struct rockchip_tsadc_chip {
- 	/* Per-sensor methods */
- 	int (*get_temp)(struct chip_tsadc_table table,
- 			int chn, void __iomem *reg, int *temp);
-+	void (*set_alarm_temp)(struct chip_tsadc_table table,
-+			       int chn, void __iomem *reg, int temp);
- 	void (*set_tshut_temp)(struct chip_tsadc_table table,
- 			       int chn, void __iomem *reg, int temp);
- 	void (*set_tshut_mode)(int chn, void __iomem *reg, enum tshut_mode m);
-@@ -183,6 +186,7 @@ struct rockchip_thermal_data {
- #define TSADCV2_INT_EN				0x08
- #define TSADCV2_INT_PD				0x0c
- #define TSADCV2_DATA(chn)			(0x20 + (chn) * 0x04)
-+#define TSADCV2_COMP_INT(chn)		        (0x30 + (chn) * 0x04)
- #define TSADCV2_COMP_SHUT(chn)		        (0x40 + (chn) * 0x04)
- #define TSADCV2_HIGHT_INT_DEBOUNCE		0x60
- #define TSADCV2_HIGHT_TSHUT_DEBOUNCE		0x64
-@@ -628,6 +632,20 @@ static int rk_tsadcv2_get_temp(struct chip_tsadc_table table,
- 	return rk_tsadcv2_code_to_temp(table, val, temp);
- }
+diff --git a/arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi b/arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi
+deleted file mode 100644
+index a10010f..0000000
+--- a/arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi
++++ /dev/null
+@@ -1,112 +0,0 @@
+-/*
+- * Device Tree Source for RK3368 SoC thermal
+- *
+- * Copyright (c) 2015, Fuzhou Rockchip Electronics Co., Ltd
+- * Caesar Wang <wxt@rock-chips.com>
+- *
+- * This file is dual-licensed: you can use it either under the terms
+- * of the GPL or the X11 license, at your option. Note that this dual
+- * licensing only applies to this file, and not this project as a
+- * whole.
+- *
+- *  a) This file is free software; you can redistribute it and/or
+- *     modify it under the terms of the GNU General Public License as
+- *     published by the Free Software Foundation; either version 2 of the
+- *     License, or (at your option) any later version.
+- *
+- *     This file is distributed in the hope that it will be useful,
+- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *     GNU General Public License for more details.
+- *
+- * Or, alternatively,
+- *
+- *  b) Permission is hereby granted, free of charge, to any person
+- *     obtaining a copy of this software and associated documentation
+- *     files (the "Software"), to deal in the Software without
+- *     restriction, including without limitation the rights to use,
+- *     copy, modify, merge, publish, distribute, sublicense, and/or
+- *     sell copies of the Software, and to permit persons to whom the
+- *     Software is furnished to do so, subject to the following
+- *     conditions:
+- *
+- *     The above copyright notice and this permission notice shall be
+- *     included in all copies or substantial portions of the Software.
+- *
+- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+- *     OTHER DEALINGS IN THE SOFTWARE.
+- */
+-
+-#include <dt-bindings/thermal/thermal.h>
+-
+-cpu_thermal: cpu_thermal {
+-	polling-delay-passive = <100>; /* milliseconds */
+-	polling-delay = <5000>; /* milliseconds */
+-
+-	thermal-sensors = <&tsadc 0>;
+-
+-	trips {
+-		cpu_alert0: cpu_alert0 {
+-			temperature = <75000>; /* millicelsius */
+-			hysteresis = <2000>; /* millicelsius */
+-			type = "passive";
+-		};
+-		cpu_alert1: cpu_alert1 {
+-			temperature = <80000>; /* millicelsius */
+-			hysteresis = <2000>; /* millicelsius */
+-			type = "passive";
+-		};
+-		cpu_crit: cpu_crit {
+-			temperature = <95000>; /* millicelsius */
+-			hysteresis = <2000>; /* millicelsius */
+-			type = "critical";
+-		};
+-	};
+-
+-	cooling-maps {
+-		map0 {
+-			trip = <&cpu_alert0>;
+-			cooling-device =
+-				<&cpu_b0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+-		};
+-		map1 {
+-			trip = <&cpu_alert1>;
+-			cooling-device =
+-				<&cpu_l0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+-		};
+-	};
+-};
+-
+-gpu_thermal: gpu_thermal {
+-	polling-delay-passive = <100>; /* milliseconds */
+-	polling-delay = <5000>; /* milliseconds */
+-
+-	thermal-sensors = <&tsadc 1>;
+-
+-	trips {
+-		gpu_alert0: gpu_alert0 {
+-			temperature = <80000>; /* millicelsius */
+-			hysteresis = <2000>; /* millicelsius */
+-			type = "passive";
+-		};
+-		gpu_crit: gpu_crit {
+-			temperature = <1150000>; /* millicelsius */
+-			hysteresis = <2000>; /* millicelsius */
+-			type = "critical";
+-		};
+-	};
+-
+-	cooling-maps {
+-		map0 {
+-			trip = <&gpu_alert0>;
+-			cooling-device =
+-				<&cpu_b0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+-		};
+-	};
+-};
+diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+index 7056a0f..8b4a7c9 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+@@ -413,7 +413,71 @@
+ 	};
  
-+static void rk_tsadcv2_alarm_temp(struct chip_tsadc_table table,
-+				  int chn, void __iomem *regs, int temp)
-+{
-+	u32 alarm_value, int_en;
+ 	thermal-zones {
+-		#include "rk3368-thermal.dtsi"
++		cpu {
++			polling-delay-passive = <100>; /* milliseconds */
++			polling-delay = <5000>; /* milliseconds */
 +
-+	alarm_value = rk_tsadcv2_temp_to_code(table, temp);
-+	writel_relaxed(alarm_value & table.data_mask,
-+		       regs + TSADCV2_COMP_INT(chn));
++			thermal-sensors = <&tsadc 0>;
 +
-+	int_en = readl_relaxed(regs + TSADCV2_INT_EN);
-+	int_en |= TSADCV2_INT_SRC_EN(chn);
-+	writel_relaxed(int_en, regs + TSADCV2_INT_EN);
-+}
++			trips {
++				cpu_alert0: cpu_alert0 {
++					temperature = <75000>; /* millicelsius */
++					hysteresis = <2000>; /* millicelsius */
++					type = "passive";
++				};
++				cpu_alert1: cpu_alert1 {
++					temperature = <80000>; /* millicelsius */
++					hysteresis = <2000>; /* millicelsius */
++					type = "passive";
++				};
++				cpu_crit: cpu_crit {
++					temperature = <95000>; /* millicelsius */
++					hysteresis = <2000>; /* millicelsius */
++					type = "critical";
++				};
++			};
 +
- static void rk_tsadcv2_tshut_temp(struct chip_tsadc_table table,
- 				  int chn, void __iomem *regs, int temp)
- {
-@@ -670,6 +688,7 @@ static const struct rockchip_tsadc_chip rk3228_tsadc_data = {
- 	.irq_ack = rk_tsadcv3_irq_ack,
- 	.control = rk_tsadcv3_control,
- 	.get_temp = rk_tsadcv2_get_temp,
-+	.set_alarm_temp = rk_tsadcv2_alarm_temp,
- 	.set_tshut_temp = rk_tsadcv2_tshut_temp,
- 	.set_tshut_mode = rk_tsadcv2_tshut_mode,
- 
-@@ -694,6 +713,7 @@ static const struct rockchip_tsadc_chip rk3288_tsadc_data = {
- 	.irq_ack = rk_tsadcv2_irq_ack,
- 	.control = rk_tsadcv2_control,
- 	.get_temp = rk_tsadcv2_get_temp,
-+	.set_alarm_temp = rk_tsadcv2_alarm_temp,
- 	.set_tshut_temp = rk_tsadcv2_tshut_temp,
- 	.set_tshut_mode = rk_tsadcv2_tshut_mode,
- 
-@@ -718,6 +738,7 @@ static const struct rockchip_tsadc_chip rk3366_tsadc_data = {
- 	.irq_ack = rk_tsadcv3_irq_ack,
- 	.control = rk_tsadcv3_control,
- 	.get_temp = rk_tsadcv2_get_temp,
-+	.set_alarm_temp = rk_tsadcv2_alarm_temp,
- 	.set_tshut_temp = rk_tsadcv2_tshut_temp,
- 	.set_tshut_mode = rk_tsadcv2_tshut_mode,
- 
-@@ -742,6 +763,7 @@ static const struct rockchip_tsadc_chip rk3368_tsadc_data = {
- 	.irq_ack = rk_tsadcv2_irq_ack,
- 	.control = rk_tsadcv2_control,
- 	.get_temp = rk_tsadcv2_get_temp,
-+	.set_alarm_temp = rk_tsadcv2_alarm_temp,
- 	.set_tshut_temp = rk_tsadcv2_tshut_temp,
- 	.set_tshut_mode = rk_tsadcv2_tshut_mode,
- 
-@@ -766,6 +788,7 @@ static const struct rockchip_tsadc_chip rk3399_tsadc_data = {
- 	.irq_ack = rk_tsadcv3_irq_ack,
- 	.control = rk_tsadcv3_control,
- 	.get_temp = rk_tsadcv2_get_temp,
-+	.set_alarm_temp = rk_tsadcv2_alarm_temp,
- 	.set_tshut_temp = rk_tsadcv2_tshut_temp,
- 	.set_tshut_mode = rk_tsadcv2_tshut_mode,
- 
-@@ -826,6 +849,21 @@ static irqreturn_t rockchip_thermal_alarm_irq_thread(int irq, void *dev)
- 	return IRQ_HANDLED;
- }
- 
-+static int rockchip_thermal_set_trips(void *_sensor, int low, int high)
-+{
-+	struct rockchip_thermal_sensor *sensor = _sensor;
-+	struct rockchip_thermal_data *thermal = sensor->thermal;
-+	const struct rockchip_tsadc_chip *tsadc = thermal->chip;
++			cooling-maps {
++				map0 {
++					trip = <&cpu_alert0>;
++					cooling-device =
++					<&cpu_b0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
++				};
++				map1 {
++					trip = <&cpu_alert1>;
++					cooling-device =
++					<&cpu_l0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
++				};
++			};
++		};
 +
-+	dev_dbg(&thermal->pdev->dev, "%s: sensor %d: low: %d, high %d\n",
-+		__func__, sensor->id, low, high);
++		gpu {
++			polling-delay-passive = <100>; /* milliseconds */
++			polling-delay = <5000>; /* milliseconds */
 +
-+	tsadc->set_alarm_temp(tsadc->table,
-+			      sensor->id, thermal->regs, high);
++			thermal-sensors = <&tsadc 1>;
 +
-+	return 0;
-+}
++			trips {
++				gpu_alert0: gpu_alert0 {
++					temperature = <80000>; /* millicelsius */
++					hysteresis = <2000>; /* millicelsius */
++					type = "passive";
++				};
++				gpu_crit: gpu_crit {
++					temperature = <115000>; /* millicelsius */
++					hysteresis = <2000>; /* millicelsius */
++					type = "critical";
++				};
++			};
 +
- static int rockchip_thermal_get_temp(void *_sensor, int *out_temp)
- {
- 	struct rockchip_thermal_sensor *sensor = _sensor;
-@@ -843,6 +881,7 @@ static int rockchip_thermal_get_temp(void *_sensor, int *out_temp)
++			cooling-maps {
++				map0 {
++					trip = <&gpu_alert0>;
++					cooling-device =
++					<&cpu_b0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
++				};
++			};
++		};
+ 	};
  
- static const struct thermal_zone_of_device_ops rockchip_of_thermal_ops = {
- 	.get_temp = rockchip_thermal_get_temp,
-+	.set_trips = rockchip_thermal_set_trips,
- };
- 
- static int rockchip_configure_from_dt(struct device *dev,
+ 	tsadc: tsadc at ff280000 {
 -- 
 1.9.1
