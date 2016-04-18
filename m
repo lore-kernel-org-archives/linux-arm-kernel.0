@@ -1,52 +1,43 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 18 Apr 2016 12:44:09 +0200
-Subject: [PATCH RFT 0/5] iio: mxs-lradc: fix leak and implement PM ops
-In-Reply-To: <57147BEF.4070606@i2se.com>
-References: <1460648909-2657-1-git-send-email-stefan.wahren@i2se.com>
- <570FF5AF.7010801@denx.de> <57147BEF.4070606@i2se.com>
-Message-ID: <5714BA79.40803@denx.de>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 18 Apr 2016 12:14:59 +0100
+Subject: [PATCH v2 2/3] arm64: mm: Show bss segment in kernel memory layout
+In-Reply-To: <1460948988-7477-3-git-send-email-wangkefeng.wang@huawei.com>
+References: <1460533772-13314-1-git-send-email-wangkefeng.wang@huawei.com>
+ <1460948988-7477-1-git-send-email-wangkefeng.wang@huawei.com>
+ <1460948988-7477-3-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <5714C1B3.3000005@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/18/2016 08:17 AM, Stefan Wahren wrote:
-> Am 14.04.2016 um 21:55 schrieb Marek Vasut:
->> On 04/14/2016 05:48 PM, Stefan Wahren wrote:
->>> This patch series fix a memory leak and implements suspend/resume
->>> support for mxs-lradc.
->>>
->>> Patch 1: fix the memory leak
->>> Patch 2-4: refactor mxs-lradc in order to prepare PM implementation
->>> Patch 5: implement suspend/resume support
->>>
->>> These patches has been tested with i.MX23 and i.MX28 but without
->>> a touchscreen. I added only a bogus touchscreen in devicetree.
->>>
->>> It would be nice if someone with a real touchscreen could test it.
->>>
->>> Stefan Wahren (5):
->>>   iio: mxs-lradc: fix memory leak
->>>   iio: mxs-lradc: move TS config into suitable function
->>>   iio: mxs-lradc: move STMP reset out of ADC init
->>>   iio: mxs-lradc: disable only mapped channels in mxs_lradc_hw_stop
->>>   iio: mxs-lradc: implement suspend/resume support
->>>
->>>  drivers/iio/adc/mxs-lradc.c |  116 ++++++++++++++++++++++++++++++-------------
->>>  1 file changed, 82 insertions(+), 34 deletions(-)
->>>
->> On M28EVK:
->>
->> Tested-by: Marek Vasut <marex@denx.de>
->>
+On 18/04/16 04:09, Kefeng Wang wrote:
+> Show the bss segment information as with text and data in Virtual
+> memory kernel layout.
 > 
+> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+> ---
+>  arch/arm64/mm/init.c | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> Thanks. Only one question, does it imply a test with a touchscreen?
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index ce2e400..c96fe51 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -379,6 +379,8 @@ void __init mem_init(void)
+>  		MLK_ROUNDUP(__init_begin, __init_end));
+>  	pr_cont("      .data : 0x%p" " - 0x%p" "   (%6ld KB)\n",
+>  		MLK_ROUNDUP(_sdata, _edata));
+> +	pr_cont("       .bss : 0x%p" " - 0x%p" "   (%6ld KB)\n",
+> +		MLK_ROUNDUP(__bss_start, __bss_stop));
+>  #ifdef CONFIG_SPARSEMEM_VMEMMAP
+>  	pr_cont("    vmemmap : 0x%16lx - 0x%16lx   (%6ld GB maximum)\n",
+>  		MLG(VMEMMAP_START, VMEMMAP_START + VMEMMAP_SIZE));
 > 
 
-Yes, this one [1]. It's an Ampire 800480 display and resistive touch
-on top of it.
+I think this is useful,
 
-[1] http://www.denx-cs.de/?q=MxxDK
+Acked-by: James Morse <james.morse@arm.com>
 
--- 
-Best regards,
-Marek Vasut
+
+Thanks,
+
+James
