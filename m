@@ -1,68 +1,45 @@
-From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Mon, 18 Apr 2016 15:13:29 +0800
-Subject: [PATCH] mmc: mediatek: fix request blocked by cancel_delayed_work
-Message-ID: <1460963609-16179-1-git-send-email-chaotian.jing@mediatek.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Mon, 18 Apr 2016 09:24:14 +0200
+Subject: [PATCH 1/2] [media] atmel-isc: add the Image Sensor Controller
+ code
+In-Reply-To: <1460533460-32336-2-git-send-email-songjun.wu@atmel.com>
+References: <1460533460-32336-1-git-send-email-songjun.wu@atmel.com>
+ <1460533460-32336-2-git-send-email-songjun.wu@atmel.com>
+Message-ID: <57148B9E.2000609@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-there are 2 points will cause could not call mmc_request_done()
-and eventually cause the caller thread blocked.
+On 04/13/2016 09:44 AM, Songjun Wu wrote:
+> Add driver for the Image Sensor Controller. It manages
+> incoming data from a parallel based CMOS/CCD sensor.
+> It has an internal image processor, also integrates a
+> triple channel direct memory access controller master
+> interface.
+> 
+> Signed-off-by: Songjun Wu <songjun.wu@atmel.com>
 
-A. if card was busy, cancel_delayed_work() will return false because
-the delay work has not been scheduled, in this case, need put
-mod_delayed_work() in front of msdc_cmd_is_ready()
+Hi Songjun,
 
-B. if a request really need more than 5s(Some Sandisk TF card), it will
-use cancel_delayed_work() to cancel itself, and also return false, so use
-in_interrupt() to avoid this case
+Before this driver can be accepted it has to pass the v4l2-compliance test.
+The v4l2-compliance utility is here:
 
-Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
----
- drivers/mmc/host/mtk-sd.c | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+git://linuxtv.org/v4l-utils.git
 
-diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-index b17f30d..1511b1b 100644
---- a/drivers/mmc/host/mtk-sd.c
-+++ b/drivers/mmc/host/mtk-sd.c
-@@ -724,7 +724,7 @@ static void msdc_request_done(struct msdc_host *host, struct mmc_request *mrq)
- 	bool ret;
- 
- 	ret = cancel_delayed_work(&host->req_timeout);
--	if (!ret) {
-+	if (!ret && in_interrupt()) {
- 		/* delay work already running */
- 		return;
- 	}
-@@ -824,7 +824,12 @@ static inline bool msdc_cmd_is_ready(struct msdc_host *host,
- 	}
- 
- 	if (mmc_resp_type(cmd) == MMC_RSP_R1B || cmd->data) {
--		tmo = jiffies + msecs_to_jiffies(20);
-+		/*
-+		 * 2550ms is from EXT_CSD[248], after switch to hs200,
-+		 * using CMD13 to polling card status, it will get response
-+		 * of 0x800, but EMMC still pull-low DAT0.
-+		 */
-+		tmo = jiffies + msecs_to_jiffies(2550);
- 		/* R1B or with data, should check SDCBUSY */
- 		while ((readl(host->base + SDC_STS) & SDC_STS_SDCBUSY) &&
- 				time_before(jiffies, tmo))
-@@ -847,6 +852,7 @@ static void msdc_start_command(struct msdc_host *host,
- 	WARN_ON(host->cmd);
- 	host->cmd = cmd;
- 
-+	mod_delayed_work(system_wq, &host->req_timeout, DAT_TIMEOUT);
- 	if (!msdc_cmd_is_ready(host, mrq, cmd))
- 		return;
- 
-@@ -858,7 +864,6 @@ static void msdc_start_command(struct msdc_host *host,
- 
- 	cmd->error = 0;
- 	rawcmd = msdc_cmd_prepare_raw_cmd(host, mrq, cmd);
--	mod_delayed_work(system_wq, &host->req_timeout, DAT_TIMEOUT);
- 
- 	sdr_set_bits(host->base + MSDC_INTEN, cmd_ints_mask);
- 	writel(cmd->arg, host->base + SDC_ARG);
--- 
-1.8.1.1.dirty
+Compile the utility straight from this repository so you're up to date.
+
+First fix any failures you get when running 'v4l2-compliance', then do the
+same when running 'v4l2-compliance -s' (now it is streaming as well) and
+finally when running 'v4l2-compliance -f' (streaming and testing all available
+formats).
+
+I would like to see the output of 'v4l2-compliance -f' as part of the cover
+letter of the next patch series.
+
+Looking at the code I see that it will definitely fail a few tests :-)
+
+Certainly the VIDIOC_CREATE_BUFS support in the queue_setup function is missing.
+Read the comments for queue_setup in videobuf2-core.h for more information.
+
+Regards,
+
+	Hans
