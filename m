@@ -1,99 +1,118 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Mon, 18 Apr 2016 14:14:05 -0700
-Subject: [PATCH v4 07/14] x86, acpi,
- numa: cleanup acpi_numa_processor_affinity_init()
+Date: Mon, 18 Apr 2016 14:14:06 -0700
+Subject: [PATCH v4 08/14] acpi,
+ numa: move bad_srat() and srat_disabled() to drivers/acpi/numa.c
 In-Reply-To: <1461014052-30788-1-git-send-email-ddaney.cavm@gmail.com>
 References: <1461014052-30788-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1461014052-30788-8-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1461014052-30788-9-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hanjun Guo <hanjun.guo@linaro.org>
 
-Cleanup acpi_numa_processor_affinity_init() in preparation for its
-move to drivers/acpi/numa.c.  It will be reused by arm64, this has no
-functional change.
+bad_srat() and srat_disabled() are shared by x86 and follow-on arm64
+patches.  Move them to drivers/acpi/numa.c in preparation for arm64
+support.
 
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 Signed-off-by: Robert Richter <rrichter@cavium.com>
 Signed-off-by: David Daney <david.daney@cavium.com>
 ---
- arch/x86/mm/srat.c | 21 +++++----------------
- 1 file changed, 5 insertions(+), 16 deletions(-)
+ arch/x86/include/asm/acpi.h |  1 -
+ arch/x86/mm/numa.c          |  2 +-
+ arch/x86/mm/srat.c          | 13 -------------
+ drivers/acpi/numa.c         |  1 +
+ include/acpi/acpi_numa.h    | 12 ++++++++++++
+ 5 files changed, 14 insertions(+), 15 deletions(-)
 
+diff --git a/arch/x86/include/asm/acpi.h b/arch/x86/include/asm/acpi.h
+index 94c18eb..65f1e95 100644
+--- a/arch/x86/include/asm/acpi.h
++++ b/arch/x86/include/asm/acpi.h
+@@ -145,7 +145,6 @@ static inline void disable_acpi(void) { }
+ #define ARCH_HAS_POWER_INIT	1
+ 
+ #ifdef CONFIG_ACPI_NUMA
+-extern int acpi_numa;
+ extern int x86_acpi_numa_init(void);
+ #endif /* CONFIG_ACPI_NUMA */
+ 
+diff --git a/arch/x86/mm/numa.c b/arch/x86/mm/numa.c
+index f70c1ff..57673f5 100644
+--- a/arch/x86/mm/numa.c
++++ b/arch/x86/mm/numa.c
+@@ -1,4 +1,5 @@
+ /* Common code for 32 and 64-bit NUMA */
++#include <linux/acpi.h>
+ #include <linux/kernel.h>
+ #include <linux/mm.h>
+ #include <linux/string.h>
+@@ -15,7 +16,6 @@
+ #include <asm/e820.h>
+ #include <asm/proto.h>
+ #include <asm/dma.h>
+-#include <asm/acpi.h>
+ #include <asm/amd_nb.h>
+ 
+ #include "numa_internal.h"
 diff --git a/arch/x86/mm/srat.c b/arch/x86/mm/srat.c
-index f242a11..9e2a833 100644
+index 9e2a833..4217071f 100644
 --- a/arch/x86/mm/srat.c
 +++ b/arch/x86/mm/srat.c
-@@ -26,11 +26,6 @@
+@@ -24,19 +24,6 @@
+ #include <asm/apic.h>
+ #include <asm/uv/uv.h>
  
- int acpi_numa __initdata;
- 
--static __init int setup_node(int pxm)
+-int acpi_numa __initdata;
+-
+-static __init void bad_srat(void)
 -{
--	return acpi_map_pxm_to_node(pxm);
+-	printk(KERN_ERR "SRAT: SRAT not used.\n");
+-	acpi_numa = -1;
 -}
 -
- static __init void bad_srat(void)
- {
- 	printk(KERN_ERR "SRAT: SRAT not used.\n");
-@@ -64,7 +59,7 @@ acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa)
- 			 pxm, apic_id);
- 		return;
- 	}
--	node = setup_node(pxm);
-+	node = acpi_map_pxm_to_node(pxm);
- 	if (node < 0) {
- 		printk(KERN_ERR "SRAT: Too many proximity domains %x\n", pxm);
- 		bad_srat();
-@@ -100,7 +95,7 @@ acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa)
- 	pxm = pa->proximity_domain_lo;
- 	if (acpi_srat_revision >= 2)
- 		pxm |= *((unsigned int*)pa->proximity_domain_hi) << 8;
--	node = setup_node(pxm);
-+	node = acpi_map_pxm_to_node(pxm);
- 	if (node < 0) {
- 		printk(KERN_ERR "SRAT: Too many proximity domains %x\n", pxm);
- 		bad_srat();
-@@ -124,12 +119,6 @@ acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa)
- 	       pxm, apic_id, node);
- }
- 
--#ifdef CONFIG_MEMORY_HOTPLUG
--static inline int save_add_info(void) {return 1;}
--#else
--static inline int save_add_info(void) {return 0;}
--#endif
+-static __init inline int srat_disabled(void)
+-{
+-	return acpi_numa < 0;
+-}
 -
- /* Callback for parsing of the Proximity Domain <-> Memory Area mappings */
- int __init
- acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
-@@ -145,7 +134,7 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
- 	if ((ma->flags & ACPI_SRAT_MEM_ENABLED) == 0)
- 		goto out_err;
- 	hotpluggable = ma->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE;
--	if (hotpluggable && !save_add_info())
-+	if (hotpluggable && !IS_ENABLED(CONFIG_MEMORY_HOTPLUG))
- 		goto out_err;
+ /* Callback for Proximity Domain -> x2APIC mapping */
+ void __init
+ acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa)
+diff --git a/drivers/acpi/numa.c b/drivers/acpi/numa.c
+index 5403d62..9b35ba9 100644
+--- a/drivers/acpi/numa.c
++++ b/drivers/acpi/numa.c
+@@ -40,6 +40,7 @@ static int node_to_pxm_map[MAX_NUMNODES]
+ 			= { [0 ... MAX_NUMNODES - 1] = PXM_INVAL };
  
- 	start = ma->base_address;
-@@ -154,7 +143,7 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
- 	if (acpi_srat_revision <= 1)
- 		pxm &= 0xff;
+ unsigned char acpi_srat_revision __initdata;
++int acpi_numa __initdata;
  
--	node = setup_node(pxm);
-+	node = acpi_map_pxm_to_node(pxm);
- 	if (node < 0) {
- 		printk(KERN_ERR "SRAT: Too many proximity domains.\n");
- 		goto out_err_bad_srat;
-@@ -182,7 +171,7 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
- out_err_bad_srat:
- 	bad_srat();
- out_err:
--	return -1;
-+	return -EINVAL;
- }
+ int pxm_to_node(int pxm)
+ {
+diff --git a/include/acpi/acpi_numa.h b/include/acpi/acpi_numa.h
+index 94a37cd..28f06a6 100644
+--- a/include/acpi/acpi_numa.h
++++ b/include/acpi/acpi_numa.h
+@@ -15,6 +15,18 @@ extern int pxm_to_node(int);
+ extern int node_to_pxm(int);
+ extern int acpi_map_pxm_to_node(int);
+ extern unsigned char acpi_srat_revision;
++extern int acpi_numa __initdata;
++
++static inline void bad_srat(void)
++{
++	pr_err("SRAT: SRAT not used.\n");
++	acpi_numa = -1;
++}
++
++static  inline int srat_disabled(void)
++{
++	return acpi_numa < 0;
++}
  
- int __init x86_acpi_numa_init(void)
+ #endif				/* CONFIG_ACPI_NUMA */
+ #endif				/* __ACP_NUMA_H */
 -- 
 1.7.11.7
