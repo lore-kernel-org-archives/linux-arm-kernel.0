@@ -1,62 +1,58 @@
-From: akshay.bhat@timesys.com (Akshay Bhat)
-Date: Mon, 18 Apr 2016 17:19:45 -0400
-Subject: [PATCH 3/3] ARM: dts: imx: b450/b650v3: Move ldb_di clk assignment
-In-Reply-To: <1461014385-26027-1-git-send-email-akshay.bhat@timesys.com>
-References: <1461014385-26027-1-git-send-email-akshay.bhat@timesys.com>
-Message-ID: <1461014385-26027-3-git-send-email-akshay.bhat@timesys.com>
+From: slemieux.tyco@gmail.com (Sylvain Lemieux)
+Date: Mon, 18 Apr 2016 17:22:28 -0400
+Subject: [PATCH 0/3] arm: dts: lpc32xx: update ssp / spi nodes
+In-Reply-To: <5714664C.7080201@mleia.com>
+References: <1460636437-21764-1-git-send-email-slemieux.tyco@gmail.com>
+ <3938626.hTOUROu3U1@wuerfel>  <5714664C.7080201@mleia.com>
+Message-ID: <1461014548.27294.10.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previously the LDB_DIx clocks could be specified in the ldb node. With
-the ERR009219 errata fix applied, the ldb_di clocks now needs to be
-specified in the clks node to ensure the clocks are setup early in the
-boot process.
+Hi Vladimir and Arnd,
 
-Signed-off-by: Akshay Bhat <akshay.bhat@timesys.com>
----
- arch/arm/boot/dts/imx6q-b450v3.dts | 5 ++++-
- arch/arm/boot/dts/imx6q-b650v3.dts | 5 ++++-
- 2 files changed, 8 insertions(+), 2 deletions(-)
+On Mon, 2016-04-18 at 07:45 +0300, Vladimir Zapolskiy wrote:
+> Hi Arnd,
+> 
+> On 16.04.2016 22:34, Arnd Bergmann wrote:
+> > On Thursday 14 April 2016 08:20:34 slemieux.tyco at gmail.com wrote:
+> >> From: Sylvain Lemieux <slemieux@tycoint.com>
+> >>
+...
+> >>
+> > The patches look fine, but it's unclear what you want to happen with them
+> > as long as the maintainer situation is not resolved. I've seen patches
+> > from Vladimir and you recently, and none from Roland, so I think it would
+> > be good if one or both of you could officially step up to be maintainers
+> > and collect all patches to forward them to arm at kernel.org for inclusion.
+> 
+> for v4.5 and v4.6 I collected my own patches from LAKML after review,
+> I started to do it for v4.7, but probably a bit later than desired.
+> 
+Vladimir, would it be possible for you to add my change, after review 
+is done on LAKML, for the lpc32xx pull request you will do for 4.7?
 
-diff --git a/arch/arm/boot/dts/imx6q-b450v3.dts b/arch/arm/boot/dts/imx6q-b450v3.dts
-index 3101be5..f0a2be5 100644
---- a/arch/arm/boot/dts/imx6q-b450v3.dts
-+++ b/arch/arm/boot/dts/imx6q-b450v3.dts
-@@ -65,11 +65,14 @@
- 	};
- };
- 
--&ldb {
-+&clks {
- 	assigned-clocks = <&clks IMX6QDL_CLK_LDB_DI0_SEL>,
- 			  <&clks IMX6QDL_CLK_LDB_DI1_SEL>;
- 	assigned-clock-parents = <&clks IMX6QDL_CLK_PLL3_USB_OTG>,
- 				 <&clks IMX6QDL_CLK_PLL3_USB_OTG>;
-+};
-+
-+&ldb {
- 	status = "okay";
- 
- 	lvds0: lvds-channel at 0 {
-diff --git a/arch/arm/boot/dts/imx6q-b650v3.dts b/arch/arm/boot/dts/imx6q-b650v3.dts
-index 823f55c..33cb71a 100644
---- a/arch/arm/boot/dts/imx6q-b650v3.dts
-+++ b/arch/arm/boot/dts/imx6q-b650v3.dts
-@@ -65,11 +65,14 @@
- 	};
- };
- 
--&ldb {
-+&clks {
- 	assigned-clocks = <&clks IMX6QDL_CLK_LDB_DI0_SEL>,
- 			  <&clks IMX6QDL_CLK_LDB_DI1_SEL>;
- 	assigned-clock-parents = <&clks IMX6QDL_CLK_PLL3_USB_OTG>,
- 				 <&clks IMX6QDL_CLK_PLL3_USB_OTG>;
-+};
-+
-+&ldb {
- 	status = "okay";
- 
- 	lvds0: lvds-channel at 0 {
--- 
-2.8.1
+> > Once we have an agreement on who does this, please send a patch to
+> > update the MAINTAINERS file.
+> 
+> I'll send a change on behalf of myself, at this point I don't think that
+> pure lpc32xx maintenance (deliberately here I exclude development!) task
+> takes more than 20 hours per month, which is affordable for me,
+> Sylvain please express your view.
+> 
+I can provide support for pure lpc32xx maintenance task 
+(I also exclude development); I can free up to 10-15 hours a
+month for doing testing and patch review.
+
+Is there any documentation available on the process 
+to submit a merge request to the mailing list?
+
+...
+> > 
+> > 	Arnd
+> > 
+> 
+> --
+> With best wishes,
+> Vladimir
+
+Sylvain
