@@ -1,129 +1,26 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 18 Apr 2016 17:10:38 +0100
-Subject: [PATCH v7 01/16] arm64: KVM: Register CPU notifiers when the
- kernel runs at HYP
-In-Reply-To: <1459529620-22150-2-git-send-email-james.morse@arm.com>
+Date: Mon, 18 Apr 2016 17:11:32 +0100
+Subject: [PATCH v7 02/16] arm64: Fold proc-macros.S into assembler.h
+In-Reply-To: <1459529620-22150-3-git-send-email-james.morse@arm.com>
 References: <1459529620-22150-1-git-send-email-james.morse@arm.com>
- <1459529620-22150-2-git-send-email-james.morse@arm.com>
-Message-ID: <20160418161037.GE18257@e104818-lin.cambridge.arm.com>
+ <1459529620-22150-3-git-send-email-james.morse@arm.com>
+Message-ID: <20160418161132.GF18257@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 01, 2016 at 05:53:25PM +0100, James Morse wrote:
-> When the kernel is running at EL2, it doesn't need init_hyp_mode() to
-> configure page tables for HYP. This function also registers the CPU
-> hotplug and lower power notifiers that cause HYP to be re-initialised
-> after the CPU has been reset.
+On Fri, Apr 01, 2016 at 05:53:26PM +0100, James Morse wrote:
+> From: Geoff Levand <geoff@infradead.org>
 > 
-> To avoid losing the register state that controls stage2 translation, move
-> the registering of these notifiers into init_subsystems(), and add a
-> is_kernel_in_hyp_mode() path to each callback.
+> To allow the assembler macros defined in arch/arm64/mm/proc-macros.S to
+> be used outside the mm code move the contents of proc-macros.S to
+> asm/assembler.h.  Also, delete proc-macros.S, and fix up all references
+> to proc-macros.S.
 > 
-> Fixes: 1e947bad0b6 ("arm64: KVM: Skip HYP setup when already running in HYP")
+> Signed-off-by: Geoff Levand <geoff@infradead.org>
+> Acked-by: Pavel Machek <pavel@ucw.cz>
+> [rebased, included dcache_by_line_op]
 > Signed-off-by: James Morse <james.morse@arm.com>
 
-To the best of my knowledge of the hyp code:
+The patch makes sense:
 
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-
-Since it has a Fixes tag, does this need to be picked for 4.6 or a Cc:
-stable if it goes in later?
-
-(cc'ing Marc and Christoffer; patch below for reference)
-
-> ---
->  arch/arm/kvm/arm.c | 52 +++++++++++++++++++++++++++++++++-------------------
->  1 file changed, 33 insertions(+), 19 deletions(-)
-> 
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index 6accd66d26f0..b5384311dec4 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -1061,15 +1061,27 @@ static void cpu_init_hyp_mode(void *dummy)
->  	kvm_arm_init_debug();
->  }
->  
-> +static void cpu_hyp_reinit(void)
-> +{
-> +	if (is_kernel_in_hyp_mode()) {
-> +		/*
-> +		 * cpu_init_stage2() is safe to call even if the PM
-> +		 * event was cancelled before the CPU was reset.
-> +		 */
-> +		cpu_init_stage2(NULL);
-> +	} else {
-> +		if (__hyp_get_vectors() == hyp_default_vectors)
-> +			cpu_init_hyp_mode(NULL);
-> +	}
-> +}
-> +
->  static int hyp_init_cpu_notify(struct notifier_block *self,
->  			       unsigned long action, void *cpu)
->  {
->  	switch (action) {
->  	case CPU_STARTING:
->  	case CPU_STARTING_FROZEN:
-> -		if (__hyp_get_vectors() == hyp_default_vectors)
-> -			cpu_init_hyp_mode(NULL);
-> -		break;
-> +		cpu_hyp_reinit();
->  	}
->  
->  	return NOTIFY_OK;
-> @@ -1084,9 +1096,8 @@ static int hyp_init_cpu_pm_notifier(struct notifier_block *self,
->  				    unsigned long cmd,
->  				    void *v)
->  {
-> -	if (cmd == CPU_PM_EXIT &&
-> -	    __hyp_get_vectors() == hyp_default_vectors) {
-> -		cpu_init_hyp_mode(NULL);
-> +	if (cmd == CPU_PM_EXIT) {
-> +		cpu_hyp_reinit();
->  		return NOTIFY_OK;
->  	}
->  
-> @@ -1128,6 +1139,22 @@ static int init_subsystems(void)
->  	int err;
->  
->  	/*
-> +	 * Register CPU Hotplug notifier
-> +	 */
-> +	cpu_notifier_register_begin();
-> +	err = __register_cpu_notifier(&hyp_init_cpu_nb);
-> +	cpu_notifier_register_done();
-> +	if (err) {
-> +		kvm_err("Cannot register KVM init CPU notifier (%d)\n", err);
-> +		return err;
-> +	}
-> +
-> +	/*
-> +	 * Register CPU lower-power notifier
-> +	 */
-> +	hyp_cpu_pm_init();
-> +
-> +	/*
->  	 * Init HYP view of VGIC
->  	 */
->  	err = kvm_vgic_hyp_init();
-> @@ -1270,19 +1297,6 @@ static int init_hyp_mode(void)
->  	free_boot_hyp_pgd();
->  #endif
->  
-> -	cpu_notifier_register_begin();
-> -
-> -	err = __register_cpu_notifier(&hyp_init_cpu_nb);
-> -
-> -	cpu_notifier_register_done();
-> -
-> -	if (err) {
-> -		kvm_err("Cannot register HYP init CPU notifier (%d)\n", err);
-> -		goto out_err;
-> -	}
-> -
-> -	hyp_cpu_pm_init();
-> -
->  	/* set size of VMID supported by CPU */
->  	kvm_vmid_bits = kvm_get_vmid_bits();
->  	kvm_info("%d-bit VMID\n", kvm_vmid_bits);
-> -- 
-> 2.8.0.rc3
