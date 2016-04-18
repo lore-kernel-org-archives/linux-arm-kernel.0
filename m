@@ -1,47 +1,50 @@
-From: slash.tmp@free.fr (Mason)
-Date: Mon, 18 Apr 2016 20:29:47 +0200
-Subject: Problem with 4.6-rc2
-In-Reply-To: <57152224.5080003@hurleysoftware.com>
-References: <57150A3D.6020500@free.fr> <57152224.5080003@hurleysoftware.com>
-Message-ID: <5715279B.9060806@free.fr>
+From: slemieux.tyco@gmail.com (Sylvain Lemieux)
+Date: Mon, 18 Apr 2016 14:34:17 -0400
+Subject: [PATCH 3/3] arm: dts: phy3250: enable ssp0
+In-Reply-To: <57144AB1.6040304@mleia.com>
+References: <1460636437-21764-1-git-send-email-slemieux.tyco@gmail.com>
+ <1460636437-21764-4-git-send-email-slemieux.tyco@gmail.com>
+ <57144AB1.6040304@mleia.com>
+Message-ID: <1461004457.27294.0.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/04/2016 20:06, Peter Hurley wrote:
-
-> On 04/18/2016 09:24 AM, Mason wrote:
->
->> I'm running into this panic. I will take a closer look tomorrow.
->> Any ideas?
+On Mon, 2016-04-18 at 05:47 +0300, Vladimir Zapolskiy wrote:
+> Hi Sylvain,
 > 
-> commit 8d2acdb9fc3a544ab0442634531834d6007b5467
-> Author: Jean Delvare <jdelvare@suse.de>
-> Date:   Mon Feb 22 09:00:39 2016 +0100
+> On 14.04.2016 15:20, slemieux.tyco at gmail.com wrote:
+> > From: Sylvain Lemieux <slemieux@tycoint.com>
+> > 
 > 
->     serial: 8250: Add hardware dependency to RT288X option
->     
->     Kconfig option SERIAL_8250_RT288X seems to be only relevant on MIPS
->     platforms, so do not present it on other architectures, unless
->     build-testing.
->     
->     Signed-off-by: Jean Delvare <jdelvare@suse.de>
->     Cc: Mans Rullgard <mans@mansr.com>
->     Cc: Jiri Slaby <jslaby@suse.com>
->     Acked-by: John Crispin <blogic@openwrt.org>
->     Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> even a short commit message is highly appreciated, e.g. "this is a preparatory
+> change prior to disabling SSPx controllers by default in the shared LPC32xx
+> DTSI file".
 > 
+> > Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
+> > ---
+> >  arch/arm/boot/dts/phy3250.dts | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/phy3250.dts b/arch/arm/boot/dts/phy3250.dts
+> > index a00d7ce..26e070f 100644
+> > --- a/arch/arm/boot/dts/phy3250.dts
+> > +++ b/arch/arm/boot/dts/phy3250.dts
+> > @@ -146,6 +146,7 @@
+> >  				#size-cells = <0>;
+> >  				num-cs = <1>;
+> >  				cs-gpios = <&gpio 3 5 0>;
+> > +				status = "okay";
+> >  
+> >  				eeprom: at25 at 0 {
+> >  					pl022,interface = <0>;
+> > 
 > 
-> Not sure why Greg picked this up over my objections though
+> Could you please swap 2/3 and 3/3 ?
+> 
+OK, will submit v2 tomorrow.
 
-Peter,
-
-Thanks for pointing out the problem.
-
-Greg,
-
-My ARM-based SoC uses this hardware (Palmchip BK-3103) and it
-now panics on boot.
-
-Can we revert 8d2acdb9fc3a in time for v4.7?
-
-Regards.
+> This may save some time to git-bisect users, if there are any :)
+> 
+> --
+> With best wishes,
+> Vladimir
