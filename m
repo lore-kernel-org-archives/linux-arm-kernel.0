@@ -1,42 +1,80 @@
 From: brad.mouring@ni.com (Brad Mouring)
-Date: Mon, 18 Apr 2016 16:36:49 -0500
-Subject: [PATCH v2 0/2] Control PL310 pwr_ctrl register through DT
-In-Reply-To: <1456265019-23900-1-git-send-email-brad.mouring@ni.com>
+Date: Mon, 18 Apr 2016 16:36:50 -0500
+Subject: [PATCH v2 1/2] pl2x0: Add OF control of cache power management
+In-Reply-To: <1461015411-14000-1-git-send-email-brad.mouring@ni.com>
 References: <1456265019-23900-1-git-send-email-brad.mouring@ni.com>
-Message-ID: <1461015411-14000-1-git-send-email-brad.mouring@ni.com>
+ <1461015411-14000-1-git-send-email-brad.mouring@ni.com>
+Message-ID: <1461015411-14000-2-git-send-email-brad.mouring@ni.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add ability to override power management bits of 310 controllers
+(dynamic clock gating and standby mode) through OF entries. As the
+saved register is only applied when working on a supported controller,
+it is safe to save the settings.
 
-This submission addresses the concerns brought up here:
-http://www.spinics.net/lists/arm-kernel/msg495003.html
+In order to maintain existing behavior, if the settings are not found
+in the DT, the corresponding feature will be enabled.
 
-The of_property_read_u32 returns -EINVAL when the property is
-not found in the dtb, and we ignore that error. An error message
-is only printed when the property is present with an invalid value.
+Signed-off-by: Brad Mouring <brad.mouring@ni.com>
+---
+ arch/arm/mm/cache-l2x0.c | 30 +++++++++++++++++++++++++-----
+ 1 file changed, 25 insertions(+), 5 deletions(-)
 
-The other issue raised was concerning the default behavior if
-the properties are not in the dtb. The existing behavior prior
-to this changeset is maintained.
-
-During some performance-oriented benchmarking on a Cortex A9
-platform, a slight performance degradation was noted on datasets
-that spanned into the L2 cache (<10%). This performance hit was
-minor, but it prompted investigation into the cause.
-
-One difference in the actual PL310 configuration that was concerning
-was the enabling of two PM-related changes: Dynamic Clock Gating
-and Standby Mode Enabling. As the kernel being tested was patched
-and configured to use the PREEMPT_RT patchset, it was desired to
-disable these settings for our use-case since anything PM can
-(and usually does) impact determinism.
-
-Making these changes resulted in a modest performance improvement
-and those wonderful warm-n-fuzzies regarding determinism and enabling
-system control without needing to change the kernel.
-
-In the following set, there's the actual change to control these
-features given DT presence of a couple of new bindings and the
-documenation to accompany those changes.
-
-Thanks for the feedback!
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 9f9d542..f284bd3 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -647,11 +647,6 @@ static void __init l2c310_enable(void __iomem *base, unsigned num_lock)
+ 		aux &= ~(L310_AUX_CTRL_FULL_LINE_ZERO | L310_AUX_CTRL_EARLY_BRESP);
+ 	}
+ 
+-	/* r3p0 or later has power control register */
+-	if (rev >= L310_CACHE_ID_RTL_R3P0)
+-		l2x0_saved_regs.pwr_ctrl = L310_DYNAMIC_CLK_GATING_EN |
+-						L310_STNDBY_MODE_EN;
+-
+ 	/*
+ 	 * Always enable non-secure access to the lockdown registers -
+ 	 * we write to them as part of the L2C enable sequence so they
+@@ -1141,6 +1136,7 @@ static void __init l2c310_of_parse(const struct device_node *np,
+ 	u32 filter[2] = { 0, 0 };
+ 	u32 assoc;
+ 	u32 prefetch;
++	u32 power;
+ 	u32 val;
+ 	int ret;
+ 
+@@ -1271,6 +1267,30 @@ static void __init l2c310_of_parse(const struct device_node *np,
+ 	}
+ 
+ 	l2x0_saved_regs.prefetch_ctrl = prefetch;
++
++	power = l2x0_saved_regs.pwr_ctrl |
++		L310_DYNAMIC_CLK_GATING_EN | L310_STNDBY_MODE_EN;
++
++	ret = of_property_read_u32(np, "arm,dynamic-clock-gating", &val);
++	if (ret == 0) {
++		if (val)
++			power |= L310_DYNAMIC_CLK_GATING_EN;
++		else
++			power &= ~L310_DYNAMIC_CLK_GATING_EN;
++	} else if (ret != -EINVAL) {
++		pr_err("L2C-310 OF dynamic-clock-gating property value is missing or invalid\n");
++	}
++	ret = of_property_read_u32(np, "arm,standby-mode", &val);
++	if (ret == 0) {
++		if (val)
++			power |= L310_STNDBY_MODE_EN;
++		else
++			power &= ~L310_STNDBY_MODE_EN;
++	} else if (ret != -EINVAL) {
++		pr_err("L2C-310 OF standby-mode property value is missing or invalid\n");
++	}
++
++	l2x0_saved_regs.pwr_ctrl = power;
+ }
+ 
+ static const struct l2c_init_data of_l2c310_data __initconst = {
+-- 
+2.7.3
