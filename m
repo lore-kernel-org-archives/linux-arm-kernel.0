@@ -1,41 +1,58 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 18 Apr 2016 17:00:49 +0200
-Subject: [PATCH v2] arm64: pci: add support for pci_mmap_page_range
-In-Reply-To: <20160418145348.GA2342@localhost.localdomain>
-References: <1460581856-12380-1-git-send-email-jerin.jacob@caviumnetworks.com>
- <10832709.SG7ma9Lsjb@wuerfel> <20160418145348.GA2342@localhost.localdomain>
-Message-ID: <29393988.imklgXkpJX@wuerfel>
+Date: Mon, 18 Apr 2016 17:03:04 +0200
+Subject: [PATCH 0/3] arm: dts: lpc32xx: update ssp / spi nodes
+In-Reply-To: <5714664C.7080201@mleia.com>
+References: <1460636437-21764-1-git-send-email-slemieux.tyco@gmail.com>
+ <3938626.hTOUROu3U1@wuerfel> <5714664C.7080201@mleia.com>
+Message-ID: <4171701.NnjsU8HtkL@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 18 April 2016 20:23:49 Jerin Jacob wrote:
-> On Mon, Apr 18, 2016 at 04:15:28PM +0200, Arnd Bergmann wrote:
-> > On Monday 18 April 2016 19:31:20 Jerin Jacob wrote:
-> > > Regarding existing user space applications,
-> > > AFAIK, DPDK has the feature to support both /sysfs and vifo scheme.
-> > > X11 uses only /sysfs scheme.
-> > > 
-> > > IMO, Nothing wrong in providing this feature in arm64 kernel.
-> > > Except arm64, almost all the major architecture has this support.
-> > 
-> > My understanding was that it's considered deprecated and only
-> > supported for backwards compatibility, but now I can't find any
-> > indication of that in the source code and I don't know if that
-> > is actually the case.
-> > 
-> > I agree with Will that we should not expose the procfs interface,
-> > it's just far too ugly.
+On Monday 18 April 2016 07:45:00 Vladimir Zapolskiy wrote:
+> Hi Arnd,
 > 
-> Me too agree with Will and I don't like it either.
-> My point was, Irrespective of this change, the /proc/bus/pci/*/* entries
-> will be created. i.e disabling /proc/bus/pci should be a seprate patch
-> and it does not depend on this patch.
+> On 16.04.2016 22:34, Arnd Bergmann wrote:
+> > On Thursday 14 April 2016 08:20:34 slemieux.tyco at gmail.com wrote:
+> >> From: Sylvain Lemieux <slemieux@tycoint.com>
+> >>
+> >> This patchset change the following:
+> >> 1) adds clock properties to spi peripheral devices,
+> >>    clock ids are taken from dt-bindings/clock/lpc32xx-clock.h
+> >>
+> >> 2) disable, by default, the SSP0/SPI1 and SSP1/SPI2 shared pinout;
+> >>    shared pin should be enable in board specific dts, as needed.
+> >>
+> >> 3) enable SSP0 used by PHY3250.
+> >>
+> >> Sylvain Lemieux (3):
+> >>   arm: dts: lpc32xx: add clock properties to spi nodes
+> >>   arm: dts: lpc32xx: disabled ssp0/spi1 & ssp1/spi2 by default
+> >>   arm: dts: phy3250: enable ssp0
+> >>
+> >>  arch/arm/boot/dts/lpc32xx.dtsi | 16 ++++++++++++++
+> >>  arch/arm/boot/dts/phy3250.dts  |  1 +
+> >>  2 files changed, 15 insertions(+)
+> >>
+> >>
+> > 
+> > The patches look fine, but it's unclear what you want to happen with them
+> > as long as the maintainer situation is not resolved. I've seen patches
+> > from Vladimir and you recently, and none from Roland, so I think it would
+> > be good if one or both of you could officially step up to be maintainers
+> > and collect all patches to forward them to arm at kernel.org for inclusion.
+> 
+> for v4.5 and v4.6 I collected my own patches from LAKML after review,
+> I started to do it for v4.7, but probably a bit later than desired.
+> 
+> Could you please remind me, when do ARM maintainers generally stop
+> applying "for-next" pull requests?
 
-The problem is that once we allow mmap() on proc/bus/pci/*/*,
-it becomes much harder to prove that we are able to remove it
-again without breaking stuff that worked.
+There is no strict rule. We like to get patches as early as possible
+though, and if you send a lot of stuff late we may ask for it to be
+deferred until the following release.
 
-We have to decouple the sysfs interface from the procfs interface
-before we allow the former.
+If you have a lot of patches that go in early, it's more likely that
+later follow-on patches get merged too.
+
 
 	Arnd
