@@ -1,136 +1,65 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Mon, 18 Apr 2016 14:14:11 -0700
-Subject: [PATCH v4 13/14] acpi, numa: Enable ACPI based NUMA on ARM64
-In-Reply-To: <1461014052-30788-1-git-send-email-ddaney.cavm@gmail.com>
-References: <1461014052-30788-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1461014052-30788-14-git-send-email-ddaney.cavm@gmail.com>
+From: akshay.bhat@timesys.com (Akshay Bhat)
+Date: Mon, 18 Apr 2016 17:19:43 -0400
+Subject: [PATCH 1/3] ARM: dts: imx6q-b850v3: Remove ldb panel
+Message-ID: <1461014385-26027-1-git-send-email-akshay.bhat@timesys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hanjun Guo <hanjun.guo@linaro.org>
+Remove ldb panel entry for the following reasons:
+- The b850v3 has an onboard LVDS to DisplayPort converter (STDP4028). So
+we should not limit the monitors that can be connected by hardcoding the
+auo,b133htn01 1080p panel.
+- The default resolution on the LVDS interface needs to be WXGA or less.
+Otherwise when a 1080p monitor is connected to the HDMI port there is no
+output on both the LVDS and HDMI ports since a single IPU on i.MX6 can
+not handle two 1080p displays. With the panel entry removed from the
+devicetree, drm driver defaults the resolution on LVDS interface to XGA.
 
-Add function needed for cpu to node mapping, and enable ACPI based
-NUMA for ARM64 in Kconfig
+Once in userspace, applications can set the desired resolution on LVDS
+interface over IPU2 CRTC.
 
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Signed-off-by: Robert Richter <rrichter@cavium.com>
-Signed-off-by: David Daney <david.daney@cavium.com>
+Signed-off-by: Akshay Bhat <akshay.bhat@timesys.com>
 ---
- drivers/acpi/Kconfig |  2 +-
- drivers/acpi/numa.c  | 35 +++++++++++++++++++++++++++++++++++
- include/linux/acpi.h | 17 ++++++++++++++++-
- 3 files changed, 52 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/imx6q-b850v3.dts | 20 --------------------
+ 1 file changed, 20 deletions(-)
 
-diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-index 82b96ee..5ce9f66 100644
---- a/drivers/acpi/Kconfig
-+++ b/drivers/acpi/Kconfig
-@@ -291,7 +291,7 @@ config ACPI_THERMAL
- config ACPI_NUMA
- 	bool "NUMA support"
- 	depends on NUMA
--	depends on (X86 || IA64)
-+	depends on (X86 || IA64 || ARM64)
- 	default y if IA64_GENERIC || IA64_SGI_SN2
+diff --git a/arch/arm/boot/dts/imx6q-b850v3.dts b/arch/arm/boot/dts/imx6q-b850v3.dts
+index 984d000..dc4b06f 100644
+--- a/arch/arm/boot/dts/imx6q-b850v3.dts
++++ b/arch/arm/boot/dts/imx6q-b850v3.dts
+@@ -51,18 +51,6 @@
+ 	chosen {
+ 		stdout-path = &uart3;
+ 	};
+-
+-	panel-lvds0 {
+-		compatible = "auo,b133htn01";
+-		backlight = <&backlight_lvds>;
+-		ddc-i2c-bus = <&mux2_i2c2>;
+-
+-		port {
+-			panel_in_lvds0: endpoint {
+-				remote-endpoint = <&lvds0_out>;
+-			};
+-		};
+-	};
+ };
  
- config ACPI_CUSTOM_DSDT_FILE
-diff --git a/drivers/acpi/numa.c b/drivers/acpi/numa.c
-index 6133eb1..0862ccd 100644
---- a/drivers/acpi/numa.c
-+++ b/drivers/acpi/numa.c
-@@ -170,6 +170,18 @@ acpi_table_print_srat_entry(struct acpi_subtable_header *header)
- 		}
- 		break;
+ &ldb {
+@@ -77,14 +65,6 @@
+ 		fsl,data-mapping = "spwg";
+ 		fsl,data-width = <24>;
+ 		status = "okay";
+-
+-		port at 4 {
+-			reg = <4>;
+-
+-			lvds0_out: endpoint {
+-				remote-endpoint = <&panel_in_lvds0>;
+-			};
+-		};
+ 	};
+ };
  
-+	case ACPI_SRAT_TYPE_GICC_AFFINITY:
-+		{
-+			struct acpi_srat_gicc_affinity *p =
-+			    (struct acpi_srat_gicc_affinity *)header;
-+			pr_debug("SRAT Processor (acpi id[0x%04x]) in proximity domain %d %s\n",
-+				 p->acpi_processor_uid,
-+				 p->proximity_domain,
-+				 (p->flags & ACPI_SRAT_GICC_ENABLED) ?
-+				 "enabled" : "disabled");
-+		}
-+		break;
-+
- 	default:
- 		pr_warn("Found unsupported SRAT entry (type = 0x%x)\n",
- 			header->type);
-@@ -347,6 +359,24 @@ acpi_parse_processor_affinity(struct acpi_subtable_header *header,
- 	return 0;
- }
- 
-+static int __init
-+acpi_parse_gicc_affinity(struct acpi_subtable_header *header,
-+			 const unsigned long end)
-+{
-+	struct acpi_srat_gicc_affinity *processor_affinity;
-+
-+	processor_affinity = (struct acpi_srat_gicc_affinity *)header;
-+	if (!processor_affinity)
-+		return -EINVAL;
-+
-+	acpi_table_print_srat_entry(header);
-+
-+	/* let architecture-dependent part to do it */
-+	acpi_numa_gicc_affinity_init(processor_affinity);
-+
-+	return 0;
-+}
-+
- static int __initdata parsed_numa_memblks;
- 
- static int __init
-@@ -391,6 +421,9 @@ int __init acpi_numa_init(void)
- {
- 	int cnt = 0;
- 
-+	if (acpi_disabled)
-+		return -EINVAL;
-+
- 	/*
- 	 * Should not limit number with cpu num that is from NR_CPUS or nr_cpus=
- 	 * SRAT cpu entries could have different order with that in MADT.
-@@ -403,6 +436,8 @@ int __init acpi_numa_init(void)
- 				     acpi_parse_x2apic_affinity, 0);
- 		acpi_table_parse_srat(ACPI_SRAT_TYPE_CPU_AFFINITY,
- 				     acpi_parse_processor_affinity, 0);
-+		acpi_table_parse_srat(ACPI_SRAT_TYPE_GICC_AFFINITY,
-+				      acpi_parse_gicc_affinity, 0);
- 		cnt = acpi_table_parse_srat(ACPI_SRAT_TYPE_MEMORY_AFFINITY,
- 					    acpi_parse_memory_affinity,
- 					    NR_NODE_MEMBLKS);
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index ab6fd96..af34064 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -239,10 +239,25 @@ int acpi_table_parse_madt(enum acpi_madt_type id,
- int acpi_parse_mcfg (struct acpi_table_header *header);
- void acpi_table_print_madt_entry (struct acpi_subtable_header *madt);
- 
--/* the following four functions are architecture-dependent */
-+/* the following numa functions are architecture-dependent */
- void acpi_numa_slit_init (struct acpi_table_slit *slit);
-+
-+#if defined(CONFIG_X86) || defined(CONFIG_IA64)
- void acpi_numa_processor_affinity_init (struct acpi_srat_cpu_affinity *pa);
-+#else
-+static inline void
-+acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa) { }
-+#endif
-+
- void acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa);
-+
-+#ifdef CONFIG_ARM64
-+void acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa);
-+#else
-+static inline void
-+acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa) { }
-+#endif
-+
- int acpi_numa_memory_affinity_init (struct acpi_srat_mem_affinity *ma);
- 
- #ifndef PHYS_CPUID_INVALID
 -- 
-1.7.11.7
+2.8.1
