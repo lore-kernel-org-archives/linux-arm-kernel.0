@@ -1,90 +1,32 @@
-From: slash.tmp@free.fr (Mason)
-Date: Mon, 18 Apr 2016 21:58:30 +0200
-Subject: Problem with 4.6-rc2
-In-Reply-To: <20160418212303.29187018@endymion>
-References: <57150A3D.6020500@free.fr> <57152224.5080003@hurleysoftware.com>
- <5715279B.9060806@free.fr> <20160418212303.29187018@endymion>
-Message-ID: <57153C66.2030409@free.fr>
+From: bp@alien8.de (Borislav Petkov)
+Date: Mon, 18 Apr 2016 22:02:27 +0200
+Subject: [PATCH] Add EDAC peripheral init functions & Ethernet EDAC.
+In-Reply-To: <5714EEC4.4060807@opensource.altera.com>
+References: <1460499181-23080-1-git-send-email-tthayer@opensource.altera.com>
+ <20160414143501.GA25212@rob-hp-laptop>
+ <20160415064042.330406ab.m.chehab@samsung.com>
+ <5711087A.8050501@opensource.altera.com>
+ <20160415214618.GB4545@cz.tnic>
+ <5714EEC4.4060807@opensource.altera.com>
+Message-ID: <20160418200227.GA2057@cz.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/04/2016 21:23, Jean Delvare wrote:
+On Mon, Apr 18, 2016 at 09:27:16AM -0500, Thor Thayer wrote:
+> We're still getting the single bit correction
 
-> Hi Peter, Mason,
-> 
-> On Mon, 18 Apr 2016 20:29:47 +0200, Mason wrote:
->> On 18/04/2016 20:06, Peter Hurley wrote:
->>
->>> On 04/18/2016 09:24 AM, Mason wrote:
->>>
->>>> I'm running into this panic. I will take a closer look tomorrow.
->>>> Any ideas?
->>>
->>> commit 8d2acdb9fc3a544ab0442634531834d6007b5467
->>> Author: Jean Delvare <jdelvare@suse.de>
->>> Date:   Mon Feb 22 09:00:39 2016 +0100
->>>
->>>     serial: 8250: Add hardware dependency to RT288X option
->>>     
->>>     Kconfig option SERIAL_8250_RT288X seems to be only relevant on MIPS
->>>     platforms, so do not present it on other architectures, unless
->>>     build-testing.
->>>     
->>>     Signed-off-by: Jean Delvare <jdelvare@suse.de>
->>>     Cc: Mans Rullgard <mans@mansr.com>
->>>     Cc: Jiri Slaby <jslaby@suse.com>
->>>     Acked-by: John Crispin <blogic@openwrt.org>
->>>     Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->>>
->>>
->>> Not sure why Greg picked this up over my objections though
-> 
-> Greg applied v1 of my patch. In v2 I added ARCH_TANGO as a possible
-> dependency, but Greg did pick the update. Mason, is your target machine
-> an ARCH_TANGO machine, or something else?
+By that you mean, you get that by enabling ECC on the FIFO block?
 
-Correct, ARCH_TANGO.
-http://lxr.free-electrons.com/source/arch/arm/mach-tango/Kconfig
+> which makes the entire system more stable and the ability to see both
+> single bit errors corrected and the number of uncorrectable errors is
+> useful from a system point of view.
 
->> Peter,
->>
->> Thanks for pointing out the problem.
-> 
-> Mason, did you check if reverting this commit and re-enabling
-> SERIAL_8250_RT288X actually solves your problem?
+If so, that makes sense, yes.
 
-I will test tomorrow. But I'm quite confident that enabling
-SERIAL_8250_RT288X will make the problem go away (see below).
+Thanks.
 
->> My ARM-based SoC uses this hardware (Palmchip BK-3103) and it
->> now panics on boot.
->>
->> Can we revert 8d2acdb9fc3a in time for v4.6?
-> 
-> If not selecting SERIAL_8250_RT288X results in a crash at boot on some
-> systems, then reverting my commit is not the proper fix. Even after
-> reverting, you can still omit selecting the option, and get the same
-> crash. In other words, my commit is not introducing the crash, it must
-> have been there lurking before.
+-- 
+Regards/Gruss,
+    Boris.
 
-I wanted to have
-select SERIAL_8250_RT288X if SERIAL_8250
-in my platform Kconfig, but Arnd shot that down :-(
-(What good is a SoC without a console?)
-
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/444131/focus=444197
-
-"Picking SERIAL_8250 but not SERIAL_8250_RT288X makes the kernel
-panic. Doesn't that qualify for selecting it?"
-
-The problem has existed for a while.
-
-> Whatever code crashes in this case should be made more robust to
-> properly deal with the situation. Or if it is too much work or too ugly
-> (not being familiar with the code, I have no idea), then we could
-> finally go with Peter's earlier proposal of dropping the
-> SERIAL_8250_RT288X option altogether and unconditionally including the
-> code in question. In fact I think Peter was supposed to send a patch
-> doing exactly that.
-
-Regards.
+ECO tip #101: Trim your mails when you reply. Srsly.
