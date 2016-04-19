@@ -1,60 +1,73 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 19 Apr 2016 16:24:02 +0900
-Subject: [PATCH] pinctrl-exynos5440: Use off-stack memory for
- pinctrl_gpio_range
-In-Reply-To: <1461039222-26592-1-git-send-email-andrew@aj.id.au>
-References: <1461039222-26592-1-git-send-email-andrew@aj.id.au>
-Message-ID: <CA+Ln22Fcdp=W1A7ZY5nNNkUqHWfTTepVBS+SzjdoeO2HDJGpuQ@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 19 Apr 2016 09:25:20 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC Drivers Updates for v4.7
+In-Reply-To: <20160418035506.GB3578@verge.net.au>
+References: <cover.1459732456.git.horms+renesas@verge.net.au>
+ <20160413194354.GQ19945@localhost>
+ <CAMuHMdUbNcbLdQYG037MiDRAe1dr7ohRK625vb16oM8W19WEFw@mail.gmail.com>
+ <20160413202328.GS19945@localhost>
+ <CAMuHMdXniFngia63Um6LN_5MKrFtJGQPeFFe7=e7Dj6A_X6PTw@mail.gmail.com>
+ <20160415003346.GA31938@verge.net.au>
+ <CAMuHMdWpdzMcCDcBo3jrRbuS9LzZ71A0GbVUR=YE_e4F_9+6hA@mail.gmail.com>
+ <20160418035506.GB3578@verge.net.au>
+Message-ID: <CAMuHMdWtZg2A62vr9hDua+wvMnqTQVPeTQO7a=GZGoBzusz5Tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Hi Simon,
 
-2016-04-19 13:13 GMT+09:00 Andrew Jeffery <andrew@aj.id.au>:
-> The range is registered into a linked list which can be referenced
-> throughout the lifetime of the driver. Ensure the range's memory is useful
-> for the same lifetime by adding it to the driver's private data structure.
+On Mon, Apr 18, 2016 at 5:55 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Fri, Apr 15, 2016 at 08:35:48AM +0200, Geert Uytterhoeven wrote:
+>> On Fri, Apr 15, 2016 at 2:33 AM, Simon Horman <horms@verge.net.au> wrote:
+>> > On Thu, Apr 14, 2016 at 10:19:04AM +0200, Geert Uytterhoeven wrote:
+>> >> On Wed, Apr 13, 2016 at 10:23 PM, Olof Johansson <olof@lixom.net> wrote:
+>> >> > On Wed, Apr 13, 2016 at 09:57:39PM +0200, Geert Uytterhoeven wrote:
+>> >> >> On Wed, Apr 13, 2016 at 9:43 PM, Olof Johansson <olof@lixom.net> wrote:
+>> >> >> > On Mon, Apr 04, 2016 at 10:22:56AM +0900, Simon Horman wrote:
+>> >> >> >> Geert Uytterhoeven (2):
+>> >> >> >>       ARM: shmobile: timer: Fix preset_lpj leading to too short delays
+>> >> >> >>       ARM: shmobile: timer: Drop support for Cortex A8
+>>
+>> >> Simon: I'm a bit surprised to see that "ARM: shmobile: timer: Fix preset_lpj
+>> >> leading to too short delays" got postponed to v4.7, while commit 406663ed61c8
+>> >> ("ARM: shmobile: defconfig: Do not enable CONFIG_CPU_BPREDICT_DISABLE") is
+>> >> already in v4.6-rc1.  The latter makes bad behavior due to too short delays
+>> >> more likely to happen.
+>> >>
+>> >> Sorry for not noticing before.
+>> >
+>> > Likewise, sorry for the mix-up.
+>> >
+>> > I can think of two ways to resolve this, likely there are others:
+>> > 1. Submit "ARM: shmobile: timer: Fix preset_lpj leading to too short delays"
+>> >    or conversely
+>> > 2. Submit a reversion of 406663ed61c8 ("ARM: shmobile: defconfig: Do not
+>> >    enable CONFIG_CPU_BPREDICT_DISABLE") as a fix for v4.6.
+>> >
+>> > Or perhaps it is a problem that can just be ironed out in v4.7.
+>> > Let me know what you think.
+>>
+>> I prefer option 1, i.e. fixing the bug instead of papering over it in
+>> the defconfig.
+>> Users may not use the defconfig, and have CONFIG_CPU_BPREDICT_DISABLE
+>> enabled anyway.
 >
-> The bug was introduced in the driver's initial commit, which was present in
-> v3.10.
+> Thanks, that reasoning sounds fine to me.
 >
-> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
-> Fixes: f0b9a7e521fa ("pinctrl: exynos5440: add pinctrl driver for Samsung EXYNOS5440 SoC")
-> Cc: stable at vger.kernel.org
-> ---
-> This is my first contribution to the kernel, so hopefully I've followed all the
-> relevant documentation. If not, please let me know and point me in the right
-> direction!
->
-> I don't have the means to test the patch, but it compiles. Someone with
-> appropriate hardware should probably give it a spin.
->
+> I plan to re-queue "ARM: shmobile: timer: Fix preset_lpj leading to too
+> short delays" in fixes-for-v4.6 and I plan to push that in a revised
+> renesas-next tag later today. I would appreciate you double checking that
+> all is in order.
 
-Thanks for the patch. Good catch, I wonder how this even worked. Just
-one minor nitpick below.
+Thanks, that commit looks fine!
 
-Unfortunately I don't have any platform based on this SoC to test, so
-I'll defer to Krzysztof or Sylwester to handle this.
+Gr{oetje,eeting}s,
 
-Given the nitpick is fixed:
+                        Geert
 
-Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
->  drivers/pinctrl/samsung/pinctrl-exynos5440.c | 14 +++++++-------
->  1 file changed, 7 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/pinctrl/samsung/pinctrl-exynos5440.c b/drivers/pinctrl/samsung/pinctrl-exynos5440.c
-> index 00ab63abf1d9..d45028a75c0f 100644
-> --- a/drivers/pinctrl/samsung/pinctrl-exynos5440.c
-> +++ b/drivers/pinctrl/samsung/pinctrl-exynos5440.c
-> @@ -117,6 +117,7 @@ struct exynos5440_pinctrl_priv_data {
->         unsigned int                    nr_groups;
->         const struct exynos5440_pmx_func        *pmx_functions;
->         unsigned int                    nr_functions;
-> +       struct pinctrl_gpio_range       range;
-
-It would be nice to also describe this field in the kerneldoc comment
-above the struct.
-
-Best regards,
-Tomasz
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
