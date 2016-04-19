@@ -1,212 +1,159 @@
 From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Tue, 19 Apr 2016 14:18:35 +0200
-Subject: [PATCH 6/8] mfd: Add STMPE1600 support
+Date: Tue, 19 Apr 2016 14:18:30 +0200
+Subject: [PATCH 1/8] mfd: stmpe: Add STMPE_IDX_SYS_CTRL/2 enum
 In-Reply-To: <1461068317-28016-1-git-send-email-patrice.chotard@st.com>
 References: <1461068317-28016-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <1461068317-28016-7-git-send-email-patrice.chotard@st.com>
+Message-ID: <1461068317-28016-2-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Patrice Chotard <patrice.chotard@st.com>
 
-STMPE1600 is a 16-bit port expander.
-Datasheet is available here :
-http://www2.st.com/content/st_com/en/products/interfaces-and-transceivers/
-i-o-expanders-and-level-translators/i-o-expanders/stmpe1600.html
+As STMPE1801/1601/24xx has a SYS_CTRL register and
+STMPE1601/2403 has even a SYS_CTRL2 register, add
+STMPE_IDX_SYS_CTRL/2 and update driver code accordingly
 
-As STMPE1600's SYS_CTRL register has the same layout as
-STMPE801 variant, unify STMPExxx_REG_SYS_CTRL_RESET/INT_EN/INT_HI
-bit masks to more generic STMPE_SYS_CTRL_RESET/INT_EN/INT_HI
+This update prepares the ground for not yet supported STMPE1600
+which share similar REG_SYS_CTRL register.
 
-Signed-off-by: Amelie DELAUNAY <amelie.delaunay@st.com>
 Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
 ---
- drivers/mfd/stmpe-i2c.c   |  2 ++
- drivers/mfd/stmpe.c       | 61 +++++++++++++++++++++++++++++++++++++++++------
- drivers/mfd/stmpe.h       | 21 ++++++++++++----
- include/linux/mfd/stmpe.h |  1 +
- 4 files changed, 74 insertions(+), 11 deletions(-)
+ drivers/mfd/stmpe.c       | 21 ++++++++++++++-------
+ drivers/mfd/stmpe.h       |  2 ++
+ include/linux/mfd/stmpe.h |  2 ++
+ 3 files changed, 18 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/mfd/stmpe-i2c.c b/drivers/mfd/stmpe-i2c.c
-index c3f4aab..863c39a 100644
---- a/drivers/mfd/stmpe-i2c.c
-+++ b/drivers/mfd/stmpe-i2c.c
-@@ -57,6 +57,7 @@ static const struct of_device_id stmpe_of_match[] = {
- 	{ .compatible = "st,stmpe610", .data = (void *)STMPE610, },
- 	{ .compatible = "st,stmpe801", .data = (void *)STMPE801, },
- 	{ .compatible = "st,stmpe811", .data = (void *)STMPE811, },
-+	{ .compatible = "st,stmpe1600", .data = (void *)STMPE1600, },
- 	{ .compatible = "st,stmpe1601", .data = (void *)STMPE1601, },
- 	{ .compatible = "st,stmpe1801", .data = (void *)STMPE1801, },
- 	{ .compatible = "st,stmpe2401", .data = (void *)STMPE2401, },
-@@ -101,6 +102,7 @@ static const struct i2c_device_id stmpe_i2c_id[] = {
- 	{ "stmpe610", STMPE610 },
- 	{ "stmpe801", STMPE801 },
- 	{ "stmpe811", STMPE811 },
-+	{ "stmpe1600", STMPE1600 },
- 	{ "stmpe1601", STMPE1601 },
- 	{ "stmpe1801", STMPE1801 },
- 	{ "stmpe2401", STMPE2401 },
 diff --git a/drivers/mfd/stmpe.c b/drivers/mfd/stmpe.c
-index af682d0..53f61b9 100644
+index fb8f9e8..c553b73 100644
 --- a/drivers/mfd/stmpe.c
 +++ b/drivers/mfd/stmpe.c
-@@ -532,6 +532,51 @@ static struct stmpe_variant_info stmpe610 = {
- };
+@@ -448,6 +448,8 @@ static const struct mfd_cell stmpe_ts_cell = {
  
- /*
-+ * STMPE1600
-+ */
-+
-+static const u8 stmpe1600_regs[] = {
-+	[STMPE_IDX_CHIP_ID]	= STMPE1600_REG_CHIP_ID,
-+	[STMPE_IDX_SYS_CTRL]	= STMPE1600_REG_SYS_CTRL,
-+	[STMPE_IDX_ICR_LSB]	= STMPE1600_REG_SYS_CTRL,
-+	[STMPE_IDX_GPMR_LSB]	= STMPE1600_REG_GPMR,
-+	[STMPE_IDX_GPSR_LSB]	= STMPE1600_REG_GPSR,
-+	[STMPE_IDX_GPDR_LSB]	= STMPE1600_REG_GPDR,
-+	[STMPE_IDX_IEGPIOR_LSB]	= STMPE1600_REG_IEGPIOR,
-+	[STMPE_IDX_ISGPIOR_LSB]	= STMPE1600_REG_ISGPIOR,
-+};
-+
-+static struct stmpe_variant_block stmpe1600_blocks[] = {
-+	{
-+		.cell	= &stmpe_gpio_cell,
-+		.irq	= 0,
-+		.block	= STMPE_BLOCK_GPIO,
-+	},
-+};
-+
-+static int stmpe1600_enable(struct stmpe *stmpe, unsigned int blocks,
-+			   bool enable)
-+{
-+	if (blocks & STMPE_BLOCK_GPIO)
-+		return 0;
-+	else
-+		return -EINVAL;
-+}
-+
-+static struct stmpe_variant_info stmpe1600 = {
-+	.name		= "stmpe1600",
-+	.id_val		= STMPE1600_ID,
-+	.id_mask	= 0xffff,
-+	.num_gpios	= 16,
-+	.af_bits	= 0,
-+	.regs		= stmpe1600_regs,
-+	.blocks		= stmpe1600_blocks,
-+	.num_blocks	= ARRAY_SIZE(stmpe1600_blocks),
-+	.num_irqs	= STMPE1600_NR_INTERNAL_IRQS,
-+	.enable		= stmpe1600_enable,
-+};
-+
-+/*
-  * STMPE1601
-  */
+ static const u8 stmpe811_regs[] = {
+ 	[STMPE_IDX_CHIP_ID]	= STMPE811_REG_CHIP_ID,
++	[STMPE_IDX_SYS_CTRL]	= STMPE811_REG_SYS_CTRL,
++	[STMPE_IDX_SYS_CTRL2]	= STMPE811_REG_SYS_CTRL2,
+ 	[STMPE_IDX_ICR_LSB]	= STMPE811_REG_INT_CTRL,
+ 	[STMPE_IDX_IER_LSB]	= STMPE811_REG_INT_EN,
+ 	[STMPE_IDX_ISR_MSB]	= STMPE811_REG_INT_STA,
+@@ -490,7 +492,7 @@ static int stmpe811_enable(struct stmpe *stmpe, unsigned int blocks,
+ 	if (blocks & STMPE_BLOCK_TOUCHSCREEN)
+ 		mask |= STMPE811_SYS_CTRL2_TSC_OFF;
  
-@@ -888,6 +933,7 @@ static struct stmpe_variant_info *stmpe_variant_info[STMPE_NBR_PARTS] = {
- 	[STMPE610]	= &stmpe610,
- 	[STMPE801]	= &stmpe801,
- 	[STMPE811]	= &stmpe811,
-+	[STMPE1600]	= &stmpe1600,
- 	[STMPE1601]	= &stmpe1601,
- 	[STMPE1801]	= &stmpe1801,
- 	[STMPE2401]	= &stmpe2401,
-@@ -914,7 +960,8 @@ static irqreturn_t stmpe_irq(int irq, void *data)
- 	int ret;
- 	int i;
+-	return __stmpe_set_bits(stmpe, STMPE811_REG_SYS_CTRL2, mask,
++	return __stmpe_set_bits(stmpe, stmpe->regs[STMPE_IDX_SYS_CTRL2], mask,
+ 				enable ? 0 : mask);
+ }
  
--	if (variant->id_val == STMPE801_ID) {
-+	if (variant->id_val == STMPE801_ID ||
-+	    variant->id_val == STMPE1600_ID) {
- 		int base = irq_create_mapping(stmpe->domain, 0);
+@@ -535,6 +537,8 @@ static struct stmpe_variant_info stmpe610 = {
  
- 		handle_nested_irq(base);
-@@ -1088,13 +1135,13 @@ static int stmpe_chip_init(struct stmpe *stmpe)
+ static const u8 stmpe1601_regs[] = {
+ 	[STMPE_IDX_CHIP_ID]	= STMPE1601_REG_CHIP_ID,
++	[STMPE_IDX_SYS_CTRL]	= STMPE1601_REG_SYS_CTRL,
++	[STMPE_IDX_SYS_CTRL2]	= STMPE1601_REG_SYS_CTRL2,
+ 	[STMPE_IDX_ICR_LSB]	= STMPE1601_REG_ICR_LSB,
+ 	[STMPE_IDX_IER_LSB]	= STMPE1601_REG_IER_LSB,
+ 	[STMPE_IDX_ISR_MSB]	= STMPE1601_REG_ISR_MSB,
+@@ -619,13 +623,13 @@ static int stmpe1601_autosleep(struct stmpe *stmpe,
+ 		return timeout;
+ 	}
+ 
+-	ret = __stmpe_set_bits(stmpe, STMPE1601_REG_SYS_CTRL2,
++	ret = __stmpe_set_bits(stmpe, stmpe->regs[STMPE_IDX_SYS_CTRL2],
+ 			STMPE1601_AUTOSLEEP_TIMEOUT_MASK,
+ 			timeout);
+ 	if (ret < 0)
  		return ret;
  
- 	if (stmpe->irq >= 0) {
--		if (id == STMPE801_ID)
--			icr = STMPE801_REG_SYS_CTRL_INT_EN;
-+		if (id == STMPE801_ID || id == STMPE1600_ID)
-+			icr = STMPE_SYS_CTRL_INT_EN;
- 		else
- 			icr = STMPE_ICR_LSB_GIM;
+-	return __stmpe_set_bits(stmpe, STMPE1601_REG_SYS_CTRL2,
++	return __stmpe_set_bits(stmpe, stmpe->regs[STMPE_IDX_SYS_CTRL2],
+ 			STPME1601_AUTOSLEEP_ENABLE,
+ 			STPME1601_AUTOSLEEP_ENABLE);
+ }
+@@ -650,7 +654,7 @@ static int stmpe1601_enable(struct stmpe *stmpe, unsigned int blocks,
+ 	else
+ 		mask &= ~STMPE1601_SYS_CTRL_ENABLE_SPWM;
  
--		/* STMPE801 doesn't support Edge interrupts */
--		if (id != STMPE801_ID) {
-+		/* STMPE801 and STMPE1600 don't support Edge interrupts */
-+		if (id != STMPE801_ID && id != STMPE1600_ID) {
- 			if (irq_trigger == IRQF_TRIGGER_FALLING ||
- 					irq_trigger == IRQF_TRIGGER_RISING)
- 				icr |= STMPE_ICR_LSB_EDGE;
-@@ -1102,8 +1149,8 @@ static int stmpe_chip_init(struct stmpe *stmpe)
+-	return __stmpe_set_bits(stmpe, STMPE1601_REG_SYS_CTRL, mask,
++	return __stmpe_set_bits(stmpe, stmpe->regs[STMPE_IDX_SYS_CTRL], mask,
+ 				enable ? mask : 0);
+ }
  
- 		if (irq_trigger == IRQF_TRIGGER_RISING ||
- 				irq_trigger == IRQF_TRIGGER_HIGH) {
--			if (id == STMPE801_ID)
--				icr |= STMPE801_REG_SYS_CTRL_INT_HI;
-+			if (id == STMPE801_ID || id == STMPE1600_ID)
-+				icr |= STMPE_SYS_CTRL_INT_HI;
- 			else
- 				icr |= STMPE_ICR_LSB_HIGH;
- 		}
+@@ -689,6 +693,7 @@ static struct stmpe_variant_info stmpe1601 = {
+  */
+ static const u8 stmpe1801_regs[] = {
+ 	[STMPE_IDX_CHIP_ID]	= STMPE1801_REG_CHIP_ID,
++	[STMPE_IDX_SYS_CTRL]	= STMPE1801_REG_SYS_CTRL,
+ 	[STMPE_IDX_ICR_LSB]	= STMPE1801_REG_INT_CTRL_LOW,
+ 	[STMPE_IDX_IER_LSB]	= STMPE1801_REG_INT_EN_MASK_LOW,
+ 	[STMPE_IDX_ISR_LSB]	= STMPE1801_REG_INT_STA_LOW,
+@@ -735,14 +740,14 @@ static int stmpe1801_reset(struct stmpe *stmpe)
+ 	unsigned long timeout;
+ 	int ret = 0;
+ 
+-	ret = __stmpe_set_bits(stmpe, STMPE1801_REG_SYS_CTRL,
++	ret = __stmpe_set_bits(stmpe, stmpe->regs[STMPE_IDX_SYS_CTRL],
+ 		STMPE1801_MSK_SYS_CTRL_RESET, STMPE1801_MSK_SYS_CTRL_RESET);
+ 	if (ret < 0)
+ 		return ret;
+ 
+ 	timeout = jiffies + msecs_to_jiffies(100);
+ 	while (time_before(jiffies, timeout)) {
+-		ret = __stmpe_reg_read(stmpe, STMPE1801_REG_SYS_CTRL);
++		ret = __stmpe_reg_read(stmpe, stmpe->regs[STMPE_IDX_SYS_CTRL]);
+ 		if (ret < 0)
+ 			return ret;
+ 		if (!(ret & STMPE1801_MSK_SYS_CTRL_RESET))
+@@ -773,6 +778,8 @@ static struct stmpe_variant_info stmpe1801 = {
+ 
+ static const u8 stmpe24xx_regs[] = {
+ 	[STMPE_IDX_CHIP_ID]	= STMPE24XX_REG_CHIP_ID,
++	[STMPE_IDX_SYS_CTRL]	= STMPE24XX_REG_SYS_CTRL,
++	[STMPE_IDX_SYS_CTRL2]	= STMPE24XX_REG_SYS_CTRL2,
+ 	[STMPE_IDX_ICR_LSB]	= STMPE24XX_REG_ICR_LSB,
+ 	[STMPE_IDX_IER_LSB]	= STMPE24XX_REG_IER_LSB,
+ 	[STMPE_IDX_ISR_MSB]	= STMPE24XX_REG_ISR_MSB,
+@@ -819,7 +826,7 @@ static int stmpe24xx_enable(struct stmpe *stmpe, unsigned int blocks,
+ 	if (blocks & STMPE_BLOCK_KEYPAD)
+ 		mask |= STMPE24XX_SYS_CTRL_ENABLE_KPC;
+ 
+-	return __stmpe_set_bits(stmpe, STMPE24XX_REG_SYS_CTRL, mask,
++	return __stmpe_set_bits(stmpe, stmpe->regs[STMPE_IDX_SYS_CTRL], mask,
+ 				enable ? mask : 0);
+ }
+ 
 diff --git a/drivers/mfd/stmpe.h b/drivers/mfd/stmpe.h
-index 4ae343d..c829caa 100644
+index 84adb46..406f9f2 100644
 --- a/drivers/mfd/stmpe.h
 +++ b/drivers/mfd/stmpe.h
-@@ -105,6 +105,8 @@ int stmpe_remove(struct stmpe *stmpe);
- #define STMPE_ICR_LSB_GIM	(1 << 0)
+@@ -138,6 +138,7 @@ int stmpe_remove(struct stmpe *stmpe);
+ #define STMPE811_NR_INTERNAL_IRQS	8
  
- #define STMPE_SYS_CTRL_RESET	(1 << 7)
-+#define STMPE_SYS_CTRL_INT_EN	(1 << 2)
-+#define STMPE_SYS_CTRL_INT_HI	(1 << 0)
+ #define STMPE811_REG_CHIP_ID		0x00
++#define STMPE811_REG_SYS_CTRL		0x03
+ #define STMPE811_REG_SYS_CTRL2		0x04
+ #define STMPE811_REG_SPI_CFG		0x08
+ #define STMPE811_REG_INT_CTRL		0x09
+@@ -264,6 +265,7 @@ int stmpe_remove(struct stmpe *stmpe);
+ #define STMPE24XX_NR_INTERNAL_IRQS	9
  
- /*
-  * STMPE801
-@@ -121,10 +123,6 @@ int stmpe_remove(struct stmpe *stmpe);
- #define STMPE801_REG_GPIO_SET_PIN	0x11
- #define STMPE801_REG_GPIO_DIR		0x12
- 
--#define STMPE801_REG_SYS_CTRL_RESET	(1 << 7)
--#define STMPE801_REG_SYS_CTRL_INT_EN	(1 << 2)
--#define STMPE801_REG_SYS_CTRL_INT_HI	(1 << 0)
--
- /*
-  * STMPE811
-  */
-@@ -166,6 +164,21 @@ int stmpe_remove(struct stmpe *stmpe);
- #define STMPE811_SYS_CTRL2_TS_OFF	(1 << 3)
- 
- /*
-+ * STMPE1600
-+ */
-+#define STMPE1600_ID			0x0016
-+#define STMPE1600_NR_INTERNAL_IRQS	16
-+
-+#define STMPE1600_REG_CHIP_ID		0x00
-+#define STMPE1600_REG_SYS_CTRL		0x03
-+#define STMPE1600_REG_IEGPIOR		0x08
-+#define STMPE1600_REG_ISGPIOR		0x0A
-+#define STMPE1600_REG_GPMR		0x10
-+#define STMPE1600_REG_GPSR		0x12
-+#define STMPE1600_REG_GPDR		0x14
-+#define STMPE1600_REG_GPPIR		0x16
-+
-+/*
-  * STMPE1601
-  */
- 
+ #define STMPE24XX_REG_SYS_CTRL		0x02
++#define STMPE24XX_REG_SYS_CTRL2		0x03
+ #define STMPE24XX_REG_ICR_LSB		0x11
+ #define STMPE24XX_REG_IER_LSB		0x13
+ #define STMPE24XX_REG_ISR_MSB		0x14
 diff --git a/include/linux/mfd/stmpe.h b/include/linux/mfd/stmpe.h
-index 6c6690f..2d94ac7 100644
+index cb83883..6c6690f 100644
 --- a/include/linux/mfd/stmpe.h
 +++ b/include/linux/mfd/stmpe.h
-@@ -26,6 +26,7 @@ enum stmpe_partnum {
- 	STMPE610,
- 	STMPE801,
- 	STMPE811,
-+	STMPE1600,
- 	STMPE1601,
- 	STMPE1801,
- 	STMPE2401,
+@@ -39,6 +39,8 @@ enum stmpe_partnum {
+  */
+ enum {
+ 	STMPE_IDX_CHIP_ID,
++	STMPE_IDX_SYS_CTRL,
++	STMPE_IDX_SYS_CTRL2,
+ 	STMPE_IDX_ICR_LSB,
+ 	STMPE_IDX_IER_LSB,
+ 	STMPE_IDX_ISR_LSB,
 -- 
 1.9.1
