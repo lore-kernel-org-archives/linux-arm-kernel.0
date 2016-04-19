@@ -1,40 +1,30 @@
 From: stuart.yoder@nxp.com (Stuart Yoder)
-Date: Tue, 19 Apr 2016 17:39:10 -0500
-Subject: [PATCH 1/3] arm64: defconfig: cleanup the defconfig
-Message-ID: <1461105550-23838-1-git-send-email-stuart.yoder@nxp.com>
+Date: Tue, 19 Apr 2016 17:39:16 -0500
+Subject: [PATCH 2/3] arm64: defconfig: enable 48-bit virtual addresses
+Message-ID: <1461105556-23877-1-git-send-email-stuart.yoder@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When doing:
-   makedefconfig
-   makesavedefconfig
-
-...without making any changes, the newly saved defconfig does
-not match arch/arm64/configs/defconfig, and the diff looks
-like:
-
-$ diff defconfig arch/arm64/configs/defconfig
-3a4
-> CONFIG_FHANDLE=y
-
-Clean that up by committing the output of savedefconfig.
+Some armv8 SoCs (e.g. ls2080a) have physical memory maps with discontiguous
+DDR regions that require 48-bit VA to have the linear map cover the entire
+range of DDR.
 
 Signed-off-by: Stuart Yoder <stuart.yoder@nxp.com>
 ---
- arch/arm64/configs/defconfig | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index a44ef99..248c242 100644
+index 248c242..e8bc263 100644
 --- a/arch/arm64/configs/defconfig
 +++ b/arch/arm64/configs/defconfig
-@@ -1,7 +1,6 @@
- # CONFIG_LOCALVERSION_AUTO is not set
- CONFIG_SYSVIPC=y
- CONFIG_POSIX_MQUEUE=y
--CONFIG_FHANDLE=y
- CONFIG_AUDIT=y
- CONFIG_NO_HZ_IDLE=y
- CONFIG_HIGH_RES_TIMERS=y
+@@ -61,6 +61,7 @@ CONFIG_PCI_XGENE=y
+ CONFIG_PCI_LAYERSCAPE=y
+ CONFIG_PCI_HISI=y
+ CONFIG_PCIE_QCOM=y
++CONFIG_ARM64_VA_BITS_48=y
+ CONFIG_SCHED_MC=y
+ CONFIG_PREEMPT=y
+ CONFIG_KSM=y
 -- 
 1.9.0
