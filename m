@@ -1,71 +1,119 @@
-From: bhupesh.sharma@nxp.com (Bhupesh Sharma)
-Date: Tue, 19 Apr 2016 12:09:40 +0000
-Subject: [PATCH v4 0/2] ARM64: Enable SP805 WDT support for FSL LS2080A
-In-Reply-To: <570FBBD8.4030704@arm.com>
-References: <1451296884-7932-1-git-send-email-bhupesh.sharma@freescale.com>
- <570FBBD8.4030704@arm.com>
-Message-ID: <VI1PR04MB12308B0964726B5D1A4492BE886C0@VI1PR04MB1230.eurprd04.prod.outlook.com>
+From: patrice.chotard@st.com (patrice.chotard at st.com)
+Date: Tue, 19 Apr 2016 14:18:32 +0200
+Subject: [PATCH 3/8] gpio: stmpe: fix edge and rising/falling edge detection
+In-Reply-To: <1461068317-28016-1-git-send-email-patrice.chotard@st.com>
+References: <1461068317-28016-1-git-send-email-patrice.chotard@st.com>
+Message-ID: <1461068317-28016-4-git-send-email-patrice.chotard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+From: Patrice Chotard <patrice.chotard@st.com>
 
-Sorry for the delayed reply. I was on holidays.
+By cross-checking STMPE 610/801/811/1601/2401/2403 datasheets,
+it appears that edge detection and rising/falling edge detection
+is not supported by all STMPE variant:
 
-> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
-> Sent: Thursday, April 14, 2016 9:19 PM
-> 
-> Hi Bhupesh,
-> 
-> On 28/12/15 10:01, Bhupesh Sharma wrote:
-> > Hi Arnd, Kevin, Olof
-> >
-> > This is the v4 of patchset which adds the support for SP805 WDT on
-> FSL
-> > LS2080A and also adds the missing documentation of SP805 WDT device-
-> tree bindings.
-> >
-> > Rebased against arm-soc/next/dt
-> >
-> > Changes since v3:
-> > (v3 can be viewed here:
-> > https://www.mail-
-> archive.com/devicetree at vger.kernel.org/msg97249.html)
-> > - Added Rob's Acked-by for patch 1/2.
-> > - Sending to 'arm at kernel.org' list and also cc'ed Shawn Guo
-> >
-> > Changes since v2:
-> > (v2 can be viewed here:
-> > http://permalink.gmane.org/gmane.linux.ports.arm.kernel/463141)
-> > - Addressed Rob's comments regarding the second mandatory CLK
-> source's
-> >   (WDOGCLK) name in the bindings.
-> >
-> > Changes since v1:
-> > (v1 can be viewed here:
-> > http://www.spinics.net/lists/devicetree/msg102487.html)
-> >
-> > - Addressed Rob and Mark's comments regarding the mandatory CLK
-> > sources
-> > - Removed interrupt property from the bindings for now (as discussed
-> >   with Mark on IRC) till Will's patch proceeds further and enables
-> >   handling the WDOG interrupts for each core connected to the same
-> PPI
-> >   line
-> > (http://lists.infradead.org/pipermail/linux-arm-kernel/2015-
-> December/3
-> > 91616.html)
-> 
-> Will just pointed me to this series. I've recently posted a set of
-> patches that should be able to deal with the quirkiness of your HW with
-> regards to PPIs:
-> 
-> http://thread.gmane.org/gmane.linux.drivers.devicetree/163464
-> 
-> Could you please let me know if this works for you?
-> 
+           GPIO              GPIO
+      Edge detection     rising/falling
+                         edge detection
+ 610 |      X        |         X       |
+ 801 |               |                 |
+ 811 |      X        |         X       |
+1600 |               |                 |
+1601 |      X        |         X       |
+1801 |               |         X       |
+2401 |      X        |         X       |
+2403 |      X        |         X       |
 
-Sure. I will have a look at the patchset and get back asap.
+Rework stmpe_dbg_show_one() and stmpe_gpio_irq to correctly
+take these cases into account.
 
-Regards,
-Bhupesh
+Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+---
+ drivers/gpio/gpio-stmpe.c | 58 +++++++++++++++++++++++++++++++++--------------
+ 1 file changed, 41 insertions(+), 17 deletions(-)
+
+diff --git a/drivers/gpio/gpio-stmpe.c b/drivers/gpio/gpio-stmpe.c
+index 5197edf..225e075 100644
+--- a/drivers/gpio/gpio-stmpe.c
++++ b/drivers/gpio/gpio-stmpe.c
+@@ -231,27 +231,51 @@ static void stmpe_dbg_show_one(struct seq_file *s,
+ 			   gpio, label ?: "(none)",
+ 			   val ? "hi" : "lo");
+ 	} else {
+-		u8 edge_det_reg = stmpe->regs[STMPE_IDX_GPEDR_MSB] + num_banks - 1 - (offset / 8);
+-		u8 rise_reg = stmpe->regs[STMPE_IDX_GPRER_LSB] - (offset / 8);
+-		u8 fall_reg = stmpe->regs[STMPE_IDX_GPFER_LSB] - (offset / 8);
+-		u8 irqen_reg = stmpe->regs[STMPE_IDX_IEGPIOR_LSB] - (offset / 8);
++		u8 edge_det_reg;
++		u8 rise_reg;
++		u8 fall_reg;
++		u8 irqen_reg;
+ 		bool edge_det;
+ 		bool rise;
+ 		bool fall;
+ 		bool irqen;
+ 
+-		ret = stmpe_reg_read(stmpe, edge_det_reg);
+-		if (ret < 0)
+-			return;
+-		edge_det = !!(ret & mask);
+-		ret = stmpe_reg_read(stmpe, rise_reg);
+-		if (ret < 0)
++		switch (stmpe->partnum) {
++		case STMPE610:
++		case STMPE811:
++		case STMPE1601:
++		case STMPE2401:
++		case STMPE2403:
++			edge_det_reg = stmpe->regs[STMPE_IDX_GPEDR_MSB] +
++				       num_banks - 1 - (offset / 8);
++			ret = stmpe_reg_read(stmpe, edge_det_reg);
++			if (ret < 0)
++				return;
++			edge_det = !!(ret & mask);
++
++		case STMPE1801:
++			rise_reg = stmpe->regs[STMPE_IDX_GPRER_LSB] -
++				   (offset / 8);
++			fall_reg = stmpe->regs[STMPE_IDX_GPFER_LSB] -
++				   (offset / 8);
++			ret = stmpe_reg_read(stmpe, rise_reg);
++			if (ret < 0)
++				return;
++			rise = !!(ret & mask);
++			ret = stmpe_reg_read(stmpe, fall_reg);
++			if (ret < 0)
++				return;
++			fall = !!(ret & mask);
++
++		case STMPE801:
++			irqen_reg = stmpe->regs[STMPE_IDX_IEGPIOR_LSB] -
++				    (offset / 8);
++			break;
++
++		default:
+ 			return;
+-		rise = !!(ret & mask);
+-		ret = stmpe_reg_read(stmpe, fall_reg);
+-		if (ret < 0)
+-			return;
+-		fall = !!(ret & mask);
++		}
++
+ 		ret = stmpe_reg_read(stmpe, irqen_reg);
+ 		if (ret < 0)
+ 			return;
+@@ -322,8 +346,8 @@ static irqreturn_t stmpe_gpio_irq(int irq, void *dev)
+ 
+ 		stmpe_reg_write(stmpe, statmsbreg + i, status[i]);
+ 
+-		/* Edge detect register is not present on 801 */
+-		if (stmpe->partnum != STMPE801)
++		/* Edge detect register is not present on 801 and 1801 */
++		if (stmpe->partnum != STMPE801 || stmpe->partnum != STMPE1801)
+ 			stmpe_reg_write(stmpe, stmpe->regs[STMPE_IDX_GPEDR_MSB]
+ 					+ i, status[i]);
+ 	}
+-- 
+1.9.1
