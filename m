@@ -1,31 +1,32 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 19 Apr 2016 13:52:54 +0300
-Subject: [PATCH 1/2] mmc: core: Improve marking broken HPI through
- devicetree
-In-Reply-To: <1461049934-12848-2-git-send-email-oliver@schinagl.nl>
-References: <1461049934-12848-1-git-send-email-oliver@schinagl.nl>
- <1461049934-12848-2-git-send-email-oliver@schinagl.nl>
-Message-ID: <57160E06.1000806@cogentembedded.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 19 Apr 2016 11:53:57 +0100
+Subject: Applied "ASoC: mediatek: Add second I2S on mt8173-rt5650 machine
+ driver" to the asoc tree
+In-Reply-To: <1461061984.28704.8.camel@mtksdaap41>
+References: <E1asSQc-0004NY-44@debutante> <1461061984.28704.8.camel@mtksdaap41>
+Message-ID: <20160419105357.GR3217@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tue, Apr 19, 2016 at 06:33:04PM +0800, PC Liao wrote:
 
-On 4/19/2016 10:12 AM, Olliver Schinagl wrote:
+> Thanks for your approval.
+> But this patch depends on [1].
+> I think it also needs to apply [1], otherwise this patch will build
+> fail.
+> Or, do I need to upload new version again?
 
-> In patch 81f8a7be66 Hans de Goede added a patch to allow marking an mmc
+> [1] https://patchwork.kernel.org/patch/5671961/ ("ASoC: core: export
+> snd_soc_get_dai_name")
 
-    scripts/checkpatch.pl now enforces certain commit citing style, the commit 
-summary should be specified too.
-
-> device as to having an broken HPI implementation. After talking some
-> with Hans, we now think it is actually the mmc controller that can be
-> broken and not support broken HPI's.
->
-> This patch adds a new capability, mmc-broken-hpi, which allows us to
-> mark a broken hpi implementation on the host level.
->
-> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
-[...]
-
-MBR, Sergei
+Ugh, dropped.  Please put administritive stuff like this after the ---
+as covered in SubmittingPatches, that helps it get noticed.  What it
+looks like you should be doing here is putting this in a subnode for
+capture.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160419/c97d4e6d/attachment.sig>
