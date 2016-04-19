@@ -1,188 +1,125 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 19 Apr 2016 13:55:02 +0100
-Subject: [PATCH V2 07/15] coresight: tmc: allocating memory when needed
-In-Reply-To: <1460483692-25061-8-git-send-email-mathieu.poirier@linaro.org>
-References: <1460483692-25061-1-git-send-email-mathieu.poirier@linaro.org>
- <1460483692-25061-8-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <57162AA6.3030605@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 19 Apr 2016 13:56:16 +0100
+Subject: [PATCH] arm64: mm: take CWG into account in __inval_cache_range()
+In-Reply-To: <1461061773-19571-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1461061773-19571-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20160419125615.GA20991@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/16 18:54, Mathieu Poirier wrote:
-> In it's current form the TMC probe() function allocates
-> trace buffer memory at boot time, event if coresight isn't
-> used.  This is highly inefficient since trace buffers can
-> occupy a lot of memory that could be used otherwised.
+Hi,
+
+On Tue, Apr 19, 2016 at 12:29:33PM +0200, Ard Biesheuvel wrote:
+> Currently, the arm64 implementation of __inval_cache_range() [aka
+> __dma_inv_range()] takes CTR_EL0.Dminline into account for two purposes:
+> - the stride to use for doing by-VA cache maintenance,
+> - to check whether the start and end arguments are unaligned with respect
+>   to the cache line size, in which case the unaligned extremes need to be
+>   cleaned before being invalidated, to avoid corrupting adjacent unrelated
+>   memory contents.
 >
-> This patch allocates trace buffers on the fly, when the
-> coresight subsystem is solicited.  Allocated buffers are
-> released when traces are read using the device descriptors
-> under /dev.
->
-> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> In the second case, the use of Dminline is incorrect, and should use the
+> CWG field instead, since an invalidate operation could result in cache
+> lines that are larger than Dminline to be evicted at any level of the
+> cache hierarchy.
+
+Have you seen this in practice, or was this found by inspection?
+
+I agree that we need to round addresses to CWG boundaries when
+performing maintenance to the PoC to prevent subsequent asynchronous
+writebacks of data falling in the same CWG, which could clobber data at
+the PoC.
+
+However, if we have unrelated data in the same CWG, surely we have no
+guarantee that said data will not be dirtied in caches by other kernel
+code, and thus we may still have issues with asynchronous writebacks?
+
+Is sharing a CWG broken by design, or is there some caveat I'm missing
+that prevents/prohibits unrelated data from being dirtied?
+
+Thanks,
+Mark.
+
+> So introduce a macro cache_cwg_size to retrieve the CWG value, and use it
+> to clean as many cachelines as required on either end of the [start, end)
+> interval.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > ---
->   drivers/hwtracing/coresight/coresight-tmc-etf.c | 85 +++++++++++++++++++++++--
->   drivers/hwtracing/coresight/coresight-tmc-etr.c | 83 +++++++++++++++++++++++-
->   drivers/hwtracing/coresight/coresight-tmc.c     | 14 ----
->   3 files changed, 163 insertions(+), 19 deletions(-)
->
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-> index 4b8f39bd478b..7cb287ef7b9e 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
-> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-> @@ -16,14 +16,12 @@
->    */
->
->   #include <linux/coresight.h>
-> +#include <linux/slab.h>
->   #include "coresight-priv.h"
->   #include "coresight-tmc.h"
->
->   void tmc_etb_enable_hw(struct tmc_drvdata *drvdata)
->   {
-> -	/* Zero out the memory to help with debug */
-> -	memset(drvdata->buf, 0, drvdata->size);
-> -
->   	CS_UNLOCK(drvdata->base);
->
->   	/* Wait for TMCSReady bit to be set */
-> @@ -110,19 +108,68 @@ static void tmc_etf_disable_hw(struct tmc_drvdata *drvdata)
->
->   static int tmc_enable_etf_sink(struct coresight_device *csdev, u32 mode)
->   {
-> +	bool allocated = false;
-
-nit: does "used" or buf_used sound more suitable than allocated ?
-
-> +	char *buf = NULL;
->   	unsigned long flags;
->   	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
->
-> +	 /* This shouldn't be happening */
-> +	WARN_ON(mode != CS_MODE_SYSFS);
+>  arch/arm64/mm/cache.S       | 34 ++++++++++++++++++++++------------
+>  arch/arm64/mm/proc-macros.S | 13 +++++++++++++
+>  2 files changed, 35 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+> index 6df07069a025..e5067e87e1b5 100644
+> --- a/arch/arm64/mm/cache.S
+> +++ b/arch/arm64/mm/cache.S
+> @@ -120,19 +120,29 @@ ENTRY(__inval_cache_range)
+>   *	- end     - virtual end address of region
+>   */
+>  __dma_inv_range:
+> -	dcache_line_size x2, x3
+> -	sub	x3, x2, #1
+> -	tst	x1, x3				// end cache line aligned?
+> -	bic	x1, x1, x3
+> -	b.eq	1f
+> -	dc	civac, x1			// clean & invalidate D / U line
+> -1:	tst	x0, x3				// start cache line aligned?
+> -	bic	x0, x0, x3
+> +	dcache_line_size x2, x3			// get Dminline in x2
+> +	sub	x3, x2, #1			// Dminline mask in x3
+> +	bic	x0, x0, x3			// align start down to line size
 > +
-> +	/*
-> +	 * If a buffer is already allocated *keep holding* the lock and
-> +	 * jump to the fast path.  Otherwise release the lock and allocate
-> +	 * memory to work with.
-> +	 */
->   	spin_lock_irqsave(&drvdata->spinlock, flags);
-> +	if (drvdata->buf)
-> +		goto fast_path;
+> +	cache_cwg_size x4, x3			// get CWG
+> +	sub	x3, x4, #1			// CWG mask in x3
 > +
-> +	spin_unlock_irqrestore(&drvdata->spinlock, flags);
+> +	tst	x1, x3				// end CWG aligned?
+>  	b.eq	2f
+> -	dc	civac, x0			// clean & invalidate D / U line
+> -	b	3f
+> -2:	dc	ivac, x0			// invalidate D / U line
+> -3:	add	x0, x0, x2
+> +	bic	x5, x1, x3
+> +0:	dc	civac, x5			// clean & invalidate D / U line
+> +	add	x5, x5, x2
+> +	tst	x5, x3
+> +	b.ne	0b
+> +	b	2f
 > +
-> +	/* Allocating the memory here while outside of the spinlock */
-> +	buf = kzalloc(drvdata->size, GFP_KERNEL);
-> +	if (!buf)
-> +		return -ENOMEM;
+> +1:	dc	civac, x0			// clean & invalidate D / U line
+> +	add	x0, x0, x2
+> +2:	tst	x0, x3				// start CWG aligned?
+> +	b.ne	1b
 > +
-> +	/* Let's try again */
-> +	spin_lock_irqsave(&drvdata->spinlock, flags);
-> +fast_path:
->   	if (drvdata->reading) {
->   		spin_unlock_irqrestore(&drvdata->spinlock, flags);
-> +		/*
-> +		 * Free allocated memory outside of the spinlock.  There is
-> +		 * no need to assert the validity of 'buf' since calling
-> +		 * kfree(NULL) is safe.
-> +		 */
-> +		kfree(buf);
->   		return -EBUSY;
->   	}
-
-We could check do the above check, before the allocation and avoid an unnecessary
-alloc/free() if we really don't need that. And may be its better to get rid of the
-"jump to fastpath" to avoid complicating the code, by using something like :
-
-	lock();
-	if (drvdata->reading) {
-		rc = -EBUSY;
-		goto unlock_out;
-	}
-
-	if (!drvdata->buf) {
-	/* Drop the lock here before allocation and retake the lock */
-		unlock();
-		alloc();
-		lock();
-		if (!buf) {
-			rc = -ENOMEM;
-			goto unlock_out;
-		}
-	}
-...
-
+> +	dc	ivac, x0			// invalidate D / U line
+> +	add	x0, x0, x2
+>  	cmp	x0, x1
+>  	b.lo	2b
+>  	dsb	sy
+> diff --git a/arch/arm64/mm/proc-macros.S b/arch/arm64/mm/proc-macros.S
+> index e6a30e1268a8..872299ce3081 100644
+> --- a/arch/arm64/mm/proc-macros.S
+> +++ b/arch/arm64/mm/proc-macros.S
+> @@ -54,6 +54,19 @@
+>  	.endm
+>  
+>  /*
+> + * cache_cwg_size - get the maximum cache line size from the CTR register
+> + */
+> +	.macro	cache_cwg_size, reg, tmp
+> +	mrs	\tmp, ctr_el0			// read CTR
+> +	ubfm	\tmp, \tmp, #24, #27		// CTR_EL0.CWG [27:24]
+> +	mov	\reg, #9			// use architectural default of
+> +	cmp	\tmp, xzr			// 2 KB (2^9 words) if CWG is
+> +	csel	\tmp, \tmp, \reg, ne		// not provided
+> +	mov	\reg, #4			// bytes per word
+> +	lsl	\reg, \reg, \tmp		// actual cache line size
+> +	.endm
 > +
->   	tmc_etb_enable_hw(drvdata);
->   	drvdata->enable = true;
-
-unlock_out:
-
->   	spin_unlock_irqrestore(&drvdata->spinlock, flags);
->
-> +	/* Free memory outside the spinlock if need be */
-> +	if (!allocated && buf)
-> +		kfree(buf);
-> +
-
-
-
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> index 495540e9064d..6022ff26deba 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> @@ -16,6 +16,7 @@
->    */
->
->   #include <linux/coresight.h>
-> +#include <linux/dma-mapping.h>
->   #include "coresight-priv.h"
->   #include "coresight-tmc.h"
->
-> @@ -83,19 +84,69 @@ static void tmc_etr_disable_hw(struct tmc_drvdata *drvdata)
->
->   static int tmc_enable_etr_sink(struct coresight_device *csdev, u32 mode)
->   {
-
-> +
-> +	/*
-> +	 * If a buffer is already allocated *keep holding* the lock and
-> +	 * jump to the fast path.  Otherwise release the lock and allocate
-> +	 * memory to work with.
-> +	 */
-> +	spin_lock_irqsave(&drvdata->spinlock, flags);
-> +	if (drvdata->vaddr)
-> +		goto fast_path;
-> +
-> +	spin_unlock_irqrestore(&drvdata->spinlock, flags);
-> +
-> +	/*
-> +	 * Contiguous  memory can't be allocated while a spinlock is held.
-> +	 * As such allocate memory here and free it if a buffer has already
-> +	 * been allocated (from a previous session).
-> +	 */
-> +	vaddr = dma_alloc_coherent(drvdata->dev, drvdata->size,
-> +				   &paddr, GFP_KERNEL);
-> +	if (!vaddr)
-> +		return -ENOMEM;
-> +
-> +	/* Let's try again */
->   	spin_lock_irqsave(&drvdata->spinlock, flags);
-> +fast_path:
->   	if (drvdata->reading) {
->   		spin_unlock_irqrestore(&drvdata->spinlock, flags);
-> +		if (vaddr)
-> +			dma_free_coherent(drvdata->dev, drvdata->size,
-> +					  vaddr, paddr);
->   		return -EBUSY;
->   	}
-
-Same as above, if you move the check above before allocation, we could avoid
-the alloc/free for such cases. And it would be better if simplify the code without
-using the fast_path label to the middle of the code.
-
-Otherwise, looks good.
-
-Thanks
-Suzuki
+> +/*
+>   * tcr_set_idmap_t0sz - update TCR.T0SZ so that we can load the ID map
+>   */
+>  	.macro	tcr_set_idmap_t0sz, valreg, tmpreg
+> -- 
+> 2.5.0
+> 
