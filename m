@@ -1,62 +1,58 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 19 Apr 2016 16:02:47 +0100
-Subject: [PATCH v7 04/16] arm64: kvm: Move the do_el2_call macro to a
- header file
-In-Reply-To: <1459529620-22150-5-git-send-email-james.morse@arm.com>
-References: <1459529620-22150-1-git-send-email-james.morse@arm.com>
- <1459529620-22150-5-git-send-email-james.morse@arm.com>
-Message-ID: <57164897.8090603@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 19 Apr 2016 16:05:55 +0100
+Subject: [PATCH] drivers: firmware: psci: add __init mark to
+ psci_dt_cpu_init_idle
+In-Reply-To: <1458657329-2484-1-git-send-email-jszhang@marvell.com>
+References: <1458657329-2484-1-git-send-email-jszhang@marvell.com>
+Message-ID: <20160419150555.GB15458@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/04/16 17:53, James Morse wrote:
-> The hyp-stub could make use of the do_el2_call(), move it to a header file.
+Hi Jisheng,
+
+On Tue, Mar 22, 2016 at 10:35:29PM +0800, Jisheng Zhang wrote:
+> psci_dt_cpu_init_idle() and psci_cpu_init_idle() are not needed after
+> booting, so mark them as __init.
 > 
-> Signed-off-by: James Morse <james.morse@arm.com>
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 > ---
->  arch/arm64/include/asm/virt.h  | 18 +++++++++++++++++-
->  arch/arm64/kvm/hyp/hyp-entry.S | 17 +----------------
->  2 files changed, 18 insertions(+), 17 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-> index 9f22dd607958..b8fdddeca71b 100644
-> --- a/arch/arm64/include/asm/virt.h
-> +++ b/arch/arm64/include/asm/virt.h
-> @@ -21,7 +21,23 @@
->  #define BOOT_CPU_MODE_EL1	(0xe11)
->  #define BOOT_CPU_MODE_EL2	(0xe12)
->  
-> -#ifndef __ASSEMBLY__
-> +#ifdef __ASSEMBLY__
-> +.macro do_el2_call
-> +	/*
-> +	 * Shuffle the parameters before calling the function
-> +	 * pointed to in x0. Assumes parameters in x[1,2,3].
-> +	 */
-> +	sub	sp, sp, #16
-> +	str	lr, [sp]
-> +	mov	lr, x0
-> +	mov	x0, x1
-> +	mov	x1, x2
-> +	mov	x2, x3
-> +	blr	lr
-> +	ldr	lr, [sp]
-> +	add	sp, sp, #16
-> +.endm
-> +#else
 
-So while I'm not opposed to this macro being reused, the name is
-slightly misleading out of the original context. This macro doesn't take
-you to EL2, but implements a very peculiar calling convention that only
-the HYP code is expecting.
+I've slightly changed the $SUBJECT, patch below FYI.
 
-Could we have a disclaimer saying something along the lines of "Don't
-you dare using this macro!"?
+Lorenzo
 
-Otherwise:
+-- >8 --
+Subject: [PATCH] drivers: firmware: psci: mark idle init functions __init
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+psci_dt_cpu_init_idle() and psci_cpu_init_idle() are not needed after
+booting, so mark them as __init.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+[lpieralisi: updated patch subject]
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+ drivers/firmware/psci.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index 6d86881..4a6a7de 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -250,7 +250,7 @@ static int __init psci_features(u32 psci_func_id)
+ #ifdef CONFIG_CPU_IDLE
+ static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
+ 
+-static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
++static int __init psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
+ {
+ 	int i, ret, count = 0;
+ 	u32 *psci_states;
+@@ -310,7 +310,7 @@ free_mem:
+ 	return ret;
+ }
+ 
+-int psci_cpu_init_idle(unsigned int cpu)
++int __init psci_cpu_init_idle(unsigned int cpu)
+ {
+ 	struct device_node *cpu_node;
+ 	int ret;
