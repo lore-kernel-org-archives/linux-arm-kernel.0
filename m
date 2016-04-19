@@ -1,47 +1,90 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 19 Apr 2016 08:27:10 +0200
-Subject: [PATCH] drm/rockchip: support non-iommu buffer path
-In-Reply-To: <1461032372-14630-1-git-send-email-mark.yao@rock-chips.com>
-References: <1461032372-14630-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <2221474.O4M7g09IWn@diego>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 19 Apr 2016 08:33:17 +0200
+Subject: [PATCH RFT 1/5] iio: mxs-lradc: fix memory leak
+In-Reply-To: <57151652.4020709@denx.de>
+References: <1460648909-2657-1-git-send-email-stefan.wahren@i2se.com>
+ <1460648909-2657-2-git-send-email-stefan.wahren@i2se.com>
+ <570FF70F.3000501@denx.de> <571360A3.3060809@kernel.org>
+ <57151652.4020709@denx.de>
+Message-ID: <5715D12D.1020303@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 19. April 2016, 10:19:32 schrieb Mark Yao:
-> Some rockchip vop not support iommu, need use non-iommu
-> buffer for it. And if we get iommu issues, we can compare
-> the issues with non-iommu path, the would help the debug.
-> 
-> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-> ---
->  drivers/gpu/drm/rockchip/rockchip_drm_drv.c |   65
-> +++++++++++++++++++-------- 1 file changed, 47 insertions(+), 18
-> deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-> b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c index f556a8f..90729c0 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+Hi Marek,
 
-[...]
+Am 18.04.2016 um 19:16 schrieb Marek Vasut:
+> On 04/17/2016 12:08 PM, Jonathan Cameron wrote:
+>> On 14/04/16 21:01, Marek Vasut wrote:
+>>> On 04/14/2016 05:48 PM, Stefan Wahren wrote:
+>>>> After successful touchscreen registration the input device was
+>>>> never freed. So fix this issue by using devm_input_allocate_device().
+>>>>
+>>>> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+>>>> ---
+>>>>  drivers/iio/adc/mxs-lradc.c |    8 ++------
+>>>>  1 file changed, 2 insertions(+), 6 deletions(-)
+>>>>
+>>>> diff --git a/drivers/iio/adc/mxs-lradc.c b/drivers/iio/adc/mxs-lradc.c
+>>>> index 33051b8..0576953 100644
+>>>> --- a/drivers/iio/adc/mxs-lradc.c
+>>>> +++ b/drivers/iio/adc/mxs-lradc.c
+>>>> @@ -1109,12 +1109,11 @@ static int mxs_lradc_ts_register(struct mxs_lradc *lradc)
+>>>>  {
+>>>>  	struct input_dev *input;
+>>>>  	struct device *dev = lradc->dev;
+>>>> -	int ret;
+>>>>  
+>>>>  	if (!lradc->use_touchscreen)
+>>>>  		return 0;
+>>>>  
+>>>> -	input = input_allocate_device();
+>>>> +	input = devm_input_allocate_device(dev);
+>>>>  	if (!input)
+>>>>  		return -ENOMEM;
+>>>>  
+>>>> @@ -1134,11 +1133,8 @@ static int mxs_lradc_ts_register(struct mxs_lradc *lradc)
+>>>>  
+>>>>  	lradc->ts_input = input;
+>>>>  	input_set_drvdata(input, lradc);
+>>>> -	ret = input_register_device(input);
+>>>> -	if (ret)
+>>>> -		input_free_device(lradc->ts_input);
+>>>>  
+>>>> -	return ret;
+>>>> +	return input_register_device(input);
+>>>>  }
+>>>>  
+>>>>  static void mxs_lradc_ts_unregister(struct mxs_lradc *lradc)
+>>>>
+>>> Nice find.
+>>>
+>>> Looks like at91_adc.c and exynos_adc.c suffer from the exact same issue.
+>>> The leak looks a bit more severe on exynos even, exynos_adc_ts_init()
+>>> could use a proper fail path. Do you want to send patches or shall I ?
+>>>
+>> As this has been there a long time I'm not going to rush it in as a fix.
+> I did take a proper look today and it seems they do the right thing
+> afterall. I checked them with kmemleak too to be sure.
 
-> @@ -497,6 +514,18 @@ static int rockchip_drm_platform_probe(struct
-> platform_device *pdev) continue;
->  		}
-> 
-> +		iommu = of_parse_phandle(port->parent, "iommus", 0);
-> +		if (!iommu || !of_device_is_available(iommu->parent)) {
-> +			dev_warn(dev, "No available iommu found for %s\n",
-> +				 port->parent->full_name);
-> +			dev_warn(dev, "Force non-iommu buffer for all crtc\n");
+thanks, input_unregister_device already free the memory.
 
-As stated in the patch-description, this is somewhat common for _some_ vops 
-[like the Cortex-A9s I'm still hoping to support at some point in the future 
-:-D ], so this should probably be either a dev_dbg or a dev_info as maximum 
-and also condensed into one line of output like:
+Sorry for the mess :-(
 
-	dev_dbg(dev, "no iommu attached for %s, using non-iommu buffers\n",
-			  port->parent->full_name);
+I think it would be the best to remove / revert this patch.
 
+Stefan
 
-Heiko
+>
+>> I suspect no platform is probing and removing it enough to get a significant
+>> amount of memory leaked.
+>>
+>> Good to clear it up though!
+>>
+>> Applied to the togreg branch of iio.git, initially pushed out as testing for
+>> the autobuilders to play with it.
+>>
+>> Thanks,
+>>
+>> Jonathan
+>>
+>
