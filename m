@@ -1,83 +1,187 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 19 Apr 2016 17:36:04 +0100
-Subject: [PATCH v4 0/2] ARM64: Enable SP805 WDT support for FSL LS2080A
-In-Reply-To: <VI1PR04MB12308B0964726B5D1A4492BE886C0@VI1PR04MB1230.eurprd04.prod.outlook.com>
-References: <1451296884-7932-1-git-send-email-bhupesh.sharma@freescale.com>
- <570FBBD8.4030704@arm.com>
- <VI1PR04MB12308B0964726B5D1A4492BE886C0@VI1PR04MB1230.eurprd04.prod.outlook.com>
-Message-ID: <57165E74.2030500@arm.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 19 Apr 2016 10:45:14 -0600
+Subject: [PATCH V2 13/15] coresight: tmc: implementing TMC-ETF AUX space
+ API
+In-Reply-To: <571659E0.4090605@arm.com>
+References: <1460483692-25061-1-git-send-email-mathieu.poirier@linaro.org>
+ <1460483692-25061-14-git-send-email-mathieu.poirier@linaro.org>
+ <571659E0.4090605@arm.com>
+Message-ID: <CANLsYkz4NSNbLHUH6c+6oCo-3cxrHQ9eP9E=JACQ5qymMF0qaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/04/16 13:09, Bhupesh Sharma wrote:
-> Hi Mark,
-> 
-> Sorry for the delayed reply. I was on holidays.
-> 
->> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
->> Sent: Thursday, April 14, 2016 9:19 PM
+On 19 April 2016 at 10:16, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+> On 12/04/16 18:54, Mathieu Poirier wrote:
 >>
->> Hi Bhupesh,
+>> This patch implement the AUX area interfaces required to
+>> use the TMC (configured as an ETF) from the Perf sub-system.
 >>
->> On 28/12/15 10:01, Bhupesh Sharma wrote:
->>> Hi Arnd, Kevin, Olof
->>>
->>> This is the v4 of patchset which adds the support for SP805 WDT on
->> FSL
->>> LS2080A and also adds the missing documentation of SP805 WDT device-
->> tree bindings.
->>>
->>> Rebased against arm-soc/next/dt
->>>
->>> Changes since v3:
->>> (v3 can be viewed here:
->>> https://www.mail-
->> archive.com/devicetree at vger.kernel.org/msg97249.html)
->>> - Added Rob's Acked-by for patch 1/2.
->>> - Sending to 'arm at kernel.org' list and also cc'ed Shawn Guo
->>>
->>> Changes since v2:
->>> (v2 can be viewed here:
->>> http://permalink.gmane.org/gmane.linux.ports.arm.kernel/463141)
->>> - Addressed Rob's comments regarding the second mandatory CLK
->> source's
->>>   (WDOGCLK) name in the bindings.
->>>
->>> Changes since v1:
->>> (v1 can be viewed here:
->>> http://www.spinics.net/lists/devicetree/msg102487.html)
->>>
->>> - Addressed Rob and Mark's comments regarding the mandatory CLK
->>> sources
->>> - Removed interrupt property from the bindings for now (as discussed
->>>   with Mark on IRC) till Will's patch proceeds further and enables
->>>   handling the WDOG interrupts for each core connected to the same
->> PPI
->>>   line
->>> (http://lists.infradead.org/pipermail/linux-arm-kernel/2015-
->> December/3
->>> 91616.html)
+>> The heuristic is heavily borrowed from the ETB10 implementation.
 >>
->> Will just pointed me to this series. I've recently posted a set of
->> patches that should be able to deal with the quirkiness of your HW with
->> regards to PPIs:
+>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> ---
+>>   drivers/hwtracing/coresight/coresight-tmc-etf.c | 198
+>> ++++++++++++++++++++++++
+>>   drivers/hwtracing/coresight/coresight-tmc.h     |  21 +++
+>>   2 files changed, 219 insertions(+)
 >>
->> http://thread.gmane.org/gmane.linux.drivers.devicetree/163464
+>> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c
+>> b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+>> index a440784e3b27..fff175d4020d 100644
+>> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
+>> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+>> @@ -15,7 +15,9 @@
+>>    * this program.  If not, see <http://www.gnu.org/licenses/>.
+>>    */
 >>
->> Could you please let me know if this works for you?
+>> +#include <linux/circ_buf.h>
+>>   #include <linux/coresight.h>
+>> +#include <linux/perf_event.h>
+>>   #include <linux/slab.h>
+>>   #include "coresight-priv.h"
+>>   #include "coresight-tmc.h"
+>> @@ -295,9 +297,205 @@ static void tmc_disable_etf_link(struct
+>> coresight_device *csdev,
+>>         dev_info(drvdata->dev, "TMC disabled\n");
+>>   }
 >>
-> 
-> Sure. I will have a look at the patchset and get back asap.
+>> +static void *tmc_alloc_etf_buffer(struct coresight_device *csdev, int
+>> cpu,
+>> +                                 void **pages, int nr_pages, bool
+>> overwrite)
+>
+>
+>
+>
+>> +
+>> +static void tmc_free_etf_buffer(void *config)
+>> +{
+>
+>
+>> +
+>> +static int tmc_set_etf_buffer(struct coresight_device *csdev,
+>> +                             struct perf_output_handle *handle,
+>> +                             void *sink_config)
+>
+>
+>
+>> +static unsigned long tmc_reset_etf_buffer(struct coresight_device *csdev,
+>> +                                         struct perf_output_handle
+>> *handle,
+>> +                                         void *sink_config, bool *lost)
+>> +{
+>
+>
+>
+>>   /**
+>> + * struct cs_buffer - keep track of a recording session' specifics
+>> + * @cur:       index of the current buffer
+>> + * @nr_pages:  max number of pages granted to us
+>> + * @offset:    offset within the current buffer
+>> + * @data_size: how much we collected in this run
+>> + * @lost:      other than zero if we had a HW buffer wrap around
+>> + * @snapshot:  is this run in snapshot mode
+>> + * @data_pages:        a handle the ring buffer
+>> + */
+>> +struct cs_tmc_buffers {
+>> +       unsigned int            cur;
+>> +       unsigned int            nr_pages;
+>> +       unsigned long           offset;
+>> +       local_t                 data_size;
+>> +       local_t                 lost;
+>> +       bool                    snapshot;
+>> +       void                    **data_pages;
+>> +};
+>
+>
+>
+> All of the above look exactly the same as what we have in etb10.c (as you
+> have mentioned).
+> Is there any chance we could reuse them under a generic name ?
 
-Thanks. It should be pretty easy to do (define all 8 affinities for your
-CPUs, and assign each one to the watchdog it corresponds to).
+I toyed with the idea many times...
 
-Of course, the watchdog driver itself is missing interrupt support, so
-you will have to hack that as well. If you have any issue with this
-stuff, please give me a shout.
+Today the structures are similar and can be used in both drivers but
+it is only a matter for time (probably months) before someone adds new
+functionality on one side that isn't compatible with the other side.
+When that happens we'll get a bloated struct with fields that aren't
+used, depending on where it gets instantiated.  Or the struct will be
+split again, coming back to what we have today.
 
-Cheers,
+>
+>> +
+>> +static void tmc_update_etf_buffer(struct coresight_device *csdev,
+>
+>
+>
+>> +        * Get a hold of the status register and see if a wrap around
+>> +        * has occurred.  If so adjust things accordingly.
+>> +        */
+>> +       status = readl_relaxed(drvdata->base + TMC_STS);
+>> +       if (status & TMC_STS_FULL) {
+>> +               local_inc(&buf->lost);
+>> +               to_read = drvdata->size;
+>> +       } else {
+>> +               to_read = CIRC_CNT(write_ptr, read_ptr, drvdata->size);
+>> +       }
+>> +
+>> +       /*
+>> +        * The TMC RAM buffer may be bigger than the space available in
+>> the
+>> +        * perf ring buffer (handle->size).  If so advance the RRP so that
+>> we
+>> +        * get the latest trace data.
+>> +        */
+>> +       if (to_read > handle->size) {
+>> +               u32 mask = 0;
+>> +
+>> +               /*
+>> +                * The value written to RRP must be byte-address aligned
+>> to
+>> +                * the width of the trace memory databus _and_ to a frame
+>> +                * boundary (16 byte), whichever is the biggest. For
+>> example,
+>> +                * for 32-bit, 64-bit and 128-bit wide trace memory, the
+>> four
+>> +                * LSBs must be 0s. For 256-bit wide trace memory, the
+>> five
+>> +                * LSBs must be 0s.
+>> +                */
+>> +               switch (drvdata->memwidth) {
+>> +               case TMC_MEM_INTF_WIDTH_32BITS:
+>> +               case TMC_MEM_INTF_WIDTH_64BITS:
+>> +               case TMC_MEM_INTF_WIDTH_128BITS:
+>> +                       mask = GENMASK(31, 5);
+>> +                       break;
+>> +               case TMC_MEM_INTF_WIDTH_256BITS:
+>> +                       mask = GENMASK(31, 6);
+>> +                       break;
+>> +               }
+>> +
+>> +               /*
+>> +                * Make sure the new size is aligned in accordance with
+>> the
+>> +                * requirement explained above.
+>> +                */
+>> +               to_read -= handle->size & mask;
+>
+>
+> Shouldn't this be :
+>
+>                 to_read = handle->size & mask;
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+You are correct.
+
+>
+>> +               /* Move the RAM read pointer up */
+>> +               read_ptr = (write_ptr + drvdata->size) - to_read;
+>> +               /* Make sure we are still within our limits */
+>> +               read_ptr &= ~(drvdata->size - 1);
+>> +               /* Tell the HW */
+>> +               writel_relaxed(read_ptr, drvdata->base + TMC_RRP);
+>> +               local_inc(&buf->lost);
+>> +       }
+>
+>
+>
+> Suzuki
