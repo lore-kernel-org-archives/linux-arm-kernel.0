@@ -1,63 +1,104 @@
-From: pc.liao@mediatek.com (PC Liao)
-Date: Tue, 19 Apr 2016 19:36:41 +0800
-Subject: [PATCH] ASoC: core: export snd_soc_get_dai_name
-Message-ID: <1461065801-19535-1-git-send-email-pc.liao@mediatek.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 19 Apr 2016 12:39:10 +0100
+Subject: [PATCH 0/4] Update cpu feature extraction
+In-Reply-To: <56AB40AB.8070302@arm.com>
+References: <1453800223-18590-1-git-send-email-vladimir.murzin@arm.com>
+ <56A9F7C6.2060109@arm.com> <20160128170141.GM10826@n2100.arm.linux.org.uk>
+ <56AB40AB.8070302@arm.com>
+Message-ID: <571618DE.5050201@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jean-Francois Moine <moinejf@free.fr>
+On 29/01/16 10:36, Vladimir Murzin wrote:
+> On 28/01/16 17:01, Russell King - ARM Linux wrote:
+>> On Thu, Jan 28, 2016 at 11:13:10AM +0000, Vladimir Murzin wrote:
+>>> On 26/01/16 09:23, Vladimir Murzin wrote:
+>>>> Hi,
+>>>>
+>>>> This has been started as a fix in cpu feature extractor, but Suzuki suggested
+>>>> syncing-up the whole cpu feature handling with the recent updates on arm64
+>>>> side [1,2].
+>>>>
+>>>> I've kept fixes separately, so they can go as the are in case there is concern
+>>>> on updating cpu feature handling.
+>>>>
+>>>> [1] http://comments.gmane.org/gmane.linux.ports.arm.kernel/455568
+>>>> [2] https://lkml.org/lkml/2015/11/18/570
+>>>>
+>>>
+>>> Russell, is it OK for patch tracker?
+>>
+>> I'd really like to hear that someone has validated these changes or at
+>> least someone in ARM Ltd such as Will or Catalin has reviewed them; I
+>> remember the subject of whether certain fields are signed or unsigned
+>> being almost a personal opinion - we used to treat all fields as
+>> unsigned, but that was declared to be wrong, so we then went to treating
+>> them all as signed fields... See:
+>>
+>> commit b8c9592b4a6c93211c8163888a97880d608503b5
+>> Author: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> Date:   Thu Mar 19 19:03:25 2015 +0100
+>>
+>>     ARM: 8318/1: treat CPU feature register fields as signed quantities
+>>
+>>     The various CPU feature registers consist of 4-bit blocks that
+>>     represent signed quantities, whose positive values represent
+>>     incremental features, and whose negative values are reserved.
+>>
+>>     To improve forward compatibility, update the feature detection
+>>     code to take possible future higher values into account, but
+>>     ignore negative values.
+>>
+>>     Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>     Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>>
+>> For instance:
+>>
+>> -       sync_prim = ((read_cpuid_ext(CPUID_EXT_ISAR3) >> 8) & 0xf0) |
+>> -                   ((read_cpuid_ext(CPUID_EXT_ISAR4) >> 20) & 0x0f);
+>> -       if (sync_prim >= 0x13)
+>> +       if (cpuid_feature_extract(CPUID_EXT_ISAR3, 12) > 1 ||
+>> +           (cpuid_feature_extract(CPUID_EXT_ISAR3, 12) == 1 &&
+>> +            cpuid_feature_extract(CPUID_EXT_ISAR3, 20) >= 3))
+>>                 elf_hwcap &= ~HWCAP_SWP;
+>>
+>> (let's ignore the ISAR4 vs ISAR3 problem).  What if ISAR4 20:23 have
+>> bit 23 set?  In the original code, that would be treated as being ">= 3"
+>> but in the new code, that's less than zero, so would fail the test.
+>>
+>> I think we had much the same questions back in March 2015 when this was
+>> last discussed, when I raised the issue of there being a documentation
+>> bug in that the documentation doesn't make it clear how reserved 4-bit
+>> CPU ID fields should be intepreted.
+>>
+>> What I'd like to see is some kind of positive concensus on this (and
+>> a doc update); what I don't want to do is to apply these patches and
+>> then get another round of patches converting some of them back to
+>> signed tests, and then later another set of patches doing the reverse,
+>> because that seems to be what's now happening.
+>>
+> 
+> It is fair point. Since this topic is quite fuzzy and discussion can
+> take some time I'd be happy if only fixes (the first two patches) can
+> find their way to mainline independent of the rest of the series.
+> 
+> Is it OK for patches 1/4 and 2/4 to go in patch tracker?
+> 
 
-snd_soc_get_dai_name() may be used to define a sound card with
-a different syntax from the one of the simple-card.
+I've just uploaded patches 1/4 and 2/4 to patch tracker with assumption
+they are OK, please, let me know in case it's wrong.
 
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
-Signed-off-by: PC Liao <pc.liao@mediatek.com>
----
-[1] is applied and needs this patch.
-Otherwise, [1] will build fail.
+Cheers
+Vladimir
 
-[1] https://patchwork.kernel.org/patch/8878491/
-("ASoC: mediatek: Add second I2S on mt8173-rt5650 machine driver")
----
- include/sound/soc.h  |    2 ++
- sound/soc/soc-core.c |    5 +++--
- 2 files changed, 5 insertions(+), 2 deletions(-)
-
-diff --git a/include/sound/soc.h b/include/sound/soc.h
-index 02b4a21..03b2d19 100644
---- a/include/sound/soc.h
-+++ b/include/sound/soc.h
-@@ -1669,6 +1669,8 @@ unsigned int snd_soc_of_parse_daifmt(struct device_node *np,
- 				     const char *prefix,
- 				     struct device_node **bitclkmaster,
- 				     struct device_node **framemaster);
-+int snd_soc_get_dai_name(struct of_phandle_args *args,
-+			 const char **dai_name);
- int snd_soc_of_get_dai_name(struct device_node *of_node,
- 			    const char **dai_name);
- int snd_soc_of_get_dai_link_codecs(struct device *dev,
-diff --git a/sound/soc/soc-core.c b/sound/soc/soc-core.c
-index d2e62b15..69cbbb0 100644
---- a/sound/soc/soc-core.c
-+++ b/sound/soc/soc-core.c
-@@ -3786,8 +3786,8 @@ unsigned int snd_soc_of_parse_daifmt(struct device_node *np,
- }
- EXPORT_SYMBOL_GPL(snd_soc_of_parse_daifmt);
- 
--static int snd_soc_get_dai_name(struct of_phandle_args *args,
--				const char **dai_name)
-+int snd_soc_get_dai_name(struct of_phandle_args *args,
-+			 const char **dai_name)
- {
- 	struct snd_soc_component *pos;
- 	struct device_node *component_of_node;
-@@ -3838,6 +3838,7 @@ static int snd_soc_get_dai_name(struct of_phandle_args *args,
- 	mutex_unlock(&client_mutex);
- 	return ret;
- }
-+EXPORT_SYMBOL_GPL(snd_soc_get_dai_name);
- 
- int snd_soc_of_get_dai_name(struct device_node *of_node,
- 			    const char **dai_name)
--- 
-1.7.9.5
+> Thanks
+> Vladimir
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> 
+> 
