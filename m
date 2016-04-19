@@ -1,87 +1,144 @@
-From: oliver@schinagl.nl (Olliver Schinagl)
-Date: Tue, 19 Apr 2016 11:42:03 +0200
-Subject: [PATCH 1/2] mmc: core: Improve marking broken HPI through
- devicetree
-In-Reply-To: <CAPDyKFqftYtrHvcQB7te1fuWxjWtrhOGY=5DnRTnrRxHm2cQ-A@mail.gmail.com>
-References: <1461049934-12848-1-git-send-email-oliver@schinagl.nl>
- <1461049934-12848-2-git-send-email-oliver@schinagl.nl>
- <CAPDyKFqftYtrHvcQB7te1fuWxjWtrhOGY=5DnRTnrRxHm2cQ-A@mail.gmail.com>
-Message-ID: <5715FD6B.5000809@schinagl.nl>
+From: sr@denx.de (Stefan Roese)
+Date: Tue, 19 Apr 2016 11:42:25 +0200
+Subject: [PATCH v5] spi: orion.c: Add direct access mode
+In-Reply-To: <4509446.OJU128rpNa@wuerfel>
+References: <1460974417-32375-1-git-send-email-sr@denx.de>
+ <4248364.c0REkIZjj0@wuerfel> <5714DA84.2050505@denx.de>
+ <4509446.OJU128rpNa@wuerfel>
+Message-ID: <5715FD81.8090100@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+On 18.04.2016 15:57, Arnd Bergmann wrote:
+> On Monday 18 April 2016 15:00:52 Stefan Roese wrote:
+>> On 18.04.2016 13:32, Arnd Bergmann wrote:
+>>> On Monday 18 April 2016 12:04:15 Mark Brown wrote:
+>>>> On Mon, Apr 18, 2016 at 12:51:55PM +0200, Arnd Bergmann wrote:
+>>>>
+>>>>> This would be easier if have a conclusive proof that 1MB per CS always enough.
+>>>>> Is this something that is guaranteed in the SPI spec or the documentation for
+>>>>> this controller?
+>>>>
+>>>> There's no spec for SPI but if there were it'd be hard to see it
+>>>> imposing a limit, one can transfer data as long as the bus is clocked
+>>>> (which some things like ADCs and DACs make use of).
+>>>>
+>>>
+>>> I just reread Stefan's patch and realized that I had fundamentally
+>>> misunderstood how the transfer is done: I thought the offset inside of
+>>> the window was used to address a NOR flash directly, but it seems
+>>> it is just used to send arbitrarily long commands.
+>>
+>> Yes. SPI NOR flash support definitely needs some additional patches.
+>> To support the address and commands being inserted in the SPI
+>> messages via the corresponding registers. Again, this patch is
+>> only intended and tested for very "simple" TX messages without any
+>> addresses being inserted at all.
+> 
+> Ok, so I looked up the datasheet again and understood now that it
+> actually does both ways: a) the direct read/write that I had always assumed
+> it did with automatic cmd/addr/data generation, and b) the mode where
+> you do each write transfer separately as implemented by your patch.
+> 
+> Those two modes seem to be wildly different in their needs for address
+> space:
+> 
+> - For a) we definitely need the mapping to be the same size as the
+>    addressable storage of the SPI-NOR (or other device that fits
+>    into the cmd/addr/data pattern supported by the hardware)
+> 
+> - For b) the address is ignored and at most 32 bytes are transfered,
+>    so whatever the smallest MBUS mapping window size is would certainly
+>    be enough.
+>
+> As a side-note, I see that you use a regular devm_ioremap_resource(),
+> which I assume prevents the transfers from ever being more than
+> a single 4-byte word, while burst mode with up to 32 bytes likely
+> requires a write-combining mapping.
 
-On 19-04-16 11:29, Ulf Hansson wrote:
-> On 19 April 2016 at 09:12, Olliver Schinagl <oliver@schinagl.nl> wrote:
->> In patch 81f8a7be66 Hans de Goede added a patch to allow marking an mmc
->> device as to having an broken HPI implementation. After talking some
->> with Hans, we now think it is actually the mmc controller that can be
->> broken and not support broken HPI's.
-> I don't want us to invent a DT binding for something you *think* is a
-> HW controller issue.
->
-> Have you really excluded that this isn't a software issue? Me
-> personally haven't been using HPI that much so I can't really tell
-> about the code robustness from the mmc core (mmc protocol point of
-> view).
-Well this patch goes hand in hand so to speak with the broken-hpi patch 
-introduced by him, he did most of the investigation. We just discussed 
-how to handle it and asked me to cook up the patch.
+Thanks for the hint. I've tested again with devm_ioremap_wc() and the
+resulting SPI TX time is identical to the one using the driver with
+the uncached (non write-combined) mapping. This is most likely a
+result of the already fully saturated SPI bus speed being the
+bottle-neck here.
 
-@hans, what do you think?
->
-> Kind regards
-> Uffe
->
->> This patch adds a new capability, mmc-broken-hpi, which allows us to
->> mark a broken hpi implementation on the host level.
+A bit more testing has shown, that using devm_ioremap_wc() leads
+to sporadic failures in the FPGA image downloading though. Now
+I'm unsure, if its really worth to add some cache flushing after
+the memcpy() call here (flush_cache_vmap ?) or better keep the
+uncached ioremap in place.
+
+>>> This means that the 1MB window is probably a reasonable size (provided
+>>> that the (most importantly) the SPI-NOR driver can guarantee that it
+>>> never exceeds this).
 >>
->> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
->> ---
->>   drivers/mmc/core/host.c  | 2 ++
->>   drivers/mmc/core/mmc.c   | 2 +-
->>   include/linux/mmc/host.h | 1 +
->>   3 files changed, 4 insertions(+), 1 deletion(-)
+>> I have no problem switching from 1MiB to using 0xffffffff in the
+>> SPI controller 'reg' node to allow even bigger windows in v6.
+> 
+> How do you decide how much of the window to map though? Using 0xffffffff
+> is nice because it better represents what the hardware looks like
+> and doesn't limit you from having arbitrarily large mbus windows
+> based on your needs, but you'd probably have to try mapping various
+> sizes then to find the maximum supported one, or you'd have to do
+> some ugly parsing of the parent node ranges.
+
+This is for the single-window mode, right? My comment above was
+still referring to the original implementation. And yes, this
+gets a bit complicated and is most likely not really necessary.
+So I would prefer to keep the mapping fixed to a max. of 1MiB for
+now.
+ 
+>>> It also means that we are probably better off using the single-window mode
+>>> of the SPI controller, where all CS lines share a single mbus window.
+>>> The only real difference here is that we can map all endpoints using a
+>>> single contiguous window into the CPU address space if we want, or we
+>>> can still map them separately on a given board if that results in a nicer
+>>> layout.
 >>
->> diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
->> index 6e4c55a..9b63b36 100644
->> --- a/drivers/mmc/core/host.c
->> +++ b/drivers/mmc/core/host.c
->> @@ -270,6 +270,8 @@ int mmc_of_parse(struct mmc_host *host)
->>                  host->caps |= MMC_CAP_HW_RESET;
->>          if (of_property_read_bool(np, "cap-sdio-irq"))
->>                  host->caps |= MMC_CAP_SDIO_IRQ;
->> +       if (of_property_read_bool(np, "mmc-broken-hpi"))
->> +               host->caps |= MMC_CAP_BROKEN_HPI;
->>          if (of_property_read_bool(np, "full-pwr-cycle"))
->>                  host->caps2 |= MMC_CAP2_FULL_PWR_CYCLE;
->>          if (of_property_read_bool(np, "keep-power-in-suspend"))
->> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
->> index 4dbe3df..9a19562 100644
->> --- a/drivers/mmc/core/mmc.c
->> +++ b/drivers/mmc/core/mmc.c
->> @@ -1592,7 +1592,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
->>          /*
->>           * Enable HPI feature (if supported)
->>           */
->> -       if (card->ext_csd.hpi) {
->> +       if (card->ext_csd.hpi && !(host->caps & MMC_CAP_BROKEN_HPI)) {
->>                  err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
->>                                  EXT_CSD_HPI_MGMT, 1,
->>                                  card->ext_csd.generic_cmd6_time);
->> diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
->> index 8dd4d29..20f758e 100644
->> --- a/include/linux/mmc/host.h
->> +++ b/include/linux/mmc/host.h
->> @@ -264,6 +264,7 @@ struct mmc_host {
->>   #define MMC_CAP_DRIVER_TYPE_A  (1 << 23)       /* Host supports Driver Type A */
->>   #define MMC_CAP_DRIVER_TYPE_C  (1 << 24)       /* Host supports Driver Type C */
->>   #define MMC_CAP_DRIVER_TYPE_D  (1 << 25)       /* Host supports Driver Type D */
->> +#define MMC_CAP_BROKEN_HPI     (1 << 29)       /* Host support for HPI is broken */
->>   #define MMC_CAP_CMD23          (1 << 30)       /* CMD23 supported. */
->>   #define MMC_CAP_HW_RESET       (1 << 31)       /* Hardware reset */
->>
->> --
->> 2.8.0.rc3
->>
+>> Frankly, I've just read about this single-window mode for the first
+>> time. What I miss here in this mode though, is the configuration of
+>> the SPI device (chip-select 0...7) for this direct-mode in the SPI
+>> driver. With the currently implemented separate window method, your
+>> suggested method is easy: Either is window can be mapped (direct-mode)
+>> or not (indirect-mode). With this single-window mode I'm missing the
+>> per-device configuration for direct-mode. Or what is your idea on
+>> how to configure this access-mode in this case?
+> 
+> It would work the same way, the main difference is that for single-window
+> mode all the devices get the same amount of address MBUS address space,
+> e.g. 1MB per CS in a contiguous MBUS range, but you can still map
+> subsections of it into the CPU, e.g.
+> 
+> 
+> &mbus {
+> 	ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000>,   /* internal regs */
+> 		 <MBUS_ID(0x01, 0x1e) 0x300000 0 0xf1100000 0x200000>, /* CS3+CS4 */
+> 		 <MBUS_ID(0x01, 0x1d) 0x600000 0 0xf1300000 0x80000>, /* bootrom */
+> 		 <MBUS_ID(0x01, 0x1e) 0x600000 0 0xf1380000 0x10000>; /* CS6 */
+> 
+> 	spi at f0,01,10600 {
+>                  reg = <MBUS_ID(0xf0, 0x01) 0x10600 0x28>,       /* control */
+>                        <MBUS_ID(0x01, 0x1e) 0x000000 0x100000>, /* CS0 */
+>                        <MBUS_ID(0x01, 0x1e) 0x100000 0x100000>, /* CS1 */
+>                        <MBUS_ID(0x01, 0x1e) 0x200000 0x100000>, /* CS2 */
+>                        <MBUS_ID(0x01, 0x1e) 0x300000 0x100000>, /* CS3 */
+>                        <MBUS_ID(0x01, 0x1e) 0x400000 0x100000>, /* CS4 */
+>                        <MBUS_ID(0x01, 0x1e) 0x500000 0x100000>, /* CS5 */
+>                        <MBUS_ID(0x01, 0x1e) 0x600000 0x100000>, /* CS6 */
+>                        <MBUS_ID(0x01, 0x1e) 0x700000 0x100000>; /* CS7 */
+> 	};
+> };
+> 
+> In this example, you have to configure the SPI controller to have 1MB per CS
+> in single-window mode using the "SPI DecodeMode" and "SPI CS Adress Decode"
+> registers. The mbus then contains two mappings, one 2MB window spanning
+> CS3 and CS4 in a continuous CPU range, and one 64K window for a device at
+> CS6, making it as small as possible to conserve CPU address space.
+
+Thanks. I've prepared a new version implementing this single-
+window mode. Please let me know how you prefer the cache issue
+above to be handled (uncached mapping, flush or ?) and I'll
+update the patch accordingly.
+
+Thanks,
+Stefan
