@@ -1,99 +1,133 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 19 Apr 2016 14:44:21 +0200
-Subject: [PATCH v2] Axi-usb: Add support for 64-bit addressing.
-In-Reply-To: <1461064248-31288-1-git-send-email-navam@xilinx.com>
-References: <1461064248-31288-1-git-send-email-navam@xilinx.com>
-Message-ID: <7208820.t2EJm8R9jW@wuerfel>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Tue, 19 Apr 2016 21:44:57 +0900
+Subject: [PATCH 1/2] mmc: core: Improve marking broken HPI through
+ devicetree
+In-Reply-To: <57162270.6040701@schinagl.nl>
+References: <1461049934-12848-1-git-send-email-oliver@schinagl.nl>
+ <1461049934-12848-2-git-send-email-oliver@schinagl.nl>
+ <CAPDyKFqftYtrHvcQB7te1fuWxjWtrhOGY=5DnRTnrRxHm2cQ-A@mail.gmail.com>
+ <5715FD6B.5000809@schinagl.nl> <5715FF1B.80402@samsung.com>
+ <57162270.6040701@schinagl.nl>
+Message-ID: <57162849.3070108@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 19 April 2016 16:40:48 Nava kishore Manne wrote:
-> This patch updates the driver to support 64-bit DMA
-> addressing.
+Hi Olliver,
+
+On 04/19/2016 09:20 PM, Olliver Schinagl wrote:
+> Hey Jaehoon,
 > 
-> Signed-off-by: Nava kishore Manne <navam@xilinx.com>
-> ---
-> Changes for v2:
-> 		-Added dma-ranges property in device tree as suggested by Arnd Bergmann.
->                 -Modified the driver code based on the xlnx,addrwidth.
->  .../devicetree/bindings/usb/udc-xilinx.txt         |  5 ++-
->  drivers/usb/gadget/udc/udc-xilinx.c                | 39 ++++++++++++++++++++--
->  2 files changed, 40 insertions(+), 4 deletions(-)
+> On 19-04-16 11:49, Jaehoon Chung wrote:
+>> Hi
+>>
+>> On 04/19/2016 06:42 PM, Olliver Schinagl wrote:
+>>> Hi Ulf,
+>>>
+>>> On 19-04-16 11:29, Ulf Hansson wrote:
+>>>> On 19 April 2016 at 09:12, Olliver Schinagl <oliver@schinagl.nl> wrote:
+>>>>> In patch 81f8a7be66 Hans de Goede added a patch to allow marking an mmc
+>>>>> device as to having an broken HPI implementation. After talking some
+>>>>> with Hans, we now think it is actually the mmc controller that can be
+>>>>> broken and not support broken HPI's.
+>>>> I don't want us to invent a DT binding for something you *think* is a
+>>>> HW controller issue.
+>>>>
+>>>> Have you really excluded that this isn't a software issue? Me
+>>>> personally haven't been using HPI that much so I can't really tell
+>>>> about the code robustness from the mmc core (mmc protocol point of
+>>>> view).
+>>> Well this patch goes hand in hand so to speak with the broken-hpi patch introduced by him, he did most of the investigation. We just discussed how to handle it and asked me to cook up the patch.
+>> I didn't understand why add this property. Is this same patch?
+>>
+>> commit 81f8a7be6642b4c26ab681b2e0f4c4120a6de1b0
+>> Author: Hans de Goede <hdegoede@redhat.com>
+>> Date:   Wed Apr 1 17:26:23 2015 +0200
+>>
+>>      mmc: Add support for marking hpi as broken through devicetree
+>>
+>>      The eMMC on a tablet I've will stop working / communicating as soon as
+>>      the kernel executes:
+>>
+>>                  mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+>>                                  EXT_CSD_HPI_MGMT, 1,
+>>                                  card->ext_csd.generic_cmd6_time);
+>>
+>>      There seems to be no way to reliable identify eMMC-s which have a broken
+>>      hpi implementation, but at least for eMMC's which are soldered onto a board
+>>      we can work around this by specifying that hpi is broken in devicetree.
+> Similar, this does it on the card level, e.g. you mark a card as having a broken HPI implementation.
 > 
-> diff --git a/Documentation/devicetree/bindings/usb/udc-xilinx.txt b/Documentation/devicetree/bindings/usb/udc-xilinx.txt
-> index 47b4e39..850d792 100644
-> --- a/Documentation/devicetree/bindings/usb/udc-xilinx.txt
-> +++ b/Documentation/devicetree/bindings/usb/udc-xilinx.txt
-> @@ -7,12 +7,15 @@ Required properties:
->  - interrupts		: Should contain single irq line of USB2 device
->  			  controller
->  - xlnx,has-builtin-dma	: if DMA is included
-> -
-> +- dma-ranges: Should be as the following <dma_addr cpu_addr max_len>.
+> The truth is, the card may not be broken at all, but the mmc controller so we add a property on the controller level.
+> 
+> What Ulf is pondering, if this is not a software stack problem, rather then a hardware implementation, which I don't know.
 
-This is not how dma-ranges is works. First of all, it is part of
-the parent node, and the addresses are not "dma" and "cpu"
-addresses but child and parent bus addresses.
+Hmm..problem is mmc controller side..it's strange.
+How did you know this problem is on mmc controller side?
 
-> +- xlnx,addrwidth       : Should be the dma addressing size in bits(ex: 40 bits).
+Well, i should be also missing something for HPI feature..but it's not relevant to mmc controller.
 
-As I said before, the width is not the interesting question here,
-the compatible string is. My guess is that version 4.00.a of the
-hardware always has the registers to do 64-bit DMA, but you should
-talk to the hardware designers to figure out which versions have
-those, or if they are optional, and what other width may be supported.
+Ok. i will check more..
 
+Best Regards,
+Jaehoon Chung
 
-> + * xudc_write64 - write 64bit value to device registers
-> + * @addr: base addr of device registers
-> + * @offset: register offset
-> + * @val: data to be written
-> + **/
-> +static void xudc_write64(void __iomem *addr, u32 offset, u64 val)
-> +{
-> +	lo_hi_writeq(val, addr + offset);
-> +}
-
-This is what I suggested, but on second thought I think it's still
-wrong:
-
->   * xudc_write32 - little endian write to device registers
->   * @addr: base addr of device registers
->   * @offset: register offset
-> @@ -330,8 +352,13 @@ static int xudc_start_dma(struct xusb_ep *ep, dma_addr_t src,
->  	 * destination registers and then set the length
->  	 * into the DMA length register.
->  	 */
-> -	udc->write_fn(udc->addr, XUSB_DMA_DSAR_ADDR_OFFSET, src);
-> -	udc->write_fn(udc->addr, XUSB_DMA_DDAR_ADDR_OFFSET, dst);
-> +	if (udc->dma_addrwidth > 32) {
-> +		xudc_write64(udc->addr, XUSB_DMA_DSAR_ADDR_OFFSET_LSB, src);
-> +		xudc_write64(udc->addr, XUSB_DMA_DDAR_ADDR_OFFSET_LSB, dst);
-> +	} else {
-> +		udc->write_fn(udc->addr, XUSB_DMA_DSAR_ADDR_OFFSET, src);
-> +		udc->write_fn(udc->addr, XUSB_DMA_DDAR_ADDR_OFFSET, dst);
-> +	}
-
-I just noticed that write_fn() needs to be used to get the
-correct endianess. lo_hi_writeq() always assumes a little-endian
-register, so it's broken if anyone builds this device with big-endian
-registers.
-
-> @@ -2097,6 +2124,12 @@ static int xudc_probe(struct platform_device *pdev)
->  
->  	udc->dma_enabled = of_property_read_bool(np, "xlnx,has-builtin-dma");
->  
-> +	ret = of_property_read_u32(np, "xlnx,addrwidth", &udc->dma_addrwidth);
-> +	if (ret < 0)
-> +		dev_warn(&pdev->dev, "missing xlnx,addrwidth property\n");
-> +
-> +	/* Set the dma mask bits */
-> +	dma_set_mask(&pdev->dev, DMA_BIT_MASK(udc->dma_addrwidth));
-
-You have to check the return code of dma_set_mask. As I said earlier, it's
-possible that someone uses a device that has the 64-bit registers on a
-machine that has a 32-bit bus but more than 4GB of RAM. In this case,
-dma_set_mask() will fail, and you should probably fall back to the
-original method for programming the DMA address then.
-
-	Arnd
+>>> @hans, what do you think?
+>>>> Kind regards
+>>>> Uffe
+>>>>
+>>>>> This patch adds a new capability, mmc-broken-hpi, which allows us to
+>>>>> mark a broken hpi implementation on the host level.
+>>>>>
+>>>>> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
+>>>>> ---
+>>>>>    drivers/mmc/core/host.c  | 2 ++
+>>>>>    drivers/mmc/core/mmc.c   | 2 +-
+>>>>>    include/linux/mmc/host.h | 1 +
+>>>>>    3 files changed, 4 insertions(+), 1 deletion(-)
+>>>>>
+>>>>> diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
+>>>>> index 6e4c55a..9b63b36 100644
+>>>>> --- a/drivers/mmc/core/host.c
+>>>>> +++ b/drivers/mmc/core/host.c
+>>>>> @@ -270,6 +270,8 @@ int mmc_of_parse(struct mmc_host *host)
+>>>>>                   host->caps |= MMC_CAP_HW_RESET;
+>>>>>           if (of_property_read_bool(np, "cap-sdio-irq"))
+>>>>>                   host->caps |= MMC_CAP_SDIO_IRQ;
+>>>>> +       if (of_property_read_bool(np, "mmc-broken-hpi"))
+>>>>> +               host->caps |= MMC_CAP_BROKEN_HPI;
+>>>>>           if (of_property_read_bool(np, "full-pwr-cycle"))
+>>>>>                   host->caps2 |= MMC_CAP2_FULL_PWR_CYCLE;
+>>>>>           if (of_property_read_bool(np, "keep-power-in-suspend"))
+>>>>> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+>>>>> index 4dbe3df..9a19562 100644
+>>>>> --- a/drivers/mmc/core/mmc.c
+>>>>> +++ b/drivers/mmc/core/mmc.c
+>>>>> @@ -1592,7 +1592,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
+>>>>>           /*
+>>>>>            * Enable HPI feature (if supported)
+>>>>>            */
+>>>>> -       if (card->ext_csd.hpi) {
+>>>>> +       if (card->ext_csd.hpi && !(host->caps & MMC_CAP_BROKEN_HPI)) {
+>>>>>                   err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+>>>>>                                   EXT_CSD_HPI_MGMT, 1,
+>>>>>                                   card->ext_csd.generic_cmd6_time);
+>>>>> diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
+>>>>> index 8dd4d29..20f758e 100644
+>>>>> --- a/include/linux/mmc/host.h
+>>>>> +++ b/include/linux/mmc/host.h
+>>>>> @@ -264,6 +264,7 @@ struct mmc_host {
+>>>>>    #define MMC_CAP_DRIVER_TYPE_A  (1 << 23)       /* Host supports Driver Type A */
+>>>>>    #define MMC_CAP_DRIVER_TYPE_C  (1 << 24)       /* Host supports Driver Type C */
+>>>>>    #define MMC_CAP_DRIVER_TYPE_D  (1 << 25)       /* Host supports Driver Type D */
+>>>>> +#define MMC_CAP_BROKEN_HPI     (1 << 29)       /* Host support for HPI is broken */
+>>>>>    #define MMC_CAP_CMD23          (1 << 30)       /* CMD23 supported. */
+>>>>>    #define MMC_CAP_HW_RESET       (1 << 31)       /* Hardware reset */
+>>>>>
+>>>>> -- 
+>>>>> 2.8.0.rc3
+>>>>>
+>>>
+>>>
+> 
+> 
+> 
