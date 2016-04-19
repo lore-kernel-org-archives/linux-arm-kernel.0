@@ -1,120 +1,101 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 19 Apr 2016 20:38:04 +0800
-Subject: [PATCH 3/8] gpio: stmpe: fix edge and rising/falling edge
- detection
-In-Reply-To: <1461068317-28016-4-git-send-email-patrice.chotard@st.com>
-Message-ID: <201604192051.Uq459IuG%fengguang.wu@intel.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 19 Apr 2016 13:40:35 +0100
+Subject: [PATCH 28/45] KVM: arm/arm64: vgic-new: Add GICv3 SGI system
+ register trap handler
+In-Reply-To: <1460740316-8755-29-git-send-email-andre.przywara@arm.com>
+References: <1460740316-8755-1-git-send-email-andre.przywara@arm.com>
+ <1460740316-8755-29-git-send-email-andre.przywara@arm.com>
+Message-ID: <CAFEAcA83Mbpjh6oq7YS0+NbeJerVLukq0mN+9rfKODFUPt0g0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 15 April 2016 at 18:11, Andre Przywara <andre.przywara@arm.com> wrote:
+> In contrast to GICv2 SGIs in a GICv3 implementation are not triggered
+> by a MMIO write, but with a system register write. KVM knows about
+> that register already, we just need to implement the handler and wire
+> it up to the core KVM/ARM code.
+>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>
+> Changelog RFC..v1:
+> - add comment about SGI_AFFINITY_LEVEL macro
 
-[auto build test WARNING on ljones-mfd/for-mfd-next]
-[also build test WARNING on v4.6-rc4 next-20160419]
-[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
+> +/**
+> + * vgic_v3_dispatch_sgi - handle SGI requests from VCPUs
+> + * @vcpu: The VCPU requesting a SGI
+> + * @reg: The value written into the ICC_SGI1R_EL1 register by that VCPU
+> + *
+> + * With GICv3 (and ARE=1) CPUs trigger SGIs by writing to a system register.
+> + * This will trap in sys_regs.c and call this function.
+> + * This ICC_SGI1R_EL1 register contains the upper three affinity levels of the
+> + * target processors as well as a bitmask of 16 Aff0 CPUs.
+> + * If the interrupt routing mode bit is not set, we iterate over all VCPUs to
+> + * check for matching ones. If this bit is set, we signal all, but not the
+> + * calling VCPU.
+> + */
 
-url:    https://github.com/0day-ci/linux/commits/patrice-chotard-st-com/STMPE-fixes-rework-and-add-STMPE1600-support/20160419-202526
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git for-mfd-next
-config: x86_64-randconfig-x010-201616 (attached as .config)
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+No ICC_SGI0R_EL1, ICC_ASGI1R_EL1 ?
 
-Note: it may well be a FALSE warning. FWIW you are at least aware of it now.
-http://gcc.gnu.org/wiki/Better_Uninitialized_Warnings
+> +void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
+> +{
+> +       struct kvm *kvm = vcpu->kvm;
+> +       struct kvm_vcpu *c_vcpu;
+> +       u16 target_cpus;
+> +       u64 mpidr;
+> +       int sgi, c;
+> +       int vcpu_id = vcpu->vcpu_id;
+> +       bool broadcast;
+> +
+> +       sgi = (reg & ICC_SGI1R_SGI_ID_MASK) >> ICC_SGI1R_SGI_ID_SHIFT;
+> +       broadcast = reg & BIT(ICC_SGI1R_IRQ_ROUTING_MODE_BIT);
+> +       target_cpus = (reg & ICC_SGI1R_TARGET_LIST_MASK) >> ICC_SGI1R_TARGET_LIST_SHIFT;
+> +       mpidr = SGI_AFFINITY_LEVEL(reg, 3);
+> +       mpidr |= SGI_AFFINITY_LEVEL(reg, 2);
+> +       mpidr |= SGI_AFFINITY_LEVEL(reg, 1);
+> +
+> +       /*
+> +        * We iterate over all VCPUs to find the MPIDRs matching the request.
+> +        * If we have handled one CPU, we clear its bit to detect early
+> +        * if we are already finished. This avoids iterating through all
+> +        * VCPUs when most of the times we just signal a single VCPU.
+> +        */
+> +       kvm_for_each_vcpu(c, c_vcpu, kvm) {
+> +               struct vgic_irq *irq;
+> +
+> +               /* Exit early if we have dealt with all requested CPUs */
+> +               if (!broadcast && target_cpus == 0)
+> +                       break;
+> +
+> +               /* Don't signal the calling VCPU */
+> +               if (broadcast && c == vcpu_id)
+> +                       continue;
+> +
+> +               if (!broadcast) {
+> +                       int level0;
+> +
+> +                       level0 = match_mpidr(mpidr, target_cpus, c_vcpu);
+> +                       if (level0 == -1)
+> +                               continue;
+> +
+> +                       /* remove this matching VCPU from the mask */
+> +                       target_cpus &= ~BIT(level0);
+> +               }
 
-All warnings (new ones prefixed by >>):
+I think you need a check in here that the SGI is actually configured
+to be the group that's been requested.
 
-   drivers/gpio/gpio-stmpe.c: In function 'stmpe_dbg_show':
->> drivers/gpio/gpio-stmpe.c:284:3: warning: 'fall' may be used uninitialized in this function [-Wmaybe-uninitialized]
-      seq_printf(s, " gpio-%-3d (%-20.20s) in  %s %s %s%s%s",
-      ^
-   drivers/gpio/gpio-stmpe.c:240:8: note: 'fall' was declared here
-      bool fall;
-           ^
->> drivers/gpio/gpio-stmpe.c:284:3: warning: 'rise' may be used uninitialized in this function [-Wmaybe-uninitialized]
-      seq_printf(s, " gpio-%-3d (%-20.20s) in  %s %s %s%s%s",
-      ^
-   drivers/gpio/gpio-stmpe.c:239:8: note: 'rise' was declared here
-      bool rise;
-           ^
->> drivers/gpio/gpio-stmpe.c:284:3: warning: 'edge_det' may be used uninitialized in this function [-Wmaybe-uninitialized]
-      seq_printf(s, " gpio-%-3d (%-20.20s) in  %s %s %s%s%s",
-      ^
-   drivers/gpio/gpio-stmpe.c:238:8: note: 'edge_det' was declared here
-      bool edge_det;
-           ^
+> +
+> +               irq = vgic_get_irq(vcpu->kvm, c_vcpu, sgi);
+> +
+> +               spin_lock(&irq->irq_lock);
+> +               irq->pending = true;
+> +
+> +               vgic_queue_irq_unlock(vcpu->kvm, irq);
+> +       }
+> +}
+>  #endif
+> --
+> 2.7.3
 
-vim +/fall +284 drivers/gpio/gpio-stmpe.c
-
-98190e59 Patrice Chotard 2016-04-19  234  		u8 edge_det_reg;
-98190e59 Patrice Chotard 2016-04-19  235  		u8 rise_reg;
-98190e59 Patrice Chotard 2016-04-19  236  		u8 fall_reg;
-98190e59 Patrice Chotard 2016-04-19  237  		u8 irqen_reg;
-27ec8a9c Linus Walleij   2014-10-02  238  		bool edge_det;
-27ec8a9c Linus Walleij   2014-10-02  239  		bool rise;
-27ec8a9c Linus Walleij   2014-10-02 @240  		bool fall;
-27ec8a9c Linus Walleij   2014-10-02  241  		bool irqen;
-27ec8a9c Linus Walleij   2014-10-02  242  
-98190e59 Patrice Chotard 2016-04-19  243  		switch (stmpe->partnum) {
-98190e59 Patrice Chotard 2016-04-19  244  		case STMPE610:
-98190e59 Patrice Chotard 2016-04-19  245  		case STMPE811:
-98190e59 Patrice Chotard 2016-04-19  246  		case STMPE1601:
-98190e59 Patrice Chotard 2016-04-19  247  		case STMPE2401:
-98190e59 Patrice Chotard 2016-04-19  248  		case STMPE2403:
-98190e59 Patrice Chotard 2016-04-19  249  			edge_det_reg = stmpe->regs[STMPE_IDX_GPEDR_MSB] +
-98190e59 Patrice Chotard 2016-04-19  250  				       num_banks - 1 - (offset / 8);
-27ec8a9c Linus Walleij   2014-10-02  251  			ret = stmpe_reg_read(stmpe, edge_det_reg);
-27ec8a9c Linus Walleij   2014-10-02  252  			if (ret < 0)
-27ec8a9c Linus Walleij   2014-10-02  253  				return;
-27ec8a9c Linus Walleij   2014-10-02  254  			edge_det = !!(ret & mask);
-98190e59 Patrice Chotard 2016-04-19  255  
-98190e59 Patrice Chotard 2016-04-19  256  		case STMPE1801:
-98190e59 Patrice Chotard 2016-04-19  257  			rise_reg = stmpe->regs[STMPE_IDX_GPRER_LSB] -
-98190e59 Patrice Chotard 2016-04-19  258  				   (offset / 8);
-98190e59 Patrice Chotard 2016-04-19  259  			fall_reg = stmpe->regs[STMPE_IDX_GPFER_LSB] -
-98190e59 Patrice Chotard 2016-04-19  260  				   (offset / 8);
-27ec8a9c Linus Walleij   2014-10-02  261  			ret = stmpe_reg_read(stmpe, rise_reg);
-27ec8a9c Linus Walleij   2014-10-02  262  			if (ret < 0)
-27ec8a9c Linus Walleij   2014-10-02  263  				return;
-27ec8a9c Linus Walleij   2014-10-02  264  			rise = !!(ret & mask);
-27ec8a9c Linus Walleij   2014-10-02  265  			ret = stmpe_reg_read(stmpe, fall_reg);
-27ec8a9c Linus Walleij   2014-10-02  266  			if (ret < 0)
-27ec8a9c Linus Walleij   2014-10-02  267  				return;
-27ec8a9c Linus Walleij   2014-10-02  268  			fall = !!(ret & mask);
-98190e59 Patrice Chotard 2016-04-19  269  
-98190e59 Patrice Chotard 2016-04-19  270  		case STMPE801:
-98190e59 Patrice Chotard 2016-04-19  271  			irqen_reg = stmpe->regs[STMPE_IDX_IEGPIOR_LSB] -
-98190e59 Patrice Chotard 2016-04-19  272  				    (offset / 8);
-98190e59 Patrice Chotard 2016-04-19  273  			break;
-98190e59 Patrice Chotard 2016-04-19  274  
-98190e59 Patrice Chotard 2016-04-19  275  		default:
-98190e59 Patrice Chotard 2016-04-19  276  			return;
-98190e59 Patrice Chotard 2016-04-19  277  		}
-98190e59 Patrice Chotard 2016-04-19  278  
-27ec8a9c Linus Walleij   2014-10-02  279  		ret = stmpe_reg_read(stmpe, irqen_reg);
-27ec8a9c Linus Walleij   2014-10-02  280  		if (ret < 0)
-27ec8a9c Linus Walleij   2014-10-02  281  			return;
-27ec8a9c Linus Walleij   2014-10-02  282  		irqen = !!(ret & mask);
-27ec8a9c Linus Walleij   2014-10-02  283  
-27ec8a9c Linus Walleij   2014-10-02 @284  		seq_printf(s, " gpio-%-3d (%-20.20s) in  %s %s %s%s%s",
-27ec8a9c Linus Walleij   2014-10-02  285  			   gpio, label ?: "(none)",
-27ec8a9c Linus Walleij   2014-10-02  286  			   val ? "hi" : "lo",
-27ec8a9c Linus Walleij   2014-10-02  287  			   edge_det ? "edge-asserted" : "edge-inactive",
-
-:::::: The code at line 284 was first introduced by commit
-:::::: 27ec8a9cb504e9995c123dc74e0cca0cba81d07f gpio: stmpe: add verbose debug code
-
-:::::: TO: Linus Walleij <linus.walleij@linaro.org>
-:::::: CC: Linus Walleij <linus.walleij@linaro.org>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 23724 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160419/e78f1935/attachment-0001.obj>
+thanks
+-- PMM
