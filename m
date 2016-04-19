@@ -1,91 +1,118 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 19 Apr 2016 07:19:45 -0500
-Subject: Runtime warning due to commit 'ARM: OMAP: Catch callers of
- revision information prior to it being populated' in -next
-In-Reply-To: <5715B5EC.2040000@roeck-us.net>
-References: <5715B5EC.2040000@roeck-us.net>
-Message-ID: <57162261.4070409@ti.com>
+From: oliver@schinagl.nl (Olliver Schinagl)
+Date: Tue, 19 Apr 2016 14:20:00 +0200
+Subject: [PATCH 1/2] mmc: core: Improve marking broken HPI through
+ devicetree
+In-Reply-To: <5715FF1B.80402@samsung.com>
+References: <1461049934-12848-1-git-send-email-oliver@schinagl.nl>
+ <1461049934-12848-2-git-send-email-oliver@schinagl.nl>
+ <CAPDyKFqftYtrHvcQB7te1fuWxjWtrhOGY=5DnRTnrRxHm2cQ-A@mail.gmail.com>
+ <5715FD6B.5000809@schinagl.nl> <5715FF1B.80402@samsung.com>
+Message-ID: <57162270.6040701@schinagl.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/18/2016 11:37 PM, Guenter Roeck wrote:
-> Hi,
-> 
+Hey Jaehoon,
 
-+ linux-omap, linux-arm
+On 19-04-16 11:49, Jaehoon Chung wrote:
+> Hi
+>
+> On 04/19/2016 06:42 PM, Olliver Schinagl wrote:
+>> Hi Ulf,
+>>
+>> On 19-04-16 11:29, Ulf Hansson wrote:
+>>> On 19 April 2016 at 09:12, Olliver Schinagl <oliver@schinagl.nl> wrote:
+>>>> In patch 81f8a7be66 Hans de Goede added a patch to allow marking an mmc
+>>>> device as to having an broken HPI implementation. After talking some
+>>>> with Hans, we now think it is actually the mmc controller that can be
+>>>> broken and not support broken HPI's.
+>>> I don't want us to invent a DT binding for something you *think* is a
+>>> HW controller issue.
+>>>
+>>> Have you really excluded that this isn't a software issue? Me
+>>> personally haven't been using HPI that much so I can't really tell
+>>> about the code robustness from the mmc core (mmc protocol point of
+>>> view).
+>> Well this patch goes hand in hand so to speak with the broken-hpi patch introduced by him, he did most of the investigation. We just discussed how to handle it and asked me to cook up the patch.
+> I didn't understand why add this property. Is this same patch?
+>
+> commit 81f8a7be6642b4c26ab681b2e0f4c4120a6de1b0
+> Author: Hans de Goede <hdegoede@redhat.com>
+> Date:   Wed Apr 1 17:26:23 2015 +0200
+>
+>      mmc: Add support for marking hpi as broken through devicetree
+>
+>      The eMMC on a tablet I've will stop working / communicating as soon as
+>      the kernel executes:
+>
+>                  mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+>                                  EXT_CSD_HPI_MGMT, 1,
+>                                  card->ext_csd.generic_cmd6_time);
+>
+>      There seems to be no way to reliable identify eMMC-s which have a broken
+>      hpi implementation, but at least for eMMC's which are soldered onto a board
+>      we can work around this by specifying that hpi is broken in devicetree.
+Similar, this does it on the card level, e.g. you mark a card as having 
+a broken HPI implementation.
 
-> commit 'ARM: OMAP: Catch callers of revision information prior to it
-> being populated' results in a runtime warning on various non-OMAP
-> architectures. I have seen it with the following qemu tests.
-> 
-> arm:vexpress-a9:multi_v7_defconfig:vexpress-v2p-ca9
-> arm:vexpress-a15:multi_v7_defconfig:vexpress-v2p-ca15-tc1
-> arm:xilinx-zynq-a9:multi_v7_defconfig:zynq-zc702
-> arm:xilinx-zynq-a9:multi_v7_defconfig:zynq-zc706
-> arm:xilinx-zynq-a9:multi_v7_defconfig:zynq-zed
-> arm:midway:multi_v7_defconfig:ecx-2000
-> arm:smdkc210:multi_v7_defconfig:exynos4210-smdkv310
-> 
-> It is also reported by kernelci.org in at least one boot test for imx6q-cm-fx6.
+The truth is, the card may not be broken at all, but the mmc controller 
+so we add a property on the controller level.
 
-Thanks for the report... :(
-> 
-> The warning is as follows.
-> 
-> ------------[ cut here ]------------
-> WARNING: CPU: 0 PID: 1 at arch/arm/mach-omap2/id.c:49 omap_rev+0x3c/0x50
-> Modules linked in:
-> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.6.0-rc2-next-20160411 #1
-> Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
-> [<c030f970>] (unwind_backtrace) from [<c030b094>] (show_stack+0x10/0x14)
-> [<c030b094>] (show_stack) from [<c0585424>] (dump_stack+0x84/0xa4)
-> [<c0585424>] (dump_stack) from [<c0341774>] (__warn+0xd4/0x100)
-> [<c0341774>] (__warn) from [<c03417c0>] (warn_slowpath_null+0x20/0x28)
-> [<c03417c0>] (warn_slowpath_null) from [<c0324024>] (omap_rev+0x3c/0x50)
-> [<c0324024>] (omap_rev) from [<c1114a18>] (__omap4_sar_ram_init+0x8/0x88)
-> [<c1114a18>] (__omap4_sar_ram_init) from [<c0301e5c>] (do_one_initcall+0x3c/0x16c)
-> [<c0301e5c>] (do_one_initcall) from [<c1100ccc>] (kernel_init_freeable+0x70/0x1ec)
-> [<c1100ccc>] (kernel_init_freeable) from [<c0b495e4>] (kernel_init+0x8/0x110)
-> [<c0b495e4>] (kernel_init) from [<c0307f78>] (ret_from_fork+0x14/0x3c)
-> ---[ end trace cb88537fdc8fa200 ]---
-> 
-> Please have a look.
-
-Tony,
-Should we get rid of omap_initcall callers(move them into
-board-generic call path or lower the check not to include default of 0?
-
-we have the following users:
-> $ git grep omap_".*"_initcall arch/arm/mach-omap2/
-> arch/arm/mach-omap2/board-n8x0.c:omap_late_initcall(n8x0_late_initcall);
-> arch/arm/mach-omap2/board-rx51-video.c:omap_subsys_initcall(rx51_video_init);
-> arch/arm/mach-omap2/devices.c:omap_postcore_initcall(omap3_l3_init);
-> arch/arm/mach-omap2/devices.c:omap_arch_initcall(omap2_init_devices);
-> arch/arm/mach-omap2/devices.c:omap_postcore_initcall(omap_gpmc_init);
-> arch/arm/mach-omap2/dma.c:omap_arch_initcall(omap2_system_dma_init);
-> arch/arm/mach-omap2/gpio.c:omap_postcore_initcall(omap2_gpio_init);
-> arch/arm/mach-omap2/hdq1w.c:omap_arch_initcall(omap_init_hdq);
-> arch/arm/mach-omap2/i2c.c:omap_subsys_initcall(omap_i2c_cmdline);
-> arch/arm/mach-omap2/id.c:omap_device_initcall(omap_feed_randpool);
-> arch/arm/mach-omap2/mcbsp.c:omap_arch_initcall(omap2_mcbsp_init);
-> arch/arm/mach-omap2/omap2-restart.c:omap_postcore_initcall(omap2xxx_common_look_up_clks_for_reset);
-> arch/arm/mach-omap2/omap4-common.c:omap_arch_initcall(omap4_sram_init);
-> arch/arm/mach-omap2/omap4-common.c:omap_early_initcall(omap4_sar_ram_init);
-^^ warning was generated here
-> arch/arm/mach-omap2/omap_device.c:omap_postcore_initcall(omap_device_init);
-> arch/arm/mach-omap2/omap_device.c:omap_late_initcall_sync(omap_device_late_init);
-> arch/arm/mach-omap2/omap_hwmod.c:omap_postcore_initcall(omap_hwmod_setup_all);
-> arch/arm/mach-omap2/omap_phy_internal.c:omap_early_initcall(omap4430_phy_power_down);
-> arch/arm/mach-omap2/opp3xxx_data.c:omap_device_initcall(omap3_opp_init);
-> arch/arm/mach-omap2/opp4xxx_data.c:omap_device_initcall(omap4_opp_init);
-> arch/arm/mach-omap2/pm-debug.c:omap_arch_initcall(pm_dbg_init);
-> arch/arm/mach-omap2/pm.c:omap_postcore_initcall(omap2_common_pm_init);
-> arch/arm/mach-omap2/pmu.c:omap_subsys_initcall(omap_init_pmu);
-> arch/arm/mach-omap2/serial.c:omap_postcore_initcall(omap_serial_early_init);
-> arch/arm/mach-omap2/smartreflex-class3.c:omap_late_initcall(sr_class3_init);
-> arch/arm/mach-omap2/timer.c:omap_arch_initcall(omap2_dm_timer_init);
-> arch/arm/mach-omap2/wd_timer.c:omap_subsys_initcall(omap_init_wdt);
-
--- 
-Regards,
-Nishanth Menon
+What Ulf is pondering, if this is not a software stack problem, rather 
+then a hardware implementation, which I don't know.
+>> @hans, what do you think?
+>>> Kind regards
+>>> Uffe
+>>>
+>>>> This patch adds a new capability, mmc-broken-hpi, which allows us to
+>>>> mark a broken hpi implementation on the host level.
+>>>>
+>>>> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
+>>>> ---
+>>>>    drivers/mmc/core/host.c  | 2 ++
+>>>>    drivers/mmc/core/mmc.c   | 2 +-
+>>>>    include/linux/mmc/host.h | 1 +
+>>>>    3 files changed, 4 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
+>>>> index 6e4c55a..9b63b36 100644
+>>>> --- a/drivers/mmc/core/host.c
+>>>> +++ b/drivers/mmc/core/host.c
+>>>> @@ -270,6 +270,8 @@ int mmc_of_parse(struct mmc_host *host)
+>>>>                   host->caps |= MMC_CAP_HW_RESET;
+>>>>           if (of_property_read_bool(np, "cap-sdio-irq"))
+>>>>                   host->caps |= MMC_CAP_SDIO_IRQ;
+>>>> +       if (of_property_read_bool(np, "mmc-broken-hpi"))
+>>>> +               host->caps |= MMC_CAP_BROKEN_HPI;
+>>>>           if (of_property_read_bool(np, "full-pwr-cycle"))
+>>>>                   host->caps2 |= MMC_CAP2_FULL_PWR_CYCLE;
+>>>>           if (of_property_read_bool(np, "keep-power-in-suspend"))
+>>>> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+>>>> index 4dbe3df..9a19562 100644
+>>>> --- a/drivers/mmc/core/mmc.c
+>>>> +++ b/drivers/mmc/core/mmc.c
+>>>> @@ -1592,7 +1592,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
+>>>>           /*
+>>>>            * Enable HPI feature (if supported)
+>>>>            */
+>>>> -       if (card->ext_csd.hpi) {
+>>>> +       if (card->ext_csd.hpi && !(host->caps & MMC_CAP_BROKEN_HPI)) {
+>>>>                   err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+>>>>                                   EXT_CSD_HPI_MGMT, 1,
+>>>>                                   card->ext_csd.generic_cmd6_time);
+>>>> diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
+>>>> index 8dd4d29..20f758e 100644
+>>>> --- a/include/linux/mmc/host.h
+>>>> +++ b/include/linux/mmc/host.h
+>>>> @@ -264,6 +264,7 @@ struct mmc_host {
+>>>>    #define MMC_CAP_DRIVER_TYPE_A  (1 << 23)       /* Host supports Driver Type A */
+>>>>    #define MMC_CAP_DRIVER_TYPE_C  (1 << 24)       /* Host supports Driver Type C */
+>>>>    #define MMC_CAP_DRIVER_TYPE_D  (1 << 25)       /* Host supports Driver Type D */
+>>>> +#define MMC_CAP_BROKEN_HPI     (1 << 29)       /* Host support for HPI is broken */
+>>>>    #define MMC_CAP_CMD23          (1 << 30)       /* CMD23 supported. */
+>>>>    #define MMC_CAP_HW_RESET       (1 << 31)       /* Hardware reset */
+>>>>
+>>>> -- 
+>>>> 2.8.0.rc3
+>>>>
+>>
+>>
