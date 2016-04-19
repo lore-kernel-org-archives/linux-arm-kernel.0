@@ -1,73 +1,72 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 19 Apr 2016 09:21:25 -0500
-Subject: Runtime warning due to commit 'ARM: OMAP: Catch callers of
- revision information prior to it being populated' in -next
-In-Reply-To: <20160419141320.GB5995@atomide.com>
-References: <5715B5EC.2040000@roeck-us.net> <57162261.4070409@ti.com>
- <20160419141320.GB5995@atomide.com>
-Message-ID: <57163EE5.9090405@ti.com>
+From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
+Date: Tue, 19 Apr 2016 14:29:27 +0000
+Subject: [PATCH 5/8] arm64: kernel: replace early 64-bit literal loads
+ with move-immediates
+In-Reply-To: <1460992188-23295-6-git-send-email-ard.biesheuvel@linaro.org>
+References: <1460992188-23295-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1460992188-23295-6-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <571640C6.4040901@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/19/2016 09:13 AM, Tony Lindgren wrote:
-> * Nishanth Menon <nm@ti.com> [160419 05:21]:
->> On 04/18/2016 11:37 PM, Guenter Roeck wrote:
->>
->> + linux-omap, linux-arm
->>
->>> commit 'ARM: OMAP: Catch callers of revision information prior to it
->>> being populated' results in a runtime warning on various non-OMAP
->>> architectures. I have seen it with the following qemu tests.
->>>
->>> arm:vexpress-a9:multi_v7_defconfig:vexpress-v2p-ca9
->>> arm:vexpress-a15:multi_v7_defconfig:vexpress-v2p-ca15-tc1
->>> arm:xilinx-zynq-a9:multi_v7_defconfig:zynq-zc702
->>> arm:xilinx-zynq-a9:multi_v7_defconfig:zynq-zc706
->>> arm:xilinx-zynq-a9:multi_v7_defconfig:zynq-zed
->>> arm:midway:multi_v7_defconfig:ecx-2000
->>> arm:smdkc210:multi_v7_defconfig:exynos4210-smdkv310
->>>
->>> It is also reported by kernelci.org in at least one boot test for imx6q-cm-fx6.
->>
->> Thanks for the report... :(
+On 04/18/2016 06:09 PM, Ard Biesheuvel wrote:
+> When building a relocatable kernel, we currently rely on the fact that
+> early 64-bit literal loads need to be deferred to after the relocation
+> has been performed only if they involve symbol references, and not if
+> they involve assemble time constants. While this is not an unreasonable
+> assumption to make, it is better to switch to movk/movz sequences, since
+> these are guaranteed to be resolved at link time, simply because there are
+> no dynamic relocation types to describe them.
 > 
-> Oh crap, sorry about that. I'll revert that commit immediately.
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/kernel/head.S | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
 > 
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index 0d487d90d221..dae9cabaadf5 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -337,7 +337,7 @@ __create_page_tables:
+>  	cmp	x0, x6
+>  	b.lo	1b
+>  
+> -	ldr	x7, =SWAPPER_MM_MMUFLAGS
+> +	mov	x7, SWAPPER_MM_MMUFLAGS
 
+mov_q here too?
 
-Thanks. Sorry about the same as well..
+---
+Best Regards, Laurentiu
 
->>> The warning is as follows.
->>>
->>> ------------[ cut here ]------------
->>> WARNING: CPU: 0 PID: 1 at arch/arm/mach-omap2/id.c:49 omap_rev+0x3c/0x50
->>> Modules linked in:
->>> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.6.0-rc2-next-20160411 #1
->>> Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
->>> [<c030f970>] (unwind_backtrace) from [<c030b094>] (show_stack+0x10/0x14)
->>> [<c030b094>] (show_stack) from [<c0585424>] (dump_stack+0x84/0xa4)
->>> [<c0585424>] (dump_stack) from [<c0341774>] (__warn+0xd4/0x100)
->>> [<c0341774>] (__warn) from [<c03417c0>] (warn_slowpath_null+0x20/0x28)
->>> [<c03417c0>] (warn_slowpath_null) from [<c0324024>] (omap_rev+0x3c/0x50)
->>> [<c0324024>] (omap_rev) from [<c1114a18>] (__omap4_sar_ram_init+0x8/0x88)
->>> [<c1114a18>] (__omap4_sar_ram_init) from [<c0301e5c>] (do_one_initcall+0x3c/0x16c)
->>> [<c0301e5c>] (do_one_initcall) from [<c1100ccc>] (kernel_init_freeable+0x70/0x1ec)
->>> [<c1100ccc>] (kernel_init_freeable) from [<c0b495e4>] (kernel_init+0x8/0x110)
->>> [<c0b495e4>] (kernel_init) from [<c0307f78>] (ret_from_fork+0x14/0x3c)
->>> ---[ end trace cb88537fdc8fa200 ]---
->>>
->>> Please have a look.
->>
->> Tony,
->> Should we get rid of omap_initcall callers(move them into
->> board-generic call path or lower the check not to include default of 0?
+>  
+>  	/*
+>  	 * Create the identity mapping.
+> @@ -393,7 +393,7 @@ __create_page_tables:
+>  	 * Map the kernel image (starting with PHYS_OFFSET).
+>  	 */
+>  	mov	x0, x26				// swapper_pg_dir
+> -	ldr	x5, =KIMAGE_VADDR
+> +	mov_q	x5, KIMAGE_VADDR
+>  	add	x5, x5, x23			// add KASLR displacement
+>  	create_pgd_entry x0, x5, x3, x6
+>  	ldr	w6, =kernel_img_size
+> @@ -631,7 +631,7 @@ ENTRY(secondary_holding_pen)
+>  	bl	el2_setup			// Drop to EL1, w20=cpu_boot_mode
+>  	bl	set_cpu_boot_mode_flag
+>  	mrs	x0, mpidr_el1
+> -	ldr     x1, =MPIDR_HWID_BITMASK
+> +	mov_q	x1, MPIDR_HWID_BITMASK
+>  	and	x0, x0, x1
+>  	adr_l	x3, secondary_holding_pen_release
+>  pen:	ldr	x4, [x3]
+> @@ -773,7 +773,7 @@ __primary_switch:
+>  	ldr	w9, =__rela_offset		// offset to reloc table
+>  	ldr	w10, =__rela_size		// size of reloc table
+>  
+> -	ldr	x11, =KIMAGE_VADDR		// default virtual offset
+> +	mov_q	x11, KIMAGE_VADDR		// default virtual offset
+>  	add	x11, x11, x23			// actual virtual offset
+>  	add	x8, x8, x11			// __va(.dynsym)
+>  	add	x9, x9, x11			// __va(.rela)
 > 
-> Most of those will disappear when we drop the legacy booting support
-> for omap3. I would not touch those before then to avoid churn with
-> the legacy code.
-
-Sounds good to me.
-
--- 
-Regards,
-Nishanth Menon
