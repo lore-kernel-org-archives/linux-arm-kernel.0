@@ -1,70 +1,52 @@
-From: andrew@aj.id.au (Andrew Jeffery)
-Date: Tue, 19 Apr 2016 13:43:42 +0930
-Subject: [PATCH] pinctrl-exynos5440: Use off-stack memory for
- pinctrl_gpio_range
-Message-ID: <1461039222-26592-1-git-send-email-andrew@aj.id.au>
+From: hs.liao@mediatek.com (HS Liao)
+Date: Tue, 19 Apr 2016 12:49:58 +0800
+Subject: [RFC v4 0/4] Mediatek MT8173 CMDQ support
+Message-ID: <1461041402-19962-1-git-send-email-hs.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The range is registered into a linked list which can be referenced
-throughout the lifetime of the driver. Ensure the range's memory is useful
-for the same lifetime by adding it to the driver's private data structure.
 
-The bug was introduced in the driver's initial commit, which was present in
-v3.10.
+Hi,
 
-Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
-Fixes: f0b9a7e521fa ("pinctrl: exynos5440: add pinctrl driver for Samsung EXYNOS5440 SoC")
-Cc: stable at vger.kernel.org
----
-This is my first contribution to the kernel, so hopefully I've followed all the
-relevant documentation. If not, please let me know and point me in the right
-direction!
+This is Mediatek MT8173 Command Queue(CMDQ) driver. The CMDQ is used
+to help read/write registers with critical time limitation, such as
+updating display configuration during the vblank. It controls Global
+Command Engine (GCE) hardware to achieve this requirement.
 
-I don't have the means to test the patch, but it compiles. Someone with
-appropriate hardware should probably give it a spin.
+These patches have a build dependency on top of v4.6-rc1.
 
- drivers/pinctrl/samsung/pinctrl-exynos5440.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+Changes since v3:
+ - rebase to v4.6-rc1
+ - pass both arm and arm64 arch compilation
+ - fix bug of removing free task list in v3
+ - marchal return error code
+ - use offset instead of physical address
+ - centralize release flow
+ - add "suspend/resume protection" patch
+ - add queue_work() in cmdq_auto_release() to prevent no more flush
+   or interrupt to consume waiting tasks
+ - remove some debug or redundant code
+ - rewrite some code to shrink code size
 
-diff --git a/drivers/pinctrl/samsung/pinctrl-exynos5440.c b/drivers/pinctrl/samsung/pinctrl-exynos5440.c
-index 00ab63abf1d9..d45028a75c0f 100644
---- a/drivers/pinctrl/samsung/pinctrl-exynos5440.c
-+++ b/drivers/pinctrl/samsung/pinctrl-exynos5440.c
-@@ -117,6 +117,7 @@ struct exynos5440_pinctrl_priv_data {
- 	unsigned int			nr_groups;
- 	const struct exynos5440_pmx_func	*pmx_functions;
- 	unsigned int			nr_functions;
-+	struct pinctrl_gpio_range	range;
- };
- 
- /**
-@@ -742,7 +743,6 @@ static int exynos5440_pinctrl_register(struct platform_device *pdev,
- 	struct pinctrl_desc *ctrldesc;
- 	struct pinctrl_dev *pctl_dev;
- 	struct pinctrl_pin_desc *pindesc, *pdesc;
--	struct pinctrl_gpio_range grange;
- 	char *pin_names;
- 	int pin, ret;
- 
-@@ -794,12 +794,12 @@ static int exynos5440_pinctrl_register(struct platform_device *pdev,
- 		return PTR_ERR(pctl_dev);
- 	}
- 
--	grange.name = "exynos5440-pctrl-gpio-range";
--	grange.id = 0;
--	grange.base = 0;
--	grange.npins = EXYNOS5440_MAX_PINS;
--	grange.gc = priv->gc;
--	pinctrl_add_gpio_range(pctl_dev, &grange);
-+	priv->range.name = "exynos5440-pctrl-gpio-range";
-+	priv->range.id = 0;
-+	priv->range.base = 0;
-+	priv->range.npins = EXYNOS5440_MAX_PINS;
-+	priv->range.gc = priv->gc;
-+	pinctrl_add_gpio_range(pctl_dev, &priv->range);
- 	return 0;
- }
- 
+Best regards,
+HS Liao
+
+HS Liao (4):
+  dt-bindings: soc: Add documentation for the MediaTek GCE unit
+  CMDQ: Mediatek CMDQ driver
+  arm64: dts: mt8173: Add GCE node
+  CMDQ: suspend/resume protection
+
+ .../devicetree/bindings/soc/mediatek/gce.txt       |   34 +
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |    8 +
+ drivers/soc/mediatek/Kconfig                       |   10 +
+ drivers/soc/mediatek/Makefile                      |    1 +
+ drivers/soc/mediatek/mtk-cmdq.c                    | 1997 ++++++++++++++++++++
+ include/soc/mediatek/cmdq.h                        |  197 ++
+ 6 files changed, 2247 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/mediatek/gce.txt
+ create mode 100644 drivers/soc/mediatek/mtk-cmdq.c
+ create mode 100644 include/soc/mediatek/cmdq.h
+
 -- 
-2.5.0
+1.7.9.5
