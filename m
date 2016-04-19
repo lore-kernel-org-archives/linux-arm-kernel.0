@@ -1,72 +1,52 @@
-From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
-Date: Tue, 19 Apr 2016 14:29:27 +0000
-Subject: [PATCH 5/8] arm64: kernel: replace early 64-bit literal loads
- with move-immediates
-In-Reply-To: <1460992188-23295-6-git-send-email-ard.biesheuvel@linaro.org>
-References: <1460992188-23295-1-git-send-email-ard.biesheuvel@linaro.org>
- <1460992188-23295-6-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <571640C6.4040901@nxp.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 19 Apr 2016 16:37:54 +0200
+Subject: [PATCH] pinctrl: at91-pio4: fix pull-up/down logic
+In-Reply-To: <1461074628-20224-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1461074628-20224-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20160419143754.GB29844@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/18/2016 06:09 PM, Ard Biesheuvel wrote:
-> When building a relocatable kernel, we currently rely on the fact that
-> early 64-bit literal loads need to be deferred to after the relocation
-> has been performed only if they involve symbol references, and not if
-> they involve assemble time constants. While this is not an unreasonable
-> assumption to make, it is better to switch to movk/movz sequences, since
-> these are guaranteed to be resolved at link time, simply because there are
-> no dynamic relocation types to describe them.
+On 19/04/2016 at 16:03:45 +0200, Ludovic Desroches wrote :
+> The default configuration of a pin is often with a value in the
+> pull-up/down field at chip reset. So, even if the internal logic of the
+> controller prevents writing a configuration with pull-up and pull-down at
+> the same time, we must ensure explicitly this condition before writing the
+> register.
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> This was leading to a pull-down condition not taken into account for
+> instance.
+> 
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> Fixes: 776180848b57 ("pinctrl: introduce driver for Atmel PIO4 controller")
+> Cc: stable at vger.kernel.org #v4.4 and later
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+
 > ---
->  arch/arm64/kernel/head.S | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
+>  drivers/pinctrl/pinctrl-at91-pio4.c | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 0d487d90d221..dae9cabaadf5 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -337,7 +337,7 @@ __create_page_tables:
->  	cmp	x0, x6
->  	b.lo	1b
->  
-> -	ldr	x7, =SWAPPER_MM_MMUFLAGS
-> +	mov	x7, SWAPPER_MM_MMUFLAGS
-
-mov_q here too?
-
----
-Best Regards, Laurentiu
-
->  
->  	/*
->  	 * Create the identity mapping.
-> @@ -393,7 +393,7 @@ __create_page_tables:
->  	 * Map the kernel image (starting with PHYS_OFFSET).
->  	 */
->  	mov	x0, x26				// swapper_pg_dir
-> -	ldr	x5, =KIMAGE_VADDR
-> +	mov_q	x5, KIMAGE_VADDR
->  	add	x5, x5, x23			// add KASLR displacement
->  	create_pgd_entry x0, x5, x3, x6
->  	ldr	w6, =kernel_img_size
-> @@ -631,7 +631,7 @@ ENTRY(secondary_holding_pen)
->  	bl	el2_setup			// Drop to EL1, w20=cpu_boot_mode
->  	bl	set_cpu_boot_mode_flag
->  	mrs	x0, mpidr_el1
-> -	ldr     x1, =MPIDR_HWID_BITMASK
-> +	mov_q	x1, MPIDR_HWID_BITMASK
->  	and	x0, x0, x1
->  	adr_l	x3, secondary_holding_pen_release
->  pen:	ldr	x4, [x3]
-> @@ -773,7 +773,7 @@ __primary_switch:
->  	ldr	w9, =__rela_offset		// offset to reloc table
->  	ldr	w10, =__rela_size		// size of reloc table
->  
-> -	ldr	x11, =KIMAGE_VADDR		// default virtual offset
-> +	mov_q	x11, KIMAGE_VADDR		// default virtual offset
->  	add	x11, x11, x23			// actual virtual offset
->  	add	x8, x8, x11			// __va(.dynsym)
->  	add	x9, x9, x11			// __va(.rela)
+> diff --git a/drivers/pinctrl/pinctrl-at91-pio4.c b/drivers/pinctrl/pinctrl-at91-pio4.c
+> index 629b6fe..75093d7 100644
+> --- a/drivers/pinctrl/pinctrl-at91-pio4.c
+> +++ b/drivers/pinctrl/pinctrl-at91-pio4.c
+> @@ -722,9 +722,11 @@ static int atmel_conf_pin_config_group_set(struct pinctrl_dev *pctldev,
+>  			break;
+>  		case PIN_CONFIG_BIAS_PULL_UP:
+>  			conf |= ATMEL_PIO_PUEN_MASK;
+> +			conf &= (~ATMEL_PIO_PDEN_MASK);
+>  			break;
+>  		case PIN_CONFIG_BIAS_PULL_DOWN:
+>  			conf |= ATMEL_PIO_PDEN_MASK;
+> +			conf &= (~ATMEL_PIO_PUEN_MASK);
+>  			break;
+>  		case PIN_CONFIG_DRIVE_OPEN_DRAIN:
+>  			if (arg == 0)
+> -- 
+> 2.5.0
 > 
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
