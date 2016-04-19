@@ -1,70 +1,103 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 19 Apr 2016 12:51:47 -0700
-Subject: [GIT PULL] omap fixes against v4.6-rc2
-In-Reply-To: <20160419145400.GC5995@atomide.com>
-References: <20160408191854.GZ16484@atomide.com>
- <20160419145400.GC5995@atomide.com>
-Message-ID: <20160419195147.GE5973@atomide.com>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 19 Apr 2016 21:29:59 +0200
+Subject: [PATCH RFT 1/5] iio: mxs-lradc: fix memory leak
+In-Reply-To: <5716348F.70200@i2se.com>
+References: <1460648909-2657-1-git-send-email-stefan.wahren@i2se.com>
+ <1460648909-2657-2-git-send-email-stefan.wahren@i2se.com>
+ <570FF70F.3000501@denx.de> <571360A3.3060809@kernel.org>
+ <57151652.4020709@denx.de> <5715D12D.1020303@i2se.com>
+ <57160937.6000903@denx.de> <5716348F.70200@i2se.com>
+Message-ID: <57168737.1070904@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [160419 07:55]:
-> * Tony Lindgren <tony@atomide.com> [160408 12:22]:
-> >       ARM: OMAP: Catch callers of revision information prior to it being populated
+On 04/19/2016 03:37 PM, Stefan Wahren wrote:
+> Hi Marek,
 > 
-> And this one causes bogus runtime warnings with other SoCs
-> as reported by Guenter Roeck. I'll revert this and post
-> an updated pull request shortly.
+> Am 19.04.2016 um 12:32 schrieb Marek Vasut:
+>> On 04/19/2016 08:33 AM, Stefan Wahren wrote:
+>>> Hi Marek,
+>>>
+>>> Am 18.04.2016 um 19:16 schrieb Marek Vasut:
+>>>> On 04/17/2016 12:08 PM, Jonathan Cameron wrote:
+>>>>> On 14/04/16 21:01, Marek Vasut wrote:
+>>>>>> On 04/14/2016 05:48 PM, Stefan Wahren wrote:
+>>>>>>> After successful touchscreen registration the input device was
+>>>>>>> never freed. So fix this issue by using devm_input_allocate_device().
+>>>>>>>
+>>>>>>> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+>>>>>>> ---
+>>>>>>>  drivers/iio/adc/mxs-lradc.c |    8 ++------
+>>>>>>>  1 file changed, 2 insertions(+), 6 deletions(-)
+>>>>>>>
+>>>>>>> diff --git a/drivers/iio/adc/mxs-lradc.c b/drivers/iio/adc/mxs-lradc.c
+>>>>>>> index 33051b8..0576953 100644
+>>>>>>> --- a/drivers/iio/adc/mxs-lradc.c
+>>>>>>> +++ b/drivers/iio/adc/mxs-lradc.c
+>>>>>>> @@ -1109,12 +1109,11 @@ static int mxs_lradc_ts_register(struct mxs_lradc *lradc)
+>>>>>>>  {
+>>>>>>>  	struct input_dev *input;
+>>>>>>>  	struct device *dev = lradc->dev;
+>>>>>>> -	int ret;
+>>>>>>>  
+>>>>>>>  	if (!lradc->use_touchscreen)
+>>>>>>>  		return 0;
+>>>>>>>  
+>>>>>>> -	input = input_allocate_device();
+>>>>>>> +	input = devm_input_allocate_device(dev);
+>>>>>>>  	if (!input)
+>>>>>>>  		return -ENOMEM;
+>>>>>>>  
+>>>>>>> @@ -1134,11 +1133,8 @@ static int mxs_lradc_ts_register(struct mxs_lradc *lradc)
+>>>>>>>  
+>>>>>>>  	lradc->ts_input = input;
+>>>>>>>  	input_set_drvdata(input, lradc);
+>>>>>>> -	ret = input_register_device(input);
+>>>>>>> -	if (ret)
+>>>>>>> -		input_free_device(lradc->ts_input);
+>>>>>>>  
+>>>>>>> -	return ret;
+>>>>>>> +	return input_register_device(input);
+>>>>>>>  }
+>>>>>>>  
+>>>>>>>  static void mxs_lradc_ts_unregister(struct mxs_lradc *lradc)
+>>>>>>>
+>>>>>> Nice find.
+>>>>>>
+>>>>>> Looks like at91_adc.c and exynos_adc.c suffer from the exact same issue.
+>>>>>> The leak looks a bit more severe on exynos even, exynos_adc_ts_init()
+>>>>>> could use a proper fail path. Do you want to send patches or shall I ?
+>>>>>>
+>>>>> As this has been there a long time I'm not going to rush it in as a fix.
+>>>> I did take a proper look today and it seems they do the right thing
+>>>> afterall. I checked them with kmemleak too to be sure.
+>>> thanks, input_unregister_device already free the memory.
+>>>
+>>> Sorry for the mess :-(
+>>>
+>>> I think it would be the best to remove / revert this patch.
+>> This one? Why exactly? Please elaborate some more, so it's possible to
+>> understand the reasoning :)
+>>
+>>
+> 
+> as you already pointed out this is not a memory leak, because
+> input_unregister_device free the input device. So the commit message is
+> incorrect.
 
-And below is the updated pull request with just the above
-commit reverted.
+I see, yes, it's not a memleak.
 
-Regards,
+> This commit also simplifies the code but in this case we should also
+> remove input_unregister_device.
 
-Tony
+This matches the explanation in drivers/input/input.c above
+input_register_device() , agreed.
 
-8< -------------------
-The following changes since commit 9735a22799b9214d17d3c231fe377fc852f042e9:
+> Regards
+> Stefan
+> 
 
-  Linux 4.6-rc2 (2016-04-03 09:09:40 -0500)
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.6/fixes-rc2-v2-signed
-
-for you to fetch changes up to 3d51ae172d759198b2e47e104c31a92d20d17927:
-
-  Revert "ARM: OMAP: Catch callers of revision information prior to it being populated" (2016-04-19 08:01:05 -0700)
-
-----------------------------------------------------------------
-Fixes for omaps against v4.6-rc2, mostly to fix suspend for beagle-x15
-that broke when we added runtime based SoC revision detection earlier.
-
-It seems suspend worked earlier as things were only partially initialized,
-while now we initialize things properly for dra7.
-
-Note that the "ARM: OMAP: Catch callers of revision information prior
-to it being populated" had to be reverted as it caused bogus warnings
-for other SoCs because omap initcalls bail out based on revision being
-set to 0 for other SoCs. These initcalls will mostly just disappear
-when we drop support for omap3 legacy booting.
-
-Also included is a fix for dra7 sys_32k_ck clock source that is not
-enabled on boot making system fall back to using emulated clock.
-
-----------------------------------------------------------------
-Keerthy (1):
-      ARM: dts: dra7: Correct clock tree for sys_32k_ck
-
-Nishanth Menon (3):
-      ARM: OMAP: DRA7: wakeupgen: Skip SAR save for wakeupgen
-      ARM: OMAP: DRA7: Provide proper class to omap2_set_globals_tap
-      ARM: OMAP: Catch callers of revision information prior to it being populated
-
-Tony Lindgren (1):
-      Revert "ARM: OMAP: Catch callers of revision information prior to it being populated"
-
- arch/arm/boot/dts/dra7xx-clocks.dtsi | 18 +++++++++++++++++-
- arch/arm/mach-omap2/io.c             |  3 ++-
- arch/arm/mach-omap2/omap-wakeupgen.c |  7 +++++++
- 3 files changed, 26 insertions(+), 2 deletions(-)
+-- 
+Best regards,
+Marek Vasut
