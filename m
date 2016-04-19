@@ -1,118 +1,39 @@
-From: oliver@schinagl.nl (Olliver Schinagl)
-Date: Tue, 19 Apr 2016 14:20:00 +0200
-Subject: [PATCH 1/2] mmc: core: Improve marking broken HPI through
- devicetree
-In-Reply-To: <5715FF1B.80402@samsung.com>
-References: <1461049934-12848-1-git-send-email-oliver@schinagl.nl>
- <1461049934-12848-2-git-send-email-oliver@schinagl.nl>
- <CAPDyKFqftYtrHvcQB7te1fuWxjWtrhOGY=5DnRTnrRxHm2cQ-A@mail.gmail.com>
- <5715FD6B.5000809@schinagl.nl> <5715FF1B.80402@samsung.com>
-Message-ID: <57162270.6040701@schinagl.nl>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 19 Apr 2016 13:20:51 +0100
+Subject: [PATCH V2 05/15] coresight: tmc: splitting driver in ETB/ETF and
+ ETR components
+In-Reply-To: <1460483692-25061-6-git-send-email-mathieu.poirier@linaro.org>
+References: <1460483692-25061-1-git-send-email-mathieu.poirier@linaro.org>
+ <1460483692-25061-6-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <571622A3.4020103@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Jaehoon,
+On 12/04/16 18:54, Mathieu Poirier wrote:
+> The TMC block can operate in 3 modes (ETB, ETF and ETR) and accessed
+> via two interfaces (sysFS and Perf).  That makes 6 mode to cover, which
+> is way too much coupling for a single file.
+>
+> This patch splits the original TMC driver in 2 halves, one for ETB/ETF
+> and another one for ETR mode.  A common core is kept for functionality
+> common to all 3 modes.
+>
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-On 19-04-16 11:49, Jaehoon Chung wrote:
-> Hi
->
-> On 04/19/2016 06:42 PM, Olliver Schinagl wrote:
->> Hi Ulf,
->>
->> On 19-04-16 11:29, Ulf Hansson wrote:
->>> On 19 April 2016 at 09:12, Olliver Schinagl <oliver@schinagl.nl> wrote:
->>>> In patch 81f8a7be66 Hans de Goede added a patch to allow marking an mmc
->>>> device as to having an broken HPI implementation. After talking some
->>>> with Hans, we now think it is actually the mmc controller that can be
->>>> broken and not support broken HPI's.
->>> I don't want us to invent a DT binding for something you *think* is a
->>> HW controller issue.
->>>
->>> Have you really excluded that this isn't a software issue? Me
->>> personally haven't been using HPI that much so I can't really tell
->>> about the code robustness from the mmc core (mmc protocol point of
->>> view).
->> Well this patch goes hand in hand so to speak with the broken-hpi patch introduced by him, he did most of the investigation. We just discussed how to handle it and asked me to cook up the patch.
-> I didn't understand why add this property. Is this same patch?
->
-> commit 81f8a7be6642b4c26ab681b2e0f4c4120a6de1b0
-> Author: Hans de Goede <hdegoede@redhat.com>
-> Date:   Wed Apr 1 17:26:23 2015 +0200
->
->      mmc: Add support for marking hpi as broken through devicetree
->
->      The eMMC on a tablet I've will stop working / communicating as soon as
->      the kernel executes:
->
->                  mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
->                                  EXT_CSD_HPI_MGMT, 1,
->                                  card->ext_csd.generic_cmd6_time);
->
->      There seems to be no way to reliable identify eMMC-s which have a broken
->      hpi implementation, but at least for eMMC's which are soldered onto a board
->      we can work around this by specifying that hpi is broken in devicetree.
-Similar, this does it on the card level, e.g. you mark a card as having 
-a broken HPI implementation.
 
-The truth is, the card may not be broken at all, but the mmc controller 
-so we add a property on the controller level.
+> diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
+> index 2d7d52747b4e..b99d4dfc1d0b 100644
+> --- a/drivers/hwtracing/coresight/coresight-tmc.h
+> +++ b/drivers/hwtracing/coresight/coresight-tmc.h
+> @@ -18,6 +18,8 @@
+>   #ifndef _CORESIGHT_TMC_H
+>   #define _CORESIGHT_TMC_H
+>
+> +#include <linux/miscdevice.h>
+> +
 
-What Ulf is pondering, if this is not a software stack problem, rather 
-then a hardware implementation, which I don't know.
->> @hans, what do you think?
->>> Kind regards
->>> Uffe
->>>
->>>> This patch adds a new capability, mmc-broken-hpi, which allows us to
->>>> mark a broken hpi implementation on the host level.
->>>>
->>>> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
->>>> ---
->>>>    drivers/mmc/core/host.c  | 2 ++
->>>>    drivers/mmc/core/mmc.c   | 2 +-
->>>>    include/linux/mmc/host.h | 1 +
->>>>    3 files changed, 4 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
->>>> index 6e4c55a..9b63b36 100644
->>>> --- a/drivers/mmc/core/host.c
->>>> +++ b/drivers/mmc/core/host.c
->>>> @@ -270,6 +270,8 @@ int mmc_of_parse(struct mmc_host *host)
->>>>                   host->caps |= MMC_CAP_HW_RESET;
->>>>           if (of_property_read_bool(np, "cap-sdio-irq"))
->>>>                   host->caps |= MMC_CAP_SDIO_IRQ;
->>>> +       if (of_property_read_bool(np, "mmc-broken-hpi"))
->>>> +               host->caps |= MMC_CAP_BROKEN_HPI;
->>>>           if (of_property_read_bool(np, "full-pwr-cycle"))
->>>>                   host->caps2 |= MMC_CAP2_FULL_PWR_CYCLE;
->>>>           if (of_property_read_bool(np, "keep-power-in-suspend"))
->>>> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
->>>> index 4dbe3df..9a19562 100644
->>>> --- a/drivers/mmc/core/mmc.c
->>>> +++ b/drivers/mmc/core/mmc.c
->>>> @@ -1592,7 +1592,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
->>>>           /*
->>>>            * Enable HPI feature (if supported)
->>>>            */
->>>> -       if (card->ext_csd.hpi) {
->>>> +       if (card->ext_csd.hpi && !(host->caps & MMC_CAP_BROKEN_HPI)) {
->>>>                   err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
->>>>                                   EXT_CSD_HPI_MGMT, 1,
->>>>                                   card->ext_csd.generic_cmd6_time);
->>>> diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
->>>> index 8dd4d29..20f758e 100644
->>>> --- a/include/linux/mmc/host.h
->>>> +++ b/include/linux/mmc/host.h
->>>> @@ -264,6 +264,7 @@ struct mmc_host {
->>>>    #define MMC_CAP_DRIVER_TYPE_A  (1 << 23)       /* Host supports Driver Type A */
->>>>    #define MMC_CAP_DRIVER_TYPE_C  (1 << 24)       /* Host supports Driver Type C */
->>>>    #define MMC_CAP_DRIVER_TYPE_D  (1 << 25)       /* Host supports Driver Type D */
->>>> +#define MMC_CAP_BROKEN_HPI     (1 << 29)       /* Host support for HPI is broken */
->>>>    #define MMC_CAP_CMD23          (1 << 30)       /* CMD23 supported. */
->>>>    #define MMC_CAP_HW_RESET       (1 << 31)       /* Hardware reset */
->>>>
->>>> -- 
->>>> 2.8.0.rc3
->>>>
->>
->>
+What was this for ?
+
+Irrespective of that,
+
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
