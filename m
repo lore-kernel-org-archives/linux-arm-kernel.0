@@ -1,32 +1,105 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 19 Apr 2016 15:43:31 -0300
-Subject: i.MX53 restart via watchdog does not work
-In-Reply-To: <571678B6.4010203@nxtcontrol.com>
-References: <57111429.6040802@nxtcontrol.com>
- <CAOMZO5DHTm2iSyGF1CcwuWxzmwbadttKmtVJQePd60A6a0jsgA@mail.gmail.com>
- <571654B0.6040203@nxtcontrol.com>
- <CAOMZO5AxUcjDLo6afdFTkZJv9QnsUvHWwcJmsno3o52DqipN-Q@mail.gmail.com>
- <571678B6.4010203@nxtcontrol.com>
-Message-ID: <CAOMZO5AUWDwdui+zkAxUu=m2XcOcrrtFEpib0oj+p_QokSR-bw@mail.gmail.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Tue, 19 Apr 2016 11:44:01 -0700
+Subject: [PATCH v4 00/14] ACPI NUMA support for ARM64
+In-Reply-To: <1461014052-30788-1-git-send-email-ddaney.cavm@gmail.com>
+References: <1461014052-30788-1-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <57167C71.5010800@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2016 at 3:28 PM, Stanislav Meduna
-<stanislav.meduna@nxtcontrol.com> wrote:
-> On 4/19/2016 8:18 PM, Fabio Estevam wrote:
->
->> I am booting via NFS, so not eMMC related.
->
-> Where are you bootstrapping the bootloader from?
->
-> I am also not using the eMMC at all, I was tftp-booting
-> a minimal initramfs image with just rdinit=/bin/sh (the fastest
-> way to play with reboots).
->
-> In my case the bootloader (U-Boot) itself is loaded from
-> the eMMC. To me it looks the shutdown code somehow brings
-> the board to a state where the processor itself can't
-> boot the bootloader.
+There is a build  problem on ia64 that slipped by.  It is easy to 
+correct, so I will have to send another version of the patches.
 
-imx53-qsb boots from a SD card. Issuing a 'reboot' command works fine
-on 4.6-rc4.
+Sorry for the noise,
+David Daney
+
+
+On 04/18/2016 02:13 PM, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
+>
+> Based on v16 of device-tree NUMA patch set for arm64 [1],this patch
+> set introduce the ACPI based configuration to provide NUMA
+> information.
+>
+> ACPI 5.1 already introduced NUMA support for ARM64, which can get the
+> NUMA domain information from SRAT and SLIT table, so parse those two
+> tables to get mappings from cpu/mem to numa node configuration and
+> system locality.
+>
+> v4 updates:
+>
+>   - Updated from Hanjun Guo's v3 patches.
+>
+>   - Rebased on top of v16 of device-tree NUMA patches.
+>
+>   - Reordered some of the changes so that we don't introduce code and
+>     then change it several times in the patch set.  New code is
+>     introduced in its final form.  Code reused from x86 is first moved
+>     with no change, and then a separate patch to make any needed
+>     changes.
+>
+>   - code that is used only by ia64, moved to architecture specific
+>     files.
+>
+> v3 updates:
+>   - Deep investigation about the ACPI_DEBUG_PRINT() and remvoe
+>     that for acpi/numa.c (patch 2/12)
+>
+>   - Remove the duplicate NULL check for table print (patch 3/12)
+>
+>   - Introduce CONFIG_ACPI_HAS_NUMA_ARCH_FIXUP to remove duplicate
+>     dummy function for acpi_numa_arch_fixup()
+>
+>   - Solve the problem that the mapping from logical cpu to numa node
+>     is wrong which spotted out by Lorenzo
+>
+>   - cleanups for x86 and move acpi_numa_slit_init() and some other
+>     functions to common place, then reduce the duplicate of x86
+>     and arm64 (patch 7-12/12).
+>
+>   - rebased on top of 4.4 and Ganapat's v9 patch set.
+>
+> [1]: https://lkml.org/lkml/2016/4/8/571
+>
+> David Daney (1):
+>    acpi, numa, srat: Improve SRAT error detection and add messages.
+>
+> Hanjun Guo (11):
+>    acpi, numa: Use pr_fmt() instead of printk
+>    acpi, numa: Replace ACPI_DEBUG_PRINT() with pr_debug()
+>    acpi, numa: remove duplicate NULL check
+>    acpi, numa: move acpi_numa_slit_init() to drivers/acpi/numa.c
+>    arm64, numa: rework numa_add_memblk()
+>    x86, acpi, numa: cleanup acpi_numa_processor_affinity_init()
+>    acpi, numa: move bad_srat() and srat_disabled() to
+>      drivers/acpi/numa.c
+>    acpi, numa: remove unneeded acpi_numa=1
+>    acpi, numa: Move acpi_numa_memory_affinity_init() to
+>      drivers/acpi/numa.c
+>    arm64, acpi, numa: NUMA support based on SRAT and SLIT
+>    acpi, numa: Enable ACPI based NUMA on ARM64
+>
+> Robert Richter (2):
+>    acpi, numa: Move acpi_numa_arch_fixup() to ia64 only
+>    arm64, acpi, numa: Default enable ACPI_NUMA with NUMA
+>
+>   arch/arm64/include/asm/acpi.h |   8 ++
+>   arch/arm64/include/asm/numa.h |   2 +
+>   arch/arm64/kernel/Makefile    |   1 +
+>   arch/arm64/kernel/acpi_numa.c | 149 +++++++++++++++++++++++++++++
+>   arch/arm64/kernel/smp.c       |   2 +
+>   arch/arm64/mm/numa.c          |  17 ++--
+>   arch/ia64/include/asm/acpi.h  |   3 +
+>   arch/ia64/kernel/acpi.c       |   2 +-
+>   arch/ia64/kernel/setup.c      |   1 +
+>   arch/x86/include/asm/acpi.h   |   1 -
+>   arch/x86/mm/numa.c            |   2 +-
+>   arch/x86/mm/srat.c            | 115 +----------------------
+>   drivers/acpi/Kconfig          |   4 +-
+>   drivers/acpi/numa.c           | 211 +++++++++++++++++++++++++++++++-----------
+>   drivers/of/of_numa.c          |   4 +-
+>   include/acpi/acpi_numa.h      |  12 +++
+>   include/linux/acpi.h          |  18 +++-
+>   17 files changed, 370 insertions(+), 182 deletions(-)
+>   create mode 100644 arch/arm64/kernel/acpi_numa.c
+>
