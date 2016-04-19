@@ -1,26 +1,19 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Tue, 19 Apr 2016 17:13:07 +0000
-Subject: [PATCH v7 5/8] genirq/irq: introduce msi_doorbell's structs and
- related callback
+Date: Tue, 19 Apr 2016 17:13:09 +0000
+Subject: [PATCH v7 7/8] genirq/msi: map/unmap the MSI doorbells on
+ msi_domain_alloc/free_irqs
 In-Reply-To: <1461085990-2547-1-git-send-email-eric.auger@linaro.org>
 References: <1461085990-2547-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1461085990-2547-6-git-send-email-eric.auger@linaro.org>
+Message-ID: <1461085990-2547-8-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The purpose is to be able to retrieve the MSI doorbells of an irqchip.
-This is now needed since on some platforms those doorbells must be
-iommu mapped (in case the MSIs transit through an IOMMU that do not
-bypass those transactions).
-
-The assumption is there is a maximum of one doorbell region per cpu.
-The number of doorbells for the whole irqchip is stored in nb_doorbells.
-
-A doorbell region is characterized by its physical address base, size and
-IOMMU protection flag.
-
-irq_chip msi_doorbell_info callback enables to retrieve the doorbells of
-the irqchip.
+This patch handles the iommu mapping of MSI doorbells that require to
+be mapped in an iommu domain. This happens on msi_domain_alloc/free_irqs
+since this is called in code that can sleep (pci_enable/disable_msi):
+iommu_map/unmap is not stated as atomic. On msi_domain_(de)activate and
+msi_domain_set_affinity, which must be atomic, we just lookup for this
+pre-allocated/mapped IOVA.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 
@@ -28,59 +21,143 @@ Signed-off-by: Eric Auger <eric.auger@linaro.org>
 
 v7: creation
 ---
- include/linux/irq.h | 26 ++++++++++++++++++++++----
- 1 file changed, 22 insertions(+), 4 deletions(-)
+ kernel/irq/msi.c | 94 ++++++++++++++++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 85 insertions(+), 9 deletions(-)
 
-diff --git a/include/linux/irq.h b/include/linux/irq.h
-index c4de623..fdad8c1 100644
---- a/include/linux/irq.h
-+++ b/include/linux/irq.h
-@@ -312,9 +312,25 @@ static inline irq_hw_number_t irqd_to_hwirq(struct irq_data *d)
- 	return d->hwirq;
+diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
+index 72bf4d6..e45907e 100644
+--- a/kernel/irq/msi.c
++++ b/kernel/irq/msi.c
+@@ -14,6 +14,8 @@
+ #include <linux/irq.h>
+ #include <linux/irqdomain.h>
+ #include <linux/msi.h>
++#include <linux/dma-reserved-iommu.h>
++#include <linux/iommu.h>
+ 
+ /* Temparory solution for building, will be removed later */
+ #include <linux/pci.h>
+@@ -322,6 +324,59 @@ int msi_domain_populate_irqs(struct irq_domain *domain, struct device *dev,
  }
  
--/**
-- * struct irq_chip - hardware interrupt chip descriptor
-- *
-+/* MSI doorbell region */
-+struct irq_chip_msi_doorbell {
-+	phys_addr_t base;
-+	size_t size;
-+	int prot; /* iommu protection flag */
-+};
-+
-+/*
-+ * Describe all the MSI doorbell regions for an irqchip.
-+ * A single doorbell region per cpu is assumed.
-+ * In case a single doorbell is supported for the whole irqchip,
-+ * the region is described in as cpu #0's one
+ /**
++ * msi_handle_doorbell_mapping: in case the irq data corresponds to an
++ * MSI that requires iommu mapping, traverse the irq domain hierarchy
++ * to retrieve the doorbells to handle and iommu_map/unmap them according
++ * to @map boolean.
++ *
++ * @data: irq data handle
++ * @map: mapping if true, unmapping if false
 + */
-+struct irq_chip_msi_doorbell_info {
-+	struct irq_chip_msi_doorbell __percpu *percpu_doorbells;
-+	int nb_doorbells; /* overall number of doorbells */
-+};
++static int msi_handle_doorbell_mappings(struct irq_data *data, bool map)
++{
 +
-+/** * struct irq_chip - hardware interrupt chip descriptor *
-  * @name:		name for /proc/interrupts
-  * @irq_startup:	start up the interrupt (defaults to ->enable if NULL)
-  * @irq_shutdown:	shut down the interrupt (defaults to ->disable if NULL)
-@@ -349,6 +365,7 @@ static inline irq_hw_number_t irqd_to_hwirq(struct irq_data *d)
-  * @irq_get_irqchip_state:	return the internal state of an interrupt
-  * @irq_set_irqchip_state:	set the internal state of a interrupt
-  * @irq_set_vcpu_affinity:	optional to target a vCPU in a virtual machine
-+ * @msi_doorbell_info:	return the MSI doorbell info
-  * @ipi_send_single:	send a single IPI to destination cpus
-  * @ipi_send_mask:	send an IPI to destination cpus in cpumask
-  * @flags:		chip specific flags
-@@ -394,7 +411,8 @@ struct irq_chip {
- 	int		(*irq_set_irqchip_state)(struct irq_data *data, enum irqchip_irq_state which, bool state);
++	for (; data; data = data->parent_data) {
++		const struct irq_chip_msi_doorbell_info *dbinfo;
++		struct iommu_domain *domain;
++		struct msi_desc *desc;
++		struct irq_chip *chip;
++		dma_addr_t iova;
++		int ret = 0, i;
++
++		chip = irq_data_get_irq_chip(data);
++		desc = irq_data_get_msi_desc(data);
++
++		domain = iommu_msi_mapping_desc_to_domain(desc);
++		if (!domain)
++			continue;
++
++		if (!chip->msi_doorbell_info)
++			continue;
++
++		dbinfo = chip->msi_doorbell_info(data);
++		if (!dbinfo)
++			return -EINVAL;
++
++		for (i = 0; i < dbinfo->nb_doorbells; i++) {
++			struct irq_chip_msi_doorbell __percpu *db;
++
++			db = per_cpu_ptr(dbinfo->percpu_doorbells, i);
++			if (map) {
++				ret = iommu_get_reserved_iova(domain,
++							      db->base,
++							      db->size,
++							      db->prot,
++							      &iova);
++				if (ret)
++					return ret;
++			} else
++				iommu_put_reserved_iova(domain, db->base);
++		}
++	}
++	return 0;
++}
++
++/**
+  * msi_domain_alloc_irqs - Allocate interrupts from a MSI interrupt domain
+  * @domain:	The domain to allocate from
+  * @dev:	Pointer to device struct of the device for which the interrupts
+@@ -352,17 +407,25 @@ int msi_domain_alloc_irqs(struct irq_domain *domain, struct device *dev,
  
- 	int		(*irq_set_vcpu_affinity)(struct irq_data *data, void *vcpu_info);
--
-+	const struct irq_chip_msi_doorbell_info *(*msi_doorbell_info)(
-+							struct irq_data *data);
- 	void		(*ipi_send_single)(struct irq_data *data, unsigned int cpu);
- 	void		(*ipi_send_mask)(struct irq_data *data, const struct cpumask *dest);
+ 		virq = __irq_domain_alloc_irqs(domain, virq, desc->nvec_used,
+ 					       dev_to_node(dev), &arg, false);
+-		if (virq < 0) {
+-			ret = -ENOSPC;
+-			if (ops->handle_error)
+-				ret = ops->handle_error(domain, desc, ret);
+-			if (ops->msi_finish)
+-				ops->msi_finish(&arg, ret);
+-			return ret;
+-		}
++		if (virq < 0)
++			goto error;
  
+-		for (i = 0; i < desc->nvec_used; i++)
++		for (i = 0; i < desc->nvec_used; i++) {
+ 			irq_set_msi_desc_off(virq, i, desc);
++			ret = msi_handle_doorbell_mappings(
++				irq_get_irq_data(virq + i), true);
++			if (ret)
++				break;
++		}
++
++		if (ret) {
++			for (; i >= 0; i--) {
++				ret = msi_handle_doorbell_mappings(
++					irq_get_irq_data(virq + i), false);
++				irq_set_msi_desc_off(virq, i, NULL);
++			}
++			goto error;
++		}
+ 	}
+ 
+ 	if (ops->msi_finish)
+@@ -377,6 +440,13 @@ int msi_domain_alloc_irqs(struct irq_domain *domain, struct device *dev,
+ 	}
+ 
+ 	return 0;
++error:
++	ret = -ENOSPC;
++	if (ops->handle_error)
++		ret = ops->handle_error(domain, desc, ret);
++	if (ops->msi_finish)
++		ops->msi_finish(&arg, ret);
++	return ret;
+ }
+ 
+ /**
+@@ -396,6 +466,12 @@ void msi_domain_free_irqs(struct irq_domain *domain, struct device *dev)
+ 		 * entry. If that's the case, don't do anything.
+ 		 */
+ 		if (desc->irq) {
++			int ret;
++
++			ret = msi_handle_doorbell_mappings(
++				irq_get_irq_data(desc->irq),
++				false);
++			WARN_ON(ret);
+ 			irq_domain_free_irqs(desc->irq, desc->nvec_used);
+ 			desc->irq = 0;
+ 		}
 -- 
 1.9.1
