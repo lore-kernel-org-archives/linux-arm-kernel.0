@@ -1,14 +1,14 @@
 From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 19 Apr 2016 10:06:12 +0100
-Subject: Tegra baseline test results for v4.6-rc3
-Message-ID: <5715F504.5090908@nvidia.com>
+Date: Tue, 19 Apr 2016 10:06:22 +0100
+Subject: Tegra baseline test results for v4.6-rc4
+Message-ID: <5715F50E.9000407@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.6-rc3.
+Here are some basic Tegra test results for Linux v4.6-rc4.
 Logs and other details at:
 
-    https://nvtb.github.io//linux/test_v4.6-rc3/20160410183102/
+    https://nvtb.github.io//linux/test_v4.6-rc4/20160417193103/
 
 
 Test summary
@@ -42,15 +42,15 @@ PM: System suspend: tegra_defconfig:
 
 
 vmlinux object size
-(delta in bytes from test_v4.6-rc2 (9735a22799b9214d17d3c231fe377fc852f042e9)):
+(delta in bytes from test_v4.6-rc3 (bf16200689118d19de1b8d2a3c314fc21f5dc7bb)):
    text     data      bss    total  kernel
-   +140        0        0     +140  defconfig
-    -16        0        0      -16  multi_v7_defconfig
-  +1120        0      +64    +1184  tegra_defconfig
+     +1        0        0       +1  defconfig
+   -667        0      -64     -731  multi_v7_defconfig
+   -607        0      -64     -671  tegra_defconfig
 
 
 Boot-time memory difference
-(delta in bytes from test_v4.6-rc2 (9735a22799b9214d17d3c231fe377fc852f042e9))
+(delta in bytes from test_v4.6-rc3 (bf16200689118d19de1b8d2a3c314fc21f5dc7bb))
     avail    rsrvd     high    freed                board              kconfig                  dtb
         .        .        .        .      qemu-vexpress64            defconfig           __internal
         .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
