@@ -1,17 +1,19 @@
-From: bsingharora@gmail.com (Balbir Singh)
-Date: Tue, 19 Apr 2016 21:32:47 +1000
-Subject: [PATCH] arch/defconfig: remove CONFIG_RESOURCE_COUNTERS
-In-Reply-To: <146105442758.18940.2792564159961963110.stgit@zurg>
-References: <146105442758.18940.2792564159961963110.stgit@zurg>
-Message-ID: <5716175F.9030001@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 19 Apr 2016 08:34:28 -0300
+Subject: [PATCH v2] ARM: dts: imx6: Add dts for Embest MarS Board
+In-Reply-To: <1460420743-30883-1-git-send-email-sergio.prado@e-labworks.com>
+References: <1460420743-30883-1-git-send-email-sergio.prado@e-labworks.com>
+Message-ID: <CAOMZO5AKdFtCZJSFg5ZJ2j8MBta_s=HSNBaH5a9zoTdkwQ477Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Apr 11, 2016 at 9:25 PM, Sergio Prado
+<sergio.prado@e-labworks.com> wrote:
 
+> +&fec {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&pinctrl_enet>;
+> +       phy-mode = "rgmii";
+> +       phy-reset-gpios = <&gpio3 31 GPIO_ACTIVE_HIGH>;
 
-On 19/04/16 18:27, Konstantin Khlebnikov wrote:
-> This option replaced by PAGE_COUNTER which is selected by MEMCG.
-> 
-> Signed-off-by: Konstantin Khlebnikov <koct9i@gmail.com>
-
-Acked-by: Balbir Singh <bsingharora@gmail.com>
+Are you sure this is really active high?
