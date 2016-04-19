@@ -1,62 +1,91 @@
-From: patrice.chotard@st.com (patrice.chotard at st.com)
-Date: Tue, 19 Apr 2016 14:18:29 +0200
-Subject: [PATCH 0/8] STMPE fixes/rework and add STMPE1600 support
-Message-ID: <1461068317-28016-1-git-send-email-patrice.chotard@st.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 19 Apr 2016 07:19:45 -0500
+Subject: Runtime warning due to commit 'ARM: OMAP: Catch callers of
+ revision information prior to it being populated' in -next
+In-Reply-To: <5715B5EC.2040000@roeck-us.net>
+References: <5715B5EC.2040000@roeck-us.net>
+Message-ID: <57162261.4070409@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Patrice Chotard <patrice.chotard@st.com>
+On 04/18/2016 11:37 PM, Guenter Roeck wrote:
+> Hi,
+> 
 
-This series cleans and fixes some bugs in MFD/GPIO STMPE drivers and prepare
- the ground to add new STMPE1600 support.
++ linux-omap, linux-arm
 
-STMPE1600 datasheet is available here : 
-http://www2.st.com/content/st_com/en/products/interfaces-and-transceivers/
-i-o-expanders-and-level-translators/i-o-expanders/stmpe1600.html
+> commit 'ARM: OMAP: Catch callers of revision information prior to it
+> being populated' results in a runtime warning on various non-OMAP
+> architectures. I have seen it with the following qemu tests.
+> 
+> arm:vexpress-a9:multi_v7_defconfig:vexpress-v2p-ca9
+> arm:vexpress-a15:multi_v7_defconfig:vexpress-v2p-ca15-tc1
+> arm:xilinx-zynq-a9:multi_v7_defconfig:zynq-zc702
+> arm:xilinx-zynq-a9:multi_v7_defconfig:zynq-zc706
+> arm:xilinx-zynq-a9:multi_v7_defconfig:zynq-zed
+> arm:midway:multi_v7_defconfig:ecx-2000
+> arm:smdkc210:multi_v7_defconfig:exynos4210-smdkv310
+> 
+> It is also reported by kernelci.org in at least one boot test for imx6q-cm-fx6.
 
-Only STMPE1600 has been tested on STM32 platform. As i have no board with
-others STMPE variant(STMPE610/STMPE801/STMPE811/STMPE1601/STMPE1801/STMPE2401
-and STMPE2403), i put in CC boards's maintainers which are using others STMPE variant.
+Thanks for the report... :(
+> 
+> The warning is as follows.
+> 
+> ------------[ cut here ]------------
+> WARNING: CPU: 0 PID: 1 at arch/arm/mach-omap2/id.c:49 omap_rev+0x3c/0x50
+> Modules linked in:
+> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.6.0-rc2-next-20160411 #1
+> Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+> [<c030f970>] (unwind_backtrace) from [<c030b094>] (show_stack+0x10/0x14)
+> [<c030b094>] (show_stack) from [<c0585424>] (dump_stack+0x84/0xa4)
+> [<c0585424>] (dump_stack) from [<c0341774>] (__warn+0xd4/0x100)
+> [<c0341774>] (__warn) from [<c03417c0>] (warn_slowpath_null+0x20/0x28)
+> [<c03417c0>] (warn_slowpath_null) from [<c0324024>] (omap_rev+0x3c/0x50)
+> [<c0324024>] (omap_rev) from [<c1114a18>] (__omap4_sar_ram_init+0x8/0x88)
+> [<c1114a18>] (__omap4_sar_ram_init) from [<c0301e5c>] (do_one_initcall+0x3c/0x16c)
+> [<c0301e5c>] (do_one_initcall) from [<c1100ccc>] (kernel_init_freeable+0x70/0x1ec)
+> [<c1100ccc>] (kernel_init_freeable) from [<c0b495e4>] (kernel_init+0x8/0x110)
+> [<c0b495e4>] (kernel_init) from [<c0307f78>] (ret_from_fork+0x14/0x3c)
+> ---[ end trace cb88537fdc8fa200 ]---
+> 
+> Please have a look.
 
-If they can kindly check that no regression has been introduce by this series
-:
+Tony,
+Should we get rid of omap_initcall callers(move them into
+board-generic call path or lower the check not to include default of 0?
 
-For ARM/FREESCALE IMX / MXC ARM ARCHITECTURE:
-	_ Shawn Guo <shawnguo@kernel.org>
-	_ Sascha Hauer <kernel@pengutronix.de>
-
-For ARM/SOCFPGA ARCHITECTURE
-	_ Dinh Nguyen <dinguyen@opensource.altera.com>
-
-For SPEAR PLATFORM SUPPORT
-	_ Viresh Kumar <vireshk@kernel.org>
-	_ Shiraz Hashim <shiraz.linux.kernel@gmail.com>
-
-For TEGRA ARCHITECTURE SUPPORT
-	_ Stephen Warren <swarren@wwwdotorg.org>
-	_ Thierry Reding <thierry.reding@gmail.com>
-	_ Alexandre Courbot <gnurou@gmail.com> 
-
-For ARM/Ux500 ARM ARCHITECTURE
-	_ Linus Walleij <linus.walleij@linaro.org>
-
-Patrice Chotard (8):
-  mfd: stmpe: Add STMPE_IDX_SYS_CTRL/2 enum
-  mfd: stmpe: Add reset support for all STMPE variant
-  gpio: stmpe: fix edge and rising/falling edge detection
-  gpio: stmpe: write int status register only when needed
-  Documentation: dt: add stmpe1600 compatible string to stmpe mfd
-  mfd: Add STMPE1600 support
-  gpio: stmpe: Add STMPE1600 support
-  gpio: stmpe: configure GPIO as output by default
-
- Documentation/devicetree/bindings/mfd/stmpe.txt |   2 +-
- drivers/gpio/gpio-stmpe.c                       | 142 ++++++++++++++++++------
- drivers/mfd/stmpe-i2c.c                         |   2 +
- drivers/mfd/stmpe.c                             | 105 ++++++++++++++----
- drivers/mfd/stmpe.h                             |  30 ++++-
- include/linux/mfd/stmpe.h                       |   3 +
- 6 files changed, 223 insertions(+), 61 deletions(-)
+we have the following users:
+> $ git grep omap_".*"_initcall arch/arm/mach-omap2/
+> arch/arm/mach-omap2/board-n8x0.c:omap_late_initcall(n8x0_late_initcall);
+> arch/arm/mach-omap2/board-rx51-video.c:omap_subsys_initcall(rx51_video_init);
+> arch/arm/mach-omap2/devices.c:omap_postcore_initcall(omap3_l3_init);
+> arch/arm/mach-omap2/devices.c:omap_arch_initcall(omap2_init_devices);
+> arch/arm/mach-omap2/devices.c:omap_postcore_initcall(omap_gpmc_init);
+> arch/arm/mach-omap2/dma.c:omap_arch_initcall(omap2_system_dma_init);
+> arch/arm/mach-omap2/gpio.c:omap_postcore_initcall(omap2_gpio_init);
+> arch/arm/mach-omap2/hdq1w.c:omap_arch_initcall(omap_init_hdq);
+> arch/arm/mach-omap2/i2c.c:omap_subsys_initcall(omap_i2c_cmdline);
+> arch/arm/mach-omap2/id.c:omap_device_initcall(omap_feed_randpool);
+> arch/arm/mach-omap2/mcbsp.c:omap_arch_initcall(omap2_mcbsp_init);
+> arch/arm/mach-omap2/omap2-restart.c:omap_postcore_initcall(omap2xxx_common_look_up_clks_for_reset);
+> arch/arm/mach-omap2/omap4-common.c:omap_arch_initcall(omap4_sram_init);
+> arch/arm/mach-omap2/omap4-common.c:omap_early_initcall(omap4_sar_ram_init);
+^^ warning was generated here
+> arch/arm/mach-omap2/omap_device.c:omap_postcore_initcall(omap_device_init);
+> arch/arm/mach-omap2/omap_device.c:omap_late_initcall_sync(omap_device_late_init);
+> arch/arm/mach-omap2/omap_hwmod.c:omap_postcore_initcall(omap_hwmod_setup_all);
+> arch/arm/mach-omap2/omap_phy_internal.c:omap_early_initcall(omap4430_phy_power_down);
+> arch/arm/mach-omap2/opp3xxx_data.c:omap_device_initcall(omap3_opp_init);
+> arch/arm/mach-omap2/opp4xxx_data.c:omap_device_initcall(omap4_opp_init);
+> arch/arm/mach-omap2/pm-debug.c:omap_arch_initcall(pm_dbg_init);
+> arch/arm/mach-omap2/pm.c:omap_postcore_initcall(omap2_common_pm_init);
+> arch/arm/mach-omap2/pmu.c:omap_subsys_initcall(omap_init_pmu);
+> arch/arm/mach-omap2/serial.c:omap_postcore_initcall(omap_serial_early_init);
+> arch/arm/mach-omap2/smartreflex-class3.c:omap_late_initcall(sr_class3_init);
+> arch/arm/mach-omap2/timer.c:omap_arch_initcall(omap2_dm_timer_init);
+> arch/arm/mach-omap2/wd_timer.c:omap_subsys_initcall(omap_init_wdt);
 
 -- 
-1.9.1
+Regards,
+Nishanth Menon
