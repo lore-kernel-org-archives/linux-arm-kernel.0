@@ -1,58 +1,103 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 19 Apr 2016 14:41:26 +0200
-Subject: [PATCH 0/8] STMPE fixes/rework and add STMPE1600 support
-In-Reply-To: <1461068317-28016-1-git-send-email-patrice.chotard@st.com>
-References: <1461068317-28016-1-git-send-email-patrice.chotard@st.com>
-Message-ID: <20160419124126.GF8284@ulmo.ba.sec>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 19 Apr 2016 14:41:52 +0200
+Subject: [PATCH v5 39/50] mtd: nand: omap2: switch to mtd_ooblayout_ops
+In-Reply-To: <571624EF.9060707@ti.com>
+References: <1459354505-32551-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1459354505-32551-40-git-send-email-boris.brezillon@free-electrons.com>
+ <5714F011.5080409@ti.com> <20160418170518.363f732d@bbrezillon>
+ <57160862.90603@ti.com> <20160419132206.5d909f7e@bbrezillon>
+ <571624EF.9060707@ti.com>
+Message-ID: <20160419144152.30a4027d@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2016 at 02:18:29PM +0200, patrice.chotard at st.com wrote:
-> From: Patrice Chotard <patrice.chotard@st.com>
-> 
-> This series cleans and fixes some bugs in MFD/GPIO STMPE drivers and prepare
->  the ground to add new STMPE1600 support.
-> 
-> STMPE1600 datasheet is available here : 
-> http://www2.st.com/content/st_com/en/products/interfaces-and-transceivers/
-> i-o-expanders-and-level-translators/i-o-expanders/stmpe1600.html
-> 
-> Only STMPE1600 has been tested on STM32 platform. As i have no board with
-> others STMPE variant(STMPE610/STMPE801/STMPE811/STMPE1601/STMPE1801/STMPE2401
-> and STMPE2403), i put in CC boards's maintainers which are using others STMPE variant.
-> 
-> If they can kindly check that no regression has been introduce by this series
-> :
-> 
-> For ARM/FREESCALE IMX / MXC ARM ARCHITECTURE:
-> 	_ Shawn Guo <shawnguo@kernel.org>
-> 	_ Sascha Hauer <kernel@pengutronix.de>
-> 
-> For ARM/SOCFPGA ARCHITECTURE
-> 	_ Dinh Nguyen <dinguyen@opensource.altera.com>
-> 
-> For SPEAR PLATFORM SUPPORT
-> 	_ Viresh Kumar <vireshk@kernel.org>
-> 	_ Shiraz Hashim <shiraz.linux.kernel@gmail.com>
-> 
-> For TEGRA ARCHITECTURE SUPPORT
-> 	_ Stephen Warren <swarren@wwwdotorg.org>
-> 	_ Thierry Reding <thierry.reding@gmail.com>
-> 	_ Alexandre Courbot <gnurou@gmail.com> 
+On Tue, 19 Apr 2016 15:30:39 +0300
+Roger Quadros <rogerq@ti.com> wrote:
 
-Adding Marcel Ziswiler, who's better suited at judging whether or not
-this has any impact on Apalis/Colibri.
+> On 19/04/16 14:22, Boris Brezillon wrote:
+> > Hi Roger,
+> > 
+> > On Tue, 19 Apr 2016 13:28:50 +0300
+> > Roger Quadros <rogerq@ti.com> wrote:
+> > 
+> >>> @@ -1921,6 +1927,9 @@ static int omap_nand_probe(struct platform_device *pdev)
+> >>>  		nand_chip->ecc.correct          = omap_correct_data;
+> >>>  		mtd_set_ooblayout(mtd, &omap_ooblayout_ops);
+> >>>  		oobbytes_per_step		= nand_chip->ecc.bytes;
+> >>> +
+> >>> +		if (nand_chip->options & NAND_BUSWIDTH_16)
+> >>> +			min_oobbytes		= 1;
+> >>
+> >> Shouldn't this have been
+> >> 		if (!(nand_chip->options & NAND_BUSWIDTH_16)
+> >> 			min_oobbytes		= 1;
+> >> ?
+> > 
+> > Yep.
+> > 
+> >>
+> >>>  		break;
+> >>>  
+> >>>  	case OMAP_ECC_BCH4_CODE_HW_DETECTION_SW:
+> >>> @@ -2038,10 +2047,8 @@ static int omap_nand_probe(struct platform_device *pdev)
+> >>>  	}
+> >>>  
+> >>>  	/* check if NAND device's OOB is enough to store ECC signatures */
+> >>> -	min_oobbytes = (oobbytes_per_step *
+> >>> -			(mtd->writesize / nand_chip->ecc.size)) +
+> >>> -		       (nand_chip->options & NAND_BUSWIDTH_16 ?
+> >>> -			BADBLOCK_MARKER_LENGTH : 1);
+> >>> +	min_oobbytes += (oobbytes_per_step *
+> >>> +			 (mtd->writesize / nand_chip->ecc.size));
+> >>>  	if (mtd->oobsize < min_oobbytes) {
+> >>>  		dev_err(&info->pdev->dev,
+> >>>  			"not enough OOB bytes required = %d, available=%d\n",
+> >>>
+> >>
+> >> After the above changes BCH with HW ECC worked fine but BCH with SW ECC still failed.
+> >> I had to fix it up with the below patch. This is mainly because chip->ecc.steps wasn't
+> >> yet initialized before calling nand_bch_init().
+> >>
+> >> After the below patch it worked fine with bch4 (hw & sw), bch8 (hw & sw) and ham1.
+> >> I couldn't yet verify bch16 though.
+> > 
+> 
+> I just verified that bch16 works as well.
+> 
+> > Thanks for the fix, but I'd prefer fixing the bug for all soft BCH
+> > users.
+> > 
+> > Could you try this patch?
+> 
+> I tried your patch and it worked fine.
 
-Marcel, in case you don't have these in your inbox you can find them on
-linux-gpio's patchwork:
+Thanks, I'll provide a reworked nand/next branch soon.
+BTW, is there anything to fix in my merge commit (the commit merging
+your GPMC/OMAP changes in nand/next)?
 
-	https://patchwork.ozlabs.org/project/linux-gpio/list/
+> You will still need the below change to omap2.c
+> 
+> --
+> cheers,
+> -roger
+> 
+> diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
+> index 0abfba6..33c8fde 100644
+> --- a/drivers/mtd/nand/omap2.c
+> +++ b/drivers/mtd/nand/omap2.c
+> @@ -1715,7 +1715,7 @@ static int omap_sw_ooblayout_free(struct mtd_info *mtd, int section,
+>  	struct nand_chip *chip = mtd_to_nand(mtd);
+>  	int off = BADBLOCK_MARKER_LENGTH;
+>  
+> -	if (section)
+> +	if (section >= chip->ecc.steps)
+>  		return -ERANGE;
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160419/ef7ce9b0/attachment.sig>
+Sorry but I don't get why we need that one. Don't we have a single
+oobfree section starting at the end of the ECC sections?
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
