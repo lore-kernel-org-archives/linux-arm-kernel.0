@@ -1,95 +1,73 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 19 Apr 2016 22:16:37 +0800
-Subject: [PATCH 1/2] clk: sunxi: add predivider handling for factors clock
-In-Reply-To: <20160419102234.GD8836@intel.com>
-References: <1460832906-24064-2-git-send-email-vishnupatekar0510@gmail.com>
- <201604170901.pPL2YWTP%fengguang.wu@intel.com>
- <CAEzqOZuhwDL7VfBD+ph+PdAhBu2asnxg=hOPpV0E=VqNr8ojdw@mail.gmail.com>
- <20160419102234.GD8836@intel.com>
-Message-ID: <CAGb2v66gL6_pcovygQhkjnJSJU39h+iAsaEbfQza8eoRQ7s7uQ@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 19 Apr 2016 09:21:25 -0500
+Subject: Runtime warning due to commit 'ARM: OMAP: Catch callers of
+ revision information prior to it being populated' in -next
+In-Reply-To: <20160419141320.GB5995@atomide.com>
+References: <5715B5EC.2040000@roeck-us.net> <57162261.4070409@ti.com>
+ <20160419141320.GB5995@atomide.com>
+Message-ID: <57163EE5.9090405@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2016 at 6:22 PM, Philip Li <philip.li@intel.com> wrote:
-> On Sun, Apr 17, 2016 at 11:53:47AM +0800, Vishnu Patekar wrote:
->> Both of these patches in series has to be applied at the same time.
->> I think this is the reason, it fails.
-
-You should probably squash the second patch into the first.
-
-ChenYu
-
-> hi Xiaolong, would you help do a check whether we apply the patches in correct sequence for this case?
->
->
->> On 17 Apr 2016 09:26, "kbuild test robot" <lkp@intel.com> wrote:
+On 04/19/2016 09:13 AM, Tony Lindgren wrote:
+> * Nishanth Menon <nm@ti.com> [160419 05:21]:
+>> On 04/18/2016 11:37 PM, Guenter Roeck wrote:
 >>
->> > Hi Vishnu,
->> >
->> > [auto build test ERROR on clk/clk-next]
->> > [also build test ERROR on v4.6-rc3 next-20160415]
->> > [if your patch is applied to the wrong git tree, please drop us a note to
->> > help improving the system]
->> >
->> > url:
->> > https://github.com/0day-ci/linux/commits/Vishnu-Patekar/sunxi-factors-clock-predivider-handling/20160417-025801
->> > base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git
->> > clk-next
->> > config: arm-sunxi_defconfig (attached as .config)
->> > reproduce:
->> >         wget
->> > https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross
->> > -O ~/bin/make.cross
->> >         chmod +x ~/bin/make.cross
->> >         # save the attached .config to linux build tree
->> >         make.cross ARCH=arm
->> >
->> > Note: the
->> > linux-review/Vishnu-Patekar/sunxi-factors-clock-predivider-handling/20160417-025801
->> > HEAD 19bb5fc952754381d9f4f9b2e57a1fa09f467359 builds fine.
->> >       It only hurts bisectibility.
->> >
->> > All errors (new ones prefixed by >>):
->> >
->> >    drivers/clk/sunxi/clk-sunxi.c: In function 'sun6i_get_ahb1_factors':
->> > >> drivers/clk/sunxi/clk-sunxi.c:310:9: error: 'struct factors_request'
->> > has no member named 'parent_index'
->> >      if (req->parent_index == SUN6I_AHB1_PARENT_PLL6) {
->> >             ^
->> >    drivers/clk/sunxi/clk-sunxi.c: In function 'sun6i_ahb1_recalc':
->> >    drivers/clk/sunxi/clk-sunxi.c:340:9: error: 'struct factors_request'
->> > has no member named 'parent_index'
->> >      if (req->parent_index == SUN6I_AHB1_PARENT_PLL6)
->> >             ^
->> >
->> > vim +310 drivers/clk/sunxi/clk-sunxi.c
->> >
->> > a78bb355 Chen-Yu Tsai 2016-01-25  304   if (req->parent_rate && req->rate
->> > > req->parent_rate)
->> > a78bb355 Chen-Yu Tsai 2016-01-25  305           req->rate =
->> > req->parent_rate;
->> > a78bb355 Chen-Yu Tsai 2016-01-25  306
->> > a78bb355 Chen-Yu Tsai 2016-01-25  307   div =
->> > DIV_ROUND_UP(req->parent_rate, req->rate);
->> > a78bb355 Chen-Yu Tsai 2016-01-25  308
->> > a78bb355 Chen-Yu Tsai 2016-01-25  309   /* calculate pre-divider if parent
->> > is pll6 */
->> > a78bb355 Chen-Yu Tsai 2016-01-25 @310   if (req->parent_index ==
->> > SUN6I_AHB1_PARENT_PLL6) {
->> > a78bb355 Chen-Yu Tsai 2016-01-25  311           if (div < 4)
->> > a78bb355 Chen-Yu Tsai 2016-01-25  312                   calcp = 0;
->> > a78bb355 Chen-Yu Tsai 2016-01-25  313           else if (div / 2 < 4)
->> >
->> > :::::: The code at line 310 was first introduced by commit
->> > :::::: a78bb35552a800949b2bf68f372d3d6ccabdd790 clk: sunxi: rewrite
->> > sun6i-a31-ahb1-clk using factors clk with custom recalc
->> >
->> > :::::: TO: Chen-Yu Tsai <wens@csie.org>
->> > :::::: CC: Maxime Ripard <maxime.ripard@free-electrons.com>
->> >
->> > ---
->> > 0-DAY kernel test infrastructure                Open Source Technology
->> > Center
->> > https://lists.01.org/pipermail/kbuild-all                   Intel
->> > Corporation
->> >
+>> + linux-omap, linux-arm
+>>
+>>> commit 'ARM: OMAP: Catch callers of revision information prior to it
+>>> being populated' results in a runtime warning on various non-OMAP
+>>> architectures. I have seen it with the following qemu tests.
+>>>
+>>> arm:vexpress-a9:multi_v7_defconfig:vexpress-v2p-ca9
+>>> arm:vexpress-a15:multi_v7_defconfig:vexpress-v2p-ca15-tc1
+>>> arm:xilinx-zynq-a9:multi_v7_defconfig:zynq-zc702
+>>> arm:xilinx-zynq-a9:multi_v7_defconfig:zynq-zc706
+>>> arm:xilinx-zynq-a9:multi_v7_defconfig:zynq-zed
+>>> arm:midway:multi_v7_defconfig:ecx-2000
+>>> arm:smdkc210:multi_v7_defconfig:exynos4210-smdkv310
+>>>
+>>> It is also reported by kernelci.org in at least one boot test for imx6q-cm-fx6.
+>>
+>> Thanks for the report... :(
+> 
+> Oh crap, sorry about that. I'll revert that commit immediately.
+> 
+
+
+Thanks. Sorry about the same as well..
+
+>>> The warning is as follows.
+>>>
+>>> ------------[ cut here ]------------
+>>> WARNING: CPU: 0 PID: 1 at arch/arm/mach-omap2/id.c:49 omap_rev+0x3c/0x50
+>>> Modules linked in:
+>>> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.6.0-rc2-next-20160411 #1
+>>> Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+>>> [<c030f970>] (unwind_backtrace) from [<c030b094>] (show_stack+0x10/0x14)
+>>> [<c030b094>] (show_stack) from [<c0585424>] (dump_stack+0x84/0xa4)
+>>> [<c0585424>] (dump_stack) from [<c0341774>] (__warn+0xd4/0x100)
+>>> [<c0341774>] (__warn) from [<c03417c0>] (warn_slowpath_null+0x20/0x28)
+>>> [<c03417c0>] (warn_slowpath_null) from [<c0324024>] (omap_rev+0x3c/0x50)
+>>> [<c0324024>] (omap_rev) from [<c1114a18>] (__omap4_sar_ram_init+0x8/0x88)
+>>> [<c1114a18>] (__omap4_sar_ram_init) from [<c0301e5c>] (do_one_initcall+0x3c/0x16c)
+>>> [<c0301e5c>] (do_one_initcall) from [<c1100ccc>] (kernel_init_freeable+0x70/0x1ec)
+>>> [<c1100ccc>] (kernel_init_freeable) from [<c0b495e4>] (kernel_init+0x8/0x110)
+>>> [<c0b495e4>] (kernel_init) from [<c0307f78>] (ret_from_fork+0x14/0x3c)
+>>> ---[ end trace cb88537fdc8fa200 ]---
+>>>
+>>> Please have a look.
+>>
+>> Tony,
+>> Should we get rid of omap_initcall callers(move them into
+>> board-generic call path or lower the check not to include default of 0?
+> 
+> Most of those will disappear when we drop the legacy booting support
+> for omap3. I would not touch those before then to avoid churn with
+> the legacy code.
+
+Sounds good to me.
+
+-- 
+Regards,
+Nishanth Menon
