@@ -1,62 +1,31 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 20 Apr 2016 00:36:01 +0200
-Subject: [PATCH] ARM: mx5: dts: Enable USB OTG on M53EVK
-Message-ID: <1461105361-6742-1-git-send-email-marex@denx.de>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 20 Apr 2016 00:37:55 +0200
+Subject: [PATCH 1/3] RTC: Enable RTC switching to battery power when
+ VCC_PSAUX is N/A
+In-Reply-To: <1460463346-24923-1-git-send-email-anuragku@xilinx.com>
+References: <1460463346-24923-1-git-send-email-anuragku@xilinx.com>
+Message-ID: <20160419223755.GG29844@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add USB OTG support to M53EVK instead of just USB gadget.
+On 12/04/2016 at 17:45:44 +0530, Anurag Kumar Vulisha wrote :
+> In order to conserve battery energy, during the PS operation,
+> it is expected that the supply for the battery-powered domain
+> to be switched from the battery (VCC_PSBATT) to (VCC_PSAUX) and
+> automatically be switched back to battery when VCC_PSAUX voltage
+> drops below a limit, doing so prevents the logic within
+> the battery-powered domain from functioning incorrectly.
+> 
+> This patch enables that feature.
+> 
+> Signed-off-by: Anurag Kumar Vulisha <anuragku@xilinx.com>
+> ---
+>  drivers/rtc/rtc-zynqmp.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+Applied, thanks.
 
-Signed-off-by: Marek Vasut <marex@denx.de>
-Cc: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/boot/dts/imx53-m53evk.dts | 21 ++++++++++++++++++++-
- 1 file changed, 20 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/imx53-m53evk.dts b/arch/arm/boot/dts/imx53-m53evk.dts
-index 53f4088..dcee1e0f 100644
---- a/arch/arm/boot/dts/imx53-m53evk.dts
-+++ b/arch/arm/boot/dts/imx53-m53evk.dts
-@@ -84,6 +84,15 @@
- 			regulator-max-microvolt = <5000000>;
- 			gpio = <&gpio1 2 0>;
- 		};
-+
-+		reg_usb_otg_vbus: regulator at 4 {
-+			compatible = "regulator-fixed";
-+			reg = <4>;
-+			regulator-name = "usb_otg_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&gpio1 4 0>;
-+		};
- 	};
- 
- 	sound {
-@@ -168,6 +177,12 @@
- 			>;
- 		};
- 
-+		pinctrl_usbotg: usbotggrp {
-+			fsl,pins = <
-+				MX53_PAD_GPIO_4__GPIO1_4		0x000b0
-+			>;
-+		};
-+
- 		led_pin_gpio: led_gpio at 0 {
- 			fsl,pins = <
- 				MX53_PAD_PATA_DATA8__GPIO2_8		0x80000000
-@@ -351,6 +366,10 @@
- };
- 
- &usbotg {
--	dr_mode = "peripheral";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usbotg>;
-+	dr_mode = "otg";
-+	vbus-supply = <&reg_usb_otg_vbus>;
-+	disable-over-current;
- 	status = "okay";
- };
 -- 
-2.7.0
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
