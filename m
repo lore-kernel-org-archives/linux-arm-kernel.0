@@ -1,52 +1,40 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 20 Apr 2016 09:01:27 +1000
-Subject: [PATCH 31/47] ARM: dts: r8a7794: Reference both DMA controllers
- in SCIFA nodes
-In-Reply-To: <20160418034059.GA1966@verge.net.au>
-References: <cover.1459732726.git.horms+renesas@verge.net.au>
- <65c295f4b305330162795b0cc2508a207ed23a98.1459732726.git.horms+renesas@verge.net.au>
- <CAOesGMgBBmUvoWdb35vcq0UAJNkMk5LD6-ERWDAaSKWEpGwu9A@mail.gmail.com>
- <CAMuHMdUUz-0EhgogpHGV-yE6htbwvAjuoAm2+DtDLa3xiG1XkA@mail.gmail.com>
- <20160418034059.GA1966@verge.net.au>
-Message-ID: <20160419230127.GE9826@verge.net.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 20 Apr 2016 01:18:28 +0200
+Subject: [PATCH 0/3] arm64: defconfig updates
+In-Reply-To: <1461105540-23799-1-git-send-email-stuart.yoder@nxp.com>
+References: <1461105540-23799-1-git-send-email-stuart.yoder@nxp.com>
+Message-ID: <7790483.f4tRIAaceA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 18, 2016 at 01:40:59PM +1000, Simon Horman wrote:
-> On Wed, Apr 13, 2016 at 09:55:14PM +0200, Geert Uytterhoeven wrote:
-> > Hi Olof,
-> > 
-> > On Wed, Apr 13, 2016 at 9:48 PM, Olof Johansson <olof@lixom.net> wrote:
-> > > On Sun, Apr 3, 2016 at 6:23 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
-> > >> diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-> > >> index eacb2b291361..4256557ca041 100644
-> > >> --- a/arch/arm/boot/dts/r8a7794.dtsi
-> > >> +++ b/arch/arm/boot/dts/r8a7794.dtsi
-> > >> @@ -296,8 +296,9 @@
-> > >>                 interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
-> > >>                 clocks = <&mstp2_clks R8A7794_CLK_SCIFA0>;
-> > >>                 clock-names = "fck";
-> > >> -               dmas = <&dmac0 0x21>, <&dmac0 0x22>;
-> > >> -               dma-names = "tx", "rx";
-> > >> +               dmas = <&dmac0 0x21>, <&dmac0 0x22>,
-> > >> +                      <&dmac1 0x21>, <&dmac1 0x22>;
-> > >> +               dma-names = "tx", "rx", "tx", "rx";
-> > >>                 power-domains = <&cpg_clocks>;
-> > >>                 status = "disabled";
-> > >>         };
-> > >
-> > > The names are no longer unique. So a get_<foo>_by_name() function no
-> > > longer can work as expected.
-> > 
-> > That's intentional, and a relic of how dma_request_slave_channel_compat()
-> > works: if e.g. the first "tx" channel can't be gotten (e.g. because
-> > the referenced
-> > DMAC instance ran out of channels), it will try the next one.
+On Tuesday 19 April 2016 17:39:00 Stuart Yoder wrote:
+> This patch series was based on 4.6-rc4.
 > 
-> Hi Olof,
+> As far as I know, when doing a 'make defconfig' immediately followed by 
+> 'make savedefconfig', the resulting defconfig should exactly match
+> the original defconfig.  This was not the case for arm64 and patch 1 cleans
+> that up.
 > 
-> is the above acceptable to you?
+> Patch 2 enables 48-bit VA to allow certain armv8 SoCs to cover all of
+> their physical memory regions. (see email thread:
+> http://www.spinics.net/lists/arm-kernel/msg497210.html)
+> 
+> Patch 3 enables some additional device for Freescale/NXP SoCs.
+> 
 
-In order to allow the other patches in this series, and others queued up
-since, to progress independently of a resolution to this question I
-have dropped this and all similar patches for now.
+The series looks fine to me. I'd suggest merging it through the
+platform maintainer path, e.g. having the i.MX mainainers pick
+them up and forward them to arm at kernel.org for inclusion in arm-soc.
+
+If the arm64 maintainers want to pick them up (or maybe just patches
+1 and 2, which are not platform specific), that's fine too, and you
+can add my
+
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+We haven't come up with a really good way to deal with this kind of
+update for arm64, as a lot of the changes to the defconfig file are
+related to stuff that goes through arm-soc, but some other stuff
+doesn't.
+
+	Arnd
