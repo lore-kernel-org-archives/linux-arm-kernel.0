@@ -1,94 +1,125 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Tue, 19 Apr 2016 17:13:06 +0000
-Subject: [PATCH v7 4/8] genirq/msi: msi_compose wrapper
+Date: Tue, 19 Apr 2016 17:13:08 +0000
+Subject: [PATCH v7 6/8] irqchip/gicv2m: implement msi_doorbell_info callback
 In-Reply-To: <1461085990-2547-1-git-send-email-eric.auger@linaro.org>
 References: <1461085990-2547-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1461085990-2547-5-git-send-email-eric.auger@linaro.org>
+Message-ID: <1461085990-2547-7-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the MSI message is composed by directly calling
-irq_chip_compose_msi_msg and erased by setting the memory to zero.
+This patch implements the msi_doorbell_info callback in the
+gicv2m driver.
 
-On some platforms, we will need to complexify this composition to
-properly handle MSI emission through IOMMU. Also we will need to track
-when the MSI message is erased.
+The driver now is able to return its doorbell characteristics
+(base, size, prot). A single doorbell is exposed.
 
-We propose to introduce a common wrapper for actual composition and
-erasure, msi_compose.
+This will allow the msi layer to iommu_map this doorbell when
+requested.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 
 ---
-v4 -> v5:
-- just introduce the msi-compose wrapper without adding new
-  functionalities
 
-v3 -> v4:
-- that code was formely in irq-gic-common.c
-  "irqchip/gicv2m/v3-its-pci-msi: IOMMU map the MSI frame when needed"
-  also the [un]mapping was done in irq_write_msi_msg; now done on compose
-
-v2 -> v3:
-- protect iova/addr manipulation with CONFIG_ARCH_DMA_ADDR_T_64BIT and
-  CONFIG_PHYS_ADDR_T_64BIT
-- only expose gic_pci_msi_domain_write_msg in case CONFIG_IOMMU_API &
-  CONFIG_PCI_MSI_IRQ_DOMAIN are set.
-- gic_set/unset_msi_addr duly become static
+v7: creation
 ---
- kernel/irq/msi.c | 19 ++++++++++++++++---
- 1 file changed, 16 insertions(+), 3 deletions(-)
+ drivers/irqchip/irq-gic-v2m.c | 32 +++++++++++++++++++++++++++++++-
+ 1 file changed, 31 insertions(+), 1 deletion(-)
 
-diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
-index 9b0ba4a..72bf4d6 100644
---- a/kernel/irq/msi.c
-+++ b/kernel/irq/msi.c
-@@ -55,6 +55,19 @@ static inline void irq_chip_write_msi_msg(struct irq_data *data,
- 	data->chip->irq_write_msi_msg(data, msg);
+diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
+index 28f047c..54690b9 100644
+--- a/drivers/irqchip/irq-gic-v2m.c
++++ b/drivers/irqchip/irq-gic-v2m.c
+@@ -24,6 +24,8 @@
+ #include <linux/of_pci.h>
+ #include <linux/slab.h>
+ #include <linux/spinlock.h>
++#include <linux/percpu.h>
++#include <linux/iommu.h>
+ 
+ /*
+ * MSI_TYPER:
+@@ -64,6 +66,7 @@ struct v2m_data {
+ 	u32 nr_spis;		/* The number of SPIs for MSIs */
+ 	unsigned long *bm;	/* MSI vector bitmap */
+ 	u32 flags;		/* v2m flags for specific implementation */
++	struct irq_chip_msi_doorbell_info doorbell_info;
+ };
+ 
+ static void gicv2m_mask_msi_irq(struct irq_data *d)
+@@ -105,6 +108,16 @@ static void gicv2m_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
+ 		msg->data -= v2m->spi_start;
  }
  
-+static int msi_compose(struct irq_data *irq_data,
-+		       struct msi_msg *msg, bool erase)
++static const struct irq_chip_msi_doorbell_info *
++gicv2m_msi_doorbell_info(struct irq_data *data)
 +{
-+	int ret = 0;
++	struct v2m_data *v2m = irq_data_get_irq_chip_data(data);
 +
-+	if (erase)
-+		memset(msg, 0, sizeof(*msg));
-+	else
-+		ret = irq_chip_compose_msi_msg(irq_data, msg);
-+
-+	return ret;
++	if (!v2m)
++		return NULL;
++	return (const struct irq_chip_msi_doorbell_info *)(&v2m->doorbell_info);
 +}
 +
- /**
-  * msi_domain_set_affinity - Generic affinity setter function for MSI domains
-  * @irq_data:	The irq data associated to the interrupt
-@@ -73,7 +86,7 @@ int msi_domain_set_affinity(struct irq_data *irq_data,
+ static struct irq_chip gicv2m_irq_chip = {
+ 	.name			= "GICv2m",
+ 	.irq_mask		= irq_chip_mask_parent,
+@@ -112,6 +125,7 @@ static struct irq_chip gicv2m_irq_chip = {
+ 	.irq_eoi		= irq_chip_eoi_parent,
+ 	.irq_set_affinity	= irq_chip_set_affinity_parent,
+ 	.irq_compose_msi_msg	= gicv2m_compose_msi_msg,
++	.msi_doorbell_info	= gicv2m_msi_doorbell_info,
+ };
  
- 	ret = parent->chip->irq_set_affinity(parent, mask, force);
- 	if (ret >= 0 && ret != IRQ_SET_MASK_OK_DONE) {
--		BUG_ON(irq_chip_compose_msi_msg(irq_data, &msg));
-+		BUG_ON(msi_compose(irq_data, &msg, false));
- 		irq_chip_write_msi_msg(irq_data, &msg);
+ static int gicv2m_irq_gic_domain_alloc(struct irq_domain *domain,
+@@ -247,6 +261,7 @@ static void gicv2m_teardown(void)
+ 
+ 	list_for_each_entry_safe(v2m, tmp, &v2m_nodes, entry) {
+ 		list_del(&v2m->entry);
++		free_percpu(v2m->doorbell_info.percpu_doorbells);
+ 		kfree(v2m->bm);
+ 		iounmap(v2m->base);
+ 		of_node_put(to_of_node(v2m->fwnode));
+@@ -299,6 +314,7 @@ static int __init gicv2m_init_one(struct fwnode_handle *fwnode,
+ {
+ 	int ret;
+ 	struct v2m_data *v2m;
++	struct irq_chip_msi_doorbell __percpu *doorbell;
+ 
+ 	v2m = kzalloc(sizeof(struct v2m_data), GFP_KERNEL);
+ 	if (!v2m) {
+@@ -311,11 +327,23 @@ static int __init gicv2m_init_one(struct fwnode_handle *fwnode,
+ 
+ 	memcpy(&v2m->res, res, sizeof(struct resource));
+ 
++	v2m->doorbell_info.percpu_doorbells =
++		alloc_percpu(struct irq_chip_msi_doorbell);
++	if (WARN_ON(!v2m->doorbell_info.percpu_doorbells)) {
++		ret = -ENOMEM;
++		goto err_free_v2m;
++	}
++	doorbell = per_cpu_ptr(v2m->doorbell_info.percpu_doorbells, 0);
++	doorbell->base = v2m->res.start;
++	doorbell->size = 4;
++	doorbell->prot = IOMMU_WRITE;
++	v2m->doorbell_info.nb_doorbells = 1;
++
+ 	v2m->base = ioremap(v2m->res.start, resource_size(&v2m->res));
+ 	if (!v2m->base) {
+ 		pr_err("Failed to map GICv2m resource\n");
+ 		ret = -ENOMEM;
+-		goto err_free_v2m;
++		goto err_free_v2m_doorbells;
  	}
  
-@@ -85,7 +98,7 @@ static void msi_domain_activate(struct irq_domain *domain,
- {
- 	struct msi_msg msg;
+ 	if (spi_start && nr_spis) {
+@@ -359,6 +387,8 @@ static int __init gicv2m_init_one(struct fwnode_handle *fwnode,
  
--	BUG_ON(irq_chip_compose_msi_msg(irq_data, &msg));
-+	BUG_ON(msi_compose(irq_data, &msg, false));
- 	irq_chip_write_msi_msg(irq_data, &msg);
- }
- 
-@@ -94,7 +107,7 @@ static void msi_domain_deactivate(struct irq_domain *domain,
- {
- 	struct msi_msg msg;
- 
--	memset(&msg, 0, sizeof(msg));
-+	msi_compose(irq_data, &msg, true);
- 	irq_chip_write_msi_msg(irq_data, &msg);
- }
- 
+ err_iounmap:
+ 	iounmap(v2m->base);
++err_free_v2m_doorbells:
++	free_percpu(v2m->doorbell_info.percpu_doorbells);
+ err_free_v2m:
+ 	kfree(v2m);
+ 	return ret;
 -- 
 1.9.1
