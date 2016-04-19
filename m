@@ -1,39 +1,41 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Tue, 19 Apr 2016 11:23:54 -0500
-Subject: [PATCH] rtc: ds1307: Use irq when available for wakeup-source device
-Message-ID: <1461083034-9227-1-git-send-email-nm@ti.com>
+From: akshay.bhat@timesys.com (Akshay Bhat)
+Date: Tue, 19 Apr 2016 12:30:01 -0400
+Subject: [PATCH] ARM: dts: imx6q-ba16: use wdog external reset
+Message-ID: <1461083401-12662-1-git-send-email-akshay.bhat@timesys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With commit 8bc2a40730ec ("rtc: ds1307: add support for the
-DT property 'wakeup-source'") we lost the ability for rtc irq
-functionality for devices that are actually hooked on a real IRQ
-line and have capability to wakeup as well. This is not an expected
-behavior. So, instead of just not requesting IRQ, skip the IRQ
-requirement only if interrupts are not defined for the device.
+The BA16 module has a PMIC that uses the WDOG_B output from iMX6 to
+reset the system on a watchdog timeout. Configure the watchdog to assert
+the external reset signal (WDOG_B) using fsl,ext-reset-output property.
 
-Fixes: 8bc2a40730ec ("rtc: ds1307: add support for the DT property 'wakeup-source'")
-Reported-by: Tony Lindgren <tony@atomide.com>
-Cc: Michael Lange <linuxstuff@milaw.biz>
-Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
+Signed-off-by: Akshay Bhat <akshay.bhat@timesys.com>
 ---
 
- drivers/rtc/rtc-ds1307.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Hi Shawn,
 
-diff --git a/drivers/rtc/rtc-ds1307.c b/drivers/rtc/rtc-ds1307.c
-index b2156ee5bae1..74cd5cd544ee 100644
---- a/drivers/rtc/rtc-ds1307.c
-+++ b/drivers/rtc/rtc-ds1307.c
-@@ -1531,7 +1531,7 @@ read_rtc:
- 		return PTR_ERR(ds1307->rtc);
- 	}
+The imx watchdog external reset patch has made it to the maintainers git tree:
+https://git.kernel.org/cgit/linux/kernel/git/groeck/linux-staging.git/commit/?h=watchdog-next&id=5b25ce9e897fdd7bcd9ca47c5aa63ad2095d1ada
+
+Adding fsl,ext-reset-output property to the BA16 module.
+
+Thanks,
+Akshay
+
+ arch/arm/boot/dts/imx6q-ba16.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/imx6q-ba16.dtsi b/arch/arm/boot/dts/imx6q-ba16.dtsi
+index 7c80a1e..b4dd2be 100644
+--- a/arch/arm/boot/dts/imx6q-ba16.dtsi
++++ b/arch/arm/boot/dts/imx6q-ba16.dtsi
+@@ -400,6 +400,7 @@
+ &wdog1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_wdog>;
++	fsl,ext-reset-output;
+ };
  
--	if (ds1307_can_wakeup_device) {
-+	if (ds1307_can_wakeup_device && ds1307->client->irq <= 0) {
- 		/* Disable request for an IRQ */
- 		want_irq = false;
- 		dev_info(&client->dev, "'wakeup-source' is set, request for an IRQ is disabled!\n");
+ &iomuxc {
 -- 
-2.8.0
+2.8.1
