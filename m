@@ -1,41 +1,83 @@
-From: akshay.bhat@timesys.com (Akshay Bhat)
-Date: Tue, 19 Apr 2016 12:30:01 -0400
-Subject: [PATCH] ARM: dts: imx6q-ba16: use wdog external reset
-Message-ID: <1461083401-12662-1-git-send-email-akshay.bhat@timesys.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 19 Apr 2016 17:36:04 +0100
+Subject: [PATCH v4 0/2] ARM64: Enable SP805 WDT support for FSL LS2080A
+In-Reply-To: <VI1PR04MB12308B0964726B5D1A4492BE886C0@VI1PR04MB1230.eurprd04.prod.outlook.com>
+References: <1451296884-7932-1-git-send-email-bhupesh.sharma@freescale.com>
+ <570FBBD8.4030704@arm.com>
+ <VI1PR04MB12308B0964726B5D1A4492BE886C0@VI1PR04MB1230.eurprd04.prod.outlook.com>
+Message-ID: <57165E74.2030500@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The BA16 module has a PMIC that uses the WDOG_B output from iMX6 to
-reset the system on a watchdog timeout. Configure the watchdog to assert
-the external reset signal (WDOG_B) using fsl,ext-reset-output property.
+On 19/04/16 13:09, Bhupesh Sharma wrote:
+> Hi Mark,
+> 
+> Sorry for the delayed reply. I was on holidays.
+> 
+>> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
+>> Sent: Thursday, April 14, 2016 9:19 PM
+>>
+>> Hi Bhupesh,
+>>
+>> On 28/12/15 10:01, Bhupesh Sharma wrote:
+>>> Hi Arnd, Kevin, Olof
+>>>
+>>> This is the v4 of patchset which adds the support for SP805 WDT on
+>> FSL
+>>> LS2080A and also adds the missing documentation of SP805 WDT device-
+>> tree bindings.
+>>>
+>>> Rebased against arm-soc/next/dt
+>>>
+>>> Changes since v3:
+>>> (v3 can be viewed here:
+>>> https://www.mail-
+>> archive.com/devicetree at vger.kernel.org/msg97249.html)
+>>> - Added Rob's Acked-by for patch 1/2.
+>>> - Sending to 'arm at kernel.org' list and also cc'ed Shawn Guo
+>>>
+>>> Changes since v2:
+>>> (v2 can be viewed here:
+>>> http://permalink.gmane.org/gmane.linux.ports.arm.kernel/463141)
+>>> - Addressed Rob's comments regarding the second mandatory CLK
+>> source's
+>>>   (WDOGCLK) name in the bindings.
+>>>
+>>> Changes since v1:
+>>> (v1 can be viewed here:
+>>> http://www.spinics.net/lists/devicetree/msg102487.html)
+>>>
+>>> - Addressed Rob and Mark's comments regarding the mandatory CLK
+>>> sources
+>>> - Removed interrupt property from the bindings for now (as discussed
+>>>   with Mark on IRC) till Will's patch proceeds further and enables
+>>>   handling the WDOG interrupts for each core connected to the same
+>> PPI
+>>>   line
+>>> (http://lists.infradead.org/pipermail/linux-arm-kernel/2015-
+>> December/3
+>>> 91616.html)
+>>
+>> Will just pointed me to this series. I've recently posted a set of
+>> patches that should be able to deal with the quirkiness of your HW with
+>> regards to PPIs:
+>>
+>> http://thread.gmane.org/gmane.linux.drivers.devicetree/163464
+>>
+>> Could you please let me know if this works for you?
+>>
+> 
+> Sure. I will have a look at the patchset and get back asap.
 
-Signed-off-by: Akshay Bhat <akshay.bhat@timesys.com>
----
+Thanks. It should be pretty easy to do (define all 8 affinities for your
+CPUs, and assign each one to the watchdog it corresponds to).
 
-Hi Shawn,
+Of course, the watchdog driver itself is missing interrupt support, so
+you will have to hack that as well. If you have any issue with this
+stuff, please give me a shout.
 
-The imx watchdog external reset patch has made it to the maintainers git tree:
-https://git.kernel.org/cgit/linux/kernel/git/groeck/linux-staging.git/commit/?h=watchdog-next&id=5b25ce9e897fdd7bcd9ca47c5aa63ad2095d1ada
+Cheers,
 
-Adding fsl,ext-reset-output property to the BA16 module.
-
-Thanks,
-Akshay
-
- arch/arm/boot/dts/imx6q-ba16.dtsi | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/boot/dts/imx6q-ba16.dtsi b/arch/arm/boot/dts/imx6q-ba16.dtsi
-index 7c80a1e..b4dd2be 100644
---- a/arch/arm/boot/dts/imx6q-ba16.dtsi
-+++ b/arch/arm/boot/dts/imx6q-ba16.dtsi
-@@ -400,6 +400,7 @@
- &wdog1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_wdog>;
-+	fsl,ext-reset-output;
- };
- 
- &iomuxc {
+	M.
 -- 
-2.8.1
+Jazz is not dead. It just smells funny...
