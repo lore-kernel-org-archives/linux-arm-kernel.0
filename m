@@ -1,136 +1,130 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Tue, 19 Apr 2016 17:24:40 +0000
-Subject: [PATCH v7 0/7] KVM PCIe/MSI passthrough on ARM/ARM64: kernel part
- 3/3: vfio changes
-Message-ID: <1461086687-2658-1-git-send-email-eric.auger@linaro.org>
+Date: Tue, 19 Apr 2016 17:24:42 +0000
+Subject: [PATCH v7 2/7] vfio/type1: vfio_find_dma accepting a type argument
+In-Reply-To: <1461086687-2658-1-git-send-email-eric.auger@linaro.org>
+References: <1461086687-2658-1-git-send-email-eric.auger@linaro.org>
+Message-ID: <1461086687-2658-3-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series allows the user-space to register a reserved IOVA domain.
-This completes the kernel integration of the whole functionality on top
-of part 1 & 2.
+In our RB-tree we now have slots of different types (USER and RESERVED).
+It becomes useful to be able to search for dma slots of a specific type or
+any type. This patch proposes an implementation for that modality and also
+changes the existing callers using the USER type.
 
-We reuse the VFIO DMA MAP ioctl with a new flag to bridge to the
-dma-reserved-iommu API. The number of IOVA pages to provision for MSI
-binding is reported through the VFIO_IOMMU_GET_INFO iotcl.
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
+---
+ drivers/vfio/vfio_iommu_type1.c | 63 ++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 53 insertions(+), 10 deletions(-)
 
-vfio_iommu_type1 checks if the MSI mapping is safe when attaching the
-vfio group to the container (allow_unsafe_interrupts modality).
-
-On ARM/ARM64, the IOMMU does not astract IRQ remapping. the modality is
-abstracted on MSI controller side. The GICv3 ITS is the first controller
-advertising the modality.
-
-More details & context can be found at:
-http://www.linaro.org/blog/core-dump/kvm-pciemsi-passthrough-armarm64/
-
-Best Regards
-
-Eric
-
-Testing:
-- functional on ARM64 AMD Overdrive HW (single GICv2m frame) with
-  Intel X540-T2 (SR-IOV capable)
-- Not tested: ARM GICv3 ITS
-
-References:
-[1] [RFC 0/2] VFIO: Add virtual MSI doorbell support
-    (https://lkml.org/lkml/2015/7/24/135)
-[2] [RFC PATCH 0/6] vfio: Add interface to map MSI pages
-    (https://lists.cs.columbia.edu/pipermail/kvmarm/2015-September/016607.html)
-[3] [PATCH v2 0/3] Introduce MSI hardware mapping for VFIO
-    (http://permalink.gmane.org/gmane.comp.emulators.kvm.arm.devel/3858)
-
-Git: complete series available at
-https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.6-rc4-pcie-passthrough-v7
-
-previous version at
-https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.6-rc1-pcie-passthrough-v6
-
-QEMU Integration:
-[RFC v2 0/8] KVM PCI/MSI passthrough with mach-virt
-(http://lists.gnu.org/archive/html/qemu-arm/2016-01/msg00444.html)
-https://git.linaro.org/people/eric.auger/qemu.git/shortlog/refs/heads/v2.5.0-pci-passthrough-rfc-v2
-
-History:
-
-v6 -> v7:
-- vfio_find_dma now accepts a dma_type argument.
-- should have recovered the capability to unmap the whole user IOVA range
-- remove computation of nb IOVA pages -> will post a separate RFC for that
-  while respinning the QEMU part
-
-RFC v5 -> patch v6:
-- split to ease the review process
-
-RFC v4 -> RFC v5:
-- take into account Thomas' comments on MSI related patches
-  - split "msi: IOMMU map the doorbell address when needed"
-  - increase readability and add comments
-  - fix style issues
- - split "iommu: Add DOMAIN_ATTR_MSI_MAPPING attribute"
- - platform ITS now advertises IOMMU_CAP_INTR_REMAP
- - fix compilation issue with CONFIG_IOMMU API unset
- - arm-smmu-v3 now advertises DOMAIN_ATTR_MSI_MAPPING
-
-RFC v3 -> v4:
-- Move doorbell mapping/unmapping in msi.c
-- fix ref count issue on set_affinity: in case of a change in the address
-  the previous address is decremented
-- doorbell map/unmap now is done on msi composition. Should allow the use
-  case for platform MSI controllers
-- create dma-reserved-iommu.h/c exposing/implementing a new API dedicated
-  to reserved IOVA management (looking like dma-iommu glue)
-- series reordering to ease the review:
-  - first part is related to IOMMU
-  - second related to MSI sub-system
-  - third related to VFIO (except arm-smmu IOMMU_CAP_INTR_REMAP removal)
-- expose the number of requested IOVA pages through VFIO_IOMMU_GET_INFO
-  [this partially addresses Marc's comments on iommu_get/put_single_reserved
-   size/alignment problematic - which I did not ignore - but I don't know
-   how much I can do at the moment]
-
-RFC v2 -> RFC v3:
-- should fix wrong handling of some CONFIG combinations:
-  CONFIG_IOVA, CONFIG_IOMMU_API, CONFIG_PCI_MSI_IRQ_DOMAIN
-- fix MSI_FLAG_IRQ_REMAPPING setting in GICv3 ITS (although not tested)
-
-PATCH v1 -> RFC v2:
-- reverted to RFC since it looks more reasonable ;-) the code is split
-  between VFIO, IOMMU, MSI controller and I am not sure I did the right
-  choices. Also API need to be further discussed.
-- iova API usage in arm-smmu.c.
-- MSI controller natively programs the MSI addr with either the PA or IOVA.
-  This is not done anymore in vfio-pci driver as suggested by Alex.
-- check irq remapping capability of the group
-
-RFC v1 [2] -> PATCH v1:
-- use the existing dma map/unmap ioctl interface with a flag to register a
-  reserved IOVA range. Use the legacy Rb to store this special vfio_dma.
-- a single reserved IOVA contiguous region now is allowed
-- use of an RB tree indexed by PA to store allocated reserved slots
-- use of a vfio_domain iova_domain to manage iova allocation within the
-  window provided by the userspace
-- vfio alloc_map/unmap_free take a vfio_group handle
-- vfio_group handle is cached in vfio_pci_device
-- add ref counting to bindings
-- user modality enabled at the end of the series
-
-
-Eric Auger (7):
-  vfio: introduce a vfio_dma type field
-  vfio/type1: vfio_find_dma accepting a type argument
-  vfio/type1: specialize remove_dma and replay according to type
-  vfio: allow reserved iova registration
-  vfio/type1: also check IRQ remapping capability at msi domain
-  iommu/arm-smmu: do not advertise IOMMU_CAP_INTR_REMAP
-  vfio/type1: return MSI mapping requirements with VFIO_IOMMU_GET_INFO
-
- drivers/iommu/arm-smmu-v3.c     |   3 +-
- drivers/iommu/arm-smmu.c        |   3 +-
- drivers/vfio/vfio_iommu_type1.c | 297 ++++++++++++++++++++++++++++++++++++++--
- include/uapi/linux/vfio.h       |  12 +-
- 4 files changed, 298 insertions(+), 17 deletions(-)
-
+diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
+index aaf5a6c..2d769d4 100644
+--- a/drivers/vfio/vfio_iommu_type1.c
++++ b/drivers/vfio/vfio_iommu_type1.c
+@@ -98,23 +98,64 @@ struct vfio_group {
+  * into DMA'ble space using the IOMMU
+  */
+ 
+-static struct vfio_dma *vfio_find_dma(struct vfio_iommu *iommu,
+-				      dma_addr_t start, size_t size)
++/**
++ * vfio_find_dma_from_node: looks for a dma slot intersecting a window
++ * from a given rb tree node
++ * @top: top rb tree node where the search starts (including this node)
++ * @start: window start
++ * @size: window size
++ * @type: window type
++ */
++static struct vfio_dma *vfio_find_dma_from_node(struct rb_node *top,
++						dma_addr_t start, size_t size,
++						enum vfio_iova_type type)
+ {
+-	struct rb_node *node = iommu->dma_list.rb_node;
++	struct rb_node *node = top;
++	struct vfio_dma *dma;
+ 
+ 	while (node) {
+-		struct vfio_dma *dma = rb_entry(node, struct vfio_dma, node);
+-
++		dma = rb_entry(node, struct vfio_dma, node);
+ 		if (start + size <= dma->iova)
+ 			node = node->rb_left;
+ 		else if (start >= dma->iova + dma->size)
+ 			node = node->rb_right;
+ 		else
++			break;
++	}
++	if (!node)
++		return NULL;
++
++	/* a dma slot intersects our window, check the type also matches */
++	if (type == VFIO_IOVA_ANY || dma->type == type)
++		return dma;
++
++	/* restart 2 searches skipping the current node */
++	if (start < dma->iova) {
++		dma = vfio_find_dma_from_node(node->rb_left, start,
++					      size, type);
++		if (dma)
+ 			return dma;
+ 	}
++	if (start + size > dma->iova + dma->size)
++		dma = vfio_find_dma_from_node(node->rb_right, start,
++					      size, type);
++	return dma;
++}
++
++/**
++ * vfio_find_dma: find a dma slot intersecting a given window
++ * @iommu: vfio iommu handle
++ * @start: window base iova
++ * @size: window size
++ * @type: window type
++ */
++static struct vfio_dma *vfio_find_dma(struct vfio_iommu *iommu,
++				      dma_addr_t start, size_t size,
++				      enum vfio_iova_type type)
++{
++	struct rb_node *top_node = iommu->dma_list.rb_node;
+ 
+-	return NULL;
++	return vfio_find_dma_from_node(top_node, start, size, type);
+ }
+ 
+ static void vfio_link_dma(struct vfio_iommu *iommu, struct vfio_dma *new)
+@@ -488,19 +529,21 @@ static int vfio_dma_do_unmap(struct vfio_iommu *iommu,
+ 	 * mappings within the range.
+ 	 */
+ 	if (iommu->v2) {
+-		dma = vfio_find_dma(iommu, unmap->iova, 0);
++		dma = vfio_find_dma(iommu, unmap->iova, 0, VFIO_IOVA_USER);
+ 		if (dma && dma->iova != unmap->iova) {
+ 			ret = -EINVAL;
+ 			goto unlock;
+ 		}
+-		dma = vfio_find_dma(iommu, unmap->iova + unmap->size - 1, 0);
++		dma = vfio_find_dma(iommu, unmap->iova + unmap->size - 1, 0,
++				    VFIO_IOVA_USER);
+ 		if (dma && dma->iova + dma->size != unmap->iova + unmap->size) {
+ 			ret = -EINVAL;
+ 			goto unlock;
+ 		}
+ 	}
+ 
+-	while ((dma = vfio_find_dma(iommu, unmap->iova, unmap->size))) {
++	while ((dma = vfio_find_dma(iommu, unmap->iova, unmap->size,
++				    VFIO_IOVA_USER))) {
+ 		if (!iommu->v2 && unmap->iova > dma->iova)
+ 			break;
+ 		unmapped += dma->size;
+@@ -604,7 +647,7 @@ static int vfio_dma_do_map(struct vfio_iommu *iommu,
+ 
+ 	mutex_lock(&iommu->lock);
+ 
+-	if (vfio_find_dma(iommu, iova, size)) {
++	if (vfio_find_dma(iommu, iova, size, VFIO_IOVA_ANY)) {
+ 		mutex_unlock(&iommu->lock);
+ 		return -EEXIST;
+ 	}
 -- 
 1.9.1
