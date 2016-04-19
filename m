@@ -1,112 +1,148 @@
-From: stanislav.meduna@nxtcontrol.com (Stanislav Meduna)
-Date: Tue, 19 Apr 2016 17:54:24 +0200
-Subject: i.MX53 restart via watchdog does not work
-In-Reply-To: <CAOMZO5DHTm2iSyGF1CcwuWxzmwbadttKmtVJQePd60A6a0jsgA@mail.gmail.com>
-References: <57111429.6040802@nxtcontrol.com>
- <CAOMZO5DHTm2iSyGF1CcwuWxzmwbadttKmtVJQePd60A6a0jsgA@mail.gmail.com>
-Message-ID: <571654B0.6040203@nxtcontrol.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 19 Apr 2016 16:56:12 +0100
+Subject: [PATCH v2 3/5] arm64/perf: Cavium ThunderX L2C CBC uncore support
+In-Reply-To: <256cecaca63266beedb57c344f10260915cc0a01.1457539622.git.jglauber@cavium.com>
+References: <cover.1457539621.git.jglauber@cavium.com>
+ <256cecaca63266beedb57c344f10260915cc0a01.1457539622.git.jglauber@cavium.com>
+Message-ID: <20160419155612.GD20991@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/19/2016 5:39 PM, Fabio Estevam wrote:
+On Wed, Mar 09, 2016 at 05:21:05PM +0100, Jan Glauber wrote:
+> @@ -300,6 +302,7 @@ static int __init thunder_uncore_init(void)
+>  	pr_info("PMU version: %d\n", thunder_uncore_version);
+>  
+>  	thunder_uncore_l2c_tad_setup();
+> +	thunder_uncore_l2c_cbc_setup();
+>  	return 0;
+>  }
+>  late_initcall(thunder_uncore_init);
 
->> I am using an TQMa53 board, which expects to be resetted
->> by watchdog circuit. In older kernels ths was done in
->> by mxc_restart defined in arch/arm/mach-imx/system.c
->> and initialized and wired in mach-imx53.c.
->>
->> Current kernels however do not use this and the mach-imx53.c
->> does not set .restart. I am getting
->>   imx2-wdt 53f98000.wdog: Device shutdown: Expect reboot!
->>   reboot: Restarting system
->> and the system just hangs there.
-> 
-> I am able to reproduce this issue on a imx6ul-evk board.
-> 
-> It works fine on a imx6q sabresd board though.
+Why aren't these just probed independently, as separate PCI devices,
+rather than using a shared initcall?
 
-After much head-scratching I was able to isolate the problem.
-In fact it has nothing to do with the watchdog or at least
-not directly. The reset is now located in the watchdog
-code itself and gets called normally (which I have
-overlooked when writing the original message).
+You'd have to read the MIDR a few times, but that's a tiny fraction of
+the rest of the cost of probing, and you can keep the common portion as
+a stateless library.
 
-The probable culprit is the eMMC card being left in some
-state that the bootloader cannot handle. For now I worked
-around it using the patch below (4.4-based), using a device
-tree property to prevent the card from sleeping
-in _mmc_suspend.
+> +int l2c_cbc_events[L2C_CBC_NR_COUNTERS] = {
+> +	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+> +	0x08, 0x09, 0x0a, 0x0b, 0x0c,
+> +	0x10, 0x11, 0x12, 0x13
+> +};
 
-I'm not really sure what the 3.9 kernel does differently
-here though...
+What are these magic numbers?
 
-Could you try to jump around the mmc_sleep(host)
-call in _mmc_suspend to see whether it fixes the problem
-also for you?
+A comment would be helpful here.
 
-Regards
-                                   Stano
+> +
+> +static void thunder_uncore_start(struct perf_event *event, int flags)
+> +{
+> +	struct thunder_uncore *uncore = event_to_thunder_uncore(event);
+> +	struct hw_perf_event *hwc = &event->hw;
+> +	struct thunder_uncore_node *node;
+> +	struct thunder_uncore_unit *unit;
+> +	u64 prev;
+> +
+> +	node = get_node(hwc->config, uncore);
+> +
+> +	/* restore counter value divided by units into all counters */
+> +	if (flags & PERF_EF_RELOAD) {
+> +		prev = local64_read(&hwc->prev_count);
+> +		prev = prev / node->nr_units;
+> +
+> +		list_for_each_entry(unit, &node->unit_list, entry)
+> +			writeq(prev, hwc->event_base + unit->map);
+> +	}
+> +
+> +	hwc->state = 0;
+> +	perf_event_update_userpage(event);
+> +}
 
+This looks practically identical to the code in patch 2. Please factor
+the common portion into the library code from patch 1 (zeroing the
+registers), and share it.
 
-commit a130df68e1c7770fa8ffc807fe40931615d2383a
-Author: Stanislav Meduna <stanislav.meduna@nxtcontrol.com>
-Date:   Mon Apr 18 19:19:28 2016 +0200
+> +
+> +static void thunder_uncore_stop(struct perf_event *event, int flags)
+> +{
+> +	struct hw_perf_event *hwc = &event->hw;
+> +
+> +	if ((flags & PERF_EF_UPDATE) && !(hwc->state & PERF_HES_UPTODATE)) {
+> +		thunder_uncore_read(event);
+> +		hwc->state |= PERF_HES_UPTODATE;
+> +	}
+> +}
 
-    mmc: disable card sleep via device-tree
+There's no stop control for this PMU?
 
-    On a TQMa53 module the mmc_sleep leaves the eMMC card in a state
-    that (probably) the U-Boot is unable to probe, resulting in
-    reboot hanging. Add a device tree property to disable sleeping
-    on suspend.
+I was under the impression the core perf code could read the counter
+while it was stopped, and it would unexpectedly count increasing values.
 
-diff --git a/Documentation/devicetree/bindings/mmc/mmc-card.txt b/Documentation/devicetree/bindings/mmc/mmc-card.txt
-index a70fcd6..776a17333 100644
---- a/Documentation/devicetree/bindings/mmc/mmc-card.txt
-+++ b/Documentation/devicetree/bindings/mmc/mmc-card.txt
-@@ -12,6 +12,9 @@ Required properties:
- Optional properties:
- -broken-hpi : Use this to indicate that the mmc-card has a broken hpi
-               implementation, and that hpi should not be used
-+-no-sleep-on-suspend : do not put the card to sleep when suspending.
-+              There are boards with bootloaders that are unable
-+              to probe such card when rebooting.
+Does PERF_HES_UPTODATE stop the core from reading the counter, or is
+it the responsibility of the backend to check that? I see that
+thunder_uncore_read does not.
 
- Example:
+Do you need PERF_HES_STOPPED, or does that not matter due to the lack of
+interrupts?
 
-diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
-index 3d5087b..6506617 100644
---- a/drivers/mmc/core/mmc.c
-+++ b/drivers/mmc/core/mmc.c
-@@ -357,7 +357,11 @@ static int mmc_decode_ext_csd(struct mmc_card *card, u8 *ext_csd)
+> +
+> +static int thunder_uncore_add(struct perf_event *event, int flags)
+> +{
+> +	struct thunder_uncore *uncore = event_to_thunder_uncore(event);
+> +	struct hw_perf_event *hwc = &event->hw;
+> +	struct thunder_uncore_node *node;
+> +	int id, i;
+> +
+> +	WARN_ON_ONCE(!uncore);
+> +	node = get_node(hwc->config, uncore);
+> +	id = get_id(hwc->config);
+> +
+> +	/* are we already assigned? */
+> +	if (hwc->idx != -1 && node->events[hwc->idx] == event)
+> +		goto out;
+> +
+> +	for (i = 0; i < node->num_counters; i++) {
+> +		if (node->events[i] == event) {
+> +			hwc->idx = i;
+> +			goto out;
+> +		}
+> +	}
+> +
+> +	/* these counters are self-sustained so idx must match the counter! */
+> +	hwc->idx = -1;
+> +	for (i = 0; i < node->num_counters; i++) {
+> +		if (l2c_cbc_events[i] == id) {
+> +			if (cmpxchg(&node->events[i], NULL, event) == NULL) {
+> +				hwc->idx = i;
+> +				break;
+> +			}
+> +		}
+> +	}
+> +
+> +out:
+> +	if (hwc->idx == -1)
+> +		return -EBUSY;
+> +
+> +	hwc->event_base = id * sizeof(unsigned long long);
+> +
+> +	/* counter is not stoppable so avoiding PERF_HES_STOPPED */
+> +	hwc->state = PERF_HES_UPTODATE;
+> +
+> +	if (flags & PERF_EF_START)
+> +		thunder_uncore_start(event, 0);
+> +
+> +	return 0;
+> +}
 
- 	np = mmc_of_find_child_device(card->host, 0);
- 	if (np && of_device_is_compatible(np, "mmc-card"))
-+	{
- 		broken_hpi = of_property_read_bool(np, "broken-hpi");
-+		card->no_sleep_on_suspend =
-+			of_property_read_bool(np, "no-sleep-on-suspend");
-+	}
- 	of_node_put(np);
+This looks practically identical to code from path 2, and all my
+comments there apply.
 
- 	/*
-@@ -1824,7 +1828,7 @@ static int _mmc_suspend(struct mmc_host *host, bool is_suspend)
- 	if (mmc_can_poweroff_notify(host->card) &&
- 		((host->caps2 & MMC_CAP2_FULL_PWR_CYCLE) || !is_suspend))
- 		err = mmc_poweroff_notify(host->card, notify_type);
--	else if (mmc_can_sleep(host->card))
-+	else if (mmc_can_sleep(host->card) && !host->card->no_sleep_on_suspend)
- 		err = mmc_sleep(host);
- 	else if (!mmc_host_is_spi(host))
- 		err = mmc_deselect_cards(host);
-diff --git a/include/linux/mmc/card.h b/include/linux/mmc/card.h
-index eb0151b..e1d275d 100644
---- a/include/linux/mmc/card.h
-+++ b/include/linux/mmc/card.h
-@@ -313,6 +313,7 @@ struct mmc_card {
- 	struct dentry		*debugfs_root;
- 	struct mmc_part	part[MMC_NUM_PHY_PARTITION]; /* physical partitions */
- 	unsigned int    nr_parts;
-+	bool	no_sleep_on_suspend;
- };
+Please factor this out into the library code in patch 1, taking into
+account my comments on patch 2.
 
- /*
+Likewise, the remainder of the file is mostly a copy+paste of patch 2.
+All those comments apply equally to this patch.
+
+Thanks,
+Mark.
