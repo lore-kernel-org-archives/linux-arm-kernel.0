@@ -1,30 +1,40 @@
 From: stuart.yoder@nxp.com (Stuart Yoder)
-Date: Tue, 19 Apr 2016 17:39:00 -0500
-Subject: [PATCH 0/3] arm64: defconfig updates
-Message-ID: <1461105540-23799-1-git-send-email-stuart.yoder@nxp.com>
+Date: Tue, 19 Apr 2016 17:39:10 -0500
+Subject: [PATCH 1/3] arm64: defconfig: cleanup the defconfig
+Message-ID: <1461105550-23838-1-git-send-email-stuart.yoder@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series was based on 4.6-rc4.
+When doing:
+   makedefconfig
+   makesavedefconfig
 
-As far as I know, when doing a 'make defconfig' immediately followed by 
-'make savedefconfig', the resulting defconfig should exactly match
-the original defconfig.  This was not the case for arm64 and patch 1 cleans
-that up.
+...without making any changes, the newly saved defconfig does
+not match arch/arm64/configs/defconfig, and the diff looks
+like:
 
-Patch 2 enables 48-bit VA to allow certain armv8 SoCs to cover all of
-their physical memory regions. (see email thread:
-http://www.spinics.net/lists/arm-kernel/msg497210.html)
+$ diff defconfig arch/arm64/configs/defconfig
+3a4
+> CONFIG_FHANDLE=y
 
-Patch 3 enables some additional device for Freescale/NXP SoCs.
+Clean that up by committing the output of savedefconfig.
 
-Stuart Yoder (3):
-  arm64: defconfig: cleanup the defconfig
-  arm64: defconfig: enable 48-bit virtual addresses
-  arm64: defconfig: enable freescale/nxp config options
+Signed-off-by: Stuart Yoder <stuart.yoder@nxp.com>
+---
+ arch/arm64/configs/defconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
- arch/arm64/configs/defconfig | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
-
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index a44ef99..248c242 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -1,7 +1,6 @@
+ # CONFIG_LOCALVERSION_AUTO is not set
+ CONFIG_SYSVIPC=y
+ CONFIG_POSIX_MQUEUE=y
+-CONFIG_FHANDLE=y
+ CONFIG_AUDIT=y
+ CONFIG_NO_HZ_IDLE=y
+ CONFIG_HIGH_RES_TIMERS=y
 -- 
 1.9.0
