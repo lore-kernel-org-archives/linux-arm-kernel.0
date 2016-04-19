@@ -1,36 +1,22 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 19 Apr 2016 14:00:05 +0100
-Subject: [PATCH v4 1/5] ACPI / processor_idle: introduce
- ARCH_SUPPORTS_ACPI_PROCESSOR_CSTATE
-In-Reply-To: <201604192041.pUqHza4O%fengguang.wu@intel.com>
-References: <201604192041.pUqHza4O%fengguang.wu@intel.com>
-Message-ID: <57162BD5.90006@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 19 Apr 2016 14:07:08 +0100
+Subject: [PATCH V2 08/15] coresight: tmc: getting the right read_count on
+ tmc_open()
+In-Reply-To: <1460483692-25061-9-git-send-email-mathieu.poirier@linaro.org>
+References: <1460483692-25061-1-git-send-email-mathieu.poirier@linaro.org>
+ <1460483692-25061-9-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <57162D7C.7040003@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 12/04/16 18:54, Mathieu Poirier wrote:
+> In function tmc_open(), if tmc_read_prepare() fails variable
+> drvdata->read_count is not decremented, causing unwanted
+> access to drvdata->buf and very likely, a crash dump.
+>
+> By moving the incrementation to a place where we know things
+> are stable this kind of situation is avoided.
+>
+> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-On 19/04/16 13:49, kbuild test robot wrote:
-> Hi,
->
-> [auto build test ERROR on pm/linux-next]
-> [also build test ERROR on v4.6-rc4 next-20160419]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
->
-> url:    https://github.com/0day-ci/linux/commits/Sudeep-Holla/ACPI-processor_idle-Add-ACPI-v6-0-LPI-support/20160419-203500
-> base:   https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git linux-next
-> config: i386-randconfig-x000-201616 (attached as .config)
-> reproduce:
->          # save the attached .config to linux build tree
->          make ARCH=i386
->
-> Note: the linux-review/Sudeep-Holla/ACPI-processor_idle-Add-ACPI-v6-0-LPI-support/20160419-203500 HEAD c51fc2a756d7b0dce908a4ca043d1d458c400af5 builds fine.
->        It only hurts bisectibility.
->
-
-Thanks for the report, it's now fixed locally.
-It will part of the next version.
-
---
-Regards,
-Sudeep
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
