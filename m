@@ -1,74 +1,47 @@
-From: van.freenix@gmail.com (Peng Fan)
-Date: Tue, 19 Apr 2016 16:33:08 +0800
-Subject: [PATCH 3/3] nvmem: imx-ocotp: handling clock
-In-Reply-To: <1461054788-339-1-git-send-email-van.freenix@gmail.com>
-References: <1461054788-339-1-git-send-email-van.freenix@gmail.com>
-Message-ID: <1461054788-339-3-git-send-email-van.freenix@gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 19 Apr 2016 10:19:11 +0200
+Subject: [PATCH] pinctrl-exynos5440: Use off-stack memory for
+ pinctrl_gpio_range
+In-Reply-To: <CA+Ln22Fcdp=W1A7ZY5nNNkUqHWfTTepVBS+SzjdoeO2HDJGpuQ@mail.gmail.com>
+References: <1461039222-26592-1-git-send-email-andrew@aj.id.au>
+ <CA+Ln22Fcdp=W1A7ZY5nNNkUqHWfTTepVBS+SzjdoeO2HDJGpuQ@mail.gmail.com>
+Message-ID: <5715E9FF.6080000@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before access ocotp nvmem area, the clock should be enabled.
-Or, `hexdump nvmem` will hang the system. So, use such flow:
-"
-  1. clock_enable_prepare
-  2. read nvmem ocotp area
-  3. clock_disable_unprepare
-"
+On 04/19/2016 09:24 AM, Tomasz Figa wrote:
+> Hi Andrew,
+> 
+> 2016-04-19 13:13 GMT+09:00 Andrew Jeffery <andrew@aj.id.au>:
+>> The range is registered into a linked list which can be referenced
+>> throughout the lifetime of the driver. Ensure the range's memory is useful
+>> for the same lifetime by adding it to the driver's private data structure.
+>>
+>> The bug was introduced in the driver's initial commit, which was present in
+>> v3.10.
+>>
+>> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+>> Fixes: f0b9a7e521fa ("pinctrl: exynos5440: add pinctrl driver for Samsung EXYNOS5440 SoC")
+>> Cc: stable at vger.kernel.org
+>> ---
+>> This is my first contribution to the kernel, so hopefully I've followed all the
+>> relevant documentation. If not, please let me know and point me in the right
+>> direction!
+>>
+>> I don't have the means to test the patch, but it compiles. Someone with
+>> appropriate hardware should probably give it a spin.
+>>
+> 
+> Thanks for the patch. Good catch, I wonder how this even worked. Just
+> one minor nitpick below.
+> 
+> Unfortunately I don't have any platform based on this SoC to test, so
+> I'll defer to Krzysztof or Sylwester to handle this.
 
-Signed-off-by: Peng Fan <van.freenix@gmail.com>
-Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: Shawn Guo <shawnguo@kernel.org>
----
- drivers/nvmem/imx-ocotp.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+We don't have this board neither, it is not so popular and apparently
+not many people are using it because such bug remained unnoticed.
 
-diff --git a/drivers/nvmem/imx-ocotp.c b/drivers/nvmem/imx-ocotp.c
-index d7796eb..55095c0 100644
---- a/drivers/nvmem/imx-ocotp.c
-+++ b/drivers/nvmem/imx-ocotp.c
-@@ -15,6 +15,7 @@
-  * http://www.gnu.org/copyleft/gpl.html
-  */
- 
-+#include <linux/clk.h>
- #include <linux/device.h>
- #include <linux/io.h>
- #include <linux/module.h>
-@@ -27,6 +28,7 @@
- 
- struct ocotp_priv {
- 	struct device *dev;
-+	struct clk *clk;
- 	void __iomem *base;
- 	unsigned int nregs;
- };
-@@ -46,11 +48,15 @@ static int imx_ocotp_read(void *context, const void *reg, size_t reg_size,
- 	if (count > (priv->nregs - index))
- 		count = priv->nregs - index;
- 
-+	clk_prepare_enable(priv->clk);
-+
- 	for (i = index; i < (index + count); i++) {
- 		*(u32 *)val = readl(priv->base + 0x400 + i * 0x10);
- 		val += 4;
- 	}
- 
-+	clk_disable_unprepare(priv->clk);
-+
- 	return 0;
- }
- 
-@@ -112,6 +118,10 @@ static int imx_ocotp_probe(struct platform_device *pdev)
- 	if (IS_ERR(priv->base))
- 		return PTR_ERR(priv->base);
- 
-+	priv->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(priv->clk))
-+		return PTR_ERR(priv->clk);
-+
- 	of_id = of_match_device(imx_ocotp_dt_ids, dev);
- 	priv->nregs = (unsigned int)of_id->data;
- 	imx_ocotp_regmap_config.max_register = 4 * priv->nregs - 4;
--- 
-1.8.4.5
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+Best regards,
+Krzysztof
