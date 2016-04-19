@@ -1,90 +1,55 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 19 Apr 2016 08:33:17 +0200
-Subject: [PATCH RFT 1/5] iio: mxs-lradc: fix memory leak
-In-Reply-To: <57151652.4020709@denx.de>
-References: <1460648909-2657-1-git-send-email-stefan.wahren@i2se.com>
- <1460648909-2657-2-git-send-email-stefan.wahren@i2se.com>
- <570FF70F.3000501@denx.de> <571360A3.3060809@kernel.org>
- <57151652.4020709@denx.de>
-Message-ID: <5715D12D.1020303@i2se.com>
+From: tiffany.lin@mediatek.com (tiffany lin)
+Date: Tue, 19 Apr 2016 14:46:17 +0800
+Subject: [PATCH 3/7] [Media] vcodec: mediatek: Add Mediatek V4L2 Video
+ Decoder Driver
+In-Reply-To: <1461001697.2719.7.camel@gmail.com>
+References: <1460548915-17536-1-git-send-email-tiffany.lin@mediatek.com>
+ <1460548915-17536-2-git-send-email-tiffany.lin@mediatek.com>
+ <1460548915-17536-3-git-send-email-tiffany.lin@mediatek.com>
+ <1460548915-17536-4-git-send-email-tiffany.lin@mediatek.com>
+ <5710FA3A.2030603@xs4all.nl> <1460958046.7861.48.camel@mtksdaap41>
+ <57148D8E.9060601@xs4all.nl> <1460967754.7861.61.camel@mtksdaap41>
+ <1461001697.2719.7.camel@gmail.com>
+Message-ID: <1461048377.32652.19.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+Hi Nicolas,
 
-Am 18.04.2016 um 19:16 schrieb Marek Vasut:
-> On 04/17/2016 12:08 PM, Jonathan Cameron wrote:
->> On 14/04/16 21:01, Marek Vasut wrote:
->>> On 04/14/2016 05:48 PM, Stefan Wahren wrote:
->>>> After successful touchscreen registration the input device was
->>>> never freed. So fix this issue by using devm_input_allocate_device().
->>>>
->>>> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
->>>> ---
->>>>  drivers/iio/adc/mxs-lradc.c |    8 ++------
->>>>  1 file changed, 2 insertions(+), 6 deletions(-)
->>>>
->>>> diff --git a/drivers/iio/adc/mxs-lradc.c b/drivers/iio/adc/mxs-lradc.c
->>>> index 33051b8..0576953 100644
->>>> --- a/drivers/iio/adc/mxs-lradc.c
->>>> +++ b/drivers/iio/adc/mxs-lradc.c
->>>> @@ -1109,12 +1109,11 @@ static int mxs_lradc_ts_register(struct mxs_lradc *lradc)
->>>>  {
->>>>  	struct input_dev *input;
->>>>  	struct device *dev = lradc->dev;
->>>> -	int ret;
->>>>  
->>>>  	if (!lradc->use_touchscreen)
->>>>  		return 0;
->>>>  
->>>> -	input = input_allocate_device();
->>>> +	input = devm_input_allocate_device(dev);
->>>>  	if (!input)
->>>>  		return -ENOMEM;
->>>>  
->>>> @@ -1134,11 +1133,8 @@ static int mxs_lradc_ts_register(struct mxs_lradc *lradc)
->>>>  
->>>>  	lradc->ts_input = input;
->>>>  	input_set_drvdata(input, lradc);
->>>> -	ret = input_register_device(input);
->>>> -	if (ret)
->>>> -		input_free_device(lradc->ts_input);
->>>>  
->>>> -	return ret;
->>>> +	return input_register_device(input);
->>>>  }
->>>>  
->>>>  static void mxs_lradc_ts_unregister(struct mxs_lradc *lradc)
->>>>
->>> Nice find.
->>>
->>> Looks like at91_adc.c and exynos_adc.c suffer from the exact same issue.
->>> The leak looks a bit more severe on exynos even, exynos_adc_ts_init()
->>> could use a proper fail path. Do you want to send patches or shall I ?
->>>
->> As this has been there a long time I'm not going to rush it in as a fix.
-> I did take a proper look today and it seems they do the right thing
-> afterall. I checked them with kmemleak too to be sure.
+On Mon, 2016-04-18 at 13:48 -0400, Nicolas Dufresne wrote:
+> Le lundi 18 avril 2016 ? 16:22 +0800, tiffany lin a ?crit :
+> > > > We are plaining to remove m2m framework in th feature, although
+> > we think
+> > > 
+> > > Remove it for just the decoder driver or both encoder and decoder?
+> > > 
+> > Remove it from decoder driver.
+> 
+> Did you look at how CODA handle it (drivers/media/platform/coda/coda-
+> common.c) ? I don't know any detail, but they do have the same issue
+> and use both v4l2_m2m_fop_poll and v4l2_m2m_fop_mmap.
+> 
+I check coda-common.c, it use v4l2_m2m_set_src_buffered to allow
+device_run be triggered without OUTPUT buffer.
 
-thanks, input_unregister_device already free the memory.
+Double check the patch "[media] mem2mem: add support for hardware
+buffered queue".
+This patch make m2m framework could support that
+1. out-of-order frames, causing a few mem2mem device runs in the
+beginning, that don't produce any decompressed buffer at the v4l2
+capture side.
+2. the last few frames can be decoded from the bitstream with mem2mem
+device runs that don't need a new input buffer at the v4l2 output side.
 
-Sorry for the mess :-(
+This is similar our requirement that we want start decode without
+CAPTURE buffer.
+Is there any restriction that when v4l2_m2m_set_src_buffered can be
+used?
 
-I think it would be the best to remove / revert this patch.
 
-Stefan
 
->
->> I suspect no platform is probing and removing it enough to get a significant
->> amount of memory leaked.
->>
->> Good to clear it up though!
->>
->> Applied to the togreg branch of iio.git, initially pushed out as testing for
->> the autobuilders to play with it.
->>
->> Thanks,
->>
->> Jonathan
->>
->
+best regards,
+Tiffany
+
+> cheers,
+> Nicolas
