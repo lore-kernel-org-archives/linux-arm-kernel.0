@@ -1,134 +1,231 @@
-From: nava.manne@xilinx.com (Nava kishore Manne)
-Date: Tue, 19 Apr 2016 16:40:48 +0530
-Subject: [PATCH v2] Axi-usb: Add support for 64-bit addressing.
-Message-ID: <1461064248-31288-1-git-send-email-navam@xilinx.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 19 Apr 2016 19:11:21 +0800
+Subject: [PATCH v1 1/1] add missing UARTs pins for AllWinner H3 DTS + add
+ new I2C entries for AllWinner H3 DTS
+In-Reply-To: <8673D89D449742EAB9F6EBD05655A295@GirolesWin7>
+References: <8673D89D449742EAB9F6EBD05655A295@GirolesWin7>
+Message-ID: <CAGb2v67e_F1=VaY7ovzW7Whc2ToJU3YabeT-orrLTb0Pouhw_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the driver to support 64-bit DMA
-addressing.
+Hi,
 
-Signed-off-by: Nava kishore Manne <navam@xilinx.com>
----
-Changes for v2:
-		-Added dma-ranges property in device tree as suggested by Arnd Bergmann.
-                -Modified the driver code based on the xlnx,addrwidth.
- .../devicetree/bindings/usb/udc-xilinx.txt         |  5 ++-
- drivers/usb/gadget/udc/udc-xilinx.c                | 39 ++++++++++++++++++++--
- 2 files changed, 40 insertions(+), 4 deletions(-)
+On Sat, Apr 16, 2016 at 1:11 AM, Martin Ayotte <martinayotte@gmail.com> wrote:
+> Hi everyone,
+>
+> This patch is submit to provide endusers access to additional UARTs on
+> AllWinner H3 SoC along with I2C ports.
+>
+> Regards,
+> Martin.
+> ---
+>  arch/arm/boot/dts/sun8i-h3-orangepi-2.dts  | 36 ++++++++++++++
+>  arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 36 ++++++++++++++
+>  arch/arm/boot/dts/sun8i-h3.dtsi            | 75
 
-diff --git a/Documentation/devicetree/bindings/usb/udc-xilinx.txt b/Documentation/devicetree/bindings/usb/udc-xilinx.txt
-index 47b4e39..850d792 100644
---- a/Documentation/devicetree/bindings/usb/udc-xilinx.txt
-+++ b/Documentation/devicetree/bindings/usb/udc-xilinx.txt
-@@ -7,12 +7,15 @@ Required properties:
- - interrupts		: Should contain single irq line of USB2 device
- 			  controller
- - xlnx,has-builtin-dma	: if DMA is included
--
-+- dma-ranges: Should be as the following <dma_addr cpu_addr max_len>.
-+- xlnx,addrwidth       : Should be the dma addressing size in bits(ex: 40 bits).
- Example:
-  		axi-usb2-device at 42e00000 {
-                         compatible = "xlnx,usb2-device-4.00.a";
-                         interrupts = <0x0 0x39 0x1>;
-                         reg = <0x42e00000 0x10000>;
-+			dma-ranges = <0x00000000 0x00000000 0x40000000>;
-                         xlnx,has-builtin-dma;
-+			xlnx,addrwidth = <0x28>;
-                 };
- 
-diff --git a/drivers/usb/gadget/udc/udc-xilinx.c b/drivers/usb/gadget/udc/udc-xilinx.c
-index 1cbb0ac..702ab9e 100644
---- a/drivers/usb/gadget/udc/udc-xilinx.c
-+++ b/drivers/usb/gadget/udc/udc-xilinx.c
-@@ -28,6 +28,7 @@
- #include <linux/of_irq.h>
- #include <linux/prefetch.h>
- #include <linux/usb/ch9.h>
-+#include <linux/io-64-nonatomic-lo-hi.h>
- #include <linux/usb/gadget.h>
- 
- /* Register offsets for the USB device.*/
-@@ -47,6 +48,15 @@
- #define XUSB_DMA_LENGTH_OFFSET		0x0210	/* DMA Length Register */
- #define XUSB_DMA_STATUS_OFFSET		0x0214	/* DMA Status Register */
- 
-+/* DMA source Address Reg for LSB */
-+#define XUSB_DMA_DSAR_ADDR_OFFSET_LSB   0x0308
-+/* DMA source Address Reg for MSB */
-+#define XUSB_DMA_DSAR_ADDR_OFFSET_MSB   0x030C
-+/* DMA destination Addr Reg LSB */
-+#define XUSB_DMA_DDAR_ADDR_OFFSET_LSB   0x0310
-+/* DMA destination Addr Reg MSB */
-+#define XUSB_DMA_DDAR_ADDR_OFFSET_MSB   0x0314
-+
- /* Endpoint Configuration Space offsets */
- #define XUSB_EP_CFGSTATUS_OFFSET	0x00	/* Endpoint Config Status  */
- #define XUSB_EP_BUF0COUNT_OFFSET	0x08	/* Buffer 0 Count */
-@@ -176,6 +186,7 @@ struct xusb_ep {
-  * @addr: the usb device base address
-  * @lock: instance of spinlock
-  * @dma_enabled: flag indicating whether the dma is included in the system
-+ * @dma_addrwidth:Indicate the DMA address width.
-  * @read_fn: function pointer to read device registers
-  * @write_fn: function pointer to write to device registers
-  */
-@@ -193,7 +204,7 @@ struct xusb_udc {
- 	void __iomem *addr;
- 	spinlock_t lock;
- 	bool dma_enabled;
--
-+	u32 dma_addrwidth;
- 	unsigned int (*read_fn)(void __iomem *);
- 	void (*write_fn)(void __iomem *, u32, u32);
- };
-@@ -215,6 +226,17 @@ static const struct usb_endpoint_descriptor config_bulk_out_desc = {
- };
- 
- /**
-+ * xudc_write64 - write 64bit value to device registers
-+ * @addr: base addr of device registers
-+ * @offset: register offset
-+ * @val: data to be written
-+ **/
-+static void xudc_write64(void __iomem *addr, u32 offset, u64 val)
-+{
-+	lo_hi_writeq(val, addr + offset);
-+}
-+
-+/**
-  * xudc_write32 - little endian write to device registers
-  * @addr: base addr of device registers
-  * @offset: register offset
-@@ -330,8 +352,13 @@ static int xudc_start_dma(struct xusb_ep *ep, dma_addr_t src,
- 	 * destination registers and then set the length
- 	 * into the DMA length register.
- 	 */
--	udc->write_fn(udc->addr, XUSB_DMA_DSAR_ADDR_OFFSET, src);
--	udc->write_fn(udc->addr, XUSB_DMA_DDAR_ADDR_OFFSET, dst);
-+	if (udc->dma_addrwidth > 32) {
-+		xudc_write64(udc->addr, XUSB_DMA_DSAR_ADDR_OFFSET_LSB, src);
-+		xudc_write64(udc->addr, XUSB_DMA_DDAR_ADDR_OFFSET_LSB, dst);
-+	} else {
-+		udc->write_fn(udc->addr, XUSB_DMA_DSAR_ADDR_OFFSET, src);
-+		udc->write_fn(udc->addr, XUSB_DMA_DDAR_ADDR_OFFSET, dst);
-+	}
- 	udc->write_fn(udc->addr, XUSB_DMA_LENGTH_OFFSET, length);
- 
- 	/*
-@@ -2097,6 +2124,12 @@ static int xudc_probe(struct platform_device *pdev)
- 
- 	udc->dma_enabled = of_property_read_bool(np, "xlnx,has-builtin-dma");
- 
-+	ret = of_property_read_u32(np, "xlnx,addrwidth", &udc->dma_addrwidth);
-+	if (ret < 0)
-+		dev_warn(&pdev->dev, "missing xlnx,addrwidth property\n");
-+
-+	/* Set the dma mask bits */
-+	dma_set_mask(&pdev->dev, DMA_BIT_MASK(udc->dma_addrwidth));
- 	/* Setup gadget structure */
- 	udc->gadget.ops = &xusb_udc_ops;
- 	udc->gadget.max_speed = USB_SPEED_HIGH;
--- 
-2.1.2
+First of all, you are touching 3 different files here. These should
+be separate patches.
+
+Secondly, our policy is to not have a default function for generic GPIO pins.
+
+
+Regards
+ChenYu
+
+> ++++++++++++++++++++++++++++++
+>  3 files changed, 147 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
+> b/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
+> index f93f5d1..f0b9823 100644
+> --- a/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
+> +++ b/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
+> @@ -176,6 +176,42 @@
+>         status = "okay";
+>  };
+>
+> +&uart1 {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&uart1_pins_a>;
+> +       status = "okay";
+> +};
+> +
+> +&uart2 {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&uart2_pins_a>;
+> +       status = "okay";
+> +};
+> +
+> +&uart3 {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&uart3_pins_a>;
+> +       status = "okay";
+> +};
+> +
+> +&i2c0 {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&i2c0_pins_a>;
+> +       status = "okay";
+> +};
+> +
+> +&i2c1 {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&i2c1_pins_a>;
+> +       status = "okay";
+> +};
+> +
+> +&i2c2 {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&i2c2_pins_a>;
+> +       status = "okay";
+> +};
+> +
+>  &usb1_vbus_pin_a {
+>         allwinner,pins = "PG13";
+>  };
+> diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+> b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+> index daf50b9a6..6994349 100644
+> --- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+> +++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+> @@ -161,6 +161,42 @@
+>         status = "okay";
+>  };
+>
+> +&uart1 {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&uart1_pins_a>;
+> +       status = "okay";
+> +};
+> +
+> +&uart2 {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&uart2_pins_a>;
+> +       status = "okay";
+> +};
+> +
+> +&uart3 {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&uart3_pins_a>;
+> +       status = "okay";
+> +};
+> +
+> +&i2c0 {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&i2c0_pins_a>;
+> +       status = "okay";
+> +};
+> +
+> +&i2c1 {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&i2c1_pins_a>;
+> +       status = "okay";
+> +};
+> +
+> +&i2c2 {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&i2c2_pins_a>;
+> +       status = "okay";
+> +};
+> +
+>  &usbphy {
+>         /* USB VBUS is always on */
+>         status = "okay";
+> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi
+> b/arch/arm/boot/dts/sun8i-h3.dtsi
+> index 4a4926b..c947360d 100644
+> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+> @@ -508,6 +508,48 @@
+>                                 allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+>                         };
+>
+> +                       uart1_pins_a: uart1 at 0 {
+> +                               allwinner,pins = "PG6", "PG7";
+> +                               allwinner,function = "uart1";
+> +                               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +                               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +                       };
+> +
+> +                       uart2_pins_a: uart2 at 0 {
+> +                               allwinner,pins = "PA0", "PA1";
+> +                               allwinner,function = "uart2";
+> +                               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +                               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +                       };
+> +
+> +                       uart3_pins_a: uart3 at 0 {
+> +                               allwinner,pins = "PA13", "PA14";
+> +                               allwinner,function = "uart3";
+> +                               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +                               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +                       };
+> +
+> +                       i2c0_pins_a: i2c0 at 0 {
+> +                               allwinner,pins = "PA11", "PA12";
+> +                               allwinner,function = "i2c0";
+> +                               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +                               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +                       };
+> +
+> +                       i2c1_pins_a: i2c1 at 0 {
+> +                               allwinner,pins = "PA18", "PA19";
+> +                               allwinner,function = "i2c1";
+> +                               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +                               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +                       };
+> +
+> +                       i2c2_pins_a: i2c2 at 0 {
+> +                               allwinner,pins = "PE12", "PE13";
+> +                               allwinner,function = "i2c2";
+> +                               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +                               allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +                       };
+> +
+>                         mmc0_pins_a: mmc0 at 0 {
+>                                 allwinner,pins = "PF0", "PF1", "PF2", "PF3",
+>                                                  "PF4", "PF5";
+> @@ -626,6 +668,39 @@
+>                         status = "disabled";
+>                 };
+>
+> +               i2c0: i2c at 01c2ac00 {
+> +                       compatible = "allwinner,sun6i-a31-i2c";
+> +                       reg = <0x01c2ac00 0x400>;
+> +                       interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
+> +                       clocks = <&bus_gates 96>;
+> +                       resets = <&apb2_rst 0>;
+> +                       status = "disabled";
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +               };
+> +
+> +               i2c1: i2c at 01c2b000 {
+> +                       compatible = "allwinner,sun6i-a31-i2c";
+> +                       reg = <0x01c2b000 0x400>;
+> +                       interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
+> +                       clocks = <&bus_gates 97>;
+> +                       resets = <&apb2_rst 1>;
+> +                       status = "disabled";
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +               };
+> +
+> +               i2c2: i2c at 01c2b400 {
+> +                       compatible = "allwinner,sun6i-a31-i2c";
+> +                       reg = <0x01c2b400 0x400>;
+> +                       interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
+> +                       clocks = <&bus_gates 98>;
+> +                       resets = <&apb2_rst 2>;
+> +                       status = "disabled";
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +               };
+> +
+>                 gic: interrupt-controller at 01c81000 {
+>                         compatible = "arm,cortex-a7-gic",
+> "arm,cortex-a15-gic";
+>                         reg = <0x01c81000 0x1000>,
+> --
+> 2.7.4
+>
