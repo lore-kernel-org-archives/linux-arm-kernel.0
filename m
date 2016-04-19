@@ -1,144 +1,138 @@
-From: sr@denx.de (Stefan Roese)
-Date: Tue, 19 Apr 2016 11:42:25 +0200
-Subject: [PATCH v5] spi: orion.c: Add direct access mode
-In-Reply-To: <4509446.OJU128rpNa@wuerfel>
-References: <1460974417-32375-1-git-send-email-sr@denx.de>
- <4248364.c0REkIZjj0@wuerfel> <5714DA84.2050505@denx.de>
- <4509446.OJU128rpNa@wuerfel>
-Message-ID: <5715FD81.8090100@denx.de>
+From: pc.liao@mediatek.com (PC Liao)
+Date: Tue, 19 Apr 2016 17:46:12 +0800
+Subject: [PATCH v5] ASoC: mediatek: Add second I2S on mt8173-rt5650 machine
+ driver
+Message-ID: <1461059172-47460-1-git-send-email-pc.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.04.2016 15:57, Arnd Bergmann wrote:
-> On Monday 18 April 2016 15:00:52 Stefan Roese wrote:
->> On 18.04.2016 13:32, Arnd Bergmann wrote:
->>> On Monday 18 April 2016 12:04:15 Mark Brown wrote:
->>>> On Mon, Apr 18, 2016 at 12:51:55PM +0200, Arnd Bergmann wrote:
->>>>
->>>>> This would be easier if have a conclusive proof that 1MB per CS always enough.
->>>>> Is this something that is guaranteed in the SPI spec or the documentation for
->>>>> this controller?
->>>>
->>>> There's no spec for SPI but if there were it'd be hard to see it
->>>> imposing a limit, one can transfer data as long as the bus is clocked
->>>> (which some things like ADCs and DACs make use of).
->>>>
->>>
->>> I just reread Stefan's patch and realized that I had fundamentally
->>> misunderstood how the transfer is done: I thought the offset inside of
->>> the window was used to address a NOR flash directly, but it seems
->>> it is just used to send arbitrarily long commands.
->>
->> Yes. SPI NOR flash support definitely needs some additional patches.
->> To support the address and commands being inserted in the SPI
->> messages via the corresponding registers. Again, this patch is
->> only intended and tested for very "simple" TX messages without any
->> addresses being inserted at all.
-> 
-> Ok, so I looked up the datasheet again and understood now that it
-> actually does both ways: a) the direct read/write that I had always assumed
-> it did with automatic cmd/addr/data generation, and b) the mode where
-> you do each write transfer separately as implemented by your patch.
-> 
-> Those two modes seem to be wildly different in their needs for address
-> space:
-> 
-> - For a) we definitely need the mapping to be the same size as the
->    addressable storage of the SPI-NOR (or other device that fits
->    into the cmd/addr/data pattern supported by the hardware)
-> 
-> - For b) the address is ignored and at most 32 bytes are transfered,
->    so whatever the smallest MBUS mapping window size is would certainly
->    be enough.
->
-> As a side-note, I see that you use a regular devm_ioremap_resource(),
-> which I assume prevents the transfers from ever being more than
-> a single 4-byte word, while burst mode with up to 32 bytes likely
-> requires a write-combining mapping.
+This patch adds second I2S connection to rt5650 codec for capture path on
+mt8173-rt5650 machine driver.
 
-Thanks for the hint. I've tested again with devm_ioremap_wc() and the
-resulting SPI TX time is identical to the one using the driver with
-the uncached (non write-combined) mapping. This is most likely a
-result of the already fully saturated SPI bus speed being the
-bottle-neck here.
+This patch depends on [1], because snd_soc_of_get_dai_name() fix the property 
+name "sound-dai". This patch needs to change name to use, so export
+snd_soc_get_dai_name() which is included in snd_soc_of_get_dai_name(). 
 
-A bit more testing has shown, that using devm_ioremap_wc() leads
-to sporadic failures in the FPGA image downloading though. Now
-I'm unsure, if its really worth to add some cache flushing after
-the memcpy() call here (flush_cache_vmap ?) or better keep the
-uncached ioremap in place.
+[1] https://patchwork.kernel.org/patch/5671961/ ("ASoC: core: export
+snd_soc_get_dai_name")
 
->>> This means that the 1MB window is probably a reasonable size (provided
->>> that the (most importantly) the SPI-NOR driver can guarantee that it
->>> never exceeds this).
->>
->> I have no problem switching from 1MiB to using 0xffffffff in the
->> SPI controller 'reg' node to allow even bigger windows in v6.
-> 
-> How do you decide how much of the window to map though? Using 0xffffffff
-> is nice because it better represents what the hardware looks like
-> and doesn't limit you from having arbitrarily large mbus windows
-> based on your needs, but you'd probably have to try mapping various
-> sizes then to find the maximum supported one, or you'd have to do
-> some ugly parsing of the parent node ranges.
+Signed-off-by: PC Liao <pc.liao@mediatek.com>
+---
+Changes since v4:
+Change name from "sound-dai" to "capture-dai" to determine the capture path
+---
+ .../devicetree/bindings/sound/mt8173-rt5650.txt    |    6 +++
+ sound/soc/mediatek/mt8173-rt5650.c                 |   44 ++++++++++++++++++--
+ 2 files changed, 47 insertions(+), 3 deletions(-)
 
-This is for the single-window mode, right? My comment above was
-still referring to the original implementation. And yes, this
-gets a bit complicated and is most likely not really necessary.
-So I would prefer to keep the mapping fixed to a max. of 1MiB for
-now.
+diff --git a/Documentation/devicetree/bindings/sound/mt8173-rt5650.txt b/Documentation/devicetree/bindings/sound/mt8173-rt5650.txt
+index fe5a5ef..802dd1b 100644
+--- a/Documentation/devicetree/bindings/sound/mt8173-rt5650.txt
++++ b/Documentation/devicetree/bindings/sound/mt8173-rt5650.txt
+@@ -5,11 +5,17 @@ Required properties:
+ - mediatek,audio-codec: the phandles of rt5650 codecs
+ - mediatek,platform: the phandle of MT8173 ASoC platform
  
->>> It also means that we are probably better off using the single-window mode
->>> of the SPI controller, where all CS lines share a single mbus window.
->>> The only real difference here is that we can map all endpoints using a
->>> single contiguous window into the CPU address space if we want, or we
->>> can still map them separately on a given board if that results in a nicer
->>> layout.
->>
->> Frankly, I've just read about this single-window mode for the first
->> time. What I miss here in this mode though, is the configuration of
->> the SPI device (chip-select 0...7) for this direct-mode in the SPI
->> driver. With the currently implemented separate window method, your
->> suggested method is easy: Either is window can be mapped (direct-mode)
->> or not (indirect-mode). With this single-window mode I'm missing the
->> per-device configuration for direct-mode. Or what is your idea on
->> how to configure this access-mode in this case?
-> 
-> It would work the same way, the main difference is that for single-window
-> mode all the devices get the same amount of address MBUS address space,
-> e.g. 1MB per CS in a contiguous MBUS range, but you can still map
-> subsections of it into the CPU, e.g.
-> 
-> 
-> &mbus {
-> 	ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000>,   /* internal regs */
-> 		 <MBUS_ID(0x01, 0x1e) 0x300000 0 0xf1100000 0x200000>, /* CS3+CS4 */
-> 		 <MBUS_ID(0x01, 0x1d) 0x600000 0 0xf1300000 0x80000>, /* bootrom */
-> 		 <MBUS_ID(0x01, 0x1e) 0x600000 0 0xf1380000 0x10000>; /* CS6 */
-> 
-> 	spi at f0,01,10600 {
->                  reg = <MBUS_ID(0xf0, 0x01) 0x10600 0x28>,       /* control */
->                        <MBUS_ID(0x01, 0x1e) 0x000000 0x100000>, /* CS0 */
->                        <MBUS_ID(0x01, 0x1e) 0x100000 0x100000>, /* CS1 */
->                        <MBUS_ID(0x01, 0x1e) 0x200000 0x100000>, /* CS2 */
->                        <MBUS_ID(0x01, 0x1e) 0x300000 0x100000>, /* CS3 */
->                        <MBUS_ID(0x01, 0x1e) 0x400000 0x100000>, /* CS4 */
->                        <MBUS_ID(0x01, 0x1e) 0x500000 0x100000>, /* CS5 */
->                        <MBUS_ID(0x01, 0x1e) 0x600000 0x100000>, /* CS6 */
->                        <MBUS_ID(0x01, 0x1e) 0x700000 0x100000>; /* CS7 */
-> 	};
-> };
-> 
-> In this example, you have to configure the SPI controller to have 1MB per CS
-> in single-window mode using the "SPI DecodeMode" and "SPI CS Adress Decode"
-> registers. The mbus then contains two mappings, one 2MB window spanning
-> CS3 and CS4 in a continuous CPU range, and one 64K window for a device at
-> CS6, making it as small as possible to conserve CPU address space.
-
-Thanks. I've prepared a new version implementing this single-
-window mode. Please let me know how you prefer the cache issue
-above to be handled (uncached mapping, flush or ?) and I'll
-update the patch accordingly.
-
-Thanks,
-Stefan
++Optional properties:
++- capture-dai: audio codec dai on capture path
++  <&rt5650 0> : Default setting. Connect rt5650 I2S1 for capture. (dai_name = rt5645-aif1)
++  <&rt5650 1> : Connect rt5650 I2S2 for capture. (dai_name = rt5645-aif2)
++
+ Example:
+ 
+ 	sound {
+ 		compatible = "mediatek,mt8173-rt5650";
+ 		mediatek,audio-codec = <&rt5650>;
+ 		mediatek,platform = <&afe>;
++		capture-dai = <&rt5650 1>;
+ 	};
+ 
+diff --git a/sound/soc/mediatek/mt8173-rt5650.c b/sound/soc/mediatek/mt8173-rt5650.c
+index bb09bb1..45dea22 100644
+--- a/sound/soc/mediatek/mt8173-rt5650.c
++++ b/sound/soc/mediatek/mt8173-rt5650.c
+@@ -85,12 +85,26 @@ static int mt8173_rt5650_init(struct snd_soc_pcm_runtime *runtime)
+ {
+ 	struct snd_soc_card *card = runtime->card;
+ 	struct snd_soc_codec *codec = runtime->codec_dais[0]->codec;
++	const char *codec_dai_capture = runtime->codec_dais[1]->name;
+ 	int ret;
+ 
+ 	rt5645_sel_asrc_clk_src(codec,
+-				RT5645_DA_STEREO_FILTER |
+-				RT5645_AD_STEREO_FILTER,
++				RT5645_DA_STEREO_FILTER,
+ 				RT5645_CLK_SEL_I2S1_ASRC);
++
++	if (!strcmp(codec_dai_capture, "rt5645-aif1")) {
++		rt5645_sel_asrc_clk_src(codec,
++					RT5645_AD_STEREO_FILTER,
++					RT5645_CLK_SEL_I2S1_ASRC);
++	} else if (!strcmp(codec_dai_capture, "rt5645-aif2")) {
++		rt5645_sel_asrc_clk_src(codec,
++					RT5645_AD_STEREO_FILTER,
++					RT5645_CLK_SEL_I2S2_ASRC);
++	} else {
++		dev_err(card->dev, "Can't get the right codec dai\n");
++		return -EINVAL;
++	}
++
+ 	/* enable jack detection */
+ 	ret = snd_soc_card_jack_new(card, "Headset Jack",
+ 				    SND_JACK_HEADPHONE | SND_JACK_MICROPHONE |
+@@ -110,6 +124,11 @@ static int mt8173_rt5650_init(struct snd_soc_pcm_runtime *runtime)
+ 
+ static struct snd_soc_dai_link_component mt8173_rt5650_codecs[] = {
+ 	{
++		/* Playback */
++		.dai_name = "rt5645-aif1",
++	},
++	{
++		/* Capture */
+ 		.dai_name = "rt5645-aif1",
+ 	},
+ };
+@@ -149,7 +168,7 @@ static struct snd_soc_dai_link mt8173_rt5650_dais[] = {
+ 		.cpu_dai_name = "I2S",
+ 		.no_pcm = 1,
+ 		.codecs = mt8173_rt5650_codecs,
+-		.num_codecs = 1,
++		.num_codecs = 2,
+ 		.init = mt8173_rt5650_init,
+ 		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
+ 			   SND_SOC_DAIFMT_CBS_CFS,
+@@ -177,6 +196,8 @@ static int mt8173_rt5650_dev_probe(struct platform_device *pdev)
+ {
+ 	struct snd_soc_card *card = &mt8173_rt5650_card;
+ 	struct device_node *platform_node;
++	const char *codec_dai_capture;
++	struct of_phandle_args args;
+ 	int i, ret;
+ 
+ 	platform_node = of_parse_phandle(pdev->dev.of_node,
+@@ -199,6 +220,23 @@ static int mt8173_rt5650_dev_probe(struct platform_device *pdev)
+ 			"Property 'audio-codec' missing or invalid\n");
+ 		return -EINVAL;
+ 	}
++	mt8173_rt5650_codecs[1].of_node = mt8173_rt5650_codecs[0].of_node;
++
++	if (device_property_present(&pdev->dev, "capture-dai")) {
++		ret = of_parse_phandle_with_args(pdev->dev.of_node,
++						 "capture-dai",
++						 "#sound-dai-cells", 0, &args);
++		if (ret < 0) {
++			dev_err(&pdev->dev,
++				"%s capture-dai name fail %d\n",
++				__func__, ret);
++			return ret;
++		}
++
++		ret = snd_soc_get_dai_name(&args, &codec_dai_capture);
++		mt8173_rt5650_codecs[1].dai_name = codec_dai_capture;
++	}
++
+ 	card->dev = &pdev->dev;
+ 	platform_set_drvdata(pdev, card);
+ 
+-- 
+1.7.9.5
