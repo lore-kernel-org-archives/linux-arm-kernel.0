@@ -1,80 +1,47 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 19 Apr 2016 11:29:28 +0200
-Subject: [PATCH 1/2] mmc: core: Improve marking broken HPI through
- devicetree
-In-Reply-To: <1461049934-12848-2-git-send-email-oliver@schinagl.nl>
-References: <1461049934-12848-1-git-send-email-oliver@schinagl.nl>
- <1461049934-12848-2-git-send-email-oliver@schinagl.nl>
-Message-ID: <CAPDyKFqftYtrHvcQB7te1fuWxjWtrhOGY=5DnRTnrRxHm2cQ-A@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 19 Apr 2016 10:31:19 +0100
+Subject: [PATCH] arm64: asm: remove unused push/pop macros
+Message-ID: <1461058279-19227-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 April 2016 at 09:12, Olliver Schinagl <oliver@schinagl.nl> wrote:
-> In patch 81f8a7be66 Hans de Goede added a patch to allow marking an mmc
-> device as to having an broken HPI implementation. After talking some
-> with Hans, we now think it is actually the mmc controller that can be
-> broken and not support broken HPI's.
+We haven't used the push/pop macros for a while now, as it's typically
+better to use immediate offsets for batches of accesses to the stack, as
+we now do in the entry assembly for the kernel and hyp code.
 
-I don't want us to invent a DT binding for something you *think* is a
-HW controller issue.
+Remove the unused macros.
 
-Have you really excluded that this isn't a software issue? Me
-personally haven't been using HPI that much so I can't really tell
-about the code robustness from the mmc core (mmc protocol point of
-view).
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: James Morse <james.morse@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/assembler.h | 12 ------------
+ 1 file changed, 12 deletions(-)
 
-Kind regards
-Uffe
-
->
-> This patch adds a new capability, mmc-broken-hpi, which allows us to
-> mark a broken hpi implementation on the host level.
->
-> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
-> ---
->  drivers/mmc/core/host.c  | 2 ++
->  drivers/mmc/core/mmc.c   | 2 +-
->  include/linux/mmc/host.h | 1 +
->  3 files changed, 4 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
-> index 6e4c55a..9b63b36 100644
-> --- a/drivers/mmc/core/host.c
-> +++ b/drivers/mmc/core/host.c
-> @@ -270,6 +270,8 @@ int mmc_of_parse(struct mmc_host *host)
->                 host->caps |= MMC_CAP_HW_RESET;
->         if (of_property_read_bool(np, "cap-sdio-irq"))
->                 host->caps |= MMC_CAP_SDIO_IRQ;
-> +       if (of_property_read_bool(np, "mmc-broken-hpi"))
-> +               host->caps |= MMC_CAP_BROKEN_HPI;
->         if (of_property_read_bool(np, "full-pwr-cycle"))
->                 host->caps2 |= MMC_CAP2_FULL_PWR_CYCLE;
->         if (of_property_read_bool(np, "keep-power-in-suspend"))
-> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
-> index 4dbe3df..9a19562 100644
-> --- a/drivers/mmc/core/mmc.c
-> +++ b/drivers/mmc/core/mmc.c
-> @@ -1592,7 +1592,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
->         /*
->          * Enable HPI feature (if supported)
->          */
-> -       if (card->ext_csd.hpi) {
-> +       if (card->ext_csd.hpi && !(host->caps & MMC_CAP_BROKEN_HPI)) {
->                 err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
->                                 EXT_CSD_HPI_MGMT, 1,
->                                 card->ext_csd.generic_cmd6_time);
-> diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
-> index 8dd4d29..20f758e 100644
-> --- a/include/linux/mmc/host.h
-> +++ b/include/linux/mmc/host.h
-> @@ -264,6 +264,7 @@ struct mmc_host {
->  #define MMC_CAP_DRIVER_TYPE_A  (1 << 23)       /* Host supports Driver Type A */
->  #define MMC_CAP_DRIVER_TYPE_C  (1 << 24)       /* Host supports Driver Type C */
->  #define MMC_CAP_DRIVER_TYPE_D  (1 << 25)       /* Host supports Driver Type D */
-> +#define MMC_CAP_BROKEN_HPI     (1 << 29)       /* Host support for HPI is broken */
->  #define MMC_CAP_CMD23          (1 << 30)       /* CMD23 supported. */
->  #define MMC_CAP_HW_RESET       (1 << 31)       /* Hardware reset */
->
-> --
-> 2.8.0.rc3
->
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index 70f7b9e..972fb55 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -27,18 +27,6 @@
+ #include <asm/thread_info.h>
+ 
+ /*
+- * Stack pushing/popping (register pairs only). Equivalent to store decrement
+- * before, load increment after.
+- */
+-	.macro	push, xreg1, xreg2
+-	stp	\xreg1, \xreg2, [sp, #-16]!
+-	.endm
+-
+-	.macro	pop, xreg1, xreg2
+-	ldp	\xreg1, \xreg2, [sp], #16
+-	.endm
+-
+-/*
+  * Enable and disable interrupts.
+  */
+ 	.macro	disable_irq
+-- 
+1.9.1
