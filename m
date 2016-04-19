@@ -1,108 +1,66 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 19 Apr 2016 15:13:21 +0100
-Subject: [PATCH] arm64: mm: take CWG into account in __inval_cache_range()
-In-Reply-To: <CAKv+Gu91hFkn5k0s=xVmJ+z0vEYMNe6h6UD6z9Qb0fxe7ba0Vw@mail.gmail.com>
-References: <1461061773-19571-1-git-send-email-ard.biesheuvel@linaro.org>
- <20160419125615.GA20991@leverpostej>
- <CAKv+Gu91hFkn5k0s=xVmJ+z0vEYMNe6h6UD6z9Qb0fxe7ba0Vw@mail.gmail.com>
-Message-ID: <20160419141321.GD8482@e104818-lin.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 19 Apr 2016 07:13:20 -0700
+Subject: Runtime warning due to commit 'ARM: OMAP: Catch callers of
+ revision information prior to it being populated' in -next
+In-Reply-To: <57162261.4070409@ti.com>
+References: <5715B5EC.2040000@roeck-us.net>
+ <57162261.4070409@ti.com>
+Message-ID: <20160419141320.GB5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2016 at 03:08:27PM +0200, Ard Biesheuvel wrote:
-> On 19 April 2016 at 14:56, Mark Rutland <mark.rutland@arm.com> wrote:
-> > Is sharing a CWG broken by design, or is there some caveat I'm missing
-> > that prevents/prohibits unrelated data from being dirtied?
+* Nishanth Menon <nm@ti.com> [160419 05:21]:
+> On 04/18/2016 11:37 PM, Guenter Roeck wrote:
 > 
-> I think sharing a CWG window is broken by design, now that I think of
-> it. The invalidate is part of the dma_unmap() code path, which means
-> the cleaning we do on the edges of the buffer may clobber data in
-> memory written by the device, and not cleaning isn't an option either.
+> + linux-omap, linux-arm
+> 
+> > commit 'ARM: OMAP: Catch callers of revision information prior to it
+> > being populated' results in a runtime warning on various non-OMAP
+> > architectures. I have seen it with the following qemu tests.
+> > 
+> > arm:vexpress-a9:multi_v7_defconfig:vexpress-v2p-ca9
+> > arm:vexpress-a15:multi_v7_defconfig:vexpress-v2p-ca15-tc1
+> > arm:xilinx-zynq-a9:multi_v7_defconfig:zynq-zc702
+> > arm:xilinx-zynq-a9:multi_v7_defconfig:zynq-zc706
+> > arm:xilinx-zynq-a9:multi_v7_defconfig:zynq-zed
+> > arm:midway:multi_v7_defconfig:ecx-2000
+> > arm:smdkc210:multi_v7_defconfig:exynos4210-smdkv310
+> > 
+> > It is also reported by kernelci.org in at least one boot test for imx6q-cm-fx6.
+> 
+> Thanks for the report... :(
 
-Indeed. It only works if the cache line is always clean (e.g. read or
-speculatively loaded) but you can't guarantee what's accessing it. I
-think we shouldn't even bother with the edges at all in __dma_inv_range.
+Oh crap, sorry about that. I'll revert that commit immediately.
 
-The best we could do is to warn if ARCH_DMA_MINALIGN is smaller than CWG
-(as Robin suggested, we could do this only if we have non-coherent DMA
-masters via arch_setup_dma_ops()). Quick hack below:
+> > The warning is as follows.
+> > 
+> > ------------[ cut here ]------------
+> > WARNING: CPU: 0 PID: 1 at arch/arm/mach-omap2/id.c:49 omap_rev+0x3c/0x50
+> > Modules linked in:
+> > CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.6.0-rc2-next-20160411 #1
+> > Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+> > [<c030f970>] (unwind_backtrace) from [<c030b094>] (show_stack+0x10/0x14)
+> > [<c030b094>] (show_stack) from [<c0585424>] (dump_stack+0x84/0xa4)
+> > [<c0585424>] (dump_stack) from [<c0341774>] (__warn+0xd4/0x100)
+> > [<c0341774>] (__warn) from [<c03417c0>] (warn_slowpath_null+0x20/0x28)
+> > [<c03417c0>] (warn_slowpath_null) from [<c0324024>] (omap_rev+0x3c/0x50)
+> > [<c0324024>] (omap_rev) from [<c1114a18>] (__omap4_sar_ram_init+0x8/0x88)
+> > [<c1114a18>] (__omap4_sar_ram_init) from [<c0301e5c>] (do_one_initcall+0x3c/0x16c)
+> > [<c0301e5c>] (do_one_initcall) from [<c1100ccc>] (kernel_init_freeable+0x70/0x1ec)
+> > [<c1100ccc>] (kernel_init_freeable) from [<c0b495e4>] (kernel_init+0x8/0x110)
+> > [<c0b495e4>] (kernel_init) from [<c0307f78>] (ret_from_fork+0x14/0x3c)
+> > ---[ end trace cb88537fdc8fa200 ]---
+> > 
+> > Please have a look.
+> 
+> Tony,
+> Should we get rid of omap_initcall callers(move them into
+> board-generic call path or lower the check not to include default of 0?
 
--------------------------------8<-----------------------------------
-diff --git a/arch/arm64/include/asm/cache.h b/arch/arm64/include/asm/cache.h
-index 5082b30bc2c0..5967fcbb617a 100644
---- a/arch/arm64/include/asm/cache.h
-+++ b/arch/arm64/include/asm/cache.h
-@@ -28,7 +28,7 @@
-  * cache before the transfer is done, causing old data to be seen by
-  * the CPU.
-  */
--#define ARCH_DMA_MINALIGN	L1_CACHE_BYTES
-+#define ARCH_DMA_MINALIGN	128
- 
- #ifndef __ASSEMBLY__
- 
-@@ -37,7 +37,7 @@
- static inline int cache_line_size(void)
- {
- 	u32 cwg = cache_type_cwg();
--	return cwg ? 4 << cwg : L1_CACHE_BYTES;
-+	return cwg ? 4 << cwg : ARCH_DMA_MINALIGN;
- }
- 
- #endif	/* __ASSEMBLY__ */
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 943f5140e0f3..b1d4d1f5b0dd 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -970,7 +970,6 @@ static void __init setup_feature_capabilities(void)
- void __init setup_cpu_features(void)
- {
- 	u32 cwg;
--	int cls;
- 
- 	/* Set the CPU feature capabilies */
- 	setup_feature_capabilities();
-@@ -983,13 +982,9 @@ void __init setup_cpu_features(void)
- 	 * Check for sane CTR_EL0.CWG value.
- 	 */
- 	cwg = cache_type_cwg();
--	cls = cache_line_size();
- 	if (!cwg)
--		pr_warn("No Cache Writeback Granule information, assuming cache line size %d\n",
--			cls);
--	if (L1_CACHE_BYTES < cls)
--		pr_warn("L1_CACHE_BYTES smaller than the Cache Writeback Granule (%d < %d)\n",
--			L1_CACHE_BYTES, cls);
-+		pr_warn("No Cache Writeback Granule information, assuming %d\n",
-+			ARCH_DMA_MINALIGN);
- }
- 
- static bool __maybe_unused
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index a6e757cbab77..08232faf38ad 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -987,6 +987,11 @@ static void __iommu_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
- void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
- 			struct iommu_ops *iommu, bool coherent)
- {
-+	WARN_TAINT_ONCE(!coherent && ARCH_DMA_MINALIGN < cache_line_size(),
-+			TAINT_CPU_OUT_OF_SPEC,
-+			"ARCH_DMA_MINALIGN smaller than the Cache Writeback Granule (%d < %d)",
-+			ARCH_DMA_MINALIGN, cache_line_size());
-+
- 	if (!dev->archdata.dma_ops)
- 		dev->archdata.dma_ops = &swiotlb_dma_ops;
- 
--------------------------------8<-----------------------------------
+Most of those will disappear when we drop the legacy booting support
+for omap3. I would not touch those before then to avoid churn with
+the legacy code.
 
-This way we could also reduce L1_CACHE_SHIFT back to 6 as it shouldn't
-cause any correctness issues (potentially performance but so far it
-seems that increasing it made things worse on some SoCs).
+Regards,
 
-The reason for cache_line_size() using ARCH_DMA_MINALIGN instead of
-L1_CACHE_BYTES is that I can see it used in the sl*b code when
-SLAB_HWCACHE_ALIGN is passed and on few occasions for DMA buffers.
-
--- 
-Catalin
+Tony
