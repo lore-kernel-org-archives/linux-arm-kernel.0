@@ -1,31 +1,41 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Tue, 19 Apr 2016 16:02:20 +0200
-Subject: SoCFPGA with CONFIG_THUMB2_KERNEL boot error
-Message-ID: <20160419140220.GA9503@pengutronix.de>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Tue, 19 Apr 2016 16:03:45 +0200
+Subject: [PATCH] pinctrl: at91-pio4: fix pull-up/down logic
+Message-ID: <1461074628-20224-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+The default configuration of a pin is often with a value in the
+pull-up/down field at chip reset. So, even if the internal logic of the
+controller prevents writing a configuration with pull-up and pull-down at
+the same time, we must ensure explicitly this condition before writing the
+register.
 
-According to kernelci.org (and validating on my own hardware), the current
-socfpga mainline kernel has an issue with CONFIG_THUMB2_KERNEL enabled.
+This was leading to a pull-down condition not taken into account for
+instance.
 
-https://storage.kernelci.org/mainline/v4.6-rc4-11-g12566cc35d0e/arm-multi_v7_defconfig/lab-khilman/boot-socfpga_cyclone5_de0_sockit.html
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Fixes: 776180848b57 ("pinctrl: introduce driver for Atmel PIO4 controller")
+Cc: stable at vger.kernel.org #v4.4 and later
+---
+ drivers/pinctrl/pinctrl-at91-pio4.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-vs
-
-https://storage.kernelci.org/mainline/v4.6-rc4-11-g12566cc35d0e/arm-multi_v7_defconfig+CONFIG_THUMB2_KERNEL=y/lab-khilman/boot-socfpga_cyclone5_de0_sockit.html
-
-Both boot successfully, but notice that the board fails to bring up CPU1 if
-thumb2 support is enabled.
-
-Any ideas why this might be happening?
-
-Regards,
-Steffen
-
+diff --git a/drivers/pinctrl/pinctrl-at91-pio4.c b/drivers/pinctrl/pinctrl-at91-pio4.c
+index 629b6fe..75093d7 100644
+--- a/drivers/pinctrl/pinctrl-at91-pio4.c
++++ b/drivers/pinctrl/pinctrl-at91-pio4.c
+@@ -722,9 +722,11 @@ static int atmel_conf_pin_config_group_set(struct pinctrl_dev *pctldev,
+ 			break;
+ 		case PIN_CONFIG_BIAS_PULL_UP:
+ 			conf |= ATMEL_PIO_PUEN_MASK;
++			conf &= (~ATMEL_PIO_PDEN_MASK);
+ 			break;
+ 		case PIN_CONFIG_BIAS_PULL_DOWN:
+ 			conf |= ATMEL_PIO_PDEN_MASK;
++			conf &= (~ATMEL_PIO_PUEN_MASK);
+ 			break;
+ 		case PIN_CONFIG_DRIVE_OPEN_DRAIN:
+ 			if (arg == 0)
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+2.5.0
