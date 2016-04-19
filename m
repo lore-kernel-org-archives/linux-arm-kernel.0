@@ -1,70 +1,39 @@
-From: fcooper@ti.com (Franklin S Cooper Jr.)
-Date: Tue, 19 Apr 2016 11:20:32 -0500
-Subject: [PATCH v5 6/6] ARM: dts: DRA7: Add dt nodes for PWMSS
-In-Reply-To: <20160411202112.GE5995@atomide.com>
-References: <1457400224-24797-1-git-send-email-fcooper@ti.com>
- <1457400224-24797-7-git-send-email-fcooper@ti.com>
- <20160317151147.GA29802@rob-hp-laptop> <56EAD315.1030307@ti.com>
- <20160411202112.GE5995@atomide.com>
-Message-ID: <57165AD0.7080908@ti.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Tue, 19 Apr 2016 11:23:54 -0500
+Subject: [PATCH] rtc: ds1307: Use irq when available for wakeup-source device
+Message-ID: <1461083034-9227-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+With commit 8bc2a40730ec ("rtc: ds1307: add support for the
+DT property 'wakeup-source'") we lost the ability for rtc irq
+functionality for devices that are actually hooked on a real IRQ
+line and have capability to wakeup as well. This is not an expected
+behavior. So, instead of just not requesting IRQ, skip the IRQ
+requirement only if interrupts are not defined for the device.
 
+Fixes: 8bc2a40730ec ("rtc: ds1307: add support for the DT property 'wakeup-source'")
+Reported-by: Tony Lindgren <tony@atomide.com>
+Cc: Michael Lange <linuxstuff@milaw.biz>
+Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
 
-On 04/11/2016 03:21 PM, Tony Lindgren wrote:
-> * Franklin S Cooper Jr. <fcooper@ti.com> [160317 08:55]:
->>
->>
->> On 03/17/2016 10:11 AM, Rob Herring wrote:
->>> On Mon, Mar 07, 2016 at 07:23:44PM -0600, Franklin S Cooper Jr wrote:
->>>> From: Vignesh R <vigneshr@ti.com>
->>>>
->>>> Add PWMSS device tree nodes for DRA7 SoC family and add documentation
->>>> for dt bindings.
->>>>
->>>> Signed-off-by: Vignesh R <vigneshr@ti.com>
->>>> [fcooper at ti.com: Add eCAP and use updated bindings for PWMSS and ePWM]
->>>> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
->>>> ---
->>>> Version 5 changes:
->>>> Add DT node for eCAP and update eCAP binding documentation
->>>>
->>>> Version 4 changes:
->>>> Updated link to the latest documentation
->>>>
->>>>  .../devicetree/bindings/pwm/pwm-tiecap.txt         |  9 +++
->>>>  .../devicetree/bindings/pwm/pwm-tiehrpwm.txt       |  9 +++
->>>>  .../devicetree/bindings/pwm/pwm-tipwmss.txt        | 15 +++-
->>>>  arch/arm/boot/dts/dra7.dtsi                        | 84 ++++++++++++++++++++++
->>>>  4 files changed, 116 insertions(+), 1 deletion(-)
->>>
->>>> +			ehrpwm1: pwm at 48440200 {
->>>> +				compatible = "ti,dra7xx-ehrpwm",
->>>> +					     "ti,am33xx-ehrpwm";
->>>> +				#pwm-cells = <3>;
->>>> +				reg = <0x48440200 0x80>;
->>>> +				clocks = <&ehrpwm1_tbclk>;
->>>> +				clock-names = "tbclk";
->>>> +				status = "disabled";
->>>> +			};
->>>> +
->>>> +			ecap1: ecap at 48440100 {
->>> This also is a PWM? Then it should also be pwm at ...
->>
->> The enhanced capture module primary purpose is to measure
->> time between external signals which is called capture mode.
->> It also has a PWM mode. So I wouldn't recommend generalizing
->> the entire node to pwm.
-> 
-> So is this patch safe for me to apply now or do we need more
-> changes?
+ drivers/rtc/rtc-ds1307.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
-No. This patch will change based on changes I will make to handle patch
-1 comments. I will send a new rev.
-> 
-> Regards,
-> 
-> Tony
-> 
+diff --git a/drivers/rtc/rtc-ds1307.c b/drivers/rtc/rtc-ds1307.c
+index b2156ee5bae1..74cd5cd544ee 100644
+--- a/drivers/rtc/rtc-ds1307.c
++++ b/drivers/rtc/rtc-ds1307.c
+@@ -1531,7 +1531,7 @@ read_rtc:
+ 		return PTR_ERR(ds1307->rtc);
+ 	}
+ 
+-	if (ds1307_can_wakeup_device) {
++	if (ds1307_can_wakeup_device && ds1307->client->irq <= 0) {
+ 		/* Disable request for an IRQ */
+ 		want_irq = false;
+ 		dev_info(&client->dev, "'wakeup-source' is set, request for an IRQ is disabled!\n");
+-- 
+2.8.0
