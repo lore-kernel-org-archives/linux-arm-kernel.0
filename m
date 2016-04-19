@@ -1,70 +1,53 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 19 Apr 2016 23:11:11 +0800
-Subject: [PATCH v1 1/1] add missing UARTs pins for AllWinner H3 DTS + add
- new I2C entries for AllWinner H3 DTS
-In-Reply-To: <21e74cd8-2ec7-4fd3-aa5c-ba4eed29a6ab@googlegroups.com>
-References: <8673D89D449742EAB9F6EBD05655A295@GirolesWin7>
- <CAGb2v67e_F1=VaY7ovzW7Whc2ToJU3YabeT-orrLTb0Pouhw_Q@mail.gmail.com>
- <21e74cd8-2ec7-4fd3-aa5c-ba4eed29a6ab@googlegroups.com>
-Message-ID: <CAGb2v65dsjbpGUrJXFG35cLGnFA6uDxtgMqupBN97=8XNnO68Q@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 19 Apr 2016 09:14:49 -0600
+Subject: [PATCH V2 05/15] coresight: tmc: splitting driver in ETB/ETF and
+ ETR components
+In-Reply-To: <571622A3.4020103@arm.com>
+References: <1460483692-25061-1-git-send-email-mathieu.poirier@linaro.org>
+ <1460483692-25061-6-git-send-email-mathieu.poirier@linaro.org>
+ <571622A3.4020103@arm.com>
+Message-ID: <CANLsYkzkJpm2L3dWGAR9ZWT5rzCjg381jDca79AoYdGX-2JOeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2016 at 10:46 PM,  <martinayotte@gmail.com> wrote:
-> Hi ChenYu,
->
-> Thanks for your comments.
->
-> On Tuesday, April 19, 2016 at 7:11:50 AM UTC-4, Chen-Yu Tsai wrote:
->> Hi,
+On 19 April 2016 at 06:20, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+> On 12/04/16 18:54, Mathieu Poirier wrote:
 >>
->> >  arch/arm/boot/dts/sun8i-h3-orangepi-2.dts  | 36 ++++++++++++++
->> >  arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 36 ++++++++++++++
->> >  arch/arm/boot/dts/sun8i-h3.dtsi            | 75
+>> The TMC block can operate in 3 modes (ETB, ETF and ETR) and accessed
+>> via two interfaces (sysFS and Perf).  That makes 6 mode to cover, which
+>> is way too much coupling for a single file.
 >>
->> First of all, you are touching 3 different files here. These should
->> be separate patches.
->
-> I'm trying to understand you here, but I can't. Those 3 files changed are related each other. I could have separated the UART changes from I2C changes, but still those 3 files would have been modified at the same time for a single commit and "git patch-format" would still have created a single patch for the 3 files commit.
-
-Try to wrap lines to 80 characters or less.
-
-1 change per patch. You are making 3 changes here. a) adding shared
-pinmux settings,
-b & c) enabling uarts and i2c busses for 2 boards.
-
-You could split them into 1 dtsi patch adding the pinmux setting, and
-then 1 for each
-board enabling the peripherals.
-
->
-> Seeing all the patches that coming into the mailing lists, all of them contains multiple files patches, why should it be different here ?
->
+>> This patch splits the original TMC driver in 2 halves, one for ETB/ETF
+>> and another one for ETR mode.  A common core is kept for functionality
+>> common to all 3 modes.
 >>
->> Secondly, our policy is to not have a default function for generic GPIO pins.
->>
+>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 >
-> If this is the official policy, then why so many DTS currently present are not following the same rules, such sun6i-a31-hummingbird, sun7i-a20-olinuxino-micro, sun7i-a20-mk808c, sun7i-a20-cubietruck and so many others ?
+>
+>
+>> diff --git a/drivers/hwtracing/coresight/coresight-tmc.h
+>> b/drivers/hwtracing/coresight/coresight-tmc.h
+>> index 2d7d52747b4e..b99d4dfc1d0b 100644
+>> --- a/drivers/hwtracing/coresight/coresight-tmc.h
+>> +++ b/drivers/hwtracing/coresight/coresight-tmc.h
+>> @@ -18,6 +18,8 @@
+>>   #ifndef _CORESIGHT_TMC_H
+>>   #define _CORESIGHT_TMC_H
+>>
+>> +#include <linux/miscdevice.h>
+>> +
+>
+>
+> What was this for ?
 
-Perhaps they were enabled before the policy was enacted, or it just
-slipped through. I
-contributed to a few. But for many boards we might not have schematics
-or the actual
-device to check.
+For the struct tmc_drvdata::miscdev field, used to generate the sink's
+entry under /dev.
 
-Also, other boards having such settings is not a good argument.
+Thanks,
+Mathieu
 
-> I thought the rules were there to make DTS the most default common usage definitions for most end-users in a general availability.
-> Then, if someone is really in shortage of GPIOs, they could easily turn them back to "disabled" state.
-
-How would you determine what the most common usage is for "development boards"?
-If the vendor explicitly designed the pins to be used one way, and even printed
-the description on the board, then you may have a valid argument. But even then,
-with the C.H.I.P., they are going with DT overlays.
-
-It shouldn't be hard for an end user to modify the DT. And with I2C devices, it
-is almost a requirement.
-
-
-Regards
-ChenYu
+>
+> Irrespective of that,
+>
+> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>
