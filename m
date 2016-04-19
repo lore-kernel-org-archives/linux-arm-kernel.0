@@ -1,63 +1,191 @@
-From: stuart.yoder@nxp.com (Stuart Yoder)
-Date: Tue, 19 Apr 2016 16:09:28 +0000
-Subject: [RFC PATCH] arm64: defconfig: add config fragment for Freescale
- SoCs
-In-Reply-To: <20160414170433.GF15182@e104818-lin.cambridge.arm.com>
-References: <1460643685-13670-1-git-send-email-stuart.yoder@nxp.com>
- <20160414170433.GF15182@e104818-lin.cambridge.arm.com>
-Message-ID: <HE1PR04MB164140935041902B1A95F52A8D6C0@HE1PR04MB1641.eurprd04.prod.outlook.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 19 Apr 2016 10:16:22 -0600
+Subject: [PATCH V2 11/15] coresight: tmc: make sysFS and Perf mode
+ mutually exclusive
+In-Reply-To: <571635C6.9070903@arm.com>
+References: <1460483692-25061-1-git-send-email-mathieu.poirier@linaro.org>
+ <1460483692-25061-12-git-send-email-mathieu.poirier@linaro.org>
+ <571635C6.9070903@arm.com>
+Message-ID: <CANLsYkwOkF3Huzjxr6Pds4_e3m9kC03Qu1t-8xUg7fyFQGOvzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 19 April 2016 at 07:42, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+> On 12/04/16 18:54, Mathieu Poirier wrote:
+>>
+>> The sysFS and Perf access methods can't be allowed to interfere
+>> with one another.  As such introducing guards to access
+>> functions that prevents moving forward if a TMC is already
+>> being used.
+>>
+>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> ---
+>>   drivers/hwtracing/coresight/coresight-tmc-etf.c | 59
+>> +++++++++++++++++++++-
+>>   drivers/hwtracing/coresight/coresight-tmc-etr.c | 67
+>> +++++++++++++++++++++++--
+>>   2 files changed, 119 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c
+>> b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+>> index 9b4cdaed09f5..50d32e8ef4ea 100644
+>> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
+>> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+>> @@ -111,7 +111,7 @@ static void tmc_etf_disable_hw(struct tmc_drvdata
+>> *drvdata)
+>>         CS_LOCK(drvdata->base);
+>>   }
+>>
+>> -static int tmc_enable_etf_sink(struct coresight_device *csdev, u32 mode)
+>> +static int tmc_enable_etf_sink_sysfs(struct coresight_device *csdev, u32
+>> mode)
+>>   {
+>>         bool allocated = false;
+>>         char *buf = NULL;
+>> @@ -189,6 +189,53 @@ out:
+>>         return 0;
+>>   }
+>>
+>> +static int tmc_enable_etf_sink_perf(struct coresight_device *csdev, u32
+>> mode)
+>> +{
+>> +       int ret = 0;
+>> +       u32 val;
+>
+>
+> To be on the safer side, I believe 'val' should be unsigned long, to match
+> the size of local_t.
+>
+>> +       unsigned long flags;
+>> +       struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+>> +
+>> +        /* This shouldn't be happening */
+>> +       WARN_ON(mode != CS_MODE_PERF);
+>
+>
+> I think the above check, and the mode parameter itself is superfluous, given
+> that this is a static function used internally only for the PERF mode.
+> Similarly for the _sysfs version.
 
+We definitely misunderstood each other then - the only reason I added
+the checks is after what (I thought) you suggested in the previous
+revision.
 
-> -----Original Message-----
-> From: Catalin Marinas [mailto:catalin.marinas at arm.com]
-> Sent: Thursday, April 14, 2016 12:05 PM
-> To: Stuart Yoder <stuart.yoder@nxp.com>
-> Cc: linux-arm-kernel at lists.infradead.org; will.deacon at arm.com; marc.zyngier at arm.com;
-> mark.rutland at arm.com; Scott Wood <scott.wood@nxp.com>; Yang-Leo Li <leoyang.li@nxp.com>
-> Subject: Re: [RFC PATCH] arm64: defconfig: add config fragment for Freescale SoCs
-> 
-> On Thu, Apr 14, 2016 at 09:21:25AM -0500, Stuart Yoder wrote:
-> > Add a config fragment enabling a reasonably useful set of
-> > devices and options for Freescale ARM v8 SoCs.
-> 
-> A gentle NAK ;).
-> 
-> > I realize that we are trying to avoid the defconfig hell in arch/arm with 100+
-> > defconfigs, but the single defconfig in arch/arm64 has some problems too.
-> 
-> Can we address these problems in defconfig?
-> 
-> > I think what we want with arch/arm64/config are some reasonable in-kernel
-> > defconfigs/fragments with built-in drivers for convenience.
-> 
-> A hard requirement for arm64 is single Image and having all SoCs in
-> defconfig is a good way to regularly test this.
-> 
-> I am aware that at some point the defconfig size will get too big but
-> that's when (ideally before) we should put effort into building more
-> stuff as loadable modules.
-> 
-> > The proposal is to allow a chip vendor 1 vendor-specific kconfig fragment
-> > to cover all their chips, allowing them to _override_ the default config
-> > options in defconfig.  One specific issue we have is that due to the ls2080a
-> > physical address map, the combination of 4KB pages and 39-bit VA does not
-> > allow us to see all our DDR.  And, thus we need CONFIG_ARM64_VA_BITS_48=y.
-> 
-> And I'm fine to add this to defconfig. We had a case for Seattle needing
-> 48-bit VA but we eventually decoupled the number of levels for idmap and
-> swapper. If it can't be addressed in a similar way on ls2080a, we may
-> need to increase the VA space to 48-bit.
+>
+>> +
+>> +       spin_lock_irqsave(&drvdata->spinlock, flags);
+>> +       if (drvdata->reading) {
+>> +               ret = -EINVAL;
+>> +               goto out;
+>> +       }
+>> +
+>> +       val = local_xchg(&drvdata->mode, mode);
+>
+>
+> We should be using local_cmpxchg() here. Otherwise, we could corrupt the
+> mode.
 
-The issue for us is the linear mapping covering the 2 very discontiguous
-memory regions on the ls2080a.  We've tried some experiments to locate all
-DDR high, but that results in issues for some devices with 32-bit DMA masks,
-that need bounce buffers.
+The newly added (above) check allows us to do that now.  There can
+only be one value coming in (CS_MODE_PERF) and the current type can
+only be CS_MODE_PERF/DISABLED.
 
-I'll submit a patch to increase the VA space to 48-bit, along with 
-the other options.
+> Similarly for the _sysfs version. I though the previous version of your
+> series
+> did that.
+>
+>> +       /*
+>> +        * In Perf mode there can be only one writer per sink.  There
+>> +        * is also no need to continue if the ETB/ETR is already operated
+>> +        * from sysFS.
+>> +        */
+>> +       if (val != CS_MODE_DISABLED) {
+>> +               ret = -EINVAL;
+>> +               goto out;
+>> +       }
+>
+>
+>
+>>   static void tmc_disable_etf_sink(struct coresight_device *csdev)
+>>   {
+>>         u32 val;
+>> @@ -271,6 +318,7 @@ const struct coresight_ops tmc_etf_cs_ops = {
+>>
+>>   int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
+>>   {
+>> +       u32 val;
+>>         enum tmc_mode mode;
+>>         int ret = 0;
+>>         unsigned long flags;
+>> @@ -289,6 +337,13 @@ int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
+>>                 goto out;
+>>         }
+>>
+>> +       val = local_read(&drvdata->mode);
+>> +       /* Don't interfere if operated from Perf */
+>> +       if (val == CS_MODE_PERF) {
+>> +               ret = -EINVAL;
+>> +               goto out;
+>> +       }
+>
+>
+> Could we get here when CS_DISABLED ? If not, we could get rid of the check
+> for CS_MODE_SYSFS below.
+>
+>> +
+>>         /* If drvdata::buf is NULL the trace data has been read already */
+>>         if (drvdata->buf == NULL) {
+>>                 ret = -EINVAL;
+>> @@ -296,7 +351,7 @@ int tmc_read_prepare_etb(struct tmc_drvdata *drvdata)
+>>         }
+>>
+>>         /* Disable the TMC if need be */
+>> -       if (local_read(&drvdata->mode) == CS_MODE_SYSFS)
+>> +       if (val == CS_MODE_SYSFS)
+>>                 tmc_etb_disable_hw(drvdata);
+>
+> See above
+
+Yes, we can get here when mode is set to CS_MODE_DISABLED.  Someone
+can read the /dev/xyz entry whenever they want, including when a sink
+hasn't been enabled.
 
 Thanks,
-Stuart
+Mathieu
+
+>
+>>         drvdata->reading = true;
+>> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c
+>> b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+>> index de5cf0056802..04fc63d85696 100644
+>> --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
+>> +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
+>> @@ -87,7 +87,7 @@ static void tmc_etr_disable_hw(struct tmc_drvdata
+>> *drvdata)
+>>         CS_LOCK(drvdata->base);
+>>   }
+>>
+>> -static int tmc_enable_etr_sink(struct coresight_device *csdev, u32 mode)
+>> +static int tmc_enable_etr_sink_sysfs(struct coresight_device *csdev, u32
+>> mode)
+>>   {
+>>         bool allocated = false;
+>>         u32 val;
+>> @@ -166,6 +166,53 @@ out:
+>>         return 0;
+>>   }
+>>
+>
+>> +static int tmc_enable_etr_sink_perf(struct coresight_device *csdev, u32
+>> mode)
+>
+> ...
+>
+>>   static void tmc_disable_etr_sink(struct coresight_device *csdev)
+>
+>
+> Same comments as for the etb side.
+>
+> Suzuki
+>
+>  {
+>
