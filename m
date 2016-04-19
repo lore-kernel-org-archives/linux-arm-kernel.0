@@ -1,130 +1,68 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Tue, 19 Apr 2016 17:24:42 +0000
-Subject: [PATCH v7 2/7] vfio/type1: vfio_find_dma accepting a type argument
+Date: Tue, 19 Apr 2016 17:24:43 +0000
+Subject: [PATCH v7 3/7] vfio/type1: specialize remove_dma and replay according
+ to type
 In-Reply-To: <1461086687-2658-1-git-send-email-eric.auger@linaro.org>
 References: <1461086687-2658-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1461086687-2658-3-git-send-email-eric.auger@linaro.org>
+Message-ID: <1461086687-2658-4-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In our RB-tree we now have slots of different types (USER and RESERVED).
-It becomes useful to be able to search for dma slots of a specific type or
-any type. This patch proposes an implementation for that modality and also
-changes the existing callers using the USER type.
+Before allowing the end-user to create VFIO_IOVA_RESERVED dma slots,
+let's implement the expected behavior for removal and replay. As opposed
+to user dma slots, the physical pages bound to reserved IOVA do not need
+to be pinned/unpinned. Also we currently handle a single reserved iova
+domain. Any attempt to remove the single reserved dma slot ends up
+deleting the underlying iova domain for each iommu domain.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 ---
- drivers/vfio/vfio_iommu_type1.c | 63 ++++++++++++++++++++++++++++++++++-------
- 1 file changed, 53 insertions(+), 10 deletions(-)
+ drivers/vfio/vfio_iommu_type1.c | 17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
-index aaf5a6c..2d769d4 100644
+index 2d769d4..93c17d9 100644
 --- a/drivers/vfio/vfio_iommu_type1.c
 +++ b/drivers/vfio/vfio_iommu_type1.c
-@@ -98,23 +98,64 @@ struct vfio_group {
-  * into DMA'ble space using the IOMMU
-  */
+@@ -36,6 +36,7 @@
+ #include <linux/uaccess.h>
+ #include <linux/vfio.h>
+ #include <linux/workqueue.h>
++#include <linux/dma-reserved-iommu.h>
  
--static struct vfio_dma *vfio_find_dma(struct vfio_iommu *iommu,
--				      dma_addr_t start, size_t size)
-+/**
-+ * vfio_find_dma_from_node: looks for a dma slot intersecting a window
-+ * from a given rb tree node
-+ * @top: top rb tree node where the search starts (including this node)
-+ * @start: window start
-+ * @size: window size
-+ * @type: window type
-+ */
-+static struct vfio_dma *vfio_find_dma_from_node(struct rb_node *top,
-+						dma_addr_t start, size_t size,
-+						enum vfio_iova_type type)
- {
--	struct rb_node *node = iommu->dma_list.rb_node;
-+	struct rb_node *node = top;
-+	struct vfio_dma *dma;
- 
- 	while (node) {
--		struct vfio_dma *dma = rb_entry(node, struct vfio_dma, node);
--
-+		dma = rb_entry(node, struct vfio_dma, node);
- 		if (start + size <= dma->iova)
- 			node = node->rb_left;
- 		else if (start >= dma->iova + dma->size)
- 			node = node->rb_right;
- 		else
-+			break;
-+	}
-+	if (!node)
-+		return NULL;
-+
-+	/* a dma slot intersects our window, check the type also matches */
-+	if (type == VFIO_IOVA_ANY || dma->type == type)
-+		return dma;
-+
-+	/* restart 2 searches skipping the current node */
-+	if (start < dma->iova) {
-+		dma = vfio_find_dma_from_node(node->rb_left, start,
-+					      size, type);
-+		if (dma)
- 			return dma;
- 	}
-+	if (start + size > dma->iova + dma->size)
-+		dma = vfio_find_dma_from_node(node->rb_right, start,
-+					      size, type);
-+	return dma;
-+}
-+
-+/**
-+ * vfio_find_dma: find a dma slot intersecting a given window
-+ * @iommu: vfio iommu handle
-+ * @start: window base iova
-+ * @size: window size
-+ * @type: window type
-+ */
-+static struct vfio_dma *vfio_find_dma(struct vfio_iommu *iommu,
-+				      dma_addr_t start, size_t size,
-+				      enum vfio_iova_type type)
-+{
-+	struct rb_node *top_node = iommu->dma_list.rb_node;
- 
--	return NULL;
-+	return vfio_find_dma_from_node(top_node, start, size, type);
+ #define DRIVER_VERSION  "0.2"
+ #define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
+@@ -445,9 +446,20 @@ static void vfio_unmap_unpin(struct vfio_iommu *iommu, struct vfio_dma *dma)
+ 	vfio_lock_acct(-unlocked);
  }
  
- static void vfio_link_dma(struct vfio_iommu *iommu, struct vfio_dma *new)
-@@ -488,19 +529,21 @@ static int vfio_dma_do_unmap(struct vfio_iommu *iommu,
- 	 * mappings within the range.
- 	 */
- 	if (iommu->v2) {
--		dma = vfio_find_dma(iommu, unmap->iova, 0);
-+		dma = vfio_find_dma(iommu, unmap->iova, 0, VFIO_IOVA_USER);
- 		if (dma && dma->iova != unmap->iova) {
- 			ret = -EINVAL;
- 			goto unlock;
- 		}
--		dma = vfio_find_dma(iommu, unmap->iova + unmap->size - 1, 0);
-+		dma = vfio_find_dma(iommu, unmap->iova + unmap->size - 1, 0,
-+				    VFIO_IOVA_USER);
- 		if (dma && dma->iova + dma->size != unmap->iova + unmap->size) {
- 			ret = -EINVAL;
- 			goto unlock;
- 		}
- 	}
++static void vfio_destroy_reserved(struct vfio_iommu *iommu)
++{
++	struct vfio_domain *d;
++
++	list_for_each_entry(d, &iommu->domain_list, next)
++		iommu_free_reserved_iova_domain(d->domain);
++}
++
+ static void vfio_remove_dma(struct vfio_iommu *iommu, struct vfio_dma *dma)
+ {
+-	vfio_unmap_unpin(iommu, dma);
++	if (likely(dma->type == VFIO_IOVA_USER))
++		vfio_unmap_unpin(iommu, dma);
++	else
++		vfio_destroy_reserved(iommu);
+ 	vfio_unlink_dma(iommu, dma);
+ 	kfree(dma);
+ }
+@@ -727,6 +739,9 @@ static int vfio_iommu_replay(struct vfio_iommu *iommu,
+ 		dma = rb_entry(n, struct vfio_dma, node);
+ 		iova = dma->iova;
  
--	while ((dma = vfio_find_dma(iommu, unmap->iova, unmap->size))) {
-+	while ((dma = vfio_find_dma(iommu, unmap->iova, unmap->size,
-+				    VFIO_IOVA_USER))) {
- 		if (!iommu->v2 && unmap->iova > dma->iova)
- 			break;
- 		unmapped += dma->size;
-@@ -604,7 +647,7 @@ static int vfio_dma_do_map(struct vfio_iommu *iommu,
- 
- 	mutex_lock(&iommu->lock);
- 
--	if (vfio_find_dma(iommu, iova, size)) {
-+	if (vfio_find_dma(iommu, iova, size, VFIO_IOVA_ANY)) {
- 		mutex_unlock(&iommu->lock);
- 		return -EEXIST;
- 	}
++		if (dma->type == VFIO_IOVA_RESERVED)
++			continue;
++
+ 		while (iova < dma->iova + dma->size) {
+ 			phys_addr_t phys = iommu_iova_to_phys(d->domain, iova);
+ 			size_t size;
 -- 
 1.9.1
