@@ -1,36 +1,25 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 19 Apr 2016 16:23:40 +0300
-Subject: [PATCH 1/2] mmc: core: Improve marking broken HPI through
- devicetree
-In-Reply-To: <571622B7.2010202@schinagl.nl>
-References: <1461049934-12848-1-git-send-email-oliver@schinagl.nl>
- <1461049934-12848-2-git-send-email-oliver@schinagl.nl>
- <57160E06.1000806@cogentembedded.com> <571622B7.2010202@schinagl.nl>
-Message-ID: <5716315C.7070001@cogentembedded.com>
+From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
+Date: Tue, 19 Apr 2016 19:03:28 +0530
+Subject: [PATCH 0/4] net: thunderx: Add multiqset support for DPDK
+Message-ID: <1461072812-44239-1-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/19/2016 3:21 PM, Olliver Schinagl wrote:
+From: Sunil Goutham <sgoutham@cavium.com>
 
->>> In patch 81f8a7be66 Hans de Goede added a patch to allow marking an mmc
->>
->>    scripts/checkpatch.pl now enforces certain commit citing style, the
->> commit summary should be specified too.
+This patch series mainly adds support for userspace application
+like DPDK with a VNIC VF attached to request additional QSets
+for having morethan the default 8 queues.
 
-> I used checkpatch from 4.6.0-rc2(or3) and did not notice it. But I'll add it
-> to v2.
+Jerin Jacob (1):
+  net: thunderx: Introduce a mailbox message to reset VF counters
 
-    Maybe it just didn't recognize your commit citing? Anyway, the format is 
-the same as for the "Fixes:" tag.
+Radoslaw Biernacki (3):
+  net: thunderx: Add multiqset support for dataplane apps
+  net: thunderx: add sysfs attribute for SQS/SVF assigments
+  net: thunderx: Improvement for MBX interface debug messages
 
->>> device as to having an broken HPI implementation. After talking some
->>> with Hans, we now think it is actually the mmc controller that can be
->>> broken and not support broken HPI's.
->>>
->>> This patch adds a new capability, mmc-broken-hpi, which allows us to
->>> mark a broken hpi implementation on the host level.
->>>
->>> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
->> [...]
-
-MBR, Sergei
+ drivers/net/ethernet/cavium/thunder/nic.h        |   32 ++-
+ drivers/net/ethernet/cavium/thunder/nic_main.c   |  321 +++++++++++++++++++---
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c |   10 +-
+ 3 files changed, 324 insertions(+), 39 deletions(-)
