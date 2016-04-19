@@ -1,53 +1,71 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 19 Apr 2016 13:04:34 +0100
-Subject: [PATCH 00/45] KVM: arm/arm64: Rework virtual GIC emulation
-In-Reply-To: <1461061586-15012-1-git-send-email-andre.przywara@arm.com>
-References: <5714D749.9030007@arm.com>
- <1461061586-15012-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <57161ED2.6000701@arm.com>
+From: bhupesh.sharma@nxp.com (Bhupesh Sharma)
+Date: Tue, 19 Apr 2016 12:09:40 +0000
+Subject: [PATCH v4 0/2] ARM64: Enable SP805 WDT support for FSL LS2080A
+In-Reply-To: <570FBBD8.4030704@arm.com>
+References: <1451296884-7932-1-git-send-email-bhupesh.sharma@freescale.com>
+ <570FBBD8.4030704@arm.com>
+Message-ID: <VI1PR04MB12308B0964726B5D1A4492BE886C0@VI1PR04MB1230.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/04/16 11:26, Andre Przywara wrote:
-> Hi Vladimir,
+Hi Mark,
+
+Sorry for the delayed reply. I was on holidays.
+
+> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
+> Sent: Thursday, April 14, 2016 9:19 PM
 > 
-> can you try the attached patch on top of the series to see if this
-> fixes the GICv3 emulation issues you see?
+> Hi Bhupesh,
+> 
+> On 28/12/15 10:01, Bhupesh Sharma wrote:
+> > Hi Arnd, Kevin, Olof
+> >
+> > This is the v4 of patchset which adds the support for SP805 WDT on
+> FSL
+> > LS2080A and also adds the missing documentation of SP805 WDT device-
+> tree bindings.
+> >
+> > Rebased against arm-soc/next/dt
+> >
+> > Changes since v3:
+> > (v3 can be viewed here:
+> > https://www.mail-
+> archive.com/devicetree at vger.kernel.org/msg97249.html)
+> > - Added Rob's Acked-by for patch 1/2.
+> > - Sending to 'arm at kernel.org' list and also cc'ed Shawn Guo
+> >
+> > Changes since v2:
+> > (v2 can be viewed here:
+> > http://permalink.gmane.org/gmane.linux.ports.arm.kernel/463141)
+> > - Addressed Rob's comments regarding the second mandatory CLK
+> source's
+> >   (WDOGCLK) name in the bindings.
+> >
+> > Changes since v1:
+> > (v1 can be viewed here:
+> > http://www.spinics.net/lists/devicetree/msg102487.html)
+> >
+> > - Addressed Rob and Mark's comments regarding the mandatory CLK
+> > sources
+> > - Removed interrupt property from the bindings for now (as discussed
+> >   with Mark on IRC) till Will's patch proceeds further and enables
+> >   handling the WDOG interrupts for each core connected to the same
+> PPI
+> >   line
+> > (http://lists.infradead.org/pipermail/linux-arm-kernel/2015-
+> December/3
+> > 91616.html)
+> 
+> Will just pointed me to this series. I've recently posted a set of
+> patches that should be able to deal with the quirkiness of your HW with
+> regards to PPIs:
+> 
+> http://thread.gmane.org/gmane.linux.drivers.devicetree/163464
+> 
+> Could you please let me know if this works for you?
 > 
 
-With attached patch I don't see issue any more - all 255 vcpus are able
-to boot and send/receive self SGI.
+Sure. I will have a look at the patchset and get back asap.
 
-Thanks
-Vladimir
-
-> I think these lines got lost during the MMIO framework rebasing.
-> 
-> Cheers,
-> Andre.
-> 
-> ---
->  virt/kvm/arm/vgic/vgic_mmio.c | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
-> index ec96188..92f39ba 100644
-> --- a/virt/kvm/arm/vgic/vgic_mmio.c
-> +++ b/virt/kvm/arm/vgic/vgic_mmio.c
-> @@ -1228,6 +1228,7 @@ int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
->  	kvm_for_each_vcpu(c, vcpu, kvm) {
->  		kvm_iodevice_init(&region->dev, &kvm_io_v3redist_ops);
->  		region->base_addr = redist_base_address;
-> +		region->redist_vcpu = vcpu;
->  
->  		mutex_lock(&kvm->slots_lock);
->  		ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS,
-> @@ -1241,6 +1242,7 @@ int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
->  		region++;
->  		kvm_iodevice_init(&region->dev, &kvm_io_v3redist_private_ops);
->  		region->base_addr = redist_base_address + SZ_64K;
-> +		region->redist_vcpu = vcpu;
->  
->  		mutex_lock(&kvm->slots_lock);
->  		ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS,
-> 
+Regards,
+Bhupesh
