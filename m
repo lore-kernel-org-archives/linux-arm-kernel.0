@@ -1,69 +1,60 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 19 Apr 2016 09:23:10 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC Fixes for v4.6
-In-Reply-To: <20160418041206.GC3578@verge.net.au>
-References: <cover.1460339328.git.horms+renesas@verge.net.au>
- <CAMuHMdUwuabK2Ajo5dMWEf014Xvk-1WYz4YBTw1jVScrTKSx0g@mail.gmail.com>
- <20160411230253.GB1589@verge.net.au>
- <20160418041206.GC3578@verge.net.au>
-Message-ID: <CAMuHMdUJmZyAmn4HUdQTNVTTTnx2Z_W0fz96WcqB__z+XYcs_A@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 19 Apr 2016 16:24:02 +0900
+Subject: [PATCH] pinctrl-exynos5440: Use off-stack memory for
+ pinctrl_gpio_range
+In-Reply-To: <1461039222-26592-1-git-send-email-andrew@aj.id.au>
+References: <1461039222-26592-1-git-send-email-andrew@aj.id.au>
+Message-ID: <CA+Ln22Fcdp=W1A7ZY5nNNkUqHWfTTepVBS+SzjdoeO2HDJGpuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi Andrew,
 
-On Mon, Apr 18, 2016 at 6:12 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Tue, Apr 12, 2016 at 08:02:54AM +0900, Simon Horman wrote:
->> On Mon, Apr 11, 2016 at 09:11:19AM +0200, Geert Uytterhoeven wrote:
->> > On Mon, Apr 11, 2016 at 3:52 AM, Simon Horman
->> > <horms+renesas@verge.net.au> wrote:
->> > > Hi Olof, Hi Kevin, Hi Arnd,
->> > >
->> > > Please consider these Renesas ARM based SoC fixes for v4.6.
->> > >
->> > >
->> > > Allow serial to work once again on the Porter board (Revision B) which
->> > > does not have the oscillator in question mounted.
->> >
->> > Have you tested this on Porter?
->>
->> I don't have working access to a porter at this time.
->>
->> > I believe there's another change to be made for this revert to actually work,
->> > cfr. "[PATCH] ARM: dts: r8a7791: Don't disable referenced optional clocks"
->> > (https://lkml.org/lkml/2016/4/6/350)
->>
->> Ok, understood.
->>
->> Could someone verify that?
+2016-04-19 13:13 GMT+09:00 Andrew Jeffery <andrew@aj.id.au>:
+> The range is registered into a linked list which can be referenced
+> throughout the lifetime of the driver. Ensure the range's memory is useful
+> for the same lifetime by adding it to the driver's private data structure.
 >
-> I have added "ARM: dts: r8a7791: Don't disable referenced optional clocks"
-> to the fixes-for-v4.6 branch and plan to push it in a fresh renesas-next
-> tag a little later today.
+> The bug was introduced in the driver's initial commit, which was present in
+> v3.10.
+>
+> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+> Fixes: f0b9a7e521fa ("pinctrl: exynos5440: add pinctrl driver for Samsung EXYNOS5440 SoC")
+> Cc: stable at vger.kernel.org
+> ---
+> This is my first contribution to the kernel, so hopefully I've followed all the
+> relevant documentation. If not, please let me know and point me in the right
+> direction!
+>
+> I don't have the means to test the patch, but it compiles. Someone with
+> appropriate hardware should probably give it a spin.
+>
 
-Thanks!
+Thanks for the patch. Good catch, I wonder how this even worked. Just
+one minor nitpick below.
 
-I would queue
+Unfortunately I don't have any platform based on this SoC to test, so
+I'll defer to Krzysztof or Sylwester to handle this.
 
-    ARM: dts: r8a7791: Don't disable referenced optional clocks
+Given the nitpick is fixed:
 
-before
+Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
 
-    Revert "ARM: dts: porter: Enable SCIF_CLK frequency and pins"
+>  drivers/pinctrl/samsung/pinctrl-exynos5440.c | 14 +++++++-------
+>  1 file changed, 7 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/pinctrl/samsung/pinctrl-exynos5440.c b/drivers/pinctrl/samsung/pinctrl-exynos5440.c
+> index 00ab63abf1d9..d45028a75c0f 100644
+> --- a/drivers/pinctrl/samsung/pinctrl-exynos5440.c
+> +++ b/drivers/pinctrl/samsung/pinctrl-exynos5440.c
+> @@ -117,6 +117,7 @@ struct exynos5440_pinctrl_priv_data {
+>         unsigned int                    nr_groups;
+>         const struct exynos5440_pmx_func        *pmx_functions;
+>         unsigned int                    nr_functions;
+> +       struct pinctrl_gpio_range       range;
 
-to preserve bisectability. So please reorder these two commits.
+It would be nice to also describe this field in the kerneldoc comment
+above the struct.
 
-> I would appreciate any review and/or testing on porter of that branch.
-
-I've provided my Reviewed-By in the original thread.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Best regards,
+Tomasz
