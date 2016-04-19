@@ -1,66 +1,37 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 19 Apr 2016 17:13:49 -0500
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Tue, 19 Apr 2016 18:16:14 -0400
 Subject: [PATCH v2] Documentation: devicetree: Clean up gpio-keys example
-In-Reply-To: <1458129209-15449-1-git-send-email-afaerber@suse.de>
+In-Reply-To: <20160419221349.GA25916@rob-hp-laptop>
 References: <1458129209-15449-1-git-send-email-afaerber@suse.de>
-Message-ID: <20160419221349.GA25916@rob-hp-laptop>
+ <20160419221349.GA25916@rob-hp-laptop>
+Message-ID: <CABxcv=nYoVss97WLgAxFfiwZZtStRNjEGZ0z-aYdb0JWiJaywQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 16, 2016 at 12:53:29PM +0100, Andreas F?rber wrote:
-> Drop #address-cells and #size-cells, which are not required by the
-> gpio-keys binding documentation, as button sub-nodes are not devices.
-> 
-> Rename sub-nodes to avoid new dtc unit address warnings when copied.
-> 
-> While at it, adopt the dashes convention for the node name.
-> 
-> Reported-by: Julien Chauveau <chauveau.julien@gmail.com>
-> Cc: Julien Chauveau <chauveau.julien@gmail.com>
-> Cc: Javier Martinez Canillas <javier@dowhile0.org>
-> Cc: Geert Uytterhoeven <geert@linux-m68k.org>
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+Hello Rob,
 
-Applied, thanks.
+On Tue, Apr 19, 2016 at 6:13 PM, Rob Herring <robh@kernel.org> wrote:
+> On Wed, Mar 16, 2016 at 12:53:29PM +0100, Andreas F?rber wrote:
+>> Drop #address-cells and #size-cells, which are not required by the
+>> gpio-keys binding documentation, as button sub-nodes are not devices.
+>>
+>> Rename sub-nodes to avoid new dtc unit address warnings when copied.
+>>
+>> While at it, adopt the dashes convention for the node name.
+>>
+>> Reported-by: Julien Chauveau <chauveau.julien@gmail.com>
+>> Cc: Julien Chauveau <chauveau.julien@gmail.com>
+>> Cc: Javier Martinez Canillas <javier@dowhile0.org>
+>> Cc: Geert Uytterhoeven <geert@linux-m68k.org>
+>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>
+> Applied, thanks.
+>
 
-Rob
+Dmitry already applied this patch in the input tree.
 
-> ---
->  v1 -> v2:
->  * Changed node name from underscore to dash
->  * Inserted white lines
->  * Renamed sub-nodes (Geert, Julien)
->  
->  Documentation/devicetree/bindings/input/gpio-keys.txt | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/input/gpio-keys.txt b/Documentation/devicetree/bindings/input/gpio-keys.txt
-> index 21641236c095..a94940481e55 100644
-> --- a/Documentation/devicetree/bindings/input/gpio-keys.txt
-> +++ b/Documentation/devicetree/bindings/input/gpio-keys.txt
-> @@ -32,17 +32,17 @@ Optional subnode-properties:
->  
->  Example nodes:
->  
-> -	gpio_keys {
-> +	gpio-keys {
->  			compatible = "gpio-keys";
-> -			#address-cells = <1>;
-> -			#size-cells = <0>;
->  			autorepeat;
-> -			button at 21 {
-> +
-> +			up {
->  				label = "GPIO Key UP";
->  				linux,code = <103>;
->  				gpios = <&gpio1 0 1>;
->  			};
-> -			button at 22 {
-> +
-> +			down {
->  				label = "GPIO Key DOWN";
->  				linux,code = <108>;
->  				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
-> -- 
-> 2.6.2
-> 
+> Rob
+>
+
+Best regards,
+Javier
