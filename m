@@ -1,49 +1,78 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Tue, 19 Apr 2016 16:56:25 +0000
-Subject: [PATCH v7 01/10] iommu: Add DOMAIN_ATTR_MSI_MAPPING attribute
+Date: Tue, 19 Apr 2016 16:56:27 +0000
+Subject: [PATCH v7 03/10] iommu: introduce a reserved iova cookie
 In-Reply-To: <1461084994-2355-1-git-send-email-eric.auger@linaro.org>
 References: <1461084994-2355-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1461084994-2355-2-git-send-email-eric.auger@linaro.org>
+Message-ID: <1461084994-2355-4-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce a new DOMAIN_ATTR_MSI_MAPPING domain attribute. If supported,
-this means the MSI addresses need to be mapped in the IOMMU.
+This patch introduces some new fields in the iommu_domain struct,
+dedicated to reserved iova management.
 
-x86 IOMMUs typically don't expose the attribute since on x86, MSI write
-transaction addresses always are within the 1MB PA region [FEE0_0000h -
-FEF0_000h] window which directly targets the APIC configuration space and
-hence bypass the sMMU. On ARM and PowerPC however MSI transactions are
-conveyed through the IOMMU.
+In a similar way as DMA mapping IOVA window, we need to store
+information related to a reserved IOVA window.
 
-Signed-off-by: Bharat Bhushan <Bharat.Bhushan@freescale.com>
+The reserved_iova_cookie will store the reserved iova_domain
+handle. An RB tree indexed by physical address is introduced to
+store the host physical addresses bound to reserved IOVAs.
+
+Those physical addresses will correspond to MSI frame base
+addresses, also referred to as doorbells. Their number should be
+quite limited per domain.
+
+Also a spin_lock is introduced to protect accesses to the iova_domain
+and RB tree. The choice of a spin_lock is driven by the fact the RB
+tree will need to be accessed in MSI controller code not allowed to
+sleep.
+
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 
 ---
-
-v4 -> v5:
-- introduce the user in the next patch
-
-RFC v1 -> v1:
-- the data field is not used
-- for this attribute domain_get_attr simply returns 0 if the MSI_MAPPING
-  capability if needed or <0 if not.
-- removed struct iommu_domain_msi_maps
+v5 -> v6:
+- initialize reserved_binding_list
+- use a spinlock instead of a mutex
 ---
- include/linux/iommu.h | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/iommu/iommu.c | 2 ++
+ include/linux/iommu.h | 6 ++++++
+ 2 files changed, 8 insertions(+)
 
+diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+index b9df141..f70ef3b 100644
+--- a/drivers/iommu/iommu.c
++++ b/drivers/iommu/iommu.c
+@@ -1073,6 +1073,8 @@ static struct iommu_domain *__iommu_domain_alloc(struct bus_type *bus,
+ 
+ 	domain->ops  = bus->iommu_ops;
+ 	domain->type = type;
++	spin_lock_init(&domain->reserved_lock);
++	domain->reserved_binding_list = RB_ROOT;
+ 
+ 	return domain;
+ }
 diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index 62a5eae..b3e8c5b 100644
+index b3e8c5b..60999db 100644
 --- a/include/linux/iommu.h
 +++ b/include/linux/iommu.h
-@@ -113,6 +113,7 @@ enum iommu_attr {
- 	DOMAIN_ATTR_FSL_PAMU_ENABLE,
- 	DOMAIN_ATTR_FSL_PAMUV1,
- 	DOMAIN_ATTR_NESTING,	/* two stages of translation */
-+	DOMAIN_ATTR_MSI_MAPPING, /* Require MSIs mapping in iommu */
- 	DOMAIN_ATTR_MAX,
+@@ -24,6 +24,7 @@
+ #include <linux/of.h>
+ #include <linux/types.h>
+ #include <linux/scatterlist.h>
++#include <linux/spinlock.h>
+ #include <trace/events/iommu.h>
+ 
+ #define IOMMU_READ	(1 << 0)
+@@ -83,6 +84,11 @@ struct iommu_domain {
+ 	void *handler_token;
+ 	struct iommu_domain_geometry geometry;
+ 	void *iova_cookie;
++	void *reserved_iova_cookie;
++	/* rb tree indexed by PA, for reserved bindings only */
++	struct rb_root reserved_binding_list;
++	/* protects reserved cookie and rbtree manipulation */
++	spinlock_t reserved_lock;
  };
  
+ enum iommu_cap {
 -- 
 1.9.1
