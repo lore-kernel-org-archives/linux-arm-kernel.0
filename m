@@ -1,24 +1,43 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 19 Apr 2016 17:46:48 +0100
-Subject: [PATCH] ASoC: core: export snd_soc_get_dai_name
-In-Reply-To: <1461065801-19535-1-git-send-email-pc.liao@mediatek.com>
-References: <1461065801-19535-1-git-send-email-pc.liao@mediatek.com>
-Message-ID: <20160419164648.GZ3217@sirena.org.uk>
+From: vishnupatekar0510@gmail.com (Vishnu Patekar)
+Date: Wed, 20 Apr 2016 00:47:45 +0800
+Subject: [PATCH v2] sunxi factors clock predivider handling
+Message-ID: <1461084466-20889-1-git-send-email-vishnupatekar0510@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 19, 2016 at 07:36:41PM +0800, PC Liao wrote:
+For allwinner A31 ahb1 and a83t ahb1 clocks have predivider for certain parent.
 
-> [1] is applied and needs this patch.
-> Otherwise, [1] will build fail.
+Currently, it's being handled in clock specific functions. 
 
-I dropped your patch and replied with a suggestion for respinning it.
-When referencing patches please use the title and (if relevant) commit
-ID inline, it makes things easier to read.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160419/52d63ca5/attachment.sig>
+A83t ahb1 and a31 ahb1 are similar clocks except a83t parent index 0b10 and 0b11
+are pll6/prediv and a31 ahb1 parent index 0x11 is pll6/prediv.
+with only this change, code duplication was needed.
+
+To handle this, this patch adds predivider table with parent index, prediv 
+shift and width, parents with predivider will have nonzero width.
+
+Rate adjustment is moved from clock specific recalc function to generic factors
+recalc. clock specific recalc was currently used only by a31 ahb1.
+
+For getter, it differentiates parents with prediv, with non-zero prediv width.
+
+I've tested this patch on a83t bpi-m3 board. I do not have a31 device.
+As there are dependencies on other a83t patches, a83t changes are not included
+in this patch, It'll be included in separate patch.
+
+
+v1->v2 Changes:
+1. As 'kbuild test robot' reported build failure due to dependency on patches,
+Combined two patches in v1 into single patch.
+
+
+Vishnu Patekar (1):
+  clk: sunxi: predivider handling for factors clock
+
+ drivers/clk/sunxi/clk-factors.c | 31 +++++++++++++++----------------
+ drivers/clk/sunxi/clk-factors.h | 10 +++++++++-
+ drivers/clk/sunxi/clk-sunxi.c   | 31 +++++++++----------------------
+ 3 files changed, 33 insertions(+), 39 deletions(-)
+
+-- 
+1.9.1
