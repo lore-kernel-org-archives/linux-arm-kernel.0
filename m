@@ -1,44 +1,103 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 19 Apr 2016 17:58:48 +0200
-Subject: [PATCH] ARM: at91/dt: fix typo in sama5d2 PIN_PD24 description
-In-Reply-To: <1461081005-2513-1-git-send-email-fvallee@eukrea.fr>
-References: <1461081005-2513-1-git-send-email-fvallee@eukrea.fr>
-Message-ID: <20160419155848.GC29844@piout.net>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 19 Apr 2016 17:01:32 +0100
+Subject: [PATCH 2/2] arm64/dma-mapping: Remove default domain workaround
+In-Reply-To: <d5297227e1501e722235a6cd2b22d1285d3f9135.1461080622.git.robin.murphy@arm.com>
+References: <d5297227e1501e722235a6cd2b22d1285d3f9135.1461080622.git.robin.murphy@arm.com>
+Message-ID: <c7bbf94e73dadab667cf66326dbbb6dfc5ff877c.1461080622.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+With the IOMMU core now taking care of default domains for groups
+regardless of bus type, we can gleefully rip out this stop-gap, as
+slight recompense for having to expand the other one.
 
-Please always include a commit log even if it is short.
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ arch/arm64/mm/dma-mapping.c | 52 +++++++--------------------------------------
+ 1 file changed, 8 insertions(+), 44 deletions(-)
 
-
-On 19/04/2016 at 17:50:05 +0200, Florian Vallee wrote :
-> Fixes: 7f16cb676c00 ("ARM: at91/dt: add sama5d2 pinmux")
-> Signed-off-by: Florian Vallee <fvallee@eukrea.fr>
-> ---
->  arch/arm/boot/dts/sama5d2-pinfunc.h | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/sama5d2-pinfunc.h b/arch/arm/boot/dts/sama5d2-pinfunc.h
-> index b0c912fe..8a394f3 100644
-> --- a/arch/arm/boot/dts/sama5d2-pinfunc.h
-> +++ b/arch/arm/boot/dts/sama5d2-pinfunc.h
-> @@ -837,8 +837,8 @@
->  #define PIN_PD23__ISC_FIELD		PINMUX_PIN(PIN_PD23, 6, 4)
->  #define PIN_PD24			120
->  #define PIN_PD24__GPIO			PINMUX_PIN(PIN_PD24, 0, 0)
-> -#define PIN_PD24__UTXD2			PINMUX_PIN(PIN_PD23, 1, 2)
-> -#define PIN_PD24__FLEXCOM4_IO3		PINMUX_PIN(PIN_PD23, 3, 3)
-> +#define PIN_PD24__UTXD2			PINMUX_PIN(PIN_PD24, 1, 2)
-> +#define PIN_PD24__FLEXCOM4_IO3		PINMUX_PIN(PIN_PD24, 3, 3)
->  #define PIN_PD25			121
->  #define PIN_PD25__GPIO			PINMUX_PIN(PIN_PD25, 0, 0)
->  #define PIN_PD25__SPI1_SPCK		PINMUX_PIN(PIN_PD25, 1, 3)
-> -- 
-> 2.7.4
-> 
-
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index 607e70911173..fd8b9426f140 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -804,57 +804,24 @@ struct iommu_dma_notifier_data {
+ static LIST_HEAD(iommu_dma_masters);
+ static DEFINE_MUTEX(iommu_dma_notifier_lock);
+ 
+-/*
+- * Temporarily "borrow" a domain feature flag to to tell if we had to resort
+- * to creating our own domain here, in case we need to clean it up again.
+- */
+-#define __IOMMU_DOMAIN_FAKE_DEFAULT		(1U << 31)
+-
+ static bool do_iommu_attach(struct device *dev, const struct iommu_ops *ops,
+ 			   u64 dma_base, u64 size)
+ {
+ 	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
+ 
+ 	/*
+-	 * Best case: The device is either part of a group which was
+-	 * already attached to a domain in a previous call, or it's
+-	 * been put in a default DMA domain by the IOMMU core.
++	 * If the IOMMU driver has the DMA domain support that we require,
++	 * then the IOMMU core will have already configured a group for this
++	 * device, and allocated the default domain for that group.
+ 	 */
+-	if (!domain) {
+-		/*
+-		 * Urgh. The IOMMU core isn't going to do default domains
+-		 * for non-PCI devices anyway, until it has some means of
+-		 * abstracting the entirely implementation-specific
+-		 * sideband data/SoC topology/unicorn dust that may or
+-		 * may not differentiate upstream masters.
+-		 * So until then, HORRIBLE HACKS!
+-		 */
+-		domain = ops->domain_alloc(IOMMU_DOMAIN_DMA);
+-		if (!domain)
+-			goto out_no_domain;
+-
+-		domain->ops = ops;
+-		domain->type = IOMMU_DOMAIN_DMA | __IOMMU_DOMAIN_FAKE_DEFAULT;
+-
+-		if (iommu_attach_device(domain, dev))
+-			goto out_put_domain;
++	if (!domain || iommu_dma_init_domain(domain, dma_base, size)) {
++		pr_warn("Failed to set up IOMMU for device %s; retaining platform DMA ops\n",
++			dev_name(dev));
++		return false;
+ 	}
+ 
+-	if (iommu_dma_init_domain(domain, dma_base, size))
+-		goto out_detach;
+-
+ 	dev->archdata.dma_ops = &iommu_dma_ops;
+ 	return true;
+-
+-out_detach:
+-	iommu_detach_device(domain, dev);
+-out_put_domain:
+-	if (domain->type & __IOMMU_DOMAIN_FAKE_DEFAULT)
+-		iommu_domain_free(domain);
+-out_no_domain:
+-	pr_warn("Failed to set up IOMMU for device %s; retaining platform DMA ops\n",
+-		dev_name(dev));
+-	return false;
+ }
+ 
+ static void queue_iommu_attach(struct device *dev, const struct iommu_ops *ops,
+@@ -971,11 +938,8 @@ void arch_teardown_dma_ops(struct device *dev)
+ {
+ 	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
+ 
+-	if (domain) {
++	if (WARN_ON(domain))
+ 		iommu_detach_device(domain, dev);
+-		if (domain->type & __IOMMU_DOMAIN_FAKE_DEFAULT)
+-			iommu_domain_free(domain);
+-	}
+ 
+ 	dev->archdata.dma_ops = NULL;
+ }
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+2.8.1.dirty
