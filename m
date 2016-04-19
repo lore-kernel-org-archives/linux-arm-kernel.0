@@ -1,166 +1,179 @@
-From: oliver@schinagl.nl (Olliver Schinagl)
-Date: Tue, 19 Apr 2016 14:45:08 +0200
-Subject: [PATCH 1/2] mmc: core: Improve marking broken HPI through
- devicetree
-In-Reply-To: <5716150D.7060200@redhat.com>
-References: <1461049934-12848-1-git-send-email-oliver@schinagl.nl>
- <1461049934-12848-2-git-send-email-oliver@schinagl.nl>
- <CAPDyKFqftYtrHvcQB7te1fuWxjWtrhOGY=5DnRTnrRxHm2cQ-A@mail.gmail.com>
- <5715FD6B.5000809@schinagl.nl> <5716150D.7060200@redhat.com>
-Message-ID: <57162854.5050109@schinagl.nl>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 19 Apr 2016 20:49:52 +0800
+Subject: [PATCH v4 1/5] ACPI / processor_idle: introduce
+ ARCH_SUPPORTS_ACPI_PROCESSOR_CSTATE
+In-Reply-To: <1461069013-13292-2-git-send-email-sudeep.holla@arm.com>
+Message-ID: <201604192041.pUqHza4O%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Hans,
+Hi,
 
-On 19-04-16 13:22, Hans de Goede wrote:
-> Hi,
->
-> On 19-04-16 11:42, Olliver Schinagl wrote:
->> Hi Ulf,
->>
->> On 19-04-16 11:29, Ulf Hansson wrote:
->>> On 19 April 2016 at 09:12, Olliver Schinagl <oliver@schinagl.nl> wrote:
->>>> In patch 81f8a7be66 Hans de Goede added a patch to allow marking an 
->>>> mmc
->>>> device as to having an broken HPI implementation. After talking some
->>>> with Hans, we now think it is actually the mmc controller that can be
->>>> broken and not support broken HPI's.
-> >>
->>> I don't want us to invent a DT binding for something you *think* is a
->>> HW controller issue.
->
-> I agree we should not add a dt flag for this, we can simply set the
-> flag in the host driver if we believe this is a host issue.
-Okay, I can remove the dt flag
->
->>> Have you really excluded that this isn't a software issue? Me
->>> personally haven't been using HPI that much so I can't really tell
->>> about the code robustness from the mmc core (mmc protocol point of
->>> view).
->> Well this patch goes hand in hand so to speak with the broken-hpi 
->> patch introduced by him, he did most of the investigation. We just 
->> discussed how to handle it and asked me to cook up the patch.
->>
->> @hans, what do you think?
->
-> When we discussed this a while back we had a pretty small sample
-> set of sunxi boards with emmc, and it seemed that hpi was broken
-> on all of them. But recently we've been seeing eMMC-s on a lot more
-> boards and they all work fine, except the one on my Utoo A13 tablets,
-> and the one you are using, so this does really seem be an eMMC
-> specific problem. That or it is a problem with the host on 
-> sun4i/sun5i/sun7i
-> which is not present on sun6i, sun8i and later ...
-Well I think we still have a very small sample size, the sun4i, sun5i 
-and sun7i boards (all using the same mmc controller afaik) have the 
-broken-hpi set, the sun6i and sun8i seem to be working fine (different 
-mmc controller?).
-I'm not so sure it is an eMMC specific problem though. The module we're 
-using is a high-end micron part, industrial grade. Granted, it could be 
-still broken there, but I find it less likely. Micron has an 
-interessting technical document:
-"TN-52-05 e.EMMC Linux Enablement"
-talking specifically about HPI on eMMC.
-It also mentions HPI is a mmc/jedic 4.41 thing, afaik our controller is 
-only 4.3 (which might not even matter according to Ulf if it is just a 
-command).
+[auto build test ERROR on pm/linux-next]
+[also build test ERROR on v4.6-rc4 next-20160419]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-The datasheet of the chip I use, MTFC4GACAANA, also mentions explicitly 
-that it supports HPI.
+url:    https://github.com/0day-ci/linux/commits/Sudeep-Holla/ACPI-processor_idle-Add-ACPI-v6-0-LPI-support/20160419-203500
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git linux-next
+config: i386-randconfig-x000-201616 (attached as .config)
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-Granted, it could still be broken, but I have doubts.
+Note: the linux-review/Sudeep-Holla/ACPI-processor_idle-Add-ACPI-v6-0-LPI-support/20160419-203500 HEAD c51fc2a756d7b0dce908a4ca043d1d458c400af5 builds fine.
+      It only hurts bisectibility.
 
->
-> But given how rare eMMC-s are on sun4i/sun5i/sun7i I think the current
-> solution where we set a flag on the emmc dt node rather then on the
-> host node / in the host driver is fine.
-Yeah it is very limited, that is true, and I suppose I can live with that.
->
-> Taking your case into account too, that will bring us up to 2 cases
-> where we set the broken-hpi flag on the emmc node, which does not
-> really seem like a number to worry about.
-Actually, 4 :), there are 3 sun5i (tablets?) devices that suffer from 
-this and my device now. The sun6i and sun8i devices are only 2 (the 
-sinlinx devices in the current kernel) that a very quick grep (mmc-card 
-) showed. Grepping for non-removable yielded a bit more, like the chip 
-sun5i-like device with a "non-removable" mmc, not sure what to make of 
-that though.
->
-> TL;DR: Thanks for writing this patch set, but given recent developments
-> I believe that it is best to keep handling broken-hpi as we are doing
-> in current kernels and no changes are necessary.
-I would still recommend to add the capability and raise the flag for the 
-sun[457]i devices though, as my gut thinks it's a problem with the sunxi 
-IP there. But with the emmc-card level work around, it does solve/fix 
-it, so what is the best way?
+All error/warnings (new ones prefixed by >>):
 
-Olliver
->
-> Regards,
->
-> Hans
->
->
->>>
->>> Kind regards
->>> Uffe
->>>
->>>> This patch adds a new capability, mmc-broken-hpi, which allows us to
->>>> mark a broken hpi implementation on the host level.
->>>>
->>>> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
->>>> ---
->>>>   drivers/mmc/core/host.c  | 2 ++
->>>>   drivers/mmc/core/mmc.c   | 2 +-
->>>>   include/linux/mmc/host.h | 1 +
->>>>   3 files changed, 4 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
->>>> index 6e4c55a..9b63b36 100644
->>>> --- a/drivers/mmc/core/host.c
->>>> +++ b/drivers/mmc/core/host.c
->>>> @@ -270,6 +270,8 @@ int mmc_of_parse(struct mmc_host *host)
->>>>                  host->caps |= MMC_CAP_HW_RESET;
->>>>          if (of_property_read_bool(np, "cap-sdio-irq"))
->>>>                  host->caps |= MMC_CAP_SDIO_IRQ;
->>>> +       if (of_property_read_bool(np, "mmc-broken-hpi"))
->>>> +               host->caps |= MMC_CAP_BROKEN_HPI;
->>>>          if (of_property_read_bool(np, "full-pwr-cycle"))
->>>>                  host->caps2 |= MMC_CAP2_FULL_PWR_CYCLE;
->>>>          if (of_property_read_bool(np, "keep-power-in-suspend"))
->>>> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
->>>> index 4dbe3df..9a19562 100644
->>>> --- a/drivers/mmc/core/mmc.c
->>>> +++ b/drivers/mmc/core/mmc.c
->>>> @@ -1592,7 +1592,7 @@ static int mmc_init_card(struct mmc_host 
->>>> *host, u32 ocr,
->>>>          /*
->>>>           * Enable HPI feature (if supported)
->>>>           */
->>>> -       if (card->ext_csd.hpi) {
->>>> +       if (card->ext_csd.hpi && !(host->caps & MMC_CAP_BROKEN_HPI)) {
->>>>                  err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
->>>>                                  EXT_CSD_HPI_MGMT, 1,
->>>> card->ext_csd.generic_cmd6_time);
->>>> diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
->>>> index 8dd4d29..20f758e 100644
->>>> --- a/include/linux/mmc/host.h
->>>> +++ b/include/linux/mmc/host.h
->>>> @@ -264,6 +264,7 @@ struct mmc_host {
->>>>   #define MMC_CAP_DRIVER_TYPE_A  (1 << 23)       /* Host supports 
->>>> Driver Type A */
->>>>   #define MMC_CAP_DRIVER_TYPE_C  (1 << 24)       /* Host supports 
->>>> Driver Type C */
->>>>   #define MMC_CAP_DRIVER_TYPE_D  (1 << 25)       /* Host supports 
->>>> Driver Type D */
->>>> +#define MMC_CAP_BROKEN_HPI     (1 << 29)       /* Host support for 
->>>> HPI is broken */
->>>>   #define MMC_CAP_CMD23          (1 << 30)       /* CMD23 
->>>> supported. */
->>>>   #define MMC_CAP_HW_RESET       (1 << 31)       /* Hardware reset */
->>>>
->>>> -- 
->>>> 2.8.0.rc3
->>>>
->>
+   drivers/acpi/processor_idle.c: In function 'acpi_processor_cstate_first_run_checks':
+>> drivers/acpi/processor_idle.c:943:3: error: 'status' undeclared (first use in this function)
+      status = acpi_os_write_port(acpi_gbl_FADT.smi_command,
+      ^
+   drivers/acpi/processor_idle.c:943:3: note: each undeclared identifier is reported only once for each function it appears in
+   drivers/acpi/processor_idle.c: In function 'acpi_processor_power_init':
+>> drivers/acpi/processor_idle.c:1062:14: warning: unused variable 'status' [-Wunused-variable]
+     acpi_status status;
+                 ^
+
+vim +/status +943 drivers/acpi/processor_idle.c
+
+   937		if (max_cstate < ACPI_C_STATES_MAX)
+   938			pr_notice("ACPI: processor limited to max C-state %d\n",
+   939				  max_cstate);
+   940		first_run++;
+   941	
+   942		if (acpi_gbl_FADT.cst_control && !nocst) {
+ > 943			status = acpi_os_write_port(acpi_gbl_FADT.smi_command,
+   944						    acpi_gbl_FADT.cst_control, 8);
+   945			if (ACPI_FAILURE(status))
+   946				ACPI_EXCEPTION((AE_INFO, status,
+   947						"Notifying BIOS of _CST ability failed"));
+   948		}
+   949	}
+   950	#else
+   951	
+   952	static inline int disabled_by_idle_boot_param(void) { return 0; }
+   953	static inline void acpi_processor_cstate_first_run_checks(void) { }
+   954	static int acpi_processor_get_power_info(struct acpi_processor *pr)
+   955	{
+   956		return -ENODEV;
+   957	}
+   958	
+   959	static int acpi_processor_setup_cpuidle_cx(struct acpi_processor *pr,
+   960						   struct cpuidle_device *dev)
+   961	{
+   962		return -EINVAL;
+   963	}
+   964	
+   965	static int acpi_processor_setup_cpuidle_states(struct acpi_processor *pr)
+   966	{
+   967		return -EINVAL;
+   968	}
+   969	
+   970	#endif
+   971	
+   972	int acpi_processor_hotplug(struct acpi_processor *pr)
+   973	{
+   974		int ret = 0;
+   975		struct cpuidle_device *dev;
+   976	
+   977		if (disabled_by_idle_boot_param())
+   978			return 0;
+   979	
+   980		if (nocst)
+   981			return -ENODEV;
+   982	
+   983		if (!pr->flags.power_setup_done)
+   984			return -ENODEV;
+   985	
+   986		dev = per_cpu(acpi_cpuidle_device, pr->id);
+   987		cpuidle_pause_and_lock();
+   988		cpuidle_disable_device(dev);
+   989		acpi_processor_get_power_info(pr);
+   990		if (pr->flags.power) {
+   991			acpi_processor_setup_cpuidle_cx(pr, dev);
+   992			ret = cpuidle_enable_device(dev);
+   993		}
+   994		cpuidle_resume_and_unlock();
+   995	
+   996		return ret;
+   997	}
+   998	
+   999	int acpi_processor_cst_has_changed(struct acpi_processor *pr)
+  1000	{
+  1001		int cpu;
+  1002		struct acpi_processor *_pr;
+  1003		struct cpuidle_device *dev;
+  1004	
+  1005		if (disabled_by_idle_boot_param())
+  1006			return 0;
+  1007	
+  1008		if (nocst)
+  1009			return -ENODEV;
+  1010	
+  1011		if (!pr->flags.power_setup_done)
+  1012			return -ENODEV;
+  1013	
+  1014		/*
+  1015		 * FIXME:  Design the ACPI notification to make it once per
+  1016		 * system instead of once per-cpu.  This condition is a hack
+  1017		 * to make the code that updates C-States be called once.
+  1018		 */
+  1019	
+  1020		if (pr->id == 0 && cpuidle_get_driver() == &acpi_idle_driver) {
+  1021	
+  1022			/* Protect against cpu-hotplug */
+  1023			get_online_cpus();
+  1024			cpuidle_pause_and_lock();
+  1025	
+  1026			/* Disable all cpuidle devices */
+  1027			for_each_online_cpu(cpu) {
+  1028				_pr = per_cpu(processors, cpu);
+  1029				if (!_pr || !_pr->flags.power_setup_done)
+  1030					continue;
+  1031				dev = per_cpu(acpi_cpuidle_device, cpu);
+  1032				cpuidle_disable_device(dev);
+  1033			}
+  1034	
+  1035			/* Populate Updated C-state information */
+  1036			acpi_processor_get_power_info(pr);
+  1037			acpi_processor_setup_cpuidle_states(pr);
+  1038	
+  1039			/* Enable all cpuidle devices */
+  1040			for_each_online_cpu(cpu) {
+  1041				_pr = per_cpu(processors, cpu);
+  1042				if (!_pr || !_pr->flags.power_setup_done)
+  1043					continue;
+  1044				acpi_processor_get_power_info(_pr);
+  1045				if (_pr->flags.power) {
+  1046					dev = per_cpu(acpi_cpuidle_device, cpu);
+  1047					acpi_processor_setup_cpuidle_cx(_pr, dev);
+  1048					cpuidle_enable_device(dev);
+  1049				}
+  1050			}
+  1051			cpuidle_resume_and_unlock();
+  1052			put_online_cpus();
+  1053		}
+  1054	
+  1055		return 0;
+  1056	}
+  1057	
+  1058	static int acpi_processor_registered;
+  1059	
+  1060	int acpi_processor_power_init(struct acpi_processor *pr)
+  1061	{
+> 1062		acpi_status status;
+  1063		int retval;
+  1064		struct cpuidle_device *dev;
+  1065	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 24581 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160419/c04ba571/attachment-0001.obj>
