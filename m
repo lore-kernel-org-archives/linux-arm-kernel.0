@@ -1,37 +1,28 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Tue, 19 Apr 2016 18:16:14 -0400
-Subject: [PATCH v2] Documentation: devicetree: Clean up gpio-keys example
-In-Reply-To: <20160419221349.GA25916@rob-hp-laptop>
-References: <1458129209-15449-1-git-send-email-afaerber@suse.de>
- <20160419221349.GA25916@rob-hp-laptop>
-Message-ID: <CABxcv=nYoVss97WLgAxFfiwZZtStRNjEGZ0z-aYdb0JWiJaywQ@mail.gmail.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Tue, 19 Apr 2016 17:30:00 -0500
+Subject: [PATCH 0/6 v2] of: Implement iterator for phandles
+In-Reply-To: <1459784962-9808-1-git-send-email-joro@8bytes.org>
+References: <1459784962-9808-1-git-send-email-joro@8bytes.org>
+Message-ID: <CAL_Jsq+ybv2=sNW_FWBOnThuh_Lfv32jwYC++vxoy2CxqNw2ig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Rob,
-
-On Tue, Apr 19, 2016 at 6:13 PM, Rob Herring <robh@kernel.org> wrote:
-> On Wed, Mar 16, 2016 at 12:53:29PM +0100, Andreas F?rber wrote:
->> Drop #address-cells and #size-cells, which are not required by the
->> gpio-keys binding documentation, as button sub-nodes are not devices.
->>
->> Rename sub-nodes to avoid new dtc unit address warnings when copied.
->>
->> While at it, adopt the dashes convention for the node name.
->>
->> Reported-by: Julien Chauveau <chauveau.julien@gmail.com>
->> Cc: Julien Chauveau <chauveau.julien@gmail.com>
->> Cc: Javier Martinez Canillas <javier@dowhile0.org>
->> Cc: Geert Uytterhoeven <geert@linux-m68k.org>
->> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+On Mon, Apr 4, 2016 at 10:49 AM, Joerg Roedel <joro@8bytes.org> wrote:
+> Hi,
 >
-> Applied, thanks.
+> here is a new version of the implementation of the iterator
+> over phandles concept which Rob Herring suggested to me some
+> time ago. My approach is a little bit different from what
+> the diff showed back then, but it gets rid of the allocation
+> and 'struct of_phandle_args' misuse.
 >
-
-Dmitry already applied this patch in the input tree.
-
-> Rob
+> I also converted the arm-smmu driver to make use of the
+> iterator. The resulting kernel boots on my AMD Seattle
+> system and fixes the warning triggered there. The patches
+> now also pass all dt-unittests in my kvm environment.
 >
+> Patches are based on v4.6-rc2
 
-Best regards,
-Javier
+Series now applied.
+
+Rob
