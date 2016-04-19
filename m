@@ -1,73 +1,57 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 19 Apr 2016 09:25:20 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC Drivers Updates for v4.7
-In-Reply-To: <20160418035506.GB3578@verge.net.au>
-References: <cover.1459732456.git.horms+renesas@verge.net.au>
- <20160413194354.GQ19945@localhost>
- <CAMuHMdUbNcbLdQYG037MiDRAe1dr7ohRK625vb16oM8W19WEFw@mail.gmail.com>
- <20160413202328.GS19945@localhost>
- <CAMuHMdXniFngia63Um6LN_5MKrFtJGQPeFFe7=e7Dj6A_X6PTw@mail.gmail.com>
- <20160415003346.GA31938@verge.net.au>
- <CAMuHMdWpdzMcCDcBo3jrRbuS9LzZ71A0GbVUR=YE_e4F_9+6hA@mail.gmail.com>
- <20160418035506.GB3578@verge.net.au>
-Message-ID: <CAMuHMdWtZg2A62vr9hDua+wvMnqTQVPeTQO7a=GZGoBzusz5Tg@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 19 Apr 2016 09:30:23 +0200
+Subject: [PATCH v2 1/2] ARM: dts: imx25-pinfunc: add all UART mux modes
+In-Reply-To: <20160330131207.GK28207@tiger>
+References: <1457085652-4748-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <1457552674-16602-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20160330131207.GK28207@tiger>
+Message-ID: <20160419073023.GH10108@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hey Shawn,
 
-On Mon, Apr 18, 2016 at 5:55 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Fri, Apr 15, 2016 at 08:35:48AM +0200, Geert Uytterhoeven wrote:
->> On Fri, Apr 15, 2016 at 2:33 AM, Simon Horman <horms@verge.net.au> wrote:
->> > On Thu, Apr 14, 2016 at 10:19:04AM +0200, Geert Uytterhoeven wrote:
->> >> On Wed, Apr 13, 2016 at 10:23 PM, Olof Johansson <olof@lixom.net> wrote:
->> >> > On Wed, Apr 13, 2016 at 09:57:39PM +0200, Geert Uytterhoeven wrote:
->> >> >> On Wed, Apr 13, 2016 at 9:43 PM, Olof Johansson <olof@lixom.net> wrote:
->> >> >> > On Mon, Apr 04, 2016 at 10:22:56AM +0900, Simon Horman wrote:
->> >> >> >> Geert Uytterhoeven (2):
->> >> >> >>       ARM: shmobile: timer: Fix preset_lpj leading to too short delays
->> >> >> >>       ARM: shmobile: timer: Drop support for Cortex A8
->>
->> >> Simon: I'm a bit surprised to see that "ARM: shmobile: timer: Fix preset_lpj
->> >> leading to too short delays" got postponed to v4.7, while commit 406663ed61c8
->> >> ("ARM: shmobile: defconfig: Do not enable CONFIG_CPU_BPREDICT_DISABLE") is
->> >> already in v4.6-rc1.  The latter makes bad behavior due to too short delays
->> >> more likely to happen.
->> >>
->> >> Sorry for not noticing before.
->> >
->> > Likewise, sorry for the mix-up.
->> >
->> > I can think of two ways to resolve this, likely there are others:
->> > 1. Submit "ARM: shmobile: timer: Fix preset_lpj leading to too short delays"
->> >    or conversely
->> > 2. Submit a reversion of 406663ed61c8 ("ARM: shmobile: defconfig: Do not
->> >    enable CONFIG_CPU_BPREDICT_DISABLE") as a fix for v4.6.
->> >
->> > Or perhaps it is a problem that can just be ironed out in v4.7.
->> > Let me know what you think.
->>
->> I prefer option 1, i.e. fixing the bug instead of papering over it in
->> the defconfig.
->> Users may not use the defconfig, and have CONFIG_CPU_BPREDICT_DISABLE
->> enabled anyway.
->
-> Thanks, that reasoning sounds fine to me.
->
-> I plan to re-queue "ARM: shmobile: timer: Fix preset_lpj leading to too
-> short delays" in fixes-for-v4.6 and I plan to push that in a revised
-> renesas-next tag later today. I would appreciate you double checking that
-> all is in order.
+On Wed, Mar 30, 2016 at 09:12:08PM +0800, Shawn Guo wrote:
+> On Wed, Mar 09, 2016 at 08:44:33PM +0100, Uwe Kleine-K?nig wrote:
+> > Apart from a few additions this also contains two fixes where the daisy
+> > chain input selection register was missing. Moreover dropped _MUX from
+> > some pins for consistency.
+> > 
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> 
+> Applied both, thanks.
 
-Thanks, that commit looks fine!
+I think I found yet another problem that involves the SION bit. On the
+same hardware where I debugged that UART problem we also had an issue
+that resulted in messages like:
 
-Gr{oetje,eeting}s,
+[  108.939397] usb 1-1: new full-speed USB device number 6 using ci_hdrc
+[  109.154390] usb 1-1: device descriptor read/64, error -71
+[  109.469404] usb 1-1: device descriptor read/64, error -71
+[  109.689385] usb 1-1: new full-speed USB device number 7 using ci_hdrc
+[  109.904383] usb 1-1: device descriptor read/64, error -71
+[  110.219376] usb 1-1: device descriptor read/64, error -71
+[  110.439396] usb 1-1: new full-speed USB device number 8 using ci_hdrc
+[  110.919379] usb 1-1: device not accepting address 8, error -71
+[  111.034396] usb 1-1: new full-speed USB device number 9 using ci_hdrc
+[  111.514384] usb 1-1: device not accepting address 9, error -71
+[  111.522547] usb usb1-port1: unable to enumerate USB device
 
-                        Geert
+whenever the spi FRAM is accessed. Now I noticed that the involved
+pin/functions (i.e. MX25_PAD_CSI_D2__CSPI3_MOSI,
+MX25_PAD_CSI_D3__CSPI3_MISO, MX25_PAD_CSI_D6__GPIO_1_31 for CS) also
+have the SION bit set and these have also an USBOTG function (which is
+not defined in imx25-pinfunc.h, so you have to check the reference
+manual).
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Assuming that removing the SION bits fixes that issue (this is still to
+be tested) I wonder if we should remove all SION bits.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+What do you think?
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
