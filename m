@@ -1,53 +1,120 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Tue, 19 Apr 2016 13:34:48 +0100
-Subject: [PATCH 26/45] KVM: arm/arm64: vgic-new: Add GICv3 IDREGS register
- handler
-In-Reply-To: <1460740316-8755-27-git-send-email-andre.przywara@arm.com>
-References: <1460740316-8755-1-git-send-email-andre.przywara@arm.com>
- <1460740316-8755-27-git-send-email-andre.przywara@arm.com>
-Message-ID: <CAFEAcA9Hy2cSVguOWrxBo6By24BjiE2rgoCPGbfo+OuuPMtSQg@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 19 Apr 2016 20:38:04 +0800
+Subject: [PATCH 3/8] gpio: stmpe: fix edge and rising/falling edge
+ detection
+In-Reply-To: <1461068317-28016-4-git-send-email-patrice.chotard@st.com>
+Message-ID: <201604192051.Uq459IuG%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 April 2016 at 18:11, Andre Przywara <andre.przywara@arm.com> wrote:
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  virt/kvm/arm/vgic/vgic_mmio.c | 21 +++++++++++++++++++--
->  1 file changed, 19 insertions(+), 2 deletions(-)
->
-> diff --git a/virt/kvm/arm/vgic/vgic_mmio.c b/virt/kvm/arm/vgic/vgic_mmio.c
-> index 7d275a7..dafa235 100644
-> --- a/virt/kvm/arm/vgic/vgic_mmio.c
-> +++ b/virt/kvm/arm/vgic/vgic_mmio.c
-> @@ -784,6 +784,23 @@ static int vgic_mmio_read_v3r_iidr(struct kvm_vcpu *vcpu,
->         return 0;
->  }
->
-> +static int vgic_mmio_read_v3_idregs(struct kvm_vcpu *vcpu,
-> +                                   struct kvm_io_device *dev,
-> +                                   gpa_t addr, int len, void *val)
-> +{
-> +       u32 regnr = (addr & 0x3f) - (GICD_IDREGS & 0x3f);
-> +       u32 reg = 0;
-> +
-> +       switch (regnr + GICD_IDREGS) {
-> +       case GICD_PIDR2:
-> +               /* report a GICv3 compliant implementation */
-> +               reg = 0x3b;
-> +               break;
-> +       }
+Hi,
 
-We claim to be an ARM implementation, so we should report the full
-set of ARM ID registers, not just GICD_PIDR2:
+[auto build test WARNING on ljones-mfd/for-mfd-next]
+[also build test WARNING on v4.6-rc4 next-20160419]
+[if your patch is applied to the wrong git tree, please drop us a note to help improving the system]
 
-        0x44, 0x00, 0x00, 0x00, 0x92, 0xB4, 0x3B, 0x00, 0x0D, 0xF0, 0x05, 0xB1
+url:    https://github.com/0day-ci/linux/commits/patrice-chotard-st-com/STMPE-fixes-rework-and-add-STMPE1600-support/20160419-202526
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git for-mfd-next
+config: x86_64-randconfig-x010-201616 (attached as .config)
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-(starting at 0xFFD0 and going up to 0xFFFC.)
+Note: it may well be a FALSE warning. FWIW you are at least aware of it now.
+http://gcc.gnu.org/wiki/Better_Uninitialized_Warnings
 
-> +       write_mask32(reg , addr & 3, len, val);
-> +       return 0;
-> +}
->  #endif
+All warnings (new ones prefixed by >>):
 
-thanks
--- PMM
+   drivers/gpio/gpio-stmpe.c: In function 'stmpe_dbg_show':
+>> drivers/gpio/gpio-stmpe.c:284:3: warning: 'fall' may be used uninitialized in this function [-Wmaybe-uninitialized]
+      seq_printf(s, " gpio-%-3d (%-20.20s) in  %s %s %s%s%s",
+      ^
+   drivers/gpio/gpio-stmpe.c:240:8: note: 'fall' was declared here
+      bool fall;
+           ^
+>> drivers/gpio/gpio-stmpe.c:284:3: warning: 'rise' may be used uninitialized in this function [-Wmaybe-uninitialized]
+      seq_printf(s, " gpio-%-3d (%-20.20s) in  %s %s %s%s%s",
+      ^
+   drivers/gpio/gpio-stmpe.c:239:8: note: 'rise' was declared here
+      bool rise;
+           ^
+>> drivers/gpio/gpio-stmpe.c:284:3: warning: 'edge_det' may be used uninitialized in this function [-Wmaybe-uninitialized]
+      seq_printf(s, " gpio-%-3d (%-20.20s) in  %s %s %s%s%s",
+      ^
+   drivers/gpio/gpio-stmpe.c:238:8: note: 'edge_det' was declared here
+      bool edge_det;
+           ^
+
+vim +/fall +284 drivers/gpio/gpio-stmpe.c
+
+98190e59 Patrice Chotard 2016-04-19  234  		u8 edge_det_reg;
+98190e59 Patrice Chotard 2016-04-19  235  		u8 rise_reg;
+98190e59 Patrice Chotard 2016-04-19  236  		u8 fall_reg;
+98190e59 Patrice Chotard 2016-04-19  237  		u8 irqen_reg;
+27ec8a9c Linus Walleij   2014-10-02  238  		bool edge_det;
+27ec8a9c Linus Walleij   2014-10-02  239  		bool rise;
+27ec8a9c Linus Walleij   2014-10-02 @240  		bool fall;
+27ec8a9c Linus Walleij   2014-10-02  241  		bool irqen;
+27ec8a9c Linus Walleij   2014-10-02  242  
+98190e59 Patrice Chotard 2016-04-19  243  		switch (stmpe->partnum) {
+98190e59 Patrice Chotard 2016-04-19  244  		case STMPE610:
+98190e59 Patrice Chotard 2016-04-19  245  		case STMPE811:
+98190e59 Patrice Chotard 2016-04-19  246  		case STMPE1601:
+98190e59 Patrice Chotard 2016-04-19  247  		case STMPE2401:
+98190e59 Patrice Chotard 2016-04-19  248  		case STMPE2403:
+98190e59 Patrice Chotard 2016-04-19  249  			edge_det_reg = stmpe->regs[STMPE_IDX_GPEDR_MSB] +
+98190e59 Patrice Chotard 2016-04-19  250  				       num_banks - 1 - (offset / 8);
+27ec8a9c Linus Walleij   2014-10-02  251  			ret = stmpe_reg_read(stmpe, edge_det_reg);
+27ec8a9c Linus Walleij   2014-10-02  252  			if (ret < 0)
+27ec8a9c Linus Walleij   2014-10-02  253  				return;
+27ec8a9c Linus Walleij   2014-10-02  254  			edge_det = !!(ret & mask);
+98190e59 Patrice Chotard 2016-04-19  255  
+98190e59 Patrice Chotard 2016-04-19  256  		case STMPE1801:
+98190e59 Patrice Chotard 2016-04-19  257  			rise_reg = stmpe->regs[STMPE_IDX_GPRER_LSB] -
+98190e59 Patrice Chotard 2016-04-19  258  				   (offset / 8);
+98190e59 Patrice Chotard 2016-04-19  259  			fall_reg = stmpe->regs[STMPE_IDX_GPFER_LSB] -
+98190e59 Patrice Chotard 2016-04-19  260  				   (offset / 8);
+27ec8a9c Linus Walleij   2014-10-02  261  			ret = stmpe_reg_read(stmpe, rise_reg);
+27ec8a9c Linus Walleij   2014-10-02  262  			if (ret < 0)
+27ec8a9c Linus Walleij   2014-10-02  263  				return;
+27ec8a9c Linus Walleij   2014-10-02  264  			rise = !!(ret & mask);
+27ec8a9c Linus Walleij   2014-10-02  265  			ret = stmpe_reg_read(stmpe, fall_reg);
+27ec8a9c Linus Walleij   2014-10-02  266  			if (ret < 0)
+27ec8a9c Linus Walleij   2014-10-02  267  				return;
+27ec8a9c Linus Walleij   2014-10-02  268  			fall = !!(ret & mask);
+98190e59 Patrice Chotard 2016-04-19  269  
+98190e59 Patrice Chotard 2016-04-19  270  		case STMPE801:
+98190e59 Patrice Chotard 2016-04-19  271  			irqen_reg = stmpe->regs[STMPE_IDX_IEGPIOR_LSB] -
+98190e59 Patrice Chotard 2016-04-19  272  				    (offset / 8);
+98190e59 Patrice Chotard 2016-04-19  273  			break;
+98190e59 Patrice Chotard 2016-04-19  274  
+98190e59 Patrice Chotard 2016-04-19  275  		default:
+98190e59 Patrice Chotard 2016-04-19  276  			return;
+98190e59 Patrice Chotard 2016-04-19  277  		}
+98190e59 Patrice Chotard 2016-04-19  278  
+27ec8a9c Linus Walleij   2014-10-02  279  		ret = stmpe_reg_read(stmpe, irqen_reg);
+27ec8a9c Linus Walleij   2014-10-02  280  		if (ret < 0)
+27ec8a9c Linus Walleij   2014-10-02  281  			return;
+27ec8a9c Linus Walleij   2014-10-02  282  		irqen = !!(ret & mask);
+27ec8a9c Linus Walleij   2014-10-02  283  
+27ec8a9c Linus Walleij   2014-10-02 @284  		seq_printf(s, " gpio-%-3d (%-20.20s) in  %s %s %s%s%s",
+27ec8a9c Linus Walleij   2014-10-02  285  			   gpio, label ?: "(none)",
+27ec8a9c Linus Walleij   2014-10-02  286  			   val ? "hi" : "lo",
+27ec8a9c Linus Walleij   2014-10-02  287  			   edge_det ? "edge-asserted" : "edge-inactive",
+
+:::::: The code at line 284 was first introduced by commit
+:::::: 27ec8a9cb504e9995c123dc74e0cca0cba81d07f gpio: stmpe: add verbose debug code
+
+:::::: TO: Linus Walleij <linus.walleij@linaro.org>
+:::::: CC: Linus Walleij <linus.walleij@linaro.org>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 23724 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160419/e78f1935/attachment-0001.obj>
